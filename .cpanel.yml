@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/maxidbvb/public_html/saint-maxime-payroll
+    - /bin/cp -R ./* "$DEPLOYPATH/"
+    - /bin/cp -f ./.htaccess "$DEPLOYPATH/"
