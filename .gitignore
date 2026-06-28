@@ -1,0 +1,18 @@
+# أسرار وملفات خاصة بكل خادم — لا تُنشَر
+config/database.php
+db_backup.php
+
+# مجلّدات مؤقتة/محلية
+tmp/
+tools/node_modules/
+uploads/
+
+# نسخ احتياطية وحزم
+*.sql
+*.zip
+
+# أدوات نشر محلية
+deploy.bat
+deploy_exclude.txt
+launch.vbs
+make_online_deploy.py

@@ -1,0 +1,142 @@
+{
+ "tax_register": {
+  "png": "tax_register.png",
+  "w_pt": 595.2000122070312,
+  "h_pt": 841.9199829101562,
+  "w_px": 1240,
+  "h_px": 1754
+ },
+ "tax_r4_1": {
+  "png": "tax_r4_1.png",
+  "w_pt": 595.2000122070312,
+  "h_pt": 841.9199829101562,
+  "w_px": 1240,
+  "h_px": 1754
+ },
+ "tax_r4_2": {
+  "png": "tax_r4_2.png",
+  "w_pt": 841.9199829101562,
+  "h_pt": 595.2000122070312,
+  "w_px": 1754,
+  "h_px": 1240
+ },
+ "tax_r5": {
+  "png": "tax_r5.png",
+  "w_pt": 595.2000122070312,
+  "h_pt": 841.9199829101562,
+  "w_px": 1240,
+  "h_px": 1754
+ },
+ "tax_r6": {
+  "png": "tax_r6.png",
+  "w_pt": 595.2000122070312,
+  "h_pt": 841.9199829101562,
+  "w_px": 1240,
+  "h_px": 1754
+ },
+ "tax_r7": {
+  "png": "tax_r7.png",
+  "w_pt": 595.2000122070312,
+  "h_pt": 841.9199829101562,
+  "w_px": 1240,
+  "h_px": 1754
+ },
+ "tax_r10": {
+  "png": "tax_r10.png",
+  "w_pt": 595.2000122070312,
+  "h_pt": 841.9199829101562,
+  "w_px": 1240,
+  "h_px": 1754
+ },
+ "cnss_contrib_monthly": {
+  "png": "cnss_contrib_monthly.png",
+  "w_pt": 842.0,
+  "h_pt": 595.0,
+  "w_px": 1755,
+  "h_px": 1240
+ },
+ "cnss_contrib_annual": {
+  "png": "cnss_contrib_annual.png",
+  "w_pt": 842.0,
+  "h_pt": 595.0,
+  "w_px": 1755,
+  "h_px": 1240
+ },
+ "cnss_eos_invite": {
+  "png": "cnss_eos_invite.png",
+  "w_pt": 595.0,
+  "h_pt": 842.0,
+  "w_px": 1240,
+  "h_px": 1755
+ },
+ "cnss_annual": {
+  "png": "cnss_annual.png",
+  "w_pt": 595.0,
+  "h_pt": 842.0,
+  "w_px": 1240,
+  "h_px": 1755
+ },
+ "cnss_work": {
+  "png": "cnss_work.png",
+  "w_pt": 612.0,
+  "h_pt": 792.0,
+  "w_px": 1275,
+  "h_px": 1650
+ },
+ "cnss_employ": {
+  "png": "cnss_employ.png",
+  "w_pt": 595.0,
+  "h_pt": 842.0,
+  "w_px": 1240,
+  "h_px": 1755
+ },
+ "cnss_terminate": {
+  "png": "cnss_terminate.png",
+  "w_pt": 595.0,
+  "h_pt": 842.0,
+  "w_px": 1240,
+  "h_px": 1755
+ },
+ "cnss_wife": {
+  "png": "cnss_wife.png",
+  "w_pt": 595.2750244140625,
+  "h_pt": 841.8900146484375,
+  "w_px": 1241,
+  "h_px": 1754
+ },
+ "cnss_employ2": {
+  "png": "cnss_employ2.png",
+  "w_pt": 595.2760009765625,
+  "h_pt": 841.8900146484375,
+  "w_px": 1241,
+  "h_px": 1754
+ },
+ "cnss_employ2_2": {
+  "png": "cnss_employ2_2.png",
+  "w_pt": 595.2760009765625,
+  "h_pt": 841.8900146484375,
+  "w_px": 1241,
+  "h_px": 1754
+ },
+ "cnss_parent": {
+  "png": "cnss_parent.png",
+  "w_pt": 612.0,
+  "h_pt": 792.0,
+  "w_px": 1275,
+  "h_px": 1650
+ },
+ "cnss_work_detail": {
+  "png": "cnss_work_detail.png",
+  "w_pt": 595.0,
+  "h_pt": 842.0,
+  "w_px": 1240,
+  "h_px": 1755
+ },
+ "cnss_eos_wage": {
+  "png": "cnss_eos_wage.png",
+  "w_pt": 595.0,
+  "h_pt": 842.0,
+  "w_px": 1240,
+  "h_px": 1755
+ }
+}

@@ -1,0 +1,539 @@
+<?php
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/payroll_calculator.php';
+requireLogin();
+requireCsrf();
+
+$currentPage = 'grades';
+$pageTitle = 'Échelons & Promotions';
+$db = getDB();
+$message = ''; $messageType = 'success';
+
+$employeeId = (int)($_GET['employee_id'] ?? 0);
+
+// أي تعديل على الدرجات يتطلّب اختيار مدرسة محددة + أن يكون الموظف ضمنها
+if ((isset($_GET['apply_law']) || isset($_GET['promote']) || $_SERVER['REQUEST_METHOD'] === 'POST') && $employeeId > 0) {
+    requireSchoolSelected();
+    $chk = $db->prepare("SELECT id FROM employees WHERE id = ? AND school_id = ? AND is_deleted = 0");
+    $chk->execute([$employeeId, currentSchoolId()]);
+    if (!$chk->fetchColumn()) {
+        $_SESSION['flash_error'] = 'الموظف غير موجود في هذه المدرسة';
+        header('Location: ' . BASE_URL . 'pages/grades.php'); exit;
+    }
+}
+
+// Apply exceptional law
+if (isset($_GET['apply_law']) && $employeeId > 0) {
+    try {
+        $result = applyExceptionalLaw($employeeId, $_GET['apply_law']);
+        recalcEmployeeYear($employeeId); // إعادة حساب الراتب تلقائياً حسب القانون
+        $_SESSION['flash'] = ['type' => 'success', 'msg' => "Loi appliquée: échelon " . $result['old_grade'] . " → " . $result['new_grade'] . " (+" . $result['grades_added'] . ")"];
+    } catch (Exception $e) {
+        $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()];
+    }
+    header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
+    exit;
+}
+
+// إعادة بناء الدرجات حسب القانون (تلقائياً) — دخول الملاك → تدرّج عادي بتشرين → استثنائية بكانون بعد التثبيت
+if (isset($_GET['rebuild_legal']) && $employeeId > 0) {
+    try {
+        $r = buildLegalGradeHistory($employeeId);
+        // إعادة حساب كل سنوات الأستاذ من سنة دخول المدرسة (hire_date) حتى السنة الحالية
+        $eDate = getDB()->query("SELECT hire_date FROM employees WHERE id=" . (int)$employeeId)->fetchColumn();
+        $y0 = $eDate ? (int)date('Y', strtotime($eDate)) : (int)date('Y') - 5;
+        for ($y = $y0; $y <= (int)date('Y'); $y++) recalcEmployeeYear($employeeId, $y . '-' . ($y + 1));
+        $_SESSION['flash'] = ['type' => 'success', 'msg' => "أُعيد بناء الدرجات حسب القانون: دخول درجة {$r['start']} → تدرّج عادي {$r['ordinary']} + استثنائية +{$r['exceptional']} = درجة {$r['final_grade']} (قانون 344 يدوي)"];
+    } catch (Exception $e) {
+        $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()];
+    }
+    header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
+    exit;
+}
+
+// Apply biennial promotion
+if (isset($_GET['promote']) && $employeeId > 0) {
+    try {
+        $effYear = (int)($_GET['eff_year'] ?? date('Y'));
+        $res = applyBiennialPromotion($employeeId, true, $effYear);
+        if ($res !== false) recalcEmployeeYear($employeeId); // إعادة حساب الراتب تلقائياً
+        if ($res === false) {
+            $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'Promotion impossible (non titulaire / sans titularisation / échelon max)'];
+        } elseif (!empty($res['deferred'])) {
+            $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'تم تطبيق التدرّج لكنه أُجِّل إلى 1/10/' . substr($res['change_date'],0,4) . ' (درجة استثنائية في نفس السنة) — الإشلون ' . $res['old_grade'] . ' → ' . $res['new_grade']];
+        } else {
+            $_SESSION['flash'] = ['type' => 'success', 'msg' => 'تم تطبيق التدرّج في ' . $res['change_date'] . ' — الإشلون ' . $res['old_grade'] . ' → ' . $res['new_grade']];
+        }
+    } catch (Exception $e) {
+        $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()];
+    }
+    header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
+    exit;
+}
+
+// Auto promotion: whole school + one year (كل مدرسة بمدرستها وكل سنة بسنتها)
+if (isset($_GET['auto_promote'])) {
+    requireSchoolSelected();
+    try {
+        $year = (int)($_GET['year'] ?? date('Y'));
+        $r = autoPromoteSchoolYear(currentSchoolId(), $year);
+        // إعادة حساب تلقائية لرواتب السنة الحالية لكل أساتذة الملاك الفاعلين بالمدرسة (حسب القانون)
+        $cy = currentSchoolYear();
+        foreach ($db->query("SELECT id FROM employees WHERE employee_type='enseignant_titulaire' AND is_deleted=0 AND status='actif'" . schoolScopeSql())->fetchAll(PDO::FETCH_COLUMN) as $tid) {
+            recalcEmployeeYear((int)$tid, $cy);
+        }
+        $_SESSION['flash'] = ['type' => 'success', 'msg' =>
+            "ترقية تلقائية $year — تمّت ترقية {$r['promoted']} أستاذ"
+            . " (غير مستحق هذه السنة: {$r['not_due']} · مُرقّى سابقاً: {$r['already']} · بلغ الحدّ الأقصى: {$r['max']})"];
+    } catch (Exception $e) {
+        $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()];
+    }
+    header('Location: ' . BASE_URL . 'pages/grades.php');
+    exit;
+}
+
+// تابلو الدرجات الاستثنائية (تشيك مارك): يطبّق المؤشَّر ويلغي غير المؤشَّر — تحكّم لكل أستاذ
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exc_save']) && $employeeId > 0) {
+    $checked = array_map('strval', (array)($_POST['exc_laws'] ?? []));
+    $lawNums = $db->query("SELECT law_number FROM exceptional_grades_laws WHERE is_active = 1")->fetchAll(PDO::FETCH_COLUMN);
+    $appl = $db->prepare("SELECT DISTINCT law_reference FROM employee_grade_history WHERE employee_id = ? AND law_reference IS NOT NULL");
+    $appl->execute([$employeeId]);
+    $appliedNow = array_map('strval', $appl->fetchAll(PDO::FETCH_COLUMN));
+    $nApp = 0; $nRem = 0;
+    foreach ($lawNums as $ln) {
+        $want = in_array((string)$ln, $checked, true);
+        $has  = in_array((string)$ln, $appliedNow, true);
+        try {
+            if ($want && !$has) { applyExceptionalLaw($employeeId, $ln); $nApp++; }
+            elseif (!$want && $has) { removeExceptionalLaw($employeeId, $ln); $nRem++; }
+        } catch (Exception $e) { /* تجاهل قانون واحد فاشل */ }
+    }
+    if ($nApp || $nRem) recalcEmployeeYear($employeeId);
+    $_SESSION['flash'] = ['type' => 'success', 'msg' => "تابلو الدرجات الاستثنائية: طُبِّق $nApp، أُلغي $nRem"];
+    header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
+    exit;
+}
+
+// تشيك-مارك لكل درجة (عادية واستثنائية): المؤشَّر = محسوب، غير المؤشَّر = **يبقى ظاهراً لكن لا يُحتسب**
+// (بلا حذف — تقدر ترجّع الصح لاحقاً فتُحتسب من جديد). ثم تُعاد سلسلة الدرجات والراتب تلقائياً.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save']) && $employeeId > 0) {
+    $keep = array_map('intval', (array)($_POST['keep'] ?? []));
+    try {
+        // 1) تأكّد أن لكل صفّ delta محفوظة (الصفوف غير المؤشَّرة سابقاً صحيحة before/after)
+        $db->prepare("UPDATE employee_grade_history SET delta=ROUND(grade_after-grade_before,1) WHERE employee_id=? AND delta IS NULL")->execute([$employeeId]);
+        // 2) اضبط counted حسب الشيك-بوكس (دخول الملاك دائماً محسوب)
+        $all = $db->prepare("SELECT id, reason FROM employee_grade_history WHERE employee_id=?");
+        $all->execute([$employeeId]);
+        $upd = $db->prepare("UPDATE employee_grade_history SET counted=? WHERE id=?");
+        foreach ($all as $r) {
+            $on = ($r['reason'] === 'titularization') ? 1 : (in_array((int)$r['id'], $keep, true) ? 1 : 0);
+            $upd->execute([$on, (int)$r['id']]);
+        }
+        // 3) أعِد ربط السلسلة + الدرجة الحالية (المحرّك، يحترم counted)
+        $g = rechainGradeHistory($employeeId);
+        // 4) أعِد حساب الراتب لكل سنوات الأستاذ
+        $eDate = $db->query("SELECT hire_date FROM employees WHERE id=" . (int)$employeeId)->fetchColumn();
+        $y0 = $eDate ? (int)date('Y', strtotime($eDate)) : (int)date('Y') - 5;
+        for ($y = $y0; $y <= (int)date('Y'); $y++) recalcEmployeeYear($employeeId, $y . '-' . ($y + 1));
+        $okMsg = "تم تحديث الدرجات المحتسَبة — الدرجة الحالية صارت $g وأُعيد حساب الراتب";
+        if (($_POST['return_to'] ?? '') === 'employee') { $_SESSION['flash_success'] = $okMsg; }
+        else { $_SESSION['flash'] = ['type' => 'success', 'msg' => $okMsg]; }
+    } catch (Exception $e) {
+        if (($_POST['return_to'] ?? '') === 'employee') { $_SESSION['flash_error'] = $e->getMessage(); }
+        else { $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()]; }
+    }
+    // العودة لملف الأستاذ إن أتى الطلب منه، وإلا لصفحة الدرجات
+    if (($_POST['return_to'] ?? '') === 'employee') {
+        header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $employeeId . '#gradesPanel');
+    } else {
+        header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
+    }
+    exit;
+}
+
+// Manual grade change
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['exc_save']) && !isset($_POST['grade_save']) && $employeeId > 0) {
+    $newGrade = (float)$_POST['new_grade'];
+    $reason = $_POST['reason'] ?? 'manual';
+    $changeDate = $_POST['change_date'] ?: date('Y-m-d');
+    $notes = trim($_POST['notes'] ?? '');
+    
+    if ($newGrade < 1 || $newGrade > 52) {
+        $message = 'Échelon invalide (1-52)';
+        $messageType = 'danger';
+    } else {
+        $stmt = $db->prepare("SELECT current_grade FROM employees WHERE id = ?");
+        $stmt->execute([$employeeId]);
+        $oldGrade = (int)$stmt->fetchColumn();
+        
+        $db->beginTransaction();
+        try {
+            $db->prepare("UPDATE employees SET current_grade = ? WHERE id = ?")->execute([$newGrade, $employeeId]);
+            $db->prepare("INSERT INTO employee_grade_history (employee_id, grade_before, grade_after, change_date, reason, notes) VALUES (?,?,?,?,?,?)")
+               ->execute([$employeeId, $oldGrade, $newGrade, $changeDate, $reason, $notes]);
+            $db->commit();
+            recalcEmployeeYear($employeeId); // إعادة حساب الراتب تلقائياً حسب الدرجة الجديدة
+            $_SESSION['flash'] = ['type' => 'success', 'msg' => "Échelon changé: $oldGrade → $newGrade"];
+        } catch (Exception $e) {
+            $db->rollBack();
+            $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()];
+        }
+        header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
+        exit;
+    }
+}
+
+if (!empty($_SESSION['flash'])) {
+    $message = $_SESSION['flash']['msg'];
+    $messageType = $_SESSION['flash']['type'];
+    unset($_SESSION['flash']);
+}
+
+include __DIR__ . '/../includes/header.php';
+?>
+
+<?php if ($message): ?>
+    <div class="alert alert-<?= $messageType ?>"><?= e($message) ?></div>
+<?php endif; ?>
+
+<?php if ($employeeId == 0): 
+    // List view: all titulaires with current grades
+    $curScaleVid = scaleVersionIdAsOf(); // إصدار السلسلة الساري اليوم
+    [$gyf, $gyp] = yearEmploymentFilter(activeSchoolYear(), 'e.'); // فلترة حسب السنة الدراسية المختارة
+    $gStmt = $db->prepare("SELECT e.*, sc.new_salary_2017, sc.new_grade_value
+                              FROM employees e
+                              LEFT JOIN salary_scale_2017 sc ON e.current_grade = sc.grade AND sc.version_id = " . (int)$curScaleVid . "
+                              WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire'" . schoolScopeSql('e.school_id') . $gyf . "
+                              ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+    $gStmt->execute($gyp);
+    $employees = $gStmt->fetchAll();
+?>
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-layer-group"></i> Échelons des enseignants titulaires</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong>📜 قواعد التدرّج / Règles de promotion:</strong><br>
+                • التدرّج: +1 درجة كل سنتين، يأخذها الأستاذ في 1/10 (تشرين).<br>
+                • الدرجات الاستثنائية تُعطى في 1/1 (كانون) — يجوز اجتماعها مع الدرجة العادية في نفس السنة لأنهما بتاريخين مختلفين.<br>
+                • فقط إذا تصادفت درجة استثنائية في نفس تاريخ 1/10 بالضبط، تؤجَّل الدرجة العادية إلى 1/10 من السنة التالية تلقائياً.<br>
+                • Lois exceptionnelles: 244/2000 (+3), 344/2001 (+4), 102/2010 (+3), 223/2012 (+4½)<br>
+                • Échelle 2017 (Journal Officiel n°37)
+            </div>
+            <?php if (!isAllSchools()): ?>
+            <div class="alert" style="background:#fffbeb;border:1px solid #fde68a;margin-bottom:16px">
+                <form method="GET" onsubmit="return confirm('ترقية تلقائية: +1 درجة لكل أستاذ ملاك مستحقّ في هذه المدرسة للسنة المختارة. متابعة؟');"
+                      class="d-flex gap-2" style="align-items:flex-end;flex-wrap:wrap;margin:0">
+                    <input type="hidden" name="auto_promote" value="1">
+                    <div class="form-group mb-0" style="max-width:170px">
+                        <label class="form-label" style="font-size:12px">سنة الترقية (1/10) / Année</label>
+                        <input type="number" name="year" class="form-control" value="<?= max(2026, (int)date('Y')) ?>" min="2026" max="2099" required>
+                    </div>
+                    <button type="submit" class="btn btn-gold"><i class="fas fa-arrow-up"></i> ترقية تلقائية لكل أساتذة المدرسة</button>
+                </form>
+                <small style="color:var(--gray-600)">يطبّق التدرّج (+1) لكل أستاذ ملاك مستحقّ هذه السنة (دورة سنتين من تاريخ الترسيم)، ويتخطّى من رُقّي سابقاً. مدرسة واحدة وسنة واحدة في كل مرّة.</small>
+            </div>
+            <?php endif; ?>
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <?php if (isAllSchools()): ?><th>École</th><?php endif; ?>
+                            <th>Diplôme</th>
+                            <th>Date Titul.</th>
+                            <th>Initial</th>
+                            <th>Actuel</th>
+                            <th>Salaire échelle</th>
+                            <th>Val. échelon</th>
+                            <th class="no-print">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($employees as $e): ?>
+                            <tr>
+                                <td><strong><?= e($e['first_name_fr'] . ' ' . $e['last_name_fr']) ?></strong></td>
+                                <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($e['school_id'])) ?></small></td><?php endif; ?>
+                                <td><?= e(diplomaLabel($e['diploma'])) ?></td>
+                                <td><?= formatDate($e['titularization_date']) ?></td>
+                                <td><?= $e['starting_grade'] ?></td>
+                                <td><span class="badge badge-gold" style="font-size:14px"><?= $e['current_grade'] ?></span></td>
+                                <td><?= formatLBP($e['new_salary_2017']) ?></td>
+                                <td><?= formatLBP($e['new_grade_value']) ?></td>
+                                <td class="no-print">
+                                    <a href="?employee_id=<?= $e['id'] ?>" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-edit"></i> Gérer
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+<?php else:
+    $stmt = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
+    $stmt->execute([$employeeId]);
+    $emp = $stmt->fetch();
+    if (!$emp) { echo "<div class='alert alert-danger'>Employé introuvable</div>"; include __DIR__ . '/../includes/footer.php'; exit; }
+    
+    $history = $db->prepare("SELECT * FROM employee_grade_history WHERE employee_id = ? ORDER BY change_date ASC, id ASC");
+    $history->execute([$employeeId]);
+    $history = $history->fetchAll();
+    
+    $stmt = $db->prepare("SELECT * FROM salary_scale_2017 WHERE version_id = ? AND grade = ?");
+    $stmt->execute([scaleVersionIdAsOf(), $emp['current_grade']]);
+    $currentScale = $stmt->fetch();
+    
+    $laws = $db->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1 ORDER BY law_date")->fetchAll();
+    $appliedLaws = $db->prepare("SELECT law_reference FROM employee_grade_history WHERE employee_id = ? AND law_reference IS NOT NULL");
+    $appliedLaws->execute([$employeeId]);
+    $appliedLaws = $appliedLaws->fetchAll(PDO::FETCH_COLUMN);
+?>
+    <div class="d-flex justify-between align-center mb-3">
+        <a href="<?= BASE_URL ?>pages/grades.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour</a>
+        <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $employeeId ?>" class="btn btn-light">
+            <i class="fas fa-user"></i> Fiche employé
+        </a>
+    </div>
+    
+    <div class="form-row cols-2">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-user"></i> <?= e($emp['first_name_fr'] . ' ' . $emp['last_name_fr']) ?></h3>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <tr><td><strong>Type</strong></td><td><?= employeeTypeLabel($emp['employee_type']) ?></td></tr>
+                    <tr><td><strong>Diplôme</strong></td><td><?= diplomaLabel($emp['diploma']) ?></td></tr>
+                    <tr><td><strong>دخول المدرسة</strong></td><td><?= formatDate($emp['hire_date']) ?></td></tr>
+                    <tr><td><strong>تاريخ التثبيت</strong></td><td><?= formatDate(tenureReferenceDate($emp)) ?> <small class="text-muted">(منه الاستثنائية — تلقائي دخول+سنتين)</small></td></tr>
+                    <tr><td><strong>Échelon initial</strong></td><td><?= $emp['starting_grade'] ?></td></tr>
+                    <tr><td><strong>Échelon actuel</strong></td><td><span class="badge badge-gold" style="font-size:16px"><?= $emp['current_grade'] ?></span></td></tr>
+                    <?php if ($emp['employee_type'] === 'enseignant_titulaire'):
+                        $lc = lawConsistencyCheckOne($employeeId); ?>
+                    <tr>
+                        <td><strong>مطابقة القانون</strong></td>
+                        <td>
+                            <?php if ($lc['err'] !== null): ?>
+                                <span class="text-muted">تعذّر الحساب: <?= e($lc['err']) ?></span>
+                            <?php elseif ($lc['ok']): ?>
+                                <span style="color:#1a7f37;font-weight:700">✅ مطابق للقانون</span>
+                                <small class="text-muted">(القانون يعطي درجة <?= $lc['law'] ?>)</small>
+                            <?php else: ?>
+                                <span style="color:#c0392b;font-weight:700">⚠️ منحرف</span>
+                                — القانون يعطي <strong><?= $lc['law'] ?></strong> والمخزّن <strong><?= $lc['stored'] ?></strong>
+                                (فجوة <?= ($lc['gap']>0?'+':'').$lc['gap'] ?>).
+                                <a href="?employee_id=<?= $employeeId ?>&rebuild_legal=1"
+                                   class="btn btn-sm btn-primary" style="margin-right:6px"
+                                   onclick="return confirm('إعادة بناء درجات هذا الأستاذ حسب القانون؟ الدرجة الحالية ستصبح <?= $lc['law'] ?>.')">
+                                   <i class="fas fa-wand-magic-sparkles"></i> ابنِ حسب القانون
+                                </a>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                    <?php if ($currentScale): ?>
+                    <tr><td><strong>Salaire scale 2017</strong></td><td><?= formatLBP($currentScale['new_salary_2017']) ?></td></tr>
+                    <tr><td><strong>Valeur échelon</strong></td><td><?= formatLBP($currentScale['new_grade_value']) ?></td></tr>
+                    <?php endif; ?>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-bolt"></i> Actions rapides</h3>
+            </div>
+            <div class="card-body">
+                <?php if ($emp['employee_type'] === 'enseignant_titulaire'): ?>
+                    <div class="d-flex gap-2 mb-3" style="align-items:flex-end">
+                        <div class="form-group mb-0" style="flex:1">
+                            <label class="form-label" style="font-size:12px">Année d'effet (1/10) / سنة المفعول</label>
+                            <input type="number" id="effYear" class="form-control" value="<?= date('Y') ?>" min="2000" max="2099">
+                        </div>
+                        <a href="#" onclick="this.href='?employee_id=<?= $employeeId ?>&promote=1&eff_year='+document.getElementById('effYear').value"
+                           class="btn btn-primary"
+                           data-confirm="Appliquer le التدرّج (+1 échelon) le 1/10 ?">
+                            <i class="fas fa-arrow-up"></i> التدرّج (+1)
+                        </a>
+                    </div>
+                    <div class="mb-3">
+                        <a href="?employee_id=<?= $employeeId ?>&rebuild_legal=1"
+                           class="btn btn-warning btn-sm"
+                           data-confirm="إعادة بناء سجلّ الدرجات حسب القانون تلقائياً (دخول الملاك → تدرّج عادي بتشرين → درجات استثنائية بكانون بعد التثبيت)؟ المجموع/الدرجة الحالية لا يتغيّران — يتغيّر توزيعها على السنين فقط. تأكّد أن تاريخ دخول الملاك وتاريخ التثبيت صحيحان أولاً.">
+                            <i class="fas fa-wand-magic-sparkles"></i> إعادة بناء الدرجات حسب القانون
+                        </a>
+                        <small class="text-muted d-block mt-1">يلزم ضبط «دخول الملاك» و«تاريخ التثبيت» في بطاقة الأستاذ أولاً.</small>
+                    </div>
+                    
+                    <h5 style="color:var(--primary);margin-top:16px">تابلو الدرجات الاستثنائية / Lois exceptionnelles</h5>
+                    <p class="text-muted" style="font-size:12px;margin:0 0 8px">
+                        ✔ = البرنامج يعطي هذه الدرجة الاستثنائية لهذا الأستاذ بتاريخها (كانون الثاني 1/1).
+                        شِيل الصح إذا ما بدك تعطيه إيّاها. الدرجات العادية تبقى تلقائياً في تشرين الأول.
+                    </p>
+                    <form method="POST">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="exc_save" value="1">
+                        <table class="table" style="font-size:13px">
+                            <thead><tr>
+                                <th style="text-align:center">إعطاء</th><th>القانون</th><th>التاريخ</th><th>عدد الدرجات</th><th>الوصف</th>
+                            </tr></thead>
+                            <tbody>
+                            <?php foreach ($laws as $law):
+                                $applied = in_array($law['law_number'], $appliedLaws);
+                                // نفس منطق التطبيق الفعلي: 1/1 بسنة بعد التثبيت (مصدر واحد)
+                                $excDate = exceptionalLawEffectiveDate($law, tenureReferenceDate($emp));
+                                $nGrades = lawGradesForEmployee($law, $emp); // قانون 2017 مشروط (6/2/0)
+                                $na = ($nGrades <= 0);
+                            ?>
+                                <tr style="<?= $applied ? 'background:#ecfdf5' : ($na ? 'background:#f3f4f6;opacity:.6' : '') ?>">
+                                    <td style="text-align:center">
+                                        <input type="checkbox" name="exc_laws[]" value="<?= e($law['law_number']) ?>"
+                                               <?= $applied ? 'checked' : '' ?> <?= $na ? 'disabled' : '' ?> style="width:20px;height:20px;cursor:pointer">
+                                    </td>
+                                    <td><strong><?= e($law['law_number']) ?></strong></td>
+                                    <td><?= formatDate($excDate) ?> <small>(كانون الثاني)</small></td>
+                                    <td><?= $na ? '<small class="text-muted">لا ينطبق</small>' : '+' . (float)$nGrades ?></td>
+                                    <td><small><?= e($law['description_ar'] ?: $law['description_fr']) ?></small></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        <button type="submit" class="btn btn-primary w-100"
+                                data-confirm="حفظ تابلو الدرجات الاستثنائية لهذا الأستاذ؟ (سيُعاد حساب راتبه)">
+                            <i class="fas fa-save"></i> حفظ التابلو
+                        </button>
+                    </form>
+                <?php else: ?>
+                    <div class="alert alert-warning">Les promotions et lois exceptionnelles s'appliquent uniquement aux enseignants titulaires.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-edit"></i> Modification manuelle</h3></div>
+        <div class="card-body">
+            <form method="POST">
+                <div class="form-row cols-4">
+                    <div class="form-group">
+                        <label class="form-label">Nouvel échelon <small>(½ permis)</small></label>
+                        <input type="number" name="new_grade" class="form-control" value="<?= (float)$emp['current_grade'] ?>" min="1" max="52" step="0.5" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date effective</label>
+                        <input type="date" name="change_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Raison</label>
+                        <select name="reason" class="form-select">
+                            <option value="manual">Manuel</option>
+                            <option value="biennial_promotion">Promotion biennale</option>
+                            <option value="titularization">Titularisation</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Enregistrer</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <input type="text" name="notes" class="form-control">
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-history"></i> Historique des changements / سجلّ الدرجات</h3></div>
+        <div class="card-body">
+            <?php if ($emp['employee_type'] === 'enseignant_titulaire'): ?>
+                <?php renderGradeChecklist($emp, 'grades'); ?>
+            <?php elseif (empty($history)): ?>
+                <div class="empty-state"><i class="fas fa-history"></i><h4>Aucun historique</h4></div>
+            <?php else: ?>
+                <table class="table">
+                    <thead><tr><th>التاريخ</th><th>قبل</th><th>بعد</th><th>الفرق</th><th>ملاحظة</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($history as $h): $diff=(float)$h['grade_after']-(float)$h['grade_before']; ?>
+                            <tr>
+                                <td><?= formatDate($h['change_date']) ?></td>
+                                <td><?= $h['grade_before'] ?></td><td><strong><?= $h['grade_after'] ?></strong></td>
+                                <td><span class="badge badge-<?= $diff>0?'success':'warning' ?>"><?= $diff>=0?'+':'' ?><?= $diff ?></span></td>
+                                <td><small><?= e($h['notes']) ?></small></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php
+    // ====== جدول تطوّر الراتب والتدرّج (تلقائي، متل «مثل 2») ======
+    $evo = ($emp['employee_type'] === 'enseignant_titulaire') ? buildSalaryEvolution($employeeId, $emp['current_grade']) : [];
+    $typeLabels = [
+        'entry'       => ['دخول الملاك', 'gold'],
+        'ordinary'    => ['درجة عادية (تشرين)', 'success'],
+        'exceptional' => ['درجة استثنائية', 'info'],
+        'manual'      => ['تعديل يدوي', 'secondary'],
+        'stable'      => ['—', 'light'],
+    ];
+    ?>
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-chart-line"></i> تطوّر الراتب والتدرّج / Évolution du salaire</h3>
+            <button type="button" onclick="window.print()" class="btn btn-light btn-sm no-print"><i class="fas fa-print"></i> Imprimer</button>
+        </div>
+        <div class="card-body">
+            <?php if (empty($evo)): ?>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    لإظهار جدول التطوّر سنة-بسنة تلقائياً، أدخِل درجات الأستاذ في "سجلّ التغييرات" بتواريخها الصحيحة
+                    (الترسيم 1/10، الدرجة العادية 1/10، الدرجة الاستثنائية بتاريخها).
+                </div>
+            <?php else: ?>
+                <p style="color:var(--gray-500);font-size:13px;margin-top:0">
+                    أساس الراتب يتراكم سنةً بسنة؛ تُضاف الدرجات في تاريخها فيصبح المجموع أساساً للسنة التالية.
+                </p>
+                <div class="table-wrapper">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>الحدث</th>
+                                <th>الإشلون</th>
+                                <th class="text-end">أساس الراتب</th>
+                                <th class="text-end">درجة عادية</th>
+                                <th class="text-end">درجات استثنائية</th>
+                                <th class="text-end">الراتب بعد التدرّج</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($evo as $r):
+                                [$lbl, $badge] = $typeLabels[$r['type']] ?? [$r['type'], 'light'];
+                            ?>
+                                <tr<?= $r['type']==='stable' ? ' style="color:var(--gray-400)"' : '' ?>>
+                                    <td><?= formatDate($r['date']) ?></td>
+                                    <td><span class="badge badge-<?= $badge ?>"><?= e($lbl) ?><?= $r['law'] ? ' '.e($r['law']) : '' ?></span></td>
+                                    <td><strong><?= rtrim(rtrim(number_format($r['grade_after'],1),'0'),'.') ?></strong></td>
+                                    <td class="text-end"><?= formatLBP($r['base'], false) ?></td>
+                                    <td class="text-end text-success"><?= $r['ordinary'] ? '+'.formatLBP($r['ordinary'], false) : '—' ?></td>
+                                    <td class="text-end text-info"><?= $r['exceptional'] ? '+'.formatLBP($r['exceptional'], false) : '—' ?></td>
+                                    <td class="text-end"><strong><?= formatLBP($r['after'], false) ?></strong></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php include __DIR__ . '/../includes/footer.php'; ?>
