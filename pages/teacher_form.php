@@ -217,15 +217,13 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $done = true;
 }
 
+// اسم المدرسة المعروض بالترويسة: يُؤخَذ من مدرسة الرابط (schoolId) منذ أوّل شاشة،
+// وإلا من مدرسة الأستاذ المُلاقى. هكذا يظهر اسم المدرسة المحدَّدة دائماً (لا اسم البرنامج).
 $schoolName = '';
-if ($isNew && $schoolId) {
+$nameSchoolId = $schoolId ?: (int)($emp['school_id'] ?? 0);
+if ($nameSchoolId) {
     $sc = $db->prepare("SELECT name_ar, name_fr FROM schools WHERE id = ?");
-    $sc->execute([$schoolId]);
-    $sc = $sc->fetch();
-    $schoolName = $sc ? ($sc['name_ar'] ?: $sc['name_fr']) : '';
-} elseif ($emp) {
-    $sc = $db->prepare("SELECT name_ar, name_fr FROM schools WHERE id = ?");
-    $sc->execute([$emp['school_id']]);
+    $sc->execute([$nameSchoolId]);
     $sc = $sc->fetch();
     $schoolName = $sc ? ($sc['name_ar'] ?: $sc['name_fr']) : '';
 }
