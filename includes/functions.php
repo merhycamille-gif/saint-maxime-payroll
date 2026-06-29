@@ -132,6 +132,20 @@ function currentSchoolName($lang = null) {
     return $lang === 'ar' ? $school['name_ar'] : $school['name_fr'];
 }
 
+// تحويل قائمة معرّفات الصفوف ("13,14") إلى أسماء مفصولة بفواصل عربية. يرجع '—' إن لم توجد.
+// محصّن: لو جدول class_levels غير موجود (قبل migration 015) يرجع '—'.
+function classLevelNames($csv) {
+    static $map = null;
+    if ($map === null) {
+        $map = [];
+        try { foreach (getDB()->query("SELECT id, name FROM class_levels") as $r) { $map[(int)$r['id']] = $r['name']; } }
+        catch (Exception $e) { $map = []; }
+    }
+    $names = [];
+    foreach (array_filter(array_map('intval', explode(',', (string)$csv))) as $cid) { if (isset($map[$cid])) $names[] = $map[$cid]; }
+    return $names ? implode('، ', $names) : '—';
+}
+
 // قائمة كل المدارس الفعّالة
 function allSchools($activeOnly = true) {
     $sql = "SELECT * FROM schools WHERE is_deleted = 0";

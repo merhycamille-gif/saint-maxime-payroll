@@ -270,6 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'specialization' => trim($_POST['specialization'] ?? ''),
         'subjects_taught' => trim($_POST['subjects_taught'] ?? ''),
         'niveau_scolaire' => is_array($_POST['niveau_scolaire'] ?? null) ? implode(',', $_POST['niveau_scolaire']) : '',
+        'classes_taught' => is_array($_POST['classes_taught'] ?? null) ? implode(',', array_map('intval', $_POST['classes_taught'])) : '',
         'hire_date' => $_POST['hire_date'] ?: null,
         // دخول الملاك = دخول المدرسة + سنتين تلقائياً إن تُرك فاضياً (القاعدة)؛ يمكن إدخاله يدوياً للتجاوز.
         'titularization_date' => ($_POST['titularization_date'] ?: (!empty($_POST['hire_date']) ? date('Y-m-d', strtotime($_POST['hire_date'] . ' +2 years')) : null)),
@@ -330,6 +331,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         $oldDiploma = $oldRow['diploma'] ?? null;
         $oldDates = $oldRow;
     }
+
+    // عمود classes_taught قد لا يكون موجوداً في قاعدة لم تُطبَّق عليها migration 015 بعد (مثلاً الأونلاين قبل التحديث)
+    // → أزِله من الحفظ لتفادي كسر حفظ الموظف. (محلياً موجود فيُحفَظ عادي.)
+    try {
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'classes_taught'")->fetch()) unset($data['classes_taught']);
+    } catch (Exception $e) { unset($data['classes_taught']); }
 
     try {
         if ($action === 'new') {
@@ -587,7 +594,7 @@ $employee = [
     'social_status' => 'celibataire', 'spouse_works' => 0, 'number_of_children' => 0,
     'gouvernorat' => '', 'district' => '', 'ville' => '', 'quartier' => '', 'rue' => '',
     'immeuble' => '', 'etage' => '', 'phone1' => '', 'phone2' => '', 'email' => '',
-    'diploma' => 'ijaza_jamiya', 'specialization' => '', 'subjects_taught' => '', 'niveau_scolaire' => '',
+    'diploma' => 'ijaza_jamiya', 'specialization' => '', 'subjects_taught' => '', 'niveau_scolaire' => '', 'classes_taught' => '',
     'hire_date' => '', 'titularization_date' => '', 'tenure_confirmation_date' => '', 'starting_grade' => 1, 'current_grade' => 1,
     'days_per_week' => 5, 'hours_per_week' => 18, 'status' => 'actif',
     'nssf_number' => '', 'finance_ministry_number' => '', 'caisse_number' => '',
@@ -933,7 +940,27 @@ include __DIR__ . '/../includes/header.php';
                         <input type="number" name="hours_per_week" class="form-control" value="<?= (float)$employee['hours_per_week'] ?>" step="0.5" min="0">
                     </div>
                 </div>
-                
+
+                <div class="form-row">
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label class="form-label">الصفوف التي يعلّم فيها / Classes enseignées</label>
+                        <?php
+                          try { $classLevels = $db->query("SELECT id, name FROM class_levels WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll(); }
+                          catch (Exception $e) { $classLevels = []; } // الجدول قد لا يكون موجوداً بعد (قبل تطبيق migration)
+                          $selClasses = array_filter(array_map('intval', explode(',', (string)($employee['classes_taught'] ?? ''))));
+                        ?>
+                        <?php if (!$classLevels): ?>
+                          <small class="text-muted">لا صفوف بعد — <a href="<?= BASE_URL ?>pages/classes.php">أضف لائحة الصفوف من هنا</a> ثم اختر للأستاذ.</small>
+                        <?php else: ?>
+                          <div class="d-flex gap-3 mt-2" style="flex-wrap:wrap;gap:14px">
+                            <?php foreach ($classLevels as $cl): ?>
+                              <label style="white-space:nowrap;font-weight:400"><input type="checkbox" name="classes_taught[]" value="<?= (int)$cl['id'] ?>" <?= in_array((int)$cl['id'], $selClasses, true) ? 'checked' : '' ?> style="margin-left:4px"> <?= e($cl['name']) ?></label>
+                            <?php endforeach; ?>
+                          </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
                 <div class="form-row cols-4">
                     <div class="form-group">
                         <label class="form-label">Date d'embauche <span class="req">*</span> <small>(دخول المدرسة)</small></label>

@@ -25,7 +25,7 @@ $msSchoolYear = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) . '-
  */
 function payslipCardHtml($emp, $salary, $month, $year) {
     $schoolYearLbl = $salary['school_year'] ?? ($month >= 10 ? $year.'-'.($year+1) : ($year-1).'-'.$year);
-    $classesLbl = $emp['niveau_scolaire'] ? str_replace(',', '، ', $emp['niveau_scolaire']) : '—';
+    $classesLbl = classLevelNames($emp['classes_taught'] ?? '');
     ob_start();
     ?>
     <div class="card payslip-card" style="page-break-inside:avoid">
@@ -283,7 +283,7 @@ include __DIR__ . '/../includes/header.php';
             <?php
             // السنة الدراسية للشهر المختار (تشرين الأول → أيلول)
             $schoolYearLbl = $salary['school_year'] ?? ($month >= 10 ? $year.'-'.($year+1) : ($year-1).'-'.$year);
-            $classesLbl = $emp['niveau_scolaire'] ? str_replace(',', '، ', $emp['niveau_scolaire']) : '—';
+            $classesLbl = classLevelNames($emp['classes_taught'] ?? '');
             ?>
             <table class="table" style="margin-bottom:16px">
                 <tr><th colspan="4" style="background:#eef3fb;color:#000"><i class="fas fa-id-badge"></i> Informations de l'enseignant / معلومات الأستاذ</th></tr>

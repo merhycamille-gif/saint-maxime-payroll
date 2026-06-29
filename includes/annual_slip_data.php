@@ -176,7 +176,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'titul'       => formatDate($emp['titularization_date']),
         'hours'       => rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.'),
         'days'        => (int)$emp['days_per_week'],
-        'classes'     => $emp['niveau_scolaire'] ? str_replace(',', '، ', $emp['niveau_scolaire']) : '—',
+        'classes'     => classLevelNames($emp['classes_taught'] ?? ''),
         'subjects'    => $emp['subjects_taught'] ?: '—',
         'cnss'        => cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']),
         'caisse_no'   => $emp['caisse_number'] ?: '—',

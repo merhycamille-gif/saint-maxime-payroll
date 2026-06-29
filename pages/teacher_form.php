@@ -47,22 +47,28 @@ function tf_nameMatches($c, $nq, $nqNS) {
 function findTeacherByNameDob($db, $schoolId, $q, $bd) {
     $nq = tf_norm($q);
     $nqNS = str_replace(' ', '', $nq);
+    // الرابط الموحّد لكل المدارس: $schoolId = 0 → بحث عبر كل المدارس (تُكتشف المدرسة من الملف).
+    // يبقى التطابق وحيداً أو null عند الغموض، فالخصوصية محفوظة حتى عبر كل المدارس.
+    $allSchools = ((int)$schoolId <= 0);
+    $schoolClause = $allSchools ? '' : ' AND school_id = ?';
+    // اقصر البحث على **الموجودين فعلاً بالسنة الدراسية الحالية** (راتب فعلي بهالسنة + غير تاركين):
+    // فلا يُطابَق من ترك أو من سنوات سابقة، ويُحلّ تلقائياً تكرارٌ يكون أحد ملفّيه قديماً/تاركاً.
+    [$yf, $yp] = yearEmploymentFilter(currentSchoolYear(), '');
     // (أ) المسار الأساسي: الاسم + تاريخ الولادة بالضبط
     $ts = strtotime($bd);
     if ($ts) {
         $bdNorm = date('Y-m-d', $ts);
-        $st = $db->prepare("SELECT * FROM employees WHERE school_id = ? AND is_deleted = 0 AND birth_date = ?");
-        $st->execute([$schoolId, $bdNorm]);
+        $st = $db->prepare("SELECT * FROM employees WHERE is_deleted = 0$schoolClause AND birth_date = ?" . $yf);
+        $st->execute(array_merge($allSchools ? [$bdNorm] : [$schoolId, $bdNorm], $yp));
         $strong = [];
         foreach ($st->fetchAll() as $c) { if (tf_nameMatches($c, $nq, $nqNS)) $strong[] = $c; }
         if (count($strong) === 1) return $strong[0];
         if (count($strong) > 1) return null; // غموض (تطابق متعدد) — لا تخمّن
     }
     // (ب) المسار الاحتياطي: تاريخ ولادة ناقص/وهمي عند الإدارة → بالاسم وحده، ضمن أساتذة هالسنة فقط
-    [$yf, $yp] = yearEmploymentFilter(currentSchoolYear(), '');
-    $st2 = $db->prepare("SELECT * FROM employees WHERE school_id = ? AND is_deleted = 0
+    $st2 = $db->prepare("SELECT * FROM employees WHERE is_deleted = 0$schoolClause
         AND (birth_date IS NULL OR birth_date = '0000-00-00' OR birth_date = '1900-01-01')" . $yf);
-    $st2->execute(array_merge([$schoolId], $yp));
+    $st2->execute($allSchools ? $yp : array_merge([$schoolId], $yp));
     $strong2 = [];
     foreach ($st2->fetchAll() as $c) { if (tf_nameMatches($c, $nq, $nqNS)) $strong2[] = $c; }
     return (count($strong2) === 1) ? $strong2[0] : null;
@@ -88,8 +94,8 @@ $isNew = false;
 
 $emp = null; $needFind = false; $needSchoolSelect = false; $activeSchools = [];
 $findError = ''; $verified = false; $findName = ''; $findDob = '';
-if ($allMode && $schoolId <= 0) {
-    // الوضع الموحّد بلا مدرسة → اعرض قائمة المدارس ليختار الأستاذ مدرسته
+if ($allMode && $newFlag && $schoolId <= 0) {
+    // أستاذ جديد عبر الرابط الموحّد: لا ملف بعد ⇒ لا يمكن كشف مدرسته → يختارها أولاً
     $needSchoolSelect = true;
     $activeSchools = $db->query("SELECT id, name_ar, name_fr FROM schools WHERE is_active = 1 AND is_deleted = 0
         ORDER BY COALESCE(NULLIF(name_ar,''),name_fr)")->fetchAll();
@@ -104,8 +110,9 @@ if ($allMode && $schoolId <= 0) {
         $findName = trim((string)($_GET['q'] ?? $_POST['q'] ?? ''));
         $findDob  = trim((string)($_GET['bd'] ?? $_POST['bd'] ?? ''));
         if ($findName !== '' && $findDob !== '') {
+            // $schoolId قد يكون 0 في الرابط الموحّد → بحث عبر كل المدارس، وتُكتشف مدرسة الأستاذ من ملفه
             $emp = findTeacherByNameDob($db, $schoolId, $findName, $findDob);
-            if ($emp) { $empId = (int)$emp['id']; $verified = true; }
+            if ($emp) { $empId = (int)$emp['id']; $schoolId = (int)$emp['school_id']; $verified = true; }
             else { $needFind = true; $findError = 'ما قدرنا نلاقي ملفك بهالمعلومات. تأكّد من كتابة اسمك وشهرتك وتاريخ ولادتك متل ما هنّي مسجّلين عند الإدارة، أو تواصل مع إدارة المدرسة.'; }
         } else {
             $needFind = true;
@@ -123,6 +130,10 @@ $newHidden = $isNew ? '<input type="hidden" name="new" value="1">' : '';
 
 // لائحة الشهادات للقائمة المنسدلة
 $diplomas = $db->query("SELECT diploma_code, diploma_name_ar, diploma_name_fr, starting_grade FROM diploma_starting_grades ORDER BY starting_grade")->fetchAll();
+// لائحة الصفوف (محصّنة: قد لا يكون الجدول موجوداً قبل migration 015)
+try { $classLevels = $db->query("SELECT id, name FROM class_levels WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll(); }
+catch (Exception $e) { $classLevels = []; }
+$selClasses = array_filter(array_map('intval', explode(',', (string)($emp['classes_taught'] ?? ''))));
 
 // سنوات الدخول للأستاذ الجديد: السنة الدراسية **القادمة فأكثر** فقط (لا يجوز للجديد الدخول على
 // السنة الجارية أو ما قبلها). الافتراضي = السنة القادمة (مثلاً 2026-2027 المفتوحة).
@@ -175,6 +186,9 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($profFields as $k => $_) { $data[$k] = trim((string)($_POST[$k] ?? '')); }
     $data['niveau_scolaire'] = is_array($_POST['niveau_scolaire'] ?? null)
         ? implode(',', array_intersect($_POST['niveau_scolaire'], array_keys($niveauOptions))) : '';
+    // الصفوف التي يعلّم فيها (معرّفات class_levels مفصولة بفواصل)
+    $data['classes_taught'] = is_array($_POST['classes_taught'] ?? null)
+        ? implode(',', array_map('intval', $_POST['classes_taught'])) : '';
     // سنة الدخول (للأستاذ الجديد فقط) — يجب أن تكون ضمن الخيارات المسموحة (القادمة فأكثر)
     if ($isNew) {
         $ey = trim((string)($_POST['entry_school_year'] ?? ''));
@@ -231,7 +245,7 @@ if ($nameSchoolId) {
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>تحديث معلومات الأستاذ</title>
+<title>SALAIRES DES ÉCOLES — تحديث معلومات الأستاذ</title>
 <style>
   body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#eef2f7;margin:0;padding:16px;color:#1f2937}
   .wrap{max-width:760px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.08);overflow:hidden}
@@ -269,9 +283,10 @@ if ($nameSchoolId) {
       <?php endif; ?>
     </div>
   <?php elseif ($needSchoolSelect): ?>
-    <div class="note">أهلاً بك. اختر <strong>مدرستك</strong> أوّلاً للمتابعة.</div>
+    <div class="note">أهلاً بك أيها الأستاذ الجديد 👋 — اختر <strong>مدرستك</strong> أوّلاً للمتابعة.</div>
     <form method="get">
       <input type="hidden" name="all" value="1">
+      <?php if ($newFlag): ?><input type="hidden" name="new" value="1"><?php endif; ?>
       <input type="hidden" name="token" value="<?= e($token) ?>">
       <label>اختر مدرستك / Choisissez votre école</label>
       <select name="school" required style="width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;margin-bottom:6px">
@@ -352,7 +367,7 @@ if ($nameSchoolId) {
         </div>
       </div>
       <div style="margin-top:12px">
-        <label>المرحلة / الصفوف التي يعلّم فيها — Niveau scolaire</label>
+        <label>المرحلة — Niveau scolaire</label>
         <?php $niveauSel = explode(',', (string)($emp['niveau_scolaire'] ?? '')); ?>
         <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
           <?php foreach ($niveauOptions as $nv => $nlbl): ?>
@@ -360,6 +375,16 @@ if ($nameSchoolId) {
           <?php endforeach; ?>
         </div>
       </div>
+      <?php if ($classLevels): ?>
+      <div style="margin-top:12px">
+        <label>الصفوف التي تعلّم فيها — Classes</label>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">
+          <?php foreach ($classLevels as $cl): ?>
+            <label style="font-weight:400;white-space:nowrap"><input type="checkbox" name="classes_taught[]" value="<?= (int)$cl['id'] ?>" <?= in_array((int)$cl['id'], $selClasses, true) ? 'checked' : '' ?> style="width:auto;margin-left:4px"> <?= e($cl['name']) ?></label>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <?php endif; ?>
       <div class="grid" style="margin-top:12px">
         <div>
           <label>عدد الساعات الأسبوعية / Heures par semaine</label>

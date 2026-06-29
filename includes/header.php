@@ -64,6 +64,11 @@ document.addEventListener('submit', function (e) {
                 <span>Échelons & Promotions</span>
             </a>
 
+            <a href="<?= BASE_URL ?>pages/classes.php" class="<?= $currentPage === 'classes' ? 'active' : '' ?>">
+                <i class="fas fa-chalkboard"></i>
+                <span>الصفوف / Classes</span>
+            </a>
+
             <a href="<?= BASE_URL ?>pages/exceptional_laws.php" class="<?= $currentPage === 'exceptional_laws' ? 'active' : '' ?>">
                 <i class="fas fa-scroll"></i>
                 <span>القوانين الاستثنائية</span>

@@ -182,8 +182,9 @@ if (!$emp):
     $hireFmt = formatDate($emp['hire_date']);
     $titFmt  = formatDate($emp['titularization_date']);
     $effFmt  = formatDate($effDate);
-    $classesAr = trim((string)$emp['niveau_scolaire']) !== '' ? str_replace(',', '، ', $emp['niveau_scolaire']) : '';
-    $classesLat = trim((string)$emp['niveau_scolaire']) !== '' ? str_replace(',', ', ', $emp['niveau_scolaire']) : '';
+    $clsNm = classLevelNames($emp['classes_taught'] ?? ''); if ($clsNm === '—') $clsNm = '';
+    $classesAr = $clsNm;
+    $classesLat = $clsNm;
     $subjects = trim((string)$emp['subjects_taught']);
     $isTit = $emp['employee_type'] === 'enseignant_titulaire';
 

@@ -18,7 +18,7 @@ $textFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','mo
     'birth_date','birth_place','nationality','number_of_children','phone1','phone2','email',
     'gouvernorat','district','ville','quartier','rue','immeuble','etage',
     // الحقول المهنية المضافة
-    'subjects_taught','niveau_scolaire','hours_per_week','days_per_week',
+    'subjects_taught','niveau_scolaire','classes_taught','hours_per_week','days_per_week',
     'nssf_number','finance_ministry_number','caisse_number'];
 $uploadCols = ['photo_path','id_document_path','family_doc_path','diploma_doc_path'];
 $intFields = ['number_of_children','days_per_week'];
@@ -125,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         ];
         $strFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','mother_first_name','mother_last_name',
             'birth_place','nationality','gouvernorat','district','ville','quartier','rue','immeuble','etage',
-            'phone1','phone2','email','diploma','subjects_taught','niveau_scolaire','nssf_number','finance_ministry_number','caisse_number'];
+            'phone1','phone2','email','diploma','subjects_taught','niveau_scolaire','classes_taught','nssf_number','finance_ministry_number','caisse_number'];
         foreach ($strFields as $f) { if (($data[$f] ?? '') !== '') $emp[$f] = $data[$f]; }
         if (($data['birth_date'] ?? '') !== '') $emp['birth_date'] = $data['birth_date'];
         if (($data['number_of_children'] ?? '') !== '') $emp['number_of_children'] = (int)$data['number_of_children'];
@@ -158,22 +158,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'rejec
 
 include __DIR__ . '/../includes/header.php';
 
-requireSchoolSelected(); // الإرسال والاستيراد لكل مدرسة على حدة
+// لم نعد نُجبر اختيار مدرسة: الرابط الموحّد لكل المدارس هو الأساس، والطلبات الواردة تُعرض
+// لكل المدارس في وضع «كل المدارس». أقسام المدرسة الواحدة (رابط الغروب + الإرسال الفردي)
+// تظهر فقط عند اختيار مدرسة واحدة (isAllSchools() == false).
 
 // رابط الفورم العام (يجب أن يكون المضيف متاحاً للأساتذة — خادم المدرسة/دومين)
 $base = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
 $formBase = $base . BASE_URL . 'pages/teacher_form.php';
 
-// أساتذة المدرسة الحالية — فقط أساتذة السنة الدراسية الحالية (لا من ترك أو من سنوات سابقة)
-[$yfE, $ypE] = yearEmploymentFilter(activeSchoolYear(), '');
-$emps = $db->prepare("SELECT * FROM employees WHERE is_deleted = 0" . schoolScopeSql('school_id') . $yfE
-    . " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr)");
-$emps->execute($ypE);
-$emps = $emps->fetchAll();
+// أساتذة المدرسة الحالية للإرسال الفردي — فقط عند اختيار مدرسة واحدة (لا في وضع «كل المدارس»)
+$emps = [];
+if (!isAllSchools()) {
+    [$yfE, $ypE] = yearEmploymentFilter(activeSchoolYear(), '');
+    $stEmps = $db->prepare("SELECT * FROM employees WHERE is_deleted = 0" . schoolScopeSql('school_id') . $yfE
+        . " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr)");
+    $stEmps->execute($ypE);
+    $emps = $stEmps->fetchAll();
+}
 
 // الطلبات الواردة (pending) للمدرسة الحالية
-$subs = $db->prepare("SELECT s.*, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr
+$subs = $db->prepare("SELECT s.*, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+    COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
     FROM info_submissions s JOIN employees e ON e.id = s.employee_id
+    LEFT JOIN schools sc ON sc.id = e.school_id
     WHERE s.status = 'pending'" . schoolScopeSql('e.school_id') . " ORDER BY s.submitted_at DESC");
 $subs->execute();
 $subs = $subs->fetchAll();
@@ -185,16 +192,27 @@ $infoIntro = "حضرة الأساتذة المحترمين،\nيرجى تعبئ�
 $labels = ['first_name_ar'=>'الاسم','first_name_fr'=>'Prénom','last_name_ar'=>'الشهرة','last_name_fr'=>'Nom',
     'mother_first_name'=>'اسم الأم','mother_last_name'=>'شهرة الأم','birth_date'=>'تاريخ الولادة','birth_place'=>'محل الولادة',
     'nationality'=>'الجنسية','number_of_children'=>'عدد الأولاد','phone1'=>'هاتف 1','phone2'=>'هاتف 2','email'=>'إيميل',
-    'entry_school_year'=>'سنة الدخول','diploma'=>'الشهادة','subjects_taught'=>'المواد','niveau_scolaire'=>'الصفوف','hours_per_week'=>'الساعات/أسبوع','days_per_week'=>'أيام الحضور',
+    'entry_school_year'=>'سنة الدخول','diploma'=>'الشهادة','subjects_taught'=>'المواد','niveau_scolaire'=>'المرحلة','classes_taught'=>'الصفوف','hours_per_week'=>'الساعات/أسبوع','days_per_week'=>'أيام الحضور',
     'nssf_number'=>'رقم الضمان','finance_ministry_number'=>'رقم المالية','caisse_number'=>'رقم الصندوق',
     'gouvernorat'=>'محافظة','district'=>'قضاء','ville'=>'بلدة','quartier'=>'حي','rue'=>'شارع','immeuble'=>'مبنى','etage'=>'طابق'];
 // خريطة أسماء الشهادات (للعرض)
 $diplomaNames = [];
 foreach ($db->query("SELECT diploma_code, diploma_name_ar FROM diploma_starting_grades") as $dr) { $diplomaNames[$dr['diploma_code']] = $dr['diploma_name_ar']; }
+// خريطة أسماء الصفوف (للعرض): id => name (محصّنة قبل migration 015)
+$classNames = [];
+try { foreach ($db->query("SELECT id, name FROM class_levels") as $cr) { $classNames[(int)$cr['id']] = $cr['name']; } } catch (Exception $e) {}
+// حوّل قائمة معرّفات صفوف ("13,14") إلى أسماء مفصولة بفواصل
+$classIdsToNames = function ($csv) use ($classNames) {
+    $names = [];
+    foreach (array_filter(array_map('intval', explode(',', (string)$csv))) as $cid) { if (isset($classNames[$cid])) $names[] = $classNames[$cid]; }
+    return implode('، ', $names);
+};
 
 // الطلبات الواردة للأساتذة الجدد (لا employee_id بعد) — للمدرسة الحالية
-$newSubs = $db->prepare("SELECT * FROM info_submissions WHERE is_new_teacher = 1 AND status = 'pending'"
-    . schoolScopeSql('school_id') . " ORDER BY submitted_at DESC");
+$newSubs = $db->prepare("SELECT s.*, COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
+    FROM info_submissions s LEFT JOIN schools sc ON sc.id = s.school_id
+    WHERE s.is_new_teacher = 1 AND s.status = 'pending'"
+    . schoolScopeSql('s.school_id') . " ORDER BY s.submitted_at DESC");
 $newSubs->execute();
 $newSubs = $newSubs->fetchAll();
 ?>
@@ -204,10 +222,12 @@ $newSubs = $newSubs->fetchAll();
   <strong>ملاحظة:</strong> ليتمكّن الأساتذة من فتح الرابط، يجب أن يكون البرنامج على خادم/دومين متاح لهم (لا «localhost»).
 </div>
 
-<?php
+<?php if (!isAllSchools()):
   $sid = currentSchoolId();
+  $schoolNm = currentSchool()['name_ar'] ?? '';
+  $groupIntro = "حضرة أساتذة " . $schoolNm . " المحترمين،\nيرجى تعبئة وتحديث معلوماتكم الشخصية ورفع مستنداتكم (صورة، إخراج قيد فردي وعائلي، الشهادة) عبر الرابط التالي، وذلك قبل تاريخ $infoDeadline. شاكرين تعاونكم.";
   $groupLink = $formBase . '?school=' . $sid . '&token=' . schoolFormToken($sid);
-  $groupMsg = rawurlencode($infoIntro . "\n(كلٌّ يختار اسمه)\n" . $groupLink);
+  $groupMsg = rawurlencode($groupIntro . "\n(كلٌّ يختار اسمه)\n" . $groupLink);
 ?>
 <div class="card" style="border:2px solid #25d366">
   <div class="card-header" style="background:#e8f9ef"><h3 style="color:#0a7a37"><i class="fab fa-whatsapp"></i> رابط واحد لكل المجموعة (الأسهل)</h3></div>
@@ -220,15 +240,16 @@ $newSubs = $newSubs->fetchAll();
     </div>
   </div>
 </div>
+<?php endif; ?>
 
 <?php if (isSuperAdmin()):
   $allLink = $formBase . '?all=1&token=' . allFormToken();
-  $allMsg = rawurlencode($infoIntro . "\n(كلٌّ يختار مدرسته ثم اسمه)\n" . $allLink);
+  $allMsg = rawurlencode($infoIntro . "\n(كلٌّ يكتب اسمه وتاريخ ولادته، والبرنامج بيعرف مدرسته تلقائياً)\n" . $allLink);
 ?>
 <div class="card" style="border:2px solid #128c7e">
-  <div class="card-header" style="background:#e6f4f1"><h3 style="color:#0a6b5e"><i class="fas fa-globe"></i> رابط موحّد لكل المدارس (رابط واحد للجميع)</h3></div>
+  <div class="card-header" style="background:#e6f4f1"><h3 style="color:#0a6b5e"><i class="fas fa-globe"></i> رابط موحّد لكل المدارس (رابط واحد للجميع) ⭐</h3></div>
   <div class="card-body">
-    <p style="color:var(--gray-600);margin-top:0">ابعت <strong>هالرابط الواحد للكل</strong> — كل أستاذ بيختار <strong>مدرسته</strong> ثم <strong>اسمه</strong> ويحدّث معلوماته. (نفسه لكل المدارس.)</p>
+    <p style="color:var(--gray-600);margin-top:0">ابعت <strong>هالرابط الواحد للكل</strong> — كل أستاذ بيكتب <strong>اسمه وتاريخ ولادته</strong> بس، والبرنامج بيعرف <strong>مدرسته تلقائياً</strong> ويحدّث معلوماته. (نفس الرابط لكل المدارس.)</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <input type="text" readonly value="<?= e($allLink) ?>" id="allLink" style="flex:1;min-width:260px;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px">
       <button type="button" class="btn" style="background:#128c7e;color:#fff" onclick="navigator.clipboard.writeText(document.getElementById('allLink').value);this.innerHTML='✓ تم النسخ'"><i class="fas fa-copy"></i> نسخ الرابط</button>
@@ -238,8 +259,9 @@ $newSubs = $newSubs->fetchAll();
 </div>
 <?php endif; ?>
 
+<?php if (!isAllSchools()): $indivSchoolNm = currentSchool()['name_ar'] ?? ''; ?>
 <div class="card">
-  <div class="card-header"><h3><i class="fab fa-whatsapp"></i> أو إرسال فردي لكل أستاذ — <?= e(currentSchool()['name_ar'] ?? '') ?> (<?= count($emps) ?>)</h3></div>
+  <div class="card-header"><h3><i class="fab fa-whatsapp"></i> أو إرسال فردي لكل أستاذ — <?= e($indivSchoolNm) ?> (<?= count($emps) ?>)</h3></div>
   <div class="card-body">
     <div class="table-wrapper">
     <table class="table">
@@ -249,7 +271,7 @@ $newSubs = $newSubs->fetchAll();
         $nm = trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
         $link = $formBase . '?emp=' . $emp['id'] . '&token=' . infoFormToken($emp['id']);
         $wa = waPhone($emp['phone1'] ?: $emp['phone2']);
-        $msg = rawurlencode("حضرة الأستاذ(ة) " . $nm . " المحترم(ة)،\nيرجى تعبئة وتحديث معلوماتك الشخصية ورفع مستنداتك (صورة، إخراج قيد فردي وعائلي، الشهادة) عبر الرابط التالي، وذلك قبل تاريخ " . $infoDeadline . ". شاكرين تعاونك.\n" . $link);
+        $msg = rawurlencode("حضرة الأستاذ(ة) " . $nm . " المحترم(ة) في " . $indivSchoolNm . "،\nيرجى تعبئة وتحديث معلوماتك الشخصية ورفع مستنداتك (صورة، إخراج قيد فردي وعائلي، الشهادة) عبر الرابط التالي، وذلك قبل تاريخ " . $infoDeadline . ". شاكرين تعاونك.\n" . $link);
       ?>
         <tr>
           <td><?= $i ?></td>
@@ -271,6 +293,7 @@ $newSubs = $newSubs->fetchAll();
     </div>
   </div>
 </div>
+<?php endif; ?>
 
 <div class="card" id="newteachers" style="border:2px solid #0a7a37">
   <div class="card-header" style="background:#e8f9ef"><h3 style="color:#0a7a37"><i class="fas fa-user-plus"></i> طلبات أساتذة جدد (<?= count($newSubs) ?>)</h3></div>
@@ -285,6 +308,7 @@ $newSubs = $newSubs->fetchAll();
         <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:8px">
           <div><strong style="font-size:16px"><?= e($nm) ?></strong>
             <span class="badge badge-success">أستاذ جديد</span>
+            <?php if (!empty($s['school_name'])): ?><span class="badge" style="background:#0a6b5e;color:#fff"><i class="fas fa-school"></i> <?= e($s['school_name']) ?></span><?php endif; ?>
             <span class="badge badge-info"><?= e($s['submitted_at']) ?></span></div>
           <div style="display:flex;gap:8px">
             <form method="post" onsubmit="return confirm('إنشاء ملف أستاذ جديد بهذه المعلومات؟ تُكمل الإعداد المالي والتدرّج من ملف الأستاذ.')" style="margin:0">
@@ -299,7 +323,7 @@ $newSubs = $newSubs->fetchAll();
         </div>
         <div class="form-row cols-4" style="margin-top:10px">
           <?php foreach ($labels as $k => $lbl): if (($data[$k] ?? '') === '') continue;
-            $val = ($k === 'diploma') ? ($diplomaNames[$data[$k]] ?? $data[$k]) : $data[$k]; ?>
+            $val = ($k === 'diploma') ? ($diplomaNames[$data[$k]] ?? $data[$k]) : (($k === 'classes_taught') ? $classIdsToNames($data[$k]) : $data[$k]); ?>
             <div style="font-size:13px"><span style="color:var(--gray-500)"><?= e($lbl) ?>:</span> <strong><?= e($val) ?></strong></div>
           <?php endforeach; ?>
         </div>
@@ -338,6 +362,7 @@ $newSubs = $newSubs->fetchAll();
       <div style="border:1px solid var(--gray-200);border-radius:8px;padding:14px;margin-bottom:14px">
         <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:8px">
           <div><strong style="font-size:16px"><?= e($nm) ?></strong>
+            <?php if (!empty($s['school_name'])): ?><span class="badge" style="background:#0a6b5e;color:#fff"><i class="fas fa-school"></i> <?= e($s['school_name']) ?></span><?php endif; ?>
             <span class="badge badge-info"><?= e($s['submitted_at']) ?></span></div>
           <div style="display:flex;gap:8px">
             <form method="post" onsubmit="return confirm('تحديث ملف الأستاذ بهذه المعلومات؟')" style="margin:0">
@@ -352,7 +377,7 @@ $newSubs = $newSubs->fetchAll();
         </div>
         <div class="form-row cols-4" style="margin-top:10px">
           <?php foreach ($labels as $k => $lbl): if (($data[$k] ?? '') === '') continue;
-            $val = ($k === 'diploma') ? ($diplomaNames[$data[$k]] ?? $data[$k]) : $data[$k]; ?>
+            $val = ($k === 'diploma') ? ($diplomaNames[$data[$k]] ?? $data[$k]) : (($k === 'classes_taught') ? $classIdsToNames($data[$k]) : $data[$k]); ?>
             <div style="font-size:13px"><span style="color:var(--gray-500)"><?= e($lbl) ?>:</span> <strong><?= e($val) ?></strong></div>
           <?php endforeach; ?>
         </div>

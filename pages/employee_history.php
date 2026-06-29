@@ -109,9 +109,22 @@ if (!$emp):
                     </table>
                 </div>
 
+                <?php
+                  // أسماء الصفوف (من class_levels) + ترجمة المرحلة
+                  $clsMap = [];
+                  try { foreach ($db->query("SELECT id, name FROM class_levels") as $r) $clsMap[(int)$r['id']] = $r['name']; } catch (Exception $e) {}
+                  $clsNames = [];
+                  foreach (array_filter(array_map('intval', explode(',', (string)($emp['classes_taught'] ?? '')))) as $cid) { if (isset($clsMap[$cid])) $clsNames[] = $clsMap[$cid]; }
+                  $clsDisplay = $clsNames ? implode('، ', $clsNames) : '—';
+                  $niveauMap = ['maternelle'=>'حضانة','primaire'=>'ابتدائي','intermediaire'=>'متوسط','secondaire'=>'ثانوي'];
+                  $nivNames = [];
+                  foreach (array_filter(explode(',', (string)($emp['niveau_scolaire'] ?? ''))) as $nv) { $nivNames[] = $niveauMap[$nv] ?? $nv; }
+                  $nivDisplay = $nivNames ? implode('، ', $nivNames) : '—';
+                ?>
                 <table class="table" style="margin-top:6px">
                     <tr><th colspan="2" style="background:var(--gold);color:var(--primary-dark)">Enseignement & Salaire / التعليم والراتب</th></tr>
-                    <tr><td style="width:38%">Classes enseignées / الصفوف</td><td><strong><?= e($emp['niveau_scolaire'] ? str_replace(',', '، ', $emp['niveau_scolaire']) : '—') ?></strong></td></tr>
+                    <tr><td style="width:38%">Classes enseignées / الصفوف</td><td><strong><?= e($clsDisplay) ?></strong></td></tr>
+                    <tr><td>Niveau / المرحلة</td><td><strong><?= e($nivDisplay) ?></strong></td></tr>
                     <tr><td>Matières / المواد</td><td><strong><?= e($emp['subjects_taught'] ?: '—') ?></strong></td></tr>
                     <tr><td>Salaire actuel (base+échelon) / الراتب الحالي</td><td><strong><?= formatLBP($curBase) ?></strong></td></tr>
                     <tr><td>Salaire net / الصافي</td><td><strong><?= formatLBP($curNet) ?></strong><?= $sal ? ' — '.monthName((int)$sal['month'],$lang).' '.$sal['year'] : '' ?></td></tr>
