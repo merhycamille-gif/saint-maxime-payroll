@@ -1,5 +1,5 @@
 /**
- * Saint Maxime Payroll - Main JS
+ * رواتب المدارس / SALAIRES DES ÉCOLES - Main JS
  */
 
 // Format LBP numbers

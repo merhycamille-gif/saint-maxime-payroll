@@ -1,5 +1,5 @@
 /**
- * Saint Maxime Payroll — طباعة وتصدير موحّد
+ * رواتب المدارس — طباعة وتصدير موحّد
  * Print / PDF / Excel / Word / WhatsApp / Email
  * يعمل على المحتوى المعروض (المنطقة #ppExportArea إن وُجدت وإلا #pageContent).
  */

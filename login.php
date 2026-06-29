@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion — Saint Maxime Payroll</title>
+    <title>Connexion — SALAIRES DES ÉCOLES</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -71,8 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-box">
         <div class="login-header">
             <i class="fas fa-graduation-cap" style="font-size:36px;color:var(--gold);margin-bottom:12px;"></i>
-            <h1>Saint Maxime Payroll</h1>
-            <p>Système de gestion de la paie — كلية سان مكسيم</p>
+            <h1>SALAIRES DES ÉCOLES</h1>
+            <p>Système de gestion de la paie / رواتب المدارس</p>
         </div>
         <div class="login-body">
             <?php if ($error): ?>

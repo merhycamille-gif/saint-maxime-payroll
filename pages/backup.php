@@ -28,7 +28,7 @@ function allTables($db) {
 if ($action === 'sql') {
     header('Content-Type: application/sql; charset=utf-8');
     header('Content-Disposition: attachment; filename="payroll_backup_' . $stamp . '.sql"');
-    echo "-- Saint Maxime Payroll — نسخة احتياطية كاملة\n";
+    echo "-- رواتب المدارس — نسخة احتياطية كاملة\n";
     echo "-- " . date('Y-m-d H:i:s') . "  DB: " . DB_NAME . "\n";
     echo "SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\n\n";
     foreach (allTables($db) as $t) {
@@ -79,7 +79,7 @@ if ($action === 'excel') {
     header('Content-Disposition: attachment; filename="payroll_data_' . $stamp . '.xls"');
     echo "\xEF\xBB\xBF"; // BOM للعربي
     echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>';
-    echo '<h2>Saint Maxime Payroll — ' . date('Y-m-d H:i') . '</h2>';
+    echo '<h2>رواتب المدارس — ' . date('Y-m-d H:i') . '</h2>';
     echo renderAllTables($db, true);
     echo '</body></html>';
     exit;
@@ -92,7 +92,7 @@ if ($action === 'word') {
     echo "\xEF\xBB\xBF";
     echo '<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">'
        . '<style>table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:3px;font-size:10px}</style></head><body>';
-    echo '<h2>Saint Maxime Payroll — ' . date('Y-m-d H:i') . '</h2>';
+    echo '<h2>رواتب المدارس — ' . date('Y-m-d H:i') . '</h2>';
     echo renderAllTables($db);
     echo '</body></html>';
     exit;

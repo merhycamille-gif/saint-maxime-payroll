@@ -4,7 +4,7 @@ require_once __DIR__ . '/functions.php';
 requireLogin();
 
 $currentPage = $currentPage ?? '';
-$pageTitle = $pageTitle ?? 'Saint Maxime Payroll';
+$pageTitle = $pageTitle ?? 'رواتب المدارس';
 $lang = $_SESSION['lang'] ?? 'fr';
 ?>
 <!DOCTYPE html>
@@ -43,7 +43,7 @@ document.addEventListener('submit', function (e) {
     <aside class="sidebar">
         <div class="sidebar-brand">
             <h2><?= e(currentSchoolName()) ?></h2>
-            <p>Gestion de la Paie / إدارة الرواتب</p>
+            <p>SALAIRES DES ÉCOLES / رواتب المدارس</p>
         </div>
         
         <nav class="sidebar-nav">
