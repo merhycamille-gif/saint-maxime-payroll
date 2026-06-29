@@ -162,7 +162,10 @@ $uploadFields = [
 ];
 $uploadCol = ['photo' => 'photo_path', 'id_document' => 'id_document_path', 'family_doc' => 'family_doc_path', 'diploma_doc' => 'diploma_doc_path'];
 
-$done = false; $error = '';
+$done = false; $error = ''; $uploadWarn = [];
+// كشف تجاوز حجم الرفع الكلّي (post_max_size): عندها PHP يُفرّغ POST و FILES مع بقاء Content-Length
+$postTooBig = ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES)
+    && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0);
 if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // اجمع الحقول النصية
     $data = [];
@@ -183,16 +186,22 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!is_dir($dir)) @mkdir($dir, 0777, true);
     $allowed = ['jpg','jpeg','png','gif','webp','pdf'];
     $savedFiles = [];
-    foreach ($uploadFields as $field => $_) {
-        if (!empty($_FILES[$field]['name']) && is_uploaded_file($_FILES[$field]['tmp_name'])
-            && (int)$_FILES[$field]['size'] <= 15 * 1024 * 1024) { // حدّ آمن 15 ميغا للملف الواحد
-            $ext = strtolower(pathinfo($_FILES[$field]['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, $allowed, true)) {
-                $subKey = $isNew ? 'new' : $empId;
-                $name = 'sub_' . $subKey . '_' . $field . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
-                if (@move_uploaded_file($_FILES[$field]['tmp_name'], $dir . '/' . $name)) {
-                    $savedFiles[$uploadCol[$field]] = 'uploads/submissions/' . $name;
-                }
+    foreach ($uploadFields as $field => $lbl) {
+        $f = $_FILES[$field] ?? null;
+        if (!$f || ($f['name'] ?? '') === '') continue; // لم يُرفَع شيء لهذا الحقل
+        // نقبل الملف كيفما جاء (صورة أو PDF، كبيراً أو صغيراً) حتى 200 ميغا.
+        // فقط إن فشل الرفع فعلاً (تجاوز حدّ السيرفر/رفع جزئي) أو تخطّى 200 ميغا → ننبّه الأستاذ بلا إسقاط صامت.
+        if (in_array((int)($f['error'] ?? 0), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE, UPLOAD_ERR_PARTIAL], true)
+            || (int)($f['size'] ?? 0) > 200 * 1024 * 1024) {
+            $uploadWarn[] = $lbl; continue;
+        }
+        if (!is_uploaded_file($f['tmp_name'])) continue;
+        $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+        if (in_array($ext, $allowed, true)) {
+            $subKey = $isNew ? 'new' : $empId;
+            $name = 'sub_' . $subKey . '_' . $field . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+            if (@move_uploaded_file($f['tmp_name'], $dir . '/' . $name)) {
+                $savedFiles[$uploadCol[$field]] = 'uploads/submissions/' . $name;
             }
         }
     }
@@ -249,12 +258,17 @@ if ($isNew && $schoolId) {
     <p><?= e($schoolName) ?> — Mise à jour des informations</p>
   </div>
   <div class="bd">
-  <?php if (!$valid): ?>
+  <?php if ($postTooBig): ?>
+    <div class="err">📁 لم تصل المعلومات (قد يكون مجموع حجم الملفات كبيراً جداً أو الإنترنت ضعيفاً). الرجاء المحاولة مجدداً، أو رفع المستندات على دفعتين، أو إعادة المحاولة على إنترنت أقوى.</div>
+  <?php elseif (!$valid): ?>
     <div class="err">الرابط غير صالح أو منتهي. اطلب رابطاً جديداً من إدارة المدرسة.</div>
   <?php elseif ($done): ?>
     <div class="ok"><div class="ic">✅</div>
       <h2>تمّ استلام معلوماتك، شكراً!</h2>
       <p>سيتم تحديثها في النظام من قبل الإدارة. يمكنك إغلاق هذه الصفحة.</p>
+      <?php if ($uploadWarn): ?>
+        <div class="err" style="text-align:right;margin-top:18px">⚠️ هذه المستندات كانت كبيرة جداً (أكثر من 200 ميغا) فلم تُرفَع: <strong><?= e(implode('، ', $uploadWarn)) ?></strong>.<br>الرجاء إعادة إرسالها عبر نفس الرابط (ويمكن تصويرها صورة لتصغر تلقائياً).</div>
+      <?php endif; ?>
     </div>
   <?php elseif ($needSchoolSelect): ?>
     <div class="note">أهلاً بك. اختر <strong>مدرستك</strong> أوّلاً للمتابعة.</div>
@@ -380,7 +394,7 @@ if ($isNew && $schoolId) {
         <?php endforeach; ?>
       </div>
       <h3>السكانات (اختياري — صورة أو PDF)</h3>
-      <div class="note" style="margin-bottom:8px"><i>📷 الصور بتنضغط تلقائياً لحجم أصغر قبل الرفع (بتظل واضحة) — بترفع بسرعة وبتوفّر باقة الإنترنت.</i></div>
+      <div class="note" style="margin-bottom:8px"><i>📎 ارفع مستنداتك بأي شكل عندك (صورة أو PDF، كبيرة أو صغيرة) — كلها مقبولة حتى لو حجمها كبير. 📷 والصور تُضغط تلقائياً قبل الرفع (وتبقى واضحة) فترفع أسرع وتوفّر باقة الإنترنت.</i></div>
       <div class="grid">
         <?php foreach ($uploadFields as $field => $lbl): ?>
           <div>
@@ -398,7 +412,7 @@ if ($isNew && $schoolId) {
 // ضغط الصور على جهاز الأستاذ قبل الرفع (تصغير الأبعاد + JPEG) — يقلّل الحجم كثيراً عبر النفق
 (function(){
   var form = document.getElementById('tf'); if(!form) return;
-  var MAXW = 1600, Q = 0.72, THRESH = 600*1024;
+  var MAXW = 2400, Q = 0.85, THRESH = 1200*1024;
   function resize(file){
     return new Promise(function(res){
       if(!file || !/^image\//.test(file.type) || file.size <= THRESH){ res(file); return; }
