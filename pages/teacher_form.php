@@ -16,39 +16,56 @@ function tf_norm($s) {
     return trim($s);
 }
 /**
+ * يطابق اسماً مُدخَلاً (مطبَّعاً) مع صفّ أستاذ: تطابق كامل بأي من الصيغ الأربع (عربي/فرنسي،
+ * عادي/معكوس)، أو احتواء المُدخَل على الاسم الأول + الشهرة معاً بأي لغة.
+ */
+function tf_nameMatches($c, $nq, $nqNS) {
+    $arFull = tf_norm(($c['first_name_ar'] ?? '') . ' ' . ($c['last_name_ar'] ?? ''));
+    $frFull = tf_norm(($c['first_name_fr'] ?? '') . ' ' . ($c['last_name_fr'] ?? ''));
+    $arRev  = tf_norm(($c['last_name_ar'] ?? '') . ' ' . ($c['first_name_ar'] ?? ''));
+    $frRev  = tf_norm(($c['last_name_fr'] ?? '') . ' ' . ($c['first_name_fr'] ?? ''));
+    foreach ([$arFull, $frFull, $arRev, $frRev] as $cf) {
+        if ($cf !== '' && str_replace(' ', '', $cf) === $nqNS) return true;
+    }
+    // قبول إذا احتوى المُدخَل على الاسم الأول والشهرة معاً (بأي لغة)
+    $la = tf_norm($c['last_name_ar'] ?? ''); $lf = tf_norm($c['last_name_fr'] ?? '');
+    $fa = tf_norm($c['first_name_ar'] ?? ''); $ff = tf_norm($c['first_name_fr'] ?? '');
+    $hasLast  = ($la !== '' && mb_strpos($nq, $la) !== false) || ($lf !== '' && mb_strpos($nq, $lf) !== false);
+    $hasFirst = ($fa !== '' && mb_strpos($nq, $fa) !== false) || ($ff !== '' && mb_strpos($nq, $ff) !== false);
+    return ($hasLast && $hasFirst);
+}
+
+/**
  * خصوصية: يلاقي ملف الأستاذ من اسمه+شهرته+تاريخ ولادته داخل مدرسته فقط، بلا عرض أي لائحة.
  * يُرجع صفّ الأستاذ عند تطابق وحيد مؤكَّد، وإلا null (0 أو أكثر من تطابق).
+ *
+ * مسار احتياطي (للأساتذة يلي تاريخ ولادتهم ناقص/وهمي «1900-01-01» عند الإدارة): يُلاقَون
+ * بالاسم وحده إذا كانوا **وحيدين بمدرستهم هالسنة الدراسية**، فيعبّون تاريخ ولادتهم الصحيح
+ * عبر الفورم فيتصحّح ملفهم تلقائياً. لا يُضعِف الخصوصية: الأستاذ ذو التاريخ الصحيح المخزّن
+ * يبقى يحتاج تاريخه الصحيح (ليس ضمن مرشّحي الاحتياط).
  */
 function findTeacherByNameDob($db, $schoolId, $q, $bd) {
-    $ts = strtotime($bd);
-    if (!$ts) return null;
-    $bdNorm = date('Y-m-d', $ts);
-    $st = $db->prepare("SELECT * FROM employees WHERE school_id = ? AND is_deleted = 0 AND birth_date = ?");
-    $st->execute([$schoolId, $bdNorm]);
-    $cands = $st->fetchAll();
-    if (!$cands) return null;
     $nq = tf_norm($q);
     $nqNS = str_replace(' ', '', $nq);
-    $strong = [];
-    foreach ($cands as $c) {
-        $arFull = tf_norm(($c['first_name_ar'] ?? '') . ' ' . ($c['last_name_ar'] ?? ''));
-        $frFull = tf_norm(($c['first_name_fr'] ?? '') . ' ' . ($c['last_name_fr'] ?? ''));
-        $arRev  = tf_norm(($c['last_name_ar'] ?? '') . ' ' . ($c['first_name_ar'] ?? ''));
-        $frRev  = tf_norm(($c['last_name_fr'] ?? '') . ' ' . ($c['first_name_fr'] ?? ''));
-        $hit = false;
-        foreach ([$arFull, $frFull, $arRev, $frRev] as $cf) {
-            if ($cf !== '' && str_replace(' ', '', $cf) === $nqNS) { $hit = true; break; }
-        }
-        if (!$hit) { // قبول إذا احتوى المُدخَل على الاسم الأول والشهرة معاً (بأي لغة)
-            $la = tf_norm($c['last_name_ar'] ?? ''); $lf = tf_norm($c['last_name_fr'] ?? '');
-            $fa = tf_norm($c['first_name_ar'] ?? ''); $ff = tf_norm($c['first_name_fr'] ?? '');
-            $hasLast  = ($la !== '' && mb_strpos($nq, $la) !== false) || ($lf !== '' && mb_strpos($nq, $lf) !== false);
-            $hasFirst = ($fa !== '' && mb_strpos($nq, $fa) !== false) || ($ff !== '' && mb_strpos($nq, $ff) !== false);
-            if ($hasLast && $hasFirst) $hit = true;
-        }
-        if ($hit) $strong[] = $c;
+    // (أ) المسار الأساسي: الاسم + تاريخ الولادة بالضبط
+    $ts = strtotime($bd);
+    if ($ts) {
+        $bdNorm = date('Y-m-d', $ts);
+        $st = $db->prepare("SELECT * FROM employees WHERE school_id = ? AND is_deleted = 0 AND birth_date = ?");
+        $st->execute([$schoolId, $bdNorm]);
+        $strong = [];
+        foreach ($st->fetchAll() as $c) { if (tf_nameMatches($c, $nq, $nqNS)) $strong[] = $c; }
+        if (count($strong) === 1) return $strong[0];
+        if (count($strong) > 1) return null; // غموض (تطابق متعدد) — لا تخمّن
     }
-    return (count($strong) === 1) ? $strong[0] : null;
+    // (ب) المسار الاحتياطي: تاريخ ولادة ناقص/وهمي عند الإدارة → بالاسم وحده، ضمن أساتذة هالسنة فقط
+    [$yf, $yp] = yearEmploymentFilter(currentSchoolYear(), '');
+    $st2 = $db->prepare("SELECT * FROM employees WHERE school_id = ? AND is_deleted = 0
+        AND (birth_date IS NULL OR birth_date = '0000-00-00' OR birth_date = '1900-01-01')" . $yf);
+    $st2->execute(array_merge([$schoolId], $yp));
+    $strong2 = [];
+    foreach ($st2->fetchAll() as $c) { if (tf_nameMatches($c, $nq, $nqNS)) $strong2[] = $c; }
+    return (count($strong2) === 1) ? $strong2[0] : null;
 }
 
 $db = getDB();
