@@ -54,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare($sql);
         $stmt->execute([...$data, $id]);
         logAudit('update', 'schools', $id, null, $data[2]);
+        $savedId = $id;
         $_SESSION['flash_success'] = 'تم تحديث المدرسة / École mise à jour';
     } else {
         $sql = "INSERT INTO schools (code, name_ar, name_fr, address, address_fr, phone, email,
@@ -63,9 +64,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute($data);
         $newId = $db->lastInsertId();
         logAudit('create', 'schools', $newId, null, $data[2]);
+        $savedId = (int)$newId;
         $_SESSION['flash_success'] = 'تمت إضافة المدرسة / École ajoutée';
     }
-    header('Location: ' . BASE_URL . 'pages/schools.php'); exit;
+    // حفظ المسؤولين الموقّعين (اسم/أجنبي/صفة/هاتف) كـ JSON بجدول الإعدادات لكل مدرسة
+    if (!empty($savedId)) {
+        $names = $_POST['sig_name'] ?? []; $namesFr = $_POST['sig_name_fr'] ?? [];
+        $titles = $_POST['sig_title'] ?? []; $phones = $_POST['sig_phone'] ?? [];
+        $sigs = [];
+        for ($i = 0; $i < count($names); $i++) {
+            $nm = trim((string)($names[$i] ?? ''));
+            if ($nm === '') continue;
+            $sigs[] = [
+                'name'    => $nm,
+                'name_fr' => trim((string)($namesFr[$i] ?? '')),
+                'title'   => trim((string)($titles[$i] ?? '')),
+                'phone'   => trim((string)($phones[$i] ?? '')),
+            ];
+        }
+        setSetting('school_signatories_' . $savedId, $sigs ? json_encode($sigs, JSON_UNESCAPED_UNICODE) : '');
+    }
+    // بعد الحفظ ارجع إلى نفس المدرسة (لا قائمة المدارس) ليبقى المستخدم يرى كل ما حفظه
+    header('Location: ' . BASE_URL . 'pages/schools.php' . (!empty($savedId) ? '?edit=' . $savedId . '#school-form' : '')); exit;
 }
 
 // Soft delete
@@ -86,11 +106,22 @@ if (isset($_GET['delete'])) {
 
 // Edit target
 $editSchool = null;
+$sigList = [];
 if (isset($_GET['edit'])) {
     $stmt = $db->prepare("SELECT * FROM schools WHERE id = ? AND is_deleted = 0");
     $stmt->execute([(int)$_GET['edit']]);
     $editSchool = $stmt->fetch();
+    if ($editSchool) {
+        $raw = getSetting('school_signatories_' . $editSchool['id'], '');
+        $dec = $raw !== '' ? json_decode($raw, true) : null;
+        if (is_array($dec)) $sigList = $dec;
+        // إن لم تُعرّف لائحة بعد، اعرض المدير الحالي كصفّ أوّل ليبدأ منه المستخدم
+        elseif (trim((string)($editSchool['director_name'] ?? '')) !== '') {
+            $sigList[] = ['name' => $editSchool['director_name'], 'name_fr' => $editSchool['director_name_fr'] ?? '', 'title' => 'المدير', 'phone' => $editSchool['phone'] ?? ''];
+        }
+    }
 }
+while (count($sigList) < 3) $sigList[] = ['name' => '', 'name_fr' => '', 'title' => '', 'phone' => ''];
 
 // List with employee counts
 $schools = $db->query("
@@ -207,6 +238,33 @@ include __DIR__ . '/../includes/header.php';
                     <input type="text" name="director_name_fr" class="form-control" dir="ltr" value="<?= e($editSchool['director_name_fr'] ?? '') ?>">
                 </div>
             </div>
+
+            <!-- المسؤولون الموقّعون: تختار منهم عند طباعة/إرسال أي ملف -->
+            <fieldset style="border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin:6px 0 14px">
+                <legend style="font-weight:700;padding:0 8px;color:#1e3a8a"><i class="fas fa-user-tie"></i> المسؤولون الموقّعون / Responsables (اسم + هاتف — تختار منهم عند الطباعة والإرسال)</legend>
+                <p class="text-muted" style="margin:0 0 10px;font-size:13px">يمكنك إدخال حتى <strong>٣ مسؤولين</strong> بأسمائهم وأرقام هواتفهم. عند طباعة أو إرسال أي إفادة، تختار أيّهم يظهر اسمه وهاتفه في التوقيع. (اتركها فارغة ليُستعمل اسم المدير أعلاه.)</p>
+                <?php foreach ($sigList as $si => $sg): ?>
+                <div class="form-row cols-4" style="align-items:end;margin-bottom:6px">
+                    <div class="form-group">
+                        <label class="form-label">الاسم <?= $si + 1 ?> (عربي)</label>
+                        <input type="text" name="sig_name[]" class="form-control" dir="rtl" value="<?= e($sg['name'] ?? '') ?>" placeholder="<?= $si === 0 ? 'اسم المسؤول' : 'اختياري' ?>">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Nom <?= $si + 1 ?> (français)</label>
+                        <input type="text" name="sig_name_fr[]" class="form-control" dir="ltr" value="<?= e($sg['name_fr'] ?? '') ?>" placeholder="تلقائي إن تُرك فارغاً">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">الصفة / Titre</label>
+                        <input type="text" name="sig_title[]" class="form-control" dir="rtl" value="<?= e($sg['title'] ?? '') ?>" placeholder="مثلاً: المدير / المنسّق">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">الهاتف / Téléphone</label>
+                        <input type="text" name="sig_phone[]" class="form-control" dir="ltr" value="<?= e($sg['phone'] ?? '') ?>" placeholder="03/000000">
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </fieldset>
+
             <div class="form-group">
                 <label class="form-check">
                     <input type="checkbox" name="is_active" value="1" <?= (!$editSchool || $editSchool['is_active']) ? 'checked' : '' ?>>

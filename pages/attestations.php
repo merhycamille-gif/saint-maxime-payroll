@@ -67,6 +67,15 @@ $schoolPhone  = $school['phone'] ?? getSetting('school_phone', '');
 $director     = $school['director_name'] ?? '';
 $employerNssf = $school['nssf_employer_number'] ?? '';
 
+// المسؤولون الموقّعون: المستخدم يختار أيّهم يظهر اسمه وهاتفه في التوقيع (الافتراضي الأول/المدير)
+$signatories = schoolSignatories($school);
+$sigIdx = (int)($_GET['sig'] ?? 0);
+if ($sigIdx < 0 || $sigIdx >= count($signatories)) $sigIdx = 0;
+$sig = $signatories[$sigIdx];
+if (trim((string)($sig['name'] ?? '')) !== '') $director = $sig['name'];
+$sigNameFr = $sig['name_fr'] ?? '';
+$sigPhone  = $sig['phone'] ?? '';
+
 include __DIR__ . '/../includes/header.php';
 
 if (!$emp):
@@ -241,7 +250,7 @@ if (!$emp):
     $L=$money($salShown); $N=$money($net); $U='';
     $nssf=cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']);
     $rtl = ($docLang === 'ar');
-    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($cur==='usd'?'&cur=usd':'').($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'');
+    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($cur==='usd'?'&cur=usd':'').($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($sigIdx>0?'&sig='.$sigIdx:'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <a href="<?= BASE_URL ?>pages/attestations.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour / رجوع</a>
@@ -269,6 +278,15 @@ if (!$emp):
             <strong>رأس المدرسة:</strong>
             <input type="hidden" name="logo" value="0">
             <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="logo" value="1" <?= $showLogo?'checked':'' ?> onchange="this.form.submit()"> ضع شعار المدرسة على الإفادة</label>
+            <?php if (count($signatories) > 1): ?>
+            <span style="margin:0 16px;color:#cbd5e1">|</span>
+            <strong>الموقّع المسؤول:</strong>
+            <select name="sig" onchange="this.form.submit()" style="padding:3px 6px;margin-right:6px">
+                <?php foreach ($signatories as $si => $sgo): ?>
+                <option value="<?= $si ?>" <?= $si===$sigIdx?'selected':'' ?>><?= e($sgo['name'] . ($sgo['title']?' — '.$sgo['title']:'') . ($sgo['phone']?' ('.$sgo['phone'].')':'')) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php else: ?><input type="hidden" name="sig" value="0"><?php endif; ?>
             <?php if ($hasComponents || $hasCurrency || $type==='isqat_haq' || $isNotice): ?><span style="margin:0 16px;color:#cbd5e1">|</span><?php endif; ?>
             <?php if ($hasComponents): ?>
             <strong>مكوّنات الراتب:</strong>
@@ -408,7 +426,7 @@ if (!$emp):
         // أجنبي: الشعار فوق على اليسار، والاسم الفرنسي والعنوان (بالأجنبي) والهاتف تحته على اليسار
         // العنوان واسم المدير بالأجنبي: المُدخَل، وإلا ترجمة تلقائية من العربي (لا العربي نفسه)
         $schoolAddrFr = trim((string)($school['address_fr'] ?? '')) ?: ($schoolAddr !== '' ? arNameToFr($schoolAddr) : '');
-        $directorFr   = trim((string)($school['director_name_fr'] ?? '')) ?: ($director !== '' ? arNameToFr($director) : '');
+        $directorFr   = ($sigNameFr !== '') ? $sigNameFr : ($director !== '' ? arNameToFr($director) : '');
         $schoolHeadFr = '<div style="border-bottom:2px solid #1e3a5f;padding-bottom:10px;margin-bottom:18px;text-align:left">'
             . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
             . '<strong style="font-size:17px">' . e($schoolNameFr) . '</strong>'
@@ -431,7 +449,7 @@ if (!$emp):
         <p>يفيد مدير <strong><?= e($schoolNameAr) ?></strong> :</p>
         <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> هو(ـي) مدرّس(ة) في مدرستنا لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> ، باشر(ت) التدريس في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong> ، ويتقاضى راتباً شهرياً قدره <strong><?= $moneyAr($salShown) ?></strong> ، فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> ، ولا يزال(تزال) مستمراً(ة) حتى تاريخه .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
-        <div style="text-align:center;margin-top:42px"><strong>المدير</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <div style="text-align:center;margin-top:42px"><strong>المدير</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'tadris'): ?>
@@ -441,7 +459,7 @@ if (!$emp):
         <p>يفيد مدير <strong><?= e($schoolNameAr) ?></strong> :</p>
         <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> هو(ـي) مدرّس(ة) في مدرستنا لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> ، باشر(ت) التدريس في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong> ، ولا يزال(تزال) مستمراً(ة) حتى تاريخه .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
-        <div style="text-align:center;margin-top:42px"><strong>المدير</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <div style="text-align:center;margin-top:42px"><strong>المدير</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'riaaya'): ?>
@@ -451,7 +469,7 @@ if (!$emp):
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> <?= e($assocTxt) ?> ،</p>
         <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> هو(ـي) معلّم(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
-        <div style="text-align:center;margin-top:42px"><strong>الإدارة</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <div style="text-align:center;margin-top:42px"><strong>الإدارة</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'embassy'): ?>
@@ -462,7 +480,7 @@ if (!$emp):
           <p>To whom it may concern,</p>
           <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">This certificate is given upon his/her request.</p>
-          <div style="text-align:center;margin-top:42px"><strong>Director</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
+          <div style="text-align:center;margin-top:42px"><strong>Director</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>Tel : <?= e($sigPhone) ?></small><?php endif; ?></div>
         </div>
         <?= $footerHtml ?>
 

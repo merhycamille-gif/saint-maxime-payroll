@@ -279,6 +279,49 @@ function allFormToken() {
 }
 
 /**
+ * المسؤولون الموقّعون للمدرسة (اسم + اسم أجنبي + صفة + هاتف) — يختار المستخدم منهم عند الطباعة/الإرسال.
+ * مخزّنون كـ JSON في جدول الإعدادات بمفتاح `school_signatories_<id>` (بلا تعديل بنية قاعدة البيانات).
+ * يُرجِع دائماً عنصراً واحداً على الأقل: إن لم تُعرّف لائحة، يقع على مدير المدرسة (director_name) وهاتفها.
+ */
+function schoolSignatories($school) {
+    $sid = (int)($school['id'] ?? 0);
+    $tr = function ($ar) { return ($ar !== '' && function_exists('arNameToFr')) ? arNameToFr($ar) : $ar; };
+    $out = [];
+    if ($sid) {
+        $raw = getSetting('school_signatories_' . $sid, '');
+        if ($raw !== '') {
+            $arr = json_decode($raw, true);
+            if (is_array($arr)) {
+                foreach ($arr as $s) {
+                    $nm = trim((string)($s['name'] ?? ''));
+                    if ($nm === '') continue;
+                    $nmFr = trim((string)($s['name_fr'] ?? ''));
+                    $out[] = [
+                        'name'     => $nm,
+                        'name_fr'  => $nmFr !== '' ? $nmFr : $tr($nm),
+                        'title'    => trim((string)($s['title'] ?? '')),
+                        'title_fr' => trim((string)($s['title_fr'] ?? '')),
+                        'phone'    => trim((string)($s['phone'] ?? '')),
+                    ];
+                }
+            }
+        }
+    }
+    if (!$out) { // الافتراضي: مدير المدرسة
+        $dn = trim((string)($school['director_name'] ?? ''));
+        $dnFr = trim((string)($school['director_name_fr'] ?? ''));
+        $out[] = [
+            'name'     => $dn,
+            'name_fr'  => $dnFr !== '' ? $dnFr : $tr($dn),
+            'title'    => 'المدير',
+            'title_fr' => 'Directeur',
+            'phone'    => trim((string)($school['phone'] ?? '')),
+        ];
+    }
+    return $out;
+}
+
+/**
  * رقم هاتف لبناني → صيغة wa.me الدولية (961...) لإرسال واتساب.
  */
 function waPhone($phone) {
