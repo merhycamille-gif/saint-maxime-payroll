@@ -131,7 +131,7 @@ $newHidden = $isNew ? '<input type="hidden" name="new" value="1">' : '';
 // لائحة الشهادات للقائمة المنسدلة
 $diplomas = $db->query("SELECT diploma_code, diploma_name_ar, diploma_name_fr, starting_grade FROM diploma_starting_grades ORDER BY starting_grade")->fetchAll();
 // لائحة الصفوف (محصّنة: قد لا يكون الجدول موجوداً قبل migration 015)
-try { $classLevels = $db->query("SELECT id, name FROM class_levels WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll(); }
+try { $classLevels = $db->query("SELECT id, name, name_fr FROM class_levels WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll(); }
 catch (Exception $e) { $classLevels = []; }
 $selClasses = array_filter(array_map('intval', explode(',', (string)($emp['classes_taught'] ?? ''))));
 
@@ -380,7 +380,7 @@ if ($nameSchoolId) {
         <label>الصفوف التي تعلّم فيها — Classes</label>
         <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">
           <?php foreach ($classLevels as $cl): ?>
-            <label style="font-weight:400;white-space:nowrap"><input type="checkbox" name="classes_taught[]" value="<?= (int)$cl['id'] ?>" <?= in_array((int)$cl['id'], $selClasses, true) ? 'checked' : '' ?> style="width:auto;margin-left:4px"> <?= e($cl['name']) ?></label>
+            <label style="font-weight:400;white-space:nowrap"><input type="checkbox" name="classes_taught[]" value="<?= (int)$cl['id'] ?>" <?= in_array((int)$cl['id'], $selClasses, true) ? 'checked' : '' ?> style="width:auto;margin-left:4px"> <?= e(trim((string)$cl['name_fr']) !== '' ? $cl['name_fr'].' / '.$cl['name'] : $cl['name']) ?></label>
           <?php endforeach; ?>
         </div>
       </div>

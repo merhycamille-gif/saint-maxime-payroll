@@ -110,12 +110,8 @@ if (!$emp):
                 </div>
 
                 <?php
-                  // أسماء الصفوف (من class_levels) + ترجمة المرحلة
-                  $clsMap = [];
-                  try { foreach ($db->query("SELECT id, name FROM class_levels") as $r) $clsMap[(int)$r['id']] = $r['name']; } catch (Exception $e) {}
-                  $clsNames = [];
-                  foreach (array_filter(array_map('intval', explode(',', (string)($emp['classes_taught'] ?? '')))) as $cid) { if (isset($clsMap[$cid])) $clsNames[] = $clsMap[$cid]; }
-                  $clsDisplay = $clsNames ? implode('، ', $clsNames) : '—';
+                  // أسماء الصفوف (فرنسي/عربي) عبر الدالة المركزية + ترجمة المرحلة
+                  $clsDisplay = classLevelNames($emp['classes_taught'] ?? '');
                   $niveauMap = ['maternelle'=>'حضانة','primaire'=>'ابتدائي','intermediaire'=>'متوسط','secondaire'=>'ثانوي'];
                   $nivNames = [];
                   foreach (array_filter(explode(',', (string)($emp['niveau_scolaire'] ?? ''))) as $nv) { $nivNames[] = $niveauMap[$nv] ?? $nv; }

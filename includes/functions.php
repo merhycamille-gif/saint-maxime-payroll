@@ -138,7 +138,11 @@ function classLevelNames($csv) {
     static $map = null;
     if ($map === null) {
         $map = [];
-        try { foreach (getDB()->query("SELECT id, name FROM class_levels") as $r) { $map[(int)$r['id']] = $r['name']; } }
+        // العرض: الفرنسي قبل العربي (fr / ar)، أو العربي وحده إن لم يوجد فرنسي
+        try { foreach (getDB()->query("SELECT id, name, name_fr FROM class_levels") as $r) {
+            $fr = trim((string)($r['name_fr'] ?? ''));
+            $map[(int)$r['id']] = $fr !== '' ? ($fr . ' / ' . $r['name']) : $r['name'];
+        } }
         catch (Exception $e) { $map = []; }
     }
     $names = [];

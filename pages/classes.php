@@ -27,10 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $redirect = BASE_URL . 'pages/classes.php';
     if ($action === 'add') {
         $name = trim($_POST['name'] ?? '');
+        $nameFr = trim($_POST['name_fr'] ?? '');
         if ($name !== '') {
             $maxOrder = (int)$db->query("SELECT COALESCE(MAX(sort_order),0) FROM class_levels")->fetchColumn();
-            $db->prepare("INSERT INTO class_levels (name, sort_order, is_active) VALUES (?, ?, 1)")
-               ->execute([$name, $maxOrder + 1]);
+            $db->prepare("INSERT INTO class_levels (name, name_fr, sort_order, is_active) VALUES (?, ?, ?, 1)")
+               ->execute([$name, $nameFr, $maxOrder + 1]);
             $newId = (int)$db->lastInsertId();
             $_SESSION['flash'] = ['type' => 'success', 'msg' => 'تمت إضافة الصف.'];
             $redirect .= '?saved=' . $newId . '#cls' . $newId; // ارجع لنفس مكان الصف الجديد
@@ -38,11 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'update') {
         $id = (int)($_POST['id'] ?? 0);
         $name = trim($_POST['name'] ?? '');
+        $nameFr = trim($_POST['name_fr'] ?? '');
         $sort = (int)($_POST['sort_order'] ?? 0);
         $active = isset($_POST['is_active']) ? 1 : 0;
         if ($id && $name !== '') {
-            $db->prepare("UPDATE class_levels SET name = ?, sort_order = ?, is_active = ? WHERE id = ?")
-               ->execute([$name, $sort, $active, $id]);
+            $db->prepare("UPDATE class_levels SET name = ?, name_fr = ?, sort_order = ?, is_active = ? WHERE id = ?")
+               ->execute([$name, $nameFr, $sort, $active, $id]);
             $_SESSION['flash'] = ['type' => 'success', 'msg' => 'تم حفظ التعديل.'];
             $redirect .= '?saved=' . $id . '#cls' . $id; // ابقَ بنفس مكان الصف لرؤية تأكيد الحفظ
         }
@@ -87,10 +89,14 @@ include __DIR__ . '/../includes/header.php';
         <form method="POST">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="add">
-            <div class="form-row cols-2">
+            <div class="form-row cols-3">
                 <div class="form-group">
-                    <label class="form-label">اسم الصف / Nom de la classe</label>
-                    <input type="text" name="name" class="form-control" placeholder="مثال: الأول ثانوي – علوم" required>
+                    <label class="form-label">الاسم بالفرنسي / Nom (FR)</label>
+                    <input type="text" name="name_fr" class="form-control" placeholder="ex: EB1, Secondaire 1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">الاسم بالعربي</label>
+                    <input type="text" name="name" class="form-control" placeholder="مثال: الأول أساسي" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">&nbsp;</label>
@@ -106,11 +112,12 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body">
         <p style="color:var(--gray-600);margin-top:0">عدّل الاسم أو الترتيب، أو ألغِ تفعيل صفّ ليختفي من خيارات ملف الأستاذ. الترتيب يحدّد تسلسل ظهور الصفوف.</p>
         <table class="table">
-            <thead><tr><th style="width:80px">الترتيب</th><th>اسم الصف</th><th style="width:90px">مُفعّل</th><th style="width:200px">إجراء</th></tr></thead>
+            <thead><tr><th style="width:80px">الترتيب</th><th>الاسم بالفرنسي</th><th>الاسم بالعربي</th><th style="width:90px">مُفعّل</th><th style="width:200px">إجراء</th></tr></thead>
             <tbody>
                 <?php $savedId = (int)($_GET['saved'] ?? 0); foreach ($classes as $c): $fid = 'cls' . $c['id']; $justSaved = ($savedId === (int)$c['id']); ?>
                 <tr<?= !$c['is_active'] ? ' style="opacity:.55"' : ($justSaved ? ' style="background:#e8f9ef"' : '') ?>>
                     <td><input form="<?= $fid ?>" type="number" name="sort_order" class="form-control" value="<?= (int)$c['sort_order'] ?>" style="width:70px"></td>
+                    <td><input form="<?= $fid ?>" type="text" name="name_fr" class="form-control" value="<?= e($c['name_fr'] ?? '') ?>" placeholder="FR"></td>
                     <td><input form="<?= $fid ?>" type="text" name="name" class="form-control" value="<?= e($c['name']) ?>" required></td>
                     <td style="text-align:center"><input form="<?= $fid ?>" type="checkbox" name="is_active" value="1" <?= $c['is_active'] ? 'checked' : '' ?>></td>
                     <td style="white-space:nowrap">
@@ -125,7 +132,7 @@ include __DIR__ . '/../includes/header.php';
                     </td>
                 </tr>
                 <?php endforeach; ?>
-                <?php if (!$classes): ?><tr><td colspan="4" style="text-align:center;color:var(--gray-500)">لا صفوف بعد — أضف من الأعلى.</td></tr><?php endif; ?>
+                <?php if (!$classes): ?><tr><td colspan="5" style="text-align:center;color:var(--gray-500)">لا صفوف بعد — أضف من الأعلى.</td></tr><?php endif; ?>
             </tbody>
         </table>
     </div>

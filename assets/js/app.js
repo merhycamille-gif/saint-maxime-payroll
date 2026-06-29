@@ -17,14 +17,27 @@ document.addEventListener('click', function(e) {
         const tabGroup = e.target.closest('.tabs');
         const tabName = e.target.dataset.tab;
         if (!tabGroup || !tabName) return;
-        
+
         tabGroup.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         e.target.classList.add('active');
-        
+
         const container = tabGroup.parentElement;
         container.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         const target = container.querySelector(`.tab-content[data-tab-content="${tabName}"]`);
         if (target) target.classList.add('active');
+
+        // تذكّر التبويب الحالي في الفورم ليرجع إليه بعد الحفظ
+        const hidden = document.getElementById('activeTabField');
+        if (hidden) hidden.value = tabName;
+    }
+});
+
+// بعد الحفظ: ارجع لنفس التبويب الذي كان مفتوحاً (?tab=...)
+document.addEventListener('DOMContentLoaded', function() {
+    const t = new URLSearchParams(location.search).get('tab');
+    if (t) {
+        const btn = document.querySelector('.tab[data-tab="' + t + '"]');
+        if (btn) btn.click();
     }
 });
 

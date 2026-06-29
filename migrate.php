@@ -41,6 +41,23 @@ try {
     $log[] = ['done', 'تم إضافة عمود الصفوف (classes_taught) لجدول الموظفين.'];
 }
 
+// --- 016: عمود الاسم الفرنسي للصفوف name_fr + تعبئته ---
+try {
+    $db->query("SELECT name_fr FROM class_levels LIMIT 1");
+    $log[] = ['ok', 'عمود الاسم الفرنسي للصفوف (name_fr) موجود مسبقاً — لا حاجة لإجراء.'];
+} catch (Exception $e) {
+    $db->exec("ALTER TABLE class_levels ADD COLUMN name_fr VARCHAR(100) NULL AFTER name");
+    $frMap = [
+        'روضة أولى'=>'PS','روضة ثانية'=>'MS','روضة ثالثة'=>'GS',
+        'الأول أساسي'=>'EB1','الثاني أساسي'=>'EB2','الثالث أساسي'=>'EB3','الرابع أساسي'=>'EB4',
+        'الخامس أساسي'=>'EB5','السادس أساسي'=>'EB6','السابع أساسي'=>'EB7','الثامن أساسي'=>'EB8','التاسع أساسي'=>'EB9',
+        'الأول ثانوي'=>'Secondaire 1','الثاني ثانوي'=>'Secondaire 2','الثالث ثانوي'=>'Secondaire 3',
+    ];
+    $up = $db->prepare("UPDATE class_levels SET name_fr = ? WHERE name = ? AND (name_fr IS NULL OR name_fr = '')");
+    foreach ($frMap as $ar => $fr) { $up->execute([$fr, $ar]); }
+    $log[] = ['done', 'تم إضافة عمود الاسم الفرنسي + تعبئة أسماء الصفوف الافتراضية بالفرنسي.'];
+}
+
 header('Content-Type: text/html; charset=utf-8');
 ?><!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>تحديث قاعدة البيانات</title>

@@ -200,7 +200,7 @@ $diplomaNames = [];
 foreach ($db->query("SELECT diploma_code, diploma_name_ar FROM diploma_starting_grades") as $dr) { $diplomaNames[$dr['diploma_code']] = $dr['diploma_name_ar']; }
 // خريطة أسماء الصفوف (للعرض): id => name (محصّنة قبل migration 015)
 $classNames = [];
-try { foreach ($db->query("SELECT id, name FROM class_levels") as $cr) { $classNames[(int)$cr['id']] = $cr['name']; } } catch (Exception $e) {}
+try { foreach ($db->query("SELECT id, name, name_fr FROM class_levels") as $cr) { $fr = trim((string)($cr['name_fr'] ?? '')); $classNames[(int)$cr['id']] = $fr !== '' ? ($fr.' / '.$cr['name']) : $cr['name']; } } catch (Exception $e) {}
 // حوّل قائمة معرّفات صفوف ("13,14") إلى أسماء مفصولة بفواصل
 $classIdsToNames = function ($csv) use ($classNames) {
     $names = [];

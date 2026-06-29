@@ -368,7 +368,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
             handleEmployeeUploads($db, $id); // رفع الصورة والوثائق (يحدّث الرسالة بعدد الملفات)
-            header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id);
+            $tabQ = ($t = preg_replace('/[^a-z]/', '', $_POST['active_tab'] ?? '')) ? '&tab=' . $t : '';
+            header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id . $tabQ);
             exit;
         } else {
             $set = implode(',', array_map(fn($c) => "$c = :$c", array_keys($data)));
@@ -406,7 +407,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
             handleEmployeeUploads($db, $id); // رفع/تحديث الصورة والوثائق
-            header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id);
+            $tabQ = ($t = preg_replace('/[^a-z]/', '', $_POST['active_tab'] ?? '')) ? '&tab=' . $t : '';
+            header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id . $tabQ);
             exit;
         }
     } catch (Exception $e) {
@@ -679,6 +681,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <form method="POST" enctype="multipart/form-data" id="empForm">
+    <input type="hidden" name="active_tab" id="activeTabField" value="<?= e(preg_replace('/[^a-z]/', '', $_GET['tab'] ?? '')) ?>">
     <!-- Tabs -->
     <div class="tabs">
         <button type="button" class="tab active" data-tab="personal">👤 Personnel</button>
@@ -945,7 +948,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="form-group" style="grid-column:1/-1">
                         <label class="form-label">الصفوف التي يعلّم فيها / Classes enseignées</label>
                         <?php
-                          try { $classLevels = $db->query("SELECT id, name FROM class_levels WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll(); }
+                          try { $classLevels = $db->query("SELECT id, name, name_fr FROM class_levels WHERE is_active = 1 ORDER BY sort_order, id")->fetchAll(); }
                           catch (Exception $e) { $classLevels = []; } // الجدول قد لا يكون موجوداً بعد (قبل تطبيق migration)
                           $selClasses = array_filter(array_map('intval', explode(',', (string)($employee['classes_taught'] ?? ''))));
                         ?>
@@ -954,7 +957,7 @@ include __DIR__ . '/../includes/header.php';
                         <?php else: ?>
                           <div class="d-flex gap-3 mt-2" style="flex-wrap:wrap;gap:14px">
                             <?php foreach ($classLevels as $cl): ?>
-                              <label style="white-space:nowrap;font-weight:400"><input type="checkbox" name="classes_taught[]" value="<?= (int)$cl['id'] ?>" <?= in_array((int)$cl['id'], $selClasses, true) ? 'checked' : '' ?> style="margin-left:4px"> <?= e($cl['name']) ?></label>
+                              <label style="white-space:nowrap;font-weight:400"><input type="checkbox" name="classes_taught[]" value="<?= (int)$cl['id'] ?>" <?= in_array((int)$cl['id'], $selClasses, true) ? 'checked' : '' ?> style="margin-left:4px"> <?= e(trim((string)$cl['name_fr']) !== '' ? $cl['name_fr'].' / '.$cl['name'] : $cl['name']) ?></label>
                             <?php endforeach; ?>
                           </div>
                         <?php endif; ?>
