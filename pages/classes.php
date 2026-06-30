@@ -48,6 +48,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['flash'] = ['type' => 'success', 'msg' => 'تم حفظ التعديل.'];
             $redirect .= '?saved=' . $id . '#cls' . $id; // ابقَ بنفس مكان الصف لرؤية تأكيد الحفظ
         }
+    } elseif ($action === 'seed_defaults') {
+        // إضافة الصفوف اللبنانية الافتراضية (روضات + أساسي 1-9 + ثانوي 1-3) — idempotent، لا يكرّر الموجود
+        $defaults = [
+            ['روضة أولى','PS'], ['روضة ثانية','MS'], ['روضة ثالثة','GS'],
+            ['الأول أساسي','EB1'], ['الثاني أساسي','EB2'], ['الثالث أساسي','EB3'],
+            ['الرابع أساسي','EB4'], ['الخامس أساسي','EB5'], ['السادس أساسي','EB6'],
+            ['السابع أساسي','EB7'], ['الثامن أساسي','EB8'], ['التاسع أساسي','EB9'],
+            ['الأول ثانوي','Secondaire 1'], ['الثاني ثانوي','Secondaire 2'], ['الثالث ثانوي','Secondaire 3'],
+        ];
+        $added = 0; $ord = 0;
+        $exists = $db->prepare("SELECT 1 FROM class_levels WHERE name = ? OR (name_fr <> '' AND name_fr = ?) LIMIT 1");
+        $ins = $db->prepare("INSERT INTO class_levels (name, name_fr, sort_order, is_active) VALUES (?, ?, ?, 1)");
+        foreach ($defaults as [$nm, $fr]) {
+            $ord++;
+            $exists->execute([$nm, $fr]);
+            if ($exists->fetchColumn()) continue;
+            $ins->execute([$nm, $fr, $ord]);
+            $added++;
+        }
+        $_SESSION['flash'] = ['type' => 'success', 'msg' => "تمت إضافة $added صفّ افتراضي" . ($added < 15 ? ' (الباقي موجود أصلاً)' : '') . '. صارت تظهر بفورم الأساتذة.'];
     }
     header('Location: ' . $redirect);
     exit;
@@ -83,8 +103,28 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if ($message): ?><div class="alert alert-<?= $messageType ?>"><?= e($message) ?></div><?php endif; ?>
 
+<?php if (count($classes) === 0): ?>
+<div class="card" style="border:2px solid #0a6b5e">
+    <div class="card-body" style="text-align:center;padding:22px">
+        <p style="font-size:15px;margin-top:0">لسا ما في صفوف معرّفة — لهيك ما بتظهر بفورم الأساتذة. اكبس لإضافة <strong>الصفوف اللبنانية الجاهزة</strong> (روضات + أساسي 1-9 + ثانوي 1-3) دفعة وحدة:</p>
+        <form method="POST" style="margin:0">
+            <?= csrfField() ?><input type="hidden" name="action" value="seed_defaults">
+            <button class="btn" style="background:#0a6b5e;color:#fff;font-size:15px;padding:10px 22px"><i class="fas fa-magic"></i> إضافة الصفوف الافتراضية (15 صفّ)</button>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-plus"></i> إضافة صف جديد / Ajouter une classe</h3></div>
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0"><i class="fas fa-plus"></i> إضافة صف جديد / Ajouter une classe</h3>
+        <?php if (count($classes) > 0): ?>
+        <form method="POST" style="margin:0" onsubmit="return confirm('إضافة الصفوف اللبنانية الافتراضية الناقصة؟');">
+            <?= csrfField() ?><input type="hidden" name="action" value="seed_defaults">
+            <button class="btn btn-sm" style="background:#0a6b5e;color:#fff"><i class="fas fa-magic"></i> إضافة الصفوف الافتراضية</button>
+        </form>
+        <?php endif; ?>
+    </div>
     <div class="card-body">
         <form method="POST">
             <?= csrfField() ?>
