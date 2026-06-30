@@ -188,10 +188,12 @@ if (!$emp):
     $subjects = trim((string)$emp['subjects_taught']);
     $isTit = $emp['employee_type'] === 'enseignant_titulaire';
 
-    // آخر شهر راتب فعلي (غير صفري) — حتى لا تأخذ الإفادة شهراً فارغاً/ناقصاً (يطلع الإضافي 0)
-    // فيه مكوّنات الراتب كاملةً. fallback: آخر صفّ مهما كان إن لم يوجد صفّ غير صفري.
+    // آخر شهر **مدفوع كامل (صافي > 0)** — فيه كل مكوّنات الراتب (أساس + إضافي + مكافأة).
+    // لا تأخذ شهراً ناقصاً (أساس محسوب بلا صافي/إضافي → يطلع الإضافي 0). الأولوية:
+    // (1) صافي>0، ثم (2) أي مكوّن>0، ثم الأحدث زمنياً. fallback: آخر صفّ مهما كان.
     $sal = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ?
-        ORDER BY (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0 OR prime_fixe_lbp > 0 OR extra_lbp > 0) DESC,
+        ORDER BY (net_salary_lbp > 0) DESC,
+                 (prime_fixe_lbp > 0 OR extra_lbp > 0 OR base_plus_echelon_lbp > 0) DESC,
                  year DESC, month DESC LIMIT 1");
     $sal->execute([$employeeId]); $sal = $sal->fetch();
     if ($sal) {
