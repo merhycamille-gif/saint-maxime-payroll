@@ -13,6 +13,75 @@ $currentPage = 'open_year';
 $pageTitle = 'Ouvrir une année / فتح سنة دراسية';
 $db = getDB();
 
+/**
+ * يطبّق «درجات القانون» المستحقّة للأستاذ الملاك عند فتح سنة جديدة:
+ *   (1) التدرّج العادي  → مؤرّخ {y1}-10-01 (تشرين الأول)
+ *   (2) الدرجات الاستثنائية → مؤرّخة {y2}-01-01 (كانون الثاني)
+ * يعتمد على **دالة القانون المعتمدة المختبَرة `buildLegalGradeHistory` (وضع dryRun، بلا أي كتابة)**
+ * لتحديد مقدار كل نوع للسنة الجديدة = الفرق بين (درجة نهاية السنة الجديدة) و(درجة نهاية السنة السابقة)
+ * قانوناً — فلا تخمين، ونفس منطق 4+4+2 والقوانين والإجازة التعليمية والحقب يُحترَم تماماً.
+ *  - الأساس (grade_before) = درجة الأستاذ في نهاية السنة السابقة من السجلّ (تشمل سنين فُتحت سابقاً)
+ *    فيصحّ عند فتح سنين متتالية. لا يلمس current_grade ولا السنين السابقة. السقف 52.
+ *  - idempotent: إن وُجد حدث بتاريخ السنة الجديدة (فُتحت سابقاً) لا يُعاد.
+ *  - أمان: إن كانت الدرجة المخزّنة لا تطابق القانون (مضبوطة يدوياً/منقولة) → تدرّج عادي بسيط (≤0.5)
+ *    فقط بلا استثنائي (لا نخمّن استثنائياً لأستاذ خارج القانون).
+ * يُرجع عدد الأحداث المضافة (0/1/2).
+ */
+function applyLegalGradesForNewYear($db, $empId, $y1, $y2) {
+    $e = $db->prepare("SELECT employee_type, current_grade FROM employees WHERE id = ?");
+    $e->execute([$empId]);
+    $e = $e->fetch(PDO::FETCH_ASSOC);
+    if (!$e || $e['employee_type'] !== 'enseignant_titulaire') return 0;
+
+    $ordDate = sprintf('%04d-10-01', $y1);  // تشرين الأول للسنة الجديدة
+    $excDate = sprintf('%04d-01-01', $y2);  // كانون الثاني للسنة الجديدة
+    // idempotent: السنة الجديدة فُتحت سابقاً لهذا الأستاذ؟ (الأحداث المضافة من «فتح السنة» تُعلَّم
+    // بالـnotes؛ ملاحظة: العمود reason ENUM لا يقبل 'exceptional' فيُخزَّن فارغاً — لذا نعتمد notes).
+    $chk = $db->prepare("SELECT 1 FROM employee_grade_history WHERE employee_id=? AND change_date IN (?,?) AND notes LIKE '%(فتح السنة)%' LIMIT 1");
+    $chk->execute([$empId, $ordDate, $excDate]);
+    if ($chk->fetchColumn()) return 0;
+
+    // الأساس = درجة نهاية السنة السابقة من السجلّ (تشمل أي سنين فُتحت سابقاً)
+    $rs = $db->prepare("SELECT grade_after FROM employee_grade_history WHERE employee_id=? AND grade_after>=1 AND change_date<? ORDER BY change_date DESC, id DESC LIMIT 1");
+    $rs->execute([$empId, $ordDate]);
+    $running = $rs->fetchColumn();
+    $running = ($running === false || $running === null) ? (float)$e['current_grade'] : (float)$running;
+    if ($running >= 52) return 0;
+
+    // مقدار درجات السنة الجديدة قانوناً (بلا كتابة): فرق نهاية السنة الجديدة عن نهاية السنة السابقة
+    try {
+        $prev = buildLegalGradeHistory($empId, sprintf('%04d-09-30', $y1), true); // cAY = y1-1 (نهاية السنة السابقة)
+        $new  = buildLegalGradeHistory($empId, sprintf('%04d-09-30', $y2), true); // cAY = y1   (نهاية السنة الجديدة)
+    } catch (Exception $ex) { return 0; }
+    $ordDelta = round((float)$new['ordinary']    - (float)$prev['ordinary'], 1);
+    $excDelta = round((float)$new['exceptional'] - (float)$prev['exceptional'], 1);
+    // أمان: درجة مخزّنة لا تطابق القانون → تدرّج عادي بسيط فقط
+    if (abs((float)$prev['final_grade'] - $running) >= 0.01) { $ordDelta = min(max($ordDelta, 0.0), 0.5); $excDelta = 0.0; }
+
+    $applied = 0;
+    // (1) التدرّج العادي — تشرين الأول
+    if ($ordDelta > 0 && $running < 52) {
+        $after = min(52.0, round($running + $ordDelta, 1));
+        if ($after > $running) {
+            $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes)
+                          VALUES (?,?,?,?,1,?,'biennial_promotion','تدرّج عادي سنوي (فتح السنة)')")
+               ->execute([$empId, $running, $after, round($after-$running,1), $ordDate]);
+            $running = $after; $applied++;
+        }
+    }
+    // (2) الدرجات الاستثنائية — كانون الثاني
+    if ($excDelta > 0 && $running < 52) {
+        $after = min(52.0, round($running + $excDelta, 1));
+        if ($after > $running) {
+            $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes)
+                          VALUES (?,?,?,?,1,?,'exceptional','درجات استثنائية بالقانون (فتح السنة)')")
+               ->execute([$empId, $running, $after, round($after-$running,1), $excDate]);
+            $applied++;
+        }
+    }
+    return $applied;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open') {
     $schoolId = isSuperAdmin() ? (int)($_POST['school_id'] ?? 0) : currentSchoolId();
     $newYear  = trim($_POST['new_year'] ?? '');
@@ -30,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         // مصدر النقل للموظف المنقول بلا إعداد: آخر راتب فعلي معروف قبل السنة الجديدة
         $srcStmt = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND net_salary_lbp > 0
                                  AND (year < ? OR (year = ? AND month < 10)) ORDER BY year DESC, month DESC LIMIT 1");
-        $n = 0; $carried = 0;
+        $n = 0; $carried = 0; $promoted = 0;
         foreach ($emps->fetchAll() as $emp) {
             $months = ((int)$emp['payment_months_per_year'] === 10)
                 ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
@@ -40,6 +109,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
                        || (float)$emp['base_salary_usd'] > 0
                        || (float)$emp['contract_salary_lbp'] > 0);
             if ($hasConfig) {
+                // الملاك: طبّق درجات القانون المستحقّة لهذه السنة (تدرّج عادي 1/10 + استثنائية 1/1) قبل الحساب
+                if ($emp['employee_type'] === 'enseignant_titulaire'
+                    && applyLegalGradesForNewYear($db, (int)$emp['id'], $y1, $y2)) $promoted++;
                 foreach ($months as [$m, $y]) {
                     try { (new PayrollCalculator((int)$emp['id'], $m, $y))->calculateAndSave(); } catch (Exception $e) {}
                 }
@@ -72,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
             }
         }
         $_SESSION['active_school_year'] = $newYear;
-        $_SESSION['flash_success'] = "تم فتح السنة $newYear للمدرسة — $n موظف محسوب بالقانون و $carried موظف نُقِل راتبه كما هو (التاركون لم يُنقَلوا).";
+        $_SESSION['flash_success'] = "تم فتح السنة $newYear للمدرسة — $n موظف محسوب بالقانون (منهم $promoted أستاذ ملاك طُبّقت درجاتهم المستحقّة تلقائياً: تدرّج عادي + درجات استثنائية بالقانون) و $carried موظف نُقِل راتبه كما هو (التاركون لم يُنقَلوا).";
         header('Location: ' . BASE_URL . 'pages/open_year.php');
         exit;
     }
@@ -93,12 +165,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear
     } elseif (!$allSch && $schoolId <= 0) {
         $_SESSION['flash_error'] = 'اختر مدرسة (أو «كل المدارس»)';
     } else {
+        // تواريخ درجات القانون المضافة آلياً لهذه السنة عند فتحها: التدرّج العادي (1/10 من سنة البدء)
+        // والدرجات الاستثنائية (1/1 من سنة الانتهاء). بما أنّ السنة مستقبلية، أي حدث بهذين التاريخين
+        // أضافه «فتح السنة» حصراً → يُحذفان ليُعكَس الفتح بالكامل.
+        $clrY1 = (int)substr($clrYear, 0, 4);
+        $clrOrdDate = sprintf('%04d-10-01', $clrY1);
+        $clrExcDate = sprintf('%04d-01-01', $clrY1 + 1);
         if ($allSch) {
             $st = $db->prepare("DELETE FROM monthly_salaries WHERE school_year = ?");
             $st->execute([$clrYear]);
+            $db->prepare("DELETE FROM employee_grade_history WHERE change_date IN (?,?) AND notes LIKE '%(فتح السنة)%'")
+               ->execute([$clrOrdDate, $clrExcDate]);
         } else {
             $st = $db->prepare("DELETE FROM monthly_salaries WHERE school_year = ? AND school_id = ?");
             $st->execute([$clrYear, $schoolId]);
+            $db->prepare("DELETE FROM employee_grade_history WHERE change_date IN (?,?) AND notes LIKE '%(فتح السنة)%'
+                          AND employee_id IN (SELECT id FROM employees WHERE school_id = ?)")
+               ->execute([$clrOrdDate, $clrExcDate, $schoolId]);
         }
         $deleted = $st->rowCount();
         $scope = $allSch ? 'كل المدارس' : ('مدرسة ' . (currentSchool()['name_ar'] ?? $schoolId));
