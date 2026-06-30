@@ -458,11 +458,18 @@ if ($action === 'list') {
         $like = "%$search%";
         array_push($params, $like, $like, $like, $like, $like);
     }
-    // فلترة حسب السنة الدراسية المختارة من الأعلى (دالة موحّدة):
-    //  «كل السنين» = الكل؛ سنة محددة = فقط مَن إلهم رواتب فعلية بتلك السنة (أساتذة/موظفو تلك السنة).
-    [$yf, $yp] = yearEmploymentFilter(activeSchoolYear());
-    $sql .= $yf;
-    $params = array_merge($params, $yp);
+    // فلترة حسب السنة الدراسية المختارة من الأعلى:
+    //  «كل السنين» = الكل؛ سنة محددة = مَن إلهم رواتب فعلية بتلك السنة، **بالإضافة إلى الأساتذة الجدد
+    //  بلا أي راتب فعلي بعد** (المُنشَؤون حديثاً) ليظهروا باللائحة فيتمكّن المستخدم من إيجادهم وإعداد رواتبهم.
+    $activeSY = activeSchoolYear();
+    if ($activeSY !== 'all') {
+        $sql .= " AND (
+                id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))
+                OR id NOT IN (SELECT employee_id FROM monthly_salaries WHERE base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)
+            )
+            AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL";
+        $params[] = $activeSY;
+    }
     $sql .= " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)";
 
     $stmt = $db->prepare($sql);
