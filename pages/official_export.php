@@ -103,7 +103,37 @@ if ($form === 'cnss_work_attestation') {
 
     $ok = officialTemplateExport(__DIR__ . '/../assets/templates/cnss_work_attestation.xlsx', $cells, $format,
         'Afadat_Amal_' . $empId . '_' . $d . '-' . $mo . '-' . $yr);
-    if (!$ok) { http_response_code(500); die('تعذّر توليد الإفادة (تحقّق من أدوات Python/LibreOffice)'); }
+    // بديل أونلاين (بلا أدوات Python/LibreOffice): عرض الإفادة كصفحة HTML رسمية تُطبَع من المتصفّح → PDF.
+    if (!$ok) {
+        $rows = '';
+        for ($i = 0; $i < 7; $i++) {
+            $rows .= '<tr><td>' . htmlspecialchars($cells['B' . (10 + $i)]) . '</td><td>'
+                  . htmlspecialchars($cells['E' . (10 + $i)]) . '</td></tr>';
+        }
+        $empNo = trim($p1 . ' - ' . $p2 . ' - ' . $p3, ' -');
+        header('Content-Type: text/html; charset=UTF-8');
+        echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>إفادة عمل للضمان</title>'
+           . '<style>@page{size:A4;margin:18mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+           . 'body{font-family:"Cairo",Arial,sans-serif;direction:rtl;color:#000;font-size:14px;line-height:1.9}'
+           . '.wrap{max-width:780px;margin:0 auto}h1{text-align:center;font-size:18px;margin:6px 0}'
+           . '.sub{text-align:center;margin-bottom:18px;font-size:13px}.row{margin:6px 0}.lbl{font-weight:bold}'
+           . 'table{width:100%;border-collapse:collapse;margin:14px 0}td{border:1px solid #444;padding:7px 10px;text-align:center}'
+           . 'thead td{background:#1e3a8a;color:#fff;font-weight:bold}.sig{margin-top:40px;text-align:left}'
+           . '.noprint{margin:14px 0;text-align:center}@media print{.noprint{display:none}}</style></head><body><div class="wrap">'
+           . '<div class="noprint"><button onclick="window.print()" style="padding:8px 18px;font-size:15px;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ احفظ كـ PDF / اطبع</button></div>'
+           . '<h1>إفادة عمل</h1><div class="sub">مديرية ضمان المرض والأمومة — الصندوق الوطني للضمان الاجتماعي</div>'
+           . '<div class="row"><span class="lbl">المؤسسة:</span> ' . htmlspecialchars($esch['name_ar'] ?? '') . '</div>'
+           . '<div class="row"><span class="lbl">رقم المؤسسة في الضمان:</span> ' . htmlspecialchars($empNo) . '</div>'
+           . '<div class="row"><span class="lbl">الاسم الثلاثي:</span> ' . htmlspecialchars($name) . '</div>'
+           . '<div class="row"><span class="lbl">رقم الضمان:</span> ' . htmlspecialchars($emp['nssf_number'] ?? '') . ''
+           . ' &nbsp;&nbsp; <span class="lbl">سنة الولادة:</span> ' . htmlspecialchars($cells['R6']) . '</div>'
+           . '<p>تشهد المؤسسة المذكورة أعلاه أنّ المضمون المذكور يعمل لديها دواماً كاملاً خلال الأشهر التالية:</p>'
+           . '<table><thead><tr><td>الشهر</td><td>الدوام</td></tr></thead><tbody>' . $rows . '</tbody></table>'
+           . '<div class="sig">حُرّر في: ' . $d . ' / ' . $mo . ' / ' . $yr . '<br><br>الخاتم والتوقيع</div>'
+           . '<script>setTimeout(function(){window.print();},600);</script>'
+           . '</div></body></html>';
+        exit;
+    }
 }
 
 http_response_code(400);

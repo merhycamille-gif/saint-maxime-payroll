@@ -40,7 +40,13 @@ if (!$cfg) {
     sendResult(false, 'لم تُضبَط إعدادات البريد بعد. افتح «إعدادات البريد» وأدخل إيميل المدرسة وكلمة المرور.', BASE_URL . 'pages/email_settings.php');
 }
 
-// توليد الـPDF عبر نفس آلية الطباعة الرسمية (Chrome/puppeteer)
+$baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+$cookieName = session_name();
+$cookieValue = session_id();
+$schoolName = getSetting('school_name_ar', currentSchool()['name_ar'] ?? '');
+$subject = 'إفادة - ' . $schoolName;
+
+// أداة توليد PDF عبر Chrome/puppeteer (متوفّرة محلياً). أونلاين (بلا الأداة): نرسل الإفادة HTML.
 $node = null;
 foreach (['C:/Program Files/nodejs/node.exe', 'node'] as $n) {
     if ($n === 'node' || @is_file($n)) { $node = $n; break; }
@@ -48,32 +54,46 @@ foreach (['C:/Program Files/nodejs/node.exe', 'node'] as $n) {
 $script = __DIR__ . '/../tools/page_to_pdf.js';
 $tmpDir = __DIR__ . '/../tmp';
 if (!is_dir($tmpDir)) @mkdir($tmpDir, 0777, true);
-if (!$node || !is_file($script) || !is_dir(__DIR__ . '/../tools/node_modules/puppeteer-core')) {
-    sendResult(false, 'أداة توليد PDF غير متوفّرة على الخادم', $back);
+$hasPuppeteer = ($node && is_file($script) && is_dir(__DIR__ . '/../tools/node_modules/puppeteer-core'));
+
+if ($hasPuppeteer) {
+    // ----- محلياً: PDF رسمي مرفق -----
+    $url = $baseUrl . BASE_URL . $target . (strpos($target, '?') !== false ? '&' : '?') . '_pdf=1';
+    session_write_close();
+    $uid = uniqid('mail', true);
+    $out = $tmpDir . '/' . $uid . '.pdf';
+    $cmd = escapeshellarg($node) . ' ' . escapeshellarg($script) . ' '
+         . escapeshellarg(str_replace('\\', '/', $out)) . ' ' . escapeshellarg($url) . ' '
+         . escapeshellarg($cookieName) . ' ' . escapeshellarg($cookieValue) . ' \'\' 2>&1';
+    @shell_exec($cmd);
+    if (!is_file($out) || filesize($out) < 400) { @unlink($out); sendResult(false, 'تعذّر توليد ملف الإفادة', $back); }
+    $pdf = file_get_contents($out);
+    @unlink($out);
+    $body = "السلام عليكم،\n\nمرفق الإفادة المطلوبة بصيغة PDF.\n\n" . $schoolName;
+    [$ok, $err] = smtpSendMail($cfg, $to, $subject, $body, [['name' => $name . '.pdf', 'data' => $pdf, 'mime' => 'application/pdf']]);
+} else {
+    // ----- أونلاين (بلا puppeteer): نجلب نصّ الإفادة (#ppExportArea) ونرسله كبريد HTML -----
+    $url = $baseUrl . BASE_URL . $target;
+    session_write_close();
+    $html = '';
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIE => $cookieName . '=' . $cookieValue,
+            CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 25, CURLOPT_SSL_VERIFYPEER => false]);
+        $html = (string)curl_exec($ch); curl_close($ch);
+    }
+    $content = '';
+    if ($html !== '') {
+        // استخرج محتوى منطقة الإفادة #ppExportArea (وإلا أرسل الصفحة كما هي)
+        if (preg_match('#<div[^>]*id=["\']ppExportArea["\'][^>]*>(.*?)</div>\s*(?:<div[^>]*class=["\'][^"\']*export|<script|</body)#is', $html, $mm)) {
+            $content = $mm[1];
+        } else { $content = $html; }
+    }
+    if ($content === '') sendResult(false, 'تعذّر جلب نصّ الإفادة لإرسالها', $back);
+    $body = '<div dir="rtl" style="font-family:Arial,sans-serif">' . $content
+          . '<hr><div style="color:#555;font-size:13px">' . htmlspecialchars($schoolName) . '</div></div>';
+    [$ok, $err] = smtpSendMail($cfg, $to, $subject, $body, [], true);
 }
-
-$baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-$url = $baseUrl . BASE_URL . $target . (strpos($target, '?') !== false ? '&' : '?') . '_pdf=1';
-$cookieName = session_name();
-$cookieValue = session_id();
-$schoolName = getSetting('school_name_ar', currentSchool()['name_ar'] ?? '');
-session_write_close(); // حرّر القفل ليفتح Chrome الصفحة بنفس الجلسة
-
-$uid = uniqid('mail', true);
-$out = $tmpDir . '/' . $uid . '.pdf';
-$cmd = escapeshellarg($node) . ' ' . escapeshellarg($script) . ' '
-     . escapeshellarg(str_replace('\\', '/', $out)) . ' ' . escapeshellarg($url) . ' '
-     . escapeshellarg($cookieName) . ' ' . escapeshellarg($cookieValue) . ' \'\' 2>&1';
-@shell_exec($cmd);
-if (!is_file($out) || filesize($out) < 400) { @unlink($out); sendResult(false, 'تعذّر توليد ملف الإفادة', $back); }
-$pdf = file_get_contents($out);
-@unlink($out);
-
-$subject = 'إفادة - ' . $schoolName;
-$body = "السلام عليكم،\n\nمرفق الإفادة المطلوبة بصيغة PDF.\n\n" . $schoolName;
-[$ok, $err] = smtpSendMail($cfg, $to, $subject, $body, [
-    ['name' => $name . '.pdf', 'data' => $pdf, 'mime' => 'application/pdf'],
-]);
 
 if ($ok) sendResult(true, "تم إرسال الإفادة إلى $to بنجاح", $back);
 sendResult(false, "فشل الإرسال: $err", $back);

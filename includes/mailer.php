@@ -11,7 +11,7 @@
  * @param array $attachments  كل عنصر ['name'=>, 'data'=>, 'mime'=>]
  * @return array [bool ok, string error]
  */
-function smtpSendMail(array $cfg, $to, $subject, $bodyText, array $attachments = [])
+function smtpSendMail(array $cfg, $to, $subject, $bodyText, array $attachments = [], $isHtml = false)
 {
     $host = $cfg['host'] ?? '';
     $port = (int)($cfg['port'] ?? 0);
@@ -74,7 +74,8 @@ function smtpSendMail(array $cfg, $to, $subject, $bodyText, array $attachments =
     $H .= "MIME-Version: 1.0\r\n";
     $H .= "Content-Type: multipart/mixed; boundary=\"$boundary\"\r\n";
     $body  = $H . "\r\n";
-    $body .= "--$boundary\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($bodyText)) . "\r\n";
+    $bodyMime = $isHtml ? 'text/html' : 'text/plain';
+    $body .= "--$boundary\r\nContent-Type: $bodyMime; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($bodyText)) . "\r\n";
     foreach ($attachments as $att) {
         $body .= "--$boundary\r\n";
         $body .= "Content-Type: " . ($att['mime'] ?? 'application/octet-stream') . "; name=\"" . $att['name'] . "\"\r\n";
