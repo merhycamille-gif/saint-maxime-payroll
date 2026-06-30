@@ -243,6 +243,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear
     exit;
 }
 
+// ⭐ تعديل الإضافات/تعويض النقل لسنة مفتوحة (شك مارك) — يضيف أو يشيل بلا تفريغ السنة كلها:
+// مفعّل = ينقل من السنة الماضية (إن لم يكن موجوداً)؛ مطفأ = يشيلهم. ثم يعيد حساب رواتب تلك السنة فقط.
+// محصور بالسنين المستقبلية (المفتوحة للتجهيز) حفاظاً على السنة الجارية.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_additions') {
+    $schoolId = isSuperAdmin() ? (int)($_POST['ba_school_id'] ?? 0) : currentSchoolId();
+    $yr = trim($_POST['ba_year'] ?? '');
+    $addOn   = !empty($_POST['ba_add']);
+    $transOn = !empty($_POST['ba_trans']);
+    if (!preg_match('/^\d{4}-\d{4}$/', $yr)) {
+        $_SESSION['flash_error'] = 'اختر سنة صحيحة';
+    } elseif ($yr <= currentSchoolYear()) {
+        $_SESSION['flash_error'] = 'هذا الخيار للسنين المستقبلية (المفتوحة للتجهيز) فقط.';
+    } elseif ($schoolId <= 0) {
+        $_SESSION['flash_error'] = 'اختر مدرسة';
+    } else {
+        [$y1, $y2] = schoolYearToYears($yr);
+        $prevSY = ($y1 - 1) . '-' . $y1;
+        $addTypes = ['prime_fixe', 'aide_complementaire'];
+        $trTypes  = ['transport_complement', 'transport_daily'];
+        $emps = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp
+            FROM employees WHERE school_id = ? AND is_deleted = 0 AND status = 'actif'
+              AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL");
+        $emps->execute([$schoolId]);
+        $cnt = 0;
+        foreach ($emps->fetchAll(PDO::FETCH_ASSOC) as $emp) {
+            $id = (int)$emp['id'];
+            // العلاوات: مفعّل → انقل من السنة الماضية (idempotent)؛ مطفأ → احذفها لهذه السنة
+            if ($addOn) copyYearBonuses($db, $id, $prevSY, $yr, $addTypes, 'same', 0);
+            else $db->prepare("DELETE FROM employee_bonuses WHERE employee_id=? AND school_year=? AND bonus_type IN ('prime_fixe','aide_complementaire')")->execute([$id, $yr]);
+            if ($transOn) copyYearBonuses($db, $id, $prevSY, $yr, $trTypes, 'same', 0);
+            else $db->prepare("DELETE FROM employee_bonuses WHERE employee_id=? AND school_year=? AND bonus_type IN ('transport_complement','transport_daily')")->execute([$id, $yr]);
+
+            $hasConfig = ($emp['employee_type'] === 'enseignant_titulaire' || (float)$emp['base_salary_usd'] > 0 || (float)$emp['contract_salary_lbp'] > 0);
+            $months = ((int)$emp['payment_months_per_year'] === 10)
+                ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
+                : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
+            if ($hasConfig) {
+                // الملاك/المُعَدّ: أعِد حساب أشهر السنة فقط (المحرّك يقرأ حالة العلاوات الجديدة) — لا يمسّ الدرجات
+                foreach ($months as [$m, $y]) { try { (new PayrollCalculator($id, $m, $y))->calculateAndSave(); } catch (Exception $e) {} }
+            } else {
+                // المتعاقد المنقول بالصفّ: عدّل أعمدة الإضافات/النقل مباشرةً وصحّح الصافي/المجموع
+                foreach ($months as [$m, $y]) {
+                    $rs = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id=? AND year=? AND month=? LIMIT 1");
+                    $rs->execute([$id, $y, $m]); $r = $rs->fetch(PDO::FETCH_ASSOC); if (!$r) continue;
+                    $oldAdd = (float)$r['extra_lbp'] + (float)$r['prime_fixe_lbp'] + (float)$r['aide_complementaire_lbp'];
+                    $oldTr  = (float)$r['transport_complement_lbp'] + (float)$r['transport_lbp'];
+                    if (!$addOn) { $r['extra_lbp']=0; $r['prime_fixe_lbp']=0; $r['aide_complementaire_lbp']=0; }
+                    elseif ($oldAdd == 0) { $p=$db->prepare("SELECT extra_lbp,prime_fixe_lbp,aide_complementaire_lbp FROM monthly_salaries WHERE employee_id=? AND year=? AND month=? AND (extra_lbp+prime_fixe_lbp+aide_complementaire_lbp)>0 LIMIT 1"); $p->execute([$id,$y-1,$m]); if($ps=$p->fetch(PDO::FETCH_ASSOC)){ $r['extra_lbp']=$ps['extra_lbp']; $r['prime_fixe_lbp']=$ps['prime_fixe_lbp']; $r['aide_complementaire_lbp']=$ps['aide_complementaire_lbp']; } }
+                    if (!$transOn) { $r['transport_complement_lbp']=0; $r['transport_lbp']=0; }
+                    elseif ($oldTr == 0) { $p=$db->prepare("SELECT transport_complement_lbp,transport_lbp FROM monthly_salaries WHERE employee_id=? AND year=? AND month=? AND (transport_complement_lbp+transport_lbp)>0 LIMIT 1"); $p->execute([$id,$y-1,$m]); if($ps=$p->fetch(PDO::FETCH_ASSOC)){ $r['transport_complement_lbp']=$ps['transport_complement_lbp']; $r['transport_lbp']=$ps['transport_lbp']; } }
+                    $newAdd = (float)$r['extra_lbp'] + (float)$r['prime_fixe_lbp'] + (float)$r['aide_complementaire_lbp'];
+                    $newTr  = (float)$r['transport_complement_lbp'] + (float)$r['transport_lbp'];
+                    $db->prepare("UPDATE monthly_salaries SET extra_lbp=?, prime_fixe_lbp=?, aide_complementaire_lbp=?, transport_complement_lbp=?, transport_lbp=?,
+                        net_salary_lbp=GREATEST(0, net_salary_lbp + ?), total_due_lbp=GREATEST(0, total_due_lbp + ?) WHERE id=?")
+                       ->execute([$r['extra_lbp'],$r['prime_fixe_lbp'],$r['aide_complementaire_lbp'],$r['transport_complement_lbp'],$r['transport_lbp'], round($newAdd-$oldAdd), round(($newAdd-$oldAdd)+($newTr-$oldTr)), $r['id']]);
+                }
+            }
+            $cnt++;
+        }
+        $_SESSION['flash_success'] = "تم تحديث $cnt موظف لسنة $yr — الأجر الإضافي والمكافأة: " . ($addOn ? 'موجودة ✓' : 'مشيولة ✗') . "، تعويض النقل: " . ($transOn ? 'موجود ✓' : 'مشيول ✗') . ".";
+    }
+    header('Location: ' . BASE_URL . 'pages/open_year.php');
+    exit;
+}
+
 include __DIR__ . '/../includes/header.php';
 
 // السنوات الموجودة لكل مدرسة (للعرض)
@@ -310,6 +375,48 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
 
             <div style="margin-top:14px">
                 <button type="submit" class="btn btn-primary"><i class="fas fa-folder-plus"></i> افتح السنة / Ouvrir</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ⭐ شك مارك: إضافة/إزالة الإضافات وتعويض النقل لسنة مفتوحة بلا تفريغها -->
+<div class="card" style="border:2px solid #0a6b5e">
+    <div class="card-header" style="background:#e6f4f1"><h3 style="color:#0a6b5e"><i class="fas fa-toggle-on"></i> تعديل الإضافات وتعويض النقل لسنة مفتوحة (بلا تفريغ)</h3></div>
+    <div class="card-body">
+        <div class="alert alert-info" style="margin-bottom:12px">
+            <i class="fas fa-info-circle"></i>
+            للسنة المفتوحة: <strong>صحّ المربّع = موجودة (تُنقَل من السنة الماضية)، شيل الصحّ = تنشال</strong> — بلا ما تفرّغ السنة ولا تعيد الأساتذة. يعيد حساب رواتب تلك السنة فقط (لا يمسّ الدرجات ولا السنة الجارية).
+        </div>
+        <form method="POST" onsubmit="return confirm('تطبيق التعديل على إضافات/نقل السنة المختارة؟');">
+            <input type="hidden" name="action" value="set_additions">
+            <div class="form-row cols-3" style="align-items:end">
+                <?php if (isSuperAdmin()): ?>
+                <div class="form-group mb-0">
+                    <label class="form-label">المدرسة / École</label>
+                    <select name="ba_school_id" class="form-select" required>
+                        <option value="">— اختر —</option>
+                        <?php foreach (allSchools() as $s): ?>
+                            <option value="<?= (int)$s['id'] ?>" <?= currentSchoolId() === (int)$s['id'] ? 'selected' : '' ?>><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php else: ?><input type="hidden" name="ba_school_id" value="<?= currentSchoolId() ?>"><?php endif; ?>
+                <div class="form-group mb-0">
+                    <label class="form-label">السنة المفتوحة</label>
+                    <select name="ba_year" class="form-select" required>
+                        <?php for ($yb = $startN + 3; $yb >= $startN + 1; $yb--): $syb = $yb . '-' . ($yb + 1); ?>
+                            <option value="<?= $syb ?>"><?= $syb ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div class="form-group mb-0">
+                    <label style="display:block;cursor:pointer;margin:4px 0;font-weight:bold"><input type="checkbox" name="ba_add" value="1" checked> الأجر الإضافي + المكافأة</label>
+                    <label style="display:block;cursor:pointer;margin:4px 0;font-weight:bold"><input type="checkbox" name="ba_trans" value="1" checked> تعويض النقل</label>
+                </div>
+            </div>
+            <div style="margin-top:12px">
+                <button type="submit" class="btn" style="background:#0a6b5e;color:#fff"><i class="fas fa-check"></i> طبّق على السنة</button>
             </div>
         </form>
     </div>
