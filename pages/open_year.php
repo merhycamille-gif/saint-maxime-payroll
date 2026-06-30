@@ -80,6 +80,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
     exit;
 }
 
+// تفريغ سنة دراسية مستقبلية: يحذف كل رواتب تلك السنة (للمدرسة أو لكل المدارس) — للسنين
+// اللاحقة للسنة الجارية فقط (أمان: لا يمكن مسح رواتب السنة الحالية أو السابقة من هنا).
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear_year') {
+    $clrYear = trim($_POST['clear_year_val'] ?? '');
+    $allSch  = isSuperAdmin() && ($_POST['clear_school_id'] ?? '') === 'all';
+    $schoolId = $allSch ? 0 : (isSuperAdmin() ? (int)($_POST['clear_school_id'] ?? 0) : currentSchoolId());
+    if (!preg_match('/^\d{4}-\d{4}$/', $clrYear)) {
+        $_SESSION['flash_error'] = 'اختر سنة دراسية صحيحة';
+    } elseif ($clrYear <= currentSchoolYear()) {
+        $_SESSION['flash_error'] = 'لا يمكن تفريغ السنة الجارية أو سنة سابقة — فقط السنين المستقبلية.';
+    } elseif (!$allSch && $schoolId <= 0) {
+        $_SESSION['flash_error'] = 'اختر مدرسة (أو «كل المدارس»)';
+    } else {
+        if ($allSch) {
+            $st = $db->prepare("DELETE FROM monthly_salaries WHERE school_year = ?");
+            $st->execute([$clrYear]);
+        } else {
+            $st = $db->prepare("DELETE FROM monthly_salaries WHERE school_year = ? AND school_id = ?");
+            $st->execute([$clrYear, $schoolId]);
+        }
+        $deleted = $st->rowCount();
+        $scope = $allSch ? 'كل المدارس' : ('مدرسة ' . (currentSchool()['name_ar'] ?? $schoolId));
+        $_SESSION['flash_success'] = "تم تفريغ السنة $clrYear ($scope) — حُذف $deleted صفّ راتب. صارت السنة فاضية، فيك تفتحها من جديد وقت تجهّز أساتذتها.";
+    }
+    header('Location: ' . BASE_URL . 'pages/open_year.php');
+    exit;
+}
+
 include __DIR__ . '/../includes/header.php';
 
 // السنوات الموجودة لكل مدرسة (للعرض)
@@ -124,6 +152,47 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                 <div class="form-group mb-0">
                     <label class="form-label">&nbsp;</label>
                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-folder-plus"></i> افتح السنة / Ouvrir</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card" style="border:2px solid #e11d48">
+    <div class="card-header" style="background:#fdeef1"><h3 style="color:#b91c3a"><i class="fas fa-eraser"></i> تفريغ سنة دراسية مستقبلية</h3></div>
+    <div class="card-body">
+        <div class="alert" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b">
+            <i class="fas fa-exclamation-triangle"></i>
+            بيحذف <strong>كل رواتب السنة المختارة</strong> فتصير فاضية (مثلاً إذا انفتحت بالغلط أو بدّك تجهّزها من جديد). للأمان: <strong>بس السنين المستقبلية</strong> (السنة الجارية <?= e(currentSchoolYear()) ?> والسابقة ما بتنحذف من هون). ملفات الأساتذة ودرجاتهم بتضل سليمة — بس بيتفضّى حساب رواتب تلك السنة.
+        </div>
+        <form method="POST" onsubmit="return confirm('متأكّد إنّك بدّك تفرّغ كل رواتب السنة المختارة؟ بترجع تفتحها وقت بدّك.');">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" value="clear_year">
+            <div class="form-row cols-3">
+                <?php if (isSuperAdmin()): ?>
+                <div class="form-group mb-0">
+                    <label class="form-label">المدرسة / École</label>
+                    <select name="clear_school_id" class="form-select" required>
+                        <option value="all">🏫 كل المدارس</option>
+                        <?php foreach (allSchools() as $s): ?>
+                            <option value="<?= (int)$s['id'] ?>"><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php else: ?>
+                    <input type="hidden" name="clear_school_id" value="<?= currentSchoolId() ?>">
+                <?php endif; ?>
+                <div class="form-group mb-0">
+                    <label class="form-label">السنة المراد تفريغها</label>
+                    <select name="clear_year_val" class="form-select" required>
+                        <?php for ($yc = $startN + 3; $yc >= $startN + 1; $yc--): $syc = $yc . '-' . ($yc + 1); ?>
+                            <option value="<?= $syc ?>"><?= $syc ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn w-100" style="background:#e11d48;color:#fff"><i class="fas fa-eraser"></i> فرّغ السنة</button>
                 </div>
             </div>
         </form>
