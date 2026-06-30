@@ -82,6 +82,31 @@ function applyLegalGradesForNewYear($db, $empId, $y1, $y2) {
     return $applied;
 }
 
+/**
+ * نسخ علاوات أستاذ (إضافات/تعويض نقل) من السنة السابقة إلى السنة الجديدة عند فتحها.
+ * $mode: 'same' (كما هي) | 'none' (لا تنسخ) | 'pct' (مع زيادة/نقص بنسبة $pct%).
+ * idempotent: لا تكرّر علاوة (نوع+فترة) موجودة أصلاً للسنة الجديدة. علاوات النسبة المئوية تبقى كما هي.
+ */
+function copyYearBonuses($db, $empId, $prevSY, $newSY, array $types, $mode, $pct) {
+    if ($mode === 'none' || !$types) return 0;
+    $factor = ($mode === 'pct') ? (1 + (float)$pct / 100) : 1.0;
+    $in = implode(',', array_fill(0, count($types), '?'));
+    $sel = $db->prepare("SELECT * FROM employee_bonuses WHERE employee_id=? AND school_year=? AND is_active=1 AND bonus_type IN ($in)");
+    $sel->execute(array_merge([$empId, $prevSY], $types));
+    $cnt = 0;
+    foreach ($sel->fetchAll(PDO::FETCH_ASSOC) as $b) {
+        $chk = $db->prepare("SELECT 1 FROM employee_bonuses WHERE employee_id=? AND school_year=? AND bonus_type=? AND period_number=? LIMIT 1");
+        $chk->execute([$empId, $newSY, $b['bonus_type'], $b['period_number']]);
+        if ($chk->fetchColumn()) continue;
+        $amt = ($b['value_type'] === 'percent') ? (float)$b['amount'] : round((float)$b['amount'] * $factor, 2);
+        $db->prepare("INSERT INTO employee_bonuses (employee_id,bonus_type,period_number,school_year,amount,value_type,currency,start_month,end_month,is_active)
+                      VALUES (?,?,?,?,?,?,?,?,?,1)")
+           ->execute([$empId, $b['bonus_type'], $b['period_number'], $newSY, $amt, $b['value_type'], $b['currency'], $b['start_month'], $b['end_month']]);
+        $cnt++;
+    }
+    return $cnt;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open') {
     $schoolId = isSuperAdmin() ? (int)($_POST['school_id'] ?? 0) : currentSchoolId();
     $newYear  = trim($_POST['new_year'] ?? '');
@@ -91,6 +116,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         $_SESSION['flash_error'] = 'اختر سنة دراسية صحيحة';
     } else {
         [$y1, $y2] = schoolYearToYears($newYear);
+        $prevSY = ($y1 - 1) . '-' . $y1;   // السنة السابقة (مصدر الإضافات/النقل عند النقل)
+        // خيارات الإضافات (الأجر الإضافي + المكافأة) وتعويض النقل: same=نفس السنة الماضية / none=بلا / pct=بنسبة
+        $addMode   = in_array($_POST['add_mode']   ?? 'same', ['same','none','pct'], true) ? ($_POST['add_mode']   ?? 'same') : 'same';
+        $transMode = in_array($_POST['trans_mode'] ?? 'same', ['same','none','pct'], true) ? ($_POST['trans_mode'] ?? 'same') : 'same';
+        $addPct    = (float)($_POST['add_pct']   ?? 0);
+        $transPct  = (float)($_POST['trans_pct'] ?? 0);
+        $addFactor   = $addMode   === 'none' ? 0.0 : ($addMode   === 'pct' ? 1 + $addPct/100   : 1.0);
+        $transFactor = $transMode === 'none' ? 0.0 : ($transMode === 'pct' ? 1 + $transPct/100 : 1.0);
         // الأساتذة/الموظفون الفاعلون غير التاركين بهالمدرسة
         $emps = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp FROM employees
                               WHERE school_id = ? AND is_deleted = 0 AND status = 'actif'
@@ -112,6 +145,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
                 // الملاك: طبّق درجات القانون المستحقّة لهذه السنة (تدرّج عادي 1/10 + استثنائية 1/1) قبل الحساب
                 if ($emp['employee_type'] === 'enseignant_titulaire'
                     && applyLegalGradesForNewYear($db, (int)$emp['id'], $y1, $y2)) $promoted++;
+                // انقل الإضافات وتعويض النقل للسنة الجديدة حسب اختيار المستخدم (قبل الحساب ليقرأها المحرّك)
+                copyYearBonuses($db, (int)$emp['id'], $prevSY, $newYear, ['prime_fixe','aide_complementaire'], $addMode, $addPct);
+                copyYearBonuses($db, (int)$emp['id'], $prevSY, $newYear, ['transport_complement','transport_daily'], $transMode, $transPct);
                 foreach ($months as [$m, $y]) {
                     try { (new PayrollCalculator((int)$emp['id'], $m, $y))->calculateAndSave(); } catch (Exception $e) {}
                 }
@@ -132,6 +168,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
                     unset($src['id'], $src['created_at'], $src['updated_at']);
                     $src['month'] = $m; $src['year'] = $y; $src['school_year'] = $newYear;
                     $src['is_paid'] = 0; $src['paid_date'] = null;
+                    // المتعاقد المنقول بالصفّ: طبّق اختيار الإضافات/النقل (none=صفّر، pct=نسبة) وصحّح الصافي/المجموع
+                    if ($addMode !== 'same' || $transMode !== 'same') {
+                        $oldAdd = (float)($src['extra_lbp'] ?? 0) + (float)($src['prime_fixe_lbp'] ?? 0) + (float)($src['aide_complementaire_lbp'] ?? 0);
+                        $oldTr  = (float)($src['transport_complement_lbp'] ?? 0) + (float)($src['transport_lbp'] ?? 0);
+                        foreach (['extra_lbp','prime_fixe_lbp','aide_complementaire_lbp'] as $c) if (isset($src[$c])) $src[$c] = round((float)$src[$c] * $addFactor);
+                        foreach (['transport_complement_lbp','transport_lbp'] as $c) if (isset($src[$c])) $src[$c] = round((float)$src[$c] * $transFactor);
+                        $newAdd = (float)($src['extra_lbp'] ?? 0) + (float)($src['prime_fixe_lbp'] ?? 0) + (float)($src['aide_complementaire_lbp'] ?? 0);
+                        $newTr  = (float)($src['transport_complement_lbp'] ?? 0) + (float)($src['transport_lbp'] ?? 0);
+                        if (isset($src['net_salary_lbp'])) $src['net_salary_lbp'] = max(0, round((float)$src['net_salary_lbp'] + ($newAdd - $oldAdd)));
+                        if (isset($src['total_due_lbp'])) $src['total_due_lbp'] = max(0, round((float)$src['total_due_lbp'] + ($newAdd - $oldAdd) + ($newTr - $oldTr)));
+                    }
                     $cols = array_keys($src);
                     $colList = '`' . implode('`,`', $cols) . '`';
                     $ph = implode(',', array_fill(0, count($cols), '?'));
@@ -176,12 +223,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear
             $st->execute([$clrYear]);
             $db->prepare("DELETE FROM employee_grade_history WHERE change_date IN (?,?) AND notes LIKE '%(فتح السنة)%'")
                ->execute([$clrOrdDate, $clrExcDate]);
+            // العلاوات (إضافات/نقل) المنسوخة لهذه السنة عند فتحها
+            $db->prepare("DELETE FROM employee_bonuses WHERE school_year = ?")->execute([$clrYear]);
         } else {
             $st = $db->prepare("DELETE FROM monthly_salaries WHERE school_year = ? AND school_id = ?");
             $st->execute([$clrYear, $schoolId]);
             $db->prepare("DELETE FROM employee_grade_history WHERE change_date IN (?,?) AND notes LIKE '%(فتح السنة)%'
                           AND employee_id IN (SELECT id FROM employees WHERE school_id = ?)")
                ->execute([$clrOrdDate, $clrExcDate, $schoolId]);
+            $db->prepare("DELETE FROM employee_bonuses WHERE school_year = ?
+                          AND employee_id IN (SELECT id FROM employees WHERE school_id = ?)")
+               ->execute([$clrYear, $schoolId]);
         }
         $deleted = $st->rowCount();
         $scope = $allSch ? 'كل المدارس' : ('مدرسة ' . (currentSchool()['name_ar'] ?? $schoolId));
@@ -210,7 +262,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
         </div>
         <form method="POST" onsubmit="return confirm('فتح السنة المختارة لهذه المدرسة ونقل الموظفين الفاعلين؟');">
             <input type="hidden" name="action" value="open">
-            <div class="form-row cols-3">
+            <div class="form-row cols-2">
                 <?php if (isSuperAdmin()): ?>
                 <div class="form-group mb-0">
                     <label class="form-label">المدرسة / École</label>
@@ -232,10 +284,32 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                         <?php endfor; ?>
                     </select>
                 </div>
-                <div class="form-group mb-0">
-                    <label class="form-label">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-folder-plus"></i> افتح السنة / Ouvrir</button>
+            </div>
+
+            <!-- خيارات نقل الإضافات وتعويض النقل للسنة الجديدة -->
+            <div style="margin-top:14px;padding:12px 14px;background:#f0f9f6;border:1px solid #b6e3d4;border-radius:8px">
+                <strong style="color:#0a6b5e"><i class="fas fa-coins"></i> الإضافات وتعويض النقل في السنة الجديدة:</strong>
+                <div class="form-row cols-2" style="margin-top:10px;gap:18px">
+                    <div>
+                        <div class="form-label" style="font-weight:bold">الأجر الإضافي + المكافأة</div>
+                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="add_mode" value="same" checked onchange="document.getElementById('add_pct').disabled=true"> نفس السنة الماضية</label>
+                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="add_mode" value="none" onchange="document.getElementById('add_pct').disabled=true"> بلا (لا تنقلها)</label>
+                        <label style="cursor:pointer;margin:3px 0"><input type="radio" name="add_mode" value="pct" onchange="document.getElementById('add_pct').disabled=false"> مع تعديل بنسبة:</label>
+                        <input type="number" id="add_pct" name="add_pct" value="0" step="0.5" disabled style="width:75px;padding:3px 6px"> %
+                    </div>
+                    <div>
+                        <div class="form-label" style="font-weight:bold">تعويض النقل</div>
+                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="trans_mode" value="same" checked onchange="document.getElementById('trans_pct').disabled=true"> نفس السنة الماضية</label>
+                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="trans_mode" value="none" onchange="document.getElementById('trans_pct').disabled=true"> بلا (لا تنقلها)</label>
+                        <label style="cursor:pointer;margin:3px 0"><input type="radio" name="trans_mode" value="pct" onchange="document.getElementById('trans_pct').disabled=false"> مع تعديل بنسبة:</label>
+                        <input type="number" id="trans_pct" name="trans_pct" value="0" step="0.5" disabled style="width:75px;padding:3px 6px"> %
+                    </div>
                 </div>
+                <small style="color:#64748b;display:block;margin-top:8px">«نفس السنة الماضية» = ينقل قيمة كل أستاذ كما هي. «بلا» = تبدأ السنة بلا إضافات/نقل (تُدخلها لاحقاً). «بنسبة» = ينقلها مع زيادة/نقص (مثال: 10 = +10٪، -5 = ‑5٪). وبأي حال فيك تعدّل قيمة أي أستاذ من ملفه بعد الفتح.</small>
+            </div>
+
+            <div style="margin-top:14px">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-folder-plus"></i> افتح السنة / Ouvrir</button>
             </div>
         </form>
     </div>
