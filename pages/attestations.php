@@ -210,8 +210,13 @@ if (!$emp):
     // خيار مكوّنات الراتب في الإفادة: الأساس بعد التدرّج وحده، أو + الأجر الإضافي، أو + مكافأة ومساعدة
     $extraW = $sal ? (int)((float)$sal['extra_lbp'] + (float)$sal['prime_fixe_lbp']) : 0;
     $aideW  = $sal ? (int)(float)$sal['aide_complementaire_lbp'] : 0;
-    $incExtra = !empty($_GET['inc_extra']);
-    $incAide  = !empty($_GET['inc_aide']);
+    // المكوّنات (الأجر الإضافي + المكافأة/المساعدة) **مفعّلة افتراضياً** لأنّها جزء أساسي من الراتب
+    // الفعلي (غالباً الأجر الإضافي هو معظم الراتب)، فتطلع الإفادة بالراتب الكامل بلا ما يضطرّ
+    // المستخدم يفعّلها كل مرّة. عند أوّل فتح (opts_set غير موجود) = مفعّلة؛ بعد أي تفاعل مع الفورم
+    // (يُرسَل opts_set=1) تُحترَم حالة المربّع الفعلية (يقدر يطفّيها إن أراد).
+    $optsSet  = !empty($_GET['opts_set']);
+    $incExtra = $optsSet ? !empty($_GET['inc_extra']) : true;
+    $incAide  = $optsSet ? !empty($_GET['inc_aide'])  : true;
     $salShown = (int)$basePlusEch + ($incExtra ? $extraW : 0) + ($incAide ? $aideW : 0);
     // العملة: ليرة (افتراضي) أو دولار — التحويل عبر سعر صرف شهر الراتب
     $cur = (($_GET['cur'] ?? 'lbp') === 'usd') ? 'usd' : 'lbp';
@@ -251,7 +256,7 @@ if (!$emp):
     $L=$money($salShown); $N=$money($net); $U='';
     $nssf=cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']);
     $rtl = ($docLang === 'ar');
-    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($cur==='usd'?'&cur=usd':'').($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($sigIdx>0?'&sig='.$sigIdx:'');
+    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($cur==='usd'?'&cur=usd':'').($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($sigIdx>0?'&sig='.$sigIdx:'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <a href="<?= BASE_URL ?>pages/attestations.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour / رجوع</a>
@@ -275,6 +280,7 @@ if (!$emp):
         <input type="hidden" name="type" value="<?= e($type) ?>">
         <input type="hidden" name="lang_doc" value="<?= e($docLang) ?>">
         <input type="hidden" name="date" value="<?= e($effDate) ?>">
+        <input type="hidden" name="opts_set" value="1">
         <div class="card-body" style="padding:10px 14px">
             <strong>رأس المدرسة:</strong>
             <input type="hidden" name="logo" value="0">
