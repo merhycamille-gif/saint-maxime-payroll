@@ -132,6 +132,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         if (($data['days_per_week'] ?? '') !== '') $emp['days_per_week'] = (int)$data['days_per_week'];
         if (($data['hours_per_week'] ?? '') !== '') $emp['hours_per_week'] = (float)$data['hours_per_week'];
         foreach ($uploadCols as $c) { if (!empty($sub[$c])) $emp[$c] = $sub[$c]; }
+        // الراتب الأساسي المُدخَل بالفورم (بالعملة المختارة): دولار→direct_usd، ليرة→direct_lbp
+        $salAmt = (float)($data['new_salary'] ?? 0);
+        if ($salAmt > 0) {
+            if (($data['new_salary_cur'] ?? 'LBP') === 'USD') { $emp['salary_input_mode'] = 'direct_usd'; $emp['base_salary_usd'] = $salAmt; }
+            else { $emp['salary_input_mode'] = 'direct_lbp'; $emp['contract_salary_lbp'] = (int)round($salAmt); }
+        }
         // ترجمة تلقائية للأسماء للفرنسي إن كان فارغاً (مثل employees.php)
         if (empty($emp['first_name_fr']) && !empty($emp['first_name_ar'])) $emp['first_name_fr'] = arNameToFr($emp['first_name_ar'], 'first');
         if (empty($emp['last_name_fr']) && !empty($emp['last_name_ar']))   $emp['last_name_fr']  = arNameToFr($emp['last_name_ar'], 'last');
@@ -142,9 +148,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         $newId = (int)$db->lastInsertId();
         $db->prepare("UPDATE employees SET employee_code = ? WHERE id = ?")->execute(['EMP' . str_pad($newId, 4, '0', STR_PAD_LEFT), $newId]);
         $db->prepare("UPDATE info_submissions SET status='applied', applied_at=NOW(), employee_id=? WHERE id=?")->execute([$newId, $sub['id']]);
-        // ولّد رواتب سنة الدخول (تكون صفراً حتى يُدخل المدير الراتب التعاقدي، فلا يظهر في سنة سابقة)
+        // الأجر الإضافي + تعويض النقل كعلاوات لسنة الدخول (بالعملة المختارة) — قبل إعادة الحساب
+        $insBonus = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+                                  VALUES (?, ?, 1, ?, ?, 'amount', ?, NULL, NULL, 1)");
+        foreach (['new_extra' => 'prime_fixe', 'new_transport' => 'transport_complement'] as $dk => $btype) {
+            $amt = (float)($data[$dk] ?? 0);
+            if ($amt > 0) {
+                $cur = (($data[$dk . '_cur'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP';
+                $insBonus->execute([$newId, $btype, $entryYear, $amt, $cur]);
+            }
+        }
+        // ولّد رواتب سنة الدخول (تشمل الراتب + الإضافي + النقل المُدخَلة بالفورم)
         try { recalcEmployeeYear($newId, $entryYear); } catch (Exception $ex) {}
-        $_SESSION['flash_success'] = "تم إنشاء ملف الأستاذ الجديد لسنة الدخول $entryYear. أكمِل الإعداد المالي (الراتب التعاقدي) من ملف الأستاذ ليظهر في تلك السنة.";
+        $hadPay = ($salAmt > 0) || ((float)($data['new_extra'] ?? 0) > 0) || ((float)($data['new_transport'] ?? 0) > 0);
+        $_SESSION['flash_success'] = "تم إنشاء ملف الأستاذ الجديد لسنة الدخول $entryYear" . ($hadPay ? ' مع راتبه وإضافاته ونقله. راجِع ملفه للتأكّد.' : '. أكمِل الإعداد المالي من ملف الأستاذ ليظهر في تلك السنة.');
         header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $newId); exit;
     }
     header('Location: ' . BASE_URL . 'pages/info_collect.php#newteachers'); exit;

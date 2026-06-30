@@ -193,6 +193,11 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($isNew) {
         $ey = trim((string)($_POST['entry_school_year'] ?? ''));
         $data['entry_school_year'] = in_array($ey, $entryYearOptions, true) ? $ey : $defaultEntryYear;
+        // الراتب الأساسي + الأجر الإضافي + تعويض النقل (كلٌّ بعملته) — تُجهَّز عند إنشاء الملف
+        foreach (['new_salary','new_extra','new_transport'] as $nf) {
+            $data[$nf] = (float)($_POST[$nf] ?? 0);
+            $data[$nf . '_cur'] = (($_POST[$nf . '_cur'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP';
+        }
     }
 
     // ارفع السكانات (اختياري) إلى uploads/submissions
@@ -338,6 +343,29 @@ if ($nameSchoolId) {
             <option value="<?= e($ey) ?>" <?= $ey === $defaultEntryYear ? 'selected' : '' ?>><?= e($ey) ?></option>
           <?php endforeach; ?>
         </select>
+      </div>
+
+      <h3 style="margin-top:16px">الراتب والإضافات (للأستاذ الجديد)</h3>
+      <div class="note" style="margin-bottom:8px">حدّد المبالغ الشهرية — كلٌّ بعملته (ليرة أو دولار). تُجهَّز تلقائياً عند إنشاء الملف، وفيك تعدّلها لاحقاً من ملف الأستاذ.</div>
+      <div class="grid">
+        <?php
+          $newPayFields = [
+            'new_salary'    => 'الراتب الأساسي الشهري / Salaire de base',
+            'new_extra'     => 'الأجر الإضافي الشهري / Indemnité supplémentaire',
+            'new_transport' => 'تعويض النقل الشهري / Transport',
+          ];
+          foreach ($newPayFields as $nf => $nlbl): $curName = $nf . '_cur'; ?>
+          <div>
+            <label><?= e($nlbl) ?></label>
+            <div style="display:flex;gap:6px">
+              <input type="number" name="<?= $nf ?>" value="<?= e($_POST[$nf] ?? '') ?>" step="any" min="0" placeholder="0" style="flex:1;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px">
+              <select name="<?= $curName ?>" style="width:80px;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px">
+                <option value="LBP" <?= (($_POST[$curName] ?? 'LBP') === 'LBP') ? 'selected' : '' ?>>ل.ل</option>
+                <option value="USD" <?= (($_POST[$curName] ?? '') === 'USD') ? 'selected' : '' ?>>$</option>
+              </select>
+            </div>
+          </div>
+        <?php endforeach; ?>
       </div>
       <?php endif; ?>
       <h3>المعلومات الشخصية</h3>
