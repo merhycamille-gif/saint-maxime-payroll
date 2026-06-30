@@ -594,6 +594,8 @@ body.rtl .table th { text-align: right; }
     .main-content, .page-content { padding: 0; }
     .card { box-shadow: none; border: none; }
     body { background: white; }
+    /* اطبع الخلفيات والألوان والترويسات الرسمية كما تظهر (صور الترويسة، الرؤوس الملوّنة) */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
 /* =================== Switch =================== */

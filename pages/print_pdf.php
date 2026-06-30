@@ -23,9 +23,11 @@ foreach (['C:/Program Files/nodejs/node.exe', 'node'] as $n) {
 $script = __DIR__ . '/../tools/page_to_pdf.js';
 $tmpDir = __DIR__ . '/../tmp';
 if (!is_dir($tmpDir)) @mkdir($tmpDir, 0777, true);
+// رابط العودة لصفحة الطباعة مع تشغيل طباعة المتصفّح تلقائياً (للبيئة بلا أدوات خادم = الموقع الأونلاين):
+// المستخدم يختار «حفظ كـ PDF» من حوار الطباعة فيطلع نفس الشكل الرسمي بلا أي أداة على الخادم.
+$autoprintUrl = BASE_URL . $target . (strpos($target, '?') !== false ? '&' : '?') . '_autoprint=1';
 if (!$node || !is_file($script) || !is_dir(__DIR__ . '/../tools/node_modules/puppeteer-core')) {
-    // لا أداة طباعة → عُد لصفحة الطباعة العادية
-    header('Location: ' . BASE_URL . $target); exit;
+    header('Location: ' . $autoprintUrl); exit;
 }
 
 $base = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
@@ -49,7 +51,7 @@ if (!empty($_GET['pdebug'])) @file_put_contents($tmpDir . '/page_pdf_debug.txt',
 
 if (!is_file($out) || filesize($out) < 400) {
     @unlink($out);
-    header('Location: ' . BASE_URL . $target); exit; // fallback للطباعة اليدوية
+    header('Location: ' . $autoprintUrl); exit; // fallback للطباعة اليدوية (طباعة المتصفّح → حفظ كـPDF)
 }
 $data = file_get_contents($out);
 @unlink($out);
