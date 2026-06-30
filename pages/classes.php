@@ -21,6 +21,9 @@ if (!$tableExists) {
     include __DIR__ . '/../includes/footer.php';
     exit;
 }
+// تصحيح ذاتي: لو عمود الاسم الفرنسي (name_fr) ناقص أونلاين (migration 016 لم يُطبَّق) أضِفه — يمنع خطأ 500 عند الإضافة
+try { $db->query("SELECT name_fr FROM class_levels LIMIT 1"); }
+catch (Exception $e) { try { $db->exec("ALTER TABLE class_levels ADD COLUMN name_fr VARCHAR(100) NULL AFTER name"); } catch (Exception $e2) {} }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';

@@ -13,9 +13,18 @@ $db = getDB();
 $log = [];
 
 // --- 015: جدول الصفوف class_levels ---
+$seedClasses = "INSERT INTO class_levels (name, sort_order) VALUES
+        ('روضة أولى',1),('روضة ثانية',2),('روضة ثالثة',3),
+        ('الأول أساسي',4),('الثاني أساسي',5),('الثالث أساسي',6),
+        ('الرابع أساسي',7),('الخامس أساسي',8),('السادس أساسي',9),
+        ('السابع أساسي',10),('الثامن أساسي',11),('التاسع أساسي',12),
+        ('الأول ثانوي',13),('الثاني ثانوي',14),('الثالث ثانوي',15)";
 try {
     $db->query("SELECT 1 FROM class_levels LIMIT 1");
-    $log[] = ['ok', 'جدول الصفوف (class_levels) موجود مسبقاً — لا حاجة لإجراء.'];
+    // الجدول موجود — لكن قد يكون فارغاً (أُنشئ سابقاً بلا تعبئة) → عبّئه
+    $cntCls = (int)$db->query("SELECT COUNT(*) FROM class_levels")->fetchColumn();
+    if ($cntCls === 0) { $db->exec($seedClasses); $log[] = ['done', 'جدول الصفوف كان فارغاً — تم تعبئة 15 صفّاً افتراضياً.']; }
+    else { $log[] = ['ok', "جدول الصفوف موجود وفيه $cntCls صفّ — لا حاجة لإجراء."]; }
 } catch (Exception $e) {
     $db->exec("CREATE TABLE class_levels (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -23,12 +32,7 @@ try {
         sort_order INT NOT NULL DEFAULT 0,
         is_active TINYINT(1) NOT NULL DEFAULT 1
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-    $db->exec("INSERT INTO class_levels (name, sort_order) VALUES
-        ('روضة أولى',1),('روضة ثانية',2),('روضة ثالثة',3),
-        ('الأول أساسي',4),('الثاني أساسي',5),('الثالث أساسي',6),
-        ('الرابع أساسي',7),('الخامس أساسي',8),('السادس أساسي',9),
-        ('السابع أساسي',10),('الثامن أساسي',11),('التاسع أساسي',12),
-        ('الأول ثانوي',13),('الثاني ثانوي',14),('الثالث ثانوي',15)");
+    $db->exec($seedClasses);
     $log[] = ['done', 'تم إنشاء جدول الصفوف + إضافة 15 صفّاً افتراضياً.'];
 }
 
