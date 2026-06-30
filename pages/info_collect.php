@@ -151,7 +151,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         // الأجر الإضافي + تعويض النقل كعلاوات لسنة الدخول (بالعملة المختارة) — قبل إعادة الحساب
         $insBonus = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
                                   VALUES (?, ?, 1, ?, ?, 'amount', ?, NULL, NULL, 1)");
-        foreach (['new_extra' => 'prime_fixe', 'new_transport' => 'transport_complement'] as $dk => $btype) {
+        // الأجر الإضافي = علاوة شهرية (prime_fixe)؛ تعويض النقل = علاوة يومية (transport_daily)
+        // تُضرَب بأيام الحضور × الأسابيع تلقائياً في المحرّك.
+        foreach (['new_extra' => 'prime_fixe', 'new_transport' => 'transport_daily'] as $dk => $btype) {
             $amt = (float)($data[$dk] ?? 0);
             if ($amt > 0) {
                 $cur = (($data[$dk . '_cur'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP';

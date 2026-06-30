@@ -346,13 +346,13 @@ if ($nameSchoolId) {
       </div>
 
       <h3 style="margin-top:16px">الراتب والإضافات (للأستاذ الجديد)</h3>
-      <div class="note" style="margin-bottom:8px">حدّد المبالغ الشهرية — كلٌّ بعملته (ليرة أو دولار). تُجهَّز تلقائياً عند إنشاء الملف، وفيك تعدّلها لاحقاً من ملف الأستاذ.</div>
+      <div class="note" style="margin-bottom:8px">الراتب والأجر الإضافي <strong>شهريان</strong>؛ تعويض النقل <strong>لليوم الواحد</strong> (يُضرَب تلقائياً بعدد أيام الحضور الأسبوعية × 4). كلٌّ بعملته (ليرة أو دولار). تُجهَّز تلقائياً عند إنشاء الملف، وفيك تعدّلها لاحقاً من ملف الأستاذ.</div>
       <div class="grid">
         <?php
           $newPayFields = [
             'new_salary'    => 'الراتب الأساسي الشهري / Salaire de base',
             'new_extra'     => 'الأجر الإضافي الشهري / Indemnité supplémentaire',
-            'new_transport' => 'تعويض النقل الشهري / Transport',
+            'new_transport' => 'تعويض النقل — لليوم الواحد / Transport (par jour)',
           ];
           foreach ($newPayFields as $nf => $nlbl): $curName = $nf . '_cur'; ?>
           <div>
