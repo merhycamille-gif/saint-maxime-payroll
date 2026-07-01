@@ -189,6 +189,12 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // الصفوف التي يعلّم فيها (معرّفات class_levels مفصولة بفواصل)
     $data['classes_taught'] = is_array($_POST['classes_taught'] ?? null)
         ? implode(',', array_map('intval', $_POST['classes_taught'])) : '';
+    // تاريخ ترك العمل (للأستاذ الحالي فقط، اختياري): إن كتبه الأستاذ فهو ينوي ترك العمل.
+    // يُعتمد من المدير فيُسجَّل تاريخ الترك (الضمان/المالية/الصندوق) فيخرج من السنة الجارية.
+    if (!$isNew) {
+        $ld = trim((string)($_POST['leave_date'] ?? ''));
+        if ($ld !== '' && strtotime($ld)) $data['leave_date'] = date('Y-m-d', strtotime($ld));
+    }
     // سنة الدخول (للأستاذ الجديد فقط) — يجب أن تكون ضمن الخيارات المسموحة (القادمة فأكثر)
     if ($isNew) {
         $ey = trim((string)($_POST['entry_school_year'] ?? ''));
@@ -445,6 +451,16 @@ if ($nameSchoolId) {
           </div>
         <?php endforeach; ?>
       </div>
+      <?php if (!$isNew): ?>
+      <h3 style="color:#b45309;border-bottom-color:#fde68a">ترك العمل (اختياري) / Départ</h3>
+      <div class="note" style="background:#fffbeb;border-color:#fde68a;color:#92400e;margin-bottom:8px">
+        إذا كنت <strong>ستترك العمل</strong>، اكتب <strong>تاريخ الترك</strong> بالأسفل. أمّا إذا كنت <strong>مستمراً في عملك</strong> فاترك هذا الحقل <strong>فارغاً</strong>.
+      </div>
+      <div style="max-width:300px">
+        <label>تاريخ ترك العمل / Date de départ</label>
+        <input type="date" name="leave_date" value="<?= e($emp['left_date_cnss'] ?? '') ?>">
+      </div>
+      <?php endif; ?>
       <h3>السكانات (اختياري — صورة أو PDF)</h3>
       <div class="note" style="margin-bottom:8px"><i>📎 ارفع مستنداتك بأي شكل عندك (صورة أو PDF، كبيرة أو صغيرة) — كلها مقبولة حتى لو حجمها كبير. 📷 والصور تُضغط تلقائياً قبل الرفع (وتبقى واضحة) فترفع أسرع وتوفّر باقة الإنترنت.</i></div>
       <div class="grid">

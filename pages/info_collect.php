@@ -56,6 +56,12 @@ function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
     foreach ($uploadCols as $c) {
         if (!empty($sub[$c])) { $set[] = "$c = ?"; $vals[] = $sub[$c]; }
     }
+    // تاريخ ترك العمل: إن أدخله الأستاذ عبر الفورم → سجّله كتاريخ ترك (ضمان/مالية/صندوق)
+    // فيخرج من السنة الجارية (yearEmploymentFilter يعتبره تاركاً بمجرّد أيّ تاريخ ترك).
+    if (!empty($data['leave_date']) && strtotime($data['leave_date'])) {
+        $ld = date('Y-m-d', strtotime($data['leave_date']));
+        foreach (['left_date_cnss','left_date_finance','left_date_eoc'] as $lc) { $set[] = "$lc = ?"; $vals[] = $ld; }
+    }
     if ($set) {
         $vals[] = $sub['employee_id'];
         $db->prepare("UPDATE employees SET " . implode(', ', $set) . " WHERE id = ?")->execute($vals);
@@ -382,9 +388,10 @@ $newSubs = $newSubs->fetchAll();
         <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:8px">
           <div><strong style="font-size:16px"><?= e($nm) ?></strong>
             <?php if (!empty($s['school_name'])): ?><span class="badge" style="background:#0a6b5e;color:#fff"><i class="fas fa-school"></i> <?= e($s['school_name']) ?></span><?php endif; ?>
-            <span class="badge badge-info"><?= e($s['submitted_at']) ?></span></div>
+            <span class="badge badge-info"><?= e($s['submitted_at']) ?></span>
+            <?php if (!empty($data['leave_date'])): ?><span class="badge" style="background:#dc2626;color:#fff"><i class="fas fa-door-open"></i> طلب ترك العمل بتاريخ <?= e($data['leave_date']) ?></span><?php endif; ?></div>
           <div style="display:flex;gap:8px">
-            <form method="post" onsubmit="return confirm('تحديث ملف الأستاذ بهذه المعلومات؟')" style="margin:0">
+            <form method="post" onsubmit="return confirm('<?= !empty($data['leave_date']) ? 'تنبيه: هذا الأستاذ طلب ترك العمل — سيُسجَّل تاريخ الترك ويخرج من السنة الجارية. متابعة؟' : 'تحديث ملف الأستاذ بهذه المعلومات؟' ?>')" style="margin:0">
               <?= csrfField() ?><input type="hidden" name="action" value="apply"><input type="hidden" name="submission_id" value="<?= $s['id'] ?>">
               <button class="btn btn-sm btn-success"><i class="fas fa-check"></i> اعتماد وتحديث الملف</button>
             </form>
