@@ -109,6 +109,10 @@ document.addEventListener('submit', function (e) {
                 <i class="fab fa-whatsapp"></i>
                 <span>تحديث معلومات الأساتذة / Mise à jour</span>
             </a>
+            <a href="<?= BASE_URL ?>pages/left_teachers.php" class="<?= $currentPage === 'left_teachers' ? 'active' : '' ?>">
+                <i class="fas fa-user-slash"></i>
+                <span>الأساتذة التاركون / Départs</span>
+            </a>
 
             <div class="nav-section">Rapports</div>
             

@@ -113,7 +113,7 @@ if ($allMode && $newFlag && $schoolId <= 0) {
             // $schoolId قد يكون 0 في الرابط الموحّد → بحث عبر كل المدارس، وتُكتشف مدرسة الأستاذ من ملفه
             $emp = findTeacherByNameDob($db, $schoolId, $findName, $findDob);
             if ($emp) { $empId = (int)$emp['id']; $schoolId = (int)$emp['school_id']; $verified = true; }
-            else { $needFind = true; $findError = 'ما قدرنا نلاقي ملفك بهالمعلومات. تأكّد من كتابة اسمك وشهرتك وتاريخ ولادتك متل ما هنّي مسجّلين عند الإدارة، أو تواصل مع إدارة المدرسة.'; }
+            else { $needFind = true; $findError = 'ما قدرنا نلاقي ملفك بهالمعلومات. تأكّد من كتابة اسمك وشهرتك وتاريخ ولادتك متل ما هنّي مسجّلين عند الإدارة، أو تواصل مع إدارة المدرسة. / Nous n\'avons pas trouvé votre dossier avec ces informations. Vérifiez votre nom, prénom et date de naissance tels qu\'enregistrés par l\'administration, ou contactez l\'école.'; }
         } else {
             $needFind = true;
         }
@@ -144,14 +144,14 @@ $defaultEntryYear = $entryYearOptions[0];
 
 // الحقول النصية القابلة للتحديث
 $textFields = [
-    'first_name_ar' => 'الاسم (عربي)', 'first_name_fr' => 'Prénom (FR)',
-    'last_name_ar' => 'الشهرة (عربي)', 'last_name_fr' => 'Nom (FR)',
-    'mother_first_name' => 'اسم الأم', 'mother_last_name' => 'شهرة الأم',
-    'birth_date' => 'تاريخ الولادة', 'birth_place' => 'محل الولادة',
-    'nationality' => 'الجنسية', 'number_of_children' => 'عدد الأولاد',
-    'phone1' => 'هاتف 1', 'phone2' => 'هاتف 2', 'email' => 'البريد الإلكتروني',
-    'gouvernorat' => 'المحافظة', 'district' => 'القضاء', 'ville' => 'البلدة',
-    'quartier' => 'الحي', 'rue' => 'الشارع', 'immeuble' => 'المبنى', 'etage' => 'الطابق',
+    'first_name_ar' => 'الاسم (عربي) / Prénom (arabe)', 'first_name_fr' => 'الاسم (فرنسي) / Prénom (FR)',
+    'last_name_ar' => 'الشهرة (عربي) / Nom (arabe)', 'last_name_fr' => 'الشهرة (فرنسي) / Nom (FR)',
+    'mother_first_name' => 'اسم الأم / Prénom de la mère', 'mother_last_name' => 'شهرة الأم / Nom de la mère',
+    'birth_date' => 'تاريخ الولادة / Date de naissance', 'birth_place' => 'محل الولادة / Lieu de naissance',
+    'nationality' => 'الجنسية / Nationalité', 'number_of_children' => 'عدد الأولاد / Nombre d\'enfants',
+    'phone1' => 'هاتف 1 / Téléphone 1', 'phone2' => 'هاتف 2 / Téléphone 2', 'email' => 'البريد الإلكتروني / E-mail',
+    'gouvernorat' => 'المحافظة / Gouvernorat', 'district' => 'القضاء / District', 'ville' => 'البلدة / Ville',
+    'quartier' => 'الحي / Quartier', 'rue' => 'الشارع / Rue', 'immeuble' => 'المبنى / Immeuble', 'etage' => 'الطابق / Étage',
 ];
 // الحقول المهنية الإضافية (شهادة/مواد/ساعات/صفوف/أيام/أرقام رسمية)
 $profFields = [
@@ -166,12 +166,14 @@ $niveauOptions = ['maternelle' => 'حضانة / Maternelle', 'primaire' => 'اب
     'intermediaire' => 'متوسط / Intermédiaire', 'secondaire' => 'ثانوي / Secondaire'];
 
 $uploadFields = [
-    'photo' => 'صورة شخصية / Photo',
-    'id_document' => 'إخراج قيد فردي / Extrait individuel',
+    'photo' => 'صورة شخصية / Photo personnelle',
+    'id_document' => 'إخراج قيد فردي أو بطاقة الهوية / Extrait individuel ou carte d\'identité',
     'family_doc' => 'إخراج قيد عائلي / Extrait familial',
-    'diploma_doc' => 'الشهادة / Diplôme',
+    'diploma_doc' => 'صورة عن الشهادة / Copie du diplôme',
 ];
 $uploadCol = ['photo' => 'photo_path', 'id_document' => 'id_document_path', 'family_doc' => 'family_doc_path', 'diploma_doc' => 'diploma_doc_path'];
+// المستندات الإلزامية (الصورة الشخصية تبقى اختيارية)
+$requiredUploads = ['id_document', 'family_doc', 'diploma_doc'];
 
 $done = false; $error = ''; $uploadWarn = [];
 // كشف تجاوز حجم الرفع الكلّي (post_max_size): عندها PHP يُفرّغ POST و FILES مع بقاء Content-Length
@@ -231,15 +233,34 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $ins = $db->prepare("INSERT INTO info_submissions (employee_id, is_new_teacher, school_id, data, photo_path, id_document_path, family_doc_path, diploma_doc_path, status, submitted_at)
-        VALUES (?,?,?,?,?,?,?,?, 'pending', NOW())");
-    $ins->execute([
-        $isNew ? null : $empId, $isNew ? 1 : 0,
-        $isNew ? $schoolId : ($emp['school_id'] ?? null), json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
-        $savedFiles['photo_path'] ?? null, $savedFiles['id_document_path'] ?? null,
-        $savedFiles['family_doc_path'] ?? null, $savedFiles['diploma_doc_path'] ?? null,
-    ]);
-    $done = true;
+    // المستندات الإلزامية: إخراج قيد فردي/هوية + إخراج عائلي + صورة الشهادة (الصورة الشخصية اختيارية).
+    // يُعفى منها: الأستاذ التارك (كتب تاريخ ترك)، أو مستند موجود مسبقاً بملف أستاذ حالي.
+    $leaving = !empty($data['leave_date']);
+    $reqUploadCols = [
+        'id_document_path' => 'إخراج القيد الفردي أو بطاقة الهوية / Extrait individuel ou carte d\'identité',
+        'family_doc_path'  => 'إخراج القيد العائلي / Extrait familial',
+        'diploma_doc_path' => 'صورة عن الشهادة / Copie du diplôme',
+    ];
+    $missingDocs = [];
+    if (!$leaving) {
+        foreach ($reqUploadCols as $col => $lbl) {
+            $onFile = !$isNew && !empty($emp[$col] ?? '');
+            if (empty($savedFiles[$col]) && !$onFile) $missingDocs[] = $lbl;
+        }
+    }
+    if ($missingDocs) {
+        $error = 'الرجاء إرفاق المستندات الإلزامية التالية ثم إعادة الإرسال / Veuillez joindre les documents obligatoires suivants puis renvoyer : ' . implode(' — ', $missingDocs);
+    } else {
+        $ins = $db->prepare("INSERT INTO info_submissions (employee_id, is_new_teacher, school_id, data, photo_path, id_document_path, family_doc_path, diploma_doc_path, status, submitted_at)
+            VALUES (?,?,?,?,?,?,?,?, 'pending', NOW())");
+        $ins->execute([
+            $isNew ? null : $empId, $isNew ? 1 : 0,
+            $isNew ? $schoolId : ($emp['school_id'] ?? null), json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
+            $savedFiles['photo_path'] ?? null, $savedFiles['id_document_path'] ?? null,
+            $savedFiles['family_doc_path'] ?? null, $savedFiles['diploma_doc_path'] ?? null,
+        ]);
+        $done = true;
+    }
 }
 
 // اسم المدرسة المعروض بالترويسة: يُؤخَذ من مدرسة الرابط (schoolId) منذ أوّل شاشة،
@@ -277,60 +298,61 @@ if ($nameSchoolId) {
 <body>
 <div class="wrap">
   <div class="hd">
-    <h1>تحديث / تجديد معلومات الأستاذ</h1>
-    <p><?= e($schoolName) ?> — Mise à jour des informations</p>
+    <h1>تحديث / تجديد معلومات الأستاذ — Mise à jour des informations de l'enseignant</h1>
+    <p><?= e($schoolName) ?></p>
   </div>
   <div class="bd">
   <?php if ($postTooBig): ?>
-    <div class="err">📁 لم تصل المعلومات (قد يكون مجموع حجم الملفات كبيراً جداً أو الإنترنت ضعيفاً). الرجاء المحاولة مجدداً، أو رفع المستندات على دفعتين، أو إعادة المحاولة على إنترنت أقوى.</div>
+    <div class="err">📁 لم تصل المعلومات (قد يكون مجموع حجم الملفات كبيراً جداً أو الإنترنت ضعيفاً). الرجاء المحاولة مجدداً، أو رفع المستندات على دفعتين، أو إعادة المحاولة على إنترنت أقوى.<br><span dir="ltr">Les informations ne sont pas parvenues (fichiers trop volumineux ou connexion faible). Veuillez réessayer, envoyer les documents en deux fois, ou utiliser une meilleure connexion.</span></div>
   <?php elseif (!$valid): ?>
-    <div class="err">الرابط غير صالح أو منتهي. اطلب رابطاً جديداً من إدارة المدرسة.</div>
+    <div class="err">الرابط غير صالح أو منتهي. اطلب رابطاً جديداً من إدارة المدرسة.<br><span dir="ltr">Lien invalide ou expiré. Demandez un nouveau lien à l'administration de l'école.</span></div>
   <?php elseif ($done): ?>
     <div class="ok"><div class="ic">✅</div>
-      <h2>تمّ استلام معلوماتك، شكراً!</h2>
-      <p>سيتم تحديثها في النظام من قبل الإدارة. يمكنك إغلاق هذه الصفحة.</p>
+      <h2>تمّ استلام معلوماتك، شكراً! — Vos informations ont été reçues, merci !</h2>
+      <p>سيتم تحديثها في النظام من قبل الإدارة. يمكنك إغلاق هذه الصفحة.<br><span dir="ltr">Elles seront mises à jour dans le système par l'administration. Vous pouvez fermer cette page.</span></p>
       <?php if ($uploadWarn): ?>
-        <div class="err" style="text-align:right;margin-top:18px">⚠️ هذه المستندات كانت كبيرة جداً (أكثر من 200 ميغا) فلم تُرفَع: <strong><?= e(implode('، ', $uploadWarn)) ?></strong>.<br>الرجاء إعادة إرسالها عبر نفس الرابط (ويمكن تصويرها صورة لتصغر تلقائياً).</div>
+        <div class="err" style="text-align:right;margin-top:18px">⚠️ هذه المستندات كانت كبيرة جداً (أكثر من 200 ميغا) فلم تُرفَع: <strong><?= e(implode('، ', $uploadWarn)) ?></strong>.<br>الرجاء إعادة إرسالها عبر نفس الرابط (ويمكن تصويرها صورة لتصغر تلقائياً).<br><span dir="ltr">Ces documents étaient trop volumineux (plus de 200 Mo) et n'ont pas été envoyés. Veuillez les renvoyer via le même lien (une photo est automatiquement compressée).</span></div>
       <?php endif; ?>
     </div>
   <?php elseif ($needSchoolSelect): ?>
-    <div class="note">أهلاً بك أيها الأستاذ الجديد 👋 — اختر <strong>مدرستك</strong> أوّلاً للمتابعة.</div>
+    <div class="note">أهلاً بك أيها الأستاذ الجديد 👋 — اختر <strong>مدرستك</strong> أوّلاً للمتابعة.<br><span dir="ltr">Bienvenue, nouvel enseignant 👋 — choisissez d'abord votre <strong>école</strong> pour continuer.</span></div>
     <form method="get">
       <input type="hidden" name="all" value="1">
       <?php if ($newFlag): ?><input type="hidden" name="new" value="1"><?php endif; ?>
       <input type="hidden" name="token" value="<?= e($token) ?>">
       <label>اختر مدرستك / Choisissez votre école</label>
       <select name="school" required style="width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;margin-bottom:6px">
-        <option value="">— اختر —</option>
+        <option value="">— اختر / Choisir —</option>
         <?php foreach ($activeSchools as $sch): ?>
           <option value="<?= $sch['id'] ?>"><?= e($sch['name_ar'] ?: $sch['name_fr']) ?></option>
         <?php endforeach; ?>
       </select>
-      <button class="btn" type="submit">متابعة ➜</button>
+      <button class="btn" type="submit">متابعة / Continuer ➜</button>
     </form>
   <?php elseif ($needFind):
     // رابط «أستاذ جديد» بنفس التوكن والمدرسة + new=1
     $newQs = ($allMode ? 'all=1&' : '') . 'school=' . (int)$schoolId . '&token=' . rawurlencode($token) . '&new=1';
   ?>
     <?php if ($findError): ?><div class="err" style="margin-bottom:14px"><?= e($findError) ?></div><?php endif; ?>
-    <div class="note">للحفاظ على الخصوصية، لا تظهر أسماء الأساتذة. إذا كنت <strong>أستاذاً حالياً</strong> اكتب اسمك وشهرتك وتاريخ ولادتك للوصول إلى <strong>ملفك أنت فقط</strong>. وإذا كنت <strong>أستاذاً جديداً</strong> اضغط الزرّ بالأسفل.</div>
+    <div class="note">للحفاظ على الخصوصية، لا تظهر أسماء الأساتذة. إذا كنت <strong>أستاذاً حالياً</strong> اكتب اسمك وشهرتك وتاريخ ولادتك للوصول إلى <strong>ملفك أنت فقط</strong>. وإذا كنت <strong>أستاذاً جديداً</strong> اضغط الزرّ بالأسفل.<br><span dir="ltr">Pour préserver la confidentialité, les noms ne sont pas affichés. Si vous êtes un <strong>enseignant actuel</strong>, saisissez votre nom, prénom et date de naissance pour accéder à <strong>votre dossier uniquement</strong>. Si vous êtes un <strong>nouvel enseignant</strong>, cliquez sur le bouton ci-dessous.</span></div>
     <form method="get">
       <?= $allHidden ?>
       <input type="hidden" name="school" value="<?= (int)$schoolId ?>">
       <input type="hidden" name="token" value="<?= e($token) ?>">
       <label>اكتب اسمك الكامل (الاسم والشهرة) / Nom complet</label>
-      <input type="text" name="q" required value="<?= e($findName) ?>" placeholder="مثال: جورج خليل" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;margin-bottom:10px">
+      <input type="text" name="q" required value="<?= e($findName) ?>" placeholder="مثال / ex : جورج خليل" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;margin-bottom:10px">
       <label>تاريخ ولادتك / Date de naissance</label>
       <input type="date" name="bd" required value="<?= e($findDob) ?>" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;margin-bottom:6px">
-      <button class="btn" type="submit">عرض ملفي ➜</button>
+      <button class="btn" type="submit">عرض ملفي / Voir mon dossier ➜</button>
     </form>
-    <div style="text-align:center;margin:16px 0 4px;color:#94a3b8">— أو —</div>
-    <a href="?<?= $newQs ?>" class="btn" style="background:#0a7a37;display:block;text-align:center;text-decoration:none">🆕 أنا أستاذ جديد (تعبئة ملف جديد)</a>
+    <div style="text-align:center;margin:16px 0 4px;color:#94a3b8">— أو / ou —</div>
+    <a href="?<?= $newQs ?>" class="btn" style="background:#0a7a37;display:block;text-align:center;text-decoration:none">🆕 أنا أستاذ جديد (تعبئة ملف جديد) / Je suis un nouvel enseignant</a>
   <?php else: ?>
+    <?php if ($error): ?><div class="err" style="margin-bottom:14px">⚠️ <?= e($error) ?></div><?php endif; ?>
     <?php if ($isNew): ?>
-      <div class="note">أهلاً بالأستاذ الجديد 👋 — عبّئ معلوماتك التالية وارفع صورك إن أمكن، ثم اضغط «إرسال». سيُنشئ الإدارة ملفك بعد المراجعة.</div>
+      <div class="note">أهلاً بالأستاذ الجديد 👋 — عبّئ معلوماتك التالية وارفع مستنداتك، ثم اضغط «إرسال». سيُنشئ الإدارة ملفك بعد المراجعة.<br><span dir="ltr">Bienvenue, nouvel enseignant 👋 — remplissez vos informations et joignez vos documents, puis cliquez sur « Envoyer ». L'administration créera votre dossier après vérification.</span></div>
     <?php else: ?>
-      <div class="note">أهلاً <strong><?= e(trim(($emp['first_name_ar']??'').' '.($emp['last_name_ar']??'')) ?: trim(($emp['first_name_fr']??'').' '.($emp['last_name_fr']??''))) ?></strong> — عبّئ/صحّح معلوماتك التالية وارفع صورك إن أمكن، ثم اضغط «إرسال».</div>
+      <div class="note">أهلاً <strong><?= e(trim(($emp['first_name_ar']??'').' '.($emp['last_name_ar']??'')) ?: trim(($emp['first_name_fr']??'').' '.($emp['last_name_fr']??''))) ?></strong> — عبّئ/صحّح معلوماتك التالية وارفع مستنداتك، ثم اضغط «إرسال».<br><span dir="ltr">Bonjour — complétez / corrigez vos informations et joignez vos documents, puis cliquez sur « Envoyer ».</span></div>
     <?php endif; ?>
     <form method="post" enctype="multipart/form-data" id="tf">
       <?php if ($isNew): // أستاذ جديد: يبقى ضمن توكن المدرسة ?>
@@ -340,8 +362,8 @@ if ($nameSchoolId) {
       <input type="hidden" name="emp" value="<?= (int)$empId ?>">
       <input type="hidden" name="token" value="<?= e($formToken) ?>">
       <?php if ($isNew): ?>
-      <h3>سنة الدخول</h3>
-      <div class="note" style="margin-bottom:8px">إنت أستاذ جديد، فدخولك يكون على <strong>السنة الدراسية القادمة</strong> (مش السنة الجارية أو اللي قبلها).</div>
+      <h3>سنة الدخول / Année d'entrée</h3>
+      <div class="note" style="margin-bottom:8px">إنت أستاذ جديد، فدخولك يكون على <strong>السنة الدراسية القادمة</strong> (مش السنة الجارية أو اللي قبلها).<br><span dir="ltr">Vous êtes un nouvel enseignant : votre entrée se fait sur <strong>l'année scolaire prochaine</strong> (pas l'année en cours ni la précédente).</span></div>
       <div>
         <label>سنة الدخول (السنة الدراسية) / Année d'entrée</label>
         <select name="entry_school_year" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px">
@@ -351,8 +373,8 @@ if ($nameSchoolId) {
         </select>
       </div>
 
-      <h3 style="margin-top:16px">الراتب والإضافات (للأستاذ الجديد)</h3>
-      <div class="note" style="margin-bottom:8px">الراتب والأجر الإضافي <strong>شهريان</strong>؛ تعويض النقل <strong>لليوم الواحد</strong> (يُضرَب تلقائياً بعدد أيام الحضور الأسبوعية × 4). كلٌّ بعملته (ليرة أو دولار). تُجهَّز تلقائياً عند إنشاء الملف، وفيك تعدّلها لاحقاً من ملف الأستاذ.</div>
+      <h3 style="margin-top:16px">الراتب والإضافات (للأستاذ الجديد) / Salaire et indemnités</h3>
+      <div class="note" style="margin-bottom:8px">الراتب والأجر الإضافي <strong>شهريان</strong>؛ تعويض النقل <strong>لليوم الواحد</strong> (يُضرَب تلقائياً بعدد أيام الحضور الأسبوعية × 4). كلٌّ بعملته (ليرة أو دولار). تُجهَّز تلقائياً عند إنشاء الملف، وفيك تعدّلها لاحقاً من ملف الأستاذ.<br><span dir="ltr">Le salaire et l'indemnité supplémentaire sont <strong>mensuels</strong> ; le transport est <strong>par jour</strong> (multiplié automatiquement par le nombre de jours de présence × 4). Chacun dans sa devise (LL ou USD).</span></div>
       <div class="grid">
         <?php
           $newPayFields = [
@@ -374,7 +396,7 @@ if ($nameSchoolId) {
         <?php endforeach; ?>
       </div>
       <?php endif; ?>
-      <h3>المعلومات الشخصية</h3>
+      <h3>المعلومات الشخصية / Informations personnelles</h3>
       <div class="grid">
         <?php foreach ($textFields as $k => $lbl): if (in_array($k, ['gouvernorat','district','ville','quartier','rue','immeuble','etage'])) continue; ?>
           <div>
@@ -384,12 +406,12 @@ if ($nameSchoolId) {
           </div>
         <?php endforeach; ?>
       </div>
-      <h3>المعلومات المهنية</h3>
+      <h3>المعلومات المهنية / Informations professionnelles</h3>
       <div class="grid">
         <div>
           <label>الشهادة العلمية / Diplôme</label>
           <select name="diploma" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
-            <option value="">— اختر —</option>
+            <option value="">— اختر / Choisir —</option>
             <?php foreach ($diplomas as $d): ?>
               <option value="<?= e($d['diploma_code']) ?>" <?= (($emp['diploma'] ?? '') === $d['diploma_code']) ? 'selected' : '' ?>><?= e($d['diploma_name_ar']) ?> / <?= e($d['diploma_name_fr']) ?></option>
             <?php endforeach; ?>
@@ -397,7 +419,7 @@ if ($nameSchoolId) {
         </div>
         <div>
           <label>المواد التي يدرّسها / Matières enseignées</label>
-          <input type="text" name="subjects_taught" value="<?= e($emp['subjects_taught'] ?? '') ?>" placeholder="رياضيات، علوم...">
+          <input type="text" name="subjects_taught" value="<?= e($emp['subjects_taught'] ?? '') ?>" placeholder="رياضيات، علوم... / maths, sciences...">
         </div>
       </div>
       <div style="margin-top:12px">
@@ -442,7 +464,7 @@ if ($nameSchoolId) {
           <input type="text" name="caisse_number" value="<?= e($emp['caisse_number'] ?? '') ?>">
         </div>
       </div>
-      <h3>العنوان</h3>
+      <h3>العنوان / Adresse</h3>
       <div class="grid">
         <?php foreach (['gouvernorat','district','ville','quartier','rue','immeuble','etage'] as $k): ?>
           <div>
@@ -454,29 +476,48 @@ if ($nameSchoolId) {
       <?php if (!$isNew): ?>
       <h3 style="color:#b45309;border-bottom-color:#fde68a">ترك العمل (اختياري) / Départ</h3>
       <div class="note" style="background:#fffbeb;border-color:#fde68a;color:#92400e;margin-bottom:8px">
-        إذا كنت <strong>ستترك العمل</strong>، اكتب <strong>تاريخ الترك</strong> بالأسفل. أمّا إذا كنت <strong>مستمراً في عملك</strong> فاترك هذا الحقل <strong>فارغاً</strong>.
+        إذا كنت <strong>ستترك العمل</strong>، اكتب <strong>تاريخ الترك</strong> بالأسفل. أمّا إذا كنت <strong>مستمراً في عملك</strong> فاترك هذا الحقل <strong>فارغاً</strong>.<br>
+        <span dir="ltr">Si vous <strong>quittez votre poste</strong>, indiquez la <strong>date de départ</strong> ci-dessous. Si vous <strong>continuez</strong>, laissez ce champ <strong>vide</strong>.</span>
       </div>
       <div style="max-width:300px">
         <label>تاريخ ترك العمل / Date de départ</label>
         <input type="date" name="leave_date" value="<?= e($emp['left_date_cnss'] ?? '') ?>">
       </div>
       <?php endif; ?>
-      <h3>السكانات (اختياري — صورة أو PDF)</h3>
-      <div class="note" style="margin-bottom:8px"><i>📎 ارفع مستنداتك بأي شكل عندك (صورة أو PDF، كبيرة أو صغيرة) — كلها مقبولة حتى لو حجمها كبير. 📷 والصور تُضغط تلقائياً قبل الرفع (وتبقى واضحة) فترفع أسرع وتوفّر باقة الإنترنت.</i></div>
+      <h3>المستندات (صورة أو PDF) / Documents (image ou PDF)</h3>
+      <div class="note" style="margin-bottom:8px">
+        المستندات المعلَّمة بـ<span style="color:#dc2626;font-weight:700">*</span> <strong>إلزامية</strong> (صورة عن الشهادة، إخراج القيد الفردي أو الهوية، إخراج القيد العائلي)؛ <strong>الصورة الشخصية اختيارية</strong>.<br>
+        <span dir="ltr">Les documents marqués d'un <span style="color:#dc2626;font-weight:700">*</span> sont <strong>obligatoires</strong> (copie du diplôme, extrait individuel ou carte d'identité, extrait familial) ; la <strong>photo personnelle est optionnelle</strong>.</span><br>
+        <i>📎 ارفع مستنداتك بأي شكل (صورة أو PDF). 📷 والصور تُضغط تلقائياً فترفع أسرع. / Joignez vos documents (image ou PDF) ; les images sont compressées automatiquement.</i>
+      </div>
       <div class="grid">
-        <?php foreach ($uploadFields as $field => $lbl): ?>
+        <?php foreach ($uploadFields as $field => $lbl):
+          $isReq = in_array($field, $requiredUploads, true);
+          $onFile = !$isNew && !empty($emp[$uploadCol[$field]] ?? '');
+          $mustUpload = $isReq && !$onFile; ?>
           <div>
-            <label><?= e($lbl) ?></label>
-            <input type="file" name="<?= e($field) ?>" accept="image/*,application/pdf">
+            <label><?= e($lbl) ?><?php if ($isReq): ?> <span style="color:#dc2626;font-weight:700">*</span><?php endif; ?>
+              <?php if ($onFile): ?><span style="color:#0a7a37;font-weight:400;font-size:12px">✓ مرفوع مسبقاً / déjà fourni</span><?php endif; ?></label>
+            <input type="file" name="<?= e($field) ?>" accept="image/*,application/pdf"<?= $mustUpload ? ' data-req="1" required' : '' ?>>
           </div>
         <?php endforeach; ?>
       </div>
-      <button class="btn" type="submit">📤 إرسال المعلومات</button>
+      <button class="btn" type="submit">📤 إرسال المعلومات / Envoyer</button>
     </form>
   <?php endif; ?>
   </div>
 </div>
 <script>
+// الأستاذ التارك (كتب تاريخ ترك) لا يُطالَب بالمستندات الإلزامية → أزِل «required» عند تعبئة تاريخ الترك
+(function(){
+  var ld = document.querySelector('input[name=leave_date]'); if(!ld) return;
+  var reqFiles = [].slice.call(document.querySelectorAll('input[type=file][data-req]'));
+  function sync(){
+    var leaving = ld.value.trim() !== '';
+    reqFiles.forEach(function(f){ if(leaving) f.removeAttribute('required'); else f.setAttribute('required','required'); });
+  }
+  ld.addEventListener('change', sync); ld.addEventListener('input', sync); sync();
+})();
 // ضغط الصور على جهاز الأستاذ قبل الرفع (تصغير الأبعاد + JPEG) — يقلّل الحجم كثيراً عبر النفق
 (function(){
   var form = document.getElementById('tf'); if(!form) return;
