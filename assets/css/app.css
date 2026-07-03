@@ -895,3 +895,32 @@ h1, h2, h3, h4, h5, h6,
         font-size: inherit !important;
     }
 }
+
+/* ============ لمسات تناسق رسمية موحّدة (2026-07-03) ============ */
+/* انتقالات ناعمة موحّدة على العناصر التفاعلية */
+.btn, .stat-card, .card, .table tbody tr, .sidebar-nav a, input, select { transition: background-color .15s ease, box-shadow .15s ease, border-color .15s ease, transform .12s ease; }
+
+/* البطاقات الإحصائية: خطّ علوي ذهبي رفيع = طابع رسمي أنيق */
+.stat-card { border-top: 3px solid var(--gold); }
+
+/* رأس الجدول: خلفية خفيفة وحدّ سفلي واضح */
+.table th { background: var(--gray-50); border-bottom: 2px solid var(--gray-200); letter-spacing: .02em; }
+
+/* مرور أنعم على صفوف الجدول */
+.table tbody tr:hover { background: #f6f9fc; }
+
+/* الأزرار: رفعة خفيفة وظلّ عند المرور */
+.btn:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
+/* الحقول: تحديد واضح ورسمي عند التركيز (كحلي) */
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(10,34,64,0.12);
+}
+
+/* رأس البطاقة: شريط سفلي ذهبي خفيف يفصل العنوان */
+.card-header { border-bottom: 2px solid var(--gray-100); }
+
+/* شارات الحالة: حواف أنعم متناسقة */
+.badge { letter-spacing: .01em; }
