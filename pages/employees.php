@@ -23,18 +23,19 @@ requireCsrf();
  * يُعرض في التبويب الشخصي (personnel). الرفع فوري عبر AJAX لحظة الاختيار.
  */
 function renderEmployeeScans($employee, $id) {
-    $renderFile = function ($path) {
-        if (empty($path)) return '<div style="margin-top:6px;color:#999;font-size:12px"><i class="fas fa-circle-xmark"></i> لا يوجد ملف بعد</div>';
+    $renderFile = function ($path, $field) {
+        if (empty($path)) return '<div class="doc-saved" style="margin-top:6px;color:#999;font-size:12px"><i class="fas fa-circle-xmark"></i> لا يوجد ملف بعد</div>';
         $url = BASE_URL . e($path);
         $isImg = preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $path);
-        $out = '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">';
+        $out = '<div class="doc-saved" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">';
         $out .= '<span style="color:#15803d;font-weight:700;font-size:12px"><i class="fas fa-circle-check"></i> ملف محفوظ / Fichier enregistré</span>';
         if ($isImg) {
             $out .= '<a href="' . $url . '" target="_blank" title="فتح كامل"><img src="' . $url . '" style="max-height:90px;border-radius:6px;border:1px solid #ccc;cursor:pointer"></a>';
         }
-        $out .= '<div style="display:flex;gap:6px">'
+        $out .= '<div style="display:flex;gap:6px;flex-wrap:wrap">'
              . '<a href="' . $url . '" target="_blank" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> فتح / Voir</a>'
              . '<button type="button" onclick="ppPrintFile(\'' . $url . '\',' . ($isImg ? 'true' : 'false') . ')" class="btn btn-sm btn-light"><i class="fas fa-print"></i> طباعة</button>'
+             . '<button type="button" onclick="ppDeleteDoc(\'' . e($field) . '\', this)" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> حذف / Supprimer</button>'
              . '</div></div>';
         return $out;
     };
@@ -51,25 +52,25 @@ function renderEmployeeScans($employee, $id) {
                         <label class="form-label">Photo / صورة شخصية</label>
                         <input type="file" name="photo" data-doc="photo" class="form-control" accept="image/*">
                         <div class="upload-status"></div>
-                        <?= $renderFile($employee['photo_path'] ?? '') ?>
+                        <?= $renderFile($employee['photo_path'] ?? '', 'photo') ?>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Extrait d'état civil / إخراج قيد (تذكرة)</label>
                         <input type="file" name="id_document" data-doc="id_document" class="form-control" accept="image/*,application/pdf">
                         <div class="upload-status"></div>
-                        <?= $renderFile($employee['id_document_path'] ?? '') ?>
+                        <?= $renderFile($employee['id_document_path'] ?? '', 'id_document') ?>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Extrait d'état civil familial / إخراج قيد عائلي</label>
                         <input type="file" name="family_doc" data-doc="family_doc" class="form-control" accept="image/*,application/pdf">
                         <div class="upload-status"></div>
-                        <?= $renderFile($employee['family_doc_path'] ?? '') ?>
+                        <?= $renderFile($employee['family_doc_path'] ?? '', 'family_doc') ?>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Diplôme / الشهادة</label>
                         <input type="file" name="diploma_doc" data-doc="diploma_doc" class="form-control" accept="image/*,application/pdf">
                         <div class="upload-status"></div>
-                        <?= $renderFile($employee['diploma_doc_path'] ?? '') ?>
+                        <?= $renderFile($employee['diploma_doc_path'] ?? '', 'diploma_doc') ?>
                     </div>
                 </div>
                 <script>
@@ -89,7 +90,8 @@ function renderEmployeeScans($employee, $id) {
                                     box.innerHTML = '<span style="color:#15803d;font-weight:700"><i class="fas fa-circle-check"></i> تم رفع الملف بنجاح</span> '
                                         + (d.isImg ? '<a href="'+d.url+'" target="_blank"><img src="'+d.url+'" style="max-height:55px;border:1px solid #ccc;border-radius:4px;vertical-align:middle"></a> ' : '')
                                         + '<a href="'+d.url+'" target="_blank" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> فتح</a> '
-                                        + '<button type="button" onclick="ppPrintFile(\''+d.url+'\','+(d.isImg?'true':'false')+')" class="btn btn-sm btn-light"><i class="fas fa-print"></i> طباعة</button>';
+                                        + '<button type="button" onclick="ppPrintFile(\''+d.url+'\','+(d.isImg?'true':'false')+')" class="btn btn-sm btn-light"><i class="fas fa-print"></i> طباعة</button> '
+                                        + '<button type="button" onclick="ppDeleteDoc(\''+inp.getAttribute('data-doc')+'\', this)" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> حذف</button>';
                                 } else {
                                     box.innerHTML = '<span style="color:#b91c1c"><i class="fas fa-triangle-exclamation"></i> '+(d.msg||'فشل الرفع')+'</span>';
                                 }
@@ -97,6 +99,25 @@ function renderEmployeeScans($employee, $id) {
                         });
                     });
                 })();
+                // حذف مستند (عام، يُستدعى من أزرار «حذف») — يمسح الملف من السيرفر ويفرّغ الحقل فوراً
+                window.ppDeleteDoc = function(field, btn){
+                    if(!confirm('متأكّد بدّك تحذف هالمستند نهائياً؟ / Supprimer définitivement ce document ?')) return;
+                    var old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '⏳';
+                    var fd = new FormData();
+                    fd.append('csrf','<?= csrfToken() ?>'); fd.append('employee_id','<?= (int)$id ?>'); fd.append('field', field);
+                    fetch('<?= BASE_URL ?>pages/employees.php?action=delete_file', {method:'POST', body:fd})
+                        .then(function(r){return r.json();}).then(function(d){
+                            if(d.ok){
+                                var grp = btn.closest('.form-group');
+                                if(grp){
+                                    var st = grp.querySelector('.upload-status'); if(st) st.innerHTML = '';
+                                    var saved = grp.querySelector('.doc-saved');
+                                    if(saved) saved.outerHTML = '<div class="doc-saved" style="margin-top:6px;color:#999;font-size:12px"><i class="fas fa-circle-xmark"></i> لا يوجد ملف بعد</div>';
+                                    var fi = grp.querySelector('input[type=file]'); if(fi) fi.value = '';
+                                } else { btn.parentNode.innerHTML = '<span style="color:#999">تم الحذف</span>'; }
+                            } else { alert(d.msg || 'فشل الحذف'); btn.disabled = false; btn.innerHTML = old; }
+                        }).catch(function(){ alert('خطأ بالاتصال'); btn.disabled = false; btn.innerHTML = old; });
+                };
                 </script>
                 <?php endif; ?>
     <?php
@@ -160,6 +181,32 @@ if ($action === 'upload_file' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $db->prepare("UPDATE employees SET {$cols[$field]} = ? WHERE id = ?")->execute([$path, $eid]);
         echo json_encode(['ok'=>true,'url'=>BASE_URL.$path,'isImg'=>(bool)preg_match('/\.(jpg|jpeg|png|gif|webp)$/i',$path),'msg'=>'تم الرفع']);
     } else { echo json_encode(['ok'=>false,'msg'=>'فشل حفظ الملف']); }
+    exit;
+}
+
+// حذف مستند (AJAX) — يفرّغ عمود المسار ويحذف الملف الفعلي من القرص
+if ($action === 'delete_file' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+    $eid = (int)($_POST['employee_id'] ?? 0);
+    $field = $_POST['field'] ?? '';
+    $cols = ['photo'=>'photo_path','id_document'=>'id_document_path','family_doc'=>'family_doc_path','diploma_doc'=>'diploma_doc_path'];
+    if (!hash_equals(csrfToken(), (string)($_POST['csrf'] ?? ''))) { echo json_encode(['ok'=>false,'msg'=>'جلسة غير صالحة، أعد تحميل الصفحة']); exit; }
+    if (!$eid || !isset($cols[$field])) { echo json_encode(['ok'=>false,'msg'=>'طلب غير صحيح']); exit; }
+    $col = $cols[$field];
+    // القراءة مقيّدة بالمدرسة الحالية (يمنع حذف مستند موظف من مدرسة أخرى)
+    $chk = $db->prepare("SELECT `$col` FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
+    $chk->execute([$eid]);
+    $cur = $chk->fetch(PDO::FETCH_COLUMN);
+    if ($cur === false) { echo json_encode(['ok'=>false,'msg'=>'الموظف غير موجود بهذه المدرسة']); exit; }
+    // احذف الملف الفعلي فقط إن كان ملفاً خاصاً بالموظف (uploads/employees/) — ملفات الطلبات
+    // (uploads/submissions/) قد يشير إليها سجلّ الطلب، فنكتفي بتفريغ العمود دون مسّ الملف.
+    if (!empty($cur) && strpos($cur, 'uploads/employees/') === 0 && strpos($cur, '..') === false) {
+        $abs = __DIR__ . '/../' . $cur;
+        if (is_file($abs)) @unlink($abs);
+    }
+    $db->prepare("UPDATE employees SET `$col` = NULL WHERE id = ?")->execute([$eid]);
+    logAudit('delete_doc', 'employees', $eid, ['field' => $col, 'path' => $cur], null);
+    echo json_encode(['ok'=>true,'msg'=>'تم الحذف']);
     exit;
 }
 
