@@ -54,10 +54,9 @@ function findTeacherByNameDob($db, $schoolId, $q, $bd) {
     // اقصر البحث على **الموجودين فعلاً بالسنة الدراسية الحالية** (راتب فعلي بهالسنة + غير تاركين):
     // فلا يُطابَق من ترك أو من سنوات سابقة، ويُحلّ تلقائياً تكرارٌ يكون أحد ملفّيه قديماً/تاركاً.
     [$yf, $yp] = yearEmploymentFilter(currentSchoolYear(), '');
-    // (أ) المسار الأساسي: الاسم + تاريخ الولادة بالضبط
-    $ts = strtotime($bd);
-    if ($ts) {
-        $bdNorm = date('Y-m-d', $ts);
+    // (أ) المسار الأساسي: الاسم + تاريخ الولادة بالضبط (يقبل الكتابة اليدوية بأي صيغة)
+    $bdNorm = parseFlexibleDate($bd);
+    if ($bdNorm) {
         $st = $db->prepare("SELECT * FROM employees WHERE is_deleted = 0$schoolClause AND birth_date = ?" . $yf);
         $st->execute(array_merge($allSchools ? [$bdNorm] : [$schoolId, $bdNorm], $yp));
         $strong = [];
@@ -192,6 +191,10 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // اجمع الحقول النصية
     $data = [];
     foreach ($textFields as $k => $_) { $data[$k] = trim((string)($_POST[$k] ?? '')); }
+    // تاريخ الولادة مكتوب يدوياً (يوم/شهر/سنة) → طبّعه إلى Y-m-d قبل الحفظ
+    if (isset($data['birth_date']) && $data['birth_date'] !== '') {
+        $data['birth_date'] = parseFlexibleDate($data['birth_date']) ?? $data['birth_date'];
+    }
     // الحقول المهنية + الشهادة + المرحلة
     $data['diploma'] = trim((string)($_POST['diploma'] ?? ''));
     foreach ($profFields as $k => $_) { $data[$k] = trim((string)($_POST[$k] ?? '')); }
@@ -203,8 +206,8 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // تاريخ ترك العمل (للأستاذ الحالي فقط، اختياري): إن كتبه الأستاذ فهو ينوي ترك العمل.
     // يُعتمد من المدير فيُسجَّل تاريخ الترك (الضمان/المالية/الصندوق) فيخرج من السنة الجارية.
     if (!$isNew) {
-        $ld = trim((string)($_POST['leave_date'] ?? ''));
-        if ($ld !== '' && strtotime($ld)) $data['leave_date'] = date('Y-m-d', strtotime($ld));
+        $ld = parseFlexibleDate($_POST['leave_date'] ?? '');
+        if ($ld) $data['leave_date'] = $ld;
     }
     // سنة الدخول (للأستاذ الجديد فقط) — يجب أن تكون ضمن الخيارات المسموحة (القادمة فأكثر)
     if ($isNew) {
@@ -380,7 +383,7 @@ if ($nameSchoolId) {
       <label>اكتب اسمك الكامل (الاسم والشهرة) / Nom complet</label>
       <input type="text" name="q" required value="<?= e($findName) ?>" placeholder="مثال / ex : جورج خليل" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;margin-bottom:10px">
       <label>تاريخ ولادتك / Date de naissance</label>
-      <input type="date" name="bd" required value="<?= e($findDob) ?>" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;margin-bottom:6px">
+      <input type="text" name="bd" required inputmode="numeric" autocomplete="off" class="date-manual" placeholder="يوم/شهر/سنة — مثلاً 15/08/1980" value="<?= e(preg_match('/^\d{4}-\d{2}-\d{2}$/', $findDob) ? displayDMY($findDob) : $findDob) ?>" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;margin-bottom:6px">
       <button class="btn" type="submit">عرض ملفي / Voir mon dossier ➜</button>
     </form>
     <div style="text-align:center;margin:16px 0 4px;color:#94a3b8">— أو / ou —</div>
@@ -444,8 +447,13 @@ if ($nameSchoolId) {
           $req = $tfReq($k); ?>
           <div>
             <label><?= e($lbl) ?><?= $req ? $reqStar : $optTag ?></label>
-            <input type="<?= $k === 'birth_date' ? 'date' : ($k === 'email' ? 'email' : ($k === 'number_of_children' ? 'number' : 'text')) ?>"
+            <?php if ($k === 'birth_date'): ?>
+            <input type="text" inputmode="numeric" autocomplete="off" class="date-manual" placeholder="يوم/شهر/سنة — مثلاً 15/08/1980"
+                   name="<?= e($k) ?>" value="<?= e(preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fv($k)) ? displayDMY($fv($k)) : $fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?>>
+            <?php else: ?>
+            <input type="<?= $k === 'email' ? 'email' : ($k === 'number_of_children' ? 'number' : 'text') ?>"
                    name="<?= e($k) ?>" value="<?= e($fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?>>
+            <?php endif; ?>
           </div>
         <?php endforeach; ?>
       </div>
@@ -524,7 +532,7 @@ if ($nameSchoolId) {
       </div>
       <div style="max-width:300px">
         <label>تاريخ ترك العمل / Date de départ</label>
-        <input type="date" name="leave_date" value="<?= e($emp['left_date_cnss'] ?? '') ?>">
+        <input type="text" name="leave_date" inputmode="numeric" autocomplete="off" class="date-manual" placeholder="يوم/شهر/سنة — مثلاً 30/09/2026" value="<?= e(displayDMY($emp['left_date_cnss'] ?? '')) ?>">
       </div>
       <?php endif; ?>
       <h3>المستندات (صورة أو PDF) / Documents (image ou PDF)</h3>
@@ -551,6 +559,21 @@ if ($nameSchoolId) {
   </div>
 </div>
 <script>
+// تنسيق تلقائي لحقول التاريخ اليدوية: يكتب الأستاذ أرقاماً فقط فتُدرَج الشرطات تلقائياً → يوم/شهر/سنة.
+// (بدل روزنامة type=date التي تُجبر على النقر للوصول لسنة الولادة على الهاتف.)
+(function(){
+  function mask(el){
+    function fmt(){
+      var v = el.value.replace(/\D/g,'').slice(0,8), out = v;
+      if(v.length > 4)      out = v.slice(0,2)+'/'+v.slice(2,4)+'/'+v.slice(4);
+      else if(v.length > 2) out = v.slice(0,2)+'/'+v.slice(2);
+      el.value = out;
+    }
+    el.addEventListener('input', fmt);
+    el.addEventListener('blur', fmt);
+  }
+  [].forEach.call(document.querySelectorAll('input.date-manual'), mask);
+})();
 // الإلزامية: الأستاذ التارك (كتب تاريخ ترك) يُعفى منها؛ ومجموعات المربّعات تتطلّب اختياراً واحداً على الأقل
 (function(){
   var form = document.getElementById('tf'); if(!form) return;

@@ -775,6 +775,26 @@ function currentSchoolYear() {
     return ($year - 1) . '-' . $year;
 }
 
+// تحليل تاريخ مُدخَل يدوياً بأيّ صيغة شائعة → 'Y-m-d' أو null.
+// يقبل: 15/08/1980 · 15-08-1980 · 15.8.1980 (يوم/شهر/سنة) و 1980-08-15 (ISO من input القديم).
+// بديل موثوق عن strtotime (الذي يفسّر «15/08/1980» بالصيغة الأمريكية فيفشل).
+function parseFlexibleDate($s) {
+    $s = trim((string)$s);
+    if ($s === '') return null;
+    if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $s, $m))            { $y = $m[1]; $mo = $m[2]; $d = $m[3]; }
+    elseif (preg_match('#^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$#', $s, $m)) { $d = $m[1]; $mo = $m[2]; $y = $m[3]; }
+    else return null;
+    if (!checkdate((int)$mo, (int)$d, (int)$y)) return null;
+    return sprintf('%04d-%02d-%02d', $y, $mo, $d);
+}
+
+// تنسيق 'Y-m-d' → 'd/m/Y' لعرضه في حقل نصّي (أو '' إن فارغ/وهمي).
+function displayDMY($ymd) {
+    if (empty($ymd) || $ymd === '0000-00-00' || $ymd === '1900-01-01') return '';
+    $ts = strtotime((string)$ymd);
+    return $ts ? date('d/m/Y', $ts) : '';
+}
+
 // السنة الدراسية التي يقع فيها تاريخ معيّن (تشرين الأول→أيلول). تُرجع مثل "2026-2027" أو null.
 function schoolYearOfDate($date) {
     $ts = strtotime((string)$date);
