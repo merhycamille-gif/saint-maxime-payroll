@@ -78,6 +78,12 @@ $empId = (int)($_GET['emp'] ?? $_POST['emp'] ?? 0);
 $token = (string)($_GET['token'] ?? $_POST['token'] ?? '');
 $schoolId = (int)($_GET['school'] ?? $_POST['school'] ?? 0);
 
+// 🔒 موعد إقفال باب تحديث/إدخال معلومات الأساتذة. بعده يُقفل الرابط للجميع، إلا إذا فعّل
+// الأدمن «السماح بالإدخال بعد الموعد» من صفحة تحديث المعلومات. الافتراضي: 30/8/2026.
+$formDeadline   = getSetting('teacher_form_deadline', '2026-08-30');
+$formAllowAfter = getSetting('teacher_form_allow_after', '0') === '1';
+$formClosed     = ($formDeadline !== '' && !$formAllowAfter && date('Y-m-d') > $formDeadline);
+
 // ثلاثة أوضاع: (أ) رابط موحّد لكل المدارس (يختار مدرسته ثم اسمه) (ب) رابط مدرسة (يختار اسمه) (ج) رابط فردي.
 $allFlag = !empty($_GET['all']) || !empty($_POST['all']);
 $newFlag = !empty($_GET['new']) || !empty($_POST['new']);   // وضع «أستاذ جديد»
@@ -108,7 +114,7 @@ if ($allMode && $newFlag && $schoolId <= 0) {
         // فيُلاقى ملفه هو فقط ثم يُكمل عبر توكنه الخاص (infoFormToken) — فلا يرى/يفتح ملف أي زميل.
         $findName = trim((string)($_GET['q'] ?? $_POST['q'] ?? ''));
         $findDob  = trim((string)($_GET['bd'] ?? $_POST['bd'] ?? ''));
-        if ($findName !== '' && $findDob !== '') {
+        if ($findName !== '' && $findDob !== '' && !$formClosed) {
             // $schoolId قد يكون 0 في الرابط الموحّد → بحث عبر كل المدارس، وتُكتشف مدرسة الأستاذ من ملفه
             $emp = findTeacherByNameDob($db, $schoolId, $findName, $findDob);
             if ($emp) { $empId = (int)$emp['id']; $schoolId = (int)$emp['school_id']; $verified = true; }
@@ -187,7 +193,7 @@ $done = false; $error = ''; $uploadWarn = [];
 // كشف تجاوز حجم الرفع الكلّي (post_max_size): عندها PHP يُفرّغ POST و FILES مع بقاء Content-Length
 $postTooBig = ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES)
     && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0);
-if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$formClosed) {
     // اجمع الحقول النصية
     $data = [];
     foreach ($textFields as $k => $_) { $data[$k] = trim((string)($_POST[$k] ?? '')); }
@@ -343,7 +349,14 @@ if ($nameSchoolId) {
     <p><?= e($schoolName) ?></p>
   </div>
   <div class="bd">
-  <?php if ($postTooBig): ?>
+  <?php if ($formClosed): ?>
+    <div class="err" style="text-align:center">
+      <div style="font-size:44px;margin-bottom:8px">🔒</div>
+      <strong>باب تحديث وإدخال المعلومات مقفل حالياً.</strong><br>
+      انتهت مهلة الإدخال بتاريخ <strong><?= e(displayDMY($formDeadline)) ?></strong>. للضرورة، الرجاء التواصل مع إدارة المدرسة.<br><br>
+      <span dir="ltr">La saisie des informations est actuellement fermée (échéance : <?= e(displayDMY($formDeadline)) ?>). En cas de nécessité, veuillez contacter l'administration de l'école.</span>
+    </div>
+  <?php elseif ($postTooBig): ?>
     <div class="err">📁 لم تصل المعلومات (قد يكون مجموع حجم الملفات كبيراً جداً أو الإنترنت ضعيفاً). الرجاء المحاولة مجدداً، أو رفع المستندات على دفعتين، أو إعادة المحاولة على إنترنت أقوى.<br><span dir="ltr">Les informations ne sont pas parvenues (fichiers trop volumineux ou connexion faible). Veuillez réessayer, envoyer les documents en deux fois, ou utiliser une meilleure connexion.</span></div>
   <?php elseif (!$valid): ?>
     <div class="err">الرابط غير صالح أو منتهي. اطلب رابطاً جديداً من إدارة المدرسة.<br><span dir="ltr">Lien invalide ou expiré. Demandez un nouveau lien à l'administration de l'école.</span></div>

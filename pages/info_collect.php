@@ -74,6 +74,16 @@ function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
     return $warn;
 }
 
+// حفظ موعد إقفال باب تحديث/إدخال المعلومات + مفتاح السماح بعده (تحكّم الأدمن)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_form_deadline') {
+    requireCsrf();
+    $d = parseFlexibleDate($_POST['deadline'] ?? '');
+    if ($d) setSetting('teacher_form_deadline', $d);
+    setSetting('teacher_form_allow_after', isset($_POST['allow_after']) ? '1' : '0');
+    $_SESSION['flash_success'] = 'تم حفظ إعدادات إقفال باب الإدخال.';
+    header('Location: ' . BASE_URL . 'pages/info_collect.php'); exit;
+}
+
 // اعتماد طلب واحد: تحديث ملف الأستاذ بالقيم المُرسَلة + ربط السكانات
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'apply') {
     requireCsrf();
@@ -286,6 +296,36 @@ $newSubs = $newSubs->fetchAll();
       <button type="button" class="btn" style="background:#128c7e;color:#fff" onclick="navigator.clipboard.writeText(document.getElementById('allLink').value);this.innerHTML='✓ تم النسخ'"><i class="fas fa-copy"></i> نسخ الرابط</button>
       <a href="https://wa.me/?text=<?= $allMsg ?>" target="_blank" class="btn" style="background:#0a6b5e;color:#fff"><i class="fab fa-whatsapp"></i> فتح واتساب للإرسال</a>
     </div>
+  </div>
+</div>
+
+<?php
+  // 🔒 إعدادات إقفال باب الإدخال (تاريخ الإقفال + السماح بعده)
+  $dl        = getSetting('teacher_form_deadline', '2026-08-30');
+  $allowAfter = getSetting('teacher_form_allow_after', '0') === '1';
+  $isClosedNow = ($dl !== '' && !$allowAfter && date('Y-m-d') > $dl);
+?>
+<div class="card" style="border:2px solid #b45309">
+  <div class="card-header" style="background:#fff7ed"><h3 style="color:#b45309"><i class="fas fa-lock"></i> إقفال باب إدخال المعلومات (بعد التاريخ)</h3></div>
+  <div class="card-body">
+    <p style="color:var(--gray-600);margin-top:0">بعد <strong>تاريخ الإقفال</strong>، يُقفَل رابط تحديث/إدخال المعلومات فلا يقدر أي أستاذ يرسل معلوماته — <strong>إلا إذا فعّلت «السماح بعد التاريخ»</strong> بالأسفل. الوضع الحالي:
+      <?php if ($isClosedNow): ?><span class="badge" style="background:#b91c1c;color:#fff">🔒 مقفل</span>
+      <?php elseif ($allowAfter): ?><span class="badge" style="background:#15803d;color:#fff">🔓 مفتوح (سماح الأدمن مُفعَّل)</span>
+      <?php else: ?><span class="badge" style="background:#15803d;color:#fff">🔓 مفتوح حتى <?= e(displayDMY($dl)) ?></span><?php endif; ?>
+    </p>
+    <form method="post" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <?= csrfField() ?>
+      <input type="hidden" name="action" value="save_form_deadline">
+      <div>
+        <label style="display:block;font-weight:700;font-size:13px;margin-bottom:4px">تاريخ الإقفال (يوم/شهر/سنة)</label>
+        <input type="text" name="deadline" inputmode="numeric" autocomplete="off" placeholder="مثلاً 30/08/2026" value="<?= e(displayDMY($dl)) ?>" style="padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;padding-bottom:9px;cursor:pointer">
+        <input type="checkbox" name="allow_after" value="1" <?= $allowAfter ? 'checked' : '' ?> style="width:18px;height:18px">
+        السماح بالإدخال بعد التاريخ (فتح استثنائي)
+      </label>
+      <button type="submit" class="btn" style="background:#b45309;color:#fff"><i class="fas fa-save"></i> حفظ</button>
+    </form>
   </div>
 </div>
 <?php endif; ?>
