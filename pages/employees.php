@@ -622,6 +622,7 @@ if ($action === 'list') {
                                     <td><?= e($emp['phone1']) ?></td>
                                     <td><span class="badge badge-<?= $statusInfo['badge'] ?>"><?= e($statusInfo['label']) ?></span></td>
                                     <td class="no-print">
+                                        <div style="display:flex;gap:5px;flex-wrap:nowrap;align-items:center">
                                         <a href="?action=edit&id=<?= $emp['id'] ?>" class="btn btn-sm btn-light" title="Modifier">
                                             <i class="fas fa-edit"></i>
                                         </a>
@@ -631,6 +632,7 @@ if ($action === 'list') {
                                         <a href="?action=delete&id=<?= $emp['id'] ?>" class="btn btn-sm btn-danger" data-confirm="<?= e('⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . (trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr'])) . '» ؟') ?>" title="Supprimer">
                                             <i class="fas fa-trash"></i>
                                         </a>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
