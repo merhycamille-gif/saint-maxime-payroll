@@ -512,12 +512,18 @@ if ($action === 'list') {
     //  بلا أي راتب فعلي بعد** (المُنشَؤون حديثاً) ليظهروا باللائحة فيتمكّن المستخدم من إيجادهم وإعداد رواتبهم.
     $activeSY = activeSchoolYear();
     if ($activeSY !== 'all') {
+        // يظهر في سنة محدّدة: (أ) مَن له راتب فعلي بتلك السنة، أو (ب) أستاذ **معيَّن حديثاً**
+        // (سنة التعيين ضمن السنة المختارة أو بعدها) بلا راتب فعلي بعد — ليُعِدّ المستخدم راتبه.
+        // شرط سنة التعيين يمنع ظهور **الأساتذة القدامى** الذين تركوا من زمان ورواتبهم صفر
+        // (بلا تاريخ ترك مسجَّل) كأنهم «جدد» في كل سنة. القديم بلا راتب لا يظهر إلا في «كل السنين».
+        $syStart = substr($activeSY, 0, 4) . '-01-01';
         $sql .= " AND (
                 id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))
-                OR id NOT IN (SELECT employee_id FROM monthly_salaries WHERE base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)
+                OR (id NOT IN (SELECT employee_id FROM monthly_salaries WHERE base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0) AND hire_date >= ?)
             )
             AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL";
         $params[] = $activeSY;
+        $params[] = $syStart;
     }
     $sql .= " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)";
 
