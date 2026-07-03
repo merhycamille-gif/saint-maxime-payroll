@@ -175,6 +175,15 @@ $uploadCol = ['photo' => 'photo_path', 'id_document' => 'id_document_path', 'fam
 // المستندات الإلزامية (الصورة الشخصية تبقى اختيارية)
 $requiredUploads = ['id_document', 'family_doc', 'diploma_doc'];
 
+// 🔴 الحقول غير الإلزامية (كل ما عداها إلزامي). التعديل من هنا فقط.
+$optionalFields = ['email', 'phone2', 'nssf_number', 'finance_ministry_number', 'caisse_number', 'leave_date', 'photo'];
+$tfReq = function ($k) use ($optionalFields) { return !in_array($k, $optionalFields, true); };
+// قيمة الحقل عند إعادة العرض بعد خطأ: يُفضَّل ما أدخله الأستاذ (POST) ثم قيمة ملفه
+$fv = function ($k) use ($emp) { return isset($_POST[$k]) ? (string)$_POST[$k] : (string)($emp[$k] ?? ''); };
+// وسوم العرض: إلزامي (نجمة حمراء) / اختياري
+$reqStar = ' <span style="color:#dc2626;font-weight:700">*</span>';
+$optTag  = ' <span style="color:#64748b;font-weight:400;font-size:12px">(اختياري / optionnel)</span>';
+
 $done = false; $error = ''; $uploadWarn = [];
 // كشف تجاوز حجم الرفع الكلّي (post_max_size): عندها PHP يُفرّغ POST و FILES مع بقاء Content-Length
 $postTooBig = ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES)
@@ -248,8 +257,23 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($savedFiles[$col]) && !$onFile) $missingDocs[] = $lbl;
         }
     }
-    if ($missingDocs) {
-        $error = 'الرجاء إرفاق المستندات الإلزامية التالية ثم إعادة الإرسال / Veuillez joindre les documents obligatoires suivants puis renvoyer : ' . implode(' — ', $missingDocs);
+    // الحقول الإلزامية الناقصة: كل الحقول إلزامية إلا $optionalFields. يُعفى منها الأستاذ التارك.
+    $missingFields = [];
+    if (!$leaving) {
+        $reqLabels = [];
+        foreach ($textFields as $k => $lbl) { if ($tfReq($k)) $reqLabels[$k] = $lbl; }
+        $reqLabels['diploma'] = 'الشهادة العلمية / Diplôme';
+        foreach ($profFields as $k => $lbl) { if ($tfReq($k)) $reqLabels[$k] = $lbl; }
+        $reqLabels['niveau_scolaire'] = 'المرحلة / Niveau scolaire';
+        if ($classLevels) $reqLabels['classes_taught'] = 'الصفوف / Classes';
+        foreach ($reqLabels as $k => $lbl) {
+            if (trim((string)($data[$k] ?? '')) === '') $missingFields[] = $lbl;
+        }
+    }
+    if ($missingFields || $missingDocs) {
+        $all = array_merge($missingFields, $missingDocs);
+        $error = 'لا يمكن الإرسال قبل تعبئة كل الحقول الإلزامية. الناقص: ' . implode(' — ', $all)
+               . ' / Envoi impossible : champs obligatoires manquants : ' . implode(' — ', $all);
     } else {
         $ins = $db->prepare("INSERT INTO info_submissions (employee_id, is_new_teacher, school_id, data, photo_path, id_document_path, family_doc_path, diploma_doc_path, status, submitted_at)
             VALUES (?,?,?,?,?,?,?,?, 'pending', NOW())");
@@ -277,7 +301,21 @@ if ($nameSchoolId) {
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SALAIRES DES ÉCOLES — تحديث معلومات الأستاذ</title>
+<title>تحديث معلومات الأستاذ — Mise à jour des informations de l'enseignant</title>
+<?php
+  // معاينة الرابط على واتساب/الشبكات: عنوان ووصف ثنائيا اللغة يظهران فور وصول الرابط
+  $ogTitle = ($schoolName ? $schoolName . ' — ' : '') . 'تحديث معلومات الأستاذ / Mise à jour des informations';
+  $ogDesc  = 'رابط رسمي من إدارة المدرسة لتعبئة وتحديث معلوماتك ورفع مستنداتك. / Lien officiel de l\'école pour mettre à jour vos informations et joindre vos documents.';
+?>
+<meta name="description" content="<?= e($ogDesc) ?>">
+<meta property="og:type" content="website">
+<meta property="og:title" content="<?= e($ogTitle) ?>">
+<meta property="og:description" content="<?= e($ogDesc) ?>">
+<meta property="og:locale" content="ar_AR">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="<?= e($ogTitle) ?>">
+<meta name="twitter:description" content="<?= e($ogDesc) ?>">
 <style>
   body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#eef2f7;margin:0;padding:16px;color:#1f2937}
   .wrap{max-width:760px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.08);overflow:hidden}
@@ -354,6 +392,10 @@ if ($nameSchoolId) {
     <?php else: ?>
       <div class="note">أهلاً <strong><?= e(trim(($emp['first_name_ar']??'').' '.($emp['last_name_ar']??'')) ?: trim(($emp['first_name_fr']??'').' '.($emp['last_name_fr']??''))) ?></strong> — عبّئ/صحّح معلوماتك التالية وارفع مستنداتك، ثم اضغط «إرسال».<br><span dir="ltr">Bonjour — complétez / corrigez vos informations et joignez vos documents, puis cliquez sur « Envoyer ».</span></div>
     <?php endif; ?>
+    <div class="note" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;margin-bottom:14px">
+      📌 الحقول المعلَّمة بـ<span style="color:#dc2626;font-weight:700">*</span> <strong>إلزامية</strong> — ما بتقدر تبعت قبل ما تعبّيها كلّها. أمّا <strong>غير الإلزامية</strong> (تركها فارغة ما بيمنع الإرسال) فهي: <strong>الصورة الشخصية، البريد الإلكتروني، الهاتف الثاني، رقم الضمان، رقم المالية، رقم صندوق التعويضات، وتاريخ الترك</strong>.<br>
+      <span dir="ltr">📌 Les champs marqués d'un <span style="color:#dc2626;font-weight:700">*</span> sont <strong>obligatoires</strong> ; l'envoi est bloqué tant qu'ils ne sont pas remplis. Champs <strong>facultatifs</strong> : photo, e-mail, 2ᵉ téléphone, N° CNSS, N° Finances, N° Caisse et date de départ.</span>
+    </div>
     <form method="post" enctype="multipart/form-data" id="tf">
       <?php if ($isNew): // أستاذ جديد: يبقى ضمن توكن المدرسة ?>
         <?= $allHidden ?><?= $newHidden ?>
@@ -398,43 +440,44 @@ if ($nameSchoolId) {
       <?php endif; ?>
       <h3>المعلومات الشخصية / Informations personnelles</h3>
       <div class="grid">
-        <?php foreach ($textFields as $k => $lbl): if (in_array($k, ['gouvernorat','district','ville','quartier','rue','immeuble','etage'])) continue; ?>
+        <?php foreach ($textFields as $k => $lbl): if (in_array($k, ['gouvernorat','district','ville','quartier','rue','immeuble','etage'])) continue;
+          $req = $tfReq($k); ?>
           <div>
-            <label><?= e($lbl) ?></label>
+            <label><?= e($lbl) ?><?= $req ? $reqStar : $optTag ?></label>
             <input type="<?= $k === 'birth_date' ? 'date' : ($k === 'email' ? 'email' : ($k === 'number_of_children' ? 'number' : 'text')) ?>"
-                   name="<?= e($k) ?>" value="<?= e($emp[$k] ?? '') ?>">
+                   name="<?= e($k) ?>" value="<?= e($fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?>>
           </div>
         <?php endforeach; ?>
       </div>
       <h3>المعلومات المهنية / Informations professionnelles</h3>
       <div class="grid">
         <div>
-          <label>الشهادة العلمية / Diplôme</label>
-          <select name="diploma" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
+          <label>الشهادة العلمية / Diplôme<?= $reqStar ?></label>
+          <select name="diploma" required data-req="1" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
             <option value="">— اختر / Choisir —</option>
             <?php foreach ($diplomas as $d): ?>
-              <option value="<?= e($d['diploma_code']) ?>" <?= (($emp['diploma'] ?? '') === $d['diploma_code']) ? 'selected' : '' ?>><?= e($d['diploma_name_ar']) ?> / <?= e($d['diploma_name_fr']) ?></option>
+              <option value="<?= e($d['diploma_code']) ?>" <?= ($fv('diploma') === $d['diploma_code']) ? 'selected' : '' ?>><?= e($d['diploma_name_ar']) ?> / <?= e($d['diploma_name_fr']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
         <div>
-          <label>المواد التي يدرّسها / Matières enseignées</label>
-          <input type="text" name="subjects_taught" value="<?= e($emp['subjects_taught'] ?? '') ?>" placeholder="رياضيات، علوم... / maths, sciences...">
+          <label>المواد التي يدرّسها / Matières enseignées<?= $reqStar ?></label>
+          <input type="text" name="subjects_taught" value="<?= e($fv('subjects_taught')) ?>" placeholder="رياضيات، علوم... / maths, sciences..." required data-req="1">
         </div>
       </div>
       <div style="margin-top:12px">
-        <label>المرحلة — Niveau scolaire</label>
-        <?php $niveauSel = explode(',', (string)($emp['niveau_scolaire'] ?? '')); ?>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
+        <label>المرحلة — Niveau scolaire<?= $reqStar ?></label>
+        <?php $niveauSel = isset($_POST['niveau_scolaire']) && is_array($_POST['niveau_scolaire']) ? $_POST['niveau_scolaire'] : explode(',', (string)($emp['niveau_scolaire'] ?? '')); ?>
+        <div class="req-checkgroup" data-reqmsg="الرجاء اختيار المرحلة (خيار واحد على الأقل) / Veuillez choisir au moins un niveau" style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
           <?php foreach ($niveauOptions as $nv => $nlbl): ?>
             <label style="font-weight:400"><input type="checkbox" name="niveau_scolaire[]" value="<?= $nv ?>" <?= in_array($nv, $niveauSel) ? 'checked' : '' ?> style="width:auto;margin-left:4px"> <?= e($nlbl) ?></label>
           <?php endforeach; ?>
         </div>
       </div>
-      <?php if ($classLevels): ?>
+      <?php if ($classLevels): $selClasses = isset($_POST['classes_taught']) && is_array($_POST['classes_taught']) ? array_map('intval', $_POST['classes_taught']) : $selClasses; ?>
       <div style="margin-top:12px">
-        <label>الصفوف التي تعلّم فيها — Classes</label>
-        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">
+        <label>الصفوف التي تعلّم فيها — Classes<?= $reqStar ?></label>
+        <div class="req-checkgroup" data-reqmsg="الرجاء اختيار الصفوف (خيار واحد على الأقل) / Veuillez choisir au moins une classe" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">
           <?php foreach ($classLevels as $cl): ?>
             <?php $clFr = trim((string)($cl['name_fr'] ?? '')); ?>
             <label style="font-weight:400;white-space:nowrap"><input type="checkbox" name="classes_taught[]" value="<?= (int)$cl['id'] ?>" <?= in_array((int)$cl['id'], $selClasses, true) ? 'checked' : '' ?> style="width:auto;margin-left:4px"> <?= e($clFr !== '' ? $clFr.' / '.$cl['name'] : $cl['name']) ?></label>
@@ -444,32 +487,32 @@ if ($nameSchoolId) {
       <?php endif; ?>
       <div class="grid" style="margin-top:12px">
         <div>
-          <label>عدد الساعات الأسبوعية / Heures par semaine</label>
-          <input type="number" step="0.5" min="0" name="hours_per_week" value="<?= e($emp['hours_per_week'] ?? '') ?>">
+          <label>عدد الساعات الأسبوعية / Heures par semaine<?= $reqStar ?></label>
+          <input type="number" step="0.5" min="0" name="hours_per_week" value="<?= e($fv('hours_per_week')) ?>" required data-req="1">
         </div>
         <div>
-          <label>عدد أيام الحضور أسبوعياً / Jours par semaine</label>
-          <input type="number" min="1" max="7" name="days_per_week" value="<?= e($emp['days_per_week'] ?? '') ?>">
+          <label>عدد أيام الحضور أسبوعياً / Jours par semaine<?= $reqStar ?></label>
+          <input type="number" min="1" max="7" name="days_per_week" value="<?= e($fv('days_per_week')) ?>" required data-req="1">
         </div>
         <div>
-          <label>رقم الضمان الاجتماعي / N° CNSS</label>
-          <input type="text" name="nssf_number" value="<?= e($emp['nssf_number'] ?? '') ?>">
+          <label>رقم الضمان الاجتماعي / N° CNSS<?= $optTag ?></label>
+          <input type="text" name="nssf_number" value="<?= e($fv('nssf_number')) ?>">
         </div>
         <div>
-          <label>رقم المالية / N° Finances</label>
-          <input type="text" name="finance_ministry_number" value="<?= e($emp['finance_ministry_number'] ?? '') ?>">
+          <label>رقم المالية / N° Finances<?= $optTag ?></label>
+          <input type="text" name="finance_ministry_number" value="<?= e($fv('finance_ministry_number')) ?>">
         </div>
         <div>
-          <label>رقم صندوق التعويضات / N° Caisse</label>
-          <input type="text" name="caisse_number" value="<?= e($emp['caisse_number'] ?? '') ?>">
+          <label>رقم صندوق التعويضات / N° Caisse<?= $optTag ?></label>
+          <input type="text" name="caisse_number" value="<?= e($fv('caisse_number')) ?>">
         </div>
       </div>
       <h3>العنوان / Adresse</h3>
       <div class="grid">
-        <?php foreach (['gouvernorat','district','ville','quartier','rue','immeuble','etage'] as $k): ?>
+        <?php foreach (['gouvernorat','district','ville','quartier','rue','immeuble','etage'] as $k): $req = $tfReq($k); ?>
           <div>
-            <label><?= e($textFields[$k]) ?></label>
-            <input type="text" name="<?= e($k) ?>" value="<?= e($emp[$k] ?? '') ?>">
+            <label><?= e($textFields[$k]) ?><?= $req ? $reqStar : $optTag ?></label>
+            <input type="text" name="<?= e($k) ?>" value="<?= e($fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?>>
           </div>
         <?php endforeach; ?>
       </div>
@@ -508,15 +551,31 @@ if ($nameSchoolId) {
   </div>
 </div>
 <script>
-// الأستاذ التارك (كتب تاريخ ترك) لا يُطالَب بالمستندات الإلزامية → أزِل «required» عند تعبئة تاريخ الترك
+// الإلزامية: الأستاذ التارك (كتب تاريخ ترك) يُعفى منها؛ ومجموعات المربّعات تتطلّب اختياراً واحداً على الأقل
 (function(){
-  var ld = document.querySelector('input[name=leave_date]'); if(!ld) return;
-  var reqFiles = [].slice.call(document.querySelectorAll('input[type=file][data-req]'));
-  function sync(){
-    var leaving = ld.value.trim() !== '';
-    reqFiles.forEach(function(f){ if(leaving) f.removeAttribute('required'); else f.setAttribute('required','required'); });
+  var form = document.getElementById('tf'); if(!form) return;
+  var ld = document.querySelector('input[name=leave_date]');
+  var reqCtrls = [].slice.call(form.querySelectorAll('[data-req]'));
+  var groups   = [].slice.call(form.querySelectorAll('.req-checkgroup'));
+  function leaving(){ return ld && ld.value.trim() !== ''; }
+  function syncReq(){
+    var lv = leaving();
+    reqCtrls.forEach(function(c){ if(lv) c.removeAttribute('required'); else c.setAttribute('required','required'); });
   }
-  ld.addEventListener('change', sync); ld.addEventListener('input', sync); sync();
+  if(ld){ ld.addEventListener('change', syncReq); ld.addEventListener('input', syncReq); }
+  syncReq();
+  // «اختَر واحداً على الأقل» لمجموعات المربّعات الإلزامية (المرحلة/الصفوف) — يعمل قبل ضغط الصور
+  form.addEventListener('submit', function(e){
+    if(leaving()) return;
+    for(var i=0;i<groups.length;i++){
+      if(groups[i].querySelectorAll('input[type=checkbox]:checked').length === 0){
+        e.preventDefault(); e.stopImmediatePropagation();
+        alert(groups[i].getAttribute('data-reqmsg') || 'الرجاء اختيار خيار واحد على الأقل / Sélectionnez au moins une option');
+        try{ groups[i].scrollIntoView({block:'center'}); }catch(_){}
+        return;
+      }
+    }
+  }, true);
 })();
 // ضغط الصور على جهاز الأستاذ قبل الرفع (تصغير الأبعاد + JPEG) — يقلّل الحجم كثيراً عبر النفق
 (function(){

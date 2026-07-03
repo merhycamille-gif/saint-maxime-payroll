@@ -51,6 +51,27 @@ if ($selYear !== 'all' && !preg_match('/^\d{4}-\d{4}$/', $selYear)) $selYear = c
 // طبّق الفلتر
 $rows = ($selYear === 'all') ? $allRows : array_values(array_filter($allRows, fn($r) => $r['_sy'] === $selYear));
 
+// 🔍 فحص تلقائي: أي تارك عنده راتب في سنة دراسية بعد سنة تركه = تناقض (راتب وهمي).
+// يُحسب لكل التاركين ضمن النطاق (بغضّ النظر عن فلتر السنة) بطلب واحد فعّال.
+$anomalies = [];
+if ($allRows) {
+    $ids = array_map(fn($r) => (int)$r['id'], $allRows);
+    $maxRank = [];
+    $q = $db->query("SELECT employee_id, MAX(CASE WHEN month >= 10 THEN year ELSE year - 1 END) AS mr
+                     FROM monthly_salaries WHERE employee_id IN (" . implode(',', $ids) . ") GROUP BY employee_id");
+    foreach ($q as $row) { $maxRank[(int)$row['employee_id']] = (int)$row['mr']; }
+    foreach ($allRows as $r) {
+        if (!$r['_primary_ts']) continue;
+        $ly = (int)date('Y', $r['_primary_ts']); $lm = (int)date('n', $r['_primary_ts']);
+        $depRank = ($lm >= 10) ? $ly : $ly - 1;
+        $mr = $maxRank[(int)$r['id']] ?? null;
+        if ($mr !== null && $mr > $depRank) {
+            $nm = trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr']);
+            $anomalies[] = ['id' => (int)$r['id'], 'name' => $nm, 'school' => $r['school_name'], 'left' => date('d/m/Y', $r['_primary_ts']), 'until' => $mr];
+        }
+    }
+}
+
 // جمّع حسب المدرسة
 $bySchool = [];
 foreach ($rows as $r) {
@@ -66,6 +87,24 @@ include __DIR__ . '/../includes/header.php';
   <i class="fas fa-door-open"></i> لائحة <strong>الأساتذة والموظفين الذين تركوا العمل</strong> (سُجِّل لهم تاريخ ترك عبر ملف الأستاذ أو عبر رابط تحديث المعلومات) — مصنّفة <strong>حسب السنة الدراسية</strong> التي وقع فيها الترك. الافتراضي: السنة الحالية <strong><?= e(currentSchoolYear()) ?></strong>.<br>
   <span dir="ltr">Liste des enseignants / employés ayant quitté, classée par année scolaire du départ. Par défaut : l'année en cours.</span>
 </div>
+
+<?php // 🔍 نتيجة الفحص التلقائي: بانر أخضر إن كل شي سليم، أو تحذير بالتناقضات ?>
+<?php if (empty($anomalies)): ?>
+  <div class="alert alert-success no-print" style="margin-bottom:14px">
+    <i class="fas fa-check-circle"></i> <strong>فحص تلقائي:</strong> كل تواريخ الترك سليمة — ما في ولا أستاذ تارك عندو راتب بعد تاريخ تركه. ✅
+    <span dir="ltr" style="opacity:.8">/ Vérification automatique : aucune incohérence.</span>
+  </div>
+<?php else: ?>
+  <div class="alert alert-danger no-print" style="margin-bottom:14px">
+    <i class="fas fa-exclamation-triangle"></i> <strong>فحص تلقائي — انتبه:</strong> في <strong><?= count($anomalies) ?></strong> أستاذ تارك عندو رواتب <strong>بعد</strong> تاريخ تركه (تاريخ ترك غلط أو رواتب وهمية). افتح ملف كل واحد وصحّح تاريخ الترك — البرنامج بيحذف الرواتب الزائدة تلقائياً عند الحفظ:
+    <ul style="margin:8px 0 0;padding-inline-start:22px">
+      <?php foreach ($anomalies as $a): ?>
+        <li><strong><?= e($a['name']) ?></strong> (<?= e($a['school']) ?>) — تاريخ الترك <?= e($a['left']) ?> لكن عندو رواتب حتى سنة <?= e($a['until']) ?>-<?= e($a['until']+1) ?>
+          <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $a['id'] ?>#tab-emploi" class="btn btn-sm btn-light" style="padding:1px 8px"><i class="fas fa-folder-open"></i> صحّح</a></li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
+<?php endif; ?>
 
 <div class="card">
   <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">

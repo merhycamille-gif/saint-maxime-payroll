@@ -65,6 +65,10 @@ function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
     if ($set) {
         $vals[] = $sub['employee_id'];
         $db->prepare("UPDATE employees SET " . implode(', ', $set) . " WHERE id = ?")->execute($vals);
+        // 🩹 إن سُجِّل تاريخ ترك → احذف تلقائياً أي راتب بعده (شفاء ذاتي، يمنع الرواتب الوهمية)
+        if (!empty($data['leave_date']) && strtotime($data['leave_date'])) {
+            pruneSalariesAfterDeparture($db, $sub['employee_id']);
+        }
     }
     $db->prepare("UPDATE info_submissions SET status='applied', applied_at=NOW() WHERE id=?")->execute([$sub['id']]);
     return $warn;
@@ -211,7 +215,9 @@ $subs->execute();
 $subs = $subs->fetchAll();
 
 // المهلة + نصّ الرسالة المرفقة بالرابط (يمكن تغييرهما بسهولة)
-$infoDeadline = '30-6-2026';
+$infoDeadline = '15-7-2026';
+// عنوان قصير ثنائي اللغة يتصدّر رسالة الواتساب — ليعرف الأستاذ فوراً ما هو الرابط عند وصوله
+$infoTitle = "📋 *تحديث معلومات الأساتذة — Mise à jour des informations des enseignants*";
 $infoIntro = "حضرة الأساتذة المحترمين،\nيرجى تعبئة وتحديث معلوماتكم الشخصية ورفع مستنداتكم (صورة، إخراج قيد فردي وعائلي، الشهادة) عبر الرابط التالي، وذلك قبل تاريخ $infoDeadline. شاكرين تعاونكم.";
 
 $labels = ['first_name_ar'=>'الاسم','first_name_fr'=>'Prénom','last_name_ar'=>'الشهرة','last_name_fr'=>'Nom',
@@ -252,7 +258,7 @@ $newSubs = $newSubs->fetchAll();
   $schoolNm = currentSchool()['name_ar'] ?? '';
   $groupIntro = "حضرة أساتذة " . $schoolNm . " المحترمين،\nيرجى تعبئة وتحديث معلوماتكم الشخصية ورفع مستنداتكم (صورة، إخراج قيد فردي وعائلي، الشهادة) عبر الرابط التالي، وذلك قبل تاريخ $infoDeadline. شاكرين تعاونكم.";
   $groupLink = $formBase . '?school=' . $sid . '&token=' . schoolFormToken($sid);
-  $groupMsg = rawurlencode($groupIntro . "\n(كلٌّ يختار اسمه)\n" . $groupLink);
+  $groupMsg = rawurlencode($infoTitle . "\n\n" . $groupIntro . "\n(كلٌّ يختار اسمه / chacun choisit son nom)\n" . $groupLink);
 ?>
 <div class="card" style="border:2px solid #25d366">
   <div class="card-header" style="background:#e8f9ef"><h3 style="color:#0a7a37"><i class="fab fa-whatsapp"></i> رابط واحد لكل المجموعة (الأسهل)</h3></div>
@@ -269,7 +275,7 @@ $newSubs = $newSubs->fetchAll();
 
 <?php if (isSuperAdmin()):
   $allLink = $formBase . '?all=1&token=' . allFormToken();
-  $allMsg = rawurlencode($infoIntro . "\n(كلٌّ يكتب اسمه وتاريخ ولادته، والبرنامج بيعرف مدرسته تلقائياً)\n" . $allLink);
+  $allMsg = rawurlencode($infoTitle . "\n\n" . $infoIntro . "\n(كلٌّ يكتب اسمه وتاريخ ولادته، والبرنامج بيعرف مدرسته تلقائياً / chacun saisit son nom et sa date de naissance)\n" . $allLink);
 ?>
 <div class="card" style="border:2px solid #128c7e">
   <div class="card-header" style="background:#e6f4f1"><h3 style="color:#0a6b5e"><i class="fas fa-globe"></i> رابط موحّد لكل المدارس (رابط واحد للجميع) ⭐</h3></div>
@@ -296,7 +302,7 @@ $newSubs = $newSubs->fetchAll();
         $nm = trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
         $link = $formBase . '?emp=' . $emp['id'] . '&token=' . infoFormToken($emp['id']);
         $wa = waPhone($emp['phone1'] ?: $emp['phone2']);
-        $msg = rawurlencode("حضرة الأستاذ(ة) " . $nm . " المحترم(ة) في " . $indivSchoolNm . "،\nيرجى تعبئة وتحديث معلوماتك الشخصية ورفع مستنداتك (صورة، إخراج قيد فردي وعائلي، الشهادة) عبر الرابط التالي، وذلك قبل تاريخ " . $infoDeadline . ". شاكرين تعاونك.\n" . $link);
+        $msg = rawurlencode($infoTitle . "\n\n" . "حضرة الأستاذ(ة) " . $nm . " المحترم(ة) في " . $indivSchoolNm . "،\nيرجى تعبئة وتحديث معلوماتك الشخصية ورفع مستنداتك (صورة، إخراج قيد فردي وعائلي، الشهادة) عبر الرابط التالي، وذلك قبل تاريخ " . $infoDeadline . ". شاكرين تعاونك.\n" . $link);
       ?>
         <tr>
           <td><?= $i ?></td>

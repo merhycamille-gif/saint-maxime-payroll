@@ -367,6 +367,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Employé créé avec succès / تم إنشاء الموظف بنجاح'];
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
+            pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
             handleEmployeeUploads($db, $id); // رفع الصورة والوثائق (يحدّث الرسالة بعدد الملفات)
             $tabQ = ($t = preg_replace('/[^a-z]/', '', $_POST['active_tab'] ?? '')) ? '&tab=' . $t : '';
             header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id . $tabQ);
@@ -406,6 +407,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             }
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
+            pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
             handleEmployeeUploads($db, $id); // رفع/تحديث الصورة والوثائق
             $tabQ = ($t = preg_replace('/[^a-z]/', '', $_POST['active_tab'] ?? '')) ? '&tab=' . $t : '';
             header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id . $tabQ);

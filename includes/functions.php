@@ -202,6 +202,23 @@ function yearEmploymentFilter($schoolYear, $prefix = '') {
     return [$sql, [$schoolYear]];
 }
 
+// 🩹 شفاء ذاتي: احذف أيّ راتب شهري يقع في سنة دراسية **بعد** سنة ترك الأستاذ.
+// يُستدعى تلقائياً بعد حفظ/تعديل تاريخ الترك (ملف الأستاذ + رابط تحديث المعلومات).
+// السبب: عند فتح سنة جديدة قبل تسجيل تاريخ الترك كانت تُولَّد «رواتب وهمية» للتاركين تبقى في البيانات.
+// هذه الدالة تضمن أن رواتب أيّ تارك تتوقّف عند سنة تركه — فلا يظهر في السنة الحالية ولا تتلوّث التقارير.
+// تحافظ على أشهر سنة الترك نفسها (مثلاً ترك 30/6 ورواتب الصيف حتى 30/9 من نفس السنة الدراسية).
+function pruneSalariesAfterDeparture($db, $empId) {
+    $empId = (int)$empId;
+    $row = $db->query("SELECT LEAST(COALESCE(left_date_cnss,'9999-12-31'),COALESCE(left_date_finance,'9999-12-31'),COALESCE(left_date_eoc,'9999-12-31')) ld FROM employees WHERE id = $empId")->fetch();
+    if (!$row || empty($row['ld']) || $row['ld'] === '9999-12-31') return 0; // ليس تاركاً → لا شيء
+    $y = (int)substr($row['ld'], 0, 4); $m = (int)substr($row['ld'], 5, 2);
+    $depRank = ($m >= 10) ? $y : $y - 1; // رتبة السنة الدراسية للترك (تبدأ في تشرين الأول)
+    // رتبة صفّ (year,month) = (month>=10 ? year : year-1). نحذف كل صفّ رتبته > رتبة الترك.
+    $del = $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND ((month >= 10 AND year > ?) OR (month < 10 AND year - 1 > ?))");
+    $del->execute([$empId, $depRank, $depRank]);
+    return $del->rowCount();
+}
+
 // جملة SQL لتقييد التقرير بالمدارس المختارة (آمنة لأنها أرقام)
 function reportSchoolSql($column = 'ms.school_id') {
     $ids = selectedReportSchoolIds();
