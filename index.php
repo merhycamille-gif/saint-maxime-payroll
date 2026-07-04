@@ -81,6 +81,15 @@ $exchangeRate = getExchangeRate();
 // تنبيه بلوغ سنّ الـ64: موظفون/أساتذة فاعلون غير تاركين بلغوا 64 (تاريخ ولادة صحيح مسجّل)
 // محصّن: قبل تطبيق migration 017 (إضافة عمود keep_working_past_64) قد لا يكون العمود موجوداً
 // أونلاين → نتجاهل التنبيه بدل كسر الصفحة (يُطبَّق العمود بزيارة migrate.php مرّة).
+// تفعيل ذاتي (يُغني نهائياً عن migrate.php): إن كان عمود keep_working_past_64 ناقصاً — كما في
+// قاعدة الأونلاين قبل التحديث — يُضيفه البرنامج بنفسه تلقائياً مرّة واحدة عند فتح الصفحة، بلا أي
+// خطوة يدوية من المستخدم. بعدها يبقى موجوداً فلا يُعاد. (تصحيح جذري: أي عمود جديد يُركّب ذاتياً.)
+try {
+    if (!$db->query("SHOW COLUMNS FROM employees LIKE 'keep_working_past_64'")->fetch()) {
+        $db->exec("ALTER TABLE employees ADD COLUMN keep_working_past_64 TINYINT(1) NOT NULL DEFAULT 0");
+    }
+} catch (Exception $e) { /* لو تعذّر (صلاحيات) → التحصين أدناه يمنع الكسر */ }
+
 $over64 = [];
 try {
     $st64 = $db->prepare("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
