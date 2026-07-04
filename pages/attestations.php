@@ -203,7 +203,16 @@ if (!$emp):
         $salPeriodAr = monthName((int)$sal['month'],'ar').' '.$sal['year'];
         $salPeriodLat = monthName((int)$sal['month'],'fr').' '.$sal['year'];
     } else {
-        $basePlusEch=scaleSalaryLBP($emp['current_grade']); $net=$basePlusEch; $netUsd=0;
+        // لا صفّ راتب محسوب → قدّر الأساس: الأستاذ من السلسلة، والموظف/المتعاقد من راتبه المباشر
+        // (الموظف الإداري يخضع لقانون العمل بلا سلسلة رتب — نفس منطق payroll_calculator::calculateBaseAndEchelon).
+        if ($emp['employee_type'] === 'enseignant_titulaire') {
+            $basePlusEch = scaleSalaryLBP($emp['current_grade']);
+        } elseif (($emp['salary_input_mode'] ?? '') === 'direct_usd' && (float)$emp['base_salary_usd'] > 0) {
+            $basePlusEch = round((float)$emp['base_salary_usd'] * getExchangeRate());
+        } else {
+            $basePlusEch = (float)($emp['contract_salary_lbp'] ?? 0);
+        }
+        $net=$basePlusEch; $netUsd=0;
         $cnssAmt=round($basePlusEch*0.03); $schoolCnss=round($basePlusEch*0.08);
         $salPeriodAr=currentSchoolYear(); $salPeriodLat=$salPeriodAr;
     }

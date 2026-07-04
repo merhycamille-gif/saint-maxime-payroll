@@ -1098,7 +1098,7 @@ include __DIR__ . '/../includes/header.php';
                         <label class="form-label">Date d'embauche <span class="req">*</span> <small>(دخول المدرسة)</small></label>
                         <input type="date" id="hireDate" name="hire_date" class="form-control" value="<?= e($employee['hire_date']) ?>" required>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group emp-teacher-only">
                         <label class="form-label">دخول الملاك <small>(تلقائي = دخول المدرسة + سنتين، يمكن تعديله)</small></label>
                         <input type="date" id="malakDate" name="titularization_date" class="form-control" value="<?= e($employee['titularization_date']) ?>">
                         <small id="malakHint" class="text-muted" style="display:block;margin-top:3px"></small>
@@ -1116,16 +1116,16 @@ include __DIR__ . '/../includes/header.php';
                         sync(false);
                     })();
                     </script>
-                    <div class="form-group">
+                    <div class="form-group emp-teacher-only">
                         <label class="form-label">تاريخ التثبيت <small>(اختياري — تلقائي = دخول المدرسة + سنتين؛ منه تبدأ الدرجات الاستثنائية بكانون)</small></label>
                         <input type="date" name="tenure_confirmation_date" class="form-control" value="<?= e($employee['tenure_confirmation_date']) ?>">
                     </div>
-                    <div class="form-group">
+                    <div class="form-group emp-teacher-only">
                         <label class="form-label">Échelon initial / درجة الدخول</label>
                         <input type="number" name="starting_grade" class="form-control" value="<?= (float)$employee['starting_grade'] ?>" min="1" max="52" step="0.5">
                         <small class="grade-salary" data-grade-for="starting_grade" style="font-weight:600;color:var(--primary)"></small>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group emp-teacher-only">
                         <label class="form-label">Échelon actuel / الدرجة الحالية <span class="req">*</span> <small>(½ permis)</small></label>
                         <input type="number" name="current_grade" class="form-control" value="<?= (float)$employee['current_grade'] ?>" min="1" max="52" step="0.5" required>
                         <small class="grade-salary" data-grade-for="current_grade" style="font-weight:700;color:var(--gold-dark,#9a7b0a)"></small>
@@ -1243,11 +1243,17 @@ include __DIR__ . '/../includes/header.php';
                         });
                     }
                     modeSel.addEventListener('change', syncSalMode);
-                    // الموظف الإداري: أخفِ حقول الأستاذ (شهادة/مواد/مرحلة/صفوف) وأظهِر نوع الوظيفة، والعكس للأستاذ.
+                    // الموظف الإداري: أخفِ حقول الأستاذ (شهادة/مواد/مرحلة/صفوف/درجة) وأظهِر نوع الوظيفة، والعكس للأستاذ.
                     function syncEmpType(){
                         var isAdmin = typeSel && typeSel.value === 'employe';
                         document.querySelectorAll('.emp-admin-only').forEach(function(el){ el.style.display = isAdmin ? '' : 'none'; });
                         document.querySelectorAll('.emp-teacher-only').forEach(function(el){ el.style.display = isAdmin ? 'none' : ''; });
+                        // حقول إلزامية داخل قسم الأستاذ: انزع required عند إخفائها (وإلا يفشل الحفظ بصمت للموظف الإداري)،
+                        // وأعِد نوع الوظيفة إلزامياً للموظف فقط.
+                        var curGrade = document.querySelector('[name="current_grade"]');
+                        if (curGrade) curGrade.required = !isAdmin;
+                        var jobSel = document.getElementById('jobTitleSelect');
+                        if (jobSel) jobSel.required = isAdmin;
                     }
                     // عند اختيار نوع الأستاذ: ملاك ⇐ السلسلة حسب القانون · متعاقد ⇐ ليرة متفق عليها
                     if (typeSel) typeSel.addEventListener('change', function(){

@@ -459,7 +459,7 @@ include __DIR__ . '/../includes/header.php';
                                 <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e($r['first_name_fr'].' '.$r['last_name_fr']) ?></td>
                                 <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
-                                <td><?= $r['current_grade'] ?></td>
+                                <td><?= e(gradeDisplay($r)) ?></td>
                                 <td><?= $r['is_calculated'] ? formatLBP($r['net_salary_lbp']) : '—' ?></td>
                                 <td><strong><?= $r['is_calculated'] ? formatLBP($r['total_due_lbp']) : '—' ?></strong></td>
                                 <td><?= $r['is_calculated'] ? formatUSD($r['total_due_usd']) : '—' ?></td>
