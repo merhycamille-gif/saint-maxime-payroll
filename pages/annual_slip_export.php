@@ -101,7 +101,9 @@ $slip = computeAnnualSlip($db, $emp, $schoolYear);
 $m = $slip['meta'];
 $rep = new ReportTable('كشف الراتب السنوي ' . $schoolYear, true);
 $rep->schoolHeader($slip['school']);
-$rep->period($m['name'] . '  —  الشهادة: ' . $m['diploma'] . ' · الفئة: ' . $m['type'] . ' · الدرجة: ' . $m['grade']
+$isAdminEmp = ($emp['employee_type'] === 'employe');
+$rep->period($m['name'] . '  —  ' . ($isAdminEmp ? 'الوظيفة' : 'الشهادة') . ': ' . $m['diploma'] . ' · الفئة: ' . $m['type']
+    . ($isAdminEmp ? '' : ' · الدرجة: ' . $m['grade'])
     . ' · ر.الضمان: ' . $m['cnss'] . ' · ر.الصندوق: ' . $m['caisse_no'] . ' · ر.المالية: ' . $m['finance_no']);
 $rep->head($head);
 $rep->widths($widths);

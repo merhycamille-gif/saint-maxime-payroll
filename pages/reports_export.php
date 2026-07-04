@@ -67,7 +67,7 @@ if ($report === 'monthly_summary') {
         foreach ($v as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [$nm($r), employeeTypeLabel($r['employee_type']), rtrim(rtrim(number_format((float)$r['grade_at_month'], 1), '0'), '.'), $v['base'], $v['ech'], $v['bpe'], $v['extra'], $v['aide'], $v['cnss'], $v['caisse'], $v['tax'], $v['net'], $v['fam'], $v['tr'], $v['tot']]);
+        $row = array_merge($row, [$nm($r), employeeTypeLabel($r['employee_type']), gradeDisplay($r['employee_type'], $r['grade_at_month']), $v['base'], $v['ech'], $v['bpe'], $v['extra'], $v['aide'], $v['cnss'], $v['caisse'], $v['tax'], $v['net'], $v['fam'], $v['tr'], $v['tot']]);
         $rep->row($row);
     }
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('الإجمالي العام', $G, $rn); }
@@ -171,13 +171,22 @@ if ($report === 'monthly_summary') {
     $data = $st->fetchAll();
     $scaleMap = [];
     foreach ($db->query("SELECT grade,new_salary_2017 FROM salary_scale_2017 WHERE version_id=1") as $sc) $scaleMap[(int)$sc['grade']] = (float)$sc['new_salary_2017'];
+    // أساس الموظف الإداري الفعلي من آخر راتب محسوب (لا سلسلة رتب — قانون العمل)
+    $baseMap = [];
+    foreach ($db->query("SELECT ms.employee_id, ms.base_plus_echelon_lbp FROM monthly_salaries ms
+                         JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE is_calculated=1 GROUP BY employee_id) lt
+                           ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym") as $b) {
+        $baseMap[(int)$b['employee_id']] = (float)$b['base_plus_echelon_lbp'];
+    }
     $cols = [
         'code' => ['Code', fn($r) => $r['employee_code']],
         'name' => ['الاسم', fn($r) => trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) ?: trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])],
         'type' => ['الفئة', fn($r) => employeeTypeLabel($r['employee_type'])],
-        'diploma' => ['الشهادة', fn($r) => diplomaLabel($r['diploma'])],
-        'grade' => ['الدرجة', fn($r) => rtrim(rtrim(number_format((float)$r['current_grade'], 1), '0'), '.')],
-        'salary' => ['الراتب', fn($r) => (int)($scaleMap[(int)round($r['current_grade'])] ?? 0)],
+        'diploma' => ['الشهادة', fn($r) => $r['employee_type'] === 'employe' ? jobTitleLabel($r['job_title'] ?? '') : diplomaLabel($r['diploma'])],
+        'grade' => ['الدرجة', fn($r) => gradeDisplay($r)],
+        'salary' => ['الراتب', fn($r) => $r['employee_type'] === 'employe'
+                        ? (int)($baseMap[(int)$r['id']] ?? 0)
+                        : (int)($scaleMap[(int)round($r['current_grade'])] ?? 0)],
         'nssf' => ['رقم الضمان', fn($r) => $r['nssf_number']],
         'mof' => ['رقم المالية', fn($r) => $r['finance_ministry_number']],
         'caisse' => ['رقم الصندوق', fn($r) => $r['caisse_number']],

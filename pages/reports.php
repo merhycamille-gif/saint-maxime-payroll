@@ -269,7 +269,7 @@ function reportSchoolPicker() {
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                                 <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
-                                <td><?= $r['grade_at_month'] ?></td>
+                                <td><?= e(gradeDisplay($r['employee_type'], $r['grade_at_month'])) ?></td>
                                 <td><?= formatLBP($r['base_salary_lbp']) ?></td>
                                 <td><?= formatLBP($r['echelon_value_lbp']) ?></td>
                                 <td><?= formatLBP($r['base_plus_echelon_lbp']) ?></td>
@@ -480,9 +480,9 @@ function reportSchoolPicker() {
         // سلسلة 2017: الراتب حسب الدرجة (لعمود الراتب)
         $scaleMap = [];
         foreach ($db->query("SELECT grade, new_salary_2017 FROM salary_scale_2017 WHERE version_id = 1") as $sc) $scaleMap[(int)$sc['grade']] = (float)$sc['new_salary_2017'];
-        // آخر راتب محسوب لكل موظف (لعمودَي الأجر الإضافي ومكافأة ومساعدة الاختياريين)
+        // آخر راتب محسوب لكل موظف (لعمودَي الأجر الإضافي ومكافأة ومساعدة الاختياريين + أساس الموظف الإداري الفعلي)
         $bonusMap = [];
-        foreach ($db->query("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
+        foreach ($db->query("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.base_plus_echelon_lbp
                              FROM monthly_salaries ms
                              JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE is_calculated=1 GROUP BY employee_id) lt
                                ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym") as $b) {
@@ -495,8 +495,11 @@ function reportSchoolPicker() {
             'name_ar' => ['الاسم بالعربي', fn($r) => e(trim($r['first_name_ar'].' '.$r['last_name_ar']))],
             'type'    => ['الفئة / Type', fn($r) => employeeTypeLabel($r['employee_type'])],
             'diploma' => ['الشهادة / Diplôme', fn($r) => diplomaLabel($r['diploma'])],
-            'grade'   => ['الدرجة / Échelon', fn($r) => $r['current_grade']],
-            'salary'  => ['الراتب (قانون) / Salaire', fn($r) => formatLBP($scaleMap[(int)round($r['current_grade'])] ?? 0)],
+            'grade'   => ['الدرجة / Échelon', fn($r) => gradeDisplay($r)],
+            // الأستاذ: راتب السلسلة حسب درجته. الموظف الإداري: راتبه الفعلي المتّفق عليه (لا سلسلة رتب — قانون العمل).
+            'salary'  => ['الراتب (قانون) / Salaire', fn($r) => $r['employee_type'] === 'employe'
+                            ? formatLBP((float)($bonusMap[(int)$r['id']]['base_plus_echelon_lbp'] ?? 0))
+                            : formatLBP($scaleMap[(int)round($r['current_grade'])] ?? 0)],
             'extra_wage' => ['الأجر الإضافي', fn($r) => formatLBP(isset($bonusMap[(int)$r['id']]) ? extraWageLbp($bonusMap[(int)$r['id']]) : 0)],
             'aide'    => ['مكافأة ومساعدة', fn($r) => formatLBP(isset($bonusMap[(int)$r['id']]) ? aideCompLbp($bonusMap[(int)$r['id']]) : 0)],
             'nssf'    => ['ضمان / N° CNSS', fn($r) => e($r['nssf_number'])],

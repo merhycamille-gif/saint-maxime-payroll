@@ -140,6 +140,12 @@ try { $classLevels = $db->query("SELECT * FROM class_levels WHERE is_active = 1 
 catch (Exception $e) { $classLevels = []; }
 $selClasses = array_filter(array_map('intval', explode(',', (string)($emp['classes_taught'] ?? ''))));
 
+// موظف إداري (يخضع لقانون العمل): لا شهادة/مواد/مرحلة/صفوف — بل «نوع الوظيفة» فقط (سكرتير/محاسبة/تنظيفات/...).
+$isAdmin  = (!$isNew && (($emp['employee_type'] ?? '') === 'employe'));
+$jobOpts  = jobTitleOptions();
+$jobStored= trim((string)($emp['job_title'] ?? ''));
+$jobIsOther = ($jobStored !== '' && !isset($jobOpts[$jobStored]));
+
 // سنوات الدخول للأستاذ الجديد: السنة الدراسية **القادمة فأكثر** فقط (لا يجوز للجديد الدخول على
 // السنة الجارية أو ما قبلها). الافتراضي = السنة القادمة (مثلاً 2026-2027 المفتوحة).
 $curStart = (int)substr(currentSchoolYear(), 0, 4);   // 2025 إذا الحالية 2025-2026
@@ -213,6 +219,11 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     // الصفوف التي يعلّم فيها (معرّفات class_levels مفصولة بفواصل)
     $data['classes_taught'] = is_array($_POST['classes_taught'] ?? null)
         ? implode(',', array_map('intval', $_POST['classes_taught'])) : '';
+    // الموظف الإداري: احفظ نوع الوظيفة (قائمة أو نص حرّ)، وتجاهل الحقول التعليمية (لا يرسلها أصلاً).
+    if ($isAdmin) {
+        $data['job_title'] = (($_POST['job_title'] ?? '') === '__other__')
+            ? trim((string)($_POST['job_title_other'] ?? '')) : trim((string)($_POST['job_title'] ?? ''));
+    }
     // تاريخ ترك العمل (للأستاذ الحالي فقط، اختياري): إن كتبه الأستاذ فهو ينوي ترك العمل.
     // يُعتمد من المدير فيُسجَّل تاريخ الترك (الضمان/المالية/الصندوق) فيخرج من السنة الجارية.
     if (!$isNew) {
@@ -263,6 +274,8 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
         'family_doc_path'  => 'إخراج القيد العائلي / Extrait familial',
         'diploma_doc_path' => 'صورة عن الشهادة / Copie du diplôme',
     ];
+    // الموظف الإداري لا شهادة له → لا تُطلب صورة الشهادة.
+    if ($isAdmin) unset($reqUploadCols['diploma_doc_path']);
     $missingDocs = [];
     if (!$leaving) {
         foreach ($reqUploadCols as $col => $lbl) {
@@ -275,10 +288,16 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     if (!$leaving) {
         $reqLabels = [];
         foreach ($textFields as $k => $lbl) { if ($tfReq($k)) $reqLabels[$k] = $lbl; }
-        $reqLabels['diploma'] = 'الشهادة العلمية / Diplôme';
-        foreach ($profFields as $k => $lbl) { if ($tfReq($k)) $reqLabels[$k] = $lbl; }
-        $reqLabels['niveau_scolaire'] = 'المرحلة / Niveau scolaire';
-        if ($classLevels) $reqLabels['classes_taught'] = 'الصفوف / Classes';
+        if ($isAdmin) {
+            // الموظف الإداري: «نوع الوظيفة» إلزامي بدل الشهادة/المواد/المرحلة/الصفوف.
+            $reqLabels['job_title'] = 'نوع الوظيفة / Fonction';
+            foreach ($profFields as $k => $lbl) { if ($tfReq($k) && $k !== 'subjects_taught') $reqLabels[$k] = $lbl; }
+        } else {
+            $reqLabels['diploma'] = 'الشهادة العلمية / Diplôme';
+            foreach ($profFields as $k => $lbl) { if ($tfReq($k)) $reqLabels[$k] = $lbl; }
+            $reqLabels['niveau_scolaire'] = 'المرحلة / Niveau scolaire';
+            if ($classLevels) $reqLabels['classes_taught'] = 'الصفوف / Classes';
+        }
         foreach ($reqLabels as $k => $lbl) {
             if (trim((string)($data[$k] ?? '')) === '') $missingFields[] = $lbl;
         }
@@ -475,6 +494,24 @@ if ($nameSchoolId) {
         <?php endforeach; ?>
       </div>
       <h3>المعلومات المهنية / Informations professionnelles</h3>
+      <?php if ($isAdmin): ?>
+      <div style="margin-bottom:4px">
+        <label>نوع الوظيفة / Fonction<?= $reqStar ?></label>
+        <select name="job_title" id="jobTitleSelect" data-req="1" required
+                onchange="var o=document.getElementById('jobTitleOther'); o.style.display=(this.value==='__other__')?'block':'none'; o.required=(this.value==='__other__')"
+                style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
+          <option value="">— اختر / Choisir —</option>
+          <?php foreach ($jobOpts as $code => $lbl): ?>
+            <option value="<?= e($code) ?>" <?= $jobStored === $code ? 'selected' : '' ?>><?= e($lbl['ar'] . ' / ' . $lbl['fr']) ?></option>
+          <?php endforeach; ?>
+          <option value="__other__" <?= $jobIsOther ? 'selected' : '' ?>>أخرى (حدّد) / Autre…</option>
+        </select>
+        <input type="text" name="job_title_other" id="jobTitleOther" placeholder="حدّد الوظيفة / Préciser la fonction"
+               value="<?= $jobIsOther ? e($jobStored) : '' ?>"<?= $jobIsOther ? ' required' : '' ?>
+               style="margin-top:8px;display:<?= $jobIsOther ? 'block' : 'none' ?>">
+        <p style="font-size:12.5px;color:#64748b;margin:6px 0 0">الموظف الإداري يخضع لقانون العمل — لا شهادة ولا مواد ولا صفوف.</p>
+      </div>
+      <?php else: ?>
       <div class="grid">
         <div>
           <label>الشهادة العلمية / Diplôme<?= $reqStar ?></label>
@@ -509,7 +546,8 @@ if ($nameSchoolId) {
           <?php endforeach; ?>
         </div>
       </div>
-      <?php endif; ?>
+      <?php endif; // classLevels ?>
+      <?php endif; // !$isAdmin (الحقول التعليمية) ?>
       <div class="grid" style="margin-top:12px">
         <div>
           <label>عدد الساعات الأسبوعية / Heures par semaine<?= $reqStar ?></label>
@@ -575,7 +613,8 @@ if ($nameSchoolId) {
       </div>
       <div class="grid">
         <?php foreach ($uploadFields as $field => $lbl):
-          $isReq = in_array($field, $requiredUploads, true);
+          // الموظف الإداري: صورة الشهادة غير إلزامية (لا شهادة له).
+          $isReq = in_array($field, $requiredUploads, true) && !($isAdmin && $field === 'diploma_doc');
           $onFile = !$isNew && !empty($emp[$uploadCol[$field]] ?? '');
           $mustUpload = $isReq && !$onFile; ?>
           <div>

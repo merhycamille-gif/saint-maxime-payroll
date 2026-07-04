@@ -145,7 +145,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
         </div>
         <table class="slip-info">
             <tr>
-                <td><span class="lbl">الشهادة العلمية / Diplôme</span><span class="val"><?= e($meta['diploma']) ?></span></td>
+                <td><span class="lbl"><?= ($emp['employee_type'] === 'employe') ? 'الوظيفة / Fonction' : 'الشهادة العلمية / Diplôme' ?></span><span class="val"><?= e($meta['diploma']) ?></span></td>
                 <td><span class="lbl">الفئة / Type</span><span class="val"><?= e($meta['type']) ?></span></td>
                 <td><span class="lbl">الدرجة / Échelon</span><span class="val"><?= e($meta['grade']) ?></span></td>
                 <td><span class="lbl">الرمز / Code</span><span class="val"><?= e($meta['code']) ?></span></td>

@@ -159,6 +159,13 @@ $db = getDB();
 $message = '';
 $messageType = 'success';
 
+// تركيب ذاتي لعمود وظيفة الموظف الإداري (job_title) إن كان ناقصاً — يُغني عن أي خطوة يدوية أونلاين (migration 018).
+try {
+    if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) {
+        $db->exec("ALTER TABLE employees ADD COLUMN job_title VARCHAR(80) NULL");
+    }
+} catch (Exception $e) { /* صلاحيات → الإزالة عند الحفظ تمنع الكسر */ }
+
 // رفع ملف فوري (AJAX) — لحظة اختيار الملف بلا ما يحفظ كل النموذج
 if ($action === 'upload_file' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
@@ -318,6 +325,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'subjects_taught' => trim($_POST['subjects_taught'] ?? ''),
         'niveau_scolaire' => is_array($_POST['niveau_scolaire'] ?? null) ? implode(',', $_POST['niveau_scolaire']) : '',
         'classes_taught' => is_array($_POST['classes_taught'] ?? null) ? implode(',', array_map('intval', $_POST['classes_taught'])) : '',
+        // وظيفة الموظف الإداري: قيمة القائمة، أو النص الحر عند اختيار «أخرى». تُحفظ فقط للموظف الإداري، وتُفرَّغ للأستاذ.
+        'job_title' => (($_POST['employee_type'] ?? '') === 'employe')
+            ? (($_POST['job_title'] ?? '') === '__other__' ? trim($_POST['job_title_other'] ?? '') : trim($_POST['job_title'] ?? ''))
+            : null,
         'hire_date' => $_POST['hire_date'] ?: null,
         // دخول الملاك = دخول المدرسة + سنتين تلقائياً إن تُرك فاضياً (القاعدة)؛ يمكن إدخاله يدوياً للتجاوز.
         'titularization_date' => ($_POST['titularization_date'] ?: (!empty($_POST['hire_date']) ? date('Y-m-d', strtotime($_POST['hire_date'] . ' +2 years')) : null)),
@@ -389,6 +400,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     try {
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'keep_working_past_64'")->fetch()) unset($data['keep_working_past_64']);
     } catch (Exception $e) { unset($data['keep_working_past_64']); }
+    // عمود job_title قد لا يكون موجوداً قبل migration 018 أونلاين → أزِله من الحفظ لتفادي الكسر
+    try {
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) unset($data['job_title']);
+    } catch (Exception $e) { unset($data['job_title']); }
 
     try {
         if ($action === 'new') {
@@ -635,8 +650,11 @@ if ($action === 'list') {
                                         <span class="badge badge-<?= $emp['employee_type'] === 'enseignant_titulaire' ? 'gold' : ($emp['employee_type'] === 'enseignant_contractuel' ? 'info' : 'secondary') ?>">
                                             <?= e(employeeTypeLabel($emp['employee_type'])) ?>
                                         </span>
+                                        <?php if ($emp['employee_type'] === 'employe' && trim((string)($emp['job_title'] ?? '')) !== ''): ?>
+                                            <div style="font-size:11.5px;color:var(--gray-600);margin-top:3px"><?= e(jobTitleLabel($emp['job_title'], 'ar')) ?></div>
+                                        <?php endif; ?>
                                     </td>
-                                    <td><strong><?= (float)$emp['current_grade'] ?></strong></td>
+                                    <td><strong><?= e(gradeDisplay($emp)) ?></strong></td>
                                     <td><?= formatDate($emp['hire_date']) ?></td>
                                     <td><?= e($emp['phone1']) ?></td>
                                     <td><span class="badge badge-<?= $statusInfo['badge'] ?>"><?= e($statusInfo['label']) ?></span></td>
@@ -679,7 +697,7 @@ $employee = [
     'social_status' => 'celibataire', 'spouse_works' => 0, 'number_of_children' => 0,
     'gouvernorat' => '', 'district' => '', 'ville' => '', 'quartier' => '', 'rue' => '',
     'immeuble' => '', 'etage' => '', 'phone1' => '', 'phone2' => '', 'email' => '',
-    'diploma' => 'ijaza_jamiya', 'specialization' => '', 'subjects_taught' => '', 'niveau_scolaire' => '', 'classes_taught' => '',
+    'diploma' => 'ijaza_jamiya', 'specialization' => '', 'subjects_taught' => '', 'niveau_scolaire' => '', 'classes_taught' => '', 'job_title' => '',
     'hire_date' => '', 'titularization_date' => '', 'tenure_confirmation_date' => '', 'starting_grade' => 1, 'current_grade' => 1,
     'days_per_week' => 5, 'hours_per_week' => 18, 'status' => 'actif',
     'nssf_number' => '', 'finance_ministry_number' => '', 'caisse_number' => '',
@@ -984,7 +1002,35 @@ include __DIR__ . '/../includes/header.php';
                 <h3><i class="fas fa-graduation-cap"></i> Qualifications & Emploi</h3>
             </div>
             <div class="card-body">
-                <div class="form-row cols-3">
+                <?php
+                  // وظيفة الموظف الإداري: كود معروف من القائمة أو نص حرّ سابق.
+                  $jobOpts   = jobTitleOptions();
+                  $jobVal    = trim((string)($employee['job_title'] ?? ''));
+                  $jobIsCode = ($jobVal !== '' && isset($jobOpts[$jobVal]));
+                  $jobIsOther= ($jobVal !== '' && !$jobIsCode);
+                ?>
+                <!-- ===== الموظف الإداري فقط: نوع الوظيفة (لا صفوف ولا مواد) ===== -->
+                <div class="form-row emp-admin-only" style="display:none">
+                    <div class="form-group" style="grid-column:1/-1">
+                        <label class="form-label">نوع الوظيفة / Fonction <span class="req">*</span></label>
+                        <select name="job_title" id="jobTitleSelect" class="form-select"
+                                onchange="document.getElementById('jobTitleOther').style.display = (this.value==='__other__')?'block':'none'">
+                            <option value="">— اختر / Choisir —</option>
+                            <?php foreach ($jobOpts as $code => $lbl): ?>
+                                <option value="<?= e($code) ?>" <?= $jobVal === $code ? 'selected' : '' ?>><?= e($lbl['ar'] . ' / ' . $lbl['fr']) ?></option>
+                            <?php endforeach; ?>
+                            <option value="__other__" <?= $jobIsOther ? 'selected' : '' ?>>أخرى (حدّد) / Autre…</option>
+                        </select>
+                        <input type="text" name="job_title_other" id="jobTitleOther" class="form-control"
+                               style="margin-top:8px;display:<?= $jobIsOther ? 'block' : 'none' ?>"
+                               placeholder="حدّد الوظيفة / Préciser la fonction" value="<?= $jobIsOther ? e($jobVal) : '' ?>">
+                        <small class="text-muted d-block" style="margin-top:4px">
+                            الموظف الإداري يخضع لقانون العمل ولكل فروع الضمان — لا صفوف ولا مواد ولا سلسلة رتب.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="form-row cols-3 emp-teacher-only">
                     <div class="form-group">
                         <label class="form-label">Diplôme</label>
                         <select name="diploma" class="form-select">
@@ -1006,7 +1052,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 
                 <div class="form-row cols-3">
-                    <div class="form-group">
+                    <div class="form-group emp-teacher-only">
                         <label class="form-label">المرحلة التي يعلّم فيها / Niveau scolaire</label>
                         <div class="d-flex gap-3 mt-2" style="flex-wrap:wrap">
                             <?php $niveau = explode(',', $employee['niveau_scolaire']); ?>
@@ -1027,7 +1073,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
 
-                <div class="form-row">
+                <div class="form-row emp-teacher-only">
                     <div class="form-group" style="grid-column:1/-1">
                         <label class="form-label">الصفوف التي يعلّم فيها / Classes enseignées</label>
                         <?php
@@ -1197,13 +1243,21 @@ include __DIR__ . '/../includes/header.php';
                         });
                     }
                     modeSel.addEventListener('change', syncSalMode);
+                    // الموظف الإداري: أخفِ حقول الأستاذ (شهادة/مواد/مرحلة/صفوف) وأظهِر نوع الوظيفة، والعكس للأستاذ.
+                    function syncEmpType(){
+                        var isAdmin = typeSel && typeSel.value === 'employe';
+                        document.querySelectorAll('.emp-admin-only').forEach(function(el){ el.style.display = isAdmin ? '' : 'none'; });
+                        document.querySelectorAll('.emp-teacher-only').forEach(function(el){ el.style.display = isAdmin ? 'none' : ''; });
+                    }
                     // عند اختيار نوع الأستاذ: ملاك ⇐ السلسلة حسب القانون · متعاقد ⇐ ليرة متفق عليها
                     if (typeSel) typeSel.addEventListener('change', function(){
                         if (typeSel.value === 'enseignant_titulaire') modeSel.value = 'percent_of_lbp';
                         else if (modeSel.value === 'percent_of_lbp') modeSel.value = 'direct_lbp';
                         syncSalMode();
+                        syncEmpType();
                     });
                     syncSalMode();
+                    syncEmpType();
                 })();
                 </script>
                 

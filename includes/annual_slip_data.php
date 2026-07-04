@@ -168,9 +168,12 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'name'        => $empNameDisp,
         'name_ar'     => $empNameAr,
         'name_fr'     => $empNameFr,
-        'diploma'     => !empty($emp['diploma']) ? diplomaLabel($emp['diploma'], 'ar') : '—',
+        // الموظف الإداري: لا شهادة علمية — تُعرَض وظيفته مكانها. والأستاذ: شهادته.
+        'diploma'     => ($emp['employee_type'] === 'employe')
+                            ? (trim((string)($emp['job_title'] ?? '')) !== '' ? jobTitleLabel($emp['job_title'], 'ar') : '—')
+                            : (!empty($emp['diploma']) ? diplomaLabel($emp['diploma'], 'ar') : '—'),
         'type'        => employeeTypeLabel($emp['employee_type']),
-        'grade'       => rtrim(rtrim(number_format((float)$emp['current_grade'], 1), '0'), '.'),
+        'grade'       => gradeDisplay($emp), // — للموظف الإداري (لا درجة، قانون العمل)
         'code'        => $emp['employee_code'] ?: '—',
         'hire'        => formatDate($emp['hire_date']),
         'titul'       => formatDate($emp['titularization_date']),

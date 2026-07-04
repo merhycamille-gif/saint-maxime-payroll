@@ -77,8 +77,9 @@ if (!$emp):
         $d = (new DateTime($emp['hire_date']))->diff(new DateTime('now'));
         $anc = $d->y . ' سنة' . ($d->m ? " و{$d->m} شهر" : '');
     }
-    // تطوّر الدرجة والراتب
-    $evolution = buildSalaryEvolution($employeeId, $emp['current_grade']);
+    $isAdminEmp = ($emp['employee_type'] === 'employe'); // موظف إداري: لا درجة/صفوف/مواد/تطوّر سلسلة
+    // تطوّر الدرجة والراتب (للأستاذ فقط — الموظف الإداري بلا سلسلة رتب)
+    $evolution = $isAdminEmp ? [] : buildSalaryEvolution($employeeId, $emp['current_grade']);
     $evLabels = ['entry'=>'دخول الملاك','ordinary'=>'درجة عادية (تدرّج)','exceptional'=>'درجة استثنائية','manual'=>'تعديل يدوي','stable'=>'— (1/10)'];
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print">
@@ -102,9 +103,9 @@ if (!$emp):
                     <table class="table">
                         <tr><th colspan="2" style="background:var(--primary);color:#fff">Carrière / المسار الوظيفي</th></tr>
                         <tr><td>Date d'embauche / المباشرة</td><td><strong><?= formatDate($emp['hire_date']) ?></strong></td></tr>
-                        <tr><td>Titularisation / الترسيم</td><td><?= formatDate($emp['titularization_date']) ?></td></tr>
+                        <tr><td>Titularisation / الترسيم</td><td><?= $isAdminEmp ? '—' : formatDate($emp['titularization_date']) ?></td></tr>
                         <tr><td>Ancienneté / الأقدمية</td><td><?= e($anc ?: '—') ?></td></tr>
-                        <tr><td>Échelon départ → actuel / الدرجة</td><td><strong><?= $emp['starting_grade'] ?> → <?= $emp['current_grade'] ?></strong></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr><td>Échelon départ → actuel / الدرجة</td><td><strong><?= gradeDisplay($emp['employee_type'], $emp['starting_grade']) ?> → <?= gradeDisplay($emp) ?></strong></td></tr><?php endif; ?>
                         <tr><td>Statut / الحالة</td><td><?php $s=employeeStatusLabel($emp['status'],$lang); ?><span class="badge badge-<?= $s['badge'] ?>"><?= e($s['label']) ?></span></td></tr>
                     </table>
                 </div>
@@ -118,10 +119,14 @@ if (!$emp):
                   $nivDisplay = $nivNames ? implode('، ', $nivNames) : '—';
                 ?>
                 <table class="table" style="margin-top:6px">
-                    <tr><th colspan="2" style="background:var(--gold);color:var(--primary-dark)">Enseignement & Salaire / التعليم والراتب</th></tr>
+                    <tr><th colspan="2" style="background:var(--gold);color:var(--primary-dark)"><?= $isAdminEmp ? 'Fonction & Salaire / الوظيفة والراتب' : 'Enseignement & Salaire / التعليم والراتب' ?></th></tr>
+                    <?php if ($isAdminEmp): ?>
+                    <tr><td style="width:38%">Fonction / الوظيفة</td><td><strong><?= e(trim((string)($emp['job_title'] ?? '')) !== '' ? jobTitleLabel($emp['job_title'], 'ar') : '—') ?></strong></td></tr>
+                    <?php else: ?>
                     <tr><td style="width:38%">Classes enseignées / الصفوف</td><td><strong><?= e($clsDisplay) ?></strong></td></tr>
                     <tr><td>Niveau / المرحلة</td><td><strong><?= e($nivDisplay) ?></strong></td></tr>
                     <tr><td>Matières / المواد</td><td><strong><?= e($emp['subjects_taught'] ?: '—') ?></strong></td></tr>
+                    <?php endif; ?>
                     <tr><td>Salaire actuel (base+échelon) / الراتب الحالي</td><td><strong><?= formatLBP($curBase) ?></strong></td></tr>
                     <tr><td>Salaire net / الصافي</td><td><strong><?= formatLBP($curNet) ?></strong><?= $sal ? ' — '.monthName((int)$sal['month'],$lang).' '.$sal['year'] : '' ?></td></tr>
                 </table>

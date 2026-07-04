@@ -71,6 +71,15 @@ try {
     $log[] = ['done', 'تم إضافة عمود «الإبقاء على العمل بعد الـ64» — لوقف محسومات التقاعد (نهاية الخدمة ٨.٥٪ للموظف / صندوق التعويضات ٦٪ للأستاذ عنه وعن المدرسة).'];
 }
 
+// --- 018: عمود «نوع وظيفة الموظف الإداري» (سكرتير/محاسبة/تنظيفات/سائق/...) ---
+try {
+    $db->query("SELECT job_title FROM employees LIMIT 1");
+    $log[] = ['ok', 'عمود نوع الوظيفة (job_title) موجود مسبقاً — لا حاجة لإجراء.'];
+} catch (Exception $e) {
+    $db->exec("ALTER TABLE employees ADD COLUMN job_title VARCHAR(80) NULL");
+    $log[] = ['done', 'تم إضافة عمود «نوع وظيفة الموظف الإداري» — سكرتير/محاسبة/تنظيفات/سائق/ممرضة/ناطور/مدير...'];
+}
+
 header('Content-Type: text/html; charset=utf-8');
 ?><!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>تحديث قاعدة البيانات</title>

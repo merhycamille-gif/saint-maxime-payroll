@@ -26,6 +26,7 @@ $msSchoolYear = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) . '-
 function payslipCardHtml($emp, $salary, $month, $year) {
     $schoolYearLbl = $salary['school_year'] ?? ($month >= 10 ? $year.'-'.($year+1) : ($year-1).'-'.$year);
     $classesLbl = classLevelNames($emp['classes_taught'] ?? '');
+    $isAdminEmp = ($emp['employee_type'] === 'employe'); // موظف إداري: لا درجة/صفوف/مواد/صندوق تعويضات
     ob_start();
     ?>
     <div class="card payslip-card" style="page-break-inside:avoid">
@@ -45,8 +46,12 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                     <td>Date d'embauche / تاريخ الدخول</td><td><strong><?= formatDate($emp['hire_date']) ?></strong></td>
                 </tr>
                 <tr>
+                    <?php if ($isAdminEmp): ?>
+                    <td>Fonction / الوظيفة</td><td colspan="3"><strong><?= e(trim((string)($emp['job_title'] ?? '')) !== '' ? jobTitleLabel($emp['job_title'], 'ar') : '—') ?></strong></td>
+                    <?php else: ?>
                     <td>Classes / الصفوف</td><td><strong><?= e($classesLbl) ?></strong></td>
                     <td>Matières / المواد</td><td><strong><?= e($emp['subjects_taught'] ?: '—') ?></strong></td>
+                    <?php endif; ?>
                 </tr>
             </table>
             <?php if (!$salary): ?>
@@ -56,14 +61,14 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                     <table class="table">
                         <tr><th colspan="2" style="background:#e3f0ff;color:#000">SALAIRE / الراتب</th></tr>
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= formatLBP($salary['base_salary_lbp']) ?></td></tr>
-                        <tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
                         <tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= formatLBP((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp']) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= formatLBP((int)$salary['aide_complementaire_lbp']) ?></td></tr>
                     </table>
                     <table class="table">
                         <tr><th colspan="2" style="background:#ffe3e3;color:#000">RETENUES / المحسومات</th></tr>
-                        <tr><td>Caisse EOC (6%)</td><td class="text-end text-danger">-<?= formatLBP($salary['caisse_amount_lbp']) ?></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr><td>Caisse EOC (6%)</td><td class="text-end text-danger">-<?= formatLBP($salary['caisse_amount_lbp']) ?></td></tr><?php endif; ?>
                         <?php if (!empty($salary['eoc_grade_lbp'])): ?><tr><td>درجة / نصف راتب (صندوق)</td><td class="text-end text-danger">-<?= formatLBP($salary['eoc_grade_lbp']) ?></td></tr><?php endif; ?>
                         <tr><td>CNSS (3%)</td><td class="text-end text-danger">-<?= formatLBP($salary['cnss_amount_lbp']) ?></td></tr>
                         <tr><td>Base imposable</td><td class="text-end"><?= formatLBP($salary['taxable_base_lbp']) ?></td></tr>
@@ -284,6 +289,7 @@ include __DIR__ . '/../includes/header.php';
             // السنة الدراسية للشهر المختار (تشرين الأول → أيلول)
             $schoolYearLbl = $salary['school_year'] ?? ($month >= 10 ? $year.'-'.($year+1) : ($year-1).'-'.$year);
             $classesLbl = classLevelNames($emp['classes_taught'] ?? '');
+            $isAdminEmp = ($emp['employee_type'] === 'employe'); // موظف إداري: لا درجة/صفوف/مواد/صندوق تعويضات
             ?>
             <table class="table" style="margin-bottom:16px">
                 <tr><th colspan="4" style="background:#eef3fb;color:#000"><i class="fas fa-id-badge"></i> Informations de l'enseignant / معلومات الأستاذ</th></tr>
@@ -293,11 +299,15 @@ include __DIR__ . '/../includes/header.php';
                 </tr>
                 <tr>
                     <td>Date d'embauche / تاريخ الدخول</td><td><strong><?= formatDate($emp['hire_date']) ?></strong></td>
-                    <td>Date titularisation / تاريخ الملاك</td><td><strong><?= formatDate($emp['titularization_date']) ?></strong></td>
+                    <td>Date titularisation / تاريخ الملاك</td><td><strong><?= $isAdminEmp ? '—' : formatDate($emp['titularization_date']) ?></strong></td>
                 </tr>
                 <tr>
+                    <?php if ($isAdminEmp): ?>
+                    <td>Fonction / الوظيفة</td><td colspan="3"><strong><?= e(trim((string)($emp['job_title'] ?? '')) !== '' ? jobTitleLabel($emp['job_title'], 'ar') : '—') ?></strong></td>
+                    <?php else: ?>
                     <td>Classes / الصفوف</td><td><strong><?= e($classesLbl) ?></strong></td>
                     <td>Matières / المواد</td><td><strong><?= e($emp['subjects_taught'] ?: '—') ?></strong></td>
+                    <?php endif; ?>
                 </tr>
                 <tr>
                     <td>Heures/semaine / عدد الساعات الأسبوعية</td><td><strong><?= rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.') ?></strong></td>
@@ -317,7 +327,7 @@ include __DIR__ . '/../includes/header.php';
                     <table class="table">
                         <tr><th colspan="2" style="background:#e3f0ff;color:#000">SALAIRE / الراتب</th></tr>
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= formatLBP($salary['base_salary_lbp']) ?></td></tr>
-                        <tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
                         <tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= formatLBP((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp']) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= formatLBP((int)$salary['aide_complementaire_lbp']) ?></td></tr>
@@ -325,7 +335,7 @@ include __DIR__ . '/../includes/header.php';
                     
                     <table class="table">
                         <tr><th colspan="2" style="background:#ffe3e3;color:#000">RETENUES / المحسومات</th></tr>
-                        <tr><td>Caisse EOC (6%)</td><td class="text-end text-danger">-<?= formatLBP($salary['caisse_amount_lbp']) ?></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr><td>Caisse EOC (6%)</td><td class="text-end text-danger">-<?= formatLBP($salary['caisse_amount_lbp']) ?></td></tr><?php endif; ?>
                         <?php if (!empty($salary['eoc_grade_lbp'])): ?><tr><td>درجة / نصف راتب (صندوق)</td><td class="text-end text-danger">-<?= formatLBP($salary['eoc_grade_lbp']) ?></td></tr><?php endif; ?>
                         <tr><td>CNSS (3%)</td><td class="text-end text-danger">-<?= formatLBP($salary['cnss_amount_lbp']) ?></td></tr>
                         <tr><td>Base imposable</td><td class="text-end"><?= formatLBP($salary['taxable_base_lbp']) ?></td></tr>

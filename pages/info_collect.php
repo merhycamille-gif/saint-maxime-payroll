@@ -13,12 +13,21 @@ $currentPage = 'info_collect';
 $pageTitle = 'تحديث معلومات الأساتذة';
 $db = getDB();
 
+// تركيب ذاتي لعمود وظيفة الموظف الإداري (job_title) إن كان ناقصاً — حتى لا يفشل اعتماد طلب موظف إداري
+// إن لم تُفتح صفحة الموظفين بعد (migration 018). محصّن: لا يكسر الصفحة إن تعذّرت الصلاحية.
+try {
+    if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) {
+        $db->exec("ALTER TABLE employees ADD COLUMN job_title VARCHAR(80) NULL");
+    }
+} catch (Exception $e) { /* صلاحيات → applyOneSubmission يتجاوز job_title إن بقي ناقصاً */ }
+
 // الحقول القابلة للتحديث من الفورم (نفس مفاتيح teacher_form.php)
 $textFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','mother_first_name','mother_last_name',
     'birth_date','birth_place','nationality','number_of_children','phone1','phone2','email',
     'gouvernorat','district','ville','quartier','rue','immeuble','etage',
     // الحقول المهنية المضافة
     'subjects_taught','niveau_scolaire','classes_taught','hours_per_week','days_per_week',
+    'job_title', // نوع وظيفة الموظف الإداري
     'nssf_number','finance_ministry_number','caisse_number',
     // الوضع الضريبي (يخضع للضريبة؟) + الملاحظات
     'tax_subject','notes'];
@@ -237,7 +246,7 @@ $infoIntro = "حضرة الأساتذة المحترمين،\nيرجى تعبئ�
 $labels = ['first_name_ar'=>'الاسم','first_name_fr'=>'Prénom','last_name_ar'=>'الشهرة','last_name_fr'=>'Nom',
     'mother_first_name'=>'اسم الأم','mother_last_name'=>'شهرة الأم','birth_date'=>'تاريخ الولادة','birth_place'=>'محل الولادة',
     'nationality'=>'الجنسية','number_of_children'=>'عدد الأولاد','phone1'=>'هاتف 1','phone2'=>'هاتف 2','email'=>'إيميل',
-    'entry_school_year'=>'سنة الدخول','diploma'=>'الشهادة','subjects_taught'=>'المواد','niveau_scolaire'=>'المرحلة','classes_taught'=>'الصفوف','hours_per_week'=>'الساعات/أسبوع','days_per_week'=>'أيام الحضور',
+    'entry_school_year'=>'سنة الدخول','diploma'=>'الشهادة','job_title'=>'نوع الوظيفة','subjects_taught'=>'المواد','niveau_scolaire'=>'المرحلة','classes_taught'=>'الصفوف','hours_per_week'=>'الساعات/أسبوع','days_per_week'=>'أيام الحضور',
     'nssf_number'=>'رقم الضمان','finance_ministry_number'=>'رقم المالية','caisse_number'=>'رقم الصندوق',
     'gouvernorat'=>'محافظة','district'=>'قضاء','ville'=>'بلدة','quartier'=>'حي','rue'=>'شارع','immeuble'=>'مبنى','etage'=>'طابق',
     'tax_subject'=>'يخضع للضريبة','notes'=>'ملاحظات'];
@@ -257,6 +266,7 @@ $classIdsToNames = function ($csv) use ($classNames) {
 $displayVal = function ($k, $v) use ($diplomaNames, $classIdsToNames) {
     if ($k === 'diploma') return $diplomaNames[$v] ?? $v;
     if ($k === 'classes_taught') return $classIdsToNames($v);
+    if ($k === 'job_title') return jobTitleLabel($v, 'ar');
     if ($k === 'tax_subject') return ((string)$v === '0') ? 'لا (معفى)' : 'نعم';
     return $v;
 };

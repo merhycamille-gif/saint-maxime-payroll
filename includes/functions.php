@@ -527,6 +527,59 @@ function employeeTypeLabel($type, $lang = 'fr') {
 }
 
 /**
+ * وظائف الموظف الإداري (employee_type = 'employe') الذي يخضع لقانون العمل.
+ * كود ثابت ⇐ عنوان ثنائي اللغة. الموظف الإداري ليس أستاذاً: لا صفوف ولا مواد ولا مراحل،
+ * بل يُحدَّد نوع وظيفته (سكرتير/محاسبة/تنظيفات/سائق/...). القيمة المخزّنة إمّا كود من هنا أو نص حر.
+ */
+function jobTitleOptions() {
+    return [
+        'directeur'          => ['fr' => 'Directeur',           'ar' => 'مدير'],
+        'directrice'         => ['fr' => 'Directrice',          'ar' => 'مديرة'],
+        'responsable'        => ['fr' => 'Responsable',         'ar' => 'مسؤول / مسؤولة'],
+        'secretaire'         => ['fr' => 'Secrétaire',          'ar' => 'سكرتير / سكرتيرة'],
+        'comptable'          => ['fr' => 'Comptable',           'ar' => 'محاسب / محاسبة'],
+        'surveillant'        => ['fr' => 'Surveillant',         'ar' => 'مراقب / ناظر'],
+        'assistante_sociale' => ['fr' => 'Assistante sociale',  'ar' => 'مساعِدة اجتماعية'],
+        'infirmiere'         => ['fr' => 'Infirmière',          'ar' => 'ممرّضة'],
+        'chauffeur'          => ['fr' => 'Chauffeur',           'ar' => 'سائق'],
+        'nettoyage'          => ['fr' => "Agent d'entretien",   'ar' => 'عامل / عاملة تنظيفات'],
+        'maintenance'        => ['fr' => 'Maintenance',         'ar' => 'صيانة'],
+        'concierge'          => ['fr' => 'Concierge / Gardien', 'ar' => 'ناطور'],
+        'cuisine'            => ['fr' => 'Cuisine',             'ar' => 'مطبخ'],
+        'bibliothecaire'     => ['fr' => 'Bibliothécaire',      'ar' => 'أمين مكتبة'],
+    ];
+}
+
+/**
+ * عنوان الوظيفة للعرض. إن كانت القيمة كوداً معروفاً تُترجَم ثنائياً، وإلا تُعرَض كما هي (نص حر).
+ */
+function jobTitleLabel($value, $lang = 'fr') {
+    $value = trim((string)$value);
+    if ($value === '') return '';
+    $opts = jobTitleOptions();
+    if (isset($opts[$value])) return $opts[$value][$lang] ?? $opts[$value]['fr'];
+    return $value; // نص حر أدخله المستخدم
+}
+
+/**
+ * عرض درجة الموظف بشكل «حسب الأصول»: الأستاذ يظهر رقم درجته (بلا الصفر العشري الزائد،
+ * والنص .5 يبقى ظاهراً)، أمّا الموظف الإداري (employe) فيظهر «—» لأنه يخضع لقانون العمل
+ * بلا سلسلة رتب ولا درجة. مرّر صفّ الموظف كاملاً، أو النوع مع الدرجة صراحةً.
+ */
+function gradeDisplay($empOrType, $grade = null) {
+    if (is_array($empOrType)) {
+        $type = $empOrType['employee_type'] ?? '';
+        if ($grade === null) {
+            $grade = $empOrType['current_grade'] ?? ($empOrType['grade_at_month'] ?? null);
+        }
+    } else {
+        $type = (string)$empOrType;
+    }
+    if ($type === 'employe') return '—'; // موظف إداري: لا درجة (قانون العمل)
+    return rtrim(rtrim(number_format((float)$grade, 1, '.', ''), '0'), '.');
+}
+
+/**
  * عنوان فئة الموظف لعناوين أقسام الكشوف (2026-06-16): الملاك / المتعاقدين / الموظفين.
  * يُستعمل لتقسيم كل التقارير: أساتذة الملاك معاً ثم المتعاقدون ثم الموظفون (كل فئة أبجدياً).
  */
