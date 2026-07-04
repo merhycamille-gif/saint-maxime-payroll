@@ -113,6 +113,10 @@ document.addEventListener('submit', function (e) {
                 <i class="fas fa-user-slash"></i>
                 <span>الأساتذة التاركون / Départs</span>
             </a>
+            <a href="<?= BASE_URL ?>pages/retirement_64.php" class="<?= $currentPage === 'retirement_64' ? 'active' : '' ?>">
+                <i class="fas fa-hourglass-half"></i>
+                <span>بلوغ سنّ الـ64 / Retraite 64</span>
+            </a>
 
             <div class="nav-section">Rapports</div>
             
