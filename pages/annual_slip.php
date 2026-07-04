@@ -133,6 +133,9 @@ function annualSlipHtml($db, $emp, $schoolYear) {
     $slip = computeAnnualSlip($db, $emp, $schoolYear);
     $meta = $slip['meta']; $rows = $slip['rows']; $tot = $slip['tot']; $empSchool = $slip['school'];
     $slipRate = $meta['rate'];
+    // موظف إداري: لا أعمدة درجة/تدرّج ولا صندوق تعويضات (يخضع لقانون العمل — راتب مباشر، نهاية خدمته من الضمان).
+    $isEmp = ($emp['employee_type'] === 'employe');
+    $slipCols = $isEmp ? 13 : 17; // عدد أعمدة الجدول (تُطرح 4 أعمدة الأستاذ للموظف الإداري)
 
     ob_start();
     ?>
@@ -169,12 +172,14 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 <tr>
                     <th rowspan="2">Mois<br>الشهر</th>
                     <th rowspan="2">أساس الراتب<br>Salaire</th>
+                    <?php if (!$isEmp): ?>
                     <th rowspan="2">قيمة الدرجة (ل.ل)<br>Valeur échelon</th>
                     <th rowspan="2">الراتب بعد التدرج<br>Après échelon</th>
+                    <?php endif; ?>
                     <th rowspan="2">الأجر الإضافي<br>Supplément</th>
                     <th rowspan="2">مكافأة ومساعدة<br>Prime &amp; aide</th>
                     <th rowspan="2">Brut<br>الإجمالي</th>
-                    <th colspan="5" class="deduction-header">Retenues / المحسومات</th>
+                    <th colspan="<?= $isEmp ? 3 : 5 ?>" class="deduction-header">Retenues / المحسومات</th>
                     <th rowspan="2">الصافي<br>Net</th>
                     <th rowspan="2">Alloc. fam.<br>عائلي</th>
                     <th rowspan="2">Transport<br>نقل</th>
@@ -182,8 +187,10 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <th rowspan="2" class="sig-col">التوقيع<br>Signature</th>
                 </tr>
                 <tr>
+                    <?php if (!$isEmp): ?>
                     <th class="deduction-header">Caisse</th>
                     <th class="deduction-header">درجة / نصف راتب</th>
+                    <?php endif; ?>
                     <th class="deduction-header">CNSS</th>
                     <th class="deduction-header">Impôt</th>
                     <th class="deduction-header">Total ret.</th>
@@ -206,13 +213,17 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             };
                         ?>
                             <td><strong><?= formatLBP($r['base_shown'], false) ?></strong></td>
+                            <?php if (!$isEmp): ?>
                             <td><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '' ?></td>
                             <td><strong><?= formatLBP($r['cur_sal'], false) ?></strong></td>
+                            <?php endif; ?>
                             <td><?php if ($r['extra_wage'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><?php else: ?>—<?php endif; ?></td>
                             <td><?php if ($r['aide'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['aide']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><?php else: ?>—<?php endif; ?></td>
                             <td><?= $money($r['brut'], true) ?></td>
+                            <?php if (!$isEmp): ?>
                             <td><?= $money($r['caisse']) ?></td>
                             <td><?= $money($r['eoc_grade']) ?></td>
+                            <?php endif; ?>
                             <td><?= $money($r['cnss']) ?></td>
                             <td><?= $money($r['income_tax']) ?></td>
                             <td><?= $money($r['total_retenues']) ?></td>
@@ -222,7 +233,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td><?= $money($r['total_due'], true) ?></td>
                             <td class="sig-cell">&nbsp;</td>
                         <?php else: ?>
-                            <td colspan="17" class="text-muted">—</td>
+                            <td colspan="<?= $slipCols ?>" class="text-muted">—</td>
                         <?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
@@ -234,13 +245,17 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 <tr class="total-row">
                     <td><strong>TOTAL</strong></td>
                     <td><strong><?= formatLBP($tot['base_shown'], false) ?></strong></td>
+                    <?php if (!$isEmp): ?>
                     <td><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
                     <td><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></td>
+                    <?php endif; ?>
                     <td><span class="cur-usd"><strong><?= number_format($tot['extra_wage_usd'], 2) ?> $</strong></span><span class="sub-lbp"><?= formatLBP($tot['extra_wage'], false) ?></span></td>
                     <td><span class="cur-usd"><strong><?= number_format($tot['aide_usd'], 2) ?> $</strong></span><span class="sub-lbp"><?= formatLBP($tot['aide'], false) ?></span></td>
                     <td><?= $moneyTot($tot['brut'], $tot['brut_usd']) ?></td>
+                    <?php if (!$isEmp): ?>
                     <td><?= $moneyTot($tot['caisse'], $tot['caisse_usd']) ?></td>
                     <td><?= $moneyTot($tot['eoc_grade'], $tot['eoc_grade_usd']) ?></td>
+                    <?php endif; ?>
                     <td><?= $moneyTot($tot['cnss'], $tot['cnss_usd']) ?></td>
                     <td><?= $moneyTot($tot['income_tax'], $tot['tax_usd']) ?></td>
                     <td><?= $moneyTot($tot['total_retenues'], $tot['totret_usd']) ?></td>

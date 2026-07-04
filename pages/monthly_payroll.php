@@ -62,7 +62,7 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                         <tr><th colspan="2" style="background:#e3f0ff;color:#000">SALAIRE / الراتب</th></tr>
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= formatLBP($salary['base_salary_lbp']) ?></td></tr>
                         <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
-                        <tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr><?php endif; ?>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= formatLBP((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp']) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= formatLBP((int)$salary['aide_complementaire_lbp']) ?></td></tr>
                     </table>
@@ -328,7 +328,7 @@ include __DIR__ . '/../includes/header.php';
                         <tr><th colspan="2" style="background:#e3f0ff;color:#000">SALAIRE / الراتب</th></tr>
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= formatLBP($salary['base_salary_lbp']) ?></td></tr>
                         <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
-                        <tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr><?php endif; ?>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= formatLBP((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp']) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= formatLBP((int)$salary['aide_complementaire_lbp']) ?></td></tr>
                     </table>

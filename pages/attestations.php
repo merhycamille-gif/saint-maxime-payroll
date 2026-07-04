@@ -175,9 +175,12 @@ if (!$emp):
     $nomFr = trim($emp['first_name_fr'].' '.($emp['father_name_fr'] ? $emp['father_name_fr'].' ' : '').$emp['last_name_fr']);
     $nomAr = trim($emp['first_name_ar'].' '.($emp['father_name_ar'] ? $emp['father_name_ar'].' ' : '').$emp['last_name_ar']);
     if ($nomAr === '') $nomAr = $nomFr;
-    $fnFr = ['fr'=>employeeTypeLabel($emp['employee_type'],'fr'),
-             'ar'=>employeeTypeLabel($emp['employee_type'],'ar'),
-             'en'=>(['enseignant_titulaire'=>'Tenured teacher','enseignant_contractuel'=>'Contract teacher','employe'=>'Administrative employee'][$emp['employee_type']] ?? $emp['employee_type'])];
+    $isEmploye = ($emp['employee_type'] === 'employe');
+    $jobT = trim((string)($emp['job_title'] ?? ''));
+    // «الصفة» في الإفادات: للموظف الإداري نوع وظيفته الفعلي (سكرتير/محاسب/سائق...)، وإلا فئته (أستاذ ملاك/متعاقد/موظف إداري).
+    $fnFr = ['fr'=> ($isEmploye && $jobT !== '') ? jobTitleLabel($emp['job_title'],'fr') : employeeTypeLabel($emp['employee_type'],'fr'),
+             'ar'=> ($isEmploye && $jobT !== '') ? jobTitleLabel($emp['job_title'],'ar') : employeeTypeLabel($emp['employee_type'],'ar'),
+             'en'=> ($isEmploye && $jobT !== '') ? jobTitleLabel($emp['job_title'],'fr') : (['enseignant_titulaire'=>'Tenured teacher','enseignant_contractuel'=>'Contract teacher','employe'=>'Administrative employee'][$emp['employee_type']] ?? $emp['employee_type'])];
     $today = date('d/m/Y');
     $hireFmt = formatDate($emp['hire_date']);
     $titFmt  = formatDate($emp['titularization_date']);
@@ -353,7 +356,7 @@ if (!$emp):
             <?php if ($grant>0): ?><div style="margin-top:6px;color:#1e40af"><?= number_format($grant) ?> دولار أميركي — بالحروف: <strong><?= e(numToArabicWords($grant)) ?> دولار أميركي</strong></div><?php endif; ?>
             <?php endif; ?>
             <?php if ($hasComponents): ?>
-            <div style="margin-top:6px;color:#1e40af">الراتب المعتمد بالإفادة: <strong><?= $moneyAr($salShown) ?></strong> (الأساس بعد التدرّج <?= $moneyAr((int)$basePlusEch) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?>)<?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
+            <div style="margin-top:6px;color:#1e40af">الراتب المعتمد بالإفادة: <strong><?= $moneyAr($salShown) ?></strong> (<?= $isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج' ?> <?= $moneyAr((int)$basePlusEch) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?>)<?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php elseif ($type === 'aqd_taalim'): ?>
             <div style="margin-top:6px;color:#1e40af">أساس الراتب بالعقد: <strong><?= $moneyAr((int)$basePlusEch) ?></strong><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php endif; ?>
@@ -470,7 +473,7 @@ if (!$emp):
         <div style="text-align:left;margin-bottom:10px"><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إلى من يهمه الأمر</h2>
         <p>يفيد مدير <strong><?= e($schoolNameAr) ?></strong> :</p>
-        <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> هو(ـي) مدرّس(ة) في مدرستنا لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> ، باشر(ت) التدريس في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong> ، ويتقاضى راتباً شهرياً قدره <strong><?= $moneyAr($salShown) ?></strong> ، فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> ، ولا يزال(تزال) مستمراً(ة) حتى تاريخه .</p>
+        <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا ، باشر(ت) العمل في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>هو(ـي) مدرّس(ة) في مدرستنا لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> ، باشر(ت) التدريس في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ، ويتقاضى راتباً شهرياً قدره <strong><?= $moneyAr($salShown) ?></strong> ، فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> ، ولا يزال(تزال) مستمراً(ة) حتى تاريخه .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
         <div style="text-align:center;margin-top:42px"><strong>المدير</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
         <?= $footerHtml ?>
@@ -480,7 +483,7 @@ if (!$emp):
         <div style="text-align:left;margin-bottom:10px"><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إلى من يهمه الأمر</h2>
         <p>يفيد مدير <strong><?= e($schoolNameAr) ?></strong> :</p>
-        <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> هو(ـي) مدرّس(ة) في مدرستنا لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> ، باشر(ت) التدريس في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong> ، ولا يزال(تزال) مستمراً(ة) حتى تاريخه .</p>
+        <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا ، باشر(ت) العمل في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>هو(ـي) مدرّس(ة) في مدرستنا لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> ، باشر(ت) التدريس في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ، ولا يزال(تزال) مستمراً(ة) حتى تاريخه .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
         <div style="text-align:center;margin-top:42px"><strong>المدير</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
         <?= $footerHtml ?>
@@ -490,7 +493,7 @@ if (!$emp):
         <div style="text-align:left;margin-bottom:10px"><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إلى من يهمه الأمر</h2>
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> <?= e($assocTxt) ?> ،</p>
-        <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> هو(ـي) معلّم(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا .</p>
+        <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا<?php else: ?>هو(ـي) معلّم(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا<?php endif; ?> .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
         <div style="text-align:center;margin-top:42px"><strong>الإدارة</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
         <?= $footerHtml ?>
@@ -501,7 +504,7 @@ if (!$emp):
           <div style="text-align:right;margin-bottom:10px"><?= date('d/m/Y') ?></div>
           <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">ATTESTATION</h2>
           <p>To whom it may concern,</p>
-          <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
+          <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">This certificate is given upon his/her request.</p>
           <div style="text-align:center;margin-top:42px"><strong>Director</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>Tel : <?= e($sigPhone) ?></small><?php endif; ?></div>
         </div>
@@ -677,7 +680,7 @@ if (!$emp):
         <p style="margin-right:26px">ـ عدد ساعات التناقص المخصصة للنشاطات اللاصفيّة : <?= $blank(70) ?></p>
 
         <p style="margin-top:10px"><strong>المادة الثالثة :</strong> يدفع الفريق الأول شهرياً للفريق الثاني لقاء المهمات التعليميّة الموكولة إليه ما يلي :</p>
-        <p style="margin-right:26px"><strong>1/3 ـ</strong> أساس الراتب: <strong><?= $emp['employee_type']==='enseignant_titulaire' ? $baseFig : $blank(120) ?></strong> &nbsp; ( الأجر القانوني )</p>
+        <p style="margin-right:26px"><strong>1/3 ـ</strong> أساس الراتب: <strong><?= in_array($emp['employee_type'],['enseignant_titulaire','employe'],true) ? $baseFig : $blank(120) ?></strong> &nbsp; ( الأجر القانوني )</p>
         <p style="margin-right:26px"><strong>2/3 ـ</strong> بدل مالي ( قانون 99/148 ) : <?= $blank(120) ?></p>
         <p style="margin-right:26px"><strong>3/3 ـ</strong> ساعات إضافية : <?= $blank(120) ?></p>
         <p style="margin-right:26px"><strong>4/3 ـ</strong> بدل إضافي بمثابة مكافأة : <?= $blank(120) ?></p>
@@ -777,9 +780,9 @@ if (!$emp):
                 <p>نشهد نحن، <strong><?= e($schoolNameAr) ?></strong>، بأنّ:</p>
                 <?php if (in_array($type,['salaire','travail','cnss'])): ?>
                 <p><strong><?= e($nomAr) ?></strong>، يشغل وظيفة <strong><?= e($fnFr['ar']) ?></strong><?php if ($emp['hire_date']): ?>، منذ تاريخ <strong><?= $hireFmt ?></strong><?php endif; ?><?php if ($isTit && $emp['titularization_date']): ?>، تاريخ الترسيم <strong><?= $titFmt ?></strong><?php endif; ?>، من ضمن ملاك مدرستنا<?= $emp['status']==='actif'?' وهو على رأس عمله حالياً':'' ?>.</p>
-                    <?php if ($classesAr || $subjects): ?><p><?php if ($classesAr): ?>الصفوف التي يُدرّسها: <strong><?= e($classesAr) ?></strong>. <?php endif; ?><?php if ($subjects): ?>المواد: <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
+                    <?php if (!$isEmploye && ($classesAr || $subjects)): ?><p><?php if ($classesAr): ?>الصفوف التي يُدرّسها: <strong><?= e($classesAr) ?></strong>. <?php endif; ?><?php if ($subjects): ?>المواد: <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
                 <?php endif; ?>
-                <?php if ($type==='salaire'): ?><p>ويبلغ راتبه الشهري (الأساس + الدرجات) <strong><?= $L ?></strong>، وصافي راتبه <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> عن <?= e($salPeriodAr) ?><?php endif; ?>.</p>
+                <?php if ($type==='salaire'): ?><p>ويبلغ راتبه الشهري<?= $isEmploye ? '' : ' (الأساس + الدرجات)' ?> <strong><?= $L ?></strong>، وصافي راتبه <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> عن <?= e($salPeriodAr) ?><?php endif; ?>.</p>
                 <?php elseif ($type==='cnss'): ?><p>وهو مسجَّل في الصندوق الوطني للضمان الاجتماعي تحت الرقم <strong><?= e($nssf) ?></strong>، على راتب شهري خاضع قدره <strong><?= $L ?></strong> (حصة الأجير 3%: <?= formatLBP($cnssAmt) ?>؛ حصة المدرسة 8%: <?= formatLBP($schoolCnss) ?>).</p>
                 <?php elseif ($type==='resignation'): ?><p>وقد تقدّم <strong><?= e($nomAr) ?></strong> باستقالته من عمله في مدرستنا<?php if ($emp['hire_date']): ?> (المباشرة منذ <strong><?= $hireFmt ?></strong>)<?php endif; ?>، وقد قُبلت اعتباراً من <strong><?= $effFmt ?></strong>.</p>
                 <?php elseif ($type==='fin_de_service'): ?><p>وقد انتهت خدمة <strong><?= e($nomAr) ?></strong> في مدرستنا<?php if ($emp['hire_date']): ?>، بعد خدمة من <strong><?= $hireFmt ?></strong> حتى <strong><?= $effFmt ?></strong><?= $yAr?' ('.e($yAr).')':'' ?><?php endif; ?>، اعتباراً من <strong><?= $effFmt ?></strong>.</p>
@@ -791,9 +794,9 @@ if (!$emp):
                 <p>Nous soussignés, <strong><?= e($schoolNameFr) ?></strong>, attestons que :</p>
                 <?php if (in_array($type,['salaire','travail','cnss'])): ?>
                 <p><strong><?= e($nomFr) ?></strong>, exerçant la fonction de <strong><?= e($fnFr['fr']) ?></strong><?php if ($emp['hire_date']): ?>, engagé(e) depuis le <strong><?= $hireFmt ?></strong><?php endif; ?><?php if ($isTit && $emp['titularization_date']): ?>, titularisé(e) le <strong><?= $titFmt ?></strong><?php endif; ?>, fait partie de notre personnel<?= $emp['status']==='actif'?' et est actuellement en activité':'' ?>.</p>
-                    <?php if ($classesLat || $subjects): ?><p><?php if ($classesLat): ?>Classes enseignées : <strong><?= e($classesLat) ?></strong>. <?php endif; ?><?php if ($subjects): ?>Matières : <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
+                    <?php if (!$isEmploye && ($classesLat || $subjects)): ?><p><?php if ($classesLat): ?>Classes enseignées : <strong><?= e($classesLat) ?></strong>. <?php endif; ?><?php if ($subjects): ?>Matières : <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
                 <?php endif; ?>
-                <?php if ($type==='salaire'): ?><p>Son salaire mensuel (base + échelon) s'élève à <strong><?= $L ?></strong>, salaire net <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> au titre de <?= e($salPeriodLat) ?><?php endif; ?>.</p>
+                <?php if ($type==='salaire'): ?><p>Son salaire mensuel<?= $isEmploye ? '' : ' (base + échelon)' ?> s'élève à <strong><?= $L ?></strong>, salaire net <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> au titre de <?= e($salPeriodLat) ?><?php endif; ?>.</p>
                 <?php elseif ($type==='cnss'): ?><p>Immatriculé(e) à la CNSS sous le n° <strong><?= e($nssf) ?></strong>, sur un salaire mensuel soumis de <strong><?= $L ?></strong> (part employé 3% : <?= formatLBP($cnssAmt) ?> ; part employeur 8% : <?= formatLBP($schoolCnss) ?>).</p>
                 <?php elseif ($type==='resignation'): ?><p><strong><?= e($nomFr) ?></strong> a présenté sa démission, acceptée à compter du <strong><?= $effFmt ?></strong>.</p>
                 <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> a cessé ses fonctions à compter du <strong><?= $effFmt ?></strong><?php if ($emp['hire_date']): ?>, après une période de service du <?= $hireFmt ?> au <?= $effFmt ?><?= $yFr?' ('.e($yFr).')':'' ?><?php endif; ?>.</p>
@@ -805,9 +808,9 @@ if (!$emp):
                 <p>We, the undersigned, <strong><?= e($schoolNameFr) ?></strong>, hereby certify that:</p>
                 <?php if (in_array($type,['salaire','travail','cnss'])): ?>
                 <p><strong><?= e($nomFr) ?></strong>, holding the position of <strong><?= e($fnFr['en']) ?></strong><?php if ($emp['hire_date']): ?>, employed since <strong><?= $hireFmt ?></strong><?php endif; ?><?php if ($isTit && $emp['titularization_date']): ?>, tenured on <strong><?= $titFmt ?></strong><?php endif; ?>, is a member of our staff<?= $emp['status']==='actif'?' and is currently in service':'' ?>.</p>
-                    <?php if ($classesLat || $subjects): ?><p><?php if ($classesLat): ?>Classes taught: <strong><?= e($classesLat) ?></strong>. <?php endif; ?><?php if ($subjects): ?>Subjects: <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
+                    <?php if (!$isEmploye && ($classesLat || $subjects)): ?><p><?php if ($classesLat): ?>Classes taught: <strong><?= e($classesLat) ?></strong>. <?php endif; ?><?php if ($subjects): ?>Subjects: <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
                 <?php endif; ?>
-                <?php if ($type==='salaire'): ?><p>His/her monthly salary (base + increment) is <strong><?= $L ?></strong>, net salary <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> for <?= e($salPeriodLat) ?><?php endif; ?>.</p>
+                <?php if ($type==='salaire'): ?><p>His/her monthly salary<?= $isEmploye ? '' : ' (base + increment)' ?> is <strong><?= $L ?></strong>, net salary <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> for <?= e($salPeriodLat) ?><?php endif; ?>.</p>
                 <?php elseif ($type==='cnss'): ?><p>Registered with the National Social Security Fund under no. <strong><?= e($nssf) ?></strong>, on a monthly contributory salary of <strong><?= $L ?></strong> (employee share 3%: <?= formatLBP($cnssAmt) ?>; employer share 8%: <?= formatLBP($schoolCnss) ?>).</p>
                 <?php elseif ($type==='resignation'): ?><p><strong><?= e($nomFr) ?></strong> has submitted his/her resignation, accepted effective <strong><?= $effFmt ?></strong>.</p>
                 <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> ended his/her duties effective <strong><?= $effFmt ?></strong><?php if ($emp['hire_date']): ?>, after a service period from <?= $hireFmt ?> to <?= $effFmt ?><?= $yEn?' ('.e($yEn).')':'' ?><?php endif; ?>.</p>

@@ -42,6 +42,10 @@ $perEmployee = ['cnss_employ','cnss_terminate','cnss_work','cnss_wife',
                 'cnss_eos_wage','cnss_parent','cnss_eos_settle'];
 // نماذج خاصة بالموظف الإداري فقط (الأستاذ ياخذ نهاية خدمته من صندوق التعويضات)
 $employeeOnly = ['cnss_eos_settle'];
+// نماذج خاصة بالملاك فقط (صندوق التعويضات = الأستاذ الملاك)
+$titulaireOnly = ['eoc_card'];
+// نماذج خاصة بالأساتذة (بطاقة الأستاذ فيها درجة/مواد/مرحلة — لا تخصّ الموظف الإداري)
+$teacherOnly = ['teacher_card'];
 
 $titles = [
     'cnss_employ'    => 'إعلام عن استخدام أجير (CNSS 41A)',
@@ -140,8 +144,10 @@ echo officialFormStyles();
 if (in_array($form, $perEmployee) && !$emp):
     // فلترة حسب السنة الدراسية المختارة (دالة موحّدة): سنة محددة = موظفو تلك السنة فقط (إلهم رواتب فيها)
     [$yearWhere, $yearParams] = yearEmploymentFilter(activeSchoolYear());
-    // نماذج خاصة بالموظف الإداري فقط
-    $onlyEmp = in_array($form, $employeeOnly) ? " AND employee_type='employe'" : '';
+    // تقييد لائحة الاختيار حسب النموذج: خاص بالموظف الإداري / بالملاك / بالأساتذة
+    $onlyEmp = in_array($form, $employeeOnly) ? " AND employee_type='employe'"
+             : (in_array($form, $titulaireOnly) ? " AND employee_type='enseignant_titulaire'"
+             : (in_array($form, $teacherOnly) ? " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')" : ''));
     $list = $db->prepare("SELECT id, first_name_fr, last_name_fr, first_name_ar, last_name_ar, employee_code
                           FROM employees WHERE is_deleted = 0 AND " . schoolScopeWhere('school_id') . $onlyEmp . $yearWhere . "
                           ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
@@ -1922,7 +1928,9 @@ elseif ($form === 'payment_list'):
             }
             $left = $r['left_date_cnss'] ?: ($r['left_date_finance'] ?: $r['left_date_eoc']);
             $sal = ofLatestSalary($db, $r['id']);
-            $rsal = $sal ? ((int)$sal['base_plus_echelon_lbp'] ?: (int)$sal['net_salary_lbp']) : (int)scaleSalaryLBP($r['current_grade']);
+            // fallback عند غياب صف راتب: الأستاذ من السلسلة، والموظف الإداري لا سلسلة له (راتبه مباشر) → 0
+            $rsalFallback = ($r['employee_type'] === 'enseignant_titulaire') ? (int)scaleSalaryLBP($r['current_grade']) : 0;
+            $rsal = $sal ? ((int)$sal['base_plus_echelon_lbp'] ?: (int)$sal['net_salary_lbp']) : $rsalFallback;
         ?>
             <tr>
                 <td><?= $i+1 ?></td>
