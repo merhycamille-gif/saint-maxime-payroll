@@ -79,18 +79,23 @@ $totalPaid = (float)$stmtPaid->fetchColumn();
 $exchangeRate = getExchangeRate();
 
 // تنبيه بلوغ سنّ الـ64: موظفون/أساتذة فاعلون غير تاركين بلغوا 64 (تاريخ ولادة صحيح مسجّل)
-$over64 = $db->prepare("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
-        e.employee_type, e.birth_date, e.keep_working_past_64,
-        COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
-    FROM employees e LEFT JOIN schools sc ON sc.id = e.school_id
-    WHERE e.is_deleted = 0 AND e.status = 'actif'
-      AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
-      AND e.birth_date IS NOT NULL AND e.birth_date NOT IN ('0000-00-00','1900-01-01')
-      AND TIMESTAMPDIFF(YEAR, e.birth_date, CURDATE()) >= 64" . schoolScopeSql('e.school_id')
-    . " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
-        COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr)");
-$over64->execute();
-$over64 = $over64->fetchAll();
+// محصّن: قبل تطبيق migration 017 (إضافة عمود keep_working_past_64) قد لا يكون العمود موجوداً
+// أونلاين → نتجاهل التنبيه بدل كسر الصفحة (يُطبَّق العمود بزيارة migrate.php مرّة).
+$over64 = [];
+try {
+    $st64 = $db->prepare("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+            e.employee_type, e.birth_date, e.keep_working_past_64,
+            COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
+        FROM employees e LEFT JOIN schools sc ON sc.id = e.school_id
+        WHERE e.is_deleted = 0 AND e.status = 'actif'
+          AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+          AND e.birth_date IS NOT NULL AND e.birth_date NOT IN ('0000-00-00','1900-01-01')
+          AND TIMESTAMPDIFF(YEAR, e.birth_date, CURDATE()) >= 64" . schoolScopeSql('e.school_id')
+        . " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
+            COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr)");
+    $st64->execute();
+    $over64 = $st64->fetchAll();
+} catch (Exception $e) { $over64 = []; }
 $need64 = array_filter($over64, fn($r) => empty($r['keep_working_past_64']));
 $kept64 = array_filter($over64, fn($r) => !empty($r['keep_working_past_64']));
 

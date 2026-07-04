@@ -385,6 +385,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     try {
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'classes_taught'")->fetch()) unset($data['classes_taught']);
     } catch (Exception $e) { unset($data['classes_taught']); }
+    // عمود keep_working_past_64 قد لا يكون موجوداً قبل migration 017 أونلاين → أزِله من الحفظ لتفادي الكسر
+    try {
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'keep_working_past_64'")->fetch()) unset($data['keep_working_past_64']);
+    } catch (Exception $e) { unset($data['keep_working_past_64']); }
 
     try {
         if ($action === 'new') {
