@@ -204,6 +204,10 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     // الحقول المهنية + الشهادة + المرحلة
     $data['diploma'] = trim((string)($_POST['diploma'] ?? ''));
     foreach ($profFields as $k => $_) { $data[$k] = trim((string)($_POST[$k] ?? '')); }
+    // الوضع الضريبي: هل يخضع الأستاذ للضريبة؟ (نعم=1 / لا=0، معفى) — يتحكّم بحساب ضريبة الدخل
+    $data['tax_subject'] = ((string)($_POST['tax_subject'] ?? '1') === '0') ? 0 : 1;
+    // ملاحظات حرّة (اختياري)
+    $data['notes'] = trim((string)($_POST['notes'] ?? ''));
     $data['niveau_scolaire'] = is_array($_POST['niveau_scolaire'] ?? null)
         ? implode(',', array_intersect($_POST['niveau_scolaire'], array_keys($niveauOptions))) : '';
     // الصفوف التي يعلّم فيها (معرّفات class_levels مفصولة بفواصل)
@@ -409,7 +413,7 @@ if ($nameSchoolId) {
       <div class="note">أهلاً <strong><?= e(trim(($emp['first_name_ar']??'').' '.($emp['last_name_ar']??'')) ?: trim(($emp['first_name_fr']??'').' '.($emp['last_name_fr']??''))) ?></strong> — عبّئ/صحّح معلوماتك التالية وارفع مستنداتك، ثم اضغط «إرسال».<br><span dir="ltr">Bonjour — complétez / corrigez vos informations et joignez vos documents, puis cliquez sur « Envoyer ».</span></div>
     <?php endif; ?>
     <div class="note" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;margin-bottom:14px">
-      📌 الحقول المعلَّمة بـ<span style="color:#dc2626;font-weight:700">*</span> <strong>إلزامية</strong> — ما بتقدر تبعت قبل ما تعبّيها كلّها. أمّا <strong>غير الإلزامية</strong> (تركها فارغة ما بيمنع الإرسال) فهي: <strong>الصورة الشخصية، البريد الإلكتروني، الهاتف الثاني، رقم الضمان، رقم المالية، رقم صندوق التعويضات، وتاريخ الترك</strong>.<br>
+      📌 الحقول المعلَّمة بـ<span style="color:#dc2626;font-weight:700">*</span> <strong>إلزامية</strong> — ما بتقدر تبعت قبل ما تعبّيها كلّها. أمّا <strong>غير الإلزامية</strong> (تركها فارغة ما بيمنع الإرسال) فهي: <strong>الصورة الشخصية، البريد الإلكتروني، الهاتف الثاني، رقم الضمان، رقم المالية، رقم صندوق التعويضات، تاريخ الترك، والملاحظات</strong>.<br>
       <span dir="ltr">📌 Les champs marqués d'un <span style="color:#dc2626;font-weight:700">*</span> sont <strong>obligatoires</strong> ; l'envoi est bloqué tant qu'ils ne sont pas remplis. Champs <strong>facultatifs</strong> : photo, e-mail, 2ᵉ téléphone, N° CNSS, N° Finances, N° Caisse et date de départ.</span>
     </div>
     <form method="post" enctype="multipart/form-data" id="tf">
@@ -536,6 +540,21 @@ if ($nameSchoolId) {
             <input type="text" name="<?= e($k) ?>" value="<?= e($fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?>>
           </div>
         <?php endforeach; ?>
+      </div>
+      <h3>الوضع الضريبي والملاحظات / Situation fiscale et remarques</h3>
+      <div class="grid">
+        <div>
+          <label>هل يخضع للضريبة؟ / Assujetti à l'impôt ?<?= $reqStar ?></label>
+          <?php $taxSel = isset($_POST['tax_subject']) ? (string)$_POST['tax_subject'] : (string)($emp['tax_subject'] ?? '1'); ?>
+          <select name="tax_subject" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
+            <option value="1" <?= $taxSel !== '0' ? 'selected' : '' ?>>نعم، يخضع للضريبة / Oui, assujetti</option>
+            <option value="0" <?= $taxSel === '0' ? 'selected' : '' ?>>لا، معفى من الضريبة / Non, exonéré</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label>ملاحظات / Remarques<?= $optTag ?></label>
+        <textarea name="notes" rows="3" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px;font-family:inherit;resize:vertical"><?= e($fv('notes')) ?></textarea>
       </div>
       <?php if (!$isNew): ?>
       <h3 style="color:#b45309;border-bottom-color:#fde68a">ترك العمل (اختياري) / Départ</h3>

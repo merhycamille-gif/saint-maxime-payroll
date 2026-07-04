@@ -19,16 +19,18 @@ $textFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','mo
     'gouvernorat','district','ville','quartier','rue','immeuble','etage',
     // الحقول المهنية المضافة
     'subjects_taught','niveau_scolaire','classes_taught','hours_per_week','days_per_week',
-    'nssf_number','finance_ministry_number','caisse_number'];
+    'nssf_number','finance_ministry_number','caisse_number',
+    // الوضع الضريبي (يخضع للضريبة؟) + الملاحظات
+    'tax_subject','notes'];
 $uploadCols = ['photo_path','id_document_path','family_doc_path','diploma_doc_path'];
-$intFields = ['number_of_children','days_per_week'];
+$intFields = ['number_of_children','days_per_week','tax_subject'];
 $floatFields = ['hours_per_week'];
 
 // دالة موحّدة: تطبّق طلباً واحداً على ملف الأستاذ (يُفترض التحقّق من نطاق المدرسة قبلها)
 // تُرجع رسالة تحذير إن تعذّر تطبيق تغيير الشهادة لأستاذ ملاك (يُعدَّل من ملف الأستاذ ليُعاد بناء الدرجات).
 function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
     $data = json_decode($sub['data'] ?: '{}', true) ?: [];
-    $intFields = ['number_of_children','days_per_week']; $floatFields = ['hours_per_week'];
+    $intFields = ['number_of_children','days_per_week','tax_subject']; $floatFields = ['hours_per_week'];
     $warn = '';
     $set = []; $vals = [];
     foreach ($textFields as $f) {
@@ -145,8 +147,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         ];
         $strFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','mother_first_name','mother_last_name',
             'birth_place','nationality','gouvernorat','district','ville','quartier','rue','immeuble','etage',
-            'phone1','phone2','email','diploma','subjects_taught','niveau_scolaire','classes_taught','nssf_number','finance_ministry_number','caisse_number'];
+            'phone1','phone2','email','diploma','subjects_taught','niveau_scolaire','classes_taught','nssf_number','finance_ministry_number','caisse_number','notes'];
         foreach ($strFields as $f) { if (($data[$f] ?? '') !== '') $emp[$f] = $data[$f]; }
+        // الوضع الضريبي (يخضع للضريبة؟): إن أرسله الأستاذ يُعتمد، وإلا يبقى الافتراضي (خاضع)
+        if (array_key_exists('tax_subject', $data)) $emp['tax_subject'] = ((string)$data['tax_subject'] === '0') ? 0 : 1;
         if (($data['birth_date'] ?? '') !== '') $emp['birth_date'] = $data['birth_date'];
         if (($data['number_of_children'] ?? '') !== '') $emp['number_of_children'] = (int)$data['number_of_children'];
         if (($data['days_per_week'] ?? '') !== '') $emp['days_per_week'] = (int)$data['days_per_week'];
@@ -235,7 +239,8 @@ $labels = ['first_name_ar'=>'الاسم','first_name_fr'=>'Prénom','last_name_a
     'nationality'=>'الجنسية','number_of_children'=>'عدد الأولاد','phone1'=>'هاتف 1','phone2'=>'هاتف 2','email'=>'إيميل',
     'entry_school_year'=>'سنة الدخول','diploma'=>'الشهادة','subjects_taught'=>'المواد','niveau_scolaire'=>'المرحلة','classes_taught'=>'الصفوف','hours_per_week'=>'الساعات/أسبوع','days_per_week'=>'أيام الحضور',
     'nssf_number'=>'رقم الضمان','finance_ministry_number'=>'رقم المالية','caisse_number'=>'رقم الصندوق',
-    'gouvernorat'=>'محافظة','district'=>'قضاء','ville'=>'بلدة','quartier'=>'حي','rue'=>'شارع','immeuble'=>'مبنى','etage'=>'طابق'];
+    'gouvernorat'=>'محافظة','district'=>'قضاء','ville'=>'بلدة','quartier'=>'حي','rue'=>'شارع','immeuble'=>'مبنى','etage'=>'طابق',
+    'tax_subject'=>'يخضع للضريبة','notes'=>'ملاحظات'];
 // خريطة أسماء الشهادات (للعرض)
 $diplomaNames = [];
 foreach ($db->query("SELECT diploma_code, diploma_name_ar FROM diploma_starting_grades") as $dr) { $diplomaNames[$dr['diploma_code']] = $dr['diploma_name_ar']; }
@@ -247,6 +252,13 @@ $classIdsToNames = function ($csv) use ($classNames) {
     $names = [];
     foreach (array_filter(array_map('intval', explode(',', (string)$csv))) as $cid) { if (isset($classNames[$cid])) $names[] = $classNames[$cid]; }
     return implode('، ', $names);
+};
+// عرض قيمة حقل واحد بشكل مقروء (الشهادة/الصفوف/الوضع الضريبي)
+$displayVal = function ($k, $v) use ($diplomaNames, $classIdsToNames) {
+    if ($k === 'diploma') return $diplomaNames[$v] ?? $v;
+    if ($k === 'classes_taught') return $classIdsToNames($v);
+    if ($k === 'tax_subject') return ((string)$v === '0') ? 'لا (معفى)' : 'نعم';
+    return $v;
 };
 
 // الطلبات الواردة للأساتذة الجدد (لا employee_id بعد) — للمدرسة الحالية
@@ -394,7 +406,7 @@ $newSubs = $newSubs->fetchAll();
         </div>
         <div class="form-row cols-4" style="margin-top:10px">
           <?php foreach ($labels as $k => $lbl): if (($data[$k] ?? '') === '') continue;
-            $val = ($k === 'diploma') ? ($diplomaNames[$data[$k]] ?? $data[$k]) : (($k === 'classes_taught') ? $classIdsToNames($data[$k]) : $data[$k]); ?>
+            $val = $displayVal($k, $data[$k]); ?>
             <div style="font-size:13px"><span style="color:var(--gray-500)"><?= e($lbl) ?>:</span> <strong><?= e($val) ?></strong></div>
           <?php endforeach; ?>
         </div>
@@ -449,7 +461,7 @@ $newSubs = $newSubs->fetchAll();
         </div>
         <div class="form-row cols-4" style="margin-top:10px">
           <?php foreach ($labels as $k => $lbl): if (($data[$k] ?? '') === '') continue;
-            $val = ($k === 'diploma') ? ($diplomaNames[$data[$k]] ?? $data[$k]) : (($k === 'classes_taught') ? $classIdsToNames($data[$k]) : $data[$k]); ?>
+            $val = $displayVal($k, $data[$k]); ?>
             <div style="font-size:13px"><span style="color:var(--gray-500)"><?= e($lbl) ?>:</span> <strong><?= e($val) ?></strong></div>
           <?php endforeach; ?>
         </div>
