@@ -108,7 +108,7 @@ include __DIR__ . '/includes/header.php';
     <div class="card-body">
         <p style="color:var(--gray-600);margin-top:0">هؤلاء بلغوا <strong>64 سنة</strong>. قرّر لكلٍّ: <strong>يبقى</strong> (تُوقَف محسومات التقاعد تلقائياً — للأستاذ الملاك صندوق التعويضات ٦٪ <strong>عنه وعن المدرسة</strong>، وللموظف نهاية الخدمة ٨.٥٪)، أو <strong>تركه</strong> (يُسجَّل تاريخ الترك فيخرج من السنة).</p>
         <div class="table-wrapper"><table class="table">
-            <thead><tr><th>الاسم</th><th>الفئة</th><th>العمر</th><th>المدرسة</th><th>القرار</th></tr></thead>
+            <thead><tr><th>الاسم</th><th>الفئة</th><th>العمر</th><th>تاريخ بلوغ 64</th><th>المدرسة</th><th>القرار</th></tr></thead>
             <tbody>
             <?php foreach ($need64 as $r):
                 $nm = trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr']);
@@ -119,6 +119,7 @@ include __DIR__ . '/includes/header.php';
                 <td><strong><?= e($nm) ?></strong></td>
                 <td><?= employeeTypeLabel($r['employee_type']) ?></td>
                 <td><span class="badge" style="background:#b45309;color:#fff"><?= (int)$age ?> سنة</span></td>
+                <td style="white-space:nowrap"><strong style="color:#b45309"><?= $def ? e(displayDMY($def)) : '—' ?></strong></td>
                 <td><?= e($r['school_name']) ?></td>
                 <td style="white-space:nowrap">
                     <form method="post" style="display:inline" onsubmit="return confirm('إبقاؤه على العمل بعد الـ64 ووقف محسومات التقاعد؟')">
@@ -144,15 +145,17 @@ include __DIR__ . '/includes/header.php';
 <div class="card no-print" style="border:1px solid #86efac;margin-bottom:16px">
     <div class="card-header" style="background:#f0fdf4"><h3 style="color:#15803d"><i class="fas fa-user-check"></i> مُبقَون بعد الـ64 — محسومات التقاعد موقوفة (<?= count($kept64) ?>)</h3></div>
     <div class="card-body"><div class="table-wrapper"><table class="table">
-        <thead><tr><th>الاسم</th><th>الفئة</th><th>العمر</th><th>المدرسة</th><th></th></tr></thead>
+        <thead><tr><th>الاسم</th><th>الفئة</th><th>العمر</th><th>تاريخ بلوغ 64</th><th>المدرسة</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($kept64 as $r):
             $nm = trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr']);
-            $age = ageOnDate($r['birth_date']); ?>
+            $age = ageOnDate($r['birth_date']);
+            $b64k = date_create(substr($r['birth_date'], 0, 10)); $d64k = $b64k ? $b64k->modify('+64 years')->format('Y-m-d') : ''; ?>
         <tr>
             <td><strong><?= e($nm) ?></strong></td>
             <td><?= employeeTypeLabel($r['employee_type']) ?></td>
             <td><?= (int)$age ?> سنة</td>
+            <td style="white-space:nowrap"><strong style="color:#15803d"><?= $d64k ? e(displayDMY($d64k)) : '—' ?></strong></td>
             <td><?= e($r['school_name']) ?></td>
             <td><form method="post" onsubmit="return confirm('إلغاء الإبقاء وإعادة محسومات التقاعد كالمعتاد؟')" style="margin:0">
                 <?= csrfField() ?><input type="hidden" name="action" value="unkeep64"><input type="hidden" name="emp_id" value="<?= $r['id'] ?>">

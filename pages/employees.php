@@ -1487,11 +1487,18 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
 
-                <?php $empAge = ageOnDate($employee['birth_date'] ?? ''); ?>
+                <?php
+                    $empAge = ageOnDate($employee['birth_date'] ?? '');
+                    $emp64Date = '';
+                    if ($empAge !== null && ($eb = date_create(substr((string)$employee['birth_date'], 0, 10)))) {
+                        $emp64Date = $eb->modify('+64 years')->format('Y-m-d');
+                    }
+                ?>
                 <div class="card" style="margin-top:16px;border:1px solid #fed7aa;">
                     <div class="card-header" style="background:#fff7ed;">
                         <h3 style="color:#b45309;"><i class="fas fa-hourglass-half"></i> بلوغ سنّ الـ64 / Âge de la retraite (64 ans)
                             <?php if ($empAge !== null): ?><span class="badge" style="background:<?= $empAge >= 64 ? '#b45309' : '#64748b' ?>;color:#fff">العمر: <?= (int)$empAge ?> سنة</span><?php endif; ?>
+                            <?php if ($emp64Date): ?><span class="badge" style="background:#b45309;color:#fff">تاريخ بلوغ 64: <?= e(displayDMY($emp64Date)) ?></span><?php endif; ?>
                         </h3>
                     </div>
                     <div class="card-body">
