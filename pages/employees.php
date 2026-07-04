@@ -341,6 +341,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'has_13th_month' => isset($_POST['has_13th_month']) ? 1 : 0,
         'm13_include_extra' => isset($_POST['m13_include_extra']) ? 1 : 0,
         'm13_include_aide' => isset($_POST['m13_include_aide']) ? 1 : 0,
+        'keep_working_past_64' => isset($_POST['keep_working_past_64']) ? 1 : 0,
         'tax_subject' => isset($_POST['tax_subject']) ? 1 : 0,
         'tax_includes_echelon' => isset($_POST['tax_includes_echelon']) ? 1 : 0,
         'tax_includes_extra' => isset($_POST['tax_includes_extra']) ? 1 : 0,
@@ -414,6 +415,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Employé créé avec succès / تم إنشاء الموظف بنجاح'];
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
+            // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
+            // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
+            if (!empty($data['keep_working_past_64'])) {
+                foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$id)->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                    if ($sy) recalcEmployeeYear($id, $sy);
+                }
+            }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
             handleEmployeeUploads($db, $id); // رفع الصورة والوثائق (يحدّث الرسالة بعدد الملفات)
             $tabQ = ($t = preg_replace('/[^a-z]/', '', $_POST['active_tab'] ?? '')) ? '&tab=' . $t : '';
@@ -454,6 +462,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             }
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
+            // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
+            // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
+            if (!empty($data['keep_working_past_64'])) {
+                foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$id)->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                    if ($sy) recalcEmployeeYear($id, $sy);
+                }
+            }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
             handleEmployeeUploads($db, $id); // رفع/تحديث الصورة والوثائق
             $tabQ = ($t = preg_replace('/[^a-z]/', '', $_POST['active_tab'] ?? '')) ? '&tab=' . $t : '';
@@ -668,7 +683,7 @@ $employee = [
     'payment_months_per_year' => 10, 'has_13th_month' => 0, 'm13_include_extra' => 0, 'm13_include_aide' => 0,
     'tax_subject' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
-    'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0,
+    'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0,
     'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0,
     'transport_daily_amount' => 0, 'transport_daily_currency' => 'LBP', 'transport_days_per_week' => 0, 'transport_weeks' => 4,
     'notes' => ''
@@ -1467,7 +1482,25 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                 </div>
-                
+
+                <?php $empAge = ageOnDate($employee['birth_date'] ?? ''); ?>
+                <div class="card" style="margin-top:16px;border:1px solid #fed7aa;">
+                    <div class="card-header" style="background:#fff7ed;">
+                        <h3 style="color:#b45309;"><i class="fas fa-hourglass-half"></i> بلوغ سنّ الـ64 / Âge de la retraite (64 ans)
+                            <?php if ($empAge !== null): ?><span class="badge" style="background:<?= $empAge >= 64 ? '#b45309' : '#64748b' ?>;color:#fff">العمر: <?= (int)$empAge ?> سنة</span><?php endif; ?>
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <label class="d-flex justify-between align-center mb-3">
+                            <span><strong>الإبقاء على العمل بعد الـ64 — وقف محسومات التقاعد</strong> / Maintenu après 64 ans (arrêt des retenues de retraite)</span>
+                            <label class="switch"><input type="checkbox" name="keep_working_past_64" value="1" <?= !empty($employee['keep_working_past_64']) ? 'checked' : '' ?>><span class="slider"></span></label>
+                        </label>
+                        <p style="font-size:12px;color:var(--gray-600);margin:0">
+                            عند تفعيله لمن بلغ 64 سنة: تُوقَف تلقائياً — للأستاذ <strong>الملاك</strong>: صندوق التعويضات ٦٪ <strong>عنه وعن المدرسة</strong>؛ وللموظف: نهاية الخدمة ٨.٥٪ (المدرسة). يبدأ الإعفاء من <strong>شهر بلوغه 64</strong> فقط (الأشهر السابقة تبقى كما هي). إن كنت <strong>لا تريد إبقاءه</strong>، سجّل تاريخ الترك في أعلى البطاقة بدل ذلك.
+                        </p>
+                    </div>
+                </div>
+
                 <div class="form-group mt-4">
                     <label class="form-label">Notes / ملاحظات</label>
                     <textarea name="notes" class="form-control" rows="3"><?= e($employee['notes']) ?></textarea>

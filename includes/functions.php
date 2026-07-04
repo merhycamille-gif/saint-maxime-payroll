@@ -803,6 +803,19 @@ function schoolYearOfDate($date) {
     return ($m >= 10) ? ($y . '-' . ($y + 1)) : (($y - 1) . '-' . $y);
 }
 
+/**
+ * العمر (سنوات كاملة) في تاريخ معيّن (أو اليوم افتراضياً)، أو null إذا كان تاريخ الولادة
+ * ناقصاً/وهمياً (0000-00-00 / 1900-01-01). يُستعمل لتنبيه بلوغ سنّ الـ64.
+ */
+function ageOnDate($birthDate, $onDate = null) {
+    $bs = substr((string)$birthDate, 0, 10);
+    if ($bs === '' || in_array($bs, ['0000-00-00', '1900-01-01'], true)) return null;
+    $b = date_create($bs);
+    $o = $onDate ? date_create(substr((string)$onDate, 0, 10)) : date_create('today');
+    if (!$b || !$o) return null;
+    return (int)date_diff($b, $o)->y;
+}
+
 // السنة الدراسية الفعّالة المختارة من الأعلى (من الجلسة)، أو الحالية افتراضياً
 function activeSchoolYear() {
     $sy = $_SESSION['active_school_year'] ?? '';

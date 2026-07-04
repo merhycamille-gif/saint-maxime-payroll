@@ -378,6 +378,22 @@ class PayrollCalculator {
             if ($emp['eoc_includes_prime_aide']) $eocBase += $aideComp;   // مكافأة ومساعدة
         }
         
+        // === بلوغ سنّ الـ64 (تقاعد) مع الإبقاء على العمل ===
+        // إذا بلغ الموظف/الأستاذ 64 سنة (اعتباراً من نهاية شهر الراتب) وقرّرت الإدارة إبقاءه
+        // (keep_working_past_64=1) تُوقَف محسومات التقاعد اعتباراً من ذلك الشهر فصاعداً:
+        //   • الموظف (employe): تُوقَف حصّة نهاية الخدمة ٨.٥٪ (المدرسة).
+        //   • الأستاذ الملاك: يُوقَف صندوق التعويضات ٦٪ عنه وعن المدرسة (+ حسم الدرجة/نصف الراتب).
+        // الإعفاء مشروط ببلوغ 64 في ذلك الشهر تحديداً، فالأشهر السابقة (قبل 64) تبقى محسوماتها كاملة.
+        $past64Titulaire = false; $past64Employe = false;
+        if (!empty($emp['keep_working_past_64'])) {
+            $endOfMonth = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $this->year, $this->month)));
+            $ageEnd = ageOnDate($emp['birth_date'] ?? '', $endOfMonth);
+            if ($ageEnd !== null && $ageEnd >= 64) {
+                if ($emp['employee_type'] === 'enseignant_titulaire') $past64Titulaire = true;
+                elseif ($emp['employee_type'] === 'employe') $past64Employe = true;
+            }
+        }
+
         // === 5. Calculate deductions ===
         // تطبيق الحد الأدنى/الأقصى للأجر الخاضع لكل فرع (جدول cnss_brackets، حسب تاريخ الشهر).
         // لكل فرع حدوده الخاصة، لذلك نشتقّ أساساً خاضعاً مستقلاً لكل فرع.
@@ -385,6 +401,9 @@ class PayrollCalculator {
         $famBase     = clampCnssBase($cnssBase, 'allocations_familiales', $this->month, $this->year);
         $finBase     = clampCnssBase($cnssBase, 'fin_de_service', $this->month, $this->year);
         $eocBase     = clampCnssBase($eocBase, 'eoc', $this->month, $this->year);
+        // بلغ 64 وأبقيناه (ملاك): يُصفَّر أساس صندوق التعويضات → يُوقَف الحسم عنه (caisseAmount)
+        // وعن المدرسة (schoolEoc) تلقائياً.
+        if ($past64Titulaire) $eocBase = 0;
 
         // النِّسَب مؤرّخة: تُقرأ القيمة السارية بتاريخ شهر الراتب (rate_history)
         $cnssRate = getRateAsOf('cnss_employee_rate', $this->month, $this->year, 3) / 100;
@@ -396,7 +415,7 @@ class PayrollCalculator {
         // درجة / نصف راتب → اشتراك صندوق التعويضات لمرّة واحدة عند حدث درجة هذا الشهر:
         // شهر الترسيم = نصف الراتب + الدرجة العادية الفورية؛ شهر الترقية = قيمة الدرجة. للملاك الخاضع للصندوق فقط.
         $eocGradeDeduction = 0;
-        if ($emp['eoc_subject'] && $emp['employee_type'] === 'enseignant_titulaire') {
+        if ($emp['eoc_subject'] && $emp['employee_type'] === 'enseignant_titulaire' && !$past64Titulaire) {
             $mStart = sprintf('%04d-%02d-01', $this->year, $this->month);
             $mEnd   = date('Y-m-t', strtotime($mStart));
             $evStmt = getDB()->prepare("SELECT grade_before, grade_after, reason FROM employee_grade_history WHERE employee_id = ? AND change_date BETWEEN ? AND ?");
@@ -435,7 +454,7 @@ class PayrollCalculator {
         $schoolFamilyComp = ($emp['employee_type'] === 'employe')
             ? $famBase * (getRateAsOf('family_compensation_rate', $this->month, $this->year, 6) / 100)
             : 0;
-        $schoolEndOfService = ($emp['employee_type'] === 'employe')
+        $schoolEndOfService = ($emp['employee_type'] === 'employe' && !$past64Employe)
             ? $finBase * (getRateAsOf('end_of_service_rate', $this->month, $this->year, 8.5) / 100)
             : 0;
         

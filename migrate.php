@@ -62,6 +62,15 @@ try {
     $log[] = ['done', 'تم إضافة عمود الاسم الفرنسي + تعبئة أسماء الصفوف الافتراضية بالفرنسي.'];
 }
 
+// --- 017: عمود «الإبقاء على العمل بعد الـ64» (وقف محسومات التقاعد) ---
+try {
+    $db->query("SELECT keep_working_past_64 FROM employees LIMIT 1");
+    $log[] = ['ok', 'عمود الإبقاء بعد الـ64 (keep_working_past_64) موجود مسبقاً — لا حاجة لإجراء.'];
+} catch (Exception $e) {
+    $db->exec("ALTER TABLE employees ADD COLUMN keep_working_past_64 TINYINT(1) NOT NULL DEFAULT 0");
+    $log[] = ['done', 'تم إضافة عمود «الإبقاء على العمل بعد الـ64» — لوقف محسومات التقاعد (نهاية الخدمة ٨.٥٪ للموظف / صندوق التعويضات ٦٪ للأستاذ عنه وعن المدرسة).'];
+}
+
 header('Content-Type: text/html; charset=utf-8');
 ?><!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <title>تحديث قاعدة البيانات</title>
