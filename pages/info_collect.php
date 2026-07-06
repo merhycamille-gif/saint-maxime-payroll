@@ -64,6 +64,16 @@ function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
             $warn = 'الأستاذ طلب تغيير الشهادة العلمية — عدّلها يدوياً من ملف الأستاذ ليُعاد بناء الدرجات حسب القانون.';
         }
     }
+    // الفئة (متعاقد/ملاك/موظف): تغييرها لأستاذ موجود يمسّ محرّك الراتب (نمط الإدخال/الدرجات/الضمان)
+    // — قاعدة حرجة. لا تُطبَّق آلياً من هنا؛ يُنبَّه المدير ليعدّلها من ملف الأستاذ. إن لم تتغيّر → تُتجاهَل.
+    if (array_key_exists('employee_type', $data) && in_array($data['employee_type'], ['enseignant_titulaire','enseignant_contractuel','employe'], true)) {
+        $curT = $db->prepare("SELECT employee_type FROM employees WHERE id = ?");
+        $curT->execute([$sub['employee_id']]);
+        $curType = (string)($curT->fetchColumn() ?: '');
+        if ($curType !== '' && $curType !== $data['employee_type']) {
+            $warn = trim($warn . ' الأستاذ طلب تغيير فئته إلى «' . employeeTypeLabel($data['employee_type'], 'ar') . '» — عدّلها يدوياً من ملف الأستاذ (تمسّ حساب الراتب والدرجات).');
+        }
+    }
     foreach ($uploadCols as $c) {
         if (!empty($sub[$c])) { $set[] = "$c = ?"; $vals[] = $sub[$c]; }
     }
@@ -232,7 +242,7 @@ if (!isAllSchools()) {
 }
 
 // الطلبات الواردة (pending) للمدرسة الحالية
-$subs = $db->prepare("SELECT s.*, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+$subs = $db->prepare("SELECT s.*, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.employee_type AS cur_type,
     COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
     FROM info_submissions s JOIN employees e ON e.id = s.employee_id
     LEFT JOIN schools sc ON sc.id = e.school_id
@@ -461,6 +471,7 @@ $newSubs = $newSubs->fetchAll();
           <div><strong style="font-size:16px"><?= e($nm) ?></strong>
             <?php if (!empty($s['school_name'])): ?><span class="badge" style="background:#0a6b5e;color:#fff"><i class="fas fa-school"></i> <?= e($s['school_name']) ?></span><?php endif; ?>
             <span class="badge badge-info"><?= e($s['submitted_at']) ?></span>
+            <?php if (!empty($data['employee_type']) && !empty($s['cur_type']) && $data['employee_type'] !== $s['cur_type']): ?><span class="badge" style="background:#b45309;color:#fff"><i class="fas fa-user-tag"></i> طلب تغيير الفئة إلى <?= e(employeeTypeLabel($data['employee_type'],'ar')) ?> (يُعدَّل يدوياً من ملف الأستاذ)</span><?php endif; ?>
             <?php if (!empty($data['leave_date'])): ?><span class="badge" style="background:#dc2626;color:#fff"><i class="fas fa-door-open"></i> طلب ترك العمل بتاريخ <?= e($data['leave_date']) ?></span><?php endif; ?></div>
           <div style="display:flex;gap:8px">
             <form method="post" onsubmit="return confirm('<?= !empty($data['leave_date']) ? 'تنبيه: هذا الأستاذ طلب ترك العمل — سيُسجَّل تاريخ الترك ويخرج من السنة الجارية. متابعة؟' : 'تحديث ملف الأستاذ بهذه المعلومات؟' ?>')" style="margin:0">

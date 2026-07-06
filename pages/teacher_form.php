@@ -146,14 +146,16 @@ $jobOpts  = jobTitleOptions();
 $jobStored= trim((string)($emp['job_title'] ?? ''));
 $jobIsOther = ($jobStored !== '' && !isset($jobOpts[$jobStored]));
 
-// فئة الأستاذ الجديد يختارها بنفسه: متعاقد (افتراضي) / ملاك / موظف إداري.
+// فئة الأستاذ يختارها بنفسه (جديداً أو حالياً): متعاقد / ملاك / موظف إداري.
 // الملاك وحده له «رقم صندوق التعويضات»؛ المتعاقد والموظف الإداري تحت الضمان (بلا صندوق).
 $newCatOptions = ['enseignant_contractuel', 'enseignant_titulaire', 'employe'];
-$newCategory   = ($isNew && in_array($_POST['new_category'] ?? '', $newCatOptions, true)) ? (string)$_POST['new_category'] : 'enseignant_contractuel';
-// «موظف إداري» فعّال: موظف حالي، أو أستاذ جديد اختار «موظف».
-$isAdminEff = $isAdmin || ($isNew && $newCategory === 'employe');
-// إظهار حقل رقم صندوق التعويضات: للملاك فقط عند الأستاذ الجديد؛ ويبقى ظاهراً دائماً للأساتذة الحاليين (لا نخفي بيانات موجودة).
-$showCaisse = !$isNew || ($newCategory === 'enseignant_titulaire');
+// الافتراضي = فئة الأستاذ الحالية (للموجود)، أو متعاقد (للجديد)
+$catDefault  = ($isNew || !in_array($emp['employee_type'] ?? '', $newCatOptions, true)) ? 'enseignant_contractuel' : (string)$emp['employee_type'];
+$selCategory = in_array($_POST['new_category'] ?? '', $newCatOptions, true) ? (string)$_POST['new_category'] : $catDefault;
+// «موظف إداري» فعّال حسب الفئة المختارة (نوع الوظيفة بدل الشهادة/المواد/الصفوف)
+$isAdminEff = ($selCategory === 'employe');
+// «رقم صندوق التعويضات» يظهر للملاك فقط
+$showCaisse = ($selCategory === 'enseignant_titulaire');
 
 // سنوات الدخول للأستاذ الجديد: السنة الدراسية **القادمة فأكثر** فقط (لا يجوز للجديد الدخول على
 // السنة الجارية أو ما قبلها). الافتراضي = السنة القادمة (مثلاً 2026-2027 المفتوحة).
@@ -216,6 +218,9 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     if (isset($data['birth_date']) && $data['birth_date'] !== '') {
         $data['birth_date'] = parseFlexibleDate($data['birth_date']) ?? $data['birth_date'];
     }
+    // فئة الأستاذ التي اختارها (متعاقد/ملاك/موظف) — للجديد تُعتمد عند الإنشاء؛ للحالي تُعرَض للمدير
+    // ولا تُطبَّق آلياً إن تغيّرت (تمسّ محرّك الراتب) بل يعدّلها المدير من ملف الأستاذ.
+    $data['employee_type'] = $selCategory;
     // الحقول المهنية + الشهادة + المرحلة
     $data['diploma'] = trim((string)($_POST['diploma'] ?? ''));
     foreach ($profFields as $k => $_) { $data[$k] = trim((string)($_POST[$k] ?? '')); }
@@ -241,8 +246,6 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     }
     // سنة الدخول (للأستاذ الجديد فقط) — يجب أن تكون ضمن الخيارات المسموحة (القادمة فأكثر)
     if ($isNew) {
-        // فئة الأستاذ التي اختارها (متعاقد/ملاك/موظف) — يعتمدها المدير عند إنشاء الملف
-        $data['employee_type'] = $newCategory;
         $ey = trim((string)($_POST['entry_school_year'] ?? ''));
         $data['entry_school_year'] = in_array($ey, $entryYearOptions, true) ? $ey : $defaultEntryYear;
         // الراتب الأساسي + الأجر الإضافي + تعويض النقل (كلٌّ بعملته) — تُجهَّز عند إنشاء الملف
@@ -505,19 +508,16 @@ if ($nameSchoolId) {
         <?php endforeach; ?>
       </div>
       <h3>المعلومات المهنية / Informations professionnelles</h3>
-      <?php if ($isNew): ?>
       <div style="margin-bottom:14px">
         <label>فئة الأستاذ / Catégorie<?= $reqStar ?></label>
         <select name="new_category" id="newCategory" onchange="tfCat()"
                 style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px">
-          <option value="enseignant_contractuel" <?= $newCategory === 'enseignant_contractuel' ? 'selected' : '' ?>>أستاذ متعاقد / Enseignant contractuel</option>
-          <option value="enseignant_titulaire" <?= $newCategory === 'enseignant_titulaire' ? 'selected' : '' ?>>أستاذ ملاك / Enseignant titulaire</option>
-          <option value="employe" <?= $newCategory === 'employe' ? 'selected' : '' ?>>موظف إداري / Employé administratif</option>
+          <option value="enseignant_contractuel" <?= $selCategory === 'enseignant_contractuel' ? 'selected' : '' ?>>أستاذ متعاقد / Enseignant contractuel</option>
+          <option value="enseignant_titulaire" <?= $selCategory === 'enseignant_titulaire' ? 'selected' : '' ?>>أستاذ ملاك / Enseignant titulaire</option>
+          <option value="employe" <?= $selCategory === 'employe' ? 'selected' : '' ?>>موظف إداري / Employé administratif</option>
         </select>
-        <p style="font-size:12.5px;color:#64748b;margin:6px 0 0">الأستاذ <strong>الملاك</strong> وحده يملك <strong>رقم صندوق التعويضات</strong>؛ أمّا <strong>المتعاقد</strong> و<strong>الموظف الإداري</strong> فتحت الضمان الاجتماعي (بلا صندوق تعويضات).</p>
+        <p style="font-size:12.5px;color:#64748b;margin:6px 0 0">الأستاذ <strong>الملاك</strong> وحده يملك <strong>رقم صندوق التعويضات</strong>؛ أمّا <strong>المتعاقد</strong> و<strong>الموظف الإداري</strong> فتحت الضمان الاجتماعي (بلا صندوق تعويضات).<?php if (!$isNew): ?> <span style="color:#b45309">إن غيّرت فئتك، سيراجعها المدير قبل اعتمادها.</span><?php endif; ?></p>
       </div>
-      <?php endif; ?>
-      <?php if ($isAdminEff || $isNew): ?>
       <div id="adminBlock" style="margin-bottom:4px;display:<?= $isAdminEff ? 'block' : 'none' ?>">
         <label>نوع الوظيفة / Fonction<?= $reqStar ?></label>
         <select name="job_title" id="jobTitleSelect" data-req="1"<?= $isAdminEff ? ' required' : ' disabled' ?>
@@ -534,9 +534,8 @@ if ($nameSchoolId) {
                style="margin-top:8px;display:<?= $jobIsOther ? 'block' : 'none' ?>">
         <p style="font-size:12.5px;color:#64748b;margin:6px 0 0">الموظف الإداري يخضع لقانون العمل — لا شهادة ولا مواد ولا صفوف.</p>
       </div>
-      <?php endif; ?>
-      <?php if (!$isAdmin): // البلوك التعليمي (شهادة/مواد/مرحلة/صفوف) — للمتعاقد والملاك ?>
-      <?php $eduHidden = ($isNew && $isAdminEff); $eduDis = $eduHidden ? ' disabled' : ''; ?>
+      <?php // البلوك التعليمي (شهادة/مواد/مرحلة/صفوف) — للمتعاقد والملاك (يُخفى للموظف الإداري) ?>
+      <?php $eduHidden = $isAdminEff; $eduDis = $eduHidden ? ' disabled' : ''; ?>
       <div id="eduBlock" style="display:<?= $eduHidden ? 'none' : 'block' ?>">
       <div class="grid">
         <div>
@@ -574,7 +573,6 @@ if ($nameSchoolId) {
       </div>
       <?php endif; // classLevels ?>
       </div><?php // #eduBlock ?>
-      <?php endif; // !$isAdmin (الحقول التعليمية) ?>
       <div class="grid" style="margin-top:12px">
         <div>
           <label>عدد الساعات الأسبوعية / Heures par semaine<?= $reqStar ?></label>
@@ -644,11 +642,13 @@ if ($nameSchoolId) {
           $isDip = ($field === 'diploma_doc');
           $isReq = in_array($field, $requiredUploads, true) && !($isAdminEff && $isDip);
           $onFile = !$isNew && !empty($emp[$uploadCol[$field]] ?? '');
-          $mustUpload = $isReq && !$onFile; ?>
+          $mustUpload = $isReq && !$onFile;
+          // صورة الشهادة: أساسها إلزامي إن كانت من المستندات الإلزامية ولم تُرفَع مسبقاً — يستعيده JS عند تبديل الفئة
+          $dipBaseReq = ($isDip && in_array($field, $requiredUploads, true) && !$onFile) ? '1' : '0'; ?>
           <div>
             <label><?= e($lbl) ?><?php if ($isReq): ?> <span<?= $isDip ? ' id="diplomaDocStar"' : '' ?> style="color:#dc2626;font-weight:700">*</span><?php elseif ($isDip): ?> <span id="diplomaDocStar" style="color:#dc2626;font-weight:700;display:none">*</span><?php endif; ?>
               <?php if ($onFile): ?><span style="color:#0a7a37;font-weight:400;font-size:12px">✓ مرفوع مسبقاً / déjà fourni</span><?php endif; ?></label>
-            <input type="file"<?= $isDip ? ' id="diplomaDocInput"' : '' ?> name="<?= e($field) ?>" accept="image/*,application/pdf"<?= $mustUpload ? ' data-req="1" required' : '' ?>>
+            <input type="file"<?= $isDip ? ' id="diplomaDocInput" data-basereq="' . $dipBaseReq . '"' : '' ?> name="<?= e($field) ?>" accept="image/*,application/pdf"<?= $mustUpload ? ' data-req="1" required' : '' ?>>
           </div>
         <?php endforeach; ?>
       </div>
@@ -672,13 +672,17 @@ function tfCat(){
   toggle('adminBlock', isEmp);      // نوع الوظيفة → للموظف الإداري فقط
   toggle('eduBlock', !isEmp);       // الشهادة/المواد/المرحلة/الصفوف → للمتعاقد والملاك
   toggle('caisseField', isTit);     // رقم صندوق التعويضات → للملاك فقط
-  // صورة الشهادة: إلزامية للمتعاقد/الملاك، غير إلزامية للموظف الإداري (لا شهادة له)
+  // صورة الشهادة: إلزامية للمتعاقد/الملاك (إن لم تكن مرفوعة مسبقاً)، غير إلزامية للموظف الإداري
   var dip = document.getElementById('diplomaDocInput'), star = document.getElementById('diplomaDocStar');
   if(dip){
-    if(isEmp){ dip.removeAttribute('required'); dip.removeAttribute('data-req'); }
-    else { dip.setAttribute('required','required'); dip.setAttribute('data-req','1'); }
+    var baseReq = dip.getAttribute('data-basereq') === '1';
+    var lv = document.querySelector('input[name=leave_date]');
+    var leaving = lv && lv.value.trim() !== '';
+    var need = baseReq && !isEmp && !leaving;
+    if(need){ dip.setAttribute('required','required'); dip.setAttribute('data-req','1'); }
+    else { dip.removeAttribute('required'); dip.removeAttribute('data-req'); }
+    if(star){ star.style.display = need ? '' : 'none'; }
   }
-  if(star){ star.style.display = isEmp ? 'none' : ''; }
 }
 tfCat();
 // تنسيق تلقائي لحقول التاريخ اليدوية: يكتب الأستاذ أرقاماً فقط فتُدرَج الشرطات تلقائياً → يوم/شهر/سنة.
