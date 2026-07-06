@@ -35,6 +35,13 @@ function activeSuperadminCount($db) {
     return (int)$db->query("SELECT COUNT(*) FROM users WHERE role='superadmin' AND is_active=1")->fetchColumn();
 }
 
+// كلمة مرور عشوائية سهلة القراءة (8 أحرف، بلا أحرف ملتبسة)
+function randomReadablePassword() {
+    $al = 'abcdefghjkmnpqrstuvwxyz23456789'; $p = '';
+    for ($i = 0; $i < 8; $i++) $p .= $al[random_int(0, strlen($al) - 1)];
+    return $p;
+}
+
 // ===== إضافة / تعديل =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrf($_POST['csrf'] ?? '')) {
@@ -54,11 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             while (in_array($u, $existing, true)) { $u = $base . $i; $i++; }
             $existing[] = $u; return $u;
         };
-        $mkPass = function () {
-            $al = 'abcdefghjkmnpqrstuvwxyz23456789'; $p = ''; // بلا أحرف ملتبسة
-            for ($i = 0; $i < 8; $i++) $p .= $al[random_int(0, strlen($al) - 1)];
-            return $p;
-        };
         $allPages = implode(',', array_keys(viewerReportPages()));
         // 1) حساب لكل مدرسة ليس لها حساب قراءة فقط مفرد
         foreach (allSchools(false) as $s) {
@@ -66,14 +68,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ex = $db->prepare("SELECT id FROM users WHERE role='viewer' AND school_id = ?");
             $ex->execute([$sid]);
             if ($ex->fetch()) continue;
-            $un = $mkUser('ecole' . ($s['code'] ?: $sid)); $pw = $mkPass();
+            $un = $mkUser('ecole' . ($s['code'] ?: $sid)); $pw = randomReadablePassword();
             $db->prepare("INSERT INTO users (username,password_hash,full_name,role,school_id,is_active,allowed_pages,allowed_schools) VALUES (?,?,?,?,?,1,?,?)")
                ->execute([$un, password_hash($pw, PASSWORD_DEFAULT), ($s['name_fr'] ?: $s['name_ar']), 'viewer', $sid, $allPages, (string)$sid]);
             $created[] = ['school' => ($s['name_fr'] ?: $s['name_ar']), 'username' => $un, 'password' => $pw];
         }
         // 2) حساب الرئاسة العامة (كل المدارس) إن لم يوجد
         if (!$db->query("SELECT id FROM users WHERE role='viewer' AND allowed_schools='all'")->fetch()) {
-            $un = $mkUser('presidence'); $pw = $mkPass();
+            $un = $mkUser('presidence'); $pw = randomReadablePassword();
             $db->prepare("INSERT INTO users (username,password_hash,full_name,role,school_id,is_active,allowed_pages,allowed_schools) VALUES (?,?,?,?,?,1,?,?)")
                ->execute([$un, password_hash($pw, PASSWORD_DEFAULT), 'Présidence Générale / الرئاسة العامة', 'viewer', null, $allPages, 'all']);
             $created[] = ['school' => '🏛️ الرئاسة العامة — كل المدارس', 'username' => $un, 'password' => $pw];
@@ -83,6 +85,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['flash_success'] = count($created) > 0
             ? (count($created) . ' حساب أُنشئ. احفظ/اطبع كلمات المرور الآن — لن تظهر مرة ثانية. / Comptes créés, notez les mots de passe.')
             : 'كل الحسابات موجودة مسبقاً — لا جديد. / Tous les comptes existent déjà.';
+        header('Location: ' . BASE_URL . 'pages/users.php'); exit;
+    }
+
+    // ===== إعادة تعيين كلمات المرور لكل حسابات المدارس وعرضها (عند فقدانها) =====
+    if (($_POST['form_action'] ?? '') === 'reset_passwords') {
+        $out = [];
+        $viewers = $db->query("SELECT id, username, full_name, school_id, allowed_schools FROM users WHERE role='viewer' ORDER BY (allowed_schools='all') DESC, school_id")->fetchAll();
+        foreach ($viewers as $v) {
+            $pw = randomReadablePassword();
+            $db->prepare("UPDATE users SET password_hash = ? WHERE id = ?")->execute([password_hash($pw, PASSWORD_DEFAULT), (int)$v['id']]);
+            $label = ($v['allowed_schools'] === 'all')
+                ? '🏛️ ' . ($lang==='ar'?'الرئاسة العامة':'Présidence')
+                : ($v['school_id'] ? schoolNameById((int)$v['school_id']) : $v['full_name']);
+            $out[] = ['school' => $label, 'username' => $v['username'], 'password' => $pw];
+        }
+        if (function_exists('logAudit')) logAudit('reset_pw', 'users', 0, null, count($out) . ' comptes');
+        $_SESSION['generated_creds'] = $out;
+        $_SESSION['flash_success'] = $out
+            ? (count($out) . ' كلمة مرور جديدة. اطبعها الآن — لن تظهر مرة ثانية. / Nouveaux mots de passe.')
+            : 'لا توجد حسابات مدارس بعد. / Aucun compte école.';
         header('Location: ' . BASE_URL . 'pages/users.php'); exit;
     }
 
@@ -243,6 +265,11 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="csrf" value="<?= csrfToken() ?>">
         <input type="hidden" name="form_action" value="generate_all">
         <button type="submit" class="btn btn-success"><i class="fas fa-magic"></i> <?= $lang==='ar'?'توليد حساب لكل المدارس':'Générer les comptes écoles' ?></button>
+    </form>
+    <form method="POST" style="display:inline" data-confirm="<?= $lang==='ar'?'⚠️ تعيين كلمات مرور جديدة لكل حسابات المدارس وطباعتها؟ (كلمات المرور القديمة لن تعود تعمل)':'Réinitialiser tous les mots de passe des écoles ?' ?>">
+        <input type="hidden" name="csrf" value="<?= csrfToken() ?>">
+        <input type="hidden" name="form_action" value="reset_passwords">
+        <button type="submit" class="btn btn-warning"><i class="fas fa-key"></i> <?= $lang==='ar'?'إعادة تعيين كلمات المرور وطباعتها':'Réinitialiser les mots de passe' ?></button>
     </form>
 </div>
 
