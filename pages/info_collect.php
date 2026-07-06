@@ -146,17 +146,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             ? $data['entry_school_year']
             : ((int)substr(currentSchoolYear(),0,4) + 1) . '-' . ((int)substr(currentSchoolYear(),0,4) + 2);
         $entryStartYear = (int)substr($entryYear, 0, 4);
-        // ابنِ صفّ الموظف من الحقول المُرسَلة (متعاقد افتراضياً — يُكمّل المدير الإعداد المالي/التدرّج لاحقاً)
+        // ابنِ صفّ الموظف من الحقول المُرسَلة. الفئة يختارها الأستاذ بالفورم (متعاقد/ملاك/موظف)؛
+        // إن غابت أو كانت غير صالحة → متعاقد افتراضياً. يُكمّل المدير الإعداد المالي/التدرّج لاحقاً.
         // hire_date = 1 تشرين الأول لسنة الدخول → فيُحسب راتبه على تلك السنة لا الجارية.
+        $validTypes = ['enseignant_contractuel', 'enseignant_titulaire', 'employe'];
+        $empType = (isset($data['employee_type']) && in_array($data['employee_type'], $validTypes, true)) ? $data['employee_type'] : 'enseignant_contractuel';
         $emp = [
-            'employee_type' => 'enseignant_contractuel',
+            'employee_type' => $empType,
             'status' => 'actif',
             'school_id' => (int)$sub['school_id'],
             'hire_date' => $entryStartYear . '-10-01',
         ];
         $strFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','mother_first_name','mother_last_name',
             'birth_place','nationality','gouvernorat','district','ville','quartier','rue','immeuble','etage',
-            'phone1','phone2','email','diploma','subjects_taught','niveau_scolaire','classes_taught','nssf_number','finance_ministry_number','caisse_number','notes'];
+            'phone1','phone2','email','diploma','job_title','subjects_taught','niveau_scolaire','classes_taught','nssf_number','finance_ministry_number','caisse_number','notes'];
         foreach ($strFields as $f) { if (($data[$f] ?? '') !== '') $emp[$f] = $data[$f]; }
         // الوضع الضريبي (يخضع للضريبة؟): إن أرسله الأستاذ يُعتمد، وإلا يبقى الافتراضي (خاضع)
         if (array_key_exists('tax_subject', $data)) $emp['tax_subject'] = ((string)$data['tax_subject'] === '0') ? 0 : 1;
@@ -246,7 +249,7 @@ $infoIntro = "حضرة الأساتذة المحترمين،\nيرجى تعبئ�
 $labels = ['first_name_ar'=>'الاسم','first_name_fr'=>'Prénom','last_name_ar'=>'الشهرة','last_name_fr'=>'Nom',
     'mother_first_name'=>'اسم الأم','mother_last_name'=>'شهرة الأم','birth_date'=>'تاريخ الولادة','birth_place'=>'محل الولادة',
     'nationality'=>'الجنسية','number_of_children'=>'عدد الأولاد','phone1'=>'هاتف 1','phone2'=>'هاتف 2','email'=>'إيميل',
-    'entry_school_year'=>'سنة الدخول','diploma'=>'الشهادة','job_title'=>'نوع الوظيفة','subjects_taught'=>'المواد','niveau_scolaire'=>'المرحلة','classes_taught'=>'الصفوف','hours_per_week'=>'الساعات/أسبوع','days_per_week'=>'أيام الحضور',
+    'employee_type'=>'الفئة','entry_school_year'=>'سنة الدخول','diploma'=>'الشهادة','job_title'=>'نوع الوظيفة','subjects_taught'=>'المواد','niveau_scolaire'=>'المرحلة','classes_taught'=>'الصفوف','hours_per_week'=>'الساعات/أسبوع','days_per_week'=>'أيام الحضور',
     'nssf_number'=>'رقم الضمان','finance_ministry_number'=>'رقم المالية','caisse_number'=>'رقم الصندوق',
     'gouvernorat'=>'محافظة','district'=>'قضاء','ville'=>'بلدة','quartier'=>'حي','rue'=>'شارع','immeuble'=>'مبنى','etage'=>'طابق',
     'tax_subject'=>'يخضع للضريبة','notes'=>'ملاحظات'];
@@ -264,6 +267,7 @@ $classIdsToNames = function ($csv) use ($classNames) {
 };
 // عرض قيمة حقل واحد بشكل مقروء (الشهادة/الصفوف/الوضع الضريبي)
 $displayVal = function ($k, $v) use ($diplomaNames, $classIdsToNames) {
+    if ($k === 'employee_type') return employeeTypeLabel($v, 'ar');
     if ($k === 'diploma') return $diplomaNames[$v] ?? $v;
     if ($k === 'classes_taught') return $classIdsToNames($v);
     if ($k === 'job_title') return jobTitleLabel($v, 'ar');

@@ -146,6 +146,15 @@ $jobOpts  = jobTitleOptions();
 $jobStored= trim((string)($emp['job_title'] ?? ''));
 $jobIsOther = ($jobStored !== '' && !isset($jobOpts[$jobStored]));
 
+// فئة الأستاذ الجديد يختارها بنفسه: متعاقد (افتراضي) / ملاك / موظف إداري.
+// الملاك وحده له «رقم صندوق التعويضات»؛ المتعاقد والموظف الإداري تحت الضمان (بلا صندوق).
+$newCatOptions = ['enseignant_contractuel', 'enseignant_titulaire', 'employe'];
+$newCategory   = ($isNew && in_array($_POST['new_category'] ?? '', $newCatOptions, true)) ? (string)$_POST['new_category'] : 'enseignant_contractuel';
+// «موظف إداري» فعّال: موظف حالي، أو أستاذ جديد اختار «موظف».
+$isAdminEff = $isAdmin || ($isNew && $newCategory === 'employe');
+// إظهار حقل رقم صندوق التعويضات: للملاك فقط عند الأستاذ الجديد؛ ويبقى ظاهراً دائماً للأساتذة الحاليين (لا نخفي بيانات موجودة).
+$showCaisse = !$isNew || ($newCategory === 'enseignant_titulaire');
+
 // سنوات الدخول للأستاذ الجديد: السنة الدراسية **القادمة فأكثر** فقط (لا يجوز للجديد الدخول على
 // السنة الجارية أو ما قبلها). الافتراضي = السنة القادمة (مثلاً 2026-2027 المفتوحة).
 $curStart = (int)substr(currentSchoolYear(), 0, 4);   // 2025 إذا الحالية 2025-2026
@@ -220,7 +229,7 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     $data['classes_taught'] = is_array($_POST['classes_taught'] ?? null)
         ? implode(',', array_map('intval', $_POST['classes_taught'])) : '';
     // الموظف الإداري: احفظ نوع الوظيفة (قائمة أو نص حرّ)، وتجاهل الحقول التعليمية (لا يرسلها أصلاً).
-    if ($isAdmin) {
+    if ($isAdminEff) {
         $data['job_title'] = (($_POST['job_title'] ?? '') === '__other__')
             ? trim((string)($_POST['job_title_other'] ?? '')) : trim((string)($_POST['job_title'] ?? ''));
     }
@@ -232,6 +241,8 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     }
     // سنة الدخول (للأستاذ الجديد فقط) — يجب أن تكون ضمن الخيارات المسموحة (القادمة فأكثر)
     if ($isNew) {
+        // فئة الأستاذ التي اختارها (متعاقد/ملاك/موظف) — يعتمدها المدير عند إنشاء الملف
+        $data['employee_type'] = $newCategory;
         $ey = trim((string)($_POST['entry_school_year'] ?? ''));
         $data['entry_school_year'] = in_array($ey, $entryYearOptions, true) ? $ey : $defaultEntryYear;
         // الراتب الأساسي + الأجر الإضافي + تعويض النقل (كلٌّ بعملته) — تُجهَّز عند إنشاء الملف
@@ -275,7 +286,7 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
         'diploma_doc_path' => 'صورة عن الشهادة / Copie du diplôme',
     ];
     // الموظف الإداري لا شهادة له → لا تُطلب صورة الشهادة.
-    if ($isAdmin) unset($reqUploadCols['diploma_doc_path']);
+    if ($isAdminEff) unset($reqUploadCols['diploma_doc_path']);
     $missingDocs = [];
     if (!$leaving) {
         foreach ($reqUploadCols as $col => $lbl) {
@@ -288,7 +299,7 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     if (!$leaving) {
         $reqLabels = [];
         foreach ($textFields as $k => $lbl) { if ($tfReq($k)) $reqLabels[$k] = $lbl; }
-        if ($isAdmin) {
+        if ($isAdminEff) {
             // الموظف الإداري: «نوع الوظيفة» إلزامي بدل الشهادة/المواد/المرحلة/الصفوف.
             $reqLabels['job_title'] = 'نوع الوظيفة / Fonction';
             foreach ($profFields as $k => $lbl) { if ($tfReq($k) && $k !== 'subjects_taught') $reqLabels[$k] = $lbl; }
@@ -494,10 +505,22 @@ if ($nameSchoolId) {
         <?php endforeach; ?>
       </div>
       <h3>المعلومات المهنية / Informations professionnelles</h3>
-      <?php if ($isAdmin): ?>
-      <div style="margin-bottom:4px">
+      <?php if ($isNew): ?>
+      <div style="margin-bottom:14px">
+        <label>فئة الأستاذ / Catégorie<?= $reqStar ?></label>
+        <select name="new_category" id="newCategory" onchange="tfCat()"
+                style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px">
+          <option value="enseignant_contractuel" <?= $newCategory === 'enseignant_contractuel' ? 'selected' : '' ?>>أستاذ متعاقد / Enseignant contractuel</option>
+          <option value="enseignant_titulaire" <?= $newCategory === 'enseignant_titulaire' ? 'selected' : '' ?>>أستاذ ملاك / Enseignant titulaire</option>
+          <option value="employe" <?= $newCategory === 'employe' ? 'selected' : '' ?>>موظف إداري / Employé administratif</option>
+        </select>
+        <p style="font-size:12.5px;color:#64748b;margin:6px 0 0">الأستاذ <strong>الملاك</strong> وحده يملك <strong>رقم صندوق التعويضات</strong>؛ أمّا <strong>المتعاقد</strong> و<strong>الموظف الإداري</strong> فتحت الضمان الاجتماعي (بلا صندوق تعويضات).</p>
+      </div>
+      <?php endif; ?>
+      <?php if ($isAdminEff || $isNew): ?>
+      <div id="adminBlock" style="margin-bottom:4px;display:<?= $isAdminEff ? 'block' : 'none' ?>">
         <label>نوع الوظيفة / Fonction<?= $reqStar ?></label>
-        <select name="job_title" id="jobTitleSelect" data-req="1" required
+        <select name="job_title" id="jobTitleSelect" data-req="1"<?= $isAdminEff ? ' required' : ' disabled' ?>
                 onchange="var o=document.getElementById('jobTitleOther'); o.style.display=(this.value==='__other__')?'block':'none'; o.required=(this.value==='__other__')"
                 style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
           <option value="">— اختر / Choisir —</option>
@@ -507,15 +530,18 @@ if ($nameSchoolId) {
           <option value="__other__" <?= $jobIsOther ? 'selected' : '' ?>>أخرى (حدّد) / Autre…</option>
         </select>
         <input type="text" name="job_title_other" id="jobTitleOther" placeholder="حدّد الوظيفة / Préciser la fonction"
-               value="<?= $jobIsOther ? e($jobStored) : '' ?>"<?= $jobIsOther ? ' required' : '' ?>
+               value="<?= $jobIsOther ? e($jobStored) : '' ?>"<?= ($jobIsOther && $isAdminEff) ? ' required' : '' ?><?= $isAdminEff ? '' : ' disabled' ?>
                style="margin-top:8px;display:<?= $jobIsOther ? 'block' : 'none' ?>">
         <p style="font-size:12.5px;color:#64748b;margin:6px 0 0">الموظف الإداري يخضع لقانون العمل — لا شهادة ولا مواد ولا صفوف.</p>
       </div>
-      <?php else: ?>
+      <?php endif; ?>
+      <?php if (!$isAdmin): // البلوك التعليمي (شهادة/مواد/مرحلة/صفوف) — للمتعاقد والملاك ?>
+      <?php $eduHidden = ($isNew && $isAdminEff); $eduDis = $eduHidden ? ' disabled' : ''; ?>
+      <div id="eduBlock" style="display:<?= $eduHidden ? 'none' : 'block' ?>">
       <div class="grid">
         <div>
           <label>الشهادة العلمية / Diplôme<?= $reqStar ?></label>
-          <select name="diploma" required data-req="1" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
+          <select name="diploma" required data-req="1"<?= $eduDis ?> style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
             <option value="">— اختر / Choisir —</option>
             <?php foreach ($diplomas as $d): ?>
               <option value="<?= e($d['diploma_code']) ?>" <?= ($fv('diploma') === $d['diploma_code']) ? 'selected' : '' ?>><?= e($d['diploma_name_ar']) ?> / <?= e($d['diploma_name_fr']) ?></option>
@@ -524,7 +550,7 @@ if ($nameSchoolId) {
         </div>
         <div>
           <label>المواد التي يدرّسها / Matières enseignées<?= $reqStar ?></label>
-          <input type="text" name="subjects_taught" value="<?= e($fv('subjects_taught')) ?>" placeholder="رياضيات، علوم... / maths, sciences..." required data-req="1">
+          <input type="text" name="subjects_taught" value="<?= e($fv('subjects_taught')) ?>" placeholder="رياضيات، علوم... / maths, sciences..." required data-req="1"<?= $eduDis ?>>
         </div>
       </div>
       <div style="margin-top:12px">
@@ -532,7 +558,7 @@ if ($nameSchoolId) {
         <?php $niveauSel = isset($_POST['niveau_scolaire']) && is_array($_POST['niveau_scolaire']) ? $_POST['niveau_scolaire'] : explode(',', (string)($emp['niveau_scolaire'] ?? '')); ?>
         <div class="req-checkgroup" data-reqmsg="الرجاء اختيار المرحلة (خيار واحد على الأقل) / Veuillez choisir au moins un niveau" style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
           <?php foreach ($niveauOptions as $nv => $nlbl): ?>
-            <label style="font-weight:400"><input type="checkbox" name="niveau_scolaire[]" value="<?= $nv ?>" <?= in_array($nv, $niveauSel) ? 'checked' : '' ?> style="width:auto;margin-left:4px"> <?= e($nlbl) ?></label>
+            <label style="font-weight:400"><input type="checkbox" name="niveau_scolaire[]" value="<?= $nv ?>" <?= in_array($nv, $niveauSel) ? 'checked' : '' ?><?= $eduDis ?> style="width:auto;margin-left:4px"> <?= e($nlbl) ?></label>
           <?php endforeach; ?>
         </div>
       </div>
@@ -542,11 +568,12 @@ if ($nameSchoolId) {
         <div class="req-checkgroup" data-reqmsg="الرجاء اختيار الصفوف (خيار واحد على الأقل) / Veuillez choisir au moins une classe" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">
           <?php foreach ($classLevels as $cl): ?>
             <?php $clFr = trim((string)($cl['name_fr'] ?? '')); ?>
-            <label style="font-weight:400;white-space:nowrap"><input type="checkbox" name="classes_taught[]" value="<?= (int)$cl['id'] ?>" <?= in_array((int)$cl['id'], $selClasses, true) ? 'checked' : '' ?> style="width:auto;margin-left:4px"> <?= e($clFr !== '' ? $clFr.' / '.$cl['name'] : $cl['name']) ?></label>
+            <label style="font-weight:400;white-space:nowrap"><input type="checkbox" name="classes_taught[]" value="<?= (int)$cl['id'] ?>" <?= in_array((int)$cl['id'], $selClasses, true) ? 'checked' : '' ?><?= $eduDis ?> style="width:auto;margin-left:4px"> <?= e($clFr !== '' ? $clFr.' / '.$cl['name'] : $cl['name']) ?></label>
           <?php endforeach; ?>
         </div>
       </div>
       <?php endif; // classLevels ?>
+      </div><?php // #eduBlock ?>
       <?php endif; // !$isAdmin (الحقول التعليمية) ?>
       <div class="grid" style="margin-top:12px">
         <div>
@@ -565,9 +592,9 @@ if ($nameSchoolId) {
           <label>رقم المالية / N° Finances<?= $optTag ?></label>
           <input type="text" name="finance_ministry_number" value="<?= e($fv('finance_ministry_number')) ?>">
         </div>
-        <div>
+        <div id="caisseField" style="display:<?= $showCaisse ? 'block' : 'none' ?>">
           <label>رقم صندوق التعويضات / N° Caisse<?= $optTag ?></label>
-          <input type="text" name="caisse_number" value="<?= e($fv('caisse_number')) ?>">
+          <input type="text" name="caisse_number" value="<?= e($fv('caisse_number')) ?>"<?= $showCaisse ? '' : ' disabled' ?>>
         </div>
       </div>
       <h3>العنوان / Adresse</h3>
@@ -614,13 +641,14 @@ if ($nameSchoolId) {
       <div class="grid">
         <?php foreach ($uploadFields as $field => $lbl):
           // الموظف الإداري: صورة الشهادة غير إلزامية (لا شهادة له).
-          $isReq = in_array($field, $requiredUploads, true) && !($isAdmin && $field === 'diploma_doc');
+          $isDip = ($field === 'diploma_doc');
+          $isReq = in_array($field, $requiredUploads, true) && !($isAdminEff && $isDip);
           $onFile = !$isNew && !empty($emp[$uploadCol[$field]] ?? '');
           $mustUpload = $isReq && !$onFile; ?>
           <div>
-            <label><?= e($lbl) ?><?php if ($isReq): ?> <span style="color:#dc2626;font-weight:700">*</span><?php endif; ?>
+            <label><?= e($lbl) ?><?php if ($isReq): ?> <span<?= $isDip ? ' id="diplomaDocStar"' : '' ?> style="color:#dc2626;font-weight:700">*</span><?php elseif ($isDip): ?> <span id="diplomaDocStar" style="color:#dc2626;font-weight:700;display:none">*</span><?php endif; ?>
               <?php if ($onFile): ?><span style="color:#0a7a37;font-weight:400;font-size:12px">✓ مرفوع مسبقاً / déjà fourni</span><?php endif; ?></label>
-            <input type="file" name="<?= e($field) ?>" accept="image/*,application/pdf"<?= $mustUpload ? ' data-req="1" required' : '' ?>>
+            <input type="file"<?= $isDip ? ' id="diplomaDocInput"' : '' ?> name="<?= e($field) ?>" accept="image/*,application/pdf"<?= $mustUpload ? ' data-req="1" required' : '' ?>>
           </div>
         <?php endforeach; ?>
       </div>
@@ -630,6 +658,29 @@ if ($nameSchoolId) {
   </div>
 </div>
 <script>
+// أستاذ جديد: تبديل الحقول حسب الفئة (متعاقد/ملاك/موظف). الموظف الإداري يرى «نوع الوظيفة»
+// بدل الشهادة/المواد/المرحلة/الصفوف؛ و«رقم صندوق التعويضات» يظهر للملاك فقط. الحقول المخفية
+// تُعطَّل (disabled) فلا تُرسَل ولا تمنع الإرسال بإلزامٍ غير مرئي.
+function tfCat(){
+  var sel = document.getElementById('newCategory'); if(!sel) return;
+  var v = sel.value, isEmp = (v === 'employe'), isTit = (v === 'enseignant_titulaire');
+  function toggle(id, show){
+    var el = document.getElementById(id); if(!el) return;
+    el.style.display = show ? 'block' : 'none';
+    [].forEach.call(el.querySelectorAll('input,select,textarea'), function(c){ c.disabled = !show; });
+  }
+  toggle('adminBlock', isEmp);      // نوع الوظيفة → للموظف الإداري فقط
+  toggle('eduBlock', !isEmp);       // الشهادة/المواد/المرحلة/الصفوف → للمتعاقد والملاك
+  toggle('caisseField', isTit);     // رقم صندوق التعويضات → للملاك فقط
+  // صورة الشهادة: إلزامية للمتعاقد/الملاك، غير إلزامية للموظف الإداري (لا شهادة له)
+  var dip = document.getElementById('diplomaDocInput'), star = document.getElementById('diplomaDocStar');
+  if(dip){
+    if(isEmp){ dip.removeAttribute('required'); dip.removeAttribute('data-req'); }
+    else { dip.setAttribute('required','required'); dip.setAttribute('data-req','1'); }
+  }
+  if(star){ star.style.display = isEmp ? 'none' : ''; }
+}
+tfCat();
 // تنسيق تلقائي لحقول التاريخ اليدوية: يكتب الأستاذ أرقاماً فقط فتُدرَج الشرطات تلقائياً → يوم/شهر/سنة.
 // (بدل روزنامة type=date التي تُجبر على النقر للوصول لسنة الولادة على الهاتف.)
 (function(){
@@ -662,6 +713,7 @@ if ($nameSchoolId) {
   form.addEventListener('submit', function(e){
     if(leaving()) return;
     for(var i=0;i<groups.length;i++){
+      if(groups[i].offsetParent === null) continue; // مجموعة مخفية (فئة أخرى) → تجاهلها
       if(groups[i].querySelectorAll('input[type=checkbox]:checked').length === 0){
         e.preventDefault(); e.stopImmediatePropagation();
         alert(groups[i].getAttribute('data-reqmsg') || 'الرجاء اختيار خيار واحد على الأقل / Sélectionnez au moins une option');
