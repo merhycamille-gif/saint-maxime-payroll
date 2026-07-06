@@ -78,7 +78,7 @@ function viewerBaseScripts() {
         'print_pdf.php',                             // طباعة PDF
         'official_forms.php', 'official_export.php', // النماذج الرسمية (طباعة)
         'settings.php',                              // لتغيير كلمة المرور فقط
-        'switch_year.php', 'switch_lang.php', 'logout.php', // ملاحة
+        'switch_year.php', 'switch_lang.php', 'switch_school.php', 'logout.php', // ملاحة
     ];
 }
 
@@ -127,18 +127,50 @@ function viewerCanSeePage($script) {
     return in_array($script, currentViewerAllowedScripts(), true);
 }
 
-/** تركيب عمود allowed_pages ذاتياً إن لم يكن موجوداً (auto-heal، بلا تدخّل يدوي). */
+/** تركيب أعمدة صلاحيات المدرسة ذاتياً إن لم تكن موجودة (auto-heal، بلا تدخّل يدوي). */
 function ensureUsersPermsColumn() {
     static $done = false;
     if ($done) return;
     $done = true;
     try {
         $db = getDB();
-        $col = $db->query("SHOW COLUMNS FROM users LIKE 'allowed_pages'")->fetch();
-        if (!$col) {
-            $db->exec("ALTER TABLE users ADD COLUMN allowed_pages TEXT NULL");
+        if (!$db->query("SHOW COLUMNS FROM users LIKE 'allowed_pages'")->fetch()) {
+            $db->exec("ALTER TABLE users ADD COLUMN allowed_pages TEXT NULL");   // التقارير المسموحة
+        }
+        if (!$db->query("SHOW COLUMNS FROM users LIKE 'allowed_schools'")->fetch()) {
+            $db->exec("ALTER TABLE users ADD COLUMN allowed_schools TEXT NULL");  // المدارس المسموحة ('all' أو قائمة ids)
         }
     } catch (Exception $e) { /* تجاهل الفشل الصامت */ }
+}
+
+/**
+ * المدارس التي يُسمح لحساب المدرسة (viewer) الحالي برؤيتها.
+ *  - allowed_schools = 'all'  ⇒ كل المدارس (يُحلّ إلى كل الـids الفعّالة).
+ *  - '2,5,7'                  ⇒ المدارس المحددة.
+ *  - NULL/''                  ⇒ مدرسته المفردة (school_id) — توافق خلفي.
+ * يرجع مصفوفة ids (مُحلّاة). تُحسب مرّة وتُخزَّن.
+ */
+function viewerAllowedSchoolIds() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    ensureUsersPermsColumn();
+    $raw = null; $sid = 0;
+    try {
+        $st = getDB()->prepare("SELECT school_id, allowed_schools FROM users WHERE id = ?");
+        $st->execute([(int)($_SESSION['user_id'] ?? 0)]);
+        $r = $st->fetch();
+        if ($r) { $raw = $r['allowed_schools']; $sid = (int)($r['school_id'] ?? 0); }
+    } catch (Exception $e) {}
+
+    if ($raw === 'all') {
+        $cache = array_map(fn($s) => (int)$s['id'], allSchools(false)); // كل المدارس
+    } elseif ($raw !== null && $raw !== '') {
+        $ids = array_filter(array_map('intval', explode(',', $raw)), fn($x) => $x > 0);
+        $cache = array_values(array_unique($ids));
+    } else {
+        $cache = $sid > 0 ? [$sid] : []; // مدرسة مفردة (توافق خلفي)
+    }
+    return $cache;
 }
 
 /**
@@ -209,6 +241,16 @@ function isSuperAdmin() {
  * يدعم اختيار عدة مدارس معاً (واحدة/تنتين/تلاتة/الكل).
  */
 function activeSchoolIds() {
+    // حساب مدرسة (قراءة فقط): نطاقه = المدارس المسموحة له.
+    // إن كان يملك عدة مدارس (أو الكل) يستطيع تصفيتها من المبدّل الأعلى (ضمن المسموح فقط).
+    if (isViewer()) {
+        $allowed = viewerAllowedSchoolIds();
+        if (count($allowed) <= 1) return $allowed;               // مدرسة واحدة (أو لا شيء)
+        $sel = $_SESSION['active_schools'] ?? [];
+        if (!is_array($sel)) $sel = [];
+        $sel = array_values(array_intersect(array_map('intval', $sel), $allowed));
+        return $sel ?: $allowed;                                  // فارغ = كل المسموح
+    }
     if (!isSuperAdmin()) {
         $sid = (int)($_SESSION['school_id'] ?? 0);
         return $sid > 0 ? [$sid] : [];

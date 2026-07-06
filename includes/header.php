@@ -231,8 +231,16 @@ document.addEventListener('submit', function (e) {
                 <h1><?= e($pageTitle) ?></h1>
             </div>
             <div class="topbar-actions">
-                <?php if (isSuperAdmin()): $navSchools = allSchools(); $activeIds = activeSchoolIds();
-                    $selLabel = empty($activeIds) ? ($lang==='ar'?'كل المدارس':'Toutes les écoles')
+                <?php
+                // مبدّل المدارس: للمدير العام (كل المدارس)، ولحساب المدرسة متعدّد المدارس (ضمن مدارسه فقط)
+                $isMultiViewer = isViewer() && count(viewerAllowedSchoolIds()) > 1;
+                if (isSuperAdmin() || $isMultiViewer):
+                    $navSchools = isSuperAdmin()
+                        ? allSchools()
+                        : array_values(array_filter(allSchools(false), fn($s) => in_array((int)$s['id'], viewerAllowedSchoolIds(), true)));
+                    $activeIds = activeSchoolIds();
+                    $isAllSel = $isMultiViewer ? (count($activeIds) === count($navSchools)) : empty($activeIds);
+                    $selLabel = $isAllSel ? ($lang==='ar'?'كل المدارس':'Toutes les écoles')
                               : (count($activeIds)===1 ? schoolNameById($activeIds[0]) : count($activeIds).($lang==='ar'?' مدارس مختارة':' écoles'));
                 ?>
                 <div class="school-switcher school-multi" id="schoolPicker">
@@ -242,7 +250,7 @@ document.addEventListener('submit', function (e) {
                     </button>
                     <div class="school-menu" id="schoolMenu">
                         <form method="get" action="<?= BASE_URL ?>switch_school.php">
-                            <label class="sm-all"><input type="checkbox" id="smAll" <?= empty($activeIds)?'checked':'' ?> onclick="document.querySelectorAll('#schoolMenu input[name=\'schools[]\']').forEach(c=>c.checked=false)"> <strong>🏫 <?= $lang==='ar'?'كل المدارس':'Toutes les écoles' ?></strong></label>
+                            <label class="sm-all"><input type="checkbox" id="smAll" <?= $isAllSel?'checked':'' ?> onclick="document.querySelectorAll('#schoolMenu input[name=\'schools[]\']').forEach(c=>c.checked=false)"> <strong>🏫 <?= $lang==='ar'?'كل المدارس':'Toutes les écoles' ?></strong></label>
                             <div class="sm-list">
                             <?php foreach ($navSchools as $navS): ?>
                                 <label><input type="checkbox" name="schools[]" value="<?= (int)$navS['id'] ?>" <?= in_array((int)$navS['id'],$activeIds,true)?'checked':'' ?> onclick="document.getElementById('smAll').checked=false"> <?= e($lang==='ar'?$navS['name_ar']:$navS['name_fr']) ?></label>

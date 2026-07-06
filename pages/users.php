@@ -41,6 +41,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['flash_error'] = 'Session expirée / انتهت الجلسة';
         header('Location: ' . BASE_URL . 'pages/users.php'); exit;
     }
+
+    // ===== توليد حساب «قراءة فقط» لكل مدرسة + حساب الرئاسة العامة =====
+    if (($_POST['form_action'] ?? '') === 'generate_all') {
+        $created = [];
+        $existing = array_map(fn($u) => $u['username'], $db->query("SELECT username FROM users")->fetchAll());
+        $mkUser = function ($base) use (&$existing) {
+            $base = preg_replace('/[^a-z0-9]/', '', strtolower($base ?: 'ecole'));
+            if ($base === '') $base = 'ecole';
+            $base = substr($base, 0, 18);
+            $u = $base; $i = 1;
+            while (in_array($u, $existing, true)) { $u = $base . $i; $i++; }
+            $existing[] = $u; return $u;
+        };
+        $mkPass = function () {
+            $al = 'abcdefghjkmnpqrstuvwxyz23456789'; $p = ''; // بلا أحرف ملتبسة
+            for ($i = 0; $i < 8; $i++) $p .= $al[random_int(0, strlen($al) - 1)];
+            return $p;
+        };
+        $allPages = implode(',', array_keys(viewerReportPages()));
+        // 1) حساب لكل مدرسة ليس لها حساب قراءة فقط مفرد
+        foreach (allSchools(false) as $s) {
+            $sid = (int)$s['id'];
+            $ex = $db->prepare("SELECT id FROM users WHERE role='viewer' AND school_id = ?");
+            $ex->execute([$sid]);
+            if ($ex->fetch()) continue;
+            $un = $mkUser('ecole' . ($s['code'] ?: $sid)); $pw = $mkPass();
+            $db->prepare("INSERT INTO users (username,password_hash,full_name,role,school_id,is_active,allowed_pages,allowed_schools) VALUES (?,?,?,?,?,1,?,?)")
+               ->execute([$un, password_hash($pw, PASSWORD_DEFAULT), ($s['name_fr'] ?: $s['name_ar']), 'viewer', $sid, $allPages, (string)$sid]);
+            $created[] = ['school' => ($s['name_fr'] ?: $s['name_ar']), 'username' => $un, 'password' => $pw];
+        }
+        // 2) حساب الرئاسة العامة (كل المدارس) إن لم يوجد
+        if (!$db->query("SELECT id FROM users WHERE role='viewer' AND allowed_schools='all'")->fetch()) {
+            $un = $mkUser('presidence'); $pw = $mkPass();
+            $db->prepare("INSERT INTO users (username,password_hash,full_name,role,school_id,is_active,allowed_pages,allowed_schools) VALUES (?,?,?,?,?,1,?,?)")
+               ->execute([$un, password_hash($pw, PASSWORD_DEFAULT), 'Présidence Générale / الرئاسة العامة', 'viewer', null, $allPages, 'all']);
+            $created[] = ['school' => '🏛️ الرئاسة العامة — كل المدارس', 'username' => $un, 'password' => $pw];
+        }
+        if (function_exists('logAudit')) logAudit('generate', 'users', 0, null, count($created) . ' comptes');
+        $_SESSION['generated_creds'] = $created;
+        $_SESSION['flash_success'] = count($created) > 0
+            ? (count($created) . ' حساب أُنشئ. احفظ/اطبع كلمات المرور الآن — لن تظهر مرة ثانية. / Comptes créés, notez les mots de passe.')
+            : 'كل الحسابات موجودة مسبقاً — لا جديد. / Tous les comptes existent déjà.';
+        header('Location: ' . BASE_URL . 'pages/users.php'); exit;
+    }
+
     $id       = (int)($_POST['id'] ?? 0);
     $fullName = trim($_POST['full_name'] ?? '');
     $username = trim($_POST['username'] ?? '');
@@ -50,24 +95,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $isActive = isset($_POST['is_active']) ? 1 : 0;
 
     if (!array_key_exists($role, $ROLES)) $role = 'viewer';
-    // المدير العام يرى كل المدارس ⇒ بلا مدرسة؛ غيره لازم مدرسة محددة
-    $schoolIdDb = ($role === 'superadmin') ? null : ($schoolId > 0 ? $schoolId : null);
-
-    // الصفحات/التقارير المسموحة (فقط لحساب المدرسة viewer) — من الـcheckboxes
-    $allowedPages = null; // null = لا يخصّ هذا الدور (يرى كل شيء أصلاً)
-    if ($role === 'viewer') {
-        $sel = $_POST['allowed'] ?? [];
-        if (!is_array($sel)) $sel = [];
-        $valid = array_keys(viewerReportPages());
-        $sel = array_values(array_intersect($sel, $valid));
-        $allowedPages = implode(',', $sel); // '' = لا شيء مختار (لوحة القيادة فقط)
-    }
 
     $err = '';
-    if ($fullName === '' || $username === '') {
+    $allowedPages = null;   // التقارير المسموحة (viewer فقط)
+    $allowedSchools = null; // المدارس المسموحة (viewer فقط): 'all' أو '2,5' أو مدرسة مفردة
+    $schoolIdDb = null;
+
+    if ($role === 'superadmin') {
+        // المدير العام يرى كل المدارس ⇒ بلا قيود
+        $schoolIdDb = null;
+    } elseif ($role === 'viewer') {
+        // التقارير المسموحة
+        $selP = $_POST['allowed'] ?? []; if (!is_array($selP)) $selP = [];
+        $selP = array_values(array_intersect($selP, array_keys(viewerReportPages())));
+        $allowedPages = implode(',', $selP); // '' = لا شيء (لوحة القيادة فقط)
+        // نطاق المدارس: «كل المدارس» أو قائمة مختارة
+        $validIds = array_map(fn($s) => (int)$s['id'], allSchools(false));
+        if (isset($_POST['schools_all'])) {
+            $allowedSchools = 'all'; $schoolIdDb = null;
+        } else {
+            $vs = $_POST['vschools'] ?? []; if (!is_array($vs)) $vs = [];
+            $vs = array_values(array_unique(array_filter(array_map('intval', $vs), fn($x) => $x > 0 && in_array($x, $validIds, true))));
+            if (empty($vs)) {
+                $err = 'اختر مدرسة واحدة على الأقل أو «كل المدارس» / Choisissez au moins une école';
+            } else {
+                $allowedSchools = implode(',', $vs);
+                $schoolIdDb = (count($vs) === 1) ? $vs[0] : null; // مدرسة مفردة تُخزَّن أيضاً بـschool_id
+            }
+        }
+    } else { // operator / admin: مدرسة مفردة
+        $schoolIdDb = $schoolId > 0 ? $schoolId : null;
+        if (!$schoolIdDb) $err = 'يجب اختيار المدرسة لهذا الحساب / Veuillez choisir l\'école';
+    }
+
+    if ($err) {
+        // يُعالَج بالأسفل
+    } elseif ($fullName === '' || $username === '') {
         $err = 'الاسم واسم الدخول مطلوبان / Nom et identifiant requis';
-    } elseif ($role !== 'superadmin' && !$schoolIdDb) {
-        $err = 'يجب اختيار المدرسة لهذا الحساب / Veuillez choisir l\'école';
     } elseif ($id === 0 && $password === '') {
         $err = 'كلمة المرور مطلوبة للحساب الجديد / Mot de passe requis';
     } elseif ($password !== '' && strlen($password) < 6) {
@@ -98,18 +162,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($password !== '') {
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $db->prepare("UPDATE users SET full_name=?, username=?, password_hash=?, role=?, school_id=?, is_active=?, allowed_pages=? WHERE id=?")
-               ->execute([$fullName, $username, $hash, $role, $schoolIdDb, $isActive, $allowedPages, $id]);
+            $db->prepare("UPDATE users SET full_name=?, username=?, password_hash=?, role=?, school_id=?, is_active=?, allowed_pages=?, allowed_schools=? WHERE id=?")
+               ->execute([$fullName, $username, $hash, $role, $schoolIdDb, $isActive, $allowedPages, $allowedSchools, $id]);
         } else {
-            $db->prepare("UPDATE users SET full_name=?, username=?, role=?, school_id=?, is_active=?, allowed_pages=? WHERE id=?")
-               ->execute([$fullName, $username, $role, $schoolIdDb, $isActive, $allowedPages, $id]);
+            $db->prepare("UPDATE users SET full_name=?, username=?, role=?, school_id=?, is_active=?, allowed_pages=?, allowed_schools=? WHERE id=?")
+               ->execute([$fullName, $username, $role, $schoolIdDb, $isActive, $allowedPages, $allowedSchools, $id]);
         }
         if (function_exists('logAudit')) logAudit('update', 'users', $id, null, $username);
         $_SESSION['flash_success'] = 'تم تحديث الحساب / Compte mis à jour';
     } else {
         $hash = password_hash($password, PASSWORD_DEFAULT);
-        $db->prepare("INSERT INTO users (username, password_hash, full_name, role, school_id, is_active, allowed_pages) VALUES (?,?,?,?,?,?,?)")
-           ->execute([$username, $hash, $fullName, $role, $schoolIdDb, $isActive, $allowedPages]);
+        $db->prepare("INSERT INTO users (username, password_hash, full_name, role, school_id, is_active, allowed_pages, allowed_schools) VALUES (?,?,?,?,?,?,?,?)")
+           ->execute([$username, $hash, $fullName, $role, $schoolIdDb, $isActive, $allowedPages, $allowedSchools]);
         $newId = (int)$db->lastInsertId();
         if (function_exists('logAudit')) logAudit('create', 'users', $newId, null, $username);
         $_SESSION['flash_success'] = 'تمت إضافة الحساب / Compte ajouté';
@@ -175,7 +239,38 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="page-actions no-print">
     <a href="#user-form" class="btn btn-primary"><i class="fas fa-user-plus"></i> <?= $lang==='ar'?'حساب جديد':'Nouveau compte' ?></a>
+    <form method="POST" style="display:inline" data-confirm="<?= $lang==='ar'?'إنشاء حساب «قراءة فقط» لكل مدرسة + حساب الرئاسة العامة؟ (المدارس التي لها حساب تُتجاهَل)':'Créer un compte lecture seule par école + présidence ?' ?>">
+        <input type="hidden" name="csrf" value="<?= csrfToken() ?>">
+        <input type="hidden" name="form_action" value="generate_all">
+        <button type="submit" class="btn btn-success"><i class="fas fa-magic"></i> <?= $lang==='ar'?'توليد حساب لكل المدارس':'Générer les comptes écoles' ?></button>
+    </form>
 </div>
+
+<?php if (!empty($_SESSION['generated_creds'])): $gc = $_SESSION['generated_creds']; unset($_SESSION['generated_creds']); ?>
+<div class="card" style="border:2px solid #16a34a">
+    <div class="card-header" style="background:#f0fdf4"><h3><i class="fas fa-key"></i>
+        <?= $lang==='ar'?'كلمات المرور الجديدة — احفظها/اطبعها الآن (لن تظهر مرة ثانية)':'Nouveaux mots de passe — notez-les maintenant' ?></h3></div>
+    <div class="card-body">
+        <div class="page-actions no-print"><button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> <?= $lang==='ar'?'طباعة':'Imprimer' ?></button></div>
+        <table class="table">
+            <thead><tr>
+                <th><?= $lang==='ar'?'المدرسة':'École' ?></th>
+                <th><?= $lang==='ar'?'اسم الدخول':'Identifiant' ?></th>
+                <th><?= $lang==='ar'?'كلمة المرور':'Mot de passe' ?></th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($gc as $c): ?>
+                <tr>
+                    <td><?= e($c['school']) ?></td>
+                    <td><code style="font-size:15px"><?= e($c['username']) ?></code></td>
+                    <td><code style="font-size:15px;font-weight:700"><?= e($c['password']) ?></code></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="alert alert-info no-print">
     <i class="fas fa-info-circle"></i>
@@ -204,7 +299,23 @@ include __DIR__ . '/../includes/header.php';
                     <td><strong><?= e($u['full_name']) ?></strong><?= $isMe ? ' <span class="badge badge-info">'.($lang==='ar'?'أنت':'vous').'</span>' : '' ?></td>
                     <td><code><?= e($u['username']) ?></code></td>
                     <td><?= e($ROLES[$u['role']] ?? $u['role']) ?></td>
-                    <td><?= $u['school_id'] ? e(schoolNameById((int)$u['school_id'])) : '<span class="text-muted">'.($lang==='ar'?'الكل':'Toutes').'</span>' ?></td>
+                    <td><?php
+                        $as = $u['allowed_schools'] ?? null;
+                        if ($u['role'] === 'superadmin') {
+                            echo '<span class="text-muted">'.($lang==='ar'?'كل المدارس':'Toutes').'</span>';
+                        } elseif ($as === 'all') {
+                            echo '<strong>🏛️ '.($lang==='ar'?'كل المدارس':'Toutes').'</strong>';
+                        } elseif ($as !== null && $as !== '' && strpos($as, ',') !== false) {
+                            $cnt = count(array_filter(explode(',', $as)));
+                            echo '<strong>'.$cnt.'</strong> '.($lang==='ar'?'مدارس':'écoles');
+                        } elseif ($u['school_id']) {
+                            echo e(schoolNameById((int)$u['school_id']));
+                        } elseif ($as !== null && $as !== '') {
+                            echo e(schoolNameById((int)$as));
+                        } else {
+                            echo '<span class="text-muted">—</span>';
+                        }
+                    ?></td>
                     <td>
                         <?php if ($u['is_active']): ?>
                             <span class="badge badge-success"><i class="fas fa-check"></i> <?= $lang==='ar'?'مفعّل':'Actif' ?></span>
@@ -251,16 +362,25 @@ include __DIR__ . '/../includes/header.php';
                     <input type="text" name="username" class="form-control" required autocomplete="off" value="<?= e($editUser['username'] ?? '') ?>">
                 </div>
             </div>
+            <?php
+            $curRole = $editUser['role'] ?? 'viewer';
+            // نطاق مدارس الـviewer عند التعديل: 'all' أو قائمة ids (أو مدرسته المفردة للحسابات القديمة)
+            $vsRaw = $editUser['allowed_schools'] ?? null;
+            $vsAll = ($vsRaw === 'all');
+            $vsIds = ($vsRaw && $vsRaw !== 'all') ? array_map('intval', array_filter(explode(',', $vsRaw))) : [];
+            if (!$vsAll && empty($vsIds) && (int)($editUser['school_id'] ?? 0) > 0) $vsIds = [(int)$editUser['school_id']];
+            $showSingle = in_array($curRole, ['operator','admin'], true);
+            ?>
             <div class="form-row cols-2">
                 <div class="form-group">
                     <label class="form-label"><?= $lang==='ar'?'الدور':'Rôle' ?> *</label>
-                    <select name="role" class="form-control" onchange="document.getElementById('schoolRow').style.display=(this.value==='superadmin')?'none':'';document.getElementById('permsRow').style.display=(this.value==='viewer')?'':'none';">
+                    <select name="role" class="form-control" onchange="var r=this.value;document.getElementById('singleSchoolRow').style.display=(r==='operator'||r==='admin')?'':'none';document.getElementById('viewerSchoolsRow').style.display=(r==='viewer')?'':'none';document.getElementById('permsRow').style.display=(r==='viewer')?'':'none';">
                         <?php foreach ($ROLES as $rk => $rlabel): ?>
-                            <option value="<?= $rk ?>" <?= (($editUser['role'] ?? 'viewer') === $rk) ? 'selected' : '' ?>><?= e($rlabel) ?></option>
+                            <option value="<?= $rk ?>" <?= ($curRole === $rk) ? 'selected' : '' ?>><?= e($rlabel) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group" id="schoolRow" style="<?= (($editUser['role'] ?? 'viewer') === 'superadmin') ? 'display:none' : '' ?>">
+                <div class="form-group" id="singleSchoolRow" style="<?= $showSingle ? '' : 'display:none' ?>">
                     <label class="form-label"><?= $lang==='ar'?'المدرسة':'École' ?></label>
                     <select name="school_id" class="form-control">
                         <option value="0">— <?= $lang==='ar'?'اختر مدرسة':'Choisir une école' ?> —</option>
@@ -273,9 +393,30 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
+            <!-- نطاق المدارس لحساب المدرسة (viewer): كل المدارس أو مدارس محددة -->
+            <div class="form-group" id="viewerSchoolsRow" style="<?= $curRole === 'viewer' ? '' : 'display:none' ?>">
+                <label class="form-label"><i class="fas fa-school"></i>
+                    <?= $lang==='ar'?'أي مدرسة/مدارس يرى هذا الحساب؟':'Quelles écoles voit ce compte ?' ?></label>
+                <div style="padding:12px 14px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
+                    <label class="form-check" style="margin:0 0 8px;font-weight:700">
+                        <input type="checkbox" name="schools_all" value="1" <?= $vsAll ? 'checked' : '' ?>
+                               onclick="document.querySelectorAll('#vsList input').forEach(c=>{c.disabled=this.checked; if(this.checked)c.checked=false;});">
+                        🏛️ <?= $lang==='ar'?'كل المدارس (الرئاسة العامة)':'Toutes les écoles' ?>
+                    </label>
+                    <div id="vsList" style="display:flex;flex-wrap:wrap;gap:14px;max-height:180px;overflow:auto">
+                        <?php foreach ($schools as $s): ?>
+                        <label class="form-check" style="margin:0;white-space:nowrap">
+                            <input type="checkbox" name="vschools[]" value="<?= (int)$s['id'] ?>" <?= in_array((int)$s['id'], $vsIds, true) ? 'checked' : '' ?> <?= $vsAll ? 'disabled' : '' ?>>
+                            <?= e($lang==='ar' ? $s['name_ar'] : $s['name_fr']) ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <small class="text-muted"><?= $lang==='ar'?'اختر «كل المدارس» للرئاسة العامة، أو أشِّر مدرسة/عدة مدارس محددة.':'« Toutes » pour la présidence, ou cochez des écoles précises.' ?></small>
+            </div>
+
             <?php
             // ما الذي تراه هذه المدرسة؟ (checklist) — allowed_pages: null=الكل (افتراضي/قديم)، ''=لا شيء
-            $curRole    = $editUser['role'] ?? 'viewer';
             $rawAllowed = $editUser ? ($editUser['allowed_pages'] ?? null) : null;
             $checkedPages = ($rawAllowed === null)
                 ? array_keys(viewerReportPages())

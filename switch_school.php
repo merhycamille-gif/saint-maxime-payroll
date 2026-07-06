@@ -7,8 +7,11 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
 requireLogin();
 
-if (isSuperAdmin()) {
-    $valid = array_map(fn($s) => (int)$s['id'], allSchools(false)); // كل المدارس الموجودة
+// المدير العام يبدّل بين كل المدارس؛ حساب المدرسة متعدّد المدارس يبدّل ضمن مدارسه المسموحة فقط.
+if (isSuperAdmin() || (isViewer() && count(viewerAllowedSchoolIds()) > 1)) {
+    $valid = isSuperAdmin()
+        ? array_map(fn($s) => (int)$s['id'], allSchools(false)) // كل المدارس
+        : viewerAllowedSchoolIds();                            // مدارس هذا الحساب فقط
 
     if (isset($_GET['schools'])) {
         // اختيار عدة مدارس: schools[]=1&schools[]=2... (فارغ = كل المدارس)
