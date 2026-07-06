@@ -136,6 +136,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="page-actions no-print">
     <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer</button>
     <a href="#school-form" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle école</a>
+    <a href="<?= BASE_URL ?>pages/purge_schools.php" class="btn btn-danger" style="margin-inline-start:auto"><i class="fas fa-trash-alt"></i> <?= ($lang??'fr')==='ar'?'حذف مدرسة نهائياً':'Supprimer définitivement' ?></a>
 </div>
 
 <!-- Liste -->
