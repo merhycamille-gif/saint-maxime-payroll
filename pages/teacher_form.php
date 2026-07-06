@@ -360,8 +360,8 @@ if ($nameSchoolId) {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>تحديث معلومات الأستاذ — Mise à jour des informations de l'enseignant</title>
 <?php
-  // معاينة الرابط على واتساب/الشبكات: عنوان ووصف ثنائيا اللغة يظهران فور وصول الرابط
-  $ogTitle = ($schoolName ? $schoolName . ' — ' : '') . 'تحديث معلومات الأستاذ / Mise à jour des informations';
+  // معاينة الرابط على واتساب/الشبكات: اسم الرابط «MSA Payroll» + وصف ثنائي اللغة يظهران فور وصول الرابط
+  $ogTitle = 'MSA Payroll';
   $ogDesc  = 'رابط رسمي من إدارة المدرسة لتعبئة وتحديث معلوماتك ورفع مستنداتك. / Lien officiel de l\'école pour mettre à jour vos informations et joindre vos documents.';
 ?>
 <meta name="description" content="<?= e($ogDesc) ?>">

@@ -229,7 +229,25 @@ include __DIR__ . '/../includes/header.php';
 
 // رابط الفورم العام (يجب أن يكون المضيف متاحاً للأساتذة — خادم المدرسة/دومين)
 $base = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-$formBase = $base . BASE_URL . 'pages/teacher_form.php';
+// 🔗 الرابط العام للأساتذة يُعرَض باسم مجلّد «msa-payroll» (أقصر وأوضح). يُخدَم عبر مجلّد msa-payroll:
+// محلياً = مجلّد البرنامج نفسه؛ وأونلاين = مجلّد alias يُنشأ ذاتياً مرّة واحدة (تحويل داخلي إلى مجلّد البرنامج).
+// آمن تماماً: إن تعذّر إنشاء الـalias (صلاحيات) يبقى الرابط على المسار الأصلي بلا أي كسر.
+$publicFolder = '/msa-payroll/';
+try {
+    $appDir   = dirname(__DIR__);                 // مجلّد البرنامج (…/saint-maxime-payroll)
+    $appName  = basename($appDir);
+    $parent   = dirname($appDir);                 // جذر الويب (…/public_html)
+    $aliasDir = $parent . '/msa-payroll';
+    $aliasOk  = ($appName === 'msa-payroll') || (is_dir($aliasDir) && is_file($aliasDir . '/.htaccess'));
+    if (!$aliasOk && is_writable($parent)) {
+        if (!is_dir($aliasDir)) @mkdir($aliasDir, 0755);
+        $htc = "RewriteEngine On\n" . 'RewriteRule ^(.*)$ /' . $appName . '/$1 [L,QSA]' . "\n";
+        if (is_dir($aliasDir)) @file_put_contents($aliasDir . '/.htaccess', $htc);
+        $aliasOk = is_dir($aliasDir) && is_file($aliasDir . '/.htaccess');
+    }
+    if (!$aliasOk) $publicFolder = BASE_URL;       // تراجُع آمن بلا كسر
+} catch (Throwable $e) { $publicFolder = BASE_URL; }
+$formBase = $base . $publicFolder . 'pages/teacher_form.php';
 
 // أساتذة المدرسة الحالية للإرسال الفردي — فقط عند اختيار مدرسة واحدة (لا في وضع «كل المدارس»)
 $emps = [];
