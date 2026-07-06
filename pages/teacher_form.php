@@ -44,7 +44,7 @@ function tf_nameMatches($c, $nq, $nqNS) {
  * عبر الفورم فيتصحّح ملفهم تلقائياً. لا يُضعِف الخصوصية: الأستاذ ذو التاريخ الصحيح المخزّن
  * يبقى يحتاج تاريخه الصحيح (ليس ضمن مرشّحي الاحتياط).
  */
-function findTeacherByNameDob($db, $schoolId, $q, $bd) {
+function findTeacherByNameDob($db, $schoolId, $q, $bd, &$multi = null) {
     $nq = tf_norm($q);
     $nqNS = str_replace(' ', '', $nq);
     // الرابط الموحّد لكل المدارس: $schoolId = 0 → بحث عبر كل المدارس (تُكتشف المدرسة من الملف).
@@ -62,7 +62,9 @@ function findTeacherByNameDob($db, $schoolId, $q, $bd) {
         $strong = [];
         foreach ($st->fetchAll() as $c) { if (tf_nameMatches($c, $nq, $nqNS)) $strong[] = $c; }
         if (count($strong) === 1) return $strong[0];
-        if (count($strong) > 1) return null; // غموض (تطابق متعدد) — لا تخمّن
+        // تطابق متعدد بنفس الاسم + **تاريخ الولادة بالضبط** = نفس الشخص يُعلّم بأكثر من مدرسة (تاريخ الولادة
+        // مُميِّز قوي). بدل الرفض، نُرجع اللائحة ليختار الأستاذ مدرسته. (خصوصية محفوظة: أثبت هويته بالاسم+الولادة.)
+        if (count($strong) > 1) { $multi = $strong; return null; }
     }
     // (ب) المسار الاحتياطي: تاريخ ولادة ناقص/وهمي عند الإدارة → بالاسم وحده، ضمن أساتذة هالسنة فقط
     $st2 = $db->prepare("SELECT * FROM employees WHERE is_deleted = 0$schoolClause
@@ -98,7 +100,7 @@ $newMode = $newFlag && $schoolMode && $schoolId > 0;
 $isNew = false;
 
 $emp = null; $needFind = false; $needSchoolSelect = false; $activeSchools = [];
-$findError = ''; $verified = false; $findName = ''; $findDob = '';
+$findError = ''; $verified = false; $findName = ''; $findDob = ''; $schoolChoices = [];
 if ($allMode && $newFlag && $schoolId <= 0) {
     // أستاذ جديد عبر الرابط الموحّد: لا ملف بعد ⇒ لا يمكن كشف مدرسته → يختارها أولاً
     $needSchoolSelect = true;
@@ -116,8 +118,17 @@ if ($allMode && $newFlag && $schoolId <= 0) {
         $findDob  = trim((string)($_GET['bd'] ?? $_POST['bd'] ?? ''));
         if ($findName !== '' && $findDob !== '' && !$formClosed) {
             // $schoolId قد يكون 0 في الرابط الموحّد → بحث عبر كل المدارس، وتُكتشف مدرسة الأستاذ من ملفه
-            $emp = findTeacherByNameDob($db, $schoolId, $findName, $findDob);
+            $multi = null;
+            $emp = findTeacherByNameDob($db, $schoolId, $findName, $findDob, $multi);
             if ($emp) { $empId = (int)$emp['id']; $schoolId = (int)$emp['school_id']; $verified = true; }
+            elseif ($multi) {
+                // نفس الأستاذ في أكثر من مدرسة → اعرض لائحة مدارسه ليختار أيّها يحدّث
+                foreach ($multi as $c) {
+                    $scn = $db->prepare("SELECT COALESCE(NULLIF(name_ar,''),name_fr) FROM schools WHERE id = ?");
+                    $scn->execute([(int)$c['school_id']]);
+                    $schoolChoices[] = ['id' => (int)$c['id'], 'school' => ($scn->fetchColumn() ?: ('مدرسة #' . (int)$c['school_id']))];
+                }
+            }
             else { $needFind = true; $findError = 'ما قدرنا نلاقي ملفك بهالمعلومات. تأكّد من كتابة اسمك وشهرتك وتاريخ ولادتك متل ما هنّي مسجّلين عند الإدارة، أو تواصل مع إدارة المدرسة. / Nous n\'avons pas trouvé votre dossier avec ces informations. Vérifiez votre nom, prénom et date de naissance tels qu\'enregistrés par l\'administration, ou contactez l\'école.'; }
         } else {
             $needFind = true;
@@ -420,6 +431,11 @@ if ($nameSchoolId) {
       </select>
       <button class="btn" type="submit">متابعة / Continuer ➜</button>
     </form>
+  <?php elseif ($schoolChoices): ?>
+    <div class="note">لقينا لك ملفات في <strong>أكثر من مدرسة</strong> (لأنك تُعلّم في أكثر من واحدة). اختر <strong>المدرسة</strong> التي تريد تحديث معلوماتك فيها الآن — وكرّر العملية لكل مدرسة.<br><span dir="ltr">Nous avons trouvé des dossiers dans <strong>plusieurs écoles</strong> (vous enseignez dans plus d'une). Choisissez l'<strong>école</strong> pour laquelle mettre à jour vos informations — répétez pour chaque école.</span></div>
+    <?php foreach ($schoolChoices as $ch): ?>
+      <a href="?emp=<?= (int)$ch['id'] ?>&token=<?= rawurlencode(infoFormToken($ch['id'])) ?>" class="btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:10px;background:#0a6b5e">🏫 <?= e($ch['school']) ?> ➜</a>
+    <?php endforeach; ?>
   <?php elseif ($needFind):
     // رابط «أستاذ جديد» بنفس التوكن والمدرسة + new=1
     $newQs = ($allMode ? 'all=1&' : '') . 'school=' . (int)$schoolId . '&token=' . rawurlencode($token) . '&new=1';
