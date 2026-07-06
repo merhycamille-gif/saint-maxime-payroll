@@ -17,6 +17,8 @@ function requireLogin() {
         header('Location: ' . BASE_URL . 'login.php');
         exit;
     }
+    // قفل مركزي لمستخدمي «قراءة فقط» (يسري على كل الصفحات والمنافذ لأن requireLogin تُستدعى في كلٍّ منها)
+    enforceViewerRestrictions();
 }
 
 function currentUser() {
@@ -31,6 +33,159 @@ function currentUser() {
 
 function isAdmin() {
     return isLoggedIn() && in_array($_SESSION['role'] ?? '', ['admin', 'superadmin']);
+}
+
+// =====================================================
+// صلاحية «قراءة فقط» (حساب مدرسة يشاهد التقارير والإفادات فقط)
+// =====================================================
+
+/** مستخدم بدور viewer = قراءة فقط، لا يعدّل ولا فاصلة. */
+function isViewer() {
+    return isLoggedIn() && ($_SESSION['role'] ?? '') === 'viewer';
+}
+
+/** هل يملك المستخدم صلاحية التعديل؟ (أي دور ما عدا viewer). */
+function canEdit() {
+    return isLoggedIn() && !isViewer();
+}
+
+/**
+ * التقارير/الصفحات التي يستطيع المدير تفعيلها/تعطيلها لكل حساب مدرسة (checklist).
+ * المفتاح = اسم الملف (basename) ؛ القيمة = التسمية بالعربي/الفرنسي.
+ */
+function viewerReportPages() {
+    return [
+        'reports.php'          => ['fr' => 'Rapports',            'ar' => 'التقارير'],
+        'attestations.php'     => ['fr' => 'Attestations',        'ar' => 'إفادات الأساتذة'],
+        'annual_slip.php'      => ['fr' => 'Relevé annuel',       'ar' => 'الكشف السنوي'],
+        'monthly_payroll.php'  => ['fr' => 'Paie mensuelle',      'ar' => 'الراتب الشهري'],
+        'employee_history.php' => ['fr' => 'Dossier enseignant',  'ar' => 'سيرة الأستاذ'],
+    ];
+}
+
+/** منافذ التصدير/الطباعة التابعة لكل صفحة (تُفتح فقط إن كانت الصفحة الأمّ مسموحة). */
+function viewerReportExports() {
+    return [
+        'reports.php'     => ['reports_export.php'],
+        'annual_slip.php' => ['annual_slip_export.php'],
+    ];
+}
+
+/** صفحات البنية التحتية المسموحة دائماً لأي حساب مدرسة (ملاحة/طباعة/كلمة مرور). */
+function viewerBaseScripts() {
+    return [
+        'index.php',                                 // لوحة القيادة (صفحة الوصول)
+        'print_pdf.php',                             // طباعة PDF
+        'official_forms.php', 'official_export.php', // النماذج الرسمية (طباعة)
+        'settings.php',                              // لتغيير كلمة المرور فقط
+        'switch_year.php', 'switch_lang.php', 'logout.php', // ملاحة
+    ];
+}
+
+/**
+ * يبني قائمة الصفحات المسموحة لحساب مدرسة بناءً على اختياره المخزّن (allowed_pages).
+ * - $allowedRaw = null  ⇒ حساب لم يُضبط بعد (قديم) ⇒ كل التقارير (توافق خلفي).
+ * - $allowedRaw = ''    ⇒ لا شيء مختار ⇒ لوحة القيادة فقط.
+ * - '"a.php,b.php"'     ⇒ الصفحات المختارة فقط.
+ */
+function viewerAllowedScriptsForUser($allowedRaw) {
+    $pages = viewerReportPages();
+    $exports = viewerReportExports();
+    if ($allowedRaw === null) {
+        $sel = array_keys($pages); // قديم: اعرض الكل
+    } else {
+        $sel = array_filter(array_map('trim', explode(',', (string)$allowedRaw)));
+    }
+    $allowed = viewerBaseScripts();
+    foreach ($sel as $s) {
+        if (!isset($pages[$s])) continue;         // تجاهل أي قيمة غير معروفة
+        $allowed[] = $s;
+        if (!empty($exports[$s])) $allowed = array_merge($allowed, $exports[$s]);
+    }
+    return array_values(array_unique($allowed));
+}
+
+/** قائمة الصفحات المسموحة للمستخدم (viewer) الحالي — تُحسب مرّة وتُخزَّن. */
+function currentViewerAllowedScripts() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    ensureUsersPermsColumn();
+    $raw = null;
+    try {
+        $st = getDB()->prepare("SELECT allowed_pages FROM users WHERE id = ?");
+        $st->execute([(int)($_SESSION['user_id'] ?? 0)]);
+        $val = $st->fetchColumn();
+        $raw = ($val === false) ? null : $val; // NULL بالقاعدة ⇒ الكل
+    } catch (Exception $e) { $raw = null; }
+    $cache = viewerAllowedScriptsForUser($raw);
+    return $cache;
+}
+
+/** هل يستطيع المستخدم الحالي رؤية هذه الصفحة؟ (غير الـviewer يرى كل شيء). */
+function viewerCanSeePage($script) {
+    if (!isViewer()) return true;
+    return in_array($script, currentViewerAllowedScripts(), true);
+}
+
+/** تركيب عمود allowed_pages ذاتياً إن لم يكن موجوداً (auto-heal، بلا تدخّل يدوي). */
+function ensureUsersPermsColumn() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        $col = $db->query("SHOW COLUMNS FROM users LIKE 'allowed_pages'")->fetch();
+        if (!$col) {
+            $db->exec("ALTER TABLE users ADD COLUMN allowed_pages TEXT NULL");
+        }
+    } catch (Exception $e) { /* تجاهل الفشل الصامت */ }
+}
+
+/**
+ * يطبّق قيود مستخدم «قراءة فقط»:
+ *  (1) إيقاف فوري إن أُوقف الحساب.
+ *  (2) قفل الصفحات حسب صلاحيات هذا الحساب تحديداً (checklist المدير).
+ *  (3) قفل التعديل: يمنع أي كتابة (POST/حذف) عدا تغيير كلمة المرور.
+ * يُستدعى مركزياً من requireLogin() فيسري على كل البرنامج ومنافذ الطباعة/التصدير.
+ * لا يؤثّر إطلاقاً على المدير/المشغّل — ينفّذ شيئاً فقط عندما يكون الدور viewer.
+ */
+function enforceViewerRestrictions() {
+    if (!isViewer()) return; // غير الـviewer: لا شيء يتغيّر
+
+    // (1) إيقاف فوري: إذا أوقف المدير هذا الحساب (is_active=0) يُطرَد حالاً حتى لو كان مسجّل دخول.
+    static $activeChecked = false;
+    if (!$activeChecked) {
+        $activeChecked = true;
+        try {
+            $st = getDB()->prepare("SELECT is_active FROM users WHERE id = ?");
+            $st->execute([(int)($_SESSION['user_id'] ?? 0)]);
+            $row = $st->fetch();
+            if (!$row || (int)$row['is_active'] !== 1) {
+                $_SESSION = [];
+                if (session_id() !== '') @session_destroy();
+                header('Location: ' . BASE_URL . 'login.php');
+                exit;
+            }
+        } catch (Exception $e) { /* تجاهل الفشل الصامت */ }
+    }
+
+    $script = basename($_SERVER['SCRIPT_NAME'] ?? ($_SERVER['PHP_SELF'] ?? ''));
+
+    // (2) قفل الصفحات حسب صلاحيات هذا الحساب
+    if (!in_array($script, currentViewerAllowedScripts(), true)) {
+        $_SESSION['flash_error'] = 'قراءة فقط: لا تملك صلاحية الدخول إلى هذه الصفحة. / Lecture seule : accès non autorisé.';
+        header('Location: ' . BASE_URL . 'index.php');
+        exit;
+    }
+
+    // (3) قفل التعديل — يُسمح فقط بتغيير كلمة المرور من صفحة الإعدادات
+    $isPasswordChange = ($script === 'settings.php' && ($_POST['action'] ?? '') === 'change_password');
+    $isWrite = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') || isset($_GET['delete']);
+    if ($isWrite && !$isPasswordChange) {
+        $_SESSION['flash_error'] = 'قراءة فقط: التعديل غير مسموح. / Lecture seule : modification interdite.';
+        header('Location: ' . BASE_URL . 'index.php');
+        exit;
+    }
 }
 
 // =====================================================
@@ -410,6 +565,9 @@ function exportToolbar($title = 'document', $opts = []) {
     $em = isset($opts['email']) ? htmlspecialchars($opts['email'], ENT_QUOTES) : '';
     $showWa    = $opts['wa']        ?? true;
     $showEmail = $opts['email_btn'] ?? true;
+    // مستخدم «قراءة فقط» (حساب مدرسة): يُسمح له بالتصدير كـ PDF و WhatsApp فقط — لا طباعة مباشرة/Excel/Word/Email
+    $viewerOnly = isViewer();
+    if ($viewerOnly) { $showEmail = false; }
     // النماذج الحكومية الثابتة: نخفي Excel/Word العامّين (يطلعان متل بلوك/صورة) — محلّهما
     // التعبئة من القالب الرسمي (أزرار خاصة بالصفحة) + PDF رسمي. $opts['no_office']=true.
     $noOffice = $opts['no_office'] ?? false;
@@ -427,21 +585,29 @@ function exportToolbar($title = 'document', $opts = []) {
         : '';
     ob_start(); ?>
     <div class="export-toolbar no-print no-export" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+        <?php if (!$viewerOnly): ?>
         <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint()"><i class="fas fa-print"></i> Imprimer / طباعة</button>
+        <?php endif; ?>
         <?php if ($officialPdf): ?>
-        <a class="btn btn-sm btn-danger" href="<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>" title="PDF رسمي طبق الأصل جاهز للدولة"><i class="fas fa-file-pdf"></i> PDF رسمي</a>
+        <a class="btn btn-sm btn-danger" href="<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>" title="PDF رسمي طبق الأصل جاهز للدولة"><i class="fas fa-file-pdf"></i> PDF<?= $viewerOnly ? '' : ' رسمي' ?></a>
         <?php else: ?>
         <button type="button" class="btn btn-sm btn-danger" onclick="ppPdf()" title="اختر: حفظ كـ PDF"><i class="fas fa-file-pdf"></i> PDF</button>
         <?php endif; ?>
-        <?php if ($server): ?>
-        <a class="btn btn-sm btn-success" href="<?= $sv . $sep ?>format=xlsx"><i class="fas fa-file-excel"></i> Excel</a>
-        <a class="btn btn-sm btn-info" href="<?= $sv . $sep ?>format=docx"><i class="fas fa-file-word"></i> Word</a>
-        <?php elseif (!$noOffice): ?>
-        <button type="button" class="btn btn-sm btn-success" onclick="ppExcel('<?= $t ?>')"><i class="fas fa-file-excel"></i> Excel</button>
-        <button type="button" class="btn btn-sm btn-info" onclick="ppWord('<?= $t ?>')"><i class="fas fa-file-word"></i> Word</button>
+        <?php if (!$viewerOnly): ?>
+            <?php if ($server): ?>
+            <a class="btn btn-sm btn-success" href="<?= $sv . $sep ?>format=xlsx"><i class="fas fa-file-excel"></i> Excel</a>
+            <a class="btn btn-sm btn-info" href="<?= $sv . $sep ?>format=docx"><i class="fas fa-file-word"></i> Word</a>
+            <?php elseif (!$noOffice): ?>
+            <button type="button" class="btn btn-sm btn-success" onclick="ppExcel('<?= $t ?>')"><i class="fas fa-file-excel"></i> Excel</button>
+            <button type="button" class="btn btn-sm btn-info" onclick="ppWord('<?= $t ?>')"><i class="fas fa-file-word"></i> Word</button>
+            <?php endif; ?>
         <?php endif; ?>
         <?php if ($showWa): ?>
-        <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $t ?>','<?= $ph ?>')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+            <?php if ($viewerOnly): ?>
+            <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsAppPdf('<?= $t ?>','<?= $ph ?>','<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>')" title="يفتح ملف الـPDF لترفقه + محادثة واتساب"><i class="fab fa-whatsapp"></i> WhatsApp PDF</button>
+            <?php else: ?>
+            <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $t ?>','<?= $ph ?>')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+            <?php endif; ?>
         <?php endif; ?>
         <?php if ($showEmail): ?>
         <button type="button" class="btn btn-sm btn-light" onclick="ppEmail('<?= $t ?>','<?= $em ?>')"><i class="fas fa-envelope"></i> Email</button>

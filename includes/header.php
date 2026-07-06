@@ -52,13 +52,14 @@ document.addEventListener('submit', function (e) {
                 <span>Tableau de bord</span>
             </a>
             
+            <?php if (canEdit()): ?>
             <div class="nav-section">Personnel</div>
-            
+
             <a href="<?= BASE_URL ?>pages/employees.php" class="<?= $currentPage === 'employees' ? 'active' : '' ?>">
                 <i class="fas fa-users"></i>
                 <span>Employés & Enseignants</span>
             </a>
-            
+
             <a href="<?= BASE_URL ?>pages/grades.php" class="<?= $currentPage === 'grades' ? 'active' : '' ?>">
                 <i class="fas fa-layer-group"></i>
                 <span>Échelons & Promotions</span>
@@ -83,28 +84,38 @@ document.addEventListener('submit', function (e) {
                 <i class="fas fa-balance-scale"></i>
                 <span>فحص مطابقة القانون</span>
             </a>
+            <?php endif; ?>
 
             <div class="nav-section">Paie</div>
-            
+
+            <?php if (viewerCanSeePage('monthly_payroll.php')): ?>
             <a href="<?= BASE_URL ?>pages/monthly_payroll.php" class="<?= $currentPage === 'monthly' ? 'active' : '' ?>">
                 <i class="fas fa-money-check-alt"></i>
                 <span>Paie mensuelle</span>
             </a>
-            
+            <?php endif; ?>
+
+            <?php if (viewerCanSeePage('annual_slip.php')): ?>
             <a href="<?= BASE_URL ?>pages/annual_slip.php" class="<?= $currentPage === 'annual' ? 'active' : '' ?>">
                 <i class="fas fa-file-invoice-dollar"></i>
                 <span>Relevé annuel</span>
             </a>
+            <?php endif; ?>
 
+            <?php if (viewerCanSeePage('attestations.php')): ?>
             <a href="<?= BASE_URL ?>pages/attestations.php" class="<?= $currentPage === 'attestations' ? 'active' : '' ?>">
                 <i class="fas fa-file-signature"></i>
                 <span>Attestations / إفادات</span>
             </a>
+            <?php endif; ?>
 
+            <?php if (viewerCanSeePage('employee_history.php')): ?>
             <a href="<?= BASE_URL ?>pages/employee_history.php" class="<?= $currentPage === 'employee_history' ? 'active' : '' ?>">
                 <i class="fas fa-user-clock"></i>
                 <span>Dossier enseignant / سيرة الأستاذ</span>
             </a>
+            <?php endif; ?>
+            <?php if (canEdit()): ?>
             <a href="<?= BASE_URL ?>pages/info_collect.php" class="<?= $currentPage === 'info_collect' ? 'active' : '' ?>">
                 <i class="fab fa-whatsapp"></i>
                 <span>تحديث معلومات الأساتذة / Mise à jour</span>
@@ -117,19 +128,24 @@ document.addEventListener('submit', function (e) {
                 <i class="fas fa-hourglass-half"></i>
                 <span>بلوغ سنّ الـ64 / Retraite 64</span>
             </a>
+            <?php endif; ?>
 
             <div class="nav-section">Rapports</div>
-            
+
+            <?php if (viewerCanSeePage('reports.php')): ?>
             <a href="<?= BASE_URL ?>pages/reports.php" class="<?= $currentPage === 'reports' ? 'active' : '' ?>">
                 <i class="fas fa-chart-bar"></i>
                 <span>Rapports</span>
             </a>
-            
+            <?php endif; ?>
+
+            <?php if (canEdit()): ?>
             <a href="<?= BASE_URL ?>pages/tax_declarations.php" class="<?= $currentPage === 'tax' ? 'active' : '' ?>">
                 <i class="fas fa-file-contract"></i>
                 <span>Déclarations</span>
             </a>
-            
+            <?php endif; ?>
+
             <div class="nav-section">Système</div>
 
             <?php if (isSuperAdmin()): ?>
@@ -139,6 +155,14 @@ document.addEventListener('submit', function (e) {
             </a>
             <?php endif; ?>
 
+            <?php if (isAdmin()): ?>
+            <a href="<?= BASE_URL ?>pages/users.php" class="<?= $currentPage === 'users' ? 'active' : '' ?>">
+                <i class="fas fa-user-shield"></i>
+                <span>Utilisateurs / حسابات المدارس</span>
+            </a>
+            <?php endif; ?>
+
+            <?php if (canEdit()): ?>
             <a href="<?= BASE_URL ?>pages/open_year.php" class="<?= $currentPage === 'open_year' ? 'active' : '' ?>">
                 <i class="fas fa-folder-plus"></i>
                 <span>فتح سنة دراسية / Ouvrir année</span>
@@ -173,6 +197,7 @@ document.addEventListener('submit', function (e) {
                 <i class="fas fa-database"></i>
                 <span>Sauvegarde / نسخة احتياطية</span>
             </a>
+            <?php endif; ?>
 
             <a href="<?= BASE_URL ?>pages/settings.php" class="<?= $currentPage === 'settings' ? 'active' : '' ?>">
                 <i class="fas fa-cog"></i>

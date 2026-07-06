@@ -122,6 +122,16 @@
         window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(txt), '_blank');
     };
 
+    // ===== WhatsApp + PDF (لحسابات المدارس) =====
+    // واتساب عبر الرابط لا يرفق ملفات؛ لذا نفتح ملف الـPDF بتبويب جاهزاً ليُرفَق، ثم نفتح محادثة واتساب.
+    window.ppWhatsAppPdf = function (title, phone, pdfUrl) {
+        // 1) افتح ملف الـPDF أولاً (ضمن ضغطة المستخدم = لا يُحجَب) ليحفظه/يرفقه
+        if (pdfUrl) window.open(pdfUrl, '_blank');
+        else window.print(); // احتياط: لا PDF رسمي → حوار "حفظ كـ PDF"
+        // 2) افتح محادثة واتساب (يسأل عن الرقم ثم يفتح المحادثة)
+        ppWhatsApp(title, phone);
+    };
+
     // ===== طباعة ملف مرفوع (صورة/PDF) عبر إطار مخفي — بلا نوافذ منبثقة =====
     window.ppPrintFile = function (url, isImg) {
         var frame = document.createElement('iframe');

@@ -49,7 +49,9 @@ include __DIR__ . '/includes/header.php';
 <?php if ($home64): ?>
 <div class="d-flex justify-between align-center no-print" style="margin-bottom:8px;flex-wrap:wrap;gap:8px">
     <div style="color:var(--gray-600);font-size:14px"><i class="fas fa-hourglass-half" style="color:#b45309"></i> بلغوا 64 في السنة الدراسية المختارة (<strong><?= e(activeSchoolYear()) ?></strong>).</div>
+    <?php if (canEdit()): ?>
     <a href="<?= BASE_URL ?>pages/retirement_64.php" class="btn btn-sm btn-light"><i class="fas fa-list"></i> عرض كل من بلغوا 64</a>
+    <?php endif; ?>
 </div>
 <?php renderAge64Cards($home64); endif; ?>
 
@@ -120,18 +122,26 @@ include __DIR__ . '/includes/header.php';
         </div>
         <div class="card-body">
             <div class="d-flex gap-3" style="flex-direction:column">
+                <?php if (canEdit()): ?>
                 <a href="<?= BASE_URL ?>pages/employees.php?action=new" class="btn btn-primary">
                     <i class="fas fa-user-plus"></i> Ajouter un employé
                 </a>
+                <?php endif; ?>
+                <?php if (viewerCanSeePage('monthly_payroll.php')): ?>
                 <a href="<?= BASE_URL ?>pages/monthly_payroll.php" class="btn btn-gold">
                     <i class="fas fa-calculator"></i> Calculer la paie mensuelle
                 </a>
+                <?php endif; ?>
+                <?php if (viewerCanSeePage('annual_slip.php')): ?>
                 <a href="<?= BASE_URL ?>pages/annual_slip.php" class="btn btn-light">
                     <i class="fas fa-file-invoice"></i> Voir relevé annuel
                 </a>
+                <?php endif; ?>
+                <?php if (canEdit()): ?>
                 <a href="<?= BASE_URL ?>pages/exchange_rates.php" class="btn btn-light">
                     <i class="fas fa-coins"></i> Gérer les taux de change
                 </a>
+                <?php endif; ?>
             </div>
         </div>
     </div>

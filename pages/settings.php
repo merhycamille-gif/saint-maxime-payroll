@@ -10,6 +10,39 @@ $pageTitle = 'Paramètres';
 $db = getDB();
 $message = ''; $messageType = 'success';
 
+// ===== تغيير كلمة المرور للمستخدم الحالي =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'change_password') {
+    $current = $_POST['current_password'] ?? '';
+    $new     = $_POST['new_password'] ?? '';
+    $confirm = $_POST['confirm_password'] ?? '';
+
+    $uid = (int)($_SESSION['user_id'] ?? 0);
+    $stmt = $db->prepare("SELECT password_hash FROM users WHERE id = ?");
+    $stmt->execute([$uid]);
+    $row = $stmt->fetch();
+
+    $err = '';
+    if (!$row) {
+        $err = 'Utilisateur introuvable / المستخدم غير موجود';
+    } elseif (!password_verify($current, $row['password_hash'])) {
+        $err = 'Mot de passe actuel incorrect / كلمة المرور الحالية غير صحيحة';
+    } elseif (strlen($new) < 6) {
+        $err = 'Le nouveau mot de passe doit comporter au moins 6 caractères / كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل';
+    } elseif ($new !== $confirm) {
+        $err = 'La confirmation ne correspond pas / تأكيد كلمة المرور غير مطابق';
+    }
+
+    if ($err) {
+        $_SESSION['flash'] = ['type' => 'danger', 'msg' => $err];
+    } else {
+        $newHash = password_hash($new, PASSWORD_DEFAULT);
+        $db->prepare("UPDATE users SET password_hash = ? WHERE id = ?")->execute([$newHash, $uid]);
+        $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Mot de passe modifié avec succès / تم تغيير كلمة المرور بنجاح'];
+    }
+    header('Location: ' . BASE_URL . 'pages/settings.php');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $oldRate = getSetting('current_exchange_rate'); // لرصد تغيّر سعر الصرف الافتراضي
     foreach ($_POST as $k => $v) {
@@ -37,6 +70,7 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if ($message): ?><div class="alert alert-<?= $messageType ?>"><?= e($message) ?></div><?php endif; ?>
 
+<?php if (canEdit()): ?>
 <div class="card">
     <div class="card-header"><h3><i class="fas fa-school"></i> Informations des écoles</h3></div>
     <div class="card-body">
@@ -102,6 +136,41 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+    </div>
+</div>
+
+<?php endif; /* canEdit — نهاية البطاقات القابلة للتعديل */ ?>
+
+<div class="card">
+    <div class="card-header"><h3><i class="fas fa-key"></i> Mot de passe / كلمة المرور</h3></div>
+    <div class="card-body">
+        <p class="text-muted" style="margin-bottom:16px;">
+            <?= $lang==='ar'
+                ? 'تغيير كلمة المرور للمستخدم الحالي: '.e($_SESSION['username'] ?? '')
+                : 'Changer le mot de passe de l\'utilisateur actuel : '.e($_SESSION['username'] ?? '') ?>
+        </p>
+        <form method="POST" autocomplete="off">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" value="change_password">
+            <div class="form-group">
+                <label class="form-label">Mot de passe actuel / كلمة المرور الحالية</label>
+                <input type="password" name="current_password" class="form-control" required autocomplete="current-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nouveau mot de passe / كلمة المرور الجديدة</label>
+                <input type="password" name="new_password" class="form-control" required minlength="6" autocomplete="new-password">
+                <small class="text-muted"><?= $lang==='ar'?'6 أحرف على الأقل.':'6 caractères minimum.' ?></small>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Confirmer le nouveau mot de passe / تأكيد كلمة المرور الجديدة</label>
+                <input type="password" name="confirm_password" class="form-control" required minlength="6" autocomplete="new-password">
+            </div>
+            <div class="d-flex justify-end">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-key"></i> <?= $lang==='ar'?'تغيير كلمة المرور':'Changer le mot de passe' ?>
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
