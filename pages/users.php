@@ -278,8 +278,11 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-header" style="background:#f0fdf4"><h3><i class="fas fa-key"></i>
         <?= $lang==='ar'?'كلمات المرور الجديدة — احفظها/اطبعها الآن (لن تظهر مرة ثانية)':'Nouveaux mots de passe — notez-les maintenant' ?></h3></div>
     <div class="card-body">
-        <div class="page-actions no-print"><button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> <?= $lang==='ar'?'طباعة':'Imprimer' ?></button></div>
-        <table class="table">
+        <div class="page-actions no-print">
+            <button onclick="dlCreds()" class="btn btn-success btn-lg"><i class="fas fa-file-excel"></i> <?= $lang==='ar'?'⬇️ تنزيل كملف Excel':'Télécharger (Excel)' ?></button>
+            <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> <?= $lang==='ar'?'طباعة':'Imprimer' ?></button>
+        </div>
+        <table class="table" id="credsTable">
             <thead><tr>
                 <th><?= $lang==='ar'?'المدرسة':'École' ?></th>
                 <th><?= $lang==='ar'?'اسم الدخول':'Identifiant' ?></th>
@@ -295,6 +298,17 @@ include __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
+        <script>
+        function dlCreds(){
+            var html='<html><head><meta charset="utf-8"></head><body><table border="1">'
+                + document.getElementById('credsTable').innerHTML + '</table></body></html>';
+            var blob=new Blob(['﻿'+html],{type:'application/vnd.ms-excel'});
+            var a=document.createElement('a');
+            a.href=URL.createObjectURL(blob);
+            a.download='mots_de_passe_ecoles_<?= date('Y-m-d') ?>.xls';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+        </script>
     </div>
 </div>
 <?php endif; ?>
