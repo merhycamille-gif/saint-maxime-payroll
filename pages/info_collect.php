@@ -253,7 +253,11 @@ if (!empty($_SERVER['HTTP_HOST']) && stripos($_SERVER['HTTP_HOST'], 'msapayroll.
     if (!$aliasOk) $publicFolder = BASE_URL;       // تراجُع آمن بلا كسر
   } catch (Throwable $e) { $publicFolder = BASE_URL; }
 }
-$formBase = $base . $publicFolder . 'pages/teacher_form.php';
+// 🌐 رابط الأساتذة العام يُعرَض دائماً باسم الدومين الرسمي msapayroll.com — مهما كان
+// الدومين الذي يتصفّح منه الأدمن — ليصل الأساتذةَ رابطٌ نظيف مُوحَّد بالعلامة نفسها.
+// (الروابط القديمة على maximos-rawatib.com/msa-payroll/ تبقى شغّالة لمن استلمها سابقاً.)
+$formBase = 'https://msapayroll.com/pages/teacher_form.php';
+// (يبقى $base/$publicFolder أعلاه للحفاظ على الشفاء الذاتي لمجلّد alias القديم.)
 
 // أساتذة المدرسة الحالية للإرسال الفردي — فقط عند اختيار مدرسة واحدة (لا في وضع «كل المدارس»)
 $emps = [];
