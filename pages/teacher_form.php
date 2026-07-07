@@ -181,7 +181,7 @@ $textFields = [
     'last_name_ar' => 'الشهرة (عربي) / Nom (arabe)', 'last_name_fr' => 'الشهرة (فرنسي) / Nom (FR)',
     'mother_first_name' => 'اسم الأم / Prénom de la mère', 'mother_last_name' => 'شهرة الأم / Nom de la mère',
     'birth_date' => 'تاريخ الولادة / Date de naissance', 'birth_place' => 'محل الولادة / Lieu de naissance',
-    'nationality' => 'الجنسية / Nationalité', 'number_of_children' => 'عدد الأولاد / Nombre d\'enfants',
+    'nationality' => 'الجنسية / Nationalité', 'number_of_children' => 'عدد الأولاد دون 18 سنة / Nombre d\'enfants de moins de 18 ans',
     'phone1' => 'هاتف 1 / Téléphone 1', 'phone2' => 'هاتف 2 / Téléphone 2', 'email' => 'البريد الإلكتروني / E-mail',
     'gouvernorat' => 'المحافظة / Gouvernorat', 'district' => 'القضاء / District', 'ville' => 'البلدة / Ville',
     'quartier' => 'الحي / Quartier', 'rue' => 'الشارع / Rue', 'immeuble' => 'المبنى / Immeuble', 'etage' => 'الطابق / Étage',
