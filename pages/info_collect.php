@@ -233,7 +233,12 @@ $base = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'ht
 // محلياً = مجلّد البرنامج نفسه؛ وأونلاين = مجلّد alias يُنشأ ذاتياً مرّة واحدة (تحويل داخلي إلى مجلّد البرنامج).
 // آمن تماماً: إن تعذّر إنشاء الـalias (صلاحيات) يبقى الرابط على المسار الأصلي بلا أي كسر.
 $publicFolder = '/msa-payroll/';
-try {
+if (!empty($_SERVER['HTTP_HOST']) && stripos($_SERVER['HTTP_HOST'], 'msapayroll.com') !== false) {
+    // 🌐 الدومين المستقلّ msapayroll.com: مجلّد البرنامج هو جذر الموقع نفسه،
+    // فالرابط يظهر باسم الدومين فقط بلا أي مجلّد (BASE_URL تساوي '/' على هذا المضيف).
+    $publicFolder = BASE_URL;
+} else {
+  try {
     $appDir   = dirname(__DIR__);                 // مجلّد البرنامج (…/saint-maxime-payroll)
     $appName  = basename($appDir);
     $parent   = dirname($appDir);                 // جذر الويب (…/public_html)
@@ -246,7 +251,8 @@ try {
         $aliasOk = is_dir($aliasDir) && is_file($aliasDir . '/.htaccess');
     }
     if (!$aliasOk) $publicFolder = BASE_URL;       // تراجُع آمن بلا كسر
-} catch (Throwable $e) { $publicFolder = BASE_URL; }
+  } catch (Throwable $e) { $publicFolder = BASE_URL; }
+}
 $formBase = $base . $publicFolder . 'pages/teacher_form.php';
 
 // أساتذة المدرسة الحالية للإرسال الفردي — فقط عند اختيار مدرسة واحدة (لا في وضع «كل المدارس»)
