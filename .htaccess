@@ -4,3 +4,17 @@ php_value post_max_size 1024M
 php_value max_execution_time 600
 php_value max_input_time 600
 php_value memory_limit 512M
+
+# ─────────────────────────────────────────────────────────────────────
+# دعم الدومين المستقل msapayroll.com (add-on domain: جذرُه = مجلّد البرنامج نفسه)
+# على هذا الدومين صار البرنامج جذر الموقع، لكن الروابط الداخلية ما زالت
+# تحمل بادئة المجلّد القديم (BASE_URL=/saint-maxime-payroll/) أو مسار الأساتذة
+# (/msa-payroll/). نُزيل هاتين البادئتين داخلياً فقط على هذا الدومين ليُخدَم
+# الملف الصحيح من الجذر. محميّ بشرط المضيف → لا يمسّ maximos-rawatib.com إطلاقاً.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteCond %{HTTP_HOST} ^(www\.)?msapayroll\.com$ [NC]
+RewriteRule ^saint-maxime-payroll/(.*)$ $1 [L]
+RewriteCond %{HTTP_HOST} ^(www\.)?msapayroll\.com$ [NC]
+RewriteRule ^msa-payroll/(.*)$ $1 [L]
+</IfModule>
