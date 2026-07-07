@@ -35,6 +35,23 @@ $uploadCols = ['photo_path','id_document_path','family_doc_path','diploma_doc_pa
 $intFields = ['number_of_children','days_per_week','tax_subject'];
 $floatFields = ['hours_per_week'];
 
+// الحالة الاجتماعية: الفورم العام يرسل مبسّطاً 'celibataire'(أعزب) أو 'marie'(متزوج)؛
+// نحوّلها إلى قيمة متوافقة مع قائمة لوحة الأدمن حسب عدد الأولاد (marie_sans_enfants / marie_N_enfants).
+// (تُبقى القيم الكاملة كما هي إن وردت مسبقاً.) تُعيد null عند قيمة غير معروفة → لا تُكتب.
+function tfMapSocialStatus($choice, $children) {
+    $choice = trim((string)$choice);
+    $known = ['celibataire','marie_sans_enfants','marie_1_enfant','marie_2_enfants','marie_3_enfants','marie_4_enfants','marie_5_enfants'];
+    if (in_array($choice, $known, true)) return $choice;
+    if (stripos($choice, 'celib') !== false) return 'celibataire';
+    if (stripos($choice, 'mari') !== false) {
+        $n = (int)$children;
+        if ($n <= 0) return 'marie_sans_enfants';
+        $n = min($n, 5);
+        return $n === 1 ? 'marie_1_enfant' : 'marie_' . $n . '_enfants';
+    }
+    return null;
+}
+
 // دالة موحّدة: تطبّق طلباً واحداً على ملف الأستاذ (يُفترض التحقّق من نطاق المدرسة قبلها)
 // تُرجع رسالة تحذير إن تعذّر تطبيق تغيير الشهادة لأستاذ ملاك (يُعدَّل من ملف الأستاذ ليُعاد بناء الدرجات).
 function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
@@ -49,6 +66,11 @@ function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
             elseif (in_array($f, $floatFields, true)) $vals[] = (float)$data[$f];
             else $vals[] = $data[$f];
         }
+    }
+    // الحالة الاجتماعية (أعزب/متزوج): تُحوَّل لقيمة متوافقة مع لوحة الأدمن حسب عدد الأولاد المُرسَل
+    if (array_key_exists('social_status', $data) && $data['social_status'] !== '') {
+        $ss = tfMapSocialStatus($data['social_status'], $data['number_of_children'] ?? 0);
+        if ($ss !== null) { $set[] = "social_status = ?"; $vals[] = $ss; }
     }
     // الشهادة: تطبَّق مباشرةً للمتعاقد/الموظف (لا أثر على الراتب). أمّا الملاك فتغييرها يُعيد بناء الدرجات
     // (قاعدة حرجة) → لا تُطبَّق آلياً من هنا؛ يُنبَّه المدير ليعدّلها من ملف الأستاذ.
@@ -175,6 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         if (array_key_exists('tax_subject', $data)) $emp['tax_subject'] = ((string)$data['tax_subject'] === '0') ? 0 : 1;
         if (($data['birth_date'] ?? '') !== '') $emp['birth_date'] = $data['birth_date'];
         if (($data['number_of_children'] ?? '') !== '') $emp['number_of_children'] = (int)$data['number_of_children'];
+        if (($data['social_status'] ?? '') !== '') { $ssNew = tfMapSocialStatus($data['social_status'], $data['number_of_children'] ?? 0); if ($ssNew !== null) $emp['social_status'] = $ssNew; }
         if (($data['days_per_week'] ?? '') !== '') $emp['days_per_week'] = (int)$data['days_per_week'];
         if (($data['hours_per_week'] ?? '') !== '') $emp['hours_per_week'] = (float)$data['hours_per_week'];
         foreach ($uploadCols as $c) { if (!empty($sub[$c])) $emp[$c] = $sub[$c]; }
@@ -286,7 +309,7 @@ $infoIntro = "حضرة الأساتذة المحترمين،\nيرجى تعبئ�
 
 $labels = ['first_name_ar'=>'الاسم','first_name_fr'=>'Prénom','last_name_ar'=>'الشهرة','last_name_fr'=>'Nom',
     'mother_first_name'=>'اسم الأم','mother_last_name'=>'شهرة الأم','birth_date'=>'تاريخ الولادة','birth_place'=>'محل الولادة',
-    'nationality'=>'الجنسية','number_of_children'=>'عدد الأولاد','phone1'=>'هاتف 1','phone2'=>'هاتف 2','email'=>'إيميل',
+    'nationality'=>'الجنسية','social_status'=>'الحالة الاجتماعية','number_of_children'=>'عدد الأولاد','phone1'=>'هاتف 1','phone2'=>'هاتف 2','email'=>'إيميل',
     'employee_type'=>'الفئة','entry_school_year'=>'سنة الدخول','diploma'=>'الشهادة','job_title'=>'نوع الوظيفة','subjects_taught'=>'المواد','niveau_scolaire'=>'المرحلة','classes_taught'=>'الصفوف','hours_per_week'=>'الساعات/أسبوع','days_per_week'=>'أيام الحضور',
     'nssf_number'=>'رقم الضمان','finance_ministry_number'=>'رقم المالية','caisse_number'=>'رقم الصندوق',
     'gouvernorat'=>'محافظة','district'=>'قضاء','ville'=>'بلدة','quartier'=>'حي','rue'=>'شارع','immeuble'=>'مبنى','etage'=>'طابق',

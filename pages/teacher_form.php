@@ -209,7 +209,7 @@ $uploadCol = ['photo' => 'photo_path', 'id_document' => 'id_document_path', 'fam
 $requiredUploads = ['id_document', 'family_doc', 'diploma_doc'];
 
 // 🔴 الحقول غير الإلزامية (كل ما عداها إلزامي). التعديل من هنا فقط.
-$optionalFields = ['email', 'phone2', 'nssf_number', 'finance_ministry_number', 'caisse_number', 'leave_date', 'photo'];
+$optionalFields = ['email', 'phone2', 'nssf_number', 'finance_ministry_number', 'caisse_number', 'leave_date', 'photo', 'number_of_children'];
 $tfReq = function ($k) use ($optionalFields) { return !in_array($k, $optionalFields, true); };
 // قيمة الحقل عند إعادة العرض بعد خطأ: يُفضَّل ما أدخله الأستاذ (POST) ثم قيمة ملفه
 $fv = function ($k) use ($emp) { return isset($_POST[$k]) ? (string)$_POST[$k] : (string)($emp[$k] ?? ''); };
@@ -225,6 +225,9 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     // اجمع الحقول النصية
     $data = [];
     foreach ($textFields as $k => $_) { $data[$k] = trim((string)($_POST[$k] ?? '')); }
+    // الحالة الاجتماعية (أعزب/متزوج) — مبسّطة؛ تُحوَّل عند الاعتماد لقيمة الأدمن حسب عدد الأولاد
+    $ssChoice = (string)($_POST['social_status'] ?? '');
+    $data['social_status'] = in_array($ssChoice, ['celibataire', 'marie'], true) ? $ssChoice : '';
     // تاريخ الولادة مكتوب يدوياً (يوم/شهر/سنة) → طبّعه إلى Y-m-d قبل الحفظ
     if (isset($data['birth_date']) && $data['birth_date'] !== '') {
         $data['birth_date'] = parseFlexibleDate($data['birth_date']) ?? $data['birth_date'];
@@ -326,6 +329,8 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
         foreach ($reqLabels as $k => $lbl) {
             if (trim((string)($data[$k] ?? '')) === '') $missingFields[] = $lbl;
         }
+        // الحالة الاجتماعية إلزامية (أعزب/متزوج)
+        if (($data['social_status'] ?? '') === '') $missingFields[] = 'الحالة الاجتماعية / État civil';
     }
     if ($missingFields || $missingDocs) {
         $all = array_merge($missingFields, $missingDocs);
@@ -511,6 +516,18 @@ if ($nameSchoolId) {
       <div class="grid">
         <?php foreach ($textFields as $k => $lbl): if (in_array($k, ['gouvernorat','district','ville','quartier','rue','immeuble','etage'])) continue;
           $req = $tfReq($k); ?>
+          <?php if ($k === 'number_of_children'):
+            $ssCur = (string)$fv('social_status');
+            $ssSel = (stripos($ssCur, 'mari') !== false) ? 'marie' : ((stripos($ssCur, 'celib') !== false) ? 'celibataire' : ''); ?>
+          <div>
+            <label>الحالة الاجتماعية / État civil<?= $reqStar ?></label>
+            <select name="social_status" required data-req="1" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px">
+              <option value="">— اختر / Choisir —</option>
+              <option value="celibataire" <?= $ssSel === 'celibataire' ? 'selected' : '' ?>>أعزب / Célibataire</option>
+              <option value="marie" <?= $ssSel === 'marie' ? 'selected' : '' ?>>متزوج / Marié(e)</option>
+            </select>
+          </div>
+          <?php endif; ?>
           <div>
             <label><?= e($lbl) ?><?= $req ? $reqStar : $optTag ?></label>
             <?php if ($k === 'birth_date'): ?>
