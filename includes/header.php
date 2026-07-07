@@ -4,7 +4,7 @@ require_once __DIR__ . '/functions.php';
 requireLogin();
 
 $currentPage = $currentPage ?? '';
-$pageTitle = $pageTitle ?? 'رواتب المدارس';
+$pageTitle = $pageTitle ?? 'MSA Payroll';
 $lang = $_SESSION['lang'] ?? 'fr';
 ?>
 <!DOCTYPE html>
@@ -42,8 +42,8 @@ document.addEventListener('submit', function (e) {
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <h2><?= e(currentSchoolName()) ?></h2>
-            <p>SALAIRES DES ÉCOLES / رواتب المدارس</p>
+            <h2>MSA Payroll</h2>
+            <p><?= e(currentSchoolName()) ?></p>
         </div>
         
         <nav class="sidebar-nav">

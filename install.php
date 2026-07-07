@@ -49,7 +49,7 @@ try {
     <div class="login-box">
         <div class="login-header">
             <h1>Installation</h1>
-            <p>SALAIRES DES ÉCOLES / رواتب المدارس</p>
+            <p>MSA Payroll</p>
         </div>
         <div class="login-body">
             <?php foreach ($messages as $msg): ?>
