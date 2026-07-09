@@ -4,3 +4,4 @@ deployment:
     - export DEPLOYPATH=/home/maxidbvb/public_html/saint-maxime-payroll
     - /bin/cp -R ./* "$DEPLOYPATH/"
     - /bin/cp -f ./.htaccess "$DEPLOYPATH/"
+    - /bin/rm -f "$DEPLOYPATH/pages/_sync_docs_pull.php"
