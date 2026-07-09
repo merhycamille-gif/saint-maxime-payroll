@@ -178,11 +178,21 @@ if ($report === 'monthly_summary') {
                            ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym") as $b) {
         $baseMap[(int)$b['employee_id']] = (float)$b['base_plus_echelon_lbp'];
     }
+    // مَن أرسل تحديثاً لملفّه عبر الرابط الموحّد + تاريخ آخر إرسال (لعمود التصدير)
+    $submitMap = [];
+    try {
+        foreach ($db->query("SELECT employee_id, MAX(submitted_at) last_sub FROM info_submissions WHERE employee_id IS NOT NULL GROUP BY employee_id") as $s) {
+            $submitMap[(int)$s['employee_id']] = $s['last_sub'];
+        }
+    } catch (Exception $e) { /* الجدول غير موجود → الكل «لم يُرسل» */ }
     $cols = [
         'code' => ['Code', fn($r) => $r['employee_code']],
         'name' => ['الاسم', fn($r) => trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) ?: trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])],
         'type' => ['الفئة', fn($r) => employeeTypeLabel($r['employee_type'])],
         'diploma' => ['الشهادة', fn($r) => $r['employee_type'] === 'employe' ? jobTitleLabel($r['job_title'] ?? '') : diplomaLabel($r['diploma'])],
+        'diploma_img' => ['صورة الشهادة', fn($r) => !empty($r['diploma_doc_path']) ? (BASE_URL . $r['diploma_doc_path']) : '—'],
+        'civil_img' => ['صورة إخراج القيد', fn($r) => !empty($r['id_document_path']) ? (BASE_URL . $r['id_document_path']) : '—'],
+        'submit_status' => ['تحديث الملف', fn($r) => isset($submitMap[(int)$r['id']]) ? ('أرسل — ' . formatDate(substr((string)$submitMap[(int)$r['id']],0,10))) : 'لم يُرسل'],
         'grade' => ['الدرجة', fn($r) => gradeDisplay($r)],
         'salary' => ['الراتب', fn($r) => $r['employee_type'] === 'employe'
                         ? (int)($baseMap[(int)$r['id']] ?? 0)

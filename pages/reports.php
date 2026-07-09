@@ -70,6 +70,20 @@ function reportSchoolPicker() {
     </div>
     <?php
 }
+
+/**
+ * صورة/مستند مصغّر داخل لائحة الموظفين (صورة الشهادة / صورة إخراج القيد).
+ * صورة → مصغّرة قابلة للنقر تفتح الأصل كاملاً؛ PDF → زر فتح؛ لا ملف → «—».
+ */
+function reportDocThumb($path) {
+    if (empty($path)) return '<span class="text-muted">—</span>';
+    $url = BASE_URL . e($path);
+    if (preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $path)) {
+        return '<a href="' . $url . '" target="_blank" title="فتح كامل / Ouvrir">'
+             . '<img src="' . $url . '" class="doc-thumb-cell" style="max-height:80px;max-width:120px;border:1px solid #ccc;border-radius:4px;object-fit:cover"></a>';
+    }
+    return '<a href="' . $url . '" target="_blank" class="btn btn-sm btn-info"><i class="fas fa-file-pdf"></i> PDF</a>';
+}
 ?>
 
 <?php if (!$report):
@@ -488,6 +502,18 @@ function reportSchoolPicker() {
                                ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym") as $b) {
             $bonusMap[(int)$b['employee_id']] = $b;
         }
+        // مَن أرسل تحديثاً لملفّه عبر الرابط الموحّد (أي حالة) + تاريخ آخر إرسال — لعمود «حالة تحديث الملف»
+        $submitMap = [];
+        try {
+            foreach ($db->query("SELECT employee_id, MAX(submitted_at) last_sub, COUNT(*) n FROM info_submissions WHERE employee_id IS NOT NULL GROUP BY employee_id") as $s) {
+                $submitMap[(int)$s['employee_id']] = ['last' => $s['last_sub'], 'n' => (int)$s['n']];
+            }
+        } catch (Exception $e) { /* جدول الطلبات غير موجود بعد → الكل «لم يُرسل» */ }
+        $submitStatusCell = function($r) use ($submitMap) {
+            $s = $submitMap[(int)$r['id']] ?? null;
+            if ($s) return '<span style="color:#15803d;font-weight:700"><i class="fas fa-circle-check"></i> أرسل</span><br><small style="color:#555">'.e(formatDate(substr((string)$s['last'],0,10))).'</small>';
+            return '<span style="color:#b91c1c;font-weight:700"><i class="fas fa-circle-xmark"></i> لم يُرسل</span>';
+        };
         // الأعمدة المتاحة: key => [label, دالة العرض]
         $availCols = [
             'code'    => ['Code', fn($r) => '<strong>'.e($r['employee_code']).'</strong>'],
@@ -495,6 +521,9 @@ function reportSchoolPicker() {
             'name_ar' => ['الاسم بالعربي', fn($r) => e(trim($r['first_name_ar'].' '.$r['last_name_ar']))],
             'type'    => ['الفئة / Type', fn($r) => employeeTypeLabel($r['employee_type'])],
             'diploma' => ['الشهادة / Diplôme', fn($r) => diplomaLabel($r['diploma'])],
+            'diploma_img' => ['صورة الشهادة / Copie du diplôme', fn($r) => reportDocThumb($r['diploma_doc_path'] ?? '')],
+            'civil_img'   => ['صورة إخراج القيد / Extrait d\'état civil', fn($r) => reportDocThumb($r['id_document_path'] ?? '')],
+            'submit_status' => ['تحديث الملف / Mise à jour', $submitStatusCell],
             'grade'   => ['الدرجة / Échelon', fn($r) => gradeDisplay($r)],
             // الأستاذ: راتب السلسلة حسب درجته. الموظف الإداري: راتبه الفعلي المتّفق عليه (لا سلسلة رتب — قانون العمل).
             'salary'  => ['الراتب (قانون) / Salaire', fn($r) => $r['employee_type'] === 'employe'

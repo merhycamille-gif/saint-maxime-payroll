@@ -78,6 +78,188 @@ $sigPhone  = $sig['phone'] ?? '';
 
 include __DIR__ . '/../includes/header.php';
 
+// ====== ملف الأستاذ الكامل / Dossier: كل شي عن الأستاذ بمكان واحد ======
+// (صور المستندات: الشهادة/التذكرة/العائلي/الصورة + ر6 + بطاقة الراتب السنوية + سيرة الأستاذ + كل الإفادات)
+if ($emp && !empty($_GET['dossier'])):
+    $dNameAr = trim($emp['first_name_ar'].' '.$emp['last_name_ar']);
+    $dNameFr = trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
+    $dTitle  = $dNameAr ?: $dNameFr;
+    // بطاقة مستند: صورة مصغّرة + فتح + طباعة، أو PDF، أو «لا يوجد»
+    $docCard = function($path, $label, $icon) {
+        $out = '<div style="flex:1 1 180px;min-width:170px;border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#fff">';
+        $out .= '<div style="font-weight:700;color:var(--primary);margin-bottom:8px"><i class="fas '.$icon.'"></i> '.e($label).'</div>';
+        if (empty($path)) {
+            $out .= '<div style="color:#b91c1c;font-size:13px"><i class="fas fa-circle-xmark"></i> لا يوجد ملف مرفوع</div>';
+        } else {
+            $url = BASE_URL . e($path);
+            $isImg = preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $path);
+            if ($isImg) {
+                $out .= '<a href="'.$url.'" target="_blank" title="فتح كامل"><img src="'.$url.'" style="max-height:150px;max-width:100%;border:1px solid #ccc;border-radius:6px;display:block;margin-bottom:8px"></a>';
+            } else {
+                $out .= '<div style="font-size:34px;color:#b91c1c;margin-bottom:8px"><i class="fas fa-file-pdf"></i> PDF</div>';
+            }
+            $out .= '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+                 . '<a href="'.$url.'" target="_blank" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> فتح</a>'
+                 . '<button type="button" onclick="ppPrintFile(\''.$url.'\','.($isImg?'true':'false').')" class="btn btn-sm btn-light"><i class="fas fa-print"></i> طباعة</button>'
+                 . '</div>';
+        }
+        return $out . '</div>';
+    };
+    $r6Url    = BASE_URL.'pages/official_forms.php?form=tax_r6&employee_id='.$employeeId;
+    $slipUrl  = BASE_URL.'pages/annual_slip.php?employee_id='.$employeeId.'&school_year='.urlencode(activeSchoolYear());
+    $histUrl  = BASE_URL.'pages/employee_history.php?employee_id='.$employeeId;
+    $editUrl  = BASE_URL.'pages/employees.php?action=edit&id='.$employeeId;
+?>
+    <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
+        <a href="<?= BASE_URL ?>pages/attestations.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع / Retour</a>
+        <a href="<?= e($editUrl) ?>" class="btn btn-sm btn-light"><i class="fas fa-user-pen"></i> تعديل ملف الأستاذ</a>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3><i class="fas fa-folder-open"></i> ملف الأستاذ الكامل / Dossier — <?= e($dTitle) ?><?php if ($emp['employee_code']): ?> <small style="opacity:.7">(<?= e($emp['employee_code']) ?>)</small><?php endif; ?></h3></div>
+        <div class="card-body">
+            <?php
+            // ===== كل معلومات الأستاذ — كل حقول ملفّه مقسّمة لأقسام =====
+            $yn  = fn($v) => ((int)$v === 1) ? 'نعم' : 'لا';
+            $row2 = function($label, $value) {
+                $v = trim((string)$value);
+                return '<div style="display:flex;gap:10px;padding:5px 2px;border-bottom:1px dashed #eef2f7;font-size:13px">'
+                     . '<span style="min-width:170px;max-width:170px;color:#64748b;font-weight:600">'.e($label).'</span>'
+                     . '<span style="flex:1;color:#0f172a">'.($v===''?'—':e($v)).'</span></div>';
+            };
+            $section = function($title, $icon, $rows) {
+                return '<div style="flex:1 1 340px;min-width:290px;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;background:#fff">'
+                     . '<h4 style="color:var(--primary);margin:0 0 10px;font-size:15px"><i class="fas '.$icon.'"></i> '.e($title).'</h4>'.$rows.'</div>';
+            };
+            $incLbl = fn($ech,$ext,$pa) => implode('، ', array_filter([ (int)$ech?'التدرّج':'', (int)$ext?'الأجر الإضافي':'', (int)$pa?'المكافأة/المساعدة':'' ])) ?: 'الأساس فقط';
+            $addr = implode(' - ', array_values(array_filter(array_map('trim', [
+                $emp['ville']??'', $emp['quartier']??'', $emp['rue']??'', $emp['immeuble']??'',
+                ($emp['etage']??'')!==''?('طابق '.$emp['etage']):'', $emp['district']??'', $emp['gouvernorat']??''
+            ]))));
+            $registry = trim(($emp['civil_registry_number']??'') . (($emp['civil_registry_place']??'')?(' / '.$emp['civil_registry_place']):''));
+            $mother = trim(($emp['mother_first_name']??'').' '.($emp['mother_last_name']??''));
+            $modeLbl = ['direct_usd'=>'راتب مباشر بالدولار','percent_of_lbp'=>'نسبة من راتب الليرة','direct_lbp'=>'راتب مباشر بالليرة'][$emp['salary_input_mode']??''] ?? ($emp['salary_input_mode']??'');
+            $transport = ((float)($emp['transport_daily_amount']??0) > 0)
+                ? (rtrim(rtrim(number_format((float)$emp['transport_daily_amount'],2),'0'),'.').' '.($emp['transport_daily_currency']??'LBP').' × '.(int)($emp['transport_days_per_week']??0).' يوم/أسبوع × '.rtrim(rtrim(number_format((float)($emp['transport_weeks']??0),1),'0'),'.').' أسبوع')
+                : '';
+            $m13 = (int)($emp['has_13th_month']??0) ? ('نعم'.(($emp['m13_include_extra']??0)||($emp['m13_include_aide']??0)?' — يشمل: '.implode('، ',array_filter([($emp['m13_include_extra']??0)?'الإضافي':'',($emp['m13_include_aide']??0)?'المكافأة':''])):'')) : 'لا';
+
+            // معلومات شخصية
+            $p  = $row2('الاسم الكامل (عربي)', trim(($emp['first_name_ar']??'').' '.($emp['father_name_ar']??'').' '.($emp['last_name_ar']??'')));
+            $p .= $row2('Nom complet (FR)', trim(($emp['first_name_fr']??'').' '.($emp['father_name_fr']??'').' '.($emp['last_name_fr']??'')));
+            $p .= $row2('اسم الأم', $mother);
+            $p .= $row2('الجنسية', $emp['nationality']??'');
+            $p .= $row2('تاريخ الولادة', $emp['birth_date'] ? formatDate($emp['birth_date']) : '');
+            $p .= $row2('محل الولادة', $emp['birth_place']??'');
+            $p .= $row2('رقم السجل / محله', $registry);
+            $p .= $row2('الوضع العائلي', $emp['social_status']??'');
+            $p .= $row2('الزوج/الزوجة يعمل', $yn($emp['spouse_works']??0));
+            $p .= $row2('عدد الأولاد', (int)($emp['number_of_children']??0));
+
+            // اتصال وسكن
+            $c  = $row2('هاتف ١', $emp['phone1']??'');
+            $c .= $row2('هاتف ٢', $emp['phone2']??'');
+            $c .= $row2('البريد الإلكتروني', $emp['email']??'');
+            $c .= $row2('العنوان الكامل', $addr);
+
+            // معلومات وظيفية
+            $w  = $row2('الفئة', employeeTypeLabel($emp['employee_type']));
+            if (($emp['employee_type']??'')==='employe') $w .= $row2('نوع الوظيفة', ($emp['job_title']??'')!=='' ? jobTitleLabel($emp['job_title']) : '');
+            $w .= $row2('الشهادة', ($emp['diploma']??'') ? diplomaLabel($emp['diploma']) : '');
+            $w .= $row2('الاختصاص', $emp['specialization']??'');
+            $w .= $row2('المواد التي يعلّمها', $emp['subjects_taught']??'');
+            $w .= $row2('المرحلة', $emp['niveau_scolaire']??'');
+            $w .= $row2('الصفوف', classLevelNames($emp['classes_taught']??''));
+            $w .= $row2('الدرجة الحالية', gradeDisplay($emp));
+            $w .= $row2('الدرجة الابتدائية', rtrim(rtrim(number_format((float)($emp['starting_grade']??0),1),'0'),'.'));
+            $w .= $row2('ساعات/أسبوع', rtrim(rtrim(number_format((float)($emp['hours_per_week']??0),1),'0'),'.'));
+            $w .= $row2('أيام/أسبوع', (int)($emp['days_per_week']??0));
+            $w .= $row2('تاريخ الدخول', $emp['hire_date'] ? formatDate($emp['hire_date']) : '');
+            $w .= $row2('تاريخ الملاك', $emp['titularization_date'] ? formatDate($emp['titularization_date']) : '');
+            $w .= $row2('تاريخ تثبيت الملاك', $emp['tenure_confirmation_date'] ? formatDate($emp['tenure_confirmation_date']) : '');
+            $w .= $row2('الحالة', employeeStatusLabel($emp['status'])['label']);
+            $w .= $row2('استمرار العمل بعد ٦٤', $yn($emp['keep_working_past_64']??0));
+
+            // أرقام رسمية وتواريخ الترك
+            $o  = $row2('رقم الضمان (CNSS)', $emp['nssf_number']??'');
+            $o .= $row2('الرقم المالي (MOF)', $emp['finance_ministry_number']??'');
+            $o .= $row2('رقم الصندوق (Caisse)', $emp['caisse_number']??'');
+            $o .= $row2('تاريخ ترك الضمان', $emp['left_date_cnss'] ? formatDate($emp['left_date_cnss']) : '');
+            $o .= $row2('تاريخ ترك المالية', $emp['left_date_finance'] ? formatDate($emp['left_date_finance']) : '');
+            $o .= $row2('تاريخ ترك الصندوق', $emp['left_date_eoc'] ? formatDate($emp['left_date_eoc']) : '');
+
+            // الراتب والاقتطاعات
+            $s  = $row2('طريقة إدخال الراتب', $modeLbl);
+            if (($emp['salary_input_mode']??'')==='direct_usd') $s .= $row2('أساس الراتب بالدولار', (float)($emp['base_salary_usd']??0) ? ('$'.number_format((float)$emp['base_salary_usd'],2)) : '');
+            if (($emp['salary_input_mode']??'')==='percent_of_lbp') $s .= $row2('النسبة من راتب الليرة', (float)($emp['base_salary_lbp_percent']??0) ? (rtrim(rtrim(number_format((float)$emp['base_salary_lbp_percent'],2),'0'),'.').'%') : '');
+            if (($emp['salary_input_mode']??'')==='direct_lbp') $s .= $row2('راتب العقد (ل.ل)', (float)($emp['contract_salary_lbp']??0) ? formatLBP($emp['contract_salary_lbp']) : '');
+            $s .= $row2('أشهر الدفع بالسنة', (int)($emp['payment_months_per_year']??0) ?: '');
+            $s .= $row2('الشهر الثالث عشر', $m13);
+            $s .= $row2('تعويض عائلي (زوج)', (float)($emp['family_allowance_spouse_lbp']??0) ? formatLBP($emp['family_allowance_spouse_lbp']) : '');
+            $s .= $row2('تعويض عائلي (أولاد)', (float)($emp['family_allowance_children_lbp']??0) ? formatLBP($emp['family_allowance_children_lbp']) : '');
+            $s .= $row2('تعويض النقل', $transport);
+
+            // الخضوع للاقتطاعات
+            $t  = $row2('خاضع للضريبة', (int)($emp['tax_subject']??0) ? ('نعم — يشمل: '.$incLbl($emp['tax_includes_echelon']??0,$emp['tax_includes_extra']??0,$emp['tax_includes_prime_aide']??0)) : 'لا');
+            $t .= $row2('خاضع للضمان', (int)($emp['cnss_subject']??0) ? ('نعم — يشمل: '.$incLbl($emp['cnss_includes_echelon']??0,$emp['cnss_includes_extra']??0,$emp['cnss_includes_prime_aide']??0)) : 'لا');
+            $t .= $row2('خاضع لصندوق التعويضات', (int)($emp['eoc_subject']??0) ? ('نعم — يشمل: '.$incLbl($emp['eoc_includes_echelon']??0,$emp['eoc_includes_extra']??0,$emp['eoc_includes_prime_aide']??0)) : 'لا');
+            ?>
+            <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:22px">
+                <?= $section('معلومات شخصية', 'fa-user', $p) ?>
+                <?= $section('اتصال وسكن', 'fa-location-dot', $c) ?>
+                <?= $section('معلومات وظيفية', 'fa-briefcase', $w) ?>
+                <?= $section('أرقام رسمية وتواريخ الترك', 'fa-hashtag', $o) ?>
+                <?= $section('الراتب والتعويضات', 'fa-money-bill-wave', $s) ?>
+                <?= $section('الخضوع للاقتطاعات', 'fa-scale-balanced', $t) ?>
+            </div>
+            <?php if (trim((string)($emp['notes']??'')) !== ''): ?>
+            <div style="border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:12px 16px;margin-bottom:22px">
+                <h4 style="color:#b45309;margin:0 0 6px;font-size:15px"><i class="fas fa-note-sticky"></i> ملاحظات</h4>
+                <div style="font-size:13.5px;white-space:pre-wrap"><?= e($emp['notes']) ?></div>
+            </div>
+            <?php endif; ?>
+
+            <h4 style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-bolt"></i> تقارير الأستاذ</h4>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px">
+                <a href="<?= e($r6Url) ?>" class="btn btn-primary"><i class="fas fa-file-lines"></i> ر6 — كشف سنوي إفرادي</a>
+                <a href="<?= e($slipUrl) ?>" class="btn btn-gold"><i class="fas fa-file-invoice-dollar"></i> بطاقة الراتب السنوية</a>
+                <a href="<?= e($histUrl) ?>" class="btn btn-info"><i class="fas fa-user-clock"></i> سيرة الأستاذ</a>
+            </div>
+
+            <h4 style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-images"></i> مستندات وصور الأستاذ</h4>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:22px">
+                <?= $docCard($emp['diploma_doc_path'] ?? '', 'صورة الشهادة / Diplôme', 'fa-graduation-cap') ?>
+                <?= $docCard($emp['id_document_path'] ?? '', 'إخراج قيد / تذكرة', 'fa-id-card') ?>
+                <?= $docCard($emp['family_doc_path'] ?? '', 'إخراج قيد عائلي', 'fa-people-roof') ?>
+                <?= $docCard($emp['photo_path'] ?? '', 'صورة شخصية / Photo', 'fa-image') ?>
+            </div>
+
+            <h4 style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-file-signature"></i> إصدار إفادة لهذا الأستاذ</h4>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <?php foreach ($ATT_TYPES as $k => $lbl): ?>
+                <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= (int)$employeeId ?>&type=<?= e($k) ?>&lang_doc=<?= e($docLang) ?>" class="btn btn-sm btn-light" style="border:1px solid #e2e8f0"><?= e($lbl['ar']) ?></a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+    <script>
+    // فتح/طباعة ملف (صورة أو PDF) بنافذة جديدة
+    function ppPrintFile(url, isImg){
+        var w = window.open('', '_blank');
+        if(!w){ window.open(url, '_blank'); return; }
+        if(isImg){
+            w.document.write('<html><head><title>طباعة</title></head><body style="margin:0;text-align:center">'
+                + '<img src="'+url+'" style="max-width:100%" onload="setTimeout(function(){window.print();},200)"></body></html>');
+            w.document.close();
+        } else {
+            w.location.href = url; // PDF: يفتح ويطبع من عارض المتصفح
+        }
+    }
+    </script>
+<?php
+    include __DIR__ . '/../includes/footer.php';
+    return;
+endif;
+
 if (!$emp):
     [$ayf, $ayp] = yearEmploymentFilter(activeSchoolYear()); // فلترة حسب السنة الدراسية المختارة
     $aStmt = $db->prepare("SELECT id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar
@@ -85,6 +267,30 @@ if (!$emp):
     $aStmt->execute($ayp);
     $employees = $aStmt->fetchAll();
 ?>
+    <?php if (!isAllSchools() && $employees): ?>
+    <div class="card" style="border:2px solid var(--primary);background:#f0f7ff">
+        <div class="card-header"><h3><i class="fas fa-folder-open"></i> ملف الأستاذ الكامل / Dossier — شوف كل شي عن الأستاذ بمكان واحد</h3></div>
+        <div class="card-body">
+            <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> اختر أستاذ وشوف صور مستنداته (الشهادة، التذكرة، العائلي، الصورة) + ر6 + بطاقة الراتب السنوية + سيرته + كل الإفادات — بدون ما تنتقل من صفحة لصفحة.</p>
+            <form method="GET" class="form-row cols-4" style="align-items:end">
+                <input type="hidden" name="dossier" value="1">
+                <div class="form-group" style="grid-column:1/3">
+                    <label class="form-label">Employé / الأستاذ</label>
+                    <select name="employee_id" class="form-select" required>
+                        <option value="">— Choisir / اختر —</option>
+                        <?php foreach ($employees as $em): ?>
+                        <option value="<?= $em['id'] ?>"><?= e($em['employee_code'].' — '.$em['first_name_fr'].' '.$em['last_name_fr']) ?> / <?= e($em['first_name_ar'].' '.$em['last_name_ar']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button class="btn btn-primary w-100"><i class="fas fa-folder-open"></i> عرض الملف الكامل</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <div class="card">
         <div class="card-header"><h3><i class="fas fa-file-signature"></i> Générer une attestation / إصدار إفادة</h3></div>
         <div class="card-body">
