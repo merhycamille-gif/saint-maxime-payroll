@@ -397,11 +397,11 @@ if (!$emp):
                 التاريخ تحت الإفادة: <strong><?= $d . ' / ' . $mo . ' / ' . $yr ?></strong>
             </div>
             <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>"><i class="fas fa-file-pdf"></i> تحميل PDF رسمي</a>
-                <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> Excel رسمي</a>
+                <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>" target="_blank"><i class="fas fa-print"></i> الإفادة الرسمية (طباعة / PDF)</a>
+                <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> تحميل Excel (للتعديل)</a>
                 <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>"><i class="fas fa-arrow-right"></i> رجوع لملف الأستاذ</a>
             </div>
-            <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> يُملأ تلقائياً من القالب الرسمي: المدرسة ورقم مؤسستها في الضمان، واسم الأجير ورقم ضمانه وسنة ولادته، والأشهر حسب تاريخ الإفادة.</p>
+            <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> «الإفادة الرسمية» تفتح النموذج الرسمي كاملاً معبّأً (المدرسة ورقمها في الضمان، اسم الأجير ورقم ضمانه وسنة ولادته، والأشهر) جاهز للطباعة — <strong>نفس الشكل تماماً أونلاين وعلى الكمبيوتر</strong>. زر Excel للتحميل والتعديل.</p>
         </div>
     </div>
     <?php

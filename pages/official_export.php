@@ -101,39 +101,48 @@ if ($form === 'cnss_work_attestation') {
         $cells['E' . (10 + $i)] = 'دوام كامل';
     }
 
-    $ok = officialTemplateExport(__DIR__ . '/../assets/templates/cnss_work_attestation.xlsx', $cells, $format,
-        'Afadat_Amal_' . $empId . '_' . $d . '-' . $mo . '-' . $yr);
-    // بديل أونلاين (بلا أدوات Python/LibreOffice): عرض الإفادة كصفحة HTML رسمية تُطبَع من المتصفّح → PDF.
-    if (!$ok) {
-        $rows = '';
-        for ($i = 0; $i < 7; $i++) {
-            $rows .= '<tr><td>' . htmlspecialchars($cells['B' . (10 + $i)]) . '</td><td>'
-                  . htmlspecialchars($cells['E' . (10 + $i)]) . '</td></tr>';
-        }
-        $empNo = trim($p1 . ' - ' . $p2 . ' - ' . $p3, ' -');
-        header('Content-Type: text/html; charset=UTF-8');
-        echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>إفادة عمل للضمان</title>'
-           . '<style>@page{size:A4;margin:18mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
-           . 'body{font-family:"Cairo",Arial,sans-serif;direction:rtl;color:#000;font-size:14px;line-height:1.9}'
-           . '.wrap{max-width:780px;margin:0 auto}h1{text-align:center;font-size:18px;margin:6px 0}'
-           . '.sub{text-align:center;margin-bottom:18px;font-size:13px}.row{margin:6px 0}.lbl{font-weight:bold}'
-           . 'table{width:100%;border-collapse:collapse;margin:14px 0}td{border:1px solid #444;padding:7px 10px;text-align:center}'
-           . 'thead td{background:#1e3a8a;color:#fff;font-weight:bold}.sig{margin-top:40px;text-align:left}'
-           . '.noprint{margin:14px 0;text-align:center}@media print{.noprint{display:none}}</style></head><body><div class="wrap">'
-           . '<div class="noprint"><button onclick="window.print()" style="padding:8px 18px;font-size:15px;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ احفظ كـ PDF / اطبع</button></div>'
-           . '<h1>إفادة عمل</h1><div class="sub">مديرية ضمان المرض والأمومة — الصندوق الوطني للضمان الاجتماعي</div>'
-           . '<div class="row"><span class="lbl">المؤسسة:</span> ' . htmlspecialchars($esch['name_ar'] ?? '') . '</div>'
-           . '<div class="row"><span class="lbl">رقم المؤسسة في الضمان:</span> ' . htmlspecialchars($empNo) . '</div>'
-           . '<div class="row"><span class="lbl">الاسم الثلاثي:</span> ' . htmlspecialchars($name) . '</div>'
-           . '<div class="row"><span class="lbl">رقم الضمان:</span> ' . htmlspecialchars($emp['nssf_number'] ?? '') . ''
-           . ' &nbsp;&nbsp; <span class="lbl">سنة الولادة:</span> ' . htmlspecialchars($cells['R6']) . '</div>'
-           . '<p>تشهد المؤسسة المذكورة أعلاه أنّ المضمون المذكور يعمل لديها دواماً كاملاً خلال الأشهر التالية:</p>'
-           . '<table><thead><tr><td>الشهر</td><td>الدوام</td></tr></thead><tbody>' . $rows . '</tbody></table>'
-           . '<div class="sig">حُرّر في: ' . $d . ' / ' . $mo . ' / ' . $yr . '<br><br>الخاتم والتوقيع</div>'
-           . '<script>setTimeout(function(){window.print();},600);</script>'
-           . '</div></body></html>';
-        exit;
+    // تحميل Excel (اختياري): يعمل حيث تتوفّر أدوات القالب (كمبيوتر المستخدم)؛ أونلاين يسقط للعرض الموحّد أدناه.
+    if ($format === 'xlsx') {
+        $ok = officialTemplateExport(__DIR__ . '/../assets/templates/cnss_work_attestation.xlsx', $cells, 'xlsx',
+            'Afadat_Amal_' . $empId . '_' . $d . '-' . $mo . '-' . $yr);
+        if ($ok) exit; // بُثَّ الملف وخرج
     }
+    // ✅ العرض الرسمي الموحّد (أونلاين = محلي تماماً): صورة النموذج الرسمي خلفية + الحقول مركّبة فوقها بمكانها،
+    // تُطبَع من المتصفّح → PDF. لا يعتمد على أي أداة خارجية، فيطلع نفس الشكل بالضبط في كل مكان.
+    $bg = BASE_URL . 'assets/templates/cnss_work_attestation.png';
+    $E  = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+    $fld = function ($align, $left, $top, $width, $text, $fs = 12) use ($E) {
+        return '<div class="f ' . $align . '" style="left:' . $left . '%;top:' . $top . '%;width:' . $width . '%;font-size:' . $fs . 'pt">' . $E($text) . '</div>';
+    };
+    $rowY = [43.9, 46.2, 48.6, 50.9, 53.2, 55.5, 57.8];
+    // اسم المؤسسة: سطر واحد بلا التفاف، محاذاة يمين تنتهي عند x62% ويمتدّ يساراً، والخطّ يصغر تلقائياً
+    // للأسماء الطويلة (shrink-to-fit) تماماً كالنسخة الرسمية.
+    $schName = (string)($esch['name_ar'] ?? '');
+    $nlen = function_exists('mb_strlen') ? mb_strlen($schName, 'UTF-8') : strlen($schName);
+    $sfs  = $nlen <= 22 ? 12 : ($nlen <= 34 ? 10 : ($nlen <= 46 ? 8.5 : 7.5));
+    $stop = $nlen <= 22 ? 25.4 : 25.9;
+    $F  = '<div style="position:absolute;right:38%;top:' . $stop . '%;white-space:nowrap;text-align:right;font-weight:bold;color:#000;font-size:' . $sfs . 'pt;line-height:1">' . $E($schName) . '</div>';
+    $F .= $fld('c', 5, 24.4, 10, $p1) . $fld('c', 17, 24.4, 10, $p2) . $fld('c', 32, 24.4, 10, $p3); // رقم المؤسسة
+    $F .= $fld('r', 34, 33.9, 26, $name);                              // اسم الأجير
+    $F .= $fld('c', 5, 34, 10, $cells['R6']) . $fld('c', 17, 34, 22, $emp['nssf_number'] ?? ''); // سنة الولادة + رقم الضمان
+    for ($i = 0; $i < 7; $i++) {                                        // جدول الأشهر
+        $F .= $fld('c', 77, $rowY[$i], 13, $cells['B' . (10 + $i)]);
+        $F .= $fld('c', 62, $rowY[$i], 15, $cells['E' . (10 + $i)]);
+    }
+    $F .= $fld('c', 27, 92.8, 6, $d) . $fld('c', 19, 92.8, 6, $mo) . $fld('c', 9, 92.8, 9, $yr); // التاريخ
+    header('Content-Type: text/html; charset=UTF-8');
+    echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>إفادة عمل للضمان</title>'
+       . '<style>@page{size:A4;margin:0}*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+       . 'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif}'
+       . '.page{position:relative;width:210mm;height:297mm;margin:0 auto;background:url(\'' . $E($bg) . '\') no-repeat;background-size:100% 100%}'
+       . '.f{position:absolute;font-size:12pt;color:#000;font-weight:bold;line-height:1}.c{text-align:center}.r{text-align:right}'
+       . '.bar{text-align:center;margin:10px 0}@media print{.bar{display:none}.page{margin:0}}'
+       . '</style></head><body>'
+       . '<div class="bar"><button onclick="window.print()" style="padding:9px 22px;font-size:15px;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ احفظ كـ PDF / اطبع</button></div>'
+       . '<div class="page">' . $F . '</div>'
+       . '<img src="' . $E($bg) . '" style="position:absolute;width:0;height:0;opacity:0" onload="setTimeout(function(){window.print();},250)">'
+       . '</body></html>';
+    exit;
 }
 
 http_response_code(400);

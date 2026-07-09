@@ -1,0 +1,17 @@
+# حماية الملفات الثنائية من تحويل نهايات الأسطر (يمنع تخريب القوالب/الصور عند النشر عبر git)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.xlsx binary
+*.xls binary
+*.docx binary
+*.doc binary
+*.pdf binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
