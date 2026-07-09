@@ -482,7 +482,7 @@ if (!$emp):
     $logoUrl = schoolLogoUrl($school);
     $logoImg = $logoUrl ? '<img src="' . htmlspecialchars($logoUrl, ENT_QUOTES) . '" alt="" style="max-height:88px;max-width:150px;object-fit:contain">' : '';
     // مجموعات حسب نوع الإفادة + خيار «رأس/شعار المدرسة» (يختاره المستخدم لكل إفادة)
-    $hasComponents = in_array($type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'salaire', 'embassy'], true);
+    $hasComponents = in_array($type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'salaire', 'embassy', 'aqd_taalim'], true);
     $hasCurrency   = in_array($type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'aqd_taalim', 'salaire', 'embassy'], true);
     $isNotice      = in_array($type, ['notice_school', 'notice_mail'], true);
     $defaultLogo   = in_array($type, ['anhaa_khedme', 'anhaa_mail', 'aqd_taalim', 'cnss', 'notice_school', 'notice_mail', 'salaire', 'tadris', 'embassy', 'riaaya'], true); // الصادرة عن المدرسة: الشعار افتراضياً
@@ -871,14 +871,29 @@ if (!$emp):
           <div style="text-align:center"><strong>الاسم والتوقيع</strong><br><?= e($nomAr) ?><div style="margin-top:34px;border-top:1px solid #333;width:220px"></div></div>
         </div>
 
-      <?php elseif ($type === 'aqd_taalim'): ?>
+      <?php elseif ($type === 'aqd_taalim'):
+        // تعبئة تلقائية للمكوّنات المالية من آخر راتب محسوب (كلّها موجودة بملف الأستاذ)
+        // الأجر الإضافي والمكافأة يظهران حسب خيار «مكوّنات الراتب» أعلى الصفحة ($incExtra/$incAide).
+        $cExtra  = $incExtra ? $extraW : 0;
+        $cAide   = $incAide  ? $aideW  : 0;
+        $cTrans  = $sal ? (int)$sal['transport_lbp'] : 0;
+        $cFamily = $sal ? (int)$sal['family_allowance_lbp'] : 0;
+        $cTotal  = (int)round($basePlusEch) + $cExtra + $cAide + $cTrans + $cFamily;
+        // قيمة تعويض النقل اليومي من ملف الأستاذ (بعملته الخاصة كما أُدخِلت)
+        $cDailyTrans = (float)($emp['transport_daily_amount'] ?? 0);
+        $cDailyStr = $cDailyTrans > 0
+            ? ((($emp['transport_daily_currency'] ?? 'LBP') === 'USD')
+                ? ('$' . rtrim(rtrim(number_format($cDailyTrans, 2), '0'), '.'))
+                : (formatLBP($cDailyTrans, false) . ' ل.ل'))
+            : '';
+      ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
         <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline">عقــد تعليــم</h2>
         <p>بين مدرسة : <strong><?= e($schoolNameAr) ?></strong> &nbsp; الممثَّلة بشخص: <?= $director ? '<strong>'.e($director).'</strong>' : $blank(150) ?> &nbsp; ( <strong>فريق أول</strong> )</p>
         <p>والسيّد / السيّدة / الآنسة : <strong><?= e($nomAr) ?></strong> &nbsp; من الجنسية: <?= $vb($natAr, 90) ?> &nbsp; ( <strong>فريق ثانٍ</strong> )</p>
         <p>المولود(ة) بتاريخ : <strong><?= $dob ?></strong> &nbsp; في : <strong><?= $bplace ?></strong> &nbsp; محل الإقامة: <?= $vb($emp['ville'] ?? '', 110) ?> &nbsp; رقم السجل: <?= $vb($regNo, 90) ?></p>
         <p>والمقيم على العنوان التالي : &nbsp; شتاءً : <?= $vb($addr, 170) ?> هاتف <?= $phone1 ?> &nbsp;&nbsp; صيفاً : <?= $blank(120) ?> هاتف <?= $vb($emp['phone2'] ?? '', 90) ?></p>
-        <p>بتاريخ : <?= $blank(110) ?> تمّ الاتفاق بين الفريقين المحدَّدَين أعلاه على ما يلي :</p>
+        <p>بتاريخ : <strong><?= $effFmt ?></strong> تمّ الاتفاق بين الفريقين المحدَّدَين أعلاه على ما يلي :</p>
 
         <p style="margin-top:10px"><strong>المادة الأولى :</strong> صرّح الفريق الثاني :</p>
         <p><strong>1/1 ـ</strong> بأنه يحمل الشهادات الرسميّة التالية :</p>
@@ -907,13 +922,18 @@ if (!$emp):
         <p style="margin-right:26px">ـ عدد ساعات التناقص المخصصة للنشاطات اللاصفيّة : <?= $blank(70) ?></p>
 
         <p style="margin-top:10px"><strong>المادة الثالثة :</strong> يدفع الفريق الأول شهرياً للفريق الثاني لقاء المهمات التعليميّة الموكولة إليه ما يلي :</p>
-        <p style="margin-right:26px"><strong>1/3 ـ</strong> أساس الراتب: <strong><?= in_array($emp['employee_type'],['enseignant_titulaire','employe'],true) ? $baseFig : $blank(120) ?></strong> &nbsp; ( الأجر القانوني )</p>
+        <p style="margin-right:26px"><strong>1/3 ـ</strong> أساس الراتب: <strong><?= (int)round($basePlusEch) > 0 ? $baseFig : $blank(120) ?></strong> &nbsp; ( الأجر القانوني )</p>
         <p style="margin-right:26px"><strong>2/3 ـ</strong> بدل مالي ( قانون 99/148 ) : <?= $blank(120) ?></p>
-        <p style="margin-right:26px"><strong>3/3 ـ</strong> ساعات إضافية : <?= $blank(120) ?></p>
-        <p style="margin-right:26px"><strong>4/3 ـ</strong> بدل إضافي بمثابة مكافأة : <?= $blank(120) ?></p>
-        <p style="margin-right:26px"><strong>5/3 ـ</strong> تعويض نقل مؤقت : <?= $blank(120) ?></p>
-        <p style="margin-right:26px"><strong>6/3 ـ</strong> تعويض عائلي : <?= $blank(120) ?> ( في حال توجّبه )</p>
-        <p style="margin-right:26px"><strong>المجموع :</strong> <?= $blank(140) ?> فقط : <?= $blank(220) ?></p>
+        <p style="margin-right:26px"><strong>3/3 ـ</strong> ساعات إضافية : <?= $cExtra > 0 ? '<strong>'.$moneyAr($cExtra).'</strong>' : $blank(120) ?></p>
+        <p style="margin-right:26px"><strong>4/3 ـ</strong> بدل إضافي بمثابة مكافأة : <?= $cAide > 0 ? '<strong>'.$moneyAr($cAide).'</strong>' : $blank(120) ?></p>
+        <p style="margin-right:26px"><strong>5/3 ـ</strong> تعويض نقل مؤقت : <?php
+            $t53 = [];
+            if ($cDailyStr !== '') $t53[] = '<strong>' . $cDailyStr . '</strong> يومياً';
+            if ($cTrans > 0) $t53[] = '<strong>' . $moneyAr($cTrans) . '</strong> شهرياً';
+            echo $t53 ? implode(' &nbsp;،&nbsp; ', $t53) : $blank(120);
+        ?></p>
+        <p style="margin-right:26px"><strong>6/3 ـ</strong> تعويض عائلي : <?= $cFamily > 0 ? '<strong>'.$moneyAr($cFamily).'</strong>' : $blank(120) ?> ( في حال توجّبه )</p>
+        <p style="margin-right:26px"><strong>المجموع :</strong> <strong><?= $moneyAr($cTotal) ?></strong> فقط : <strong><?= e($moneyWords($cTotal)) ?></strong></p>
         <p>تُحسم من مستحقات الفريق الثاني المبالغ الشهرية المترتبة قانوناً لصندوق التعويضات ، والصندوق الوطني للضمان الاجتماعي ولوزارة المال وبدل الطوابع ، ويدفعها الفريق الأول إلى المراجع المختصة على مسؤوليته .</p>
 
         <p style="margin-top:10px"><strong>شـروط خصوصيـة</strong></p>
