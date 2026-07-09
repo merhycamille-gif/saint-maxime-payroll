@@ -106,7 +106,9 @@ if ($form === 'cnss_work_attestation') {
     //    يعمل حيث تتوفّر أدوات القالب (كمبيوتر المستخدم: Python+openpyxl + LibreOffice)؛ وإن تعذّرت (أونلاين
     //    بلا هذه الأدوات) يرجع false فنسقط تلقائياً للعرض المصوّر أدناه الذي يعمل في كل مكان.
     $tplName = 'Ifadat_Damane_' . $empId . '_' . $d . '-' . $mo . '-' . $yr;
-    if (officialTemplateExport(__DIR__ . '/../assets/templates/cnss_work_attestation.xlsx', $cells, $format, $tplName)) {
+    // mode=image يفرض النسخة المصوّرة (للفحص/المقارنة)؛ غير ذلك نجرّب قالب الإكسل أولاً.
+    if (($_GET['mode'] ?? '') !== 'image'
+        && officialTemplateExport(__DIR__ . '/../assets/templates/cnss_work_attestation.xlsx', $cells, $format, $tplName)) {
         exit; // بُثَّ الملف (pdf أو xlsx) وخرج
     }
     // ✅ العرض الرسمي الموحّد (أونلاين = محلي تماماً): صورة النموذج الرسمي خلفية + الحقول مركّبة فوقها بمكانها،
@@ -121,9 +123,9 @@ if ($form === 'cnss_work_attestation') {
     // للأسماء الطويلة (shrink-to-fit) تماماً كالنسخة الرسمية.
     $schName = (string)($esch['name_ar'] ?? '');
     $nlen = function_exists('mb_strlen') ? mb_strlen($schName, 'UTF-8') : strlen($schName);
-    $sfs  = $nlen <= 22 ? 12 : ($nlen <= 34 ? 10 : ($nlen <= 46 ? 8.5 : 7.5));
-    $stop = $nlen <= 22 ? 25.4 : 25.9;
-    $F  = '<div style="position:absolute;right:38%;top:' . $stop . '%;white-space:nowrap;text-align:right;font-weight:bold;color:#000;font-size:' . $sfs . 'pt;line-height:1">' . $E($schName) . '</div>';
+    $sfs  = $nlen <= 26 ? 12.5 : ($nlen <= 40 ? 11 : ($nlen <= 54 ? 9.5 : 8.5));
+    $stop = 22.9;
+    $F  = '<div style="position:absolute;right:22%;top:' . $stop . '%;white-space:nowrap;text-align:right;font-weight:bold;color:#000;font-size:' . $sfs . 'pt;line-height:1">' . $E($schName) . '</div>';
     $F .= $fld('c', 5, 24.4, 10, $p1) . $fld('c', 17, 24.4, 10, $p2) . $fld('c', 32, 24.4, 10, $p3); // رقم المؤسسة
     $F .= $fld('r', 34, 33.9, 26, $name);                              // اسم الأجير
     $F .= $fld('c', 5, 34, 10, $cells['R6']) . $fld('c', 17, 34, 22, $emp['nssf_number'] ?? ''); // سنة الولادة + رقم الضمان
