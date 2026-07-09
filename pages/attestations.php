@@ -40,6 +40,16 @@ if (!isset($DOC_LANGS[$docLang])) $docLang = 'ar';
 $effDate = $_GET['date'] ?? date('Y-m-d');
 $emp = null;
 
+// وضع «كل المدارس»: عند اختيار أستاذ، بدّل المدرسة الفعّالة لمدرسته تلقائياً — حتى يفتّش عن الأستاذ
+// بلا ما يضطرّ يختار مدرسة أولاً (يُقيَّد بالمدارس المسموحة له إن كان حساب مدرسة).
+if ($employeeId > 0 && isAllSchools()) {
+    $sidQ = $db->prepare("SELECT school_id FROM employees WHERE id = ? AND is_deleted = 0");
+    $sidQ->execute([$employeeId]);
+    $sid = (int)$sidQ->fetchColumn();
+    $mayView = isSuperAdmin() || (function_exists('viewerAllowedSchoolIds') && in_array($sid, viewerAllowedSchoolIds(), true));
+    if ($sid > 0 && $mayView) { $_SESSION['active_schools'] = [$sid]; unset($_SESSION['report_schools']); }
+}
+
 if ($employeeId > 0) {
     requireSchoolSelected();
     $stmt = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
@@ -91,7 +101,9 @@ if ($emp && !empty($_GET['dossier'])):
         if (empty($path)) {
             $out .= '<div style="color:#b91c1c;font-size:13px"><i class="fas fa-circle-xmark"></i> لا يوجد ملف مرفوع</div>';
         } else {
-            $url = BASE_URL . e($path);
+            // المعاينة المحلية: الصور مرفوعة على السيرفر (أونلاين)؛ إذا الملف مش موجود محلياً اعرضه من msapayroll.com
+            $absLocal = __DIR__ . '/../' . $path;
+            $url = (BASE_URL !== '/' && !is_file($absLocal)) ? ('https://msapayroll.com/' . e($path)) : (BASE_URL . e($path));
             $isImg = preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $path);
             if ($isImg) {
                 $out .= '<a href="'.$url.'" target="_blank" title="فتح كامل"><img src="'.$url.'" style="max-height:150px;max-width:100%;border:1px solid #ccc;border-radius:6px;display:block;margin-bottom:8px"></a>';
@@ -283,24 +295,25 @@ endif;
 
 if (!$emp):
     [$ayf, $ayp] = yearEmploymentFilter(activeSchoolYear()); // فلترة حسب السنة الدراسية المختارة
-    $aStmt = $db->prepare("SELECT id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar
-                             FROM employees WHERE is_deleted = 0" . schoolScopeSql() . $ayf . " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
+    $aStmt = $db->prepare("SELECT id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar, school_id
+                             FROM employees WHERE is_deleted = 0" . schoolScopeSql() . $ayf . " ORDER BY school_id, FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
     $aStmt->execute($ayp);
     $employees = $aStmt->fetchAll();
+    $attShowSch = isAllSchools(); // في وضع «كل المدارس» نعرض اسم المدرسة جنب كل أستاذ
 ?>
-    <?php if (!isAllSchools() && $employees): ?>
+    <?php if ($employees): ?>
     <div class="card" style="border:2px solid var(--primary);background:#f0f7ff">
         <div class="card-header"><h3><i class="fas fa-folder-open"></i> ملف الأستاذ الكامل / Dossier — شوف كل شي عن الأستاذ بمكان واحد</h3></div>
         <div class="card-body">
-            <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> اختر أستاذ وشوف صور مستنداته (الشهادة، التذكرة، العائلي، الصورة) + ر6 + بطاقة الراتب السنوية + سيرته + كل الإفادات — بدون ما تنتقل من صفحة لصفحة.</p>
+            <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> اختر أستاذ (بتقدر تفتّش عنه حتى لو «كل المدارس» مختارة) وشوف صور مستنداته + ر6 + بطاقة الراتب السنوية + سيرته + كل الإفادات — بدون ما تنتقل من صفحة لصفحة.</p>
             <form method="GET" class="form-row cols-4" style="align-items:end">
                 <input type="hidden" name="dossier" value="1">
                 <div class="form-group" style="grid-column:1/3">
                     <label class="form-label">Employé / الأستاذ</label>
                     <select name="employee_id" class="form-select" required>
                         <option value="">— Choisir / اختر —</option>
-                        <?php foreach ($employees as $em): ?>
-                        <option value="<?= $em['id'] ?>"><?= e($em['employee_code'].' — '.$em['first_name_fr'].' '.$em['last_name_fr']) ?> / <?= e($em['first_name_ar'].' '.$em['last_name_ar']) ?></option>
+                        <?php foreach ($employees as $em): $pfx = $attShowSch ? (schoolNameById($em['school_id']).' — ') : ''; ?>
+                        <option value="<?= $em['id'] ?>"><?= e($pfx.$em['employee_code'].' — '.$em['first_name_fr'].' '.$em['last_name_fr']) ?> / <?= e($em['first_name_ar'].' '.$em['last_name_ar']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -315,18 +328,16 @@ if (!$emp):
     <div class="card">
         <div class="card-header"><h3><i class="fas fa-file-signature"></i> Générer une attestation / إصدار إفادة</h3></div>
         <div class="card-body">
-            <?php if (isAllSchools()): ?>
-                <div class="alert alert-warning">اختر مدرسة محددة من الأعلى أولاً / Sélectionnez une école.</div>
-            <?php elseif (!$employees): ?>
-                <div class="alert alert-info">لا يوجد موظفون في هذه المدرسة.</div>
+            <?php if (!$employees): ?>
+                <div class="alert alert-info">لا يوجد موظفون.</div>
             <?php else: ?>
             <form method="GET" class="form-row cols-4">
                 <div class="form-group">
                     <label class="form-label">Employé / الموظف</label>
                     <select name="employee_id" class="form-select" required>
                         <option value="">— Choisir / اختر —</option>
-                        <?php foreach ($employees as $em): ?>
-                        <option value="<?= $em['id'] ?>"><?= e($em['employee_code'].' — '.$em['first_name_fr'].' '.$em['last_name_fr']) ?> / <?= e($em['first_name_ar'].' '.$em['last_name_ar']) ?></option>
+                        <?php foreach ($employees as $em): $pfx = $attShowSch ? (schoolNameById($em['school_id']).' — ') : ''; ?>
+                        <option value="<?= $em['id'] ?>"><?= e($pfx.$em['employee_code'].' — '.$em['first_name_fr'].' '.$em['last_name_fr']) ?> / <?= e($em['first_name_ar'].' '.$em['last_name_ar']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

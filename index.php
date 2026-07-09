@@ -43,13 +43,14 @@ $exchangeRate = getExchangeRate();
 // أما القائمة الكاملة (كل من بلغوا 64) ففي صفحتها الخاصة pages/retirement_64.php.
 $home64 = age64List($db, true);
 
-// أساتذة المدرسة الحالية لبطاقة «ملف الأستاذ الكامل» على الداشبورد (كبسة مباشرة لكل شي عن الأستاذ)
+// أساتذة لبطاقة «ملف الأستاذ الكامل» على الداشبورد — تشمل كل المدارس المسموحة (حتى في وضع «كل المدارس»
+// يقدر يفتّش عن الأستاذ؛ عند اختياره تُبدَّل المدرسة تلقائياً لمدرسته). schoolScopeSql تقيّد تلقائياً حسب المسموح.
 $homeEmps = [];
-if (viewerCanSeePage('attestations.php') && !isAllSchools()) {
+if (viewerCanSeePage('attestations.php')) {
     [$ayf, $ayp] = yearEmploymentFilter(activeSchoolYear());
-    $stHE = $db->prepare("SELECT id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar
+    $stHE = $db->prepare("SELECT id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar, school_id
         FROM employees WHERE is_deleted = 0" . schoolScopeSql() . $ayf . "
-        ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
+        ORDER BY school_id, FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
     $stHE->execute($ayp);
     $homeEmps = $stHE->fetchAll();
 }
@@ -104,20 +105,18 @@ include __DIR__ . '/includes/header.php';
 <div class="card no-print" style="border:2px solid var(--primary);background:#f0f7ff;margin-bottom:16px">
     <div class="card-header"><h3><i class="fas fa-folder-open"></i> ملف الأستاذ الكامل / Dossier — كل شي عن الأستاذ بكبسة</h3></div>
     <div class="card-body">
-        <?php if (isAllSchools()): ?>
-            <div class="alert alert-warning" style="margin:0"><i class="fas fa-info-circle"></i> اختر مدرسة محددة من الأعلى أولاً لعرض ملف أستاذ.</div>
-        <?php elseif (!$homeEmps): ?>
-            <div class="alert alert-info" style="margin:0">لا يوجد أساتذة في هذه المدرسة.</div>
+        <?php if (!$homeEmps): ?>
+            <div class="alert alert-info" style="margin:0">لا يوجد أساتذة.</div>
         <?php else: ?>
-            <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> اختر الأستاذ، وبتفتح صفحة فيها كل شي عنه: معلوماته كاملة، صور مستنداته (الشهادة/التذكرة/العائلي)، وأي إفادة أو تقرير إلو (ر6، بطاقة الراتب السنوية، سيرته...) جاهز للطباعة.</p>
+            <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> اختر الأستاذ (بتقدر تفتّش عنه حتى لو «كل المدارس» مختارة)، وبتفتح صفحة فيها كل شي عنه: معلوماته كاملة، صور مستنداته (الشهادة/التذكرة/العائلي)، وأي إفادة أو تقرير إلو (ر6، بطاقة الراتب السنوية، سيرته...) جاهز للطباعة.</p>
             <form method="GET" action="<?= BASE_URL ?>pages/attestations.php" class="form-row cols-4" style="align-items:end">
                 <input type="hidden" name="dossier" value="1">
                 <div class="form-group" style="grid-column:1/3">
                     <label class="form-label">الأستاذ / Employé</label>
                     <select name="employee_id" class="form-select" required>
                         <option value="">— اختر / Choisir —</option>
-                        <?php foreach ($homeEmps as $em): ?>
-                        <option value="<?= $em['id'] ?>"><?= e($em['employee_code'].' — '.$em['first_name_fr'].' '.$em['last_name_fr']) ?> / <?= e($em['first_name_ar'].' '.$em['last_name_ar']) ?></option>
+                        <?php $showSch = isAllSchools(); foreach ($homeEmps as $em): $pfx = $showSch ? (schoolNameById($em['school_id']).' — ') : ''; ?>
+                        <option value="<?= $em['id'] ?>"><?= e($pfx.$em['employee_code'].' — '.$em['first_name_fr'].' '.$em['last_name_fr']) ?> / <?= e($em['first_name_ar'].' '.$em['last_name_ar']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
