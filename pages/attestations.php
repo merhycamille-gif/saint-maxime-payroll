@@ -112,7 +112,10 @@ if ($emp && !empty($_GET['dossier'])):
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <a href="<?= BASE_URL ?>pages/attestations.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع / Retour</a>
-        <a href="<?= e($editUrl) ?>" class="btn btn-sm btn-light"><i class="fas fa-user-pen"></i> تعديل ملف الأستاذ</a>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> طباعة الملف</button>
+            <a href="<?= e($editUrl) ?>" class="btn btn-light"><i class="fas fa-user-pen"></i> تعديل ملف الأستاذ</a>
+        </div>
     </div>
     <div class="card">
         <div class="card-header"><h3><i class="fas fa-folder-open"></i> ملف الأستاذ الكامل / Dossier — <?= e($dTitle) ?><?php if ($emp['employee_code']): ?> <small style="opacity:.7">(<?= e($emp['employee_code']) ?>)</small><?php endif; ?></h3></div>
@@ -218,8 +221,8 @@ if ($emp && !empty($_GET['dossier'])):
             </div>
             <?php endif; ?>
 
-            <h4 style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-bolt"></i> تقارير الأستاذ</h4>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px">
+            <h4 class="no-print" style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-bolt"></i> تقارير الأستاذ</h4>
+            <div class="no-print" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px">
                 <a href="<?= e($r6Url) ?>" class="btn btn-primary"><i class="fas fa-file-lines"></i> ر6 — كشف سنوي إفرادي</a>
                 <a href="<?= e($slipUrl) ?>" class="btn btn-gold"><i class="fas fa-file-invoice-dollar"></i> بطاقة الراتب السنوية</a>
                 <a href="<?= e($histUrl) ?>" class="btn btn-info"><i class="fas fa-user-clock"></i> سيرة الأستاذ</a>
@@ -233,10 +236,28 @@ if ($emp && !empty($_GET['dossier'])):
                 <?= $docCard($emp['photo_path'] ?? '', 'صورة شخصية / Photo', 'fa-image') ?>
             </div>
 
-            <h4 style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-file-signature"></i> إصدار إفادة لهذا الأستاذ</h4>
-            <div style="display:flex;flex-wrap:wrap;gap:8px">
-                <?php foreach ($ATT_TYPES as $k => $lbl): ?>
-                <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= (int)$employeeId ?>&type=<?= e($k) ?>&lang_doc=<?= e($docLang) ?>" class="btn btn-sm btn-light" style="border:1px solid #e2e8f0"><?= e($lbl['ar']) ?></a>
+            <h4 class="no-print" style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-file-signature"></i> إصدار إفادة لهذا الأستاذ — كل الإفادات مرتّبة</h4>
+            <?php
+            // كل أنواع الإفادات مقسّمة لأقسام واضحة (تُغطّى كل الأنواع + قسم «أخرى» احتياطاً لأي نوع جديد)
+            $attGroups = [
+                'راتب وعمل وضمان' => ['salaire','tadris','cnss','cnss_travail','afade_madrasiya','embassy','riaaya'],
+                'نهاية الخدمة والاستقالة وإبراء الذمّة' => ['anhaa_khedme','anhaa_mail','talab_istiqala','isqat_haq','baraa_zimma'],
+                'عقود وإقرارات وإنذارات' => ['aqd_taalim','iqrar','notice_school','notice_mail'],
+            ];
+            $grouped = array_merge(...array_values($attGroups));
+            $others = array_values(array_diff(array_keys($ATT_TYPES), $grouped));
+            if ($others) $attGroups['أخرى'] = $others;
+            ?>
+            <div class="no-print">
+                <?php foreach ($attGroups as $gTitle => $keys): ?>
+                <div style="margin-bottom:12px">
+                    <div style="font-weight:700;color:#334155;font-size:13px;margin-bottom:6px"><i class="fas fa-angle-left" style="color:var(--primary)"></i> <?= e($gTitle) ?></div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                        <?php foreach ($keys as $k): if (!isset($ATT_TYPES[$k])) continue; ?>
+                        <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= (int)$employeeId ?>&type=<?= e($k) ?>&lang_doc=<?= e($docLang) ?>" class="btn btn-sm btn-light" style="border:1px solid #cbd5e1"><i class="fas fa-file-lines" style="color:var(--primary);opacity:.6"></i> <?= e($ATT_TYPES[$k]['ar']) ?></a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
                 <?php endforeach; ?>
             </div>
         </div>
@@ -367,7 +388,7 @@ if (!$emp):
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>"><i class="fas fa-file-pdf"></i> تحميل PDF رسمي</a>
                 <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> Excel رسمي</a>
-                <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations.php"><i class="fas fa-arrow-right"></i> رجوع</a>
+                <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>"><i class="fas fa-arrow-right"></i> رجوع لملف الأستاذ</a>
             </div>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> يُملأ تلقائياً من القالب الرسمي: المدرسة ورقم مؤسستها في الضمان، واسم الأجير ورقم ضمانه وسنة ولادته، والأشهر حسب تاريخ الإفادة.</p>
         </div>
@@ -484,7 +505,7 @@ if (!$emp):
     $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($cur==='usd'?'&cur=usd':'').($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($sigIdx>0?'&sig='.$sigIdx:'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
-        <a href="<?= BASE_URL ?>pages/attestations.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour / رجوع</a>
+        <a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع لملف الأستاذ / Dossier</a>
         <div class="btn-group" role="group">
             <?php foreach ($DOC_LANGS as $lk => $lbl): ?>
             <a href="?<?= $qs ?>&lang_doc=<?= $lk ?>" class="btn btn-sm <?= $lk===$docLang?'btn-primary':'btn-light' ?>"><?= e($lbl) ?></a>
