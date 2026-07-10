@@ -119,24 +119,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exc_save']) && $emplo
 // (بلا حذف — تقدر ترجّع الصح لاحقاً فتُحتسب من جديد). ثم تُعاد سلسلة الدرجات والراتب تلقائياً.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save']) && $employeeId > 0) {
     $keep = array_map('intval', (array)($_POST['keep'] ?? []));
+    $gdate = (array)($_POST['gdate'] ?? []);            // [rowId => 'Y-m-d'] تعديل تاريخ درجة موجودة
+    $gunit = array_map('strval', (array)($_POST['gunit'] ?? []));  // "lawNum__idx" وحدات استثنائية تُمنَح فردياً
+    $gudate = (array)($_POST['gudate'] ?? []);          // ["lawNum__idx" => 'Y-m-d'] تاريخ كل وحدة
     try {
         // 1) تأكّد أن لكل صفّ delta محفوظة (الصفوف غير المؤشَّرة سابقاً صحيحة before/after)
         $db->prepare("UPDATE employee_grade_history SET delta=ROUND(grade_after-grade_before,1) WHERE employee_id=? AND delta IS NULL")->execute([$employeeId]);
-        // 2) اضبط counted حسب الشيك-بوكس (دخول الملاك دائماً محسوب)
+        // 2) اضبط counted حسب الشيك-بوكس للأسطر **الموجودة حالياً** (قبل إضافة أي درجة جديدة!
+        //    وإلا الدرجات المُعطاة تحت تنحسب صفر لأنها ما كانت ضمن keep[]). دخول الملاك دائماً محسوب.
         $all = $db->prepare("SELECT id, reason FROM employee_grade_history WHERE employee_id=?");
         $all->execute([$employeeId]);
         $upd = $db->prepare("UPDATE employee_grade_history SET counted=? WHERE id=?");
+        $setDate = $db->prepare("UPDATE employee_grade_history SET change_date=? WHERE id=? AND employee_id=? AND reason<>'titularization'");
         foreach ($all as $r) {
-            $on = ($r['reason'] === 'titularization') ? 1 : (in_array((int)$r['id'], $keep, true) ? 1 : 0);
-            $upd->execute([$on, (int)$r['id']]);
+            $rid = (int)$r['id'];
+            $on = ($r['reason'] === 'titularization') ? 1 : (in_array($rid, $keep, true) ? 1 : 0);
+            $upd->execute([$on, $rid]);
+            // تعديل تاريخ الدرجة إن غيّره المستخدم (عدا دخول الملاك)
+            if ($r['reason'] !== 'titularization' && isset($gdate[$rid]) && strtotime($gdate[$rid])) {
+                $setDate->execute([date('Y-m-d', strtotime($gdate[$rid])), $rid, $employeeId]);
+            }
         }
-        // 3) أعِد ربط السلسلة + الدرجة الحالية (المحرّك، يحترم counted)
+        // 2ب) إعطاء **وحدات** الدرجات الاستثنائية المكبوسة — كل وحدة (+1/½) صفّ مستقل بتاريخها (counted=1)
+        $granted = 0;
+        if (!empty($gunit)) {
+            $emp = $db->query("SELECT * FROM employees WHERE id=" . (int)$employeeId)->fetch();
+            $byLaw = [];
+            foreach ($gunit as $k) { if (preg_match('/^(.+)__(\d+)$/', $k, $m)) $byLaw[$m[1]][] = (int)$m[2]; }
+            $insU = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,0,?,?,1,?,'exceptional',?,?)");
+            foreach ($byLaw as $ln => $idxs) {
+                $lw = $db->prepare("SELECT * FROM exceptional_grades_laws WHERE law_number=? AND is_active=1");
+                $lw->execute([$ln]); $lw = $lw->fetch();
+                if (!$lw) continue;
+                $units = exceptionalGrantUnits($emp, $lw);      // يُحسب مرّة قبل أي إدراج (idx ثابت)
+                foreach ($idxs as $i) {
+                    if (!isset($units[$i])) continue;
+                    $u = (float)$units[$i]['delta'];
+                    $key = $ln . '__' . $i;
+                    $d = (isset($gudate[$key]) && strtotime($gudate[$key])) ? date('Y-m-d', strtotime($gudate[$key])) : $units[$i]['date'];
+                    $insU->execute([$employeeId, $u, $u, $d, $ln, 'قانون ' . $ln]);
+                    $granted++;
+                }
+            }
+        }
+        // 3) أعِد ربط السلسلة + الدرجة الحالية (المحرّك، يحترم counted والترتيب الزمني)
         $g = rechainGradeHistory($employeeId);
         // 4) أعِد حساب الراتب لكل سنوات الأستاذ
         $eDate = $db->query("SELECT hire_date FROM employees WHERE id=" . (int)$employeeId)->fetchColumn();
         $y0 = $eDate ? (int)date('Y', strtotime($eDate)) : (int)date('Y') - 5;
         for ($y = $y0; $y <= (int)date('Y'); $y++) recalcEmployeeYear($employeeId, $y . '-' . ($y + 1));
-        $okMsg = "تم تحديث الدرجات المحتسَبة — الدرجة الحالية صارت $g وأُعيد حساب الراتب";
+        $okMsg = "تم تحديث الدرجات — الدرجة الحالية صارت $g وأُعيد حساب الراتب"
+               . ($granted ? " (أُعطيت $granted درجة استثنائية جديدة)" : "");
         if (($_POST['return_to'] ?? '') === 'employee') { $_SESSION['flash_success'] = $okMsg; }
         else { $_SESSION['flash'] = ['type' => 'success', 'msg' => $okMsg]; }
     } catch (Exception $e) {

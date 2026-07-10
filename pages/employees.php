@@ -791,6 +791,9 @@ include __DIR__ . '/../includes/header.php';
         <button type="button" class="tab" data-tab="finance">💰 Financier</button>
         <button type="button" class="tab" data-tab="bonuses">🎁 Primes & Indemnités</button>
         <button type="button" class="tab" data-tab="deductions">🧾 Retenues</button>
+        <?php if ($id > 0 && $employee['employee_type'] === 'enseignant_titulaire'): ?>
+        <button type="button" class="tab" data-tab="grades">🏆 الدرجات / Échelons</button>
+        <?php endif; ?>
     </div>
     
     <!-- ========== Personal Tab ========== -->
@@ -1168,31 +1171,9 @@ include __DIR__ . '/../includes/header.php';
 
                 <?php if ($id > 0 && $employee['employee_type'] === 'enseignant_titulaire'): ?>
                 <h4 style="color:var(--primary);margin-top:20px;">Grades exceptionnels / الدرجات الاستثنائية</h4>
-                <p style="color:var(--gray-500);font-size:13px;">Lois appliquées au TEC pré-universitaire (Roudha, Primaire, Intermédiaire)</p>
-                
-                <div class="form-row cols-2">
-                    <?php foreach ($exceptionalLaws as $law): 
-                        $applied = in_array($law['law_number'], $appliedLaws);
-                    ?>
-                        <div style="padding:12px;border:1px solid var(--gray-200);border-radius:8px;<?= $applied ? 'background:#ecfdf5;border-color:#a7f3d0;' : '' ?>">
-                            <div class="d-flex justify-between align-center">
-                                <div>
-                                    <strong>Loi <?= e($law['law_number']) ?>/<?= date('Y', strtotime($law['law_date'])) ?></strong>
-                                    <span class="badge badge-gold">+<?= (float)$law['grades_count'] ?> grades</span>
-                                    <p style="font-size:12px;color:var(--gray-600);margin:4px 0 0;"><?= e($law['description_ar']) ?></p>
-                                </div>
-                                <?php if ($applied): ?>
-                                    <span class="badge badge-success"><i class="fas fa-check"></i> Appliquée</span>
-                                <?php else: ?>
-                                    <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>&apply_law=<?= e($law['law_number']) ?>" 
-                                       class="btn btn-sm btn-gold" 
-                                       data-confirm="Appliquer la loi <?= e($law['law_number']) ?> et ajouter <?= (float)$law['grades_count'] ?> grades ?">
-                                        Appliquer
-                                    </a>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                <div class="alert alert-info" style="font-size:13px">
+                    <i class="fas fa-arrow-up"></i> إدارة الدرجات الاستثنائية (كل درجة لحالها بتاريخها) صارت في تبويب
+                    <strong>«🏆 الدرجات»</strong> فوق — كل الدرجات مفصّلة مع شك-مارك وتاريخ قابل للتعديل، والدرجات المتاحة للإعطاء.
                 </div>
                 <?php endif; ?>
             </div>
@@ -1594,7 +1575,8 @@ include __DIR__ . '/../includes/header.php';
 </form>
 
 <?php if ($id > 0 && $employee['employee_type'] === 'enseignant_titulaire'): ?>
-<div class="card" id="gradesPanel" style="margin-top:18px">
+<!-- لائحة الدرجات: تظهر فقط تحت تبويب «🏆 الدرجات» (مخفية افتراضياً؛ يتحكّم بها gradesTabToggle أدناه) -->
+<div class="card" id="gradesPanel" style="margin-top:18px;display:none">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <h3><i class="fas fa-layer-group"></i> درجات الأستاذ — كلها بتواريخها، شيل الصح عن أي وحدة ما بدّك تحسبها</h3>
         <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>" class="btn btn-sm btn-light no-print">
@@ -1605,6 +1587,21 @@ include __DIR__ . '/../includes/header.php';
         <?php renderGradeChecklist($employee, 'employee'); ?>
     </div>
 </div>
+<script>
+// إظهار لائحة الدرجات فقط عند فتح تبويب «الدرجات» (البانل خارج النموذج، فنتحكّم به يدوياً).
+(function () {
+    var gp = document.getElementById('gradesPanel');
+    var tabsWrap = document.querySelector('.tabs');
+    if (!gp || !tabsWrap) return;
+    function sync(name) { gp.style.display = (name === 'grades') ? '' : 'none'; }
+    tabsWrap.addEventListener('click', function (e) {
+        var b = e.target.closest('.tab');
+        if (b && b.getAttribute('data-tab')) sync(b.getAttribute('data-tab'));
+    });
+    var t = new URLSearchParams(location.search).get('tab');   // بعد الحفظ يرجع لنفس التبويب
+    sync(t || 'personal');
+})();
+</script>
 <?php endif; ?>
 
 <?php if ($id > 0): ?>

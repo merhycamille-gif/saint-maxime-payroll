@@ -1192,6 +1192,24 @@ function buildSalaryEvolution($employeeId, $currentGrade) {
 }
 
 /**
+ * شفاء ذاتي: وصف قانون 2017 في `exceptional_grades_laws` حُفِظ سابقاً برموز معطوبة (؟؟؟) بسبب
+ * ترميز قديم عند التنصيب. يُصحَّح النصّ العربي/الفرنسي مرّة واحدة (الشرط LIKE '%?%' يجعله idempotent
+ * فلا يُكتب بعد الإصلاح). آمن — بيانات مرجعية فقط (لا يمسّ درجات أو رواتب).
+ */
+function healLaw2017Description() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $ar = 'سلسلة 2017: 6 درجات لمن دخل الملاك قبل 1/1/2010 (كل الشهادات) أو قسم ثاني (2010→30/9/2017)؛ درجتان لإجازة جامعية/جاردينير ب.ت/ت.س (2010→30/9/2017).';
+        $fr = 'Loi 2017: 6 échelons (titularisé avant 2010, ou Qsm2 2010-2017) / 2 échelons (Licence/Jardinière 2010-2017).';
+        $st = getDB()->prepare("UPDATE exceptional_grades_laws SET description_ar=?, description_fr=?
+                                WHERE law_number='2017' AND description_ar LIKE '%?%'");
+        $st->execute([$ar, $fr]);
+    } catch (Throwable $e) { /* تجاهل آمن */ }
+}
+
+/**
  * لوحة درجات الأستاذ (مشتركة بين صفحة الدرجات grades.php وملف الأستاذ employees.php):
  * تعرض كل الدرجات بترتيب زمني مع شاك-مارك «محسوبة؟» لكل درجة (عدا دخول الملاك المقفل).
  * شيل الصح = الدرجة تبقى ظاهرة لكن لا تُحتسب (delta محفوظ، قابلة للإرجاع). تُحفظ بإرسال
@@ -1202,48 +1220,83 @@ function buildSalaryEvolution($employeeId, $currentGrade) {
 function renderGradeChecklist($emp, $returnTo = 'grades') {
     if (($emp['employee_type'] ?? '') !== 'enseignant_titulaire') return;
     $db = getDB();
+    // شفاء ذاتي مرّة واحدة: قسّم أي درجة استثنائية ملمومة لهذا الأستاذ إلى وحدات مفردة (آمن، بلا تغيير المجموع/الراتب).
+    splitExceptionalUnitsForEmployee((int)$emp['id']);
+    // شفاء ذاتي: وصف قانون 2017 كان محفوظاً برموز معطوبة (ترميز قديم) → يُصحَّح مرّة (idempotent).
+    healLaw2017Description();
     $st = $db->prepare("SELECT * FROM employee_grade_history WHERE employee_id = ? ORDER BY change_date ASC, id ASC");
     $st->execute([(int)$emp['id']]);
     $history = $st->fetchAll(PDO::FETCH_ASSOC);
-    if (empty($history)) {
+    $fmtG = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.');
+
+    // نوع كل درجة بتسمية واضحة (الاستثنائية مخزّنة بـreason='' فنستدلّ عليها من law_reference/الملاحظة).
+    $labelFor = function ($h) {
+        $r = $h['reason'];
+        if ($r === 'titularization')     return ['دخول الملاك', 'gold', true];
+        if ($r === 'biennial_promotion') return ['درجة عادية (تشرين)', 'success', false];
+        if ($r === 'manual')             return ['تعديل يدوي', 'secondary', false];
+        // ما تبقّى = درجة استثنائية: إمّا قانون مسمّى (244/102/223/2017) أو نظام الأساتذة الجدد (4+4+2).
+        $lbl = !empty($h['law_reference'])
+            ? 'درجة استثنائية — قانون ' . $h['law_reference']
+            : 'درجة استثنائية (4+4+2)';   // بلا قانون مسمّى = نظام المستجدّ (يشمل دفعات فتح السنة)
+        return [$lbl, 'info', false];
+    };
+
+    // خريطة كل قانون (رقم → الاسم + تاريخ الصدور) لعرضه في عمود «ملاحظة» بجانب كل درجة استثنائية.
+    $lawNames = [];
+    foreach ($db->query("SELECT law_number, law_date, description_ar, description_fr FROM exceptional_grades_laws") as $L) {
+        $lawNames[(string)$L['law_number']] = [
+            'name' => $L['description_ar'] ?: $L['description_fr'],
+            'date' => $L['law_date'],
+        ];
+    }
+    // نصّ «سلسلة الرتب والرواتب (قانون 46/2017)» + تاريخ صدوره — لدرجات الدخول والتدرّج العادي.
+    $scaleLaw = (isset($lawNames['2017']['date']) && $lawNames['2017']['date'])
+        ? 'قانون 46/2017 صادر ' . formatDate($lawNames['2017']['date'])
+        : 'قانون 46/2017';
+
+    // قوانين استثنائية فيها **وحدات لم تُعطَ بعد** لهذا الأستاذ — كل وحدة (+1 أو ½) تُمنَح فردياً بتاريخها.
+    $laws = $db->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1 ORDER BY law_date")->fetchAll(PDO::FETCH_ASSOC);
+    $grantable = [];
+    foreach ($laws as $law) {
+        $units = exceptionalGrantUnits($emp, $law);   // المتبقّي = مجموع القانون − المُعطى، وحداتٍ مفردة
+        if (empty($units)) continue;                  // مُعطى كاملاً أو لا ينطبق
+        $grantable[] = ['law' => $law, 'units' => $units];
+    }
+
+    $excludedCount = 0;
+    foreach ($history as $hh) { if ($hh['reason'] !== 'titularization' && (int)$hh['counted'] === 0) $excludedCount++; }
+
+    if (empty($history) && empty($grantable)) {
         echo '<div class="empty-state"><i class="fas fa-history"></i><h4>لا يوجد سجلّ درجات بعد</h4>'
            . '<p class="text-muted">اضبط دخول الملاك والشهادة واضغط «إعادة بناء الدرجات حسب القانون» في صفحة الدرجات.</p></div>';
         return;
     }
-    $reasonLabels = [
-        'titularization'     => ['دخول الملاك', 'gold'],
-        'biennial_promotion' => ['درجة عادية (تشرين)', 'success'],
-        'exceptional'        => ['درجة استثنائية (كانون)', 'info'],
-        'manual'             => ['تعديل يدوي', 'secondary'],
-    ];
-    $excludedCount = 0;
-    foreach ($history as $hh) { if ($hh['reason'] !== 'titularization' && (int)$hh['counted'] === 0) $excludedCount++; }
-    $fmtG = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.');
     ?>
     <p class="text-muted" style="font-size:13px;margin:0 0 8px">
-        ✅ = البرنامج حاطّ هذه الدرجة تلقائياً وهي <strong>محسوبة</strong> للأستاذ.
-        <strong>شِيل الصح عن أي درجة ما بدّك تعطيه ياها</strong> — تبقى ظاهرة لكن <strong>لا تُحسب</strong>
-        (وتقدر ترجّع الصح وقت ما بدّك فتُحسب من جديد). ثم اضغط «حفظ» — تتحدّث الدرجة الحالية والراتب تلقائياً.
-        (درجة دخول الملاك ثابتة دائماً.)
+        ✅ = درجة <strong>مُعطاة ومحسوبة</strong> للأستاذ (وضعها البرنامج تلقائياً عند استحقاقها).
+        <strong>شِيل الصح</strong> عن أي درجة ما بدّك تحسبها (تبقى ظاهرة لكن لا تُحسب، وترجّعها وقت ما بدّك).
+        <strong>التاريخ قدّام كل درجة تقدر تعدّلو.</strong>
+        وتحت اللائحة في <strong>«درجات استثنائية بعدها ما أُعطيت»</strong> — كبس الصح واختر التاريخ لتُعطى وتُحسب.
+        ثم اضغط «حفظ» فتتحدّث الدرجة والراتب تلقائياً. (درجة دخول الملاك ثابتة.)
         <?php if ($excludedCount): ?><br><span style="color:#c0392b">حالياً <?= $excludedCount ?> درجة مستثناة (غير محسوبة).</span><?php endif; ?>
     </p>
     <form method="POST" action="<?= BASE_URL ?>pages/grades.php?employee_id=<?= (int)$emp['id'] ?>">
         <?= csrfField() ?>
         <input type="hidden" name="grade_save" value="1">
         <input type="hidden" name="return_to" value="<?= e($returnTo) ?>">
+        <?php if (!empty($history)): ?>
         <table class="table">
             <thead><tr>
                 <th style="text-align:center">محسوبة؟</th>
-                <th>التاريخ</th><th>نوع الدرجة</th><th style="text-align:center">مقدارها</th>
+                <th>التاريخ <small class="text-muted">(قابل للتعديل)</small></th><th>نوع الدرجة</th><th style="text-align:center">مقدارها</th>
                 <th style="text-align:center">الدرجة بعدها</th><th>ملاحظة</th>
             </tr></thead>
             <tbody>
             <?php foreach ($history as $h):
-                $isTitul = ($h['reason'] === 'titularization');
+                [$rlabel, $rcolor, $isTitul] = $labelFor($h);
                 $counted = $isTitul || (int)$h['counted'] === 1;
                 $amount  = ($h['delta'] !== null) ? (float)$h['delta'] : ((float)$h['grade_after'] - (float)$h['grade_before']);
-                [$rlabel, $rcolor] = $reasonLabels[$h['reason']] ?? [$h['reason'], 'light'];
-                if ($h['law_reference']) $rlabel .= ' — قانون ' . $h['law_reference'];
             ?>
                 <tr style="<?= !$counted ? 'opacity:.5;background:#fbfbfb' : '' ?>">
                     <td style="text-align:center">
@@ -1253,16 +1306,78 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                             <input type="checkbox" name="keep[]" value="<?= (int)$h['id'] ?>" <?= $counted ? 'checked' : '' ?> style="width:20px;height:20px;cursor:pointer">
                         <?php endif; ?>
                     </td>
-                    <td><strong><?= formatDate($h['change_date']) ?></strong></td>
+                    <td>
+                        <?php if ($isTitul): ?>
+                            <strong><?= formatDate($h['change_date']) ?></strong>
+                        <?php else: ?>
+                            <input type="date" name="gdate[<?= (int)$h['id'] ?>]" value="<?= e($h['change_date']) ?>" class="form-control" style="max-width:160px;font-size:12px;padding:4px 6px">
+                        <?php endif; ?>
+                    </td>
                     <td><span class="badge badge-<?= $rcolor ?>"><?= e($rlabel) ?></span></td>
                     <td style="text-align:center"><span class="badge badge-<?= $amount > 0 ? 'success' : 'warning' ?>"><?= $amount >= 0 ? '+' : '' ?><?= $fmtG($amount) ?></span></td>
                     <td style="text-align:center"><?= $counted ? '<strong>' . $fmtG($h['grade_after']) . '</strong>' : '<span class="text-muted" title="غير محسوبة">—</span>' ?></td>
-                    <td><small><?= e($h['notes']) ?></small></td>
+                    <td><small><?php
+                        // عمود الملاحظة: الأساس القانوني لكل درجة (لكل الحالات) —
+                        //  • قانون استثنائي مسمّى (244/102/223/2017=قانون 46): «قانون X — الاسم».
+                        //  • درجة استثنائية بلا قانون مسمّى = نظام الأساتذة الجدد 4+4+2 (يشمل دفعات فتح السنة).
+                        //  • دخول الملاك: درجة الدخول حسب الشهادة.  • التدرّج العادي: التدرّج الدوري.
+                        $ref = (string)$h['law_reference'];
+                        $rsn = $h['reason'];
+                        if ($ref !== '' && isset($lawNames[$ref])) {
+                            $li = $lawNames[$ref];
+                            $issued = !empty($li['date']) ? ' (صدر بتاريخ ' . formatDate($li['date']) . ')' : '';
+                            $noteTxt = 'قانون ' . $ref . $issued . ' — ' . $li['name'];
+                        } elseif ($rsn === 'titularization') {
+                            $noteTxt = 'درجة الدخول حسب الشهادة — سلسلة الرتب والرواتب (' . $scaleLaw . ') عند دخول الملاك';
+                        } elseif ($rsn === 'biennial_promotion') {
+                            $noteTxt = 'التدرّج الدوري نصف درجة كل سنة — سلسلة الرتب والرواتب (' . $scaleLaw . ')';
+                        } elseif ($rsn === 'manual') {
+                            $noteTxt = $h['notes'] !== '' ? $h['notes'] : 'تعديل يدوي';
+                        } else {
+                            // نظام الأساتذة الجدد 4+4+2 = بديل قوانين الدرجات الاستثنائية للمستجدّين (بعد 2/4/2012).
+                            // نذكر القوانين المرجعية وأرقامها وتواريخ صدورها.
+                            $subs = [];
+                            foreach (['244','102','223'] as $ln) {
+                                if (!isset($lawNames[$ln])) continue;
+                                $dt = !empty($lawNames[$ln]['date']) ? ' صادر ' . formatDate($lawNames[$ln]['date']) : '';
+                                $subs[] = 'قانون ' . $ln . $dt;
+                            }
+                            $noteTxt = 'درجات الأساتذة الجدد (نظام 4+4+2) — بموجب '
+                                     . ($subs ? implode(' · ', $subs) : 'قوانين الدرجات الاستثنائية')
+                                     . ' لمن دخل الملاك بعد 2012';
+                        }
+                        echo e($noteTxt);
+                    ?></small></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
-        <button type="submit" class="btn btn-primary" data-confirm="حفظ الدرجات المحتسَبة وإعادة حساب الراتب؟">
+        <?php endif; ?>
+
+        <?php if (!empty($grantable)): ?>
+        <h4 style="color:var(--primary);margin:18px 0 6px"><i class="fas fa-plus-circle"></i> درجات استثنائية بعدها ما أُعطيت (متاحة لهذا الأستاذ)</h4>
+        <p class="text-muted" style="font-size:12px;margin:0 0 8px"><strong>كل درجة لحالها.</strong> الشك-مارك فاضي = ما انعطت بعد. كبس الصح واختر تاريخ الإعطاء لكل درجة بدّك ياها فتُضاف وتُحسب.</p>
+        <table class="table">
+            <thead><tr>
+                <th style="text-align:center">إعطاء؟</th><th>القانون / الدرجة</th><th style="text-align:center">مقدارها</th>
+                <th>تاريخ الإعطاء</th><th>الوصف</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($grantable as $gb): $law = $gb['law']; $units = $gb['units']; $nU = count($units);
+                foreach ($units as $i => $u): $key = $law['law_number'] . '__' . $i; ?>
+                <tr>
+                    <td style="text-align:center"><input type="checkbox" name="gunit[]" value="<?= e($key) ?>" style="width:20px;height:20px;cursor:pointer"></td>
+                    <td><strong>قانون <?= e($law['law_number']) ?></strong> <small class="text-muted">— درجة <?= $i + 1 ?>/<?= $nU ?></small></td>
+                    <td style="text-align:center"><span class="badge badge-gold">+<?= $fmtG($u['delta']) ?></span></td>
+                    <td><input type="date" name="gudate[<?= e($key) ?>]" value="<?= e($u['date']) ?>" class="form-control" style="max-width:160px;font-size:12px;padding:4px 6px"></td>
+                    <td><small><?= e($law['description_ar'] ?: $law['description_fr']) ?></small></td>
+                </tr>
+            <?php endforeach; endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+
+        <button type="submit" class="btn btn-primary" data-confirm="حفظ الدرجات وإعادة حساب الراتب؟">
             <i class="fas fa-save"></i> حفظ الدرجات
         </button>
     </form>

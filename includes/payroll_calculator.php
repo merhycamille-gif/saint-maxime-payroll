@@ -769,6 +769,22 @@ function exceptionalLawEffectiveDate($law, $referenceDate) {
 }
 
 /**
+ * تقسيم مقدار درجات إلى **وحدات مفردة**: كل درجة كاملة +1 لحالها، والكسر الأخير (½ عادةً) لحاله.
+ * مثال: 3 → [1,1,1]؛ 4.5 → [1,1,1,1,0.5]؛ 0.5 → [0.5]؛ 6 → [1,1,1,1,1,1].
+ */
+function splitGradeUnits($amount) {
+    $amount = round((float)$amount, 1);
+    $units = [];
+    $guard = 0;
+    while ($amount > 0.001 && $guard++ < 120) {
+        $u = ($amount >= 1) ? 1.0 : $amount;
+        $units[] = $u;
+        $amount = round($amount - $u, 1);
+    }
+    return $units;
+}
+
+/**
  * تاريخ **دخول الملاك** (الترسيم) = منه تبدأ درجة الدخول والتدرّج كاملاً (قاعدة المستخدم).
  * = `titularization_date` (المصحّح = دخول المدرسة + سنتين)، واحتياطاً `hire_date`+سنتين إن غاب.
  */
@@ -942,6 +958,19 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false) 
 
     usort($events, fn($a,$b) => strcmp($a['date'], $b['date']));
 
+    // 🔵 كل درجة استثنائية تُخزَّن **مفردة** (+1، والكسر الأخير +½ لحاله) — طلب المستخدم:
+    //    3 درجات = 1+1+1، و4.5 = 1+1+1+1+½، كل وحدة صفّ مستقل بتاريخها وشك-ماركها.
+    //    التقسيم لا يغيّر المجموع ولا التاريخ ولا الراتب — عرض/تفصيل فقط. (العادية تبقى كما هي: ≤1.)
+    $unitEvents = [];
+    foreach ($events as $ev) {
+        if ($ev['type'] === 'exceptional' && round((float)$ev['delta'], 1) > 1) {
+            foreach (splitGradeUnits($ev['delta']) as $u) { $e2 = $ev; $e2['delta'] = $u; $unitEvents[] = $e2; }
+        } else {
+            $unitEvents[] = $ev;
+        }
+    }
+    $events = $unitEvents;
+
     // وضع «حساب فقط» (dryRun): يحسب الدرجة النهائية من القانون بلا أي كتابة على القاعدة —
     // للمقارنة بين ما يعطيه القانون وما هو مخزَّن (فحص شامل بلا تعديل بيانات).
     if ($dryRun) {
@@ -1041,6 +1070,44 @@ function lawConsistencyCheckOne($empId) {
 }
 
 /**
+ * 🔵 شفاء ذاتي: تقسيم الدرجات الاستثنائية **الملمومة** (مقدارها > 1) لأستاذ واحد إلى وحدات مفردة
+ * (+1، والكسر ½) — كل درجة صفّ مستقل بتاريخها وشك-ماركها. آمن تماماً: لا يغيّر المجموع ولا التواريخ
+ * ولا الرواتب (يتحقّق أنّ الدرجة الحالية لم تتغيّر، وإلا يتراجع). يُستدعى عند عرض لوحة الدرجات فيُطبَّق
+ * مرّة واحدة لكل أستاذ (بعدها لا يبقى صفّ ملموم فيصير لا-عمل). يرجّع true إن جرى تقسيم.
+ */
+function splitExceptionalUnitsForEmployee($empId) {
+    $db = getDB();
+    $empId = (int)$empId;
+    $lumped = $db->query("SELECT * FROM employee_grade_history
+        WHERE employee_id=$empId AND reason NOT IN ('titularization','biennial_promotion','manual')
+          AND ROUND(ABS(COALESCE(delta, grade_after-grade_before)),1) > 1
+        ORDER BY change_date, id")->fetchAll(PDO::FETCH_ASSOC);
+    if (empty($lumped)) return false;
+    $before = (float)$db->query("SELECT current_grade FROM employees WHERE id=$empId")->fetchColumn();
+    $ownTx = !$db->inTransaction();
+    if ($ownTx) $db->beginTransaction();
+    try {
+        $ins = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,?,?,?,?,?,?,?,?)");
+        $del = $db->prepare("DELETE FROM employee_grade_history WHERE id=?");
+        foreach ($lumped as $r) {
+            $eff = round((float)($r['delta'] !== null ? $r['delta'] : ($r['grade_after'] - $r['grade_before'])), 1);
+            $sign = $eff < 0 ? -1 : 1;
+            foreach (splitGradeUnits(abs($eff)) as $u) {
+                $ins->execute([$empId, 0, $sign * $u, $sign * $u, $r['counted'], $r['change_date'], $r['reason'], $r['law_reference'], $r['notes']]);
+            }
+            $del->execute([(int)$r['id']]);
+        }
+        $after = rechainGradeHistory($empId);            // يعيد الربط + الدرجة الحالية (لغاية اليوم)
+        if (abs($after - $before) > 0.001) throw new Exception("split mismatch $before/$after");
+        if ($ownTx) $db->commit();
+        return true;
+    } catch (Throwable $e) {
+        if ($ownTx && $db->inTransaction()) $db->rollBack();
+        return false;                                    // فشل آمن: يبقى ملموماً بلا أي ضرر
+    }
+}
+
+/**
  * إعادة ربط سلسلة درجات الأستاذ من عمود `delta` و`counted` (بلا حذف أي صف):
  * يمشي على الأحداث بالترتيب الزمني، يبدأ من 0، ويطبّق delta كل حدث **محسوب** فقط
  * (counted=1، ودخول الملاك دائماً محسوب)؛ الحدث غير المحسوب يبقى ظاهراً لكن لا يُقدّم الدرجة
@@ -1050,13 +1117,15 @@ function lawConsistencyCheckOne($empId) {
  */
 function rechainGradeHistory($empId) {
     $db = getDB();
-    $rows = $db->query("SELECT id, reason, grade_before, grade_after, delta, counted
+    $rows = $db->query("SELECT id, reason, grade_before, grade_after, delta, counted, change_date
                         FROM employee_grade_history WHERE employee_id=" . (int)$empId . "
                         ORDER BY change_date ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
     $ownTx = !$db->inTransaction();
     if ($ownTx) $db->beginTransaction();
     try {
         $running = 0.0;
+        $today = date('Y-m-d');
+        $asOfToday = 0.0;   // الدرجة الحالية = القيمة لغاية اليوم (الأسطر المستقبلية «فتح السنة» تُسلسَل لكن لا تدخل current_grade)
         $upd = $db->prepare("UPDATE employee_grade_history SET grade_before=?, grade_after=? WHERE id=?");
         foreach ($rows as $r) {
             $isTitul = ($r['reason'] === 'titularization');
@@ -1066,10 +1135,11 @@ function rechainGradeHistory($empId) {
             $after  = $counts ? round(min(52, $running + $delta), 1) : $running;
             $upd->execute([$before, $after, (int)$r['id']]);
             $running = $after;
+            if ($r['change_date'] <= $today) $asOfToday = $running;   // آخر درجة سارية اليوم
         }
-        $db->prepare("UPDATE employees SET current_grade=? WHERE id=?")->execute([$running, $empId]);
+        $db->prepare("UPDATE employees SET current_grade=? WHERE id=?")->execute([$asOfToday, $empId]);
         if ($ownTx) $db->commit();
-        return $running;
+        return $asOfToday;
     } catch (Throwable $e) { if ($ownTx) $db->rollBack(); throw $e; }
 }
 
@@ -1104,9 +1174,36 @@ function lawGradesForEmployee($law, $emp) {
 }
 
 /**
- * Apply exceptional grades law
+ * وحدات درجة استثنائية **لم تُعطَ بعد** لأستاذ عن قانون معيّن (لعرضها بشك-مارك فاضي + منحها فردياً).
+ * = (مجموع درجات القانون لهذا الأستاذ) − (المُعطى فعلاً)، مقسوماً وحداتٍ مفردة (+1 والكسر ½).
+ * يرجّع مصفوفة [['delta'=>1.0|0.5, 'date'=>'YYYY-01-01'], ...]. فارغة = القانون مُعطى كاملاً أو لا ينطبق.
+ * التاريخ الافتراضي يتدرّج سنةً بسنة من التاريخ القانوني بعد ما أُعطي منه (والمستخدم يعدّله كما يشاء).
  */
-function applyExceptionalLaw($employeeId, $lawNumber) {
+function exceptionalGrantUnits($emp, $law) {
+    $total = lawGradesForEmployee($law, $emp);
+    if ($total <= 0) return [];
+    $db = getDB();
+    $q = $db->quote((string)$law['law_number']);
+    $id = (int)$emp['id'];
+    $granted = (float)$db->query("SELECT COALESCE(SUM(COALESCE(delta, grade_after-grade_before)),0)
+                                  FROM employee_grade_history WHERE employee_id=$id AND law_reference=$q")->fetchColumn();
+    $grantedCount = (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id=$id AND law_reference=$q")->fetchColumn();
+    $remaining = round($total - $granted, 1);
+    if ($remaining <= 0.001) return [];
+    $base = exceptionalLawEffectiveDate($law, tenureReferenceDate($emp));
+    $baseYear = (int)date('Y', strtotime($base));
+    $out = [];
+    foreach (splitGradeUnits($remaining) as $i => $u) {
+        $out[] = ['delta' => $u, 'date' => ($baseYear + $grantedCount + $i) . '-01-01'];
+    }
+    return $out;
+}
+
+/**
+ * Apply exceptional grades law
+ * @param string|null $dateOverride تاريخ منح مختار من المستخدم (Y-m-d)؛ إن غاب = التاريخ القانوني التلقائي.
+ */
+function applyExceptionalLaw($employeeId, $lawNumber, $dateOverride = null) {
     $stmt = getDB()->prepare("SELECT * FROM exceptional_grades_laws WHERE law_number = ? AND is_active = 1");
     $stmt->execute([$lawNumber]);
     $law = $stmt->fetch();
@@ -1134,21 +1231,23 @@ function applyExceptionalLaw($employeeId, $lawNumber) {
         $stmt->execute([$newGrade, $employeeId]);
         
         $reason = 'exceptional_law_' . $lawNumber;
-        // 1/1 (كانون الثاني) بسنة بعد **التثبيت** — انظر exceptionalLawEffectiveDate().
-        $excDate = exceptionalLawEffectiveDate($law, tenureReferenceDate($emp));
-        $stmt = getDB()->prepare("INSERT INTO employee_grade_history (employee_id, grade_before, grade_after, change_date, reason, law_reference, notes) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $employeeId,
-            $emp['current_grade'],
-            $newGrade,
-            $excDate,
-            $reason,
-            $lawNumber,
-            $law['description_ar']
-        ]);
-        
+        // التاريخ: المختار من المستخدم إن وُجد وصحيح، وإلا 1/1 (كانون الثاني) بسنة بعد التثبيت.
+        $excDate = ($dateOverride && strtotime($dateOverride))
+            ? date('Y-m-d', strtotime($dateOverride))
+            : exceptionalLawEffectiveDate($law, tenureReferenceDate($emp));
+        // 🔵 نكتب كل درجة **مفردة** (+1، والكسر الأخير ½) صفّاً مستقلاً بـcounted=1 وdelta ثابت —
+        //    ليطابق نموذج «كل درجة لحالها». المجموع = gradesToAdd. (المستخدم يعدّل التواريخ فردياً لاحقاً.)
+        $ins = getDB()->prepare("INSERT INTO employee_grade_history (employee_id, grade_before, grade_after, delta, counted, change_date, reason, law_reference, notes) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)");
+        $run = (float)$emp['current_grade'];
+        foreach (splitGradeUnits($gradesToAdd) as $u) {
+            $b = $run; $a = min(52, round($run + $u, 1));
+            if ($a == $b) continue;                    // بلغ السقف 52
+            $ins->execute([$employeeId, $b, $a, $u, $excDate, $reason, $lawNumber, $law['description_ar']]);
+            $run = $a;
+        }
+        getDB()->prepare("UPDATE employees SET current_grade = ? WHERE id = ?")->execute([$run, $employeeId]);
         getDB()->commit();
-        return ['old_grade' => $emp['current_grade'], 'new_grade' => $newGrade, 'grades_added' => $gradesToAdd];
+        return ['old_grade' => $emp['current_grade'], 'new_grade' => $run, 'grades_added' => $gradesToAdd];
     } catch (Exception $e) {
         getDB()->rollBack();
         throw $e;
