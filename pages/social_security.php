@@ -84,7 +84,10 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-plus"></i> <?= $editRow ? 'Modifier une limite / تعديل حدّ' : 'Ajouter une limite / إضافة حدّ' ?></h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-plus"></i> <?= $editRow ? 'Modifier une limite' : 'Ajouter une limite' ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= $editRow ? 'تعديل حدّ' : 'إضافة حدّ' ?></div>
+    </h3></div>
     <div class="card-body">
         <form method="POST"<?= $editRow ? ' class="lockedit"' : '' ?>>
             <input type="hidden" name="action" value="save">
@@ -105,13 +108,13 @@ include __DIR__ . '/../includes/header.php';
                     <input type="date" name="effective_from" class="form-control" value="<?= e($editRow['effective_from'] ?? date('Y-m-d')) ?>" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Au / إلى تاريخ <small>(<?= $lang==='ar'?'فارغ = حتى الآن':'vide = jusqu\'à présent' ?>)</small></label>
+                    <label class="form-label">Au / إلى تاريخ <small>(vide = jusqu'à présent / فارغ = حتى الآن)</small></label>
                     <input type="date" name="effective_to" class="form-control" value="<?= e($editRow['effective_to'] ?? '') ?>">
                 </div>
             </div>
             <div class="form-row cols-2">
                 <div class="form-group">
-                    <label class="form-label">Plafond (L.L) / الحد الأقصى <small>(<?= $lang==='ar'?'فارغ = بلا سقف':'vide = sans plafond' ?>)</small></label>
+                    <label class="form-label">Plafond (L.L) / الحد الأقصى <small>(vide = sans plafond / فارغ = بلا سقف)</small></label>
                     <input type="number" name="max_salary_lbp" class="form-control" min="0" value="<?= e($editRow['max_salary_lbp'] ?? '') ?>">
                 </div>
                 <div class="form-group">
@@ -121,7 +124,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-group">
                 <label class="form-label">Note / ملاحظة</label>
-                <input type="text" name="notes" class="form-control" value="<?= e($editRow['notes'] ?? '') ?>" placeholder="<?= $lang==='ar'?'مثال: تعميم الضمان رقم ... بتاريخ ...':'ex: circulaire CNSS n° ...' ?>">
+                <input type="text" name="notes" class="form-control" value="<?= e($editRow['notes'] ?? '') ?>" placeholder="ex: circulaire CNSS n° ... / مثال: تعميم الضمان رقم ... بتاريخ ...">
             </div>
             <?php if ($editRow): ?>
                 <a href="<?= BASE_URL ?>pages/social_security.php" class="btn btn-light btn-sm"><i class="fas fa-times"></i> Annuler / إلغاء</a>
@@ -132,22 +135,25 @@ include __DIR__ . '/../includes/header.php';
 
 <?php foreach (cnssBranches() as $key => $names): ?>
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-shield-alt"></i> <?= e($names['ar']) ?> — <?= e($names['fr']) ?></h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-shield-alt"></i> <?= e($names['fr']) ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($names['ar']) ?></div>
+    </h3></div>
     <div class="card-body">
         <table class="table">
             <thead><tr>
                 <th>Du / من</th><th>Au / إلى</th>
                 <th>Plafond / الحد الأقصى</th>
-                <th>Note</th><th>Action</th>
+                <th>Note / ملاحظة</th><th>Action / إجراء</th>
             </tr></thead>
             <tbody>
                 <?php if (empty($byBranch[$key])): ?>
-                    <tr><td colspan="5" class="text-muted"><?= $lang==='ar'?'لا يوجد':'—' ?></td></tr>
+                    <tr><td colspan="5" class="text-muted">Aucun / لا يوجد</td></tr>
                 <?php else: foreach ($byBranch[$key] as $r): ?>
                     <tr>
                         <td><?= formatDate($r['effective_from']) ?></td>
-                        <td><?= $r['effective_to'] ? formatDate($r['effective_to']) : '<span class="badge badge-success">'.($lang==='ar'?'حتى الآن':'En cours').'</span>' ?></td>
-                        <td><?= $r['max_salary_lbp'] !== null ? '<strong>'.formatLBP($r['max_salary_lbp']).'</strong>' : '<span class="text-muted">'.($lang==='ar'?'بلا سقف':'sans plafond').'</span>' ?></td>
+                        <td><?= $r['effective_to'] ? formatDate($r['effective_to']) : '<span class="badge badge-success">En cours / حتى الآن</span>' ?></td>
+                        <td><?= $r['max_salary_lbp'] !== null ? '<strong>'.formatLBP($r['max_salary_lbp']).'</strong>' : '<span class="text-muted">sans plafond / بلا سقف</span>' ?></td>
                         <td><small><?= e($r['notes']) ?></small></td>
                         <td style="white-space:nowrap">
                             <a href="?edit=<?= $r['id'] ?>" class="btn btn-sm btn-light"><i class="fas fa-edit"></i></a>

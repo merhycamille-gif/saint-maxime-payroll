@@ -30,18 +30,21 @@ function renderEmployeeScans($employee, $id) {
         $out = '<div class="doc-saved" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">';
         $out .= '<span style="color:#15803d;font-weight:700;font-size:12px"><i class="fas fa-circle-check"></i> ملف محفوظ / Fichier enregistré</span>';
         if ($isImg) {
-            $out .= '<a href="' . $url . '" target="_blank" title="فتح كامل"><img src="' . $url . '" style="max-height:90px;border-radius:6px;border:1px solid #ccc;cursor:pointer"></a>';
+            $out .= '<a href="' . $url . '" target="_blank" title="Ouvrir / فتح كامل"><img src="' . $url . '" style="max-height:90px;border-radius:6px;border:1px solid #ccc;cursor:pointer"></a>';
         }
         $out .= '<div style="display:flex;gap:6px;flex-wrap:wrap">'
              . '<a href="' . $url . '" target="_blank" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> فتح / Voir</a>'
-             . '<button type="button" onclick="ppPrintFile(\'' . $url . '\',' . ($isImg ? 'true' : 'false') . ')" class="btn btn-sm btn-light"><i class="fas fa-print"></i> طباعة</button>'
+             . '<button type="button" onclick="ppPrintFile(\'' . $url . '\',' . ($isImg ? 'true' : 'false') . ')" class="btn btn-sm btn-light"><i class="fas fa-print"></i> Imprimer / طباعة</button>'
              . '<button type="button" onclick="ppDeleteDoc(\'' . e($field) . '\', this)" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> حذف / Supprimer</button>'
              . '</div></div>';
         return $out;
     };
     ob_start();
     ?>
-                <h4 style="color:var(--primary);margin-top:20px;">Documents & Scans / المستندات والصور</h4>
+                <h4 style="color:var(--primary);margin-top:20px;">
+                    <span dir="ltr">Documents & Scans</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">المستندات والصور</div>
+                </h4>
                 <p style="color:var(--gray-500);font-size:13px;">صور أو PDF. إذا في ملف محفوظ بيظهر رابطه؛ اترك الحقل فاضي حتى ما يتغيّر.</p>
                 <?php if ($id <= 0): ?>
                     <div class="alert alert-warning" style="font-size:13px"><i class="fas fa-info-circle"></i> احفظ الموظف أولاً (زر «حفظ» بالأسفل)، وبعدها بترجع وبترفع الصور والوثائق وبتنزل فوراً.</div>
@@ -225,7 +228,7 @@ if (in_array($action, ['new', 'edit', 'delete'])) {
 // ===== محرّر الأجر الإضافي/المكافآت المباشر (inline) — سطر لكل مرحلة، بالليرة أو الدولار =====
 function renderBonusRow($r = null) {
     // ثلاثة أنواع مستقلة: «مكافأة ومساعدة» (aide_complementaire) · «الأجر الإضافي» (prime_fixe) · «نقل».
-    $types = ['aide_complementaire' => '💰 مكافأة ومساعدة', 'prime_fixe' => '➕ الأجر الإضافي', 'transport_complement' => '🚌 نقل'];
+    $types = ['aide_complementaire' => '💰 Prime & aide / مكافأة ومساعدة', 'prime_fixe' => '➕ Supplément / الأجر الإضافي', 'transport_complement' => '🚌 Transport / نقل'];
     $t = $r['bonus_type'] ?? 'aide_complementaire';
     $cur = $r['currency'] ?? 'LBP';
     $vt = $r['value_type'] ?? 'amount';
@@ -236,7 +239,7 @@ function renderBonusRow($r = null) {
     <tr>
         <td><select name="bonus_rows[type][]" class="form-select"><?php foreach ($types as $k => $lbl): ?><option value="<?= $k ?>" <?= $t === $k ? 'selected' : '' ?>><?= $lbl ?></option><?php endforeach; ?></select></td>
         <td><select name="bonus_rows[currency][]" class="form-select"><option value="LBP" <?= $cur === 'LBP' ? 'selected' : '' ?>>ل.ل</option><option value="USD" <?= $cur === 'USD' ? 'selected' : '' ?>>$</option></select></td>
-        <td><select name="bonus_rows[vtype][]" class="form-select"><option value="amount" <?= $vt === 'amount' ? 'selected' : '' ?>>مبلغ</option><option value="percent" <?= $vt === 'percent' ? 'selected' : '' ?>>نسبة %</option></select></td>
+        <td><select name="bonus_rows[vtype][]" class="form-select"><option value="amount" <?= $vt === 'amount' ? 'selected' : '' ?>>Montant / مبلغ</option><option value="percent" <?= $vt === 'percent' ? 'selected' : '' ?>>Taux % / نسبة</option></select></td>
         <td><input type="number" step="0.01" min="0" name="bonus_rows[value][]" value="<?= $val ?>" class="form-control" style="min-width:90px" placeholder="0"></td>
         <td><select name="bonus_rows[from][]" class="form-select"><option value="">—</option><?php for ($mm = 1; $mm <= 12; $mm++): ?><option value="<?= $mm ?>" <?= $from === $mm ? 'selected' : '' ?>><?= monthName($mm) ?></option><?php endfor; ?></select></td>
         <td><select name="bonus_rows[to][]" class="form-select"><option value="">—</option><?php for ($mm = 1; $mm <= 12; $mm++): ?><option value="<?= $mm ?>" <?= $to === $mm ? 'selected' : '' ?>><?= monthName($mm) ?></option><?php endfor; ?></select></td>
@@ -525,7 +528,7 @@ if (!empty($_SESSION['flash'])) {
 // View routing
 // =====================================================
 if ($action === 'list') {
-    $pageTitle = 'Employés & Enseignants';
+    $pageTitle = 'Employés & Enseignants / الموظفون والأساتذة';
     include __DIR__ . '/../includes/header.php';
     
     $typeFilter = $_GET['type'] ?? '';
@@ -573,11 +576,14 @@ if ($action === 'list') {
     <div class="card">
         <div class="card-header">
             <?php $syLbl = (activeSchoolYear() === 'all') ? (($_SESSION['lang'] ?? 'fr') === 'ar' ? 'كل السنين' : 'Toutes années') : activeSchoolYear(); ?>
-            <h3><i class="fas fa-users"></i> Liste des employés (<?= count($employees) ?>) — <?= e(currentSchoolName()) ?> — <span style="color:var(--primary)"><i class="fas fa-calendar-alt"></i> <?= e($syLbl) ?></span></h3>
+            <h3>
+                <span dir="ltr"><i class="fas fa-users"></i> Liste des employés (<?= count($employees) ?>) — <?= e(currentSchoolName()) ?> — <span style="color:var(--primary)"><i class="fas fa-calendar-alt"></i> <?= e($syLbl) ?></span></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">لائحة الموظفين والأساتذة</div>
+            </h3>
             <div class="d-flex gap-2 no-print">
-                <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer</button>
+                <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer / طباعة</button>
                 <?php if (!isAllSchools()): ?>
-                <a href="?action=new" class="btn btn-primary"><i class="fas fa-plus"></i> Nouveau</a>
+                <a href="?action=new" class="btn btn-primary"><i class="fas fa-plus"></i> Nouveau / جديد</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -588,33 +594,36 @@ if ($action === 'list') {
                 </div>
                 <div class="form-group mb-0">
                     <select name="type" class="form-select">
-                        <option value="">Tous les types</option>
-                        <option value="enseignant_titulaire" <?= $typeFilter === 'enseignant_titulaire' ? 'selected' : '' ?>>Enseignant titulaire</option>
-                        <option value="enseignant_contractuel" <?= $typeFilter === 'enseignant_contractuel' ? 'selected' : '' ?>>Enseignant contractuel</option>
-                        <option value="employe" <?= $typeFilter === 'employe' ? 'selected' : '' ?>>Employé administratif</option>
+                        <option value="">Tous les types / كل الأنواع</option>
+                        <option value="enseignant_titulaire" <?= $typeFilter === 'enseignant_titulaire' ? 'selected' : '' ?>>Enseignant titulaire / أستاذ في الملاك</option>
+                        <option value="enseignant_contractuel" <?= $typeFilter === 'enseignant_contractuel' ? 'selected' : '' ?>>Enseignant contractuel / أستاذ متعاقد</option>
+                        <option value="employe" <?= $typeFilter === 'employe' ? 'selected' : '' ?>>Employé administratif / موظف إداري</option>
                     </select>
                 </div>
                 <div class="form-group mb-0">
                     <select name="status" class="form-select">
-                        <option value="">Tous statuts</option>
-                        <option value="actif" <?= $statusFilter === 'actif' ? 'selected' : '' ?>>Actif</option>
-                        <option value="suspendu" <?= $statusFilter === 'suspendu' ? 'selected' : '' ?>>Suspendu</option>
-                        <option value="retraite" <?= $statusFilter === 'retraite' ? 'selected' : '' ?>>Retraité</option>
-                        <option value="demissionne" <?= $statusFilter === 'demissionne' ? 'selected' : '' ?>>Démissionné</option>
+                        <option value="">Tous statuts / كل الحالات</option>
+                        <option value="actif" <?= $statusFilter === 'actif' ? 'selected' : '' ?>>Actif / نشط</option>
+                        <option value="suspendu" <?= $statusFilter === 'suspendu' ? 'selected' : '' ?>>Suspendu / متوقف</option>
+                        <option value="retraite" <?= $statusFilter === 'retraite' ? 'selected' : '' ?>>Retraité / متقاعد</option>
+                        <option value="demissionne" <?= $statusFilter === 'demissionne' ? 'selected' : '' ?>>Démissionné / مستقيل</option>
                     </select>
                 </div>
                 <div class="form-group mb-0">
-                    <button type="submit" class="btn btn-light w-100"><i class="fas fa-filter"></i> Filtrer</button>
+                    <button type="submit" class="btn btn-light w-100"><i class="fas fa-filter"></i> Filtrer / تصفية</button>
                 </div>
             </form>
             
             <?php if (empty($employees)): ?>
                 <div class="empty-state">
                     <i class="fas fa-users"></i>
-                    <h4>Aucun employé trouvé</h4>
-                    <p>Commencez par ajouter votre premier employé</p>
+                    <h4>
+                        <span dir="ltr">Aucun employé trouvé</span>
+                        <div style="font-size:0.85em;font-weight:600;opacity:0.9">لا يوجد موظفون</div>
+                    </h4>
+                    <p>Commencez par ajouter votre premier employé / ابدأ بإضافة أول موظف</p>
                     <a href="?action=new" class="btn btn-primary mt-3">
-                        <i class="fas fa-plus"></i> Nouveau
+                        <i class="fas fa-plus"></i> Nouveau / جديد
                     </a>
                 </div>
             <?php else: ?>
@@ -622,15 +631,15 @@ if ($action === 'list') {
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Code</th>
-                                <?php if (isAllSchools()): ?><th>École</th><?php endif; ?>
-                                <th>Nom complet</th>
-                                <th>Type</th>
-                                <th>Échelon</th>
-                                <th>Date d'embauche</th>
-                                <th>Téléphone</th>
-                                <th>Statut</th>
-                                <th class="no-print">Actions</th>
+                                <th>Code / الرمز</th>
+                                <?php if (isAllSchools()): ?><th>École / المدرسة</th><?php endif; ?>
+                                <th>Nom complet / الاسم الكامل</th>
+                                <th>Type / النوع</th>
+                                <th>Échelon / الدرجة</th>
+                                <th>Date d'embauche / تاريخ الدخول</th>
+                                <th>Téléphone / الهاتف</th>
+                                <th>Statut / الحالة</th>
+                                <th class="no-print">Actions / إجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -660,13 +669,13 @@ if ($action === 'list') {
                                     <td><span class="badge badge-<?= $statusInfo['badge'] ?>"><?= e($statusInfo['label']) ?></span></td>
                                     <td class="no-print">
                                         <div style="display:flex;gap:5px;flex-wrap:nowrap;align-items:center">
-                                        <a href="?action=edit&id=<?= $emp['id'] ?>" class="btn btn-sm btn-light" title="Modifier">
+                                        <a href="?action=edit&id=<?= $emp['id'] ?>" class="btn btn-sm btn-light" title="Modifier / تعديل">
                                             <i class="fas fa-edit"></i>
                                         </a>
-                                        <a href="<?= BASE_URL ?>pages/monthly_payroll.php?employee_id=<?= $emp['id'] ?>" class="btn btn-sm btn-light" title="Paie">
+                                        <a href="<?= BASE_URL ?>pages/monthly_payroll.php?employee_id=<?= $emp['id'] ?>" class="btn btn-sm btn-light" title="Paie / الراتب">
                                             <i class="fas fa-money-check"></i>
                                         </a>
-                                        <a href="?action=delete&id=<?= $emp['id'] ?>" class="btn btn-sm btn-danger" data-confirm="<?= e('⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . (trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr'])) . '» ؟') ?>" title="Supprimer">
+                                        <a href="?action=delete&id=<?= $emp['id'] ?>" class="btn btn-sm btn-danger" data-confirm="<?= e('⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . (trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr'])) . '» ؟') ?>" title="Supprimer / حذف">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                         </div>
@@ -725,7 +734,7 @@ if ($action === 'edit' && $id > 0) {
     }
 }
 
-$pageTitle = $action === 'new' ? 'Nouvel employé' : 'Modifier: ' . trim($employee['first_name_fr'] . ' ' . $employee['last_name_fr']);
+$pageTitle = $action === 'new' ? 'Nouvel employé / موظف جديد' : 'Modifier / تعديل: ' . trim($employee['first_name_fr'] . ' ' . $employee['last_name_fr']);
 
 // Get diplomas
 $diplomas = $db->query("SELECT * FROM diploma_starting_grades")->fetchAll();
@@ -758,7 +767,7 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="d-flex justify-between align-center mb-3">
     <a href="<?= BASE_URL ?>pages/employees.php" class="btn btn-light">
-        <i class="fas fa-arrow-left"></i> Retour à la liste
+        <i class="fas fa-arrow-left"></i> Retour à la liste / العودة إلى اللائحة
     </a>
     <?php if ($id > 0): ?>
         <div class="d-flex gap-2">
@@ -769,13 +778,13 @@ include __DIR__ . '/../includes/header.php';
                 <i class="fas fa-trash"></i> حذف / Supprimer
             </a>
             <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>" class="btn btn-light">
-                <i class="fas fa-layer-group"></i> Échelons & Promotions
+                <i class="fas fa-layer-group"></i> Échelons & Promotions / الدرجات والترقيات
             </a>
             <a href="<?= BASE_URL ?>pages/monthly_payroll.php?employee_id=<?= $id ?>" class="btn btn-gold">
-                <i class="fas fa-money-check"></i> Calculer paie
+                <i class="fas fa-money-check"></i> Calculer paie / حساب الراتب
             </a>
             <a href="<?= BASE_URL ?>pages/annual_slip.php?employee_id=<?= $id ?>" class="btn btn-primary">
-                <i class="fas fa-file-invoice"></i> Bulletin annuel
+                <i class="fas fa-file-invoice"></i> Bulletin annuel / الكشف السنوي
             </a>
         </div>
     <?php endif; ?>
@@ -785,12 +794,12 @@ include __DIR__ . '/../includes/header.php';
     <input type="hidden" name="active_tab" id="activeTabField" value="<?= e(preg_replace('/[^a-z]/', '', $_GET['tab'] ?? '')) ?>">
     <!-- Tabs -->
     <div class="tabs">
-        <button type="button" class="tab active" data-tab="personal">👤 Personnel</button>
-        <button type="button" class="tab" data-tab="address">🏠 Adresse</button>
-        <button type="button" class="tab" data-tab="employment">🎓 Emploi</button>
-        <button type="button" class="tab" data-tab="finance">💰 Financier</button>
-        <button type="button" class="tab" data-tab="bonuses">🎁 Primes & Indemnités</button>
-        <button type="button" class="tab" data-tab="deductions">🧾 Retenues</button>
+        <button type="button" class="tab active" data-tab="personal">👤 Personnel / شخصي</button>
+        <button type="button" class="tab" data-tab="address">🏠 Adresse / العنوان</button>
+        <button type="button" class="tab" data-tab="employment">🎓 Emploi / التوظيف</button>
+        <button type="button" class="tab" data-tab="finance">💰 Financier / مالي</button>
+        <button type="button" class="tab" data-tab="bonuses">🎁 Primes & Indemnités / مكافآت وتعويضات</button>
+        <button type="button" class="tab" data-tab="deductions">🧾 Retenues / محسومات</button>
         <?php if ($id > 0 && $employee['employee_type'] === 'enseignant_titulaire'): ?>
         <button type="button" class="tab" data-tab="grades">🏆 الدرجات / Échelons</button>
         <?php endif; ?>
@@ -800,7 +809,10 @@ include __DIR__ . '/../includes/header.php';
     <div class="tab-content active" data-tab-content="personal">
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-id-card"></i> Type & Identité</h3>
+                <h3>
+                    <span dir="ltr"><i class="fas fa-id-card"></i> Type & Identité</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">النوع والهوية</div>
+                </h3>
             </div>
             <div class="card-body">
                 <div class="form-row cols-3">
@@ -824,12 +836,12 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Code <small>(auto)</small></label>
+                        <label class="form-label">Code / الرمز <small>(auto)</small></label>
                         <input type="text" class="form-control" value="<?= e($employee['employee_code']) ?>" disabled>
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Statut</label>
+                        <label class="form-label">Statut / الحالة</label>
                         <select name="status" class="form-select">
                             <option value="actif" <?= $employee['status'] === 'actif' ? 'selected' : '' ?>>Actif / نشط</option>
                             <option value="suspendu" <?= $employee['status'] === 'suspendu' ? 'selected' : '' ?>>Suspendu / متوقف</option>
@@ -839,97 +851,103 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
                 
-                <h4 style="color:var(--primary);margin-top:20px;">Informations personnelles / المعلومات الشخصية</h4>
+                <h4 style="color:var(--primary);margin-top:20px;">
+                    <span dir="ltr">Informations personnelles</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">المعلومات الشخصية</div>
+                </h4>
                 
                 <div class="form-row cols-3">
                     <div class="form-group">
-                        <label class="form-label">Prénom (FR)</label>
+                        <label class="form-label">Prénom (FR) / الاسم الأول</label>
                         <input type="text" name="first_name_fr" class="form-control" value="<?= e($employee['first_name_fr']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">الاسم الأول (AR) <span class="req">*</span></label>
+                        <label class="form-label">Prénom / الاسم الأول (AR) <span class="req">*</span></label>
                         <input type="text" name="first_name_ar" class="form-control" value="<?= e($employee['first_name_ar']) ?>" dir="rtl" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Nom du père (FR)</label>
+                        <label class="form-label">Nom du père (FR) / اسم الأب</label>
                         <input type="text" name="father_name_fr" class="form-control" value="<?= e($employee['father_name_fr']) ?>">
                     </div>
                 </div>
                 
                 <div class="form-row cols-3">
                     <div class="form-group">
-                        <label class="form-label">اسم الأب (AR)</label>
+                        <label class="form-label">Nom du père / اسم الأب (AR)</label>
                         <input type="text" name="father_name_ar" class="form-control" value="<?= e($employee['father_name_ar']) ?>" dir="rtl">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Nom de famille (FR)</label>
+                        <label class="form-label">Nom de famille (FR) / الشهرة</label>
                         <input type="text" name="last_name_fr" class="form-control" value="<?= e($employee['last_name_fr']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">الشهرة (AR) <span class="req">*</span></label>
+                        <label class="form-label">Nom de famille / الشهرة (AR) <span class="req">*</span></label>
                         <input type="text" name="last_name_ar" class="form-control" value="<?= e($employee['last_name_ar']) ?>" dir="rtl" required>
                     </div>
                 </div>
                 
                 <div class="form-row cols-2">
                     <div class="form-group">
-                        <label class="form-label">Prénom de la mère</label>
+                        <label class="form-label">Prénom de la mère / اسم الأم</label>
                         <input type="text" name="mother_first_name" class="form-control" value="<?= e($employee['mother_first_name']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Nom de famille de la mère</label>
+                        <label class="form-label">Nom de famille de la mère / شهرة الأم</label>
                         <input type="text" name="mother_last_name" class="form-control" value="<?= e($employee['mother_last_name']) ?>">
                     </div>
                 </div>
                 
                 <div class="form-row cols-4">
                     <div class="form-group">
-                        <label class="form-label">Nationalité</label>
+                        <label class="form-label">Nationalité / الجنسية</label>
                         <select name="nationality" class="form-select">
-                            <option value="lebanese" <?= $employee['nationality'] === 'lebanese' ? 'selected' : '' ?>>Libanais</option>
-                            <option value="syrian" <?= $employee['nationality'] === 'syrian' ? 'selected' : '' ?>>Syrien</option>
-                            <option value="palestinian" <?= $employee['nationality'] === 'palestinian' ? 'selected' : '' ?>>Palestinien</option>
-                            <option value="other" <?= $employee['nationality'] === 'other' ? 'selected' : '' ?>>Autre</option>
+                            <option value="lebanese" <?= $employee['nationality'] === 'lebanese' ? 'selected' : '' ?>>Libanais / لبناني</option>
+                            <option value="syrian" <?= $employee['nationality'] === 'syrian' ? 'selected' : '' ?>>Syrien / سوري</option>
+                            <option value="palestinian" <?= $employee['nationality'] === 'palestinian' ? 'selected' : '' ?>>Palestinien / فلسطيني</option>
+                            <option value="other" <?= $employee['nationality'] === 'other' ? 'selected' : '' ?>>Autre / أخرى</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Date de naissance</label>
+                        <label class="form-label">Date de naissance / تاريخ الولادة</label>
                         <input type="date" name="birth_date" class="form-control" value="<?= e($employee['birth_date']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Lieu de naissance</label>
+                        <label class="form-label">Lieu de naissance / مكان الولادة</label>
                         <input type="text" name="birth_place" class="form-control" value="<?= e($employee['birth_place']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">N° registre civil</label>
+                        <label class="form-label">N° registre civil / رقم السجل المدني</label>
                         <input type="text" name="civil_registry_number" class="form-control" value="<?= e($employee['civil_registry_number']) ?>">
                     </div>
                 </div>
                 
-                <h4 style="color:var(--primary);margin-top:20px;">Situation familiale / الحالة العائلية</h4>
+                <h4 style="color:var(--primary);margin-top:20px;">
+                    <span dir="ltr">Situation familiale</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">الحالة العائلية</div>
+                </h4>
                 
                 <div class="form-row cols-3">
                     <div class="form-group">
-                        <label class="form-label">Situation</label>
+                        <label class="form-label">Situation / الوضع العائلي</label>
                         <select name="social_status" class="form-select">
                             <option value="celibataire" <?= $employee['social_status'] === 'celibataire' ? 'selected' : '' ?>>Célibataire / أعزب</option>
-                            <option value="marie_sans_enfants" <?= $employee['social_status'] === 'marie_sans_enfants' ? 'selected' : '' ?>>Marié sans enfants</option>
-                            <option value="marie_1_enfant" <?= $employee['social_status'] === 'marie_1_enfant' ? 'selected' : '' ?>>Marié 1 enfant</option>
-                            <option value="marie_2_enfants" <?= $employee['social_status'] === 'marie_2_enfants' ? 'selected' : '' ?>>Marié 2 enfants</option>
-                            <option value="marie_3_enfants" <?= $employee['social_status'] === 'marie_3_enfants' ? 'selected' : '' ?>>Marié 3 enfants</option>
-                            <option value="marie_4_enfants" <?= $employee['social_status'] === 'marie_4_enfants' ? 'selected' : '' ?>>Marié 4 enfants</option>
-                            <option value="marie_5_enfants" <?= $employee['social_status'] === 'marie_5_enfants' ? 'selected' : '' ?>>Marié 5 enfants</option>
+                            <option value="marie_sans_enfants" <?= $employee['social_status'] === 'marie_sans_enfants' ? 'selected' : '' ?>>Marié sans enfants / متزوج بلا أولاد</option>
+                            <option value="marie_1_enfant" <?= $employee['social_status'] === 'marie_1_enfant' ? 'selected' : '' ?>>Marié 1 enfant / متزوج وولد</option>
+                            <option value="marie_2_enfants" <?= $employee['social_status'] === 'marie_2_enfants' ? 'selected' : '' ?>>Marié 2 enfants / متزوج وولدان</option>
+                            <option value="marie_3_enfants" <?= $employee['social_status'] === 'marie_3_enfants' ? 'selected' : '' ?>>Marié 3 enfants / متزوج و3 أولاد</option>
+                            <option value="marie_4_enfants" <?= $employee['social_status'] === 'marie_4_enfants' ? 'selected' : '' ?>>Marié 4 enfants / متزوج و4 أولاد</option>
+                            <option value="marie_5_enfants" <?= $employee['social_status'] === 'marie_5_enfants' ? 'selected' : '' ?>>Marié 5 enfants / متزوج و5 أولاد</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Conjoint travaille ?</label>
+                        <label class="form-label">Conjoint travaille ? / هل يعمل الزوج؟</label>
                         <label class="switch">
                             <input type="checkbox" name="spouse_works" value="1" <?= $employee['spouse_works'] ? 'checked' : '' ?>>
                             <span class="slider"></span>
                         </label>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Nombre d'enfants</label>
+                        <label class="form-label">Nombre d'enfants / عدد الأولاد</label>
                         <input type="number" name="number_of_children" class="form-control" value="<?= (int)$employee['number_of_children'] ?>" min="0" max="20">
                     </div>
                 </div>
@@ -943,50 +961,53 @@ include __DIR__ . '/../includes/header.php';
     <div class="tab-content" data-tab-content="address">
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-home"></i> Adresse & Contact</h3>
+                <h3>
+                    <span dir="ltr"><i class="fas fa-home"></i> Adresse & Contact</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">العنوان والتواصل</div>
+                </h3>
             </div>
             <div class="card-body">
                 <div class="form-row cols-4">
                     <div class="form-group">
-                        <label class="form-label">Gouvernorat</label>
+                        <label class="form-label">Gouvernorat / المحافظة</label>
                         <input type="text" name="gouvernorat" class="form-control" value="<?= e($employee['gouvernorat']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Caza</label>
+                        <label class="form-label">Caza / القضاء</label>
                         <input type="text" name="district" class="form-control" value="<?= e($employee['district']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Ville</label>
+                        <label class="form-label">Ville / المدينة</label>
                         <input type="text" name="ville" class="form-control" value="<?= e($employee['ville']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Quartier</label>
+                        <label class="form-label">Quartier / الحي</label>
                         <input type="text" name="quartier" class="form-control" value="<?= e($employee['quartier']) ?>">
                     </div>
                 </div>
                 
                 <div class="form-row cols-3">
                     <div class="form-group">
-                        <label class="form-label">Rue</label>
+                        <label class="form-label">Rue / الشارع</label>
                         <input type="text" name="rue" class="form-control" value="<?= e($employee['rue']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Immeuble</label>
+                        <label class="form-label">Immeuble / المبنى</label>
                         <input type="text" name="immeuble" class="form-control" value="<?= e($employee['immeuble']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Étage</label>
+                        <label class="form-label">Étage / الطابق</label>
                         <input type="text" name="etage" class="form-control" value="<?= e($employee['etage']) ?>">
                     </div>
                 </div>
                 
                 <div class="form-row cols-3">
                     <div class="form-group">
-                        <label class="form-label">Téléphone 1</label>
+                        <label class="form-label">Téléphone 1 / الهاتف 1</label>
                         <input type="text" name="phone1" class="form-control" value="<?= e($employee['phone1']) ?>" placeholder="+961 ...">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Téléphone 2</label>
+                        <label class="form-label">Téléphone 2 / الهاتف 2</label>
                         <input type="text" name="phone2" class="form-control" value="<?= e($employee['phone2']) ?>">
                     </div>
                     <div class="form-group">
@@ -1002,7 +1023,10 @@ include __DIR__ . '/../includes/header.php';
     <div class="tab-content" data-tab-content="employment">
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-graduation-cap"></i> Qualifications & Emploi</h3>
+                <h3>
+                    <span dir="ltr"><i class="fas fa-graduation-cap"></i> Qualifications & Emploi</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">المؤهلات والتوظيف</div>
+                </h3>
             </div>
             <div class="card-body">
                 <?php
@@ -1035,7 +1059,7 @@ include __DIR__ . '/../includes/header.php';
 
                 <div class="form-row cols-3 emp-teacher-only">
                     <div class="form-group">
-                        <label class="form-label">Diplôme</label>
+                        <label class="form-label">Diplôme / الشهادة</label>
                         <select name="diploma" class="form-select">
                             <?php foreach ($diplomas as $d): ?>
                                 <option value="<?= e($d['diploma_code']) ?>" data-grade="<?= $d['starting_grade'] ?>" data-immediate="<?= (int)$d['gets_immediate_grade'] ?>" <?= $employee['diploma'] === $d['diploma_code'] ? 'selected' : '' ?>>
@@ -1045,11 +1069,11 @@ include __DIR__ . '/../includes/header.php';
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Spécialisation</label>
+                        <label class="form-label">Spécialisation / الاختصاص</label>
                         <input type="text" name="specialization" class="form-control" value="<?= e($employee['specialization']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Matières enseignées</label>
+                        <label class="form-label">Matières enseignées / المواد التي يعلّمها</label>
                         <input type="text" name="subjects_taught" class="form-control" value="<?= e($employee['subjects_taught']) ?>" placeholder="Maths, Sciences...">
                     </div>
                 </div>
@@ -1066,12 +1090,12 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Jours/semaine <small>(أيام الحضور — منها يُحسب النقل)</small></label>
+                        <label class="form-label">Jours/semaine / أيام بالأسبوع <small>(أيام الحضور — منها يُحسب النقل)</small></label>
                         <input type="number" id="daysPerWeek" name="days_per_week" class="form-control" value="<?= (int)$employee['days_per_week'] ?>" min="1" max="7">
                         <small id="dpwTransport" class="text-muted" style="display:block;margin-top:3px"></small>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Heures/semaine</label>
+                        <label class="form-label">Heures/semaine / ساعات بالأسبوع</label>
                         <input type="number" name="hours_per_week" class="form-control" value="<?= (float)$employee['hours_per_week'] ?>" step="0.5" min="0">
                     </div>
                 </div>
@@ -1098,11 +1122,11 @@ include __DIR__ . '/../includes/header.php';
 
                 <div class="form-row cols-4">
                     <div class="form-group">
-                        <label class="form-label">Date d'embauche <span class="req">*</span> <small>(دخول المدرسة)</small></label>
+                        <label class="form-label">Date d'embauche / تاريخ الدخول <span class="req">*</span> <small>(دخول المدرسة)</small></label>
                         <input type="date" id="hireDate" name="hire_date" class="form-control" value="<?= e($employee['hire_date']) ?>" required>
                     </div>
                     <div class="form-group emp-teacher-only">
-                        <label class="form-label">دخول الملاك <small>(تلقائي = دخول المدرسة + سنتين، يمكن تعديله)</small></label>
+                        <label class="form-label">Titularisation / دخول الملاك <small>(تلقائي = دخول المدرسة + سنتين، يمكن تعديله)</small></label>
                         <input type="date" id="malakDate" name="titularization_date" class="form-control" value="<?= e($employee['titularization_date']) ?>">
                         <small id="malakHint" class="text-muted" style="display:block;margin-top:3px"></small>
                     </div>
@@ -1120,7 +1144,7 @@ include __DIR__ . '/../includes/header.php';
                     })();
                     </script>
                     <div class="form-group emp-teacher-only">
-                        <label class="form-label">تاريخ التثبيت <small>(اختياري — تلقائي = دخول المدرسة + سنتين؛ منه تبدأ الدرجات الاستثنائية بكانون)</small></label>
+                        <label class="form-label">Confirmation / تاريخ التثبيت <small>(اختياري — تلقائي = دخول المدرسة + سنتين؛ منه تبدأ الدرجات الاستثنائية بكانون)</small></label>
                         <input type="date" name="tenure_confirmation_date" class="form-control" value="<?= e($employee['tenure_confirmation_date']) ?>">
                     </div>
                     <div class="form-group emp-teacher-only">
@@ -1136,7 +1160,10 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
 
-                <h4 style="color:var(--primary);margin-top:16px;">تواريخ الترك / Dates de départ <small style="font-weight:normal;color:var(--gray-500)">(اتركها فاضية إذا الموظف ما زال على رأس عمله — والمتروك ما بينتقل للسنة الجديدة)</small></h4>
+                <h4 style="color:var(--primary);margin-top:16px;">
+                    <span dir="ltr">Dates de départ</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">تواريخ الترك <small style="font-weight:normal;color:var(--gray-500)">(اتركها فاضية إذا الموظف ما زال على رأس عمله — والمتروك ما بينتقل للسنة الجديدة)</small></div>
+                </h4>
                 <div class="form-row cols-3">
                     <div class="form-group">
                         <label class="form-label">ترك الضمان / Départ CNSS</label>
@@ -1152,25 +1179,31 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
                 
-                <h4 style="color:var(--primary);margin-top:20px;">Numéros officiels / الأرقام الرسمية</h4>
+                <h4 style="color:var(--primary);margin-top:20px;">
+                    <span dir="ltr">Numéros officiels</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">الأرقام الرسمية</div>
+                </h4>
                 
                 <div class="form-row cols-3">
                     <div class="form-group">
-                        <label class="form-label">N° NSSF / CNSS</label>
+                        <label class="form-label">N° NSSF/CNSS / رقم الضمان</label>
                         <input type="text" name="nssf_number" class="form-control" value="<?= e($employee['nssf_number']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">N° Ministère des Finances</label>
+                        <label class="form-label">N° Ministère des Finances / رقم وزارة المالية</label>
                         <input type="text" name="finance_ministry_number" class="form-control" value="<?= e($employee['finance_ministry_number']) ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">N° Caisse d'indemnités</label>
+                        <label class="form-label">N° Caisse d'indemnités / رقم صندوق التعويضات</label>
                         <input type="text" name="caisse_number" class="form-control" value="<?= e($employee['caisse_number']) ?>">
                     </div>
                 </div>
 
                 <?php if ($id > 0 && $employee['employee_type'] === 'enseignant_titulaire'): ?>
-                <h4 style="color:var(--primary);margin-top:20px;">Grades exceptionnels / الدرجات الاستثنائية</h4>
+                <h4 style="color:var(--primary);margin-top:20px;">
+                    <span dir="ltr">Grades exceptionnels</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">الدرجات الاستثنائية</div>
+                </h4>
                 <div class="alert alert-info" style="font-size:13px">
                     <i class="fas fa-arrow-up"></i> إدارة الدرجات الاستثنائية (كل درجة لحالها بتاريخها) صارت في تبويب
                     <strong>«🏆 الدرجات»</strong> فوق — كل الدرجات مفصّلة مع شك-مارك وتاريخ قابل للتعديل، والدرجات المتاحة للإعطاء.
@@ -1184,7 +1217,10 @@ include __DIR__ . '/../includes/header.php';
     <div class="tab-content" data-tab-content="finance">
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-money-bill-wave"></i> Salaire de base</h3>
+                <h3>
+                    <span dir="ltr"><i class="fas fa-money-bill-wave"></i> Salaire de base</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">الراتب الأساسي</div>
+                </h3>
             </div>
             <div class="card-body">
                 <div class="form-row cols-3">
@@ -1192,8 +1228,8 @@ include __DIR__ . '/../includes/header.php';
                         <label class="form-label">طريقة احتساب الراتب / Mode de salaire</label>
                         <select name="salary_input_mode" id="salaryModeSelect" class="form-select">
                             <option value="percent_of_lbp" <?= $employee['salary_input_mode'] === 'percent_of_lbp' ? 'selected' : '' ?>>📊 السلسلة حسب القانون (ملاك) / Échelle légale</option>
-                            <option value="direct_lbp" <?= $employee['salary_input_mode'] === 'direct_lbp' ? 'selected' : '' ?>>💷 راتب متفق عليه بالليرة (متعاقد)</option>
-                            <option value="direct_usd" <?= $employee['salary_input_mode'] === 'direct_usd' ? 'selected' : '' ?>>💵 راتب متفق عليه بالدولار</option>
+                            <option value="direct_lbp" <?= $employee['salary_input_mode'] === 'direct_lbp' ? 'selected' : '' ?>>💷 Salaire convenu en LBP / راتب متفق عليه بالليرة (متعاقد)</option>
+                            <option value="direct_usd" <?= $employee['salary_input_mode'] === 'direct_usd' ? 'selected' : '' ?>>💵 Salaire convenu en USD / راتب متفق عليه بالدولار</option>
                         </select>
                     </div>
                     <div class="form-group salmode-field" data-mode="direct_lbp">
@@ -1202,7 +1238,7 @@ include __DIR__ . '/../includes/header.php';
                         <small class="text-muted d-block">يُعتمد هذا المبلغ كأساس للراتب مباشرةً للأستاذ المتعاقد.</small>
                     </div>
                     <div class="form-group salmode-field" data-mode="direct_usd">
-                        <label class="form-label">Salaire en USD ($)</label>
+                        <label class="form-label">Salaire en USD ($) / الراتب بالدولار</label>
                         <input type="number" name="base_salary_usd" class="form-control" value="<?= e($employee['base_salary_usd']) ?>" step="0.01" min="0">
                     </div>
                     <div class="form-group salmode-field" data-mode="percent_of_lbp">
@@ -1250,11 +1286,11 @@ include __DIR__ . '/../includes/header.php';
                 
                 <div class="form-row cols-3">
                     <div class="form-group">
-                        <label class="form-label">Nombre de mois payés / an</label>
+                        <label class="form-label">Nombre de mois payés/an / عدد الأشهر المدفوعة سنوياً</label>
                         <select name="payment_months_per_year" class="form-select">
-                            <option value="10" <?= $employee['payment_months_per_year'] == 10 ? 'selected' : '' ?>>10 mois (Enseignant)</option>
-                            <option value="11" <?= $employee['payment_months_per_year'] == 11 ? 'selected' : '' ?>>11 mois</option>
-                            <option value="12" <?= $employee['payment_months_per_year'] == 12 ? 'selected' : '' ?>>12 mois (Employé)</option>
+                            <option value="10" <?= $employee['payment_months_per_year'] == 10 ? 'selected' : '' ?>>10 mois (Enseignant) / 10 أشهر (أستاذ)</option>
+                            <option value="11" <?= $employee['payment_months_per_year'] == 11 ? 'selected' : '' ?>>11 mois / 11 شهراً</option>
+                            <option value="12" <?= $employee['payment_months_per_year'] == 12 ? 'selected' : '' ?>>12 mois (Employé) / 12 شهراً (موظف)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -1271,16 +1307,19 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
                 
-                <h4 style="color:var(--primary);margin-top:20px;">Allocations familiales (exonérées de toutes retenues)</h4>
+                <h4 style="color:var(--primary);margin-top:20px;">
+                    <span dir="ltr">Allocations familiales (exonérées de toutes retenues)</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">التعويضات العائلية (معفاة من كل المحسومات)</div>
+                </h4>
                 <p style="color:var(--gray-500);font-size:13px;">معفاة من كل المحسومات والضرائب</p>
                 
                 <div class="form-row cols-2">
                     <div class="form-group">
-                        <label class="form-label">Allocation épouse (L.L)</label>
+                        <label class="form-label">Allocation épouse (L.L) / تعويض الزوجة</label>
                         <input type="number" name="family_allowance_spouse_lbp" class="form-control" value="<?= (int)$employee['family_allowance_spouse_lbp'] ?>" min="0">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Allocation enfants (L.L)</label>
+                        <label class="form-label">Allocation enfants (L.L) / تعويض الأولاد</label>
                         <input type="number" name="family_allowance_children_lbp" class="form-control" value="<?= (int)$employee['family_allowance_children_lbp'] ?>" min="0">
                     </div>
                 </div>
@@ -1304,7 +1343,10 @@ include __DIR__ . '/../includes/header.php';
                     ];
                 }
                 ?>
-                <h4 style="color:var(--primary);margin-top:24px;">🚌 تعويض النقل اليومي / Transport journalier</h4>
+                <h4 style="color:var(--primary);margin-top:24px;">
+                    <span dir="ltr">🚌 Transport journalier</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">تعويض النقل اليومي</div>
+                </h4>
                 <p style="color:var(--gray-500);font-size:13px;margin-top:0">
                     القيمة <strong>يومية</strong>، والبرنامج يحسب النقل الشهري = <strong>اليومي × الأيام × الأسابيع</strong>.
                     أضِف <strong>سطر لكل فترة (من شهر إلى شهر)</strong> إذا تغيّرت القيمة اليومية خلال السنة. (اتركه فاضي إذا ما في نقل.)
@@ -1323,7 +1365,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="table-wrapper">
                     <table class="table" style="min-width:560px">
                         <thead><tr>
-                            <th>القيمة اليومية</th><th>العملة</th><th>من شهر</th><th>إلى شهر</th><th>الشهري ≈</th><th></th>
+                            <th>Valeur journalière / القيمة اليومية</th><th>Devise / العملة</th><th>De (mois) / من شهر</th><th>À (mois) / إلى شهر</th><th>Mensuel ≈ / الشهري ≈</th><th></th>
                         </tr></thead>
                         <tbody id="tLinesBody"></tbody>
                     </table>
@@ -1376,7 +1418,10 @@ include __DIR__ . '/../includes/header.php';
                 })();
                 </script>
 
-                <h4 style="color:var(--primary);margin-top:24px;">مكافأة ومساعدة وتعويض النقل / Prime, aide & transport</h4>
+                <h4 style="color:var(--primary);margin-top:24px;">
+                    <span dir="ltr">Prime, aide & transport</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">مكافأة ومساعدة وتعويض النقل</div>
+                </h4>
                 <p style="color:var(--gray-500);font-size:13px;margin-top:0">
                     كل سطر: النوع · العملة (ل.ل أو $) · مبلغ أو نسبة % · من شهر إلى شهر.
                     أضِف أسطر للّيرة وللدولار وعلى مراحل. (النسبة % تُحسب من الراتب الأساسي · شهر فاضي = كل الأشهر)
@@ -1385,7 +1430,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="table-wrapper">
                     <table class="table" style="min-width:680px">
                         <thead><tr>
-                            <th>النوع</th><th>العملة</th><th>مبلغ/نسبة</th><th>القيمة</th><th>من شهر</th><th>إلى شهر</th><th></th>
+                            <th>Type / النوع</th><th>Devise / العملة</th><th>Montant/Taux / مبلغ/نسبة</th><th>Valeur / القيمة</th><th>De (mois) / من شهر</th><th>À (mois) / إلى شهر</th><th></th>
                         </tr></thead>
                         <tbody id="bonusBody">
                             <?php
@@ -1414,10 +1459,13 @@ include __DIR__ . '/../includes/header.php';
     <div class="tab-content" data-tab-content="bonuses">
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-gift"></i> Primes & Aides & Transport</h3>
+                <h3>
+                    <span dir="ltr"><i class="fas fa-gift"></i> Primes & Aides & Transport</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">المكافآت والمساعدات والنقل</div>
+                </h3>
                 <?php if ($id > 0): ?>
                     <a href="<?= BASE_URL ?>pages/bonuses.php?employee_id=<?= $id ?>" class="btn btn-primary btn-sm">
-                        <i class="fas fa-edit"></i> Gérer les primes
+                        <i class="fas fa-edit"></i> Gérer les primes / إدارة المكافآت
                     </a>
                 <?php endif; ?>
             </div>
@@ -1430,10 +1478,10 @@ include __DIR__ . '/../includes/header.php';
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Type</th>
-                                <th>Période</th>
-                                <th>Montant</th>
-                                <th>Mois</th>
+                                <th>Type / النوع</th>
+                                <th>Période / الفترة</th>
+                                <th>Montant / المبلغ</th>
+                                <th>Mois / الأشهر</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1454,7 +1502,7 @@ include __DIR__ . '/../includes/header.php';
                                     <td><?= $b['start_month'] ? monthName($b['start_month'], 'fr', true) : 'Tous' ?> → <?= $b['end_month'] ? monthName($b['end_month'], 'fr', true) : 'Tous' ?></td>
                                 </tr>
                             <?php endforeach; if (!$hasAny): ?>
-                                <tr><td><?= $label ?></td><td colspan="3" style="color:var(--gray-400)">Aucune</td></tr>
+                                <tr><td><?= $label ?></td><td colspan="3" style="color:var(--gray-400)">Aucune / لا يوجد</td></tr>
                             <?php endif; endforeach; ?>
                         </tbody>
                     </table>
@@ -1467,7 +1515,10 @@ include __DIR__ . '/../includes/header.php';
     <div class="tab-content" data-tab-content="deductions">
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-percent"></i> Configuration des bases de retenues</h3>
+                <h3>
+                    <span dir="ltr"><i class="fas fa-percent"></i> Configuration des bases de retenues</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">إعداد أسس المحسومات</div>
+                </h3>
             </div>
             <div class="card-body">
                 <div class="alert alert-info">
@@ -1479,7 +1530,10 @@ include __DIR__ . '/../includes/header.php';
                     <!-- Tax -->
                     <div class="card" style="margin:0;">
                         <div class="card-header" style="background:#fef2f2;">
-                            <h3 style="color:var(--danger)"><i class="fas fa-file-invoice-dollar"></i> Impôt sur le revenu</h3>
+                            <h3 style="color:var(--danger)">
+                                <span dir="ltr"><i class="fas fa-file-invoice-dollar"></i> Impôt sur le revenu</span>
+                                <div style="font-size:0.85em;font-weight:600;opacity:0.9">ضريبة الدخل</div>
+                            </h3>
                         </div>
                         <div class="card-body">
                             <label class="d-flex justify-between align-center mb-3">
@@ -1496,7 +1550,10 @@ include __DIR__ . '/../includes/header.php';
                     <!-- CNSS -->
                     <div class="card" style="margin:0;">
                         <div class="card-header" style="background:#eff6ff;">
-                            <h3 style="color:var(--info)"><i class="fas fa-hospital"></i> CNSS (3%)</h3>
+                            <h3 style="color:var(--info)">
+                                <span dir="ltr"><i class="fas fa-hospital"></i> CNSS (3%)</span>
+                                <div style="font-size:0.85em;font-weight:600;opacity:0.9">الضمان الاجتماعي (٣٪)</div>
+                            </h3>
                         </div>
                         <div class="card-body">
                             <label class="d-flex justify-between align-center mb-3">
@@ -1513,7 +1570,10 @@ include __DIR__ . '/../includes/header.php';
                     <!-- EOC -->
                     <div class="card" style="margin:0;">
                         <div class="card-header" style="background:#fffbeb;">
-                            <h3 style="color:var(--warning)"><i class="fas fa-piggy-bank"></i> Caisse EOC (6%)</h3>
+                            <h3 style="color:var(--warning)">
+                                <span dir="ltr"><i class="fas fa-piggy-bank"></i> Caisse EOC (6%)</span>
+                                <div style="font-size:0.85em;font-weight:600;opacity:0.9">صندوق التعويضات (٦٪)</div>
+                            </h3>
                         </div>
                         <div class="card-body">
                             <label class="d-flex justify-between align-center mb-3">
@@ -1537,9 +1597,12 @@ include __DIR__ . '/../includes/header.php';
                 ?>
                 <div class="card" style="margin-top:16px;border:1px solid #fed7aa;">
                     <div class="card-header" style="background:#fff7ed;">
-                        <h3 style="color:#b45309;"><i class="fas fa-hourglass-half"></i> بلوغ سنّ الـ64 / Âge de la retraite (64 ans)
-                            <?php if ($empAge !== null): ?><span class="badge" style="background:<?= $empAge >= 64 ? '#b45309' : '#64748b' ?>;color:#fff">العمر: <?= (int)$empAge ?> سنة</span><?php endif; ?>
-                            <?php if ($emp64Date): ?><span class="badge" style="background:#b45309;color:#fff">تاريخ بلوغ 64: <?= e(displayDMY($emp64Date)) ?></span><?php endif; ?>
+                        <h3 style="color:#b45309;">
+                            <span dir="ltr"><i class="fas fa-hourglass-half"></i> Âge de la retraite (64 ans)
+                                <?php if ($empAge !== null): ?><span class="badge" style="background:<?= $empAge >= 64 ? '#b45309' : '#64748b' ?>;color:#fff">العمر: <?= (int)$empAge ?> سنة</span><?php endif; ?>
+                                <?php if ($emp64Date): ?><span class="badge" style="background:#b45309;color:#fff">تاريخ بلوغ 64: <?= e(displayDMY($emp64Date)) ?></span><?php endif; ?>
+                            </span>
+                            <div style="font-size:0.85em;font-weight:600;opacity:0.9">بلوغ سنّ الـ64</div>
                         </h3>
                     </div>
                     <div class="card-body">
@@ -1565,7 +1628,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card">
         <div class="card-body d-flex justify-between">
             <a href="<?= BASE_URL ?>pages/employees.php" class="btn btn-light">
-                <i class="fas fa-times"></i> Annuler
+                <i class="fas fa-times"></i> Annuler / إلغاء
             </a>
             <button type="submit" id="empSaveBtn" class="btn btn-primary btn-lg">
                 <i class="fas fa-save"></i> Enregistrer / حفظ
@@ -1578,9 +1641,12 @@ include __DIR__ . '/../includes/header.php';
 <!-- لائحة الدرجات: تظهر فقط تحت تبويب «🏆 الدرجات» (مخفية افتراضياً؛ يتحكّم بها gradesTabToggle أدناه) -->
 <div class="card" id="gradesPanel" style="margin-top:18px;display:none">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <h3><i class="fas fa-layer-group"></i> درجات الأستاذ — كلها بتواريخها، شيل الصح عن أي وحدة ما بدّك تحسبها</h3>
+        <h3>
+            <span dir="ltr"><i class="fas fa-layer-group"></i> Échelons de l'enseignant — chacun daté, décochez celui à ne pas calculer</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">درجات الأستاذ — كلها بتواريخها، شيل الصح عن أي وحدة ما بدّك تحسبها</div>
+        </h3>
         <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>" class="btn btn-sm btn-light no-print">
-            <i class="fas fa-up-right-from-square"></i> صفحة الدرجات الكاملة (قوانين/تدرّج)
+            <i class="fas fa-up-right-from-square"></i> Page complète des échelons / صفحة الدرجات الكاملة (قوانين/تدرّج)
         </a>
     </div>
     <div class="card-body">

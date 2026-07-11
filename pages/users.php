@@ -260,33 +260,34 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="page-actions no-print">
-    <a href="#user-form" class="btn btn-primary"><i class="fas fa-user-plus"></i> <?= $lang==='ar'?'حساب جديد':'Nouveau compte' ?></a>
-    <form method="POST" style="display:inline" data-confirm="<?= $lang==='ar'?'إنشاء حساب «قراءة فقط» لكل مدرسة + حساب الرئاسة العامة؟ (المدارس التي لها حساب تُتجاهَل)':'Créer un compte lecture seule par école + présidence ?' ?>">
+    <a href="#user-form" class="btn btn-primary"><i class="fas fa-user-plus"></i> Nouveau compte / حساب جديد</a>
+    <form method="POST" style="display:inline" data-confirm="Créer un compte lecture seule par école + présidence ? / إنشاء حساب «قراءة فقط» لكل مدرسة + حساب الرئاسة العامة؟">
         <input type="hidden" name="csrf" value="<?= csrfToken() ?>">
         <input type="hidden" name="form_action" value="generate_all">
-        <button type="submit" class="btn btn-success"><i class="fas fa-magic"></i> <?= $lang==='ar'?'توليد حساب لكل المدارس':'Générer les comptes écoles' ?></button>
+        <button type="submit" class="btn btn-success"><i class="fas fa-magic"></i> Générer les comptes écoles / توليد حساب لكل المدارس</button>
     </form>
-    <form method="POST" style="display:inline" data-confirm="<?= $lang==='ar'?'⚠️ تعيين كلمات مرور جديدة لكل حسابات المدارس وطباعتها؟ (كلمات المرور القديمة لن تعود تعمل)':'Réinitialiser tous les mots de passe des écoles ?' ?>">
+    <form method="POST" style="display:inline" data-confirm="Réinitialiser tous les mots de passe des écoles ? / ⚠️ تعيين كلمات مرور جديدة لكل حسابات المدارس؟">
         <input type="hidden" name="csrf" value="<?= csrfToken() ?>">
         <input type="hidden" name="form_action" value="reset_passwords">
-        <button type="submit" class="btn btn-warning"><i class="fas fa-key"></i> <?= $lang==='ar'?'إعادة تعيين كلمات المرور وطباعتها':'Réinitialiser les mots de passe' ?></button>
+        <button type="submit" class="btn btn-warning"><i class="fas fa-key"></i> Réinitialiser les mots de passe / إعادة تعيين كلمات المرور وطباعتها</button>
     </form>
 </div>
 
 <?php if (!empty($_SESSION['generated_creds'])): $gc = $_SESSION['generated_creds']; unset($_SESSION['generated_creds']); ?>
 <div class="card" style="border:2px solid #16a34a">
     <div class="card-header" style="background:#f0fdf4"><h3><i class="fas fa-key"></i>
-        <?= $lang==='ar'?'كلمات المرور الجديدة — احفظها/اطبعها الآن (لن تظهر مرة ثانية)':'Nouveaux mots de passe — notez-les maintenant' ?></h3></div>
+        <span dir="ltr">Nouveaux mots de passe — notez-les maintenant</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">كلمات المرور الجديدة — احفظها/اطبعها الآن (لن تظهر مرة ثانية)</div></h3></div>
     <div class="card-body">
         <div class="page-actions no-print">
-            <button onclick="dlCreds()" class="btn btn-success btn-lg"><i class="fas fa-file-excel"></i> <?= $lang==='ar'?'⬇️ تنزيل كملف Excel':'Télécharger (Excel)' ?></button>
-            <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> <?= $lang==='ar'?'طباعة':'Imprimer' ?></button>
+            <button onclick="dlCreds()" class="btn btn-success btn-lg"><i class="fas fa-file-excel"></i> Télécharger (Excel) / تنزيل كملف Excel</button>
+            <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer / طباعة</button>
         </div>
         <table class="table" id="credsTable">
             <thead><tr>
-                <th><?= $lang==='ar'?'المدرسة':'École' ?></th>
-                <th><?= $lang==='ar'?'اسم الدخول':'Identifiant' ?></th>
-                <th><?= $lang==='ar'?'كلمة المرور':'Mot de passe' ?></th>
+                <th>École / المدرسة</th>
+                <th>Identifiant / اسم الدخول</th>
+                <th>Mot de passe / كلمة المرور</th>
             </tr></thead>
             <tbody>
             <?php foreach ($gc as $c): ?>
@@ -322,33 +323,33 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- Liste -->
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-users-cog"></i> <?= $lang==='ar'?'الحسابات':'Comptes' ?></h3></div>
+    <div class="card-header"><h3><i class="fas fa-users-cog"></i> <span dir="ltr">Comptes</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">الحسابات</div></h3></div>
     <div class="card-body">
         <table class="table table-hover">
             <thead><tr>
-                <th><?= $lang==='ar'?'الاسم':'Nom' ?></th>
-                <th><?= $lang==='ar'?'اسم الدخول':'Identifiant' ?></th>
-                <th><?= $lang==='ar'?'الدور':'Rôle' ?></th>
-                <th><?= $lang==='ar'?'المدرسة':'École' ?></th>
-                <th><?= $lang==='ar'?'الحالة':'État' ?></th>
-                <th><?= $lang==='ar'?'آخر دخول':'Dernière connexion' ?></th>
-                <th class="no-print"><?= $lang==='ar'?'إجراءات':'Actions' ?></th>
+                <th>Nom / الاسم</th>
+                <th>Identifiant / اسم الدخول</th>
+                <th>Rôle / الدور</th>
+                <th>École / المدرسة</th>
+                <th>État / الحالة</th>
+                <th>Dernière connexion / آخر دخول</th>
+                <th class="no-print">Actions / إجراءات</th>
             </tr></thead>
             <tbody>
             <?php foreach ($users as $u): $isMe = ((int)$u['id'] === $myId); ?>
                 <tr>
-                    <td><strong><?= e($u['full_name']) ?></strong><?= $isMe ? ' <span class="badge badge-info">'.($lang==='ar'?'أنت':'vous').'</span>' : '' ?></td>
+                    <td><strong><?= e($u['full_name']) ?></strong><?= $isMe ? ' <span class="badge badge-info">vous / أنت</span>' : '' ?></td>
                     <td><code><?= e($u['username']) ?></code></td>
                     <td><?= e($ROLES[$u['role']] ?? $u['role']) ?></td>
                     <td><?php
                         $as = $u['allowed_schools'] ?? null;
                         if ($u['role'] === 'superadmin') {
-                            echo '<span class="text-muted">'.($lang==='ar'?'كل المدارس':'Toutes').'</span>';
+                            echo '<span class="text-muted">Toutes / كل المدارس</span>';
                         } elseif ($as === 'all') {
-                            echo '<strong>🏛️ '.($lang==='ar'?'كل المدارس':'Toutes').'</strong>';
+                            echo '<strong>🏛️ Toutes / كل المدارس</strong>';
                         } elseif ($as !== null && $as !== '' && strpos($as, ',') !== false) {
                             $cnt = count(array_filter(explode(',', $as)));
-                            echo '<strong>'.$cnt.'</strong> '.($lang==='ar'?'مدارس':'écoles');
+                            echo '<strong>'.$cnt.'</strong> écoles / مدارس';
                         } elseif ($u['school_id']) {
                             echo e(schoolNameById((int)$u['school_id']));
                         } elseif ($as !== null && $as !== '') {
@@ -359,21 +360,21 @@ include __DIR__ . '/../includes/header.php';
                     ?></td>
                     <td>
                         <?php if ($u['is_active']): ?>
-                            <span class="badge badge-success"><i class="fas fa-check"></i> <?= $lang==='ar'?'مفعّل':'Actif' ?></span>
+                            <span class="badge badge-success"><i class="fas fa-check"></i> Actif / مفعّل</span>
                         <?php else: ?>
-                            <span class="badge badge-danger"><i class="fas fa-ban"></i> <?= $lang==='ar'?'موقوف':'Bloqué' ?></span>
+                            <span class="badge badge-danger"><i class="fas fa-ban"></i> Bloqué / موقوف</span>
                         <?php endif; ?>
                     </td>
                     <td class="text-muted"><?= $u['last_login'] ? e($u['last_login']) : '—' ?></td>
                     <td class="no-print">
-                        <a href="?edit=<?= $u['id'] ?>#user-form" class="btn btn-sm btn-light" title="<?= $lang==='ar'?'تعديل':'Modifier' ?>"><i class="fas fa-edit"></i></a>
+                        <a href="?edit=<?= $u['id'] ?>#user-form" class="btn btn-sm btn-light" title="Modifier / تعديل"><i class="fas fa-edit"></i></a>
                         <?php if (!$isMe): ?>
                             <?php if ($u['is_active']): ?>
-                                <a href="?toggle=<?= $u['id'] ?>" class="btn btn-sm btn-warning" data-confirm="<?= $lang==='ar'?'إيقاف دخول هذا الحساب؟':'Bloquer l\'accès de ce compte ?' ?>" title="<?= $lang==='ar'?'إيقاف الدخول':'Bloquer' ?>"><i class="fas fa-ban"></i> <?= $lang==='ar'?'إيقاف':'Bloquer' ?></a>
+                                <a href="?toggle=<?= $u['id'] ?>" class="btn btn-sm btn-warning" data-confirm="Bloquer l'accès de ce compte ? / إيقاف دخول هذا الحساب؟" title="Bloquer / إيقاف الدخول"><i class="fas fa-ban"></i> Bloquer / إيقاف</a>
                             <?php else: ?>
-                                <a href="?toggle=<?= $u['id'] ?>" class="btn btn-sm btn-success" data-confirm="<?= $lang==='ar'?'تفعيل دخول هذا الحساب؟':'Activer l\'accès ?' ?>" title="<?= $lang==='ar'?'تفعيل':'Activer' ?>"><i class="fas fa-check"></i> <?= $lang==='ar'?'تفعيل':'Activer' ?></a>
+                                <a href="?toggle=<?= $u['id'] ?>" class="btn btn-sm btn-success" data-confirm="Activer l'accès ? / تفعيل دخول هذا الحساب؟" title="Activer / تفعيل"><i class="fas fa-check"></i> Activer / تفعيل</a>
                             <?php endif; ?>
-                            <a href="?delete=<?= $u['id'] ?>" class="btn btn-sm btn-danger" data-confirm="<?= $lang==='ar'?'حذف هذا الحساب نهائياً؟':'Supprimer ce compte ?' ?>" title="<?= $lang==='ar'?'حذف':'Supprimer' ?>"><i class="fas fa-trash"></i></a>
+                            <a href="?delete=<?= $u['id'] ?>" class="btn btn-sm btn-danger" data-confirm="Supprimer ce compte ? / حذف هذا الحساب نهائياً؟" title="Supprimer / حذف"><i class="fas fa-trash"></i></a>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -387,7 +388,8 @@ include __DIR__ . '/../includes/header.php';
 <div class="card no-print" id="user-form">
     <div class="card-header">
         <h3><i class="fas fa-<?= $editUser ? 'user-edit' : 'user-plus' ?>"></i>
-            <?= $editUser ? ($lang==='ar'?'تعديل الحساب':'Modifier le compte') : ($lang==='ar'?'حساب جديد':'Nouveau compte') ?></h3>
+            <span dir="ltr"><?= $editUser ? 'Modifier le compte' : 'Nouveau compte' ?></span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= $editUser ? 'تعديل الحساب' : 'حساب جديد' ?></div></h3>
     </div>
     <div class="card-body">
         <form method="POST"<?= $editUser ? ' class="lockedit"' : '' ?>>
@@ -395,11 +397,11 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="id" value="<?= $editUser['id'] ?? 0 ?>">
             <div class="form-row cols-2">
                 <div class="form-group">
-                    <label class="form-label"><?= $lang==='ar'?'الاسم الكامل':'Nom complet' ?> *</label>
+                    <label class="form-label">Nom complet / الاسم الكامل *</label>
                     <input type="text" name="full_name" class="form-control" required value="<?= e($editUser['full_name'] ?? '') ?>">
                 </div>
                 <div class="form-group">
-                    <label class="form-label"><?= $lang==='ar'?'اسم الدخول':'Identifiant' ?> *</label>
+                    <label class="form-label">Identifiant / اسم الدخول *</label>
                     <input type="text" name="username" class="form-control" required autocomplete="off" value="<?= e($editUser['username'] ?? '') ?>">
                 </div>
             </div>
@@ -414,7 +416,7 @@ include __DIR__ . '/../includes/header.php';
             ?>
             <div class="form-row cols-2">
                 <div class="form-group">
-                    <label class="form-label"><?= $lang==='ar'?'الدور':'Rôle' ?> *</label>
+                    <label class="form-label">Rôle / الدور *</label>
                     <select name="role" class="form-control" onchange="var r=this.value;document.getElementById('singleSchoolRow').style.display=(r==='operator'||r==='admin')?'':'none';document.getElementById('viewerSchoolsRow').style.display=(r==='viewer')?'':'none';document.getElementById('permsRow').style.display=(r==='viewer')?'':'none';">
                         <?php foreach ($ROLES as $rk => $rlabel): ?>
                             <option value="<?= $rk ?>" <?= ($curRole === $rk) ? 'selected' : '' ?>><?= e($rlabel) ?></option>
@@ -422,9 +424,9 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
                 <div class="form-group" id="singleSchoolRow" style="<?= $showSingle ? '' : 'display:none' ?>">
-                    <label class="form-label"><?= $lang==='ar'?'المدرسة':'École' ?></label>
+                    <label class="form-label">École / المدرسة</label>
                     <select name="school_id" class="form-control">
-                        <option value="0">— <?= $lang==='ar'?'اختر مدرسة':'Choisir une école' ?> —</option>
+                        <option value="0">— Choisir une école / اختر مدرسة —</option>
                         <?php foreach ($schools as $s): ?>
                             <option value="<?= (int)$s['id'] ?>" <?= (($editUser['school_id'] ?? 0) == $s['id']) ? 'selected' : '' ?>>
                                 <?= e($lang==='ar' ? $s['name_ar'] : $s['name_fr']) ?>
@@ -437,12 +439,12 @@ include __DIR__ . '/../includes/header.php';
             <!-- نطاق المدارس لحساب المدرسة (viewer): كل المدارس أو مدارس محددة -->
             <div class="form-group" id="viewerSchoolsRow" style="<?= $curRole === 'viewer' ? '' : 'display:none' ?>">
                 <label class="form-label"><i class="fas fa-school"></i>
-                    <?= $lang==='ar'?'أي مدرسة/مدارس يرى هذا الحساب؟':'Quelles écoles voit ce compte ?' ?></label>
+                    Quelles écoles voit ce compte ? / أي مدرسة/مدارس يرى هذا الحساب؟</label>
                 <div style="padding:12px 14px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
                     <label class="form-check" style="margin:0 0 8px;font-weight:700">
                         <input type="checkbox" name="schools_all" value="1" <?= $vsAll ? 'checked' : '' ?>
                                onclick="document.querySelectorAll('#vsList input').forEach(c=>{c.disabled=this.checked; if(this.checked)c.checked=false;});">
-                        🏛️ <?= $lang==='ar'?'كل المدارس (الرئاسة العامة)':'Toutes les écoles' ?>
+                        🏛️ Toutes les écoles / كل المدارس (الرئاسة العامة)
                     </label>
                     <div id="vsList" style="display:flex;flex-wrap:wrap;gap:14px;max-height:180px;overflow:auto">
                         <?php foreach ($schools as $s): ?>
@@ -465,7 +467,7 @@ include __DIR__ . '/../includes/header.php';
             ?>
             <div class="form-group" id="permsRow" style="<?= $curRole === 'viewer' ? '' : 'display:none' ?>">
                 <label class="form-label"><i class="fas fa-tasks"></i>
-                    <?= $lang==='ar'?'ماذا ترى هذه المدرسة؟ (ضع ✓ على ما تريدها أن تراه)':'Que voit cette école ? (cochez ce qu\'elle peut voir)' ?></label>
+                    Que voit cette école ? (cochez ce qu'elle peut voir) / ماذا ترى هذه المدرسة؟ (ضع ✓ على ما تريدها أن تراه)</label>
                 <div style="display:flex;flex-wrap:wrap;gap:16px;padding:12px 14px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
                     <?php foreach (viewerReportPages() as $pk => $plabel): ?>
                     <label class="form-check" style="margin:0;white-space:nowrap">
@@ -480,7 +482,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-row cols-2">
                 <div class="form-group">
-                    <label class="form-label"><?= $lang==='ar'?'كلمة المرور':'Mot de passe' ?> <?= $editUser ? '' : '*' ?></label>
+                    <label class="form-label">Mot de passe / كلمة المرور <?= $editUser ? '' : '*' ?></label>
                     <input type="password" name="password" class="form-control" autocomplete="new-password" minlength="6"
                            <?= $editUser ? '' : 'required' ?>
                            placeholder="<?= $editUser ? ($lang==='ar'?'اتركها فارغة لعدم التغيير':'Laisser vide pour ne pas changer') : '' ?>">
@@ -489,14 +491,14 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-group" style="align-self:end">
                     <label class="form-check">
                         <input type="checkbox" name="is_active" value="1" <?= (!$editUser || $editUser['is_active']) ? 'checked' : '' ?>>
-                        <?= $lang==='ar'?'الحساب مفعّل (يسمح بالدخول)':'Compte actif (accès autorisé)' ?>
+                        Compte actif (accès autorisé) / الحساب مفعّل (يسمح بالدخول)
                     </label>
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> <?= $lang==='ar'?'حفظ':'Enregistrer' ?></button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
                 <?php if ($editUser): ?>
-                <a href="<?= BASE_URL ?>pages/users.php" class="btn btn-light"><?= $lang==='ar'?'إلغاء':'Annuler' ?></a>
+                <a href="<?= BASE_URL ?>pages/users.php" class="btn btn-light">Annuler / إلغاء</a>
                 <?php endif; ?>
             </div>
         </form>

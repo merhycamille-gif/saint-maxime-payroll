@@ -14,7 +14,7 @@ $db = getDB();
 handleAge64Post($db, BASE_URL . 'pages/retirement_64.php'); // يعالج keep64/unkeep64/depart64 ثم يعيد التوجيه
 
 $currentPage = 'retirement_64';
-$pageTitle = 'بلوغ سنّ الـ64';
+$pageTitle = 'Atteinte de 64 ans / بلوغ سنّ الـ64';
 
 $rows = age64List($db, false); // الجميع (كل السنوات)
 
@@ -26,7 +26,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <?php
-renderAge64Cards($rows, '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-user-check"></i><h4>لا أحد بلغ 64 حالياً</h4><p>ستظهر هنا أسماء من يبلغون 64 سنة وهم على رأس عملهم.</p></div></div></div>');
+renderAge64Cards($rows, '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-user-check"></i><h4><span dir="ltr">Personne n\'a atteint 64 ans actuellement</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">لا أحد بلغ 64 حالياً</div></h4><p>ستظهر هنا أسماء من يبلغون 64 سنة وهم على رأس عملهم.</p></div></div></div>');
 ?>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

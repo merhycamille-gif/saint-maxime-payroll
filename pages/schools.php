@@ -134,19 +134,22 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="page-actions no-print">
-    <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer</button>
-    <a href="#school-form" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle école</a>
-    <a href="<?= BASE_URL ?>pages/purge_schools.php" class="btn btn-danger" style="margin-inline-start:auto"><i class="fas fa-trash-alt"></i> <?= ($lang??'fr')==='ar'?'حذف مدرسة نهائياً':'Supprimer définitivement' ?></a>
+    <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer / طباعة</button>
+    <a href="#school-form" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle école / مدرسة جديدة</a>
+    <a href="<?= BASE_URL ?>pages/purge_schools.php" class="btn btn-danger" style="margin-inline-start:auto"><i class="fas fa-trash-alt"></i> Supprimer définitivement / حذف مدرسة نهائياً</a>
 </div>
 
 <!-- Liste -->
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-school"></i> Liste des écoles / قائمة المدارس</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-school"></i> Liste des écoles</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">قائمة المدارس</div>
+    </h3></div>
     <div class="card-body">
         <table class="table table-hover">
             <thead><tr>
-                <th>Code</th><th>Nom FR</th><th>الاسم</th><th>Tél</th>
-                <th>Employés</th><th>État</th><th class="no-print">Actions</th>
+                <th>Code / الرمز</th><th>Nom FR / الاسم بالفرنسي</th><th>Nom AR / الاسم بالعربي</th><th>Tél / الهاتف</th>
+                <th>Employés / الموظفون</th><th>État / الحالة</th><th class="no-print">Actions / إجراءات</th>
             </tr></thead>
             <tbody>
                 <?php foreach ($schools as $s): ?>
@@ -158,19 +161,19 @@ include __DIR__ . '/../includes/header.php';
                     <td><span class="badge badge-info"><?= $s['emp_count'] ?></span></td>
                     <td>
                         <?php if ($s['is_active']): ?>
-                            <span class="badge badge-success">Actif</span>
+                            <span class="badge badge-success">Actif / فعّال</span>
                         <?php else: ?>
-                            <span class="badge badge-secondary">Inactif</span>
+                            <span class="badge badge-secondary">Inactif / غير فعّال</span>
                         <?php endif; ?>
                     </td>
                     <td class="no-print">
-                        <a href="?edit=<?= $s['id'] ?>#school-form" class="btn btn-sm btn-light" title="Modifier"><i class="fas fa-edit"></i></a>
-                        <a href="?delete=<?= $s['id'] ?>" class="btn btn-sm btn-danger" data-confirm="Supprimer cette école ? / حذف هذه المدرسة؟" title="Supprimer"><i class="fas fa-trash"></i></a>
+                        <a href="?edit=<?= $s['id'] ?>#school-form" class="btn btn-sm btn-light" title="Modifier / تعديل"><i class="fas fa-edit"></i></a>
+                        <a href="?delete=<?= $s['id'] ?>" class="btn btn-sm btn-danger" data-confirm="Supprimer cette école ? / حذف هذه المدرسة؟" title="Supprimer / حذف"><i class="fas fa-trash"></i></a>
                     </td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (!$schools): ?>
-                <tr><td colspan="7" class="text-center text-muted">Aucune école — ajoutez la première ci-dessous</td></tr>
+                <tr><td colspan="7" class="text-center text-muted">Aucune école — ajoutez la première ci-dessous / لا توجد مدرسة — أضف الأولى أدناه</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -180,8 +183,10 @@ include __DIR__ . '/../includes/header.php';
 <!-- Formulaire -->
 <div class="card no-print" id="school-form">
     <div class="card-header">
-        <h3><i class="fas fa-<?= $editSchool ? 'edit' : 'plus' ?>"></i>
-            <?= $editSchool ? 'Modifier l\'école' : 'Nouvelle école' ?></h3>
+        <h3>
+            <span dir="ltr"><i class="fas fa-<?= $editSchool ? 'edit' : 'plus' ?>"></i>
+            <?= $editSchool ? 'Modifier l\'école' : 'Nouvelle école' ?></span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= $editSchool ? 'تعديل مدرسة' : 'مدرسة جديدة' ?></div></h3>
     </div>
     <div class="card-body">
         <form method="POST"<?= $editSchool ? ' class="lockedit"' : '' ?>>
@@ -189,21 +194,21 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="id" value="<?= $editSchool['id'] ?? 0 ?>">
             <div class="form-row cols-3">
                 <div class="form-group">
-                    <label class="form-label">Code</label>
+                    <label class="form-label">Code / الرمز</label>
                     <input type="text" name="code" class="form-control" value="<?= e($editSchool['code'] ?? '') ?>" placeholder="ex: SM">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Nom (Français) *</label>
+                    <label class="form-label">Nom (Français) / الاسم بالفرنسي *</label>
                     <input type="text" name="name_fr" class="form-control" required value="<?= e($editSchool['name_fr'] ?? '') ?>">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">الاسم (عربي) *</label>
+                    <label class="form-label">Nom (arabe) / الاسم (عربي) *</label>
                     <input type="text" name="name_ar" class="form-control" dir="rtl" required value="<?= e($editSchool['name_ar'] ?? '') ?>">
                 </div>
             </div>
             <div class="form-row cols-3">
                 <div class="form-group">
-                    <label class="form-label">العنوان (عربي)</label>
+                    <label class="form-label">Adresse (arabe) / العنوان (عربي)</label>
                     <input type="text" name="address" class="form-control" dir="rtl" value="<?= e($editSchool['address'] ?? '') ?>">
                 </div>
                 <div class="form-group">
@@ -229,7 +234,7 @@ include __DIR__ . '/../includes/header.php';
                     <input type="text" name="finance_number" class="form-control" value="<?= e($editSchool['finance_number'] ?? '') ?>">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">المدير (عربي)</label>
+                    <label class="form-label">Directeur (arabe) / المدير (عربي)</label>
                     <input type="text" name="director_name" class="form-control" dir="rtl" value="<?= e($editSchool['director_name'] ?? '') ?>">
                 </div>
             </div>
@@ -247,11 +252,11 @@ include __DIR__ . '/../includes/header.php';
                 <?php foreach ($sigList as $si => $sg): ?>
                 <div class="form-row cols-4" style="align-items:end;margin-bottom:6px">
                     <div class="form-group">
-                        <label class="form-label">الاسم <?= $si + 1 ?> (عربي)</label>
+                        <label class="form-label">Nom <?= $si + 1 ?> (arabe) / الاسم (عربي)</label>
                         <input type="text" name="sig_name[]" class="form-control" dir="rtl" value="<?= e($sg['name'] ?? '') ?>" placeholder="<?= $si === 0 ? 'اسم المسؤول' : 'اختياري' ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Nom <?= $si + 1 ?> (français)</label>
+                        <label class="form-label">Nom <?= $si + 1 ?> (français) / الاسم (فرنسي)</label>
                         <input type="text" name="sig_name_fr[]" class="form-control" dir="ltr" value="<?= e($sg['name_fr'] ?? '') ?>" placeholder="تلقائي إن تُرك فارغاً">
                     </div>
                     <div class="form-group">
@@ -275,7 +280,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
                 <?php if ($editSchool): ?>
-                <a href="<?= BASE_URL ?>pages/schools.php" class="btn btn-light">Annuler</a>
+                <a href="<?= BASE_URL ?>pages/schools.php" class="btn btn-light">Annuler / إلغاء</a>
                 <?php endif; ?>
             </div>
         </form>

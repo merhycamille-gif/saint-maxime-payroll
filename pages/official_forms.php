@@ -48,43 +48,43 @@ $titulaireOnly = ['eoc_card'];
 $teacherOnly = ['teacher_card'];
 
 $titles = [
-    'cnss_employ'    => 'إعلام عن استخدام أجير (CNSS 41A)',
-    'cnss_terminate' => 'إعلام عن ترك أجير عمله (CNSS 41A)',
-    'cnss_employ2'   => 'تصريح باستخدام أجير + العيال (CNSS 2-AA)',
-    'cnss_work'      => 'إفادة عمل لمن يهمه الأمر (CNSS 489)',
-    'cnss_work_detail'=> 'إفادة عمل — مرض (مفصّلة) (CNSS 2M)',
-    'cnss_wife'      => 'تصريح عن الزوجة (CNSS 485A)',
-    'cnss_annual'    => 'التصريح الاسمي السنوي (CNSS 386)',
-    'cnss_nominative_monthly' => 'كشف اشتراكات الضمان الشهري — اسمي مفصّل',
-    'salary_detail'  => 'معلومات تفصيلية عن الراتب — جميع الأساتذة/الموظفون',
-    'cnss_contrib_monthly' => 'تصريح الضمان الشهري (CNSS 190A)',
-    'cnss_contrib_annual'  => 'تصريح الضمان الفصلي (CNSS 190A)',
-    'cnss_eos_invite'=> 'دعوة/إفادة تحديد الأجور — نهاية الخدمة (CNSS 215A)',
-    'cnss_eos_wage'  => 'إفادة بالأجر الأخير — نهاية الخدمة (CNSS 207)',
-    'cnss_eos_settle'=> 'طلب تصفية تعويض نهاية الخدمة — للموظف (CNSS)',
-    'cnss_parent'    => 'طلب تحقيق اجتماعي للوالد (CNSS 482)',
-    'tax_r5'         => 'نموذج ر5 — تصريح سنوي عن ضريبة الرواتب',
-    'tax_r6'         => 'نموذج ر6 — كشف سنوي إفرادي',
-    'tax_r6t'        => 'نموذج ر6/ت — تعديل كشف سنوي إفرادي',
-    'tax_r4'         => 'نموذج ر4 — بيان معلومات + جدول العيال',
-    'tax_r7'         => 'نموذج ر7 — كشف تاركي العمل خلال السنة',
-    'tax_r10'        => 'نموذج ر10 — بيان دوري بتأدية الضريبة',
-    'tax_register'   => 'نموذج ر3 — طلب تسجيل مستخدم/أجير جديد',
-    'teacher_card'   => 'بطاقة الأستاذ',
-    'teaching_staff' => 'لائحة الهيئة التعليمية',
-    'eoc_card'       => 'بطاقة ملاك — صندوق التعويضات',
-    'eoc_staff'      => 'بيان عام (ملاك/متعاقدين) — صندوق التعويضات',
-    'eoc_quarterly'  => 'المحسومات الفصلية — صندوق التعويضات',
-    'salary_all'     => 'كشف رواتب كل الموظفين',
-    'differences'    => 'كشف الفروقات / الزيادة',
-    'general_report' => 'تقرير عام بالمجاميع',
-    'payment_list'   => 'كشف الدفع / لائحة الرواتب',
-    'employer_cost'  => 'كلفة المؤسسة الإجمالية',
-    'full_register'  => 'جميع الأساتذة — كشف شامل بالكلفة',
-    'staff_stats'    => 'إحصاءات الموظفين',
-    'general_info'   => 'معلومات عامة عن الموظفين',
+    'cnss_employ'    => 'Déclaration d\'embauche d\'un salarié (CNSS 41A) / إعلام عن استخدام أجير (CNSS 41A)',
+    'cnss_terminate' => 'Déclaration de cessation de travail d\'un salarié (CNSS 41A) / إعلام عن ترك أجير عمله (CNSS 41A)',
+    'cnss_employ2'   => 'Déclaration d\'embauche d\'un salarié + charges de famille (CNSS 2-AA) / تصريح باستخدام أجير + العيال (CNSS 2-AA)',
+    'cnss_work'      => 'Attestation de travail (CNSS 489) / إفادة عمل لمن يهمه الأمر (CNSS 489)',
+    'cnss_work_detail'=> 'Attestation de travail — maladie (détaillée) (CNSS 2M) / إفادة عمل — مرض (مفصّلة) (CNSS 2M)',
+    'cnss_wife'      => 'Déclaration concernant l\'épouse (CNSS 485A) / تصريح عن الزوجة (CNSS 485A)',
+    'cnss_annual'    => 'Déclaration nominative annuelle (CNSS 386) / التصريح الاسمي السنوي (CNSS 386)',
+    'cnss_nominative_monthly' => 'État mensuel des cotisations CNSS — nominatif détaillé / كشف اشتراكات الضمان الشهري — اسمي مفصّل',
+    'salary_detail'  => 'Détail des salaires — tous les enseignants/employés / معلومات تفصيلية عن الراتب — جميع الأساتذة/الموظفون',
+    'cnss_contrib_monthly' => 'Déclaration mensuelle CNSS (CNSS 190A) / تصريح الضمان الشهري (CNSS 190A)',
+    'cnss_contrib_annual'  => 'Déclaration trimestrielle CNSS (CNSS 190A) / تصريح الضمان الفصلي (CNSS 190A)',
+    'cnss_eos_invite'=> 'Convocation/attestation de fixation des salaires — fin de service (CNSS 215A) / دعوة/إفادة تحديد الأجور — نهاية الخدمة (CNSS 215A)',
+    'cnss_eos_wage'  => 'Attestation du dernier salaire — fin de service (CNSS 207) / إفادة بالأجر الأخير — نهاية الخدمة (CNSS 207)',
+    'cnss_eos_settle'=> 'Demande de liquidation de l\'indemnité de fin de service — employé (CNSS) / طلب تصفية تعويض نهاية الخدمة — للموظف (CNSS)',
+    'cnss_parent'    => 'Demande d\'enquête sociale pour le parent (CNSS 482) / طلب تحقيق اجتماعي للوالد (CNSS 482)',
+    'tax_r5'         => 'Formulaire R5 — déclaration annuelle de l\'impôt sur les salaires / نموذج ر5 — تصريح سنوي عن ضريبة الرواتب',
+    'tax_r6'         => 'Formulaire R6 — état annuel individuel / نموذج ر6 — كشف سنوي إفرادي',
+    'tax_r6t'        => 'Formulaire R6/T — état annuel individuel rectificatif / نموذج ر6/ت — تعديل كشف سنوي إفرادي',
+    'tax_r4'         => 'Formulaire R4 — fiche de renseignements + charges de famille / نموذج ر4 — بيان معلومات + جدول العيال',
+    'tax_r7'         => 'Formulaire R7 — état des départs en cours d\'année / نموذج ر7 — كشف تاركي العمل خلال السنة',
+    'tax_r10'        => 'Formulaire R10 — état périodique de versement de l\'impôt / نموذج ر10 — بيان دوري بتأدية الضريبة',
+    'tax_register'   => 'Formulaire R3 — demande d\'inscription d\'un nouveau salarié / نموذج ر3 — طلب تسجيل مستخدم/أجير جديد',
+    'teacher_card'   => 'Fiche de l\'enseignant / بطاقة الأستاذ',
+    'teaching_staff' => 'Liste du corps enseignant / لائحة الهيئة التعليمية',
+    'eoc_card'       => 'Fiche du titulaire — Caisse d\'indemnités / بطاقة ملاك — صندوق التعويضات',
+    'eoc_staff'      => 'État général (titulaires/contractuels) — Caisse d\'indemnités / بيان عام (ملاك/متعاقدين) — صندوق التعويضات',
+    'eoc_quarterly'  => 'Retenues trimestrielles — Caisse d\'indemnités / المحسومات الفصلية — صندوق التعويضات',
+    'salary_all'     => 'État des salaires de tous les employés / كشف رواتب كل الموظفين',
+    'differences'    => 'État des écarts / augmentations / كشف الفروقات / الزيادة',
+    'general_report' => 'Rapport général récapitulatif / تقرير عام بالمجاميع',
+    'payment_list'   => 'État de paiement / liste de paie / كشف الدفع / لائحة الرواتب',
+    'employer_cost'  => 'Coût total pour l\'établissement / كلفة المؤسسة الإجمالية',
+    'full_register'  => 'Tous les enseignants — état complet avec coûts / جميع الأساتذة — كشف شامل بالكلفة',
+    'staff_stats'    => 'Statistiques du personnel / إحصاءات الموظفين',
+    'general_info'   => 'Informations générales sur le personnel / معلومات عامة عن الموظفين',
 ];
-$pageTitle = $titles[$form] ?? 'Rapports officiels';
+$pageTitle = $titles[$form] ?? 'Rapports officiels / تقارير رسمية';
 $currentPage = 'reports';
 
 /* ===== دوال جلب البيانات ===== */
@@ -155,14 +155,21 @@ if (in_array($form, $perEmployee) && !$emp):
     $emps = $list->fetchAll();
 ?>
     <div class="card no-print">
-        <div class="card-header"><h3><i class="fas fa-user-check"></i> <?= e($titles[$form] ?? '') ?> — اختر الموظف</h3></div>
+        <div class="card-header"><?php
+            $ofTParts = array_map('trim', explode(' / ', $titles[$form] ?? ''));
+            $ofTFr = []; $ofTAr = [];
+            foreach ($ofTParts as $ofTp) { if ($ofTp === '') continue; if (preg_match('/\p{Arabic}/u', $ofTp)) $ofTAr[] = $ofTp; else $ofTFr[] = $ofTp; }
+        ?><h3>
+            <span dir="ltr"><i class="fas fa-user-check"></i> <?= e(implode(' / ', $ofTFr)) ?> — Choisir l'employé</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e(implode(' / ', $ofTAr)) ?> — اختر الموظف</div>
+        </h3></div>
         <div class="card-body">
             <form method="get" class="form-row cols-2">
                 <input type="hidden" name="form" value="<?= e($form) ?>">
                 <div class="form-group mb-0">
                     <label class="form-label">الموظف / Employé</label>
                     <select name="employee_id" class="form-select" required>
-                        <option value="">— اختر —</option>
+                        <option value="">— Choisir / اختر —</option>
                         <?php foreach ($emps as $x): ?>
                         <option value="<?= (int)$x['id'] ?>">
                             <?= e(trim(($x['first_name_fr'].' '.$x['last_name_fr'])) ?: ($x['first_name_ar'].' '.$x['last_name_ar'])) ?>
@@ -173,7 +180,7 @@ if (in_array($form, $perEmployee) && !$emp):
                 </div>
                 <div class="form-group mb-0">
                     <label class="form-label">&nbsp;</label>
-                    <button class="btn btn-primary"><i class="fas fa-file-alt"></i> عرض النموذج</button>
+                    <button class="btn btn-primary"><i class="fas fa-file-alt"></i> Afficher le formulaire / عرض النموذج</button>
                 </div>
             </form>
         </div>
@@ -824,13 +831,13 @@ elseif ($form === 'teacher_card'):
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="teaching_staff">
         <div class="card-body form-row cols-2">
-            <div class="form-group mb-0"><label class="form-label">الفئة</label>
+            <div class="form-group mb-0"><label class="form-label">Catégorie / الفئة</label>
                 <select name="cat" class="form-select" onchange="this.form.submit()">
-                    <option value="all" <?=$cat==='all'?'selected':''?>>المتعاقدون والملاك معاً</option>
-                    <option value="titulaire" <?=$cat==='titulaire'?'selected':''?>>الداخلون في الملاك فقط</option>
-                    <option value="contractuel" <?=$cat==='contractuel'?'selected':''?>>المتعاقدون فقط</option>
+                    <option value="all" <?=$cat==='all'?'selected':''?>>Contractuels et titulaires / المتعاقدون والملاك معاً</option>
+                    <option value="titulaire" <?=$cat==='titulaire'?'selected':''?>>Titulaires uniquement / الداخلون في الملاك فقط</option>
+                    <option value="contractuel" <?=$cat==='contractuel'?'selected':''?>>Contractuels uniquement / المتعاقدون فقط</option>
                 </select></div>
-            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary"><i class="fas fa-eye"></i> عرض</button></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary"><i class="fas fa-eye"></i> Afficher / عرض</button></div>
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
@@ -914,12 +921,12 @@ elseif ($form === 'teacher_card'):
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="eoc_staff">
         <div class="card-body form-row cols-2">
-            <div class="form-group mb-0"><label class="form-label">الفئة</label>
+            <div class="form-group mb-0"><label class="form-label">Catégorie / الفئة</label>
                 <select name="cat" class="form-select" onchange="this.form.submit()">
-                    <option value="titulaire" <?=$cat==='titulaire'?'selected':''?>>الداخلون في الملاك</option>
-                    <option value="contractuel" <?=$cat==='contractuel'?'selected':''?>>المتعاقدون</option>
+                    <option value="titulaire" <?=$cat==='titulaire'?'selected':''?>>Titulaires / الداخلون في الملاك</option>
+                    <option value="contractuel" <?=$cat==='contractuel'?'selected':''?>>Contractuels / المتعاقدون</option>
                 </select></div>
-            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary"><i class="fas fa-eye"></i> عرض</button></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary"><i class="fas fa-eye"></i> Afficher / عرض</button></div>
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
@@ -1056,9 +1063,9 @@ elseif ($form === 'teacher_card'):
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="eoc_quarterly">
         <div class="card-body form-row cols-3">
-            <div class="form-group mb-0"><label class="form-label">الفصل</label>
+            <div class="form-group mb-0"><label class="form-label">Trimestre / الفصل</label>
                 <select name="quarter" class="form-select" onchange="this.form.submit()"><?php foreach ($qNames as $qn=>$ql): ?><option value="<?=$qn?>" <?=$qn===$quarter?'selected':''?>><?= e($ql) ?></option><?php endforeach; ?></select></div>
-            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> عرض</button></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
@@ -1122,9 +1129,9 @@ elseif ($form === 'teacher_card'):
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="salary_all">
         <div class="card-body form-row cols-3">
-            <div class="form-group mb-0"><label class="form-label">الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m,'ar')?></option><?php endfor; ?></select></div>
-            <div class="form-group mb-0"><label class="form-label">السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
-            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> عرض</button></div>
+            <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m,'ar')?></option><?php endfor; ?></select></div>
+            <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
@@ -1469,25 +1476,25 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
 ?>
     <?php if (!$isQuarter): ?>
     <div class="no-print" style="background:#e9f9ee;border:2px solid #1a7f37;border-radius:10px;padding:14px;margin-bottom:14px;text-align:center">
-        <div style="font-weight:700;margin-bottom:8px;font-size:15px">📥 النموذج الرسمي طبق الأصل (معبّى تلقائياً) — اكبس وحمّل:</div>
-        <a class="btn btn-danger btn-lg" href="<?= $ofExp ?>&format=pdf"><i class="fas fa-file-pdf"></i> تحميل PDF رسمي</a>
-        <a class="btn btn-success btn-lg" href="<?= $ofExp ?>&format=xlsx"><i class="fas fa-file-excel"></i> تحميل Excel رسمي</a>
+        <div style="font-weight:700;margin-bottom:8px;font-size:15px">📥 Formulaire officiel conforme (rempli automatiquement) — cliquez pour télécharger / النموذج الرسمي طبق الأصل (معبّى تلقائياً) — اكبس وحمّل:</div>
+        <a class="btn btn-danger btn-lg" href="<?= $ofExp ?>&format=pdf"><i class="fas fa-file-pdf"></i> Télécharger PDF officiel / تحميل PDF رسمي</a>
+        <a class="btn btn-success btn-lg" href="<?= $ofExp ?>&format=xlsx"><i class="fas fa-file-excel"></i> Télécharger Excel officiel / تحميل Excel رسمي</a>
     </div>
     <?php endif; ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="<?= e($form) ?>">
         <div class="card-body form-row cols-3">
             <?php if ($isQuarter): ?>
-            <div class="form-group mb-0"><label class="form-label">الفصل</label>
+            <div class="form-group mb-0"><label class="form-label">Trimestre / الفصل</label>
                 <select name="quarter" class="form-select">
                     <?php foreach ($qNames as $qn=>$ql): ?><option value="<?=$qn?>" <?=$qn===$quarter?'selected':''?>><?= e($ql) ?></option><?php endforeach; ?>
                 </select></div>
             <?php else: ?>
-            <div class="form-group mb-0"><label class="form-label">الشهر</label>
+            <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label>
                 <select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m,'ar')?></option><?php endfor; ?></select></div>
             <?php endif; ?>
-            <div class="form-group mb-0"><label class="form-label">السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
-            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> عرض</button></div>
+            <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
     <div class="official-doc rtl" id="ppExportArea" style="max-width:100%;padding:6mm">
@@ -1507,7 +1514,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         'years'   => $years > 0 ? ($years.' سنة خدمة') : '',
     ];
 ?>
-    <div class="alert alert-info no-print"><i class="fas fa-info-circle"></i> نموذج خاص بالموظف الإداري (الأستاذ ياخذ تعويض نهاية الخدمة من صندوق التعويضات لا من الضمان).</div>
+    <div class="alert alert-info no-print"><i class="fas fa-info-circle"></i> Formulaire réservé à l'employé administratif (l'enseignant perçoit son indemnité de fin de service de la Caisse d'indemnités, non de la CNSS). / نموذج خاص بالموظف الإداري (الأستاذ ياخذ تعويض نهاية الخدمة من صندوق التعويضات لا من الضمان).</div>
     <div class="official-doc rtl" id="ppExportArea" style="max-width:100%;padding:6mm">
         <?= renderFormTemplate('eos_settle', $vars) ?>
     </div>
@@ -1676,9 +1683,9 @@ elseif ($form === 'payment_list'):
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="payment_list">
         <div class="card-body form-row cols-3">
-            <div class="form-group mb-0"><label class="form-label">الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m,'ar')?></option><?php endfor; ?></select></div>
-            <div class="form-group mb-0"><label class="form-label">السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
-            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> عرض</button></div>
+            <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m,'ar')?></option><?php endfor; ?></select></div>
+            <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
@@ -1744,9 +1751,9 @@ elseif ($form === 'payment_list'):
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="full_register">
         <div class="card-body form-row cols-3">
-            <div class="form-group mb-0"><label class="form-label">الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m,'ar')?></option><?php endfor; ?></select></div>
-            <div class="form-group mb-0"><label class="form-label">السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
-            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> عرض</button></div>
+            <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m,'ar')?></option><?php endfor; ?></select></div>
+            <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
@@ -1979,10 +1986,10 @@ elseif ($form === 'payment_list'):
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="cnss_nominative_monthly">
         <div class="card-body form-row cols-3">
-            <div class="form-group mb-0"><label class="form-label">الشهر</label>
+            <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label>
                 <select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m,'ar')?></option><?php endfor; ?></select></div>
-            <div class="form-group mb-0"><label class="form-label">السنة</label><input type="number" name="year" class="form-control" value="<?= (int)$year ?>"></div>
-            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> عرض</button></div>
+            <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= (int)$year ?>"></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
@@ -2137,10 +2144,10 @@ elseif ($form === 'payment_list'):
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="salary_detail">
         <div class="card-body form-row cols-3">
-            <div class="form-group mb-0"><label class="form-label">الشهر</label>
+            <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label>
                 <select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m,'ar')?></option><?php endfor; ?></select></div>
-            <div class="form-group mb-0"><label class="form-label">السنة</label><input type="number" name="year" class="form-control" value="<?= (int)$year ?>"></div>
-            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> عرض</button></div>
+            <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= (int)$year ?>"></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">

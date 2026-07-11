@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/annual_slip_data.php'; // computeAnnualSlip
 requireLogin();
 
 $currentPage = 'annual';
-$pageTitle = 'Relevé de salaire annuel';
+$pageTitle = 'Relevé de salaire annuel / كشف الراتب السنوي';
 $db = getDB();
 
 $action = $_GET['action'] ?? '';
@@ -354,14 +354,17 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="card no-print">
     <div class="card-header">
-        <h3><i class="fas fa-file-invoice-dollar"></i> Sélection</h3>
+        <h3>
+            <span dir="ltr"><i class="fas fa-file-invoice-dollar"></i> Sélection</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">اختيار</div>
+        </h3>
     </div>
     <div class="card-body">
         <form method="GET" class="form-row cols-4">
             <div class="form-group mb-0">
                 <label class="form-label">Employé / موظف واحد</label>
                 <select name="employee_id" class="form-select">
-                    <option value="">-- (اتركه فارغاً للطباعة الجماعية) --</option>
+                    <option value="">-- (laisser vide pour impression groupée / اتركه فارغاً للطباعة الجماعية) --</option>
                     <?php
                     $emps = getYearEmployees($db, $schoolYear, $typeFilter);
                     foreach ($emps as $e):
@@ -398,19 +401,19 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-group mb-0">
                 <label class="form-label">&nbsp;</label>
-                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher</button>
+                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button>
             </div>
         </form>
 
         <!-- أزرار الكل: احتساب وطباعة جماعية للسنة المختارة حسب الفلتر -->
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px;border-top:1px solid var(--gray-200);padding-top:14px">
-            <span style="font-weight:600;color:var(--gray-700)"><i class="fas fa-users"></i> كل المدرسة (<?= e($typeFilter ? employeeTypeLabel($typeFilter) : 'الكل') ?>) للسنة <?= e($schoolYear) ?>:</span>
+            <span style="font-weight:600;color:var(--gray-700)"><i class="fas fa-users"></i> Toute l'école / كل المدرسة (<?= e($typeFilter ? employeeTypeLabel($typeFilter) : 'Tous / الكل') ?>) année / للسنة <?= e($schoolYear) ?>:</span>
             <a href="?action=calc_all_year&school_year=<?= e($schoolYear) ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-gold"
                onclick="return confirm('احتساب رواتب كل الموظفين المعروضين لكامل السنة الدراسية <?= e($schoolYear) ?>؟ قد تأخذ وقتاً.')">
-                <i class="fas fa-calculator"></i> احتساب الكل للسنة
+                <i class="fas fa-calculator"></i> Calculer toute l'année / احتساب الكل للسنة
             </a>
             <a href="?action=print_all&school_year=<?= e($schoolYear) ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-primary">
-                <i class="fas fa-print"></i> عرض/طباعة كل الكشوف
+                <i class="fas fa-print"></i> Afficher/imprimer tous les relevés / عرض/طباعة كل الكشوف
             </a>
         </div>
     </div>
@@ -437,9 +440,9 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
                 // «PDF رسمي (الكل)» = طبق الأصل عبر Chrome (صفحة لكل أستاذ، نفس تصميم الشاشة)
                 $allTarget = rawurlencode('pages/annual_slip.php?action=print_all&type=' . $typeFilter . '&school_year=' . $schoolYear);
             ?>
-            <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&fit=1&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF رسمي (الكل)</a>
+            <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&fit=1&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel (tous) / PDF رسمي (الكل)</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expAllQ ?>&format=xlsx" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
-            <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> طباعة المتصفّح</button>
+            <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
         </div>
     </div>
     <div class="alert alert-info no-print" style="margin-bottom:16px">
@@ -447,7 +450,7 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
         <strong>ملاحظة:</strong> تظهر الأرقام فقط للأشهر المُحتسَبة — إن كانت فارغة استعمل «احتساب الكل للسنة» أولاً.
     </div>
     <?php if (!$empsP): ?>
-        <div class="alert alert-warning">لا يوجد موظفون مطابقون للفلتر في هذه السنة.</div>
+        <div class="alert alert-warning">Aucun employé correspondant au filtre cette année / لا يوجد موظفون مطابقون للفلتر في هذه السنة.</div>
     <?php else: foreach ($empsP as $empP) { echo annualSlipHtml($db, $empP, $schoolYear); } endif; ?>
 
 <?php elseif ($employeeId > 0):
@@ -470,12 +473,12 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
                 <div class="form-group mb-0"><label class="form-label" style="font-size:12px">من شهر / De</label>
                     <select name="from_m" class="form-select"><?php for($i=1;$i<=12;$i++) echo "<option value='$i'>".monthName($i,'fr',true)."</option>"; ?></select>
                 </div>
-                <div class="form-group mb-0"><label class="form-label" style="font-size:12px">سنة</label>
+                <div class="form-group mb-0"><label class="form-label" style="font-size:12px">Année / سنة</label>
                     <input type="number" name="from_y" class="form-control" value="<?= $y1 ?>" style="width:90px"></div>
                 <div class="form-group mb-0"><label class="form-label" style="font-size:12px">إلى شهر / À</label>
                     <select name="to_m" class="form-select"><?php for($i=1;$i<=12;$i++) echo "<option value='$i'>".monthName($i,'fr',true)."</option>"; ?></select>
                 </div>
-                <div class="form-group mb-0"><label class="form-label" style="font-size:12px">سنة</label>
+                <div class="form-group mb-0"><label class="form-label" style="font-size:12px">Année / سنة</label>
                     <input type="number" name="to_y" class="form-control" value="<?= $y2 ?>" style="width:90px"></div>
                 <button class="btn btn-secondary"><i class="fas fa-calculator"></i> احسب الفترة / Période</button>
             </form>
@@ -485,9 +488,9 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
                 // «PDF رسمي» = طبق الأصل عن الشاشة عبر Chrome (نفس تصميم الكشف بالضبط، بلا قصّ)
                 $slipTarget = rawurlencode('pages/annual_slip.php?employee_id=' . $employeeId . '&school_year=' . $schoolYear);
             ?>
-            <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $slipTarget ?>&fit=1&name=releve_<?= $employeeId ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF رسمي</a>
+            <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $slipTarget ?>&fit=1&name=releve_<?= $employeeId ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel / PDF رسمي</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expQ ?>&format=xlsx" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
-            <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> طباعة المتصفّح</button>
+            <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
         </div>
     </div>
 
@@ -496,8 +499,11 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
 <?php else: ?>
     <div class="empty-state">
         <i class="fas fa-file-invoice-dollar"></i>
-        <h4>اختر موظفاً واحداً، أو استعمل «عرض/طباعة كل الكشوف»</h4>
-        <p>اختر السنة الدراسية والفئة، ثم موظفاً للعرض الفردي أو اطبع الكل دفعة واحدة</p>
+        <h4>
+            <span dir="ltr">Choisissez un employé, ou « Afficher/imprimer tous les relevés »</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">اختر موظفاً واحداً، أو استعمل «عرض/طباعة كل الكشوف»</div>
+        </h4>
+        <p>Choisissez l'année scolaire et le type, puis un employé pour l'aperçu individuel, ou imprimez tout en une fois / اختر السنة الدراسية والفئة، ثم موظفاً للعرض الفردي أو اطبع الكل دفعة واحدة</p>
     </div>
 <?php endif; ?>
 

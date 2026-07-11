@@ -46,7 +46,10 @@ $fromName = getSetting('smtp_from_name', '');
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="card" style="max-width:680px">
-    <div class="card-header"><h3><i class="fas fa-envelope"></i> إعدادات البريد الإلكتروني (للإرسال التلقائي)</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-envelope"></i> Paramètres de messagerie (envoi automatique)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إعدادات البريد الإلكتروني (للإرسال التلقائي)</div>
+    </h3></div>
     <div class="card-body">
         <div class="alert alert-info" style="line-height:1.9">
             يكفي إدخال <strong>إيميل المدرسة وكلمة السر</strong> — الخادم يُكشَف تلقائياً (Hotmail / Gmail / Outlook…).<br>
@@ -55,39 +58,39 @@ include __DIR__ . '/../includes/header.php';
         <form method="post" class="lockedit">
             <?= csrfField() ?>
             <div class="form-group">
-                <label class="form-label">البريد الإلكتروني للمدرسة</label>
+                <label class="form-label">E-mail de l'école / البريد الإلكتروني للمدرسة</label>
                 <input type="email" name="smtp_email" class="form-control" dir="ltr" value="<?= e($email) ?>" placeholder="ecole@hotmail.com" required>
             </div>
             <div class="form-group">
-                <label class="form-label">كلمة السر / كلمة مرور التطبيق <?= $hasPass ? '<span style="color:#16a34a">(محفوظة — اتركها فارغة للإبقاء عليها)</span>' : '' ?></label>
+                <label class="form-label">Mot de passe / كلمة السر / كلمة مرور التطبيق <?= $hasPass ? '<span style="color:#16a34a">(محفوظة — اتركها فارغة للإبقاء عليها)</span>' : '' ?></label>
                 <input type="password" name="smtp_pass" class="form-control" dir="ltr" placeholder="<?= $hasPass ? '••••••••' : 'كلمة المرور' ?>" autocomplete="new-password">
             </div>
             <div class="form-group">
-                <label class="form-label">اسم المُرسِل (يظهر بالبريد)</label>
+                <label class="form-label">Nom de l'expéditeur / اسم المُرسِل (يظهر بالبريد)</label>
                 <input type="text" name="smtp_from_name" class="form-control" value="<?= e($fromName) ?>" placeholder="<?= e(getSetting('school_name_ar','')) ?>">
             </div>
             <details style="margin:10px 0">
-                <summary style="cursor:pointer;color:#2563eb">إعدادات متقدّمة (اختياري — اتركها فارغة للكشف التلقائي)</summary>
+                <summary style="cursor:pointer;color:#2563eb">Paramètres avancés (optionnel — laisser vide pour la détection auto) / إعدادات متقدّمة (اختياري — اتركها فارغة للكشف التلقائي)</summary>
                 <div class="form-row cols-3" style="margin-top:8px">
-                    <div class="form-group"><label class="form-label">الخادم SMTP</label><input type="text" name="smtp_host" class="form-control" dir="ltr" value="<?= e($host) ?>" placeholder="smtp-mail.outlook.com"></div>
-                    <div class="form-group"><label class="form-label">المنفذ Port</label><input type="text" name="smtp_port" class="form-control" dir="ltr" value="<?= e($port) ?>" placeholder="587"></div>
-                    <div class="form-group"><label class="form-label">التشفير</label>
+                    <div class="form-group"><label class="form-label">Serveur SMTP / الخادم SMTP</label><input type="text" name="smtp_host" class="form-control" dir="ltr" value="<?= e($host) ?>" placeholder="smtp-mail.outlook.com"></div>
+                    <div class="form-group"><label class="form-label">Port / المنفذ</label><input type="text" name="smtp_port" class="form-control" dir="ltr" value="<?= e($port) ?>" placeholder="587"></div>
+                    <div class="form-group"><label class="form-label">Chiffrement / التشفير</label>
                         <select name="smtp_secure" class="form-select">
-                            <option value="" <?= $secure===''?'selected':'' ?>>تلقائي</option>
+                            <option value="" <?= $secure===''?'selected':'' ?>>Auto / تلقائي</option>
                             <option value="tls" <?= $secure==='tls'?'selected':'' ?>>STARTTLS (587)</option>
                             <option value="ssl" <?= $secure==='ssl'?'selected':'' ?>>SSL (465)</option>
                         </select>
                     </div>
                 </div>
             </details>
-            <button class="btn btn-primary" name="save" value="1"><i class="fas fa-save"></i> حفظ</button>
+            <button class="btn btn-primary" name="save" value="1"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
         </form>
         <hr>
         <form method="post" class="form-row" style="align-items:end;gap:10px">
             <?= csrfField() ?>
-            <div class="form-group" style="flex:1"><label class="form-label">إرسال رسالة تجربة إلى</label>
+            <div class="form-group" style="flex:1"><label class="form-label">Envoyer un e-mail de test à / إرسال رسالة تجربة إلى</label>
                 <input type="email" name="test_to" class="form-control" dir="ltr" value="<?= e($email) ?>" placeholder="جرّب على إيميلك"></div>
-            <button class="btn btn-success" name="test" value="1"><i class="fas fa-paper-plane"></i> إرسال تجربة</button>
+            <button class="btn btn-success" name="test" value="1"><i class="fas fa-paper-plane"></i> Envoyer un test / إرسال تجربة</button>
         </form>
     </div>
 </div>

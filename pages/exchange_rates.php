@@ -6,7 +6,7 @@ requireLogin();
 requireCsrf();
 
 $currentPage = 'rates';
-$pageTitle = 'Taux de change';
+$pageTitle = 'Taux de change / أسعار الصرف';
 $db = getDB();
 $message = ''; $messageType = 'success';
 
@@ -56,13 +56,16 @@ include __DIR__ . '/../includes/header.php';
 <?php if ($message): ?><div class="alert alert-<?= $messageType ?>"><?= e($message) ?></div><?php endif; ?>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-plus"></i> Ajouter / Modifier un taux</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-plus"></i> Ajouter / Modifier un taux</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إضافة / تعديل سعر صرف</div>
+    </h3></div>
     <div class="card-body">
         <form method="POST">
             <input type="hidden" name="action" value="set">
             <div class="form-row cols-4">
                 <div class="form-group">
-                    <label class="form-label">Mois</label>
+                    <label class="form-label">Mois / الشهر</label>
                     <select name="month" class="form-select" required>
                         <?php for($m=1;$m<=12;$m++): ?>
                             <option value="<?=$m?>" <?=$m===(int)date('n')?'selected':''?>><?=monthName($m)?></option>
@@ -70,20 +73,20 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Année</label>
+                    <label class="form-label">Année / السنة</label>
                     <input type="number" name="year" class="form-control" value="<?= date('Y') ?>" min="2020" max="2030" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Taux (1 USD = X L.L)</label>
+                    <label class="form-label">Taux (1 USD = X L.L) / سعر الصرف</label>
                     <input type="number" name="rate" class="form-control" step="0.01" value="89500" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Enregistrer</button>
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
                 </div>
             </div>
             <div class="form-group">
-                <label class="form-label">Source / Note</label>
+                <label class="form-label">Source / Note / المصدر أو ملاحظة</label>
                 <input type="text" name="source" class="form-control" placeholder="ex: BDL, Sayrafa, Marché parallèle...">
             </div>
         </form>
@@ -91,10 +94,13 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-history"></i> Historique des taux</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-history"></i> Historique des taux</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">سجلّ الأسعار</div>
+    </h3></div>
     <div class="card-body">
         <table class="table">
-            <thead><tr><th>Mois</th><th>Année</th><th>Taux</th><th>Source</th><th>Action</th></tr></thead>
+            <thead><tr><th>Mois / الشهر</th><th>Année / السنة</th><th>Taux / السعر</th><th>Source / المصدر</th><th>Action / إجراء</th></tr></thead>
             <tbody>
                 <?php foreach ($rates as $r): ?>
                     <tr>

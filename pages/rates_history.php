@@ -89,7 +89,10 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-plus"></i> <?= $editRow ? 'Modifier une valeur / تعديل قيمة' : 'Ajouter une valeur / إضافة قيمة' ?></h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-plus"></i> <?= $editRow ? 'Modifier une valeur' : 'Ajouter une valeur' ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= $editRow ? 'تعديل قيمة' : 'إضافة قيمة' ?></div>
+    </h3></div>
     <div class="card-body">
         <form method="POST"<?= $editRow ? ' class="lockedit"' : '' ?>>
             <input type="hidden" name="action" value="save">
@@ -114,7 +117,7 @@ include __DIR__ . '/../includes/header.php';
                     <input type="date" name="effective_from" class="form-control" value="<?= e($editRow['effective_from'] ?? date('Y-m-d')) ?>" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Au / إلى <small>(<?= $lang==='ar'?'فارغ=حتى الآن':'vide=en cours' ?>)</small></label>
+                    <label class="form-label">Au / إلى <small>(vide=en cours / فارغ)</small></label>
                     <input type="date" name="effective_to" class="form-control" value="<?= e($editRow['effective_to'] ?? '') ?>">
                 </div>
             </div>
@@ -137,17 +140,20 @@ include __DIR__ . '/../includes/header.php';
 
 <?php foreach (ratedParams() as $key => $info): ?>
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-percent"></i> <?= e($info['ar']) ?> — <?= e($info['fr']) ?></h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-percent"></i> <?= e($info['fr']) ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($info['ar']) ?></div>
+    </h3></div>
     <div class="card-body">
         <table class="table">
-            <thead><tr><th>Du / من</th><th>Au / إلى</th><th>Valeur / القيمة</th><th>Note</th><th>Action</th></tr></thead>
+            <thead><tr><th>Du / من</th><th>Au / إلى</th><th>Valeur / القيمة</th><th>Note / ملاحظة</th><th>Action / إجراء</th></tr></thead>
             <tbody>
                 <?php if (empty($byKey[$key])): ?>
                     <tr><td colspan="5" class="text-muted">—</td></tr>
                 <?php else: foreach ($byKey[$key] as $r): ?>
                     <tr>
                         <td><?= formatDate($r['effective_from']) ?></td>
-                        <td><?= $r['effective_to'] ? formatDate($r['effective_to']) : '<span class="badge badge-success">'.($lang==='ar'?'حتى الآن':'En cours').'</span>' ?></td>
+                        <td><?= $r['effective_to'] ? formatDate($r['effective_to']) : '<span class="badge badge-success">En cours / حتى الآن</span>' ?></td>
                         <td><strong><?= fmtRate($key, $r['value']) ?></strong></td>
                         <td><small><?= e($r['notes']) ?></small></td>
                         <td style="white-space:nowrap">

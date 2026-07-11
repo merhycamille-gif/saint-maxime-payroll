@@ -49,56 +49,56 @@ document.addEventListener('submit', function (e) {
         <nav class="sidebar-nav">
             <a href="<?= BASE_URL ?>index.php" class="<?= $currentPage === 'dashboard' ? 'active' : '' ?>">
                 <i class="fas fa-chart-line"></i>
-                <span>Tableau de bord</span>
+                <span>Tableau de bord / لوحة القيادة</span>
             </a>
             
             <?php if (canEdit()): ?>
-            <div class="nav-section">Personnel</div>
+            <div class="nav-section">Personnel / الموظفون</div>
 
             <a href="<?= BASE_URL ?>pages/employees.php" class="<?= $currentPage === 'employees' ? 'active' : '' ?>">
                 <i class="fas fa-users"></i>
-                <span>Employés & Enseignants</span>
+                <span>Employés & Enseignants / الموظفون والأساتذة</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/grades.php" class="<?= $currentPage === 'grades' ? 'active' : '' ?>">
                 <i class="fas fa-layer-group"></i>
-                <span>Échelons & Promotions</span>
+                <span>Échelons & Promotions / الدرجات والترقيات</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/classes.php" class="<?= $currentPage === 'classes' ? 'active' : '' ?>">
                 <i class="fas fa-chalkboard"></i>
-                <span>الصفوف / Classes</span>
+                <span>Classes / الصفوف</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/exceptional_laws.php" class="<?= $currentPage === 'exceptional_laws' ? 'active' : '' ?>">
                 <i class="fas fa-scroll"></i>
-                <span>القوانين الاستثنائية</span>
+                <span>Lois exceptionnelles / القوانين الاستثنائية</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/bulk_allowances.php" class="<?= $currentPage === 'bulk_allowances' ? 'active' : '' ?>">
                 <i class="fas fa-gift"></i>
-                <span>المكافآت والنقل (تابلو جماعي)</span>
+                <span>Primes & transport / المكافآت والنقل</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/law_check.php" class="<?= $currentPage === 'law_check' ? 'active' : '' ?>">
                 <i class="fas fa-balance-scale"></i>
-                <span>فحص مطابقة القانون</span>
+                <span>Conformité légale / فحص مطابقة القانون</span>
             </a>
             <?php endif; ?>
 
-            <div class="nav-section">Paie</div>
+            <div class="nav-section">Paie / الرواتب</div>
 
             <?php if (viewerCanSeePage('monthly_payroll.php')): ?>
             <a href="<?= BASE_URL ?>pages/monthly_payroll.php" class="<?= $currentPage === 'monthly' ? 'active' : '' ?>">
                 <i class="fas fa-money-check-alt"></i>
-                <span>Paie mensuelle</span>
+                <span>Paie mensuelle / الرواتب الشهرية</span>
             </a>
             <?php endif; ?>
 
             <?php if (viewerCanSeePage('annual_slip.php')): ?>
             <a href="<?= BASE_URL ?>pages/annual_slip.php" class="<?= $currentPage === 'annual' ? 'active' : '' ?>">
                 <i class="fas fa-file-invoice-dollar"></i>
-                <span>Relevé annuel</span>
+                <span>Relevé annuel / الكشف السنوي</span>
             </a>
             <?php endif; ?>
 
@@ -118,39 +118,39 @@ document.addEventListener('submit', function (e) {
             <?php if (canEdit()): ?>
             <a href="<?= BASE_URL ?>pages/info_collect.php" class="<?= $currentPage === 'info_collect' ? 'active' : '' ?>">
                 <i class="fab fa-whatsapp"></i>
-                <span>تحديث معلومات الأساتذة / Mise à jour</span>
+                <span>Mise à jour / تحديث معلومات الأساتذة</span>
             </a>
             <a href="<?= BASE_URL ?>pages/info_status.php" class="<?= $currentPage === 'info_status' ? 'active' : '' ?>">
                 <i class="fas fa-clipboard-check"></i>
-                <span>حالة التحديث (مين بعت) / État MàJ</span>
+                <span>État MàJ / حالة التحديث (مين بعت)</span>
             </a>
             <a href="<?= BASE_URL ?>pages/left_teachers.php" class="<?= $currentPage === 'left_teachers' ? 'active' : '' ?>">
                 <i class="fas fa-user-slash"></i>
-                <span>الأساتذة التاركون / Départs</span>
+                <span>Départs / الأساتذة التاركون</span>
             </a>
             <a href="<?= BASE_URL ?>pages/retirement_64.php" class="<?= $currentPage === 'retirement_64' ? 'active' : '' ?>">
                 <i class="fas fa-hourglass-half"></i>
-                <span>بلوغ سنّ الـ64 / Retraite 64</span>
+                <span>Retraite 64 / بلوغ سنّ الـ64</span>
             </a>
             <?php endif; ?>
 
-            <div class="nav-section">Rapports</div>
+            <div class="nav-section">Rapports / التقارير</div>
 
             <?php if (viewerCanSeePage('reports.php')): ?>
             <a href="<?= BASE_URL ?>pages/reports.php" class="<?= $currentPage === 'reports' ? 'active' : '' ?>">
                 <i class="fas fa-chart-bar"></i>
-                <span>Rapports</span>
+                <span>Rapports / التقارير</span>
             </a>
             <?php endif; ?>
 
             <?php if (canEdit()): ?>
             <a href="<?= BASE_URL ?>pages/tax_declarations.php" class="<?= $currentPage === 'tax' ? 'active' : '' ?>">
                 <i class="fas fa-file-contract"></i>
-                <span>Déclarations</span>
+                <span>Déclarations / التصاريح</span>
             </a>
             <?php endif; ?>
 
-            <div class="nav-section">Système</div>
+            <div class="nav-section">Système / النظام</div>
 
             <?php if (isSuperAdmin()): ?>
             <a href="<?= BASE_URL ?>pages/schools.php" class="<?= $currentPage === 'schools' ? 'active' : '' ?>">
@@ -169,12 +169,12 @@ document.addEventListener('submit', function (e) {
             <?php if (canEdit()): ?>
             <a href="<?= BASE_URL ?>pages/open_year.php" class="<?= $currentPage === 'open_year' ? 'active' : '' ?>">
                 <i class="fas fa-folder-plus"></i>
-                <span>فتح سنة دراسية / Ouvrir année</span>
+                <span>Ouvrir année / فتح سنة دراسية</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/exchange_rates.php" class="<?= $currentPage === 'rates' ? 'active' : '' ?>">
                 <i class="fas fa-coins"></i>
-                <span>Taux de change</span>
+                <span>Taux de change / أسعار الصرف</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/social_security.php" class="<?= $currentPage === 'social_security' ? 'active' : '' ?>">
@@ -205,12 +205,12 @@ document.addEventListener('submit', function (e) {
 
             <a href="<?= BASE_URL ?>pages/settings.php" class="<?= $currentPage === 'settings' ? 'active' : '' ?>">
                 <i class="fas fa-cog"></i>
-                <span>Paramètres</span>
+                <span>Paramètres / الإعدادات</span>
             </a>
             <?php if (isSuperAdmin()): ?>
             <a href="<?= BASE_URL ?>pages/email_settings.php" class="<?= $currentPage === 'email_settings' ? 'active' : '' ?>">
                 <i class="fas fa-envelope"></i>
-                <span>إعدادات البريد</span>
+                <span>Paramètres Email / إعدادات البريد</span>
             </a>
             <?php endif; ?>
         </nav>
@@ -229,10 +229,20 @@ document.addEventListener('submit', function (e) {
                 <button type="button" class="btn btn-light no-print" title="رجوع / Retour"
                         onclick="if(document.referrer&&history.length>1){history.back()}else{location.href='<?= BASE_URL ?>index.php'}"
                         style="white-space:nowrap">
-                    <i class="fas fa-arrow-right"></i> <?= $lang === 'ar' ? 'رجوع' : 'Retour' ?>
+                    <i class="fas fa-arrow-right"></i> Retour / رجوع
                 </button>
                 <?php endif; ?>
-                <h1><?= e($pageTitle) ?></h1>
+                <?php
+                // عنوان الصفحة ثنائي اللغة: الفرنسي فوق والعربي تحت (يُكتشفان تلقائياً من $pageTitle
+                // مهما كان ترتيبه — أي جزء فيه حروف عربية = السطر العربي، والباقي = الفرنسي).
+                $ptParts = array_map('trim', explode(' / ', (string)$pageTitle));
+                $ptFr = []; $ptAr = [];
+                foreach ($ptParts as $ptp) { if ($ptp === '') continue; if (preg_match('/\p{Arabic}/u', $ptp)) $ptAr[] = $ptp; else $ptFr[] = $ptp; }
+                ?>
+                <h1 style="line-height:1.15">
+                    <?php if ($ptFr): ?><span dir="ltr"><?= e(implode(' / ', $ptFr)) ?></span><?php endif; ?>
+                    <?php if ($ptAr): ?><span style="display:block;font-size:0.62em;font-weight:600;opacity:0.92"><?= e(implode(' / ', $ptAr)) ?></span><?php endif; ?>
+                </h1>
             </div>
             <div class="topbar-actions">
                 <?php
@@ -244,8 +254,8 @@ document.addEventListener('submit', function (e) {
                         : array_values(array_filter(allSchools(false), fn($s) => in_array((int)$s['id'], viewerAllowedSchoolIds(), true)));
                     $activeIds = activeSchoolIds();
                     $isAllSel = $isMultiViewer ? (count($activeIds) === count($navSchools)) : empty($activeIds);
-                    $selLabel = $isAllSel ? ($lang==='ar'?'كل المدارس':'Toutes les écoles')
-                              : (count($activeIds)===1 ? schoolNameById($activeIds[0]) : count($activeIds).($lang==='ar'?' مدارس مختارة':' écoles'));
+                    $selLabel = $isAllSel ? 'Toutes les écoles / كل المدارس'
+                              : (count($activeIds)===1 ? schoolNameById($activeIds[0]) : count($activeIds).' écoles / مدارس');
                 ?>
                 <div class="school-switcher school-multi" id="schoolPicker">
                     <i class="fas fa-school"></i>
@@ -254,13 +264,13 @@ document.addEventListener('submit', function (e) {
                     </button>
                     <div class="school-menu" id="schoolMenu">
                         <form method="get" action="<?= BASE_URL ?>switch_school.php">
-                            <label class="sm-all"><input type="checkbox" id="smAll" <?= $isAllSel?'checked':'' ?> onclick="document.querySelectorAll('#schoolMenu input[name=\'schools[]\']').forEach(c=>c.checked=false)"> <strong>🏫 <?= $lang==='ar'?'كل المدارس':'Toutes les écoles' ?></strong></label>
+                            <label class="sm-all"><input type="checkbox" id="smAll" <?= $isAllSel?'checked':'' ?> onclick="document.querySelectorAll('#schoolMenu input[name=\'schools[]\']').forEach(c=>c.checked=false)"> <strong>🏫 Toutes les écoles / كل المدارس</strong></label>
                             <div class="sm-list">
                             <?php foreach ($navSchools as $navS): ?>
                                 <label><input type="checkbox" name="schools[]" value="<?= (int)$navS['id'] ?>" <?= in_array((int)$navS['id'],$activeIds,true)?'checked':'' ?> onclick="document.getElementById('smAll').checked=false"> <?= e($lang==='ar'?$navS['name_ar']:$navS['name_fr']) ?></label>
                             <?php endforeach; ?>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> <?= $lang==='ar'?'تطبيق':'Appliquer' ?></button>
+                            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> Appliquer / تطبيق</button>
                         </form>
                     </div>
                 </div>
@@ -273,7 +283,7 @@ document.addEventListener('submit', function (e) {
                         $aSY = activeSchoolYear();
                         $cyH = (int)date('Y'); $cmH = (int)date('n'); $startH = ($cmH >= 10) ? $cyH : $cyH - 1;
                         ?>
-                        <option value="all" <?= $aSY === 'all' ? 'selected' : '' ?>>📅 <?= $lang === 'ar' ? 'كل السنين' : 'Toutes années' ?></option>
+                        <option value="all" <?= $aSY === 'all' ? 'selected' : '' ?>>📅 Toutes années / كل السنين</option>
                         <?php for ($yh = $startH + 1; $yh >= 2006; $yh--): $syH = $yh . '-' . ($yh + 1); ?>
                             <option value="<?= $syH ?>" <?= $syH === $aSY ? 'selected' : '' ?>><?= $syH ?></option>
                         <?php endfor; ?>
@@ -292,7 +302,7 @@ document.addEventListener('submit', function (e) {
                     <span><?= e($_SESSION['full_name'] ?? '') ?></span>
                 </div>
                 
-                <a href="<?= BASE_URL ?>logout.php" class="btn btn-light btn-sm" title="Déconnexion">
+                <a href="<?= BASE_URL ?>logout.php" class="btn btn-light btn-sm" title="Déconnexion / تسجيل الخروج">
                     <i class="fas fa-sign-out-alt"></i>
                 </a>
             </div>

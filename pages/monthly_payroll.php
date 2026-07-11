@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/payroll_calculator.php';
 requireLogin();
 
 $currentPage = 'monthly';
-$pageTitle = 'Paie mensuelle';
+$pageTitle = 'Paie mensuelle / الرواتب الشهرية';
 $db = getDB();
 
 $action = $_GET['action'] ?? 'list';
@@ -31,7 +31,10 @@ function payslipCardHtml($emp, $salary, $month, $year) {
     ?>
     <div class="card payslip-card" style="page-break-inside:avoid">
         <div class="card-header">
-            <h3><i class="fas fa-user"></i> <?= e(trim($emp['first_name_fr'].' '.$emp['last_name_fr']) ?: trim($emp['first_name_ar'].' '.$emp['last_name_ar'])) ?> — <?= monthName($month) ?> <?= $year ?></h3>
+            <h3>
+                <span dir="ltr"><i class="fas fa-user"></i> <?= e(trim($emp['first_name_fr'].' '.$emp['last_name_fr']) ?: trim($emp['first_name_ar'].' '.$emp['last_name_ar'])) ?> — <?= monthName($month) ?> <?= $year ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e(trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: 'قسيمة الراتب') ?></div>
+            </h3>
             <div style="font-size:13px;color:var(--gray-600)"><?= e(currentSchoolName()) ?></div>
         </div>
         <div class="card-body">
@@ -168,12 +171,15 @@ include __DIR__ . '/../includes/header.php';
 <!-- Period selector -->
 <div class="card">
     <div class="card-header">
-        <h3><i class="fas fa-calendar-alt"></i> Période</h3>
+        <h3>
+            <span dir="ltr"><i class="fas fa-calendar-alt"></i> Période</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">الفترة</div>
+        </h3>
     </div>
     <div class="card-body">
         <form method="GET" class="form-row cols-5">
             <div class="form-group mb-0">
-                <label class="form-label">Mois</label>
+                <label class="form-label">Mois / الشهر</label>
                 <select name="month" class="form-select">
                     <?php for ($m = 1; $m <= 12; $m++): ?>
                         <option value="<?= $m ?>" <?= $m === $month ? 'selected' : '' ?>><?= monthName($m) ?></option>
@@ -181,7 +187,7 @@ include __DIR__ . '/../includes/header.php';
                 </select>
             </div>
             <div class="form-group mb-0">
-                <label class="form-label">Année</label>
+                <label class="form-label">Année / السنة</label>
                 <input type="number" name="year" class="form-control" value="<?= $year ?>" min="2020" max="2030">
             </div>
             <div class="form-group mb-0">
@@ -194,12 +200,12 @@ include __DIR__ . '/../includes/header.php';
                 </select>
             </div>
             <div class="form-group mb-0">
-                <label class="form-label">Taux de change</label>
+                <label class="form-label">Taux de change / سعر الصرف</label>
                 <input type="text" class="form-control" value="<?= formatLBP(getExchangeRate($month, $year)) ?> / $1" disabled>
             </div>
             <div class="form-group mb-0">
                 <label class="form-label">&nbsp;</label>
-                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher</button>
+                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button>
             </div>
         </form>
     </div>
@@ -241,7 +247,7 @@ include __DIR__ . '/../includes/header.php';
         <i class="fas fa-info-circle"></i> راجِع رواتب كل الأساتذة/الموظفين تحت، وعند التأكد اضغط «طباعة الكل». كل قسيمة تُطبع بصفحة مستقلة.
     </div>
     <?php if (!$empsP): ?>
-        <div class="alert alert-warning">لا يوجد موظفون مطابقون للفلتر.</div>
+        <div class="alert alert-warning">Aucun employé correspondant au filtre / لا يوجد موظفون مطابقون للفلتر.</div>
     <?php else: foreach ($empsP as $empP):
         $salStmt->execute([$empP['id'], $month, $year]);
         $salP = $salStmt->fetch();
@@ -262,10 +268,10 @@ include __DIR__ . '/../includes/header.php';
 ?>
     <div class="d-flex justify-between align-center mb-3">
         <a href="<?= BASE_URL ?>pages/monthly_payroll.php?month=<?= $month ?>&year=<?= $year ?>" class="btn btn-light">
-            <i class="fas fa-arrow-left"></i> Retour à la liste
+            <i class="fas fa-arrow-left"></i> Retour à la liste / رجوع
         </a>
         <a href="?action=calc&employee_id=<?= $employeeId ?>&month=<?= $month ?>&year=<?= $year ?>" class="btn btn-gold">
-            <i class="fas fa-calculator"></i> <?= $salary ? 'Recalculer' : 'Calculer' ?>
+            <i class="fas fa-calculator"></i> <?= $salary ? 'Recalculer / إعادة الاحتساب' : 'Calculer / احتساب' ?>
         </a>
     </div>
     
@@ -281,7 +287,10 @@ include __DIR__ . '/../includes/header.php';
 
     <div class="card" id="ppExportArea">
         <div class="card-header">
-            <h3><i class="fas fa-user"></i> <?= e($emp['first_name_fr'].' '.$emp['last_name_fr']) ?> — <?= monthName($month) ?> <?= $year ?></h3>
+            <h3>
+                <span dir="ltr"><i class="fas fa-user"></i> <?= e($emp['first_name_fr'].' '.$emp['last_name_fr']) ?> — <?= monthName($month) ?> <?= $year ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e(trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: 'قسيمة الراتب') ?></div>
+            </h3>
             <div style="font-size:13px;color:var(--gray-600)"><?= e(currentSchoolName()) ?></div>
         </div>
         <div class="card-body">
@@ -317,9 +326,12 @@ include __DIR__ . '/../includes/header.php';
             <?php if (!$salary): ?>
                 <div class="empty-state">
                     <i class="fas fa-calculator"></i>
-                    <h4>Pas encore calculé</h4>
+                    <h4>
+                        <span dir="ltr">Pas encore calculé</span>
+                        <div style="font-size:0.85em;font-weight:600;opacity:0.9">لم يُحتسب بعد</div>
+                    </h4>
                     <a href="?action=calc&employee_id=<?= $employeeId ?>&month=<?= $month ?>&year=<?= $year ?>" class="btn btn-primary mt-3">
-                        <i class="fas fa-bolt"></i> Calculer maintenant
+                        <i class="fas fa-bolt"></i> Calculer maintenant / احسب الآن
                     </a>
                 </div>
             <?php else: ?>
@@ -361,7 +373,7 @@ include __DIR__ . '/../includes/header.php';
                 
                 <details style="margin-top:20px">
                     <summary style="cursor:pointer;color:var(--gray-600);font-weight:600">
-                        <i class="fas fa-eye"></i> Charges patronales (cachées du bulletin)
+                        <i class="fas fa-eye"></i> Charges patronales (cachées du bulletin) / أعباء رب العمل (مخفية عن القسيمة)
                     </summary>
                     <table class="table" style="margin-top:10px">
                         <tr><td>CNSS École (8%)</td><td class="text-end"><?= formatLBP($salary['school_cnss_8_lbp']) ?></td></tr>
@@ -404,33 +416,36 @@ include __DIR__ . '/../includes/header.php';
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-icon primary"><i class="fas fa-users"></i></div>
-            <div><div class="stat-label">Total employés actifs</div><div class="stat-value"><?= count($list) ?></div></div>
+            <div><div class="stat-label">Total employés actifs / إجمالي الموظفين الفاعلين</div><div class="stat-value"><?= count($list) ?></div></div>
         </div>
         <div class="stat-card">
             <div class="stat-icon success"><i class="fas fa-check"></i></div>
-            <div><div class="stat-label">Calculés</div><div class="stat-value"><?= $calculatedCount ?></div></div>
+            <div><div class="stat-label">Calculés / المحتسَبون</div><div class="stat-value"><?= $calculatedCount ?></div></div>
         </div>
         <div class="stat-card">
             <div class="stat-icon warning"><i class="fas fa-clock"></i></div>
-            <div><div class="stat-label">En attente</div><div class="stat-value"><?= count($list) - $calculatedCount ?></div></div>
+            <div><div class="stat-label">En attente / قيد الانتظار</div><div class="stat-value"><?= count($list) - $calculatedCount ?></div></div>
         </div>
         <div class="stat-card">
             <div class="stat-icon gold"><i class="fas fa-money-bill"></i></div>
-            <div><div class="stat-label">Total dû</div><div class="stat-value" style="font-size:18px"><?= formatLBP($totalDue) ?></div></div>
+            <div><div class="stat-label">Total dû / الإجمالي المتوجب</div><div class="stat-value" style="font-size:18px"><?= formatLBP($totalDue) ?></div></div>
         </div>
     </div>
     
     <div class="card">
         <div class="card-header">
-            <h3><i class="fas fa-money-check-alt"></i> Paie de <?= monthName($month) ?> <?= $year ?> — <?= e(currentSchoolName()) ?></h3>
+            <h3>
+                <span dir="ltr"><i class="fas fa-money-check-alt"></i> Paie de <?= monthName($month) ?> <?= $year ?> — <?= e(currentSchoolName()) ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">رواتب الشهر</div>
+            </h3>
             <div class="d-flex gap-2 no-print">
-                <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> طباعة الجدول</button>
-                <a href="?action=print_all&month=<?= $month ?>&year=<?= $year ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-primary" title="عرض/طباعة قسيمة كل موظف">
-                    <i class="fas fa-file-invoice"></i> طباعة القسائم
+                <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer le tableau / طباعة الجدول</button>
+                <a href="?action=print_all&month=<?= $month ?>&year=<?= $year ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-primary" title="Afficher/imprimer le bulletin de chaque employé / عرض/طباعة قسيمة كل موظف">
+                    <i class="fas fa-file-invoice"></i> Imprimer les bulletins / طباعة القسائم
                 </a>
                 <?php if (!isAllSchools()): ?>
                 <a href="?action=calc_all&month=<?= $month ?>&year=<?= $year ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-gold" data-confirm="احتساب رواتب كل الموظفين المعروضين لهذا الشهر؟">
-                    <i class="fas fa-bolt"></i> احتساب الكل
+                    <i class="fas fa-bolt"></i> Calculer tout / احتساب الكل
                 </a>
                 <?php endif; ?>
             </div>
@@ -440,16 +455,16 @@ include __DIR__ . '/../includes/header.php';
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Code</th>
-                            <?php if (isAllSchools()): ?><th>École</th><?php endif; ?>
-                            <th>Nom</th>
-                            <th>Type</th>
-                            <th>Échelon</th>
-                            <th>Net salaire</th>
-                            <th>Total dû L.L</th>
-                            <th>Total dû $</th>
-                            <th>Statut</th>
-                            <th class="no-print">Action</th>
+                            <th>Code / الرمز</th>
+                            <?php if (isAllSchools()): ?><th>École / المدرسة</th><?php endif; ?>
+                            <th>Nom / الاسم</th>
+                            <th>Type / الفئة</th>
+                            <th>Échelon / الدرجة</th>
+                            <th>Net salaire / الصافي</th>
+                            <th>Total dû L.L / الإجمالي ل.ل</th>
+                            <th>Total dû $ / الإجمالي بالدولار</th>
+                            <th>Statut / الحالة</th>
+                            <th class="no-print">Action / إجراء</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -465,9 +480,9 @@ include __DIR__ . '/../includes/header.php';
                                 <td><?= $r['is_calculated'] ? formatUSD($r['total_due_usd']) : '—' ?></td>
                                 <td>
                                     <?php if ($r['is_calculated']): ?>
-                                        <span class="badge badge-success">✓ Calculé</span>
+                                        <span class="badge badge-success">✓ Calculé / محتسَب</span>
                                     <?php else: ?>
-                                        <span class="badge badge-warning">En attente</span>
+                                        <span class="badge badge-warning">En attente / قيد الانتظار</span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="no-print">
@@ -475,7 +490,7 @@ include __DIR__ . '/../includes/header.php';
                                         <i class="fas fa-eye"></i>
                                     </a>
                                     <?php if (!isAllSchools()): ?>
-                                    <a href="?action=calc&employee_id=<?= $r['id'] ?>&month=<?= $month ?>&year=<?= $year ?>" class="btn btn-sm btn-gold" title="Calculer">
+                                    <a href="?action=calc&employee_id=<?= $r['id'] ?>&month=<?= $month ?>&year=<?= $year ?>" class="btn btn-sm btn-gold" title="Calculer / احتساب">
                                         <i class="fas fa-calculator"></i>
                                     </a>
                                     <?php endif; ?>

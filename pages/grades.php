@@ -6,7 +6,7 @@ requireLogin();
 requireCsrf();
 
 $currentPage = 'grades';
-$pageTitle = 'Échelons & Promotions';
+$pageTitle = 'Échelons & Promotions / الدرجات والترقيات';
 $db = getDB();
 $message = ''; $messageType = 'success';
 
@@ -277,7 +277,10 @@ include __DIR__ . '/../includes/header.php';
 ?>
     <div class="card">
         <div class="card-header">
-            <h3><i class="fas fa-layer-group"></i> Échelons des enseignants titulaires</h3>
+            <h3>
+                <span dir="ltr"><i class="fas fa-layer-group"></i> Échelons des enseignants titulaires</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">درجات الأساتذة الملاك</div>
+            </h3>
         </div>
         <div class="card-body">
             <div class="alert alert-info">
@@ -306,15 +309,15 @@ include __DIR__ . '/../includes/header.php';
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Nom</th>
-                            <?php if (isAllSchools()): ?><th>École</th><?php endif; ?>
-                            <th>Diplôme</th>
-                            <th>Date Titul.</th>
-                            <th>Initial</th>
-                            <th>Actuel</th>
-                            <th>Salaire échelle</th>
-                            <th>Val. échelon</th>
-                            <th class="no-print">Actions</th>
+                            <th>Nom / الاسم</th>
+                            <?php if (isAllSchools()): ?><th>École / المدرسة</th><?php endif; ?>
+                            <th>Diplôme / الشهادة</th>
+                            <th>Date Titul. / تاريخ التثبيت</th>
+                            <th>Initial / الأولية</th>
+                            <th>Actuel / الحالية</th>
+                            <th>Salaire échelle / راتب السلسلة</th>
+                            <th>Val. échelon / قيمة الدرجة</th>
+                            <th class="no-print">Actions / إجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -330,7 +333,7 @@ include __DIR__ . '/../includes/header.php';
                                 <td><?= formatLBP($e['new_grade_value']) ?></td>
                                 <td class="no-print">
                                     <a href="?employee_id=<?= $e['id'] ?>" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-edit"></i> Gérer
+                                        <i class="fas fa-edit"></i> Gérer / إدارة
                                     </a>
                                 </td>
                             </tr>
@@ -344,7 +347,7 @@ include __DIR__ . '/../includes/header.php';
     $stmt = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
     $stmt->execute([$employeeId]);
     $emp = $stmt->fetch();
-    if (!$emp) { echo "<div class='alert alert-danger'>Employé introuvable</div>"; include __DIR__ . '/../includes/footer.php'; exit; }
+    if (!$emp) { echo "<div class='alert alert-danger'>Employé introuvable / الموظف غير موجود</div>"; include __DIR__ . '/../includes/footer.php'; exit; }
     
     $history = $db->prepare("SELECT * FROM employee_grade_history WHERE employee_id = ? ORDER BY change_date ASC, id ASC");
     $history->execute([$employeeId]);
@@ -360,9 +363,9 @@ include __DIR__ . '/../includes/header.php';
     $appliedLaws = $appliedLaws->fetchAll(PDO::FETCH_COLUMN);
 ?>
     <div class="d-flex justify-between align-center mb-3">
-        <a href="<?= BASE_URL ?>pages/grades.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour</a>
+        <a href="<?= BASE_URL ?>pages/grades.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour / رجوع</a>
         <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $employeeId ?>" class="btn btn-light">
-            <i class="fas fa-user"></i> Fiche employé
+            <i class="fas fa-user"></i> Fiche employé / بطاقة الموظف
         </a>
     </div>
     
@@ -373,16 +376,16 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="card-body">
                 <table class="table">
-                    <tr><td><strong>Type</strong></td><td><?= employeeTypeLabel($emp['employee_type']) ?></td></tr>
-                    <tr><td><strong>Diplôme</strong></td><td><?= diplomaLabel($emp['diploma']) ?></td></tr>
-                    <tr><td><strong>دخول المدرسة</strong></td><td><?= formatDate($emp['hire_date']) ?></td></tr>
-                    <tr><td><strong>تاريخ التثبيت</strong></td><td><?= formatDate(tenureReferenceDate($emp)) ?> <small class="text-muted">(منه الاستثنائية — تلقائي دخول+سنتين)</small></td></tr>
-                    <tr><td><strong>Échelon initial</strong></td><td><?= $emp['starting_grade'] ?></td></tr>
-                    <tr><td><strong>Échelon actuel</strong></td><td><span class="badge badge-gold" style="font-size:16px"><?= $emp['current_grade'] ?></span></td></tr>
+                    <tr><td><strong>Type / النوع</strong></td><td><?= employeeTypeLabel($emp['employee_type']) ?></td></tr>
+                    <tr><td><strong>Diplôme / الشهادة</strong></td><td><?= diplomaLabel($emp['diploma']) ?></td></tr>
+                    <tr><td><strong>Entrée (école) / دخول المدرسة</strong></td><td><?= formatDate($emp['hire_date']) ?></td></tr>
+                    <tr><td><strong>Date titularisation / تاريخ التثبيت</strong></td><td><?= formatDate(tenureReferenceDate($emp)) ?> <small class="text-muted">(منه الاستثنائية — تلقائي دخول+سنتين)</small></td></tr>
+                    <tr><td><strong>Échelon initial / الدرجة الأولية</strong></td><td><?= $emp['starting_grade'] ?></td></tr>
+                    <tr><td><strong>Échelon actuel / الدرجة الحالية</strong></td><td><span class="badge badge-gold" style="font-size:16px"><?= $emp['current_grade'] ?></span></td></tr>
                     <?php if ($emp['employee_type'] === 'enseignant_titulaire'):
                         $lc = lawConsistencyCheckOne($employeeId); ?>
                     <tr>
-                        <td><strong>مطابقة القانون</strong></td>
+                        <td><strong>Conformité légale / مطابقة القانون</strong></td>
                         <td>
                             <?php if ($lc['err'] !== null): ?>
                                 <span class="text-muted">تعذّر الحساب: <?= e($lc['err']) ?></span>
@@ -403,8 +406,8 @@ include __DIR__ . '/../includes/header.php';
                     </tr>
                     <?php endif; ?>
                     <?php if ($currentScale): ?>
-                    <tr><td><strong>Salaire scale 2017</strong></td><td><?= formatLBP($currentScale['new_salary_2017']) ?></td></tr>
-                    <tr><td><strong>Valeur échelon</strong></td><td><?= formatLBP($currentScale['new_grade_value']) ?></td></tr>
+                    <tr><td><strong>Salaire scale 2017 / راتب السلسلة 2017</strong></td><td><?= formatLBP($currentScale['new_salary_2017']) ?></td></tr>
+                    <tr><td><strong>Valeur échelon / قيمة الدرجة</strong></td><td><?= formatLBP($currentScale['new_grade_value']) ?></td></tr>
                     <?php endif; ?>
                 </table>
             </div>
@@ -412,7 +415,10 @@ include __DIR__ . '/../includes/header.php';
         
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-bolt"></i> Actions rapides</h3>
+                <h3>
+                    <span dir="ltr"><i class="fas fa-bolt"></i> Actions rapides</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">إجراءات سريعة</div>
+                </h3>
             </div>
             <div class="card-body">
                 <?php if ($emp['employee_type'] === 'enseignant_titulaire'): ?>
@@ -424,19 +430,22 @@ include __DIR__ . '/../includes/header.php';
                         <a href="#" onclick="this.href='?employee_id=<?= $employeeId ?>&promote=1&eff_year='+document.getElementById('effYear').value"
                            class="btn btn-primary"
                            data-confirm="Appliquer le التدرّج (+1 échelon) le 1/10 ?">
-                            <i class="fas fa-arrow-up"></i> التدرّج (+1)
+                            <i class="fas fa-arrow-up"></i> Promotion (+1) / التدرّج (+1)
                         </a>
                     </div>
                     <div class="mb-3">
                         <a href="?employee_id=<?= $employeeId ?>&rebuild_legal=1"
                            class="btn btn-warning btn-sm"
                            data-confirm="إعادة بناء سجلّ الدرجات حسب القانون تلقائياً (دخول الملاك → تدرّج عادي بتشرين → درجات استثنائية بكانون بعد التثبيت)؟ المجموع/الدرجة الحالية لا يتغيّران — يتغيّر توزيعها على السنين فقط. تأكّد أن تاريخ دخول الملاك وتاريخ التثبيت صحيحان أولاً.">
-                            <i class="fas fa-wand-magic-sparkles"></i> إعادة بناء الدرجات حسب القانون
+                            <i class="fas fa-wand-magic-sparkles"></i> Reconstruire selon la loi / إعادة بناء الدرجات حسب القانون
                         </a>
                         <small class="text-muted d-block mt-1">يلزم ضبط «دخول الملاك» و«تاريخ التثبيت» في بطاقة الأستاذ أولاً.</small>
                     </div>
                     
-                    <h5 style="color:var(--primary);margin-top:16px">تابلو الدرجات الاستثنائية / Lois exceptionnelles</h5>
+                    <h5 style="color:var(--primary);margin-top:16px">
+                      <span dir="ltr">Grades exceptionnels (lois)</span>
+                      <div style="font-size:0.85em;font-weight:600;opacity:0.9">تابلو الدرجات الاستثنائية</div>
+                    </h5>
                     <p class="text-muted" style="font-size:12px;margin:0 0 8px">
                         ✔ = البرنامج يعطي هذه الدرجة الاستثنائية لهذا الأستاذ بتاريخها (كانون الثاني 1/1).
                         شِيل الصح إذا ما بدك تعطيه إيّاها. الدرجات العادية تبقى تلقائياً في تشرين الأول.
@@ -446,7 +455,7 @@ include __DIR__ . '/../includes/header.php';
                         <input type="hidden" name="exc_save" value="1">
                         <table class="table" style="font-size:13px">
                             <thead><tr>
-                                <th style="text-align:center">إعطاء</th><th>القانون</th><th>التاريخ</th><th>عدد الدرجات</th><th>الوصف</th>
+                                <th style="text-align:center">Accorder / إعطاء</th><th>Loi / القانون</th><th>Date / التاريخ</th><th>Nb échelons / عدد الدرجات</th><th>Description / الوصف</th>
                             </tr></thead>
                             <tbody>
                             <?php foreach ($laws as $law):
@@ -463,7 +472,7 @@ include __DIR__ . '/../includes/header.php';
                                     </td>
                                     <td><strong><?= e($law['law_number']) ?></strong></td>
                                     <td><?= formatDate($excDate) ?> <small>(كانون الثاني)</small></td>
-                                    <td><?= $na ? '<small class="text-muted">لا ينطبق</small>' : '+' . (float)$nGrades ?></td>
+                                    <td><?= $na ? '<small class="text-muted">N/A / لا ينطبق</small>' : '+' . (float)$nGrades ?></td>
                                     <td><small><?= e($law['description_ar'] ?: $law['description_fr']) ?></small></td>
                                 </tr>
                             <?php endforeach; ?>
@@ -471,44 +480,47 @@ include __DIR__ . '/../includes/header.php';
                         </table>
                         <button type="submit" class="btn btn-primary w-100"
                                 data-confirm="حفظ تابلو الدرجات الاستثنائية لهذا الأستاذ؟ (سيُعاد حساب راتبه)">
-                            <i class="fas fa-save"></i> حفظ التابلو
+                            <i class="fas fa-save"></i> Enregistrer le tableau / حفظ التابلو
                         </button>
                     </form>
                 <?php else: ?>
-                    <div class="alert alert-warning">Les promotions et lois exceptionnelles s'appliquent uniquement aux enseignants titulaires.</div>
+                    <div class="alert alert-warning">Les promotions et lois exceptionnelles s'appliquent uniquement aux enseignants titulaires. / الترقيات والقوانين الاستثنائية تنطبق فقط على الأساتذة الملاك.</div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
     
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-edit"></i> Modification manuelle</h3></div>
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-edit"></i> Modification manuelle</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">تعديل يدوي</div>
+        </h3></div>
         <div class="card-body">
             <form method="POST" class="lockedit">
                 <div class="form-row cols-4">
                     <div class="form-group">
-                        <label class="form-label">Nouvel échelon <small>(½ permis)</small></label>
+                        <label class="form-label">Nouvel échelon / درجة جديدة <small>(½ permis)</small></label>
                         <input type="number" name="new_grade" class="form-control" value="<?= (float)$emp['current_grade'] ?>" min="1" max="52" step="0.5" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Date effective</label>
+                        <label class="form-label">Date effective / التاريخ الفعلي</label>
                         <input type="date" name="change_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Raison</label>
+                        <label class="form-label">Raison / السبب</label>
                         <select name="reason" class="form-select">
-                            <option value="manual">Manuel</option>
-                            <option value="biennial_promotion">Promotion biennale</option>
-                            <option value="titularization">Titularisation</option>
+                            <option value="manual">Manuel / يدوي</option>
+                            <option value="biennial_promotion">Promotion biennale / ترقية كل سنتين</option>
+                            <option value="titularization">Titularisation / تثبيت</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">&nbsp;</label>
-                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Enregistrer</button>
+                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Notes</label>
+                    <label class="form-label">Notes / ملاحظات</label>
                     <input type="text" name="notes" class="form-control">
                 </div>
             </form>
@@ -516,15 +528,21 @@ include __DIR__ . '/../includes/header.php';
     </div>
     
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-history"></i> Historique des changements / سجلّ الدرجات</h3></div>
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-history"></i> Historique des changements</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">سجلّ الدرجات</div>
+        </h3></div>
         <div class="card-body">
             <?php if ($emp['employee_type'] === 'enseignant_titulaire'): ?>
                 <?php renderGradeChecklist($emp, 'grades'); ?>
             <?php elseif (empty($history)): ?>
-                <div class="empty-state"><i class="fas fa-history"></i><h4>Aucun historique</h4></div>
+                <div class="empty-state"><i class="fas fa-history"></i><h4>
+                    <span dir="ltr">Aucun historique</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">لا يوجد سجلّ</div>
+                </h4></div>
             <?php else: ?>
                 <table class="table">
-                    <thead><tr><th>التاريخ</th><th>قبل</th><th>بعد</th><th>الفرق</th><th>ملاحظة</th></tr></thead>
+                    <thead><tr><th>Date / التاريخ</th><th>Avant / قبل</th><th>Après / بعد</th><th>Diff. / الفرق</th><th>Note / ملاحظة</th></tr></thead>
                     <tbody>
                         <?php foreach ($history as $h): $diff=(float)$h['grade_after']-(float)$h['grade_before']; ?>
                             <tr>
@@ -544,17 +562,20 @@ include __DIR__ . '/../includes/header.php';
     // ====== جدول تطوّر الراتب والتدرّج (تلقائي، متل «مثل 2») ======
     $evo = ($emp['employee_type'] === 'enseignant_titulaire') ? buildSalaryEvolution($employeeId, $emp['current_grade']) : [];
     $typeLabels = [
-        'entry'       => ['دخول الملاك', 'gold'],
-        'ordinary'    => ['درجة عادية (تشرين)', 'success'],
-        'exceptional' => ['درجة استثنائية', 'info'],
-        'manual'      => ['تعديل يدوي', 'secondary'],
+        'entry'       => ['Entrée / دخول الملاك', 'gold'],
+        'ordinary'    => ['Ordinaire / درجة عادية (تشرين)', 'success'],
+        'exceptional' => ['Except. / درجة استثنائية', 'info'],
+        'manual'      => ['Manuel / تعديل يدوي', 'secondary'],
         'stable'      => ['—', 'light'],
     ];
     ?>
     <div class="card">
         <div class="card-header">
-            <h3><i class="fas fa-chart-line"></i> تطوّر الراتب والتدرّج / Évolution du salaire</h3>
-            <button type="button" onclick="window.print()" class="btn btn-light btn-sm no-print"><i class="fas fa-print"></i> Imprimer</button>
+            <h3>
+                <span dir="ltr"><i class="fas fa-chart-line"></i> Évolution du salaire</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">تطوّر الراتب والتدرّج</div>
+            </h3>
+            <button type="button" onclick="window.print()" class="btn btn-light btn-sm no-print"><i class="fas fa-print"></i> Imprimer / طباعة</button>
         </div>
         <div class="card-body">
             <?php if (empty($evo)): ?>
@@ -571,13 +592,13 @@ include __DIR__ . '/../includes/header.php';
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>التاريخ</th>
-                                <th>الحدث</th>
-                                <th>الإشلون</th>
-                                <th class="text-end">أساس الراتب</th>
-                                <th class="text-end">درجة عادية</th>
-                                <th class="text-end">درجات استثنائية</th>
-                                <th class="text-end">الراتب بعد التدرّج</th>
+                                <th>Date / التاريخ</th>
+                                <th>Événement / الحدث</th>
+                                <th>Échelon / الإشلون</th>
+                                <th class="text-end">Base salaire / أساس الراتب</th>
+                                <th class="text-end">Échelon ordinaire / درجة عادية</th>
+                                <th class="text-end">Échelons except. / درجات استثنائية</th>
+                                <th class="text-end">Salaire après / الراتب بعد التدرّج</th>
                             </tr>
                         </thead>
                         <tbody>

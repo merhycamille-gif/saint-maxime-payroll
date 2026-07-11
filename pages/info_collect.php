@@ -10,7 +10,7 @@ require_once __DIR__ . '/../includes/payroll_calculator.php'; // recalcEmployeeY
 requireLogin();
 
 $currentPage = 'info_collect';
-$pageTitle = 'تحديث معلومات الأساتذة';
+$pageTitle = 'Mise à jour des informations des enseignants / تحديث معلومات الأساتذة';
 $db = getDB();
 
 // تركيب ذاتي لعمود وظيفة الموظف الإداري (job_title) إن كان ناقصاً — حتى لا يفشل اعتماد طلب موظف إداري
@@ -358,13 +358,16 @@ $newSubs = $newSubs->fetchAll();
   $groupMsg = rawurlencode($infoTitle . "\n\n" . $groupIntro . "\n(كلٌّ يختار اسمه / chacun choisit son nom)\n" . $groupLink);
 ?>
 <div class="card" style="border:2px solid #25d366">
-  <div class="card-header" style="background:#e8f9ef"><h3 style="color:#0a7a37"><i class="fab fa-whatsapp"></i> رابط واحد لكل المجموعة (الأسهل)</h3></div>
+  <div class="card-header" style="background:#e8f9ef"><h3 style="color:#0a7a37">
+    <span dir="ltr"><i class="fab fa-whatsapp"></i> Un seul lien pour tout le groupe (le plus simple)</span>
+    <div style="font-size:0.85em;font-weight:600;opacity:0.9">رابط واحد لكل المجموعة (الأسهل)</div>
+  </h3></div>
   <div class="card-body">
     <p style="color:var(--gray-600);margin-top:0">ابعت <strong>هالرابط الواحد</strong> لغروب الأساتذة على واتساب — كل أستاذ بيفتحه، بيختار اسمه، وبيحدّث معلوماته.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <input type="text" readonly value="<?= e($groupLink) ?>" id="grpLink" style="flex:1;min-width:260px;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px">
-      <button type="button" class="btn" style="background:#25d366;color:#fff" onclick="navigator.clipboard.writeText(document.getElementById('grpLink').value);this.innerHTML='✓ تم النسخ'"><i class="fas fa-copy"></i> نسخ الرابط</button>
-      <a href="https://wa.me/?text=<?= $groupMsg ?>" target="_blank" class="btn" style="background:#128c7e;color:#fff"><i class="fab fa-whatsapp"></i> فتح واتساب للإرسال</a>
+      <button type="button" class="btn" style="background:#25d366;color:#fff" onclick="navigator.clipboard.writeText(document.getElementById('grpLink').value);this.innerHTML='✓ تم النسخ'"><i class="fas fa-copy"></i> Copier le lien / نسخ الرابط</button>
+      <a href="https://wa.me/?text=<?= $groupMsg ?>" target="_blank" class="btn" style="background:#128c7e;color:#fff"><i class="fab fa-whatsapp"></i> Ouvrir WhatsApp / فتح واتساب للإرسال</a>
     </div>
   </div>
 </div>
@@ -375,13 +378,16 @@ $newSubs = $newSubs->fetchAll();
   $allMsg = rawurlencode($infoTitle . "\n\n" . $infoIntro . "\n(كلٌّ يكتب اسمه وتاريخ ولادته، والبرنامج بيعرف مدرسته تلقائياً / chacun saisit son nom et sa date de naissance)\n" . $allLink);
 ?>
 <div class="card" style="border:2px solid #128c7e">
-  <div class="card-header" style="background:#e6f4f1"><h3 style="color:#0a6b5e"><i class="fas fa-globe"></i> رابط موحّد لكل المدارس (رابط واحد للجميع) ⭐</h3></div>
+  <div class="card-header" style="background:#e6f4f1"><h3 style="color:#0a6b5e">
+    <span dir="ltr"><i class="fas fa-globe"></i> Lien unifié pour toutes les écoles (un seul lien pour tous) ⭐</span>
+    <div style="font-size:0.85em;font-weight:600;opacity:0.9">رابط موحّد لكل المدارس (رابط واحد للجميع)</div>
+  </h3></div>
   <div class="card-body">
     <p style="color:var(--gray-600);margin-top:0">ابعت <strong>هالرابط الواحد للكل</strong> — كل أستاذ بيكتب <strong>اسمه وتاريخ ولادته</strong> بس، والبرنامج بيعرف <strong>مدرسته تلقائياً</strong> ويحدّث معلوماته. (نفس الرابط لكل المدارس.)</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <input type="text" readonly value="<?= e($allLink) ?>" id="allLink" style="flex:1;min-width:260px;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px">
-      <button type="button" class="btn" style="background:#128c7e;color:#fff" onclick="navigator.clipboard.writeText(document.getElementById('allLink').value);this.innerHTML='✓ تم النسخ'"><i class="fas fa-copy"></i> نسخ الرابط</button>
-      <a href="https://wa.me/?text=<?= $allMsg ?>" target="_blank" class="btn" style="background:#0a6b5e;color:#fff"><i class="fab fa-whatsapp"></i> فتح واتساب للإرسال</a>
+      <button type="button" class="btn" style="background:#128c7e;color:#fff" onclick="navigator.clipboard.writeText(document.getElementById('allLink').value);this.innerHTML='✓ تم النسخ'"><i class="fas fa-copy"></i> Copier le lien / نسخ الرابط</button>
+      <a href="https://wa.me/?text=<?= $allMsg ?>" target="_blank" class="btn" style="background:#0a6b5e;color:#fff"><i class="fab fa-whatsapp"></i> Ouvrir WhatsApp / فتح واتساب للإرسال</a>
     </div>
   </div>
 </div>
@@ -393,7 +399,10 @@ $newSubs = $newSubs->fetchAll();
   $isClosedNow = ($dl !== '' && !$allowAfter && date('Y-m-d') > $dl);
 ?>
 <div class="card" style="border:2px solid #b45309">
-  <div class="card-header" style="background:#fff7ed"><h3 style="color:#b45309"><i class="fas fa-lock"></i> إقفال باب إدخال المعلومات (بعد التاريخ)</h3></div>
+  <div class="card-header" style="background:#fff7ed"><h3 style="color:#b45309">
+    <span dir="ltr"><i class="fas fa-lock"></i> Fermeture de la saisie des informations (après la date)</span>
+    <div style="font-size:0.85em;font-weight:600;opacity:0.9">إقفال باب إدخال المعلومات (بعد التاريخ)</div>
+  </h3></div>
   <div class="card-body">
     <p style="color:var(--gray-600);margin-top:0">بعد <strong>تاريخ الإقفال</strong>، يُقفَل رابط تحديث/إدخال المعلومات فلا يقدر أي أستاذ يرسل معلوماته — <strong>إلا إذا فعّلت «السماح بعد التاريخ»</strong> بالأسفل. الوضع الحالي:
       <?php if ($isClosedNow): ?><span class="badge" style="background:#b91c1c;color:#fff">🔒 مقفل</span>
@@ -404,14 +413,14 @@ $newSubs = $newSubs->fetchAll();
       <?= csrfField() ?>
       <input type="hidden" name="action" value="save_form_deadline">
       <div>
-        <label style="display:block;font-weight:700;font-size:13px;margin-bottom:4px">تاريخ الإقفال (يوم/شهر/سنة)</label>
+        <label style="display:block;font-weight:700;font-size:13px;margin-bottom:4px">Date de fermeture (j/m/a) / تاريخ الإقفال (يوم/شهر/سنة)</label>
         <input type="text" name="deadline" inputmode="numeric" autocomplete="off" placeholder="مثلاً 30/08/2026" value="<?= e(displayDMY($dl)) ?>" style="padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px">
       </div>
       <label style="display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;padding-bottom:9px;cursor:pointer">
         <input type="checkbox" name="allow_after" value="1" <?= $allowAfter ? 'checked' : '' ?> style="width:18px;height:18px">
-        السماح بالإدخال بعد التاريخ (فتح استثنائي)
+        Autoriser la saisie après la date (ouverture exceptionnelle) / السماح بالإدخال بعد التاريخ (فتح استثنائي)
       </label>
-      <button type="submit" class="btn" style="background:#b45309;color:#fff"><i class="fas fa-save"></i> حفظ</button>
+      <button type="submit" class="btn" style="background:#b45309;color:#fff"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
     </form>
   </div>
 </div>
@@ -419,11 +428,14 @@ $newSubs = $newSubs->fetchAll();
 
 <?php if (!isAllSchools()): $indivSchoolNm = currentSchool()['name_ar'] ?? ''; ?>
 <div class="card">
-  <div class="card-header"><h3><i class="fab fa-whatsapp"></i> أو إرسال فردي لكل أستاذ — <?= e($indivSchoolNm) ?> (<?= count($emps) ?>)</h3></div>
+  <div class="card-header"><h3>
+    <span dir="ltr"><i class="fab fa-whatsapp"></i> Envoi individuel à chaque enseignant — <?= e($indivSchoolNm) ?> (<?= count($emps) ?>)</span>
+    <div style="font-size:0.85em;font-weight:600;opacity:0.9">أو إرسال فردي لكل أستاذ</div>
+  </h3></div>
   <div class="card-body">
     <div class="table-wrapper">
     <table class="table">
-      <thead><tr><th>#</th><th>الاسم</th><th>الفئة</th><th>الهاتف</th><th>إرسال / نسخ الرابط</th></tr></thead>
+      <thead><tr><th>#</th><th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>Téléphone / الهاتف</th><th>Envoyer / copier — إرسال / نسخ الرابط</th></tr></thead>
       <tbody>
       <?php $i=0; foreach ($emps as $emp): $i++;
         $nm = trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
@@ -440,9 +452,9 @@ $newSubs = $newSubs->fetchAll();
             <?php if ($wa): ?>
               <a href="https://wa.me/<?= $wa ?>?text=<?= $msg ?>" target="_blank" class="btn btn-sm" style="background:#25d366;color:#fff"><i class="fab fa-whatsapp"></i> واتساب</a>
             <?php else: ?>
-              <span class="badge badge-warning">لا هاتف</span>
+              <span class="badge badge-warning">Pas de téléphone / لا هاتف</span>
             <?php endif; ?>
-            <button type="button" class="btn btn-sm btn-light" onclick="navigator.clipboard.writeText('<?= e($link) ?>');this.innerHTML='✓ نُسخ'"><i class="fas fa-copy"></i> نسخ الرابط</button>
+            <button type="button" class="btn btn-sm btn-light" onclick="navigator.clipboard.writeText('<?= e($link) ?>');this.innerHTML='✓ نُسخ'"><i class="fas fa-copy"></i> Copier le lien / نسخ الرابط</button>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -454,10 +466,16 @@ $newSubs = $newSubs->fetchAll();
 <?php endif; ?>
 
 <div class="card" id="newteachers" style="border:2px solid #0a7a37">
-  <div class="card-header" style="background:#e8f9ef"><h3 style="color:#0a7a37"><i class="fas fa-user-plus"></i> طلبات أساتذة جدد (<?= count($newSubs) ?>)</h3></div>
+  <div class="card-header" style="background:#e8f9ef"><h3 style="color:#0a7a37">
+    <span dir="ltr"><i class="fas fa-user-plus"></i> Demandes de nouveaux enseignants (<?= count($newSubs) ?>)</span>
+    <div style="font-size:0.85em;font-weight:600;opacity:0.9">طلبات أساتذة جدد</div>
+  </h3></div>
   <div class="card-body">
     <?php if (!$newSubs): ?>
-      <div class="empty-state"><i class="fas fa-user-plus"></i><h4>لا طلبات أساتذة جدد</h4><p>عند تعبئة أستاذ جديد للفورم (خيار «أنا أستاذ جديد») يظهر هنا لتنشئ ملفه.</p></div>
+      <div class="empty-state"><i class="fas fa-user-plus"></i><h4>
+        <span dir="ltr">Aucune demande de nouvel enseignant</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">لا طلبات أساتذة جدد</div>
+      </h4><p>عند تعبئة أستاذ جديد للفورم (خيار «أنا أستاذ جديد») يظهر هنا لتنشئ ملفه.</p></div>
     <?php else: foreach ($newSubs as $s):
         $data = json_decode($s['data'] ?: '{}', true) ?: [];
         $nm = trim(($data['first_name_ar']??'').' '.($data['last_name_ar']??'')) ?: trim(($data['first_name_fr']??'').' '.($data['last_name_fr']??'')) ?: '(بلا اسم)';
@@ -465,17 +483,17 @@ $newSubs = $newSubs->fetchAll();
       <div style="border:1px solid var(--gray-200);border-radius:8px;padding:14px;margin-bottom:14px">
         <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:8px">
           <div><strong style="font-size:16px"><?= e($nm) ?></strong>
-            <span class="badge badge-success">أستاذ جديد</span>
+            <span class="badge badge-success">Nouvel enseignant / أستاذ جديد</span>
             <?php if (!empty($s['school_name'])): ?><span class="badge" style="background:#0a6b5e;color:#fff"><i class="fas fa-school"></i> <?= e($s['school_name']) ?></span><?php endif; ?>
             <span class="badge badge-info"><?= e($s['submitted_at']) ?></span></div>
           <div style="display:flex;gap:8px">
             <form method="post" onsubmit="return confirm('إنشاء ملف أستاذ جديد بهذه المعلومات؟ تُكمل الإعداد المالي والتدرّج من ملف الأستاذ.')" style="margin:0">
               <?= csrfField() ?><input type="hidden" name="action" value="create_new"><input type="hidden" name="submission_id" value="<?= $s['id'] ?>">
-              <button class="btn btn-sm btn-success"><i class="fas fa-user-plus"></i> إنشاء ملف الأستاذ</button>
+              <button class="btn btn-sm btn-success"><i class="fas fa-user-plus"></i> Créer le dossier / إنشاء ملف الأستاذ</button>
             </form>
             <form method="post" onsubmit="return confirm('تجاهل هذا الطلب؟')" style="margin:0">
               <?= csrfField() ?><input type="hidden" name="action" value="reject"><input type="hidden" name="submission_id" value="<?= $s['id'] ?>">
-              <button class="btn btn-sm btn-light"><i class="fas fa-times"></i> تجاهل</button>
+              <button class="btn btn-sm btn-light"><i class="fas fa-times"></i> Ignorer / تجاهل</button>
             </form>
           </div>
         </div>
@@ -486,7 +504,7 @@ $newSubs = $newSubs->fetchAll();
           <?php endforeach; ?>
         </div>
         <?php
-          $files = ['photo_path'=>'صورة','id_document_path'=>'إخراج فردي','family_doc_path'=>'إخراج عائلي','diploma_doc_path'=>'الشهادة'];
+          $files = ['photo_path'=>'Photo / صورة','id_document_path'=>'Ext. individuel / إخراج فردي','family_doc_path'=>'Ext. familial / إخراج عائلي','diploma_doc_path'=>'Diplôme / الشهادة'];
           $any = false; foreach ($files as $c=>$l) if (!empty($s[$c])) $any = true;
           if ($any): ?>
           <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
@@ -502,17 +520,23 @@ $newSubs = $newSubs->fetchAll();
 
 <div class="card" id="received">
   <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <h3><i class="fas fa-inbox"></i> الطلبات الواردة (<?= count($subs) ?>)</h3>
+    <h3>
+      <span dir="ltr"><i class="fas fa-inbox"></i> Demandes reçues (<?= count($subs) ?>)</span>
+      <div style="font-size:0.85em;font-weight:600;opacity:0.9">الطلبات الواردة</div>
+    </h3>
     <?php if ($subs): ?>
     <form method="post" onsubmit="return confirm('اعتماد وتحديث ملفات كل الـ<?= count($subs) ?> أستاذ دفعةً واحدة؟')" style="margin:0">
       <?= csrfField() ?><input type="hidden" name="action" value="apply_all">
-      <button class="btn btn-success"><i class="fas fa-check-double"></i> اعتماد الكل وتحديث الملفات (<?= count($subs) ?>)</button>
+      <button class="btn btn-success"><i class="fas fa-check-double"></i> Tout approuver et mettre à jour / اعتماد الكل وتحديث الملفات (<?= count($subs) ?>)</button>
     </form>
     <?php endif; ?>
   </div>
   <div class="card-body">
     <?php if (!$subs): ?>
-      <div class="empty-state"><i class="fas fa-inbox"></i><h4>لا طلبات واردة بعد</h4><p>ستظهر هنا بعد أن يعبّئ الأساتذة الفورم.</p></div>
+      <div class="empty-state"><i class="fas fa-inbox"></i><h4>
+        <span dir="ltr">Aucune demande reçue pour l'instant</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">لا طلبات واردة بعد</div>
+      </h4><p>ستظهر هنا بعد أن يعبّئ الأساتذة الفورم.</p></div>
     <?php else: foreach ($subs as $s):
         $nm = trim($s['first_name_ar'].' '.$s['last_name_ar']) ?: trim($s['first_name_fr'].' '.$s['last_name_fr']);
         $data = json_decode($s['data'] ?: '{}', true) ?: [];
@@ -527,11 +551,11 @@ $newSubs = $newSubs->fetchAll();
           <div style="display:flex;gap:8px">
             <form method="post" onsubmit="return confirm('<?= !empty($data['leave_date']) ? 'تنبيه: هذا الأستاذ طلب ترك العمل — سيُسجَّل تاريخ الترك ويخرج من السنة الجارية. متابعة؟' : 'تحديث ملف الأستاذ بهذه المعلومات؟' ?>')" style="margin:0">
               <?= csrfField() ?><input type="hidden" name="action" value="apply"><input type="hidden" name="submission_id" value="<?= $s['id'] ?>">
-              <button class="btn btn-sm btn-success"><i class="fas fa-check"></i> اعتماد وتحديث الملف</button>
+              <button class="btn btn-sm btn-success"><i class="fas fa-check"></i> Approuver et mettre à jour / اعتماد وتحديث الملف</button>
             </form>
             <form method="post" onsubmit="return confirm('تجاهل هذا الطلب؟')" style="margin:0">
               <?= csrfField() ?><input type="hidden" name="action" value="reject"><input type="hidden" name="submission_id" value="<?= $s['id'] ?>">
-              <button class="btn btn-sm btn-light"><i class="fas fa-times"></i> تجاهل</button>
+              <button class="btn btn-sm btn-light"><i class="fas fa-times"></i> Ignorer / تجاهل</button>
             </form>
           </div>
         </div>
@@ -542,7 +566,7 @@ $newSubs = $newSubs->fetchAll();
           <?php endforeach; ?>
         </div>
         <?php
-          $files = ['photo_path'=>'صورة','id_document_path'=>'إخراج فردي','family_doc_path'=>'إخراج عائلي','diploma_doc_path'=>'الشهادة'];
+          $files = ['photo_path'=>'Photo / صورة','id_document_path'=>'Ext. individuel / إخراج فردي','family_doc_path'=>'Ext. familial / إخراج عائلي','diploma_doc_path'=>'Diplôme / الشهادة'];
           $any = false; foreach ($files as $c=>$l) if (!empty($s[$c])) $any = true;
           if ($any): ?>
           <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">

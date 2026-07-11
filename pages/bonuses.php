@@ -6,7 +6,7 @@ requireLogin();
 requireCsrf();
 
 $currentPage = 'employees';
-$pageTitle = 'Primes & Indemnités';
+$pageTitle = 'Primes & Indemnités / المكافآت والتعويضات';
 $db = getDB();
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 
@@ -82,19 +82,25 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="d-flex justify-between align-center mb-3">
     <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $employeeId ?>" class="btn btn-light">
-        <i class="fas fa-arrow-left"></i> Retour
+        <i class="fas fa-arrow-left"></i> Retour / رجوع
     </a>
-    <h3 style="margin:0"><?= e($emp['first_name_fr'].' '.$emp['last_name_fr']) ?></h3>
+    <h3 style="margin:0">
+        <span dir="ltr"><?= e($emp['first_name_fr'].' '.$emp['last_name_fr']) ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e(trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: 'المكافآت') ?></div>
+    </h3>
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-plus"></i> Ajouter une prime</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-plus"></i> Ajouter une prime</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إضافة مكافأة</div>
+    </h3></div>
     <div class="card-body">
         <form method="POST">
             <input type="hidden" name="action" value="add">
             <div class="form-row cols-4">
                 <div class="form-group">
-                    <label class="form-label">Type</label>
+                    <label class="form-label">Type / النوع</label>
                     <select name="bonus_type" class="form-select" required>
                         <option value="prime_fixe">💰 Prime fixe / مكافأة ثابتة</option>
                         <option value="aide_complementaire">🤝 Aide complémentaire / مساعدة</option>
@@ -104,16 +110,16 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-group">
                     <label class="form-label">Période / الفترة</label>
                     <select name="period_number" class="form-select" required>
-                        <option value="1">Période 1</option>
-                        <option value="2">Période 2</option>
-                        <option value="3">Période 3</option>
+                        <option value="1">Période 1 / الفترة 1</option>
+                        <option value="2">Période 2 / الفترة 2</option>
+                        <option value="3">Période 3 / الفترة 3</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Type de valeur / النوع</label>
                     <select name="value_type" id="b_value_type" class="form-select" onchange="bonusValTypeChange()">
                         <option value="amount">مبلغ ثابت / Montant</option>
-                        <option value="percent">نسبة % من الأساس</option>
+                        <option value="percent">Pourcentage % de la base / نسبة % من الأساس</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -123,29 +129,29 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-row cols-4">
                 <div class="form-group">
-                    <label class="form-label">Devise</label>
+                    <label class="form-label">Devise / العملة</label>
                     <select name="currency" class="form-select">
                         <option value="USD">USD ($)</option>
                         <option value="LBP">LBP (ل.ل)</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Du mois</label>
+                    <label class="form-label">Du mois / من شهر</label>
                     <select name="start_month" class="form-select">
-                        <option value="">Tous</option>
+                        <option value="">Tous / الكل</option>
                         <?php for ($m=1;$m<=12;$m++): ?><option value="<?=$m?>"><?=monthName($m)?></option><?php endfor; ?>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Au mois</label>
+                    <label class="form-label">Au mois / إلى شهر</label>
                     <select name="end_month" class="form-select">
-                        <option value="">Tous</option>
+                        <option value="">Tous / الكل</option>
                         <?php for ($m=1;$m<=12;$m++): ?><option value="<?=$m?>"><?=monthName($m)?></option><?php endfor; ?>
                     </select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-plus"></i> Ajouter</button>
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-plus"></i> Ajouter / إضافة</button>
                 </div>
             </div>
         </form>
@@ -153,13 +159,19 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-list"></i> Primes existantes</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-list"></i> Primes existantes</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">المكافآت الموجودة</div>
+    </h3></div>
     <div class="card-body">
         <?php if (empty($bonuses)): ?>
-            <div class="empty-state"><i class="fas fa-gift"></i><h4>Aucune prime</h4></div>
+            <div class="empty-state"><i class="fas fa-gift"></i><h4>
+                <span dir="ltr">Aucune prime</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">لا توجد مكافآت</div>
+            </h4></div>
         <?php else: ?>
             <table class="table">
-                <thead><tr><th>Type</th><th>Période</th><th>Montant</th><th>Devise</th><th>Du</th><th>Au</th><th>Action</th></tr></thead>
+                <thead><tr><th>Type / النوع</th><th>Période / الفترة</th><th>Montant / المبلغ</th><th>Devise / العملة</th><th>Du / من</th><th>Au / إلى</th><th>Action / إجراء</th></tr></thead>
                 <tbody>
                     <?php 
                     $typeLabels = ['prime_fixe'=>'💰 Prime fixe','aide_complementaire'=>'🤝 Aide','transport_complement'=>'🚌 Transport'];

@@ -18,7 +18,7 @@ function sendResult($ok, $msg, $back)
         . '.box{background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.12);padding:34px;max-width:480px;text-align:center}'
         . '.ic{font-size:46px;color:' . $color . '}a{display:inline-block;margin-top:18px;background:#1e3a5f;color:#fff;padding:9px 20px;border-radius:8px;text-decoration:none}</style></head>'
         . '<body><div class="box"><div class="ic">' . $icon . '</div><h2 style="color:' . $color . '">' . htmlspecialchars($msg) . '</h2>'
-        . '<a href="' . htmlspecialchars($back) . '">رجوع</a></div></body></html>';
+        . '<a href="' . htmlspecialchars($back) . '">Retour / رجوع</a></div></body></html>';
     exit;
 }
 

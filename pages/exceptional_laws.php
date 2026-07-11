@@ -114,8 +114,10 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-<?= $editRow ? 'edit' : 'plus' ?>"></i>
-        <?= $editRow ? 'تعديل قانون / Modifier' : 'إضافة قانون جديد / Ajouter une loi' ?></h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-<?= $editRow ? 'edit' : 'plus' ?>"></i>
+        <?= $editRow ? 'Modifier une loi' : 'Ajouter une loi' ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= $editRow ? 'تعديل قانون' : 'إضافة قانون جديد' ?></div></h3></div>
     <div class="card-body">
         <form method="POST"<?= $editRow ? ' class="lockedit"' : '' ?>>
             <?= csrfField() ?>
@@ -131,17 +133,17 @@ include __DIR__ . '/../includes/header.php';
                     <input type="date" name="law_date" class="form-control" value="<?= e($editRow['law_date'] ?? date('Y-m-d')) ?>" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">عدد الدرجات / Nb échelons <small>(<?= $lang==='ar'?'يدعم 4.5':'ex: 4.5' ?>)</small></label>
+                    <label class="form-label">عدد الدرجات / Nb échelons <small>(ex: 4.5 / يدعم 4.5)</small></label>
                     <input type="number" step="0.5" name="grades_count" class="form-control" value="<?= e($editRow['grades_count'] ?? '') ?>" required>
                 </div>
             </div>
             <div class="form-row cols-3">
                 <div class="form-group">
-                    <label class="form-label">من تاريخ / Du <small>(<?= $lang==='ar'?'بداية سريان القانون':'début' ?>)</small></label>
+                    <label class="form-label">من تاريخ / Du <small>(début / بداية السريان)</small></label>
                     <input type="date" name="effective_from" class="form-control" value="<?= e($editRow['effective_from'] ?? $editRow['effective_date'] ?? date('Y-01-01')) ?>" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">إلى تاريخ / Au <small>(<?= $lang==='ar'?'فارغ = مفتوح/حتى الآن':'vide = en cours' ?>)</small></label>
+                    <label class="form-label">إلى تاريخ / Au <small>(vide = en cours / فارغ = مفتوح)</small></label>
                     <input type="date" name="effective_to" class="form-control" value="<?= e($editRow['effective_to'] ?? '') ?>">
                 </div>
                 <div class="form-group">
@@ -160,14 +162,14 @@ include __DIR__ . '/../includes/header.php';
             <div class="form-group">
                 <label class="form-label" style="cursor:pointer">
                     <input type="checkbox" name="is_active" value="1" <?= (!$editRow || $editRow['is_active']) ? 'checked' : '' ?> style="width:18px;height:18px;vertical-align:middle">
-                    <?= $lang==='ar'?'مفعّل (يظهر للأساتذة)':'Actif (visible dans les fiches)' ?>
+                    Actif (visible dans les fiches) / مفعّل (يظهر للأساتذة)
                 </label>
             </div>
             <div class="form-group">
                 <label class="form-label" style="cursor:pointer">
                     <input type="checkbox" name="auto_apply" value="1" <?= (!$editRow || $editRow['auto_apply']) ? 'checked' : '' ?> style="width:18px;height:18px;vertical-align:middle">
-                    <strong><?= $lang==='ar'?'يُطبّق تلقائياً على الأساتذة المستحقّين':'Application automatique' ?></strong>
-                    <small class="text-muted">(<?= $lang==='ar'?'شيل الصح = يدوي فقط، متل قانون 344':'décocher = manuel uniquement (ex: loi 344)' ?>)</small>
+                    <strong>Application automatique / يُطبّق تلقائياً على المستحقّين</strong>
+                    <small class="text-muted">(décocher = manuel (ex: loi 344) / شيل الصح = يدوي فقط)</small>
                 </label>
             </div>
             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ / Enregistrer</button>
@@ -179,16 +181,19 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-scroll"></i> القوانين الاستثنائية / Lois exceptionnelles</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-scroll"></i> Lois exceptionnelles</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">القوانين الاستثنائية</div>
+    </h3></div>
     <div class="card-body">
         <table class="table" style="font-size:13px">
             <thead><tr>
-                <th>رقم القانون</th><th>تاريخ القانون</th><th>عدد الدرجات</th><th>من</th><th>إلى</th>
-                <th>التطبيق</th><th>الوصف</th><th>الحالة</th><th>مطبّق على</th><th>إجراء</th>
+                <th>N° loi / رقم القانون</th><th>Date loi / تاريخ القانون</th><th>Nb échelons / عدد الدرجات</th><th>Du / من</th><th>Au / إلى</th>
+                <th>Application / التطبيق</th><th>Description / الوصف</th><th>Statut / الحالة</th><th>Appliqué à / مطبّق على</th><th>Action / إجراء</th>
             </tr></thead>
             <tbody>
             <?php if (empty($rows)): ?>
-                <tr><td colspan="10" class="text-muted"><?= $lang==='ar'?'لا يوجد قوانين':'—' ?></td></tr>
+                <tr><td colspan="10" class="text-muted">Aucune loi / لا يوجد قوانين</td></tr>
             <?php else: foreach ($rows as $r):
                 $applied = $appliedCounts[$r['law_number']] ?? 0;
                 $is2017 = ((string)$r['law_number'] === '2017');
@@ -196,30 +201,30 @@ include __DIR__ . '/../includes/header.php';
                 <tr style="<?= $r['is_active'] ? '' : 'opacity:.5;background:#f3f4f6' ?>">
                     <td><strong><?= e($r['law_number']) ?></strong></td>
                     <td><?= formatDate($r['law_date']) ?></td>
-                    <td><?= $is2017 ? '<span class="badge badge-gold">6/2/0 حسب الأستاذ</span>' : '+'.(float)$r['grades_count'] ?></td>
+                    <td><?= $is2017 ? '<span class="badge badge-gold">6/2/0 selon ens. / حسب الأستاذ</span>' : '+'.(float)$r['grades_count'] ?></td>
                     <td><?= formatDate($r['effective_from'] ?? $r['effective_date']) ?></td>
-                    <td><?= $r['effective_to'] ? formatDate($r['effective_to']) : '<span class="badge badge-success">'.($lang==='ar'?'مفتوح':'En cours').'</span>' ?></td>
+                    <td><?= $r['effective_to'] ? formatDate($r['effective_to']) : '<span class="badge badge-success">En cours / مفتوح</span>' ?></td>
                     <td><?= $r['auto_apply']
-                        ? '<span class="badge badge-success">'.($lang==='ar'?'تلقائي':'Auto').'</span>'
-                        : '<span class="badge badge-warning">'.($lang==='ar'?'يدوي':'Manuel').'</span>' ?></td>
+                        ? '<span class="badge badge-success">Auto / تلقائي</span>'
+                        : '<span class="badge badge-warning">Manuel / يدوي</span>' ?></td>
                     <td><small><?= e($r['description_ar'] ?: $r['description_fr']) ?></small></td>
                     <td><?= $r['is_active']
-                        ? '<span class="badge badge-success">'.($lang==='ar'?'مفعّل':'Actif').'</span>'
-                        : '<span class="badge badge-secondary">'.($lang==='ar'?'معطّل':'Inactif').'</span>' ?></td>
-                    <td><?= $applied > 0 ? '<span class="badge badge-info">'.$applied.' '.($lang==='ar'?'أستاذ':'ens.').'</span>' : '<span class="text-muted">0</span>' ?></td>
+                        ? '<span class="badge badge-success">Actif / مفعّل</span>'
+                        : '<span class="badge badge-secondary">Inactif / معطّل</span>' ?></td>
+                    <td><?= $applied > 0 ? '<span class="badge badge-info">'.$applied.' '.'ens. / أستاذ'.'</span>' : '<span class="text-muted">0</span>' ?></td>
                     <td style="white-space:nowrap">
-                        <a href="?edit=<?= $r['id'] ?>" class="btn btn-sm btn-light" title="تعديل"><i class="fas fa-edit"></i></a>
+                        <a href="?edit=<?= $r['id'] ?>" class="btn btn-sm btn-light" title="Éditer / تعديل"><i class="fas fa-edit"></i></a>
                         <form method="POST" style="display:inline">
                             <?= csrfField() ?>
                             <input type="hidden" name="action" value="toggle">
                             <input type="hidden" name="id" value="<?= $r['id'] ?>">
-                            <button type="submit" class="btn btn-sm btn-warning" title="<?= $r['is_active']?'تعطيل':'تفعيل' ?>">
+                            <button type="submit" class="btn btn-sm btn-warning" title="<?= $r['is_active']?'Désactiver / تعطيل':'Activer / تفعيل' ?>">
                                 <i class="fas fa-<?= $r['is_active']?'eye-slash':'eye' ?>"></i>
                             </button>
                         </form>
                         <a href="?delete=<?= $r['id'] ?>" class="btn btn-sm btn-danger"
                            data-confirm="<?= $applied>0 ? 'القانون مطبّق على '.$applied.' أستاذ — عطّله بدل حذفه' : 'حذف القانون نهائياً؟' ?>"
-                           title="حذف"><i class="fas fa-trash"></i></a>
+                           title="Supprimer / حذف"><i class="fas fa-trash"></i></a>
                     </td>
                 </tr>
             <?php endforeach; endif; ?>

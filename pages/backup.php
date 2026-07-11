@@ -79,7 +79,7 @@ if ($action === 'excel') {
     header('Content-Disposition: attachment; filename="payroll_data_' . $stamp . '.xls"');
     echo "\xEF\xBB\xBF"; // BOM للعربي
     echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>';
-    echo '<h2>رواتب المدارس — ' . date('Y-m-d H:i') . '</h2>';
+    echo '<h2><span dir="ltr">Salaires des écoles — ' . date('Y-m-d H:i') . '</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">رواتب المدارس</div></h2>';
     echo renderAllTables($db, true);
     echo '</body></html>';
     exit;
@@ -92,7 +92,7 @@ if ($action === 'word') {
     echo "\xEF\xBB\xBF";
     echo '<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">'
        . '<style>table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:3px;font-size:10px}</style></head><body>';
-    echo '<h2>رواتب المدارس — ' . date('Y-m-d H:i') . '</h2>';
+    echo '<h2><span dir="ltr">Salaires des écoles — ' . date('Y-m-d H:i') . '</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">رواتب المدارس</div></h2>';
     echo renderAllTables($db);
     echo '</body></html>';
     exit;
@@ -114,7 +114,7 @@ foreach ($tables as $t) {
 ?>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-database"></i> Sauvegarde des données / النسخ الاحتياطي للبيانات</h3></div>
+    <div class="card-header"><h3><i class="fas fa-database"></i> <span dir="ltr">Sauvegarde des données</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">النسخ الاحتياطي للبيانات</div></h3></div>
     <div class="card-body">
         <div class="alert alert-info">
             <i class="fas fa-info-circle"></i>
@@ -123,10 +123,10 @@ foreach ($tables as $t) {
         </div>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">
-            <a href="?action=sql" class="btn btn-primary"><i class="fas fa-download"></i> نسخة كاملة (SQL) — ملف لكل الداتا</a>
-            <a href="?action=excel" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel — كل الداتا</a>
-            <a href="?action=word" class="btn btn-info"><i class="fas fa-file-word"></i> Word — كل الداتا</a>
-            <button type="button" class="btn btn-danger" onclick="window.print()"><i class="fas fa-file-pdf"></i> PDF / Imprimer</button>
+            <a href="?action=sql" class="btn btn-primary"><i class="fas fa-download"></i> Sauvegarde complète (SQL) / نسخة كاملة (SQL) — ملف لكل الداتا</a>
+            <a href="?action=excel" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel — toutes les données / كل الداتا</a>
+            <a href="?action=word" class="btn btn-info"><i class="fas fa-file-word"></i> Word — toutes les données / كل الداتا</a>
+            <button type="button" class="btn btn-danger" onclick="window.print()"><i class="fas fa-file-pdf"></i> PDF / Imprimer / طباعة</button>
         </div>
 
         <table class="table">
@@ -135,7 +135,7 @@ foreach ($tables as $t) {
                 <?php foreach ($counts as $t => $n): ?>
                 <tr><td><?= e($t) ?></td><td class="text-end"><?= number_format($n) ?></td></tr>
                 <?php endforeach; ?>
-                <tr class="total-row"><td><strong>TOTAL</strong></td><td class="text-end"><strong><?= number_format($totalRows) ?></strong></td></tr>
+                <tr class="total-row"><td><strong>TOTAL / الإجمالي</strong></td><td class="text-end"><strong><?= number_format($totalRows) ?></strong></td></tr>
             </tbody>
         </table>
 

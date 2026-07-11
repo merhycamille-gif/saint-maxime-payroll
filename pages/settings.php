@@ -6,7 +6,7 @@ requireLogin();
 requireCsrf();
 
 $currentPage = 'settings';
-$pageTitle = 'Paramètres';
+$pageTitle = 'Paramètres / الإعدادات';
 $db = getDB();
 $message = ''; $messageType = 'success';
 
@@ -72,7 +72,10 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if (canEdit()): ?>
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-school"></i> Informations des écoles</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-school"></i> Informations des écoles</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">معلومات المدارس</div>
+    </h3></div>
     <div class="card-body">
         <div class="alert alert-info">
             <i class="fas fa-info-circle"></i>
@@ -85,7 +88,10 @@ include __DIR__ . '/../includes/header.php';
 
 <form method="POST" class="lockedit">
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-calendar"></i> Paramètres généraux</h3></div>
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-calendar"></i> Paramètres généraux</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">الإعدادات العامة</div>
+        </h3></div>
         <div class="card-body">
             <div class="form-group">
                 <label class="form-label">Année scolaire actuelle / السنة الدراسية</label>
@@ -95,10 +101,13 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-coins"></i> Taux de change actuel / سعر الصرف الحالي</h3></div>
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-coins"></i> Taux de change actuel</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">سعر الصرف الحالي</div>
+        </h3></div>
         <div class="card-body">
             <div class="form-group">
-                <label class="form-label">Taux de change actuel (par défaut)</label>
+                <label class="form-label">Taux de change actuel (par défaut) / سعر الصرف الحالي (افتراضي)</label>
                 <input type="number" name="current_exchange_rate" class="form-control" value="<?= e(getSetting('current_exchange_rate')) ?>" step="0.01">
                 <small class="text-muted"><?= $lang==='ar'?'الأسعار الشهرية المفصّلة في صفحة «Taux de change».':'Les taux mensuels détaillés sont dans la page « Taux de change ».' ?></small>
             </div>
@@ -115,7 +124,10 @@ include __DIR__ . '/../includes/header.php';
 </form>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-percent"></i> Taux & Pourcentages (lois) / النِّسَب والقيم القانونية</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-percent"></i> Taux &amp; Pourcentages (lois)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">النِّسَب والقيم القانونية</div>
+    </h3></div>
     <div class="card-body">
         <div class="alert alert-info">
             <i class="fas fa-info-circle"></i>
@@ -127,7 +139,7 @@ include __DIR__ . '/../includes/header.php';
             <a href="<?= BASE_URL ?>pages/social_security.php"><strong>Plafonds CNSS / حدود الضمان</strong></a>.
         </div>
         <table class="table">
-            <thead><tr><th><?= $lang==='ar'?'القيمة':'Valeur' ?></th><th><?= $lang==='ar'?'الساري حالياً':'Actuel' ?></th></tr></thead>
+            <thead><tr><th>Valeur / القيمة</th><th>Actuel / الساري حالياً</th></tr></thead>
             <tbody>
             <?php foreach (ratedParams() as $key => $info):
                 $cur = getRateAsOf($key, (int)date('n'), (int)date('Y'));
@@ -142,7 +154,10 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; /* canEdit — نهاية البطاقات القابلة للتعديل */ ?>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-key"></i> Mot de passe / كلمة المرور</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-key"></i> Mot de passe</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">كلمة المرور</div>
+    </h3></div>
     <div class="card-body">
         <p class="text-muted" style="margin-bottom:16px;">
             <?= $lang==='ar'
@@ -167,7 +182,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="d-flex justify-end">
                 <button type="submit" class="btn btn-primary btn-lg">
-                    <i class="fas fa-key"></i> <?= $lang==='ar'?'تغيير كلمة المرور':'Changer le mot de passe' ?>
+                    <i class="fas fa-key"></i> Changer le mot de passe / تغيير كلمة المرور
                 </button>
             </div>
         </form>

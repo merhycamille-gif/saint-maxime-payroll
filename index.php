@@ -6,7 +6,7 @@ require_once __DIR__ . '/includes/age64.php';               // أدوات تنب
 requireLogin();
 
 $currentPage = 'dashboard';
-$pageTitle = 'Tableau de bord';
+$pageTitle = 'Tableau de bord / لوحة القيادة';
 
 $db = getDB();
 
@@ -71,7 +71,7 @@ include __DIR__ . '/includes/header.php';
     <div class="stat-card">
         <div class="stat-icon primary"><i class="fas fa-users"></i></div>
         <div>
-            <div class="stat-label">Total Personnel</div>
+            <div class="stat-label">Total Personnel / إجمالي الموظفين</div>
             <div class="stat-value"><?= $stats['total_employees'] ?></div>
         </div>
     </div>
@@ -79,7 +79,7 @@ include __DIR__ . '/includes/header.php';
     <div class="stat-card">
         <div class="stat-icon gold"><i class="fas fa-chalkboard-teacher"></i></div>
         <div>
-            <div class="stat-label">Enseignants Titulaires</div>
+            <div class="stat-label">Enseignants Titulaires / أساتذة الملاك</div>
             <div class="stat-value"><?= $stats['titulaires'] ?></div>
         </div>
     </div>
@@ -87,7 +87,7 @@ include __DIR__ . '/includes/header.php';
     <div class="stat-card">
         <div class="stat-icon info"><i class="fas fa-user-clock"></i></div>
         <div>
-            <div class="stat-label">Contractuels</div>
+            <div class="stat-label">Contractuels / المتعاقدون</div>
             <div class="stat-value"><?= $stats['contractuels'] ?></div>
         </div>
     </div>
@@ -95,7 +95,7 @@ include __DIR__ . '/includes/header.php';
     <div class="stat-card">
         <div class="stat-icon success"><i class="fas fa-user-tie"></i></div>
         <div>
-            <div class="stat-label">Employés</div>
+            <div class="stat-label">Employés / الموظفون الإداريون</div>
             <div class="stat-value"><?= $stats['employes'] ?></div>
         </div>
     </div>
@@ -103,7 +103,10 @@ include __DIR__ . '/includes/header.php';
 
 <?php if (viewerCanSeePage('attestations.php')): ?>
 <div class="card no-print" style="border:2px solid var(--primary);background:#f0f7ff;margin-bottom:16px">
-    <div class="card-header"><h3><i class="fas fa-folder-open"></i> ملف الأستاذ الكامل / Dossier — كل شي عن الأستاذ بكبسة</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-folder-open"></i> Dossier complet de l'enseignant</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">ملف الأستاذ الكامل — كل شي عن الأستاذ بكبسة</div>
+    </h3></div>
     <div class="card-body">
         <?php if (!$homeEmps): ?>
             <div class="alert alert-info" style="margin:0">لا يوجد أساتذة.</div>
@@ -132,24 +135,27 @@ include __DIR__ . '/includes/header.php';
 <div class="form-row cols-2">
     <div class="card">
         <div class="card-header">
-            <h3><i class="fas fa-info-circle"></i> Informations système</h3>
+            <h3>
+                <span dir="ltr"><i class="fas fa-info-circle"></i> Informations système</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">معلومات النظام</div>
+            </h3>
         </div>
         <div class="card-body">
             <table class="table">
                 <tr>
-                    <td><strong>Année scolaire</strong></td>
+                    <td><strong>Année scolaire / السنة الدراسية</strong></td>
                     <td><?= e(getSetting('current_school_year', currentSchoolYear())) ?></td>
                 </tr>
                 <tr>
-                    <td><strong>Taux de change actuel</strong></td>
+                    <td><strong>Taux de change actuel / سعر الصرف الحالي</strong></td>
                     <td><?= formatLBP($exchangeRate) ?> / $1</td>
                 </tr>
                 <tr>
-                    <td><strong>Salaire minimum (Loi)</strong></td>
+                    <td><strong>Salaire minimum (Loi) / الحد الأدنى للأجور (القانون)</strong></td>
                     <td><?= formatLBP(getSetting('minimum_wage_lbp', 28000000)) ?></td>
                 </tr>
                 <tr>
-                    <td><strong>Total payé ce mois</strong></td>
+                    <td><strong>Total payé ce mois / إجمالي المدفوع هذا الشهر</strong></td>
                     <td><strong class="text-success"><?= formatLBP($totalPaid) ?></strong></td>
                 </tr>
             </table>
@@ -158,28 +164,31 @@ include __DIR__ . '/includes/header.php';
     
     <div class="card">
         <div class="card-header">
-            <h3><i class="fas fa-bolt"></i> Actions rapides</h3>
+            <h3>
+                <span dir="ltr"><i class="fas fa-bolt"></i> Actions rapides</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">إجراءات سريعة</div>
+            </h3>
         </div>
         <div class="card-body">
             <div class="d-flex gap-3" style="flex-direction:column">
                 <?php if (canEdit()): ?>
                 <a href="<?= BASE_URL ?>pages/employees.php?action=new" class="btn btn-primary">
-                    <i class="fas fa-user-plus"></i> Ajouter un employé
+                    <i class="fas fa-user-plus"></i> Ajouter un employé / إضافة موظف
                 </a>
                 <?php endif; ?>
                 <?php if (viewerCanSeePage('monthly_payroll.php')): ?>
                 <a href="<?= BASE_URL ?>pages/monthly_payroll.php" class="btn btn-gold">
-                    <i class="fas fa-calculator"></i> Calculer la paie mensuelle
+                    <i class="fas fa-calculator"></i> Calculer la paie mensuelle / حساب الرواتب الشهرية
                 </a>
                 <?php endif; ?>
                 <?php if (viewerCanSeePage('annual_slip.php')): ?>
                 <a href="<?= BASE_URL ?>pages/annual_slip.php" class="btn btn-light">
-                    <i class="fas fa-file-invoice"></i> Voir relevé annuel
+                    <i class="fas fa-file-invoice"></i> Voir relevé annuel / كشف سنوي
                 </a>
                 <?php endif; ?>
                 <?php if (canEdit()): ?>
                 <a href="<?= BASE_URL ?>pages/exchange_rates.php" class="btn btn-light">
-                    <i class="fas fa-coins"></i> Gérer les taux de change
+                    <i class="fas fa-coins"></i> Gérer les taux de change / أسعار الصرف
                 </a>
                 <?php endif; ?>
             </div>
@@ -189,12 +198,18 @@ include __DIR__ . '/includes/header.php';
 
 <div class="card">
     <div class="card-header">
-        <h3><i class="fas fa-gavel"></i> Réglementation appliquée</h3>
+        <h3>
+            <span dir="ltr"><i class="fas fa-gavel"></i> Réglementation appliquée</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">القوانين المطبَّقة</div>
+        </h3>
     </div>
     <div class="card-body">
         <div class="form-row cols-2">
             <div>
-                <h4 style="color:var(--primary);">Enseignants Titulaires</h4>
+                <h4 style="color:var(--primary);">
+                    <span dir="ltr">Enseignants Titulaires</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">الأساتذة الملاك</div>
+                </h4>
                 <ul>
                     <li>Échelle des grades : Loi 2017 (Journal Officiel n°37)</li>
                     <li>CNSS Maladie/Maternité : 3% (employé) + 8% (école)</li>
@@ -204,7 +219,10 @@ include __DIR__ . '/includes/header.php';
                 </ul>
             </div>
             <div>
-                <h4 style="color:var(--primary);">Employés (Code du travail)</h4>
+                <h4 style="color:var(--primary);">
+                    <span dir="ltr">Employés (Code du travail)</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">الموظفون (قانون العمل)</div>
+                </h4>
                 <ul>
                     <li>Salaire minimum : <?= formatLBP(getSetting('minimum_wage_lbp', 28000000)) ?> (2025)</li>
                     <li>CNSS Maladie/Maternité : 3% (employé) + 8% (école)</li>

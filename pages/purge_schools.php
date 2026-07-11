@@ -94,25 +94,26 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="alert alert-danger">
     <i class="fas fa-exclamation-triangle"></i>
-    <strong><?= $lang==='ar'?'تحذير:':'Attention :' ?></strong>
-    <?= $lang==='ar'
-        ? 'هذه الصفحة تحذف المدرسة وكل موظفيها ورواتبهم وتاريخهم نهائياً — لا يمكن التراجع. تُحفظ نسخة استرجاع في مجلّد backups قبل الحذف.'
-        : 'Supprime définitivement l\'école et toutes ses données. Une sauvegarde de récupération est créée avant.' ?>
+    <strong>Attention : / تحذير:</strong>
+    Supprime définitivement l'école et toutes ses données. Une sauvegarde de récupération est créée avant. / هذه الصفحة تحذف المدرسة وكل موظفيها ورواتبهم وتاريخهم نهائياً — لا يمكن التراجع. تُحفظ نسخة استرجاع في مجلّد backups قبل الحذف.
 </div>
 
-<form method="POST" data-confirm="<?= $lang==='ar'?'⚠️ حذف نهائي للمدارس المختارة وكل بياناتها؟ لا رجعة!':'Suppression définitive ?' ?>">
+<form method="POST" data-confirm="Suppression définitive ? / ⚠️ حذف نهائي للمدارس المختارة وكل بياناتها؟ لا رجعة!">
     <input type="hidden" name="csrf" value="<?= csrfToken() ?>">
     <input type="hidden" name="confirm" value="DELETE">
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-trash-alt"></i> <?= $lang==='ar'?'اختر المدرسة/المدارس للحذف النهائي':'Écoles à supprimer' ?></h3></div>
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-trash-alt"></i> Écoles à supprimer définitivement</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">اختر المدرسة/المدارس للحذف النهائي</div>
+        </h3></div>
         <div class="card-body">
             <table class="table table-hover">
                 <thead><tr>
                     <th style="width:40px"></th>
-                    <th><?= $lang==='ar'?'المدرسة':'École' ?></th>
-                    <th><?= $lang==='ar'?'موظفون':'Employés' ?></th>
-                    <th><?= $lang==='ar'?'رواتب مسجّلة':'Salaires' ?></th>
-                    <th><?= $lang==='ar'?'الحالة':'État' ?></th>
+                    <th>École / المدرسة</th>
+                    <th>Employés / موظفون</th>
+                    <th>Salaires / رواتب مسجّلة</th>
+                    <th>État / الحالة</th>
                 </tr></thead>
                 <tbody>
                 <?php foreach ($schools as $s): ?>
@@ -121,7 +122,7 @@ include __DIR__ . '/../includes/header.php';
                         <td><strong><?= e($lang==='ar'?$s['name_ar']:$s['name_fr']) ?></strong><br><small class="text-muted"><?= e($lang==='ar'?$s['name_fr']:$s['name_ar']) ?></small></td>
                         <td><span class="badge badge-info"><?= (int)$s['emp'] ?></span></td>
                         <td><span class="badge badge-info"><?= (int)$s['sal'] ?></span></td>
-                        <td><?= $s['is_active'] ? '<span class="badge badge-success">'.($lang==='ar'?'فعّالة':'Active').'</span>' : '<span class="badge badge-secondary">'.($lang==='ar'?'موقوفة':'Inactive').'</span>' ?></td>
+                        <td><?= $s['is_active'] ? '<span class="badge badge-success">Active / فعّالة</span>' : '<span class="badge badge-secondary">Inactive / موقوفة</span>' ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -130,12 +131,12 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <div class="card"><div class="card-body d-flex gap-2" style="align-items:center">
         <label class="form-check" style="margin:0">
-            <input type="checkbox" required> <?= $lang==='ar'?'أفهم أن الحذف نهائي ولا يمكن التراجع':'Je comprends que c\'est définitif' ?>
+            <input type="checkbox" required> Je comprends que c'est définitif / أفهم أن الحذف نهائي ولا يمكن التراجع
         </label>
         <button type="submit" class="btn btn-danger btn-lg" style="margin-inline-start:auto">
-            <i class="fas fa-trash-alt"></i> <?= $lang==='ar'?'حذف نهائي':'Supprimer définitivement' ?>
+            <i class="fas fa-trash-alt"></i> Supprimer définitivement / حذف نهائي
         </button>
-        <a href="<?= BASE_URL ?>pages/schools.php" class="btn btn-light"><?= $lang==='ar'?'إلغاء':'Annuler' ?></a>
+        <a href="<?= BASE_URL ?>pages/schools.php" class="btn btn-light">Annuler / إلغاء</a>
     </div></div>
 </form>
 

@@ -319,7 +319,10 @@ foreach ($existing as $r) $bySchool[$r['school_id']][$r['school_year']] = $r['em
 $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $cyN - 1;
 ?>
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-folder-plus"></i> فتح سنة دراسية جديدة / Ouvrir une année</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-folder-plus"></i> Ouvrir une nouvelle année</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">فتح سنة دراسية جديدة</div>
+    </h3></div>
     <div class="card-body">
         <div class="alert alert-info">
             <i class="fas fa-info-circle"></i>
@@ -332,7 +335,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                 <div class="form-group mb-0">
                     <label class="form-label">المدرسة / École</label>
                     <select name="school_id" class="form-select" required>
-                        <option value="">— اختر —</option>
+                        <option value="">— Choisir / اختر —</option>
                         <?php foreach (allSchools() as $s): ?>
                             <option value="<?= (int)$s['id'] ?>" <?= currentSchoolId() === (int)$s['id'] ? 'selected' : '' ?>><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
                         <?php endforeach; ?>
@@ -353,20 +356,20 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
 
             <!-- خيارات نقل الإضافات وتعويض النقل للسنة الجديدة -->
             <div style="margin-top:14px;padding:12px 14px;background:#f0f9f6;border:1px solid #b6e3d4;border-radius:8px">
-                <strong style="color:#0a6b5e"><i class="fas fa-coins"></i> الإضافات وتعويض النقل في السنة الجديدة:</strong>
+                <strong style="color:#0a6b5e"><i class="fas fa-coins"></i> Primes &amp; transport dans la nouvelle année / الإضافات وتعويض النقل في السنة الجديدة:</strong>
                 <div class="form-row cols-2" style="margin-top:10px;gap:18px">
                     <div>
-                        <div class="form-label" style="font-weight:bold">الأجر الإضافي + المكافأة</div>
-                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="add_mode" value="same" checked onchange="document.getElementById('add_pct').disabled=true"> نفس السنة الماضية</label>
-                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="add_mode" value="none" onchange="document.getElementById('add_pct').disabled=true"> بلا (لا تنقلها)</label>
-                        <label style="cursor:pointer;margin:3px 0"><input type="radio" name="add_mode" value="pct" onchange="document.getElementById('add_pct').disabled=false"> مع تعديل بنسبة:</label>
+                        <div class="form-label" style="font-weight:bold">Salaire additionnel + prime / الأجر الإضافي + المكافأة</div>
+                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="add_mode" value="same" checked onchange="document.getElementById('add_pct').disabled=true"> Comme l'an dernier / نفس السنة الماضية</label>
+                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="add_mode" value="none" onchange="document.getElementById('add_pct').disabled=true"> Aucun / بلا (لا تنقلها)</label>
+                        <label style="cursor:pointer;margin:3px 0"><input type="radio" name="add_mode" value="pct" onchange="document.getElementById('add_pct').disabled=false"> Avec ajustement (%) / مع تعديل بنسبة:</label>
                         <input type="number" id="add_pct" name="add_pct" value="0" step="0.5" disabled style="width:75px;padding:3px 6px"> %
                     </div>
                     <div>
-                        <div class="form-label" style="font-weight:bold">تعويض النقل</div>
-                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="trans_mode" value="same" checked onchange="document.getElementById('trans_pct').disabled=true"> نفس السنة الماضية</label>
-                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="trans_mode" value="none" onchange="document.getElementById('trans_pct').disabled=true"> بلا (لا تنقلها)</label>
-                        <label style="cursor:pointer;margin:3px 0"><input type="radio" name="trans_mode" value="pct" onchange="document.getElementById('trans_pct').disabled=false"> مع تعديل بنسبة:</label>
+                        <div class="form-label" style="font-weight:bold">Transport / تعويض النقل</div>
+                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="trans_mode" value="same" checked onchange="document.getElementById('trans_pct').disabled=true"> Comme l'an dernier / نفس السنة الماضية</label>
+                        <label style="display:block;cursor:pointer;margin:3px 0"><input type="radio" name="trans_mode" value="none" onchange="document.getElementById('trans_pct').disabled=true"> Aucun / بلا (لا تنقلها)</label>
+                        <label style="cursor:pointer;margin:3px 0"><input type="radio" name="trans_mode" value="pct" onchange="document.getElementById('trans_pct').disabled=false"> Avec ajustement (%) / مع تعديل بنسبة:</label>
                         <input type="number" id="trans_pct" name="trans_pct" value="0" step="0.5" disabled style="width:75px;padding:3px 6px"> %
                     </div>
                 </div>
@@ -382,7 +385,10 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
 
 <!-- ⭐ شك مارك: إضافة/إزالة الإضافات وتعويض النقل لسنة مفتوحة بلا تفريغها -->
 <div class="card" style="border:2px solid #0a6b5e">
-    <div class="card-header" style="background:#e6f4f1"><h3 style="color:#0a6b5e"><i class="fas fa-toggle-on"></i> تعديل الإضافات وتعويض النقل لسنة مفتوحة (بلا تفريغ)</h3></div>
+    <div class="card-header" style="background:#e6f4f1"><h3 style="color:#0a6b5e">
+        <span dir="ltr"><i class="fas fa-toggle-on"></i> Modifier primes &amp; transport d'une année ouverte (sans la vider)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">تعديل الإضافات وتعويض النقل لسنة مفتوحة (بلا تفريغ)</div>
+    </h3></div>
     <div class="card-body">
         <div class="alert alert-info" style="margin-bottom:12px">
             <i class="fas fa-info-circle"></i>
@@ -395,7 +401,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                 <div class="form-group mb-0">
                     <label class="form-label">المدرسة / École</label>
                     <select name="ba_school_id" class="form-select" required>
-                        <option value="">— اختر —</option>
+                        <option value="">— Choisir / اختر —</option>
                         <?php foreach (allSchools() as $s): ?>
                             <option value="<?= (int)$s['id'] ?>" <?= currentSchoolId() === (int)$s['id'] ? 'selected' : '' ?>><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
                         <?php endforeach; ?>
@@ -403,7 +409,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                 </div>
                 <?php else: ?><input type="hidden" name="ba_school_id" value="<?= currentSchoolId() ?>"><?php endif; ?>
                 <div class="form-group mb-0">
-                    <label class="form-label">السنة المفتوحة</label>
+                    <label class="form-label">Année ouverte / السنة المفتوحة</label>
                     <select name="ba_year" class="form-select" required>
                         <?php for ($yb = $startN + 3; $yb >= $startN + 1; $yb--): $syb = $yb . '-' . ($yb + 1); ?>
                             <option value="<?= $syb ?>"><?= $syb ?></option>
@@ -411,19 +417,22 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                     </select>
                 </div>
                 <div class="form-group mb-0">
-                    <label style="display:block;cursor:pointer;margin:4px 0;font-weight:bold"><input type="checkbox" name="ba_add" value="1" checked> الأجر الإضافي + المكافأة</label>
-                    <label style="display:block;cursor:pointer;margin:4px 0;font-weight:bold"><input type="checkbox" name="ba_trans" value="1" checked> تعويض النقل</label>
+                    <label style="display:block;cursor:pointer;margin:4px 0;font-weight:bold"><input type="checkbox" name="ba_add" value="1" checked> Salaire additionnel + prime / الأجر الإضافي + المكافأة</label>
+                    <label style="display:block;cursor:pointer;margin:4px 0;font-weight:bold"><input type="checkbox" name="ba_trans" value="1" checked> Transport / تعويض النقل</label>
                 </div>
             </div>
             <div style="margin-top:12px">
-                <button type="submit" class="btn" style="background:#0a6b5e;color:#fff"><i class="fas fa-check"></i> طبّق على السنة</button>
+                <button type="submit" class="btn" style="background:#0a6b5e;color:#fff"><i class="fas fa-check"></i> Appliquer à l'année / طبّق على السنة</button>
             </div>
         </form>
     </div>
 </div>
 
 <div class="card" style="border:2px solid #e11d48">
-    <div class="card-header" style="background:#fdeef1"><h3 style="color:#b91c3a"><i class="fas fa-eraser"></i> تفريغ سنة دراسية مستقبلية</h3></div>
+    <div class="card-header" style="background:#fdeef1"><h3 style="color:#b91c3a">
+        <span dir="ltr"><i class="fas fa-eraser"></i> Vider une année future</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">تفريغ سنة دراسية مستقبلية</div>
+    </h3></div>
     <div class="card-body">
         <div class="alert" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b">
             <i class="fas fa-exclamation-triangle"></i>
@@ -437,7 +446,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                 <div class="form-group mb-0">
                     <label class="form-label">المدرسة / École</label>
                     <select name="clear_school_id" class="form-select" required>
-                        <option value="all">🏫 كل المدارس</option>
+                        <option value="all">🏫 Toutes les écoles / كل المدارس</option>
                         <?php foreach (allSchools() as $s): ?>
                             <option value="<?= (int)$s['id'] ?>"><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
                         <?php endforeach; ?>
@@ -447,7 +456,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                     <input type="hidden" name="clear_school_id" value="<?= currentSchoolId() ?>">
                 <?php endif; ?>
                 <div class="form-group mb-0">
-                    <label class="form-label">السنة المراد تفريغها</label>
+                    <label class="form-label">Année à vider / السنة المراد تفريغها</label>
                     <select name="clear_year_val" class="form-select" required>
                         <?php for ($yc = $startN + 3; $yc >= $startN + 1; $yc--): $syc = $yc . '-' . ($yc + 1); ?>
                             <option value="<?= $syc ?>"><?= $syc ?></option>
@@ -456,7 +465,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                 </div>
                 <div class="form-group mb-0">
                     <label class="form-label">&nbsp;</label>
-                    <button type="submit" class="btn w-100" style="background:#e11d48;color:#fff"><i class="fas fa-eraser"></i> فرّغ السنة</button>
+                    <button type="submit" class="btn w-100" style="background:#e11d48;color:#fff"><i class="fas fa-eraser"></i> Vider l'année / فرّغ السنة</button>
                 </div>
             </div>
         </form>
@@ -464,10 +473,13 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-table"></i> السنوات المفتوحة لكل مدرسة</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-table"></i> Années ouvertes par école</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">السنوات المفتوحة لكل مدرسة</div>
+    </h3></div>
     <div class="card-body">
         <table class="table">
-            <thead><tr><th>المدرسة / École</th><th>السنوات الموجودة</th></tr></thead>
+            <thead><tr><th>École / المدرسة</th><th>Années existantes / السنوات الموجودة</th></tr></thead>
             <tbody>
                 <?php foreach (allSchools() as $s): $sy = $bySchool[$s['id']] ?? []; krsort($sy); ?>
                     <tr>

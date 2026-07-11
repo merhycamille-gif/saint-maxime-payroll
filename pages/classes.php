@@ -9,7 +9,7 @@ requireLogin();
 requireCsrf();
 
 $currentPage = 'classes';
-$pageTitle = 'الصفوف الدراسية';
+$pageTitle = 'Classes / الصفوف الدراسية';
 $db = getDB();
 
 // الجدول قد لا يكون موجوداً أونلاين قبل تطبيق migration 015 — اعرض إرشاداً بدل خطأ
@@ -112,7 +112,7 @@ include __DIR__ . '/../includes/header.php';
         <p style="font-size:15px;margin-top:0">لسا ما في صفوف معرّفة — لهيك ما بتظهر بفورم الأساتذة. اكبس لإضافة <strong>الصفوف اللبنانية الجاهزة</strong> (روضات + أساسي 1-9 + ثانوي 1-3) دفعة وحدة:</p>
         <form method="POST" style="margin:0">
             <?= csrfField() ?><input type="hidden" name="action" value="seed_defaults">
-            <button class="btn" style="background:#0a6b5e;color:#fff;font-size:15px;padding:10px 22px"><i class="fas fa-magic"></i> إضافة الصفوف الافتراضية (15 صفّ)</button>
+            <button class="btn" style="background:#0a6b5e;color:#fff;font-size:15px;padding:10px 22px"><i class="fas fa-magic"></i> Ajouter les classes par défaut (15) / إضافة الصفوف الافتراضية (15 صفّ)</button>
         </form>
     </div>
 </div>
@@ -120,11 +120,14 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="card">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <h3 style="margin:0"><i class="fas fa-plus"></i> إضافة صف جديد / Ajouter une classe</h3>
+        <h3 style="margin:0">
+            <span dir="ltr"><i class="fas fa-plus"></i> Ajouter une classe</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">إضافة صف جديد</div>
+        </h3>
         <?php if (count($classes) > 0): ?>
         <form method="POST" style="margin:0" onsubmit="return confirm('إضافة الصفوف اللبنانية الافتراضية الناقصة؟');">
             <?= csrfField() ?><input type="hidden" name="action" value="seed_defaults">
-            <button class="btn btn-sm" style="background:#0a6b5e;color:#fff"><i class="fas fa-magic"></i> إضافة الصفوف الافتراضية</button>
+            <button class="btn btn-sm" style="background:#0a6b5e;color:#fff"><i class="fas fa-magic"></i> Ajouter les classes par défaut / إضافة الصفوف الافتراضية</button>
         </form>
         <?php endif; ?>
     </div>
@@ -138,12 +141,12 @@ include __DIR__ . '/../includes/header.php';
                     <input type="text" name="name_fr" class="form-control" placeholder="ex: EB1, Secondaire 1">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">الاسم بالعربي</label>
+                    <label class="form-label">Nom (AR) / الاسم بالعربي</label>
                     <input type="text" name="name" class="form-control" placeholder="مثال: الأول أساسي" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> إضافة</button>
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Ajouter / إضافة</button>
                 </div>
             </div>
         </form>
@@ -151,11 +154,14 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-list"></i> لائحة الصفوف (<?= count($classes) ?>)</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-list"></i> Liste des classes (<?= count($classes) ?>)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">لائحة الصفوف</div>
+    </h3></div>
     <div class="card-body">
         <p style="color:var(--gray-600);margin-top:0">عدّل الاسم أو الترتيب، أو ألغِ تفعيل صفّ ليختفي من خيارات ملف الأستاذ. الترتيب يحدّد تسلسل ظهور الصفوف.</p>
         <table class="table">
-            <thead><tr><th style="width:80px">الترتيب</th><th>الاسم بالفرنسي</th><th>الاسم بالعربي</th><th style="width:90px">مُفعّل</th><th style="width:200px">إجراء</th></tr></thead>
+            <thead><tr><th style="width:80px">Ordre / الترتيب</th><th>Nom (FR) / الاسم بالفرنسي</th><th>Nom (AR) / الاسم بالعربي</th><th style="width:90px">Actif / مُفعّل</th><th style="width:200px">Action / إجراء</th></tr></thead>
             <tbody>
                 <?php $savedId = (int)($_GET['saved'] ?? 0); foreach ($classes as $c): $fid = 'cls' . $c['id']; $justSaved = ($savedId === (int)$c['id']); ?>
                 <tr<?= !$c['is_active'] ? ' style="opacity:.55"' : ($justSaved ? ' style="background:#e8f9ef"' : '') ?>>
@@ -168,14 +174,14 @@ include __DIR__ . '/../includes/header.php';
                             <?= csrfField() ?>
                             <input type="hidden" name="action" value="update">
                             <input type="hidden" name="id" value="<?= $c['id'] ?>">
-                            <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-save"></i> حفظ</button>
+                            <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
                         </form>
                         <a href="?delete=<?= $c['id'] ?>" class="btn btn-sm btn-danger" data-confirm="حذف هذا الصف؟"><i class="fas fa-trash"></i></a>
-                        <?php if ($justSaved): ?><span style="color:#0a7a37;font-weight:700;margin-right:6px">✓ تم الحفظ</span><?php endif; ?>
+                        <?php if ($justSaved): ?><span style="color:#0a7a37;font-weight:700;margin-right:6px">✓ Enregistré / تم الحفظ</span><?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
-                <?php if (!$classes): ?><tr><td colspan="5" style="text-align:center;color:var(--gray-500)">لا صفوف بعد — أضف من الأعلى.</td></tr><?php endif; ?>
+                <?php if (!$classes): ?><tr><td colspan="5" style="text-align:center;color:var(--gray-500)">Aucune classe — ajoutez ci-dessus / لا صفوف بعد — أضف من الأعلى.</td></tr><?php endif; ?>
             </tbody>
         </table>
     </div>

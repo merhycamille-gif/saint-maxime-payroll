@@ -415,7 +415,10 @@ if ($nameSchoolId) {
     <div class="err">الرابط غير صالح أو منتهي. اطلب رابطاً جديداً من إدارة المدرسة.<br><span dir="ltr">Lien invalide ou expiré. Demandez un nouveau lien à l'administration de l'école.</span></div>
   <?php elseif ($done): ?>
     <div class="ok"><div class="ic">✅</div>
-      <h2>تمّ استلام معلوماتك، شكراً! — Vos informations ont été reçues, merci !</h2>
+      <h2>
+        <span dir="ltr">Vos informations ont été reçues, merci !</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">تمّ استلام معلوماتك، شكراً!</div>
+      </h2>
       <p>سيتم تحديثها في النظام من قبل الإدارة. يمكنك إغلاق هذه الصفحة.<br><span dir="ltr">Elles seront mises à jour dans le système par l'administration. Vous pouvez fermer cette page.</span></p>
       <?php if ($uploadWarn): ?>
         <div class="err" style="text-align:right;margin-top:18px">⚠️ هذه المستندات كانت كبيرة جداً (أكثر من 200 ميغا) فلم تُرفَع: <strong><?= e(implode('، ', $uploadWarn)) ?></strong>.<br>الرجاء إعادة إرسالها عبر نفس الرابط (ويمكن تصويرها صورة لتصغر تلقائياً).<br><span dir="ltr">Ces documents étaient trop volumineux (plus de 200 Mo) et n'ont pas été envoyés. Veuillez les renvoyer via le même lien (une photo est automatiquement compressée).</span></div>
@@ -478,7 +481,10 @@ if ($nameSchoolId) {
       <input type="hidden" name="emp" value="<?= (int)$empId ?>">
       <input type="hidden" name="token" value="<?= e($formToken) ?>">
       <?php if ($isNew): ?>
-      <h3>سنة الدخول / Année d'entrée</h3>
+      <h3>
+        <span dir="ltr">Année d'entrée</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">سنة الدخول</div>
+      </h3>
       <div class="note" style="margin-bottom:8px">إنت أستاذ جديد، فدخولك يكون على <strong>السنة الدراسية القادمة</strong> (مش السنة الجارية أو اللي قبلها).<br><span dir="ltr">Vous êtes un nouvel enseignant : votre entrée se fait sur <strong>l'année scolaire prochaine</strong> (pas l'année en cours ni la précédente).</span></div>
       <div>
         <label>سنة الدخول (السنة الدراسية) / Année d'entrée</label>
@@ -489,7 +495,10 @@ if ($nameSchoolId) {
         </select>
       </div>
 
-      <h3 style="margin-top:16px">الراتب والإضافات (للأستاذ الجديد) / Salaire et indemnités</h3>
+      <h3 style="margin-top:16px">
+        <span dir="ltr">Salaire et indemnités (nouvel enseignant)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">الراتب والإضافات (للأستاذ الجديد)</div>
+      </h3>
       <div class="note" style="margin-bottom:8px">الراتب والأجر الإضافي <strong>شهريان</strong>؛ تعويض النقل <strong>لليوم الواحد</strong> (يُضرَب تلقائياً بعدد أيام الحضور الأسبوعية × 4). كلٌّ بعملته (ليرة أو دولار). تُجهَّز تلقائياً عند إنشاء الملف، وفيك تعدّلها لاحقاً من ملف الأستاذ.<br><span dir="ltr">Le salaire et l'indemnité supplémentaire sont <strong>mensuels</strong> ; le transport est <strong>par jour</strong> (multiplié automatiquement par le nombre de jours de présence × 4). Chacun dans sa devise (LL ou USD).</span></div>
       <div class="grid">
         <?php
@@ -512,7 +521,10 @@ if ($nameSchoolId) {
         <?php endforeach; ?>
       </div>
       <?php endif; ?>
-      <h3>المعلومات الشخصية / Informations personnelles</h3>
+      <h3>
+        <span dir="ltr">Informations personnelles</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">المعلومات الشخصية</div>
+      </h3>
       <div class="grid">
         <?php foreach ($textFields as $k => $lbl): if (in_array($k, ['gouvernorat','district','ville','quartier','rue','immeuble','etage'])) continue;
           $req = $tfReq($k); ?>
@@ -540,7 +552,10 @@ if ($nameSchoolId) {
           </div>
         <?php endforeach; ?>
       </div>
-      <h3>المعلومات المهنية / Informations professionnelles</h3>
+      <h3>
+        <span dir="ltr">Informations professionnelles</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">المعلومات المهنية</div>
+      </h3>
       <div style="margin-bottom:14px">
         <label>فئة الأستاذ / Catégorie<?= $reqStar ?></label>
         <select name="new_category" id="newCategory" onchange="tfCat()"
@@ -628,7 +643,10 @@ if ($nameSchoolId) {
           <input type="text" name="caisse_number" value="<?= e($fv('caisse_number')) ?>"<?= $showCaisse ? '' : ' disabled' ?>>
         </div>
       </div>
-      <h3>العنوان / Adresse</h3>
+      <h3>
+        <span dir="ltr">Adresse</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">العنوان</div>
+      </h3>
       <div class="grid">
         <?php foreach (['gouvernorat','district','ville','quartier','rue','immeuble','etage'] as $k): $req = $tfReq($k); ?>
           <div>
@@ -637,7 +655,10 @@ if ($nameSchoolId) {
           </div>
         <?php endforeach; ?>
       </div>
-      <h3>الوضع الضريبي والملاحظات / Situation fiscale et remarques</h3>
+      <h3>
+        <span dir="ltr">Situation fiscale et remarques</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">الوضع الضريبي والملاحظات</div>
+      </h3>
       <div class="grid">
         <div>
           <label>هل يخضع للضريبة؟ / Assujetti à l'impôt ?<?= $reqStar ?></label>
@@ -653,7 +674,10 @@ if ($nameSchoolId) {
         <textarea name="notes" rows="3" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px;font-family:inherit;resize:vertical"><?= e($fv('notes')) ?></textarea>
       </div>
       <?php if (!$isNew): ?>
-      <h3 style="color:#b45309;border-bottom-color:#fde68a">ترك العمل (اختياري) / Départ</h3>
+      <h3 style="color:#b45309;border-bottom-color:#fde68a">
+        <span dir="ltr">Départ (optionnel)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">ترك العمل (اختياري)</div>
+      </h3>
       <div class="note" style="background:#fffbeb;border-color:#fde68a;color:#92400e;margin-bottom:8px">
         إذا كنت <strong>ستترك العمل</strong>، اكتب <strong>تاريخ الترك</strong> بالأسفل. أمّا إذا كنت <strong>مستمراً في عملك</strong> فاترك هذا الحقل <strong>فارغاً</strong>.<br>
         <span dir="ltr">Si vous <strong>quittez votre poste</strong>, indiquez la <strong>date de départ</strong> ci-dessous. Si vous <strong>continuez</strong>, laissez ce champ <strong>vide</strong>.</span>
@@ -663,7 +687,10 @@ if ($nameSchoolId) {
         <input type="text" name="leave_date" inputmode="numeric" autocomplete="off" class="date-manual" placeholder="يوم/شهر/سنة — مثلاً 30/09/2026" value="<?= e(displayDMY($emp['left_date_cnss'] ?? '')) ?>">
       </div>
       <?php endif; ?>
-      <h3>المستندات (صورة أو PDF) / Documents (image ou PDF)</h3>
+      <h3>
+        <span dir="ltr">Documents (image ou PDF)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">المستندات (صورة أو PDF)</div>
+      </h3>
       <div class="note" style="margin-bottom:8px">
         المستندات المعلَّمة بـ<span style="color:#dc2626;font-weight:700">*</span> <strong>إلزامية</strong> (صورة عن الشهادة، إخراج القيد الفردي أو الهوية، إخراج القيد العائلي)؛ <strong>الصورة الشخصية اختيارية</strong>.<br>
         <span dir="ltr">Les documents marqués d'un <span style="color:#dc2626;font-weight:700">*</span> sont <strong>obligatoires</strong> (copie du diplôme, extrait individuel ou carte d'identité, extrait familial) ; la <strong>photo personnelle est optionnelle</strong>.</span><br>

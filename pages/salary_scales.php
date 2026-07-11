@@ -131,21 +131,21 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-layer-group"></i> Versions / الإصدارات</h3></div>
+    <div class="card-header"><h3><i class="fas fa-layer-group"></i> <span dir="ltr">Versions</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">الإصدارات</div></h3></div>
     <div class="card-body">
         <table class="table">
-            <thead><tr><th>#</th><th>Nom / الاسم</th><th>Du / من</th><th>Au / إلى</th><th>Grades</th><th>Actif</th><th>Action</th></tr></thead>
+            <thead><tr><th>#</th><th>Nom / الاسم</th><th>Du / من</th><th>Au / إلى</th><th>Grades / الدرجات</th><th>Actif / مفعّل</th><th>Action / إجراء</th></tr></thead>
             <tbody>
             <?php foreach ($versions as $v): ?>
                 <tr>
                     <td><?= $v['id'] ?></td>
                     <td><strong><?= e($lang==='ar'?$v['name_ar']:$v['name_fr']) ?></strong><?php if($v['notes']):?><br><small class="text-muted"><?= e($v['notes']) ?></small><?php endif;?></td>
                     <td><?= formatDate($v['effective_from']) ?></td>
-                    <td><?= $v['effective_to'] ? formatDate($v['effective_to']) : '<span class="badge badge-success">'.($lang==='ar'?'حتى الآن':'En cours').'</span>' ?></td>
+                    <td><?= $v['effective_to'] ? formatDate($v['effective_to']) : '<span class="badge badge-success">En cours / حتى الآن</span>' ?></td>
                     <td><?= $v['rows_cnt'] ?></td>
                     <td><?= $v['is_active'] ? '✅' : '—' ?></td>
                     <td style="white-space:nowrap">
-                        <a href="?edit=<?= $v['id'] ?>" class="btn btn-sm btn-light"><i class="fas fa-edit"></i> <?= $lang==='ar'?'تعديل':'Éditer' ?></a>
+                        <a href="?edit=<?= $v['id'] ?>" class="btn btn-sm btn-light"><i class="fas fa-edit"></i> Éditer / تعديل</a>
                         <?php if ((int)$v['id'] !== 1): ?>
                             <a href="?delete_version=<?= $v['id'] ?>" class="btn btn-sm btn-danger" data-confirm="Supprimer cette version ? / حذف الإصدار؟"><i class="fas fa-trash"></i></a>
                         <?php endif; ?>
@@ -158,7 +158,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-plus"></i> Nouvelle version / إصدار جديد</h3></div>
+    <div class="card-header"><h3><i class="fas fa-plus"></i> <span dir="ltr">Nouvelle version</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">إصدار جديد</div></h3></div>
     <div class="card-body">
         <form method="POST">
             <input type="hidden" name="action" value="create_version">
@@ -171,7 +171,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="form-row cols-3">
                 <div class="form-group"><label class="form-label">Du / من تاريخ</label>
                     <input type="date" name="effective_from" class="form-control" value="<?= date('Y-m-d') ?>" required></div>
-                <div class="form-group"><label class="form-label">Au / إلى <small>(<?= $lang==='ar'?'فارغ=حتى الآن':'vide' ?>)</small></label>
+                <div class="form-group"><label class="form-label">Au / إلى <small>(vide / فارغ)</small></label>
                     <input type="date" name="effective_to" class="form-control"></div>
                 <div class="form-group"><label class="form-label">Copier depuis / نسخ القيم من</label>
                     <select name="copy_from" class="form-select">
@@ -190,24 +190,26 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if ($editVersion): ?>
 <div class="card" id="editzone">
-    <div class="card-header"><h3><i class="fas fa-edit"></i> <?= e($lang==='ar'?$editVersion['name_ar']:$editVersion['name_fr']) ?> — <?= $lang==='ar'?'تفاصيل وقيم':'Détails & valeurs' ?></h3></div>
+    <div class="card-header"><h3><i class="fas fa-edit"></i>
+        <span dir="ltr"><?= e($editVersion['name_fr']) ?> — Détails & valeurs</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($editVersion['name_ar']) ?> — تفاصيل وقيم</div></h3></div>
     <div class="card-body">
         <form method="POST" class="lockedit" style="margin-bottom:20px">
             <input type="hidden" name="action" value="save_meta">
             <input type="hidden" name="id" value="<?= (int)$editVersion['id'] ?>">
             <div class="form-row cols-4">
-                <div class="form-group"><label class="form-label">Nom (AR)</label><input type="text" name="name_ar" class="form-control" value="<?= e($editVersion['name_ar']) ?>" required></div>
-                <div class="form-group"><label class="form-label">Nom (FR)</label><input type="text" name="name_fr" class="form-control" value="<?= e($editVersion['name_fr']) ?>" required></div>
+                <div class="form-group"><label class="form-label">Nom (AR) / الاسم بالعربي</label><input type="text" name="name_ar" class="form-control" value="<?= e($editVersion['name_ar']) ?>" required></div>
+                <div class="form-group"><label class="form-label">Nom (FR) / الاسم بالفرنسي</label><input type="text" name="name_fr" class="form-control" value="<?= e($editVersion['name_fr']) ?>" required></div>
                 <div class="form-group"><label class="form-label">Du / من</label><input type="date" name="effective_from" class="form-control" value="<?= e($editVersion['effective_from']) ?>" required></div>
                 <div class="form-group"><label class="form-label">Au / إلى</label><input type="date" name="effective_to" class="form-control" value="<?= e($editVersion['effective_to'] ?? '') ?>"></div>
             </div>
             <div class="form-row cols-2">
-                <div class="form-group" style="flex:2"><label class="form-label">Note</label><input type="text" name="notes" class="form-control" value="<?= e($editVersion['notes'] ?? '') ?>"></div>
+                <div class="form-group" style="flex:2"><label class="form-label">Note / ملاحظة</label><input type="text" name="notes" class="form-control" value="<?= e($editVersion['notes'] ?? '') ?>"></div>
                 <div class="form-group"><label class="form-label">&nbsp;</label>
-                    <label style="display:block"><input type="checkbox" name="is_active" <?= $editVersion['is_active']?'checked':'' ?>> <?= $lang==='ar'?'مفعّل':'Actif' ?></label>
+                    <label style="display:block"><input type="checkbox" name="is_active" <?= $editVersion['is_active']?'checked':'' ?>> Actif / مفعّل</label>
                 </div>
             </div>
-            <button type="submit" class="btn btn-light btn-sm"><i class="fas fa-save"></i> <?= $lang==='ar'?'حفظ التفاصيل':'Enregistrer détails' ?></button>
+            <button type="submit" class="btn btn-light btn-sm"><i class="fas fa-save"></i> Enregistrer détails / حفظ التفاصيل</button>
         </form>
 
         <form method="POST" class="lockedit">
@@ -215,7 +217,7 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="version_id" value="<?= (int)$editVersion['id'] ?>">
             <div style="max-height:520px;overflow:auto">
             <table class="table">
-                <thead><tr><th><?= $lang==='ar'?'الدرجة':'Grade' ?></th><th><?= $lang==='ar'?'الراتب (new_salary_2017)':'Salaire' ?></th><th><?= $lang==='ar'?'قيمة الدرجة':'Valeur grade' ?></th></tr></thead>
+                <thead><tr><th>Grade / الدرجة</th><th>Salaire / الراتب</th><th>Valeur grade / قيمة الدرجة</th></tr></thead>
                 <tbody>
                 <?php foreach ($scaleRows as $r): ?>
                     <tr>
@@ -227,7 +229,7 @@ include __DIR__ . '/../includes/header.php';
                 </tbody>
             </table>
             </div>
-            <button type="submit" class="btn btn-primary" style="margin-top:12px"><i class="fas fa-save"></i> <?= $lang==='ar'?'حفظ قيم السلسلة':'Enregistrer la grille' ?></button>
+            <button type="submit" class="btn btn-primary" style="margin-top:12px"><i class="fas fa-save"></i> Enregistrer la grille / حفظ قيم السلسلة</button>
         </form>
     </div>
 </div>

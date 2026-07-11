@@ -171,8 +171,9 @@ if ($editSet) {
 
 <!-- ===== نموذج إضافة/تعديل مجموعة شطور ===== -->
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-layer-group"></i>
-        <?= $editSet ? ('تعديل مجموعة الشطور السارية من ' . e($editSetFrom)) : 'إضافة مجموعة شطور جديدة / Nouveau jeu' ?>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-layer-group"></i> <?= $editSet ? ('Modifier le jeu de tranches dès ' . e($editSetFrom)) : 'Nouveau jeu de tranches' ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= $editSet ? ('تعديل مجموعة الشطور السارية من ' . e($editSetFrom)) : 'إضافة مجموعة شطور جديدة' ?></div>
     </h3></div>
     <div class="card-body">
         <form method="POST"<?= $editSet ? ' class="lockedit"' : '' ?>>
@@ -185,17 +186,17 @@ if ($editSet) {
                     <input type="date" name="effective_from" class="form-control" value="<?= e($editSetFrom ?: date('Y-m-d')) ?>" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Au / إلى تاريخ <small>(<?= $lang==='ar'?'فارغ = حتى صدور قانون جديد':'vide' ?>)</small></label>
+                    <label class="form-label">Au / إلى تاريخ <small>(vide = jusqu'à nouvelle loi / فارغ = حتى صدور قانون جديد)</small></label>
                     <input type="date" name="effective_to" class="form-control" value="<?= e($editEffTo) ?>">
                 </div>
             </div>
 
             <table class="table" id="tiersTable">
                 <thead><tr>
-                    <th style="width:120px">الشطر</th>
-                    <th><?= $lang==='ar'?'من (شهري ل.ل)':'De (mensuel)' ?></th>
-                    <th><?= $lang==='ar'?'لغاية (شهري ل.ل)':'À (mensuel)' ?></th>
-                    <th style="width:110px"><?= $lang==='ar'?'النسبة %':'Taux %' ?></th>
+                    <th style="width:120px">Tranche / الشطر</th>
+                    <th>De (mensuel) / من (شهري ل.ل)</th>
+                    <th>À (mensuel) / لغاية (شهري ل.ل)</th>
+                    <th style="width:110px">Taux % / النسبة %</th>
                     <th style="width:50px"></th>
                 </tr></thead>
                 <tbody id="tiersBody">
@@ -203,14 +204,14 @@ if ($editSet) {
                     <tr>
                         <td class="tier-num"><?= e(bracketName($i, $isLast && count($formTiers)>1)) ?></td>
                         <td><input type="number" name="monthly_from[]" class="form-control" min="0" step="1" value="<?= e($t['from']) ?>"></td>
-                        <td><input type="number" name="monthly_to[]" class="form-control" min="0" step="1" value="<?= e($t['to']) ?>" placeholder="<?= $lang==='ar'?'فارغ=غير محدود':'illimité' ?>"></td>
+                        <td><input type="number" name="monthly_to[]" class="form-control" min="0" step="1" value="<?= e($t['to']) ?>" placeholder="illimité / فارغ=غير محدود"></td>
                         <td><input type="number" name="rate[]" class="form-control" min="0" step="0.01" value="<?= e($t['rate']) ?>"></td>
                         <td><button type="button" class="btn btn-sm btn-danger" onclick="removeTier(this)"><i class="fas fa-times"></i></button></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
-            <button type="button" class="btn btn-light btn-sm" onclick="addTier()"><i class="fas fa-plus"></i> <?= $lang==='ar'?'إضافة شطر':'Ajouter' ?></button>
+            <button type="button" class="btn btn-light btn-sm" onclick="addTier()"><i class="fas fa-plus"></i> Ajouter / إضافة شطر</button>
 
             <div style="margin-top:14px">
                 <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
@@ -224,36 +225,36 @@ if ($editSet) {
 
 <!-- ===== عرض مجموعات الشطور (متل القانون: اسم الشطر + شهري + سنوي + نسبة) ===== -->
 <?php if (empty($sets)): ?>
-    <div class="alert alert-warning"><?= $lang==='ar'?'لا توجد شطور مُدخلة بعد.':'Aucune tranche.' ?></div>
+    <div class="alert alert-warning">Aucune tranche. / لا توجد شطور مُدخلة بعد.</div>
 <?php else: foreach ($sets as $date => $rows): ?>
 <div class="card">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-        <h3><i class="fas fa-percent"></i>
-            <?= $lang==='ar'?'ضريبة الرواتب والأجور (الباب الثاني) — سارية من':'Impôt sur salaires — dès' ?> <?= formatDate($date) ?>
-            <?php $to = $rows[0]['effective_to'] ?? null; ?>
-            <?= $to ? (' — ' . ($lang==='ar'?'إلى':'au') . ' ' . formatDate($to)) : ' <span class="badge badge-success">'.($lang==='ar'?'سارية':'En vigueur').'</span>' ?>
+        <?php $to = $rows[0]['effective_to'] ?? null; ?>
+        <h3>
+            <span dir="ltr"><i class="fas fa-percent"></i> Impôt sur salaires — dès <?= formatDate($date) ?><?= $to ? (' — au ' . formatDate($to)) : ' <span class="badge badge-success">En vigueur</span>' ?></span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">ضريبة الرواتب والأجور (الباب الثاني) — سارية من <?= formatDate($date) ?><?= $to ? (' — إلى ' . formatDate($to)) : ' <span class="badge badge-success">سارية</span>' ?></div>
         </h3>
         <div style="white-space:nowrap">
-            <a href="?edit_set=<?= e($date) ?>" class="btn btn-sm btn-light"><i class="fas fa-edit"></i> <?= $lang==='ar'?'تعديل':'Modifier' ?></a>
-            <a href="?delete_set=<?= e($date) ?>" class="btn btn-sm btn-danger" data-confirm="<?= $lang==='ar'?'حذف كل شطور هذه المجموعة؟':'Supprimer ?' ?>"><i class="fas fa-trash"></i></a>
+            <a href="?edit_set=<?= e($date) ?>" class="btn btn-sm btn-light"><i class="fas fa-edit"></i> Modifier / تعديل</a>
+            <a href="?delete_set=<?= e($date) ?>" class="btn btn-sm btn-danger" data-confirm="Supprimer ? / حذف كل شطور هذه المجموعة؟"><i class="fas fa-trash"></i></a>
         </div>
     </div>
     <div class="card-body">
         <table class="table">
             <thead><tr>
-                <th><?= $lang==='ar'?'الشطر':'Tranche' ?></th>
-                <th><?= $lang==='ar'?'شهري من':'Mensuel de' ?></th><th><?= $lang==='ar'?'شهري لغاية':'Mensuel à' ?></th>
-                <th><?= $lang==='ar'?'سنوي من':'Annuel de' ?></th><th><?= $lang==='ar'?'سنوي لغاية':'Annuel à' ?></th>
-                <th><?= $lang==='ar'?'النسبة':'Taux' ?></th>
+                <th>Tranche / الشطر</th>
+                <th>Mensuel de / شهري من</th><th>Mensuel à / شهري لغاية</th>
+                <th>Annuel de / سنوي من</th><th>Annuel à / سنوي لغاية</th>
+                <th>Taux / النسبة</th>
             </tr></thead>
             <tbody>
                 <?php foreach ($rows as $r): ?>
                 <tr>
                     <td><strong><?= e($r['bracket_name'] ?: ('الشطر '.$r['bracket_number'])) ?></strong></td>
                     <td><?= formatLBP($r['monthly_from']) ?></td>
-                    <td><?= $r['monthly_to'] !== null ? formatLBP($r['monthly_to']) : '<span class="badge badge-info">'.($lang==='ar'?'غير محدود':'illimité').'</span>' ?></td>
+                    <td><?= $r['monthly_to'] !== null ? formatLBP($r['monthly_to']) : '<span class="badge badge-info">illimité / غير محدود</span>' ?></td>
                     <td><?= formatLBP($r['annual_from']) ?></td>
-                    <td><?= $r['annual_to'] !== null ? formatLBP($r['annual_to']) : '<span class="badge badge-info">'.($lang==='ar'?'غير محدود':'illimité').'</span>' ?></td>
+                    <td><?= $r['annual_to'] !== null ? formatLBP($r['annual_to']) : '<span class="badge badge-info">illimité / غير محدود</span>' ?></td>
                     <td><strong><?= rtrim(rtrim(number_format((float)$r['rate_percent'],2),'0'),'.') ?>%</strong></td>
                 </tr>
                 <?php endforeach; ?>
@@ -265,8 +266,9 @@ if ($editSet) {
 
 <!-- ===== التنزيلات العائلية ===== -->
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-users"></i>
-        <?= $editDed ? 'تعديل تنزيل عائلي' : 'التنزيلات العائلية السنوية / Déductions familiales' ?>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-users"></i> <?= $editDed ? 'Modifier une déduction familiale' : 'Déductions familiales annuelles' ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= $editDed ? 'تعديل تنزيل عائلي' : 'التنزيلات العائلية السنوية' ?></div>
     </h3></div>
     <div class="card-body">
         <div class="alert alert-info" style="margin-bottom:14px">
@@ -281,7 +283,7 @@ if ($editSet) {
             <input type="hidden" name="ded_id" value="<?= $editDed ? (int)$editDed['id'] : 0 ?>">
             <div class="form-row cols-3">
                 <div class="form-group">
-                    <label class="form-label"><?= $lang==='ar'?'الوضع العائلي':'Situation' ?></label>
+                    <label class="form-label">Situation / الوضع العائلي</label>
                     <select name="social_status" class="form-select" required>
                         <?php foreach ($statuses as $s): ?>
                             <option value="<?= $s ?>" <?= ($editDed && $editDed['social_status']===$s)?'selected':'' ?>><?= e(socialStatusLabel($s,$lang)) ?></option>
@@ -289,7 +291,7 @@ if ($editSet) {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label"><?= $lang==='ar'?'التنزيل السنوي (ل.ل)':'Déduction annuelle' ?></label>
+                    <label class="form-label">Déduction annuelle / التنزيل السنوي (ل.ل)</label>
                     <input type="number" name="annual_deduction" class="form-control" min="0" value="<?= e($editDed['annual_deduction'] ?? '') ?>" required>
                 </div>
                 <div class="form-group">
@@ -304,9 +306,12 @@ if ($editSet) {
         </form>
 
         <?php foreach ($dedByDate as $date => $rows): ?>
-        <h4 style="margin-top:20px"><?= $lang==='ar'?'سارية من':'Dès' ?> <?= formatDate($date) ?></h4>
+        <h4 style="margin-top:20px">
+            <span dir="ltr">Dès <?= formatDate($date) ?></span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">سارية من <?= formatDate($date) ?></div>
+        </h4>
         <table class="table">
-            <thead><tr><th><?= $lang==='ar'?'الوضع العائلي':'Situation' ?></th><th><?= $lang==='ar'?'التنزيل السنوي':'Déduction' ?></th><th style="width:120px"></th></tr></thead>
+            <thead><tr><th>Situation / الوضع العائلي</th><th>Déduction / التنزيل السنوي</th><th style="width:120px"></th></tr></thead>
             <tbody>
                 <?php foreach ($rows as $r): ?>
                 <tr>
@@ -314,7 +319,7 @@ if ($editSet) {
                     <td><strong><?= formatLBP($r['annual_deduction']) ?></strong></td>
                     <td style="white-space:nowrap">
                         <a href="?edit_ded=<?= $r['id'] ?>" class="btn btn-sm btn-light"><i class="fas fa-edit"></i></a>
-                        <a href="?delete_ded=<?= $r['id'] ?>" class="btn btn-sm btn-danger" data-confirm="<?= $lang==='ar'?'حذف؟':'Supprimer ?' ?>"><i class="fas fa-trash"></i></a>
+                        <a href="?delete_ded=<?= $r['id'] ?>" class="btn btn-sm btn-danger" data-confirm="Supprimer ? / حذف؟"><i class="fas fa-trash"></i></a>
                     </td>
                 </tr>
                 <?php endforeach; ?>

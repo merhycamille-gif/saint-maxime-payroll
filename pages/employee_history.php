@@ -38,12 +38,12 @@ if (!$emp):
     $employees = $hStmt->fetchAll();
 ?>
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-user-clock"></i> Dossier enseignant / سيرة الأستاذ</h3></div>
+        <div class="card-header"><h3><i class="fas fa-user-clock"></i> <span dir="ltr">Dossier enseignant</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">سيرة الأستاذ</div></h3></div>
         <div class="card-body">
             <?php if (isAllSchools()): ?>
                 <div class="alert alert-warning">اختر مدرسة محددة من الأعلى أولاً / Sélectionnez une école.</div>
             <?php elseif (!$employees): ?>
-                <div class="alert alert-info">لا يوجد موظفون في هذه المدرسة.</div>
+                <div class="alert alert-info">Aucun employé dans cette école / لا يوجد موظفون في هذه المدرسة.</div>
             <?php else: ?>
             <form method="GET" class="form-row cols-2">
                 <div class="form-group">
@@ -80,7 +80,7 @@ if (!$emp):
     $isAdminEmp = ($emp['employee_type'] === 'employe'); // موظف إداري: لا درجة/صفوف/مواد/تطوّر سلسلة
     // تطوّر الدرجة والراتب (للأستاذ فقط — الموظف الإداري بلا سلسلة رتب)
     $evolution = $isAdminEmp ? [] : buildSalaryEvolution($employeeId, $emp['current_grade']);
-    $evLabels = ['entry'=>'دخول الملاك','ordinary'=>'درجة عادية (تدرّج)','exceptional'=>'درجة استثنائية','manual'=>'تعديل يدوي','stable'=>'— (1/10)'];
+    $evLabels = ['entry'=>'Entrée au cadre / دخول الملاك','ordinary'=>'Échelon ordinaire / درجة عادية (تدرّج)','exceptional'=>'Échelon exceptionnel / درجة استثنائية','manual'=>'Modification manuelle / تعديل يدوي','stable'=>'— (1/10)'];
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print">
         <a href="<?= BASE_URL ?>pages/employee_history.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour / رجوع</a>
@@ -134,7 +134,7 @@ if (!$emp):
         </div>
 
         <div class="card">
-            <div class="card-header"><h3><i class="fas fa-chart-line"></i> Évolution des échelons et du salaire / تطوّر الدرجات والراتب</h3></div>
+            <div class="card-header"><h3><i class="fas fa-chart-line"></i> <span dir="ltr">Évolution des échelons et du salaire</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">تطوّر الدرجات والراتب</div></h3></div>
             <div class="card-body">
                 <?php if (!$evolution): ?>
                     <p class="text-muted">لا يوجد سجلّ درجات كافٍ. أدخل تواريخ الترسيم والدرجات من صفحة «Échelons / الدرجات».</p>

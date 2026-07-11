@@ -9,7 +9,7 @@ require_once __DIR__ . '/../includes/report_helpers.php';
 requireLogin();
 
 $currentPage = 'reports';
-$pageTitle = 'Rapports';
+$pageTitle = 'Rapports / التقارير';
 $db = getDB();
 
 $report = $_GET['report'] ?? '';
@@ -151,17 +151,24 @@ function reportDocThumb($path) {
     ];
 ?>
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-chart-bar"></i> Centre de rapports / مركز التقارير</h3></div>
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-chart-bar"></i> Centre de rapports</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">مركز التقارير</div>
+        </h3></div>
         <div class="card-body">
             <?php if (isSuperAdmin()): ?>
             <div class="alert alert-info no-print">
                 <i class="fas fa-info-circle"></i>
-                Dans chaque rapport, vous pouvez choisir <strong>une école, plusieurs écoles ou toutes</strong>.
+                Dans chaque rapport, vous pouvez choisir <strong>une école, plusieurs écoles ou toutes</strong>. / في كل تقرير يمكنك اختيار مدرسة واحدة أو عدة مدارس أو كلّها.
             </div>
             <?php endif; ?>
             <?php foreach ($categories as $cat): ?>
             <div class="report-cat">
-                <h4 class="report-cat-title"><i class="fas <?= $cat['icon'] ?>" style="color:<?= $cat['color'] ?>"></i> <?= e($cat['title']) ?></h4>
+                <?php $ctParts = explode(' / ', $cat['title'], 2); ?>
+                <h4 class="report-cat-title">
+                    <span dir="ltr"><i class="fas <?= $cat['icon'] ?>" style="color:<?= $cat['color'] ?>"></i> <?= e($ctParts[1] ?? $cat['title']) ?></span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($ctParts[0]) ?></div>
+                </h4>
                 <div class="report-grid">
                     <?php foreach ($cat['tiles'] as $t): ?>
                     <a href="<?= e($t['url']) ?>" class="report-card">
@@ -179,8 +186,8 @@ function reportDocThumb($path) {
     </div>
 <?php else: ?>
     <div class="d-flex justify-between align-center mb-3 no-print">
-        <a href="<?= BASE_URL ?>pages/reports.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour</a>
-        <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Imprimer</button>
+        <a href="<?= BASE_URL ?>pages/reports.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour / رجوع</a>
+        <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Imprimer / طباعة</button>
     </div>
 
     <?php echo officialFormStyles(); ?>
@@ -218,25 +225,28 @@ function reportDocThumb($path) {
             <input type="hidden" name="report" value="monthly_summary">
             <div class="card-body form-row cols-3">
                 <div class="form-group mb-0">
-                    <label class="form-label">Mois</label>
+                    <label class="form-label">Mois / الشهر</label>
                     <select name="month" class="form-select">
                         <?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m)?></option><?php endfor; ?>
                     </select>
                 </div>
                 <div class="form-group mb-0">
-                    <label class="form-label">Année</label>
+                    <label class="form-label">Année / السنة</label>
                     <input type="number" name="year" class="form-control" value="<?= $year ?>">
                 </div>
                 <div class="form-group mb-0">
                     <label class="form-label">&nbsp;</label>
-                    <button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher</button>
+                    <button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button>
                 </div>
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
 
         <div class="card">
-            <div class="card-header"><h3>📅 Résumé mensuel — <?= monthName($month) ?> <?= $year ?></h3></div>
+            <div class="card-header"><h3>
+                <span dir="ltr">📅 Résumé mensuel — <?= monthName($month) ?> <?= $year ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">كشف رواتب شهري</div>
+            </h3></div>
             <div class="card-body">
                 <table class="doc-table" dir="rtl">
                     <thead><tr>
@@ -318,14 +328,17 @@ function reportDocThumb($path) {
         <form method="GET" class="card no-print">
             <input type="hidden" name="report" value="cnss_summary">
             <div class="card-body form-row cols-3">
-                <div class="form-group mb-0"><label class="form-label">Mois</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
-                <div class="form-group mb-0"><label class="form-label">Année</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
-                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher</button></div>
+                <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
+                <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
+                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
         <div class="card">
-            <div class="card-header"><h3>🏥 CNSS — <?= monthName($month) ?> <?= $year ?></h3></div>
+            <div class="card-header"><h3>
+                <span dir="ltr">🏥 CNSS — <?= monthName($month) ?> <?= $year ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">الضمان الاجتماعي</div>
+            </h3></div>
             <div class="card-body">
                 <table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
@@ -381,14 +394,17 @@ function reportDocThumb($path) {
         <form method="GET" class="card no-print">
             <input type="hidden" name="report" value="tax_summary">
             <div class="card-body form-row cols-3">
-                <div class="form-group mb-0"><label class="form-label">Mois</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
-                <div class="form-group mb-0"><label class="form-label">Année</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
-                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher</button></div>
+                <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
+                <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
+                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
         <div class="card">
-            <div class="card-header"><h3>💵 Impôt sur le revenu — <?= monthName($month) ?> <?= $year ?></h3></div>
+            <div class="card-header"><h3>
+                <span dir="ltr">💵 Impôt sur le revenu — <?= monthName($month) ?> <?= $year ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">ضريبة الدخل</div>
+            </h3></div>
             <div class="card-body">
                 <table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th>الراتب الخاضع للضريبة</th><th>الضريبة</th></tr></thead>
@@ -442,14 +458,17 @@ function reportDocThumb($path) {
         <form method="GET" class="card no-print">
             <input type="hidden" name="report" value="eoc_summary">
             <div class="card-body form-row cols-3">
-                <div class="form-group mb-0"><label class="form-label">Mois</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
-                <div class="form-group mb-0"><label class="form-label">Année</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
-                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher</button></div>
+                <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
+                <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
+                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
         <div class="card">
-            <div class="card-header"><h3>🏦 Caisse EOC — <?= monthName($month) ?> <?= $year ?></h3></div>
+            <div class="card-header"><h3>
+                <span dir="ltr">🏦 Caisse EOC — <?= monthName($month) ?> <?= $year ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">صندوق التعليم الخاص</div>
+            </h3></div>
             <div class="card-body">
                 <table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
@@ -518,7 +537,7 @@ function reportDocThumb($path) {
         $availCols = [
             'code'    => ['Code', fn($r) => '<strong>'.e($r['employee_code']).'</strong>'],
             'name'    => ['الاسم / Nom', fn($r) => e(trim($r['first_name_fr'].' '.$r['last_name_fr']) ?: trim($r['first_name_ar'].' '.$r['last_name_ar']))],
-            'name_ar' => ['الاسم بالعربي', fn($r) => e(trim($r['first_name_ar'].' '.$r['last_name_ar']))],
+            'name_ar' => ['الاسم بالعربي / Nom (arabe)', fn($r) => e(trim($r['first_name_ar'].' '.$r['last_name_ar']))],
             'type'    => ['الفئة / Type', fn($r) => employeeTypeLabel($r['employee_type'])],
             'diploma' => ['الشهادة / Diplôme', fn($r) => diplomaLabel($r['diploma'])],
             'diploma_img' => ['صورة الشهادة / Copie du diplôme', fn($r) => reportDocThumb($r['diploma_doc_path'] ?? '')],
@@ -529,8 +548,8 @@ function reportDocThumb($path) {
             'salary'  => ['الراتب (قانون) / Salaire', fn($r) => $r['employee_type'] === 'employe'
                             ? formatLBP((float)($bonusMap[(int)$r['id']]['base_plus_echelon_lbp'] ?? 0))
                             : formatLBP($scaleMap[(int)round($r['current_grade'])] ?? 0)],
-            'extra_wage' => ['الأجر الإضافي', fn($r) => formatLBP(isset($bonusMap[(int)$r['id']]) ? extraWageLbp($bonusMap[(int)$r['id']]) : 0)],
-            'aide'    => ['مكافأة ومساعدة', fn($r) => formatLBP(isset($bonusMap[(int)$r['id']]) ? aideCompLbp($bonusMap[(int)$r['id']]) : 0)],
+            'extra_wage' => ['الأجر الإضافي / Supplément', fn($r) => formatLBP(isset($bonusMap[(int)$r['id']]) ? extraWageLbp($bonusMap[(int)$r['id']]) : 0)],
+            'aide'    => ['مكافأة ومساعدة / Prime & aide', fn($r) => formatLBP(isset($bonusMap[(int)$r['id']]) ? aideCompLbp($bonusMap[(int)$r['id']]) : 0)],
             'nssf'    => ['ضمان / N° CNSS', fn($r) => e($r['nssf_number'])],
             'mof'     => ['مالية / N° MOF', fn($r) => e($r['finance_ministry_number'])],
             'caisse'  => ['صندوق / N° Caisse', fn($r) => e($r['caisse_number'])],
@@ -541,8 +560,8 @@ function reportDocThumb($path) {
             'social'  => ['عائلي / Famille', fn($r) => e($r['social_status']).' ('.(int)$r['number_of_children'].')'],
             'hire'    => ['الدخول / Embauche', fn($r) => formatDate($r['hire_date'])],
             'titul'   => ['الملاك / Titularisation', fn($r) => formatDate($r['titularization_date'])],
-            'hours'   => ['ساعات/أسبوع', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'],1),'0'),'.')],
-            'days'    => ['أيام/أسبوع', fn($r) => (int)$r['days_per_week']],
+            'hours'   => ['ساعات/أسبوع / Heures/sem.', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'],1),'0'),'.')],
+            'days'    => ['أيام/أسبوع / Jours/sem.', fn($r) => (int)$r['days_per_week']],
             'status'  => ['الحالة / Statut', fn($r) => '<span class="badge badge-'.employeeStatusLabel($r['status'])['badge'].'">'.e(employeeStatusLabel($r['status'])['label']).'</span>'],
         ];
         $defaultCols = ['code','name','type','grade','status'];
@@ -576,7 +595,11 @@ function reportDocThumb($path) {
             </div>
         </form>
         <div class="card">
-            <div class="card-header"><h3>👥 <?= $listTitle ?> (<?= count($data) ?>)</h3></div>
+            <?php $ltParts = explode(' / ', $listTitle, 2); ?>
+            <div class="card-header"><h3>
+                <span dir="ltr">👥 <?= e($ltParts[1] ?? $listTitle) ?> (<?= count($data) ?>)</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($ltParts[0]) ?></div>
+            </h3></div>
             <div class="card-body">
                 <table class="doc-table" dir="rtl">
                     <thead><tr>
@@ -625,15 +648,18 @@ function reportDocThumb($path) {
         <form method="GET" class="card no-print">
             <input type="hidden" name="report" value="annual_totals">
             <div class="card-body form-row cols-3">
-                <div class="form-group mb-0"><label class="form-label">Année scolaire</label><input type="text" name="school_year" class="form-control" value="<?= e($schoolYear) ?>"></div>
-                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher</button></div>
+                <div class="form-group mb-0"><label class="form-label">Année scolaire / السنة الدراسية</label><input type="text" name="school_year" class="form-control" value="<?= e($schoolYear) ?>"></div>
+                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
 
         <?php if ($multi && $perSchool): ?>
         <div class="card">
-            <div class="card-header"><h3>🏫 Détail par école — <?= e($schoolYear) ?></h3></div>
+            <div class="card-header"><h3>
+                <span dir="ltr">🏫 Détail par école — <?= e($schoolYear) ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">تفصيل لكل مدرسة</div>
+            </h3></div>
             <div class="card-body">
                 <table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><th>المدرسة</th><th>عدد الكشوف</th><th>الإجمالي المتوجب</th><th>الضمان</th><th>الضريبة</th></tr></thead>
@@ -656,7 +682,10 @@ function reportDocThumb($path) {
         <?php endif; ?>
 
         <div class="card">
-            <div class="card-header"><h3>📊 Totaux annuels (cumulés) — <?= e($schoolYear) ?></h3></div>
+            <div class="card-header"><h3>
+                <span dir="ltr">📊 Totaux annuels (cumulés) — <?= e($schoolYear) ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">مجاميع سنوية</div>
+            </h3></div>
             <div class="card-body">
                 <table class="doc-table" dir="rtl">
                     <tr><td><strong>عدد الكشوف المحسوبة</strong></td><td><?= $tot['cnt'] ?: 0 ?></td></tr>

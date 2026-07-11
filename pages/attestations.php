@@ -99,20 +99,20 @@ if ($emp && !empty($_GET['dossier'])):
         $out = '<div style="flex:1 1 180px;min-width:170px;border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#fff">';
         $out .= '<div style="font-weight:700;color:var(--primary);margin-bottom:8px"><i class="fas '.$icon.'"></i> '.e($label).'</div>';
         if (empty($path)) {
-            $out .= '<div style="color:#b91c1c;font-size:13px"><i class="fas fa-circle-xmark"></i> لا يوجد ملف مرفوع</div>';
+            $out .= '<div style="color:#b91c1c;font-size:13px"><i class="fas fa-circle-xmark"></i> Aucun fichier / لا يوجد ملف مرفوع</div>';
         } else {
             // المعاينة المحلية: الصور مرفوعة على السيرفر (أونلاين)؛ إذا الملف مش موجود محلياً اعرضه من msapayroll.com
             $absLocal = __DIR__ . '/../' . $path;
             $url = (BASE_URL !== '/' && !is_file($absLocal)) ? ('https://msapayroll.com/' . e($path)) : (BASE_URL . e($path));
             $isImg = preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $path);
             if ($isImg) {
-                $out .= '<a href="'.$url.'" target="_blank" title="فتح كامل"><img src="'.$url.'" style="max-height:150px;max-width:100%;border:1px solid #ccc;border-radius:6px;display:block;margin-bottom:8px"></a>';
+                $out .= '<a href="'.$url.'" target="_blank" title="Ouvrir en plein écran / فتح كامل"><img src="'.$url.'" style="max-height:150px;max-width:100%;border:1px solid #ccc;border-radius:6px;display:block;margin-bottom:8px"></a>';
             } else {
                 $out .= '<div style="font-size:34px;color:#b91c1c;margin-bottom:8px"><i class="fas fa-file-pdf"></i> PDF</div>';
             }
             $out .= '<div style="display:flex;gap:6px;flex-wrap:wrap">'
-                 . '<a href="'.$url.'" target="_blank" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> فتح</a>'
-                 . '<button type="button" onclick="ppPrintFile(\''.$url.'\','.($isImg?'true':'false').')" class="btn btn-sm btn-light"><i class="fas fa-print"></i> طباعة</button>'
+                 . '<a href="'.$url.'" target="_blank" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> Ouvrir / فتح</a>'
+                 . '<button type="button" onclick="ppPrintFile(\''.$url.'\','.($isImg?'true':'false').')" class="btn btn-sm btn-light"><i class="fas fa-print"></i> Imprimer / طباعة</button>'
                  . '</div>';
         }
         return $out . '</div>';
@@ -125,12 +125,15 @@ if ($emp && !empty($_GET['dossier'])):
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <a href="<?= BASE_URL ?>pages/attestations.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع / Retour</a>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> طباعة الملف</button>
-            <a href="<?= e($editUrl) ?>" class="btn btn-light"><i class="fas fa-user-pen"></i> تعديل ملف الأستاذ</a>
+            <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Imprimer le dossier / طباعة الملف</button>
+            <a href="<?= e($editUrl) ?>" class="btn btn-light"><i class="fas fa-user-pen"></i> Modifier le dossier / تعديل ملف الأستاذ</a>
         </div>
     </div>
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-folder-open"></i> ملف الأستاذ الكامل / Dossier — <?= e($dTitle) ?><?php if ($emp['employee_code']): ?> <small style="opacity:.7">(<?= e($emp['employee_code']) ?>)</small><?php endif; ?></h3></div>
+        <div class="card-header"><h3>
+          <span dir="ltr"><i class="fas fa-folder-open"></i> Dossier complet de l'enseignant — <?= e($dTitle) ?><?php if ($emp['employee_code']): ?> <small style="opacity:.7">(<?= e($emp['employee_code']) ?>)</small><?php endif; ?></span>
+          <div style="font-size:0.85em;font-weight:600;opacity:0.9">ملف الأستاذ الكامل</div>
+        </h3></div>
         <div class="card-body">
             <?php
             // ===== كل معلومات الأستاذ — كل حقول ملفّه مقسّمة لأقسام =====
@@ -228,37 +231,49 @@ if ($emp && !empty($_GET['dossier'])):
             </div>
             <?php if (trim((string)($emp['notes']??'')) !== ''): ?>
             <div style="border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:12px 16px;margin-bottom:22px">
-                <h4 style="color:#b45309;margin:0 0 6px;font-size:15px"><i class="fas fa-note-sticky"></i> ملاحظات</h4>
+                <h4 style="color:#b45309;margin:0 0 6px;font-size:15px">
+                    <span dir="ltr"><i class="fas fa-note-sticky"></i> Remarques</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">ملاحظات</div>
+                </h4>
                 <div style="font-size:13.5px;white-space:pre-wrap"><?= e($emp['notes']) ?></div>
             </div>
             <?php endif; ?>
 
-            <h4 class="no-print" style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-bolt"></i> تقارير الأستاذ</h4>
+            <h4 class="no-print" style="color:var(--primary);margin:6px 0 10px">
+                <span dir="ltr"><i class="fas fa-bolt"></i> Rapports de l'enseignant</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">تقارير الأستاذ</div>
+            </h4>
             <div class="no-print" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px">
-                <a href="<?= e($r6Url) ?>" class="btn btn-primary"><i class="fas fa-file-lines"></i> ر6 — كشف سنوي إفرادي</a>
-                <a href="<?= e($slipUrl) ?>" class="btn btn-gold"><i class="fas fa-file-invoice-dollar"></i> بطاقة الراتب السنوية</a>
-                <a href="<?= e($histUrl) ?>" class="btn btn-info"><i class="fas fa-user-clock"></i> سيرة الأستاذ</a>
+                <a href="<?= e($r6Url) ?>" class="btn btn-primary"><i class="fas fa-file-lines"></i> R6 — Relevé annuel individuel / ر6 — كشف سنوي إفرادي</a>
+                <a href="<?= e($slipUrl) ?>" class="btn btn-gold"><i class="fas fa-file-invoice-dollar"></i> Fiche de salaire annuelle / بطاقة الراتب السنوية</a>
+                <a href="<?= e($histUrl) ?>" class="btn btn-info"><i class="fas fa-user-clock"></i> Parcours de l'enseignant / سيرة الأستاذ</a>
             </div>
 
-            <h4 style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-images"></i> مستندات وصور الأستاذ</h4>
+            <h4 style="color:var(--primary);margin:6px 0 10px">
+                <span dir="ltr"><i class="fas fa-images"></i> Documents et photos de l'enseignant</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">مستندات وصور الأستاذ</div>
+            </h4>
             <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:22px">
                 <?= $docCard($emp['diploma_doc_path'] ?? '', 'صورة الشهادة / Diplôme', 'fa-graduation-cap') ?>
-                <?= $docCard($emp['id_document_path'] ?? '', 'إخراج قيد / تذكرة', 'fa-id-card') ?>
-                <?= $docCard($emp['family_doc_path'] ?? '', 'إخراج قيد عائلي', 'fa-people-roof') ?>
+                <?= $docCard($emp['id_document_path'] ?? '', 'Extrait d\'état civil / إخراج قيد / تذكرة', 'fa-id-card') ?>
+                <?= $docCard($emp['family_doc_path'] ?? '', 'Extrait d\'état civil familial / إخراج قيد عائلي', 'fa-people-roof') ?>
                 <?= $docCard($emp['photo_path'] ?? '', 'صورة شخصية / Photo', 'fa-image') ?>
             </div>
 
-            <h4 class="no-print" style="color:var(--primary);margin:6px 0 10px"><i class="fas fa-file-signature"></i> إصدار إفادة لهذا الأستاذ — كل الإفادات مرتّبة</h4>
+            <h4 class="no-print" style="color:var(--primary);margin:6px 0 10px">
+                <span dir="ltr"><i class="fas fa-file-signature"></i> Générer une attestation pour cet enseignant — toutes les attestations classées</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9">إصدار إفادة لهذا الأستاذ — كل الإفادات مرتّبة</div>
+            </h4>
             <?php
             // كل أنواع الإفادات مقسّمة لأقسام واضحة (تُغطّى كل الأنواع + قسم «أخرى» احتياطاً لأي نوع جديد)
             $attGroups = [
-                'راتب وعمل وضمان' => ['salaire','tadris','cnss','cnss_travail','afade_madrasiya','embassy','riaaya'],
-                'نهاية الخدمة والاستقالة وإبراء الذمّة' => ['anhaa_khedme','anhaa_mail','talab_istiqala','isqat_haq','baraa_zimma'],
-                'عقود وإقرارات وإنذارات' => ['aqd_taalim','iqrar','notice_school','notice_mail'],
+                'Salaire, travail et CNSS / راتب وعمل وضمان' => ['salaire','tadris','cnss','cnss_travail','afade_madrasiya','embassy','riaaya'],
+                'Fin de service, démission et décharge / نهاية الخدمة والاستقالة وإبراء الذمّة' => ['anhaa_khedme','anhaa_mail','talab_istiqala','isqat_haq','baraa_zimma'],
+                'Contrats, déclarations et avertissements / عقود وإقرارات وإنذارات' => ['aqd_taalim','iqrar','notice_school','notice_mail'],
             ];
             $grouped = array_merge(...array_values($attGroups));
             $others = array_values(array_diff(array_keys($ATT_TYPES), $grouped));
-            if ($others) $attGroups['أخرى'] = $others;
+            if ($others) $attGroups['Autres / أخرى'] = $others;
             ?>
             <div class="no-print">
                 <?php foreach ($attGroups as $gTitle => $keys): ?>
@@ -266,7 +281,7 @@ if ($emp && !empty($_GET['dossier'])):
                     <div style="font-weight:700;color:#334155;font-size:13px;margin-bottom:6px"><i class="fas fa-angle-left" style="color:var(--primary)"></i> <?= e($gTitle) ?></div>
                     <div style="display:flex;flex-wrap:wrap;gap:8px">
                         <?php foreach ($keys as $k): if (!isset($ATT_TYPES[$k])) continue; ?>
-                        <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= (int)$employeeId ?>&type=<?= e($k) ?>&lang_doc=<?= e($docLang) ?>" class="btn btn-sm btn-light" style="border:1px solid #cbd5e1"><i class="fas fa-file-lines" style="color:var(--primary);opacity:.6"></i> <?= e($ATT_TYPES[$k]['ar']) ?></a>
+                        <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= (int)$employeeId ?>&type=<?= e($k) ?>&lang_doc=<?= e($docLang) ?>" class="btn btn-sm btn-light" style="border:1px solid #cbd5e1"><i class="fas fa-file-lines" style="color:var(--primary);opacity:.6"></i> <?= e($ATT_TYPES[$k]['fr'].' / '.$ATT_TYPES[$k]['ar']) ?></a>
                         <?php endforeach; ?>
                     </div>
                 </div>
@@ -303,7 +318,10 @@ if (!$emp):
 ?>
     <?php if ($employees): ?>
     <div class="card" style="border:2px solid var(--primary);background:#f0f7ff">
-        <div class="card-header"><h3><i class="fas fa-folder-open"></i> ملف الأستاذ الكامل / Dossier — شوف كل شي عن الأستاذ بمكان واحد</h3></div>
+        <div class="card-header"><h3>
+          <span dir="ltr"><i class="fas fa-folder-open"></i> Dossier complet — tout sur l'enseignant en un seul endroit</span>
+          <div style="font-size:0.85em;font-weight:600;opacity:0.9">ملف الأستاذ الكامل — شوف كل شي عن الأستاذ بمكان واحد</div>
+        </h3></div>
         <div class="card-body">
             <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> اختر أستاذ (بتقدر تفتّش عنه حتى لو «كل المدارس» مختارة) وشوف صور مستنداته + ر6 + بطاقة الراتب السنوية + سيرته + كل الإفادات — بدون ما تنتقل من صفحة لصفحة.</p>
             <form method="GET" class="form-row cols-4" style="align-items:end">
@@ -318,7 +336,7 @@ if (!$emp):
                     </select>
                 </div>
                 <div class="form-group">
-                    <button class="btn btn-primary w-100"><i class="fas fa-folder-open"></i> عرض الملف الكامل</button>
+                    <button class="btn btn-primary w-100"><i class="fas fa-folder-open"></i> Voir le dossier complet / عرض الملف الكامل</button>
                 </div>
             </form>
         </div>
@@ -326,10 +344,13 @@ if (!$emp):
     <?php endif; ?>
 
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-file-signature"></i> Générer une attestation / إصدار إفادة</h3></div>
+        <div class="card-header"><h3>
+          <span dir="ltr"><i class="fas fa-file-signature"></i> Générer une attestation</span>
+          <div style="font-size:0.85em;font-weight:600;opacity:0.9">إصدار إفادة</div>
+        </h3></div>
         <div class="card-body">
             <?php if (!$employees): ?>
-                <div class="alert alert-info">لا يوجد موظفون.</div>
+                <div class="alert alert-info">Aucun employé / لا يوجد موظفون.</div>
             <?php else: ?>
             <form method="GET" class="form-row cols-4">
                 <div class="form-group">
@@ -381,25 +402,28 @@ if (!$emp):
         $expBase = BASE_URL . 'pages/official_export.php?form=cnss_work_attestation&emp=' . (int)$employeeId . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr;
     ?>
     <div class="card no-print" style="max-width:760px;margin:0 auto">
-        <div class="card-header"><h3><i class="fas fa-file-medical"></i> إفادة عمل للضمان (نموذج رسمي) — <?= e($nm) ?></h3></div>
+        <div class="card-header"><h3>
+          <span dir="ltr"><i class="fas fa-file-medical"></i> Attestation de travail CNSS (officiel) — <?= e($nm) ?></span>
+          <div style="font-size:0.85em;font-weight:600;opacity:0.9">إفادة عمل للضمان (نموذج رسمي)</div>
+        </h3></div>
         <div class="card-body">
             <form method="GET" class="form-row cols-3" style="align-items:end;margin-bottom:14px">
                 <input type="hidden" name="employee_id" value="<?= (int)$employeeId ?>">
                 <input type="hidden" name="type" value="cnss_travail">
                 <div class="form-group">
-                    <label class="form-label">تاريخ الإفادة (في:)</label>
+                    <label class="form-label">Date de l'attestation / تاريخ الإفادة (في:)</label>
                     <input type="date" name="date" class="form-control" value="<?= e($effDate) ?>" onchange="this.form.submit()">
                 </div>
-                <div class="form-group"><button class="btn btn-secondary"><i class="fas fa-sync"></i> تحديث الأشهر</button></div>
+                <div class="form-group"><button class="btn btn-secondary"><i class="fas fa-sync"></i> Actualiser les mois / تحديث الأشهر</button></div>
             </form>
             <div class="alert alert-info">
                 الأشهر السبعة المحتسَبة تلقائياً من التاريخ (من الأقدم للأحدث): <strong><?= e(implode(' ، ', $mlist)) ?></strong> — كلّها «دوام كامل».<br>
                 التاريخ تحت الإفادة: <strong><?= $d . ' / ' . $mo . ' / ' . $yr ?></strong>
             </div>
             <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>" target="_blank"><i class="fas fa-print"></i> الإفادة الرسمية (طباعة / PDF)</a>
-                <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> تحميل Excel (للتعديل)</a>
-                <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>"><i class="fas fa-arrow-right"></i> رجوع لملف الأستاذ</a>
+                <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>" target="_blank"><i class="fas fa-print"></i> Attestation officielle (Impression / PDF) / الإفادة الرسمية (طباعة / PDF)</a>
+                <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> Télécharger Excel (modifiable) / تحميل Excel (للتعديل)</a>
+                <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>"><i class="fas fa-arrow-right"></i> Retour au dossier / رجوع لملف الأستاذ</a>
             </div>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> «الإفادة الرسمية» تفتح النموذج الرسمي كاملاً معبّأً (المدرسة ورقمها في الضمان، اسم الأجير ورقم ضمانه وسنة ولادته، والأشهر) جاهز للطباعة — <strong>نفس الشكل تماماً أونلاين وعلى الكمبيوتر</strong>. زر Excel للتحميل والتعديل.</p>
         </div>
@@ -522,7 +546,7 @@ if (!$emp):
             <a href="?<?= $qs ?>&lang_doc=<?= $lk ?>" class="btn btn-sm <?= $lk===$docLang?'btn-primary':'btn-light' ?>"><?= e($lbl) ?></a>
             <?php endforeach; ?>
         </div>
-        <button type="button" class="btn btn-sm" style="background:#0ea5e9;color:#fff" onclick="ppSendAtt('<?= e(addslashes('pages/attestations.php?'.$qs)) ?>','<?= e($exportOpts['email'] ?? '') ?>','<?= e($exportTitle ?? 'attestation') ?>')"><i class="fas fa-paper-plane"></i> إرسال بالإيميل (PDF تلقائي)</button>
+        <button type="button" class="btn btn-sm" style="background:#0ea5e9;color:#fff" onclick="ppSendAtt('<?= e(addslashes('pages/attestations.php?'.$qs)) ?>','<?= e($exportOpts['email'] ?? '') ?>','<?= e($exportTitle ?? 'attestation') ?>')"><i class="fas fa-paper-plane"></i> Envoyer par email (PDF auto) / إرسال بالإيميل (PDF تلقائي)</button>
     </div>
     <script>
     function ppSendAtt(target, defEmail, name){
@@ -539,12 +563,12 @@ if (!$emp):
         <input type="hidden" name="date" value="<?= e($effDate) ?>">
         <input type="hidden" name="opts_set" value="1">
         <div class="card-body" style="padding:10px 14px">
-            <strong>رأس المدرسة:</strong>
+            <strong>En-tête de l'école / رأس المدرسة:</strong>
             <input type="hidden" name="logo" value="0">
-            <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="logo" value="1" <?= $showLogo?'checked':'' ?> onchange="this.form.submit()"> ضع شعار المدرسة على الإفادة</label>
+            <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="logo" value="1" <?= $showLogo?'checked':'' ?> onchange="this.form.submit()"> Mettre le logo de l'école / ضع شعار المدرسة على الإفادة</label>
             <?php if (count($signatories) > 1): ?>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
-            <strong>الموقّع المسؤول:</strong>
+            <strong>Signataire responsable / الموقّع المسؤول:</strong>
             <select name="sig" onchange="this.form.submit()" style="padding:3px 6px;margin-right:6px">
                 <?php foreach ($signatories as $si => $sgo): ?>
                 <option value="<?= $si ?>" <?= $si===$sigIdx?'selected':'' ?>><?= e($sgo['name'] . ($sgo['title']?' — '.$sgo['title']:'') . ($sgo['phone']?' ('.$sgo['phone'].')':'')) ?></option>
@@ -553,43 +577,43 @@ if (!$emp):
             <?php else: ?><input type="hidden" name="sig" value="0"><?php endif; ?>
             <?php if ($hasComponents || $hasCurrency || $type==='isqat_haq' || $isNotice): ?><span style="margin:0 16px;color:#cbd5e1">|</span><?php endif; ?>
             <?php if ($hasComponents): ?>
-            <strong>مكوّنات الراتب:</strong>
-            <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_extra" value="1" <?= $incExtra?'checked':'' ?> onchange="this.form.submit()"> + الأجر الإضافي (<?= formatLBP($extraW,false) ?>)</label>
-            <label style="cursor:pointer"><input type="checkbox" name="inc_aide" value="1" <?= $incAide?'checked':'' ?> onchange="this.form.submit()"> + مكافأة ومساعدة (<?= formatLBP($aideW,false) ?>)</label>
+            <strong>Composantes du salaire / مكوّنات الراتب:</strong>
+            <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_extra" value="1" <?= $incExtra?'checked':'' ?> onchange="this.form.submit()"> + Rémunération suppl. / + الأجر الإضافي (<?= formatLBP($extraW,false) ?>)</label>
+            <label style="cursor:pointer"><input type="checkbox" name="inc_aide" value="1" <?= $incAide?'checked':'' ?> onchange="this.form.submit()"> + Prime et aide / + مكافأة ومساعدة (<?= formatLBP($aideW,false) ?>)</label>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
             <?php endif; ?>
             <?php if ($hasCurrency): ?>
-            <strong>العملة:</strong>
-            <label style="margin:0 10px;cursor:pointer"><input type="radio" name="cur" value="lbp" <?= $cur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> ليرة (ل.ل)</label>
-            <label style="cursor:pointer"><input type="radio" name="cur" value="usd" <?= $cur==='usd'?'checked':'' ?> onchange="this.form.submit()"> دولار ($)</label>
+            <strong>Devise / العملة:</strong>
+            <label style="margin:0 10px;cursor:pointer"><input type="radio" name="cur" value="lbp" <?= $cur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> Livre (LBP) / ليرة (ل.ل)</label>
+            <label style="cursor:pointer"><input type="radio" name="cur" value="usd" <?= $cur==='usd'?'checked':'' ?> onchange="this.form.submit()"> Dollar / دولار ($)</label>
             <?php endif; ?>
             <?php if ($type === 'isqat_haq'): ?>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
-            <strong>مبلغ تعويض الصرف المحسوب:</strong>
+            <strong>Montant de l'indemnité calculée / مبلغ تعويض الصرف المحسوب:</strong>
             <input type="text" name="eos" value="<?= $eos>0 ? (int)$eos : '' ?>" placeholder="اكتب المبلغ" style="width:150px;padding:3px 6px" onchange="this.form.submit()">
             <div style="margin-top:6px">
-                <strong>الحالة:</strong>
-                <label style="margin:0 10px;cursor:pointer"><input type="radio" name="isq" value="istiqala" <?= $isqMode==='istiqala'?'checked':'' ?> onchange="this.form.submit()"> قدّمت استقالتي</label>
-                <label style="cursor:pointer"><input type="radio" name="isq" value="sarf" <?= $isqMode==='sarf'?'checked':'' ?> onchange="this.form.submit()"> صار صرفي من الخدمة</label>
+                <strong>Situation / الحالة:</strong>
+                <label style="margin:0 10px;cursor:pointer"><input type="radio" name="isq" value="istiqala" <?= $isqMode==='istiqala'?'checked':'' ?> onchange="this.form.submit()"> J'ai présenté ma démission / قدّمت استقالتي</label>
+                <label style="cursor:pointer"><input type="radio" name="isq" value="sarf" <?= $isqMode==='sarf'?'checked':'' ?> onchange="this.form.submit()"> J'ai été licencié(e) / صار صرفي من الخدمة</label>
             </div>
             <?php endif; ?>
             <?php if ($isNotice): ?>
-            <div style="margin-top:6px"><strong>الموضوع / سبب الإنذار:</strong>
+            <div style="margin-top:6px"><strong>Objet / motif de l'avertissement / الموضوع / سبب الإنذار:</strong>
             <input type="text" name="subj_txt" value="<?= e($subjectTxt) ?>" style="width:60%;min-width:300px;padding:3px 6px" onchange="this.form.submit()"></div>
             <?php endif; ?>
             <?php if ($type === 'riaaya'): ?>
-            <div style="margin-top:6px"><strong>الجهة ورقم التسجيل:</strong>
+            <div style="margin-top:6px"><strong>Organisme et n° d'enregistrement / الجهة ورقم التسجيل:</strong>
             <input type="text" name="assoc_txt" value="<?= e($assocTxt) ?>" style="width:70%;min-width:340px;padding:3px 6px" onchange="this.form.submit()"></div>
             <?php endif; ?>
             <?php if ($type === 'embassy'): ?>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
-            <strong>المبلغ الشهري (اكتبه):</strong>
+            <strong>Montant mensuel (à saisir) / المبلغ الشهري (اكتبه):</strong>
             <input type="text" name="emb_amt" value="<?= $embAmt>0 ? (int)$embAmt : '' ?>" placeholder="المبلغ" style="width:140px;padding:3px 6px" onchange="this.form.submit()">
-            <span style="color:#64748b">(اختر العملة دولار/ليرة من فوق)</span>
+            <span style="color:#64748b">(Choisir la devise ci-dessus) / (اختر العملة دولار/ليرة من فوق)</span>
             <?php endif; ?>
             <?php if ($type === 'iqrar'): ?>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
-            <strong>قيمة المنحة (دولار أميركي):</strong>
+            <strong>Valeur de la subvention (USD) / قيمة المنحة (دولار أميركي):</strong>
             <input type="text" name="grant" value="<?= $grant>0 ? (int)$grant : '' ?>" placeholder="اكتب المبلغ" style="width:150px;padding:3px 6px" onchange="this.form.submit()">
             <?php if ($grant>0): ?><div style="margin-top:6px;color:#1e40af"><?= number_format($grant) ?> دولار أميركي — بالحروف: <strong><?= e(numToArabicWords($grant)) ?> دولار أميركي</strong></div><?php endif; ?>
             <?php endif; ?>
@@ -740,7 +764,7 @@ if (!$emp):
         <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
         <div dir="ltr" style="text-align:left">
           <div style="text-align:right;margin-bottom:10px"><?= date('d/m/Y') ?></div>
-          <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">ATTESTATION</h2>
+          <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة</h2>
           <p>To whom it may concern,</p>
           <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">This certificate is given upon his/her request.</p>
@@ -1032,7 +1056,9 @@ if (!$emp):
                 <?php if ($employerNssf && ($type==='cnss')): ?><br><small><?= $rtl?'رقم رب العمل في الضمان: ':'N° employeur CNSS: ' ?><?= e($employerNssf) ?></small><?php endif; ?>
             </div>
 
-            <h2 style="text-align:center;margin:6px 0 26px;text-decoration:underline"><?= e($ATT_TYPES[$type][$docLang]) ?></h2>
+            <h2 style="text-align:center;margin:6px 0 26px;text-decoration:underline">
+                <?= e($ATT_TYPES[$type][$docLang]) ?>
+            </h2>
 
             <?php if ($docLang === 'ar'): ?>
                 <p>نشهد نحن، <strong><?= e($schoolNameAr) ?></strong>، بأنّ:</p>

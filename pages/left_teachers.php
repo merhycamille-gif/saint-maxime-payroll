@@ -100,7 +100,7 @@ include __DIR__ . '/../includes/header.php';
     <ul style="margin:8px 0 0;padding-inline-start:22px">
       <?php foreach ($anomalies as $a): ?>
         <li><strong><?= e($a['name']) ?></strong> (<?= e($a['school']) ?>) — تاريخ الترك <?= e($a['left']) ?> لكن عندو رواتب حتى سنة <?= e($a['until']) ?>-<?= e($a['until']+1) ?>
-          <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $a['id'] ?>#tab-emploi" class="btn btn-sm btn-light" style="padding:1px 8px"><i class="fas fa-folder-open"></i> صحّح</a></li>
+          <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $a['id'] ?>#tab-emploi" class="btn btn-sm btn-light" style="padding:1px 8px"><i class="fas fa-folder-open"></i> Corriger / صحّح</a></li>
       <?php endforeach; ?>
     </ul>
   </div>
@@ -108,7 +108,9 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="card">
   <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <h3><i class="fas fa-user-slash"></i> التاركون في <?= $selYear === 'all' ? 'كل السنوات / Toutes les années' : e($selYear) ?> (<?= $total ?>)</h3>
+    <h3><i class="fas fa-user-slash"></i>
+      <span dir="ltr">Départs en <?= $selYear === 'all' ? 'toutes les années' : e($selYear) ?> (<?= $total ?>)</span>
+      <div style="font-size:0.85em;font-weight:600;opacity:0.9">التاركون في <?= $selYear === 'all' ? 'كل السنوات' : e($selYear) ?> (<?= $total ?>)</div></h3>
     <form method="get" class="no-print" style="margin:0;display:flex;align-items:center;gap:8px">
       <label style="margin:0;font-weight:700">السنة الدراسية / Année :</label>
       <select name="sy" onchange="this.form.submit()" style="padding:8px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:14px">
@@ -126,7 +128,8 @@ include __DIR__ . '/../includes/header.php';
   <div class="card-body">
     <?php if (!$total): ?>
       <div class="empty-state"><i class="fas fa-user-check"></i>
-        <h4>لا يوجد تاركون في <?= $selYear === 'all' ? 'أي سنة' : e($selYear) ?> / Aucun départ</h4>
+        <h4><span dir="ltr">Aucun départ</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">لا يوجد تاركون في <?= $selYear === 'all' ? 'أي سنة' : e($selYear) ?></div></h4>
         <p>عند تسجيل تاريخ ترك لأي أستاذ في هذه السنة (من ملفه أو عبر رابط تحديث المعلومات) يظهر هنا مباشرةً.
         <?php if ($grandTotal > 0 && $selYear !== 'all'): ?><br>يوجد <strong><?= $grandTotal ?></strong> تارك في سنوات أخرى — اختر «كل السنوات» لعرضهم.<?php endif; ?></p></div>
     <?php else: foreach ($bySchool as $schoolName => $list): ?>
@@ -144,7 +147,7 @@ include __DIR__ . '/../includes/header.php';
           <th>ترك المالية / Finances</th>
           <th>ترك الصندوق / EOC</th>
           <th>الهاتف / Tél.</th>
-          <th class="no-print">الملف</th>
+          <th class="no-print">Dossier / الملف</th>
         </tr></thead>
         <tbody>
         <?php $i = 0; foreach ($list as $emp): $i++;
@@ -161,7 +164,7 @@ include __DIR__ . '/../includes/header.php';
             <td><?= ltDate($emp['left_date_eoc']) ?></td>
             <td><?= e($emp['phone1'] ?: $emp['phone2'] ?: '—') ?></td>
             <td class="no-print">
-              <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$emp['id'] ?>" class="btn btn-sm btn-light" title="فتح الملف">
+              <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$emp['id'] ?>" class="btn btn-sm btn-light" title="Ouvrir le dossier / فتح الملف">
                 <i class="fas fa-folder-open"></i>
               </a>
             </td>

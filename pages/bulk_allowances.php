@@ -12,7 +12,7 @@ requireLogin();
 requireCsrf();
 
 $currentPage = 'bulk_allowances';
-$pageTitle = 'Primes & Transport groupés';
+$pageTitle = 'Primes & Transport groupés / المكافآت والنقل الجماعي';
 $db = getDB();
 @set_time_limit(0);
 
@@ -188,7 +188,10 @@ if ($hasScope) {
 $exchangeRate = (float)getExchangeRate();
 ?>
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-gift"></i> تابلو المكافآت وتعويض النقل الجماعي</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-gift"></i> Tableau des primes &amp; transport groupés</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">تابلو المكافآت وتعويض النقل الجماعي</div>
+    </h3></div>
     <div class="card-body">
         <div class="alert alert-info" style="font-size:13px">
             حُطّ القيمة مرّة وحدة وطبّقها على الفئة كلها بضغطة — لمدرسة أو <strong>لكل المدارس دفعة وحدة</strong> (للمدير العام).
@@ -200,10 +203,10 @@ $exchangeRate = (float)getExchangeRate();
         <form method="GET" class="form-row cols-2 no-print" style="margin-bottom:10px">
             <?php if (isSuperAdmin()): ?>
             <div class="form-group mb-0">
-                <label class="form-label">المدرسة / النطاق</label>
+                <label class="form-label">École / Portée / المدرسة والنطاق</label>
                 <select name="sch" class="form-select" onchange="this.form.submit()">
-                    <option value="">— اختر —</option>
-                    <option value="all" <?= $scopeAll?'selected':'' ?>>🌐 كل المدارس (كل البرنامج)</option>
+                    <option value="">— Choisir / اختر —</option>
+                    <option value="all" <?= $scopeAll?'selected':'' ?>>🌐 Toutes les écoles / كل المدارس (كل البرنامج)</option>
                     <?php foreach (allSchools() as $s): ?>
                         <option value="<?= (int)$s['id'] ?>" <?= (!$scopeAll && $schoolId===(int)$s['id'])?'selected':'' ?>><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
                     <?php endforeach; ?>
@@ -211,7 +214,7 @@ $exchangeRate = (float)getExchangeRate();
             </div>
             <?php else: ?><input type="hidden" name="sch" value="<?= $schoolId ?>"><?php endif; ?>
             <div class="form-group mb-0">
-                <label class="form-label">السنة الدراسية</label>
+                <label class="form-label">Année scolaire / السنة الدراسية</label>
                 <input type="text" name="sy" class="form-control" value="<?= e($schoolYear) ?>" onchange="this.form.submit()">
             </div>
         </form>
@@ -221,7 +224,10 @@ $exchangeRate = (float)getExchangeRate();
 <?php if ($hasScope): $scopeIn = ($scopeAll ? 'all' : $schoolId); ?>
 <!-- محرّر أسطر متعدّدة: مكافآت / تعويض نقل من شهر لشهر -->
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-coins"></i> مكافآت وتعويض نقل — أسطر متعدّدة (من شهر لشهر)</h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-coins"></i> Primes &amp; transport — lignes multiples (mois par mois)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">مكافآت وتعويض نقل — أسطر متعدّدة (من شهر لشهر)</div>
+    </h3></div>
     <div class="card-body">
         <div class="alert alert-info" style="font-size:12px">
             أضِف سطراً لكل قيمة وفترة. <strong>القيمة بتتغيّر خلال السنة؟</strong> ضيف سطرين بفترتين (مثلاً نقل: تشرين→كانون قيمة، شباط→أيلول قيمة أخرى).
@@ -233,19 +239,19 @@ $exchangeRate = (float)getExchangeRate();
             <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
             <div style="overflow:auto">
             <table class="table" style="font-size:13px;min-width:640px">
-                <thead><tr><th>النوع</th><th>القيمة</th><th>مبلغ/نسبة</th><th>العملة</th><th>من شهر</th><th>إلى شهر</th><th></th></tr></thead>
+                <thead><tr><th>Type / النوع</th><th>Valeur / القيمة</th><th>Montant/% / مبلغ/نسبة</th><th>Devise / العملة</th><th>Du mois / من شهر</th><th>Au mois / إلى شهر</th><th></th></tr></thead>
                 <tbody id="linesBody"></tbody>
             </table>
             </div>
-            <button type="button" class="btn btn-sm btn-light" onclick="addLine()"><i class="fas fa-plus"></i> أضِف سطر</button>
-            <button type="submit" class="btn btn-primary" style="float:left" data-confirm="تطبيق هذه الأسطر على «الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?>»؟ (تستبدل الأنواع المُدخَلة لكامل السنة)"><i class="fas fa-check"></i> طبّق على الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?></button>
+            <button type="button" class="btn btn-sm btn-light" onclick="addLine()"><i class="fas fa-plus"></i> Ajouter ligne / أضِف سطر</button>
+            <button type="submit" class="btn btn-primary" style="float:left" data-confirm="تطبيق هذه الأسطر على «الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?>»؟ (تستبدل الأنواع المُدخَلة لكامل السنة)"><i class="fas fa-check"></i> Appliquer / طبّق على الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?></button>
             <div style="clear:both"></div>
         </form>
         <form method="POST" onsubmit="return confirm('إزالة هذا النوع عن الفئة كلها؟')" style="margin-top:10px">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="remove_bonus"><input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
-            <select name="bonus_type" class="form-select" style="display:inline-block;width:auto"><option value="aide_complementaire">مكافأة ومساعدة</option><option value="prime_fixe">الأجر الإضافي</option><option value="transport_complement">تعويض نقل (شهري)</option></select>
-            <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-trash"></i> إزالة هذا النوع عن الفئة</button>
+            <select name="bonus_type" class="form-select" style="display:inline-block;width:auto"><option value="aide_complementaire">Prime &amp; aide / مكافأة ومساعدة</option><option value="prime_fixe">Salaire additionnel / الأجر الإضافي</option><option value="transport_complement">Transport (mensuel) / تعويض نقل (شهري)</option></select>
+            <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-trash"></i> Retirer ce type / إزالة هذا النوع عن الفئة</button>
         </form>
         <script>
         (function(){
@@ -275,7 +281,10 @@ $exchangeRate = (float)getExchangeRate();
 
 <!-- تعويض النقل اليومي — أسطر بفترات -->
     <div class="card">
-        <div class="card-header"><h3><i class="fas fa-bus"></i> تعويض النقل اليومي — أسطر (من شهر لشهر)</h3></div>
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-bus"></i> Transport journalier — lignes (mois par mois)</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">تعويض النقل اليومي — أسطر (من شهر لشهر)</div>
+        </h3></div>
         <div class="card-body">
             <div class="alert alert-info" style="font-size:12px">القيمة <strong>يومية</strong>؛ الشهري = اليومي × <strong>أيام الحضور</strong> (من ملف كل أستاذ) × 4 أسابيع. ضيف سطر لكل فترة إذا القيمة اليومية بتتغيّر خلال السنة.</div>
             <form method="POST" id="tPeriodsForm">
@@ -284,18 +293,18 @@ $exchangeRate = (float)getExchangeRate();
                 <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
                 <div style="overflow:auto">
                 <table class="table" style="font-size:13px;min-width:440px">
-                    <thead><tr><th>القيمة اليومية</th><th>العملة</th><th>من شهر</th><th>إلى شهر</th><th></th></tr></thead>
+                    <thead><tr><th>Valeur journalière / القيمة اليومية</th><th>Devise / العملة</th><th>Du mois / من شهر</th><th>Au mois / إلى شهر</th><th></th></tr></thead>
                     <tbody id="tLinesBody"></tbody>
                 </table>
                 </div>
-                <button type="button" class="btn btn-sm btn-light" onclick="addTLine()"><i class="fas fa-plus"></i> أضِف سطر</button>
-                <button type="submit" class="btn btn-primary" style="float:left" data-confirm="تطبيق أسطر النقل اليومي على «الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?>»؟ (تستبدل النقل اليومي لكامل السنة)"><i class="fas fa-check"></i> طبّق على الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?></button>
+                <button type="button" class="btn btn-sm btn-light" onclick="addTLine()"><i class="fas fa-plus"></i> Ajouter ligne / أضِف سطر</button>
+                <button type="submit" class="btn btn-primary" style="float:left" data-confirm="تطبيق أسطر النقل اليومي على «الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?>»؟ (تستبدل النقل اليومي لكامل السنة)"><i class="fas fa-check"></i> Appliquer / طبّق على الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?></button>
                 <div style="clear:both"></div>
             </form>
             <form method="POST" onsubmit="return confirm('إزالة كل النقل اليومي عن الفئة المختارة؟')" style="margin-top:10px">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="remove_transport_periods"><input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
-                <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-trash"></i> إزالة كل النقل اليومي عن الفئة</button>
+                <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-trash"></i> Retirer tout le transport journalier / إزالة كل النقل اليومي عن الفئة</button>
             </form>
             <p class="text-muted" style="font-size:12px;margin-top:8px">أيام الحضور من ملف كل أستاذ (Employés)، وكل أستاذ بياخد نقلو حسب أيامه.</p>
             <script>
@@ -321,10 +330,13 @@ $exchangeRate = (float)getExchangeRate();
 
 <!-- معاينة النطاق -->
 <div class="card">
-    <div class="card-header"><h3><i class="fas fa-list"></i> معاينة: <?= catLabel($categories) ?> (<?= count($preview) ?>) — <?= e(scopeLabel($scopeAll,$schoolId)) ?> — <?= e($schoolYear) ?></h3></div>
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-list"></i> Aperçu : <?= catLabel($categories) ?> (<?= count($preview) ?>) — <?= e(scopeLabel($scopeAll,$schoolId)) ?> — <?= e($schoolYear) ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">معاينة: <?= catLabel($categories) ?> (<?= count($preview) ?>) — <?= e(scopeLabel($scopeAll,$schoolId)) ?> — <?= e($schoolYear) ?></div>
+    </h3></div>
     <div class="card-body" style="overflow:auto">
         <table class="table" style="font-size:13px">
-            <thead><tr><th>#</th><?php if ($scopeAll): ?><th>المدرسة</th><?php endif; ?><th>الاسم</th><th>الفئة</th><th>أيام/أسبوع</th><th>نقل يومي</th><th>نقل شهري (محسوب)</th><th>المكافآت الحالية</th></tr></thead>
+            <thead><tr><th>#</th><?php if ($scopeAll): ?><th>École / المدرسة</th><?php endif; ?><th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>Jours/sem. / أيام/أسبوع</th><th>Transport journalier / نقل يومي</th><th>Transport mensuel (calculé) / نقل شهري (محسوب)</th><th>Primes actuelles / المكافآت الحالية</th></tr></thead>
             <tbody>
             <?php $i=1; foreach ($preview as $p):
                 $nm = trim(($p['first_name_ar'] ?: $p['first_name_fr']).' '.($p['last_name_ar'] ?: $p['last_name_fr']));
@@ -347,7 +359,7 @@ $exchangeRate = (float)getExchangeRate();
     </div>
 </div>
 <?php else: ?>
-<div class="alert alert-warning">اختر مدرسة (أو «كل المدارس») من الأعلى.</div>
+<div class="alert alert-warning">Choisissez une école (ou « toutes les écoles ») ci-dessus / اختر مدرسة (أو «كل المدارس») من الأعلى.</div>
 <?php endif; ?>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
