@@ -928,3 +928,23 @@ input:focus, select:focus, textarea:focus {
 
 /* شارات الحالة: حواف أنعم متناسقة */
 .badge { letter-spacing: .01em; }
+
+/* =============== بطاقات الوصول السريع بلوحة القيادة (Accès rapide) =============== */
+.ht-section { font-weight:700; color:var(--gray-600); margin:16px 0 8px; font-size:14px; }
+.ht-section:first-child { margin-top:0; }
+.home-tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
+.home-tile {
+    display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px;
+    padding:14px 10px; border:1px solid var(--gray-200); border-radius:12px;
+    background:#fff; color:var(--gray-700); text-decoration:none; transition:all .15s ease;
+}
+.home-tile:hover { border-color:var(--primary); box-shadow:0 6px 16px rgba(0,0,0,.10); transform:translateY(-3px); }
+.home-tile .ht-ic { width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; }
+.home-tile .ht-ic i { font-size:24px; }
+.home-tile .ht-fr { font-weight:700; font-size:13px; line-height:1.2; color:var(--gray-800, #1f2937); }
+.home-tile .ht-ar { font-size:12px; opacity:.75; line-height:1.2; }
+/* المربّع البارز لملف الأستاذ براس الصفحة */
+.home-tile-hero { max-width:260px; padding:22px 18px; margin-bottom:18px; gap:8px;
+    border-width:2px; border-color:var(--primary); background:#f0f7ff; }
+.home-tile-hero .ht-ic-lg { width:64px; height:64px; border-radius:16px; }
+.home-tile-hero .ht-ic-lg i { font-size:30px; }

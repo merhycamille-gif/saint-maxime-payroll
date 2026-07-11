@@ -67,6 +67,83 @@ include __DIR__ . '/includes/header.php';
 </div>
 <?php renderAge64Cards($home64); endif; ?>
 
+<?php if (viewerCanSeePage('attestations.php')): ?>
+<a class="home-tile home-tile-hero" href="<?= BASE_URL ?>pages/attestations.php?dossier=1">
+    <span class="ht-ic ht-ic-lg" style="background:#e0e7ff;color:#4f46e5"><i class="fas fa-folder-open"></i></span>
+    <span class="ht-fr" style="font-size:15px">Dossier de l'enseignant</span>
+    <span class="ht-ar">ملف الأستاذ الكامل — شوف كل شي عن الأستاذ</span>
+</a>
+<?php endif; ?>
+
+<?php
+// 🧩 وصول سريع (Accès rapide): بطاقات لكل أقسام البرنامج — روابط فقط، تحترم صلاحيات المستخدم (نفس شروط القائمة الجانبية).
+// إضافة شكليّة بحتة: لا تمسّ أي حساب/قاعدة بيانات/منطق.
+// لوحة ألوان متنوّعة (خلفية فاتحة + لون أيقونة) — تُوزَّع على البطاقات لتصير ملوّنة متل النموذج
+$palette = [
+    ['#e0f2fe','#0284c7'], ['#dcfce7','#16a34a'], ['#fef3c7','#d97706'], ['#fee2e2','#dc2626'],
+    ['#ede9fe','#7c3aed'], ['#cffafe','#0891b2'], ['#fce7f3','#db2777'], ['#ffedd5','#ea580c'],
+    ['#e0e7ff','#4f46e5'], ['#d1fae5','#059669'],
+];
+$tile = function ($href, $icon, $fr, $ar, $bg, $fg) {
+    echo '<a class="home-tile" href="' . BASE_URL . $href . '">'
+       . '<span class="ht-ic" style="background:' . $bg . ';color:' . $fg . '"><i class="' . $icon . '"></i></span>'
+       . '<span class="ht-fr">' . e($fr) . '</span>'
+       . '<span class="ht-ar">' . e($ar) . '</span></a>';
+};
+$navGroups = [
+    ['Personnel', 'الموظفون', array_filter([
+        canEdit() ? ['pages/employees.php','fas fa-users','Employés & Enseignants','الموظفون والأساتذة'] : null,
+        canEdit() ? ['pages/grades.php','fas fa-layer-group','Échelons & Promotions','الدرجات والترقيات'] : null,
+        canEdit() ? ['pages/classes.php','fas fa-chalkboard','Classes','الصفوف'] : null,
+        canEdit() ? ['pages/exceptional_laws.php','fas fa-scroll','Lois exceptionnelles','القوانين الاستثنائية'] : null,
+        canEdit() ? ['pages/bulk_allowances.php','fas fa-gift','Primes & transport','المكافآت والنقل'] : null,
+        canEdit() ? ['pages/law_check.php','fas fa-balance-scale','Conformité légale','فحص مطابقة القانون'] : null,
+    ])],
+    ['Paie', 'الرواتب', array_filter([
+        viewerCanSeePage('monthly_payroll.php') ? ['pages/monthly_payroll.php','fas fa-money-check-alt','Paie mensuelle','الرواتب الشهرية'] : null,
+        viewerCanSeePage('annual_slip.php') ? ['pages/annual_slip.php','fas fa-file-invoice-dollar','Relevé annuel','الكشف السنوي'] : null,
+        viewerCanSeePage('attestations.php') ? ['pages/attestations.php','fas fa-file-signature','Attestations','إفادات'] : null,
+        viewerCanSeePage('employee_history.php') ? ['pages/employee_history.php','fas fa-user-clock','Dossier enseignant','سيرة الأستاذ'] : null,
+        canEdit() ? ['pages/info_collect.php','fab fa-whatsapp','Mise à jour','تحديث معلومات الأساتذة'] : null,
+        canEdit() ? ['pages/info_status.php','fas fa-clipboard-check','État MàJ','حالة التحديث'] : null,
+        canEdit() ? ['pages/left_teachers.php','fas fa-user-slash','Départs','الأساتذة التاركون'] : null,
+        canEdit() ? ['pages/retirement_64.php','fas fa-hourglass-half','Retraite 64','بلوغ سنّ الـ64'] : null,
+    ])],
+    ['Rapports', 'التقارير', array_filter([
+        viewerCanSeePage('reports.php') ? ['pages/reports.php','fas fa-chart-bar','Rapports','التقارير'] : null,
+        canEdit() ? ['pages/tax_declarations.php','fas fa-file-contract','Déclarations','التصاريح'] : null,
+    ])],
+    ['Système', 'النظام', array_filter([
+        isSuperAdmin() ? ['pages/schools.php','fas fa-school','Écoles','المدارس'] : null,
+        isAdmin() ? ['pages/users.php','fas fa-user-shield','Utilisateurs','حسابات المدارس'] : null,
+        canEdit() ? ['pages/open_year.php','fas fa-folder-plus','Ouvrir année','فتح سنة دراسية'] : null,
+        canEdit() ? ['pages/exchange_rates.php','fas fa-coins','Taux de change','أسعار الصرف'] : null,
+        canEdit() ? ['pages/social_security.php','fas fa-shield-alt','Plafonds CNSS','حدود الضمان'] : null,
+        canEdit() ? ['pages/tax_brackets.php','fas fa-percent',"Tranches d'impôt",'الشطور الضريبية'] : null,
+        canEdit() ? ['pages/rates_history.php','fas fa-percent','Taux datés','النِّسَب حسب التاريخ'] : null,
+        canEdit() ? ['pages/salary_scales.php','fas fa-layer-group','Grille','إصدارات السلسلة'] : null,
+        canEdit() ? ['pages/backup.php','fas fa-database','Sauvegarde','نسخة احتياطية'] : null,
+        ['pages/settings.php','fas fa-cog','Paramètres','الإعدادات'],
+        isSuperAdmin() ? ['pages/email_settings.php','fas fa-envelope','Paramètres Email','إعدادات البريد'] : null,
+    ])],
+];
+?>
+<div class="card no-print">
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-th-large"></i> Accès rapide</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">وصول سريع لكل الأقسام</div>
+    </h3></div>
+    <div class="card-body">
+        <?php $ci = 0; foreach ($navGroups as [$gFr, $gAr, $items]): if (!$items) continue; ?>
+        <div class="ht-section"><span dir="ltr"><?= e($gFr) ?></span> / <?= e($gAr) ?></div>
+        <div class="home-tiles">
+            <?php foreach ($items as $it): [$bg, $fg] = $palette[$ci % count($palette)]; $ci++;
+                $tile($it[0], $it[1], $it[2], $it[3], $bg, $fg); endforeach; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon primary"><i class="fas fa-users"></i></div>
@@ -100,37 +177,6 @@ include __DIR__ . '/includes/header.php';
         </div>
     </div>
 </div>
-
-<?php if (viewerCanSeePage('attestations.php')): ?>
-<div class="card no-print" style="border:2px solid var(--primary);background:#f0f7ff;margin-bottom:16px">
-    <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-folder-open"></i> Dossier complet de l'enseignant</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">ملف الأستاذ الكامل — كل شي عن الأستاذ بكبسة</div>
-    </h3></div>
-    <div class="card-body">
-        <?php if (!$homeEmps): ?>
-            <div class="alert alert-info" style="margin:0">لا يوجد أساتذة.</div>
-        <?php else: ?>
-            <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> اختر الأستاذ (بتقدر تفتّش عنه حتى لو «كل المدارس» مختارة)، وبتفتح صفحة فيها كل شي عنه: معلوماته كاملة، صور مستنداته (الشهادة/التذكرة/العائلي)، وأي إفادة أو تقرير إلو (ر6، بطاقة الراتب السنوية، سيرته...) جاهز للطباعة.</p>
-            <form method="GET" action="<?= BASE_URL ?>pages/attestations.php" class="form-row cols-4" style="align-items:end">
-                <input type="hidden" name="dossier" value="1">
-                <div class="form-group" style="grid-column:1/3">
-                    <label class="form-label">الأستاذ / Employé</label>
-                    <select name="employee_id" class="form-select" required>
-                        <option value="">— اختر / Choisir —</option>
-                        <?php $showSch = isAllSchools(); foreach ($homeEmps as $em): $pfx = $showSch ? (schoolNameById($em['school_id']).' — ') : ''; ?>
-                        <option value="<?= $em['id'] ?>"><?= e($pfx.$em['employee_code'].' — '.$em['first_name_fr'].' '.$em['last_name_fr']) ?> / <?= e($em['first_name_ar'].' '.$em['last_name_ar']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <button class="btn btn-primary w-100"><i class="fas fa-folder-open"></i> افتح الملف الكامل</button>
-                </div>
-            </form>
-        <?php endif; ?>
-    </div>
-</div>
-<?php endif; ?>
 
 <div class="form-row cols-2">
     <div class="card">
