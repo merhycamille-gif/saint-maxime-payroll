@@ -589,8 +589,12 @@ body.rtl .table th { text-align: right; }
 .w-100 { width: 100%; }
 
 /* =================== Print =================== */
+/* يظهر عند الطباعة فقط (مخفي على الشاشة) */
+.print-only { display: none; }
+
 @media print {
     .sidebar, .topbar, .no-print { display: none !important; }
+    .print-only { display: block !important; }
     .main-content, .page-content { padding: 0; }
     .card { box-shadow: none; border: none; }
     body { background: white; }

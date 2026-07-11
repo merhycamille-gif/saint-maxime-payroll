@@ -118,6 +118,23 @@ function newTeacherName($r) {
         ?: (trim(($d['first_name_fr'] ?? '') . ' ' . ($d['last_name_fr'] ?? '')) ?: '(بلا اسم)');
 }
 
+// فلتر العرض: الكل / بعتوا فقط / ما بعتوا فقط / جدد فقط — ليطبع المدير كل مجموعة لحالها
+$show = $_GET['show'] ?? 'all';
+if (!in_array($show, ['all', 'sent', 'notsent', 'new'], true)) $show = 'all';
+$showSent = ($show === 'all' || $show === 'sent');
+$showNot  = ($show === 'all' || $show === 'notsent');
+$showNew  = ($show === 'all' || $show === 'new');
+$showLabels = ['all' => 'الكل', 'sent' => 'اللي حدّثوا وبعتوا', 'notsent' => 'اللي ما بعتوا', 'new' => 'الأساتذة الجدد'];
+
+// المدارس التي فيها محتوى ضمن الفلتر المختار (حتى لا تظهر مدرسة فارغة عند فلترة مجموعة واحدة)
+$renderKeys = [];
+foreach ($schoolKeys as $sk) {
+    $hasS = $showSent && !empty($bySchool[$sk]['sent']);
+    $hasN = $showNot  && !empty($bySchool[$sk]['notsent']);
+    $hasW = $showNew  && !empty($newBySchool[$sk]);
+    if ($hasS || $hasN || $hasW) $renderKeys[] = $sk;
+}
+
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="alert alert-info no-print" style="margin-bottom:14px">
@@ -126,21 +143,40 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card no-print" style="margin-bottom:14px">
-  <div class="card-body" style="display:flex;gap:22px;flex-wrap:wrap;align-items:center">
-    <div><span class="badge badge-success" style="font-size:14px"><i class="fas fa-check"></i> بعتوا وحدّثوا</span> <strong style="font-size:20px"><?= $gSent ?></strong>
-      <?php if ($gPending): ?><span style="color:#b45309">(منهم <?= $gPending ?> بانتظار اعتمادك)</span><?php endif; ?></div>
-    <div><span class="badge badge-warning" style="font-size:14px"><i class="fas fa-hourglass-half"></i> ما بعتوا بعد</span> <strong style="font-size:20px"><?= $gNot ?></strong></div>
-    <div><span class="badge" style="background:#0a7a37;color:#fff;font-size:14px"><i class="fas fa-user-plus"></i> أساتذة جدد</span> <strong style="font-size:20px"><?= $gNew ?></strong></div>
-    <button type="button" onclick="window.print()" class="btn btn-light" style="margin-inline-start:auto"><i class="fas fa-print"></i> طباعة</button>
+  <div class="card-body">
+    <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center">
+      <div><span class="badge badge-success" style="font-size:14px"><i class="fas fa-check"></i> بعتوا وحدّثوا</span> <strong style="font-size:20px"><?= $gSent ?></strong>
+        <?php if ($gPending): ?><span style="color:#b45309">(منهم <?= $gPending ?> بانتظار اعتمادك)</span><?php endif; ?></div>
+      <div><span class="badge badge-warning" style="font-size:14px"><i class="fas fa-hourglass-half"></i> ما بعتوا بعد</span> <strong style="font-size:20px"><?= $gNot ?></strong></div>
+      <div><span class="badge" style="background:#0a7a37;color:#fff;font-size:14px"><i class="fas fa-user-plus"></i> أساتذة جدد</span> <strong style="font-size:20px"><?= $gNew ?></strong></div>
+      <button type="button" onclick="window.print()" class="btn btn-light" style="margin-inline-start:auto"><i class="fas fa-print"></i> طباعة <?= $show === 'all' ? '' : '«' . e($showLabels[$show]) . '»' ?></button>
+    </div>
+    <div style="margin-top:12px;border-top:1px solid var(--gray-200);padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-weight:700;color:var(--gray-600)"><i class="fas fa-filter"></i> اعرض / اطبع:</span>
+      <?php foreach ($showLabels as $key => $lbl):
+        $on = ($show === $key);
+        $icon = ['all'=>'fa-list','sent'=>'fa-check','notsent'=>'fa-hourglass-half','new'=>'fa-user-plus'][$key];
+      ?>
+        <a href="<?= BASE_URL ?>pages/info_status.php?show=<?= $key ?>"
+           class="btn btn-sm <?= $on ? 'btn-success' : 'btn-light' ?>"><i class="fas <?= $icon ?>"></i> <?= e($lbl) ?></a>
+      <?php endforeach; ?>
+    </div>
   </div>
 </div>
 
-<?php if (!$schoolKeys): ?>
+<?php if ($show !== 'all'): ?>
+<div class="print-only" style="text-align:center;margin-bottom:10px"><h2 style="margin:0"><?= e($showLabels[$show]) ?> — <?= e(currentSchoolYear()) ?></h2></div>
+<?php endif; ?>
+
+<?php if (!$renderKeys): ?>
   <div class="card"><div class="card-body">
-    <div class="empty-state"><i class="fas fa-inbox"></i><h4>لا بيانات بعد</h4>
-      <p>ابعت رابط تحديث المعلومات للأساتذة من صفحة «تحديث معلومات الأساتذة»، وبمجرّد ما يعبّوه بيظهروا هون.</p></div>
+    <div class="empty-state"><i class="fas fa-inbox"></i>
+      <h4><?= $show === 'all' ? 'لا بيانات بعد' : 'لا أحد ضمن «' . e($showLabels[$show]) . '»' ?></h4>
+      <p><?= $show === 'all'
+          ? 'ابعت رابط تحديث المعلومات للأساتذة من صفحة «تحديث معلومات الأساتذة»، وبمجرّد ما يعبّوه بيظهروا هون.'
+          : 'جرّب فلتر تاني من فوق، أو «الكل».' ?></p></div>
   </div></div>
-<?php else: foreach ($schoolKeys as $schoolName):
+<?php else: foreach ($renderKeys as $schoolName):
     $sent    = $bySchool[$schoolName]['sent'] ?? [];
     $notsent = $bySchool[$schoolName]['notsent'] ?? [];
     $news    = $newBySchool[$schoolName] ?? [];
@@ -148,14 +184,15 @@ include __DIR__ . '/../includes/header.php';
 <div class="card" style="margin-bottom:16px">
   <div class="card-header" style="background:#eef6ff">
     <h3 style="color:#0a6b5e"><i class="fas fa-school"></i> <?= e($schoolName) ?>
-      <span class="badge badge-success" style="margin-inline-start:6px"><i class="fas fa-check"></i> <?= count($sent) ?> بعتوا</span>
-      <span class="badge badge-warning"><i class="fas fa-hourglass-half"></i> <?= count($notsent) ?> ما بعتوا</span>
-      <?php if ($news): ?><span class="badge" style="background:#0a7a37;color:#fff"><i class="fas fa-user-plus"></i> <?= count($news) ?> جدد</span><?php endif; ?>
+      <?php if ($showSent): ?><span class="badge badge-success" style="margin-inline-start:6px"><i class="fas fa-check"></i> <?= count($sent) ?> بعتوا</span><?php endif; ?>
+      <?php if ($showNot): ?><span class="badge badge-warning"><i class="fas fa-hourglass-half"></i> <?= count($notsent) ?> ما بعتوا</span><?php endif; ?>
+      <?php if ($showNew && $news): ?><span class="badge" style="background:#0a7a37;color:#fff"><i class="fas fa-user-plus"></i> <?= count($news) ?> جدد</span><?php endif; ?>
     </h3>
   </div>
   <div class="card-body">
 
     <!-- ✅ بعتوا وحدّثوا -->
+    <?php if ($showSent && ($sent || $show === 'sent')): ?>
     <h4 style="color:#15803d;border-bottom:2px solid #dcfce7;padding-bottom:6px;margin:6px 0 10px">
       <i class="fas fa-check-circle"></i> بعتوا وحدّثوا معلوماتهم (<?= count($sent) ?>)
     </h4>
@@ -194,8 +231,10 @@ include __DIR__ . '/../includes/header.php';
       </table>
       </div>
     <?php endif; ?>
+    <?php endif; /* showSent */ ?>
 
     <!-- ⏳ ما بعتوا -->
+    <?php if ($showNot && ($notsent || $show === 'notsent')): ?>
     <h4 style="color:#b45309;border-bottom:2px solid #fef3c7;padding-bottom:6px;margin:18px 0 10px">
       <i class="fas fa-hourglass-half"></i> ما بعتوا بعد (<?= count($notsent) ?>)
     </h4>
@@ -229,9 +268,10 @@ include __DIR__ . '/../includes/header.php';
       </table>
       </div>
     <?php endif; ?>
+    <?php endif; /* showNot */ ?>
 
     <!-- 🆕 الأساتذة الجدد -->
-    <?php if ($news): ?>
+    <?php if ($showNew && $news): ?>
     <h4 style="color:#0a7a37;border-bottom:2px solid #dcfce7;padding-bottom:6px;margin:18px 0 10px">
       <i class="fas fa-user-plus"></i> أساتذة جدد (<?= count($news) ?>)
     </h4>
