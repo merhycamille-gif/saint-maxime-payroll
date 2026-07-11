@@ -91,7 +91,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="card">
     <div class="card-header"><h3><i class="fas fa-plus"></i> <?= $editRow ? 'Modifier une valeur / تعديل قيمة' : 'Ajouter une valeur / إضافة قيمة' ?></h3></div>
     <div class="card-body">
-        <form method="POST">
+        <form method="POST"<?= $editRow ? ' class="lockedit"' : '' ?>>
             <input type="hidden" name="action" value="save">
             <input type="hidden" name="id" value="<?= $editRow ? (int)$editRow['id'] : 0 ?>">
             <div class="form-row cols-4">

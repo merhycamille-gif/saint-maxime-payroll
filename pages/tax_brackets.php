@@ -175,7 +175,7 @@ if ($editSet) {
         <?= $editSet ? ('تعديل مجموعة الشطور السارية من ' . e($editSetFrom)) : 'إضافة مجموعة شطور جديدة / Nouveau jeu' ?>
     </h3></div>
     <div class="card-body">
-        <form method="POST">
+        <form method="POST"<?= $editSet ? ' class="lockedit"' : '' ?>>
             <?= csrfField() ?>
             <input type="hidden" name="action" value="save_set">
             <input type="hidden" name="orig_from" value="<?= e($editSetFrom) ?>">
@@ -275,7 +275,7 @@ if ($editSet) {
                 ? 'التنزيل العائلي السنوي يُطرح من الأساس الخاضع قبل تطبيق الشطور، حسب الوضع العائلي وتاريخ سريان القانون.'
                 : 'Déduction annuelle soustraite avant les tranches, selon la situation et la date.' ?>
         </div>
-        <form method="POST">
+        <form method="POST"<?= $editDed ? ' class="lockedit"' : '' ?>>
             <?= csrfField() ?>
             <input type="hidden" name="action" value="save_deduction">
             <input type="hidden" name="ded_id" value="<?= $editDed ? (int)$editDed['id'] : 0 ?>">

@@ -83,7 +83,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<form method="POST">
+<form method="POST" class="lockedit">
     <div class="card">
         <div class="card-header"><h3><i class="fas fa-calendar"></i> Paramètres généraux</h3></div>
         <div class="card-body">

@@ -1234,7 +1234,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         $r = $h['reason'];
         if ($r === 'titularization')     return ['دخول الملاك', 'gold', true];
         if ($r === 'biennial_promotion') return ['درجة عادية (تشرين)', 'success', false];
-        if ($r === 'manual')             return ['تعديل يدوي', 'secondary', false];
+        if ($r === 'manual')             return ['درجة يدوية (بقرارك)', 'secondary', false];
         // ما تبقّى = درجة استثنائية: إمّا قانون مسمّى (244/102/223/2017) أو نظام الأساتذة الجدد (4+4+2).
         $lbl = !empty($h['law_reference'])
             ? 'درجة استثنائية — قانون ' . $h['law_reference']
@@ -1281,7 +1281,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         ثم اضغط «حفظ» فتتحدّث الدرجة والراتب تلقائياً. (درجة دخول الملاك ثابتة.)
         <?php if ($excludedCount): ?><br><span style="color:#c0392b">حالياً <?= $excludedCount ?> درجة مستثناة (غير محسوبة).</span><?php endif; ?>
     </p>
-    <form method="POST" action="<?= BASE_URL ?>pages/grades.php?employee_id=<?= (int)$emp['id'] ?>">
+    <form method="POST" class="lockedit" action="<?= BASE_URL ?>pages/grades.php?employee_id=<?= (int)$emp['id'] ?>">
         <?= csrfField() ?>
         <input type="hidden" name="grade_save" value="1">
         <input type="hidden" name="return_to" value="<?= e($returnTo) ?>">
@@ -1380,6 +1380,36 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         <button type="submit" class="btn btn-primary" data-confirm="حفظ الدرجات وإعادة حساب الراتب؟">
             <i class="fas fa-save"></i> حفظ الدرجات
         </button>
+    </form>
+
+    <!-- ➕ إضافة درجة يدوية (خارج القانون، بقرار المستخدم) — نموذج مستقلّ -->
+    <form method="POST" class="lockedit" action="<?= BASE_URL ?>pages/grades.php?employee_id=<?= (int)$emp['id'] ?>"
+          style="margin-top:16px;padding:14px;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc">
+        <?= csrfField() ?>
+        <input type="hidden" name="manual_add" value="1">
+        <input type="hidden" name="return_to" value="<?= e($returnTo) ?>">
+        <h4 style="margin:0 0 4px;color:var(--primary)"><i class="fas fa-plus-circle"></i> أضف درجة يدوية (بقرارك، خارج القانون)</h4>
+        <p class="text-muted" style="font-size:12px;margin:0 0 10px">
+            درجة تحطّها انت بمقدار وتاريخ من اختيارك (تشرين 1/10 أو كانون 1/1 أو أي تاريخ). بمجرّد الحفظ
+            <strong>تُضاف فوراً لأساس الراتب ويتدرّج الراتب من بعدها تلقائياً</strong>، وتقدر تشيلها لاحقاً بالشك-مارك.
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group mb-0">
+                <label class="form-label" style="font-size:12px">مقدار الدرجة</label>
+                <input type="number" name="manual_amount" value="1" step="0.5" min="0.5" max="52" class="form-control" style="max-width:110px" required>
+            </div>
+            <div class="form-group mb-0">
+                <label class="form-label" style="font-size:12px">التاريخ</label>
+                <input type="date" name="manual_date" value="<?= date('Y') ?>-10-01" class="form-control" style="max-width:170px" required>
+            </div>
+            <div class="form-group mb-0" style="flex:1;min-width:160px">
+                <label class="form-label" style="font-size:12px">ملاحظة (اختياري)</label>
+                <input type="text" name="manual_note" class="form-control" placeholder="سبب الدرجة (اختياري)">
+            </div>
+            <button type="submit" class="btn btn-gold" data-confirm="إضافة درجة يدوية بهذا المقدار والتاريخ، وإعادة حساب الراتب؟">
+                <i class="fas fa-plus"></i> أضف الدرجة
+            </button>
+        </div>
     </form>
     <?php
 }

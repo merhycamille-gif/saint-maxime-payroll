@@ -192,7 +192,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="card" id="editzone">
     <div class="card-header"><h3><i class="fas fa-edit"></i> <?= e($lang==='ar'?$editVersion['name_ar']:$editVersion['name_fr']) ?> — <?= $lang==='ar'?'تفاصيل وقيم':'Détails & valeurs' ?></h3></div>
     <div class="card-body">
-        <form method="POST" style="margin-bottom:20px">
+        <form method="POST" class="lockedit" style="margin-bottom:20px">
             <input type="hidden" name="action" value="save_meta">
             <input type="hidden" name="id" value="<?= (int)$editVersion['id'] ?>">
             <div class="form-row cols-4">
@@ -210,7 +210,7 @@ include __DIR__ . '/../includes/header.php';
             <button type="submit" class="btn btn-light btn-sm"><i class="fas fa-save"></i> <?= $lang==='ar'?'حفظ التفاصيل':'Enregistrer détails' ?></button>
         </form>
 
-        <form method="POST">
+        <form method="POST" class="lockedit">
             <input type="hidden" name="action" value="save_rows">
             <input type="hidden" name="version_id" value="<?= (int)$editVersion['id'] ?>">
             <div style="max-height:520px;overflow:auto">

@@ -390,7 +390,7 @@ include __DIR__ . '/../includes/header.php';
             <?= $editUser ? ($lang==='ar'?'تعديل الحساب':'Modifier le compte') : ($lang==='ar'?'حساب جديد':'Nouveau compte') ?></h3>
     </div>
     <div class="card-body">
-        <form method="POST">
+        <form method="POST"<?= $editUser ? ' class="lockedit"' : '' ?>>
             <input type="hidden" name="csrf" value="<?= csrfToken() ?>">
             <input type="hidden" name="id" value="<?= $editUser['id'] ?? 0 ?>">
             <div class="form-row cols-2">

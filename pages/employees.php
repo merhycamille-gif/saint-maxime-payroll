@@ -762,7 +762,7 @@ include __DIR__ . '/../includes/header.php';
     </a>
     <?php if ($id > 0): ?>
         <div class="d-flex gap-2">
-            <button type="button" id="btnEditEmp" class="btn btn-warning" style="display:none">
+            <button type="button" id="btnEditEmp" data-lockedit-for="empForm" class="btn btn-warning" style="display:none">
                 <i class="fas fa-pen"></i> تعديل / Modifier
             </button>
             <a href="?action=delete&id=<?= $id ?>" class="btn btn-danger" data-confirm="<?= e('⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . (trim($employee['first_name_ar'].' '.$employee['last_name_ar']) ?: trim($employee['first_name_fr'].' '.$employee['last_name_fr'])) . '» ؟ بعد الحذف لا يعود يظهر في البرنامج (يمكن استرجاعه لاحقاً عند الحاجة).') ?>">
@@ -781,7 +781,7 @@ include __DIR__ . '/../includes/header.php';
     <?php endif; ?>
 </div>
 
-<form method="POST" enctype="multipart/form-data" id="empForm">
+<form method="POST" enctype="multipart/form-data" id="empForm"<?= $id > 0 ? ' class="lockedit"' : '' ?>>
     <input type="hidden" name="active_tab" id="activeTabField" value="<?= e(preg_replace('/[^a-z]/', '', $_GET['tab'] ?? '')) ?>">
     <!-- Tabs -->
     <div class="tabs">
@@ -1604,37 +1604,10 @@ include __DIR__ . '/../includes/header.php';
 </script>
 <?php endif; ?>
 
-<?php if ($id > 0): ?>
-<script>
-// قفل ملف الأستاذ للقراءة بعد الحفظ: الحقول مقفّلة، وزر «تعديل» يفتحها، وزر «حذف» موجود.
-(function () {
-    var form = document.getElementById('empForm');
-    var btnEdit = document.getElementById('btnEditEmp');
-    var btnSave = document.getElementById('empSaveBtn');
-    if (!form) return;
-
-    function setLocked(locked) {
-        form.querySelectorAll('input, select, textarea').forEach(function (el) {
-            if (locked) {
-                if (!el.disabled) { el.disabled = true; el.setAttribute('data-waslocked', '1'); }
-            } else if (el.getAttribute('data-waslocked')) {
-                el.disabled = false; el.removeAttribute('data-waslocked');
-            }
-        });
-        if (btnSave) btnSave.style.display = locked ? 'none' : '';
-        if (btnEdit) btnEdit.style.display = locked ? '' : 'none';
-    }
-
-    // عند الفتح: مقفّل للقراءة. زر «تعديل» يفتح الحقول.
-    setLocked(true);
-    if (btnEdit) btnEdit.addEventListener('click', function () {
-        setLocked(false);
-        var tip = document.getElementById('empEditTip');
-        if (tip) tip.style.display = '';
-    });
-})();
-</script>
-<?php endif; ?>
+<?php
+// ملاحظة: قفل ملف الأستاذ صار عبر السكربت المشترك assets/js/form-lock.js
+// (class="lockedit" على الفورم + زر «تعديل» في الشريط العلوي عبر data-lockedit-for).
+?>
 
 <?php
 // خريطة السلسلة (درجة → راتب) للإصدار الساري — لعرض الراتب فوراً عند اختيار الدرجة

@@ -52,7 +52,7 @@ include __DIR__ . '/../includes/header.php';
             يكفي إدخال <strong>إيميل المدرسة وكلمة السر</strong> — الخادم يُكشَف تلقائياً (Hotmail / Gmail / Outlook…).<br>
             🔑 <strong>مهم:</strong> Gmail و Hotmail/Outlook يتطلّبان غالباً <strong>«كلمة مرور تطبيق» (App Password)</strong> بدل كلمة سرّك العادية (من إعدادات أمان حسابك)، لأنّ كلمة السر العادية مرفوضة للإرسال الخارجي.
         </div>
-        <form method="post">
+        <form method="post" class="lockedit">
             <?= csrfField() ?>
             <div class="form-group">
                 <label class="form-label">البريد الإلكتروني للمدرسة</label>

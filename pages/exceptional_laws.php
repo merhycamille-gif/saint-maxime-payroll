@@ -117,7 +117,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-header"><h3><i class="fas fa-<?= $editRow ? 'edit' : 'plus' ?>"></i>
         <?= $editRow ? 'تعديل قانون / Modifier' : 'إضافة قانون جديد / Ajouter une loi' ?></h3></div>
     <div class="card-body">
-        <form method="POST">
+        <form method="POST"<?= $editRow ? ' class="lockedit"' : '' ?>>
             <?= csrfField() ?>
             <input type="hidden" name="action" value="save">
             <input type="hidden" name="id" value="<?= $editRow ? (int)$editRow['id'] : 0 ?>">

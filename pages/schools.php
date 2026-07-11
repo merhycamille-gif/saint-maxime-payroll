@@ -184,7 +184,7 @@ include __DIR__ . '/../includes/header.php';
             <?= $editSchool ? 'Modifier l\'école' : 'Nouvelle école' ?></h3>
     </div>
     <div class="card-body">
-        <form method="POST">
+        <form method="POST"<?= $editSchool ? ' class="lockedit"' : '' ?>>
             <input type="hidden" name="csrf" value="<?= csrfToken() ?>">
             <input type="hidden" name="id" value="<?= $editSchool['id'] ?? 0 ?>">
             <div class="form-row cols-3">

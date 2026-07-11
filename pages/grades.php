@@ -185,8 +185,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save']) && $emp
     exit;
 }
 
+// ➕ إضافة درجة يدوية (بقرار المستخدم، خارج القانون): تُضاف بمقدار وتاريخ مختارين، counted=1،
+// ثم rechain + إعادة حساب الراتب فتدخل أساس الراتب فوراً ويتدرّج من بعدها تلقائياً. (لا تُمَسّ من محرّك القانون.)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['manual_add']) && $employeeId > 0) {
+    $amt   = round((float)($_POST['manual_amount'] ?? 0), 1);
+    $mdate = $_POST['manual_date'] ?: date('Y-m-d');
+    $mnote = trim($_POST['manual_note'] ?? '');
+    if ($mnote === '') $mnote = 'درجة يدوية (بقرار المدرسة)';
+    try {
+        if ($amt == 0) throw new Exception('حدّد مقدار الدرجة (مثلاً 1 أو ½)');
+        if (!strtotime($mdate)) throw new Exception('تاريخ غير صحيح');
+        $mdate = date('Y-m-d', strtotime($mdate));
+        $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,0,?,?,1,?,'manual',NULL,?)")
+           ->execute([$employeeId, $amt, $amt, $mdate, $mnote]);
+        $g = rechainGradeHistory($employeeId);  // يعيد ربط السلسلة والأساس حسب الترتيب الزمني
+        $eDate = $db->query("SELECT hire_date FROM employees WHERE id=" . (int)$employeeId)->fetchColumn();
+        $y0 = $eDate ? (int)date('Y', strtotime($eDate)) : (int)date('Y') - 5;
+        for ($y = $y0; $y <= (int)date('Y'); $y++) recalcEmployeeYear($employeeId, $y . '-' . ($y + 1));
+        $amtTxt = rtrim(rtrim(number_format($amt, 1), '0'), '.');
+        $okMsg = "تمت إضافة درجة يدوية (+$amtTxt) بتاريخ $mdate — الدرجة الحالية صارت $g وأُعيد حساب الراتب (يتدرّج من بعدها).";
+        if (($_POST['return_to'] ?? '') === 'employee') { $_SESSION['flash_success'] = $okMsg; }
+        else { $_SESSION['flash'] = ['type' => 'success', 'msg' => $okMsg]; }
+    } catch (Exception $e) {
+        if (($_POST['return_to'] ?? '') === 'employee') { $_SESSION['flash_error'] = $e->getMessage(); }
+        else { $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()]; }
+    }
+    if (($_POST['return_to'] ?? '') === 'employee') {
+        header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $employeeId . '#gradesPanel');
+    } else {
+        header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
+    }
+    exit;
+}
+
 // Manual grade change
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['exc_save']) && !isset($_POST['grade_save']) && $employeeId > 0) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['exc_save']) && !isset($_POST['grade_save']) && !isset($_POST['manual_add']) && $employeeId > 0) {
     $newGrade = (float)$_POST['new_grade'];
     $reason = $_POST['reason'] ?? 'manual';
     $changeDate = $_POST['change_date'] ?: date('Y-m-d');
@@ -408,7 +441,7 @@ include __DIR__ . '/../includes/header.php';
                         ✔ = البرنامج يعطي هذه الدرجة الاستثنائية لهذا الأستاذ بتاريخها (كانون الثاني 1/1).
                         شِيل الصح إذا ما بدك تعطيه إيّاها. الدرجات العادية تبقى تلقائياً في تشرين الأول.
                     </p>
-                    <form method="POST">
+                    <form method="POST" class="lockedit">
                         <?= csrfField() ?>
                         <input type="hidden" name="exc_save" value="1">
                         <table class="table" style="font-size:13px">
@@ -451,7 +484,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card">
         <div class="card-header"><h3><i class="fas fa-edit"></i> Modification manuelle</h3></div>
         <div class="card-body">
-            <form method="POST">
+            <form method="POST" class="lockedit">
                 <div class="form-row cols-4">
                     <div class="form-group">
                         <label class="form-label">Nouvel échelon <small>(½ permis)</small></label>

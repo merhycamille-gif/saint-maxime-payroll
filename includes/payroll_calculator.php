@@ -956,6 +956,12 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false) 
         $events[] = ['date' => $m['change_date'], 'type' => 'exceptional', 'delta' => (float)$m['d'], 'law' => '344'];
     }
 
+    // ----- الحفاظ على الدرجات اليدوية (reason='manual'، بقرار المستخدم خارج القانون) — تُعاد كما هي بعد البناء -----
+    $manualRows = $db->prepare("SELECT change_date, COALESCE(delta, grade_after-grade_before) d, counted, notes
+                                FROM employee_grade_history WHERE employee_id=? AND reason='manual'");
+    $manualRows->execute([$empId]);
+    $manualRows = $manualRows->fetchAll(PDO::FETCH_ASSOC);
+
     usort($events, fn($a,$b) => strcmp($a['date'], $b['date']));
 
     // 🔵 كل درجة استثنائية تُخزَّن **مفردة** (+1، والكسر الأخير +½ لحاله) — طلب المستخدم:
@@ -981,6 +987,11 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false) 
             if ($ev['type'] === 'ordinary') $nOrd += ($after - $g);
             else { $nExc += ($after - $g); $byLaw[$ev['law'] ?? '4+4+2'] = ($byLaw[$ev['law'] ?? '4+4+2'] ?? 0) + ($after - $g); }
             $g = $after;
+        }
+        // الدرجات اليدوية المحسوبة (دخلت أساس الراتب) تُضاف للدرجة المتوقّعة حتى تطابق المخزّنة (لا تُعتبر «انحرافاً»).
+        $todayStr = date('Y-m-d', $todayTs);
+        foreach ($manualRows as $mr) {
+            if ((int)$mr['counted'] && $mr['change_date'] <= $todayStr) $g = min(52, round($g + (float)$mr['d'], 1));
         }
         return ['start'=>$start, 'entry_date'=>$entryDate, 'ordinary'=>$nOrd,
                 'exceptional'=>$nExc, 'final_grade'=>$g, 'events'=>count($events)+1, 'by_law'=>$byLaw, 'dry'=>true];
@@ -1012,6 +1023,14 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false) 
             $g = $after;
         }
         $db->prepare("UPDATE employees SET current_grade=? WHERE id=?")->execute([$g, $empId]);
+        // أعِد إدراج الدرجات اليدوية المحفوظة (بقيمها وتواريخها وحالة احتسابها)، ثم أعِد الربط لتشمل الدرجة الحالية.
+        if (!empty($manualRows)) {
+            $insM = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,0,?,?,?,?,'manual',NULL,?)");
+            foreach ($manualRows as $mr) {
+                $insM->execute([$empId, (float)$mr['d'], (float)$mr['d'], (int)$mr['counted'], $mr['change_date'], ($mr['notes'] !== null && $mr['notes'] !== '') ? $mr['notes'] : 'درجة يدوية (بقرار المدرسة)']);
+            }
+            $g = rechainGradeHistory($empId);   // يعيد الحساب شاملاً اليدوية (يحترم التاريخ/الاحتساب)
+        }
         $db->commit();
     } catch (Exception $e) { $db->rollBack(); throw $e; }
 
