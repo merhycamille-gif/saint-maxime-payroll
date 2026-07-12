@@ -18,23 +18,36 @@ handleAge64Post($db, BASE_URL . 'index.php');
 // تُحتسب صفوف موظفين سابقين تركها الاستيراد (نفس مبدأ yearEmploymentFilter بكل البرنامج).
 $sc = schoolScopeSql();
 $notLeft = " AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL";
+// 🔢 الأعداد حسب **السنة الدراسية المختارة** + المدرسة/المدارس المختارة (نفس فلتر السنة المستعمَل بكل البرنامج).
+// «كل السنين» → بلا فلتر سنة (تُعيد yearEmploymentFilter فراغاً) فيُحتسب كل الفاعلين الحاليين.
+[$yfStat, $ypStat] = yearEmploymentFilter(activeSchoolYear());
+$dashCount = function ($typeSql) use ($db, $notLeft, $sc, $yfStat, $ypStat) {
+    $st = $db->prepare("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND status = 'actif'" . $typeSql . $notLeft . $sc . $yfStat);
+    $st->execute($ypStat);
+    return (int)$st->fetchColumn();
+};
 $stats = [
-    'total_employees' => $db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND status = 'actif'" . $notLeft . $sc)->fetchColumn(),
-    'titulaires' => $db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND status = 'actif' AND employee_type = 'enseignant_titulaire'" . $notLeft . $sc)->fetchColumn(),
-    'contractuels' => $db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND status = 'actif' AND employee_type = 'enseignant_contractuel'" . $notLeft . $sc)->fetchColumn(),
-    'employes' => $db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND status = 'actif' AND employee_type = 'employe'" . $notLeft . $sc)->fetchColumn(),
+    'total_employees' => $dashCount(''),
+    'titulaires'      => $dashCount(" AND employee_type = 'enseignant_titulaire'"),
+    'contractuels'    => $dashCount(" AND employee_type = 'enseignant_contractuel'"),
+    'employes'        => $dashCount(" AND employee_type = 'employe'"),
 ];
 
-$currentMonth = (int)date('n');
-$currentYear = (int)date('Y');
-
-// مجموع المدفوع للشهر الحالي — يُستثنى المحذوفون والتاركون (صفوف الأشباح) عبر ربط الموظف.
+// 💰 مجموع المدفوع في **السنة الدراسية المختارة** + المدرسة/المدارس المختارة (بدل الشهر — ليكون حسب السنة).
+// «كل السنين» → مجموع كل السنوات ضمن النطاق.
 $scE = schoolScopeSql('e.school_id');
-$stmtPaid = $db->prepare("SELECT COALESCE(SUM(ms.total_due_lbp), 0)
-    FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
-    WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0"
-    . " AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL" . $scE);
-$stmtPaid->execute([$currentYear, $currentMonth]);
+$ayPaid = activeSchoolYear();
+if ($ayPaid === 'all') {
+    $stmtPaid = $db->prepare("SELECT COALESCE(SUM(ms.total_due_lbp), 0)
+        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE e.is_deleted = 0" . $scE);
+    $stmtPaid->execute();
+} else {
+    $stmtPaid = $db->prepare("SELECT COALESCE(SUM(ms.total_due_lbp), 0)
+        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE ms.school_year = ? AND e.is_deleted = 0" . $scE);
+    $stmtPaid->execute([$ayPaid]);
+}
 $totalPaid = (float)$stmtPaid->fetchColumn();
 
 $exchangeRate = getExchangeRate();
@@ -55,25 +68,11 @@ if (viewerCanSeePage('attestations.php')) {
     $homeEmps = $stHE->fetchAll();
 }
 
+// لوحة القيادة لا يُطبَع منها شي → أخفِ شريط الطباعة/التصدير (يبقى ظاهراً في صفحات التقارير)
+$hideExportToolbar = true;
+
 include __DIR__ . '/includes/header.php';
 ?>
-
-<?php if ($home64): ?>
-<div class="d-flex justify-between align-center no-print" style="margin-bottom:8px;flex-wrap:wrap;gap:8px">
-    <div style="color:var(--gray-600);font-size:14px"><i class="fas fa-hourglass-half" style="color:#b45309"></i> بلغوا 64 في السنة الدراسية المختارة (<strong><?= e(activeSchoolYear()) ?></strong>).</div>
-    <?php if (canEdit()): ?>
-    <a href="<?= BASE_URL ?>pages/retirement_64.php" class="btn btn-sm btn-light"><i class="fas fa-list"></i> عرض كل من بلغوا 64</a>
-    <?php endif; ?>
-</div>
-<?php renderAge64Cards($home64); endif; ?>
-
-<?php if (viewerCanSeePage('attestations.php')): ?>
-<a class="home-tile home-tile-hero" href="<?= BASE_URL ?>pages/attestations.php?dossier=1">
-    <span class="ht-ic ht-ic-lg" style="background:#e0e7ff;color:#4f46e5"><i class="fas fa-folder-open"></i></span>
-    <span class="ht-fr" style="font-size:15px">Dossier de l'enseignant</span>
-    <span class="ht-ar">ملف الأستاذ الكامل — شوف كل شي عن الأستاذ</span>
-</a>
-<?php endif; ?>
 
 <?php
 // 🧩 وصول سريع (Accès rapide): بطاقات لكل أقسام البرنامج — روابط فقط، تحترم صلاحيات المستخدم (نفس شروط القائمة الجانبية).
@@ -128,135 +127,63 @@ $navGroups = [
     ])],
 ];
 ?>
-<div class="card no-print">
-    <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-th-large"></i> Accès rapide</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">وصول سريع لكل الأقسام</div>
-    </h3></div>
-    <div class="card-body">
-        <?php $ci = 0; foreach ($navGroups as [$gFr, $gAr, $items]): if (!$items) continue; ?>
-        <div class="ht-section"><span dir="ltr"><?= e($gFr) ?></span> / <?= e($gAr) ?></div>
-        <div class="home-tiles">
-            <?php foreach ($items as $it): [$bg, $fg] = $palette[$ci % count($palette)]; $ci++;
-                $tile($it[0], $it[1], $it[2], $it[3], $bg, $fg); endforeach; ?>
-        </div>
-        <?php endforeach; ?>
-    </div>
+<div class="home-tiles" style="margin-bottom:16px">
+    <?php $ci = 0; foreach ($navGroups as [$gFr, $gAr, $items]): foreach ($items as $it): [$bg, $fg] = $palette[$ci % count($palette)]; $ci++;
+        $tile($it[0], $it[1], $it[2], $it[3], $bg, $fg); endforeach; endforeach; ?>
 </div>
 
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-icon primary"><i class="fas fa-users"></i></div>
-        <div>
-            <div class="stat-label">Total Personnel / إجمالي الموظفين</div>
-            <div class="stat-value"><?= $stats['total_employees'] ?></div>
-        </div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-icon gold"><i class="fas fa-chalkboard-teacher"></i></div>
-        <div>
-            <div class="stat-label">Enseignants Titulaires / أساتذة الملاك</div>
-            <div class="stat-value"><?= $stats['titulaires'] ?></div>
-        </div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-icon info"><i class="fas fa-user-clock"></i></div>
-        <div>
-            <div class="stat-label">Contractuels / المتعاقدون</div>
-            <div class="stat-value"><?= $stats['contractuels'] ?></div>
-        </div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-icon success"><i class="fas fa-user-tie"></i></div>
-        <div>
-            <div class="stat-label">Employés / الموظفون الإداريون</div>
-            <div class="stat-value"><?= $stats['employes'] ?></div>
-        </div>
-    </div>
+<!-- 📊 نظرة عامة: أرقام + معلومات النظام كبطاقات أيقونات ملوّنة -->
+<div class="ht-section"><span dir="ltr">Aperçu</span> / نظرة عامة</div>
+<?php
+$kpi = function ($icon, $bg, $fg, $val, $fr, $ar) {
+    echo '<div class="home-tile kpi-tile">'
+       . '<span class="ht-ic" style="background:' . $bg . ';color:' . $fg . '"><i class="' . $icon . '"></i></span>'
+       . '<span class="kpi-val">' . $val . '</span>'
+       . '<span class="kpi-lbl">' . $fr . ' / ' . $ar . '</span></div>';
+};
+?>
+<div class="home-tiles" style="margin-bottom:18px">
+    <?php
+    $kpi('fas fa-users', '#e0f2fe', '#0284c7', (int)$stats['total_employees'], 'Total Personnel', 'إجمالي الموظفين');
+    $kpi('fas fa-chalkboard-teacher', '#dcfce7', '#16a34a', (int)$stats['titulaires'], 'Titulaires', 'أساتذة الملاك');
+    $kpi('fas fa-user-clock', '#fef3c7', '#d97706', (int)$stats['contractuels'], 'Contractuels', 'المتعاقدون');
+    $kpi('fas fa-user-tie', '#ede9fe', '#7c3aed', (int)$stats['employes'], 'Employés', 'الموظفون الإداريون');
+    $kpi('fas fa-calendar-alt', '#cffafe', '#0891b2', (activeSchoolYear() === 'all' ? 'كل السنين / Toutes' : e(activeSchoolYear())), 'Année scolaire', 'السنة الدراسية');
+    $kpi('fas fa-coins', '#fef9c3', '#ca8a04', formatLBP($exchangeRate) . ' / $1', 'Taux de change', 'سعر الصرف');
+    $kpi('fas fa-money-bill-wave', '#fce7f3', '#db2777', formatLBP(getSetting('minimum_wage_lbp', 28000000)), 'Salaire min. (Loi)', 'الحد الأدنى للأجور');
+    $kpi('fas fa-wallet', '#d1fae5', '#059669', formatLBP($totalPaid), 'Payé (année)', 'المدفوع بالسنة');
+    ?>
 </div>
 
-<div class="form-row cols-2">
-    <div class="card">
-        <div class="card-header">
-            <h3>
-                <span dir="ltr"><i class="fas fa-info-circle"></i> Informations système</span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9">معلومات النظام</div>
-            </h3>
-        </div>
-        <div class="card-body">
-            <table class="table">
-                <tr>
-                    <td><strong>Année scolaire / السنة الدراسية</strong></td>
-                    <td><?= e(getSetting('current_school_year', currentSchoolYear())) ?></td>
-                </tr>
-                <tr>
-                    <td><strong>Taux de change actuel / سعر الصرف الحالي</strong></td>
-                    <td><?= formatLBP($exchangeRate) ?> / $1</td>
-                </tr>
-                <tr>
-                    <td><strong>Salaire minimum (Loi) / الحد الأدنى للأجور (القانون)</strong></td>
-                    <td><?= formatLBP(getSetting('minimum_wage_lbp', 28000000)) ?></td>
-                </tr>
-                <tr>
-                    <td><strong>Total payé ce mois / إجمالي المدفوع هذا الشهر</strong></td>
-                    <td><strong class="text-success"><?= formatLBP($totalPaid) ?></strong></td>
-                </tr>
-            </table>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h3>
-                <span dir="ltr"><i class="fas fa-bolt"></i> Actions rapides</span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9">إجراءات سريعة</div>
-            </h3>
-        </div>
-        <div class="card-body">
-            <div class="d-flex gap-3" style="flex-direction:column">
-                <?php if (canEdit()): ?>
-                <a href="<?= BASE_URL ?>pages/employees.php?action=new" class="btn btn-primary">
-                    <i class="fas fa-user-plus"></i> Ajouter un employé / إضافة موظف
-                </a>
-                <?php endif; ?>
-                <?php if (viewerCanSeePage('monthly_payroll.php')): ?>
-                <a href="<?= BASE_URL ?>pages/monthly_payroll.php" class="btn btn-gold">
-                    <i class="fas fa-calculator"></i> Calculer la paie mensuelle / حساب الرواتب الشهرية
-                </a>
-                <?php endif; ?>
-                <?php if (viewerCanSeePage('annual_slip.php')): ?>
-                <a href="<?= BASE_URL ?>pages/annual_slip.php" class="btn btn-light">
-                    <i class="fas fa-file-invoice"></i> Voir relevé annuel / كشف سنوي
-                </a>
-                <?php endif; ?>
-                <?php if (canEdit()): ?>
-                <a href="<?= BASE_URL ?>pages/exchange_rates.php" class="btn btn-light">
-                    <i class="fas fa-coins"></i> Gérer les taux de change / أسعار الصرف
-                </a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-</div>
+<?php /* «إجراءات سريعة» أُزيلت من لوحة القيادة — أقسامها موجودة أصلاً ضمن «وصول سريع» (لتوفير المساحة). */ ?>
 
-<div class="card">
-    <div class="card-header">
-        <h3>
-            <span dir="ltr"><i class="fas fa-gavel"></i> Réglementation appliquée</span>
-            <div style="font-size:0.85em;font-weight:600;opacity:0.9">القوانين المطبَّقة</div>
-        </h3>
+<?php if ($home64): ?>
+<details class="reg-details no-print">
+    <summary>
+        <span class="rd-ic" style="background:rgba(217,119,6,.16);color:#d97706"><i class="fas fa-hourglass-half"></i></span>
+        <span dir="ltr">Retraite 64</span> <span style="opacity:.85">/ بلغوا سنّ الـ64 (<?= count($home64) ?>)</span>
+        <i class="fas fa-chevron-down rd-chev"></i>
+    </summary>
+    <div class="rd-body">
+        <?php renderAge64Cards($home64); ?>
     </div>
-    <div class="card-body">
+</details>
+<?php endif; ?>
+
+<details class="reg-details">
+    <summary>
+        <span class="rd-ic" style="background:var(--accent-bg);color:var(--accent)"><i class="fas fa-gavel"></i></span>
+        <span dir="ltr">Réglementation appliquée</span> <span style="opacity:.85">/ القوانين المطبَّقة</span>
+        <i class="fas fa-chevron-down rd-chev"></i>
+    </summary>
+    <div class="rd-body">
         <div class="form-row cols-2">
             <div>
                 <h4 style="color:var(--primary);">
                     <span dir="ltr">Enseignants Titulaires</span>
                     <div style="font-size:0.85em;font-weight:600;opacity:0.9">الأساتذة الملاك</div>
                 </h4>
-                <ul>
+                <ul class="reg-list">
                     <li>Échelle des grades : Loi 2017 (Journal Officiel n°37)</li>
                     <li>CNSS Maladie/Maternité : 3% (employé) + 8% (école)</li>
                     <li>Caisse d'indemnités (EOC) : 6% (employé) + 6% (école)</li>
@@ -269,7 +196,7 @@ $navGroups = [
                     <span dir="ltr">Employés (Code du travail)</span>
                     <div style="font-size:0.85em;font-weight:600;opacity:0.9">الموظفون (قانون العمل)</div>
                 </h4>
-                <ul>
+                <ul class="reg-list">
                     <li>Salaire minimum : <?= formatLBP(getSetting('minimum_wage_lbp', 28000000)) ?> (2025)</li>
                     <li>CNSS Maladie/Maternité : 3% (employé) + 8% (école)</li>
                     <li>Allocations familiales : 6% (école)</li>
@@ -279,6 +206,6 @@ $navGroups = [
             </div>
         </div>
     </div>
-</div>
+</details>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

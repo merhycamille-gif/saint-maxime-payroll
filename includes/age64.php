@@ -72,6 +72,13 @@ function age64List($db, $activeYearOnly = false) {
         }
     } catch (Exception $e) { /* صلاحيات → التحصين أدناه يمنع الكسر */ }
 
+    // شرط العمر: عند اختيار **سنة دراسية محددة** (لوحة القيادة) نعرض **كل** من يبلغ 64 ضمن تلك السنة
+    // بغضّ النظر عن عمره اليوم — يشمل من سيبلغها لاحقاً في نفس السنة (قرار التقاعد مطلوب مسبقاً)
+    // ومن بلغها سابقاً. خلاف ذلك («كل السنين» / الصفحة العامة): من بلغوا 64 فعلاً حتى تاريخه.
+    $selYear = $activeYearOnly ? activeSchoolYear() : 'all';
+    $specificYear = ($selYear !== 'all' && preg_match('/^\d{4}-\d{4}$/', (string)$selYear));
+    $ageCond = $specificYear ? '' : ' AND TIMESTAMPDIFF(YEAR, e.birth_date, CURDATE()) >= 64';
+
     $rows = [];
     try {
         $st = $db->prepare("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
@@ -80,22 +87,20 @@ function age64List($db, $activeYearOnly = false) {
             FROM employees e LEFT JOIN schools sc ON sc.id = e.school_id
             WHERE e.is_deleted = 0 AND e.status = 'actif'
               AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
-              AND e.birth_date IS NOT NULL AND e.birth_date NOT IN ('0000-00-00','1900-01-01')
-              AND TIMESTAMPDIFF(YEAR, e.birth_date, CURDATE()) >= 64" . schoolScopeSql('e.school_id')
+              AND e.birth_date IS NOT NULL AND e.birth_date NOT IN ('0000-00-00','1900-01-01')"
+              . $ageCond . schoolScopeSql('e.school_id')
             . " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
                 COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr)");
         $st->execute();
         $rows = $st->fetchAll();
     } catch (Exception $e) { $rows = []; }
 
-    if ($activeYearOnly) {
-        $ay = activeSchoolYear();
-        if ($ay !== 'all') {   // «كل السنوات» → أظهر الكل بالرئيسية أيضاً
-            $rows = array_values(array_filter($rows, function ($r) use ($ay) {
-                $d64 = age64Date($r['birth_date']);
-                return $d64 && schoolYearOfDate($d64) === $ay;
-            }));
-        }
+    // فلترة دقيقة حسب السنة الدراسية للـ64 (تُطابق تماماً السنة المختارة — تشمل من لم يبلغها بعد ضمن السنة)
+    if ($specificYear) {
+        $rows = array_values(array_filter($rows, function ($r) use ($selYear) {
+            $d64 = age64Date($r['birth_date']);
+            return $d64 && schoolYearOfDate($d64) === $selYear;
+        }));
     }
     return $rows;
 }

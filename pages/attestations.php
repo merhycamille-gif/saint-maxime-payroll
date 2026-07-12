@@ -316,17 +316,18 @@ if (!$emp):
     $employees = $aStmt->fetchAll();
     $attShowSch = isAllSchools(); // في وضع «كل المدارس» نعرض اسم المدرسة جنب كل أستاذ
 ?>
-    <?php if ($employees): ?>
-    <div class="card" style="border:2px solid var(--primary);background:#f0f7ff">
+    <div class="card">
         <div class="card-header"><h3>
-          <span dir="ltr"><i class="fas fa-folder-open"></i> Dossier complet — tout sur l'enseignant en un seul endroit</span>
-          <div style="font-size:0.85em;font-weight:600;opacity:0.9">ملف الأستاذ الكامل — شوف كل شي عن الأستاذ بمكان واحد</div>
+          <span dir="ltr"><i class="fas fa-user-check"></i> Enseignant : dossier complet ou attestation</span>
+          <div style="font-size:0.85em;font-weight:600;opacity:0.9">الأستاذ: الملف الكامل أو إصدار إفادة</div>
         </h3></div>
         <div class="card-body">
-            <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> اختر أستاذ (بتقدر تفتّش عنه حتى لو «كل المدارس» مختارة) وشوف صور مستنداته + ر6 + بطاقة الراتب السنوية + سيرته + كل الإفادات — بدون ما تنتقل من صفحة لصفحة.</p>
+            <?php if (!$employees): ?>
+                <div class="alert alert-info">Aucun employé / لا يوجد موظفون.</div>
+            <?php else: ?>
+            <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> فتّش عن الأستاذ مرّة وحدة (بتقدر تفتّش عنه حتى لو «كل المدارس» مختارة). بعدها إمّا اكبس «الملف الكامل» لتشوف كل شي عنه (مستنداته + ر6 + بطاقة الراتب + سيرته + كل الإفادات)، أو اختَر نوع الإفادة واللغة واكبس «إصدار الإفادة».</p>
             <form method="GET" class="form-row cols-4" style="align-items:end">
-                <input type="hidden" name="dossier" value="1">
-                <div class="form-group" style="grid-column:1/3">
+                <div class="form-group" style="grid-column:1/-1">
                     <label class="form-label">Employé / الأستاذ</label>
                     <select name="employee_id" class="form-select" required>
                         <option value="">— Choisir / اختر —</option>
@@ -336,35 +337,8 @@ if (!$emp):
                     </select>
                 </div>
                 <div class="form-group">
-                    <button class="btn btn-primary w-100"><i class="fas fa-folder-open"></i> Voir le dossier complet / عرض الملف الكامل</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    <?php endif; ?>
-
-    <div class="card">
-        <div class="card-header"><h3>
-          <span dir="ltr"><i class="fas fa-file-signature"></i> Générer une attestation</span>
-          <div style="font-size:0.85em;font-weight:600;opacity:0.9">إصدار إفادة</div>
-        </h3></div>
-        <div class="card-body">
-            <?php if (!$employees): ?>
-                <div class="alert alert-info">Aucun employé / لا يوجد موظفون.</div>
-            <?php else: ?>
-            <form method="GET" class="form-row cols-4">
-                <div class="form-group">
-                    <label class="form-label">Employé / الموظف</label>
-                    <select name="employee_id" class="form-select" required>
-                        <option value="">— Choisir / اختر —</option>
-                        <?php foreach ($employees as $em): $pfx = $attShowSch ? (schoolNameById($em['school_id']).' — ') : ''; ?>
-                        <option value="<?= $em['id'] ?>"><?= e($pfx.$em['employee_code'].' — '.$em['first_name_fr'].' '.$em['last_name_fr']) ?> / <?= e($em['first_name_ar'].' '.$em['last_name_ar']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group">
                     <label class="form-label">Type / نوع الإفادة</label>
-                    <select name="type" class="form-select" required>
+                    <select name="type" class="form-select">
                         <?php foreach ($ATT_TYPES as $k => $lbl): ?>
                         <option value="<?= $k ?>"><?= e($lbl['fr']) ?> / <?= e($lbl['ar']) ?></option>
                         <?php endforeach; ?>
@@ -382,8 +356,9 @@ if (!$emp):
                     <label class="form-label">Date (استقالة/صرف/براءة)</label>
                     <input type="date" name="date" class="form-control" value="<?= e($effDate) ?>">
                 </div>
-                <div class="form-group" style="grid-column:1/-1">
-                    <button class="btn btn-primary"><i class="fas fa-file-export"></i> Générer / إصدار</button>
+                <div class="form-group" style="grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap">
+                    <button class="btn btn-primary"><i class="fas fa-file-export"></i> Générer l'attestation / إصدار الإفادة</button>
+                    <button name="dossier" value="1" class="btn btn-info"><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل</button>
                 </div>
             </form>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> كل إفادة تصدر بلغة واحدة مستقلة ومرتّبة. تقدر تبدّل اللغة من الوثيقة وتطبع/تصدّر كل لغة لحالها. حقل التاريخ للاستقالة والصرف وبراءة الذمة.</p>

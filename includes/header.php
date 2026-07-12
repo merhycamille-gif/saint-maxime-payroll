@@ -6,6 +6,26 @@ requireLogin();
 $currentPage = $currentPage ?? '';
 $pageTitle = $pageTitle ?? 'MSA Payroll';
 $lang = $_SESSION['lang'] ?? 'fr';
+
+// 🎨 لون + أيقونة مميّزة لكل قسم من البرنامج (تُطبَّق على العنوان وبادجات رؤوس البطاقات)
+$sectionColors = [
+    'dashboard' => ['#0891b2', 'rgba(8,145,178,.16)'],   // لوحة القيادة — تركوازي
+    'personnel' => ['#0284c7', 'rgba(2,132,199,.16)'],   // الموظفون — أزرق
+    'paie'      => ['#16a34a', 'rgba(22,163,74,.16)'],   // الرواتب — أخضر
+    'rapports'  => ['#7c3aed', 'rgba(124,58,237,.16)'],  // التقارير — بنفسجي
+    'systeme'   => ['#d97706', 'rgba(217,119,6,.16)'],   // النظام — برتقالي
+];
+$sectionIcons = ['dashboard'=>'fa-gauge-high','personnel'=>'fa-users','paie'=>'fa-money-check-dollar','rapports'=>'fa-chart-column','systeme'=>'fa-gear'];
+$pageSection = [
+    'dashboard'=>'dashboard',
+    'employees'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','law_check'=>'personnel',
+    'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie',
+    'reports'=>'rapports','tax'=>'rapports',
+    'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme',
+];
+$sec = $pageSection[$currentPage] ?? 'dashboard';
+[$accentColor, $accentBg] = $sectionColors[$sec];
+$secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
 ?>
 <!DOCTYPE html>
 <html lang="<?= $lang === 'ar' ? 'ar' : 'fr' ?>" dir="<?= $lang === 'ar' ? 'rtl' : 'ltr' ?>">
@@ -229,7 +249,7 @@ document.addEventListener('submit', function (e) {
                 <button type="button" class="btn btn-light no-print" title="رجوع / Retour"
                         onclick="if(document.referrer&&history.length>1){history.back()}else{location.href='<?= BASE_URL ?>index.php'}"
                         style="white-space:nowrap">
-                    <i class="fas fa-arrow-right"></i> Retour / رجوع
+                    <i class="fas fa-arrow-right" style="color:#16a34a"></i> Retour / رجوع
                 </button>
                 <?php endif; ?>
                 <?php
@@ -239,12 +259,21 @@ document.addEventListener('submit', function (e) {
                 $ptFr = []; $ptAr = [];
                 foreach ($ptParts as $ptp) { if ($ptp === '') continue; if (preg_match('/\p{Arabic}/u', $ptp)) $ptAr[] = $ptp; else $ptFr[] = $ptp; }
                 ?>
-                <h1 style="line-height:1.15">
-                    <?php if ($ptFr): ?><span dir="ltr"><?= e(implode(' / ', $ptFr)) ?></span><?php endif; ?>
-                    <?php if ($ptAr): ?><span style="display:block;font-size:0.62em;font-weight:600;opacity:0.92"><?= e(implode(' / ', $ptAr)) ?></span><?php endif; ?>
-                </h1>
+                <div style="display:flex;align-items:center;gap:12px">
+                    <span style="width:44px;height:44px;min-width:44px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:<?= $accentColor ?>;color:#fff"><i class="fas <?= $secIcon ?>" style="font-size:20px"></i></span>
+                    <h1 style="line-height:1.15;margin:0">
+                        <?php if ($ptFr): ?><span dir="ltr"><?= e(implode(' / ', $ptFr)) ?></span><?php endif; ?>
+                        <?php if ($ptAr): ?><span style="display:block;font-size:0.62em;font-weight:600;opacity:0.92"><?= e(implode(' / ', $ptAr)) ?></span><?php endif; ?>
+                    </h1>
+                </div>
             </div>
             <div class="topbar-actions">
+                <?php if (viewerCanSeePage('attestations.php')): ?>
+                <a href="<?= BASE_URL ?>pages/attestations.php?dossier=1" class="topbar-dossier no-print" title="ملف الأستاذ الكامل / Dossier complet de l'enseignant">
+                    <span class="td-ic"><i class="fas fa-folder-open"></i></span>
+                    <span class="td-txt"><span dir="ltr">Dossier</span><span>ملف الأستاذ الكامل</span></span>
+                </a>
+                <?php endif; ?>
                 <?php
                 // مبدّل المدارس: للمدير العام (كل المدارس)، ولحساب المدرسة متعدّد المدارس (ضمن مدارسه فقط)
                 $isMultiViewer = isViewer() && count(viewerAllowedSchoolIds()) > 1;
@@ -258,7 +287,7 @@ document.addEventListener('submit', function (e) {
                               : (count($activeIds)===1 ? schoolNameById($activeIds[0]) : count($activeIds).' écoles / مدارس');
                 ?>
                 <div class="school-switcher school-multi" id="schoolPicker">
-                    <i class="fas fa-school"></i>
+                    <i class="fas fa-school" style="color:#fff;background:#0891b2;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
                     <button type="button" class="sm-btn" onclick="document.getElementById('schoolMenu').classList.toggle('open')">
                         <?= e($selLabel) ?> <i class="fas fa-caret-down"></i>
                     </button>
@@ -277,7 +306,7 @@ document.addEventListener('submit', function (e) {
                 <?php endif; ?>
 
                 <form method="get" action="<?= BASE_URL ?>switch_year.php" class="school-switcher" title="<?= $lang === 'ar' ? 'السنة الدراسية' : 'Année scolaire' ?>">
-                    <i class="fas fa-calendar-alt"></i>
+                    <i class="fas fa-calendar-alt" style="color:#fff;background:#d97706;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
                     <select name="school_year" onchange="this.form.submit()" class="form-control form-control-sm">
                         <?php
                         $aSY = activeSchoolYear();
@@ -291,7 +320,7 @@ document.addEventListener('submit', function (e) {
                 </form>
 
                 <a href="<?= BASE_URL ?>switch_lang.php?lang=<?= $lang === 'ar' ? 'fr' : 'ar' ?>" class="btn btn-light btn-sm">
-                    <i class="fas fa-globe"></i>
+                    <i class="fas fa-globe" style="color:#fff;background:#0284c7;width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
                     <?= $lang === 'ar' ? 'Français' : 'العربية' ?>
                 </a>
                 
@@ -303,12 +332,11 @@ document.addEventListener('submit', function (e) {
                 </div>
                 
                 <a href="<?= BASE_URL ?>logout.php" class="btn btn-light btn-sm" title="Déconnexion / تسجيل الخروج">
-                    <i class="fas fa-sign-out-alt"></i>
+                    <i class="fas fa-sign-out-alt" style="color:#dc2626"></i>
                 </a>
             </div>
         </header>
-        
-        <div class="page-content" id="pageContent">
+        <div class="page-content" id="pageContent" style="--accent: <?= $accentColor ?>; --accent-bg: <?= $accentBg ?>;">
         <?php
         // رسائل التنبيه (flash)
         foreach (['flash_success' => 'success', 'flash_error' => 'danger', 'flash_info' => 'info'] as $fk => $cls):
