@@ -210,7 +210,7 @@ if (in_array($form, $imageForms)) {
     // قيم مشتركة
     $natAr = ($emp && $emp['nationality'] === 'lebanese') ? 'لبنانية' : ($emp['nationality'] ?? '');
     $sal = $emp ? ofLatestSalary($db, $emp['id']) : null;
-    $salary = $sal ? (int)($sal['base_plus_echelon_lbp'] + $sal['extra_lbp'] + $sal['prime_fixe_lbp']) : 0;
+    $salary = $sal ? composedSalaryLbp($sal) : 0; // الراتب المركّب (يتبع «الراتب يشمل»)
     $data = [];
 
     if ($emp) {
@@ -813,7 +813,8 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">رقمه المالي:</span> <?= fillVal($emp['finance_ministry_number']) ?></div>
         <div><span class="k">الأجر الإضافي:</span> <strong><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
         <div><span class="k">مكافأة ومساعدة:</span> <strong><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
-        <div class="full"><span class="k">الراتب الشهري (سلسلة):</span> <strong><?= formatLBP($salary) ?></strong></div>
+        <div class="full"><span class="k">الراتب الشهري (سلسلة):</span> <strong><?= money($sal ? (int)$sal['base_plus_echelon_lbp'] : (int)$salary, $sal ? rowRate($sal) : null) ?></strong></div>
+        <div class="full" style="background:#eef2ff;padding:4px 8px;border-radius:6px"><span class="k">الراتب المركّب (<?= e(salaryCompLabel()) ?>):</span> <strong><?= $sal ? money(composedSalaryLbp($sal), rowRate($sal)) : formatLBP($salary) ?></strong></div>
     </div>
     <div class="sign-row"><?= signatureBox('توقيع المدير وخاتم المدرسة', $school['ville'] ?? '', formatDate(date('Y-m-d'))) ?></div>
 </div>
@@ -958,7 +959,7 @@ elseif ($form === 'teacher_card'):
                 <th rowspan="2">عدد ساعات التعليم</th>
                 <th rowspan="2">أساس الراتب</th>
                 <th rowspan="2">الأجر الإضافي</th><th rowspan="2">مكافأة ومساعدة</th><th rowspan="2">تعويض النقل</th>
-                <th rowspan="2">الراتب (ل.ل)</th>
+                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
                 <?php if (!$isMlk): ?><th rowspan="2">تعاقد رسمي</th><?php endif; ?>
                 <th rowspan="2">التوقيع</th>
             </tr>
@@ -999,7 +1000,7 @@ elseif ($form === 'teacher_card'):
                 <td class="num"><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td>
                 <td class="num"><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td>
                 <td class="num"><?= money($sal ? (int)$sal['transport_lbp'] : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td>
-                <td class="num"><?= formatLBP($rsal,false) ?></td>
+                <td class="num" style="background:#eef2ff"><strong><?= $sal ? money(composedSalaryLbp($sal), rowRate($sal), ['withCur'=>false]) : formatLBP($rsal,false) ?></strong></td>
                 <?php if (!$isMlk): ?><td class="num"><?= $contract>0?formatLBP($contract,false):'' ?></td><?php endif; ?>
                 <td>&nbsp;</td>
             </tr>
@@ -1029,9 +1030,10 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">تاريخ الدخول في الملاك:</span> <?= fillVal(formatDate($emp['titularization_date'])) ?></div>
         <div><span class="k">الدرجة الحالية:</span> <?= fillVal(rtrim(rtrim((string)$emp['current_grade'],'0'),'.')) ?></div>
         <div><span class="k">عدد ساعات التعليم:</span> <?= fillVal(rtrim(rtrim((string)$emp['hours_per_week'],'0'),'.')) ?></div>
-        <div><span class="k">الراتب الأساسي (سلسلة):</span> <strong><?= formatLBP($base) ?></strong></div>
+        <div><span class="k">الراتب الأساسي (سلسلة):</span> <strong><?= money($sal ? (int)$sal['base_plus_echelon_lbp'] : (int)$base, $sal ? rowRate($sal) : null) ?></strong></div>
         <div><span class="k">الأجر الإضافي:</span> <strong><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
         <div><span class="k">مكافأة ومساعدة:</span> <strong><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
+        <div style="background:#eef2ff;padding:4px 8px;border-radius:6px"><span class="k">الراتب المركّب (<?= e(salaryCompLabel()) ?>):</span> <strong><?= $sal ? money(composedSalaryLbp($sal), rowRate($sal)) : formatLBP($base) ?></strong></div>
         <div><span class="k">اشتراك الصندوق (٦٪):</span> <strong><?= formatLBP($eoc) ?></strong></div>
         <?php if ($eocGradeCard > 0): ?><div><span class="k">درجة / نصف راتب (آخر حسم):</span> <strong><?= formatLBP($eocGradeCard) ?></strong></div><?php endif; ?>
     </div>
@@ -2170,9 +2172,10 @@ elseif ($form === 'payment_list'):
     $st->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $st->fetchAll();
     $catLabel = ['enseignant_titulaire'=>'الملاك','enseignant_contractuel'=>'المتعاقدين','employe'=>'الموظفين'];
-    $fmt = fn($v) => (int)$v ? formatLBP((int)$v, false) : '0';
+    $sdRate = getExchangeRate($month, $year); // سعر صرف الشهر (كل الصفوف بنفس الشهر)
+    $fmt = fn($v) => (int)$v ? money((int)$v, $sdRate, ['withCur'=>false]) : '0';
     // مفاتيح الأعمدة الرقمية القابلة للجمع
-    $keys = ['base','ech','bpe','cola','bonus','half','caisse','gross','txb','tax','cnss','ret','net','fam','trans','due'];
+    $keys = ['base','ech','bpe','cola','bonus','composed','half','caisse','gross','txb','tax','cnss','ret','net','fam','trans','due'];
     $zero = array_fill_keys($keys, 0);
     // استخراج قيم صفّ واحد
     $rowVals = function($r) {
@@ -2181,6 +2184,7 @@ elseif ($form === 'payment_list'):
             'base'=>(int)$r['base_salary_lbp'], 'ech'=>(int)$r['echelon_value_lbp'], 'bpe'=>(int)$r['base_plus_echelon_lbp'],
             // عمودان منفصلان: «الأجر الإضافي» = prime_fixe (+extra)، «مكافأة ومساعدة» = aide_complementaire (موحّد مع كشف الضمان الاسمي)
             'cola'=>(int)$r['extra_lbp']+(int)$r['prime_fixe_lbp'], 'bonus'=>(int)$r['aide_complementaire_lbp'],
+            'composed'=>composedSalaryLbp($r),
             'half'=>(int)$r['eoc_grade_lbp'], 'caisse'=>(int)$r['caisse_amount_lbp'], 'gross'=>$gross,
             'txb'=>(int)$r['taxable_base_lbp'], 'tax'=>(int)$r['income_tax_lbp'], 'cnss'=>(int)$r['cnss_amount_lbp'],
             'ret'=>(int)$r['total_retenues_lbp'], 'net'=>(int)$r['net_salary_lbp'], 'fam'=>(int)$r['family_allowance_lbp'],
@@ -2217,6 +2221,7 @@ elseif ($form === 'payment_list'):
                 <th rowspan="2">الراتب بعد الدرج</th>
                 <th rowspan="2">الأجر الإضافي</th>
                 <th rowspan="2">مكافأة ومساعدة</th>
+                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
                 <th colspan="6">المحسومات القانونية</th>
                 <th rowspan="2">الصافي</th>
                 <th rowspan="2">تعويض عائلي</th>
@@ -2245,6 +2250,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($v['bpe']) ?></td>
                 <td class="num"><?= $fmt($v['cola']) ?></td>
                 <td class="num"><?= $fmt($v['bonus']) ?></td>
+                <td class="num" style="background:#eef2ff"><strong><?= $fmt($v['composed']) ?></strong></td>
                 <td class="num"><?= $fmt($v['half']) ?></td>
                 <td class="num"><?= $fmt($v['caisse']) ?></td>
                 <td class="num"><?= $fmt($v['gross']) ?></td>
@@ -2264,7 +2270,7 @@ elseif ($form === 'payment_list'):
                 <td></td><td style="text-align:right"><?= e($label) ?></td>
                 <td class="num"><?= $fmt($a['base']) ?></td><td class="num"><?= $fmt($a['ech']) ?></td>
                 <td class="num"><?= $fmt($a['bpe']) ?></td><td class="num"><?= $fmt($a['cola']) ?></td>
-                <td class="num"><?= $fmt($a['bonus']) ?></td><td class="num"><?= $fmt($a['half']) ?></td>
+                <td class="num"><?= $fmt($a['bonus']) ?></td><td class="num" style="background:#eef2ff"><strong><?= $fmt($a['composed']) ?></strong></td><td class="num"><?= $fmt($a['half']) ?></td>
                 <td class="num"><?= $fmt($a['caisse']) ?></td><td class="num"><?= $fmt($a['gross']) ?></td>
                 <td class="num"><?= $fmt($a['txb']) ?></td><td class="num"><?= $fmt($a['tax']) ?></td>
                 <td class="num"><?= $fmt($a['cnss']) ?></td><td class="num"><?= $fmt($a['ret']) ?></td>
@@ -2278,7 +2284,7 @@ elseif ($form === 'payment_list'):
             if ($cat !== $curCat):
                 if ($curCat !== null) $drawTotal('المجموع', $sub);
                 $sub = $zero; $curCat = $cat;
-                ?><tr><td colspan="18" style="text-align:right;font-weight:700;background:#eef2ff"><?= e($catLabel[$cat] ?? $cat) ?></td></tr><?php
+                ?><tr><td colspan="19" style="text-align:right;font-weight:700;background:#eef2ff"><?= e($catLabel[$cat] ?? $cat) ?></td></tr><?php
             endif;
             $v = $rowVals($r);
             foreach ($keys as $k) { $sub[$k]+=$v[$k]; $grand[$k]+=$v[$k]; }
@@ -2286,7 +2292,7 @@ elseif ($form === 'payment_list'):
             $drawRow(++$n, $name, $v);
         endforeach;
         if ($curCat !== null) $drawTotal('المجموع', $sub);
-        if (!$rows): ?><tr><td colspan="18" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif;
+        if (!$rows): ?><tr><td colspan="19" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif;
         ?>
         </tbody>
         <?php if ($rows): ?>
