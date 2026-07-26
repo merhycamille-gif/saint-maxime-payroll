@@ -42,7 +42,7 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <!-- App CSS -->
-    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app.css') ?: '1' ?>">
 </head>
 <body class="<?= $lang === 'ar' ? 'rtl' : '' ?>">
 
