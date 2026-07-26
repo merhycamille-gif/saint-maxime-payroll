@@ -45,11 +45,13 @@ function aideCompLbp(array $r): int {
 function extraAideHeads(): string {
     return '<th>الأجر الإضافي</th><th>مكافأة ومساعدة</th>';
 }
-/** خليّتا العمودين لصف الجسم. $num=true يضيف class="num" (للنماذج الرسمية ذات الأرقام يساراً). */
+/** خليّتا العمودين لصف الجسم. $num=true يضيف class="num" (للنماذج الرسمية ذات الأرقام يساراً).
+ *  تعرض العملة حسب وضع المستخدم (ليرة/دولار/الاثنين) عبر money() بسعر صرف شهر الصف. */
 function extraAideCells(array $r, bool $num = true): string {
     $cls = $num ? ' class="num"' : '';
-    return '<td' . $cls . '>' . formatLBP(extraWageLbp($r), false) . '</td>'
-         . '<td' . $cls . '>' . formatLBP(aideCompLbp($r), false) . '</td>';
+    $rate = rowRate($r);
+    return '<td' . $cls . '>' . money(extraWageLbp($r), $rate, ['withCur' => false]) . '</td>'
+         . '<td' . $cls . '>' . money(aideCompLbp($r), $rate, ['withCur' => false]) . '</td>';
 }
 /**
  * الأجر الخاضع للضمان/نهاية الخدمة حسب **خيار خضوع الأستاذ** (الزرّ الأخضر بملف الأستاذ):
@@ -326,6 +328,8 @@ function officialFormStyles(): string {
 .doc-table tfoot td,.doc-table .total-row td{background:#fef9c3;font-weight:700;}
 .doc-table .num{text-align:left;font-variant-numeric:tabular-nums;}
 .doc-table tbody tr:nth-child(even){background:#f8fafc;}
+.money-usd{display:block;font-size:.8em;color:#047857;font-weight:600;line-height:1.2;}
+.money-usd-inline{color:#047857;font-weight:600;white-space:nowrap;}
 
 /* شبكة معلومات — كل خانة على سطر مسطّر متل النموذج الأصلي */
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px 30px;margin:12px 0;font-size:13px;}

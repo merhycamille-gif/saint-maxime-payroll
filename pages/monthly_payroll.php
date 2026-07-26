@@ -66,8 +66,8 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= formatLBP($salary['base_salary_lbp']) ?></td></tr>
                         <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
                         <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr><?php endif; ?>
-                        <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= formatLBP((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp']) ?></td></tr>
-                        <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= formatLBP((int)$salary['aide_complementaire_lbp']) ?></td></tr>
+                        <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= money((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
                     </table>
                     <table class="table">
                         <tr><th colspan="2" style="background:#ffe3e3;color:#000">RETENUES / المحسومات</th></tr>
@@ -86,7 +86,7 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                         <td class="text-end text-muted"><?= formatUSD($salary['net_salary_usd']) ?></td>
                     </tr>
                     <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= formatLBP($salary['family_allowance_lbp']) ?></td><td></td></tr>
-                    <tr><td>Transport</td><td class="text-end text-success">+<?= formatLBP($salary['transport_lbp']) ?></td><td></td></tr>
+                    <tr><td>Transport</td><td class="text-end text-success">+<?= money($salary['transport_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr style="background:#fff3cd;color:#000">
                         <td style="font-size:18px"><strong>💰 TOTAL DÛ</strong></td>
                         <td class="text-end" style="font-size:18px"><strong><?= formatLBP($salary['total_due_lbp']) ?></strong></td>
@@ -341,10 +341,10 @@ include __DIR__ . '/../includes/header.php';
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= formatLBP($salary['base_salary_lbp']) ?></td></tr>
                         <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
                         <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr><?php endif; ?>
-                        <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= formatLBP((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp']) ?></td></tr>
-                        <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= formatLBP((int)$salary['aide_complementaire_lbp']) ?></td></tr>
+                        <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= money((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
                     </table>
-                    
+
                     <table class="table">
                         <tr><th colspan="2" style="background:#ffe3e3;color:#000">RETENUES / المحسومات</th></tr>
                         <?php if (!$isAdminEmp): ?><tr><td>Caisse EOC (6%)</td><td class="text-end text-danger">-<?= formatLBP($salary['caisse_amount_lbp']) ?></td></tr><?php endif; ?>
@@ -363,7 +363,7 @@ include __DIR__ . '/../includes/header.php';
                         <td class="text-end text-muted"><?= formatUSD($salary['net_salary_usd']) ?></td>
                     </tr>
                     <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= formatLBP($salary['family_allowance_lbp']) ?></td><td></td></tr>
-                    <tr><td>Transport</td><td class="text-end text-success">+<?= formatLBP($salary['transport_lbp']) ?></td><td></td></tr>
+                    <tr><td>Transport</td><td class="text-end text-success">+<?= money($salary['transport_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr style="background:#fff3cd;color:#000">
                         <td style="font-size:18px"><strong>💰 TOTAL DÛ</strong></td>
                         <td class="text-end" style="font-size:18px"><strong><?= formatLBP($salary['total_due_lbp']) ?></strong></td>

@@ -475,12 +475,24 @@ if (!$emp):
     $incAide  = $optsSet ? !empty($_GET['inc_aide'])  : true;
     $salShown = (int)$basePlusEch + ($incExtra ? $extraW : 0) + ($incAide ? $aideW : 0);
     // العملة: ليرة (افتراضي) أو دولار — التحويل عبر سعر صرف شهر الراتب
-    $cur = (($_GET['cur'] ?? 'lbp') === 'usd') ? 'usd' : 'lbp';
+    // العملة: تتبع الوضع العام (ليرة/دولار/الاثنين) ما لم يُحدَّد يدوياً لهذه الإفادة عبر ?cur=
+    $cur = $_GET['cur'] ?? displayCurrency();
+    if (!in_array($cur, ['lbp', 'usd', 'both'], true)) $cur = 'lbp';
     $fxRate = $sal ? getExchangeRate((int)$sal['month'], (int)$sal['year']) : getExchangeRate();
-    $money   = function ($lbp) use ($cur, $fxRate) { return $cur === 'usd' ? formatUSD($fxRate > 0 ? $lbp / $fxRate : 0) : formatLBP($lbp); };
-    $moneyAr = function ($lbp) use ($cur, $fxRate) { return $cur === 'usd' ? formatUSD($fxRate > 0 ? $lbp / $fxRate : 0) : (formatLBP($lbp, false) . ' ل.ل'); };
-    $moneyWords = function ($lbp) use ($cur, $fxRate) {
-        if ($cur === 'usd') return numToArabicWords((int)round($fxRate > 0 ? $lbp / $fxRate : 0)) . ' دولار أميركي';
+    $usdOf   = function ($lbp) use ($fxRate) { return $fxRate > 0 ? $lbp / $fxRate : 0; };
+    $money   = function ($lbp) use ($cur, $usdOf) {
+        if ($cur === 'usd') return formatUSD($usdOf($lbp));
+        if ($cur === 'both') return formatLBP($lbp) . ' (' . formatUSD($usdOf($lbp)) . ')';
+        return formatLBP($lbp);
+    };
+    $moneyAr = function ($lbp) use ($cur, $usdOf) {
+        if ($cur === 'usd') return formatUSD($usdOf($lbp));
+        if ($cur === 'both') return formatLBP($lbp, false) . ' ل.ل (' . formatUSD($usdOf($lbp)) . ')';
+        return formatLBP($lbp, false) . ' ل.ل';
+    };
+    $moneyWords = function ($lbp) use ($cur, $usdOf) {
+        if ($cur === 'usd') return numToArabicWords((int)round($usdOf($lbp))) . ' دولار أميركي';
+        // «الاثنين»: تُعتمد الليرة بالحروف (المبلغ القانوني)، والدولار يظهر رقماً في المتن
         return numToArabicWords((int)round($lbp)) . ' ليرة لبنانية';
     };
     // مبلغ حرّ يكتبه المستخدم (تعويض الصرف المحسوب) — يُعرَض كما هو بالعملة المختارة بلا تحويل
@@ -507,12 +519,15 @@ if (!$emp):
         ? "width:794px;min-height:1123px;margin:0 auto;background:url('" . htmlspecialchars($lhUrl, ENT_QUOTES) . "') no-repeat;background-size:794px 1123px;padding:195px 95px 150px;box-sizing:border-box"
         : "max-width:820px;margin:0 auto;padding:28px 32px";
     $lhClass = $lhOn ? '' : 'card';
-    $freeNum   = function ($v) use ($cur) { return $cur === 'usd' ? ('$' . number_format($v, 2)) : (formatLBP($v, false) . ' ل.ل'); };
+    $freeNum   = function ($v) use ($cur) {
+        if ($cur === 'usd') return '$' . number_format($v, 2);
+        return formatLBP($v, false) . ' ل.ل';
+    };
     $freeWords = function ($v) use ($cur) { return numToArabicWords((int)round($v)) . ($cur === 'usd' ? ' دولار أميركي' : ' ليرة لبنانية'); };
     $L=$money($salShown); $N=$money($net); $U='';
     $nssf=cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']);
     $rtl = ($docLang === 'ar');
-    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($cur==='usd'?'&cur=usd':'').($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($sigIdx>0?'&sig='.$sigIdx:'');
+    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($sigIdx>0?'&sig='.$sigIdx:'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع لملف الأستاذ / Dossier</a>
@@ -560,7 +575,8 @@ if (!$emp):
             <?php if ($hasCurrency): ?>
             <strong>Devise / العملة:</strong>
             <label style="margin:0 10px;cursor:pointer"><input type="radio" name="cur" value="lbp" <?= $cur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> Livre (LBP) / ليرة (ل.ل)</label>
-            <label style="cursor:pointer"><input type="radio" name="cur" value="usd" <?= $cur==='usd'?'checked':'' ?> onchange="this.form.submit()"> Dollar / دولار ($)</label>
+            <label style="margin:0 10px;cursor:pointer"><input type="radio" name="cur" value="usd" <?= $cur==='usd'?'checked':'' ?> onchange="this.form.submit()"> Dollar / دولار ($)</label>
+            <label style="cursor:pointer"><input type="radio" name="cur" value="both" <?= $cur==='both'?'checked':'' ?> onchange="this.form.submit()"> Les deux / الاثنين (ل.ل + $)</label>
             <?php endif; ?>
             <?php if ($type === 'isqat_haq'): ?>
             <span style="margin:0 16px;color:#cbd5e1">|</span>

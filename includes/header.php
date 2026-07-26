@@ -319,6 +319,16 @@ document.addEventListener('submit', function (e) {
                     </select>
                 </form>
 
+                <form method="get" action="<?= BASE_URL ?>switch_currency.php" class="school-switcher" title="<?= $lang === 'ar' ? 'عرض المبالغ' : 'Affichage des montants' ?>">
+                    <i class="fas fa-money-bill-wave" style="color:#fff;background:#059669;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
+                    <?php $dispCur = displayCurrency(); ?>
+                    <select name="currency" onchange="this.form.submit()" class="form-control form-control-sm">
+                        <option value="both" <?= $dispCur === 'both' ? 'selected' : '' ?>>💱 <?= $lang === 'ar' ? 'ليرة + دولار' : 'L.L + $' ?></option>
+                        <option value="lbp" <?= $dispCur === 'lbp' ? 'selected' : '' ?>>🇱🇧 <?= $lang === 'ar' ? 'ليرة فقط' : 'L.L seul' ?></option>
+                        <option value="usd" <?= $dispCur === 'usd' ? 'selected' : '' ?>>💵 <?= $lang === 'ar' ? 'دولار فقط' : '$ seul' ?></option>
+                    </select>
+                </form>
+
                 <a href="<?= BASE_URL ?>switch_lang.php?lang=<?= $lang === 'ar' ? 'fr' : 'ar' ?>" class="btn btn-light btn-sm">
                     <i class="fas fa-globe" style="color:#fff;background:#0284c7;width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
                     <?= $lang === 'ar' ? 'Français' : 'العربية' ?>

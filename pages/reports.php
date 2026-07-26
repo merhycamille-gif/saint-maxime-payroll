@@ -15,6 +15,7 @@ $db = getDB();
 $report = $_GET['report'] ?? '';
 $month = (int)($_GET['month'] ?? date('n'));
 $year = (int)($_GET['year'] ?? date('Y'));
+$repRate = getExchangeRate($month, $year); // سعر صرف الشهر (لعرض البنود بالدولار — التقارير الشهرية بشهر واحد)
 $schoolYear = $_GET['school_year'] ?? activeSchoolYear();
 if ($schoolYear === 'all') $schoolYear = currentSchoolYear(); // تقارير السنة تحتاج سنة محددة
 
@@ -261,17 +262,25 @@ function reportDocThumb($path) {
                     <tbody>
                         <?php
                         $colspanLbl = $multi ? 5 : 4;
-                        $zeroT = ['base'=>0,'ech'=>0,'bpe'=>0,'extra'=>0,'aide'=>0,'cnss'=>0,'caisse'=>0,'tax'=>0,'net'=>0,'family'=>0,'trans'=>0,'total'=>0];
+                        $zeroT = ['base'=>0,'ech'=>0,'bpe'=>0,'extra'=>0,'aide'=>0,'cnss'=>0,'caisse'=>0,'tax'=>0,'net'=>0,'family'=>0,'trans'=>0,'total'=>0,
+                                  'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0];
+                        // عرض مبلغ بند بالعملتين انطلاقاً من مجموعَي الليرة والدولار المتراكمَين (لصفوف المجاميع)
+                        $dualTot = function($lbp, $usd) {
+                            $m = displayCurrency();
+                            if ($m === 'lbp') return formatLBP($lbp);
+                            if ($m === 'usd') return formatUSD($usd);
+                            return formatLBP($lbp) . '<span class="money-usd">' . formatUSD($usd) . '</span>';
+                        };
                         // صفّ مجاميع (فرعي لكل فئة أو إجمالي عام) بنفس ترتيب الأعمدة
-                        $sumRow = function($label, $t, $isGrand) use ($colspanLbl) {
+                        $sumRow = function($label, $t, $isGrand) use ($colspanLbl, $dualTot) {
                             $bg = $isGrand ? '' : 'background:#e0e7ff;';
                             ob_start(); ?>
                             <tr class="<?= $isGrand ? 'total-row' : 'subtotal-row' ?>" style="<?= $bg ?>font-weight:700">
                                 <td colspan="<?= $colspanLbl ?>" style="text-align:right"><?= $label ?></td>
                                 <td><?= formatLBP($t['base']) ?></td><td><?= formatLBP($t['ech']) ?></td><td><?= formatLBP($t['bpe']) ?></td>
-                                <td><?= formatLBP($t['extra']) ?></td><td><?= formatLBP($t['aide']) ?></td>
+                                <td><?= $dualTot($t['extra'], $t['extra_usd']) ?></td><td><?= $dualTot($t['aide'], $t['aide_usd']) ?></td>
                                 <td><?= formatLBP($t['cnss']) ?></td><td><?= formatLBP($t['caisse']) ?></td><td><?= formatLBP($t['tax']) ?></td>
-                                <td><?= formatLBP($t['net']) ?></td><td><?= formatLBP($t['family']) ?></td><td><?= formatLBP($t['trans']) ?></td>
+                                <td><?= formatLBP($t['net']) ?></td><td><?= formatLBP($t['family']) ?></td><td><?= $dualTot($t['trans'], $t['trans_usd']) ?></td>
                                 <td><strong><?= formatLBP($t['total']) ?></strong></td>
                             </tr>
                         <?php return ob_get_clean(); };
@@ -280,10 +289,12 @@ function reportDocThumb($path) {
                             $cat = $r['employee_type'];
                             if ($curCat !== null && $cat !== $curCat) { echo $sumRow('مجموع '.empCategoryTitle($curCat).' — العدد: '.$catN, $catTot, false); $catTot=$zeroT; $catN=0; }
                             $rTrans = (int)$r['transport_lbp']; // من ملف الأستاذ — transport_lbp = transport_complement_lbp فلا تجمعهما (دوبل)
+                            $rRate = rowRate($r);
                             $v = ['base'=>(int)$r['base_salary_lbp'],'ech'=>(int)$r['echelon_value_lbp'],'bpe'=>(int)$r['base_plus_echelon_lbp'],
                                   'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'cnss'=>(int)$r['cnss_amount_lbp'],'caisse'=>(int)$r['caisse_amount_lbp'],
                                   'tax'=>(int)$r['income_tax_lbp'],'net'=>(int)$r['net_salary_lbp'],'family'=>(int)$r['family_allowance_lbp'],
-                                  'trans'=>$rTrans,'total'=>(int)$r['total_due_lbp']];
+                                  'trans'=>$rTrans,'total'=>(int)$r['total_due_lbp'],
+                                  'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd($rTrans,$rRate)];
                             foreach ($v as $k=>$val) { $catTot[$k]+=$val; $totals[$k]+=$val; }
                             $catN++;
                             echo categoryHeaderRow($curCat, $cat, $multi?17:16);
@@ -297,14 +308,14 @@ function reportDocThumb($path) {
                                 <td><?= formatLBP($r['base_salary_lbp']) ?></td>
                                 <td><?= formatLBP($r['echelon_value_lbp']) ?></td>
                                 <td><?= formatLBP($r['base_plus_echelon_lbp']) ?></td>
-                                <td><?= formatLBP(extraWageLbp($r)) ?></td>
-                                <td><?= formatLBP(aideCompLbp($r)) ?></td>
+                                <td><?= money(extraWageLbp($r), $rRate) ?></td>
+                                <td><?= money(aideCompLbp($r), $rRate) ?></td>
                                 <td><?= formatLBP($r['cnss_amount_lbp']) ?></td>
                                 <td><?= formatLBP($r['caisse_amount_lbp']) ?></td>
                                 <td><?= formatLBP($r['income_tax_lbp']) ?></td>
                                 <td><?= formatLBP($r['net_salary_lbp']) ?></td>
                                 <td><?= formatLBP($r['family_allowance_lbp']) ?></td>
-                                <td><?= formatLBP($rTrans) ?></td>
+                                <td><?= money($rTrans, $rRate) ?></td>
                                 <td><strong><?= formatLBP($r['total_due_lbp']) ?></strong></td>
                             </tr>
                         <?php endforeach; ?>
@@ -345,10 +356,10 @@ function reportDocThumb($path) {
                     <tbody>
                         <?php
                         $zC = ['base'=>0,'extra'=>0,'aide'=>0,'cnss'=>0,'school'=>0]; $G = $zC; $csL = $multi?4:3;
-                        $drawTotal = function($label,$a,$isGrand) use ($csL){
+                        $drawTotal = function($label,$a,$isGrand) use ($csL, $repRate){
                             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; ?>
                             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="<?= $csL ?>" style="text-align:right"><?= e($label) ?></td>
-                                <td><?= formatLBP($a['base']) ?></td><td><?= formatLBP($a['extra']) ?></td><td><?= formatLBP($a['aide']) ?></td>
+                                <td><?= formatLBP($a['base']) ?></td><td><?= money($a['extra'], $repRate) ?></td><td><?= money($a['aide'], $repRate) ?></td>
                                 <td></td><td><?= formatLBP($a['cnss']) ?></td><td><?= formatLBP($a['school']) ?></td></tr>
                         <?php };
                         $rn=0; $curCat=null; $sub=$zC;
@@ -367,8 +378,8 @@ function reportDocThumb($path) {
                                 <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'])) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                                 <td><?= formatLBP($r['base_salary_lbp']) ?></td>
-                                <td><?= formatLBP(extraWageLbp($r)) ?></td>
-                                <td><?= formatLBP(aideCompLbp($r)) ?></td>
+                                <td><?= money(extraWageLbp($r), $repRate) ?></td>
+                                <td><?= money(aideCompLbp($r), $repRate) ?></td>
                                 <?php /* وعاء الضمان الفعلي مشتقّاً من اشتراك ٣٪ المخزّن — لا وعاء الضريبة (يطلع صفر تحت العتبة) */ ?>
                                 <td><?= formatLBP($r['cnss_amount_lbp'] ? (int)round($r['cnss_amount_lbp']/0.03) : 0) ?></td>
                                 <td><?= formatLBP($r['cnss_amount_lbp']) ?></td>
@@ -411,10 +422,10 @@ function reportDocThumb($path) {
                     <tbody>
                         <?php
                         $zX = ['base'=>0,'extra'=>0,'aide'=>0,'tax'=>0]; $G = $zX; $csL = $multi?4:3;
-                        $drawTotal = function($label,$a,$isGrand) use ($csL){
+                        $drawTotal = function($label,$a,$isGrand) use ($csL, $repRate){
                             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; ?>
                             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="<?= $csL ?>" style="text-align:right"><?= e($label) ?></td>
-                                <td><?= formatLBP($a['base']) ?></td><td><?= formatLBP($a['extra']) ?></td><td><?= formatLBP($a['aide']) ?></td>
+                                <td><?= formatLBP($a['base']) ?></td><td><?= money($a['extra'], $repRate) ?></td><td><?= money($a['aide'], $repRate) ?></td>
                                 <td></td><td><strong><?= formatLBP($a['tax']) ?></strong></td></tr>
                         <?php };
                         $rn=0; $curCat=null; $sub=$zX;
@@ -433,8 +444,8 @@ function reportDocThumb($path) {
                                 <td><?= e($r['finance_ministry_number']) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                                 <td><?= formatLBP($r['base_salary_lbp']) ?></td>
-                                <td><?= formatLBP(extraWageLbp($r)) ?></td>
-                                <td><?= formatLBP(aideCompLbp($r)) ?></td>
+                                <td><?= money(extraWageLbp($r), $repRate) ?></td>
+                                <td><?= money(aideCompLbp($r), $repRate) ?></td>
                                 <td><?= formatLBP($r['taxable_base_lbp']) ?></td>
                                 <td><strong><?= formatLBP($r['income_tax_lbp']) ?></strong></td>
                             </tr>
@@ -480,15 +491,15 @@ function reportDocThumb($path) {
                                 <td><?= e($r['caisse_number']) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                                 <td><?= formatLBP($r['base_salary_lbp']) ?></td>
-                                <td><?= formatLBP(extraWageLbp($r)) ?></td>
-                                <td><?= formatLBP(aideCompLbp($r)) ?></td>
+                                <td><?= money(extraWageLbp($r), $repRate) ?></td>
+                                <td><?= money(aideCompLbp($r), $repRate) ?></td>
                                 <td><?= formatLBP($r['caisse_amount_lbp']) ?></td>
                                 <td><?= (int)$r['eoc_grade_lbp'] > 0 ? formatLBP($r['eoc_grade_lbp']) : '—' ?></td>
                                 <td><?= formatLBP($r['school_eoc_6_lbp']) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         <?php if (!$data): ?><tr><td colspan="<?= $multi?10:9 ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
-                        <tr class="total-row"><td colspan="<?= $multi?4:3 ?>">المجاميع — العدد: <?= $rn ?></td><td><?= formatLBP($teBaseE) ?></td><td><?= formatLBP($teEx) ?></td><td><?= formatLBP($teAi) ?></td><td><?= formatLBP($te) ?></td><td><?= formatLBP($teg) ?></td><td><?= formatLBP($ts) ?></td></tr>
+                        <tr class="total-row"><td colspan="<?= $multi?4:3 ?>">المجاميع — العدد: <?= $rn ?></td><td><?= formatLBP($teBaseE) ?></td><td><?= money($teEx, $repRate) ?></td><td><?= money($teAi, $repRate) ?></td><td><?= formatLBP($te) ?></td><td><?= formatLBP($teg) ?></td><td><?= formatLBP($ts) ?></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -515,7 +526,7 @@ function reportDocThumb($path) {
         foreach ($db->query("SELECT grade, new_salary_2017 FROM salary_scale_2017 WHERE version_id = 1") as $sc) $scaleMap[(int)$sc['grade']] = (float)$sc['new_salary_2017'];
         // آخر راتب محسوب لكل موظف (لعمودَي الأجر الإضافي ومكافأة ومساعدة الاختياريين + أساس الموظف الإداري الفعلي)
         $bonusMap = [];
-        foreach ($db->query("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.base_plus_echelon_lbp
+        foreach ($db->query("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.base_plus_echelon_lbp, ms.exchange_rate, ms.year, ms.month
                              FROM monthly_salaries ms
                              JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE is_calculated=1 GROUP BY employee_id) lt
                                ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym") as $b) {
@@ -548,8 +559,8 @@ function reportDocThumb($path) {
             'salary'  => ['الراتب (قانون) / Salaire', fn($r) => $r['employee_type'] === 'employe'
                             ? formatLBP((float)($bonusMap[(int)$r['id']]['base_plus_echelon_lbp'] ?? 0))
                             : formatLBP($scaleMap[(int)round($r['current_grade'])] ?? 0)],
-            'extra_wage' => ['الأجر الإضافي / Supplément', fn($r) => formatLBP(isset($bonusMap[(int)$r['id']]) ? extraWageLbp($bonusMap[(int)$r['id']]) : 0)],
-            'aide'    => ['مكافأة ومساعدة / Prime & aide', fn($r) => formatLBP(isset($bonusMap[(int)$r['id']]) ? aideCompLbp($bonusMap[(int)$r['id']]) : 0)],
+            'extra_wage' => ['الأجر الإضافي / Supplément', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(extraWageLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : formatLBP(0)],
+            'aide'    => ['مكافأة ومساعدة / Prime & aide', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(aideCompLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : formatLBP(0)],
             'nssf'    => ['ضمان / N° CNSS', fn($r) => e($r['nssf_number'])],
             'mof'     => ['مالية / N° MOF', fn($r) => e($r['finance_ministry_number'])],
             'caisse'  => ['صندوق / N° Caisse', fn($r) => e($r['caisse_number'])],
@@ -630,7 +641,10 @@ function reportDocThumb($path) {
                               SUM(ms.school_cnss_8_lbp) scnss, SUM(ms.school_eoc_6_lbp) seoc,
                               SUM(ms.base_salary_lbp) base_sal, SUM(ms.base_plus_echelon_lbp) bpe,
                               SUM(ms.extra_lbp + ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide,
-                              SUM(ms.transport_lbp) transport
+                              SUM(ms.transport_lbp) transport,
+                              SUM((ms.extra_lbp + ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0)) extra_wage_usd,
+                              SUM(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) aide_usd,
+                              SUM(ms.transport_lbp/NULLIF(ms.exchange_rate,0)) transport_usd
                               FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                               WHERE e.is_deleted=0" . $annualEmpFilter . " AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql);
         $stmt->execute(array_merge($annualEmpParams, [$schoolYear]));
@@ -693,9 +707,10 @@ function reportDocThumb($path) {
                     <tr style="background:var(--gold-light)"><td><strong>الإجمالي المتوجب (صافي + تعويضات)</strong></td><td><strong><?= formatLBP($tot['total']) ?></strong></td></tr>
                     <tr><td>أساس الراتب</td><td><?= formatLBP($tot['base_sal']) ?></td></tr>
                     <tr><td>الراتب بعد التدرّج</td><td><?= formatLBP($tot['bpe']) ?></td></tr>
-                    <tr><td>الأجر الإضافي</td><td><?= formatLBP($tot['extra_wage']) ?></td></tr>
-                    <tr><td>مكافأة ومساعدة</td><td><?= formatLBP($tot['aide']) ?></td></tr>
-                    <tr><td>تعويض النقل</td><td><?= formatLBP($tot['transport']) ?></td></tr>
+                    <?php $dualTotA = function($lbp,$usd){ $m=displayCurrency(); if($m==='lbp')return formatLBP($lbp); if($m==='usd')return formatUSD($usd); return formatLBP($lbp).'<span class="money-usd">'.formatUSD($usd).'</span>'; }; ?>
+                    <tr><td>الأجر الإضافي</td><td><?= $dualTotA($tot['extra_wage'], $tot['extra_wage_usd']) ?></td></tr>
+                    <tr><td>مكافأة ومساعدة</td><td><?= $dualTotA($tot['aide'], $tot['aide_usd']) ?></td></tr>
+                    <tr><td>تعويض النقل</td><td><?= $dualTotA($tot['transport'], $tot['transport_usd']) ?></td></tr>
                     <tr><td>الضمان — الأجير ٣٪</td><td><?= formatLBP($tot['cnss']) ?></td></tr>
                     <tr><td>الضمان — المدرسة ٨٪</td><td><?= formatLBP($tot['scnss']) ?></td></tr>
                     <tr><td>صندوق التعويضات — الأجير ٦٪</td><td><?= formatLBP($tot['caisse']) ?></td></tr>

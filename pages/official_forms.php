@@ -108,9 +108,12 @@ function ofAnnualAgg($db, $empId, $schoolYear) {
         SUM(base_plus_echelon_lbp) AS base,
         SUM(extra_lbp+prime_fixe_lbp+aide_complementaire_lbp) AS extra,
         SUM(extra_lbp+prime_fixe_lbp) AS extra_wage,
+        SUM((extra_lbp+prime_fixe_lbp)/NULLIF(exchange_rate,0)) AS extra_wage_usd,
         SUM(aide_complementaire_lbp) AS aide,
+        SUM(aide_complementaire_lbp/NULLIF(exchange_rate,0)) AS aide_usd,
         SUM(family_allowance_lbp) AS family,
         SUM(transport_lbp) AS transport,
+        SUM(transport_lbp/NULLIF(exchange_rate,0)) AS transport_usd,
         SUM(taxable_base_lbp) AS taxable,
         SUM(income_tax_lbp) AS tax,
         SUM(cnss_amount_lbp) AS cnss_emp,
@@ -532,7 +535,9 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
     $q = $db->prepare("SELECT COUNT(DISTINCT e.id) n,
             SUM(ms.base_plus_echelon_lbp+ms.extra_lbp+ms.prime_fixe_lbp+ms.aide_complementaire_lbp) gross,
             SUM(ms.extra_lbp+ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide,
+            SUM((ms.extra_lbp+ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0)) extra_wage_usd, SUM(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) aide_usd,
             SUM(ms.transport_lbp) transport,
+            SUM(ms.transport_lbp/NULLIF(ms.exchange_rate,0)) transport_usd,
             SUM(ms.family_allowance_lbp) family,
             SUM(ms.taxable_base_lbp) taxable, SUM(ms.income_tax_lbp) tax
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
@@ -586,8 +591,8 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
             </tbody>
         </table>
         <div class="info-grid" style="margin-top:8px">
-            <div><span class="k">منها: الأجر الإضافي:</span> <strong><?= formatLBP((int)($g['extra_wage']??0)) ?></strong></div>
-            <div><span class="k">منها: مكافأة ومساعدة:</span> <strong><?= formatLBP((int)($g['aide']??0)) ?></strong></div>
+            <div><span class="k">منها: الأجر الإضافي:</span> <strong><?= dualFromUsd((int)($g['extra_wage']??0), (float)($g['extra_wage_usd']??0)) ?></strong></div>
+            <div><span class="k">منها: مكافأة ومساعدة:</span> <strong><?= dualFromUsd((int)($g['aide']??0), (float)($g['aide_usd']??0)) ?></strong></div>
             <div><span class="k">إجمالي الرواتب الخاضعة للضريبة:</span> <strong><?= formatLBP($taxable) ?></strong></div>
             <div><span class="k">إجمالي الضريبة المتوجبة:</span> <strong><?= formatLBP($tax) ?></strong></div>
         </div>
@@ -712,16 +717,17 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     $mq = $db->prepare("SELECT ms.month,
                             SUM(ms.cnss_amount_lbp) m3, SUM(ms.school_cnss_8_lbp) m8,
                             SUM(ms.school_end_of_service_8_5_lbp) eos, SUM(ms.school_family_comp_6_lbp) fam6,
-                            SUM(ms.extra_lbp+ms.prime_fixe_lbp) ex, SUM(ms.aide_complementaire_lbp) ai
+                            SUM(ms.extra_lbp+ms.prime_fixe_lbp) ex, SUM(ms.aide_complementaire_lbp) ai,
+                            SUM((ms.extra_lbp+ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0)) ex_usd, SUM(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) ai_usd
                         FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
                         WHERE e.is_deleted=0 AND e.cnss_subject=1" . $yf . " AND ms.school_year=? AND " . schoolScopeWhere('e.school_id') . "
                         GROUP BY ms.month");
     $mq->execute(array_merge($yp, [$schoolYear]));
-    $byMonth = []; $brM = ['m3'=>0,'m8'=>0,'eos'=>0,'fam6'=>0,'ex'=>0,'ai'=>0];
+    $byMonth = []; $brM = ['m3'=>0,'m8'=>0,'eos'=>0,'fam6'=>0,'ex'=>0,'ai'=>0,'ex_usd'=>0.0,'ai_usd'=>0.0];
     foreach ($mq->fetchAll() as $r) {
         $byMonth[(int)$r['month']] = (int)$r['m3'] ? (int)round($r['m3']/0.03) : 0;
         $brM['m3']+=(int)$r['m3']; $brM['m8']+=(int)$r['m8']; $brM['eos']+=(int)$r['eos']; $brM['fam6']+=(int)$r['fam6'];
-        $brM['ex']+=(int)$r['ex']; $brM['ai']+=(int)$r['ai'];
+        $brM['ex']+=(int)$r['ex']; $brM['ai']+=(int)$r['ai']; $brM['ex_usd']+=(float)$r['ex_usd']; $brM['ai_usd']+=(float)$r['ai_usd'];
     }
     $order = [1=>'كانون الثاني',2=>'شباط',3=>'آذار',4=>'نيسان',5=>'أيار',6=>'حزيران',7=>'تموز',8=>'آب',9=>'أيلول',10=>'تشرين الأول',11=>'تشرين الثاني',12=>'كانون الأول'];
     $totalWages = array_sum($byMonth);
@@ -749,8 +755,8 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
             <tr><td><?= $lbl ?></td><td class="num"><?= isset($byMonth[$mn])?formatLBP($byMonth[$mn],false):'' ?></td></tr>
         <?php endforeach; ?>
             <tr class="total-row"><td>المجاميع</td><td class="num"><?= formatLBP($totalWages,false) ?></td></tr>
-            <tr><td>منها: الأجر الإضافي (خلال السنة)</td><td class="num"><?= formatLBP($brM['ex'],false) ?></td></tr>
-            <tr><td>منها: مكافأة ومساعدة (خلال السنة)</td><td class="num"><?= formatLBP($brM['ai'],false) ?></td></tr>
+            <tr><td>منها: الأجر الإضافي (خلال السنة)</td><td class="num"><?= dualFromUsd($brM['ex'],$brM['ex_usd'],false) ?></td></tr>
+            <tr><td>منها: مكافأة ومساعدة (خلال السنة)</td><td class="num"><?= dualFromUsd($brM['ai'],$brM['ai_usd'],false) ?></td></tr>
         </tbody>
     </table>
 
@@ -805,8 +811,8 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">عدد الساعات الأسبوعية:</span> <?= fillVal(rtrim(rtrim((string)$emp['hours_per_week'],'0'),'.')) ?></div>
         <div><span class="k">رقمه في الضمان:</span> <?= fillVal($emp['nssf_number']) ?></div>
         <div><span class="k">رقمه المالي:</span> <?= fillVal($emp['finance_ministry_number']) ?></div>
-        <div><span class="k">الأجر الإضافي:</span> <strong><?= formatLBP($sal ? extraWageLbp($sal) : 0) ?></strong></div>
-        <div><span class="k">مكافأة ومساعدة:</span> <strong><?= formatLBP($sal ? aideCompLbp($sal) : 0) ?></strong></div>
+        <div><span class="k">الأجر الإضافي:</span> <strong><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
+        <div><span class="k">مكافأة ومساعدة:</span> <strong><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
         <div class="full"><span class="k">الراتب الشهري (سلسلة):</span> <strong><?= formatLBP($salary) ?></strong></div>
     </div>
     <div class="sign-row"><?= signatureBox('توقيع المدير وخاتم المدرسة', $school['ville'] ?? '', formatDate(date('Y-m-d'))) ?></div>
@@ -889,9 +895,9 @@ elseif ($form === 'teacher_card'):
                 <td><?= rtrim(rtrim((string)$r['hours_per_week'],'0'),'.') ?></td>
                 <td><?= $r['tax_subject']?$X:'' ?></td>
                 <td class="num"><?= formatLBP($sal ? (int)$sal['base_salary_lbp'] : 0,false) ?></td>
-                <td class="num"><?= formatLBP($sal ? extraWageLbp($sal) : 0,false) ?></td>
-                <td class="num"><?= formatLBP($sal ? aideCompLbp($sal) : 0,false) ?></td>
-                <td class="num"><?= formatLBP($sal ? (int)$sal['transport_lbp'] : 0,false) ?></td>
+                <td class="num"><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td>
+                <td class="num"><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td>
+                <td class="num"><?= money($sal ? (int)$sal['transport_lbp'] : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td>
                 <td class="num"><?= formatLBP($rsal,false) ?></td>
                 <td>&nbsp;</td>
             </tr>
@@ -990,9 +996,9 @@ elseif ($form === 'teacher_card'):
                 <td><?= $hasSec?$X:'' ?></td>
                 <td><?= rtrim(rtrim((string)$r['hours_per_week'],'0'),'.') ?></td>
                 <td class="num"><?= formatLBP($sal ? (int)$sal['base_salary_lbp'] : 0,false) ?></td>
-                <td class="num"><?= formatLBP($sal ? extraWageLbp($sal) : 0,false) ?></td>
-                <td class="num"><?= formatLBP($sal ? aideCompLbp($sal) : 0,false) ?></td>
-                <td class="num"><?= formatLBP($sal ? (int)$sal['transport_lbp'] : 0,false) ?></td>
+                <td class="num"><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td>
+                <td class="num"><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td>
+                <td class="num"><?= money($sal ? (int)$sal['transport_lbp'] : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td>
                 <td class="num"><?= formatLBP($rsal,false) ?></td>
                 <?php if (!$isMlk): ?><td class="num"><?= $contract>0?formatLBP($contract,false):'' ?></td><?php endif; ?>
                 <td>&nbsp;</td>
@@ -1024,8 +1030,8 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">الدرجة الحالية:</span> <?= fillVal(rtrim(rtrim((string)$emp['current_grade'],'0'),'.')) ?></div>
         <div><span class="k">عدد ساعات التعليم:</span> <?= fillVal(rtrim(rtrim((string)$emp['hours_per_week'],'0'),'.')) ?></div>
         <div><span class="k">الراتب الأساسي (سلسلة):</span> <strong><?= formatLBP($base) ?></strong></div>
-        <div><span class="k">الأجر الإضافي:</span> <strong><?= formatLBP($sal ? extraWageLbp($sal) : 0) ?></strong></div>
-        <div><span class="k">مكافأة ومساعدة:</span> <strong><?= formatLBP($sal ? aideCompLbp($sal) : 0) ?></strong></div>
+        <div><span class="k">الأجر الإضافي:</span> <strong><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
+        <div><span class="k">مكافأة ومساعدة:</span> <strong><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
         <div><span class="k">اشتراك الصندوق (٦٪):</span> <strong><?= formatLBP($eoc) ?></strong></div>
         <?php if ($eocGradeCard > 0): ?><div><span class="k">درجة / نصف راتب (آخر حسم):</span> <strong><?= formatLBP($eocGradeCard) ?></strong></div><?php endif; ?>
     </div>
@@ -1147,17 +1153,18 @@ elseif ($form === 'teacher_card'):
         <tbody>
         <?php
         $zeroT = array_fill_keys(array_keys($T), 0);
+        foreach (['extra_usd','aide_usd','trans_usd'] as $uk) { $zeroT[$uk]=0.0; if(!isset($T[$uk])) $T[$uk]=0.0; }
         // صفّ مجاميع (فرعي لفئة أو إجمالي عام) بنفس ترتيب أعمدة الجدول
         $drawTotal = function($label, $a, $isGrand) {
             $bg = $isGrand ? '' : 'background:#e0e7ff;'; $cls = $isGrand ? 'total-row' : 'subtotal-row'; ?>
             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="2" style="text-align:right"><?= e($label) ?></td>
                 <td class="num"><?= formatLBP($a['base'],false) ?></td><td class="num"><?= formatLBP($a['ech'],false) ?></td>
                 <td class="num"><?= formatLBP($a['bpe'],false) ?></td>
-                <td class="num"><?= formatLBP($a['extra'],false) ?></td><td class="num"><?= formatLBP($a['aide'],false) ?></td>
+                <td class="num"><?= dualFromUsd($a['extra'],$a['extra_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['aide'],$a['aide_usd'],false) ?></td>
                 <td class="num"><?= formatLBP($a['caisse'],false) ?></td>
                 <td class="num"><?= formatLBP($a['txb'],false) ?></td><td class="num"><?= formatLBP($a['tax'],false) ?></td>
                 <td class="num"><?= formatLBP($a['cnss'],false) ?></td><td class="num"><?= formatLBP($a['ded'],false) ?></td>
-                <td class="num"><?= formatLBP($a['fam'],false) ?></td><td class="num"><?= formatLBP($a['trans'],false) ?></td>
+                <td class="num"><?= formatLBP($a['fam'],false) ?></td><td class="num"><?= dualFromUsd($a['trans'],$a['trans_usd'],false) ?></td>
                 <td class="num"><?= formatLBP($a['due'],false) ?></td><td class="num"><strong><?= formatLBP($a['net'],false) ?></strong></td>
             </tr>
         <?php };
@@ -1169,8 +1176,10 @@ elseif ($form === 'teacher_card'):
                 $sub = $zeroT; $curCat = $cat;
                 ?><tr class="cat-row"><td colspan="16" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
-            $add = ['base'=>$r['base_salary_lbp'],'ech'=>$r['echelon_value_lbp'],'bpe'=>$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'caisse'=>$r['caisse_amount_lbp'],'txb'=>$r['taxable_base_lbp'],'tax'=>$r['income_tax_lbp'],'cnss'=>$r['cnss_amount_lbp'],'ded'=>$r['total_retenues_lbp'],'fam'=>$r['family_allowance_lbp'],'trans'=>$r['transport_lbp'],'due'=>$r['total_due_lbp'],'net'=>$r['net_salary_lbp']];
-            foreach ($add as $k=>$val) { $T[$k]+=(int)$val; $sub[$k]+=(int)$val; } ?>
+            $rRate = rowRate($r);
+            $add = ['base'=>$r['base_salary_lbp'],'ech'=>$r['echelon_value_lbp'],'bpe'=>$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'caisse'=>$r['caisse_amount_lbp'],'txb'=>$r['taxable_base_lbp'],'tax'=>$r['income_tax_lbp'],'cnss'=>$r['cnss_amount_lbp'],'ded'=>$r['total_retenues_lbp'],'fam'=>$r['family_allowance_lbp'],'trans'=>$r['transport_lbp'],'due'=>$r['total_due_lbp'],'net'=>$r['net_salary_lbp'],
+                    'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd((int)$r['transport_lbp'],$rRate)];
+            foreach ($add as $k=>$val) { $T[$k]+=$val; $sub[$k]+=$val; } ?>
             <tr><td><?= ++$nn ?></td>
                 <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                 <td class="num"><?= formatLBP($r['base_salary_lbp'],false) ?></td>
@@ -1183,7 +1192,7 @@ elseif ($form === 'teacher_card'):
                 <td class="num"><?= formatLBP($r['cnss_amount_lbp'],false) ?></td>
                 <td class="num"><?= formatLBP($r['total_retenues_lbp'],false) ?></td>
                 <td class="num"><?= formatLBP($r['family_allowance_lbp'],false) ?></td>
-                <td class="num"><?= formatLBP($r['transport_lbp'],false) ?></td>
+                <td class="num"><?= money($r['transport_lbp'], rowRate($r), ['withCur'=>false]) ?></td>
                 <td class="num"><?= formatLBP($r['total_due_lbp'],false) ?></td>
                 <td class="num"><strong><?= formatLBP($r['net_salary_lbp'],false) ?></strong></td></tr>
         <?php endforeach;
@@ -1202,12 +1211,14 @@ elseif ($form === 'teacher_card'):
                    SUM(CASE WHEN ms.school_year=? THEN ms.net_salary_lbp ELSE 0 END) AS cur,
                    SUM(CASE WHEN ms.school_year=? THEN ms.net_salary_lbp ELSE 0 END) AS prev,
                    SUM(CASE WHEN ms.school_year=? THEN ms.extra_lbp+ms.prime_fixe_lbp ELSE 0 END) AS extra_wage,
+                   SUM(CASE WHEN ms.school_year=? THEN (ms.extra_lbp+ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0) ELSE 0 END) AS extra_wage_usd,
                    SUM(CASE WHEN ms.school_year=? THEN ms.aide_complementaire_lbp ELSE 0 END) AS aide,
+                   SUM(CASE WHEN ms.school_year=? THEN ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0) ELSE 0 END) AS aide_usd,
                    SUM(CASE WHEN ms.school_year=? THEN ms.base_salary_lbp ELSE 0 END) AS base_salary
             FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
             WHERE e.is_deleted=0 AND ms.school_year IN (?, ?) AND " . schoolScopeWhere('e.school_id') . "
             GROUP BY e.id, e.employee_type HAVING (cur>0 OR prev>0) ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
-    $q->execute([$schoolYear, $prevSY, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $prevSY]);
+    $q->execute([$schoolYear, $prevSY, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $prevSY]);
     $rows = $q->fetchAll();
     $tc=0;$tp=0;$tEx=0;$tAi=0;$tBase=0;
 ?>
@@ -1218,12 +1229,12 @@ elseif ($form === 'teacher_card'):
         <thead><tr><th>#</th><th>الاسم والشهرة</th><th>أساس الراتب</th><?= extraAideHeads() ?><th>صافي <?= e($prevSY) ?></th><th>صافي <?= e($schoolYear) ?></th><th>الفرق</th></tr></thead>
         <tbody>
         <?php
-        $zD = ['base'=>0,'ex'=>0,'ai'=>0,'prev'=>0,'cur'=>0]; $G=$zD;
+        $zD = ['base'=>0,'ex'=>0,'ai'=>0,'prev'=>0,'cur'=>0,'ex_usd'=>0.0,'ai_usd'=>0.0]; $G=$zD;
         $drawTotal = function($label,$a,$isGrand){
             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; $d=$a['cur']-$a['prev']; ?>
             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="2" style="text-align:right"><?= e($label) ?></td>
                 <td class="num"><?= formatLBP($a['base'],false) ?></td>
-                <td class="num"><?= formatLBP($a['ex'],false) ?></td><td class="num"><?= formatLBP($a['ai'],false) ?></td>
+                <td class="num"><?= dualFromUsd($a['ex'],$a['ex_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['ai'],$a['ai_usd'],false) ?></td>
                 <td class="num"><?= formatLBP($a['prev'],false) ?></td><td class="num"><?= formatLBP($a['cur'],false) ?></td>
                 <td class="num" style="color:<?= $d>=0?'#15803d':'#b91c1c' ?>"><strong><?= ($d>=0?'+':'').formatLBP($d,false) ?></strong></td></tr>
         <?php };
@@ -1235,14 +1246,14 @@ elseif ($form === 'teacher_card'):
                 $sub=$zD; $curCat=$cat;
                 ?><tr class="cat-row"><td colspan="8" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
-            $add=['base'=>(int)$r['base_salary'],'ex'=>(int)$r['extra_wage'],'ai'=>(int)$r['aide'],'prev'=>(int)$r['prev'],'cur'=>(int)$r['cur']];
+            $add=['base'=>(int)$r['base_salary'],'ex'=>(int)$r['extra_wage'],'ai'=>(int)$r['aide'],'prev'=>(int)$r['prev'],'cur'=>(int)$r['cur'],'ex_usd'=>(float)$r['extra_wage_usd'],'ai_usd'=>(float)$r['aide_usd']];
             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; }
             $diff=$r['cur']-$r['prev']; ?>
             <tr><td><?= ++$nn ?></td>
                 <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                 <td class="num"><?= formatLBP((int)$r['base_salary'],false) ?></td>
-                <td class="num"><?= formatLBP((int)$r['extra_wage'],false) ?></td>
-                <td class="num"><?= formatLBP((int)$r['aide'],false) ?></td>
+                <td class="num"><?= dualFromUsd((int)$r['extra_wage'],(float)$r['extra_wage_usd'],false) ?></td>
+                <td class="num"><?= dualFromUsd((int)$r['aide'],(float)$r['aide_usd'],false) ?></td>
                 <td class="num"><?= formatLBP($r['prev'],false) ?></td>
                 <td class="num"><?= formatLBP($r['cur'],false) ?></td>
                 <td class="num" style="color:<?= $diff>=0?'#15803d':'#b91c1c' ?>"><strong><?= ($diff>=0?'+':'').formatLBP($diff,false) ?></strong></td></tr>
@@ -1262,8 +1273,11 @@ elseif ($form === 'teacher_card'):
             SUM(ms.base_salary_lbp) base_salary,
             SUM(ms.net_salary_lbp) net,
             SUM(ms.extra_lbp + ms.prime_fixe_lbp) extra_wage,
+            SUM((ms.extra_lbp + ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0)) extra_wage_usd,
             SUM(ms.aide_complementaire_lbp) aide,
+            SUM(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) aide_usd,
             SUM(ms.transport_lbp) transport,
+            SUM(ms.transport_lbp/NULLIF(ms.exchange_rate,0)) transport_usd,
             SUM(ms.cnss_amount_lbp + ms.school_cnss_8_lbp) cnss,
             SUM(ms.caisse_amount_lbp + ms.eoc_grade_lbp + ms.school_eoc_6_lbp) eoc,
             SUM(ms.income_tax_lbp) tax
@@ -1271,7 +1285,7 @@ elseif ($form === 'teacher_card'):
         WHERE e.is_deleted=0" . $ofYearFilter . " AND ms.school_year=? AND " . schoolScopeWhere('ms.school_id') . " GROUP BY ms.school_id ORDER BY ms.school_id");
     $q->execute(array_merge($ofYearParams, [$schoolYear]));
     $sdata = $q->fetchAll();
-    $T = ['base'=>0,'netNo'=>0,'extra'=>0,'aide'=>0,'trans'=>0,'netWith'=>0,'cnss'=>0,'eoc'=>0,'tax'=>0,'total'=>0];
+    $T = ['base'=>0,'netNo'=>0,'extra'=>0,'aide'=>0,'trans'=>0,'netWith'=>0,'cnss'=>0,'eoc'=>0,'tax'=>0,'total'=>0,'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0];
     $boxName = (count($sdata)===1) ? schoolNameById($sdata[0]['school_id'],'ar') : 'المدارس المختارة';
 ?>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
@@ -1296,16 +1310,18 @@ elseif ($form === 'teacher_card'):
         <?php foreach ($sdata as $sd):
             $net=(int)$sd['net']; $trans=(int)$sd['transport']; $cnss=(int)$sd['cnss']; $eoc=(int)$sd['eoc']; $tax=(int)$sd['tax'];
             $exW=(int)$sd['extra_wage']; $aid=(int)$sd['aide']; $bse=(int)$sd['base_salary'];
+            $exWu=(float)($sd['extra_wage_usd']??0); $aidu=(float)($sd['aide_usd']??0); $transu=(float)($sd['transport_usd']??0);
             $netWith=$net+$trans; $tot=$netWith+$cnss+$eoc+$tax;
             $T['base']+=$bse;$T['netNo']+=$net;$T['extra']+=$exW;$T['aide']+=$aid;$T['trans']+=$trans;$T['netWith']+=$netWith;$T['cnss']+=$cnss;$T['eoc']+=$eoc;$T['tax']+=$tax;$T['total']+=$tot;
+            $T['extra_usd']+=$exWu;$T['aide_usd']+=$aidu;$T['trans_usd']+=$transu;
         ?>
             <tr>
                 <td style="text-align:right;font-weight:600"><?= e(schoolNameById($sd['school_id'],'ar')) ?></td>
                 <td class="num"><?= formatLBP($bse,false) ?></td>
                 <td class="num"><?= formatLBP($net,false) ?></td>
-                <td class="num"><?= formatLBP($exW,false) ?></td>
-                <td class="num"><?= formatLBP($aid,false) ?></td>
-                <td class="num"><?= formatLBP($trans,false) ?></td>
+                <td class="num"><?= dualFromUsd($exW,$exWu,false) ?></td>
+                <td class="num"><?= dualFromUsd($aid,$aidu,false) ?></td>
+                <td class="num"><?= dualFromUsd($trans,$transu,false) ?></td>
                 <td class="num"><?= formatLBP($netWith,false) ?></td>
                 <td class="num"><?= formatLBP($cnss,false) ?></td>
                 <td class="num"><?= formatLBP($eoc,false) ?></td>
@@ -1319,9 +1335,9 @@ elseif ($form === 'teacher_card'):
             <td>المجموع</td>
             <td class="num"><?= formatLBP($T['base'],false) ?></td>
             <td class="num"><?= formatLBP($T['netNo'],false) ?></td>
-            <td class="num"><?= formatLBP($T['extra'],false) ?></td>
-            <td class="num"><?= formatLBP($T['aide'],false) ?></td>
-            <td class="num"><?= formatLBP($T['trans'],false) ?></td>
+            <td class="num"><?= dualFromUsd($T['extra'],$T['extra_usd'],false) ?></td>
+            <td class="num"><?= dualFromUsd($T['aide'],$T['aide_usd'],false) ?></td>
+            <td class="num"><?= dualFromUsd($T['trans'],$T['trans_usd'],false) ?></td>
             <td class="num"><?= formatLBP($T['netWith'],false) ?></td>
             <td class="num"><?= formatLBP($T['cnss'],false) ?></td>
             <td class="num"><?= formatLBP($T['eoc'],false) ?></td>
@@ -1629,7 +1645,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         <thead><tr><th>الشهر</th><th>عدد أيام/أسابيع العمل الفعلي</th><th>الأجر الإضافي</th><th>مكافأة ومساعدة</th><th>الأجر المدفوع (ل.ل)</th></tr></thead>
         <tbody>
         <?php for ($i=0;$i<6;$i++): $p=$paid[$i] ?? null; ?>
-            <tr><td><?= $p?monthName($p['month'],'ar').' '.$p['year']:'&nbsp;' ?></td><td>&nbsp;</td><td class="num"><?= $p?formatLBP(extraWageLbp($p),false):'' ?></td><td class="num"><?= $p?formatLBP(aideCompLbp($p),false):'' ?></td><td class="num"><?= $p?formatLBP(cnssSubjectWageLbp($p,$emp),false):'' ?></td></tr>
+            <tr><td><?= $p?monthName($p['month'],'ar').' '.$p['year']:'&nbsp;' ?></td><td>&nbsp;</td><td class="num"><?= $p?money(extraWageLbp($p),rowRate($p),['withCur'=>false]):'' ?></td><td class="num"><?= $p?money(aideCompLbp($p),rowRate($p),['withCur'=>false]):'' ?></td><td class="num"><?= $p?formatLBP(cnssSubjectWageLbp($p,$emp),false):'' ?></td></tr>
         <?php endfor; ?>
         </tbody>
     </table>
@@ -1695,13 +1711,13 @@ elseif ($form === 'payment_list'):
         <thead><tr><th>#</th><th>الرمز</th><th>الاسم والشهرة</th><th>رقم الضمان</th><th>أساس الراتب</th><?= extraAideHeads() ?><th>تعويض النقل</th><th>الصافي (ل.ل)</th><th>الإجمالي المتوجب (ل.ل)</th><th>التوقيع بالاستلام</th></tr></thead>
         <tbody>
         <?php
-        $zP = ['base'=>0,'ex'=>0,'ai'=>0,'trans'=>0,'net'=>0,'due'=>0]; $G = $zP;
+        $zP = ['base'=>0,'ex'=>0,'ai'=>0,'trans'=>0,'net'=>0,'due'=>0,'ex_usd'=>0.0,'ai_usd'=>0.0,'trans_usd'=>0.0]; $G = $zP;
         $drawTotal = function($label,$a,$isGrand){
             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; ?>
             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="4" style="text-align:right"><?= e($label) ?></td>
                 <td class="num"><?= formatLBP($a['base'],false) ?></td>
-                <td class="num"><?= formatLBP($a['ex'],false) ?></td><td class="num"><?= formatLBP($a['ai'],false) ?></td>
-                <td class="num"><?= formatLBP($a['trans'],false) ?></td>
+                <td class="num"><?= dualFromUsd($a['ex'],$a['ex_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['ai'],$a['ai_usd'],false) ?></td>
+                <td class="num"><?= dualFromUsd($a['trans'],$a['trans_usd'],false) ?></td>
                 <td class="num"><?= formatLBP($a['net'],false) ?></td><td class="num"><?= formatLBP($a['due'],false) ?></td><td></td>
             </tr>
         <?php };
@@ -1713,7 +1729,9 @@ elseif ($form === 'payment_list'):
                 $sub=$zP; $curCat=$cat;
                 ?><tr class="cat-row"><td colspan="11" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
-            $add=['base'=>(int)$r['base_salary_lbp'],'ex'=>extraWageLbp($r),'ai'=>aideCompLbp($r),'trans'=>(int)$r['transport_lbp'],'net'=>(int)$r['net_salary_lbp'],'due'=>(int)$r['total_due_lbp']];
+            $rRate=rowRate($r);
+            $add=['base'=>(int)$r['base_salary_lbp'],'ex'=>extraWageLbp($r),'ai'=>aideCompLbp($r),'trans'=>(int)$r['transport_lbp'],'net'=>(int)$r['net_salary_lbp'],'due'=>(int)$r['total_due_lbp'],
+                  'ex_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'ai_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd((int)$r['transport_lbp'],$rRate)];
             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; } ?>
             <tr>
                 <td><?= ++$nn ?></td>
@@ -1722,7 +1740,7 @@ elseif ($form === 'payment_list'):
                 <td><?= e($r['nssf_number']) ?></td>
                 <td class="num"><?= formatLBP($r['base_salary_lbp'],false) ?></td>
                 <?= extraAideCells($r) ?>
-                <td class="num"><?= formatLBP($r['transport_lbp'],false) ?></td>
+                <td class="num"><?= money($r['transport_lbp'], rowRate($r), ['withCur'=>false]) ?></td>
                 <td class="num"><?= formatLBP($r['net_salary_lbp'],false) ?></td>
                 <td class="num"><strong><?= formatLBP($r['total_due_lbp'],false) ?></strong></td>
                 <td style="min-width:90px">&nbsp;</td>
@@ -1771,14 +1789,15 @@ elseif ($form === 'payment_list'):
         <tbody>
         <?php
         $zeroT = array_fill_keys(array_keys($T), 0); $csLbl = $multiS?4:3;
+        foreach (['extra_usd','aide_usd','trans_usd'] as $uk) { $zeroT[$uk]=0.0; if(!isset($T[$uk])) $T[$uk]=0.0; }
         $drawTotal = function($label,$a,$isGrand) use ($csLbl){
             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; ?>
             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="<?= $csLbl ?>" style="text-align:right"><?= e($label) ?></td>
                 <td class="num"><?= formatLBP($a['base'],false) ?></td><td class="num"><?= formatLBP($a['ech'],false) ?></td><td class="num"><?= formatLBP($a['bpe'],false) ?></td>
-                <td class="num"><?= formatLBP($a['extra'],false) ?></td><td class="num"><?= formatLBP($a['aide'],false) ?></td>
+                <td class="num"><?= dualFromUsd($a['extra'],$a['extra_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['aide'],$a['aide_usd'],false) ?></td>
                 <td class="num"><?= formatLBP($a['cnss8'],false) ?></td><td class="num"><?= formatLBP($a['eoc6'],false) ?></td>
                 <td class="num"><?= formatLBP($a['eos85'],false) ?></td><td class="num"><?= formatLBP($a['fam6'],false) ?></td>
-                <td class="num"><?= formatLBP($a['fam'],false) ?></td><td class="num"><?= formatLBP($a['trans'],false) ?></td><td class="num"><?= formatLBP($a['tax'],false) ?></td>
+                <td class="num"><?= formatLBP($a['fam'],false) ?></td><td class="num"><?= dualFromUsd($a['trans'],$a['trans_usd'],false) ?></td><td class="num"><?= formatLBP($a['tax'],false) ?></td>
                 <td class="num"><strong><?= formatLBP($a['cost'],false) ?></strong></td>
             </tr>
         <?php };
@@ -1793,7 +1812,9 @@ elseif ($form === 'payment_list'):
             $cost = (int)$r['base_plus_echelon_lbp'] + (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']
                   + (int)$r['family_allowance_lbp'] + (int)$r['transport_lbp']
                   + (int)$r['school_cnss_8_lbp'] + (int)$r['school_eoc_6_lbp'] + (int)$r['school_end_of_service_8_5_lbp'] + (int)$r['school_family_comp_6_lbp'];
-            $add=['base'=>(int)$r['base_salary_lbp'],'ech'=>(int)$r['echelon_value_lbp'],'bpe'=>(int)$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'cnss8'=>(int)$r['school_cnss_8_lbp'],'eoc6'=>(int)$r['school_eoc_6_lbp'],'eos85'=>(int)$r['school_end_of_service_8_5_lbp'],'fam6'=>(int)$r['school_family_comp_6_lbp'],'fam'=>(int)$r['family_allowance_lbp'],'trans'=>(int)$r['transport_lbp'],'tax'=>(int)$r['income_tax_lbp'],'cost'=>$cost];
+            $rRate=rowRate($r);
+            $add=['base'=>(int)$r['base_salary_lbp'],'ech'=>(int)$r['echelon_value_lbp'],'bpe'=>(int)$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'cnss8'=>(int)$r['school_cnss_8_lbp'],'eoc6'=>(int)$r['school_eoc_6_lbp'],'eos85'=>(int)$r['school_end_of_service_8_5_lbp'],'fam6'=>(int)$r['school_family_comp_6_lbp'],'fam'=>(int)$r['family_allowance_lbp'],'trans'=>(int)$r['transport_lbp'],'tax'=>(int)$r['income_tax_lbp'],'cost'=>$cost,
+                  'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd((int)$r['transport_lbp'],$rRate)];
             foreach ($add as $k=>$v){ $T[$k]+=$v; $sub[$k]+=$v; } ?>
             <tr>
                 <td><?= ++$nn ?></td>
@@ -1809,7 +1830,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= formatLBP($r['school_end_of_service_8_5_lbp'],false) ?></td>
                 <td class="num"><?= formatLBP($r['school_family_comp_6_lbp'],false) ?></td>
                 <td class="num"><?= formatLBP($r['family_allowance_lbp'],false) ?></td>
-                <td class="num"><?= formatLBP($r['transport_lbp'],false) ?></td>
+                <td class="num"><?= money($r['transport_lbp'], rowRate($r), ['withCur'=>false]) ?></td>
                 <td class="num"><?= formatLBP($r['income_tax_lbp'],false) ?></td>
                 <td class="num"><strong><?= formatLBP($cost,false) ?></strong></td>
             </tr>

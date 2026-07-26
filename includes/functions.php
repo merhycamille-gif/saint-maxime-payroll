@@ -701,6 +701,82 @@ function formatUSD($amount, $withCurrency = true) {
     return $withCurrency ? '$' . $formatted : $formatted;
 }
 
+// =====================================================
+// عرض العملة (ليرة/دولار/الاثنين) — زرّ خيار موحّد لكل التقارير والملفات والإفادات
+// =====================================================
+/**
+ * وضع عرض العملة المختار من المستخدم عبر مبدّل الترويسة:
+ *   'both' (افتراضي) = ليرة والدولار تحتها | 'lbp' = ليرة فقط | 'usd' = دولار فقط.
+ */
+function displayCurrency(): string {
+    $c = $_SESSION['display_currency'] ?? 'both';
+    return in_array($c, ['both', 'lbp', 'usd'], true) ? $c : 'both';
+}
+
+/** تحويل مبلغ مخزّن بالليرة إلى دولار حسب سعر صرف معطى (سعر شهر الراتب). */
+function lbpToUsd($lbp, $rate): float {
+    $rate = (float)$rate;
+    return $rate > 0 ? (float)$lbp / $rate : 0.0;
+}
+
+/**
+ * سعر صرف صف راتب: يفضّل اللقطة المخزّنة `exchange_rate` (الأدقّ لأنها سعر شهر الراتب)،
+ * وإلا يجلب سعر شهر/سنة الصف، وإلا السعر الحالي.
+ */
+function rowRate(array $row): float {
+    if (!empty($row['exchange_rate']) && (float)$row['exchange_rate'] > 0) return (float)$row['exchange_rate'];
+    return (float)getExchangeRate($row['month'] ?? null, $row['year'] ?? null);
+}
+
+/**
+ * عرض مبلغ (مخزّن بالليرة) حسب وضع العملة المختار — الدالة الموحّدة لكل المستندات.
+ *   $lbp  : المبلغ بالليرة (مصدر التخزين).
+ *   $rate : سعر صرف شهر الراتب (مرّر $row['exchange_rate'] أو rowRate($row)). null → السعر الحالي.
+ *   $opts : mode (تجاوز الوضع)، withCur (وحدة العملة، افتراضي true)،
+ *           stacked (بوضع both: الدولار بسطر تحت — للجداول؛ false = بينهما شرطة، للنصوص).
+ * يرجّع HTML جاهز. (للنصوص/الإكسل استعمل moneyText.)
+ */
+function money($lbp, $rate = null, array $opts = []): string {
+    $mode    = $opts['mode']    ?? displayCurrency();
+    $withCur = $opts['withCur'] ?? true;
+    $stacked = $opts['stacked'] ?? true;
+    if ($rate === null) $rate = getExchangeRate($opts['month'] ?? null, $opts['year'] ?? null);
+    $lbpStr = formatLBP($lbp, $withCur);
+    if ($mode === 'lbp') return $lbpStr;
+    if ($mode === 'usd') return formatUSD(lbpToUsd($lbp, $rate), $withCur);
+    // both: ليرة + دولار (الدولار يحمل علامة $ دائماً للوضوح حتى لو الليرة بلا وحدة)
+    $usdStr = formatUSD(lbpToUsd($lbp, $rate), true);
+    if ($stacked) {
+        return $lbpStr . '<span class="money-usd">' . $usdStr . '</span>';
+    }
+    return $lbpStr . ' <span class="money-usd-inline">(' . $usdStr . ')</span>';
+}
+
+/**
+ * عرض بند بالعملتين انطلاقاً من مجموعَي الليرة والدولار المتراكمَين مسبقاً (لصفوف المجاميع/الفوتر
+ * حيث كل صف قد يكون بسعر صرف مختلف فيُجمع الدولار صفّاً صفّاً). $withCur: وحدة العملة.
+ */
+function dualFromUsd($lbp, $usd, bool $withCur = true): string {
+    $m = displayCurrency();
+    if ($m === 'lbp') return formatLBP($lbp, $withCur);
+    if ($m === 'usd') return formatUSD($usd, $withCur);
+    return formatLBP($lbp, $withCur) . '<span class="money-usd">' . formatUSD($usd, true) . '</span>';
+}
+
+/**
+ * نسخة نصّية بحتة (بلا HTML) لعرض المبلغ حسب الوضع — للإفادات النصّية وتصدير Excel/Word.
+ */
+function moneyText($lbp, $rate = null, array $opts = []): string {
+    $mode    = $opts['mode']    ?? displayCurrency();
+    $withCur = $opts['withCur'] ?? true;
+    if ($rate === null) $rate = getExchangeRate($opts['month'] ?? null, $opts['year'] ?? null);
+    $lbpStr = formatLBP($lbp, $withCur);
+    if ($mode === 'lbp') return $lbpStr;
+    $usdStr = formatUSD(lbpToUsd($lbp, $rate), $withCur);
+    if ($mode === 'usd') return $usdStr;
+    return $lbpStr . ' (' . $usdStr . ')';
+}
+
 function formatDate($date, $format = 'd/m/Y') {
     if (!$date || $date === '0000-00-00') return '—';
     $ts = is_numeric($date) ? $date : strtotime($date);

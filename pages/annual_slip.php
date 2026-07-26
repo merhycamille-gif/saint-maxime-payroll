@@ -167,7 +167,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
             </tr>
         </table>
 
-        <table class="salary-slip-table">
+        <table class="salary-slip-table curmode-<?= displayCurrency() ?>">
             <thead>
                 <tr>
                     <th rowspan="2">Mois<br>الشهر</th>
@@ -304,6 +304,10 @@ include __DIR__ . '/../includes/header.php';
 .salary-slip-table td { padding: 8px 8px; }
 /* قيمة الأجر الإضافي بالليرة تحت الدولار مباشرةً */
 .salary-slip-table .sub-lbp { display:block; font-size: 0.82em; color: var(--gray-600,#4b5563); }
+/* وضع العملة المختار من الزرّ العام: إظهار/إخفاء الليرة أو الدولار */
+.salary-slip-table.curmode-lbp .cur-usd { display:none; }
+.salary-slip-table.curmode-lbp .sub-lbp { color:#111; font-size:1em; }
+.salary-slip-table.curmode-usd .sub-lbp { display:none; }
 /* عمود التوقيع أوسع شوي */
 .salary-slip-table .sig-col, .salary-slip-table .sig-cell { min-width: 120px; }
 
