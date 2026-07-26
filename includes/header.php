@@ -373,6 +373,12 @@ document.addEventListener('submit', function (e) {
             <div class="alert alert-<?= $cls ?>"><i class="fas fa-info-circle"></i> <?= e($_SESSION[$fk]) ?></div>
         <?php unset($_SESSION[$fk]); endif; endforeach; ?>
         <?php
+        // شريط «الراتب المركّب يشمل» الظاهر (خانات اختيار متل شريط الإفادة) — على صفحات الرواتب فقط
+        if (in_array($currentPage ?? '', ['reports', 'employee_history', 'monthly'], true)) {
+            echo salaryCompToolbar();
+        }
+        ?>
+        <?php
         // شريط الطباعة والتصدير — يظهر تلقائياً بكل صفحة (طباعة/PDF/Excel/Word/واتساب/إيميل)
         if (empty($hideExportToolbar)) {
             echo exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);

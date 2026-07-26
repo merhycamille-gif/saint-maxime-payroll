@@ -995,3 +995,13 @@ input:focus, select:focus, textarea:focus {
 .money-usd { display:block; font-size:.8em; color:#059669; font-weight:600; line-height:1.2; margin-top:1px; }
 .money-usd-inline { color:#059669; font-weight:600; white-space:nowrap; }
 @media print { .money-usd, .money-usd-inline { color:#047857 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+
+/* ===== شريط «الراتب المركّب يشمل» الظاهر (خانات اختيار متل الإفادة) ===== */
+.salcomp-bar { display:flex; flex-wrap:wrap; align-items:center; gap:6px 16px;
+  background:#f5f3ff; border:1px solid #ddd6fe; border-inline-start:4px solid #7c3aed;
+  border-radius:10px; padding:10px 14px; margin:0 0 14px; font-size:13.5px; }
+.salcomp-bar .scb-label { font-weight:700; color:#5b21b6; }
+.salcomp-bar .scb-opt { cursor:pointer; display:inline-flex; align-items:center; gap:5px;
+  background:#fff; border:1px solid #ddd6fe; border-radius:8px; padding:4px 10px; user-select:none; }
+.salcomp-bar .scb-opt input { cursor:pointer; width:16px; height:16px; accent-color:#7c3aed; }
+.salcomp-bar .scb-hint { color:#8b8b8b; font-size:12px; }

@@ -789,6 +789,24 @@ function composedSalaryLbp(array $row): int {
     return $s;
 }
 
+/**
+ * شريط خانات اختيار ظاهر (متل شريط الإفادة) — يُعرَض فوق التقارير والملفات ليتحكّم المستخدم
+ * بمكوّنات «الراتب المركّب» مباشرةً (يتغيّر فوراً عند الكبس). لا يظهر بالطباعة/التصدير.
+ */
+function salaryCompToolbar(): string {
+    $sel  = salaryComp();
+    $lang = $_SESSION['lang'] ?? 'fr';
+    ob_start(); ?>
+    <form method="get" action="<?= BASE_URL ?>switch_salarycomp.php" class="salcomp-bar no-print no-export">
+        <span class="scb-label"><i class="fas fa-layer-group"></i> <?= $lang==='ar' ? 'الراتب المركّب يشمل:' : 'Le salaire composé inclut :' ?></span>
+        <label class="scb-opt"><input type="checkbox" name="comp[]" value="extra" <?= in_array('extra',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> + <?= $lang==='ar'?'الأجر الإضافي':'Supplément' ?></label>
+        <label class="scb-opt"><input type="checkbox" name="comp[]" value="aide" <?= in_array('aide',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> + <?= $lang==='ar'?'المكافأة والمساعدة':'Prime & aide' ?></label>
+        <label class="scb-opt"><input type="checkbox" name="comp[]" value="transport" <?= in_array('transport',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> + <?= $lang==='ar'?'تعويض النقل':'Transport' ?></label>
+        <span class="scb-hint"><?= $lang==='ar'?'(الأساس + الدرجة دائماً)':'(Base + échelon toujours)' ?></span>
+    </form>
+    <?php return ob_get_clean();
+}
+
 /** تسمية مختصرة لِما يشمله الراتب المركّب (للعناوين). */
 function salaryCompLabel(): string {
     $names = ['extra' => 'الإضافي', 'aide' => 'المكافأة', 'transport' => 'النقل'];
