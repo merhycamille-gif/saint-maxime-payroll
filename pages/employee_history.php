@@ -127,8 +127,15 @@ if (!$emp):
                     <tr><td>Niveau / المرحلة</td><td><strong><?= e($nivDisplay) ?></strong></td></tr>
                     <tr><td>Matières / المواد</td><td><strong><?= e($emp['subjects_taught'] ?: '—') ?></strong></td></tr>
                     <?php endif; ?>
-                    <tr><td>Salaire actuel (base+échelon) / الراتب الحالي</td><td><strong><?= formatLBP($curBase) ?></strong></td></tr>
-                    <tr><td>Salaire net / الصافي</td><td><strong><?= formatLBP($curNet) ?></strong><?= $sal ? ' — '.monthName((int)$sal['month'],$lang).' '.$sal['year'] : '' ?></td></tr>
+                    <?php $slRate = $sal ? rowRate($sal) : null; ?>
+                    <tr><td>Salaire actuel (base+échelon) / الراتب الحالي</td><td><strong><?= money($curBase, $slRate) ?></strong></td></tr>
+                    <?php if ($sal): ?>
+                    <tr><td>+ Supplément / الأجر الإضافي</td><td><?= money((int)$sal['extra_lbp'] + (int)$sal['prime_fixe_lbp'], $slRate) ?></td></tr>
+                    <tr><td>+ Prime &amp; aide / المكافأة والمساعدة</td><td><?= money((int)$sal['aide_complementaire_lbp'], $slRate) ?></td></tr>
+                    <tr><td>+ Transport / تعويض النقل</td><td><?= money((int)$sal['transport_lbp'], $slRate) ?></td></tr>
+                    <tr style="background:#eef2ff"><td><strong>Salaire composé / الراتب المركّب</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td><strong><?= money(composedSalaryLbp($sal), $slRate) ?></strong></td></tr>
+                    <?php endif; ?>
+                    <tr><td>Salaire net / الصافي</td><td><strong><?= money($curNet, $slRate) ?></strong><?= $sal ? ' — '.monthName((int)$sal['month'],$lang).' '.$sal['year'] : '' ?></td></tr>
                 </table>
             </div>
         </div>
