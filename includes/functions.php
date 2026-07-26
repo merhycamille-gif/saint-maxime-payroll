@@ -13,6 +13,13 @@ function isLoggedIn() {
 }
 
 function requireLogin() {
+    // منع المتصفّح من تخبئة الصفحات: حتى تنعكس تبديلات العملة/«الراتب يشمل» فوراً بلا Ctrl+F5،
+    // وأماناً لأنّ الصفحات فيها بيانات رواتب حسّاسة يجب ألّا تُخزَّن بذاكرة المتصفّح.
+    if (!headers_sent()) {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+    }
     if (!isLoggedIn()) {
         header('Location: ' . BASE_URL . 'login.php');
         exit;
