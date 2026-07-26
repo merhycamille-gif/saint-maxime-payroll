@@ -329,6 +329,25 @@ document.addEventListener('submit', function (e) {
                     </select>
                 </form>
 
+                <?php $salSel = salaryComp(); ?>
+                <div class="school-switcher school-multi" id="salCompPicker" title="<?= $lang === 'ar' ? 'مكوّنات الراتب المعروض' : 'Composantes du salaire affiché' ?>">
+                    <i class="fas fa-layer-group" style="color:#fff;background:#7c3aed;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
+                    <button type="button" class="sm-btn" onclick="document.getElementById('salCompMenu').classList.toggle('open')">
+                        <?= $lang === 'ar' ? 'الراتب يشمل' : 'Salaire inclut' ?> <i class="fas fa-caret-down"></i>
+                    </button>
+                    <div class="school-menu" id="salCompMenu">
+                        <form method="get" action="<?= BASE_URL ?>switch_salarycomp.php">
+                            <div class="sm-list">
+                                <label><input type="checkbox" name="comp[]" value="extra" <?= in_array('extra',$salSel,true)?'checked':'' ?>> <?= $lang==='ar'?'الأجر الإضافي':'Supplément' ?></label>
+                                <label><input type="checkbox" name="comp[]" value="aide" <?= in_array('aide',$salSel,true)?'checked':'' ?>> <?= $lang==='ar'?'المكافأة والمساعدة':'Prime & aide' ?></label>
+                                <label><input type="checkbox" name="comp[]" value="transport" <?= in_array('transport',$salSel,true)?'checked':'' ?>> <?= $lang==='ar'?'تعويض النقل':'Transport' ?></label>
+                            </div>
+                            <div style="font-size:11px;color:#64748b;padding:2px 4px 6px"><?= $lang==='ar'?'الأساس + الدرجة يبقى دائماً':'Base + échelon toujours inclus' ?></div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> Appliquer / تطبيق</button>
+                        </form>
+                    </div>
+                </div>
+
                 <a href="<?= BASE_URL ?>switch_lang.php?lang=<?= $lang === 'ar' ? 'fr' : 'ar' ?>" class="btn btn-light btn-sm">
                     <i class="fas fa-globe" style="color:#fff;background:#0284c7;width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
                     <?= $lang === 'ar' ? 'Français' : 'العربية' ?>

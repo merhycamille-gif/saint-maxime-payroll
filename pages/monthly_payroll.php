@@ -68,6 +68,7 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                         <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr><?php endif; ?>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= money((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp'], rowRate($salary)) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr style="background:#eef2ff"><td><strong>الراتب المركّب / Salaire composé</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td class="text-end"><strong><?= money(composedSalaryLbp($salary), rowRate($salary)) ?></strong></td></tr>
                     </table>
                     <table class="table">
                         <tr><th colspan="2" style="background:#ffe3e3;color:#000">RETENUES / المحسومات</th></tr>
@@ -343,6 +344,7 @@ include __DIR__ . '/../includes/header.php';
                         <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr><?php endif; ?>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= money((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp'], rowRate($salary)) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr style="background:#eef2ff"><td><strong>الراتب المركّب / Salaire composé</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td class="text-end"><strong><?= money(composedSalaryLbp($salary), rowRate($salary)) ?></strong></td></tr>
                     </table>
 
                     <table class="table">

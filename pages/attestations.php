@@ -466,14 +466,14 @@ if (!$emp):
     // خيار مكوّنات الراتب في الإفادة: الأساس بعد التدرّج وحده، أو + الأجر الإضافي، أو + مكافأة ومساعدة
     $extraW = $sal ? (int)((float)$sal['extra_lbp'] + (float)$sal['prime_fixe_lbp']) : 0;
     $aideW  = $sal ? (int)(float)$sal['aide_complementaire_lbp'] : 0;
-    // المكوّنات (الأجر الإضافي + المكافأة/المساعدة) **مفعّلة افتراضياً** لأنّها جزء أساسي من الراتب
-    // الفعلي (غالباً الأجر الإضافي هو معظم الراتب)، فتطلع الإفادة بالراتب الكامل بلا ما يضطرّ
-    // المستخدم يفعّلها كل مرّة. عند أوّل فتح (opts_set غير موجود) = مفعّلة؛ بعد أي تفاعل مع الفورم
-    // (يُرسَل opts_set=1) تُحترَم حالة المربّع الفعلية (يقدر يطفّيها إن أراد).
+    $transW = $sal ? (int)(float)$sal['transport_lbp'] : 0;
+    // المكوّنات: عند أوّل فتح (opts_set غير موجود) تتبع اختيار «الراتب يشمل» العام بالترويسة
+    // (salaryComp)؛ بعد أي تفاعل مع الفورم (opts_set=1) تُحترَم حالة المربّعات الفعلية.
     $optsSet  = !empty($_GET['opts_set']);
-    $incExtra = $optsSet ? !empty($_GET['inc_extra']) : true;
-    $incAide  = $optsSet ? !empty($_GET['inc_aide'])  : true;
-    $salShown = (int)$basePlusEch + ($incExtra ? $extraW : 0) + ($incAide ? $aideW : 0);
+    $incExtra = $optsSet ? !empty($_GET['inc_extra']) : salaryCompHas('extra');
+    $incAide  = $optsSet ? !empty($_GET['inc_aide'])  : salaryCompHas('aide');
+    $incTrans = $optsSet ? !empty($_GET['inc_trans']) : salaryCompHas('transport');
+    $salShown = (int)$basePlusEch + ($incExtra ? $extraW : 0) + ($incAide ? $aideW : 0) + ($incTrans ? $transW : 0);
     // العملة: ليرة (افتراضي) أو دولار — التحويل عبر سعر صرف شهر الراتب
     // العملة: تتبع الوضع العام (ليرة/دولار/الاثنين) ما لم يُحدَّد يدوياً لهذه الإفادة عبر ?cur=
     $cur = $_GET['cur'] ?? displayCurrency();
@@ -527,7 +527,7 @@ if (!$emp):
     $L=$money($salShown); $N=$money($net); $U='';
     $nssf=cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']);
     $rtl = ($docLang === 'ar');
-    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($sigIdx>0?'&sig='.$sigIdx:'');
+    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($sigIdx>0?'&sig='.$sigIdx:'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع لملف الأستاذ / Dossier</a>
@@ -569,7 +569,8 @@ if (!$emp):
             <?php if ($hasComponents): ?>
             <strong>Composantes du salaire / مكوّنات الراتب:</strong>
             <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_extra" value="1" <?= $incExtra?'checked':'' ?> onchange="this.form.submit()"> + Rémunération suppl. / + الأجر الإضافي (<?= formatLBP($extraW,false) ?>)</label>
-            <label style="cursor:pointer"><input type="checkbox" name="inc_aide" value="1" <?= $incAide?'checked':'' ?> onchange="this.form.submit()"> + Prime et aide / + مكافأة ومساعدة (<?= formatLBP($aideW,false) ?>)</label>
+            <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_aide" value="1" <?= $incAide?'checked':'' ?> onchange="this.form.submit()"> + Prime et aide / + مكافأة ومساعدة (<?= formatLBP($aideW,false) ?>)</label>
+            <label style="cursor:pointer"><input type="checkbox" name="inc_trans" value="1" <?= $incTrans?'checked':'' ?> onchange="this.form.submit()"> + Transport / + تعويض النقل (<?= formatLBP($transW,false) ?>)</label>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
             <?php endif; ?>
             <?php if ($hasCurrency): ?>
@@ -609,7 +610,7 @@ if (!$emp):
             <?php if ($grant>0): ?><div style="margin-top:6px;color:#1e40af"><?= number_format($grant) ?> دولار أميركي — بالحروف: <strong><?= e(numToArabicWords($grant)) ?> دولار أميركي</strong></div><?php endif; ?>
             <?php endif; ?>
             <?php if ($hasComponents): ?>
-            <div style="margin-top:6px;color:#1e40af">الراتب المعتمد بالإفادة: <strong><?= $moneyAr($salShown) ?></strong> (<?= $isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج' ?> <?= $moneyAr((int)$basePlusEch) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?>)<?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
+            <div style="margin-top:6px;color:#1e40af">الراتب المعتمد بالإفادة: <strong><?= $moneyAr($salShown) ?></strong> (<?= $isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج' ?> <?= $moneyAr((int)$basePlusEch) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?><?= $incTrans?' + النقل':'' ?>)<?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php elseif ($type === 'aqd_taalim'): ?>
             <div style="margin-top:6px;color:#1e40af">أساس الراتب بالعقد: <strong><?= $moneyAr((int)$basePlusEch) ?></strong><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php endif; ?>

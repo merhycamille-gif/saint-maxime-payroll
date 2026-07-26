@@ -763,6 +763,33 @@ function dualFromUsd($lbp, $usd, bool $withCur = true): string {
     return formatLBP($lbp, $withCur) . '<span class="money-usd">' . formatUSD($usd, true) . '</span>';
 }
 
+// =====================================================
+// تركيب «الراتب المركّب»: أي مكوّنات تُضاف للأساس (أساس+درجة) — زرّ خيار موحّد بالترويسة
+// =====================================================
+/** المكوّنات المختارة لإضافتها للأساس: مجموعة فرعية من ['extra','aide','transport']. */
+function salaryComp(): array {
+    $c = $_SESSION['salary_comp'] ?? ['extra', 'aide']; // الافتراضي: الأساسي + الإضافي + المكافأة/المساعدة
+    return array_values(array_intersect((array)$c, ['extra', 'aide', 'transport']));
+}
+function salaryCompHas(string $k): bool { return in_array($k, salaryComp(), true); }
+
+/** الراتب المركّب بالليرة = أساس+درجة + المكوّنات المختارة (إضافي/مكافأة-مساعدة/نقل). */
+function composedSalaryLbp(array $row): int {
+    $s = (int)($row['base_plus_echelon_lbp'] ?? 0);
+    if (salaryCompHas('extra'))     $s += (int)($row['extra_lbp'] ?? 0) + (int)($row['prime_fixe_lbp'] ?? 0);
+    if (salaryCompHas('aide'))      $s += (int)($row['aide_complementaire_lbp'] ?? 0);
+    if (salaryCompHas('transport')) $s += (int)($row['transport_lbp'] ?? 0);
+    return $s;
+}
+
+/** تسمية مختصرة لِما يشمله الراتب المركّب (للعناوين). */
+function salaryCompLabel(): string {
+    $names = ['extra' => 'الإضافي', 'aide' => 'المكافأة', 'transport' => 'النقل'];
+    $sel = salaryComp();
+    if (!$sel) return 'الأساسي فقط';
+    return 'الأساسي + ' . implode(' + ', array_map(fn($k) => $names[$k], $sel));
+}
+
 /**
  * نسخة نصّية بحتة (بلا HTML) لعرض المبلغ حسب الوضع — للإفادات النصّية وتصدير Excel/Word.
  */
