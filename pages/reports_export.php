@@ -45,35 +45,54 @@ if ($report === 'monthly_summary') {
     $rep = new ReportTable('كشف الرواتب الشهري — ' . monthName($month, 'ar') . ' ' . $year, true);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
-    $head = array_merge($head, ['الاسم', 'الفئة', 'الدرجة', 'أساس الراتب', 'قيمة الدرجة', 'الراتب بعد التدرّج', 'الأجر الإضافي', 'مكافأة ومساعدة', 'الضمان ٣٪', 'الصندوق ٦٪', 'الضريبة', 'الصافي', 'تعويض عائلي', 'تعويض النقل', 'الإجمالي المتوجب']);
+    // الأعمدة تتبع زرّ «الراتب المركّب يشمل» — العمود غير المختار يُخفى (متل الشاشة)
+    $head = array_merge($head, ['الاسم', 'الفئة', 'الدرجة', 'أساس الراتب', 'قيمة الدرجة', 'الراتب بعد التدرّج']);
+    $w = $schCol ? [5, 18, 26, 14, 8, 16, 14, 18] : [5, 28, 14, 8, 16, 14, 18];
+    if (salaryCompHas('extra')) { $head[] = 'الأجر الإضافي'; $w[] = 14; }
+    if (salaryCompHas('aide'))  { $head[] = 'مكافأة ومساعدة'; $w[] = 14; }
+    $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')'; $w[] = 18;
+    $head = array_merge($head, ['الضمان ٣٪', 'الصندوق ٦٪', 'الضريبة', 'الصافي', 'تعويض عائلي']);
+    $w = array_merge($w, [14, 14, 12, 16, 14]);
+    if (salaryCompHas('transport')) { $head[] = 'تعويض النقل'; $w[] = 14; }
+    $head[] = 'الإجمالي المتوجب'; $w[] = 18;
     $rep->head($head);
-    $rep->widths($schCol ? [5, 18, 26, 14, 8, 16, 14, 18, 14, 14, 14, 14, 12, 16, 14, 14, 18] : [5, 28, 14, 8, 16, 14, 18, 14, 14, 14, 14, 12, 16, 14, 14, 18]);
+    $rep->widths($w);
 
-    $z = ['base' => 0, 'ech' => 0, 'bpe' => 0, 'extra' => 0, 'aide' => 0, 'cnss' => 0, 'caisse' => 0, 'tax' => 0, 'net' => 0, 'fam' => 0, 'tr' => 0, 'tot' => 0];
+    $z = ['base' => 0, 'ech' => 0, 'bpe' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'cnss' => 0, 'caisse' => 0, 'tax' => 0, 'net' => 0, 'fam' => 0, 'tr' => 0, 'tot' => 0];
     $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
     $emit = function ($label, $a, $n) use ($rep, $schCol) {
-        $cells = ['', 'مجموع ' . $label . ' — العدد: ' . $n];
-        if ($schCol) array_splice($cells, 1, 0, '');
         // محاذاة الأعمدة: بعد (#,[school],name,type,grade) تبدأ الأرقام
         $pad = $schCol ? 5 : 4; $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'مجموع ' . $label . ' — العدد: ' . $n;
-        $row = array_merge($row, [$a['base'], $a['ech'], $a['bpe'], $a['extra'], $a['aide'], $a['cnss'], $a['caisse'], $a['tax'], $a['net'], $a['fam'], $a['tr'], $a['tot']]);
+        $row = array_merge($row, [$a['base'], $a['ech'], $a['bpe']]);
+        if (salaryCompHas('extra')) $row[] = $a['extra'];
+        if (salaryCompHas('aide'))  $row[] = $a['aide'];
+        $row[] = $a['composed'];
+        $row = array_merge($row, [$a['cnss'], $a['caisse'], $a['tax'], $a['net'], $a['fam']]);
+        if (salaryCompHas('transport')) $row[] = $a['tr'];
+        $row[] = $a['tot'];
         $rep->totalRow($row);
     };
     foreach ($data as $r) {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
         $tr = (int)$r['transport_lbp'];
-        $v = ['base' => (int)$r['base_salary_lbp'], 'ech' => (int)$r['echelon_value_lbp'], 'bpe' => (int)$r['base_plus_echelon_lbp'], 'extra' => extraWageLbp($r), 'aide' => aideCompLbp($r), 'cnss' => (int)$r['cnss_amount_lbp'], 'caisse' => (int)$r['caisse_amount_lbp'], 'tax' => (int)$r['income_tax_lbp'], 'net' => (int)$r['net_salary_lbp'], 'fam' => (int)$r['family_allowance_lbp'], 'tr' => $tr, 'tot' => (int)$r['total_due_lbp']];
+        $v = ['base' => (int)$r['base_salary_lbp'], 'ech' => (int)$r['echelon_value_lbp'], 'bpe' => (int)$r['base_plus_echelon_lbp'], 'extra' => extraWageLbp($r), 'aide' => aideCompLbp($r), 'composed' => composedSalaryLbp($r), 'cnss' => (int)$r['cnss_amount_lbp'], 'caisse' => (int)$r['caisse_amount_lbp'], 'tax' => (int)$r['income_tax_lbp'], 'net' => (int)$r['net_salary_lbp'], 'fam' => (int)$r['family_allowance_lbp'], 'tr' => $tr, 'tot' => (int)$r['total_due_lbp']];
         foreach ($v as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [$nm($r), employeeTypeLabel($r['employee_type']), gradeDisplay($r['employee_type'], $r['grade_at_month']), $v['base'], $v['ech'], $v['bpe'], $v['extra'], $v['aide'], $v['cnss'], $v['caisse'], $v['tax'], $v['net'], $v['fam'], $v['tr'], $v['tot']]);
+        $row = array_merge($row, [$nm($r), employeeTypeLabel($r['employee_type']), gradeDisplay($r['employee_type'], $r['grade_at_month']), $v['base'], $v['ech'], $v['bpe']]);
+        if (salaryCompHas('extra')) $row[] = $v['extra'];
+        if (salaryCompHas('aide'))  $row[] = $v['aide'];
+        $row[] = $v['composed'];
+        $row = array_merge($row, [$v['cnss'], $v['caisse'], $v['tax'], $v['net'], $v['fam']]);
+        if (salaryCompHas('transport')) $row[] = $v['tr'];
+        $row[] = $v['tot'];
         $rep->row($row);
     }
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('الإجمالي العام', $G, $rn); }
 
 } elseif ($report === 'cnss_summary') {
-    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.nssf_number,e.birth_date,e.school_id,ms.base_salary_lbp,ms.cnss_amount_lbp,ms.school_cnss_8_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
+    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.nssf_number,e.birth_date,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.cnss_amount_lbp,ms.school_cnss_8_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.cnss_subject=1" . $schoolSql . $empYearFilter . "
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
@@ -82,30 +101,39 @@ if ($report === 'monthly_summary') {
     $rep = new ReportTable('كشف اشتراكات الضمان — ' . monthName($month, 'ar') . ' ' . $year, true);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
-    $head = array_merge($head, ['رقم الضمان', 'الاسم', 'أساس الراتب', 'الأجر الإضافي', 'مكافأة ومساعدة', 'وعاء الضمان', 'الأجير ٣٪', 'المدرسة ٨٪']);
+    $head = array_merge($head, ['رقم الضمان', 'الاسم', 'أساس الراتب']);
+    if (salaryCompHas('extra')) $head[] = 'الأجر الإضافي';
+    if (salaryCompHas('aide'))  $head[] = 'مكافأة ومساعدة';
+    $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')';
+    $head = array_merge($head, ['وعاء الضمان', 'الأجير ٣٪', 'المدرسة ٨٪']);
     $rep->head($head);
-    $z = ['base' => 0, 'extra' => 0, 'aide' => 0, 'cnss' => 0, 'school' => 0]; $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
+    $z = ['base' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'cnss' => 0, 'school' => 0]; $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
     $pad = $schCol ? 4 : 3;
     $emit = function ($label, $a, $n) use ($rep, $pad) {
         $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'مجموع ' . $label . ' — العدد: ' . $n;
-        $row = array_merge($row, [$a['base'], $a['extra'], $a['aide'], '', $a['cnss'], $a['school']]);
+        $row[] = $a['base'];
+        if (salaryCompHas('extra')) $row[] = $a['extra'];
+        if (salaryCompHas('aide'))  $row[] = $a['aide'];
+        $row = array_merge($row, [$a['composed'], '', $a['cnss'], $a['school']]);
         $rep->totalRow($row);
     };
     foreach ($data as $r) {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
-        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $cnss = (int)$r['cnss_amount_lbp']; $sch = (int)$r['school_cnss_8_lbp'];
-        $sub['base'] += $base; $sub['extra'] += $ex; $sub['aide'] += $ai; $sub['cnss'] += $cnss; $sub['school'] += $sch;
-        foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'cnss' => $cnss, 'school' => $sch] as $k => $val) $G[$k] += $val;
+        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r); $cnss = (int)$r['cnss_amount_lbp']; $sch = (int)$r['school_cnss_8_lbp'];
+        foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'cnss' => $cnss, 'school' => $sch] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [cnssWithBirthYear($r['nssf_number'], $r['birth_date']), $nm($r), $base, $ex, $ai, ($cnss ? (int)round($cnss / 0.03) : 0), $cnss, $sch]);
+        $row = array_merge($row, [cnssWithBirthYear($r['nssf_number'], $r['birth_date']), $nm($r), $base]);
+        if (salaryCompHas('extra')) $row[] = $ex;
+        if (salaryCompHas('aide'))  $row[] = $ai;
+        $row = array_merge($row, [$comp, ($cnss ? (int)round($cnss / 0.03) : 0), $cnss, $sch]);
         $rep->row($row);
     }
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('المجموع العام', $G, $rn); }
 
 } elseif ($report === 'tax_summary') {
-    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.finance_ministry_number,e.school_id,ms.base_salary_lbp,ms.income_tax_lbp,ms.taxable_base_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
+    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.finance_ministry_number,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.income_tax_lbp,ms.taxable_base_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.tax_subject=1" . $schoolSql . $empYearFilter . "
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
@@ -114,30 +142,39 @@ if ($report === 'monthly_summary') {
     $rep = new ReportTable('كشف ضريبة الدخل — ' . monthName($month, 'ar') . ' ' . $year, true);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
-    $head = array_merge($head, ['رقم المالية', 'الاسم', 'أساس الراتب', 'الأجر الإضافي', 'مكافأة ومساعدة', 'الراتب الخاضع', 'ضريبة الدخل']);
+    $head = array_merge($head, ['رقم المالية', 'الاسم', 'أساس الراتب']);
+    if (salaryCompHas('extra')) $head[] = 'الأجر الإضافي';
+    if (salaryCompHas('aide'))  $head[] = 'مكافأة ومساعدة';
+    $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')';
+    $head = array_merge($head, ['الراتب الخاضع', 'ضريبة الدخل']);
     $rep->head($head);
-    $z = ['base' => 0, 'extra' => 0, 'aide' => 0, 'txb' => 0, 'tax' => 0]; $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
+    $z = ['base' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'txb' => 0, 'tax' => 0]; $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
     $pad = $schCol ? 4 : 3;
     $emit = function ($label, $a, $n) use ($rep, $pad) {
         $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'مجموع ' . $label . ' — العدد: ' . $n;
-        $row = array_merge($row, [$a['base'], $a['extra'], $a['aide'], $a['txb'], $a['tax']]);
+        $row[] = $a['base'];
+        if (salaryCompHas('extra')) $row[] = $a['extra'];
+        if (salaryCompHas('aide'))  $row[] = $a['aide'];
+        $row = array_merge($row, [$a['composed'], $a['txb'], $a['tax']]);
         $rep->totalRow($row);
     };
     foreach ($data as $r) {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
-        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $txb = (int)$r['taxable_base_lbp']; $tax = (int)$r['income_tax_lbp'];
-        $sub['base'] += $base; $sub['extra'] += $ex; $sub['aide'] += $ai; $sub['txb'] += $txb; $sub['tax'] += $tax;
-        foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'txb' => $txb, 'tax' => $tax] as $k => $val) $G[$k] += $val;
+        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r); $txb = (int)$r['taxable_base_lbp']; $tax = (int)$r['income_tax_lbp'];
+        foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'txb' => $txb, 'tax' => $tax] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [$r['finance_ministry_number'], $nm($r), $base, $ex, $ai, $txb, $tax]);
+        $row = array_merge($row, [$r['finance_ministry_number'], $nm($r), $base]);
+        if (salaryCompHas('extra')) $row[] = $ex;
+        if (salaryCompHas('aide'))  $row[] = $ai;
+        $row = array_merge($row, [$comp, $txb, $tax]);
         $rep->row($row);
     }
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('المجموع العام', $G, $rn); }
 
 } elseif ($report === 'eoc_summary') {
-    $st = $db->prepare("SELECT e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.caisse_number,e.school_id,ms.base_salary_lbp,ms.caisse_amount_lbp,ms.eoc_grade_lbp,ms.school_eoc_6_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
+    $st = $db->prepare("SELECT e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.caisse_number,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.caisse_amount_lbp,ms.eoc_grade_lbp,ms.school_eoc_6_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.employee_type='enseignant_titulaire'" . $schoolSql . $empYearFilter . "
         ORDER BY e.school_id, COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
@@ -146,19 +183,29 @@ if ($report === 'monthly_summary') {
     $rep = new ReportTable('كشف صندوق التعويضات — ' . monthName($month, 'ar') . ' ' . $year, true);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
-    $head = array_merge($head, ['رقم الصندوق', 'الاسم', 'أساس الراتب', 'الأجر الإضافي', 'مكافأة ومساعدة', 'الأجير ٦٪', 'درجة/نصف راتب', 'المدرسة ٦٪']);
+    $head = array_merge($head, ['رقم الصندوق', 'الاسم', 'أساس الراتب']);
+    if (salaryCompHas('extra')) $head[] = 'الأجر الإضافي';
+    if (salaryCompHas('aide'))  $head[] = 'مكافأة ومساعدة';
+    $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')';
+    $head = array_merge($head, ['الأجير ٦٪', 'درجة/نصف راتب', 'المدرسة ٦٪']);
     $rep->head($head);
-    $T = ['base' => 0, 'extra' => 0, 'aide' => 0, 'caisse' => 0, 'grade' => 0, 'school' => 0]; $rn = 0;
+    $T = ['base' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'caisse' => 0, 'grade' => 0, 'school' => 0]; $rn = 0;
     foreach ($data as $r) {
-        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $ca = (int)$r['caisse_amount_lbp']; $gr = (int)$r['eoc_grade_lbp']; $sc = (int)$r['school_eoc_6_lbp'];
-        $T['base'] += $base; $T['extra'] += $ex; $T['aide'] += $ai; $T['caisse'] += $ca; $T['grade'] += $gr; $T['school'] += $sc; $rn++;
+        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r); $ca = (int)$r['caisse_amount_lbp']; $gr = (int)$r['eoc_grade_lbp']; $sc = (int)$r['school_eoc_6_lbp'];
+        $T['base'] += $base; $T['extra'] += $ex; $T['aide'] += $ai; $T['composed'] += $comp; $T['caisse'] += $ca; $T['grade'] += $gr; $T['school'] += $sc; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [$r['caisse_number'], $nm($r), $base, $ex, $ai, $ca, ($gr > 0 ? $gr : '—'), $sc]);
+        $row = array_merge($row, [$r['caisse_number'], $nm($r), $base]);
+        if (salaryCompHas('extra')) $row[] = $ex;
+        if (salaryCompHas('aide'))  $row[] = $ai;
+        $row = array_merge($row, [$comp, $ca, ($gr > 0 ? $gr : '—'), $sc]);
         $rep->row($row);
     }
     if ($data) {
         $pad = $schCol ? 4 : 3; $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'المجاميع — العدد: ' . $rn;
-        $rep->totalRow(array_merge($row, [$T['base'], $T['extra'], $T['aide'], $T['caisse'], $T['grade'], $T['school']]));
+        $row[] = $T['base'];
+        if (salaryCompHas('extra')) $row[] = $T['extra'];
+        if (salaryCompHas('aide'))  $row[] = $T['aide'];
+        $rep->totalRow(array_merge($row, [$T['composed'], $T['caisse'], $T['grade'], $T['school']]));
     }
 
 } elseif ($report === 'employee_list') {
@@ -238,9 +285,11 @@ if ($report === 'monthly_summary') {
     $rep->totalRow(['الإجمالي المتوجب (صافي + تعويضات)', (int)$t['total']]);
     $rep->row(['أساس الراتب', (int)$t['base_sal']]);
     $rep->row(['الراتب بعد التدرّج', (int)$t['bpe']]);
-    $rep->row(['الأجر الإضافي', (int)$t['extra_wage']]);
-    $rep->row(['مكافأة ومساعدة', (int)$t['aide']]);
-    $rep->row(['تعويض النقل', (int)$t['transport']]);
+    if (salaryCompHas('extra')) $rep->row(['الأجر الإضافي', (int)$t['extra_wage']]);
+    if (salaryCompHas('aide'))  $rep->row(['مكافأة ومساعدة', (int)$t['aide']]);
+    if (salaryCompHas('transport')) $rep->row(['تعويض النقل', (int)$t['transport']]);
+    $compAnn = (int)$t['bpe'] + (salaryCompHas('extra') ? (int)$t['extra_wage'] : 0) + (salaryCompHas('aide') ? (int)$t['aide'] : 0) + (salaryCompHas('transport') ? (int)$t['transport'] : 0);
+    $rep->totalRow(['الراتب المركّب (' . salaryCompLabel() . ')', $compAnn]);
     $rep->row(['الضمان (حصة الأجير ٣٪)', (int)$t['cnss']]);
     $rep->row(['الضمان (حصة المدرسة ٨٪)', (int)$t['scnss']]);
     $rep->row(['صندوق التعويضات (الأجير)', (int)$t['caisse']]);

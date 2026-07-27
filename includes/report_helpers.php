@@ -41,17 +41,49 @@ function extraWageLbp(array $r): int {
 function aideCompLbp(array $r): int {
     return (int)($r['aide_complementaire_lbp'] ?? 0);
 }
-/** رأسا العمودين (يُدرجان في <thead><tr>). */
-function extraAideHeads(): string {
-    return '<th>الأجر الإضافي</th><th>مكافأة ومساعدة</th>';
+/** رأسا العمودين (يُدرجان في <thead><tr>).
+ *  يتبعان زرّ «الراتب المركّب يشمل» بالترويسة: العمود غير المختار يُخفى كلياً من التقرير.
+ *  $attrs: سمات إضافية للـ<th> (مثل ' rowspan="2"'). */
+function extraAideHeads(string $attrs = ''): string {
+    $h = '';
+    if (salaryCompHas('extra')) $h .= '<th' . $attrs . '>الأجر الإضافي</th>';
+    if (salaryCompHas('aide'))  $h .= '<th' . $attrs . '>مكافأة ومساعدة</th>';
+    return $h;
 }
-/** خليّتا العمودين لصف الجسم. $num=true يضيف class="num" (للنماذج الرسمية ذات الأرقام يساراً).
+/** خليّتا العمودين لصف الجسم (تتبعان زرّ «الراتب المركّب يشمل» — تُخفيان إن لم تُختارا).
+ *  $num=true يضيف class="num" (للنماذج الرسمية ذات الأرقام يساراً).
  *  تعرض العملة حسب وضع المستخدم (ليرة/دولار/الاثنين) عبر money() بسعر صرف شهر الصف. */
 function extraAideCells(array $r, bool $num = true): string {
     $cls = $num ? ' class="num"' : '';
     $rate = rowRate($r);
-    return '<td' . $cls . '>' . money(extraWageLbp($r), $rate, ['withCur' => false]) . '</td>'
-         . '<td' . $cls . '>' . money(aideCompLbp($r), $rate, ['withCur' => false]) . '</td>';
+    $h = '';
+    if (salaryCompHas('extra')) $h .= '<td' . $cls . '>' . money(extraWageLbp($r), $rate, ['withCur' => false]) . '</td>';
+    if (salaryCompHas('aide'))  $h .= '<td' . $cls . '>' . money(aideCompLbp($r), $rate, ['withCur' => false]) . '</td>';
+    return $h;
+}
+/** خليّتا مجاميع العمودين (لصفوف subtotal/total المبنية من مصفوفات مجاميع بالليرة والدولار). */
+function extraAideTotalCells($exLbp, $exUsd, $aiLbp, $aiUsd, bool $num = true): string {
+    $cls = $num ? ' class="num"' : '';
+    $h = '';
+    if (salaryCompHas('extra')) $h .= '<td' . $cls . '>' . dualFromUsd($exLbp, $exUsd, false) . '</td>';
+    if (salaryCompHas('aide'))  $h .= '<td' . $cls . '>' . dualFromUsd($aiLbp, $aiUsd, false) . '</td>';
+    return $h;
+}
+/** رأس عمود «تعويض النقل» (يتبع زرّ «الراتب المركّب يشمل» — يُخفى إن لم يُختَر النقل). */
+function transportHead(string $attrs = '', string $label = 'تعويض النقل'): string {
+    return salaryCompHas('transport') ? '<th' . $attrs . '>' . $label . '</th>' : '';
+}
+/** خلية «تعويض النقل» لصف الجسم (تُخفى إن لم يُختَر النقل). */
+function transportCell(array $r, bool $num = true): string {
+    if (!salaryCompHas('transport')) return '';
+    $cls = $num ? ' class="num"' : '';
+    return '<td' . $cls . '>' . money((int)($r['transport_lbp'] ?? 0), rowRate($r), ['withCur' => false]) . '</td>';
+}
+/** خلية مجموع «تعويض النقل» (لصفوف المجاميع). */
+function transportTotalCell($lbp, $usd, bool $num = true): string {
+    if (!salaryCompHas('transport')) return '';
+    $cls = $num ? ' class="num"' : '';
+    return '<td' . $cls . '>' . dualFromUsd($lbp, $usd, false) . '</td>';
 }
 /**
  * الأجر الخاضع للضمان/نهاية الخدمة حسب **خيار خضوع الأستاذ** (الزرّ الأخضر بملف الأستاذ):

@@ -470,7 +470,10 @@ include __DIR__ . '/../includes/header.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($list as $r): ?>
+                        <?php $mpT = ['net'=>0,'due'=>0,'due_usd'=>0.0,'n'=>0];
+                        foreach ($list as $r):
+                            if ($r['is_calculated']) { $mpT['net'] += (int)$r['net_salary_lbp']; $mpT['due'] += (int)$r['total_due_lbp']; $mpT['due_usd'] += (float)$r['total_due_usd']; $mpT['n']++; }
+                        ?>
                             <tr>
                                 <td><strong><?= e($r['employee_code']) ?></strong></td>
                                 <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
@@ -500,6 +503,13 @@ include __DIR__ . '/../includes/header.php';
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
+                    <?php if ($mpT['n'] > 0): ?><tfoot><tr class="total-row" style="font-weight:700;background:var(--gold-light,#fdf6e3)">
+                        <td colspan="<?= isAllSchools() ? 5 : 4 ?>" style="text-align:right">المجموع (المحتسَبون: <?= $mpT['n'] ?>) / Total</td>
+                        <td><?= formatLBP($mpT['net']) ?></td>
+                        <td><strong><?= formatLBP($mpT['due']) ?></strong></td>
+                        <td><?= formatUSD($mpT['due_usd']) ?></td>
+                        <td></td><td class="no-print"></td>
+                    </tr></tfoot><?php endif; ?>
                 </table>
             </div>
         </div>

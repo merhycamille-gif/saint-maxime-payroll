@@ -135,7 +135,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
     $slipRate = $meta['rate'];
     // موظف إداري: لا أعمدة درجة/تدرّج ولا صندوق تعويضات (يخضع لقانون العمل — راتب مباشر، نهاية خدمته من الضمان).
     $isEmp = ($emp['employee_type'] === 'employe');
-    $slipCols = $isEmp ? 13 : 17; // عدد أعمدة الجدول (تُطرح 4 أعمدة الأستاذ للموظف الإداري)
+    // عدد أعمدة الجدول (تُطرح 4 أعمدة الأستاذ للموظف الإداري) — أعمدة الإضافي/المكافأة/النقل تتبع زرّ «الراتب يشمل»
+    $slipCols = ($isEmp ? 10 : 14) + compColsCount();
 
     ob_start();
     ?>
@@ -176,13 +177,13 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <th rowspan="2">قيمة الدرجة (ل.ل)<br>Valeur échelon</th>
                     <th rowspan="2">الراتب بعد التدرج<br>Après échelon</th>
                     <?php endif; ?>
-                    <th rowspan="2">الأجر الإضافي<br>Supplément</th>
-                    <th rowspan="2">مكافأة ومساعدة<br>Prime &amp; aide</th>
+                    <?php if (salaryCompHas('extra')): ?><th rowspan="2">الأجر الإضافي<br>Supplément</th><?php endif; ?>
+                    <?php if (salaryCompHas('aide')): ?><th rowspan="2">مكافأة ومساعدة<br>Prime &amp; aide</th><?php endif; ?>
                     <th rowspan="2">Brut<br>الإجمالي</th>
                     <th colspan="<?= $isEmp ? 3 : 5 ?>" class="deduction-header">Retenues / المحسومات</th>
                     <th rowspan="2">الصافي<br>Net</th>
                     <th rowspan="2">Alloc. fam.<br>عائلي</th>
-                    <th rowspan="2">Transport<br>نقل</th>
+                    <?php if (salaryCompHas('transport')): ?><th rowspan="2">Transport<br>نقل</th><?php endif; ?>
                     <th rowspan="2">المستحق<br>Total dû</th>
                     <th rowspan="2" class="sig-col">التوقيع<br>Signature</th>
                 </tr>
@@ -217,8 +218,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '' ?></td>
                             <td><strong><?= formatLBP($r['cur_sal'], false) ?></strong></td>
                             <?php endif; ?>
-                            <td><?php if ($r['extra_wage'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><?php else: ?>—<?php endif; ?></td>
-                            <td><?php if ($r['aide'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['aide']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><?php else: ?>—<?php endif; ?></td>
+                            <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
+                            <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['aide']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <td><?= $money($r['brut'], true) ?></td>
                             <?php if (!$isEmp): ?>
                             <td><?= $money($r['caisse']) ?></td>
@@ -229,7 +230,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td><?= $money($r['total_retenues']) ?></td>
                             <td><?= $money($r['net'], true) ?></td>
                             <td><?= $money($r['family']) ?></td>
-                            <td><?= $money($r['transport']) ?></td>
+                            <?php if (salaryCompHas('transport')): ?><td><?= $money($r['transport']) ?></td><?php endif; ?>
                             <td><?= $money($r['total_due'], true) ?></td>
                             <td class="sig-cell">&nbsp;</td>
                         <?php else: ?>
@@ -249,8 +250,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <td><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
                     <td><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></td>
                     <?php endif; ?>
-                    <td><span class="cur-usd"><strong><?= number_format($tot['extra_wage_usd'], 2) ?> $</strong></span><span class="sub-lbp"><?= formatLBP($tot['extra_wage'], false) ?></span></td>
-                    <td><span class="cur-usd"><strong><?= number_format($tot['aide_usd'], 2) ?> $</strong></span><span class="sub-lbp"><?= formatLBP($tot['aide'], false) ?></span></td>
+                    <?php if (salaryCompHas('extra')): ?><td><span class="cur-usd"><strong><?= number_format($tot['extra_wage_usd'], 2) ?> $</strong></span><span class="sub-lbp"><?= formatLBP($tot['extra_wage'], false) ?></span></td><?php endif; ?>
+                    <?php if (salaryCompHas('aide')): ?><td><span class="cur-usd"><strong><?= number_format($tot['aide_usd'], 2) ?> $</strong></span><span class="sub-lbp"><?= formatLBP($tot['aide'], false) ?></span></td><?php endif; ?>
                     <td><?= $moneyTot($tot['brut'], $tot['brut_usd']) ?></td>
                     <?php if (!$isEmp): ?>
                     <td><?= $moneyTot($tot['caisse'], $tot['caisse_usd']) ?></td>
@@ -261,7 +262,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <td><?= $moneyTot($tot['total_retenues'], $tot['totret_usd']) ?></td>
                     <td><?= $moneyTot($tot['net'], $tot['net_usd']) ?></td>
                     <td><?= $moneyTot($tot['family'], $tot['family_usd']) ?></td>
-                    <td><?= $moneyTot($tot['transport'], $tot['transport_usd']) ?></td>
+                    <?php if (salaryCompHas('transport')): ?><td><?= $moneyTot($tot['transport'], $tot['transport_usd']) ?></td><?php endif; ?>
                     <td><?= $moneyTot($tot['total_due'], $tot['total_due_usd']) ?></td>
                     <td class="sig-cell"></td>
                 </tr>

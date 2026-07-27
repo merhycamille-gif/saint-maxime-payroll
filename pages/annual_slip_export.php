@@ -33,9 +33,22 @@ $widths = [12, 14, 12, 15, 14, 13, 15, 12, 12, 13, 12, 14, 15, 12, 14, 15, 12];
 
 // أعمدة الأستاذ التي تُحذف للموظف الإداري (قيمة الدرجة، الراتب بعد التدرّج، الصندوق، درجة/نصف راتب) — مؤشّرات 0-based.
 const ANNUAL_TEACHER_COLS = [2, 3, 7, 8];
-function annualDropTeacherCols(array $row) {
-    foreach (ANNUAL_TEACHER_COLS as $i) unset($row[$i]);
+// أعمدة المكوّنات في التخطيط الأصلي (17 عموداً): الأجر الإضافي=4، مكافأة ومساعدة=5، النقل=14 —
+// تُحذف حسب زرّ «الراتب المركّب يشمل» (متل الشاشة). الحذف يتم دفعة واحدة بالمؤشّرات الأصلية.
+function annualCompDropIdx(): array {
+    $d = [];
+    if (!salaryCompHas('extra'))     $d[] = 4;
+    if (!salaryCompHas('aide'))      $d[] = 5;
+    if (!salaryCompHas('transport')) $d[] = 14;
+    return $d;
+}
+function annualDropCols(array $row, bool $dropTeacher): array {
+    $drop = array_merge($dropTeacher ? ANNUAL_TEACHER_COLS : [], annualCompDropIdx());
+    foreach ($drop as $i) unset($row[$i]);
     return array_values($row);
+}
+function annualDropTeacherCols(array $row) {
+    return annualDropCols($row, true);
 }
 
 /**
@@ -46,7 +59,7 @@ function annualDropTeacherCols(array $row) {
 function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $dropCols = false) {
     $m = $slip['meta'];
     $emit = function (array $row, $isTotal = false) use ($rep, $dropCols) {
-        if ($dropCols) $row = annualDropTeacherCols($row);
+        $row = annualDropCols($row, $dropCols);
         $isTotal ? $rep->totalRow($row) : $rep->row($row);
     };
     if ($withIdentity) {
@@ -93,8 +106,8 @@ if ($all) {
     $rep = new ReportTable('كشوف الرواتب السنوية ' . $schoolYear . ' — ' . $typeLbl, true);
     $rep->schoolHeader(currentSchool());
     $rep->period('السنة الدراسية ' . $schoolYear . ' — ' . $typeLbl . ' (' . count($emps) . ' موظف)');
-    $rep->head($head);
-    $rep->widths($widths);
+    $rep->head(annualDropCols($head, false));
+    $rep->widths(annualDropCols($widths, false));
     foreach ($emps as $emp) {
         addEmployeeBlock($rep, computeAnnualSlip($db, $emp, $schoolYear));
     }
@@ -118,7 +131,7 @@ $rep->period($m['name'] . '  —  ' . ($isAdminEmp ? 'الوظيفة' : 'الش�
     . ($isAdminEmp ? '' : ' · الدرجة: ' . $m['grade'])
     . ' · ر.الضمان: ' . $m['cnss'] . ' · ر.الصندوق: ' . $m['caisse_no'] . ' · ر.المالية: ' . $m['finance_no']);
 // الموظف الإداري: احذف أعمدة الدرجة/التدرّج/الصندوق من الرأس والعرض والصفوف (لا سلسلة رتب له).
-$rep->head($isAdminEmp ? annualDropTeacherCols($head) : $head);
-$rep->widths($isAdminEmp ? annualDropTeacherCols($widths) : $widths);
+$rep->head(annualDropCols($head, $isAdminEmp));
+$rep->widths(annualDropCols($widths, $isAdminEmp));
 addEmployeeBlock($rep, $slip, false, $isAdminEmp); // الهوية معروضة في period — لا تكرّرها
 $rep->export($format);

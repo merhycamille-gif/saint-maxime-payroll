@@ -397,13 +397,18 @@ function yearEmploymentFilter($schoolYear, $prefix = '') {
         return ['', []];
     }
     // «موجود فعلاً بهذه السنة» = عنده راتب **فعلي (غير صفري)** بتلك السنة الدراسية،
-    // **وغير تارك**. الاعتماد على **تاريخ الترك**: بمجرّد إدخال أيّ تاريخ ترك (ضمان/مالية/
-    // صندوق) لا يعود الأستاذ يظهر في أي سنة محدّدة. ولرؤية السابقين يُستعمل «كل السنين»
-    // (تُعيد الدالة بلا فلترة فيظهر الجميع). شرط القيمة>0 يستبعد الصفوف الصفرية (الأشباح).
+    // **ولم يترك قبل بدايتها**. التارك يبقى ظاهراً في كل سنة عمل فيها حتى تاريخ تركه
+    // (مثال: ترك 30-9-2026 → يظهر في 2025-2026 كاملة لأنه عمل فيها، ويختفي من 2026-2027
+    // التي تبدأ 1-10-2026). ولرؤية كل السابقين يُستعمل «كل السنين» (بلا فلترة).
+    // شرط القيمة>0 يستبعد الصفوف الصفرية (الأشباح).
+    $yearStart = $m[1] . '-10-01'; // بداية السنة الدراسية (تشرين الأول)
+    $leftDate = "LEAST(COALESCE({$prefix}left_date_cnss,'9999-12-31'),"
+              . "COALESCE({$prefix}left_date_finance,'9999-12-31'),"
+              . "COALESCE({$prefix}left_date_eoc,'9999-12-31'))";
     $sql = " AND {$prefix}id IN (SELECT employee_id FROM monthly_salaries"
          . " WHERE school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))"
-         . " AND {$prefix}left_date_cnss IS NULL AND {$prefix}left_date_finance IS NULL AND {$prefix}left_date_eoc IS NULL";
-    return [$sql, [$schoolYear]];
+         . " AND {$leftDate} >= ?";
+    return [$sql, [$schoolYear, $yearStart]];
 }
 
 // 🩹 شفاء ذاتي: احذف أيّ راتب شهري يقع في سنة دراسية **بعد** سنة ترك الأستاذ.
@@ -779,6 +784,13 @@ function salaryComp(): array {
     return array_values(array_intersect((array)$c, ['extra', 'aide', 'transport']));
 }
 function salaryCompHas(string $k): bool { return in_array($k, salaryComp(), true); }
+
+/** عدد أعمدة المكوّنات الظاهرة (إضافي/مكافأة/نقل) — لضبط colspan الجداول ديناميكياً حسب «الراتب يشمل». */
+function compColsCount(bool $withTransport = true): int {
+    $n = (salaryCompHas('extra') ? 1 : 0) + (salaryCompHas('aide') ? 1 : 0);
+    if ($withTransport) $n += salaryCompHas('transport') ? 1 : 0;
+    return $n;
+}
 
 /** الراتب المركّب بالليرة = أساس+درجة + المكوّنات المختارة (إضافي/مكافأة-مساعدة/نقل). */
 function composedSalaryLbp(array $row): int {

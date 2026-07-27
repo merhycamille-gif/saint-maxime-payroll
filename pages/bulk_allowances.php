@@ -338,10 +338,11 @@ $exchangeRate = (float)getExchangeRate();
         <table class="table" style="font-size:13px">
             <thead><tr><th>#</th><?php if ($scopeAll): ?><th>École / المدرسة</th><?php endif; ?><th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>Jours/sem. / أيام/أسبوع</th><th>Transport journalier / نقل يومي</th><th>Transport mensuel (calculé) / نقل شهري (محسوب)</th><th>Primes actuelles / المكافآت الحالية</th></tr></thead>
             <tbody>
-            <?php $i=1; foreach ($preview as $p):
+            <?php $i=1; $baTot=0.0; foreach ($preview as $p):
                 $nm = trim(($p['first_name_ar'] ?: $p['first_name_fr']).' '.($p['last_name_ar'] ?: $p['last_name_fr']));
                 $td = (float)$p['transport_daily_amount']; $days = (float)$p['days_per_week'];
                 $monthly = $td * $days * 4; if (($p['transport_daily_currency'] ?? 'LBP')==='USD') $monthly *= $exchangeRate;
+                $baTot += $monthly;
             ?>
                 <tr>
                     <td><?= $i++ ?></td>
@@ -355,6 +356,11 @@ $exchangeRate = (float)getExchangeRate();
                 </tr>
             <?php endforeach; ?>
             </tbody>
+            <?php if ($preview): ?><tfoot><tr style="font-weight:700;background:#fdf6e3">
+                <td colspan="<?= $scopeAll ? 6 : 5 ?>" style="text-align:right">المجموع — العدد: <?= count($preview) ?> / Total</td>
+                <td><?= formatLBP($baTot) ?></td>
+                <td></td>
+            </tr></tfoot><?php endif; ?>
         </table>
     </div>
 </div>
