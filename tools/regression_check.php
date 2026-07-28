@@ -205,6 +205,45 @@ check('صف المجموع موجود — لائحة رواتب الشهر', str
 // تطابق المجموع مع الداتا: مجموع «الراتب المركّب» بذيل eoc_staff = مجموع الحساب المباشر من DB
 // (فحص وجود القيمة المتوقعة ضمن الصفحة يكفي لكشف أي انزلاق بالأعمدة)
 
+/* =====================================================================
+ * 8) التنسيق الرسمي A4 (2026-07-28): كشف الرواتب/القسيمة/الإفادتين
+ * =================================================================== */
+$hSA = $html['salary_all|all'] ?? renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra', 'aide', 'transport']);
+check('كشف الرواتب: العنوان الرسمي «كشف الرواتب والأجور الشهري»', strpos($hSA, 'كشف الرواتب والأجور الشهري') !== false);
+check('كشف الرواتب: عمود توقيع الموظف', strpos($hSA, 'توقيع الموظف') !== false);
+check('كشف الرواتب: تواقيع إعداد/تدقيق/اعتماد', strpos($hSA, 'إعداد: المحاسب') !== false
+      && strpos($hSA, 'تدقيق: مدير الموارد البشرية') !== false && strpos($hSA, 'اعتماد: المدير العام') !== false);
+$hlpSrc = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php');
+check('رؤوس الجداول كحلية #1F4E5F (شاشة + طباعة)', substr_count($hlpSrc, '#1F4E5F') >= 2);
+check('الخط العربي الرسمي (Sakkal Majalla) معرَّف', strpos($hlpSrc, 'Sakkal Majalla') !== false);
+$regEid = (int)$db->query("SELECT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+                           WHERE ms.month = 6 AND ms.year = 2026 AND ms.net_salary_lbp > 0 AND e.is_deleted = 0 LIMIT 1")->fetchColumn();
+if ($regEid) {
+    $hPs = renderPage('pages/monthly_payroll.php', ['employee_id' => $regEid, 'month' => 6, 'year' => 2026], []);
+    check('القسيمة: توقيعا المحاسب والموظف بالاستلام', strpos($hPs, 'توقيع المحاسب') !== false && strpos($hPs, 'توقيع الموظف بالاستلام') !== false);
+    check('القسيمة: «صافي الراتب المستحق للدفع» بارز', strpos($hPs, 'صافي الراتب المستحق للدفع') !== false);
+    $hAt = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire'], []);
+    check('إفادة راتب: الصيغة الرسمية (تفصيل + عدم مسؤولية)', strpos($hAt, 'وفق التفصيل الآتي') !== false && strpos($hAt, 'دون أدنى مسؤولية') !== false);
+    $hAw = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'tadris'], []);
+    check('إفادة عمل: جملة حسن السلوك والالتزام', strpos($hAw, 'حسن سلوك والتزام') !== false);
+} else {
+    check('التنسيق الرسمي: لا موظف تجريبي (6/2026)', false, 'ما لقيت راتب محسوب 6/2026');
+}
+
+/* =====================================================================
+ * 9) «الراتب يشمل» يعمّ كل التقارير (2026-07-28): بيان الصندوق الفصلي + معلومات عامة
+ * =================================================================== */
+$hQon  = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 3], ['extra', 'aide']);
+$hQoff = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 3], []);
+check('بيان الصندوق الفصلي: أعمدة الإضافي/المكافأة/المركّب تظهر مع الخيار',
+      strpos($hQon, 'الأجر الإضافي<br>(ل.ل)') !== false && strpos($hQon, 'مكافأة ومساعدة<br>(ل.ل)') !== false && strpos($hQon, 'الراتب المركّب') !== false);
+check('بيان الصندوق الفصلي: الأعمدة تختفي بلا الخيار',
+      strpos($hQoff, 'الأجر الإضافي<br>(ل.ل)') === false && strpos($hQoff, 'مكافأة ومساعدة<br>(ل.ل)') === false && strpos($hQoff, '#4338ca') === false);
+$hGon  = renderPage('pages/official_forms.php', ['form' => 'general_info'], ['extra']);
+$hGoff = renderPage('pages/official_forms.php', ['form' => 'general_info'], []);
+check('معلومات عامة: عمود الراتب مركّب حسب الخيار', strpos($hGon, 'الأساسي + الإضافي') !== false);
+check('معلومات عامة: يرجع أساسياً فقط بلا الخيار', strpos($hGoff, 'الأساسي + الإضافي') === false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

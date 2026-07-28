@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/payroll_calculator.php';
+require_once __DIR__ . '/../includes/report_helpers.php';
 requireLogin();
 
 $currentPage = 'monthly';
@@ -27,6 +28,15 @@ function payslipCardHtml($emp, $salary, $month, $year) {
     $schoolYearLbl = $salary['school_year'] ?? ($month >= 10 ? $year.'-'.($year+1) : ($year-1).'-'.$year);
     $classesLbl = classLevelNames($emp['classes_taught'] ?? '');
     $isAdminEmp = ($emp['employee_type'] === 'employe'); // موظف إداري: لا درجة/صفوف/مواد/صندوق تعويضات
+    // ترويسة المدرسة الرسمية على القسيمة — مدرسة الموظف نفسه (تعمل أيضاً بوضع «كل المدارس»)
+    static $slipSchools = [];
+    $sid = (int)($emp['school_id'] ?? 0);
+    if ($sid && !array_key_exists($sid, $slipSchools)) {
+        $q = getDB()->prepare("SELECT * FROM schools WHERE id = ? AND is_deleted = 0");
+        $q->execute([$sid]);
+        $slipSchools[$sid] = $q->fetch() ?: null;
+    }
+    $slipSchool = $sid ? ($slipSchools[$sid] ?? null) : currentSchool();
     ob_start();
     ?>
     <div class="card payslip-card" style="page-break-inside:avoid">
@@ -38,6 +48,8 @@ function payslipCardHtml($emp, $salary, $month, $year) {
             <div style="font-size:13px;color:var(--gray-600)"><?= e(currentSchoolName()) ?></div>
         </div>
         <div class="card-body">
+            <?= $slipSchool ? schoolLetterhead($slipSchool) : '' ?>
+            <div class="doc-title" style="margin:2px 0 12px">Bulletin de paie mensuel / قسيمة الراتب الشهرية — <?= monthName($month, 'ar') ?> <?= $year ?></div>
             <table class="table" style="margin-bottom:16px">
                 <tr><th colspan="4" style="background:#eef3fb;color:#000"><i class="fas fa-id-badge"></i> Informations / المعلومات</th></tr>
                 <tr>
@@ -46,7 +58,11 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                 </tr>
                 <tr>
                     <td>Année scolaire / السنة الدراسية</td><td><strong><?= e($schoolYearLbl) ?></strong></td>
-                    <td>Date d'embauche / تاريخ الدخول</td><td><strong><?= formatDate($emp['hire_date']) ?></strong></td>
+                    <td>Date d'embauche / تاريخ المباشرة</td><td><strong><?= formatDate($emp['hire_date']) ?></strong></td>
+                </tr>
+                <tr>
+                    <td>N° dossier / رقم الملف</td><td><strong><?= (int)$emp['id'] ?></strong></td>
+                    <td>N° CNSS / رقم الضمان</td><td><strong><?= e(trim((string)($emp['nssf_number'] ?? '')) !== '' ? $emp['nssf_number'] : '—') ?></strong></td>
                 </tr>
                 <tr>
                     <?php if ($isAdminEmp): ?>
@@ -89,11 +105,15 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                     <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= formatLBP($salary['family_allowance_lbp']) ?></td><td></td></tr>
                     <tr><td>Transport</td><td class="text-end text-success">+<?= money($salary['transport_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr style="background:#fff3cd;color:#000">
-                        <td style="font-size:18px"><strong>💰 TOTAL DÛ</strong></td>
+                        <td style="font-size:18px"><strong>💰 TOTAL DÛ / صافي الراتب المستحق للدفع</strong></td>
                         <td class="text-end" style="font-size:18px"><strong><?= formatLBP($salary['total_due_lbp']) ?></strong></td>
                         <td class="text-end" style="font-size:16px"><strong><?= formatUSD($salary['total_due_usd']) ?></strong></td>
                     </tr>
                 </table>
+                <div class="sign-row" style="margin-top:26px">
+                    <?= signatureBox('Le comptable / توقيع المحاسب') ?>
+                    <?= signatureBox("Signature de l'employé / توقيع الموظف بالاستلام") ?>
+                </div>
             <?php endif; ?>
         </div>
     </div>
@@ -163,14 +183,27 @@ if (!empty($_SESSION['flash'])) {
 }
 
 include __DIR__ . '/../includes/header.php';
+echo officialFormStyles(); // ستايلات الترويسة/التوقيع/العناوين الرسمية على القسيمة
 ?>
+<style>
+/* طباعة القسيمة: ضغط الحشوات وإخفاء رأس البطاقة المكرّر حتى تسع القسيمة كاملة بصفحة A4 واحدة */
+@media print{
+  .payslip-card .card-header,#ppExportArea .card-header{display:none !important}
+  .payslip-card .table th,.payslip-card .table td,
+  #ppExportArea .table th,#ppExportArea .table td{padding:4px 8px !important}
+  .payslip-card .table,#ppExportArea .table{margin-bottom:8px !important}
+  .payslip-card .letterhead,#ppExportArea .letterhead{margin-bottom:8px;padding-bottom:6px}
+  .payslip-card .sign-row,#ppExportArea .sign-row{margin-top:14px !important;page-break-inside:avoid}
+  .payslip-card .sign-box .sign-label,#ppExportArea .sign-box .sign-label{margin-bottom:26px}
+}
+</style>
 
 <?php if ($message): ?>
     <div class="alert alert-<?= $messageType ?>"><?= e($message) ?></div>
 <?php endif; ?>
 
 <!-- Period selector -->
-<div class="card">
+<div class="card no-print">
     <div class="card-header">
         <h3>
             <span dir="ltr"><i class="fas fa-calendar-alt"></i> Période</span>
@@ -267,7 +300,7 @@ include __DIR__ . '/../includes/header.php';
     $stmt->execute([$employeeId, $month, $year]);
     $salary = $stmt->fetch();
 ?>
-    <div class="d-flex justify-between align-center mb-3">
+    <div class="d-flex justify-between align-center mb-3 no-print">
         <a href="<?= BASE_URL ?>pages/monthly_payroll.php?month=<?= $month ?>&year=<?= $year ?>" class="btn btn-light">
             <i class="fas fa-arrow-left"></i> Retour à la liste / رجوع
         </a>
@@ -300,7 +333,16 @@ include __DIR__ . '/../includes/header.php';
             $schoolYearLbl = $salary['school_year'] ?? ($month >= 10 ? $year.'-'.($year+1) : ($year-1).'-'.$year);
             $classesLbl = classLevelNames($emp['classes_taught'] ?? '');
             $isAdminEmp = ($emp['employee_type'] === 'employe'); // موظف إداري: لا درجة/صفوف/مواد/صندوق تعويضات
+            // ترويسة المدرسة الرسمية للقسيمة — مدرسة الموظف نفسه
+            $slipSchool1 = null;
+            if (!empty($emp['school_id'])) {
+                $qS = $db->prepare("SELECT * FROM schools WHERE id = ? AND is_deleted = 0");
+                $qS->execute([(int)$emp['school_id']]);
+                $slipSchool1 = $qS->fetch() ?: null;
+            }
             ?>
+            <?= $slipSchool1 ? schoolLetterhead($slipSchool1) : '' ?>
+            <div class="doc-title" style="margin:2px 0 12px">Bulletin de paie mensuel / قسيمة الراتب الشهرية — <?= monthName($month, 'ar') ?> <?= $year ?></div>
             <table class="table" style="margin-bottom:16px">
                 <tr><th colspan="4" style="background:#eef3fb;color:#000"><i class="fas fa-id-badge"></i> Informations de l'enseignant / معلومات الأستاذ</th></tr>
                 <tr>
@@ -322,6 +364,10 @@ include __DIR__ . '/../includes/header.php';
                 <tr>
                     <td>Heures/semaine / عدد الساعات الأسبوعية</td><td><strong><?= rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.') ?></strong></td>
                     <td>Jours/semaine / أيام الحضور الأسبوعية</td><td><strong><?= (int)$emp['days_per_week'] ?></strong></td>
+                </tr>
+                <tr>
+                    <td>N° dossier / رقم الملف</td><td><strong><?= (int)$emp['id'] ?></strong></td>
+                    <td>N° CNSS / رقم الضمان</td><td><strong><?= e(trim((string)($emp['nssf_number'] ?? '')) !== '' ? $emp['nssf_number'] : '—') ?></strong></td>
                 </tr>
             </table>
             <?php if (!$salary): ?>
@@ -367,13 +413,18 @@ include __DIR__ . '/../includes/header.php';
                     <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= formatLBP($salary['family_allowance_lbp']) ?></td><td></td></tr>
                     <tr><td>Transport</td><td class="text-end text-success">+<?= money($salary['transport_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr style="background:#fff3cd;color:#000">
-                        <td style="font-size:18px"><strong>💰 TOTAL DÛ</strong></td>
+                        <td style="font-size:18px"><strong>💰 TOTAL DÛ / صافي الراتب المستحق للدفع</strong></td>
                         <td class="text-end" style="font-size:18px"><strong><?= formatLBP($salary['total_due_lbp']) ?></strong></td>
                         <td class="text-end" style="font-size:16px"><strong><?= formatUSD($salary['total_due_usd']) ?></strong></td>
                     </tr>
                 </table>
-                
-                <details style="margin-top:20px">
+
+                <div class="sign-row" style="margin-top:26px">
+                    <?= signatureBox('Le comptable / توقيع المحاسب') ?>
+                    <?= signatureBox("Signature de l'employé / توقيع الموظف بالاستلام") ?>
+                </div>
+
+                <details style="margin-top:20px" class="no-print">
                     <summary style="cursor:pointer;color:var(--gray-600);font-weight:600">
                         <i class="fas fa-eye"></i> Charges patronales (cachées du bulletin) / أعباء رب العمل (مخفية عن القسيمة)
                     </summary>

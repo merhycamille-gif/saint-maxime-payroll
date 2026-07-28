@@ -625,6 +625,7 @@ if (!$emp):
     if ($type === 'cnss'):
     ?>
     <?php if ($lhOn): ?><style>@page{size:A4;margin:0}</style><?php endif; ?>
+    <?php if ($docLang === 'ar'): ?><style>/* خط عربي رسمي واضح للإفادات العربية */ #ppExportArea{font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo',sans-serif}</style><?php endif; ?>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl">
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12px;<?= $lhOn?'padding:0':'' ?>">
             <?php if ($showRecHead && $logoImg): ?><div style="text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
@@ -714,6 +715,7 @@ if (!$emp):
             . ($schoolPhone ? '<br><small>Tel : ' . e($schoolPhone) . '</small>' : '') . '</div>';
     ?>
     <?php if ($lhOn): ?><style>@page{size:A4;margin:0}</style><?php endif; ?>
+    <?php if ($docLang === 'ar'): ?><style>/* خط عربي رسمي واضح للإفادات العربية */ #ppExportArea{font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo',sans-serif}</style><?php endif; ?>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl">
       <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12px;<?= $lhOn?'padding:0':'' ?>">
 
@@ -724,22 +726,36 @@ if (!$emp):
       ?>
       <?php if ($type === 'salaire'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <div style="text-align:left;margin-bottom:10px"><?= $today ?></div>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إلى من يهمه الأمر</h2>
-        <p>يفيد مدير <strong><?= e($schoolNameAr) ?></strong> :</p>
-        <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا ، باشر(ت) العمل في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>هو(ـي) مدرّس(ة) في مدرستنا لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> ، باشر(ت) التدريس في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ، ويتقاضى راتباً شهرياً قدره <strong><?= $moneyAr($salShown) ?></strong> ، فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> ، ولا يزال(تزال) مستمراً(ة) حتى تاريخه .</p>
-        <p>وللبيان أُعطيت هذه الإفادة .</p>
-        <div style="text-align:center;margin-top:42px"><strong>المدير</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+            <span>الرقم : <span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span></span>
+            <span>التاريخ : <?= $today ?></span>
+        </div>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة راتب</h2>
+        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) على رأس عمله(ا) ، ويتقاضى راتباً شهرياً وفق التفصيل الآتي :</p>
+        <table dir="rtl" style="width:70%;margin:14px auto;border-collapse:collapse;text-align:center">
+            <tr>
+                <th style="background:#1F4E5F;color:#fff;border:1px solid #1F4E5F;padding:6px 10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">البند</th>
+                <th style="background:#1F4E5F;color:#fff;border:1px solid #1F4E5F;padding:6px 10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">المبلغ الشهري</th>
+            </tr>
+            <tr><td style="border:1px solid #64748b;padding:6px 10px">الراتب الأساسي<?= $isEmploye ? '' : ' (بعد التدرّج)' ?></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr((int)$basePlusEch) ?></strong></td></tr>
+            <tr><td style="border:1px solid #64748b;padding:6px 10px">البدلات والملحقات</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($salShown - (int)$basePlusEch) ?></strong></td></tr>
+            <tr style="background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact"><td style="border:1px solid #64748b;padding:6px 10px"><strong>الإجمالي</strong></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($salShown) ?></strong></td></tr>
+        </table>
+        <p>فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> .</p>
+        <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم ، دون أدنى مسؤولية على المؤسسة تجاه أي طرف ثالث .</p>
+        <div style="text-align:center;margin-top:42px"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'tadris'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <div style="text-align:left;margin-bottom:10px"><?= $today ?></div>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إلى من يهمه الأمر</h2>
-        <p>يفيد مدير <strong><?= e($schoolNameAr) ?></strong> :</p>
-        <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا ، باشر(ت) العمل في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>هو(ـي) مدرّس(ة) في مدرستنا لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> ، باشر(ت) التدريس في <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ، ولا يزال(تزال) مستمراً(ة) حتى تاريخه .</p>
-        <p>وللبيان أُعطيت هذه الإفادة .</p>
-        <div style="text-align:center;margin-top:42px"><strong>المدير</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+            <span>الرقم : <span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span></span>
+            <span>التاريخ : <?= $today ?></span>
+        </div>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? 'إفادة عمل' : 'إفادة عمل وتدريس' ?></h2>
+        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) على رأس عمله(ا) حتى تاريخه ، وهو(هي) على حسن سلوك والتزام في أداء عمله(ا) .</p>
+        <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم ، دون أدنى مسؤولية على المؤسسة تجاه أي طرف ثالث .</p>
+        <div style="text-align:center;margin-top:42px"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'riaaya'): ?>

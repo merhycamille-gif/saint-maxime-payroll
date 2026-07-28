@@ -316,7 +316,7 @@ function officialFormStyles(): string {
 <style>
 /* ===== النماذج الرسمية — A4 ===== */
 .official-doc{background:#fff;color:#111;max-width:210mm;margin:0 auto;padding:14mm 14mm;
-  border:1px solid #e5e7eb;border-radius:10px;font-family:'Cairo','Inter',sans-serif;line-height:1.7;}
+  border:1px solid #e5e7eb;border-radius:10px;font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo','Inter',sans-serif;line-height:1.7;}
 .official-doc.rtl,.official-doc[dir="rtl"]{direction:rtl;text-align:right;}
 
 /* ترويسة المدرسة */
@@ -363,10 +363,13 @@ function officialFormStyles(): string {
 .report-table-wrap::-webkit-scrollbar-track,.card-body::-webkit-scrollbar-track{background:#e8edf3;border-radius:8px;}
 .report-table-wrap::-webkit-scrollbar-thumb,.card-body::-webkit-scrollbar-thumb{background:var(--primary,#1e3a8a);border-radius:8px;border:2px solid #e8edf3;}
 .doc-table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;}
-.doc-table th{background:var(--primary,#1e3a8a);color:#fff;padding:7px 8px;text-align:center;
-  font-weight:600;border:1px solid #1e3a8a;font-size:11.5px;}
+/* خط عربي واضح موحّد للمستندات والتقارير المطبوعة */
+.doc-table,#ppExportArea,.payslip-card{font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo','Inter',sans-serif;}
+.doc-table th{background:#1F4E5F;color:#fff;padding:7px 8px;text-align:center;
+  font-weight:600;border:1px solid #1F4E5F;font-size:11.5px;}
 .doc-table td{border:1px solid #94a3b8;padding:6px 8px;text-align:center;}
-.doc-table tfoot td,.doc-table .total-row td{background:#fef9c3;font-weight:700;}
+.doc-table tfoot td,.doc-table .total-row td{background:#eef1f4;font-weight:700;}
+.doc-table .subtotal-row td{background:#f1f5f9;font-weight:700;}
 .doc-table .num{text-align:left;font-variant-numeric:tabular-nums;}
 .doc-table tbody tr:nth-child(even){background:#f8fafc;}
 .money-usd{display:block;font-size:.8em;color:#047857;font-weight:600;line-height:1.2;}
@@ -412,9 +415,11 @@ function officialFormStyles(): string {
   .land-report{page:landscapePage;}
   body{background:#fff;}
   .official-doc{border:none !important;border-radius:0;padding:0;max-width:100%;box-shadow:none;page-break-inside:auto;}
-  .doc-table th{background:#e5e7eb !important;color:#000 !important;
+  .doc-table th{background:#1F4E5F !important;color:#fff !important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .doc-table tfoot td,.doc-table .total-row td{background:#f3f4f6 !important;
+  .doc-table tfoot td,.doc-table .total-row td{background:#e2e8f0 !important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .doc-table .subtotal-row td{background:#f1f5f9 !important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
   /* تكرار رأس الجدول وذيله على كل صفحة عند تعدّد الصفحات */
   .doc-table{page-break-inside:auto;}
