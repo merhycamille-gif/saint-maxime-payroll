@@ -14,6 +14,7 @@ $employeeId = (int)($_GET['employee_id'] ?? 0);
 
 // أي تعديل على الدرجات يتطلّب اختيار مدرسة محددة + أن يكون الموظف ضمنها
 if ((isset($_GET['apply_law']) || isset($_GET['promote']) || $_SERVER['REQUEST_METHOD'] === 'POST') && $employeeId > 0) {
+    autoSwitchToEmployeeSchool($employeeId);
     requireSchoolSelected();
     $chk = $db->prepare("SELECT id FROM employees WHERE id = ? AND school_id = ? AND is_deleted = 0");
     $chk->execute([$employeeId, currentSchoolId()]);

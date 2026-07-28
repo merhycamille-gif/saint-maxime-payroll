@@ -59,6 +59,7 @@ function getYearCalcRoster($db, $typeFilter = '') {
 
 // احسب كل أشهر السنة الدراسية دفعة واحدة لهذا الأستاذ
 if ($action === 'calc_year' && $employeeId > 0) {
+    autoSwitchToEmployeeSchool($employeeId);
     requireSchoolSelected();
     $eC = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
     $eC->execute([$employeeId]);
@@ -80,6 +81,7 @@ if ($action === 'calc_year' && $employeeId > 0) {
 
 // احسب فترة محددة: من شهر/سنة إلى شهر/سنة (لكل أستاذ على حدة)
 if ($action === 'calc_range' && $employeeId > 0) {
+    autoSwitchToEmployeeSchool($employeeId);
     requireSchoolSelected();
     $fm = (int)($_GET['from_m'] ?? 0); $fy = (int)($_GET['from_y'] ?? 0);
     $tm = (int)($_GET['to_m'] ?? 0);   $ty = (int)($_GET['to_y'] ?? 0);

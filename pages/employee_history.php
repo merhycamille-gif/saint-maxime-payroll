@@ -15,6 +15,7 @@ $db = getDB();
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 $emp = null;
 if ($employeeId > 0) {
+    autoSwitchToEmployeeSchool($employeeId);
     requireSchoolSelected();
     $stmt = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
     $stmt->execute([$employeeId]);

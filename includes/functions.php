@@ -313,6 +313,22 @@ function requireSchoolSelected() {
     }
 }
 
+/**
+ * 🔵 من وضع «كل المدارس»: إن كان الإجراء يخصّ موظفاً معيّناً، بدّل الجلسة لمدرسته تلقائياً
+ * وأكمل — بدل تحويل المستخدم للائحة المدارس ليختار بنفسه. تُستدعى قبل requireSchoolSelected().
+ * تتقيد بالمدارس المسموحة للمستخدم (schoolScopeSql) فلا تفتح مدرسة ليست من صلاحياته.
+ */
+function autoSwitchToEmployeeSchool(int $employeeId): void {
+    if ($employeeId <= 0 || !isAllSchools()) return;
+    $st = getDB()->prepare("SELECT school_id FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
+    $st->execute([$employeeId]);
+    $sid = (int)$st->fetchColumn();
+    if ($sid > 0) {
+        $_SESSION['active_schools'] = [$sid];
+        unset($_SESSION['report_schools']);
+    }
+}
+
 // بيانات المدرسة الحالية (صف من جدول schools) أو null في وضع "الكل"
 function currentSchool() {
     static $cache = [];

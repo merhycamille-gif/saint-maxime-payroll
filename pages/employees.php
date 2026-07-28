@@ -220,7 +220,12 @@ if ($action === 'delete_file' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// الإضافة/التعديل/الحذف تتطلّب اختيار مدرسة محددة (ليس وضع "كل المدارس")
+// الإضافة/التعديل/الحذف تتطلّب مدرسة محددة (ليس وضع "كل المدارس").
+// 🔵 تعديل/حذف موظف معيّن من وضع «كل المدارس»: نبدّل الجلسة لمدرسته تلقائياً ونكمل
+// (بدل تحويل المستخدم للائحة المدارس ليختار بنفسه).
+if (in_array($action, ['edit', 'delete'], true)) {
+    autoSwitchToEmployeeSchool((int)($_GET['id'] ?? $_POST['id'] ?? 0));
+}
 if (in_array($action, ['new', 'edit', 'delete'])) {
     requireSchoolSelected();
 }
