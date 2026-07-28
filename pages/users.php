@@ -275,7 +275,7 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if (!empty($_SESSION['generated_creds'])): $gc = $_SESSION['generated_creds']; unset($_SESSION['generated_creds']); ?>
 <div class="card" style="border:2px solid #16a34a">
-    <div class="card-header" style="background:#f0fdf4"><h3><i class="fas fa-key"></i>
+    <div class="card-header" style="background:#f0fdf4"><h3 style="color:#15803d"><i class="fas fa-key"></i>
         <span dir="ltr">Nouveaux mots de passe — notez-les maintenant</span>
         <div style="font-size:0.85em;font-weight:600;opacity:0.9">كلمات المرور الجديدة — احفظها/اطبعها الآن (لن تظهر مرة ثانية)</div></h3></div>
     <div class="card-body">

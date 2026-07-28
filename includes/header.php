@@ -73,7 +73,7 @@ document.addEventListener('submit', function (e) {
             </a>
             
             <?php if (canEdit()): ?>
-            <div class="nav-section">Personnel / الموظفون</div>
+            <div class="nav-section" style="--ns:#38bdf8">Personnel / الموظفون</div>
 
             <a href="<?= BASE_URL ?>pages/employees.php" class="<?= $currentPage === 'employees' ? 'active' : '' ?>">
                 <i class="fas fa-users"></i>
@@ -106,7 +106,7 @@ document.addEventListener('submit', function (e) {
             </a>
             <?php endif; ?>
 
-            <div class="nav-section">Paie / الرواتب</div>
+            <div class="nav-section" style="--ns:#4ade80">Paie / الرواتب</div>
 
             <?php if (viewerCanSeePage('monthly_payroll.php')): ?>
             <a href="<?= BASE_URL ?>pages/monthly_payroll.php" class="<?= $currentPage === 'monthly' ? 'active' : '' ?>">
@@ -154,7 +154,7 @@ document.addEventListener('submit', function (e) {
             </a>
             <?php endif; ?>
 
-            <div class="nav-section">Rapports / التقارير</div>
+            <div class="nav-section" style="--ns:#c4b5fd">Rapports / التقارير</div>
 
             <?php if (viewerCanSeePage('reports.php')): ?>
             <a href="<?= BASE_URL ?>pages/reports.php" class="<?= $currentPage === 'reports' ? 'active' : '' ?>">
@@ -170,7 +170,7 @@ document.addEventListener('submit', function (e) {
             </a>
             <?php endif; ?>
 
-            <div class="nav-section">Système / النظام</div>
+            <div class="nav-section" style="--ns:#fbbf24">Système / النظام</div>
 
             <?php if (isSuperAdmin()): ?>
             <a href="<?= BASE_URL ?>pages/schools.php" class="<?= $currentPage === 'schools' ? 'active' : '' ?>">

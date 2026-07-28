@@ -42,8 +42,10 @@ $uid = uniqid('page', true);
 $out = $tmpDir . '/' . $uid . '.pdf';
 // fit=1 → تصغير/تكبير تلقائي ليملأ صفحة A4 واحدة بلا قصّ (للكشوف المفردة)
 $fitArg = !empty($_GET['fit']) ? 'fit' : '';
+// 🔴 ويندوز: escapeshellarg يستبدل علامة % بمسافة، فيكسر روابط فيها معاملات مرمّزة
+// (مثل cols%5B%5D لأعمدة التقارير المختارة) → نمرّر الرابط base64 (بلا %) ويفكّه السكربت.
 $cmd = escapeshellarg($node) . ' ' . escapeshellarg($script) . ' '
-     . escapeshellarg(str_replace('\\', '/', $out)) . ' ' . escapeshellarg($url) . ' '
+     . escapeshellarg(str_replace('\\', '/', $out)) . ' ' . escapeshellarg('b64:' . base64_encode($url)) . ' '
      . escapeshellarg($cookieName) . ' ' . escapeshellarg($cookieValue) . ' '
      . escapeshellarg($fitArg) . ' 2>&1';
 $res = @shell_exec($cmd);

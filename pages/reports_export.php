@@ -218,13 +218,27 @@ if ($report === 'monthly_summary') {
     $data = $st->fetchAll();
     $scaleMap = [];
     foreach ($db->query("SELECT grade,new_salary_2017 FROM salary_scale_2017 WHERE version_id=1") as $sc) $scaleMap[(int)$sc['grade']] = (float)$sc['new_salary_2017'];
-    // أساس الموظف الإداري الفعلي من آخر راتب محسوب (لا سلسلة رتب — قانون العمل)
-    $baseMap = [];
-    foreach ($db->query("SELECT ms.employee_id, ms.base_plus_echelon_lbp FROM monthly_salaries ms
+    // آخر راتب محسوب لكل موظف — للأساس الفعلي + الإضافي/المكافأة/النقل/المركّب (نفس الشاشة).
+    // 🔴 يُفضَّل آخر راتب **ضمن السنة الدراسية النشطة** — السنوات المولّدة مسبقاً بلا إضافي/نقل.
+    $bonusSy = activeSchoolYear();
+    if ($bonusSy === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$bonusSy)) $bonusSy = currentSchoolYear();
+    $bonusMap = [];
+    $bmQ = $db->prepare("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp,
+                                ms.base_plus_echelon_lbp, ms.transport_lbp, ms.exchange_rate, ms.year, ms.month
+                         FROM monthly_salaries ms
+                         JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE is_calculated=1 AND school_year=? GROUP BY employee_id) lt
+                           ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym AND ms.school_year=?");
+    $bmQ->execute([$bonusSy, $bonusSy]);
+    foreach ($bmQ as $b) $bonusMap[(int)$b['employee_id']] = $b;
+    foreach ($db->query("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp,
+                                ms.base_plus_echelon_lbp, ms.transport_lbp, ms.exchange_rate, ms.year, ms.month
+                         FROM monthly_salaries ms
                          JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE is_calculated=1 GROUP BY employee_id) lt
                            ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym") as $b) {
-        $baseMap[(int)$b['employee_id']] = (float)$b['base_plus_echelon_lbp'];
+        $eid = (int)$b['employee_id'];
+        if (!isset($bonusMap[$eid])) $bonusMap[$eid] = $b;
     }
+    $baseMap = array_map(fn($b) => (float)$b['base_plus_echelon_lbp'], $bonusMap);
     // مَن أرسل تحديثاً لملفّه عبر الرابط الموحّد + تاريخ آخر إرسال (لعمود التصدير)
     $submitMap = [];
     try {
@@ -232,9 +246,11 @@ if ($report === 'monthly_summary') {
             $submitMap[(int)$s['employee_id']] = $s['last_sub'];
         }
     } catch (Exception $e) { /* الجدول غير موجود → الكل «لم يُرسل» */ }
+    // 🔴 نفس أعمدة الشاشة (reports.php) تماماً — أي عمود يختاره المستخدم يجب أن يصل للملف
     $cols = [
         'code' => ['Code', fn($r) => $r['employee_code']],
         'name' => ['الاسم', fn($r) => trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) ?: trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])],
+        'name_ar' => ['الاسم بالعربي', fn($r) => trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])],
         'type' => ['الفئة', fn($r) => employeeTypeLabel($r['employee_type'])],
         'diploma' => ['الشهادة', fn($r) => $r['employee_type'] === 'employe' ? jobTitleLabel($r['job_title'] ?? '') : diplomaLabel($r['diploma'])],
         'diploma_img' => ['صورة الشهادة', fn($r) => !empty($r['diploma_doc_path']) ? (BASE_URL . $r['diploma_doc_path']) : '—'],
@@ -244,12 +260,22 @@ if ($report === 'monthly_summary') {
         'salary' => ['الراتب', fn($r) => $r['employee_type'] === 'employe'
                         ? (int)($baseMap[(int)$r['id']] ?? 0)
                         : (int)($scaleMap[(int)round($r['current_grade'])] ?? 0)],
+        'extra_wage' => ['الأجر الإضافي', fn($r) => isset($bonusMap[(int)$r['id']]) ? extraWageLbp($bonusMap[(int)$r['id']]) : 0],
+        'aide' => ['مكافأة ومساعدة', fn($r) => isset($bonusMap[(int)$r['id']]) ? aideCompLbp($bonusMap[(int)$r['id']]) : 0],
+        'transport' => ['تعويض النقل', fn($r) => isset($bonusMap[(int)$r['id']]) ? (int)$bonusMap[(int)$r['id']]['transport_lbp'] : 0],
+        'composed' => ['الراتب المركّب', fn($r) => isset($bonusMap[(int)$r['id']]) ? composedSalaryLbp($bonusMap[(int)$r['id']]) : 0],
         'nssf' => ['رقم الضمان', fn($r) => $r['nssf_number']],
         'mof' => ['رقم المالية', fn($r) => $r['finance_ministry_number']],
         'caisse' => ['رقم الصندوق', fn($r) => $r['caisse_number']],
         'phone' => ['هاتف', fn($r) => implode(' / ', array_filter([trim($r['phone1']), trim($r['phone2'])]))],
+        'email' => ['Email', fn($r) => $r['email']],
+        'address' => ['السكن', fn($r) => trim(implode(' ', array_filter([$r['gouvernorat'], $r['district'], $r['ville'], $r['rue'], $r['immeuble']])))],
+        'birth' => ['الولادة', fn($r) => trim(formatDate($r['birth_date']) . ' ' . $r['birth_place'])],
+        'social' => ['الوضع العائلي', fn($r) => $r['social_status'] . ' (' . (int)$r['number_of_children'] . ')'],
         'hire' => ['الدخول', fn($r) => formatDate($r['hire_date'])],
         'titul' => ['دخول الملاك', fn($r) => formatDate($r['titularization_date'])],
+        'hours' => ['ساعات/أسبوع', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'], 1), '0'), '.')],
+        'days' => ['أيام/أسبوع', fn($r) => (int)$r['days_per_week']],
         'status' => ['الحالة', fn($r) => employeeStatusLabel($r['status'])['label']],
     ];
     $defaultCols = ['code', 'name', 'type', 'grade', 'status'];

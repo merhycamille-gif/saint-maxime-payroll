@@ -75,22 +75,51 @@ include __DIR__ . '/includes/header.php';
 ?>
 
 <?php
-// 🧩 وصول سريع (Accès rapide): بطاقات لكل أقسام البرنامج — روابط فقط، تحترم صلاحيات المستخدم (نفس شروط القائمة الجانبية).
-// إضافة شكليّة بحتة: لا تمسّ أي حساب/قاعدة بيانات/منطق.
-// لوحة ألوان متنوّعة (خلفية فاتحة + لون أيقونة) — تُوزَّع على البطاقات لتصير ملوّنة متل النموذج
-$palette = [
-    ['#e0f2fe','#0284c7'], ['#dcfce7','#16a34a'], ['#fef3c7','#d97706'], ['#fee2e2','#dc2626'],
-    ['#ede9fe','#7c3aed'], ['#cffafe','#0891b2'], ['#fce7f3','#db2777'], ['#ffedd5','#ea580c'],
-    ['#e0e7ff','#4f46e5'], ['#d1fae5','#059669'],
-];
-$tile = function ($href, $icon, $fr, $ar, $bg, $fg) {
-    echo '<a class="home-tile" href="' . BASE_URL . $href . '">'
-       . '<span class="ht-ic" style="background:' . $bg . ';color:' . $fg . '"><i class="' . $icon . '"></i></span>'
-       . '<span class="ht-fr">' . e($fr) . '</span>'
-       . '<span class="ht-ar">' . e($ar) . '</span></a>';
+// 🧩 لوحة قيادة رسمية مرتّبة: أرقام رئيسية، فشريط معلومات النظام، فأقسام واضحة بعناوين
+// (Personnel / Paie / Rapports / Système) بلون موحّد لكل قسم مطابق لألوان الأقسام في header.php.
+// روابط فقط تحترم صلاحيات المستخدم (نفس شروط القائمة الجانبية) — لا تمسّ أي حساب/قاعدة بيانات/منطق.
+?>
+
+<!-- 📊 الأرقام الرئيسية (Indicateurs) -->
+<?php
+$kpiCard = function ($icon, $bg, $fg, $val, $fr, $ar) {
+    echo '<div class="dash-kpi">'
+       . '<span class="dk-ic" style="background:' . $bg . ';color:' . $fg . '"><i class="' . $icon . '"></i></span>'
+       . '<span><span class="dk-val">' . $val . '</span>'
+       . '<span class="dk-lbl"><span dir="ltr">' . $fr . '</span> / ' . $ar . '</span></span></div>';
 };
-$navGroups = [
-    ['Personnel', 'الموظفون', array_filter([
+?>
+<div class="dash-kpis">
+    <?php
+    $kpiCard('fas fa-users', 'rgba(10,34,64,.08)', '#0a2240', (int)$stats['total_employees'], 'Total Personnel', 'إجمالي الموظفين');
+    $kpiCard('fas fa-chalkboard-teacher', 'rgba(2,132,199,.10)', '#0284c7', (int)$stats['titulaires'], 'Titulaires', 'أساتذة الملاك');
+    $kpiCard('fas fa-user-clock', 'rgba(22,163,74,.10)', '#16a34a', (int)$stats['contractuels'], 'Contractuels', 'المتعاقدون');
+    $kpiCard('fas fa-user-tie', 'rgba(124,58,237,.10)', '#7c3aed', (int)$stats['employes'], 'Employés', 'الموظفون الإداريون');
+    ?>
+</div>
+
+<!-- ℹ️ شريط معلومات النظام (Informations) -->
+<?php
+$metaItem = function ($icon, $bg, $fg, $val, $fr, $ar) {
+    echo '<div class="dm-item">'
+       . '<span class="dm-ic" style="background:' . $bg . ';color:' . $fg . '"><i class="' . $icon . '"></i></span>'
+       . '<span><span class="dm-val">' . $val . '</span>'
+       . '<span class="dm-lbl"><span dir="ltr">' . $fr . '</span> / ' . $ar . '</span></span></div>';
+};
+?>
+<div class="dash-meta">
+    <?php
+    $metaItem('fas fa-calendar-alt', 'rgba(8,145,178,.10)', '#0891b2', (activeSchoolYear() === 'all' ? '<span dir="ltr">Toutes</span> / كل السنين' : e(activeSchoolYear())), 'Année scolaire', 'السنة الدراسية');
+    $metaItem('fas fa-coins', 'rgba(202,138,4,.12)', '#ca8a04', formatLBP($exchangeRate) . ' / $1', 'Taux de change', 'سعر الصرف');
+    $metaItem('fas fa-money-bill-wave', 'rgba(219,39,119,.10)', '#db2777', formatLBP(getSetting('minimum_wage_lbp', 28000000)), 'Salaire min. (Loi)', 'الحد الأدنى للأجور');
+    $metaItem('fas fa-wallet', 'rgba(5,150,105,.10)', '#059669', formatLBP($totalPaid), 'Payé (année)', 'المدفوع بالسنة');
+    ?>
+</div>
+
+<!-- 🗂️ الوصول السريع مقسّماً بعناوين أقسام واضحة -->
+<?php
+$dashSections = [
+    ['Personnel', 'الموظفون', 'fa-users', '#0284c7', 'rgba(2,132,199,.10)', array_filter([
         canEdit() ? ['pages/employees.php','fas fa-users','Employés & Enseignants','الموظفون والأساتذة'] : null,
         canEdit() ? ['pages/grades.php','fas fa-layer-group','Échelons & Promotions','الدرجات والترقيات'] : null,
         canEdit() ? ['pages/classes.php','fas fa-chalkboard','Classes','الصفوف'] : null,
@@ -98,7 +127,7 @@ $navGroups = [
         canEdit() ? ['pages/bulk_allowances.php','fas fa-gift','Primes & transport','المكافآت والنقل'] : null,
         canEdit() ? ['pages/law_check.php','fas fa-balance-scale','Conformité légale','فحص مطابقة القانون'] : null,
     ])],
-    ['Paie', 'الرواتب', array_filter([
+    ['Paie', 'الرواتب', 'fa-money-check-dollar', '#16a34a', 'rgba(22,163,74,.10)', array_filter([
         viewerCanSeePage('monthly_payroll.php') ? ['pages/monthly_payroll.php','fas fa-money-check-alt','Paie mensuelle','الرواتب الشهرية'] : null,
         viewerCanSeePage('annual_slip.php') ? ['pages/annual_slip.php','fas fa-file-invoice-dollar','Relevé annuel','الكشف السنوي'] : null,
         viewerCanSeePage('attestations.php') ? ['pages/attestations.php','fas fa-file-signature','Attestations','إفادات'] : null,
@@ -108,11 +137,11 @@ $navGroups = [
         canEdit() ? ['pages/left_teachers.php','fas fa-user-slash','Départs','الأساتذة التاركون'] : null,
         canEdit() ? ['pages/retirement_64.php','fas fa-hourglass-half','Retraite 64','بلوغ سنّ الـ64'] : null,
     ])],
-    ['Rapports', 'التقارير', array_filter([
+    ['Rapports', 'التقارير', 'fa-chart-column', '#7c3aed', 'rgba(124,58,237,.10)', array_filter([
         viewerCanSeePage('reports.php') ? ['pages/reports.php','fas fa-chart-bar','Rapports','التقارير'] : null,
         canEdit() ? ['pages/tax_declarations.php','fas fa-file-contract','Déclarations','التصاريح'] : null,
     ])],
-    ['Système', 'النظام', array_filter([
+    ['Système', 'النظام', 'fa-gear', '#d97706', 'rgba(217,119,6,.10)', array_filter([
         isSuperAdmin() ? ['pages/schools.php','fas fa-school','Écoles','المدارس'] : null,
         isAdmin() ? ['pages/users.php','fas fa-user-shield','Utilisateurs','حسابات المدارس'] : null,
         canEdit() ? ['pages/open_year.php','fas fa-folder-plus','Ouvrir année','فتح سنة دراسية'] : null,
@@ -127,35 +156,23 @@ $navGroups = [
     ])],
 ];
 ?>
-<div class="home-tiles" style="margin-bottom:16px">
-    <?php $ci = 0; foreach ($navGroups as [$gFr, $gAr, $items]): foreach ($items as $it): [$bg, $fg] = $palette[$ci % count($palette)]; $ci++;
-        $tile($it[0], $it[1], $it[2], $it[3], $bg, $fg); endforeach; endforeach; ?>
-</div>
-
-<!-- 📊 نظرة عامة: أرقام + معلومات النظام كبطاقات أيقونات ملوّنة -->
-<div class="ht-section"><span dir="ltr">Aperçu</span> / نظرة عامة</div>
-<?php
-$kpi = function ($icon, $bg, $fg, $val, $fr, $ar) {
-    echo '<div class="home-tile kpi-tile">'
-       . '<span class="ht-ic" style="background:' . $bg . ';color:' . $fg . '"><i class="' . $icon . '"></i></span>'
-       . '<span class="kpi-val">' . $val . '</span>'
-       . '<span class="kpi-lbl">' . $fr . ' / ' . $ar . '</span></div>';
-};
-?>
-<div class="home-tiles" style="margin-bottom:18px">
-    <?php
-    $kpi('fas fa-users', '#e0f2fe', '#0284c7', (int)$stats['total_employees'], 'Total Personnel', 'إجمالي الموظفين');
-    $kpi('fas fa-chalkboard-teacher', '#dcfce7', '#16a34a', (int)$stats['titulaires'], 'Titulaires', 'أساتذة الملاك');
-    $kpi('fas fa-user-clock', '#fef3c7', '#d97706', (int)$stats['contractuels'], 'Contractuels', 'المتعاقدون');
-    $kpi('fas fa-user-tie', '#ede9fe', '#7c3aed', (int)$stats['employes'], 'Employés', 'الموظفون الإداريون');
-    $kpi('fas fa-calendar-alt', '#cffafe', '#0891b2', (activeSchoolYear() === 'all' ? 'كل السنين / Toutes' : e(activeSchoolYear())), 'Année scolaire', 'السنة الدراسية');
-    $kpi('fas fa-coins', '#fef9c3', '#ca8a04', formatLBP($exchangeRate) . ' / $1', 'Taux de change', 'سعر الصرف');
-    $kpi('fas fa-money-bill-wave', '#fce7f3', '#db2777', formatLBP(getSetting('minimum_wage_lbp', 28000000)), 'Salaire min. (Loi)', 'الحد الأدنى للأجور');
-    $kpi('fas fa-wallet', '#d1fae5', '#059669', formatLBP($totalPaid), 'Payé (année)', 'المدفوع بالسنة');
-    ?>
-</div>
-
-<?php /* «إجراءات سريعة» أُزيلت من لوحة القيادة — أقسامها موجودة أصلاً ضمن «وصول سريع» (لتوفير المساحة). */ ?>
+<?php foreach ($dashSections as [$gFr, $gAr, $gIcon, $gC, $gBg, $items]): if (!$items) continue; ?>
+<section class="dash-sec" style="--sec-c:<?= $gC ?>;--sec-bg:<?= $gBg ?>">
+    <div class="dash-sec-head">
+        <span class="ds-ic"><i class="fas <?= $gIcon ?>"></i></span>
+        <span class="ds-fr" dir="ltr"><?= e($gFr) ?></span>
+        <span class="ds-ar"><?= e($gAr) ?></span>
+    </div>
+    <div class="dash-links">
+        <?php foreach ($items as [$href, $icon, $fr, $ar]): ?>
+        <a class="dash-link" href="<?= BASE_URL . $href ?>">
+            <span class="dl-ic"><i class="<?= $icon ?>"></i></span>
+            <span><span class="dl-fr" dir="ltr"><?= e($fr) ?></span><span class="dl-ar"><?= e($ar) ?></span></span>
+        </a>
+        <?php endforeach; ?>
+    </div>
+</section>
+<?php endforeach; ?>
 
 <?php if ($home64): ?>
 <details class="reg-details no-print">

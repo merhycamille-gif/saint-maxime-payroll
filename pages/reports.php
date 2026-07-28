@@ -166,8 +166,8 @@ function reportDocThumb($path) {
             <?php foreach ($categories as $cat): ?>
             <div class="report-cat">
                 <?php $ctParts = explode(' / ', $cat['title'], 2); ?>
-                <h4 class="report-cat-title">
-                    <span dir="ltr"><i class="fas <?= $cat['icon'] ?>" style="color:<?= $cat['color'] ?>"></i> <?= e($ctParts[1] ?? $cat['title']) ?></span>
+                <h4 class="report-cat-title" style="--rc:<?= $cat['color'] ?>">
+                    <span dir="ltr"><i class="fas <?= $cat['icon'] ?>"></i> <?= e($ctParts[1] ?? $cat['title']) ?></span>
                     <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($ctParts[0]) ?></div>
                 </h4>
                 <div class="report-grid">
@@ -198,12 +198,16 @@ function reportDocThumb($path) {
         @page { size: A4 landscape; margin: 7mm; }
         /* حجم 12 للحرف والرقم (بطلب المستخدم) + جدول يتأقلم على A4 ويلفّ النص بلا قصّ */
         .doc-table { font-size: 12px !important; table-layout: fixed; width: 100% !important; }
-        .doc-table th, .doc-table td { padding: 3px 5px !important; word-wrap: break-word; overflow-wrap: anywhere; }
+        /* break-word (لا anywhere): يلفّ عند الفراغات فلا ينقسم الرقم المالي بنصّه أبداً */
+        .doc-table th, .doc-table td { padding: 3px 5px !important; word-wrap: break-word; overflow-wrap: break-word; }
         .no-print { display: none !important; }
     }
     /* على الشاشة: تمرير أفقي للجداول الواسعة بدل ضغط الأعمدة */
     .report-table-wrap { overflow-x: auto; }
+    /* تقارير هذه الصفحة تُطبع A4 أفقياً دائماً → هدف التصغير المحسوب هو عرض الورقة الأفقية */
+    .doc-table { --pz-target: 1075; }
     </style>
+<?php /* الملاءمة التلقائية للجداول الواسعة صارت مشتركة في officialFormStyles() — تعمل هنا وفي النماذج الرسمية */ ?>
     <!-- ترويسة رسمية: ترويسة المدرسة (مدرسة واحدة) أو بانر المدارس المختارة (عدة) -->
     <?php if (!$multi && !isAllSchools()): ?>
         <?= schoolLetterhead(currentSchool()) ?>
@@ -249,7 +253,7 @@ function reportDocThumb($path) {
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">كشف رواتب شهري</div>
             </h3></div>
             <div class="card-body">
-                <table class="doc-table" dir="rtl">
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>
                         <th>#</th>
                         <?php if ($multi): ?><th>المدرسة</th><?php endif; ?>
@@ -327,7 +331,7 @@ function reportDocThumb($path) {
                         <?php if (!$data): ?><tr><td colspan="<?= ($multi?15:14) + compColsCount() ?>" class="text-center text-muted">لا توجد بيانات — احسب رواتب هذا الشهر أولاً</td></tr><?php endif; ?>
                         <?php if ($data) echo $sumRow('الإجمالي العام — مجموع كل الفئات (العدد: '.$rn.')', $totals, true); ?>
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
     <?php elseif ($report === 'cnss_summary'):
@@ -355,7 +359,7 @@ function reportDocThumb($path) {
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">الضمان الاجتماعي</div>
             </h3></div>
             <div class="card-body">
-                <table class="doc-table" dir="rtl">
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
                     <tbody>
                         <?php
@@ -396,7 +400,7 @@ function reportDocThumb($path) {
                         if (!$data): ?><tr><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
                         <?php if ($data) $drawTotal('المجموع العام — العدد: '.$rn, $G, true); ?>
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
     <?php elseif ($report === 'tax_summary'):
@@ -423,7 +427,7 @@ function reportDocThumb($path) {
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">ضريبة الدخل</div>
             </h3></div>
             <div class="card-body">
-                <table class="doc-table" dir="rtl">
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الراتب الخاضع للضريبة</th><th>الضريبة</th></tr></thead>
                     <tbody>
                         <?php
@@ -462,7 +466,7 @@ function reportDocThumb($path) {
                         if (!$data): ?><tr><td colspan="<?= ($multi?8:7) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
                         <?php if ($data) $drawTotal('المجموع العام — العدد: '.$rn, $G, true); ?>
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
     <?php elseif ($report === 'eoc_summary'):
@@ -489,7 +493,7 @@ function reportDocThumb($path) {
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">صندوق التعليم الخاص</div>
             </h3></div>
             <div class="card-body">
-                <table class="doc-table" dir="rtl">
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
                     <tbody>
                         <?php $rn=0; foreach ($data as $r): $te += $r['caisse_amount_lbp']; $ts += $r['school_eoc_6_lbp']; $teg += $r['eoc_grade_lbp']; $teEx += extraWageLbp($r); $teAi += aideCompLbp($r); $teBaseE += (int)$r['base_salary_lbp']; $teComposed += composedSalaryLbp($r); ?>
@@ -510,7 +514,7 @@ function reportDocThumb($path) {
                         <?php if (!$data): ?><tr><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
                         <tr class="total-row"><td colspan="<?= $multi?4:3 ?>">المجاميع — العدد: <?= $rn ?></td><td><?= formatLBP($teBaseE) ?></td><?php if (salaryCompHas('extra')): ?><td><?= money($teEx, $repRate) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($teAi, $repRate) ?></td><?php endif; ?><td style="background:#eef2ff"><strong><?= money($teComposed, $repRate) ?></strong></td><td><?= formatLBP($te) ?></td><td><?= formatLBP($teg) ?></td><td><?= formatLBP($ts) ?></td></tr>
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
     <?php elseif ($report === 'employee_list'):
@@ -533,13 +537,25 @@ function reportDocThumb($path) {
         // سلسلة 2017: الراتب حسب الدرجة (لعمود الراتب)
         $scaleMap = [];
         foreach ($db->query("SELECT grade, new_salary_2017 FROM salary_scale_2017 WHERE version_id = 1") as $sc) $scaleMap[(int)$sc['grade']] = (float)$sc['new_salary_2017'];
-        // آخر راتب محسوب لكل موظف (لعمودَي الأجر الإضافي ومكافأة ومساعدة الاختياريين + أساس الموظف الإداري الفعلي)
+        // آخر راتب محسوب لكل موظف (لأعمدة الإضافي/المكافأة/النقل + أساس الموظف الإداري الفعلي)
+        // 🔴 يُفضَّل آخر راتب **ضمن السنة الدراسية النشطة**: السنوات المولّدة مسبقاً (المستقبلية)
+        // بلا إضافي/نقل، فأخذ «آخر راتب بالمطلق» كان يُظهر أصفاراً مع أن السنة المعروضة فيها القيم.
+        $bonusSy = activeSchoolYear();
+        if ($bonusSy === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$bonusSy)) $bonusSy = currentSchoolYear();
         $bonusMap = [];
+        $bmQ = $db->prepare("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.exchange_rate, ms.year, ms.month
+                             FROM monthly_salaries ms
+                             JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE is_calculated=1 AND school_year=? GROUP BY employee_id) lt
+                               ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym AND ms.school_year=?");
+        $bmQ->execute([$bonusSy, $bonusSy]);
+        foreach ($bmQ as $b) $bonusMap[(int)$b['employee_id']] = $b;
+        // من ليس له رواتب بالسنة النشطة → آخر راتب بالمطلق (متل السابق)
         foreach ($db->query("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.exchange_rate, ms.year, ms.month
                              FROM monthly_salaries ms
                              JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE is_calculated=1 GROUP BY employee_id) lt
                                ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym") as $b) {
-            $bonusMap[(int)$b['employee_id']] = $b;
+            $eid = (int)$b['employee_id'];
+            if (!isset($bonusMap[$eid])) $bonusMap[$eid] = $b;
         }
         // مَن أرسل تحديثاً لملفّه عبر الرابط الموحّد (أي حالة) + تاريخ آخر إرسال — لعمود «حالة تحديث الملف»
         $submitMap = [];
@@ -570,6 +586,7 @@ function reportDocThumb($path) {
                             : formatLBP($scaleMap[(int)round($r['current_grade'])] ?? 0)],
             'extra_wage' => ['الأجر الإضافي / Supplément', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(extraWageLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : formatLBP(0)],
             'aide'    => ['مكافأة ومساعدة / Prime & aide', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(aideCompLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : formatLBP(0)],
+            'transport' => ['تعويض النقل / Transport', fn($r) => isset($bonusMap[(int)$r['id']]) ? money((float)$bonusMap[(int)$r['id']]['transport_lbp'], rowRate($bonusMap[(int)$r['id']])) : formatLBP(0)],
             'composed' => ['الراتب المركّب / Salaire composé', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(composedSalaryLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : formatLBP(0)],
             'nssf'    => ['ضمان / N° CNSS', fn($r) => e($r['nssf_number'])],
             'mof'     => ['مالية / N° MOF', fn($r) => e($r['finance_ministry_number'])],
@@ -622,7 +639,7 @@ function reportDocThumb($path) {
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($ltParts[0]) ?></div>
             </h3></div>
             <div class="card-body">
-                <table class="doc-table" dir="rtl">
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>
                         <th>#</th>
                         <?php if ($multi): ?><th>المدرسة</th><?php endif; ?>
@@ -637,6 +654,7 @@ function reportDocThumb($path) {
                                                 : (float)($scaleMap[(int)round($r['current_grade'])] ?? 0),
                             'extra_wage' => fn($r) => isset($bonusMap[(int)$r['id']]) ? extraWageLbp($bonusMap[(int)$r['id']]) : 0,
                             'aide'       => fn($r) => isset($bonusMap[(int)$r['id']]) ? aideCompLbp($bonusMap[(int)$r['id']]) : 0,
+                            'transport'  => fn($r) => isset($bonusMap[(int)$r['id']]) ? (float)$bonusMap[(int)$r['id']]['transport_lbp'] : 0,
                             'composed'   => fn($r) => isset($bonusMap[(int)$r['id']]) ? composedSalaryLbp($bonusMap[(int)$r['id']]) : 0,
                         ];
                         $colTot = array_fill_keys(array_keys($sumCols), 0.0);
@@ -661,7 +679,7 @@ function reportDocThumb($path) {
                         <tr class="total-row"><td colspan="<?= count($selectedCols) + 1 + ($multi?1:0) ?>">العدد الإجمالي / Total: <?= count($data) ?></td></tr>
                         <?php endif; ?>
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
     <?php elseif ($report === 'annual_totals'):
@@ -707,7 +725,7 @@ function reportDocThumb($path) {
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">تفصيل لكل مدرسة</div>
             </h3></div>
             <div class="card-body">
-                <table class="doc-table" dir="rtl">
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><th>المدرسة</th><th>عدد الكشوف</th><th>الإجمالي المتوجب</th><th>الضمان</th><th>الضريبة</th></tr></thead>
                     <tbody>
                         <?php $rn=0; foreach ($perSchool as $p): ?>
@@ -722,7 +740,7 @@ function reportDocThumb($path) {
                         <?php endforeach; ?>
                         <tr class="total-row"><td colspan="6">عدد المدارس / Écoles: <?= count($perSchool) ?></td></tr>
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
         <?php endif; ?>
@@ -733,7 +751,7 @@ function reportDocThumb($path) {
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">مجاميع سنوية</div>
             </h3></div>
             <div class="card-body">
-                <table class="doc-table" dir="rtl">
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <tr><td><strong>عدد الكشوف المحسوبة</strong></td><td><?= $tot['cnt'] ?: 0 ?></td></tr>
                     <tr style="background:var(--gold-light)"><td><strong>إجمالي المدفوع (الصافي)</strong></td><td><strong><?= formatLBP($tot['net']) ?></strong></td></tr>
                     <tr style="background:var(--gold-light)"><td><strong>الإجمالي المتوجب (صافي + تعويضات)</strong></td><td><strong><?= formatLBP($tot['total']) ?></strong></td></tr>
@@ -753,7 +771,7 @@ function reportDocThumb($path) {
                     <tr><td>صندوق التعويضات — الأجير ٦٪</td><td><?= formatLBP($tot['caisse']) ?></td></tr>
                     <tr><td>صندوق التعويضات — المدرسة ٦٪</td><td><?= formatLBP($tot['seoc']) ?></td></tr>
                     <tr><td>ضريبة الدخل</td><td><?= formatLBP($tot['tax']) ?></td></tr>
-                </table>
+                </table></div>
             </div>
         </div>
     <?php endif; ?>

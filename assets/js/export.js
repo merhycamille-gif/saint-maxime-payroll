@@ -21,6 +21,8 @@
         var node = area().cloneNode(true);
         node.querySelectorAll('.no-print, .no-export, .export-toolbar, script, button, .btn, form.no-print')
             .forEach(function (n) { n.remove(); });
+        // أزل تصغير الشاشة (zoom) عن الجداول — التصدير لوورد/إكسل يجب أن يكون بالحجم الكامل
+        node.querySelectorAll('[style*="zoom"]').forEach(function (n) { n.style.zoom = ''; });
         return node.innerHTML;
     }
 

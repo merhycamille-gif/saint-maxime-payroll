@@ -353,6 +353,15 @@ function officialFormStyles(): string {
 .kv .k{color:#475569;}
 
 /* جداول النماذج */
+/* على الشاشة: أي جدول واسع داخل بطاقة يُمرَّر أفقياً بدل ما تنقصّ أعمدته (الطباعة لها قياسها الخاص A4) */
+.card-body:has(> .doc-table){overflow-x:auto;}
+/* الجدول العربي (dir=rtl) يبدأ عرضه من اليمين — حتى يظهر العمود الأول (الاسم) فوراً بلا سحب */
+.card-body:has(> .doc-table[dir="rtl"]){direction:rtl;}
+.report-table-wrap{overflow-x:auto;}
+/* شريط تمرير بارز وواضح ليعرف المستخدم أن في أعمدة إضافية */
+.report-table-wrap::-webkit-scrollbar,.card-body::-webkit-scrollbar{height:12px;}
+.report-table-wrap::-webkit-scrollbar-track,.card-body::-webkit-scrollbar-track{background:#e8edf3;border-radius:8px;}
+.report-table-wrap::-webkit-scrollbar-thumb,.card-body::-webkit-scrollbar-thumb{background:var(--primary,#1e3a8a);border-radius:8px;border:2px solid #e8edf3;}
 .doc-table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;}
 .doc-table th{background:var(--primary,#1e3a8a);color:#fff;padding:7px 8px;text-align:center;
   font-weight:600;border:1px solid #1e3a8a;font-size:11.5px;}
@@ -486,6 +495,58 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
   table.xlsf .xv{font-size:13px;font-weight:800;}
   @page landscapePage{size:A4 landscape;margin:6mm;}
 }
+/* الطباعة: تصغير محسوب خاص بها (--pz يحسبه السكربت أدناه = عرض الورقة ÷ عرض الجدول الطبيعي)
+   فلا يُقصّ أي عمود على الورق مهما اتّسع الجدول؛ الجدول الذي يسع ورقته يبقى بحجمه (--pz=1) */
+@media print{ .doc-table{zoom:var(--pz,1) !important;} }
+/* عرض الورقة المستهدف بالبكسل (A4 ناقص الهوامش): أفقي للتقارير العريضة، عمودي لسواها */
+.doc-table{--pz-target:745;}
+.land-report .doc-table,.xls-sheet .doc-table{--pz-target:1075;}
+/* وضع قياس خاطف: نفس شروط الطباعة (عرض طبيعي + خط الطباعة) لقياس العرض الحقيقي قبل حساب --pz */
+.doc-table.pz-measure{width:max-content !important;table-layout:auto !important;}
+.doc-table.cols-many.pz-measure{font-size:9.5px !important;}
+.doc-table.cols-many.pz-measure th,.doc-table.cols-many.pz-measure td{font-size:9.5px !important;padding:2px 3px !important;}
+/* جدول بأعمدة كثيرة (١٤+): خط أصغر بالطباعة كي لا تتقطّع الكلمات/الأرقام على A4
+   (يشمل th/td صراحةً — قاعدة عامة تفرض عليها حجماً أكبر بغير ذلك) */
+@media print{
+  .doc-table.cols-many,.doc-table.cols-many th,.doc-table.cols-many td{font-size:9.5px !important;}
+  .doc-table.cols-many th,.doc-table.cols-many td{padding:2px 3px !important;}
+  /* توزيع الأعمدة حسب المحتوى (لا بالتساوي) → العمود المالي يأخذ عرضه فلا ينقسم الرقم أبداً */
+  .doc-table.cols-many{table-layout:auto !important;}
+}
 </style>
+<script>
+// 🔍 ملاءمة تلقائية لكل جداول التقارير (doc-table): الجدول الواسع يصغّر نفسه ليظهر
+// بكل أعمدته على الشاشة مرة واحدة (متل الطباعة) بلا سحب. تعمل في مركز التقارير
+// والنماذج الرسمية معاً. إن كان أوسع من الضعف نكتفي بـ0.5 ويبقى تمرير للباقي.
+(function () {
+    function fitDocTables() {
+        var tables = document.querySelectorAll('table.doc-table');
+        for (var i = 0; i < tables.length; i++) {
+            var t = tables[i], w = t.parentElement;
+            if (!w) continue;
+            w.style.overflowX = 'auto';                       // ضمان التمرير مهما كانت الحاوية
+            if (t.getAttribute('dir') === 'rtl') w.style.direction = 'rtl'; // البداية من اليمين (الاسم أولاً)
+            var row = t.querySelector('tr');                  // أعمدة كثيرة → خط أصغر بالطباعة
+            if (row && row.children.length >= 14) t.classList.add('cols-many');
+            t.style.zoom = '';
+            // تصغير الطباعة (--pz): عرض الورقة المستهدف ÷ عرض الجدول الطبيعي — يضمن أن
+            // كل الأعمدة تدخل بالورقة مهما اتّسع الجدول (يقرأه CSS الطباعة أعلاه)
+            var target = parseFloat(getComputedStyle(t).getPropertyValue('--pz-target')) || 745;
+            // قياس حقيقي: نفعّل شروط الطباعة لحظياً (خط/حشوة/عرض طبيعي) ونقيس عرض الجدول الفعلي
+            t.classList.add('pz-measure');
+            var natW = t.getBoundingClientRect().width || t.scrollWidth;
+            t.classList.remove('pz-measure');
+            var pz = target / natW;
+            t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
+            var z = w.clientWidth / t.scrollWidth;
+            if (z < 1) t.style.zoom = Math.max(z, 0.5);
+        }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitDocTables);
+    else fitDocTables();
+    window.addEventListener('resize', fitDocTables);
+    window.addEventListener('load', fitDocTables); // بعد تحميل الصور/الخطوط (تغيّر عرض الأعمدة)
+})();
+</script>
 CSS;
 }

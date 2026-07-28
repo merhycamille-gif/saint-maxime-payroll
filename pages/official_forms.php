@@ -1279,7 +1279,7 @@ elseif ($form === 'teacher_card'):
     $rows = $q->fetchAll();
     $tc=0;$tp=0;$tEx=0;$tAi=0;$tBase=0;
 ?>
-<div class="official-doc rtl" id="ppExportArea">
+<div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الفروقات — <?= e($prevSY) ?> مقابل <?= e($schoolYear) ?></div>
     <table class="doc-table">

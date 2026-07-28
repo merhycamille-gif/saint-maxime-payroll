@@ -17,8 +17,10 @@ function chromePath() {
 }
 
 (async () => {
-  const [out, url, cookieName, cookieValue, fit] = process.argv.slice(2);
+  let [out, url, cookieName, cookieValue, fit] = process.argv.slice(2);
   if (!out || !url) { console.error('args: out url [cookieName cookieValue] [fit]'); process.exit(2); }
+  // الرابط قد يصل base64 (بادئة b64:) — لأن ويندوز يشوّه علامة % في وسائط الأوامر
+  if (url.startsWith('b64:')) url = Buffer.from(url.slice(4), 'base64').toString('utf8');
   const exe = chromePath();
   if (!exe) { console.error('no chrome'); process.exit(3); }
   const browser = await puppeteer.launch({ executablePath: exe, headless: 'new', args: ['--no-sandbox', '--disable-gpu'] });
