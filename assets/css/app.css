@@ -512,33 +512,42 @@ body.rtl .table th { text-align: right; }
 .alert-info { background: #eff6ff; color: #1e40af; border-color: #93c5fd; }
 
 /* =================== Tabs =================== */
+/* تبويبات بارزة (بطلب المستخدم «واضحة ونافرة» — بطاقة الموظف: شخصي/العنوان/التوظيف/مالي…):
+   أزرار حبوب واضحة، والتبويب المفتوح بلون القسم الكامل + كتابة بيضاء */
 .tabs {
     display: flex;
-    gap: 4px;
-    border-bottom: 2px solid var(--gray-200);
+    gap: 6px;
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    padding: 5px;
     margin-bottom: 20px;
     overflow-x: auto;
 }
 
 .tab {
-    padding: 10px 20px;
+    padding: 9px 16px;
     cursor: pointer;
-    border: none;
-    background: transparent;
-    color: var(--gray-600);
-    font-size: 14px;
-    font-weight: 600;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--gray-700);
+    font-size: 13.5px;
+    font-weight: 700;
     transition: all 0.15s;
     white-space: nowrap;
 }
 
-.tab:hover { color: var(--primary); }
+.tab:hover {
+    border-color: var(--accent, var(--primary));
+    color: var(--accent, var(--primary));
+}
 
 .tab.active {
-    color: var(--primary);
-    border-bottom-color: var(--gold);
+    background: var(--accent, var(--primary));
+    border-color: var(--accent, var(--primary));
+    color: #fff;
+    box-shadow: 0 2px 7px rgba(0,0,0,.20);
 }
 
 .tab-content { display: none; }
@@ -976,6 +985,20 @@ input:focus, select:focus, textarea:focus {
 
 /* شارات الحالة: حواف أنعم متناسقة */
 .badge { letter-spacing: .01em; }
+
+/* عناوين الأقسام الداخلية بالفورمات (h4 بلون --primary داخل البطاقات، مثل «المعلومات الشخصية»
+   ببطاقة الموظف): شريط نافر بلون القسم + كتابة بيضاء — بطلب المستخدم «واضحة ونافرة» */
+.card-body h4[style*="--primary"] {
+    background: var(--accent, var(--primary));
+    color: #fff !important;
+    padding: 7px 12px;
+    border-radius: 8px;
+    margin: 18px 0 12px;
+    font-size: 13.5px;
+}
+@media print {
+    .card-body h4[style*="--primary"] { background: #fff; color: #000 !important; border-bottom: 1px solid #000; border-radius: 0; }
+}
 
 /* =============== لوحة القيادة الرسمية (Tableau de bord) =============== */
 /* الأرقام الرئيسية (Indicateurs) */
