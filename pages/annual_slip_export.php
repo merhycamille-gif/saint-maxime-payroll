@@ -33,13 +33,14 @@ $widths = [12, 14, 12, 15, 14, 13, 15, 12, 12, 13, 12, 14, 15, 12, 14, 15, 12];
 
 // أعمدة الأستاذ التي تُحذف للموظف الإداري (قيمة الدرجة، الراتب بعد التدرّج، الصندوق، درجة/نصف راتب) — مؤشّرات 0-based.
 const ANNUAL_TEACHER_COLS = [2, 3, 7, 8];
-// أعمدة المكوّنات في التخطيط الأصلي (17 عموداً): الأجر الإضافي=4، مكافأة ومساعدة=5 —
-// تُحذف حسب زرّ «الراتب المركّب يشمل» (متل الشاشة). عمود النقل (14) يظهر دائماً متل الشاشة
-// لأن «المستحق» يشمله دائماً. الحذف يتم دفعة واحدة بالمؤشّرات الأصلية.
+// أعمدة المكوّنات في التخطيط الأصلي (17 عموداً): الأجر الإضافي=4، مكافأة ومساعدة=5، النقل=14 —
+// تُحذف حسب زرّ «الراتب المركّب يشمل» (متل الشاشة — النقل خيار بإيد المستخدم).
+// لما يكون النقل مخفياً يُصدَّر «المستحق» بلا النقل لتبقى الأرقام راكبة (متل الشاشة).
 function annualCompDropIdx(): array {
     $d = [];
     if (!salaryCompHas('extra'))     $d[] = 4;
     if (!salaryCompHas('aide'))      $d[] = 5;
+    if (!salaryCompHas('transport')) $d[] = 14;
     return $d;
 }
 function annualDropCols(array $row, bool $dropTeacher): array {
@@ -79,14 +80,16 @@ function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $
             $r['brut'], ($r['caisse'] > 0 ? $r['caisse'] : ''), ($r['eoc_grade'] > 0 ? $r['eoc_grade'] : ''),
             ($r['cnss'] > 0 ? $r['cnss'] : ''), ($r['income_tax'] > 0 ? $r['income_tax'] : ''),
             $r['total_retenues'], $r['net'], ($r['family'] > 0 ? $r['family'] : ''),
-            ($r['transport'] > 0 ? $r['transport'] : ''), $r['total_due'], '',
+            ($r['transport'] > 0 ? $r['transport'] : ''),
+            $r['total_due'] - (salaryCompHas('transport') ? 0 : $r['transport']), '',
         ]);
     }
     $t = $slip['tot'];
     $emit([
         'المجموع', $t['base_shown'], $t['grade_inc'], $t['base_plus_echelon'], $t['extra_wage'], $t['aide'],
         $t['brut'], $t['caisse'], $t['eoc_grade'], $t['cnss'], $t['income_tax'], $t['total_retenues'], $t['net'],
-        $t['family'], $t['transport'], $t['total_due'], '',
+        $t['family'], $t['transport'],
+        $t['total_due'] - (salaryCompHas('transport') ? 0 : $t['transport']), '',
     ], true);
 }
 
