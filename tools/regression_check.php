@@ -216,6 +216,14 @@ check('كشف الرواتب: تواقيع إعداد/تدقيق/اعتماد', 
 $hlpSrc = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php');
 check('رؤوس الجداول كحلية #1F4E5F (شاشة + طباعة)', substr_count($hlpSrc, '#1F4E5F') >= 2);
 check('الخط العربي الرسمي (Sakkal Majalla) معرَّف', strpos($hlpSrc, 'Sakkal Majalla') !== false);
+// حجم الخط 12pt (متل «12» بالوورد) بالتقارير والإفادات — بطلب المستخدم 2026-07-29
+check('حجم الخط 12pt بالتقارير (doc-table + رؤوس + فقرات النماذج)',
+      strpos($hlpSrc, 'font-size:12pt;margin:10px 0') !== false          // .doc-table
+      && substr_count($hlpSrc, 'font-size:12pt') >= 6);                   // th/info-grid/fline/doc-p/sign-box
+$attSrc = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
+check('حجم الخط 12pt بالإفادات (أجسام الإفادات الثلاثة)', substr_count($attSrc, 'font-size:12pt') >= 3);
+$repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+check('حجم الخط 12pt بطباعة مركز التقارير', strpos($repSrc, 'font-size: 12pt !important') !== false);
 $regEid = (int)$db->query("SELECT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                            WHERE ms.month = 6 AND ms.year = 2026 AND ms.net_salary_lbp > 0 AND e.is_deleted = 0 LIMIT 1")->fetchColumn();
 if ($regEid) {

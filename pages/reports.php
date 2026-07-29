@@ -196,8 +196,8 @@ function reportDocThumb($path) {
     /* تقارير reports.php كلّها جداول واسعة (١٦ عموداً) → A4 أفقي مرتّب يسع كل الأعمدة بلا قصّ */
     @media print {
         @page { size: A4 landscape; margin: 7mm; }
-        /* حجم 12 للحرف والرقم (بطلب المستخدم) + جدول يتأقلم على A4 ويلفّ النص بلا قصّ */
-        .doc-table { font-size: 12px !important; table-layout: fixed; width: 100% !important; }
+        /* حجم 12pt (متل «12» بالوورد — بطلب المستخدم) + جدول يتأقلم على A4 ويلفّ النص بلا قصّ */
+        .doc-table { font-size: 12pt !important; table-layout: fixed; width: 100% !important; }
         /* break-word (لا anywhere): يلفّ عند الفراغات فلا ينقسم الرقم المالي بنصّه أبداً */
         .doc-table th, .doc-table td { padding: 3px 5px !important; word-wrap: break-word; overflow-wrap: break-word; }
         .no-print { display: none !important; }

@@ -362,11 +362,12 @@ function officialFormStyles(): string {
 .report-table-wrap::-webkit-scrollbar,.card-body::-webkit-scrollbar{height:12px;}
 .report-table-wrap::-webkit-scrollbar-track,.card-body::-webkit-scrollbar-track{background:#e8edf3;border-radius:8px;}
 .report-table-wrap::-webkit-scrollbar-thumb,.card-body::-webkit-scrollbar-thumb{background:var(--primary,#1e3a8a);border-radius:8px;border:2px solid #e8edf3;}
-.doc-table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;}
+/* حجم الخط 12pt (متل «12» بالوورد) بطلب المستخدم — للتقارير والإفادات كلها */
+.doc-table{width:100%;border-collapse:collapse;font-size:12pt;margin:10px 0;}
 /* خط عربي واضح موحّد للمستندات والتقارير المطبوعة */
 .doc-table,#ppExportArea,.payslip-card{font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo','Inter',sans-serif;}
 .doc-table th{background:#1F4E5F;color:#fff;padding:7px 8px;text-align:center;
-  font-weight:600;border:1px solid #1F4E5F;font-size:11.5px;}
+  font-weight:600;border:1px solid #1F4E5F;font-size:12pt;}
 .doc-table td{border:1px solid #94a3b8;padding:6px 8px;text-align:center;}
 .doc-table tfoot td,.doc-table .total-row td{background:#eef1f4;font-weight:700;}
 .doc-table .subtotal-row td{background:#f1f5f9;font-weight:700;}
@@ -376,7 +377,7 @@ function officialFormStyles(): string {
 .money-usd-inline{color:#047857;font-weight:600;white-space:nowrap;}
 
 /* شبكة معلومات — كل خانة على سطر مسطّر متل النموذج الأصلي */
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px 30px;margin:12px 0;font-size:13px;}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px 30px;margin:12px 0;font-size:12pt;}
 .info-grid > div{display:flex;align-items:flex-end;gap:6px;border-bottom:1px dotted #475569;
   padding-bottom:3px;min-height:21px;line-height:1.5;}
 .info-grid .k{white-space:nowrap;color:#334155;}
@@ -384,7 +385,7 @@ function officialFormStyles(): string {
 .info-grid .full{grid-column:1 / -1;}
 
 /* سطر النموذج الرسمي: تسمية + قيمة على خط منقّط يملأ السطر (متل النماذج الرسمية) */
-.fline{display:flex;align-items:flex-end;gap:6px;margin:8px 0;font-size:13px;line-height:1.7;flex-wrap:wrap;}
+.fline{display:flex;align-items:flex-end;gap:6px;margin:8px 0;font-size:12pt;line-height:1.7;flex-wrap:wrap;}
 .fline .lbl{white-space:nowrap;color:#111;}
 .fline .val{flex:1 1 60px;border-bottom:1px dotted #475569;min-height:18px;font-weight:700;
   color:#0a3d91;padding:0 5px;text-align:center;}
@@ -394,11 +395,11 @@ function officialFormStyles(): string {
 .opt .n{display:inline-block;min-width:15px;height:15px;border:1.2px solid #333;text-align:center;
   line-height:14px;font-size:11px;font-weight:700;}
 .opt.on .n{background:#0a3d91;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-.doc-p{font-size:13px;line-height:1.8;margin:8px 0;}
+.doc-p{font-size:12pt;line-height:1.8;margin:8px 0;}
 
 /* صناديق التوقيع */
 .sign-row{display:flex;justify-content:space-between;gap:30px;margin-top:30px;}
-.sign-box{flex:1;text-align:center;font-size:12px;}
+.sign-box{flex:1;text-align:center;font-size:12pt;}
 .sign-box .sign-label{margin-bottom:36px;color:#334155;}
 .sign-box .sign-place{margin-bottom:10px;color:#64748b;}
 .sign-box .sign-line{border-top:1px solid #475569;margin:0 18px;}
@@ -508,12 +509,12 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
 .land-report .doc-table,.xls-sheet .doc-table{--pz-target:1075;}
 /* وضع قياس خاطف: نفس شروط الطباعة (عرض طبيعي + خط الطباعة) لقياس العرض الحقيقي قبل حساب --pz */
 .doc-table.pz-measure{width:max-content !important;table-layout:auto !important;}
-.doc-table.cols-many.pz-measure{font-size:9.5px !important;}
-.doc-table.cols-many.pz-measure th,.doc-table.cols-many.pz-measure td{font-size:9.5px !important;padding:2px 3px !important;}
-/* جدول بأعمدة كثيرة (١٤+): خط أصغر بالطباعة كي لا تتقطّع الكلمات/الأرقام على A4
-   (يشمل th/td صراحةً — قاعدة عامة تفرض عليها حجماً أكبر بغير ذلك) */
+.doc-table.cols-many.pz-measure{font-size:12pt !important;}
+.doc-table.cols-many.pz-measure th,.doc-table.cols-many.pz-measure td{font-size:12pt !important;padding:2px 3px !important;}
+/* جدول بأعمدة كثيرة (١٤+): نفس حجم 12pt (بطلب المستخدم) وحشوة مضغوطة،
+   والتصغير المحسوب --pz يضمن دخول كل الأعمدة بالورقة بلا قصّ */
 @media print{
-  .doc-table.cols-many,.doc-table.cols-many th,.doc-table.cols-many td{font-size:9.5px !important;}
+  .doc-table.cols-many,.doc-table.cols-many th,.doc-table.cols-many td{font-size:12pt !important;}
   .doc-table.cols-many th,.doc-table.cols-many td{padding:2px 3px !important;}
   /* توزيع الأعمدة حسب المحتوى (لا بالتساوي) → العمود المالي يأخذ عرضه فلا ينقسم الرقم أبداً */
   .doc-table.cols-many{table-layout:auto !important;}
