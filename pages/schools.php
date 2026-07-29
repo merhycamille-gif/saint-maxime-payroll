@@ -41,16 +41,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         trim($_POST['email'] ?? ''),
         trim($_POST['nssf_employer_number'] ?? ''),
         trim($_POST['finance_number'] ?? ''),
+        trim($_POST['caisse_number'] ?? ''),
         $dirAr,
         $dirFr,
         isset($_POST['is_active']) ? 1 : 0,
     ];
+    // تركيب ذاتي: عمود رقم المدرسة لدى صندوق التعويضات
+    try { $db->query("SELECT caisse_number FROM schools LIMIT 1"); }
+    catch (Exception $e) { try { $db->exec("ALTER TABLE schools ADD COLUMN caisse_number VARCHAR(50) NULL COMMENT 'رقم المدرسة لدى صندوق التعويضات'"); } catch (Exception $e2) {} }
 
     if ($data[1] === '' && $data[2] === '') {
         $_SESSION['flash_error'] = 'الاسم مطلوب / Le nom est requis';
     } elseif ($id > 0) {
         $sql = "UPDATE schools SET code=?, name_ar=?, name_fr=?, address=?, address_fr=?, phone=?, email=?,
-                nssf_employer_number=?, finance_number=?, director_name=?, director_name_fr=?, is_active=? WHERE id=?";
+                nssf_employer_number=?, finance_number=?, caisse_number=?, director_name=?, director_name_fr=?, is_active=? WHERE id=?";
         $stmt = $db->prepare($sql);
         $stmt->execute([...$data, $id]);
         logAudit('update', 'schools', $id, null, $data[2]);
@@ -58,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['flash_success'] = 'تم تحديث المدرسة / École mise à jour';
     } else {
         $sql = "INSERT INTO schools (code, name_ar, name_fr, address, address_fr, phone, email,
-                nssf_employer_number, finance_number, director_name, director_name_fr, is_active)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
+                nssf_employer_number, finance_number, caisse_number, director_name, director_name_fr, is_active)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)";
         $stmt = $db->prepare($sql);
         $stmt->execute($data);
         $newId = $db->lastInsertId();
@@ -234,11 +238,15 @@ include __DIR__ . '/../includes/header.php';
                     <input type="text" name="finance_number" class="form-control" value="<?= e($editSchool['finance_number'] ?? '') ?>">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Directeur (arabe) / المدير (عربي)</label>
-                    <input type="text" name="director_name" class="form-control" dir="rtl" value="<?= e($editSchool['director_name'] ?? '') ?>">
+                    <label class="form-label">N° Caisse / رقم المدرسة لدى صندوق التعويضات</label>
+                    <input type="text" name="caisse_number" class="form-control" value="<?= e($editSchool['caisse_number'] ?? '') ?>">
                 </div>
             </div>
             <div class="form-row cols-3">
+                <div class="form-group">
+                    <label class="form-label">Directeur (arabe) / المدير (عربي)</label>
+                    <input type="text" name="director_name" class="form-control" dir="rtl" value="<?= e($editSchool['director_name'] ?? '') ?>">
+                </div>
                 <div class="form-group">
                     <label class="form-label">Directeur (français) / اسم المدير بالأجنبي</label>
                     <input type="text" name="director_name_fr" class="form-control" dir="ltr" value="<?= e($editSchool['director_name_fr'] ?? '') ?>">

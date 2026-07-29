@@ -253,12 +253,19 @@ if ($regEid) {
 /* =====================================================================
  * 9) «الراتب يشمل» يعمّ كل التقارير (2026-07-28): بيان الصندوق الفصلي + معلومات عامة
  * =================================================================== */
-$hQon  = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 3], ['extra', 'aide']);
-$hQoff = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 3], []);
-check('بيان الصندوق الفصلي: أعمدة الإضافي/المكافأة/المركّب تظهر مع الخيار',
-      strpos($hQon, 'الأجر الإضافي<br>(ل.ل)') !== false && strpos($hQon, 'مكافأة ومساعدة<br>(ل.ل)') !== false && strpos($hQon, 'الراتب المركّب') !== false);
-check('بيان الصندوق الفصلي: الأعمدة تختفي بلا الخيار',
-      strpos($hQoff, 'الأجر الإضافي<br>(ل.ل)') === false && strpos($hQoff, 'مكافأة ومساعدة<br>(ل.ل)') === false && strpos($hQoff, '#4338ca') === false);
+// (2026-07-29) بيان الصندوق الفصلي صار مطابقاً للنموذج الرسمي الورقي (صورة المستخدم)
+$hQ = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 3], []);
+check('بيان الصندوق الفصلي: ترويسة النموذج الرسمي',
+      strpos($hQ, 'بيان بالمحسومات المقتطعة ومساهمة المدرسة') !== false
+      && strpos($hQ, 'لأفراد الهيئة التعليمية في المدارس الخاصة') !== false
+      && strpos($hQ, 'رقم المدرسة') !== false && strpos($hQ, 'عن الفصل') !== false);
+check('بيان الصندوق الفصلي: أعمدة النموذج (اسم الأب/الإضافي/نصف راتب/مختلف درجة)',
+      strpos($hQ, 'اسم الأب') !== false && strpos($hQ, 'الأجر<br>الإضافي ل.ل') !== false
+      && strpos($hQ, 'نصف<br>راتب ل.ل') !== false && strpos($hQ, 'مختلف، درجة<br>تمرين ل.ل') !== false);
+check('بيان الصندوق الفصلي: خلاصة المقتطعة + مساهمة المدرسة + المجموع العام + المادة 6',
+      strpos($hQ, 'المحسومات المقتطعة') !== false && strpos($hQ, 'مساهمة المدرسة') !== false
+      && strpos($hQ, 'المجموع العام') !== false && strpos($hQ, 'المرسوم الاشتراعي رقم 47') !== false
+      && strpos($hQ, 'توقيع المدير أو من يقوم مقامه') !== false && strpos($hQ, 'ليرة لبنانية لا غير') !== false);
 $hGon  = renderPage('pages/official_forms.php', ['form' => 'general_info'], ['extra']);
 $hGoff = renderPage('pages/official_forms.php', ['form' => 'general_info'], []);
 check('معلومات عامة: عمود الراتب مركّب حسب الخيار', strpos($hGon, 'الأساسي + الإضافي') !== false);

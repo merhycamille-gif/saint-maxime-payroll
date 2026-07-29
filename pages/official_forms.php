@@ -1088,35 +1088,44 @@ elseif ($form === 'teacher_card'):
 </div>
 
 <?php elseif ($form === 'eoc_quarterly'):
-    // المحسومات الفصلية — صندوق التعويضات: ملخّص لكل مدرسة للفصل، بالليرة والدولار (مطابق ملف cind T)
+    // المحسومات الفصلية — صندوق التعويضات: مطابق للنموذج الرسمي (بيان بالمحسومات المقتطعة ومساهمة
+    // المدرسة عن أفراد الهيئة التعليمية الداخلين في الملاك) — بطلب المستخدم 2026-07-29 (صورة النموذج الورقي)
+    // تركيب ذاتي: عمود «رقم المدرسة لدى صندوق التعويضات» في جدول المدارس
+    try { $db->query("SELECT caisse_number FROM schools LIMIT 1"); }
+    catch (Exception $e) { try { $db->exec("ALTER TABLE schools ADD COLUMN caisse_number VARCHAR(50) NULL COMMENT 'رقم المدرسة لدى صندوق التعويضات'"); } catch (Exception $e2) {} }
+    // تعبئة ذاتية لمرة واحدة: رقم القديس مكسيموس لدى الصندوق (من النموذج الورقي الرسمي) — لا يمسّ قيمة مُدخلة
+    try { $db->exec("UPDATE schools SET caisse_number='75210' WHERE (caisse_number IS NULL OR caisse_number='') AND (name_ar LIKE '%مكسيموس%' OR name_fr LIKE '%Maximos%' OR name_fr LIKE '%Maxime%')"); } catch (Exception $e) {}
     $qNames = [1=>'الفصل الأول (كانون الثاني - شباط - آذار)', 2=>'الفصل الثاني (نيسان - أيار - حزيران)',
                3=>'الفصل الثالث (تموز - آب - أيلول)', 4=>'الفصل الرابع (تشرين الأول - تشرين الثاني - كانون الأول)'];
+    $qShort = [1=>'الفصل الأول', 2=>'الفصل الثاني', 3=>'الفصل الثالث', 4=>'الفصل الرابع'];
     $quarter = max(1, min(4, (int)($_GET['quarter'] ?? ceil($month/3))));
     [$qy1, $qy2] = schoolYearToYears($schoolYear);
     $qm = [1=>[1,2,3], 2=>[4,5,6], 3=>[7,8,9], 4=>[10,11,12]][$quarter];
     $qYear = ($quarter === 4) ? $qy1 : $qy2;       // الفصل الرابع (ت١/ت٢/ك١) بالسنة الأولى
-    $rate = (float)($_GET['rate'] ?? (getExchangeRate($qm[2], $qYear) ?: getExchangeRate() ?: 89500));
-    if ($rate <= 0) $rate = 89500;
     $ph = implode(',', array_fill(0, 3, '?'));
     // تفصيل لكل أستاذ ملاك: الراتب السابق (أساس قبل التدرّج) والحالي (بعد التدرّج) + المحسوم الفصلي لصندوق التعويضات
-    $q = $db->prepare("SELECT e.id, e.school_id, e.caisse_number,
-            e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+    $q = $db->prepare("SELECT e.id, e.school_id, e.caisse_number, e.titularization_date,
+            e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.father_name_ar, e.father_name_fr,
             MAX(ms.base_salary_lbp) prevSal, MAX(ms.base_plus_echelon_lbp) currSal,
-            MAX(ms.extra_lbp + ms.prime_fixe_lbp) extraM, MAX(ms.aide_complementaire_lbp) aideM, MAX(ms.transport_lbp) transM,
+            MAX(ms.extra_lbp + ms.prime_fixe_lbp) extraM,
             COUNT(DISTINCT ms.month) months, MAX(ms.caisse_amount_lbp) monthlyCaisse,
             SUM(ms.caisse_amount_lbp) qCaisse, SUM(ms.eoc_grade_lbp) gradeHalf
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
         WHERE e.employee_type='enseignant_titulaire' AND e.is_deleted=0" . $ofYearFilter . "
               AND ms.year=? AND ms.month IN ($ph) AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
         GROUP BY e.id
-        ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+        ORDER BY e.school_id, COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
     $q->execute(array_merge($ofYearParams, [$qYear], $qm));
     $rows = $q->fetchAll();
     $multiS = (count(activeSchoolIds()) !== 1);
     $qMonthsLabel = implode(' - ', array_map(fn($m)=>monthName($m,'ar'), $qm));
-    // أعمدة «الراتب يشمل» (إضافي/مكافأة/نقل + الراتب المركّب) تظهر فقط عند اختيارها من شريط الترويسة
-    $qCC = compColsCount();
-    $lblSpan = $multiS ? 6 : 5; $allSpan = ($multiS ? 10 : 9) + $qCC + ($qCC ? 1 : 0);
+    // نصف الراتب مقابل «مختلف/درجة»: إذا وقع تاريخ دخول الملاك ضمن هذا الفصل → المبلغ نصف راتب، وإلا فهو قسط درجة/زيادة
+    $isTitInQuarter = function ($r) use ($qYear, $qm) {
+        $td = $r['titularization_date'] ?? null;
+        if (!$td || $td === '0000-00-00') return false;
+        return ((int)date('Y', strtotime($td)) === $qYear) && in_array((int)date('n', strtotime($td)), $qm, true);
+    };
+    $allSpan = $multiS ? 12 : 11;
 ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="eoc_quarterly">
@@ -1127,67 +1136,100 @@ elseif ($form === 'teacher_card'):
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12px;margin-bottom:6px">
-        <div style="font-weight:700;line-height:1.6">صندوق التعويضات<br><span style="font-weight:400">لأفراد الهيئة التعليمية في المدارس الخاصة</span></div>
-        <div style="text-align:left">
-            <div style="font-weight:700"><?= e($school['name_ar'] ?? '') ?></div>
-            <div><?= e($school['address'] ?? '') ?></div>
-            <div>الرقم المالي: <?= e($school['finance_number'] ?? '') ?></div>
+    <?php /* ترويسة النموذج الرسمي: صندوق التعويضات يميناً، عنوان البيان ورقم الهاتف يساراً */ ?>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:4px">
+        <div style="font-weight:700;line-height:1.7;font-size:12pt">صندوق التعويضات<br>
+            <span style="font-weight:600">لأفراد الهيئة التعليمية في المدارس الخاصة</span><br>
+            <span style="font-weight:400">في مدرسة: <?= e($school['name_ar'] ?? '') ?><?= !empty($school['ville']) ? ' - ' . e($school['ville']) : '' ?> / غير مجاني</span>
+        </div>
+        <div style="text-align:left;line-height:1.7;font-size:12pt">
+            <strong>بيان بالمحسومات المقتطعة ومساهمة المدرسة<br>عن أفراد الهيئة التعليمية الداخلين في الملاك</strong><br>
+            رقم الهاتف: <?= e($school['phone'] ?? '') ?: '<span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span>' ?>
         </div>
     </div>
-    <div class="doc-title">بيان بالمحسومات المقتطعة ومساهمة المدرسة عن أفراد الهيئة التعليمية الداخلين في الملاك</div>
-    <div style="text-align:center;font-size:13px;margin-bottom:6px">عن الفصل: <?= e($qNames[$quarter]) ?> — من السنة المدرسية <?= e($schoolYear) ?> &nbsp;(<?= e($qMonthsLabel) ?>)</div>
-    <table class="doc-table" style="font-size:11px">
+    <div style="display:flex;justify-content:space-between;font-size:12pt;margin-bottom:2px">
+        <div>رقم المدرسة: <strong><?= e($school['caisse_number'] ?? '') ?: '<span style="display:inline-block;min-width:80px;border-bottom:1px dotted #475569">&nbsp;</span>' ?></strong>
+             &nbsp;&nbsp; من السنة المدرسية <strong><?= e($schoolYear) ?></strong></div>
+        <div>Page 1 Of 1</div>
+    </div>
+    <div style="font-size:12pt;margin-bottom:6px">عن الفصل: <strong><?= e($qShort[$quarter]) ?></strong> (<?= e($qMonthsLabel) ?>)</div>
+    <table class="doc-table">
         <thead><tr>
-            <th>#</th><?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
-            <th>رقم السجل في<br>إدارة الصندوق</th><th>الاسم والشهرة</th>
-            <th>الراتب الشهري<br>السابق (ل.ل)</th><th>الراتب الشهري<br>الحالي (ل.ل)</th>
-            <?php if (salaryCompHas('extra')): ?><th>الأجر الإضافي<br>(ل.ل)</th><?php endif; ?>
-            <?php if (salaryCompHas('aide')): ?><th>مكافأة ومساعدة<br>(ل.ل)</th><?php endif; ?>
-            <?php if (salaryCompHas('transport')): ?><th>بدل النقل<br>(ل.ل)</th><?php endif; ?>
-            <?php if ($qCC): ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><?php endif; ?>
-            <th>المحسومات<br>الشهرية (ل.ل)</th><th>المحسومات<br>الفصلية (ل.ل)</th>
-            <th>نصف راتب /<br>درجة (ل.ل)</th><th>ملاحظات</th>
+            <?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
+            <th>الرقم المالي</th><th>الاسم والشهرة</th><th>اسم الأب</th>
+            <th>الراتب الشهري<br>السابق ل.ل</th><th>الراتب الشهري<br>الحالي ل.ل</th>
+            <th>الأجر<br>الإضافي ل.ل</th>
+            <th>المحسومات<br>الشهرية ل.ل</th><th>المحسومات<br>الفصلية ل.ل</th>
+            <th>نصف<br>راتب ل.ل</th><th>مختلف، درجة<br>تمرين ل.ل</th><th>ملاحظات</th>
         </tr></thead>
         <tbody>
-        <?php $totM=0;$totQ=0;$totG=0;$totEx=0;$totAi=0;$totTr=0;$totCp=0; foreach ($rows as $i=>$r):
-            $mc=(int)$r['monthlyCaisse']; $qc=(int)$r['qCaisse']; $gh=(int)$r['gradeHalf'];
-            $exM=(int)$r['extraM']; $aiM=(int)$r['aideM']; $trM=(int)$r['transM'];
-            // الراتب المركّب = الحالي + المكوّنات المختارة فقط (متل باقي التقارير)
-            $cpM=(int)$r['currSal'] + (salaryCompHas('extra')?$exM:0) + (salaryCompHas('aide')?$aiM:0) + (salaryCompHas('transport')?$trM:0);
-            $totM+=$mc; $totQ+=$qc; $totG+=$gh; $totEx+=$exM; $totAi+=$aiM; $totTr+=$trM; $totCp+=$cpM; ?>
+        <?php $totPrev=0;$totCur=0;$totM=0;$totQ=0;$totHalf=0;$totMisc=0;$totEx=0; foreach ($rows as $i=>$r):
+            $mc=(int)$r['monthlyCaisse']; $qc=(int)$r['qCaisse']; $gh=(int)$r['gradeHalf']; $exM=(int)$r['extraM'];
+            $half = ($gh > 0 && $isTitInQuarter($r)) ? $gh : 0;   // دخل الملاك بهذا الفصل → نصف راتب
+            $misc = $gh - $half;                                   // وإلا → قسط درجة/زيادة (مختلف)
+            $totPrev+=(int)$r['prevSal']; $totCur+=(int)$r['currSal']; $totM+=$mc; $totQ+=$qc; $totHalf+=$half; $totMisc+=$misc; $totEx+=$exM; ?>
             <tr>
-                <td><?= $i+1 ?></td>
                 <?php if ($multiS): ?><td><small><?= e(schoolNameById($r['school_id'],'ar')) ?></small></td><?php endif; ?>
                 <td><?= e($r['caisse_number']) ?></td>
                 <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                <td><?= e(trim((string)$r['father_name_ar']) ?: (string)$r['father_name_fr']) ?></td>
                 <td class="num"><?= formatLBP($r['prevSal'],false) ?></td>
                 <td class="num"><?= formatLBP($r['currSal'],false) ?></td>
-                <?php if (salaryCompHas('extra')): ?><td class="num"><?= formatLBP($exM,false) ?></td><?php endif; ?>
-                <?php if (salaryCompHas('aide')): ?><td class="num"><?= formatLBP($aiM,false) ?></td><?php endif; ?>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= formatLBP($trM,false) ?></td><?php endif; ?>
-                <?php if ($qCC): ?><td class="num" style="background:#eef2ff"><strong><?= formatLBP($cpM,false) ?></strong></td><?php endif; ?>
+                <td class="num"><?= $exM>0?formatLBP($exM,false):'00' ?></td>
                 <td class="num"><?= formatLBP($mc,false) ?></td>
                 <td class="num"><strong><?= formatLBP($qc,false) ?></strong></td>
-                <td class="num"><?= $gh>0?formatLBP($gh,false):'' ?></td>
+                <td class="num"><?= $half>0?formatLBP($half,false):'00' ?></td>
+                <td class="num"><?= $misc>0?formatLBP($misc,false):'00' ?></td>
                 <td>&nbsp;</td>
             </tr>
         <?php endforeach; ?>
         <?php if(!$rows): ?><tr><td colspan="<?= $allSpan ?>" class="text-center">لا يوجد أساتذة ملاك بهذا الفصل</td></tr><?php endif; ?>
         </tbody>
         <tfoot><tr class="total-row">
-            <td colspan="<?= $lblSpan ?>">المجموع العام (<?= count($rows) ?> أستاذ)</td>
-            <?php if (salaryCompHas('extra')): ?><td class="num"><strong><?= formatLBP($totEx,false) ?></strong></td><?php endif; ?>
-            <?php if (salaryCompHas('aide')): ?><td class="num"><strong><?= formatLBP($totAi,false) ?></strong></td><?php endif; ?>
-            <?php if (salaryCompHas('transport')): ?><td class="num"><strong><?= formatLBP($totTr,false) ?></strong></td><?php endif; ?>
-            <?php if ($qCC): ?><td class="num"><strong><?= formatLBP($totCp,false) ?></strong></td><?php endif; ?>
+            <td colspan="<?= $multiS ? 4 : 3 ?>">المجموع</td>
+            <td class="num"><strong><?= formatLBP($totPrev,false) ?></strong></td>
+            <td class="num"><strong><?= formatLBP($totCur,false) ?></strong></td>
+            <td class="num"><strong><?= formatLBP($totEx,false) ?></strong></td>
             <td class="num"><strong><?= formatLBP($totM,false) ?></strong></td>
             <td class="num"><strong><?= formatLBP($totQ,false) ?></strong></td>
-            <td class="num"><strong><?= formatLBP($totG,false) ?></strong></td>
+            <td class="num"><strong><?= formatLBP($totHalf,false) ?></strong></td>
+            <td class="num"><strong><?= formatLBP($totMisc,false) ?></strong></td>
             <td></td>
         </tr></tfoot>
     </table>
-    <div class="sign-row"><?= signatureBox('المسؤول عن صندوق التعويضات', $school['ville'] ?? '', formatDate(date('Y-m-d'))) ?></div>
+
+    <?php // خلاصة النموذج الرسمي: المحسومات المقتطعة + مساهمة المدرسة + المجموع العام + التفقيط + نص المادة 6
+    $deducted = $totQ + $totHalf + $totMisc;   // المحسومات المقتطعة = الفصلية + نصف الراتب + المختلف
+    $grand = $deducted + $totQ;                // + مساهمة المدرسة (توازي المحسومات الفصلية 6%)
+    ?>
+    <div style="display:flex;justify-content:space-between;gap:24px;margin-top:14px;font-size:12pt;line-height:2">
+        <div style="flex:1">
+            <div>عدد الأساتذة: <strong><?= count($rows) ?></strong></div>
+            <div><strong>فقط <?= e(numToArabicWords($grand)) ?> ليرة لبنانية لا غير</strong></div>
+            <div style="margin-top:8px;font-size:11pt">ملاحظة: نص المادة 6 من المرسوم الاشتراعي رقم 47 تاريخ 29/06/1983<br>
+                تتكوّن المحسومات من:<br>
+                1- نصف راتب الشهر الأول من خدمة الموظف .<br>
+                2- ستة بالمئة من الراتب الشهري .<br>
+                3- القسط الأول من كل زيادة تطرأ على الراتب .</div>
+        </div>
+        <div style="min-width:330px">
+            <table style="border-collapse:collapse;width:100%;font-size:12pt">
+                <tr><td style="padding:3px 8px">المحسومات المقتطعة</td>
+                    <td class="num" style="padding:3px 8px;border-bottom:1px solid #333"><?= formatLBP($totQ,false) ?> + <?= formatLBP($totHalf+$totMisc,false) ?></td>
+                    <td style="padding:3px 8px">=</td><td class="num" style="padding:3px 8px"><strong><?= formatLBP($deducted,false) ?></strong></td></tr>
+                <tr><td style="padding:3px 8px">مساهمة المدرسة</td>
+                    <td class="num" style="padding:3px 8px"><?= formatLBP($totQ,false) ?></td>
+                    <td style="padding:3px 8px">=</td><td class="num" style="padding:3px 8px"><strong><?= formatLBP($totQ,false) ?></strong></td></tr>
+                <tr><td style="padding:6px 8px;font-weight:700">المجموع العام:</td><td></td><td></td>
+                    <td class="num" style="padding:6px 8px;border-top:2px solid #333"><strong><?= formatLBP($grand,false) ?></strong></td></tr>
+            </table>
+            <div style="margin-top:16px;line-height:2.2">
+                نظّم وصدّق على مسؤوليتي بتاريخ <span style="display:inline-block;min-width:110px;border-bottom:1px dotted #475569">&nbsp;</span><br>
+                توقيع المدير أو من يقوم مقامه<br><br>
+                ختم المدرسة
+            </div>
+        </div>
+    </div>
 </div>
 
 <?php elseif ($form === 'salary_all'):
