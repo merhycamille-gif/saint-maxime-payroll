@@ -149,26 +149,26 @@ function annualSlipHtml($db, $emp, $schoolYear) {
         <div class="slip-emp-name">
             <span class="slip-school"><?= e($empSchool['name_fr'] ?: $empSchool['name_ar']) ?><?= ($empSchool['name_fr'] && $empSchool['name_ar']) ? ' — ' . e($empSchool['name_ar']) : '' ?></span>
             <span class="slip-pname"><?= e($meta['name']) ?></span>
-            <span class="slip-rep">كشف الراتب السنوي / Relevé annuel <?= e($schoolYear) ?></span>
+            <span class="slip-rep">Relevé annuel <?= e($schoolYear) ?> / كشف الراتب السنوي</span>
         </div>
         <table class="slip-info">
             <tr>
-                <td><span class="lbl"><?= ($emp['employee_type'] === 'employe') ? 'الوظيفة / Fonction' : 'الشهادة العلمية / Diplôme' ?></span><span class="val"><?= e($meta['diploma']) ?></span></td>
-                <td><span class="lbl">الفئة / Type</span><span class="val"><?= e($meta['type']) ?></span></td>
-                <td><span class="lbl">الدرجة / Échelon</span><span class="val"><?= e($meta['grade']) ?></span></td>
-                <td><span class="lbl">الرمز / Code</span><span class="val"><?= e($meta['code']) ?></span></td>
+                <td><span class="lbl"><?= ($emp['employee_type'] === 'employe') ? 'Fonction / الوظيفة' : 'Diplôme / الشهادة العلمية' ?></span><span class="val"><?= e($meta['diploma']) ?></span></td>
+                <td><span class="lbl">Type / الفئة</span><span class="val"><?= e($meta['type']) ?></span></td>
+                <td><span class="lbl">Échelon / الدرجة</span><span class="val"><?= e($meta['grade']) ?></span></td>
+                <td><span class="lbl">Code / الرمز</span><span class="val"><?= e($meta['code']) ?></span></td>
             </tr>
             <tr>
-                <td><span class="lbl">تاريخ الدخول / Embauche</span><span class="val"><?= e($meta['hire']) ?></span></td>
-                <td><span class="lbl">تاريخ الملاك / Titularisation</span><span class="val"><?= e($meta['titul']) ?></span></td>
-                <td><span class="lbl">الساعات / الأيام أسبوعياً</span><span class="val"><?= e($meta['hours']) ?> سا / <?= e($meta['days']) ?> ي</span></td>
-                <td><span class="lbl">الصفوف / Classes</span><span class="val"><?= e($meta['classes']) ?></span></td>
+                <td><span class="lbl">Embauche / تاريخ الدخول</span><span class="val"><?= e($meta['hire']) ?></span></td>
+                <td><span class="lbl">Titularisation / تاريخ الملاك</span><span class="val"><?= e($meta['titul']) ?></span></td>
+                <td><span class="lbl">Heures / jours par semaine — الساعات / الأيام أسبوعياً</span><span class="val"><?= e($meta['hours']) ?> h / <?= e($meta['days']) ?> j</span></td>
+                <td><span class="lbl">Classes / الصفوف</span><span class="val"><?= e($meta['classes']) ?></span></td>
             </tr>
             <tr>
-                <td><span class="lbl">المواد / Matières</span><span class="val"><?= e($meta['subjects']) ?></span></td>
-                <td><span class="lbl">رقم الضمان / N° CNSS</span><span class="val"><?= e($meta['cnss']) ?></span></td>
-                <td><span class="lbl">رقم صندوق التعويضات / N° Caisse</span><span class="val"><?= e($meta['caisse_no']) ?></span></td>
-                <td><span class="lbl">الرقم المالي / N° Fin.</span><span class="val"><?= e($meta['finance_no']) ?></span></td>
+                <td><span class="lbl">Matières / المواد</span><span class="val"><?= e($meta['subjects']) ?></span></td>
+                <td><span class="lbl">N° CNSS / رقم الضمان</span><span class="val"><?= e($meta['cnss']) ?></span></td>
+                <td><span class="lbl">N° Caisse / رقم صندوق التعويضات</span><span class="val"><?= e($meta['caisse_no']) ?></span></td>
+                <td><span class="lbl">N° Fin. / الرقم المالي</span><span class="val"><?= e($meta['finance_no']) ?></span></td>
             </tr>
         </table>
 
@@ -176,25 +176,25 @@ function annualSlipHtml($db, $emp, $schoolYear) {
             <thead>
                 <tr>
                     <th rowspan="2">Mois<br>الشهر</th>
-                    <th rowspan="2">أساس الراتب<br>Salaire</th>
+                    <th rowspan="2">Salaire<br>أساس الراتب</th>
                     <?php if (!$isEmp): ?>
-                    <th rowspan="2">قيمة الدرجة (ل.ل)<br>Valeur échelon</th>
-                    <th rowspan="2">الراتب بعد التدرج<br>Après échelon</th>
+                    <th rowspan="2">Valeur échelon<br>قيمة الدرجة (ل.ل)</th>
+                    <th rowspan="2">Après échelon<br>الراتب بعد التدرج</th>
                     <?php endif; ?>
-                    <?php if (salaryCompHas('extra')): ?><th rowspan="2">الأجر الإضافي<br>Supplément</th><?php endif; ?>
-                    <?php if (salaryCompHas('aide')): ?><th rowspan="2">مكافأة ومساعدة<br>Prime &amp; aide</th><?php endif; ?>
+                    <?php if (salaryCompHas('extra')): ?><th rowspan="2">Supplément<br>الأجر الإضافي</th><?php endif; ?>
+                    <?php if (salaryCompHas('aide')): ?><th rowspan="2">Prime &amp; aide<br>مكافأة ومساعدة</th><?php endif; ?>
                     <th rowspan="2">Brut<br>الإجمالي</th>
                     <th colspan="<?= $isEmp ? 3 : 5 ?>" class="deduction-header">Retenues / المحسومات</th>
-                    <th rowspan="2">الصافي<br>Net</th>
+                    <th rowspan="2">Net<br>الصافي</th>
                     <th rowspan="2">Alloc. fam.<br>عائلي</th>
                     <?php if ($showTrans): ?><th rowspan="2">Transport<br>نقل</th><?php endif; ?>
-                    <th rowspan="2">المستحق<br>Total dû</th>
-                    <th rowspan="2" class="sig-col">التوقيع<br>Signature</th>
+                    <th rowspan="2">Total dû<br>المستحق</th>
+                    <th rowspan="2" class="sig-col">Signature<br>التوقيع</th>
                 </tr>
                 <tr>
                     <?php if (!$isEmp): ?>
                     <th class="deduction-header">Caisse</th>
-                    <th class="deduction-header">درجة / نصف راتب</th>
+                    <th class="deduction-header">Échelon / ½ sal.<br>درجة / نصف راتب</th>
                     <?php endif; ?>
                     <th class="deduction-header">CNSS</th>
                     <th class="deduction-header">Impôt</th>

@@ -179,7 +179,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'titul'       => formatDate($emp['titularization_date']),
         'hours'       => rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.'),
         'days'        => (int)$emp['days_per_week'],
-        'classes'     => classLevelNames($emp['classes_taught'] ?? ''),
+        'classes'     => classLevelNames($emp['classes_taught'] ?? '', true), // الكشف السنوي: الصفوف بالفرنسي فقط (بطلب المستخدم)
         'subjects'    => $emp['subjects_taught'] ?: '—',
         'cnss'        => cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']),
         'caisse_no'   => $emp['caisse_number'] ?: '—',

@@ -354,20 +354,26 @@ function currentSchoolName($lang = null) {
 
 // تحويل قائمة معرّفات الصفوف ("13,14") إلى أسماء مفصولة بفواصل عربية. يرجع '—' إن لم توجد.
 // محصّن: لو جدول class_levels غير موجود (قبل migration 015) يرجع '—'.
-function classLevelNames($csv) {
+// $frOnly=true: الأسماء الفرنسية فقط (CP، CE1...) — تُستعمل بالكشف السنوي بطلب المستخدم.
+function classLevelNames($csv, bool $frOnly = false) {
     static $map = null;
     if ($map === null) {
         $map = [];
-        // العرض: الفرنسي قبل العربي (fr / ar)، أو العربي وحده إن لم يوجد فرنسي
         try { foreach (getDB()->query("SELECT id, name, name_fr FROM class_levels") as $r) {
             $fr = trim((string)($r['name_fr'] ?? ''));
-            $map[(int)$r['id']] = $fr !== '' ? ($fr . ' / ' . $r['name']) : $r['name'];
+            $map[(int)$r['id']] = ['fr' => $fr, 'ar' => (string)$r['name']];
         } }
         catch (Exception $e) { $map = []; }
     }
     $names = [];
-    foreach (array_filter(array_map('intval', explode(',', (string)$csv))) as $cid) { if (isset($map[$cid])) $names[] = $map[$cid]; }
-    return $names ? implode('، ', $names) : '—';
+    foreach (array_filter(array_map('intval', explode(',', (string)$csv))) as $cid) {
+        if (!isset($map[$cid])) continue;
+        $fr = $map[$cid]['fr']; $ar = $map[$cid]['ar'];
+        // العرض: الفرنسي قبل العربي (fr / ar)، أو الفرنسي وحده ($frOnly)، مع سقوط للعربي إن لا فرنسي
+        $names[] = $frOnly ? ($fr !== '' ? $fr : $ar) : ($fr !== '' ? ($fr . ' / ' . $ar) : $ar);
+    }
+    if (!$names) return '—';
+    return implode($frOnly ? ', ' : '، ', $names);
 }
 
 // قائمة كل المدارس الفعّالة
