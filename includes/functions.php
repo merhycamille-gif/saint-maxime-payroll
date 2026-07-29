@@ -450,6 +450,53 @@ function pruneSalariesAfterDeparture($db, $empId) {
     return $del->rowCount();
 }
 
+// 🩹 شفاء ذاتي (مرّة واحدة، 2026-07-29): السنة 2026-2027 فُتحت قبل آلية «نسخ العلاوات مع
+// فتح السنة»، فطلعت رواتبها بلا الأجر الإضافي/المكافأة رغم وجودها في 2025-2026 (شكوى p1).
+// عند أول فتح صفحة: ينسخ prime_fixe + aide_complementaire من السنة السابقة لكل موظف عنده
+// رواتب 2026-2027 وما عنده هذه العلاوات فيها، ثم يعيد حساب أشهر سنته. علامة settings تمنع
+// التكرار للأبد (فلا يُعيد إحياء علاوة حذفها المستخدم لاحقاً). لا يلمس النقل (موجود ولا يُدوبل).
+function healYearAdditions2627() {
+    $flag = 'yr_additions_backfilled_2026-2027';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        $newSY = '2026-2027'; $prevSY = '2025-2026'; $y1 = 2026; $y2 = 2027;
+        $emps = $db->prepare("SELECT DISTINCT e.* FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+                              WHERE ms.school_year = ? AND e.is_deleted = 0");
+        $emps->execute([$newSY]);
+        $emps = $emps->fetchAll(PDO::FETCH_ASSOC);
+        if (!$emps) { setSetting($flag, date('Y-m-d H:i') . ' (لا رواتب)'); return; }
+        @set_time_limit(600);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $n = 0;
+        foreach ($emps as $emp) {
+            $id = (int)$emp['id'];
+            $has = $db->prepare("SELECT 1 FROM employee_bonuses WHERE employee_id=? AND school_year=? AND is_active=1
+                                 AND bonus_type IN ('prime_fixe','aide_complementaire') LIMIT 1");
+            $has->execute([$id, $newSY]);
+            if ($has->fetchColumn()) continue; // عنده — خياره محفوظ
+            $sel = $db->prepare("SELECT * FROM employee_bonuses WHERE employee_id=? AND school_year=? AND is_active=1
+                                 AND bonus_type IN ('prime_fixe','aide_complementaire')");
+            $sel->execute([$id, $prevSY]);
+            $rows = $sel->fetchAll(PDO::FETCH_ASSOC);
+            if (!$rows) continue; // ما كان عنده السنة الماضية
+            foreach ($rows as $b) {
+                $db->prepare("INSERT INTO employee_bonuses (employee_id,bonus_type,period_number,school_year,amount,value_type,currency,start_month,end_month,is_active)
+                              VALUES (?,?,?,?,?,?,?,?,?,1)")
+                   ->execute([$id, $b['bonus_type'], $b['period_number'], $newSY, $b['amount'], $b['value_type'], $b['currency'], $b['start_month'], $b['end_month']]);
+            }
+            $months = ((int)$emp['payment_months_per_year'] === 10)
+                ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
+                : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
+            foreach ($months as [$m, $y]) {
+                try { (new PayrollCalculator($id, $m, $y))->calculateAndSave(); } catch (Exception $e) {}
+            }
+            $n++;
+        }
+        setSetting($flag, date('Y-m-d H:i') . " ($n موظف)");
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
 // جملة SQL لتقييد التقرير بالمدارس المختارة (آمنة لأنها أرقام)
 function reportSchoolSql($column = 'ms.school_id') {
     $ids = selectedReportSchoolIds();

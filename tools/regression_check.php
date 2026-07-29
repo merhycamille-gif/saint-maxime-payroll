@@ -300,6 +300,18 @@ $oySrc = (string)file_get_contents(__DIR__ . '/../pages/open_year.php');
 check('فتح السنة: لا جمع لعمودَي النقل عند تصحيح total_due', strpos($oySrc, "transport_complement_lbp'] + (float)") === false
       && strpos($oySrc, "transport_complement_lbp'] ?? 0) + (float)") === false);
 
+/* =====================================================================
+ * 11) علاوات السنة الجديدة (2026-07-29): الإضافي/المكافأة موجودة برواتب 2026-2027
+ *     + شفاء ذاتي أونلاين مربوط بالهيدر (مرّة واحدة بعلامة settings)
+ * =================================================================== */
+$q = $db->query("SELECT COUNT(DISTINCT ms.employee_id) FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+                 WHERE ms.school_year='2026-2027' AND e.is_deleted=0 AND ms.prime_fixe_lbp>0")->fetchColumn();
+check('السنة الجديدة 2026-2027: الأجر الإضافي موجود برواتبها (≥20 موظف)', (int)$q >= 20, "n=$q");
+$fnSrc = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
+$hdSrc = (string)file_get_contents(__DIR__ . '/../includes/header.php');
+check('الشفاء الذاتي healYearAdditions2627 معرَّف ومربوط بالهيدر',
+      strpos($fnSrc, 'function healYearAdditions2627') !== false && strpos($hdSrc, 'healYearAdditions2627();') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
