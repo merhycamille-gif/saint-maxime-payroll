@@ -86,6 +86,25 @@ function transportTotalCell($lbp, $usd, bool $num = true): string {
     return '<td' . $cls . '>' . dualFromUsd($lbp, $usd, false) . '</td>';
 }
 /**
+ * مجموع المكوّنات **المخفية** بزرّ «الراتب يشمل» — يُطرَح من الإجماليات المعروضة
+ * (المستحق/الكلفة) كي يبقى كل رقم إجمالي = مجموع الأعمدة الظاهرة أمام المستخدم
+ * («الأرقام تركب» — نمط الكشف السنوي المعتمد). $extraAide=true يشمل أيضاً
+ * الإضافي والمكافأة (للإجماليات التي تجمعها مباشرةً كالكلفة على المؤسسة).
+ */
+function hiddenCompsLbp(array $r, bool $extraAide = false): int {
+    $h = 0;
+    if (!salaryCompHas('transport')) $h += (int)($r['transport_lbp'] ?? 0);
+    if ($extraAide) {
+        if (!salaryCompHas('extra')) $h += (int)($r['extra_lbp'] ?? 0) + (int)($r['prime_fixe_lbp'] ?? 0);
+        if (!salaryCompHas('aide'))  $h += (int)($r['aide_complementaire_lbp'] ?? 0);
+    }
+    return $h;
+}
+/** «المستحق المعروض»: total_due ناقص النقل عندما يكون عموده مخفياً (زرّ «الراتب يشمل»). */
+function dueShownLbp(array $r): int {
+    return (int)($r['total_due_lbp'] ?? 0) - hiddenCompsLbp($r);
+}
+/**
  * الأجر الخاضع للضمان/نهاية الخدمة حسب **خيار خضوع الأستاذ** (الزرّ الأخضر بملف الأستاذ):
  * أساس+درجة + (الأجر الإضافي إن `cnss_includes_extra`) + (مكافأة ومساعدة إن `cnss_includes_prime_aide`).
  * نهاية الخدمة (٨.٥٪) تشتقّ وعاءها من وعاء الضمان (نفس الفلاغين) فتُستعمل لها أيضاً.

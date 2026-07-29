@@ -171,11 +171,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
                     // المتعاقد المنقول بالصفّ: طبّق اختيار الإضافات/النقل (none=صفّر، pct=نسبة) وصحّح الصافي/المجموع
                     if ($addMode !== 'same' || $transMode !== 'same') {
                         $oldAdd = (float)($src['extra_lbp'] ?? 0) + (float)($src['prime_fixe_lbp'] ?? 0) + (float)($src['aide_complementaire_lbp'] ?? 0);
-                        $oldTr  = (float)($src['transport_complement_lbp'] ?? 0) + (float)($src['transport_lbp'] ?? 0);
+                        // النقل داخل total_due مرّة واحدة فقط (transport_lbp = transport_complement_lbp نفس القيمة مخزّنة مرّتين) — لا تجمع العمودين وإلا تضاعف الفرق
+                        $oldTr  = (float)($src['transport_lbp'] ?? 0);
                         foreach (['extra_lbp','prime_fixe_lbp','aide_complementaire_lbp'] as $c) if (isset($src[$c])) $src[$c] = round((float)$src[$c] * $addFactor);
                         foreach (['transport_complement_lbp','transport_lbp'] as $c) if (isset($src[$c])) $src[$c] = round((float)$src[$c] * $transFactor);
                         $newAdd = (float)($src['extra_lbp'] ?? 0) + (float)($src['prime_fixe_lbp'] ?? 0) + (float)($src['aide_complementaire_lbp'] ?? 0);
-                        $newTr  = (float)($src['transport_complement_lbp'] ?? 0) + (float)($src['transport_lbp'] ?? 0);
+                        $newTr  = (float)($src['transport_lbp'] ?? 0);
                         if (isset($src['net_salary_lbp'])) $src['net_salary_lbp'] = max(0, round((float)$src['net_salary_lbp'] + ($newAdd - $oldAdd)));
                         if (isset($src['total_due_lbp'])) $src['total_due_lbp'] = max(0, round((float)$src['total_due_lbp'] + ($newAdd - $oldAdd) + ($newTr - $oldTr)));
                     }
@@ -288,13 +289,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
                     $rs = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id=? AND year=? AND month=? LIMIT 1");
                     $rs->execute([$id, $y, $m]); $r = $rs->fetch(PDO::FETCH_ASSOC); if (!$r) continue;
                     $oldAdd = (float)$r['extra_lbp'] + (float)$r['prime_fixe_lbp'] + (float)$r['aide_complementaire_lbp'];
-                    $oldTr  = (float)$r['transport_complement_lbp'] + (float)$r['transport_lbp'];
+                    // النقل داخل total_due مرّة واحدة فقط (العمودان نفس القيمة) — الفرق يُحسب من transport_lbp وحده
+                    $oldTr  = (float)$r['transport_lbp'];
                     if (!$addOn) { $r['extra_lbp']=0; $r['prime_fixe_lbp']=0; $r['aide_complementaire_lbp']=0; }
                     elseif ($oldAdd == 0) { $p=$db->prepare("SELECT extra_lbp,prime_fixe_lbp,aide_complementaire_lbp FROM monthly_salaries WHERE employee_id=? AND year=? AND month=? AND (extra_lbp+prime_fixe_lbp+aide_complementaire_lbp)>0 LIMIT 1"); $p->execute([$id,$y-1,$m]); if($ps=$p->fetch(PDO::FETCH_ASSOC)){ $r['extra_lbp']=$ps['extra_lbp']; $r['prime_fixe_lbp']=$ps['prime_fixe_lbp']; $r['aide_complementaire_lbp']=$ps['aide_complementaire_lbp']; } }
                     if (!$transOn) { $r['transport_complement_lbp']=0; $r['transport_lbp']=0; }
                     elseif ($oldTr == 0) { $p=$db->prepare("SELECT transport_complement_lbp,transport_lbp FROM monthly_salaries WHERE employee_id=? AND year=? AND month=? AND (transport_complement_lbp+transport_lbp)>0 LIMIT 1"); $p->execute([$id,$y-1,$m]); if($ps=$p->fetch(PDO::FETCH_ASSOC)){ $r['transport_complement_lbp']=$ps['transport_complement_lbp']; $r['transport_lbp']=$ps['transport_lbp']; } }
                     $newAdd = (float)$r['extra_lbp'] + (float)$r['prime_fixe_lbp'] + (float)$r['aide_complementaire_lbp'];
-                    $newTr  = (float)$r['transport_complement_lbp'] + (float)$r['transport_lbp'];
+                    $newTr  = (float)$r['transport_lbp'];
                     $db->prepare("UPDATE monthly_salaries SET extra_lbp=?, prime_fixe_lbp=?, aide_complementaire_lbp=?, transport_complement_lbp=?, transport_lbp=?,
                         net_salary_lbp=GREATEST(0, net_salary_lbp + ?), total_due_lbp=GREATEST(0, total_due_lbp + ?) WHERE id=?")
                        ->execute([$r['extra_lbp'],$r['prime_fixe_lbp'],$r['aide_complementaire_lbp'],$r['transport_complement_lbp'],$r['transport_lbp'], round($newAdd-$oldAdd), round(($newAdd-$oldAdd)+($newTr-$oldTr)), $r['id']]);

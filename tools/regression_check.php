@@ -271,6 +271,35 @@ $hGoff = renderPage('pages/official_forms.php', ['form' => 'general_info'], []);
 check('معلومات عامة: عمود الراتب مركّب حسب الخيار', strpos($hGon, 'الأساسي + الإضافي') !== false);
 check('معلومات عامة: يرجع أساسياً فقط بلا الخيار', strpos($hGoff, 'الأساسي + الإضافي') === false);
 
+/* =====================================================================
+ * 10) «الأرقام تركب» (2026-07-29): المستحق المعروض يتبع زرّ النقل بكل الكشوف
+ *     بلا النقل: المستحق = الصافي + العائلي (لا 9 مليون مجهولة المصدر) —
+ *     مع النقل: المستحق = total_due كاملاً وعمود النقل ظاهر يفسّر الفرق.
+ * =================================================================== */
+$rk = $db->query("SELECT ms.net_salary_lbp+ms.family_allowance_lbp a, ms.total_due_lbp b
+                  FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+                  WHERE ms.year=2026 AND ms.month=6 AND ms.transport_lbp>0 AND ms.total_due_lbp>0 AND e.is_deleted=0
+                  LIMIT 1")->fetch();
+if ($rk) {
+    $fA = number_format((float)$rk['a']); $fB = number_format((float)$rk['b']);
+    foreach (['monthly_rep', 'salary_all', 'payment_list'] as $p) {
+        check("الأرقام تركب: المستحق بلا النقل = صافي+عائلي — $p", strpos($html["$p|none"] ?? '', $fA) !== false, $fA);
+        check("الأرقام تركب: المستحق مع النقل كامل — $p", strpos($html["$p|all"] ?? '', $fB) !== false, $fB);
+    }
+} else {
+    check('الأرقام تركب: لا موظف بنقل>0 (6/2026) للفحص', false);
+}
+// المجاميع السنوية: تسمية المتوجب توضح «+ النقل» فقط عند تفعيله + سطر التعويضات العائلية موجود
+$hAtOn  = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026'], ['extra', 'aide', 'transport']);
+$hAtOff = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026'], ['extra', 'aide']);
+check('المجاميع السنوية: المتوجب «+ النقل» مع الخيار فقط',
+      strpos($hAtOn, 'الصافي + التعويضات + النقل') !== false && strpos($hAtOff, 'الصافي + التعويضات + النقل') === false);
+check('المجاميع السنوية: سطر التعويضات العائلية موجود', strpos($hAtOff, 'التعويضات العائلية') !== false);
+// فتح السنة: فرق النقل يُحسب من transport_lbp وحده (العمودان نفس القيمة — الجمع = دوبل)
+$oySrc = (string)file_get_contents(__DIR__ . '/../pages/open_year.php');
+check('فتح السنة: لا جمع لعمودَي النقل عند تصحيح total_due', strpos($oySrc, "transport_complement_lbp'] + (float)") === false
+      && strpos($oySrc, "transport_complement_lbp'] ?? 0) + (float)") === false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

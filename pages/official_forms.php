@@ -1296,7 +1296,7 @@ elseif ($form === 'teacher_card'):
                 ?><tr class="cat-row"><td colspan="<?= 15 + compColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
             $rRate = rowRate($r);
-            $add = ['base'=>$r['base_salary_lbp'],'ech'=>$r['echelon_value_lbp'],'bpe'=>$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'caisse'=>$r['caisse_amount_lbp'],'txb'=>$r['taxable_base_lbp'],'tax'=>$r['income_tax_lbp'],'cnss'=>$r['cnss_amount_lbp'],'ded'=>$r['total_retenues_lbp'],'fam'=>$r['family_allowance_lbp'],'trans'=>$r['transport_lbp'],'due'=>$r['total_due_lbp'],'net'=>$r['net_salary_lbp'],
+            $add = ['base'=>$r['base_salary_lbp'],'ech'=>$r['echelon_value_lbp'],'bpe'=>$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'caisse'=>$r['caisse_amount_lbp'],'txb'=>$r['taxable_base_lbp'],'tax'=>$r['income_tax_lbp'],'cnss'=>$r['cnss_amount_lbp'],'ded'=>$r['total_retenues_lbp'],'fam'=>$r['family_allowance_lbp'],'trans'=>$r['transport_lbp'],'due'=>dueShownLbp($r),'net'=>$r['net_salary_lbp'],
                     'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd((int)$r['transport_lbp'],$rRate),
                     'composed'=>composedSalaryLbp($r),'composed_usd'=>lbpToUsd(composedSalaryLbp($r),$rRate)];
             foreach ($add as $k=>$val) { $T[$k]+=$val; $sub[$k]+=$val; } ?>
@@ -1314,7 +1314,7 @@ elseif ($form === 'teacher_card'):
                 <td class="num"><?= formatLBP($r['total_retenues_lbp'],false) ?></td>
                 <td class="num"><?= formatLBP($r['family_allowance_lbp'],false) ?></td>
                 <?= transportCell($r) ?>
-                <td class="num"><?= formatLBP($r['total_due_lbp'],false) ?></td>
+                <td class="num"><?= formatLBP(dueShownLbp($r),false) ?></td>
                 <td class="num"><strong><?= formatLBP($r['net_salary_lbp'],false) ?></strong></td>
                 <td style="min-width:60px"></td></tr>
         <?php endforeach;
@@ -1871,7 +1871,7 @@ elseif ($form === 'payment_list'):
                 ?><tr class="cat-row"><td colspan="<?= 9 + compColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
             $rRate=rowRate($r);
-            $add=['base'=>(int)$r['base_salary_lbp'],'ex'=>extraWageLbp($r),'ai'=>aideCompLbp($r),'trans'=>(int)$r['transport_lbp'],'net'=>(int)$r['net_salary_lbp'],'due'=>(int)$r['total_due_lbp'],
+            $add=['base'=>(int)$r['base_salary_lbp'],'ex'=>extraWageLbp($r),'ai'=>aideCompLbp($r),'trans'=>(int)$r['transport_lbp'],'net'=>(int)$r['net_salary_lbp'],'due'=>dueShownLbp($r),
                   'ex_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'ai_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd((int)$r['transport_lbp'],$rRate),
                   'composed'=>composedSalaryLbp($r),'composed_usd'=>lbpToUsd(composedSalaryLbp($r),$rRate)];
             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; } ?>
@@ -1885,7 +1885,7 @@ elseif ($form === 'payment_list'):
                 <td class="num" style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $rRate, ['withCur'=>false]) ?></strong></td>
                 <?= transportCell($r) ?>
                 <td class="num"><?= formatLBP($r['net_salary_lbp'],false) ?></td>
-                <td class="num"><strong><?= formatLBP($r['total_due_lbp'],false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP(dueShownLbp($r),false) ?></strong></td>
                 <td style="min-width:90px">&nbsp;</td>
             </tr>
         <?php endforeach;
@@ -1956,7 +1956,8 @@ elseif ($form === 'payment_list'):
             endif;
             $cost = (int)$r['base_plus_echelon_lbp'] + (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']
                   + (int)$r['family_allowance_lbp'] + (int)$r['transport_lbp']
-                  + (int)$r['school_cnss_8_lbp'] + (int)$r['school_eoc_6_lbp'] + (int)$r['school_end_of_service_8_5_lbp'] + (int)$r['school_family_comp_6_lbp'];
+                  + (int)$r['school_cnss_8_lbp'] + (int)$r['school_eoc_6_lbp'] + (int)$r['school_end_of_service_8_5_lbp'] + (int)$r['school_family_comp_6_lbp']
+                  - hiddenCompsLbp($r, true); // الكلفة المعروضة = مجموع الأعمدة الظاهرة فقط (زرّ «الراتب يشمل»)
             $rRate=rowRate($r);
             $add=['base'=>(int)$r['base_salary_lbp'],'ech'=>(int)$r['echelon_value_lbp'],'bpe'=>(int)$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'cnss8'=>(int)$r['school_cnss_8_lbp'],'eoc6'=>(int)$r['school_eoc_6_lbp'],'eos85'=>(int)$r['school_end_of_service_8_5_lbp'],'fam6'=>(int)$r['school_family_comp_6_lbp'],'fam'=>(int)$r['family_allowance_lbp'],'trans'=>(int)$r['transport_lbp'],'tax'=>(int)$r['income_tax_lbp'],'cost'=>$cost,
                   'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd((int)$r['transport_lbp'],$rRate),

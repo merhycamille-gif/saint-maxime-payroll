@@ -76,7 +76,7 @@ if ($report === 'monthly_summary') {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
         $tr = (int)$r['transport_lbp'];
-        $v = ['base' => (int)$r['base_salary_lbp'], 'ech' => (int)$r['echelon_value_lbp'], 'bpe' => (int)$r['base_plus_echelon_lbp'], 'extra' => extraWageLbp($r), 'aide' => aideCompLbp($r), 'composed' => composedSalaryLbp($r), 'cnss' => (int)$r['cnss_amount_lbp'], 'caisse' => (int)$r['caisse_amount_lbp'], 'tax' => (int)$r['income_tax_lbp'], 'net' => (int)$r['net_salary_lbp'], 'fam' => (int)$r['family_allowance_lbp'], 'tr' => $tr, 'tot' => (int)$r['total_due_lbp']];
+        $v = ['base' => (int)$r['base_salary_lbp'], 'ech' => (int)$r['echelon_value_lbp'], 'bpe' => (int)$r['base_plus_echelon_lbp'], 'extra' => extraWageLbp($r), 'aide' => aideCompLbp($r), 'composed' => composedSalaryLbp($r), 'cnss' => (int)$r['cnss_amount_lbp'], 'caisse' => (int)$r['caisse_amount_lbp'], 'tax' => (int)$r['income_tax_lbp'], 'net' => (int)$r['net_salary_lbp'], 'fam' => (int)$r['family_allowance_lbp'], 'tr' => $tr, 'tot' => dueShownLbp($r)];
         foreach ($v as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
@@ -298,7 +298,7 @@ if ($report === 'monthly_summary') {
     if ($data) { $pad = ($schCol ? 2 : 1); $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'العدد الإجمالي: ' . count($data); $rep->totalRow($row); }
 
 } elseif ($report === 'annual_totals') {
-    $st = $db->prepare("SELECT COUNT(*) cnt, SUM(ms.net_salary_lbp) net, SUM(ms.total_due_lbp) total, SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax, SUM(ms.caisse_amount_lbp) caisse, SUM(ms.school_cnss_8_lbp) scnss, SUM(ms.school_eoc_6_lbp) seoc, SUM(ms.base_salary_lbp) base_sal, SUM(ms.base_plus_echelon_lbp) bpe, SUM(ms.extra_lbp+ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide, SUM(ms.transport_lbp) transport
+    $st = $db->prepare("SELECT COUNT(*) cnt, SUM(ms.net_salary_lbp) net, SUM(ms.total_due_lbp) total, SUM(ms.family_allowance_lbp) fam, SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax, SUM(ms.caisse_amount_lbp) caisse, SUM(ms.school_cnss_8_lbp) scnss, SUM(ms.school_eoc_6_lbp) seoc, SUM(ms.base_salary_lbp) base_sal, SUM(ms.base_plus_echelon_lbp) bpe, SUM(ms.extra_lbp+ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide, SUM(ms.transport_lbp) transport
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=0" . $annualEmpFilter . " AND ms.school_year=? AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $schoolSql);
     $st->execute(array_merge($annualEmpParams, [$schoolYear]));
     $t = $st->fetch();
@@ -308,7 +308,8 @@ if ($report === 'monthly_summary') {
     $rep->widths([40, 28]);
     $rep->row(['عدد الكشوف المحسوبة', (int)$t['cnt']]);
     $rep->totalRow(['إجمالي المدفوع (الصافي)', (int)$t['net']]);
-    $rep->totalRow(['الإجمالي المتوجب (صافي + تعويضات)', (int)$t['total']]);
+    $rep->row(['التعويضات العائلية', (int)$t['fam']]);
+    $rep->totalRow(['الإجمالي المتوجب (الصافي + التعويضات' . (salaryCompHas('transport') ? ' + النقل' : '') . ')', (int)$t['total'] - (salaryCompHas('transport') ? 0 : (int)$t['transport'])]);
     $rep->row(['أساس الراتب', (int)$t['base_sal']]);
     $rep->row(['الراتب بعد التدرّج', (int)$t['bpe']]);
     if (salaryCompHas('extra')) $rep->row(['الأجر الإضافي', (int)$t['extra_wage']]);

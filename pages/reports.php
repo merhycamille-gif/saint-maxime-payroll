@@ -299,7 +299,7 @@ function reportDocThumb($path) {
                             $v = ['base'=>(int)$r['base_salary_lbp'],'ech'=>(int)$r['echelon_value_lbp'],'bpe'=>(int)$r['base_plus_echelon_lbp'],
                                   'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'cnss'=>(int)$r['cnss_amount_lbp'],'caisse'=>(int)$r['caisse_amount_lbp'],
                                   'tax'=>(int)$r['income_tax_lbp'],'net'=>(int)$r['net_salary_lbp'],'family'=>(int)$r['family_allowance_lbp'],
-                                  'trans'=>$rTrans,'total'=>(int)$r['total_due_lbp'],
+                                  'trans'=>$rTrans,'total'=>dueShownLbp($r),
                                   'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd($rTrans,$rRate),
                                   'composed'=>composedSalaryLbp($r),'composed_usd'=>lbpToUsd(composedSalaryLbp($r),$rRate)];
                             foreach ($v as $k=>$val) { $catTot[$k]+=$val; $totals[$k]+=$val; }
@@ -324,7 +324,7 @@ function reportDocThumb($path) {
                                 <td><?= formatLBP($r['net_salary_lbp']) ?></td>
                                 <td><?= formatLBP($r['family_allowance_lbp']) ?></td>
                                 <?php if (salaryCompHas('transport')): ?><td><?= money($rTrans, $rRate) ?></td><?php endif; ?>
-                                <td><strong><?= formatLBP($r['total_due_lbp']) ?></strong></td>
+                                <td><strong><?= formatLBP(dueShownLbp($r)) ?></strong></td>
                             </tr>
                         <?php endforeach; ?>
                         <?php if ($data) echo $sumRow('مجموع '.empCategoryTitle($curCat).' — العدد: '.$catN, $catTot, false); ?>
@@ -686,6 +686,7 @@ function reportDocThumb($path) {
         [$y1,$y2] = schoolYearToYears($schoolYear);
         // إجمالي عام
         $stmt = $db->prepare("SELECT COUNT(*) cnt, SUM(ms.net_salary_lbp) net, SUM(ms.total_due_lbp) total,
+                              SUM(ms.family_allowance_lbp) fam,
                               SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax, SUM(ms.caisse_amount_lbp) caisse,
                               SUM(ms.school_cnss_8_lbp) scnss, SUM(ms.school_eoc_6_lbp) seoc,
                               SUM(ms.base_salary_lbp) base_sal, SUM(ms.base_plus_echelon_lbp) bpe,
@@ -702,7 +703,7 @@ function reportDocThumb($path) {
         // تفصيل لكل مدرسة (عند تعدد المدارس)
         $perSchool = [];
         if ($multi) {
-            $ps = $db->prepare("SELECT ms.school_id, COUNT(*) cnt, SUM(ms.total_due_lbp) total, SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax
+            $ps = $db->prepare("SELECT ms.school_id, COUNT(*) cnt, SUM(ms.total_due_lbp) total, SUM(ms.transport_lbp) trans, SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax
                                 FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                                 WHERE e.is_deleted=0" . $annualEmpFilter . " AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . " GROUP BY ms.school_id ORDER BY ms.school_id");
             $ps->execute(array_merge($annualEmpParams, [$schoolYear]));
@@ -733,7 +734,7 @@ function reportDocThumb($path) {
                             <td><?= ++$rn ?></td>
                             <td><strong><?= e(schoolNameById($p['school_id'])) ?></strong></td>
                             <td><?= $p['cnt'] ?></td>
-                            <td><?= formatLBP($p['total']) ?></td>
+                            <td><?= formatLBP((int)$p['total'] - (salaryCompHas('transport') ? 0 : (int)$p['trans'])) ?></td>
                             <td><?= formatLBP($p['cnss']) ?></td>
                             <td><?= formatLBP($p['tax']) ?></td>
                         </tr>
@@ -754,7 +755,8 @@ function reportDocThumb($path) {
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <tr><td><strong>عدد الكشوف المحسوبة</strong></td><td><?= $tot['cnt'] ?: 0 ?></td></tr>
                     <tr style="background:var(--gold-light)"><td><strong>إجمالي المدفوع (الصافي)</strong></td><td><strong><?= formatLBP($tot['net']) ?></strong></td></tr>
-                    <tr style="background:var(--gold-light)"><td><strong>الإجمالي المتوجب (صافي + تعويضات)</strong></td><td><strong><?= formatLBP($tot['total']) ?></strong></td></tr>
+                    <tr><td>التعويضات العائلية</td><td><?= formatLBP($tot['fam']) ?></td></tr>
+                    <tr style="background:var(--gold-light)"><td><strong>الإجمالي المتوجب (الصافي + التعويضات<?= salaryCompHas('transport') ? ' + النقل' : '' ?>)</strong></td><td><strong><?= formatLBP((int)$tot['total'] - (salaryCompHas('transport') ? 0 : (int)$tot['transport'])) ?></strong></td></tr>
                     <tr><td>أساس الراتب</td><td><?= formatLBP($tot['base_sal']) ?></td></tr>
                     <tr><td>الراتب بعد التدرّج</td><td><?= formatLBP($tot['bpe']) ?></td></tr>
                     <?php $dualTotA = function($lbp,$usd){ $m=displayCurrency(); if($m==='lbp')return formatLBP($lbp); if($m==='usd')return formatUSD($usd); return formatLBP($lbp).'<span class="money-usd">'.formatUSD($usd).'</span>'; }; ?>
