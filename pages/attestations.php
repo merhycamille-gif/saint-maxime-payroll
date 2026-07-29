@@ -738,7 +738,10 @@ if (!$emp):
                 <th style="background:#1F4E5F;color:#fff;border:1px solid #1F4E5F;padding:6px 10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">المبلغ الشهري</th>
             </tr>
             <tr><td style="border:1px solid #64748b;padding:6px 10px">الراتب الأساسي<?= $isEmploye ? '' : ' (بعد التدرّج)' ?></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr((int)$basePlusEch) ?></strong></td></tr>
-            <tr><td style="border:1px solid #64748b;padding:6px 10px">البدلات والملحقات</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($salShown - (int)$basePlusEch) ?></strong></td></tr>
+            <?php /* كل مكوّن مختار يظهر بسطر مستقل واضح (الإضافي/المكافأة/تعويض النقل) — لا يُدمج بسطر «بدلات» عام */ ?>
+            <?php if ($incExtra && $extraW > 0): ?><tr><td style="border:1px solid #64748b;padding:6px 10px">الأجر الإضافي</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($extraW) ?></strong></td></tr><?php endif; ?>
+            <?php if ($incAide && $aideW > 0): ?><tr><td style="border:1px solid #64748b;padding:6px 10px">مكافأة ومساعدة</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($aideW) ?></strong></td></tr><?php endif; ?>
+            <?php if ($incTrans && $transW > 0): ?><tr><td style="border:1px solid #64748b;padding:6px 10px">تعويض النقل</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($transW) ?></strong></td></tr><?php endif; ?>
             <tr style="background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact"><td style="border:1px solid #64748b;padding:6px 10px"><strong>الإجمالي</strong></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($salShown) ?></strong></td></tr>
         </table>
         <p>فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> .</p>

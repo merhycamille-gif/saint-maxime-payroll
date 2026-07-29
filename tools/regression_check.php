@@ -234,6 +234,10 @@ if ($regEid) {
     check('إفادة راتب: الصيغة الرسمية (تفصيل + عدم مسؤولية)', strpos($hAt, 'وفق التفصيل الآتي') !== false && strpos($hAt, 'دون أدنى مسؤولية') !== false);
     $hAw = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'tadris'], []);
     check('إفادة عمل: جملة حسن السلوك والالتزام', strpos($hAw, 'حسن سلوك والتزام') !== false);
+    // تعويض النقل (2026-07-29): عمود النقل بالكشف السنوي يظهر دائماً (متل العائلي) حتى بلا خيار «يشمل النقل»
+    $hAn = renderPage('pages/annual_slip.php', ['employee_id' => $regEid, 'school_year' => '2025-2026'], []);
+    check('الكشف السنوي: عمود النقل ظاهر دائماً', strpos($hAn, 'Transport<br>نقل') !== false);
+    check('إفادة راتب: سطر «تعويض النقل» مفصول بجدول التفصيل', strpos($attSrc, '>تعويض النقل<') !== false);
 } else {
     check('التنسيق الرسمي: لا موظف تجريبي (6/2026)', false, 'ما لقيت راتب محسوب 6/2026');
 }
