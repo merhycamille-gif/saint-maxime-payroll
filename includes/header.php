@@ -37,7 +37,7 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -63,10 +63,22 @@ document.addEventListener('submit', function (e) {
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <h2>MSA Payroll</h2>
-            <p><?= e(currentSchoolName()) ?></p>
+            <span class="brand-logo"><i class="fas fa-graduation-cap"></i></span>
+            <div>
+                <h2>MSA Payroll</h2>
+                <p><?= e(currentSchoolName()) ?></p>
+            </div>
         </div>
-        
+
+        <!-- بحث سريع بالقائمة (تصفية فورية) -->
+        <div class="sidebar-search no-print">
+            <div class="ss-wrap">
+                <i class="fas fa-magnifying-glass ss-ic"></i>
+                <input type="text" id="navFilter" placeholder="Rechercher / بحث..." autocomplete="off"
+                       oninput="var q=this.value.trim().toLowerCase();document.querySelectorAll('.sidebar-nav a').forEach(function(a){a.style.display=(!q||a.textContent.toLowerCase().indexOf(q)>-1)?'':'none'});document.querySelectorAll('.sidebar-nav .nav-section').forEach(function(s){s.style.display=q?'none':''});">
+            </div>
+        </div>
+
         <nav class="sidebar-nav">
             <a href="<?= BASE_URL ?>index.php" class="<?= $currentPage === 'dashboard' ? 'active' : '' ?>">
                 <i class="fas fa-chart-line"></i>
@@ -240,12 +252,26 @@ document.addEventListener('submit', function (e) {
             v<?= APP_VERSION ?> • <?= date('Y') ?>
         </div>
     </aside>
-    
+
+    <!-- غطاء يغلق القائمة على الموبايل + إغلاق القوائم المنسدلة عند الكبس خارجها -->
+    <div class="nav-overlay no-print" onclick="document.body.classList.remove('nav-open')"></div>
+    <script>
+    document.addEventListener('click', function (e) {
+        document.querySelectorAll('.school-menu.open').forEach(function (m) {
+            if (!m.closest('.school-multi').contains(e.target)) m.classList.remove('open');
+        });
+    });
+    </script>
+
     <!-- Main Content -->
     <main class="main-content">
         <!-- Top bar -->
         <header class="topbar">
             <div style="display:flex;align-items:center;gap:12px">
+                <button type="button" class="menu-toggle no-print" title="Menu / القائمة"
+                        onclick="document.body.classList.toggle('nav-open')">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <?php if ($currentPage !== 'dashboard'): ?>
                 <button type="button" class="btn btn-light no-print" title="رجوع / Retour"
                         onclick="if(document.referrer&&history.length>1){history.back()}else{location.href='<?= BASE_URL ?>index.php'}"

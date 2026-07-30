@@ -312,6 +312,24 @@ $hdSrc = (string)file_get_contents(__DIR__ . '/../includes/header.php');
 check('الشفاء الذاتي healYearAdditions2627 معرَّف ومربوط بالهيدر',
       strpos($fnSrc, 'function healYearAdditions2627') !== false && strpos($hdSrc, 'healYearAdditions2627();') !== false);
 
+/* =====================================================================
+ * 12) الواجهة العصرية (2026-07-30): قائمة الموبايل + بحث القائمة الجانبية
+ *     + نظام التصميم الحديث في app.css + عدم المسّ بستايلات الطباعة
+ * =================================================================== */
+$cssSrc = (string)file_get_contents(__DIR__ . '/../assets/css/app.css');
+check('الواجهة العصرية: زر القائمة للموبايل + الغطاء موجودان بالهيدر',
+      strpos($hdSrc, 'menu-toggle') !== false && strpos($hdSrc, 'nav-overlay') !== false);
+check('الواجهة العصرية: بحث القائمة الجانبية (navFilter) موجود',
+      strpos($hdSrc, 'navFilter') !== false && strpos($cssSrc, '.sidebar-search') !== false);
+check('الواجهة العصرية: تجاوب الموبايل بالـCSS (درج منزلق ≤1080px)',
+      strpos($cssSrc, 'max-width: 1080px') !== false && strpos($cssSrc, 'nav-open') !== false);
+check('الواجهة العصرية: قاعدتا «12px + بولد» بطلب المستخدم باقيتان',
+      strpos($cssSrc, 'font-size: 12px !important') !== false && strpos($cssSrc, 'font-weight: 700 !important') !== false);
+check('الواجهة العصرية: استثناء النماذج الرسمية .official-doc باقٍ',
+      strpos($cssSrc, '.official-doc td') !== false);
+check('الواجهة العصرية: ستايلات الطباعة الأساسية باقية (إخفاء القائمة/الشريط + A4)',
+      strpos($cssSrc, '.sidebar, .topbar, .no-print') !== false && strpos($cssSrc, '@page { size: A4; margin: 12mm; }') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

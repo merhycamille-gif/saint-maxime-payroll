@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion — MSA Payroll</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css">
 </head>
@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="login-page">
     <div class="login-box">
         <div class="login-header">
-            <i class="fas fa-graduation-cap" style="font-size:36px;color:var(--gold);margin-bottom:12px;"></i>
+            <div class="login-logo"><i class="fas fa-graduation-cap"></i></div>
             <h1>MSA Payroll</h1>
             <p>Système de gestion de la paie / نظام إدارة الرواتب</p>
         </div>
@@ -97,10 +97,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <i class="fas fa-sign-in-alt"></i>
                     Se connecter / دخول
                 </button>
-                
-                <div class="text-center mt-4" style="color:var(--gray-500);font-size:12px;">
-                    Par défaut: <code>admin</code> / <code>admin123</code>
-                </div>
             </form>
         </div>
     </div>
