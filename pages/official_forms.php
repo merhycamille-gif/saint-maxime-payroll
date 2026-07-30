@@ -29,6 +29,14 @@ if (!preg_match('/^\d{4}-\d{4}$/', (string)$schoolYear)) $schoolYear = currentSc
 $month = ($month >= 1 && $month <= 12) ? $month : (int)date('n');
 $year  = ($year >= 2000 && $year <= 2100) ? $year : (int)date('Y');
 $school = currentSchool();
+// 🔵 نموذج لأستاذ محدّد في وضع «كل المدارس»: المؤسسة صاحبة العمل هي **مدرسة الأستاذ**
+// (كان $school = null فتُطبَع ترويسة فارغة وتظهر تحذيرات «قراءة من قيمة فارغة»).
+if (!$school && $employeeId > 0) {
+    $sOwn = $db->prepare("SELECT s.* FROM employees e JOIN schools s ON s.id = e.school_id
+                           WHERE e.id = ? AND e.is_deleted = 0" . schoolScopeSql('e.school_id'));
+    $sOwn->execute([$employeeId]);
+    $school = $sOwn->fetch() ?: null;
+}
 // 🔵 النماذج المؤسّسية (تصاريح الضريبة والضمان) تُصدَر باسم مؤسسة واحدة ورقمها لدى الضمان.
 // في وضع «كل المدارس» كان $school = null فتُطبَع الترويسة فارغة وتُدمَج أرقام كل المدارس
 // في تصريح واحد بلا رقم صاحب عمل. الآن نطلب اختيار مدرسة بوضوح.
@@ -907,7 +915,7 @@ elseif ($form === 'teacher_card'):
         <div>دائرة الهيئة التعليمية في المدارس الخاصة</div>
         <div style="text-align:left">
             <div style="font-weight:700"><?= e($school['name_ar'] ?? '') ?></div>
-            <div><?= e($school['address'] ?? '') ?><?= $school['phone']?' — هاتف: '.e($school['phone']):'' ?></div>
+            <div><?= e($school['address'] ?? '') ?><?= !empty($school['phone'])?' — هاتف: '.e($school['phone']):'' ?></div>
         </div>
     </div>
     <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div>
@@ -1012,7 +1020,7 @@ elseif ($form === 'teacher_card'):
         <div style="font-weight:700;line-height:1.6">صندوق التعويضات<br><span style="font-weight:400">لأفراد الهيئة التعليمية في المدارس الخاصة</span></div>
         <div style="text-align:left">
             <div style="font-weight:700"><?= e($school['name_ar'] ?? '') ?></div>
-            <div><?= e($school['address'] ?? '') ?><?= $school['phone']?' — هاتف: '.e($school['phone']):'' ?></div>
+            <div><?= e($school['address'] ?? '') ?><?= !empty($school['phone'])?' — هاتف: '.e($school['phone']):'' ?></div>
             <div>الرقم المالي: <?= e($school['finance_number'] ?? '') ?></div>
         </div>
     </div>
