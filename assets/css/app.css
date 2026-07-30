@@ -1228,3 +1228,126 @@ input:focus, select:focus, textarea:focus {
     .user-menu span { display: none; }
     .school-switcher select { max-width: 140px; }
 }
+
+/* =====================================================
+   🔍 البحث الشامل (Ctrl+K) — أستاذ أو صفحة من أي مكان
+   ===================================================== */
+.global-search {
+    position: relative;
+    flex: 1 1 240px;
+    max-width: 440px;
+    display: flex;
+    align-items: center;
+}
+.global-search .gs-ic {
+    position: absolute; inset-inline-start: 13px;
+    color: var(--gray-400); font-size: 13px; pointer-events: none;
+}
+.global-search input {
+    width: 100%;
+    padding: 9px 74px 9px 36px;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    background: var(--gray-100);
+    font-size: 13px;
+    color: var(--gray-800);
+    transition: background .15s, border-color .15s, box-shadow .15s;
+}
+body.rtl .global-search input { padding: 9px 36px 9px 74px; }
+.global-search input:focus {
+    background: #fff;
+    border-color: var(--primary-light) !important;
+    box-shadow: 0 0 0 3px rgba(31,90,158,0.12);
+    outline: none;
+}
+.global-search .gs-kbd {
+    position: absolute; inset-inline-end: 10px;
+    background: #fff; border: 1px solid var(--gray-300); border-bottom-width: 2px;
+    border-radius: 6px; padding: 1px 7px;
+    font-size: 10.5px !important; color: var(--gray-500);
+    pointer-events: none;
+}
+.global-search .gs-panel {
+    display: none;
+    position: absolute; top: calc(100% + 8px); inset-inline-start: 0;
+    width: 100%; min-width: 300px; max-height: 420px; overflow-y: auto;
+    background: #fff; border: 1px solid var(--gray-200); border-radius: 14px;
+    box-shadow: var(--shadow-lg); padding: 6px; z-index: 120;
+}
+.global-search .gs-panel.open { display: block; animation: menuIn .16s ease; }
+.gs-sec {
+    font-size: 10.5px !important; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--gray-400); padding: 8px 10px 4px;
+    display: flex; align-items: center; gap: 6px;
+}
+.gs-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 10px; border-radius: 9px;
+    text-decoration: none; color: var(--gray-800);
+    transition: background .12s;
+}
+.gs-item:hover { background: var(--gray-100); }
+.gs-item i {
+    width: 30px; height: 30px; min-width: 30px; border-radius: 8px;
+    background: rgba(23,63,111,.08); color: var(--primary);
+    display: inline-flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.gs-item span { display: flex; flex-direction: column; line-height: 1.3; }
+.gs-item small { color: var(--gray-500); font-size: 11px !important; }
+.gs-empty { padding: 14px; text-align: center; color: var(--gray-500); }
+@media (max-width: 900px) { .global-search .gs-kbd { display: none; } }
+
+/* =====================================================
+   🔔 تنبيهات عائمة عصرية (Toasts) — النجاح يختفي لحاله والخطأ يبقى
+   ===================================================== */
+.toast-stack {
+    position: fixed; top: 74px; inset-inline-end: 20px;
+    display: flex; flex-direction: column; gap: 10px;
+    z-index: 400; max-width: min(420px, calc(100vw - 40px));
+}
+.toast-stack .toast {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin: 0; padding: 12px 14px;
+    box-shadow: var(--shadow-lg);
+    border-radius: 12px;
+    animation: toastIn .25s ease;
+}
+.toast-stack .toast span { flex: 1; }
+.toast-x {
+    border: none; background: transparent; cursor: pointer;
+    font-size: 16px !important; line-height: 1; color: inherit; opacity: .55;
+    padding: 0 2px;
+}
+.toast-x:hover { opacity: 1; }
+.toast-hide { opacity: 0; transform: translateY(-8px); transition: all .35s ease; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+
+/* =====================================================
+   ✨ لمسات عصرية عامة (2026-07-30)
+   ===================================================== */
+/* دخول ناعم لمحتوى الصفحة (شاشة فقط) */
+@media screen {
+    .page-content { animation: pageIn .28s ease both; }
+    @keyframes pageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+
+/* صفوف جدول متناوبة (زيبرا) + مرور أوضح */
+.table tbody tr:nth-child(even) { background: #fafcfe; }
+.table tbody tr:hover { background: #eef5fb; }
+
+/* =====================================================
+   📐 تدرّج عناوين عصري — شاشة فقط
+   (الطباعة تبقى 12px موحّدة تماماً كطلب المستخدم —
+    وعلى الشاشة لا شيء أصغر من 12px، فقط العناوين والأرقام
+    الرئيسية أكبر ليصير في تسلسل بصري حديث)
+   ===================================================== */
+@media screen {
+    .topbar h1, .topbar h1 span[dir="ltr"] { font-size: 18px !important; }
+    h2:not(.official-doc *) { font-size: 16px !important; }
+    .card-header h3:not(.official-doc *), .card-header h3:not(.official-doc *) > span { font-size: 14px !important; }
+    .stat-value, .dash-kpi .dk-val { font-size: 22px !important; }
+    .login-header h1 { font-size: 20px !important; }
+    .sidebar-brand h2 { font-size: 15px !important; }
+    .empty-state h4 { font-size: 14px !important; }
+    .btn-lg { font-size: 14px !important; }
+}

@@ -329,6 +329,18 @@ check('الواجهة العصرية: استثناء النماذج الرسمي
       strpos($cssSrc, '.official-doc td') !== false);
 check('الواجهة العصرية: ستايلات الطباعة الأساسية باقية (إخفاء القائمة/الشريط + A4)',
       strpos($cssSrc, '.sidebar, .topbar, .no-print') !== false && strpos($cssSrc, '@page { size: A4; margin: 12mm; }') !== false);
+// البحث الشامل Ctrl+K: الملف موجود + مربوط بالهيدر + مقيّد بالمدارس المسموحة + التنبيهات العائمة
+check('البحث الشامل: ajax_search.php موجود ومقيّد بنطاق المدارس',
+      is_file(__DIR__ . '/../ajax_search.php')
+      && strpos((string)file_get_contents(__DIR__ . '/../ajax_search.php'), 'schoolScopeSql()') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../ajax_search.php'), 'requireLogin()') !== false);
+check('البحث الشامل: مربوط بالشريط العلوي (globalSearch + Ctrl+K)',
+      strpos($hdSrc, 'globalSearch') !== false && strpos($hdSrc, "toLowerCase() === 'k'") !== false);
+check('التنبيهات العائمة: toast-stack بالهيدر + ستايلها بالـCSS',
+      strpos($hdSrc, 'toast-stack') !== false && strpos($cssSrc, '.toast-stack') !== false);
+check('تدرّج العناوين: شاشة فقط (@media screen) والطباعة تبقى 12px موحّدة',
+      strpos($cssSrc, 'تدرّج عناوين عصري') !== false
+      && preg_match('/@media screen \{[^}]*\.topbar h1/s', $cssSrc) === 1);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

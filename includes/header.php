@@ -42,6 +42,9 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+
     <!-- App CSS -->
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app.css') ?: '1' ?>">
 </head>
@@ -294,6 +297,16 @@ document.addEventListener('submit', function (e) {
                     </h1>
                 </div>
             </div>
+
+            <!-- 🔍 البحث الشامل (Ctrl+K): أستاذ أو صفحة — من أي مكان بالبرنامج -->
+            <?php $gsCanDossier = viewerCanSeePage('attestations.php'); ?>
+            <div class="global-search no-print" id="globalSearch">
+                <i class="fas fa-magnifying-glass gs-ic"></i>
+                <input type="text" id="gsInput" placeholder="Recherche / بحث: أستاذ أو صفحة..." autocomplete="off">
+                <span class="gs-kbd">Ctrl+K</span>
+                <div class="gs-panel" id="gsPanel"></div>
+            </div>
+
             <div class="topbar-actions">
                 <?php if (viewerCanSeePage('attestations.php')): ?>
                 <a href="<?= BASE_URL ?>pages/attestations.php?dossier=1" class="topbar-dossier no-print" title="ملف الأستاذ الكامل / Dossier complet de l'enseignant">
@@ -392,13 +405,89 @@ document.addEventListener('submit', function (e) {
                 </a>
             </div>
         </header>
+        <!-- سكربت البحث الشامل -->
+        <script>
+        (function () {
+            var inp = document.getElementById('gsInput'), panel = document.getElementById('gsPanel'), box = document.getElementById('globalSearch');
+            if (!inp) return;
+            var canDossier = <?= $gsCanDossier ? 'true' : 'false' ?>, timer = null;
+            function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+            function close() { panel.classList.remove('open'); }
+            function findPages(q) {
+                var out = [];
+                document.querySelectorAll('.sidebar-nav a').forEach(function (a) {
+                    var txt = a.textContent.trim();
+                    if (txt.toLowerCase().indexOf(q) > -1) {
+                        var ic = a.querySelector('i');
+                        out.push({ t: txt, h: a.href, i: ic ? ic.className : 'fas fa-link' });
+                    }
+                });
+                return out.slice(0, 6);
+            }
+            function render(pg, emps) {
+                var h = '';
+                if (pg.length) {
+                    h += '<div class="gs-sec"><i class="fas fa-window-maximize"></i> Pages / الصفحات</div>';
+                    pg.forEach(function (p) { h += '<a class="gs-item" href="' + esc(p.h) + '"><i class="' + esc(p.i) + '"></i><span>' + esc(p.t) + '</span></a>'; });
+                }
+                if (emps.length) {
+                    h += '<div class="gs-sec"><i class="fas fa-users"></i> Enseignants / الأساتذة</div>';
+                    emps.forEach(function (r) {
+                        h += '<a class="gs-item" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=' + r.id + '">'
+                           + '<i class="fas fa-user"></i><span>' + esc(r.fr) + ' / ' + esc(r.ar)
+                           + '<small>' + esc(r.code + (r.school ? ' — ' + r.school : '')) + '</small></span></a>';
+                    });
+                }
+                if (!h) h = '<div class="gs-empty">Aucun résultat / لا نتائج</div>';
+                panel.innerHTML = h;
+                panel.classList.add('open');
+            }
+            inp.addEventListener('input', function () {
+                var q = inp.value.trim();
+                clearTimeout(timer);
+                if (q.length < 2) { close(); return; }
+                timer = setTimeout(function () {
+                    var pg = findPages(q.toLowerCase());
+                    if (canDossier) {
+                        fetch('<?= BASE_URL ?>ajax_search.php?q=' + encodeURIComponent(q))
+                            .then(function (r) { return r.json(); })
+                            .then(function (emps) { render(pg, emps); })
+                            .catch(function () { render(pg, []); });
+                    } else { render(pg, []); }
+                }, 220);
+            });
+            document.addEventListener('keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key && e.key.toLowerCase() === 'k') { e.preventDefault(); inp.focus(); inp.select(); }
+                if (e.key === 'Escape') close();
+            });
+            document.addEventListener('click', function (e) { if (!box.contains(e.target)) close(); });
+        })();
+        </script>
+
         <div class="page-content" id="pageContent" style="--accent: <?= $accentColor ?>; --accent-bg: <?= $accentBg ?>;">
         <?php
-        // رسائل التنبيه (flash)
-        foreach (['flash_success' => 'success', 'flash_error' => 'danger', 'flash_info' => 'info'] as $fk => $cls):
+        // رسائل التنبيه (flash) — تنبيهات عائمة عصرية تختفي لحالها (الأخطاء تبقى ليكبس ×)
+        $hasFlash = !empty($_SESSION['flash_success']) || !empty($_SESSION['flash_error']) || !empty($_SESSION['flash_info']);
+        if ($hasFlash): ?>
+        <div class="toast-stack no-print" id="toastStack">
+        <?php foreach (['flash_success' => 'success', 'flash_error' => 'danger', 'flash_info' => 'info'] as $fk => $cls):
             if (!empty($_SESSION[$fk])): ?>
-            <div class="alert alert-<?= $cls ?>"><i class="fas fa-info-circle"></i> <?= e($_SESSION[$fk]) ?></div>
+            <div class="alert alert-<?= $cls ?> toast">
+                <i class="fas <?= $cls === 'success' ? 'fa-circle-check' : ($cls === 'danger' ? 'fa-circle-exclamation' : 'fa-info-circle') ?>"></i>
+                <span><?= e($_SESSION[$fk]) ?></span>
+                <button type="button" class="toast-x" onclick="this.closest('.toast').remove()" title="Fermer / إغلاق">&times;</button>
+            </div>
         <?php unset($_SESSION[$fk]); endif; endforeach; ?>
+        </div>
+        <script>
+        setTimeout(function () {
+            document.querySelectorAll('#toastStack .toast:not(.alert-danger)').forEach(function (t) {
+                t.classList.add('toast-hide');
+                setTimeout(function () { t.remove(); }, 400);
+            });
+        }, 6500);
+        </script>
+        <?php endif; ?>
         <?php
         // شريط «الراتب المركّب يشمل» الظاهر (خانات اختيار متل شريط الإفادة) — على صفحات الرواتب فقط
         if (in_array($currentPage ?? '', ['reports', 'employee_history', 'monthly'], true)) {
