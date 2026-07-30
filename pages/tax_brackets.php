@@ -45,9 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $origFrom = $_POST['orig_from'] ?: null; // عند التعديل: التاريخ الأصلي للمجموعة
             if (!$from) throw new Exception('تاريخ السريان (من) مطلوب');
 
-            $rates = $_POST['rate'] ?? [];
-            $froms = $_POST['monthly_from'] ?? [];
-            $tos   = $_POST['monthly_to'] ?? [];
+            // (array) يمنع TypeError إن أُرسِل الحقل قيمةً مفردة بدل مصفوفة
+            $rates = (array)($_POST['rate'] ?? []);
+            $froms = (array)($_POST['monthly_from'] ?? []);
+            $tos   = (array)($_POST['monthly_to'] ?? []);
             $tiers = [];
             for ($i = 0; $i < count($rates); $i++) {
                 $r = trim((string)($rates[$i] ?? ''));

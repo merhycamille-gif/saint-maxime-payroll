@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
                writeSchoolYear(), // «كل السنين» → السنة الحالية (لا تُخزَّن 'all' فلا يراها المحرّك)
                (float)str_replace(',', '', $_POST['amount']),
                $vtype,
-               ($vtype === 'percent') ? 'LBP' : ($_POST['currency'] ?? 'USD'),
+               ($vtype === 'percent') ? 'LBP' : sanitizeAmountCurrency((float)str_replace(',', '', $_POST['amount']), ($_POST['currency'] ?? 'USD')),
                $_POST['start_month'] ?: null,
                $_POST['end_month'] ?: null
            ]);
@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
 if (isset($_GET['delete'])) {
     requireWriteAction();
     $db->prepare("DELETE FROM employee_bonuses WHERE id = ? AND employee_id = ?")->execute([(int)$_GET['delete'], $employeeId]);
-    recalcEmployeeYear($employeeId, (activeSchoolYear() === 'all') ? currentSchoolYear() : activeSchoolYear()); // إعادة حساب الراتب تلقائياً
+    recalcEmployeeYear($employeeId, writeSchoolYear()); // إعادة حساب الراتب تلقائياً
     $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Supprimée'];
     header("Location: ?employee_id=$employeeId");
     exit;

@@ -73,8 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     // حفظ المسؤولين الموقّعين (اسم/أجنبي/صفة/هاتف) كـ JSON بجدول الإعدادات لكل مدرسة
     if (!empty($savedId)) {
-        $names = $_POST['sig_name'] ?? []; $namesFr = $_POST['sig_name_fr'] ?? [];
-        $titles = $_POST['sig_title'] ?? []; $phones = $_POST['sig_phone'] ?? [];
+        $names = (array)($_POST['sig_name'] ?? []); $namesFr = (array)($_POST['sig_name_fr'] ?? []);
+        $titles = (array)($_POST['sig_title'] ?? []); $phones = (array)($_POST['sig_phone'] ?? []);
         $sigs = [];
         for ($i = 0; $i < count($names); $i++) {
             $nm = trim((string)($names[$i] ?? ''));

@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'save_rows') {
             $vid = (int)$_POST['version_id'];
-            $salaries = $_POST['new_salary_2017'] ?? [];
+            $salaries = (array)($_POST['new_salary_2017'] ?? []);
             $gradeVals = $_POST['new_grade_value'] ?? [];
             $db->beginTransaction();
             $up = $db->prepare("UPDATE salary_scale_2017 SET new_salary_2017=?, new_grade_value=? WHERE version_id=? AND grade=?");

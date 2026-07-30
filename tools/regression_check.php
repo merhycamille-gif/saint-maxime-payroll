@@ -28,7 +28,7 @@ require_once $PROJ . '/includes/functions.php';
 $db = getDB();
 
 // ---------- عارض صفحات داخلي (كل صفحة بعملية فرعية لتفادي إعادة تعريف الدوال) ----------
-function renderPage(string $rel, array $get, array $comp, array $schoolIds = []): string {
+function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = ''): string {
     global $PROJ;
     $runner = __DIR__ . '/_render_one.php';
     // الوسائط تمرَّر base64 (اقتباسات JSON تتخربط بسطر أوامر ويندوز)
@@ -42,6 +42,8 @@ $_SESSION += ['user_id'=>1,'username'=>'admin','full_name'=>'RegCheck','role'=>'
 $_SESSION['salary_comp'] = json_decode(base64_decode($argv[3] ?? ''), true) ?: [];
 $__sch = json_decode(base64_decode($argv[4] ?? ''), true) ?: [];
 if ($__sch) $_SESSION['active_schools'] = $__sch; // نطاق مدرسة محدّدة (للنماذج المؤسّسية)
+$__cur = $argv[5] ?? '';
+if ($__cur !== '') $_SESSION['display_currency'] = $__cur; // وضع العملة (ليرة/دولار/الاثنين)
 $_GET = json_decode(base64_decode($argv[2] ?? ''), true) ?: [];
 $_SERVER['REQUEST_URI'] = '/x';
 chdir(dirname($PROJ . '/' . $argv[1]));
@@ -51,7 +53,7 @@ catch (Throwable $e) { ob_end_clean(); echo 'FATAL: ' . $e->getMessage(); }
 PHP);
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner) . ' '
          . escapeshellarg($rel) . ' ' . base64_encode(json_encode($get)) . ' ' . base64_encode(json_encode($comp))
-         . ' ' . base64_encode(json_encode($schoolIds));
+         . ' ' . base64_encode(json_encode($schoolIds)) . ' ' . escapeshellarg($currency);
     return (string)shell_exec($cmd . ' 2>NUL');
 }
 $noFatal = fn(string $h) => strpos($h, 'FATAL') !== 0 && stripos($h, 'Fatal error') === false && strlen($h) > 5000;
@@ -487,6 +489,81 @@ check('رقم الصندوق: شفاء ذاتي يمنع كتابة رقم مد�
       && strpos($ofSrc, "UPDATE schools SET caisse_number='75210'") === false);
 $badCaisse = (int)$db->query("SELECT COUNT(*) FROM schools WHERE caisse_number='75210' AND name_ar NOT LIKE 'مدرسة%'")->fetchColumn();
 check('رقم الصندوق: لا مؤسسة غير المدرسة تحمل رقمها', $badCaisse === 0, "n=$badCaisse");
+
+/* =====================================================================
+ * 17) جولة «ولا غلطة» (2026-07-30): النِّسَب المؤرّخة، الأسرار، الكاش، العملة، التدقيق
+ * =================================================================== */
+$fnSrc3 = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
+$ofSrc3 = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
+$oeSrc3 = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
+check('النماذج الرسمية: لا نِسَب مكتوبة بالكود (كلّها مؤرّخة من rate_history)',
+      preg_match('/[\/*]\s*0\.(11|085|06|03)\b/', $ofSrc3) === 0 && preg_match('/[\/*]\s*0\.(11|085|06|03)\b/', $oeSrc3) === 0
+      && strpos($fnSrc3, 'function rateFrac') !== false && strpos($fnSrc3, 'function cnssTotalFrac') !== false);
+// النسبة المؤرّخة تُقرأ فعلاً بالقيم الصحيحة
+check('النِّسَب المؤرّخة تُقرأ صحيحة (ضمان 3% ونهاية خدمة 8.5% وتعويض عائلي 6%)',
+      abs(rateFrac('cnss_employee_rate', 6, 2026, 3) - 0.03) < 1e-9
+      && abs(rateFrac('end_of_service_rate', 6, 2026, 8.5) - 0.085) < 1e-9
+      && abs(rateFrac('family_compensation_rate', 6, 2026, 6) - 0.06) < 1e-9
+      && abs(cnssTotalFrac(6, 2026) - 0.11) < 1e-9);
+check('سرّ روابط الأساتذة عشوائي لكل تنصيب (ليس نصّاً بالكود)',
+      strpos($fnSrc3, 'StM_infoform_') === false && strpos($fnSrc3, 'function infoFormSecret') !== false
+      && strpos($fnSrc3, 'random_bytes(32)') !== false);
+$secLen = strlen((string)getSetting('info_form_secret', ''));
+check('سرّ الروابط مخزَّن بقاعدة البيانات بطول كافٍ', $secLen >= 32, "طول=$secLen");
+// التوكن ثابت (الروابط المُرسَلة تبقى تعمل ضمن نفس التنصيب)
+check('توكن الأستاذ ثابت بين الاستدعاءات', infoFormToken(1828) === infoFormToken(1828));
+$dbSrc = (string)file_get_contents(__DIR__ . '/../config/database.php');
+check('ذاكرة الإعدادات تتحدّث عند الحفظ (لا قراءة قيمة قديمة بنفس الطلب)',
+      strpos($dbSrc, 'function &settingsCache') !== false
+      && preg_match('/function setSetting.*?settingsCache\(\);\s*\$settings\[\$key\] = \$value;/s', $dbSrc) === 1);
+$probeKey = '__reg_probe_' . getmypid();
+setSetting($probeKey, 'v1');
+$readBack = getSetting($probeKey, '');
+setSetting($probeKey, 'v2');
+$readBack2 = getSetting($probeKey, '');
+try { $db->exec("DELETE FROM settings WHERE `key` = " . $db->quote($probeKey)); } catch (Exception $e) {}
+check('اختبار فعلي: الحفظ ثم القراءة بنفس الطلب يرجع الجديد', $readBack === 'v1' && $readBack2 === 'v2', "$readBack/$readBack2");
+check('الدولار المخزَّن الصفري يُحسَب من الليرة عند العرض (لا $0.00)',
+      strpos($fnSrc3, 'function rowUsd') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/monthly_payroll.php'), "rowUsd(\$salary, 'net_salary_usd'") !== false);
+// وضع العملة: «دولار فقط» لا يخلط الليرة بالدولار في الكشف الشهري
+$hUsd = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [], 'usd');
+$lbpHits = preg_match_all('/L\.L/u', $hUsd);
+check('وضع «دولار فقط»: الكشف الشهري بلا خلط عملات', $lbpHits <= 2, "خلايا ليرة=$lbpHits");
+$repSrc3 = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+check('الكشف الشهري: كل أعمدة المجاميع بالعملة المختارة (لا formatLBP ثابتة)',
+      strpos($repSrc3, "\$dualTot(\$t['total'], \$t['total_usd'])") !== false
+      && strpos($repSrc3, "\$dualTot(\$t['net'], \$t['net_usd'])") !== false
+      && strpos($repSrc3, "\$dualTot(\$t['base'], \$t['base_usd'])") !== false);
+check('تدقيق سلامة الأرقام المخزَّنة موجود بصفحة فحص القانون',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/law_check.php'), 'تدقيق سلامة الأرقام المخزَّنة') !== false);
+// سلامة البيانات: الثوابت التي يجب أن تبقى صفراً دائماً
+$INT = 'FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=0';
+// الأقواس ضرورية: AND تسبق OR بالأولوية، فبلاها يتسرّب شرط is_deleted ويُحتسب المحذوفون
+$dq = fn(string $w) => (int)$db->query("SELECT COUNT(*) $INT AND ($w)")->fetchColumn();
+check('بيانات: الأساس+الدرجة = الأساس + قيمة الدرجة (كل الصفوف)',
+      $dq('ABS(ms.base_plus_echelon_lbp - (ms.base_salary_lbp + ms.echelon_value_lbp)) > 1') === 0);
+check('بيانات: المستحق = الصافي + العائلي + النقل (كل الصفوف)',
+      $dq('ABS(ms.total_due_lbp - (ms.net_salary_lbp + ms.family_allowance_lbp + ms.transport_lbp)) > 1') === 0);
+check('بيانات: لا ضمان محسوم على غير خاضع للضمان', $dq('ms.cnss_amount_lbp > 0 AND e.cnss_subject = 0') === 0);
+check('بيانات: لا ضريبة أكبر من الأساس الخاضع', $dq('ms.income_tax_lbp > ms.taxable_base_lbp') === 0);
+check('بيانات: لا قيم سالبة', $dq('ms.base_salary_lbp < 0 OR ms.net_salary_lbp < 0 OR ms.total_due_lbp < 0 OR ms.cnss_amount_lbp < 0 OR ms.income_tax_lbp < 0') === 0);
+check('بيانات: لا مبالغ مستحيلة (>100 مليار بصفّ)', $dq('ms.prime_fixe_lbp > 1e11 OR ms.total_due_lbp > 1e11 OR ms.base_salary_lbp > 1e11') === 0);
+check('بيانات: عمودا النقل متطابقان دائماً (لا دوبل)', $dq('ms.transport_lbp > 0 AND ms.transport_complement_lbp > 0 AND ms.transport_lbp <> ms.transport_complement_lbp') === 0);
+check('بيانات: لا صفوف رواتب مكرّرة (موظف/شهر/سنة)',
+      (int)$db->query("SELECT COUNT(*) FROM (SELECT employee_id, month, year, COUNT(*) c FROM monthly_salaries GROUP BY employee_id, month, year HAVING c > 1) x")->fetchColumn() === 0);
+check('بيانات: لا رواتب لموظفين غير موجودين',
+      (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms LEFT JOIN employees e ON e.id = ms.employee_id WHERE e.id IS NULL")->fetchColumn() === 0);
+check('حارس خطأ العملة: مبلغ ضخم بالدولار يُفهَم ليرةً (يمنع راتب 3600 مليار)',
+      strpos($fnSrc3, 'function sanitizeAmountCurrency') !== false
+      && sanitizeAmountCurrency(54000000, 'USD') === 'LBP'
+      && sanitizeAmountCurrency(1500, 'USD') === 'USD'
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'sanitizeAmountCurrency(') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/bonuses.php'), 'sanitizeAmountCurrency(') !== false);
+check('حماية: الحقول المصفوفة بالفورمات محصّنة ((array) cast)',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/tax_brackets.php'), "(array)(\$_POST['rate']") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/schools.php'), "(array)(\$_POST['sig_name']") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/salary_scales.php'), "(array)(\$_POST['new_salary_2017']") !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -439,7 +439,7 @@ if (!$emp):
     $sal->execute([$employeeId]); $sal = $sal->fetch();
     if ($sal) {
         $basePlusEch=(float)$sal['base_plus_echelon_lbp']; $net=(float)$sal['net_salary_lbp'];
-        $netUsd=(float)$sal['net_salary_usd']; $cnssAmt=(float)$sal['cnss_amount_lbp']; $schoolCnss=(float)$sal['school_cnss_8_lbp'];
+        $netUsd=rowUsd($sal, 'net_salary_usd', 'net_salary_lbp'); $cnssAmt=(float)$sal['cnss_amount_lbp']; $schoolCnss=(float)$sal['school_cnss_8_lbp'];
         $salPeriodAr = monthName((int)$sal['month'],'ar').' '.$sal['year'];
         $salPeriodLat = monthName((int)$sal['month'],'fr').' '.$sal['year'];
     } else {

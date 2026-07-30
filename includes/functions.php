@@ -619,25 +619,42 @@ function e($str) {
 /**
  * توكن رابط فورم تحديث معلومات الأستاذ (يمنع تخمين الروابط). ثابت لكل أستاذ.
  */
+/**
+ * 🔴 سرّ روابط الأساتذة (2026-07-30): كان السرّ نصّاً ثابتاً داخل الكود، ومستودع الكود
+ * **عام** على GitHub — فأي شخص يستطيع حساب رابط كل أستاذ (١٦٨١ موظفاً) وفتح بياناته
+ * الشخصية (الاسم، الولادة، اسم الأم، العنوان الكامل، الهواتف، رقم الضمان والرقم المالي).
+ * الآن السرّ **عشوائي لكل تنصيب**، يُولَّد ذاتياً ويُخزَّن في قاعدة البيانات (خارج الكود)
+ * فلا يُحسَب من الكود المنشور.
+ * ⚠️ الروابط المُرسَلة سابقاً تتوقّف — يُرسَل رابط جديد من صفحة «تحديث معلومات الأساتذة».
+ */
+function infoFormSecret() {
+    static $sec = null;
+    if ($sec !== null) return $sec;
+    $sec = (string)getSetting('info_form_secret', '');
+    if ($sec === '' || strlen($sec) < 32) {
+        try { $sec = bin2hex(random_bytes(32)); }
+        catch (Exception $e) { $sec = hash('sha256', uniqid('', true) . microtime(true)); }
+        setSetting('info_form_secret', $sec);
+    }
+    return $sec;
+}
+
 function infoFormToken($empId) {
-    $secret = 'StM_infoform_' . (defined('DB_NAME') ? DB_NAME : 'x') . '_v1';
-    return substr(hash_hmac('sha256', (string)((int)$empId) . '|info', $secret), 0, 24);
+    return substr(hash_hmac('sha256', (string)((int)$empId) . '|info', infoFormSecret()), 0, 24);
 }
 
 /**
  * توكن رابط المدرسة (رابط واحد للمجموعة): الأستاذ يفتحه ويختار اسمه.
  */
 function schoolFormToken($schoolId) {
-    $secret = 'StM_infoform_' . (defined('DB_NAME') ? DB_NAME : 'x') . '_v1';
-    return substr(hash_hmac('sha256', (string)((int)$schoolId) . '|school', $secret), 0, 24);
+    return substr(hash_hmac('sha256', (string)((int)$schoolId) . '|school', infoFormSecret()), 0, 24);
 }
 
 /**
  * توكن الرابط الموحّد لكل المدارس: الأستاذ يختار مدرسته ثم اسمه.
  */
 function allFormToken() {
-    $secret = 'StM_infoform_' . (defined('DB_NAME') ? DB_NAME : 'x') . '_v1';
-    return substr(hash_hmac('sha256', 'ALL|school', $secret), 0, 24);
+    return substr(hash_hmac('sha256', 'ALL|school', infoFormSecret()), 0, 24);
 }
 
 /**
@@ -905,9 +922,39 @@ function lbpToUsd($lbp, $rate): float {
  * سعر صرف صف راتب: يفضّل اللقطة المخزّنة `exchange_rate` (الأدقّ لأنها سعر شهر الراتب)،
  * وإلا يجلب سعر شهر/سنة الصف، وإلا السعر الحالي.
  */
+/**
+ * 🛡️ حارس خطأ العملة (2026-07-30): مبلغٌ بالدولار كبيرٌ جداً يعني أنّ المستخدم كتب
+ * مبلغ **الليرة** والعملة تركها دولاراً. حصل فعلاً: علاوة 54,000,000 «دولار» ولّدت
+ * راتباً 3,624 مليار ليرة (كان على موظف تجربة محذوف، لكنّها قنبلة لو تكرّرت على موظف حقيقي).
+ * يرجّع العملة المصحّحة، ويضبط $warn إن صحّحها.
+ * الحدّ: 200,000 دولار شهرياً — أعلى بكثير من أي راتب واقعي، فلا يعترض الاستعمال الطبيعي.
+ */
+function sanitizeAmountCurrency(float $amount, string $currency, ?string &$warn = null): string {
+    $warn = null;
+    if ($currency === 'USD' && $amount > 200000) {
+        $warn = 'المبلغ ' . number_format($amount) . ' كبير جداً كدولار — فُهم أنه بالليرة اللبنانية وصُحّحت العملة تلقائياً.';
+        return 'LBP';
+    }
+    return $currency;
+}
+
 function rowRate(array $row): float {
     if (!empty($row['exchange_rate']) && (float)$row['exchange_rate'] > 0) return (float)$row['exchange_rate'];
     return (float)getExchangeRate($row['month'] ?? null, $row['year'] ?? null);
+}
+
+/**
+ * 🔵 قيمة بالدولار لعمود دولار مخزَّن (2026-07-30): 1,251 صفّاً قديماً (2023-2025) مخزَّن
+ * فيه سعر الصرف = 0 فصارت أعمدة الدولار المخزَّنة (net_salary_usd/total_due_usd) صفراً،
+ * فتُطبَع «$0.00» بلائحة الرواتب والقسيمة مع أنّ مبلغ الليرة صحيح.
+ * الحل عرضاً (بلا لمس البيانات): إن كان الدولار المخزَّن صفراً نحسبه من الليرة ÷ سعر الشهر.
+ *   $usdKey مثل 'net_salary_usd' و $lbpKey مثل 'net_salary_lbp'
+ */
+function rowUsd(array $row, string $usdKey, string $lbpKey): float {
+    $u = (float)($row[$usdKey] ?? 0);
+    if ($u > 0) return $u;
+    $rate = rowRate($row);
+    return $rate > 0 ? ((float)($row[$lbpKey] ?? 0)) / $rate : 0.0;
 }
 
 /**
@@ -1277,6 +1324,22 @@ function getRateAsOf($key, $month = null, $year = null, $default = null) {
     $fallback = getSetting($key, '');
     if ($fallback !== '') return (float)$fallback;
     return (float)$default;
+}
+
+/**
+ * 🔵 النسبة السارية ككسر (0.03 لا 3) — للنماذج الرسمية التي تستنتج الأجر من الاشتراك
+ * (الأجر = الاشتراك ÷ النسبة). كانت النِّسَب مكتوبة أرقاماً بالكود (0.03/0.085/0.06/0.11)
+ * فلو عدّل المستخدم نسبةً من «النِّسَب حسب التاريخ» يبقى عمود الاشتراك صحيحاً (من العمود
+ * المخزَّن) ويصير عمود الأجر خاطئاً — فيناقض النموذج نفسه أمام الضمان.
+ */
+function rateFrac($key, $month = null, $year = null, $default = 0) {
+    $v = getRateAsOf($key, $month, $year, $default);
+    return ((float)$v) / 100.0;
+}
+
+/** نسبة الضمان الإجمالية (المضمون + صاحب العمل) ككسر — لعمود «مجموع الأجور» بنموذج 190A. */
+function cnssTotalFrac($month = null, $year = null) {
+    return rateFrac('cnss_employee_rate', $month, $year, 3) + rateFrac('cnss_employer_rate', $month, $year, 8);
 }
 
 /**

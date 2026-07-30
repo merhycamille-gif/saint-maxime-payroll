@@ -100,14 +100,14 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                     <tr style="background:var(--gold-light)">
                         <td><strong>Salaire net</strong></td>
                         <td class="text-end"><strong><?= formatLBP($salary['net_salary_lbp']) ?></strong></td>
-                        <td class="text-end text-muted"><?= formatUSD($salary['net_salary_usd']) ?></td>
+                        <td class="text-end text-muted"><?= formatUSD(rowUsd($salary, 'net_salary_usd', 'net_salary_lbp')) ?></td>
                     </tr>
                     <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= formatLBP($salary['family_allowance_lbp']) ?></td><td></td></tr>
                     <tr><td>Transport</td><td class="text-end text-success">+<?= money($salary['transport_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr style="background:#fff3cd;color:#000">
                         <td style="font-size:18px"><strong>💰 TOTAL DÛ / صافي الراتب المستحق للدفع</strong></td>
                         <td class="text-end" style="font-size:18px"><strong><?= formatLBP($salary['total_due_lbp']) ?></strong></td>
-                        <td class="text-end" style="font-size:16px"><strong><?= formatUSD($salary['total_due_usd']) ?></strong></td>
+                        <td class="text-end" style="font-size:16px"><strong><?= formatUSD(rowUsd($salary, 'total_due_usd', 'total_due_lbp')) ?></strong></td>
                     </tr>
                 </table>
                 <div class="sign-row" style="margin-top:26px">
@@ -408,14 +408,14 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                     <tr style="background:var(--gold-light)">
                         <td><strong>Salaire net</strong></td>
                         <td class="text-end"><strong><?= formatLBP($salary['net_salary_lbp']) ?></strong></td>
-                        <td class="text-end text-muted"><?= formatUSD($salary['net_salary_usd']) ?></td>
+                        <td class="text-end text-muted"><?= formatUSD(rowUsd($salary, 'net_salary_usd', 'net_salary_lbp')) ?></td>
                     </tr>
                     <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= formatLBP($salary['family_allowance_lbp']) ?></td><td></td></tr>
                     <tr><td>Transport</td><td class="text-end text-success">+<?= money($salary['transport_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr style="background:#fff3cd;color:#000">
                         <td style="font-size:18px"><strong>💰 TOTAL DÛ / صافي الراتب المستحق للدفع</strong></td>
                         <td class="text-end" style="font-size:18px"><strong><?= formatLBP($salary['total_due_lbp']) ?></strong></td>
-                        <td class="text-end" style="font-size:16px"><strong><?= formatUSD($salary['total_due_usd']) ?></strong></td>
+                        <td class="text-end" style="font-size:16px"><strong><?= formatUSD(rowUsd($salary, 'total_due_usd', 'total_due_lbp')) ?></strong></td>
                     </tr>
                 </table>
 
@@ -523,7 +523,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                     <tbody>
                         <?php $mpT = ['net'=>0,'due'=>0,'due_usd'=>0.0,'n'=>0];
                         foreach ($list as $r):
-                            if ($r['is_calculated']) { $mpT['net'] += (int)$r['net_salary_lbp']; $mpT['due'] += (int)$r['total_due_lbp']; $mpT['due_usd'] += (float)$r['total_due_usd']; $mpT['n']++; }
+                            if ($r['is_calculated']) { $mpT['net'] += (int)$r['net_salary_lbp']; $mpT['due'] += (int)$r['total_due_lbp']; $mpT['due_usd'] += rowUsd($r, 'total_due_usd', 'total_due_lbp'); $mpT['n']++; }
                         ?>
                             <tr>
                                 <td><strong><?= e($r['employee_code']) ?></strong></td>
@@ -533,7 +533,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                                 <td><?= e(gradeDisplay($r)) ?></td>
                                 <td><?= $r['is_calculated'] ? formatLBP($r['net_salary_lbp']) : '—' ?></td>
                                 <td><strong><?= $r['is_calculated'] ? formatLBP($r['total_due_lbp']) : '—' ?></strong></td>
-                                <td><?= $r['is_calculated'] ? formatUSD($r['total_due_usd']) : '—' ?></td>
+                                <td><?= $r['is_calculated'] ? formatUSD(rowUsd($r, 'total_due_usd', 'total_due_lbp')) : '—' ?></td>
                                 <td>
                                     <?php if ($r['is_calculated']): ?>
                                         <span class="badge badge-success">✓ Calculé / محتسَب</span>

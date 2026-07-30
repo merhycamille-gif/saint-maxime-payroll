@@ -271,7 +271,7 @@ if (in_array($form, $imageForms)) {
         $tw = (int)($db->query("SELECT COALESCE(SUM(base_plus_echelon_lbp+extra_lbp+prime_fixe_lbp),0)
                                 FROM monthly_salaries WHERE employee_id=" . (int)$emp['id'] . " AND is_calculated=1")->fetchColumn());
         $common['total_wages'] = $tw ? formatLBP($tw, false) : '';
-        $common['eos_amount']  = $tw ? formatLBP((int)round($tw * 0.085), false) : '';
+        $common['eos_amount']  = $tw ? formatLBP((int)round($tw * rateFrac('end_of_service_rate', $month, $year, 8.5)), false) : '';
 
         // بيانات ر6 السنوية (كشف إفرادي): مجاميع السنة الدراسية المختارة
         if ($form === 'tax_r6' || $form === 'tax_r6t') {
@@ -325,7 +325,7 @@ if (in_array($form, $imageForms)) {
         $bb = $bq->fetch();
         $cnM = (int)($bb['m3'] ?? 0) + (int)($bb['m8'] ?? 0);
         $cnE = (int)($bb['eos'] ?? 0); $cnF = (int)($bb['fam6'] ?? 0);
-        if ((int)($bb['m3'] ?? 0)) $w = (int)round($bb['m3'] / 0.03);
+        if ((int)($bb['m3'] ?? 0)) $w = (int)round($bb['m3'] / rateFrac('cnss_employee_rate', $month, $year, 3));
         if ($form === 'cnss_contrib_monthly') $tg['n'] = $bb['n'] ?? 0;
         $data['count']      = (string)(int)($tg['n'] ?? 0);
         $data['gross']      = formatLBP((int)($tg['gross'] ?? 0), false);
@@ -347,7 +347,7 @@ if (in_array($form, $imageForms)) {
         $mq = $db->prepare("SELECT month, SUM(cnss_amount_lbp) m3 FROM monthly_salaries ms
                             WHERE ms.school_year=? AND " . schoolScopeWhere('ms.school_id') . " GROUP BY month");
         $mq->execute([$schoolYear]);
-        $bym = []; foreach ($mq->fetchAll() as $r) $bym[(int)$r['month']] = (int)$r['m3'] ? (int)round($r['m3']/0.03) : 0;
+        $bym = []; foreach ($mq->fetchAll() as $r) $bym[(int)$r['month']] = (int)$r['m3'] ? (int)round($r['m3']/rateFrac('cnss_employee_rate', (int)$r['month'], $year, 3)) : 0;
         $ys = 24.8; $dy = 1.72; $cols = [17, 28.5, 40];
         foreach ([1,2,3,4,5,6,7,8,9,10,11,12] as $i => $mn) {
             if (empty($bym[$mn])) continue;
@@ -780,7 +780,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     $mq->execute(array_merge($yp, [$schoolYear]));
     $byMonth = []; $brM = ['m3'=>0,'m8'=>0,'eos'=>0,'fam6'=>0,'ex'=>0,'ai'=>0,'ex_usd'=>0.0,'ai_usd'=>0.0];
     foreach ($mq->fetchAll() as $r) {
-        $byMonth[(int)$r['month']] = (int)$r['m3'] ? (int)round($r['m3']/0.03) : 0;
+        $byMonth[(int)$r['month']] = (int)$r['m3'] ? (int)round($r['m3']/rateFrac('cnss_employee_rate', (int)$r['month'], $year, 3)) : 0;
         $brM['m3']+=(int)$r['m3']; $brM['m8']+=(int)$r['m8']; $brM['eos']+=(int)$r['eos']; $brM['fam6']+=(int)$r['fam6'];
         $brM['ex']+=(int)$r['ex']; $brM['ai']+=(int)$r['ai']; $brM['ex_usd']+=(float)$r['ex_usd']; $brM['ai_usd']+=(float)$r['ai_usd'];
     }
@@ -790,8 +790,8 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     $cEos     = $brM['eos'];                        // نهاية الخدمة ٨.٥٪ (للموظفين)
     $cFamily  = $brM['fam6'];                       // التعويضات العائلية ٦٪ (للموظفين)
     $cTotal   = $cMaladie + $cEos + $cFamily;
-    $baseEos  = $cEos    ? (int)round($cEos/0.085) : 0;
-    $baseFam  = $cFamily ? (int)round($cFamily/0.06) : 0;
+    $baseEos  = $cEos    ? (int)round($cEos/rateFrac('end_of_service_rate', $month, $year, 8.5)) : 0;
+    $baseFam  = $cFamily ? (int)round($cFamily/rateFrac('family_compensation_rate', $month, $year, 6)) : 0;
 ?>
 <div class="official-doc cnss-form rtl" id="ppExportArea">
     <div class="cnss-head">الصندوق الوطني للضمان الاجتماعي — جانب صاحب العمل</div>
@@ -1665,9 +1665,9 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         WHERE e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
     $q3->execute($params); $fpaid = (int)$q3->fetchColumn();
     // الاشتراك المخزّن لكل فرع، والأجور = الاشتراك ÷ المعدل (الأساس الفعلي بعد الحد الأقصى)
-    $c1=(int)$a['c']; $n1=(int)$a['n']; $w1=$c1 ? (int)round($c1/0.11) : 0;
-    $c2=(int)$t['c']; $n2=(int)$t['n']; $w2=$c2 ? (int)round($c2/0.085) : 0;
-    $c3=(int)$fam['c']; $n3=(int)$fam['n']; $w3=$c3 ? (int)round($c3/0.06) : 0;
+    $c1=(int)$a['c']; $n1=(int)$a['n']; $w1=$c1 ? (int)round($c1/cnssTotalFrac($month, $year)) : 0;
+    $c2=(int)$t['c']; $n2=(int)$t['n']; $w2=$c2 ? (int)round($c2/rateFrac('end_of_service_rate', $month, $year, 8.5)) : 0;
+    $c3=(int)$fam['c']; $n3=(int)$fam['n']; $w3=$c3 ? (int)round($c3/rateFrac('family_compensation_rate', $month, $year, 6)) : 0;
     $total=$c1+$c2+$c3; $net=$total-$fpaid;
     $vars = [
         'school'=>$school['name_ar'], 'empno'=>$school['nssf_employer_number'], 'year'=>$year, 'plabel'=>$plabel,
@@ -1736,7 +1736,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     $sal = ofLatestSalary($db, $emp['id']);
     $lastSalary = $sal ? cnssSubjectWageLbp($sal, $emp) : 0;
     $lastExW = $sal ? extraWageLbp($sal) : 0; $lastAid = $sal ? aideCompLbp($sal) : 0;
-    $eos = round($totalWages*0.085);
+    $eos = round($totalWages*rateFrac('end_of_service_rate', $month, $year, 8.5));
 ?>
 <div class="official-doc cnss-form rtl" id="ppExportArea">
     <div class="cnss-head">الصندوق الوطني للضمان الاجتماعي
@@ -2263,7 +2263,7 @@ elseif ($form === 'payment_list'):
             $m8    = (int)$r['school_cnss_8_lbp'];
             // مجموع الرواتب ضمن الحد الأقصى = وعاء الضمان الفعلي الذي احتُسب عليه الاشتراك
             // (يُشتقّ من الاشتراك المخزّن ٣٪ فيبقى متّسقاً مع باقي الأعمدة حتى عند تطبيق السقف).
-            $capped= $m3 ? (int)round($m3 / 0.03) : (int)$r['taxable_base_lbp'];
+            $capped= $m3 ? (int)round($m3 / rateFrac('cnss_employee_rate', $month, $year, 3)) : (int)$r['taxable_base_lbp'];
             $mtot  = $m3 + $m8;
             $eos   = (int)$r['school_end_of_service_8_5_lbp'];
             $fam6  = (int)$r['school_family_comp_6_lbp'];

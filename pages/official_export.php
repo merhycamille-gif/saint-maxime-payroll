@@ -46,9 +46,9 @@ if ($form === 'cnss_contrib_monthly') {
         WHERE e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month=? AND " . schoolScopeWhere('ms.school_id'));
     $q3->execute($params); $fpaid = (int)$q3->fetchColumn();
 
-    $c1 = (int)$a['c']; $n1 = (int)$a['n']; $w1 = $c1 ? (int)round($c1 / 0.11) : 0;
-    $c2 = (int)$t['c']; $n2 = (int)$t['n']; $w2 = $c2 ? (int)round($c2 / 0.085) : 0;
-    $c3 = (int)$fam['c']; $n3 = (int)$fam['n']; $w3 = $c3 ? (int)round($c3 / 0.06) : 0;
+    $c1 = (int)$a['c']; $n1 = (int)$a['n']; $w1 = $c1 ? (int)round($c1 / cnssTotalFrac($month, $year)) : 0;
+    $c2 = (int)$t['c']; $n2 = (int)$t['n']; $w2 = $c2 ? (int)round($c2 / rateFrac('end_of_service_rate', $month, $year, 8.5)) : 0;
+    $c3 = (int)$fam['c']; $n3 = (int)$fam['n']; $w3 = $c3 ? (int)round($c3 / rateFrac('family_compensation_rate', $month, $year, 6)) : 0;
 
     $ok = officialTemplateExport(__DIR__ . '/../assets/templates/cnss_monthly.xlsx', [
         'D8'  => $school['name_ar'] ?? '',

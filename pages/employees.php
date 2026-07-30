@@ -269,6 +269,9 @@ function saveEmployeeBonuses($db, $employeeId) {
         if ($val <= 0) continue;
         $vt = (($rows['vtype'][$i] ?? 'amount') === 'percent') ? 'percent' : 'amount';
         $cur = (($rows['currency'][$i] ?? 'USD') === 'LBP') ? 'LBP' : 'USD';
+        // 🛡️ حارس خطأ العملة: مبلغ ضخم بالدولار = مبلغ ليرة كُتب والعملة بقيت دولاراً
+        $cur = sanitizeAmountCurrency($val, $cur, $curWarn);
+        if ($curWarn) $_SESSION['flash_info'] = $curWarn;
         $from = (isset($rows['from'][$i]) && $rows['from'][$i] !== '') ? (int)$rows['from'][$i] : null;
         $to = (isset($rows['to'][$i]) && $rows['to'][$i] !== '') ? (int)$rows['to'][$i] : null;
         $counters[$bt] = ($counters[$bt] ?? 0) + 1;

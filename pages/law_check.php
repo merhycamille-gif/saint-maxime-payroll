@@ -102,6 +102,75 @@ include __DIR__ . '/../includes/header.php';
     </div>
   </div>
 
+  <?php
+  /* =====================================================================
+   * 🔍 تدقيق سلامة الأرقام المخزَّنة (2026-07-30)
+   * «الأرقام تركب» تنطبق على البيانات نفسها لا العرض فقط: نكشف الصفوف التي
+   * لا تُفسِّر مكوّناتُها مجموعَها (رواتب منقولة/مستوردة أُدخلت كمبلغ واحد بلا
+   * تفصيل المحسومات). لا نخمّن أرقاماً ولا نعدّل شيئاً — نعرضها ليصحّحها المستخدم.
+   * =================================================================== */
+  $auditYear = ($lcYear === 'all') ? currentSchoolYear() : $lcYear;
+  $scAud = schoolScopeSql('e.school_id');
+  $audSt = $db->prepare("SELECT ms.employee_id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+             e.employee_type, e.school_id, COUNT(*) n,
+             MAX(ABS(ms.total_retenues_lbp - (ms.cnss_amount_lbp + ms.caisse_amount_lbp + ms.income_tax_lbp + ms.eoc_grade_lbp))) gapDed,
+             MAX(ABS(ms.net_salary_lbp - ((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp))) gapNet
+        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+       WHERE e.is_deleted = 0 AND ms.school_year = ?" . $scAud . "
+         AND (ABS(ms.total_retenues_lbp - (ms.cnss_amount_lbp + ms.caisse_amount_lbp + ms.income_tax_lbp + ms.eoc_grade_lbp)) > 1
+              OR ABS(ms.net_salary_lbp - ((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp)) > 1)
+       GROUP BY ms.employee_id ORDER BY gapDed DESC, gapNet DESC");
+  $audSt->execute([$auditYear]);
+  $audRows = $audSt->fetchAll();
+  ?>
+  <div class="card">
+    <div class="card-header"><h3>
+      <i class="fas fa-calculator"></i> <span dir="ltr">Cohérence des montants stockés</span>
+      <div style="font-size:0.85em;font-weight:600;opacity:0.9">تدقيق سلامة الأرقام المخزَّنة — <?= e($auditYear) ?></div>
+    </h3></div>
+    <div class="card-body">
+      <?php if (!$audRows): ?>
+        <div class="alert alert-success" style="margin:0">
+          <i class="fas fa-check-circle"></i>
+          كل الأرقام المخزَّنة متماسكة: مكوّنات المحسومات تساوي مجموعها، والصافي = الإجمالي − المحسومات في كل الصفوف.
+        </div>
+      <?php else: ?>
+        <div class="alert alert-warning">
+          <i class="fas fa-triangle-exclamation"></i>
+          <strong><?= count($audRows) ?></strong> موظف عنده صفوف رواتب <strong>مبالغها لا تُفسِّرها مكوّناتها</strong> —
+          غالباً رواتب «منقولة» أُدخلت كمبلغ واحد (صافي/مستحق) بلا تفصيل الأساس والمحسومات، فتظهر الضريبة أو الصندوق صفراً
+          مع أنّ المحسوم أكبر. التقارير تعرض المخزَّن كما هو، فيبقى «مجموع المحسومات» أكبر من مجموع أعمدته.
+          <br><strong>ما العمل:</strong> افتح ملف الأستاذ وأدخِل إعداد راتبه (الأساس/العقد) ثم اضغط «احتساب السنة» ليُبنى راتبه من القانون بمكوّنات كاملة.
+          <span class="text-muted">(البرنامج لا يخمّن أرقاماً ولا يعدّلها من تلقائه.)</span>
+        </div>
+        <table class="table">
+          <thead><tr>
+            <th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>École / المدرسة</th>
+            <th style="text-align:center">Mois / أشهر</th>
+            <th style="text-align:center">Écart déductions / فجوة المحسومات</th>
+            <th style="text-align:center">Écart net / فجوة الصافي</th>
+            <th class="no-print"></th>
+          </tr></thead>
+          <tbody>
+          <?php foreach ($audRows as $ar): ?>
+            <tr>
+              <td><strong><?= e(trim($ar['first_name_ar'] . ' ' . $ar['last_name_ar']) ?: trim($ar['first_name_fr'] . ' ' . $ar['last_name_fr'])) ?></strong></td>
+              <td><small><?= e(employeeTypeLabel($ar['employee_type'])) ?></small></td>
+              <td><small><?= e(schoolNameById((int)$ar['school_id'], 'ar')) ?></small></td>
+              <td style="text-align:center"><?= (int)$ar['n'] ?></td>
+              <td style="text-align:center;color:<?= (float)$ar['gapDed'] > 1 ? '#c0392b' : '#888' ?>"><?= (float)$ar['gapDed'] > 1 ? formatLBP($ar['gapDed']) : '—' ?></td>
+              <td style="text-align:center;color:<?= (float)$ar['gapNet'] > 1 ? '#c0392b' : '#888' ?>"><?= (float)$ar['gapNet'] > 1 ? formatLBP($ar['gapNet']) : '—' ?></td>
+              <td class="no-print" style="text-align:center">
+                <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$ar['employee_id'] ?>" class="btn btn-sm btn-light"><i class="fas fa-user-pen"></i> ملف الأستاذ</a>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      <?php endif; ?>
+    </div>
+  </div>
+
   <!-- تفصيل لكل مدرسة (عند فحص أكثر من مدرسة) -->
   <?php if (count($bySchool) > 1): ?>
   <div class="card">
