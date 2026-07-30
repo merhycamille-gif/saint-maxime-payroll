@@ -23,7 +23,7 @@ $pageSection = [
     'employees'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','law_check'=>'personnel',
     'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie',
     'reports'=>'rapports','tax'=>'rapports',
-    'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme',
+    'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
 ];
 $sec = $pageSection[$currentPage] ?? 'dashboard';
 [$accentColor, $accentBg] = $sectionColors[$sec];
@@ -237,6 +237,13 @@ document.addEventListener('submit', function (e) {
             <a href="<?= BASE_URL ?>pages/backup.php" class="<?= $currentPage === 'backup' ? 'active' : '' ?>">
                 <i class="fas fa-database"></i>
                 <span>Sauvegarde / نسخة احتياطية</span>
+            </a>
+            <?php endif; ?>
+
+            <?php if (isAdmin()): ?>
+            <a href="<?= BASE_URL ?>pages/health_check.php" class="<?= $currentPage === 'health_check' ? 'active' : '' ?>">
+                <i class="fas fa-stethoscope"></i>
+                <span>Contrôle de santé / فحص صحّة البرنامج</span>
             </a>
             <?php endif; ?>
 

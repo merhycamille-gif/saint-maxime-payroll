@@ -565,6 +565,27 @@ check('حماية: الحقول المصفوفة بالفورمات محصّنة
       && strpos((string)file_get_contents(__DIR__ . '/../pages/schools.php'), "(array)(\$_POST['sig_name']") !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/salary_scales.php'), "(array)(\$_POST['new_salary_2017']") !== false);
 
+/* =====================================================================
+ * 18) صفحة «فحص صحّة البرنامج» (2026-07-30): يفحص المستخدمُ البرنامجَ بنفسه
+ * =================================================================== */
+$hcSrc = (string)file_get_contents(__DIR__ . '/../pages/health_check.php');
+$hdSrc2 = (string)file_get_contents(__DIR__ . '/../includes/header.php');
+check('فحص الصحّة: الصفحة موجودة وللمدير فقط وقراءة فقط',
+      $hcSrc !== '' && strpos($hcSrc, 'if (!isAdmin())') !== false
+      && preg_match('/\b(UPDATE|DELETE|INSERT|ALTER)\s+(?!.*health_log_since)/i', preg_replace('/\/\*.*?\*\/|\/\/[^\n]*/s', '', $hcSrc)) === 0);
+check('فحص الصحّة: مربوطة بالقائمة الجانبية', strpos($hdSrc2, 'pages/health_check.php') !== false);
+check('فحص الصحّة: تفصل خطأ البرنامج عن بيانات تحتاج قرار المستخدم',
+      strpos($hcSrc, "\$type = 'review'") !== false && strpos($hcSrc, '$reviewAll') !== false);
+check('فحص الصحّة: قراءة تاريخ سجلّ Apache تتجاهل الميكروثانية (وإلّا احتُسب القديم جديداً)',
+      strpos($hcSrc, "preg_replace('/\\.\\d+/', '', \$dm[1])") !== false);
+check('فحص الصحّة: زرّ تصفير سجلّ التحذيرات محميّ (POST + CSRF)',
+      strpos($hcSrc, "'reset_log'") !== false && strpos($hcSrc, 'requireCsrf()') !== false
+      && strpos($hcSrc, 'health_log_since') !== false);
+// تشغيل فعلي: الصفحة تعطي «لا خطأ برمجي»
+$hcOut = renderPage('pages/health_check.php', [], ['extra','aide','transport']);
+check('تشغيل فعلي: صفحة فحص الصحّة تقول «لا خطأ برمجي واحد»',
+      strpos($hcOut, 'لا خطأ برمجي واحد') !== false, 'len=' . strlen($hcOut));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
