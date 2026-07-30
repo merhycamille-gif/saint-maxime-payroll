@@ -28,7 +28,7 @@ require_once $PROJ . '/includes/functions.php';
 $db = getDB();
 
 // ---------- عارض صفحات داخلي (كل صفحة بعملية فرعية لتفادي إعادة تعريف الدوال) ----------
-function renderPage(string $rel, array $get, array $comp): string {
+function renderPage(string $rel, array $get, array $comp, array $schoolIds = []): string {
     global $PROJ;
     $runner = __DIR__ . '/_render_one.php';
     // الوسائط تمرَّر base64 (اقتباسات JSON تتخربط بسطر أوامر ويندوز)
@@ -40,6 +40,8 @@ $PROJ = dirname(__DIR__);
 session_start();
 $_SESSION += ['user_id'=>1,'username'=>'admin','full_name'=>'RegCheck','role'=>'superadmin','lang'=>'ar'];
 $_SESSION['salary_comp'] = json_decode(base64_decode($argv[3] ?? ''), true) ?: [];
+$__sch = json_decode(base64_decode($argv[4] ?? ''), true) ?: [];
+if ($__sch) $_SESSION['active_schools'] = $__sch; // نطاق مدرسة محدّدة (للنماذج المؤسّسية)
 $_GET = json_decode(base64_decode($argv[2] ?? ''), true) ?: [];
 $_SERVER['REQUEST_URI'] = '/x';
 chdir(dirname($PROJ . '/' . $argv[1]));
@@ -48,7 +50,8 @@ try { include $PROJ . '/' . $argv[1]; echo ob_get_clean(); }
 catch (Throwable $e) { ob_end_clean(); echo 'FATAL: ' . $e->getMessage(); }
 PHP);
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner) . ' '
-         . escapeshellarg($rel) . ' ' . base64_encode(json_encode($get)) . ' ' . base64_encode(json_encode($comp));
+         . escapeshellarg($rel) . ' ' . base64_encode(json_encode($get)) . ' ' . base64_encode(json_encode($comp))
+         . ' ' . base64_encode(json_encode($schoolIds));
     return (string)shell_exec($cmd . ' 2>NUL');
 }
 $noFatal = fn(string $h) => strpos($h, 'FATAL') !== 0 && stripos($h, 'Fatal error') === false && strlen($h) > 5000;
@@ -374,6 +377,116 @@ check('النسخ الاحتياطي: تدفّق غير مخزّن (لا انف�
 $repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
 check('الكشف الشهري: مفاتيح مجاميع الدولار/المركّب مهيّأة (لا Undefined)',
       preg_match('/\$totals = \[[^\]]*composed_usd/s', $repSrc) === 1);
+
+/* =====================================================================
+ * 15) الفحص الشامل — الأمان والصلاحيات (2026-07-30)
+ * =================================================================== */
+$fnSrc2 = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
+$instSrc = (string)file_get_contents(__DIR__ . '/../install.php');
+check('أمان: install.php مُحيَّد (410) ولا يشغّل schema',
+      strpos($instSrc, 'http_response_code(410)') !== false
+      && strpos($instSrc, 'file_get_contents(__DIR__') === false // لا قراءة/تشغيل لملفات sql
+      && strpos($instSrc, '->exec(') === false && strpos($instSrc, 'new PDO') === false);
+check('أمان: حساب المدرسة متعدّد المدارس لا يرى تقارير مدارس أخرى (viewerAllowedSchoolIds)',
+      preg_match('/function selectedReportSchoolIds.*?isViewer\(\).*?viewerAllowedSchoolIds\(\)/s', $fnSrc2) === 1);
+check('أمان: مبدّلات العرض والبحث مسموحة لحساب المدرسة (لا يُطرَد)',
+      strpos($fnSrc2, "'switch_currency.php', 'switch_salarycomp.php', 'ajax_search.php'") !== false);
+check('أمان: requireWriteAction معرَّفة (صلاحية + مصدر داخلي)',
+      strpos($fnSrc2, 'function requireWriteAction') !== false
+      && strpos($fnSrc2, 'HTTP_SEC_FETCH_SITE') !== false && strpos($fnSrc2, '!canEdit()') !== false);
+$getWritePages = ['annual_slip'=>3,'grades'=>4,'employees'=>1,'bonuses'=>1,'classes'=>1,'exceptional_laws'=>1,
+                  'exchange_rates'=>1,'rates_history'=>1,'social_security'=>1,'salary_scales'=>1,'tax_brackets'=>2,
+                  'users'=>2,'schools'=>1];
+$gwMissing = [];
+foreach ($getWritePages as $pg => $minN) {
+    $c = preg_match_all('/requireWriteAction\(/', (string)file_get_contents(__DIR__ . "/../pages/$pg.php"));
+    if ($c < $minN) $gwMissing[] = "$pg($c/$minN)";
+}
+check('أمان: كل عمليات التعديل عبر الروابط محميّة بـrequireWriteAction', empty($gwMissing), $gwMissing ? implode(' ', $gwMissing) : '13 صفحة');
+check('أمان: القوانين الوطنية (نِسَب/ضمان/سلسلة/شطور) تعديلها للمدير فقط',
+      count(array_filter(['rates_history','social_security','salary_scales','tax_brackets'],
+        fn($p) => strpos((string)file_get_contents(__DIR__ . "/../pages/$p.php"), 'قوانين وطنية مشتركة') !== false)) === 4);
+check('أمان: الإعدادات العامة بقائمة بيضاء وللمدير فقط',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/settings.php'), '$allowedSettings') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/settings.php'), 'if (!isAdmin())') !== false);
+$usrSrc = (string)file_get_contents(__DIR__ . '/../pages/users.php');
+check('أمان: دور «مدير عام» ينشئه/يعدّله المدير العام فقط',
+      strpos($usrSrc, "if (isSuperAdmin()) \$ROLES['superadmin']") !== false
+      && strpos($usrSrc, "\$cur['role'] === 'superadmin' && !isSuperAdmin()") !== false);
+check('أمان: تجديد معرّف الجلسة عند الدخول (session fixation)',
+      strpos((string)file_get_contents(__DIR__ . '/../login.php'), 'session_regenerate_id(true)') !== false);
+$swOk = count(array_filter(['switch_currency','switch_lang','switch_salarycomp','switch_school','switch_year'],
+    fn($s) => strpos((string)file_get_contents(__DIR__ . "/../$s.php"), 'safeBackUrl()') !== false));
+check('أمان: رجوع المبدّلات مقيّد بنفس الموقع (safeBackUrl)', $swOk === 5, "$swOk/5");
+
+/* =====================================================================
+ * 16) الفحص الشامل — صحّة الأرقام والأعداد (2026-07-30)
+ * =================================================================== */
+$ofSrc = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
+check('تصريح ر5/ر10: لا تنزيل للنقل من مبلغ لا يحتويه (السطور تترابط)',
+      preg_match('/\$paid\s+=\s+\$gross \+ \$trans;/', $ofSrc) === 1
+      && preg_match('/\$net\s+=\s+\$paid - \$trans - \$other;/', $ofSrc) === 1
+      && strpos($ofSrc, '$net=$gross-$trans;') === false);
+// ترابط فعلي بالأرقام: ١٢٠−١٣٠−١٥٠ = ١٦٠ و ١٦٠−١٧٠ = ١٨٠
+$r5 = renderPage('pages/official_forms.php', ['form' => 'tax_r5', 'school_year' => '2025-2026'], ['extra','aide','transport'], [2]); // مدرسة واحدة (التصريح مؤسّسي)
+$r5t = preg_replace('/<[^>]+>/u', ' ', $r5); $r5v = [];
+foreach (['١٢٠','١٣٠','١٥٠','١٦٠','١٧٠','١٨٠'] as $cd) {
+    if (preg_match('/' . preg_quote($cd, '/') . '\s+([^0-9]{0,70}?)\s*([0-9,]{7,})/u', $r5t, $mm)) $r5v[$cd] = (int)str_replace(',', '', $mm[2]);
+}
+check('تصريح ر5: ١٢٠ − ١٣٠ − ١٥٠ = ١٦٠',
+      isset($r5v['١٢٠'],$r5v['١٣٠'],$r5v['١٥٠'],$r5v['١٦٠']) && ($r5v['١٢٠']-$r5v['١٣٠']-$r5v['١٥٠']) === $r5v['١٦٠']);
+check('تصريح ر5: ١٦٠ − ١٧٠ = ١٨٠',
+      isset($r5v['١٦٠'],$r5v['١٨٠']) && ($r5v['١٦٠'] - ($r5v['١٧٠'] ?? 0)) === $r5v['١٨٠']);
+check('التقرير العام: «الصافية مع النقل» والمجموع يتبعان زرّ النقل',
+      strpos($ofSrc, '$transShown = salaryCompHas(\'transport\') ? $trans : 0;') !== false
+      && strpos($ofSrc, '$netWith=$net+$trans;') === false);
+check('النماذج المؤسّسية: تطلب مدرسة واحدة (لا تصريح بلا رقم صاحب عمل)',
+      strpos($ofSrc, '$institutionForms') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/official_export.php'), 'if (!$school) {') !== false);
+check('النماذج: السنة/الشهر مُتحقَّق منهما (لا فلتر سنة فارغ)',
+      strpos($ofSrc, "preg_match('/^\\d{4}-\\d{4}\$/', (string)\$schoolYear)") !== false);
+$asSrc = (string)file_get_contents(__DIR__ . '/../pages/annual_slip.php');
+$aeSrc = (string)file_get_contents(__DIR__ . '/../pages/annual_slip_export.php');
+check('الكشف السنوي: الإجمالي/الصافي/المستحق تتبع إخفاء الإضافي والمكافأة (شاشة+تصدير)',
+      strpos($asSrc, '$hidRow') !== false && strpos($asSrc, "\$money(\$r['brut'] - \$hR, true)") !== false
+      && strpos($aeSrc, "\$r['brut'] - \$hR") !== false && strpos($aeSrc, "\$t['net'] - \$hT") !== false);
+check('إفادة الضمان: سطر النقل يظهر عند اختياره فيساوي المجموع',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), '$attTrans = $incTrans') !== false);
+$elSrc = (string)file_get_contents(__DIR__ . '/../pages/exceptional_laws.php');
+check('القوانين الاستثنائية: العدد = أساتذة فعليون (DISTINCT + غير محذوفين + نطاق المدارس)',
+      strpos($elSrc, 'COUNT(DISTINCT gh.employee_id)') !== false && strpos($elSrc, "schoolScopeSql('e.school_id')") !== false);
+$lawCnt = (int)$db->query("SELECT COUNT(DISTINCT gh.employee_id) FROM employee_grade_history gh JOIN employees e ON e.id=gh.employee_id WHERE gh.law_reference='102' AND e.is_deleted=0")->fetchColumn();
+$lawRows = (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE law_reference='102'")->fetchColumn();
+check('القوانين الاستثنائية: العدد أقل من عدد الصفوف (الدرجة مفردة صفّاً لكل وحدة)', $lawCnt > 0 && $lawCnt < $lawRows, "أساتذة=$lawCnt صفوف=$lawRows");
+check('الصفوف: عدّ مستعملي الصفّ مقيّد بنطاق المدارس',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/classes.php'), "schoolScopeSql()") !== false);
+check('«كل المدارس» = الفاعلة فقط (المعطّلة لا تُدمَج بالمجاميع)',
+      strpos($fnSrc2, 'function allActiveSchoolIdsCached') !== false
+      && preg_match('/function schoolScopeSql.*?allActiveSchoolIdsCached\(\)/s', $fnSrc2) === 1
+      && preg_match('/function reportSchoolSql.*?allActiveSchoolIdsCached\(\)/s', $fnSrc2) === 1);
+check('التقارير: منتقي المدارس لا يعرض المعطّلة',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/reports.php'), '$schools = allSchools();') !== false);
+check('حفظ العلاوات: «كل السنين» تُخزَّن بالسنة الحالية لا \'all\'',
+      strpos($fnSrc2, 'function writeSchoolYear') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/bonuses.php'), 'writeSchoolYear()') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'writeSchoolYear()') !== false);
+$noAllYear = (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE school_year = 'all'")->fetchColumn();
+check('لا علاوة مخزَّنة بسنة \'all\' بالبيانات', $noAllYear === 0, "n=$noAllYear");
+$reSrc = (string)file_get_contents(__DIR__ . '/../pages/reports_export.php');
+check('التصدير = الشاشة: لائحة الموظفين فيها صفّ مجاميع الأعمدة المالية',
+      strpos($reSrc, '$sumCols = [') !== false && strpos($reSrc, "\$row[] = isset(\$sumCols[\$c]) ? formatLBP(\$colTot[\$c]) : '';") !== false);
+check('التصدير = الشاشة: عمود الشهادة يعرض وظيفة الموظف الإداري بالاثنين',
+      strpos($repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php'), "\$r['employee_type'] === 'employe' ? jobTitleLabel(\$r['job_title'] ?? '') : diplomaLabel(\$r['diploma'])") !== false);
+check('تقرير الصندوق: لا صفّ مجاميع أصفار على شهر بلا بيانات',
+      strpos($repSrc, 'لا تطبع صفّ مجاميع أصفار') !== false);
+check('الضريبة: مجموع «الراتب الخاضع للضريبة» يظهر بالشاشة (كان فارغاً)',
+      strpos($repSrc, "'txb'=>(int)\$r['taxable_base_lbp']") !== false && strpos($repSrc, "formatLBP(\$a['txb'])") !== false);
+check('رقم الصندوق: شفاء ذاتي يمنع كتابة رقم مدرسة على مؤسسات أخرى',
+      strpos($fnSrc2, 'function healCaisseNumbers') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'healCaisseNumbers();') !== false
+      && strpos($ofSrc, "UPDATE schools SET caisse_number='75210'") === false);
+$badCaisse = (int)$db->query("SELECT COUNT(*) FROM schools WHERE caisse_number='75210' AND name_ar NOT LIKE 'مدرسة%'")->fetchColumn();
+check('رقم الصندوق: لا مؤسسة غير المدرسة تحمل رقمها', $badCaisse === 0, "n=$badCaisse");
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

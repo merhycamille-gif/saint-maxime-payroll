@@ -288,14 +288,39 @@ if ($report === 'monthly_summary') {
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
     foreach ($sel as $c) $head[] = $cols[$c][0];
     $rep->head($head);
+    // 🔴 تطابق الشاشة مع التصدير («الأرقام تركب»): صفّ مجاميع الأعمدة المالية — كان الملف
+    // المُصدَّر يعرض أعمدة مبالغ بلا أي مجموع، بينما الشاشة تعرض المجموع.
+    $sumCols = [
+        'salary'     => fn($r) => $r['employee_type'] === 'employe'
+                            ? (float)($bonusMap[(int)$r['id']]['base_plus_echelon_lbp'] ?? 0)
+                            : (float)($scaleMap[(int)round($r['current_grade'])] ?? 0),
+        'extra_wage' => fn($r) => isset($bonusMap[(int)$r['id']]) ? extraWageLbp($bonusMap[(int)$r['id']]) : 0,
+        'aide'       => fn($r) => isset($bonusMap[(int)$r['id']]) ? aideCompLbp($bonusMap[(int)$r['id']]) : 0,
+        'transport'  => fn($r) => isset($bonusMap[(int)$r['id']]) ? (float)$bonusMap[(int)$r['id']]['transport_lbp'] : 0,
+        'composed'   => fn($r) => isset($bonusMap[(int)$r['id']]) ? composedSalaryLbp($bonusMap[(int)$r['id']]) : 0,
+    ];
+    $colTot = array_fill_keys(array_keys($sumCols), 0.0);
     $cur = null; $rn = 0;
     foreach ($data as $r) {
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
         $rn++; $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        foreach ($sel as $c) $row[] = ($cols[$c][1])($r);
+        foreach ($sel as $c) {
+            $row[] = ($cols[$c][1])($r);
+            if (isset($sumCols[$c])) $colTot[$c] += $sumCols[$c]($r);
+        }
         $rep->row($row);
     }
-    if ($data) { $pad = ($schCol ? 2 : 1); $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'العدد الإجمالي: ' . count($data); $rep->totalRow($row); }
+    if ($data) {
+        $pad = ($schCol ? 2 : 1);
+        $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'المجموع (' . count($data) . ')';
+        $hasMoneyCol = (bool)array_intersect($sel, array_keys($sumCols));
+        if ($hasMoneyCol) {
+            foreach ($sel as $c) $row[] = isset($sumCols[$c]) ? formatLBP($colTot[$c]) : '';
+        } else {
+            $row[$pad - 1] = 'العدد الإجمالي: ' . count($data);
+        }
+        $rep->totalRow($row);
+    }
 
 } elseif ($report === 'annual_totals') {
     $st = $db->prepare("SELECT COUNT(*) cnt, SUM(ms.net_salary_lbp) net, SUM(ms.total_due_lbp) total, SUM(ms.family_allowance_lbp) fam, SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax, SUM(ms.caisse_amount_lbp) caisse, SUM(ms.school_cnss_8_lbp) scnss, SUM(ms.school_eoc_6_lbp) seoc, SUM(ms.base_salary_lbp) base_sal, SUM(ms.base_plus_echelon_lbp) bpe, SUM(ms.extra_lbp+ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide, SUM(ms.transport_lbp) transport

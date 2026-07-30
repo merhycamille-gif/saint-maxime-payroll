@@ -44,8 +44,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'chang
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // 🔒 صلاحية: هذه إعدادات عامة تمسّ كل المدارس (سعر الصرف الافتراضي يعيد حساب الرواتب
+    // من 2017 لكل المدارس) — للمدير فقط.
+    if (!isAdmin()) {
+        $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'صلاحية المدير مطلوبة / Accès administrateur requis'];
+        header('Location: ' . BASE_URL . 'pages/settings.php');
+        exit;
+    }
+    // 🔴 قائمة بيضاء (كان `foreach ($_POST ...)` يكتب **أي** حقل مُرسَل كإعداد عام —
+    // فيُخزَّن توكن الـcsrf كإعداد، ويمكن لأي حقل زائد أن يطمس مفاتيح حسّاسة مثل
+    // teacher_form_deadline أو علامات الشفاء الذاتي yr_additions_backfilled_*).
+    $allowedSettings = ['current_exchange_rate', 'current_school_year', 'grades_baseline_year',
+                        'minimum_wage_lbp', 'school_name_ar', 'school_name_fr', 'school_address',
+                        'school_phone', 'teacher_form_deadline', 'teacher_form_allow_after'];
     $oldRate = getSetting('current_exchange_rate'); // لرصد تغيّر سعر الصرف الافتراضي
     foreach ($_POST as $k => $v) {
+        if (!in_array($k, $allowedSettings, true) || is_array($v)) continue;
         setSetting($k, trim((string)$v));
     }
     // سعر الصرف الافتراضي fallback أخير لرواتب بلا سعر شهري — أعِد الحساب تلقائياً إن تغيّر

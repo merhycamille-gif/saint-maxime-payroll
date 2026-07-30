@@ -59,6 +59,7 @@ function getYearCalcRoster($db, $typeFilter = '') {
 
 // احسب كل أشهر السنة الدراسية دفعة واحدة لهذا الأستاذ
 if ($action === 'calc_year' && $employeeId > 0) {
+    requireWriteAction(); // 🔒 قراءة-فقط ممنوع + مصدر داخلي فقط
     autoSwitchToEmployeeSchool($employeeId);
     requireSchoolSelected();
     $eC = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
@@ -81,6 +82,7 @@ if ($action === 'calc_year' && $employeeId > 0) {
 
 // احسب فترة محددة: من شهر/سنة إلى شهر/سنة (لكل أستاذ على حدة)
 if ($action === 'calc_range' && $employeeId > 0) {
+    requireWriteAction();
     autoSwitchToEmployeeSchool($employeeId);
     requireSchoolSelected();
     $fm = (int)($_GET['from_m'] ?? 0); $fy = (int)($_GET['from_y'] ?? 0);
@@ -110,6 +112,7 @@ if ($action === 'calc_range' && $employeeId > 0) {
 
 // احتساب الكل للسنة الدراسية (كل أستاذ حسب أشهره) — حسب الفلتر
 if ($action === 'calc_all_year') {
+    requireWriteAction();
     requireSchoolSelected();
     $emps = getYearCalcRoster($db, $typeFilter); // الاحتساب على الفاعلين (يشمل غير المحتسَبين بعد)
     $nEmp = 0; $nMonths = 0;
@@ -140,6 +143,22 @@ function annualSlipHtml($db, $emp, $schoolYear) {
     // عدد أعمدة الجدول (تُطرح 4 أعمدة الأستاذ للموظف الإداري) — أعمدة الإضافي/المكافأة/النقل تتبع زرّ «الراتب يشمل»
     // (بطلب المستخدم: النقل خيار بإيده). ولما يكون النقل مخفياً، يُعرض «المستحق» بلا النقل لتبقى الأرقام راكبة.
     $showTrans = salaryCompHas('transport');
+    // 🔴 «الأرقام تركب» (قاعدة ملزِمة): الإضافي والمكافأة داخلان في الإجمالي والصافي والمستحق،
+    // فإذا أُخفي عمودهما وجب طرحهما من الثلاثة أيضاً — وإلّا ظهر إجماليٌّ لا يفسّره أي عمود
+    // (مثال حقيقي: أساس 1,695,000 وإجمالي 100,545,000 لأنّ 98.85 مليون إضافي مخفيّة).
+    // الطرح متوازن حسابياً: الإجمالي−المحسومات = الصافي، والصافي+العائلي+النقل = المستحق.
+    $hidRow = function ($r) {
+        return (salaryCompHas('extra') ? 0 : (int)($r['extra_wage'] ?? 0))
+             + (salaryCompHas('aide')  ? 0 : (int)($r['aide'] ?? 0));
+    };
+    $hidTot = function ($t) {
+        return (salaryCompHas('extra') ? 0 : (int)($t['extra_wage'] ?? 0))
+             + (salaryCompHas('aide')  ? 0 : (int)($t['aide'] ?? 0));
+    };
+    $hidTotUsd = function ($t) {
+        return (salaryCompHas('extra') ? 0.0 : (float)($t['extra_wage_usd'] ?? 0))
+             + (salaryCompHas('aide')  ? 0.0 : (float)($t['aide_usd'] ?? 0));
+    };
     $slipCols = ($isEmp ? 10 : 14) + compColsCount();
 
     ob_start();
@@ -224,7 +243,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <?php endif; ?>
                             <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['aide']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
-                            <td><?= $money($r['brut'], true) ?></td>
+                            <?php $hR = $hidRow($r); ?>
+                            <td><?= $money($r['brut'] - $hR, true) ?></td>
                             <?php if (!$isEmp): ?>
                             <td><?= $money($r['caisse']) ?></td>
                             <td><?= $money($r['eoc_grade']) ?></td>
@@ -232,10 +252,10 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td><?= $money($r['cnss']) ?></td>
                             <td><?= $money($r['income_tax']) ?></td>
                             <td><?= $money($r['total_retenues']) ?></td>
-                            <td><?= $money($r['net'], true) ?></td>
+                            <td><?= $money($r['net'] - $hR, true) ?></td>
                             <td><?= $money($r['family']) ?></td>
                             <?php if ($showTrans): ?><td><?= $money($r['transport']) ?></td><?php endif; ?>
-                            <td><?= $money($r['total_due'] - ($showTrans ? 0 : $r['transport']), true) ?></td>
+                            <td><?= $money($r['total_due'] - $hR - ($showTrans ? 0 : $r['transport']), true) ?></td>
                             <td class="sig-cell">&nbsp;</td>
                         <?php else: ?>
                             <td colspan="<?= $slipCols ?>" class="text-muted">—</td>

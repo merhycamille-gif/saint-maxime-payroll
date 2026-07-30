@@ -23,7 +23,21 @@ $year = (int)($_GET['year'] ?? date('Y'));
 $month = (int)($_GET['month'] ?? date('n'));
 $schoolYear = $_GET['school_year'] ?? activeSchoolYear();
 if ($schoolYear === 'all') $schoolYear = currentSchoolYear();
+// 🔒 تحقّق من شكل السنة: قيمة غير صالحة كانت تُفرِّغ فلتر السنة (yearEmploymentFilter)
+// فيُحتسب كل التاريخ بالتصاريح المؤسّسية، وتُسبّب «Undefined array key 1» بتفكيك السنة.
+if (!preg_match('/^\d{4}-\d{4}$/', (string)$schoolYear)) $schoolYear = currentSchoolYear();
+$month = ($month >= 1 && $month <= 12) ? $month : (int)date('n');
+$year  = ($year >= 2000 && $year <= 2100) ? $year : (int)date('Y');
 $school = currentSchool();
+// 🔵 النماذج المؤسّسية (تصاريح الضريبة والضمان) تُصدَر باسم مؤسسة واحدة ورقمها لدى الضمان.
+// في وضع «كل المدارس» كان $school = null فتُطبَع الترويسة فارغة وتُدمَج أرقام كل المدارس
+// في تصريح واحد بلا رقم صاحب عمل. الآن نطلب اختيار مدرسة بوضوح.
+$institutionForms = ['tax_r5','tax_r10','tax_r7','cnss_annual','cnss_contrib_monthly','cnss_contrib_annual','cnss_nominative_monthly'];
+if (in_array($form, $institutionForms, true) && !$school) {
+    $_SESSION['flash_error'] = 'هذا التصريح يُصدَر لمدرسة واحدة — اختر المدرسة من الأعلى أولاً. / Choisissez une seule école.';
+    header('Location: ' . BASE_URL . 'pages/tax_declarations.php');
+    exit;
+}
 $lang = $_SESSION['lang'] ?? 'fr';
 
 // فلترا «موظفي الفترة» الموحّدان (نفس مصدر بيان صندوق التعويضات yearEmploymentFilter) —
@@ -551,23 +565,52 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
             SUM(ms.transport_lbp) transport,
             SUM(ms.transport_lbp/NULLIF(ms.exchange_rate,0)) transport_usd,
             SUM(ms.family_allowance_lbp) family,
+            SUM(ms.cnss_amount_lbp) cnss, SUM(ms.caisse_amount_lbp) caisse, SUM(ms.eoc_grade_lbp) eoc,
             SUM(ms.taxable_base_lbp) taxable, SUM(ms.income_tax_lbp) tax
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
         WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . " AND ms.school_year=? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id'));
     $q->execute(array_merge($yp, [$schoolYear]));
     $g = $q->fetch();
     [$gy1] = schoolYearToYears($schoolYear);
-    $gross=(int)($g['gross']??0); $trans=(int)($g['transport']??0); $fam=(int)($g['family']??0);
-    $net=$gross-$trans; $taxable=(int)($g['taxable']??0); $tax=(int)($g['tax']??0);
+    // 🔴 إصلاح 2026-07-30 (كان التصريح خاطئاً بمقدار النقل ≈34.7 مليار على كل المدارس):
+    // كان ١٠٠/١٢٠ «مجموع المبالغ المدفوعة» يُطبَع **بلا** النقل ثم يُنزَّل النقل في ١٣٠،
+    // فيخرج ١٦٠ ناقصاً النقل مرّةً أخرى — تنزيلٌ لشيء لم يُضَف أصلاً. والآن يترابط السطور:
+    //   ١٢٠ (كل المدفوع مع النقل) − ١٣٠ النقل − ١٥٠ (الصندوق ودرجة الصندوق، وهي التي
+    //   يحسمها المحرّك فعلاً من أساس الضريبة) = ١٦٠ ، وهي تساوي مجموع taxable_base المخزَّن
+    //   بالضبط (مُتحقَّق: فرق صفر). ثم ١٦٠ − ١٧٠ التنزيل العائلي/الشخصي = ١٨٠ الخاضع للضريبة
+    //   الذي حُسبت منه الضريبة ١٩٠ عبر الشطور. (الضمان لا يُحسَم من أساس الضريبة فلا يُدرَج.)
+    $gross=(int)($g['gross']??0); $trans=(int)($g['transport']??0);
+    $paid   = $gross + $trans;                                       // ١٠٠/١٢٠ كل ما دُفع فعلاً
+    $other  = (int)($g['caisse']??0) + (int)($g['eoc']??0);           // ١٥٠ ما يُحسم من أساس الضريبة
+    $net    = $paid - $trans - $other;                               // ١٦٠ = مجموع الأساس الخاضع قبل التنزيل
+    $tax    = (int)($g['tax']??0);
+    // ١٧٠ التنزيل العائلي/الشخصي: يُمنح **مرّة واحدة سنوياً لكل موظف** حسب وضعه الاجتماعي
+    // والتاريخ الساري (نفس مصدر المحرّك family_tax_deductions)، ومحدود بأساسه الخاضع.
+    $qDed = $db->prepare("SELECT e.id, e.social_status, SUM(ms.taxable_base_lbp) tb
+        FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
+        WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . " AND ms.school_year=?
+          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
+        GROUP BY e.id, e.social_status");
+    $qDed->execute(array_merge($yp, [$schoolYear]));
+    $dedAsOf = ($gy1 + 1) . '-01-01'; // منتصف السنة الدراسية (كانون الثاني) = التنزيل الساري للسنة المصرَّح عنها
+    $dedStmt = $db->prepare("SELECT annual_deduction FROM family_tax_deductions
+                              WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+    $exempt = 0; $dedCache = [];
+    foreach ($qDed->fetchAll() as $de) {
+        $ss = (string)$de['social_status'];
+        if (!array_key_exists($ss, $dedCache)) { $dedStmt->execute([$ss, $dedAsOf]); $dedCache[$ss] = (float)($dedStmt->fetchColumn() ?: 0); }
+        $exempt += (int)min($dedCache[$ss], (float)$de['tb']);
+    }
+    $taxable = max(0, $net - $exempt);                               // ١٨٠
     $rows = [
-        ['١٠٠','الرواتب وملحقاتها',$gross],
+        ['١٠٠','الرواتب وملحقاتها',$paid],
         ['١١٠','المنافع النقدية والعينية',0],
-        ['١٢٠','مجموع المبالغ المدفوعة',$gross],
+        ['١٢٠','مجموع المبالغ المدفوعة',$paid],
         ['١٣٠','ينزل: تعويضات نقل وانتقال',$trans],
         ['١٤٠','تعويضات تمثيل',0],
-        ['١٥٠','تنزيلات أخرى',0],
+        ['١٥٠','ينزل: صندوق التعويضات ودرجة الصندوق',$other],
         ['١٦٠','المبالغ الصافية',$net],
-        ['١٧٠','التنزيل العائلي',$fam],
+        ['١٧٠','التنزيل العائلي',$exempt],
         ['١٨٠','الرواتب والأجور الخاضعة للضريبة',$taxable],
         ['١٩٠','الضريبة المتوجبة',$tax],
     ];
@@ -1093,8 +1136,10 @@ elseif ($form === 'teacher_card'):
     // تركيب ذاتي: عمود «رقم المدرسة لدى صندوق التعويضات» في جدول المدارس
     try { $db->query("SELECT caisse_number FROM schools LIMIT 1"); }
     catch (Exception $e) { try { $db->exec("ALTER TABLE schools ADD COLUMN caisse_number VARCHAR(50) NULL COMMENT 'رقم المدرسة لدى صندوق التعويضات'"); } catch (Exception $e2) {} }
-    // تعبئة ذاتية لمرة واحدة: رقم القديس مكسيموس لدى الصندوق (من النموذج الورقي الرسمي) — لا يمسّ قيمة مُدخلة
-    try { $db->exec("UPDATE schools SET caisse_number='75210' WHERE (caisse_number IS NULL OR caisse_number='') AND (name_ar LIKE '%مكسيموس%' OR name_fr LIKE '%Maximos%' OR name_fr LIKE '%Maxime%')"); } catch (Exception $e) {}
+    // 🔴 أُزيلت التعبئة الذاتية بالاسم (2026-07-30): كان `LIKE '%مكسيموس%'` يطابق أيضاً
+    // «مركز البطريرك مكسيموس الخامس حكيم» (٣ مؤسسات) فكتب رقم صندوق المدرسة 75210 عندها،
+    // فكان بيانها الفصلي يُطبَع برقم مؤسسة أخرى تحت توقيع المدير وخَتمه.
+    // الرقم يُدخَل يدوياً من صفحة المدارس لكل مدرسة، والإصلاح الذاتي في healCaisseNumbers().
     $qNames = [1=>'الفصل الأول (كانون الثاني - شباط - آذار)', 2=>'الفصل الثاني (نيسان - أيار - حزيران)',
                3=>'الفصل الثالث (تموز - آب - أيلول)', 4=>'الفصل الرابع (تشرين الأول - تشرين الثاني - كانون الأول)'];
     $qShort = [1=>'الفصل الأول', 2=>'الفصل الثاني', 3=>'الفصل الثالث', 4=>'الفصل الرابع'];
@@ -1450,7 +1495,10 @@ elseif ($form === 'teacher_card'):
             $bpe=(int)($sd['bpe']??0); $bpeu=(float)($sd['bpe_usd']??0);
             $composed = $bpe + (salaryCompHas('extra')?$exW:0) + (salaryCompHas('aide')?$aid:0) + (salaryCompHas('transport')?$trans:0);
             $composedu = $bpeu + (salaryCompHas('extra')?$exWu:0) + (salaryCompHas('aide')?$aidu:0) + (salaryCompHas('transport')?$transu:0);
-            $netWith=$net+$trans; $tot=$netWith+$cnss+$eoc+$tax;
+            // 🔴 «الأرقام تركب»: عمود النقل يتبع زرّ «الراتب يشمل»، فإن كان مخفياً وجب
+            // ألّا يدخل في «الصافية مع النقل» ولا في «المجموع» — وإلّا ظهرت قفزة بلا عمود يفسّرها.
+            $transShown = salaryCompHas('transport') ? $trans : 0;
+            $netWith=$net+$transShown; $tot=$netWith+$cnss+$eoc+$tax;
             $T['base']+=$bse;$T['netNo']+=$net;$T['extra']+=$exW;$T['aide']+=$aid;$T['trans']+=$trans;$T['netWith']+=$netWith;$T['cnss']+=$cnss;$T['eoc']+=$eoc;$T['tax']+=$tax;$T['total']+=$tot;
             $T['extra_usd']+=$exWu;$T['aide_usd']+=$aidu;$T['trans_usd']+=$transu;$T['composed']+=$composed;$T['composed_usd']+=$composedu;
         ?>

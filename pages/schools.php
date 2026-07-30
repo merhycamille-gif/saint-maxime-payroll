@@ -94,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Soft delete
 if (isset($_GET['delete'])) {
+    requireWriteAction(); // 🔒 قراءة-فقط ممنوع + مصدر داخلي فقط
     $delId = (int)$_GET['delete'];
     // منع حذف المدرسة إذا فيها موظفين
     $count = $db->prepare("SELECT COUNT(*) FROM employees WHERE school_id = ? AND is_deleted = 0");

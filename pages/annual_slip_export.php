@@ -76,22 +76,28 @@ function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $
             $emit([$r['label'], '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
             continue;
         }
+        // 🔴 «الأرقام تركب» (مطابق للشاشة تماماً): الإضافي/المكافأة داخلان في الإجمالي
+        // والصافي والمستحق، فإن أُخفي عمودهما وجب طرحهما من الثلاثة أيضاً.
+        $hR = (salaryCompHas('extra') ? 0 : (int)($r['extra_wage'] ?? 0))
+            + (salaryCompHas('aide')  ? 0 : (int)($r['aide'] ?? 0));
         $emit([
             $r['label'], $r['base_shown'], ($r['grade_inc'] > 0 ? $r['grade_inc'] : ''), $r['cur_sal'],
             ($r['extra_wage'] > 0 ? $r['extra_wage'] : ''), ($r['aide'] > 0 ? $r['aide'] : ''),
-            $r['brut'], ($r['caisse'] > 0 ? $r['caisse'] : ''), ($r['eoc_grade'] > 0 ? $r['eoc_grade'] : ''),
+            $r['brut'] - $hR, ($r['caisse'] > 0 ? $r['caisse'] : ''), ($r['eoc_grade'] > 0 ? $r['eoc_grade'] : ''),
             ($r['cnss'] > 0 ? $r['cnss'] : ''), ($r['income_tax'] > 0 ? $r['income_tax'] : ''),
-            $r['total_retenues'], $r['net'], ($r['family'] > 0 ? $r['family'] : ''),
+            $r['total_retenues'], $r['net'] - $hR, ($r['family'] > 0 ? $r['family'] : ''),
             ($r['transport'] > 0 ? $r['transport'] : ''),
-            $r['total_due'] - (salaryCompHas('transport') ? 0 : $r['transport']), '',
+            $r['total_due'] - $hR - (salaryCompHas('transport') ? 0 : $r['transport']), '',
         ]);
     }
     $t = $slip['tot'];
+    $hT = (salaryCompHas('extra') ? 0 : (int)($t['extra_wage'] ?? 0))
+        + (salaryCompHas('aide')  ? 0 : (int)($t['aide'] ?? 0));
     $emit([
         'المجموع', $t['base_shown'], $t['grade_inc'], $t['base_plus_echelon'], $t['extra_wage'], $t['aide'],
-        $t['brut'], $t['caisse'], $t['eoc_grade'], $t['cnss'], $t['income_tax'], $t['total_retenues'], $t['net'],
+        $t['brut'] - $hT, $t['caisse'], $t['eoc_grade'], $t['cnss'], $t['income_tax'], $t['total_retenues'], $t['net'] - $hT,
         $t['family'], $t['transport'],
-        $t['total_due'] - (salaryCompHas('transport') ? 0 : $t['transport']), '',
+        $t['total_due'] - $hT - (salaryCompHas('transport') ? 0 : $t['transport']), '',
     ], true);
 }
 

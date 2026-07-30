@@ -208,7 +208,7 @@ include __DIR__ . '/../includes/header.php';
     <?php else: ?>
       <div class="table-wrapper">
       <table class="table">
-        <thead><tr><th>#</th><th>الاسم / Nom</th><th>Catégorie / الفئة</th><th>Statut / الحالة</th><th>Date d'envoi / تاريخ الإرسال</th><th class="no-print">Dossier / الملف</th></tr></thead>
+        <thead><tr><th>#</th><th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>Statut / الحالة</th><th>Date d'envoi / تاريخ الإرسال</th><th class="no-print">Dossier / الملف</th></tr></thead>
         <tbody>
         <?php $i = 0; foreach ($sent as $emp): $i++;
           $nm = trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
@@ -251,7 +251,7 @@ include __DIR__ . '/../includes/header.php';
     <?php else: ?>
       <div class="table-wrapper">
       <table class="table">
-        <thead><tr><th>#</th><th>الاسم / Nom</th><th>Catégorie / الفئة</th><th>Téléphone / الهاتف</th><th class="no-print">Rappel WhatsApp / تذكير واتساب</th><th class="no-print">Dossier / الملف</th></tr></thead>
+        <thead><tr><th>#</th><th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>Téléphone / الهاتف</th><th class="no-print">Rappel WhatsApp / تذكير واتساب</th><th class="no-print">Dossier / الملف</th></tr></thead>
         <tbody>
         <?php $i = 0; foreach ($notsent as $emp): $i++;
           $nm = trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
@@ -286,7 +286,7 @@ include __DIR__ . '/../includes/header.php';
     </h4>
     <div class="table-wrapper">
     <table class="table">
-      <thead><tr><th>#</th><th>الاسم / Nom</th><th>Statut / الحالة</th><th>Date de la demande / تاريخ الطلب</th><th class="no-print">Action / إجراء</th></tr></thead>
+      <thead><tr><th>#</th><th>Nom / الاسم</th><th>Statut / الحالة</th><th>Date de la demande / تاريخ الطلب</th><th class="no-print">Action / إجراء</th></tr></thead>
       <tbody>
       <?php $i = 0; foreach ($news as $r): $i++;
         $nm = newTeacherName($r); $isApplied = ($r['status'] === 'applied' && !empty($r['employee_id']));

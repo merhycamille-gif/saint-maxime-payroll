@@ -140,13 +140,13 @@ include __DIR__ . '/../includes/header.php';
       <table class="table">
         <thead><tr>
           <th>#</th>
-          <th>الاسم / Nom</th>
-          <th>الفئة / Catégorie</th>
-          <th>تاريخ الترك / Date de départ</th>
-          <th>ترك الضمان / CNSS</th>
-          <th>ترك المالية / Finances</th>
-          <th>ترك الصندوق / EOC</th>
-          <th>الهاتف / Tél.</th>
+          <th>Nom / الاسم</th>
+          <th>Catégorie / الفئة</th>
+          <th>Date de départ / تاريخ الترك</th>
+          <th>CNSS / ترك الضمان</th>
+          <th>Finances / ترك المالية</th>
+          <th>EOC / ترك الصندوق</th>
+          <th>Tél. / الهاتف</th>
           <th class="no-print">Dossier / الملف</th>
         </tr></thead>
         <tbody>

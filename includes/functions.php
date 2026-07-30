@@ -86,6 +86,9 @@ function viewerBaseScripts() {
         'official_forms.php', 'official_export.php', // النماذج الرسمية (طباعة)
         'settings.php',                              // لتغيير كلمة المرور فقط
         'switch_year.php', 'switch_lang.php', 'switch_school.php', 'logout.php', // ملاحة
+        // مبدّلات العرض والبحث (كانت ناقصة فكان حساب المدرسة يُطرد عند تغيير العملة/مكوّنات الراتب
+        // ويرجع بحث Ctrl+K فارغاً — كلّها عرض فقط ولا تعدّل بيانات):
+        'switch_currency.php', 'switch_salarycomp.php', 'ajax_search.php',
     ];
 }
 
@@ -286,9 +289,25 @@ function isAllSchools() {
  * جملة SQL لتقييد الاستعلام بالمدارس المختارة (واحدة أو عدة). آمنة (أرقام).
  * مثال: "SELECT * FROM employees WHERE is_deleted=0" . schoolScopeSql()
  */
+/**
+ * 🔵 معرّفات المدارس **الفاعلة** (is_active=1) — تعريف «كل المدارس».
+ * وضع «كل المدارس» كان يعني «بلا أي فلترة» فتُدمَج بياناتُ المدارس المعطّلة في كل
+ * المجاميع (641 مليون ل.ل بسنة 2025-2026) رغم أنها لا تظهر بمبدّل المدارس ولا بالتقارير.
+ * القاعدة الملزِمة: أي عرض/تقرير يستثني المدارس المعطّلة.
+ */
+function allActiveSchoolIdsCached() {
+    static $ids = null;
+    if ($ids === null) {
+        try { $ids = array_map('intval', array_column(allSchools(), 'id')); }
+        catch (Exception $e) { $ids = []; }
+    }
+    return $ids;
+}
+
 function schoolScopeSql($column = 'school_id') {
     $ids = activeSchoolIds();
-    if (empty($ids)) return ' ';
+    if (empty($ids)) $ids = allActiveSchoolIdsCached(); // «الكل» = كل الفاعلة (لا المعطّلة)
+    if (empty($ids)) return ' ';                        // لا مدارس فاعلة: لا تُعطّل الصفحة
     $in = implode(',', array_map('intval', $ids));
     return " AND {$column} IN ({$in}) ";
 }
@@ -296,6 +315,7 @@ function schoolScopeSql($column = 'school_id') {
 // نفس الفكرة لكن كأول شرط (بدون AND بادئة)
 function schoolScopeWhere($column = 'school_id') {
     $ids = activeSchoolIds();
+    if (empty($ids)) $ids = allActiveSchoolIdsCached();
     if (empty($ids)) return ' 1 ';
     $in = implode(',', array_map('intval', $ids));
     return " {$column} IN ({$in}) ";
@@ -392,8 +412,15 @@ function allSchools($activeOnly = true) {
  */
 function selectedReportSchoolIds() {
     if (!isSuperAdmin()) {
+        // 🔴 حساب مدرسة (قراءة فقط) قد يكون مصرّحاً له بعدّة مدارس — وقتها users.school_id = NULL
+        // فكان $sid = 0 ويُفهَم «كل المدارس» فيرى تقارير كل المدارس! الصحّ: مدارسه المصرّح بها فقط.
+        if (isViewer()) {
+            $allowed = viewerAllowedSchoolIds();
+            if (!empty($allowed)) return array_values(array_map('intval', $allowed));
+        }
         $sid = (int)($_SESSION['school_id'] ?? 0);
-        return $sid > 0 ? [$sid] : [];
+        // بلا مدرسة ولا تصريح: لا شيء (id مستحيل) — أفضل من كشف كل المدارس
+        return $sid > 0 ? [$sid] : [-1];
     }
     // اختيار عدة مدارس معاً (٣ أو ٥ أو ٨ أو الكل) — يُثبَّت بالجلسة ليبقى محفوظاً
     if (isset($_GET['schools'])) {
@@ -455,6 +482,27 @@ function pruneSalariesAfterDeparture($db, $empId) {
 // عند أول فتح صفحة: ينسخ prime_fixe + aide_complementaire من السنة السابقة لكل موظف عنده
 // رواتب 2026-2027 وما عنده هذه العلاوات فيها، ثم يعيد حساب أشهر سنته. علامة settings تمنع
 // التكرار للأبد (فلا يُعيد إحياء علاوة حذفها المستخدم لاحقاً). لا يلمس النقل (موجود ولا يُدوبل).
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-07-30): تصحيح «رقم المدرسة لدى صندوق التعويضات».
+ * السبب: تعبئة ذاتية سابقة في official_forms.php كانت تطابق بالاسم `LIKE '%مكسيموس%'`
+ * فكتبت رقم مدرسة القديس مكسيموس (75210) على «مركز البطريرك مكسيموس الخامس حكيم» أيضاً
+ * (٣ مؤسسات) — فكان البيان الفصلي يُطبَع برقم مؤسسة أخرى. نُفرغ الرقم عن كل مؤسسة
+ * ليست المدرسة نفسها، فيُدخله المستخدم يدوياً لكل مدرسة من صفحة المدارس.
+ * آمن: لا يمسّ إلا القيمة 75210 المكتوبة آلياً، ولا يُلغي أي رقم أدخله المستخدم لمدرسة أخرى.
+ */
+function healCaisseNumbers() {
+    $flag = 'caisse_number_like_fix_2026_07_30';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        // المدرسة المقصودة فعلاً بالرقم: اسمها يبدأ بـ«مدرسة» (لا «مركز»/«دير»/«دار»)
+        $db->exec("UPDATE schools SET caisse_number = NULL
+                    WHERE caisse_number = '75210'
+                      AND name_ar NOT LIKE 'مدرسة%'");
+        setSetting($flag, date('Y-m-d H:i:s'));
+    } catch (Exception $e) { /* لا نُعطّل الصفحة */ }
+}
+
 function healYearAdditions2627() {
     $flag = 'yr_additions_backfilled_2026-2027';
     if (getSetting($flag, '') !== '') return;
@@ -500,7 +548,8 @@ function healYearAdditions2627() {
 // جملة SQL لتقييد التقرير بالمدارس المختارة (آمنة لأنها أرقام)
 function reportSchoolSql($column = 'ms.school_id') {
     $ids = selectedReportSchoolIds();
-    if (empty($ids)) return ' '; // كل المدارس
+    if (empty($ids)) $ids = allActiveSchoolIdsCached(); // «كل المدارس» = الفاعلة فقط
+    if (empty($ids)) return ' ';
     $in = implode(',', array_map('intval', $ids));
     return " AND {$column} IN ({$in}) ";
 }
@@ -509,8 +558,8 @@ function reportSchoolSql($column = 'ms.school_id') {
 function reportIsMultiSchool() {
     $ids = selectedReportSchoolIds();
     if (empty($ids)) {
-        // "الكل": متعدد إذا في أكثر من مدرسة فعلاً
-        return count(allSchools(false)) > 1;
+        // "الكل": متعدد إذا في أكثر من مدرسة **فاعلة** فعلاً
+        return count(allSchools()) > 1;
     }
     return count($ids) > 1;
 }
@@ -671,6 +720,58 @@ function requireCsrf() {
         die('<div style="font-family:sans-serif;padding:40px;text-align:center;color:#b91c1c">'
           . '⚠️ Jeton de sécurité invalide / رمز الأمان غير صحيح — أعد تحميل الصفحة وحاول مجدداً.<br><br>'
           . '<a href="javascript:history.back()">Retour / رجوع</a></div>');
+    }
+}
+
+/**
+ * 🔒 رجوع آمن بعد المبدّلات (العملة/السنة/المدرسة/اللغة): يقبل الـReferer فقط إن كان
+ * من نفس الموقع — كان أي رابط خارجي يستدعي مبدّلاً فيُرجَع المستخدم إلى الموقع الخارجي.
+ */
+function safeBackUrl($fallback = null) {
+    $fallback = $fallback ?: (BASE_URL . 'index.php');
+    $ref = $_SERVER['HTTP_REFERER'] ?? '';
+    if ($ref === '') return $fallback;
+    $rHost = parse_url($ref, PHP_URL_HOST);
+    $myHost = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? ''));
+    if (!$rHost || !$myHost || strcasecmp((string)$rHost, $myHost) !== 0) return $fallback;
+    return $ref;
+}
+
+/**
+ * 🔒 حماية موحّدة لأي عملية تعديل تُنفَّذ عبر رابط (GET) — تُستدعى في بداية كل فرع
+ * يعدّل/يحذف/يعيد الحساب بلا فورم POST (احتساب، ترقية، حذف بندٍ، حذف سعر صرف…).
+ * تمنع أمرين معاً:
+ *   1) صلاحية: حساب «قراءة فقط» (viewer) لا يعدّل شيئاً — قفل الـviewer المركزي كان يرى
+ *      الـGET قراءةً فيمرّ، فكان بإمكان حساب مدرسة إعادة حساب كل رواتب مدرسته من الكشف السنوي.
+ *   2) CSRF: الطلب يجب أن يكون من داخل البرنامج نفسه (same-origin) — فلا ينفّذ رابطٌ
+ *      أو صورةٌ في بريد/موقع خارجي عمليةً بحساب المدير وهو فاتح البرنامج.
+ * تُطبَّق على كل البرنامج (feedback-apply-fixes-program-wide).
+ */
+function requireWriteAction($redirect = null) {
+    $back = $redirect ?: (BASE_URL . 'index.php');
+    if (!canEdit()) {
+        $_SESSION['flash_error'] = 'قراءة فقط: التعديل غير مسموح. / Lecture seule : modification interdite.';
+        header('Location: ' . $back);
+        exit;
+    }
+    // مصدر الطلب: نقبل same-origin (المتصفحات الحديثة ترسل Sec-Fetch-Site)، أو Referer من نفس الموقع.
+    $sfs = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';
+    if ($sfs !== '' && !in_array($sfs, ['same-origin', 'same-site', 'none'], true)) {
+        $_SESSION['flash_error'] = 'طلب غير صالح (مصدر خارجي) / Requête externe refusée.';
+        header('Location: ' . $back);
+        exit;
+    }
+    if ($sfs === '') { // متصفح قديم: تحقّق من الـReferer
+        $ref = $_SERVER['HTTP_REFERER'] ?? '';
+        if ($ref !== '') {
+            $rHost = parse_url($ref, PHP_URL_HOST);
+            $myHost = $_SERVER['HTTP_HOST'] ?? '';
+            if ($rHost && $myHost && strcasecmp((string)$rHost, preg_replace('/:\d+$/', '', $myHost)) !== 0) {
+                $_SESSION['flash_error'] = 'طلب غير صالح (مصدر خارجي) / Requête externe refusée.';
+                header('Location: ' . $back);
+                exit;
+            }
+        }
     }
 }
 
@@ -1284,6 +1385,17 @@ function ageOnDate($birthDate, $onDate = null) {
     $o = $onDate ? date_create(substr((string)$onDate, 0, 10)) : date_create('today');
     if (!$b || !$o) return null;
     return (int)date_diff($b, $o)->y;
+}
+
+/**
+ * 🔴 السنة الدراسية **للكتابة** (حفظ علاوة/مكافأة/نقل): وضع «كل السنين» ليس سنةً
+ * يمكن الحفظ فيها — كان يُخزَّن school_year='all' فلا يراه محرّك الرواتب أبداً
+ * (يطابق '2025-2026' أو NULL) ولا يظهر بالمحرّر لاحقاً، فيظنّ المستخدم أنّ المبلغ
+ * محفوظ ولا شيء يتغيّر. نُرجع السنة الحالية عندها.
+ */
+function writeSchoolYear() {
+    $sy = activeSchoolYear();
+    return ($sy === 'all') ? currentSchoolYear() : $sy;
 }
 
 // السنة الدراسية الفعّالة المختارة من الأعلى (من الجلسة)، أو الحالية افتراضياً

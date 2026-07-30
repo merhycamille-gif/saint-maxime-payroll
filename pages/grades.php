@@ -26,6 +26,7 @@ if ((isset($_GET['apply_law']) || isset($_GET['promote']) || $_SERVER['REQUEST_M
 
 // Apply exceptional law
 if (isset($_GET['apply_law']) && $employeeId > 0) {
+    requireWriteAction();
     try {
         $result = applyExceptionalLaw($employeeId, $_GET['apply_law']);
         recalcEmployeeYear($employeeId); // إعادة حساب الراتب تلقائياً حسب القانون
@@ -39,6 +40,7 @@ if (isset($_GET['apply_law']) && $employeeId > 0) {
 
 // إعادة بناء الدرجات حسب القانون (تلقائياً) — دخول الملاك → تدرّج عادي بتشرين → استثنائية بكانون بعد التثبيت
 if (isset($_GET['rebuild_legal']) && $employeeId > 0) {
+    requireWriteAction();
     try {
         $r = buildLegalGradeHistory($employeeId);
         // إعادة حساب كل سنوات الأستاذ من سنة دخول المدرسة (hire_date) حتى السنة الحالية
@@ -55,6 +57,7 @@ if (isset($_GET['rebuild_legal']) && $employeeId > 0) {
 
 // Apply biennial promotion
 if (isset($_GET['promote']) && $employeeId > 0) {
+    requireWriteAction();
     try {
         $effYear = (int)($_GET['eff_year'] ?? date('Y'));
         $res = applyBiennialPromotion($employeeId, true, $effYear);
@@ -75,6 +78,7 @@ if (isset($_GET['promote']) && $employeeId > 0) {
 
 // Auto promotion: whole school + one year (كل مدرسة بمدرستها وكل سنة بسنتها)
 if (isset($_GET['auto_promote'])) {
+    requireWriteAction();
     requireSchoolSelected();
     try {
         $year = (int)($_GET['year'] ?? date('Y'));

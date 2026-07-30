@@ -77,9 +77,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if (isset($_GET['delete'])) {
+    requireWriteAction();
     $id = (int)$_GET['delete'];
     // كم أستاذ يستعمل هذا الصف؟ (المعرّف ضمن قائمة classes_taught المفصولة بفواصل)
-    $used = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted=0 AND FIND_IN_SET($id, classes_taught)")->fetchColumn();
+    // مقيّد بنطاق مدارس المستخدم: كان يعدّ أساتذة مدارس لا يراها فيظهر رقم مضلّل.
+    $usedSt = $db->prepare("SELECT COUNT(*) FROM employees WHERE is_deleted=0 AND FIND_IN_SET(?, classes_taught)" . schoolScopeSql());
+    $usedSt->execute([$id]);
+    $used = (int)$usedSt->fetchColumn();
     if ($used > 0) {
         // لا نحذف فعلياً كي لا نكسر اختيارات الأساتذة؛ نُعطّله فقط (يختفي من قوائم الاختيار)
         $db->prepare("UPDATE class_levels SET is_active = 0 WHERE id = ?")->execute([$id]);

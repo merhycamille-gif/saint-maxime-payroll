@@ -40,14 +40,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
                $employeeId,
                $_POST['bonus_type'],
                (int)$_POST['period_number'],
-               activeSchoolYear(),
+               writeSchoolYear(), // «كل السنين» → السنة الحالية (لا تُخزَّن 'all' فلا يراها المحرّك)
                (float)str_replace(',', '', $_POST['amount']),
                $vtype,
                ($vtype === 'percent') ? 'LBP' : ($_POST['currency'] ?? 'USD'),
                $_POST['start_month'] ?: null,
                $_POST['end_month'] ?: null
            ]);
-        recalcEmployeeYear($employeeId, (activeSchoolYear() === 'all') ? currentSchoolYear() : activeSchoolYear()); // إعادة حساب الراتب تلقائياً
+        recalcEmployeeYear($employeeId, writeSchoolYear()); // إعادة حساب الراتب تلقائياً
         $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Prime ajoutée'];
     } catch (Exception $e) {
         $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()];
@@ -58,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
 
 // Delete bonus
 if (isset($_GET['delete'])) {
+    requireWriteAction();
     $db->prepare("DELETE FROM employee_bonuses WHERE id = ? AND employee_id = ?")->execute([(int)$_GET['delete'], $employeeId]);
     recalcEmployeeYear($employeeId, (activeSchoolYear() === 'all') ? currentSchoolYear() : activeSchoolYear()); // إعادة حساب الراتب تلقائياً
     $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Supprimée'];

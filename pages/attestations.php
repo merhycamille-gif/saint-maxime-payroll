@@ -621,7 +621,12 @@ if (!$emp):
     // إفادة الضمان الرسمية «لمن يهمه الأمر» — بنفس نصّ نموذج المستخدم بالضبط.
     $attBase = (int)round($basePlusEch);
     $attSupp = ($incExtra ? $extraW : 0) + ($incAide ? $aideW : 0);
-    $attTotal = $attBase + $attSupp;
+    // 🔴 «الأرقام تركب» (2026-07-30): خانة «+ تعويض النقل» كانت تُعرَض للإفادة والشاشة تقول
+    // إنّ المبلغ يشمله، لكن نصّ الوثيقة يجمع الأساس والملحقات فقط — فيظهر المجموع أقلّ
+    // بمقدار النقل (٩ ملايين بمثال حقيقي) في ورقةٍ موقّعة ومختومة. الآن النقل سطر مستقل
+    // يظهر فقط إن اختاره المستخدم، والمجموع يساويه فعلاً.
+    $attTrans = $incTrans ? (int)round($transW) : 0;
+    $attTotal = $attBase + $attSupp + $attTrans;
     if ($type === 'cnss'):
     ?>
     <?php if ($lhOn): ?><style>@page{size:A4;margin:0}</style><?php endif; ?>
@@ -643,6 +648,9 @@ if (!$emp):
             <p>ويتقاضى راتباً شهرياً :</p>
             <p style="margin-right:34px">- أساس راتب عملاً بالقانون : <strong><?= $moneyAr($attBase) ?></strong></p>
             <p style="margin-right:34px">- ملحقات مدفوعة من أشخاص ثالثين : <strong><?= $moneyAr($attSupp) ?></strong></p>
+            <?php if ($attTrans > 0): ?>
+            <p style="margin-right:34px">- تعويض نقل : <strong><?= $moneyAr($attTrans) ?></strong></p>
+            <?php endif; ?>
             <p>المجموع : <strong><?= $moneyAr($attTotal) ?></strong> فقط <?= e($moneyWords($attTotal)) ?> لا غير .</p>
             <?php if ($emp['status']==='actif'): ?><p>وهو مستمر في عمله حتى تاريخه .</p><?php endif; ?>
             <div style="display:flex;justify-content:space-between;margin-top:54px">

@@ -23,12 +23,14 @@ $lang = $_SESSION['lang'] ?? 'fr';
 $myId = (int)($_SESSION['user_id'] ?? 0);
 
 // الأدوار المتاحة (viewer = حساب مدرسة قراءة فقط)
+// 🔒 «مدير عام» (كل المدارس) لا يُنشئه ولا يمنحه إلا مدير عام — وإلّا كان بإمكان مدير
+// مدرسة واحدة أن يصنع حساباً يرى كل المدارس فيلتفّ على حصر النطاق.
 $ROLES = [
     'viewer'     => 'حساب مدرسة (قراءة فقط) / École (lecture seule)',
     'operator'   => 'مُشغّل (إدخال) / Opérateur',
     'admin'      => 'مدير / Administrateur',
-    'superadmin' => 'مدير عام (كل المدارس) / Directeur général',
 ];
+if (isSuperAdmin()) $ROLES['superadmin'] = 'مدير عام (كل المدارس) / Directeur général';
 
 // عدد المدراء العامّين الفعّالين (لمنع حذف/إيقاف آخر واحد)
 function activeSuperadminCount($db) {
@@ -181,6 +183,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['flash_error'] = 'لا يمكن تغيير دور آخر مدير عام / Impossible : dernier directeur';
                 header('Location: ' . BASE_URL . 'pages/users.php?edit=' . $id . '#user-form'); exit;
             }
+            // 🔒 حساب «مدير عام» لا يعدّله (ولا يغيّر كلمة مروره) إلا مدير عام — وإلّا كان
+            // بإمكان مدير مدرسة واحدة أن يطمس كلمة مرور المدير العام ويستولي على كل المدارس.
+            if ($cur['role'] === 'superadmin' && !isSuperAdmin()) {
+                $_SESSION['flash_error'] = 'حساب المدير العام يُعدّله المدير العام فقط / Réservé au directeur général';
+                header('Location: ' . BASE_URL . 'pages/users.php'); exit;
+            }
         }
         if ($password !== '') {
             $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -205,6 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ===== إيقاف / تفعيل الدخول (زر «الأوك») =====
 if (isset($_GET['toggle'])) {
+    requireWriteAction(); // 🔒 قراءة-فقط ممنوع + مصدر داخلي فقط
     $tid = (int)$_GET['toggle'];
     if ($tid === $myId) {
         $_SESSION['flash_error'] = 'لا يمكنك إيقاف حسابك أنت / Vous ne pouvez pas désactiver votre compte';
@@ -228,6 +237,7 @@ if (isset($_GET['toggle'])) {
 
 // ===== حذف =====
 if (isset($_GET['delete'])) {
+    requireWriteAction(); // 🔒 قراءة-فقط ممنوع + مصدر داخلي فقط
     $did = (int)$_GET['delete'];
     if ($did === $myId) {
         $_SESSION['flash_error'] = 'لا يمكنك حذف حسابك أنت / Suppression de votre propre compte interdite';

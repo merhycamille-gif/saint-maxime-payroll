@@ -63,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if (isset($_GET['delete'])) {
+    requireWriteAction();
     $id = (int)$_GET['delete'];
     $r = $db->prepare("SELECT law_number FROM exceptional_grades_laws WHERE id=?");
     $r->execute([$id]); $ln = $r->fetchColumn();
@@ -90,9 +91,17 @@ if (isset($_GET['edit'])) {
 }
 
 $rows = $db->query("SELECT * FROM exceptional_grades_laws ORDER BY law_date, law_number")->fetchAll();
-// عدد الأساتذة المطبّق عليهم كل قانون
+// عدد **الأساتذة** المطبّق عليهم كل قانون.
+// 🔴 كان COUNT(*) يعدّ صفوف السجلّ لا الأساتذة: الدرجة الاستثنائية تُخزَّن مفردة (+1/½)
+// صفّاً لكل وحدة، فكان العدد منفوخاً ٣ أضعاف (قانون 102: 573 بدل 191)، وكان يشمل
+// المحذوفين ومدارس لا يراها المستخدم. الصحيح: DISTINCT + is_deleted=0 + نطاق المدارس.
 $appliedCounts = [];
-foreach ($db->query("SELECT law_reference, COUNT(*) c FROM employee_grade_history WHERE law_reference IS NOT NULL GROUP BY law_reference") as $ac) {
+$acSt = $db->prepare("SELECT gh.law_reference, COUNT(DISTINCT gh.employee_id) c
+                        FROM employee_grade_history gh JOIN employees e ON e.id = gh.employee_id
+                       WHERE gh.law_reference IS NOT NULL AND e.is_deleted = 0" . schoolScopeSql('e.school_id') . "
+                       GROUP BY gh.law_reference");
+$acSt->execute();
+foreach ($acSt->fetchAll() as $ac) {
     $appliedCounts[$ac['law_reference']] = (int)$ac['c'];
 }
 

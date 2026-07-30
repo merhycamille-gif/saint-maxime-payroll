@@ -12,6 +12,6 @@ if ($sy === 'all' || preg_match('/^\d{4}-\d{4}$/', $sy)) {
     $_SESSION['active_school_year'] = $sy;
 }
 
-$back = $_SERVER['HTTP_REFERER'] ?? (BASE_URL . 'index.php');
+$back = safeBackUrl();
 header('Location: ' . $back);
 exit;

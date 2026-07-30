@@ -15,6 +15,13 @@ $format = ($_GET['format'] ?? 'pdf') === 'xlsx' ? 'xlsx' : 'pdf';
 $month = (int)($_GET['month'] ?? date('n'));
 $year = (int)($_GET['year'] ?? date('Y'));
 $school = currentSchool();
+// 🔒 نموذج الضمان 190A يُصدَر لمؤسسة واحدة برقم صاحب عمل واحد — في وضع «كل المدارس»
+// كان يُبَثّ ملفٌ بترويسة فارغة يجمع أرقام كل المدارس. اطلب اختيار مدرسة.
+if (!$school) {
+    $_SESSION['flash_error'] = 'هذا النموذج يُصدَر لمدرسة واحدة — اختر المدرسة من الأعلى أولاً. / Choisissez une seule école.';
+    header('Location: ' . BASE_URL . 'pages/tax_declarations.php');
+    exit;
+}
 
 if ($form === 'cnss_contrib_monthly') {
     $periodSY = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) . '-' . $year);

@@ -34,6 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         if ($valid) {
+            // 🔒 جدّد معرّف الجلسة عند نجاح الدخول (يمنع تثبيت جلسة مزروعة مسبقاً — session fixation)
+            session_regenerate_id(true);
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['full_name'] = $user['full_name'];

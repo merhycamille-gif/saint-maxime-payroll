@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if (isset($_GET['delete'])) {
+    requireWriteAction();
     $db->prepare("DELETE FROM exchange_rates WHERE id = ?")->execute([(int)$_GET['delete']]);
     // إعادة حساب تلقائية بعد الحذف (الشهور التي كانت تعتمد هذا السعر تنتقل لـ«الأحدث»)
     $nRec = recalcSalariesInRange($db, '2017-08-01', null);

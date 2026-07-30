@@ -57,7 +57,9 @@ include __DIR__ . '/../includes/header.php';
  */
 function reportSchoolPicker() {
     if (!isSuperAdmin()) return;
-    $schools = allSchools(false);
+    // 🔵 المدارس الفاعلة فقط (is_active=1) — كانت المدارس المعطّلة تظهر كخيار بالتقارير
+    // وتُدمَج بياناتها في وضع «كل المدارس» رغم أنها لا تظهر بمبدّل المدارس بالأعلى.
+    $schools = allSchools();
     $selected = selectedReportSchoolIds(); // فارغة = الكل
     ?>
     <div class="form-group mb-0" style="grid-column:1 / -1">
@@ -432,13 +434,13 @@ function reportDocThumb($path) {
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الراتب الخاضع للضريبة</th><th>الضريبة</th></tr></thead>
                     <tbody>
                         <?php
-                        $zX = ['base'=>0,'extra'=>0,'aide'=>0,'composed'=>0,'tax'=>0]; $G = $zX; $csL = $multi?4:3;
+                        $zX = ['base'=>0,'extra'=>0,'aide'=>0,'composed'=>0,'txb'=>0,'tax'=>0]; $G = $zX; $csL = $multi?4:3;
                         $drawTotal = function($label,$a,$isGrand) use ($csL, $repRate){
                             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; ?>
                             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="<?= $csL ?>" style="text-align:right"><?= e($label) ?></td>
                                 <td><?= formatLBP($a['base']) ?></td><?php if (salaryCompHas('extra')): ?><td><?= money($a['extra'], $repRate) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($a['aide'], $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= money($a['composed'], $repRate) ?></strong></td>
-                                <td></td><td><strong><?= formatLBP($a['tax']) ?></strong></td></tr>
+                                <td><strong><?= formatLBP($a['txb']) ?></strong></td><td><strong><?= formatLBP($a['tax']) ?></strong></td></tr>
                         <?php };
                         $rn=0; $curCat=null; $sub=$zX;
                         foreach ($data as $r):
@@ -448,7 +450,7 @@ function reportDocThumb($path) {
                                 $sub=$zX; $curCat=$cat;
                                 ?><tr class="cat-row"><td colspan="<?= ($multi?8:7) + compColsCount(false) ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
                             endif;
-                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'tax'=>(int)$r['income_tax_lbp']];
+                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'txb'=>(int)$r['taxable_base_lbp'],'tax'=>(int)$r['income_tax_lbp']];
                             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; } ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
@@ -513,7 +515,9 @@ function reportDocThumb($path) {
                             </tr>
                         <?php endforeach; ?>
                         <?php if (!$data): ?><tr><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
+                        <?php if ($data): // لا تطبع صفّ مجاميع أصفار على شهر بلا بيانات (كان يظهر تحت «لا توجد بيانات») ?>
                         <tr class="total-row"><td colspan="<?= $multi?4:3 ?>">المجاميع — العدد: <?= $rn ?></td><td><?= formatLBP($teBaseE) ?></td><?php if (salaryCompHas('extra')): ?><td><?= money($teEx, $repRate) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($teAi, $repRate) ?></td><?php endif; ?><td style="background:#eef2ff"><strong><?= money($teComposed, $repRate) ?></strong></td><td><?= formatLBP($te) ?></td><td><?= formatLBP($teg) ?></td><td><?= formatLBP($ts) ?></td></tr>
+                        <?php endif; ?>
                     </tbody>
                 </table></div>
             </div>
@@ -576,7 +580,8 @@ function reportDocThumb($path) {
             'name'    => ['الاسم / Nom', fn($r) => e(trim($r['first_name_fr'].' '.$r['last_name_fr']) ?: trim($r['first_name_ar'].' '.$r['last_name_ar']))],
             'name_ar' => ['الاسم بالعربي / Nom (arabe)', fn($r) => e(trim($r['first_name_ar'].' '.$r['last_name_ar']))],
             'type'    => ['الفئة / Type', fn($r) => employeeTypeLabel($r['employee_type'])],
-            'diploma' => ['الشهادة / Diplôme', fn($r) => diplomaLabel($r['diploma'])],
+            // الموظف الإداري: تُعرَض وظيفته بدل الشهادة (مطابق للتصدير — كانا مختلفَين)
+            'diploma' => ['الشهادة / Diplôme', fn($r) => $r['employee_type'] === 'employe' ? jobTitleLabel($r['job_title'] ?? '') : diplomaLabel($r['diploma'])],
             'diploma_img' => ['صورة الشهادة / Copie du diplôme', fn($r) => reportDocThumb($r['diploma_doc_path'] ?? '')],
             'civil_img'   => ['صورة إخراج القيد / Extrait d\'état civil', fn($r) => reportDocThumb($r['id_document_path'] ?? '')],
             'submit_status' => ['تحديث الملف / Mise à jour', $submitStatusCell],

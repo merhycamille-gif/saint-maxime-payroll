@@ -255,7 +255,7 @@ function renderBonusRow($r = null) {
 
 function saveEmployeeBonuses($db, $employeeId) {
     if (empty($_POST['bonus_editor'])) return; // المحرّر المباشر لم يكن ظاهراً
-    $sy = activeSchoolYear(); // المكافآت مربوطة بالسنة المختارة (ما تتسرّب لسنين تانية)
+    $sy = writeSchoolYear(); // المكافآت مربوطة بالسنة المختارة («كل السنين» → السنة الحالية، لا 'all')
     $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND school_year = ?")->execute([$employeeId, $sy]);
     $rows = $_POST['bonus_rows'] ?? [];
     $types = $rows['type'] ?? [];
@@ -512,6 +512,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
 // Handle Delete
 // =====================================================
 if ($action === 'delete' && $id > 0) {
+    requireWriteAction();
     $db->prepare("UPDATE employees SET is_deleted = 1 WHERE id = ? AND school_id = ?")
        ->execute([$id, currentSchoolId()]);
     logAudit('delete', 'employees', $id);

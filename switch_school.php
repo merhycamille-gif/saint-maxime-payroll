@@ -27,6 +27,6 @@ if (isSuperAdmin() || (isViewer() && count(viewerAllowedSchoolIds()) > 1)) {
     unset($_SESSION['report_schools']);              // التقارير تتبع الاختيار الجديد
 }
 
-$back = $_SERVER['HTTP_REFERER'] ?? (BASE_URL . 'index.php');
+$back = safeBackUrl();
 header('Location: ' . $back);
 exit;

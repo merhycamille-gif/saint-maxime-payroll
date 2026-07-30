@@ -3,6 +3,12 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/payroll_calculator.php';
 requireLogin();
+// 🔒 قوانين وطنية مشتركة بين كل المدارس (نِسَب/حدود الضمان/السلسلة/الشطور):
+// التعديل للمدير فقط — كان أي مستخدم مُصرَّح له بالتعديل يقدر يغيّرها على كل المدارس.
+if (!isAdmin() && ($_SERVER["REQUEST_METHOD"] === "POST" || preg_grep("/^(delete|delete_set|delete_ded|delete_version|toggle)$/", array_keys($_GET)))) {
+    $_SESSION["flash_error"] = "صلاحية المدير مطلوبة لتعديل القوانين / Accès administrateur requis";
+    header("Location: " . BASE_URL . "index.php"); exit;
+}
 requireCsrf();
 
 $currentPage = 'rates_history';
@@ -49,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if (isset($_GET['delete'])) {
+    requireWriteAction(); // 🔒 قراءة-فقط ممنوع + مصدر داخلي فقط
     $r = $db->prepare("SELECT effective_from, effective_to FROM rate_history WHERE id = ?");
     $r->execute([(int)$_GET['delete']]); $rr = $r->fetch();
     $db->prepare("DELETE FROM rate_history WHERE id = ?")->execute([(int)$_GET['delete']]);
