@@ -342,6 +342,21 @@ check('تدرّج العناوين: شاشة فقط (@media screen) والطبا
       strpos($cssSrc, 'تدرّج عناوين عصري') !== false
       && preg_match('/@media screen \{[^}]*\.topbar h1/s', $cssSrc) === 1);
 
+/* =====================================================================
+ * 13) فحص مطابقة القانون (2026-07-30): العدد يتبع السنة الدراسية المختارة
+ *     (yearEmploymentFilter) — التارك لا يُحتسب بعد سنة تركه (كان يعدّ كل التاريخ)
+ * =================================================================== */
+require_once __DIR__ . '/../includes/payroll_calculator.php';
+[$yfLC, $ypLC] = yearEmploymentFilter('2025-2026');
+$stLC = $db->prepare("SELECT COUNT(*) FROM employees WHERE employee_type='enseignant_titulaire' AND is_deleted=0" . $yfLC . " AND school_id=2");
+$stLC->execute($ypLC);
+$expLC = (int)$stLC->fetchColumn();
+$gotLC = count(lawConsistencyCheck([2], '2025-2026'));
+$allLC = count(lawConsistencyCheck([2], 'all'));
+check('فحص القانون: العدد = أساتذة السنة المختارة فقط (مدرسة 2 / 2025-2026)', $gotLC === $expLC && $expLC > 0, "n=$gotLC");
+check('فحص القانون: «كل السنين» أكبر (تشمل التاركين) والسنة المفلترة أصغر', $allLC > $gotLC, "all=$allLC year=$gotLC");
+check('فحص القانون: الصفحة توضح السنة المفحوصة', strpos((string)file_get_contents(__DIR__ . '/../pages/law_check.php'), 'السنة المفحوصة') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

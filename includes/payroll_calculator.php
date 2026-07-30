@@ -1045,17 +1045,24 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false) 
  * $schoolIds = مصفوفة معرّفات مدارس (أو null/فارغة = كل المدارس).
  * لا يعدّل أي بيانات إطلاقاً — للعرض والمراقبة فقط.
  */
-function lawConsistencyCheck($schoolIds = null) {
+function lawConsistencyCheck($schoolIds = null, $schoolYear = null) {
     $db = getDB();
+    // 🔴 «الأرقام تركب»: نفس فلتر السنة الدراسية المعتمد بكل البرنامج (yearEmploymentFilter) —
+    // يُحتسب فقط أساتذة الملاك الموجودون فعلاً بالسنة المختارة، والتارك لا يظهر بعد سنة تركه
+    // (كان الفحص يعدّ كل الملاك التاريخيين بمن فيهم التاركين فيطلع العدد منفوخاً).
+    if ($schoolYear === null) $schoolYear = activeSchoolYear();
+    [$yf, $yp] = yearEmploymentFilter($schoolYear);
     $sql = "SELECT id, first_name_ar, last_name_ar, first_name_fr, last_name_fr, diploma,
                    school_id, starting_grade, current_grade, hire_date, titularization_date
-            FROM employees WHERE employee_type='enseignant_titulaire' AND is_deleted=0";
+            FROM employees WHERE employee_type='enseignant_titulaire' AND is_deleted=0" . $yf;
     if (is_array($schoolIds) && !empty($schoolIds)) {
         $in = implode(',', array_map('intval', $schoolIds));
         $sql .= " AND school_id IN ($in)";
     }
     $sql .= " ORDER BY school_id, COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)";
-    $rows = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    $st = $db->prepare($sql);
+    $st->execute($yp);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
     $out = [];
     foreach ($rows as $e) {
         $stored = (float)$e['current_grade'];
