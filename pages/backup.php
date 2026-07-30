@@ -24,53 +24,79 @@ function allTables($db) {
     return $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
 }
 
+// 🔧 اتصال ثانٍ «غير مخزّن» (unbuffered) للتدفّق صفاً صفاً:
+// جدول الرواتب ضخم، وتحميله كاملاً بالذاكرة كان يفجّر النسخ الاحتياطي
+// (PHP Fatal: Allowed memory size exhausted). التدفّق يعمل مهما كبرت الداتا.
+function dumpConn() {
+    return new PDO(
+        'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET,
+        DB_USER, DB_PASS,
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => false]
+    );
+}
+
 // ===== 1) نسخة SQL كاملة (ملف لكل الداتا، قابل للاستعادة) =====
 if ($action === 'sql') {
+    @set_time_limit(0);
+    while (ob_get_level()) { ob_end_flush(); } // بثّ مباشر بلا تجميع بالذاكرة
     header('Content-Type: application/sql; charset=utf-8');
     header('Content-Disposition: attachment; filename="payroll_backup_' . $stamp . '.sql"');
     echo "-- رواتب المدارس — نسخة احتياطية كاملة\n";
     echo "-- " . date('Y-m-d H:i:s') . "  DB: " . DB_NAME . "\n";
     echo "SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\n\n";
+    $dump = dumpConn();
     foreach (allTables($db) as $t) {
         $create = $db->query("SHOW CREATE TABLE `$t`")->fetch(PDO::FETCH_ASSOC);
         echo "DROP TABLE IF EXISTS `$t`;\n" . ($create['Create Table'] ?? '') . ";\n\n";
-        $rows = $db->query("SELECT * FROM `$t`")->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($rows as $row) {
-            $cols = implode(',', array_map(fn($c) => "`$c`", array_keys($row)));
-            $vals = implode(',', array_map(fn($v) => $v === null ? 'NULL' : $db->quote($v), array_values($row)));
-            echo "INSERT INTO `$t` ($cols) VALUES ($vals);\n";
+        $st = $dump->query("SELECT * FROM `$t`");
+        $cols = ''; $batch = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if ($cols === '') $cols = implode(',', array_map(fn($c) => "`$c`", array_keys($row)));
+            $batch[] = '(' . implode(',', array_map(fn($v) => $v === null ? 'NULL' : $db->quote($v), array_values($row))) . ')';
+            if (count($batch) >= 200) {
+                echo "INSERT INTO `$t` ($cols) VALUES\n" . implode(",\n", $batch) . ";\n";
+                $batch = [];
+                flush();
+            }
         }
+        if ($batch) echo "INSERT INTO `$t` ($cols) VALUES\n" . implode(",\n", $batch) . ";\n";
+        $st->closeCursor();
         echo "\n";
+        flush();
     }
     echo "SET FOREIGN_KEY_CHECKS=1;\n";
     exit;
 }
 
-// ===== HTML لكل الجداول (للـExcel/Word والعرض) =====
+// ===== HTML لكل الجداول (للـExcel/Word) — يبثّ مباشرة صفاً صفاً (لا يجمع بالذاكرة) =====
 function renderAllTables($db, $forExport = false) {
-    $html = '';
+    @set_time_limit(0);
+    $dump = dumpConn();
     foreach (allTables($db) as $t) {
-        $rows = $db->query("SELECT * FROM `$t`")->fetchAll(PDO::FETCH_ASSOC);
-        $html .= '<h3 style="margin-top:18px">' . htmlspecialchars($t) . ' (' . count($rows) . ')</h3>';
-        if (!$rows) { $html .= '<p style="color:#888">—</p>'; continue; }
-        $cols = array_keys($rows[0]);
-        $html .= '<table class="table" border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:11px"><thead><tr>';
+        $cnt = (int)$db->query("SELECT COUNT(*) FROM `$t`")->fetchColumn();
+        echo '<h3 style="margin-top:18px">' . htmlspecialchars($t) . ' (' . $cnt . ')</h3>';
+        $st = $dump->query("SELECT * FROM `$t`");
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { echo '<p style="color:#888">—</p>'; $st->closeCursor(); continue; }
+        $cols = array_keys($row);
+        echo '<table class="table" border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:11px"><thead><tr>';
         foreach ($cols as $c) {
             if ($c === 'password_hash') continue; // لا نُظهر الهاش بالتصدير
-            $html .= '<th>' . htmlspecialchars($c) . '</th>';
+            echo '<th>' . htmlspecialchars($c) . '</th>';
         }
-        $html .= '</tr></thead><tbody>';
-        foreach ($rows as $row) {
-            $html .= '<tr>';
+        echo '</tr></thead><tbody>';
+        do {
+            echo '<tr>';
             foreach ($cols as $c) {
                 if ($c === 'password_hash') continue;
-                $html .= '<td>' . htmlspecialchars((string)($row[$c] ?? '')) . '</td>';
+                echo '<td>' . htmlspecialchars((string)($row[$c] ?? '')) . '</td>';
             }
-            $html .= '</tr>';
-        }
-        $html .= '</tbody></table>';
+            echo '</tr>';
+        } while ($row = $st->fetch(PDO::FETCH_ASSOC));
+        echo '</tbody></table>';
+        $st->closeCursor();
+        flush();
     }
-    return $html;
 }
 
 // ===== 2) Excel كامل =====
@@ -80,7 +106,7 @@ if ($action === 'excel') {
     echo "\xEF\xBB\xBF"; // BOM للعربي
     echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>';
     echo '<h2><span dir="ltr">Salaires des écoles — ' . date('Y-m-d H:i') . '</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">رواتب المدارس</div></h2>';
-    echo renderAllTables($db, true);
+    renderAllTables($db, true);
     echo '</body></html>';
     exit;
 }
@@ -93,7 +119,7 @@ if ($action === 'word') {
     echo '<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">'
        . '<style>table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:3px;font-size:10px}</style></head><body>';
     echo '<h2><span dir="ltr">Salaires des écoles — ' . date('Y-m-d H:i') . '</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">رواتب المدارس</div></h2>';
-    echo renderAllTables($db);
+    renderAllTables($db);
     echo '</body></html>';
     exit;
 }

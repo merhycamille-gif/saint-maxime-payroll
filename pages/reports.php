@@ -223,7 +223,8 @@ function reportDocThumb($path) {
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
-        $totals = ['cnss'=>0,'caisse'=>0,'tax'=>0,'net'=>0,'family'=>0,'total'=>0,'extra'=>0,'aide'=>0,'base'=>0,'ech'=>0,'bpe'=>0,'trans'=>0];
+        $totals = ['cnss'=>0,'caisse'=>0,'tax'=>0,'net'=>0,'family'=>0,'total'=>0,'extra'=>0,'aide'=>0,'base'=>0,'ech'=>0,'bpe'=>0,'trans'=>0,
+                   'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0];
         $rn = 0;
     ?>
         <form method="GET" class="card no-print">

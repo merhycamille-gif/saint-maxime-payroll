@@ -357,6 +357,24 @@ check('فحص القانون: العدد = أساتذة السنة المختا�
 check('فحص القانون: «كل السنين» أكبر (تشمل التاركين) والسنة المفلترة أصغر', $allLC > $gotLC, "all=$allLC year=$gotLC");
 check('فحص القانون: الصفحة توضح السنة المفحوصة', strpos((string)file_get_contents(__DIR__ . '/../pages/law_check.php'), 'السنة المفحوصة') !== false);
 
+/* =====================================================================
+ * 14) الفحص الشامل (2026-07-30): لا تحذيرات PHP بأي صفحة مفحوصة
+ *     + النسخ الاحتياطي يتدفّق (unbuffered) بدل تحميل كل الداتا بالذاكرة
+ * =================================================================== */
+$warnHit = '';
+foreach ($html as $hk => $hv) {
+    if (strpos($hv, 'Undefined array key') !== false || strpos($hv, 'Undefined variable') !== false
+        || strpos($hv, 'Fatal error') !== false || preg_match('/\bWarning: /', $hv)) { $warnHit = $hk; break; }
+}
+check('لا تحذيرات/أخطاء PHP بكل الصفحات المفحوصة', $warnHit === '', $warnHit ?: 'نظيف');
+$bkSrc = (string)file_get_contents(__DIR__ . '/../pages/backup.php');
+check('النسخ الاحتياطي: تدفّق غير مخزّن (لا انفجار ذاكرة)',
+      strpos($bkSrc, 'MYSQL_ATTR_USE_BUFFERED_QUERY => false') !== false
+      && strpos($bkSrc, '$db->query("SELECT * FROM `$t`")->fetchAll') === false);
+$repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+check('الكشف الشهري: مفاتيح مجاميع الدولار/المركّب مهيّأة (لا Undefined)',
+      preg_match('/\$totals = \[[^\]]*composed_usd/s', $repSrc) === 1);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
