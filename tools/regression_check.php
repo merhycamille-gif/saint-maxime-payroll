@@ -28,7 +28,7 @@ require_once $PROJ . '/includes/functions.php';
 $db = getDB();
 
 // ---------- عارض صفحات داخلي (كل صفحة بعملية فرعية لتفادي إعادة تعريف الدوال) ----------
-function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = ''): string {
+function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = '', string $schoolYear = ''): string {
     global $PROJ;
     $runner = __DIR__ . '/_render_one.php';
     // الوسائط تمرَّر base64 (اقتباسات JSON تتخربط بسطر أوامر ويندوز)
@@ -44,6 +44,8 @@ $__sch = json_decode(base64_decode($argv[4] ?? ''), true) ?: [];
 if ($__sch) $_SESSION['active_schools'] = $__sch; // نطاق مدرسة محدّدة (للنماذج المؤسّسية)
 $__cur = $argv[5] ?? '';
 if ($__cur !== '') $_SESSION['display_currency'] = $__cur; // وضع العملة (ليرة/دولار/الاثنين)
+$__sy = $argv[6] ?? '';
+if ($__sy !== '') $_SESSION['active_school_year'] = $__sy; // السنة الدراسية المعروضة
 $_GET = json_decode(base64_decode($argv[2] ?? ''), true) ?: [];
 $_SERVER['REQUEST_URI'] = '/x';
 chdir(dirname($PROJ . '/' . $argv[1]));
@@ -53,7 +55,7 @@ catch (Throwable $e) { ob_end_clean(); echo 'FATAL: ' . $e->getMessage(); }
 PHP);
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner) . ' '
          . escapeshellarg($rel) . ' ' . base64_encode(json_encode($get)) . ' ' . base64_encode(json_encode($comp))
-         . ' ' . base64_encode(json_encode($schoolIds)) . ' ' . escapeshellarg($currency);
+         . ' ' . base64_encode(json_encode($schoolIds)) . ' ' . escapeshellarg($currency) . ' ' . escapeshellarg($schoolYear);
     return (string)shell_exec($cmd . ' 2>NUL');
 }
 $noFatal = fn(string $h) => strpos($h, 'FATAL') !== 0 && stripos($h, 'Fatal error') === false && strlen($h) > 5000;
@@ -585,6 +587,59 @@ check('فحص الصحّة: زرّ تصفير سجلّ التحذيرات محم
 $hcOut = renderPage('pages/health_check.php', [], ['extra','aide','transport']);
 check('تشغيل فعلي: صفحة فحص الصحّة تقول «لا خطأ برمجي واحد»',
       strpos($hcOut, 'لا خطأ برمجي واحد') !== false, 'len=' . strlen($hcOut));
+
+/* =====================================================================
+ * 19) رؤوس الجداول الثابتة (2026-07-30): العناوين تبقى ظاهرة أثناء التمرير
+ *     بكل الجداول (.table/.doc-table/.salary-slip-table) — والطباعة كما هي
+ * =================================================================== */
+$jsSrc = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
+$cssSrc19 = (string)file_get_contents(__DIR__ . '/../assets/css/app.css');
+check('رؤوس ثابتة: CSS التثبيت موجود (sticky + tbl-scroll) لكل أنواع الجداول',
+      strpos($cssSrc19, '.tbl-scroll') !== false
+      && preg_match('/\.table thead th, \.doc-table thead th, \.salary-slip-table thead th \{\s*position:\s*sticky/s', $cssSrc19) === 1);
+check('رؤوس ثابتة: على الشاشة فقط — الطباعة تلغي صندوق التمرير (الرأس يتكرّر بكل صفحة)',
+      preg_match('/@media print \{\s*\.tbl-scroll \{ max-height: none !important; overflow: visible !important; \}/s', $cssSrc19) === 1);
+check('رؤوس ثابتة: app.js يركّبها تلقائياً على كل الجداول + يدعم رأس الصفّين (top تراكمي)',
+      strpos($jsSrc, 'initStickyHeads') !== false
+      && strpos($jsSrc, "classList.add('tbl-scroll')") !== false
+      && strpos($jsSrc, 'top += rows[i].offsetHeight') !== false);
+check('رؤوس ثابتة: تكرار رأس الجدول بالطباعة باقٍ (thead: table-header-group)',
+      strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), 'display:table-header-group') !== false);
+
+/* =====================================================================
+ * 20) 🔴 قاعدة التارك (2026-07-30، شكوى المستخدم): مَن عمل ولو شهراً واحداً
+ *     في السنة يبقى اسمه فيها حتى لو ترك خلالها (حتى التارك 30-9)،
+ *     ويُشال فقط من السنة الدراسية التي تبدأ بعد تركه —
+ *     بلائحة الموظفين + عدّادات الرئيسية + «احسب للكل»
+ * =================================================================== */
+$lv = $db->query("SELECT id, employee_code FROM employees
+    WHERE is_deleted = 0 AND status = 'actif'
+      AND LEAST(COALESCE(left_date_cnss,'9999-12-31'),COALESCE(left_date_finance,'9999-12-31'),COALESCE(left_date_eoc,'9999-12-31')) BETWEEN '2025-10-01' AND '2026-09-30'
+      AND id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = '2025-2026'
+                 AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))
+    LIMIT 1")->fetch();
+if ($lv) {
+    $lvMark = '<strong>' . $lv['employee_code'] . '</strong>';
+    $empY = renderPage('pages/employees.php', [], ['extra','aide','transport'], [], '', '2025-2026');
+    check('قاعدة التارك: تارك خلال 2025-2026 يبقى بلائحة موظفي 2025-2026', strpos($empY, $lvMark) !== false, 'id=' . $lv['id']);
+    $empN = renderPage('pages/employees.php', [], ['extra','aide','transport'], [], '', '2026-2027');
+    check('قاعدة التارك: نفسه يختفي من لائحة 2026-2027 (بدأت بعد تركه)', strpos($empN, $lvMark) === false, 'id=' . $lv['id']);
+} else {
+    check('قاعدة التارك: وجود عيّنة تارك خلال 2025-2026 للفحص الفعلي', false, 'لا عيّنة');
+}
+$empSrc20 = (string)file_get_contents(__DIR__ . '/../pages/employees.php');
+$idxSrc20 = (string)file_get_contents(__DIR__ . '/../index.php');
+$mpSrc20  = (string)file_get_contents(__DIR__ . '/../pages/monthly_payroll.php');
+$oySrc20  = (string)file_get_contents(__DIR__ . '/../pages/open_year.php');
+$isNullTrio = "left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL";
+check('قاعدة التارك: لائحة الموظفين تفلتر ببداية السنة الدراسية لا باستبعاد كلّي',
+      strpos($empSrc20, "LEAST(COALESCE(left_date_cnss") !== false && strpos($empSrc20, $isNullTrio) === false);
+check('قاعدة التارك: عدّادات الرئيسية تستبعد التاركين فقط في وضع «كل السنين»',
+      preg_match('/\$notLeft = \(\$yfStat === \'\'\)/', $idxSrc20) === 1);
+check('قاعدة التارك: «احسب للكل» يحسب التارك لأشهر سنة تركه (حدّ بداية السنة)',
+      strpos($mpSrc20, '$syStartC') !== false && strpos($mpSrc20, $isNullTrio) === false);
+check('قاعدة التارك: فتح السنة الجديدة يبقى يستثني التاركين (لا ينتقلون للسنة الجديدة)',
+      substr_count($oySrc20, $isNullTrio) >= 2);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

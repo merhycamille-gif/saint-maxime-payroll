@@ -534,6 +534,26 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
     box-shadow: var(--shadow-sm);
 }
 
+/* 📌 رؤوس الجداول الثابتة: العناوين تبقى ظاهرة أثناء الصعود والنزول.
+   الجدول الطويل يتمرّر داخل حاويته (tbl-scroll يضيفها app.js تلقائياً لكل جدول)
+   والرأس يلتصق بأعلى الحاوية — يشمل الرؤوس المركّبة من صفّين (top يحسبه app.js). */
+@media screen {
+    .tbl-scroll { max-height: calc(100vh - 150px); overflow: auto; }
+    .table thead th, .doc-table thead th, .salary-slip-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+    }
+    /* border-collapse يُسقط حدود الخلية الملتصقة — نعوّضها بظل يرسم الخط الفاصل */
+    .table thead th { box-shadow: 0 1px 0 var(--gray-200); }
+    .doc-table thead th { box-shadow: 0 0 0 1px #1F4E5F; }
+    .salary-slip-table thead th { box-shadow: 0 0 0 1px var(--primary-dark, #1e3a8a); }
+}
+/* الطباعة كما هي: لا صناديق تمرير — الرأس يتكرّر على كل صفحة بآلية الطباعة نفسها */
+@media print {
+    .tbl-scroll { max-height: none !important; overflow: visible !important; }
+}
+
 .table {
     width: 100%;
     border-collapse: collapse;

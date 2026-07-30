@@ -150,15 +150,18 @@ if ($action === 'calc' && $employeeId > 0) {
 
 // Calculate all (يحترم فلتر النوع إن وُجد)
 if ($action === 'calc_all') {
-    // الاحتساب على الفاعلين فقط (status=actif وبلا تاريخ ترك) — بمجرّد أن يترك الأستاذ
-    // (حالة ≠ نشط أو تاريخ ترك) لا يُحتسب له راتب فلا يظهر في السنين اللاحقة.
+    // الاحتساب على الفاعلين (status=actif) ضمن السنة الدراسية للشهر المحسوب.
+    // 🔴 قاعدة التارك (لا تُغيَّر): مَن ترك خلال السنة يبقى راتبه يُحتسب لكل أشهر سنة تركه
+    // (بما فيها أشهر الصيف حتى 30-9)، ويُستبعد فقط من السنين التي تبدأ بعد تاريخ تركه —
+    // نفس مبدأ yearEmploymentFilter و pruneSalariesAfterDeparture.
     // 🔴 حماية المنقولين يدوياً: يُحتسب فقط مَن له إعداد فعلي (ملاك أو أساس بالدولار/بالعقد > 0).
     // المتعاقد/الموظف ذو الراتب المنقول (بلا إعداد) لا يُعاد حسابه هنا لئلا يُصفَّر راتبه المخزّن
     // (نفس حماية recalcEmployeeYear / recalcSalariesInRange).
+    $syStartC = ($month >= 10 ? $year : $year - 1) . '-10-01'; // بداية السنة الدراسية للشهر المحسوب
     $sqlC = "SELECT id FROM employees WHERE is_deleted = 0 AND status = 'actif'"
-          . " AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL"
+          . " AND LEAST(COALESCE(left_date_cnss,'9999-12-31'),COALESCE(left_date_finance,'9999-12-31'),COALESCE(left_date_eoc,'9999-12-31')) >= ?"
           . " AND (employee_type = 'enseignant_titulaire' OR base_salary_usd > 0 OR contract_salary_lbp > 0)" . schoolScopeSql();
-    $paramsC = [];
+    $paramsC = [$syStartC];
     if ($typeFilter) { $sqlC .= " AND employee_type = ?"; $paramsC[] = $typeFilter; }
     $stmtC = $db->prepare($sqlC);
     $stmtC->execute($paramsC);

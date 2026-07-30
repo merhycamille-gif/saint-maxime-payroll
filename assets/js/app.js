@@ -74,6 +74,41 @@ document.addEventListener('change', function(e) {
     }
 });
 
+// 📌 تثبيت رؤوس الجداول أثناء التمرير (على كل البرنامج):
+// كل جدول طويل يتمرّر داخل حاويته (tbl-scroll) ورأسه يبقى ظاهراً فوق.
+// يدعم الرؤوس المركّبة من صفّين (rowspan/colspan): كل صف يلتصق تحت الذي قبله.
+(function () {
+    function initStickyHeads() {
+        var tables = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table');
+        for (var k = 0; k < tables.length; k++) {
+            var t = tables[k];
+            if (!t.tHead || t.tHead.rows.length === 0) continue;
+            // الحاوية التي سيتمرّر الجدول داخلها: أقرب أب يمرّر عمودياً،
+            // وإلا (أب مقصوص overflow:hidden مثل .card) الأب المباشر للجدول
+            var sc = null, p = t.parentElement;
+            while (p && p !== document.body) {
+                var oy = getComputedStyle(p).overflowY;
+                if (oy === 'auto' || oy === 'scroll') { sc = p; break; }
+                if (oy === 'hidden' || oy === 'clip') break;
+                p = p.parentElement;
+            }
+            (sc || t.parentElement).classList.add('tbl-scroll');
+            // صفوف الرأس المتعدّدة: top تراكمي حتى لا يغطي الصف الأول الثاني
+            var top = 0, rows = t.tHead.rows;
+            for (var i = 0; i < rows.length; i++) {
+                for (var j = 0; j < rows[i].cells.length; j++) {
+                    rows[i].cells[j].style.top = top + 'px';
+                }
+                top += rows[i].offsetHeight;
+            }
+        }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initStickyHeads);
+    else initStickyHeads();
+    window.addEventListener('load', initStickyHeads);   // بعد الخطوط/الصور وملاءمة fitDocTables
+    window.addEventListener('resize', initStickyHeads);
+})();
+
 // Alert function
 function showAlert(msg, type = 'info') {
     const div = document.createElement('div');

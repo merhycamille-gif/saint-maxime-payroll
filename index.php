@@ -14,13 +14,14 @@ $db = getDB();
 handleAge64Post($db, BASE_URL . 'index.php');
 
 // Stats (مقيّدة بالمدرسة الحالية — أو كل المدارس للمدير العام)
-// «الموظفون الحاليون» = غير محذوفين، فاعلون، وغير تاركين (أي تاريخ ترك يُخرجهم) — حتى لا
-// تُحتسب صفوف موظفين سابقين تركها الاستيراد (نفس مبدأ yearEmploymentFilter بكل البرنامج).
-$sc = schoolScopeSql();
-$notLeft = " AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL";
 // 🔢 الأعداد حسب **السنة الدراسية المختارة** + المدرسة/المدارس المختارة (نفس فلتر السنة المستعمَل بكل البرنامج).
 // «كل السنين» → بلا فلتر سنة (تُعيد yearEmploymentFilter فراغاً) فيُحتسب كل الفاعلين الحاليين.
+$sc = schoolScopeSql();
 [$yfStat, $ypStat] = yearEmploymentFilter(activeSchoolYear());
+// 🔴 قاعدة التارك (لا تُغيَّر): في سنة محدّدة يُحتسب مَن عمل فيها ولو شهراً واحداً حتى لو ترك خلالها
+// (yearEmploymentFilter يتكفّل بإخفائه من السنين بعد تركه). استبعاد التاركين كلياً يُطبَّق فقط في
+// وضع «كل السنين» — حتى لا تُحتسب صفوف موظفين سابقين تركها الاستيراد.
+$notLeft = ($yfStat === '') ? " AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL" : "";
 $dashCount = function ($typeSql) use ($db, $notLeft, $sc, $yfStat, $ypStat) {
     $st = $db->prepare("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND status = 'actif'" . $typeSql . $notLeft . $sc . $yfStat);
     $st->execute($ypStat);

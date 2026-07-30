@@ -563,13 +563,17 @@ if ($action === 'list') {
         // شرط سنة التعيين يمنع ظهور **الأساتذة القدامى** الذين تركوا من زمان ورواتبهم صفر
         // (بلا تاريخ ترك مسجَّل) كأنهم «جدد» في كل سنة. القديم بلا راتب لا يظهر إلا في «كل السنين».
         $syStart = substr($activeSY, 0, 4) . '-01-01';
+        // 🔴 قاعدة التارك (لا تُغيَّر): مَن عمل ولو شهراً واحداً في السنة يبقى اسمه فيها —
+        // يُخفى فقط من السنين التي تبدأ **بعد** تاريخ تركه (نفس مبدأ yearEmploymentFilter).
+        // (مثال: ترك 30-9-2026 → يظهر في 2025-2026 كاملة ويختفي من 2026-2027 التي تبدأ 1-10-2026.)
         $sql .= " AND (
                 id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))
                 OR (id NOT IN (SELECT employee_id FROM monthly_salaries WHERE base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0) AND hire_date >= ?)
             )
-            AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL";
+            AND LEAST(COALESCE(left_date_cnss,'9999-12-31'),COALESCE(left_date_finance,'9999-12-31'),COALESCE(left_date_eoc,'9999-12-31')) >= ?";
         $params[] = $activeSY;
         $params[] = $syStart;
+        $params[] = substr($activeSY, 0, 4) . '-10-01'; // بداية السنة الدراسية (تشرين الأول)
     }
     $sql .= " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)";
 
