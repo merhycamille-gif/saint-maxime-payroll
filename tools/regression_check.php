@@ -641,6 +641,29 @@ check('قاعدة التارك: «احسب للكل» يحسب التارك لأ
 check('قاعدة التارك: فتح السنة الجديدة يبقى يستثني التاركين (لا ينتقلون للسنة الجديدة)',
       substr_count($oySrc20, $isNullTrio) >= 2);
 
+/* =====================================================================
+ * 21) 🗑️ حذف مدرستَي «ثانوية السيدة - مغدوشة» و«ليسيه سان نيقولا» نهائياً
+ *     (2026-07-31، بطلب المستخدم): لا أثر لهما ولا بيانات يتيمة خلفهما،
+ *     والشفاء الذاتي يبقى مركّباً بالهيدر ليحذفهما من الأونلاين تلقائياً
+ * =================================================================== */
+check('حذف مغدوشة/سان نيقولا: لا مدرسة بهذا الاسم في الداتا',
+      (int)$db->query("SELECT COUNT(*) FROM schools WHERE name_ar LIKE '%مغدوشة%' OR name_ar LIKE '%نيقولا%' OR name_fr LIKE '%Maghdouch%' OR name_fr LIKE '%Nicolas%'")->fetchColumn() === 0);
+check('حذف مغدوشة/سان نيقولا: لا موظفين يتامى (مدرستهم محذوفة)',
+      (int)$db->query("SELECT COUNT(*) FROM employees e LEFT JOIN schools s ON s.id = e.school_id WHERE s.id IS NULL")->fetchColumn() === 0);
+check('حذف مغدوشة/سان نيقولا: لا رواتب يتيمة (مدرستها محذوفة)',
+      (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms LEFT JOIN schools s ON s.id = ms.school_id WHERE s.id IS NULL")->fetchColumn() === 0);
+$fnSrc21 = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
+$hdSrc21 = (string)file_get_contents(__DIR__ . '/../includes/header.php');
+check('حذف مغدوشة/سان نيقولا: الشفاء الذاتي موجود ومستدعى بالهيدر (يُصلح الأونلاين لحاله)',
+      strpos($fnSrc21, 'function healPurgeClosedSchools20260731') !== false
+      && strpos($hdSrc21, 'healPurgeClosedSchools20260731();') !== false);
+check('حذف مغدوشة/سان نيقولا: الشفاء يحفظ نسخة استرجاع قبل الحذف',
+      strpos($fnSrc21, "purge_auto_") !== false && strpos($fnSrc21, 'FOREIGN_KEY_CHECKS=0') !== false);
+$hcSrc21 = (string)file_get_contents(__DIR__ . '/../pages/health_check.php');
+check('حذف مغدوشة/سان نيقولا: فحصا اليتامى مضافان بصفحة فحص الصحّة',
+      strpos($hcSrc21, 'لا موظفين تابعين لمدرسة محذوفة') !== false
+      && strpos($hcSrc21, 'لا رواتب تابعة لمدرسة محذوفة') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

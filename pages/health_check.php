@@ -96,6 +96,11 @@ try {
     hc($groups, $G1, $dup === 0, 'لا رواتب مكرّرة لنفس الموظف والشهر', $dup === 0 ? 'صفر تكرار' : "$dup تكرار", 'لو فشل: الموظف يظهر مرّتين بكشف الشهر فتتضخّم المجاميع.');
     $orph = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms LEFT JOIN employees e ON e.id = ms.employee_id WHERE e.id IS NULL")->fetchColumn();
     hc($groups, $G1, $orph === 0, 'لا رواتب لموظفين غير موجودين', $orph === 0 ? 'صفر' : "$orph صفّاً", 'لو فشل: مبالغ بلا صاحب تدخل بالمجاميع.');
+    // بعد حذف مدارس نهائياً (مغدوشة/سان نيقولا 2026-07-31): لا يجوز أن يبقى خلفها أي أثر
+    $orphE = (int)$db->query("SELECT COUNT(*) FROM employees e LEFT JOIN schools s ON s.id = e.school_id WHERE s.id IS NULL")->fetchColumn();
+    hc($groups, $G1, $orphE === 0, 'لا موظفين تابعين لمدرسة محذوفة', $orphE === 0 ? 'صفر' : "$orphE موظفاً", 'لو فشل: حذف مدرسة ترك موظفيها بلا مدرسة — يدخلون بالمجاميع ولا يظهرون بأي لائحة.');
+    $orphS = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms LEFT JOIN schools s ON s.id = ms.school_id WHERE s.id IS NULL")->fetchColumn();
+    hc($groups, $G1, $orphS === 0, 'لا رواتب تابعة لمدرسة محذوفة', $orphS === 0 ? 'صفر' : "$orphS صفّاً", 'لو فشل: حذف مدرسة ترك رواتب بلا مدرسة تتلوّث بها المجاميع.');
 } catch (Exception $e) {}
 
 /* الأرقام «المنقولة»: مكوّناتها لا تفسّر مجموعها (بيانات مستوردة — تحتاج قرار المستخدم) */

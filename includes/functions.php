@@ -503,6 +503,70 @@ function healCaisseNumbers() {
     } catch (Exception $e) { /* لا نُعطّل الصفحة */ }
 }
 
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-07-31): حذف نهائي لمدرستَي «ثانوية السيدة - مغدوشة»
+ * و«ليسيه سان نيقولا» بكل بياناتهما (موظفون/رواتب/علاوات/تاريخ درجات/طلبات فورم)
+ * بطلب صريح من المستخدم — لم تعودا موجودتين في البرنامج.
+ * المطابقة بالاسم لا بالرقم (تحسّباً لاختلاف الأرقام بين المحلي والأونلاين).
+ * قبل الحذف تُحفظ نسخة استرجاع INSERTs في backups/ (كما تفعل صفحة purge_schools).
+ */
+function healPurgeClosedSchools20260731() {
+    $flag = 'purged_maghdouche_nicolas_2026_07_31';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        $ids = $db->query("SELECT id FROM schools
+                            WHERE name_ar LIKE '%مغدوشة%' OR name_fr LIKE '%Maghdouch%'
+                               OR name_ar LIKE '%نيقولا%' OR name_fr LIKE '%Nicolas%'")
+                  ->fetchAll(PDO::FETCH_COLUMN);
+        $ids = array_map('intval', $ids);
+        if (!$ids) { setSetting($flag, date('Y-m-d H:i') . ' (غير موجودتين)'); return; }
+        @set_time_limit(600);
+        $in = implode(',', $ids);
+        $empIds = $db->query("SELECT id FROM employees WHERE school_id IN ($in)")->fetchAll(PDO::FETCH_COLUMN);
+        $empIn = $empIds ? implode(',', array_map('intval', $empIds)) : '0';
+
+        // (1) نسخة استرجاع لكل الصفوف قبل الحذف
+        $dumpRows = function ($table, $rows) use ($db) {
+            if (!$rows) return "-- $table: 0\n";
+            $cols = '`' . implode('`,`', array_keys($rows[0])) . '`';
+            $sql = "-- $table (" . count($rows) . ")\n";
+            foreach ($rows as $r) {
+                $vals = array_map(fn($v) => $v === null ? 'NULL' : $db->quote((string)$v), array_values($r));
+                $sql .= "INSERT INTO `$table` ($cols) VALUES (" . implode(',', $vals) . ");\n";
+            }
+            return $sql . "\n";
+        };
+        $dump = "-- نسخة استرجاع (حذف مغدوشة + سان نيقولا) — " . date('Y-m-d H:i:s') . "\n-- المدارس: $in\nSET FOREIGN_KEY_CHECKS=0;\n\n";
+        $dump .= $dumpRows('schools', $db->query("SELECT * FROM schools WHERE id IN ($in)")->fetchAll(PDO::FETCH_ASSOC));
+        $dump .= $dumpRows('employees', $db->query("SELECT * FROM employees WHERE school_id IN ($in)")->fetchAll(PDO::FETCH_ASSOC));
+        $dump .= $dumpRows('monthly_salaries', $db->query("SELECT * FROM monthly_salaries WHERE school_id IN ($in) OR employee_id IN ($empIn)")->fetchAll(PDO::FETCH_ASSOC));
+        $dump .= $dumpRows('employee_bonuses', $db->query("SELECT * FROM employee_bonuses WHERE employee_id IN ($empIn)")->fetchAll(PDO::FETCH_ASSOC));
+        $dump .= $dumpRows('employee_grade_history', $db->query("SELECT * FROM employee_grade_history WHERE employee_id IN ($empIn)")->fetchAll(PDO::FETCH_ASSOC));
+        try { $dump .= $dumpRows('info_submissions', $db->query("SELECT * FROM info_submissions WHERE school_id IN ($in) OR employee_id IN ($empIn)")->fetchAll(PDO::FETCH_ASSOC)); } catch (Exception $e) {}
+        $dump .= "\nSET FOREIGN_KEY_CHECKS=1;\n";
+        $dir = __DIR__ . '/../backups';
+        if (!is_dir($dir)) @mkdir($dir, 0775, true);
+        @file_put_contents($dir . '/purge_auto_' . date('Ymd_His') . '.sql', $dump);
+
+        // (2) الحذف بترتيب آمن ضمن معاملة واحدة (نفس ترتيب purge_schools.php)
+        $db->beginTransaction();
+        $db->exec("DELETE FROM employee_bonuses WHERE employee_id IN ($empIn)");
+        $db->exec("DELETE FROM employee_grade_history WHERE employee_id IN ($empIn)");
+        $db->exec("DELETE FROM monthly_salaries WHERE school_id IN ($in) OR employee_id IN ($empIn)");
+        try { $db->exec("DELETE FROM info_submissions WHERE school_id IN ($in) OR employee_id IN ($empIn)"); } catch (Exception $e) {}
+        $db->exec("DELETE FROM employees WHERE school_id IN ($in)");
+        $db->exec("UPDATE users SET school_id = NULL WHERE school_id IN ($in)");
+        $db->exec("DELETE FROM schools WHERE id IN ($in)");
+        $db->commit();
+        if (function_exists('logAudit')) logAudit('purge', 'schools', 0, null, "auto-heal ids=$in");
+        setSetting($flag, date('Y-m-d H:i') . " (ids={$in} — " . count($empIds) . " موظف)");
+    } catch (Throwable $e) {
+        try { if (isset($db) && $db->inTransaction()) $db->rollBack(); } catch (Throwable $e2) {}
+        /* لا نكسر الصفحة — يُعاد عند الفتح التالي */
+    }
+}
+
 function healYearAdditions2627() {
     $flag = 'yr_additions_backfilled_2026-2027';
     if (getSetting($flag, '') !== '') return;
