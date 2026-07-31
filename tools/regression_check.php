@@ -261,7 +261,9 @@ if ($regEid) {
  * 9) «الراتب يشمل» يعمّ كل التقارير (2026-07-28): بيان الصندوق الفصلي + معلومات عامة
  * =================================================================== */
 // (2026-07-29) بيان الصندوق الفصلي صار مطابقاً للنموذج الرسمي الورقي (صورة المستخدم)
-$hQ = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 3], []);
+// (2026-07-31) عمود «الأجر الإضافي» صار يتبع زرّ «الراتب يشمل» — الفحص هنا بالزرّ مفعّلاً
+// (حالة الزرّ المطفأ يغطّيها فحص التوازن بالقسم 26)
+$hQ = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 3], ['extra', 'aide', 'transport']);
 check('بيان الصندوق الفصلي: ترويسة النموذج الرسمي',
       strpos($hQ, 'بيان بالمحسومات المقتطعة ومساهمة المدرسة') !== false
       && strpos($hQ, 'لأفراد الهيئة التعليمية في المدارس الخاصة') !== false
@@ -897,16 +899,38 @@ $colBalance = function (string $html): array {
     }
     return [$leaf, 0];
 };
-$balOk = true; $balDetail = [];
-foreach ([['extra','aide','transport'], ['aide','transport'], ['transport'], []] as $comp26) {
-    foreach (['salary_detail', 'cnss_nominative_monthly'] as $form26) {
+$balOk = true; $balDetail = []; $balN = 0;
+$balForms26 = ['salary_detail', 'cnss_nominative_monthly', 'eoc_quarterly', 'salary_all',
+               'payment_list', 'full_register', 'general_report', 'teaching_staff', 'eoc_staff'];
+foreach ([['extra','aide','transport'], ['transport'], []] as $comp26) {
+    foreach ($balForms26 as $form26) {
         $h26 = renderPage('pages/official_forms.php', ['form' => $form26, 'month' => '7', 'year' => '2026'], $comp26, [2]);
         [$lf, $cells] = $colBalance($h26);
-        if ($lf < 10 || $lf !== $cells) { $balOk = false; $balDetail[] = $form26 . '[' . implode(',', $comp26) . "]=$lf/$cells"; }
+        $balN++;
+        if ($lf < 5 || $lf !== $cells) { $balOk = false; $balDetail[] = $form26 . '[' . implode(',', $comp26) . "]=$lf/$cells"; }
     }
 }
-check('الراتب يشمل: رؤوس الأعمدة = خلايا الصف بكل تركيبات الزر (الاسمي المفصّل + معلومات تفصيلية)',
-      $balOk, $balDetail ? implode(' · ', $balDetail) : '8 تركيبات متوازنة');
+check('الراتب يشمل: رؤوس الأعمدة = خلايا الصف بكل تركيبات الزر (9 كشوف جماعية × 3 تركيبات)',
+      $balOk, $balDetail ? implode(' · ', $balDetail) : "$balN حالة متوازنة");
+// بقية الكشوف والبطاقات التي كانت تتجاهل الزر (جولة p1 الثانية — eoc_quarterly وأخواتها)
+check('الراتب يشمل: المحسومات الفصلية (صندوق التعويضات) — عمود الأجر الإضافي مشروط بالزر',
+      strpos($ofSrc26, "\$allSpan = (\$multiS ? 11 : 10) + (salaryCompHas('extra') ? 1 : 0);") !== false
+      && preg_match('/if \(salaryCompHas\(\'extra\'\)\): \?><th>الأجر<br>الإضافي/u', $ofSrc26) === 1);
+check('الراتب يشمل: كلفة المؤسسة — الإجمالي والكلفة من البنود الظاهرة فقط وسطور «منها»/النقل مشروطة',
+      strpos($ofSrc26, "\$totalCost = \$gross+\$fam+(salaryCompHas('transport') ? \$trans : 0)+\$employerCharges;") !== false
+      && strpos($ofSrc26, "if (salaryCompHas('extra')) \$lines[] = ['— منها: الأجر الإضافي'") !== false
+      && strpos($ofSrc26, "if (salaryCompHas('transport')) \$lines[] = ['تعويضات النقل'") !== false);
+check('الراتب يشمل: بطاقة الأستاذ وبطاقة الملاك — سطرا الإضافي/المكافأة مشروطان بالزر',
+      substr_count($ofSrc26, "if (salaryCompHas('extra')): ?><div><span class=\"k\">الأجر الإضافي:</span>") === 2
+      && substr_count($ofSrc26, "if (salaryCompHas('aide')): ?><div><span class=\"k\">مكافأة ومساعدة:</span>") === 2);
+$ehSrc26 = (string)file_get_contents(__DIR__ . '/../pages/employee_history.php');
+check('الراتب يشمل: سيرة الأستاذ — سطور «+ إضافي/مكافأة/نقل» مشروطة فيبقى المركّب = مجموع الظاهر',
+      strpos($ehSrc26, "if (salaryCompHas('extra')): ?><tr><td>+ Supplément") !== false
+      && strpos($ehSrc26, "if (salaryCompHas('aide')): ?><tr><td>+ Prime") !== false
+      && strpos($ehSrc26, "if (salaryCompHas('transport')): ?><tr><td>+ Transport") !== false);
+check('الراتب يشمل: التقرير العام — عمود «الصافية مع تعويض النقل» مشروط بالنقل (لا ذكر للنقل والزرّ مطفأ)',
+      strpos($ofSrc26, "if (salaryCompHas('transport')): ?><th>الرواتب الصافية<br>مع تعويض النقل</th>") !== false
+      && strpos($ofSrc26, "<th>الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th>") !== false);
 // النقل يظهر عند اختياره ويختفي عند إلغائه (نص الرأس نفسه)
 $hT26 = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => '7', 'year' => '2026'], ['transport'], [2]);
 $hN26 = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => '7', 'year' => '2026'], [], [2]);

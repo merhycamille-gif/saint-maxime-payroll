@@ -874,8 +874,8 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">عدد الساعات الأسبوعية:</span> <?= fillVal(rtrim(rtrim((string)$emp['hours_per_week'],'0'),'.')) ?></div>
         <div><span class="k">رقمه في الضمان:</span> <?= fillVal($emp['nssf_number']) ?></div>
         <div><span class="k">رقمه المالي:</span> <?= fillVal($emp['finance_ministry_number']) ?></div>
-        <div><span class="k">الأجر الإضافي:</span> <strong><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
-        <div><span class="k">مكافأة ومساعدة:</span> <strong><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
+        <?php if (salaryCompHas('extra')): ?><div><span class="k">الأجر الإضافي:</span> <strong><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div><?php endif; ?>
+        <?php if (salaryCompHas('aide')): ?><div><span class="k">مكافأة ومساعدة:</span> <strong><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div><?php endif; ?>
         <div class="full"><span class="k">الراتب الشهري (سلسلة):</span> <strong><?= money($sal ? (int)$sal['base_plus_echelon_lbp'] : (int)$salary, $sal ? rowRate($sal) : null) ?></strong></div>
         <div class="full" style="background:#eef2ff;padding:4px 8px;border-radius:6px"><span class="k">الراتب المركّب (<?= e(salaryCompLabel()) ?>):</span> <strong><?= $sal ? money(composedSalaryLbp($sal), rowRate($sal)) : formatLBP($salary) ?></strong></div>
     </div>
@@ -1129,8 +1129,8 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">الدرجة الحالية:</span> <?= fillVal(rtrim(rtrim((string)$emp['current_grade'],'0'),'.')) ?></div>
         <div><span class="k">عدد ساعات التعليم:</span> <?= fillVal(rtrim(rtrim((string)$emp['hours_per_week'],'0'),'.')) ?></div>
         <div><span class="k">الراتب الأساسي (سلسلة):</span> <strong><?= money($sal ? (int)$sal['base_plus_echelon_lbp'] : (int)$base, $sal ? rowRate($sal) : null) ?></strong></div>
-        <div><span class="k">الأجر الإضافي:</span> <strong><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
-        <div><span class="k">مكافأة ومساعدة:</span> <strong><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div>
+        <?php if (salaryCompHas('extra')): ?><div><span class="k">الأجر الإضافي:</span> <strong><?= money($sal ? extraWageLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div><?php endif; ?>
+        <?php if (salaryCompHas('aide')): ?><div><span class="k">مكافأة ومساعدة:</span> <strong><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div><?php endif; ?>
         <div style="background:#eef2ff;padding:4px 8px;border-radius:6px"><span class="k">الراتب المركّب (<?= e(salaryCompLabel()) ?>):</span> <strong><?= $sal ? money(composedSalaryLbp($sal), rowRate($sal)) : formatLBP($base) ?></strong></div>
         <div><span class="k">اشتراك الصندوق (٦٪):</span> <strong><?= formatLBP($eoc) ?></strong></div>
         <?php if ($eocGradeCard > 0): ?><div><span class="k">درجة / نصف راتب (آخر حسم):</span> <strong><?= formatLBP($eocGradeCard) ?></strong></div><?php endif; ?>
@@ -1178,7 +1178,8 @@ elseif ($form === 'teacher_card'):
         if (!$td || $td === '0000-00-00') return false;
         return ((int)date('Y', strtotime($td)) === $qYear) && in_array((int)date('n', strtotime($td)), $qm, true);
     };
-    $allSpan = $multiS ? 12 : 11;
+    // عمود «الأجر الإضافي» يتبع زرّ «الراتب يشمل» (طلب المستخدم p1) — المحسومات نفسها تبقى المخزّنة القانونية
+    $allSpan = ($multiS ? 11 : 10) + (salaryCompHas('extra') ? 1 : 0);
 ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="eoc_quarterly">
@@ -1211,7 +1212,7 @@ elseif ($form === 'teacher_card'):
             <?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
             <th>الرقم المالي</th><th>الاسم والشهرة</th><th>اسم الأب</th>
             <th>الراتب الشهري<br>السابق ل.ل</th><th>الراتب الشهري<br>الحالي ل.ل</th>
-            <th>الأجر<br>الإضافي ل.ل</th>
+            <?php if (salaryCompHas('extra')): ?><th>الأجر<br>الإضافي ل.ل</th><?php endif; ?>
             <th>المحسومات<br>الشهرية ل.ل</th><th>المحسومات<br>الفصلية ل.ل</th>
             <th>نصف<br>راتب ل.ل</th><th>مختلف، درجة<br>تمرين ل.ل</th><th>ملاحظات</th>
         </tr></thead>
@@ -1228,7 +1229,7 @@ elseif ($form === 'teacher_card'):
                 <td><?= e(trim((string)$r['father_name_ar']) ?: (string)$r['father_name_fr']) ?></td>
                 <td class="num"><?= formatLBP($r['prevSal'],false) ?></td>
                 <td class="num"><?= formatLBP($r['currSal'],false) ?></td>
-                <td class="num"><?= $exM>0?formatLBP($exM,false):'00' ?></td>
+                <?php if (salaryCompHas('extra')): ?><td class="num"><?= $exM>0?formatLBP($exM,false):'00' ?></td><?php endif; ?>
                 <td class="num"><?= formatLBP($mc,false) ?></td>
                 <td class="num"><strong><?= formatLBP($qc,false) ?></strong></td>
                 <td class="num"><?= $half>0?formatLBP($half,false):'00' ?></td>
@@ -1242,7 +1243,7 @@ elseif ($form === 'teacher_card'):
             <td colspan="<?= $multiS ? 4 : 3 ?>">المجموع</td>
             <td class="num"><strong><?= formatLBP($totPrev,false) ?></strong></td>
             <td class="num"><strong><?= formatLBP($totCur,false) ?></strong></td>
-            <td class="num"><strong><?= formatLBP($totEx,false) ?></strong></td>
+            <?php if (salaryCompHas('extra')): ?><td class="num"><strong><?= formatLBP($totEx,false) ?></strong></td><?php endif; ?>
             <td class="num"><strong><?= formatLBP($totM,false) ?></strong></td>
             <td class="num"><strong><?= formatLBP($totQ,false) ?></strong></td>
             <td class="num"><strong><?= formatLBP($totHalf,false) ?></strong></td>
@@ -1492,7 +1493,7 @@ elseif ($form === 'teacher_card'):
         <thead><tr>
             <th>اسم المؤسسة</th>
             <th>أساس الراتب</th>
-            <th>الرواتب الصافية<br>بدون النقل</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><?= transportHead() ?><th>الرواتب الصافية<br>مع تعويض النقل</th>
+            <th>الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><?= transportHead() ?><?php if (salaryCompHas('transport')): ?><th>الرواتب الصافية<br>مع تعويض النقل</th><?php endif; ?>
             <th>الضمان الاجتماعي</th><th>صندوق التعويضات</th><th>ضريبة الدخل</th><th>المجموع</th>
         </tr></thead>
         <tbody>
@@ -1517,15 +1518,15 @@ elseif ($form === 'teacher_card'):
                 <?php if (salaryCompHas('extra')): ?><td class="num"><?= dualFromUsd($exW,$exWu,false) ?></td><?php endif; ?>
                 <?php if (salaryCompHas('aide')): ?><td class="num"><?= dualFromUsd($aid,$aidu,false) ?></td><?php endif; ?>
                 <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($composed,$composedu,false) ?></strong></td>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= dualFromUsd($trans,$transu,false) ?></td><?php endif; ?>
-                <td class="num"><?= formatLBP($netWith,false) ?></td>
+                <?php if (salaryCompHas('transport')): ?><td class="num"><?= dualFromUsd($trans,$transu,false) ?></td>
+                <td class="num"><?= formatLBP($netWith,false) ?></td><?php endif; ?>
                 <td class="num"><?= formatLBP($cnss,false) ?></td>
                 <td class="num"><?= formatLBP($eoc,false) ?></td>
                 <td class="num"><?= formatLBP($tax,false) ?></td>
                 <td class="num"><strong><?= formatLBP($tot,false) ?></strong></td>
             </tr>
         <?php endforeach; ?>
-        <?php if(!$sdata): ?><tr><td colspan="<?= 9 + compColsCount() ?>" class="text-center">لا توجد بيانات لهذه السنة</td></tr><?php endif; ?>
+        <?php if(!$sdata): ?><tr><td colspan="<?= 8 + compColsCount() + (salaryCompHas('transport') ? 1 : 0) ?>" class="text-center">لا توجد بيانات لهذه السنة</td></tr><?php endif; ?>
         </tbody>
         <tfoot><tr class="total-row">
             <td>المجموع</td>
@@ -1534,7 +1535,7 @@ elseif ($form === 'teacher_card'):
             <?= extraAideTotalCells($T['extra'],$T['extra_usd'],$T['aide'],$T['aide_usd']) ?>
             <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($T['composed'],$T['composed_usd'],false) ?></strong></td>
             <?= transportTotalCell($T['trans'],$T['trans_usd']) ?>
-            <td class="num"><?= formatLBP($T['netWith'],false) ?></td>
+            <?php if (salaryCompHas('transport')): ?><td class="num"><?= formatLBP($T['netWith'],false) ?></td><?php endif; ?>
             <td class="num"><?= formatLBP($T['cnss'],false) ?></td>
             <td class="num"><?= formatLBP($T['eoc'],false) ?></td>
             <td class="num"><?= formatLBP($T['tax'],false) ?></td>
@@ -2061,25 +2062,34 @@ elseif ($form === 'payment_list'):
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE e.is_deleted=0" . $ofYearFilter . " AND ms.school_year=? AND " . schoolScopeWhere('ms.school_id'));
     $q->execute(array_merge($ofYearParams, [$schoolYear])); $g = $q->fetch();
-    $gross=(int)($g['gross']??0); $fam=(int)($g['family']??0); $trans=(int)($g['transport']??0);
+    $fam=(int)($g['family']??0); $trans=(int)($g['transport']??0);
     $cnss8=(int)($g['cnss8']??0); $eoc6=(int)($g['eoc6']??0); $fam6=(int)($g['fam6']??0); $eos85=(int)($g['eos85']??0);
     $employerCharges = $cnss8+$eoc6+$fam6+$eos85;
-    $totalCost = $gross+$fam+$trans+$employerCharges;
+    // «الأرقام تركب» + زرّ «الراتب يشمل»: الإجمالي والكلفة = مجموع البنود الظاهرة فقط
+    $gross = (int)($g['bpe']??0)
+           + (salaryCompHas('extra') ? (int)($g['extraWage']??0) : 0)
+           + (salaryCompHas('aide')  ? (int)($g['aideC']??0) : 0);
+    $totalCost = $gross+$fam+(salaryCompHas('transport') ? $trans : 0)+$employerCharges;
+    $grossParts = ['أساسي + درجة'];
+    if (salaryCompHas('extra')) $grossParts[] = 'إضافي';
+    if (salaryCompHas('aide'))  $grossParts[] = 'مكافآت';
     $lines = [
-        ['الرواتب الإجمالية (أساسي + درجة + إضافي + مكافآت)', $gross, false],
+        ['الرواتب الإجمالية (' . implode(' + ', $grossParts) . ')', $gross, false],
         ['— منها: أساس الراتب', (int)($g['baseS']??0), true],
         ['— منها: الراتب بعد التدرّج', (int)($g['bpe']??0), true],
-        ['— منها: الأجر الإضافي', (int)($g['extraWage']??0), true],
-        ['— منها: مكافأة ومساعدة', (int)($g['aideC']??0), true],
-        ['التعويضات العائلية', $fam, false],
-        ['تعويضات النقل', $trans, false],
+    ];
+    if (salaryCompHas('extra')) $lines[] = ['— منها: الأجر الإضافي', (int)($g['extraWage']??0), true];
+    if (salaryCompHas('aide'))  $lines[] = ['— منها: مكافأة ومساعدة', (int)($g['aideC']??0), true];
+    $lines[] = ['التعويضات العائلية', $fam, false];
+    if (salaryCompHas('transport')) $lines[] = ['تعويضات النقل', $trans, false];
+    $lines = array_merge($lines, [
         ['— مساهمة المؤسسة بالضمان (٨٪ مرض)', $cnss8, true],
         ['— مساهمة المؤسسة بنهاية الخدمة (٨.٥٪)', $eos85, true],
         ['— مساهمة المؤسسة بالتعويضات العائلية (٦٪)', $fam6, true],
         ['— مساهمة المؤسسة بصندوق التعويضات (٦٪)', $eoc6, true],
         ['مجموع مساهمات المؤسسة', $employerCharges, false],
         ['الكلفة الإجمالية على المؤسسة', $totalCost, false],
-    ];
+    ]);
 ?>
 <div class="official-doc rtl" id="ppExportArea">
     <?= schoolLetterhead($school) ?>
@@ -2093,7 +2103,7 @@ elseif ($form === 'payment_list'):
         <?php endforeach; ?>
         </tbody>
     </table>
-    <div class="doc-note">الكلفة الإجمالية = الرواتب + التعويضات العائلية + النقل + كل مساهمات المؤسسة (الضمان + نهاية الخدمة + العائلية + صندوق التعويضات).</div>
+    <div class="doc-note">الكلفة الإجمالية = الرواتب + التعويضات العائلية<?= salaryCompHas('transport') ? ' + النقل' : '' ?> + كل مساهمات المؤسسة (الضمان + نهاية الخدمة + العائلية + صندوق التعويضات) — البنود بحسب زرّ «الراتب يشمل».</div>
     <div class="sign-row"><?= signatureBox('المحاسب', '', '') ?><?= signatureBox('المدير', $school['ville'] ?? '', formatDate(date('Y-m-d'))) ?></div>
 </div>
 
