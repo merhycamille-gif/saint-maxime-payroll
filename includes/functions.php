@@ -1722,9 +1722,10 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
     }
     ?>
     <p class="text-muted" style="font-size:13px;margin:0 0 10px;line-height:1.9">
-        ✅ = درجة <strong>محسوبة</strong>. شِيل الصح = تبقى ظاهرة بلا حساب (وترجّعها وقت ما بدّك).
-        <strong>أوّل ما تغيّر أي شي يظهر زرّ «حفظ» أخضر بنفس السطر — كبسة وحدة والحفظ فوري.</strong>
-        و<strong>«تعديل»</strong> يفتح تاريخ الدرجة ومقدارها، و<strong>«حذف»</strong> يشيلها نهائياً. (درجة دخول الملاك ثابتة 🔒.)
+        🔒 <strong>كل اللائحة مقفولة للحماية.</strong> اكبس <strong>«تعديل»</strong> قدّام الدرجة التي تريد تغييرها —
+        هي وحدها تنفتح (الصح «محسوبة؟» + التاريخ + المقدار)، وأوّل ما تغيّر شيئاً يظهر زرّ
+        <strong>«حفظ» أخضر بنفس السطر</strong> — كبسة وحدة والحفظ فوري. و<strong>«حذف»</strong> يشيل الدرجة نهائياً (بتأكيد).
+        ✅ = درجة محسوبة؛ شِيل الصح = تبقى ظاهرة بلا حساب. (درجة دخول الملاك ثابتة دائماً.)
         <?php if ($excludedCount): ?><br><span style="color:#c0392b;font-weight:700">حالياً <?= $excludedCount ?> درجة مستثناة (غير محسوبة).</span><?php endif; ?>
     </p>
     <form method="POST" id="gradeChecklistForm" action="<?= BASE_URL ?>pages/grades.php?employee_id=<?= (int)$emp['id'] ?>">
@@ -1745,12 +1746,12 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                 $counted = $isTitul || (int)$h['counted'] === 1;
                 $amount  = ($h['delta'] !== null) ? (float)$h['delta'] : ((float)$h['grade_after'] - (float)$h['grade_before']);
             ?>
-                <tr style="<?= !$counted ? 'opacity:.55;background:#fbfbfb' : '' ?>">
+                <tr class="<?= $isTitul ? '' : 'gr-locked' ?>" style="<?= !$counted ? 'opacity:.55;background:#fbfbfb' : '' ?>">
                     <td style="text-align:center">
                         <?php if ($isTitul): ?>
                             <i class="fas fa-lock text-muted" title="درجة دخول الملاك — ثابتة دائماً"></i>
                         <?php else: ?>
-                            <input type="checkbox" name="keep[]" value="<?= (int)$h['id'] ?>" <?= $counted ? 'checked' : '' ?> style="width:20px;height:20px;cursor:pointer">
+                            <input type="checkbox" name="keep[]" value="<?= (int)$h['id'] ?>" <?= $counted ? 'checked' : '' ?> tabindex="-1" style="width:20px;height:20px;cursor:pointer">
                         <?php endif; ?>
                     </td>
                     <td>
@@ -1838,18 +1839,21 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
             <thead><tr>
                 <th style="text-align:center">إعطاء؟</th><th>القانون / الدرجة</th><th style="text-align:center">مقدارها</th>
                 <th>تاريخ الإعطاء</th><th>الوصف</th>
-                <th style="text-align:center;width:110px" class="no-print">حفظ</th>
+                <th style="text-align:center;width:160px" class="no-print">إجراءات</th>
             </tr></thead>
             <tbody>
             <?php foreach ($grantable as $gb): $law = $gb['law']; $units = $gb['units']; $nU = count($units);
                 foreach ($units as $i => $u): $key = $law['law_number'] . '__' . $i; ?>
-                <tr>
-                    <td style="text-align:center"><input type="checkbox" name="gunit[]" value="<?= e($key) ?>" style="width:20px;height:20px;cursor:pointer"></td>
+                <tr class="gr-locked">
+                    <td style="text-align:center"><input type="checkbox" name="gunit[]" value="<?= e($key) ?>" tabindex="-1" style="width:20px;height:20px;cursor:pointer"></td>
                     <td><strong>قانون <?= e($law['law_number']) ?></strong> <small class="text-muted">— درجة <?= $i + 1 ?>/<?= $nU ?></small></td>
                     <td style="text-align:center"><span class="badge badge-gold">+<?= $fmtG($u['delta']) ?></span></td>
-                    <td><input type="date" name="gudate[<?= e($key) ?>]" value="<?= e($u['date']) ?>" class="form-control" style="max-width:145px;padding:4px 6px"></td>
+                    <td><input type="date" name="gudate[<?= e($key) ?>]" value="<?= e($u['date']) ?>" readonly class="form-control gr-field" style="max-width:145px;padding:4px 6px"></td>
                     <td><small><?= e($law['description_ar'] ?: $law['description_fr']) ?></small></td>
                     <td style="text-align:center" class="no-print">
+                        <button type="button" class="btn btn-sm btn-warning gr-edit" title="فتح هذه الدرجة (الصح والتاريخ) للإعطاء">
+                            <i class="fas fa-pen"></i> تعديل
+                        </button>
                         <button type="submit" class="btn btn-sm btn-success gr-save" style="display:none"
                                 title="يحفظ تغييراتك فوراً ويعيد حساب الراتب">
                             <i class="fas fa-save"></i> حفظ
@@ -1862,15 +1866,16 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         <?php endif; ?>
 
         <style>
+        /* 🔒 كل الصفوف مقفولة افتراضياً: الصحّات لا تُكبس والحقول لا تُكتب حتى «تعديل» على الصفّ نفسه */
+        #gradeChecklistForm tr.gr-locked input[type=checkbox]{pointer-events:none;opacity:.45;cursor:default}
         /* زرّ الحفظ الفوري يلفت النظر لمّا يظهر قدّام الشي المتغيّر */
         .gr-pulse{animation:grPulse .9s ease infinite alternate}
         @keyframes grPulse{from{box-shadow:0 0 0 0 rgba(22,163,74,.55)}to{box-shadow:0 0 0 7px rgba(22,163,74,0)}}
         </style>
         <script>
-        // 🖱️ الحفظ الفوري قدّام التغيير: أوّل ما تغيّر أي شي (صح «محسوبة؟» / تاريخ / مقدار / إعطاء درجة)
-        // يظهر زرّ «حفظ» أخضر نابض بنفس السطر — كبسة وحدة تحفظ كل ما هو معروض وتعيد حساب الراتب
-        // (يحفظ كامل حالة الجدول فلا يضيع أي تغيير آخر عملته قبل الكبسة).
-        // و«تعديل» يفتح حقلَي التاريخ والمقدار للصفّ فقط — حماية من التعديل غير المقصود.
+        // 🔒 كل اللائحة مقفولة افتراضياً — «تعديل» يفتح صفّه فقط (الصح + التاريخ + المقدار)،
+        // وأوّل ما يتغيّر شيء ينبض زرّ «حفظ» الأخضر بنفس السطر. الحفظ فوري ويحفظ كامل
+        // الحالة المعروضة (فلا يضيع تغيير صفّ آخر فتحتَه قبل الكبسة) ثم يُعاد حساب الراتب.
         (function () {
             var f = document.getElementById('gradeChecklistForm');
             if (!f || f.dataset.grInit) return;
@@ -1880,14 +1885,17 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                 if (!btn) return;
                 e.preventDefault();
                 var tr = btn.closest('tr');
+                tr.classList.remove('gr-locked');                     // فكّ قفل هذا الصفّ فقط
                 tr.querySelectorAll('.gr-field').forEach(function (x) { x.readOnly = false; x.style.background = '#fef9c3'; });
+                tr.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.removeAttribute('tabindex'); });
                 var sv = tr.querySelector('.gr-save');
                 if (sv) sv.style.display = '';
                 btn.style.display = 'none';
             });
             function reveal(el) {
                 var tr = el.closest ? el.closest('tr') : null;
-                var sv = tr ? tr.querySelector('.gr-save') : null;
+                if (!tr || tr.classList.contains('gr-locked')) return; // الصفوف المقفولة لا تتغيّر أصلاً
+                var sv = tr.querySelector('.gr-save');
                 if (!sv) return;
                 sv.style.display = '';
                 sv.classList.add('gr-pulse');

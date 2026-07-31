@@ -727,6 +727,15 @@ check('أزرار الدرجات: الحفظ الفوري — أي تغيير ي
       && strpos($fnSrc23, "f.addEventListener('input',  function (e) { reveal(e.target); })") !== false
       && strpos($fnSrc23, 'gr-pulse') !== false
       && strpos($fnSrc23, 'id="gradeUnitsTable"') !== false);
+check('أزرار الدرجات: 🔒 كل اللائحة مقفولة افتراضياً و«تعديل» يفتح صفّه فقط',
+      strpos($fnSrc23, 'tr.gr-locked input[type=checkbox]{pointer-events:none') !== false
+      && strpos($fnSrc23, "tr.classList.remove('gr-locked')") !== false
+      && substr_count($fnSrc23, 'class="gr-locked"') >= 1
+      && substr_count($fnSrc23, 'gr-locked') >= 5);
+// القفل بـpointer-events لا بـdisabled: المعطَّل لا يُرسَل مع POST فيمسح «محسوبة؟» عن كل الصفوف المقفولة
+preg_match('/<input type="checkbox" name="keep\[\]"[^>]*>/u', $fnSrc23, $mKeep23);
+check('أزرار الدرجات: الصحّات المقفولة تبقى تُرسَل مع الحفظ (pointer-events لا disabled — لا يضيع «محسوبة؟»)',
+      !empty($mKeep23[0]) && strpos($mKeep23[0], 'disabled') === false);
 // فحص فعلي: صفحة الدرجات وملف الأستاذ يعرضان الأزرار لأستاذ ملاك عنده سجلّ درجات
 $t23 = $db->query("SELECT e.id FROM employees e JOIN employee_grade_history g ON g.employee_id = e.id
                    WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 LIMIT 1")->fetchColumn();
