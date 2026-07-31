@@ -771,6 +771,52 @@ if ($t23) {
     }
 }
 
+/* =====================================================================
+ * 24) 📊 درجات كانون تظهر بعمود «قيمة الدرجة» لا مدموجة بالأساس (2026-07-31، p1 مارغريتا بونصار)
+ *     الباگ: early-return بالمحرّك كان يُرجِع تدرّج 0 لكل درجة كسرية (X.5) فتُدمج
+ *     درجات كانون الاستثنائية دغري بأساس الراتب بالكشوف. الصح: أساس الشهر = مجموع
+ *     الشهر السابق + قيمة الدرجة = الفرق، ثم تنضمّ للأساس الأشهر التالية.
+ *     وقاعدة نصف الدرجة تبقى محفوظة (floor بالسلسلة): نص وحده = أساس ثابت وتدرّج 0.
+ * =================================================================== */
+$pcSrc24 = (string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php');
+$fnSrc24 = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
+$hdSrc24 = (string)file_get_contents(__DIR__ . '/../includes/header.php');
+check('توزيع الدرجات: أُزيل early-return «الدرجة الكسرية = تدرّج 0» من المحرّك',
+      strpos($pcSrc24, 'if ($effGrade != floor($effGrade)) {') === false
+      && strpos($pcSrc24, 'فالفرق يظهر بعمود «قيمة الدرجة»') !== false);
+check('توزيع الدرجات: الشفاء الذاتي healEchelonSplit20260731 موجود ومربوط بالهيدر (يُصلح الأونلاين لحاله)',
+      strpos($fnSrc24, 'function healEchelonSplit20260731') !== false
+      && strpos($hdSrc24, 'healEchelonSplit20260731();') !== false);
+check('توزيع الدرجات: لا يبقى أي شهر «درجة كسرية بقفزة أساس وتدرّج 0» بالداتا',
+      (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms
+        JOIN monthly_salaries p ON p.employee_id = ms.employee_id AND p.school_year = ms.school_year
+             AND (p.year*12 + p.month) = (ms.year*12 + ms.month) - 1
+        JOIN employees e ON e.id = ms.employee_id AND e.employee_type = 'enseignant_titulaire'
+        WHERE ms.grade_at_month <> FLOOR(ms.grade_at_month) AND ms.echelon_value_lbp = 0
+          AND FLOOR(ms.grade_at_month) > FLOOR(p.grade_at_month)
+          AND p.base_plus_echelon_lbp > 0 AND p.base_plus_echelon_lbp < ms.base_plus_echelon_lbp")->fetchColumn() === 0);
+check('توزيع الدرجات: أساس + قيمة الدرجة = الراتب بعد التدرّج بكل صفوف الرواتب (المجموع لم يتغيّر)',
+      (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE base_salary_lbp + echelon_value_lbp <> base_plus_echelon_lbp")->fetchColumn() === 0);
+// مرجع حيّ ١: جونا زوبا 1546 (درجة 23.5) — كانون 2025: الأساس يبقى 1,755,000 والدرجات 260,000 بعمودها
+$r24 = $db->query("SELECT base_salary_lbp, echelon_value_lbp, base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = 1546 AND month = 1 AND year = 2025")->fetch(PDO::FETCH_ASSOC);
+check('توزيع الدرجات: مرجع جونا زوبا كانون 2025 = أساس 1,755,000 + درجات 260,000 = 2,015,000',
+      $r24 && (int)$r24['base_salary_lbp'] === 1755000 && (int)$r24['echelon_value_lbp'] === 260000 && (int)$r24['base_plus_echelon_lbp'] === 2015000,
+      $r24 ? json_encode($r24) : 'لا صفّ');
+// مرجع حيّ ٢: الين منصور 191 (39.5) — قاعدة نصف الدرجة محفوظة: أساس ثابت 3,445,000 وتدرّج 0 طوال 2025-2026
+$r24b = $db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = 191 AND school_year = '2025-2026'
+                    AND (base_salary_lbp <> 3445000 OR echelon_value_lbp <> 0)")->fetchColumn();
+check('توزيع الدرجات: قاعدة نصف الدرجة محفوظة (الين منصور 39.5: أساس ثابت 3,445,000 وتدرّج 0 كل السنة)',
+      (int)$r24b === 0 && (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = 191 AND school_year = '2025-2026'")->fetchColumn() > 0);
+// مرجع حيّ ٣: جمّا عبّود 1752 لم يتأثّر (درجات كاملة): تشرين تدرّج 40,000 ومجموع السنة 15,420,000
+$r24c = $db->query("SELECT SUM(base_plus_echelon_lbp) FROM monthly_salaries WHERE employee_id = 1752 AND school_year = '2025-2026'")->fetchColumn();
+$r24d = $db->query("SELECT echelon_value_lbp FROM monthly_salaries WHERE employee_id = 1752 AND month = 10 AND year = 2025")->fetchColumn();
+check('توزيع الدرجات: مرجع جمّا ثابت (تشرين تدرّج 40,000 ومجموع السنة 15,420,000)',
+      (int)$r24c === 15420000 && (int)$r24d === 40000, "مجموع=$r24c تشرين=$r24d");
+$hcSrc24 = (string)file_get_contents(__DIR__ . '/../pages/health_check.php');
+check('توزيع الدرجات: الفحصان مضافان بصفحة فحص الصحّة',
+      strpos($hcSrc24, 'أساس الراتب + قيمة الدرجة = الراتب بعد التدرّج') !== false
+      && strpos($hcSrc24, 'درجات كانون لا تُدمج دغري بأساس الراتب') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

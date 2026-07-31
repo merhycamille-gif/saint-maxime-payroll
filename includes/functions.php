@@ -609,6 +609,37 @@ function healYearAdditions2627() {
     } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-07-31، طلب المستخدم p1 — مارغريتا بونصار):
+ * درجات كانون الاستثنائية كانت تُدمج دغري بأساس الراتب بالكشوف لمن درجته كسرية (X.5)
+ * بسبب early-return قديم بالمحرّك (نصف الدرجة = تدرّج 0) — أُزيل من payroll_calculator.
+ * هنا نصلّح الصفوف المخزّنة: أساس الشهر = مجموع الشهر السابق، وقيمة الدرجة = الفرق.
+ * المجموع (أساس + درجة) لا يتغيّر إطلاقاً — توزيع عرض فقط، فلا يتأثّر صافٍ/ضمان/ضريبة.
+ * idempotent: بعد الإصلاح قيمة الدرجة ≠ 0 فلا يطابق الشرط ثانيةً.
+ */
+function healEchelonSplit20260731() {
+    $flag = 'echelon_split_fix_2026_07_31';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        @set_time_limit(300);
+        $n = $db->exec("UPDATE monthly_salaries ms
+                        JOIN monthly_salaries p ON p.employee_id = ms.employee_id
+                             AND p.school_year = ms.school_year
+                             AND (p.year*12 + p.month) = (ms.year*12 + ms.month) - 1
+                        JOIN employees e ON e.id = ms.employee_id
+                             AND e.employee_type = 'enseignant_titulaire'
+                        SET ms.base_salary_lbp   = p.base_plus_echelon_lbp,
+                            ms.echelon_value_lbp = ms.base_plus_echelon_lbp - p.base_plus_echelon_lbp
+                        WHERE ms.grade_at_month <> FLOOR(ms.grade_at_month)
+                          AND ms.echelon_value_lbp = 0
+                          AND FLOOR(ms.grade_at_month) > FLOOR(p.grade_at_month)
+                          AND p.base_plus_echelon_lbp > 0
+                          AND p.base_plus_echelon_lbp < ms.base_plus_echelon_lbp");
+        setSetting($flag, date('Y-m-d H:i') . " ($n صفّ)");
+    } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
 // جملة SQL لتقييد التقرير بالمدارس المختارة (آمنة لأنها أرقام)
 function reportSchoolSql($column = 'ms.school_id') {
     $ids = selectedReportSchoolIds();

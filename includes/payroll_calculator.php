@@ -245,14 +245,11 @@ class PayrollCalculator {
             }
             if ($startGrade > $effGrade) $startGrade = $effGrade;
 
-            // 🔴 قاعدة نصف الدرجة (.5): السنة اللي فيها نص درجة = **أساس ثابت على الدرجة الكاملة
-            // (floor) بلا تدرّج** (قيمة الدرجة = 0). لأنّ النص يعني أنّ التدرّج لم يكتمل هذه السنة؛
-            // الدرجة الكاملة الجديدة تظهر كأساس أعلى **السنة القادمة**، لا كقيمة تدرّج وسط السنة.
-            if ($effGrade != floor($effGrade)) {
-                $base = $this->getScaleSalaryLBP($effGrade) * $percent; // = راتب الدرجة الكاملة (floor)
-                return [$base, 0.0, $effGrade];
-            }
-
+            // 🔴 قاعدة نصف الدرجة (.5): الراتب دائماً على الدرجة الكاملة (floor) — getScaleSalaryLBP
+            // يعتمد floor داخلياً، فنصف الدرجة وحده لا يُظهر تدرّجاً (أساس ثابت وقيمة درجة 0).
+            // أما إذا ارتفعت الدرجة الكاملة نفسها هذا الشهر (كدرجات كانون الاستثنائية 19.5→23.5)
+            // فالفرق يظهر بعمود «قيمة الدرجة» ثم ينضمّ للأساس الأشهر التالية — لا يُدمج بالأساس دغري.
+            // (كان هنا early-return يُرجِع تدرّج 0 لكل درجة كسرية فيبلع درجات كانون بالكشوف — أُزيل بطلب المستخدم p1.)
             $base    = $this->getScaleSalaryLBP($startGrade) * $percent;
             $current = $this->getScaleSalaryLBP($effGrade)   * $percent;
             $echelon = max(0, $current - $base);

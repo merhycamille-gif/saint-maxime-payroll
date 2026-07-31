@@ -101,6 +101,17 @@ try {
     hc($groups, $G1, $orphE === 0, 'لا موظفين تابعين لمدرسة محذوفة', $orphE === 0 ? 'صفر' : "$orphE موظفاً", 'لو فشل: حذف مدرسة ترك موظفيها بلا مدرسة — يدخلون بالمجاميع ولا يظهرون بأي لائحة.');
     $orphS = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms LEFT JOIN schools s ON s.id = ms.school_id WHERE s.id IS NULL")->fetchColumn();
     hc($groups, $G1, $orphS === 0, 'لا رواتب تابعة لمدرسة محذوفة', $orphS === 0 ? 'صفر' : "$orphS صفّاً", 'لو فشل: حذف مدرسة ترك رواتب بلا مدرسة تتلوّث بها المجاميع.');
+    // توزيع أساس/درجة (2026-07-31، p1 مارغريتا): درجات كانون تظهر بعمود «قيمة الدرجة» لا مدموجة بالأساس
+    $splitBad = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE base_salary_lbp + echelon_value_lbp <> base_plus_echelon_lbp")->fetchColumn();
+    hc($groups, $G1, $splitBad === 0, 'أساس الراتب + قيمة الدرجة = الراتب بعد التدرّج (بكل الصفوف)', $splitBad === 0 ? 'صفر خلل' : "$splitBad صفّاً", 'لو فشل: عمودا الأساس والدرجة بالكشوف لا يجمعان على الراتب المعروض.');
+    $swal = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms
+        JOIN monthly_salaries p ON p.employee_id = ms.employee_id AND p.school_year = ms.school_year
+             AND (p.year*12 + p.month) = (ms.year*12 + ms.month) - 1
+        JOIN employees e ON e.id = ms.employee_id AND e.employee_type = 'enseignant_titulaire'
+        WHERE ms.grade_at_month <> FLOOR(ms.grade_at_month) AND ms.echelon_value_lbp = 0
+          AND FLOOR(ms.grade_at_month) > FLOOR(p.grade_at_month)
+          AND p.base_plus_echelon_lbp > 0 AND p.base_plus_echelon_lbp < ms.base_plus_echelon_lbp")->fetchColumn();
+    hc($groups, $G1, $swal === 0, 'درجات كانون لا تُدمج دغري بأساس الراتب (أصحاب النص درجة)', $swal === 0 ? 'صفر حالة' : "$swal شهراً", 'لو فشل: شهر نزول الدرجات يعرضها ضمن الأساس بدل عمود «قيمة الدرجة» ثم تنضمّ للأساس لاحقاً.');
 } catch (Exception $e) {}
 
 /* الأرقام «المنقولة»: مكوّناتها لا تفسّر مجموعها (بيانات مستوردة — تحتاج قرار المستخدم) */
