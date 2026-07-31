@@ -59,8 +59,15 @@ if ($form === 'cnss_contrib_monthly') {
         'C37' => $n3, 'D37' => $w3, 'P37' => $c3,
         'P45' => $fpaid,
     ], $format, 'CNSS_190A_' . $month . '_' . $year);
-    // officialTemplateExport يبثّ ويخرج؛ لو رجع false (أداة ناقصة) نوجّه للعرض العادي
-    if (!$ok) { header('Location: ' . BASE_URL . 'pages/official_forms.php?form=' . urlencode($form) . '&month=' . $month . '&year=' . $year); exit; }
+    // officialTemplateExport يبثّ ويخرج؛ لو رجع false (تحويل PDF غير متاح على هذا الخادم —
+    // أونلاين بلا LibreOffice) نوجّه للعرض الرسمي بالمتصفح مع شرح واضح بدل «ما صار شي».
+    if (!$ok) {
+        $_SESSION['flash_info'] = ($format === 'pdf')
+            ? 'تحويل PDF الرسمي متاح على كمبيوتر المدرسة فقط. هون فيك: تنزّل «Excel رسمي» (معبّى بنفس الأرقام) أو تكبس Ctrl+P وتختار «حفظ كـ PDF» لطباعة النموذج المعروض. / Le PDF officiel n\'est disponible que sur l\'ordinateur de l\'école — téléchargez l\'Excel officiel ou imprimez avec Ctrl+P.'
+            : 'تعذّر توليد الملف على هذا الخادم — جرّب من كمبيوتر المدرسة. / Génération impossible sur ce serveur.';
+        header('Location: ' . BASE_URL . 'pages/official_forms.php?form=' . urlencode($form) . '&month=' . $month . '&year=' . $year);
+        exit;
+    }
 }
 
 if ($form === 'cnss_work_attestation') {

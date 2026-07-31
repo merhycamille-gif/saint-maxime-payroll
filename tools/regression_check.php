@@ -817,6 +817,48 @@ check('توزيع الدرجات: الفحصان مضافان بصفحة فحص 
       strpos($hcSrc24, 'أساس الراتب + قيمة الدرجة = الراتب بعد التدرّج') !== false
       && strpos($hcSrc24, 'درجات كانون لا تُدمج دغري بأساس الراتب') !== false);
 
+/* =====================================================================
+ * 25) 🖨️ تنزيل النماذج الرسمية يعمل على أي خادم (2026-07-31، «ما عم في اطبع اكسل ولا PDF» أونلاين)
+ *     المولّد الاحتياطي phpFillXlsxTemplate (ZipArchive+DOM، بلا بايثون/LibreOffice)
+ *     يعبّي قالب المستخدم الرسمي نفسه → زرّ Excel يعمل أونلاين، وطلب PDF بلا LibreOffice
+ *     لا يُخطَف بملف إكسل بل يرجع للبديل الصحيح مع رسالة توضيحية.
+ * =================================================================== */
+$reSrc25 = (string)file_get_contents(__DIR__ . '/../includes/report_export.php');
+$oeSrc25 = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
+check('التصدير الرسمي: المولّد الاحتياطي بـPHP موجود ومربوط كبديل عن بايثون',
+      strpos($reSrc25, 'function phpFillXlsxTemplate') !== false
+      && strpos($reSrc25, 'if (!phpFillXlsxTemplate($templateAbs, $cells, $outXlsx))') !== false);
+check('التصدير الرسمي: طلب PDF بلا LibreOffice يرجع false (البديل الصحيح) لا ملف إكسل مخطوف',
+      strpos($reSrc25, 'لا نخطف طلب الـPDF') !== false);
+check('التصدير الرسمي: رسالة توضيحية للمستخدم عند تعذّر PDF على الخادم (بدل «ما صار شي»)',
+      strpos($oeSrc25, "\$_SESSION['flash_info']") !== false);
+check('التصدير الرسمي: القالبان الرسميان موجودان (الاشتراكات الشهري + إفادة العمل)',
+      is_file(__DIR__ . '/../assets/templates/cnss_monthly.xlsx')
+      && is_file(__DIR__ . '/../assets/templates/cnss_work_attestation.xlsx'));
+// فحص فعلي: تعبئة القالب بـPHP وحده ثم قراءة الملف الناتج والتثبّت من القيم وإجبار إعادة حساب المجاميع
+if (!function_exists('phpFillXlsxTemplate')) require_once __DIR__ . '/../includes/report_export.php';
+$out25 = __DIR__ . '/../tmp/regr_fill_' . uniqid() . '.xlsx';
+try {
+    $ok25 = phpFillXlsxTemplate(__DIR__ . '/../assets/templates/cnss_monthly.xlsx',
+        ['D8' => 'فحص regression', 'C21' => 29, 'P21' => 165673200, 'G14' => '045'], $out25);
+    $sheet25 = '';
+    if ($ok25) {
+        $z25 = new ZipArchive();
+        if ($z25->open($out25) === true) { $sheet25 = (string)$z25->getFromName('xl/worksheets/sheet1.xml'); $z25->close(); }
+    }
+    check('التصدير الرسمي: التعبئة بـPHP وحدها تنجح والقيم (نص عربي/رقم/صفر بادئ) تُكتب فعلاً',
+          $ok25 && strpos($sheet25, 'فحص regression') !== false
+          && strpos($sheet25, '<v>165673200</v>') !== false
+          && strpos($sheet25, '>045<') !== false);
+    // خلايا الصيغ (مجموع القالب P43) يجب أن تكون بلا قيمة مخبّأة — وإلا يظهر مجموع قديم خاطئ للدولة
+    check('التصدير الرسمي: مجاميع القالب تُحسب من جديد (لا قيمة مخبّأة قديمة بخلايا الصيغ)',
+          $sheet25 !== '' && preg_match('#<c r="P43"[^>]*>(?:(?!</c>).)*<v>#s', $sheet25) === 0
+          && strpos($sheet25, 'P21+P29+P37') !== false);
+} catch (Throwable $e) {
+    check('التصدير الرسمي: التعبئة بـPHP وحدها تنجح والقيم (نص عربي/رقم/صفر بادئ) تُكتب فعلاً', false, $e->getMessage());
+}
+@unlink($out25);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

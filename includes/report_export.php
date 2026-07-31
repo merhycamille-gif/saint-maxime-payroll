@@ -4,6 +4,120 @@
  * النموذج يطلع طبق الأصل لأنّه قالب المستخدم الرسمي نفسه. يُستعمل للنماذج الحكومية (CNSS...).
  *   $templateAbs: مسار القالب .xlsx | $cells: [خلية => قيمة] | $format: xlsx|pdf | $name: اسم التنزيل
  */
+
+/**
+ * 🟢 مولّد احتياطي بلا أي أداة خارجية (2026-07-31، «ما عم في اطبع اكسل ولا PDF» أونلاين):
+ * يعبّي قالب الـxlsx مباشرةً بـPHP (ZipArchive + DOM) — فيعمل زرّ Excel الرسمي على
+ * الاستضافة أونلاين حيث لا Python/openpyxl. يكتب القيم بالخلايا المطلوبة بورقة القالب
+ * الأولى محافظاً على تنسيقها (style)، ويفرض إعادة حساب الصيغ عند الفتح (fullCalcOnLoad)
+ * حتى لا تبقى مجاميع القالب (P43/P47...) على قيمها القديمة المخبّأة.
+ */
+function phpFillXlsxTemplate($templateAbs, array $cells, $outPath)
+{
+    if (!class_exists('ZipArchive') || !class_exists('DOMDocument')) return false;
+    if (!@copy($templateAbs, $outPath)) return false;
+    $zip = new ZipArchive();
+    if ($zip->open($outPath) !== true) { @unlink($outPath); return false; }
+    try {
+        // الورقة الأولى (قوالبنا الرسمية كلها بورقة واحدة)
+        $sheetPath = null;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $n = $zip->getNameIndex($i);
+            if (preg_match('#^xl/worksheets/sheet\d+\.xml$#', $n)) { $sheetPath = $n; break; }
+        }
+        if (!$sheetPath) { $zip->close(); @unlink($outPath); return false; }
+        $xml = $zip->getFromName($sheetPath);
+        if ($xml === false) { $zip->close(); @unlink($outPath); return false; }
+
+        $ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+        $doc = new DOMDocument();
+        if (!$doc->loadXML($xml)) { $zip->close(); @unlink($outPath); return false; }
+        $sheetData = $doc->getElementsByTagNameNS($ns, 'sheetData')->item(0);
+        if (!$sheetData) { $zip->close(); @unlink($outPath); return false; }
+
+        // فهرسة الصفوف الموجودة حسب رقمها
+        $rows = [];
+        foreach ($sheetData->getElementsByTagNameNS($ns, 'row') as $r) $rows[(int)$r->getAttribute('r')] = $r;
+        $colIdx = function ($letters) {
+            $n = 0;
+            foreach (str_split(strtoupper($letters)) as $ch) $n = $n * 26 + (ord($ch) - 64);
+            return $n;
+        };
+
+        foreach ($cells as $ref => $val) {
+            if (!preg_match('/^([A-Za-z]+)(\d+)$/', $ref, $m)) continue;
+            $rowNum = (int)$m[2];
+            // الصفّ: موجود أو يُدرَج بمكانه الصحيح (ترتيب تصاعدي)
+            if (isset($rows[$rowNum])) {
+                $row = $rows[$rowNum];
+            } else {
+                $row = $doc->createElementNS($ns, 'row');
+                $row->setAttribute('r', (string)$rowNum);
+                $before = null;
+                foreach ($rows as $rn => $rEl) { if ($rn > $rowNum && ($before === null || $rn < (int)$before->getAttribute('r'))) $before = $rEl; }
+                $sheetData->insertBefore($row, $before);
+                $rows[$rowNum] = $row;
+            }
+            // الخلية: موجودة (نحافظ على style) أو تُدرَج بمكانها حسب ترتيب الأعمدة
+            $cell = null;
+            foreach ($row->getElementsByTagNameNS($ns, 'c') as $c) {
+                if (strtoupper($c->getAttribute('r')) === strtoupper($ref)) { $cell = $c; break; }
+            }
+            if (!$cell) {
+                $cell = $doc->createElementNS($ns, 'c');
+                $cell->setAttribute('r', strtoupper($ref));
+                $before = null; $myCol = $colIdx($m[1]);
+                foreach ($row->getElementsByTagNameNS($ns, 'c') as $c) {
+                    if (preg_match('/^([A-Za-z]+)\d+$/', $c->getAttribute('r'), $cm) && $colIdx($cm[1]) > $myCol) { $before = $c; break; }
+                }
+                $row->insertBefore($cell, $before);
+            }
+            while ($cell->firstChild) $cell->removeChild($cell->firstChild);
+            $cell->removeAttribute('t');
+            // نصّ رقمي بصفر بادئ (مثل «043» برقم مؤسسة الضمان) يبقى نصاً — لا يُحوَّل لرقم فيضيع صفره
+            if (is_int($val) || is_float($val)
+                || (is_string($val) && preg_match('/^-?\d+(\.\d+)?$/', $val) && !preg_match('/^0\d/', $val))) {
+                $cell->appendChild($doc->createElementNS($ns, 'v', (string)$val));
+            } else {
+                $cell->setAttribute('t', 'inlineStr');
+                $is = $doc->createElementNS($ns, 'is');
+                $t  = $doc->createElementNS($ns, 't');
+                $t->setAttribute('xml:space', 'preserve');
+                $t->appendChild($doc->createTextNode((string)$val));
+                $is->appendChild($t);
+                $cell->appendChild($is);
+            }
+        }
+        // 🔴 شطب القيم المخبّأة لكل خلايا الصيغ (متل openpyxl): LibreOffice الصامت لا يحترم
+        // fullCalcOnLoad ويعرض المجموع القديم المخبّأ من آخر استعمال يدوي للقالب — بلا قيمة
+        // مخبّأة يُجبَر أي برنامج (Excel/LibreOffice) على حساب الصيغة من جديد عند الفتح.
+        foreach ($doc->getElementsByTagNameNS($ns, 'c') as $c) {
+            if ($c->getElementsByTagNameNS($ns, 'f')->length === 0) continue;
+            foreach (iterator_to_array($c->getElementsByTagNameNS($ns, 'v')) as $v) $c->removeChild($v);
+        }
+        $zip->addFromString($sheetPath, $doc->saveXML());
+
+        // فرض إعادة حساب الصيغ عند الفتح (وإلا تبقى المجاميع المخبّأة القديمة ظاهرة)
+        $wb = $zip->getFromName('xl/workbook.xml');
+        if ($wb !== false) {
+            if (strpos($wb, '<calcPr') !== false) {
+                $wb2 = preg_replace('/<calcPr\b(?![^>]*fullCalcOnLoad)/', '<calcPr fullCalcOnLoad="1" ', $wb, 1);
+            } elseif (strpos($wb, '</definedNames>') !== false) {
+                $wb2 = str_replace('</definedNames>', '</definedNames><calcPr fullCalcOnLoad="1"/>', $wb);
+            } else {
+                $wb2 = str_replace('</sheets>', '</sheets><calcPr fullCalcOnLoad="1"/>', $wb);
+            }
+            if ($wb2 && $wb2 !== $wb) $zip->addFromString('xl/workbook.xml', $wb2);
+        }
+        $zip->close();
+        return is_file($outPath) && filesize($outPath) > 200;
+    } catch (Throwable $e) {
+        try { $zip->close(); } catch (Throwable $e2) {}
+        @unlink($outPath);
+        return false;
+    }
+}
+
 function officialTemplateExport($templateAbs, array $cells, $format, $name)
 {
     $py = null;
@@ -26,7 +140,11 @@ function officialTemplateExport($templateAbs, array $cells, $format, $name)
     file_put_contents($specFile, json_encode($spec, JSON_UNESCAPED_UNICODE));
     @shell_exec(escapeshellarg($py) . ' ' . escapeshellarg($script) . ' ' . escapeshellarg($specFile) . ' 2>&1');
     @unlink($specFile);
-    if (!is_file($outXlsx) || filesize($outXlsx) < 200) { @unlink($outXlsx); return false; }
+    if (!is_file($outXlsx) || filesize($outXlsx) < 200) {
+        // 🟢 لا بايثون/openpyxl (الاستضافة أونلاين)؟ المولّد الاحتياطي بـPHP يعبّي القالب نفسه
+        @unlink($outXlsx);
+        if (!phpFillXlsxTemplate($templateAbs, $cells, $outXlsx)) { @unlink($outXlsx); return false; }
+    }
 
     if ($format === 'pdf') {
         $soffice = null;
@@ -48,7 +166,11 @@ function officialTemplateExport($templateAbs, array $cells, $format, $name)
             header('Content-Length: ' . strlen($data));
             echo $data; exit;
         }
-        // لا LibreOffice → نزّل Excel بدلاً من PDF
+        // لا LibreOffice (أونلاين) → لا نخطف طلب الـPDF بملف إكسل: نرجع false ليشتغل
+        // البديل الصحيح عند كل صفحة (إفادة الضمان: النسخة المصوّرة للطباعة؛
+        // نموذج الاشتراكات: العرض الرسمي بالمتصفح مع رسالة توضيحية) — زرّ Excel يبقى يعمل.
+        @unlink($outXlsx);
+        return false;
     }
     $data = file_get_contents($outXlsx); @unlink($outXlsx);
     while (ob_get_level()) ob_end_clean();

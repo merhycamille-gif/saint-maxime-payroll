@@ -181,6 +181,16 @@ hc($groups, $G4, strpos($fn, 'function sanitizeAmountCurrency') !== false,
 hc($groups, $G4, strpos($fn, 'function writeSchoolYear') !== false,
    'حفظ العلاوات يصيب سنةً حقيقية دائماً', 'مضبوط ✓',
    'لو فشل: علاوة تُحفظ بوضع «كل السنين» فتضيع بلا أن تعرف.');
+// تصدير النماذج الرسمية (2026-07-31): زرّ Excel الرسمي يجب أن يعمل على أي خادم — المولّد
+// الاحتياطي بـPHP (بلا بايثون/LibreOffice) + القوالب الرسمية موجودة
+$reSrc = @file_get_contents($PROJ . '/includes/report_export.php') ?: '';
+hc($groups, $G4,
+   class_exists('ZipArchive') && class_exists('DOMDocument')
+   && strpos($reSrc, 'function phpFillXlsxTemplate') !== false
+   && is_file($PROJ . '/assets/templates/cnss_monthly.xlsx')
+   && is_file($PROJ . '/assets/templates/cnss_work_attestation.xlsx'),
+   'تنزيل Excel الرسمي (تعبئة القالب) يعمل على هذا الخادم', 'جاهز ✓',
+   'لو فشل: زرّ «تحميل Excel رسمي» بنموذج الضمان يرجع بلا ملف — القوالب أو مولّد PHP الاحتياطي ناقصة.');
 
 /* =============================================================================
  * (٣) أخطاء PHP الأخيرة من سجلّ الخادم (إن توفّر)
