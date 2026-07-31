@@ -1013,7 +1013,7 @@ input:checked + .slider:before { transform: translateX(20px); }
     .table th { background: #e5e7eb !important; color: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .table td, .table th { border: 1px solid #999 !important; }
     a[href]:after { content: ""; } /* لا تطبع الروابط */
-    body { font-size: 12px; }
+    body { font-size: 12pt; } /* «12» متل الوورد (12pt) بطلب المستخدم 2026-07-31 */
 }
 
 /* =================== قراءة مريحة: كل الكلمات والأرقام بولد (2026-06-22) =================== */
@@ -1067,16 +1067,24 @@ h1, h2, h3, h4, h5, h6,
 }
 
 @media print {
+    /* 🔠 «12» على الورق = 12pt متل الوورد (بطلب المستخدم 2026-07-31) — كل التقارير والإفادات والقسائم */
     body, p, span, label, small, a, li, td, th, caption, option,
     h1, h2, h3, h4, h5, h6, .badge, .table, .table th, .table td {
-        font-size: 12px !important;
+        font-size: 12pt !important;
     }
-    /* النماذج الرسمية: تبقى بحجمها المصمّم بالطباعة أيضاً */
+    /* النماذج الرسمية: نصوصها ترث حجم حاويتها (12pt ما لم يكبّره العنوان) */
     .official-doc td, .official-doc th, .official-doc span, .official-doc small,
     .official-doc strong, .official-doc b, .official-doc a, .official-doc li, .official-doc label {
         font-size: inherit !important;
     }
+    /* الجدول العريض يصغّر نفسه محسوباً (--pz من app.js) فلا يُقصّ عمود — كنظام doc-table نفسه */
+    .table { zoom: var(--pz, 1); }
+    .payslip-card, .salary-slip { zoom: var(--pz, 1); }
 }
+/* وضع قياس خاطف (شاشة): نفس شروط الطباعة لقياس العرض الحقيقي قبل حساب --pz */
+.table.pz-measure { width: max-content !important; table-layout: auto !important; }
+.table.pz-measure, .table.pz-measure th, .table.pz-measure td { font-size: 12pt !important; }
+.pz-measure-page .no-print, .pz-measure-page .card-header { display: none !important; }
 
 /* ============ لمسات تناسق رسمية موحّدة (2026-07-03) ============ */
 /* انتقالات ناعمة موحّدة على العناصر التفاعلية */

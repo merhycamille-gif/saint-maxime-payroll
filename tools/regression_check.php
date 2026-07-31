@@ -664,6 +664,45 @@ check('حذف مغدوشة/سان نيقولا: فحصا اليتامى مضاف
       strpos($hcSrc21, 'لا موظفين تابعين لمدرسة محذوفة') !== false
       && strpos($hcSrc21, 'لا رواتب تابعة لمدرسة محذوفة') !== false);
 
+/* =====================================================================
+ * 22) 🔠 حجم الخط 12 (12pt متل الوورد) بكل التقارير والإفادات والقسائم
+ *     (2026-07-31، طلب p1): النص 12pt كحدّ أدنى على الورق، والجدول/القسيمة
+ *     الأعرض من الورقة تصغّر نفسها محسوباً (--pz) فلا يُقصّ عمود ولا تنقسم قسيمة
+ * =================================================================== */
+$cssSrc22 = (string)file_get_contents(__DIR__ . '/../assets/css/app.css');
+$jsSrc22  = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
+$rhSrc22  = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php');
+$ofSrc22  = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
+$asSrc22  = (string)file_get_contents(__DIR__ . '/../pages/annual_slip.php');
+check('خط 12: طباعة الجداول العادية 12pt لا 12px (app.css)',
+      strpos($cssSrc22, 'body { font-size: 12pt; }') !== false
+      && preg_match('/@media print \{\s*\/\*[^*]*\*\/\s*body, p, span[^}]*\{\s*font-size: 12pt !important;/s', $cssSrc22) === 1
+      && strpos($cssSrc22, 'font-size: 12px !important;
+    }
+    /* النماذج الرسمية') === false);
+check('خط 12: الجدول العريض يصغّر نفسه بالطباعة (--pz للجداول العادية + القسائم)',
+      strpos($cssSrc22, '.table { zoom: var(--pz, 1); }') !== false
+      && strpos($cssSrc22, '.payslip-card, .salary-slip { zoom: var(--pz, 1); }') !== false
+      && strpos($jsSrc22, 'function fitPrintZoom') !== false
+      && strpos($jsSrc22, "addEventListener('beforeprint', fitPrintZoom)") !== false);
+check('خط 12: جداول التقارير doc-table أساسها 12pt (report_helpers)',
+      strpos($rhSrc22, '.doc-table{width:100%;border-collapse:collapse;font-size:12pt;') !== false);
+check('خط 12: لا نصوص مستندات أصغر من 12 في report_helpers (doc-note/code-table/mof/cnss)',
+      strpos($rhSrc22, '.doc-note{font-size:12pt;') !== false
+      && strpos($rhSrc22, '.code-table{width:100%;border-collapse:collapse;font-size:12pt;') !== false
+      && preg_match('/\.(doc-note|code-table|mof-gov|cnss-head|lh-contact)\{[^}]*font-size:(?:[0-9]|1[01])(?:\.\d+)?px/u', $rhSrc22) === 0);
+check('خط 12: لا تصغير يدوي على جداول النماذج الرسمية (official_forms)',
+      strpos($ofSrc22, 'doc-table" style="font-size:') === false
+      && preg_match('/font-size:(?:[0-9]|1[01])(?:\.\d+)?px/', $ofSrc22) === 0);
+check('خط 12: القسيمة السنوية 12pt والتصغير المحسوب يبقيها بصفحة واحدة',
+      strpos($asSrc22, '.salary-slip-table { font-size: 12pt !important;') !== false
+      && strpos($asSrc22, 'zoom: var(--pz, 1);') !== false
+      && preg_match('/font-size:\s*(?:[0-9]|1[01])(?:\.\d+)?px\s*!important/', $asSrc22) === 0);
+check('خط 12: القسيمة الشهرية مشمولة (payslip-card على العرض الفردي والجماعي)',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/monthly_payroll.php'), '<div class="card payslip-card" id="ppExportArea">') !== false);
+check('خط 12: النماذج طبق الأصل مستثناة عمداً (xlsf 9px كما صُمّمت — المحاذاة أهم)',
+      strpos($rhSrc22, 'table.xlsf{font-size:9px;}') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

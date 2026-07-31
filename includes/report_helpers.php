@@ -334,7 +334,11 @@ function officialFormStyles(): string {
     return <<<'CSS'
 <style>
 /* ===== النماذج الرسمية — A4 ===== */
-.official-doc{background:#fff;color:#111;max-width:210mm;margin:0 auto;padding:14mm 14mm;
+/* 🔠 القاعدة (بطلب المستخدم 2026-07-31): «12» = 12pt متل الوورد — نصّ كل التقارير
+   والإفادات والنماذج 12pt كحدّ أدنى (العناوين الكبيرة تبقى أكبر)، والجدول الأعرض من
+   ورقته يصغّر نفسه محسوباً (--pz) فلا يُقصّ عمود. المستثنى الوحيد: النماذج طبق الأصل
+   (xlsf من إكسل + ofs فوق صورة رسمية) لأن محاذاتها على النموذج الرسمي أهم من حجم خطها. */
+.official-doc{background:#fff;color:#111;max-width:210mm;margin:0 auto;padding:14mm 14mm;font-size:12pt;
   border:1px solid #e5e7eb;border-radius:10px;font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo','Inter',sans-serif;line-height:1.7;}
 .official-doc.rtl,.official-doc[dir="rtl"]{direction:rtl;text-align:right;}
 
@@ -345,17 +349,17 @@ function officialFormStyles(): string {
 .letterhead .lh-logo{max-height:64px;max-width:90px;object-fit:contain;}
 .letterhead .lh-center{flex:1 1 auto;text-align:center;}
 .lh-name-ar{font-size:20px;font-weight:700;color:var(--primary-dark,#1e3a8a);}
-.lh-name-fr{font-size:13px;font-weight:600;color:#475569;letter-spacing:.3px;}
-.lh-contact{font-size:11px;color:#64748b;margin-top:3px;}
-.letterhead .lh-right{flex:0 0 auto;font-size:11px;color:#334155;text-align:left;min-width:120px;}
+.lh-name-fr{font-size:12pt;font-weight:600;color:#475569;letter-spacing:.3px;}
+.lh-contact{font-size:12pt;color:#64748b;margin-top:3px;}
+.letterhead .lh-right{flex:0 0 auto;font-size:12pt;color:#334155;text-align:left;min-width:120px;}
 .lh-num{margin-bottom:2px;}
 
 /* ترويسة حكومية */
 .gov-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;
   border-bottom:1px solid #cbd5e1;padding-bottom:8px;}
-.gov-header .gov-center{flex:1 1 auto;text-align:center;font-size:13px;font-weight:600;line-height:1.6;}
-.gov-header .gov-title{margin-top:6px;font-size:15px;font-weight:700;color:var(--primary-dark,#1e3a8a);}
-.gov-header .gov-code{flex:0 0 60px;font-weight:700;font-size:15px;border:1.5px solid #111;border-radius:6px;
+.gov-header .gov-center{flex:1 1 auto;text-align:center;font-size:12pt;font-weight:600;line-height:1.6;}
+.gov-header .gov-title{margin-top:6px;font-size:13pt;font-weight:700;color:var(--primary-dark,#1e3a8a);}
+.gov-header .gov-code{flex:0 0 60px;font-weight:700;font-size:12pt;border:1.5px solid #111;border-radius:6px;
   padding:4px 8px;text-align:center;height:fit-content;}
 .gov-header .gov-emblem{flex:0 0 60px;text-align:center;}
 .gov-header .gov-emblem img{max-height:54px;}
@@ -363,7 +367,7 @@ function officialFormStyles(): string {
 /* عنوان النموذج */
 .doc-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 16px;
   color:var(--primary-dark,#1e3a8a);}
-.doc-subtitle{text-align:center;font-size:14px;color:#475569;margin-top:-10px;margin-bottom:14px;}
+.doc-subtitle{text-align:center;font-size:12pt;color:#475569;margin-top:-10px;margin-bottom:14px;}
 
 /* خطوط التعبئة */
 .fill{font-weight:600;color:#0f172a;display:inline-block;padding:0 4px;}
@@ -392,7 +396,7 @@ function officialFormStyles(): string {
 .doc-table .subtotal-row td{background:#f1f5f9;font-weight:700;}
 .doc-table .num{text-align:left;font-variant-numeric:tabular-nums;}
 .doc-table tbody tr:nth-child(even){background:#f8fafc;}
-.money-usd{display:block;font-size:.8em;color:#047857;font-weight:600;line-height:1.2;}
+.money-usd{display:block;font-size:12pt;color:#047857;font-weight:600;line-height:1.2;}
 .money-usd-inline{color:#047857;font-weight:600;white-space:nowrap;}
 
 /* شبكة معلومات — كل خانة على سطر مسطّر متل النموذج الأصلي */
@@ -411,8 +415,8 @@ function officialFormStyles(): string {
 .fline .val.g{flex:0 1 auto;min-width:80px;}
 .fline .val.lg{flex:2 1 140px;}
 .opt{display:inline-flex;align-items:center;gap:3px;margin:0 8px 0 0;white-space:nowrap;}
-.opt .n{display:inline-block;min-width:15px;height:15px;border:1.2px solid #333;text-align:center;
-  line-height:14px;font-size:11px;font-weight:700;}
+.opt .n{display:inline-block;min-width:20px;height:20px;border:1.2px solid #333;text-align:center;
+  line-height:19px;font-size:12pt;font-weight:700;}
 .opt.on .n{background:#0a3d91;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 .doc-p{font-size:12pt;line-height:1.8;margin:8px 0;}
 
@@ -423,7 +427,7 @@ function officialFormStyles(): string {
 .sign-box .sign-place{margin-bottom:10px;color:#64748b;}
 .sign-box .sign-line{border-top:1px solid #475569;margin:0 18px;}
 
-.doc-note{font-size:11px;color:#64748b;margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:6px;}
+.doc-note{font-size:12pt;color:#64748b;margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:6px;}
 .doc-section{font-weight:700;color:var(--primary-dark,#1e3a8a);margin:14px 0 6px;
   border-right:3px solid var(--gold,#d4af37);padding-right:8px;}
 .official-doc:not(.rtl) .doc-section{border-right:none;border-left:3px solid var(--gold,#d4af37);padding-right:0;padding-left:8px;}
@@ -458,35 +462,35 @@ function officialFormStyles(): string {
 /* ===== نموذج وزارة المالية (إطار أخضر + صندوق رمز) ===== */
 .mof-form{border:3px solid #2f9e44;border-radius:5px;padding:0;overflow:hidden;}
 .mof-head{display:flex;align-items:stretch;border-bottom:3px solid #2f9e44;}
-.mof-gov{padding:8px 12px;font-size:11px;font-weight:700;line-height:1.7;text-align:right;min-width:185px;color:#111;}
+.mof-gov{padding:8px 12px;font-size:12pt;font-weight:700;line-height:1.7;text-align:right;min-width:185px;color:#111;}
 .mof-titles{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;}
 .mof-title{font-size:17px;font-weight:800;color:#111;line-height:1.4;}
 .mof-code{min-width:56px;background:#2f9e44;color:#fff;display:flex;align-items:center;
   justify-content:center;font-size:21px;font-weight:800;letter-spacing:2px;}
 .mof-body{padding:12px 16px;}
 /* جدول الرموز (ر6/ر5/ر10) */
-.code-table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0;}
-.code-table th{background:#e9ecef;border:1px solid #adb5bd;padding:5px 6px;font-size:11px;text-align:center;}
+.code-table{width:100%;border-collapse:collapse;font-size:12pt;margin:6px 0;}
+.code-table th{background:#e9ecef;border:1px solid #adb5bd;padding:5px 6px;font-size:12pt;text-align:center;}
 .code-table td{border:1px solid #adb5bd;padding:4px 8px;}
 .code-table td.lbl{text-align:right;}
 .code-table td.num{text-align:left;font-variant-numeric:tabular-nums;min-width:90px;}
 .code-cell{background:#212529;color:#fff;font-weight:700;text-align:center;width:34px;
-  font-size:11px;letter-spacing:1px;}
+  font-size:12pt;letter-spacing:1px;}
 .code-table tr.gray td{background:#dee2e6;}
 .code-table tr.sum td{background:#ced4da;font-weight:800;}
 /* مربعات أرقام التسجيل */
 .digit-boxes{display:inline-flex;gap:0;vertical-align:middle;}
-.digit-boxes span{display:inline-block;min-width:14px;height:16px;border:1px solid #495057;
-  border-right:none;text-align:center;font-size:11px;line-height:16px;}
+.digit-boxes span{display:inline-block;min-width:22px;height:24px;border:1px solid #495057;
+  border-right:none;text-align:center;font-size:12pt;line-height:23px;}
 .digit-boxes span:last-child{border-right:1px solid #495057;}
 .checkbox-opt{display:inline-flex;align-items:center;gap:4px;margin-left:14px;}
-.checkbox-opt .bx{display:inline-block;width:14px;height:14px;border:1.3px solid #333;text-align:center;
-  line-height:13px;font-weight:700;font-size:12px;}
+.checkbox-opt .bx{display:inline-block;width:20px;height:20px;border:1.3px solid #333;text-align:center;
+  line-height:19px;font-weight:700;font-size:12pt;}
 
 /* ===== نموذج الضمان الاجتماعي (أزرق) ===== */
 .cnss-form{border:1px solid #1e3a8a;}
-.cnss-head{color:#1e40af;font-weight:800;font-size:15px;line-height:1.5;text-align:right;margin-bottom:4px;}
-.cnss-head .sub{font-size:11px;font-weight:600;color:#1e3a8a;}
+.cnss-head{color:#1e40af;font-weight:800;font-size:12pt;line-height:1.5;text-align:right;margin-bottom:4px;}
+.cnss-head .sub{font-size:12pt;font-weight:600;color:#1e3a8a;}
 .cnss-title{text-align:center;font-size:19px;font-weight:800;color:#1e40af;margin:12px 0 16px;}
 .cnss-title u{text-underline-offset:5px;}
 .cnss-form .doc-section{color:#1e40af;border-color:#1e40af;}

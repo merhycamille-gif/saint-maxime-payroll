@@ -677,7 +677,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
 ?>
 <div class="official-doc cnss-form rtl" id="ppExportArea">
     <div class="cnss-head">الصندوق الوطني للضمان الاجتماعي</div>
-    <div class="cnss-title">إعـــلام<br><span style="font-size:15px"><?= $isTerm?'عن ترك أجير عمله في المؤسسة':'عن استخدام أجير' ?></span></div>
+    <div class="cnss-title">إعـــلام<br><span style="font-size:12pt"><?= $isTerm?'عن ترك أجير عمله في المؤسسة':'عن استخدام أجير' ?></span></div>
 
     <div class="doc-p">إن صاحب العمل الموقّع أدناه،</div>
     <div class="fline"><span class="lbl">المسؤول عن مؤسسة</span> <?= fval($school['name_ar']) ?></div>
@@ -803,7 +803,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
 ?>
 <div class="official-doc cnss-form rtl" id="ppExportArea">
     <div class="cnss-head">الصندوق الوطني للضمان الاجتماعي — جانب صاحب العمل</div>
-    <div class="cnss-title"><u>التصريح الاسمي السنوي</u><br><span style="font-size:14px">لسنة <?= e($schoolYear) ?></span></div>
+    <div class="cnss-title"><u>التصريح الاسمي السنوي</u><br><span style="font-size:12pt">لسنة <?= e($schoolYear) ?></span></div>
 
     <div class="info-grid">
         <div><span class="k">إسم المؤسسة:</span> <?= fillVal($school['name_ar']) ?></div>
@@ -911,7 +911,7 @@ elseif ($form === 'teacher_card'):
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12px;margin-bottom:6px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12pt;margin-bottom:6px">
         <div>دائرة الهيئة التعليمية في المدارس الخاصة</div>
         <div style="text-align:left">
             <div style="font-weight:700"><?= e($school['name_ar'] ?? '') ?></div>
@@ -919,8 +919,8 @@ elseif ($form === 'teacher_card'):
         </div>
     </div>
     <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div>
-    <div style="text-align:center;font-size:13px;margin-bottom:8px">عن السنة المدرسية <?= e($sy) ?></div>
-    <table class="doc-table" style="font-size:11px">
+    <div style="text-align:center;font-size:12pt;margin-bottom:8px">عن السنة المدرسية <?= e($sy) ?></div>
+    <table class="doc-table">
         <thead>
             <tr>
                 <th rowspan="2">#</th><th rowspan="2">الإسم والشهرة</th><th rowspan="2">أعلى شهادة علمية</th>
@@ -1016,7 +1016,7 @@ elseif ($form === 'teacher_card'):
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12px;margin-bottom:6px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12pt;margin-bottom:6px">
         <div style="font-weight:700;line-height:1.6">صندوق التعويضات<br><span style="font-weight:400">لأفراد الهيئة التعليمية في المدارس الخاصة</span></div>
         <div style="text-align:left">
             <div style="font-weight:700"><?= e($school['name_ar'] ?? '') ?></div>
@@ -1025,8 +1025,8 @@ elseif ($form === 'teacher_card'):
         </div>
     </div>
     <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div>
-    <div style="text-align:center;font-size:13px;margin-bottom:8px">عن السنة المدرسية <?= e($sy) ?></div>
-    <table class="doc-table" style="font-size:11px">
+    <div style="text-align:center;font-size:12pt;margin-bottom:8px">عن السنة المدرسية <?= e($sy) ?></div>
+    <table class="doc-table">
         <thead>
             <tr>
                 <th rowspan="2">#</th><th rowspan="2">الرقم المالي</th>
@@ -1259,7 +1259,7 @@ elseif ($form === 'teacher_card'):
         <div style="flex:1">
             <div>عدد الأساتذة: <strong><?= count($rows) ?></strong></div>
             <div><strong>فقط <?= e(numToArabicWords($grand)) ?> ليرة لبنانية لا غير</strong></div>
-            <div style="margin-top:8px;font-size:11pt">ملاحظة: نص المادة 6 من المرسوم الاشتراعي رقم 47 تاريخ 29/06/1983<br>
+            <div style="margin-top:8px;font-size:12pt">ملاحظة: نص المادة 6 من المرسوم الاشتراعي رقم 47 تاريخ 29/06/1983<br>
                 تتكوّن المحسومات من:<br>
                 1- نصف راتب الشهر الأول من خدمة الموظف .<br>
                 2- ستة بالمئة من الراتب الشهري .<br>
@@ -1311,7 +1311,7 @@ elseif ($form === 'teacher_card'):
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الرواتب والأجور الشهري — <?= monthName($month,'ar').' '.$year ?></div>
     <div class="doc-subtitle"><?= e($curLbl) ?></div>
-    <table class="doc-table" style="font-size:9.5px">
+    <table class="doc-table">
         <thead><tr>
             <th>#</th><th>الاسم</th><th>أساس الراتب</th><th>درجة عادية واستثنائية</th><th>الراتب بعد التدرّج</th>
             <?= extraAideHeads() ?>
@@ -1480,15 +1480,15 @@ elseif ($form === 'teacher_card'):
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:8px">
         <div style="flex:1;text-align:center">
-            <div style="font-weight:700;font-size:15px">الموازنة السنوية المقدّرة على الرواتب والأجور</div>
-            <div style="font-size:13px">والمحسومات القانونية المتوجبة</div>
+            <div style="font-weight:700;font-size:13pt">الموازنة السنوية المقدّرة على الرواتب والأجور</div>
+            <div style="font-size:12pt">والمحسومات القانونية المتوجبة</div>
             <div style="font-weight:700;margin-top:6px"><?= e($schoolYear) ?></div>
         </div>
         <div style="border:1.5px solid #b8860b;border-radius:6px;padding:10px 16px;font-weight:700;text-align:center;min-width:160px">
             <?= e($boxName) ?>
         </div>
     </div>
-    <table class="doc-table" style="font-size:11.5px;margin-top:8px">
+    <table class="doc-table" style="margin-top:8px">
         <thead><tr>
             <th>اسم المؤسسة</th>
             <th>أساس الراتب</th>
@@ -1784,7 +1784,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
 ?>
 <div class="official-doc cnss-form rtl" id="ppExportArea">
     <div class="cnss-head">الصندوق الوطني للضمان الاجتماعي</div>
-    <div class="cnss-title"><u>تصريح باستخدام أجير</u><br><span style="font-size:12px;font-weight:600">(يملأ هذا التصريح من قبل صاحب العمل وعلى مسؤوليته)</span></div>
+    <div class="cnss-title"><u>تصريح باستخدام أجير</u><br><span style="font-size:12pt;font-weight:600">(يملأ هذا التصريح من قبل صاحب العمل وعلى مسؤوليته)</span></div>
     <div class="doc-section">أ – معلومات خاصة بالمؤسسة</div>
     <div class="info-grid">
         <div class="full"><span class="k">إسم صاحب العمل أو الشركة:</span> <?= fillVal($school['name_ar']) ?></div>
@@ -1860,7 +1860,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
 ?>
 <div class="official-doc cnss-form rtl" id="ppExportArea">
     <div class="cnss-head">الصندوق الوطني للضمان الاجتماعي</div>
-    <div class="cnss-title"><u>طلب إجراء تحقيق اجتماعي</u><br><span style="font-size:14px">للاستفادة عن الوالد</span></div>
+    <div class="cnss-title"><u>طلب إجراء تحقيق اجتماعي</u><br><span style="font-size:12pt">للاستفادة عن الوالد</span></div>
     <div class="info-grid">
         <div><span class="k">اسم المضمون:</span> <?= fillVal(empFullNameAr($emp)) ?></div>
         <div><span class="k">رقمه في الضمان:</span> <?= fillVal($emp['nssf_number']) ?></div>
@@ -1871,7 +1871,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         <div class="full"><span class="k">عنوان سكن المضمون:</span> <?= fillVal(empAddress($emp)) ?></div>
         <div class="full"><span class="k">عمل الوالد/الوالدة ومداخيلهما:</span> <span class="fill dotted" style="min-width:260px">&nbsp;</span></div>
     </div>
-    <p style="font-size:12px;margin-top:10px">أتعهّد بأنني معيل لوالدي/لوالدتي، وأفيد على مسؤوليتي بأن جميع المعلومات الواردة أعلاه صحيحة.</p>
+    <p style="font-size:12pt;margin-top:10px">أتعهّد بأنني معيل لوالدي/لوالدتي، وأفيد على مسؤوليتي بأن جميع المعلومات الواردة أعلاه صحيحة.</p>
     <div class="sign-row"><?= signatureBox('توقيع المضمون','',formatDate(date('Y-m-d'))) ?></div>
     <div class="doc-note">المستندات المرفقة: إفادة عمل من المؤسسة · إخراج قيد عائلي للوالد · إفادة من الإدارات الرسمية · تقرير اللجنة الطبية عند العجز.</div>
 </div>
@@ -1976,8 +1976,8 @@ elseif ($form === 'payment_list'):
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
     <?php if (!$multiS) echo schoolLetterhead($school); ?>
     <div class="doc-title">جميع الأساتذة — كشف شامل بالرواتب وكلفة المؤسسة</div>
-    <div style="text-align:center;font-size:13px;margin-bottom:8px"><?= monthName($month,'ar').' '.$year ?></div>
-    <table class="doc-table" style="font-size:10px">
+    <div style="text-align:center;font-size:12pt;margin-bottom:8px"><?= monthName($month,'ar').' '.$year ?></div>
+    <table class="doc-table">
         <thead><tr>
             <th>#</th><?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
             <th>اسم الأستاذ</th><th>عدد الساعات</th><th>أساس الراتب</th><th>درجة وتدرّج</th><th>الراتب بعد التدرّج</th>
@@ -2112,7 +2112,7 @@ elseif ($form === 'payment_list'):
 <div class="official-doc rtl" id="ppExportArea">
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">إحصاءات الموظفين — <?= e(activeSchoolYear()==='all'?'كل السنين':activeSchoolYear()) ?></div>
-    <div class="kv" style="font-size:15px;margin-bottom:14px">العدد الإجمالي: <strong><?= $totN ?></strong></div>
+    <div class="kv" style="font-size:12pt;margin-bottom:14px">العدد الإجمالي: <strong><?= $totN ?></strong></div>
     <div class="form-row cols-3">
         <div>
             <div class="doc-section">حسب الفئة</div>
@@ -2147,7 +2147,7 @@ elseif ($form === 'payment_list'):
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">معلومات عامة عن الموظفين — <?= e(activeSchoolYear()==='all'?'كل السنين':activeSchoolYear()) ?></div>
-    <table class="doc-table" style="font-size:11.5px">
+    <table class="doc-table">
         <thead><tr>
             <th>#</th><th>الإسم والشهرة</th><th>تاريخ الولادة</th><th>العمر</th>
             <th>تاريخ الدخول</th><th>تاريخ الترك</th><th>رقم الصندوق</th><th>الرقم المالي</th><th>الراتب (ل.ل)<?php if (compColsCount()): ?><br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?php endif; ?></th>
@@ -2224,13 +2224,13 @@ elseif ($form === 'payment_list'):
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12px;margin-bottom:6px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12pt;margin-bottom:6px">
         <div><div style="font-weight:700">المدرسة: <?= e($school['name_ar'] ?? '') ?></div>
              <div>رقمها في الضمان: <?= e($school['nssf_employer_number'] ?? '') ?></div></div>
         <div style="text-align:left">الصندوق الوطني للضمان الاجتماعي</div>
     </div>
     <div class="doc-title" style="margin:4px 0">اشتراكات الضمان المتوجبة عن شهر <?= e(monthName($month,'ar')) ?> <?= (int)$year ?></div>
-    <table class="doc-table" style="font-size:9.5px">
+    <table class="doc-table">
         <thead>
             <tr>
                 <th rowspan="2">#</th>
@@ -2384,8 +2384,8 @@ elseif ($form === 'payment_list'):
         </div>
     </form>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12px;margin-bottom:6px">
-        <div style="border:1px solid #333;padding:6px 10px;font-size:11px;line-height:1.7">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12pt;margin-bottom:6px">
+        <div style="border:1px solid #333;padding:6px 10px;font-size:12pt;line-height:1.7">
             <div style="font-weight:700">معلومات تفصيلية عن الراتب</div>
             <div>للعام الدراسي: <?= e($ofMonthSchoolYear) ?></div>
             <div>شهر: <?= e(monthName($month,'ar')) ?></div>
@@ -2393,7 +2393,7 @@ elseif ($form === 'payment_list'):
         <div style="text-align:left;font-weight:700"><?= e($school['name_ar'] ?? '') ?></div>
     </div>
     <div class="doc-title" style="margin:4px 0">جميع الأساتذة / الموظفون</div>
-    <table class="doc-table" style="font-size:8.5px">
+    <table class="doc-table">
         <thead>
             <tr>
                 <th rowspan="2">رقم</th>

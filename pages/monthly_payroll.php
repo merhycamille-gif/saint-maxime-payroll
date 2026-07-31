@@ -322,7 +322,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     }
     </style>
 
-    <div class="card" id="ppExportArea">
+    <div class="card payslip-card" id="ppExportArea">
         <div class="card-header">
             <h3>
                 <span dir="ltr"><i class="fas fa-user"></i> <?= e($emp['first_name_fr'].' '.$emp['last_name_fr']) ?> — <?= monthName($month) ?> <?= $year ?></span>
