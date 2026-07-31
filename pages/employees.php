@@ -1655,8 +1655,8 @@ include __DIR__ . '/../includes/header.php';
 <div class="card" id="gradesPanel" style="margin-top:18px;display:none">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <h3>
-            <span dir="ltr"><i class="fas fa-layer-group"></i> Échelons de l'enseignant — chacun daté, décochez celui à ne pas calculer</span>
-            <div style="font-size:0.85em;font-weight:600;opacity:0.9">درجات الأستاذ — كلها بتواريخها، شيل الصح عن أي وحدة ما بدّك تحسبها</div>
+            <span dir="ltr"><i class="fas fa-layer-group"></i> Échelons de l'enseignant — modifier / enregistrer / supprimer chaque échelon</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">درجات الأستاذ — قدّام كل درجة: تعديل / حفظ / حذف</div>
         </h3>
         <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>" class="btn btn-sm btn-light no-print">
             <i class="fas fa-up-right-from-square"></i> Page complète des échelons / صفحة الدرجات الكاملة (قوانين/تدرّج)

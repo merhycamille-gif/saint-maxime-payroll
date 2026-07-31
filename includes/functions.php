@@ -1721,24 +1721,23 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         return;
     }
     ?>
-    <p class="text-muted" style="font-size:13px;margin:0 0 8px">
-        ✅ = درجة <strong>مُعطاة ومحسوبة</strong> للأستاذ (وضعها البرنامج تلقائياً عند استحقاقها).
-        <strong>شِيل الصح</strong> عن أي درجة ما بدّك تحسبها (تبقى ظاهرة لكن لا تُحسب، وترجّعها وقت ما بدّك).
-        <strong>التاريخ قدّام كل درجة تقدر تعدّلو.</strong>
-        وتحت اللائحة في <strong>«درجات استثنائية بعدها ما أُعطيت»</strong> — كبس الصح واختر التاريخ لتُعطى وتُحسب.
-        ثم اضغط «حفظ» فتتحدّث الدرجة والراتب تلقائياً. (درجة دخول الملاك ثابتة.)
-        <?php if ($excludedCount): ?><br><span style="color:#c0392b">حالياً <?= $excludedCount ?> درجة مستثناة (غير محسوبة).</span><?php endif; ?>
+    <p class="text-muted" style="font-size:13px;margin:0 0 10px;line-height:1.9">
+        ✅ = درجة <strong>محسوبة</strong>. شِيل الصح = تبقى ظاهرة بلا حساب (وترجّعها وقت ما بدّك).
+        قدّام كل درجة: <strong>«تعديل»</strong> يفتح تاريخها ومقدارها، <strong>«حفظ»</strong> يحفظها ويعيد حساب الراتب،
+        <strong>«حذف»</strong> يشيلها نهائياً. (درجة دخول الملاك ثابتة 🔒.)
+        <?php if ($excludedCount): ?><br><span style="color:#c0392b;font-weight:700">حالياً <?= $excludedCount ?> درجة مستثناة (غير محسوبة).</span><?php endif; ?>
     </p>
-    <form method="POST" class="lockedit" action="<?= BASE_URL ?>pages/grades.php?employee_id=<?= (int)$emp['id'] ?>">
+    <form method="POST" action="<?= BASE_URL ?>pages/grades.php?employee_id=<?= (int)$emp['id'] ?>">
         <?= csrfField() ?>
         <input type="hidden" name="grade_save" value="1">
         <input type="hidden" name="return_to" value="<?= e($returnTo) ?>">
         <?php if (!empty($history)): ?>
-        <table class="table">
+        <table class="table" id="gradeRowsTable">
             <thead><tr>
-                <th style="text-align:center">محسوبة؟</th>
-                <th>التاريخ <small class="text-muted">(قابل للتعديل)</small></th><th>نوع الدرجة</th><th style="text-align:center">مقدارها</th>
-                <th style="text-align:center">الدرجة بعدها</th><th>ملاحظة</th>
+                <th style="text-align:center;width:70px">محسوبة؟</th>
+                <th style="width:150px">التاريخ</th><th>نوع الدرجة</th><th style="text-align:center;width:90px">مقدارها</th>
+                <th style="text-align:center;width:90px">الدرجة بعدها</th><th>الأساس القانوني</th>
+                <th style="text-align:center;width:190px" class="no-print">إجراءات</th>
             </tr></thead>
             <tbody>
             <?php foreach ($history as $h):
@@ -1746,7 +1745,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                 $counted = $isTitul || (int)$h['counted'] === 1;
                 $amount  = ($h['delta'] !== null) ? (float)$h['delta'] : ((float)$h['grade_after'] - (float)$h['grade_before']);
             ?>
-                <tr style="<?= !$counted ? 'opacity:.5;background:#fbfbfb' : '' ?>">
+                <tr style="<?= !$counted ? 'opacity:.55;background:#fbfbfb' : '' ?>">
                     <td style="text-align:center">
                         <?php if ($isTitul): ?>
                             <i class="fas fa-lock text-muted" title="درجة دخول الملاك — ثابتة دائماً"></i>
@@ -1758,48 +1757,96 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                         <?php if ($isTitul): ?>
                             <strong><?= formatDate($h['change_date']) ?></strong>
                         <?php else: ?>
-                            <input type="date" name="gdate[<?= (int)$h['id'] ?>]" value="<?= e($h['change_date']) ?>" class="form-control" style="max-width:160px;font-size:12px;padding:4px 6px">
+                            <input type="date" name="gdate[<?= (int)$h['id'] ?>]" value="<?= e($h['change_date']) ?>" readonly
+                                   class="form-control gr-field" style="max-width:145px;padding:4px 6px">
                         <?php endif; ?>
                     </td>
                     <td><span class="badge badge-<?= $rcolor ?>"><?= e($rlabel) ?></span></td>
-                    <td style="text-align:center"><span class="badge badge-<?= $amount > 0 ? 'success' : 'warning' ?>"><?= $amount >= 0 ? '+' : '' ?><?= $fmtG($amount) ?></span></td>
+                    <td style="text-align:center">
+                        <?php if ($isTitul): ?>
+                            <span class="badge badge-success">+<?= $fmtG($amount) ?></span>
+                        <?php else: ?>
+                            <input type="number" name="gamt[<?= (int)$h['id'] ?>]" value="<?= $fmtG($amount) ?>" step="0.5" min="-52" max="52" readonly
+                                   class="form-control gr-field" style="max-width:75px;padding:4px 6px;text-align:center;margin:0 auto">
+                        <?php endif; ?>
+                    </td>
                     <td style="text-align:center"><?= $counted ? '<strong>' . $fmtG($h['grade_after']) . '</strong>' : '<span class="text-muted" title="غير محسوبة">—</span>' ?></td>
                     <td><small><?php
                         // عمود الملاحظة: الأساس القانوني لكل درجة (لكل الحالات) —
                         //  • قانون استثنائي مسمّى (244/102/223/2017=قانون 46): «قانون X — الاسم».
                         //  • درجة استثنائية بلا قانون مسمّى = نظام الأساتذة الجدد 4+4+2 (يشمل دفعات فتح السنة).
                         //  • دخول الملاك: درجة الدخول حسب الشهادة.  • التدرّج العادي: التدرّج الدوري.
+                        // نصّ مختصر يرتّب الجدول + التفصيل الكامل يظهر عند مرور الماوس (title)
                         $ref = (string)$h['law_reference'];
                         $rsn = $h['reason'];
                         if ($ref !== '' && isset($lawNames[$ref])) {
                             $li = $lawNames[$ref];
                             $issued = !empty($li['date']) ? ' (صدر بتاريخ ' . formatDate($li['date']) . ')' : '';
+                            $noteShort = 'قانون ' . $ref;
                             $noteTxt = 'قانون ' . $ref . $issued . ' — ' . $li['name'];
                         } elseif ($rsn === 'titularization') {
+                            $noteShort = 'درجة الدخول حسب الشهادة';
                             $noteTxt = 'درجة الدخول حسب الشهادة — سلسلة الرتب والرواتب (' . $scaleLaw . ') عند دخول الملاك';
                         } elseif ($rsn === 'biennial_promotion') {
+                            $noteShort = 'التدرّج الدوري — ' . $scaleLaw;
                             $noteTxt = 'التدرّج الدوري نصف درجة كل سنة — سلسلة الرتب والرواتب (' . $scaleLaw . ')';
                         } elseif ($rsn === 'manual') {
-                            $noteTxt = $h['notes'] !== '' ? $h['notes'] : 'تعديل يدوي';
+                            $noteShort = $h['notes'] !== '' ? $h['notes'] : 'تعديل يدوي';
+                            $noteTxt = $noteShort;
                         } else {
                             // نظام الأساتذة الجدد 4+4+2 = بديل قوانين الدرجات الاستثنائية للمستجدّين (بعد 2/4/2012).
-                            // نذكر القوانين المرجعية وأرقامها وتواريخ صدورها.
                             $subs = [];
                             foreach (['244','102','223'] as $ln) {
                                 if (!isset($lawNames[$ln])) continue;
                                 $dt = !empty($lawNames[$ln]['date']) ? ' صادر ' . formatDate($lawNames[$ln]['date']) : '';
                                 $subs[] = 'قانون ' . $ln . $dt;
                             }
+                            $noteShort = 'نظام الأساتذة الجدد (4+4+2)';
                             $noteTxt = 'درجات الأساتذة الجدد (نظام 4+4+2) — بموجب '
                                      . ($subs ? implode(' · ', $subs) : 'قوانين الدرجات الاستثنائية')
                                      . ' لمن دخل الملاك بعد 2012';
                         }
-                        echo e($noteTxt);
+                        echo '<span title="' . e($noteTxt) . '" style="cursor:help;border-bottom:1px dotted #cbd5e1">' . e($noteShort) . '</span>';
                     ?></small></td>
+                    <td style="text-align:center" class="no-print">
+                        <?php if ($isTitul): ?>
+                            <small class="text-muted">🔒 ثابتة</small>
+                        <?php else: ?>
+                            <button type="button" class="btn btn-sm btn-warning gr-edit" title="فتح تاريخ ومقدار هذه الدرجة للتعديل">
+                                <i class="fas fa-pen"></i> تعديل
+                            </button>
+                            <button type="submit" name="row_save" value="<?= (int)$h['id'] ?>" class="btn btn-sm btn-success gr-save" style="display:none"
+                                    data-confirm="حفظ هذه الدرجة (التاريخ/المقدار/محسوبة؟) وإعادة حساب الراتب؟">
+                                <i class="fas fa-save"></i> حفظ
+                            </button>
+                            <button type="submit" name="row_delete" value="<?= (int)$h['id'] ?>" class="btn btn-sm btn-danger"
+                                    data-confirm="⚠️ حذف هذه الدرجة نهائياً؟ ستُعاد سلسلة الدرجات وحساب الراتب بدونها.">
+                                <i class="fas fa-trash-alt"></i> حذف
+                            </button>
+                        <?php endif; ?>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
+        <script>
+        // «تعديل» يفتح حقلَي التاريخ والمقدار لهذا الصفّ فقط ويُظهر «حفظ» — حماية من التعديل غير المقصود
+        (function () {
+            var tb = document.getElementById('gradeRowsTable');
+            if (!tb || tb.dataset.grInit) return;
+            tb.dataset.grInit = '1';
+            tb.addEventListener('click', function (e) {
+                var btn = e.target.closest('.gr-edit');
+                if (!btn) return;
+                e.preventDefault();
+                var tr = btn.closest('tr');
+                tr.querySelectorAll('.gr-field').forEach(function (f) { f.readOnly = false; f.style.background = '#fef9c3'; });
+                var sv = tr.querySelector('.gr-save');
+                if (sv) sv.style.display = '';
+                btn.style.display = 'none';
+            });
+        })();
+        </script>
         <?php endif; ?>
 
         <?php if (!empty($grantable)): ?>
@@ -1817,7 +1864,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                     <td style="text-align:center"><input type="checkbox" name="gunit[]" value="<?= e($key) ?>" style="width:20px;height:20px;cursor:pointer"></td>
                     <td><strong>قانون <?= e($law['law_number']) ?></strong> <small class="text-muted">— درجة <?= $i + 1 ?>/<?= $nU ?></small></td>
                     <td style="text-align:center"><span class="badge badge-gold">+<?= $fmtG($u['delta']) ?></span></td>
-                    <td><input type="date" name="gudate[<?= e($key) ?>]" value="<?= e($u['date']) ?>" class="form-control" style="max-width:160px;font-size:12px;padding:4px 6px"></td>
+                    <td><input type="date" name="gudate[<?= e($key) ?>]" value="<?= e($u['date']) ?>" class="form-control" style="max-width:145px;padding:4px 6px"></td>
                     <td><small><?= e($law['description_ar'] ?: $law['description_fr']) ?></small></td>
                 </tr>
             <?php endforeach; endforeach; ?>
@@ -1825,9 +1872,10 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         </table>
         <?php endif; ?>
 
-        <button type="submit" class="btn btn-primary" data-confirm="حفظ الدرجات وإعادة حساب الراتب؟">
-            <i class="fas fa-save"></i> حفظ الدرجات
+        <button type="submit" class="btn btn-primary" data-confirm="حفظ كل التغييرات (المحسوبة؟ + التواريخ + المقادير + الدرجات المُعطاة الجديدة) وإعادة حساب الراتب؟">
+            <i class="fas fa-save"></i> حفظ الكل دفعة واحدة
         </button>
+        <small class="text-muted d-block mt-1">يحفظ كل الجدول دفعة واحدة (الشك-ماركات والدرجات المُعطاة الجديدة) — أو استعمل «حفظ» قدّام كل درجة لحالها.</small>
     </form>
 
     <!-- ➕ إضافة درجة يدوية (خارج القانون، بقرار المستخدم) — نموذج مستقلّ -->

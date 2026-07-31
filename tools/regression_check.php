@@ -703,6 +703,60 @@ check('خط 12: القسيمة الشهرية مشمولة (payslip-card على 
 check('خط 12: النماذج طبق الأصل مستثناة عمداً (xlsf 9px كما صُمّمت — المحاذاة أهم)',
       strpos($rhSrc22, 'table.xlsf{font-size:9px;}') !== false);
 
+/* =====================================================================
+ * 23) ✏️ أزرار «تعديل/حفظ/حذف» قدّام كل درجة بلوحة درجات الأستاذ (2026-07-31)
+ *     + ترتيب اللوحة (أساس قانوني مختصر بتلميح، حقول مقفلة حتى «تعديل»)
+ * =================================================================== */
+$fnSrc23 = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
+$grSrc23 = (string)file_get_contents(__DIR__ . '/../pages/grades.php');
+check('أزرار الدرجات: اللوحة فيها تعديل/حفظ/حذف لكل صفّ (gr-edit/gr-save/row_delete)',
+      strpos($fnSrc23, 'class="btn btn-sm btn-warning gr-edit"') !== false
+      && strpos($fnSrc23, 'name="row_save"') !== false
+      && strpos($fnSrc23, 'name="row_delete"') !== false);
+check('أزرار الدرجات: معالجا الصفّ الواحد موجودان مع حماية دخول الملاك + rechain',
+      strpos($grSrc23, "isset(\$_POST['row_save']) || isset(\$_POST['row_delete'])") !== false
+      && strpos($grSrc23, 'درجة دخول الملاك ثابتة — لا تُعدَّل ولا تُحذف') !== false
+      && substr_count($grSrc23, 'rechainGradeHistory($employeeId)') >= 2);
+check('أزرار الدرجات: الحفظ الشامل لا يخطف كبسة حفظ/حذف الصفّ الواحد',
+      strpos($grSrc23, "!isset(\$_POST['row_save']) && !isset(\$_POST['row_delete']) && \$employeeId > 0") !== false);
+check('أزرار الدرجات: حقلا التاريخ والمقدار مقفلان (readonly) حتى كبسة «تعديل»',
+      strpos($fnSrc23, 'readonly') !== false && strpos($fnSrc23, 'f.readOnly = false') !== false
+      && strpos($fnSrc23, "name=\"gamt[") !== false);
+// فحص فعلي: صفحة الدرجات وملف الأستاذ يعرضان الأزرار لأستاذ ملاك عنده سجلّ درجات
+$t23 = $db->query("SELECT e.id FROM employees e JOIN employee_grade_history g ON g.employee_id = e.id
+                   WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 LIMIT 1")->fetchColumn();
+if ($t23) {
+    $hGr = renderPage('pages/grades.php', ['employee_id' => (string)$t23], ['extra','aide','transport']);
+    check('أزرار الدرجات: صفحة الدرجات تعرض الجدول والأزرار فعلياً', strpos($hGr, 'gradeRowsTable') !== false
+          && strpos($hGr, 'gr-edit') !== false && strpos($hGr, 'row_delete') !== false, 'id=' . $t23);
+    $hEmp23 = renderPage('pages/employees.php', ['action' => 'edit', 'id' => (string)$t23], ['extra','aide','transport']);
+    check('أزرار الدرجات: لوحة الدرجات بملف الأستاذ تعرض الأزرار فعلياً', strpos($hEmp23, 'gradeRowsTable') !== false
+          && strpos($hEmp23, 'gr-edit') !== false, 'id=' . $t23);
+} else {
+    check('أزرار الدرجات: وجود أستاذ ملاك بسجلّ درجات للفحص الفعلي', false, 'لا عيّنة');
+}
+// فحص فعلي على الداتا (ضمن معاملة تُرجَع بالكامل): إضافة درجة ثم حذفها مع rechain تعيد الدرجة الحالية كما كانت
+if ($t23) {
+    try {
+        $g0 = (float)$db->query("SELECT current_grade FROM employees WHERE id = $t23")->fetchColumn();
+        $db->beginTransaction();
+        $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes)
+                      VALUES (?,0,1,1,1,'2020-01-01','manual',NULL,'فحص regression مؤقت')")->execute([$t23]);
+        $rid23 = (int)$db->lastInsertId();
+        rechainGradeHistory($t23);
+        $g1 = (float)$db->query("SELECT current_grade FROM employees WHERE id = $t23")->fetchColumn();
+        $db->prepare("DELETE FROM employee_grade_history WHERE id = ?")->execute([$rid23]);
+        rechainGradeHistory($t23);
+        $g2 = (float)$db->query("SELECT current_grade FROM employees WHERE id = $t23")->fetchColumn();
+        $db->rollBack();
+        check('أزرار الدرجات: الحذف يعيد السلسلة والدرجة الحالية كما كانت (rechain بعد delete)',
+              abs($g1 - ($g0 + 1)) < 0.01 && abs($g2 - $g0) < 0.01, "قبل=$g0 بعد الإضافة=$g1 بعد الحذف=$g2");
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) $db->rollBack();
+        check('أزرار الدرجات: الحذف يعيد السلسلة والدرجة الحالية كما كانت (rechain بعد delete)', false, $e->getMessage());
+    }
+}
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
