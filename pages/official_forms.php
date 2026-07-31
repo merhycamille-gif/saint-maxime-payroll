@@ -2197,7 +2197,7 @@ elseif ($form === 'payment_list'):
     // فلتر «موظفي الفترة» الموحّد محسوب بأعلى الملف حسب شهر/سنة الكشف ($ofMonthFilter/$ofMonthParams).
     $sql = "SELECT e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
                    e.nssf_number, e.birth_date, e.employee_type, e.hire_date,
-                   ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.taxable_base_lbp,
+                   ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.transport_lbp, ms.taxable_base_lbp,
                    ms.cnss_amount_lbp, ms.school_cnss_8_lbp,
                    ms.school_end_of_service_8_5_lbp, ms.school_family_comp_6_lbp, ms.family_allowance_lbp
             FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
@@ -2211,8 +2211,11 @@ elseif ($form === 'payment_list'):
     $rows = $st->fetchAll();
     $fmt = fn($v) => (int)$v ? formatLBP((int)$v, false) : '0';
     // المجاميع
-    $T = ['baseSal'=>0,'teach'=>0,'cola'=>0,'bonus'=>0,'work'=>0,'base'=>0,'nT'=>0,'nW'=>0,
+    $T = ['baseSal'=>0,'teach'=>0,'cola'=>0,'bonus'=>0,'trans'=>0,'work'=>0,'base'=>0,'nT'=>0,'nW'=>0,
           'm3'=>0,'m8'=>0,'mtot'=>0,'eos'=>0,'fam6'=>0,'due'=>0,'fpaid'=>0,'rest'=>0];
+    // أعمدة الإضافي/المكافأة/النقل تتبع زرّ «الراتب يشمل» بالترويسة (كباقي الكشوف) —
+    // عمود «مجموع الرواتب ضمن الحد الأقصى» يبقى وعاء الضمان القانوني المخزّن كما هو.
+    $nomCols = 19 + compColsCount();
 ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="cnss_nominative_monthly">
@@ -2239,8 +2242,7 @@ elseif ($form === 'payment_list'):
                 <th rowspan="2">ملاك / متعاقد / مستخدم</th>
                 <th rowspan="2">أساس الراتب</th>
                 <th rowspan="2">رواتب الأساتذة</th>
-                <th rowspan="2">الأجر الإضافي</th>
-                <th rowspan="2">مكافأة ومساعدة</th>
+                <?= extraAideHeads(' rowspan="2"') ?><?= transportHead(' rowspan="2"') ?>
                 <th rowspan="2">رواتب العمال</th>
                 <th rowspan="2">مجموع الرواتب ضمن الحد الأقصى</th>
                 <th rowspan="2">عدد الأساتذة</th>
@@ -2258,7 +2260,7 @@ elseif ($form === 'payment_list'):
         <tbody>
         <?php $curCat=null; foreach ($rows as $i=>$r):
             $type = $r['employee_type'];
-            echo categoryHeaderRow($curCat, $type, 21);
+            echo categoryHeaderRow($curCat, $type, $nomCols);
             $isTeacher = in_array($type, ['enseignant_titulaire','enseignant_contractuel']);
             $status = ['enseignant_titulaire'=>'ملاك','enseignant_contractuel'=>'متعاقد','employe'=>'مستخدم'][$type] ?? '';
             $base = (int)$r['base_plus_echelon_lbp'];
@@ -2267,6 +2269,7 @@ elseif ($form === 'payment_list'):
             // عمودان منفصلان بطلب المستخدم: «الأجر الإضافي» = prime_fixe (+extra القديم)، «مكافأة ومساعدة» = aide_complementaire.
             $cola  = (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp']; // الأجر الإضافي
             $bonus = (int)$r['aide_complementaire_lbp'];               // مكافأة ومساعدة
+            $trans = (int)$r['transport_lbp'];                          // تعويض النقل (عرض فقط — ليس من وعاء الضمان)
             $m3    = (int)$r['cnss_amount_lbp'];
             $m8    = (int)$r['school_cnss_8_lbp'];
             // مجموع الرواتب ضمن الحد الأقصى = وعاء الضمان الفعلي الذي احتُسب عليه الاشتراك
@@ -2279,7 +2282,7 @@ elseif ($form === 'payment_list'):
             $fpaid = (int)$r['family_allowance_lbp'];
             $rest  = $due - $fpaid;
             $T['baseSal']+=(int)$r['base_salary_lbp'];
-            $T['teach']+=$teach; $T['cola']+=$cola; $T['bonus']+=$bonus; $T['work']+=$work;
+            $T['teach']+=$teach; $T['cola']+=$cola; $T['bonus']+=$bonus; $T['trans']+=$trans; $T['work']+=$work;
             $T['base']+=$capped; $T['nT']+=$isTeacher?1:0; $T['nW']+=$isTeacher?0:1;
             $T['m3']+=$m3; $T['m8']+=$m8; $T['mtot']+=$mtot; $T['eos']+=$eos; $T['fam6']+=$fam6;
             $T['due']+=$due; $T['fpaid']+=$fpaid; $T['rest']+=$rest;
@@ -2292,8 +2295,9 @@ elseif ($form === 'payment_list'):
                 <td><?= e($status) ?></td>
                 <td class="num"><?= $fmt((int)$r['base_salary_lbp']) ?></td>
                 <td class="num"><?= $fmt($teach) ?></td>
-                <td class="num"><?= $fmt($cola) ?></td>
-                <td class="num"><?= $fmt($bonus) ?></td>
+                <?php if (salaryCompHas('extra')): ?><td class="num"><?= $fmt($cola) ?></td><?php endif; ?>
+                <?php if (salaryCompHas('aide')): ?><td class="num"><?= $fmt($bonus) ?></td><?php endif; ?>
+                <?php if (salaryCompHas('transport')): ?><td class="num"><?= $fmt($trans) ?></td><?php endif; ?>
                 <td class="num"><?= $fmt($work) ?></td>
                 <td class="num"><?= $fmt($capped) ?></td>
                 <td><?= $isTeacher?1:0 ?></td>
@@ -2309,7 +2313,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($rest) ?></td>
             </tr>
         <?php endforeach; ?>
-        <?php if(!$rows): ?><tr><td colspan="21" class="text-center">لا يوجد مضمونون لهذا الشهر</td></tr><?php endif; ?>
+        <?php if(!$rows): ?><tr><td colspan="<?= $nomCols ?>" class="text-center">لا يوجد مضمونون لهذا الشهر</td></tr><?php endif; ?>
         </tbody>
         <?php if ($rows): ?>
         <tfoot>
@@ -2317,8 +2321,9 @@ elseif ($form === 'payment_list'):
                 <td colspan="4">المجاميع</td>
                 <td class="num"><?= $fmt($T['baseSal']) ?></td>
                 <td class="num"><?= $fmt($T['teach']) ?></td>
-                <td class="num"><?= $fmt($T['cola']) ?></td>
-                <td class="num"><?= $fmt($T['bonus']) ?></td>
+                <?php if (salaryCompHas('extra')): ?><td class="num"><?= $fmt($T['cola']) ?></td><?php endif; ?>
+                <?php if (salaryCompHas('aide')): ?><td class="num"><?= $fmt($T['bonus']) ?></td><?php endif; ?>
+                <?php if (salaryCompHas('transport')): ?><td class="num"><?= $fmt($T['trans']) ?></td><?php endif; ?>
                 <td class="num"><?= $fmt($T['work']) ?></td>
                 <td class="num"><?= $fmt($T['base']) ?></td>
                 <td><?= $T['nT'] ?></td>
@@ -2361,7 +2366,10 @@ elseif ($form === 'payment_list'):
     $zero = array_fill_keys($keys, 0);
     // استخراج قيم صفّ واحد
     $rowVals = function($r) {
-        $gross = (int)$r['base_plus_echelon_lbp'] + (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp'];
+        // «الأجر الإجمالي» يتبع زرّ «الراتب يشمل» (الأرقام تركب): أساس+درجة + الظاهر من الإضافي/المكافأة
+        $gross = (int)$r['base_plus_echelon_lbp']
+               + (salaryCompHas('extra') ? (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] : 0)
+               + (salaryCompHas('aide')  ? (int)$r['aide_complementaire_lbp'] : 0);
         return [
             'base'=>(int)$r['base_salary_lbp'], 'ech'=>(int)$r['echelon_value_lbp'], 'bpe'=>(int)$r['base_plus_echelon_lbp'],
             // عمودان منفصلان: «الأجر الإضافي» = prime_fixe (+extra)، «مكافأة ومساعدة» = aide_complementaire (موحّد مع كشف الضمان الاسمي)
@@ -2370,9 +2378,13 @@ elseif ($form === 'payment_list'):
             'half'=>(int)$r['eoc_grade_lbp'], 'caisse'=>(int)$r['caisse_amount_lbp'], 'gross'=>$gross,
             'txb'=>(int)$r['taxable_base_lbp'], 'tax'=>(int)$r['income_tax_lbp'], 'cnss'=>(int)$r['cnss_amount_lbp'],
             'ret'=>(int)$r['total_retenues_lbp'], 'net'=>(int)$r['net_salary_lbp'], 'fam'=>(int)$r['family_allowance_lbp'],
-            'trans'=>(int)$r['transport_lbp'], 'due'=>(int)$r['total_due_lbp'],
+            'trans'=>(int)$r['transport_lbp'],
+            // «مجموع المدفوعات» = المستحق المعروض (يطرح النقل إن كان عموده مخفياً — الأرقام تركب)
+            'due'=>dueShownLbp($r),
         ];
     };
+    // عدد الأعمدة الظاهرة (لصفوف عناوين الفئات): 16 ثابتاً + أعمدة «الراتب يشمل» المختارة
+    $sdCols = 16 + compColsCount();
 ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="salary_detail">
@@ -2401,22 +2413,22 @@ elseif ($form === 'payment_list'):
                 <th rowspan="2">أساس الراتب</th>
                 <th rowspan="2">درجة عادية واستثنائية</th>
                 <th rowspan="2">الراتب بعد الدرج</th>
-                <th rowspan="2">الأجر الإضافي</th>
-                <th rowspan="2">مكافأة ومساعدة</th>
+                <?= extraAideHeads(' rowspan="2"') ?>
                 <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
-                <th colspan="6">المحسومات القانونية</th>
+                <th colspan="7">المحسومات القانونية</th>
                 <th rowspan="2">الصافي</th>
                 <th rowspan="2">تعويض عائلي</th>
-                <th rowspan="2">تعويض نقل</th>
+                <?= transportHead(' rowspan="2"', 'تعويض نقل') ?>
                 <th rowspan="2">مجموع المدفوعات</th>
             </tr>
             <tr>
                 <th>نصف راتب،درجة</th>
                 <th>صندوق التعويضات 6%</th>
-                <th>التنزيل العائلي</th>
+                <th>الأجر الإجمالي</th>
                 <th>الراتب الخاضع لضريبة الدخل</th>
                 <th>ضريبة الدخل</th>
                 <th>الضمان الاجتماعي<br>المرض الأمومة 3%</th>
+                <th>مجموع المحسومات</th>
             </tr>
             <tr style="display:none"></tr>
         </thead>
@@ -2430,8 +2442,8 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($v['base']) ?></td>
                 <td class="num"><?= $fmt($v['ech']) ?></td>
                 <td class="num"><?= $fmt($v['bpe']) ?></td>
-                <td class="num"><?= $fmt($v['cola']) ?></td>
-                <td class="num"><?= $fmt($v['bonus']) ?></td>
+                <?php if (salaryCompHas('extra')): ?><td class="num"><?= $fmt($v['cola']) ?></td><?php endif; ?>
+                <?php if (salaryCompHas('aide')): ?><td class="num"><?= $fmt($v['bonus']) ?></td><?php endif; ?>
                 <td class="num" style="background:#eef2ff"><strong><?= $fmt($v['composed']) ?></strong></td>
                 <td class="num"><?= $fmt($v['half']) ?></td>
                 <td class="num"><?= $fmt($v['caisse']) ?></td>
@@ -2442,7 +2454,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($v['ret']) ?></td>
                 <td class="num"><?= $fmt($v['net']) ?></td>
                 <td class="num"><?= $fmt($v['fam']) ?></td>
-                <td class="num"><?= $fmt($v['trans']) ?></td>
+                <?php if (salaryCompHas('transport')): ?><td class="num"><?= $fmt($v['trans']) ?></td><?php endif; ?>
                 <td class="num"><?= $fmt($v['due']) ?></td>
             </tr>
         <?php };
@@ -2451,13 +2463,16 @@ elseif ($form === 'payment_list'):
             <tr class="total-row">
                 <td></td><td style="text-align:right"><?= e($label) ?></td>
                 <td class="num"><?= $fmt($a['base']) ?></td><td class="num"><?= $fmt($a['ech']) ?></td>
-                <td class="num"><?= $fmt($a['bpe']) ?></td><td class="num"><?= $fmt($a['cola']) ?></td>
-                <td class="num"><?= $fmt($a['bonus']) ?></td><td class="num" style="background:#eef2ff"><strong><?= $fmt($a['composed']) ?></strong></td><td class="num"><?= $fmt($a['half']) ?></td>
+                <td class="num"><?= $fmt($a['bpe']) ?></td>
+                <?php if (salaryCompHas('extra')): ?><td class="num"><?= $fmt($a['cola']) ?></td><?php endif; ?>
+                <?php if (salaryCompHas('aide')): ?><td class="num"><?= $fmt($a['bonus']) ?></td><?php endif; ?>
+                <td class="num" style="background:#eef2ff"><strong><?= $fmt($a['composed']) ?></strong></td><td class="num"><?= $fmt($a['half']) ?></td>
                 <td class="num"><?= $fmt($a['caisse']) ?></td><td class="num"><?= $fmt($a['gross']) ?></td>
                 <td class="num"><?= $fmt($a['txb']) ?></td><td class="num"><?= $fmt($a['tax']) ?></td>
                 <td class="num"><?= $fmt($a['cnss']) ?></td><td class="num"><?= $fmt($a['ret']) ?></td>
                 <td class="num"><?= $fmt($a['net']) ?></td><td class="num"><?= $fmt($a['fam']) ?></td>
-                <td class="num"><?= $fmt($a['trans']) ?></td><td class="num"><?= $fmt($a['due']) ?></td>
+                <?php if (salaryCompHas('transport')): ?><td class="num"><?= $fmt($a['trans']) ?></td><?php endif; ?>
+                <td class="num"><?= $fmt($a['due']) ?></td>
             </tr>
         <?php };
         $n = 0; $curCat = null; $sub = $zero; $grand = $zero;
@@ -2466,7 +2481,7 @@ elseif ($form === 'payment_list'):
             if ($cat !== $curCat):
                 if ($curCat !== null) $drawTotal('المجموع', $sub);
                 $sub = $zero; $curCat = $cat;
-                ?><tr><td colspan="19" style="text-align:right;font-weight:700;background:#eef2ff"><?= e($catLabel[$cat] ?? $cat) ?></td></tr><?php
+                ?><tr><td colspan="<?= $sdCols ?>" style="text-align:right;font-weight:700;background:#eef2ff"><?= e($catLabel[$cat] ?? $cat) ?></td></tr><?php
             endif;
             $v = $rowVals($r);
             foreach ($keys as $k) { $sub[$k]+=$v[$k]; $grand[$k]+=$v[$k]; }
@@ -2474,7 +2489,7 @@ elseif ($form === 'payment_list'):
             $drawRow(++$n, $name, $v);
         endforeach;
         if ($curCat !== null) $drawTotal('المجموع', $sub);
-        if (!$rows): ?><tr><td colspan="19" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif;
+        if (!$rows): ?><tr><td colspan="<?= $sdCols ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif;
         ?>
         </tbody>
         <?php if ($rows): ?>

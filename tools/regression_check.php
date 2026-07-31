@@ -859,6 +859,62 @@ try {
 }
 @unlink($out25);
 
+/* =====================================================================
+ * 26) 📑 زرّ «الراتب يشمل» يُحترم بكشف الضمان الاسمي المفصّل + «معلومات تفصيلية عن الراتب»
+ *     (2026-07-31، p1: «حطيت نقل ما ببين، شلت إضافي بضلها الإضافي») + إصلاح انزياح
+ *     أعمدة «معلومات تفصيلية» (كانت 18 رأساً مقابل 19 خلية — الأرقام تحت عناوين غلط).
+ * =================================================================== */
+$ofSrc26 = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
+check('الراتب يشمل: كشف الضمان الاسمي يستعمل extraAideHeads/transportHead (لا أعمدة مقصوصة بالكود)',
+      substr_count($ofSrc26, 'extraAideHeads(\' rowspan="2"\')') >= 4
+      && strpos($ofSrc26, "\$nomCols = 19 + compColsCount();") !== false);
+check('الراتب يشمل: «معلومات تفصيلية عن الراتب» — المحسومات 7 أعمدة برؤوس صحيحة (مجموع المحسومات موجود)',
+      strpos($ofSrc26, '<th colspan="7">المحسومات القانونية</th>') !== false
+      && strpos($ofSrc26, '<th>مجموع المحسومات</th>') !== false
+      && strpos($ofSrc26, '<th>التنزيل العائلي</th>') === false);
+check('الراتب يشمل: «معلومات تفصيلية» — المستحق المعروض عبر dueShownLbp والأجر الإجمالي من الظاهر فقط',
+      strpos($ofSrc26, "'due'=>dueShownLbp(\$r),") !== false
+      && strpos($ofSrc26, "\$sdCols = 16 + compColsCount();") !== false);
+// فحص فعلي: توازن الرؤوس/الخلايا بكل تركيبات الزر للنموذجين (يمسك أي عمود ناقص/زائد فوراً)
+$colBalance = function (string $html): array {
+    if (!preg_match('#<table[^>]*doc-table[^>]*>(.*?)</table>#s', $html, $tm)) return [-1, -1];
+    preg_match('#<thead>(.*?)</thead>#s', $tm[1], $hm);
+    preg_match_all('#<tr[^>]*>(.*?)</tr>#s', $hm[1] ?? '', $hrows);
+    $leaf = 0;
+    foreach ($hrows[1] as $ri => $rowHtml) {
+        preg_match_all('#<th([^>]*)>#', $rowHtml, $ths);
+        foreach ($ths[1] as $attrs) {
+            $cs = preg_match('/colspan="(\d+)"/', $attrs, $c) ? (int)$c[1] : 1;
+            if ($ri === 0) $leaf += ($cs > 1) ? 0 : $cs;
+            if ($ri === 1) $leaf += $cs;
+        }
+    }
+    preg_match('#<tbody>(.*?)$#s', $tm[1], $bm);
+    preg_match_all('#<tr>(.*?)</tr>#s', $bm[1] ?? '', $brows);
+    foreach ($brows[1] as $rowHtml) {
+        $n = preg_match_all('#<td[^>]*>#', $rowHtml, $x);
+        if ($n > 5) return [$leaf, $n];
+    }
+    return [$leaf, 0];
+};
+$balOk = true; $balDetail = [];
+foreach ([['extra','aide','transport'], ['aide','transport'], ['transport'], []] as $comp26) {
+    foreach (['salary_detail', 'cnss_nominative_monthly'] as $form26) {
+        $h26 = renderPage('pages/official_forms.php', ['form' => $form26, 'month' => '7', 'year' => '2026'], $comp26, [2]);
+        [$lf, $cells] = $colBalance($h26);
+        if ($lf < 10 || $lf !== $cells) { $balOk = false; $balDetail[] = $form26 . '[' . implode(',', $comp26) . "]=$lf/$cells"; }
+    }
+}
+check('الراتب يشمل: رؤوس الأعمدة = خلايا الصف بكل تركيبات الزر (الاسمي المفصّل + معلومات تفصيلية)',
+      $balOk, $balDetail ? implode(' · ', $balDetail) : '8 تركيبات متوازنة');
+// النقل يظهر عند اختياره ويختفي عند إلغائه (نص الرأس نفسه)
+$hT26 = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => '7', 'year' => '2026'], ['transport'], [2]);
+$hN26 = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => '7', 'year' => '2026'], [], [2]);
+check('الراتب يشمل: عمود «تعويض النقل» بكشف الضمان الاسمي يظهر مع النقل ويختفي بلاه، والإضافي يختفي عند شيله',
+      strpos($hT26, '<th rowspan="2">تعويض النقل</th>') !== false
+      && strpos($hT26, '<th rowspan="2">الأجر الإضافي</th>') === false
+      && strpos($hN26, '<th rowspan="2">تعويض النقل</th>') === false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
