@@ -1723,11 +1723,11 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
     ?>
     <p class="text-muted" style="font-size:13px;margin:0 0 10px;line-height:1.9">
         ✅ = درجة <strong>محسوبة</strong>. شِيل الصح = تبقى ظاهرة بلا حساب (وترجّعها وقت ما بدّك).
-        قدّام كل درجة: <strong>«تعديل»</strong> يفتح تاريخها ومقدارها، <strong>«حفظ»</strong> يحفظها ويعيد حساب الراتب،
-        <strong>«حذف»</strong> يشيلها نهائياً. (درجة دخول الملاك ثابتة 🔒.)
+        <strong>أوّل ما تغيّر أي شي يظهر زرّ «حفظ» أخضر بنفس السطر — كبسة وحدة والحفظ فوري.</strong>
+        و<strong>«تعديل»</strong> يفتح تاريخ الدرجة ومقدارها، و<strong>«حذف»</strong> يشيلها نهائياً. (درجة دخول الملاك ثابتة 🔒.)
         <?php if ($excludedCount): ?><br><span style="color:#c0392b;font-weight:700">حالياً <?= $excludedCount ?> درجة مستثناة (غير محسوبة).</span><?php endif; ?>
     </p>
-    <form method="POST" action="<?= BASE_URL ?>pages/grades.php?employee_id=<?= (int)$emp['id'] ?>">
+    <form method="POST" id="gradeChecklistForm" action="<?= BASE_URL ?>pages/grades.php?employee_id=<?= (int)$emp['id'] ?>">
         <?= csrfField() ?>
         <input type="hidden" name="grade_save" value="1">
         <input type="hidden" name="return_to" value="<?= e($returnTo) ?>">
@@ -1815,8 +1815,8 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                             <button type="button" class="btn btn-sm btn-warning gr-edit" title="فتح تاريخ ومقدار هذه الدرجة للتعديل">
                                 <i class="fas fa-pen"></i> تعديل
                             </button>
-                            <button type="submit" name="row_save" value="<?= (int)$h['id'] ?>" class="btn btn-sm btn-success gr-save" style="display:none"
-                                    data-confirm="حفظ هذه الدرجة (التاريخ/المقدار/محسوبة؟) وإعادة حساب الراتب؟">
+                            <button type="submit" class="btn btn-sm btn-success gr-save" style="display:none"
+                                    title="يحفظ تغييراتك فوراً ويعيد حساب الراتب">
                                 <i class="fas fa-save"></i> حفظ
                             </button>
                             <button type="submit" name="row_delete" value="<?= (int)$h['id'] ?>" class="btn btn-sm btn-danger"
@@ -1829,33 +1829,16 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
             <?php endforeach; ?>
             </tbody>
         </table>
-        <script>
-        // «تعديل» يفتح حقلَي التاريخ والمقدار لهذا الصفّ فقط ويُظهر «حفظ» — حماية من التعديل غير المقصود
-        (function () {
-            var tb = document.getElementById('gradeRowsTable');
-            if (!tb || tb.dataset.grInit) return;
-            tb.dataset.grInit = '1';
-            tb.addEventListener('click', function (e) {
-                var btn = e.target.closest('.gr-edit');
-                if (!btn) return;
-                e.preventDefault();
-                var tr = btn.closest('tr');
-                tr.querySelectorAll('.gr-field').forEach(function (f) { f.readOnly = false; f.style.background = '#fef9c3'; });
-                var sv = tr.querySelector('.gr-save');
-                if (sv) sv.style.display = '';
-                btn.style.display = 'none';
-            });
-        })();
-        </script>
         <?php endif; ?>
 
         <?php if (!empty($grantable)): ?>
         <h4 style="color:var(--primary);margin:18px 0 6px"><i class="fas fa-plus-circle"></i> درجات استثنائية بعدها ما أُعطيت (متاحة لهذا الأستاذ)</h4>
         <p class="text-muted" style="font-size:12px;margin:0 0 8px"><strong>كل درجة لحالها.</strong> الشك-مارك فاضي = ما انعطت بعد. كبس الصح واختر تاريخ الإعطاء لكل درجة بدّك ياها فتُضاف وتُحسب.</p>
-        <table class="table">
+        <table class="table" id="gradeUnitsTable">
             <thead><tr>
                 <th style="text-align:center">إعطاء؟</th><th>القانون / الدرجة</th><th style="text-align:center">مقدارها</th>
                 <th>تاريخ الإعطاء</th><th>الوصف</th>
+                <th style="text-align:center;width:110px" class="no-print">حفظ</th>
             </tr></thead>
             <tbody>
             <?php foreach ($grantable as $gb): $law = $gb['law']; $units = $gb['units']; $nU = count($units);
@@ -1866,16 +1849,58 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                     <td style="text-align:center"><span class="badge badge-gold">+<?= $fmtG($u['delta']) ?></span></td>
                     <td><input type="date" name="gudate[<?= e($key) ?>]" value="<?= e($u['date']) ?>" class="form-control" style="max-width:145px;padding:4px 6px"></td>
                     <td><small><?= e($law['description_ar'] ?: $law['description_fr']) ?></small></td>
+                    <td style="text-align:center" class="no-print">
+                        <button type="submit" class="btn btn-sm btn-success gr-save" style="display:none"
+                                title="يحفظ تغييراتك فوراً ويعيد حساب الراتب">
+                            <i class="fas fa-save"></i> حفظ
+                        </button>
+                    </td>
                 </tr>
             <?php endforeach; endforeach; ?>
             </tbody>
         </table>
         <?php endif; ?>
 
+        <style>
+        /* زرّ الحفظ الفوري يلفت النظر لمّا يظهر قدّام الشي المتغيّر */
+        .gr-pulse{animation:grPulse .9s ease infinite alternate}
+        @keyframes grPulse{from{box-shadow:0 0 0 0 rgba(22,163,74,.55)}to{box-shadow:0 0 0 7px rgba(22,163,74,0)}}
+        </style>
+        <script>
+        // 🖱️ الحفظ الفوري قدّام التغيير: أوّل ما تغيّر أي شي (صح «محسوبة؟» / تاريخ / مقدار / إعطاء درجة)
+        // يظهر زرّ «حفظ» أخضر نابض بنفس السطر — كبسة وحدة تحفظ كل ما هو معروض وتعيد حساب الراتب
+        // (يحفظ كامل حالة الجدول فلا يضيع أي تغيير آخر عملته قبل الكبسة).
+        // و«تعديل» يفتح حقلَي التاريخ والمقدار للصفّ فقط — حماية من التعديل غير المقصود.
+        (function () {
+            var f = document.getElementById('gradeChecklistForm');
+            if (!f || f.dataset.grInit) return;
+            f.dataset.grInit = '1';
+            f.addEventListener('click', function (e) {
+                var btn = e.target.closest('.gr-edit');
+                if (!btn) return;
+                e.preventDefault();
+                var tr = btn.closest('tr');
+                tr.querySelectorAll('.gr-field').forEach(function (x) { x.readOnly = false; x.style.background = '#fef9c3'; });
+                var sv = tr.querySelector('.gr-save');
+                if (sv) sv.style.display = '';
+                btn.style.display = 'none';
+            });
+            function reveal(el) {
+                var tr = el.closest ? el.closest('tr') : null;
+                var sv = tr ? tr.querySelector('.gr-save') : null;
+                if (!sv) return;
+                sv.style.display = '';
+                sv.classList.add('gr-pulse');
+            }
+            f.addEventListener('change', function (e) { reveal(e.target); });
+            f.addEventListener('input',  function (e) { reveal(e.target); });
+        })();
+        </script>
+
         <button type="submit" class="btn btn-primary" data-confirm="حفظ كل التغييرات (المحسوبة؟ + التواريخ + المقادير + الدرجات المُعطاة الجديدة) وإعادة حساب الراتب؟">
             <i class="fas fa-save"></i> حفظ الكل دفعة واحدة
         </button>
-        <small class="text-muted d-block mt-1">يحفظ كل الجدول دفعة واحدة (الشك-ماركات والدرجات المُعطاة الجديدة) — أو استعمل «حفظ» قدّام كل درجة لحالها.</small>
+        <small class="text-muted d-block mt-1">نفس مفعول زرّ «حفظ» الأخضر الذي يظهر قدّام أي تغيير — الاثنان يحفظان كل ما هو معروض فوراً.</small>
     </form>
 
     <!-- ➕ إضافة درجة يدوية (خارج القانون، بقرار المستخدم) — نموذج مستقلّ -->

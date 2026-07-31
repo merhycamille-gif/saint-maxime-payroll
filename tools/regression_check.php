@@ -711,17 +711,22 @@ $fnSrc23 = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
 $grSrc23 = (string)file_get_contents(__DIR__ . '/../pages/grades.php');
 check('أزرار الدرجات: اللوحة فيها تعديل/حفظ/حذف لكل صفّ (gr-edit/gr-save/row_delete)',
       strpos($fnSrc23, 'class="btn btn-sm btn-warning gr-edit"') !== false
-      && strpos($fnSrc23, 'name="row_save"') !== false
+      && strpos($fnSrc23, 'gr-save') !== false
       && strpos($fnSrc23, 'name="row_delete"') !== false);
-check('أزرار الدرجات: معالجا الصفّ الواحد موجودان مع حماية دخول الملاك + rechain',
-      strpos($grSrc23, "isset(\$_POST['row_save']) || isset(\$_POST['row_delete'])") !== false
+check('أزرار الدرجات: معالج الحذف موجود مع حماية دخول الملاك + rechain',
+      strpos($grSrc23, "isset(\$_POST['row_delete'])") !== false
       && strpos($grSrc23, 'درجة دخول الملاك ثابتة — لا تُعدَّل ولا تُحذف') !== false
       && substr_count($grSrc23, 'rechainGradeHistory($employeeId)') >= 2);
-check('أزرار الدرجات: الحفظ الشامل لا يخطف كبسة حفظ/حذف الصفّ الواحد',
-      strpos($grSrc23, "!isset(\$_POST['row_save']) && !isset(\$_POST['row_delete']) && \$employeeId > 0") !== false);
+check('أزرار الدرجات: الحفظ الشامل لا يخطف كبسة حذف الصفّ الواحد',
+      strpos($grSrc23, "!isset(\$_POST['row_delete']) && \$employeeId > 0") !== false);
 check('أزرار الدرجات: حقلا التاريخ والمقدار مقفلان (readonly) حتى كبسة «تعديل»',
-      strpos($fnSrc23, 'readonly') !== false && strpos($fnSrc23, 'f.readOnly = false') !== false
+      strpos($fnSrc23, 'readonly') !== false && strpos($fnSrc23, 'x.readOnly = false') !== false
       && strpos($fnSrc23, "name=\"gamt[") !== false);
+check('أزرار الدرجات: الحفظ الفوري — أي تغيير يُظهر زرّ «حفظ» بنفس السطر (change/input + نبض)',
+      strpos($fnSrc23, "f.addEventListener('change', function (e) { reveal(e.target); })") !== false
+      && strpos($fnSrc23, "f.addEventListener('input',  function (e) { reveal(e.target); })") !== false
+      && strpos($fnSrc23, 'gr-pulse') !== false
+      && strpos($fnSrc23, 'id="gradeUnitsTable"') !== false);
 // فحص فعلي: صفحة الدرجات وملف الأستاذ يعرضان الأزرار لأستاذ ملاك عنده سجلّ درجات
 $t23 = $db->query("SELECT e.id FROM employees e JOIN employee_grade_history g ON g.employee_id = e.id
                    WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 LIMIT 1")->fetchColumn();

@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exc_save']) && $emplo
 // تشيك-مارك لكل درجة (عادية واستثنائية): المؤشَّر = محسوب، غير المؤشَّر = **يبقى ظاهراً لكن لا يُحتسب**
 // (بلا حذف — تقدر ترجّع الصح لاحقاً فتُحتسب من جديد). ثم تُعاد سلسلة الدرجات والراتب تلقائياً.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save'])
-    && !isset($_POST['row_save']) && !isset($_POST['row_delete']) && $employeeId > 0) {
+    && !isset($_POST['row_delete']) && $employeeId > 0) {
     $keep = array_map('intval', (array)($_POST['keep'] ?? []));
     $gdate = (array)($_POST['gdate'] ?? []);            // [rowId => 'Y-m-d'] تعديل تاريخ درجة موجودة
     $gamt  = (array)($_POST['gamt'] ?? []);             // [rowId => delta] تعديل مقدار درجة موجودة
@@ -196,35 +196,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save'])
     exit;
 }
 
-// ✏️/🗑️ أزرار الصفّ الواحد (قدّام كل درجة): «حفظ» يحفظ تاريخ/مقدار/محسوبة لهذه الدرجة فقط،
-// و«حذف» يحذفها نهائياً — وبعد أيّ منهما تُعاد سلسلة الدرجات (rechain) ويُعاد حساب الراتب.
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['row_save']) || isset($_POST['row_delete'])) && $employeeId > 0) {
+// 🗑️ زرّ «حذف» قدّام كل درجة: يحذفها نهائياً ثم تُعاد سلسلة الدرجات (rechain) ويُعاد حساب الراتب.
+// (زرّ «حفظ» قدّام كل صفّ يمرّ عبر معالج grade_save أعلاه — يحفظ كامل حالة الجدول المعروضة فوراً.)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['row_delete']) && $employeeId > 0) {
     requireWriteAction(BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
-    $rid = (int)($_POST['row_save'] ?? $_POST['row_delete']);
-    $isDelete = isset($_POST['row_delete']);
+    $rid = (int)$_POST['row_delete'];
     try {
         $rw = $db->prepare("SELECT * FROM employee_grade_history WHERE id = ? AND employee_id = ?");
         $rw->execute([$rid, $employeeId]);
         $rw = $rw->fetch();
         if (!$rw) throw new Exception('الدرجة غير موجودة');
         if ($rw['reason'] === 'titularization') throw new Exception('درجة دخول الملاك ثابتة — لا تُعدَّل ولا تُحذف');
-        if ($isDelete) {
-            $db->prepare("DELETE FROM employee_grade_history WHERE id = ? AND employee_id = ?")->execute([$rid, $employeeId]);
-            if (function_exists('logAudit')) logAudit('delete', 'employee_grade_history', $rid, $rw, null);
-        } else {
-            $d = (string)($_POST['gdate'][$rid] ?? $rw['change_date']);
-            if (!strtotime($d)) throw new Exception('تاريخ غير صحيح');
-            $a = round((float)($_POST['gamt'][$rid] ?? ($rw['delta'] ?? ((float)$rw['grade_after'] - (float)$rw['grade_before']))), 1);
-            if ($a == 0.0) throw new Exception('حدّد مقدار الدرجة (مثلاً 1 أو ½)');
-            $counted = in_array($rid, array_map('intval', (array)($_POST['keep'] ?? [])), true) ? 1 : 0;
-            $db->prepare("UPDATE employee_grade_history SET change_date = ?, delta = ?, counted = ? WHERE id = ? AND employee_id = ?")
-               ->execute([date('Y-m-d', strtotime($d)), $a, $counted, $rid, $employeeId]);
-        }
+        $db->prepare("DELETE FROM employee_grade_history WHERE id = ? AND employee_id = ?")->execute([$rid, $employeeId]);
+        if (function_exists('logAudit')) logAudit('delete', 'employee_grade_history', $rid, $rw, null);
         $g = rechainGradeHistory($employeeId);      // يعيد ربط قبل/بعد والدرجة الحالية حسب الترتيب الزمني
         $eDate = $db->query("SELECT hire_date FROM employees WHERE id=" . (int)$employeeId)->fetchColumn();
         $y0 = $eDate ? (int)date('Y', strtotime($eDate)) : (int)date('Y') - 5;
         for ($y = $y0; $y <= (int)date('Y'); $y++) recalcEmployeeYear($employeeId, $y . '-' . ($y + 1));
-        $okMsg = ($isDelete ? 'تم حذف الدرجة' : 'تم حفظ الدرجة') . " — الدرجة الحالية صارت $g وأُعيد حساب الراتب";
+        $okMsg = "تم حذف الدرجة — الدرجة الحالية صارت $g وأُعيد حساب الراتب";
         if (($_POST['return_to'] ?? '') === 'employee') { $_SESSION['flash_success'] = $okMsg; }
         else { $_SESSION['flash'] = ['type' => 'success', 'msg' => $okMsg]; }
     } catch (Exception $e) {
