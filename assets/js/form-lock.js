@@ -132,3 +132,48 @@
     init();
   }
 })();
+
+/*
+ * 💾 الحفظ الفوري بجانب الحقل — قاعدة المستخدم (2026-08-01):
+ * «بدي بس حط أي رقم يكون دغري بجانبو حفظ» — أي تغيير بأي حقل (رقم/نص/اختيار)
+ * بأي فورم حفظ (POST) يُظهر زرّ «حفظ» أخضر نابضاً بجانب الحقل نفسه فوراً،
+ * وكبسته تحفظ الفورم كاملاً (نفس معالج الحفظ الموجود — لا يضيع أي تغيير آخر).
+ * الزرّ واحد يتبع آخر حقل معدَّل (متل الحفظ الفوري بلوحة الدرجات).
+ */
+(function () {
+  'use strict';
+  var btn = null;
+
+  function ensureBtn() {
+    if (btn) return btn;
+    var st = document.createElement('style');
+    st.textContent =
+      '.quicksave-btn{margin:4px 6px 0;vertical-align:middle;white-space:nowrap;' +
+      'animation:qsPulse 1.2s ease-in-out infinite}' +
+      '@keyframes qsPulse{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.55)}50%{box-shadow:0 0 0 8px rgba(22,163,74,0)}}';
+    document.head.appendChild(st);
+    btn = document.createElement('button');
+    btn.type = 'submit';
+    btn.className = 'btn btn-success btn-sm quicksave-btn';
+    btn.innerHTML = '<i class="fas fa-save"></i> حفظ / Enregistrer';
+    return btn;
+  }
+
+  function onFieldChange(e) {
+    var el = e.target;
+    if (!el || !el.matches || !el.matches('input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea')) return;
+    var form = el.form || (el.closest && el.closest('form'));
+    if (!form || (form.method || '').toLowerCase() !== 'post') return; // فورمات الحفظ فقط (لا فلاتر البحث GET)
+    if (el.closest('.no-quicksave')) return;                            // استثناء صريح عند الحاجة
+    var b = ensureBtn();
+    // اربط الزرّ بفورم الحقل نفسه (يلزم للحقول المربوطة بسمة form= خارج الفورم متل سطور الجداول)
+    var fid = form.getAttribute('id');
+    if (fid) b.setAttribute('form', fid); else b.removeAttribute('form');
+    // بجانب الحقل نفسه مباشرة (يتبع آخر حقل معدَّل)
+    if (el.nextElementSibling !== b) el.insertAdjacentElement('afterend', b);
+    b.style.display = '';
+  }
+
+  document.addEventListener('input', onFieldChange, true);
+  document.addEventListener('change', onFieldChange, true);
+})();

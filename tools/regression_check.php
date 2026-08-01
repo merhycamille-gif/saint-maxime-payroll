@@ -1107,6 +1107,14 @@ check('ملف الأستاذ: صفّ أزرار تعديل/حفظ/حذف بكل 
       substr_count($empSrc30, '<?php $empTabBar(); ?>') === 6
       && strpos($empSrc30, 'function () use ($id, $employee)') !== false
       && strpos($flSrc30, 'extBtns.forEach') !== false);
+// الحفظ الفوري بجانب الحقل («بدي بس حط أي رقم يكون دغري بجانبو حفظ»): أي تغيير بأي
+// فورم POST يُظهر زرّ حفظ أخضر نابضاً بجانب الحقل نفسه، مربوطاً بفورم الحقل (سمة form=)
+$flSrc30b = (string)file_get_contents(__DIR__ . '/../assets/js/form-lock.js');
+check('الحفظ الفوري: زرّ «حفظ» أخضر نابض يظهر بجانب أي حقل يتغيّر (بكل فورمات الحفظ)',
+      strpos($flSrc30b, 'quicksave-btn') !== false
+      && strpos($flSrc30b, "qsPulse") !== false
+      && strpos($flSrc30b, "b.setAttribute('form', fid)") !== false
+      && strpos($flSrc30b, "el.insertAdjacentElement('afterend', b)") !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
