@@ -378,7 +378,9 @@ include __DIR__ . '/../includes/header.php';
     .slip-info { margin-bottom: 5px !important; }
     .slip-info td { border:1px solid #888 !important; padding: 3px 8px !important; }
     .slip-info .lbl { font-size: 10.5pt !important; margin-bottom: 1px !important; color:#555 !important; }
-    .slip-info .val { font-size: 14pt !important; font-weight:700 !important; }
+    /* بولد حقيقي غامق (طلب المستخدم): خط Cairo يملك وزناً ثقيلاً فعلياً — Sakkal بولده خفيف */
+    .slip-info .val { font-size: 13.5pt !important; font-weight:800 !important;
+                      font-family:'Cairo','Sakkal Majalla','Inter',sans-serif !important; color:#000 !important; }
     /* الجدول: خط 12pt بلا قصّ (table-layout تلقائي فالأرقام تظهر كاملة)؛
        التصغير المحسوب --pz يضمن صفحة A4 أفقية واحدة بلا قصّ ولا انقسام */
     .salary-slip-table { font-size: 12pt !important; width: 100% !important; border-collapse: collapse; }
