@@ -1038,6 +1038,10 @@ check('قد الورقة: جداول التقارير (٦ أعمدة+) الأص�
 check('البطاقة السنوية بالشكل الرسمي: رؤوس كحلية #1F4E5F عالورق والليرة رئيسية والدولار تحتها',
       strpos($asSrc29, '.salary-slip-table thead th { background: #1F4E5F !important; color: #fff !important;') !== false
       && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);
+// «الأزرار مكرّرة وعجقة» (اختيار المستخدم 2026-08-01): شريط التصدير العام مخفي بصفحة
+// البطاقة السنوية — أزرار الصفحة الخاصة (PDF رسمي/Excel/طباعة) هي المجموعة الوحيدة
+check('البطاقة السنوية: لا أزرار مكرّرة — شريط التصدير العام مخفي والصفحة بأزرارها الخاصة فقط',
+      strpos($asSrc29, '$hideExportToolbar = true;') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
