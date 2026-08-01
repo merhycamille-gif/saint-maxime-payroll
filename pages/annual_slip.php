@@ -227,22 +227,24 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                         <?php if (!empty($r['s'])):
                             $rate = $r['rate'];
                             $usd = function($lbp) use ($rate) { return $rate > 0 ? $lbp / $rate : 0; };
-                            // عرض القيمة: الدولار فوق واللبناني تحته (— إن صفر)
+                            // عرض القيمة: الليرة الرئيسية وتحتها الدولار صغيراً بالأخضر (— إن صفر)
+                            // موحَّد مع كل كشوف البرنامج الرسمية (شكوى p1: الدولار فوق كان يعجّق الخانات)
                             $money = function($lbp, $bold = false) use ($rate) {
                                 $lbp = (int)$lbp; if ($lbp == 0) return '—';
+                                $l = formatLBP($lbp, false);
+                                if ($bold) $l = '<strong>' . $l . '</strong>';
                                 $u = number_format(($rate > 0 ? $lbp / $rate : 0), 2) . ' $';
-                                if ($bold) $u = '<strong>' . $u . '</strong>';
-                                // الدولار في span قابل للإخفاء (وضع الطباعة الكبيرة يعرض الليرة فقط)
-                                return '<span class="cur-usd">' . $u . '</span><span class="sub-lbp">' . formatLBP($lbp, false) . '</span>';
+                                // الدولار في span قابل للإخفاء (زرّ العملة يعرض الليرة فقط/الدولار فقط)
+                                return '<span class="sub-lbp">' . $l . '</span><span class="cur-usd">' . $u . '</span>';
                             };
                         ?>
                             <td><strong><?= formatLBP($r['base_shown'], false) ?></strong></td>
                             <?php if (!$isEmp): ?>
-                            <td><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '' ?></td>
+                            <td><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '—' ?></td>
                             <td><strong><?= formatLBP($r['cur_sal'], false) ?></strong></td>
                             <?php endif; ?>
-                            <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
-                            <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="cur-usd"><?= number_format($usd($r['aide']), 2) ?> $</span><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
+                            <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 2) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
+                            <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['aide']), 2) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <?php $hR = $hidRow($r); ?>
                             <td><?= $money($r['brut'] - $hR, true) ?></td>
                             <?php if (!$isEmp): ?>
@@ -264,8 +266,9 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 <?php endforeach; ?>
 
                 <?php $moneyTot = function($lbp, $usd, $bold = true) {
-                    $u = number_format($usd, 2) . ' $'; if ($bold) $u = '<strong>' . $u . '</strong>';
-                    return '<span class="cur-usd">' . $u . '</span><span class="sub-lbp">' . formatLBP((int)$lbp, false) . '</span>';
+                    $l = formatLBP((int)$lbp, false); if ($bold) $l = '<strong>' . $l . '</strong>';
+                    $u = number_format($usd, 2) . ' $';
+                    return '<span class="sub-lbp">' . $l . '</span><span class="cur-usd">' . $u . '</span>';
                 }; ?>
                 <tr class="total-row">
                     <td><strong>TOTAL</strong></td>
@@ -274,8 +277,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <td><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
                     <td><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></td>
                     <?php endif; ?>
-                    <?php if (salaryCompHas('extra')): ?><td><span class="cur-usd"><strong><?= number_format($tot['extra_wage_usd'], 2) ?> $</strong></span><span class="sub-lbp"><?= formatLBP($tot['extra_wage'], false) ?></span></td><?php endif; ?>
-                    <?php if (salaryCompHas('aide')): ?><td><span class="cur-usd"><strong><?= number_format($tot['aide_usd'], 2) ?> $</strong></span><span class="sub-lbp"><?= formatLBP($tot['aide'], false) ?></span></td><?php endif; ?>
+                    <?php if (salaryCompHas('extra')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['extra_wage'], false) ?></strong></span><span class="cur-usd"><?= number_format($tot['extra_wage_usd'], 2) ?> $</span></td><?php endif; ?>
+                    <?php if (salaryCompHas('aide')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['aide'], false) ?></strong></span><span class="cur-usd"><?= number_format($tot['aide_usd'], 2) ?> $</span></td><?php endif; ?>
                     <td><?= $moneyTot($tot['brut'], $tot['brut_usd']) ?></td>
                     <?php if (!$isEmp): ?>
                     <td><?= $moneyTot($tot['caisse'], $tot['caisse_usd']) ?></td>
@@ -325,16 +328,22 @@ include __DIR__ . '/../includes/header.php';
 .slip-info .lbl { display:block; color:var(--gray-500); font-weight:700; font-size:12pt; margin-bottom:2px; }
 .slip-info .val { font-weight:700; font-size:12pt; color:#111827; }
 
-/* تابلو المبالغ بخط 12 (12pt متل الوورد) على الشاشة والورق معاً */
+/* 📄 توحيد بطاقة الراتب مع الشكل الرسمي المعتمد بكل كشوف البرنامج (طلب p1 بتاريخ 2026-08-01):
+   خط Sakkal Majalla الرسمي + رؤوس كحلية #1F4E5F + الليرة الرئيسية والدولار صغيراً تحتها بالأخضر */
+.salary-slip, .salary-slip-table, .slip-info { font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo','Inter',sans-serif; }
 .salary-slip-table { font-size: 12pt; }
-.salary-slip-table th { font-size: 12pt; padding: 7px 6px; }
+.salary-slip-table th { font-size: 12pt; padding: 7px 6px; background:#1F4E5F; border:1px solid #1F4E5F; }
+.salary-slip-table .deduction-header { background:#163B48 !important; }
 .salary-slip-table td { padding: 8px 8px; }
-/* قيمة الأجر الإضافي بالليرة تحت الدولار مباشرةً */
-.salary-slip-table .sub-lbp { display:block; font-size: 0.82em; color: var(--gray-600,#4b5563); }
+.salary-slip-table tbody tr:nth-child(even) { background:#f8fafc; }
+/* الليرة الرئيسية (سطر أول واضح) والدولار صغيراً بالأخضر تحتها — متل كل الكشوف */
+.salary-slip-table .sub-lbp { display:block; font-weight:600; color:#111827; }
+.salary-slip-table .cur-usd { display:block; font-size:0.8em; color:#047857; font-weight:600; line-height:1.2; }
 /* وضع العملة المختار من الزرّ العام: إظهار/إخفاء الليرة أو الدولار */
 .salary-slip-table.curmode-lbp .cur-usd { display:none; }
 .salary-slip-table.curmode-lbp .sub-lbp { color:#111; font-size:1em; }
 .salary-slip-table.curmode-usd .sub-lbp { display:none; }
+.salary-slip-table.curmode-usd .cur-usd { font-size:1em; color:#111827; }
 /* عمود التوقيع أوسع شوي */
 .salary-slip-table .sig-col, .salary-slip-table .sig-cell { min-width: 120px; }
 
@@ -363,9 +372,11 @@ include __DIR__ . '/../includes/header.php';
        التصغير المحسوب --pz يضمن صفحة A4 أفقية واحدة بلا قصّ ولا انقسام */
     .salary-slip-table { font-size: 12pt !important; width: 100% !important; border-collapse: collapse; }
     .salary-slip-table th, .salary-slip-table td { border: 1px solid #888 !important; padding: 5px 2px !important; line-height: 1.3; white-space: nowrap; text-align: center; }
-    .salary-slip-table thead th { background: #e3f0ff !important; font-size: 12pt !important; white-space: normal; padding: 4px 2px !important; }
-    .salary-slip-table .sub-lbp { white-space: nowrap; font-size: 0.9em; }
-    .salary-slip-table .deduction-header { background: #ffe3e3 !important; }
+    /* الرؤوس الكحلية الرسمية نفسها عالورق (متل كشف الرواتب المعتمد) — لا رؤوس باهتة */
+    .salary-slip-table thead th { background: #1F4E5F !important; color: #fff !important; font-size: 12pt !important; white-space: normal; padding: 4px 2px !important; }
+    .salary-slip-table .sub-lbp { white-space: nowrap; }
+    .salary-slip-table .cur-usd { white-space: nowrap; color: #047857 !important; }
+    .salary-slip-table .deduction-header { background: #163B48 !important; color: #fff !important; }
     .salary-slip-table .row-month { white-space: nowrap; }
     .total-row td { background: #fff3cd !important; font-weight: bold; }
 }
