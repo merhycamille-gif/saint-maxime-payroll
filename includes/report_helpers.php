@@ -255,10 +255,13 @@ function signatureBox(string $label = 'توقيع المدير وخاتم الم
 
 /**
  * شريط أدوات النموذج (رجوع + طباعة) — لا يظهر بالطباعة.
- * $back: رابط الرجوع (افتراضي مركز التقارير).
+ * $back: رابط الرجوع (افتراضي «نفس الصفحة اللي كان فيها» عبر docBackUrl).
+ * بوضع «عرض المستند» (doc-view) لا يُطبع شيء: الرجوع صار بالشريط العلوي الموحّد
+ * والطباعة بشريط التصدير — حتى لا تتكرّر الأزرار وتعجّق الشاشة.
  */
 function officialFormToolbar(string $back = ''): string {
-    $back = $back ?: (BASE_URL . 'pages/reports.php');
+    if (!empty($GLOBALS['docFocus'])) return '';
+    $back = $back ?: docBackUrl();
     ob_start(); ?>
     <div class="page-actions no-print">
         <a href="<?= e($back) ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour / رجوع</a>
@@ -266,6 +269,48 @@ function officialFormToolbar(string $back = ''): string {
     </div>
     <?php
     return ob_get_clean();
+}
+
+/**
+ * ===== الورقة الموحّدة لكل التقارير والإفادات (docSheet) =====
+ * قالب واحد ثابت: ورقة بيضاء نظيفة تحوي (١) ترويسة المدرسة الرسمية — أو بانر
+ * المدارس المختارة عند التعدّد — (٢) عنوان التقرير موحّداً (فرنسي فوق وعربي تحت)
+ * (٣) سطر معلومات موحّد (الفترة/العدد + العملة + «الراتب يشمل» + تاريخ الإصدار).
+ * تُظبَط مرّة واحدة هنا فتنظبط كل التقارير معاً — ممنوع ترتيب تقرير «لحاله».
+ *
+ * $chips: معلومات التقرير (مثل الشهر/السنة أو العدد). $opts:
+ *   - school: ترويسة مدرسة محدّدة بدل الحالية · no_letterhead: بلا ترويسة
+ *   - comp: false = بلا شارة «الراتب يشمل» (لتقارير لا تعرض رواتب)
+ */
+function docSheetStart(string $titleFr, string $titleAr, array $chips = [], array $opts = []): string {
+    $multi = (function_exists('reportIsMultiSchool') && reportIsMultiSchool()) || isAllSchools();
+    $auto = [];
+    $cur = displayCurrency();
+    if ($cur !== 'both') $auto[] = 'العملة: ' . ($cur === 'usd' ? 'دولار فقط' : 'ليرة فقط');
+    if (($opts['comp'] ?? true) && function_exists('salaryCompLabel')) $auto[] = 'الراتب يشمل: ' . salaryCompLabel();
+    $auto[] = 'صدر بتاريخ ' . formatDate(date('Y-m-d'));
+    ob_start(); ?>
+    <div class="doc-sheet">
+        <?php if (empty($opts['no_letterhead'])): ?>
+            <?php if (!$multi || !empty($opts['school'])): ?>
+                <?= schoolLetterhead($opts['school'] ?? currentSchool()) ?>
+            <?php else: ?>
+                <div class="report-scope"><i class="fas fa-school"></i> <strong>المدارس / Écoles:</strong>
+                    <?= e(implode(' + ', array_map('schoolNameById', selectedReportSchoolIds())) ?: 'Toutes les écoles / كل المدارس') ?></div>
+            <?php endif; ?>
+        <?php endif; ?>
+        <div class="doc-head">
+            <div class="dh-fr" dir="ltr"><?= e($titleFr) ?></div>
+            <div class="dh-ar"><?= e($titleAr) ?></div>
+            <div class="dh-meta">
+                <?php foreach (array_merge($chips, $auto) as $c): ?><span class="dh-chip"><?= e($c) ?></span><?php endforeach; ?>
+            </div>
+        </div>
+    <?php
+    return ob_get_clean();
+}
+function docSheetEnd(): string {
+    return '</div>';
 }
 
 /**

@@ -1973,3 +1973,23 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
     </form>
     <?php
 }
+
+/**
+ * رابط «الرجوع لنفس الصفحة اللي كنت فيها» بوضع عرض المستند (doc-view).
+ * يلتقط مرجع الدخول أول ما يُفتح التقرير/النموذج ويحفظه بالجلسة، فيبقى زرّ الرجوع
+ * يعيد المستخدم لصفحته الأصلية حتى لو غيّر الفلاتر (شهر/سنة/مدارس) داخل التقرير.
+ * تغيير الفلاتر لا يغيّر «هوية المستند» (الصفحة + report/form) فلا يُلتقط كمرجع.
+ */
+function docBackUrl(string $fallback = ''): string {
+    $fallback = $fallback !== '' ? $fallback : BASE_URL . 'pages/reports.php';
+    $ref  = $_SERVER['HTTP_REFERER'] ?? '';
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $self = basename((string)parse_url($_SERVER['PHP_SELF'] ?? '', PHP_URL_PATH));
+    $docId = (string)($_GET['report'] ?? ($_GET['form'] ?? ''));
+    if ($ref !== '' && $host !== '' && strpos($ref, '//' . $host . '/') !== false) {
+        $sameDoc = $self !== '' && strpos($ref, $self) !== false
+                 && ($docId === '' || strpos($ref, $docId) !== false);
+        if (!$sameDoc) $_SESSION['doc_back'] = $ref;
+    }
+    return $_SESSION['doc_back'] ?? $fallback;
+}

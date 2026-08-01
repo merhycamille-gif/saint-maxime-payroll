@@ -1379,3 +1379,50 @@ body.rtl .global-search input { padding: 9px 36px 9px 74px; }
     .empty-state h4 { font-size: 14px !important; }
     .btn-lg { font-size: 14px !important; }
 }
+
+/* =====================================================
+   وضع «عرض المستند» (doc-view) + الورقة الموحّدة (doc-sheet)
+   بس يفتح المستخدم تقريراً/إفادة: تختفي القائمة الجانبية وكل أدوات
+   التنقّل غير الضرورية، ويبقى شريط علوي نظيف (رجوع لنفس الصفحة + عنوان
+   + العملة + «الراتب يشمل») والتقرير واضح بنصّ الشاشة بلا عجقة.
+   ===================================================== */
+body.doc-view .sidebar,
+body.doc-view .nav-overlay,
+body.doc-view .menu-toggle,
+body.doc-view .global-search,
+body.doc-view .topbar-dossier,
+body.doc-view #schoolPicker,
+body.doc-view form[action*="switch_year"],
+body.doc-view a[href*="switch_lang"],
+body.doc-view .user-menu { display: none !important; }
+body.doc-view .main-content { margin: 0; }
+body.doc-view .page-content { max-width: 1320px; margin: 0 auto; }
+body.doc-view { background: #eef1f5; }
+
+/* الورقة الموحّدة: خلفية بيضاء بظل خفيف متل ورقة حقيقية — بالطباعة تصير عادية */
+.doc-sheet {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 2px 16px rgba(15, 23, 42, .08);
+    padding: 26px 28px 30px;
+    margin: 0 auto 20px;
+    max-width: 100%;
+}
+/* عنوان التقرير الموحّد: فرنسي فوق، عربي كبير تحته، خط مزدوج كحلي رسمي */
+.doc-head { text-align: center; margin: 4px 0 16px; border-bottom: 3px double #1F4E5F; padding-bottom: 12px; }
+.doc-head .dh-fr { font-size: 15px; font-weight: 600; color: #475569; letter-spacing: .3px; }
+.doc-head .dh-ar { font-size: 23px; font-weight: 800; color: #1F4E5F; line-height: 1.5; }
+.doc-head .dh-meta { display: flex; flex-wrap: wrap; gap: 6px 8px; justify-content: center; margin-top: 10px; }
+.doc-head .dh-chip {
+    background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155;
+    border-radius: 999px; padding: 3px 14px; font-size: 12.5px; font-weight: 600;
+}
+@media print {
+    .doc-sheet { border: none !important; border-radius: 0; box-shadow: none; padding: 0; margin: 0; }
+    .doc-head { border-bottom-color: #1F4E5F; page-break-after: avoid; }
+    .doc-head .dh-chip { border: 1px solid #94a3b8; background: #fff !important; }
+}
+@media screen and (max-width: 760px) {
+    .doc-sheet { padding: 14px 12px 18px; }
+}

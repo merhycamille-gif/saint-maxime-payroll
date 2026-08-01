@@ -50,6 +50,9 @@ if ($report && in_array($report, $exportableReports, true)) {
     $exportTitle = 'تقرير';
 }
 
+// وضع «عرض المستند»: عند فتح تقرير محدّد تختفي القوائم ويصير الرجوع لنفس الصفحة الأصلية
+if ($report !== '') $docFocus = true;
+
 include __DIR__ . '/../includes/header.php';
 
 /**
@@ -188,11 +191,7 @@ function reportDocThumb($path) {
         </div>
     </div>
 <?php else: ?>
-    <div class="d-flex justify-between align-center mb-3 no-print">
-        <a href="<?= BASE_URL ?>pages/reports.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour / رجوع</a>
-        <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Imprimer / طباعة</button>
-    </div>
-
+    <?php /* زرّا الرجوع/الطباعة صارا بالشريط العلوي الموحّد وشريط التصدير (وضع doc-view) */ ?>
     <?php echo officialFormStyles(); ?>
     <style>
     /* تقارير reports.php كلّها جداول واسعة (١٦ عموداً) → A4 أفقي مرتّب يسع كل الأعمدة بلا قصّ */
@@ -210,13 +209,7 @@ function reportDocThumb($path) {
     .doc-table { --pz-target: 1075; }
     </style>
 <?php /* الملاءمة التلقائية للجداول الواسعة صارت مشتركة في officialFormStyles() — تعمل هنا وفي النماذج الرسمية */ ?>
-    <!-- ترويسة رسمية: ترويسة المدرسة (مدرسة واحدة) أو بانر المدارس المختارة (عدة) -->
-    <?php if (!$multi && !isAllSchools()): ?>
-        <?= schoolLetterhead(currentSchool()) ?>
-    <?php else: ?>
-        <div class="report-scope"><i class="fas fa-school"></i> <strong>المدارس / Écoles:</strong> <?= e($selectedNames) ?></div>
-    <?php endif; ?>
-
+    <?php /* الترويسة (مدرسة واحدة/بانر المدارس) صارت داخل الورقة الموحّدة docSheetStart */ ?>
     <?php if ($report === 'monthly_summary'):
         $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.employee_type, e.school_id, ms.*
                               FROM monthly_salaries ms
@@ -251,12 +244,7 @@ function reportDocThumb($path) {
             </div>
         </form>
 
-        <div class="card">
-            <div class="card-header"><h3>
-                <span dir="ltr">📅 Résumé mensuel — <?= monthName($month) ?> <?= $year ?></span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9">كشف رواتب شهري</div>
-            </h3></div>
-            <div class="card-body">
+        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>
                         <th>#</th>
@@ -342,8 +330,7 @@ function reportDocThumb($path) {
                         <?php if ($data) echo $sumRow('الإجمالي العام — مجموع كل الفئات (العدد: '.$rn.')', $totals, true); ?>
                     </tbody>
                 </table></div>
-            </div>
-        </div>
+        <?= docSheetEnd() ?>
     <?php elseif ($report === 'cnss_summary'):
         $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.nssf_number, e.birth_date, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.cnss_amount_lbp, ms.school_cnss_8_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms
@@ -363,12 +350,7 @@ function reportDocThumb($path) {
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
-        <div class="card">
-            <div class="card-header"><h3>
-                <span dir="ltr">🏥 CNSS — <?= monthName($month) ?> <?= $year ?></span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9">الضمان الاجتماعي</div>
-            </h3></div>
-            <div class="card-body">
+        <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
                     <tbody>
@@ -411,8 +393,7 @@ function reportDocThumb($path) {
                         <?php if ($data) $drawTotal('المجموع العام — العدد: '.$rn, $G, true); ?>
                     </tbody>
                 </table></div>
-            </div>
-        </div>
+        <?= docSheetEnd() ?>
     <?php elseif ($report === 'tax_summary'):
         $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.finance_ministry_number, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
@@ -431,12 +412,7 @@ function reportDocThumb($path) {
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
-        <div class="card">
-            <div class="card-header"><h3>
-                <span dir="ltr">💵 Impôt sur le revenu — <?= monthName($month) ?> <?= $year ?></span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9">ضريبة الدخل</div>
-            </h3></div>
-            <div class="card-body">
+        <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الراتب الخاضع للضريبة</th><th>الضريبة</th></tr></thead>
                     <tbody>
@@ -477,8 +453,7 @@ function reportDocThumb($path) {
                         <?php if ($data) $drawTotal('المجموع العام — العدد: '.$rn, $G, true); ?>
                     </tbody>
                 </table></div>
-            </div>
-        </div>
+        <?= docSheetEnd() ?>
     <?php elseif ($report === 'eoc_summary'):
         $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.caisse_number, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.caisse_amount_lbp, ms.eoc_grade_lbp, ms.school_eoc_6_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
@@ -497,12 +472,7 @@ function reportDocThumb($path) {
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
-        <div class="card">
-            <div class="card-header"><h3>
-                <span dir="ltr">🏦 Caisse EOC — <?= monthName($month) ?> <?= $year ?></span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9">صندوق التعليم الخاص</div>
-            </h3></div>
-            <div class="card-body">
+        <?= docSheetStart('Caisse EOC — retenues mensuelles', 'كشف صندوق التعليم الخاص الشهري', [monthName($month) . ' ' . $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
                     <tbody>
@@ -527,8 +497,7 @@ function reportDocThumb($path) {
                         <?php endif; ?>
                     </tbody>
                 </table></div>
-            </div>
-        </div>
+        <?= docSheetEnd() ?>
     <?php elseif ($report === 'employee_list'):
         $empType = $_GET['emp_type'] ?? '';
         $typeAllowed = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
@@ -645,13 +614,8 @@ function reportDocThumb($path) {
                 <button class="btn btn-primary" style="margin-top:14px"><i class="fas fa-filter"></i> عرض التقرير / Afficher</button>
             </div>
         </form>
-        <div class="card">
-            <?php $ltParts = explode(' / ', $listTitle, 2); ?>
-            <div class="card-header"><h3>
-                <span dir="ltr">👥 <?= e($ltParts[1] ?? $listTitle) ?> (<?= count($data) ?>)</span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($ltParts[0]) ?></div>
-            </h3></div>
-            <div class="card-body">
+        <?php $ltParts = explode(' / ', $listTitle, 2); ?>
+        <?= docSheetStart('Liste du personnel — ' . ($ltParts[1] ?? $listTitle), 'لائحة الموظفين — ' . $ltParts[0], ['العدد: ' . count($data)], ['comp' => false]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>
                         <th>#</th>
@@ -693,8 +657,7 @@ function reportDocThumb($path) {
                         <?php endif; ?>
                     </tbody>
                 </table></div>
-            </div>
-        </div>
+        <?= docSheetEnd() ?>
     <?php elseif ($report === 'annual_totals'):
         [$y1,$y2] = schoolYearToYears($schoolYear);
         // إجمالي عام
@@ -733,12 +696,7 @@ function reportDocThumb($path) {
         </form>
 
         <?php if ($multi && $perSchool): ?>
-        <div class="card">
-            <div class="card-header"><h3>
-                <span dir="ltr">🏫 Détail par école — <?= e($schoolYear) ?></span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9">تفصيل لكل مدرسة</div>
-            </h3></div>
-            <div class="card-body">
+        <?= docSheetStart('Détail par école', 'تفصيل لكل مدرسة', [$schoolYear], ['comp' => false]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><th>المدرسة</th><th>عدد الكشوف</th><th>الإجمالي المتوجب</th><th>الضمان</th><th>الضريبة</th></tr></thead>
                     <tbody>
@@ -755,16 +713,10 @@ function reportDocThumb($path) {
                         <tr class="total-row"><td colspan="6">عدد المدارس / Écoles: <?= count($perSchool) ?></td></tr>
                     </tbody>
                 </table></div>
-            </div>
-        </div>
+        <?= docSheetEnd() ?>
         <?php endif; ?>
 
-        <div class="card">
-            <div class="card-header"><h3>
-                <span dir="ltr">📊 Totaux annuels (cumulés) — <?= e($schoolYear) ?></span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9">مجاميع سنوية</div>
-            </h3></div>
-            <div class="card-body">
+        <?= docSheetStart('Totaux annuels (cumulés)', 'المجاميع السنوية', [$schoolYear]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <tr><td><strong>عدد الكشوف المحسوبة</strong></td><td><?= $tot['cnt'] ?: 0 ?></td></tr>
                     <tr style="background:var(--gold-light)"><td><strong>إجمالي المدفوع (الصافي)</strong></td><td><strong><?= formatLBP($tot['net']) ?></strong></td></tr>
@@ -787,8 +739,7 @@ function reportDocThumb($path) {
                     <tr><td>صندوق التعويضات — المدرسة ٦٪</td><td><?= formatLBP($tot['seoc']) ?></td></tr>
                     <tr><td>ضريبة الدخل</td><td><?= formatLBP($tot['tax']) ?></td></tr>
                 </table></div>
-            </div>
-        </div>
+        <?= docSheetEnd() ?>
     <?php endif; ?>
 
     <script>

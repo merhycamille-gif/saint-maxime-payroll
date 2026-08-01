@@ -174,6 +174,9 @@ $isMarried = strpos($famStatus, 'marie') === 0;
 // + أزرار التعبئة من القالب الرسمي (للنماذج المدعومة مثل الضمان).
 $exportOpts['no_office'] = true;
 
+// وضع «عرض المستند»: عند فتح نموذج/تقرير تختفي القوائم ويصير الرجوع لنفس الصفحة الأصلية
+if ($form !== '') $docFocus = true;
+
 include __DIR__ . '/../includes/header.php';
 echo officialFormStyles();
 

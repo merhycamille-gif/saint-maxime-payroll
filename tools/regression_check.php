@@ -939,6 +939,57 @@ check('الراتب يشمل: عمود «تعويض النقل» بكشف الض
       && strpos($hT26, '<th rowspan="2">الأجر الإضافي</th>') === false
       && strpos($hN26, '<th rowspan="2">تعويض النقل</th>') === false);
 
+/* =====================================================================
+ * 27) القالب الموحّد للتقارير (docSheet) + وضع «عرض المستند» (doc-view)
+ *     — طلب المستخدم 2026-08-01: «التقارير والإفادات منظّمة ومرتّبة قبل كل شي»
+ *     + «افتح التقرير واضح بلا عجقة وارجع لنفس الصفحة اللي كنت فيها»
+ * =================================================================== */
+$fnSrc27  = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
+$rhSrc27  = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php');
+$hdSrc27  = (string)file_get_contents(__DIR__ . '/../includes/header.php');
+$repSrc27 = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+check('القالب الموحّد: دوال docSheetStart/docSheetEnd و docBackUrl موجودة',
+      strpos($rhSrc27, 'function docSheetStart(') !== false
+      && strpos($rhSrc27, 'function docSheetEnd(') !== false
+      && strpos($fnSrc27, 'function docBackUrl(') !== false);
+check('القالب الموحّد: التقارير الستة بمركز التقارير كلها على docSheetStart (لا ترويسة/عنوان «لحاله»)',
+      substr_count($repSrc27, 'docSheetStart(') >= 7   // 6 تقارير + جدول «تفصيل لكل مدرسة»
+      && substr_count($repSrc27, 'docSheetEnd()') === substr_count($repSrc27, 'docSheetStart('));
+check('وضع عرض المستند: الصفحات الخمس تفعّله (تقارير/نماذج/إفادات/بطاقة سنوية/سيرة)',
+      strpos($repSrc27, '$docFocus = true') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/official_forms.php'), '$docFocus = true') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), '$docFocus = true') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/annual_slip.php'), '$docFocus = true') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/employee_history.php'), '$docFocus = true') !== false);
+check('وضع عرض المستند: الهيدر يضيف صف doc-view للـbody وزرّ الرجوع يستعمل docBackUrl',
+      strpos($hdSrc27, "!empty(\$docFocus) ? ' doc-view'") !== false
+      && strpos($hdSrc27, 'docBackUrl()') !== false);
+check('وضع عرض المستند: CSS يخفي القائمة الجانبية وأدوات التنقّل ويرسم الورقة الموحّدة',
+      ($cssSrc27 = (string)file_get_contents(__DIR__ . '/../assets/css/app.css')) !== ''
+      && strpos($cssSrc27, 'body.doc-view .sidebar') !== false
+      && strpos($cssSrc27, '.doc-sheet') !== false
+      && strpos($cssSrc27, '.doc-head .dh-ar') !== false);
+// فحص فعلي: التقارير الستة ترندر بورقة موحّدة (doc-sheet + عنوان عربي + body doc-view)
+$docRepOk = true; $docRepDetail = [];
+foreach ([['report' => 'monthly_summary', 'month' => 6, 'year' => 2026],
+          ['report' => 'cnss_summary', 'month' => 6, 'year' => 2026],
+          ['report' => 'tax_summary', 'month' => 6, 'year' => 2026],
+          ['report' => 'eoc_summary', 'month' => 6, 'year' => 2026],
+          ['report' => 'employee_list'],
+          ['report' => 'annual_totals', 'school_year' => '2025-2026']] as $g27) {
+    $h27 = renderPage('pages/reports.php', $g27, ['extra', 'aide', 'transport']);
+    if (strpos($h27, 'doc-sheet') === false || strpos($h27, 'dh-ar') === false
+        || strpos($h27, 'doc-view') === false || strpos($h27, 'صدر بتاريخ') === false) {
+        $docRepOk = false; $docRepDetail[] = $g27['report'];
+    }
+}
+check('القالب الموحّد: التقارير الستة ترندر فعلاً بورقة موحّدة (ترويسة + عنوان + شارات) بوضع doc-view',
+      $docRepOk, $docRepDetail ? ('ناقص: ' . implode(',', $docRepDetail)) : '6/6');
+// النماذج الرسمية: بوضع doc-view لا يتكرّر زرّا رجوع/طباعة (officialFormToolbar يصمت)
+$hOF27 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra', 'aide', 'transport'], [2]);
+check('وضع عرض المستند: النماذج الرسمية عليها doc-view وبلا شريط أزرار مكرّر (page-actions)',
+      strpos($hOF27, 'doc-view') !== false && strpos($hOF27, 'page-actions') === false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

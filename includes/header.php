@@ -51,7 +51,7 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <!-- App CSS -->
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app.css') ?: '1' ?>">
 </head>
-<body class="<?= $lang === 'ar' ? 'rtl' : '' ?>">
+<body class="<?= $lang === 'ar' ? 'rtl' : '' ?><?= !empty($docFocus) ? ' doc-view' : '' ?>">
 
 <!-- حماية CSRF: حقن توكن تلقائياً بكل نماذج POST -->
 <script>
@@ -286,8 +286,13 @@ document.addEventListener('submit', function (e) {
                     <i class="fas fa-bars"></i>
                 </button>
                 <?php if ($currentPage !== 'dashboard'): ?>
+                <?php
+                // بوضع «عرض المستند» (تقرير/نموذج/إفادة): الرجوع يعيد **لنفس الصفحة اللي
+                // كان فيها** المستخدم (docBackUrl) لا لحالة الفلاتر السابقة بالتاريخ.
+                $docBackHref = !empty($docFocus) ? docBackUrl() : '';
+                ?>
                 <button type="button" class="btn btn-light no-print" title="رجوع / Retour"
-                        onclick="if(document.referrer&&history.length>1){history.back()}else{location.href='<?= BASE_URL ?>index.php'}"
+                        onclick="<?= $docBackHref !== '' ? "location.href='" . e($docBackHref) . "'" : "if(document.referrer&&history.length>1){history.back()}else{location.href='" . BASE_URL . "index.php'}" ?>"
                         style="white-space:nowrap">
                     <i class="fas fa-arrow-right" style="color:#16a34a"></i> Retour / رجوع
                 </button>

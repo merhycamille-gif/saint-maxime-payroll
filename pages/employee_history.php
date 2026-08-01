@@ -29,6 +29,9 @@ if ($employeeId > 0) {
     $exportOpts = ['phone' => $emp['phone1'] ?: ''];
 }
 
+// وضع «عرض المستند»: عند عرض سيرة أستاذ تختفي القوائم ويرجع الزرّ لنفس الصفحة الأصلية
+if ($emp) $docFocus = true;
+
 include __DIR__ . '/../includes/header.php';
 
 if (!$emp):

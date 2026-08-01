@@ -297,6 +297,9 @@ function annualSlipHtml($db, $emp, $schoolYear) {
     return ob_get_clean();
 }
 
+// وضع «عرض المستند»: عند عرض بطاقة راتب أستاذ تختفي القوائم ويرجع الزرّ لنفس الصفحة الأصلية
+if ($employeeId > 0) $docFocus = true;
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
