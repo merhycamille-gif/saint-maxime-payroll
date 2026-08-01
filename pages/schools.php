@@ -139,7 +139,7 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="page-actions no-print">
-    <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer / طباعة</button>
+    <?php /* 🧹 زرّ «طباعة» أُزيل — مكرّر مع شريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
     <a href="#school-form" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle école / مدرسة جديدة</a>
     <a href="<?= BASE_URL ?>pages/purge_schools.php" class="btn btn-danger" style="margin-inline-start:auto"><i class="fas fa-trash-alt"></i> Supprimer définitivement / حذف مدرسة نهائياً</a>
 </div>

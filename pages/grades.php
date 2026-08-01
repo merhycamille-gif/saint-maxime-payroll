@@ -618,7 +618,7 @@ include __DIR__ . '/../includes/header.php';
                 <span dir="ltr"><i class="fas fa-chart-line"></i> Évolution du salaire</span>
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">تطوّر الراتب والتدرّج</div>
             </h3>
-            <button type="button" onclick="window.print()" class="btn btn-light btn-sm no-print"><i class="fas fa-print"></i> Imprimer / طباعة</button>
+            <?php /* 🧹 زرّ «طباعة» أُزيل — مكرّر مع شريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
         </div>
         <div class="card-body">
             <?php if (empty($evo)): ?>

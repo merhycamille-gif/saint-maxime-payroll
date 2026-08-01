@@ -276,8 +276,8 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
             <i class="fas fa-arrow-left"></i> Retour à la liste / رجوع
         </a>
         <div>
+            <?php /* 🧹 زرّ «طباعة الكل» أُزيل — مكرّر مع «طباعة» بشريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
             <span class="badge badge-info"><?= count($empsP) ?> — <?= e($typeLbl) ?></span>
-            <button type="button" onclick="window.print()" class="btn btn-gold"><i class="fas fa-print"></i> طباعة الكل / Imprimer</button>
         </div>
     </div>
     <div class="alert alert-info no-print" style="margin-bottom:16px">
@@ -495,7 +495,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">رواتب الشهر</div>
             </h3>
             <div class="d-flex gap-2 no-print">
-                <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer le tableau / طباعة الجدول</button>
+                <?php /* 🧹 زرّ «طباعة الجدول» أُزيل — مكرّر مع «طباعة» بشريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
                 <a href="?action=print_all&month=<?= $month ?>&year=<?= $year ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-primary" title="Afficher/imprimer le bulletin de chaque employé / عرض/طباعة قسيمة كل موظف">
                     <i class="fas fa-file-invoice"></i> Imprimer les bulletins / طباعة القسائم
                 </a>

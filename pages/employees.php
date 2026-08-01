@@ -594,7 +594,7 @@ if ($action === 'list') {
                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">لائحة الموظفين والأساتذة</div>
             </h3>
             <div class="d-flex gap-2 no-print">
-                <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer / طباعة</button>
+                <?php /* 🧹 زرّ «طباعة» أُزيل — مكرّر مع شريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
                 <?php if (!isAllSchools()): ?>
                 <a href="?action=new" class="btn btn-primary"><i class="fas fa-plus"></i> Nouveau / جديد</a>
                 <?php endif; ?>

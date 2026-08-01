@@ -152,7 +152,7 @@ include __DIR__ . '/../includes/header.php';
         <?php if ($gPending): ?><span style="color:#b45309">(منهم <?= $gPending ?> بانتظار اعتمادك / en attente)</span><?php endif; ?></div>
       <div><span class="badge badge-warning" style="font-size:14px"><i class="fas fa-hourglass-half"></i> N'ont pas envoyé / ما بعتوا</span> <strong style="font-size:20px"><?= $gNot ?></strong></div>
       <div><span class="badge" style="background:#0a7a37;color:#fff;font-size:14px"><i class="fas fa-user-plus"></i> Nouveaux / جدد</span> <strong style="font-size:20px"><?= $gNew ?></strong></div>
-      <button type="button" onclick="window.print()" class="btn btn-light" style="margin-inline-start:auto"><i class="fas fa-print"></i> Imprimer / طباعة <?= $show === 'all' ? '' : '«' . e($showLabels[$show]) . '»' ?></button>
+      <?php /* 🧹 زرّ «طباعة» أُزيل — مكرّر مع شريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
     </div>
     <div style="margin-top:12px;border-top:1px solid var(--gray-200);padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <span style="font-weight:700;color:var(--gray-600)"><i class="fas fa-filter"></i> Afficher / imprimer — اعرض / اطبع:</span>

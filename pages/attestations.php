@@ -126,7 +126,7 @@ if ($emp && !empty($_GET['dossier'])):
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <a href="<?= BASE_URL ?>pages/attestations.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع / Retour</a>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Imprimer le dossier / طباعة الملف</button>
+            <?php /* 🧹 زرّ «طباعة الملف» أُزيل — مكرّر مع «طباعة» بشريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
             <a href="<?= e($editUrl) ?>" class="btn btn-light"><i class="fas fa-user-pen"></i> Modifier le dossier / تعديل ملف الأستاذ</a>
         </div>
     </div>

@@ -1042,6 +1042,15 @@ check('البطاقة السنوية بالشكل الرسمي: رؤوس كحل�
 // البطاقة السنوية — أزرار الصفحة الخاصة (PDF رسمي/Excel/طباعة) هي المجموعة الوحيدة
 check('البطاقة السنوية: لا أزرار مكرّرة — شريط التصدير العام مخفي والصفحة بأزرارها الخاصة فقط',
       strpos($asSrc29, '$hideExportToolbar = true;') !== false);
+// 🔴 قاعدة عامة ملزِمة («بكل شي ما تخلي الأزرار مكررة وتعجق الصفحة»): أي صفحة عليها شريط
+// التصدير العام ممنوع تحوي زرّ طباعة خاصاً بها — مجموعة أزرار واحدة بكل صفحة
+$dupBtns = [];
+foreach (['monthly_payroll', 'attestations', 'employees', 'grades', 'info_status', 'schools', 'users'] as $pg29) {
+    $src29 = (string)file_get_contents(__DIR__ . '/../pages/' . $pg29 . '.php');
+    if (preg_match('/<button[^>]*window\.print\(\)/', $src29)) $dupBtns[] = $pg29;
+}
+check('لا أزرار مكرّرة بكل البرنامج: لا زرّ طباعة خاصاً بصفحة عليها شريط التصدير العام',
+      empty($dupBtns), $dupBtns ? ('مكرّر في: ' . implode(',', $dupBtns)) : '7 صفحات نظيفة');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

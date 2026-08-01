@@ -291,7 +291,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body">
         <div class="page-actions no-print">
             <button onclick="dlCreds()" class="btn btn-success btn-lg"><i class="fas fa-file-excel"></i> Télécharger (Excel) / تنزيل كملف Excel</button>
-            <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer / طباعة</button>
+            <?php /* 🧹 زرّ «طباعة» أُزيل — مكرّر مع شريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
         </div>
         <table class="table" id="credsTable">
             <thead><tr>
