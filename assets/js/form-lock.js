@@ -90,6 +90,9 @@
     }
 
     function setLocked(locked) {
+      // 🛡️ حالة القفل معلنة على الفورم — يقرأها الحفظ الفوري فلا يظهر على فورم مقفول
+      // (حادثة أندره مراد: حفظ وقع والفورم مقفول فوصل فارغاً ومسح البيانات)
+      form.dataset.lockState = locked ? 'locked' : 'open';
       fields.forEach(function (el) {
         if (locked) {
           if (!el.disabled) { el.disabled = true; el.setAttribute('data-lockwas', '1'); }
@@ -97,6 +100,12 @@
           el.disabled = false;
           el.removeAttribute('data-lockwas');
         }
+      });
+      // أزرار الإجراءات (إضافة سطر...) تُقفل أيضاً — كانت تبقى فعّالة بالوضع المقفول
+      // فتضيف حقولاً مفتوحة بفورم مقفول (نفس ثغرة الحادثة). التبويبات مستثناة.
+      Array.prototype.forEach.call(form.querySelectorAll('button[type=button]'), function (b) {
+        if (b === editBtn || b.classList.contains('tab') || b.hasAttribute('data-lockedit-for')) return;
+        b.disabled = locked;
       });
       subs.forEach(function (b) { b.style.display = locked ? 'none' : ''; });
       if (extBtns.length) {
@@ -165,6 +174,8 @@
     var form = el.form || (el.closest && el.closest('form'));
     if (!form || (form.method || '').toLowerCase() !== 'post') return; // فورمات الحفظ فقط (لا فلاتر البحث GET)
     if (el.closest('.no-quicksave')) return;                            // استثناء صريح عند الحاجة
+    // 🛡️ فورم مقفول = ممنوع أي حفظ (الحقول المعطَّلة لا تُرسَل فيصل الحفظ فارغاً ويمسح)
+    if (form.dataset.lockState === 'locked') return;
     var b = ensureBtn();
     // اربط الزرّ بفورم الحقل نفسه (يلزم للحقول المربوطة بسمة form= خارج الفورم متل سطور الجداول)
     var fid = form.getAttribute('id');

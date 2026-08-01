@@ -303,6 +303,20 @@ function saveEmployeeBonuses($db, $employeeId) {
 // Handle Save
 // =====================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit'])) {
+    // 🛡️ صمام أمان ضد مسح البيانات (حادثة أندره مراد 2026-08-01): إذا وصل الحفظ
+    // **بلا اسم** لموظف له اسم محفوظ، فهذا حفظ ناقص (فورم مقفول أُرسل والحقول
+    // المعطَّلة لا تُرسَل) — نرفضه كلياً بدل أن يمسح ملف الموظف.
+    if ($action === 'edit' && $id > 0
+        && trim($_POST['first_name_ar'] ?? '') === '' && trim($_POST['first_name_fr'] ?? '') === '') {
+        $exNm = $db->prepare("SELECT first_name_ar, first_name_fr FROM employees WHERE id = ?");
+        $exNm->execute([$id]);
+        $exN = $exNm->fetch();
+        if ($exN && (trim($exN['first_name_ar']) !== '' || trim($exN['first_name_fr']) !== '')) {
+            $_SESSION['flash_error'] = '⚠️ لم يُحفَظ شيء: وصل طلب الحفظ فارغاً (يبدو أن الصفحة كانت مقفولة). اضغط «تعديل» أولاً ثم عدّل واحفظ. / Rien n\'a été enregistré — formulaire verrouillé.';
+            header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id);
+            exit;
+        }
+    }
     $data = [
         'employee_type' => $_POST['employee_type'] ?? 'enseignant_titulaire',
         'first_name_ar' => trim($_POST['first_name_ar'] ?? ''),
@@ -516,6 +530,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
 // =====================================================
 if ($action === 'delete' && $id > 0) {
     requireWriteAction();
+    // 🛡️ قاعدة المستخدم (2026-08-01 بعد حادثة أندره مراد): «بس بدي امحي أي شغلة لازم
+    // تسألني قبل ما امحي» — الحذف لا يتمّ إلا بعد صفحة تأكيد حقيقية (لا رسالة متصفح فقط)
+    if (empty($_GET['confirmed'])) {
+        $dq = $db->prepare("SELECT first_name_ar, last_name_ar, first_name_fr, last_name_fr FROM employees WHERE id = ? AND is_deleted = 0");
+        $dq->execute([$id]);
+        $dEmp = $dq->fetch();
+        $dName = $dEmp ? (trim($dEmp['first_name_ar'] . ' ' . $dEmp['last_name_ar']) ?: trim($dEmp['first_name_fr'] . ' ' . $dEmp['last_name_fr'])) : '';
+        $currentPage = 'employees';
+        $pageTitle = 'Confirmer la suppression / تأكيد الحذف';
+        $hideExportToolbar = true;
+        include __DIR__ . '/../includes/header.php';
+        ?>
+        <div class="card" style="max-width:640px;margin:40px auto;border:2px solid #dc2626">
+            <div class="card-body" style="text-align:center;padding:30px">
+                <div style="font-size:44px;margin-bottom:10px">⚠️</div>
+                <h3 style="margin:0 0 8px">هل تريد فعلاً حذف الموظف؟</h3>
+                <p style="font-size:18px;font-weight:800;color:#b91c1c;margin:6px 0 4px"><?= e($dName ?: '—') ?></p>
+                <p style="color:#64748b;margin:4px 0 18px">بعد الحذف لا يعود يظهر في البرنامج — ويمكن استرجاعه لاحقاً عند الحاجة.</p>
+                <div class="d-flex gap-2" style="justify-content:center">
+                    <a href="?action=edit&id=<?= $id ?>" class="btn btn-light btn-lg"><i class="fas fa-arrow-left"></i> لا، رجوع / Non</a>
+                    <a href="?action=delete&id=<?= $id ?>&confirmed=1" class="btn btn-danger btn-lg"><i class="fas fa-trash"></i> نعم، احذف / Oui, supprimer</a>
+                </div>
+            </div>
+        </div>
+        <?php
+        include __DIR__ . '/../includes/footer.php';
+        exit;
+    }
     $db->prepare("UPDATE employees SET is_deleted = 1 WHERE id = ? AND school_id = ?")
        ->execute([$id, currentSchoolId()]);
     logAudit('delete', 'employees', $id);

@@ -1116,6 +1116,27 @@ check('الحفظ الفوري: زرّ «حفظ» أخضر نابض يظهر ب�
       && strpos($flSrc30b, "b.setAttribute('form', fid)") !== false
       && strpos($flSrc30b, "el.insertAdjacentElement('afterend', b)") !== false);
 
+/* =====================================================================
+ * 31) أمان الحذف والحفظ (حادثة أندره مراد 2026-08-01: حفظ بفورم مقفول
+ *     وصل فارغاً فمسح بياناته ثم حُذف بالغلط — استُرجع من نسخة الأونلاين)
+ * =================================================================== */
+$empSrc31 = (string)file_get_contents(__DIR__ . '/../pages/employees.php');
+$flSrc31 = (string)file_get_contents(__DIR__ . '/../assets/js/form-lock.js');
+check('🛡️ صمام مسح البيانات: حفظ بلا اسم لموظف له اسم = مرفوض كلياً (فورم مقفول أُرسل فارغاً)',
+      strpos($empSrc31, 'لم يُحفَظ شيء: وصل طلب الحفظ فارغاً') !== false);
+check('🛡️ الحفظ الفوري لا يظهر على فورم مقفول + أزرار «إضافة سطر» تُقفل مع الفورم',
+      strpos($flSrc31, "form.dataset.lockState === 'locked'") !== false
+      && strpos($flSrc31, 'b.disabled = locked;') !== false);
+check('🛡️ «أي محي لازم يسألني قبل»: حذف الموظف بصفحة تأكيد حقيقية (لا يتمّ بلا confirmed=1)',
+      strpos($empSrc31, "empty(\$_GET['confirmed'])") !== false
+      && strpos($empSrc31, 'هل تريد فعلاً حذف الموظف؟') !== false);
+// أندره مراد (1673) مُستعاد وغير محذوف — بياناته التعريفية موجودة
+$aq31 = $db->query("SELECT first_name_ar, last_name_ar, finance_ministry_number, nssf_number, is_deleted FROM employees WHERE id = 1673")->fetch();
+check('أندره مراد مُستعاد بالكامل (اسم + رقم مالية 479105 + ضمان 778170 + غير محذوف)',
+      $aq31 && $aq31['first_name_ar'] === 'اندره' && $aq31['last_name_ar'] === 'مراد'
+      && $aq31['finance_ministry_number'] === '479105' && $aq31['nssf_number'] === '778170'
+      && (int)$aq31['is_deleted'] === 0);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
