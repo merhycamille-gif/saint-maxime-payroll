@@ -1384,6 +1384,9 @@ include __DIR__ . '/../includes/header.php';
                     </table>
                 </div>
                 <button type="button" class="btn btn-light btn-sm" onclick="addTLine()"><i class="fas fa-plus"></i> أضِف فترة نقل / Ajouter</button>
+                <?php /* «الحفظ دغري بس قدّام يلي غيّرتو» (قاعدة المستخدم): زرّ حفظ بنفس القسم —
+                       يحفظ ملف الأستاذ كاملاً (نفس زرّ الحفظ الرئيسي) فلا يضيع أي تغيير آخر */ ?>
+                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-save"></i> حفظ تعويض النقل / Enregistrer</button>
                 <p style="font-size:12px;color:var(--gray-500);margin-top:6px">كل فترة تُحسب بشهورها فقط؛ الأيام والأسابيع مشتركة للكل.</p>
                 <script>
                 (function(){
@@ -1457,6 +1460,8 @@ include __DIR__ . '/../includes/header.php';
                     </table>
                 </div>
                 <button type="button" class="btn btn-light btn-sm" onclick="addBonusRow()"><i class="fas fa-plus"></i> إضافة سطر / Ajouter</button>
+                <?php /* زرّ حفظ بنفس القسم (قاعدة «الحفظ دغري بس قدّام يلي غيّرتو») — يحفظ الملف كاملاً */ ?>
+                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-save"></i> حفظ المكافآت والنقل / Enregistrer</button>
                 <template id="bonusRowTpl"><?= renderBonusRow(null) ?></template>
                 <script>
                 function addBonusRow(){
