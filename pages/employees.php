@@ -813,6 +813,10 @@ if ($id > 0) {
     }
 }
 
+// 🧹 «ها العجقة كلها لشو» (المستخدم 2026-08-01): صفحة تعديل الملف بلا شريط تصدير عام
+// (طباعة/Excel/واتساب لفورم تعديل بلا معنى) — الطباعة من الكشف السنوي/القسيمة
+$hideExportToolbar = true;
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -826,12 +830,8 @@ include __DIR__ . '/../includes/header.php';
     </a>
     <?php if ($id > 0): ?>
         <div class="d-flex gap-2">
-            <button type="button" id="btnEditEmp" data-lockedit-for="empForm" class="btn btn-warning" style="display:none">
-                <i class="fas fa-pen"></i> تعديل / Modifier
-            </button>
-            <a href="?action=delete&id=<?= $id ?>" class="btn btn-danger" data-confirm="<?= e('⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . (trim($employee['first_name_ar'].' '.$employee['last_name_ar']) ?: trim($employee['first_name_fr'].' '.$employee['last_name_fr'])) . '» ؟ بعد الحذف لا يعود يظهر في البرنامج (يمكن استرجاعه لاحقاً عند الحاجة).') ?>">
-                <i class="fas fa-trash"></i> حذف / Supprimer
-            </a>
+            <?php /* 🧹 زرّا «تعديل/حذف» العلويان أُزيلا — مكرّران مع صفّ الأزرار الموجود بكل
+                     تبويب تحتهما مباشرة («ها العجقة كلها لشو» — 2026-08-01) */ ?>
             <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>" class="btn btn-light">
                 <i class="fas fa-layer-group"></i> Échelons & Promotions / الدرجات والترقيات
             </a>
