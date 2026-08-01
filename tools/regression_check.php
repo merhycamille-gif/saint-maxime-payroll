@@ -1032,6 +1032,11 @@ check('قد الورقة: البطاقة السنوية تملأ طول الور
       ($asSrc29 = (string)file_get_contents(__DIR__ . '/../pages/annual_slip.php')) !== ''
       && strpos($asSrc29, 'min-height: 193mm') !== false
       && strpos($asSrc29, 'flex: 1 1 auto') !== false);
+// الأرقام العريضة (strong/b) أيضاً 12pt عالورق — كانت ناقصة من لائحة الطباعة فتطبع
+// أهم الأرقام (الإجمالي/الصافي/المستحق) أصغر من جيرانها (ملاحظة المستخدم p1)
+check('الخط 12 بكل شي: strong/b ضمن لائحة 12pt للطباعة (الأرقام العريضة لا تطبع أصغر)',
+      preg_match('/@media print \{[^}]*?strong, b,[^}]*?font-size: 12pt !important/s',
+                 (string)file_get_contents(__DIR__ . '/../assets/css/app.css')) === 1);
 check('الخط 12 بكل شي: جداول التقارير لا تتكبّر فوق خط 12 (تملأ الورقة بتوسيع الأعمدة) ولا تُقصّ',
       strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), 'حجم الخط 12 بكل شي') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), '? 1.4 : 1') === false
