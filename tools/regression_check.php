@@ -1041,14 +1041,27 @@ check('الخط 12 بكل شي: جداول التقارير لا تتكبّر ف
       strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), 'حجم الخط 12 بكل شي') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), '? 1.4 : 1') === false
       && strpos($jsSrc29, '? 1.4 : 1') === false && strpos($jsSrc29, '1.8') === false);
-// 🎨 ذوق المستخدم بالبطاقة السنوية (2026-08-01): بلا كحلي — رؤوس فاتحة هادئة وعناوين
-// «المحسومات» وحدها بأحمر فاتح + الأرقام كبيرة 14pt عريضة والدولار صغيراً تحتها
-check('البطاقة السنوية بذوق المستخدم: رؤوس فاتحة والمحسومات بأحمر فاتح والليرة كبيرة والدولار تحتها',
+// 🎨🔒 التصميم النهائي المجمّد للبطاقة السنوية — اعتمده المستخدم حرفياً بقوله
+// «ما تغير بقى شي بالبطاقة احفظها منيح» (2026-08-01 مساءً). أي كسر لأحد هذه البنود
+// = خرق لقرار المستخدم الصريح — ممنوع تعديل تصميم البطاقة بدون طلبه المباشر:
+// بلا كحلي · رؤوس فاتحة · المحسومات أحمر فاتح · أرقام 14 عريضة والدولار تحتها ·
+// خط Cairo موحّد · اسم الأستاذ 17pt أبرز عنصر · معلومات 13.5 عريضة · صفحة واحدة
+check('🔒 البطاقة السنوية (تصميم مجمّد بأمر المستخدم): رؤوس فاتحة والمحسومات بأحمر فاتح وبلا كحلي',
       strpos($asSrc29, '.salary-slip-table thead th { background: #f1f5f9 !important; color: #111 !important;') !== false
       && strpos($asSrc29, 'th.deduction-header { background: #ffe3e3 !important;') !== false
-      && strpos($asSrc29, 'font-size: 14pt !important; font-weight: 700 !important;') !== false
-      && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false
       && strpos($asSrc29, '#1F4E5F !important') === false);
+check('🔒 البطاقة السنوية (تصميم مجمّد): الليرة 14 عريضة والدولار 8.5 أخضر تحتها',
+      strpos($asSrc29, 'font-size: 14pt !important; font-weight: 700 !important;') !== false
+      && strpos($asSrc29, "font-size: 8.5pt !important") !== false
+      && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);
+check('🔒 البطاقة السنوية (تصميم مجمّد): خط Cairo موحّد + اسم الأستاذ 17pt أبرز عنصر + معلومات عريضة',
+      strpos($asSrc29, ".salary-slip, .salary-slip-table, .slip-info { font-family:'Cairo'") !== false
+      && strpos($asSrc29, '.slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 800 !important;') !== false
+      && strpos($asSrc29, 'font-weight:800 !important') !== false);
+check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طول الورقة (193mm + flex) وبلا fit القديم',
+      strpos($asSrc29, 'min-height: 193mm') !== false
+      && strpos($asSrc29, 'flex: 1 1 auto') !== false
+      && strpos($asSrc29, '&fit=1') === false);
 // «الأزرار مكرّرة وعجقة» (اختيار المستخدم 2026-08-01): شريط التصدير العام مخفي بصفحة
 // البطاقة السنوية — أزرار الصفحة الخاصة (PDF رسمي/Excel/طباعة) هي المجموعة الوحيدة
 check('البطاقة السنوية: لا أزرار مكرّرة — شريط التصدير العام مخفي والصفحة بأزرارها الخاصة فقط',
