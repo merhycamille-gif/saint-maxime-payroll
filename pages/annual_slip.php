@@ -392,7 +392,9 @@ include __DIR__ . '/../includes/header.php';
     /* 🔠 «كبّر الأرقام بعد» (طلب المستخدم 2026-08-01): رقم الليرة هو بطل الورقة — أكبر
        وأعرض (14pt عريض)، والدولار مرجع صغير تحته، والرؤوس أصغر بدرجة لتفسح المجال */
     .salary-slip-table .sub-lbp { white-space: nowrap; font-size: 14pt !important; font-weight: 700 !important; }
-    .salary-slip-table .cur-usd { white-space: nowrap; color: #047857 !important; font-size: 8.5pt !important; }
+    /* 🔠 «مبالغ الدولار صغيرة كتير» (طلب المستخدم 2026-08-01): الدولار 11pt عريض واضح —
+       يُقرأ بسهولة ومتناسق مع الليرة (14pt) والليرة تبقى الرئيسية */
+    .salary-slip-table .cur-usd { white-space: nowrap; color: #047857 !important; font-size: 11pt !important; font-weight: 700 !important; }
     .salary-slip-table td { padding: 4px 3px !important; }
     .salary-slip-table .row-month { white-space: nowrap; }
     .total-row td { background: #fff3cd !important; font-weight: bold; }
