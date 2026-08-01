@@ -331,12 +331,14 @@ include __DIR__ . '/../includes/header.php';
 .slip-info .lbl { display:block; color:var(--gray-500); font-weight:700; font-size:12pt; margin-bottom:2px; }
 .slip-info .val { font-weight:700; font-size:12pt; color:#111827; }
 
-/* 📄 توحيد بطاقة الراتب مع الشكل الرسمي المعتمد بكل كشوف البرنامج (طلب p1 بتاريخ 2026-08-01):
-   خط Sakkal Majalla الرسمي + رؤوس كحلية #1F4E5F + الليرة الرئيسية والدولار صغيراً تحتها بالأخضر */
+/* 📄 توحيد بطاقة الراتب (طلب p1 بتاريخ 2026-08-01): خط Sakkal Majalla الرسمي + الليرة
+   الرئيسية والدولار صغيراً تحتها بالأخضر.
+   🎨 بطلب المستخدم (2026-08-01): بلا كحلي بالبطاقة — رؤوس هادئة فاتحة، وعناوين
+   «المحسومات» وحدها بأحمر فاتح لتتميّز */
 .salary-slip, .salary-slip-table, .slip-info { font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo','Inter',sans-serif; }
 .salary-slip-table { font-size: 12pt; }
-.salary-slip-table th { font-size: 12pt; padding: 7px 6px; background:#1F4E5F; border:1px solid #1F4E5F; }
-.salary-slip-table .deduction-header { background:#163B48 !important; }
+.salary-slip-table th { font-size: 12pt; padding: 7px 6px; background:#f1f5f9; color:#111827; border:1px solid #94a3b8; }
+.salary-slip-table .deduction-header { background:#ffe3e3 !important; color:#7f1d1d !important; }
 .salary-slip-table td { padding: 8px 8px; }
 .salary-slip-table tbody tr:nth-child(even) { background:#f8fafc; }
 /* الليرة الرئيسية (سطر أول واضح) والدولار صغيراً بالأخضر تحتها — متل كل الكشوف */
@@ -380,14 +382,14 @@ include __DIR__ . '/../includes/header.php';
        التصغير المحسوب --pz يضمن صفحة A4 أفقية واحدة بلا قصّ ولا انقسام */
     .salary-slip-table { font-size: 12pt !important; width: 100% !important; border-collapse: collapse; }
     .salary-slip-table th, .salary-slip-table td { border: 1px solid #888 !important; padding: 5px 2px !important; line-height: 1.3; white-space: nowrap; text-align: center; }
-    /* الرؤوس الكحلية الرسمية نفسها عالورق (متل كشف الرواتب المعتمد) — لا رؤوس باهتة */
-    .salary-slip-table thead th { background: #1F4E5F !important; color: #fff !important; font-size: 11pt !important; white-space: normal; padding: 4px 1px !important; }
+    /* 🎨 بطلب المستخدم: بلا كحلي — رؤوس فاتحة هادئة، وعناوين «المحسومات» وحدها بأحمر فاتح */
+    .salary-slip-table thead th { background: #f1f5f9 !important; color: #111 !important; font-size: 11pt !important; white-space: normal; padding: 4px 1px !important; }
+    .salary-slip-table thead th.deduction-header { background: #ffe3e3 !important; color: #7f1d1d !important; }
     /* 🔠 «كبّر الأرقام بعد» (طلب المستخدم 2026-08-01): رقم الليرة هو بطل الورقة — أكبر
        وأعرض (14pt عريض)، والدولار مرجع صغير تحته، والرؤوس أصغر بدرجة لتفسح المجال */
     .salary-slip-table .sub-lbp { white-space: nowrap; font-size: 14pt !important; font-weight: 700 !important; }
     .salary-slip-table .cur-usd { white-space: nowrap; color: #047857 !important; font-size: 8.5pt !important; }
     .salary-slip-table td { padding: 4px 1px !important; }
-    .salary-slip-table .deduction-header { background: #163B48 !important; color: #fff !important; }
     .salary-slip-table .row-month { white-space: nowrap; }
     .total-row td { background: #fff3cd !important; font-weight: bold; }
 }

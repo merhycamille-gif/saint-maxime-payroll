@@ -1041,9 +1041,14 @@ check('الخط 12 بكل شي: جداول التقارير لا تتكبّر ف
       strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), 'حجم الخط 12 بكل شي') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), '? 1.4 : 1') === false
       && strpos($jsSrc29, '? 1.4 : 1') === false && strpos($jsSrc29, '1.8') === false);
-check('البطاقة السنوية بالشكل الرسمي: رؤوس كحلية #1F4E5F عالورق والليرة رئيسية والدولار تحتها',
-      strpos($asSrc29, '.salary-slip-table thead th { background: #1F4E5F !important; color: #fff !important;') !== false
-      && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);
+// 🎨 ذوق المستخدم بالبطاقة السنوية (2026-08-01): بلا كحلي — رؤوس فاتحة هادئة وعناوين
+// «المحسومات» وحدها بأحمر فاتح + الأرقام كبيرة 14pt عريضة والدولار صغيراً تحتها
+check('البطاقة السنوية بذوق المستخدم: رؤوس فاتحة والمحسومات بأحمر فاتح والليرة كبيرة والدولار تحتها',
+      strpos($asSrc29, '.salary-slip-table thead th { background: #f1f5f9 !important; color: #111 !important;') !== false
+      && strpos($asSrc29, 'th.deduction-header { background: #ffe3e3 !important;') !== false
+      && strpos($asSrc29, 'font-size: 14pt !important; font-weight: 700 !important;') !== false
+      && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false
+      && strpos($asSrc29, '#1F4E5F !important') === false);
 // «الأزرار مكرّرة وعجقة» (اختيار المستخدم 2026-08-01): شريط التصدير العام مخفي بصفحة
 // البطاقة السنوية — أزرار الصفحة الخاصة (PDF رسمي/Excel/طباعة) هي المجموعة الوحيدة
 check('البطاقة السنوية: لا أزرار مكرّرة — شريط التصدير العام مخفي والصفحة بأزرارها الخاصة فقط',
