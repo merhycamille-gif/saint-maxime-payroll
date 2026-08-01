@@ -1025,16 +1025,17 @@ $jsSrc29 = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
 check('قد الورقة: قياس القسائم/البطاقات على عرض الورقة الحقيقي لا عرض الشاشة (لا تصغير زائد)',
       strpos($jsSrc29, "c.style.width = tw + 'px';") !== false
       && strpos($jsSrc29, "c.style.setProperty('--pz', 1);") !== false);
-check('قد الورقة: البطاقة السنوية تتمدّد لتملأ الورقة (سقف 1.8) والقسيمة صفحة واحدة بهامش أمان التواقيع (960)',
-      strpos($jsSrc29, "isSlip ? 1.8 : 1") !== false
+check('الخط 12 بكل شي: لا تكبير فوق خط 12 بالقسائم/البطاقات (سقف 1) والقسيمة صفحة واحدة بهامش أمان التواقيع (960)',
+      strpos($jsSrc29, "Math.min(tw / (w * scale), th / (h * scale), 1)") !== false
       && strpos($jsSrc29, "th = land ? 720 : 960;") !== false);
 check('قد الورقة: البطاقة السنوية تملأ طول الورقة (193mm) والجدول يوزّع الفراغ على صفوفه',
       ($asSrc29 = (string)file_get_contents(__DIR__ . '/../pages/annual_slip.php')) !== ''
       && strpos($asSrc29, 'min-height: 193mm') !== false
       && strpos($asSrc29, 'flex: 1 1 auto') !== false);
-check('قد الورقة: جداول التقارير (٦ أعمدة+) الأصغر من الورقة تتكبّر لتملأ عرضها (سقف 1.4)',
-      strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), "row.children.length >= 6) ? 1.4 : 1") !== false
-      && strpos($jsSrc29, "children.length >= 6 ? 1.4 : 1") !== false);
+check('الخط 12 بكل شي: جداول التقارير لا تتكبّر فوق خط 12 (تملأ الورقة بتوسيع الأعمدة) ولا تُقصّ',
+      strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), 'حجم الخط 12 بكل شي') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), '? 1.4 : 1') === false
+      && strpos($jsSrc29, '? 1.4 : 1') === false && strpos($jsSrc29, '1.8') === false);
 check('البطاقة السنوية بالشكل الرسمي: رؤوس كحلية #1F4E5F عالورق والليرة رئيسية والدولار تحتها',
       strpos($asSrc29, '.salary-slip-table thead th { background: #1F4E5F !important; color: #fff !important;') !== false
       && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);

@@ -124,12 +124,9 @@ document.addEventListener('change', function(e) {
             var natW = t.getBoundingClientRect().width || t.scrollWidth;
             t.classList.remove('pz-measure');
             var pz = target / natW;
-            // 📏 «قد ورقة A4 وواضحة» (طلب المستخدم 2026-08-01): الجدول الواسع يتصغّر حتى لا يُقصّ،
-            // والجدول العريض (٦ أعمدة+) الأصغر من الورقة **يتكبّر** ليملأها بخط أوضح (سقف 1.4×)
-            var r0 = t.querySelector('tr');
-            var grow = r0 && r0.children.length >= 6 ? 1.4 : 1;
-            pz = Math.min(pz, grow);
-            t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : pz.toFixed(3));
+            // 🔠 «حجم الخط 12 بكل شي» (2026-08-01): لا تكبير فوق خط 12 — الجدول الأصغر من
+            // الورقة يملؤها بتوسيع أعمدته وخطه 12 تماماً؛ الأعرض وحده يتصغّر حتى لا يُقصّ
+            t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
         }
         // (٢) القسائم بصفحة وحدة: التصغير يراعي العرض والطول معاً فلا تنقسم على صفحتين
         var cards = document.querySelectorAll('.payslip-card, .salary-slip');
@@ -153,9 +150,11 @@ document.addEventListener('change', function(e) {
             // الطباعة 12pt والشاشة أصغر — نقيس بنسبة الخط الفعلية حتى لا نصغّر أقلّ من اللازم
             var fs = parseFloat(getComputedStyle(c).fontSize) || 16;
             var scale = Math.max(1, 16 / fs);                       // 12pt = 16px
-            // البطاقة السنوية تتمدّد لتملأ الورقة (سقف 1.8×)؛ القسيمة تتصغّر فقط (سقف 1)
-            var pz2 = Math.min(tw / (w * scale), th / (h * scale), isSlip ? 1.8 : 1);
-            c.style.setProperty('--pz', pz2 < 1 ? Math.max(pz2, 0.4).toFixed(3) : pz2.toFixed(3));
+            // 🔠 «حجم الخط 12 بكل شي»: لا تكبير فوق خط 12 (سقف 1) — ملء طول الورقة يتمّ
+            // بتوزيع الفراغ على الصفوف (flex بالبطاقة السنوية) لا بتكبير الخط؛
+            // والتصغير فقط عند الضرورة (محتوى أعرض/أطول من الورقة) حتى لا يُقصّ شيء
+            var pz2 = Math.min(tw / (w * scale), th / (h * scale), 1);
+            c.style.setProperty('--pz', pz2 < 1 ? Math.max(pz2, 0.4).toFixed(3) : 1);
         }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitPrintZoom);

@@ -614,12 +614,10 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             var natW = t.getBoundingClientRect().width || t.scrollWidth;
             t.classList.remove('pz-measure');
             var pz = target / natW;
-            // 📏 «قد ورقة A4 وواضحة» (طلب المستخدم 2026-08-01): الجدول الأعرض من الورقة يتصغّر
-            // حتى لا يُقصّ (كما كان)، وجدول التقرير (٦ أعمدة+) الأصغر من الورقة **يتكبّر**
-            // ليملأ عرضها بخط أوضح (سقف 1.4× حتى لا تتضخّم الجداول الصغيرة داخل النماذج الرسمية)
-            var grow = (row && row.children.length >= 6) ? 1.4 : 1;
-            pz = Math.min(pz, grow);
-            t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : pz.toFixed(3));
+            // 🔠 «حجم الخط 12 بكل شي» (طلب المستخدم 2026-08-01): لا تكبير فوق خط 12 أبداً —
+            // الجدول الأصغر من الورقة يملؤها بتوسيع أعمدته (width:100%) وخطه يبقى 12 تماماً؛
+            // والجدول الأعرض من الورقة وحده يتصغّر بالمحسوب حتى لا يُقصّ عمود (كما كان)
+            t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
             var z = w.clientWidth / t.scrollWidth;
             if (z < 1) t.style.zoom = Math.max(z, 0.5);
         }
