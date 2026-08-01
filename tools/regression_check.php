@@ -1050,8 +1050,9 @@ check('🔒 البطاقة السنوية (تصميم مجمّد بأمر الم
       strpos($asSrc29, '.salary-slip-table thead th { background: #f1f5f9 !important; color: #111 !important;') !== false
       && strpos($asSrc29, 'th.deduction-header { background: #ffe3e3 !important;') !== false
       && strpos($asSrc29, '#1F4E5F !important') === false);
-check('🔒 البطاقة السنوية (تصميم مجمّد): الليرة 14 عريضة والدولار 11 عريض أخضر تحتها (كبّره بطلبه المباشر)',
-      strpos($asSrc29, 'font-size: 14pt !important; font-weight: 700 !important;') !== false
+check('🔒 البطاقة السنوية (تصميم مجمّد): كل مبالغ الليرة 12 عريضة موحّدة والدولار 11 عريض أخضر تحتها',
+      strpos($asSrc29, '.salary-slip-table .sub-lbp { white-space: nowrap; font-size: 12pt !important; font-weight: 700 !important; }') !== false
+      && strpos($asSrc29, '.salary-slip-table .num-lbp, .salary-slip-table .num-lbp strong { font-size: 12pt !important;') !== false
       && strpos($asSrc29, "font-size: 11pt !important; font-weight: 700 !important;") !== false
       && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);
 check('🔒 البطاقة السنوية (تصميم مجمّد): خط Cairo موحّد + اسم الأستاذ 17pt أبرز عنصر + معلومات عريضة',

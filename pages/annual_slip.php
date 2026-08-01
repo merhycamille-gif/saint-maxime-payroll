@@ -393,11 +393,10 @@ include __DIR__ . '/../includes/header.php';
     /* 🎨 بطلب المستخدم: بلا كحلي — رؤوس فاتحة هادئة، وعناوين «المحسومات» وحدها بأحمر فاتح */
     .salary-slip-table thead th { background: #f1f5f9 !important; color: #111 !important; font-size: 11pt !important; white-space: normal; padding: 4px 1px !important; }
     .salary-slip-table thead th.deduction-header { background: #ffe3e3 !important; color: #7f1d1d !important; }
-    /* 🔠 «كبّر الأرقام بعد» (طلب المستخدم 2026-08-01): رقم الليرة هو بطل الورقة — أكبر
-       وأعرض (14pt عريض)، والدولار مرجع صغير تحته، والرؤوس أصغر بدرجة لتفسح المجال */
-    .salary-slip-table .sub-lbp { white-space: nowrap; font-size: 14pt !important; font-weight: 700 !important; }
-    /* 🔠 «أحجام المبالغ بالليرة متل بعضها» (2026-08-01): أعمدة الليرة الصرفة بنفس الـ14 العريض */
-    .salary-slip-table .num-lbp, .salary-slip-table .num-lbp strong { font-size: 14pt !important; font-weight: 700 !important; white-space: nowrap; }
+    /* 🔠 «بدي ياهن متل ما كان الخط بالراتب بعد التدرج» (قرار المستخدم النهائي 2026-08-01):
+       كل مبالغ الليرة بالجدول بحجم واحد = 12pt عريض (حجم «بعد التدرج» الأصلي) — موحّدة */
+    .salary-slip-table .sub-lbp { white-space: nowrap; font-size: 12pt !important; font-weight: 700 !important; }
+    .salary-slip-table .num-lbp, .salary-slip-table .num-lbp strong { font-size: 12pt !important; font-weight: 700 !important; white-space: nowrap; }
     /* 🔠 «مبالغ الدولار صغيرة كتير» (طلب المستخدم 2026-08-01): الدولار 11pt عريض واضح —
        يُقرأ بسهولة ومتناسق مع الليرة (14pt) والليرة تبقى الرئيسية */
     .salary-slip-table .cur-usd { white-space: nowrap; color: #047857 !important; font-size: 11pt !important; font-weight: 700 !important; }
