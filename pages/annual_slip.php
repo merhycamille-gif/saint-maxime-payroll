@@ -492,7 +492,8 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
                 // «PDF رسمي (الكل)» = طبق الأصل عبر Chrome (صفحة لكل أستاذ، نفس تصميم الشاشة)
                 $allTarget = rawurlencode('pages/annual_slip.php?action=print_all&type=' . $typeFilter . '&school_year=' . $schoolYear);
             ?>
-            <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&fit=1&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel (tous) / PDF رسمي (الكل)</a>
+            <?php /* 📏 بلا fit=1: المسار العادي صار يملأ الورقة كاملة (وضع fit القديم كان يطبع أصغر — ملاحظة المستخدم p1) */ ?>
+            <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel (tous) / PDF رسمي (الكل)</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expAllQ ?>&format=xlsx" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
         </div>
@@ -540,7 +541,8 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
                 // «PDF رسمي» = طبق الأصل عن الشاشة عبر Chrome (نفس تصميم الكشف بالضبط، بلا قصّ)
                 $slipTarget = rawurlencode('pages/annual_slip.php?employee_id=' . $employeeId . '&school_year=' . $schoolYear);
             ?>
-            <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $slipTarget ?>&fit=1&name=releve_<?= $employeeId ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel / PDF رسمي</a>
+            <?php /* 📏 بلا fit=1: المسار العادي صار يملأ الورقة كاملة (وضع fit القديم كان يطبع أصغر — ملاحظة المستخدم p1) */ ?>
+            <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $slipTarget ?>&name=releve_<?= $employeeId ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel / PDF رسمي</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expQ ?>&format=xlsx" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
         </div>

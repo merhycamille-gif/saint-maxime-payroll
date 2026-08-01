@@ -1051,6 +1051,10 @@ foreach (['monthly_payroll', 'attestations', 'employees', 'grades', 'info_status
 }
 check('لا أزرار مكرّرة بكل البرنامج: لا زرّ طباعة خاصاً بصفحة عليها شريط التصدير العام',
       empty($dupBtns), $dupBtns ? ('مكرّر في: ' . implode(',', $dupBtns)) : '7 صفحات نظيفة');
+// زرّا «PDF رسمي» بالبطاقة السنوية على المسار العادي (بلا fit=1): وضع fit القديم كان يطبع
+// البطاقة أصغر من الورقة (ملاحظة المستخدم p1) والمسار العادي صار يملأها كاملة
+check('البطاقة السنوية: زرّا PDF الرسمي (فردي/جماعي) بلا وضع fit القديم — يطبعان قدّ الورقة',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/annual_slip.php'), '&fit=1') === false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
