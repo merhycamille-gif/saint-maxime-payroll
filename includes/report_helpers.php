@@ -490,10 +490,13 @@ function officialFormStyles(): string {
     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .doc-table .subtotal-row td{background:#f1f5f9 !important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  /* تكرار رأس الجدول وذيله على كل صفحة عند تعدّد الصفحات */
+  /* تكرار رأس الجدول على كل صفحة عند تعدّد الصفحات.
+     🔴 المجاميع (tfoot) تُطبع مرّة واحدة بآخر التقرير فقط — كانت table-footer-group
+     فتتكرّر «المجموع العام» بأسفل كل صفحة ويظنّها القارئ مجاميع وسطية خاطئة
+     (لاحظها المستخدم بكشف الرواتب وبيان الملاك 2026-08-01). */
   .doc-table{page-break-inside:auto;}
   .doc-table thead{display:table-header-group;}
-  .doc-table tfoot{display:table-footer-group;}
+  .doc-table tfoot{display:table-row-group;}
   .doc-table tr{page-break-inside:avoid;break-inside:avoid;}
   .doc-table th,.doc-table td{border:1px solid #555 !important;}
   /* الترويسة وعنوان التقرير لا ينفصلان عن بداية الجدول */

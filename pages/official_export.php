@@ -58,7 +58,7 @@ if ($form === 'cnss_contrib_monthly') {
         'C29' => $n2, 'D29' => $w2, 'P29' => $c2,
         'C37' => $n3, 'D37' => $w3, 'P37' => $c3,
         'P45' => $fpaid,
-    ], $format, 'CNSS_190A_' . $month . '_' . $year);
+    ], $format, 'CNSS_190A_' . $month . '_' . $year, !empty($_GET['inline']) ? 'inline' : 'attachment');
     // officialTemplateExport يبثّ ويخرج؛ لو رجع false (تحويل PDF غير متاح على هذا الخادم —
     // أونلاين بلا LibreOffice) نوجّه للعرض الرسمي بالمتصفح مع شرح واضح بدل «ما صار شي».
     if (!$ok) {

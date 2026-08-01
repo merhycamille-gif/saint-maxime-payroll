@@ -990,6 +990,30 @@ $hOF27 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month'
 check('وضع عرض المستند: النماذج الرسمية عليها doc-view وبلا شريط أزرار مكرّر (page-actions)',
       strpos($hOF27, 'doc-view') !== false && strpos($hOF27, 'page-actions') === false);
 
+/* =====================================================================
+ * 28) ملاحظات المستخدم 2026-08-01 (p1): «رجعنا نفس الأخطاء والتظبيطات»
+ *     — المجاميع مرّة واحدة بآخر التقرير + نموذج الضمان 190A مرتّب
+ * =================================================================== */
+// المجموع العام يُطبع مرّة واحدة بآخر التقرير (لا يتكرّر بأسفل كل صفحة فيُقرأ كمجاميع وسطية)
+check('ترتيب التقارير: المجاميع (tfoot) تُطبع مرّة واحدة بآخر التقرير لا على كل صفحة',
+      strpos($rhSrc27, '.doc-table tfoot{display:table-row-group;}') !== false
+      && strpos($rhSrc27, 'table-footer-group;}') === false);
+// نموذج الضمان 190A: السنة لا تتكرّر («آب 2026 2026») — plabel بلا سنة والقالب يطبع @@year@@ وحدها
+$ofSrc28 = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
+check('نموذج الضمان 190A: السنة لا تظهر مرّتين (plabel بلا سنة داخل القالب)',
+      strpos($ofSrc28, '$plabelNoYear = $isQuarter ? $qNames[$quarter] : monthName($month, \'ar\');') !== false
+      && strpos($ofSrc28, "'plabel'=>\$plabelNoYear") !== false);
+// المعاينة عالشاشة = النموذج الرسمي المعبّى (iframe inline) حيث LibreOffice متوفّر، والطباعة تبقى بالنسخة المرسومة
+$h190 = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 8, 'year' => 2026], [], [2]);
+$hasLO = is_file('C:/Program Files/LibreOffice/program/soffice.exe') || is_file('C:/Program Files (x86)/LibreOffice/program/soffice.exe');
+check('نموذج الضمان 190A: المعاينة عالشاشة هي النموذج الرسمي المعبّى نفسه (حيث LibreOffice) والرسمة تبقى للطباعة',
+      $hasLO ? (strpos($h190, 'format=pdf&inline=1') !== false && strpos($h190, 'print-only') !== false)
+             : (strpos($h190, 'xls-sheet') !== false));
+// officialTemplateExport يدعم العرض داخل الصفحة (inline) بلا كسر التنزيل الافتراضي
+check('نموذج الضمان 190A: التصدير الرسمي يدعم المعاينة داخل الصفحة (disposition inline)',
+      strpos((string)file_get_contents(__DIR__ . '/../includes/report_export.php'),
+             "function officialTemplateExport(\$templateAbs, array \$cells, \$format, \$name, \$disposition = 'attachment')") !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

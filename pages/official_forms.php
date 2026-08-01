@@ -1681,8 +1681,11 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     $c2=(int)$t['c']; $n2=(int)$t['n']; $w2=$c2 ? (int)round($c2/rateFrac('end_of_service_rate', $month, $year, 8.5)) : 0;
     $c3=(int)$fam['c']; $n3=(int)$fam['n']; $w3=$c3 ? (int)round($c3/rateFrac('family_compensation_rate', $month, $year, 6)) : 0;
     $total=$c1+$c2+$c3; $net=$total-$fpaid;
+    // ملاحظة: القالب يطبع @@plabel@@ ثم @@year@@ بخانتين متجاورتين — لا تضع السنة داخل
+    // plabel (كانت السنة تظهر مرّتين «آب 2026 2026» — لاحظها المستخدم 2026-08-01)
+    $plabelNoYear = $isQuarter ? $qNames[$quarter] : monthName($month, 'ar');
     $vars = [
-        'school'=>$school['name_ar'], 'empno'=>$school['nssf_employer_number'], 'year'=>$year, 'plabel'=>$plabel,
+        'school'=>$school['name_ar'], 'empno'=>$school['nssf_employer_number'], 'year'=>$year, 'plabel'=>$plabelNoYear,
         'n1'=>$n1, 'w1'=>formatLBP($w1,false), 'c1'=>formatLBP($c1,false),
         'n2'=>$n2, 'w2'=>formatLBP($w2,false), 'c2'=>formatLBP($c2,false),
         'n3'=>$n3, 'w3'=>formatLBP($w3,false), 'c3'=>formatLBP($c3,false),
@@ -1713,9 +1716,30 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
             <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
+    <?php
+    // 🎯 المعاينة عالشاشة = النموذج الرسمي المعبّى نفسه (قالب الإكسل الرسمي → PDF) —
+    // أرتب وأدقّ من النسخة المرسومة HTML التي كانت تحتاج «ضل ظبط» (طلب المستخدم 2026-08-01).
+    // متاح حيث LibreOffice موجود (كمبيوتر المدرسة)؛ أونلاين تبقى النسخة المرسومة كما هي.
+    $loPreview = false;
+    if (!$isQuarter) {
+        foreach (['C:/Program Files/LibreOffice/program/soffice.exe', 'C:/Program Files (x86)/LibreOffice/program/soffice.exe'] as $soPath) {
+            if (@is_file($soPath)) { $loPreview = true; break; }
+        }
+    }
+    ?>
+    <?php if ($loPreview): ?>
+    <div class="doc-sheet no-print" style="padding:10px">
+        <iframe src="<?= $ofExp ?>&format=pdf&inline=1" title="CNSS 190A"
+                style="width:100%;height:80vh;border:none;border-radius:6px;background:#fff"></iframe>
+    </div>
+    <div class="official-doc rtl print-only" id="ppExportArea" style="max-width:100%;padding:6mm">
+        <?= renderFormTemplate('cnss_190a', $vars) ?>
+    </div>
+    <?php else: ?>
     <div class="official-doc rtl" id="ppExportArea" style="max-width:100%;padding:6mm">
         <?= renderFormTemplate('cnss_190a', $vars) ?>
     </div>
+    <?php endif; ?>
 
 <?php elseif ($form === 'cnss_eos_settle'): // طلب تصفية تعويض نهاية الخدمة (موظف) — نفس فورمة Excel
     $hireD = $emp['hire_date'];

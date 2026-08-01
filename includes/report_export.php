@@ -118,7 +118,7 @@ function phpFillXlsxTemplate($templateAbs, array $cells, $outPath)
     }
 }
 
-function officialTemplateExport($templateAbs, array $cells, $format, $name)
+function officialTemplateExport($templateAbs, array $cells, $format, $name, $disposition = 'attachment')
 {
     $py = null;
     foreach (['C:/Python314/python.exe', 'C:/Python313/python.exe', 'C:/Python312/python.exe', 'python'] as $p) {
@@ -162,7 +162,8 @@ function officialTemplateExport($templateAbs, array $cells, $format, $name)
             $data = file_get_contents($outPdf); @unlink($outPdf);
             while (ob_get_level()) ob_end_clean();
             header('Content-Type: application/pdf');
-            header('Content-Disposition: attachment; filename="' . $name . '.pdf"');
+            // inline = معاينة النموذج الرسمي داخل الصفحة (iframe) بدل التنزيل
+            header('Content-Disposition: ' . ($disposition === 'inline' ? 'inline' : 'attachment') . '; filename="' . $name . '.pdf"');
             header('Content-Length: ' . strlen($data));
             echo $data; exit;
         }
