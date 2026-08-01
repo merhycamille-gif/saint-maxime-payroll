@@ -136,7 +136,7 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </div>
     <div class="card-body">
-        <form method="POST">
+        <form method="POST" class="lockedit">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="add">
             <div class="form-row cols-3">
@@ -174,7 +174,7 @@ include __DIR__ . '/../includes/header.php';
                     <td><input form="<?= $fid ?>" type="text" name="name" class="form-control" value="<?= e($c['name']) ?>" required></td>
                     <td style="text-align:center"><input form="<?= $fid ?>" type="checkbox" name="is_active" value="1" <?= $c['is_active'] ? 'checked' : '' ?>></td>
                     <td style="white-space:nowrap">
-                        <form id="<?= $fid ?>" method="POST" style="display:inline">
+                        <form id="<?= $fid ?>" method="POST" style="display:inline" class="lockedit lockedit-compact">
                             <?= csrfField() ?>
                             <input type="hidden" name="action" value="update">
                             <input type="hidden" name="id" value="<?= $c['id'] ?>">

@@ -233,7 +233,7 @@ $exchangeRate = (float)getExchangeRate();
             أضِف سطراً لكل قيمة وفترة. <strong>القيمة بتتغيّر خلال السنة؟</strong> ضيف سطرين بفترتين (مثلاً نقل: تشرين→كانون قيمة، شباط→أيلول قيمة أخرى).
             «تعويض نقل (شهري)» هون = مبلغ شهري ثابت للفترة (غير النقل اليومي حسب الأيام بالأسفل). النسبة % تُحسب من الراتب.
         </div>
-        <form method="POST" id="periodsForm">
+        <form method="POST" id="periodsForm" class="lockedit">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="apply_periods">
             <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
@@ -287,7 +287,7 @@ $exchangeRate = (float)getExchangeRate();
         </h3></div>
         <div class="card-body">
             <div class="alert alert-info" style="font-size:12px">القيمة <strong>يومية</strong>؛ الشهري = اليومي × <strong>أيام الحضور</strong> (من ملف كل أستاذ) × 4 أسابيع. ضيف سطر لكل فترة إذا القيمة اليومية بتتغيّر خلال السنة.</div>
-            <form method="POST" id="tPeriodsForm">
+            <form method="POST" id="tPeriodsForm" class="lockedit">
                 <?= csrfField() ?>
                 <input type="hidden" name="action" value="apply_transport_periods">
                 <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">

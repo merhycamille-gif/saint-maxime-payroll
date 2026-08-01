@@ -11,10 +11,21 @@
   'use strict';
 
   // الحقول القابلة للكتابة (نتجاهل المخفية وأزرار الإرسال/الأزرار العادية)
+  // 🔒 تشمل أيضاً الحقول المربوطة بالفورم عبر السمة form="ID" وهي خارجه
+  // (متل سطور جدول الصفوف) — حتى يقفلها زرّ «تعديل» نفسه (قاعدة المستخدم:
+  // «كل البرنامج مسكّر ويفتح بس على التعديل البدي ياه»)
   function editableFields(form) {
-    return form.querySelectorAll(
-      'input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]), select, textarea'
-    );
+    var sel = 'input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]), select, textarea';
+    var inside = Array.prototype.slice.call(form.querySelectorAll(sel));
+    // ⚠️ getAttribute لا form.id: حقل مخفي اسمه «id» داخل الفورم يغطّي على الخاصية
+    var fid = form.getAttribute('id');
+    if (fid) {
+      var linked = document.querySelectorAll('[form="' + fid + '"]');
+      Array.prototype.forEach.call(linked, function (el) {
+        if (el.matches && el.matches(sel) && inside.indexOf(el) === -1) inside.push(el);
+      });
+    }
+    return inside;
   }
 
   // أزرار الإرسال التابعة لهذا الفورم تحديداً (لا فورم متداخل)
@@ -50,22 +61,29 @@
     var subs = ownSubmits(form);
 
     // زر تعديل خارجي معرَّف مسبقاً؟ (ملف الأستاذ) وإلا نحقن شريطاً
-    var extBtn = form.id ? document.querySelector('[data-lockedit-for="' + form.id + '"]') : null;
+    var lockFid = form.getAttribute('id'); // getAttribute لا .id (قد يغطّيه حقل اسمه id)
+    var extBtn = lockFid ? document.querySelector('[data-lockedit-for="' + lockFid + '"]') : null;
     var bar = null, editBtn = extBtn, msgEl = null;
+    // وضع مضغوط (سطور الجداول): زر «تعديل» صغير فقط بلا شريط رسالة
+    var compact = form.classList.contains('lockedit-compact');
 
     if (!editBtn) {
-      injectStyle();
-      bar = document.createElement('div');
-      bar.className = 'lockedit-bar';
-      msgEl = document.createElement('span');
-      msgEl.className = 'lockedit-msg';
       editBtn = document.createElement('button');
       editBtn.type = 'button';
       editBtn.className = 'btn btn-warning btn-sm';
-      editBtn.innerHTML = '<i class="fas fa-pen"></i> تعديل / Modifier';
-      bar.appendChild(msgEl);
-      bar.appendChild(editBtn);
-      form.insertBefore(bar, form.firstChild);
+      editBtn.innerHTML = compact ? '<i class="fas fa-pen"></i> تعديل' : '<i class="fas fa-pen"></i> تعديل / Modifier';
+      if (compact) {
+        form.insertBefore(editBtn, form.firstChild);
+      } else {
+        injectStyle();
+        bar = document.createElement('div');
+        bar.className = 'lockedit-bar';
+        msgEl = document.createElement('span');
+        msgEl.className = 'lockedit-msg';
+        bar.appendChild(msgEl);
+        bar.appendChild(editBtn);
+        form.insertBefore(bar, form.firstChild);
+      }
     }
 
     function setLocked(locked) {
@@ -78,10 +96,9 @@
         }
       });
       subs.forEach(function (b) { b.style.display = locked ? 'none' : ''; });
-      if (extBtn) extBtn.style.display = locked ? '' : 'none';
+      editBtn.style.display = locked ? '' : 'none';
       if (bar) {
         bar.classList.toggle('is-editing', !locked);
-        editBtn.style.display = locked ? '' : 'none';
         msgEl.innerHTML = locked
           ? '<i class="fas fa-lock"></i> مقفَّل للحماية من التعديل غير المقصود — اضغط «تعديل» للكتابة / Verrouillé'
           : '<i class="fas fa-lock-open"></i> وضع التعديل مفعَّل — عدّل ثم اضغط «حفظ» / Mode édition';

@@ -409,7 +409,7 @@ $newSubs = $newSubs->fetchAll();
       <?php elseif ($allowAfter): ?><span class="badge" style="background:#15803d;color:#fff">🔓 مفتوح (سماح الأدمن مُفعَّل)</span>
       <?php else: ?><span class="badge" style="background:#15803d;color:#fff">🔓 مفتوح حتى <?= e(displayDMY($dl)) ?></span><?php endif; ?>
     </p>
-    <form method="post" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <form method="post" class="lockedit" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
       <?= csrfField() ?>
       <input type="hidden" name="action" value="save_form_deadline">
       <div>

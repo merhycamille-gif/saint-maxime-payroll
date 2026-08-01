@@ -1080,6 +1080,27 @@ check('لا أزرار مكرّرة بكل البرنامج: لا زرّ طبا�
 check('البطاقة السنوية: زرّا PDF الرسمي (فردي/جماعي) بلا وضع fit القديم — يطبعان قدّ الورقة',
       strpos((string)file_get_contents(__DIR__ . '/../pages/annual_slip.php'), '&fit=1') === false);
 
+/* =====================================================================
+ * 30) القفل الشامل («كل البرنامج مسكّر إلا إذا بدي أعمل تعديل لشي معيّن
+ *     ويفتح بس على التعديل البدي ياه» — قاعدة المستخدم 2026-08-01)
+ * =================================================================== */
+$lockPages30 = ['bonuses', 'bulk_allowances', 'classes', 'exchange_rates', 'info_collect',
+                'email_settings', 'employees', 'exceptional_laws', 'grades', 'rates_history',
+                'salary_scales', 'schools', 'settings', 'social_security', 'tax_brackets', 'users'];
+$noLock30 = [];
+foreach ($lockPages30 as $lp30) {
+    if (strpos((string)file_get_contents(__DIR__ . '/../pages/' . $lp30 . '.php'), 'lockedit') === false) $noLock30[] = $lp30;
+}
+check('القفل الشامل: كل صفحات التعديل الـ16 على آلية lockedit (مقفولة حتى كبسة «تعديل»)',
+      empty($noLock30), $noLock30 ? ('بلا قفل: ' . implode(',', $noLock30)) : '16 صفحة مقفولة');
+$flSrc30 = (string)file_get_contents(__DIR__ . '/../assets/js/form-lock.js');
+check('القفل الشامل: القفل يلقط حقول السطور المربوطة بسمة form= ويقرأ المعرّف بـgetAttribute (حقل «id» كان يغطّيه)',
+      strpos($flSrc30, "form.getAttribute('id')") !== false
+      && strpos($flSrc30, "document.querySelectorAll('[form=\"' + fid + '\"]')") !== false
+      && strpos($flSrc30, 'lockedit-compact') !== false);
+check('القفل الشامل: سطور جدول الصفوف مقفولة صفّاً صفّاً (متل لوحة الدرجات)',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/classes.php'), 'class="lockedit lockedit-compact"') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

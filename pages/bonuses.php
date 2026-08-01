@@ -97,7 +97,7 @@ include __DIR__ . '/../includes/header.php';
         <div style="font-size:0.85em;font-weight:600;opacity:0.9">إضافة مكافأة</div>
     </h3></div>
     <div class="card-body">
-        <form method="POST">
+        <form method="POST" class="lockedit">
             <input type="hidden" name="action" value="add">
             <div class="form-row cols-4">
                 <div class="form-group">
