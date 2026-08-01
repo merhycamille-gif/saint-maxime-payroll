@@ -372,12 +372,13 @@ include __DIR__ . '/../includes/header.php';
     .salary-slip-header .ssh-school h2 { font-size: 15pt !important; }
     .ssh-ar { font-size: 12pt !important; } .ssh-addr { font-size: 12pt !important; }
     .ssh-title h3 { font-size: 12pt !important; } .ssh-sub { font-size: 12pt !important; } .ssh-year { font-size: 12pt !important; }
-    .slip-emp-name { font-size: 13pt !important; background:#eff6ff !important; padding:3px !important; margin-bottom:4px !important; }
-    /* معلومات الأستاذ: شبكة بحدود واضحة عند الطباعة (مضغوطة لتسع صفحة واحدة) */
-    .slip-info { margin-bottom: 4px !important; }
-    .slip-info td { border:1px solid #888 !important; padding: 1.5px 6px !important; }
-    .slip-info .lbl { font-size: 12pt !important; margin-bottom: 0 !important; }
-    .slip-info .val { font-size: 12pt !important; font-weight:700 !important; }
+    /* 🔠 «معلومات الأستاذ فوق أكبر» (طلب المستخدم 2026-08-01): سطر الاسم والقيم كبار
+       عريضة (14pt) والتسميات أصغر منها بدرجة — تُقرأ من نظرة متل أرقام الجدول */
+    .slip-emp-name { font-size: 15pt !important; background:#eff6ff !important; padding:5px 8px !important; margin-bottom:5px !important; }
+    .slip-info { margin-bottom: 5px !important; }
+    .slip-info td { border:1px solid #888 !important; padding: 3px 8px !important; }
+    .slip-info .lbl { font-size: 10.5pt !important; margin-bottom: 1px !important; color:#555 !important; }
+    .slip-info .val { font-size: 14pt !important; font-weight:700 !important; }
     /* الجدول: خط 12pt بلا قصّ (table-layout تلقائي فالأرقام تظهر كاملة)؛
        التصغير المحسوب --pz يضمن صفحة A4 أفقية واحدة بلا قصّ ولا انقسام */
     .salary-slip-table { font-size: 12pt !important; width: 100% !important; border-collapse: collapse; }
