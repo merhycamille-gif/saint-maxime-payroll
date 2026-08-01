@@ -955,12 +955,15 @@ check('القالب الموحّد: دوال docSheetStart/docSheetEnd و docBac
 check('القالب الموحّد: التقارير الستة بمركز التقارير كلها على docSheetStart (لا ترويسة/عنوان «لحاله»)',
       substr_count($repSrc27, 'docSheetStart(') >= 7   // 6 تقارير + جدول «تفصيل لكل مدرسة»
       && substr_count($repSrc27, 'docSheetEnd()') === substr_count($repSrc27, 'docSheetStart('));
-check('وضع عرض المستند: الصفحات الخمس تفعّله (تقارير/نماذج/إفادات/بطاقة سنوية/سيرة)',
+// 🔴 doc-view للتقارير والنماذج الرسمية **فقط** — بطاقة الراتب السنوية والإفادات وسيرة الأستاذ
+// تبقى بشكلها المعهود (شكوى المستخدم p1 بتاريخ 2026-08-01: «خربتلي كل التقارير والإفادات»)
+check('وضع عرض المستند: مفعَّل بمركز التقارير والنماذج الرسمية فقط — لا يلمس البطاقة السنوية/الإفادات/السيرة',
       strpos($repSrc27, '$docFocus = true') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/official_forms.php'), '$docFocus = true') !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), '$docFocus = true') !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/annual_slip.php'), '$docFocus = true') !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/employee_history.php'), '$docFocus = true') !== false);
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), '$docFocus = true') === false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/annual_slip.php'), '$docFocus = true') === false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/employee_history.php'), '$docFocus = true') === false
+      && strpos((string)file_get_contents(__DIR__ . '/../assets/css/app.css'), 'body.doc-view { background') === false);
 check('وضع عرض المستند: الهيدر يضيف صف doc-view للـbody وزرّ الرجوع يستعمل docBackUrl',
       strpos($hdSrc27, "!empty(\$docFocus) ? ' doc-view'") !== false
       && strpos($hdSrc27, 'docBackUrl()') !== false);

@@ -1397,7 +1397,7 @@ body.doc-view a[href*="switch_lang"],
 body.doc-view .user-menu { display: none !important; }
 body.doc-view .main-content { margin: 0; }
 body.doc-view .page-content { max-width: 1320px; margin: 0 auto; }
-body.doc-view { background: #eef1f5; }
+/* (الخلفية تبقى خلفية البرنامج المعهودة — الرمادي الغامق كان يعطي إحساساً «مغبّراً»، شكوى p1) */
 
 /* الورقة الموحّدة: خلفية بيضاء بظل خفيف متل ورقة حقيقية — بالطباعة تصير عادية */
 .doc-sheet {

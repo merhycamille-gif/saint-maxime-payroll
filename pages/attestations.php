@@ -86,9 +86,7 @@ if (trim((string)($sig['name'] ?? '')) !== '') $director = $sig['name'];
 $sigNameFr = $sig['name_fr'] ?? '';
 $sigPhone  = $sig['phone'] ?? '';
 
-// وضع «عرض المستند»: عند عرض إفادة أو ملف أستاذ كامل تختفي القوائم ويرجع الزرّ لنفس الصفحة الأصلية
-if ($emp && ($type !== '' || !empty($_GET['dossier']))) $docFocus = true;
-
+// 🔴 لا doc-view هنا: الإفادات وملف الأستاذ يبقيان بشكلهما المعهود (شكوى المستخدم p1 بتاريخ 2026-08-01).
 include __DIR__ . '/../includes/header.php';
 
 // ====== ملف الأستاذ الكامل / Dossier: كل شي عن الأستاذ بمكان واحد ======
