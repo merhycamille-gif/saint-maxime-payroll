@@ -60,9 +60,12 @@
 
     var subs = ownSubmits(form);
 
-    // زر تعديل خارجي معرَّف مسبقاً؟ (ملف الأستاذ) وإلا نحقن شريطاً
+    // أزرار تعديل خارجية معرَّفة مسبقاً؟ (ملف الأستاذ: زر بالشريط العلوي + زر بكل تبويب)
     var lockFid = form.getAttribute('id'); // getAttribute لا .id (قد يغطّيه حقل اسمه id)
-    var extBtn = lockFid ? document.querySelector('[data-lockedit-for="' + lockFid + '"]') : null;
+    var extBtns = lockFid
+        ? Array.prototype.slice.call(document.querySelectorAll('[data-lockedit-for="' + lockFid + '"]'))
+        : [];
+    var extBtn = extBtns.length ? extBtns[0] : null;
     var bar = null, editBtn = extBtn, msgEl = null;
     // وضع مضغوط (سطور الجداول): زر «تعديل» صغير فقط بلا شريط رسالة
     var compact = form.classList.contains('lockedit-compact');
@@ -96,7 +99,11 @@
         }
       });
       subs.forEach(function (b) { b.style.display = locked ? 'none' : ''; });
-      editBtn.style.display = locked ? '' : 'none';
+      if (extBtns.length) {
+        extBtns.forEach(function (b) { b.style.display = locked ? '' : 'none'; });
+      } else {
+        editBtn.style.display = locked ? '' : 'none';
+      }
       if (bar) {
         bar.classList.toggle('is-editing', !locked);
         msgEl.innerHTML = locked
@@ -105,10 +112,12 @@
       }
     }
 
-    editBtn.addEventListener('click', function (e) {
+    function onEdit(e) {
       e.preventDefault();
       setLocked(false);
-    });
+    }
+    if (extBtns.length) extBtns.forEach(function (b) { b.addEventListener('click', onEdit); });
+    else editBtn.addEventListener('click', onEdit);
 
     setLocked(true); // يُفتح مقفَّلاً
   }

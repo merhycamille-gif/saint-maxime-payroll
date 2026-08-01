@@ -805,6 +805,29 @@ include __DIR__ . '/../includes/header.php';
 
 <form method="POST" enctype="multipart/form-data" id="empForm"<?= $id > 0 ? ' class="lockedit"' : '' ?>>
     <input type="hidden" name="active_tab" id="activeTabField" value="<?= e(preg_replace('/[^a-z]/', '', $_GET['tab'] ?? '')) ?>">
+    <?php
+    // 💾 صفّ أزرار موحّد أعلى كل تبويب من ملف الأستاذ (طلب المستخدم 2026-08-01:
+    // «بكل صفحة من صفحاتو لازم يكون في زر تعديل وزر حذف وزر حفظ»):
+    // تعديل يفتح القفل (يظهر مقفولاً فقط) · حفظ يحفظ الملف كاملاً (يظهر بوضع التعديل فقط —
+    // القفل يديره) · حذف يحذف الموظف بتأكيد. للموظف المحفوظ فقط.
+    $empTabBar = function () use ($id, $employee) {
+        if ($id <= 0) return;
+        $delMsg = '⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «'
+            . (trim($employee['first_name_ar'] . ' ' . $employee['last_name_ar']) ?: trim($employee['first_name_fr'] . ' ' . $employee['last_name_fr']))
+            . '» ؟ بعد الحذف لا يعود يظهر في البرنامج (يمكن استرجاعه لاحقاً عند الحاجة).';
+        ?>
+        <div class="d-flex gap-2 no-print" style="justify-content:flex-end;margin-bottom:12px;flex-wrap:wrap">
+            <button type="button" data-lockedit-for="empForm" class="btn btn-warning btn-sm" style="display:none">
+                <i class="fas fa-pen"></i> تعديل / Modifier
+            </button>
+            <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-save"></i> حفظ / Enregistrer</button>
+            <a href="?action=delete&id=<?= $id ?>" class="btn btn-danger btn-sm" data-confirm="<?= e($delMsg) ?>">
+                <i class="fas fa-trash"></i> حذف / Supprimer
+            </a>
+        </div>
+        <?php
+    };
+    ?>
     <!-- Tabs -->
     <div class="tabs">
         <button type="button" class="tab active" data-tab="personal">👤 Personnel / شخصي</button>
@@ -820,6 +843,7 @@ include __DIR__ . '/../includes/header.php';
     
     <!-- ========== Personal Tab ========== -->
     <div class="tab-content active" data-tab-content="personal">
+        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -972,6 +996,7 @@ include __DIR__ . '/../includes/header.php';
 
     <!-- ========== Address Tab ========== -->
     <div class="tab-content" data-tab-content="address">
+        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -1034,6 +1059,7 @@ include __DIR__ . '/../includes/header.php';
     
     <!-- ========== Employment Tab ========== -->
     <div class="tab-content" data-tab-content="employment">
+        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -1228,6 +1254,7 @@ include __DIR__ . '/../includes/header.php';
     
     <!-- ========== Finance Tab ========== -->
     <div class="tab-content" data-tab-content="finance">
+        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -1475,6 +1502,7 @@ include __DIR__ . '/../includes/header.php';
     
     <!-- ========== Bonuses Tab ========== -->
     <div class="tab-content" data-tab-content="bonuses">
+        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -1531,6 +1559,7 @@ include __DIR__ . '/../includes/header.php';
     
     <!-- ========== Deductions Tab ========== -->
     <div class="tab-content" data-tab-content="deductions">
+        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>

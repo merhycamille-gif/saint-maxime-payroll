@@ -1100,6 +1100,13 @@ check('القفل الشامل: القفل يلقط حقول السطور الم
       && strpos($flSrc30, 'lockedit-compact') !== false);
 check('القفل الشامل: سطور جدول الصفوف مقفولة صفّاً صفّاً (متل لوحة الدرجات)',
       strpos((string)file_get_contents(__DIR__ . '/../pages/classes.php'), 'class="lockedit lockedit-compact"') !== false);
+// ملف الأستاذ: صفّ أزرار (تعديل + حفظ + حذف) بكل تبويب من التبويبات الستة
+// (طلب المستخدم 2026-08-01: «بكل صفحة من صفحاتو لازم يكون في زر تعديل وزر حذف وزر حفظ»)
+$empSrc30 = (string)file_get_contents(__DIR__ . '/../pages/employees.php');
+check('ملف الأستاذ: صفّ أزرار تعديل/حفظ/حذف بكل تبويب (٦ تبويبات) والقفل يدعم أزرار تعديل متعددة',
+      substr_count($empSrc30, '<?php $empTabBar(); ?>') === 6
+      && strpos($empSrc30, 'function () use ($id, $employee)') !== false
+      && strpos($flSrc30, 'extBtns.forEach') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
