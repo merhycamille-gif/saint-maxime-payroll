@@ -128,11 +128,61 @@ document.addEventListener('change', function(e) {
             // الورقة يملؤها بتوسيع أعمدته وخطه 12 تماماً؛ الأعرض وحده يتصغّر حتى لا يُقصّ
             t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
         }
-        // (٢) القسائم بصفحة وحدة: التصغير يراعي العرض والطول معاً فلا تنقسم على صفحتين
-        var cards = document.querySelectorAll('.payslip-card, .salary-slip');
+        // (٢-أ) 🔒 البطاقات السنوية تُقاس **بشروط الطباعة الحقيقية** لا بتنسيق الشاشة:
+        // beforeprint يشتغل والصفحة بعدها بتنسيق الشاشة فتلتفّ الأسطر ويطلع ارتفاع
+        // وهمي → تصغير خاطئ ~0.42 والورقة نصها فاضي (شكوى المستخدم 2026-08-01).
+        // الحل: قلب قواعد @media print إلى الشاشة مؤقتاً (خطوة متزامنة لا تُرى)،
+        // قياس البطاقة على مقاس ورقة التصميم (A4 أفقي بهوامش 4mm)، ثم تصغير محسوب
+        // فقط عند الضرورة. الطباعة الجماعية: كل جولة قياس تُنفَّذ للبطاقات **كلها معاً**
+        // (كتابة العروض ثم قراءة القياسات دفعة) = إعادة تخطيط واحدة للجولة لا لكل بطاقة.
+        var slips = document.querySelectorAll('.salary-slip');
+        if (slips.length) {
+            var flipped = [];
+            try {
+                for (var s = 0; s < document.styleSheets.length; s++) {
+                    var rules; try { rules = document.styleSheets[s].cssRules; } catch (e) { continue; }
+                    if (!rules) continue;
+                    for (var r = 0; r < rules.length; r++) {
+                        var rule = rules[r];
+                        if (rule.media && /print/.test(rule.media.mediaText)) {
+                            flipped.push([rule, rule.media.mediaText]);
+                            rule.media.mediaText = 'all';
+                        }
+                    }
+                }
+                // مساحة A4 أفقية داخل هوامش 4mm — الطول بهامش أمان (710 لا 763)
+                // يستوعب حواشي الصفحة فوق البطاقة وفروق تدفّق الطباعة الفعلية
+                var twS = 1085, thS = 710, k;
+                var zArr = [], prevWArr = [];
+                for (k = 0; k < slips.length; k++) {
+                    zArr.push(1); prevWArr.push(slips[k].style.width);
+                    slips[k].style.setProperty('--pz', 1);
+                }
+                for (var it = 0; it < 5; it++) {
+                    var stable = true;
+                    for (k = 0; k < slips.length; k++) slips[k].style.width = Math.round(twS / zArr[k]) + 'px';
+                    for (k = 0; k < slips.length; k++) {
+                        var ws = slips[k].scrollWidth, hs = slips[k].scrollHeight;
+                        // المطلوب بصرياً: ws×z ≤ عرض الورقة و hs×z ≤ طولها → z الجديد
+                        var nz = Math.max(Math.min(1, twS / ws, thS / hs), 0.4);
+                        if (Math.abs(nz - zArr[k]) >= 0.005) stable = false;
+                        zArr[k] = nz;
+                    }
+                    if (stable) break;
+                }
+                for (k = 0; k < slips.length; k++) {
+                    slips[k].style.width = prevWArr[k];
+                    slips[k].style.setProperty('--pz', zArr[k] < 1 ? zArr[k].toFixed(3) : 1);
+                }
+            } finally {
+                for (var fI = 0; fI < flipped.length; fI++) flipped[fI][0].media.mediaText = flipped[fI][1];
+            }
+        }
+        // (٢-ب) القسيمة الشهرية: قياس على تنسيق الشاشة بنسبة الخط (كما كان)
+        var cards = document.querySelectorAll('.payslip-card');
         for (var j = 0; j < cards.length; j++) {
-            var c = cards[j], isSlip = c.classList.contains('salary-slip');
-            var land = !!c.closest('.land-report') || isSlip;
+            var c = cards[j];
+            var land = !!c.closest('.land-report');
             // مقاس ورقة A4 (أفقي/عمودي) — القسيمة الشهرية العمودية بهامش أمان (960 لا 1030)
             // حتى تبقى صفحة واحدة **بتواقيعها** بعد فروق تدفّق الطباعة الفعلية
             var tw = land ? 1075 : 745, th = land ? 720 : 960;

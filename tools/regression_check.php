@@ -1028,10 +1028,21 @@ check('قد الورقة: قياس القسائم/البطاقات على عرض
 check('الخط 12 بكل شي: لا تكبير فوق خط 12 بالقسائم/البطاقات (سقف 1) والقسيمة صفحة واحدة بهامش أمان التواقيع (960)',
       strpos($jsSrc29, "Math.min(tw / (w * scale), th / (h * scale), 1)") !== false
       && strpos($jsSrc29, "th = land ? 720 : 960;") !== false);
-check('قد الورقة: البطاقة السنوية تملأ طول الورقة (193mm) والجدول يوزّع الفراغ على صفوفه',
+check('قد الورقة: البطاقة السنوية تملأ طول الورقة (188mm معوَّضة بالتصغير) والجدول يوزّع الفراغ على صفوفه',
       ($asSrc29 = (string)file_get_contents(__DIR__ . '/../pages/annual_slip.php')) !== ''
-      && strpos($asSrc29, 'min-height: 193mm') !== false
+      && strpos($asSrc29, 'min-height: calc(188mm / var(--pz, 1))') !== false
       && strpos($asSrc29, 'flex: 1 1 auto') !== false);
+// 🖨️ إصلاح «البطاقة أونلاين صغيرة بنص ورقة فاضية» (شكوى المستخدم p1 بتاريخ 2026-08-01):
+// beforeprint يقيس على تنسيق الشاشة فيغلط (~0.42) — القياس الصحيح يقلب قواعد @media print
+// مؤقتاً ويقيس على مقاس الورقة، دفعةً واحدة لكل البطاقات (الطباعة الجماعية لا تعلّق)
+check('🖨️ البطاقة السنوية: القياس بشروط الطباعة الحقيقية (قلب @media print) دفعةً لكل البطاقات',
+      strpos($jsSrc29, "rule.media.mediaText = 'all';") !== false
+      && strpos($jsSrc29, 'twS = 1085, thS = 710') !== false
+      && strpos($jsSrc29, 'zArr') !== false
+      && strpos($jsSrc29, "flipped[fI][0].media.mediaText = flipped[fI][1];") !== false);
+check('🖨️ صمام الصفوف: صفّ البطاقة لا ينقسم على صفحتين + بانر إرشاد هوامش المتصفح (None) بوضع _autoprint',
+      strpos($asSrc29, '.salary-slip-table tr { page-break-inside: avoid; }') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/footer.php'), 'Marges / Margins') !== false);
 // الأرقام العريضة (strong/b) أيضاً 12pt عالورق — كانت ناقصة من لائحة الطباعة فتطبع
 // أهم الأرقام (الإجمالي/الصافي/المستحق) أصغر من جيرانها (ملاحظة المستخدم p1)
 check('الخط 12 بكل شي: strong/b ضمن لائحة 12pt للطباعة (الأرقام العريضة لا تطبع أصغر)',
@@ -1059,8 +1070,8 @@ check('🔒 البطاقة السنوية (تصميم مجمّد): خط Cairo م
       strpos($asSrc29, ".salary-slip, .salary-slip-table, .slip-info { font-family:'Cairo'") !== false
       && strpos($asSrc29, '.slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 800 !important;') !== false
       && strpos($asSrc29, 'font-weight:800 !important') !== false);
-check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طول الورقة (193mm + flex) وبلا fit القديم',
-      strpos($asSrc29, 'min-height: 193mm') !== false
+check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طول الورقة (188mm/pz + flex) وبلا fit القديم',
+      strpos($asSrc29, 'min-height: calc(188mm / var(--pz, 1))') !== false
       && strpos($asSrc29, 'flex: 1 1 auto') !== false
       && strpos($asSrc29, '&fit=1') === false);
 // «الأزرار مكرّرة وعجقة» (اختيار المستخدم 2026-08-01): شريط التصدير العام مخفي بصفحة

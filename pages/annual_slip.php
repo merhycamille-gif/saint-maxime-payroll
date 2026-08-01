@@ -364,12 +364,19 @@ include __DIR__ . '/../includes/header.php';
     body { font-size: 12pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .no-print { display: none !important; }
     .salary-slip, .salary-slip * { box-shadow: none !important; color: #000 !important; }
-    .salary-slip { page-break-inside: avoid; page-break-after: always; width: 100%; padding: 0 !important; zoom: var(--pz, 1); }
-    .salary-slip:last-child { page-break-after: auto; }
     /* 📏 «قد ورقة A4 وواضحة» (طلب المستخدم 2026-08-01): البطاقة تتمدّد على كامل طول
-       الورقة (بالملم — وحدة الورق الموثوقة) والجدول يوزّع الفراغ المتبقي على صفوفه
-       فتكبر الصفوف وتتوضّح — لا نصف صفحة فاضي تحت الجدول */
-    .salary-slip { display: flex; flex-direction: column; min-height: 193mm; }
+       الورقة والجدول يوزّع الفراغ المتبقي على صفوفه فتكبر الصفوف وتتوضّح.
+       التصغير المحسوب --pz (من app.js بقياس بشروط الطباعة الحقيقية) يتعوّض بالعرض
+       والطول (القسمة على --pz): يظل شكل البطاقة **قدّ الورقة تماماً** — يصغر الخط
+       قليلاً فقط عند الضرورة بلا فراغ فاضي ولا فيضان لصفحة ثانية.
+       🔴 التصميم مضبوط على هوامش @page 4mm: إذا فرض المستخدم هوامش أكبر بحوار
+       الطباعة (مثل 1 إنش) تضيق الورقة فيفيض — بانر _autoprint يرشده لتصحيحها */
+    .salary-slip { page-break-inside: avoid; page-break-after: always; padding: 0 !important;
+                   width: 100%; zoom: var(--pz, 1); }
+    .salary-slip:last-child { page-break-after: auto; }
+    .salary-slip { display: flex; flex-direction: column; min-height: calc(188mm / var(--pz, 1)); }
+    /* صمام: لو ضاقت مساحة الورقة (هوامش مستخدم كبيرة) لا ينقسم صفّ مفرد على صفحتين */
+    .salary-slip-table tr { page-break-inside: avoid; }
     .salary-slip-table { flex: 1 1 auto; }
     .salary-slip-header { border-bottom: none !important; padding-bottom: 0 !important; margin-bottom: 3px !important; }
     .salary-slip-header .ssh-school h2 { font-size: 15pt !important; }
