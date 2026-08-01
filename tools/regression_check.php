@@ -1042,7 +1042,13 @@ check('🖨️ البطاقة السنوية: القياس بشروط الطبا
       && strpos($jsSrc29, "flipped[fI][0].media.mediaText = flipped[fI][1];") !== false);
 check('🖨️ صمام الصفوف: صفّ البطاقة لا ينقسم على صفحتين + بانر إرشاد هوامش المتصفح (None) بوضع _autoprint',
       strpos($asSrc29, '.salary-slip-table tr { page-break-inside: avoid; }') !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../includes/footer.php'), 'Marges / Margins') !== false);
+      && strpos(($ftSrc29 = (string)file_get_contents(__DIR__ . '/../includes/footer.php')), 'Marges / Margins') !== false);
+// «بدي بس اطبع ما تطلع دغري البرنتر» (طلب المستخدم 2026-08-01): وضع _autoprint = معاينة
+// الورقة أولاً + زرّ «اطبع الآن» — ممنوع فتح حوار الطابعة تلقائياً عند تحميل الصفحة
+check('🖨️ معاينة قبل الطباعة: _autoprint لا يفتح الطابعة لحاله (بلا setTimeout print) وفيه زرّ «اطبع الآن»',
+      strpos($ftSrc29, 'اطبع الآن') !== false
+      && strpos($ftSrc29, "onclick=\"window.print()\"") !== false
+      && !preg_match('/setTimeout\([^)]*window\.print/s', $ftSrc29));
 // الأرقام العريضة (strong/b) أيضاً 12pt عالورق — كانت ناقصة من لائحة الطباعة فتطبع
 // أهم الأرقام (الإجمالي/الصافي/المستحق) أصغر من جيرانها (ملاحظة المستخدم p1)
 check('الخط 12 بكل شي: strong/b ضمن لائحة 12pt للطباعة (الأرقام العريضة لا تطبع أصغر)',
