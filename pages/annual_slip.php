@@ -238,10 +238,12 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                                 return '<span class="sub-lbp">' . $l . '</span><span class="cur-usd">' . $u . '</span>';
                             };
                         ?>
-                            <td><strong><?= formatLBP($r['base_shown'], false) ?></strong></td>
+                            <?php /* 🔠 «أحجام المبالغ بالليرة متل بعضها» (طلب المستخدم 2026-08-01):
+                                     num-lbp = نفس حجم كل مبالغ الليرة بالجدول (14 عريض) */ ?>
+                            <td class="num-lbp"><strong><?= formatLBP($r['base_shown'], false) ?></strong></td>
                             <?php if (!$isEmp): ?>
-                            <td><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '—' ?></td>
-                            <td><strong><?= formatLBP($r['cur_sal'], false) ?></strong></td>
+                            <td class="num-lbp"><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '—' ?></td>
+                            <td class="num-lbp"><strong><?= formatLBP($r['cur_sal'], false) ?></strong></td>
                             <?php endif; ?>
                             <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 2) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['aide']), 2) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
@@ -272,10 +274,10 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 }; ?>
                 <tr class="total-row">
                     <td><strong>TOTAL</strong></td>
-                    <td><strong><?= formatLBP($tot['base_shown'], false) ?></strong></td>
+                    <td class="num-lbp"><strong><?= formatLBP($tot['base_shown'], false) ?></strong></td>
                     <?php if (!$isEmp): ?>
-                    <td><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
-                    <td><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></td>
+                    <td class="num-lbp"><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
+                    <td class="num-lbp"><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></td>
                     <?php endif; ?>
                     <?php if (salaryCompHas('extra')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['extra_wage'], false) ?></strong></span><span class="cur-usd"><?= number_format($tot['extra_wage_usd'], 2) ?> $</span></td><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['aide'], false) ?></strong></span><span class="cur-usd"><?= number_format($tot['aide_usd'], 2) ?> $</span></td><?php endif; ?>
@@ -342,6 +344,8 @@ include __DIR__ . '/../includes/header.php';
 .salary-slip-table tbody tr:nth-child(even) { background:#f8fafc; }
 /* الليرة الرئيسية (سطر أول واضح) والدولار صغيراً بالأخضر تحتها — متل كل الكشوف */
 .salary-slip-table .sub-lbp { display:block; font-weight:600; color:#111827; }
+/* أعمدة الليرة الصرفة (أساس/قيمة الدرجة/بعد التدرج): نفس حجم باقي مبالغ الليرة تماماً */
+.salary-slip-table .num-lbp { font-weight:700; color:#111827; }
 .salary-slip-table .cur-usd { display:block; font-size:0.8em; color:#047857; font-weight:600; line-height:1.2; }
 /* وضع العملة المختار من الزرّ العام: إظهار/إخفاء الليرة أو الدولار */
 .salary-slip-table.curmode-lbp .cur-usd { display:none; }
@@ -392,6 +396,8 @@ include __DIR__ . '/../includes/header.php';
     /* 🔠 «كبّر الأرقام بعد» (طلب المستخدم 2026-08-01): رقم الليرة هو بطل الورقة — أكبر
        وأعرض (14pt عريض)، والدولار مرجع صغير تحته، والرؤوس أصغر بدرجة لتفسح المجال */
     .salary-slip-table .sub-lbp { white-space: nowrap; font-size: 14pt !important; font-weight: 700 !important; }
+    /* 🔠 «أحجام المبالغ بالليرة متل بعضها» (2026-08-01): أعمدة الليرة الصرفة بنفس الـ14 العريض */
+    .salary-slip-table .num-lbp, .salary-slip-table .num-lbp strong { font-size: 14pt !important; font-weight: 700 !important; white-space: nowrap; }
     /* 🔠 «مبالغ الدولار صغيرة كتير» (طلب المستخدم 2026-08-01): الدولار 11pt عريض واضح —
        يُقرأ بسهولة ومتناسق مع الليرة (14pt) والليرة تبقى الرئيسية */
     .salary-slip-table .cur-usd { white-space: nowrap; color: #047857 !important; font-size: 11pt !important; font-weight: 700 !important; }
