@@ -38,12 +38,11 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= e($pageTitle) ?> — <?= e(currentSchoolName()) ?></title>
     
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Fonts: محلية بالكامل (استقلال البرنامج + توليد PDF بالمتصفح يحتاج خطوطاً بنفس الأصل) -->
+    <link href="<?= BASE_URL ?>assets/fonts/fonts.css?v=<?= @filemtime(__DIR__ . '/../assets/fonts/fonts.css') ?: '1' ?>" rel="stylesheet">
+
+    <!-- Icons: Font Awesome محلي -->
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/vendor/fontawesome/css/all.min.css">
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">

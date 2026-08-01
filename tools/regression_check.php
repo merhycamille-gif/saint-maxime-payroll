@@ -1051,6 +1051,29 @@ check('🖨️ معاينة قبل الطباعة (متل الوورد): _autopr
       && strpos($ftSrc29, 'احفظها عالكمبيوتر') !== false
       && strpos($ftSrc29, "onclick=\"window.print()\"") !== false
       && !preg_match('/setTimeout\([^)]*window\.print/s', $ftSrc29));
+// 💾 «ما بيّن عندي Save as PDF» (2026-08-01): زرّ الحفظ ينزّل ملف PDF حقيقياً بكبسة
+// واحدة بلا أي شاشة (تصوير القسيمة بشكل الطباعة + jsPDF) — المكتبات والخطوط محلية
+// بالكامل (استقلال البرنامج: بلا Google Fonts وبلا cdnjs)
+check('💾 حفظ PDF بكبسة واحدة: pdf-save.js مربوط بالفوتر والزرّ يستدعي msaSavePdfStart',
+      strpos($ftSrc29, 'pdf-save.js') !== false
+      && strpos($ftSrc29, 'msaSavePdfStart(this)') !== false
+      && strpos($ftSrc29, 'window.BASE_URL') !== false
+      && is_file(__DIR__ . '/../assets/js/pdf-save.js'));
+check('💾 مكتبتا التوليد محليتان (html-to-image + jsPDF) وتصوير القسيمة بشكل الطباعة (قلب @media print)',
+      is_file(__DIR__ . '/../assets/vendor/html-to-image.js')
+      && is_file(__DIR__ . '/../assets/vendor/jspdf.umd.min.js')
+      && strpos(($psSrc29 = (string)file_get_contents(__DIR__ . '/../assets/js/pdf-save.js')), "mediaText = 'all'") !== false
+      && strpos($psSrc29, 'msaSavePdfStart') !== false);
+$hdSrc29 = (string)file_get_contents(__DIR__ . '/../includes/header.php');
+check('🔤 الخطوط والأيقونات محلية بالكامل (استقلال البرنامج — بلا CDN خارجي)',
+      strpos($hdSrc29, 'fonts.googleapis.com') === false
+      && strpos($hdSrc29, 'cdnjs.cloudflare.com') === false
+      && strpos($hdSrc29, 'assets/fonts/fonts.css') !== false
+      && strpos($hdSrc29, 'assets/vendor/fontawesome/css/all.min.css') !== false
+      && is_file(__DIR__ . '/../assets/fonts/fonts.css')
+      && is_file(__DIR__ . '/../assets/vendor/fontawesome/css/all.min.css')
+      && is_file(__DIR__ . '/../assets/vendor/fontawesome/webfonts/fa-solid-900.woff2')
+      && strpos((string)file_get_contents(__DIR__ . '/../assets/fonts/fonts.css'), 'fonts.gstatic.com') === false);
 // الأرقام العريضة (strong/b) أيضاً 12pt عالورق — كانت ناقصة من لائحة الطباعة فتطبع
 // أهم الأرقام (الإجمالي/الصافي/المستحق) أصغر من جيرانها (ملاحظة المستخدم p1)
 check('الخط 12 بكل شي: strong/b ضمن لائحة 12pt للطباعة (الأرقام العريضة لا تطبع أصغر)',
