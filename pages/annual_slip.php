@@ -358,6 +358,11 @@ include __DIR__ . '/../includes/header.php';
     .salary-slip, .salary-slip * { box-shadow: none !important; color: #000 !important; }
     .salary-slip { page-break-inside: avoid; page-break-after: always; width: 100%; padding: 0 !important; zoom: var(--pz, 1); }
     .salary-slip:last-child { page-break-after: auto; }
+    /* 📏 «قد ورقة A4 وواضحة» (طلب المستخدم 2026-08-01): البطاقة تتمدّد على كامل طول
+       الورقة (بالملم — وحدة الورق الموثوقة) والجدول يوزّع الفراغ المتبقي على صفوفه
+       فتكبر الصفوف وتتوضّح — لا نصف صفحة فاضي تحت الجدول */
+    .salary-slip { display: flex; flex-direction: column; min-height: 193mm; }
+    .salary-slip-table { flex: 1 1 auto; }
     .salary-slip-header { border-bottom: none !important; padding-bottom: 0 !important; margin-bottom: 3px !important; }
     .salary-slip-header .ssh-school h2 { font-size: 15pt !important; }
     .ssh-ar { font-size: 12pt !important; } .ssh-addr { font-size: 12pt !important; }

@@ -614,7 +614,12 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             var natW = t.getBoundingClientRect().width || t.scrollWidth;
             t.classList.remove('pz-measure');
             var pz = target / natW;
-            t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
+            // 📏 «قد ورقة A4 وواضحة» (طلب المستخدم 2026-08-01): الجدول الأعرض من الورقة يتصغّر
+            // حتى لا يُقصّ (كما كان)، وجدول التقرير (٦ أعمدة+) الأصغر من الورقة **يتكبّر**
+            // ليملأ عرضها بخط أوضح (سقف 1.4× حتى لا تتضخّم الجداول الصغيرة داخل النماذج الرسمية)
+            var grow = (row && row.children.length >= 6) ? 1.4 : 1;
+            pz = Math.min(pz, grow);
+            t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : pz.toFixed(3));
             var z = w.clientWidth / t.scrollWidth;
             if (z < 1) t.style.zoom = Math.max(z, 0.5);
         }

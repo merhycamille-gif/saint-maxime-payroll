@@ -1017,6 +1017,28 @@ check('نموذج الضمان 190A: التصدير الرسمي يدعم الم
       strpos((string)file_get_contents(__DIR__ . '/../includes/report_export.php'),
              "function officialTemplateExport(\$templateAbs, array \$cells, \$format, \$name, \$disposition = 'attachment')") !== false);
 
+/* =====================================================================
+ * 29) «قد ورقة A4 وواضحة» (طلب المستخدم 2026-08-01) — مؤكَّدة بصرياً بالـPDF:
+ *     البطاقة السنوية تملأ الورقة، والقسيمة الشهرية صفحة واحدة بتواقيعها
+ * =================================================================== */
+$jsSrc29 = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
+check('قد الورقة: قياس القسائم/البطاقات على عرض الورقة الحقيقي لا عرض الشاشة (لا تصغير زائد)',
+      strpos($jsSrc29, "c.style.width = tw + 'px';") !== false
+      && strpos($jsSrc29, "c.style.setProperty('--pz', 1);") !== false);
+check('قد الورقة: البطاقة السنوية تتمدّد لتملأ الورقة (سقف 1.8) والقسيمة صفحة واحدة بهامش أمان التواقيع (960)',
+      strpos($jsSrc29, "isSlip ? 1.8 : 1") !== false
+      && strpos($jsSrc29, "th = land ? 720 : 960;") !== false);
+check('قد الورقة: البطاقة السنوية تملأ طول الورقة (193mm) والجدول يوزّع الفراغ على صفوفه',
+      ($asSrc29 = (string)file_get_contents(__DIR__ . '/../pages/annual_slip.php')) !== ''
+      && strpos($asSrc29, 'min-height: 193mm') !== false
+      && strpos($asSrc29, 'flex: 1 1 auto') !== false);
+check('قد الورقة: جداول التقارير (٦ أعمدة+) الأصغر من الورقة تتكبّر لتملأ عرضها (سقف 1.4)',
+      strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), "row.children.length >= 6) ? 1.4 : 1") !== false
+      && strpos($jsSrc29, "children.length >= 6 ? 1.4 : 1") !== false);
+check('البطاقة السنوية بالشكل الرسمي: رؤوس كحلية #1F4E5F عالورق والليرة رئيسية والدولار تحتها',
+      strpos($asSrc29, '.salary-slip-table thead th { background: #1F4E5F !important; color: #fff !important;') !== false
+      && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

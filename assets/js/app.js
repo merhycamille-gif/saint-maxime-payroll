@@ -124,21 +124,38 @@ document.addEventListener('change', function(e) {
             var natW = t.getBoundingClientRect().width || t.scrollWidth;
             t.classList.remove('pz-measure');
             var pz = target / natW;
-            t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
+            // 📏 «قد ورقة A4 وواضحة» (طلب المستخدم 2026-08-01): الجدول الواسع يتصغّر حتى لا يُقصّ،
+            // والجدول العريض (٦ أعمدة+) الأصغر من الورقة **يتكبّر** ليملأها بخط أوضح (سقف 1.4×)
+            var r0 = t.querySelector('tr');
+            var grow = r0 && r0.children.length >= 6 ? 1.4 : 1;
+            pz = Math.min(pz, grow);
+            t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : pz.toFixed(3));
         }
         // (٢) القسائم بصفحة وحدة: التصغير يراعي العرض والطول معاً فلا تنقسم على صفحتين
         var cards = document.querySelectorAll('.payslip-card, .salary-slip');
         for (var j = 0; j < cards.length; j++) {
-            var c = cards[j], land = !!c.closest('.land-report') || c.classList.contains('salary-slip');
-            var tw = land ? 1075 : 745, th = land ? 720 : 1030;     // مقاس ورقة A4 (أفقي/عمودي)
+            var c = cards[j], isSlip = c.classList.contains('salary-slip');
+            var land = !!c.closest('.land-report') || isSlip;
+            // مقاس ورقة A4 (أفقي/عمودي) — القسيمة الشهرية العمودية بهامش أمان (960 لا 1030)
+            // حتى تبقى صفحة واحدة **بتواقيعها** بعد فروق تدفّق الطباعة الفعلية
+            var tw = land ? 1075 : 745, th = land ? 720 : 960;
             c.classList.add('pz-measure-page');                     // إخفاء ما لا يُطبع قبل القياس
+            // استقرار القياس: صفّر أي تصغير سابق قبل القياس (وإلا القياس الثاني يقيس المصغَّر)
+            c.style.setProperty('--pz', 1);
+            // 📏 «قد ورقة A4 وواضحة» (2026-08-01): القياس على **عرض الورقة الحقيقي** لا عرض
+            // الشاشة — الشاشة العريضة كانت تمدّد المحتوى فيُحسب تصغير زائد (~0.5) ويطلع
+            // الخط صغيراً والورقة نصها فاضي
+            var prevW = c.style.width;
+            c.style.width = tw + 'px';
             var w = c.scrollWidth, h = c.scrollHeight;
+            c.style.width = prevW;
             c.classList.remove('pz-measure-page');
             // الطباعة 12pt والشاشة أصغر — نقيس بنسبة الخط الفعلية حتى لا نصغّر أقلّ من اللازم
             var fs = parseFloat(getComputedStyle(c).fontSize) || 16;
             var scale = Math.max(1, 16 / fs);                       // 12pt = 16px
-            var pz2 = Math.min(tw / (w * scale), th / (h * scale));
-            c.style.setProperty('--pz', pz2 < 1 ? Math.max(pz2, 0.4).toFixed(3) : 1);
+            // البطاقة السنوية تتمدّد لتملأ الورقة (سقف 1.8×)؛ القسيمة تتصغّر فقط (سقف 1)
+            var pz2 = Math.min(tw / (w * scale), th / (h * scale), isSlip ? 1.8 : 1);
+            c.style.setProperty('--pz', pz2 < 1 ? Math.max(pz2, 0.4).toFixed(3) : pz2.toFixed(3));
         }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitPrintZoom);
