@@ -525,6 +525,30 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
 .btn-sm { padding: 6px 12px; font-size: 12px; }
 .btn-lg { padding: 12px 24px; font-size: 15px; }
 
+/* 🗑️ أزرار الحذف زغيرة وهادية حتى ما تنكبس بالغلط (طلب المستخدم 2026-08-02):
+   كل زر أحمر فيه سلة مهملات (أو ✕ شيل سطر) = حذف حقيقي → حجم أصغر + شكل مفرّغ
+   (إطار أحمر خفيف بدل كتلة حمرا) + مسافة عن الأزرار اللي حدّه (خصوصاً «حفظ»).
+   صفحة تأكيد الحذف (btn-lg) مقصودة كبيرة وواضحة — مستثناة. أزرار PDF الحمرا لا تتأثر. */
+.btn-danger:has(.fa-trash, .fa-trash-alt):not(.btn-lg),
+.btn-danger[onclick*=".remove()"] {
+    padding: 3px 9px;
+    font-size: 11px;
+    background: #fff;
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+}
+/* المسافة الواقية فقط عندما يكون حدّ أزرار أخرى (لا عندما يكون وحده بخانة جدول) */
+* + .btn-danger:has(.fa-trash, .fa-trash-alt):not(.btn-lg),
+* + .btn-danger[onclick*=".remove()"] {
+    margin-inline-start: 14px;
+}
+.btn-danger:has(.fa-trash, .fa-trash-alt):not(.btn-lg):hover,
+.btn-danger[onclick*=".remove()"]:hover {
+    background: #dc2626;
+    color: #fff;
+    border-color: #dc2626;
+}
+
 /* =================== Tables =================== */
 .table-wrapper {
     overflow-x: auto;

@@ -432,6 +432,13 @@ check('تغيير السنة يطبَّق حتى على الصفحات المث�
       strpos($syw, "preg_match('/[?&]school_year=/', \$back)") !== false
       && strpos($syw, "school_year=[^&]*&?") !== false      // فرع «كل السنين»: إزالة الوسيط
       && strpos($syw, "[?&]school_year=)[^&]*") !== false); // فرع سنة محدّدة: تبديل القيمة
+// 🗑️ «بدي زر الحذف يكون زغير مش كبير لحتى ما نكبس بالغلط» (2026-08-02): قاعدة CSS مركزية
+// تصغّر كل أزرار الحذف (سلة المهملات/✕) وتباعدها عن جيرانها؛ صفحة التأكيد الكبيرة مستثناة.
+$appCss = (string)file_get_contents(__DIR__ . '/../assets/css/app.css');
+check('أزرار الحذف زغيرة ومفرّغة بكل البرنامج (حماية من الكبس بالغلط)',
+      strpos($appCss, '.btn-danger:has(.fa-trash, .fa-trash-alt):not(.btn-lg)') !== false
+      && strpos($appCss, '.btn-danger[onclick*=".remove()"]') !== false
+      && strpos($appCss, 'margin-inline-start: 14px') !== false);
 
 /* =====================================================================
  * 16) الفحص الشامل — صحّة الأرقام والأعداد (2026-07-30)
