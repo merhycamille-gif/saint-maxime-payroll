@@ -424,6 +424,14 @@ check('أمان: تجديد معرّف الجلسة عند الدخول (session
 $swOk = count(array_filter(['switch_currency','switch_lang','switch_salarycomp','switch_school','switch_year'],
     fn($s) => strpos((string)file_get_contents(__DIR__ . "/../$s.php"), 'safeBackUrl()') !== false));
 check('أمان: رجوع المبدّلات مقيّد بنفس الموقع (safeBackUrl)', $swOk === 5, "$swOk/5");
+// 🔴 تغيير السنة من فوق وأنت على صفحة تثبّت السنة برابطها (البطاقة السنوية/التقارير/النماذج):
+// كان يرجع للرابط القديم فتضل الصفحة على السنة القديمة (شكوى 2026-08-02). التصليح: switch_year
+// يبدّل school_year في رابط العودة نفسه (وعند «كل السنين» يشيله ليتبع الجلسة).
+$syw = (string)file_get_contents(__DIR__ . '/../switch_year.php');
+check('تغيير السنة يطبَّق حتى على الصفحات المثبّتة سنتها بالرابط (البطاقة السنوية/التقارير)',
+      strpos($syw, "preg_match('/[?&]school_year=/', \$back)") !== false
+      && strpos($syw, "school_year=[^&]*&?") !== false      // فرع «كل السنين»: إزالة الوسيط
+      && strpos($syw, "[?&]school_year=)[^&]*") !== false); // فرع سنة محدّدة: تبديل القيمة
 
 /* =====================================================================
  * 16) الفحص الشامل — صحّة الأرقام والأعداد (2026-07-30)
