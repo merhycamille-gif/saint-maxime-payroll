@@ -432,6 +432,19 @@ check('تغيير السنة يطبَّق حتى على الصفحات المث�
       strpos($syw, "preg_match('/[?&]school_year=/', \$back)") !== false
       && strpos($syw, "school_year=[^&]*&?") !== false      // فرع «كل السنين»: إزالة الوسيط
       && strpos($syw, "[?&]school_year=)[^&]*") !== false); // فرع سنة محدّدة: تبديل القيمة
+// 📝 عقد التعليم: «المبلغ المتفق عليه» بالعملتين أو كل عملة لحالها (طلب المستخدم 2026-08-02) —
+// خانتان فوق العقد (aqd_lbp/aqd_usd) وسطر بالمادة الثالثة بالأرقام والحروف؛ الفارغ = فراغ منقّط.
+$aqdEmp = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id WHERE e.is_deleted=0 LIMIT 1")->fetchColumn();
+$aqdH = renderPage('pages/attestations.php', ['employee_id' => $aqdEmp, 'type' => 'aqd_taalim', 'opts_set' => 1, 'aqd_lbp' => 50000000, 'aqd_usd' => 500], []);
+check('عقد التعليم: خانتا المبلغ المتفق عليه + سطره بالعقد بالأرقام والحروف (ل.ل و $)',
+      strpos($aqdH, 'name="aqd_lbp"') !== false && strpos($aqdH, 'name="aqd_usd"') !== false
+      && strpos($aqdH, 'المبلغ المتفق عليه :') !== false
+      && strpos($aqdH, '50,000,000 ل.ل') !== false && strpos($aqdH, 'خمسون مليون ليرة لبنانية') !== false
+      && strpos($aqdH, '$500') !== false && strpos($aqdH, 'خمسمئة دولار أميركي') !== false);
+$aqdH2 = renderPage('pages/attestations.php', ['employee_id' => $aqdEmp, 'type' => 'aqd_taalim', 'opts_set' => 1], []);
+check('عقد التعليم: بلا مبلغ متفق عليه → فراغ منقّط يُكتب باليد (ولا أثر لمبلغ صفري)',
+      strpos($aqdH2, 'المبلغ المتفق عليه :') !== false
+      && preg_match('/المبلغ المتفق عليه :<\/strong>\s*<span style="display:inline-block;min-width:240px/u', $aqdH2) === 1);
 // 🗑️ «بدي زر الحذف يكون زغير مش كبير لحتى ما نكبس بالغلط» (2026-08-02): قاعدة CSS مركزية
 // تصغّر كل أزرار الحذف (سلة المهملات/✕) وتباعدها عن جيرانها؛ صفحة التأكيد الكبيرة مستثناة.
 $appCss = (string)file_get_contents(__DIR__ . '/../assets/css/app.css');

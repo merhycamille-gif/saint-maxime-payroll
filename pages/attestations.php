@@ -499,6 +499,9 @@ if (!$emp):
     // مبلغ حرّ يكتبه المستخدم (تعويض الصرف المحسوب) — يُعرَض كما هو بالعملة المختارة بلا تحويل
     $eos = (int)preg_replace('/[^0-9]/', '', (string)($_GET['eos'] ?? ''));
     $embAmt = (int)preg_replace('/[^0-9]/', '', (string)($_GET['emb_amt'] ?? '')); // مبلغ إفادة السفارة (يدوي)
+    // عقد التعليم: المبلغ المتفق عليه (يدوي) — بالليرة و/أو بالدولار، تُعبَّأ عملة وحدها أو الاثنتان معاً
+    $aqdLbp = (int)preg_replace('/[^0-9]/', '', (string)($_GET['aqd_lbp'] ?? ''));
+    $aqdUsd = (int)preg_replace('/[^0-9]/', '', (string)($_GET['aqd_usd'] ?? ''));
     $isqMode = in_array(($_GET['isq'] ?? ''), ['istiqala', 'sarf'], true) ? $_GET['isq'] : ''; // إسقاط الحق: استقالة أو صرف
     $grant   = (int)preg_replace('/[^0-9]/', '', (string)($_GET['grant'] ?? '')); // قيمة المنحة بالدولار (إقرار) — تظهر بالأرقام والحروف
     // شعار المدرسة للترويسة (خاص بالمدرسة أو الموحّد)
@@ -528,7 +531,7 @@ if (!$emp):
     $L=$money($salShown); $N=$money($net); $U='';
     $nssf=cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']);
     $rtl = ($docLang === 'ar');
-    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($sigIdx>0?'&sig='.$sigIdx:'');
+    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع لملف الأستاذ / Dossier</a>
@@ -614,6 +617,14 @@ if (!$emp):
             <div style="margin-top:6px;color:#1e40af">الراتب المعتمد بالإفادة: <strong><?= $moneyAr($salShown) ?></strong> (<?= $isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج' ?> <?= $moneyAr((int)$basePlusEch) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?><?= $incTrans?' + النقل':'' ?>)<?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php elseif ($type === 'aqd_taalim'): ?>
             <div style="margin-top:6px;color:#1e40af">أساس الراتب بالعقد: <strong><?= $moneyAr((int)$basePlusEch) ?></strong><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
+            <?php endif; ?>
+            <?php if ($type === 'aqd_taalim'): ?>
+            <div style="margin-top:6px">
+                <strong>Montant convenu / المبلغ المتفق عليه:</strong>
+                L.L <input type="text" name="aqd_lbp" value="<?= $aqdLbp>0 ? (int)$aqdLbp : '' ?>" placeholder="بالليرة" style="width:140px;padding:3px 6px" onchange="this.form.submit()">
+                &nbsp; $ <input type="text" name="aqd_usd" value="<?= $aqdUsd>0 ? (int)$aqdUsd : '' ?>" placeholder="بالدولار" style="width:110px;padding:3px 6px" onchange="this.form.submit()">
+                <span style="color:#64748b">(عبّي عملة وحدها أو الاثنتين معاً — الفاضية ما بتظهر بالعقد)</span>
+            </div>
             <?php endif; ?>
         </div>
     </form>
@@ -989,6 +1000,13 @@ if (!$emp):
         ?></p>
         <p style="margin-right:26px"><strong>6/3 ـ</strong> تعويض عائلي : <?= $cFamily > 0 ? '<strong>'.$moneyAr($cFamily).'</strong>' : $blank(120) ?> ( في حال توجّبه )</p>
         <p style="margin-right:26px"><strong>المجموع :</strong> <strong><?= $moneyAr($cTotal) ?></strong> فقط : <strong><?= e($moneyWords($cTotal)) ?></strong></p>
+        <?php // المبلغ المتفق عليه (يدوي من الخانات فوق): عملة وحدها أو الاثنتان — وإن لم يُعبَّأ شيء يظهر فراغ منقّط ليُكتب بخط اليد ?>
+        <p style="margin-right:26px"><strong>المبلغ المتفق عليه :</strong> <?php
+            $agreed = [];
+            if ($aqdLbp > 0) $agreed[] = '<strong>' . number_format($aqdLbp) . ' ل.ل</strong> فقط ' . e(numToArabicWords($aqdLbp)) . ' ليرة لبنانية لا غير';
+            if ($aqdUsd > 0) $agreed[] = '<strong>$' . number_format($aqdUsd) . '</strong> فقط ' . e(numToArabicWords($aqdUsd)) . ' دولار أميركي لا غير';
+            echo $agreed ? implode(' &nbsp;و&nbsp; ', $agreed) : $blank(240);
+        ?></p>
         <p>تُحسم من مستحقات الفريق الثاني المبالغ الشهرية المترتبة قانوناً لصندوق التعويضات ، والصندوق الوطني للضمان الاجتماعي ولوزارة المال وبدل الطوابع ، ويدفعها الفريق الأول إلى المراجع المختصة على مسؤوليته .</p>
 
         <p style="margin-top:10px"><strong>شـروط خصوصيـة</strong></p>
