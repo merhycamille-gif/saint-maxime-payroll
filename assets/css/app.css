@@ -1114,6 +1114,8 @@ h1, h2, h3, h4, h5, h6,
     /* الجدول العريض يصغّر نفسه محسوباً (--pz من app.js) فلا يُقصّ عمود — كنظام doc-table نفسه */
     .table { zoom: var(--pz, 1); }
     .payslip-card, .salary-slip { zoom: var(--pz, 1); }
+    /* الإفادات والنماذج الرسمية: صفحة A4 واحدة دائماً — الأطول يتصغّر محسوباً (app.js ٢-ج) */
+    #ppExportArea { zoom: var(--pz, 1); }
 }
 /* وضع قياس خاطف (شاشة): نفس شروط الطباعة لقياس العرض الحقيقي قبل حساب --pz */
 .table.pz-measure { width: max-content !important; table-layout: auto !important; }

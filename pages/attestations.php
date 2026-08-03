@@ -520,7 +520,9 @@ if (!$emp):
     $lhOn  = ($showLogo && $lhUrl !== '' && !in_array($type, ['notice_mail', 'anhaa_mail'], true)); // نماذج البريد لها ترويسة بريدية خاصة
     $showRecHead = ($showLogo && !$lhOn); // عرض الترويسة المُعاد بناؤها فقط حين لا توجد صورة ترويسة
     $lhStyle = $lhOn
-        ? "width:794px;min-height:1123px;margin:0 auto;background:url('" . htmlspecialchars($lhUrl, ENT_QUOTES) . "') no-repeat;background-size:794px 1123px;padding:195px 95px 150px;box-sizing:border-box"
+        // 🔴 1122 لا 1123: ورقة A4 = 297mm = 1122.5px — صندوق 1123px أطول من الورقة بنصف
+        // بكسل فينكسر آخر سطر (التوقيع) لصفحة ثانية فاضية (شكوى المستخدم 2026-08-03)
+        ? "width:794px;min-height:1122px;margin:0 auto;background:url('" . htmlspecialchars($lhUrl, ENT_QUOTES) . "') no-repeat;background-size:794px 1122px;padding:195px 95px 150px;box-sizing:border-box"
         : "max-width:820px;margin:0 auto;padding:28px 32px";
     $lhClass = $lhOn ? '' : 'card';
     $freeNum   = function ($v) use ($cur) {
@@ -641,9 +643,12 @@ if (!$emp):
     $attTotal = $attBase + $attSupp + $attTrans;
     if ($type === 'cnss'):
     ?>
-    <?php if ($lhOn): ?><style>@page{size:A4;margin:0}</style><?php endif; ?>
+    <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
+    وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
+    @page{size:A4;margin:<?= $lhOn ? '0' : '12mm' ?>}
+    .page-content{padding:0 !important;margin:0 !important}</style>
     <?php if ($docLang === 'ar'): ?><style>/* خط عربي رسمي واضح للإفادات العربية */ #ppExportArea{font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo',sans-serif}</style><?php endif; ?>
-    <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl">
+    <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;<?= $lhOn?'padding:0':'' ?>">
             <?php if ($showRecHead && $logoImg): ?><div style="text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
             <div style="text-align:left;font-weight:700;line-height:1.7;margin-bottom:6px">
@@ -734,9 +739,12 @@ if (!$emp):
             . ($schoolAddrFr ? '<br><small>' . e($schoolAddrFr) . '</small>' : '')
             . ($schoolPhone ? '<br><small>Tel : ' . e($schoolPhone) . '</small>' : '') . '</div>';
     ?>
-    <?php if ($lhOn): ?><style>@page{size:A4;margin:0}</style><?php endif; ?>
+    <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
+    وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
+    @page{size:A4;margin:<?= $lhOn ? '0' : '12mm' ?>}
+    .page-content{padding:0 !important;margin:0 !important}</style>
     <?php if ($docLang === 'ar'): ?><style>/* خط عربي رسمي واضح للإفادات العربية */ #ppExportArea{font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo',sans-serif}</style><?php endif; ?>
-    <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl">
+    <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
       <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;<?= $lhOn?'padding:0':'' ?>">
 
       <?php
@@ -1083,7 +1091,10 @@ if (!$emp):
       </div>
     </div>
     <?php else: ?>
-    <div id="ppExportArea" class="card" style="max-width:820px;margin:0 auto;padding:10px" <?= $rtl?'dir="rtl"':'' ?>>
+    <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح */
+    @page{size:A4;margin:12mm}
+    .page-content{padding:0 !important;margin:0 !important}</style>
+    <div id="ppExportArea" class="card" style="max-width:820px;margin:0 auto;padding:10px" data-fit1="1" <?= $rtl?'dir="rtl"':'' ?>>
         <div class="card-body" style="line-height:1.95;font-size:12pt;<?= $rtl?'text-align:right':'' ?>">
             <!-- ترويسة باللغة المختارة -->
             <div style="border-bottom:2px solid var(--primary,#1e3a5f);padding-bottom:10px;margin-bottom:22px;<?= $rtl?'text-align:right':'text-align:left' ?>">

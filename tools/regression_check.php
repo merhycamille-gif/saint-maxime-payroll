@@ -1223,6 +1223,21 @@ check('الإفادة المدرسية: لا «راجع ظهر الصفحة» ب
 check('عقد التعليم: «ساعات إضافية» خطّ فارغ دائماً بلا مبلغ',
       strpos($atSrc32, 'ساعات إضافية : <?= $blank(120) ?>') !== false
       && strpos($atSrc32, 'moneyAr($cExtra)') === false);
+// 🖨️ «الإفادة ما عم تكون قد ورقة A4، عم تطلع على صفحتين» (2026-08-03):
+// (١) صندوق الترويسة 1122px لا 1123 (A4=1122.5px — نصف البكسل كان يكسر التوقيع لصفحة ثانية)
+// (٢) @page بيد الإفادة + تصفير حشوة .page-content بالطباعة (16px فوق كانت تزيح الورقة)
+// (٣) قياس ppExportArea في app.js (data-fit1) + zoom محسوب في app.css — وعقد التعليم مستثنى
+$appJs32  = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
+$appCss32 = (string)file_get_contents(__DIR__ . '/../assets/css/app.css');
+check('🖨️ الإفادات صفحة A4 واحدة دائماً (1122px + @page + تصفير الحشوة + قياس --pz) وعقد التعليم مستثنى',
+      strpos($atSrc32, 'min-height:1122px') !== false
+      && strpos($atSrc32, 'min-height:1123px') === false
+      && substr_count($atSrc32, 'data-fit1') >= 3
+      && strpos($atSrc32, "\$type === 'aqd_taalim' ? '' : ' data-fit1=\"1\"'") !== false
+      && substr_count($atSrc32, '.page-content{padding:0 !important;margin:0 !important}') === 3
+      && strpos($appJs32, "getElementById('ppExportArea')") !== false
+      && strpos($appJs32, "getAttribute('data-fit1')") !== false
+      && strpos($appCss32, '#ppExportArea { zoom: var(--pz, 1); }') !== false);
 // شعار مكسيموس: إفادات مدارس/مراكز «مكسيموس» تأخذ شعارها الخاص لا شعار م.س.أ الموحّد
 $sMax32 = $db->query("SELECT * FROM schools WHERE id = 2")->fetch();
 $sSal32 = $db->query("SELECT * FROM schools WHERE id = 3")->fetch();

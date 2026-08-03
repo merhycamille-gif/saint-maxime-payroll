@@ -206,6 +206,49 @@ document.addEventListener('change', function(e) {
             var pz2 = Math.min(tw / (w * scale), th / (h * scale), 1);
             c.style.setProperty('--pz', pz2 < 1 ? Math.max(pz2, 0.4).toFixed(3) : 1);
         }
+        // (٢-ج) الإفادات والنماذج الرسمية (#ppExportArea): «ما عم تكون قد ورقة A4، عم تطلع
+        // على صفحتين» (2026-08-03) — تُقاس بشروط الطباعة الحقيقية (قلب @media print كالبطاقة
+        // السنوية، لأن 12pt الطباعة يغيّر ارتفاع العناوين عن الشاشة) والأطول من الورقة
+        // يتصغّر محسوباً فيطلع صفحة A4 واحدة دائماً — ولا تكبير فوق خط 12 (سقف 1)
+        // عقد التعليم (وأمثاله) متعدّد الصفحات بطبيعته — يُستثنى (بلا data-fit1) حتى لا يُضغط لصفحة
+        var pp = document.getElementById('ppExportArea');
+        if (pp && pp.getAttribute('data-fit1') === '1') {
+            var flipped3 = [];
+            try {
+                for (var s3 = 0; s3 < document.styleSheets.length; s3++) {
+                    var rules3; try { rules3 = document.styleSheets[s3].cssRules; } catch (e3) { continue; }
+                    if (!rules3) continue;
+                    for (var r3 = 0; r3 < rules3.length; r3++) {
+                        var rule3 = rules3[r3];
+                        if (rule3.media && /print/.test(rule3.media.mediaText)) {
+                            flipped3.push([rule3, rule3.media.mediaText]);
+                            rule3.media.mediaText = 'all';
+                        }
+                    }
+                }
+                pp.classList.add('pz-measure-page');
+                pp.style.setProperty('--pz', 1);
+                // الترويسة الرسمية صورة خلفية بمقاس الورقة كاملة (@page margin:0) → هدفها
+                // مقاس A4 نفسه؛ وإلا مقاس داخل الهوامش بهامش أمان لفروق تدفّق الطباعة
+                // المقاسات على هوامش @page المفروضة من الإفادة نفسها: ترويسة رسمية = هامش 0
+                // (صندوق الورقة 794×1122 — أقل من A4=1122.5px بنصف بكسل حتى لا ينكسر)،
+                // وإلا هامش 12mm (~45px) = 704×1033 بأمان 990
+                var lh3 = pp.style.minHeight === '1122px';
+                var tw3 = lh3 ? 794 : 704, th3 = lh3 ? 1115 : 990;
+                var prevW3 = pp.style.width, prevMW3 = pp.style.maxWidth;
+                pp.style.maxWidth = 'none'; pp.style.width = tw3 + 'px';
+                var w3 = pp.scrollWidth, h3 = pp.scrollHeight;
+                pp.style.width = prevW3; pp.style.maxWidth = prevMW3;
+                pp.classList.remove('pz-measure-page');
+                // ترويسة تملأ ورقتها تماماً (المحتوى ضمن الصندوق) = لا تصغير إطلاقاً؛
+                // التصغير فقط حين يفيض المحتوى فوق مقاس الصندوق/الورقة
+                var pz3 = (lh3 && h3 <= 1122) ? Math.min(tw3 / w3, 1)
+                                              : Math.min(tw3 / w3, th3 / h3, 1);
+                pp.style.setProperty('--pz', pz3 < 1 ? Math.max(pz3, 0.4).toFixed(3) : 1);
+            } finally {
+                for (var f3 = 0; f3 < flipped3.length; f3++) flipped3[f3][0].media.mediaText = flipped3[f3][1];
+            }
+        }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitPrintZoom);
     else fitPrintZoom();
