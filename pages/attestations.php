@@ -751,7 +751,7 @@ if (!$emp):
             <span>التاريخ : <?= $today ?></span>
         </div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة راتب</h2>
-        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) على رأس عمله(ا) ، ويتقاضى راتباً شهرياً وفق التفصيل الآتي :</p>
+        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) حتى تاريخه ، ويتقاضى راتباً شهرياً وفق التفصيل الآتي :</p>
         <table dir="rtl" style="width:70%;margin:14px auto;border-collapse:collapse;text-align:center">
             <tr>
                 <th style="background:#1F4E5F;color:#fff;border:1px solid #1F4E5F;padding:6px 10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">البند</th>
@@ -766,7 +766,7 @@ if (!$emp):
         </table>
         <p>فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> .</p>
         <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم ، دون أدنى مسؤولية على المؤسسة تجاه أي طرف ثالث .</p>
-        <div style="text-align:center;margin-top:42px"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
+        <div style="text-align:center;margin-top:42px"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'tadris'): ?>
@@ -776,9 +776,9 @@ if (!$emp):
             <span>التاريخ : <?= $today ?></span>
         </div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? 'إفادة عمل' : 'إفادة عمل وتدريس' ?></h2>
-        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) على رأس عمله(ا) حتى تاريخه ، وهو(هي) على حسن سلوك والتزام في أداء عمله(ا) .</p>
+        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) حتى تاريخه ، وهو(هي) على حسن سلوك والتزام في أداء عمله(ا) .</p>
         <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم ، دون أدنى مسؤولية على المؤسسة تجاه أي طرف ثالث .</p>
-        <div style="text-align:center;margin-top:42px"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
+        <div style="text-align:center;margin-top:42px"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'riaaya'): ?>
@@ -788,7 +788,7 @@ if (!$emp):
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> <?= e($assocTxt) ?> ،</p>
         <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا<?php else: ?>هو(ـي) معلّم(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا<?php endif; ?> .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
-        <div style="text-align:center;margin-top:42px"><strong>الإدارة</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>هاتف : <?= e($sigPhone) ?></small><?php endif; ?></div>
+        <div style="text-align:center;margin-top:42px"><strong>الإدارة</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'embassy'): ?>
@@ -799,7 +799,7 @@ if (!$emp):
           <p>To whom it may concern,</p>
           <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">This certificate is given upon his/her request.</p>
-          <div style="text-align:center;margin-top:42px"><strong>Director</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?><?php if ($sigPhone): ?><br><small>Tel : <?= e($sigPhone) ?></small><?php endif; ?></div>
+          <div style="text-align:center;margin-top:42px"><strong>Director</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
         </div>
         <?= $footerHtml ?>
 
@@ -883,8 +883,6 @@ if (!$emp):
         </div>
         <p style="margin-top:22px;font-size:12pt;color:#444">ملاحظة : تُرسل هذه الإفادة إلى إدارة صندوق تعويضات أفراد الهيئة التعليمية في المدارس الخاصة .</p>
         <p style="text-align:center;font-size:12pt;color:#444">وزارة التربية الوطنية والشباب والرياضة - بيروت</p>
-        <p style="text-align:center;font-size:12pt;color:#444">( راجع ظهر الصفحة )</p>
-
       <?php elseif ($type === 'isqat_haq'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفـادة إسقاط حـق</h2>
@@ -990,7 +988,7 @@ if (!$emp):
         <p style="margin-top:10px"><strong>المادة الثالثة :</strong> يدفع الفريق الأول شهرياً للفريق الثاني لقاء المهمات التعليميّة الموكولة إليه ما يلي :</p>
         <p style="margin-right:26px"><strong>1/3 ـ</strong> أساس الراتب: <strong><?= (int)round($basePlusEch) > 0 ? $baseFig : $blank(120) ?></strong> &nbsp; ( الأجر القانوني )</p>
         <p style="margin-right:26px"><strong>2/3 ـ</strong> بدل مالي ( قانون 99/148 ) : <?= $blank(120) ?></p>
-        <p style="margin-right:26px"><strong>3/3 ـ</strong> ساعات إضافية : <?= $cExtra > 0 ? '<strong>'.$moneyAr($cExtra).'</strong>' : $blank(120) ?></p>
+        <p style="margin-right:26px"><strong>3/3 ـ</strong> ساعات إضافية : <?= $blank(120) ?></p>
         <p style="margin-right:26px"><strong>4/3 ـ</strong> بدل إضافي بمثابة مكافأة : <?= $cAide > 0 ? '<strong>'.$moneyAr($cAide).'</strong>' : $blank(120) ?></p>
         <p style="margin-right:26px"><strong>5/3 ـ</strong> تعويض نقل مؤقت : <?php
             $t53 = [];
@@ -1101,7 +1099,7 @@ if (!$emp):
             <?php if ($docLang === 'ar'): ?>
                 <p>نشهد نحن، <strong><?= e($schoolNameAr) ?></strong>، بأنّ:</p>
                 <?php if (in_array($type,['salaire','travail','cnss'])): ?>
-                <p><strong><?= e($nomAr) ?></strong>، يشغل وظيفة <strong><?= e($fnFr['ar']) ?></strong><?php if ($emp['hire_date']): ?>، منذ تاريخ <strong><?= $hireFmt ?></strong><?php endif; ?><?php if ($isTit && $emp['titularization_date']): ?>، تاريخ الترسيم <strong><?= $titFmt ?></strong><?php endif; ?>، من ضمن ملاك مدرستنا<?= $emp['status']==='actif'?' وهو على رأس عمله حالياً':'' ?>.</p>
+                <p><strong><?= e($nomAr) ?></strong>، يشغل وظيفة <strong><?= e($fnFr['ar']) ?></strong><?php if ($emp['hire_date']): ?>، منذ تاريخ <strong><?= $hireFmt ?></strong><?php endif; ?><?php if ($isTit && $emp['titularization_date']): ?>، تاريخ الترسيم <strong><?= $titFmt ?></strong><?php endif; ?>، من ضمن ملاك مدرستنا<?= $emp['status']==='actif'?' ولا يزال حتى تاريخه':'' ?>.</p>
                     <?php if (!$isEmploye && ($classesAr || $subjects)): ?><p><?php if ($classesAr): ?>الصفوف التي يُدرّسها: <strong><?= e($classesAr) ?></strong>. <?php endif; ?><?php if ($subjects): ?>المواد: <strong><?= e($subjects) ?></strong>.<?php endif; ?></p><?php endif; ?>
                 <?php endif; ?>
                 <?php if ($type==='salaire'): ?><p>ويبلغ راتبه الشهري<?= $isEmploye ? '' : ' (الأساس + الدرجات)' ?> <strong><?= $L ?></strong>، وصافي راتبه <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> عن <?= e($salPeriodAr) ?><?php endif; ?>.</p>
