@@ -1223,6 +1223,12 @@ check('الإفادة المدرسية: لا «راجع ظهر الصفحة» ب
 check('عقد التعليم: «ساعات إضافية» خطّ فارغ دائماً بلا مبلغ',
       strpos($atSrc32, 'ساعات إضافية : <?= $blank(120) ?>') !== false
       && strpos($atSrc32, 'moneyAr($cExtra)') === false);
+// شعار مكسيموس: إفادات مدارس/مراكز «مكسيموس» تأخذ شعارها الخاص لا شعار م.س.أ الموحّد
+$sMax32 = $db->query("SELECT * FROM schools WHERE id = 2")->fetch();
+$sSal32 = $db->query("SELECT * FROM schools WHERE id = 3")->fetch();
+check('شعار مكسيموس على إفاداته (لا شعار م.س.أ الموحّد) والباقي على الموحّد',
+      $sMax32 && strpos((string)schoolLogoUrl($sMax32), 'maximos.') !== false
+      && $sSal32 && strpos((string)schoolLogoUrl($sSal32), 'unified.') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

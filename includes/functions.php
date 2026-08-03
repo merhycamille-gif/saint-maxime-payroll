@@ -675,14 +675,23 @@ function schoolNameById($id, $lang = null) {
 
 /**
  * رابط شعار المدرسة للترويسة:
- * 1) إن كان `schools.logo_path` مضبوطاً والملف موجود → يُستعمل (شعار خاص، مثل مكسيموس).
- * 2) وإلا الشعار الموحّد `assets/logos/unified.(png|jpg|jpeg|svg)` إن وُجد.
- * 3) وإلا فراغ (تظهر الترويسة بالاسم فقط).
+ * 1) إن كان `schools.logo_path` مضبوطاً والملف موجود → يُستعمل (شعار خاص).
+ * 2) وإلا: مدارس/مراكز «مكسيموس» تأخذ شعارها الخاص `assets/logos/maximos.*`
+ *    (شعار م.س.أ الموحّد على إفادات مكسيموس غلط — طلب المستخدم 2026-08-03).
+ * 3) وإلا الشعار الموحّد `assets/logos/unified.(png|jpg|jpeg|svg)` إن وُجد.
+ * 4) وإلا فراغ (تظهر الترويسة بالاسم فقط).
  */
 function schoolLogoUrl($school) {
     $base = dirname(__DIR__);
     $lp = is_array($school) ? trim((string)($school['logo_path'] ?? '')) : '';
     if ($lp !== '' && is_file($base . '/' . ltrim($lp, '/'))) return BASE_URL . ltrim($lp, '/');
+    $nameAr = is_array($school) ? (string)($school['name_ar'] ?? '') : '';
+    $nameFr = is_array($school) ? (string)($school['name_fr'] ?? '') : '';
+    if (mb_strpos($nameAr, 'مكسيموس') !== false || stripos($nameFr, 'maxim') !== false) {
+        foreach (['png', 'jpg', 'jpeg', 'svg'] as $e) {
+            if (is_file($base . "/assets/logos/maximos.$e")) return BASE_URL . "assets/logos/maximos.$e";
+        }
+    }
     foreach (['png', 'jpg', 'jpeg', 'svg'] as $e) {
         if (is_file($base . "/assets/logos/unified.$e")) return BASE_URL . "assets/logos/unified.$e";
     }
