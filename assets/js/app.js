@@ -101,7 +101,7 @@ document.addEventListener('change', function(e) {
             while (p && p !== document.body) {
                 var st = getComputedStyle(p);
                 if ((st.overflow !== 'visible' || st.overflowX !== 'visible' || st.overflowY !== 'visible')
-                    && /(^|\s)(card|card-body|report-table-wrap|table-wrapper|tbl-scroll)(\s|$)/.test(p.className || '')) {
+                    && /(^|\s)(card|card-body|report-table-wrap|table-wrapper|tbl-scroll|official-doc|doc-sheet|xls-sheet|mof-form)(\s|$)/.test(p.className || '')) {
                     p.classList.remove('tbl-scroll');
                     p.style.overflow = 'visible';
                     p.setAttribute('data-stkvis', '1');
