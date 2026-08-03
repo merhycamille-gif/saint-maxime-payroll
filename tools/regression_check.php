@@ -629,10 +629,18 @@ check('رؤوس ثابتة: CSS التثبيت موجود (sticky + tbl-scroll) 
       && preg_match('/\.table thead th, \.doc-table thead th, \.salary-slip-table thead th \{\s*position:\s*sticky/s', $cssSrc19) === 1);
 check('رؤوس ثابتة: على الشاشة فقط — الطباعة تلغي صندوق التمرير (الرأس يتكرّر بكل صفحة)',
       preg_match('/@media print \{\s*\.tbl-scroll \{ max-height: none !important; overflow: visible !important; \}/s', $cssSrc19) === 1);
-check('رؤوس ثابتة: app.js يركّبها تلقائياً على كل الجداول + يدعم رأس الصفّين (top تراكمي)',
+// 📌 «العناوين تبقى براس الصفحة مش بنص الصفحة» (2026-08-03): الصفحة نفسها هي الأسانسور
+// (لا صناديق تمرير داخلية)، الرأس يلتصق تحت الشريط العلوي، والجدول الأعرض من شاشته
+// يحتفظ بأسانسوره الأفقي فقط ورأسه يُثبَّت يدوياً بالتمرير (translateY)
+check('رؤوس ثابتة براس الشاشة: أسانسور واحد للصفحة + فتح الحاويات + تثبيت يدوي للجدول العريض',
       strpos($jsSrc, 'initStickyHeads') !== false
-      && strpos($jsSrc, "classList.add('tbl-scroll')") !== false
-      && strpos($jsSrc, 'top += rows[i].offsetHeight') !== false);
+      && strpos($jsSrc, 'stickXHeads') !== false
+      && strpos($jsSrc, 'data-stkvis') !== false
+      && strpos($jsSrc, 'translateY') !== false
+      && strpos($jsSrc, 'table-wrapper') !== false
+      && strpos($jsSrc, "addEventListener('scroll', stickXHeads") !== false
+      && strpos($jsSrc, 'top += rows[i].offsetHeight') !== false
+      && strpos($jsSrc, "classList.add('tbl-scroll')") === false);
 check('رؤوس ثابتة: تكرار رأس الجدول بالطباعة باقٍ (thead: table-header-group)',
       strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), 'display:table-header-group') !== false);
 

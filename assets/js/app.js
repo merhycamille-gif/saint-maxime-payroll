@@ -75,26 +75,56 @@ document.addEventListener('change', function(e) {
 });
 
 // 📌 تثبيت رؤوس الجداول أثناء التمرير (على كل البرنامج):
-// كل جدول طويل يتمرّر داخل حاويته (tbl-scroll) ورأسه يبقى ظاهراً فوق.
+// «العناوين تبقى براس الصفحة مش بنص الصفحة» (2026-08-03): الصفحة نفسها هي الأسانسور،
+// والرأس يلتصق بأعلى الشاشة تحت الشريط العلوي (لا صناديق تمرير داخلية إلا للجدول
+// الأعرض من شاشته — فيبقى بصندوقه الأفقي ورأسه لاصقاً بأعلى الصندوق).
 // يدعم الرؤوس المركّبة من صفّين (rowspan/colspan): كل صف يلتصق تحت الذي قبله.
 (function () {
+    var xTables = [];   // الجداول الأعرض من شاشتها: رأسها يُثبَّت يدوياً مع تمرير الصفحة
+    var topOffG = 0;
     function initStickyHeads() {
+        // إرجاع ما عدّلناه بجولة سابقة (تغيّر المقاس قد يقلب الحالة)
+        var prev = document.querySelectorAll('[data-stkvis]');
+        for (var r0 = 0; r0 < prev.length; r0++) { prev[r0].style.overflow = ''; prev[r0].style.overflowX = ''; prev[r0].removeAttribute('data-stkvis'); }
+        xTables = [];
+        // ارتفاع الشريط العلوي الملتصق — الرأس يلتصق تحته لا خلفه
+        topOffG = 0;
+        var tb = document.querySelector('.topbar');
+        if (tb) { var tbs = getComputedStyle(tb); if (tbs.position === 'sticky' && tbs.display !== 'none') topOffG = Math.ceil(tb.getBoundingClientRect().height); }
         var tables = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table');
         for (var k = 0; k < tables.length; k++) {
             var t = tables[k];
             if (!t.tHead || t.tHead.rows.length === 0) continue;
-            // الحاوية التي سيتمرّر الجدول داخلها: أقرب أب يمرّر عمودياً،
-            // وإلا (أب مقصوص overflow:hidden مثل .card) الأب المباشر للجدول
-            var sc = null, p = t.parentElement;
+            // فتح كل حاويات الجداول المقصوصة/المتمرّرة على السلسلة: الصفحة نفسها هي
+            // الأسانسور الوحيد عمودياً — لا صناديق تمرير داخلية بعد اليوم
+            var p = t.parentElement;
             while (p && p !== document.body) {
-                var oy = getComputedStyle(p).overflowY;
-                if (oy === 'auto' || oy === 'scroll') { sc = p; break; }
-                if (oy === 'hidden' || oy === 'clip') break;
+                var st = getComputedStyle(p);
+                if ((st.overflow !== 'visible' || st.overflowX !== 'visible' || st.overflowY !== 'visible')
+                    && /(^|\s)(card|card-body|report-table-wrap|table-wrapper|tbl-scroll)(\s|$)/.test(p.className || '')) {
+                    p.classList.remove('tbl-scroll');
+                    p.style.overflow = 'visible';
+                    p.setAttribute('data-stkvis', '1');
+                }
                 p = p.parentElement;
             }
-            (sc || t.parentElement).classList.add('tbl-scroll');
+            var z = parseFloat(getComputedStyle(t).zoom) || 1;
+            var host = t.parentElement;
+            var needX = t.scrollWidth > host.clientWidth + 2;   // أعرض من حاويته = بدو أسانسور أفقي
+            var top = 0;
+            if (needX) {
+                // أسانسور أفقي فقط على الحاوية (بلا حبس عمودي)، والرأس يُثبَّت يدوياً
+                // بالتمرير (translateY) لأن sticky لا يخترق حاوية متمرّرة
+                host.style.overflowX = 'auto';
+                host.setAttribute('data-stkvis', '1');
+                xTables.push({ t: t, z: z });
+            } else {
+                // الرأس يلتصق بأعلى الشاشة تحت الشريط (sticky عادي — الإحداثيات داخل
+                // الجدول المصغَّر بالـzoom مقسومة على تصغيره)
+                top = Math.ceil(topOffG / z);
+            }
             // صفوف الرأس المتعدّدة: top تراكمي حتى لا يغطي الصف الأول الثاني
-            var top = 0, rows = t.tHead.rows;
+            var rows = t.tHead.rows;
             for (var i = 0; i < rows.length; i++) {
                 for (var j = 0; j < rows[i].cells.length; j++) {
                     rows[i].cells[j].style.top = top + 'px';
@@ -102,11 +132,29 @@ document.addEventListener('change', function(e) {
                 top += rows[i].offsetHeight;
             }
         }
+        stickXHeads();
+    }
+    // التثبيت اليدوي للجداول العريضة: خلايا الرأس (وهي sticky = فوق الجسم بالتراصف)
+    // تنزاح translateY بمقدار ما غاص الجدول فوق رأس الشاشة، وتتوقف قرب نهايته
+    function stickXHeads() {
+        for (var k = 0; k < xTables.length; k++) {
+            var t = xTables[k].t, z = xTables[k].z;
+            var r = t.getBoundingClientRect();
+            var hH = t.tHead.getBoundingClientRect().height;
+            var dy = topOffG - r.top;
+            if (dy > 0) dy = Math.min(dy, r.height - hH * 1.5);
+            var tf = dy > 0 ? 'translateY(' + Math.round(dy / z) + 'px)' : '';
+            var rows = t.tHead.rows;
+            for (var i = 0; i < rows.length; i++) {
+                for (var j = 0; j < rows[i].cells.length; j++) rows[i].cells[j].style.transform = tf;
+            }
+        }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initStickyHeads);
     else initStickyHeads();
     window.addEventListener('load', initStickyHeads);   // بعد الخطوط/الصور وملاءمة fitDocTables
     window.addEventListener('resize', initStickyHeads);
+    window.addEventListener('scroll', stickXHeads, { passive: true });
 })();
 
 // 🔠 طباعة بخط 12 (12pt متل الوورد) بلا قصّ: الجدول/القسيمة الأعرض من ورقتها تصغّر نفسها
