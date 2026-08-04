@@ -57,6 +57,22 @@ $lang = $_SESSION['lang'] ?? 'fr';
 $ofMonthSchoolYear = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) . '-' . $year);
 [$ofMonthFilter, $ofMonthParams] = yearEmploymentFilter($ofMonthSchoolYear, 'e.');
 
+// 🧑‍🏫 فلترا الفئة والخضوع للضريبة الموحّدان («بدي بكل التقارير» 2026-08-04) — نفس فلترَي
+// صفحة التقارير: يدخلان استعلام كل نموذج/كشف جماعي، ويظهر المختار على رأس المستند المطبوع.
+$empTypesAllowed = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
+$empTypeSel = in_array($_GET['emp_type'] ?? '', $empTypesAllowed, true) ? $_GET['emp_type'] : '';
+$taxSubSel = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
+$ofEmpFilter = ($empTypeSel ? " AND e.employee_type = " . $db->quote($empTypeSel) : '')
+             . ($taxSubSel !== '' ? " AND e.tax_subject = " . (int)$taxSubSel : '');
+// نسخة لاستعلامات بلا alias (FROM employees WHERE ...)
+$ofEmpFilterPlain = str_replace(' e.', ' ', $ofEmpFilter);
+// نسخة لاستعلامات الرواتب بلا join مع الموظفين (FROM monthly_salaries ms WHERE ...)
+$ofEmpFilterMs = $ofEmpFilter !== ''
+    ? " AND ms.employee_id IN (SELECT id FROM employees WHERE 1=1" . $ofEmpFilterPlain . ")"
+    : '';
+$ofFilterTitle = ($empTypeSel ? (empCategoryTitle($empTypeSel)) : '')
+               . ($taxSubSel !== '' ? (($empTypeSel ? ' — ' : '') . ($taxSubSel === '1' ? 'الخاضعون للضريبة' : 'غير الخاضعين للضريبة')) : '');
+
 // النماذج التي تحتاج موظفاً محدّداً (تُعبَّأ لكل أستاذ)
 $perEmployee = ['cnss_employ','cnss_terminate','cnss_work','cnss_wife',
                 'teacher_card','eoc_card','tax_register','tax_r6','tax_r6t',
@@ -179,6 +195,53 @@ if ($form !== '') $docFocus = true;
 
 include __DIR__ . '/../includes/header.php';
 echo officialFormStyles();
+
+/* ===== شريط الفلترة الموحّد (الفئة + الخضوع للضريبة) — فوق كل نموذج/كشف جماعي ===== */
+$ofFilterableForms = ['salary_all', 'payment_list', 'full_register', 'general_report', 'differences',
+    'employer_cost', 'general_info', 'salary_detail', 'teaching_staff', 'eoc_staff', 'eoc_quarterly',
+    'cnss_nominative_monthly', 'cnss_annual', 'cnss_contrib_monthly', 'cnss_contrib_annual',
+    'tax_r5', 'tax_r10', 'tax_r7', 'staff_stats'];
+if ($form !== '' && in_array($form, $ofFilterableForms, true)):
+?>
+<form method="get" class="card no-print">
+    <div class="card-body form-row cols-3">
+        <?php foreach ($_GET as $gk => $gv): if (in_array($gk, ['emp_type', 'tax_sub'], true) || is_array($gv)) continue; ?>
+            <input type="hidden" name="<?= e($gk) ?>" value="<?= e((string)$gv) ?>">
+        <?php endforeach; ?>
+        <div class="form-group mb-0">
+            <label class="form-label"><i class="fas fa-users"></i> Catégorie / الفئة</label>
+            <select name="emp_type" class="form-select">
+                <option value="">Tous ensemble / الكل مع بعض</option>
+                <option value="enseignant_titulaire" <?= $empTypeSel === 'enseignant_titulaire' ? 'selected' : '' ?>>Titulaires / أساتذة الملاك</option>
+                <option value="enseignant_contractuel" <?= $empTypeSel === 'enseignant_contractuel' ? 'selected' : '' ?>>Contractuels / أساتذة متعاقدون</option>
+                <option value="employe" <?= $empTypeSel === 'employe' ? 'selected' : '' ?>>Employés / موظفون إداريون</option>
+            </select>
+        </div>
+        <div class="form-group mb-0">
+            <label class="form-label"><i class="fas fa-file-invoice-dollar"></i> Impôt / الضريبة</label>
+            <select name="tax_sub" class="form-select">
+                <option value="">Tous / الكل</option>
+                <option value="1" <?= $taxSubSel === '1' ? 'selected' : '' ?>>Soumis / خاضع للضريبة</option>
+                <option value="0" <?= $taxSubSel === '0' ? 'selected' : '' ?>>Non soumis / لا يخضع</option>
+            </select>
+        </div>
+        <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filtrer / فلترة</button></div>
+    </div>
+</form>
+<?php if ($ofFilterTitle !== ''): ?>
+<script>
+// الفلتر المختار يُطبَع على رأس المستند نفسه (داخل ppExportArea) فلا يُقرأ كشف مفلتر على أنه كامل
+document.addEventListener('DOMContentLoaded', function () {
+    var d = document.getElementById('ppExportArea'); if (!d) return;
+    var t = d.querySelector('.doc-title') || d.firstElementChild;
+    var n = document.createElement('div');
+    n.className = 'doc-subtitle'; n.style.fontWeight = '700';
+    n.textContent = <?= json_encode('الفلتر: ' . $ofFilterTitle, JSON_UNESCAPED_UNICODE) ?>;
+    if (t) t.insertAdjacentElement('afterend', n);
+});
+</script>
+<?php endif; ?>
+<?php endif;
 
 /* ===== شاشة اختيار موظف ===== */
 if (in_array($form, $perEmployee) && !$emp):
@@ -318,7 +381,7 @@ if (in_array($form, $imageForms)) {
                 SUM(base_plus_echelon_lbp+extra_lbp+prime_fixe_lbp+aide_complementaire_lbp) gross,
                 SUM(transport_lbp) transport,
                 SUM(taxable_base_lbp) taxable, SUM(income_tax_lbp) tax
-            FROM monthly_salaries ms WHERE ms.school_year=? AND " . schoolScopeWhere('ms.school_id'));
+            FROM monthly_salaries ms WHERE ms.school_year=? AND " . schoolScopeWhere('ms.school_id') . $ofEmpFilterMs);
         $tq->execute([$schoolYear]); $tg = $tq->fetch();
         $w = (int)($tg['taxable'] ?? 0);
         // اشتراكات الضمان من الأعمدة المخزّنة لكل فرع (لا من وعاء الضريبة × النسبة):
@@ -327,10 +390,10 @@ if (in_array($form, $imageForms)) {
                     SUM(school_end_of_service_8_5_lbp) eos, SUM(school_family_comp_6_lbp) fam6
                  FROM monthly_salaries ms WHERE ";
         if ($form === 'cnss_contrib_monthly') {
-            $bq = $db->prepare($bSql . "ms.month=? AND ms.year=? AND " . schoolScopeWhere('ms.school_id'));
+            $bq = $db->prepare($bSql . "ms.month=? AND ms.year=? AND " . schoolScopeWhere('ms.school_id') . $ofEmpFilterMs);
             $bq->execute([$month, $year]);
         } else {
-            $bq = $db->prepare($bSql . "ms.school_year=? AND " . schoolScopeWhere('ms.school_id'));
+            $bq = $db->prepare($bSql . "ms.school_year=? AND " . schoolScopeWhere('ms.school_id') . $ofEmpFilterMs);
             $bq->execute([$schoolYear]);
         }
         $bb = $bq->fetch();
@@ -356,7 +419,7 @@ if (in_array($form, $imageForms)) {
         // أجور كل شهر تحت الفروع الثلاثة (المرض/العائلية/نهاية الخدمة)
         // وعاء الضمان لكل شهر = يُشتقّ من اشتراك المرض ٣٪ المخزّن (لا من وعاء الضريبة)
         $mq = $db->prepare("SELECT month, SUM(cnss_amount_lbp) m3 FROM monthly_salaries ms
-                            WHERE ms.school_year=? AND " . schoolScopeWhere('ms.school_id') . " GROUP BY month");
+                            WHERE ms.school_year=? AND " . schoolScopeWhere('ms.school_id') . $ofEmpFilterMs . " GROUP BY month");
         $mq->execute([$schoolYear]);
         $bym = []; foreach ($mq->fetchAll() as $r) $bym[(int)$r['month']] = (int)$r['m3'] ? (int)round($r['m3']/rateFrac('cnss_employee_rate', (int)$r['month'], $year, 3)) : 0;
         $ys = 24.8; $dy = 1.72; $cols = [17, 28.5, 40];
@@ -371,7 +434,7 @@ if (in_array($form, $imageForms)) {
         // لائحة تاركي العمل خلال السنة
         [$y1f,$y2f] = schoolYearToYears($schoolYear);
         $st = "$y1f-10-01"; $en = "$y2f-09-30";
-        $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . "
+        $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $ofEmpFilterPlain . "
             AND ((left_date_cnss BETWEEN ? AND ?) OR (left_date_finance BETWEEN ? AND ?) OR (left_date_eoc BETWEEN ? AND ?))
             ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
         $q->execute([$st,$en,$st,$en,$st,$en]);
@@ -579,7 +642,7 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
             SUM(ms.cnss_amount_lbp) cnss, SUM(ms.caisse_amount_lbp) caisse, SUM(ms.eoc_grade_lbp) eoc,
             SUM(ms.taxable_base_lbp) taxable, SUM(ms.income_tax_lbp) tax
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
-        WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . " AND ms.school_year=? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id'));
+        WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . $ofEmpFilter . " AND ms.school_year=? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id'));
     $q->execute(array_merge($yp, [$schoolYear]));
     $g = $q->fetch();
     [$gy1] = schoolYearToYears($schoolYear);
@@ -599,7 +662,7 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
     // والتاريخ الساري (نفس مصدر المحرّك family_tax_deductions)، ومحدود بأساسه الخاضع.
     $qDed = $db->prepare("SELECT e.id, e.social_status, SUM(ms.taxable_base_lbp) tb
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
-        WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . " AND ms.school_year=?
+        WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . $ofEmpFilter . " AND ms.school_year=?
           AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
         GROUP BY e.id, e.social_status");
     $qDed->execute(array_merge($yp, [$schoolYear]));
@@ -894,7 +957,7 @@ elseif ($form === 'teacher_card'):
     else $catSql = " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')";
     $catTitle = ['titulaire'=>'الداخلين في الملاك', 'contractuel'=>'المتعاقدين'][$cat] ?? 'المتعاقدين والملاك';
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear());
-    $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $catSql . $yf . "
+    $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $catSql . $yf . $ofEmpFilterPlain . "
                        ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
     $q->execute($yp);
     $rows = $q->fetchAll();
@@ -999,7 +1062,7 @@ elseif ($form === 'teacher_card'):
     $typeSql = $isMlk ? "employee_type='enseignant_titulaire'" : "employee_type='enseignant_contractuel'";
     $catTitle = $isMlk ? 'الداخلين في الملاك' : 'المتعاقدين';
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear());
-    $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . " AND $typeSql" . $yf . "
+    $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . " AND $typeSql" . $yf . $ofEmpFilterPlain . "
                        ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
     $q->execute($yp);
     $rows = $q->fetchAll();
@@ -1292,7 +1355,7 @@ elseif ($form === 'teacher_card'):
 <?php elseif ($form === 'salary_all'):
     $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-                          WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . " AND" . schoolScopeWhere('e.school_id') . "
+                          WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
                           ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
@@ -1475,7 +1538,7 @@ elseif ($form === 'teacher_card'):
             SUM(ms.caisse_amount_lbp + ms.eoc_grade_lbp + ms.school_eoc_6_lbp) eoc,
             SUM(ms.income_tax_lbp) tax
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.is_deleted=0" . $ofYearFilter . " AND ms.school_year=? AND " . schoolScopeWhere('ms.school_id') . " GROUP BY ms.school_id ORDER BY ms.school_id");
+        WHERE e.is_deleted=0" . $ofYearFilter . $ofEmpFilter . " AND ms.school_year=? AND " . schoolScopeWhere('ms.school_id') . " GROUP BY ms.school_id ORDER BY ms.school_id");
     $q->execute(array_merge($ofYearParams, [$schoolYear]));
     $sdata = $q->fetchAll();
     $T = ['base'=>0,'netNo'=>0,'extra'=>0,'aide'=>0,'trans'=>0,'netWith'=>0,'cnss'=>0,'eoc'=>0,'tax'=>0,'total'=>0,'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0];
@@ -1602,7 +1665,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
 <?php elseif ($form === 'tax_r7'): // كشف تاركي العمل خلال السنة (مؤسسة)
     [$y1,$y2] = schoolYearToYears($schoolYear);
     $start = "$y1-10-01"; $end = "$y2-09-30";
-    $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . "
+    $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $ofEmpFilterPlain . "
         AND ( (left_date_cnss BETWEEN ? AND ?) OR (left_date_finance BETWEEN ? AND ?) OR (left_date_eoc BETWEEN ? AND ?) )
         ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
     $q->execute([$start,$end,$start,$end,$start,$end]);
@@ -1661,20 +1724,20 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     $q1 = $db->prepare("SELECT COUNT(DISTINCT CASE WHEN (ms.cnss_amount_lbp+ms.school_cnss_8_lbp)>0 THEN ms.employee_id END) n,
             COALESCE(SUM(ms.cnss_amount_lbp + ms.school_cnss_8_lbp),0) c
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.cnss_subject=1 AND e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
+        WHERE e.cnss_subject=1 AND e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
     $q1->execute($params); $a = $q1->fetch();
     $q2 = $db->prepare("SELECT COUNT(DISTINCT CASE WHEN ms.school_end_of_service_8_5_lbp>0 THEN ms.employee_id END) n,
             COALESCE(SUM(ms.school_end_of_service_8_5_lbp),0) c
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
+        WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
     $q2->execute($params); $t = $q2->fetch();
     $q2b = $db->prepare("SELECT COUNT(DISTINCT CASE WHEN ms.school_family_comp_6_lbp>0 THEN ms.employee_id END) n,
             COALESCE(SUM(ms.school_family_comp_6_lbp),0) c
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
+        WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
     $q2b->execute($params); $fam = $q2b->fetch();
     $q3 = $db->prepare("SELECT COALESCE(SUM(ms.family_allowance_lbp),0) f FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
+        WHERE e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
     $q3->execute($params); $fpaid = (int)$q3->fetchColumn();
     // الاشتراك المخزّن لكل فرع، والأجور = الاشتراك ÷ المعدل (الأساس الفعلي بعد الحد الأقصى)
     $c1=(int)$a['c']; $n1=(int)$a['n']; $w1=$c1 ? (int)round($c1/cnssTotalFrac($month, $year)) : 0;
@@ -1914,7 +1977,7 @@ elseif ($form === 'payment_list'):
                                  e.nssf_number, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.exchange_rate, ms.net_salary_lbp, ms.total_due_lbp, ms.family_allowance_lbp, ms.transport_lbp,
                                  ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-                          WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . " AND" . schoolScopeWhere('e.school_id') . "
+                          WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
                           ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
@@ -1986,7 +2049,7 @@ elseif ($form === 'payment_list'):
     $stmt = $db->prepare("SELECT e.school_id, e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
                                  e.hours_per_week, ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-                          WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . " AND" . schoolScopeWhere('e.school_id') . "
+                          WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
                           ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
@@ -2087,7 +2150,7 @@ elseif ($form === 'payment_list'):
             SUM(income_tax_lbp) tax, SUM(cnss_amount_lbp) cnssEmp, SUM(caisse_amount_lbp) eocEmp,
             SUM(net_salary_lbp) net, COUNT(DISTINCT ms.employee_id) n
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.is_deleted=0" . $ofYearFilter . " AND ms.school_year=? AND " . schoolScopeWhere('ms.school_id'));
+        WHERE e.is_deleted=0" . $ofYearFilter . $ofEmpFilter . " AND ms.school_year=? AND " . schoolScopeWhere('ms.school_id'));
     $q->execute(array_merge($ofYearParams, [$schoolYear])); $g = $q->fetch();
     $fam=(int)($g['family']??0); $trans=(int)($g['transport']??0);
     $cnss8=(int)($g['cnss8']??0); $eoc6=(int)($g['eoc6']??0); $fam6=(int)($g['fam6']??0); $eos85=(int)($g['eos85']??0);
@@ -2137,13 +2200,13 @@ elseif ($form === 'payment_list'):
 <?php elseif ($form === 'staff_stats'):
     // إحصاءات الموظفين: توزيع حسب النوع/الشهادة/الحالة + متوسط الدرجة
     [$yf,$yp] = yearEmploymentFilter(activeSchoolYear());
-    $byType = $db->prepare("SELECT employee_type t, COUNT(*) c FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . " GROUP BY employee_type");
+    $byType = $db->prepare("SELECT employee_type t, COUNT(*) c FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain . " GROUP BY employee_type");
     $byType->execute($yp); $types = $byType->fetchAll();
-    $byStatus = $db->prepare("SELECT status s, COUNT(*) c FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . " GROUP BY status");
+    $byStatus = $db->prepare("SELECT status s, COUNT(*) c FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain . " GROUP BY status");
     $byStatus->execute($yp); $statuses = $byStatus->fetchAll();
-    $byDip = $db->prepare("SELECT COALESCE(NULLIF(diploma,''),'(غير محدد)') d, COUNT(*) c FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . " GROUP BY diploma ORDER BY c DESC");
+    $byDip = $db->prepare("SELECT COALESCE(NULLIF(diploma,''),'(غير محدد)') d, COUNT(*) c FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain . " GROUP BY diploma ORDER BY c DESC");
     $byDip->execute($yp); $dips = $byDip->fetchAll();
-    $totQ = $db->prepare("SELECT COUNT(*) n FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf);
+    $totQ = $db->prepare("SELECT COUNT(*) n FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain);
     $totQ->execute($yp); $totN = (int)$totQ->fetchColumn();
 ?>
 <div class="official-doc rtl" id="ppExportArea">
@@ -2176,7 +2239,7 @@ elseif ($form === 'payment_list'):
 <?php elseif ($form === 'general_info'):
     // معلومات عامة عن الموظفين (مطابق Ecole.exe — p13)
     [$yf,$yp] = yearEmploymentFilter(activeSchoolYear());
-    $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . "
+    $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain . "
                        ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
     $q->execute($yp); $rows = $q->fetchAll();
     $today = new DateTime();
@@ -2238,7 +2301,7 @@ elseif ($form === 'payment_list'):
                    ms.cnss_amount_lbp, ms.school_cnss_8_lbp,
                    ms.school_end_of_service_8_5_lbp, ms.school_family_comp_6_lbp, ms.family_allowance_lbp
             FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
-            WHERE e.is_deleted = 0 AND e.cnss_subject = 1" . $ofMonthFilter . "
+            WHERE e.is_deleted = 0 AND e.cnss_subject = 1" . $ofMonthFilter . $ofEmpFilter . "
               AND ms.year = ? AND ms.month = ? AND " . schoolScopeWhere('ms.school_id') . "
               AND (ms.taxable_base_lbp > 0 OR ms.cnss_amount_lbp > 0 OR ms.base_plus_echelon_lbp > 0)
             ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
@@ -2388,7 +2451,7 @@ elseif ($form === 'payment_list'):
     $sql = "SELECT e.first_name_ar,e.last_name_ar,e.first_name_fr,e.last_name_fr,e.employee_type, ms.*
             FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
             WHERE ms.month=? AND ms.year=? AND e.is_deleted=0
-              AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $ofMonthFilter . "
+              AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $ofMonthFilter . $ofEmpFilter . "
               AND " . schoolScopeWhere('e.school_id') . "
             ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
                      COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr)";

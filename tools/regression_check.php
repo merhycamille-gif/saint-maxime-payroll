@@ -1474,6 +1474,23 @@ check('فلتر الضريبة (تجربة فعلية): الخاضعون = عد�
       && strpos($h34c, 'غير الخاضعين للضريبة') !== false,
       'خاضعون ظاهر: ' . ($m34b[1] ?? '؟') . ' / قاعدة: ' . $q34(" AND e.tax_subject = 1") . ' — غير خاضعين قاعدة: ' . $exp34c);
 
+// «بدي بكل التقارير»: الفلتران معمَّمان على النماذج الرسمية أيضاً (شريط موحّد + استعلامات)
+$ofSrc34 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+check('فلترا كل التقارير: شريط موحّد بالنماذج الرسمية (19 نموذجاً جماعياً) والاستعلامات تحمل الفلترين',
+      strpos($ofSrc34, '$ofFilterableForms = [') !== false
+      && substr_count($ofSrc34, '$ofEmpFilter') >= 15
+      && strpos($ofSrc34, "name=\"tax_sub\"") !== false
+      && strpos($ofSrc34, 'الفلتر المختار يُطبَع على رأس المستند نفسه') !== false);
+// تجربة فعلية (كشف رواتب كل الموظفين — مدرسة 3): الكل = ملاك + متعاقدون + موظفون
+$n34 = function ($cmb) {
+    $h = renderPage('pages/official_forms.php', array_merge(['form' => 'salary_all', 'month' => 6, 'year' => 2026], $cmb), [], [3]);
+    return preg_match('/المجموع العام \((\d+)\)/u', $h, $m) ? (int)$m[1] : -1;
+};
+$all34 = $n34([]);
+$sum34 = $n34(['emp_type' => 'enseignant_titulaire']) + $n34(['emp_type' => 'enseignant_contractuel']) + $n34(['emp_type' => 'employe']);
+check('فلترا النماذج (تجربة فعلية): كشف رواتب كل الموظفين — الكل = مجموع الفئات الثلاث وكلٌّ لحاله',
+      $all34 > 0 && $all34 === $sum34, "الكل=$all34 / مجموع الفئات=$sum34");
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
