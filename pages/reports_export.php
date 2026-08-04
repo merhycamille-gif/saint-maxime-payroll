@@ -26,6 +26,16 @@ $periodSchoolYear = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) 
 [$empYearFilter, $empYearParams] = yearEmploymentFilter($periodSchoolYear, 'e.');
 [$annualEmpFilter, $annualEmpParams] = yearEmploymentFilter($schoolYear, 'e.');
 
+// 🧑‍🏫 فلترا الفئة والضريبة الموحّدان (مطابقان لـreports.php): الملاك/المتعاقدون/الموظفون/الكل
+// + خاضع للضريبة/لا يخضع/الكل — يسريان على استعلام كل تقرير مصدَّر وعنوانه (الملف = الشاشة).
+$empTypesAllowed = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
+$empTypeSel = in_array($_GET['emp_type'] ?? '', $empTypesAllowed, true) ? $_GET['emp_type'] : '';
+$taxSubSel = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
+$empTypeSql = ($empTypeSel ? " AND e.employee_type = " . $db->quote($empTypeSel) : '')
+            . ($taxSubSel !== '' ? " AND e.tax_subject = " . (int)$taxSubSel : '');
+$empTypeTitle = ($empTypeSel ? (' — ' . empCategoryTitle($empTypeSel)) : '')
+              . ($taxSubSel !== '' ? ($taxSubSel === '1' ? ' — الخاضعون للضريبة' : ' — غير الخاضعين للضريبة') : '');
+
 $nm = function ($r) { return trim(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? '')) ?: trim(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? '')); };
 $catTitle = fn($t) => empCategoryTitle($t);
 
@@ -37,12 +47,12 @@ $rep = null;
 if ($report === 'monthly_summary') {
     $st = $db->prepare("SELECT e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.employee_type,e.school_id,ms.*
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $schoolSql . $empYearFilter . "
+        WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $schoolSql . $empYearFilter . $empTypeSql . "
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
 
-    $rep = new ReportTable('كشف الرواتب الشهري — ' . monthName($month, 'ar') . ' ' . $year, true);
+    $rep = new ReportTable('كشف الرواتب الشهري — ' . monthName($month, 'ar') . ' ' . $year . $empTypeTitle, true);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
     // الأعمدة تتبع زرّ «الراتب المركّب يشمل» — العمود غير المختار يُخفى (متل الشاشة)
@@ -94,11 +104,11 @@ if ($report === 'monthly_summary') {
 } elseif ($report === 'cnss_summary') {
     $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.nssf_number,e.birth_date,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.cnss_amount_lbp,ms.school_cnss_8_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.cnss_subject=1" . $schoolSql . $empYearFilter . "
+        WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.cnss_subject=1" . $schoolSql . $empYearFilter . $empTypeSql . "
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
-    $rep = new ReportTable('كشف اشتراكات الضمان — ' . monthName($month, 'ar') . ' ' . $year, true);
+    $rep = new ReportTable('كشف اشتراكات الضمان — ' . monthName($month, 'ar') . ' ' . $year . $empTypeTitle, true);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
     $head = array_merge($head, ['رقم الضمان', 'الاسم', 'أساس الراتب']);
@@ -135,11 +145,11 @@ if ($report === 'monthly_summary') {
 } elseif ($report === 'tax_summary') {
     $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.finance_ministry_number,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.income_tax_lbp,ms.taxable_base_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.tax_subject=1" . $schoolSql . $empYearFilter . "
+        WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.tax_subject=1" . $schoolSql . $empYearFilter . $empTypeSql . "
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
-    $rep = new ReportTable('كشف ضريبة الدخل — ' . monthName($month, 'ar') . ' ' . $year, true);
+    $rep = new ReportTable('كشف ضريبة الدخل — ' . monthName($month, 'ar') . ' ' . $year . $empTypeTitle, true);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
     $head = array_merge($head, ['رقم المالية', 'الاسم', 'أساس الراتب']);
@@ -209,9 +219,9 @@ if ($report === 'monthly_summary') {
     }
 
 } elseif ($report === 'employee_list') {
-    $empType = $_GET['emp_type'] ?? '';
-    $allowed = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
-    $typeSql = in_array($empType, $allowed, true) ? " AND e.employee_type=" . $db->quote($empType) : "";
+    // الفلتر الموحّد (نفس منتقي الفئة بكل التقارير)
+    $empType = $empTypeSel;
+    $typeSql = $empTypeSql;
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear(), 'e.');
     $st = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted=0" . $schoolSqlEmp . $typeSql . $yf . " ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
     $st->execute($yp);
@@ -283,7 +293,7 @@ if ($report === 'monthly_summary') {
     if (!is_array($sel)) $sel = $defaultCols;
     $sel = array_values(array_filter($sel, fn($c) => isset($cols[$c])));
     if (!$sel) $sel = $defaultCols;
-    $rep = new ReportTable('لائحة الموظفين', false);
+    $rep = new ReportTable('لائحة الموظفين' . $empTypeTitle, false);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
     foreach ($sel as $c) $head[] = $cols[$c][0];
@@ -324,10 +334,10 @@ if ($report === 'monthly_summary') {
 
 } elseif ($report === 'annual_totals') {
     $st = $db->prepare("SELECT COUNT(*) cnt, SUM(ms.net_salary_lbp) net, SUM(ms.total_due_lbp) total, SUM(ms.family_allowance_lbp) fam, SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax, SUM(ms.caisse_amount_lbp) caisse, SUM(ms.school_cnss_8_lbp) scnss, SUM(ms.school_eoc_6_lbp) seoc, SUM(ms.base_salary_lbp) base_sal, SUM(ms.base_plus_echelon_lbp) bpe, SUM(ms.extra_lbp+ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide, SUM(ms.transport_lbp) transport
-        FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=0" . $annualEmpFilter . " AND ms.school_year=? AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $schoolSql);
+        FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=0" . $annualEmpFilter . $empTypeSql . " AND ms.school_year=? AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $schoolSql);
     $st->execute(array_merge($annualEmpParams, [$schoolYear]));
     $t = $st->fetch();
-    $rep = new ReportTable('المجاميع السنوية — ' . $schoolYear, false);
+    $rep = new ReportTable('المجاميع السنوية — ' . $schoolYear . $empTypeTitle, false);
     $rep->schoolHeader($school);
     $rep->head(['البيان', 'القيمة (ل.ل)']);
     $rep->widths([40, 28]);

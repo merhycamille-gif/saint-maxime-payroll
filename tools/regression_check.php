@@ -1428,6 +1428,52 @@ check('امتصاص الفجوة (تجربة فعلية): الترجيع أعا�
       && (int)$r33['net_salary_lbp'] === (int)$dr33['net_salary_lbp']
       && (int)$r33['total_due_lbp'] === (int)$dr33['total_due_lbp']);
 
+/* =====================================================================
+ * 34) فلترا التقارير الموحّدان (طلب 2026-08-04): «الملاك لحالون أو المتعاقدين
+ *     أو الموظفين أو مع بعض» + «يخضع للضرائب أو لا يخضع» — بكل التقارير والتصدير
+ * =================================================================== */
+$repSrc34 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$expSrc34 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+check('فلتر الفئة والضريبة: منتقٍ موحّد empTypePicker بكل تقارير reports.php والاستعلامات تحمل الفلترين',
+      substr_count($repSrc34, 'empTypePicker();') >= 5
+      && substr_count($repSrc34, '$empTypeSql') >= 6
+      && strpos($repSrc34, 'الكل مع بعض') !== false
+      && strpos($repSrc34, "name=\"tax_sub\"") !== false
+      && strpos($repSrc34, 'e.tax_subject = ') !== false);
+check('فلتر الفئة والضريبة: التصدير Excel/Word يحترم الفلترين نفسيهما وبعنوان الملف',
+      substr_count($expSrc34, '$empTypeSql') >= 6
+      && substr_count($expSrc34, '$empTypeTitle') >= 5
+      && strpos($expSrc34, "tax_sub") !== false);
+// تجربة فعلية: كشف حزيران 2026 مفلتراً بالمتعاقدين — عدد الإجمالي العام = عدّ قاعدة البيانات نفسه
+[$yf34, $yp34] = yearEmploymentFilter('2025-2026', 'e.');
+$act34 = implode(',', array_map('intval', allActiveSchoolIdsCached()));
+$q34 = function ($extraWhere) use ($db, $yf34, $yp34, $act34) {
+    $st = $db->prepare("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE ms.year = 2026 AND ms.month = 6 AND e.is_deleted = 0
+          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)
+          AND ms.school_id IN ($act34)" . $yf34 . $extraWhere);
+    $st->execute($yp34);
+    return (int)$st->fetchColumn();
+};
+$h34 = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026, 'emp_type' => 'enseignant_contractuel'], []);
+preg_match('/مجموع كل الفئات \(العدد: (\d+)\)/u', $h34, $m34a);
+check('فلتر الفئة (تجربة فعلية): كشف حزيران بالمتعاقدين فقط — العدد الظاهر = عدّ القاعدة، وعنوانه يذكر الفئة',
+      isset($m34a[1]) && (int)$m34a[1] === $q34(" AND e.employee_type = 'enseignant_contractuel'")
+      && strpos($h34, '— المتعاقدين') !== false,
+      'ظاهر: ' . ($m34a[1] ?? '؟') . ' / قاعدة: ' . $q34(" AND e.employee_type = 'enseignant_contractuel'"));
+// فلتر «خاضع للضريبة»: العدد الظاهر = عدّ القاعدة (وإن كان صفراً تُعرض «لا توجد بيانات» بسلام)
+$h34b = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026, 'tax_sub' => '1'], []);
+preg_match('/مجموع كل الفئات \(العدد: (\d+)\)/u', $h34b, $m34b);
+$h34c = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026, 'tax_sub' => '0'], []);
+preg_match('/مجموع كل الفئات \(العدد: (\d+)\)/u', $h34c, $m34c);
+$exp34c = $q34(" AND e.tax_subject = 0");
+check('فلتر الضريبة (تجربة فعلية): الخاضعون = عدّ القاعدة وعنوانه يذكرهم، وغير الخاضعين كذلك (أو «لا بيانات» إن صفر)',
+      isset($m34b[1]) && (int)$m34b[1] === $q34(" AND e.tax_subject = 1")
+      && strpos($h34b, 'الخاضعون للضريبة') !== false
+      && ($exp34c === 0 ? (strpos($h34c, 'لا توجد بيانات') !== false) : (isset($m34c[1]) && (int)$m34c[1] === $exp34c))
+      && strpos($h34c, 'غير الخاضعين للضريبة') !== false,
+      'خاضعون ظاهر: ' . ($m34b[1] ?? '؟') . ' / قاعدة: ' . $q34(" AND e.tax_subject = 1") . ' — غير خاضعين قاعدة: ' . $exp34c);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

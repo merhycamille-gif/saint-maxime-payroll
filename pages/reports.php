@@ -19,6 +19,18 @@ $repRate = getExchangeRate($month, $year); // سعر صرف الشهر (لعرض
 $schoolYear = $_GET['school_year'] ?? activeSchoolYear();
 if ($schoolYear === 'all') $schoolYear = currentSchoolYear(); // تقارير السنة تحتاج سنة محددة
 
+// 🧑‍🏫 فلتر الفئة الموحّد بكل التقارير (طلب المستخدم 2026-08-04): «الملاك لحالون أو
+// المتعاقدين أو الموظفين أو مع بعض» + «خاضع للضرائب أو لا يخضع» —
+// يُطبَّق على الاستعلام والعنوان والتصدير معاً.
+$empTypesAllowed = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
+$empTypeSel = in_array($_GET['emp_type'] ?? '', $empTypesAllowed, true) ? $_GET['emp_type'] : '';
+$taxSubSel = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
+$empTypeSql = ($empTypeSel ? " AND e.employee_type = " . $db->quote($empTypeSel) : '')
+            . ($taxSubSel !== '' ? " AND e.tax_subject = " . (int)$taxSubSel : '');
+// لاحقة العنوان: تظهر الفئة/الخضوع المختاران على رأس التقرير المطبوع
+$empTypeTitle = ($empTypeSel ? (' — ' . empCategoryTitle($empTypeSel)) : '')
+              . ($taxSubSel !== '' ? ($taxSubSel === '1' ? ' — الخاضعون للضريبة' : ' — غير الخاضعين للضريبة') : '');
+
 // فلتر المدارس (آمن — أرقام)
 $schoolSql = reportSchoolSql('ms.school_id');     // للجداول المرتبطة برواتب (alias ms)
 $schoolSqlEmp = reportSchoolSql('e.school_id');   // لجداول الموظفين (alias e)
@@ -43,6 +55,7 @@ if ($report && in_array($report, $exportableReports, true)) {
     $qs = http_build_query(array_filter([
         'report' => $report, 'month' => $month, 'year' => $year,
         'school_year' => $schoolYear, 'emp_type' => $_GET['emp_type'] ?? null,
+        'tax_sub' => $_GET['tax_sub'] ?? null,
     ], fn($v) => $v !== null && $v !== ''));
     $colsQ = '';
     if (!empty($_GET['cols']) && is_array($_GET['cols'])) foreach ($_GET['cols'] as $c) $colsQ .= '&cols[]=' . urlencode($c);
@@ -76,6 +89,32 @@ function reportSchoolPicker() {
     </div>
     <?php
 }
+
+/**
+ * منتقيا الفلترة الموحّدان — بكل التقارير:
+ * (١) الفئة: الملاك لحالهم / المتعاقدون / الموظفون / الكل مع بعض
+ * (٢) الضريبة: خاضع للضريبة / غير خاضع / الكل
+ */
+function empTypePicker() {
+    global $empTypeSel, $taxSubSel; ?>
+    <div class="form-group mb-0">
+        <label class="form-label"><i class="fas fa-users"></i> Catégorie / الفئة</label>
+        <select name="emp_type" class="form-select">
+            <option value="">Tous ensemble / الكل مع بعض</option>
+            <option value="enseignant_titulaire" <?= $empTypeSel === 'enseignant_titulaire' ? 'selected' : '' ?>>Titulaires / أساتذة الملاك</option>
+            <option value="enseignant_contractuel" <?= $empTypeSel === 'enseignant_contractuel' ? 'selected' : '' ?>>Contractuels / أساتذة متعاقدون</option>
+            <option value="employe" <?= $empTypeSel === 'employe' ? 'selected' : '' ?>>Employés / موظفون إداريون</option>
+        </select>
+    </div>
+    <div class="form-group mb-0">
+        <label class="form-label"><i class="fas fa-file-invoice-dollar"></i> Impôt / الضريبة</label>
+        <select name="tax_sub" class="form-select">
+            <option value="">Tous / الكل</option>
+            <option value="1" <?= $taxSubSel === '1' ? 'selected' : '' ?>>Soumis / خاضع للضريبة</option>
+            <option value="0" <?= $taxSubSel === '0' ? 'selected' : '' ?>>Non soumis / لا يخضع</option>
+        </select>
+    </div>
+<?php }
 
 /**
  * صورة/مستند مصغّر داخل لائحة الموظفين (صورة الشهادة / صورة إخراج القيد).
@@ -216,7 +255,7 @@ function reportDocThumb($path) {
         $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.employee_type, e.school_id, ms.*
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
-                              WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . $empYearFilter . "
+                              WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . $empYearFilter . $empTypeSql . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
@@ -238,6 +277,7 @@ function reportDocThumb($path) {
                     <label class="form-label">Année / السنة</label>
                     <input type="number" name="year" class="form-control" value="<?= $year ?>">
                 </div>
+                <?php empTypePicker(); ?>
                 <div class="form-group mb-0">
                     <label class="form-label">&nbsp;</label>
                     <button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button>
@@ -246,7 +286,7 @@ function reportDocThumb($path) {
             </div>
         </form>
 
-        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year]) ?>
+        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year . $empTypeTitle]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>
                         <th>#</th>
@@ -337,7 +377,7 @@ function reportDocThumb($path) {
         $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.nssf_number, e.birth_date, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.cnss_amount_lbp, ms.school_cnss_8_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
-                              WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.cnss_subject = 1" . $schoolSql . $empYearFilter . "
+                              WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.cnss_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
@@ -348,11 +388,12 @@ function reportDocThumb($path) {
             <div class="card-body form-row cols-3">
                 <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
                 <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
+                <?php empTypePicker(); ?>
                 <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
-        <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year]) ?>
+        <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
                     <tbody>
@@ -399,7 +440,7 @@ function reportDocThumb($path) {
     <?php elseif ($report === 'tax_summary'):
         $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.finance_ministry_number, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
-                              WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.tax_subject = 1" . $schoolSql . $empYearFilter . "
+                              WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.tax_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
@@ -410,11 +451,12 @@ function reportDocThumb($path) {
             <div class="card-body form-row cols-3">
                 <div class="form-group mb-0"><label class="form-label">Mois / الشهر</label><select name="month" class="form-select"><?php for($m=1;$m<=12;$m++): ?><option value="<?=$m?>" <?=$m===$month?'selected':''?>><?=monthName($m)?></option><?php endfor; ?></select></div>
                 <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="year" class="form-control" value="<?= $year ?>"></div>
+                <?php empTypePicker(); ?>
                 <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
-        <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year]) ?>
+        <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year . $empTypeTitle]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الراتب الخاضع للضريبة</th><th>الضريبة</th></tr></thead>
                     <tbody>
@@ -501,9 +543,9 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'employee_list'):
-        $empType = $_GET['emp_type'] ?? '';
-        $typeAllowed = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
-        $typeSql = in_array($empType, $typeAllowed, true) ? " AND e.employee_type = " . $db->quote($empType) : "";
+        // الفلتر الموحّد (نفس منتقي الفئة بكل التقارير)
+        $empType = $empTypeSel;
+        $typeSql = $empTypeSql;
         // فلترة حسب السنة الدراسية المختارة (سنة محددة = موظفو تلك السنة؛ كل السنين = الكل)
         [$yf, $yp] = yearEmploymentFilter(activeSchoolYear(), 'e.');
         $stmtEL = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted = 0" . $schoolSqlEmp . $typeSql . $yf . " ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
@@ -596,15 +638,7 @@ function reportDocThumb($path) {
             <input type="hidden" name="report" value="employee_list">
             <div class="card-body">
                 <div class="form-row cols-3">
-                    <div class="form-group mb-0">
-                        <label class="form-label">الفئة / Type</label>
-                        <select name="emp_type" class="form-select">
-                            <option value="">الكل / Tous</option>
-                            <option value="enseignant_titulaire" <?= $empType==='enseignant_titulaire'?'selected':'' ?>>أساتذة الملاك / Titulaires</option>
-                            <option value="enseignant_contractuel" <?= $empType==='enseignant_contractuel'?'selected':'' ?>>أساتذة متعاقدون / Contractuels</option>
-                            <option value="employe" <?= $empType==='employe'?'selected':'' ?>>موظفون / Employés</option>
-                        </select>
-                    </div>
+                    <?php empTypePicker(); ?>
                     <?php reportSchoolPicker(); ?>
                 </div>
                 <label class="form-label" style="margin-top:14px;display:block">📋 المعلومات اللي بدّك ياها بالتقرير / Colonnes à afficher:</label>
@@ -617,7 +651,7 @@ function reportDocThumb($path) {
             </div>
         </form>
         <?php $ltParts = explode(' / ', $listTitle, 2); ?>
-        <?= docSheetStart('Liste du personnel — ' . ($ltParts[1] ?? $listTitle), 'لائحة الموظفين — ' . $ltParts[0], ['العدد: ' . count($data)], ['comp' => false]) ?>
+        <?= docSheetStart('Liste du personnel — ' . ($ltParts[1] ?? $listTitle), 'لائحة الموظفين — ' . $ltParts[0], array_values(array_filter(['العدد: ' . count($data), $taxSubSel !== '' ? ($taxSubSel === '1' ? 'الخاضعون للضريبة' : 'غير الخاضعين للضريبة') : ''])), ['comp' => false]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>
                         <th>#</th>
@@ -675,7 +709,7 @@ function reportDocThumb($path) {
                               SUM(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) aide_usd,
                               SUM(ms.transport_lbp/NULLIF(ms.exchange_rate,0)) transport_usd
                               FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-                              WHERE e.is_deleted=0" . $annualEmpFilter . " AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql);
+                              WHERE e.is_deleted=0" . $annualEmpFilter . $empTypeSql . " AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql);
         $stmt->execute(array_merge($annualEmpParams, [$schoolYear]));
         $tot = $stmt->fetch();
         // تفصيل لكل مدرسة (عند تعدد المدارس)
@@ -683,7 +717,7 @@ function reportDocThumb($path) {
         if ($multi) {
             $ps = $db->prepare("SELECT ms.school_id, COUNT(*) cnt, SUM(ms.total_due_lbp) total, SUM(ms.transport_lbp) trans, SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax
                                 FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-                                WHERE e.is_deleted=0" . $annualEmpFilter . " AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . " GROUP BY ms.school_id ORDER BY ms.school_id");
+                                WHERE e.is_deleted=0" . $annualEmpFilter . $empTypeSql . " AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . " GROUP BY ms.school_id ORDER BY ms.school_id");
             $ps->execute(array_merge($annualEmpParams, [$schoolYear]));
             $perSchool = $ps->fetchAll();
         }
@@ -692,13 +726,14 @@ function reportDocThumb($path) {
             <input type="hidden" name="report" value="annual_totals">
             <div class="card-body form-row cols-3">
                 <div class="form-group mb-0"><label class="form-label">Année scolaire / السنة الدراسية</label><input type="text" name="school_year" class="form-control" value="<?= e($schoolYear) ?>"></div>
+                <?php empTypePicker(); ?>
                 <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
 
         <?php if ($multi && $perSchool): ?>
-        <?= docSheetStart('Détail par école', 'تفصيل لكل مدرسة', [$schoolYear], ['comp' => false]) ?>
+        <?= docSheetStart('Détail par école', 'تفصيل لكل مدرسة', [$schoolYear . $empTypeTitle], ['comp' => false]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><th>المدرسة</th><th>عدد الكشوف</th><th>الإجمالي المتوجب</th><th>الضمان</th><th>الضريبة</th></tr></thead>
                     <tbody>
@@ -718,7 +753,7 @@ function reportDocThumb($path) {
         <?= docSheetEnd() ?>
         <?php endif; ?>
 
-        <?= docSheetStart('Totaux annuels (cumulés)', 'المجاميع السنوية', [$schoolYear]) ?>
+        <?= docSheetStart('Totaux annuels (cumulés)', 'المجاميع السنوية', [$schoolYear . $empTypeTitle]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <tr><td><strong>عدد الكشوف المحسوبة</strong></td><td><?= $tot['cnt'] ?: 0 ?></td></tr>
                     <tr style="background:var(--gold-light)"><td><strong>إجمالي المدفوع (الصافي)</strong></td><td><strong><?= formatLBP($tot['net']) ?></strong></td></tr>
