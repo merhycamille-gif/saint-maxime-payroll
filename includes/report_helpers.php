@@ -592,9 +592,10 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
 }
 </style>
 <script>
-// 🔍 ملاءمة تلقائية لكل جداول التقارير (doc-table): الجدول الواسع يصغّر نفسه ليظهر
-// بكل أعمدته على الشاشة مرة واحدة (متل الطباعة) بلا سحب. تعمل في مركز التقارير
-// والنماذج الرسمية معاً. إن كان أوسع من الضعف نكتفي بـ0.5 ويبقى تمرير للباقي.
+// 🔠 «بدي حجم الخط بالتقارير يكون 12» (طلب المستخدم 2026-08-04): على الشاشة لا تصغير
+// أبداً — الخط 12 حقيقي دائماً، والجدول الأوسع من شاشته له تمرير أفقي فقط (والعناوين
+// تبقى لازقة براس الشاشة عبر آلية التثبيت في app.js). يبقى هنا حساب --pz للطباعة
+// وحدها فلا يُقصّ عمود على الورق. تعمل في مركز التقارير والنماذج الرسمية معاً.
 (function () {
     function fitDocTables() {
         var tables = document.querySelectorAll('table.doc-table');
@@ -605,7 +606,7 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             if (t.getAttribute('dir') === 'rtl') w.style.direction = 'rtl'; // البداية من اليمين (الاسم أولاً)
             var row = t.querySelector('tr');                  // أعمدة كثيرة → خط أصغر بالطباعة
             if (row && row.children.length >= 14) t.classList.add('cols-many');
-            t.style.zoom = '';
+            t.style.zoom = '';   // تنظيف أي تصغير شاشة قديم — الخط على الشاشة 12 دائماً
             // تصغير الطباعة (--pz): عرض الورقة المستهدف ÷ عرض الجدول الطبيعي — يضمن أن
             // كل الأعمدة تدخل بالورقة مهما اتّسع الجدول (يقرأه CSS الطباعة أعلاه)
             var target = parseFloat(getComputedStyle(t).getPropertyValue('--pz-target')) || 745;
@@ -618,8 +619,6 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             // الجدول الأصغر من الورقة يملؤها بتوسيع أعمدته (width:100%) وخطه يبقى 12 تماماً؛
             // والجدول الأعرض من الورقة وحده يتصغّر بالمحسوب حتى لا يُقصّ عمود (كما كان)
             t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
-            var z = w.clientWidth / t.scrollWidth;
-            if (z < 1) t.style.zoom = Math.max(z, 0.5);
         }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitDocTables);
