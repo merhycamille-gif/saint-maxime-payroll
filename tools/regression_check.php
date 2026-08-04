@@ -1324,6 +1324,27 @@ $left33 = (int)$db->query("SELECT COUNT(*) FROM (SELECT ms.employee_id FROM mont
     GROUP BY ms.employee_id, ms.school_year
     HAVING MAX((ms.net_salary_lbp + ms.total_retenues_lbp) - (ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp)) > 0) t")->fetchColumn();
 check('الشفاء الشامل: لا يبقى موظف منقول عنده أجر إضافي مخفي بلا علاوة مسجّلة بملفه', $left33 === 0, "متبقٍّ: $left33");
+// الشفاء ب (p1 ديانا بالتقارير): العلاوات المدخلة يدوياً **قبل** نزول التصليح تُركَّب
+// على الأعمدة فوراً بلا انتظار فتح البطاقة — وبعده كل الحالات القابلة للمطابقة الدقيقة
+// (مبلغ ل.ل لكل السنة) منعكسة على الأشهر
+check('الشفاء ب: healOverlayImportedBonuses20260804b موجودة ومربوطة بالهيدر ومحجوبة عن القراءة-فقط',
+      function_exists('healOverlayImportedBonuses20260804b')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healOverlayImportedBonuses20260804b();') !== false);
+healOverlayImportedBonuses20260804b(); // idempotent — إن كان الفلاغ مضبوطاً لا يفعل شيئاً
+$mm33 = (int)$db->query("SELECT COUNT(DISTINCT e.id) FROM employees e
+    WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire'
+      AND COALESCE(e.base_salary_usd, 0) = 0 AND COALESCE(e.contract_salary_lbp, 0) = 0
+      AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id AND b.school_year = '2025-2026' AND b.is_active = 1
+                    AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND b.value_type = 'amount' AND b.currency = 'LBP'
+                    AND b.start_month IS NULL AND b.end_month IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM employee_bonuses b2 WHERE b2.employee_id = e.id AND b2.school_year = '2025-2026' AND b2.is_active = 1
+                    AND b2.bonus_type IN ('prime_fixe','aide_complementaire')
+                    AND (b2.value_type <> 'amount' OR b2.currency <> 'LBP' OR b2.start_month IS NOT NULL OR b2.end_month IS NOT NULL))
+      AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = '2025-2026' AND COALESCE(ms.is_indemnity_month, 0) = 0
+                    AND (ms.prime_fixe_lbp + ms.aide_complementaire_lbp) <>
+                        (SELECT COALESCE(SUM(b3.amount), 0) FROM employee_bonuses b3 WHERE b3.employee_id = e.id AND b3.school_year = '2025-2026' AND b3.is_active = 1
+                           AND b3.bonus_type IN ('prime_fixe','aide_complementaire')))")->fetchColumn();
+check('الشفاء ب: كل علاوات المنقولين المسجّلة (مبلغ ل.ل لكل السنة) منعكسة على أشهر 2025-2026', $mm33 === 0, "غير منعكسة: $mm33");
 // ديانا شرو نفسها (p1): العلاوة اتسجّلت بملفها تلقائياً 43م والعمود امتلأ والصافي/المستحق ما تغيّرا
 $db33 = $db->query("SELECT COALESCE(SUM(amount),0) s FROM employee_bonuses WHERE employee_id = 1826 AND school_year = '2025-2026' AND bonus_type = 'prime_fixe' AND is_active = 1")->fetch();
 $dr33 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp, total_due_lbp, transport_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();

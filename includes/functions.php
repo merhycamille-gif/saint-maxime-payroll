@@ -703,6 +703,33 @@ function healHiddenImportedExtras20260804() {
     } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-04ب — p1 ديانا شرو بالتقارير): من كان له علاوة
+ * إضافي/مكافأة مسجّلة **قبل نزول التصليح** (أدخلها المستخدم يدوياً والمحرّك حينها كان
+ * يتجاهل المنقولين — فتخطّاه الشفاء الشامل احتراماً لإدخاله اليدوي) بقيت أعمدته فارغة
+ * بالتقارير إلى أن تُفتح بطاقته السنوية. نمرّر «تركيب العلاوات» مرّة على كل منقول له
+ * أي علاوة مسجّلة فتكتمل أعمدته فوراً بكل التقارير. idempotent (المطابق لا يتغيّر).
+ */
+function healOverlayImportedBonuses20260804b() {
+    $flag = 'hidden_extrawage_fix_2026_08_04b';
+    if (getSetting($flag, '') !== '') return;
+    if (isViewer()) return; // حسابات «قراءة فقط» لا تكتب شيئاً
+    try {
+        $db = getDB();
+        @set_time_limit(300);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $cand = $db->query("SELECT DISTINCT ms.employee_id, ms.school_year FROM monthly_salaries ms
+            JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire'
+              AND COALESCE(e.base_salary_usd, 0) = 0 AND COALESCE(e.contract_salary_lbp, 0) = 0
+              AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = ms.employee_id
+                          AND (b.school_year = ms.school_year OR b.school_year IS NULL))")->fetchAll();
+        $n = 0;
+        foreach ($cand as $c) { $n += overlayStoredYearBonuses((int)$c['employee_id'], $c['school_year']); }
+        setSetting($flag, date('Y-m-d H:i') . " (" . count($cand) . " موظف×سنة / $n شهراً معدَّلاً)");
+    } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
 // جملة SQL لتقييد التقرير بالمدارس المختارة (آمنة لأنها أرقام)
 function reportSchoolSql($column = 'ms.school_id') {
     $ids = selectedReportSchoolIds();
