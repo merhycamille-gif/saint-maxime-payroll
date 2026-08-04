@@ -749,6 +749,75 @@ function healNetUsdMirror20260804c() {
     } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
+/** ضريبة الدخل السنوية بشطور البرنامج المؤرّخة (تُستعمل للتحقّق من المحسومات المنقولة). */
+function annualLawTaxAsOf($db, $annualTaxable, $socialStatus, $m, $y) {
+    if ($annualTaxable <= 0) return 0;
+    $asOf = sprintf('%04d-%02d-01', $y, $m);
+    $st = $db->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+    $st->execute([$socialStatus, $asOf]);
+    $rem = max(0, $annualTaxable - (float)($st->fetchColumn() ?: 0));
+    if ($rem <= 0) return 0;
+    $st = $db->prepare("SELECT * FROM tax_brackets WHERE effective_from = (SELECT MAX(effective_from) FROM tax_brackets WHERE effective_from <= ?) ORDER BY bracket_number ASC");
+    $st->execute([$asOf]);
+    $tax = 0;
+    foreach ($st->fetchAll() as $b) {
+        $size = $b['annual_to'] ? ($b['annual_to'] - $b['annual_from']) : PHP_INT_MAX;
+        $in = min($rem, $size);
+        if ($in <= 0) break;
+        $tax += $in * ((float)$b['rate_percent'] / 100);
+        $rem -= $in;
+        if ($rem <= 0) break;
+    }
+    return $tax;
+}
+
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-04د — الفحص الشامل خطوة خطوة): المحسومات المنقولة
+ * المخزّنة كمجموع بلا تفصيل — الفرق (المجموع − الضمان) ثبت حسابياً أنه **ضريبة الدخل**
+ * التي حسمها البرنامج القديم (على أساس ×12 شهراً): 373 من 384 صفاً بسنة 2025-2026 طابقت
+ * شطور القانون ±2%. ننسب الفرق لعمود الضريبة **للصفوف المطابِقة للقانون فقط** —
+ * فتكتمل أعمدة البطاقة والتقارير («الأرقام تركب») ويدخل المحسوم فعلاً بتقارير الضريبة.
+ * 🔴 غير المطابِق لا يُمسّ إطلاقاً (لا تخمين): يبقى ظاهراً بفحص الصحّة/فحص القانون للمراجعة
+ * (طانيوس سابا، وسنة 2023-2024 فرقها اشتراك مقطوع موحّد لا ضريبة).
+ */
+function healImportedTaxColumn20260804d() {
+    $flag = 'imported_tax_column_fix_2026_08_04d2'; // d2: يملأ «الأساس الخاضع» أيضاً مع الضريبة
+    if (getSetting($flag, '') !== '') return;
+    if (isViewer()) return; // حسابات «قراءة فقط» لا تكتب شيئاً
+    try {
+        $db = getDB();
+        @set_time_limit(300);
+        // المرشّحون: فرق محسومات غير منسوب، أو ضريبة منسوبة سابقاً بلا أساس خاضع (تكملة d الأولى)
+        $rows = $db->query("SELECT ms.id, ms.month, ms.year, ms.total_retenues_lbp, ms.caisse_amount_lbp, ms.cnss_amount_lbp,
+                ms.income_tax_lbp, ms.taxable_base_lbp, COALESCE(ms.eoc_grade_lbp, 0) eoc, ms.base_plus_echelon_lbp, ms.extra_lbp,
+                ms.prime_fixe_lbp, ms.aide_complementaire_lbp, e.social_status
+            FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire'
+              AND COALESCE(e.base_salary_usd, 0) = 0 AND COALESCE(e.contract_salary_lbp, 0) = 0
+              AND (ABS(ms.total_retenues_lbp - (ms.caisse_amount_lbp + ms.cnss_amount_lbp + ms.income_tax_lbp + COALESCE(ms.eoc_grade_lbp, 0))) > 1
+                   OR (ms.income_tax_lbp > 0 AND ms.taxable_base_lbp < ms.income_tax_lbp))")->fetchAll();
+        $upd = $db->prepare("UPDATE monthly_salaries SET income_tax_lbp = income_tax_lbp + ?, taxable_base_lbp = ? WHERE id = ?");
+        $n = 0;
+        foreach ($rows as $r) {
+            $resid = (int)$r['total_retenues_lbp'] - ((int)$r['caisse_amount_lbp'] + (int)$r['cnss_amount_lbp'] + (int)$r['income_tax_lbp'] + (int)$r['eoc']);
+            // الهدف المُتحقَّق منه: الفرق غير المنسوب، أو الضريبة المنسوبة سابقاً بلا أساس
+            $target = ($resid > 1) ? $resid : (int)$r['income_tax_lbp'];
+            if ($target <= 0) continue;
+            $brut = (int)$r['base_plus_echelon_lbp'] + (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp'];
+            // التحقّق القانوني: المبلغ = ضريبة الشطور على ×12 (طريقة القديم) على الإجمالي أو الإجمالي−الضمان
+            $okBase = null;
+            foreach ([$brut, $brut - (int)$r['cnss_amount_lbp']] as $base) {
+                $t = annualLawTaxAsOf($db, $base * 12, $r['social_status'], (int)$r['month'], (int)$r['year']) / 12;
+                if (abs($t - $target) / $target <= 0.02) { $okBase = $base; break; }
+            }
+            if ($okBase === null) continue; // غير مطابق للقانون → لا تخمين، يبقى للمراجعة
+            $upd->execute([($resid > 1 ? $resid : 0), $okBase, $r['id']]);
+            $n++;
+        }
+        setSetting($flag, date('Y-m-d H:i') . " ($n صفّاً)");
+    } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
 // جملة SQL لتقييد التقرير بالمدارس المختارة (آمنة لأنها أرقام)
 function reportSchoolSql($column = 'ms.school_id') {
     $ids = selectedReportSchoolIds();

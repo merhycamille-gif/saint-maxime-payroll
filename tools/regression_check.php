@@ -1354,6 +1354,22 @@ check('الشفاء ج: healNetUsdMirror20260804c موجودة ومربوطة ب
 healNetUsdMirror20260804c(); // idempotent — إن كان الفلاغ مضبوطاً لا يفعل شيئاً
 $usd33 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE net_salary_usd = 0 AND net_salary_lbp > 0 AND exchange_rate > 0")->fetchColumn();
 check('الشفاء ج: لا صافي دولار صفري وصف الليرة موجب (الشاشة المزدوجة لا تعرض $0.00)', $usd33 === 0, "متبقٍّ: $usd33");
+// الشفاء د: فرق المحسومات المنقولة يُنسب لعمود الضريبة فقط عند مطابقته شطور القانون ±2%
+// (ضريبة القديم على ×12) — غير المطابق (طانيوس سابا + 2023-2024) لا يُمسّ ويبقى للمراجعة
+check('الشفاء د: healImportedTaxColumn20260804d موجودة ومربوطة بالهيدر وبشرط المطابقة القانونية (لا تخمين)',
+      function_exists('healImportedTaxColumn20260804d')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healImportedTaxColumn20260804d();') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'if ($okBase === null) continue; // غير مطابق للقانون → لا تخمين، يبقى للمراجعة') !== false);
+healImportedTaxColumn20260804d(); // idempotent — إن كان الفلاغ مضبوطاً لا يفعل شيئاً
+$ret33 = (int)$db->query("SELECT COUNT(DISTINCT ms.employee_id) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.is_deleted = 0 AND ms.school_year = '2025-2026'
+      AND ABS(ms.total_retenues_lbp - (ms.caisse_amount_lbp + ms.cnss_amount_lbp + ms.income_tax_lbp + COALESCE(ms.eoc_grade_lbp, 0))) > 1")->fetchColumn();
+check('الشفاء د: تفصيل المحسومات 2025-2026 اكتمل — لم يبقَ إلا غير المطابِق للقانون (طانيوس سابا وحده أو أقل)',
+      $ret33 <= 1, "متبقٍّ: $ret33 موظفاً");
+$dt33 = $db->query("SELECT income_tax_lbp, total_retenues_lbp, cnss_amount_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
+check('ديانا شرو: عمود الضريبة صار 130,000 والمحسومات باتت مفصّلة بالكامل (1,320,000 + 130,000 = 1,450,000)',
+      $dt33 && (int)$dt33['income_tax_lbp'] === 130000
+      && (int)$dt33['cnss_amount_lbp'] + (int)$dt33['income_tax_lbp'] === (int)$dt33['total_retenues_lbp']);
 // ديانا شرو نفسها (p1): العلاوة اتسجّلت بملفها تلقائياً 43م والعمود امتلأ والصافي/المستحق ما تغيّرا
 $db33 = $db->query("SELECT COALESCE(SUM(amount),0) s FROM employee_bonuses WHERE employee_id = 1826 AND school_year = '2025-2026' AND bonus_type = 'prime_fixe' AND is_active = 1")->fetch();
 $dr33 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp, total_due_lbp, transport_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
