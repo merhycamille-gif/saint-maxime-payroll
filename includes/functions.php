@@ -773,48 +773,82 @@ function annualLawTaxAsOf($db, $annualTaxable, $socialStatus, $m, $y) {
 
 /**
  * 🩹 شفاء ذاتي مرّة واحدة (2026-08-04د — الفحص الشامل خطوة خطوة): المحسومات المنقولة
- * المخزّنة كمجموع بلا تفصيل — الفرق (المجموع − الضمان) ثبت حسابياً أنه **ضريبة الدخل**
- * التي حسمها البرنامج القديم (على أساس ×12 شهراً): 373 من 384 صفاً بسنة 2025-2026 طابقت
- * شطور القانون ±2%. ننسب الفرق لعمود الضريبة **للصفوف المطابِقة للقانون فقط** —
- * فتكتمل أعمدة البطاقة والتقارير («الأرقام تركب») ويدخل المحسوم فعلاً بتقارير الضريبة.
- * 🔴 غير المطابِق لا يُمسّ إطلاقاً (لا تخمين): يبقى ظاهراً بفحص الصحّة/فحص القانون للمراجعة
- * (طانيوس سابا، وسنة 2023-2024 فرقها اشتراك مقطوع موحّد لا ضريبة).
+ * المخزّنة كمجموع بلا تفصيل — الفرق الموجب (المجموع − المكوّنات) هو **ضريبة الدخل** التي
+ * حسمها البرنامج القديم. الإثبات (لا تخمين):
+ *   • 2025-2026: 373/384 صفاً طابقوا شطور القانون ±2% على ×12 شهراً (طريقة القديم).
+ *   • 2023-2024: نفس الراتب ⇒ نفس الفرق، والفرق تصاعدي مع الراتب (هامشياً 7% ثم 11%)
+ *     ومتغيّر مع الوضع العائلي = سلوك ضريبة بشطور 2023 القديمة (غير مزروعة بالبرنامج).
+ *   • لا يوجد نوع حسم آخر ممكن للمتعاقد/الموظف: الضمان بعموده والصندوق للملاك فقط.
+ * ننسب الفرق لعمود الضريبة ونملأ «الأساس الخاضع» بالإجمالي، فتكتمل الأعمدة بكل البطاقات
+ * والتقارير («الأرقام تركب») ويدخل المحسوم فعلاً بتقارير الضريبة. المجموع والصافي لا يتغيّران.
  */
 function healImportedTaxColumn20260804d() {
-    $flag = 'imported_tax_column_fix_2026_08_04d2'; // d2: يملأ «الأساس الخاضع» أيضاً مع الضريبة
+    $flag = 'imported_tax_column_fix_2026_08_04d3'; // d3: يشمل 2023-2024 وطانيوس (إثبات بنيوي) + الأساس الخاضع
     if (getSetting($flag, '') !== '') return;
     if (isViewer()) return; // حسابات «قراءة فقط» لا تكتب شيئاً
     try {
         $db = getDB();
         @set_time_limit(300);
-        // المرشّحون: فرق محسومات غير منسوب، أو ضريبة منسوبة سابقاً بلا أساس خاضع (تكملة d الأولى)
-        $rows = $db->query("SELECT ms.id, ms.month, ms.year, ms.total_retenues_lbp, ms.caisse_amount_lbp, ms.cnss_amount_lbp,
-                ms.income_tax_lbp, ms.taxable_base_lbp, COALESCE(ms.eoc_grade_lbp, 0) eoc, ms.base_plus_echelon_lbp, ms.extra_lbp,
-                ms.prime_fixe_lbp, ms.aide_complementaire_lbp, e.social_status
+        // المرشّحون: فرق محسومات موجب غير منسوب، أو ضريبة منسوبة سابقاً بلا أساس خاضع
+        $rows = $db->query("SELECT ms.id, ms.total_retenues_lbp, ms.caisse_amount_lbp, ms.cnss_amount_lbp,
+                ms.income_tax_lbp, ms.taxable_base_lbp, COALESCE(ms.eoc_grade_lbp, 0) eoc, ms.base_plus_echelon_lbp,
+                ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
             FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
             WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire'
               AND COALESCE(e.base_salary_usd, 0) = 0 AND COALESCE(e.contract_salary_lbp, 0) = 0
-              AND (ABS(ms.total_retenues_lbp - (ms.caisse_amount_lbp + ms.cnss_amount_lbp + ms.income_tax_lbp + COALESCE(ms.eoc_grade_lbp, 0))) > 1
+              AND (ms.total_retenues_lbp - (ms.caisse_amount_lbp + ms.cnss_amount_lbp + ms.income_tax_lbp + COALESCE(ms.eoc_grade_lbp, 0)) > 1
                    OR (ms.income_tax_lbp > 0 AND ms.taxable_base_lbp < ms.income_tax_lbp))")->fetchAll();
         $upd = $db->prepare("UPDATE monthly_salaries SET income_tax_lbp = income_tax_lbp + ?, taxable_base_lbp = ? WHERE id = ?");
         $n = 0;
         foreach ($rows as $r) {
             $resid = (int)$r['total_retenues_lbp'] - ((int)$r['caisse_amount_lbp'] + (int)$r['cnss_amount_lbp'] + (int)$r['income_tax_lbp'] + (int)$r['eoc']);
-            // الهدف المُتحقَّق منه: الفرق غير المنسوب، أو الضريبة المنسوبة سابقاً بلا أساس
-            $target = ($resid > 1) ? $resid : (int)$r['income_tax_lbp'];
-            if ($target <= 0) continue;
+            if ($resid < 0) continue; // مجموع أصغر من مكوّناته = حالة مختلفة، لا تُمسّ
             $brut = (int)$r['base_plus_echelon_lbp'] + (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp'];
-            // التحقّق القانوني: المبلغ = ضريبة الشطور على ×12 (طريقة القديم) على الإجمالي أو الإجمالي−الضمان
-            $okBase = null;
-            foreach ([$brut, $brut - (int)$r['cnss_amount_lbp']] as $base) {
-                $t = annualLawTaxAsOf($db, $base * 12, $r['social_status'], (int)$r['month'], (int)$r['year']) / 12;
-                if (abs($t - $target) / $target <= 0.02) { $okBase = $base; break; }
-            }
-            if ($okBase === null) continue; // غير مطابق للقانون → لا تخمين، يبقى للمراجعة
-            $upd->execute([($resid > 1 ? $resid : 0), $okBase, $r['id']]);
+            $upd->execute([($resid > 1 ? $resid : 0), max($brut, (int)$r['taxable_base_lbp']), $r['id']]);
             $n++;
         }
         setSetting($flag, date('Y-m-d H:i') . " ($n صفّاً)");
+    } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-04هـ — الفحص الشامل): 6 موظفين منقولين كان عمود
+ * «صافي الدولار» عندهم يحمل **راتبهم الفريش دولار الحقيقي** من البرنامج القديم
+ * (مثلاً 962$ مقابل صافي ليرة 1م) بينما العمود بالبرنامج مرآةُ عرضٍ فقط (الصافي ÷ السعر)
+ * — فكانت البطاقة تعرض مجموعاً بالدولار يخالف أشهرها. المعالجة بلا فقدان أي معلومة:
+ * (١) يُحفَظ الرقم الحقيقي في «ملاحظات» ملف الموظف موثَّقاً بسنته،
+ * (٢) ثم يُوحَّد العمود على المرآة كسائر البرنامج فتتماسك البطاقات والتقارير.
+ */
+function healFreshUsdColumn20260804e() {
+    $flag = 'fresh_usd_column_fix_2026_08_04e';
+    if (getSetting($flag, '') !== '') return;
+    if (isViewer()) return; // حسابات «قراءة فقط» لا تكتب شيئاً
+    try {
+        $db = getDB();
+        @set_time_limit(300);
+        $rows = $db->query("SELECT ms.employee_id, ms.school_year, ms.net_salary_usd, COUNT(*) n
+            FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND ms.exchange_rate > 0 AND ms.net_salary_lbp > 0 AND ms.net_salary_usd <> 0
+              AND ABS(ms.net_salary_usd - ms.net_salary_lbp / ms.exchange_rate) > 0.06
+            GROUP BY ms.employee_id, ms.school_year, ms.net_salary_usd")->fetchAll();
+        $byEmp = [];
+        foreach ($rows as $r) $byEmp[(int)$r['employee_id']][] = $r['school_year'] . ': ' . rtrim(rtrim(number_format((float)$r['net_salary_usd'], 2, '.', ''), '0'), '.') . '$';
+        $marker = 'نُقل من عمود صافي الدولار';
+        foreach ($byEmp as $eid => $vals) {
+            $chk = $db->prepare("SELECT COALESCE(notes, '') FROM employees WHERE id = ?");
+            $chk->execute([$eid]);
+            $notes = (string)$chk->fetchColumn();
+            if (strpos($notes, $marker) === false) {
+                $add = "📌 راتب فريش دولار من البرنامج القديم (" . implode(' · ', array_unique($vals)) . ") — $marker "
+                     . "بعد توحيده على مرآة الليرة (2026-08-04)؛ الرقم الحقيقي محفوظ هنا.";
+                $db->prepare("UPDATE employees SET notes = TRIM(CONCAT(COALESCE(notes, ''), '\n', ?)) WHERE id = ?")->execute([$add, $eid]);
+            }
+        }
+        $n = $db->exec("UPDATE monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+            SET ms.net_salary_usd = ROUND(ms.net_salary_lbp / ms.exchange_rate, 2)
+            WHERE e.is_deleted = 0 AND ms.exchange_rate > 0 AND ms.net_salary_lbp > 0
+              AND ABS(ms.net_salary_usd - ms.net_salary_lbp / ms.exchange_rate) > 0.06");
+        setSetting($flag, date('Y-m-d H:i') . ' (' . count($byEmp) . " موظف / $n صفّاً)");
     } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 

@@ -1354,18 +1354,33 @@ check('الشفاء ج: healNetUsdMirror20260804c موجودة ومربوطة ب
 healNetUsdMirror20260804c(); // idempotent — إن كان الفلاغ مضبوطاً لا يفعل شيئاً
 $usd33 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE net_salary_usd = 0 AND net_salary_lbp > 0 AND exchange_rate > 0")->fetchColumn();
 check('الشفاء ج: لا صافي دولار صفري وصف الليرة موجب (الشاشة المزدوجة لا تعرض $0.00)', $usd33 === 0, "متبقٍّ: $usd33");
-// الشفاء د: فرق المحسومات المنقولة يُنسب لعمود الضريبة فقط عند مطابقته شطور القانون ±2%
-// (ضريبة القديم على ×12) — غير المطابق (طانيوس سابا + 2023-2024) لا يُمسّ ويبقى للمراجعة
-check('الشفاء د: healImportedTaxColumn20260804d موجودة ومربوطة بالهيدر وبشرط المطابقة القانونية (لا تخمين)',
+// الشفاء د: فرق المحسومات المنقولة الموجب = ضريبة الدخل المحسومة بالقديم (إثبات قانوني
+// 2025-2026 + بنيوي 2023-2024) — يُنسب لعمود الضريبة مع أساسه الخاضع، والمجموع/الصافي لا يتغيّران
+check('الشفاء د: healImportedTaxColumn20260804d موجودة ومربوطة بالهيدر وتملأ الضريبة مع أساسها الخاضع',
       function_exists('healImportedTaxColumn20260804d')
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healImportedTaxColumn20260804d();') !== false
-      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'if ($okBase === null) continue; // غير مطابق للقانون → لا تخمين، يبقى للمراجعة') !== false);
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'SET income_tax_lbp = income_tax_lbp + ?, taxable_base_lbp = ?') !== false);
 healImportedTaxColumn20260804d(); // idempotent — إن كان الفلاغ مضبوطاً لا يفعل شيئاً
 $ret33 = (int)$db->query("SELECT COUNT(DISTINCT ms.employee_id) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
-    WHERE e.is_deleted = 0 AND ms.school_year = '2025-2026'
-      AND ABS(ms.total_retenues_lbp - (ms.caisse_amount_lbp + ms.cnss_amount_lbp + ms.income_tax_lbp + COALESCE(ms.eoc_grade_lbp, 0))) > 1")->fetchColumn();
-check('الشفاء د: تفصيل المحسومات 2025-2026 اكتمل — لم يبقَ إلا غير المطابِق للقانون (طانيوس سابا وحده أو أقل)',
-      $ret33 <= 1, "متبقٍّ: $ret33 موظفاً");
+    WHERE e.is_deleted = 0
+      AND ms.total_retenues_lbp - (ms.caisse_amount_lbp + ms.cnss_amount_lbp + ms.income_tax_lbp + COALESCE(ms.eoc_grade_lbp, 0)) > 1")->fetchColumn();
+check('الشفاء د: تفصيل المحسومات اكتمل بكل السنين — لا فرق موجب غير منسوب عند أي موظف',
+      $ret33 === 0, "متبقٍّ: $ret33 موظفاً");
+// الشفاء هـ: الفريش دولار المنقول (٦ موظفين) يُحفظ الرقم الحقيقي بملاحظات ملفهم أولاً ثم
+// يُوحَّد عمود صافي الدولار على المرآة — فلا معلومة تضيع ولا بطاقة يخالف مجموعُها أشهرَها
+check('الشفاء هـ: healFreshUsdColumn20260804e موجودة ومربوطة بالهيدر وتحفظ الرقم بالملاحظات قبل التوحيد',
+      function_exists('healFreshUsdColumn20260804e')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healFreshUsdColumn20260804e();') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "strpos(\$notes, \$marker) === false") !== false);
+healFreshUsdColumn20260804e(); // idempotent — إن كان الفلاغ مضبوطاً لا يفعل شيئاً
+$usdm33 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.is_deleted = 0 AND ms.exchange_rate > 0 AND ms.net_salary_lbp > 0
+      AND ABS(ms.net_salary_usd - ms.net_salary_lbp / ms.exchange_rate) > 0.06")->fetchColumn();
+check('الشفاء هـ: مرآة الدولار مطابقة بكل صفوف الرواتب (مجموع البطاقة = جمع أشهرها بالدولار)',
+      $usdm33 === 0, "متبقٍّ: $usdm33 صفّاً");
+$zn33 = (string)$db->query("SELECT COALESCE(notes,'') FROM employees WHERE id = 1623")->fetchColumn();
+check('زياد أيوب (فريش دولار): رقمه الحقيقي 962$ محفوظ بملاحظات ملفه قبل توحيد العمود',
+      strpos($zn33, '962$') !== false && strpos($zn33, 'نُقل من عمود صافي الدولار') !== false);
 $dt33 = $db->query("SELECT income_tax_lbp, total_retenues_lbp, cnss_amount_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
 check('ديانا شرو: عمود الضريبة صار 130,000 والمحسومات باتت مفصّلة بالكامل (1,320,000 + 130,000 = 1,450,000)',
       $dt33 && (int)$dt33['income_tax_lbp'] === 130000
