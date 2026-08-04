@@ -1283,6 +1283,53 @@ check('شعار مكسيموس على إفاداته (لا شعار م.س.أ ا�
       $sMax32 && strpos((string)schoolLogoUrl($sMax32), 'maximos.') !== false
       && $sSal32 && strpos((string)schoolLogoUrl($sSal32), 'unified.') !== false);
 
+/* =====================================================================
+ * 33) تركيب العلاوات للمنقولين (p1 ديانا شرو 2026-08-04): أجر إضافي يُدخَل
+ *     بملف موظف منقول (بلا أساس بالإعداد) لازم يظهر على البطاقة السنوية
+ * =================================================================== */
+require_once $PROJ . '/includes/payroll_calculator.php';
+$pcSrc33 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$asdSrc33 = (string)file_get_contents($PROJ . '/includes/annual_slip_data.php');
+check('تركيب العلاوات: دالة overlayStoredYearBonuses موجودة وrecalcEmployeeYear يحوّل المنقول إليها بدل تجاهله',
+      function_exists('overlayStoredYearBonuses')
+      && strpos($pcSrc33, 'if (!$hasConfig) return overlayStoredYearBonuses($employeeId, $sy);') !== false);
+check('تركيب العلاوات: مصدر واحد لمنطق العلاوات (calculate يستعمل bonusComponents نفسها)',
+      strpos($pcSrc33, '= $this->bonusComponents($basePlusEchelon);') !== false
+      && strpos($pcSrc33, 'public function bonusComponents(') !== false);
+check('تركيب العلاوات: شفاء ذاتي بالبطاقة السنوية (computeAnnualSlip) محجوب عن حسابات القراءة-فقط',
+      strpos($asdSrc33, 'overlayStoredYearBonuses((int)$emp[\'id\'], $schoolYear)') !== false
+      && strpos($asdSrc33, '!isViewer()') !== false);
+check('تركيب العلاوات: حارس العائلات — لا تصفير نقل منقول لا سجلّ له (الفرق من transport_lbp وحده)',
+      strpos($pcSrc33, "if (!\$doAdd && !\$doTr) return 0;") !== false
+      && strpos($pcSrc33, 'الفرق من transport_lbp وحده') !== false);
+check('تركيب العلاوات: فحص انعكاس العلاوات مُضاف بصفحة «فحص صحّة البرنامج»',
+      strpos((string)file_get_contents($PROJ . '/pages/health_check.php'), 'منعكسة على أشهرهم') !== false);
+// تجربة فعلية بقاعدة البيانات (داخل معاملة تُرجَع كاملة): ديانا شرو 1826 —
+// إضافة أجر إضافي 43م ⇒ ينعكس على الشهر (العمود + الصافي + المستحق) والنقل 9م لا يتغيّر
+$tx33Ok = false; $tx33Detail = '';
+try {
+    $db->beginTransaction();
+    $b33 = $db->query("SELECT prime_fixe_lbp, aide_complementaire_lbp, net_salary_lbp, total_due_lbp, transport_lbp
+                       FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
+    $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+                  VALUES (1826, 'prime_fixe', 1, '2025-2026', 43000000, 'amount', 'LBP', NULL, NULL, 1)")->execute();
+    $n33 = overlayStoredYearBonuses(1826, '2025-2026');
+    $a33 = $db->query("SELECT prime_fixe_lbp, aide_complementaire_lbp, net_salary_lbp, total_due_lbp, transport_lbp
+                       FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
+    $tx33Ok = $b33 && $a33 && $n33 > 0
+        && (int)$a33['prime_fixe_lbp'] === 43000000
+        && (int)$a33['net_salary_lbp'] === (int)$b33['net_salary_lbp'] + 43000000 - (int)$b33['prime_fixe_lbp']
+        && (int)$a33['total_due_lbp'] === (int)$b33['total_due_lbp'] + 43000000 - (int)$b33['prime_fixe_lbp']
+        && (int)$a33['transport_lbp'] === (int)$b33['transport_lbp'];
+    $tx33Detail = $a33 ? ('prime=' . $a33['prime_fixe_lbp'] . ' net=' . $a33['net_salary_lbp'] . ' tr=' . $a33['transport_lbp']) : 'صف مفقود';
+} catch (Throwable $e33) { $tx33Detail = 'خطأ: ' . $e33->getMessage(); }
+finally { if ($db->inTransaction()) $db->rollBack(); }
+check('تركيب العلاوات (تجربة فعلية مع ترجيع): أجر إضافي 43م لديانا ينعكس عموداً وصافياً ومستحقاً والنقل ثابت', $tx33Ok, $tx33Detail);
+// وبعد الترجيع: الأرقام رجعت متل ما كانت (المعاملة ما خرّبت شي)
+$r33 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp, total_due_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
+check('تركيب العلاوات (تجربة فعلية): الترجيع أعاد أرقام ديانا الأصلية حرفياً',
+      $r33 && (int)$r33['prime_fixe_lbp'] === 0 && (int)$r33['net_salary_lbp'] === 42550000 && (int)$r33['total_due_lbp'] === 51550000);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

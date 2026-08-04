@@ -112,6 +112,28 @@ try {
           AND FLOOR(ms.grade_at_month) > FLOOR(p.grade_at_month)
           AND p.base_plus_echelon_lbp > 0 AND p.base_plus_echelon_lbp < ms.base_plus_echelon_lbp")->fetchColumn();
     hc($groups, $G1, $swal === 0, 'درجات كانون لا تُدمج دغري بأساس الراتب (أصحاب النص درجة)', $swal === 0 ? 'صفر حالة' : "$swal شهراً", 'لو فشل: شهر نزول الدرجات يعرضها ضمن الأساس بدل عمود «قيمة الدرجة» ثم تنضمّ للأساس لاحقاً.');
+    // تركيب العلاوات للمنقولين (2026-08-04، p1 ديانا شرو): أجر إضافي/مكافأة مسجّلة بملف
+    // موظف منقول (بلا أساس بالإعداد) يجب أن تنعكس على أشهره المخزّنة — يفحص الحالات
+    // القابلة للمطابقة الدقيقة فقط (مبلغ ل.ل لكل السنة، بلا نِسَب/دولار/فترات).
+    $ovYear = activeSchoolYear(); if ($ovYear === 'all') $ovYear = currentSchoolYear();
+    $ovSt = $db->prepare("SELECT COUNT(DISTINCT e.id) FROM employees e
+        WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire'
+          AND COALESCE(e.base_salary_usd, 0) = 0 AND COALESCE(e.contract_salary_lbp, 0) = 0
+          AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id AND b.school_year = ? AND b.is_active = 1
+                        AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND b.value_type = 'amount' AND b.currency = 'LBP'
+                        AND b.start_month IS NULL AND b.end_month IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM employee_bonuses b2 WHERE b2.employee_id = e.id AND b2.school_year = ? AND b2.is_active = 1
+                        AND b2.bonus_type IN ('prime_fixe','aide_complementaire')
+                        AND (b2.value_type <> 'amount' OR b2.currency <> 'LBP' OR b2.start_month IS NOT NULL OR b2.end_month IS NOT NULL))
+          AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND COALESCE(ms.is_indemnity_month, 0) = 0
+                        AND (ms.prime_fixe_lbp + ms.aide_complementaire_lbp) <>
+                            (SELECT COALESCE(SUM(b3.amount), 0) FROM employee_bonuses b3 WHERE b3.employee_id = e.id AND b3.school_year = ? AND b3.is_active = 1
+                               AND b3.bonus_type IN ('prime_fixe','aide_complementaire')))");
+    $ovSt->execute([$ovYear, $ovYear, $ovYear, $ovYear]);
+    $ovBad = (int)$ovSt->fetchColumn();
+    hc($groups, $G1, $ovBad === 0, "الأجر الإضافي/المكافأة المسجّلة للمنقولين منعكسة على أشهرهم ($ovYear)",
+       $ovBad === 0 ? 'صفر حالة' : "$ovBad موظفاً",
+       'لو فشل: أجر إضافي مدخَل بملف موظف منقول لا يظهر على البطاقة السنوية والكشوف. الحلّ: افتح بطاقته السنوية (تُشفى تلقائياً) أو احفظ ملفه مرّة.');
 } catch (Exception $e) {}
 
 /* الأرقام «المنقولة»: مكوّناتها لا تفسّر مجموعها (بيانات مستوردة — تحتاج قرار المستخدم) */

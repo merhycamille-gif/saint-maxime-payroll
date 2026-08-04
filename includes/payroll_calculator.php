@@ -313,16 +313,12 @@ class PayrollCalculator {
     }
     
     /**
-     * Main calculation
+     * مكوّنات العلاوات لشهر الحساب: [الأجر الإضافي prime_fixe، المكافأة aide، النقل الكامل].
+     * مصدر واحد للمنطق: يستعمله calculate() للمُعَدّين (ملاك/أساس>0)،
+     * وoverlayStoredYearBonuses() للمنقولين بصفوف مخزّنة — كي لا يختلف الحساب بين المسارين.
      */
-    public function calculate() {
+    public function bonusComponents($basePlusEchelon = 0) {
         $emp = $this->employee;
-        
-        // === 1. أساس الراتب + الدرجة (تراكمي حسب تاريخ الشهر، من سلسلة 2017) ===
-        [$baseSalary, $echelonValue, $effectiveGrade] = $this->calculateBaseAndEchelon();
-        $basePlusEchelon = $baseSalary + $echelonValue;
-        
-        // === 3. Suppléments ===
         $primeFixe = $this->getBonusForMonth('prime_fixe', $basePlusEchelon);
         $aideComp = $this->getBonusForMonth('aide_complementaire', $basePlusEchelon);
         $transportComp = $this->getBonusForMonth('transport_complement', $basePlusEchelon);
@@ -341,6 +337,21 @@ class PayrollCalculator {
         // (ب) تعويض النقل اليومي **المؤرّخ بالفترات** (employee_bonuses نوع transport_daily): يتغيّر
         // خلال السنة. لكل فترة سارية للشهر: القيمة اليومية × الأيام × الأسابيع (تُحوَّل إن دولار).
         $transportComp += $this->getDailyTransportForMonth($tDays, $tWeeks);
+        return [$primeFixe, $aideComp, $transportComp];
+    }
+
+    /**
+     * Main calculation
+     */
+    public function calculate() {
+        $emp = $this->employee;
+        
+        // === 1. أساس الراتب + الدرجة (تراكمي حسب تاريخ الشهر، من سلسلة 2017) ===
+        [$baseSalary, $echelonValue, $effectiveGrade] = $this->calculateBaseAndEchelon();
+        $basePlusEchelon = $baseSalary + $echelonValue;
+        
+        // === 3. Suppléments ===
+        [$primeFixe, $aideComp, $transportComp] = $this->bonusComponents($basePlusEchelon);
         $extra = 0; // can be customized
         // عمودان مستقلان بالخضوع (بطلب المستخدم): «الأجر الإضافي» = extra + prime_fixe (فلاغ *_includes_extra)،
         // «مكافأة ومساعدة» = aide_complementaire (فلاغ *_includes_prime_aide). كلٌّ يدخل القاعدة بزرّه الأخضر المستقل.
@@ -580,11 +591,11 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
     $e = $e->fetch();
     if (!$e || (int)$e['is_deleted'] === 1) return 0;
 
-    // أمان: لا تُعد الحساب لمن أساسه صفر بالإعداد (راتبه مخزَّن منقول) لئلا يُصفَّر.
+    // أمان: لا حساب كامل لمن أساسه صفر بالإعداد (راتبه مخزَّن منقول) لئلا يُصفَّر.
+    // لكنه لا يُهمَل: علاواته المسجّلة (أجر إضافي/مكافأة/نقل) تُركَّب على أشهره المخزّنة (أدناه).
     $hasConfig = ($e['employee_type'] === 'enseignant_titulaire')
               || (float)$e['base_salary_usd'] > 0
               || (float)$e['contract_salary_lbp'] > 0;
-    if (!$hasConfig) return 0;
 
     // افتراضياً السنة الحالية؛ لكن الأستاذ الجديد الذي تاريخ دخوله في سنة دراسية **لاحقة**
     // (مثلاً عُيِّن لسنة 2026-2027 المفتوحة) يُحسب على سنة دخوله لا الحالية — فلا يظهر في
@@ -595,6 +606,12 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
         if ($hireSy && $hireSy > $sy) $sy = $hireSy; // مقارنة نصّية صحيحة لصيغة YYYY-YYYY
     }
     if ($sy === 'all' || !preg_match('/^(\d{4})-(\d{4})$/', (string)$sy, $mm)) return 0;
+
+    // المنقول بصفوف مخزّنة (متعاقد/موظف بأساس صفر): بدل تجاهُله كلياً — ركِّب علاواته
+    // المسجّلة على أشهره المخزّنة، فيظهر الأجر الإضافي الذي يدخله المستخدم في ملفه
+    // على البطاقة السنوية وكل الكشوف (حالة ديانا شرو 2026-08-04).
+    if (!$hasConfig) return overlayStoredYearBonuses($employeeId, $sy);
+
     $y1 = (int)$mm[1]; $y2 = (int)$mm[2];
     $months = ((int)$e['payment_months_per_year'] === 10)
         ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
@@ -602,6 +619,69 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
     $n = 0;
     foreach ($months as [$m, $y]) {
         try { (new PayrollCalculator($employeeId, $m, $y))->calculateAndSave(); $n++; } catch (Exception $ex) {}
+    }
+    return $n;
+}
+
+/**
+ * «تركيب العلاوات» للموظف المنقول بصفوف مخزّنة (بلا أساس بالإعداد):
+ * المحرّك الكامل ممنوع عليه (يُصفِّر أساسه)، لكن علاوات ملفه (أجر إضافي/مكافأة/نقل)
+ * يجب أن تنعكس على أشهره المخزّنة — وإلا بقيت البطاقة السنوية وكل الكشوف على القديم
+ * مهما عدّل المستخدم (حالة ديانا شرو 2026-08-04).
+ *
+ * يعدّل أعمدة العلاوات فقط ويصحّح الصافي/المستحق (ومرايا الدولار) بفرق التغيير —
+ * لا يلمس الأساس ولا المحسومات المخزّنة (نفس فلسفة مسار open_year للمتعاقد المنقول).
+ *
+ * أمان: كل عائلة تُركَّب فقط إذا كان له سجلّ من عائلتها لتلك السنة في ملفه
+ * (إضافي+مكافأة عائلة، والنقل بأنواعه عائلة) — فلا يُصفَّر نقلٌ منقول قديم لا سجلّ له.
+ * العملية idempotent: إعادة تشغيلها بلا تغيير بيانات لا تبدّل شيئاً.
+ */
+function overlayStoredYearBonuses($employeeId, $schoolYear) {
+    $db = getDB();
+    if (!preg_match('/^\d{4}-\d{4}$/', (string)$schoolYear)) return 0;
+
+    // أي عائلات علاوات مسجّلة له هذه السنة؟ (تشمل غير الفعّالة كي يُصفَّر المطفأ)
+    $fam = $db->prepare("SELECT
+            COALESCE(SUM(bonus_type IN ('prime_fixe','aide_complementaire')), 0) AS n_add,
+            COALESCE(SUM(bonus_type IN ('transport_complement','transport_daily')), 0) AS n_tr
+        FROM employee_bonuses WHERE employee_id = ? AND (school_year IS NULL OR school_year = ?)");
+    $fam->execute([$employeeId, $schoolYear]);
+    $f = $fam->fetch(PDO::FETCH_ASSOC) ?: ['n_add' => 0, 'n_tr' => 0];
+    $doAdd = (int)$f['n_add'] > 0;
+    // النقل اليومي الثابت (عمود بطاقة الموظف) يُعدّ إعداد نقل أيضاً
+    $tFixed = $db->prepare("SELECT COALESCE(transport_daily_amount, 0) FROM employees WHERE id = ?");
+    $tFixed->execute([$employeeId]);
+    $doTr = ((int)$f['n_tr'] > 0) || ((float)$tFixed->fetchColumn() > 0);
+    if (!$doAdd && !$doTr) return 0; // لا علاوات مسجّلة → لا تلمس الصفوف المنقولة أبداً
+
+    $rows = $db->prepare("SELECT * FROM monthly_salaries
+        WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month, 0) = 0");
+    $rows->execute([$employeeId, $schoolYear]);
+    $upd = $db->prepare("UPDATE monthly_salaries SET
+            prime_fixe_lbp = ?, aide_complementaire_lbp = ?, transport_complement_lbp = ?, transport_lbp = ?,
+            net_salary_lbp = ?, total_due_lbp = ?, net_salary_usd = ?, total_due_usd = ?
+        WHERE id = ?");
+    $n = 0;
+    foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        try { $calc = new PayrollCalculator($employeeId, (int)$r['month'], (int)$r['year']); }
+        catch (Exception $ex) { continue; }
+        [$primeFixe, $aideComp, $transportComp] = $calc->bonusComponents((float)$r['base_plus_echelon_lbp']);
+        $newPrime = $doAdd ? (int)round($primeFixe) : (int)$r['prime_fixe_lbp'];
+        $newAide  = $doAdd ? (int)round($aideComp)  : (int)$r['aide_complementaire_lbp'];
+        $newTr    = $doTr  ? (int)round($transportComp) : (int)$r['transport_lbp'];
+        $newTrC   = $doTr  ? (int)round($transportComp) : (int)$r['transport_complement_lbp'];
+        $dAdd = ($newPrime + $newAide) - ((int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']);
+        // 🔴 النقل داخل المستحق مرّة واحدة (العمودان نفس القيمة) — الفرق من transport_lbp وحده
+        $dTr = $newTr - (int)$r['transport_lbp'];
+        if ($dAdd === 0 && $dTr === 0 && $newTrC === (int)$r['transport_complement_lbp']) continue;
+        $newNet = max(0, (int)$r['net_salary_lbp'] + $dAdd);
+        $newDue = max(0, (int)$r['total_due_lbp'] + $dAdd + $dTr);
+        $rate = (float)$r['exchange_rate'];
+        $upd->execute([$newPrime, $newAide, $newTrC, $newTr, $newNet, $newDue,
+            $rate > 0 ? round($newNet / $rate, 2) : $r['net_salary_usd'],
+            $rate > 0 ? round($newDue / $rate, 2) : $r['total_due_usd'],
+            $r['id']]);
+        $n++;
     }
     return $n;
 }

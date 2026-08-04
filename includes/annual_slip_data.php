@@ -22,6 +22,17 @@ if (!function_exists('schoolYearMonthsFor')) {
  * كل صف يحوي القيم بالليرة (المخزّنة الرسمية) + ما يلزم للعرض المزدوج (دولار) على الشاشة.
  */
 function computeAnnualSlip($db, $emp, $schoolYear) {
+    // 🩹 شفاء ذاتي (2026-08-04 — حالة ديانا شرو): الموظف المنقول بلا أساس بالإعداد لا يمرّ
+    // بالمحرّك الكامل، فأي أجر إضافي/مكافأة/نقل يُدخَل بملفه كان يبقى غير ظاهر هنا.
+    // نركّب علاواته المسجّلة على أشهره المخزّنة قبل العرض (idempotent — بلا تغيير = بلا كتابة).
+    // حسابات «قراءة فقط» لا تكتب شيئاً (قاعدة الفحص الشامل).
+    $hasCfg = ($emp['employee_type'] === 'enseignant_titulaire')
+           || (float)($emp['base_salary_usd'] ?? 0) > 0
+           || (float)($emp['contract_salary_lbp'] ?? 0) > 0;
+    if (!$hasCfg && function_exists('overlayStoredYearBonuses') && function_exists('isViewer') && !isViewer()) {
+        try { overlayStoredYearBonuses((int)$emp['id'], $schoolYear); } catch (Throwable $e) {}
+    }
+
     [$y1, $y2] = schoolYearToYears($schoolYear);
 
     $empSchool = $db->prepare("SELECT * FROM schools WHERE id = ?");

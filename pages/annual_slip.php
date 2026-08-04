@@ -67,7 +67,11 @@ if ($action === 'calc_year' && $employeeId > 0) {
     $eC = $eC->fetch();
     $hasConfig = $eC && ($eC['employee_type'] === 'enseignant_titulaire' || (float)$eC['base_salary_usd'] > 0 || (float)$eC['contract_salary_lbp'] > 0);
     if ($eC && !$hasConfig) {
-        $_SESSION['flash_error'] = 'راتب هذا الموظف مُدخَل يدوياً (منقول) — لا يُعاد حسابه تلقائياً لئلا يُصفَّر.';
+        // المنقول: لا حساب كامل (يُصفَّر أساسه) — لكن علاواته المسجّلة تُركَّب على أشهره المخزّنة
+        $nOv = overlayStoredYearBonuses($employeeId, $schoolYear);
+        $_SESSION['flash_success'] = $nOv > 0
+            ? "راتبه الأساسي منقول (لا يُعاد حسابه) — ورُكِّبت علاواته المسجّلة على $nOv شهر."
+            : 'راتب هذا الموظف مُدخَل يدوياً (منقول) — أساسه لا يُعاد حسابه، وعلاواته مطابقة أصلاً.';
     } elseif ($eC) {
         $months = schoolYearMonthsFor($eC['payment_months_per_year'], $y1, $y2);
         $n = 0;
