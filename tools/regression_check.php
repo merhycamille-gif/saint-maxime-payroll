@@ -1491,6 +1491,18 @@ $sum34 = $n34(['emp_type' => 'enseignant_titulaire']) + $n34(['emp_type' => 'ens
 check('فلترا النماذج (تجربة فعلية): كشف رواتب كل الموظفين — الكل = مجموع الفئات الثلاث وكلٌّ لحاله',
       $all34 > 0 && $all34 === $sum34, "الكل=$all34 / مجموع الفئات=$sum34");
 
+// 🏷️ «بكل ورقة من التقارير لازم يكون في عنوان التقرير» (2026-08-04): صفّ عنوان يُحقن
+// داخل thead فيتكرّر مع رأس الجدول أعلى كل صفحة مطبوعة — مخفيّ على الشاشة
+$rhSrc35 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$ajSrc35 = (string)file_get_contents($PROJ . '/assets/js/app.js');
+check('🏷️ عنوان التقرير على كل ورقة مطبوعة: حقن pr-title-row داخل thead (app.js) + CSS يظهره بالطباعة فقط',
+      strpos($ajSrc35, "row.className = 'pr-title-row'") !== false
+      && strpos($ajSrc35, 'table.tHead || table.createTHead()') !== false
+      && strpos($ajSrc35, "'.doc-sheet, .official-doc'") !== false
+      && strpos($rhSrc35, '.pr-title-row{display:none;}') !== false
+      && strpos($rhSrc35, '.doc-table thead .pr-title-row{display:table-row;}') !== false
+      && strpos($rhSrc35, '.doc-table thead{display:table-header-group;}') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

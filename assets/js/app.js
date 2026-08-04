@@ -310,6 +310,40 @@ document.addEventListener('change', function(e) {
     window.addEventListener('beforeprint', fitPrintZoom);
 })();
 
+// 🏷️ عنوان التقرير على كل ورقة مطبوعة (طلب المستخدم 2026-08-04):
+// يُحقن صفّ عنوان داخل thead أول جدول doc-table بكل تقرير/نموذج، فيتكرّر مع رأس
+// الجدول أعلى كل صفحة بالطباعة (thead = table-header-group). مخفيّ على الشاشة.
+// setTimeout(0): يعمل بعد سكربتات الصفحة (مثل حقن «الفلتر: …» بالنماذج) فيلتقطها بالعنوان.
+(function () {
+    function injectPrintTitles() {
+        document.querySelectorAll('.doc-sheet, .official-doc').forEach(function (root) {
+            var t = root.querySelector('.doc-head .dh-ar, .doc-title');
+            if (!t) return;
+            var txt = (t.textContent || '').trim();
+            var fr = root.querySelector('.doc-head .dh-fr');
+            if (fr && fr.textContent.trim()) txt += ' — ' + fr.textContent.trim();
+            // أول chip (الفترة + الفلتر) بالورقة الموحّدة، أو السطر الفرعي بالنماذج الرسمية
+            var sub = root.querySelector('.dh-meta .dh-chip, .doc-subtitle');
+            if (sub && sub.textContent.trim()) txt += ' — ' + sub.textContent.trim();
+            if (!txt) return;
+            var table = root.querySelector('table.doc-table');
+            if (!table || table.querySelector('.pr-title-row')) return;
+            var thead = table.tHead || table.createTHead();
+            var row = thead.insertRow(0);
+            row.className = 'pr-title-row';
+            var th = document.createElement('th');
+            th.colSpan = 99;
+            th.textContent = txt;
+            row.appendChild(th);
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { setTimeout(injectPrintTitles, 0); });
+    } else {
+        setTimeout(injectPrintTitles, 0);
+    }
+})();
+
 // Alert function
 function showAlert(msg, type = 'info') {
     const div = document.createElement('div');

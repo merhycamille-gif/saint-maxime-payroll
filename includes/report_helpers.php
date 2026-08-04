@@ -426,6 +426,8 @@ function officialFormStyles(): string {
 /* الجدول العربي (dir=rtl) يبدأ عرضه من اليمين — حتى يظهر العمود الأول (الاسم) فوراً بلا سحب */
 .card-body:has(> .doc-table[dir="rtl"]){direction:rtl;}
 .report-table-wrap{overflow-x:auto;}
+/* صفّ عنوان التقرير المتكرّر بالطباعة — مخفيّ على الشاشة (يُظهره بلوك الطباعة أدناه) */
+.pr-title-row{display:none;}
 /* شريط تمرير بارز وواضح ليعرف المستخدم أن في أعمدة إضافية */
 .report-table-wrap::-webkit-scrollbar,.card-body::-webkit-scrollbar{height:12px;}
 .report-table-wrap::-webkit-scrollbar-track,.card-body::-webkit-scrollbar-track{background:#e8edf3;border-radius:8px;}
@@ -497,6 +499,11 @@ function officialFormStyles(): string {
   .doc-table{page-break-inside:auto;}
   .doc-table thead{display:table-header-group;}
   .doc-table tfoot{display:table-row-group;}
+  /* 🏷️ عنوان التقرير على كل ورقة مطبوعة (طلب المستخدم 2026-08-04): صفّ عنوان يُحقن
+     بالـJS داخل thead (app.js) فيتكرّر مع رأس الجدول أعلى كل صفحة — مخفيّ على الشاشة */
+  .doc-table thead .pr-title-row{display:table-row;}
+  .doc-table thead .pr-title-row th{background:#fff !important;color:#000 !important;
+    border:none !important;font-size:11.5pt;font-weight:800;text-align:center;padding:4px 2px 6px;}
   .doc-table tr{page-break-inside:avoid;break-inside:avoid;}
   .doc-table th,.doc-table td{border:1px solid #555 !important;}
   /* الترويسة وعنوان التقرير لا ينفصلان عن بداية الجدول */
