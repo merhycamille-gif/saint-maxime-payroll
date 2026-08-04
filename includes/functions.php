@@ -730,6 +730,25 @@ function healOverlayImportedBonuses20260804b() {
     } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-04ج — الفحص الشامل): 1,580 صفّاً منقولاً «صافي الدولار»
+ * فيه صفر لم يُملأ عند النقل (بينما مستحق الدولار مملوء) فتعرض الشاشة المزدوجة $0.00 تحت
+ * الصافي ويختلف مجموع البطاقة عن أشهرها. نملأه بقاعدة المحرّك نفسها (الصافي ÷ سعر الشهر).
+ * 🔴 لا يُمسّ أي صف فيه دولار مخزّن غير صفري — رواتب «فريش دولار» المنقولة حقيقية وليست مرآة.
+ */
+function healNetUsdMirror20260804c() {
+    $flag = 'net_usd_mirror_fix_2026_08_04c';
+    if (getSetting($flag, '') !== '') return;
+    if (isViewer()) return; // حسابات «قراءة فقط» لا تكتب شيئاً
+    try {
+        $db = getDB();
+        @set_time_limit(300);
+        $n = $db->exec("UPDATE monthly_salaries SET net_salary_usd = ROUND(net_salary_lbp / exchange_rate, 2)
+                        WHERE net_salary_usd = 0 AND net_salary_lbp > 0 AND exchange_rate > 0");
+        setSetting($flag, date('Y-m-d H:i') . " ($n صفّاً)");
+    } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
 // جملة SQL لتقييد التقرير بالمدارس المختارة (آمنة لأنها أرقام)
 function reportSchoolSql($column = 'ms.school_id') {
     $ids = selectedReportSchoolIds();

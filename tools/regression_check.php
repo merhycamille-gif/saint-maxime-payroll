@@ -1345,6 +1345,15 @@ $mm33 = (int)$db->query("SELECT COUNT(DISTINCT e.id) FROM employees e
                         (SELECT COALESCE(SUM(b3.amount), 0) FROM employee_bonuses b3 WHERE b3.employee_id = e.id AND b3.school_year = '2025-2026' AND b3.is_active = 1
                            AND b3.bonus_type IN ('prime_fixe','aide_complementaire')))")->fetchColumn();
 check('الشفاء ب: كل علاوات المنقولين المسجّلة (مبلغ ل.ل لكل السنة) منعكسة على أشهر 2025-2026', $mm33 === 0, "غير منعكسة: $mm33");
+// الشفاء ج (الفحص الشامل): «صافي الدولار» الصفري المنقول يُملأ بمرآة المحرّك — والفريش
+// دولار الحقيقي (net_salary_usd غير صفري) لا يُمسّ أبداً
+check('الشفاء ج: healNetUsdMirror20260804c موجودة ومربوطة بالهيدر وشرطها net_salary_usd = 0 فقط',
+      function_exists('healNetUsdMirror20260804c')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNetUsdMirror20260804c();') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'WHERE net_salary_usd = 0 AND net_salary_lbp > 0 AND exchange_rate > 0') !== false);
+healNetUsdMirror20260804c(); // idempotent — إن كان الفلاغ مضبوطاً لا يفعل شيئاً
+$usd33 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE net_salary_usd = 0 AND net_salary_lbp > 0 AND exchange_rate > 0")->fetchColumn();
+check('الشفاء ج: لا صافي دولار صفري وصف الليرة موجب (الشاشة المزدوجة لا تعرض $0.00)', $usd33 === 0, "متبقٍّ: $usd33");
 // ديانا شرو نفسها (p1): العلاوة اتسجّلت بملفها تلقائياً 43م والعمود امتلأ والصافي/المستحق ما تغيّرا
 $db33 = $db->query("SELECT COALESCE(SUM(amount),0) s FROM employee_bonuses WHERE employee_id = 1826 AND school_year = '2025-2026' AND bonus_type = 'prime_fixe' AND is_active = 1")->fetch();
 $dr33 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp, total_due_lbp, transport_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
