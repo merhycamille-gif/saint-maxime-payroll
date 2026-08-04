@@ -640,6 +640,69 @@ function healEchelonSplit20260731() {
     } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-04 — سؤال المستخدم «فوت على كل أستاذ متعاقد وحطلو الإضافي؟»):
+ * المنقولون من البرنامج القديم صافيهم صحيح لكن «الأجر الإضافي» غير مفروز بأعمدتهم
+ * (مثلاً أساس 1م وصافٍ 42.55م). الفجوة = (الصافي+المحسومات) − (الأساس+الإضافات) هي
+ * أجره الإضافي الحقيقي شهراً بشهر — نسجّلها تلقائياً علاوةَ «أجر إضافي» بملفه (سطر لكل
+ * فترة متساوية القيمة) ثم يركّبها overlayStoredYearBonuses على الأعمدة **بلا تغيير
+ * الصافي** (امتصاص الفجوة). من له علاوة إضافي/مكافأة مسجّلة أصلاً لا يُمسّ (كديانا
+ * شرو المدخلة يدوياً). idempotent: بعد التسجيل ما عاد في مرشّحون.
+ */
+function healHiddenImportedExtras20260804() {
+    $flag = 'hidden_extrawage_fix_2026_08_04';
+    if (getSetting($flag, '') !== '') return;
+    if (isViewer()) return; // حسابات «قراءة فقط» لا تكتب شيئاً
+    try {
+        $db = getDB();
+        @set_time_limit(300);
+        require_once __DIR__ . '/payroll_calculator.php';
+        // كل (موظف منقول بلا أساس بالإعداد، سنة) عنده فجوة موجبة وليس له أي علاوة إضافي/مكافأة
+        $cand = $db->query("SELECT ms.employee_id, ms.school_year FROM monthly_salaries ms
+            JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire'
+              AND COALESCE(e.base_salary_usd, 0) = 0 AND COALESCE(e.contract_salary_lbp, 0) = 0
+              AND COALESCE(ms.is_indemnity_month, 0) = 0
+              AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = ms.employee_id
+                              AND (b.school_year = ms.school_year OR b.school_year IS NULL)
+                              AND b.bonus_type IN ('prime_fixe','aide_complementaire'))
+            GROUP BY ms.employee_id, ms.school_year
+            HAVING MAX((ms.net_salary_lbp + ms.total_retenues_lbp) - (ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp)) > 0")->fetchAll();
+        $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+                             VALUES (?, 'prime_fixe', ?, ?, ?, 'amount', 'LBP', ?, ?, 1)");
+        $gq = $db->prepare("SELECT month, (net_salary_lbp + total_retenues_lbp) - (base_plus_echelon_lbp + extra_lbp + prime_fixe_lbp + aide_complementaire_lbp) AS gap
+                            FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month, 0) = 0");
+        $nEmp = 0; $nRows = 0;
+        foreach ($cand as $c) {
+            $eid = (int)$c['employee_id']; $sy = $c['school_year'];
+            $gq->execute([$eid, $sy]);
+            $gapByM = [];
+            foreach ($gq->fetchAll() as $g) $gapByM[(int)$g['month']] = (int)$g['gap'];
+            // فترات متتالية بترتيب السنة الدراسية (10→9) متساوية الفجوة → سطر علاوة لكل فترة
+            $runs = []; $cur = null;
+            foreach ([10,11,12,1,2,3,4,5,6,7,8,9] as $m) {
+                $g = $gapByM[$m] ?? 0;
+                if ($g > 0 && $cur !== null && $g === $cur['gap']) { $cur['to'] = $m; continue; }
+                if ($cur !== null) $runs[] = $cur;
+                $cur = ($g > 0) ? ['from' => $m, 'to' => $m, 'gap' => $g] : null;
+            }
+            if ($cur !== null) $runs[] = $cur;
+            if (!$runs) continue;
+            // كل أشهره الموجودة بنفس الفجوة → سطر واحد «لكل السنة» (يغطي أي شهر يُستحدث لاحقاً)
+            $allSame = (count($runs) === 1 && count(array_filter($gapByM, fn($x) => $x > 0)) === count($gapByM));
+            $pn = 0;
+            foreach ($runs as $r) {
+                $pn++;
+                $ins->execute([$eid, $pn, $sy, $r['gap'], $allSame ? null : $r['from'], $allSame ? null : $r['to']]);
+                $nRows++;
+            }
+            overlayStoredYearBonuses($eid, $sy); // يملأ الأعمدة — الصافي لا يتغيّر (امتصاص الفجوة)
+            $nEmp++;
+        }
+        setSetting($flag, date('Y-m-d H:i') . " ($nEmp موظفاً / $nRows سطراً)");
+    } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
 // جملة SQL لتقييد التقرير بالمدارس المختارة (آمنة لأنها أرقام)
 function reportSchoolSql($column = 'ms.school_id') {
     $ids = selectedReportSchoolIds();

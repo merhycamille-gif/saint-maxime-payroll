@@ -674,8 +674,14 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
         // 🔴 النقل داخل المستحق مرّة واحدة (العمودان نفس القيمة) — الفرق من transport_lbp وحده
         $dTr = $newTr - (int)$r['transport_lbp'];
         if ($dAdd === 0 && $dTr === 0 && $newTrC === (int)$r['transport_complement_lbp']) continue;
-        $newNet = max(0, (int)$r['net_salary_lbp'] + $dAdd);
-        $newDue = max(0, (int)$r['total_due_lbp'] + $dAdd + $dTr);
+        // 🔴 امتصاص الفجوة (المنقول من القديم): إذا كان الصافي المخزّن أكبر من (الأساس+الإضافات)
+        // فالفرق «أجر إضافي مخفي» موجود داخل الصافي أصلاً — تسجيله بالملف يملأ العمود
+        // ولا يُضاف للصافي مرّة ثانية؛ فقط ما يزيد عن الفجوة يُعتبر علاوة جديدة فعلية.
+        $gap = max(0, ((int)$r['net_salary_lbp'] + (int)$r['total_retenues_lbp'])
+                    - ((int)$r['base_plus_echelon_lbp'] + (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']));
+        $dNet = ($dAdd > 0) ? max(0, $dAdd - $gap) : $dAdd;
+        $newNet = max(0, (int)$r['net_salary_lbp'] + $dNet);
+        $newDue = max(0, (int)$r['total_due_lbp'] + $dNet + $dTr);
         $rate = (float)$r['exchange_rate'];
         $upd->execute([$newPrime, $newAide, $newTrC, $newTr, $newNet, $newDue,
             $rate > 0 ? round($newNet / $rate, 2) : $r['net_salary_usd'],

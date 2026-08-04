@@ -1304,31 +1304,68 @@ check('تركيب العلاوات: حارس العائلات — لا تصفي�
       && strpos($pcSrc33, 'الفرق من transport_lbp وحده') !== false);
 check('تركيب العلاوات: فحص انعكاس العلاوات مُضاف بصفحة «فحص صحّة البرنامج»',
       strpos((string)file_get_contents($PROJ . '/pages/health_check.php'), 'منعكسة على أشهرهم') !== false);
-// تجربة فعلية بقاعدة البيانات (داخل معاملة تُرجَع كاملة): ديانا شرو 1826 —
-// إضافة أجر إضافي 43م ⇒ ينعكس على الشهر (العمود + الصافي + المستحق) والنقل 9م لا يتغيّر
+check('امتصاص الفجوة بالكود: المخفي داخل الصافي لا يُضاف مرّة ثانية (الفائض فقط علاوة جديدة)',
+      strpos($pcSrc33, '$dNet = ($dAdd > 0) ? max(0, $dAdd - $gap) : $dAdd;') !== false);
+// الشفاء الشامل («فوت على كل أستاذ متعاقد وحطلو الإضافي؟» — لا، تلقائي): الدالة موجودة
+// ومربوطة بالهيدر، وبعد تشغيلها لا يبقى منقول عنده «إضافي مخفي» بلا علاوة مسجّلة بملفه
+check('الشفاء الشامل: healHiddenImportedExtras20260804 موجودة ومربوطة بالهيدر ومحجوبة عن القراءة-فقط',
+      function_exists('healHiddenImportedExtras20260804')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healHiddenImportedExtras20260804();') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "if (isViewer()) return; // حسابات «قراءة فقط» لا تكتب شيئاً") !== false);
+healHiddenImportedExtras20260804(); // idempotent — إن كان الفلاغ مضبوطاً لا يفعل شيئاً
+$left33 = (int)$db->query("SELECT COUNT(*) FROM (SELECT ms.employee_id FROM monthly_salaries ms
+    JOIN employees e ON e.id = ms.employee_id
+    WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire'
+      AND COALESCE(e.base_salary_usd, 0) = 0 AND COALESCE(e.contract_salary_lbp, 0) = 0
+      AND COALESCE(ms.is_indemnity_month, 0) = 0
+      AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = ms.employee_id
+                      AND (b.school_year = ms.school_year OR b.school_year IS NULL)
+                      AND b.bonus_type IN ('prime_fixe','aide_complementaire'))
+    GROUP BY ms.employee_id, ms.school_year
+    HAVING MAX((ms.net_salary_lbp + ms.total_retenues_lbp) - (ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp)) > 0) t")->fetchColumn();
+check('الشفاء الشامل: لا يبقى موظف منقول عنده أجر إضافي مخفي بلا علاوة مسجّلة بملفه', $left33 === 0, "متبقٍّ: $left33");
+// ديانا شرو نفسها (p1): العلاوة اتسجّلت بملفها تلقائياً 43م والعمود امتلأ والصافي/المستحق ما تغيّرا
+$db33 = $db->query("SELECT COALESCE(SUM(amount),0) s FROM employee_bonuses WHERE employee_id = 1826 AND school_year = '2025-2026' AND bonus_type = 'prime_fixe' AND is_active = 1")->fetch();
+$dr33 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp, total_due_lbp, transport_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
+check('ديانا شرو (p1): الأجر الإضافي 43م اتسجّل بملفها تلقائياً وظهر بالعمود والصافي 42.55م والنقل 9م ما تغيّرا',
+      $db33 && (int)$db33['s'] === 43000000 && $dr33
+      && (int)$dr33['prime_fixe_lbp'] === 43000000
+      && (int)$dr33['net_salary_lbp'] === 42550000
+      && (int)$dr33['total_due_lbp'] === 51550000
+      && (int)$dr33['transport_lbp'] === 9000000,
+      $dr33 ? ('prime=' . $dr33['prime_fixe_lbp'] . ' net=' . $dr33['net_salary_lbp'] . ' due=' . $dr33['total_due_lbp']) : 'صف مفقود');
+// تجربة فعلية بمعاملة تُرجَع كاملة: علاوة أكبر من الفجوة — الفائض فقط يُضاف للصافي
+// (امتصاص الفجوة: المخفي داخل الصافي أصلاً لا يُضاف مرّة ثانية)
 $tx33Ok = false; $tx33Detail = '';
 try {
     $db->beginTransaction();
-    $b33 = $db->query("SELECT prime_fixe_lbp, aide_complementaire_lbp, net_salary_lbp, total_due_lbp, transport_lbp
+    $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = 1826 AND school_year = '2025-2026' AND bonus_type IN ('prime_fixe','aide_complementaire')")->execute();
+    $b33 = $db->query("SELECT base_plus_echelon_lbp, extra_lbp, prime_fixe_lbp, aide_complementaire_lbp, total_retenues_lbp, net_salary_lbp, total_due_lbp, transport_lbp
                        FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
     $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
-                  VALUES (1826, 'prime_fixe', 1, '2025-2026', 43000000, 'amount', 'LBP', NULL, NULL, 1)")->execute();
+                  VALUES (1826, 'prime_fixe', 1, '2025-2026', 50000000, 'amount', 'LBP', NULL, NULL, 1)")->execute();
     $n33 = overlayStoredYearBonuses(1826, '2025-2026');
-    $a33 = $db->query("SELECT prime_fixe_lbp, aide_complementaire_lbp, net_salary_lbp, total_due_lbp, transport_lbp
+    $a33 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp, total_due_lbp, transport_lbp
                        FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
+    $gap33 = max(0, ((int)$b33['net_salary_lbp'] + (int)$b33['total_retenues_lbp'])
+               - ((int)$b33['base_plus_echelon_lbp'] + (int)$b33['extra_lbp'] + (int)$b33['prime_fixe_lbp'] + (int)$b33['aide_complementaire_lbp']));
+    $dAdd33 = 50000000 - ((int)$b33['prime_fixe_lbp'] + (int)$b33['aide_complementaire_lbp']);
+    $dNet33 = max(0, $dAdd33 - $gap33); // المتوقّع: 50م − 43م فجوة = 7م فقط تُضاف
     $tx33Ok = $b33 && $a33 && $n33 > 0
-        && (int)$a33['prime_fixe_lbp'] === 43000000
-        && (int)$a33['net_salary_lbp'] === (int)$b33['net_salary_lbp'] + 43000000 - (int)$b33['prime_fixe_lbp']
-        && (int)$a33['total_due_lbp'] === (int)$b33['total_due_lbp'] + 43000000 - (int)$b33['prime_fixe_lbp']
+        && (int)$a33['prime_fixe_lbp'] === 50000000
+        && (int)$a33['net_salary_lbp'] === (int)$b33['net_salary_lbp'] + $dNet33
+        && (int)$a33['total_due_lbp'] === (int)$b33['total_due_lbp'] + $dNet33
         && (int)$a33['transport_lbp'] === (int)$b33['transport_lbp'];
-    $tx33Detail = $a33 ? ('prime=' . $a33['prime_fixe_lbp'] . ' net=' . $a33['net_salary_lbp'] . ' tr=' . $a33['transport_lbp']) : 'صف مفقود';
+    $tx33Detail = $a33 ? ('prime=' . $a33['prime_fixe_lbp'] . ' net=' . $a33['net_salary_lbp'] . ' فائض=' . $dNet33) : 'صف مفقود';
 } catch (Throwable $e33) { $tx33Detail = 'خطأ: ' . $e33->getMessage(); }
 finally { if ($db->inTransaction()) $db->rollBack(); }
-check('تركيب العلاوات (تجربة فعلية مع ترجيع): أجر إضافي 43م لديانا ينعكس عموداً وصافياً ومستحقاً والنقل ثابت', $tx33Ok, $tx33Detail);
-// وبعد الترجيع: الأرقام رجعت متل ما كانت (المعاملة ما خرّبت شي)
+check('امتصاص الفجوة (تجربة فعلية مع ترجيع): علاوة 50م فوق فجوة 43م ⇒ العمود 50م والصافي +7م فقط والنقل ثابت', $tx33Ok, $tx33Detail);
+// وبعد الترجيع: أرقام ديانا رجعت متل ما كانت حرفياً (المعاملة ما خرّبت شي)
 $r33 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp, total_due_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
-check('تركيب العلاوات (تجربة فعلية): الترجيع أعاد أرقام ديانا الأصلية حرفياً',
-      $r33 && (int)$r33['prime_fixe_lbp'] === 0 && (int)$r33['net_salary_lbp'] === 42550000 && (int)$r33['total_due_lbp'] === 51550000);
+check('امتصاص الفجوة (تجربة فعلية): الترجيع أعاد أرقام ديانا كما كانت قبل التجربة',
+      $r33 && $dr33 && (int)$r33['prime_fixe_lbp'] === (int)$dr33['prime_fixe_lbp']
+      && (int)$r33['net_salary_lbp'] === (int)$dr33['net_salary_lbp']
+      && (int)$r33['total_due_lbp'] === (int)$dr33['total_due_lbp']);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
