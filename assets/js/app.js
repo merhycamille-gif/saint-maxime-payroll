@@ -168,8 +168,13 @@ document.addEventListener('change', function(e) {
             var t = tables[i];
             if (t.classList.contains('doc-table') || t.closest('.payslip-card, .salary-slip, .no-print')) continue;
             var target = t.closest('.land-report') ? 1075 : 745;   // عرض A4 المطبوع بالبكسل
-            t.classList.add('pz-measure');                          // شروط الطباعة (12pt + عرض طبيعي)
-            var natW = t.getBoundingClientRect().width || t.scrollWidth;
+            // شروط الطباعة الحقيقية: خط 12 + عرض الورقة + لفّ الرؤوس + إخفاء أعمدة الأزرار —
+            // فلا يُصغَّر إلا الجدول الذي لا تسعه الورقة فعلاً (أرقامه لا تلتفّ)
+            t.classList.add('pz-measure');
+            var prevW = t.style.width;
+            t.style.setProperty('width', target + 'px', 'important');
+            var natW = Math.max(t.scrollWidth, Math.ceil(t.getBoundingClientRect().width), 1);
+            t.style.width = prevW;
             t.classList.remove('pz-measure');
             var pz = target / natW;
             // 🔠 «حجم الخط 12 بكل شي» (2026-08-01): لا تكبير فوق خط 12 — الجدول الأصغر من

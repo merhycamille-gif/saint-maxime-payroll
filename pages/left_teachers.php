@@ -106,7 +106,9 @@ include __DIR__ . '/../includes/header.php';
   </div>
 <?php endif; ?>
 
-<div class="card">
+<?php /* جدول التاركين 8 أعمدة مطبوعة → A4 أفقي حتى يطلع الخط 12 كاملاً بلا تصغير (2026-08-04) */ ?>
+<style>@media print{ @page{size:A4 landscape;margin:7mm} }</style>
+<div class="card land-report">
   <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <h3><i class="fas fa-user-slash"></i>
       <span dir="ltr">Départs en <?= $selYear === 'all' ? 'toutes les années' : e($selYear) ?> (<?= $total ?>)</span>

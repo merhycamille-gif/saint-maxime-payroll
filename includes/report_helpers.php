@@ -578,8 +578,12 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
 /* عرض الورقة المستهدف بالبكسل (A4 ناقص الهوامش): أفقي للتقارير العريضة، عمودي لسواها */
 .doc-table{--pz-target:745;}
 .land-report .doc-table,.xls-sheet .doc-table{--pz-target:1075;}
-/* وضع قياس خاطف: نفس شروط الطباعة (عرض طبيعي + خط الطباعة) لقياس العرض الحقيقي قبل حساب --pz */
-.doc-table.pz-measure{width:max-content !important;table-layout:auto !important;}
+/* وضع قياس خاطف: نفس شروط الطباعة **الحقيقية** — عرض الورقة (يضبطه السكربت) + لفّ النص
+   عند الفراغات + إخفاء ما لا يُطبع. القياس القديم بأوسع حالة (max-content بلا أي لفّ
+   ومع أعمدة الأزرار) كان يصغّر أكثر من اللزوم بكثير (ملاحظة المستخدم 2026-08-04:
+   تقارير تطبع 6-9 بدل 12) — الآن لا تصغير إلا إذا ما لا يلتفّ (الأرقام) لم يسع الورقة */
+.doc-table.pz-measure{table-layout:auto !important;}
+.pz-measure .no-print{display:none !important;}
 .doc-table.cols-many.pz-measure{font-size:12pt !important;}
 .doc-table.cols-many.pz-measure th,.doc-table.cols-many.pz-measure td{font-size:12pt !important;padding:2px 3px !important;}
 /* جدول بأعمدة كثيرة (١٤+): نفس حجم 12pt (بطلب المستخدم) وحشوة مضغوطة،
@@ -610,9 +614,14 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             // تصغير الطباعة (--pz): عرض الورقة المستهدف ÷ عرض الجدول الطبيعي — يضمن أن
             // كل الأعمدة تدخل بالورقة مهما اتّسع الجدول (يقرأه CSS الطباعة أعلاه)
             var target = parseFloat(getComputedStyle(t).getPropertyValue('--pz-target')) || 745;
-            // قياس حقيقي: نفعّل شروط الطباعة لحظياً (خط/حشوة/عرض طبيعي) ونقيس عرض الجدول الفعلي
+            // قياس حقيقي: شروط الطباعة لحظياً (خط/حشوة/لفّ نص) وعرض مضبوط على عرض الورقة —
+            // فيلفّ النص عند الفراغات كما على الورق، ولا يتجاوز الجدولُ الورقةَ إلا بقدر
+            // ما لا يلتفّ (الأرقام الكاملة) — هذا التجاوز وحده يُصغَّر له (--pz)
             t.classList.add('pz-measure');
-            var natW = t.getBoundingClientRect().width || t.scrollWidth;
+            var prevW = t.style.width;
+            t.style.setProperty('width', target + 'px', 'important');
+            var natW = Math.max(t.scrollWidth, Math.ceil(t.getBoundingClientRect().width), 1);
+            t.style.width = prevW;
             t.classList.remove('pz-measure');
             var pz = target / natW;
             // 🔠 «حجم الخط 12 بكل شي» (طلب المستخدم 2026-08-01): لا تكبير فوق خط 12 أبداً —

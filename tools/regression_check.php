@@ -1126,6 +1126,23 @@ $rhSrc34 = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'
 check('الخط 12 على الشاشة: جداول التقارير بلا تصغير zoom على الشاشة (التصغير المحسوب للطباعة فقط)',
       preg_match('/if \(z < 1\) t\.style\.zoom/', $rhSrc34) === 0
       && strpos($rhSrc34, '@media print{ .doc-table{zoom:var(--pz,1) !important;} }') !== false);
+// 🔠 «على الورق في تقارير 12 وتقارير مش 12» (ملاحظة المستخدم 2026-08-04): القياس القديم
+// كان بأوسع حالة (max-content بلا لفّ نص + مع أعمدة الأزرار غير المطبوعة) فيصغّر أكثر
+// من اللزوم (التاركون 6.3 والضمان 9 بدل 12). القياس الصحيح: بعرض الورقة الحقيقي مع لفّ
+// النص وإخفاء no-print — فلا يُصغَّر إلا ما لا تسعه الورقة فعلاً (الكشف الشهري 17 عموداً)
+$asSrc34 = (string)file_get_contents(__DIR__ . '/../assets/css/app.css');
+$jsSrc34 = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
+check('الخط 12 على الورق: القياس بعرض الورقة الحقيقي لا بأوسع حالة (doc-table + .table معاً)',
+      strpos($rhSrc34, "t.style.setProperty('width', target + 'px', 'important')") !== false
+      && strpos($jsSrc34, "t.style.setProperty('width', target + 'px', 'important')") !== false
+      && strpos($rhSrc34, 'width:max-content !important;table-layout:auto') === false
+      && preg_match('/\.table\.pz-measure \{ width: max-content/', $asSrc34) === 0);
+check('الخط 12 على الورق: أعمدة الأزرار (no-print) لا تدخل بقياس التصغير',
+      strpos($rhSrc34, '.pz-measure .no-print{display:none !important;}') !== false
+      && strpos($asSrc34, '.pz-measure .no-print { display: none !important; }') !== false);
+check('الخط 12 على الورق: تقارير reports.php أعمدتها حسب المحتوى (لا fixed يقصّ الأرقام) والتاركون A4 أفقي',
+      strpos((string)file_get_contents(__DIR__ . '/../pages/reports.php'), 'table-layout: fixed') === false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/left_teachers.php'), 'land-report') !== false);
 // 🎨🔒 التصميم النهائي المجمّد للبطاقة السنوية — اعتمده المستخدم حرفياً بقوله
 // «ما تغير بقى شي بالبطاقة احفظها منيح» (2026-08-01 مساءً). أي كسر لأحد هذه البنود
 // = خرق لقرار المستخدم الصريح — ممنوع تعديل تصميم البطاقة بدون طلبه المباشر:

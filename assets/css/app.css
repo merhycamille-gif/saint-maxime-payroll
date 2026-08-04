@@ -1113,13 +1113,19 @@ h1, h2, h3, h4, h5, h6,
     }
     /* الجدول العريض يصغّر نفسه محسوباً (--pz من app.js) فلا يُقصّ عمود — كنظام doc-table نفسه */
     .table { zoom: var(--pz, 1); }
+    /* الرأس الثنائي (Nom / الاسم) يلفّ عند « / » على الورق فلا يعرّض العمود بلا داعٍ */
+    .table th { white-space: normal; }
     .payslip-card, .salary-slip { zoom: var(--pz, 1); }
     /* الإفادات والنماذج الرسمية: صفحة A4 واحدة دائماً — الأطول يتصغّر محسوباً (app.js ٢-ج) */
     #ppExportArea { zoom: var(--pz, 1); }
 }
-/* وضع قياس خاطف (شاشة): نفس شروط الطباعة لقياس العرض الحقيقي قبل حساب --pz */
-.table.pz-measure { width: max-content !important; table-layout: auto !important; }
+/* وضع قياس خاطف (شاشة): نفس شروط الطباعة **الحقيقية** — عرض الورقة (يضبطه السكربت) +
+   لفّ رؤوس الأعمدة + إخفاء ما لا يُطبع (أعمدة الأزرار). القياس القديم بأوسع حالة
+   (max-content بلا لفّ ومع الأزرار) كان يصغّر أكثر من اللزوم (تقارير 6-9 بدل 12) */
+.table.pz-measure { table-layout: auto !important; }
+.table.pz-measure th { white-space: normal; }
 .table.pz-measure, .table.pz-measure th, .table.pz-measure td { font-size: 12pt !important; }
+.pz-measure .no-print { display: none !important; }
 .pz-measure-page .no-print, .pz-measure-page .card-header { display: none !important; }
 
 /* ============ لمسات تناسق رسمية موحّدة (2026-07-03) ============ */
