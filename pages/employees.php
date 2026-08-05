@@ -223,10 +223,10 @@ if ($action === 'delete_file' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // الإضافة/التعديل/الحذف تتطلّب مدرسة محددة (ليس وضع "كل المدارس").
 // 🔵 تعديل/حذف موظف معيّن من وضع «كل المدارس»: نبدّل الجلسة لمدرسته تلقائياً ونكمل
 // (بدل تحويل المستخدم للائحة المدارس ليختار بنفسه).
-if (in_array($action, ['edit', 'delete'], true)) {
+if (in_array($action, ['edit', 'delete', 'copy_year'], true)) {
     autoSwitchToEmployeeSchool((int)($_GET['id'] ?? $_POST['id'] ?? 0));
 }
-if (in_array($action, ['new', 'edit', 'delete'])) {
+if (in_array($action, ['new', 'edit', 'delete', 'copy_year'])) {
     requireSchoolSelected();
 }
 
@@ -567,6 +567,172 @@ if ($action === 'delete' && $id > 0) {
 }
 
 // =====================================================
+// 📅 نسخ ملف الموظف لسنة دراسية («كوبي») — عودة أستاذ ترك من سنين بلا إعادة إدخال:
+// ينسخ راتبه وعلاواته من آخر سنة اشتغل فيها إلى السنة المختارة فيرجع يظهر فيها.
+// الدرجات لا تُمَسّ أبداً (قاعدة: لا إعادة بناء درجات تلقائية) — المستخدم يعدّلها من صفحة الدرجات إذا لزم.
+// =====================================================
+if ($action === 'copy_year' && $id > 0) {
+    requireWriteAction();
+    $cq = $db->prepare("SELECT * FROM employees WHERE id = ? AND school_id = ? AND is_deleted = 0");
+    $cq->execute([$id, currentSchoolId()]);
+    $cEmp = $cq->fetch(PDO::FETCH_ASSOC);
+    if (!$cEmp) {
+        $_SESSION['flash_error'] = 'Employé introuvable / الموظف غير موجود في هذه المدرسة';
+        header('Location: ' . BASE_URL . 'pages/employees.php');
+        exit;
+    }
+    $cName = trim($cEmp['first_name_ar'] . ' ' . $cEmp['last_name_ar']) ?: trim($cEmp['first_name_fr'] . ' ' . $cEmp['last_name_fr']);
+    // السنين اللي عنده فيها رواتب فعلية (غير صفرية) — الأحدث أولاً؛ الأحدث = مصدر النسخ
+    $hy = $db->prepare("SELECT DISTINCT school_year FROM monthly_salaries
+                        WHERE employee_id = ? AND school_year IS NOT NULL
+                          AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)
+                        ORDER BY school_year DESC");
+    $hy->execute([$id]);
+    $haveYears = $hy->fetchAll(PDO::FETCH_COLUMN);
+    $srcSY = $haveYears[0] ?? null;
+    $hasConfig = ($cEmp['employee_type'] === 'enseignant_titulaire')
+              || (float)$cEmp['base_salary_usd'] > 0
+              || (float)($cEmp['contract_salary_lbp'] ?? 0) > 0;
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $target = trim($_POST['target_year'] ?? '');
+        if (!preg_match('/^(\d{4})-(\d{4})$/', $target, $tm) || (int)$tm[2] !== (int)$tm[1] + 1) {
+            $_SESSION['flash_error'] = 'اختر سنة دراسية صحيحة';
+        } elseif (in_array($target, $haveYears, true)) {
+            $_SESSION['flash_error'] = "ملف $cName موجود أصلاً بسنة $target (إله رواتب فيها) — ما في شي لينتسخ.";
+        } elseif (!$srcSY && !$hasConfig) {
+            $_SESSION['flash_error'] = 'لا يوجد أي سنة رواتب سابقة بملفه ولا إعداد راتب — جهّز راتبه من تبويب «مالي» أولاً.';
+        } else {
+            [$ty1, $ty2] = [(int)$tm[1], (int)$tm[2]];
+            $targetStart = $tm[1] . '-10-01';
+            // (١) تواريخ التّرك القديمة تخفيه عن السنة الهدف → رجّعه «فاعلاً» واحفظ القديم بالملاحظات
+            $leftMin = min($cEmp['left_date_cnss'] ?: '9999-12-31', $cEmp['left_date_finance'] ?: '9999-12-31', $cEmp['left_date_eoc'] ?: '9999-12-31');
+            $reactivated = false;
+            if ($leftMin !== '9999-12-31' && $leftMin < $targetStart) {
+                $oldLefts = 'ضمان: ' . ($cEmp['left_date_cnss'] ?: '—') . ' · مالية: ' . ($cEmp['left_date_finance'] ?: '—') . ' · صندوق: ' . ($cEmp['left_date_eoc'] ?: '—');
+                $noteLine = "↩️ عاد للعمل بسنة $target (نُسخ ملفه بتاريخ " . date('Y-m-d') . ") — تواريخ التّرك السابقة: $oldLefts";
+                $db->prepare("UPDATE employees SET left_date_cnss = NULL, left_date_finance = NULL, left_date_eoc = NULL,
+                              status = 'actif', notes = TRIM(CONCAT(COALESCE(notes,''), '\n', ?)) WHERE id = ?")
+                   ->execute([$noteLine, $id]);
+                $reactivated = true;
+            }
+            // (٢) علاواته (أجر إضافي/مكافأة/نقل) من سنة المصدر → السنة الهدف (idempotent — لا يكرّر الموجود)
+            $bonusCopied = 0;
+            if ($srcSY) {
+                $bsel = $db->prepare("SELECT * FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND is_active = 1");
+                $bsel->execute([$id, $srcSY]);
+                $bchk = $db->prepare("SELECT 1 FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND bonus_type = ? AND period_number = ? LIMIT 1");
+                $bins = $db->prepare("INSERT INTO employee_bonuses (employee_id,bonus_type,period_number,school_year,amount,value_type,currency,start_month,end_month,is_active)
+                                      VALUES (?,?,?,?,?,?,?,?,?,1)");
+                foreach ($bsel->fetchAll(PDO::FETCH_ASSOC) as $b) {
+                    $bchk->execute([$id, $target, $b['bonus_type'], $b['period_number']]);
+                    if ($bchk->fetchColumn()) continue;
+                    $bins->execute([$id, $b['bonus_type'], $b['period_number'], $target, $b['amount'], $b['value_type'] ?? 'amount', $b['currency'], $b['start_month'], $b['end_month']]);
+                    $bonusCopied++;
+                }
+            }
+            // (٣) رواتب السنة الهدف
+            $rowsCopied = 0;
+            $months = ((int)$cEmp['payment_months_per_year'] === 10)
+                ? [[10,$ty1],[11,$ty1],[12,$ty1],[1,$ty2],[2,$ty2],[3,$ty2],[4,$ty2],[5,$ty2],[6,$ty2],[7,$ty2]]
+                : [[10,$ty1],[11,$ty1],[12,$ty1],[1,$ty2],[2,$ty2],[3,$ty2],[4,$ty2],[5,$ty2],[6,$ty2],[7,$ty2],[8,$ty2],[9,$ty2]];
+            if (!$hasConfig && $srcSY) {
+                // المنقول بلا إعداد: انسخ صفوفه المخزّنة شهراً بشهر من سنة المصدر (نفس مسار فتح السنة)
+                $pbm = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND month = ?
+                                     AND COALESCE(is_indemnity_month,0) = 0 AND net_salary_lbp > 0 LIMIT 1");
+                $fb = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND net_salary_lbp > 0
+                                    AND COALESCE(is_indemnity_month,0) = 0 ORDER BY year DESC, month DESC LIMIT 1");
+                $fb->execute([$id, $srcSY]);
+                $fallback = $fb->fetch(PDO::FETCH_ASSOC);
+                foreach ($months as [$m, $y]) {
+                    $pbm->execute([$id, $srcSY, $m]);
+                    $src = $pbm->fetch(PDO::FETCH_ASSOC) ?: $fallback;
+                    if (!$src) continue;
+                    unset($src['id'], $src['created_at'], $src['updated_at']);
+                    $src['month'] = $m; $src['year'] = $y; $src['school_year'] = $target;
+                    $src['is_paid'] = 0; $src['paid_date'] = null;
+                    $cols = array_keys($src);
+                    $colList = '`' . implode('`,`', $cols) . '`';
+                    $ph = implode(',', array_fill(0, count($cols), '?'));
+                    $updc = [];
+                    foreach ($cols as $c) $updc[] = "`$c`=VALUES(`$c`)";
+                    try {
+                        $db->prepare("INSERT INTO monthly_salaries ($colList) VALUES ($ph) ON DUPLICATE KEY UPDATE " . implode(',', $updc))
+                           ->execute(array_values($src));
+                        $rowsCopied++;
+                    } catch (Exception $e) {}
+                }
+            }
+            // المُعَدّ (ملاك/أساس>0): يُحسب بالقانون الساري لكل أشهر السنة الهدف بدرجته الحالية —
+            // وللمنقول بالصفوف: يركّب علاواته المسجّلة على الأشهر المنسوخة (overlayStoredYearBonuses)
+            $calcN = recalcEmployeeYear($id, $target);
+            logAudit('copy_year', 'employees', $id, null, ['from' => $srcSY, 'to' => $target, 'rows' => $rowsCopied, 'calc' => $calcN, 'bonuses' => $bonusCopied, 'reactivated' => $reactivated]);
+            $_SESSION['active_school_year'] = $target; // بدّل السنة المعروضة ليشوف النتيجة فوراً
+            $doneN = $hasConfig ? $calcN : $rowsCopied;
+            $_SESSION['flash'] = ['type' => 'success', 'msg' =>
+                "✅ انتسخ ملف «{$cName}» لسنة $target" . ($srcSY ? " (من آخر سنة عمل فيها: $srcSY)" : '') .
+                " — $doneN شهر راتب" . ($bonusCopied ? " + $bonusCopied علاوة" : '') .
+                ($reactivated ? '، ورجع «فاعلاً» (تواريخ التّرك القديمة انحفظت بالملاحظات)' : '') .
+                '. الدرجات ما تغيّرت — إذا بدّك تعدّلها من صفحة الدرجات. / Dossier copié vers ' . $target];
+            header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id);
+            exit;
+        }
+        header('Location: ' . BASE_URL . 'pages/employees.php?action=copy_year&id=' . $id);
+        exit;
+    }
+
+    // صفحة الاختيار والتأكيد (GET)
+    $currentPage = 'employees';
+    $pageTitle = 'Copier le dossier vers une année / نسخ الملف لسنة';
+    $hideExportToolbar = true;
+    $cyC = (int)date('Y'); $cmC = (int)date('n'); $startC = ($cmC >= 10) ? $cyC : $cyC - 1;
+    include __DIR__ . '/../includes/header.php';
+    ?>
+    <div class="card" style="max-width:680px;margin:40px auto;border:2px solid var(--primary)">
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-copy"></i> Copier le dossier vers une année</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">نسخ ملف الموظف لسنة دراسية</div>
+        </h3></div>
+        <div class="card-body">
+            <p style="font-size:17px;font-weight:800;margin:0 0 10px"><?= e($cName) ?></p>
+            <div class="alert alert-info" style="font-size:13px">
+                <i class="fas fa-info-circle"></i>
+                بينسخ <strong>ملفه كامل</strong> (رواتب كل أشهر السنة + الأجر الإضافي والمكافأة والنقل)
+                <?= $srcSY ? 'من آخر سنة اشتغل فيها (<strong>' . e($srcSY) . '</strong>)' : 'حسب إعداد راتبه الحالي' ?>
+                للسنة اللي بتختارها، وبيرجع يظهر فيها — بلا ما تعيد إدخال أي معلومة.
+                <br>• إذا كان مسجَّل تارك: بيرجع «فاعلاً» وتواريخ التّرك القديمة بتنحفظ بالملاحظات.
+                <br>• <strong>الدرجات ما بتتغيّر</strong> — بتضل متل ما هي، وبتعدّلها من صفحة الدرجات إذا لزم.
+            </div>
+            <?php if ($haveYears): ?>
+                <p style="color:var(--gray-500);font-size:12.5px;margin:6px 0">السنين الموجودة أصلاً بملفه: <?= e(implode('، ', $haveYears)) ?></p>
+            <?php endif; ?>
+            <form method="POST">
+                <?= csrfField() ?>
+                <div class="form-row cols-2" style="align-items:end">
+                    <div class="form-group mb-0">
+                        <label class="form-label">Copier vers l'année / انسخ لسنة <span class="req">*</span></label>
+                        <select name="target_year" class="form-select" required>
+                            <?php for ($yy = $startC + 1; $yy >= 2006; $yy--): $sy = $yy . '-' . ($yy + 1); $exists = in_array($sy, $haveYears, true); ?>
+                                <option value="<?= $sy ?>" <?= $exists ? 'disabled' : '' ?>><?= $sy ?><?= $exists ? ' — موجودة أصلاً ✓' : '' ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                    <div class="form-group mb-0 d-flex gap-2">
+                        <a href="?action=edit&id=<?= $id ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع / Retour</a>
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('نسخ ملف «<?= e($cName) ?>» للسنة المختارة؟')">
+                            <i class="fas fa-copy"></i> انسخ الملف / Copier
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php
+    include __DIR__ . '/../includes/footer.php';
+    exit;
+}
+
+// =====================================================
 // Read flash
 // =====================================================
 if (!empty($_SESSION['flash'])) {
@@ -832,6 +998,9 @@ include __DIR__ . '/../includes/header.php';
         <div class="d-flex gap-2">
             <?php /* 🧹 زرّا «تعديل/حذف» العلويان أُزيلا — مكرّران مع صفّ الأزرار الموجود بكل
                      تبويب تحتهما مباشرة («ها العجقة كلها لشو» — 2026-08-01) */ ?>
+            <a href="?action=copy_year&id=<?= $id ?>" class="btn btn-light" title="نسخ ملفه كامل لسنة تانية (مثلاً أستاذ ترك ورجع)">
+                <i class="fas fa-copy"></i> Copier vers une année / نسخ لسنة
+            </a>
             <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>" class="btn btn-light">
                 <i class="fas fa-layer-group"></i> Échelons & Promotions / الدرجات والترقيات
             </a>

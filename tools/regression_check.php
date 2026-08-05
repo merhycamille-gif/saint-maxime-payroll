@@ -1503,6 +1503,49 @@ check('🏷️ عنوان التقرير على كل ورقة مطبوعة: حق
       && strpos($rhSrc35, '.doc-table thead .pr-title-row{display:table-row;}') !== false
       && strpos($rhSrc35, '.doc-table thead{display:table-header-group;}') !== false);
 
+/* =====================================================================
+ * 36) زرّ «نسخ الملف لسنة» بملف الموظف (طلب 2026-08-05): أستاذ ترك من سنين
+ *     ورجع — كبسة وحدة تنسخ ملفه كامل (رواتب + علاوات) لأي سنة يختارها
+ *     بلا إعادة إدخال، ويرجع «فاعلاً» مع حفظ تواريخ التّرك القديمة بالملاحظات.
+ *     🔴 الدرجات لا تُمَسّ أبداً (قاعدة: لا إعادة بناء درجات تلقائية).
+ * =================================================================== */
+$empSrc36 = (string)file_get_contents($PROJ . '/pages/employees.php');
+check('نسخ الملف لسنة: الزر بملف الموظف + المعالج copy_year موجود ومحمي (كتابة + مدرسة + تبديل تلقائي)',
+      strpos($empSrc36, "action=copy_year&id=") !== false
+      && strpos($empSrc36, 'نسخ لسنة') !== false
+      && strpos($empSrc36, "\$action === 'copy_year' && \$id > 0") !== false
+      && strpos($empSrc36, "['edit', 'delete', 'copy_year']") !== false
+      && strpos($empSrc36, "['new', 'edit', 'delete', 'copy_year']") !== false);
+// جوهر المعالج: يرجّعه فاعلاً بحفظ تواريخ التّرك بالملاحظات، ينسخ العلاوات بلا تكرار،
+// ينسخ صفوف المنقول بـis_paid=0، يحسب بالمحرّك الموحّد recalcEmployeeYear — وممنوع يلمس الدرجات
+$h36s = strpos($empSrc36, '📅 نسخ ملف الموظف لسنة');
+$h36e = strpos($empSrc36, 'صفحة الاختيار والتأكيد');
+$hnd36 = ($h36s !== false && $h36e !== false && $h36e > $h36s) ? substr($empSrc36, $h36s, $h36e - $h36s) : '';
+check('نسخ الملف لسنة: المعالج يرجّع التارك «فاعلاً» ويحفظ تواريخ التّرك بالملاحظات وينسخ العلاوات والصفوف ويحسب بالمحرّك الموحّد',
+      $hnd36 !== ''
+      && strpos($hnd36, 'تواريخ التّرك السابقة') !== false
+      && strpos($hnd36, "left_date_cnss = NULL, left_date_finance = NULL, left_date_eoc = NULL") !== false
+      && strpos($hnd36, "status = 'actif'") !== false
+      && strpos($hnd36, "\$src['is_paid'] = 0") !== false
+      && strpos($hnd36, 'ON DUPLICATE KEY UPDATE') !== false
+      && strpos($hnd36, 'recalcEmployeeYear($id, $target)') !== false
+      && strpos($hnd36, "logAudit('copy_year'") !== false);
+check('🔴 نسخ الملف لسنة: المعالج لا يلمس الدرجات إطلاقاً (لا بناء ولا إعادة ربط ولا حذف أحداث)',
+      $hnd36 !== ''
+      && strpos($hnd36, 'buildLegalGradeHistory') === false
+      && strpos($hnd36, 'rechainGradeHistory') === false
+      && strpos($hnd36, 'employee_grade_history') === false);
+// تجربة فعلية (قراءة فقط): صفحة النسخ لجوانا الفغالي (1545، تاركة 2023) تعرض اسمها
+// وآخر سنة عمل (2022-2023) كمصدر، وتوضّح أن الدرجات لا تتغيّر، مع منتقي سنة وتأكيد
+$h36 = renderPage('pages/employees.php', ['action' => 'copy_year', 'id' => 1545], [], [3]);
+check('نسخ الملف لسنة (تجربة فعلية): صفحة التأكيد تعرض الاسم + آخر سنة عمل كمصدر + «الدرجات ما بتتغيّر» + منتقي السنة',
+      strpos($h36, 'جوانا الفغالي') !== false
+      && strpos($h36, '2022-2023') !== false
+      && strpos($h36, 'الدرجات ما بتتغيّر') !== false
+      && strpos($h36, 'name="target_year"') !== false
+      && strpos($h36, 'انسخ الملف / Copier') !== false,
+      strlen($h36) . ' حرف');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
