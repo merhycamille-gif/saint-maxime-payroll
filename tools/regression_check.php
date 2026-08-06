@@ -2094,6 +2094,25 @@ if ($z47 && (int)$z47['spouse_works'] === 0) {
     check('زيادة الزوج اختيارية (تجربة فعلية)', true, 'زاهية غير مطابقة — تخطٍّ');
 }
 
+/* =====================================================================
+ * 48) تشييك كل المدارس (طلب 2026-08-06): مجاميع كشف الرواتب لكل مدرسة = القاعدة
+ *     بالمليم + فحص «ملفات محتملة التكرار» بصفحة الصحة (مراجعة المستخدم).
+ * =================================================================== */
+$hc48 = (string)file_get_contents($PROJ . '/pages/health_check.php');
+check('كل المدارس: فحص «ملفات بنفس الاسم والفئة بنفس المؤسسة وكلاهما يقبض» بصفحة الصحة (مراجعة)',
+      strpos($hc48, 'ملفات بنفس الاسم والفئة بنفس المؤسسة وكلاهما يقبض') !== false
+      && strpos($hc48, "GROUP BY e.school_id, nm, e.employee_type HAVING COUNT(*) > 1") !== false);
+// تجربة فعلية: 3 مدارس مختلفة الأحجام — عدد «المجموع العام» بكشف الرواتب = عدّ القاعدة
+foreach ([3, 4, 6] as $sid48) {
+    $db48 = $db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE ms.school_id = $sid48 AND ms.month = 6 AND ms.year = 2026 AND e.is_deleted = 0
+          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)")->fetchColumn();
+    $h48 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], [], [$sid48]);
+    preg_match('/المجموع العام \((\d+)\)/u', $h48, $m48);
+    check("كل المدارس (تجربة فعلية): كشف رواتب مدرسة $sid48 — العدد الظاهر = عدّ القاعدة",
+          isset($m48[1]) && (int)$m48[1] === (int)$db48, 'قاعدة: ' . $db48 . ' / كشف: ' . ($m48[1] ?? '؟'));
+}
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
