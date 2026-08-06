@@ -273,10 +273,15 @@ class PayrollCalculator {
         if ($annualTaxableBase <= 0) return 0;
         
         // Get family deduction — السارية حسب تاريخ الشهر (أحدث تنزيل تاريخه ≤ تاريخ الراتب)
-        $asOfDed = $this->year . '-' . str_pad($this->month, 2, '0', STR_PAD_LEFT) . '-01';
-        $stmt = getDB()->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
-        $stmt->execute([$this->employee['social_status'], $asOfDed]);
-        $familyDeduction = (float)($stmt->fetchColumn() ?: 0);
+        // 🔵 خيار المستخدم بملف الموظف (2026-08-06): «تطبيق التنزيل العائلي» — مطفأ ⇒ لا تنزيل
+        // (الافتراضي مفعّل كما كان البرنامج دائماً؛ العمود قد يغيب قبل التركيب الذاتي ⇒ 1)
+        $familyDeduction = 0.0;
+        if ((int)($this->employee['apply_family_deduction'] ?? 1) === 1) {
+            $asOfDed = $this->year . '-' . str_pad($this->month, 2, '0', STR_PAD_LEFT) . '-01';
+            $stmt = getDB()->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+            $stmt->execute([$this->employee['social_status'], $asOfDed]);
+            $familyDeduction = (float)($stmt->fetchColumn() ?: 0);
+        }
         
         // Apply deduction
         $taxableAfterDeduction = max(0, $annualTaxableBase - $familyDeduction);

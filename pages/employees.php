@@ -379,6 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'm13_include_aide' => isset($_POST['m13_include_aide']) ? 1 : 0,
         'keep_working_past_64' => isset($_POST['keep_working_past_64']) ? 1 : 0,
         'tax_subject' => isset($_POST['tax_subject']) ? 1 : 0,
+        'apply_family_deduction' => isset($_POST['apply_family_deduction']) ? 1 : 0,
         'tax_includes_echelon' => isset($_POST['tax_includes_echelon']) ? 1 : 0,
         'tax_includes_extra' => isset($_POST['tax_includes_extra']) ? 1 : 0,
         'tax_includes_prime_aide' => isset($_POST['tax_includes_prime_aide']) ? 1 : 0,
@@ -429,6 +430,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     try {
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) unset($data['job_title']);
     } catch (Exception $e) { unset($data['job_title']); }
+    // عمود «تطبيق التنزيل العائلي»: ركّبه ذاتياً، وإن تعذّر أزِله من الحفظ لتفادي الكسر
+    try {
+        ensureEmployeeFlagColumns();
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'apply_family_deduction'")->fetch()) unset($data['apply_family_deduction']);
+    } catch (Exception $e) { unset($data['apply_family_deduction']); }
 
     try {
         if ($action === 'new') {
@@ -933,7 +939,7 @@ $employee = [
     'nssf_number' => '', 'finance_ministry_number' => '', 'caisse_number' => '',
     'salary_input_mode' => 'percent_of_lbp', 'base_salary_usd' => 0, 'base_salary_lbp_percent' => 100, 'contract_salary_lbp' => 0,
     'payment_months_per_year' => 10, 'has_13th_month' => 0, 'm13_include_extra' => 0, 'm13_include_aide' => 0,
-    'tax_subject' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
+    'tax_subject' => 1, 'apply_family_deduction' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
     'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0,
     'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0,
@@ -1797,6 +1803,11 @@ include __DIR__ . '/../includes/header.php';
                             <label class="d-flex justify-between align-center mb-3">
                                 <span><strong>خاضع للضريبة</strong> / Soumis à l'impôt</span>
                                 <label class="switch"><input type="checkbox" name="tax_subject" value="1" <?= $employee['tax_subject'] ? 'checked' : '' ?>><span class="slider"></span></label>
+                            </label>
+                            <label class="d-flex justify-between align-center mb-3">
+                                <span><strong>تطبيق التنزيل العائلي</strong> / Abattement familial
+                                    <small style="display:block;color:var(--gray-500)">مطفأ = الضريبة تُحسب بلا تنزيل عائلي لهذا الموظف</small></span>
+                                <label class="switch"><input type="checkbox" name="apply_family_deduction" value="1" <?= !isset($employee['apply_family_deduction']) || $employee['apply_family_deduction'] ? 'checked' : '' ?>><span class="slider"></span></label>
                             </label>
                             <p style="font-size:12px;color:var(--gray-500)">Inclure dans la base:</p>
                             <label><input type="checkbox" name="tax_includes_echelon" value="1" <?= $employee['tax_includes_echelon'] ? 'checked' : '' ?>> الدرجة والتدرّج / Échelon</label><br>

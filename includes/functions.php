@@ -839,6 +839,23 @@ function healNetUsdMirror20260804c() {
     } catch (Throwable $e) { /* لا نكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
+/**
+ * 🩹 تركيب ذاتي (2026-08-06): عمود «تطبيق التنزيل العائلي» بملف الموظف —
+ * خيار بيد المستخدم لكل موظف: يُطبَّق التنزيل العائلي على ضريبته أو لا (الافتراضي: يُطبَّق،
+ * كما كان البرنامج دائماً). يُركَّب ذاتياً بلا أي خطوة يدوية (منهج DB self-install).
+ */
+function ensureEmployeeFlagColumns() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'apply_family_deduction'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN apply_family_deduction TINYINT(1) NOT NULL DEFAULT 1");
+        }
+    } catch (Exception $e) { /* لا نكسر الصفحة — يُعاد بالفتحة التالية */ }
+}
+
 /** ضريبة الدخل السنوية بشطور البرنامج المؤرّخة (تُستعمل للتحقّق من المحسومات المنقولة). */
 function annualLawTaxAsOf($db, $annualTaxable, $socialStatus, $m, $y) {
     if ($annualTaxable <= 0) return 0;

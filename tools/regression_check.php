@@ -1811,6 +1811,60 @@ check('ر5 (تجربة فعلية): بعده تصريحاً سنوياً يعم�
       strpos($h40c, 'تصريح سنوي عن ضريبة الدخل على الرواتب والأجور') !== false
       && strpos($h40c, 'FATAL') === false, strlen($h40c) . ' حرف');
 
+/* =====================================================================
+ * 41) خيار «تطبيق التنزيل العائلي» بملف الموظف (طلب 2026-08-06): زرّ لكل موظف
+ *     يقرّر تطبيق التنزيل العائلي على ضريبته أو لا — العمود يتركّب ذاتياً،
+ *     والمحرّك + ر5 + ر10 يحترمونه، والافتراضي مفعّل (كما كان دائماً).
+ * =================================================================== */
+$fn41 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$pc41 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$emp41 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$of41 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+$hd41 = (string)file_get_contents($PROJ . '/includes/header.php');
+check('التنزيل العائلي اختياري: العمود يتركّب ذاتياً (ensureEmployeeFlagColumns بالهيدر وبحفظ الملف)',
+      function_exists('ensureEmployeeFlagColumns')
+      && strpos($fn41, "ADD COLUMN apply_family_deduction TINYINT(1) NOT NULL DEFAULT 1") !== false
+      && strpos($hd41, 'ensureEmployeeFlagColumns();') !== false
+      && strpos($emp41, 'ensureEmployeeFlagColumns();') !== false);
+check('التنزيل العائلي اختياري: المحرّك يحترم الخيار (مطفأ = صفر تنزيل) والافتراضي مفعّل',
+      strpos($pc41, "(int)(\$this->employee['apply_family_deduction'] ?? 1) === 1") !== false);
+check('التنزيل العائلي اختياري: زرّ بملف الموظف (بطاقة الضريبة) + يُحفَظ مع الملف',
+      strpos($emp41, 'name="apply_family_deduction"') !== false
+      && strpos($emp41, "'apply_family_deduction' => isset(\$_POST['apply_family_deduction'])") !== false
+      && strpos($emp41, "'apply_family_deduction' => 1,") !== false);
+check('التنزيل العائلي اختياري: ر5 ور10 يستثنيان مَن أطفأ خياره من سطر ١٧٠',
+      substr_count($of41, "COALESCE(e.apply_family_deduction, 1) afd") === 2
+      && substr_count($of41, "(int)\$de['afd'] !== 1) continue;") === 2);
+// تجربة فعلية (مع ترجيع كامل): موظف خاضع بضريبة موجبة وتنزيل ساري > 0 — طفي الخيار
+// يرفع ضريبته الشهرية، وإرجاعه يعيدها كما كانت بالمليم
+ensureEmployeeFlagColumns();
+$cand41 = $db->query("SELECT e.id, ms.income_tax_lbp t0 FROM employees e
+    JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.year = 2026 AND ms.month = 6
+    WHERE e.is_deleted = 0 AND e.tax_subject = 1 AND e.employee_type = 'enseignant_titulaire'
+      AND ms.income_tax_lbp > 0 AND COALESCE(e.apply_family_deduction, 1) = 1
+      AND LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
+                COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
+                COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31')) = '9999-12-31'
+      AND EXISTS (SELECT 1 FROM family_tax_deductions f WHERE f.social_status = e.social_status
+                    AND f.effective_from <= '2026-06-01' AND f.annual_deduction > 0)
+    LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($cand41) {
+    $cid41 = (int)$cand41['id']; $t0 = (int)$cand41['t0'];
+    $tOf41 = $db->prepare("SELECT income_tax_lbp FROM monthly_salaries WHERE employee_id = ? AND month = 6 AND year = 2026");
+    $db->exec("UPDATE employees SET apply_family_deduction = 0 WHERE id = $cid41");
+    try { (new PayrollCalculator($cid41, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
+    $tOf41->execute([$cid41]); $tNo = (int)$tOf41->fetchColumn();
+    $db->exec("UPDATE employees SET apply_family_deduction = 1 WHERE id = $cid41");
+    try { (new PayrollCalculator($cid41, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
+    $tOf41->execute([$cid41]); $tBack = (int)$tOf41->fetchColumn();
+    check('التنزيل العائلي اختياري (تجربة فعلية): إطفاء الخيار يرفع الضريبة الشهرية',
+          $tNo > $t0, "id $cid41 — مع التنزيل: " . number_format($t0) . " / بلا: " . number_format($tNo));
+    check('التنزيل العائلي اختياري (تجربة فعلية): إرجاع الخيار يعيد الضريبة كما كانت بالمليم',
+          $tBack === $t0, number_format($tBack));
+} else {
+    check('التنزيل العائلي اختياري (تجربة فعلية)', true, 'لا مرشّح مناسب — تخطٍّ');
+}
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
