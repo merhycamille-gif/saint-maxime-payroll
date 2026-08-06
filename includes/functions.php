@@ -1439,12 +1439,13 @@ function compColsCount(bool $withTransport = true): int {
     return $n;
 }
 
-/** الراتب المركّب بالليرة = أساس+درجة + المكوّنات المختارة (إضافي/مكافأة-مساعدة/نقل). */
+/** الراتب المركّب بالليرة = أساس+درجة + المكوّنات المختارة (إضافي/مكافأة-مساعدة).
+ *  🔴 قاعدة المستخدم (2026-08-06): تعويض النقل **لا يدخل بالمركّب أبداً** — النقل عمود
+ *  مستقل يوضع قبل «الإجمالي المتوجب» فيُجمع فيه (خيار transport بالشريط يتحكّم بعموده فقط). */
 function composedSalaryLbp(array $row): int {
     $s = (int)($row['base_plus_echelon_lbp'] ?? 0);
     if (salaryCompHas('extra'))     $s += (int)($row['extra_lbp'] ?? 0) + (int)($row['prime_fixe_lbp'] ?? 0);
     if (salaryCompHas('aide'))      $s += (int)($row['aide_complementaire_lbp'] ?? 0);
-    if (salaryCompHas('transport')) $s += (int)($row['transport_lbp'] ?? 0);
     return $s;
 }
 
@@ -1460,16 +1461,16 @@ function salaryCompToolbar(): string {
         <span class="scb-label"><i class="fas fa-layer-group"></i> <?= $lang==='ar' ? 'الراتب المركّب يشمل:' : 'Le salaire composé inclut :' ?></span>
         <label class="scb-opt"><input type="checkbox" name="comp[]" value="extra" <?= in_array('extra',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> + <?= $lang==='ar'?'الأجر الإضافي':'Supplément' ?></label>
         <label class="scb-opt"><input type="checkbox" name="comp[]" value="aide" <?= in_array('aide',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> + <?= $lang==='ar'?'المكافأة والمساعدة':'Prime & aide' ?></label>
-        <label class="scb-opt"><input type="checkbox" name="comp[]" value="transport" <?= in_array('transport',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> + <?= $lang==='ar'?'تعويض النقل':'Transport' ?></label>
-        <span class="scb-hint"><?= $lang==='ar'?'(الأساس + الدرجة دائماً)':'(Base + échelon toujours)' ?></span>
+        <label class="scb-opt"><input type="checkbox" name="comp[]" value="transport" <?= in_array('transport',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> <?= $lang==='ar'?'عمود تعويض النقل (يُجمع بالمستحق)':'Colonne transport (dans le dû)' ?></label>
+        <span class="scb-hint"><?= $lang==='ar'?'(الأساس + الدرجة دائماً — النقل لا يدخل بالمركّب)':'(Base + échelon toujours — transport hors salaire composé)' ?></span>
     </form>
     <?php return ob_get_clean();
 }
 
-/** تسمية مختصرة لِما يشمله الراتب المركّب (للعناوين). */
+/** تسمية مختصرة لِما يشمله الراتب المركّب (للعناوين) — النقل ليس منه (عموده مستقل). */
 function salaryCompLabel(): string {
-    $names = ['extra' => 'الإضافي', 'aide' => 'المكافأة', 'transport' => 'النقل'];
-    $sel = salaryComp();
+    $names = ['extra' => 'الإضافي', 'aide' => 'المكافأة'];
+    $sel = array_values(array_intersect(salaryComp(), ['extra', 'aide']));
     if (!$sel) return 'الأساسي فقط';
     return 'الأساسي + ' . implode(' + ', array_map(fn($k) => $names[$k], $sel));
 }

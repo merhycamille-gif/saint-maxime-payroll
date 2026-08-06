@@ -164,9 +164,10 @@ if ($srow) {
     check('composedSalaryLbp (أساس+إضافي)', composedSalaryLbp($srow) === $exp, number_format($exp));
     $_SESSION['salary_comp'] = [];
     check('composedSalaryLbp (أساسي فقط)', composedSalaryLbp($srow) === (int)$srow['base_plus_echelon_lbp']);
+    // (تصحيح المستخدم 2026-08-06): النقل لا يدخل بالمركّب أبداً — عموده مستقل قبل «الإجمالي المتوجب»
     $_SESSION['salary_comp'] = ['extra', 'aide', 'transport'];
-    $expAll = $exp + (int)$srow['aide_complementaire_lbp'] + (int)$srow['transport_lbp'];
-    check('composedSalaryLbp (كل المكوّنات)', composedSalaryLbp($srow) === $expAll, number_format($expAll));
+    $expAll = $exp + (int)$srow['aide_complementaire_lbp'];
+    check('composedSalaryLbp (كل المكوّنات — بلا النقل)', composedSalaryLbp($srow) === $expAll, number_format($expAll));
 } else {
     check('composedSalaryLbp', true, 'لا صف مناسب — تخطٍّ');
 }
@@ -1988,6 +1989,35 @@ check('كشف رواتب كل الموظفين (تجربة فعلية): بصف �
       && strpos($row44, number_format($after42)) !== false
       && mb_strpos($row44, number_format($share42)) < mb_strpos($row44, number_format($after42)),
       isset($share42, $after42) ? ('حصّة: ' . number_format($share42) . ' / خاضع بعدها: ' . number_format($after42)) : '؟');
+
+/* =====================================================================
+ * 45) «الراتب المركّب» بلا تعويض النقل (قاعدة المستخدم 2026-08-06): العمود الذي
+ *     يلي الإضافي والمكافأة لا يحوي النقل — النقل عمود مستقل قبل «الإجمالي
+ *     المتوجب» فيُجمع فيه. مركزي بـcomposedSalaryLbp فيعمّ كل الكشوف والتصدير.
+ * =================================================================== */
+$fn45 = (string)file_get_contents($PROJ . '/includes/functions.php');
+check('المركّب بلا نقل: composedSalaryLbp المركزية لا تجمع transport_lbp والتسمية بلا «النقل»',
+      strpos($fn45, "لا يدخل بالمركّب أبداً") !== false
+      && preg_match('/function composedSalaryLbp.*?^}/ms', $fn45, $m45) === 1
+      && strpos($m45[0], 'transport_lbp') === false
+      && strpos($fn45, "array_intersect(salaryComp(), ['extra', 'aide'])") !== false);
+check('المركّب بلا نقل: خيار النقل بالشريط صار «عمود تعويض النقل (يُجمع بالمستحق)»',
+      strpos($fn45, 'عمود تعويض النقل (يُجمع بالمستحق)') !== false);
+// تجربة فعلية: كشف رواتب كل الموظفين 6/2026 بكل الخيارات — مركّب مارسيلا 56,145,000
+// (بلا النقل 9,000,000) لا 65,145,000، وعمود النقل مستقل والمستحق 59,786,424 يجمعه
+$h45 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [2]);
+$p45 = mb_strpos($h45, 'مارسيلا');
+$row45 = $p45 !== false ? mb_substr($h45, $p45, 1800) : '';
+check('المركّب بلا نقل (تجربة فعلية): مركّب مارسيلا 56,145,000 والنقل 9,000,000 مستقل والمستحق 59,786,424',
+      $row45 !== ''
+      && strpos($row45, '56,145,000') !== false
+      && strpos($row45, '65,145,000') === false
+      && strpos($row45, '9,000,000') !== false
+      && strpos($row45, '59,786,424') !== false);
+// والكشف الشهري العام أيضاً: النقل قبل «الإجمالي المتوجب» مباشرة (بنية الرأس)
+$rp45 = (string)file_get_contents($PROJ . '/pages/reports.php');
+check('الكشف الشهري: عمود النقل يسبق «الإجمالي المتوجب» مباشرة',
+      strpos($rp45, 'transportHead() ?><th>الإجمالي المتوجب</th>') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
