@@ -860,6 +860,11 @@ function ensureEmployeeFlagColumns() {
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'count_children_allowance'")->fetch()) {
             $db->exec("ALTER TABLE employees ADD COLUMN count_children_allowance TINYINT(1) NOT NULL DEFAULT 1");
         }
+        // خيار «زيادة الزوج بالتنزيل العائلي: تُعطى/لا تُعطى» (2026-08-06 بطلب المستخدم —
+        // قانوناً الزيادة عن «الزوجة التي لا تعمل»، والمرأة لا تأخذها عن زوج قادر على العمل)
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'grant_spouse_addition'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN grant_spouse_addition TINYINT(1) NOT NULL DEFAULT 1");
+        }
     } catch (Exception $e) { /* لا نكسر الصفحة — يُعاد بالفتحة التالية */ }
 }
 
@@ -867,12 +872,13 @@ function ensureEmployeeFlagColumns() {
  * 🔴 المصدر الوحيد للتنزيل العائلي السنوي الساري لموظف (2026-08-06، حالة زاهية الحاج):
  * يعتمده المحرّك وكل الكشوف وتصاريح ر5/ر10 — فلا يختلف رقم عن رقم.
  *   - زرّ «تطبيق التنزيل العائلي» بملفه مطفأ ⇒ 0.
- *   - «الزوج/الزوجة يعمل» ✓ وهو متأهل ⇒ تُحذف **زيادة الزوج** (فرق «متأهل بلا أولاد»
- *     عن «عازب»، حالياً 225 مليون) — فيبقى التنزيل الشخصي + حصص الأولاد فقط،
- *     لأن الزوج العامل يأخذ تنزيله من جهة عمله (نفس منطق التعويض العائلي).
+ *   - «الزوج/الزوجة يعمل» ✓ **أو** زرّ «زيادة الزوج: لا تُعطى» بملفه ⇒ تُحذف **زيادة
+ *     الزوج** (فرق «متأهل بلا أولاد» عن «عازب»، حالياً 225 مليون) — فيبقى التنزيل
+ *     الشخصي + حصص الأولاد فقط. (قانوناً المادة 31: الزيادة عن «الزوجة التي لا تعمل»؛
+ *     المرأة لا تأخذها عن زوج قادر على العمل — القرار النهائي بيد المستخدم عبر الزرّ.)
  * $asOf: تاريخ السريان (أحدث قيم effective_from ≤ التاريخ).
  */
-function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf) {
+function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $grantSpouseAdd = 1) {
     if ((int)($applyFlag ?? 1) !== 1) return 0;
     try {
         $db = getDB();
@@ -880,7 +886,7 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf) {
                            WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
         $q->execute([(string)$socialStatus, $asOf]);
         $ded = (float)($q->fetchColumn() ?: 0);
-        if (!empty($spouseWorks) && strpos((string)$socialStatus, 'marie') === 0) {
+        if ((!empty($spouseWorks) || (int)($grantSpouseAdd ?? 1) !== 1) && strpos((string)$socialStatus, 'marie') === 0) {
             $q->execute(['marie_sans_enfants', $asOf]);
             $married0 = (float)($q->fetchColumn() ?: 0);
             $q->execute(['celibataire', $asOf]);

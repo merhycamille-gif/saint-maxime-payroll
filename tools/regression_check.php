@@ -1838,7 +1838,7 @@ check('التنزيل العائلي اختياري: زرّ بملف الموظ�
 check('التنزيل العائلي اختياري: ر5 ور10 وعمود كشف الرواتب كلهم على المصدر الوحيد familyDeductionAnnual',
       substr_count($of41, "COALESCE(e.apply_family_deduction, 1) afd") === 3
       && substr_count($of41, "familyDeductionAnnual(\$de['social_status'], \$de['spouse_works'], \$de['afd']") === 2
-      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf)") !== false);
+      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 1)") !== false);
 // تجربة فعلية (مع ترجيع كامل): موظف خاضع بضريبة موجبة وتنزيل ساري > 0 — طفي الخيار
 // يرفع ضريبته الشهرية، وإرجاعه يعيدها كما كانت بالمليم
 ensureEmployeeFlagColumns();
@@ -1881,7 +1881,7 @@ $rx42 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 check('عمود التنزيل العائلي: حصّة الشهر + قبل «الخاضع» + الخاضع بعد الحسم (شاشة، بالمصدر الوحيد)',
       strpos($rp42, 'التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small>') !== false
       && strpos($rp42, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false
-      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf)") !== false);
+      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf, \$r['gsa'] ?? 1)") !== false);
 check('عمود التنزيل العائلي: بتصدير Excel/Word بنفس الترتيب والمنطق',
       strpos($rx42, "'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)'") !== false
       && strpos($rx42, "COALESCE(e.apply_family_deduction,1) afd") !== false
@@ -1979,7 +1979,7 @@ $of44 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('كشف رواتب كل الموظفين: عمود التنزيل العائلي (حصّة الشهر) قبل الخاضع والخاضع بعد الحسم',
       strpos($of44, '<th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th>') !== false
       && strpos($of44, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$sfd)") !== false
-      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf)") !== false);
+      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 1)") !== false);
 // تجربة فعلية: صف مارسيلا بكشف 6/2026 — الحصّة ثم الخاضع بعدها بهذا الترتيب (نفس أرقام كشف الضريبة)
 $h44 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [2]);
 $p44 = mb_strpos($h44, 'مارسيلا');
@@ -2052,6 +2052,46 @@ if ($z46 && $z46['social_status'] === 'marie_sans_enfants') {
     check('زيادة الزوج (تجربة فعلية): الترجيع أعاد ضريبتها كما كانت', $tBack46 === $t0_46, number_format($tBack46));
 } else {
     check('زيادة الزوج (تجربة فعلية)', true, 'زاهية غير مطابقة للسيناريو — تخطٍّ');
+}
+
+/* =====================================================================
+ * 47) زرّ «زيادة الزوج/الزوجة بالتنزيل: تُعطى / لا تُعطى» بملف الموظف (طلب
+ *     المستخدم 2026-08-06 بعد التفتيش القانوني): خيار صريح يُسقط زيادة الزوج
+ *     (225م) وحدها مع بقاء الشخصي + الأولاد — والعمود ذاتي التركيب.
+ * =================================================================== */
+$fn47 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$emp47 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$pc47 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+check('زيادة الزوج اختيارية: العمود grant_spouse_addition ذاتي التركيب والدالة الموحّدة تحترمه',
+      strpos($fn47, "ADD COLUMN grant_spouse_addition TINYINT(1) NOT NULL DEFAULT 1") !== false
+      && strpos($fn47, '$grantSpouseAdd = 1') !== false
+      && strpos($fn47, "(!empty(\$spouseWorks) || (int)(\$grantSpouseAdd ?? 1) !== 1)") !== false);
+check('زيادة الزوج اختيارية: زرّ بملف الموظف + يُحفَظ + المحرّك يمرّره',
+      strpos($emp47, 'name="grant_spouse_addition"') !== false
+      && strpos($emp47, "'grant_spouse_addition' => isset(\$_POST['grant_spouse_addition'])") !== false
+      && strpos($pc47, "\$this->employee['grant_spouse_addition'] ?? 1") !== false);
+// تجربة فعلية على زاهية (متأهلة بلا أولاد، زوجها لا يعمل، ضريبتها 0) مع ترجيع كامل:
+// إطفاء «زيادة الزوج» وحده ⇒ تنزيلها 450م ⇒ تظهر ضريبة — والدالة مباشرة: 675م → 450م
+$fdG47a = familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-06-01', 1);
+$fdG47b = familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-06-01', 0);
+check('زيادة الزوج اختيارية: الدالة — تُعطى = 675م، لا تُعطى = 450م (الشخصي فقط)',
+      $fdG47a === 675000000 && $fdG47b === 450000000,
+      number_format($fdG47a) . ' → ' . number_format($fdG47b));
+$z47 = $db->query("SELECT COALESCE(grant_spouse_addition,1) g, spouse_works FROM employees WHERE id = 18")->fetch(PDO::FETCH_ASSOC);
+if ($z47 && (int)$z47['spouse_works'] === 0) {
+    $tOf47 = $db->prepare("SELECT income_tax_lbp FROM monthly_salaries WHERE employee_id = 18 AND month = 6 AND year = 2026");
+    $tOf47->execute([]); $t0_47 = (int)$tOf47->fetchColumn();
+    $db->exec("UPDATE employees SET grant_spouse_addition = 0 WHERE id = 18");
+    try { (new PayrollCalculator(18, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
+    $tOf47->execute([]); $tNo47 = (int)$tOf47->fetchColumn();
+    $db->exec("UPDATE employees SET grant_spouse_addition = " . (int)$z47['g'] . " WHERE id = 18");
+    try { (new PayrollCalculator(18, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
+    $tOf47->execute([]); $tBack47 = (int)$tOf47->fetchColumn();
+    check('زيادة الزوج اختيارية (تجربة فعلية): إطفاء الزرّ لزاهية يُظهر ضريبة فعلية',
+          $t0_47 === 0 && $tNo47 > 0, 'قبل: ' . number_format($t0_47) . ' / بعد: ' . number_format($tNo47));
+    check('زيادة الزوج اختيارية (تجربة فعلية): الترجيع أعاد ضريبتها كما كانت', $tBack47 === $t0_47, number_format($tBack47));
+} else {
+    check('زيادة الزوج اختيارية (تجربة فعلية)', true, 'زاهية غير مطابقة — تخطٍّ');
 }
 
 /* ---------- الخلاصة ---------- */

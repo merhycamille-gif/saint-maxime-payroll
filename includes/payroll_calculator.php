@@ -280,7 +280,8 @@ class PayrollCalculator {
             $this->employee['social_status'] ?? '',
             $this->employee['spouse_works'] ?? 0,
             $this->employee['apply_family_deduction'] ?? 1,
-            $asOfDed
+            $asOfDed,
+            $this->employee['grant_spouse_addition'] ?? 1
         );
         
         // Apply deduction
