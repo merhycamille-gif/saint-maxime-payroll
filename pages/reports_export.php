@@ -143,12 +143,22 @@ if ($report === 'monthly_summary') {
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('المجموع العام', $G, $rn); }
 
 } elseif ($report === 'tax_summary') {
-    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.finance_ministry_number,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.income_tax_lbp,ms.taxable_base_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
+    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.finance_ministry_number,e.school_id,e.social_status,COALESCE(e.apply_family_deduction,1) afd,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.income_tax_lbp,ms.taxable_base_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.tax_subject=1" . $schoolSql . $empYearFilter . $empTypeSql . "
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
+    // عمود «التنزيل العائلي» (2026-08-06): نفس مصدر الشاشة — السنوي الساري ويتبع زرّ ملفه (مطفأ = 0)
+    $fdAsOf = sprintf('%04d-%02d-01', $year, $month);
+    $fdStmt = $db->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+    $fdCache = [];
+    $fdOf = function ($r) use ($fdStmt, &$fdCache, $fdAsOf) {
+        if ((int)($r['afd'] ?? 1) !== 1) return 0;
+        $ss = (string)($r['social_status'] ?? '');
+        if (!array_key_exists($ss, $fdCache)) { $fdStmt->execute([$ss, $fdAsOf]); $fdCache[$ss] = (int)($fdStmt->fetchColumn() ?: 0); }
+        return $fdCache[$ss];
+    };
     $rep = new ReportTable('كشف ضريبة الدخل — ' . monthName($month, 'ar') . ' ' . $year . $empTypeTitle, true);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
@@ -156,29 +166,29 @@ if ($report === 'monthly_summary') {
     if (salaryCompHas('extra')) $head[] = 'الأجر الإضافي';
     if (salaryCompHas('aide'))  $head[] = 'مكافأة ومساعدة';
     $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')';
-    $head = array_merge($head, ['الراتب الخاضع', 'ضريبة الدخل']);
+    $head = array_merge($head, ['الراتب الخاضع', 'التنزيل العائلي (سنوي)', 'ضريبة الدخل']);
     $rep->head($head);
-    $z = ['base' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'txb' => 0, 'tax' => 0]; $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
+    $z = ['base' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'txb' => 0, 'fded' => 0, 'tax' => 0]; $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
     $pad = $schCol ? 4 : 3;
     $emit = function ($label, $a, $n) use ($rep, $pad) {
         $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'مجموع ' . $label . ' — العدد: ' . $n;
         $row[] = $a['base'];
         if (salaryCompHas('extra')) $row[] = $a['extra'];
         if (salaryCompHas('aide'))  $row[] = $a['aide'];
-        $row = array_merge($row, [$a['composed'], $a['txb'], $a['tax']]);
+        $row = array_merge($row, [$a['composed'], $a['txb'], $a['fded'], $a['tax']]);
         $rep->totalRow($row);
     };
     foreach ($data as $r) {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
-        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r); $txb = (int)$r['taxable_base_lbp']; $tax = (int)$r['income_tax_lbp'];
-        foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'txb' => $txb, 'tax' => $tax] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
+        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r); $txb = (int)$r['taxable_base_lbp']; $fded = $fdOf($r); $tax = (int)$r['income_tax_lbp'];
+        foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'txb' => $txb, 'fded' => $fded, 'tax' => $tax] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
         $row = array_merge($row, [$r['finance_ministry_number'], $nm($r), $base]);
         if (salaryCompHas('extra')) $row[] = $ex;
         if (salaryCompHas('aide'))  $row[] = $ai;
-        $row = array_merge($row, [$comp, $txb, $tax]);
+        $row = array_merge($row, [$comp, $txb, $fded, $tax]);
         $rep->row($row);
     }
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('المجموع العام', $G, $rn); }

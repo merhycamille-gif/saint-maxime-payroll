@@ -1865,6 +1865,33 @@ if ($cand41) {
     check('التنزيل العائلي اختياري (تجربة فعلية)', true, 'لا مرشّح مناسب — تخطٍّ');
 }
 
+/* =====================================================================
+ * 42) عمود «التنزيل العائلي» مقابل كل أستاذ بكشف ضريبة الدخل (طلب 2026-08-06):
+ *     بالشاشة والتصدير معاً — السنوي الساري حسب وضعه الاجتماعي، ويتبع زرّ
+ *     «تطبيق التنزيل العائلي» بملفه (مطفأ = 0). نفس مصدر المحرّك.
+ * =================================================================== */
+$rp42 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rx42 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+check('عمود التنزيل العائلي: بكشف الضريبة على الشاشة (رأس + قيمة لكل صف + بالمجاميع) ويتبع زرّ الملف',
+      strpos($rp42, 'التنزيل العائلي<br><small style="font-weight:400">سنوي — مطفأ بملفه = 0</small>') !== false
+      && strpos($rp42, "'fded'=>\$fdOf(\$r)") !== false
+      && strpos($rp42, "formatLBP(\$a['fded'])") !== false
+      && strpos($rp42, "(int)(\$r['afd'] ?? 1) !== 1) return 0;") !== false);
+check('عمود التنزيل العائلي: بتصدير Excel/Word لنفس الكشف بنفس المصدر',
+      strpos($rx42, "'التنزيل العائلي (سنوي)'") !== false
+      && strpos($rx42, "COALESCE(e.apply_family_deduction,1) afd") !== false
+      && strpos($rx42, "'fded' => \$fded") !== false);
+// تجربة فعلية: كشف حزيران 2026 مدرسة 2 — قيمة تنزيل مارسيلا الظاهرة = السارية بالقاعدة لوضعها
+$fd42 = (int)$db->query("SELECT f.annual_deduction FROM family_tax_deductions f
+    JOIN employees e ON e.social_status = f.social_status
+    WHERE e.id = 1677 AND f.effective_from <= '2026-06-01'
+    ORDER BY f.effective_from DESC LIMIT 1")->fetchColumn();
+$h42 = renderPage('pages/reports.php', ['report' => 'tax_summary', 'month' => 6, 'year' => 2026], [], [2]);
+check('عمود التنزيل العائلي (تجربة فعلية): الرأس ظاهر وقيمة مارسيلا = التنزيل الساري لوضعها الاجتماعي',
+      strpos($h42, 'التنزيل العائلي') !== false
+      && $fd42 > 0 && strpos($h42, number_format($fd42)) !== false,
+      'الساري بالقاعدة: ' . number_format($fd42));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

@@ -438,13 +438,24 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'tax_summary'):
-        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.finance_ministry_number, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
+        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.finance_ministry_number, e.school_id, e.social_status, COALESCE(e.apply_family_deduction, 1) afd, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.tax_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
         $t=0;$txExtra=0;$txAide=0;$txBase=0;
+        // عمود «التنزيل العائلي» (طلب 2026-08-06): السنوي الساري بتاريخ الشهر حسب وضعه
+        // الاجتماعي — ويتبع زرّ «تطبيق التنزيل العائلي» بملفه (مطفأ = 0). نفس مصدر المحرّك.
+        $fdAsOf = sprintf('%04d-%02d-01', $year, $month);
+        $fdStmt = $db->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+        $fdCache = [];
+        $fdOf = function ($r) use ($fdStmt, &$fdCache, $fdAsOf) {
+            if ((int)($r['afd'] ?? 1) !== 1) return 0;
+            $ss = (string)($r['social_status'] ?? '');
+            if (!array_key_exists($ss, $fdCache)) { $fdStmt->execute([$ss, $fdAsOf]); $fdCache[$ss] = (int)($fdStmt->fetchColumn() ?: 0); }
+            return $fdCache[$ss];
+        };
     ?>
         <form method="GET" class="card no-print">
             <input type="hidden" name="report" value="tax_summary">
@@ -458,16 +469,16 @@ function reportDocThumb($path) {
         </form>
         <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year . $empTypeTitle]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الراتب الخاضع للضريبة</th><th>الضريبة</th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الراتب الخاضع للضريبة</th><th>التنزيل العائلي<br><small style="font-weight:400">سنوي — مطفأ بملفه = 0</small></th><th>الضريبة</th></tr></thead>
                     <tbody>
                         <?php
-                        $zX = ['base'=>0,'extra'=>0,'aide'=>0,'composed'=>0,'txb'=>0,'tax'=>0]; $G = $zX; $csL = $multi?4:3;
+                        $zX = ['base'=>0,'extra'=>0,'aide'=>0,'composed'=>0,'txb'=>0,'fded'=>0,'tax'=>0]; $G = $zX; $csL = $multi?4:3;
                         $drawTotal = function($label,$a,$isGrand) use ($csL, $repRate){
                             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; ?>
                             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="<?= $csL ?>" style="text-align:right"><?= e($label) ?></td>
                                 <td><?= formatLBP($a['base']) ?></td><?php if (salaryCompHas('extra')): ?><td><?= money($a['extra'], $repRate) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($a['aide'], $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= money($a['composed'], $repRate) ?></strong></td>
-                                <td><strong><?= formatLBP($a['txb']) ?></strong></td><td><strong><?= formatLBP($a['tax']) ?></strong></td></tr>
+                                <td><strong><?= formatLBP($a['txb']) ?></strong></td><td><strong><?= formatLBP($a['fded']) ?></strong></td><td><strong><?= formatLBP($a['tax']) ?></strong></td></tr>
                         <?php };
                         $rn=0; $curCat=null; $sub=$zX;
                         foreach ($data as $r):
@@ -475,9 +486,9 @@ function reportDocThumb($path) {
                             if ($cat !== $curCat):
                                 if ($curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
                                 $sub=$zX; $curCat=$cat;
-                                ?><tr class="cat-row"><td colspan="<?= ($multi?8:7) + compColsCount(false) ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
+                                ?><tr class="cat-row"><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
                             endif;
-                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'txb'=>(int)$r['taxable_base_lbp'],'tax'=>(int)$r['income_tax_lbp']];
+                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'txb'=>(int)$r['taxable_base_lbp'],'fded'=>$fdOf($r),'tax'=>(int)$r['income_tax_lbp']];
                             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; } ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
@@ -489,11 +500,12 @@ function reportDocThumb($path) {
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $repRate) ?></strong></td>
                                 <td><?= formatLBP($r['taxable_base_lbp']) ?></td>
+                                <td><?= formatLBP($add['fded']) ?></td>
                                 <td><strong><?= formatLBP($r['income_tax_lbp']) ?></strong></td>
                             </tr>
                         <?php endforeach;
                         if ($data && $curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
-                        if (!$data): ?><tr><td colspan="<?= ($multi?8:7) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
+                        if (!$data): ?><tr><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
                         <?php if ($data) $drawTotal('المجموع العام — العدد: '.$rn, $G, true); ?>
                     </tbody>
                 </table></div>
