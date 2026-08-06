@@ -153,8 +153,8 @@ if ($report === 'monthly_summary') {
     // (السنوي ÷ أشهر دفعه)، يتبع زرّ ملفه والزوج العامل، ثم «الخاضع» = بعد حسم الحصّة
     $fdAsOf = sprintf('%04d-%02d-01', $year, $month);
     $fdOf = function ($r) use ($fdAsOf) {
-        $mpy = max(1, (int)($r['payment_months_per_year'] ?? 12));
-        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $fdAsOf, $r['gsa'] ?? 1) / $mpy);
+        // حصّة الشهر = السنوي ÷ 12 دائماً (القاعدة الرسمية: كل شهر معمول = 1/12 من التنزيل)
+        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $fdAsOf, $r['gsa'] ?? 1) / 12);
     };
     $rep = new ReportTable('كشف ضريبة الدخل — ' . monthName($month, 'ar') . ' ' . $year . $empTypeTitle, true);
     $rep->schoolHeader($school);

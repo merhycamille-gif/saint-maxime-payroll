@@ -446,10 +446,16 @@ class PayrollCalculator {
         // === 6. Income Tax ===
         // اشتراك صندوق التعويضات (٦٪ + درجة/نصف راتب) معفى من ضريبة الدخل ⇒ يُنزَّل من الأساس الخاضع.
         $taxBase = max(0, $taxBase - $caisseAmount - $eocGradeDeduction);
-        $monthsPerYear = (int)$emp['payment_months_per_year'];
-        $annualTaxable = $taxBase * $monthsPerYear;
+        // 🔴 القاعدة الرسمية (دليل وزارة المالية ص55 — طُبّقت 2026-08-06 بطلب المستخدم
+        // «كل شي حسب القوانين اللبنانية»): «يجري تجزئة التنزيل العائلي وشطور الضريبة
+        // بالنسبة إلى مدة العمل» — كل شهر معمول يستحق 1/12 من التنزيل السنوي و1/12 من
+        // الشطور مهما كان عدد أشهر دفعه. التطبيق: أساس الشهر يُسنوَن ×12 وتُحسب الضريبة
+        // السنوية (بالتنزيل الكامل والشطور الكاملة) ثم تُقسم ÷12 = ضريبة الشهر المعمول.
+        // فمن يعمل 10 أشهر يدفع 10 حصص شهرية = 10/12 من السنوية تلقائياً (لا ×10/÷10
+        // كما كان — ذلك أعطاه التنزيل السنوي كاملاً وشطور سنة كاملة عن 10 أشهر خطأً).
+        $annualTaxable = $taxBase * 12;
         $annualTax = $this->calculateIncomeTax($annualTaxable);
-        $monthlyTax = $monthsPerYear > 0 ? $annualTax / $monthsPerYear : 0;
+        $monthlyTax = $annualTax / 12;
 
         // === 7. Family Allowances (NOT subject to any deduction) ===
         // 🔵 خيارا الملف (2026-08-06): «احتساب تعويض الزوج/الزوجة» و«احتساب تعويض الأولاد»

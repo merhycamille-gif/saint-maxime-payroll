@@ -808,7 +808,7 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
     $tax    = (int)($g['tax']??0);
     // ١٧٠ التنزيل العائلي/الشخصي: يُمنح **مرّة واحدة سنوياً لكل موظف** حسب وضعه الاجتماعي
     // والتاريخ الساري (نفس مصدر المحرّك family_tax_deductions)، ومحدود بأساسه الخاضع.
-    $qDed = $db->prepare("SELECT e.id, e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 1) gsa, SUM(ms.taxable_base_lbp) tb
+    $qDed = $db->prepare("SELECT e.id, e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 1) gsa, COUNT(DISTINCT ms.month) mcnt, SUM(ms.taxable_base_lbp) tb
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
         WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . $ofEmpFilter . " AND ms.school_year=?
           AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
@@ -817,9 +817,10 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
     $dedAsOf = ($gy1 + 1) . '-01-01'; // منتصف السنة الدراسية (كانون الثاني) = التنزيل الساري للسنة المصرَّح عنها
     $exempt = 0;
     foreach ($qDed->fetchAll() as $de) {
-        // المصدر الوحيد familyDeductionAnnual: يحترم زرّ ملفه + الزوج العامل (بلا زيادة الزوج)
+        // المصدر الوحيد familyDeductionAnnual + القاعدة الرسمية (دليل المالية ص55): التنزيل
+        // يُجزَّأ بمدة العمل — حصة كل شهر معمول = السنوي ÷ 12 (فذو الـ10 أشهر يأخذ 10/12)
         $fda = familyDeductionAnnual($de['social_status'], $de['spouse_works'], $de['afd'], $dedAsOf, $de['gsa'] ?? 1);
-        $exempt += (int)min($fda, (float)$de['tb']);
+        $exempt += (int)min($fda / 12 * min(12, (int)$de['mcnt']), (float)$de['tb']);
     }
     $taxable = max(0, $net - $exempt);                               // ١٨٠
     $rows = [
@@ -1512,8 +1513,8 @@ elseif ($form === 'teacher_card'):
     $sfdAsOf = sprintf('%04d-%02d-01', $year, $month);
     $sfdOf = function ($r) use ($sfdAsOf) {
         if ((int)($r['income_tax_lbp'] ?? 0) + (int)($r['taxable_base_lbp'] ?? 0) === 0) return 0;
-        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $sfdAsOf, $r['gsa'] ?? 1)
-                          / max(1, (int)($r['payment_months_per_year'] ?? 12)));
+        // حصّة الشهر = السنوي ÷ 12 دائماً (القاعدة الرسمية: كل شهر معمول = 1/12 من التنزيل)
+        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $sfdAsOf, $r['gsa'] ?? 1) / 12);
     };
 ?>
     <form method="get" class="card no-print">

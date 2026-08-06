@@ -869,6 +869,35 @@ function ensureEmployeeFlagColumns() {
 }
 
 /**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-06 — «بدي البرنامج يشتغل كل شي صح وحسب القوانين
+ * اللبنانية»): تطبيق قاعدة تجزئة التنزيل والشطور بمدة العمل (دليل وزارة المالية ص55)
+ * على المخزّن — يُعاد حساب غير ذوي الـ12 شهراً الخاضعين للضريبة (المعدّين) للسنة
+ * الحالية والسنين المفتوحة اللاحقة، فتتصحّح ضريبتهم على المعادلة القانونية (×12/÷12).
+ * ذوو الـ12 شهراً لا يتغيّرون (المعادلتان متطابقتان لهم). idempotent.
+ */
+function healLawfulTaxProration20260806() {
+    $flag = 'lawful_tax_proration_2026_08_06';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        if (function_exists('set_time_limit')) @set_time_limit(600);
+        $q = $db->prepare("SELECT DISTINCT ms.employee_id, ms.school_year FROM monthly_salaries ms
+            JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND e.payment_months_per_year <> 12 AND e.tax_subject = 1
+              AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+              AND ms.school_year >= ?");
+        $q->execute([currentSchoolYear()]);
+        $n = 0;
+        foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            try { recalcEmployeeYear((int)$r['employee_id'], $r['school_year']); $n++; } catch (Exception $e2) {}
+        }
+        setSetting($flag, date('Y-m-d H:i:s') . " ($n)");
+        if ($n) logAudit('heal_lawful_tax_proration', 'monthly_salaries', 0, null, ['recalcs' => $n]);
+    } catch (Exception $e) { /* يُعاد بالفتحة التالية */ }
+}
+
+/**
  * 🩹 شفاء ذاتي مرّة واحدة (2026-08-06 بأمر المستخدم الصريح «الملف اللي ما في اسم الأب شيلو»):
  * الموظف ذو الملفين بنفس المؤسسة وكلاهما قابض بالسنة الحالية — يُشال الملف الذي **ليس فيه
  * اسم أب حقيقي** (فارغ أو نقاط أو حرف واحد = placeholder المنقول) ويبقى الملف الكامل.

@@ -2146,6 +2146,48 @@ $h50 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' =
 check('شيل ملف بلا أب (تجربة فعلية): مريم ريشا صارت مرّة واحدة فقط بكشف رواتب النجاة',
       substr_count($h50, 'مريم ريشا') === 1, substr_count($h50, 'مريم ريشا') . ' مرّة');
 
+/* =====================================================================
+ * 51) 🔴 القاعدة الرسمية: تجزئة التنزيل العائلي وشطور الضريبة بمدة العمل
+ *     (دليل وزارة المالية ص55 — «بدي كل شي حسب القوانين اللبنانية» 2026-08-06):
+ *     كل شهر معمول = 1/12 من التنزيل و1/12 من الشطور — المحرّك يُسنوِن ×12
+ *     ويقسم ÷12 (لا ×أشهر الدفع/÷أشهر الدفع)، وحصّة الشهر بالكشوف = السنوي÷12.
+ * =================================================================== */
+$pc51 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$fn51 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$hd51 = (string)file_get_contents($PROJ . '/includes/header.php');
+$rp51 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$of51 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+check('تجزئة القانون: المحرّك يُسنوِن ×12 ويقسم ÷12 (لا على أشهر الدفع)',
+      strpos($pc51, '$annualTaxable = $taxBase * 12;') !== false
+      && strpos($pc51, '$monthlyTax = $annualTax / 12;') !== false
+      && strpos($pc51, '$taxBase * $monthsPerYear') === false);
+check('تجزئة القانون: حصّة الشهر بالكشوف = السنوي ÷ 12 دائماً + ر5 بحصص الأشهر المعمولة + الشفاء مربوط',
+      substr_count($rp51 . $of51 . (string)file_get_contents($PROJ . '/pages/reports_export.php'), '?? 1) / 12)') >= 2
+      && strpos($of51, '$exempt += (int)min($fda / 12 * min(12, (int)$de[\'mcnt\']), (float)$de[\'tb\']);') !== false
+      && function_exists('healLawfulTaxProration20260806')
+      && strpos($hd51, 'healLawfulTaxProration20260806();') !== false);
+// تجربة فعلية: طانوس القزي (عازب، 10 أشهر) — حصّته بكشف الضريبة صارت 37,500,000 لا 45,000,000
+$h51 = renderPage('pages/reports.php', ['report' => 'tax_summary', 'month' => 6, 'year' => 2026], [], [2]);
+$p51 = mb_strpos($h51, 'طانوس القزي');
+$row51 = $p51 !== false ? mb_substr($h51, $p51, 1200) : '';
+check('تجزئة القانون (تجربة فعلية): حصّة طانوس القزي (10 أشهر) = 37,500,000 لا 45,000,000',
+      $row51 !== '' && strpos($row51, '37,500,000') !== false && strpos($row51, '45,000,000') === false);
+// تجربة فعلية: كل معدٍّ غير ذي 12 شهراً خاضع وضريبته > 0 بحزيران — ضريبته المخزّنة
+// = القانون بالضبط (شطور ×12 − التنزيل الكامل ثم ÷12) ضمن ±1 ل.ل. للتقريب
+$law51 = $db->query("SELECT ms.employee_id, ms.taxable_base_lbp txb, ms.income_tax_lbp tax, e.social_status ss
+    FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.is_deleted = 0 AND e.payment_months_per_year <> 12 AND e.tax_subject = 1
+      AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+      AND e.spouse_works = 0 AND COALESCE(e.apply_family_deduction, 1) = 1 AND COALESCE(e.grant_spouse_addition, 1) = 1
+      AND ms.month = 6 AND ms.year = 2026 AND ms.income_tax_lbp > 0")->fetchAll(PDO::FETCH_ASSOC);
+$bad51 = [];
+foreach ($law51 as $r51x) {
+    $exp51 = (int)round(annualLawTaxAsOf($db, (float)$r51x['txb'] * 12, $r51x['ss'], 6, 2026) / 12);
+    if (abs((int)$r51x['tax'] - $exp51) > 1) $bad51[] = $r51x['employee_id'] . ':' . number_format((int)$r51x['tax']) . '≠' . number_format($exp51);
+}
+check('تجزئة القانون (تجربة فعلية): ضريبة كل المعدّين غير ذوي الـ12 شهراً المخزّنة = المعادلة القانونية بالمليم',
+      count($law51) > 0 && !$bad51, count($law51) . ' موظفاً' . ($bad51 ? ' — خلل: ' . implode(' · ', $bad51) : ' كلهم مطابقون'));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
