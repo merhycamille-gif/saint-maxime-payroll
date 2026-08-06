@@ -853,6 +853,13 @@ function ensureEmployeeFlagColumns() {
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'apply_family_deduction'")->fetch()) {
             $db->exec("ALTER TABLE employees ADD COLUMN apply_family_deduction TINYINT(1) NOT NULL DEFAULT 1");
         }
+        // خيارا التعويض العائلي (2026-08-06): احتساب تعويض الزوج/الزوجة والأولاد أو لا
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'count_spouse_allowance'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN count_spouse_allowance TINYINT(1) NOT NULL DEFAULT 1");
+        }
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'count_children_allowance'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN count_children_allowance TINYINT(1) NOT NULL DEFAULT 1");
+        }
     } catch (Exception $e) { /* لا نكسر الصفحة — يُعاد بالفتحة التالية */ }
 }
 

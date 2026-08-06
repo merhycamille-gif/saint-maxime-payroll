@@ -393,6 +393,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'eoc_includes_prime_aide' => isset($_POST['eoc_includes_prime_aide']) ? 1 : 0,
         'family_allowance_spouse_lbp' => (int)str_replace(',', '', $_POST['family_allowance_spouse_lbp'] ?? 0),
         'family_allowance_children_lbp' => (int)str_replace(',', '', $_POST['family_allowance_children_lbp'] ?? 0),
+        'count_spouse_allowance' => isset($_POST['count_spouse_allowance']) ? 1 : 0,
+        'count_children_allowance' => isset($_POST['count_children_allowance']) ? 1 : 0,
         // تعويض النقل اليومي: الشهري = اليومي × أيام الأسبوع × عدد الأسابيع
         'transport_daily_amount' => (float)str_replace(',', '', $_POST['transport_daily_amount'] ?? 0),
         'transport_daily_currency' => (($_POST['transport_daily_currency'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP',
@@ -430,11 +432,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     try {
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) unset($data['job_title']);
     } catch (Exception $e) { unset($data['job_title']); }
-    // عمود «تطبيق التنزيل العائلي»: ركّبه ذاتياً، وإن تعذّر أزِله من الحفظ لتفادي الكسر
-    try {
-        ensureEmployeeFlagColumns();
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'apply_family_deduction'")->fetch()) unset($data['apply_family_deduction']);
-    } catch (Exception $e) { unset($data['apply_family_deduction']); }
+    // أعمدة الخيارات (التنزيل العائلي + احتساب تعويض الزوجة/الأولاد): ركّبها ذاتياً،
+    // وإن تعذّر أزِلها من الحفظ لتفادي الكسر
+    foreach (['apply_family_deduction', 'count_spouse_allowance', 'count_children_allowance'] as $flagCol) {
+        try {
+            ensureEmployeeFlagColumns();
+            if (!$db->query("SHOW COLUMNS FROM employees LIKE '$flagCol'")->fetch()) unset($data[$flagCol]);
+        } catch (Exception $e) { unset($data[$flagCol]); }
+    }
 
     try {
         if ($action === 'new') {
@@ -943,6 +948,7 @@ $employee = [
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
     'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0,
     'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0,
+    'count_spouse_allowance' => 1, 'count_children_allowance' => 1,
     'transport_daily_amount' => 0, 'transport_daily_currency' => 'LBP', 'transport_days_per_week' => 0, 'transport_weeks' => 4,
     'notes' => ''
 ];
@@ -1574,10 +1580,20 @@ include __DIR__ . '/../includes/header.php';
                     <div class="form-group">
                         <label class="form-label">Allocation épouse (L.L) / تعويض الزوجة</label>
                         <input type="number" name="family_allowance_spouse_lbp" class="form-control" value="<?= (int)$employee['family_allowance_spouse_lbp'] ?>" min="0">
+                        <label class="d-flex justify-between align-center" style="margin-top:6px">
+                            <span><strong>احتساب تعويض الزوج/الزوجة</strong> / Compter
+                                <small style="display:block;color:var(--gray-500)">مطفأ = لا يُدفع تعويض الزوجة (والزوج/الزوجة العامل لا تعويض له تلقائياً)</small></span>
+                            <label class="switch"><input type="checkbox" name="count_spouse_allowance" value="1" <?= !isset($employee['count_spouse_allowance']) || $employee['count_spouse_allowance'] ? 'checked' : '' ?>><span class="slider"></span></label>
+                        </label>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Allocation enfants (L.L) / تعويض الأولاد</label>
                         <input type="number" name="family_allowance_children_lbp" class="form-control" value="<?= (int)$employee['family_allowance_children_lbp'] ?>" min="0">
+                        <label class="d-flex justify-between align-center" style="margin-top:6px">
+                            <span><strong>احتساب تعويض الأولاد</strong> / Compter
+                                <small style="display:block;color:var(--gray-500)">أدخِل المبلغ الكامل — إذا «الزوج/الزوجة يعمل» ✓ يُحسب <strong>النصف تلقائياً</strong> (يتقاسمانه)</small></span>
+                            <label class="switch"><input type="checkbox" name="count_children_allowance" value="1" <?= !isset($employee['count_children_allowance']) || $employee['count_children_allowance'] ? 'checked' : '' ?>><span class="slider"></span></label>
+                        </label>
                     </div>
                 </div>
 

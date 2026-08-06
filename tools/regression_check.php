@@ -1892,6 +1892,70 @@ check('عمود التنزيل العائلي (تجربة فعلية): الرأ�
       && $fd42 > 0 && strpos($h42, number_format($fd42)) !== false,
       'الساري بالقاعدة: ' . number_format($fd42));
 
+/* =====================================================================
+ * 43) خيارا التعويض العائلي بملف الموظف (طلب 2026-08-06): زرّ «احتساب تعويض
+ *     الزوج/الزوجة» + زرّ «احتساب تعويض الأولاد» + قاعدة: الزوج/الزوجة يعمل ⇒
+ *     لا تعويض زوجة + تعويض الأولاد مناصفةً (النصف تلقائياً).
+ * =================================================================== */
+$fn43 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$pc43 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$emp43 = (string)file_get_contents($PROJ . '/pages/employees.php');
+check('تعويض عائلي اختياري: العمودان يتركّبان ذاتياً (count_spouse/children_allowance)',
+      strpos($fn43, "ADD COLUMN count_spouse_allowance TINYINT(1) NOT NULL DEFAULT 1") !== false
+      && strpos($fn43, "ADD COLUMN count_children_allowance TINYINT(1) NOT NULL DEFAULT 1") !== false);
+check('تعويض عائلي اختياري: المحرّك يحترم الزرّين + الزوج العامل = لا تعويض زوجة ونصف تعويض الأولاد',
+      strpos($pc43, "(int)(\$emp['count_spouse_allowance'] ?? 1) !== 1) \$famSpouse = 0;") !== false
+      && strpos($pc43, "(int)(\$emp['count_children_allowance'] ?? 1) !== 1) \$famChildren = 0;") !== false
+      && strpos($pc43, "\$famChildren = round(\$famChildren / 2);") !== false);
+check('تعويض عائلي اختياري: زرّان بملف الموظف عند حقلي التعويض ويُحفَظان مع الملف',
+      strpos($emp43, 'name="count_spouse_allowance"') !== false
+      && strpos($emp43, 'name="count_children_allowance"') !== false
+      && strpos($emp43, "'count_spouse_allowance' => isset(\$_POST['count_spouse_allowance'])") !== false
+      && strpos($emp43, 'يُحسب <strong>النصف تلقائياً</strong>') !== false);
+// تجربة فعلية (مع ترجيع كامل): موظف فاعل معدّ — نركّب عليه مبلغَي زوجة 600,000 وأولاد 900,000
+// ونجرّب الحالات الأربع على شهر 6/2026 عبر عمود family_allowance_lbp المخزّن
+ensureEmployeeFlagColumns();
+$c43 = $db->query("SELECT e.id, e.spouse_works, e.family_allowance_spouse_lbp sp, e.family_allowance_children_lbp ch,
+                          COALESCE(e.count_spouse_allowance,1) cs, COALESCE(e.count_children_allowance,1) cc
+    FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.year = 2026 AND ms.month = 6
+    WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND ms.net_salary_lbp > 0
+      AND LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
+                COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
+                COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31')) = '9999-12-31'
+    LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($c43) {
+    $cid43 = (int)$c43['id'];
+    $fam43 = $db->prepare("SELECT family_allowance_lbp FROM monthly_salaries WHERE employee_id = ? AND month = 6 AND year = 2026");
+    $famOf = function () use ($fam43, $cid43, $db) {
+        try { (new PayrollCalculator($cid43, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
+        $fam43->execute([$cid43]);
+        return (int)$fam43->fetchColumn();
+    };
+    $set43 = function ($sw, $cs, $cc) use ($db, $cid43) {
+        $db->exec("UPDATE employees SET spouse_works = $sw, count_spouse_allowance = $cs, count_children_allowance = $cc,
+                   family_allowance_spouse_lbp = 600000, family_allowance_children_lbp = 900000 WHERE id = $cid43");
+    };
+    $set43(0, 1, 1); $fA = $famOf();   // زوجة لا تعمل + الزرّان مفعّلان = 1,500,000
+    $set43(0, 0, 1); $fB = $famOf();   // زرّ الزوجة مطفأ = 900,000
+    $set43(0, 1, 0); $fC = $famOf();   // زرّ الأولاد مطفأ = 600,000
+    $set43(1, 1, 1); $fD = $famOf();   // الزوجة تعمل = 0 زوجة + نصّ الأولاد = 450,000
+    // ترجيع كامل
+    $db->exec("UPDATE employees SET spouse_works = " . (int)$c43['spouse_works'] . ", count_spouse_allowance = " . (int)$c43['cs'] . ",
+               count_children_allowance = " . (int)$c43['cc'] . ", family_allowance_spouse_lbp = " . (int)$c43['sp'] . ",
+               family_allowance_children_lbp = " . (int)$c43['ch'] . " WHERE id = $cid43");
+    $fR = $famOf();
+    $expR = ((int)$c43['spouse_works'] ? 0 : ((int)$c43['cs'] ? (int)$c43['sp'] : 0))
+          + ((int)$c43['cc'] ? (int)round(((int)$c43['ch']) / ((int)$c43['spouse_works'] ? 2 : 1)) : 0);
+    check('تعويض عائلي (تجربة فعلية): الزرّان يتحكّمان بالمبلغ (كامل/بلا زوجة/بلا أولاد)',
+          $fA === 1500000 && $fB === 900000 && $fC === 600000,
+          "id $cid43 — كامل: " . number_format($fA) . " / بلا زوجة: " . number_format($fB) . " / بلا أولاد: " . number_format($fC));
+    check('تعويض عائلي (تجربة فعلية): الزوج/الزوجة يعمل ⇒ صفر زوجة + نصف الأولاد (450,000 من 900,000)',
+          $fD === 450000, number_format($fD));
+    check('تعويض عائلي (تجربة فعلية): الترجيع أعاد كل شيء كما كان', $fR === $expR, number_format($fR));
+} else {
+    check('تعويض عائلي (تجربة فعلية)', true, 'لا مرشّح — تخطٍّ');
+}
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

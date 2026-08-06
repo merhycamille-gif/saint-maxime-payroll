@@ -451,7 +451,18 @@ class PayrollCalculator {
         $monthlyTax = $monthsPerYear > 0 ? $annualTax / $monthsPerYear : 0;
 
         // === 7. Family Allowances (NOT subject to any deduction) ===
-        $familyAllowance = (float)$emp['family_allowance_spouse_lbp'] + (float)$emp['family_allowance_children_lbp'];
+        // 🔵 خيارا الملف (2026-08-06): «احتساب تعويض الزوج/الزوجة» و«احتساب تعويض الأولاد»
+        // (الافتراضي محسوبان) + قاعدة المستخدم: الزوج/الزوجة يعمل ⇒ لا تعويض زوجة إطلاقاً
+        // (يأخذه من جهة عمله) وتعويضُ الأولاد **مناصفةً** بين الوالدَين (النصف هنا).
+        $famSpouse   = (float)$emp['family_allowance_spouse_lbp'];
+        $famChildren = (float)$emp['family_allowance_children_lbp'];
+        if ((int)($emp['count_spouse_allowance'] ?? 1) !== 1) $famSpouse = 0;
+        if ((int)($emp['count_children_allowance'] ?? 1) !== 1) $famChildren = 0;
+        if (!empty($emp['spouse_works'])) {
+            $famSpouse = 0;
+            $famChildren = round($famChildren / 2);
+        }
+        $familyAllowance = $famSpouse + $famChildren;
 
         // === 8. Totals ===
         $totalRetenues = $cnssAmount + $caisseAmount + $monthlyTax + $eocGradeDeduction;
