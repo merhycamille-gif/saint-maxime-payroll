@@ -2123,6 +2123,29 @@ check('ذو الملفين: فحص «موظف بملفين بنفس المؤسس
       && strpos($hc49, "HAVING COUNT(*) > 1 AND SUM(e.tax_subject = 1) > 1") !== false
       && strpos($hc49, 'أطفئ «خاضع للضريبة»') !== false);
 
+/* =====================================================================
+ * 50) «الملف اللي ما في اسم الأب شيلو» (أمر المستخدم 2026-08-06): الشفاء الذاتي
+ *     شال الملف المكرّر ذا الأب الوهمي (نقاط/حرف) حذفاً ناعماً وأبقى الكامل —
+ *     وما لمس مَن كلا ملفيه بلا أب (جان عاد، قرار يدوي) ولا الشخصين الحقيقيين.
+ * =================================================================== */
+$fn50 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$hd50 = (string)file_get_contents($PROJ . '/includes/header.php');
+check('شيل ملف بلا أب: الشفاء موجود ومربوط بالهيدر (حذف ناعم + مطابقة بالاسم + أمان الحالتين)',
+      function_exists('healRemoveNoFatherDuplicates20260806')
+      && strpos($hd50, 'healRemoveNoFatherDuplicates20260806();') !== false
+      && strpos($fn50, "UPDATE employees SET is_deleted = 1 WHERE id = ?") !== false
+      && strpos($fn50, 'if (!$with || !$without) continue;') !== false);
+// البيانات بعد الشفاء: الملفات الخمسة الوهمية مشالة والملفات الكاملة باقية وجان عاد بملفيه
+$gone50 = (int)$db->query("SELECT SUM(is_deleted = 1) FROM employees WHERE id IN (976, 641, 1593, 1795, 1746)")->fetchColumn();
+$kept50 = (int)$db->query("SELECT SUM(is_deleted = 0) FROM employees WHERE id IN (69, 248, 419, 1514, 1540)")->fetchColumn();
+$jean50 = (int)$db->query("SELECT SUM(is_deleted = 0) FROM employees WHERE id IN (1657, 1794)")->fetchColumn();
+check('شيل ملف بلا أب (البيانات): الخمسة الوهمية مشالة، الكاملة باقية، جان عاد بملفيه لقرار المستخدم',
+      $gone50 === 5 && $kept50 === 5 && $jean50 === 2, "مشال $gone50/5 · باقٍ $kept50/5 · جان عاد $jean50/2");
+// وبالكشوف: المشال ما عاد يظهر (مريم ريشا صارت مرة واحدة بكشف النجاة)
+$h50 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], [], [3]);
+check('شيل ملف بلا أب (تجربة فعلية): مريم ريشا صارت مرّة واحدة فقط بكشف رواتب النجاة',
+      substr_count($h50, 'مريم ريشا') === 1, substr_count($h50, 'مريم ريشا') . ' مرّة');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

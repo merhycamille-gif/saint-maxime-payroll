@@ -869,6 +869,42 @@ function ensureEmployeeFlagColumns() {
 }
 
 /**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-06 بأمر المستخدم الصريح «الملف اللي ما في اسم الأب شيلو»):
+ * الموظف ذو الملفين بنفس المؤسسة وكلاهما قابض بالسنة الحالية — يُشال الملف الذي **ليس فيه
+ * اسم أب حقيقي** (فارغ أو نقاط أو حرف واحد = placeholder المنقول) ويبقى الملف الكامل.
+ * حذف ناعم (is_deleted=1) قابل للاسترجاع + سجلّ تدقيق. المطابقة بالاسم لا بالرقم (يعمل
+ * أونلاين مهما اختلفت الأرقام). أمان: إن كان كلا الملفين بلا أب حقيقي (جان عاد) أو كلاهما
+ * بأب حقيقي (شخصان مثل ريتا/ماريا حليحل) → لا يُمَسّ شيء، القرار يدوي.
+ */
+function healRemoveNoFatherDuplicates20260806() {
+    $flag = 'remove_nofather_dups_2026_08_06';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        $q = $db->prepare("SELECT e.id, e.school_id, CONCAT(e.first_name_ar,' ',e.last_name_ar) nm, e.father_name_ar
+            FROM employees e WHERE e.is_deleted = 0
+              AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.net_salary_lbp > 0)");
+        $q->execute([currentSchoolYear()]);
+        $groups = [];
+        foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) $groups[$r['school_id'] . '|' . $r['nm']][] = $r;
+        $realFather = function ($f) { return mb_strlen(str_replace('.', '', trim((string)$f))) >= 2; };
+        $removed = [];
+        foreach ($groups as $g) {
+            if (count($g) < 2) continue;
+            $with = array_filter($g, function ($r) use ($realFather) { return $realFather($r['father_name_ar']); });
+            $without = array_filter($g, function ($r) use ($realFather) { return !$realFather($r['father_name_ar']); });
+            if (!$with || !$without) continue; // كلاهما بلا أب أو كلاهما بأب → قرار يدوي
+            foreach ($without as $r) {
+                $db->prepare("UPDATE employees SET is_deleted = 1 WHERE id = ?")->execute([(int)$r['id']]);
+                $removed[] = $r['nm'] . ' (#' . $r['id'] . ')';
+            }
+        }
+        setSetting($flag, date('Y-m-d H:i:s'));
+        if ($removed) logAudit('heal_remove_nofather_dups', 'employees', 0, null, ['removed' => $removed]);
+    } catch (Exception $e) { /* لا نعطّل الصفحة — يُعاد بالفتحة التالية */ }
+}
+
+/**
  * 🔴 المصدر الوحيد للتنزيل العائلي السنوي الساري لموظف (2026-08-06، حالة زاهية الحاج):
  * يعتمده المحرّك وكل الكشوف وتصاريح ر5/ر10 — فلا يختلف رقم عن رقم.
  *   - زرّ «تطبيق التنزيل العائلي» بملفه مطفأ ⇒ 0.
