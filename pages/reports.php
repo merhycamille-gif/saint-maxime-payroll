@@ -486,7 +486,8 @@ function reportDocThumb($path) {
                                 $sub=$zX; $curCat=$cat;
                                 ?><tr class="cat-row"><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
                             endif;
-                            $fded43=$fdOf($r);
+                            // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55)
+                            $fded43=min($fdOf($r), (int)$r['taxable_base_lbp']);
                             $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'fded'=>$fded43,'txb'=>max(0,(int)$r['taxable_base_lbp']-$fded43),'tax'=>(int)$r['income_tax_lbp']];
                             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; } ?>
                             <tr>

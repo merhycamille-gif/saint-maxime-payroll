@@ -178,7 +178,9 @@ if ($report === 'monthly_summary') {
     foreach ($data as $r) {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
-        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r); $fded = $fdOf($r); $txb = max(0, (int)$r['taxable_base_lbp'] - $fded); $tax = (int)$r['income_tax_lbp'];
+        $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r);
+        // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55)
+        $fded = min($fdOf($r), (int)$r['taxable_base_lbp']); $txb = max(0, (int)$r['taxable_base_lbp'] - $fded); $tax = (int)$r['income_tax_lbp'];
         foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'fded' => $fded, 'txb' => $txb, 'tax' => $tax] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);

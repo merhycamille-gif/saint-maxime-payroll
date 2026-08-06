@@ -1573,7 +1573,8 @@ elseif ($form === 'teacher_card'):
                 ?><tr class="cat-row"><td colspan="<?= 16 + compColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
             $rRate = rowRate($r);
-            $sfd = $sfdOf($r);
+            // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55)
+            $sfd = min($sfdOf($r), (int)$r['taxable_base_lbp']);
             $add = ['base'=>$r['base_salary_lbp'],'ech'=>$r['echelon_value_lbp'],'bpe'=>$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'caisse'=>$r['caisse_amount_lbp'],'fded'=>$sfd,'txb'=>max(0,(int)$r['taxable_base_lbp']-$sfd),'tax'=>$r['income_tax_lbp'],'cnss'=>$r['cnss_amount_lbp'],'ded'=>$r['total_retenues_lbp'],'fam'=>$r['family_allowance_lbp'],'trans'=>$r['transport_lbp'],'due'=>dueShownLbp($r),'net'=>$r['net_salary_lbp'],
                     'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd((int)$r['transport_lbp'],$rRate),
                     'composed'=>composedSalaryLbp($r),'composed_usd'=>lbpToUsd(composedSalaryLbp($r),$rRate)];

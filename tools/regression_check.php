@@ -2166,12 +2166,21 @@ check('تجزئة القانون: حصّة الشهر بالكشوف = السن�
       && strpos($of51, '$exempt += (int)min($fda / 12 * min(12, (int)$de[\'mcnt\']), (float)$de[\'tb\']);') !== false
       && function_exists('healLawfulTaxProration20260806')
       && strpos($hd51, 'healLawfulTaxProration20260806();') !== false);
-// تجربة فعلية: طانوس القزي (عازب، 10 أشهر) — حصّته بكشف الضريبة صارت 37,500,000 لا 45,000,000
+// (تكملة بقاعدة المستخدم «ما بيصير نيغاتيف»): التنزيل المعروض بحدّ الراتب الخاضع —
+// طانوس القزي (عازب 10 أشهر، خاضعه 32م < حصة 37.5م): تنزيله المعروض = 32,000,000
+// والخاضع بعده = 0 — لا 45,000,000 القديمة ولا 37,500,000 غير المسقّفة
+check('التنزيل بحدّ الخاضع: السقف min() مطبَّق بالكشوف الثلاثة (شاشة/تصدير/رواتب)',
+      strpos($rp51, "min(\$fdOf(\$r), (int)\$r['taxable_base_lbp'])") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/reports_export.php'), "min(\$fdOf(\$r), (int)\$r['taxable_base_lbp'])") !== false
+      && strpos($of51, "min(\$sfdOf(\$r), (int)\$r['taxable_base_lbp'])") !== false);
 $h51 = renderPage('pages/reports.php', ['report' => 'tax_summary', 'month' => 6, 'year' => 2026], [], [2]);
 $p51 = mb_strpos($h51, 'طانوس القزي');
 $row51 = $p51 !== false ? mb_substr($h51, $p51, 1200) : '';
-check('تجزئة القانون (تجربة فعلية): حصّة طانوس القزي (10 أشهر) = 37,500,000 لا 45,000,000',
-      $row51 !== '' && strpos($row51, '37,500,000') !== false && strpos($row51, '45,000,000') === false);
+$e51 = mb_strpos($row51, '</tr>');
+if ($e51 !== false) $row51 = mb_substr($row51, 0, $e51); // صفّه فقط (لا الصف التالي)
+check('تجزئة القانون + السقف (تجربة فعلية): تنزيل طانوس المعروض = راتبه الخاضع 32,000,000 (لا 45م ولا 37.5م) وضريبته 0',
+      $row51 !== '' && strpos($row51, '32,000,000') !== false
+      && strpos($row51, '45,000,000') === false && strpos($row51, '37,500,000') === false);
 // تجربة فعلية: كل معدٍّ غير ذي 12 شهراً خاضع وضريبته > 0 بحزيران — ضريبته المخزّنة
 // = القانون بالضبط (شطور ×12 − التنزيل الكامل ثم ÷12) ضمن ±1 ل.ل. للتقريب
 $law51 = $db->query("SELECT ms.employee_id, ms.taxable_base_lbp txb, ms.income_tax_lbp tax, e.social_status ss
