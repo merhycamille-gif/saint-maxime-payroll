@@ -433,11 +433,25 @@ if (!$emp):
     //  (1) شهر فيه **أجر إضافي/مكافأة** (prime/extra) — غالباً معظم الراتب، فلا تطلع الإفادة ناقصة،
     //  (2) ثمّ شهر فيه **صافي/أساس** فعلي، (3) ثمّ الأحدث زمنياً. fallback: آخر صفّ مهما كان.
     // ملاحظة: لا نعتمد «الصافي» وحده لأنّ بعض الصفوف أونلاين صافيها صفر (غير محسوب) رغم وجود الإضافي.
-    $sal = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ?
-        ORDER BY (prime_fixe_lbp > 0 OR extra_lbp > 0) DESC,
+    // 🔴 مصدر واحد (2026-08-06): الشهر يُختار من **السنة الدراسية المعروضة نفسها** التي تعرضها
+    // كل التقارير والبطاقات — لا من كل التاريخ (كانت الإفادة تلقّط شهراً من سنة أخرى، مثلاً
+    // السنة الجديدة المفتوحة، فتخالف أرقامُها الكشوفَ). إن لم يكن للموظف صفوف بالسنة المعروضة
+    // (أو الوضع «كل السنين») → أفضل شهر إجمالاً كما قبل.
+    $salPickSql = "ORDER BY (prime_fixe_lbp > 0 OR extra_lbp > 0) DESC,
                  (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) DESC,
-                 year DESC, month DESC LIMIT 1");
-    $sal->execute([$employeeId]); $sal = $sal->fetch();
+                 year DESC, month DESC LIMIT 1";
+    $sal = null;
+    $attSy = activeSchoolYear();
+    if ($attSy !== 'all') {
+        $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? " . $salPickSql);
+        $q->execute([$employeeId, $attSy]);
+        $sal = $q->fetch();
+    }
+    if (!$sal) {
+        $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? " . $salPickSql);
+        $q->execute([$employeeId]);
+        $sal = $q->fetch();
+    }
     if ($sal) {
         $basePlusEch=(float)$sal['base_plus_echelon_lbp']; $net=(float)$sal['net_salary_lbp'];
         $netUsd=rowUsd($sal, 'net_salary_usd', 'net_salary_lbp'); $cnssAmt=(float)$sal['cnss_amount_lbp']; $schoolCnss=(float)$sal['school_cnss_8_lbp'];

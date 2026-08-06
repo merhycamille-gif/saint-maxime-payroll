@@ -67,9 +67,21 @@ if (!$emp):
     $nomFr = trim($emp['first_name_fr'].' '.($emp['father_name_fr'] ? $emp['father_name_fr'].' ' : '').$emp['last_name_fr']);
     $nomAr = trim($emp['first_name_ar'].' '.($emp['father_name_ar'] ? $emp['father_name_ar'].' ' : '').$emp['last_name_ar']);
 
-    // الراتب الحالي
-    $sal = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? ORDER BY year DESC, month DESC LIMIT 1");
-    $sal->execute([$employeeId]); $sal = $sal->fetch();
+    // الراتب الحالي — 🔴 مصدر واحد (2026-08-06): من السنة الدراسية المعروضة نفسها التي تعرضها
+    // كل التقارير (كان يأخذ آخر صفّ مخزّن ولو من سنة مفتوحة لاحقة فيخالف الكشوف)؛
+    // وإن لم يكن فيها صفوف (أو الوضع «كل السنين») → آخر صفّ إجمالاً كما قبل.
+    $sal = null;
+    $ehSy = activeSchoolYear();
+    if ($ehSy !== 'all') {
+        $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? ORDER BY year DESC, month DESC LIMIT 1");
+        $q->execute([$employeeId, $ehSy]);
+        $sal = $q->fetch();
+    }
+    if (!$sal) {
+        $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? ORDER BY year DESC, month DESC LIMIT 1");
+        $q->execute([$employeeId]);
+        $sal = $q->fetch();
+    }
     $curBase = $sal ? (float)$sal['base_plus_echelon_lbp'] : scaleSalaryLBP($emp['current_grade']);
     $curNet  = $sal ? (float)$sal['net_salary_lbp'] : $curBase;
 

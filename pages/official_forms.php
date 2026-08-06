@@ -454,10 +454,12 @@ if (in_array($form, $imageForms)) {
     }
     elseif ($form === 'cnss_work_detail' && $emp) {
         // إفادة عمل (CNSS 2M): جدول الأشهر الستة (عمود «الشهر» فقط) + قسم آخر 3 أشهر (الأجر المدفوع)
+        // 🔴 الأشهر الفعلية الماضية فقط (حتى شهر اليوم) — لا أشهر مستقبلية من سنة مفتوحة للتجهيز
         $q = $db->prepare("SELECT month, year, (base_plus_echelon_lbp+extra_lbp+prime_fixe_lbp) p
                            FROM monthly_salaries WHERE employee_id=? AND is_calculated=1
+                             AND (year * 100 + month) <= ?
                            ORDER BY year DESC, month DESC LIMIT 6");
-        $q->execute([$emp['id']]);
+        $q->execute([$emp['id'], (int)date('Y') * 100 + (int)date('n')]);
         $rowsP = $q->fetchAll();
         $six = array_reverse($rowsP);          // الأقدم→الأحدث للجدول (6 أشهر)
         $last3 = array_slice($rowsP, 0, 3);     // أحدث 3 أشهر لقسم الأجر المدفوع
@@ -1914,10 +1916,12 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
 </div>
 
 <?php elseif ($form === 'cnss_work_detail'): // 2M إفادة عمل — مرض (مفصّلة)
+    // 🔴 الأشهر الفعلية الماضية فقط (حتى شهر اليوم) — لا أشهر مستقبلية من سنة مفتوحة للتجهيز
     $rows = $db->prepare("SELECT month, year, base_plus_echelon_lbp, extra_lbp, prime_fixe_lbp, aide_complementaire_lbp
                           FROM monthly_salaries WHERE employee_id=? AND is_calculated=1
+                            AND (year * 100 + month) <= ?
                           ORDER BY year DESC, month DESC LIMIT 6");
-    $rows->execute([$emp['id']]);
+    $rows->execute([$emp['id'], (int)date('Y') * 100 + (int)date('n')]);
     $paid = array_reverse($rows->fetchAll());
 ?>
 <div class="official-doc cnss-form rtl" id="ppExportArea">
