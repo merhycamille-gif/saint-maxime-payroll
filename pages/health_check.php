@@ -158,6 +158,23 @@ try {
     hc($groups, $G1, $phUnpaid === 0, 'لا رواتب وهمية لتارك بعد سنة تركه (قاعدة التارك)',
        $phUnpaid === 0 ? 'صفر صفوف' : "$phUnpaid صفّاً",
        'لو فشل: تارك يظهر بكشوف سنة ما عاد يعمل فيها (مثلاً بعد فتح سنة جديدة) — يُنظَّف تلقائياً بأول فتح صفحة وحماية المحرّك تمنع رجوعه.');
+    // مطابقة الملف والكشوف (حالة مارسيلا 2026-08-06): علاوات ملف الموظف المعدّ (إضافي/مكافأة)
+    // = المخزّن بأشهره **بكل السنين** — للحالات القابلة للمطابقة الدقيقة (مبلغ ل.ل لكل السنة).
+    $mir = (int)$db->query("SELECT COUNT(*) FROM (SELECT ms.employee_id FROM monthly_salaries ms
+        JOIN employees e ON e.id = ms.employee_id
+        WHERE e.is_deleted = 0 AND COALESCE(ms.is_indemnity_month, 0) = 0
+          AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+          AND NOT EXISTS (SELECT 1 FROM employee_bonuses b2 WHERE b2.employee_id = e.id AND b2.school_year = ms.school_year AND b2.is_active = 1
+              AND b2.bonus_type IN ('prime_fixe','aide_complementaire')
+              AND (b2.value_type <> 'amount' OR b2.currency <> 'LBP' OR b2.start_month IS NOT NULL OR b2.end_month IS NOT NULL))
+        GROUP BY ms.employee_id, ms.school_year
+        HAVING SUM((ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) <>
+            (SELECT COALESCE(SUM(b.amount),0) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1
+               AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND b.value_type = 'amount' AND b.currency = 'LBP'
+               AND b.start_month IS NULL AND b.end_month IS NULL)) > 0) x")->fetchColumn();
+    hc($groups, $G1, $mir === 0, 'الإضافي/المكافأة بملف الموظف = المخزّن بكشوفه بكل السنين (الكشف يطابق الملف)',
+       $mir === 0 ? 'صفر حالة' : "$mir موظف×سنة",
+       'لو فشل: علاوة معدَّلة بالملف لم تنعكس على كشوف سنتها (متل حالة مارسيلا) — تُصلَح تلقائياً بأول فتح صفحة، وأي حفظ جديد يعيد حساب كل السنين المفتوحة.');
 } catch (Exception $e) {}
 
 /* الأرقام «المنقولة»: مكوّناتها لا تفسّر مجموعها (بيانات مستوردة — تحتاج قرار المستخدم) */

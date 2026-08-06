@@ -513,6 +513,60 @@ function healLeaverPhantomRows() {
     } catch (Exception $e) { /* لا نُعطّل الصفحة */ }
 }
 
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-06 — حالة مارسيلا داود «الإضافي بالملف صح وبالكشف مش
+ * هوي ذاتو»): إعادة الحساب بعد حفظ الملف كانت تصيب السنة التقويمية فقط بينما العلاوات
+ * تُحفَظ على السنة المعروضة — فأي تعديل والمستخدم على السنة الجديدة المفتوحة ترك أشهرها
+ * المخزّنة على القديم واختلفت الكشوف عن الملف. الكود صُلِّح (recalcEmployeeYear)؛ وهذا
+ * الشفاء يصلّح البيانات العالقة الموجودة:
+ *   (أ) كل السنين المفتوحة اللاحقة للسنة الجارية: يعاد حسابها بالمحرّك الموحّد
+ *       (المعدّون حساب كامل، والمنقولون تركيب علاوات آمن، والتاركون يحميهم حارس المحرّك).
+ *   (ب) جراحياً: أي (موظف معدّ، سنة) مخزّنه لا يطابق علاوات ملفه — للحالات القابلة
+ *       للمطابقة الدقيقة (مبلغ ل.ل لكل السنة) — يعاد حسابه أيضاً.
+ * علامة settings تمنع التكرار؛ والعملية idempotent فلو انقطعت منتصفها تكمل بالفتحة التالية.
+ */
+function healStaleYearMirror20260806() {
+    $flag = 'stale_year_recalc_2026_08_06';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        if (function_exists('set_time_limit')) @set_time_limit(300);
+        $cur = currentSchoolYear();
+        // (أ) السنين المفتوحة المستقبلية
+        $q = $db->prepare("SELECT DISTINCT ms.employee_id, ms.school_year FROM monthly_salaries ms
+                           JOIN employees e ON e.id = ms.employee_id
+                           WHERE e.is_deleted = 0 AND ms.school_year > ?");
+        $q->execute([$cur]);
+        $nA = 0;
+        foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            try { recalcEmployeeYear((int)$r['employee_id'], $r['school_year']); $nA++; } catch (Exception $e2) {}
+        }
+        // (ب) جراحي: المعدّون الذين مخزّن سنةٍ ما عندهم لا يطابق علاوات ملفهم (المقارنة الدقيقة فقط)
+        $mm = $db->query("SELECT ms.employee_id, ms.school_year FROM monthly_salaries ms
+            JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND COALESCE(ms.is_indemnity_month, 0) = 0
+              AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+              AND NOT EXISTS (SELECT 1 FROM employee_bonuses b2 WHERE b2.employee_id = e.id AND b2.school_year = ms.school_year AND b2.is_active = 1
+                  AND b2.bonus_type IN ('prime_fixe','aide_complementaire')
+                  AND (b2.value_type <> 'amount' OR b2.currency <> 'LBP' OR b2.start_month IS NOT NULL OR b2.end_month IS NOT NULL))
+            GROUP BY ms.employee_id, ms.school_year
+            HAVING SUM((ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) <>
+                (SELECT COALESCE(SUM(b.amount),0) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1
+                   AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND b.value_type = 'amount' AND b.currency = 'LBP'
+                   AND b.start_month IS NULL AND b.end_month IS NULL)) > 0")->fetchAll(PDO::FETCH_ASSOC);
+        $nB = 0;
+        foreach ($mm as $r) {
+            try { recalcEmployeeYear((int)$r['employee_id'], $r['school_year']); $nB++; } catch (Exception $e2) {}
+        }
+        setSetting($flag, date('Y-m-d H:i:s'));
+        if ($nA || $nB) {
+            logAudit('heal_stale_year_mirror', 'monthly_salaries', 0, null,
+                     ['future_year_recalcs' => $nA, 'mismatch_recalcs' => $nB]);
+        }
+    } catch (Exception $e) { /* لا نُعطّل الصفحة — يُعاد بالفتحة التالية لأن العلامة لم تُكتب */ }
+}
+
 // 🩹 شفاء ذاتي (مرّة واحدة، 2026-07-29): السنة 2026-2027 فُتحت قبل آلية «نسخ العلاوات مع
 // فتح السنة»، فطلعت رواتبها بلا الأجر الإضافي/المكافأة رغم وجودها في 2025-2026 (شكوى p1).
 // عند أول فتح صفحة: ينسخ prime_fixe + aide_complementaire من السنة السابقة لكل موظف عنده

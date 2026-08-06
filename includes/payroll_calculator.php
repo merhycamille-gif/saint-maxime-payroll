@@ -613,15 +613,39 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
               || (float)$e['base_salary_usd'] > 0
               || (float)$e['contract_salary_lbp'] > 0;
 
-    // افتراضياً السنة الحالية؛ لكن الأستاذ الجديد الذي تاريخ دخوله في سنة دراسية **لاحقة**
-    // (مثلاً عُيِّن لسنة 2026-2027 المفتوحة) يُحسب على سنة دخوله لا الحالية — فلا يظهر في
-    // السنة الجارية أو ما قبلها. (يُطبَّق فقط حين لا تُمرَّر سنة صريحة، فلا يمسّ القدامى.)
-    $sy = $schoolYear ?: currentSchoolYear();
+    // 🔴 (2026-08-06 — حالة مارسيلا داود «الإضافي بالملف صح وبالكشف مش هوي») النداء بلا سنة
+    // صريحة كان يعيد حساب السنة **التقويمية** فقط، بينما العلاوات تُحفَظ على السنة **المعروضة**
+    // (writeSchoolYear) — فإذا عدّل المستخدم علاوة وهو على السنة الجديدة المفتوحة بقيت أشهرها
+    // المخزّنة على القديم واختلف الكشف عن الملف. الصحيح: بلا سنة صريحة يُعاد حساب السنة
+    // المعروضة + السنة التقويمية + كل السنين المفتوحة اللاحقة (المجهّزة مسبقاً من إعدادات
+    // الملف نفسها) — فتبقى كل الكشوف مطابقة للملف مهما كانت السنة المعروضة.
+    $sy = $schoolYear ?: writeSchoolYear();
     if (!$schoolYear && !empty($e['hire_date'])) {
+        // الأستاذ الجديد الذي تاريخ دخوله في سنة دراسية **لاحقة** (عُيِّن لسنة مفتوحة)
+        // يُحسب على سنة دخوله — فلا يظهر في السنة الجارية أو ما قبلها.
         $hireSy = schoolYearOfDate($e['hire_date']);
         if ($hireSy && $hireSy > $sy) $sy = $hireSy; // مقارنة نصّية صحيحة لصيغة YYYY-YYYY
     }
     if ($sy === 'all' || !preg_match('/^(\d{4})-(\d{4})$/', (string)$sy, $mm)) return 0;
+
+    if (!$schoolYear) {
+        $others = [];
+        $cur = currentSchoolYear();
+        // السنة التقويمية أيضاً (تعديل الإعداد يمسّها) — إلا الأستاذ المعيَّن لسنة لاحقة
+        // (دخوله بعد السنة الجارية): لا تُحسب له السنة الجارية فلا يظهر فيها.
+        $hireSyG = !empty($e['hire_date']) ? schoolYearOfDate($e['hire_date']) : null;
+        if ($cur !== $sy && (!$hireSyG || $hireSyG <= $cur)) $others[$cur] = 1;
+        try {
+            $fq = $db->prepare("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = ? AND school_year > ?");
+            $fq->execute([$employeeId, $cur]);
+            foreach ($fq->fetchAll(PDO::FETCH_COLUMN) as $fSy) {
+                if ($fSy !== $sy && preg_match('/^\d{4}-\d{4}$/', (string)$fSy)) $others[$fSy] = 1;
+            }
+        } catch (Exception $ex) {}
+        foreach (array_keys($others) as $oSy) {
+            try { recalcEmployeeYear($employeeId, $oSy); } catch (Exception $ex) {}
+        }
+    }
 
     // المنقول بصفوف مخزّنة (متعاقد/موظف بأساس صفر): بدل تجاهُله كلياً — ركِّب علاواته
     // المسجّلة على أشهره المخزّنة، فيظهر الأجر الإضافي الذي يدخله المستخدم في ملفه

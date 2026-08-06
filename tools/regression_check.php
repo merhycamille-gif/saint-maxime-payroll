@@ -1640,6 +1640,82 @@ $phAll37 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employ
 check('قاعدة التارك: صفر رواتب وهمية (غير مدفوعة) لتاركين بعد سنة تركهم بكل القاعدة', $phAll37 === 0,
       $phAll37 === 0 ? 'نظيفة' : "$phAll37 صفّاً");
 
+/* =====================================================================
+ * 38) «الكشف يطابق الملف» (شكوى 2026-08-06 — مارسيلا داود): إعادة الحساب بلا
+ *     سنة صريحة كانت تصيب السنة التقويمية فقط بينما العلاوات تُحفَظ على السنة
+ *     المعروضة → كشوف السنة الجديدة المفتوحة تبقى على القديم. صار النداء بلا
+ *     سنة يعيد حساب: السنة المعروضة + التقويمية + كل السنين المفتوحة اللاحقة.
+ * =================================================================== */
+$pcSrc38 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$fnSrc38 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$hdSrc38 = (string)file_get_contents($PROJ . '/includes/header.php');
+check('الكشف يطابق الملف: recalcEmployeeYear بلا سنة = السنة المعروضة + التقويمية + المفتوحة اللاحقة',
+      strpos($pcSrc38, '$sy = $schoolYear ?: writeSchoolYear();') !== false
+      && strpos($pcSrc38, '$schoolYear ?: currentSchoolYear()') === false
+      && strpos($pcSrc38, 'foreach (array_keys($others) as $oSy)') !== false);
+check('الكشف يطابق الملف: الشفاء healStaleYearMirror20260806 موجود ومربوط بالهيدر',
+      function_exists('healStaleYearMirror20260806')
+      && strpos($hdSrc38, 'healStaleYearMirror20260806();') !== false
+      && strpos($fnSrc38, "stale_year_recalc_2026_08_06") !== false);
+$hcSrc38 = (string)file_get_contents($PROJ . '/pages/health_check.php');
+check('الكشف يطابق الملف: فحص المطابقة بصفحة الصحة (علاوات الملف = المخزّن بكل السنين)',
+      strpos($hcSrc38, 'الإضافي/المكافأة بملف الموظف = المخزّن بكشوفه بكل السنين') !== false);
+
+// تجربة فعلية (سيناريو مارسيلا بالضبط، مع ترجيع كامل): موظف معدّ له علاوة إضافي
+// «مبلغ ل.ل لكل السنة» بسنة مفتوحة لاحقة — نعدّل قيمة العلاوة ونستدعي إعادة الحساب
+// **بلا سنة** والجلسة على السنة التقويمية: يجب أن تتحدّث أشهر السنة اللاحقة تلقائياً.
+$cur38 = currentSchoolYear();
+$cand38 = $db->query("SELECT b.id bid, b.employee_id eid, b.amount, b.school_year
+    FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id
+    WHERE e.is_deleted = 0 AND b.is_active = 1 AND b.bonus_type = 'prime_fixe'
+      AND b.value_type = 'amount' AND b.currency = 'LBP' AND b.start_month IS NULL AND b.end_month IS NULL
+      AND b.school_year > '$cur38'
+      AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+      AND LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
+                COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
+                COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31')) = '9999-12-31'
+      AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = b.employee_id AND ms.school_year = b.school_year)
+    LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($cand38) {
+    $eid38 = (int)$cand38['eid']; $sy38 = $cand38['school_year']; $orig38 = (float)$cand38['amount'];
+    $test38 = $orig38 + 1000000; // +مليون ليرة للتجربة
+    $y138 = (int)substr($sy38, 0, 4);
+    $prm38 = $db->prepare("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id = ? AND month = 10 AND year = ?");
+    $oldSess38 = $_SESSION['active_school_year'] ?? null;
+    $_SESSION['active_school_year'] = $cur38; // المستخدم واقف على السنة التقويمية (سيناريو الباگ)
+    $db->prepare("UPDATE employee_bonuses SET amount = ? WHERE id = ?")->execute([$test38, (int)$cand38['bid']]);
+    recalcEmployeeYear($eid38); // ⬅ بلا سنة — قبل الإصلاح ما كان يلمس $sy38
+    $prm38->execute([$eid38, $y138]);
+    $got38 = (int)$prm38->fetchColumn();
+    // ترجيع كامل ثم تثبّت أن القيمة رجعت
+    $db->prepare("UPDATE employee_bonuses SET amount = ? WHERE id = ?")->execute([$orig38, (int)$cand38['bid']]);
+    recalcEmployeeYear($eid38, $sy38);
+    $prm38->execute([$eid38, $y138]);
+    $back38 = (int)$prm38->fetchColumn();
+    if ($oldSess38 === null) unset($_SESSION['active_school_year']); else $_SESSION['active_school_year'] = $oldSess38;
+    check('الكشف يطابق الملف (تجربة فعلية): تعديل علاوة سنة مفتوحة + إعادة حساب بلا سنة حدّث أشهرها',
+          $got38 === (int)$test38, "موظف $eid38 سنة $sy38 — مخزّن 10/$y138 = " . number_format($got38) . " (المتوقّع " . number_format($test38) . ")");
+    check('الكشف يطابق الملف (تجربة فعلية): الترجيع أعاد المخزّن كما كان',
+          $back38 === (int)$orig38, number_format($back38));
+} else {
+    check('الكشف يطابق الملف (تجربة فعلية)', true, 'لا علاوة مناسبة بسنة مفتوحة — تخطٍّ');
+}
+// البيانات كلها مطابقة: صفر (موظف معدّ × سنة) مخزّنه يخالف علاوات ملفه (المقارنة الدقيقة)
+$mir38 = (int)$db->query("SELECT COUNT(*) FROM (SELECT ms.employee_id FROM monthly_salaries ms
+    JOIN employees e ON e.id = ms.employee_id
+    WHERE e.is_deleted = 0 AND COALESCE(ms.is_indemnity_month, 0) = 0
+      AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+      AND NOT EXISTS (SELECT 1 FROM employee_bonuses b2 WHERE b2.employee_id = e.id AND b2.school_year = ms.school_year AND b2.is_active = 1
+          AND b2.bonus_type IN ('prime_fixe','aide_complementaire')
+          AND (b2.value_type <> 'amount' OR b2.currency <> 'LBP' OR b2.start_month IS NOT NULL OR b2.end_month IS NOT NULL))
+    GROUP BY ms.employee_id, ms.school_year
+    HAVING SUM((ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) <>
+        (SELECT COALESCE(SUM(b.amount),0) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1
+           AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND b.value_type = 'amount' AND b.currency = 'LBP'
+           AND b.start_month IS NULL AND b.end_month IS NULL)) > 0) x")->fetchColumn();
+check('الكشف يطابق الملف: صفر موظف معدّ مخزّنُ سنةٍ عنده يخالف علاوات ملفه (بكل القاعدة)',
+      $mir38 === 0, $mir38 === 0 ? 'مطابق' : "$mir38 موظف×سنة");
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
