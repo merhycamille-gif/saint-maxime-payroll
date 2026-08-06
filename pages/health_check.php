@@ -196,17 +196,24 @@ try {
     // ملفات محتملة التكرار (تشييك كل المدارس 2026-08-06): نفس الاسم + نفس الفئة بنفس
     // المؤسسة وكلاهما قبض بالسنة المعروضة. (ملاك + متعاقد بنفس الاسم = دوام مزدوج طبيعي
     // فلا يُعدّ تكراراً.) القرار للمستخدم — لا حذف آلياً أبداً.
+    // 🔎 تمييز الأشخاص الحقيقيين بنفس الاسم (تدقيق المستخدم 2026-08-06): إذا اسم الأب أو
+    // الأم أو تاريخ الولادة **الحقيقيون** مختلفون بين الملفين ⇒ شخصان مختلفان لا تكرار.
+    // (الحقيقي: أب ≥ حرفين بلا نقاط، أم ≥ 3 أحرف، ولادة ≠ 1900-01-01 placeholder المنقول.)
+    $hcDistinct = "COUNT(DISTINCT CASE WHEN CHAR_LENGTH(REPLACE(COALESCE(e.father_name_ar,''),'.','')) >= 2 THEN e.father_name_ar END) <= 1
+          AND COUNT(DISTINCT CASE WHEN CHAR_LENGTH(TRIM(CONCAT(COALESCE(e.mother_first_name,''),' ',COALESCE(e.mother_last_name,'')))) >= 3
+                THEN CONCAT(COALESCE(e.mother_first_name,''),' ',COALESCE(e.mother_last_name,'')) END) <= 1
+          AND COUNT(DISTINCT CASE WHEN e.birth_date IS NOT NULL AND e.birth_date <> '1900-01-01' THEN e.birth_date END) <= 1";
     $dupSt = $db->prepare("SELECT COUNT(*) FROM (
         SELECT e.school_id, CONCAT(e.first_name_ar,' ',e.last_name_ar) nm, e.employee_type
         FROM employees e WHERE e.is_deleted = 0
           AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.net_salary_lbp > 0)
-        GROUP BY e.school_id, nm, e.employee_type HAVING COUNT(*) > 1) x");
+        GROUP BY e.school_id, nm, e.employee_type HAVING COUNT(*) > 1 AND $hcDistinct) x");
     $dupSt->execute([$hcYear]);
     $dupN = (int)$dupSt->fetchColumn();
     hc($groups, $G2, $dupN === 0, "ملفات بنفس الاسم والفئة بنفس المؤسسة وكلاهما يقبض ($hcYear)",
        $dupN === 0 ? 'لا يوجد' : "$dupN حالة",
-       'اسمان متطابقان بنفس الفئة بنفس المؤسسة وكلاهما له رواتب بالسنة — قد يكونان شخصين مختلفين فعلاً (أسماء شائعة) أو ملفاً مكرّراً بالغلط. '
-       . 'راجعهم من لائحة الموظفين (فتّش بالاسم): إن كان تكراراً احذف الملف الزائد، وإن كانا شخصين فلا شيء يلزم. الملاك + المتعاقد بنفس الاسم لا يُحتسب هنا (دوام مزدوج طبيعي).',
+       'اسمان متطابقان بنفس الفئة بنفس المؤسسة وكلاهما له رواتب بالسنة. مَن اختلف اسم أبيه أو أمه أو تاريخ ولادته الحقيقي استُثني تلقائياً (شخصان مختلفان). '
+       . 'راجعهم من لائحة الموظفين (فتّش بالاسم): إن كان تكراراً احذف الملف الزائد، وإن كانا شخصين فأكمِل اسم الأب/الأم بالملفين فيُستثنيا. الملاك + المتعاقد بنفس الاسم لا يُحتسب هنا (دوام مزدوج طبيعي).',
        'review');
     // 🔴 قاعدة المستخدم (2026-08-06): الموظف ذو الملفين بنفس المؤسسة (مثلاً ملاك + متعاقد)
     // يجب أن يكون **واحد منهما فقط خاضعاً للضريبة** والآخر «بلاه» — وإلا أخذ التنزيل
@@ -217,14 +224,14 @@ try {
         FROM employees e WHERE e.is_deleted = 0
           AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.net_salary_lbp > 0)
         GROUP BY e.school_id, nm
-        HAVING COUNT(*) > 1 AND SUM(e.tax_subject = 1) > 1) x");
+        HAVING COUNT(*) > 1 AND SUM(e.tax_subject = 1) > 1 AND $hcDistinct) x");
     $dtxSt->execute([$hcYear]);
     $dtxN = (int)$dtxSt->fetchColumn();
     hc($groups, $G2, $dtxN === 0, "موظف بملفين بنفس المؤسسة وكلاهما خاضع للضريبة ($hcYear)",
        $dtxN === 0 ? 'لا يوجد' : "$dtxN حالة",
        'قاعدتك: ذو الملفين (كملاك + متعاقد بنفس المدرسة) يكون ملف واحد فقط خاضعاً للضريبة والثاني بلا. '
-       . 'إن كان الاسمان لشخص واحد: افتح الملف الثانوي وأطفئ «خاضع للضريبة» ثم احفظ (يُعاد الحساب تلقائياً). '
-       . 'وإن كانا شخصين مختلفين بنفس الاسم فلا شيء يلزم.',
+       . 'مَن اختلف اسم أبيه أو أمه أو ولادته الحقيقية استُثني تلقائياً (شخصان مختلفان). للباقي: افتح الملف الثانوي وأطفئ «خاضع للضريبة» ثم احفظ (يُعاد الحساب تلقائياً)، '
+       . 'وإن كانا شخصين فعلاً فأكمِل اسم الأب/الأم بالملفين فيُستثنيا.',
        'review');
     // قاعدة التارك §١٠: صفوف مدفوعة لتارك بعد سنة تركه — لا تُحذف آلياً (قد تكون قرار المستخدم)
     $phPaid = (int)$db->query("SELECT COUNT(*) $hcPh AND ms.is_paid = 1")->fetchColumn();
