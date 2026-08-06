@@ -1505,13 +1505,25 @@ elseif ($form === 'teacher_card'):
 </div>
 
 <?php elseif ($form === 'salary_all'):
-    $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, ms.*
+    $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.social_status, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
                           ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
-    $T = ['base'=>0,'ech'=>0,'bpe'=>0,'extra'=>0,'aide'=>0,'caisse'=>0,'txb'=>0,'tax'=>0,'cnss'=>0,'ded'=>0,'fam'=>0,'trans'=>0,'due'=>0,'net'=>0];
+    $T = ['base'=>0,'ech'=>0,'bpe'=>0,'extra'=>0,'aide'=>0,'caisse'=>0,'fded'=>0,'txb'=>0,'tax'=>0,'cnss'=>0,'ded'=>0,'fam'=>0,'trans'=>0,'due'=>0,'net'=>0];
+    // عمود «التنزيل العائلي» (قاعدة المستخدم 2026-08-06): حصّة الشهر (السنوي الساري ÷ أشهر
+    // دفعه — نفس قسمة المحرّك)، قبل «الخاضع للضريبة»، والخاضع المعروض = بعد حسم الحصّة.
+    // غير الخاضع للضريبة (tax_subject=0) لا تنزيل له. يتبع زرّ «تطبيق التنزيل العائلي» بملفه.
+    $sfdAsOf = sprintf('%04d-%02d-01', $year, $month);
+    $sfdStmt = $db->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+    $sfdCache = [];
+    $sfdOf = function ($r) use ($sfdStmt, &$sfdCache, $sfdAsOf) {
+        if ((int)($r['afd'] ?? 1) !== 1 || (int)($r['income_tax_lbp'] ?? 0) + (int)($r['taxable_base_lbp'] ?? 0) === 0) return 0;
+        $ss = (string)($r['social_status'] ?? '');
+        if (!array_key_exists($ss, $sfdCache)) { $sfdStmt->execute([$ss, $sfdAsOf]); $sfdCache[$ss] = (int)($sfdStmt->fetchColumn() ?: 0); }
+        return (int)round($sfdCache[$ss] / max(1, (int)($r['payment_months_per_year'] ?? 12)));
+    };
 ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="salary_all">
@@ -1535,7 +1547,7 @@ elseif ($form === 'teacher_card'):
             <th>#</th><th>الاسم</th><th>أساس الراتب</th><th>درجة عادية واستثنائية</th><th>الراتب بعد التدرّج</th>
             <?= extraAideHeads() ?>
             <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
-            <th>صندوق التعويضات ٦٪</th><th>الراتب الخاضع للضريبة</th><th>ضريبة الدخل</th><th>الضمان الاجتماعي</th>
+            <th>صندوق التعويضات ٦٪</th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>ضريبة الدخل</th><th>الضمان الاجتماعي</th>
             <th>مجموع المحسومات</th><th>تعويض عائلي</th><?= transportHead('', 'تعويض نقل') ?><th>مجموع المدفوعات</th><th>الصافي</th>
             <th>توقيع الموظف</th>
         </tr></thead>
@@ -1552,6 +1564,7 @@ elseif ($form === 'teacher_card'):
                 <?= extraAideTotalCells($a['extra'],$a['extra_usd'],$a['aide'],$a['aide_usd']) ?>
                 <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($a['composed'],$a['composed_usd'],false) ?></strong></td>
                 <td class="num"><?= formatLBP($a['caisse'],false) ?></td>
+                <td class="num"><?= formatLBP($a['fded'],false) ?></td>
                 <td class="num"><?= formatLBP($a['txb'],false) ?></td><td class="num"><?= formatLBP($a['tax'],false) ?></td>
                 <td class="num"><?= formatLBP($a['cnss'],false) ?></td><td class="num"><?= formatLBP($a['ded'],false) ?></td>
                 <td class="num"><?= formatLBP($a['fam'],false) ?></td><?= transportTotalCell($a['trans'],$a['trans_usd']) ?>
@@ -1565,10 +1578,11 @@ elseif ($form === 'teacher_card'):
             if ($cat !== $curCat):
                 if ($curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
                 $sub = $zeroT; $curCat = $cat;
-                ?><tr class="cat-row"><td colspan="<?= 15 + compColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
+                ?><tr class="cat-row"><td colspan="<?= 16 + compColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
             $rRate = rowRate($r);
-            $add = ['base'=>$r['base_salary_lbp'],'ech'=>$r['echelon_value_lbp'],'bpe'=>$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'caisse'=>$r['caisse_amount_lbp'],'txb'=>$r['taxable_base_lbp'],'tax'=>$r['income_tax_lbp'],'cnss'=>$r['cnss_amount_lbp'],'ded'=>$r['total_retenues_lbp'],'fam'=>$r['family_allowance_lbp'],'trans'=>$r['transport_lbp'],'due'=>dueShownLbp($r),'net'=>$r['net_salary_lbp'],
+            $sfd = $sfdOf($r);
+            $add = ['base'=>$r['base_salary_lbp'],'ech'=>$r['echelon_value_lbp'],'bpe'=>$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'caisse'=>$r['caisse_amount_lbp'],'fded'=>$sfd,'txb'=>max(0,(int)$r['taxable_base_lbp']-$sfd),'tax'=>$r['income_tax_lbp'],'cnss'=>$r['cnss_amount_lbp'],'ded'=>$r['total_retenues_lbp'],'fam'=>$r['family_allowance_lbp'],'trans'=>$r['transport_lbp'],'due'=>dueShownLbp($r),'net'=>$r['net_salary_lbp'],
                     'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd((int)$r['transport_lbp'],$rRate),
                     'composed'=>composedSalaryLbp($r),'composed_usd'=>lbpToUsd(composedSalaryLbp($r),$rRate)];
             foreach ($add as $k=>$val) { $T[$k]+=$val; $sub[$k]+=$val; } ?>
@@ -1580,7 +1594,8 @@ elseif ($form === 'teacher_card'):
                 <?= extraAideCells($r) ?>
                 <td class="num" style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $rRate, ['withCur'=>false]) ?></strong></td>
                 <td class="num"><?= formatLBP($r['caisse_amount_lbp'],false) ?></td>
-                <td class="num"><?= formatLBP($r['taxable_base_lbp'],false) ?></td>
+                <td class="num"><?= formatLBP($add['fded'],false) ?></td>
+                <td class="num"><?= formatLBP($add['txb'],false) ?></td>
                 <td class="num"><?= formatLBP($r['income_tax_lbp'],false) ?></td>
                 <td class="num"><?= formatLBP($r['cnss_amount_lbp'],false) ?></td>
                 <td class="num"><?= formatLBP($r['total_retenues_lbp'],false) ?></td>
@@ -1591,7 +1606,7 @@ elseif ($form === 'teacher_card'):
                 <td style="min-width:60px"></td></tr>
         <?php endforeach;
         if ($rows && $curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
-        if(!$rows): ?><tr><td colspan="<?= 15 + compColsCount() ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif; ?>
+        if(!$rows): ?><tr><td colspan="<?= 16 + compColsCount() ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif; ?>
         </tbody>
         <?php if ($rows): ?><tfoot><?php $drawTotal('المجموع العام ('.count($rows).')', $T, true); ?></tfoot><?php endif; ?>
     </table>

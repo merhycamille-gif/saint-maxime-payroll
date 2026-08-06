@@ -1833,8 +1833,8 @@ check('التنزيل العائلي اختياري: زرّ بملف الموظ�
       strpos($emp41, 'name="apply_family_deduction"') !== false
       && strpos($emp41, "'apply_family_deduction' => isset(\$_POST['apply_family_deduction'])") !== false
       && strpos($emp41, "'apply_family_deduction' => 1,") !== false);
-check('التنزيل العائلي اختياري: ر5 ور10 يستثنيان مَن أطفأ خياره من سطر ١٧٠',
-      substr_count($of41, "COALESCE(e.apply_family_deduction, 1) afd") === 2
+check('التنزيل العائلي اختياري: ر5 ور10 يستثنيان مَن أطفأ خياره من سطر ١٧٠ (+ عمود كشف الرواتب يتبعه)',
+      substr_count($of41, "COALESCE(e.apply_family_deduction, 1) afd") === 3
       && substr_count($of41, "(int)\$de['afd'] !== 1) continue;") === 2);
 // تجربة فعلية (مع ترجيع كامل): موظف خاضع بضريبة موجبة وتنزيل ساري > 0 — طفي الخيار
 // يرفع ضريبته الشهرية، وإرجاعه يعيدها كما كانت بالمليم
@@ -1968,6 +1968,26 @@ if ($c43) {
 } else {
     check('تعويض عائلي (تجربة فعلية)', true, 'لا مرشّح — تخطٍّ');
 }
+
+/* =====================================================================
+ * 44) عمود «التنزيل العائلي» بكشف رواتب كل الموظفين (طلب 2026-08-06):
+ *     نفس قاعدة كشف الضريبة — حصّة الشهر، قبل «الخاضع للضريبة»، والخاضع بعد الحسم.
+ * =================================================================== */
+$of44 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+check('كشف رواتب كل الموظفين: عمود التنزيل العائلي (حصّة الشهر) قبل الخاضع والخاضع بعد الحسم',
+      strpos($of44, '<th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th>') !== false
+      && strpos($of44, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$sfd)") !== false
+      && strpos($of44, 'round($sfdCache[$ss] / max(1, (int)($r[\'payment_months_per_year\'] ?? 12)))') !== false);
+// تجربة فعلية: صف مارسيلا بكشف 6/2026 — الحصّة ثم الخاضع بعدها بهذا الترتيب (نفس أرقام كشف الضريبة)
+$h44 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [2]);
+$p44 = mb_strpos($h44, 'مارسيلا');
+$row44 = $p44 !== false ? mb_substr($h44, $p44, 1600) : '';
+check('كشف رواتب كل الموظفين (تجربة فعلية): بصف مارسيلا حصّة التنزيل ثم الخاضع بعد حسمها بالترتيب',
+      $row44 !== '' && isset($share42, $after42) && $share42 > 0
+      && strpos($row44, number_format($share42)) !== false
+      && strpos($row44, number_format($after42)) !== false
+      && mb_strpos($row44, number_format($share42)) < mb_strpos($row44, number_format($after42)),
+      isset($share42, $after42) ? ('حصّة: ' . number_format($share42) . ' / خاضع بعدها: ' . number_format($after42)) : '؟');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
