@@ -676,8 +676,11 @@ check('قاعدة التارك: عدّادات الرئيسية تستبعد ا�
       preg_match('/\$notLeft = \(\$yfStat === \'\'\)/', $idxSrc20) === 1);
 check('قاعدة التارك: «احسب للكل» يحسب التارك لأشهر سنة تركه (حدّ بداية السنة)',
       strpos($mpSrc20, '$syStartC') !== false && strpos($mpSrc20, $isNullTrio) === false);
+// (2026-08-06) صار الاستثناء ببداية السنة المفتوحة (>= y1-10-01) بدل الاستبعاد الكلّي —
+// التارك قبل بداية السنة لا يُنقَل، ومن ترك خلالها/بعدها يُشمَل (فتصحّ السنين القديمة أيضاً)
 check('قاعدة التارك: فتح السنة الجديدة يبقى يستثني التاركين (لا ينتقلون للسنة الجديدة)',
-      substr_count($oySrc20, $isNullTrio) >= 2);
+      substr_count($oySrc20, "\$emps->execute([\$schoolId, \$y1 . '-10-01']);") === 2
+      && strpos($oySrc20, $isNullTrio) === false);
 
 /* =====================================================================
  * 21) 🗑️ حذف مدرستَي «ثانوية السيدة - مغدوشة» و«ليسيه سان نيقولا» نهائياً
@@ -1545,6 +1548,97 @@ check('نسخ الملف لسنة (تجربة فعلية): صفحة التأكي
       && strpos($h36, 'name="target_year"') !== false
       && strpos($h36, 'انسخ الملف / Copier') !== false,
       strlen($h36) . ' حرف');
+
+/* =====================================================================
+ * 37) قاعدة التارك بالسنة الجديدة (شكوى 2026-08-06): «فتحت سنة جديدة وأساتذة
+ *     تاركين طلعوا فيها» — ثلاث طبقات: حماية المحرّك (calculateAndSave لا يحفظ
+ *     راتباً لسنة تبدأ بعد الترك) + شفاء ذاتي يمسح الوهمي غير المدفوع + فلتر
+ *     فتح السنة حسب §١٠ (يُستثنى فقط من ترك قبل بداية السنة المفتوحة).
+ * =================================================================== */
+$pcSrc37 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$fnSrc37 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$hdSrc37 = (string)file_get_contents($PROJ . '/includes/header.php');
+$oySrc37 = (string)file_get_contents($PROJ . '/pages/open_year.php');
+$hcSrc37 = (string)file_get_contents($PROJ . '/pages/health_check.php');
+check('قاعدة التارك: حماية المحرّك موجودة (calculateAndSave يرفض سنة بعد الترك)',
+      strpos($pcSrc37, 'قاعدة التارك (§١٠)') !== false
+      && strpos($pcSrc37, 'if ($rowRank > $depRank) return $this->calculate();') !== false);
+check('قاعدة التارك: الشفاء الذاتي healLeaverPhantomRows مربوط بالهيدر ولا يمسّ المدفوع',
+      function_exists('healLeaverPhantomRows')
+      && strpos($fnSrc37, 'COALESCE(ms.is_paid, 0) = 0') !== false
+      && strpos($hdSrc37, 'healLeaverPhantomRows();') !== false);
+check('قاعدة التارك: فتح السنة (والشك مارك) يستثنيان فقط من ترك قبل بداية السنة (>= 1/10)',
+      substr_count($oySrc37, "\$emps->execute([\$schoolId, \$y1 . '-10-01']);") === 2
+      && strpos($oySrc37, 'left_date_cnss IS NULL') === false);
+check('قاعدة التارك: فحصا صفحة الصحة (وهمي غير مدفوع = خطأ، مدفوع = مراجعة المستخدم)',
+      strpos($hcSrc37, 'لا رواتب وهمية لتارك بعد سنة تركه') !== false
+      && strpos($hcSrc37, 'رواتب مدفوعة لتاركين بعد سنة تركهم') !== false);
+
+// شغّل الشفاء فعلياً (ينظّف أي وهمي موجود بالبيانات قبل التجارب)
+unset($_SESSION['heal_leaver_phantoms_done']);
+healLeaverPhantomRows();
+
+// اختر تاركاً ملاكاً ما إله أي صف بعد سنة تركه (بعد الشفاء يبقى فقط أصحاب المدفوع فيُستثنون)
+$lv37 = $db->query("SELECT e.id, LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
+                                       COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
+                                       COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31')) ld
+                    FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire'
+                    HAVING ld < '9999-12-31' ORDER BY ld DESC LIMIT 20")->fetchAll();
+$pick37 = null; $ty37 = 0;
+$cAfter37 = $db->prepare("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = ?
+                          AND (CASE WHEN month >= 10 THEN year ELSE year - 1 END) > ?");
+foreach ($lv37 as $r37) {
+    $ldY = (int)substr($r37['ld'], 0, 4); $ldM = (int)substr($r37['ld'], 5, 2);
+    $depR = ($ldM >= 10) ? $ldY : $ldY - 1;
+    $cAfter37->execute([(int)$r37['id'], $depR]);
+    if ((int)$cAfter37->fetchColumn() === 0) { $pick37 = $r37; $ty37 = $depR + 1; break; }
+}
+if ($pick37) {
+    $pid37 = (int)$pick37['id'];
+    // (أ) المحرّك: محاولة حساب 11/$ty37 (سنة دراسية بعد الترك) يجب ألا تُنشئ أي صف
+    try { (new PayrollCalculator($pid37, 11, $ty37))->calculateAndSave(); } catch (Exception $e) {}
+    $cg37 = $db->prepare("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = ? AND month = 11 AND year = ?");
+    $cg37->execute([$pid37, $ty37]);
+    check('قاعدة التارك (تجربة فعلية): المحرّك ما أنشأ راتباً لتارك بشهر بعد سنة تركه',
+          (int)$cg37->fetchColumn() === 0, "id $pid37 ترك {$pick37['ld']} — جرّبنا 11/$ty37");
+    // (ب) الشفاء: ازرع صفاً وهمياً (نسخة عن آخر شهر حقيقي إله) وشغّل الشفاء → لازم ينحذف
+    $srcQ37 = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? ORDER BY year DESC, month DESC LIMIT 1");
+    $srcQ37->execute([$pid37]);
+    $s37 = $srcQ37->fetch(PDO::FETCH_ASSOC);
+    if ($s37) {
+        unset($s37['id'], $s37['created_at']);
+        $s37['month'] = 10; $s37['year'] = $ty37; $s37['school_year'] = $ty37 . '-' . ($ty37 + 1);
+        $s37['is_paid'] = 0; if (array_key_exists('paid_date', $s37)) $s37['paid_date'] = null;
+        $cols37 = array_keys($s37);
+        $db->prepare("INSERT INTO monthly_salaries (`" . implode('`,`', $cols37) . "`) VALUES ("
+                     . implode(',', array_fill(0, count($cols37), '?')) . ")")->execute(array_values($s37));
+        unset($_SESSION['heal_leaver_phantoms_done']);
+        healLeaverPhantomRows();
+        $ch37 = $db->prepare("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = ? AND month = 10 AND year = ?");
+        $ch37->execute([$pid37, $ty37]);
+        $healed37 = (int)$ch37->fetchColumn() === 0;
+        check('قاعدة التارك (تجربة فعلية): الشفاء الذاتي مسح صفاً وهمياً مزروعاً لتارك بعد سنة تركه',
+              $healed37, "id $pid37 — 10/$ty37");
+        if (!$healed37) { // ترجيع: لا نترك أثر التجربة لو فشل الشفاء
+            $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND month = 10 AND year = ? AND COALESCE(is_paid,0) = 0")
+               ->execute([$pid37, $ty37]);
+        }
+    } else {
+        check('قاعدة التارك (تجربة الشفاء)', true, 'لا صف مصدر للزرع — تخطٍّ');
+    }
+} else {
+    check('قاعدة التارك (تجارب فعلية)', true, 'لا تارك ملاك مناسب بالبيانات — تخطٍّ');
+}
+// (ج) البيانات كلها نظيفة بعد الشفاء: صفر رواتب وهمية (غير مدفوعة) لتاركين بعد سنة تركهم
+$ldAll37 = "LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
+                  COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
+                  COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31'))";
+$phAll37 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.is_deleted = 0 AND $ldAll37 < '9999-12-31' AND COALESCE(ms.is_paid, 0) = 0
+      AND (CASE WHEN ms.month >= 10 THEN ms.year ELSE ms.year - 1 END)
+          > (CASE WHEN MONTH($ldAll37) >= 10 THEN YEAR($ldAll37) ELSE YEAR($ldAll37) - 1 END)")->fetchColumn();
+check('قاعدة التارك: صفر رواتب وهمية (غير مدفوعة) لتاركين بعد سنة تركهم بكل القاعدة', $phAll37 === 0,
+      $phAll37 === 0 ? 'نظيفة' : "$phAll37 صفّاً");
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

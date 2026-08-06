@@ -124,11 +124,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         $transPct  = (float)($_POST['trans_pct'] ?? 0);
         $addFactor   = $addMode   === 'none' ? 0.0 : ($addMode   === 'pct' ? 1 + $addPct/100   : 1.0);
         $transFactor = $transMode === 'none' ? 0.0 : ($transMode === 'pct' ? 1 + $transPct/100 : 1.0);
-        // الأساتذة/الموظفون الفاعلون غير التاركين بهالمدرسة
+        // الأساتذة/الموظفون الفاعلون بهالمدرسة — قاعدة التارك (§١٠): مَن ترك **قبل بداية**
+        // السنة المفتوحة (1/10) لا يُنقَل إليها؛ ومَن ترك خلالها أو بعدها يُشمَل (يبقى بسنة
+        // عمله حتى 30-9) — فيصحّ أيضاً فتح سنين قديمة كان يعمل فيها تارك لاحق.
         $emps = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp FROM employees
                               WHERE school_id = ? AND is_deleted = 0 AND status = 'actif'
-                                AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL");
-        $emps->execute([$schoolId]);
+                                AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'),
+                                          COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'),
+                                          COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= ?");
+        $emps->execute([$schoolId, $y1 . '-10-01']);
         // مصدر النقل للموظف المنقول بلا إعداد: آخر راتب فعلي معروف قبل السنة الجديدة
         $srcStmt = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND net_salary_lbp > 0
                                  AND (year < ? OR (year = ? AND month < 10)) ORDER BY year DESC, month DESC LIMIT 1");
@@ -263,10 +267,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
         $prevSY = ($y1 - 1) . '-' . $y1;
         $addTypes = ['prime_fixe', 'aide_complementaire'];
         $trTypes  = ['transport_complement', 'transport_daily'];
+        // نفس قاعدة التارك (§١٠) المطبَّقة عند فتح السنة: مَن ترك قبل بداية السنة لا يُشمَل
         $emps = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp
             FROM employees WHERE school_id = ? AND is_deleted = 0 AND status = 'actif'
-              AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL");
-        $emps->execute([$schoolId]);
+              AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'),
+                        COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'),
+                        COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= ?");
+        $emps->execute([$schoolId, $y1 . '-10-01']);
         $cnt = 0;
         foreach ($emps->fetchAll(PDO::FETCH_ASSOC) as $emp) {
             $id = (int)$emp['id'];
@@ -328,7 +335,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
     <div class="card-body">
         <div class="alert alert-info">
             <i class="fas fa-info-circle"></i>
-            اختر مدرسة وسنة دراسية جديدة. البرنامج بينقل **كل الأساتذة والموظفين الفاعلين** (غير التاركين — اللي محطوط إلهم تاريخ ترك ما بينتقلوا) للسنة الجديدة بدرجتهم الحالية.
+            اختر مدرسة وسنة دراسية جديدة. البرنامج بينقل **كل الأساتذة والموظفين الفاعلين** للسنة الجديدة بدرجتهم الحالية — والتارك اللي تاريخ تركه قبل بداية السنة المختارة (1 تشرين الأول) **ما بينتقل أبداً**.
         </div>
         <form method="POST" onsubmit="return confirm('فتح السنة المختارة لهذه المدرسة ونقل الموظفين الفاعلين؟');">
             <input type="hidden" name="action" value="open">

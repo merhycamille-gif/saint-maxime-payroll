@@ -477,6 +477,42 @@ function pruneSalariesAfterDeparture($db, $empId) {
     return $del->rowCount();
 }
 
+/**
+ * 🩹 شفاء ذاتي مستمرّ (2026-08-06 — شكوى «التاركون رجعوا طلعوا بالسنة الجديدة»):
+ * تنظيف «الرواتب الوهمية» لكل التاركين دفعة واحدة، بكل المدارس:
+ *   (1) أي صفّ راتب **غير مدفوع** (is_paid=0) في سنة دراسية تبدأ بعد تاريخ الترك يُحذف.
+ *       الصفوف المدفوعة لا تُمَسّ أبداً (لو وُجدت فهي بحاجة قرار المستخدم — تظهر بصفحة فحص الصحة).
+ *   (2) أحداث الدرجات الآلية «(فتح السنة)» المؤرّخة بعد سنة الترك (ذيل السجلّ فقط، لا اليدوية).
+ *   (3) العلاوات المنسوخة آلياً لسنين بعد الترك.
+ * السبب: قبل حماية المحرّك (calculateAndSave) كانت أي إعادة حساب أو فتح سنة تولّد رواتب
+ * لتاركين. يعمل مرّة لكل جلسة (خفيف)، وزرّ «نسخ الملف لسنة» يرجّع الراجع فاعلاً فلا يتأثّر.
+ * قاعدة التارك §١٠: يبقى بسنة عمله (حتى 30-9) ويُشال ممّا بعدها فقط.
+ */
+function healLeaverPhantomRows() {
+    if (!empty($_SESSION['heal_leaver_phantoms_done'])) return;
+    $_SESSION['heal_leaver_phantoms_done'] = 1;
+    try {
+        $db = getDB();
+        $ldExpr = "LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),"
+                . "COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),"
+                . "COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31'))";
+        $depRank = "(CASE WHEN MONTH($ldExpr) >= 10 THEN YEAR($ldExpr) ELSE YEAR($ldExpr) - 1 END)";
+        $d1 = (int)$db->exec("DELETE ms FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND $ldExpr < '9999-12-31' AND COALESCE(ms.is_paid, 0) = 0
+              AND (CASE WHEN ms.month >= 10 THEN ms.year ELSE ms.year - 1 END) > $depRank");
+        $d2 = (int)$db->exec("DELETE gh FROM employee_grade_history gh JOIN employees e ON e.id = gh.employee_id
+            WHERE e.is_deleted = 0 AND $ldExpr < '9999-12-31' AND gh.notes LIKE '%(فتح السنة)%'
+              AND (CASE WHEN MONTH(gh.change_date) >= 10 THEN YEAR(gh.change_date) ELSE YEAR(gh.change_date) - 1 END) > $depRank");
+        $d3 = (int)$db->exec("DELETE b FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id
+            WHERE e.is_deleted = 0 AND $ldExpr < '9999-12-31'
+              AND CAST(SUBSTRING(b.school_year, 1, 4) AS UNSIGNED) > $depRank");
+        if ($d1 || $d2 || $d3) {
+            logAudit('heal_leaver_phantoms', 'monthly_salaries', 0, null,
+                     ['salaries' => $d1, 'grade_events' => $d2, 'bonuses' => $d3]);
+        }
+    } catch (Exception $e) { /* لا نُعطّل الصفحة */ }
+}
+
 // 🩹 شفاء ذاتي (مرّة واحدة، 2026-07-29): السنة 2026-2027 فُتحت قبل آلية «نسخ العلاوات مع
 // فتح السنة»، فطلعت رواتبها بلا الأجر الإضافي/المكافأة رغم وجودها في 2025-2026 (شكوى p1).
 // عند أول فتح صفحة: ينسخ prime_fixe + aide_complementaire من السنة السابقة لكل موظف عنده

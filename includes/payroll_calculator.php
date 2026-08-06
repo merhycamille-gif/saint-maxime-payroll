@@ -519,6 +519,22 @@ class PayrollCalculator {
      * Save calculation to database
      */
     public function calculateAndSave() {
+        // 🔴 قاعدة التارك (§١٠): مَن له تاريخ ترك لا يُحفَظ له راتب في سنة دراسية تبدأ
+        // **بعد** تاريخ تركه — من أي مسار كان (فتح سنة/إعادة حساب/زرّ احتساب/شفاء ذاتي).
+        // يبقى راتبه يُحسب لكل أشهر سنة تركه حتى 30-9 (رتبة السنة نفسها مسموحة).
+        // زرّ «نسخ الملف لسنة» للتارك الراجع يمسح تواريخ التّرك قبل الحساب فلا يتأثّر.
+        // نفس مبدأ pruneSalariesAfterDeparture و yearEmploymentFilter.
+        $lds = array_filter([
+            $this->employee['left_date_cnss'] ?? null,
+            $this->employee['left_date_finance'] ?? null,
+            $this->employee['left_date_eoc'] ?? null,
+        ], fn($d) => !empty($d) && $d !== '0000-00-00');
+        if ($lds) {
+            $ld = min($lds);
+            $depRank = ((int)substr($ld, 5, 2) >= 10) ? (int)substr($ld, 0, 4) : (int)substr($ld, 0, 4) - 1;
+            $rowRank = ($this->month >= 10) ? $this->year : $this->year - 1;
+            if ($rowRank > $depRank) return $this->calculate(); // بلا أي حفظ — سنة بعد الترك
+        }
         $data = $this->calculate();
         
         $sql = "INSERT INTO monthly_salaries (
