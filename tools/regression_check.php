@@ -513,8 +513,9 @@ check('التصدير = الشاشة: عمود الشهادة يعرض وظيف�
       strpos($repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php'), "\$r['employee_type'] === 'employe' ? jobTitleLabel(\$r['job_title'] ?? '') : diplomaLabel(\$r['diploma'])") !== false);
 check('تقرير الصندوق: لا صفّ مجاميع أصفار على شهر بلا بيانات',
       strpos($repSrc, 'لا تطبع صفّ مجاميع أصفار') !== false);
+// (تحديث 2026-08-06: الخاضع المعروض صار **بعد حسم حصّة التنزيل العائلي** بطلب المستخدم)
 check('الضريبة: مجموع «الراتب الخاضع للضريبة» يظهر بالشاشة (كان فارغاً)',
-      strpos($repSrc, "'txb'=>(int)\$r['taxable_base_lbp']") !== false && strpos($repSrc, "formatLBP(\$a['txb'])") !== false);
+      strpos($repSrc, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false && strpos($repSrc, "formatLBP(\$a['txb'])") !== false);
 check('رقم الصندوق: شفاء ذاتي يمنع كتابة رقم مدرسة على مؤسسات أخرى',
       strpos($fnSrc2, 'function healCaisseNumbers') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'healCaisseNumbers();') !== false
@@ -1872,25 +1873,37 @@ if ($cand41) {
  * =================================================================== */
 $rp42 = (string)file_get_contents($PROJ . '/pages/reports.php');
 $rx42 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
-check('عمود التنزيل العائلي: بكشف الضريبة على الشاشة (رأس + قيمة لكل صف + بالمجاميع) ويتبع زرّ الملف',
-      strpos($rp42, 'التنزيل العائلي<br><small style="font-weight:400">سنوي — مطفأ بملفه = 0</small>') !== false
-      && strpos($rp42, "'fded'=>\$fdOf(\$r)") !== false
-      && strpos($rp42, "formatLBP(\$a['fded'])") !== false
+// (تصحيح المستخدم 2026-08-06): الكشف شهري ⇒ التنزيل «حصّة الشهر» (السنوي ÷ أشهر دفعه)،
+// وعموده **قبل** «الخاضع للضريبة» لأنه يُحسم منه، والخاضع المعروض = بعد الحسم
+check('عمود التنزيل العائلي: حصّة الشهر + قبل «الخاضع» + الخاضع بعد الحسم (شاشة)',
+      strpos($rp42, 'التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small>') !== false
+      && strpos($rp42, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false
+      && strpos($rp42, 'round($fdCache[$ss] / $mpy)') !== false
       && strpos($rp42, "(int)(\$r['afd'] ?? 1) !== 1) return 0;") !== false);
-check('عمود التنزيل العائلي: بتصدير Excel/Word لنفس الكشف بنفس المصدر',
-      strpos($rx42, "'التنزيل العائلي (سنوي)'") !== false
+check('عمود التنزيل العائلي: بتصدير Excel/Word بنفس الترتيب والمنطق',
+      strpos($rx42, "'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)'") !== false
       && strpos($rx42, "COALESCE(e.apply_family_deduction,1) afd") !== false
-      && strpos($rx42, "'fded' => \$fded") !== false);
-// تجربة فعلية: كشف حزيران 2026 مدرسة 2 — قيمة تنزيل مارسيلا الظاهرة = السارية بالقاعدة لوضعها
+      && strpos($rx42, "\$txb = max(0, (int)\$r['taxable_base_lbp'] - \$fded)") !== false
+      && strpos($rx42, '[$comp, $fded, $txb, $tax]') !== false);
+// تجربة فعلية: كشف حزيران 2026 مدرسة 2 — مارسيلا (12 شهر دفع): حصّة الشهر = السنوي ÷ 12
+// والخاضع الظاهر = المخزّن − الحصّة، والعمود قبل الخاضع بترتيب الخلايا
 $fd42 = (int)$db->query("SELECT f.annual_deduction FROM family_tax_deductions f
     JOIN employees e ON e.social_status = f.social_status
     WHERE e.id = 1677 AND f.effective_from <= '2026-06-01'
     ORDER BY f.effective_from DESC LIMIT 1")->fetchColumn();
+$mpy42 = max(1, (int)$db->query("SELECT payment_months_per_year FROM employees WHERE id = 1677")->fetchColumn());
+$txb42 = (int)$db->query("SELECT taxable_base_lbp FROM monthly_salaries WHERE employee_id = 1677 AND month = 6 AND year = 2026")->fetchColumn();
+$share42 = (int)round($fd42 / $mpy42);
+$after42 = max(0, $txb42 - $share42);
 $h42 = renderPage('pages/reports.php', ['report' => 'tax_summary', 'month' => 6, 'year' => 2026], [], [2]);
-check('عمود التنزيل العائلي (تجربة فعلية): الرأس ظاهر وقيمة مارسيلا = التنزيل الساري لوضعها الاجتماعي',
-      strpos($h42, 'التنزيل العائلي') !== false
-      && $fd42 > 0 && strpos($h42, number_format($fd42)) !== false,
-      'الساري بالقاعدة: ' . number_format($fd42));
+$pM42 = mb_strpos($h42, 'مارسيلا');
+$row42 = $pM42 !== false ? mb_substr($h42, $pM42, 1200) : '';
+check('عمود التنزيل العائلي (تجربة فعلية): بصف مارسيلا الحصّة الشهرية ثم الخاضع بعد حسمها بهذا الترتيب',
+      $fd42 > 0 && $row42 !== ''
+      && strpos($row42, number_format($share42)) !== false
+      && strpos($row42, number_format($after42)) !== false
+      && mb_strpos($row42, number_format($share42)) < mb_strpos($row42, number_format($after42)),
+      "حصّة: " . number_format($share42) . " / خاضع بعدها: " . number_format($after42));
 
 /* =====================================================================
  * 43) خيارا التعويض العائلي بملف الموظف (طلب 2026-08-06): زرّ «احتساب تعويض
