@@ -630,9 +630,155 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
     </div>
 </div>
 
-<?php elseif ($form === 'tax_r5' || $form === 'tax_r10'):
-    // ر5 سنوي / ر10 دوري — مستوى المؤسسة (مجاميع)
-    $isR10 = ($form === 'tax_r10');
+<?php elseif ($form === 'tax_r10'):
+    /* ر10 — بيان دوري (فصلي) بتأدية ضريبة الرواتب والأجور (النموذج الرسمي طبعة 2010،
+     * مرجع المستخدم Desktop\ر10 تصريح فصلي.pdf 2026-08-06): التصريح كل ٣ أشهر على فصول
+     * السنة الميلادية، مع منتقي «عن الفترة» (أي فصل + أي سنة) يظهر من–إلى على المستند.
+     * المصدر نفسه (monthly_salaries) محدوداً بأشهر الفصل المختار حصراً. */
+    $rqNow = intdiv((int)date('n') - 1, 3) + 1;              // فصل اليوم
+    $rq  = (int)($_GET['rq'] ?? 0);
+    $rqy = (int)($_GET['rqy'] ?? 0);
+    if ($rq < 1 || $rq > 4) {                                 // الافتراضي: آخر فصل مكتمل
+        $rq = $rqNow - 1; $rqyDef = (int)date('Y');
+        if ($rq < 1) { $rq = 4; $rqyDef--; }
+    } else { $rqyDef = (int)date('Y'); }
+    if ($rqy < 2000 || $rqy > 2100) $rqy = $rqyDef;
+    $rqMonthsMap = [1 => [1,2,3], 2 => [4,5,6], 3 => [7,8,9], 4 => [10,11,12]];
+    $rqEndDay    = [1 => 31, 2 => 30, 3 => 30, 4 => 31];
+    $rqM = $rqMonthsMap[$rq];
+    $rqLbl = 'الفصل ' . ['١','٢','٣','٤'][$rq-1] . ' (' . monthName($rqM[0],'ar') . ' – ' . monthName($rqM[2],'ar') . ') ' . $rqy;
+    $rqFrom = sprintf('01/%02d/%04d', $rqM[0], $rqy);
+    $rqTo   = sprintf('%02d/%02d/%04d', $rqEndDay[$rq], $rqM[2], $rqy);
+    // السنة الدراسية التي تقع فيها أشهر هذا الفصل (فصول الميلادية لا تعبر حدود 1/10 أبداً)
+    $rqSy = ($rq === 4) ? ($rqy . '-' . ($rqy + 1)) : (($rqy - 1) . '-' . $rqy);
+    $rqIn = implode(',', $rqM);
+    [$yf,$yp] = yearEmploymentFilter($rqSy, 'e.');
+    // مجاميع أشهر الفصل حصراً — نفس بنية ر5 (نفس المصدر ونفس ترابط السطور ١٠٠-١٩٠)
+    $q = $db->prepare("SELECT COUNT(DISTINCT e.id) n,
+            SUM(ms.base_plus_echelon_lbp+ms.extra_lbp+ms.prime_fixe_lbp+ms.aide_complementaire_lbp) gross,
+            SUM(ms.extra_lbp+ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide,
+            SUM((ms.extra_lbp+ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0)) extra_wage_usd, SUM(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) aide_usd,
+            SUM(ms.transport_lbp) transport,
+            SUM(ms.family_allowance_lbp) family,
+            SUM(ms.cnss_amount_lbp) cnss, SUM(ms.caisse_amount_lbp) caisse, SUM(ms.eoc_grade_lbp) eoc,
+            SUM(ms.taxable_base_lbp) taxable, SUM(ms.income_tax_lbp) tax
+        FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
+        WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($rqIn)
+          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id'));
+    $q->execute(array_merge($yp, [$rqy]));
+    $g = $q->fetch();
+    $gross=(int)($g['gross']??0); $trans=(int)($g['transport']??0);
+    $paid  = $gross + $trans;                                  // ١٠٠/١٢٠
+    $other = (int)($g['caisse']??0) + (int)($g['eoc']??0);      // ١٥٠
+    $net   = $paid - $trans - $other;                          // ١٦٠
+    $tax   = (int)($g['tax']??0);                              // ١٩٠
+    // ١٧٠ التنزيل العائلي للفترة: حصة الفصل = (التنزيل السنوي ÷ ١٢) × عدد أشهر الموظف
+    // بالفصل (نفس منطق المحرّك الشهري)، ومحدود بأساسه الخاضع بالفترة
+    $qDed = $db->prepare("SELECT e.id, e.social_status, COUNT(DISTINCT ms.month) mcnt, SUM(ms.taxable_base_lbp) tb
+        FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
+        WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($rqIn)
+          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
+        GROUP BY e.id, e.social_status");
+    $qDed->execute(array_merge($yp, [$rqy]));
+    $dedAsOf = sprintf('%04d-%02d-01', $rqy, $rqM[0]);
+    $dedStmt = $db->prepare("SELECT annual_deduction FROM family_tax_deductions
+                              WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+    $exempt = 0; $dedCache = [];
+    foreach ($qDed->fetchAll() as $de) {
+        $ss = (string)$de['social_status'];
+        if (!array_key_exists($ss, $dedCache)) { $dedStmt->execute([$ss, $dedAsOf]); $dedCache[$ss] = (float)($dedStmt->fetchColumn() ?: 0); }
+        $exempt += (int)min($dedCache[$ss] / 12 * (int)$de['mcnt'], (float)$de['tb']);
+    }
+    $taxable = max(0, $net - $exempt);                         // ١٨٠
+    $rows = [
+        ['١٠٠','الرواتب وملحقاتها',$paid],
+        ['١١٠','المنافع النقدية والعينية',0],
+        ['١٢٠','مجموع المبالغ المدفوعة',$paid],
+        ['١٣٠','ينزل: تعويضات نقل وانتقال',$trans],
+        ['١٤٠','تعويضات تمثيل',0],
+        ['١٥٠','تنزيلات أخرى (صندوق التعويضات ودرجة الصندوق)',$other],
+        ['١٦٠','المبالغ الصافية',$net],
+        ['١٧٠','التنزيل العائلي',$exempt],
+        ['١٨٠','الرواتب والأجور الخاضعة للضريبة',$taxable],
+        ['١٩٠','الضريبة المتوجبة',$tax],
+    ];
+?>
+    <form method="get" class="card no-print">
+        <input type="hidden" name="form" value="tax_r10">
+        <?php if (($_GET['emp_type'] ?? '') !== ''): ?><input type="hidden" name="emp_type" value="<?= e($_GET['emp_type']) ?>"><?php endif; ?>
+        <?php if (($_GET['tax_sub'] ?? '') !== ''): ?><input type="hidden" name="tax_sub" value="<?= e($_GET['tax_sub']) ?>"><?php endif; ?>
+        <div class="card-body form-row cols-3">
+            <div class="form-group mb-0"><label class="form-label">Trimestre / عن الفترة (الفصل)</label>
+                <select name="rq" class="form-select">
+                    <?php foreach ([1,2,3,4] as $qq): $mm = $rqMonthsMap[$qq]; ?>
+                        <option value="<?= $qq ?>" <?= $qq === $rq ? 'selected' : '' ?>>الفصل <?= ['١','٢','٣','٤'][$qq-1] ?> — <?= monthName($mm[0],'ar') ?> إلى <?= monthName($mm[2],'ar') ?></option>
+                    <?php endforeach; ?>
+                </select></div>
+            <div class="form-group mb-0"><label class="form-label">Année / السنة</label><input type="number" name="rqy" class="form-control" value="<?= $rqy ?>"></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
+        </div>
+    </form>
+<div class="official-doc mof-form rtl" id="ppExportArea">
+    <div class="mof-head">
+        <div class="mof-gov">الجمهورية اللبنانية<br>وزارة المالية<br>مديرية المالية العامة<br>مديرية الواردات – ضريبة الرواتب والأجور</div>
+        <div class="mof-titles"><div class="mof-title">بيان دوري بتأدية ضريبة الرواتب والأجور</div></div>
+        <div class="mof-code">ر ١٠</div>
+    </div>
+    <div class="mof-body">
+        <div class="info-grid">
+            <div><span class="k">إسم الشركة/المؤسسة:</span> <?= fillVal($school['name_ar']) ?></div>
+            <div><span class="k">رقم التسجيل:</span> <?= digitBoxes($school['finance_number'],10) ?></div>
+            <div><span class="k">السنة المالية:</span> من <strong>01/01/<?= $rqy ?></strong> إلى <strong>31/12/<?= $rqy ?></strong></div>
+            <div><span class="k">عن الفتــرة:</span> من <strong><?= $rqFrom ?></strong> إلى <strong><?= $rqTo ?></strong> — <?= e($rqLbl) ?></div>
+            <div class="full"><span class="k">عنوان المركز الرئيسي:</span> <?= fillVal($school['address']) ?></div>
+        </div>
+        <table class="code-table" style="margin-bottom:6px">
+            <tbody>
+                <tr><td class="code-cell">٧٠</td><td class="lbl">عدد رئيس وأعضاء مجلس الإدارة</td><td class="num"></td></tr>
+                <tr class="gray"><td class="code-cell">٨٠</td><td class="lbl">عدد المستخدمين والأجراء للفترة المصرح عنها</td><td class="num"><?= (int)($g['n']??0) ?></td></tr>
+                <tr><td class="code-cell">٩٠</td><td class="lbl">عدد العمال الذين يتقاضون أجوراً مقطوعة</td><td class="num">0</td></tr>
+            </tbody>
+        </table>
+        <table class="code-table">
+            <thead><tr>
+                <th class="code-cell">الرمز</th><th>ضريبة الباب الثاني</th>
+                <th>رئيس وأعضاء مجلس الإدارة (١)</th><th>المستخدمون والأجراء (٢)</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($rows as $r): $gr = in_array($r[0],['١٢٠','١٦٠','١٨٠','١٩٠']); ?>
+                <tr class="<?= $gr?'gray':'' ?>">
+                    <td class="code-cell"><?= $r[0] ?></td>
+                    <td class="lbl"><?= e($r[1]) ?></td>
+                    <td class="num"></td>
+                    <td class="num"><?= formatLBP($r[2],false) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <table class="code-table" style="margin-top:6px">
+            <tbody>
+                <tr><td class="code-cell">٢٤٠</td><td class="lbl">المبالغ المدفوعة كأجور مقطوعة</td><td class="num">0</td></tr>
+                <tr><td class="code-cell">٢٥٠</td><td class="lbl">الضريبة على الأجور المقطوعة</td><td class="num">0</td></tr>
+                <tr class="gray"><td class="code-cell">٢٦٠</td><td class="lbl">إجمالي الرواتب والأجور الخاضعة للضريبة</td><td class="num"><?= formatLBP($taxable,false) ?></td></tr>
+                <tr class="gray"><td class="code-cell">٢٧٠</td><td class="lbl">إجمالي الضريبة المتوجبة</td><td class="num"><?= formatLBP($tax,false) ?></td></tr>
+                <tr><td class="code-cell">٢٨٠</td><td class="lbl">غرامة التحقق</td><td class="num"></td></tr>
+                <tr><td class="code-cell">٢٩٠</td><td class="lbl">غرامة التحصيل</td><td class="num"></td></tr>
+                <tr class="gray"><td class="code-cell">٣٠٠</td><td class="lbl">المبلغ الإجمالي الواجب دفعه</td><td class="num"><strong><?= formatLBP($tax,false) ?></strong></td></tr>
+            </tbody>
+        </table>
+        <div class="info-grid" style="margin-top:8px">
+            <div><span class="k">منها: الأجر الإضافي:</span> <strong><?= dualFromUsd((int)($g['extra_wage']??0), (float)($g['extra_wage_usd']??0)) ?></strong></div>
+            <div><span class="k">منها: مكافأة ومساعدة:</span> <strong><?= dualFromUsd((int)($g['aide']??0), (float)($g['aide_usd']??0)) ?></strong></div>
+        </div>
+        <div class="doc-section">إفادة</div>
+        <p>أنا الموقّع أدناه أشهد بصدق وصحة المعلومات التي ينطوي عليها هذا التصريح.</p>
+        <div class="sign-row"><?= signatureBox('الإسم والصفة والتوقيع', $school['ville'] ?? 'بيروت', formatDate(date('Y-m-d'))) ?></div>
+    </div>
+</div>
+
+<?php elseif ($form === 'tax_r5'):
+    // ر5 سنوي — مستوى المؤسسة (مجاميع السنة الدراسية المعروضة)
+    $isR10 = false;
     // عدد المستخدمين والأجراء والمجاميع = نفس مصدر بيان صندوق التعويضات (yearEmploymentFilter):
     // يستبعد المحذوفين والتاركين وصفوف الأشباح، فلا يُحتسب موظفون سابقون من السنوات السابقة.
     [$yf,$yp] = yearEmploymentFilter($schoolYear, 'e.');

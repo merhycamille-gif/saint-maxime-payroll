@@ -1771,6 +1771,46 @@ check('مصدر واحد (تجربة فعلية): «مجموع الأجور» ب
       && strpos($h39d, number_format($allTot39)) === false,
       'محدود: ' . number_format($capTot39) . ' / الكلّي المرفوض: ' . number_format($allTot39));
 
+/* =====================================================================
+ * 40) ر10 بيان دوري **فصلي** (شكوى 2026-08-06 + مرجع Desktop\ر10 تصريح فصلي.pdf):
+ *     التصريح كل ٣ أشهر مع منتقي «عن الفترة» (الفصل + السنة) يظهر من–إلى على
+ *     المستند، والمجاميع من أشهر الفصل المختار حصراً — وبقي ر5 سنوياً.
+ * =================================================================== */
+$of40 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+check('ر10 فصلي: فرع مستقل بمنتقي الفصل (rq/rqy) وأشهر الفصل حصراً + «عن الفتــرة» على المستند',
+      strpos($of40, "elseif (\$form === 'tax_r10'):") !== false
+      && strpos($of40, 'name="rq"') !== false
+      && strpos($of40, 'ms.month IN ($rqIn)') !== false
+      && strpos($of40, 'عن الفتــرة') !== false
+      && strpos($of40, 'بيان دوري بتأدية ضريبة الرواتب والأجور') !== false);
+check('ر5 بقي سنوياً على السنة الدراسية المعروضة (فرع مستقل عن ر10)',
+      strpos($of40, "elseif (\$form === 'tax_r5'):") !== false
+      && strpos($of40, "form === 'tax_r5' || \$form === 'tax_r10'") === false);
+// تجربة فعلية: الفصل ٢/2026 (نيسان-حزيران) مدرسة 2 — التواريخ على المستند وضريبته
+// تساوي مجموع القاعدة لنفس الأشهر بالمليم، بنفس فلاتر المصدر الواحد
+$h40 = renderPage('pages/official_forms.php', ['form' => 'tax_r10', 'rq' => 2, 'rqy' => 2026], [], [2]);
+$dbTax40 = (int)$db->query("SELECT COALESCE(SUM(ms.income_tax_lbp),0) FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+    WHERE e.is_deleted=0 AND e.tax_subject=1 AND ms.year=2026 AND ms.month IN (4,5,6) AND ms.school_id=2
+      AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)
+      AND LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) >= '2025-10-01'
+      AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year='2025-2026'
+                     AND (base_plus_echelon_lbp>0 OR net_salary_lbp>0 OR total_due_lbp>0))")->fetchColumn();
+check('ر10 فصلي (تجربة فعلية): الفصل ٢/2026 — «من 01/04/2026 إلى 30/06/2026» وضريبته = مجموع القاعدة للأشهر 4-6 بالمليم',
+      strpos($h40, '01/04/2026') !== false && strpos($h40, '30/06/2026') !== false
+      && $dbTax40 > 0 && strpos($h40, number_format($dbTax40)) !== false,
+      'ضريبة القاعدة: ' . number_format($dbTax40));
+// الافتراضي بلا باراميترات = آخر فصل مكتمل (يُحسب ديناميكياً فلا يفسد الفحص بمرور الوقت)
+$q40 = intdiv((int)date('n') - 1, 3) + 1; $q40y = (int)date('Y');
+$q40--; if ($q40 < 1) { $q40 = 4; $q40y--; }
+$q40from = sprintf('01/%02d/%04d', [1=>1,2=>4,3=>7,4=>10][$q40], $q40y);
+$h40b = renderPage('pages/official_forms.php', ['form' => 'tax_r10'], [], [2]);
+check('ر10 فصلي (تجربة فعلية): الافتراضي بلا اختيار = آخر فصل مكتمل',
+      strpos($h40b, $q40from) !== false, "المتوقّع من $q40from");
+$h40c = renderPage('pages/official_forms.php', ['form' => 'tax_r5'], [], [2]);
+check('ر5 (تجربة فعلية): بعده تصريحاً سنوياً يعمل بلا خطأ',
+      strpos($h40c, 'تصريح سنوي عن ضريبة الدخل على الرواتب والأجور') !== false
+      && strpos($h40c, 'FATAL') === false, strlen($h40c) . ' حرف');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
