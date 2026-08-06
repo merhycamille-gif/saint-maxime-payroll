@@ -1731,8 +1731,9 @@ check('مصدر واحد: الإفادات تختار شهر الراتب من �
 check('مصدر واحد: السيرة/الملف الكامل «الراتب الحالي» من السنة المعروضة أولاً',
       strpos($ehSrc39, '$ehSy = activeSchoolYear();') !== false
       && strpos($ehSrc39, 'AND school_year = ? ORDER BY year DESC, month DESC LIMIT 1') !== false);
-check('مصدر واحد: إفادة عمل الضمان (٦ أشهر) محصورة بالأشهر الفعلية الماضية (بالموقعين)',
-      substr_count($ofSrc39, '(year * 100 + month) <= ?') === 2);
+check('مصدر واحد: إفادة عمل الضمان (٦ أشهر ×٢) + مجاميع نهاية الخدمة (215A/207 + التصفية) كلها محصورة بالأشهر الفعلية الماضية',
+      substr_count($ofSrc39, '(year * 100 + month) <= ?') === 3
+      && substr_count($ofSrc39, '(year * 100 + month) <= " . ((int)date') === 1);
 // تجربة فعلية: إفادة راتب مارسيلا (1677، لها 2025-2026 بأساس 2,085,000 و2026-2027
 // بأساس 2,225,000) — أرقام الإفادة تتبع السنة المعروضة نفسها التي تعرضها كل الكشوف
 $h39a = renderPage('pages/attestations.php', ['type' => 'salaire', 'employee_id' => 1677], [], [2], '', '2025-2026');
@@ -1751,6 +1752,24 @@ check('مصدر واحد (تجربة فعلية): إفادة عمل الضمان
       && strpos($h39c, 'أيلول 2027') === false && strpos($h39c, 'أيار 2027') === false
       && strpos($h39c, 'نيسان 2027') === false,
       strlen($h39c) . ' حرف');
+// تجربة فعلية: إفادة الأجر الأخير (نهاية الخدمة 207) لمارسيلا — «مجموع الأجور» يجب أن يكون
+// مجموع الأشهر الفعلية الماضية فقط (حتى شهر اليوم)، لا شامل أشهر 2026-2027 المستقبلية
+$nowYM39 = (int)date('Y') * 100 + (int)date('n');
+$twQ39 = $db->prepare("SELECT SUM(base_plus_echelon_lbp) base, SUM(extra_lbp+prime_fixe_lbp) exw, SUM(aide_complementaire_lbp) aide
+                       FROM monthly_salaries WHERE employee_id = 1677 AND is_calculated = 1" . " AND (year * 100 + month) <= " . $nowYM39);
+$twQ39->execute(); $twCap39 = $twQ39->fetch(PDO::FETCH_ASSOC);
+$twQ39b = $db->query("SELECT SUM(base_plus_echelon_lbp) base, SUM(extra_lbp+prime_fixe_lbp) exw, SUM(aide_complementaire_lbp) aide
+                      FROM monthly_salaries WHERE employee_id = 1677 AND is_calculated = 1")->fetch(PDO::FETCH_ASSOC);
+$flags39 = $db->query("SELECT cnss_includes_extra, cnss_includes_prime_aide FROM employees WHERE id = 1677")->fetch(PDO::FETCH_ASSOC);
+$mkTot39 = fn($t) => (int)$t['base'] + (!empty($flags39['cnss_includes_extra']) ? (int)$t['exw'] : 0)
+                   + (!empty($flags39['cnss_includes_prime_aide']) ? (int)$t['aide'] : 0);
+$capTot39 = $mkTot39($twCap39); $allTot39 = $mkTot39($twQ39b);
+$h39d = renderPage('pages/official_forms.php', ['form' => 'cnss_eos_invite', 'employee_id' => 1677], [], [2]);
+check('مصدر واحد (تجربة فعلية): «مجموع الأجور» بإفادة نهاية الخدمة 215A = الأشهر الماضية فقط (لا يشمل السنة المفتوحة)',
+      $capTot39 !== $allTot39
+      && strpos($h39d, number_format($capTot39)) !== false
+      && strpos($h39d, number_format($allTot39)) === false,
+      'محدود: ' . number_format($capTot39) . ' / الكلّي المرفوض: ' . number_format($allTot39));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

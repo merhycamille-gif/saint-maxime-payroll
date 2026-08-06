@@ -342,8 +342,10 @@ if (in_array($form, $imageForms)) {
             'today'       => formatDate(date('Y-m-d')),
         ];
         // مجموع الأجور التاريخي + اشتراك نهاية الخدمة 8.5% (لنماذج 215A/207)
+        // 🔴 الأشهر الفعلية الماضية فقط (حتى شهر اليوم) — لا أشهر مستقبلية من سنة مفتوحة للتجهيز
         $tw = (int)($db->query("SELECT COALESCE(SUM(base_plus_echelon_lbp+extra_lbp+prime_fixe_lbp),0)
-                                FROM monthly_salaries WHERE employee_id=" . (int)$emp['id'] . " AND is_calculated=1")->fetchColumn());
+                                FROM monthly_salaries WHERE employee_id=" . (int)$emp['id'] . " AND is_calculated=1
+                                  AND (year * 100 + month) <= " . ((int)date('Y') * 100 + (int)date('n')))->fetchColumn());
         $common['total_wages'] = $tw ? formatLBP($tw, false) : '';
         $common['eos_amount']  = $tw ? formatLBP((int)round($tw * rateFrac('end_of_service_rate', $month, $year, 8.5)), false) : '';
 
@@ -1828,8 +1830,10 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     // 215A دعوة/إفادة تحديد الأجور — 207 إفادة بالأجر الأخير (نهاية الخدمة)
     $isWage = ($form === 'cnss_eos_wage');
     // مجموع الأجور بحسب خيار خضوع الأستاذ (الزرّ الأخضر): الأساس دائماً + الأجر الإضافي/المكافأة إن خاضعَين
-    $tot = $db->prepare("SELECT SUM(base_plus_echelon_lbp) base, SUM(extra_lbp+prime_fixe_lbp) exw, SUM(aide_complementaire_lbp) aide FROM monthly_salaries WHERE employee_id=? AND is_calculated=1");
-    $tot->execute([$emp['id']]); $tw = $tot->fetch();
+    // 🔴 الأشهر الفعلية الماضية فقط (حتى شهر اليوم) — لا أشهر مستقبلية من سنة مفتوحة للتجهيز
+    $tot = $db->prepare("SELECT SUM(base_plus_echelon_lbp) base, SUM(extra_lbp+prime_fixe_lbp) exw, SUM(aide_complementaire_lbp) aide
+                         FROM monthly_salaries WHERE employee_id=? AND is_calculated=1 AND (year * 100 + month) <= ?");
+    $tot->execute([$emp['id'], (int)date('Y') * 100 + (int)date('n')]); $tw = $tot->fetch();
     $totExW = (int)($tw['exw'] ?? 0); $totAid = (int)($tw['aide'] ?? 0);
     $totalWages = (int)($tw['base'] ?? 0)
         + (!empty($emp['cnss_includes_extra']) ? $totExW : 0)
