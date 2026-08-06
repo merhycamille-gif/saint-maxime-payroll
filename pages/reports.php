@@ -438,7 +438,7 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'tax_summary'):
-        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.finance_ministry_number, e.school_id, e.social_status, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
+        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.finance_ministry_number, e.school_id, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.tax_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
@@ -450,14 +450,9 @@ function reportDocThumb($path) {
         // دفعه (نفس قسمة المحرّك بالضبط) — ويتبع زرّ «تطبيق التنزيل العائلي» بملفه (مطفأ = 0).
         // و«الراتب الخاضع للضريبة» المعروض = بعد حسم حصّة التنزيل (فتركب الأعمدة كالتصريح).
         $fdAsOf = sprintf('%04d-%02d-01', $year, $month);
-        $fdStmt = $db->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
-        $fdCache = [];
-        $fdOf = function ($r) use ($fdStmt, &$fdCache, $fdAsOf) {
-            if ((int)($r['afd'] ?? 1) !== 1) return 0;
-            $ss = (string)($r['social_status'] ?? '');
-            if (!array_key_exists($ss, $fdCache)) { $fdStmt->execute([$ss, $fdAsOf]); $fdCache[$ss] = (int)($fdStmt->fetchColumn() ?: 0); }
+        $fdOf = function ($r) use ($fdAsOf) {
             $mpy = max(1, (int)($r['payment_months_per_year'] ?? 12));
-            return (int)round($fdCache[$ss] / $mpy);
+            return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $fdAsOf) / $mpy);
         };
     ?>
         <form method="GET" class="card no-print">

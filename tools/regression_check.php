@@ -1828,15 +1828,17 @@ check('التنزيل العائلي اختياري: العمود يتركّب �
       && strpos($fn41, "ADD COLUMN apply_family_deduction TINYINT(1) NOT NULL DEFAULT 1") !== false
       && strpos($hd41, 'ensureEmployeeFlagColumns();') !== false
       && strpos($emp41, 'ensureEmployeeFlagColumns();') !== false);
-check('التنزيل العائلي اختياري: المحرّك يحترم الخيار (مطفأ = صفر تنزيل) والافتراضي مفعّل',
-      strpos($pc41, "(int)(\$this->employee['apply_family_deduction'] ?? 1) === 1") !== false);
+check('التنزيل العائلي اختياري: المحرّك يقرأه من المصدر الوحيد familyDeductionAnnual (يحترم الزرّ والزوج العامل)',
+      strpos($pc41, 'familyDeductionAnnual(') !== false
+      && strpos($pc41, "\$this->employee['apply_family_deduction'] ?? 1") !== false);
 check('التنزيل العائلي اختياري: زرّ بملف الموظف (بطاقة الضريبة) + يُحفَظ مع الملف',
       strpos($emp41, 'name="apply_family_deduction"') !== false
       && strpos($emp41, "'apply_family_deduction' => isset(\$_POST['apply_family_deduction'])") !== false
       && strpos($emp41, "'apply_family_deduction' => 1,") !== false);
-check('التنزيل العائلي اختياري: ر5 ور10 يستثنيان مَن أطفأ خياره من سطر ١٧٠ (+ عمود كشف الرواتب يتبعه)',
+check('التنزيل العائلي اختياري: ر5 ور10 وعمود كشف الرواتب كلهم على المصدر الوحيد familyDeductionAnnual',
       substr_count($of41, "COALESCE(e.apply_family_deduction, 1) afd") === 3
-      && substr_count($of41, "(int)\$de['afd'] !== 1) continue;") === 2);
+      && substr_count($of41, "familyDeductionAnnual(\$de['social_status'], \$de['spouse_works'], \$de['afd']") === 2
+      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf)") !== false);
 // تجربة فعلية (مع ترجيع كامل): موظف خاضع بضريبة موجبة وتنزيل ساري > 0 — طفي الخيار
 // يرفع ضريبته الشهرية، وإرجاعه يعيدها كما كانت بالمليم
 ensureEmployeeFlagColumns();
@@ -1876,11 +1878,10 @@ $rp42 = (string)file_get_contents($PROJ . '/pages/reports.php');
 $rx42 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 // (تصحيح المستخدم 2026-08-06): الكشف شهري ⇒ التنزيل «حصّة الشهر» (السنوي ÷ أشهر دفعه)،
 // وعموده **قبل** «الخاضع للضريبة» لأنه يُحسم منه، والخاضع المعروض = بعد الحسم
-check('عمود التنزيل العائلي: حصّة الشهر + قبل «الخاضع» + الخاضع بعد الحسم (شاشة)',
+check('عمود التنزيل العائلي: حصّة الشهر + قبل «الخاضع» + الخاضع بعد الحسم (شاشة، بالمصدر الوحيد)',
       strpos($rp42, 'التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small>') !== false
       && strpos($rp42, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false
-      && strpos($rp42, 'round($fdCache[$ss] / $mpy)') !== false
-      && strpos($rp42, "(int)(\$r['afd'] ?? 1) !== 1) return 0;") !== false);
+      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf)") !== false);
 check('عمود التنزيل العائلي: بتصدير Excel/Word بنفس الترتيب والمنطق',
       strpos($rx42, "'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)'") !== false
       && strpos($rx42, "COALESCE(e.apply_family_deduction,1) afd") !== false
@@ -1978,7 +1979,7 @@ $of44 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('كشف رواتب كل الموظفين: عمود التنزيل العائلي (حصّة الشهر) قبل الخاضع والخاضع بعد الحسم',
       strpos($of44, '<th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th>') !== false
       && strpos($of44, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$sfd)") !== false
-      && strpos($of44, 'round($sfdCache[$ss] / max(1, (int)($r[\'payment_months_per_year\'] ?? 12)))') !== false);
+      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf)") !== false);
 // تجربة فعلية: صف مارسيلا بكشف 6/2026 — الحصّة ثم الخاضع بعدها بهذا الترتيب (نفس أرقام كشف الضريبة)
 $h44 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [2]);
 $p44 = mb_strpos($h44, 'مارسيلا');
@@ -2018,6 +2019,40 @@ check('المركّب بلا نقل (تجربة فعلية): مركّب مارس
 $rp45 = (string)file_get_contents($PROJ . '/pages/reports.php');
 check('الكشف الشهري: عمود النقل يسبق «الإجمالي المتوجب» مباشرة',
       strpos($rp45, 'transportHead() ?><th>الإجمالي المتوجب</th>') !== false);
+
+/* =====================================================================
+ * 46) «الزوج/الزوجة يعمل» يُسقط زيادة الزوج من التنزيل العائلي (حالة زاهية الحاج
+ *     2026-08-06): المصدر الوحيد familyDeductionAnnual — متأهل وزوجه يعمل ⇒
+ *     التنزيل = الشخصي (عازب) + حصص الأولاد فقط، بلا زيادة الزوج (225 مليون).
+ * =================================================================== */
+$fn46 = (string)file_get_contents($PROJ . '/includes/functions.php');
+check('زيادة الزوج: الدالة الموحّدة familyDeductionAnnual موجودة (زوج عامل ⇒ حذف الزيادة، بحدّ العازب)',
+      function_exists('familyDeductionAnnual')
+      && strpos($fn46, "\$ded = max(\$single, \$ded - max(0, \$married0 - \$single));") !== false);
+// تجربة فعلية على زاهية الحاج (18، متأهلة بلا أولاد، ضريبتها 0 لأن 656.4م < 675م) مع ترجيع:
+// تعليم «الزوج يعمل» ⇒ تنزيلها يصير 450م (بلا زيادة الزوج) ⇒ تظهر ضريبة فعلية
+$z46 = $db->query("SELECT spouse_works, social_status FROM employees WHERE id = 18")->fetch(PDO::FETCH_ASSOC);
+if ($z46 && $z46['social_status'] === 'marie_sans_enfants') {
+    $fdBase46 = familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-06-01');
+    $fdSW46   = familyDeductionAnnual('marie_sans_enfants', 1, 1, '2026-06-01');
+    $fdSingle46 = familyDeductionAnnual('celibataire', 0, 1, '2026-06-01');
+    check('زيادة الزوج: متأهل بلا أولاد = 675م، وزوجه يعمل = تنزيل العازب 450م',
+          $fdBase46 === 675000000 && $fdSW46 === $fdSingle46 && $fdSW46 === 450000000,
+          number_format($fdBase46) . ' → ' . number_format($fdSW46));
+    $tOf46 = $db->prepare("SELECT income_tax_lbp FROM monthly_salaries WHERE employee_id = 18 AND month = 6 AND year = 2026");
+    $tOf46->execute([]); $t0_46 = (int)$tOf46->fetchColumn();
+    $db->exec("UPDATE employees SET spouse_works = 1 WHERE id = 18");
+    try { (new PayrollCalculator(18, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
+    $tOf46->execute([]); $tSW46 = (int)$tOf46->fetchColumn();
+    $db->exec("UPDATE employees SET spouse_works = " . (int)$z46['spouse_works'] . " WHERE id = 18");
+    try { (new PayrollCalculator(18, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
+    $tOf46->execute([]); $tBack46 = (int)$tOf46->fetchColumn();
+    check('زيادة الزوج (تجربة فعلية): تعليم «زوج زاهية يعمل» يُظهر ضريبة فعلية بعد أن كانت صفراً',
+          $t0_46 === 0 && $tSW46 > 0, 'قبل: ' . number_format($t0_46) . ' / بعد: ' . number_format($tSW46));
+    check('زيادة الزوج (تجربة فعلية): الترجيع أعاد ضريبتها كما كانت', $tBack46 === $t0_46, number_format($tBack46));
+} else {
+    check('زيادة الزوج (تجربة فعلية)', true, 'زاهية غير مطابقة للسيناريو — تخطٍّ');
+}
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

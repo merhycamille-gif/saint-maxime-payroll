@@ -863,6 +863,34 @@ function ensureEmployeeFlagColumns() {
     } catch (Exception $e) { /* لا نكسر الصفحة — يُعاد بالفتحة التالية */ }
 }
 
+/**
+ * 🔴 المصدر الوحيد للتنزيل العائلي السنوي الساري لموظف (2026-08-06، حالة زاهية الحاج):
+ * يعتمده المحرّك وكل الكشوف وتصاريح ر5/ر10 — فلا يختلف رقم عن رقم.
+ *   - زرّ «تطبيق التنزيل العائلي» بملفه مطفأ ⇒ 0.
+ *   - «الزوج/الزوجة يعمل» ✓ وهو متأهل ⇒ تُحذف **زيادة الزوج** (فرق «متأهل بلا أولاد»
+ *     عن «عازب»، حالياً 225 مليون) — فيبقى التنزيل الشخصي + حصص الأولاد فقط،
+ *     لأن الزوج العامل يأخذ تنزيله من جهة عمله (نفس منطق التعويض العائلي).
+ * $asOf: تاريخ السريان (أحدث قيم effective_from ≤ التاريخ).
+ */
+function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf) {
+    if ((int)($applyFlag ?? 1) !== 1) return 0;
+    try {
+        $db = getDB();
+        $q = $db->prepare("SELECT annual_deduction FROM family_tax_deductions
+                           WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+        $q->execute([(string)$socialStatus, $asOf]);
+        $ded = (float)($q->fetchColumn() ?: 0);
+        if (!empty($spouseWorks) && strpos((string)$socialStatus, 'marie') === 0) {
+            $q->execute(['marie_sans_enfants', $asOf]);
+            $married0 = (float)($q->fetchColumn() ?: 0);
+            $q->execute(['celibataire', $asOf]);
+            $single = (float)($q->fetchColumn() ?: 0);
+            $ded = max($single, $ded - max(0, $married0 - $single));
+        }
+        return (int)round($ded);
+    } catch (Exception $e) { return 0; }
+}
+
 /** ضريبة الدخل السنوية بشطور البرنامج المؤرّخة (تُستعمل للتحقّق من المحسومات المنقولة). */
 function annualLawTaxAsOf($db, $annualTaxable, $socialStatus, $m, $y) {
     if ($annualTaxable <= 0) return 0;

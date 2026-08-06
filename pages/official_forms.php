@@ -674,21 +674,18 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
     $tax   = (int)($g['tax']??0);                              // ١٩٠
     // ١٧٠ التنزيل العائلي للفترة: حصة الفصل = (التنزيل السنوي ÷ ١٢) × عدد أشهر الموظف
     // بالفصل (نفس منطق المحرّك الشهري)، ومحدود بأساسه الخاضع بالفترة
-    $qDed = $db->prepare("SELECT e.id, e.social_status, COALESCE(e.apply_family_deduction, 1) afd, COUNT(DISTINCT ms.month) mcnt, SUM(ms.taxable_base_lbp) tb
+    $qDed = $db->prepare("SELECT e.id, e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction, 1) afd, COUNT(DISTINCT ms.month) mcnt, SUM(ms.taxable_base_lbp) tb
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
         WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($rqIn)
           AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
-        GROUP BY e.id, e.social_status, afd");
+        GROUP BY e.id, e.social_status, e.spouse_works, afd");
     $qDed->execute(array_merge($yp, [$rqy]));
     $dedAsOf = sprintf('%04d-%02d-01', $rqy, $rqM[0]);
-    $dedStmt = $db->prepare("SELECT annual_deduction FROM family_tax_deductions
-                              WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
-    $exempt = 0; $dedCache = [];
+    $exempt = 0;
     foreach ($qDed->fetchAll() as $de) {
-        if ((int)$de['afd'] !== 1) continue; // خيار الموظف: لا تنزيل عائلي له
-        $ss = (string)$de['social_status'];
-        if (!array_key_exists($ss, $dedCache)) { $dedStmt->execute([$ss, $dedAsOf]); $dedCache[$ss] = (float)($dedStmt->fetchColumn() ?: 0); }
-        $exempt += (int)min($dedCache[$ss] / 12 * (int)$de['mcnt'], (float)$de['tb']);
+        // المصدر الوحيد familyDeductionAnnual: يحترم زرّ ملفه + الزوج العامل (بلا زيادة الزوج)
+        $fda = familyDeductionAnnual($de['social_status'], $de['spouse_works'], $de['afd'], $dedAsOf);
+        $exempt += (int)min($fda / 12 * (int)$de['mcnt'], (float)$de['tb']);
     }
     $taxable = max(0, $net - $exempt);                         // ١٨٠
     $rows = [
@@ -811,21 +808,18 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
     $tax    = (int)($g['tax']??0);
     // ١٧٠ التنزيل العائلي/الشخصي: يُمنح **مرّة واحدة سنوياً لكل موظف** حسب وضعه الاجتماعي
     // والتاريخ الساري (نفس مصدر المحرّك family_tax_deductions)، ومحدود بأساسه الخاضع.
-    $qDed = $db->prepare("SELECT e.id, e.social_status, COALESCE(e.apply_family_deduction, 1) afd, SUM(ms.taxable_base_lbp) tb
+    $qDed = $db->prepare("SELECT e.id, e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction, 1) afd, SUM(ms.taxable_base_lbp) tb
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
         WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . $ofEmpFilter . " AND ms.school_year=?
           AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
-        GROUP BY e.id, e.social_status, afd");
+        GROUP BY e.id, e.social_status, e.spouse_works, afd");
     $qDed->execute(array_merge($yp, [$schoolYear]));
     $dedAsOf = ($gy1 + 1) . '-01-01'; // منتصف السنة الدراسية (كانون الثاني) = التنزيل الساري للسنة المصرَّح عنها
-    $dedStmt = $db->prepare("SELECT annual_deduction FROM family_tax_deductions
-                              WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
-    $exempt = 0; $dedCache = [];
+    $exempt = 0;
     foreach ($qDed->fetchAll() as $de) {
-        if ((int)$de['afd'] !== 1) continue; // خيار الموظف بملفه: لا يُطبَّق التنزيل العائلي له
-        $ss = (string)$de['social_status'];
-        if (!array_key_exists($ss, $dedCache)) { $dedStmt->execute([$ss, $dedAsOf]); $dedCache[$ss] = (float)($dedStmt->fetchColumn() ?: 0); }
-        $exempt += (int)min($dedCache[$ss], (float)$de['tb']);
+        // المصدر الوحيد familyDeductionAnnual: يحترم زرّ ملفه + الزوج العامل (بلا زيادة الزوج)
+        $fda = familyDeductionAnnual($de['social_status'], $de['spouse_works'], $de['afd'], $dedAsOf);
+        $exempt += (int)min($fda, (float)$de['tb']);
     }
     $taxable = max(0, $net - $exempt);                               // ١٨٠
     $rows = [
@@ -1505,7 +1499,7 @@ elseif ($form === 'teacher_card'):
 </div>
 
 <?php elseif ($form === 'salary_all'):
-    $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.social_status, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, ms.*
+    $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
                           ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
@@ -1516,13 +1510,10 @@ elseif ($form === 'teacher_card'):
     // دفعه — نفس قسمة المحرّك)، قبل «الخاضع للضريبة»، والخاضع المعروض = بعد حسم الحصّة.
     // غير الخاضع للضريبة (tax_subject=0) لا تنزيل له. يتبع زرّ «تطبيق التنزيل العائلي» بملفه.
     $sfdAsOf = sprintf('%04d-%02d-01', $year, $month);
-    $sfdStmt = $db->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
-    $sfdCache = [];
-    $sfdOf = function ($r) use ($sfdStmt, &$sfdCache, $sfdAsOf) {
-        if ((int)($r['afd'] ?? 1) !== 1 || (int)($r['income_tax_lbp'] ?? 0) + (int)($r['taxable_base_lbp'] ?? 0) === 0) return 0;
-        $ss = (string)($r['social_status'] ?? '');
-        if (!array_key_exists($ss, $sfdCache)) { $sfdStmt->execute([$ss, $sfdAsOf]); $sfdCache[$ss] = (int)($sfdStmt->fetchColumn() ?: 0); }
-        return (int)round($sfdCache[$ss] / max(1, (int)($r['payment_months_per_year'] ?? 12)));
+    $sfdOf = function ($r) use ($sfdAsOf) {
+        if ((int)($r['income_tax_lbp'] ?? 0) + (int)($r['taxable_base_lbp'] ?? 0) === 0) return 0;
+        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $sfdAsOf)
+                          / max(1, (int)($r['payment_months_per_year'] ?? 12)));
     };
 ?>
     <form method="get" class="card no-print">
