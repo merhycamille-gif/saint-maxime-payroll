@@ -518,6 +518,14 @@ if (!$emp):
     $aqdUsd = (int)preg_replace('/[^0-9]/', '', (string)($_GET['aqd_usd'] ?? ''));
     $isqMode = in_array(($_GET['isq'] ?? ''), ['istiqala', 'sarf'], true) ? $_GET['isq'] : ''; // إسقاط الحق: استقالة أو صرف
     $grant   = (int)preg_replace('/[^0-9]/', '', (string)($_GET['grant'] ?? '')); // قيمة المنحة بالدولار (إقرار) — تظهر بالأرقام والحروف
+    // صفة الموقّع أسفل الإفادة: الرئيسة / الإدارة / المدير — يختارها المستخدم لكل إفادة
+    $sigTitle = $_GET['sig_t'] ?? 'moudir';
+    if (!in_array($sigTitle, ['raisa', 'idara', 'moudir'], true)) $sigTitle = 'moudir';
+    $SIG_TITLES = ['raisa' => ['ar' => 'الرئيسة', 'fr' => 'La Supérieure'],
+                   'idara' => ['ar' => 'الإدارة', 'fr' => 'La Direction'],
+                   'moudir'=> ['ar' => 'المدير',  'fr' => 'Le Directeur']];
+    $sigTitleAr = $SIG_TITLES[$sigTitle]['ar'];
+    $hasSigTitle = ($type === 'salaire'); // الإفادات التي فيها خيار صفة الموقّع
     // شعار المدرسة للترويسة (خاص بالمدرسة أو الموحّد)
     $logoUrl = schoolLogoUrl($school);
     $logoImg = $logoUrl ? '<img src="' . htmlspecialchars($logoUrl, ENT_QUOTES) . '" alt="" style="max-height:88px;max-width:150px;object-fit:contain">' : '';
@@ -547,7 +555,7 @@ if (!$emp):
     $L=$money($salShown); $N=$money($net); $U='';
     $nssf=cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']);
     $rtl = ($docLang === 'ar');
-    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'');
+    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'').($hasSigTitle?'&sig_t='.$sigTitle:'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع لملف الأستاذ / Dossier</a>
@@ -585,6 +593,13 @@ if (!$emp):
                 <?php endforeach; ?>
             </select>
             <?php else: ?><input type="hidden" name="sig" value="0"><?php endif; ?>
+            <?php if ($hasSigTitle): ?>
+            <span style="margin:0 16px;color:#cbd5e1">|</span>
+            <strong>Signature / الإمضاء:</strong>
+            <?php foreach ($SIG_TITLES as $stk => $stl): ?>
+            <label style="margin:0 10px;cursor:pointer"><input type="radio" name="sig_t" value="<?= $stk ?>" <?= $sigTitle===$stk?'checked':'' ?> onchange="this.form.submit()"> <?= e($stl['fr']) ?> / <?= e($stl['ar']) ?></label>
+            <?php endforeach; ?>
+            <?php endif; ?>
             <?php if ($hasComponents || $hasCurrency || $type==='isqat_haq' || $isNotice): ?><span style="margin:0 16px;color:#cbd5e1">|</span><?php endif; ?>
             <?php if ($hasComponents): ?>
             <strong>Composantes du salaire / مكوّنات الراتب:</strong>
@@ -787,8 +802,8 @@ if (!$emp):
             <tr style="background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact"><td style="border:1px solid #64748b;padding:6px 10px"><strong>الإجمالي</strong></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($salShown) ?></strong></td></tr>
         </table>
         <p>فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> .</p>
-        <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم ، دون أدنى مسؤولية على المؤسسة تجاه أي طرف ثالث .</p>
-        <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم .</p>
+        <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'tadris'): ?>
