@@ -39,7 +39,7 @@
 
         // الغلاف + خانة الكتابة + لوحة النتائج
         var wrap = document.createElement('div');
-        wrap.className = 'ss-wrap';
+        wrap.className = 'emsr-wrap';
         wrap.style.position = 'relative';
         var inp = document.createElement('input');
         inp.type = 'text';
@@ -47,7 +47,7 @@
         inp.setAttribute('autocomplete', 'off');
         inp.placeholder = 'اكتب أول حرف من الاسم أو الاسم أو رقم الهاتف… / Nom ou téléphone…';
         var panel = document.createElement('div');
-        panel.className = 'ss-panel';
+        panel.className = 'emsr-panel';
         panel.style.cssText = 'position:absolute;top:100%;right:0;left:0;z-index:1000;background:#fff;'
             + 'border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.14);'
             + 'max-height:280px;overflow-y:auto;display:none;margin-top:4px';
@@ -89,7 +89,7 @@
             panel.innerHTML = '';
             list.slice(0, 60).forEach(function (o, i) {
                 var it = document.createElement('div');
-                it.className = 'ss-item';
+                it.className = 'emsr-item';
                 it.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px dashed #f1f5f9';
                 it.textContent = o.label;
                 it.addEventListener('mousedown', function (ev) { ev.preventDefault(); choose(i); });
@@ -107,7 +107,7 @@
 
         function highlight(i) {
             active = i;
-            Array.prototype.forEach.call(panel.querySelectorAll('.ss-item'), function (el, j) {
+            Array.prototype.forEach.call(panel.querySelectorAll('.emsr-item'), function (el, j) {
                 el.style.background = j === i ? '#eef2ff' : '';
             });
         }
@@ -126,17 +126,19 @@
             if (q === '') { render(opts); return; }
             var qd = q.replace(/[^0-9]/g, '');
             var words = q.split(' ').filter(Boolean);
-            var res = opts.filter(function (o) {
-                // هاتف: الاستعلام كله أرقام (3+ خانات) → يطابق أي جزء من أي رقم من أرقامه
+            // score: 0 = أول حرف من كلمة (يتصدّر) · 1 = جزء من الاسم · 2 = هاتف
+            var res = [];
+            opts.forEach(function (o) {
                 if (qd.length >= 3 && qd === q.replace(/ /g, '')
-                    && o.phones.some(function (p) { return p.indexOf(qd) !== -1; })) return true;
-                // اسم: كل كلمة مكتوبة تطابق **أول** كلمة ما بالاسم (أول حرف فأكثر) أو جزءاً منه
-                return words.every(function (w) {
-                    if (o.search.indexOf(w) !== -1) return true;              // جزء من الاسم/الرقم
-                    return o.search.split(' ').some(function (t) { return t.indexOf(w) === 0; }); // أول حرف/أحرف
-                });
+                    && o.phones.some(function (p) { return p.indexOf(qd) !== -1; })) { res.push({ o: o, s: 2 }); return; }
+                var toks = o.search.split(' ');
+                var allPrefix = words.every(function (w) { return toks.some(function (t) { return t.indexOf(w) === 0; }); });
+                var allSub    = words.every(function (w) { return o.search.indexOf(w) !== -1; });
+                if (allPrefix) res.push({ o: o, s: 0 });        // «ري» → ريتا وريما أولاً
+                else if (allSub) res.push({ o: o, s: 1 });      // ثم من الحرف بوسط اسمه (كريستل…)
             });
-            render(res);
+            res.sort(function (a, b) { return a.s - b.s; });
+            render(res.map(function (r) { return r.o; }));
         }
 
         inp.addEventListener('input', function () {
