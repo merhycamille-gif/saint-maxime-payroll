@@ -70,6 +70,23 @@ if ($employeeId > 0) {
         'phone' => (trim((string)($schForExport['phone'] ?? '')) ?: ($emp['phone1'] ?: '')),
         'email' => (trim((string)($schForExport['email'] ?? '')) ?: ($emp['email'] ?? '')),
     ];
+
+    // 💾 حفظ تاريخ ترك العمل بملف الموظف من شاشة «إعلام ترك أجير» («بعدك ما عم بتحط
+    // تاريخ الترك» 2026-08-18): النموذج يقرأ التاريخ من الملف حصراً — فإن كان الملف
+    // فارغاً تعرض الشاشة خانة تحفظه بخانة «تاريخ ترك الضمان» بملف الموظف نفسه.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_leave_date'])) {
+        requireCsrf();
+        $newLd = trim((string)($_POST['ld_new'] ?? ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $newLd)) {
+            $up = $db->prepare("UPDATE employees SET left_date_cnss = ? WHERE id = ?");
+            $up->execute([$newLd, $employeeId]);
+            $_SESSION['flash_success'] = 'انحفظ تاريخ ترك العمل بملف الموظف (خانة ترك الضمان): ' . formatDate($newLd) . ' / Date de cessation enregistrée dans le dossier.';
+        } else {
+            $_SESSION['flash_error'] = 'تاريخ غير صالح / Date invalide';
+        }
+        header('Location: ' . BASE_URL . 'pages/attestations.php?employee_id=' . $employeeId . '&type=cnss_leave&lang_doc=' . urlencode($docLang));
+        exit;
+    }
 }
 
 $school = currentSchool();
@@ -436,6 +453,23 @@ if (!$emp):
           <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($ATT_TYPES[$type]['ar']) ?></div>
         </h3></div>
         <div class="card-body">
+            <?php if ($isLeave && $leaveDate === ''): ?>
+            <div style="border:1px solid #fecaca;background:#fef2f2;border-radius:10px;padding:12px 16px;margin-bottom:14px">
+                <div style="color:#b91c1c;font-weight:700;margin-bottom:8px"><i class="fas fa-triangle-exclamation"></i>
+                    ملف الموظف ما فيه تاريخ ترك عمل — حطّه هون مرّة وحدة وينحفظ بملفه (خانة «تاريخ ترك الضمان»)، والنموذج يقرأه من الملف دائماً.
+                    <span style="font-weight:400;font-size:12.5px;display:block">Aucune date de cessation dans le dossier — enregistrez-la ici une seule fois.</span>
+                </div>
+                <form method="POST" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="save_leave_date" value="1">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Date de cessation / تاريخ ترك العمل</label>
+                        <input type="date" name="ld_new" class="form-control" required>
+                    </div>
+                    <button class="btn btn-primary"><i class="fas fa-floppy-disk"></i> Enregistrer dans le dossier / احفظ بملف الموظف</button>
+                </form>
+            </div>
+            <?php endif; ?>
             <form method="GET" class="form-row cols-3" style="align-items:end;margin-bottom:14px">
                 <input type="hidden" name="employee_id" value="<?= (int)$employeeId ?>">
                 <input type="hidden" name="type" value="<?= e($type) ?>">
@@ -456,14 +490,12 @@ if (!$emp):
                     <input type="number" name="hrs" class="form-control" value="<?= e($hrsDef) ?>" onchange="this.form.submit()">
                 </div>
                 <?php else: ?>
+                <?php if ($leaveDate !== ''): ?>
                 <div class="form-group">
                     <label class="form-label">Date de cessation / تاريخ ترك العمل (من ملف الموظف)</label>
-                    <?php if ($leaveDate !== ''): ?>
                     <input type="text" class="form-control" value="<?= e(formatDate($leaveDate)) ?>" readonly style="background:#f1f5f9;font-weight:700">
-                    <?php else: ?>
-                    <input type="text" class="form-control" value="غير محدّد — حطّه بملف الموظف (تاريخ ترك الضمان)" readonly style="background:#fef2f2;color:#b91c1c">
-                    <?php endif; ?>
                 </div>
+                <?php endif; ?>
                 <div class="form-group">
                     <label class="form-label">Motif / سبب ترك العمل</label>
                     <select name="reason" class="form-select" onchange="this.form.submit()">

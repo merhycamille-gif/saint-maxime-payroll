@@ -2233,9 +2233,17 @@ check('نماذج الضمان الثلاثة (تجربة فعلية): شاشة 
 // تاريخ الترك يُقرأ من ملف الموظف حصراً (بطلبه 2026-08-18): لا خانة يدوية بالشاشة،
 // والتصدير يأخذ left_date_cnss من الملف — وإن كان فارغاً تبقى خانات النموذج فارغة (لا تاريخ اليوم)
 check('نماذج الضمان الثلاثة: تاريخ الترك من ملف الموظف حصراً (عرض للعلم فقط، بلا خانة يدوية)',
-      strpos($h52, 'name="ld"') === false && strpos($h52, 'من ملف الموظف') !== false
+      strpos($h52, 'name="ld"') === false
       && strpos($oe52, "\$ldTs = \$emp['left_date_cnss'] ? strtotime(\$emp['left_date_cnss']) : 0;") !== false
       && strpos($oe52, "\$_GET['ld']") === false);
+// «بعدك ما عم بتحط تاريخ الترك» (2026-08-18): إن كان ملف الموظف بلا تاريخ ترك، شاشة
+// إعلام الترك تعرض خانة تحفظه **بملف الموظف نفسه** (left_date_cnss عبر POST بحماية CSRF)
+$at52b = (string)file_get_contents($PROJ . '/pages/attestations.php');
+check('نماذج الضمان الثلاثة: ملف بلا تاريخ ترك → خانة حفظ التاريخ بملف الموظف (POST + CSRF) موجودة',
+      strpos($at52b, "isset(\$_POST['save_leave_date'])") !== false
+      && strpos($at52b, 'requireCsrf();') !== false
+      && strpos($at52b, 'UPDATE employees SET left_date_cnss = ? WHERE id = ?') !== false
+      && strpos($at52b, 'name="ld_new"') !== false);
 // الخط 12 بكل خانات القوالب الثلاثة («بدي الخط يكون حجم 12» 2026-08-18) — نقرأ ملف الأنماط
 // من كل قالب ونتثبّت أن لا حجم خط غير 12 (قاعدة الخط 12 بكل شي)
 $fontsOk52 = true; $fontsBad52 = '';
