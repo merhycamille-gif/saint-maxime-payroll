@@ -16,6 +16,9 @@ $db = getDB();
 $ATT_TYPES = [
     'cnss'           => ['fr' => 'Attestation pour la CNSS',     'en' => 'Social Security Certificate',  'ar' => 'إفادة للضمان الاجتماعي'],
     'cnss_travail'   => ['fr' => 'Attestation de travail CNSS (officiel)','en' => 'CNSS Work Attestation (official)','ar' => 'إفادة عمل للضمان (نموذج رسمي)'],
+    'cnss_hire_new'  => ['fr' => "Déclaration d'embauche — non immatriculé (CNSS 2AA, officiel)", 'en' => 'Hiring Declaration — not registered (official)', 'ar' => 'تصريح باستخدام أجير — ما عندو رقم ضمان (نموذج رسمي)'],
+    'cnss_hire_reg'  => ['fr' => "Déclaration d'embauche — déjà immatriculé (officiel)", 'en' => 'Hiring Declaration — registered (official)', 'ar' => 'إعلام استخدام أجير — عندو رقم ضمان (نموذج رسمي)'],
+    'cnss_leave'     => ['fr' => 'Déclaration de cessation de travail (officiel)', 'en' => 'Leaving Declaration (official)', 'ar' => 'إعلام ترك أجير (نموذج رسمي)'],
     'salaire'        => ['fr' => 'Attestation de salaire',        'en' => 'Salary Certificate',          'ar' => 'إفادة راتب'],
     'tadris'         => ['fr' => "Attestation d'enseignement",    'en' => 'Teaching Certificate',        'ar' => 'إفادة تدريس'],
     'embassy'        => ['fr' => 'Attestation (ambassade, EN)',   'en' => 'Attestation (Embassy, EN)',   'ar' => 'إفادة للسفارة (إنكليزي)'],
@@ -268,7 +271,7 @@ if ($emp && !empty($_GET['dossier'])):
             <?php
             // كل أنواع الإفادات مقسّمة لأقسام واضحة (تُغطّى كل الأنواع + قسم «أخرى» احتياطاً لأي نوع جديد)
             $attGroups = [
-                'Salaire, travail et CNSS / راتب وعمل وضمان' => ['salaire','tadris','cnss','cnss_travail','afade_madrasiya','embassy','riaaya'],
+                'Salaire, travail et CNSS / راتب وعمل وضمان' => ['salaire','tadris','cnss','cnss_travail','cnss_hire_new','cnss_hire_reg','cnss_leave','afade_madrasiya','embassy','riaaya'],
                 'Fin de service, démission et décharge / نهاية الخدمة والاستقالة وإبراء الذمّة' => ['anhaa_khedme','anhaa_mail','talab_istiqala','isqat_haq','baraa_zimma'],
                 'Contrats, déclarations et avertissements / عقود وإقرارات وإنذارات' => ['aqd_taalim','iqrar','notice_school','notice_mail'],
             ];
@@ -402,6 +405,76 @@ if (!$emp):
                 <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>"><i class="fas fa-arrow-right"></i> Retour au dossier / رجوع لملف الأستاذ</a>
             </div>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> «الإفادة الرسمية» تفتح النموذج الرسمي كاملاً معبّأً (المدرسة ورقمها في الضمان، اسم الأجير ورقم ضمانه وسنة ولادته، والأشهر) جاهز للطباعة — <strong>نفس الشكل تماماً أونلاين وعلى الكمبيوتر</strong>. زر Excel للتحميل والتعديل.</p>
+        </div>
+    </div>
+    <?php
+        include __DIR__ . '/../includes/footer.php';
+        return;
+    endif;
+    // نماذج الضمان الرسمية الثلاثة (قوالب المستخدم الأصلية): استخدام أجير جديد/مضمون سابقاً + ترك أجير.
+    // شاشة خيارات صغيرة (الجنس + الساعات + تاريخ/سبب الترك) ثم أزرار PDF/Excel طبق الأصل.
+    if (in_array($type, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)):
+        $isLeave = ($type === 'cnss_leave');
+        $ts  = strtotime($effDate) ?: time();
+        $d   = (int)date('j', $ts); $mo = (int)date('n', $ts); $yr = (int)date('Y', $ts);
+        $nm  = preg_replace('/\s+/', ' ', trim(($emp['first_name_ar'] ?? '') . ' ' . ($emp['father_name_ar'] ?? '') . ' ' . ($emp['last_name_ar'] ?? '')));
+        if ($nm === '') $nm = trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? ''));
+        $sexSel = (($_GET['sex'] ?? 'm') === 'f') ? 'f' : 'm';
+        $hrsDef = trim((string)($_GET['hrs'] ?? ''));
+        if ($hrsDef === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrsDef = (string)round((float)$emp['hours_per_week'] * 52 / 12);
+        $leaveDate = $_GET['ld'] ?? ($emp['left_date_cnss'] ?: date('Y-m-d'));
+        $reasonSel = (int)($_GET['reason'] ?? 1); if ($reasonSel < 1 || $reasonSel > 7) $reasonSel = 1;
+        $REASONS = [1=>'استقالة / Démission',2=>'بلوغ السن / Âge légal',3=>'عجز / Invalidité',4=>'زواج / Mariage',5=>'وفاة / Décès',6=>'هجرة / Émigration',7=>'عمل آخر / Autre emploi'];
+        $expBase = BASE_URL . 'pages/official_export.php?form=' . e($type) . '&emp=' . (int)$employeeId
+                 . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr . '&sex=' . $sexSel . '&hrs=' . urlencode($hrsDef)
+                 . ($isLeave ? '&ld=' . urlencode($leaveDate) . '&reason=' . $reasonSel : '');
+    ?>
+    <div class="card no-print" style="max-width:760px;margin:0 auto">
+        <div class="card-header"><h3>
+          <span dir="ltr"><i class="fas fa-file-medical"></i> <?= e($ATT_TYPES[$type]['fr']) ?> — <?= e($nm) ?></span>
+          <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($ATT_TYPES[$type]['ar']) ?></div>
+        </h3></div>
+        <div class="card-body">
+            <form method="GET" class="form-row cols-3" style="align-items:end;margin-bottom:14px">
+                <input type="hidden" name="employee_id" value="<?= (int)$employeeId ?>">
+                <input type="hidden" name="type" value="<?= e($type) ?>">
+                <div class="form-group">
+                    <label class="form-label">Date de la déclaration / تاريخ التصريح</label>
+                    <input type="date" name="date" class="form-control" value="<?= e($effDate) ?>" onchange="this.form.submit()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Sexe / الجنس</label>
+                    <select name="sex" class="form-select" onchange="this.form.submit()">
+                        <option value="m" <?= $sexSel==='m'?'selected':'' ?>>Homme / ذكر</option>
+                        <option value="f" <?= $sexSel==='f'?'selected':'' ?>>Femme / أنثى</option>
+                    </select>
+                </div>
+                <?php if (!$isLeave): ?>
+                <div class="form-group">
+                    <label class="form-label">Heures de travail par mois / ساعات العمل في الشهر</label>
+                    <input type="number" name="hrs" class="form-control" value="<?= e($hrsDef) ?>" onchange="this.form.submit()">
+                </div>
+                <?php else: ?>
+                <div class="form-group">
+                    <label class="form-label">Date de cessation / تاريخ ترك العمل</label>
+                    <input type="date" name="ld" class="form-control" value="<?= e($leaveDate) ?>" onchange="this.form.submit()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Motif / سبب ترك العمل</label>
+                    <select name="reason" class="form-select" onchange="this.form.submit()">
+                        <?php foreach ($REASONS as $k => $lbl): ?>
+                        <option value="<?= $k ?>" <?= $k===$reasonSel?'selected':'' ?>><?= e($lbl) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
+            </form>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي (طباعة / PDF) / Formulaire officiel (PDF)</a>
+                <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> Télécharger Excel (modifiable) / تحميل Excel (للتعديل)</a>
+                <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>"><i class="fas fa-arrow-right"></i> Retour au dossier / رجوع لملف الأستاذ</a>
+            </div>
+            <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج الضمان الرسمي</strong> معبّأً تلقائياً: المدرسة ورقمها في الضمان وهاتفها وعنوانها، واسم الأجير وأهله وولادته وسجلّه وعنوانه، وتاريخ الاستخدام وراتبه الخاضع للضمان رقماً وحروفاً<?= $isLeave ? '، وتاريخ الترك وسببه' : '' ?>. عدّل الخيارات فوق قبل الطباعة إذا لزم.</p>
         </div>
     </div>
     <?php

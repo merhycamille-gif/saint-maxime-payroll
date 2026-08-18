@@ -6,6 +6,7 @@
  */
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/report_helpers.php';
 require_once __DIR__ . '/../includes/report_export.php';
 requireLogin();
 
@@ -224,6 +225,183 @@ if ($form === 'cnss_work_attestation') {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0'); // منع الكاش نهائياً — دائماً نسخة طازجة
     header('Pragma: no-cache');
     echo $buildHtml($bg, $chromeBin ? 'download' : 'print');
+    exit;
+}
+
+/* ============================================================================
+ * نماذج الضمان الرسمية الثلاثة (قوالب المستخدم الأصلية من الدسك توب — 2026-08-18):
+ *   cnss_hire_new — تصريح باستخدام أجير غير مضمون سابقاً (CNSS-2AA)
+ *   cnss_hire_reg — إعلام عن استخدام أجير مضمون سابقاً (عنده رقم ضمان)
+ *   cnss_leave    — إعلام عن ترك أجير عمله في المؤسسة
+ * تُعبَّأ خانةً خانة في قالب الإكسل الرسمي نفسه → PDF/Excel طبق الأصل (محلياً)،
+ * وإن تعذّر تحويل PDF (أونلاين بلا LibreOffiche) نقع على النسخة المبنية بالبرنامج.
+ * ========================================================================== */
+if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
+    $empId = (int)($_GET['emp'] ?? 0);
+    $d  = (int)($_GET['d']  ?? date('j'));
+    $mo = (int)($_GET['mo'] ?? date('n'));
+    $yr = (int)($_GET['yr'] ?? date('Y'));
+    $sex = (($_GET['sex'] ?? 'm') === 'f') ? 'f' : 'm';
+
+    // جلب الموظف ضمن نطاق المدرسة المسموح بها (أمان)
+    $st = $db->prepare("SELECT * FROM employees WHERE id=? AND is_deleted=0 AND " . schoolScopeWhere('school_id'));
+    $st->execute([$empId]);
+    $emp = $st->fetch();
+    if (!$emp) { http_response_code(404); die('الموظف غير موجود أو خارج صلاحيتك'); }
+
+    // مدرسة الموظف هي صاحب العمل (اسمها ورقمها في الضمان وهاتفها وعنوانها)
+    $ss = $db->prepare("SELECT * FROM schools WHERE id=?");
+    $ss->execute([(int)$emp['school_id']]);
+    $esch = $ss->fetch() ?: [];
+
+    // رقم المؤسسة في الضمان «25 - 82 - 043» → 3 خانات يمين→يسار كما في النموذج الورقي
+    $parts = preg_split('/[\s\-]+/', trim((string)($esch['nssf_employer_number'] ?? '')), -1, PREG_SPLIT_NO_EMPTY);
+    $p1 = $parts[0] ?? ''; $p2 = $parts[1] ?? ''; $p3 = $parts[2] ?? '';
+    // الهاتف «07 975440» → مقدّمة + رقم بخانتين منفصلتين كما في القالب
+    $phSplit = function ($phone) {
+        $ph = preg_replace('/[^0-9]/', '', (string)$phone);
+        if (strlen($ph) >= 7 && $ph[0] === '0') return [substr($ph, 0, 2), substr($ph, 2)];
+        return ['', $ph];
+    };
+    [$sPhPre, $sPhNum] = $phSplit($esch['phone'] ?? '');
+
+    // الاسم والأهل والولادة والسجل
+    $name = preg_replace('/\s+/', ' ', trim(($emp['first_name_ar'] ?? '') . ' ' . ($emp['father_name_ar'] ?? '') . ' ' . ($emp['last_name_ar'] ?? '')));
+    if ($name === '') $name = trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? ''));
+    $first  = trim((string)($emp['first_name_ar'] ?? '')) ?: trim((string)($emp['first_name_fr'] ?? ''));
+    $last   = trim((string)($emp['last_name_ar'] ?? ''))  ?: trim((string)($emp['last_name_fr'] ?? ''));
+    $father = trim((string)($emp['father_name_ar'] ?? ''));
+    $mother = trim(((string)($emp['mother_first_name'] ?? '')) . ' ' . ((string)($emp['mother_last_name'] ?? '')));
+    $bTs = $emp['birth_date'] ? strtotime($emp['birth_date']) : 0;
+    $bD = $bTs ? (int)date('j', $bTs) : ''; $bM = $bTs ? (int)date('n', $bTs) : '';
+    $bY = $bTs ? date('Y', $bTs) : ''; $bYY = $bY !== '' ? substr($bY, 2) : '';
+    $hTs = $emp['hire_date'] ? strtotime($emp['hire_date']) : 0;
+    $hD = $hTs ? (int)date('j', $hTs) : ''; $hM = $hTs ? (int)date('n', $hTs) : ''; $hY = $hTs ? date('Y', $hTs) : '';
+    $natRaw = trim((string)($emp['nationality'] ?? ''));
+    $nat = ($natRaw === '' || strcasecmp($natRaw, 'lebanese') === 0 || $natRaw === 'لبناني' || $natRaw === 'لبنانية') ? 'لبنانية' : $natRaw;
+    $married = strpos((string)($emp['social_status'] ?? ''), 'marie') === 0;
+    $registry = trim((string)($emp['civil_registry_number'] ?? ''));
+    $regPlace = trim((string)($emp['civil_registry_place'] ?? ''));
+    // الصفة: الموظف الإداري بنوع وظيفته الفعلي، وإلا فئته (نفس منطق النماذج المبنية)
+    $jobT = trim((string)($emp['job_title'] ?? ''));
+    $fnAr = ($emp['employee_type'] === 'employe' && $jobT !== '') ? jobTitleLabel($jobT, 'ar') : employeeTypeLabel($emp['employee_type'], 'ar');
+    // ساعات العمل في الشهر (قابلة للتعديل من الشاشة؛ الافتراضي من ساعات الأسبوع)
+    $hrs = trim((string)($_GET['hrs'] ?? ''));
+    if ($hrs === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrs = (string)round((float)$emp['hours_per_week'] * 52 / 12);
+
+    // 🔴 مصدر واحد: الراتب الخاضع للضمان من رواتب **السنة الدراسية المعروضة** (نفس اختيار الإفادات)
+    $salPickSql = "ORDER BY (prime_fixe_lbp > 0 OR extra_lbp > 0) DESC,
+                 (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) DESC,
+                 year DESC, month DESC LIMIT 1";
+    $sal = null;
+    $attSy = activeSchoolYear();
+    if ($attSy !== 'all') {
+        $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? " . $salPickSql);
+        $q->execute([$empId, $attSy]);
+        $sal = $q->fetch();
+    }
+    if (!$sal) {
+        $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? " . $salPickSql);
+        $q->execute([$empId]);
+        $sal = $q->fetch();
+    }
+    $wage = $sal ? cnssSubjectWageLbp($sal, $emp) : 0;
+    $wageNum = $wage > 0 ? number_format($wage) : '';
+    $wageWords = $wage > 0 ? (numToArabicWords($wage) . ' ليرة لبنانية') : '';
+
+    // اسم المسؤول الموقّع (المدير/الرئيسة — أول مسؤولي المدرسة)
+    $sigs = schoolSignatories($esch);
+    $sigName = trim((string)($sigs[0]['name'] ?? ''));
+
+    if ($form === 'cnss_hire_new') {
+        // تصريح باستخدام أجير — غير مضمون سابقاً (CNSS-2AA)
+        $cells = [
+            'K5' => $p1, 'J5' => $p2, 'I5' => $p3,
+            'B7' => $esch['name_ar'] ?? '',
+            'K8' => $sPhNum, 'L8' => $sPhPre,
+            'G9' => $esch['address'] ?? '',
+            'C13' => $sex === 'm' ? 'X' : '1', 'E13' => $sex === 'f' ? 'X' : '2',
+            'C14' => $first, 'K14' => $last,
+            'C15' => $father, 'J15' => $mother,
+            'D16' => trim(($emp['birth_place'] ?? '') . ' ' . ($bTs ? formatDate($emp['birth_date']) : '')),
+            'I16' => $regPlace, 'L16' => $registry,
+            'D17' => !$married ? 'X' : '1', 'F17' => $married ? 'X' : '2',
+            'E18' => $regPlace !== '' ? $regPlace : trim((string)($emp['ville'] ?? '')),
+            'F19' => $emp['gouvernorat'] ?? '', 'J19' => $emp['district'] ?? '',
+            'D20' => $emp['ville'] ?? '', 'I20' => $emp['quartier'] ?? '', 'K20' => $emp['rue'] ?? '',
+            'C21' => trim(($emp['immeuble'] ?? '') . (trim((string)($emp['etage'] ?? '')) !== '' ? ' طابق ' . $emp['etage'] : '')),
+            'D22' => $hD, 'E22' => $hM, 'F22' => $hY, 'L22' => $hrs,
+            'D23' => 'X',
+            'D24' => $fnAr, 'J24' => $wageNum,
+            'E25' => $wageWords,
+            'D26' => 'X',
+            // سطر التوقيع: الاسم ملحق بخانة النص الطويلة (تفيض بحرية — H33 الضيقة تقصّه)،
+            // والتاريخ كاملاً بالخانة العريضة K33 (M33/N33 أضيق من 4 أرقام فتظهر #)
+            'A33' => 'اوافق على صحة المعلومات المدرجة أعلاه: اسم الأجير:  ' . trim($first . ' ' . $last),
+            'K33' => $d . ' / ' . $mo . ' / ' . $yr,
+            'L36' => $sigName,
+        ];
+        [$empPhPre, $empPhNum] = $phSplit($emp['phone1'] ?? '');
+        $cells['I21'] = $empPhNum; $cells['K21'] = $empPhPre;
+        $tplFile = 'cnss_hire_new.xlsx'; $tplName = 'Tasrih_Istikhdam_Ajir_' . $empId;
+        $fallbackForm = 'cnss_employ2';
+    } elseif ($form === 'cnss_hire_reg') {
+        // إعلام عن استخدام أجير — مضمون سابقاً (عنده رقم ضمان)
+        $cells = [
+            'C6' => $esch['name_ar'] ?? '',
+            'K7' => $p3, 'M7' => $p2, 'N7' => $p1,
+            'K8' => $sPhNum, 'M8' => $sPhPre,
+            'A9' => 'وعنوانها الكامل:  ' . trim((string)($esch['address'] ?? '')),
+            'K11' => $emp['nssf_number'] ?? '', 'N11' => $bYY,
+            'C12' => $sex === 'm' ? 'X' : '1', 'E12' => $sex === 'f' ? 'X' : '2',
+            'B13' => $first, 'E13' => $last, 'K13' => $emp['nssf_number'] ?? '', 'N13' => $bYY,
+            'B14' => $father, 'H14' => $mother,
+            'C15' => $bD, 'D15' => $bM, 'E15' => $bY, 'H15' => $registry, 'L15' => $nat,
+            'C16' => !$married ? 'X' : '1', 'E16' => $married ? 'X' : '2',
+            'B17' => $hD, 'C17' => $hM, 'D17' => $hY, 'J17' => $hrs,
+            'B18' => 'X',
+            'C19' => $fnAr, 'G19' => trim($wageNum . '  ' . $wageWords),
+            'C20' => 'X',
+            'B27' => $first, 'C27' => $last,
+            'L27' => $sigName,
+        ];
+        $tplFile = 'cnss_hire_reg.xlsx'; $tplName = 'Ilam_Istikhdam_Ajir_' . $empId;
+        $fallbackForm = 'cnss_employ';
+    } else {
+        // إعلام عن ترك أجير عمله في المؤسسة
+        $ldTs = strtotime((string)($_GET['ld'] ?? '')) ?: ($emp['left_date_cnss'] ? strtotime($emp['left_date_cnss']) : time());
+        $reason = (int)($_GET['reason'] ?? 1); if ($reason < 1 || $reason > 7) $reason = 1;
+        $reasonCells = [1 => 'C20', 2 => 'E20', 3 => 'G20', 4 => 'I20', 5 => 'K20', 6 => 'M20', 7 => 'O20'];
+        $cells = [
+            'E8' => $esch['name_ar'] ?? '',
+            'P9' => $p1, 'O9' => $p2, 'N9' => $p3,
+            'L10' => $sPhNum, 'N10' => $sPhPre,
+            'C11' => $esch['address'] ?? '',
+            'N13' => $emp['nssf_number'] ?? '', 'P13' => $bYY,
+            'C14' => $sex === 'm' ? 'X' : '1', 'F14' => $sex === 'f' ? 'X' : '2',
+            'B15' => $first, 'I15' => $last,
+            'B16' => $father, 'K16' => $mother,
+            'D17' => $emp['birth_place'] ?? '', 'F17' => $bTs ? formatDate($emp['birth_date']) : '',
+            'K17' => $registry, 'O17' => $nat,
+            'D18' => !$married ? 'X' : '1', 'F18' => $married ? 'X' : '2',
+            'C19' => (int)date('j', $ldTs), 'E19' => (int)date('n', $ldTs), 'F19' => date('Y', $ldTs),
+            $reasonCells[$reason] => 'X',
+            'D21' => $fnAr,
+            'F22' => $wageNum, 'I22' => $wageWords,
+            'A23' => trim((string)($esch['ville'] ?? '') ?: 'صيدا') . ' في ' . $d . '/' . $mo . '/' . $yr
+                   . str_repeat(' ', 20) . 'خاتم المؤسسة       اسم المسؤول عن المؤسسة وتوقيعه',
+            'K25' => $first, 'L25' => $last,
+        ];
+        $tplFile = 'cnss_leave.xlsx'; $tplName = 'Ilam_Tark_Ajir_' . $empId;
+        $fallbackForm = 'cnss_terminate';
+    }
+
+    if (officialTemplateExport(__DIR__ . '/../assets/templates/' . $tplFile, $cells, $format, $tplName . '_' . $d . '-' . $mo . '-' . $yr)) {
+        exit; // بُثَّ الملف (pdf أو xlsx) وخرج
+    }
+    // تعذّر توليد الملف (أونلاين بلا LibreOffice) → النسخة المبنية بالبرنامج بنفس المعلومات
+    $_SESSION['flash_info'] = 'النموذج الرسمي طبق الأصل (PDF) يتولّد على كمبيوتر المدرسة. هون فتحنالك النسخة المبنية بالبرنامج بنفس المعلومات — اطبعها من زرّ الطباعة، أو نزّل Excel الرسمي. / Le PDF officiel n\'est disponible que sur l\'ordinateur de l\'école — version imprimable affichée.';
+    header('Location: ' . BASE_URL . 'pages/official_forms.php?form=' . $fallbackForm . '&employee_id=' . $empId);
     exit;
 }
 

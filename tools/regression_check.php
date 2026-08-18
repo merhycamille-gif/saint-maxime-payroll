@@ -2204,6 +2204,52 @@ foreach ($law51 as $r51x) {
 check('تجزئة القانون (تجربة فعلية): ضريبة كل المعدّين غير ذوي الـ12 شهراً المخزّنة = المعادلة القانونية بالمليم',
       count($law51) > 0 && !$bad51, count($law51) . ' موظفاً' . ($bad51 ? ' — خلل: ' . implode(' · ', $bad51) : ' كلهم مطابقون'));
 
+/* =====================================================================
+ * 52) 📜 نماذج الضمان الرسمية الثلاثة بملف إفادات الأستاذ (2026-08-18):
+ *     تصريح باستخدام أجير غير مضمون (CNSS-2AA) + إعلام استخدام أجير مضمون
+ *     (عنده رقم) + إعلام ترك أجير — قوالب المستخدم الأصلية تُعبَّأ طبق الأصل.
+ * =================================================================== */
+check('نماذج الضمان الثلاثة: القوالب الرسمية موجودة (استخدام جديد/مضمون سابقاً/ترك)',
+      is_file($PROJ . '/assets/templates/cnss_hire_new.xlsx')
+      && is_file($PROJ . '/assets/templates/cnss_hire_reg.xlsx')
+      && is_file($PROJ . '/assets/templates/cnss_leave.xlsx'));
+$at52 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$oe52 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+check('نماذج الضمان الثلاثة: الأنواع مضافة بصفحة الإفادات وبمجموعة «راتب وعمل وضمان» بملف الأستاذ',
+      strpos($at52, "'cnss_hire_new'") !== false && strpos($at52, "'cnss_hire_reg'") !== false
+      && strpos($at52, "'cnss_leave'") !== false
+      && preg_match("/'Salaire, travail et CNSS[^]]*'cnss_hire_new','cnss_hire_reg','cnss_leave'/u", $at52) === 1);
+check('نماذج الضمان الثلاثة: التصدير الرسمي يعالجها (تعبئة القالب + بديل النسخة المبنية عند تعذّر PDF)',
+      strpos($oe52, "['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave']") !== false
+      && strpos($oe52, "\$fallbackForm = 'cnss_employ2'") !== false
+      && strpos($oe52, "\$fallbackForm = 'cnss_employ'") !== false
+      && strpos($oe52, "\$fallbackForm = 'cnss_terminate'") !== false);
+// تجربة فعلية: شاشة الخيارات تفتح لموظف حقيقي وفيها زرّا PDF/Excel
+$emp52 = $db->query("SELECT id FROM employees WHERE is_deleted = 0 ORDER BY id LIMIT 1")->fetchColumn();
+$h52 = renderPage('pages/attestations.php', ['employee_id' => $emp52, 'type' => 'cnss_leave'], [], []);
+check('نماذج الضمان الثلاثة (تجربة فعلية): شاشة إعلام الترك تفتح وفيها PDF وExcel وسبب الترك',
+      strpos($h52, 'official_export.php?form=cnss_leave') !== false
+      && strpos($h52, 'format=xlsx') !== false && strpos($h52, 'سبب ترك العمل') !== false);
+// التعبئة بـPHP وحدها (الأونلاين) تكتب القيم فعلاً في قالب الترك
+$out52 = $PROJ . '/tmp/regr_cnss3_' . uniqid() . '.xlsx';
+try {
+    $ok52 = phpFillXlsxTemplate($PROJ . '/assets/templates/cnss_leave.xlsx',
+        ['E8' => 'فحص المدرسة', 'B15' => 'فحص الاسم', 'N13' => '911426'], $out52);
+    $sheet52 = '';
+    if ($ok52) {
+        $z52 = new ZipArchive();
+        if ($z52->open($out52) === true) { $sheet52 = (string)$z52->getFromName('xl/worksheets/sheet1.xml'); $z52->close(); }
+    }
+    // قالب openpyxl بلا encoding مصرَّح → DOM يكتب العربي كـ&#x..; (Excel يقرأها) — نفكّها قبل المقارنة
+    $dec52 = html_entity_decode($sheet52, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    check('نماذج الضمان الثلاثة: التعبئة بـPHP وحدها (أونلاين) تكتب فعلاً في قالب الترك',
+          $ok52 && strpos($dec52, 'فحص المدرسة') !== false && strpos($dec52, 'فحص الاسم') !== false
+          && strpos($dec52, '911426') !== false);
+} catch (Throwable $e) {
+    check('نماذج الضمان الثلاثة: التعبئة بـPHP وحدها (أونلاين) تكتب فعلاً في قالب الترك', false, $e->getMessage());
+}
+@unlink($out52);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
