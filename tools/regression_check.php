@@ -2230,6 +2230,24 @@ $h52 = renderPage('pages/attestations.php', ['employee_id' => $emp52, 'type' => 
 check('نماذج الضمان الثلاثة (تجربة فعلية): شاشة إعلام الترك تفتح وفيها PDF وExcel وسبب الترك',
       strpos($h52, 'official_export.php?form=cnss_leave') !== false
       && strpos($h52, 'format=xlsx') !== false && strpos($h52, 'سبب ترك العمل') !== false);
+// تاريخ الترك يُقرأ من ملف الموظف حصراً (بطلبه 2026-08-18): لا خانة يدوية بالشاشة،
+// والتصدير يأخذ left_date_cnss من الملف — وإن كان فارغاً تبقى خانات النموذج فارغة (لا تاريخ اليوم)
+check('نماذج الضمان الثلاثة: تاريخ الترك من ملف الموظف حصراً (عرض للعلم فقط، بلا خانة يدوية)',
+      strpos($h52, 'name="ld"') === false && strpos($h52, 'من ملف الموظف') !== false
+      && strpos($oe52, "\$ldTs = \$emp['left_date_cnss'] ? strtotime(\$emp['left_date_cnss']) : 0;") !== false
+      && strpos($oe52, "\$_GET['ld']") === false);
+// الخط 12 بكل خانات القوالب الثلاثة («بدي الخط يكون حجم 12» 2026-08-18) — نقرأ ملف الأنماط
+// من كل قالب ونتثبّت أن لا حجم خط غير 12 (قاعدة الخط 12 بكل شي)
+$fontsOk52 = true; $fontsBad52 = '';
+foreach (['cnss_hire_new.xlsx', 'cnss_hire_reg.xlsx', 'cnss_leave.xlsx'] as $t52) {
+    $z52b = new ZipArchive();
+    if ($z52b->open($PROJ . '/assets/templates/' . $t52) !== true) { $fontsOk52 = false; $fontsBad52 = $t52 . ': لا يفتح'; break; }
+    $styles52 = (string)$z52b->getFromName('xl/styles.xml'); $z52b->close();
+    preg_match_all('/<sz val="([0-9.]+)"/', $styles52, $m52);
+    $others52 = array_diff(array_unique($m52[1]), ['12', '12.0']);
+    if ($others52) { $fontsOk52 = false; $fontsBad52 = $t52 . ': ' . implode('،', $others52); break; }
+}
+check('نماذج الضمان الثلاثة: الخط 12 بكل خانات القوالب (لا حجم آخر بملف الأنماط)', $fontsOk52, $fontsBad52);
 // التعبئة بـPHP وحدها (الأونلاين) تكتب القيم فعلاً في قالب الترك
 $out52 = $PROJ . '/tmp/regr_cnss3_' . uniqid() . '.xlsx';
 try {

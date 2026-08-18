@@ -422,12 +422,13 @@ if (!$emp):
         $sexSel = (($_GET['sex'] ?? 'm') === 'f') ? 'f' : 'm';
         $hrsDef = trim((string)($_GET['hrs'] ?? ''));
         if ($hrsDef === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrsDef = (string)round((float)$emp['hours_per_week'] * 52 / 12);
-        $leaveDate = $_GET['ld'] ?? ($emp['left_date_cnss'] ?: date('Y-m-d'));
+        // 🔴 تاريخ الترك من ملف الموظف (تاريخ ترك الضمان) حصراً — يُعرض للعلم فقط ويُعدَّل من ملف الموظف
+        $leaveDate = $emp['left_date_cnss'] ?: '';
         $reasonSel = (int)($_GET['reason'] ?? 1); if ($reasonSel < 1 || $reasonSel > 7) $reasonSel = 1;
         $REASONS = [1=>'استقالة / Démission',2=>'بلوغ السن / Âge légal',3=>'عجز / Invalidité',4=>'زواج / Mariage',5=>'وفاة / Décès',6=>'هجرة / Émigration',7=>'عمل آخر / Autre emploi'];
         $expBase = BASE_URL . 'pages/official_export.php?form=' . e($type) . '&emp=' . (int)$employeeId
                  . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr . '&sex=' . $sexSel . '&hrs=' . urlencode($hrsDef)
-                 . ($isLeave ? '&ld=' . urlencode($leaveDate) . '&reason=' . $reasonSel : '');
+                 . ($isLeave ? '&reason=' . $reasonSel : '');
     ?>
     <div class="card no-print" style="max-width:760px;margin:0 auto">
         <div class="card-header"><h3>
@@ -456,8 +457,12 @@ if (!$emp):
                 </div>
                 <?php else: ?>
                 <div class="form-group">
-                    <label class="form-label">Date de cessation / تاريخ ترك العمل</label>
-                    <input type="date" name="ld" class="form-control" value="<?= e($leaveDate) ?>" onchange="this.form.submit()">
+                    <label class="form-label">Date de cessation / تاريخ ترك العمل (من ملف الموظف)</label>
+                    <?php if ($leaveDate !== ''): ?>
+                    <input type="text" class="form-control" value="<?= e(formatDate($leaveDate)) ?>" readonly style="background:#f1f5f9;font-weight:700">
+                    <?php else: ?>
+                    <input type="text" class="form-control" value="غير محدّد — حطّه بملف الموظف (تاريخ ترك الضمان)" readonly style="background:#fef2f2;color:#b91c1c">
+                    <?php endif; ?>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Motif / سبب ترك العمل</label>

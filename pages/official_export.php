@@ -369,7 +369,9 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
         $fallbackForm = 'cnss_employ';
     } else {
         // إعلام عن ترك أجير عمله في المؤسسة
-        $ldTs = strtotime((string)($_GET['ld'] ?? '')) ?: ($emp['left_date_cnss'] ? strtotime($emp['left_date_cnss']) : time());
+        // 🔴 تاريخ الترك يُقرأ من ملف الموظف (تاريخ ترك الضمان) حصراً — لا من الشاشة
+        // (بطلب المستخدم 2026-08-18)؛ إن لم يكن محطوطاً بالملف تبقى الخانات فارغة (لا تاريخ اليوم).
+        $ldTs = $emp['left_date_cnss'] ? strtotime($emp['left_date_cnss']) : 0;
         $reason = (int)($_GET['reason'] ?? 1); if ($reason < 1 || $reason > 7) $reason = 1;
         $reasonCells = [1 => 'C20', 2 => 'E20', 3 => 'G20', 4 => 'I20', 5 => 'K20', 6 => 'M20', 7 => 'O20'];
         $cells = [
@@ -384,7 +386,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'D17' => $emp['birth_place'] ?? '', 'F17' => $bTs ? formatDate($emp['birth_date']) : '',
             'K17' => $registry, 'O17' => $nat,
             'D18' => !$married ? 'X' : '1', 'F18' => $married ? 'X' : '2',
-            'C19' => (int)date('j', $ldTs), 'E19' => (int)date('n', $ldTs), 'F19' => date('Y', $ldTs),
+            'C19' => $ldTs ? (int)date('j', $ldTs) : '', 'E19' => $ldTs ? (int)date('n', $ldTs) : '', 'F19' => $ldTs ? date('Y', $ldTs) : '',
             $reasonCells[$reason] => 'X',
             'D21' => $fnAr,
             'F22' => $wageNum, 'I22' => $wageWords,
