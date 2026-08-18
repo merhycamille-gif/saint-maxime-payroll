@@ -450,7 +450,7 @@ include __DIR__ . '/../includes/header.php';
                         $nm = trim($e['first_name_fr'] . ' ' . $e['last_name_fr']);
                         if ($nm === '') $nm = trim($e['first_name_ar'] . ' ' . $e['last_name_ar']);
                     ?>
-                        <option value="<?= $e['id'] ?>" <?= $employeeId === (int)$e['id'] ? 'selected' : '' ?>>
+                        <option value="<?= $e['id'] ?>" <?= $employeeId === (int)$e['id'] ? 'selected' : '' ?> data-phone="<?= e(trim(($e['phone1'] ?? '').' '.($e['phone2'] ?? ''))) ?>" data-search="<?= e(trim($e['first_name_ar'].' '.$e['last_name_ar'])) ?>">
                             <?= e($nm) ?> (<?= employeeTypeLabel($e['employee_type']) ?>)
                         </option>
                     <?php endforeach; ?>

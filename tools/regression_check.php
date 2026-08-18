@@ -2268,6 +2268,29 @@ try {
 }
 @unlink($out52);
 
+/* =====================================================================
+ * 53) 🔎 تفتيش سريع بقوائم اختيار الأستاذ («نكتب أول حرف من اسمو أو اسمو
+ *     أو رقم الهاتف» 2026-08-18): ويدجت select-search.js تحوّل كل
+ *     select[name=employee_id] لخانة تفتيش حيّة (اسم عربي/فرنسي بأول حرف
+ *     أو جزء + رقم الهاتف من data-phone) — بالإفادات والبطاقة السنوية
+ *     وسيرة الأستاذ والنماذج الرسمية.
+ * =================================================================== */
+$ssJs53 = (string)file_get_contents($PROJ . '/assets/js/select-search.js');
+check('تفتيش الأستاذ: الويدجت موجودة ومربوطة بالفوتر (كل الصفحات) وفيها تطبيع عربي وهاتف',
+      $ssJs53 !== '' && strpos($ssJs53, "select[name=\"employee_id\"]") !== false
+      && strpos($ssJs53, 'data-phone') !== false && strpos($ssJs53, '[أإآٱ]') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/footer.php'), 'select-search.js') !== false);
+check('تفتيش الأستاذ: رقم الهاتف مزروع data-phone بقوائم الصفحات الأربع',
+      substr_count((string)file_get_contents($PROJ . '/pages/attestations.php'), 'data-phone=') >= 1
+      && substr_count((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'data-phone=') >= 1
+      && substr_count((string)file_get_contents($PROJ . '/pages/employee_history.php'), 'data-phone=') >= 1
+      && substr_count((string)file_get_contents($PROJ . '/pages/official_forms.php'), 'data-phone=') >= 1);
+// تجربة فعلية: صفحة الإفادات (مدرسة فيها موظفون) تبثّ خيارات فيها هواتف حقيقية + السكربت
+$h53 = renderPage('pages/attestations.php', [], [], [2], '', '2025-2026');
+check('تفتيش الأستاذ (تجربة فعلية): قائمة الإفادات فيها data-phone بأرقام حقيقية والسكربت محمّل',
+      preg_match('/data-phone="[^"]*\d{6}/', $h53) === 1
+      && strpos($h53, 'select-search.js') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

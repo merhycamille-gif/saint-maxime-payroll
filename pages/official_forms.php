@@ -251,7 +251,7 @@ if (in_array($form, $perEmployee) && !$emp):
     $onlyEmp = in_array($form, $employeeOnly) ? " AND employee_type='employe'"
              : (in_array($form, $titulaireOnly) ? " AND employee_type='enseignant_titulaire'"
              : (in_array($form, $teacherOnly) ? " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')" : ''));
-    $list = $db->prepare("SELECT id, first_name_fr, last_name_fr, first_name_ar, last_name_ar, employee_code
+    $list = $db->prepare("SELECT id, first_name_fr, last_name_fr, first_name_ar, last_name_ar, employee_code, phone1, phone2
                           FROM employees WHERE is_deleted = 0 AND " . schoolScopeWhere('school_id') . $onlyEmp . $yearWhere . "
                           ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
     $list->execute($yearParams);
@@ -274,7 +274,7 @@ if (in_array($form, $perEmployee) && !$emp):
                     <select name="employee_id" class="form-select" required>
                         <option value="">— Choisir / اختر —</option>
                         <?php foreach ($emps as $x): ?>
-                        <option value="<?= (int)$x['id'] ?>">
+                        <option value="<?= (int)$x['id'] ?>" data-phone="<?= e(trim(($x['phone1'] ?? '').' '.($x['phone2'] ?? ''))) ?>" data-search="<?= e(trim($x['first_name_ar'].' '.$x['last_name_ar'])) ?>">
                             <?= e(trim(($x['first_name_fr'].' '.$x['last_name_fr'])) ?: ($x['first_name_ar'].' '.$x['last_name_ar'])) ?>
                             <?= $x['employee_code'] ? ' ('.e($x['employee_code']).')' : '' ?>
                         </option>
