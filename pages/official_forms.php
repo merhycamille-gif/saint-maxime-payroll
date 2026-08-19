@@ -917,7 +917,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     <?php if (!$isTerm): ?>
     <div class="fline"><span class="lbl">استُخدم فيها منذ</span> <?= fval(formatDate($emp['hire_date'])) ?> <span class="lbl">عدد ساعات العمل في الشهر</span> <?= fval('','g') ?></div>
     <div class="fline"><span class="lbl">الدوام :</span> <?= fopt('كامل',1,true) ?> <?= fopt('جزئي',2) ?></div>
-    <div class="fline"><span class="lbl">عمل الأجير الحالي</span> <?= fval(employeeTypeLabel($emp['employee_type'],'ar')) ?> <span class="lbl">إن الراتب الحالي</span> <?= fval($salary?formatLBP($salary,false):'','g') ?> <span class="lbl">ل.ل</span></div>
+    <div class="fline"><span class="lbl">عمل الأجير الحالي</span> <?= fval(cnssOccupationAr($emp)) ?> <span class="lbl">إن الراتب الحالي</span> <?= fval($salary?formatLBP($salary,false):'','g') ?> <span class="lbl">ل.ل</span></div>
     <div class="fline"><span class="lbl">منها الأجر الإضافي</span> <?= fval($exW?formatLBP($exW,false):'—','g') ?> <span class="lbl">ل.ل — ومكافأة ومساعدة</span> <?= fval($aid?formatLBP($aid,false):'—','g') ?> <span class="lbl">ل.ل</span></div>
     <div class="fline"><span class="lbl">طريقة دفع الأجر :</span> <?= fopt('شهري',1,true) ?> <?= fopt('اسبوعي',2) ?> <?= fopt('يومي',3) ?> <?= fopt('لقاء عمولة',4) ?> <?= fopt('على الإنتاج',5) ?></div>
     <div class="fline"><span class="lbl">هل يعمل حسب معرفتك لدى صاحب عمل آخر :</span> <?= fopt('نعم',1) ?> <?= fopt('كلا',2) ?></div>
@@ -2055,7 +2055,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     <div class="fline"><span class="lbl">٧. الوضع العائلي :</span> <?= fopt('أعزب',1,!$isMarried) ?> <?= fopt('متأهل',2,$isMarried) ?> <?= fopt('أرمل',3) ?> <?= fopt('مطلق',4) ?></div>
     <div class="fline"><span class="lbl">٨. محل الإقامة</span> <?= fval($emp['ville']) ?> <span class="lbl">١٠. تاريخ دخول العمل</span> <?= fval(formatDate($emp['hire_date']),'g') ?></div>
     <div class="fline"><span class="lbl">دوام العمل :</span> <?= fopt('كامل',1,true) ?> <?= fopt('جزئي',2) ?></div>
-    <div class="fline"><span class="lbl">١١. عمل الأجير الحالي</span> <?= fval(employeeTypeLabel($emp['employee_type'],'ar')) ?> <span class="lbl">الراتب</span> <?= fval($salary?formatLBP($salary,false):'','g') ?> <span class="lbl">ل.ل</span></div>
+    <div class="fline"><span class="lbl">١١. عمل الأجير الحالي</span> <?= fval(cnssOccupationAr($emp)) ?> <span class="lbl">الراتب</span> <?= fval($salary?formatLBP($salary,false):'','g') ?> <span class="lbl">ل.ل</span></div>
     <div class="fline"><span class="lbl">منها الأجر الإضافي</span> <?= fval($exW?formatLBP($exW,false):'—','g') ?> <span class="lbl">ل.ل — ومكافأة ومساعدة</span> <?= fval($aid?formatLBP($aid,false):'—','g') ?> <span class="lbl">ل.ل</span></div>
     <div class="fline"><span class="lbl">١٢. طريقة دفع الأجر :</span> <?= fopt('شهري',1,true) ?> <?= fopt('اسبوعي',2) ?> <?= fopt('يومي',3) ?> <?= fopt('لقاء عمولة',4) ?> <?= fopt('على الإنتاج',5) ?></div>
     <div class="doc-section">تصريح عن أفراد عائلة الأجير للإستفادة من التعويضات العائلية</div>

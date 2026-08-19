@@ -2336,6 +2336,48 @@ $oe54 = (string)file_get_contents($PROJ . '/pages/official_export.php');
 check('صاحب العمل بالضمان: التصدير الرسمي (القوالب) يمرّ كله بـcnssEmployerSchool',
       substr_count($oe54, 'cnssEmployerSchool(') >= 3);
 
+/* =====================================================================
+ * 55) 📐 «بدي الإفادة مليانة على A4» + «عمل الأجير = أستاذ» (2026-08-19):
+ *     قالبا الترك والاستخدام-المضمون كانا يطبعان مصغّرين (~56%) لأن منطقة
+ *     الطباعة فيها أعمدة فاضية عريضة والملاءمة تحشر كل شي — قُصّت المنطقة
+ *     على الأعمدة المعبّأة + توسيط عمودي + خانة الراتب حروفاً تلتف بسطرين.
+ *     و«عمل الأجير» بنماذج الضمان: أستاذ فقط (لا ملاك/متعاقد)، والموظف بوظيفته.
+ * =================================================================== */
+check('عمل الأجير بالضمان: أستاذ فقط للأساتذة والموظف حسب وظيفته (cnssOccupationAr)',
+      function_exists('cnssOccupationAr')
+      && cnssOccupationAr(['employee_type' => 'enseignant_titulaire']) === 'أستاذ'
+      && cnssOccupationAr(['employee_type' => 'enseignant_contractuel']) === 'أستاذ'
+      && cnssOccupationAr(['employee_type' => 'employe', 'job_title' => '']) === 'موظف'
+      && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), '$fnAr = cnssOccupationAr($emp);') !== false
+      && substr_count((string)file_get_contents($PROJ . '/pages/official_forms.php'), 'cnssOccupationAr($emp)') >= 2);
+// القالبان مطبوعان ملء الصفحة: منطقة طباعة مقصوصة + توسيط أفقي/عمودي + ملاءمة صفحة واحدة
+$fit55ok = true; $fit55msg = '';
+foreach (['cnss_leave.xlsx' => 'A1:R38', 'cnss_hire_reg.xlsx' => 'A1:O38'] as $t55 => $area55) {
+    $z55 = new ZipArchive();
+    if ($z55->open($PROJ . '/assets/templates/' . $t55) !== true) { $fit55ok = false; $fit55msg = $t55 . ': لا يفتح'; break; }
+    $sh55 = (string)$z55->getFromName('xl/worksheets/sheet1.xml');
+    $wb55 = (string)$z55->getFromName('xl/workbook.xml');
+    $z55->close();
+    $areaRef55 = str_replace(':', ':$', '$' . str_replace(':', ':', $area55)); // A1:R38 → $A$1... (مرجع مطلق)
+    $areaOk55 = (strpos($wb55, str_replace(['A1', 'R38', 'O38'], ['$A$1', '$R$38', '$O$38'], $area55)) !== false)
+              || (strpos($wb55, $area55) !== false);
+    if (!$areaOk55 || strpos($sh55, 'verticalCentered="1"') === false
+        || strpos($sh55, 'fitToPage="1"') === false) {
+        $fit55ok = false; $fit55msg = $t55; break;
+    }
+}
+check('نماذج الضمان مليانة على A4: منطقة الطباعة مقصوصة + توسيط عمودي + ملاءمة الصفحة', $fit55ok, $fit55msg);
+// خانة الراتب حروفاً بنموذج الاستخدام-المضمون مدموجة وتلتف (لا قصّ للنص الطويل)
+$z55b = new ZipArchive(); $mrg55 = ''; $wrap55 = false;
+if ($z55b->open($PROJ . '/assets/templates/cnss_hire_reg.xlsx') === true) {
+    $sh55b = (string)$z55b->getFromName('xl/worksheets/sheet1.xml');
+    $st55b = (string)$z55b->getFromName('xl/styles.xml');
+    $z55b->close();
+    $mrg55 = (strpos($sh55b, '<mergeCell ref="G19:O19"/>') !== false) ? 'ok' : '';
+    $wrap55 = strpos($st55b, 'wrapText="1"') !== false;
+}
+check('نموذج الاستخدام-المضمون: خانة الراتب حروفاً G19:O19 مدموجة وملتفّة', $mrg55 === 'ok' && $wrap55);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

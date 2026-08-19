@@ -286,9 +286,8 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     $married = strpos((string)($emp['social_status'] ?? ''), 'marie') === 0;
     $registry = trim((string)($emp['civil_registry_number'] ?? ''));
     $regPlace = trim((string)($emp['civil_registry_place'] ?? ''));
-    // الصفة: الموظف الإداري بنوع وظيفته الفعلي، وإلا فئته (نفس منطق النماذج المبنية)
-    $jobT = trim((string)($emp['job_title'] ?? ''));
-    $fnAr = ($emp['employee_type'] === 'employe' && $jobT !== '') ? jobTitleLabel($jobT, 'ar') : employeeTypeLabel($emp['employee_type'], 'ar');
+    // «عمل الأجير»: الأستاذ = «أستاذ» فقط، والموظف الإداري حسب وظيفته (بطلبه 2026-08-19)
+    $fnAr = cnssOccupationAr($emp);
     // ساعات العمل في الشهر (قابلة للتعديل من الشاشة؛ الافتراضي من ساعات الأسبوع)
     $hrs = trim((string)($_GET['hrs'] ?? ''));
     if ($hrs === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrs = (string)round((float)$emp['hours_per_week'] * 52 / 12);

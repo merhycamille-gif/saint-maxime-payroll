@@ -382,6 +382,16 @@ function cnssEmployerNumberKey($num): string {
     $parts = preg_split('/[^0-9]+/', $num, -1, PREG_SPLIT_NO_EMPTY);
     return implode('-', array_map('intval', $parts));
 }
+/* «عمل الأجير» في نماذج الضمان (بطلب المستخدم 2026-08-19): الأستاذ يُكتب «أستاذ» فقط
+ * (لا «أستاذ في الملاك» ولا «أستاذ متعاقد») — والموظف الإداري حسب وظيفته الفعلية. */
+function cnssOccupationAr(array $emp): string {
+    if (($emp['employee_type'] ?? '') === 'employe') {
+        $jt = trim((string)($emp['job_title'] ?? ''));
+        return $jt !== '' ? jobTitleLabel($jt, 'ar') : 'موظف';
+    }
+    return 'أستاذ';
+}
+
 function cnssEmployerSchool(?array $school): ?array {
     if (!$school) return $school;
     static $EMPLOYERS = [
