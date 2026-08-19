@@ -1061,7 +1061,11 @@ elseif ($form === 'teacher_card'):
     $sal = ofLatestSalary($db, $emp['id']);
     $salary = $sal ? $sal['base_plus_echelon_lbp'] : (int)scaleSalaryLBP($emp['current_grade']);
 ?>
-<div class="official-doc rtl" id="ppExportArea">
+<style>/* 🖨️ بطاقة الأستاذ صفحة واحدة: التوقيع كان يقفز وحده لورقة ثانية فاضية (جردة 2026-08-19)
+   — تكثيف بسيط بالطباعة فقط يُبقي البطاقة كاملة بتوقيعها على A4 واحدة */
+@media print{ .tcard .info-grid{gap:7px 26px;margin:8px 0} .tcard .doc-section{margin:8px 0 4px}
+  .tcard .sign-row{margin-top:10px;page-break-inside:avoid} .tcard .sign-box .sign-label{margin-bottom:20px} }</style>
+<div class="official-doc rtl tcard" id="ppExportArea">
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">بطاقة الأستاذ — للعام الدراسي <?= e($schoolYear) ?></div>
     <div class="doc-section">الهوية</div>
@@ -1967,22 +1971,44 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     </div>
     <?php endif; ?>
 
-<?php elseif ($form === 'cnss_eos_settle'): // طلب تصفية تعويض نهاية الخدمة (موظف) — نفس فورمة Excel
+<?php elseif ($form === 'cnss_eos_settle'): // طلب تصفية تعويض نهاية الخدمة (موظف)
+    // 🖨️ 2026-08-19: كانت «نفس فورمة Excel» (eos_settle.html) تُطبع مخربطة بالكامل
+    // (نصوص متراكبة وخانات بلا محلها — جردة الطباعة الشاملة) — أُعيد بناؤها نموذجاً
+    // مبنياً نظيفاً بنمط نماذج الضمان (fline/cbox) بنفس بنود النموذج الرسمي حرفياً.
     $hireD = $emp['hire_date'];
     $leftD = $emp['left_date_cnss'] ?: ($emp['left_date_finance'] ?: ($emp['left_date_eoc'] ?: date('Y-m-d')));
     $years = ($hireD && strtotime($hireD)) ? (int)floor((strtotime($leftD)-strtotime($hireD))/(365.25*86400)) : 0;
-    $vars = [
-        'empname' => empFullNameAr($emp),
-        'nssf'    => $emp['nssf_number'],
-        'school'  => $school['name_ar'],
-        'empno'   => $school['nssf_employer_number'],
-        'address' => $school['address'],
-        'years'   => $years > 0 ? ($years.' سنة خدمة') : '',
-    ];
 ?>
     <div class="alert alert-info no-print"><i class="fas fa-info-circle"></i> Formulaire réservé à l'employé administratif (l'enseignant perçoit son indemnité de fin de service de la Caisse d'indemnités, non de la CNSS). / نموذج خاص بالموظف الإداري (الأستاذ ياخذ تعويض نهاية الخدمة من صندوق التعويضات لا من الضمان).</div>
-    <div class="official-doc rtl" id="ppExportArea" style="max-width:100%;padding:6mm">
-        <?= renderFormTemplate('eos_settle', $vars) ?>
+    <div class="official-doc cnss-form rtl" id="ppExportArea">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+            <div class="cnss-head">الصندوق الوطني<br>للضمان الاجتماعي<br><span class="sub">المديرية الفنية — دائرة تعويض نهاية الخدمة</span></div>
+            <table style="border-collapse:collapse;font-size:12pt;text-align:center">
+                <tr><th style="border:1px solid #333;padding:3px 10px">المكتب</th>
+                    <th style="border:1px solid #333;padding:3px 10px">رقم الطلب في المكتب</th>
+                    <th style="border:1px solid #333;padding:3px 10px">رقم طلب التصفية<br>دائرة نهاية الخدمة</th></tr>
+                <tr><td style="border:1px solid #333;padding:12px"></td><td style="border:1px solid #333"></td><td style="border:1px solid #333"></td></tr>
+            </table>
+        </div>
+        <div class="cnss-title">طــلــب تصــفـيــة تـعـويــض نـهـايــة الـخـدمــة</div>
+        <div class="doc-p">حضرة المدير العام للصندوق الوطني للضمان الاجتماعي المحترم،</div>
+        <div class="doc-p">أنا المضمون (1) / صاحب الحق / الوكيل الموقّع أدناه،</div>
+        <div class="fline"><span class="lbl">أرجو الموافقة على تصفية (1):</span> <?= cbox('تعويضي', true, 'X') ?> <?= cbox('تعويض المضمون :') ?> <?= fval(empFullNameAr($emp)) ?></div>
+        <div class="fline"><span class="lbl">علماً أنني (1) / أنه منتسب (2):</span> <?= cbox('إلزامياً', true, 'X') ?> <?= cbox('اختيارياً') ?> <span class="lbl">إلى نظام تعويض نهاية الخدمة ومسجَّل في الصندوق تحت رقم:</span> <?= digitBoxes($emp['nssf_number'], 8) ?></div>
+        <div class="fline"><span class="lbl">وأعمل (1) / وكان يعمل في مؤسسة:</span> <?= fval($school['name_ar']) ?> <span class="lbl">رقمها</span> <?= fval($school['nssf_employer_number'], 'g') ?></div>
+        <div class="fline"><span class="lbl">وعنوانها:</span> <?= fval($school['address'], 'lg') ?><?php if ($years > 0): ?> <span class="lbl">(مدة الخدمة: <?= $years ?> سنة)</span><?php endif; ?></div>
+        <div class="fline"><span class="lbl">وذلك بسبب (2):</span> <?= cbox('بلوغ السن') ?> <?= cbox('العجز') ?> <?= cbox('الوفاة') ?> <?= cbox('ترك العمل المأجور نهائياً', true, 'X') ?> <?= cbox('الزواج') ?></div>
+        <div class="doc-section">وأقدّم ربطاً المستندات المطلوبة (2):</div>
+        <div class="fline"><?= cbox('صورة عن الهوية') ?> <?= cbox('إخراج قيد إفرادي') ?> <?= cbox('إخراج قيد عائلي') ?> <?= cbox('وثيقة زواج') ?> <?= cbox('تقرير طبي') ?></div>
+        <div class="fline"><?= cbox('وكالة') ?> <?= cbox('تحقيق اجتماعي') ?> <?= cbox('وثيقة وفاة') ?> <?= cbox('حكم وصاية') ?> <?= cbox('إفادة بتحديد الأجور والاشتراكات') ?></div>
+        <div class="fline"><?= cbox('إفادة بالأجر والكسب الأخير', true, 'X') ?> <?= cbox('إعلام ترك العمل') ?> <?= cbox('مستندات أخرى') ?> <?= fval('', 'lg') ?></div>
+        <div class="fline" style="margin-top:16px"><span class="lbl">التاريخ:</span> <?= fval(formatDate(date('Y-m-d')), 'g') ?>
+            <span class="lbl">اسم المضمون / صاحب الحق / الوكيل:</span> <?= fval(empFullNameAr($emp)) ?>
+            <span class="lbl">التوقيع:</span> <?= fval('', 'g') ?></div>
+        <div class="doc-note">(1) اشطب العبارة غير المناسبة &nbsp;&nbsp; (2) ضع علامة X في المربع المناسب</div>
+        <div style="border:1.5px solid #333;border-radius:6px;margin-top:14px;padding:8px 12px;min-height:70px">
+            <strong>حقل مخصص للصندوق</strong>
+        </div>
     </div>
 
 <?php elseif ($form === 'cnss_eos_invite' || $form === 'cnss_eos_wage'):
