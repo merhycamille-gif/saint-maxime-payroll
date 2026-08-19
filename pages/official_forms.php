@@ -183,6 +183,9 @@ if ($emp) {
     $schStmt->execute([$emp['school_id']]);
     $school = $schStmt->fetch() ?: $school;
 }
+// 🏛️ نماذج الضمان كلها تصدر باسم صاحب العمل المسجَّل برقمه لدى الصندوق
+// (25-82-043 ⇒ «الراهبات المخلصيات لسيدة البشارة» — بطلب المستخدم 2026-08-19):
+if (strpos($form, 'cnss') === 0 && $school) $school = cnssEmployerSchool($school);
 $famStatus = $emp['social_status'] ?? '';
 $isMarried = strpos($famStatus, 'marie') === 0;
 

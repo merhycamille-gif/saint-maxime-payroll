@@ -23,6 +23,9 @@ if (!$school) {
     header('Location: ' . BASE_URL . 'pages/tax_declarations.php');
     exit;
 }
+// 🏛️ كل نماذج هذا الملف تابعة للضمان: اسم صاحب العمل حسب رقمه لدى الصندوق
+// (25-82-043 ⇒ «الراهبات المخلصيات لسيدة البشارة» — cnssEmployerSchool)
+$school = cnssEmployerSchool($school);
 
 if ($form === 'cnss_contrib_monthly') {
     $periodSY = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) . '-' . $year);
@@ -88,7 +91,7 @@ if ($form === 'cnss_work_attestation') {
     // مدرسة الموظف هي صاحب العمل (نأخذ رقم المؤسسة منها لا من المدرسة المختارة)
     $ss = $db->prepare("SELECT * FROM schools WHERE id=?");
     $ss->execute([(int)$emp['school_id']]);
-    $esch = $ss->fetch() ?: [];
+    $esch = cnssEmployerSchool($ss->fetch() ?: []);
 
     // رقم المؤسسة في الضمان «25 - 82 - 043» → 3 خانات R4/P4/N4 (يمين → يسار)
     $parts = preg_split('/[\s\-]+/', trim((string)($esch['nssf_employer_number'] ?? '')), -1, PREG_SPLIT_NO_EMPTY);
@@ -250,9 +253,10 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     if (!$emp) { http_response_code(404); die('الموظف غير موجود أو خارج صلاحيتك'); }
 
     // مدرسة الموظف هي صاحب العمل (اسمها ورقمها في الضمان وهاتفها وعنوانها)
+    // — والاسم باسم صاحب الرقم لدى الصندوق (cnssEmployerSchool)
     $ss = $db->prepare("SELECT * FROM schools WHERE id=?");
     $ss->execute([(int)$emp['school_id']]);
-    $esch = $ss->fetch() ?: [];
+    $esch = cnssEmployerSchool($ss->fetch() ?: []);
 
     // رقم المؤسسة في الضمان «25 - 82 - 043» → 3 خانات يمين→يسار كما في النموذج الورقي
     $parts = preg_split('/[\s\-]+/', trim((string)($esch['nssf_employer_number'] ?? '')), -1, PREG_SPLIT_NO_EMPTY);

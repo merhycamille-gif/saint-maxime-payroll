@@ -372,6 +372,30 @@ function currentSchoolName($lang = null) {
     return $lang === 'ar' ? $school['name_ar'] : $school['name_fr'];
 }
 
+/* 🏛️ صاحب العمل تجاه الضمان الاجتماعي (بطلب المستخدم 2026-08-19):
+ * «كل شي تابع للضمان» (الإفادات والنماذج والتقارير) يصدر باسم صاحب العمل المسجَّل
+ * لدى الصندوق برقمه — فكل المؤسسات التي رقمها 25-82-043 تصدر أوراق ضمانها باسم
+ * «الراهبات المخلصيات لسيدة البشارة» (الجمعية صاحبة الرقم)، وما عداها باسم مؤسسته.
+ * المطابقة برقم صاحب العمل مطبَّعاً (تجاهل الفراغات والأصفار البادئة: «25 - 82 - 43» = «25 - 82 - 043»). */
+function cnssEmployerNumberKey($num): string {
+    $num = strtr((string)$num, ['٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9']);
+    $parts = preg_split('/[^0-9]+/', $num, -1, PREG_SPLIT_NO_EMPTY);
+    return implode('-', array_map('intval', $parts));
+}
+function cnssEmployerSchool(?array $school): ?array {
+    if (!$school) return $school;
+    static $EMPLOYERS = [
+        '25-82-43' => ['ar' => 'الراهبات المخلصيات لسيدة البشارة',
+                       'fr' => "Sœurs Salvatoriennes de Notre-Dame de l'Annonciation"],
+    ];
+    $key = cnssEmployerNumberKey($school['nssf_employer_number'] ?? '');
+    if ($key !== '' && isset($EMPLOYERS[$key])) {
+        $school['name_ar'] = $EMPLOYERS[$key]['ar'];
+        $school['name_fr'] = $EMPLOYERS[$key]['fr'];
+    }
+    return $school;
+}
+
 // تحويل قائمة معرّفات الصفوف ("13,14") إلى أسماء مفصولة بفواصل عربية. يرجع '—' إن لم توجد.
 // محصّن: لو جدول class_levels غير موجود (قبل migration 015) يرجع '—'.
 // $frOnly=true: الأسماء الفرنسية فقط (CP، CE1...) — تُستعمل بالكشف السنوي بطلب المستخدم.

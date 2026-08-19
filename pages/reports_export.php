@@ -109,7 +109,8 @@ if ($report === 'monthly_summary') {
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
     $rep = new ReportTable('كشف اشتراكات الضمان — ' . monthName($month, 'ar') . ' ' . $year . $empTypeTitle, true);
-    $rep->schoolHeader($school);
+    // 🏛️ ترويسة كشف الضمان باسم صاحب العمل لدى الصندوق (25-82-043 ⇒ الجمعية)
+    $rep->schoolHeader(cnssEmployerSchool($school));
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
     $head = array_merge($head, ['رقم الضمان', 'الاسم', 'أساس الراتب']);
     if (salaryCompHas('extra')) $head[] = 'الأجر الإضافي';

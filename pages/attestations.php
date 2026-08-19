@@ -96,6 +96,13 @@ $schoolAddr   = $school['address'] ?? getSetting('school_address', '');
 $schoolPhone  = $school['phone'] ?? getSetting('school_phone', '');
 $director     = $school['director_name'] ?? '';
 $employerNssf = $school['nssf_employer_number'] ?? '';
+// 🏛️ إفادات الضمان تصدر باسم صاحب العمل المسجَّل برقمه لدى الصندوق
+// (25-82-043 ⇒ «الراهبات المخلصيات لسيدة البشارة» — بطلب المستخدم 2026-08-19):
+if (strpos((string)$type, 'cnss') === 0 && $school) {
+    $schCn = cnssEmployerSchool($school);
+    $schoolNameFr = $schCn['name_fr'] ?? $schoolNameFr;
+    $schoolNameAr = $schCn['name_ar'] ?? $schoolNameAr;
+}
 
 // المسؤولون الموقّعون: المستخدم يختار أيّهم يظهر اسمه وهاتفه في التوقيع (الافتراضي الأول/المدير)
 $signatories = schoolSignatories($school);

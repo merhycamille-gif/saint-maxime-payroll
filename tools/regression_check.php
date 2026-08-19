@@ -2299,6 +2299,43 @@ check('تفتيش الأستاذ (تجربة فعلية): قائمة الإفا�
       preg_match('/data-phone="[^"]*\d{6}/', $h53) === 1
       && strpos($h53, 'select-search.js') !== false);
 
+/* =====================================================================
+ * 54) 🏛️ اسم صاحب العمل تجاه الضمان («كل شي تابع للضمان باسم الراهبات
+ *     المخلصيات لسيدة البشارة» 2026-08-19): المؤسسات ذات رقم الضمان
+ *     25-82-043 تصدر كل أوراق الضمان (نماذج/إفادات/تقارير) باسم الجمعية،
+ *     وما عداها (رقم مختلف) باسم مؤسسته — cnssEmployerSchool.
+ * =================================================================== */
+$CONG54 = 'الراهبات المخلصيات لسيدة البشارة';
+check('صاحب العمل بالضمان: الدالة موجودة والتطبيع يوحّد «25 - 82 - 043» و«25 - 82 - 43»',
+      function_exists('cnssEmployerSchool')
+      && cnssEmployerNumberKey('25 - 82 - 043') === '25-82-43'
+      && cnssEmployerNumberKey('25 - 82 - 43') === '25-82-43'
+      && cnssEmployerSchool(['nssf_employer_number' => '25 - 82 - 043', 'name_ar' => 'مدرسة'])['name_ar'] === $CONG54
+      && cnssEmployerSchool(['nssf_employer_number' => '22 - 82 - 745', 'name_ar' => 'مكسيموس'])['name_ar'] === 'مكسيموس');
+// تجربة فعلية: نموذج ضمان مبني لموظف من مؤسسة 043 → اسم الجمعية؛ ولمؤسسة برقم آخر → اسمها هي
+$emp54a = $db->query("SELECT e.id FROM employees e JOIN schools s ON s.id = e.school_id
+    WHERE e.is_deleted = 0 AND REPLACE(REPLACE(s.nssf_employer_number,' ',''),'-','') IN ('2582043','258243') LIMIT 1")->fetchColumn();
+$emp54b = $db->query("SELECT e.id FROM employees e JOIN schools s ON s.id = e.school_id
+    WHERE e.is_deleted = 0 AND e.school_id = 2 LIMIT 1")->fetchColumn();
+$sid54a = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$emp54a)->fetchColumn();
+$h54a = renderPage('pages/official_forms.php', ['form' => 'cnss_employ', 'employee_id' => (int)$emp54a], [], [$sid54a]);
+$h54b = renderPage('pages/official_forms.php', ['form' => 'cnss_employ', 'employee_id' => (int)$emp54b], [], [2]);
+check('صاحب العمل بالضمان (تجربة فعلية): نموذج 41A لمؤسسة 043 باسم الجمعية، ولمكسيموس باسمه',
+      strpos($h54a, $CONG54) !== false && strpos($h54b, $CONG54) === false && strpos($h54b, 'مكسيموس') !== false);
+// إفادة الضمان (لمن يهمه الأمر) باسم الجمعية — وإفادة الراتب (غير الضمان) تبقى باسم المدرسة
+$h54c = renderPage('pages/attestations.php', ['employee_id' => (int)$emp54a, 'type' => 'cnss'], [], [$sid54a]);
+$h54d = renderPage('pages/attestations.php', ['employee_id' => (int)$emp54a, 'type' => 'salaire'], [], [$sid54a]);
+check('صاحب العمل بالضمان (تجربة فعلية): إفادة الضمان باسم الجمعية وإفادة الراتب باسم المدرسة',
+      strpos($h54c, $CONG54) !== false && strpos($h54d, $CONG54) === false);
+// كشف الضمان الشهري: ترويسته باسم الجمعية لمؤسسة 043
+$h54e = renderPage('pages/reports.php', ['report' => 'cnss_summary', 'month' => 6, 'year' => 2026], [], [$sid54a]);
+check('صاحب العمل بالضمان (تجربة فعلية): ترويسة كشف الضمان الشهري باسم الجمعية',
+      strpos($h54e, $CONG54) !== false);
+// التصدير الرسمي (القوالب الثلاثة + إفادة العمل + 190A) يمرّ بـcnssEmployerSchool
+$oe54 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+check('صاحب العمل بالضمان: التصدير الرسمي (القوالب) يمرّ كله بـcnssEmployerSchool',
+      substr_count($oe54, 'cnssEmployerSchool(') >= 3);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
