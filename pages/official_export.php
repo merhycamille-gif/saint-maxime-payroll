@@ -181,7 +181,7 @@ if ($form === 'cnss_work_attestation') {
         return '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>إفادة عمل للضمان</title>'
            . '<style>@page{size:A4;margin:8mm}*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
            . 'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:#e9edf2}'
-           . '.sheet{width:210mm;margin:0 auto}'
+           . '.sheet{width:210mm;margin:0 auto;direction:ltr}' /* direction:ltr حتى لا تفيض الصفحة يساراً بالـRTL وتنقصّ حافتها بالطباعة */
            . '.page{position:relative;width:210mm;height:297mm;background:#fff;overflow:hidden;transform-origin:top left}'
            . '.pbg{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}'
            . '.f{position:absolute;z-index:1;font-size:12pt;color:#000;font-weight:bold;line-height:1}.c{text-align:center}.r{text-align:right}'
@@ -390,6 +390,10 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'K17' => $registry, 'O17' => $nat,
             'D18' => !$married ? 'X' : '1', 'F18' => $married ? 'X' : '2',
             'C19' => $ldTs ? (int)date('j', $ldTs) : '', 'E19' => $ldTs ? (int)date('n', $ldTs) : '', 'F19' => $ldTs ? date('Y', $ldTs) : '',
+            // السبب المختار X، والباقي بأرقامه المطبوعة (تُعاد كتابتها لأن خانات التعبئة
+            // مفرّغة من صورة الخلفية — وكتابتها بالإكسل فوق نفس الرقم بلا أثر)
+            $reasonCells[1] => '1', $reasonCells[2] => '2', $reasonCells[3] => '3',
+            $reasonCells[4] => '4', $reasonCells[5] => '5', $reasonCells[6] => '6', $reasonCells[7] => '7',
             $reasonCells[$reason] => 'X',
             'D21' => $fnAr,
             'F22' => $wageNum, 'I22' => $wageWords,
@@ -401,10 +405,58 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
         $fallbackForm = 'cnss_terminate';
     }
 
-    if (officialTemplateExport(__DIR__ . '/../assets/templates/' . $tplFile, $cells, $format, $tplName . '_' . $d . '-' . $mo . '-' . $yr)) {
+    // mode=image يفرض النسخة المصوّرة (للفحص والمقارنة)؛ غير ذلك نجرّب قالب الإكسل أولاً (محلياً).
+    if (($_GET['mode'] ?? '') !== 'image'
+        && officialTemplateExport(__DIR__ . '/../assets/templates/' . $tplFile, $cells, $format, $tplName . '_' . $d . '-' . $mo . '-' . $yr)) {
         exit; // بُثَّ الملف (pdf أو xlsx) وخرج
     }
-    // تعذّر توليد الملف (أونلاين بلا LibreOffice) → النسخة المبنية بالبرنامج بنفس المعلومات
+    // 🖼️ تعذّر توليد الـPDF (أونلاين بلا LibreOffice) → «الإكسل صح بس PDF غلط» (2026-08-19):
+    // نفس شكل القالب الرسمي بالضبط: صورة القالب الفاضي خلفيةً + القيم نفسها ($cells) مركّبة
+    // فوقها بإحداثيات معايَرة تلقائياً (assets/templates/<form>.pos.json من tools/calibrate)
+    // — فيطلع زرّ الطباعة/PDF طبق الأصل متل الإكسل بلا أي أداة على الخادم.
+    $posFile = __DIR__ . '/../assets/templates/' . $form . '.pos.json';
+    $bgFile  = __DIR__ . '/../assets/templates/' . $form . '.png';
+    if (is_file($posFile) && is_file($bgFile)) {
+        $pos = json_decode((string)file_get_contents($posFile), true) ?: [];
+        $fsBase = (float)($pos['fs'] ?? 11);
+        $E = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+        $F = '';
+        foreach ($cells as $ref => $val) {
+            $val = trim((string)$val);
+            if ($val === '' || !isset($pos['cells'][$ref])) continue;
+            $p = $pos['cells'][$ref];
+            $len = function_exists('mb_strlen') ? mb_strlen($val, 'UTF-8') : strlen($val);
+            // القيم الطويلة (الراتب حروفاً/سطر التوقيع) تصغر تدريجياً حتى لا تفيض عن الورقة
+            $fs = $fsBase * ($len > 70 ? 0.62 : ($len > 50 ? 0.75 : 1));
+            $style = 'top:' . $p['yt'] . '%;font-size:' . round($fs, 1) . 'pt';
+            if (($p['align'] ?? '') === 'center') {
+                $style .= ';left:' . $p['xc'] . '%;transform:translateX(-50%)';
+            } else { // محاذاة يمين (النص العربي/العام) — المرساة عند يمين الخانة كما في القالب
+                $style .= ';right:' . round(100 - $p['xr'], 2) . '%';
+            }
+            $F .= '<div class="f" style="' . $style . '">' . $E($val) . '</div>';
+        }
+        $titleAr = ['cnss_hire_new' => 'تصريح باستخدام أجير', 'cnss_hire_reg' => 'إعلام عن استخدام أجير', 'cnss_leave' => 'إعلام عن ترك أجير'][$form];
+        header('Content-Type: text/html; charset=UTF-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>' . $E($titleAr) . '</title>'
+           . '<style>@page{size:A4;margin:8mm}*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+           . 'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:#e9edf2}'
+           . '.sheet{width:210mm;margin:0 auto;direction:ltr}' /* direction:ltr حتى لا تفيض الصفحة يساراً بالـRTL وتنقصّ حافتها بالطباعة */
+           . '.page{position:relative;width:210mm;height:297mm;background:#fff;overflow:hidden;transform-origin:top left}'
+           . '.pbg{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}'
+           . '.f{position:absolute;z-index:1;color:#000;font-weight:bold;line-height:1.15;white-space:nowrap}'
+           . '.bar{text-align:center;margin:10px 0}'
+           . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:194mm;height:276mm;overflow:hidden;margin:0}.page{transform:scale(0.923)}}'
+           . '</style></head><body>'
+           . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
+           . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — النموذج طبق الأصل الرسمي</div></div>'
+           . '<div class="sheet"><div class="page"><img class="pbg" src="' . BASE_URL . 'assets/templates/' . $form . '.png" alt=""> ' . $F . '</div></div>'
+           . '</body></html>';
+        exit;
+    }
+    // احتياط أخير (ملفات الصورة/الإحداثيات غير موجودة) → النسخة المبنية بالبرنامج بنفس المعلومات
     $_SESSION['flash_info'] = 'النموذج الرسمي طبق الأصل (PDF) يتولّد على كمبيوتر المدرسة. هون فتحنالك النسخة المبنية بالبرنامج بنفس المعلومات — اطبعها من زرّ الطباعة، أو نزّل Excel الرسمي. / Le PDF officiel n\'est disponible que sur l\'ordinateur de l\'école — version imprimable affichée.';
     header('Location: ' . BASE_URL . 'pages/official_forms.php?form=' . $fallbackForm . '&employee_id=' . $empId);
     exit;

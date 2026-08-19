@@ -2378,6 +2378,30 @@ if ($z55b->open($PROJ . '/assets/templates/cnss_hire_reg.xlsx') === true) {
 }
 check('نموذج الاستخدام-المضمون: خانة الراتب حروفاً G19:O19 مدموجة وملتفّة', $mrg55 === 'ok' && $wrap55);
 
+/* =====================================================================
+ * 56) 🖼️ «الإكسل صح بس PDF غلط» (2026-08-19): أونلاين بلا LibreOffice كان
+ *     زرّ PDF يقع على النسخة المبنية بالبرنامج — صار يعرض صورة القالب
+ *     الرسمي الفاضي (خانات التعبئة مفرَّغة منه) والقيم نفسها مركّبة فوقها
+ *     بإحداثيات معايَرة (<form>.pos.json) → طبق الأصل متل الإكسل بكل مكان.
+ * =================================================================== */
+$ov56ok = true; $ov56msg = '';
+foreach (['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'] as $f56) {
+    $pj56 = $PROJ . '/assets/templates/' . $f56 . '.pos.json';
+    if (!is_file($pj56) || !is_file($PROJ . '/assets/templates/' . $f56 . '.png')) { $ov56ok = false; $ov56msg = $f56 . ': ملفات ناقصة'; break; }
+    $pd56 = json_decode((string)file_get_contents($pj56), true);
+    if (!is_array($pd56) || empty($pd56['cells']) || count($pd56['cells']) < 30 || empty($pd56['fs'])) { $ov56ok = false; $ov56msg = $f56 . ': إحداثيات ناقصة'; break; }
+}
+check('نماذج الضمان الثلاثة: صورة القالب + إحداثيات المعايرة موجودة للنسخة المصوّرة (أونلاين)', $ov56ok, $ov56msg);
+$oe56 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+check('نماذج الضمان الثلاثة: زرّ PDF أونلاين = صورة القالب بالقيم المركّبة (لا النسخة المبنية إلا احتياطاً أخيراً)',
+      strpos($oe56, "\$form . '.pos.json'") !== false
+      && strpos($oe56, "\$form . '.png'") !== false
+      && strpos($oe56, "translateX(-50%)") !== false
+      && strpos($oe56, "direction:ltr") !== false);
+// أرقام مربعات سبب الترك (1-7) تُعاد كتابتها لأن خاناتها مفرَّغة من صورة الخلفية
+check('إعلام الترك: أرقام مربعات سبب الترك 1-7 تُكتب مع X المختار (لا مربعات فاضية بالنسخة المصوّرة)',
+      strpos($oe56, "\$reasonCells[7] => '7'") !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
