@@ -196,6 +196,8 @@ $exportOpts['no_office'] = true;
 // وضع «عرض المستند»: عند فتح نموذج/تقرير تختفي القوائم ويصير الرجوع لنفس الصفحة الأصلية
 if ($form !== '') $docFocus = true;
 
+// صفحة القائمة (بلا نموذج مختار): لا شيء يُصدَّر — شريط التصدير زائد (2026-08-19)
+if ($form === '') $hideExportToolbar = true;
 include __DIR__ . '/../includes/header.php';
 echo officialFormStyles();
 

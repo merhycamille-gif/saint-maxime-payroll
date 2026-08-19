@@ -2425,6 +2425,40 @@ check('بطاقة الأستاذ: تكثيف الطباعة صفحة واحدة 
       strpos($of57, '"official-doc rtl tcard"') !== false
       && strpos($of57, '.tcard .sign-row{margin-top:10px') !== false);
 
+/* =====================================================================
+ * 58) 🎨 «الواجهات أنعم والخطوط الملونة أنحف والمكرر بلاه» (2026-08-19):
+ *     رؤوس البطاقات وأقسام لوحة القيادة وعناوين الأقسام الداخلية صارت
+ *     شرائط رفيعة فاتحة بلون القسم (لا أشرطة غامقة عريضة بكتابة بيضاء) +
+ *     شريط التصدير مخفيّ بصفحات القوائم (لا شيء يُصدَّر منها) + شيل زرّ
+ *     «رجوع لملف الأستاذ» المكرَّر (الرجوع بالهيدر + Dossier موجودان).
+ * =================================================================== */
+$css58 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+check('واجهة أنعم: رؤوس البطاقات شرائط رفيعة فاتحة (لا شريط غامق بكتابة بيضاء)',
+      strpos($css58, '.card-header:not([style*="background"]) h3 { color: #fff; }') === false
+      && strpos($css58, 'border-inline-start: 3px solid var(--accent, var(--primary));') !== false
+      && strpos($css58, '.dash-sec-head .ds-fr { font-weight:700; font-size:12.5px; color:var(--sec-c);') !== false);
+check('شريط التصدير مخفيّ بصفحات القوائم (تقارير/إفادات/نماذج/تصاريح — لا شيء يُصدَّر منها)',
+      strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "if (\$report === '') \$hideExportToolbar = true;") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), "if (!\$emp) \$hideExportToolbar = true;") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/official_forms.php'), "if (\$form === '') \$hideExportToolbar = true;") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/tax_declarations.php'), '$hideExportToolbar = true;') !== false);
+check('لا أزرار «رجوع لملف الأستاذ» مكرَّرة بصفحات الإفادات (الرجوع بالهيدر + زرّ Dossier)',
+      strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), 'رجوع لملف الأستاذ') === false);
+// 🧾 الإفادة المدرسية لصندوق التعويضات: تفصيل الراتب (أساس/إضافي/مكافأة ثم المجموع) حسب
+// خيارات «الراتب يشمل» — تجربة فعلية بموظفة عندها أجر إضافي
+$h58 = renderPage('pages/attestations.php', ['employee_id' => 968, 'type' => 'afade_madrasiya', 'lang_doc' => 'ar',
+                  'opts_set' => 1, 'inc_extra' => 1, 'inc_aide' => 1], [], [3]);
+check('الإفادة المدرسية (تجربة فعلية): تفصيل الراتب أساس + إضافي + المجموع حسب الخيارات',
+      strpos($h58, 'مؤلّفاً ممّا يلي') !== false
+      && strpos($h58, 'أساس الراتب :') !== false
+      && strpos($h58, 'الأجر الإضافي :') !== false
+      && strpos($h58, 'المجموع :') !== false);
+$h58b = renderPage('pages/attestations.php', ['employee_id' => 968, 'type' => 'afade_madrasiya', 'lang_doc' => 'ar',
+                  'opts_set' => 1], [], [3]);
+check('الإفادة المدرسية: الأساس وحده مختاراً → سطر واحد كما كان (بلا تفصيل)',
+      strpos($h58b, 'مؤلّفاً ممّا يلي') === false
+      && strpos($h58b, 'وكان راتبه الشهري ( دون التعويض العائلي )') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

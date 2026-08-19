@@ -65,6 +65,8 @@ if ($report && in_array($report, $exportableReports, true)) {
 
 // وضع «عرض المستند»: عند فتح تقرير محدّد تختفي القوائم ويصير الرجوع لنفس الصفحة الأصلية
 if ($report !== '') $docFocus = true;
+// صفحة القائمة (بلا تقرير مختار): لا شيء يُصدَّر — شريط التصدير زائد يعجّق الواجهة (2026-08-19)
+if ($report === '') $hideExportToolbar = true;
 
 include __DIR__ . '/../includes/header.php';
 

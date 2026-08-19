@@ -114,6 +114,8 @@ $sigNameFr = $sig['name_fr'] ?? '';
 $sigPhone  = $sig['phone'] ?? '';
 
 // 🔴 لا doc-view هنا: الإفادات وملف الأستاذ يبقيان بشكلهما المعهود (شكوى المستخدم p1 بتاريخ 2026-08-01).
+// صفحة اختيار الأستاذ (بلا موظف): لا شيء يُصدَّر — شريط التصدير زائد يعجّق الواجهة (2026-08-19)
+if (!$emp) $hideExportToolbar = true;
 include __DIR__ . '/../includes/header.php';
 
 // ====== ملف الأستاذ الكامل / Dossier: كل شي عن الأستاذ بمكان واحد ======
@@ -426,7 +428,6 @@ if (!$emp):
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>" target="_blank"><i class="fas fa-print"></i> Attestation officielle (Impression / PDF) / الإفادة الرسمية (طباعة / PDF)</a>
                 <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> Télécharger Excel (modifiable) / تحميل Excel (للتعديل)</a>
-                <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>"><i class="fas fa-arrow-right"></i> Retour au dossier / رجوع لملف الأستاذ</a>
             </div>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> «الإفادة الرسمية» تفتح النموذج الرسمي كاملاً معبّأً (المدرسة ورقمها في الضمان، اسم الأجير ورقم ضمانه وسنة ولادته، والأشهر) جاهز للطباعة — <strong>نفس الشكل تماماً أونلاين وعلى الكمبيوتر</strong>. زر Excel للتحميل والتعديل.</p>
         </div>
@@ -516,7 +517,6 @@ if (!$emp):
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي (طباعة / PDF) / Formulaire officiel (PDF)</a>
                 <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> Télécharger Excel (modifiable) / تحميل Excel (للتعديل)</a>
-                <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>"><i class="fas fa-arrow-right"></i> Retour au dossier / رجوع لملف الأستاذ</a>
             </div>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج الضمان الرسمي</strong> معبّأً تلقائياً: المدرسة ورقمها في الضمان وهاتفها وعنوانها، واسم الأجير وأهله وولادته وسجلّه وعنوانه، وتاريخ الاستخدام وراتبه الخاضع للضمان رقماً وحروفاً<?= $isLeave ? '، وتاريخ الترك وسببه' : '' ?>. عدّل الخيارات فوق قبل الطباعة إذا لزم.</p>
         </div>
@@ -675,7 +675,6 @@ if (!$emp):
     $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'').($hasSigTitle?'&sig_t='.$sigTitle:'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
-        <a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$employeeId ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> رجوع لملف الأستاذ / Dossier</a>
         <div class="btn-group" role="group">
             <?php foreach ($DOC_LANGS as $lk => $lbl): ?>
             <a href="?<?= $qs ?>&lang_doc=<?= $lk ?>" class="btn btn-sm <?= $lk===$docLang?'btn-primary':'btn-light' ?>"><?= e($lbl) ?></a>
@@ -1027,8 +1026,26 @@ if (!$emp):
         <p>قد باشر التدريس في مدرستنا بتاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(120) ?></strong></p>
         <p>وانقطع عن العمل بتاريخ <strong><?= $effFmt ?></strong></p>
         <p>للأسباب الآتية : <?= $blank(380) ?></p>
+        <?php /* 🧾 تفصيل الراتب بالإفادة المدرسية (بطلب المستخدم 2026-08-19): أساس الراتب لحاله
+               والأجر الإضافي لحاله والمكافأة لحالها ثم المجموع — كلٌّ حسب خيارات «الراتب يشمل»
+               (اختيارية)؛ وإن كان الأساس وحده مختاراً يبقى سطراً واحداً كما كان. */
+        $attParts = [];
+        if ($incExtra && $extraW > 0) $attParts[] = ['الأجر الإضافي', $extraW];
+        if ($incAide  && $aideW  > 0) $attParts[] = ['المكافأة والمساعدة', $aideW];
+        if ($incTrans && $transW > 0) $attParts[] = ['تعويض النقل', $transW];
+        ?>
+        <?php if ($attParts): ?>
+        <p>وكان راتبه الشهري ( دون التعويض العائلي ) في الشهر الأخير من الخدمة الفعلية مؤلّفاً ممّا يلي :</p>
+        <p style="margin-right:34px">- أساس الراتب : <strong><?= $moneyAr((int)$basePlusEch) ?></strong></p>
+        <?php foreach ($attParts as $ap): ?>
+        <p style="margin-right:34px">- <?= e($ap[0]) ?> : <strong><?= $moneyAr((int)$ap[1]) ?></strong></p>
+        <?php endforeach; ?>
+        <p style="margin-right:34px">- المجموع : <strong><?= $salFig ?></strong></p>
+        <p>فقط <strong><?= e($salWrd) ?> لا غير .</strong></p>
+        <?php else: ?>
         <p>وكان راتبه الشهري ( دون التعويض العائلي ) في الشهر الأخير من الخدمة الفعلية <strong><?= $salFig ?></strong></p>
         <p>فقط <strong><?= e($salWrd) ?> لا غير .</strong></p>
+        <?php endif; ?>
         <p>وبياناً للواقع ، وبالاستناد إلى قيود سجلات المدرسة ، أُعطيت هذه الإفادة .</p>
         <div style="display:flex;justify-content:space-between;margin-top:38px">
           <div>تحريراً في <?= $effFmt ?></div>

@@ -1152,16 +1152,26 @@ input:focus, select:focus, textarea:focus {
     box-shadow: 0 0 0 3px rgba(31,90,158,0.14);
 }
 
-/* رأس البطاقة بكل صفحات البرنامج: شريط بلون القسم الكامل + كتابة بيضاء
-   (مطابق لعناوين أقسام لوحة القيادة — الرؤوس ذات الخلفية الفاتحة المخصّصة inline تبقى بلونها الدلالي) */
+/* رأس البطاقة بكل صفحات البرنامج — «الواجهات أنعم والخطوط الملونة أنحف» (بطلب المستخدم
+   2026-08-19): بدل الشريط الملوّن الغامق العريض بكتابة بيضاء → شريط رفيع هادئ: خلفية
+   فاتحة بلمسة لون القسم + كتابة بلون القسم + خط جانبي رفيع (الرؤوس ذات الخلفية
+   المخصّصة inline تبقى بلونها الدلالي) */
 .card-header:not([style*="background"]) {
-    background: var(--accent, var(--primary));
-    /* درجة أنعم قليلاً من لون القسم (المتصفحات الحديثة) */
-    background: linear-gradient(135deg, color-mix(in srgb, var(--accent, var(--primary)) 86%, #fff), color-mix(in srgb, var(--accent, var(--primary)) 96%, #000));
-    border-bottom: none;
+    background: var(--gray-50);
+    background: color-mix(in srgb, var(--accent, var(--primary)) 7%, #fff);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent, var(--primary)) 18%, #fff);
+    border-inline-start: 3px solid var(--accent, var(--primary));
+    padding: 6px 14px;
 }
-.card-header:not([style*="background"]) h3 { color: #fff; }
-.card-header:not([style*="background"]) h3 i { color: #fff; background: rgba(255,255,255,.22); }
+.card-header:not([style*="background"]) h3 {
+    color: var(--accent, var(--primary));
+    color: color-mix(in srgb, var(--accent, var(--primary)) 82%, #000);
+    font-size: 14.5px;
+}
+.card-header:not([style*="background"]) h3 i {
+    color: var(--accent, var(--primary));
+    background: color-mix(in srgb, var(--accent, var(--primary)) 12%, #fff);
+}
 /* عند الطباعة: الخلفيات تُحذف → رجّع الكتابة غامقة لتبقى مقروءة على الورق */
 @media print {
     .card-header { background: #fff !important; border-bottom: 1px solid #000; }
@@ -1173,14 +1183,18 @@ input:focus, select:focus, textarea:focus {
 .badge { letter-spacing: .01em; }
 
 /* عناوين الأقسام الداخلية بالفورمات (h4 بلون --primary داخل البطاقات، مثل «المعلومات الشخصية»
-   ببطاقة الموظف): شريط نافر بلون القسم + كتابة بيضاء — بطلب المستخدم «واضحة ونافرة» */
+   ببطاقة الموظف): شريط رفيع هادئ بلمسة لون القسم — «أنعم وأنحف» (بطلبه 2026-08-19،
+   يحلّ محل «واضحة ونافرة» الغامقة السابقة) */
 .card-body h4[style*="--primary"] {
-    background: var(--accent, var(--primary));
-    color: #fff !important;
-    padding: 7px 12px;
-    border-radius: 8px;
-    margin: 18px 0 12px;
-    font-size: 13.5px;
+    background: var(--gray-50);
+    background: color-mix(in srgb, var(--accent, var(--primary)) 8%, #fff);
+    color: var(--accent, var(--primary)) !important;
+    color: color-mix(in srgb, var(--accent, var(--primary)) 82%, #000) !important;
+    padding: 4px 10px;
+    border-inline-start: 3px solid var(--accent, var(--primary));
+    border-radius: 6px;
+    margin: 16px 0 10px;
+    font-size: 13px;
 }
 @media print {
     .card-body h4[style*="--primary"] { background: #fff; color: #000 !important; border-bottom: 1px solid #000; border-radius: 0; }
@@ -1209,13 +1223,16 @@ input:focus, select:focus, textarea:focus {
 /* أقسام الوصول السريع بعناوين واضحة — لون القسم عبر --sec-c/--sec-bg */
 .dash-sec { background:#fff; border:1px solid var(--gray-200); border-radius:14px;
     margin-bottom:12px; box-shadow:var(--shadow-sm); overflow:hidden; }
-.dash-sec-head { display:flex; align-items:center; gap:10px; padding:7px 14px;
-    background:var(--sec-c);
-    background:linear-gradient(135deg, color-mix(in srgb, var(--sec-c) 86%, #fff), color-mix(in srgb, var(--sec-c) 96%, #000)); }
-.dash-sec-head .ds-ic { width:26px; height:26px; min-width:26px; border-radius:7px; background:rgba(255,255,255,.22); color:#fff;
-    display:flex; align-items:center; justify-content:center; font-size:12px; }
-.dash-sec-head .ds-fr { font-weight:700; font-size:13px; color:#fff; letter-spacing:.02em; }
-.dash-sec-head .ds-ar { font-weight:600; font-size:12.5px; color:rgba(255,255,255,.92); }
+/* «أنعم وأنحف» (2026-08-19): شريط القسم صار رفيعاً فاتحاً بلمسة لونه بدل اللون الغامق الكامل */
+.dash-sec-head { display:flex; align-items:center; gap:9px; padding:4px 12px;
+    background:var(--sec-bg, var(--gray-50));
+    border-inline-start:3px solid var(--sec-c);
+    border-bottom:1px solid color-mix(in srgb, var(--sec-c) 14%, #fff); }
+.dash-sec-head .ds-ic { width:22px; height:22px; min-width:22px; border-radius:6px;
+    background:color-mix(in srgb, var(--sec-c) 13%, #fff); color:var(--sec-c);
+    display:flex; align-items:center; justify-content:center; font-size:11px; }
+.dash-sec-head .ds-fr { font-weight:700; font-size:12.5px; color:var(--sec-c); letter-spacing:.02em; }
+.dash-sec-head .ds-ar { font-weight:600; font-size:12px; color:color-mix(in srgb, var(--sec-c) 70%, #000); }
 .dash-links { display:grid; grid-template-columns:repeat(auto-fill, minmax(185px, 1fr)); gap:8px; padding:12px 14px; }
 .dash-link { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--gray-100); border-radius:10px;
     background:#fff; text-decoration:none; transition:all .15s ease; }

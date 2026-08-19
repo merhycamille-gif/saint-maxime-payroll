@@ -7,6 +7,8 @@ $currentPage = 'tax';
 $pageTitle = 'Déclarations fiscales / التصاريح الضريبية';
 $db = getDB();
 
+// صفحة قائمة فقط: لا شيء يُصدَّر منها — شريط التصدير زائد (2026-08-19)
+$hideExportToolbar = true;
 include __DIR__ . '/../includes/header.php';
 ?>
 
