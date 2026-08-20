@@ -393,6 +393,14 @@ if ($regEid) {
     $asdSrc = (string)file_get_contents(__DIR__ . '/../includes/annual_slip_data.php');
     check('الكشف السنوي: الصفوف بالفرنسي فقط', strpos($asdSrc, "classLevelNames(\$emp['classes_taught'] ?? '', true)") !== false);
     check('إفادة راتب: سطر «تعويض النقل» مفصول بالتفصيل', strpos($attSrc, "['تعويض النقل', \$transW]") !== false);
+    // (2026-08-20) «بدو يكون عنا خيار لسبب ترك العمل» بإفادة صندوق التعويضات: خيار جاهز
+    // (استقالة/صرف/بلوغ السن) أو نص حرّ يكتبه — والفاضي يبقى خطاً منقّطاً للتعبئة باليد
+    $hAf1 = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'afade_madrasiya', 'opts_set' => 1, 'lv_sel' => 'بلوغ السن القانوني'], []);
+    $hAf2 = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'afade_madrasiya', 'opts_set' => 1, 'lv_txt' => 'سبب حرّ للتجربة'], []);
+    check('إفادة صندوق التعويضات: خيار سبب الترك (جاهز/حرّ/فاضي منقّط)',
+          strpos($hAf1, 'للأسباب الآتية : <strong>بلوغ السن القانوني</strong>') !== false
+          && strpos($hAf2, 'للأسباب الآتية : <strong>سبب حرّ للتجربة</strong>') !== false
+          && strpos($attSrc, "name=\"lv_sel\"") !== false && strpos($attSrc, "name=\"lv_txt\"") !== false);
 } else {
     check('التنسيق الرسمي: لا موظف تجريبي (6/2026)', false, 'ما لقيت راتب محسوب 6/2026');
 }

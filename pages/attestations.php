@@ -656,6 +656,13 @@ if (!$emp):
     $defaultLogo   = in_array($type, ['anhaa_khedme', 'anhaa_mail', 'aqd_taalim', 'cnss', 'notice_school', 'notice_mail', 'salaire', 'tadris', 'embassy', 'riaaya'], true); // الصادرة عن المدرسة: الشعار افتراضياً
     $showLogo      = isset($_GET['logo']) ? ($_GET['logo'] === '1') : $defaultLogo;
     $subjectTxt    = trim((string)($_GET['subj_txt'] ?? '')); if ($subjectTxt === '') $subjectTxt = 'الإهمال في حفظ النظام والتربية';
+    // 📝 سبب ترك العمل بإفادة صندوق التعويضات (بطلبه 2026-08-20): خيار جاهز
+    // (استقالة/صرف/بلوغ السن القانوني) أو سبب حرّ يكتبه — والمكتوب يغلب المختار
+    $LV_REASONS = ['استقالة', 'صرف من الخدمة', 'بلوغ السن القانوني'];
+    $lvSel = trim((string)($_GET['lv_sel'] ?? ''));
+    if ($lvSel !== '' && !in_array($lvSel, $LV_REASONS, true)) $lvSel = '';
+    $lvTxt = trim((string)($_GET['lv_txt'] ?? ''));
+    $lvFinal = $lvTxt !== '' ? $lvTxt : $lvSel;
     $assocTxt      = trim((string)($_GET['assoc_txt'] ?? '')); if ($assocTxt === '') $assocTxt = 'التابعة لجمعية الراهبات المخلصيات لسيدة البشارة المسجّلة لديكم تحت الرقم (.....)';
     // الترويسة الرسمية الكاملة كصورة خلفية (إن وُجدت لهذه المدرسة) — تُغني عن الترويسة المُعاد بناؤها
     $lhUrl = schoolLetterheadUrl($school, ($type === 'embassy') ? 'fr' : 'ar');
@@ -707,7 +714,7 @@ if (!$emp):
     $L=$money($salShown); $N=$money($net); $U='';
     $nssf=cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']);
     $rtl = ($docLang === 'ar');
-    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'').($hasSigTitle?'&sig_t='.$sigTitle:'');
+    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'').($hasSigTitle?'&sig_t='.$sigTitle:'').($lvSel!==''?'&lv_sel='.urlencode($lvSel):'').($lvTxt!==''?'&lv_txt='.urlencode($lvTxt):'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <div class="btn-group" role="group">
@@ -778,6 +785,18 @@ if (!$emp):
             <?php if ($isNotice): ?>
             <div style="margin-top:6px"><strong>Objet / motif de l'avertissement / الموضوع / سبب الإنذار:</strong>
             <input type="text" name="subj_txt" value="<?= e($subjectTxt) ?>" style="width:60%;min-width:300px;padding:3px 6px" onchange="this.form.submit()"></div>
+            <?php endif; ?>
+            <?php if ($type === 'afade_madrasiya'): ?>
+            <div style="margin-top:6px">
+                <strong>Motif de cessation / سبب ترك العمل:</strong>
+                <select name="lv_sel" onchange="this.form.submit()" style="padding:3px 8px">
+                    <option value="">— فراغ منقّط (تعبئة باليد) —</option>
+                    <?php foreach ($LV_REASONS as $r): ?><option value="<?= e($r) ?>" <?= $lvSel===$r?'selected':'' ?>><?= e($r) ?></option><?php endforeach; ?>
+                </select>
+                &nbsp; <strong>أو اكتب سبباً:</strong>
+                <input type="text" name="lv_txt" value="<?= e($lvTxt) ?>" placeholder="سبب آخر تكتبه بإيدك" style="width:240px;padding:3px 6px" onchange="this.form.submit()">
+                <span style="color:#64748b">(المكتوب يغلب المختار)</span>
+            </div>
             <?php endif; ?>
             <?php if ($type === 'riaaya'): ?>
             <div style="margin-top:6px"><strong>Organisme et n° d'enregistrement / الجهة ورقم التسجيل:</strong>
@@ -1077,7 +1096,8 @@ if (!$emp):
         <p>أُثبت أنّ السيّد (ة) : <strong><?= e($nomAr) ?></strong> &nbsp; حامل بطاقة الهوية رقم <?= $blank(150) ?></p>
         <p>قد باشر التدريس في مدرستنا بتاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(120) ?></strong></p>
         <p>وانقطع عن العمل بتاريخ <strong><?= $effFmt ?></strong></p>
-        <p>للأسباب الآتية : <?= $blank(380) ?></p>
+        <?php /* سبب الترك من الخيار/النص الحرّ (2026-08-20) — والفاضي = خط منقّط يُعبّأ باليد */ ?>
+        <p>للأسباب الآتية : <?= $lvFinal !== '' ? '<strong>' . e($lvFinal) . '</strong>' : $blank(380) ?></p>
         <?php /* 🧾 تفصيل الراتب بالإفادة المدرسية (بطلب المستخدم 2026-08-19): أساس الراتب لحاله
                والأجر الإضافي لحاله والمكافأة لحالها ثم المجموع — كلٌّ حسب خيارات «الراتب يشمل»
                (اختيارية)؛ وإن كان الأساس وحده مختاراً يبقى سطراً واحداً كما كان. */
