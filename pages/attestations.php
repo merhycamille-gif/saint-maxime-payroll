@@ -664,6 +664,14 @@ if (!$emp):
         ? "width:794px;min-height:1122px;margin:0 auto;background:url('" . htmlspecialchars($lhUrl, ENT_QUOTES) . "') no-repeat;background-size:794px 1122px;padding:195px 95px 150px;box-sizing:border-box"
         : "max-width:820px;margin:0 auto;padding:28px 32px";
     $lhClass = $lhOn ? '' : 'card';
+    // 🪪 ترويسة تصدير الوورد (بطلبه 2026-08-20): بلا خط تحت الشعار + العنوان اسم المدينة فقط
+    // + الهاتف LTR حتى يبقى الكود على شمال الرقم (بسياق RTL كان يطلع «531450-04»)
+    $cityAr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddr)[0] ?? ''));
+    $schoolHeadWord = '<div style="text-align:right;margin-bottom:16px">'
+        . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
+        . '<strong style="font-size:17px">' . e($schoolNameAr) . '</strong>'
+        . ($cityAr !== '' ? '<br><small>' . e($cityAr) . '</small>' : '')
+        . ($schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
     $freeNum   = function ($v) use ($cur) {
         if ($cur === 'usd') return '$' . number_format($v, 2);
         return formatLBP($v, false) . ' ل.ل';
@@ -796,7 +804,7 @@ if (!$emp):
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
             <?php /* 🪪 ترويسة وورد بديلة: صورة الترويسة خلفية CSS والوورد ما بيعرض الخلفيات — تصدير Word يُظهر هالرأس المخفي (بطلب المستخدم 2026-08-20) */ ?>
-            <?php if ($lhOn && $logoImg): ?><div class="word-head" style="display:none;text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
+            <?php if ($lhOn): ?><div class="word-head" style="display:none"><?= $schoolHeadWord ?></div><?php endif; ?>
             <?php if ($showRecHead && $logoImg): ?><div style="text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
             <div style="text-align:left;font-weight:700;line-height:1.7;margin-bottom:6px">
                 الصندوق الوطني<br>للضمان الاجتماعي<br>
@@ -810,10 +818,10 @@ if (!$emp):
             <p>أنّ المضمون <strong><?= e($nomAr) ?></strong> رقمه <strong><?= e($emp['nssf_number']) ?></strong> قد بدأ العمل لدينا بدوام كامل</p>
             <p>اعتباراً من تاريخ <strong><?= $hireFmt ?></strong> بصفة (<strong><?= e($fnFr['ar']) ?></strong>)</p>
             <p>ويتقاضى راتباً شهرياً :</p>
-            <p style="margin-right:34px">- أساس راتب عملاً بالقانون : <strong><?= $moneyAr($attBase) ?></strong></p>
-            <p style="margin-right:34px">- ملحقات مدفوعة من أشخاص ثالثين : <strong><?= $moneyAr($attSupp) ?></strong></p>
+            <p style="margin-right:34px;text-align:right">- أساس راتب عملاً بالقانون : <strong><?= $moneyAr($attBase) ?></strong></p>
+            <p style="margin-right:34px;text-align:right">- ملحقات مدفوعة من أشخاص ثالثين : <strong><?= $moneyAr($attSupp) ?></strong></p>
             <?php if ($attTrans > 0): ?>
-            <p style="margin-right:34px">- تعويض نقل : <strong><?= $moneyAr($attTrans) ?></strong></p>
+            <p style="margin-right:34px;text-align:right">- تعويض نقل : <strong><?= $moneyAr($attTrans) ?></strong></p>
             <?php endif; ?>
             <p>المجموع : <strong><?= $moneyAr($attTotal) ?></strong> فقط <?= e($moneyWords($attTotal)) ?> لا غير .</p>
             <?php if ($emp['status']==='actif'): ?><p>وهو مستمر في عمله حتى تاريخه .</p><?php endif; ?>
@@ -875,7 +883,7 @@ if (!$emp):
             . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
             . '<strong style="font-size:17px">' . e($schoolNameAr) . '</strong>'
             . ($schoolAddr ? '<br><small>' . e($schoolAddr) . '</small>' : '')
-            . ($schoolPhone ? '<br><small>هاتف : ' . e($schoolPhone) . '</small>' : '') . '</div>';
+            . ($schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
         // أجنبي: الشعار فوق على اليسار، والاسم الفرنسي والعنوان (بالأجنبي) والهاتف تحته على اليسار
         // العنوان واسم المدير بالأجنبي: المُدخَل، وإلا ترجمة تلقائية من العربي (لا العربي نفسه)
         $schoolAddrFr = trim((string)($school['address_fr'] ?? '')) ?: ($schoolAddr !== '' ? arNameToFr($schoolAddr) : '');
@@ -884,7 +892,14 @@ if (!$emp):
             . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
             . '<strong style="font-size:17px">' . e($schoolNameFr) . '</strong>'
             . ($schoolAddrFr ? '<br><small>' . e($schoolAddrFr) . '</small>' : '')
-            . ($schoolPhone ? '<br><small>Tel : ' . e($schoolPhone) . '</small>' : '') . '</div>';
+            . ($schoolPhone ? '<br><small>Tel : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
+        // ترويسة وورد بالفرنسي (للسفارة): بلا خط + المدينة فقط + الهاتف LTR
+        $cityFr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddrFr)[0] ?? ''));
+        $schoolHeadWordFr = '<div style="text-align:left;margin-bottom:16px">'
+            . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
+            . '<strong style="font-size:17px">' . e($schoolNameFr) . '</strong>'
+            . ($cityFr !== '' ? '<br><small>' . e($cityFr) . '</small>' : '')
+            . ($schoolPhone ? '<br><small>Tel : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
     ?>
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
@@ -894,7 +909,7 @@ if (!$emp):
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
       <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
       <?php /* 🪪 ترويسة وورد بديلة: صورة الترويسة خلفية CSS والوورد ما بيعرض الخلفيات — تصدير Word يُظهر هالرأس المخفي (بطلب المستخدم 2026-08-20) */ ?>
-      <?php if ($lhOn): ?><div class="word-head" style="display:none"><?= $type === 'embassy' ? $schoolHeadFr : $schoolHead ?></div><?php endif; ?>
+      <?php if ($lhOn): ?><div class="word-head" style="display:none"><?= $type === 'embassy' ? $schoolHeadWordFr : $schoolHeadWord ?></div><?php endif; ?>
 
       <?php
         // ترويسة اتصال أسفل الصفحة (نمط مكسيموس) — تظهر مع الشعار
@@ -902,26 +917,28 @@ if (!$emp):
         $footerHtml = '';
       ?>
       <?php if ($type === 'salaire'): ?>
+        <?php // 🧾 «بدي إفادة الراتب بدون تابلو» (2026-08-20): تفصيل الراتب سطوراً لا جدولاً —
+              // والأساس وحده مختاراً = جملة واحدة بالمبلغ بلا تفصيل
+        $salParts = [];
+        if ($incExtra && $extraW > 0) $salParts[] = ['الأجر الإضافي', $extraW];
+        if ($incAide  && $aideW  > 0) $salParts[] = ['مكافأة ومساعدة', $aideW];
+        if ($incTrans && $transW > 0) $salParts[] = ['تعويض النقل', $transW];
+        ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
         <div style="display:flex;justify-content:space-between;margin-bottom:10px">
             <span>الرقم : <span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span></span>
             <span>التاريخ : <?= $today ?></span>
         </div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة راتب</h2>
-        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) حتى تاريخه ، ويتقاضى راتباً شهرياً وفق التفصيل الآتي :</p>
-        <table dir="rtl" style="width:70%;margin:14px auto;border-collapse:collapse;text-align:center">
-            <tr>
-                <?php /* بلا ألوان للتابلو (بطلب المستخدم 2026-08-20) — الأبيض مكتوب صراحةً حتى لا يلوّنه ستايل تصدير الوورد */ ?>
-                <th style="background:#fff;color:#000;border:1px solid #64748b;padding:6px 10px">البند</th>
-                <th style="background:#fff;color:#000;border:1px solid #64748b;padding:6px 10px">المبلغ الشهري</th>
-            </tr>
-            <tr><td style="border:1px solid #64748b;padding:6px 10px">الراتب الأساسي<?= $isEmploye ? '' : ' (بعد التدرّج)' ?></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr((int)$basePlusEch) ?></strong></td></tr>
-            <?php /* كل مكوّن مختار يظهر بسطر مستقل واضح (الإضافي/المكافأة/تعويض النقل) — لا يُدمج بسطر «بدلات» عام */ ?>
-            <?php if ($incExtra && $extraW > 0): ?><tr><td style="border:1px solid #64748b;padding:6px 10px">الأجر الإضافي</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($extraW) ?></strong></td></tr><?php endif; ?>
-            <?php if ($incAide && $aideW > 0): ?><tr><td style="border:1px solid #64748b;padding:6px 10px">مكافأة ومساعدة</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($aideW) ?></strong></td></tr><?php endif; ?>
-            <?php if ($incTrans && $transW > 0): ?><tr><td style="border:1px solid #64748b;padding:6px 10px">تعويض النقل</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($transW) ?></strong></td></tr><?php endif; ?>
-            <tr style="background:#fff"><td style="border:1px solid #64748b;padding:6px 10px"><strong>الإجمالي</strong></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($salShown) ?></strong></td></tr>
-        </table>
+        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) حتى تاريخه ، ويتقاضى راتباً شهرياً<?= $salParts ? ' وفق التفصيل الآتي :' : ' قدره <strong>' . $moneyAr($salShown) . '</strong> .' ?></p>
+        <?php if ($salParts): ?>
+        <?php /* كل مكوّن مختار سطر مستقل واضح (الإضافي/المكافأة/النقل) — لا يُدمج بسطر «بدلات» عام */ ?>
+        <p style="margin-right:34px;text-align:right">- الراتب الأساسي<?= $isEmploye ? '' : ' (بعد التدرّج)' ?> : <strong><?= $moneyAr((int)$basePlusEch) ?></strong></p>
+        <?php foreach ($salParts as $sp): ?>
+        <p style="margin-right:34px;text-align:right">- <?= e($sp[0]) ?> : <strong><?= $moneyAr((int)$sp[1]) ?></strong></p>
+        <?php endforeach; ?>
+        <p style="margin-right:34px;text-align:right">- الإجمالي : <strong><?= $moneyAr($salShown) ?></strong></p>
+        <?php endif; ?>
         <p>فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> .</p>
         <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم .</p>
         <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
@@ -990,7 +1007,7 @@ if (!$emp):
             <?php if ($showLogo && $logoImg): ?><?= $logoImg ?><br><?php endif; ?>
             <strong style="font-size:15px"><?= e($schoolNameAr) ?></strong>
             <?= $schoolAddr ? '<br><small>' . e($schoolAddr) . '</small>' : '' ?>
-            <?= $schoolPhone ? '<br><small>هاتف : ' . e($schoolPhone) . '</small>' : '' ?>
+            <?= $schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '' ?>
           </div>
         </div>
         <div style="border:1px solid #bbb;padding:8px 12px;line-height:1.95;margin-bottom:14px">
@@ -1041,11 +1058,11 @@ if (!$emp):
         ?>
         <?php if ($attParts): ?>
         <p>وكان راتبه الشهري ( دون التعويض العائلي ) في الشهر الأخير من الخدمة الفعلية مؤلّفاً ممّا يلي :</p>
-        <p style="margin-right:34px">- أساس الراتب : <strong><?= $moneyAr((int)$basePlusEch) ?></strong></p>
+        <p style="margin-right:34px;text-align:right">- أساس الراتب : <strong><?= $moneyAr((int)$basePlusEch) ?></strong></p>
         <?php foreach ($attParts as $ap): ?>
-        <p style="margin-right:34px">- <?= e($ap[0]) ?> : <strong><?= $moneyAr((int)$ap[1]) ?></strong></p>
+        <p style="margin-right:34px;text-align:right">- <?= e($ap[0]) ?> : <strong><?= $moneyAr((int)$ap[1]) ?></strong></p>
         <?php endforeach; ?>
-        <p style="margin-right:34px">- المجموع : <strong><?= $salFig ?></strong></p>
+        <p style="margin-right:34px;text-align:right">- المجموع : <strong><?= $salFig ?></strong></p>
         <p>فقط <strong><?= e($salWrd) ?> لا غير .</strong></p>
         <?php else: ?>
         <p>وكان راتبه الشهري ( دون التعويض العائلي ) في الشهر الأخير من الخدمة الفعلية <strong><?= $salFig ?></strong></p>
@@ -1233,7 +1250,7 @@ if (!$emp):
             <?php if ($showLogo && $logoImg): ?><?= $logoImg ?><br><?php endif; ?>
             <strong style="font-size:15px"><?= e($schoolNameAr) ?></strong>
             <?= $schoolAddr ? '<br><small>' . e($schoolAddr) . '</small>' : '' ?>
-            <?= $schoolPhone ? '<br><small>هاتف : ' . e($schoolPhone) . '</small>' : '' ?>
+            <?= $schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '' ?>
           </div>
         </div>
         <div style="border:1px solid #bbb;padding:8px 12px;line-height:1.95;margin-bottom:14px">
@@ -1268,7 +1285,7 @@ if (!$emp):
             <!-- ترويسة باللغة المختارة -->
             <div style="border-bottom:2px solid var(--primary,#1e3a5f);padding-bottom:10px;margin-bottom:22px;<?= $rtl?'text-align:right':'text-align:left' ?>">
                 <strong style="font-size:19px"><?= $rtl ? e($schoolNameAr) : e($schoolNameFr) ?></strong><br>
-                <small><?= e($schoolAddr) ?><?= $schoolPhone ? ' — '.e($schoolPhone) : '' ?></small>
+                <small><?= e($schoolAddr) ?><?= $schoolPhone ? ' — <span dir="ltr">'.e($schoolPhone).'</span>' : '' ?></small>
                 <?php if ($employerNssf && ($type==='cnss')): ?><br><small><?= $rtl?'رقم رب العمل في الضمان: ':'N° employeur CNSS: ' ?><?= e($employerNssf) ?></small><?php endif; ?>
             </div>
 

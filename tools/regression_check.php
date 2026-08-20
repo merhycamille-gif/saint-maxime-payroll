@@ -240,11 +240,14 @@ check('خط الإفادات Arial بكل اللغات (٣ مواضع، بلا S
 check('تصدير وورد: ترويسة .word-head البديلة (موضعا الضمان ونمط مكسيموس) + Arial إنلاين بأجسام الإفادات',
       substr_count($attSrc, 'class="word-head"') >= 2
       && substr_count($attSrc, "font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif") >= 3);
-// (2026-08-20) «الإفادات بدون ألوان للتابلو»: جدول إفادة الراتب أبيض بحدود عادية — والأبيض إنلاين
-// صراحةً حتى لا يلوّنه ستايل th الأزرق بتصدير الوورد/الإكسل
-check('إفادة راتب: التابلو بلا ألوان (رأس أبيض إنلاين، لا كحلي #1F4E5F بالإفادات)',
+// (2026-08-20) «إفادة الراتب بدون تابلو» + «بدون ألوان»: لا جدول بإفادة الراتب ولا كحلي بالإفادات،
+// وترويسة الوورد بلا خط تحت الشعار + المدينة فقط + الهاتف LTR (الكود على شمال الرقم)
+$whW = strpos($attSrc, '$schoolHeadWord =') !== false ? substr($attSrc, strpos($attSrc, '$schoolHeadWord ='), 700) : 'border-bottom';
+check('إفادة راتب بلا تابلو + ترويسة وورد (بلا خط تحت الشعار، مدينة فقط، هاتف LTR)',
       strpos($attSrc, 'background:#1F4E5F') === false
-      && substr_count($attSrc, '<th style="background:#fff;color:#000;border:1px solid #64748b') >= 2);
+      && strpos($whW, 'border-bottom') === false
+      && strpos($whW, '$cityAr') !== false
+      && substr_count($attSrc, 'هاتف : <span dir="ltr">') >= 3);
 $expSrc = (string)file_get_contents(__DIR__ . '/../assets/js/export.js');
 check('تصدير وورد: ملف MHT بصور مضمَّنة base64 (multipart/related + كشف .word-head + rawDownload بلا BOM)',
       strpos($expSrc, 'multipart/related') !== false
@@ -260,7 +263,18 @@ if ($regEid) {
     check('القسيمة: «صافي الراتب المستحق للدفع» بارز', strpos($hPs, 'صافي الراتب المستحق للدفع') !== false);
     $hAt = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire'], []);
     // (2026-08-16) بطلب المستخدم: جملة «دون أدنى مسؤولية...» انشالت من إفادة الراتب فقط
-    check('إفادة راتب: الصيغة الرسمية (تفصيل، بلا جملة عدم المسؤولية)', strpos($hAt, 'وفق التفصيل الآتي') !== false && strpos($hAt, 'دون أدنى مسؤولية') === false);
+    // (2026-08-20) «بدون تابلو»: الأساس وحده = جملة «قدره» بلا تفصيل ولا جدول
+    check('إفادة راتب: الصيغة الرسمية (الأساس وحده = جملة قدره، بلا جملة عدم المسؤولية، بلا جدول)',
+          strpos($hAt, 'ويتقاضى راتباً شهرياً قدره') !== false
+          && strpos($hAt, 'دون أدنى مسؤولية') === false
+          && strpos($hAt, '<table dir="rtl"') === false);
+    // (2026-08-20) «بدون تابلو»: مع المكوّنات المختارة = تفصيل سطوراً (أساس + إضافي + الإجمالي) لا جدولاً
+    $hAtC = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire'], ['extra']);
+    check('إفادة راتب بلا تابلو: التفصيل سطوراً مع المكوّنات (أساس + الأجر الإضافي + الإجمالي)',
+          strpos($hAtC, 'وفق التفصيل الآتي') !== false
+          && strpos($hAtC, '- الأجر الإضافي :') !== false
+          && strpos($hAtC, '- الإجمالي :') !== false
+          && strpos($hAtC, '<table dir="rtl"') === false);
     // (2026-08-16) خيار صفة الموقّع بإفادة الراتب: الرئيسة/الإدارة/المدير (المدير افتراضياً)
     check('إفادة راتب: خيار الإمضاء (الرئيسة/الإدارة/المدير) والافتراضي المدير',
           strpos($hAt, 'المدير — التوقيع والختم') !== false
@@ -280,7 +294,7 @@ if ($regEid) {
           && strpos($hAn0, 'Total dû<br>المستحق') !== false && strpos($hAn0, 'Classes / الصفوف') !== false);
     $asdSrc = (string)file_get_contents(__DIR__ . '/../includes/annual_slip_data.php');
     check('الكشف السنوي: الصفوف بالفرنسي فقط', strpos($asdSrc, "classLevelNames(\$emp['classes_taught'] ?? '', true)") !== false);
-    check('إفادة راتب: سطر «تعويض النقل» مفصول بجدول التفصيل', strpos($attSrc, '>تعويض النقل<') !== false);
+    check('إفادة راتب: سطر «تعويض النقل» مفصول بالتفصيل', strpos($attSrc, "['تعويض النقل', \$transW]") !== false);
 } else {
     check('التنسيق الرسمي: لا موظف تجريبي (6/2026)', false, 'ما لقيت راتب محسوب 6/2026');
 }
