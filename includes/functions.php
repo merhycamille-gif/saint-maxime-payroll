@@ -399,10 +399,40 @@ function dedupeAddress($addr): string {
     $seen = []; $out = [];
     foreach ($parts as $p) {
         $k = preg_replace('/\s+/u', ' ', trim($p));
-        if ($k === '' || isset($seen[$k])) continue;
+        // مقطع بلا أي حرف/رقم («.» وحدها) = زبالة إدخال — لا يُعرض
+        if ($k === '' || isset($seen[$k]) || !preg_match('/[\p{L}\p{N}]/u', $k)) continue;
         $seen[$k] = 1; $out[] = $k;
     }
     return implode(' - ', $out);
+}
+
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-20 «صححها كلها وين ما كان — برنامج ما لازم يكون فيه أخطاء»):
+ * عناوين مدارس مخزّنة بمقاطع مكررة («عبرا - عبرا - الراهبات المخلصيات»، وزوج مكرر كامل بمدرسة)
+ * وألف مكررة بأول كلمة («االمحتقرة») — ننقّي address (وaddress_fr إن وُجد) بالداتا نفسها،
+ * فتصير كل الشاشات والتقارير والنماذج نظيفة من مصدرها. idempotent: المنقّى لا يتبدّل ثانيةً.
+ */
+function healSchoolAddressDedupe20260820() {
+    $flag = 'school_address_dedupe_2026_08_20';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        $cols = ['address'];
+        try { $db->query("SELECT address_fr FROM schools LIMIT 1"); $cols[] = 'address_fr'; } catch (Throwable $e) {}
+        $n = 0;
+        foreach ($db->query("SELECT * FROM schools")->fetchAll(PDO::FETCH_ASSOC) as $s) {
+            foreach ($cols as $c) {
+                $old = (string)($s[$c] ?? '');
+                if (trim($old) === '') continue;
+                $new = preg_replace('/(^|\s)اا/u', '$1ا', dedupeAddress($old));
+                if ($new !== $old) {
+                    $db->prepare("UPDATE schools SET `$c` = ? WHERE id = ?")->execute([$new, (int)$s['id']]);
+                    $n++;
+                }
+            }
+        }
+        setSetting($flag, date('Y-m-d H:i') . " ($n حقل)");
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
 function cnssEmployerSchool(?array $school): ?array {

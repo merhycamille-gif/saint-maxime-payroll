@@ -284,6 +284,18 @@ check('تنقية العنوان: dedupeAddress تشيل المقاطع المك
       && dedupeAddress('الحدث - تلال الحدث - الراهبات المخلصيات') === 'الحدث - تلال الحدث - الراهبات المخلصيات'
       && substr_count($oeSrc, 'dedupeAddress(') >= 3
       && strpos($attSrc, 'dedupeAddress(') !== false);
+// (2026-08-20) «صححها كلها وين ما كان — برنامج ما لازم يكون فيه أخطاء»: الداتا نفسها منقّاة
+// بالشفاء healSchoolAddressDedupe20260820 (بالهيدر) — صفر عناوين مدارس بمقاطع مكررة أو ألف مزدوجة
+$badAddr = [];
+foreach ($db->query("SELECT id, address FROM schools")->fetchAll(PDO::FETCH_KEY_PAIR) as $sid => $a) {
+    $a = (string)$a;
+    if (trim($a) === '') continue;
+    if ($a !== dedupeAddress($a) || preg_match('/(^|\s)اا/u', $a)) $badAddr[] = $sid;
+}
+$hdrSrc = (string)file_get_contents(__DIR__ . '/../includes/header.php');
+check('عناوين المدارس منقّاة بالداتا نفسها (شفاء بالهيدر + صفر عناوين مخربطة)',
+      !$badAddr && strpos($hdrSrc, 'healSchoolAddressDedupe20260820') !== false,
+      $badAddr ? ('مدارس: ' . implode(',', $badAddr)) : '');
 // (2026-08-20) «قلنالك بدون هيدا الخط الأسود تحت اللوغو»: بلا أي خط صلب تحت ترويسات الإفادات
 // بالشاشة والطباعة والوورد كلها — المسموح فقط الخطوط المنقّطة/المتقطعة لخانات التعبئة
 check('لا خط صلب تحت ترويسات الإفادات (شاشة/طباعة/وورد)',
