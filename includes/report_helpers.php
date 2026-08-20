@@ -484,6 +484,9 @@ function officialFormStyles(): string {
   @page{size:A4 portrait;margin:10mm;}
   /* تقرير عريض → A4 أفقي (يُضاف .land-report للحاوية) */
   .land-report{page:landscapePage;}
+  /* 🔴 نمط الصفحة الأفقي على body كله حين يوجد تقرير أفقي: أي ذيل بعد الحاوية الأفقية
+     (ولو صفري الارتفاع) كان يفرض «صفحة أخيرة بيضاء عمودية» لاختلاف نمط الصفحة (جردة 2026-08-20) */
+  body:has(.land-report){page:landscapePage;}
   body{background:#fff;}
   .official-doc{border:none !important;border-radius:0;padding:0;max-width:100%;box-shadow:none;page-break-inside:auto;}
   .doc-table th{background:#1F4E5F !important;color:#fff !important;
@@ -500,6 +503,10 @@ function officialFormStyles(): string {
   /* 🖨️ هامش سالب صغير: يسحب نهاية الجدول عن حافة الورقة فلا يترك كروم «ورقة أخيرة بيضاء»
      (خلل تقطيع بالجداول الطويلة مع الرأس المكرر — جردة 2026-08-20، بلا أي أثر بصري) */
   .doc-table{margin-bottom:-12px;}
+  /* 🔴 والضمانة العامة: هامش سالب سخي على حاويتي الورقة — «ذيل» ما بعد المحتوى (بقايا تقطيع
+     كروم للجداول المصغَّرة --pz) كان يولّد ورقة أخيرة بيضاء. مجرَّب حتى -400px: لا يمسّ
+     أي صفحة فيها محتوى إطلاقاً (المحتوى يفرض صفحاته) — يشيل صفحات «الذيل» الفارغة فقط */
+  .official-doc,.doc-sheet{margin-bottom:-120px;}
   .doc-table thead{display:table-header-group;}
   .doc-table tfoot{display:table-row-group;}
   /* 🏷️ عنوان التقرير على كل ورقة مطبوعة (طلب المستخدم 2026-08-04): صفّ عنوان يُحقن
@@ -518,7 +525,11 @@ function officialFormStyles(): string {
   .letterhead,.doc-title,.gov-header,.cnss-head,.mof-head{page-break-after:avoid;border-color:#000;}
   .page-break{page-break-after:always;}
   .mof-form,.cnss-form{box-shadow:none;}
-  .sign-row{page-break-inside:avoid;}
+  /* 🔴 flex لا يحترم «منع الانقسام» بالطباعة (كروميوم) فكان صندوق التوقيع ينقسم عند حافة
+     الورقة وتطلع بقيّته «ورقة أخيرة بيضاء» (الاسمي الشهري — جردة 2026-08-20). جدول بالطباعة
+     يحترمه ويبقي الصناديق جنب بعضها متساوية */
+  .sign-row{display:table;width:100%;table-layout:fixed;page-break-inside:avoid;break-inside:avoid;}
+  .sign-row .sign-box{display:table-cell;padding:0 15px;}
 }
 @page landscapePage{size:A4 landscape;margin:8mm;}
 
@@ -591,8 +602,11 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
    فلا يُقصّ أي عمود على الورق مهما اتّسع الجدول؛ الجدول الذي يسع ورقته يبقى بحجمه (--pz=1) */
 @media print{ .doc-table{zoom:var(--pz,1) !important;} }
 /* عرض الورقة المستهدف بالبكسل (A4 ناقص الهوامش): أفقي للتقارير العريضة، عمودي لسواها */
-.doc-table{--pz-target:745;}
-.land-report .doc-table,.xls-sheet .doc-table{--pz-target:1075;}
+/* 🔴 الهدف = عرض الورقة الفعلي داخل هوامش @page (عمودي 10mm → 190mm=718px،
+   أفقي 8mm → 281mm=1062px) — كان 745/1075 أعرض من الورقة فيُقصّ طرف الجدول المصغَّر
+   صمتاً (عمود «الباقي للصندوق» بالاسمي الشهري — جردة 2026-08-20) */
+.doc-table{--pz-target:718;}
+.land-report .doc-table,.xls-sheet .doc-table{--pz-target:1062;}
 /* وضع قياس خاطف: نفس شروط الطباعة **الحقيقية** — عرض الورقة (يضبطه السكربت) + لفّ النص
    عند الفراغات + إخفاء ما لا يُطبع. القياس القديم بأوسع حالة (max-content بلا أي لفّ
    ومع أعمدة الأزرار) كان يصغّر أكثر من اللزوم بكثير (ملاحظة المستخدم 2026-08-04:
@@ -638,7 +652,9 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             var natW = Math.max(t.scrollWidth, Math.ceil(t.getBoundingClientRect().width), 1);
             t.style.width = prevW;
             t.classList.remove('pz-measure');
-            var pz = target / natW;
+            // ×0.98 هامش أمان: قياس المحاكاة يختلف عن تدفّق الطباعة الحقيقي ~1.5% فكان طرف
+            // الجدول المصغَّر يُقصّ صمتاً (عمود «الباقي للصندوق» بالاسمي الشهري — جردة 2026-08-20)
+            var pz = (target * 0.98) / natW;
             // 🔠 «حجم الخط 12 بكل شي» (طلب المستخدم 2026-08-01): لا تكبير فوق خط 12 أبداً —
             // الجدول الأصغر من الورقة يملؤها بتوسيع أعمدته (width:100%) وخطه يبقى 12 تماماً؛
             // والجدول الأعرض من الورقة وحده يتصغّر بالمحسوب حتى لا يُقصّ عمود (كما كان)

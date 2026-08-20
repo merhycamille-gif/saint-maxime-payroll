@@ -167,7 +167,7 @@ document.addEventListener('change', function(e) {
         for (var i = 0; i < tables.length; i++) {
             var t = tables[i];
             if (t.classList.contains('doc-table') || t.closest('.payslip-card, .salary-slip, .no-print')) continue;
-            var target = t.closest('.land-report') ? 1075 : 745;   // عرض A4 المطبوع بالبكسل
+            var target = t.closest('.land-report') ? 1062 : 718;   // عرض A4 الفعلي داخل هوامش @page (كان 1075/745 أعرض من الورقة فيُقصّ الطرف — 2026-08-20)
             // شروط الطباعة الحقيقية: خط 12 + عرض الورقة + لفّ الرؤوس + إخفاء أعمدة الأزرار —
             // فلا يُصغَّر إلا الجدول الذي لا تسعه الورقة فعلاً (أرقامه لا تلتفّ)
             t.classList.add('pz-measure');
@@ -176,7 +176,8 @@ document.addEventListener('change', function(e) {
             var natW = Math.max(t.scrollWidth, Math.ceil(t.getBoundingClientRect().width), 1);
             t.style.width = prevW;
             t.classList.remove('pz-measure');
-            var pz = target / natW;
+            // ×0.98 هامش أمان: قياس المحاكاة يختلف عن تدفّق الطباعة الحقيقي قليلاً (جردة 2026-08-20)
+            var pz = (target * 0.98) / natW;
             // 🔠 «حجم الخط 12 بكل شي» (2026-08-01): لا تكبير فوق خط 12 — الجدول الأصغر من
             // الورقة يملؤها بتوسيع أعمدته وخطه 12 تماماً؛ الأعرض وحده يتصغّر حتى لا يُقصّ
             t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);

@@ -311,12 +311,23 @@ check('ترحيل العلاوات الناقصة أونلاين: اللائحة
 $appJs = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
 $rhSrc = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php');
 $cssSrc = (string)file_get_contents(__DIR__ . '/../assets/css/app.css');
-check('لا ورقة أخيرة بيضاء بالتقارير الطويلة (colSpan حقيقي + عنوان سطر واحد + هامش سالب + فكّ التمطيط)',
+check('لا ورقة أخيرة بيضاء بالتقارير الطويلة (colSpan حقيقي + عنوان سطر واحد + هوامش سالبة + فكّ التمطيط)',
       strpos($appJs, 'colSpan = 99') === false
       && strpos($appJs, 'pr-title-text') !== false
       && strpos($rhSrc, '.pr-title-text{width:0;min-width:100%;white-space:nowrap') !== false
       && strpos($rhSrc, '.doc-table{margin-bottom:-12px;}') !== false
+      && strpos($rhSrc, '.official-doc,.doc-sheet{margin-bottom:-120px;}') !== false
+      && strpos($rhSrc, 'body:has(.land-report){page:landscapePage;}') !== false
       && strpos($cssSrc, '.app-layout, .main-content { display: block !important') !== false);
+// (2026-08-20) جردة ب: (١) هدف التصغير = عرض الورقة الفعلي داخل هوامش @page (كان 745/1075
+// أعرض من الورقة فيُقصّ طرف الجدول المصغَّر صمتاً — عمود «الباقي للصندوق» بالاسمي الشهري)
+// + هامش أمان 0.98 بمعادلة --pz (٢) sign-row جدولاً بالطباعة (flex لا يحترم منع الانقسام)
+check('لا قصّ صامت بالجداول المصغَّرة (أهداف 718/1062 + أمان 0.98) + صفوف التواقيع جدول بالطباعة',
+      strpos($rhSrc, '--pz-target:718') !== false
+      && strpos($rhSrc, '--pz-target:1062') !== false
+      && substr_count($rhSrc . $appJs, '(target * 0.98) / natW') >= 2
+      && strpos($appJs, "? 1062 : 718") !== false
+      && strpos($rhSrc, '.sign-row{display:table;width:100%;table-layout:fixed') !== false);
 // (2026-08-20) «قلنالك بدون هيدا الخط الأسود تحت اللوغو»: بلا أي خط صلب تحت ترويسات الإفادات
 // بالشاشة والطباعة والوورد كلها — المسموح فقط الخطوط المنقّطة/المتقطعة لخانات التعبئة
 check('لا خط صلب تحت ترويسات الإفادات (شاشة/طباعة/وورد)',
