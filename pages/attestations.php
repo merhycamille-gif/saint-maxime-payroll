@@ -92,7 +92,8 @@ if ($employeeId > 0) {
 $school = currentSchool();
 $schoolNameFr = $school['name_fr'] ?? getSetting('school_name_fr', 'Collège');
 $schoolNameAr = $school['name_ar'] ?? getSetting('school_name_ar', 'المدرسة');
-$schoolAddr   = $school['address'] ?? getSetting('school_address', '');
+// «صحح العنوان» (2026-08-20): تنقية المقاطع المكررة («عبرا - عبرا») من عنوان المدرسة بكل العروض
+$schoolAddr   = dedupeAddress($school['address'] ?? getSetting('school_address', ''));
 $schoolPhone  = $school['phone'] ?? getSetting('school_phone', '');
 $director     = $school['director_name'] ?? '';
 $employerNssf = $school['nssf_employer_number'] ?? '';

@@ -324,7 +324,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'K5' => $p1, 'J5' => $p2, 'I5' => $p3,
             'B7' => $esch['name_ar'] ?? '',
             'K8' => $sPhNum, 'L8' => $sPhPre,
-            'G9' => $esch['address'] ?? '',
+            'G9' => dedupeAddress($esch['address'] ?? ''), // «صحح العنوان» 2026-08-20: بلا مقاطع مكررة
             'C13' => $sex === 'm' ? 'X' : '1', 'E13' => $sex === 'f' ? 'X' : '2',
             'C14' => $first, 'K14' => $last,
             'C15' => $father, 'J15' => $mother,
@@ -356,7 +356,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'C6' => $esch['name_ar'] ?? '',
             'K7' => $p3, 'M7' => $p2, 'N7' => $p1,
             'K8' => $sPhNum, 'M8' => $sPhPre,
-            'A9' => 'وعنوانها الكامل:  ' . trim((string)($esch['address'] ?? '')),
+            'A9' => 'وعنوانها الكامل:  ' . dedupeAddress($esch['address'] ?? ''), // «صحح العنوان» 2026-08-20
             'K11' => $emp['nssf_number'] ?? '', 'N11' => $bYY,
             'C12' => $sex === 'm' ? 'X' : '1', 'E12' => $sex === 'f' ? 'X' : '2',
             'B13' => $first, 'E13' => $last, 'K13' => $emp['nssf_number'] ?? '', 'N13' => $bYY,
@@ -383,7 +383,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'E8' => $esch['name_ar'] ?? '',
             'P9' => $p1, 'O9' => $p2, 'N9' => $p3,
             'L10' => $sPhNum, 'N10' => $sPhPre,
-            'C11' => $esch['address'] ?? '',
+            'C11' => dedupeAddress($esch['address'] ?? ''), // «صحح العنوان» 2026-08-20
             'N13' => $emp['nssf_number'] ?? '', 'P13' => $bYY,
             'C14' => $sex === 'm' ? 'X' : '1', 'F14' => $sex === 'f' ? 'X' : '2',
             'B15' => $first, 'I15' => $last,

@@ -392,6 +392,19 @@ function cnssOccupationAr(array $emp): string {
     return 'أستاذ';
 }
 
+/* 🏙️ «صحح العنوان» (بطلب المستخدم 2026-08-20): عناوين مدارس مخزّنة بمقاطع مكررة
+ * («عبرا - عبرا - الراهبات المخلصيات») — للعرض بالوثائق نشيل المقطع المكرر ونبقي أول ظهور. */
+function dedupeAddress($addr): string {
+    $parts = preg_split('/\s*[-–ـ]\s*/u', trim((string)$addr), -1, PREG_SPLIT_NO_EMPTY);
+    $seen = []; $out = [];
+    foreach ($parts as $p) {
+        $k = preg_replace('/\s+/u', ' ', trim($p));
+        if ($k === '' || isset($seen[$k])) continue;
+        $seen[$k] = 1; $out[] = $k;
+    }
+    return implode(' - ', $out);
+}
+
 function cnssEmployerSchool(?array $school): ?array {
     if (!$school) return $school;
     static $EMPLOYERS = [
