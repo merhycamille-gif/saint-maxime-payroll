@@ -26,13 +26,17 @@
         return node.innerHTML;
     }
 
-    function download(filename, content, mime) {
-        var blob = new Blob(['﻿' + content], { type: mime + ';charset=utf-8' });
+    function rawDownload(filename, content, mime) {
+        var blob = new Blob([content], { type: mime });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
         a.href = url; a.download = filename;
         document.body.appendChild(a); a.click();
         setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 800);
+    }
+
+    function download(filename, content, mime) {
+        rawDownload(filename, '﻿' + content, mime + ';charset=utf-8');
     }
 
     function safeName(t) {
@@ -79,6 +83,29 @@
     };
 
     // ===== Word — صفحة A4 بالاتجاه الصحيح (أفقي للعريض) + هوامش، فيطلع بصفحة مرتّبة لا ينقصّ =====
+    // 🖼️ «وقت عم اطبع وورد ما عم يبين لوغو المدرسة» (2026-08-20): وورد لا يعرض الصور بروابط
+    // نسبية ولا data: ولا خلفيات CSS — فصار الملف بصيغة MHT (multipart/related) والصور
+    // (الشعار/الترويسة) مضمَّنة base64 داخل الملف نفسه، والترويسة البديلة .word-head تُكشف هنا فقط.
+    function b64Wrap(b64) { return b64.replace(/(.{76})/g, '$1\r\n'); }
+    function utf8B64(str) { return b64Wrap(btoa(unescape(encodeURIComponent(str)))); }
+    function imgPart(absUrl, idx) {
+        return fetch(absUrl, { credentials: 'same-origin' }).then(function (r) {
+            if (!r.ok) throw new Error('http ' + r.status);
+            return r.blob();
+        }).then(function (blob) {
+            return new Promise(function (res, rej) {
+                var fr = new FileReader();
+                fr.onload = function () {
+                    var m = String(fr.result).match(/^data:([^;]+);base64,(.*)$/);
+                    if (!m) return rej(new Error('no b64'));
+                    var ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/bmp': 'bmp' }[m[1]] || 'img';
+                    res({ mime: m[1], b64: m[2], loc: 'http://msa.doc/img' + idx + '.' + ext });
+                };
+                fr.onerror = function () { rej(new Error('read')); };
+                fr.readAsDataURL(blob);
+            });
+        });
+    }
     window.ppWord = function (title) {
         var wide = isWide();
         // A4: عمودي 595.3×841.9pt، أفقي 841.9×595.3pt
@@ -96,8 +123,41 @@
         var head = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
             + 'xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">' + css + '</head>'
             + '<body dir="rtl"><div class="WordSection1">';
-        download(safeName(title) + '_' + stamp() + '.doc', head + cleanHtml() + '</div></body></html>',
-            'application/msword');
+        // نسخة نظيفة + كشف ترويسة الوورد البديلة (بدل صورة الترويسة الخلفية التي لا يعرضها وورد)
+        var node = area().cloneNode(true);
+        node.querySelectorAll('.no-print, .no-export, .export-toolbar, script, button, .btn, form.no-print')
+            .forEach(function (n) { n.remove(); });
+        node.querySelectorAll('[style*="zoom"]').forEach(function (n) { n.style.zoom = ''; });
+        node.querySelectorAll('.word-head').forEach(function (n) { n.style.display = ''; });
+        // كل صورة → جزء مضمَّن بالملف؛ وإن تعذّر جلبها يبقى رابطها المطلق (أفضل من النسبي)
+        var jobs = Array.prototype.slice.call(node.querySelectorAll('img')).map(function (img, i) {
+            var src = img.getAttribute('src') || '';
+            if (!src || src.slice(0, 5) === 'data:') return Promise.resolve(null);
+            var abs; try { abs = new URL(src, document.baseURI).href; } catch (e) { return Promise.resolve(null); }
+            return imgPart(abs, i)
+                .then(function (p) { img.setAttribute('src', p.loc); return p; })
+                .catch(function () { img.setAttribute('src', abs); return null; });
+        });
+        Promise.all(jobs).then(function (parts) {
+            var htmlDoc = head + node.innerHTML + '</div></body></html>';
+            var B = '----=_MSA_DOC_PART';
+            var mht = 'MIME-Version: 1.0\r\n'
+                + 'Content-Type: multipart/related; type="text/html"; boundary="' + B + '"\r\n\r\n'
+                + '--' + B + '\r\n'
+                + 'Content-Type: text/html; charset="utf-8"\r\n'
+                + 'Content-Transfer-Encoding: base64\r\n'
+                + 'Content-Location: http://msa.doc/doc.html\r\n\r\n'
+                + utf8B64(htmlDoc) + '\r\n';
+            parts.filter(Boolean).forEach(function (p) {
+                mht += '--' + B + '\r\n'
+                    + 'Content-Type: ' + p.mime + '\r\n'
+                    + 'Content-Transfer-Encoding: base64\r\n'
+                    + 'Content-Location: ' + p.loc + '\r\n\r\n'
+                    + b64Wrap(p.b64) + '\r\n';
+            });
+            mht += '--' + B + '--\r\n';
+            rawDownload(safeName(title) + '_' + stamp() + '.doc', mht, 'application/msword');
+        });
     };
 
     // ===== WhatsApp =====

@@ -235,6 +235,21 @@ check('حجم الخط 12pt بالإفادات (أجسام الإفادات ال
 check('خط الإفادات Arial بكل اللغات (٣ مواضع، بلا Sakkal بصفحة الإفادات)',
       substr_count($attSrc, "#ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}") >= 3
       && strpos($attSrc, 'Sakkal') === false);
+// (2026-08-20) «وقت عم اطبع وورد ما عم يبين لوغو المدرسة»: وورد لا يعرض خلفيات CSS ولا روابط نسبية —
+// ترويسة .word-head مخفية تُكشف بتصدير الوورد فقط + خط Arial إنلاين على أجسام الإفادات لينتقل للوورد
+check('تصدير وورد: ترويسة .word-head البديلة (موضعا الضمان ونمط مكسيموس) + Arial إنلاين بأجسام الإفادات',
+      substr_count($attSrc, 'class="word-head"') >= 2
+      && substr_count($attSrc, "font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif") >= 3);
+// (2026-08-20) «الإفادات بدون ألوان للتابلو»: جدول إفادة الراتب أبيض بحدود عادية — والأبيض إنلاين
+// صراحةً حتى لا يلوّنه ستايل th الأزرق بتصدير الوورد/الإكسل
+check('إفادة راتب: التابلو بلا ألوان (رأس أبيض إنلاين، لا كحلي #1F4E5F بالإفادات)',
+      strpos($attSrc, 'background:#1F4E5F') === false
+      && substr_count($attSrc, '<th style="background:#fff;color:#000;border:1px solid #64748b') >= 2);
+$expSrc = (string)file_get_contents(__DIR__ . '/../assets/js/export.js');
+check('تصدير وورد: ملف MHT بصور مضمَّنة base64 (multipart/related + كشف .word-head + rawDownload بلا BOM)',
+      strpos($expSrc, 'multipart/related') !== false
+      && strpos($expSrc, 'word-head') !== false
+      && strpos($expSrc, 'rawDownload') !== false);
 $repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
 check('حجم الخط 12pt بطباعة مركز التقارير', strpos($repSrc, 'font-size: 12pt !important') !== false);
 $regEid = (int)$db->query("SELECT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id

@@ -794,7 +794,9 @@ if (!$emp):
     .page-content{padding:0 !important;margin:0 !important}</style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
-        <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;<?= $lhOn?'padding:0':'' ?>">
+        <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
+            <?php /* 🪪 ترويسة وورد بديلة: صورة الترويسة خلفية CSS والوورد ما بيعرض الخلفيات — تصدير Word يُظهر هالرأس المخفي (بطلب المستخدم 2026-08-20) */ ?>
+            <?php if ($lhOn && $logoImg): ?><div class="word-head" style="display:none;text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
             <?php if ($showRecHead && $logoImg): ?><div style="text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
             <div style="text-align:left;font-weight:700;line-height:1.7;margin-bottom:6px">
                 الصندوق الوطني<br>للضمان الاجتماعي<br>
@@ -890,7 +892,9 @@ if (!$emp):
     .page-content{padding:0 !important;margin:0 !important}</style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
-      <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;<?= $lhOn?'padding:0':'' ?>">
+      <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
+      <?php /* 🪪 ترويسة وورد بديلة: صورة الترويسة خلفية CSS والوورد ما بيعرض الخلفيات — تصدير Word يُظهر هالرأس المخفي (بطلب المستخدم 2026-08-20) */ ?>
+      <?php if ($lhOn): ?><div class="word-head" style="display:none"><?= $type === 'embassy' ? $schoolHeadFr : $schoolHead ?></div><?php endif; ?>
 
       <?php
         // ترويسة اتصال أسفل الصفحة (نمط مكسيموس) — تظهر مع الشعار
@@ -907,15 +911,16 @@ if (!$emp):
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) حتى تاريخه ، ويتقاضى راتباً شهرياً وفق التفصيل الآتي :</p>
         <table dir="rtl" style="width:70%;margin:14px auto;border-collapse:collapse;text-align:center">
             <tr>
-                <th style="background:#1F4E5F;color:#fff;border:1px solid #1F4E5F;padding:6px 10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">البند</th>
-                <th style="background:#1F4E5F;color:#fff;border:1px solid #1F4E5F;padding:6px 10px;-webkit-print-color-adjust:exact;print-color-adjust:exact">المبلغ الشهري</th>
+                <?php /* بلا ألوان للتابلو (بطلب المستخدم 2026-08-20) — الأبيض مكتوب صراحةً حتى لا يلوّنه ستايل تصدير الوورد */ ?>
+                <th style="background:#fff;color:#000;border:1px solid #64748b;padding:6px 10px">البند</th>
+                <th style="background:#fff;color:#000;border:1px solid #64748b;padding:6px 10px">المبلغ الشهري</th>
             </tr>
             <tr><td style="border:1px solid #64748b;padding:6px 10px">الراتب الأساسي<?= $isEmploye ? '' : ' (بعد التدرّج)' ?></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr((int)$basePlusEch) ?></strong></td></tr>
             <?php /* كل مكوّن مختار يظهر بسطر مستقل واضح (الإضافي/المكافأة/تعويض النقل) — لا يُدمج بسطر «بدلات» عام */ ?>
             <?php if ($incExtra && $extraW > 0): ?><tr><td style="border:1px solid #64748b;padding:6px 10px">الأجر الإضافي</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($extraW) ?></strong></td></tr><?php endif; ?>
             <?php if ($incAide && $aideW > 0): ?><tr><td style="border:1px solid #64748b;padding:6px 10px">مكافأة ومساعدة</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($aideW) ?></strong></td></tr><?php endif; ?>
             <?php if ($incTrans && $transW > 0): ?><tr><td style="border:1px solid #64748b;padding:6px 10px">تعويض النقل</td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($transW) ?></strong></td></tr><?php endif; ?>
-            <tr style="background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact"><td style="border:1px solid #64748b;padding:6px 10px"><strong>الإجمالي</strong></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($salShown) ?></strong></td></tr>
+            <tr style="background:#fff"><td style="border:1px solid #64748b;padding:6px 10px"><strong>الإجمالي</strong></td><td style="border:1px solid #64748b;padding:6px 10px"><strong><?= $moneyAr($salShown) ?></strong></td></tr>
         </table>
         <p>فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> .</p>
         <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم .</p>
@@ -1259,7 +1264,7 @@ if (!$emp):
     .page-content{padding:0 !important;margin:0 !important}</style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
     <div id="ppExportArea" class="card" style="max-width:820px;margin:0 auto;padding:10px" data-fit1="1" <?= $rtl?'dir="rtl"':'' ?>>
-        <div class="card-body" style="line-height:1.95;font-size:12pt;<?= $rtl?'text-align:right':'' ?>">
+        <div class="card-body" style="line-height:1.95;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $rtl?'text-align:right':'' ?>">
             <!-- ترويسة باللغة المختارة -->
             <div style="border-bottom:2px solid var(--primary,#1e3a5f);padding-bottom:10px;margin-bottom:22px;<?= $rtl?'text-align:right':'text-align:left' ?>">
                 <strong style="font-size:19px"><?= $rtl ? e($schoolNameAr) : e($schoolNameFr) ?></strong><br>
