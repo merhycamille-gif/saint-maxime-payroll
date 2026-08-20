@@ -365,7 +365,9 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'C16' => !$married ? 'X' : '1', 'E16' => $married ? 'X' : '2',
             'B17' => $hD, 'C17' => $hM, 'D17' => $hY, 'J17' => $hrs,
             'B18' => 'X',
-            'C19' => $fnAr, 'G19' => trim($wageNum . '  ' . $wageWords),
+            // «بدو يكون رقم المبلغ قبل التفقيط» (p1 بطلبه 2026-08-20): علامة RTL بأول الخانة
+            // حتى ما يقلب العرضُ الرقمَ لآخر السطر — الرقم يظهر أولاً بعد «ان الراتب الحالي» ثم التفقيط
+            'C19' => $fnAr, 'G19' => trim("\u{200F}" . $wageNum . '  ' . $wageWords),
             'C20' => 'X',
             'B27' => $first, 'C27' => $last,
             'L27' => $sigName,
