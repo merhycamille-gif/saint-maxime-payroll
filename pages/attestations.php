@@ -830,7 +830,8 @@ if (!$emp):
             <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (2026-08-20): بلا خط + المدينة فقط — تصدير Word يكشفها ويشيل scr-head */ ?>
             <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= $schoolHeadWord ?></div><?php endif; ?>
             <?php if ($showRecHead && $logoImg): ?><div class="scr-head" style="margin-bottom:8px"><?= $headBodyAr($logoImg) ?></div><?php endif; ?>
-            <div style="text-align:left;font-weight:700;line-height:1.7;margin-bottom:6px">
+            <?php /* «p1: بدو يكونو على اليمين» (2026-08-20): كتلة الصندوق الوطني عاليمين لا عاليسار */ ?>
+            <div style="text-align:right;font-weight:700;line-height:1.7;margin-bottom:6px">
                 الصندوق الوطني<br>للضمان الاجتماعي<br>
                 <span style="font-weight:400">مكتب ـــــــــــــ</span><br>
                 <span style="font-weight:400">رقم الوارد : ــــــــ</span><br>
