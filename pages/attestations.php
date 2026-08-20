@@ -630,6 +630,21 @@ if (!$emp):
         // «الاثنين»: تُعتمد الليرة بالحروف (المبلغ القانوني)، والدولار يظهر رقماً في المتن
         return numToArabicWords((int)round($lbp)) . ' ليرة لبنانية';
     };
+    // 💬 «أي إفادة بأي لغة وتترجم صح دغري» (بطلبه 2026-08-20): صيَغ المبالغ والتفقيط للإفادات
+    // الفرنسية/الإنكليزية — نفس منطق العربي (ليرة/دولار/الاثنين) بتسميات لاتينية
+    $moneyLat = function ($lbp) use ($cur, $usdOf) {
+        if ($cur === 'usd') return formatUSD($usdOf($lbp));
+        if ($cur === 'both') return number_format((int)round($lbp)) . ' LBP (' . formatUSD($usdOf($lbp)) . ')';
+        return number_format((int)round($lbp)) . ' LBP';
+    };
+    $moneyWordsFr = function ($lbp) use ($cur, $usdOf) {
+        if ($cur === 'usd') return numToFrenchWords((int)round($usdOf($lbp))) . ' dollars américains';
+        return numToFrenchWords((int)round($lbp)) . ' livres libanaises';
+    };
+    $moneyWordsEn = function ($lbp) use ($cur, $usdOf) {
+        if ($cur === 'usd') return numToEnglishWords((int)round($usdOf($lbp))) . ' US Dollars';
+        return numToEnglishWords((int)round($lbp)) . ' Lebanese Pounds';
+    };
     // مبلغ حرّ يكتبه المستخدم (تعويض الصرف المحسوب) — يُعرَض كما هو بالعملة المختارة بلا تحويل
     $eos = (int)preg_replace('/[^0-9]/', '', (string)($_GET['eos'] ?? ''));
     $embAmt = (int)preg_replace('/[^0-9]/', '', (string)($_GET['emb_amt'] ?? '')); // مبلغ إفادة السفارة (يدوي)
@@ -668,7 +683,8 @@ if (!$emp):
     $lvFinal = $lvTxt !== '' ? $lvTxt : $lvSel;
     $assocTxt      = trim((string)($_GET['assoc_txt'] ?? '')); if ($assocTxt === '') $assocTxt = 'التابعة لجمعية الراهبات المخلصيات لسيدة البشارة المسجّلة لديكم تحت الرقم (.....)';
     // الترويسة الرسمية الكاملة كصورة خلفية (إن وُجدت لهذه المدرسة) — تُغني عن الترويسة المُعاد بناؤها
-    $lhUrl = schoolLetterheadUrl($school, ($type === 'embassy') ? 'fr' : 'ar');
+    // الترويسة الرسمية بلغة الوثيقة (2026-08-20 «أي إفادة بأي لغة»): فرنسية للإفادات اللاتينية
+    $lhUrl = schoolLetterheadUrl($school, ($type === 'embassy' || $docLang !== 'ar') ? 'fr' : 'ar');
     $lhOn  = ($showLogo && $lhUrl !== '' && !in_array($type, ['notice_mail', 'anhaa_mail'], true)); // نماذج البريد لها ترويسة بريدية خاصة
     $showRecHead = ($showLogo && !$lhOn); // عرض الترويسة المُعاد بناؤها فقط حين لا توجد صورة ترويسة
     $lhStyle = $lhOn
@@ -709,6 +725,22 @@ if (!$emp):
             . '</td><td style="border:none;padding:0"></td></tr></table>';
     };
     $schoolHeadWord = '<div style="margin-bottom:16px">' . $headBodyAr($logoImgWord) . '</div>';
+    // أجنبي (مشترَك لكل الإفادات اللاتينية — 2026-08-20 «أي إفادة بأي لغة»): الاسم الفرنسي
+    // والمدينة والهاتف بنفس نمط «لوغو الراهبات» على يسار الصفحة؛ العنوان والمدير المُدخَلان
+    // بالأجنبي وإلا ترجمة تلقائية من العربي
+    $schoolAddrFr = trim((string)($school['address_fr'] ?? '')) ?: ($schoolAddr !== '' ? arNameToFr($schoolAddr) : '');
+    $directorFr   = ($sigNameFr !== '') ? $sigNameFr : ($director !== '' ? arNameToFr($director) : '');
+    $cityFr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddrFr)[0] ?? ''));
+    $headBodyFr = function ($logoHtml) use ($schoolNameFr, $cityFr, $schoolPhone) {
+        return '<div dir="ltr"><table style="width:100%;border-collapse:collapse"><tr><td style="border:none;padding:0;width:32%;text-align:center;line-height:1.8">'
+            . ($logoHtml ? '<div style="margin-bottom:2px">' . $logoHtml . '</div>' : '')
+            . '<strong style="font-size:16px">' . e($schoolNameFr) . '</strong>'
+            . ($cityFr !== '' ? '<br><strong style="font-size:15px">' . e($cityFr) . '</strong>' : '')
+            . ($schoolPhone ? '<br><span style="font-size:14px">Tel : <span dir="ltr">' . e($schoolPhone) . '</span></span>' : '')
+            . '</td><td style="border:none;padding:0"></td></tr></table></div>';
+    };
+    $schoolHeadFr = '<div class="scr-head" style="margin-bottom:18px">' . $headBodyFr($logoImg) . '</div>';
+    $schoolHeadWordFr = '<div style="margin-bottom:16px">' . $headBodyFr($logoImgWord) . '</div>';
     $freeNum   = function ($v) use ($cur) {
         if ($cur === 'usd') return '$' . number_format($v, 2);
         return formatLBP($v, false) . ' ل.ل';
@@ -859,7 +891,36 @@ if (!$emp):
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
             <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (2026-08-20): بلا خط + المدينة فقط — تصدير Word يكشفها ويشيل scr-head */ ?>
-            <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= $schoolHeadWord ?></div><?php endif; ?>
+            <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= $docLang !== 'ar' ? $schoolHeadWordFr : $schoolHeadWord ?></div><?php endif; ?>
+            <?php if ($docLang !== 'ar'): $FR = ($docLang === 'fr'); /* «أي إفادة بأي لغة وتترجم صح دغري» (2026-08-20) */ ?>
+            <?php if ($showRecHead && $logoImg): ?><div class="scr-head" style="margin-bottom:8px"><?= $headBodyFr($logoImg) ?></div><?php endif; ?>
+            <div dir="ltr" style="text-align:left">
+              <div style="font-weight:700;line-height:1.7;margin-bottom:6px">
+                  <?= $FR ? 'Fonds National de<br>Sécurité Sociale' : 'National Social<br>Security Fund' ?><br>
+                  <span style="font-weight:400"><?= $FR ? 'Bureau' : 'Office' ?> : ــــــــ</span><br>
+                  <span style="font-weight:400"><?= $FR ? 'N° d\'entrée' : 'Entry No.' ?> : ــــــــ</span><br>
+                  <span style="font-weight:400">Date : ــــــــ</span>
+              </div>
+              <h2 style="text-align:center;margin:18px 0 26px;text-decoration:underline"><?= $FR ? 'Attestation — À qui de droit' : 'Attestation — To whom it may concern' ?></h2>
+              <p><?= $FR ? 'L\'institution' : 'The institution' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
+              <p><?= $FR ? 'immatriculée au Fonds National de Sécurité Sociale sous le n°' : 'registered with the National Social Security Fund under No.' ?> <strong><?= e($employerNssf) ?></strong></p>
+              <p><?= $FR ? 'atteste que l\'assuré(e)' : 'certifies that the insured' ?> <strong><?= e($nomFr) ?></strong>, <?= $FR ? 'n°' : 'No.' ?> <strong><?= e($emp['nssf_number']) ?></strong>, <?= $FR ? 'a commencé à travailler chez nous à plein temps' : 'started working with us on a full-time basis' ?></p>
+              <p><?= $FR ? 'à compter du' : 'as of' ?> <strong><?= $hireFmt ?></strong> <?= $FR ? 'en qualité de' : 'in the capacity of' ?> (<strong><?= e($FR ? $fnFr['fr'] : $fnFr['en']) ?></strong>)</p>
+              <p><?= $FR ? 'et perçoit un salaire mensuel :' : 'and receives a monthly salary of:' ?></p>
+              <p style="margin-left:34px">- <?= $FR ? 'Salaire de base conformément à la loi' : 'Basic salary in accordance with the law' ?> : <strong><?= $moneyLat($attBase) ?></strong></p>
+              <p style="margin-left:34px">- <?= $FR ? 'Rémunération supplémentaire' : 'Additional remuneration' ?> : <strong><?= $moneyLat($attSupp) ?></strong></p>
+              <?php if ($attTrans > 0): ?>
+              <p style="margin-left:34px">- <?= $FR ? 'Indemnité de transport' : 'Transport allowance' ?> : <strong><?= $moneyLat($attTrans) ?></strong></p>
+              <?php endif; ?>
+              <p>Total : <strong><?= $moneyLat($attTotal) ?></strong>, <?= $FR ? 'soit' : 'i.e.' ?> <?= e($FR ? $moneyWordsFr($attTotal) : $moneyWordsEn($attTotal)) ?> <?= $FR ? 'uniquement' : 'only' ?>.</p>
+              <?php if ($emp['status']==='actif'): ?><p><?= $FR ? 'Il/Elle poursuit son travail à ce jour.' : 'He/She is still in service to date.' ?></p><?php endif; ?>
+              <div style="display:flex;justify-content:space-between;margin-top:54px">
+                  <div>Date : <?= $today ?></div>
+                  <div style="text-align:center"><strong><?= $FR ? 'Cachet et signature' : 'Stamp and signature' ?></strong>
+                      <div style="margin-top:44px;border-top:1px solid #333;width:200px"></div></div>
+              </div>
+            </div>
+            <?php else: ?>
             <?php if ($showRecHead && $logoImg): ?><div class="scr-head" style="margin-bottom:8px"><?= $headBodyAr($logoImg) ?></div><?php endif; ?>
             <?php /* «p1: بدو يكونو على اليمين» (2026-08-20): كتلة الصندوق الوطني عاليمين لا عاليسار */ ?>
             <div style="text-align:right;font-weight:700;line-height:1.7;margin-bottom:6px">
@@ -887,6 +948,7 @@ if (!$emp):
                 <div style="text-align:center"><strong>الخاتم والتوقيع</strong>
                     <div style="margin-top:44px;border-top:1px solid #333;width:200px"></div></div>
             </div>
+            <?php endif; ?>
         </div>
     </div>
     <?php elseif (in_array($type, ['salaire','tadris','embassy','riaaya','anhaa_khedme','anhaa_mail','talab_istiqala','afade_madrasiya','isqat_haq','baraa_zimma','iqrar','aqd_taalim','notice_school','notice_mail'])):
@@ -912,6 +974,7 @@ if (!$emp):
         $regNo = trim((string)($emp['civil_registry_number'] ?? '')) . (($emp['civil_registry_place'] ?? '') ? ' / ' . $emp['civil_registry_place'] : '');
         $addr  = implode(' - ', array_values(array_unique(array_filter(array_map(function ($x) { return trim((string)$x); }, [$emp['ville'] ?? '', $emp['quartier'] ?? '', $emp['rue'] ?? '', $emp['immeuble'] ?? '', ($emp['etage'] ?? '') ? ('طابق ' . $emp['etage']) : '', $emp['district'] ?? '', $emp['gouvernorat'] ?? ''])))));
         $dipAr = ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma'], 'ar') : '';
+        $dipFr = ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma'], 'fr') : ''; // للعقد الفرنسي/الإنكليزي
         $subj  = trim((string)($emp['subjects_taught'] ?? ''));
         $niveau = trim((string)($emp['niveau_scolaire'] ?? ''));
         $hpw   = ($emp['hours_per_week'] ?? null) !== null && $emp['hours_per_week'] !== '' ? rtrim(rtrim((string)$emp['hours_per_week'], '0'), '.') : '';
@@ -957,22 +1020,6 @@ if (!$emp):
         // «بس حط المنطقة قلنا» + «بدون الخط الأسود» + «متل لوغو الراهبات» (2026-08-20):
         // ترويسة الشاشة = نفس كتابة نموذج «لوغو الراهبات» المتوسّطة تحت الشعار، بلا خط، بالمدينة فقط
         $schoolHead = '<div class="scr-head" style="margin-bottom:18px">' . $headBodyAr($logoImg) . '</div>';
-        // أجنبي: الشعار فوق على اليسار، والاسم الفرنسي والعنوان (بالأجنبي) والهاتف تحته على اليسار
-        // العنوان واسم المدير بالأجنبي: المُدخَل، وإلا ترجمة تلقائية من العربي (لا العربي نفسه)
-        $schoolAddrFr = trim((string)($school['address_fr'] ?? '')) ?: ($schoolAddr !== '' ? arNameToFr($schoolAddr) : '');
-        $directorFr   = ($sigNameFr !== '') ? $sigNameFr : ($director !== '' ? arNameToFr($director) : '');
-        $cityFr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddrFr)[0] ?? ''));
-        // بالفرنسي (للسفارة): نفس نمط «لوغو الراهبات» متوسّطاً تحت الشعار، على يسار الصفحة
-        $headBodyFr = function ($logoHtml) use ($schoolNameFr, $cityFr, $schoolPhone) {
-            return '<div dir="ltr"><table style="width:100%;border-collapse:collapse"><tr><td style="border:none;padding:0;width:32%;text-align:center;line-height:1.8">'
-                . ($logoHtml ? '<div style="margin-bottom:2px">' . $logoHtml . '</div>' : '')
-                . '<strong style="font-size:16px">' . e($schoolNameFr) . '</strong>'
-                . ($cityFr !== '' ? '<br><strong style="font-size:15px">' . e($cityFr) . '</strong>' : '')
-                . ($schoolPhone ? '<br><span style="font-size:14px">Tel : <span dir="ltr">' . e($schoolPhone) . '</span></span>' : '')
-                . '</td><td style="border:none;padding:0"></td></tr></table></div>';
-        };
-        $schoolHeadFr = '<div class="scr-head" style="margin-bottom:18px">' . $headBodyFr($logoImg) . '</div>';
-        $schoolHeadWordFr = '<div style="margin-bottom:16px">' . $headBodyFr($logoImgWord) . '</div>';
     ?>
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
@@ -983,14 +1030,340 @@ if (!$emp):
       <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
       <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (بطلب المستخدم 2026-08-20): بلا خط تحت الشعار + المدينة فقط —
               تصدير Word يكشفها ويشيل ترويسة الشاشة scr-head (وخلفية الترويسة أصلاً لا يعرضها وورد) */ ?>
-      <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= $type === 'embassy' ? $schoolHeadWordFr : $schoolHeadWord ?></div><?php endif; ?>
+      <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= ($type === 'embassy' || $docLang !== 'ar') ? $schoolHeadWordFr : $schoolHeadWord ?></div><?php endif; ?>
 
       <?php
         // ترويسة اتصال أسفل الصفحة (نمط مكسيموس) — تظهر مع الشعار
         // التذييل يظهر فقط مع ترويسة صورة (مكسيموس)؛ المخلصيات نموذجها بلا تذييل (ترويسة فقط)
         $footerHtml = '';
       ?>
-      <?php if ($type === 'salaire'): ?>
+      <?php if ($docLang !== 'ar' && $type !== 'embassy'):
+        // 💬 «أي إفادة موجودة أنا اختار دغري بأي لغة بدي ياها وتترجم صح دغري — وبكل المؤسسات»
+        // (بطلبه 2026-08-20): النسخ الفرنسية والإنكليزية لكل الإفادات — نفس نصوص العربي
+        // بالمعنى حرفياً، وبيانات كل مدرسة تُسحب من ملفها (الاسم الفرنسي/المدينة/الترويسة)
+        $FR = ($docLang === 'fr');
+        $SIG_EN = ['raisa' => 'The Mother Superior', 'idara' => 'The Administration', 'moudir' => 'The Director'];
+        $sigTitleLat = $FR ? $SIG_TITLES[$sigTitle]['fr'] : $SIG_EN[$sigTitle];
+        $funcLat  = $FR ? $fnFr['fr'] : $fnFr['en'];
+        $wordsLat = $FR ? $moneyWordsFr : $moneyWordsEn;
+        $uniq     = $FR ? 'uniquement' : 'only';
+        $levelsLat = $FR ? $levelsFr : $levelsEn;
+        $lvMapLat = ['استقالة' => $FR ? 'Démission' : 'Resignation',
+                     'صرف من الخدمة' => $FR ? 'Licenciement' : 'Dismissal from service',
+                     'بلوغ السن القانوني' => $FR ? 'Atteinte de l\'âge légal' : 'Reaching the legal age'];
+        $lvLat = $lvFinal !== '' ? ($lvMapLat[$lvFinal] ?? $lvFinal) : '';
+        $mrsLat = $FR ? 'M./Mme' : 'Mr./Mrs.';
+        $reqLine = $FR ? 'La présente attestation lui est délivrée à sa demande.' : 'This certificate is issued upon his/her request.';
+        $stillLine = $FR ? 'toujours en fonction à ce jour' : 'and is still in service to date';
+        $salParts = [];
+        if ($incExtra && $extraW > 0) $salParts[] = [$FR ? 'Rémunération supplémentaire' : 'Additional remuneration', $extraW];
+        if ($incAide  && $aideW  > 0) $salParts[] = [$FR ? 'Prime et aide' : 'Bonus and aid', $aideW];
+        if ($incTrans && $transW > 0) $salParts[] = [$FR ? 'Indemnité de transport' : 'Transport allowance', $transW];
+      ?>
+        <?php if (!in_array($type, ['anhaa_mail', 'notice_mail'], true)): ?>
+        <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
+        <?php endif; ?>
+        <div dir="ltr" style="text-align:left">
+
+        <?php if ($type === 'salaire'): ?>
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+            <span><?= $FR ? 'N°' : 'No.' ?> : <span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span></span>
+            <span>Date : <?= $today ?></span>
+        </div>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation de salaire' : 'Salary Certificate' ?></h2>
+        <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille chez elle en qualité de' : 'has been working there as' ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $FR ? 'enseigne chez elle la matière' : 'has been teaching' ?> <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'toujours en fonction à ce jour, et perçoit un salaire mensuel' : 'is still in service to date, and receives a monthly salary' ?><?= $salParts ? ($FR ? ' détaillé comme suit :' : ' detailed as follows:') : ($FR ? ' de <strong>' . $moneyLat($salShown) . '</strong> .' : ' of <strong>' . $moneyLat($salShown) . '</strong>.') ?></p>
+        <?php if ($salParts): ?>
+        <p style="margin-left:34px">- <?= $FR ? 'Salaire de base' . ($isEmploye ? '' : ' (après échelons)') : 'Basic salary' . ($isEmploye ? '' : ' (after increments)') ?> : <strong><?= $moneyLat((int)$basePlusEch) ?></strong></p>
+        <?php foreach ($salParts as $sp): ?>
+        <p style="margin-left:34px">- <?= e($sp[0]) ?> : <strong><?= $moneyLat((int)$sp[1]) ?></strong></p>
+        <?php endforeach; ?>
+        <p style="margin-left:34px">- Total : <strong><?= $moneyLat($salShown) ?></strong></p>
+        <?php endif; ?>
+        <p><?= $FR ? 'Soit' : 'Say' ?> <strong><?= e($wordsLat($salShown)) ?> <?= $uniq ?></strong>.</p>
+        <p><?= $reqLine ?></p>
+        <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleLat) ?> — <?= $FR ? 'Signature et cachet' : 'Signature & stamp' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
+
+        <?php elseif ($type === 'tadris'): ?>
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+            <span><?= $FR ? 'N°' : 'No.' ?> : <span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span></span>
+            <span>Date : <?= $today ?></span>
+        </div>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? ($FR ? 'Attestation de travail' : 'Work Certificate') : ($FR ? 'Attestation de travail et d\'enseignement' : 'Work and Teaching Certificate') ?></h2>
+        <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille chez elle en qualité de' : 'has been working there as' ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $FR ? 'enseigne chez elle la matière' : 'has been teaching' ?> <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'toujours en fonction à ce jour. Il/Elle fait preuve de bonne conduite et d\'assiduité dans l\'accomplissement de son travail.' : 'and is still in service to date. He/She is of good conduct and committed in the performance of his/her duties.' ?></p>
+        <p><?= $reqLine ?></p>
+        <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= $FR ? 'Le Directeur — Signature et cachet' : 'The Director — Signature & stamp' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
+
+        <?php elseif ($type === 'riaaya'): ?>
+        <div style="text-align:right;margin-bottom:10px"><?= $today ?></div>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'À qui de droit' : 'To whom it may concern' ?></h2>
+        <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= strpos($assocTxt, 'التابعة لجمعية') === 0 ? ($FR ? 'relevant de l\'Association des Religieuses Salvatoriennes de Notre-Dame de l\'Annonciation, enregistrée auprès de vos services sous le n° (.....)' : 'affiliated to the Association of the Salvatorian Sisters of Our Lady of the Annunciation, registered with you under No. (.....)') : e($assocTxt) ?>,</p>
+        <p><?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille en qualité de' : 'works as' ?> <strong><?= e($funcLat) ?></strong> <?= $FR ? 'dans notre école' : 'at our school' ?><?php else: ?><?= $FR ? 'est enseignant(e) de la matière' : 'is a teacher of' ?> <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsLat ?> <?= $FR ? 'dans notre école' : 'at our school' ?><?php endif; ?>.</p>
+        <p><?= $FR ? 'La présente attestation est délivrée à cet effet.' : 'This attestation is issued accordingly.' ?></p>
+        <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= $FR ? 'L\'Administration' : 'The Administration' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
+
+        <?php elseif ($type === 'anhaa_khedme' || $type === 'anhaa_mail'): ?>
+        <?php if ($type === 'anhaa_mail'): ?>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:10px">
+          <div style="text-align:left"><?php if ($showLogo && $logoImg): ?><?= $logoImg ?><br><?php endif; ?>
+            <strong style="font-size:15px"><?= e($schoolNameFr) ?></strong>
+            <?= $cityFr ? '<br><small>' . e($cityFr) . '</small>' : '' ?>
+            <?= $schoolPhone ? '<br><small>Tel : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '' ?>
+          </div>
+          <div style="text-align:right;font-weight:700;font-size:13px;line-height:1.7"><?= $FR ? 'Carte découverte<br>avec accusé de réception<br>Recommandée' : 'Open card<br>with acknowledgment of receipt<br>Registered' ?></div>
+        </div>
+        <div style="border:1px solid #bbb;padding:8px 12px;line-height:1.95;margin-bottom:14px">
+          <p style="margin:2px 0"><?= $FR ? 'De' : 'From' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
+          <p style="margin:2px 0"><?= $FR ? 'À' : 'To' ?> : <strong><?= e($nomFr) ?></strong></p>
+          <p style="margin:2px 0"><?= $FR ? 'Adresse' : 'Address' ?> : <?= $addr !== '' ? '<strong>' . e($addr) . '</strong>' : $blank(320) ?></p>
+          <p style="margin:2px 0"><?= $FR ? 'Tél' : 'Phone' ?> : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong><span dir="ltr">' . e($emp['phone1']) . '</span></strong>' : $blank(150) ?></p>
+        </div>
+        <?php endif; ?>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Lettre de fin de service' : 'End-of-Service Letter' ?></h2>
+        <?php if ($type === 'anhaa_khedme'): ?><p><?= $FR ? 'Cher(ère) Professeur(e)' : 'Dear Teacher' ?> : <strong><?= e($nomFr) ?></strong></p><?php endif; ?>
+        <p><?= $FR ? 'En vertu des lois en vigueur, notamment la loi sur le corps enseignant des écoles privées, et en application de l\'article 29 et de ses amendements de ladite loi,' : 'Pursuant to the laws in force, in particular the law on the teaching staff of private schools, and in application of Article 29 thereof as amended,' ?></p>
+        <p><?= $FR ? 'nous vous informons, avant le cinq juillet' : 'we hereby inform you, before the fifth of July' ?> <strong><?= $effYear ?></strong>, <?= $FR ? 'de la décision contraignante de l\'école' : 'of the compelled decision of' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
+        <p><?= $FR ? 'de mettre fin à vos services d\'enseignement pour l\'année scolaire' : 'to terminate your teaching services for the academic year' ?> <strong><?= $curSY ?></strong> <?= $FR ? 'et les suivantes.' : 'and thereafter.' ?></p>
+        <p><?= $FR ? 'Tout en regrettant de vous notifier sa décision, l\'administration de l\'école vous remercie de votre coopération dévouée et vous souhaite plein succès, avec l\'expression de son profond respect.' : 'While regretting to notify you of its decision, the school administration thanks you for your devoted cooperation and wishes you every success, with its highest consideration.' ?></p>
+        <div style="display:flex;justify-content:space-between;margin-top:32px">
+          <div><?= $FR ? 'Le' : 'On' ?> : <?= $effFmt ?></div>
+          <div style="text-align:center"><strong><?= $FR ? 'La Directrice de l\'école' : 'The School Principal' ?></strong><div style="margin-top:36px;border-top:1px solid #333;width:200px"></div></div>
+        </div>
+        <p style="margin-top:12px<?= $type === 'anhaa_mail' ? ';text-align:center' : '' ?>"><?= $FR ? 'Sous toutes réserves' : 'With all reservations' ?></p>
+        <?php if ($type === 'anhaa_khedme'): ?>
+        <div style="margin-top:24px;border-top:1px dashed #999;padding-top:12px">
+          <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= e($nomFr) ?></strong></p>
+          <p><?= $FR ? 'reconnais avoir reçu de la Directrice de l\'école la lettre de fin de mes services.' : 'acknowledge having received from the School Principal the letter terminating my services.' ?></p>
+          <div style="display:flex;justify-content:space-between;margin-top:24px">
+            <div><?= $FR ? 'Le' : 'On' ?> : <?= $blank(90) ?></div>
+            <div style="text-align:center"><strong><?= $FR ? 'Nom et signature' : 'Name and signature' ?></strong><div style="margin-top:32px;border-top:1px solid #333;width:200px"></div></div>
+          </div>
+        </div>
+        <?php endif; ?>
+
+        <?php elseif ($type === 'talab_istiqala'): ?>
+        <h2 style="text-align:center;margin:6px 0 24px;text-decoration:underline"><?= $FR ? 'Demande de démission' : 'Resignation Request' ?></h2>
+        <p><?= $FR ? 'Madame la Directrice de l\'école' : 'To the Principal of' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
+        <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= e($nomFr) ?></strong></p>
+        <p><?= $FR ? 'vous informe de ma démission de mes fonctions à l\'école' : 'hereby inform you of my resignation from my duties at' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'à compter de la prochaine année scolaire' : 'as of the coming academic year' ?> <strong><?= $nextSY ?></strong>, <?= $FR ? 'et ce pour des raisons personnelles.' : 'for personal reasons.' ?></p>
+        <p><?= $FR ? 'Veuillez agréer l\'expression de mon profond respect.' : 'Please accept my highest consideration.' ?></p>
+        <div style="display:flex;justify-content:space-between;margin-top:46px">
+          <div><?= $FR ? 'Le' : 'On' ?> : <?= $effFmt ?></div>
+          <div style="text-align:center"><strong>Signature</strong><div style="margin-top:44px;border-top:1px solid #333;width:200px"></div></div>
+        </div>
+
+        <?php elseif ($type === 'afade_madrasiya'): ?>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation scolaire' : 'School Attestation' ?></h2>
+        <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= $directorFr ? e($directorFr) : $blank(180) ?></strong></p>
+        <p><?= $FR ? 'Chef d\'établissement de l\'école' : 'Head of' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
+        <p><?= $FR ? 'certifie que' : 'certify that' ?> <?= $mrsLat ?> : <strong><?= e($nomFr) ?></strong> &nbsp; <?= $FR ? 'titulaire de la carte d\'identité n°' : 'holder of ID card No.' ?> <?= $blank(150) ?></p>
+        <p><?= $FR ? 'a commencé à enseigner dans notre école le' : 'started teaching at our school on' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(120) ?></strong></p>
+        <p><?= $FR ? 'et a cessé son travail le' : 'and ceased work on' ?> <strong><?= $effFmt ?></strong></p>
+        <p><?= $FR ? 'pour les motifs suivants' : 'for the following reasons' ?> : <?= $lvLat !== '' ? '<strong>' . e($lvLat) . '</strong>' : $blank(380) ?></p>
+        <?php $attParts = [];
+        if ($incExtra && $extraW > 0) $attParts[] = [$FR ? 'Rémunération supplémentaire' : 'Additional remuneration', $extraW];
+        if ($incAide  && $aideW  > 0) $attParts[] = [$FR ? 'Prime et aide' : 'Bonus and aid', $aideW];
+        if ($incTrans && $transW > 0) $attParts[] = [$FR ? 'Indemnité de transport' : 'Transport allowance', $transW];
+        ?>
+        <?php if ($attParts): ?>
+        <p><?= $FR ? 'Son salaire mensuel (hors allocations familiales) au dernier mois de service effectif se composait comme suit :' : 'His/her monthly salary (excluding family allowances) in the last month of actual service was composed as follows:' ?></p>
+        <p style="margin-left:34px">- <?= $FR ? 'Salaire de base' : 'Basic salary' ?> : <strong><?= $moneyLat((int)$basePlusEch) ?></strong></p>
+        <?php foreach ($attParts as $ap): ?>
+        <p style="margin-left:34px">- <?= e($ap[0]) ?> : <strong><?= $moneyLat((int)$ap[1]) ?></strong></p>
+        <?php endforeach; ?>
+        <p style="margin-left:34px">- Total : <strong><?= $moneyLat($salShown) ?></strong></p>
+        <?php else: ?>
+        <p><?= $FR ? 'Son salaire mensuel (hors allocations familiales) au dernier mois de service effectif était de' : 'His/her monthly salary (excluding family allowances) in the last month of actual service was' ?> <strong><?= $moneyLat($salShown) ?></strong></p>
+        <?php endif; ?>
+        <p><?= $FR ? 'Soit' : 'Say' ?> <strong><?= e($wordsLat($salShown)) ?> <?= $uniq ?>.</strong></p>
+        <p><?= $FR ? 'La présente attestation est établie conformément aux faits et sur la base des registres de l\'école.' : 'This attestation is issued in accordance with the facts and based on the school records.' ?></p>
+        <div style="display:flex;justify-content:space-between;margin-top:38px">
+          <div><?= $FR ? 'Fait le' : 'Issued on' ?> <?= $effFmt ?></div>
+          <div style="text-align:center"><strong><?= $FR ? 'Signature du chef d\'établissement' : 'Signature of the head of school' ?></strong><div style="margin-top:10px"><?= $FR ? 'Cachet de l\'école' : 'School stamp' ?></div>
+            <div style="margin-top:28px;border-top:1px solid #333;width:220px"></div></div>
+        </div>
+        <p style="margin-top:22px;font-size:12pt;color:#444"><?= $FR ? 'Note : la présente attestation est à adresser à la direction de la Caisse d\'indemnités des membres du corps enseignant des écoles privées.' : 'Note: this attestation is to be sent to the administration of the Compensation Fund for Private-School Teaching Staff.' ?></p>
+        <p style="text-align:center;font-size:12pt;color:#444"><?= $FR ? 'Ministère de l\'Éducation Nationale, de la Jeunesse et des Sports — Beyrouth' : 'Ministry of National Education, Youth and Sports — Beirut' ?></p>
+
+        <?php elseif ($type === 'isqat_haq'): ?>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Renonciation de droits' : 'Waiver of Rights' ?></h2>
+        <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> <strong><?= e($nomFr) ?></strong></p>
+        <p><?= $FR ? 'selon ma carte d\'identité, registre n°' : 'as per my identity card, registry No.' ?> <?= $blank(150) ?> &nbsp; <?= $FR ? 'déclare ce qui suit :' : 'declare the following:' ?></p>
+        <p><strong>1)</strong> <?= $FR ? 'J\'ai travaillé à l\'école' : 'I worked at' ?> : <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'en qualité de' : 'as' ?> : <strong><?= e($funcLat) ?></strong> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'mon salaire à la date de la présente renonciation s\'élevant (en chiffres) à' : 'my salary as of the date of this waiver amounting (in figures) to' ?> <strong><?= $moneyLat($salShown) ?></strong>, <?= $FR ? 'soit (en lettres)' : 'in words' ?> <strong><?= e($wordsLat($salShown)) ?> <?= $uniq ?>.</strong></p>
+        <p><strong>2)</strong> <?= $FR ? 'J\'ai perçu de l\'école' : 'I received from' ?> : <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'l\'intégralité de mes salaires et de leurs accessoires pendant toute la durée de mon travail, ainsi que tous les droits que la loi me confère pour ladite période, y compris les heures supplémentaires et les congés annuels, etc.' : 'all my salaries and their accessories throughout my period of work, as well as all the rights conferred upon me by law for the said period, including overtime and annual leave, etc.' ?></p>
+        <p><strong>3)</strong> <?= $FR ? 'En date du' : 'On' ?> <strong><?= $effFmt ?></strong> &nbsp; <?= $box($isqMode==='istiqala') ?> <?= $FR ? 'j\'ai présenté ma démission' : 'I submitted my resignation' ?> &nbsp;&nbsp; <?= $box($isqMode==='sarf') ?> <?= $FR ? 'j\'ai été licencié(e)' : 'I was dismissed from service' ?>.</p>
+        <p><?= $FR ? 'En conséquence et après règlement des comptes, j\'ai perçu de l\'école' : 'Consequently, and after settlement of accounts, I received from' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'la somme (en chiffres) de' : 'the amount (in figures) of' ?> <strong><?= $eos>0 ? $freeNum($eos) : $blank(140) ?></strong> &nbsp; (<?= $FR ? 'en lettres' : 'in words' ?>) <strong><?= $eos>0 ? e(($FR ? numToFrenchWords($eos) : numToEnglishWords($eos)) . ' ' . ($cur === 'usd' ? ($FR ? 'dollars américains' : 'US Dollars') : ($FR ? 'livres libanaises' : 'Lebanese Pounds')) . ' ' . $uniq) : $blank(240) ?></strong></p>
+        <p><?= $FR ? 'Cette somme constitue mon indemnité de licenciement.' : 'This amount constitutes my end-of-service indemnity.' ?></p>
+        <p><?= $FR ? 'En conséquence, je reconnais que l\'école' : 'Accordingly, I acknowledge that' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'm\'a versé toutes les sommes qui m\'étaient dues en ma qualité d\'employé(e), notamment l\'indemnité de licenciement et l\'indemnité de préavis ; je renonce à l\'égard de ladite école à tout droit, action ou réclamation m\'appartenant en vertu du Code du travail et de ses amendements et de toutes les lois et réglementations en vigueur, et je décharge entièrement l\'école à cet égard, décharge totale couvrant l\'ensemble de la relation de travail qui existait entre nous.' : 'has paid me all amounts due to me in my capacity as its employee, in particular the end-of-service indemnity and the notice indemnity; I waive towards the said school any right, action or claim belonging to me under the Labor Law and its amendments and all applicable laws and regulations, and I fully release the school in this respect, a complete release covering the entire employment relationship that existed between us.' ?></p>
+        <div style="display:flex;justify-content:space-between;margin-top:38px">
+          <div><?= $FR ? 'Fait le' : 'Done on' ?> <?= $effFmt ?></div>
+          <div style="text-align:center"><strong><?= $FR ? 'Bon pour renonciation de droits' : 'Valid for waiver of rights' ?></strong><div style="margin-top:40px;border-top:1px solid #333;width:220px">Signature</div></div>
+        </div>
+
+        <?php elseif ($type === 'baraa_zimma'): $bzMonthLat = $FR ? monthName($eMo, 'fr') : monthName($eMo, 'en'); ?>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Quittance, décharge et renonciation de droits' : 'Acknowledgment, Full Release and Waiver of Rights' ?></h2>
+        <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= e($nomFr) ?></strong></p>
+        <p><?= $FR ? 'déclare, en pleine capacité juridique, ce qui suit :' : 'declare, with full legal capacity, the following:' ?></p>
+        <p><?= $FR ? 'J\'ai travaillé à l\'école' : 'I worked at' ?> : <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'en qualité de' : 'as' ?> <strong><?= e($funcLat) ?></strong>, <?= $FR ? 'et je reconnais avoir perçu l\'intégralité de mes droits financiers de ladite école, y compris les salaires mensuels et leurs accessoires, les indemnités — notamment les aides et rémunérations supplémentaires versées en compensation de l\'effondrement de la monnaie libanaise —, les droits et toutes les sommes qui m\'étaient dues au titre de ma période de travail ; ces montants ne constituent nullement une avance sur indemnité mais une indemnisation complète et définitive à cet égard, et ce jusqu\'à la fin du mois de' : 'and I acknowledge having received all my financial dues from the said school, including monthly salaries and their accessories, indemnities — in particular aids and additional remunerations paid in compensation for the collapse of the Lebanese currency —, rights and all amounts due to me for my period of work; these amounts shall in no way be considered an advance on indemnity but a full and final compensation in this respect, up to the end of the month of' ?> <strong><?= e($bzMonthLat) ?></strong> <?= $FR ? 'de l\'année' : 'of the year' ?> <strong><?= $effYear ?></strong>.</p>
+        <p><?= $FR ? 'En conséquence, je décharge ladite école, sa direction, l\'ensemble de ses propriétaires et de ses dirigeants, de tout droit, réclamation ou action que j\'aurais ou pourrais avoir à leur encontre, décharge totale, complète et irrévocable ; je m\'engage à assumer l\'entière responsabilité juridique, financière et pénale en cas de réclamation ultérieure de ma part contraire à la présente déclaration.' : 'Accordingly, I release the said school, its administration, all its owners and directors, from any right, claim or action that I have or may have against them, a full, complete and irrevocable release; I undertake to bear full legal, financial and penal responsibility should any claim be made by me subsequently contrary to this declaration.' ?></p>
+        <p><?= $FR ? 'Je renonce également, de manière définitive, irrévocable et globale, à tout droit, action ou réclamation que je pourrais avoir à l\'encontre de ladite école, de sa direction ou de l\'un quelconque de ses propriétaires ou dirigeants, en vertu de toute loi ou réglementation en vigueur, et je les décharge de toute relation de travail antérieure ayant existé entre nous, décharge totale non susceptible d\'annulation ni de rétractation.' : 'I also waive, finally, irrevocably and comprehensively, any right, action or claim that I may have against the said school, its administration or any of its owners or directors, under any applicable law or regulation, and I release them from any previous employment relationship that existed between us, a full release not subject to annulment or withdrawal.' ?></p>
+        <p><?= $FR ? 'La présente déclaration et décharge a été établie volontairement, de mon plein gré, sans pression ni contrainte.' : 'This declaration and release has been made voluntarily, of my own free will, without pressure or coercion.' ?></p>
+        <div style="display:flex;justify-content:space-between;margin-top:40px">
+          <div><?= $FR ? 'Fait le' : 'Done on' ?> : <?= $effFmt ?></div>
+          <div style="text-align:center"><strong><?= $FR ? 'Nom et signature' : 'Name and signature' ?></strong><br><?= e($nomFr) ?><div style="margin-top:34px;border-top:1px solid #333;width:220px"></div></div>
+        </div>
+
+        <?php elseif ($type === 'iqrar'): $iqEndYear = $syStart + 2; ?>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Déclaration' : 'Declaration' ?></h2>
+        <p><?= $FR ? 'Je soussigné(e),' : 'I, the undersigned,' ?></p>
+        <p><?= $FR ? 'Nom complet' : 'Full name' ?> : <strong><?= e($nomFr) ?></strong></p>
+        <p><?= $FR ? 'ai contracté avec l\'école' : 'contracted with' ?> : <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'pour l\'année scolaire' : 'for the academic year' ?> : <strong><?= $nextSY ?></strong> <?= $FR ? 'en qualité de' : 'as' ?> <strong><?= e($funcLat) ?></strong>.</p>
+        <p><?= $FR ? 'Je déclare avoir été informé(e) par l\'administration de l\'école que, en raison des circonstances économiques difficiles, je percevrai au cours de l\'année scolaire' : 'I declare that I have been informed by the school administration that, due to the pressing economic circumstances, I will receive during the academic year' ?> <strong><?= $nextSY ?></strong> <?= $FR ? 'des subventions financières d\'une valeur de' : 'financial grants amounting to' ?> <?= $grant>0 ? '<strong>'.number_format($grant).'</strong>' : $blank(110) ?> USD ( <?= $grant>0 ? '<strong>'.e($FR ? numToFrenchWords($grant) : numToEnglishWords($grant)).'</strong>' : $blank(150) ?> <?= $FR ? 'dollars américains' : 'US Dollars' ?> ), <?= $FR ? 'ou dont la valeur, les échéances et les modalités de paiement seront fixées par l\'administration de l\'école de manière unilatérale.' : 'or whose value, timing and method of payment shall be determined by the school administration unilaterally.' ?></p>
+        <p><?= $FR ? 'Je reconnais en conséquence que les subventions financières que je percevrai durant l\'année scolaire' : 'I therefore acknowledge that the financial grants I will receive during the academic year' ?> <strong><?= $nextSY ?></strong> <?= $FR ? 'constituent, à titre exceptionnel, des subventions spéciales et une aide financière occasionnelle et circonstancielle, versées exceptionnellement selon l\'appréciation unilatérale de l\'administration de l\'école, compte tenu des conditions économiques et de vie difficiles et évolutives.' : 'constitute, exceptionally, special grants and an occasional, circumstantial financial aid, paid exceptionally at the sole discretion of the school administration, given the difficult and evolving economic and living conditions.' ?></p>
+        <p><?= $FR ? 'Je reconnais également que ces subventions ne font pas partie des éléments du salaire mensuel versé et déclaré à toutes les autorités compétentes, qu\'aucun principe de constance et de répétition ne saurait être invoqué à ce titre, pour quelque raison que ce soit, pour les considérer comme un élément du salaire, et qu\'aucun droit financier, indemnitaire ou contractuel n\'en découle à l\'égard de l\'école.' : 'I also acknowledge that these grants do not form part of the monthly salary paid and declared to all competent authorities, that no principle of consistency and repetition may be invoked in this respect, for any reason whatsoever, to consider them a salary component, and that no financial, compensatory or contractual rights arise therefrom towards the school.' ?></p>
+        <p><?= $FR ? 'En conséquence, l\'administration de l\'école est en droit, de sa seule volonté, de cesser le versement de ces subventions ou d\'en modifier la valeur, à tout moment qu\'elle jugera opportun, sans qu\'aucune responsabilité juridique ou financière n\'en résulte pour elle.' : 'Accordingly, the school administration is entitled, at its sole discretion, to stop paying these grants or to modify their value, at any time it deems appropriate, without incurring any legal or financial liability as a result.' ?></p>
+        <p><?= $FR ? 'Je déclare et confirme en outre, par la présente, mon engagement de ne pas quitter l\'enseignement à :' : 'I further declare and confirm, hereby, my commitment not to leave teaching at:' ?></p>
+        <p><?= $FR ? 'l\'école' : '' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'durant l\'année scolaire' : 'during the academic year' ?> <strong><?= $nextSY ?></strong>.</p>
+        <p><?= $FR ? 'Et ce à compter de la date de la présente déclaration et jusqu\'au 30 juin' : 'This applies from the date of this declaration until 30 June' ?> <strong><?= $iqEndYear ?></strong>. <?= $FR ? 'Je suis conscient(e) que tout manquement à cet engagement peut m\'exposer aux dommages-intérêts prévus à l\'article 30 de la loi sur le corps enseignant du 15/6/1956 (aucun membre du corps enseignant n\'a le droit de quitter le travail au cours de l\'année scolaire, sous peine de dommages-intérêts équivalant au double de ses salaires et accessoires pour la période restante de l\'année scolaire).' : 'I am aware that any breach of this commitment may expose me to the damages provided for in Article 30 of the Teaching Staff Law of 15/6/1956 (no member of the teaching staff may leave work during the school year, under penalty of damages equal to double his salaries and accessories for the remaining period of the school year).' ?></p>
+        <p><?= $FR ? 'En conséquence, en pleine capacité juridique, je signe la présente déclaration, m\'engageant à en respecter totalement et intégralement le contenu, et assumant toute responsabilité financière, juridique, pénale ou civile en cas de violation de ses termes.' : 'Therefore, with full legal capacity, I sign this declaration, undertaking to fully and completely abide by its content, and bearing any financial, legal, penal or civil liability in the event of my violation of its terms.' ?></p>
+        <div style="display:flex;justify-content:space-between;margin-top:40px">
+          <div><?= $FR ? 'Fait le' : 'Done on' ?> : <?= $effFmt ?></div>
+          <div style="text-align:center"><strong><?= $FR ? 'Nom et signature' : 'Name and signature' ?></strong><br><?= e($nomFr) ?><div style="margin-top:34px;border-top:1px solid #333;width:220px"></div></div>
+        </div>
+
+        <?php elseif ($type === 'notice_school' || $type === 'notice_mail'):
+          $subjLat = ($subjectTxt === 'الإهمال في حفظ النظام والتربية')
+              ? ($FR ? 'la négligence dans le maintien de l\'ordre et de la discipline' : 'negligence in maintaining order and discipline')
+              : $subjectTxt; ?>
+        <?php if ($type === 'notice_mail'): ?>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:10px">
+          <div style="text-align:left"><?php if ($showLogo && $logoImg): ?><?= $logoImg ?><br><?php endif; ?>
+            <strong style="font-size:15px"><?= e($schoolNameFr) ?></strong>
+            <?= $cityFr ? '<br><small>' . e($cityFr) . '</small>' : '' ?>
+            <?= $schoolPhone ? '<br><small>Tel : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '' ?>
+          </div>
+          <div style="text-align:right;font-weight:700;font-size:13px;line-height:1.7"><?= $FR ? 'Carte découverte<br>avec accusé de réception<br>Recommandée' : 'Open card<br>with acknowledgment of receipt<br>Registered' ?></div>
+        </div>
+        <div style="border:1px solid #bbb;padding:8px 12px;line-height:1.95;margin-bottom:14px">
+          <p style="margin:2px 0"><?= $FR ? 'De' : 'From' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
+          <p style="margin:2px 0"><?= $FR ? 'À' : 'To' ?> : <strong><?= e($nomFr) ?></strong></p>
+          <p style="margin:2px 0"><?= $FR ? 'Adresse' : 'Address' ?> : <?= $addr !== '' ? '<strong>' . e($addr) . '</strong>' : $blank(320) ?></p>
+          <p style="margin:2px 0"><?= $FR ? 'Tél' : 'Phone' ?> : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong><span dir="ltr">' . e($emp['phone1']) . '</span></strong>' : $blank(150) ?></p>
+        </div>
+        <?php endif; ?>
+        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline"><?= $FR ? 'Avertissement' : 'Warning' ?></h2>
+        <p><?= $FR ? 'Cher(ère) Professeur(e)' : 'Dear Teacher' ?> : <strong><?= e($nomFr) ?></strong></p>
+        <p><?= $FR ? 'Objet' : 'Subject' ?> : <strong><?= e($subjLat) ?></strong>.</p>
+        <p><?= $FR ? 'Référence' : 'Reference' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
+        <p><?= $FR ? 'Après vos manquements répétés concernant' : 'Further to your repeated' ?> <?= e($subjLat) ?>, <?= $FR ? 'et conformément à l\'article 26 (tel que modifié par la loi n° 44/87 du 21/11/1987) : si un membre du corps enseignant ou administratif néglige ses devoirs de maintien de l\'ordre et de la discipline, commet une infraction aux dispositions de ladite loi, s\'absente sans excuse légitime, ou se conduit d\'une manière portant atteinte à la réputation de l\'école ou au bon déroulement du travail, il s\'expose aux sanctions prévues par la loi.' : 'and in accordance with Article 26 (as amended by Law No. 44/87 of 21/11/1987): if a member of the teaching or administrative staff neglects his duties of maintaining order and discipline, violates the provisions of the said law, is absent without legitimate excuse, or behaves in a manner harmful to the school\'s reputation or the orderly conduct of work, he shall be subject to the penalties provided by law.' ?></p>
+        <p style="text-align:center;font-weight:700"><?= $FR ? 'En conséquence' : 'Therefore' ?></p>
+        <p><?= $FR ? 'l\'administration de l\'école attire votre attention sur la nécessité de ne pas récidiver, afin de ne pas être contrainte, à regret, d\'appliquer à votre égard les lois en vigueur.' : 'the school administration draws your attention to the necessity of not repeating this, so as not to be compelled, regretfully, to apply the laws in force against you.' ?></p>
+        <p><?= $FR ? 'Merci.' : 'Thank you.' ?></p>
+        <div style="display:flex;justify-content:space-between;margin-top:34px">
+          <div><?= $FR ? 'Le' : 'On' ?> : <?= $effFmt ?></div>
+          <div style="text-align:center"><strong><?= $FR ? 'La Directrice de l\'école' : 'The School Principal' ?></strong><div style="margin-top:38px;border-top:1px solid #333;width:200px"></div></div>
+        </div>
+        <?php if ($type === 'notice_school'): ?>
+        <div style="margin-top:30px;border-top:1px dashed #999;padding-top:10px">
+          <p><?= $FR ? 'J\'ai reçu la lettre dont le contenu figure ci-dessus,' : 'I have received the letter whose content appears above,' ?></p>
+          <p><?= $FR ? 'Le/La Professeur(e)' : 'The Teacher' ?> : <?= $blank(220) ?></p>
+          <p>Signature : <?= $blank(220) ?></p>
+        </div>
+        <?php endif; ?>
+
+        <?php elseif ($type === 'aqd_taalim'):
+        $cExtra  = $incExtra ? $extraW : 0;
+        $cAide   = $incAide  ? $aideW  : 0;
+        $cTrans  = $sal ? (int)$sal['transport_lbp'] : 0;
+        $cFamily = $sal ? (int)$sal['family_allowance_lbp'] : 0;
+        $cTotal  = (int)round($basePlusEch) + $cExtra + $cAide + $cTrans + $cFamily;
+        $cDailyTrans = (float)($emp['transport_daily_amount'] ?? 0);
+        $cDailyStr = $cDailyTrans > 0
+            ? ((($emp['transport_daily_currency'] ?? 'LBP') === 'USD')
+                ? ('$' . rtrim(rtrim(number_format($cDailyTrans, 2), '0'), '.'))
+                : (number_format($cDailyTrans) . ' LBP'))
+            : '';
+        $natLat = $FR ? (in_array(mb_strtolower((string)($emp['nationality'] ?? '')), ['lebanese','lebanaise','libanaise','لبنانية','لبناني']) ? 'libanaise' : (string)($emp['nationality'] ?? '')) : (in_array(mb_strtolower((string)($emp['nationality'] ?? '')), ['lebanese','lebanaise','libanaise','لبنانية','لبناني']) ? 'Lebanese' : (string)($emp['nationality'] ?? ''));
+        ?>
+        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline"><?= $FR ? 'Contrat d\'enseignement' : 'Teaching Contract' ?></h2>
+        <p><?= $FR ? 'Entre l\'école' : 'Between' ?> : <strong><?= e($schoolNameFr) ?></strong> &nbsp; <?= $FR ? 'représentée par' : 'represented by' ?> : <?= $directorFr ? '<strong>'.e($directorFr).'</strong>' : $blank(150) ?> &nbsp; ( <strong><?= $FR ? 'Première partie' : 'First party' ?></strong> )</p>
+        <p><?= $FR ? 'et M./Mme/Mlle' : 'and Mr./Mrs./Miss' ?> : <strong><?= e($nomFr) ?></strong> &nbsp; <?= $FR ? 'de nationalité' : 'of nationality' ?> : <?= $vb($natLat, 90) ?> &nbsp; ( <strong><?= $FR ? 'Seconde partie' : 'Second party' ?></strong> )</p>
+        <p><?= $FR ? 'né(e) le' : 'born on' ?> : <strong><?= $dob ?></strong> &nbsp; <?= $FR ? 'à' : 'in' ?> : <strong><?= $bplace ?></strong> &nbsp; <?= $FR ? 'domicile' : 'residence' ?> : <?= $vb($emp['ville'] ?? '', 110) ?> &nbsp; <?= $FR ? 'registre n°' : 'registry No.' ?> : <?= $vb($regNo, 90) ?></p>
+        <p><?= $FR ? 'demeurant à l\'adresse suivante' : 'residing at the following address' ?> : &nbsp; <?= $FR ? 'hiver' : 'winter' ?> : <?= $vb($addr, 170) ?> <?= $FR ? 'tél' : 'phone' ?> <?= $phone1 ?> &nbsp;&nbsp; <?= $FR ? 'été' : 'summer' ?> : <?= $blank(120) ?> <?= $FR ? 'tél' : 'phone' ?> <?= $vb($emp['phone2'] ?? '', 90) ?></p>
+        <p><?= $FR ? 'En date du' : 'On' ?> : <strong><?= $effFmt ?></strong> <?= $FR ? 'il a été convenu entre les deux parties susmentionnées ce qui suit :' : 'it has been agreed between the two above-mentioned parties as follows:' ?></p>
+
+        <p style="margin-top:10px"><strong><?= $FR ? 'Article premier' : 'Article One' ?> :</strong> <?= $FR ? 'La seconde partie déclare :' : 'The second party declares:' ?></p>
+        <p><strong>1/1 ـ</strong> <?= $FR ? 'être titulaire des diplômes officiels suivants :' : 'to hold the following official diplomas:' ?></p>
+        <p style="margin-left:26px">1 ـ <?= $vb($dipFr, 150) ?> <?= $FR ? 'délivré par' : 'issued by' ?> : <?= $blank(150) ?> <?= $FR ? 'année' : 'year' ?> <?= $blank(60) ?></p>
+        <p style="margin-left:26px">2 ـ <?= $blank(150) ?> <?= $FR ? 'délivré par' : 'issued by' ?> : <?= $blank(150) ?> <?= $FR ? 'année' : 'year' ?> <?= $blank(60) ?></p>
+        <p><strong>2/1 ـ</strong> <?= $FR ? 'avoir suivi les sessions de formation et de qualification suivantes :' : 'to have followed the following training and qualification courses:' ?></p>
+        <p style="margin-left:26px">1 ـ <?= $blank(150) ?> <?= $FR ? 'à' : 'at' ?> : <?= $blank(150) ?> <?= $FR ? 'année' : 'year' ?> <?= $blank(60) ?></p>
+        <p style="margin-left:26px">2 ـ <?= $blank(150) ?> <?= $FR ? 'à' : 'at' ?> : <?= $blank(150) ?> <?= $FR ? 'année' : 'year' ?> <?= $blank(60) ?></p>
+        <p><strong>3/1 ـ</strong> <?= $FR ? 'avoir exercé l\'enseignement à :' : 'to have taught at:' ?></p>
+        <p style="margin-left:26px">1 ـ <?= $FR ? 'école' : 'school' ?> : <?= $blank(120) ?> <?= $FR ? 'de' : 'from' ?> <?= $blank(70) ?> <?= $FR ? 'à' : 'to' ?> <?= $blank(70) ?> <?= $FR ? 'classes' : 'classes' ?> <?= $blank(90) ?> <?= $FR ? 'matière' : 'subject' ?> <?= $blank(90) ?></p>
+        <p style="margin-left:26px">2 ـ <?= $FR ? 'école' : 'school' ?> : <?= $blank(120) ?> <?= $FR ? 'de' : 'from' ?> <?= $blank(70) ?> <?= $FR ? 'à' : 'to' ?> <?= $blank(70) ?> <?= $FR ? 'classes' : 'classes' ?> <?= $blank(90) ?> <?= $FR ? 'matière' : 'subject' ?> <?= $blank(90) ?></p>
+        <p><strong>4/1 ـ</strong> <?= $FR ? 'exercer actuellement l\'enseignement à :' : 'to currently teach at:' ?></p>
+        <p style="margin-left:26px">1 ـ <?= $FR ? 'école' : 'school' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'en qualité de' : 'as' ?> <?= $box($isContr) ?> <?= $FR ? 'contractuel(le)' : 'contractual' ?> <?= $box($isTit) ?> <?= $FR ? 'cadré(e)' : 'permanent staff' ?> &nbsp; <?= $FR ? 'nombre d\'heures' : 'number of hours' ?> <?= $vb($hpw, 60) ?></p>
+        <p style="margin-left:26px">2 ـ <?= $FR ? 'école' : 'school' ?> <?= $blank(120) ?> <?= $FR ? 'en qualité de' : 'as' ?> <?= $chk ?> <?= $FR ? 'contractuel(le)' : 'contractual' ?> <?= $chk ?> <?= $FR ? 'cadré(e)' : 'permanent staff' ?> &nbsp; <?= $FR ? 'nombre d\'heures' : 'number of hours' ?> <?= $blank(60) ?></p>
+        <p><strong>5/1 ـ</strong> <?= $FR ? 'remplir les conditions générales requises pour l\'exercice de l\'enseignement (définies par le décret-loi 59/112 : civiles, sanitaires, .....)' : 'to meet the general conditions required for the practice of teaching (defined by Legislative Decree 59/112: civil, health, .....)' ?></p>
+        <p><strong>6/1 ـ</strong> <?= $FR ? 'être disposé(e) à suivre les sessions de qualification organisées par l\'école, qui en détermine le sujet, la durée, le lieu et l\'horaire.' : 'to be prepared to attend the qualification sessions organized by the school, which determines their subject, duration, place and time.' ?></p>
+        <p><strong>7/1 ـ</strong> <?= $FR ? 'être' : 'to be' ?> : <?= $box(!$isMarried) ?> <?= $FR ? 'célibataire' : 'single' ?> <?= $box($isMarried) ?> <?= $FR ? 'marié(e)' : 'married' ?> <?= $box(false) ?> <?= $FR ? 'veuf(ve)' : 'widowed' ?> <?= $box(false) ?> <?= $FR ? 'divorcé(e)' : 'divorced' ?> &nbsp; <?= $FR ? 'nombre d\'enfants à charge' : 'number of dependent children' ?> : <?= $vb((string)$nKids, 60) ?></p>
+        <p><strong>8/1 ـ</strong> <?= $FR ? 'que le conjoint' : 'that the spouse' ?> <?= $box(!$spouseWorks) ?> <?= $FR ? 'n\'exerce pas' : 'does not perform' ?> <?= $box((bool)$spouseWorks) ?> <?= $FR ? 'exerce un travail rémunéré (nom de l\'institution)' : 'performs paid work (name of institution)' ?> : <?= $blank(150) ?></p>
+        <p><strong>9/1 ـ</strong> <?= $FR ? 'avoir une connaissance suffisante des programmes officiels et de leurs objectifs.' : 'to be well acquainted with the official curricula and their objectives.' ?></p>
+        <p><strong>10/1 ـ</strong> <?= $FR ? 'savoir pleinement que l\'école est une école catholique attachée aux directives et enseignements de l\'Église visant la formation spirituelle, humaine, scientifique et patriotique de l\'élève, en coopération avec les parents et le corps enseignant, conformément au règlement particulier établi par l\'école régissant les relations éducatives, pédagogiques et administratives entre toutes les parties concernées.' : 'to be fully aware that the school is a Catholic school committed to the directives and teachings of the Church aiming at the spiritual, human, scientific and patriotic formation of the student, in cooperation with the parents and the teaching staff, in accordance with the special regulations established by the school governing the educational and administrative relations between all concerned.' ?></p>
+        <p><strong>11/1 ـ</strong> <?= $FR ? 's\'engager à remettre à la première partie les documents justificatifs de ses déclarations dans un délai maximal de' : 'to undertake to submit to the first party the documents supporting his/her declarations within a maximum period of' ?> <?= $blank(120) ?></p>
+
+        <p style="margin-top:10px"><strong><?= $FR ? 'Article 2' : 'Article Two' ?> :</strong> <?= $FR ? 'La première partie engage la seconde partie pour enseigner durant l\'année scolaire' : 'The first party contracts the second party to teach during the academic year' ?> : <strong><?= $nextSY ?></strong></p>
+        <p style="margin-left:26px">ـ <?= $FR ? 'en qualité de' : 'in the capacity of' ?> : <?= $chk ?> <?= $FR ? 'puéricultrice' : 'nursery teacher' ?> <?= $chk ?> <?= $FR ? 'instituteur(trice)' : 'instructor' ?> <?= $chk ?> <?= $FR ? 'maître(sse)' : 'teacher' ?> <?= $chk ?> <?= $FR ? 'professeur du secondaire' : 'secondary teacher' ?> <?= $box(false) ?> <?= $FR ? 'stagiaire' : 'trainee' ?> <?= $box($isContr) ?> <?= $FR ? 'contractuel(le)' : 'contractual' ?></p>
+        <p style="margin-left:26px">ـ <?= $FR ? 'nombre d\'heures d\'enseignement effectif par semaine' : 'number of actual teaching hours per week' ?> : <?= $vb($hpw, 70) ?> &nbsp; <?= $FR ? 'niveau' : 'level' ?> : <?= $vb($niveau, 110) ?> &nbsp; <?= $FR ? 'matière' : 'subject' ?> : <?= $vb($subj, 110) ?></p>
+        <p style="margin-left:26px">ـ <?= $FR ? 'nombre d\'heures de décharge consacrées aux activités parascolaires' : 'number of reduced hours allocated to extracurricular activities' ?> : <?= $blank(70) ?></p>
+
+        <p style="margin-top:10px"><strong><?= $FR ? 'Article 3' : 'Article Three' ?> :</strong> <?= $FR ? 'La première partie verse mensuellement à la seconde partie, en contrepartie des missions d\'enseignement qui lui sont confiées :' : 'The first party shall pay the second party monthly, in consideration of the teaching duties entrusted to him/her:' ?></p>
+        <p style="margin-left:26px"><strong>1/3 ـ</strong> <?= $FR ? 'Salaire de base' : 'Basic salary' ?> : <strong><?= (int)round($basePlusEch) > 0 ? $moneyLat((int)$basePlusEch) : $blank(120) ?></strong> &nbsp; ( <?= $FR ? 'salaire légal' : 'legal wage' ?> )</p>
+        <p style="margin-left:26px"><strong>2/3 ـ</strong> <?= $FR ? 'Indemnité financière (loi 99/148)' : 'Financial allowance (Law 99/148)' ?> : <?= $blank(120) ?></p>
+        <p style="margin-left:26px"><strong>3/3 ـ</strong> <?= $FR ? 'Heures supplémentaires' : 'Overtime hours' ?> : <?= $blank(120) ?></p>
+        <p style="margin-left:26px"><strong>4/3 ـ</strong> <?= $FR ? 'Indemnité supplémentaire à titre de prime' : 'Additional allowance as bonus' ?> : <?= $cAide > 0 ? '<strong>'.$moneyLat($cAide).'</strong>' : $blank(120) ?></p>
+        <p style="margin-left:26px"><strong>5/3 ـ</strong> <?= $FR ? 'Indemnité de transport provisoire' : 'Temporary transport allowance' ?> : <?php
+            $t53 = [];
+            if ($cDailyStr !== '') $t53[] = '<strong>' . $cDailyStr . '</strong> ' . ($FR ? 'par jour' : 'per day');
+            if ($cTrans > 0) $t53[] = '<strong>' . $moneyLat($cTrans) . '</strong> ' . ($FR ? 'par mois' : 'per month');
+            echo $t53 ? implode(' &nbsp;,&nbsp; ', $t53) : $blank(120);
+        ?></p>
+        <p style="margin-left:26px"><strong>6/3 ـ</strong> <?= $FR ? 'Allocations familiales' : 'Family allowances' ?> : <?= $cFamily > 0 ? '<strong>'.$moneyLat($cFamily).'</strong>' : $blank(120) ?> ( <?= $FR ? 'le cas échéant' : 'if applicable' ?> )</p>
+        <p style="margin-left:26px"><strong>Total :</strong> <strong><?= $moneyLat($cTotal) ?></strong> <?= $FR ? 'soit' : 'i.e.' ?> : <strong><?= e($wordsLat($cTotal)) ?></strong></p>
+        <p style="margin-left:26px"><strong><?= $FR ? 'Montant convenu' : 'Agreed amount' ?> :</strong> <?php
+            $agreed = [];
+            if ($aqdLbp > 0) $agreed[] = '<strong>' . number_format($aqdLbp) . ' LBP</strong> ' . ($FR ? 'soit ' : 'say ') . e($FR ? numToFrenchWords($aqdLbp) . ' livres libanaises uniquement' : numToEnglishWords($aqdLbp) . ' Lebanese Pounds only');
+            if ($aqdUsd > 0) $agreed[] = '<strong>$' . number_format($aqdUsd) . '</strong> ' . ($FR ? 'soit ' : 'say ') . e($FR ? numToFrenchWords($aqdUsd) . ' dollars américains uniquement' : numToEnglishWords($aqdUsd) . ' US Dollars only');
+            echo $agreed ? implode(' &nbsp;' . ($FR ? 'et' : 'and') . '&nbsp; ', $agreed) : $blank(240);
+        ?></p>
+        <p><?= $FR ? 'Sont retenues sur les droits de la seconde partie les sommes mensuelles légalement dues à la Caisse d\'indemnités, à la Caisse Nationale de Sécurité Sociale, au Ministère des Finances et au titre des timbres, que la première partie verse aux autorités compétentes sous sa responsabilité.' : 'The monthly amounts legally due to the Compensation Fund, the National Social Security Fund, the Ministry of Finance and stamp duties shall be withheld from the second party\'s dues and paid by the first party to the competent authorities under its responsibility.' ?></p>
+
+        <p style="margin-top:10px"><strong><?= $FR ? 'Conditions particulières' : 'Special Conditions' ?></strong></p>
+        <p><strong>1 ـ</strong> <?= $FR ? 'La première partie se réserve la fixation des heures d\'enseignement dans le cadre de l\'horaire scolaire au plus tard fin octobre, compte tenu des dispositions particulières relatives au corps enseignant du cycle secondaire ; elle peut modifier ces horaires si la bonne marche de l\'école l\'exige, sans que la seconde partie puisse s\'y opposer, à condition qu\'il n\'en résulte pas pour elle des heures supplémentaires.' : 'The first party reserves the right to set the teaching hours within the school schedule no later than the end of October, taking into account the special provisions relating to secondary-cycle teachers; it may modify these schedules if the proper functioning of the school so requires, without objection from the second party, provided no additional working hours result therefrom.' ?></p>
+        <p><strong>2 ـ</strong> <?= $FR ? 'La seconde partie doit respecter l\'horaire qui lui est assigné et ne peut s\'absenter sans excuse légitime au regard des articles 23, 24 et 25 nouveaux de la loi du 15-6-1956 ; l\'école se réserve le droit de prendre les sanctions appropriées prévues limitativement à l\'article 26 de la même loi, au vu des conséquences de la durée de l\'absence légitime.' : 'The second party must abide by the assigned schedule and may not be absent without legitimate excuse under the new Articles 23, 24 and 25 of the Law of 15-6-1956; the school reserves the right to take the appropriate sanctions exhaustively provided for in Article 26 of the same law, in light of the consequences of the duration of the legitimate absence.' ?></p>
+        <p><strong>3 ـ</strong> <?= $FR ? 'La seconde partie s\'engage à suivre toutes les directives éducatives et pédagogiques arrêtées par la première partie, à assister aux réunions et discussions de toute nature, à participer effectivement aux examens scolaires et à leur surveillance et à coopérer pleinement à leur bon déroulement, aux moments fixés par l\'administration pendant ou en dehors de l\'horaire ; les dispositions de l\'article 26 de la loi du 15-6-1956 s\'appliquent à toute violation de la présente clause.' : 'The second party undertakes to follow all educational directives set by the first party, to attend meetings and discussions of all kinds, to participate effectively in school examinations and their supervision and to cooperate fully in their proper conduct, at the times set by the administration during or outside working hours; the provisions of Article 26 of the Law of 15-6-1956 apply to any breach of this clause.' ?></p>
+        <p><strong>4 ـ</strong> <?= $FR ? 'La seconde partie s\'engage à respecter les programmes officiels et propres à l\'école et à ne porter atteinte ni à l\'école, ni à ses élèves, ni à ses collègues, pendant son travail comme en dehors de l\'école ; en cas de manquement, les sanctions prévues à l\'article 26 précité lui sont applicables.' : 'The second party undertakes to abide by the official and school-specific curricula and not to harm the school, its students or colleagues, during work or outside the school; in case of breach, the penalties provided for in the aforementioned Article 26 shall apply.' ?></p>
+        <p><strong>5 ـ</strong> <?= $FR ? 'La seconde partie prend acte des attributions confiées à la direction des études, aux coordinateurs et aux surveillants généraux conformément au règlement intérieur de l\'école. L\'administration fonde son évaluation du travail de la seconde partie sur les rapports établis par la direction des études, les coordinateurs et les surveillants généraux, à condition qu\'ils lui soient communiqués ; les rapports émanant du comité des parents, des parents d\'élèves ou des élèves eux-mêmes sont également pris en considération dans l\'évaluation du dossier de la seconde partie et la détermination des primes et mesures objet de la clause 3/3.' : 'The second party takes note of the powers vested in the academic direction, the coordinators and the general supervisors in accordance with the school\'s internal regulations. The administration bases its evaluation of the second party\'s work on the reports drawn up by the academic direction, the coordinators and the general supervisors, provided they are communicated to him/her; reports from the parents\' committee, parents or students themselves are also taken into consideration in evaluating the second party\'s file and determining the bonuses and measures under clause 3/3.' ?></p>
+        <p><strong>6 ـ</strong> <?= $FR ? 'Les notifications sont effectuées par le secrétariat de l\'école, qui reçoit tout recours à ce sujet ; en cas de refus de notification, la seconde partie est réputée dûment notifiée par procès-verbal établi par le secrétariat, sur la base duquel il est procédé conformément à la loi. Ces règles font partie intégrante du présent contrat et lient les deux parties pour assurer la bonne marche du travail éducatif.' : 'Notifications are made through the school secretariat, which receives any petition in this regard; in case of refusal of notification, the second party is deemed duly notified by minutes drawn up by the secretariat, on the basis of which legal action is taken. These rules form an integral part of this contract and bind both parties to ensure the proper conduct of the educational work.' ?></p>
+        <p><strong>7 ـ</strong> <?= $FR ? 'Le présent contrat est résilié « de plein droit » aux torts de la seconde partie si elle manque à ses obligations et s\'absente de l\'école pendant quinze jours sans excuse légitime ; la seconde partie doit alors indemniser la première partie conformément à la loi, notamment l\'article 30 de la loi du 15-6-1956 et ses amendements.' : 'This contract is terminated "ipso facto" at the fault of the second party if he/she fails in his/her obligations and is absent from the school for fifteen days without legitimate excuse; the second party must then compensate the first party in accordance with the law, in particular Article 30 of the Law of 15-6-1956 as amended.' ?></p>
+        <p><strong>8 ـ</strong> <?= $FR ? 'La première partie peut résilier le contrat des stagiaires ou des nouveaux contractuels avant le quinze février si l\'incompétence scientifique ou comportementale de la seconde partie, ou son incapacité à maintenir la discipline, est établie ; ses salaires sont payés jusqu\'à la date du licenciement.' : 'The first party may terminate the contract of trainees or new contractual staff before the fifteenth of February if the second party\'s scientific or behavioral incompetence, or inability to maintain discipline, is established; his/her salaries shall be paid up to the date of dismissal.' ?></p>
+        <p><strong>9 ـ</strong> <?= $FR ? 'La seconde partie ne peut quitter le travail à l\'école avant la fin de l\'année scolaire sans l\'accord de la première partie, sous peine des dommages-intérêts visés à l\'article 30 de la loi du 15-6-1956.' : 'The second party may not leave work at the school before the end of the school year without the first party\'s consent, under penalty of the damages referred to in Article 30 of the Law of 15-6-1956.' ?></p>
+        <p><strong>10 ـ</strong> <?= $FR ? 'La première partie peut imposer à la seconde partie, sans contrepartie, des heures supplémentaires pour achever le programme que cette dernière a établi et déposé auprès de l\'administration en début d\'année.' : 'The first party may impose on the second party, without consideration, additional hours to complete the curriculum which the latter established and filed with the administration at the beginning of the year.' ?></p>
+        <p><strong>11 ـ</strong> <?= $FR ? 'La seconde partie s\'engage à respecter les échéances relatives à la répartition annuelle des cours et à leur préparation, à la remise des questions des devoirs hebdomadaires et des examens, à leur correction et à leur restitution sans délai aux responsables, aux dates fixées par l\'administration.' : 'The second party undertakes to respect the deadlines relating to the annual distribution of lessons and their preparation, the submission of weekly assignment and examination questions, their correction and their return without delay to those in charge, on the dates set by the administration.' ?></p>
+        <p><strong>12 ـ</strong> <?= $FR ? 'La seconde partie reste liée à l\'administration de l\'école pendant un mois des vacances d\'été, fixé par le chef d\'établissement avant la fin de l\'année scolaire ; elle doit répondre à toute convocation durant ce mois dans les limites de ses devoirs professionnels, à l\'exception de l\'enseignement, et dans le délai fixé par l\'administration (article 22 de la loi du 15-6-1956).' : 'The second party remains bound to the school administration for one month of the summer vacation, to be determined by the head of school before the end of the school year; he/she must respond to any summons during this month within the limits of his/her professional duties, excluding teaching, and within the period set by the administration (Article 22 of the Law of 15-6-1956).' ?></p>
+        <p><strong>13 ـ</strong> <?= $FR ? 'Le présent contrat est réputé suspendu si son exécution devient impossible pour toute cause indépendante de la volonté des deux parties et que cette impossibilité persiste trois mois à compter de la suspension ; dans ce cas, la seconde partie a droit au salaire entier du premier mois et à la moitié du salaire des deux mois suivants. L\'impossibilité comprend, à titre d\'exemple non limitatif, les troubles, les guerres et les mesures de l\'État ; aucun droit d\'aucune sorte ne naît pour l\'une des parties à l\'égard de l\'autre à compter de la suspension de l\'exécution du présent contrat.' : 'This contract is deemed suspended if its performance becomes impossible for any cause beyond the control of both parties and such impossibility persists for three months from the suspension; in this case, the second party is entitled to the full salary of the first month and half the salary of the following two months. Impossibility includes, by way of non-limiting example, unrest, wars and State measures; no rights of any kind arise for either party towards the other as from the suspension of the performance of this contract.' ?></p>
+        <p><strong>14 ـ</strong> <?= $FR ? 'Pour toutes les matières non mentionnées aux articles précédents, les dispositions des lois en vigueur s\'appliquent, notamment la loi du 15-6-1956 et les lois relatives à l\'organisation du budget scolaire.' : 'In all matters not mentioned in the preceding articles, the provisions of the laws in force shall apply, in particular the Law of 15-6-1956 and the laws relating to the organization of the school budget.' ?></p>
+        <p><strong>15 ـ</strong> <?= $FR ? 'Le présent contrat s\'applique du' : 'This contract applies from' ?> <?= $blank(90) ?> <?= $FR ? 'au' : 'to' ?> <?= $blank(90) ?>, <?= $FR ? 'et se renouvelle automatiquement sous réserve des dispositions des articles 29 nouveau et 30 de la loi du 15-6-1956.' : 'and is automatically renewed subject to the provisions of the new Article 29 and Article 30 of the Law of 15-6-1956.' ?></p>
+        <p style="text-align:center;margin-top:14px"><?= $FR ? 'Le présent contrat a été établi en deux exemplaires originaux, chaque partie en ayant reçu un pour s\'y conformer.' : 'This contract has been drawn up in two original copies, each party having received one to abide by.' ?></p>
+        <p style="text-align:center"><?= $FR ? 'Le' : 'On' ?> : <?= $effFmt ?></p>
+        <div style="display:flex;justify-content:space-between;margin-top:30px">
+          <div style="text-align:center"><strong><?= $FR ? 'Première partie' : 'First party' ?></strong><div style="margin-top:40px;border-top:1px solid #333;width:200px"></div></div>
+          <div style="text-align:center"><strong><?= $FR ? 'Seconde partie' : 'Second party' ?></strong><div style="margin-top:40px;border-top:1px solid #333;width:200px"></div></div>
+        </div>
+        <?php endif; ?>
+
+        </div>
+      <?php elseif ($type === 'salaire'): ?>
         <?php // 🧾 «بدي إفادة الراتب بدون تابلو» (2026-08-20): تفصيل الراتب سطوراً لا جدولاً —
               // والأساس وحده مختاراً = جملة واحدة بالمبلغ بلا تفصيل
         $salParts = [];

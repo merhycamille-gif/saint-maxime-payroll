@@ -412,6 +412,33 @@ if ($regEid) {
           && strpos($attSrc, 'name="emb_cur"') !== false && strpos($attSrc, 'name="emb_per"') !== false
           && numToEnglishWords(90000000) === 'Ninety Million'
           && numToEnglishWords(136445000) === 'One Hundred Thirty-Six Million Four Hundred Forty-Five Thousand');
+    // (2026-08-20) «أي إفادة موجودة أنا اختار دغري بأي لغة وتترجم صح دغري — وبكل المؤسسات»:
+    // كل الإفادات الـ14 لها نسخة فرنسية وإنكليزية كاملة تُختار من أزرار اللغة
+    $latTitles = [
+        'salaire' => ['Attestation de salaire', 'Salary Certificate'],
+        'tadris' => ['Attestation de travail', 'Work'],
+        'cnss' => ['À qui de droit', 'To whom it may concern'],
+        'riaaya' => ['À qui de droit', 'To whom it may concern'],
+        'anhaa_khedme' => ['Lettre de fin de service', 'End-of-Service Letter'],
+        'anhaa_mail' => ['Lettre de fin de service', 'End-of-Service Letter'],
+        'talab_istiqala' => ['Demande de démission', 'Resignation Request'],
+        'afade_madrasiya' => ['Attestation scolaire', 'School Attestation'],
+        'isqat_haq' => ['Renonciation de droits', 'Waiver of Rights'],
+        'baraa_zimma' => ['Quittance', 'Release'],
+        'iqrar' => ['Déclaration', 'Declaration'],
+        'aqd_taalim' => ["Contrat d'enseignement", 'Teaching Contract'],
+        'notice_school' => ['Avertissement', 'Warning'],
+        'notice_mail' => ['Avertissement', 'Warning'],
+    ];
+    $latBad = [];
+    foreach ($latTitles as $lt => $pair) {
+        $hF = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => $lt, 'lang_doc' => 'fr'], []);
+        if (strpos($hF, $pair[0]) === false || strpos($hF, 'FATAL') !== false) $latBad[] = $lt . '/fr';
+        $hE = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => $lt, 'lang_doc' => 'en'], []);
+        if (strpos($hE, $pair[1]) === false || strpos($hE, 'FATAL') !== false) $latBad[] = $lt . '/en';
+    }
+    check('كل الإفادات الـ14 تصدر بالفرنسية والإنكليزية بعناوينها الصحيحة (28 نسخة)',
+          !$latBad, $latBad ? implode(',', $latBad) : '');
     // (2026-08-20) «بدي نفس الإفادة باللغة الفرنسية»: إفادة سفارة فرنسية كاملة بزرّ Français
     // + تفقيط فرنسي صحيح (soixante et onze / quatre-vingts / cents)
     $hEmF = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'embassy', 'lang_doc' => 'fr', 'opts_set' => 1, 'emb_amt' => 1500], []);
@@ -1446,9 +1473,9 @@ check('🖨️ الإفادات صفحة A4 واحدة دائماً (1122px + @p
       && strpos($appCss32, '#ppExportArea { zoom: var(--pz, 1); }') !== false);
 // ✍️ «الامضاء بنهاية الافادة على جنب الورقة مش بالنص» (2026-08-03): توقيع المدير/الإدارة
 // على يسار الورقة (margin-right:auto) بإفادات الراتب/العمل/يهمه الأمر، والسفارة (LTR) يمينها
-check('✍️ إمضاء نهاية الإفادة على جنب الورقة لا في الوسط (3 عربي يسار + سفارة يمين)',
-      substr_count($atSrc32, 'margin:42px auto 0 0') === 3
-      && substr_count($atSrc32, 'margin:42px 0 0 auto') === 1
+check('✍️ إمضاء نهاية الإفادة على جنب الورقة لا في الوسط (عربي يسار + سفارة fr/en يمين)',
+      substr_count($atSrc32, 'margin:42px auto 0 0') >= 3
+      && substr_count($atSrc32, 'margin:42px 0 0 auto') >= 2   // نسختا السفارة (فرنسي + إنكليزي) 2026-08-20
       && strpos($atSrc32, 'text-align:center;margin-top:42px') === false);
 // شعار مكسيموس: إفادات مدارس/مراكز «مكسيموس» تأخذ شعارها الخاص لا شعار م.س.أ الموحّد
 $sMax32 = $db->query("SELECT * FROM schools WHERE id = 2")->fetch();
