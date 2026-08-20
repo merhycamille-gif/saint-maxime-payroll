@@ -401,6 +401,13 @@ if ($regEid) {
           strpos($hAf1, 'للأسباب الآتية : <strong>بلوغ السن القانوني</strong>') !== false
           && strpos($hAf2, 'للأسباب الآتية : <strong>سبب حرّ للتجربة</strong>') !== false
           && strpos($attSrc, "name=\"lv_sel\"") !== false && strpos($attSrc, "name=\"lv_txt\"") !== false);
+    // (2026-08-20) إفادة السفارة: «خيار أنا حط قيمة الراتب بالدولار + شهري أو سنوي»
+    $hEm1 = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'embassy', 'opts_set' => 1, 'emb_amt' => 1500, 'emb_cur' => 'usd', 'emb_per' => 'month'], []);
+    $hEm2 = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'embassy', 'opts_set' => 1, 'emb_amt' => 18000, 'emb_per' => 'year'], []);
+    check('إفادة السفارة: المبلغ اليدوي بالدولار + الفترة شهري/سنوي',
+          strpos($hEm1, '$1,500 per month') !== false
+          && strpos($hEm2, '$18,000 per year') !== false
+          && strpos($attSrc, 'name="emb_cur"') !== false && strpos($attSrc, 'name="emb_per"') !== false);
 } else {
     check('التنسيق الرسمي: لا موظف تجريبي (6/2026)', false, 'ما لقيت راتب محسوب 6/2026');
 }

@@ -633,6 +633,9 @@ if (!$emp):
     // مبلغ حرّ يكتبه المستخدم (تعويض الصرف المحسوب) — يُعرَض كما هو بالعملة المختارة بلا تحويل
     $eos = (int)preg_replace('/[^0-9]/', '', (string)($_GET['eos'] ?? ''));
     $embAmt = (int)preg_replace('/[^0-9]/', '', (string)($_GET['emb_amt'] ?? '')); // مبلغ إفادة السفارة (يدوي)
+    // 💵 إفادة السفارة (بطلبه 2026-08-20): عملة المبلغ اليدوي (دولار افتراضياً) + الفترة شهري/سنوي
+    $embCur = (($_GET['emb_cur'] ?? 'usd') === 'lbp') ? 'lbp' : 'usd';
+    $embPer = (($_GET['emb_per'] ?? 'month') === 'year') ? 'year' : 'month';
     // عقد التعليم: المبلغ المتفق عليه (يدوي) — بالليرة و/أو بالدولار، تُعبَّأ عملة وحدها أو الاثنتان معاً
     $aqdLbp = (int)preg_replace('/[^0-9]/', '', (string)($_GET['aqd_lbp'] ?? ''));
     $aqdUsd = (int)preg_replace('/[^0-9]/', '', (string)($_GET['aqd_usd'] ?? ''));
@@ -714,7 +717,7 @@ if (!$emp):
     $L=$money($salShown); $N=$money($net); $U='';
     $nssf=cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']);
     $rtl = ($docLang === 'ar');
-    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'').($hasSigTitle?'&sig_t='.$sigTitle:'').($lvSel!==''?'&lv_sel='.urlencode($lvSel):'').($lvTxt!==''?'&lv_txt='.urlencode($lvTxt):'');
+    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($embCur!=='usd'?'&emb_cur='.$embCur:'').($embPer!=='month'?'&emb_per='.$embPer:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'').($hasSigTitle?'&sig_t='.$sigTitle:'').($lvSel!==''?'&lv_sel='.urlencode($lvSel):'').($lvTxt!==''?'&lv_txt='.urlencode($lvTxt):'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <div class="btn-group" role="group">
@@ -804,9 +807,15 @@ if (!$emp):
             <?php endif; ?>
             <?php if ($type === 'embassy'): ?>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
-            <strong>Montant mensuel (à saisir) / المبلغ الشهري (اكتبه):</strong>
+            <strong>Montant (à saisir) / قيمة الراتب (اكتبها):</strong>
             <input type="text" name="emb_amt" value="<?= $embAmt>0 ? (int)$embAmt : '' ?>" placeholder="المبلغ" style="width:140px;padding:3px 6px" onchange="this.form.submit()">
-            <span style="color:#64748b">(Choisir la devise ci-dessus) / (اختر العملة دولار/ليرة من فوق)</span>
+            <label style="margin:0 8px;cursor:pointer"><input type="radio" name="emb_cur" value="usd" <?= $embCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> $ دولار</label>
+            <label style="cursor:pointer"><input type="radio" name="emb_cur" value="lbp" <?= $embCur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> ل.ل ليرة</label>
+            <span style="margin:0 12px;color:#cbd5e1">|</span>
+            <strong>Période / الفترة:</strong>
+            <label style="margin:0 8px;cursor:pointer"><input type="radio" name="emb_per" value="month" <?= $embPer==='month'?'checked':'' ?> onchange="this.form.submit()"> Mensuel / شهري</label>
+            <label style="cursor:pointer"><input type="radio" name="emb_per" value="year" <?= $embPer==='year'?'checked':'' ?> onchange="this.form.submit()"> Annuel / سنوي</label>
+            <span style="color:#64748b">(الفاضي = الراتب المحسوب بالدولار تلقائياً)</span>
             <?php endif; ?>
             <?php if ($type === 'iqrar'): ?>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
@@ -922,7 +931,15 @@ if (!$emp):
         $levelsEn = count($nivEn) >= 2 ? ('at both ' . implode(' and ', $nivEn) . ' levels') : (count($nivEn) == 1 ? ('at the ' . $nivEn[0] . ' level') : '');
         $usdSal = $fxRate > 0 ? (int)round($salShown / $fxRate) : 0;
         // سعر إفادة السفارة: المبلغ اليدوي بالعملة المختارة، وإلا المحسوب بالدولار
-        $embRate = $embAmt > 0 ? ($cur === 'usd' ? '$' . number_format($embAmt) : number_format($embAmt) . ' L.L') : ($usdSal > 0 ? '$' . number_format($usdSal) : '');
+        // «خيار أنا حط قيمة الراتب بالدولار + شهري أو سنوي» (2026-08-20): المبلغ اليدوي بعملة
+        // خانته (دولار افتراضياً)، وإلا المحسوب بالدولار (×12 حين تكون الفترة سنوية)
+        if ($embAmt > 0) {
+            $embRate = $embCur === 'lbp' ? number_format($embAmt) . ' L.L' : '$' . number_format($embAmt);
+        } else {
+            $embAuto = $embPer === 'year' ? $usdSal * 12 : $usdSal;
+            $embRate = $embAuto > 0 ? '$' . number_format($embAuto) : '';
+        }
+        $embPerWord = $embPer === 'year' ? 'year' : 'month';
         $contactBits = array_filter([trim((string)($school['address'] ?? '')), $schoolPhone ? ('هاتف: ' . $schoolPhone) : '', trim((string)($school['email'] ?? ''))]);
         $contactFooter = implode('  |  ', $contactBits);
         // ترويسة عربية: الشعار يمين + اسم المدرسة (عربي) + الهاتف، بشكل رسمي
@@ -1021,7 +1038,7 @@ if (!$emp):
           <div style="text-align:right;margin-bottom:10px"><?= date('d/m/Y') ?></div>
           <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة</h2>
           <p>To whom it may concern,</p>
-          <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per month</strong><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
+          <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">This certificate is given upon his/her request.</p>
           <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong>Director</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
         </div>
