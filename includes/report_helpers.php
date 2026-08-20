@@ -497,13 +497,21 @@ function officialFormStyles(): string {
      فتتكرّر «المجموع العام» بأسفل كل صفحة ويظنّها القارئ مجاميع وسطية خاطئة
      (لاحظها المستخدم بكشف الرواتب وبيان الملاك 2026-08-01). */
   .doc-table{page-break-inside:auto;}
+  /* 🖨️ هامش سالب صغير: يسحب نهاية الجدول عن حافة الورقة فلا يترك كروم «ورقة أخيرة بيضاء»
+     (خلل تقطيع بالجداول الطويلة مع الرأس المكرر — جردة 2026-08-20، بلا أي أثر بصري) */
+  .doc-table{margin-bottom:-12px;}
   .doc-table thead{display:table-header-group;}
   .doc-table tfoot{display:table-row-group;}
   /* 🏷️ عنوان التقرير على كل ورقة مطبوعة (طلب المستخدم 2026-08-04): صفّ عنوان يُحقن
      بالـJS داخل thead (app.js) فيتكرّر مع رأس الجدول أعلى كل صفحة — مخفيّ على الشاشة */
   .doc-table thead .pr-title-row{display:table-row;}
+  /* 🔴 سطر واحد دائماً: العنوان الطويل كان يلتفّ عدة أسطر فيطول الرأس المكرر ويخرّب تقطيع
+     الجدول — ورقة أخيرة بيضاء بالتقارير الطويلة (جردة 2026-08-20). div داخلية بحيلة
+     width:0/min-width:100% حتى لا يمدّد النص أعمدة الجدول ولا يلتفّ (قصّ أنيق عند الطول) */
   .doc-table thead .pr-title-row th{background:#fff !important;color:#000 !important;
-    border:none !important;font-size:11.5pt;font-weight:800;text-align:center;padding:4px 2px 6px;}
+    border:none !important;padding:2px 2px 4px;}
+  .doc-table thead .pr-title-row .pr-title-text{width:0;min-width:100%;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;font-size:10pt;font-weight:800;text-align:center;}
   .doc-table tr{page-break-inside:avoid;break-inside:avoid;}
   .doc-table th,.doc-table td{border:1px solid #555 !important;}
   /* الترويسة وعنوان التقرير لا ينفصلان عن بداية الجدول */

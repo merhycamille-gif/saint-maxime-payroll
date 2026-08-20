@@ -795,6 +795,11 @@ body.rtl .table th { text-align: right; }
     .sidebar, .topbar, .no-print, .menu-toggle, .nav-overlay { display: none !important; }
     .print-only { display: block !important; }
     .main-content, .page-content { padding: 0; }
+    /* 🖨️ «صفحة فاضية بآخر التقرير» (جردة 2026-08-20): هيكل الـflex كان يخلّي main-content
+       أطول من محتواه ~10px (حجز سكرول أفقي) فتولد ورقة أخيرة بيضاء بالتقارير الطويلة
+       (كشف الضمان/الضريبة) — بالطباعة السايدبار مخفي أصلاً فنفكّ الـflex بالكامل ونصفّر
+       الحدود الدنيا فلا يمتد شيء أبعد من آخر سطر فعلي */
+    .app-layout, .main-content { display: block !important; min-height: 0 !important; height: auto !important; overflow: visible !important; }
     .card { box-shadow: none; border: none; }
     body { background: white; }
     /* اطبع الخلفيات والألوان والترويسات الرسمية كما تظهر (صور الترويسة، الرؤوس الملوّنة) */

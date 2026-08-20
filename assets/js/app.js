@@ -332,8 +332,18 @@ document.addEventListener('change', function(e) {
             var row = thead.insertRow(0);
             row.className = 'pr-title-row';
             var th = document.createElement('th');
-            th.colSpan = 99;
-            th.textContent = txt;
+            // 🔴 colSpan بعدد الأعمدة الحقيقي حصراً — colspan=99 (أكبر من الأعمدة) كان يخرّب
+            // تقطيع الجدول بالطباعة فيولّد ورقة أخيرة بيضاء بالتقارير الطويلة (جردة 2026-08-20)
+            var ref = table.querySelector('thead tr:not(.pr-title-row)') || table.querySelector('tbody tr');
+            var nCols = 0;
+            if (ref) for (var ci = 0; ci < ref.children.length; ci++) nCols += (ref.children[ci].colSpan || 1);
+            th.colSpan = Math.max(1, nCols);
+            // العنوان بdiv داخلية (width:0/min-width:100%): سطر واحد دائماً بقصّ أنيق،
+            // بلا ما يلتفّ (يطوّل الرأس المكرر ويخرّب التقطيع) وبلا ما يمدّد أعمدة الجدول
+            var tt = document.createElement('div');
+            tt.className = 'pr-title-text';
+            tt.textContent = txt;
+            th.appendChild(tt);
             row.appendChild(th);
         });
     }

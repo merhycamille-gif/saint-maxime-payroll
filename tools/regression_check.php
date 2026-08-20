@@ -304,6 +304,19 @@ check('ترحيل العلاوات الناقصة أونلاين: اللائحة
       is_array($bfList) && count($bfList) > 700
       && isset($bfList[0]['e'], $bfList[0]['t'], $bfList[0]['sy'], $bfList[0]['a'])
       && strpos($hdrSrc, 'healBonusBackfill20260820') !== false);
+// (2026-08-20) جردة «صحح كل البرنامج» — الورقة الأخيرة البيضاء بالتقارير الطويلة:
+// (١) صف العنوان المحقون colSpan بعدد الأعمدة الحقيقي (99 كان يخرّب تقطيع الجدول)
+// (٢) العنوان بdiv .pr-title-text سطراً واحداً (width:0/min-width:100% — الالتفاف كان يطوّل
+//     الرأس المكرر ويولّد ورقة بيضاء) (٣) هامش سالب صغير بآخر الجدول (٤) فكّ تمطيط الهيكل بالطباعة
+$appJs = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
+$rhSrc = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php');
+$cssSrc = (string)file_get_contents(__DIR__ . '/../assets/css/app.css');
+check('لا ورقة أخيرة بيضاء بالتقارير الطويلة (colSpan حقيقي + عنوان سطر واحد + هامش سالب + فكّ التمطيط)',
+      strpos($appJs, 'colSpan = 99') === false
+      && strpos($appJs, 'pr-title-text') !== false
+      && strpos($rhSrc, '.pr-title-text{width:0;min-width:100%;white-space:nowrap') !== false
+      && strpos($rhSrc, '.doc-table{margin-bottom:-12px;}') !== false
+      && strpos($cssSrc, '.app-layout, .main-content { display: block !important') !== false);
 // (2026-08-20) «قلنالك بدون هيدا الخط الأسود تحت اللوغو»: بلا أي خط صلب تحت ترويسات الإفادات
 // بالشاشة والطباعة والوورد كلها — المسموح فقط الخطوط المنقّطة/المتقطعة لخانات التعبئة
 check('لا خط صلب تحت ترويسات الإفادات (شاشة/طباعة/وورد)',
