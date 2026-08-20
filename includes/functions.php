@@ -435,6 +435,67 @@ function healSchoolAddressDedupe20260820() {
     } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
+/**
+ * 🩹 شفاء ذاتي (2026-08-20 «الراتب بدك تجمعو مع الإضافي أو المكافأة إذا محطوطين — صحح»):
+ * علاوات (أجر إضافي/نقل) موجودة بنسخة الكمبيوتر وناقصة أونلاين (مثال السي موسى: الإضافي
+ * 133م مفقود أونلاين فطلع «الراتب الحالي» بنموذج الضمان أساساً فقط). اللائحة الكاملة مولَّدة
+ * من الداتا المحلية بassets/data/bonuses_backfill_20260820.json — هنا نضيف **الناقص فقط**
+ * (موظف مطابق الهوية بالاسم أو رقم الضمان، وما عنده علاوة فعّالة من نفس النوع لنفس السنة)
+ * ثم نعيد حساب أشهر تلك السنة الموجودة له. يعمل دفعاتٍ (25 موظفاً بالفتحة) حتى لا يعلّق
+ * الأونلاين، ويتابع تلقائياً بالفتحات التالية إلى أن يختم بـdone. idempotent بالكامل.
+ */
+function healBonusBackfill20260820() {
+    $flagKey = 'bonus_backfill_2026_08_20';
+    $st = getSetting($flagKey, '');
+    if (strpos($st, 'done') === 0) return;
+    $file = __DIR__ . '/../assets/data/bonuses_backfill_20260820.json';
+    if (!is_file($file)) return;
+    try {
+        $db = getDB();
+        $list = json_decode((string)file_get_contents($file), true);
+        if (!is_array($list) || !$list) { setSetting($flagKey, 'done (ملف فارغ)'); return; }
+        $byEmp = [];
+        foreach ($list as $r) $byEmp[(int)$r['e']][] = $r;
+        $ids = array_keys($byEmp); sort($ids);
+        $from = (strpos($st, 'i=') === 0) ? (int)substr($st, 2) : 0;
+        $insTot = (strpos($st, 'i=') === 0 && strpos($st, '+') !== false) ? (int)substr($st, strpos($st, '+') + 1) : 0;
+        @set_time_limit(600);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $batch = 0;
+        for ($i = $from; $i < count($ids); $i++) {
+            if (++$batch > 25) { setSetting($flagKey, 'i=' . $i . ' +' . $insTot); return; } // يتابع بالفتحة الجاية
+            $eid = $ids[$i];
+            $eq = $db->prepare("SELECT first_name_ar, last_name_ar, nssf_number FROM employees WHERE id=? AND is_deleted=0");
+            $eq->execute([$eid]);
+            $er = $eq->fetch();
+            if (!$er) continue;
+            $recalcYears = [];
+            foreach ($byEmp[$eid] as $b) {
+                // أمان الهوية: نفس الاسم والشهرة، أو نفس رقم الضمان — وإلا لا نلمس
+                $nameOk = trim((string)$er['first_name_ar']) === trim((string)$b['fn'])
+                       && trim((string)$er['last_name_ar'])  === trim((string)$b['ln']);
+                $nssfOk = trim((string)$b['ns']) !== '' && trim((string)$er['nssf_number']) === trim((string)$b['ns']);
+                if (!$nameOk && !$nssfOk) continue;
+                $has = $db->prepare("SELECT 1 FROM employee_bonuses WHERE employee_id=? AND school_year=? AND bonus_type=? AND is_active=1 LIMIT 1");
+                $has->execute([$eid, $b['sy'], $b['t']]);
+                if ($has->fetchColumn()) continue; // عنده — لا تكرار ولا تعديل
+                $db->prepare("INSERT INTO employee_bonuses (employee_id,bonus_type,period_number,school_year,amount,value_type,currency,start_month,end_month,is_active)
+                              VALUES (?,?,?,?,?,?,?,?,?,1)")
+                   ->execute([$eid, $b['t'], $b['p'], $b['sy'], $b['a'], $b['vt'], $b['cur'], $b['sm'], $b['em']]);
+                $recalcYears[(string)$b['sy']] = 1; $insTot++;
+            }
+            foreach (array_keys($recalcYears) as $sy) {
+                $mq = $db->prepare("SELECT month, year FROM monthly_salaries WHERE employee_id=? AND school_year=?");
+                $mq->execute([$eid, $sy]);
+                foreach ($mq->fetchAll(PDO::FETCH_ASSOC) as $mrow) {
+                    try { (new PayrollCalculator($eid, (int)$mrow['month'], (int)$mrow['year']))->calculateAndSave(); } catch (Exception $e) {}
+                }
+            }
+        }
+        setSetting($flagKey, 'done ' . date('Y-m-d H:i') . " (+$insTot علاوة)");
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
 function cnssEmployerSchool(?array $school): ?array {
     if (!$school) return $school;
     static $EMPLOYERS = [

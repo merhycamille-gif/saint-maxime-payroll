@@ -296,6 +296,14 @@ $hdrSrc = (string)file_get_contents(__DIR__ . '/../includes/header.php');
 check('عناوين المدارس منقّاة بالداتا نفسها (شفاء بالهيدر + صفر عناوين مخربطة)',
       !$badAddr && strpos($hdrSrc, 'healSchoolAddressDedupe20260820') !== false,
       $badAddr ? ('مدارس: ' . implode(',', $badAddr)) : '');
+// (2026-08-20) «الراتب بدك تجمعو مع الإضافي أو المكافأة إذا محطوطين»: علاوات ناقصة أونلاين
+// (السي موسى) — لائحة الترحيل من الكمبيوتر + شفاء دفعات بالهيدر يكمّل الناقص أونلاين فقط
+$bfFile = __DIR__ . '/../assets/data/bonuses_backfill_20260820.json';
+$bfList = is_file($bfFile) ? json_decode((string)file_get_contents($bfFile), true) : null;
+check('ترحيل العلاوات الناقصة أونلاين: اللائحة موجودة وسليمة + الشفاء بالهيدر',
+      is_array($bfList) && count($bfList) > 700
+      && isset($bfList[0]['e'], $bfList[0]['t'], $bfList[0]['sy'], $bfList[0]['a'])
+      && strpos($hdrSrc, 'healBonusBackfill20260820') !== false);
 // (2026-08-20) «قلنالك بدون هيدا الخط الأسود تحت اللوغو»: بلا أي خط صلب تحت ترويسات الإفادات
 // بالشاشة والطباعة والوورد كلها — المسموح فقط الخطوط المنقّطة/المتقطعة لخانات التعبئة
 check('لا خط صلب تحت ترويسات الإفادات (شاشة/طباعة/وورد)',
