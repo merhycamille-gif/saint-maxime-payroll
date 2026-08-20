@@ -666,9 +666,19 @@ if (!$emp):
     $lhClass = $lhOn ? '' : 'card';
     // 🪪 ترويسة تصدير الوورد (بطلبه 2026-08-20): بلا خط تحت الشعار + العنوان اسم المدينة فقط
     // + الهاتف LTR حتى يبقى الكود على شمال الرقم (بسياق RTL كان يطلع «531450-04»)
+    // الشعار بقياس width/height صريح: وورد لا يفهم max-height فكان الشعار الكبير يطلع بحجمه الكامل
+    $logoImgWord = $logoImg;
+    if ($logoUrl) {
+        $lf = dirname(__DIR__) . '/' . ltrim(substr($logoUrl, strlen(BASE_URL)), '/');
+        $sz = @getimagesize($lf);
+        if ($sz && $sz[0] > 0 && $sz[1] > 0) {
+            $k = min(88 / $sz[1], 150 / $sz[0], 1);
+            $logoImgWord = '<img src="' . htmlspecialchars($logoUrl, ENT_QUOTES) . '" alt="" width="' . (int)round($sz[0] * $k) . '" height="' . (int)round($sz[1] * $k) . '">';
+        }
+    }
     $cityAr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddr)[0] ?? ''));
     $schoolHeadWord = '<div style="text-align:right;margin-bottom:16px">'
-        . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
+        . ($logoImgWord ? '<div style="margin-bottom:2px">' . $logoImgWord . '</div>' : '')
         . '<strong style="font-size:17px">' . e($schoolNameAr) . '</strong>'
         . ($cityAr !== '' ? '<br><small>' . e($cityAr) . '</small>' : '')
         . ($schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
@@ -803,9 +813,9 @@ if (!$emp):
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
-            <?php /* 🪪 ترويسة وورد بديلة: صورة الترويسة خلفية CSS والوورد ما بيعرض الخلفيات — تصدير Word يُظهر هالرأس المخفي (بطلب المستخدم 2026-08-20) */ ?>
-            <?php if ($lhOn): ?><div class="word-head" style="display:none"><?= $schoolHeadWord ?></div><?php endif; ?>
-            <?php if ($showRecHead && $logoImg): ?><div style="text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
+            <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (2026-08-20): بلا خط + المدينة فقط — تصدير Word يكشفها ويشيل scr-head */ ?>
+            <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= $schoolHeadWord ?></div><?php endif; ?>
+            <?php if ($showRecHead && $logoImg): ?><div class="scr-head" style="text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
             <div style="text-align:left;font-weight:700;line-height:1.7;margin-bottom:6px">
                 الصندوق الوطني<br>للضمان الاجتماعي<br>
                 <span style="font-weight:400">مكتب ـــــــــــــ</span><br>
@@ -879,24 +889,26 @@ if (!$emp):
         $contactFooter = implode('  |  ', $contactBits);
         // ترويسة عربية: الشعار يمين + اسم المدرسة (عربي) + الهاتف، بشكل رسمي
         // عربي: الشعار فوق على اليمين، واسم المدرسة والهاتف تحته على اليمين (مثل نموذج باقي المدارس)
-        $schoolHead = '<div style="border-bottom:2px solid #1e3a5f;padding-bottom:10px;margin-bottom:18px;text-align:right">'
+        // «بس حط المنطقة قلنا» (2026-08-20): العنوان بالترويسة = اسم المدينة فقط (كان العنوان
+        // الكامل يتكرّر «ايلح - ايلح...») + scr-head: تصدير الوورد يشيل ترويسة الشاشة ويكشف word-head
+        $schoolHead = '<div class="scr-head" style="border-bottom:2px solid #1e3a5f;padding-bottom:10px;margin-bottom:18px;text-align:right">'
             . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
             . '<strong style="font-size:17px">' . e($schoolNameAr) . '</strong>'
-            . ($schoolAddr ? '<br><small>' . e($schoolAddr) . '</small>' : '')
+            . ($cityAr !== '' ? '<br><small>' . e($cityAr) . '</small>' : '')
             . ($schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
         // أجنبي: الشعار فوق على اليسار، والاسم الفرنسي والعنوان (بالأجنبي) والهاتف تحته على اليسار
         // العنوان واسم المدير بالأجنبي: المُدخَل، وإلا ترجمة تلقائية من العربي (لا العربي نفسه)
         $schoolAddrFr = trim((string)($school['address_fr'] ?? '')) ?: ($schoolAddr !== '' ? arNameToFr($schoolAddr) : '');
         $directorFr   = ($sigNameFr !== '') ? $sigNameFr : ($director !== '' ? arNameToFr($director) : '');
-        $schoolHeadFr = '<div style="border-bottom:2px solid #1e3a5f;padding-bottom:10px;margin-bottom:18px;text-align:left">'
+        $cityFr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddrFr)[0] ?? ''));
+        $schoolHeadFr = '<div class="scr-head" style="border-bottom:2px solid #1e3a5f;padding-bottom:10px;margin-bottom:18px;text-align:left">'
             . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
             . '<strong style="font-size:17px">' . e($schoolNameFr) . '</strong>'
-            . ($schoolAddrFr ? '<br><small>' . e($schoolAddrFr) . '</small>' : '')
+            . ($cityFr !== '' ? '<br><small>' . e($cityFr) . '</small>' : '')
             . ($schoolPhone ? '<br><small>Tel : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
         // ترويسة وورد بالفرنسي (للسفارة): بلا خط + المدينة فقط + الهاتف LTR
-        $cityFr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddrFr)[0] ?? ''));
         $schoolHeadWordFr = '<div style="text-align:left;margin-bottom:16px">'
-            . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
+            . ($logoImgWord ? '<div style="margin-bottom:2px">' . $logoImgWord . '</div>' : '')
             . '<strong style="font-size:17px">' . e($schoolNameFr) . '</strong>'
             . ($cityFr !== '' ? '<br><small>' . e($cityFr) . '</small>' : '')
             . ($schoolPhone ? '<br><small>Tel : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
@@ -908,8 +920,9 @@ if (!$emp):
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
       <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
-      <?php /* 🪪 ترويسة وورد بديلة: صورة الترويسة خلفية CSS والوورد ما بيعرض الخلفيات — تصدير Word يُظهر هالرأس المخفي (بطلب المستخدم 2026-08-20) */ ?>
-      <?php if ($lhOn): ?><div class="word-head" style="display:none"><?= $type === 'embassy' ? $schoolHeadWordFr : $schoolHeadWord ?></div><?php endif; ?>
+      <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (بطلب المستخدم 2026-08-20): بلا خط تحت الشعار + المدينة فقط —
+              تصدير Word يكشفها ويشيل ترويسة الشاشة scr-head (وخلفية الترويسة أصلاً لا يعرضها وورد) */ ?>
+      <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= $type === 'embassy' ? $schoolHeadWordFr : $schoolHeadWord ?></div><?php endif; ?>
 
       <?php
         // ترويسة اتصال أسفل الصفحة (نمط مكسيموس) — تظهر مع الشعار
@@ -1285,7 +1298,7 @@ if (!$emp):
             <!-- ترويسة باللغة المختارة -->
             <div style="border-bottom:2px solid var(--primary,#1e3a5f);padding-bottom:10px;margin-bottom:22px;<?= $rtl?'text-align:right':'text-align:left' ?>">
                 <strong style="font-size:19px"><?= $rtl ? e($schoolNameAr) : e($schoolNameFr) ?></strong><br>
-                <small><?= e($schoolAddr) ?><?= $schoolPhone ? ' — <span dir="ltr">'.e($schoolPhone).'</span>' : '' ?></small>
+                <small><?= e($cityAr) ?><?= $schoolPhone ? ' — <span dir="ltr">'.e($schoolPhone).'</span>' : '' ?></small>
                 <?php if ($employerNssf && ($type==='cnss')): ?><br><small><?= $rtl?'رقم رب العمل في الضمان: ':'N° employeur CNSS: ' ?><?= e($employerNssf) ?></small><?php endif; ?>
             </div>
 

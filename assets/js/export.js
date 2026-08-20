@@ -16,10 +16,10 @@
         try { return new Date().toISOString().slice(0, 10); } catch (e) { return ''; }
     }
 
-    // نسخة نظيفة من المحتوى بدون أزرار/عناصر لا تُصدَّر
+    // نسخة نظيفة من المحتوى بدون أزرار/عناصر لا تُصدَّر (.word-head خاصة بتصدير الوورد فقط)
     function cleanHtml() {
         var node = area().cloneNode(true);
-        node.querySelectorAll('.no-print, .no-export, .export-toolbar, script, button, .btn, form.no-print')
+        node.querySelectorAll('.no-print, .no-export, .export-toolbar, script, button, .btn, form.no-print, .word-head')
             .forEach(function (n) { n.remove(); });
         // أزل تصغير الشاشة (zoom) عن الجداول — التصدير لوورد/إكسل يجب أن يكون بالحجم الكامل
         node.querySelectorAll('[style*="zoom"]').forEach(function (n) { n.style.zoom = ''; });
@@ -123,12 +123,16 @@
         var head = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
             + 'xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">' + css + '</head>'
             + '<body dir="rtl"><div class="WordSection1">';
-        // نسخة نظيفة + كشف ترويسة الوورد البديلة (بدل صورة الترويسة الخلفية التي لا يعرضها وورد)
+        // نسخة نظيفة + كشف ترويسة الوورد البديلة (بلا خط، المدينة فقط) بدل ترويسة الشاشة scr-head
         var node = area().cloneNode(true);
         node.querySelectorAll('.no-print, .no-export, .export-toolbar, script, button, .btn, form.no-print')
             .forEach(function (n) { n.remove(); });
         node.querySelectorAll('[style*="zoom"]').forEach(function (n) { n.style.zoom = ''; });
-        node.querySelectorAll('.word-head').forEach(function (n) { n.style.display = ''; });
+        var wh = node.querySelectorAll('.word-head');
+        if (wh.length) {
+            wh.forEach(function (n) { n.style.display = ''; });
+            node.querySelectorAll('.scr-head').forEach(function (n) { n.remove(); });
+        }
         // كل صورة → جزء مضمَّن بالملف؛ وإن تعذّر جلبها يبقى رابطها المطلق (أفضل من النسبي)
         var jobs = Array.prototype.slice.call(node.querySelectorAll('img')).map(function (img, i) {
             var src = img.getAttribute('src') || '';

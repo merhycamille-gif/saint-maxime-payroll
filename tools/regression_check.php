@@ -248,10 +248,18 @@ check('إفادة راتب بلا تابلو + ترويسة وورد (بلا خ�
       && strpos($whW, 'border-bottom') === false
       && strpos($whW, '$cityAr') !== false
       && substr_count($attSrc, 'هاتف : <span dir="ltr">') >= 3);
+// (2026-08-20) «في تكرار للمنطقة بس حط المنطقة قلنا» (p1 — ايلح-ايلح): ترويسات الشاشة كمان
+// بالمدينة فقط ($cityAr/$cityFr) + scr-head ينشال بتصدير الوورد مكان word-head (لكل المدارس)
+// + الشعار بword-head بقياس width/height صريح (وورد لا يفهم max-height فكان يطلع بحجمه الكامل)
+check('ترويسات الإفادات بالمدينة فقط + scr-head/word-head لكل المدارس + شعار الوورد بقياس صريح',
+      substr_count($attSrc, 'class="scr-head"') >= 3
+      && strpos($attSrc, '$logoImgWord') !== false
+      && strpos($attSrc, "e(\$cityAr)") !== false && strpos($attSrc, "e(\$cityFr)") !== false);
 $expSrc = (string)file_get_contents(__DIR__ . '/../assets/js/export.js');
-check('تصدير وورد: ملف MHT بصور مضمَّنة base64 (multipart/related + كشف .word-head + rawDownload بلا BOM)',
+check('تصدير وورد: ملف MHT بصور مضمَّنة base64 (multipart/related + كشف .word-head وإزالة .scr-head + rawDownload بلا BOM)',
       strpos($expSrc, 'multipart/related') !== false
       && strpos($expSrc, 'word-head') !== false
+      && strpos($expSrc, 'scr-head') !== false
       && strpos($expSrc, 'rawDownload') !== false);
 $repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
 check('حجم الخط 12pt بطباعة مركز التقارير', strpos($repSrc, 'font-size: 12pt !important') !== false);
