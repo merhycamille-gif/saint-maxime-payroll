@@ -230,6 +230,11 @@ check('حجم الخط 12pt بالتقارير (doc-table + رؤوس + فقرا�
       && substr_count($hlpSrc, 'font-size:12pt') >= 6);                   // th/info-grid/fline/doc-p/sign-box
 $attSrc = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
 check('حجم الخط 12pt بالإفادات (أجسام الإفادات الثلاثة)', substr_count($attSrc, 'font-size:12pt') >= 3);
+// (2026-08-20) بطلب المستخدم: خط الإفادات Arial (متل «أبجد هوز» بالوورد) بكل اللغات —
+// القاعدة معرَّفة بمواضع العرض الثلاثة (إفادة الضمان + نمط مكسيموس + القسم العام) وبلا Sakkal بالصفحة
+check('خط الإفادات Arial بكل اللغات (٣ مواضع، بلا Sakkal بصفحة الإفادات)',
+      substr_count($attSrc, "#ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}") >= 3
+      && strpos($attSrc, 'Sakkal') === false);
 $repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
 check('حجم الخط 12pt بطباعة مركز التقارير', strpos($repSrc, 'font-size: 12pt !important') !== false);
 $regEid = (int)$db->query("SELECT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id

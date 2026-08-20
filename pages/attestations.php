@@ -792,7 +792,7 @@ if (!$emp):
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
     @page{size:A4;margin:<?= $lhOn ? '0' : '12mm' ?>}
     .page-content{padding:0 !important;margin:0 !important}</style>
-    <?php if ($docLang === 'ar'): ?><style>/* خط عربي رسمي واضح للإفادات العربية */ #ppExportArea{font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo',sans-serif}</style><?php endif; ?>
+    <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;<?= $lhOn?'padding:0':'' ?>">
             <?php if ($showRecHead && $logoImg): ?><div style="text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
@@ -888,7 +888,7 @@ if (!$emp):
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
     @page{size:A4;margin:<?= $lhOn ? '0' : '12mm' ?>}
     .page-content{padding:0 !important;margin:0 !important}</style>
-    <?php if ($docLang === 'ar'): ?><style>/* خط عربي رسمي واضح للإفادات العربية */ #ppExportArea{font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo',sans-serif}</style><?php endif; ?>
+    <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
       <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;<?= $lhOn?'padding:0':'' ?>">
 
@@ -1257,6 +1257,7 @@ if (!$emp):
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح */
     @page{size:A4;margin:12mm}
     .page-content{padding:0 !important;margin:0 !important}</style>
+    <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
     <div id="ppExportArea" class="card" style="max-width:820px;margin:0 auto;padding:10px" data-fit1="1" <?= $rtl?'dir="rtl"':'' ?>>
         <div class="card-body" style="line-height:1.95;font-size:12pt;<?= $rtl?'text-align:right':'' ?>">
             <!-- ترويسة باللغة المختارة -->
