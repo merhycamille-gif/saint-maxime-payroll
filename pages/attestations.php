@@ -954,7 +954,8 @@ if (!$emp):
         <p style="margin-right:34px;text-align:right">- الإجمالي : <strong><?= $moneyAr($salShown) ?></strong></p>
         <?php endif; ?>
         <p>فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> .</p>
-        <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم .</p>
+        <?php /* «شيل جملة واستعمالها لمن يلزم» (2026-08-20) — من إفادة الراتب فقط */ ?>
+        <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) .</p>
         <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
