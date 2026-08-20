@@ -255,6 +255,11 @@ check('ترويسات الإفادات بالمدينة فقط + scr-head/word-h
       substr_count($attSrc, 'class="scr-head"') >= 3
       && strpos($attSrc, '$logoImgWord') !== false
       && strpos($attSrc, "e(\$cityAr)") !== false && strpos($attSrc, "e(\$cityFr)") !== false);
+// (2026-08-20) «قلنالك بدون هيدا الخط الأسود تحت اللوغو»: بلا أي خط صلب تحت ترويسات الإفادات
+// بالشاشة والطباعة والوورد كلها — المسموح فقط الخطوط المنقّطة/المتقطعة لخانات التعبئة
+check('لا خط صلب تحت ترويسات الإفادات (شاشة/طباعة/وورد)',
+      strpos($attSrc, 'border-bottom:2px') === false
+      && strpos($attSrc, 'border-bottom:1px solid') === false);
 $expSrc = (string)file_get_contents(__DIR__ . '/../assets/js/export.js');
 check('تصدير وورد: ملف MHT بصور مضمَّنة base64 (multipart/related + كشف .word-head وإزالة .scr-head + rawDownload بلا BOM)',
       strpos($expSrc, 'multipart/related') !== false

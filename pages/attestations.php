@@ -815,7 +815,7 @@ if (!$emp):
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
             <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (2026-08-20): بلا خط + المدينة فقط — تصدير Word يكشفها ويشيل scr-head */ ?>
             <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= $schoolHeadWord ?></div><?php endif; ?>
-            <?php if ($showRecHead && $logoImg): ?><div class="scr-head" style="text-align:right;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
+            <?php if ($showRecHead && $logoImg): ?><div class="scr-head" style="text-align:right;margin-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
             <div style="text-align:left;font-weight:700;line-height:1.7;margin-bottom:6px">
                 الصندوق الوطني<br>للضمان الاجتماعي<br>
                 <span style="font-weight:400">مكتب ـــــــــــــ</span><br>
@@ -891,7 +891,8 @@ if (!$emp):
         // عربي: الشعار فوق على اليمين، واسم المدرسة والهاتف تحته على اليمين (مثل نموذج باقي المدارس)
         // «بس حط المنطقة قلنا» (2026-08-20): العنوان بالترويسة = اسم المدينة فقط (كان العنوان
         // الكامل يتكرّر «ايلح - ايلح...») + scr-head: تصدير الوورد يشيل ترويسة الشاشة ويكشف word-head
-        $schoolHead = '<div class="scr-head" style="border-bottom:2px solid #1e3a5f;padding-bottom:10px;margin-bottom:18px;text-align:right">'
+        // «قلنالك بدون هيدا الخط الأسود تحت اللوغو» (2026-08-20): بلا خط بالشاشة والطباعة كمان لا بس بالوورد
+        $schoolHead = '<div class="scr-head" style="margin-bottom:18px;text-align:right">'
             . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
             . '<strong style="font-size:17px">' . e($schoolNameAr) . '</strong>'
             . ($cityAr !== '' ? '<br><small>' . e($cityAr) . '</small>' : '')
@@ -901,7 +902,7 @@ if (!$emp):
         $schoolAddrFr = trim((string)($school['address_fr'] ?? '')) ?: ($schoolAddr !== '' ? arNameToFr($schoolAddr) : '');
         $directorFr   = ($sigNameFr !== '') ? $sigNameFr : ($director !== '' ? arNameToFr($director) : '');
         $cityFr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddrFr)[0] ?? ''));
-        $schoolHeadFr = '<div class="scr-head" style="border-bottom:2px solid #1e3a5f;padding-bottom:10px;margin-bottom:18px;text-align:left">'
+        $schoolHeadFr = '<div class="scr-head" style="margin-bottom:18px;text-align:left">'
             . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
             . '<strong style="font-size:17px">' . e($schoolNameFr) . '</strong>'
             . ($cityFr !== '' ? '<br><small>' . e($cityFr) . '</small>' : '')
@@ -1296,7 +1297,7 @@ if (!$emp):
     <div id="ppExportArea" class="card" style="max-width:820px;margin:0 auto;padding:10px" data-fit1="1" <?= $rtl?'dir="rtl"':'' ?>>
         <div class="card-body" style="line-height:1.95;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $rtl?'text-align:right':'' ?>">
             <!-- ترويسة باللغة المختارة -->
-            <div style="border-bottom:2px solid var(--primary,#1e3a5f);padding-bottom:10px;margin-bottom:22px;<?= $rtl?'text-align:right':'text-align:left' ?>">
+            <div style="margin-bottom:22px;<?= $rtl?'text-align:right':'text-align:left' ?>">
                 <strong style="font-size:19px"><?= $rtl ? e($schoolNameAr) : e($schoolNameFr) ?></strong><br>
                 <small><?= e($cityAr) ?><?= $schoolPhone ? ' — <span dir="ltr">'.e($schoolPhone).'</span>' : '' ?></small>
                 <?php if ($employerNssf && ($type==='cnss')): ?><br><small><?= $rtl?'رقم رب العمل في الضمان: ':'N° employeur CNSS: ' ?><?= e($employerNssf) ?></small><?php endif; ?>
