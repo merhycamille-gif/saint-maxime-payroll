@@ -677,11 +677,25 @@ if (!$emp):
         }
     }
     $cityAr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddr)[0] ?? ''));
-    $schoolHeadWord = '<div style="text-align:right;margin-bottom:16px">'
-        . ($logoImgWord ? '<div style="margin-bottom:2px">' . $logoImgWord . '</div>' : '')
-        . '<strong style="font-size:17px">' . e($schoolNameAr) . '</strong>'
-        . ($cityAr !== '' ? '<br><small>' . e($cityAr) . '</small>' : '')
-        . ($schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
+    // 🏷️ «لوغو الراهبات» (نموذجه عالدسك توب، بطلبه 2026-08-20): الكتابة لكل مدرسة متوسّطة تحت
+    // الشعار — اسم المدرسة، فسطر «للراهبات المخلصيات – المدينة» (إن كان بالاسم)، فالهاتف.
+    // جدول بلا حدود بدل inline-block لأن وورد لا يفهم inline-block (والحدود/العرض إنلاين تغلب ستايل تصدير الوورد)
+    $headL1 = trim((string)$schoolNameAr); $headL2 = $cityAr;
+    if (mb_strpos($headL1, 'للراهبات المخلصيات') !== false) {
+        $headL2 = trim('للراهبات المخلصيات' . ($cityAr !== '' ? ' – ' . $cityAr : ''));
+        $headL1 = trim(mb_substr($headL1, 0, mb_strpos($headL1, 'للراهبات المخلصيات')));
+    }
+    // جدول بعرض كامل وخانة المحتوى الأولى (= جهة البداية: يمين بالعربي) — «جدول width:auto» كان
+    // الوورد يوسّطه بنص الصفحة، وهالشكل يثبت الكتلة بجهتها بالشاشة والوورد سواء
+    $headBodyAr = function ($logoHtml) use ($headL1, $headL2, $schoolPhone) {
+        return '<table style="width:100%;border-collapse:collapse"><tr><td style="border:none;padding:0;width:32%;text-align:center;line-height:1.8">'
+            . ($logoHtml ? '<div style="margin-bottom:2px">' . $logoHtml . '</div>' : '')
+            . '<strong style="font-size:16px">' . e($headL1) . '</strong>'
+            . ($headL2 !== '' ? '<br><strong style="font-size:15px">' . e($headL2) . '</strong>' : '')
+            . ($schoolPhone ? '<br><span style="font-size:14px">هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></span>' : '')
+            . '</td><td style="border:none;padding:0"></td></tr></table>';
+    };
+    $schoolHeadWord = '<div style="margin-bottom:16px">' . $headBodyAr($logoImgWord) . '</div>';
     $freeNum   = function ($v) use ($cur) {
         if ($cur === 'usd') return '$' . number_format($v, 2);
         return formatLBP($v, false) . ' ل.ل';
@@ -815,7 +829,7 @@ if (!$emp):
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
             <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (2026-08-20): بلا خط + المدينة فقط — تصدير Word يكشفها ويشيل scr-head */ ?>
             <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= $schoolHeadWord ?></div><?php endif; ?>
-            <?php if ($showRecHead && $logoImg): ?><div class="scr-head" style="text-align:right;margin-bottom:8px"><?= $logoImg ?> &nbsp; <strong style="font-size:16px"><?= e($schoolNameAr) ?></strong></div><?php endif; ?>
+            <?php if ($showRecHead && $logoImg): ?><div class="scr-head" style="margin-bottom:8px"><?= $headBodyAr($logoImg) ?></div><?php endif; ?>
             <div style="text-align:left;font-weight:700;line-height:1.7;margin-bottom:6px">
                 الصندوق الوطني<br>للضمان الاجتماعي<br>
                 <span style="font-weight:400">مكتب ـــــــــــــ</span><br>
@@ -889,30 +903,25 @@ if (!$emp):
         $contactFooter = implode('  |  ', $contactBits);
         // ترويسة عربية: الشعار يمين + اسم المدرسة (عربي) + الهاتف، بشكل رسمي
         // عربي: الشعار فوق على اليمين، واسم المدرسة والهاتف تحته على اليمين (مثل نموذج باقي المدارس)
-        // «بس حط المنطقة قلنا» (2026-08-20): العنوان بالترويسة = اسم المدينة فقط (كان العنوان
-        // الكامل يتكرّر «ايلح - ايلح...») + scr-head: تصدير الوورد يشيل ترويسة الشاشة ويكشف word-head
-        // «قلنالك بدون هيدا الخط الأسود تحت اللوغو» (2026-08-20): بلا خط بالشاشة والطباعة كمان لا بس بالوورد
-        $schoolHead = '<div class="scr-head" style="margin-bottom:18px;text-align:right">'
-            . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
-            . '<strong style="font-size:17px">' . e($schoolNameAr) . '</strong>'
-            . ($cityAr !== '' ? '<br><small>' . e($cityAr) . '</small>' : '')
-            . ($schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
+        // «بس حط المنطقة قلنا» + «بدون الخط الأسود» + «متل لوغو الراهبات» (2026-08-20):
+        // ترويسة الشاشة = نفس كتابة نموذج «لوغو الراهبات» المتوسّطة تحت الشعار، بلا خط، بالمدينة فقط
+        $schoolHead = '<div class="scr-head" style="margin-bottom:18px">' . $headBodyAr($logoImg) . '</div>';
         // أجنبي: الشعار فوق على اليسار، والاسم الفرنسي والعنوان (بالأجنبي) والهاتف تحته على اليسار
         // العنوان واسم المدير بالأجنبي: المُدخَل، وإلا ترجمة تلقائية من العربي (لا العربي نفسه)
         $schoolAddrFr = trim((string)($school['address_fr'] ?? '')) ?: ($schoolAddr !== '' ? arNameToFr($schoolAddr) : '');
         $directorFr   = ($sigNameFr !== '') ? $sigNameFr : ($director !== '' ? arNameToFr($director) : '');
         $cityFr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddrFr)[0] ?? ''));
-        $schoolHeadFr = '<div class="scr-head" style="margin-bottom:18px;text-align:left">'
-            . ($logoImg ? '<div style="margin-bottom:2px">' . $logoImg . '</div>' : '')
-            . '<strong style="font-size:17px">' . e($schoolNameFr) . '</strong>'
-            . ($cityFr !== '' ? '<br><small>' . e($cityFr) . '</small>' : '')
-            . ($schoolPhone ? '<br><small>Tel : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
-        // ترويسة وورد بالفرنسي (للسفارة): بلا خط + المدينة فقط + الهاتف LTR
-        $schoolHeadWordFr = '<div style="text-align:left;margin-bottom:16px">'
-            . ($logoImgWord ? '<div style="margin-bottom:2px">' . $logoImgWord . '</div>' : '')
-            . '<strong style="font-size:17px">' . e($schoolNameFr) . '</strong>'
-            . ($cityFr !== '' ? '<br><small>' . e($cityFr) . '</small>' : '')
-            . ($schoolPhone ? '<br><small>Tel : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '') . '</div>';
+        // بالفرنسي (للسفارة): نفس نمط «لوغو الراهبات» متوسّطاً تحت الشعار، على يسار الصفحة
+        $headBodyFr = function ($logoHtml) use ($schoolNameFr, $cityFr, $schoolPhone) {
+            return '<div dir="ltr"><table style="width:100%;border-collapse:collapse"><tr><td style="border:none;padding:0;width:32%;text-align:center;line-height:1.8">'
+                . ($logoHtml ? '<div style="margin-bottom:2px">' . $logoHtml . '</div>' : '')
+                . '<strong style="font-size:16px">' . e($schoolNameFr) . '</strong>'
+                . ($cityFr !== '' ? '<br><strong style="font-size:15px">' . e($cityFr) . '</strong>' : '')
+                . ($schoolPhone ? '<br><span style="font-size:14px">Tel : <span dir="ltr">' . e($schoolPhone) . '</span></span>' : '')
+                . '</td><td style="border:none;padding:0"></td></tr></table></div>';
+        };
+        $schoolHeadFr = '<div class="scr-head" style="margin-bottom:18px">' . $headBodyFr($logoImg) . '</div>';
+        $schoolHeadWordFr = '<div style="margin-bottom:16px">' . $headBodyFr($logoImgWord) . '</div>';
     ?>
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */

@@ -242,11 +242,14 @@ check('تصدير وورد: ترويسة .word-head البديلة (موضعا �
       && substr_count($attSrc, "font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif") >= 3);
 // (2026-08-20) «إفادة الراتب بدون تابلو» + «بدون ألوان»: لا جدول بإفادة الراتب ولا كحلي بالإفادات،
 // وترويسة الوورد بلا خط تحت الشعار + المدينة فقط + الهاتف LTR (الكود على شمال الرقم)
-$whW = strpos($attSrc, '$schoolHeadWord =') !== false ? substr($attSrc, strpos($attSrc, '$schoolHeadWord ='), 700) : 'border-bottom';
-check('إفادة راتب بلا تابلو + ترويسة وورد (بلا خط تحت الشعار، مدينة فقط، هاتف LTR)',
+// (2026-08-20) «لوغو الراهبات»: كتابة الترويسة متوسّطة تحت الشعار ($headBodyAr — جدول بلا حدود
+// لأن وورد لا يفهم inline-block) + سطر «للراهبات المخلصيات – المدينة» إن كان بالاسم + الهاتف LTR
+$whW = strpos($attSrc, '$headBodyAr =') !== false ? substr($attSrc, strpos($attSrc, '$headBodyAr ='), 900) : 'border-bottom';
+check('إفادة راتب بلا تابلو + ترويسة «لوغو الراهبات» (متوسّطة، بلا خط، هاتف LTR)',
       strpos($attSrc, 'background:#1F4E5F') === false
       && strpos($whW, 'border-bottom') === false
-      && strpos($whW, '$cityAr') !== false
+      && strpos($whW, 'text-align:center') !== false
+      && strpos($attSrc, 'للراهبات المخلصيات') !== false
       && substr_count($attSrc, 'هاتف : <span dir="ltr">') >= 3);
 // (2026-08-20) «في تكرار للمنطقة بس حط المنطقة قلنا» (p1 — ايلح-ايلح): ترويسات الشاشة كمان
 // بالمدينة فقط ($cityAr/$cityFr) + scr-head ينشال بتصدير الوورد مكان word-head (لكل المدارس)
