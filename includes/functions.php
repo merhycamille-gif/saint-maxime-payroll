@@ -1533,6 +1533,35 @@ function formatLBP($amount, $withCurrency = true) {
 }
 
 // تحويل رقم صحيح إلى كلمات عربية (للإفادات الرسمية: «فقط ... ليرة لبنانية لا غير»)
+/* 💬 تفقيط بالإنكليزي (بطلب المستخدم 2026-08-20 — إفادة السفارة): 1500 → One Thousand Five Hundred */
+function numToEnglishWords($num): string {
+    $num = (int)round((float)$num);
+    if ($num == 0) return 'Zero';
+    if ($num < 0) return 'Minus ' . numToEnglishWords(-$num);
+    $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+             'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    $below1000 = function (int $x) use ($ones, $tens): string {
+        $out = [];
+        if ($x >= 100) { $out[] = $ones[intdiv($x, 100)] . ' Hundred'; $x %= 100; }
+        if ($x >= 20) {
+            $t = $tens[intdiv($x, 10)];
+            $out[] = ($x % 10) ? $t . '-' . $ones[$x % 10] : $t;
+        } elseif ($x > 0) {
+            $out[] = $ones[$x];
+        }
+        return implode(' ', $out);
+    };
+    $parts = [];
+    foreach ([[1000000000, 'Billion'], [1000000, 'Million'], [1000, 'Thousand'], [1, '']] as [$div, $label]) {
+        if ($num >= $div) {
+            $q = intdiv($num, $div); $num %= $div;
+            $parts[] = trim($below1000($q) . ($label !== '' ? ' ' . $label : ''));
+        }
+    }
+    return implode(' ', $parts);
+}
+
 function numToArabicWords($num) {
     $num = (int)round((float)$num);
     if ($num === 0) return 'صفر';

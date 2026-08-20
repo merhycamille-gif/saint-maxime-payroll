@@ -935,9 +935,12 @@ if (!$emp):
         // خانته (دولار افتراضياً)، وإلا المحسوب بالدولار (×12 حين تكون الفترة سنوية)
         if ($embAmt > 0) {
             $embRate = $embCur === 'lbp' ? number_format($embAmt) . ' L.L' : '$' . number_format($embAmt);
+            // «لازم تفقط قيمة الراتب بالإنكليزي» (2026-08-20)
+            $embWords = numToEnglishWords($embAmt) . ' ' . ($embCur === 'lbp' ? 'Lebanese Pounds' : 'US Dollars') . ' only';
         } else {
             $embAuto = $embPer === 'year' ? $usdSal * 12 : $usdSal;
             $embRate = $embAuto > 0 ? '$' . number_format($embAuto) : '';
+            $embWords = $embAuto > 0 ? numToEnglishWords($embAuto) . ' US Dollars only' : '';
         }
         $embPerWord = $embPer === 'year' ? 'year' : 'month';
         $contactBits = array_filter([trim((string)($school['address'] ?? '')), $schoolPhone ? ('هاتف: ' . $schoolPhone) : '', trim((string)($school['email'] ?? ''))]);
@@ -1038,7 +1041,7 @@ if (!$emp):
           <div style="text-align:right;margin-bottom:10px"><?= date('d/m/Y') ?></div>
           <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة</h2>
           <p>To whom it may concern,</p>
-          <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
+          <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?= $embRate !== '' ? ' (' . e($embWords) . ')' : '' ?><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?= $embRate !== '' ? ' (' . e($embWords) . ')' : '' ?><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">This certificate is given upon his/her request.</p>
           <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong>Director</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
         </div>

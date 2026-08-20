@@ -404,10 +404,14 @@ if ($regEid) {
     // (2026-08-20) إفادة السفارة: «خيار أنا حط قيمة الراتب بالدولار + شهري أو سنوي»
     $hEm1 = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'embassy', 'opts_set' => 1, 'emb_amt' => 1500, 'emb_cur' => 'usd', 'emb_per' => 'month'], []);
     $hEm2 = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'embassy', 'opts_set' => 1, 'emb_amt' => 18000, 'emb_per' => 'year'], []);
-    check('إفادة السفارة: المبلغ اليدوي بالدولار + الفترة شهري/سنوي',
+    check('إفادة السفارة: المبلغ اليدوي بالدولار + الفترة شهري/سنوي + التفقيط بالإنكليزي',
           strpos($hEm1, '$1,500 per month') !== false
+          && strpos($hEm1, '(One Thousand Five Hundred US Dollars only)') !== false
           && strpos($hEm2, '$18,000 per year') !== false
-          && strpos($attSrc, 'name="emb_cur"') !== false && strpos($attSrc, 'name="emb_per"') !== false);
+          && strpos($hEm2, '(Eighteen Thousand US Dollars only)') !== false
+          && strpos($attSrc, 'name="emb_cur"') !== false && strpos($attSrc, 'name="emb_per"') !== false
+          && numToEnglishWords(90000000) === 'Ninety Million'
+          && numToEnglishWords(136445000) === 'One Hundred Thirty-Six Million Four Hundred Forty-Five Thousand');
 } else {
     check('التنسيق الرسمي: لا موظف تجريبي (6/2026)', false, 'ما لقيت راتب محسوب 6/2026');
 }
