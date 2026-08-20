@@ -844,7 +844,8 @@ if (!$emp):
             <p>اعتباراً من تاريخ <strong><?= $hireFmt ?></strong> بصفة (<strong><?= e($fnFr['ar']) ?></strong>)</p>
             <p>ويتقاضى راتباً شهرياً :</p>
             <p style="margin-right:34px;text-align:right">- أساس راتب عملاً بالقانون : <strong><?= $moneyAr($attBase) ?></strong></p>
-            <p style="margin-right:34px;text-align:right">- ملحقات مدفوعة من أشخاص ثالثين : <strong><?= $moneyAr($attSupp) ?></strong></p>
+            <?php /* «مكان جملة ملحقات مدفوعة بدو يكون الأجر الإضافي» (بطلبه 2026-08-20) */ ?>
+            <p style="margin-right:34px;text-align:right">- الأجر الإضافي : <strong><?= $moneyAr($attSupp) ?></strong></p>
             <?php if ($attTrans > 0): ?>
             <p style="margin-right:34px;text-align:right">- تعويض نقل : <strong><?= $moneyAr($attTrans) ?></strong></p>
             <?php endif; ?>
