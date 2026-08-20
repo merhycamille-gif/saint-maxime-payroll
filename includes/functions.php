@@ -1562,6 +1562,41 @@ function numToEnglishWords($num): string {
     return implode(' ', $parts);
 }
 
+/* 💬 تفقيط بالفرنسي (بطلب المستخدم 2026-08-20 — إفادة السفارة الفرنسية):
+ * 1500 → mille cinq cents — بقواعد الفرنسية (et un / soixante-dix / quatre-vingts / cents) */
+function numToFrenchWords($num): string {
+    $num = (int)round((float)$num);
+    if ($num == 0) return 'zéro';
+    if ($num < 0) return 'moins ' . numToFrenchWords(-$num);
+    $ones = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze',
+             'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
+    $below100 = function (int $x) use ($ones): string {
+        if ($x < 20) return $ones[$x];
+        $names = [2 => 'vingt', 3 => 'trente', 4 => 'quarante', 5 => 'cinquante', 6 => 'soixante'];
+        $t = intdiv($x, 10); $u = $x % 10;
+        if ($t <= 6) return $u == 1 ? $names[$t] . ' et un' : $names[$t] . ($u ? '-' . $ones[$u] : '');
+        if ($t == 7) return $x == 71 ? 'soixante et onze' : 'soixante-' . $ones[$x - 60];
+        if ($x == 80) return 'quatre-vingts';
+        return 'quatre-vingt-' . $ones[$x - 80];
+    };
+    $below1000 = function (int $x) use ($below100): string {
+        if ($x < 100) return $below100($x);
+        $h = intdiv($x, 100); $r = $x % 100;
+        $cent = ($h == 1) ? 'cent' : $below100($h) . ' cent' . ($r == 0 ? 's' : '');
+        return $cent . ($r ? ' ' . $below100($r) : '');
+    };
+    $parts = [];
+    foreach ([[1000000000, 'milliard', true], [1000000, 'million', true], [1000, 'mille', false]] as [$div, $label, $plural]) {
+        if ($num >= $div) {
+            $q = intdiv($num, $div); $num %= $div;
+            if ($label === 'mille') $parts[] = ($q == 1) ? 'mille' : $below1000($q) . ' mille';
+            else $parts[] = $below1000($q) . ' ' . $label . (($plural && $q > 1) ? 's' : '');
+        }
+    }
+    if ($num > 0) $parts[] = $below1000($num);
+    return implode(' ', $parts);
+}
+
 function numToArabicWords($num) {
     $num = (int)round((float)$num);
     if ($num === 0) return 'صفر';

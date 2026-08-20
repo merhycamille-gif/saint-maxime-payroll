@@ -412,6 +412,17 @@ if ($regEid) {
           && strpos($attSrc, 'name="emb_cur"') !== false && strpos($attSrc, 'name="emb_per"') !== false
           && numToEnglishWords(90000000) === 'Ninety Million'
           && numToEnglishWords(136445000) === 'One Hundred Thirty-Six Million Four Hundred Forty-Five Thousand');
+    // (2026-08-20) «بدي نفس الإفادة باللغة الفرنسية»: إفادة سفارة فرنسية كاملة بزرّ Français
+    // + تفقيط فرنسي صحيح (soixante et onze / quatre-vingts / cents)
+    $hEmF = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'embassy', 'lang_doc' => 'fr', 'opts_set' => 1, 'emb_amt' => 1500], []);
+    check('إفادة السفارة الفرنسية: النص والتفقيط بالفرنسي (والإنكليزية بحالها)',
+          strpos($hEmF, 'À qui de droit') !== false
+          && strpos($hEmF, 'par mois</strong> (mille cinq cents dollars américains uniquement)') !== false
+          && strpos($hEmF, 'Cette attestation lui est délivrée à sa demande.') !== false
+          && numToFrenchWords(71) === 'soixante et onze'
+          && numToFrenchWords(80) === 'quatre-vingts'
+          && numToFrenchWords(200) === 'deux cents'
+          && strpos($hEm1, 'To whom it may concern') !== false);
 } else {
     check('التنسيق الرسمي: لا موظف تجريبي (6/2026)', false, 'ما لقيت راتب محسوب 6/2026');
 }

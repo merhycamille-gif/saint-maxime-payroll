@@ -929,20 +929,27 @@ if (!$emp):
         $nivEn = array_values(array_filter(array_map(function ($k) use ($nivMapEn) { return $nivMapEn[$k] ?? ''; }, $nivKeys)));
         $levelsAr = count($nivAr) > 2 ? ('في الأقسام ' . implode(' و', $nivAr)) : (count($nivAr) == 2 ? ('في القسمين ' . $nivAr[0] . ' و' . $nivAr[1]) : (count($nivAr) == 1 ? ('في قسم ' . $nivAr[0]) : ''));
         $levelsEn = count($nivEn) >= 2 ? ('at both ' . implode(' and ', $nivEn) . ' levels') : (count($nivEn) == 1 ? ('at the ' . $nivEn[0] . ' level') : '');
+        // «بدي نفس الإفادة باللغة الفرنسية» (2026-08-20): الأقسام بالفرنسي لإفادة السفارة الفرنسية
+        $nivMapFr = ['maternelle'=>'Maternelle','primaire'=>'Primaire','intermediaire'=>'Complémentaire','secondaire'=>'Secondaire'];
+        $nivFr = array_values(array_filter(array_map(function ($k) use ($nivMapFr) { return $nivMapFr[$k] ?? ''; }, $nivKeys)));
+        $levelsFr = count($nivFr) >= 2 ? ('aux niveaux ' . implode(' et ', $nivFr)) : (count($nivFr) == 1 ? ('au niveau ' . $nivFr[0]) : '');
         $usdSal = $fxRate > 0 ? (int)round($salShown / $fxRate) : 0;
         // سعر إفادة السفارة: المبلغ اليدوي بالعملة المختارة، وإلا المحسوب بالدولار
         // «خيار أنا حط قيمة الراتب بالدولار + شهري أو سنوي» (2026-08-20): المبلغ اليدوي بعملة
         // خانته (دولار افتراضياً)، وإلا المحسوب بالدولار (×12 حين تكون الفترة سنوية)
         if ($embAmt > 0) {
             $embRate = $embCur === 'lbp' ? number_format($embAmt) . ' L.L' : '$' . number_format($embAmt);
-            // «لازم تفقط قيمة الراتب بالإنكليزي» (2026-08-20)
-            $embWords = numToEnglishWords($embAmt) . ' ' . ($embCur === 'lbp' ? 'Lebanese Pounds' : 'US Dollars') . ' only';
+            // «لازم تفقط قيمة الراتب بالإنكليزي» (2026-08-20) + بالفرنسي للنسخة الفرنسية
+            $embWords   = numToEnglishWords($embAmt) . ' ' . ($embCur === 'lbp' ? 'Lebanese Pounds' : 'US Dollars') . ' only';
+            $embWordsFr = numToFrenchWords($embAmt) . ' ' . ($embCur === 'lbp' ? 'livres libanaises' : 'dollars américains') . ' uniquement';
         } else {
             $embAuto = $embPer === 'year' ? $usdSal * 12 : $usdSal;
             $embRate = $embAuto > 0 ? '$' . number_format($embAuto) : '';
-            $embWords = $embAuto > 0 ? numToEnglishWords($embAuto) . ' US Dollars only' : '';
+            $embWords   = $embAuto > 0 ? numToEnglishWords($embAuto) . ' US Dollars only' : '';
+            $embWordsFr = $embAuto > 0 ? numToFrenchWords($embAuto) . ' dollars américains uniquement' : '';
         }
         $embPerWord = $embPer === 'year' ? 'year' : 'month';
+        $embPerWordFr = $embPer === 'year' ? 'an' : 'mois';
         $contactBits = array_filter([trim((string)($school['address'] ?? '')), $schoolPhone ? ('هاتف: ' . $schoolPhone) : '', trim((string)($school['email'] ?? ''))]);
         $contactFooter = implode('  |  ', $contactBits);
         // ترويسة عربية: الشعار يمين + اسم المدرسة (عربي) + الهاتف، بشكل رسمي
@@ -1033,6 +1040,19 @@ if (!$emp):
         <p>أنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا<?php else: ?>هو(ـي) معلّم(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا<?php endif; ?> .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
         <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong>الإدارة</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <?= $footerHtml ?>
+
+      <?php elseif ($type === 'embassy' && $docLang === 'fr'): ?>
+        <?php /* «بدي نفس الإفادة باللغة الفرنسية» (2026-08-20) — تُختار من أزرار اللغة فوق */ ?>
+        <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
+        <div dir="ltr" style="text-align:left">
+          <div style="text-align:right;margin-bottom:10px"><?= date('d/m/Y') ?></div>
+          <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">Attestation</h2>
+          <p>À qui de droit,</p>
+          <p>Nous certifions par la présente que <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>est employé(e) en qualité de <strong><?= e($fnFr['fr']) ?></strong> à <strong><?= e($schoolNameFr) ?></strong>, à raison de <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> par <?= $embPerWordFr ?></strong><?= $embRate !== '' ? ' (' . e($embWordsFr) . ')' : '' ?><?php else: ?>est enseignant(e) à <strong><?= e($schoolNameFr) ?></strong>. Il/Elle enseigne <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsFr ?>, à raison de <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> par <?= $embPerWordFr ?></strong><?= $embRate !== '' ? ' (' . e($embWordsFr) . ')' : '' ?><?php endif; ?>. Nous confirmons également qu'il/elle est engagé(e) dans notre établissement pour l'année scolaire <strong><?= $nextSY ?></strong>.</p>
+          <p style="text-align:center">Cette attestation lui est délivrée à sa demande.</p>
+          <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong>Directeur</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
+        </div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'embassy'): ?>
