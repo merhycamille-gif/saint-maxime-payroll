@@ -954,7 +954,7 @@ if (!$emp):
         <p style="margin-right:34px;text-align:right">- الإجمالي : <strong><?= $moneyAr($salShown) ?></strong></p>
         <?php endif; ?>
         <p>فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> .</p>
-        <?php /* «شيل جملة واستعمالها لمن يلزم» (2026-08-20) — من إفادة الراتب فقط */ ?>
+        <?php /* صيغة «لمن يلزم» شِيلت من كل الإفادات (بطلبه 2026-08-20) */ ?>
         <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) .</p>
         <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
@@ -967,7 +967,8 @@ if (!$emp):
         </div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? 'إفادة عمل' : 'إفادة عمل وتدريس' ?></h2>
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) حتى تاريخه ، وهو(هي) على حسن سلوك والتزام في أداء عمله(ا) .</p>
-        <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) لاستعمالها لدى من يلزم ، دون أدنى مسؤولية على المؤسسة تجاه أي طرف ثالث .</p>
+        <?php /* صيغة «لمن يلزم» وجملة عدم المسؤولية شِيلتا من كل الإفادات (بطلبه 2026-08-20) */ ?>
+        <p>وقد أُعطيت هذه الإفادة بناءً على طلبه(ا) .</p>
         <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
@@ -1320,7 +1321,7 @@ if (!$emp):
                 <?php elseif ($type==='fin_de_service'): ?><p>وقد انتهت خدمة <strong><?= e($nomAr) ?></strong> في مدرستنا<?php if ($emp['hire_date']): ?>، بعد خدمة من <strong><?= $hireFmt ?></strong> حتى <strong><?= $effFmt ?></strong><?= $yAr?' ('.e($yAr).')':'' ?><?php endif; ?>، اعتباراً من <strong><?= $effFmt ?></strong>.</p>
                 <?php elseif ($type==='decharge'): ?><p>يُقرّ <strong><?= e($nomAr) ?></strong> بأنه قبض من مدرستنا كامل حقوقه ورواتبه ومستحقاته (بما فيها التعويضات وتعويض نهاية الخدمة) لغاية تاريخ <strong><?= $effFmt ?></strong>، وأنه لا يطالب المدرسة بأي حقّ أو مستحق بعد هذا التاريخ (براءة ذمة تامة).</p>
                 <?php endif; ?>
-                <p>أُعطيت هذه الإفادة بناءً على طلبه لاستعمالها عند الحاجة.</p>
+                <p>أُعطيت هذه الإفادة بناءً على طلبه.</p>
 
             <?php elseif ($docLang === 'fr'): ?>
                 <p>Nous soussignés, <strong><?= e($schoolNameFr) ?></strong>, attestons que :</p>
@@ -1334,7 +1335,7 @@ if (!$emp):
                 <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> a cessé ses fonctions à compter du <strong><?= $effFmt ?></strong><?php if ($emp['hire_date']): ?>, après une période de service du <?= $hireFmt ?> au <?= $effFmt ?><?= $yFr?' ('.e($yFr).')':'' ?><?php endif; ?>.</p>
                 <?php elseif ($type==='decharge'): ?><p><strong><?= e($nomFr) ?></strong> reconnaît avoir perçu de notre établissement l'intégralité de ses droits et salaires (y compris indemnités et fin de service) à la date du <strong><?= $effFmt ?></strong>, et déclare n'avoir aucune réclamation envers l'établissement (reçu pour solde de tout compte).</p>
                 <?php endif; ?>
-                <p>La présente attestation est délivrée pour servir et valoir ce que de droit.</p>
+                <p>La présente attestation est délivrée à sa demande.</p>
 
             <?php else: /* en */ ?>
                 <p>We, the undersigned, <strong><?= e($schoolNameFr) ?></strong>, hereby certify that:</p>
@@ -1348,7 +1349,7 @@ if (!$emp):
                 <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> ended his/her duties effective <strong><?= $effFmt ?></strong><?php if ($emp['hire_date']): ?>, after a service period from <?= $hireFmt ?> to <?= $effFmt ?><?= $yEn?' ('.e($yEn).')':'' ?><?php endif; ?>.</p>
                 <?php elseif ($type==='decharge'): ?><p><strong><?= e($nomFr) ?></strong> acknowledges having received from our establishment all of his/her dues and salaries (including allowances and end-of-service) as of <strong><?= $effFmt ?></strong>, and declares having no claim whatsoever against the establishment (final discharge / receipt in full).</p>
                 <?php endif; ?>
-                <p>This certificate is issued to whom it may concern.</p>
+                <p>This certificate is issued upon his/her request.</p>
             <?php endif; ?>
 
             <!-- التاريخ والتوقيع -->
