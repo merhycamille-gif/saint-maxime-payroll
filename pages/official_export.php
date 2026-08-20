@@ -146,7 +146,9 @@ if ($form === 'cnss_work_attestation') {
     $F  = '<div style="position:absolute;right:22%;top:' . $stop . '%;white-space:nowrap;text-align:right;font-weight:bold;color:#000;font-size:' . $sfs . 'pt;line-height:1">' . $E($schName) . '</div>';
     $F .= $fld('c', 5, 24.4, 10, $p1) . $fld('c', 17, 24.4, 10, $p2) . $fld('c', 32, 24.4, 10, $p3); // رقم المؤسسة
     $F .= $fld('r', 34, 33.9, 26, $name);                              // اسم الأجير
-    $F .= $fld('c', 5, 34, 10, $cells['R6']) . $fld('c', 17, 34, 22, $emp['nssf_number'] ?? ''); // سنة الولادة + رقم الضمان
+    // «رقم ضمان الموظف مرتب بنص المربعات» (p1 بطلبه 2026-08-20): الإحداثيات مقيسة من صورة
+    // القالب نفسها (المربع الصغير 6.3–12.8% والعريض 12.8–32.9%، الوسط العمودي 33.2%)
+    $F .= $fld('c', 6.3, 32.4, 6.5, $cells['R6']) . $fld('c', 12.8, 32.4, 20, $emp['nssf_number'] ?? ''); // سنة الولادة + رقم الضمان
     for ($i = 0; $i < 7; $i++) {                                        // جدول الأشهر
         $F .= $fld('c', 77, $rowY[$i], 13, $cells['B' . (10 + $i)]);
         $F .= $fld('c', 62, $rowY[$i], 15, $cells['E' . (10 + $i)]);

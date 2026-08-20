@@ -602,7 +602,9 @@ if (!$emp):
     // المكوّنات: عند أوّل فتح (opts_set غير موجود) تتبع اختيار «الراتب يشمل» العام بالترويسة
     // (salaryComp)؛ بعد أي تفاعل مع الفورم (opts_set=1) تُحترَم حالة المربّعات الفعلية.
     $optsSet  = !empty($_GET['opts_set']);
-    $incExtra = $optsSet ? !empty($_GET['inc_extra']) : salaryCompHas('extra');
+    // «الأجر الإضافي بكل الإفادات بدها تكون» (بطلبه 2026-08-20): الإضافي محطوط افتراضياً بكل
+    // الإفادات (لا يتبع زر «الراتب يشمل» العام)، ومربّع الخيار بالفورم يبقى بيد المستخدم
+    $incExtra = $optsSet ? !empty($_GET['inc_extra']) : true;
     $incAide  = $optsSet ? !empty($_GET['inc_aide'])  : salaryCompHas('aide');
     $incTrans = $optsSet ? !empty($_GET['inc_trans']) : salaryCompHas('transport');
     $salShown = (int)$basePlusEch + ($incExtra ? $extraW : 0) + ($incAide ? $aideW : 0) + ($incTrans ? $transW : 0);

@@ -294,7 +294,12 @@ if ($regEid) {
     $hPs = renderPage('pages/monthly_payroll.php', ['employee_id' => $regEid, 'month' => 6, 'year' => 2026], []);
     check('القسيمة: توقيعا المحاسب والموظف بالاستلام', strpos($hPs, 'توقيع المحاسب') !== false && strpos($hPs, 'توقيع الموظف بالاستلام') !== false);
     check('القسيمة: «صافي الراتب المستحق للدفع» بارز', strpos($hPs, 'صافي الراتب المستحق للدفع') !== false);
-    $hAt = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire'], []);
+    // (2026-08-20) «الأجر الإضافي بكل الإفادات بدها تكون»: الإضافي محطوط افتراضياً — فالأساس-وحده
+    // يُجرَّب بشيل المربّع صراحةً (opts_set=1 بلا inc_extra)
+    $hAt = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire', 'opts_set' => 1], []);
+    $hAtDef = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire'], []);
+    check('إفادة راتب: الأجر الإضافي محطوط افتراضياً بكل الإفادات (المربّع مؤشَّر بلا أي خيار)',
+          strpos($hAtDef, 'name="inc_extra" value="1" checked') !== false);
     // (2026-08-16) بطلب المستخدم: جملة «دون أدنى مسؤولية...» انشالت من إفادة الراتب فقط
     // (2026-08-20) «بدون تابلو»: الأساس وحده = جملة «قدره» بلا تفصيل ولا جدول
     check('إفادة راتب: الصيغة الرسمية (الأساس وحده = جملة قدره، بلا جملة عدم المسؤولية، بلا جدول، بلا «لاستعمالها لدى من يلزم»)',
