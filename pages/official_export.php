@@ -108,14 +108,15 @@ if ($form === 'cnss_contrib_monthly') {
             header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             header('Pragma: no-cache');
             echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>CNSS 190A</title>'
-               . '<style>@page{size:A4 landscape;margin:8mm}*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+               . '<style>@page{size:A4 landscape;margin:0}*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
                . 'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:#e9edf2}'
                . '.sheet{width:297mm;margin:0 auto;direction:ltr}'
                . '.page{position:relative;width:297mm;height:210mm;background:#fff;overflow:hidden;transform-origin:top left}'
                . '.pbg{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}'
                . '.f{position:absolute;z-index:1;color:#000;font-weight:bold;line-height:1.15;white-space:nowrap}'
                . '.bar{text-align:center;margin:10px 0}'
-               . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:281mm;height:194mm;overflow:hidden;margin:0}.page{transform:scale(0.946)}}'
+               /* «بدي ياها تكون قد A4» (2026-08-21): هامش صفحة 0 وبلا أي تصغير — النموذج بحجمه الكامل */
+               . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:297mm;height:210mm;overflow:hidden;margin:0}.page{transform:none}}'
                . '</style></head><body>'
                . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
                . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — النموذج طبق الأصل الرسمي (اتجاه الورقة: أفقي/Paysage)</div></div>'
