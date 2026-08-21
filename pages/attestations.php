@@ -890,9 +890,12 @@ if (!$emp):
     ?>
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
-    @page{size:A4;margin:<?= $lhOn ? '0' : '8mm' ?>}
+    /* 🖨️ «بدي بس 2 سنتم» (2026-08-21): هامش الورقة صفر وكل المسافات من جوّا الإفادة نفسها
+       (2 سم للنص و8mm للترويسة) — فتطلع 2 سم تماماً مهما كان خيار هوامش متصفحه (None/Default)؛
+       عقد التعليم متعدد الصفحات يبقي هامشاً عمودياً لصفحاته التالية */
+    @page{size:A4;margin:<?= $lhOn ? '0' : ($type === 'aqd_taalim' ? '10mm 0' : '0') ?>}
     .page-content{padding:0 !important;margin:0 !important}
-    <?= $lhOn ? '' : '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding-top:0 !important}' ?></style>
+    <?= $lhOn ? '' : '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding:8mm 20mm 10mm !important} #ppExportArea .scr-head{margin-left:-12mm !important;margin-right:-12mm !important}' ?></style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
     <?php /* 🗏 ترتيب مثال p1.png + «بدي المسافة 2 سنتم» (2026-08-21): 12mm بجسم الإفادة فوق
            8mm (حشوة الشاشة/هامش الورقة) = 2 سم للكتابة من حافتي الورقة تماماً، وترويسة اللوغو
@@ -1039,9 +1042,12 @@ if (!$emp):
     ?>
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
-    @page{size:A4;margin:<?= $lhOn ? '0' : '8mm' ?>}
+    /* 🖨️ «بدي بس 2 سنتم» (2026-08-21): هامش الورقة صفر وكل المسافات من جوّا الإفادة نفسها
+       (2 سم للنص و8mm للترويسة) — فتطلع 2 سم تماماً مهما كان خيار هوامش متصفحه (None/Default)؛
+       عقد التعليم متعدد الصفحات يبقي هامشاً عمودياً لصفحاته التالية */
+    @page{size:A4;margin:<?= $lhOn ? '0' : ($type === 'aqd_taalim' ? '10mm 0' : '0') ?>}
     .page-content{padding:0 !important;margin:0 !important}
-    <?= $lhOn ? '' : '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding-top:0 !important}' ?></style>
+    <?= $lhOn ? '' : '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding:8mm 20mm 10mm !important} #ppExportArea .scr-head{margin-left:-12mm !important;margin-right:-12mm !important}' ?></style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
     <?php /* 🗏 ترتيب مثال p1.png + «بدي المسافة 2 سنتم» (2026-08-21): 12mm بجسم الإفادة فوق
            8mm (حشوة الشاشة/هامش الورقة) = 2 سم للكتابة من حافتي الورقة تماماً، وترويسة اللوغو

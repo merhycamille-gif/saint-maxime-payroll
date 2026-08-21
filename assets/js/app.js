@@ -288,7 +288,9 @@ document.addEventListener('change', function(e) {
                 // (صندوق الورقة 794×1122 — أقل من A4=1122.5px بنصف بكسل حتى لا ينكسر)،
                 // وإلا هامش 12mm (~45px) = 704×1033 بأمان 990
                 var lh3 = pp.style.minHeight === '1122px';
-                var tw3 = lh3 ? 794 : 704, th3 = lh3 ? 1115 : 990;
+                // (2026-08-21) هوامش @page صارت صفراً بكل الإفادات (المسافات من جوّا الإفادة
+                // نفسها) → هدف القياس مقاس A4 كاملاً بالحالتين، بأمان بسيط لفروق تدفّق الطباعة
+                var tw3 = 794, th3 = lh3 ? 1115 : 1100;
                 var prevW3 = pp.style.width, prevMW3 = pp.style.maxWidth;
                 pp.style.maxWidth = 'none'; pp.style.width = tw3 + 'px';
                 var w3 = pp.scrollWidth, h3 = pp.scrollHeight;

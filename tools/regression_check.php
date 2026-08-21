@@ -48,6 +48,7 @@ $__sy = $argv[6] ?? '';
 if ($__sy !== '') $_SESSION['active_school_year'] = $__sy; // السنة الدراسية المعروضة
 $_GET = json_decode(base64_decode($argv[2] ?? ''), true) ?: [];
 $_SERVER['REQUEST_URI'] = '/x';
+$_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET'; // CLI بلا REQUEST_METHOD — تحذيره كان يتصدّر مخرجات القياس
 chdir(dirname($PROJ . '/' . $argv[1]));
 ob_start();
 try { include $PROJ . '/' . $argv[1]; echo ob_get_clean(); }
@@ -304,7 +305,9 @@ check('أسماء المناطق باللاتينية: قاموس المناطق
 check('ترتيب p1: اللوغو بزاوية الورقة والكتابة 2 سم من الحافتين + justify لاتيني + المدينة قبل التاريخ',
       strpos($attSrc, 'padding:20px 8mm') !== false
       && substr_count($attSrc, '#ppExportArea .card-body{padding-left:12mm;padding-right:12mm} #ppExportArea .scr-head{margin-left:-12mm;margin-right:-12mm}') >= 2
-      && substr_count($attSrc, '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding-top:0 !important}') >= 2
+      && substr_count($attSrc, '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding:8mm 20mm 10mm !important}') >= 2
+      && substr_count($attSrc, "\$type === 'aqd_taalim' ? '10mm 0' : '0'") >= 1
+      && strpos((string)file_get_contents(__DIR__ . '/../assets/js/export.js'), "att ? '1.2cm 2cm'") !== false
       && strpos($attSrc, '<div dir="ltr" style="text-align:left">') === false
       && substr_count($attSrc, "e(\$cityFr) . ', le '") >= 3);
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',

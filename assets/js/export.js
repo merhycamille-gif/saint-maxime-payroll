@@ -111,8 +111,11 @@
         // A4: عمودي 595.3×841.9pt، أفقي 841.9×595.3pt
         var size = wide ? '841.9pt 595.3pt' : '595.3pt 841.9pt';
         var orient = wide ? 'landscape' : 'portrait';
+        // 🗏 «بدي بس 2 سنتم» (2026-08-21): وورد الإفادات (ppExportArea العمودي) هوامش جوانبه
+        // 2 سم بالضبط — والتقارير/الجداول العريضة تبقى 1 سم حتى لا تنحشر
+        var att = !wide && !!document.getElementById('ppExportArea');
         var css = '<style>'
-            + '@page WordSection1{size:' + size + ';mso-page-orientation:' + orient + ';margin:1cm 1cm;}'
+            + '@page WordSection1{size:' + size + ';mso-page-orientation:' + orient + ';margin:' + (att ? '1.2cm 2cm' : '1cm 1cm') + ';}'
             + 'div.WordSection1{page:WordSection1;}'
             + 'body{font-family:Cairo,Arial,sans-serif;direction:rtl}'
             + 'table{border-collapse:collapse;width:100%;table-layout:fixed}'
