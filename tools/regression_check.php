@@ -331,6 +331,10 @@ check('المادة بلغة الإفادة: قاموس المواد بالات�
       && subjectToLang('اللّغة العربيّة', 'fr') === 'Arabe'
       && subjectToLang('Chimie', 'ar') === 'الكيمياء'
       && subjectToLang('مادة غير معروفة', 'fr') === 'مادة غير معروفة'
+      /* p1 (2026-08-21): موادّ متعددة بمسافات تُترجم كلمةً كلمة إن عُرفت كلها، وإلا تبقى كما هي */
+      && subjectToLang('تاريخ تربية جغرافيا', 'fr') === 'Histoire, Éducation civique, Géographie'
+      && subjectToLang('تاريخ تربية جغرافيا', 'en') === 'History, Civics, Geography'
+      && subjectToLang('مديرة قسم الروضات', 'fr') === 'مديرة قسم الروضات'
       && strpos($attSrc, "subjectToLang(\$subj, 'ar')") !== false
       && strpos($attSrc, 'e($subjAr)') !== false && strpos($attSrc, 'e($subjL)') !== false
       && strpos($attSrc, 'e($subjFr)') !== false && strpos($attSrc, 'e($subjEn)') !== false

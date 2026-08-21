@@ -333,23 +333,35 @@ function subjectNormalize($s) {
     return trim(preg_replace('/\s+/u', ' ', $s));
 }
 
-/** المادة بلغة الوثيقة ('ar'|'fr'|'en') — يدعم موادّ متعددة مفصولة بـ , ، / + */
+/** المادة بلغة الوثيقة ('ar'|'fr'|'en') — يدعم موادّ متعددة مفصولة بـ , ، / + أو بمسافات
+ *  («تاريخ تربية جغرافيا» — p1 ‏2026-08-21): تُترجم كلمةً كلمة فقط إن عُرفت كل الكلمات،
+ *  وإلا يبقى النص كما كُتب (حتى لا تتخربط عبارة حرّة مثل «مديرة قسم الروضات»). */
 function subjectToLang($raw, $lang) {
     $raw = trim((string)$raw);
     if ($raw === '') return '';
     $i = ['ar' => 0, 'fr' => 1, 'en' => 2][$lang] ?? 0;
     $map = subjectMap();
-    $one = function ($part) use ($map, $i) {
+    $sep = ($lang === 'ar') ? ' و' : ', ';
+    $one = function ($part) use ($map, $i, $sep) {
         $part = trim($part);
         if ($part === '') return '';
         $k = subjectNormalize($part);
-        return isset($map[$k]) ? $map[$k][$i] : $part; // غير المعروف يبقى كما كُتب
+        if (isset($map[$k])) return $map[$k][$i];
+        // موادّ متعددة بمسافات: طابق أطول عبارة (حتى 3 كلمات) — كل الكلمات لازم تُعرف
+        $words = array_values(array_filter(explode(' ', $k), 'strlen'));
+        if (count($words) < 2) return $part;
+        $out = [];
+        for ($w = 0; $w < count($words); $w++) {
+            for ($len = min(3, count($words) - $w); $len >= 1; $len--) {
+                $ph = implode(' ', array_slice($words, $w, $len));
+                if (isset($map[$ph])) { $out[] = $map[$ph][$i]; $w += $len - 1; continue 2; }
+            }
+            return $part; // كلمة غير معروفة → العبارة كلها كما كُتبت
+        }
+        return implode($sep, $out);
     };
-    // المادة كلها دفعة واحدة (تغطي «اجتماع واقتصاد») ثم التقسيم على الفواصل
-    $k = subjectNormalize($raw);
-    if (isset($map[$k])) return $map[$k][$i];
     $parts = array_filter(array_map($one, preg_split('/\s*[,،;\/+&]\s*/u', $raw)), 'strlen');
-    return implode($lang === 'ar' ? ' و' : ', ', $parts);
+    return implode($sep, $parts);
 }
 
 /**
