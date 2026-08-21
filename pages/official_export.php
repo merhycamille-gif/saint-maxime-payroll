@@ -54,18 +54,75 @@ if ($form === 'cnss_contrib_monthly') {
     $c2 = (int)$t['c']; $n2 = (int)$t['n']; $w2 = $c2 ? (int)round($c2 / rateFrac('end_of_service_rate', $month, $year, 8.5)) : 0;
     $c3 = (int)$fam['c']; $n3 = (int)$fam['n']; $w3 = $c3 ? (int)round($c3 / rateFrac('family_compensation_rate', $month, $year, 6)) : 0;
 
-    $ok = officialTemplateExport(__DIR__ . '/../assets/templates/cnss_monthly.xlsx', [
+    $cells190 = [
         'D8'  => $school['name_ar'] ?? '',
         'G14' => $school['nssf_employer_number'] ?? '',
         'AC1' => monthName($month, 'ar'), 'AI1' => $year,
-        'C21' => $n1, 'D21' => $w1, 'P21' => $c1,
-        'C29' => $n2, 'D29' => $w2, 'P29' => $c2,
-        'C37' => $n3, 'D37' => $w3, 'P37' => $c3,
-        'P45' => $fpaid,
-    ], $format, 'CNSS_190A_' . $month . '_' . $year, !empty($_GET['inline']) ? 'inline' : 'attachment');
-    // officialTemplateExport يبثّ ويخرج؛ لو رجع false (تحويل PDF غير متاح على هذا الخادم —
-    // أونلاين بلا LibreOffice) نوجّه للعرض الرسمي بالمتصفح مع شرح واضح بدل «ما صار شي».
+        'C21' => $n1, 'D21' => formatLBP($w1, false), 'P21' => formatLBP($c1, false),
+        'C29' => $n2, 'D29' => formatLBP($w2, false), 'P29' => formatLBP($c2, false),
+        'C37' => $n3, 'D37' => formatLBP($w3, false), 'P37' => formatLBP($c3, false),
+        // خانتا المجموع والباقي صيغتان بالإكسل — بالنسخة المصوّرة نحسبهما هنا
+        'P43' => formatLBP($c1 + $c2 + $c3, false),
+        'P45' => formatLBP($fpaid, false),
+        'P47' => formatLBP(($c1 + $c2 + $c3) - $fpaid, false),
+    ];
+    $ok = false;
+    if (($_GET['mode'] ?? '') !== 'image') {
+        $ok = officialTemplateExport(__DIR__ . '/../assets/templates/cnss_monthly.xlsx', [
+            'D8'  => $school['name_ar'] ?? '',
+            'G14' => $school['nssf_employer_number'] ?? '',
+            'AC1' => monthName($month, 'ar'), 'AI1' => $year,
+            'C21' => $n1, 'D21' => $w1, 'P21' => $c1,
+            'C29' => $n2, 'D29' => $w2, 'P29' => $c2,
+            'C37' => $n3, 'D37' => $w3, 'P37' => $c3,
+            'P45' => $fpaid,
+        ], $format, 'CNSS_190A_' . $month . '_' . $year, !empty($_GET['inline']) ? 'inline' : 'attachment');
+    }
+    // officialTemplateExport يبثّ ويخرج؛ لو رجع false (تحويل PDF غير متاح — أونلاين بلا
+    // LibreOffice) → «هيدي PDF مش مظبوطة» (p1 ‏2026-08-21): نفس آلية النماذج الثلاثة —
+    // صورة القالب الرسمي الفاضي + القيم مركّبة فوقها بإحداثيات معايَرة (cnss_monthly.pos.json)
+    // فيطلع زرّ الطباعة/PDF طبق الأصل الرسمي بلا أي أداة على الخادم. النموذج أفقي (A4 landscape).
     if (!$ok) {
+        $posFile190 = __DIR__ . '/../assets/templates/cnss_monthly.pos.json';
+        $bgFile190  = __DIR__ . '/../assets/templates/cnss_monthly.png';
+        if ($format === 'pdf' && is_file($posFile190) && is_file($bgFile190)) {
+            $pos = json_decode((string)file_get_contents($posFile190), true) ?: [];
+            $fsBase = (float)($pos['fs'] ?? 10.7);
+            $E = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+            $F = '';
+            foreach ($cells190 as $ref => $val) {
+                $val = trim((string)$val);
+                if ($val === '' || $val === '0' || !isset($pos['cells'][$ref])) continue;
+                $p = $pos['cells'][$ref];
+                $len = function_exists('mb_strlen') ? mb_strlen($val, 'UTF-8') : strlen($val);
+                $fs = $fsBase * ($len > 30 ? 0.8 : 1);
+                $style = 'top:' . $p['yt'] . '%;font-size:' . round($fs, 1) . 'pt';
+                if (($p['align'] ?? '') === 'center') {
+                    $style .= ';left:' . $p['xc'] . '%;transform:translateX(-50%)';
+                } else {
+                    $style .= ';right:' . round(100 - $p['xr'], 2) . '%';
+                }
+                $F .= '<div class="f" style="' . $style . '">' . $E($val) . '</div>';
+            }
+            header('Content-Type: text/html; charset=UTF-8');
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            header('Pragma: no-cache');
+            echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>CNSS 190A</title>'
+               . '<style>@page{size:A4 landscape;margin:8mm}*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+               . 'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:#e9edf2}'
+               . '.sheet{width:297mm;margin:0 auto;direction:ltr}'
+               . '.page{position:relative;width:297mm;height:210mm;background:#fff;overflow:hidden;transform-origin:top left}'
+               . '.pbg{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}'
+               . '.f{position:absolute;z-index:1;color:#000;font-weight:bold;line-height:1.15;white-space:nowrap}'
+               . '.bar{text-align:center;margin:10px 0}'
+               . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:281mm;height:194mm;overflow:hidden;margin:0}.page{transform:scale(0.946)}}'
+               . '</style></head><body>'
+               . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
+               . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — النموذج طبق الأصل الرسمي (اتجاه الورقة: أفقي/Paysage)</div></div>'
+               . '<div class="sheet"><div class="page"><img class="pbg" src="' . BASE_URL . 'assets/templates/cnss_monthly.png" alt=""> ' . $F . '</div></div>'
+               . '</body></html>';
+            exit;
+        }
         $_SESSION['flash_info'] = ($format === 'pdf')
             ? 'تحويل PDF الرسمي متاح على كمبيوتر المدرسة فقط. هون فيك: تنزّل «Excel رسمي» (معبّى بنفس الأرقام) أو تكبس Ctrl+P وتختار «حفظ كـ PDF» لطباعة النموذج المعروض. / Le PDF officiel n\'est disponible que sur l\'ordinateur de l\'école — téléchargez l\'Excel officiel ou imprimez avec Ctrl+P.'
             : 'تعذّر توليد الملف على هذا الخادم — جرّب من كمبيوتر المدرسة. / Génération impossible sur ce serveur.';

@@ -343,6 +343,18 @@ check('المادة بلغة الإفادة: قاموس المواد بالات�
       && strpos($attSrc, 'e($subjFr)') !== false && strpos($attSrc, 'e($subjEn)') !== false
       && strpos($attSrc, '$vb($subjAr, 110)') !== false && strpos($attSrc, '$vb($subjL, 110)') !== false
       && strpos($attSrc, "\$blank(140) ?></strong> <?= \$levelsAr ?>") !== false);
+// (2026-08-21) p1: «هيدي PDF مش مظبوطة» — نموذج 190A أونلاين (بلا LibreOffice) كان يقع على
+// النسخة المرسومة المخربطة → صار له نسخة مصوّرة طبق الأصل (صورة القالب الرسمي المفرَّغ +
+// القيم المركّبة بإحداثيات معايَرة + خانتا المجموع/الباقي محسوبتان) — A4 أفقي
+$oe190 = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
+check('نموذج 190A: نسخة مصوّرة طبق الأصل (خلفية + إحداثيات + مجموع/باقٍ محسوبان + A4 أفقي)',
+      is_file(__DIR__ . '/../assets/templates/cnss_monthly.png')
+      && is_file(__DIR__ . '/../assets/templates/cnss_monthly.pos.json')
+      && count(json_decode((string)file_get_contents(__DIR__ . '/../assets/templates/cnss_monthly.pos.json'), true)['cells'] ?? []) === 16
+      && strpos($oe190, "'P43' => formatLBP(\$c1 + \$c2 + \$c3, false)") !== false
+      && strpos($oe190, "'P47' => formatLBP((\$c1 + \$c2 + \$c3) - \$fpaid, false)") !== false
+      && strpos($oe190, 'cnss_monthly.pos.json') !== false
+      && strpos($oe190, 'size:A4 landscape') !== false);
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
       strpos($attSrc, "'N°' : 'No.'") === false
       && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false
