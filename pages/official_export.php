@@ -132,6 +132,114 @@ if ($form === 'cnss_contrib_monthly') {
     }
 }
 
+if ($form === 'mof_r3') {
+    // 🏛️ نموذج وزارة المالية ر3 — «طلب تسجيل مستخدم/أجير جديد» طبق الأصل («شوف ر3 على
+    // الدسك توب وبدي متلها طبق الأصل» — 2026-08-21): صورة النموذج الرسمي (mof_r3.png من
+    // ملف المستخدم الأصلي PDF) + معلومات الموظف مركّبة فوقها بإحداثيات مقيسة من الـPDF
+    // نفسه (تسميات fitz + مسح مربعات PIL). A4 عمودي بالحجم الكامل (قاعدة «قد A4»).
+    $empId = (int)($_GET['emp'] ?? 0);
+    $st = $db->prepare("SELECT * FROM employees WHERE id=? AND is_deleted=0 AND " . schoolScopeWhere('school_id'));
+    $st->execute([$empId]);
+    $emp = $st->fetch();
+    if (!$emp) { http_response_code(404); die('الموظف غير موجود أو خارج صلاحيتك'); }
+    // للمالية: مدرسة الموظف نفسها برقمها المالي (لا تخضع لقاعدة «صاحب العمل بالضمان»)
+    $ss = $db->prepare("SELECT * FROM schools WHERE id=?");
+    $ss->execute([(int)$emp['school_id']]);
+    $esch = $ss->fetch() ?: [];
+
+    $sex  = (($_GET['sex'] ?? 'm') === 'f') ? 'f' : 'm';
+    $wage = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? $_GET['wage'] : 'm';
+    $social = (string)($emp['social_status'] ?? 'celibataire');
+    $isMar = (strpos($social, 'marie') === 0);
+    $marKey = $isMar ? 'married' : ((strpos($social, 'veu') === 0) ? 'widow' : ((strpos($social, 'divor') === 0) ? 'divorced' : 'single'));
+    $mofNum = preg_replace('/\D/', '', (string)($emp['finance_ministry_number'] ?? ''));
+    $dsplit = function ($date) { $t = $date ? strtotime($date) : 0; return $t ? [date('j', $t), date('n', $t), date('Y', $t)] : ['', '', '']; };
+    [$bD, $bM, $bY] = $dsplit($emp['birth_date'] ?? '');
+    [$hD, $hM, $hY] = $dsplit($emp['hire_date'] ?? '');
+    $famBenef = (int)($emp['number_of_children'] ?? 0) + (($isMar && !(int)($emp['spouse_works'] ?? 0)) ? 1 : 0);
+    $motherAr = trim(($emp['mother_first_name'] ?? '') . ' ' . ($emp['mother_last_name'] ?? ''));
+    $regNo3 = trim((string)($emp['civil_registry_number'] ?? ''));
+    $regPl3 = trim((string)($emp['civil_registry_place'] ?? ''));
+
+    // الحقول: [النص، x%، y%، محاذاة r=مرساة يمين / c=توسيط، حجم الخط pt]
+    $R3 = [];
+    $put = function ($t, $x, $y, $a = 'r', $fs = 9.5) use (&$R3) { $t = trim((string)$t); if ($t !== '' && $t !== '0/0/0') $R3[] = [$t, $x, $y, $a, $fs]; };
+    $digits = function ($num, $centers, $y) use (&$R3) { // رقم بخانات: يتعبّأ من يمين الصف (آخر الخانات)
+        $num = preg_replace('/\D/', '', (string)$num);
+        $off = max(0, count($centers) - strlen($num));
+        for ($i = 0; $i < strlen($num) && ($off + $i) < count($centers); $i++) $R3[] = [$num[$i], $centers[$off + $i], $y, 'c', 10];
+    };
+    $X = function ($x, $y) use (&$R3) { $R3[] = ['×', $x, $y, 'c', 11]; };
+
+    // المؤسسة
+    $put($esch['name_ar'] ?? '', 81.2, 10.05);
+    $digits($esch['finance_number'] ?? '', [26.05,30.08,34.12,38.15,42.18,46.22,50.25,54.12,58.15,62.18,66.22], 12.35);
+    // هل لديه رقم مالي شخصي؟ + الرقم
+    if ($mofNum !== '') { $X(42.1, 15.35); $digits($mofNum, [13.95,17.98,22.02,26.05,30.08,34.12,38.15,42.18,46.05,50.08], 17.35); }
+    else { $X(30.1, 15.35); }
+    // تعريف المستخدم
+    $put($emp['first_name_ar'] ?? '', 90.1, 19.05);
+    $put($emp['last_name_ar'] ?? '', 46.4, 19.05);
+    $put($emp['father_name_ar'] ?? '', 89.4, 20.8);
+    $put($motherAr, 37.0, 20.8);
+    $X($sex === 'f' ? 66.2 : 78.3, 22.6);
+    $natR3 = in_array(mb_strtolower(trim((string)($emp['nationality'] ?? ''))), ['lebanese', 'lebanaise', 'libanaise', 'لبنانية', 'لبناني'], true) ? 'لبنانية' : (string)($emp['nationality'] ?? '');
+    $put($natR3, 45.9, 22.55);
+    $put($emp['birth_place'] ?? '', 87.1, 24.3);
+    $put($bD, 36.05, 24.3, 'c'); $put($bM, 24.0, 24.3, 'c'); $put($bY, 12.0, 24.3, 'c');
+    $put($regNo3, 88.7, 26.9);
+    $put($regPl3, 46.2, 26.9);
+    $X(['single' => 74.3, 'married' => 62.2, 'widow' => 50.1, 'divorced' => 38.2][$marKey], 30.4);
+    $put((string)(int)($emp['number_of_children'] ?? 0), 88.2, 32.15);
+    $put($hD, 40.1, 32.15, 'c'); $put($hM, 28.1, 32.15, 'c'); $put($hY, 16.1, 32.15, 'c');
+    $put($emp['nssf_number'] ?? '', 82.4, 34.8);
+    $X(['m' => 78.3, 'd' => 66.2, 'h' => 54.1][$wage], 36.3);
+    // الزوج/الزوجة: المستفيدون من التنزيل + هل يعمل
+    if ($famBenef > 0) $put((string)$famBenef, 68.9, 47.85, 'r');
+    if ($isMar) $X((int)($emp['spouse_works'] ?? 0) ? 66.2 : 54.1, 49.8);
+    // عنوان السكن
+    $put($emp['gouvernorat'] ?? '', 91.3, 63.0);
+    $put($emp['district'] ?? '', 67.9, 63.0);
+    $put($emp['ville'] ?? '', 44.9, 63.0);
+    $put($emp['quartier'] ?? '', 24.0, 63.0);
+    $put($emp['rue'] ?? '', 91.4, 64.75);
+    $put($emp['immeuble'] ?? '', 91.8, 66.5);
+    $put($emp['etage'] ?? '', 63.4, 66.5);
+    $put($emp['phone1'] ?? '', 40.8, 66.5);
+    $put($emp['phone2'] ?? '', 20.7, 66.5);
+    $put($emp['email'] ?? '', 82.2, 70.0, 'r', 8.5);
+    // الإفادة (يوقّعها صاحب العمل) — القسم «خاص بالإدارة» يبقى فارغاً للدائرة المالية
+    $put($esch['name_ar'] ?? '', 86.7, 79.15, 'r', 8.5);
+    $put(date('j'), 84.3, 85.3, 'c'); $put(date('n'), 72.3, 85.3, 'c'); $put(date('Y'), 60.2, 85.3, 'c');
+
+    $E = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+    $F = '';
+    foreach ($R3 as $f) {
+        $style = 'top:' . $f[2] . '%;font-size:' . $f[4] . 'pt';
+        if ($f[3] === 'c') $style .= ';left:' . $f[1] . '%;transform:translateX(-50%)';
+        else $style .= ';right:' . round(100 - $f[1], 2) . '%';
+        $F .= '<div class="f" style="' . $style . '">' . $E($f[0]) . '</div>';
+    }
+    header('Content-Type: text/html; charset=UTF-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>نموذج ر3 — طلب تسجيل مستخدم/أجير جديد</title>'
+       . '<style>@page{size:A4;margin:0}*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+       . 'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:#e9edf2}'
+       . '.sheet{width:210mm;margin:0 auto;direction:ltr}'
+       . '.page{position:relative;width:210mm;height:297mm;background:#fff;overflow:hidden}'
+       . '.pbg{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}'
+       . '.f{position:absolute;z-index:1;color:#000;font-weight:bold;line-height:1.15;white-space:nowrap}'
+       . '.bar{text-align:center;margin:10px 0}'
+       . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:210mm;height:297mm;overflow:hidden;margin:0}}'
+       . '</style></head><body>'
+       . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
+       . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — نموذج ر3 طبق الأصل الرسمي (Margins = None)</div></div>'
+       . '<div class="sheet"><div class="page"><img class="pbg" src="' . BASE_URL . 'assets/templates/mof_r3.png" alt=""> ' . $F . '</div></div>'
+       . '</body></html>';
+    exit;
+}
+
 if ($form === 'cnss_work_attestation') {
     // افادة عمل للضمان (مديرية ضمان المرض والأمومة) — تعبئة قالب المستخدم الرسمي تلقائياً.
     // ?form=cnss_work_attestation&emp=ID&d=&mo=&yr=&format=pdf|xlsx

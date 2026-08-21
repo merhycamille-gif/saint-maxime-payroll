@@ -19,6 +19,7 @@ $ATT_TYPES = [
     'cnss_hire_new'  => ['fr' => "Déclaration d'embauche — non immatriculé (CNSS 2AA, officielle)", 'en' => 'Hiring Declaration — not registered (official)', 'ar' => 'تصريح باستخدام أجير — لا يحمل رقم ضمان (نموذج رسمي)'],
     'cnss_hire_reg'  => ['fr' => "Déclaration d'embauche — déjà immatriculé (officielle)", 'en' => 'Hiring Declaration — registered (official)', 'ar' => 'إعلام استخدام أجير — يحمل رقم ضمان (نموذج رسمي)'],
     'cnss_leave'     => ['fr' => 'Déclaration de cessation de travail (officielle)', 'en' => 'Leaving Declaration (official)', 'ar' => 'إعلام ترك أجير (نموذج رسمي)'],
+    'mof_r3'         => ['fr' => 'Formulaire R3 — enregistrement d\'un salarié (Finances, officiel)', 'en' => 'R3 Form — Employee Registration (MoF, official)', 'ar' => 'طلب تسجيل مستخدم/أجير جديد — ر3 (المالية، نموذج رسمي)'],
     'salaire'        => ['fr' => 'Attestation de salaire',        'en' => 'Salary Certificate',          'ar' => 'إفادة راتب'],
     'tadris'         => ['fr' => "Attestation d'enseignement",    'en' => 'Teaching Certificate',        'ar' => 'إفادة تدريس'],
     'embassy'        => ['fr' => 'Attestation (ambassade, EN)',   'en' => 'Attestation (Embassy, EN)',   'ar' => 'إفادة للسفارة (إنكليزي)'],
@@ -298,7 +299,7 @@ if ($emp && !empty($_GET['dossier'])):
             <?php
             // كل أنواع الإفادات مقسّمة لأقسام واضحة (تُغطّى كل الأنواع + قسم «أخرى» احتياطاً لأي نوع جديد)
             $attGroups = [
-                'Salaire, travail et CNSS / راتب وعمل وضمان' => ['salaire','tadris','cnss','cnss_travail','cnss_hire_new','cnss_hire_reg','cnss_leave','afade_madrasiya','embassy','riaaya'],
+                'Salaire, travail et CNSS / راتب وعمل وضمان' => ['salaire','tadris','cnss','cnss_travail','cnss_hire_new','cnss_hire_reg','cnss_leave','mof_r3','afade_madrasiya','embassy','riaaya'],
                 'Fin de service, démission et décharge / نهاية الخدمة والاستقالة وإبراء الذمّة' => ['anhaa_khedme','anhaa_mail','talab_istiqala','isqat_haq','baraa_zimma'],
                 'Contrats, déclarations et avertissements / عقود وإقرارات وإنذارات' => ['aqd_taalim','iqrar','notice_school','notice_mail'],
             ];
@@ -431,6 +432,51 @@ if (!$emp):
                 <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> Télécharger Excel (modifiable) / تحميل Excel (للتعديل)</a>
             </div>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> «الإفادة الرسمية» تفتح النموذج الرسمي كاملاً معبّأً (المدرسة ورقمها في الضمان، اسم الأجير ورقم ضمانه وسنة ولادته، والأشهر) جاهز للطباعة — <strong>نفس الشكل تماماً أونلاين وعلى الكمبيوتر</strong>. زر Excel للتحميل والتعديل.</p>
+        </div>
+    </div>
+    <?php
+        include __DIR__ . '/../includes/footer.php';
+        return;
+    endif;
+    // 🏛️ نموذج المالية ر3 — طلب تسجيل مستخدم/أجير جديد طبق الأصل («شوف ر3 عالدسك توب» 2026-08-21):
+    // شاشة خيارات صغيرة (الجنس + نوع الأجر) ثم زرّ النموذج الرسمي المعبّى (صورة + قيم) للطباعة/PDF
+    if ($type === 'mof_r3'):
+        $nm  = preg_replace('/\s+/', ' ', trim(($emp['first_name_ar'] ?? '') . ' ' . ($emp['father_name_ar'] ?? '') . ' ' . ($emp['last_name_ar'] ?? '')));
+        if ($nm === '') $nm = trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? ''));
+        $sexSel  = (($_GET['sex'] ?? 'm') === 'f') ? 'f' : 'm';
+        $wageSel = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? $_GET['wage'] : 'm';
+        $expR3 = BASE_URL . 'pages/official_export.php?form=mof_r3&emp=' . (int)$employeeId . '&sex=' . $sexSel . '&wage=' . $wageSel;
+        $hasMof = trim((string)($emp['finance_ministry_number'] ?? '')) !== '';
+    ?>
+    <div class="card no-print" style="max-width:760px;margin:0 auto">
+        <div class="card-header"><h3>
+          <span dir="ltr"><i class="fas fa-file-medical"></i> Formulaire R3 (Finances) — <?= e($nm) ?></span>
+          <div style="font-size:0.85em;font-weight:600;opacity:0.9">طلب تسجيل مستخدم/أجير جديد — ر3</div>
+        </h3></div>
+        <div class="card-body">
+            <form method="GET" class="form-row cols-3" style="align-items:end;margin-bottom:14px">
+                <input type="hidden" name="employee_id" value="<?= (int)$employeeId ?>">
+                <input type="hidden" name="type" value="mof_r3">
+                <div class="form-group">
+                    <label class="form-label">Sexe / الجنس</label>
+                    <select name="sex" class="form-select" onchange="this.form.submit()">
+                        <option value="m" <?= $sexSel==='m'?'selected':'' ?>>Homme / ذكر</option>
+                        <option value="f" <?= $sexSel==='f'?'selected':'' ?>>Femme / أنثى</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type de salaire / نوع الأجر</label>
+                    <select name="wage" class="form-select" onchange="this.form.submit()">
+                        <option value="m" <?= $wageSel==='m'?'selected':'' ?>>Mensuel / شهري</option>
+                        <option value="d" <?= $wageSel==='d'?'selected':'' ?>>Journalier / يومي</option>
+                        <option value="h" <?= $wageSel==='h'?'selected':'' ?>>À l'heure / بالساعة</option>
+                    </select>
+                </div>
+            </form>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <a class="btn btn-danger btn-lg" href="<?= e($expR3) ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي ر3 (طباعة / PDF) / Formulaire officiel R3 (PDF)</a>
+            </div>
+            <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج ر3 الرسمي</strong> معبّأً تلقائياً من ملف الموظف: المؤسسة ورقمها المالي، والاسم والشهرة والأهل والولادة والسجل، والوضع العائلي وعدد الأولاد وتاريخ بدء العمل ورقم الضمان، والمستفيدين من التنزيل العائلي وعمل الزوج، وعنوان السكن والهاتف — والقسم «خاص بالإدارة» يبقى فارغاً للدائرة المالية. <?= $hasMof ? 'رقمه المالي موجود بملفه وسيُعبّأ («نعم»).' : 'ما في رقم مالي بملفه — سيُعلَّم «كلا» (وهذا هو المطلوب لهذا النموذج).' ?></p>
         </div>
     </div>
     <?php

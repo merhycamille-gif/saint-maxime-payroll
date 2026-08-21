@@ -355,6 +355,18 @@ check('نموذج 190A: نسخة مصوّرة طبق الأصل (خلفية + إ
       && strpos($oe190, "'P47' => formatLBP((\$c1 + \$c2 + \$c3) - \$fpaid, false)") !== false
       && strpos($oe190, 'cnss_monthly.pos.json') !== false
       && strpos($oe190, 'size:A4 landscape') !== false);
+// (2026-08-21) «شوف ر3 على الدسك توب وبدي متلها طبق الأصل»: نموذج المالية ر3 (طلب تسجيل
+// مستخدم/أجير جديد) — صورة النموذج الرسمي + تعبئة تلقائية من ملف الموظف بإحداثيات مقيسة
+$hR3 = renderPage('pages/official_export.php', ['form' => 'mof_r3', 'emp' => 2, 'sex' => 'f', 'wage' => 'm'], [], [1]);
+check('نموذج المالية ر3 طبق الأصل: الصورة + التعبئة (لبنانية/الضمان/خانات الأرقام) + A4 كامل',
+      is_file(__DIR__ . '/../assets/templates/mof_r3.png')
+      && is_file(__DIR__ . '/../assets/templates/mof_r3.pdf')
+      && strpos($hR3, 'assets/templates/mof_r3.png') !== false
+      && strpos($hR3, 'لبنانية') !== false
+      && strpos($hR3, '911426') !== false
+      && strpos($hR3, 'size:A4;margin:0') !== false
+      && strpos($attSrc, "'mof_r3'") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/official_export.php'), "count(\$centers) - strlen(\$num)") !== false);
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
       strpos($attSrc, "'N°' : 'No.'") === false
       && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false
