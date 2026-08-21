@@ -171,46 +171,48 @@ if ($form === 'mof_r3') {
     };
     $X = function ($x, $y) use (&$R3) { $R3[] = ['×', $x, $y, 'c', 11]; };
 
+    // 🗺️ الإحداثيات مقيسة بصرياً على نسخة المستخدم r3.xps (طبعة 2010) — «بدي ر3 متل اللي
+    // بعتلك ياها طبق الأصل» (2026-08-21): شبكة 1% مكبّرة على mof_r3.png لكل صف
     // المؤسسة
-    $put($esch['name_ar'] ?? '', 81.2, 10.05);
-    $digits($esch['finance_number'] ?? '', [26.05,30.08,34.12,38.15,42.18,46.22,50.25,54.12,58.15,62.18,66.22], 12.35);
+    $put($esch['name_ar'] ?? '', 76.5, 8.5, 'r', 8.5);
+    $digits($esch['finance_number'] ?? '', [56.5, 59, 61.5, 64, 66.5, 69, 71.5, 74], 12.6);
     // هل لديه رقم مالي شخصي؟ + الرقم
-    if ($mofNum !== '') { $X(42.1, 15.35); $digits($mofNum, [13.95,17.98,22.02,26.05,30.08,34.12,38.15,42.18,46.05,50.08], 17.35); }
-    else { $X(30.1, 15.35); }
+    if ($mofNum !== '') { $X(47.7, 16.05); $digits($mofNum, [2.6, 4.9, 7.1, 9.4, 11.6, 13.9, 16.1, 18.4], 16.85); }
+    else { $X(37.9, 16.05); }
     // تعريف المستخدم
-    $put($emp['first_name_ar'] ?? '', 90.1, 19.05);
-    $put($emp['last_name_ar'] ?? '', 46.4, 19.05);
-    $put($emp['father_name_ar'] ?? '', 89.4, 20.8);
-    $put($motherAr, 37.0, 20.8);
-    $X($sex === 'f' ? 66.2 : 78.3, 22.6);
+    $put($emp['first_name_ar'] ?? '', 84.5, 19.3);
+    $put($emp['last_name_ar'] ?? '', 38.5, 19.5);
+    $put($emp['father_name_ar'] ?? '', 84.5, 21.5);
+    $put($motherAr, 32.5, 22.25);
+    $X($sex === 'f' ? 74.8 : 83.5, 23.9);
     $natR3 = in_array(mb_strtolower(trim((string)($emp['nationality'] ?? ''))), ['lebanese', 'lebanaise', 'libanaise', 'لبنانية', 'لبناني'], true) ? 'لبنانية' : (string)($emp['nationality'] ?? '');
-    $put($natR3, 45.9, 22.55);
-    $put($emp['birth_place'] ?? '', 87.1, 24.3);
-    $put($bD, 36.05, 24.3, 'c'); $put($bM, 24.0, 24.3, 'c'); $put($bY, 12.0, 24.3, 'c');
-    $put($regNo3, 88.7, 26.9);
-    $put($regPl3, 46.2, 26.9);
-    $X(['single' => 74.3, 'married' => 62.2, 'widow' => 50.1, 'divorced' => 38.2][$marKey], 30.4);
-    $put((string)(int)($emp['number_of_children'] ?? 0), 88.2, 32.15);
-    $put($hD, 40.1, 32.15, 'c'); $put($hM, 28.1, 32.15, 'c'); $put($hY, 16.1, 32.15, 'c');
-    $put($emp['nssf_number'] ?? '', 82.4, 34.8);
-    $X(['m' => 78.3, 'd' => 66.2, 'h' => 54.1][$wage], 36.3);
+    $put($natR3, 40.5, 24.45);
+    $put($emp['birth_place'] ?? '', 79.5, 26.6);
+    $put($bD, 34.3, 26.7, 'c'); $put($bM, 27.3, 26.7, 'c'); $put($bY, 18.8, 26.7, 'c');
+    $put($regNo3, 84.0, 29.25);
+    $put($regPl3, 56.5, 29.35);
+    $X(['single' => 79.1, 'married' => 71.1, 'widow' => 63.5, 'divorced' => 55.5][$marKey], 31.7);
+    $put((string)(int)($emp['number_of_children'] ?? 0), 25.5, 32.6);
+    $put($hD, 76.0, 35.15, 'c'); $put($hM, 66.0, 35.15, 'c'); $put($hY, 57.5, 35.15, 'c');
+    $put($emp['nssf_number'] ?? '', 26.5, 34.75);
+    $X(['m' => 23.3, 'd' => 15.7, 'h' => 8.8][$wage], 36.15);
     // الزوج/الزوجة: المستفيدون من التنزيل + هل يعمل
-    if ($famBenef > 0) $put((string)$famBenef, 68.9, 47.85, 'r');
-    if ($isMar) $X((int)($emp['spouse_works'] ?? 0) ? 66.2 : 54.1, 49.8);
+    if ($famBenef > 0) $put((string)$famBenef, 45.5, 53.0, 'r');
+    if ($isMar) $X((int)($emp['spouse_works'] ?? 0) ? 68.3 : 59.7, 55.15);
     // عنوان السكن
-    $put($emp['gouvernorat'] ?? '', 91.3, 63.0);
-    $put($emp['district'] ?? '', 67.9, 63.0);
-    $put($emp['ville'] ?? '', 44.9, 63.0);
-    $put($emp['quartier'] ?? '', 24.0, 63.0);
-    $put($emp['rue'] ?? '', 91.4, 64.75);
-    $put($emp['immeuble'] ?? '', 91.8, 66.5);
-    $put($emp['etage'] ?? '', 63.4, 66.5);
-    $put($emp['phone1'] ?? '', 40.8, 66.5);
-    $put($emp['phone2'] ?? '', 20.7, 66.5);
-    $put($emp['email'] ?? '', 82.2, 70.0, 'r', 8.5);
+    $put($emp['gouvernorat'] ?? '', 87.5, 69.5);
+    $put($emp['district'] ?? '', 69.5, 69.5);
+    $put($emp['ville'] ?? '', 46.0, 69.5);
+    $put($emp['quartier'] ?? '', 25.5, 69.5);
+    $put($emp['rue'] ?? '', 87.5, 70.7);
+    $put($emp['immeuble'] ?? '', 88.0, 71.9);
+    $put($emp['etage'] ?? '', 59.0, 71.9);
+    $put($emp['phone1'] ?? '', 41.5, 71.9);
+    $put($emp['phone2'] ?? '', 23.5, 71.9);
+    $put($emp['email'] ?? '', 66.0, 74.45, 'r', 8.5);
     // الإفادة (يوقّعها صاحب العمل) — القسم «خاص بالإدارة» يبقى فارغاً للدائرة المالية
-    $put($esch['name_ar'] ?? '', 86.7, 79.15, 'r', 8.5);
-    $put(date('j'), 84.3, 85.3, 'c'); $put(date('n'), 72.3, 85.3, 'c'); $put(date('Y'), 60.2, 85.3, 'c');
+    $put($esch['name_ar'] ?? '', 76.0, 84.5, 'r', 7);
+    $put(date('j'), 64.5, 90.35, 'c'); $put(date('n'), 59.0, 90.35, 'c'); $put(date('Y'), 52.0, 90.35, 'c');
 
     $E = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
     $F = '';
