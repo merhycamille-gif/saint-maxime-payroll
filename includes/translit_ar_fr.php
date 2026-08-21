@@ -304,6 +304,7 @@ function subjectMap() {
         [['تاريخ','histoire','history'], 'التاريخ', 'Histoire', 'History'],
         [['جغرافيا','جغرافيه','geographie','geography'], 'الجغرافيا', 'Géographie', 'Geography'],
         [['اجتماع','sociologie','sociology'], 'علم الاجتماع', 'Sociologie', 'Sociology'],
+        [['اجتماعيات','sciences sociales','social studies','etudes sociales'], 'الاجتماعيات', 'Sciences sociales', 'Social Studies'],
         [['اقتصاد','economie','economics'], 'الاقتصاد', 'Économie', 'Economics'],
         [['اجتماع واقتصاد'], 'الاجتماع والاقتصاد', 'Sociologie et économie', 'Sociology and Economics'],
         [['فلسفه','philosophie','philosophy'], 'الفلسفة', 'Philosophie', 'Philosophy'],
@@ -350,6 +351,14 @@ function subjectToLang($raw, $lang) {
         // موادّ متعددة بمسافات: طابق أطول عبارة (حتى 3 كلمات) — كل الكلمات لازم تُعرف
         $words = array_values(array_filter(explode(' ', $k), 'strlen'));
         if (count($words) < 2) return $part;
+        // واو العطف الملزوقة («واجتماعيات» — p1 ‏2026-08-21): شيلها إن عُرفت الكلمة بلاها
+        $words = array_map(function ($w) use ($map) {
+            if (mb_strpos($w, 'و') === 0 && mb_strlen($w, 'UTF-8') > 2 && !isset($map[$w])) {
+                $c = mb_substr($w, 1, null, 'UTF-8');
+                if (isset($map[$c])) return $c;
+            }
+            return $w;
+        }, $words);
         $out = [];
         for ($w = 0; $w < count($words); $w++) {
             for ($len = min(3, count($words) - $w); $len >= 1; $len--) {

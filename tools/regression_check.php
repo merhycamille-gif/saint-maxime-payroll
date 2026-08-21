@@ -335,6 +335,9 @@ check('المادة بلغة الإفادة: قاموس المواد بالات�
       && subjectToLang('تاريخ تربية جغرافيا', 'fr') === 'Histoire, Éducation civique, Géographie'
       && subjectToLang('تاريخ تربية جغرافيا', 'en') === 'History, Civics, Geography'
       && subjectToLang('مديرة قسم الروضات', 'fr') === 'مديرة قسم الروضات'
+      /* p1: واو العطف الملزوقة + «اجتماعيات» */
+      && subjectToLang('لغة عربية واجتماعيات', 'fr') === 'Arabe, Sciences sociales'
+      && subjectToLang('لغة عربية واجتماعيات', 'ar') === 'اللغة العربية والاجتماعيات'
       && strpos($attSrc, "subjectToLang(\$subj, 'ar')") !== false
       && strpos($attSrc, 'e($subjAr)') !== false && strpos($attSrc, 'e($subjL)') !== false
       && strpos($attSrc, 'e($subjFr)') !== false && strpos($attSrc, 'e($subjEn)') !== false
