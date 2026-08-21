@@ -1515,8 +1515,10 @@ function exportToolbar($title = 'document', $opts = []) {
     $reqUri = $_SERVER['REQUEST_URI'] ?? '';
     $relTarget = ltrim(preg_replace('#^' . preg_quote(rtrim(BASE_URL, '/'), '#') . '#', '', $reqUri), '/');
     $pdfName = preg_replace('/[^A-Za-z0-9_]+/', '_', $title) ?: 'document';
+    // «بس اضغط زر طبع PDF ما بيطبع — ظبطها تطبع» (2026-08-21): view=1 → الـPDF يفتح بتبويب
+    // جديد وشاشة الطباعة تطلع لحالها (كان ينزّل الملف بصمت عالـDownloads فيبدو أن ما صار شي)
     $officialPdf = ($relTarget && strpos($relTarget, 'print_pdf.php') === false)
-        ? BASE_URL . 'pages/print_pdf.php?target=' . rawurlencode($relTarget) . '&name=' . rawurlencode($pdfName)
+        ? BASE_URL . 'pages/print_pdf.php?target=' . rawurlencode($relTarget) . '&name=' . rawurlencode($pdfName) . '&view=1'
         : '';
     ob_start(); ?>
     <div class="export-toolbar no-print no-export" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
@@ -1524,7 +1526,7 @@ function exportToolbar($title = 'document', $opts = []) {
         <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint()"><i class="fas fa-print"></i> Imprimer / طباعة</button>
         <?php endif; ?>
         <?php if ($officialPdf): ?>
-        <a class="btn btn-sm btn-danger" href="<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>" title="PDF رسمي طبق الأصل جاهز للدولة"><i class="fas fa-file-pdf"></i> PDF<?= $viewerOnly ? '' : ' رسمي' ?></a>
+        <a class="btn btn-sm btn-danger" href="<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>" target="_blank" title="PDF رسمي طبق الأصل — يفتح ويطبع"><i class="fas fa-file-pdf"></i> PDF<?= $viewerOnly ? '' : ' رسمي' ?></a>
         <?php else: ?>
         <button type="button" class="btn btn-sm btn-danger" onclick="ppPdf()" title="اختر: حفظ كـ PDF"><i class="fas fa-file-pdf"></i> PDF</button>
         <?php endif; ?>

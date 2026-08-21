@@ -8,6 +8,23 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 requireLogin();
 
+// 🖨️ «بس اضغط زر طبع PDF ما بيطبع — ظبطها تطبع» (2026-08-21): وضع fetch يقدّم PDF مولَّداً
+// سابقاً (inline للعرض بالتبويب، أو dl=1 للتنزيل) — تخدمه صفحة العرض-والطباعة أدناه.
+// (قبل فحص target — طلب fetch ما إلو target)
+if (!empty($_GET['fetch'])) {
+    $tok = preg_replace('/[^a-z0-9.]/i', '', (string)$_GET['fetch']);
+    $f = __DIR__ . '/../tmp/view_' . $tok . '.pdf';
+    if ($tok === '' || !is_file($f)) { http_response_code(404); die('انتهت صلاحية الملف — أعد كبسة زر PDF'); }
+    $nm = preg_replace('/[^a-z0-9_]+/i', '_', (string)($_GET['name'] ?? 'document'));
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: ' . (empty($_GET['dl']) ? 'inline' : 'attachment') . '; filename="' . $nm . '_' . date('Y-m-d') . '.pdf"');
+    header('Content-Length: ' . filesize($f));
+    header('Cache-Control: no-cache');
+    readfile($f);
+    exit;
+}
+
 $target = $_GET['target'] ?? '';
 // أمان: مسار داخلي فقط (يبدأ بـ pages/ أو الجذر) بلا مضيف/سكيم خارجي
 $target = ltrim($target, '/');
@@ -60,6 +77,28 @@ $data = file_get_contents($out);
 
 // اسم الملف من نوع النموذج/التقرير
 $name = preg_replace('/[^a-z0-9_]+/i', '_', (string)($_GET['name'] ?? 'document'));
+
+// 🖨️ view=1 (زر «PDF رسمي» بالشريط): بدل التنزيل الصامت عالـDownloads — الـPDF يظهر
+// بالتبويب وشاشة الطباعة تفتح لحالها (كبسة تأكيد واحدة وبيطبع)، وفوق زرّا اطبع/تنزيل
+if (!empty($_GET['view'])) {
+    $tok = preg_replace('/[^a-z0-9.]/i', '', uniqid('v', true) . mt_rand(100, 999));
+    file_put_contents($tmpDir . '/view_' . $tok . '.pdf', $data);
+    foreach ((array)glob($tmpDir . '/view_*.pdf') as $old) { if (@filemtime($old) < time() - 3600) @unlink($old); } // تنظيف >ساعة
+    $src = BASE_URL . 'pages/print_pdf.php?fetch=' . $tok . '&name=' . rawurlencode($name);
+    $dl  = $src . '&dl=1';
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>' . htmlspecialchars($name) . '</title>'
+        . '<style>body{margin:0;font-family:Tahoma,Arial}.bar{position:fixed;top:0;left:0;right:0;height:52px;background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:center;gap:12px;z-index:9}'
+        . '.bar button,.bar a{background:#16a34a;color:#fff;border:0;border-radius:8px;padding:9px 22px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;font-family:inherit}'
+        . '.bar a.dl{background:#2563eb}iframe{position:fixed;top:52px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 52px);border:0}</style></head><body>'
+        . '<div class="bar"><button type="button" onclick="pr()">🖨️ Imprimer / اطبع</button><a class="dl" href="' . htmlspecialchars($dl, ENT_QUOTES) . '">⬇️ تنزيل الملف</a></div>'
+        . '<iframe id="pf" src="' . htmlspecialchars($src, ENT_QUOTES) . '"></iframe>'
+        . '<script>var f=document.getElementById("pf");function pr(){try{f.contentWindow.focus();f.contentWindow.print();}catch(e){window.print();}}'
+        . 'f.addEventListener("load",function(){setTimeout(pr,800);});</script></body></html>';
+    exit;
+}
+
 while (ob_get_level()) ob_end_clean();
 header('Content-Type: application/pdf');
 header('Content-Disposition: attachment; filename="' . $name . '_' . date('Y-m-d') . '.pdf"');
