@@ -691,9 +691,10 @@ if (!$emp):
         // 🔴 1122 لا 1123: ورقة A4 = 297mm = 1122.5px — صندوق 1123px أطول من الورقة بنصف
         // بكسل فينكسر آخر سطر (التوقيع) لصفحة ثانية فاضية (شكوى المستخدم 2026-08-03)
         ? "width:794px;min-height:1122px;margin:0 auto;background:url('" . htmlspecialchars($lhUrl, ENT_QUOTES) . "') no-repeat;background-size:794px 1122px;padding:195px 95px 150px;box-sizing:border-box"
-        // 🗏 «المسافة بين حافة الورقة والكتابة 2 سنتم» (2026-08-21): حشوة الجوانب 12mm عالشاشة
-        // (بالطباعة تصير صفراً ويقوم مقامها هامش الورقة 12mm) + 8mm بجسم الإفادة = 2 سم تماماً
-        : "max-width:820px;margin:0 auto;padding:28px 12mm";
+        // 🗏 ترتيب مثال p1.png (2026-08-21): اللوغو بزاوية الورقة (8mm) والكتابة بهوامش 25mm
+        // من الجهتين — حشوة الجوانب 8mm عالشاشة (بالطباعة صفر ويقوم مقامها هامش الورقة 8mm)
+        // + 17mm بجسم الإفادة = 25mm متل المثال
+        : "max-width:820px;margin:0 auto;padding:20px 8mm";
     $lhClass = $lhOn ? '' : 'card';
     // 🪪 ترويسة تصدير الوورد (بطلبه 2026-08-20): بلا خط تحت الشعار + العنوان اسم المدينة فقط
     // + الهاتف LTR حتى يبقى الكود على شمال الرقم (بسياق RTL كان يطلع «531450-04»)
@@ -889,21 +890,21 @@ if (!$emp):
     ?>
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
-    @page{size:A4;margin:<?= $lhOn ? '0' : '12mm' ?>}
+    @page{size:A4;margin:<?= $lhOn ? '0' : '8mm' ?>}
     .page-content{padding:0 !important;margin:0 !important}
-    <?= $lhOn ? '' : '#ppExportArea{padding-left:0 !important;padding-right:0 !important}' ?></style>
+    <?= $lhOn ? '' : '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding-top:0 !important}' ?></style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
-    <?php /* 🗏 «الكتابة 2 سنتم من حافتي الورقة واللوغو بزاوية الورقة» (2026-08-21): 8mm بجسم
-           الإفادة فوق 12mm (حشوة الشاشة/هامش الورقة) = 2 سم، وترويسة اللوغو scr-head ترجع
-           للحافة بهامش سالب فتبقى بالزاوية — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
-    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:8mm;padding-right:8mm} #ppExportArea .scr-head{margin-left:-8mm;margin-right:-8mm}' ?></style>
+    <?php /* 🗏 ترتيب مثال p1.png (2026-08-21): 17mm بجسم الإفادة فوق 8mm (حشوة الشاشة/هامش
+           الورقة) = 25mm للكتابة متل المثال، وترويسة اللوغو scr-head ترجع للحافة بهامش سالب
+           فتبقى بزاوية الورقة — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
+    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:17mm;padding-right:17mm} #ppExportArea .scr-head{margin-left:-17mm;margin-right:-17mm}' ?></style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
             <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (2026-08-20): بلا خط + المدينة فقط — تصدير Word يكشفها ويشيل scr-head */ ?>
             <?php if ($showLogo): ?><div class="word-head" style="display:none"><?= $docLang !== 'ar' ? $schoolHeadWordFr : $schoolHeadWord ?></div><?php endif; ?>
             <?php if ($docLang !== 'ar'): $FR = ($docLang === 'fr'); /* «أي إفادة بأي لغة وتترجم صح دغري» (2026-08-20) */ ?>
             <?php if ($showRecHead && $logoImg): ?><div class="scr-head" style="margin-bottom:8px"><?= $headBodyFr($logoImg) ?></div><?php endif; ?>
-            <div dir="ltr" style="text-align:left">
+            <div dir="ltr" style="text-align:justify">
               <div style="font-weight:700;line-height:1.7;margin-bottom:6px">
                   <?= $FR ? 'Caisse Nationale de<br>Sécurité Sociale' : 'National Social<br>Security Fund' ?><br>
                   <span style="font-weight:400"><?= $FR ? 'Bureau' : 'Office' ?> : ــــــــ</span><br>
@@ -1038,14 +1039,14 @@ if (!$emp):
     ?>
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
-    @page{size:A4;margin:<?= $lhOn ? '0' : '12mm' ?>}
+    @page{size:A4;margin:<?= $lhOn ? '0' : '8mm' ?>}
     .page-content{padding:0 !important;margin:0 !important}
-    <?= $lhOn ? '' : '#ppExportArea{padding-left:0 !important;padding-right:0 !important}' ?></style>
+    <?= $lhOn ? '' : '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding-top:0 !important}' ?></style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
-    <?php /* 🗏 «الكتابة 2 سنتم من حافتي الورقة واللوغو بزاوية الورقة» (2026-08-21): 8mm بجسم
-           الإفادة فوق 12mm (حشوة الشاشة/هامش الورقة) = 2 سم، وترويسة اللوغو scr-head ترجع
-           للحافة بهامش سالب فتبقى بالزاوية — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
-    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:8mm;padding-right:8mm} #ppExportArea .scr-head{margin-left:-8mm;margin-right:-8mm}' ?></style>
+    <?php /* 🗏 ترتيب مثال p1.png (2026-08-21): 17mm بجسم الإفادة فوق 8mm (حشوة الشاشة/هامش
+           الورقة) = 25mm للكتابة متل المثال، وترويسة اللوغو scr-head ترجع للحافة بهامش سالب
+           فتبقى بزاوية الورقة — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
+    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:17mm;padding-right:17mm} #ppExportArea .scr-head{margin-left:-17mm;margin-right:-17mm}' ?></style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
       <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
       <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (بطلب المستخدم 2026-08-20): بلا خط تحت الشعار + المدينة فقط —
@@ -1083,12 +1084,13 @@ if (!$emp):
         <?php if (!in_array($type, ['anhaa_mail', 'notice_mail'], true)): ?>
         <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
         <?php endif; ?>
-        <div dir="ltr" style="text-align:left">
+        <div dir="ltr" style="text-align:justify">
 
         <?php if ($type === 'salaire'): ?>
         <?php /* p1 (2026-08-21): خانة N° انشالت + التاريخ على يمين الصفحة بالإفادات اللاتينية —
                div بمحاذاة نصية لا flex حتى يثبت مكانه بالشاشة والوورد سواء */ ?>
-        <div style="text-align:right;margin-bottom:10px">Date : <?= $today ?></div>
+        <?php /* متل مثال p1.png: اسم المدينة قبل التاريخ («Mansourieh, le ...» / «Mansourieh: ...») */ ?>
+        <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : 'Date : ' ?><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation de salaire' : 'Salary Certificate' ?></h2>
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille au sein de son établissement en qualité de' : 'has been working there as' ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $FR ? 'enseigne au sein de son établissement la matière' : 'has been teaching' ?> <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'toujours en fonction à ce jour, et perçoit un salaire mensuel' : 'is still in service to date, and receives a monthly salary' ?><?= $salParts ? ($FR ? ' détaillé comme suit :' : ' detailed as follows:') : ($FR ? ' de <strong>' . $moneyLat($salShown) . '</strong>.' : ' of <strong>' . $moneyLat($salShown) . '</strong>.') ?></p>
         <?php if ($salParts): ?>
@@ -1105,14 +1107,15 @@ if (!$emp):
         <?php elseif ($type === 'tadris'): ?>
         <?php /* p1 (2026-08-21): خانة N° انشالت + التاريخ على يمين الصفحة بالإفادات اللاتينية —
                div بمحاذاة نصية لا flex حتى يثبت مكانه بالشاشة والوورد سواء */ ?>
-        <div style="text-align:right;margin-bottom:10px">Date : <?= $today ?></div>
+        <?php /* متل مثال p1.png: اسم المدينة قبل التاريخ («Mansourieh, le ...» / «Mansourieh: ...») */ ?>
+        <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : 'Date : ' ?><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? ($FR ? 'Attestation de travail' : 'Work Certificate') : ($FR ? 'Attestation de travail et d\'enseignement' : 'Work and Teaching Certificate') ?></h2>
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille au sein de son établissement en qualité de' : 'has been working there as' ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $FR ? 'enseigne au sein de son établissement la matière' : 'has been teaching' ?> <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'toujours en fonction à ce jour. Il/Elle fait preuve de bonne conduite et d\'assiduité dans l\'accomplissement de son travail.' : 'and is still in service to date. He/She has shown good conduct and commitment in the performance of his/her duties.' ?></p>
         <p><?= $reqLine ?></p>
         <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= $FR ? 'Le Directeur — Signature et cachet' : 'The Director — Signature & stamp' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
 
         <?php elseif ($type === 'riaaya'): ?>
-        <div style="text-align:right;margin-bottom:10px"><?= $today ?></div>
+        <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : '' ?><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'À qui de droit' : 'To whom it may concern' ?></h2>
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= strpos($assocTxt, 'التابعة لجمعية') === 0 ? ($FR ? 'relevant de l\'Association des Religieuses Salvatoriennes de Notre-Dame de l\'Annonciation, enregistrée auprès de vos services sous le n° (.....)' : 'affiliated to the Association of the Salvatorian Sisters of Our Lady of the Annunciation, registered with you under No. (.....)') : e($assocTxt) ?>,</p>
         <p><?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille en qualité de' : 'works as' ?> <strong><?= e($funcLat) ?></strong> <?= $FR ? 'dans notre école' : 'at our school' ?><?php else: ?><?= $FR ? 'est enseignant(e) de la matière' : 'is a teacher of' ?> <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsLat ?> <?= $FR ? 'dans notre école' : 'at our school' ?><?php endif; ?>.</p>
@@ -1434,8 +1437,8 @@ if (!$emp):
       <?php elseif ($type === 'embassy' && $docLang === 'fr'): ?>
         <?php /* «بدي نفس الإفادة باللغة الفرنسية» (2026-08-20) — تُختار من أزرار اللغة فوق */ ?>
         <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
-        <div dir="ltr" style="text-align:left">
-          <div style="text-align:right;margin-bottom:10px"><?= date('d/m/Y') ?></div>
+        <div dir="ltr" style="text-align:justify">
+          <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? e($cityFr) . ', le ' : '' ?><?= date('d/m/Y') ?></div>
           <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">Attestation</h2>
           <p>À qui de droit,</p>
           <p>Nous certifions par la présente que <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>est employé(e) en qualité de <strong><?= e($fnFr['fr']) ?></strong> à <strong><?= e($schoolNameFr) ?></strong>, à raison de <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> par <?= $embPerWordFr ?></strong><?= $embRate !== '' ? ' (' . e($embWordsFr) . ')' : '' ?><?php else: ?>est enseignant(e) à <strong><?= e($schoolNameFr) ?></strong>. Il/Elle enseigne <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsFr ?>, à raison de <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> par <?= $embPerWordFr ?></strong><?= $embRate !== '' ? ' (' . e($embWordsFr) . ')' : '' ?><?php endif; ?>. Nous confirmons également qu'il/elle est engagé(e) dans notre établissement pour l'année scolaire <strong><?= $nextSY ?></strong>.</p>
@@ -1446,8 +1449,8 @@ if (!$emp):
 
       <?php elseif ($type === 'embassy'): ?>
         <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
-        <div dir="ltr" style="text-align:left">
-          <div style="text-align:right;margin-bottom:10px"><?= date('d/m/Y') ?></div>
+        <div dir="ltr" style="text-align:justify">
+          <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? e($cityFr) . ': ' : '' ?><?= date('d/m/Y') ?></div>
           <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">Attestation</h2>
           <p>To whom it may concern,</p>
           <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?= $embRate !== '' ? ' (' . e($embWords) . ')' : '' ?><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?= $embRate !== '' ? ' (' . e($embWords) . ')' : '' ?><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
@@ -1759,10 +1762,10 @@ if (!$emp):
     @page{size:A4;margin:12mm}
     .page-content{padding:0 !important;margin:0 !important}</style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
-    <?php /* 🗏 «الكتابة 2 سنتم من حافتي الورقة واللوغو بزاوية الورقة» (2026-08-21): 8mm بجسم
-           الإفادة فوق 12mm (حشوة الشاشة/هامش الورقة) = 2 سم، وترويسة اللوغو scr-head ترجع
-           للحافة بهامش سالب فتبقى بالزاوية — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
-    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:8mm;padding-right:8mm} #ppExportArea .scr-head{margin-left:-8mm;margin-right:-8mm}' ?></style>
+    <?php /* 🗏 ترتيب مثال p1.png (2026-08-21): 17mm بجسم الإفادة فوق 8mm (حشوة الشاشة/هامش
+           الورقة) = 25mm للكتابة متل المثال، وترويسة اللوغو scr-head ترجع للحافة بهامش سالب
+           فتبقى بزاوية الورقة — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
+    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:17mm;padding-right:17mm} #ppExportArea .scr-head{margin-left:-17mm;margin-right:-17mm}' ?></style>
     <div id="ppExportArea" class="card" style="max-width:820px;margin:0 auto;padding:10px" data-fit1="1" <?= $rtl?'dir="rtl"':'' ?>>
         <div class="card-body" style="line-height:1.95;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $rtl?'text-align:right':'' ?>">
             <!-- ترويسة باللغة المختارة -->

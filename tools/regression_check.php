@@ -298,18 +298,20 @@ check('أسماء المناطق باللاتينية: قاموس المناطق
       && strpos($attSrc, '$addrLat') !== false && strpos($attSrc, '$bplaceLat') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/schools.php'), 'arPlaceToFr($addrAr)') !== false
       && function_exists('healSchoolNameFrDiacritics20260821'));
-// (2026-08-21) «المسافة بين حافة الورقة والكتابة 2 سنتم واللوغو بزاوية الورقة»: بالطباعة
-// 12mm هامش صفحة (حشوة جوانب الصندوق تصير صفراً) + 8mm بجسم الإفادة = 2 سم تماماً،
-// وترويسة اللوغو scr-head ترجع للحافة بهامش سالب — مقيسة فعلياً بالـPDF: نص 19.5-19.8mm
-check('هوامش الإفادات: الكتابة 2 سم من حافتي الورقة (12mm+8mm) واللوغو بزاوية الورقة (scr-head -8mm)',
-      strpos($attSrc, 'padding:28px 12mm') !== false
-      && substr_count($attSrc, '#ppExportArea .card-body{padding-left:8mm;padding-right:8mm} #ppExportArea .scr-head{margin-left:-8mm;margin-right:-8mm}') >= 2
-      && substr_count($attSrc, '#ppExportArea{padding-left:0 !important;padding-right:0 !important}') >= 2);
+// (2026-08-21) ترتيب مثال p1.png: اللوغو بزاوية الورقة (هامش صفحة 8mm وترويسة scr-head ترجع
+// للحافة بهامش سالب -17mm) والكتابة بهوامش 25mm من الجهتين (8mm صفحة + 17mm جسم الإفادة)
+// والنص اللاتيني مضبوط الطرفين + اسم المدينة قبل التاريخ بالنسخ اللاتينية — مقيسة فعلياً بالـPDF
+check('ترتيب p1: اللوغو بزاوية الورقة والكتابة 25mm من الحافتين + justify لاتيني + المدينة قبل التاريخ',
+      strpos($attSrc, 'padding:20px 8mm') !== false
+      && substr_count($attSrc, '#ppExportArea .card-body{padding-left:17mm;padding-right:17mm} #ppExportArea .scr-head{margin-left:-17mm;margin-right:-17mm}') >= 2
+      && substr_count($attSrc, '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding-top:0 !important}') >= 2
+      && strpos($attSrc, '<div dir="ltr" style="text-align:left">') === false
+      && substr_count($attSrc, "e(\$cityFr) . ', le '") >= 3);
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
       strpos($attSrc, "'N°' : 'No.'") === false
       && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false
       && substr_count($attSrc, '<div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : ') === 2
-      && substr_count($attSrc, '<div style="text-align:right;margin-bottom:10px">Date : ') === 2
+      && substr_count($attSrc, ": 'Date : ' ?><?= \$today ?>") === 2 /* سطر التاريخ اللاتيني (مدينة، le/: تاريخ — وDate احتياط) بإفادتي الراتب والعمل */
       && strpos($attSrc, '<div dir="rtl" style="font-size:14px">هاتف : <span dir="ltr">') !== false
       && substr_count($attSrc, '<div dir="rtl"><small>هاتف : <span dir="ltr">') === 2);
 // (2026-08-20) «p1 وp2: صحح العنوان»: عناوين المدارس المخزّنة فيها مقاطع مكررة («عبرا - عبرا») —
