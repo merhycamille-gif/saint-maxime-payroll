@@ -285,6 +285,74 @@ function arPlaceDict() {
 }
 
 /**
+ * 📚 قاموس المواد الدراسية (2026-08-21 «بدنا نكتب لمادة اللغة الإنكليزية»): المادة مخزّنة
+ * بملف الأستاذ بأي لغة («Anglais»/«رياضيات»...) — بالإفادة تُكتب بلغة الوثيقة نفسها:
+ * عربي = «اللغة الإنكليزية»، فرنسي = «Anglais»، إنكليزي = «English». غير المعروف يبقى كما هو.
+ */
+function subjectMap() {
+    static $m = null;
+    if ($m !== null) return $m;
+    $rows = [ // [مرادفات مطبَّعة] => [ar, fr, en]
+        [['عربي','عربيه','arabe','arabic'], 'اللغة العربية', 'Arabe', 'Arabic'],
+        [['فرنسي','فرنسيه','francais','french'], 'اللغة الفرنسية', 'Français', 'French'],
+        [['انكليزي','انكليزيه','انجليزي','انجليزيه','anglais','english'], 'اللغة الإنكليزية', 'Anglais', 'English'],
+        [['رياضيات','حساب','math','maths','mathematique','mathematiques','mathematics'], 'الرياضيات', 'Mathématiques', 'Mathematics'],
+        [['علوم','science','sciences'], 'العلوم', 'Sciences', 'Science'],
+        [['فيزياء','physique','physics'], 'الفيزياء', 'Physique', 'Physics'],
+        [['كيمياء','chimie','chemistry'], 'الكيمياء', 'Chimie', 'Chemistry'],
+        [['احياء','بيولوجيا','علوم الحياه','biologie','biology','svt'], 'علوم الحياة', 'Biologie', 'Biology'],
+        [['تاريخ','histoire','history'], 'التاريخ', 'Histoire', 'History'],
+        [['جغرافيا','جغرافيه','geographie','geography'], 'الجغرافيا', 'Géographie', 'Geography'],
+        [['اجتماع','sociologie','sociology'], 'علم الاجتماع', 'Sociologie', 'Sociology'],
+        [['اقتصاد','economie','economics'], 'الاقتصاد', 'Économie', 'Economics'],
+        [['اجتماع واقتصاد'], 'الاجتماع والاقتصاد', 'Sociologie et économie', 'Sociology and Economics'],
+        [['فلسفه','philosophie','philosophy'], 'الفلسفة', 'Philosophie', 'Philosophy'],
+        [['تربيه','تربيه مدنيه','تربيه وطنيه','civique','education civique','civics'], 'التربية المدنية', 'Éducation civique', 'Civics'],
+        [['تعليم مسيحي','تربيه مسيحيه','catechese','religion','دين'], 'التعليم المسيحي', 'Catéchèse', 'Religious Education'],
+        [['معلوماتيه','informatique','computer','computer science'], 'المعلوماتية', 'Informatique', 'Computer Science'],
+        [['رياضه','رياضه بدنيه','sport','eps','education physique'], 'التربية الرياضية', 'Éducation physique', 'Physical Education'],
+        [['موسيقى','musique','music'], 'الموسيقى', 'Musique', 'Music'],
+        [['رسم','فنون','dessin','art','arts','arts plastiques'], 'الرسم والفنون', 'Arts plastiques', 'Arts'],
+        [['مسرح','theatre','drama'], 'المسرح', 'Théâtre', 'Drama'],
+        [['رياضيات وعلوم','maths sciences','math sciences'], 'الرياضيات والعلوم', 'Maths et sciences', 'Maths and Science'],
+    ];
+    $m = [];
+    foreach ($rows as $r) { foreach ($r[0] as $al) $m[$al] = [$r[1], $r[2], $r[3]]; }
+    return $m;
+}
+
+/** تطبيع اسم مادة للمطابقة: أحرف صغيرة، بلا أكسنت فرنسي، بلا «اللغة/لغة/مادة/ال/langue». */
+function subjectNormalize($s) {
+    $s = mb_strtolower(trim((string)$s), 'UTF-8');
+    $s = strtr($s, ['é'=>'e','è'=>'e','ê'=>'e','ë'=>'e','à'=>'a','â'=>'a','ç'=>'c','î'=>'i','ï'=>'i','ô'=>'o','û'=>'u','ù'=>'u']);
+    $s = str_replace('ة', 'ه', arFrNormalize($s));
+    foreach (['اللغه ', 'لغه ', 'ماده ', 'langue ', 'the '] as $p) {
+        if (mb_strpos($s, $p) === 0) $s = mb_substr($s, mb_strlen($p, 'UTF-8'), null, 'UTF-8');
+    }
+    $s = preg_replace('/^ال(?=\S)/u', '', $s);
+    return trim(preg_replace('/\s+/u', ' ', $s));
+}
+
+/** المادة بلغة الوثيقة ('ar'|'fr'|'en') — يدعم موادّ متعددة مفصولة بـ , ، / + */
+function subjectToLang($raw, $lang) {
+    $raw = trim((string)$raw);
+    if ($raw === '') return '';
+    $i = ['ar' => 0, 'fr' => 1, 'en' => 2][$lang] ?? 0;
+    $map = subjectMap();
+    $one = function ($part) use ($map, $i) {
+        $part = trim($part);
+        if ($part === '') return '';
+        $k = subjectNormalize($part);
+        return isset($map[$k]) ? $map[$k][$i] : $part; // غير المعروف يبقى كما كُتب
+    };
+    // المادة كلها دفعة واحدة (تغطي «اجتماع واقتصاد») ثم التقسيم على الفواصل
+    $k = subjectNormalize($raw);
+    if (isset($map[$k])) return $map[$k][$i];
+    $parts = array_filter(array_map($one, preg_split('/\s*[,،;\/+&]\s*/u', $raw)), 'strlen');
+    return implode($lang === 'ar' ? ' و' : ', ', $parts);
+}
+
+/**
  * ترجمة اسم مكان/عنوان عربي إلى التهجئة اللاتينية الصحيحة (للإفادات الفرنسية والإنكليزية):
  * مطابقة المقطع كاملاً بالقاموس، ثم أطول عبارة (حتى 3 كلمات)، ثم كلمة كلمة (مع إسقاط «ال»)،
  * والاحتياط نقل الحروف. المقاطع تُفصل على - / – / ، وتُعاد موصولة بـ« - ».

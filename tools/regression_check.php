@@ -321,6 +321,21 @@ check('زر PDF رسمي يعرض ويطبع (view=1 + fetch + طباعة تلق
       && strpos($ppdf21, "addEventListener(\"load\",function(){setTimeout(pr,800);})") !== false
       && strpos($attSrc, '<div dir="ltr" style="text-align:left">') === false
       && substr_count($attSrc, "e(\$cityFr) . ', le '") >= 3);
+// (2026-08-21) p1: «بدنا نكتب لمادة اللغة الإنكليزية» — المادة تُكتب بلغة الوثيقة نفسها
+// مهما كانت لغة تخزينها بملف الأستاذ (subjectToLang: Anglais→اللغة الإنكليزية بالعربي والعكس)
+check('المادة بلغة الإفادة: قاموس المواد بالاتجاهات الثلاثة + مربوط بمواضع المادة كلها',
+      subjectToLang('Anglais', 'ar') === 'اللغة الإنكليزية'
+      && subjectToLang('Anglais', 'en') === 'English'
+      && subjectToLang('اللغة الفرنسية', 'fr') === 'Français'
+      && subjectToLang('رياضيات', 'en') === 'Mathematics'
+      && subjectToLang('اللّغة العربيّة', 'fr') === 'Arabe'
+      && subjectToLang('Chimie', 'ar') === 'الكيمياء'
+      && subjectToLang('مادة غير معروفة', 'fr') === 'مادة غير معروفة'
+      && strpos($attSrc, "subjectToLang(\$subj, 'ar')") !== false
+      && strpos($attSrc, 'e($subjAr)') !== false && strpos($attSrc, 'e($subjL)') !== false
+      && strpos($attSrc, 'e($subjFr)') !== false && strpos($attSrc, 'e($subjEn)') !== false
+      && strpos($attSrc, '$vb($subjAr, 110)') !== false && strpos($attSrc, '$vb($subjL, 110)') !== false
+      && strpos($attSrc, "\$blank(140) ?></strong> <?= \$levelsAr ?>") !== false);
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
       strpos($attSrc, "'N°' : 'No.'") === false
       && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false
