@@ -1009,6 +1009,32 @@ function healNetUsdMirror20260804c() {
  * خيار بيد المستخدم لكل موظف: يُطبَّق التنزيل العائلي على ضريبته أو لا (الافتراضي: يُطبَّق،
  * كما كان البرنامج دائماً). يُركَّب ذاتياً بلا أي خطوة يدوية (منهج DB self-install).
  */
+/**
+ * 🏛️ تركيب ذاتي (2026-08-21 «وين معلومات الزوج/الزوجة» بنموذج ر3): أعمدة معلومات
+ * الزوج/الزوجة بملف الموظف — تُعبَّأ من شاشة نموذج ر3 وتُحفَظ بالملف فتُستعمل بكل طبعة.
+ */
+function ensureSpouseColumns20260821() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        $cols = [
+            'spouse_full_name' => 'VARCHAR(120) NULL', 'spouse_maiden_name' => 'VARCHAR(120) NULL',
+            'spouse_father_name' => 'VARCHAR(120) NULL', 'spouse_mother_name' => 'VARCHAR(120) NULL',
+            'spouse_nationality' => 'VARCHAR(60) NULL', 'spouse_birth_place' => 'VARCHAR(120) NULL',
+            'spouse_birth_date' => 'DATE NULL', 'spouse_id_card' => 'VARCHAR(60) NULL',
+            'spouse_mof_number' => 'VARCHAR(30) NULL', 'spouse_employer_name' => 'VARCHAR(160) NULL',
+            'spouse_employer_mof' => 'VARCHAR(30) NULL', 'spouse_employer_public' => 'TINYINT(1) NOT NULL DEFAULT 0',
+        ];
+        foreach ($cols as $c => $def) {
+            if (!$db->query("SHOW COLUMNS FROM employees LIKE '$c'")->fetch()) {
+                $db->exec("ALTER TABLE employees ADD COLUMN `$c` $def");
+            }
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
 function ensureEmployeeFlagColumns() {
     static $done = false;
     if ($done) return;

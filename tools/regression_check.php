@@ -367,6 +367,20 @@ check('نموذج المالية ر3 طبق الأصل: الصورة + التع�
       && strpos($hR3, 'size:A4;margin:0') !== false
       && strpos($attSrc, "'mof_r3'") !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/official_export.php'), "count(\$centers) - strlen(\$num)") !== false);
+// (2026-08-21) «وين معلومات الزوج/الزوجة» + «وخاص بالإدارة»: أعمدة الزوج بملف الموظف
+// (تركيب ذاتي) + شاشة حفظها بنموذج ر3 + تعبئة قسمَي الزوج/الزوجة وخاص بالإدارة بالنموذج
+$oeR3s = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
+check('نموذج ر3: معلومات الزوج/الزوجة (أعمدة ذاتية + شاشة حفظ + تعبئة) + قسم خاص بالإدارة',
+      function_exists('ensureSpouseColumns20260821')
+      && (ensureSpouseColumns20260821() ?? true)
+      && $db->query("SHOW COLUMNS FROM employees LIKE 'spouse_full_name'")->fetch() !== false
+      && $db->query("SHOW COLUMNS FROM employees LIKE 'spouse_employer_public'")->fetch() !== false
+      && strpos($attSrc, 'save_spouse') !== false
+      && strpos($attSrc, 'name="spouse_mof_number"') !== false
+      && strpos($oeR3s, "\$emp['spouse_full_name']") !== false
+      && strpos($oeR3s, "\$emp['spouse_mof_number']") !== false
+      && strpos($oeR3s, 'خاص بالإدارة') !== false
+      && strpos($oeR3s, '82.55') !== false);
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
       strpos($attSrc, "'N°' : 'No.'") === false
       && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false

@@ -196,9 +196,27 @@ if ($form === 'mof_r3') {
     $put($hD, 76.0, 35.15, 'c'); $put($hM, 66.0, 35.15, 'c'); $put($hY, 57.5, 35.15, 'c');
     $put($emp['nssf_number'] ?? '', 26.5, 34.75);
     $X(['m' => 23.3, 'd' => 15.7, 'h' => 8.8][$wage], 36.15);
-    // الزوج/الزوجة: المستفيدون من التنزيل + هل يعمل
-    if ($famBenef > 0) $put((string)$famBenef, 45.5, 53.0, 'r');
+    // الزوج/الزوجة: كل معلوماته من ملف الموظف (تُعبَّأ بشاشة نموذج ر3 — «وين معلومات
+    // الزوج/الزوجة» + «ناقصة كتير معلومات» 2026-08-21) + المستفيدون من التنزيل + هل يعمل
+    $spNat = in_array(mb_strtolower(trim((string)($emp['spouse_nationality'] ?? ''))), ['lebanese', 'lebanaise', 'libanaise', 'لبنانية', 'لبناني'], true) ? 'لبنانية' : (string)($emp['spouse_nationality'] ?? '');
+    [$sD, $sM, $sY] = $dsplit($emp['spouse_birth_date'] ?? '');
+    $put($emp['spouse_full_name'] ?? '', 72.5, 40.95);
+    $put($emp['spouse_maiden_name'] ?? '', 38.5, 41.8);
+    $put($emp['spouse_father_name'] ?? '', 84.0, 43.75);
+    $put($emp['spouse_mother_name'] ?? '', 37.5, 44.85);
+    $put($spNat, 86.0, 47.0);
+    $put($emp['spouse_birth_place'] ?? '', 40.0, 47.4);
+    $put($sD, 77.5, 49.55, 'c'); $put($sM, 70.5, 49.55, 'c'); $put($sY, 64.0, 49.55, 'c');
+    $put($emp['spouse_id_card'] ?? '', 40.0, 49.8);
+    if ($famBenef > 0) $put((string)$famBenef, 45.5, 53.15, 'r');
     if ($isMar) $X((int)($emp['spouse_works'] ?? 0) ? 68.3 : 59.7, 55.15);
+    $digits($emp['spouse_mof_number'] ?? '', [60.75, 63.25, 65.75, 68.25, 70.75, 73.25, 75.75, 78.25], 57.95);
+    if (!empty($emp['spouse_employer_public'])) {
+        $put($emp['spouse_employer_name'] ?? '', 66.0, 65.7, 'r', 8.5); // ب — الإدارات العامة: إسم الإدارة
+    } else {
+        $put($emp['spouse_employer_name'] ?? '', 59.0, 62.8, 'r', 8.5); // أ — القطاع الخاص
+        $digits($emp['spouse_employer_mof'] ?? '', [2.7, 5.1, 7.5, 9.9, 12.3, 14.7, 17.1, 19.5], 62.2);
+    }
     // عنوان السكن
     $put($emp['gouvernorat'] ?? '', 87.5, 69.5);
     $put($emp['district'] ?? '', 69.5, 69.5);
@@ -210,9 +228,12 @@ if ($form === 'mof_r3') {
     $put($emp['phone1'] ?? '', 41.5, 71.9);
     $put($emp['phone2'] ?? '', 23.5, 71.9);
     $put($emp['email'] ?? '', 66.0, 74.45, 'r', 8.5);
-    // الإفادة (يوقّعها صاحب العمل) — القسم «خاص بالإدارة» يبقى فارغاً للدائرة المالية
+    // الإفادة (يوقّعها صاحب العمل)
     $put($esch['name_ar'] ?? '', 76.0, 84.5, 'r', 7);
     $put(date('j'), 64.5, 90.35, 'c'); $put(date('n'), 59.0, 90.35, 'c'); $put(date('Y'), 52.0, 90.35, 'c');
+    // خاص بالإدارة («وخاص بالإدارة» — بطلبه 2026-08-21): الرقم المالي بالخانات + تاريخ التسجيل
+    $digits($mofNum, [2.7, 5.1, 7.5, 9.9, 12.3, 14.7, 17.1, 19.5], 82.55);
+    $put(date('j'), 31.5, 86.1, 'c'); $put(date('n'), 25.8, 86.1, 'c'); $put(date('Y'), 19.8, 86.1, 'c');
 
     $E = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
     $F = '';

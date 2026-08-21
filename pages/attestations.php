@@ -88,6 +88,26 @@ if ($employeeId > 0) {
         header('Location: ' . BASE_URL . 'pages/attestations.php?employee_id=' . $employeeId . '&type=cnss_leave&lang_doc=' . urlencode($docLang));
         exit;
     }
+
+    // 💾 حفظ معلومات الزوج/الزوجة بملف الموظف من شاشة نموذج ر3 («وين معلومات الزوج/الزوجة» 2026-08-21)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_spouse'])) {
+        requireCsrf();
+        ensureSpouseColumns20260821();
+        $sp = [];
+        foreach (['spouse_full_name', 'spouse_maiden_name', 'spouse_father_name', 'spouse_mother_name',
+                  'spouse_nationality', 'spouse_birth_place', 'spouse_id_card', 'spouse_mof_number',
+                  'spouse_employer_name', 'spouse_employer_mof'] as $c) {
+            $sp[$c] = trim((string)($_POST[$c] ?? ''));
+        }
+        $bd = trim((string)($_POST['spouse_birth_date'] ?? ''));
+        $sp['spouse_birth_date'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', $bd) ? $bd : null;
+        $sp['spouse_employer_public'] = !empty($_POST['spouse_employer_public']) ? 1 : 0;
+        $set = implode(', ', array_map(function ($c) { return "`$c` = ?"; }, array_keys($sp)));
+        $db->prepare("UPDATE employees SET $set WHERE id = ?")->execute(array_merge(array_values($sp), [$employeeId]));
+        $_SESSION['flash_success'] = 'انحفظت معلومات الزوج/الزوجة بملف الموظف — رح تنزل بنموذج ر3 تلقائياً / Informations du conjoint enregistrées.';
+        header('Location: ' . BASE_URL . 'pages/attestations.php?employee_id=' . $employeeId . '&type=mof_r3');
+        exit;
+    }
 }
 
 $school = currentSchool();
@@ -473,10 +493,37 @@ if (!$emp):
                     </select>
                 </div>
             </form>
+            <?php // 👫 معلومات الزوج/الزوجة — تُحفَظ بملف الموظف مرة واحدة وتنزل بالنموذج («وين معلومات الزوج/الزوجة» 2026-08-21)
+            ensureSpouseColumns20260821();
+            $spv = function ($k) use ($emp) { return e(trim((string)($emp[$k] ?? ''))); }; ?>
+            <form method="POST" style="border:1px solid #bae6fd;background:#f0f9ff;border-radius:10px;padding:12px 16px;margin-bottom:14px">
+                <?= csrfField() ?>
+                <input type="hidden" name="save_spouse" value="1">
+                <div style="font-weight:700;color:#0369a1;margin-bottom:10px"><i class="fas fa-user-group"></i> معلومات الزوج/الزوجة (تنحفظ بملف الموظف وتنزل بالنموذج) / Informations du conjoint</div>
+                <div class="form-row cols-3">
+                    <div class="form-group"><label class="form-label">إسم الزوج/الزوجة</label><input type="text" name="spouse_full_name" class="form-control" value="<?= $spv('spouse_full_name') ?>"></div>
+                    <div class="form-group"><label class="form-label">الشهرة قبل الزواج</label><input type="text" name="spouse_maiden_name" class="form-control" value="<?= $spv('spouse_maiden_name') ?>"></div>
+                    <div class="form-group"><label class="form-label">إسم الأب</label><input type="text" name="spouse_father_name" class="form-control" value="<?= $spv('spouse_father_name') ?>"></div>
+                    <div class="form-group"><label class="form-label">إسم الأم وشهرتها قبل الزواج</label><input type="text" name="spouse_mother_name" class="form-control" value="<?= $spv('spouse_mother_name') ?>"></div>
+                    <div class="form-group"><label class="form-label">الجنسية</label><input type="text" name="spouse_nationality" class="form-control" value="<?= $spv('spouse_nationality') ?: 'لبنانية' ?>"></div>
+                    <div class="form-group"><label class="form-label">محل الولادة</label><input type="text" name="spouse_birth_place" class="form-control" value="<?= $spv('spouse_birth_place') ?>"></div>
+                    <div class="form-group"><label class="form-label">تاريخ الولادة</label><input type="date" name="spouse_birth_date" class="form-control" value="<?= $spv('spouse_birth_date') ?>"></div>
+                    <div class="form-group"><label class="form-label">رقم بطاقة الهوية</label><input type="text" name="spouse_id_card" class="form-control" value="<?= $spv('spouse_id_card') ?>"></div>
+                    <div class="form-group"><label class="form-label">رقم تسجيله لدى وزارة المالية</label><input type="text" name="spouse_mof_number" class="form-control" value="<?= $spv('spouse_mof_number') ?>"></div>
+                    <div class="form-group"><label class="form-label">جهة عمله (إن كان يعمل)</label><input type="text" name="spouse_employer_name" class="form-control" value="<?= $spv('spouse_employer_name') ?>"></div>
+                    <div class="form-group"><label class="form-label">رقم تسجيل جهة العمل (المالية)</label><input type="text" name="spouse_employer_mof" class="form-control" value="<?= $spv('spouse_employer_mof') ?>"></div>
+                    <div class="form-group"><label class="form-label">نوع جهة العمل</label>
+                        <select name="spouse_employer_public" class="form-select">
+                            <option value="0" <?= empty($emp['spouse_employer_public']) ? 'selected' : '' ?>>قطاع خاص / مؤسسة عامة (القسم أ)</option>
+                            <option value="1" <?= !empty($emp['spouse_employer_public']) ? 'selected' : '' ?>>إدارة عامة (القسم ب)</option>
+                        </select></div>
+                </div>
+                <button class="btn btn-primary"><i class="fas fa-floppy-disk"></i> احفظ معلومات الزوج/الزوجة بملف الموظف</button>
+            </form>
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <a class="btn btn-danger btn-lg" href="<?= e($expR3) ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي ر3 (طباعة / PDF) / Formulaire officiel R3 (PDF)</a>
             </div>
-            <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج ر3 الرسمي</strong> معبّأً تلقائياً من ملف الموظف: المؤسسة ورقمها المالي، والاسم والشهرة والأهل والولادة والسجل، والوضع العائلي وعدد الأولاد وتاريخ بدء العمل ورقم الضمان، والمستفيدين من التنزيل العائلي وعمل الزوج، وعنوان السكن والهاتف — والقسم «خاص بالإدارة» يبقى فارغاً للدائرة المالية. <?= $hasMof ? 'رقمه المالي موجود بملفه وسيُعبّأ («نعم»).' : 'ما في رقم مالي بملفه — سيُعلَّم «كلا» (وهذا هو المطلوب لهذا النموذج).' ?></p>
+            <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج ر3 الرسمي</strong> معبّأً تلقائياً من ملف الموظف: المؤسسة ورقمها المالي، والاسم والشهرة والأهل والولادة والسجل، والوضع العائلي وعدد الأولاد وتاريخ بدء العمل ورقم الضمان، ومعلومات الزوج/الزوجة كاملة (من الخانات أعلاه)، والمستفيدين من التنزيل العائلي وعمل الزوج، وعنوان السكن والهاتف، وقسم «خاص بالإدارة» (الرقم المالي بالخانات + تاريخ التسجيل). <?= $hasMof ? 'رقمه المالي موجود بملفه وسيُعبّأ («نعم»).' : 'ما في رقم مالي بملفه — سيُعلَّم «كلا» (وهذا هو المطلوب لهذا النموذج).' ?></p>
         </div>
     </div>
     <?php
