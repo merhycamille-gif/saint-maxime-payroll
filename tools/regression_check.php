@@ -308,6 +308,7 @@ check('ترتيب p1: اللوغو بزاوية الورقة والكتابة 2 
       && substr_count($attSrc, '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding:8mm 20mm 10mm !important}') >= 2
       && substr_count($attSrc, "\$type === 'aqd_taalim' ? '10mm 0' : '0'") >= 1
       && strpos((string)file_get_contents(__DIR__ . '/../assets/js/export.js'), "att ? '1.2cm 2cm'") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../tools/page_to_pdf.js'), "isAtt ? '0' : '5mm'") !== false /* PDF الإيميل بلا هوامش إضافية للإفادات */
       && strpos($attSrc, '<div dir="ltr" style="text-align:left">') === false
       && substr_count($attSrc, "e(\$cityFr) . ', le '") >= 3);
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',

@@ -35,7 +35,11 @@ function chromePath() {
     await page.emulateMediaType('print');
     await new Promise(r => setTimeout(r, 400));
 
-    const pdfOpts = { path: out, printBackground: true, margin: { top: '5mm', bottom: '5mm', left: '5mm', right: '5mm' } };
+    // 🗏 «بدي بس 2 سنتم» (2026-08-21): صفحات الإفادات (ppExportArea) هوامشها محفورة جوّاها
+    // (@page 0 + 2 سم بالجسم) — أي هامش إضافي هنا كان يكبّر مسافات الـPDF المُرسَل بالإيميل
+    const isAtt = await page.evaluate(() => !!document.getElementById('ppExportArea'));
+    const M = isAtt ? '0' : '5mm';
+    const pdfOpts = { path: out, printBackground: true, margin: { top: M, bottom: M, left: M, right: M } };
 
     if (fit === 'fit') {
       // قياس حجم أكبر كشف ثم حساب معامل تصغير/تكبير ليملأ كل كشف صفحة A4 أفقية واحدة.
