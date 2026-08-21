@@ -721,7 +721,8 @@ if (!$emp):
             . ($logoHtml ? '<div style="margin-bottom:2px">' . $logoHtml . '</div>' : '')
             . '<strong style="font-size:16px">' . e($headL1) . '</strong>'
             . ($headL2 !== '' ? '<br><strong style="font-size:15px">' . e($headL2) . '</strong>' : '')
-            . ($schoolPhone ? '<br><span style="font-size:14px">هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></span>' : '')
+            // p1 (2026-08-21): سطر الهاتف فقرة dir=rtl مستقلة — بلا rtl صريح كان الوورد يقلب السطر فيظهر الرقم قبل كلمة «هاتف»
+            . ($schoolPhone ? '<div dir="rtl" style="font-size:14px">هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></div>' : '')
             . '</td><td style="border:none;padding:0"></td></tr></table>';
     };
     $schoolHeadWord = '<div style="margin-bottom:16px">' . $headBodyAr($logoImgWord) . '</div>';
@@ -1066,10 +1067,9 @@ if (!$emp):
         <div dir="ltr" style="text-align:left">
 
         <?php if ($type === 'salaire'): ?>
-        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
-            <span><?= $FR ? 'N°' : 'No.' ?> : <span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span></span>
-            <span>Date : <?= $today ?></span>
-        </div>
+        <?php /* p1 (2026-08-21): خانة N° انشالت + التاريخ على يمين الصفحة بالإفادات اللاتينية —
+               div بمحاذاة نصية لا flex حتى يثبت مكانه بالشاشة والوورد سواء */ ?>
+        <div style="text-align:right;margin-bottom:10px">Date : <?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation de salaire' : 'Salary Certificate' ?></h2>
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille au sein de son établissement en qualité de' : 'has been working there as' ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $FR ? 'enseigne au sein de son établissement la matière' : 'has been teaching' ?> <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'toujours en fonction à ce jour, et perçoit un salaire mensuel' : 'is still in service to date, and receives a monthly salary' ?><?= $salParts ? ($FR ? ' détaillé comme suit :' : ' detailed as follows:') : ($FR ? ' de <strong>' . $moneyLat($salShown) . '</strong>.' : ' of <strong>' . $moneyLat($salShown) . '</strong>.') ?></p>
         <?php if ($salParts): ?>
@@ -1084,10 +1084,9 @@ if (!$emp):
         <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleLat) ?> — <?= $FR ? 'Signature et cachet' : 'Signature & stamp' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
 
         <?php elseif ($type === 'tadris'): ?>
-        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
-            <span><?= $FR ? 'N°' : 'No.' ?> : <span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span></span>
-            <span>Date : <?= $today ?></span>
-        </div>
+        <?php /* p1 (2026-08-21): خانة N° انشالت + التاريخ على يمين الصفحة بالإفادات اللاتينية —
+               div بمحاذاة نصية لا flex حتى يثبت مكانه بالشاشة والوورد سواء */ ?>
+        <div style="text-align:right;margin-bottom:10px">Date : <?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? ($FR ? 'Attestation de travail' : 'Work Certificate') : ($FR ? 'Attestation de travail et d\'enseignement' : 'Work and Teaching Certificate') ?></h2>
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille au sein de son établissement en qualité de' : 'has been working there as' ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $FR ? 'enseigne au sein de son établissement la matière' : 'has been teaching' ?> <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'toujours en fonction à ce jour. Il/Elle fait preuve de bonne conduite et d\'assiduité dans l\'accomplissement de son travail.' : 'and is still in service to date. He/She has shown good conduct and commitment in the performance of his/her duties.' ?></p>
         <p><?= $reqLine ?></p>
@@ -1372,10 +1371,9 @@ if (!$emp):
         if ($incTrans && $transW > 0) $salParts[] = ['تعويض النقل', $transW];
         ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
-            <span>الرقم : <span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span></span>
-            <span>التاريخ : <?= $today ?></span>
-        </div>
+        <?php /* p1 (2026-08-21): خانة «الرقم» انشالت + التاريخ على شمال الصفحة بالإفادة العربية —
+               dir=rtl على السطر حتى تبقى كلمة «التاريخ» قبل الرقم (يمينه) بالشاشة والوورد سواء */ ?>
+        <div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : <?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة راتب</h2>
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) حتى تاريخه ، ويتقاضى راتباً شهرياً<?= $salParts ? ' وفق التفصيل الآتي :' : ' قدره <strong>' . $moneyAr($salShown) . '</strong> .' ?></p>
         <?php if ($salParts): ?>
@@ -1394,10 +1392,9 @@ if (!$emp):
 
       <?php elseif ($type === 'tadris'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
-            <span>الرقم : <span style="display:inline-block;min-width:90px;border-bottom:1px dotted #475569">&nbsp;</span></span>
-            <span>التاريخ : <?= $today ?></span>
-        </div>
+        <?php /* p1 (2026-08-21): خانة «الرقم» انشالت + التاريخ على شمال الصفحة بالإفادة العربية —
+               dir=rtl على السطر حتى تبقى كلمة «التاريخ» قبل الرقم (يمينه) بالشاشة والوورد سواء */ ?>
+        <div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : <?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? 'إفادة عمل' : 'إفادة عمل وتدريس' ?></h2>
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ السيّد(ة) <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?>يعمل(تعمل) لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?>يعمل(تعمل) لديها بوظيفة مدرّس(ة) لمادة <strong><?= $subj !== '' ? e($subj) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> ولا يزال(تزال) حتى تاريخه ، وهو(هي) على حسن سلوك والتزام في أداء عمله(ا) .</p>
         <?php /* صيغة «لمن يلزم» وجملة عدم المسؤولية شِيلتا من كل الإفادات (بطلبه 2026-08-20) */ ?>
@@ -1469,7 +1466,7 @@ if (!$emp):
             <?php if ($showLogo && $logoImg): ?><?= $logoImg ?><br><?php endif; ?>
             <strong style="font-size:15px"><?= e($schoolNameAr) ?></strong>
             <?= $schoolAddr ? '<br><small>' . e($schoolAddr) . '</small>' : '' ?>
-            <?= $schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '' ?>
+            <?= $schoolPhone ? '<div dir="rtl"><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small></div>' : '' ?>
           </div>
         </div>
         <div style="border:1px solid #bbb;padding:8px 12px;line-height:1.95;margin-bottom:14px">
@@ -1713,7 +1710,7 @@ if (!$emp):
             <?php if ($showLogo && $logoImg): ?><?= $logoImg ?><br><?php endif; ?>
             <strong style="font-size:15px"><?= e($schoolNameAr) ?></strong>
             <?= $schoolAddr ? '<br><small>' . e($schoolAddr) . '</small>' : '' ?>
-            <?= $schoolPhone ? '<br><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small>' : '' ?>
+            <?= $schoolPhone ? '<div dir="rtl"><small>هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></small></div>' : '' ?>
           </div>
         </div>
         <div style="border:1px solid #bbb;padding:8px 12px;line-height:1.95;margin-bottom:14px">

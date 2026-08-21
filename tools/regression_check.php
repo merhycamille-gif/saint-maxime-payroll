@@ -280,6 +280,16 @@ check('نموذج الاستخدام-المضمون: الرقم قبل التف�
 check('إفادة الضمان: سطر «الأجر الإضافي» بدل «ملحقات مدفوعة من أشخاص ثالثين»',
       strpos($attSrc, 'ملحقات مدفوعة من أشخاص ثالثين') === false
       && strpos($attSrc, '- الأجر الإضافي : <strong><?= $moneyAr($attSupp)') !== false);
+// (2026-08-21) p1: خانة «الرقم/N°» انشالت من رأس إفادتي الراتب والعمل + التاريخ وحده سطراً
+// (شمال الصفحة بالعربي بdir=rtl حتى تسبق كلمة «التاريخ» الرقم، ويمينها باللاتيني) — بلا flex
+// لأن الوورد لا يفهمه فتتكوّم السطور بجهة وحدة + كلمة «هاتف» قبل الرقم (سطر الهاتف dir=rtl)
+check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
+      strpos($attSrc, "'N°' : 'No.'") === false
+      && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false
+      && substr_count($attSrc, '<div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : ') === 2
+      && substr_count($attSrc, '<div style="text-align:right;margin-bottom:10px">Date : ') === 2
+      && strpos($attSrc, '<div dir="rtl" style="font-size:14px">هاتف : <span dir="ltr">') !== false
+      && substr_count($attSrc, '<div dir="rtl"><small>هاتف : <span dir="ltr">') === 2);
 // (2026-08-20) «p1 وp2: صحح العنوان»: عناوين المدارس المخزّنة فيها مقاطع مكررة («عبرا - عبرا») —
 // dedupeAddress تشيل المكرر بالعرض، ومطبَّقة على خانات العنوان بنماذج الضمان الثلاثة وبالإفادات
 $oeSrc = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
