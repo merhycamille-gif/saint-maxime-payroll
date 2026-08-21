@@ -691,9 +691,9 @@ if (!$emp):
         // 🔴 1122 لا 1123: ورقة A4 = 297mm = 1122.5px — صندوق 1123px أطول من الورقة بنصف
         // بكسل فينكسر آخر سطر (التوقيع) لصفحة ثانية فاضية (شكوى المستخدم 2026-08-03)
         ? "width:794px;min-height:1122px;margin:0 auto;background:url('" . htmlspecialchars($lhUrl, ENT_QUOTES) . "') no-repeat;background-size:794px 1122px;padding:195px 95px 150px;box-sizing:border-box"
-        // 🗏 ترتيب مثال p1.png (2026-08-21): اللوغو بزاوية الورقة (8mm) والكتابة بهوامش 25mm
-        // من الجهتين — حشوة الجوانب 8mm عالشاشة (بالطباعة صفر ويقوم مقامها هامش الورقة 8mm)
-        // + 17mm بجسم الإفادة = 25mm متل المثال
+        // 🗏 ترتيب مثال p1.png + «بدي المسافة 2 سنتم» (2026-08-21): اللوغو بزاوية الورقة (8mm)
+        // والكتابة 2 سم من الجهتين — حشوة الجوانب 8mm عالشاشة (بالطباعة صفر ويقوم مقامها
+        // هامش الورقة 8mm) + 12mm بجسم الإفادة = 20mm تماماً
         : "max-width:820px;margin:0 auto;padding:20px 8mm";
     $lhClass = $lhOn ? '' : 'card';
     // 🪪 ترويسة تصدير الوورد (بطلبه 2026-08-20): بلا خط تحت الشعار + العنوان اسم المدينة فقط
@@ -894,10 +894,10 @@ if (!$emp):
     .page-content{padding:0 !important;margin:0 !important}
     <?= $lhOn ? '' : '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding-top:0 !important}' ?></style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
-    <?php /* 🗏 ترتيب مثال p1.png (2026-08-21): 17mm بجسم الإفادة فوق 8mm (حشوة الشاشة/هامش
-           الورقة) = 25mm للكتابة متل المثال، وترويسة اللوغو scr-head ترجع للحافة بهامش سالب
-           فتبقى بزاوية الورقة — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
-    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:17mm;padding-right:17mm} #ppExportArea .scr-head{margin-left:-17mm;margin-right:-17mm}' ?></style>
+    <?php /* 🗏 ترتيب مثال p1.png + «بدي المسافة 2 سنتم» (2026-08-21): 12mm بجسم الإفادة فوق
+           8mm (حشوة الشاشة/هامش الورقة) = 2 سم للكتابة من حافتي الورقة تماماً، وترويسة اللوغو
+           scr-head ترجع للحافة بهامش سالب فتبقى بزاوية الورقة — لا يشمل الترويسة-الصورة ($lhOn) */ ?>
+    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:12mm;padding-right:12mm} #ppExportArea .scr-head{margin-left:-12mm;margin-right:-12mm}' ?></style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
             <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (2026-08-20): بلا خط + المدينة فقط — تصدير Word يكشفها ويشيل scr-head */ ?>
@@ -1043,10 +1043,10 @@ if (!$emp):
     .page-content{padding:0 !important;margin:0 !important}
     <?= $lhOn ? '' : '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding-top:0 !important}' ?></style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
-    <?php /* 🗏 ترتيب مثال p1.png (2026-08-21): 17mm بجسم الإفادة فوق 8mm (حشوة الشاشة/هامش
-           الورقة) = 25mm للكتابة متل المثال، وترويسة اللوغو scr-head ترجع للحافة بهامش سالب
-           فتبقى بزاوية الورقة — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
-    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:17mm;padding-right:17mm} #ppExportArea .scr-head{margin-left:-17mm;margin-right:-17mm}' ?></style>
+    <?php /* 🗏 ترتيب مثال p1.png + «بدي المسافة 2 سنتم» (2026-08-21): 12mm بجسم الإفادة فوق
+           8mm (حشوة الشاشة/هامش الورقة) = 2 سم للكتابة من حافتي الورقة تماماً، وترويسة اللوغو
+           scr-head ترجع للحافة بهامش سالب فتبقى بزاوية الورقة — لا يشمل الترويسة-الصورة ($lhOn) */ ?>
+    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:12mm;padding-right:12mm} #ppExportArea .scr-head{margin-left:-12mm;margin-right:-12mm}' ?></style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
       <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
       <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (بطلب المستخدم 2026-08-20): بلا خط تحت الشعار + المدينة فقط —
@@ -1762,10 +1762,10 @@ if (!$emp):
     @page{size:A4;margin:12mm}
     .page-content{padding:0 !important;margin:0 !important}</style>
     <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
-    <?php /* 🗏 ترتيب مثال p1.png (2026-08-21): 17mm بجسم الإفادة فوق 8mm (حشوة الشاشة/هامش
-           الورقة) = 25mm للكتابة متل المثال، وترويسة اللوغو scr-head ترجع للحافة بهامش سالب
-           فتبقى بزاوية الورقة — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
-    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:17mm;padding-right:17mm} #ppExportArea .scr-head{margin-left:-17mm;margin-right:-17mm}' ?></style>
+    <?php /* 🗏 ترتيب مثال p1.png + «بدي المسافة 2 سنتم» (2026-08-21): 12mm بجسم الإفادة فوق
+           8mm (حشوة الشاشة/هامش الورقة) = 2 سم للكتابة من حافتي الورقة تماماً، وترويسة اللوغو
+           scr-head ترجع للحافة بهامش سالب فتبقى بزاوية الورقة — لا يشمل الترويسة-الصورة ($lhOn) */ ?>
+    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:12mm;padding-right:12mm} #ppExportArea .scr-head{margin-left:-12mm;margin-right:-12mm}' ?></style>
     <div id="ppExportArea" class="card" style="max-width:820px;margin:0 auto;padding:10px" data-fit1="1" <?= $rtl?'dir="rtl"':'' ?>>
         <div class="card-body" style="line-height:1.95;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $rtl?'text-align:right':'' ?>">
             <!-- ترويسة باللغة المختارة -->

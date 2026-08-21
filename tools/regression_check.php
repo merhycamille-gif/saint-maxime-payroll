@@ -298,12 +298,12 @@ check('أسماء المناطق باللاتينية: قاموس المناطق
       && strpos($attSrc, '$addrLat') !== false && strpos($attSrc, '$bplaceLat') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/schools.php'), 'arPlaceToFr($addrAr)') !== false
       && function_exists('healSchoolNameFrDiacritics20260821'));
-// (2026-08-21) ترتيب مثال p1.png: اللوغو بزاوية الورقة (هامش صفحة 8mm وترويسة scr-head ترجع
-// للحافة بهامش سالب -17mm) والكتابة بهوامش 25mm من الجهتين (8mm صفحة + 17mm جسم الإفادة)
-// والنص اللاتيني مضبوط الطرفين + اسم المدينة قبل التاريخ بالنسخ اللاتينية — مقيسة فعلياً بالـPDF
-check('ترتيب p1: اللوغو بزاوية الورقة والكتابة 25mm من الحافتين + justify لاتيني + المدينة قبل التاريخ',
+// (2026-08-21) ترتيب مثال p1.png + «بدي المسافة 2 سنتم»: اللوغو بزاوية الورقة (هامش صفحة 8mm
+// وترويسة scr-head ترجع للحافة بهامش سالب -12mm) والكتابة 2 سم من الجهتين (8mm صفحة +
+// 12mm جسم الإفادة) والنص اللاتيني مضبوط الطرفين + المدينة قبل التاريخ — مقيسة فعلياً بالـPDF
+check('ترتيب p1: اللوغو بزاوية الورقة والكتابة 2 سم من الحافتين + justify لاتيني + المدينة قبل التاريخ',
       strpos($attSrc, 'padding:20px 8mm') !== false
-      && substr_count($attSrc, '#ppExportArea .card-body{padding-left:17mm;padding-right:17mm} #ppExportArea .scr-head{margin-left:-17mm;margin-right:-17mm}') >= 2
+      && substr_count($attSrc, '#ppExportArea .card-body{padding-left:12mm;padding-right:12mm} #ppExportArea .scr-head{margin-left:-12mm;margin-right:-12mm}') >= 2
       && substr_count($attSrc, '#ppExportArea{padding:0 !important} #ppExportArea .card-body{padding-top:0 !important}') >= 2
       && strpos($attSrc, '<div dir="ltr" style="text-align:left">') === false
       && substr_count($attSrc, "e(\$cityFr) . ', le '") >= 3);
