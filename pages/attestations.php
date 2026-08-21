@@ -729,7 +729,8 @@ if (!$emp):
     // أجنبي (مشترَك لكل الإفادات اللاتينية — 2026-08-20 «أي إفادة بأي لغة»): الاسم الفرنسي
     // والمدينة والهاتف بنفس نمط «لوغو الراهبات» على يسار الصفحة؛ العنوان والمدير المُدخَلان
     // بالأجنبي وإلا ترجمة تلقائية من العربي
-    $schoolAddrFr = trim((string)($school['address_fr'] ?? '')) ?: ($schoolAddr !== '' ? arNameToFr($schoolAddr) : '');
+    // 🗺️ «اسم المكان مظبوط بالفرنسي» (2026-08-21): العنوان عبر قاموس المناطق (الحدث → Hadath لا Hds)
+    $schoolAddrFr = trim((string)($school['address_fr'] ?? '')) ?: ($schoolAddr !== '' ? arPlaceToFr($schoolAddr) : '');
     $directorFr   = ($sigNameFr !== '') ? $sigNameFr : ($director !== '' ? arNameToFr($director) : '');
     $cityFr = trim((string)(preg_split('/[-–,،]/u', (string)$schoolAddrFr)[0] ?? ''));
     $headBodyFr = function ($logoHtml) use ($schoolNameFr, $cityFr, $schoolPhone) {
@@ -976,6 +977,12 @@ if (!$emp):
         $addr  = implode(' - ', array_values(array_unique(array_filter(array_map(function ($x) { return trim((string)$x); }, [$emp['ville'] ?? '', $emp['quartier'] ?? '', $emp['rue'] ?? '', $emp['immeuble'] ?? '', ($emp['etage'] ?? '') ? ('طابق ' . $emp['etage']) : '', $emp['district'] ?? '', $emp['gouvernorat'] ?? ''])))));
         $dipAr = ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma'], 'ar') : '';
         $dipFr = ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma'], 'fr') : ''; // للعقد الفرنسي/الإنكليزي
+        // 🗺️ «صحح كل المناطق بالإفادات باللغات الأجنبية» (2026-08-21): أماكن الموظف بالنسخ
+        // اللاتينية عبر قاموس المناطق اللبنانية (الحدث → Hadath) — للفرنسي والإنكليزي سواء
+        $addrLat   = $addr !== '' ? arPlaceToFr($addr) : '';
+        $bplaceLat = trim((string)($emp['birth_place'] ?? '')) !== '' ? arPlaceToFr($emp['birth_place']) : $blank(120);
+        $villeLat  = arPlaceToFr($emp['ville'] ?? '');
+        $regNoLat  = trim((string)($emp['civil_registry_number'] ?? '')) . (($emp['civil_registry_place'] ?? '') ? ' / ' . arPlaceToFr($emp['civil_registry_place']) : '');
         $subj  = trim((string)($emp['subjects_taught'] ?? ''));
         $niveau = trim((string)($emp['niveau_scolaire'] ?? ''));
         $hpw   = ($emp['hours_per_week'] ?? null) !== null && $emp['hours_per_week'] !== '' ? rtrim(rtrim((string)$emp['hours_per_week'], '0'), '.') : '';
@@ -1113,7 +1120,7 @@ if (!$emp):
         <div style="border:1px solid #bbb;padding:8px 12px;line-height:1.95;margin-bottom:14px">
           <p style="margin:2px 0"><?= $FR ? 'De' : 'From' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
           <p style="margin:2px 0"><?= $FR ? 'À' : 'To' ?> : <strong><?= e($nomFr) ?></strong></p>
-          <p style="margin:2px 0"><?= $FR ? 'Adresse' : 'Address' ?> : <?= $addr !== '' ? '<strong>' . e($addr) . '</strong>' : $blank(320) ?></p>
+          <p style="margin:2px 0"><?= $FR ? 'Adresse' : 'Address' ?> : <?= $addrLat !== '' ? '<strong>' . e($addrLat) . '</strong>' : $blank(320) ?></p>
           <p style="margin:2px 0"><?= $FR ? 'Tél' : 'Phone' ?> : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong><span dir="ltr">' . e($emp['phone1']) . '</span></strong>' : $blank(150) ?></p>
         </div>
         <?php endif; ?>
@@ -1245,7 +1252,7 @@ if (!$emp):
         <div style="border:1px solid #bbb;padding:8px 12px;line-height:1.95;margin-bottom:14px">
           <p style="margin:2px 0"><?= $FR ? 'De' : 'From' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
           <p style="margin:2px 0"><?= $FR ? 'À' : 'To' ?> : <strong><?= e($nomFr) ?></strong></p>
-          <p style="margin:2px 0"><?= $FR ? 'Adresse' : 'Address' ?> : <?= $addr !== '' ? '<strong>' . e($addr) . '</strong>' : $blank(320) ?></p>
+          <p style="margin:2px 0"><?= $FR ? 'Adresse' : 'Address' ?> : <?= $addrLat !== '' ? '<strong>' . e($addrLat) . '</strong>' : $blank(320) ?></p>
           <p style="margin:2px 0"><?= $FR ? 'Tél' : 'Phone' ?> : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong><span dir="ltr">' . e($emp['phone1']) . '</span></strong>' : $blank(150) ?></p>
         </div>
         <?php endif; ?>
@@ -1286,8 +1293,8 @@ if (!$emp):
         <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline"><?= $FR ? 'Contrat d\'enseignement' : 'Teaching Contract' ?></h2>
         <p><?= $FR ? 'Entre l\'école' : 'Between' ?> : <strong><?= e($schoolNameFr) ?></strong> &nbsp; <?= $FR ? 'représentée par' : 'represented by' ?> : <?= $directorFr ? '<strong>'.e($directorFr).'</strong>' : $blank(150) ?> &nbsp; ( <strong><?= $FR ? 'Première partie' : 'First party' ?></strong> )</p>
         <p><?= $FR ? 'et M./Mme/Mlle' : 'and Mr./Mrs./Miss' ?> : <strong><?= e($nomFr) ?></strong> &nbsp; <?= $FR ? 'de nationalité' : 'of nationality' ?> : <?= $vb($natLat, 90) ?> &nbsp; ( <strong><?= $FR ? 'Seconde partie' : 'Second party' ?></strong> )</p>
-        <p><?= $FR ? 'né(e) le' : 'born on' ?> : <strong><?= $dob ?></strong> &nbsp; <?= $FR ? 'à' : 'in' ?> : <strong><?= $bplace ?></strong> &nbsp; <?= $FR ? 'domicile' : 'residence' ?> : <?= $vb($emp['ville'] ?? '', 110) ?> &nbsp; <?= $FR ? 'registre n°' : 'registry No.' ?> : <?= $vb($regNo, 90) ?></p>
-        <p><?= $FR ? 'demeurant à l\'adresse suivante' : 'residing at the following address' ?> : &nbsp; <?= $FR ? 'hiver' : 'winter' ?> : <?= $vb($addr, 170) ?> <?= $FR ? 'tél' : 'phone' ?> <?= $phone1 ?> &nbsp;&nbsp; <?= $FR ? 'été' : 'summer' ?> : <?= $blank(120) ?> <?= $FR ? 'tél' : 'phone' ?> <?= $vb($emp['phone2'] ?? '', 90) ?></p>
+        <p><?= $FR ? 'né(e) le' : 'born on' ?> : <strong><?= $dob ?></strong> &nbsp; <?= $FR ? 'à' : 'in' ?> : <strong><?= $bplaceLat ?></strong> &nbsp; <?= $FR ? 'domicile' : 'residence' ?> : <?= $vb($villeLat, 110) ?> &nbsp; <?= $FR ? 'registre n°' : 'registry No.' ?> : <?= $vb($regNoLat, 90) ?></p>
+        <p><?= $FR ? 'demeurant à l\'adresse suivante' : 'residing at the following address' ?> : &nbsp; <?= $FR ? 'hiver' : 'winter' ?> : <?= $vb($addrLat, 170) ?> <?= $FR ? 'tél' : 'phone' ?> <?= $phone1 ?> &nbsp;&nbsp; <?= $FR ? 'été' : 'summer' ?> : <?= $blank(120) ?> <?= $FR ? 'tél' : 'phone' ?> <?= $vb($emp['phone2'] ?? '', 90) ?></p>
         <p><?= $FR ? 'En date du' : 'On' ?> : <strong><?= $effFmt ?></strong> <?= $FR ? 'il a été convenu entre les deux parties susmentionnées ce qui suit :' : 'it has been agreed between the two above-mentioned parties as follows:' ?></p>
 
         <p style="margin-top:10px"><strong><?= $FR ? 'Article premier' : 'Article One' ?> :</strong> <?= $FR ? 'La seconde partie déclare :' : 'The second party declares:' ?></p>

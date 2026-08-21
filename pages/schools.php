@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // العنوان واسم المدير: إذا تُرك الحقل الأجنبي فارغاً يُترجَم تلقائياً من العربي
     $addrAr = trim($_POST['address'] ?? '');
     $dirAr  = trim($_POST['director_name'] ?? '');
-    $addrFr = trim($_POST['address_fr'] ?? '');        if ($addrFr === '' && $addrAr !== '') $addrFr = arNameToFr($addrAr);
+    $addrFr = trim($_POST['address_fr'] ?? '');        if ($addrFr === '' && $addrAr !== '') $addrFr = arPlaceToFr($addrAr); // قاموس المناطق (الحدث → Hadath)
     $dirFr  = trim($_POST['director_name_fr'] ?? '');  if ($dirFr === '' && $dirAr !== '') $dirFr = arNameToFr($dirAr);
     $data = [
         trim($_POST['code'] ?? '') ?: null,

@@ -212,3 +212,113 @@ function arNameToFr($ar, $type = 'last') {
     }
     return trim(implode(' ', array_filter($parts)));
 }
+
+/**
+ * 🗺️ قاموس أسماء المناطق والأماكن اللبنانية → التهجئة اللاتينية المتعارف عليها
+ * («اسم المكان بدك تكتبو مظبوط بالفرنسي: الحدث = Hadath لا Hds» — بطلب المستخدم 2026-08-21).
+ * يغطي كل مقاطع عناوين المدارس + المناطق المتكررة بعناوين الموظفين ومحالّ ولادتهم.
+ * المفاتيح تُطبَّع (arFrNormalize + ة→ه) فتغطي «مغدوشة/مغدوشه» بمدخل واحد.
+ */
+function arPlaceDict() {
+    static $d = null;
+    if ($d !== null) return $d;
+    $raw = [
+        // محافظات وأقضية
+        'الجنوب'=>'Liban-Sud','لبنان الجنوبي'=>'Liban-Sud','الشمال'=>'Liban-Nord','جبل لبنان'=>'Mont-Liban',
+        'البقاع'=>'Békaa','البقاع الغربي'=>'Békaa-Ouest','بيروت'=>'Beyrouth','النبطية'=>'Nabatiyeh',
+        'عكار'=>'Akkar','بعلبك الهرمل'=>'Baalbeck-Hermel','صيدا'=>'Saida','جزين'=>'Jezzine','الشوف'=>'Chouf',
+        'بعبدا'=>'Baabda','المتن'=>'Metn','كسروان'=>'Kesrouan','جبيل'=>'Jbeil','عاليه'=>'Aley','زحلة'=>'Zahlé',
+        'بنت جبيل'=>'Bint Jbeil','مرجعيون'=>'Marjeyoun','صور'=>'Sour','البترون'=>'Batroun','بعلبك'=>'Baalbeck',
+        'راشيا'=>'Rachaiya','حاصبيا'=>'Hasbaya','طرابلس'=>'Tripoli',
+        // مناطق المدارس وضواحيها
+        'الحدث'=>'Hadath','تلال الحدث'=>'Tilal El Hadath','المنصورية'=>'Mansourieh','البلاطة'=>'Blata',
+        'عبرا'=>'Abra','عبرا الجديدة'=>'Abra El Jdideh','عبرا الجديدة مكسيموس'=>'Abra El Jdideh',
+        'مغدوشة'=>'Maghdouché','جون'=>'Joun','جون الدير'=>'Joun','المحتقرة'=>'Mohtakra','الفرزل'=>'Ferzol',
+        'الفرزل التحتا'=>'Ferzol El Tahta','الفرزل الفوقا'=>'Ferzol El Faouqa','ابلح'=>'Ablah','كسارة'=>'Ksara',
+        'تلال كسارة'=>'Tilal Ksara','يارون'=>'Yaroun','جعيتا'=>'Jeita','الدامور'=>'Damour','مكسيموس'=>'Maximos',
+        'الراهبات المخلصيات'=>'Sœurs Salvatoriennes','سامي الصلح'=>'Sami El Solh','مستوصف'=>'Dispensaire',
+        'الدير'=>'El Deir','دير'=>'Deir','المدرسة'=>"l'École",'البلدية'=>'La Municipalité','الديشونية'=>'Dichounieh',
+        // بلدات ومناطق شائعة بعناوين الموظفين
+        'القرية'=>'Qraiyeh','عين الدلب'=>'Ain El Delb','الهلالية'=>'Hlaliyeh','الرميلة'=>'Rmeileh',
+        'مجدليون'=>'Majdelyoun','المية ومية'=>'Miyé ou Miyé','حوش الامراء'=>'Housh El Oumara',
+        'جنسنايا'=>'Jensnaya','المعلقة'=>'Maallaqa','درب السيم'=>'Darb El Sim','علمان'=>'Aalman',
+        'جديتا'=>'Jdita','انان'=>'Anan','عين المير'=>'Ain El Mir','الزهراني'=>'Zahrani','بسابا'=>'Bsaba',
+        'كفرشيما'=>'Kfarchima','نيحا'=>'Niha','الحسانية'=>'Hassaniyeh','بيت مري'=>'Beit Mery','روم'=>'Roum',
+        'مراح الحباس'=>'Mrah El Habbas','وادي بعنقودين'=>'Wadi Baanqoudine','بيصور'=>'Baysour',
+        'سن الفيل'=>'Sin El Fil','شواليق'=>'Chwalik','قيتولي'=>'Qaitouli','وادي شحرور'=>'Wadi Chahrour',
+        'الحازمية'=>'Hazmieh','الصالحية'=>'Salhiyeh','بدادون'=>'Bdadoun','رياق'=>'Rayak',
+        'رياق الفوقا'=>'Rayak El Faouqa','عين الرمانة'=>'Ain El Remmaneh','كفرفالوس'=>'Kfarfalous',
+        'الدكوانة'=>'Dekwaneh','تعلبايا'=>'Taalabaya','حارة صيدا'=>'Haret Saida','لبعا'=>'Lebaa','لبعه'=>'Lebaa',
+        'وادي الليمون'=>'Wadi El Laymoun','العدوسية'=>'Aadousiyeh','الغازية'=>'Ghaziyeh','الفياضية'=>'Fayadiyeh',
+        'برتي'=>'Berti','حوش حالا'=>'Housh Hala','شحيم'=>'Chhim','البرامية'=>'Bramiyeh','بليبل'=>'Bleibel',
+        'تربل'=>'Terbol','عين سعادة'=>'Ain Saadeh','برج حمود'=>'Bourj Hammoud','سبنيه'=>'Sebnay','الزلقا'=>'Zalka',
+        'البوشرية'=>'Baouchriyeh','الحجة'=>'Hajjeh','الراسية'=>'Rassiyeh','الراسية الفوقا'=>'Rassiyeh El Faouqa',
+        'الزعرورية'=>'Zaarouriyeh','الميدان'=>'Maydan','قب الياس'=>'Qab Elias','كفرجرة'=>'Kfarjarra',
+        'كفريا'=>'Kefraya','الكنيسة'=>'El Knisseh','الجديدة'=>'Jdeideh','السيدة'=>'El Saydeh',
+        'حي السيدة'=>'Hay El Saydeh','الكحالة'=>'Kahaleh','جل الديب'=>'Jal El Dib','رميش'=>'Rmeich',
+        'صربا'=>'Sarba','عين ابل'=>'Ain Ebel','فرن الشباك'=>'Furn El Chebbak','الشارع العام'=>'Rue Principale',
+        'الطريق العام'=>'Route Principale','العام'=>'Rue Principale','بطشاي'=>'Btechay','شرحبيل'=>'Charhabil',
+        'قاع الريم'=>'Qaa El Rim','كترمايا'=>'Ketermaya','وادي جزين'=>'Wadi Jezzine','الدوير'=>'Dweir',
+        'حي الدوير'=>'Hay El Dweir','مار الياس'=>'Mar Elias','مارالياس'=>'Mar Elias','الشياح'=>'Chiyah',
+        'الفنار'=>'Fanar','المطلة'=>'Mtolleh','المعمرية'=>'Maamariyeh','انطلياس'=>'Antelias','بجه'=>'Bejjeh',
+        'برجا'=>'Barja','بسكنتا'=>'Baskinta','بصاليم'=>'Bsalim','بيت الشعار'=>'Beit Chaar','حلب'=>'Alep',
+        'عازور'=>'Aazour','عين عرب'=>'Ain Aarab','كفرحونة'=>'Kfarhouna','نيو روضة'=>'New Rawda',
+        'الروضة'=>'Rawda','القاطع'=>'El Qatea','دير الاحمر'=>'Deir El Ahmar','راس بعلبك'=>'Ras Baalbeck',
+        'ربله'=>'Ribleh','جديدة مرجعيون'=>'Jdeidet Marjeyoun','الجية'=>'Jiyeh','الكرك'=>'Karak',
+        'المغيرية'=>'Mghayriyeh','النجارية'=>'Najjariyeh','بيت شباب'=>'Beit Chabab','تمنين التحتا'=>'Temnine El Tahta',
+        'ذوق مصبح'=>'Zouk Mosbeh','زوق مصبح'=>'Zouk Mosbeh','زوق مكايل'=>'Zouk Mikael','صغبين'=>'Saghbine',
+        'صليما'=>'Salima','طنبوريت'=>'Tanbourit','عقتانيت'=>'Aaqtanit','قتالي'=>'Qtali','كفرزبد'=>'Kfarzabad',
+        'الانطونية'=>'Antoniyeh','البيادر'=>'Bayader','الثكنة'=>'El Thakneh','الخندق'=>'Khandaq',
+        'الساحة'=>'El Saha','الشاغور'=>'Chaghour','الفوار'=>'Fawar','بر الياس'=>'Bar Elias',
+        'حارة البطم'=>'Haret El Batm','الحوش'=>'El Housh','القصير'=>'Qousseir','رشميا'=>'Rechmaya',
+        'مشغرة'=>'Machghara','الاشرفية'=>'Achrafieh','الاشرفية الفوقا'=>'Achrafieh El Faouqa','الحمرا'=>'Hamra',
+        'الحرش'=>'El Horch','الصرفند'=>'Sarafand','الشويفات'=>'Choueifat','الضبية'=>'Dbayeh','الدورة'=>'Dora',
+        'الدكرمان'=>'Dekerman','بسري'=>'Bisri','الاسكندرية'=>'Alexandrie','السعودية'=>'Arabie Saoudite',
+        'قطر'=>'Qatar','الدوحه'=>'Doha','ابيدجان'=>'Abidjan',
+        // كلمات عناوين عامة
+        'حي'=>'Hay','حارة'=>'Haret','شارع'=>'Rue','طريق'=>'Route','طابق'=>'Étage','بناية'=>'Imm.',
+        'عمارة'=>'Imm.','التحتا'=>'El Tahta','الفوقا'=>'El Faouqa','التحتاني'=>'El Tahtani','الفوقاني'=>'El Faouqani',
+    ];
+    $d = [];
+    foreach ($raw as $k => $v) { $d[str_replace('ة', 'ه', arFrNormalize($k))] = $v; }
+    return $d;
+}
+
+/**
+ * ترجمة اسم مكان/عنوان عربي إلى التهجئة اللاتينية الصحيحة (للإفادات الفرنسية والإنكليزية):
+ * مطابقة المقطع كاملاً بالقاموس، ثم أطول عبارة (حتى 3 كلمات)، ثم كلمة كلمة (مع إسقاط «ال»)،
+ * والاحتياط نقل الحروف. المقاطع تُفصل على - / – / ، وتُعاد موصولة بـ« - ».
+ */
+function arPlaceToFr($ar) {
+    $ar = trim((string)$ar);
+    if ($ar === '') return '';
+    if (preg_match('/^[\x00-\x7F]+$/', $ar)) return $ar; // لاتيني أصلاً — كما هو
+    $dict = arPlaceDict();
+    $normP = function ($s) { return str_replace('ة', 'ه', arFrNormalize($s)); };
+    $strip = function ($w) { return (mb_substr($w, 0, 2, 'UTF-8') === 'ال' && mb_strlen($w, 'UTF-8') > 3) ? mb_substr($w, 2, null, 'UTF-8') : $w; };
+    $lookup = function ($seg) use ($dict, $strip) {
+        if ($seg === '') return '';
+        if (preg_match('/^[\x00-\x7F]+$/', $seg)) return $seg; // مقطع لاتيني/رقمي
+        if (isset($dict[$seg])) return $dict[$seg];
+        $core = $strip($seg);
+        return isset($dict[$core]) ? $dict[$core] : null;
+    };
+    $outSegs = [];
+    foreach (preg_split('/\s*[-–,،\/]\s*/u', $normP($ar)) as $seg) {
+        $seg = trim($seg);
+        if ($seg === '') continue;
+        $hit = $lookup($seg);
+        if ($hit !== null) { if ($hit !== '') $outSegs[] = $hit; continue; }
+        $words = array_values(array_filter(explode(' ', $seg), 'strlen'));
+        $parts = [];
+        for ($i = 0; $i < count($words); $i++) {
+            for ($len = min(3, count($words) - $i); $len >= 1; $len--) {
+                $h = $lookup(implode(' ', array_slice($words, $i, $len)));
+                if ($h !== null) { $parts[] = $h; $i += $len - 1; continue 2; }
+            }
+            $parts[] = arFrTranslitWord($strip($words[$i]));
+        }
+        $outSegs[] = trim(implode(' ', array_filter($parts, 'strlen')));
+    }
+    return implode(' - ', array_filter($outSegs, 'strlen'));
+}

@@ -283,6 +283,21 @@ check('إفادة الضمان: سطر «الأجر الإضافي» بدل «م
 // (2026-08-21) p1: خانة «الرقم/N°» انشالت من رأس إفادتي الراتب والعمل + التاريخ وحده سطراً
 // (شمال الصفحة بالعربي بdir=rtl حتى تسبق كلمة «التاريخ» الرقم، ويمينها باللاتيني) — بلا flex
 // لأن الوورد لا يفهمه فتتكوّم السطور بجهة وحدة + كلمة «هاتف» قبل الرقم (سطر الهاتف dir=rtl)
+// (2026-08-21) «اسم المكان بدك تكتبو مظبوط بالفرنسي — الحدث Hadath مش Hds»: قاموس المناطق
+// اللبنانية arPlaceToFr يترجم عناوين المدارس وأماكن الموظفين بالإفادات اللاتينية (فرنسي/إنكليزي)
+require_once __DIR__ . '/../includes/translit_ar_fr.php';
+check('أسماء المناطق باللاتينية: قاموس المناطق + العناوين المركّبة + مربوط بالإفادات وصفحة المدارس',
+      arPlaceToFr('الحدث') === 'Hadath'
+      && arPlaceToFr('الحدث - تلال الحدث - الراهبات المخلصيات') === 'Hadath - Tilal El Hadath - Sœurs Salvatoriennes'
+      && arPlaceToFr('عبرا - الراهبات المخلصيات') === 'Abra - Sœurs Salvatoriennes'
+      && arPlaceToFr('المحتقرة - جون - الراهبات المخلصيات') === 'Mohtakra - Joun - Sœurs Salvatoriennes'
+      && arPlaceToFr('المنصورية') === 'Mansourieh'
+      && arPlaceToFr('ابلح') === 'Ablah' && arPlaceToFr('يارون') === 'Yaroun'
+      && arPlaceToFr('كسارة - تلال كسارة - الراهبات المخلصيات') === 'Ksara - Tilal Ksara - Sœurs Salvatoriennes'
+      && strpos($attSrc, 'arPlaceToFr($schoolAddr)') !== false
+      && strpos($attSrc, '$addrLat') !== false && strpos($attSrc, '$bplaceLat') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/schools.php'), 'arPlaceToFr($addrAr)') !== false
+      && function_exists('healSchoolNameFrDiacritics20260821'));
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
       strpos($attSrc, "'N°' : 'No.'") === false
       && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false

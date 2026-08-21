@@ -436,6 +436,33 @@ function healSchoolAddressDedupe20260820() {
 }
 
 /**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-21 «اسم المكان مظبوط بالفرنسي»): حرف تشكيل عربي ضائع
+ * بأول الاسم الفرنسي لمدرسة («ُEcole St.Georges» بيارون) — ننقّي name_fr وaddress_fr من
+ * حروف التشكيل والتطويل العربية بالداتا نفسها فتصير كل الإفادات اللاتينية نظيفة. idempotent.
+ */
+function healSchoolNameFrDiacritics20260821() {
+    $flag = 'school_name_fr_diacritics_2026_08_21';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        $n = 0;
+        foreach ($db->query("SELECT * FROM schools")->fetchAll(PDO::FETCH_ASSOC) as $s) {
+            foreach (['name_fr', 'address_fr'] as $c) {
+                if (!array_key_exists($c, $s)) continue;
+                $old = (string)($s[$c] ?? '');
+                if (trim($old) === '') continue;
+                $new = trim(preg_replace('/[\x{0617}-\x{061A}\x{064B}-\x{0652}\x{0670}\x{0640}]/u', '', $old));
+                if ($new !== $old) {
+                    $db->prepare("UPDATE schools SET `$c` = ? WHERE id = ?")->execute([$new, (int)$s['id']]);
+                    $n++;
+                }
+            }
+        }
+        setSetting($flag, date('Y-m-d H:i') . " ($n حقل)");
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
+/**
  * 🩹 شفاء ذاتي (2026-08-20 «الراتب بدك تجمعو مع الإضافي أو المكافأة إذا محطوطين — صحح»):
  * علاوات (أجر إضافي/نقل) موجودة بنسخة الكمبيوتر وناقصة أونلاين (مثال السي موسى: الإضافي
  * 133م مفقود أونلاين فطلع «الراتب الحالي» بنموذج الضمان أساساً فقط). اللائحة الكاملة مولَّدة
