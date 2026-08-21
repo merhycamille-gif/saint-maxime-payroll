@@ -298,6 +298,13 @@ check('أسماء المناطق باللاتينية: قاموس المناطق
       && strpos($attSrc, '$addrLat') !== false && strpos($attSrc, '$bplaceLat') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/schools.php'), 'arPlaceToFr($addrAr)') !== false
       && function_exists('healSchoolNameFrDiacritics20260821'));
+// (2026-08-21) «المسافة بين حافة الورقة والكتابة 2 سنتم واللوغو بزاوية الورقة»: بالطباعة
+// 12mm هامش صفحة (حشوة جوانب الصندوق تصير صفراً) + 8mm بجسم الإفادة = 2 سم تماماً،
+// وترويسة اللوغو scr-head ترجع للحافة بهامش سالب — مقيسة فعلياً بالـPDF: نص 19.5-19.8mm
+check('هوامش الإفادات: الكتابة 2 سم من حافتي الورقة (12mm+8mm) واللوغو بزاوية الورقة (scr-head -8mm)',
+      strpos($attSrc, 'padding:28px 12mm') !== false
+      && substr_count($attSrc, '#ppExportArea .card-body{padding-left:8mm;padding-right:8mm} #ppExportArea .scr-head{margin-left:-8mm;margin-right:-8mm}') >= 2
+      && substr_count($attSrc, '#ppExportArea{padding-left:0 !important;padding-right:0 !important}') >= 2);
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
       strpos($attSrc, "'N°' : 'No.'") === false
       && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false

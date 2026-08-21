@@ -691,7 +691,9 @@ if (!$emp):
         // 🔴 1122 لا 1123: ورقة A4 = 297mm = 1122.5px — صندوق 1123px أطول من الورقة بنصف
         // بكسل فينكسر آخر سطر (التوقيع) لصفحة ثانية فاضية (شكوى المستخدم 2026-08-03)
         ? "width:794px;min-height:1122px;margin:0 auto;background:url('" . htmlspecialchars($lhUrl, ENT_QUOTES) . "') no-repeat;background-size:794px 1122px;padding:195px 95px 150px;box-sizing:border-box"
-        : "max-width:820px;margin:0 auto;padding:28px 32px";
+        // 🗏 «المسافة بين حافة الورقة والكتابة 2 سنتم» (2026-08-21): حشوة الجوانب 12mm عالشاشة
+        // (بالطباعة تصير صفراً ويقوم مقامها هامش الورقة 12mm) + 8mm بجسم الإفادة = 2 سم تماماً
+        : "max-width:820px;margin:0 auto;padding:28px 12mm";
     $lhClass = $lhOn ? '' : 'card';
     // 🪪 ترويسة تصدير الوورد (بطلبه 2026-08-20): بلا خط تحت الشعار + العنوان اسم المدينة فقط
     // + الهاتف LTR حتى يبقى الكود على شمال الرقم (بسياق RTL كان يطلع «531450-04»)
@@ -888,8 +890,13 @@ if (!$emp):
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
     @page{size:A4;margin:<?= $lhOn ? '0' : '12mm' ?>}
-    .page-content{padding:0 !important;margin:0 !important}</style>
-    <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
+    .page-content{padding:0 !important;margin:0 !important}
+    <?= $lhOn ? '' : '#ppExportArea{padding-left:0 !important;padding-right:0 !important}' ?></style>
+    <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
+    <?php /* 🗏 «الكتابة 2 سنتم من حافتي الورقة واللوغو بزاوية الورقة» (2026-08-21): 8mm بجسم
+           الإفادة فوق 12mm (حشوة الشاشة/هامش الورقة) = 2 سم، وترويسة اللوغو scr-head ترجع
+           للحافة بهامش سالب فتبقى بالزاوية — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
+    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:8mm;padding-right:8mm} #ppExportArea .scr-head{margin-left:-8mm;margin-right:-8mm}' ?></style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
         <div class="card-body" style="line-height:2.15;text-align:right;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
             <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (2026-08-20): بلا خط + المدينة فقط — تصدير Word يكشفها ويشيل scr-head */ ?>
@@ -1032,8 +1039,13 @@ if (!$emp):
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح (هوامش 1 إنش كانت تكسر الصفحة)،
     وحشوة .page-content (16px فوق/32px تحت) كانت تدفع الإفادة فتنكسر آخر شلفة لصفحة ثانية */
     @page{size:A4;margin:<?= $lhOn ? '0' : '12mm' ?>}
-    .page-content{padding:0 !important;margin:0 !important}</style>
-    <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
+    .page-content{padding:0 !important;margin:0 !important}
+    <?= $lhOn ? '' : '#ppExportArea{padding-left:0 !important;padding-right:0 !important}' ?></style>
+    <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
+    <?php /* 🗏 «الكتابة 2 سنتم من حافتي الورقة واللوغو بزاوية الورقة» (2026-08-21): 8mm بجسم
+           الإفادة فوق 12mm (حشوة الشاشة/هامش الورقة) = 2 سم، وترويسة اللوغو scr-head ترجع
+           للحافة بهامش سالب فتبقى بالزاوية — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
+    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:8mm;padding-right:8mm} #ppExportArea .scr-head{margin-left:-8mm;margin-right:-8mm}' ?></style>
     <div id="ppExportArea" class="<?= $lhClass ?>" style="<?= $lhStyle ?>" dir="rtl"<?= $type === 'aqd_taalim' ? '' : ' data-fit1="1"' ?>>
       <div class="card-body" style="line-height:2.15;text-align:justify;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $lhOn?'padding:0':'' ?>">
       <?php /* 🪪 ترويسة وورد بديلة لكل المدارس (بطلب المستخدم 2026-08-20): بلا خط تحت الشعار + المدينة فقط —
@@ -1746,7 +1758,11 @@ if (!$emp):
     <style media="print">/* هوامش الورقة بيد الإفادة لا بيد إعدادات المتصفح */
     @page{size:A4;margin:12mm}
     .page-content{padding:0 !important;margin:0 !important}</style>
-    <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}</style>
+    <style>/* خط الإفادات Arial بكل اللغات (بطلب المستخدم 2026-08-20) */ #ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}
+    <?php /* 🗏 «الكتابة 2 سنتم من حافتي الورقة واللوغو بزاوية الورقة» (2026-08-21): 8mm بجسم
+           الإفادة فوق 12mm (حشوة الشاشة/هامش الورقة) = 2 سم، وترويسة اللوغو scr-head ترجع
+           للحافة بهامش سالب فتبقى بالزاوية — لا يشمل الترويسة-الصورة الرسمية ($lhOn) */ ?>
+    <?= $lhOn ? '' : '#ppExportArea .card-body{padding-left:8mm;padding-right:8mm} #ppExportArea .scr-head{margin-left:-8mm;margin-right:-8mm}' ?></style>
     <div id="ppExportArea" class="card" style="max-width:820px;margin:0 auto;padding:10px" data-fit1="1" <?= $rtl?'dir="rtl"':'' ?>>
         <div class="card-body" style="line-height:1.95;font-size:12pt;font-family:Arial,'Segoe UI',Tahoma,sans-serif;<?= $rtl?'text-align:right':'' ?>">
             <!-- ترويسة باللغة المختارة -->
