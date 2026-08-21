@@ -381,6 +381,16 @@ check('نموذج ر3: معلومات الزوج/الزوجة (أعمدة ذات
       && strpos($oeR3s, "\$emp['spouse_mof_number']") !== false
       && strpos($oeR3s, 'خاص بالإدارة') !== false
       && strpos($oeR3s, '82.55') !== false);
+// (2026-08-21) p1: «ما عم يبين أسانسور التفتيش» — البطاقات .card عليها overflow:hidden فكانت
+// لائحة نتائج التفتيش تنقصّ كلياً حين تكون البطاقة قصيرة (صفحة النماذج الرسمية) — الويدجت
+// صارت تفتح قصّ البطاقات الأسلاف وقت اللوحة مفتوحة (setCardClip) وترجّعه عند إغلاقها
+$ssSrc21 = (string)file_get_contents(__DIR__ . '/../assets/js/select-search.js');
+check('تفتيش الأستاذ: لائحة النتائج لا تنقصّ ببطاقات overflow:hidden (setCardClip/hidePanel)',
+      strpos($ssSrc21, 'function setCardClip') !== false
+      && strpos($ssSrc21, "el.style.overflow = open ? 'visible' : ''") !== false
+      && strpos($ssSrc21, 'function hidePanel') !== false
+      && substr_count($ssSrc21, 'setCardClip(true)') >= 2
+      && substr_count($ssSrc21, 'hidePanel') >= 4);
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
       strpos($attSrc, "'N°' : 'No.'") === false
       && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false

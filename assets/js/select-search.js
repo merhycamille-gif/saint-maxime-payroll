@@ -79,11 +79,24 @@
 
         var active = -1, shown = [];
 
+        // 🛗 «ما عم يبين أسانسور التفتيش» (p1 ‏2026-08-21): البطاقات .card عليها overflow:hidden
+        // فكانت لائحة النتائج تنقصّ كلياً حين تكون البطاقة قصيرة (صفحة النماذج الرسمية) —
+        // نفتح قصّ البطاقات الأسلاف وقت اللوحة مفتوحة فقط ونرجّعه عند إغلاقها
+        function setCardClip(open) {
+            var el = wrap.parentNode;
+            while (el && el !== document.body) {
+                if (el.classList && el.classList.contains('card')) el.style.overflow = open ? 'visible' : '';
+                el = el.parentNode;
+            }
+        }
+        function hidePanel() { panel.style.display = 'none'; setCardClip(false); }
+
         function render(list) {
             shown = list; active = -1;
             if (!list.length) {
                 panel.innerHTML = '<div style="padding:10px 12px;color:#94a3b8;font-size:13px">لا نتيجة — جرّب حرفاً أقل / Aucun résultat</div>';
                 panel.style.display = 'block';
+                setCardClip(true);
                 return;
             }
             panel.innerHTML = '';
@@ -103,6 +116,7 @@
                 panel.appendChild(more);
             }
             panel.style.display = 'block';
+            setCardClip(true);
         }
 
         function highlight(i) {
@@ -117,7 +131,7 @@
             if (!o) return;
             sel.value = o.value;
             inp.value = o.label;
-            panel.style.display = 'none';
+            hidePanel();
             sel.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
@@ -147,7 +161,7 @@
             filter();
         });
         inp.addEventListener('focus', function () { inp.select(); filter(); });
-        inp.addEventListener('blur', function () { setTimeout(function () { panel.style.display = 'none'; }, 150); });
+        inp.addEventListener('blur', function () { setTimeout(hidePanel, 150); });
         inp.addEventListener('keydown', function (ev) {
             if (panel.style.display === 'none') return;
             if (ev.key === 'ArrowDown') { ev.preventDefault(); highlight(Math.min(active + 1, Math.min(shown.length, 60) - 1)); }
@@ -155,7 +169,7 @@
             else if (ev.key === 'Enter') {
                 if (shown.length) { ev.preventDefault(); choose(active >= 0 ? active : 0); }
             }
-            else if (ev.key === 'Escape') { panel.style.display = 'none'; }
+            else if (ev.key === 'Escape') { hidePanel(); }
         });
     }
 
