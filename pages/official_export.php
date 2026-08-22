@@ -272,14 +272,28 @@ if ($form === 'mof_r3') {
                         $py = (int)round($Hx * $y / 100);
                         $txt = htmlspecialchars((string)$t, ENT_XML1 | ENT_QUOTES, 'UTF-8');
                         $sid++;
-                        $shapes .= '<xdr:absoluteAnchor><xdr:pos x="' . $px . '" y="' . $py . '"/><xdr:ext cx="' . $cx . '" cy="' . $cy . '"/>'
+                        // 🔴 «الارقام والكلمات مش بمحلها» على شاشة الإكسل (2026-08-22): المراسي
+                        // المطلقة تكبَّر بنسبة مختلفة عن الصورة مع تكبير شاشة ويندوز (DPI) فتفلّ
+                        // النصوص عن السطور. الحل: الصورة والنصوص كلاهما مربوطان بشبكة الخلايا
+                        // (twoCellAnchor على شبكة 47 عموداً ×17px و70 صفاً ×16px = A4) — أي تكبير
+                        // يطبَّق على الشبكة يطالهما سوية فلا ينفكّان أبداً (شاشة/طباعة/PDF).
+                        $pxx = $px / 9525.0; $pyy = $py / 9525.0;          // EMU → بكسل 96dpi
+                        $cxx = $cx / 9525.0; $cyy = $cy / 9525.0;
+                        $anch = function ($xp, $yp) {                       // بكسل → (عمود/صف + إزاحة)
+                            $c = min(46, (int)floor($xp / 17)); $r = min(69, (int)floor($yp / 16));
+                            return [$c, (int)round(($xp - $c * 17) * 9525), $r, (int)round(($yp - $r * 16) * 9525)];
+                        };
+                        [$c1, $o1, $r1, $q1] = $anch($pxx, $pyy);
+                        [$c2, $o2, $r2, $q2] = $anch($pxx + $cxx, $pyy + $cyy);
+                        $shapes .= '<xdr:twoCellAnchor editAs="twoCell"><xdr:from><xdr:col>' . $c1 . '</xdr:col><xdr:colOff>' . $o1 . '</xdr:colOff><xdr:row>' . $r1 . '</xdr:row><xdr:rowOff>' . $q1 . '</xdr:rowOff></xdr:from>'
+                            . '<xdr:to><xdr:col>' . $c2 . '</xdr:col><xdr:colOff>' . $o2 . '</xdr:colOff><xdr:row>' . $r2 . '</xdr:row><xdr:rowOff>' . $q2 . '</xdr:rowOff></xdr:to>'
                             . '<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="' . $sid . '" name="fld' . $sid . '"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr>'
                             . '<xdr:spPr><a:xfrm><a:off x="' . $px . '" y="' . $py . '"/><a:ext cx="' . $cx . '" cy="' . $cy . '"/></a:xfrm>'
                             . '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></xdr:spPr>'
                             . '<xdr:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"/><a:lstStyle/>'
                             . '<a:p><a:pPr algn="' . $algn . '"' . $rtl . '/><a:r><a:rPr lang="' . $rlang . '" sz="' . (int)round($fs * 100) . '" b="1">'
                             . '<a:latin typeface="Arial"/><a:cs typeface="Arial"/></a:rPr><a:t>' . $txt . '</a:t></a:r></a:p>'
-                            . '</xdr:txBody></xdr:sp><xdr:clientData/></xdr:absoluteAnchor>';
+                            . '</xdr:txBody></xdr:sp><xdr:clientData/></xdr:twoCellAnchor>';
                     }
                     $z->addFromString('xl/drawings/drawing1.xml', str_replace('</xdr:wsDr>', $shapes . '</xdr:wsDr>', $dr));
                     $okR3 = true;

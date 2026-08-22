@@ -408,7 +408,7 @@ check('نموذج ر3 إكسل رسمي: القالب (صورة المستخدم
       && filesize(__DIR__ . '/../assets/templates/mof_r3_excel.xlsx') > 1000000
       && substr((string)$xR3, 0, 2) === 'PK'
       && strlen((string)$xR3) > 1000000
-      && strpos($oeR3s, 'absoluteAnchor') !== false
+      && strpos($oeR3s, 'twoCellAnchor') !== false /* مرساة الشبكة: النص ملزوق بالصورة بأي شاشة/تكبير */
       && strpos($oeR3s, 'mof_r3_excel.xlsx') !== false
       && strpos($attSrc, '&format=xlsx') !== false);
 // (2026-08-22) «عمول شغلك صح دغري»: ر3 من النماذج الرسمية يحوّل لنموذج mof_r3 طبق الأصل —
