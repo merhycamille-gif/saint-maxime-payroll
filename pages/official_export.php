@@ -182,25 +182,25 @@ if ($form === 'mof_r3') {
     $put($esch['name_ar'] ?? '', 76.5, 9.05, 'r', 8.5);
     $digits($esch['finance_number'] ?? '', [56.06, 58.16, 60.24, 62.32, 64.39, 66.46, 68.54, 70.61, 72.71, 74.91], 12.6);
     // هل لديه رقم مالي شخصي؟ + الرقم
-    if ($mofNum !== '') { $X(47.7, 16.05); $digits($mofNum, [2.24, 4.33, 6.42, 8.48, 10.56, 12.64, 14.72, 16.81, 18.88], 16.25); }
-    else { $X(37.9, 16.05); }
+    if ($mofNum !== '') { $X(47.85, 16.1); $digits($mofNum, [2.24, 4.33, 6.42, 8.48, 10.56, 12.64, 14.72, 16.81, 18.88], 16.25); }
+    else { $X(37.25, 16.1); }
     // تعريف المستخدم
     $put($emp['first_name_ar'] ?? '', 84.5, 19.3);
     $put($emp['last_name_ar'] ?? '', 38.5, 19.5);
     $put($emp['father_name_ar'] ?? '', 84.5, 21.5);
     $put($motherAr, 25.2, 21.6);
-    $X($sex === 'f' ? 74.8 : 83.5, 23.9);
+    $X($sex === 'f' ? 74.5 : 83.2, 23.8);
     $natR3 = in_array(mb_strtolower(trim((string)($emp['nationality'] ?? ''))), ['lebanese', 'lebanaise', 'libanaise', 'لبنانية', 'لبناني'], true) ? 'لبنانية' : (string)($emp['nationality'] ?? '');
     $put($natR3, 40.5, 24.45);
     $put($emp['birth_place'] ?? '', 79.5, 26.6);
-    $put($bD, 34.3, 26.7, 'c'); $put($bM, 27.3, 26.7, 'c'); $put($bY, 18.8, 26.7, 'c');
+    $put($bD, 34.3, 26.25, 'c'); $put($bM, 27.3, 26.25, 'c'); $put($bY, 18.8, 26.25, 'c');
     $put($regNo3, 84.0, 29.25);
     $put($regPl3, 56.5, 29.35);
-    $X(['single' => 79.1, 'married' => 71.1, 'widow' => 63.5, 'divorced' => 55.5][$marKey], 31.7);
+    $X(['single' => 78.4, 'married' => 70.35, 'widow' => 65.0, 'divorced' => 54.75][$marKey], 31.7);
     $put((string)(int)($emp['number_of_children'] ?? 0), 21.5, 31.2);
-    $put($hD, 76.0, 35.15, 'c'); $put($hM, 66.0, 35.15, 'c'); $put($hY, 57.5, 35.15, 'c');
+    $put($hD, 76.0, 34.2, 'c'); $put($hM, 66.0, 34.2, 'c'); $put($hY, 57.5, 34.2, 'c');
     $put($emp['nssf_number'] ?? '', 18.2, 33.3);
-    $X(['m' => 23.3, 'd' => 15.7, 'h' => 8.8][$wage], 36.15);
+    $X(['m' => 22.7, 'd' => 15.2, 'h' => 8.1][$wage], 35.95);
     // الزوج/الزوجة: كل معلوماته من ملف الموظف (تُعبَّأ بشاشة نموذج ر3 — «وين معلومات
     // الزوج/الزوجة» + «ناقصة كتير معلومات» 2026-08-21) + المستفيدون من التنزيل + هل يعمل
     $spNat = in_array(mb_strtolower(trim((string)($emp['spouse_nationality'] ?? ''))), ['lebanese', 'lebanaise', 'libanaise', 'لبنانية', 'لبناني'], true) ? 'لبنانية' : (string)($emp['spouse_nationality'] ?? '');
@@ -208,13 +208,13 @@ if ($form === 'mof_r3') {
     $put($emp['spouse_full_name'] ?? '', 72.5, 40.6);
     $put($emp['spouse_maiden_name'] ?? '', 38.5, 41.0);
     $put($emp['spouse_father_name'] ?? '', 84.0, 43.45);
-    $put($emp['spouse_mother_name'] ?? '', 33.0, 43.75);
+    $put($emp['spouse_mother_name'] ?? '', 31.8, 43.75);
     $put($spNat, 86.0, 46.3);
     $put($emp['spouse_birth_place'] ?? '', 40.0, 46.65);
-    $put($sD, 77.5, 49.55, 'c'); $put($sM, 70.5, 49.55, 'c'); $put($sY, 64.0, 49.55, 'c');
+    $put($sD, 77.5, 48.95, 'c'); $put($sM, 70.5, 48.95, 'c'); $put($sY, 64.0, 48.95, 'c');
     $put($emp['spouse_id_card'] ?? '', 40.0, 49.25);
     if ($famBenef > 0) $put((string)$famBenef, 57.0, 52.3, 'c');
-    if ($isMar) $X((int)($emp['spouse_works'] ?? 0) ? 67.75 : 59.9, 54.55);
+    if ($isMar) $X((int)($emp['spouse_works'] ?? 0) ? 67.75 : 59.9, 54.4);
     $digits($emp['spouse_mof_number'] ?? '', [61.06, 63.16, 65.24, 67.31, 69.39, 71.46, 73.54, 75.61, 77.69], 57.62);
     if (!empty($emp['spouse_employer_public'])) {
         $put($emp['spouse_employer_name'] ?? '', 66.0, 66.0, 'r', 8.5); // ب — الإدارات العامة: إسم الإدارة
@@ -235,7 +235,7 @@ if ($form === 'mof_r3') {
     $put($emp['email'] ?? '', 66.0, 75.1, 'r', 8.5);
     // الإفادة (يوقّعها صاحب العمل)
     $put($esch['name_ar'] ?? '', 76.0, 84.05, 'r', 7);
-    $put(date('j'), 64.5, 90.35, 'c'); $put(date('n'), 59.0, 90.35, 'c'); $put(date('Y'), 52.0, 90.35, 'c');
+    $put(date('j'), 64.5, 91.0, 'c'); $put(date('n'), 59.0, 91.0, 'c'); $put(date('Y'), 52.0, 91.0, 'c');
     // خاص بالإدارة («وخاص بالإدارة» — بطلبه 2026-08-21): الرقم المالي بالخانات + تاريخ التسجيل
     $digits($mofNum, [11.32, 13.41, 15.49, 17.56, 19.63, 21.72, 23.79, 25.88, 27.95], 82.45);
     $put(date('j'), 31.5, 86.1, 'c'); $put(date('n'), 25.8, 86.1, 'c'); $put(date('Y'), 19.8, 86.1, 'c');
