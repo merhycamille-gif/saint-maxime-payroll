@@ -149,8 +149,9 @@ if ($form === 'mof_r3') {
     $ss->execute([(int)$emp['school_id']]);
     $esch = $ss->fetch() ?: [];
 
-    $sex  = (($_GET['sex'] ?? 'm') === 'f') ? 'f' : 'm';
-    $wage = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? $_GET['wage'] : 'm';
+    // الجنس: من الرابط إن حُدِّد، وإلا تلقائياً من خانة gender بملف الموظف (2026-08-22)
+    $sex  = (($_GET['sex'] ?? (($emp['gender'] ?? '') ?: 'm')) === 'f') ? 'f' : 'm';
+    $wage = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? ($_GET['wage'] ?? 'm') : 'm';
     $social = (string)($emp['social_status'] ?? 'celibataire');
     $isMar = (strpos($social, 'marie') === 0);
     $marKey = $isMar ? 'married' : ((strpos($social, 'veu') === 0) ? 'widow' : ((strpos($social, 'divor') === 0) ? 'divorced' : 'single'));
@@ -488,13 +489,13 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     $d  = (int)($_GET['d']  ?? date('j'));
     $mo = (int)($_GET['mo'] ?? date('n'));
     $yr = (int)($_GET['yr'] ?? date('Y'));
-    $sex = (($_GET['sex'] ?? 'm') === 'f') ? 'f' : 'm';
-
     // جلب الموظف ضمن نطاق المدرسة المسموح بها (أمان)
     $st = $db->prepare("SELECT * FROM employees WHERE id=? AND is_deleted=0 AND " . schoolScopeWhere('school_id'));
     $st->execute([$empId]);
     $emp = $st->fetch();
     if (!$emp) { http_response_code(404); die('الموظف غير موجود أو خارج صلاحيتك'); }
+    // الجنس: من الرابط إن حُدِّد، وإلا تلقائياً من خانة gender بملف الموظف (2026-08-22)
+    $sex = (($_GET['sex'] ?? (($emp['gender'] ?? '') ?: 'm')) === 'f') ? 'f' : 'm';
 
     // مدرسة الموظف هي صاحب العمل (اسمها ورقمها في الضمان وهاتفها وعنوانها)
     // — والاسم باسم صاحب الرقم لدى الصندوق (cnssEmployerSchool)

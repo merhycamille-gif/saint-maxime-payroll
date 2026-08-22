@@ -1035,6 +1035,43 @@ function ensureSpouseColumns20260821() {
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
+/**
+ * 🧑 خانة الجنس بملف الموظف («المعلومات بدها تتعبى من ملف الموظف تلقائياً» — 2026-08-22):
+ * عمود gender (m/f) يتركّب ذاتياً، ويُعبَّأ **مرة واحدة تلقائياً من الاسم الأول** للأسماء
+ * اللبنانية المعروفة (لوائح ذكور/إناث عربي وفرنسي + «الاخت/السيدة» أنثى و«الاب/الخوري» ذكر).
+ * لا يمسّ إلا الفارغ (NULL) — ما حُدِّد يدوياً بملف الموظف أو من شاشة نموذج يبقى.
+ */
+function ensureGenderColumn20260822() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'gender'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN gender VARCHAR(1) NULL");
+        }
+        // ١) ألقاب دينية/اجتماعية ببداية الاسم — الأوثق
+        $db->exec("UPDATE employees SET gender='f' WHERE gender IS NULL AND (
+            first_name_ar LIKE 'الاخت%' OR first_name_ar LIKE 'الأخت%' OR first_name_ar LIKE 'لاخت%'
+            OR first_name_ar LIKE 'السيدة%' OR first_name_ar LIKE 'الانسة%' OR first_name_ar LIKE 'الآنسة%'
+            OR first_name_fr LIKE 'Soeur%' OR first_name_fr LIKE 'Sœur%' OR first_name_fr LIKE 'Sr %')");
+        $db->exec("UPDATE employees SET gender='m' WHERE gender IS NULL AND (
+            first_name_ar LIKE 'الاب %' OR first_name_ar LIKE 'الأب %' OR first_name_ar LIKE 'الخوري%'
+            OR first_name_ar LIKE 'الاباتي%' OR first_name_ar LIKE 'الأباتي%'
+            OR first_name_fr LIKE 'Père %' OR first_name_fr LIKE 'Pere %' OR first_name_fr LIKE 'Abbé%')");
+        // ٢) لوائح الأسماء المعروفة (مطابقة تامة لأول كلمة من الاسم — لا تخمين لواحق)
+        $femAr = ['تريز','تراز','تيريز','ماري','مريم','ريتا','ليلى','ماجدة','كارلا','انطوانيت','أنطوانيت','ريما','زاهية','ميراي','ميشلين','كوليت','ندى','عائدة','جانيت','دنيا','اسما','أسماء','اسماء','ايفا','إيفا','جورجات','دوللي','زينه','زينة','غاده','غادة','كارولين','لارا','لوسي','لينا','مادونا','مارينا','ماغي','جسي','اجني','أجني','منى','اوديل','أوديل','اغابي','أغابي','اوغستان','هالة','هاله','رنا','رانيا','ريم','سمر','سهى','سوزان','سيلفا','عبير','فاديا','فيفيان','كلوديا','جيزيل','جاكلين','دارين','ديانا','رلى','روز','روزيت','سابين','سالي','ساندرا','سماح','سميرة','سونيا','غريس','مايا','ميرنا','نانسي','ناتالي','نجوى','نجلا','نجاة','نادين','ناديا','نيكول','هدى','هيام','هيلدا','وفاء','يارا','يولا','ايمان','إيمان','برناديت','بولين','تانيا','جومانا','دلال','رندة','رنده','زينب','سلمى','سلوى','غنى','فاطمة','لور','ليال','ليان','ليندا','مارلين','مي','نهى','هبة','هبه','هناء','هند','وردة','الهام','إلهام','انجيل','أنجيل','ايفلين','إيفلين','امل','أمل','امال','آمال','كريستين','خريستين','كريستال','جويس','ميري','شادية','جوزفين','دوريس','بولا','باميلا','ساره','سارة','سينتيا','ميرا','ميليسا','نايلة','نايله','نورما','باتريسيا','برلا','بيرلا','جنفياف','جوان','جويل','نوره','نورا','رولا','سيلفانا','كاتيا','اميرة','أميرة','ماجي','جيسيكا','فيرونيك','فلورانس','روزي','تيريزا','مارتا','مرتا','جانين','فيرا','كارمن','كلارا','لوريس','ليليان','ماريان','ميشلين','نعمت','هيفا','رئيفة','رفقا','رندلى','ريتا ماريا','سناء','سوسن','عايدة','غيتا','فاتن','لودي','ليلي','مادلين','مانيا','ميساء','ميلاني','نجود','نهاد','نوال','هنادي','وداد','ياسمين','يمنى'];
+        $malAr = ['اميل','إميل','روكز','زياد','كميل','جوزيف','جرجس','انطوان','أنطوان','مارون','سمير','ساسين','غابي','كابي','رجا','علاء','مرسال','ايلي','إيلي','الياس','إلياس','بولس','خليل','جورج','جان','جو','جوني','حبيب','حنا','خضر','داني','دانيال','ربيع','رمزي','روبير','روجيه','روي','ريمون','سامي','سايد','سعيد','سليم','شادي','شربل','صبحي','طانيوس','طوني','عادل','عبدو','فادي','فارس','فيليب','كرم','كريم','مارك','ماهر','مجد','محمد','مروان','ميشال','ناجي','نبيل','نجيب','نديم','نزيه','نقولا','هاني','وليد','يوسف','يعقوب','ابراهيم','إبراهيم','اسعد','أسعد','اكرم','أكرم','امين','أمين','انيس','أنيس','ايمن','أيمن','باسم','بشارة','بيار','جهاد','حسان','حسن','حسين','رامي','رشيد','ريشار','زاهي','عصام','عماد','غسان','فؤاد','فوزي','قيصر','كمال','مالك','منير','موسى','ميلاد','نعيم','وديع','بطرس','سركيس','جبران','راجي','سهيل','طلال','عفيف','فريد','لويس','منصور','نمر','وهيب','يوحنا','جيلبير','ادمون','أدمون','ادوار','أنطونيوس','انطونيوس','جواد','رودريك','شوقي','قزحيا','ضاهر','ديب','نخله','نخلة','واكيم','سمعان','عقل','عساف','فرنسوا','نبيه','منيف','رفيق','توفيق','بديع','حليم','سليمان','مصطفى','علي','عمر','احمد','أحمد','محمود','حسام','هيثم','وائل','جميل','جوزف','دومينيك','رياض','سيمون','عبدالله','غطاس','فايز','فضل','كلوفيس','مخايل','مطانيوس','منذر','نسيب','نصري','نوفل','يوحنا'];
+        $femFr = ['Marie','Rita','Nada','Mireille','Micheline','Colette','Janette','Jeanette','Georgette','Dolly','Carla','Antoinette','Rima','Nicole','Josiane','Denise','Therese','Thérèse','Christiane','Christine','Yvonne','Laure','Nathalie','Nancy','Maya','Rana','Rania','Lina','Lara','Sandra','Sonia','Suzanne','Viviane','Jacqueline','Gisele','Gisèle','Claudia','Caroline','Madona','Madonna','Maguy','Mona','Leila','Layla','Magida','Aida','Hoda','Rola','Rima','Mirna','Nawal','Najat','Nadine','Nadia','Hilda','Wafaa','Yara','Yola','Pauline','Bernadette','Tania','Joumana','Dalal','Salma','Salwa','Linda','Marlene','May','Mayssa','Noura','Roula','Katia','Amira','Silvana','Jessica','Veronique','Florence','Carmen','Clara','Liliane','Madeleine','Yasmine','Nawal','Nohad','Sana','Sawsan','Vera','Janine','Marta','Pamela','Paula','Cynthia','Mira','Melissa','Nayla','Norma','Patricia','Perla','Genevieve','Joelle'];
+        $malFr = ['Georges','George','Joseph','Antoine','Elie','Elias','Charbel','Tony','Toni','Michel','Marcel','Camille','Pierre','Paul','Boulos','Maroun','Samir','Selim','Salim','Fadi','Fady','Fares','Philippe','Walid','Youssef','Jean','John','Johnny','Habib','Hanna','Dany','Daniel','Rabih','Ramzi','Robert','Roger','Roy','Raymond','Sami','Said','Chadi','Sobhi','Tanios','Adel','Abdo','Karim','Marc','Maher','Marwan','Naji','Nabil','Najib','Nadim','Nazih','Nicolas','Hani','Jacques','Ibrahim','Assaad','Akram','Amine','Anis','Ayman','Bassem','Bechara','Jihad','Hassan','Hussein','Rami','Rachid','Richard','Zahi','Issam','Imad','Ghassan','Fouad','Fawzi','Kamal','Malek','Mounir','Moussa','Milad','Naim','Wadih','Boutros','Sarkis','Gebran','Raji','Souheil','Talal','Afif','Farid','Louis','Mansour','Nemer','Wahib','Emile','Gaby','Gabi','Ziad','Gilbert','Edmond','Edouard','Antonios','Rodrigue'];
+        $inList = function (array $names) use ($db) { return implode(',', array_map([$db, 'quote'], $names)); };
+        $db->exec("UPDATE employees SET gender='f' WHERE gender IS NULL AND SUBSTRING_INDEX(TRIM(first_name_ar),' ',1) IN (" . $inList($femAr) . ")");
+        $db->exec("UPDATE employees SET gender='m' WHERE gender IS NULL AND SUBSTRING_INDEX(TRIM(first_name_ar),' ',1) IN (" . $inList($malAr) . ")");
+        $db->exec("UPDATE employees SET gender='f' WHERE gender IS NULL AND SUBSTRING_INDEX(TRIM(first_name_fr),' ',1) IN (" . $inList($femFr) . ")");
+        $db->exec("UPDATE employees SET gender='m' WHERE gender IS NULL AND SUBSTRING_INDEX(TRIM(first_name_fr),' ',1) IN (" . $inList($malFr) . ")");
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
 function ensureEmployeeFlagColumns() {
     static $done = false;
     if ($done) return;

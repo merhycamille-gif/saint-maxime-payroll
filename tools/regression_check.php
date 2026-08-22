@@ -408,6 +408,18 @@ check('ر3 بالنماذج الرسمية = طبق الأصل حصراً (تح�
       strpos($ofSrc22, "\$form === 'tax_register' && \$emp") !== false
       && strpos($ofSrc22, "type=mof_r3") !== false
       && strpos($ofSrc22, "elseif (\$form === 'tax_register'): // ر3 طلب تسجيل") === false);
+// (2026-08-22) «المعلومات بدها تتعبى من ملف الموظف تلقائياً»: خانة الجنس بملف الموظف —
+// عمود gender ذاتي التركيب + تعبئة تلقائية من الاسم (لوائح أسماء + الاخت/الاب) + شاشات
+// ر3 ونماذج الضمان تقرأها تلقائياً وأي تغيير منها يُحفَظ بالملف + خانة بفورم الموظف
+check('الجنس تلقائياً من ملف الموظف: عمود gender + تعبئة من الاسم + الشاشات تقرأه وتحفظ تغييره',
+      function_exists('ensureGenderColumn20260822')
+      && (ensureGenderColumn20260822() ?? true)
+      && $db->query("SHOW COLUMNS FROM employees LIKE 'gender'")->fetch() !== false
+      && (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted=0 AND gender IS NOT NULL")->fetchColumn() > 500
+      && substr_count($attSrc, 'ensureGenderColumn20260822') >= 2
+      && substr_count($attSrc, "UPDATE employees SET gender=?") >= 2
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'name="gender"') !== false
+      && substr_count((string)file_get_contents(__DIR__ . '/../pages/official_export.php'), "\$emp['gender']") >= 2);
 // (2026-08-22) p1 «ورقة الطباعة بيضاء»: صمام _autoprint — صفحة كل محتواها no-print (شاشة
 // اختيار موظف) ما تعرض زرّي الطباعة بل رسالة توجيه، فلا تنطبع ورقة فاضية
 $ftSrc22 = (string)file_get_contents(__DIR__ . '/../includes/footer.php');

@@ -13,6 +13,7 @@ if (($_GET['action'] ?? '') === 'translit') {
     exit;
 }
 requireCsrf();
+ensureGenderColumn20260822(); // 🧑 خانة الجنس بملف الموظف — تركيب ذاتي + تعبئة تلقائية من الاسم (2026-08-22)
 
 /**
  * رفع ملفات الأستاذ: صورة، إخراج قيد/تذكرة، إخراج قيد عائلي.
@@ -328,6 +329,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'mother_first_name' => trim($_POST['mother_first_name'] ?? ''),
         'mother_last_name' => trim($_POST['mother_last_name'] ?? ''),
         'nationality' => trim($_POST['nationality'] ?? 'lebanese'),
+        'gender' => in_array($_POST['gender'] ?? '', ['m', 'f'], true) ? $_POST['gender'] : null,
         'birth_date' => $_POST['birth_date'] ?: null,
         'birth_place' => trim($_POST['birth_place'] ?? ''),
         'civil_registry_number' => trim($_POST['civil_registry_number'] ?? ''),
@@ -934,7 +936,7 @@ $employee = [
     'id' => 0, 'employee_code' => '', 'employee_type' => 'enseignant_titulaire',
     'first_name_ar' => '', 'first_name_fr' => '', 'father_name_ar' => '', 'father_name_fr' => '',
     'last_name_ar' => '', 'last_name_fr' => '', 'mother_first_name' => '', 'mother_last_name' => '',
-    'nationality' => 'lebanese', 'birth_date' => '', 'birth_place' => '',
+    'nationality' => 'lebanese', 'gender' => '', 'birth_date' => '', 'birth_place' => '',
     'civil_registry_number' => '', 'civil_registry_place' => '',
     'social_status' => 'celibataire', 'spouse_works' => 0, 'number_of_children' => 0,
     'gouvernorat' => '', 'district' => '', 'ville' => '', 'quartier' => '', 'rue' => '',
@@ -1159,6 +1161,14 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 
                 <div class="form-row cols-4">
+                    <div class="form-group">
+                        <label class="form-label">Sexe / الجنس</label>
+                        <select name="gender" class="form-select">
+                            <option value="">— حدّد / Choisir —</option>
+                            <option value="m" <?= ($employee['gender'] ?? '') === 'm' ? 'selected' : '' ?>>Homme / ذكر</option>
+                            <option value="f" <?= ($employee['gender'] ?? '') === 'f' ? 'selected' : '' ?>>Femme / أنثى</option>
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label class="form-label">Nationalité / الجنسية</label>
                         <select name="nationality" class="form-select">

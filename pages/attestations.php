@@ -463,8 +463,21 @@ if (!$emp):
     if ($type === 'mof_r3'):
         $nm  = preg_replace('/\s+/', ' ', trim(($emp['first_name_ar'] ?? '') . ' ' . ($emp['father_name_ar'] ?? '') . ' ' . ($emp['last_name_ar'] ?? '')));
         if ($nm === '') $nm = trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? ''));
-        $sexSel  = (($_GET['sex'] ?? 'm') === 'f') ? 'f' : 'm';
-        $wageSel = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? $_GET['wage'] : 'm';
+        // 🧑 «المعلومات بدها تتعبى من ملف الموظف تلقائياً» (2026-08-22): الجنس من خانة
+        // gender بملف الموظف (تتعبّى ذاتياً من الاسم للأسماء المعروفة)، وأي تغيير من
+        // هالشاشة يُحفَظ بالملف فيصير تلقائياً بكل النماذج من بعدها.
+        ensureGenderColumn20260822();
+        $sexFile = in_array(($emp['gender'] ?? ''), ['m', 'f'], true) ? $emp['gender'] : '';
+        if (isset($_GET['sex']) && in_array($_GET['sex'], ['m', 'f'], true)) {
+            $sexSel = $_GET['sex'];
+            if ($sexSel !== $sexFile) {
+                $db->prepare("UPDATE employees SET gender=? WHERE id=? AND " . schoolScopeWhere('school_id'))->execute([$sexSel, (int)$employeeId]);
+                $emp['gender'] = $sexSel;
+            }
+        } else {
+            $sexSel = $sexFile ?: 'm';
+        }
+        $wageSel = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? ($_GET['wage'] ?? 'm') : 'm';
         $expR3 = BASE_URL . 'pages/official_export.php?form=mof_r3&emp=' . (int)$employeeId . '&sex=' . $sexSel . '&wage=' . $wageSel;
         $hasMof = trim((string)($emp['finance_ministry_number'] ?? '')) !== '';
     ?>
@@ -478,7 +491,7 @@ if (!$emp):
                 <input type="hidden" name="employee_id" value="<?= (int)$employeeId ?>">
                 <input type="hidden" name="type" value="mof_r3">
                 <div class="form-group">
-                    <label class="form-label">Sexe / الجنس</label>
+                    <label class="form-label">Sexe / الجنس (تلقائي من ملف الموظف — تغييره يُحفَظ بالملف)</label>
                     <select name="sex" class="form-select" onchange="this.form.submit()">
                         <option value="m" <?= $sexSel==='m'?'selected':'' ?>>Homme / ذكر</option>
                         <option value="f" <?= $sexSel==='f'?'selected':'' ?>>Femme / أنثى</option>
@@ -539,7 +552,18 @@ if (!$emp):
         $d   = (int)date('j', $ts); $mo = (int)date('n', $ts); $yr = (int)date('Y', $ts);
         $nm  = preg_replace('/\s+/', ' ', trim(($emp['first_name_ar'] ?? '') . ' ' . ($emp['father_name_ar'] ?? '') . ' ' . ($emp['last_name_ar'] ?? '')));
         if ($nm === '') $nm = trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? ''));
-        $sexSel = (($_GET['sex'] ?? 'm') === 'f') ? 'f' : 'm';
+        // 🧑 الجنس تلقائياً من ملف الموظف (خانة gender) — وأي تغيير يُحفَظ بالملف (2026-08-22)
+        ensureGenderColumn20260822();
+        $sexFile = in_array(($emp['gender'] ?? ''), ['m', 'f'], true) ? $emp['gender'] : '';
+        if (isset($_GET['sex']) && in_array($_GET['sex'], ['m', 'f'], true)) {
+            $sexSel = $_GET['sex'];
+            if ($sexSel !== $sexFile) {
+                $db->prepare("UPDATE employees SET gender=? WHERE id=? AND " . schoolScopeWhere('school_id'))->execute([$sexSel, (int)$employeeId]);
+                $emp['gender'] = $sexSel;
+            }
+        } else {
+            $sexSel = $sexFile ?: 'm';
+        }
         $hrsDef = trim((string)($_GET['hrs'] ?? ''));
         if ($hrsDef === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrsDef = (string)round((float)$emp['hours_per_week'] * 52 / 12);
         // 🔴 تاريخ الترك من ملف الموظف (تاريخ ترك الضمان) حصراً — يُعرض للعلم فقط ويُعدَّل من ملف الموظف
@@ -581,7 +605,7 @@ if (!$emp):
                     <input type="date" name="date" class="form-control" value="<?= e($effDate) ?>" onchange="this.form.submit()">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Sexe / الجنس</label>
+                    <label class="form-label">Sexe / الجنس (تلقائي من ملف الموظف — تغييره يُحفَظ بالملف)</label>
                     <select name="sex" class="form-select" onchange="this.form.submit()">
                         <option value="m" <?= $sexSel==='m'?'selected':'' ?>>Homme / ذكر</option>
                         <option value="f" <?= $sexSel==='f'?'selected':'' ?>>Femme / أنثى</option>
