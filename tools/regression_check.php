@@ -430,6 +430,15 @@ check('الجنس تلقائياً من ملف الموظف: عمود gender + �
       && substr_count($attSrc, "UPDATE employees SET gender=?") >= 2
       && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'name="gender"') !== false
       && substr_count((string)file_get_contents(__DIR__ . '/../pages/official_export.php'), "\$emp['gender']") >= 2);
+// (2026-08-22) «إلسي/تيا/اسمهان طلعوا ذكر»: جنس مجهول = لا علامة × إطلاقاً (لا افتراض ذكر)
+// + الشاشة تعرض «حدّد الجنس» بإطار أحمر بدل تعليم غلط على نموذج رسمي
+$oeR3g = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
+check('الجنس المجهول بر3: لا × على ذكر/أنثى + شاشة «حدّد الجنس» + أسماء النساء المفقودة بالتعبئة',
+      strpos($oeR3g, "if (\$sex !== '') \$X(") !== false
+      && substr_count($oeR3g, "in_array(\$sexQ, ['m', 'f'], true) ? \$sexQ : ''") >= 2
+      && substr_count($attSrc, 'حدّد الجنس') >= 2
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), "'إلسي'") !== false
+      && $db->query("SELECT COUNT(*) FROM employees WHERE first_name_ar IN ('تيا','اسمهان','السي') AND is_deleted=0 AND gender='f'")->fetchColumn() >= 3);
 // (2026-08-22) p1 «ورقة الطباعة بيضاء»: صمام _autoprint — صفحة كل محتواها no-print (شاشة
 // اختيار موظف) ما تعرض زرّي الطباعة بل رسالة توجيه، فلا تنطبع ورقة فاضية
 $ftSrc22 = (string)file_get_contents(__DIR__ . '/../includes/footer.php');

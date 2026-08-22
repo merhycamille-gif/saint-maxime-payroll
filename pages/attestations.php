@@ -475,7 +475,7 @@ if (!$emp):
                 $emp['gender'] = $sexSel;
             }
         } else {
-            $sexSel = $sexFile ?: 'm';
+            $sexSel = $sexFile; // '' = غير محدد → النموذج يطلع بلا × على الجنس
         }
         $wageSel = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? ($_GET['wage'] ?? 'm') : 'm';
         $expR3 = BASE_URL . 'pages/official_export.php?form=mof_r3&emp=' . (int)$employeeId . '&sex=' . $sexSel . '&wage=' . $wageSel;
@@ -492,7 +492,8 @@ if (!$emp):
                 <input type="hidden" name="type" value="mof_r3">
                 <div class="form-group">
                     <label class="form-label">Sexe / الجنس (تلقائي من ملف الموظف — تغييره يُحفَظ بالملف)</label>
-                    <select name="sex" class="form-select" onchange="this.form.submit()">
+                    <select name="sex" class="form-select" onchange="this.form.submit()" <?= $sexSel==='' ? 'style="border:2px solid #dc2626;background:#fef2f2"' : '' ?>>
+                        <?php if ($sexSel === ''): ?><option value="" selected>⚠ حدّد الجنس — بلا تحديد يطلع النموذج بلا × / Sexe non défini</option><?php endif; ?>
                         <option value="m" <?= $sexSel==='m'?'selected':'' ?>>Homme / ذكر</option>
                         <option value="f" <?= $sexSel==='f'?'selected':'' ?>>Femme / أنثى</option>
                     </select>
@@ -562,7 +563,7 @@ if (!$emp):
                 $emp['gender'] = $sexSel;
             }
         } else {
-            $sexSel = $sexFile ?: 'm';
+            $sexSel = $sexFile; // '' = غير محدد → النموذج يطلع بلا × على الجنس
         }
         $hrsDef = trim((string)($_GET['hrs'] ?? ''));
         if ($hrsDef === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrsDef = (string)round((float)$emp['hours_per_week'] * 52 / 12);
@@ -606,7 +607,8 @@ if (!$emp):
                 </div>
                 <div class="form-group">
                     <label class="form-label">Sexe / الجنس (تلقائي من ملف الموظف — تغييره يُحفَظ بالملف)</label>
-                    <select name="sex" class="form-select" onchange="this.form.submit()">
+                    <select name="sex" class="form-select" onchange="this.form.submit()" <?= $sexSel==='' ? 'style="border:2px solid #dc2626;background:#fef2f2"' : '' ?>>
+                        <?php if ($sexSel === ''): ?><option value="" selected>⚠ حدّد الجنس — بلا تحديد يطلع النموذج بلا × / Sexe non défini</option><?php endif; ?>
                         <option value="m" <?= $sexSel==='m'?'selected':'' ?>>Homme / ذكر</option>
                         <option value="f" <?= $sexSel==='f'?'selected':'' ?>>Femme / أنثى</option>
                     </select>

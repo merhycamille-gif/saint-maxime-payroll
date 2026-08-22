@@ -149,8 +149,10 @@ if ($form === 'mof_r3') {
     $ss->execute([(int)$emp['school_id']]);
     $esch = $ss->fetch() ?: [];
 
-    // الجنس: من الرابط إن حُدِّد، وإلا تلقائياً من خانة gender بملف الموظف (2026-08-22)
-    $sex  = (($_GET['sex'] ?? (($emp['gender'] ?? '') ?: 'm')) === 'f') ? 'f' : 'm';
+    // الجنس: من الرابط إن حُدِّد وإلا من خانة gender بملفه — وإن كان مجهولاً فلا علامة ×
+    // إطلاقاً (تعليم «ذكر» افتراضياً كان يغلّط بنماذج الإناث — «إلسي/تيا/اسمهان» 2026-08-22)
+    $sexQ = (string)($_GET['sex'] ?? ($emp['gender'] ?? ''));
+    $sex  = in_array($sexQ, ['m', 'f'], true) ? $sexQ : '';
     $wage = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? ($_GET['wage'] ?? 'm') : 'm';
     $social = (string)($emp['social_status'] ?? 'celibataire');
     $isMar = (strpos($social, 'marie') === 0);
@@ -189,7 +191,7 @@ if ($form === 'mof_r3') {
     $put($emp['last_name_ar'] ?? '', 38.5, 19.5);
     $put($emp['father_name_ar'] ?? '', 84.5, 21.5);
     $put($motherAr, 25.2, 21.6);
-    $X($sex === 'f' ? 74.5 : 83.2, 23.8);
+    if ($sex !== '') $X($sex === 'f' ? 74.5 : 83.2, 23.8); // مجهول → المربعان فارغان
     $natR3 = in_array(mb_strtolower(trim((string)($emp['nationality'] ?? ''))), ['lebanese', 'lebanaise', 'libanaise', 'لبنانية', 'لبناني'], true) ? 'لبنانية' : (string)($emp['nationality'] ?? '');
     $put($natR3, 40.5, 24.45);
     $put($emp['birth_place'] ?? '', 79.5, 26.6);
@@ -501,8 +503,9 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     $st->execute([$empId]);
     $emp = $st->fetch();
     if (!$emp) { http_response_code(404); die('الموظف غير موجود أو خارج صلاحيتك'); }
-    // الجنس: من الرابط إن حُدِّد، وإلا تلقائياً من خانة gender بملف الموظف (2026-08-22)
-    $sex = (($_GET['sex'] ?? (($emp['gender'] ?? '') ?: 'm')) === 'f') ? 'f' : 'm';
+    // الجنس: من الرابط أو من ملفه — مجهول = '' فلا يُعلَّم X على أي جنس (خانتا 1/2 تبقيان)
+    $sexQ = (string)($_GET['sex'] ?? ($emp['gender'] ?? ''));
+    $sex = in_array($sexQ, ['m', 'f'], true) ? $sexQ : '';
 
     // مدرسة الموظف هي صاحب العمل (اسمها ورقمها في الضمان وهاتفها وعنوانها)
     // — والاسم باسم صاحب الرقم لدى الصندوق (cnssEmployerSchool)
