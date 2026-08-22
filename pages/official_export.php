@@ -174,19 +174,21 @@ if ($form === 'mof_r3') {
     };
     $X = function ($x, $y) use (&$R3) { $R3[] = ['×', $x, $y, 'c', 11]; };
 
-    // 🗺️ الإحداثيات مقيسة بصرياً على نسخة المستخدم r3.xps (طبعة 2010) — «بدي ر3 متل اللي
-    // بعتلك ياها طبق الأصل» (2026-08-21): شبكة 1% مكبّرة على mof_r3.png لكل صف
+    // 🗺️ الإحداثيات مقيسة على mof_r3.png نفسها: مواقع السطور والخانات مكشوفة آلياً من
+    // الصورة (كشف صفوف/أعمدة السواد) ثم تثبيت بصري مكبّراً حقلاً حقلاً — «مش جايين
+    // المعلومات بمحلهون على السطر» (2026-08-22): النص يقعد على سطره تماماً (top = سطر −
+    // صعود الخط) والأرقام بوسط خاناتها الحقيقية (٩-١٠ خانات بخطوة ~2.08٪ لا 8×2.5).
     // المؤسسة
-    $put($esch['name_ar'] ?? '', 76.5, 8.5, 'r', 8.5);
-    $digits($esch['finance_number'] ?? '', [56.5, 59, 61.5, 64, 66.5, 69, 71.5, 74], 12.6);
+    $put($esch['name_ar'] ?? '', 76.5, 9.05, 'r', 8.5);
+    $digits($esch['finance_number'] ?? '', [56.06, 58.16, 60.24, 62.32, 64.39, 66.46, 68.54, 70.61, 72.71, 74.91], 12.6);
     // هل لديه رقم مالي شخصي؟ + الرقم
-    if ($mofNum !== '') { $X(47.7, 16.05); $digits($mofNum, [2.6, 4.9, 7.1, 9.4, 11.6, 13.9, 16.1, 18.4], 16.85); }
+    if ($mofNum !== '') { $X(47.7, 16.05); $digits($mofNum, [2.24, 4.33, 6.42, 8.48, 10.56, 12.64, 14.72, 16.81, 18.88], 16.25); }
     else { $X(37.9, 16.05); }
     // تعريف المستخدم
     $put($emp['first_name_ar'] ?? '', 84.5, 19.3);
     $put($emp['last_name_ar'] ?? '', 38.5, 19.5);
     $put($emp['father_name_ar'] ?? '', 84.5, 21.5);
-    $put($motherAr, 32.5, 22.25);
+    $put($motherAr, 25.2, 21.6);
     $X($sex === 'f' ? 74.8 : 83.5, 23.9);
     $natR3 = in_array(mb_strtolower(trim((string)($emp['nationality'] ?? ''))), ['lebanese', 'lebanaise', 'libanaise', 'لبنانية', 'لبناني'], true) ? 'لبنانية' : (string)($emp['nationality'] ?? '');
     $put($natR3, 40.5, 24.45);
@@ -195,47 +197,47 @@ if ($form === 'mof_r3') {
     $put($regNo3, 84.0, 29.25);
     $put($regPl3, 56.5, 29.35);
     $X(['single' => 79.1, 'married' => 71.1, 'widow' => 63.5, 'divorced' => 55.5][$marKey], 31.7);
-    $put((string)(int)($emp['number_of_children'] ?? 0), 25.5, 32.6);
+    $put((string)(int)($emp['number_of_children'] ?? 0), 21.5, 31.2);
     $put($hD, 76.0, 35.15, 'c'); $put($hM, 66.0, 35.15, 'c'); $put($hY, 57.5, 35.15, 'c');
-    $put($emp['nssf_number'] ?? '', 26.5, 34.75);
+    $put($emp['nssf_number'] ?? '', 18.2, 33.3);
     $X(['m' => 23.3, 'd' => 15.7, 'h' => 8.8][$wage], 36.15);
     // الزوج/الزوجة: كل معلوماته من ملف الموظف (تُعبَّأ بشاشة نموذج ر3 — «وين معلومات
     // الزوج/الزوجة» + «ناقصة كتير معلومات» 2026-08-21) + المستفيدون من التنزيل + هل يعمل
     $spNat = in_array(mb_strtolower(trim((string)($emp['spouse_nationality'] ?? ''))), ['lebanese', 'lebanaise', 'libanaise', 'لبنانية', 'لبناني'], true) ? 'لبنانية' : (string)($emp['spouse_nationality'] ?? '');
     [$sD, $sM, $sY] = $dsplit($emp['spouse_birth_date'] ?? '');
-    $put($emp['spouse_full_name'] ?? '', 72.5, 40.95);
-    $put($emp['spouse_maiden_name'] ?? '', 38.5, 41.8);
-    $put($emp['spouse_father_name'] ?? '', 84.0, 43.75);
-    $put($emp['spouse_mother_name'] ?? '', 37.5, 44.85);
-    $put($spNat, 86.0, 47.0);
-    $put($emp['spouse_birth_place'] ?? '', 40.0, 47.4);
+    $put($emp['spouse_full_name'] ?? '', 72.5, 40.6);
+    $put($emp['spouse_maiden_name'] ?? '', 38.5, 41.0);
+    $put($emp['spouse_father_name'] ?? '', 84.0, 43.45);
+    $put($emp['spouse_mother_name'] ?? '', 33.0, 43.75);
+    $put($spNat, 86.0, 46.3);
+    $put($emp['spouse_birth_place'] ?? '', 40.0, 46.65);
     $put($sD, 77.5, 49.55, 'c'); $put($sM, 70.5, 49.55, 'c'); $put($sY, 64.0, 49.55, 'c');
-    $put($emp['spouse_id_card'] ?? '', 40.0, 49.8);
-    if ($famBenef > 0) $put((string)$famBenef, 45.5, 53.15, 'r');
-    if ($isMar) $X((int)($emp['spouse_works'] ?? 0) ? 68.3 : 59.7, 55.15);
-    $digits($emp['spouse_mof_number'] ?? '', [60.75, 63.25, 65.75, 68.25, 70.75, 73.25, 75.75, 78.25], 57.95);
+    $put($emp['spouse_id_card'] ?? '', 40.0, 49.25);
+    if ($famBenef > 0) $put((string)$famBenef, 57.0, 52.3, 'c');
+    if ($isMar) $X((int)($emp['spouse_works'] ?? 0) ? 67.75 : 59.9, 54.55);
+    $digits($emp['spouse_mof_number'] ?? '', [61.06, 63.16, 65.24, 67.31, 69.39, 71.46, 73.54, 75.61, 77.69], 57.62);
     if (!empty($emp['spouse_employer_public'])) {
-        $put($emp['spouse_employer_name'] ?? '', 66.0, 65.7, 'r', 8.5); // ب — الإدارات العامة: إسم الإدارة
+        $put($emp['spouse_employer_name'] ?? '', 66.0, 66.0, 'r', 8.5); // ب — الإدارات العامة: إسم الإدارة
     } else {
-        $put($emp['spouse_employer_name'] ?? '', 59.0, 62.8, 'r', 8.5); // أ — القطاع الخاص
-        $digits($emp['spouse_employer_mof'] ?? '', [2.7, 5.1, 7.5, 9.9, 12.3, 14.7, 17.1, 19.5], 62.2);
+        $put($emp['spouse_employer_name'] ?? '', 59.0, 62.5, 'r', 8.5); // أ — القطاع الخاص
+        $digits($emp['spouse_employer_mof'] ?? '', [3.03, 5.12, 7.2, 9.27, 11.34, 13.42, 15.5, 17.58, 19.67], 61.5);
     }
     // عنوان السكن
-    $put($emp['gouvernorat'] ?? '', 87.5, 69.5);
-    $put($emp['district'] ?? '', 69.5, 69.5);
-    $put($emp['ville'] ?? '', 46.0, 69.5);
-    $put($emp['quartier'] ?? '', 25.5, 69.5);
-    $put($emp['rue'] ?? '', 87.5, 70.7);
+    $put($emp['gouvernorat'] ?? '', 87.5, 69.15);
+    $put($emp['district'] ?? '', 69.5, 69.15);
+    $put($emp['ville'] ?? '', 46.0, 69.15);
+    $put($emp['quartier'] ?? '', 25.5, 69.15);
+    $put($emp['rue'] ?? '', 87.5, 70.5);
     $put($emp['immeuble'] ?? '', 88.0, 71.9);
     $put($emp['etage'] ?? '', 59.0, 71.9);
     $put($emp['phone1'] ?? '', 41.5, 71.9);
-    $put($emp['phone2'] ?? '', 23.5, 71.9);
-    $put($emp['email'] ?? '', 66.0, 74.45, 'r', 8.5);
+    $put($emp['phone2'] ?? '', 14.5, 72.36);
+    $put($emp['email'] ?? '', 66.0, 75.1, 'r', 8.5);
     // الإفادة (يوقّعها صاحب العمل)
-    $put($esch['name_ar'] ?? '', 76.0, 84.5, 'r', 7);
+    $put($esch['name_ar'] ?? '', 76.0, 84.05, 'r', 7);
     $put(date('j'), 64.5, 90.35, 'c'); $put(date('n'), 59.0, 90.35, 'c'); $put(date('Y'), 52.0, 90.35, 'c');
     // خاص بالإدارة («وخاص بالإدارة» — بطلبه 2026-08-21): الرقم المالي بالخانات + تاريخ التسجيل
-    $digits($mofNum, [2.7, 5.1, 7.5, 9.9, 12.3, 14.7, 17.1, 19.5], 82.55);
+    $digits($mofNum, [11.32, 13.41, 15.49, 17.56, 19.63, 21.72, 23.79, 25.88, 27.95], 82.45);
     $put(date('j'), 31.5, 86.1, 'c'); $put(date('n'), 25.8, 86.1, 'c'); $put(date('Y'), 19.8, 86.1, 'c');
 
     // 📊 «بدي ياها اكسل كمان» (2026-08-22): نفس النموذج طبق الأصل ملف إكسل — القالب
