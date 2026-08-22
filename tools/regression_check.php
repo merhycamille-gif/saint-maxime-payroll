@@ -28,7 +28,9 @@ require_once $PROJ . '/includes/functions.php';
 $db = getDB();
 
 // ---------- عارض صفحات داخلي (كل صفحة بعملية فرعية لتفادي إعادة تعريف الدوال) ----------
-function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = '', string $schoolYear = ''): string {
+// $outFile: للمخرجات الثنائية (xlsx...) — أنبوب shell_exec بويندوز وضع نصي يقصّ عند أول
+// محرف 0x1A، فالثنائي يُكتب لملف عبر إعادة توجيه cmd ويُقرأ من القرص (2026-08-22)
+function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = '', string $schoolYear = '', string $outFile = ''): string {
     global $PROJ;
     $runner = __DIR__ . '/_render_one.php';
     // الوسائط تمرَّر base64 (اقتباسات JSON تتخربط بسطر أوامر ويندوز)
@@ -57,6 +59,13 @@ PHP);
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner) . ' '
          . escapeshellarg($rel) . ' ' . base64_encode(json_encode($get)) . ' ' . base64_encode(json_encode($comp))
          . ' ' . base64_encode(json_encode($schoolIds)) . ' ' . escapeshellarg($currency) . ' ' . escapeshellarg($schoolYear);
+    if ($outFile !== '') {
+        @unlink($outFile);
+        shell_exec($cmd . ' 2>NUL > ' . escapeshellarg($outFile));
+        $res = (string)@file_get_contents($outFile);
+        @unlink($outFile);
+        return $res;
+    }
     return (string)shell_exec($cmd . ' 2>NUL');
 }
 $noFatal = fn(string $h) => strpos($h, 'FATAL') !== 0 && stripos($h, 'Fatal error') === false && strlen($h) > 5000;
@@ -381,6 +390,30 @@ check('نموذج ر3: معلومات الزوج/الزوجة (أعمدة ذات
       && strpos($oeR3s, "\$emp['spouse_mof_number']") !== false
       && strpos($oeR3s, 'خاص بالإدارة') !== false
       && strpos($oeR3s, '82.55') !== false);
+// (2026-08-22) «شوف على الدسك توب ر3 اكسل بدي ياها طبق الاصل» + «بدي ياها اكسل كمان»:
+// صورة عالية الدقة من r3_exel.xlsx + تصدير إكسل معبّى (قالب الصورة + نصوص فوقها) — تجربة فعلية
+$xR3 = renderPage('pages/official_export.php', ['form' => 'mof_r3', 'emp' => 2, 'sex' => 'f', 'wage' => 'm', 'format' => 'xlsx'], [], [1], '', '', sys_get_temp_dir() . '/reg_r3_xlsx.bin');
+check('نموذج ر3 إكسل رسمي: القالب (صورة المستخدم قد A4) + توليد xlsx معبّى فعلياً + زرّ Excel بشاشة ر3',
+      is_file(__DIR__ . '/../assets/templates/mof_r3_excel.xlsx')
+      && filesize(__DIR__ . '/../assets/templates/mof_r3_excel.xlsx') > 1000000
+      && substr((string)$xR3, 0, 2) === 'PK'
+      && strlen((string)$xR3) > 1000000
+      && strpos($oeR3s, 'absoluteAnchor') !== false
+      && strpos($oeR3s, 'mof_r3_excel.xlsx') !== false
+      && strpos($attSrc, '&format=xlsx') !== false);
+// (2026-08-22) «عمول شغلك صح دغري»: ر3 من النماذج الرسمية يحوّل لنموذج mof_r3 طبق الأصل —
+// النسخة المبنية HTML القديمة انشالت نهائياً من official_forms
+$ofSrc22 = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
+check('ر3 بالنماذج الرسمية = طبق الأصل حصراً (تحويل لmof_r3 + لا نسخة مبنية قديمة)',
+      strpos($ofSrc22, "\$form === 'tax_register' && \$emp") !== false
+      && strpos($ofSrc22, "type=mof_r3") !== false
+      && strpos($ofSrc22, "elseif (\$form === 'tax_register'): // ر3 طلب تسجيل") === false);
+// (2026-08-22) p1 «ورقة الطباعة بيضاء»: صمام _autoprint — صفحة كل محتواها no-print (شاشة
+// اختيار موظف) ما تعرض زرّي الطباعة بل رسالة توجيه، فلا تنطبع ورقة فاضية
+$ftSrc22 = (string)file_get_contents(__DIR__ . '/../includes/footer.php');
+check('صمام الورقة الفاضية بالطباعة: _autoprint يتحقق من وجود مستند قابل للطباعة قبل عرض الأزرار',
+      strpos($ftSrc22, 'hasPrintable') !== false
+      && strpos($ftSrc22, 'ما في مستند معروض للطباعة') !== false);
 // (2026-08-21) p1: «ما عم يبين أسانسور التفتيش» — البطاقات .card عليها overflow:hidden فكانت
 // لائحة نتائج التفتيش تنقصّ كلياً حين تكون البطاقة قصيرة (صفحة النماذج الرسمية) — الويدجت
 // صارت تفتح قصّ البطاقات الأسلاف وقت اللوحة مفتوحة (setCardClip) وترجّعه عند إغلاقها

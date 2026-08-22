@@ -186,6 +186,13 @@ if ($emp) {
 // 🏛️ نماذج الضمان كلها تصدر باسم صاحب العمل المسجَّل برقمه لدى الصندوق
 // (25-82-043 ⇒ «الراهبات المخلصيات لسيدة البشارة» — بطلب المستخدم 2026-08-19):
 if (strpos($form, 'cnss') === 0 && $school) $school = cnssEmployerSchool($school);
+// 🏛️ ر3 صار طبق الأصل حصراً («عمول شغلك صح دغري» 2026-08-22): باختيار الموظف ينتقل
+// لشاشة النموذج الرسمي المعبّى (mof_r3 بالإفادات — صورة النموذج + القيم + PDF/Excel)
+// بدل النسخة المبنية HTML القديمة التي انشالت من هالصفحة نهائياً.
+if ($form === 'tax_register' && $emp) {
+    header('Location: ' . BASE_URL . 'pages/attestations.php?employee_id=' . (int)$emp['id'] . '&type=mof_r3');
+    exit;
+}
 $famStatus = $emp['social_status'] ?? '';
 $isMarried = strpos($famStatus, 'marie') === 0;
 
@@ -590,51 +597,8 @@ if ($form === 'tax_r6' || $form === 'tax_r6t'):
     </div>
 </div>
 
-<?php elseif ($form === 'tax_register'): // ر3 طلب تسجيل ?>
-<div class="official-doc mof-form rtl" id="ppExportArea">
-    <div class="mof-head">
-        <div class="mof-gov">الجمهورية اللبنانية<br>وزارة المالية<br>مديرية المالية العامة<br>مديرية الواردات – ضريبة الرواتب والأجور</div>
-        <div class="mof-titles"><div class="mof-title">طلب تسجيل مستخدم/أجير جديد</div></div>
-        <div class="mof-code">ر ٣</div>
-    </div>
-    <div class="mof-body">
-        <div class="info-grid">
-            <div><span class="k">إسم الشركة/المؤسسة:</span> <?= fillVal($school['name_ar']) ?></div>
-            <div><span class="k">رقم تسجيل المؤسسة:</span> <?= digitBoxes($school['finance_number'],10) ?></div>
-        </div>
-        <div class="doc-section">تعريف المستخدم/الأجير</div>
-        <div class="info-grid">
-            <div class="full"><span class="k">هل لديه رقم مالي شخصي؟</span> <?= cbox('نعم',(bool)$emp['finance_ministry_number']) ?><?= cbox('كلا',!$emp['finance_ministry_number']) ?> &nbsp; في حال نعم: <?= digitBoxes($emp['finance_ministry_number'],10) ?></div>
-            <div><span class="k">١. الإسم:</span> <?= fillVal($emp['first_name_ar'] ?: $emp['first_name_fr']) ?></div>
-            <div><span class="k">٢. الشهرة:</span> <?= fillVal($emp['last_name_ar'] ?: $emp['last_name_fr']) ?></div>
-            <div><span class="k">٣. إسم الأب:</span> <?= fillVal($emp['father_name_ar']) ?></div>
-            <div><span class="k">٤. إسم الأم وشهرتها قبل الزواج:</span> <?= fillVal(trim($emp['mother_first_name'].' '.$emp['mother_last_name'])) ?></div>
-            <div><span class="k">٥. الجنس:</span> <?= cbox('ذكر') ?><?= cbox('أنثى') ?></div>
-            <div><span class="k">٦. الجنسية:</span> <?= fillVal($emp['nationality']==='lebanese'?'لبنانية':$emp['nationality']) ?></div>
-            <div><span class="k">٧. محل الولادة:</span> <?= fillVal($emp['birth_place']) ?></div>
-            <div><span class="k">٨. تاريخ الولادة:</span> <?= fillVal(formatDate($emp['birth_date'])) ?></div>
-            <div><span class="k">٩. رقم السجل:</span> <?= fillVal($emp['civil_registry_number']) ?></div>
-            <div><span class="k">١٠. مكان السجل:</span> <?= fillVal($emp['civil_registry_place']) ?></div>
-            <div><span class="k">١٢. الوضع العائلي:</span> <?= cbox('أعزب',!$isMarried) ?><?= cbox('متزوج',$isMarried) ?><?= cbox('أرمل') ?><?= cbox('مطلق') ?></div>
-            <div><span class="k">١٣. عدد الأولاد:</span> <?= fillVal($emp['number_of_children']) ?></div>
-            <div><span class="k">١٤. تاريخ ابتداء العمل:</span> <?= fillVal(formatDate($emp['hire_date'])) ?></div>
-            <div><span class="k">١٦. نوع الأجر:</span> <?= cbox('شهري',true) ?><?= cbox('يومي') ?><?= cbox('بالساعة') ?></div>
-        </div>
-        <div class="doc-section">عنوان السكن</div>
-        <div class="info-grid">
-            <div><span class="k">محافظة:</span> <?= fillVal($emp['gouvernorat']) ?></div>
-            <div><span class="k">قضاء:</span> <?= fillVal($emp['district']) ?></div>
-            <div><span class="k">منطقة – بلدة:</span> <?= fillVal($emp['ville']) ?></div>
-            <div><span class="k">الشارع:</span> <?= fillVal($emp['rue']) ?></div>
-            <div><span class="k">المبنى:</span> <?= fillVal($emp['immeuble']) ?></div>
-            <div><span class="k">الطابق:</span> <?= fillVal($emp['etage']) ?></div>
-            <div><span class="k">هاتف:</span> <?= fillVal($emp['phone1'] ?: $emp['phone2']) ?></div>
-            <div><span class="k">البريد الإلكتروني:</span> <?= fillVal($emp['email']) ?></div>
-        </div>
-        <div class="sign-row"><?= signatureBox('إسم صاحب العمل والصفة والتوقيع', $school['ville'] ?? 'بيروت', formatDate(date('Y-m-d'))) ?></div>
-    </div>
-</div>
-
+<?php /* ر3 (tax_register): انشالت النسخة المبنية HTML — صار التحويل لنموذج mof_r3
+         طبق الأصل (صورة + قيم) قبل رسم الصفحة («عمول شغلك صح دغري» 2026-08-22) */ ?>
 <?php elseif ($form === 'tax_r10'):
     /* ر10 — بيان دوري (فصلي) بتأدية ضريبة الرواتب والأجور (النموذج الرسمي طبعة 2010،
      * مرجع المستخدم Desktop\ر10 تصريح فصلي.pdf 2026-08-06): التصريح كل ٣ أشهر على فصول

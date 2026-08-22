@@ -237,6 +237,57 @@ if ($form === 'mof_r3') {
     $digits($mofNum, [2.7, 5.1, 7.5, 9.9, 12.3, 14.7, 17.1, 19.5], 82.55);
     $put(date('j'), 31.5, 86.1, 'c'); $put(date('n'), 25.8, 86.1, 'c'); $put(date('Y'), 19.8, 86.1, 'c');
 
+    // 📊 «بدي ياها اكسل كمان» (2026-08-22): نفس النموذج طبق الأصل ملف إكسل — القالب
+    // assets/templates/mof_r3_excel.xlsx هو ملف المستخدم r3_exel.xlsx نفسه (صورة النموذج
+    // الرسمي قد A4 بورقة إكسل، هوامش صفر + fitToPage) والقيم تُركَّب فوق الصورة كنصوص
+    // Text Box بنفس إحداثيات النسخة المطبوعة تماماً (٪ من عرض/طول A4 → EMU).
+    if (($_GET['format'] ?? '') === 'xlsx') {
+        $tplR3 = __DIR__ . '/../assets/templates/mof_r3_excel.xlsx';
+        $tmpR3 = tempnam(sys_get_temp_dir(), 'r3x');
+        $okR3 = false;
+        if (is_file($tplR3) && @copy($tplR3, $tmpR3) && class_exists('ZipArchive')) {
+            $z = new ZipArchive();
+            if ($z->open($tmpR3) === true) {
+                $dr = $z->getFromName('xl/drawings/drawing1.xml');
+                if ($dr !== false) {
+                    $Wx = 7562850; $Hx = 10696575; // أبعاد صورة النموذج بالقالب = A4 كاملة (EMU)
+                    $shapes = ''; $sid = 100;
+                    foreach ($R3 as $f) {
+                        [$t, $x, $y, $a, $fs] = $f;
+                        $cy = (int)round($fs * 1.6 * 12700);
+                        if ($a === 'c') { $cx = 720000; $algn = 'ctr'; $rtl = ''; }
+                        else { $cx = 3000000; $algn = 'r'; $rtl = ' rtl="1"'; }
+                        $px = (int)round($Wx * $x / 100 - ($a === 'c' ? $cx / 2 : $cx));
+                        if ($px < 0) { $cx += $px; $px = 0; }
+                        $py = (int)round($Hx * $y / 100);
+                        $txt = htmlspecialchars((string)$t, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+                        $sid++;
+                        $shapes .= '<xdr:absoluteAnchor><xdr:pos x="' . $px . '" y="' . $py . '"/><xdr:ext cx="' . $cx . '" cy="' . $cy . '"/>'
+                            . '<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="' . $sid . '" name="fld' . $sid . '"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr>'
+                            . '<xdr:spPr><a:xfrm><a:off x="' . $px . '" y="' . $py . '"/><a:ext cx="' . $cx . '" cy="' . $cy . '"/></a:xfrm>'
+                            . '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></xdr:spPr>'
+                            . '<xdr:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"/><a:lstStyle/>'
+                            . '<a:p><a:pPr algn="' . $algn . '"' . $rtl . '/><a:r><a:rPr lang="ar-LB" sz="' . (int)round($fs * 100) . '" b="1">'
+                            . '<a:latin typeface="Arial"/><a:cs typeface="Arial"/></a:rPr><a:t>' . $txt . '</a:t></a:r></a:p>'
+                            . '</xdr:txBody></xdr:sp><xdr:clientData/></xdr:absoluteAnchor>';
+                    }
+                    $z->addFromString('xl/drawings/drawing1.xml', str_replace('</xdr:wsDr>', $shapes . '</xdr:wsDr>', $dr));
+                    $okR3 = true;
+                }
+                $z->close();
+            }
+        }
+        if (!$okR3) { @unlink($tmpR3); http_response_code(500); die('تعذّر توليد ملف الإكسل — القالب mof_r3_excel.xlsx غير متوفر'); }
+        $fnR3 = 'R3_' . preg_replace('/[^\p{L}\p{N}_-]+/u', '_', trim(($emp['first_name_ar'] ?: $emp['first_name_fr']) . '_' . ($emp['last_name_ar'] ?: $emp['last_name_fr']))) . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . rawurlencode($fnR3) . '"; filename*=UTF-8\'\'' . rawurlencode($fnR3));
+        header('Content-Length: ' . filesize($tmpR3));
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        readfile($tmpR3);
+        @unlink($tmpR3);
+        exit;
+    }
+
     $E = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
     $F = '';
     foreach ($R3 as $f) {

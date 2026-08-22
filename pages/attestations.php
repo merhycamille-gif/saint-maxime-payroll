@@ -522,6 +522,7 @@ if (!$emp):
             </form>
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <a class="btn btn-danger btn-lg" href="<?= e($expR3) ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي ر3 (طباعة / PDF) / Formulaire officiel R3 (PDF)</a>
+                <a class="btn btn-success btn-lg" href="<?= e($expR3) ?>&format=xlsx"><i class="fas fa-file-excel"></i> Excel رسمي (معبّى) / Excel officiel rempli</a>
             </div>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج ر3 الرسمي</strong> معبّأً تلقائياً من ملف الموظف: المؤسسة ورقمها المالي، والاسم والشهرة والأهل والولادة والسجل، والوضع العائلي وعدد الأولاد وتاريخ بدء العمل ورقم الضمان، ومعلومات الزوج/الزوجة كاملة (من الخانات أعلاه)، والمستفيدين من التنزيل العائلي وعمل الزوج، وعنوان السكن والهاتف، وقسم «خاص بالإدارة» (الرقم المالي بالخانات + تاريخ التسجيل). <?= $hasMof ? 'رقمه المالي موجود بملفه وسيُعبّأ («نعم»).' : 'ما في رقم مالي بملفه — سيُعلَّم «كلا» (وهذا هو المطلوب لهذا النموذج).' ?></p>
         </div>

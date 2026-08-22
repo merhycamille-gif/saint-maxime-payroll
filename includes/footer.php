@@ -15,6 +15,22 @@
 // «اطبع الآن» كبير + إرشاد الهوامش (Margins → None مرّة واحدة والمتصفح يتذكّرها).
 (function () {
   if (/[?&]_autoprint=1/.test(location.search)) {
+    // 🛡️ صمام الورقة الفاضية («p1 شوف» 2026-08-22): إذا الصفحة كلها شاشة اختيار/قوائم
+    // (كل محتواها no-print — متل شاشة «اختر الموظف» بالنماذج الفردية) ما في شي يُطبع —
+    // فلا نعرض زرّي الطباعة/الحفظ لئلا تطلع ورقة بيضاء، بل رسالة توجّهه لاختيار الموظف.
+    var pc = document.querySelector('.page-content') || document.body;
+    var hasPrintable = Array.prototype.some.call(pc.children, function (el) {
+      if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return false;
+      return !(el.classList && el.classList.contains('no-print'));
+    });
+    if (!hasPrintable) {
+      var w = document.createElement('div');
+      w.className = 'no-print';
+      w.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#fef2f2;border-bottom:2px solid #dc2626;color:#7f1d1d;padding:12px 16px;font-size:15px;text-align:center;font-weight:700';
+      w.textContent = 'ما في مستند معروض للطباعة — اختر الموظف/النموذج أولاً ثم اكبس زرّ الطباعة. / Choisissez d\'abord l\'employé.';
+      window.addEventListener('load', function () { document.body.appendChild(w); });
+      return;
+    }
     // متل الوورد (طلب المستخدم): الورقة معروضة، وخياران واضحان — «اطبع عالورق» (حوار
     // المتصفح) أو «احفظها عالكمبيوتر» = تنزيل ملف PDF حقيقي فوراً بلا أي شاشة
     // (msaSavePdfStart في pdf-save.js — «ما بيّن عندي Save as PDF» 2026-08-01).
