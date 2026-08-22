@@ -256,8 +256,13 @@ if ($form === 'mof_r3') {
                     foreach ($R3 as $f) {
                         [$t, $x, $y, $a, $fs] = $f;
                         $cy = (int)round($fs * 1.6 * 12700);
-                        if ($a === 'c') { $cx = 720000; $algn = 'ctr'; $rtl = ''; }
-                        else { $cx = 3000000; $algn = 'r'; $rtl = ' rtl="1"'; }
+                        // 🔴 الاتجاه صريح دائماً («R3 ايلي بولس» 2026-08-22): rtl="1" للعربي فقط،
+                        // وrtl="0" + lang لاتينية لغيره — بلا تصريح، الإكسل يخمّن من lang=ar
+                        // فيقلب الهاتف والإيميل والأرقام حرفاً حرفاً.
+                        $isAr = (bool)preg_match('/\p{Arabic}/u', (string)$t);
+                        if ($a === 'c') { $cx = 720000; $algn = 'ctr'; $rtl = ' rtl="0"'; }
+                        else { $cx = 3000000; $algn = 'r'; $rtl = $isAr ? ' rtl="1"' : ' rtl="0"'; }
+                        $rlang = $isAr ? 'ar-LB' : 'en-US';
                         $px = (int)round($Wx * $x / 100 - ($a === 'c' ? $cx / 2 : $cx));
                         if ($px < 0) { $cx += $px; $px = 0; }
                         $py = (int)round($Hx * $y / 100);
@@ -268,7 +273,7 @@ if ($form === 'mof_r3') {
                             . '<xdr:spPr><a:xfrm><a:off x="' . $px . '" y="' . $py . '"/><a:ext cx="' . $cx . '" cy="' . $cy . '"/></a:xfrm>'
                             . '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></xdr:spPr>'
                             . '<xdr:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"/><a:lstStyle/>'
-                            . '<a:p><a:pPr algn="' . $algn . '"' . $rtl . '/><a:r><a:rPr lang="ar-LB" sz="' . (int)round($fs * 100) . '" b="1">'
+                            . '<a:p><a:pPr algn="' . $algn . '"' . $rtl . '/><a:r><a:rPr lang="' . $rlang . '" sz="' . (int)round($fs * 100) . '" b="1">'
                             . '<a:latin typeface="Arial"/><a:cs typeface="Arial"/></a:rPr><a:t>' . $txt . '</a:t></a:r></a:p>'
                             . '</xdr:txBody></xdr:sp><xdr:clientData/></xdr:absoluteAnchor>';
                     }
