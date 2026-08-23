@@ -12,6 +12,124 @@
  * الأولى محافظاً على تنسيقها (style)، ويفرض إعادة حساب الصيغ عند الفتح (fullCalcOnLoad)
  * حتى لا تبقى مجاميع القالب (P43/P47...) على قيمها القديمة المخبّأة.
  */
+/**
+ * 📤 تعبئة قالب إكسل متعدد الأوراق بالاسم (لملف الوزارة R567 وأمثاله — 2026-08-23):
+ * $sheetsCells = ['R5' => [خلية => قيمة], 'R6' => [...], ...] — تعديل الخانات فقط،
+ * والقالب (بما فيه الماكرو vbaProject والصيَغ والأكواد) يبقى كما هو بايت-بايت.
+ */
+function phpFillXlsxTemplateSheets($templateAbs, array $sheetsCells, $outPath)
+{
+    if (!class_exists('ZipArchive') || !class_exists('DOMDocument')) return false;
+    if (!@copy($templateAbs, $outPath)) return false;
+    $zip = new ZipArchive();
+    if ($zip->open($outPath) !== true) { @unlink($outPath); return false; }
+    try {
+        // ورقة بالاسم → ملفها (workbook.xml + rels)
+        $wbx = (string)$zip->getFromName('xl/workbook.xml');
+        $rels = (string)$zip->getFromName('xl/_rels/workbook.xml.rels');
+        $rid2file = [];
+        if (preg_match_all('#Id="(rId\d+)"[^>]*Target="(worksheets/sheet\d+\.xml)"#', $rels, $mm, PREG_SET_ORDER)) {
+            foreach ($mm as $m) $rid2file[$m[1]] = 'xl/' . $m[2];
+        }
+        $name2file = [];
+        if (preg_match_all('#<sheet name="([^"]+)"[^>]*r:id="(rId\d+)"#', $wbx, $mm, PREG_SET_ORDER)) {
+            foreach ($mm as $m) { if (isset($rid2file[$m[2]])) $name2file[$m[1]] = $rid2file[$m[2]]; }
+        }
+        foreach ($sheetsCells as $sheetName => $cells) {
+            if (!isset($name2file[$sheetName]) || !$cells) continue;
+            $path = $name2file[$sheetName];
+            $xml = $zip->getFromName($path);
+            if ($xml === false) continue;
+            $xml2 = phpFillSheetXmlCells($xml, $cells);
+            if ($xml2 !== null) $zip->addFromString($path, $xml2);
+        }
+        // فرض إعادة حساب الصيغ عند الفتح (أكواد المناطق والوضع العائلي INDEX/MATCH)
+        if (strpos($wbx, '<calcPr') !== false) {
+            $wb2 = preg_replace('/<calcPr\b(?![^>]*fullCalcOnLoad)/', '<calcPr fullCalcOnLoad="1" ', $wbx, 1);
+        } elseif (strpos($wbx, '</sheets>') !== false) {
+            $wb2 = str_replace('</sheets>', '</sheets><calcPr fullCalcOnLoad="1"/>', $wbx);
+        } else { $wb2 = $wbx; }
+        if ($wb2 && $wb2 !== $wbx) $zip->addFromString('xl/workbook.xml', $wb2);
+        $zip->close();
+        return is_file($outPath) && filesize($outPath) > 200;
+    } catch (Throwable $e) {
+        try { $zip->close(); } catch (Throwable $e2) {}
+        @unlink($outPath);
+        return false;
+    }
+}
+
+/**
+ * يكتب خانات في XML ورقة واحدة — معالجة نصّية بمسار واحد (لا DOM: ورقة R6 بقالب
+ * الوزارة 15MB والصيَغ حتى الصف 600، وDOM عليها يعلّق). يعيد XML أو null.
+ */
+function phpFillSheetXmlCells($xml, array $cells)
+{
+    $colIdx = function ($letters) {
+        $n = 0;
+        foreach (str_split(strtoupper($letters)) as $ch) $n = $n * 26 + (ord($ch) - 64);
+        return $n;
+    };
+    // تجميع الخانات حسب الصف
+    $byRow = [];
+    foreach ($cells as $ref => $val) {
+        if (!preg_match('/^([A-Za-z]+)(\d+)$/', $ref, $m)) continue;
+        $byRow[(int)$m[2]][strtoupper($m[1])] = $val;
+    }
+    if (!$byRow) return $xml;
+    // ستايل كل عمود من أول صف يحويه (لخلايا تُستحدث بصفوف ما فيها العمود أصلاً)
+    $colStyle = [];
+    $buildCell = function ($ref, $attrs, $val) {
+        $attrs = preg_replace('/\s+t="[^"]*"/', '', $attrs);
+        if ($val === '' || $val === null) return '<c r="' . $ref . '"' . $attrs . '/>';
+        if (is_int($val) || is_float($val)
+            || (is_string($val) && preg_match('/^-?\d+(\.\d+)?$/', $val) && !preg_match('/^0\d/', $val))) {
+            return '<c r="' . $ref . '"' . $attrs . '><v>' . $val . '</v></c>';
+        }
+        $t = htmlspecialchars((string)$val, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        return '<c r="' . $ref . '"' . $attrs . ' t="inlineStr"><is><t xml:space="preserve">' . $t . '</t></is></c>';
+    };
+    $out = preg_replace_callback('#(<row\b[^>]*\br="(\d+)"[^>]*)(/>|>(.*?)</row>)#s',
+        function ($rm) use (&$byRow, &$colStyle, $colIdx, $buildCell) {
+            $rowNum = (int)$rm[2];
+            $inner = ($rm[3] === '/>') ? '' : $rm[4];
+            // خرائط خلايا الصف الموجودة (بترتيبها)
+            $exist = [];   // colIdx => [ref, attrs, fullXml, hasFormula]
+            if ($inner !== '' && preg_match_all('#<c\b[^>]*\br="([A-Za-z]+)(\d+)"[^>]*?(?:/>|>.*?</c>)#s', $inner, $cm2, PREG_SET_ORDER)) {
+                foreach ($cm2 as $c2) {
+                    $ci = $colIdx($c2[1]);
+                    preg_match('#^<c\b([^>]*?)/?>#s', $c2[0], $am);
+                    $a = trim(preg_replace('/\br="[^"]*"/', '', $am[1] ?? ''));
+                    $exist[$ci] = ['ref' => $c2[1] . $c2[2], 'attrs' => ($a === '' ? '' : ' ' . $a),
+                                   'xml' => $c2[0], 'f' => strpos($c2[0], '<f') !== false];
+                    if (!isset($colStyle[$ci]) && preg_match('/\bs="(\d+)"/', $c2[0], $sm2)) $colStyle[$ci] = $sm2[1];
+                }
+            }
+            if (!isset($byRow[$rowNum])) return $rm[0];
+            $vals = $byRow[$rowNum];
+            unset($byRow[$rowNum]);
+            foreach ($vals as $colL => $val) {
+                $ci = $colIdx($colL);
+                if (isset($exist[$ci])) {
+                    if ($exist[$ci]['f']) { continue; } // 🔴 ممنوع دهس خلايا الصيغ (أعمدة أكواد الوزارة)
+                    $exist[$ci]['xml'] = $buildCell($colL . $rowNum, $exist[$ci]['attrs'], $val);
+                } else {
+                    $attrs = isset($colStyle[$ci]) ? ' s="' . $colStyle[$ci] . '"' : '';
+                    $exist[$ci] = ['ref' => $colL . $rowNum, 'attrs' => $attrs,
+                                   'xml' => $buildCell($colL . $rowNum, $attrs, $val), 'f' => false];
+                }
+            }
+            ksort($exist);
+            return rtrim($rm[1]) . '>' . implode('', array_column($exist, 'xml')) . '</row>';
+        }, $xml);
+    if ($out === null) return null;
+    // صفوف مطلوبة غير موجودة أصلاً بالقالب = خطأ صريح (قالب الوزارة صفوفه جاهزة سلفاً)
+    if ($byRow) return null;
+    // شطب القيم المخبّأة لخلايا الصيغ — تُحسب من جديد عند الفتح (أكواد المناطق)
+    $out = preg_replace('#(<f\b[^>]*/>|</f>)<v>[^<]*</v>#', '$1', $out);
+    return $out;
+}
+
 function phpFillXlsxTemplate($templateAbs, array $cells, $outPath)
 {
     if (!class_exists('ZipArchive') || !class_exists('DOMDocument')) return false;

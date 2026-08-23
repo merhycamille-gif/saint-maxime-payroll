@@ -495,6 +495,266 @@ function mofXlsxServe($tplKey, array $cells, $fname, $checkbox = 0) {
     exit;
 }
 
+if ($form === 'mof_r567') {
+    /* 📤 ملف الوزارة السنوي R567 («منبعت للدولة نهاية كل سنة ملف فيه ر5 ور6 ور7» —
+     * 2026-08-23): قالب الوزارة الرسمي بالماكرو (ملف المستخدم R567.xlsm نفسه مفرَّغاً،
+     * assets/templates/mof_r567.xlsm) يُعبَّأ بثلاث أوراقه — R5 إجمالي السنة، R6 صف لكل
+     * موظف، R7 التاركون — ثم يفتح المستخدم الملف ويكبس زرّ الوزارة فيولّد R567.xml
+     * المشفَّر للرفع على بوابة المالية. 🔴 الأسماء الجغرافية والوضع العائلي بمفردات
+     * قوائم الوزارة حرفياً (الماكرو يحوّلها أكواداً بصيَغ INDEX/MATCH داخل القالب).
+     * &check=1 يعرض تقرير تدقيق الأسماء على قوائم الأكواد قبل التوليد. */
+    ensureMofProfile20260823();
+    ensureEmployeeChildren20260823();
+    $fy = (int)($_GET['fy'] ?? 0);
+    if ($fy < 2000 || $fy > 2100) $fy = (int)date('Y') - 1;
+    $empFilter = mofEmpFilterSql($db);
+    $serial567 = function ($dateStr) { return (int)round((strtotime($dateStr) - strtotime('1899-12-30')) / 86400); };
+    $s0 = currentSchool();
+    $ss = $db->prepare("SELECT * FROM schools WHERE id=?");
+    $ss->execute([(int)($s0['id'] ?? 0)]);
+    $sch = $ss->fetch() ?: $s0;
+    $prof = mofProfile($sch);
+    $finNum = preg_replace('/\D/', '', (string)($sch['finance_number'] ?? ''));
+
+    // ١) إجماليات السنة (نفس محرّك ر5 = مجموع الفصول الأربعة) + لائحة الموظفين
+    $sum = ['gross' => 0, 'trans' => 0, 'other' => 0, 'net' => 0, 'exempt' => 0, 'taxable' => 0, 'tax' => 0];
+    $ids = [];
+    for ($q = 1; $q <= 4; $q++) {
+        $qa = mofQuarterAgg($db, $q, $fy, $empFilter);
+        foreach ($sum as $k => $v) $sum[$k] += $qa[$k];
+        $ids = array_merge($ids, $qa['ids']);
+    }
+    $ids = array_values(array_unique($ids));
+    $cnt = count($ids);
+    $paid = $sum['gross'] + $sum['trans'];
+    $marLbl = function ($ss2) {
+        if (strpos((string)$ss2, 'marie') === 0) return 'متزوج';
+        if (strpos((string)$ss2, 'veuf') === 0) return 'أرمل';
+        if (strpos((string)$ss2, 'divorce') === 0) return 'مطلق';
+        return 'أعزب';
+    };
+
+    // ٢) صفوف الموظفين مرتّبة بالاسم + مجاميع كل موظف بالسنة الميلادية
+    $empRows = [];
+    if ($ids) {
+        $in = implode(',', array_map('intval', $ids));
+        // 🔴 ماكرو الوزارة يقف عند أول صف رقم ماليته فارغ (Exit For) — ناقصو الرقم آخر اللائحة
+        $le = $db->query("SELECT * FROM employees WHERE id IN ($in)
+            ORDER BY (COALESCE(finance_ministry_number,'') REGEXP '[0-9]') DESC,
+                COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)")->fetchAll();
+        $agQ = $db->prepare("SELECT SUM(base_plus_echelon_lbp) base,
+                SUM(extra_lbp+prime_fixe_lbp) extraw, SUM(aide_complementaire_lbp) aide,
+                SUM(family_allowance_lbp) family, SUM(transport_lbp) trans,
+                SUM(caisse_amount_lbp+eoc_grade_lbp) other,
+                SUM(taxable_base_lbp) tb, SUM(income_tax_lbp) tax,
+                COUNT(DISTINCT month) mcnt, MIN(month) m1, MAX(month) m2
+            FROM monthly_salaries WHERE employee_id=? AND year=?
+              AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
+        foreach ($le as $emp2) {
+            $agQ->execute([(int)$emp2['id'], $fy]);
+            $a2 = $agQ->fetch() ?: [];
+            if (!(int)($a2['mcnt'] ?? 0)) continue;
+            $isMar2 = strpos((string)($emp2['social_status'] ?? ''), 'marie') === 0;
+            $fda2 = familyDeductionAnnual($emp2['social_status'] ?? '', $emp2['spouse_works'] ?? 0,
+                $emp2['apply_family_deduction'] ?? 1, $fy . '-01-01',
+                $emp2['grant_spouse_addition'] ?? 0, $emp2['grant_children_addition'] ?? 0, (int)$emp2['id']);
+            $fd2 = (int)min($fda2 / 12 * min(12, (int)$a2['mcnt']), (float)$a2['tb']);
+            // عدد الأولاد دون 18 بأول السنة (المؤرَّخون أولاً وإلا العدد الثابت)
+            $kq2 = $db->prepare("SELECT COUNT(*) FROM employee_children WHERE employee_id=? AND DATE_ADD(birth_date, INTERVAL 18 YEAR) > ?");
+            $kq2->execute([(int)$emp2['id'], $fy . '-01-01']);
+            $hasKids = (int)$db->query("SELECT COUNT(*) FROM employee_children WHERE employee_id=" . (int)$emp2['id'])->fetchColumn();
+            $nKids = $hasKids ? (int)$kq2->fetchColumn() : (int)($emp2['number_of_children'] ?? 0);
+            $benef2 = $nKids + (($isMar2 && !(int)($emp2['spouse_works'] ?? 0) && (int)($emp2['grant_spouse_addition'] ?? 0) === 1) ? 1 : 0);
+            $empRows[] = ['e' => $emp2, 'a' => $a2, 'fd' => $fd2, 'kids' => $nKids, 'benef' => $benef2, 'mar' => $marLbl($emp2['social_status'] ?? '')];
+        }
+    }
+
+    // ٣) التاركون خلال السنة (ر7)
+    $lv = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . "
+        AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'),
+                  COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'),
+                  COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) BETWEEN ? AND ?
+        ORDER BY (COALESCE(finance_ministry_number,'') REGEXP '[0-9]') DESC,
+            COALESCE(NULLIF(first_name_ar,''),first_name_fr)");
+    $lv->execute([$fy . '-01-01', $fy . '-12-31']);
+    $leavers = $lv->fetchAll();
+
+    // ٤) تدقيق الأسماء على قوائم أكواد الوزارة (&check=1)
+    $geo = json_decode((string)@file_get_contents(__DIR__ . '/../assets/templates/mof_r567_geo.json'), true) ?: [];
+    $govNames = array_keys($geo['govs'] ?? []);
+    $cazaNames = array_column($geo['cazas'] ?? [], 'name');
+    $townNames = array_column($geo['towns'] ?? [], 'name');
+    if (($_GET['check'] ?? '') === '1') {
+        // 🔴 صيَغ الوزارة تطابق التسلسل لا الاسم وحده: القضاء ضمن محافظته والبلدة ضمن قضائها
+        // (MATCH(بلدة & كود القضاء) — بلدة صحيحة بقضاء غلط = كود 0)
+        $cazaByGov = []; $cazaId2Name = [];
+        foreach (($geo['cazas'] ?? []) as $cz) { $cazaByGov[$cz['name']][] = $cz; $cazaId2Name[$cz['id']] = $cz['name']; }
+        $townByName = [];
+        foreach (($geo['towns'] ?? []) as $tw) $townByName[$tw['name']][] = $tw;
+        $nearest = function ($val, $list) {
+            $best = ''; $bestP = 0;
+            foreach ($list as $cand) { similar_text($val, $cand, $pct); if ($pct > $bestP) { $bestP = $pct; $best = $cand; } }
+            return $bestP >= 55 ? ' ← الأقرب بقائمة الوزارة: «' . $best . '»' : '';
+        };
+        $probs = [];
+        foreach ($empRows as $r2) {
+            $e2 = $r2['e'];
+            $nm2 = trim(($e2['first_name_ar'] ?: $e2['first_name_fr']) . ' ' . ($e2['last_name_ar'] ?: $e2['last_name_fr']));
+            // 🔴 رقم المالية إلزامي: ماكرو الوزارة يقف عند أول صف بلا رقم فيسقط هو ومن بعده
+            if (preg_replace('/\D/', '', (string)($e2['finance_ministry_number'] ?? '')) === '') {
+                $probs[] = [$nm2, 'رقم المالية (إلزامي — بدونه يسقط من ملف الوزارة)', '(فارغ)'];
+            }
+            $gv = trim((string)($e2['gouvernorat'] ?? ''));
+            $cz = trim((string)($e2['district'] ?? ''));
+            $tw = trim((string)($e2['ville'] ?? ''));
+            $govId = null; $cazaId = null;
+            if ($gv === '') $probs[] = [$nm2, 'المحافظة', '(فارغة)'];
+            elseif (!isset($geo['govs'][$gv])) $probs[] = [$nm2, 'المحافظة', $gv . $nearest($gv, $govNames)];
+            else $govId = $geo['govs'][$gv];
+            if ($cz === '') $probs[] = [$nm2, 'القضاء', '(فارغ)'];
+            elseif (!isset($cazaByGov[$cz])) $probs[] = [$nm2, 'القضاء', $cz . $nearest($cz, $cazaNames)];
+            else {
+                $hit = null;
+                foreach ($cazaByGov[$cz] as $c3) if ($govId === null || $c3['gov'] === $govId) { $hit = $c3; break; }
+                if ($hit) $cazaId = $hit['id'];
+                else $probs[] = [$nm2, 'القضاء', $cz . ' — مش بمحافظة «' . $gv . '» بقوائم الوزارة'];
+            }
+            if ($tw === '') $probs[] = [$nm2, 'البلدة', '(فارغة)'];
+            elseif (!isset($townByName[$tw])) $probs[] = [$nm2, 'البلدة', $tw . $nearest($tw, $townNames)];
+            elseif ($cazaId !== null) {
+                $ok3 = false;
+                foreach ($townByName[$tw] as $t3) if ($t3['caza'] === $cazaId) { $ok3 = true; break; }
+                if (!$ok3) {
+                    $where3 = implode('/', array_unique(array_map(fn($t3) => $cazaId2Name[$t3['caza']] ?? '؟', $townByName[$tw])));
+                    $probs[] = [$nm2, 'البلدة', $tw . ' — بقوائم الوزارة هالبلدة بقضاء «' . $where3 . '» لا «' . $cz . '»: صحّح القضاء أو البلدة'];
+                }
+            }
+        }
+        foreach ($leavers as $le2) {
+            if (preg_replace('/\D/', '', (string)($le2['finance_ministry_number'] ?? '')) === '') {
+                $nm3 = trim((($le2['first_name_ar'] ?? '') ?: ($le2['first_name_fr'] ?? '')) . ' ' . (($le2['last_name_ar'] ?? '') ?: ($le2['last_name_fr'] ?? '')));
+                $probs[] = [$nm3, 'رقم المالية — تارك (ر7)', '(فارغ)'];
+            }
+        }
+        header('Content-Type: text/html; charset=UTF-8');
+        echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تدقيق أسماء R567</title>'
+           . '<style>body{font-family:"Segoe UI",Tahoma,sans-serif;background:#f1f5f9;padding:24px}table{border-collapse:collapse;background:#fff;width:100%;max-width:760px;margin:0 auto}td,th{border:1px solid #cbd5e1;padding:6px 12px;text-align:right}th{background:#1F4E5F;color:#fff}h2{text-align:center}</style></head><body>'
+           . '<h2>تدقيق الأسماء الجغرافية على قوائم أكواد الوزارة — ' . $fy . '</h2>';
+        if (!$probs) {
+            echo '<p style="text-align:center;font-size:18px;color:#166534;font-weight:700">✅ كل أسماء المحافظات والأقضية والبلدات (' . count($empRows) . ' موظفاً) مطابقة لقوائم الوزارة — الأكواد رح تطلع صح.</p>';
+        } else {
+            echo '<p style="text-align:center;color:#b91c1c;font-weight:700">⚠️ ' . count($probs) . ' خانة غير مطابقة — الكود سيطلع 0 بالملف. صحّحها بملف الموظف (عنوان السكن) بنفس تهجئة قوائم الوزارة:</p><table><tr><th>الموظف</th><th>الخانة</th><th>القيمة الحالية</th></tr>';
+            foreach ($probs as $p2) echo '<tr><td>' . e($p2[0]) . '</td><td>' . e($p2[1]) . '</td><td><strong>' . e($p2[2]) . '</strong></td></tr>';
+            echo '</table>';
+        }
+        echo '</body></html>';
+        exit;
+    }
+
+    // ٥) بناء خانات الأوراق الثلاث
+    $r5c = [
+        'C5' => $sch['name_ar'] ?? '', 'C7' => $finNum, 'C8' => $prof['trade_name'],
+        'K6' => $serial567($fy . '-01-01'), 'P6' => '31/12/' . $fy,
+        'K7' => $serial567($fy . '-01-01'), 'P7' => '31/12/' . $fy,
+        'C11' => $prof['gov'], 'K11' => $prof['gov'], 'C12' => $prof['caza'], 'K12' => $prof['caza'],
+        'G13' => $prof['town'], 'Q13' => $prof['town'], 'C14' => $prof['street'], 'L14' => $prof['street'],
+        'Q15' => $prof['building'], 'C16' => $prof['floor'], 'L16' => $prof['floor'],
+        'C22' => $prof['contact_name'], 'K22' => $prof['preparer_name'],
+        'C23' => $prof['contact_reg'], 'K23' => $prof['preparer_reg'],
+        'C24' => $prof['contact_phone'], 'H24' => $prof['contact_fax'],
+        'K24' => $prof['preparer_phone'], 'P24' => $prof['preparer_fax'],
+        'F28' => $cnt,
+        'L31' => $paid, 'L33' => $paid, 'L34' => $sum['trans'] ?: '', 'L36' => $sum['other'] ?: '',
+        'L37' => $sum['net'], 'L38' => $sum['exempt'] ?: '', 'L39' => $sum['taxable'], 'L40' => $sum['tax'],
+        'K48' => $sum['taxable'], 'K49' => $sum['tax'], 'K50' => 0, 'K51' => $sum['tax'], 'K54' => $sum['tax'],
+        'B54' => 0, 'B60' => $prof['signer_name'], 'L60' => $prof['signer_title'] ?: 'المدير',
+        'C61' => $serial567(date('Y-m-d')),
+    ];
+    $r6c = [
+        'C6' => trim(($sch['name_ar'] ?? '') . ($prof['town'] !== '' ? ' - ' . $prof['town'] : '')),
+        'F6' => $fy, 'C7' => $prof['trade_name'], 'C8' => $finNum,
+        'F8' => count($empRows), 'F12' => count($empRows),
+    ];
+    $rowN = 16;
+    foreach ($empRows as $i => $r2) {
+        $e2 = $r2['e']; $a2 = $r2['a'];
+        $base2 = (int)$a2['base']; $exw2 = (int)$a2['extraw']; $aide2 = (int)$a2['aide'];
+        $fam2 = (int)$a2['family']; $tr2 = (int)$a2['trans']; $oth2 = (int)$a2['other'];
+        $tb2 = (int)$a2['tb']; $tax2 = (int)$a2['tax'];
+        $isMar2 = ($r2['mar'] === 'متزوج');
+        $famSp = $isMar2 ? $fam2 : 0; $famCh = $isMar2 ? 0 : $fam2;
+        $tot1 = $base2 + $exw2 + $aide2 + $fam2 + $tr2;
+        $tot2 = $fam2 + $tr2;
+        $tot3 = $base2 + $exw2 + $aide2;
+        $net350 = max(0, $tb2 - $r2['fd']);
+        $from2 = sprintf('%04d-%02d-01', $fy, (int)$a2['m1']);
+        $to2 = date('d/m/Y', strtotime(date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $fy, (int)$a2['m2'])))));
+        $R = $rowN + $i;
+        $r6c += [
+            'A' . $R => $i + 1,
+            'B' . $R => trim((string)($e2['first_name_ar'] ?: $e2['first_name_fr'])),
+            'C' . $R => trim((string)($e2['father_name_ar'] ?? '')),
+            'D' . $R => trim((string)($e2['last_name_ar'] ?: $e2['last_name_fr'])),
+            'E' . $R => preg_replace('/\D/', '', (string)($e2['finance_ministry_number'] ?? '')),
+            'F' . $R => cnssOccupationAr($e2), 'G' . $R => 'شهري', 'I' . $R => $r2['mar'],
+            'K' . $R => $r2['kids'], 'L' . $R => $r2['benef'],
+            'M' . $R => $serial567($from2), 'O' . $R => $to2, 'Q' . $R => min(365, (int)$a2['mcnt'] * 30),
+            'R' . $R => trim((string)($e2['gouvernorat'] ?? '')), 'T' . $R => trim((string)($e2['district'] ?? '')),
+            'V' . $R => trim((string)($e2['ville'] ?? '')), 'X' . $R => trim((string)($e2['quartier'] ?? '')),
+            'Y' . $R => trim((string)($e2['rue'] ?? '')), 'Z' . $R => trim((string)($e2['immeuble'] ?? '')),
+            'AA' . $R => trim((string)($e2['etage'] ?? '')), 'AB' . $R => trim((string)($e2['phone1'] ?? '')),
+            'AC' . $R => trim((string)($e2['phone2'] ?? '')), 'AG' . $R => trim((string)($e2['email'] ?? '')),
+            'AH' . $R => $base2, 'AI' . $R => 0, 'AJ' . $R => $base2,
+            'AN' . $R => $exw2 ?: '', 'AO' . $R => $exw2 ?: '',
+            'AP' . $R => $famSp, 'AQ' . $R => $famSp, 'AR' . $R => 0,
+            'AS' . $R => $famCh, 'AT' . $R => $famCh, 'AU' . $R => 0,
+            'AV' . $R => $tr2, 'AW' . $R => $tr2, 'AX' . $R => 0,
+            'CB' . $R => $aide2 ?: '', 'CC' . $R => 0, 'CD' . $R => $aide2 ?: '',
+            'CE' . $R => $tot1, 'CF' . $R => $tot2, 'CG' . $R => $tot3,
+            'CH' . $R => $r2['fd'] ?: '', 'CI' . $R => $oth2 ?: '', 'CJ' . $R => $net350, 'CK' . $R => $tax2,
+        ];
+    }
+    $r7c = [
+        'B6' => $sch['name_ar'] ?? '', 'E6' => $fy, 'B7' => $prof['trade_name'], 'B8' => $finNum,
+        'E8' => trim((string)($sch['nssf_employer_number'] ?? '')),
+    ];
+    foreach ($leavers as $j => $le2) {
+        $R = 13 + $j;
+        $left2 = min(array_filter([
+            ($le2['left_date_cnss'] ?? null) ?: null,
+            ($le2['left_date_finance'] ?? null) ?: null,
+            ($le2['left_date_eoc'] ?? null) ?: null,
+        ]) ?: [$fy . '-12-31']);
+        $nm3 = preg_replace('/\s+/', ' ', trim(($le2['first_name_ar'] ?? '') . ' ' . ($le2['father_name_ar'] ?? '') . ' ' . ($le2['last_name_ar'] ?? '')));
+        if ($nm3 === '') $nm3 = trim(($le2['first_name_fr'] ?? '') . ' ' . ($le2['last_name_fr'] ?? ''));
+        $r7c += [
+            'A' . $R => $nm3,
+            'B' . $R => preg_replace('/\D/', '', (string)($le2['finance_ministry_number'] ?? '')),
+            'C' . $R => trim((string)($le2['nssf_number'] ?? '')),
+            'D' . $R => ($le2['hire_date'] ?? '') ? $serial567($le2['hire_date']) : '',
+            'E' . $R => date('d/m/Y', strtotime($left2)),
+        ];
+    }
+
+    // ٦) التوليد والبثّ (.xlsm — الماكرو محفوظ)
+    $tpl567 = __DIR__ . '/../assets/templates/mof_r567.xlsm';
+    $tmp567 = tempnam(sys_get_temp_dir(), 'r567');
+    if (!is_file($tpl567) || !phpFillXlsxTemplateSheets($tpl567, ['R5' => $r5c, 'R6' => $r6c, 'R7' => $r7c], $tmp567)) {
+        @unlink($tmp567);
+        http_response_code(500);
+        die('تعذّر توليد ملف الوزارة — القالب mof_r567.xlsm غير متوفر');
+    }
+    $fn567 = 'R567_' . $fy . '.xlsm';
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/vnd.ms-excel.sheet.macroEnabled.12');
+    header('Content-Disposition: attachment; filename="' . rawurlencode($fn567) . '"; filename*=UTF-8\'\'' . rawurlencode($fn567));
+    header('Content-Length: ' . filesize($tmp567));
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    readfile($tmp567);
+    @unlink($tmp567);
+    exit;
+}
+
 if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
     ensureMofProfile20260823();
     $fmt2 = function ($v) { if ($v === '' || $v === null) return ''; return (float)$v == 0.0 ? '0' : number_format((float)$v, 2, '.', ','); };

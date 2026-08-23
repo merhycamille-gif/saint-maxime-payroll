@@ -3117,6 +3117,60 @@ check('المحرّك والقارئون يمرّرون رقم الموظف لل
       && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), "(int)\$de['id']") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "(int)(\$r['eid'] ?? 0)") !== false);
 
+/* ---------- ٦٧) ملف الوزارة السنوي R567 (ر5+ر6+ر7 بقالب الماكرو الرسمي — 2026-08-23) ---------- */
+check('قالب الوزارة mof_r567.xlsm موجود ومعه قوائم الأكواد الجغرافية',
+      is_file($PROJ . '/assets/templates/mof_r567.xlsm') && filesize($PROJ . '/assets/templates/mof_r567.xlsm') > 1000000
+      && is_file($PROJ . '/assets/templates/mof_r567_geo.json'));
+$geo67 = json_decode((string)file_get_contents($PROJ . '/assets/templates/mof_r567_geo.json'), true) ?: [];
+check('قوائم الأكواد: 8 محافظات + 25 قضاء + 1942 بلدة',
+      count($geo67['govs'] ?? []) === 8 && count($geo67['cazas'] ?? []) === 25 && count($geo67['towns'] ?? []) === 1942);
+$oe67 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+check('مولّد R567: الأوراق الثلاث منفصلة + حماية «الماكرو يقف عند رقم مالية فارغ» + شاشة التدقيق الهرمي',
+      strpos($oe67, "form === 'mof_r567'") !== false
+      && strpos($oe67, "phpFillXlsxTemplateSheets(\$tpl567, ['R5' => \$r5c, 'R6' => \$r6c, 'R7' => \$r7c]") !== false
+      && substr_count($oe67, "REGEXP '[0-9]') DESC") === 2
+      && strpos($oe67, 'بقوائم الوزارة هالبلدة بقضاء') !== false);
+$of67 = renderPage('pages/official_forms.php', ['form' => 'tax_r5'], [], [2]);
+check('زرّا R567 (توليد + تدقيق أسماء) بشاشة ر5',
+      strpos($of67, 'form=mof_r567') !== false && strpos($of67, 'تدقيق أسماء المناطق') !== false
+      && strpos($of67, 'FATAL') === false);
+// تعبئة متعددة الأوراق: نصيّة (لا DOM — ورقة R6 ‏15MB) + ممنوع دهس خلايا الصيغ
+require_once $PROJ . '/includes/report_export.php';
+$x67 = '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+     . '<row r="16" spans="1:5"><c r="A16" s="3"/><c r="B16" s="4" t="s"><v>9</v></c>'
+     . '<c r="C16" s="5"><f>A16*2</f><v>44</v></c></row></sheetData></worksheet>';
+$y67 = phpFillSheetXmlCells($x67, ['A16' => 123, 'B16' => 'نصّ&قيمة', 'C16' => 999, 'D16' => '']);
+check('التعبئة النصيّة: رقم + نصّ مهرَّب + صيغة محمية من الدهس + شطب القيمة المخبّأة',
+      is_string($y67)
+      && strpos($y67, '<c r="A16" s="3"><v>123</v></c>') !== false
+      && strpos($y67, 'نصّ&amp;قيمة') !== false
+      && strpos($y67, '<f>A16*2</f>') !== false && strpos($y67, '<v>44</v>') === false
+      && strpos($y67, '999') === false);
+// توليد حي: ملف xlsm سليم بماكرو الوزارة والقيم بأوراقه
+$b67 = renderPage('pages/official_export.php', ['form' => 'mof_r567', 'fy' => '2025'], [], [2], '', '', $PROJ . '/tools/_r567_test.xlsm');
+$ok67 = strncmp($b67, 'PK', 2) === 0 && strlen($b67) > 1000000;
+$vba67 = false; $r6emp67 = false;
+if ($ok67) {
+    $tmp67 = $PROJ . '/tools/_r567_probe.xlsm';
+    file_put_contents($tmp67, $b67);
+    $z67 = new ZipArchive();
+    if ($z67->open($tmp67) === true) {
+        $vba67 = $z67->getFromName('xl/vbaProject.bin') !== false;
+        for ($i67 = 1; $i67 <= 6; $i67++) {
+            $sx67 = (string)$z67->getFromName("xl/worksheets/sheet$i67.xml");
+            if (strpos($sx67, 'أعزب') !== false || strpos($sx67, 'متزوج') !== false) { $r6emp67 = true; break; }
+        }
+        $z67->close();
+    }
+    @unlink($tmp67);
+}
+check('توليد R567 حي: ملف xlsm سليم + ماكرو الوزارة محفوظ + صفوف الموظفين بمفردات الوزارة (أعزب/متزوج)',
+      $ok67 && $vba67 && $r6emp67, 'حجم ' . number_format(strlen($b67)));
+$chk67 = renderPage('pages/official_export.php', ['form' => 'mof_r567', 'fy' => '2025', 'check' => '1'], [], [2]);
+check('شاشة تدقيق أسماء المناطق تشتغل (عنوانها + جدول/رسالة نتيجتها)',
+      strpos($chk67, 'تدقيق الأسماء الجغرافية على قوائم أكواد الوزارة') !== false
+      && (strpos($chk67, 'مطابقة لقوائم الوزارة') !== false || strpos($chk67, 'غير مطابقة') !== false));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
