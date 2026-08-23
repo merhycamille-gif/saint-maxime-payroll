@@ -1490,3 +1490,6 @@ body.doc-view .page-content { max-width: 1320px; margin: 0 auto; }
 @media screen and (max-width: 760px) {
     .doc-sheet { padding: 14px 12px 18px; }
 }
+
+/* إشارة الاقتراحات المعلّقة تضوي (2026-08-23) */
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }

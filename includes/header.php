@@ -114,6 +114,13 @@ document.addEventListener('submit', function (e) {
                 <span>Employés & Enseignants / الموظفون والأساتذة</span>
             </a>
 
+            <?php $tsPend = taxSuggestionsPendingCount(); // 💡 «لازم يضوي بالبرنامج» (2026-08-23): الإشارة تضوي ما دام في اقتراحات معلّقة ?>
+            <a href="<?= BASE_URL ?>pages/tax_suggestions.php" class="<?= $currentPage === 'tax_suggestions' ? 'active' : '' ?>">
+                <i class="fas fa-lightbulb" <?= $tsPend ? 'style="color:#f59e0b"' : '' ?>></i>
+                <span>Suggestions état civil / اقتراحات من إخراج القيد</span>
+                <?php if ($tsPend): ?><span style="background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite"><?= $tsPend ?></span><?php endif; ?>
+            </a>
+
             <a href="<?= BASE_URL ?>pages/grades.php" class="<?= $currentPage === 'grades' ? 'active' : '' ?>">
                 <i class="fas fa-layer-group"></i>
                 <span>Échelons & Promotions / الدرجات والترقيات</span>

@@ -3024,6 +3024,26 @@ $naj63 = $db->query("SELECT
 check('حالات سيدة النجاة: عيّنات مثبّتة (جونا متزوجة+3 مضوّى · برباري أرملة+2 مضوّى · قرعه أرملة مطفى · غنيمه متزوجة بلا قاصرين)',
       (int)$naj63 === 4, 'مطابق: ' . $naj63 . '/4');
 
+/* =====================================================================
+ * 64) 💡 «لازم يضوي بالبرنامج وانا بساعتها بطبق او لاء» (2026-08-23):
+ *     اقتراحات إخراجات القيد بجدول ذاتي التركيب + صفحة قرار (طبّق/تجاهل
+ *     بإعادة احتساب تلقائية) + إشارة حمراء تضوي بالقائمة عند وجود معلَّق.
+ * =================================================================== */
+ensureTaxSuggestions20260823();
+check('اقتراحات إخراج القيد: الجدول ذاتي التركيب + زرع قراءات سيدة النجاة (14 مطبَّقاً موثَّقاً)',
+      (int)$db->query("SELECT COUNT(*) FROM tax_suggestions WHERE source_key LIKE 'najat_%' AND status='applied'")->fetchColumn() === 13
+      && (int)$db->query("SELECT COUNT(*) FROM tax_suggestions WHERE source_key IN ('najat_62','najat_1387','maxim_38')")->fetchColumn() === 3);
+$ts64 = renderPage('pages/tax_suggestions.php', [], []);
+check('اقتراحات إخراج القيد: الصفحة تعرض المعلَّق والمطبَّق بأزرار القرار',
+      strpos($ts64, 'اقتراحات من قراءة إخراجات القيد') !== false
+      && strpos($ts64, 'name="act" value="apply"') !== false
+      && strpos($ts64, 'name="act" value="dismiss"') !== false
+      && strpos($ts64, 'FATAL') === false);
+check('اقتراحات إخراج القيد: الإشارة تضوي بالقائمة (عدّاد أحمر نابض) + التطبيق يعيد الاحتساب',
+      strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'taxSuggestionsPendingCount()') !== false
+      && strpos((string)file_get_contents($PROJ . '/assets/css/app.css'), '@keyframes pulse') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/tax_suggestions.php'), 'recalcEmployeeYear((int)$sg[\'employee_id\'], $sy);') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

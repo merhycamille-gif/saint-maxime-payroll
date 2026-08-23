@@ -1226,6 +1226,64 @@ function healNajatCivilStatus20260823() {
     } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد بالفتحة التالية */ }
 }
 
+/**
+ * 💡 اقتراحات ضريبية من إخراجات القيد («لازم يضوي بالبرنامج وانا بساعتها بطبق او لاء»
+ * — 2026-08-23): جدول ذاتي التركيب يحمل ما قُرئ من إخراجات القيد العائلية كاقتراحات؛
+ * إشارة حمراء تضوي بالقائمة عند وجود معلَّق، والمستخدم يقرّر «طبّق» أو «تجاهل» من صفحة
+ * «اقتراحات من إخراج القيد». القراءات الجديدة تُزرَع هنا (source_key يمنع التكرار).
+ */
+function ensureTaxSuggestions20260823() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        $db->exec("CREATE TABLE IF NOT EXISTS tax_suggestions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            source_key VARCHAR(80) UNIQUE,
+            employee_id INT NULL,
+            school_id INT NULL,
+            emp_name VARCHAR(160) NULL,
+            title VARCHAR(255) NOT NULL,
+            details TEXT NULL,
+            proposed TEXT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            created_at DATETIME NULL,
+            decided_at DATETIME NULL
+        ) DEFAULT CHARSET=utf8mb4");
+        // زرع قراءات سيدة النجاة (22 إخراجاً — 2026-08-23): المطبَّق موثَّق والمعلَّق بانتظار قراره
+        $ins = $db->prepare("INSERT IGNORE INTO tax_suggestions (source_key, employee_id, school_id, emp_name, title, details, proposed, status, created_at, decided_at) VALUES (?,?,?,?,?,?,?,?,NOW(),?)");
+        $J = fn($a) => json_encode($a, JSON_UNESCAPED_UNICODE);
+        $rows = [
+            ['najat_1546', 1546, 3, 'جونا زوبا', 'متزوجة من روجيه نادر + 3 أولاد دون 18', 'إخراج القيد: توأم ماريا وإلاريا (2013 — 13 سنة) + شريل (2019 — 7 سنوات). كانت «عزباء» بالبرنامج.', $J(['social_status'=>'marie_3_enfants','number_of_children'=>3,'grant_children_addition'=>1,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_1826', 1826, 3, 'ديانا شرو', 'متزوجة من ميشال عبود (2017) + ولدان دون 18', 'إخراج القيد: جويا (2020 — 6 سنوات) + شربل (2021 — 4 سنوات).', $J(['social_status'=>'marie_2_enfants','number_of_children'=>2,'grant_children_addition'=>1,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_68', 68, 3, 'مرسال منصور', 'متزوجة من ميلاد السروجي + ولدان دون 18 (من أصل 4)', 'إخراج القيد: رومي (2003) وروبين (2004) فوق 18 + ريبيكا (2009 — 17 سنة) وريا (2011 — 15 سنة).', $J(['social_status'=>'marie_2_enfants','number_of_children'=>2,'grant_children_addition'=>1,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_968', 968, 3, 'إليانا برباري', 'أرملة (الزوج توفي 2015) + ولدان دون 18', 'قيد سوري: ولدان مواليد ~2009 (17 سنة) و~2012 (14 سنة) — الأعمار تقريبية.', $J(['social_status'=>'veuf_2_enfants','number_of_children'=>2,'grant_children_addition'=>1,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_51', 51, 3, 'دوللي كرم', 'متزوجة + بنت دون 18', 'إخراج القيد: ألكسيا مارتينا (2014 — 12 سنة).', $J(['social_status'=>'marie_1_enfant','number_of_children'=>1,'grant_children_addition'=>1,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_1224', 1224, 3, 'فاليسا خاطر', 'متزوجة من فريدي أبي أنطون + ولد رضيع', 'إخراج القيد: ولد مواليد ~2024.', $J(['social_status'=>'marie_1_enfant','number_of_children'=>1,'grant_children_addition'=>1,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_1840', 1840, 3, 'كارين السكاف', 'متزوجة من ماريو الجد (2024) + طفل رضيع', 'إخراج القيد: مايكل (10/9/2025).', $J(['social_status'=>'marie_1_enfant','number_of_children'=>1,'grant_children_addition'=>1,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_425', 425, 3, 'ميراي فاخوري', 'متزوجة من ردي غصين (2025) + بنت رضيعة', 'إخراج القيد: جايمي (28/11/2024).', $J(['social_status'=>'marie_1_enfant','number_of_children'=>1,'grant_children_addition'=>1,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_1066', 1066, 3, 'الين قاصوف', 'متزوجة من جان القارح — كل الأولاد فوق 18', 'إخراج القيد: ديزيري (1995) وديانا (1997) تزوّجتا + جاك (2003 — 23 سنة).', $J(['social_status'=>'marie_sans_enfants','number_of_children'=>0,'grant_children_addition'=>0,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_61', 61, 3, 'لينا القارح', 'متزوجة من بيار القارح — كل الأولاد فوق 18', 'إخراج القيد: جيمي (1999) + جان (2002).', $J(['social_status'=>'marie_sans_enfants','number_of_children'=>0,'grant_children_addition'=>0,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_65', 65, 3, 'مارينا غنيمه', 'متزوجة من طنوس العشي — الأصغر بلغ 18 في 1/8/2026', 'إخراج القيد: بندليون (2004) + أيوب (2007) + لبيب (1/8/2008).', $J(['social_status'=>'marie_sans_enfants','number_of_children'=>0,'grant_children_addition'=>0,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_1138', 1138, 3, 'هيلاني يعقوب', 'متزوجة — ولداها فوق 18 (الصورة ضعيفة)', 'إخراج القيد: ولدان ~1992 و~1995. يُستحسن نسخة أوضح للأرشيف.', $J(['social_status'=>'marie_sans_enfants','number_of_children'=>0,'grant_children_addition'=>0,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_53', 53, 3, 'زينة قرعه', 'أرملة (الزوج توفي 2023) — ولداها فوق 18', 'إخراج القيد: نقولا (2003) + شربل (2005).', $J(['social_status'=>'veuf_sans_enfants','number_of_children'=>0,'grant_children_addition'=>0,'grant_spouse_addition'=>0]), 'applied', date('Y-m-d H:i:s')],
+            ['najat_62', 62, 3, 'مادونا عازار', '⚠️ متزوجة من ناجي عبدالله + ولدان بأعمار غير مؤكّدة (~16-21)', 'الخط غير واضح بإخراجها — طُبّق مؤقتاً «متزوجة بلا أولاد قاصرين». إن ثبت ولد دون 18 بنسخة أوضح: طبّق الاقتراح ليُضاف ولد واحد.', $J(['social_status'=>'marie_1_enfant','number_of_children'=>1,'grant_children_addition'=>1,'grant_spouse_addition'=>0]), 'pending', null],
+            ['najat_1387', 1387, 3, 'كميل مرعي', '⚠️ الملف المرفوع بخانة إخراج القيد ليس إخراج قيد', 'الملف سكرين شوت واتساب — يُطلب رفع إخراج القيد العائلي الصحيح عبر رابط التحديث.', null, 'pending', null],
+            ['maxim_38', 38, 2, 'دنيا القزي', '⚠️ الملف المرفوع بخانة إخراج القيد جواز سفر', 'دنيا القزي (القديس مكسيموس) رفعت جواز سفر بدل إخراج القيد — يُطلب رفع الصحيح.', null, 'pending', null],
+        ];
+        foreach ($rows as $r) $ins->execute($r);
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/** عدد الاقتراحات المعلّقة (لإضاءة الإشارة بالقائمة) */
+function taxSuggestionsPendingCount(): int {
+    try {
+        ensureTaxSuggestions20260823();
+        return (int)getDB()->query("SELECT COUNT(*) FROM tax_suggestions WHERE status='pending'")->fetchColumn();
+    } catch (Throwable $e) { return 0; }
+}
+
 function healLawfulTaxProration20260806() {
     $flag = 'lawful_tax_proration_2026_08_06';
     if (getSetting($flag, '') !== '') return;
