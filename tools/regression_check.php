@@ -2250,7 +2250,7 @@ $ox41 = (string)file_get_contents($PROJ . '/pages/official_export.php');
 check('التنزيل العائلي اختياري: ر5 ور10 وعمود كشف الرواتب كلهم على المصدر الوحيد familyDeductionAnnual',
       substr_count($ox41, "COALESCE(e.apply_family_deduction,1) afd") === 1
       && substr_count($ox41, "familyDeductionAnnual(\$de['social_status'], \$de['spouse_works'], \$de['afd']") === 1
-      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 1, \$r['gca'] ?? 0)") !== false);
+      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0)") !== false);
 // تجربة فعلية (مع ترجيع كامل): موظف خاضع بضريبة موجبة وتنزيل ساري > 0 — طفي الخيار
 // يرفع ضريبته الشهرية، وإرجاعه يعيدها كما كانت بالمليم
 ensureEmployeeFlagColumns();
@@ -2293,7 +2293,7 @@ $rx42 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 check('عمود التنزيل العائلي: حصّة الشهر + قبل «الخاضع» + الخاضع بعد الحسم (شاشة، بالمصدر الوحيد)',
       strpos($rp42, 'التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small>') !== false
       && strpos($rp42, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false
-      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf, \$r['gsa'] ?? 1, \$r['gca'] ?? 0)") !== false);
+      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0)") !== false);
 check('عمود التنزيل العائلي: بتصدير Excel/Word بنفس الترتيب والمنطق',
       strpos($rx42, "'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)'") !== false
       && strpos($rx42, "COALESCE(e.apply_family_deduction,1) afd") !== false
@@ -2391,7 +2391,7 @@ $of44 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('كشف رواتب كل الموظفين: عمود التنزيل العائلي (حصّة الشهر) قبل الخاضع والخاضع بعد الحسم',
       strpos($of44, '<th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th>') !== false
       && strpos($of44, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$sfd)") !== false
-      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 1, \$r['gca'] ?? 0)") !== false);
+      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0)") !== false);
 // تجربة فعلية: صف مارسيلا بكشف 6/2026 — الحصّة ثم الخاضع بعدها بهذا الترتيب (نفس أرقام كشف الضريبة)
 $h44 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [2]);
 $p44 = mb_strpos($h44, 'مارسيلا');
@@ -2445,22 +2445,30 @@ check('زيادة الزوج: الدالة الموحّدة familyDeductionAnnua
 // تعليم «الزوج يعمل» ⇒ تنزيلها يصير 450م (بلا زيادة الزوج) ⇒ تظهر ضريبة فعلية
 $z46 = $db->query("SELECT spouse_works, social_status FROM employees WHERE id = 18")->fetch(PDO::FETCH_ASSOC);
 if ($z46 && $z46['social_status'] === 'marie_sans_enfants') {
-    $fdBase46 = familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-06-01');
-    $fdSW46   = familyDeductionAnnual('marie_sans_enfants', 1, 1, '2026-06-01');
-    $fdSingle46 = familyDeductionAnnual('celibataire', 0, 1, '2026-06-01');
+    // (منذ «طفي زيادة الزوج» 2026-08-23 الافتراضي مطفأ — الصيغ هنا بتضوية صريحة gsa=1)
+    $fdBase46 = familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-06-01', 1);
+    $fdSW46   = familyDeductionAnnual('marie_sans_enfants', 1, 1, '2026-06-01', 1);
+    $fdSingle46 = familyDeductionAnnual('celibataire', 0, 1, '2026-06-01', 1);
     check('زيادة الزوج: متأهل بلا أولاد = 675م، وزوجه يعمل = تنزيل العازب 450م',
           $fdBase46 === 675000000 && $fdSW46 === $fdSingle46 && $fdSW46 === 450000000,
           number_format($fdBase46) . ' → ' . number_format($fdSW46));
+    // زاهية اليوم: gsa=0 ⇒ عندها ضريبة. تضوية الزيادة تصفّرها (675م)، وتعليم «الزوج يعمل»
+    // يسقطها حكماً فترجع الضريبة — ثم ترجيع كامل. (معكوس القديم بعد «طفي زيادة الزوج»)
+    $g46 = (int)$db->query("SELECT COALESCE(grant_spouse_addition,0) FROM employees WHERE id = 18")->fetchColumn();
     $tOf46 = $db->prepare("SELECT income_tax_lbp FROM monthly_salaries WHERE employee_id = 18 AND month = 6 AND year = 2026");
     $tOf46->execute([]); $t0_46 = (int)$tOf46->fetchColumn();
+    $db->exec("UPDATE employees SET grant_spouse_addition = 1 WHERE id = 18");
+    try { (new PayrollCalculator(18, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
+    $tOf46->execute([]); $tGr46 = (int)$tOf46->fetchColumn();
     $db->exec("UPDATE employees SET spouse_works = 1 WHERE id = 18");
     try { (new PayrollCalculator(18, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
     $tOf46->execute([]); $tSW46 = (int)$tOf46->fetchColumn();
-    $db->exec("UPDATE employees SET spouse_works = " . (int)$z46['spouse_works'] . " WHERE id = 18");
+    $db->exec("UPDATE employees SET spouse_works = " . (int)$z46['spouse_works'] . ", grant_spouse_addition = " . $g46 . " WHERE id = 18");
     try { (new PayrollCalculator(18, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
     $tOf46->execute([]); $tBack46 = (int)$tOf46->fetchColumn();
-    check('زيادة الزوج (تجربة فعلية): تعليم «زوج زاهية يعمل» يُظهر ضريبة فعلية بعد أن كانت صفراً',
-          $t0_46 === 0 && $tSW46 > 0, 'قبل: ' . number_format($t0_46) . ' / بعد: ' . number_format($tSW46));
+    check('زيادة الزوج (تجربة فعلية): تضويتها لزاهية تصفّر ضريبتها، و«الزوج يعمل» يسقطها حكماً فتعود',
+          $t0_46 > 0 && $tGr46 === 0 && $tSW46 === $t0_46,
+          'بلا زيادة: ' . number_format($t0_46) . ' / معها: ' . number_format($tGr46) . ' / زوج يعمل: ' . number_format($tSW46));
     check('زيادة الزوج (تجربة فعلية): الترجيع أعاد ضريبتها كما كانت', $tBack46 === $t0_46, number_format($tBack46));
 } else {
     check('زيادة الزوج (تجربة فعلية)', true, 'زاهية غير مطابقة للسيناريو — تخطٍّ');
@@ -2475,13 +2483,13 @@ $fn47 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $emp47 = (string)file_get_contents($PROJ . '/pages/employees.php');
 $pc47 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
 check('زيادة الزوج اختيارية: العمود grant_spouse_addition ذاتي التركيب والدالة الموحّدة تحترمه',
-      strpos($fn47, "ADD COLUMN grant_spouse_addition TINYINT(1) NOT NULL DEFAULT 1") !== false
-      && strpos($fn47, '$grantSpouseAdd = 1') !== false
+      strpos($fn47, "ADD COLUMN grant_spouse_addition TINYINT(1) NOT NULL DEFAULT 0") !== false
+      && strpos($fn47, '$grantSpouseAdd = 0') !== false
       && strpos($fn47, "(!empty(\$spouseWorks) || (int)(\$grantSpouseAdd ?? 1) !== 1)") !== false);
 check('زيادة الزوج اختيارية: زرّ بملف الموظف + يُحفَظ + المحرّك يمرّره',
       strpos($emp47, 'name="grant_spouse_addition"') !== false
       && strpos($emp47, "'grant_spouse_addition' => isset(\$_POST['grant_spouse_addition'])") !== false
-      && strpos($pc47, "\$this->employee['grant_spouse_addition'] ?? 1") !== false);
+      && strpos($pc47, "\$this->employee['grant_spouse_addition'] ?? 0") !== false);
 // تجربة فعلية على زاهية (متأهلة بلا أولاد، زوجها لا يعمل، ضريبتها 0) مع ترجيع كامل:
 // إطفاء «زيادة الزوج» وحده ⇒ تنزيلها 450م ⇒ تظهر ضريبة — والدالة مباشرة: 675م → 450م
 $fdG47a = familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-06-01', 1);
@@ -2491,16 +2499,17 @@ check('زيادة الزوج اختيارية: الدالة — تُعطى = 675
       number_format($fdG47a) . ' → ' . number_format($fdG47b));
 $z47 = $db->query("SELECT COALESCE(grant_spouse_addition,1) g, spouse_works FROM employees WHERE id = 18")->fetch(PDO::FETCH_ASSOC);
 if ($z47 && (int)$z47['spouse_works'] === 0) {
+    // (معكوس بعد «طفي زيادة الزوج»): الزر مطفأ ⇒ ضريبة فعلية؛ تضويته تصفّرها؛ الترجيع يعيدها
     $tOf47 = $db->prepare("SELECT income_tax_lbp FROM monthly_salaries WHERE employee_id = 18 AND month = 6 AND year = 2026");
     $tOf47->execute([]); $t0_47 = (int)$tOf47->fetchColumn();
-    $db->exec("UPDATE employees SET grant_spouse_addition = 0 WHERE id = 18");
+    $db->exec("UPDATE employees SET grant_spouse_addition = 1 WHERE id = 18");
     try { (new PayrollCalculator(18, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
-    $tOf47->execute([]); $tNo47 = (int)$tOf47->fetchColumn();
+    $tOf47->execute([]); $tOn47 = (int)$tOf47->fetchColumn();
     $db->exec("UPDATE employees SET grant_spouse_addition = " . (int)$z47['g'] . " WHERE id = 18");
     try { (new PayrollCalculator(18, 6, 2026))->calculateAndSave(); } catch (Exception $e) {}
     $tOf47->execute([]); $tBack47 = (int)$tOf47->fetchColumn();
-    check('زيادة الزوج اختيارية (تجربة فعلية): إطفاء الزرّ لزاهية يُظهر ضريبة فعلية',
-          $t0_47 === 0 && $tNo47 > 0, 'قبل: ' . number_format($t0_47) . ' / بعد: ' . number_format($tNo47));
+    check('زيادة الزوج اختيارية (تجربة فعلية): الزر المطفأ = ضريبة فعلية، وتضويته تصفّرها (تنزيل 675م)',
+          $t0_47 > 0 && $tOn47 === 0, 'مطفأ: ' . number_format($t0_47) . ' / مضوّى: ' . number_format($tOn47));
     check('زيادة الزوج اختيارية (تجربة فعلية): الترجيع أعاد ضريبتها كما كانت', $tBack47 === $t0_47, number_format($tBack47));
 } else {
     check('زيادة الزوج اختيارية (تجربة فعلية)', true, 'زاهية غير مطابقة — تخطٍّ');
@@ -2599,7 +2608,7 @@ $law51 = $db->query("SELECT ms.employee_id, ms.taxable_base_lbp txb, ms.income_t
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
     WHERE e.is_deleted = 0 AND e.payment_months_per_year <> 12 AND e.tax_subject = 1
       AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
-      AND e.spouse_works = 0 AND COALESCE(e.apply_family_deduction, 1) = 1 AND COALESCE(e.grant_spouse_addition, 1) = 1
+      AND e.social_status = 'celibataire' AND COALESCE(e.apply_family_deduction, 1) = 1
       AND ms.month = 6 AND ms.year = 2026 AND ms.income_tax_lbp > 0")->fetchAll(PDO::FETCH_ASSOC);
 $bad51 = [];
 foreach ($law51 as $r51x) {
@@ -3043,6 +3052,23 @@ check('اقتراحات إخراج القيد: الإشارة تضوي بالق�
       strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'taxSuggestionsPendingCount()') !== false
       && strpos((string)file_get_contents($PROJ . '/assets/css/app.css'), '@keyframes pulse') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/tax_suggestions.php'), 'recalcEmployeeYear((int)$sg[\'employee_id\'], $sy);') !== false);
+
+/* =====================================================================
+ * 65) 💑 «طفي زيادة الزوج» + «الا قراري انا وانت اكيد بتكون باعتلي رسالة»
+ *     (2026-08-23): زيادة الزوج مطفأة تلقائياً للجميع (كمفتاح الأولاد)،
+ *     والمتأثرون وصلتهم رسالة قرار بصفحة الاقتراحات (طبّق = تعود له).
+ * =================================================================== */
+check('زيادة الزوج مطفأة تلقائياً: الافتراضي بالعمود والمحرّك والقارئين = 0',
+      (string)($db->query("SHOW COLUMNS FROM employees LIKE 'grant_spouse_addition'")->fetch(PDO::FETCH_ASSOC)['Default'] ?? '') === '0'
+      && strpos((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), "\$this->employee['grant_spouse_addition'] ?? 0") !== false
+      && substr_count((string)file_get_contents($PROJ . '/pages/official_export.php'), "gsa'] ?? 0") >= 1
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "'grant_spouse_addition' => 0,") !== false);
+check('زيادة الزوج: الشفاء موصول بالهيدر + رسائل القرار مزروعة للمتأثرين',
+      function_exists('healSpouseAdditionOff20260823')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healSpouseAdditionOff20260823();') !== false
+      && (int)$db->query("SELECT COUNT(*) FROM tax_suggestions WHERE source_key LIKE 'gsa_off_%'")->fetchColumn() >= 20);
+check('زيادة الزوج: لا موظف يأخذها إلا بقرار صريح (كلهم مطفأون الآن)',
+      (int)$db->query("SELECT COUNT(*) FROM employees WHERE grant_spouse_addition=1")->fetchColumn() === 0);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

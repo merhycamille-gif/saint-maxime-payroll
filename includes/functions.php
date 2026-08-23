@@ -1136,8 +1136,9 @@ function ensureEmployeeFlagColumns() {
         }
         // خيار «زيادة الزوج بالتنزيل العائلي: تُعطى/لا تُعطى» (2026-08-06 بطلب المستخدم —
         // قانوناً الزيادة عن «الزوجة التي لا تعمل»، والمرأة لا تأخذها عن زوج قادر على العمل)
+        // 🔴 «طفي زيادة الزوج» (2026-08-23): الافتراضي مطفأ — تُضوّى بقرار المستخدم لكل موظف
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'grant_spouse_addition'")->fetch()) {
-            $db->exec("ALTER TABLE employees ADD COLUMN grant_spouse_addition TINYINT(1) NOT NULL DEFAULT 1");
+            $db->exec("ALTER TABLE employees ADD COLUMN grant_spouse_addition TINYINT(1) NOT NULL DEFAULT 0");
         }
         // خيار «تنزيل الأولاد بالضريبة: يُعطى/لا» («لو عندها اولاد او الزوج لا يعمل اذا انا
         // مطفي التنزيل عليهن ما لازم يحسب — بس تنزيل الاستاذ لوحدو» — 2026-08-23)
@@ -1284,6 +1285,45 @@ function taxSuggestionsPendingCount(): int {
     } catch (Throwable $e) { return 0; }
 }
 
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-23 — «طفي زيادة الزوج» + «الا قراري انا وانت اكيد
+ * بتكون باعتلي رسالة»): زيادة الزوج/الزوجة تُطفأ تلقائياً لكل الموظفين (كمفتاح الأولاد)
+ * — تُضوّى بقرار المستخدم فقط. المتأثرون (متزوج + الزوج لا يعمل + كانت الزيادة مضوّاة):
+ * يُعاد احتساب سنواتهم من السنة الجارية + **رسالة لكل واحد بصفحة الاقتراحات** (تضوي
+ * بالقائمة) فيها زر «طبّق» يعيد له الزيادة إن قرّر المستخدم. idempotent — محلياً وأونلاين.
+ */
+function healSpouseAdditionOff20260823() {
+    $flag = 'spouse_addition_off_2026_08_23';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        ensureEmployeeFlagColumns();
+        ensureTaxSuggestions20260823();
+        if (function_exists('set_time_limit')) @set_time_limit(600);
+        // المتأثرون قبل الإطفاء (كانوا يأخذون الزيادة فعلاً)
+        $aff = $db->query("SELECT id, school_id, COALESCE(NULLIF(TRIM(CONCAT(first_name_ar,' ',last_name_ar)),''), TRIM(CONCAT(first_name_fr,' ',last_name_fr))) nm
+            FROM employees WHERE is_deleted=0 AND social_status LIKE 'marie%' AND COALESCE(spouse_works,0)=0
+              AND COALESCE(apply_family_deduction,1)=1 AND COALESCE(grant_spouse_addition,1)=1 AND tax_subject=1")->fetchAll(PDO::FETCH_ASSOC);
+        // الإطفاء للجميع + الافتراضي مطفأ
+        $db->exec("UPDATE employees SET grant_spouse_addition = 0");
+        try { $db->exec("ALTER TABLE employees MODIFY COLUMN grant_spouse_addition TINYINT(1) NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
+        // إعادة احتساب المتأثرين من السنة الجارية + رسالة قرار لكل واحد
+        require_once __DIR__ . '/payroll_calculator.php';
+        $cur = currentSchoolYear();
+        $ins = $db->prepare("INSERT IGNORE INTO tax_suggestions (source_key, employee_id, school_id, emp_name, title, details, proposed, status, created_at) VALUES (?,?,?,?,?,?,?, 'pending', NOW())");
+        foreach ($aff as $a) {
+            foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$a['id'] . " AND school_year >= " . $db->quote($cur) . " ORDER BY school_year")->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                try { recalcEmployeeYear((int)$a['id'], $sy); } catch (Throwable $e) {}
+            }
+            $ins->execute(['gsa_off_' . (int)$a['id'], (int)$a['id'], (int)$a['school_id'], $a['nm'],
+                'انطفت عنه زيادة الزوج/الزوجة تلقائياً — قرارك إذا بتتضوّى',
+                'متزوج والزوج/الزوجة لا يعمل وكان يأخذ زيادة الزوج (225 مليوناً سنوياً) قبل قاعدة «الإطفاء التلقائي». إن أردت إعادتها له اكبس «طبّق»، وإلا «تجاهل».',
+                json_encode(['grant_spouse_addition' => 1], JSON_UNESCAPED_UNICODE)]);
+        }
+        setSetting($flag, date('Y-m-d H:i') . ' (' . count($aff) . ' متأثراً)');
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد بالفتحة التالية */ }
+}
+
 function healLawfulTaxProration20260806() {
     $flag = 'lawful_tax_proration_2026_08_06';
     if (getSetting($flag, '') !== '') return;
@@ -1352,7 +1392,7 @@ function healRemoveNoFatherDuplicates20260806() {
  *     المرأة لا تأخذها عن زوج قادر على العمل — القرار النهائي بيد المستخدم عبر الزرّ.)
  * $asOf: تاريخ السريان (أحدث قيم effective_from ≤ التاريخ).
  */
-function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $grantSpouseAdd = 1, $grantChildrenAdd = 1) {
+function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $grantSpouseAdd = 0, $grantChildrenAdd = 0) {
     if ((int)($applyFlag ?? 1) !== 1) return 0;
     try {
         $db = getDB();

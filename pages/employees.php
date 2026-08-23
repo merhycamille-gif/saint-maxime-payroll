@@ -952,7 +952,7 @@ $employee = [
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
     'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0,
     'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0,
-    'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'grant_spouse_addition' => 1, 'grant_children_addition' => 0,
+    'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'grant_spouse_addition' => 0, 'grant_children_addition' => 0,
     'transport_daily_amount' => 0, 'transport_daily_currency' => 'LBP', 'transport_days_per_week' => 0, 'transport_weeks' => 4,
     'notes' => ''
 ];
@@ -1843,8 +1843,8 @@ include __DIR__ . '/../includes/header.php';
                             </label>
                             <label class="d-flex justify-between align-center mb-3">
                                 <span><strong>زيادة الزوج/الزوجة بالتنزيل: تُعطى</strong> / Majoration conjoint
-                                    <small style="display:block;color:var(--gray-500)">للمتأهل — مطفأ = يبقى التنزيل الشخصي + الأولاد فقط (قانوناً الزيادة عن الزوجة التي لا تعمل؛ «الزوج/الزوجة يعمل» ✓ يُسقطها تلقائياً أيضاً)</small></span>
-                                <label class="switch"><input type="checkbox" name="grant_spouse_addition" value="1" <?= !isset($employee['grant_spouse_addition']) || $employee['grant_spouse_addition'] ? 'checked' : '' ?>><span class="slider"></span></label>
+                                    <small style="display:block;color:var(--gray-500)">مطفأة تلقائياً لكل الموظفين — ضوّيها أنت لمن تريد إعطاءه زيادة الزوج/الزوجة (و«الزوج يعمل» ✓ يُسقطها حكماً حتى لو مضوّاة)</small></span>
+                                <label class="switch"><input type="checkbox" name="grant_spouse_addition" value="1" <?= !empty($employee['grant_spouse_addition']) ? 'checked' : '' ?>><span class="slider"></span></label>
                             </label>
                             <label class="d-flex justify-between align-center mb-3">
                                 <span><strong>تنزيل الأولاد بالضريبة: يُعطى</strong> / Abattement enfants
