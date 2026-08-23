@@ -1139,6 +1139,12 @@ function ensureEmployeeFlagColumns() {
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'grant_spouse_addition'")->fetch()) {
             $db->exec("ALTER TABLE employees ADD COLUMN grant_spouse_addition TINYINT(1) NOT NULL DEFAULT 1");
         }
+        // خيار «تنزيل الأولاد بالضريبة: يُعطى/لا» («لو عندها اولاد او الزوج لا يعمل اذا انا
+        // مطفي التنزيل عليهن ما لازم يحسب — بس تنزيل الاستاذ لوحدو» — 2026-08-23)
+        // 🔴 «هيدا الزر يكون مطفي تلقائيا حتى انا اذا بدي ضوي»: الافتراضي مطفأ — يُضوّى يدوياً لكل موظف
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'grant_children_addition'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN grant_children_addition TINYINT(1) NOT NULL DEFAULT 0");
+        }
     } catch (Exception $e) { /* لا نكسر الصفحة — يُعاد بالفتحة التالية */ }
 }
 
@@ -1217,7 +1223,7 @@ function healRemoveNoFatherDuplicates20260806() {
  *     المرأة لا تأخذها عن زوج قادر على العمل — القرار النهائي بيد المستخدم عبر الزرّ.)
  * $asOf: تاريخ السريان (أحدث قيم effective_from ≤ التاريخ).
  */
-function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $grantSpouseAdd = 1) {
+function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $grantSpouseAdd = 1, $grantChildrenAdd = 1) {
     if ((int)($applyFlag ?? 1) !== 1) return 0;
     try {
         $db = getDB();
@@ -1225,6 +1231,13 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
                            WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
         $q->execute([(string)$socialStatus, $asOf]);
         $ded = (float)($q->fetchColumn() ?: 0);
+        // 🔴 «تنزيل الأولاد: لا يُعطى» (2026-08-23): تُحذف حصة الأولاد كاملة (فرق وضعه عن
+        // «متزوج بلا أولاد») حتى لو وضعه العائلي فيه أولاد — يبقى الشخصي (+ زيادة الزوج إن حقّت)
+        if ((int)($grantChildrenAdd ?? 1) !== 1 && strpos((string)$socialStatus, 'marie') === 0) {
+            $q->execute(['marie_sans_enfants', $asOf]);
+            $married0k = (float)($q->fetchColumn() ?: 0);
+            $ded = min($ded, $married0k > 0 ? $married0k : $ded);
+        }
         if ((!empty($spouseWorks) || (int)($grantSpouseAdd ?? 1) !== 1) && strpos((string)$socialStatus, 'marie') === 0) {
             $q->execute(['marie_sans_enfants', $asOf]);
             $married0 = (float)($q->fetchColumn() ?: 0);

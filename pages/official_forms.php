@@ -811,7 +811,7 @@ elseif ($form === 'tax_emp_report'):
             $inQ = implode(',', $months);
             $st = $db->prepare("SELECT e.id, e.school_id, e.employee_type,
                     e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
-                    e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction,1) afd, COALESCE(e.grant_spouse_addition,1) gsa,
+                    e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction,1) afd, COALESCE(e.grant_spouse_addition,1) gsa, COALESCE(e.grant_children_addition,0) gca,
                     SUM(ms.base_plus_echelon_lbp) base, SUM(ms.extra_lbp+ms.prime_fixe_lbp) extraw,
                     SUM(ms.aide_complementaire_lbp) aide, SUM(ms.transport_lbp) trans,
                     SUM(ms.caisse_amount_lbp+ms.eoc_grade_lbp) other,
@@ -824,7 +824,7 @@ elseif ($form === 'tax_emp_report'):
             $asOfQ = sprintf('%04d-%02d-01', $y, $months[0]);
             foreach ($st->fetchAll() as $r) {
                 // المصدر الوحيد familyDeductionAnnual + تجزئة بأشهر الفصل المعمولة، بسقف خاضعه
-                $fda = familyDeductionAnnual($r['social_status'], $r['spouse_works'], $r['afd'], $asOfQ, $r['gsa'] ?? 1);
+                $fda = familyDeductionAnnual($r['social_status'], $r['spouse_works'], $r['afd'], $asOfQ, $r['gsa'] ?? 1, $r['gca'] ?? 0);
                 $fd = (int)min($fda / 12 * (int)$r['mcnt'], (float)$r['tb']);
                 $id = (int)$r['id'];
                 if (!isset($EMPR[$id])) {
@@ -1570,7 +1570,7 @@ elseif ($form === 'teacher_card'):
 </div>
 
 <?php elseif ($form === 'salary_all'):
-    $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 1) gsa, ms.*
+    $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 1) gsa, COALESCE(e.grant_children_addition, 0) gca, ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
                           ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
@@ -1584,7 +1584,7 @@ elseif ($form === 'teacher_card'):
     $sfdOf = function ($r) use ($sfdAsOf) {
         if ((int)($r['income_tax_lbp'] ?? 0) + (int)($r['taxable_base_lbp'] ?? 0) === 0) return 0;
         // حصّة الشهر = السنوي ÷ 12 دائماً (القاعدة الرسمية: كل شهر معمول = 1/12 من التنزيل)
-        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $sfdAsOf, $r['gsa'] ?? 1) / 12);
+        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $sfdAsOf, $r['gsa'] ?? 1, $r['gca'] ?? 0) / 12);
     };
 ?>
     <form method="get" class="card no-print">

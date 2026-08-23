@@ -2250,7 +2250,7 @@ $ox41 = (string)file_get_contents($PROJ . '/pages/official_export.php');
 check('التنزيل العائلي اختياري: ر5 ور10 وعمود كشف الرواتب كلهم على المصدر الوحيد familyDeductionAnnual',
       substr_count($ox41, "COALESCE(e.apply_family_deduction,1) afd") === 1
       && substr_count($ox41, "familyDeductionAnnual(\$de['social_status'], \$de['spouse_works'], \$de['afd']") === 1
-      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 1)") !== false);
+      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 1, \$r['gca'] ?? 0)") !== false);
 // تجربة فعلية (مع ترجيع كامل): موظف خاضع بضريبة موجبة وتنزيل ساري > 0 — طفي الخيار
 // يرفع ضريبته الشهرية، وإرجاعه يعيدها كما كانت بالمليم
 ensureEmployeeFlagColumns();
@@ -2293,7 +2293,7 @@ $rx42 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 check('عمود التنزيل العائلي: حصّة الشهر + قبل «الخاضع» + الخاضع بعد الحسم (شاشة، بالمصدر الوحيد)',
       strpos($rp42, 'التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small>') !== false
       && strpos($rp42, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false
-      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf, \$r['gsa'] ?? 1)") !== false);
+      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf, \$r['gsa'] ?? 1, \$r['gca'] ?? 0)") !== false);
 check('عمود التنزيل العائلي: بتصدير Excel/Word بنفس الترتيب والمنطق',
       strpos($rx42, "'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)'") !== false
       && strpos($rx42, "COALESCE(e.apply_family_deduction,1) afd") !== false
@@ -2391,7 +2391,7 @@ $of44 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('كشف رواتب كل الموظفين: عمود التنزيل العائلي (حصّة الشهر) قبل الخاضع والخاضع بعد الحسم',
       strpos($of44, '<th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th>') !== false
       && strpos($of44, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$sfd)") !== false
-      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 1)") !== false);
+      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 1, \$r['gca'] ?? 0)") !== false);
 // تجربة فعلية: صف مارسيلا بكشف 6/2026 — الحصّة ثم الخاضع بعدها بهذا الترتيب (نفس أرقام كشف الضريبة)
 $h44 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [2]);
 $p44 = mb_strpos($h44, 'مارسيلا');
@@ -2574,7 +2574,7 @@ check('تجزئة القانون: المحرّك يُسنوِن ×12 ويقسم 
       && strpos($pc51, '$monthlyTax = $annualTax / 12;') !== false
       && strpos($pc51, '$taxBase * $monthsPerYear') === false);
 check('تجزئة القانون: حصّة الشهر بالكشوف = السنوي ÷ 12 دائماً + ر5/ر10 بحصص الأشهر المعمولة + الشفاء مربوط',
-      substr_count($rp51 . $of51 . (string)file_get_contents($PROJ . '/pages/reports_export.php'), '?? 1) / 12)') >= 2
+      substr_count($rp51 . $of51 . (string)file_get_contents($PROJ . '/pages/reports_export.php'), '?? 0) / 12)') >= 2
       && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), '$exempt += (int)min($fda / 12 * (int)$de[\'mcnt\'], (float)$de[\'tb\']);') !== false
       && function_exists('healLawfulTaxProration20260806')
       && strpos($hd51, 'healLawfulTaxProration20260806();') !== false);
@@ -2951,6 +2951,40 @@ check('تقرير ضريبة الأستاذ-الموظف: ضمن الفلاتر 
       strpos($of60, "'tax_r5', 'tax_r10', 'tax_r7', 'tax_emp_report', 'staff_stats'") !== false
       && strpos($of60, "'tax_emp_report',") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "tax_emp_report") !== false);
+
+/* =====================================================================
+ * 61) 👶 مفتاح «تنزيل الأولاد بالضريبة: يُعطى/لا» («لو عندها اولاد او الزوج
+ *     لا يعمل اذا انا مطفي التنزيل عليهن ما لازم يحسب — بس تنزيل الاستاذ
+ *     لوحدو» — 2026-08-23): عمود grant_children_addition ذاتي التركيب،
+ *     المعادلة المركزية familyDeductionAnnual تحترمه، وكل القارئين يمرّرونه
+ *     (المحرّك + كشوف reports/export + salary_all + tax_emp_report + ر5/ر6/ر10).
+ * =================================================================== */
+ensureEmployeeFlagColumns();
+$col61 = $db->query("SHOW COLUMNS FROM employees LIKE 'grant_children_addition'")->fetch(PDO::FETCH_ASSOC);
+check('تنزيل الأولاد اختياري: العمود يتركّب ذاتياً والافتراضي مطفأ («هيدا الزر يكون مطفي تلقائيا»)',
+      $col61 !== false && (string)$col61['Default'] === '0');
+$fd61full = familyDeductionAnnual('marie_3_enfants', 0, 1, '2026-04-01', 1, 1);
+$fd61noKids = familyDeductionAnnual('marie_3_enfants', 0, 1, '2026-04-01', 1, 0);
+$fd61solo = familyDeductionAnnual('marie_3_enfants', 0, 1, '2026-04-01', 0, 0);
+$fd61m0 = familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-04-01', 1, 1);
+$fd61single = familyDeductionAnnual('celibataire', 0, 1, '2026-04-01', 1, 1);
+check('تنزيل الأولاد اختياري: مطفأ = كأنه متزوج بلا أولاد، ومع طفي الزوج = الشخصي لوحده',
+      $fd61full > $fd61noKids && $fd61noKids === $fd61m0 && $fd61solo === $fd61single,
+      number_format($fd61full) . ' / ' . number_format($fd61noKids) . ' / ' . number_format($fd61solo));
+$pc61 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$emp61s = (string)file_get_contents($PROJ . '/pages/employees.php');
+check('تنزيل الأولاد اختياري: المحرّك يمرّره + مفتاح بملف الموظف (يُحفَظ مع الملف)',
+      strpos($pc61, "\$this->employee['grant_children_addition'] ?? 0") !== false
+      && strpos($emp61s, 'name="grant_children_addition"') !== false
+      && strpos($emp61s, "'grant_children_addition' => isset(\$_POST['grant_children_addition'])") !== false
+      && strpos($emp61s, "'grant_children_addition' => 0,") !== false);
+$gcaCount = 0;
+foreach (['pages/reports.php', 'pages/reports_export.php', 'pages/official_forms.php', 'pages/official_export.php'] as $f61) {
+    $gcaCount += substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$r['gca'] ?? 0")
+               + substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$de['gca'] ?? 0")
+               + substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$emp['grant_children_addition'] ?? 0");
+}
+check('تنزيل الأولاد اختياري: كل القارئين يمرّرونه (كشوف + تقرير الضريبة + ر5/ر6/ر10)', $gcaCount >= 6, 'ممرَّر بـ' . $gcaCount . ' مواضع');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

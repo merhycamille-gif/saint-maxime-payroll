@@ -383,6 +383,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'tax_subject' => isset($_POST['tax_subject']) ? 1 : 0,
         'apply_family_deduction' => isset($_POST['apply_family_deduction']) ? 1 : 0,
         'grant_spouse_addition' => isset($_POST['grant_spouse_addition']) ? 1 : 0,
+        'grant_children_addition' => isset($_POST['grant_children_addition']) ? 1 : 0,
         'tax_includes_echelon' => isset($_POST['tax_includes_echelon']) ? 1 : 0,
         'tax_includes_extra' => isset($_POST['tax_includes_extra']) ? 1 : 0,
         'tax_includes_prime_aide' => isset($_POST['tax_includes_prime_aide']) ? 1 : 0,
@@ -437,7 +438,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     } catch (Exception $e) { unset($data['job_title']); }
     // أعمدة الخيارات (التنزيل العائلي + احتساب تعويض الزوجة/الأولاد): ركّبها ذاتياً،
     // وإن تعذّر أزِلها من الحفظ لتفادي الكسر
-    foreach (['apply_family_deduction', 'count_spouse_allowance', 'count_children_allowance', 'grant_spouse_addition'] as $flagCol) {
+    foreach (['apply_family_deduction', 'count_spouse_allowance', 'count_children_allowance', 'grant_spouse_addition', 'grant_children_addition'] as $flagCol) {
         try {
             ensureEmployeeFlagColumns();
             if (!$db->query("SHOW COLUMNS FROM employees LIKE '$flagCol'")->fetch()) unset($data[$flagCol]);
@@ -951,7 +952,7 @@ $employee = [
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
     'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0,
     'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0,
-    'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'grant_spouse_addition' => 1,
+    'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'grant_spouse_addition' => 1, 'grant_children_addition' => 0,
     'transport_daily_amount' => 0, 'transport_daily_currency' => 'LBP', 'transport_days_per_week' => 0, 'transport_weeks' => 4,
     'notes' => ''
 ];
@@ -1840,6 +1841,11 @@ include __DIR__ . '/../includes/header.php';
                                 <span><strong>زيادة الزوج/الزوجة بالتنزيل: تُعطى</strong> / Majoration conjoint
                                     <small style="display:block;color:var(--gray-500)">للمتأهل — مطفأ = يبقى التنزيل الشخصي + الأولاد فقط (قانوناً الزيادة عن الزوجة التي لا تعمل؛ «الزوج/الزوجة يعمل» ✓ يُسقطها تلقائياً أيضاً)</small></span>
                                 <label class="switch"><input type="checkbox" name="grant_spouse_addition" value="1" <?= !isset($employee['grant_spouse_addition']) || $employee['grant_spouse_addition'] ? 'checked' : '' ?>><span class="slider"></span></label>
+                            </label>
+                            <label class="d-flex justify-between align-center mb-3">
+                                <span><strong>تنزيل الأولاد بالضريبة: يُعطى</strong> / Abattement enfants
+                                    <small style="display:block;color:var(--gray-500)">مطفأ تلقائياً لكل الموظفين — ضوّيه أنت لمن تريد إعطاءه تنزيل الأولاد (مطفأ = تنزيل الموظف الشخصي وزيادة الزوج إن حقّت فقط)</small></span>
+                                <label class="switch"><input type="checkbox" name="grant_children_addition" value="1" <?= !empty($employee['grant_children_addition']) ? 'checked' : '' ?>><span class="slider"></span></label>
                             </label>
                             <p style="font-size:12px;color:var(--gray-500)">Inclure dans la base:</p>
                             <label><input type="checkbox" name="tax_includes_echelon" value="1" <?= $employee['tax_includes_echelon'] ? 'checked' : '' ?>> الدرجة والتدرّج / Échelon</label><br>
