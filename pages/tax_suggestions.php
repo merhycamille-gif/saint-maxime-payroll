@@ -91,16 +91,22 @@ $currentPage = 'tax_suggestions';
 $hideExportToolbar = true;
 include __DIR__ . '/../includes/header.php';
 
-/* ===== ١) قرارات التنزيل لكل أستاذ (متزوج/أرمل أو له أولاد مسجّلون) ===== */
-$emps = $db->query("SELECT e.id, e.school_id, e.social_status, e.spouse_works, e.spouse_work_start_date,
+/* ===== ١) قرارات التنزيل لكل أستاذ (متزوج/أرمل أو له أولاد مسجّلون) =====
+ * 📅 «لازم يبينو الاساتذة بالسنة اللي انا فيها مش بكل السنين» (2026-08-23): الفلتر
+ * الموحّد yearEmploymentFilter — موظفو السنة الدراسية المعروضة فقط (لهم رواتب فيها،
+ * بلا تاركين/قدامى)، كسائر شاشات الاختيار. */
+[$tsYf, $tsYp] = yearEmploymentFilter(activeSchoolYear(), 'e.');
+$empsQ = $db->prepare("SELECT e.id, e.school_id, e.social_status, e.spouse_works, e.spouse_work_start_date,
         COALESCE(e.grant_children_addition,0) gca, COALESCE(e.grant_spouse_addition,0) gsa,
         COALESCE(NULLIF(TRIM(CONCAT(e.first_name_ar,' ',e.last_name_ar)),''), TRIM(CONCAT(e.first_name_fr,' ',e.last_name_fr))) nm,
         s.name_ar school_name
     FROM employees e JOIN schools s ON s.id = e.school_id
-    WHERE e.is_deleted = 0 AND " . schoolScopeWhere('e.school_id') . "
+    WHERE e.is_deleted = 0 AND " . schoolScopeWhere('e.school_id') . $tsYf . "
       AND (e.social_status LIKE 'marie%' OR e.social_status LIKE 'veuf%' OR e.social_status LIKE 'divorce%'
            OR EXISTS (SELECT 1 FROM employee_children c WHERE c.employee_id = e.id))
-    ORDER BY s.id, nm")->fetchAll();
+    ORDER BY s.id, nm");
+$empsQ->execute($tsYp);
+$emps = $empsQ->fetchAll();
 $kidsByEmp = [];
 foreach ($db->query("SELECT * FROM employee_children ORDER BY birth_date") as $k) $kidsByEmp[(int)$k['employee_id']][] = $k;
 $today = date('Y-m-d');
