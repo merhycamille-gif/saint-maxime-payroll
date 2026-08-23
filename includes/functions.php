@@ -1072,6 +1072,52 @@ function ensureGenderColumn20260822() {
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
+/**
+ * 🏛️ ملف تعريف المؤسسة لنماذج وزارة المالية (ر5/ر6/ر10 طبق الأصل — 2026-08-23):
+ * عمود schools.mof_profile (JSON) يتركّب ذاتياً ويُزرَع تلقائياً لمدرسة القديس مكسيموس
+ * من قيم ملفات المستخدم نفسها (عنوان المركز + الشخص المكلف بتبليغ البريد + الممثل والموقّع).
+ * باقي المدارس تعبّئه مرة واحدة من صندوق «معلومات المؤسسة» على شاشة النموذج.
+ */
+function ensureMofProfile20260823() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        if (!$db->query("SHOW COLUMNS FROM schools LIKE 'mof_profile'")->fetch()) {
+            $db->exec("ALTER TABLE schools ADD COLUMN mof_profile TEXT NULL");
+        }
+        // زرع سان مكسيم (رقمها المالي 2459823) بقيم ملفات المستخدم — مرة واحدة على الفارغ فقط
+        $seed = [
+            'gov' => 'جبل لبنان', 'caza' => 'المتن', 'town' => 'المنصورية', 'quarter' => '',
+            'street' => 'البلاطة', 'cadastral' => 'المنصورية حي البلاطة', 'lot' => '', 'building' => 'المدرسة',
+            'floor' => '', 'fax' => '04/531450', 'pob' => '', 'region' => '1825/1', 'email' => 'cm5h@hotmail.com',
+            'trade_name' => 'مدرسة', 'rep_name' => 'كميل سعيد مرعي', 'rep_title' => 'مسؤول',
+            'contact_name' => 'كميل سعيد مرعي', 'contact_reg' => '271629', 'contact_phone' => '03-888849', 'contact_fax' => '04-531450',
+            'preparer_name' => 'كميل سعيد مرعي', 'preparer_reg' => '271629', 'preparer_phone' => '03-888849', 'preparer_fax' => '04-531450',
+            'signer_name' => 'كميل مرعي', 'signer_title' => 'مسؤول',
+        ];
+        $db->prepare("UPDATE schools SET mof_profile=? WHERE (mof_profile IS NULL OR mof_profile='') AND REPLACE(COALESCE(finance_number,''),' ','')='2459823'")
+           ->execute([json_encode($seed, JSON_UNESCAPED_UNICODE)]);
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/** يعيد ملف تعريف المؤسسة للمالية بكل المفاتيح (الفارغ = '') */
+function mofProfile($school): array {
+    $defaults = ['gov'=>'','caza'=>'','town'=>'','quarter'=>'','street'=>'','cadastral'=>'','lot'=>'','building'=>'',
+        'floor'=>'','fax'=>'','pob'=>'','region'=>'','email'=>'','trade_name'=>'','rep_name'=>'','rep_title'=>'',
+        'contact_name'=>'','contact_reg'=>'','contact_phone'=>'','contact_fax'=>'',
+        'preparer_name'=>'','preparer_reg'=>'','preparer_phone'=>'','preparer_fax'=>'','signer_name'=>'','signer_title'=>''];
+    $p = [];
+    if (is_array($school) && !empty($school['mof_profile'])) {
+        $p = json_decode((string)$school['mof_profile'], true) ?: [];
+    }
+    $out = array_merge($defaults, array_intersect_key($p, $defaults));
+    // فراغات ذكية من ملف المدرسة نفسه
+    if ($out['email'] === '' && !empty($school['email'])) $out['email'] = (string)$school['email'];
+    return $out;
+}
+
 function ensureEmployeeFlagColumns() {
     static $done = false;
     if ($done) return;

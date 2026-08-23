@@ -350,6 +350,366 @@ if ($form === 'mof_r3') {
     exit;
 }
 
+/* ============================================================================
+ * 🏛️ نماذج وزارة المالية ر5/ر6/ر10 طبق الأصل («بعتلك اكسل بدي ياهون طبق الاصل
+ * r3,r6,r5,r10» — 2026-08-23): القوالب هي ملفات المستخدم نفسها (مفرَّغة من بيانات
+ * العيّنة) assets/templates/mof_r5|r6|r10.xlsx + صورة 300dpi للطباعة + إحداثيات كل
+ * خانة معايَرة آلياً بماركرات من PDF إكسل نفسه (mof_rX.pos.json — 187 خانة).
+ *   - زر الطباعة: صورة القالب + القيم فوقها بمواقعها الحقيقية (يعمل محلياً وأونلاين).
+ *   - زر «Excel رسمي»: تعبئة خانات القالب نفسه (تنسيقه ونمط أرقامه كما هو).
+ * الأرقام من monthly_salaries حصراً (قاعدة «مصدر واحد») بمنطق ر10 الفصلي المعتمد:
+ * السنة الميلادية = ٤ فصول تُجمع، فالسنوي «يركب» على مجموع الفصول بالمليم.
+ * ========================================================================== */
+
+/** فلترا الفئة/الضريبة من الرابط (نفس فلتري official_forms) */
+function mofEmpFilterSql($db) {
+    $t = in_array($_GET['emp_type'] ?? '', ['enseignant_titulaire', 'enseignant_contractuel', 'employe'], true) ? $_GET['emp_type'] : '';
+    $x = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
+    return ($t ? " AND e.employee_type = " . $db->quote($t) : '')
+         . ($x !== '' ? " AND e.tax_subject = " . (int)$x : '');
+}
+
+/** مجاميع فصل ميلادي واحد — المنطق المعتمد نفسه من نموذج ر10 (2026-08-06) */
+function mofQuarterAgg($db, $rq, $rqy, $empFilter) {
+    $rqMonthsMap = [1 => [1, 2, 3], 2 => [4, 5, 6], 3 => [7, 8, 9], 4 => [10, 11, 12]];
+    $rqM = $rqMonthsMap[$rq];
+    $rqIn = implode(',', $rqM);
+    $rqSy = ($rq === 4) ? ($rqy . '-' . ($rqy + 1)) : (($rqy - 1) . '-' . $rqy);
+    [$yf, $yp] = yearEmploymentFilter($rqSy, 'e.');
+    $q = $db->prepare("SELECT
+            SUM(ms.base_plus_echelon_lbp+ms.extra_lbp+ms.prime_fixe_lbp+ms.aide_complementaire_lbp) gross,
+            SUM(ms.transport_lbp) transport,
+            SUM(ms.caisse_amount_lbp) caisse, SUM(ms.eoc_grade_lbp) eoc,
+            SUM(ms.taxable_base_lbp) taxable, SUM(ms.income_tax_lbp) tax
+        FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
+        WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . $empFilter . " AND ms.year=? AND ms.month IN ($rqIn)
+          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id'));
+    $q->execute(array_merge($yp, [$rqy]));
+    $g = $q->fetch() ?: [];
+    // ١٧٠ التنزيل العائلي للفترة (المصدر الوحيد familyDeductionAnnual — تجزئة بمدة العمل)
+    $qDed = $db->prepare("SELECT e.id, e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction,1) afd, COALESCE(e.grant_spouse_addition,1) gsa, COUNT(DISTINCT ms.month) mcnt, SUM(ms.taxable_base_lbp) tb
+        FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
+        WHERE e.is_deleted=0 AND e.tax_subject=1" . $yf . $empFilter . " AND ms.year=? AND ms.month IN ($rqIn)
+          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
+        GROUP BY e.id, e.social_status, e.spouse_works, afd");
+    $qDed->execute(array_merge($yp, [$rqy]));
+    $dedAsOf = sprintf('%04d-%02d-01', $rqy, $rqM[0]);
+    $exempt = 0; $ids = [];
+    foreach ($qDed->fetchAll() as $de) {
+        $ids[] = (int)$de['id'];
+        $fda = familyDeductionAnnual($de['social_status'], $de['spouse_works'], $de['afd'], $dedAsOf, $de['gsa'] ?? 1);
+        $exempt += (int)min($fda / 12 * (int)$de['mcnt'], (float)$de['tb']);
+    }
+    $gross = (int)($g['gross'] ?? 0); $trans = (int)($g['transport'] ?? 0);
+    $other = (int)($g['caisse'] ?? 0) + (int)($g['eoc'] ?? 0);
+    $net   = $gross - $other; // = (gross+trans) − trans − other = مجموع الأساس الخاضع المخزَّن
+    return [
+        'ids' => $ids, 'gross' => $gross, 'trans' => $trans, 'other' => $other,
+        'net' => $net, 'exempt' => $exempt, 'taxable' => max(0, $net - $exempt), 'tax' => (int)($g['tax'] ?? 0),
+    ];
+}
+
+/** صفحة العرض/الطباعة طبق الأصل: صورة القالب + القيم بإحداثياتها المعايَرة */
+function mofOverlayServe($tplKey, $titleAr, array $vals, array $widths = []) {
+    $posFile = __DIR__ . '/../assets/templates/' . $tplKey . '.pos.json';
+    $pos = is_file($posFile) ? (json_decode((string)file_get_contents($posFile), true) ?: []) : [];
+    $cells = $pos['cells'] ?? [];
+    $E = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+    $F = '';
+    foreach ($vals as $ref => $v) {
+        $v = trim((string)$v);
+        if ($v === '' || !isset($cells[$ref])) continue;
+        $p = $cells[$ref];
+        $fs = (float)$p['fs'];
+        // تصغير تلقائي للنص الطويل (متل shrinkToFit بخانات الأسماء بالقالب)
+        if (isset($widths[$ref])) {
+            $len = function_exists('mb_strlen') ? mb_strlen($v, 'UTF-8') : strlen($v);
+            $estPct = $len * $fs * 0.52 / 5.9532; // عرض تقريبي ٪ من عرض A4
+            if ($estPct > $widths[$ref]) $fs = max(6.0, round($fs * $widths[$ref] / $estPct, 1));
+        }
+        $style = 'top:' . $p['y'] . '%;font-size:' . $fs . 'pt';
+        if ($p['a'] === 'c') $style .= ';left:' . $p['x'] . '%;transform:translateX(-50%)';
+        elseif ($p['a'] === 'l') $style .= ';left:' . $p['x'] . '%';
+        else $style .= ';right:' . round(100 - (float)$p['x'], 3) . '%';
+        $F .= '<div class="f" style="' . $style . '">' . $E($v) . '</div>';
+    }
+    header('Content-Type: text/html; charset=UTF-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>' . $E($titleAr) . '</title>'
+       . '<style>@page{size:A4;margin:0}*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+       . 'body{font-family:Calibri,"Segoe UI",Tahoma,Arial,sans-serif;background:#e9edf2}'
+       . '.sheet{width:210mm;margin:0 auto;direction:ltr}'
+       . '.page{position:relative;width:210mm;height:297mm;background:#fff;overflow:hidden}'
+       . '.pbg{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}'
+       . '.f{position:absolute;z-index:1;color:#000;line-height:1.18;white-space:nowrap}'
+       . '.bar{text-align:center;margin:10px 0}'
+       . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:210mm;height:297mm;overflow:hidden;margin:0}}'
+       . '</style></head><body>'
+       . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
+       . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — ' . $E($titleAr) . ' طبق الأصل الرسمي (Margins = None)</div></div>'
+       . '<div class="sheet"><div class="page"><img class="pbg" src="' . BASE_URL . 'assets/templates/' . $tplKey . '.png" alt=""> ' . $F . '</div></div>'
+       . '</body></html>';
+    exit;
+}
+
+/** بثّ قالب إكسل معبّأً (طبق الأصل) — تعبئة PHP خالصة (تعديل الخانات فقط): القالب يبقى
+ *  بايت-بايت كملف المستخدم (مسار python/openpyxl يعيد كتابة الملف فيرمي أجزاءً منه).
+ *  $checkbox: رقم مربع «الوضع العائلي» (1=أعزب 2=متزوج 3=أرمل 4=مطلق) يُعلَّم بالقالب
+ *  (ctrlPropN + شكل VML المقابل s102(4+N)) — القالب محفوظ كله بلا علامات. */
+function mofXlsxServe($tplKey, array $cells, $fname, $checkbox = 0) {
+    $tpl = __DIR__ . '/../assets/templates/' . $tplKey . '.xlsx';
+    $tmp = tempnam(sys_get_temp_dir(), 'mof');
+    if (!is_file($tpl) || !phpFillXlsxTemplate($tpl, $cells, $tmp)) {
+        @unlink($tmp);
+        http_response_code(500);
+        die('تعذّر توليد ملف الإكسل — القالب ' . htmlspecialchars($tplKey, ENT_QUOTES, 'UTF-8') . '.xlsx غير متوفر');
+    }
+    if ($checkbox >= 1 && $checkbox <= 4 && class_exists('ZipArchive')) {
+        $z = new ZipArchive();
+        if ($z->open($tmp) === true) {
+            $cpName = 'xl/ctrlProps/ctrlProp' . (int)$checkbox . '.xml';
+            $cp = $z->getFromName($cpName);
+            if ($cp !== false && strpos($cp, 'checked=') === false) {
+                $z->addFromString($cpName, str_replace('objectType="CheckBox"', 'objectType="CheckBox" checked="Checked"', $cp));
+            }
+            $vml = $z->getFromName('xl/drawings/vmlDrawing1.vml');
+            $shapeId = '_x0000_s' . (1024 + (int)$checkbox);
+            if ($vml !== false && preg_match('/<v:shape id="' . $shapeId . '".*?<\/v:shape>/s', $vml, $mSh)
+                && strpos($mSh[0], '<x:Checked>') === false) {
+                $sh2 = preg_replace('/(<x:ClientData[^>]*>)/', '$1<x:Checked>1</x:Checked>', $mSh[0], 1);
+                $z->addFromString('xl/drawings/vmlDrawing1.vml', str_replace($mSh[0], $sh2, $vml));
+            }
+            $z->close();
+        }
+    }
+    $fn = $fname . '.xlsx';
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . rawurlencode($fn) . '"; filename*=UTF-8\'\'' . rawurlencode($fn));
+    header('Content-Length: ' . filesize($tmp));
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    readfile($tmp);
+    @unlink($tmp);
+    exit;
+}
+
+if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
+    ensureMofProfile20260823();
+    $fmt2 = function ($v) { if ($v === '' || $v === null) return ''; return (float)$v == 0.0 ? '0' : number_format((float)$v, 2, '.', ','); };
+    $fmt0 = function ($v) { if ($v === '' || $v === null) return ''; return (float)$v == 0.0 ? '0' : number_format((float)$v, 0, '.', ','); };
+    $serial = function ($dateStr) { return (int)round((strtotime($dateStr) - strtotime('1899-12-30')) / 86400); };
+    $empFilter = mofEmpFilterSql($db);
+    $fy = (int)($_GET['fy'] ?? 0);
+    if ($fy < 2000 || $fy > 2100) $fy = (int)date('Y') - 1;
+    $isXlsx = (($_GET['format'] ?? '') === 'xlsx');
+
+    if ($form === 'mof_r6') {
+        // ===== ر6: كشف سنوي إفرادي لموظف واحد عن سنة ميلادية =====
+        $empId = (int)($_GET['emp'] ?? 0);
+        $st = $db->prepare("SELECT * FROM employees WHERE id=? AND is_deleted=0 AND " . schoolScopeWhere('school_id'));
+        $st->execute([$empId]);
+        $emp = $st->fetch();
+        if (!$emp) { http_response_code(404); die('الموظف غير موجود أو خارج صلاحيتك'); }
+        $ss = $db->prepare("SELECT * FROM schools WHERE id=?");
+        $ss->execute([(int)$emp['school_id']]);
+        $esch = $ss->fetch() ?: [];
+        $prof = mofProfile($esch);
+        // مجاميع الموظف للسنة الميلادية (نفس أعمدة المحرّك — مصدر واحد)
+        $ag = $db->prepare("SELECT SUM(base_plus_echelon_lbp) base,
+                SUM(extra_lbp+prime_fixe_lbp) extraw, SUM(aide_complementaire_lbp) aide,
+                SUM(family_allowance_lbp) family, SUM(transport_lbp) transport,
+                SUM(caisse_amount_lbp+eoc_grade_lbp) other,
+                SUM(taxable_base_lbp) taxable, SUM(income_tax_lbp) tax,
+                COUNT(DISTINCT month) mcnt, MIN(month) m1, MAX(month) m2
+            FROM monthly_salaries WHERE employee_id=? AND year=?
+              AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
+        $ag->execute([$empId, $fy]);
+        $a = $ag->fetch() ?: [];
+        $base = (int)($a['base'] ?? 0); $extraW = (int)($a['extraw'] ?? 0); $aide = (int)($a['aide'] ?? 0);
+        $family = (int)($a['family'] ?? 0); $trans = (int)($a['transport'] ?? 0); $other = (int)($a['other'] ?? 0);
+        $tbSum = (int)($a['taxable'] ?? 0); $tax = (int)($a['tax'] ?? 0); $mcnt = (int)($a['mcnt'] ?? 0);
+        $isMar = strpos((string)($emp['social_status'] ?? ''), 'marie') === 0;
+        // ٣٣٠ التنزيل العائلي: المصدر الوحيد + تجزئة بأشهر العمل، محدود بأساسه الخاضع
+        $fda = familyDeductionAnnual($emp['social_status'] ?? '', $emp['spouse_works'] ?? 0,
+            $emp['apply_family_deduction'] ?? 1, $fy . '-01-01', $emp['grant_spouse_addition'] ?? 1);
+        $fd = $mcnt ? (int)min($fda / 12 * min(12, $mcnt), (float)$tbSum) : 0;
+        $tot1 = $base + $extraW + $aide + $family + $trans;  // إجمالي (١)
+        $tot2 = $family + $trans;                            // غير خاضع (٢)
+        $tot3 = $base + $extraW + $aide;                     // خاضع (٣)
+        $net350 = max(0, $tbSum - $fd);
+        // عدّاد «المدخل x من y»: موظفو المؤسسة بنفس السنة (اتحاد الفصول الأربعة)
+        $allIds = [];
+        for ($q = 1; $q <= 4; $q++) { $qa = mofQuarterAgg($db, $q, $fy, ''); $allIds = array_merge($allIds, $qa['ids']); }
+        $allIds = array_values(array_unique($allIds));
+        $cnt = count($allIds);
+        $seq = '';
+        if ($allIds) {
+            $in = implode(',', array_map('intval', $allIds));
+            $ord = $db->query("SELECT id FROM employees WHERE id IN ($in)
+                ORDER BY COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)")->fetchAll(PDO::FETCH_COLUMN);
+            $ix = array_search($empId, array_map('intval', $ord), true);
+            if ($ix !== false) $seq = $ix + 1;
+        }
+        // الوضع العائلي: مربعات القالب نفسها (أعزب/متزوج/أرمل/مطلق) لا نصاً
+        $marMap = ['celibataire' => 1, 'marie' => 2, 'veuf' => 3, 'divorce' => 4];
+        $marBox = 1;
+        foreach ($marMap as $k => $vv) { if (strpos((string)($emp['social_status'] ?? ''), $k) === 0) { $marBox = $vv; break; } }
+        $mofNum = trim((string)($emp['finance_ministry_number'] ?? ''));
+        $from = $mcnt ? sprintf('%04d-%02d-01', $fy, (int)$a['m1']) : '';
+        $to   = $mcnt ? date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $fy, (int)$a['m2']))) : '';
+        $benef = (int)($emp['number_of_children'] ?? 0) + (($isMar && !(int)($emp['spouse_works'] ?? 0)) ? 1 : 0);
+        $common = [
+            'D5' => $esch['name_ar'] ?? '', 'C6' => $prof['trade_name'], 'D7' => preg_replace('/\D/', '', (string)($esch['finance_number'] ?? '')),
+            'K5' => $fy, 'K6' => $cnt ?: '', 'K8' => $seq, 'L8' => $cnt ? ($cnt . '/') : '',
+            'D9' => trim((string)($emp['first_name_ar'] ?: $emp['first_name_fr'])),
+            'G9' => trim((string)($emp['father_name_ar'] ?? '')),
+            'J9' => trim((string)($emp['last_name_ar'] ?: $emp['last_name_fr'])),
+            'D10' => $mofNum, 'G10' => cnssOccupationAr($emp),
+            'I10' => ' X شهري', 'J10' => 'يومي', 'K10' => 'بالساعة',
+            'H11' => (string)(int)($emp['number_of_children'] ?? 0), 'K12' => (string)$benef,
+            'D17' => $emp['gouvernorat'] ?? '', 'G17' => $emp['district'] ?? '', 'J17' => $emp['ville'] ?? '',
+            'D18' => $emp['quartier'] ?? '', 'G18' => $emp['rue'] ?? '',
+            'D19' => $emp['immeuble'] ?? '', 'G19' => $emp['etage'] ?? '',
+            'I19' => $emp['phone1'] ?? '', 'K19' => $emp['phone2'] ?? '', 'D21' => $emp['email'] ?? '',
+        ];
+        $money = [
+            'F24' => $base, 'J24' => $base,
+            'F26' => $extraW ?: '', 'J26' => $extraW ?: '',
+            'F27' => $isMar ? $family : 0, 'H27' => $isMar ? $family : 0,
+            'F28' => $isMar ? 0 : $family, 'H28' => $isMar ? 0 : $family,
+            'F29' => $trans, 'H29' => $trans,
+            'F41' => $aide ?: '', 'J41' => $aide ?: '',
+            'F42' => $tot1, 'H42' => $tot2, 'J42' => $tot3,
+            'F44' => $fd ?: '', 'F45' => $other ?: '',
+            'I48' => $net350, 'I49' => $tax,
+        ];
+        $nm = trim(($emp['first_name_ar'] ?: $emp['first_name_fr']) . '_' . ($emp['last_name_ar'] ?: $emp['last_name_fr']));
+        if ($isXlsx) {
+            $cells = $common;
+            $cells['C13'] = $from ? $serial($from) : '';
+            $cells['E13'] = $to ? $serial($to) : '';
+            foreach ($money as $k => $v) $cells[$k] = ($v === '' ? '' : (int)$v);
+            $cells = array_filter($cells, function ($v) { return $v !== '' && $v !== null; });
+            mofXlsxServe('mof_r6', $cells, 'R6_' . preg_replace('/[^\p{L}\p{N}_-]+/u', '_', $nm) . '_' . $fy, $marBox);
+        }
+        $vals = $common;
+        $vals[['CB_single', 'CB_married', 'CB_widow', 'CB_divorced'][$marBox - 1]] = '×';
+        $vals['C13'] = $from ? date('d/m/Y', strtotime($from)) : '';
+        $vals['E13'] = $to ? date('d/m/Y', strtotime($to)) : '';
+        foreach ($money as $k => $v) $vals[$k] = ($v === '' ? '' : $fmt2($v));
+        mofOverlayServe('mof_r6', 'نموذج ر6 — كشف سنوي إفرادي ' . $fy, $vals, ['D5' => 24, 'G10' => 7]);
+    }
+
+    // ===== ر5 (سنوي) / ر10 (فصلي) — مستوى المؤسسة =====
+    // مدرسة المالية = المدرسة المختارة نفسها برقمها المالي (لا قاعدة «صاحب العمل بالضمان»)
+    $s0 = currentSchool();
+    $ss = $db->prepare("SELECT * FROM schools WHERE id=?");
+    $ss->execute([(int)($s0['id'] ?? 0)]);
+    $sch = $ss->fetch() ?: $s0;
+    $prof = mofProfile($sch);
+    $finNum = preg_replace('/\D/', '', (string)($sch['finance_number'] ?? ''));
+
+    if ($form === 'mof_r5') {
+        // السنة الميلادية = مجموع فصولها الأربعة (نفس محرّك ر10 — «الأرقام تركب»)
+        $sum = ['gross' => 0, 'trans' => 0, 'other' => 0, 'net' => 0, 'exempt' => 0, 'taxable' => 0, 'tax' => 0];
+        $ids = [];
+        for ($q = 1; $q <= 4; $q++) {
+            $qa = mofQuarterAgg($db, $q, $fy, $empFilter);
+            foreach ($sum as $k => $v) $sum[$k] += $qa[$k];
+            $ids = array_merge($ids, $qa['ids']);
+        }
+        $cnt = count(array_unique($ids));
+        $paid = $sum['gross'] + $sum['trans'];
+        $common = [
+            'D6' => $sch['name_ar'] ?? '', 'C7' => $finNum, 'C10' => $prof['trade_name'],
+            'J6' => '31/12/' . $fy, 'J8' => '31/12/' . $fy,
+            'C12' => $prof['gov'], 'H12' => $prof['gov'], 'C13' => $prof['caza'], 'H13' => $prof['caza'],
+            'C14' => $prof['town'], 'H14' => $prof['town'], 'F14' => $prof['quarter'], 'J14' => $prof['quarter'],
+            'C15' => $prof['street'], 'H15' => $prof['street'], 'F15' => $prof['cadastral'], 'J15' => $prof['cadastral'],
+            'C16' => $prof['lot'], 'H16' => $prof['lot'], 'F16' => $prof['building'], 'J16' => $prof['building'],
+            'C17' => $prof['floor'], 'H17' => $prof['floor'], 'F17' => $sch['phone'] ?? '', 'J17' => $sch['phone'] ?? '',
+            'C18' => $prof['fax'], 'H18' => $prof['fax'],
+            'D19' => $prof['pob'], 'I19' => $prof['pob'], 'F19' => $prof['region'], 'K19' => $prof['region'],
+            'E20' => $prof['email'], 'K20' => $prof['email'],
+            'C22' => $prof['contact_name'], 'H22' => $prof['preparer_name'],
+            'C23' => $prof['contact_reg'], 'H23' => $prof['preparer_reg'],
+            'C24' => $prof['contact_phone'], 'E24' => $prof['contact_fax'],
+            'H24' => $prof['preparer_phone'], 'J24' => $prof['preparer_fax'],
+            'F27' => $cnt ?: '',
+            'C53' => $prof['signer_name'], 'C54' => date('j'), 'D54' => date('n'), 'E54' => date('Y'),
+            'I54' => $prof['signer_title'],
+        ];
+        $money = [
+            'I29' => $sum['gross'], 'I30' => $sum['trans'] ?: '', 'I31' => $paid,
+            'I32' => $sum['trans'] ?: '', 'I34' => $sum['other'] ?: '', 'I35' => $sum['net'],
+            'I36' => $sum['exempt'] ?: '', 'I37' => $sum['taxable'], 'I38' => $sum['tax'],
+            'J43' => $sum['taxable'], 'J44' => $sum['tax'], 'J45' => 0, 'J46' => $sum['tax'],
+            'J49' => $sum['tax'], 'C49' => 0,
+        ];
+        if ($isXlsx) {
+            $cells = array_filter($common, function ($v) { return $v !== '' && $v !== null; });
+            $cells['H6'] = $serial($fy . '-01-01'); $cells['H8'] = $serial($fy . '-01-01');
+            foreach ($money as $k => $v) { if ($v !== '') $cells[$k] = (int)$v; }
+            mofXlsxServe('mof_r5', $cells, 'R5_' . preg_replace('/[^\p{L}\p{N}_-]+/u', '_', (string)($sch['name_ar'] ?? 'school')) . '_' . $fy);
+        }
+        $vals = $common;
+        $vals['H6'] = '01/01/' . $fy; $vals['H8'] = '01/01/' . $fy;
+        foreach ($money as $k => $v) $vals[$k] = ($v === '' ? '' : $fmt2($v));
+        mofOverlayServe('mof_r5', 'نموذج ر5 — تصريح سنوي عن ضريبة الرواتب ' . $fy, $vals,
+            ['D6' => 19, 'C22' => 12, 'H22' => 12, 'C53' => 12, 'E20' => 13, 'K20' => 10, 'C24' => 9, 'E24' => 9, 'H24' => 9, 'J24' => 8]);
+    }
+
+    if ($form === 'mof_r10') {
+        $rqNow = intdiv((int)date('n') - 1, 3) + 1;
+        $rq = (int)($_GET['rq'] ?? 0);
+        $rqy = (int)($_GET['rqy'] ?? 0);
+        if ($rq < 1 || $rq > 4) {
+            $rq = $rqNow - 1; $rqyDef = (int)date('Y');
+            if ($rq < 1) { $rq = 4; $rqyDef--; }
+        } else { $rqyDef = (int)date('Y'); }
+        if ($rqy < 2000 || $rqy > 2100) $rqy = $rqyDef;
+        $rqMonthsMap = [1 => [1, 2, 3], 2 => [4, 5, 6], 3 => [7, 8, 9], 4 => [10, 11, 12]];
+        $rqEndDay = [1 => 31, 2 => 30, 3 => 30, 4 => 31];
+        $rqM = $rqMonthsMap[$rq];
+        $qa = mofQuarterAgg($db, $rq, $rqy, $empFilter);
+        $paid = $qa['gross'] + $qa['trans'];
+        $cnt = count(array_unique($qa['ids']));
+        $common = [
+            'D5' => $sch['name_ar'] ?? '', 'C6' => $finNum, 'D9' => $prof['trade_name'],
+            'E10' => $prof['rep_name'], 'H10' => $prof['rep_title'], 'N10' => $prof['rep_phone'] ?? '',
+            'H5' => 1, 'I5' => 1, 'J5' => $rqy, 'L5' => 31, 'M5' => 12, 'N5' => $rqy,
+            'H7' => 1, 'I7' => $rqM[0], 'J7' => $rqy, 'L7' => $rqEndDay[$rq], 'M7' => $rqM[2], 'N7' => $rqy,
+            'D13' => $prof['gov'], 'F13' => $prof['caza'], 'J13' => $prof['town'], 'N13' => $prof['quarter'],
+            'D14' => $prof['street'], 'F14' => $prof['cadastral'], 'J14' => $prof['lot'], 'N14' => $prof['building'],
+            'D15' => $prof['floor'], 'F15' => $sch['phone'] ?? '', 'I15' => '', 'N15' => $prof['fax'],
+            'D16' => $prof['pob'], 'F16' => $prof['region'], 'K16' => $prof['email'],
+            'E18' => $prof['contact_name'], 'J18' => $prof['preparer_name'],
+            'E19' => $prof['contact_reg'], 'M19' => $prof['preparer_reg'],
+            'C20' => $prof['contact_phone'], 'F20' => $prof['contact_fax'],
+            'I20' => $prof['preparer_phone'], 'M20' => $prof['preparer_fax'],
+            'G23' => 0, 'G24' => $cnt ?: '', 'O23' => 0,
+            'C52' => $prof['signer_name'], 'I52' => $prof['signer_title'],
+            'C55' => date('j'), 'D55' => date('n'), 'E55' => date('Y'),
+        ];
+        $money = [
+            'J27' => $qa['gross'], 'J28' => $qa['trans'] ?: '', 'J29' => $paid,
+            'J30' => $qa['trans'] ?: '', 'J32' => $qa['other'] ?: '', 'J33' => $qa['net'],
+            'J34' => $qa['exempt'] ?: '', 'J35' => $qa['taxable'], 'J36' => $qa['tax'],
+            'K43' => $qa['taxable'], 'K44' => $qa['tax'], 'K47' => $qa['tax'],
+        ];
+        if ($isXlsx) {
+            $cells = array_filter($common, function ($v) { return $v !== '' && $v !== null; });
+            foreach ($money as $k => $v) { if ($v !== '') $cells[$k] = (int)$v; }
+            mofXlsxServe('mof_r10', $cells, 'R10_' . preg_replace('/[^\p{L}\p{N}_-]+/u', '_', (string)($sch['name_ar'] ?? 'school')) . '_T' . $rq . '_' . $rqy);
+        }
+        $vals = $common;
+        foreach ($money as $k => $v) $vals[$k] = ($v === '' ? '' : $fmt0($v));
+        mofOverlayServe('mof_r10', 'نموذج ر10 — بيان دوري بتأدية الضريبة — الفصل ' . $rq . ' / ' . $rqy, $vals,
+            ['D5' => 14, 'E10' => 12, 'E18' => 10, 'J18' => 10, 'C52' => 10, 'K16' => 13, 'N15' => 8]);
+    }
+}
+
 if ($form === 'cnss_work_attestation') {
     // افادة عمل للضمان (مديرية ضمان المرض والأمومة) — تعبئة قالب المستخدم الرسمي تلقائياً.
     // ?form=cnss_work_attestation&emp=ID&d=&mo=&yr=&format=pdf|xlsx

@@ -836,20 +836,34 @@ check('أزرار الحذف زغيرة ومفرّغة بكل البرنامج (
  * 16) الفحص الشامل — صحّة الأرقام والأعداد (2026-07-30)
  * =================================================================== */
 $ofSrc = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
+// (منذ 2026-08-23 ر5/ر10 طبق الأصل بofficial_export: 100 رواتب بلا نقل + 110 نقل +
+//  120 المجموع − 130 النقل − 150 تنزيلات أخرى = 160 = مجموع الأساس الخاضع المخزَّن)
+$oxSrc16 = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
 check('تصريح ر5/ر10: لا تنزيل للنقل من مبلغ لا يحتويه (السطور تترابط)',
-      preg_match('/\$paid\s+=\s+\$gross \+ \$trans;/', $ofSrc) === 1
-      && preg_match('/\$net\s+=\s+\$paid - \$trans - \$other;/', $ofSrc) === 1
-      && strpos($ofSrc, '$net=$gross-$trans;') === false);
-// ترابط فعلي بالأرقام: ١٢٠−١٣٠−١٥٠ = ١٦٠ و ١٦٠−١٧٠ = ١٨٠
-$r5 = renderPage('pages/official_forms.php', ['form' => 'tax_r5', 'school_year' => '2025-2026'], ['extra','aide','transport'], [2]); // مدرسة واحدة (التصريح مؤسّسي)
-$r5t = preg_replace('/<[^>]+>/u', ' ', $r5); $r5v = [];
-foreach (['١٢٠','١٣٠','١٥٠','١٦٠','١٧٠','١٨٠'] as $cd) {
-    if (preg_match('/' . preg_quote($cd, '/') . '\s+([^0-9]{0,70}?)\s*([0-9,]{7,})/u', $r5t, $mm)) $r5v[$cd] = (int)str_replace(',', '', $mm[2]);
+      preg_match('/\$net\s+=\s+\$gross - \$other;/', $oxSrc16) === 1
+      && strpos($oxSrc16, "\$paid = \$sum['gross'] + \$sum['trans'];") !== false
+      && strpos($oxSrc16, "\$paid = \$qa['gross'] + \$qa['trans'];") !== false);
+// ترابط فعلي بالأرقام من ملف الإكسل المعبّى نفسه (خانات القالب: 100=I29 .. 190=I38)
+$r5x = renderPage('pages/official_export.php', ['form' => 'mof_r5', 'fy' => 2025, 'format' => 'xlsx'], [], [2], '', '', $PROJ . '/tmp/reg16.xlsx');
+$r5v = [];
+if (strpos($r5x, 'PK') === 0) {
+    file_put_contents($PROJ . '/tmp/reg16b.xlsx', $r5x);
+    $z16 = new ZipArchive();
+    if ($z16->open($PROJ . '/tmp/reg16b.xlsx') === true) {
+        $sh16 = (string)$z16->getFromName('xl/worksheets/sheet1.xml');
+        foreach (['100'=>'I29','110'=>'I30','120'=>'I31','130'=>'I32','150'=>'I34','160'=>'I35','170'=>'I36','180'=>'I37','190'=>'I38'] as $cd => $ref) {
+            if (preg_match('/<c r="' . $ref . '"[^>]*><v>(-?\d+)/', $sh16, $mm)) $r5v[$cd] = (int)$mm[1];
+        }
+        $z16->close();
+    }
+    @unlink($PROJ . '/tmp/reg16b.xlsx');
 }
-check('تصريح ر5: ١٢٠ − ١٣٠ − ١٥٠ = ١٦٠',
-      isset($r5v['١٢٠'],$r5v['١٣٠'],$r5v['١٥٠'],$r5v['١٦٠']) && ($r5v['١٢٠']-$r5v['١٣٠']-$r5v['١٥٠']) === $r5v['١٦٠']);
-check('تصريح ر5: ١٦٠ − ١٧٠ = ١٨٠',
-      isset($r5v['١٦٠'],$r5v['١٨٠']) && ($r5v['١٦٠'] - ($r5v['١٧٠'] ?? 0)) === $r5v['١٨٠']);
+check('تصريح ر5: ١٢٠ − ١٣٠ − ١٥٠ = ١٦٠ (من خانات الإكسل المعبّى)',
+      isset($r5v['120'],$r5v['130'],$r5v['160']) && ($r5v['120'] - $r5v['130'] - ($r5v['150'] ?? 0)) === $r5v['160'],
+      json_encode($r5v));
+check('تصريح ر5: ١٦٠ − ١٧٠ = ١٨٠ + ١٠٠+١١٠=١٢٠',
+      isset($r5v['160'],$r5v['180']) && ($r5v['160'] - ($r5v['170'] ?? 0)) === $r5v['180']
+      && isset($r5v['100'],$r5v['120']) && ($r5v['100'] + ($r5v['110'] ?? 0)) === $r5v['120']);
 check('التقرير العام: «الصافية مع النقل» والمجموع يتبعان زرّ النقل',
       strpos($ofSrc, '$transShown = salaryCompHas(\'transport\') ? $trans : 0;') !== false
       && strpos($ofSrc, '$netWith=$net+$trans;') === false);
@@ -2156,40 +2170,55 @@ check('مصدر واحد (تجربة فعلية): «مجموع الأجور» ب
  *     التصريح كل ٣ أشهر مع منتقي «عن الفترة» (الفصل + السنة) يظهر من–إلى على
  *     المستند، والمجاميع من أشهر الفصل المختار حصراً — وبقي ر5 سنوياً.
  * =================================================================== */
+// (منذ 2026-08-23 ر10 طبق الأصل بofficial_export — منتقي الفصل بشاشة official_forms
+//  والأرقام من أشهر الفصل حصراً بmofQuarterAgg)
 $of40 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
-check('ر10 فصلي: فرع مستقل بمنتقي الفصل (rq/rqy) وأشهر الفصل حصراً + «عن الفتــرة» على المستند',
+$ox40 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+check('ر10 فصلي: فرع مستقل بمنتقي الفصل (rq/rqy) وأشهر الفصل حصراً + طبق الأصل',
       strpos($of40, "elseif (\$form === 'tax_r10'):") !== false
       && strpos($of40, 'name="rq"') !== false
-      && strpos($of40, 'ms.month IN ($rqIn)') !== false
-      && strpos($of40, 'عن الفتــرة') !== false
-      && strpos($of40, 'بيان دوري بتأدية ضريبة الرواتب والأجور') !== false);
-check('ر5 بقي سنوياً على السنة الدراسية المعروضة (فرع مستقل عن ر10)',
+      && strpos($ox40, 'ms.month IN ($rqIn)') !== false
+      && strpos($ox40, 'function mofQuarterAgg') !== false);
+check('ر5 بقي سنوياً (مجموع الفصول الأربعة — فرع مستقل عن ر10)',
       strpos($of40, "elseif (\$form === 'tax_r5'):") !== false
+      && strpos($ox40, 'for ($q = 1; $q <= 4; $q++)') !== false
       && strpos($of40, "form === 'tax_r5' || \$form === 'tax_r10'") === false);
-// تجربة فعلية: الفصل ٢/2026 (نيسان-حزيران) مدرسة 2 — التواريخ على المستند وضريبته
-// تساوي مجموع القاعدة لنفس الأشهر بالمليم، بنفس فلاتر المصدر الواحد
-$h40 = renderPage('pages/official_forms.php', ['form' => 'tax_r10', 'rq' => 2, 'rqy' => 2026], [], [2]);
+// تجربة فعلية: الفصل ٢/2026 (نيسان-حزيران) مدرسة 2 — تواريخ الفترة بخانات القالب
+// (H7..N7) وضريبته (خانة 190=J36) تساوي مجموع القاعدة لنفس الأشهر بالمليم
 $dbTax40 = (int)$db->query("SELECT COALESCE(SUM(ms.income_tax_lbp),0) FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
     WHERE e.is_deleted=0 AND e.tax_subject=1 AND ms.year=2026 AND ms.month IN (4,5,6) AND ms.school_id=2
       AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)
       AND LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) >= '2025-10-01'
       AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year='2025-2026'
                      AND (base_plus_echelon_lbp>0 OR net_salary_lbp>0 OR total_due_lbp>0))")->fetchColumn();
-check('ر10 فصلي (تجربة فعلية): الفصل ٢/2026 — «من 01/04/2026 إلى 30/06/2026» وضريبته = مجموع القاعدة للأشهر 4-6 بالمليم',
-      strpos($h40, '01/04/2026') !== false && strpos($h40, '30/06/2026') !== false
-      && $dbTax40 > 0 && strpos($h40, number_format($dbTax40)) !== false,
-      'ضريبة القاعدة: ' . number_format($dbTax40));
+$x40 = renderPage('pages/official_export.php', ['form' => 'mof_r10', 'rq' => 2, 'rqy' => 2026, 'format' => 'xlsx'], [], [2], '', '', $PROJ . '/tmp/reg40.xlsx');
+$v40 = [];
+if (strpos($x40, 'PK') === 0) {
+    file_put_contents($PROJ . '/tmp/reg40b.xlsx', $x40);
+    $z40 = new ZipArchive();
+    if ($z40->open($PROJ . '/tmp/reg40b.xlsx') === true) {
+        $sh40 = (string)$z40->getFromName('xl/worksheets/sheet1.xml');
+        foreach (['H7','I7','J7','L7','M7','N7','J36'] as $ref) {
+            if (preg_match('/<c r="' . $ref . '"[^>]*><v>(-?\d+)/', $sh40, $mm)) $v40[$ref] = (int)$mm[1];
+        }
+        $z40->close();
+    }
+    @unlink($PROJ . '/tmp/reg40b.xlsx');
+}
+check('ر10 فصلي (تجربة فعلية): الفصل ٢/2026 — من 1/4/2026 إلى 30/6/2026 وضريبته = مجموع القاعدة بالمليم',
+      ($v40['H7'] ?? 0) === 1 && ($v40['I7'] ?? 0) === 4 && ($v40['J7'] ?? 0) === 2026
+      && ($v40['L7'] ?? 0) === 30 && ($v40['M7'] ?? 0) === 6 && ($v40['N7'] ?? 0) === 2026
+      && $dbTax40 > 0 && ($v40['J36'] ?? -1) === $dbTax40,
+      'ضريبة القاعدة: ' . number_format($dbTax40) . ' / بالنموذج: ' . number_format($v40['J36'] ?? -1));
 // الافتراضي بلا باراميترات = آخر فصل مكتمل (يُحسب ديناميكياً فلا يفسد الفحص بمرور الوقت)
 $q40 = intdiv((int)date('n') - 1, 3) + 1; $q40y = (int)date('Y');
 $q40--; if ($q40 < 1) { $q40 = 4; $q40y--; }
-$q40from = sprintf('01/%02d/%04d', [1=>1,2=>4,3=>7,4=>10][$q40], $q40y);
 $h40b = renderPage('pages/official_forms.php', ['form' => 'tax_r10'], [], [2]);
 check('ر10 فصلي (تجربة فعلية): الافتراضي بلا اختيار = آخر فصل مكتمل',
-      strpos($h40b, $q40from) !== false, "المتوقّع من $q40from");
+      strpos($h40b, 'form=mof_r10&amp;rq=' . $q40 . '&amp;rqy=' . $q40y) !== false, "المتوقّع rq=$q40 rqy=$q40y");
 $h40c = renderPage('pages/official_forms.php', ['form' => 'tax_r5'], [], [2]);
-check('ر5 (تجربة فعلية): بعده تصريحاً سنوياً يعمل بلا خطأ',
-      strpos($h40c, 'تصريح سنوي عن ضريبة الدخل على الرواتب والأجور') !== false
-      && strpos($h40c, 'FATAL') === false, strlen($h40c) . ' حرف');
+check('ر5 (تجربة فعلية): شاشته تعمل بلا خطأ وتقود للنموذج الرسمي',
+      strpos($h40c, 'form=mof_r5') !== false && strpos($h40c, 'FATAL') === false, strlen($h40c) . ' حرف');
 
 /* =====================================================================
  * 41) خيار «تطبيق التنزيل العائلي» بملف الموظف (طلب 2026-08-06): زرّ لكل موظف
@@ -2213,9 +2242,11 @@ check('التنزيل العائلي اختياري: زرّ بملف الموظ�
       strpos($emp41, 'name="apply_family_deduction"') !== false
       && strpos($emp41, "'apply_family_deduction' => isset(\$_POST['apply_family_deduction'])") !== false
       && strpos($emp41, "'apply_family_deduction' => 1,") !== false);
+// (منذ 2026-08-23 ر5/ر10 بofficial_export — المصدر الوحيد نفسه بmofQuarterAgg)
+$ox41 = (string)file_get_contents($PROJ . '/pages/official_export.php');
 check('التنزيل العائلي اختياري: ر5 ور10 وعمود كشف الرواتب كلهم على المصدر الوحيد familyDeductionAnnual',
-      substr_count($of41, "COALESCE(e.apply_family_deduction, 1) afd") === 3
-      && substr_count($of41, "familyDeductionAnnual(\$de['social_status'], \$de['spouse_works'], \$de['afd']") === 2
+      substr_count($ox41, "COALESCE(e.apply_family_deduction,1) afd") === 1
+      && substr_count($ox41, "familyDeductionAnnual(\$de['social_status'], \$de['spouse_works'], \$de['afd']") === 1
       && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 1)") !== false);
 // تجربة فعلية (مع ترجيع كامل): موظف خاضع بضريبة موجبة وتنزيل ساري > 0 — طفي الخيار
 // يرفع ضريبته الشهرية، وإرجاعه يعيدها كما كانت بالمليم
@@ -2539,9 +2570,9 @@ check('تجزئة القانون: المحرّك يُسنوِن ×12 ويقسم 
       strpos($pc51, '$annualTaxable = $taxBase * 12;') !== false
       && strpos($pc51, '$monthlyTax = $annualTax / 12;') !== false
       && strpos($pc51, '$taxBase * $monthsPerYear') === false);
-check('تجزئة القانون: حصّة الشهر بالكشوف = السنوي ÷ 12 دائماً + ر5 بحصص الأشهر المعمولة + الشفاء مربوط',
+check('تجزئة القانون: حصّة الشهر بالكشوف = السنوي ÷ 12 دائماً + ر5/ر10 بحصص الأشهر المعمولة + الشفاء مربوط',
       substr_count($rp51 . $of51 . (string)file_get_contents($PROJ . '/pages/reports_export.php'), '?? 1) / 12)') >= 2
-      && strpos($of51, '$exempt += (int)min($fda / 12 * min(12, (int)$de[\'mcnt\']), (float)$de[\'tb\']);') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), '$exempt += (int)min($fda / 12 * (int)$de[\'mcnt\'], (float)$de[\'tb\']);') !== false
       && function_exists('healLawfulTaxProration20260806')
       && strpos($hd51, 'healLawfulTaxProration20260806();') !== false);
 // (تكملة بقاعدة المستخدم «ما بيصير نيغاتيف»): التنزيل المعروض بحدّ الراتب الخاضع —
@@ -2829,6 +2860,70 @@ $h58b = renderPage('pages/attestations.php', ['employee_id' => 968, 'type' => 'a
 check('الإفادة المدرسية: الأساس وحده مختاراً → سطر واحد كما كان (بلا تفصيل)',
       strpos($h58b, 'مؤلّفاً ممّا يلي') === false
       && strpos($h58b, 'وكان راتبه الشهري ( دون التعويض العائلي )') !== false);
+
+/* =====================================================================
+ * 59) 🏛️ نماذج المالية ر5/ر6/ر10 طبق الأصل («بعتلك اكسل بدي ياهون طبق
+ *     الاصل r3,r6,r5,r10» — 2026-08-23): القوالب ملفات المستخدم نفسها
+ *     (مفرَّغة) + صورة 300dpi + إحداثيات معايَرة، والتعبئة PHP خالصة تحفظ
+ *     القالب بايت-بايت. السنة الميلادية بر5 = مجموع فصول ر10 الأربعة.
+ * =================================================================== */
+foreach (['mof_r5' => 69, 'mof_r6' => 55, 'mof_r10' => 66] as $tpl59 => $minCells59) {
+    $okT = is_file($PROJ . "/assets/templates/$tpl59.xlsx") && is_file($PROJ . "/assets/templates/$tpl59.png");
+    $pos59 = json_decode((string)@file_get_contents($PROJ . "/assets/templates/$tpl59.pos.json"), true);
+    check("قالب $tpl59: xlsx + png + إحداثيات كاملة", $okT && count($pos59['cells'] ?? []) >= $minCells59,
+          'cells=' . count($pos59['cells'] ?? []));
+}
+check('ر6: مربعات الوضع العائلي الأربعة بالإحداثيات (CB_single..CB_divorced)',
+      count(array_intersect(['CB_single', 'CB_married', 'CB_widow', 'CB_divorced'],
+            array_keys(json_decode((string)@file_get_contents($PROJ . '/assets/templates/mof_r6.pos.json'), true)['cells'] ?? []))) === 4);
+// القالب المفرَّغ: بلا علامة أعزب محفورة (تُعلَّم حسب الموظف عند التوليد)
+$z59 = new ZipArchive();
+$okCb59 = $z59->open($PROJ . '/assets/templates/mof_r6.xlsx') === true
+       && strpos((string)$z59->getFromName('xl/ctrlProps/ctrlProp1.xml'), 'checked=') === false;
+$z59->close();
+check('ر6: القالب المفرَّغ بلا علامة وضع عائلي محفورة', $okCb59);
+// ملف تعريف المؤسسة: العمود يتركّب ذاتياً ومزروع لسان مكسيم من ملفات المستخدم
+ensureMofProfile20260823();
+$prof59 = json_decode((string)$db->query("SELECT mof_profile FROM schools WHERE REPLACE(COALESCE(finance_number,''),' ','')='2459823' LIMIT 1")->fetchColumn(), true) ?: [];
+check('mof_profile: مزروع لسان مكسيم (المكلف بالبريد 271629 + المنطقة 1825/1)',
+      ($prof59['contact_reg'] ?? '') === '271629' && ($prof59['region'] ?? '') === '1825/1');
+// شاشات الأزرار الجديدة (فلتر الفئة يبقى + زرا الطباعة والإكسل + صندوق معلومات المؤسسة)
+$scr59 = renderPage('pages/official_forms.php', ['form' => 'tax_r5'], [], [2]);
+check('شاشة ر5: زرا «طباعة/PDF» و«Excel رسمي» + صندوق معلومات المؤسسة',
+      strpos($scr59, 'form=mof_r5') !== false && strpos($scr59, 'Excel رسمي') !== false
+      && strpos($scr59, 'save_mof_profile') !== false);
+$scr59b = renderPage('pages/official_forms.php', ['form' => 'tax_r10'], [], [2]);
+check('شاشة ر10: منتقي الفصل + زرا النموذج الرسمي', strpos($scr59b, 'form=mof_r10') !== false && strpos($scr59b, 'الفصل') !== false);
+$scr59c = renderPage('pages/official_forms.php', ['form' => 'tax_r6', 'employee_id' => 15], [], [2]);
+check('شاشة ر6: سنة ميلادية + زرا النموذج الرسمي', strpos($scr59c, 'form=mof_r6') !== false);
+// «الأرقام تركب»: صفحة ر5 المعبّاة تحمل مجموع ضريبة السنة الميلادية من monthly_salaries نفسها
+$tax59 = 0; $tb59 = 0;
+$q59 = $db->query("SELECT COALESCE(SUM(ms.income_tax_lbp),0) t FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+                   WHERE e.is_deleted=0 AND e.tax_subject=1 AND ms.year=2025 AND ms.school_id=2
+                     AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)");
+$tax59 = (int)$q59->fetchColumn();
+$h59 = renderPage('pages/official_export.php', ['form' => 'mof_r5', 'fy' => 2025], [], [2]);
+check('ر5 المعبّى: صورة القالب + مجموع ضريبة 2025 من monthly_salaries (رمز 190)',
+      strpos($h59, 'mof_r5.png') !== false
+      && ($tax59 === 0 || strpos($h59, number_format($tax59, 2, '.', ',')) !== false),
+      'tax=' . $tax59);
+$h59b = renderPage('pages/official_export.php', ['form' => 'mof_r10', 'rq' => 1, 'rqy' => 2025], [], [2]);
+check('ر10 المعبّى: صورة القالب + زر الطباعة', strpos($h59b, 'mof_r10.png') !== false && strpos($h59b, 'اطبع') !== false);
+$h59c = renderPage('pages/official_export.php', ['form' => 'mof_r6', 'emp' => 15, 'fy' => 2025], [], [2]);
+check('ر6 المعبّى: صورة القالب + علامة الوضع العائلي ×', strpos($h59c, 'mof_r6.png') !== false && strpos($h59c, '>×<') !== false);
+// إكسل ر6 المعبّى: القالب محفوظ بكل أجزائه (تعبئة PHP خالصة لا openpyxl) + المربع معلَّم
+$x59 = renderPage('pages/official_export.php', ['form' => 'mof_r6', 'emp' => 15, 'fy' => 2025, 'format' => 'xlsx'], [], [2], '', '', $PROJ . '/tmp/reg59.xlsx');
+$okX59 = strpos($x59, 'PK') === 0;
+if ($okX59) {
+    file_put_contents($PROJ . '/tmp/reg59b.xlsx', $x59);
+    $zt59 = new ZipArchive(); $zo59 = new ZipArchive();
+    $okX59 = $zt59->open($PROJ . '/tmp/reg59b.xlsx') === true && $zo59->open($PROJ . '/assets/templates/mof_r6.xlsx') === true
+          && $zt59->numFiles === $zo59->numFiles
+          && strpos((string)$zt59->getFromName('xl/drawings/vmlDrawing1.vml'), '<x:Checked>1</x:Checked>') !== false;
+    @$zt59->close(); @$zo59->close();
+    @unlink($PROJ . '/tmp/reg59b.xlsx');
+}
+check('إكسل ر6 المعبّى: كل أجزاء القالب محفوظة + مربع الوضع العائلي معلَّم', $okX59);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
