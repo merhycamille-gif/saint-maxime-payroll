@@ -1209,6 +1209,10 @@ include __DIR__ . '/../includes/header.php';
                             <option value="marie_3_enfants" <?= $employee['social_status'] === 'marie_3_enfants' ? 'selected' : '' ?>>Marié 3 enfants / متزوج و3 أولاد</option>
                             <option value="marie_4_enfants" <?= $employee['social_status'] === 'marie_4_enfants' ? 'selected' : '' ?>>Marié 4 enfants / متزوج و4 أولاد</option>
                             <option value="marie_5_enfants" <?= $employee['social_status'] === 'marie_5_enfants' ? 'selected' : '' ?>>Marié 5 enfants / متزوج و5 أولاد</option>
+                            <option value="veuf_sans_enfants" <?= $employee['social_status'] === 'veuf_sans_enfants' ? 'selected' : '' ?>>Veuf(ve) sans enfants / أرمل بلا أولاد</option>
+                            <option value="veuf_1_enfant" <?= $employee['social_status'] === 'veuf_1_enfant' ? 'selected' : '' ?>>Veuf(ve) 1 enfant / أرمل وولد</option>
+                            <option value="veuf_2_enfants" <?= $employee['social_status'] === 'veuf_2_enfants' ? 'selected' : '' ?>>Veuf(ve) 2 enfants / أرمل وولدان</option>
+                            <option value="veuf_3_enfants" <?= $employee['social_status'] === 'veuf_3_enfants' ? 'selected' : '' ?>>Veuf(ve) 3 enfants / أرمل و3 أولاد</option>
                         </select>
                     </div>
                     <div class="form-group">

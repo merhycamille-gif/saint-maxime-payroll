@@ -3000,6 +3000,30 @@ check('مايا أبي حبيب: مفتاحا الزوج والأولاد مطف
       $maya62 && (int)$maya62['gsa'] === 0 && (int)$maya62['gca'] === 0 && (int)$tax62 === 0,
       'أشهر بضريبة صفر: ' . $tax62);
 
+/* =====================================================================
+ * 63) 🖤 «صحح الحالات وضوي المفاتيح» (2026-08-23): حالات سيدة النجاة مصحّحة
+ *     من إخراجات القيد (14 موظفاً) + فئة «أرمل» مدعومة بالمعادلة (تُحسب على
+ *     فئة المتزوج المقابلة بلا زيادة زوج دائماً) + خياراتها بملف الموظف.
+ * =================================================================== */
+check('فئة الأرمل: المعادلة تحسبها (شخصي + أولاد بمفتاحهم، بلا زيادة زوج)',
+      familyDeductionAnnual('veuf_2_enfants', 0, 1, '2026-01-01', 1, 1) === familyDeductionAnnual('marie_2_enfants', 1, 1, '2026-01-01', 1, 1)
+      && familyDeductionAnnual('veuf_sans_enfants', 0, 1, '2026-01-01', 1, 1) === familyDeductionAnnual('celibataire', 0, 1, '2026-01-01', 1, 1)
+      && familyDeductionAnnual('veuf_2_enfants', 0, 1, '2026-01-01', 1, 0) === familyDeductionAnnual('celibataire', 0, 1, '2026-01-01', 1, 1));
+check('فئة الأرمل: خياراتها بملف الموظف + تسمياتها',
+      strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'value="veuf_2_enfants"') !== false
+      && socialStatusLabel('veuf_2_enfants', 'ar') === 'أرمل وله ولدان');
+check('حالات سيدة النجاة: الشفاء موصول بالهيدر (يعمل أونلاين بعد النشر)',
+      function_exists('healNajatCivilStatus20260823')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNajatCivilStatus20260823();') !== false);
+$naj63 = $db->query("SELECT
+    SUM(CASE WHEN id=1546 AND social_status='marie_3_enfants' AND grant_children_addition=1 AND grant_spouse_addition=0 THEN 1 ELSE 0 END)
+  + SUM(CASE WHEN id=968 AND social_status='veuf_2_enfants' AND grant_children_addition=1 THEN 1 ELSE 0 END)
+  + SUM(CASE WHEN id=53 AND social_status='veuf_sans_enfants' AND grant_children_addition=0 THEN 1 ELSE 0 END)
+  + SUM(CASE WHEN id=65 AND social_status='marie_sans_enfants' AND grant_children_addition=0 THEN 1 ELSE 0 END)
+  FROM employees WHERE id IN (1546,968,53,65)")->fetchColumn();
+check('حالات سيدة النجاة: عيّنات مثبّتة (جونا متزوجة+3 مضوّى · برباري أرملة+2 مضوّى · قرعه أرملة مطفى · غنيمه متزوجة بلا قاصرين)',
+      (int)$naj63 === 4, 'مطابق: ' . $naj63 . '/4');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

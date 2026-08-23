@@ -1181,6 +1181,51 @@ function healMayaTaxFlags20260823() {
     } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد بالفتحة التالية */ }
 }
 
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-23 — «صحح الحالات وضوي المفاتيح»): تصحيح الوضع
+ * العائلي لموظفي سيدة النجاة من إخراجات القيد العائلية المقروءة (كانوا كلهم «عازب»
+ * بالبرنامج خطأً) + تضوية مفتاح «تنزيل الأولاد» لمن لديهم أولاد دون 18 حصراً (معيار
+ * المستخدم) + زيادة الزوج مطفأة (نمط مايا) + عدد الأولاد = الأولاد دون 18 (المستفاد
+ * عنهم ضريبياً) ثم إعادة احتساب سنواتهم من 2025-2026. idempotent — يعمل محلياً وأونلاين.
+ */
+function healNajatCivilStatus20260823() {
+    $flag = 'najat_civil_status_2026_08_23';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        ensureEmployeeFlagColumns();
+        if (function_exists('set_time_limit')) @set_time_limit(600);
+        // [id, جزء من الشهرة للتثبّت, الوضع, عدد الأولاد (<18), gsa, gca]
+        $fix = [
+            [1546, 'زوبا',    'marie_3_enfants',   3, 0, 1], // جونا: توأم 2013 + 2019
+            [1826, 'شرو',     'marie_2_enfants',   2, 0, 1], // ديانا: 2020 + 2021
+            [68,   'منصور',   'marie_2_enfants',   2, 0, 1], // مرسال: 2009 + 2011 (والكبيران فوق 18)
+            [51,   'كرم',     'marie_1_enfant',    1, 0, 1], // دوللي: 2014
+            [1224, 'خاطر',    'marie_1_enfant',    1, 0, 1], // فاليسا: ~2024
+            [1840, 'السكاف',  'marie_1_enfant',    1, 0, 1], // كارين: 2025
+            [425,  'فاخوري',  'marie_1_enfant',    1, 0, 1], // ميراي: 11/2024
+            [968,  'برباري',  'veuf_2_enfants',    2, 0, 1], // إليانا: أرملة + ~2009 و~2012
+            [1066, 'قاصوف',   'marie_sans_enfants', 0, 0, 0], // الين: أولادها فوق 18
+            [61,   'القارح',  'marie_sans_enfants', 0, 0, 0], // لينا: فوق 18
+            [65,   'غنيمه',   'marie_sans_enfants', 0, 0, 0], // مارينا: الأصغر بلغ 18 بآب 2026
+            [1138, 'يعقوب',   'marie_sans_enfants', 0, 0, 0], // هيلاني: فوق 18
+            [62,   'عازار',   'marie_sans_enfants', 0, 0, 0], // مادونا: أولاد غير مؤكّدين — نسخة أوضح
+            [53,   'قرعه',    'veuf_sans_enfants',  0, 0, 0], // زينة: أرملة، أولادها فوق 18
+        ];
+        require_once __DIR__ . '/payroll_calculator.php';
+        $st = $db->prepare("UPDATE employees SET social_status=?, number_of_children=?, grant_spouse_addition=?, grant_children_addition=? WHERE id=? AND last_name_ar LIKE ?");
+        foreach ($fix as [$id, $nm, $ss, $ch, $gsa, $gca]) {
+            $st->execute([$ss, $ch, $gsa, $gca, $id, '%' . $nm . '%']);
+            if ($st->rowCount() >= 0) {
+                foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$id . " AND school_year >= '2025-2026' ORDER BY school_year")->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                    try { recalcEmployeeYear((int)$id, $sy); } catch (Throwable $e) {}
+                }
+            }
+        }
+        setSetting($flag, date('Y-m-d H:i'));
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد بالفتحة التالية */ }
+}
+
 function healLawfulTaxProration20260806() {
     $flag = 'lawful_tax_proration_2026_08_06';
     if (getSetting($flag, '') !== '') return;
@@ -1253,6 +1298,15 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
     if ((int)($applyFlag ?? 1) !== 1) return 0;
     try {
         $db = getDB();
+        // 🖤 الأرمل/المطلق (2026-08-23 — أرملتا سيدة النجاة): جدول القانون فيه فئات المتزوج فقط،
+        // فالأرمل يُحسب على فئة المتزوج المقابلة **بلا زيادة الزوج دائماً** (لا زوج): الشخصي
+        // + حصة الأولاد (تتبع مفتاح «تنزيل الأولاد» كالمعتاد). veuf/divorce بلا أولاد = الشخصي.
+        $socialStatus = (string)$socialStatus;
+        if (strpos($socialStatus, 'veuf') === 0 || strpos($socialStatus, 'divorce') === 0) {
+            $mapped = preg_replace('/^(veuf|divorce)/', 'marie', $socialStatus);
+            $socialStatus = (strpos($mapped, 'marie_') === 0) ? $mapped : 'marie_sans_enfants';
+            $spouseWorks = 1; // يُسقط زيادة الزوج حكماً
+        }
         $q = $db->prepare("SELECT annual_deduction FROM family_tax_deductions
                            WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
         $q->execute([(string)$socialStatus, $asOf]);
@@ -2080,7 +2134,11 @@ function socialStatusLabel($status, $lang = 'fr') {
         'marie_2_enfants' => ['fr' => 'Marié 2 enfants', 'ar' => 'متزوج وله ولدين'],
         'marie_3_enfants' => ['fr' => 'Marié 3 enfants', 'ar' => 'متزوج وله 3 أولاد'],
         'marie_4_enfants' => ['fr' => 'Marié 4 enfants', 'ar' => 'متزوج وله 4 أولاد'],
-        'marie_5_enfants' => ['fr' => 'Marié 5 enfants', 'ar' => 'متزوج وله 5 أولاد']
+        'marie_5_enfants' => ['fr' => 'Marié 5 enfants', 'ar' => 'متزوج وله 5 أولاد'],
+        'veuf_sans_enfants' => ['fr' => 'Veuf(ve) sans enfants', 'ar' => 'أرمل بلا أولاد'],
+        'veuf_1_enfant' => ['fr' => 'Veuf(ve) 1 enfant', 'ar' => 'أرمل وله ولد'],
+        'veuf_2_enfants' => ['fr' => 'Veuf(ve) 2 enfants', 'ar' => 'أرمل وله ولدان'],
+        'veuf_3_enfants' => ['fr' => 'Veuf(ve) 3 enfants', 'ar' => 'أرمل وله 3 أولاد']
     ];
     return $labels[$status][$lang] ?? $status;
 }
