@@ -144,7 +144,7 @@ if ($report === 'monthly_summary') {
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('المجموع العام', $G, $rn); }
 
 } elseif ($report === 'tax_summary') {
-    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.finance_ministry_number,e.school_id,e.social_status,e.spouse_works,e.payment_months_per_year,COALESCE(e.apply_family_deduction,1) afd,COALESCE(e.grant_spouse_addition,0) gsa,COALESCE(e.grant_children_addition,0) gca,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.income_tax_lbp,ms.taxable_base_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
+    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.finance_ministry_number,e.school_id,e.social_status,e.spouse_works,e.payment_months_per_year,COALESCE(e.apply_family_deduction,1) afd,COALESCE(e.grant_spouse_addition,0) gsa,COALESCE(e.grant_children_addition,0) gca,e.id eid,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.income_tax_lbp,ms.taxable_base_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.tax_subject=1" . $schoolSql . $empYearFilter . $empTypeSql . "
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
@@ -155,7 +155,7 @@ if ($report === 'monthly_summary') {
     $fdAsOf = sprintf('%04d-%02d-01', $year, $month);
     $fdOf = function ($r) use ($fdAsOf) {
         // حصّة الشهر = السنوي ÷ 12 دائماً (القاعدة الرسمية: كل شهر معمول = 1/12 من التنزيل)
-        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $fdAsOf, $r['gsa'] ?? 0, $r['gca'] ?? 0) / 12);
+        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $fdAsOf, $r['gsa'] ?? 0, $r['gca'] ?? 0, (int)($r['eid'] ?? 0)) / 12);
     };
     $rep = new ReportTable('كشف ضريبة الدخل — ' . monthName($month, 'ar') . ' ' . $year . $empTypeTitle, true);
     $rep->schoolHeader($school);

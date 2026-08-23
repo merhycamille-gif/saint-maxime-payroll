@@ -335,6 +335,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'civil_registry_number' => trim($_POST['civil_registry_number'] ?? ''),
         'civil_registry_place' => trim($_POST['civil_registry_place'] ?? ''),
         'social_status' => $_POST['social_status'] ?? 'celibataire',
+        'spouse_work_start_date' => (preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['spouse_work_start_date'] ?? '') ? $_POST['spouse_work_start_date'] : null),
         'spouse_works' => isset($_POST['spouse_works']) ? 1 : 0,
         'number_of_children' => (int)($_POST['number_of_children'] ?? 0),
         'gouvernorat' => trim($_POST['gouvernorat'] ?? ''),
@@ -438,7 +439,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     } catch (Exception $e) { unset($data['job_title']); }
     // أعمدة الخيارات (التنزيل العائلي + احتساب تعويض الزوجة/الأولاد): ركّبها ذاتياً،
     // وإن تعذّر أزِلها من الحفظ لتفادي الكسر
-    foreach (['apply_family_deduction', 'count_spouse_allowance', 'count_children_allowance', 'grant_spouse_addition', 'grant_children_addition'] as $flagCol) {
+    ensureEmployeeChildren20260823();
+    foreach (['apply_family_deduction', 'count_spouse_allowance', 'count_children_allowance', 'grant_spouse_addition', 'grant_children_addition', 'spouse_work_start_date'] as $flagCol) {
         try {
             ensureEmployeeFlagColumns();
             if (!$db->query("SHOW COLUMNS FROM employees LIKE '$flagCol'")->fetch()) unset($data[$flagCol]);
@@ -1217,6 +1219,8 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div class="form-group">
                         <label class="form-label">Conjoint travaille ? / هل يعمل الزوج؟</label>
+                        <small style="display:block;color:var(--gray-500);margin-bottom:4px">إذا بدأ الزوج العمل بتاريخ معيّن حدّده — الزيادة تنشال تلقائياً من ذاك التاريخ:</small>
+                        <input type="date" name="spouse_work_start_date" class="form-control" style="margin-bottom:6px" value="<?= e($employee['spouse_work_start_date'] ?? '') ?>">
                         <label class="switch">
                             <input type="checkbox" name="spouse_works" value="1" <?= $employee['spouse_works'] ? 'checked' : '' ?>>
                             <span class="slider"></span>

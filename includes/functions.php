@@ -1324,6 +1324,77 @@ function healSpouseAdditionOff20260823() {
     } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد بالفتحة التالية */ }
 }
 
+/**
+ * 👶📅 أولاد الموظفين بتواريخ ولادتهم («يشيل التنزيل من تاريخ بلوغ 18» — 2026-08-23):
+ * جدول ذاتي التركيب + عمود «تاريخ بدء عمل الزوج» + زرع أولاد سيدة النجاة من إخراجات
+ * القيد المقروءة (بتواريخهم الفعلية) فيتوقف تنزيل كل ولد تلقائياً من شهر بلوغه الـ18.
+ */
+function ensureEmployeeChildren20260823() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        $db->exec("CREATE TABLE IF NOT EXISTS employee_children (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            child_name VARCHAR(120) NULL,
+            birth_date DATE NOT NULL,
+            source VARCHAR(40) NULL,
+            UNIQUE KEY uq_child (employee_id, child_name, birth_date)
+        ) DEFAULT CHARSET=utf8mb4");
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'spouse_work_start_date'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN spouse_work_start_date DATE NULL");
+        }
+        if (getSetting('children_seed_najat_2026_08_23', '') !== '') return;
+        // زرع أولاد سيدة النجاة من إخراجات القيد المقروءة (التقريبي معلَّم بمصدره)
+        $rows = [
+            [1546, 'ماريا نادر', '2013-07-08'], [1546, 'إلاريا نادر', '2013-07-08'], [1546, 'شريل نادر', '2019-04-02'],
+            [1826, 'جويا عبود', '2020-02-12'], [1826, 'شربل عبود', '2021-12-17'],
+            [68, 'رومي السروجي', '2003-04-17'], [68, 'روبين السروجي', '2004-06-25'], [68, 'ريبيكا السروجي', '2009-05-13'], [68, 'ريا السروجي', '2011-08-18'],
+            [51, 'ألكسيا مارتينا', '2014-04-04'],
+            [1224, 'ولد أبي أنطون (تقريبي)', '2024-08-02'],
+            [1840, 'مايكل الجد', '2025-09-10'],
+            [425, 'جايمي غصين', '2024-11-28'],
+            [968, 'بيتر (تقريبي)', '2009-09-04'], [968, 'بيير (تقريبي)', '2012-08-31'],
+            [1066, 'ديزيري القارح', '1995-10-11'], [1066, 'ديانا القارح', '1997-08-14'], [1066, 'جاك القارح', '2003-08-29'],
+            [61, 'جيمي القارح', '1999-11-10'], [61, 'جان القارح', '2002-06-18'],
+            [65, 'بندليون العشي', '2004-04-20'], [65, 'أيوب العشي', '2007-02-19'], [65, 'لبيب العشي', '2008-08-01'],
+            [53, 'نقولا صليبا', '2003-03-11'], [53, 'شربل صليبا', '2005-07-25'],
+        ];
+        $ins = $db->prepare("INSERT IGNORE INTO employee_children (employee_id, child_name, birth_date, source) VALUES (?,?,?, 'family_doc')");
+        foreach ($rows as $r) {
+            // لا تزرع إلا إذا الموظف موجود (قاعدة أونلاين/محلي متطابقة الأرقام)
+            $ok = $db->query("SELECT id FROM employees WHERE id = " . (int)$r[0])->fetch();
+            if ($ok) $ins->execute($r);
+        }
+        setSetting('children_seed_najat_2026_08_23', date('Y-m-d H:i'));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-23): بعد زرع أولاد سيدة النجاة بتواريخهم، يُعاد
+ * احتساب أشهر أصحابهم المخزّنة من السنة الجارية فتسري أتمتة «سقوط تنزيل الولد من شهر
+ * بلوغه الـ18» على السنوات المولّدة مسبقاً أيضاً (2026-2027+). idempotent — محلياً وأونلاين.
+ */
+function healChildrenAutomation20260823() {
+    $flag = 'children_automation_2026_08_23';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        ensureEmployeeChildren20260823();
+        if (function_exists('set_time_limit')) @set_time_limit(600);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $cur = currentSchoolYear();
+        foreach ($db->query("SELECT DISTINCT employee_id FROM employee_children")->fetchAll(PDO::FETCH_COLUMN) as $eid) {
+            foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$eid . " AND school_year >= " . $db->quote($cur) . " ORDER BY school_year")->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                try { recalcEmployeeYear((int)$eid, $sy); } catch (Throwable $e) {}
+            }
+        }
+        setSetting($flag, date('Y-m-d H:i'));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
 function healLawfulTaxProration20260806() {
     $flag = 'lawful_tax_proration_2026_08_06';
     if (getSetting($flag, '') !== '') return;
@@ -1392,14 +1463,43 @@ function healRemoveNoFatherDuplicates20260806() {
  *     المرأة لا تأخذها عن زوج قادر على العمل — القرار النهائي بيد المستخدم عبر الزرّ.)
  * $asOf: تاريخ السريان (أحدث قيم effective_from ≤ التاريخ).
  */
-function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $grantSpouseAdd = 0, $grantChildrenAdd = 0) {
+function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $grantSpouseAdd = 0, $grantChildrenAdd = 0, $employeeId = 0) {
     if ((int)($applyFlag ?? 1) !== 1) return 0;
     try {
         $db = getDB();
+        $socialStatus = (string)$socialStatus;
+        // 📅 التأريخ التلقائي («اذا الاولاد تحت 18 واذا اكتر خلص — يشيل التنزيل من تاريخ بلوغ
+        // 18، والزوج اذا اصبح يعمل من تاريخ بدء العمل» — 2026-08-23): عند تمرير رقم الموظف:
+        //   ١) أولاده المؤرَّخون (employee_children): يُحتسب فقط من لم يبلغ 18 في أول الشهر
+        //      المطلوب ($asOf) — فيسقط تنزيل كل ولد تلقائياً من شهر بلوغه الـ18.
+        //   ٢) «تاريخ بدء عمل الزوج» (spouse_work_start_date): من ذاك التاريخ تُسقَط زيادة
+        //      الزوج تلقائياً. من لا أولاد مؤرَّخين له يبقى على فئة وضعه العائلي كما هي.
+        if ((int)$employeeId > 0) {
+            $eid = (int)$employeeId;
+            $fdKids = []; $fdSws = null;
+            try {
+                ensureEmployeeChildren20260823();
+                $kq = $db->prepare("SELECT birth_date FROM employee_children WHERE employee_id = ?");
+                $kq->execute([$eid]);
+                $fdKids = $kq->fetchAll(PDO::FETCH_COLUMN);
+                $sq = $db->prepare("SELECT spouse_work_start_date FROM employees WHERE id = ?");
+                $sq->execute([$eid]);
+                $sw = $sq->fetchColumn();
+                $fdSws = ($sw && $sw !== '0000-00-00') ? $sw : null;
+            } catch (Throwable $e) {}
+            if ($fdKids && preg_match('/^(marie|veuf|divorce)/', $socialStatus, $mPre)) {
+                $n = 0;
+                foreach ($fdKids as $dob) {
+                    if (date('Y-m-d', strtotime($dob . ' +18 years')) > $asOf) $n++;
+                }
+                $n = min(5, $n);
+                $socialStatus = $mPre[1] . ($n === 0 ? '_sans_enfants' : ($n === 1 ? '_1_enfant' : '_' . $n . '_enfants'));
+            }
+            if ($fdSws !== null && $asOf >= $fdSws) $spouseWorks = 1;
+        }
         // 🖤 الأرمل/المطلق (2026-08-23 — أرملتا سيدة النجاة): جدول القانون فيه فئات المتزوج فقط،
         // فالأرمل يُحسب على فئة المتزوج المقابلة **بلا زيادة الزوج دائماً** (لا زوج): الشخصي
         // + حصة الأولاد (تتبع مفتاح «تنزيل الأولاد» كالمعتاد). veuf/divorce بلا أولاد = الشخصي.
-        $socialStatus = (string)$socialStatus;
         if (strpos($socialStatus, 'veuf') === 0 || strpos($socialStatus, 'divorce') === 0) {
             $mapped = preg_replace('/^(veuf|divorce)/', 'marie', $socialStatus);
             $socialStatus = (strpos($mapped, 'marie_') === 0) ? $mapped : 'marie_sans_enfants';

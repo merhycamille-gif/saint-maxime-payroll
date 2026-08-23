@@ -282,7 +282,8 @@ class PayrollCalculator {
             $this->employee['apply_family_deduction'] ?? 1,
             $asOfDed,
             $this->employee['grant_spouse_addition'] ?? 0,
-            $this->employee['grant_children_addition'] ?? 0
+            $this->employee['grant_children_addition'] ?? 0,
+            (int)($this->employee['id'] ?? 0) // 📅 أتمتة الـ18 وتاريخ عمل الزوج (2026-08-23)
         );
         
         // Apply deduction

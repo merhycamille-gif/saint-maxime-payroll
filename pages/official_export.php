@@ -396,7 +396,7 @@ function mofQuarterAgg($db, $rq, $rqy, $empFilter) {
     $exempt = 0; $ids = [];
     foreach ($qDed->fetchAll() as $de) {
         $ids[] = (int)$de['id'];
-        $fda = familyDeductionAnnual($de['social_status'], $de['spouse_works'], $de['afd'], $dedAsOf, $de['gsa'] ?? 0, $de['gca'] ?? 0);
+        $fda = familyDeductionAnnual($de['social_status'], $de['spouse_works'], $de['afd'], $dedAsOf, $de['gsa'] ?? 0, $de['gca'] ?? 0, (int)$de['id']);
         $exempt += (int)min($fda / 12 * (int)$de['mcnt'], (float)$de['tb']);
     }
     $gross = (int)($g['gross'] ?? 0); $trans = (int)($g['transport'] ?? 0);
@@ -533,7 +533,7 @@ if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
         $isMar = strpos((string)($emp['social_status'] ?? ''), 'marie') === 0;
         // ٣٣٠ التنزيل العائلي: المصدر الوحيد + تجزئة بأشهر العمل، محدود بأساسه الخاضع
         $fda = familyDeductionAnnual($emp['social_status'] ?? '', $emp['spouse_works'] ?? 0,
-            $emp['apply_family_deduction'] ?? 1, $fy . '-01-01', $emp['grant_spouse_addition'] ?? 0, $emp['grant_children_addition'] ?? 0);
+            $emp['apply_family_deduction'] ?? 1, $fy . '-01-01', $emp['grant_spouse_addition'] ?? 0, $emp['grant_children_addition'] ?? 0, (int)$emp['id']);
         $fd = $mcnt ? (int)min($fda / 12 * min(12, $mcnt), (float)$tbSum) : 0;
         $tot1 = $base + $extraW + $aide + $family + $trans;  // إجمالي (١)
         $tot2 = $family + $trans;                            // غير خاضع (٢)

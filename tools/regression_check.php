@@ -2250,7 +2250,7 @@ $ox41 = (string)file_get_contents($PROJ . '/pages/official_export.php');
 check('التنزيل العائلي اختياري: ر5 ور10 وعمود كشف الرواتب كلهم على المصدر الوحيد familyDeductionAnnual',
       substr_count($ox41, "COALESCE(e.apply_family_deduction,1) afd") === 1
       && substr_count($ox41, "familyDeductionAnnual(\$de['social_status'], \$de['spouse_works'], \$de['afd']") === 1
-      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0)") !== false);
+      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0, (int)(\$r['employee_id'] ?? 0))") !== false);
 // تجربة فعلية (مع ترجيع كامل): موظف خاضع بضريبة موجبة وتنزيل ساري > 0 — طفي الخيار
 // يرفع ضريبته الشهرية، وإرجاعه يعيدها كما كانت بالمليم
 ensureEmployeeFlagColumns();
@@ -2293,7 +2293,7 @@ $rx42 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 check('عمود التنزيل العائلي: حصّة الشهر + قبل «الخاضع» + الخاضع بعد الحسم (شاشة، بالمصدر الوحيد)',
       strpos($rp42, 'التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small>') !== false
       && strpos($rp42, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false
-      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0)") !== false);
+      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0, (int)(\$r['eid'] ?? 0))") !== false);
 check('عمود التنزيل العائلي: بتصدير Excel/Word بنفس الترتيب والمنطق',
       strpos($rx42, "'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)'") !== false
       && strpos($rx42, "COALESCE(e.apply_family_deduction,1) afd") !== false
@@ -2391,7 +2391,7 @@ $of44 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('كشف رواتب كل الموظفين: عمود التنزيل العائلي (حصّة الشهر) قبل الخاضع والخاضع بعد الحسم',
       strpos($of44, '<th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th>') !== false
       && strpos($of44, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$sfd)") !== false
-      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0)") !== false);
+      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0, (int)(\$r['employee_id'] ?? 0))") !== false);
 // تجربة فعلية: صف مارسيلا بكشف 6/2026 — الحصّة ثم الخاضع بعدها بهذا الترتيب (نفس أرقام كشف الضريبة)
 $h44 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [2]);
 $p44 = mb_strpos($h44, 'مارسيلا');
@@ -2583,7 +2583,7 @@ check('تجزئة القانون: المحرّك يُسنوِن ×12 ويقسم 
       && strpos($pc51, '$monthlyTax = $annualTax / 12;') !== false
       && strpos($pc51, '$taxBase * $monthsPerYear') === false);
 check('تجزئة القانون: حصّة الشهر بالكشوف = السنوي ÷ 12 دائماً + ر5/ر10 بحصص الأشهر المعمولة + الشفاء مربوط',
-      substr_count($rp51 . $of51 . (string)file_get_contents($PROJ . '/pages/reports_export.php'), '?? 0) / 12)') >= 2
+      substr_count($rp51 . $of51 . (string)file_get_contents($PROJ . '/pages/reports_export.php'), '?? 0)) / 12)') >= 2
       && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), '$exempt += (int)min($fda / 12 * (int)$de[\'mcnt\'], (float)$de[\'tb\']);') !== false
       && function_exists('healLawfulTaxProration20260806')
       && strpos($hd51, 'healLawfulTaxProration20260806();') !== false);
@@ -3051,7 +3051,7 @@ check('اقتراحات إخراج القيد: الصفحة تعرض المعل�
 check('اقتراحات إخراج القيد: الإشارة تضوي بالقائمة (عدّاد أحمر نابض) + التطبيق يعيد الاحتساب',
       strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'taxSuggestionsPendingCount()') !== false
       && strpos((string)file_get_contents($PROJ . '/assets/css/app.css'), '@keyframes pulse') !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/tax_suggestions.php'), 'recalcEmployeeYear((int)$sg[\'employee_id\'], $sy);') !== false);
+      && strpos((string)file_get_contents($PROJ . '/pages/tax_suggestions.php'), '$recalcFrom((int)$sg[\'employee_id\']);') !== false);
 
 /* =====================================================================
  * 65) 💑 «طفي زيادة الزوج» + «الا قراري انا وانت اكيد بتكون باعتلي رسالة»
@@ -3069,6 +3069,50 @@ check('زيادة الزوج: الشفاء موصول بالهيدر + رسائ�
       && (int)$db->query("SELECT COUNT(*) FROM tax_suggestions WHERE source_key LIKE 'gsa_off_%'")->fetchColumn() >= 20);
 check('زيادة الزوج: لا موظف يأخذها إلا بقرار صريح (كلهم مطفأون الآن)',
       (int)$db->query("SELECT COUNT(*) FROM employees WHERE grant_spouse_addition=1")->fetchColumn() === 0);
+
+/* =====================================================================
+ * 66) 📅 التنزيل المؤرَّخ تلقائياً («اذا الاولاد تحت 18 واذا اكتر خلص —
+ *     يشيل التنزيل من تاريخ بلوغ 18، والزوج اذا اصبح يعمل من تاريخ بدء
+ *     العمل، مع ابتداءً من تاريخ الى تاريخ» — 2026-08-23): أولاد مؤرَّخون
+ *     (employee_children) + تاريخ بدء عمل الزوج + صفحة قرارات نعم/كلا.
+ * =================================================================== */
+ensureEmployeeChildren20260823();
+check('الأولاد المؤرَّخون: الجدول ذاتي التركيب + زرع أولاد سيدة النجاة من إخراجات القيد',
+      $db->query("SHOW TABLES LIKE 'employee_children'")->fetch() !== false
+      && (int)$db->query("SELECT COUNT(*) FROM employee_children WHERE source='family_doc'")->fetchColumn() >= 24
+      && $db->query("SHOW COLUMNS FROM employees LIKE 'spouse_work_start_date'")->fetch() !== false);
+// أتمتة الـ18 (مرسال 68: ريبيكا 13/5/2009 وريا 18/8/2011): 2 ← 1 ← 0 ولد عبر السنين
+check('أتمتة الـ18: تنزيل كل ولد يسقط من شهر بلوغه (مرسال: 540م ← 495م ← 450م)',
+      familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-06-01', 0, 1, 68) === 540000000
+      && familyDeductionAnnual('marie_2_enfants', 0, 1, '2027-06-01', 0, 1, 68) === 495000000
+      && familyDeductionAnnual('marie_2_enfants', 0, 1, '2029-09-01', 0, 1, 68) === 450000000);
+// عتبة الشهر بالضبط (لبيب العشي مواليد 1/8/2008): تموز 2026 محتسب، آب لا
+check('أتمتة الـ18: العتبة بأول الشهر (لبيب: تموز 2026 محتسب، آب 2026 ساقط)',
+      familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-07-01', 0, 1, 65) === 495000000
+      && familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-08-01', 0, 1, 65) === 450000000);
+// تاريخ بدء عمل الزوج: زاهية (18) مؤقتاً — الزيادة تسقط تلقائياً من التاريخ (مع ترجيع)
+$sw66 = $db->query("SELECT spouse_work_start_date FROM employees WHERE id = 18")->fetchColumn();
+$db->exec("UPDATE employees SET spouse_work_start_date = '2026-03-01' WHERE id = 18");
+$fd66a = familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-02-01', 1, 0, 18);
+$fd66b = familyDeductionAnnual('marie_sans_enfants', 0, 1, '2026-04-01', 1, 0, 18);
+$db->prepare("UPDATE employees SET spouse_work_start_date = ? WHERE id = 18")->execute([$sw66 ?: null]);
+check('تاريخ بدء عمل الزوج: الزيادة تسري قبله وتسقط تلقائياً منه (675م ← 450م)',
+      $fd66a === 675000000 && $fd66b === 450000000,
+      number_format($fd66a) . ' ← ' . number_format($fd66b));
+// (ملاحظة: الكاش الساكن داخل الدالة لكل طلب — بفحص CLI هذا كل نداء طلب مستقل فالقيم طازجة)
+$dec66 = renderPage('pages/tax_suggestions.php', [], [], [3]);
+check('صفحة القرارات: نعم/كلا لكل أستاذ + «تنزيله إلى تاريخ بلوغ 18» + إدارة الأولاد وتاريخ عمل الزوج',
+      strpos($dec66, 'قرارات التنزيل العائلي') !== false
+      && strpos($dec66, 'تنزيله <strong>إلى') !== false
+      && strpos($dec66, 'name="act" value="toggle_gca"') !== false
+      && strpos($dec66, 'name="act" value="toggle_gsa"') !== false
+      && strpos($dec66, 'name="act" value="add_child"') !== false
+      && strpos($dec66, 'name="act" value="spouse_start"') !== false
+      && strpos($dec66, 'FATAL') === false);
+check('المحرّك والقارئون يمرّرون رقم الموظف للأتمتة المؤرَّخة',
+      strpos((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), "(int)(\$this->employee['id'] ?? 0)") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), "(int)\$de['id']") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "(int)(\$r['eid'] ?? 0)") !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

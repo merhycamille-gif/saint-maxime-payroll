@@ -824,7 +824,7 @@ elseif ($form === 'tax_emp_report'):
             $asOfQ = sprintf('%04d-%02d-01', $y, $months[0]);
             foreach ($st->fetchAll() as $r) {
                 // المصدر الوحيد familyDeductionAnnual + تجزئة بأشهر الفصل المعمولة، بسقف خاضعه
-                $fda = familyDeductionAnnual($r['social_status'], $r['spouse_works'], $r['afd'], $asOfQ, $r['gsa'] ?? 0, $r['gca'] ?? 0);
+                $fda = familyDeductionAnnual($r['social_status'], $r['spouse_works'], $r['afd'], $asOfQ, $r['gsa'] ?? 0, $r['gca'] ?? 0, (int)$r['id']);
                 $fd = (int)min($fda / 12 * (int)$r['mcnt'], (float)$r['tb']);
                 $id = (int)$r['id'];
                 if (!isset($EMPR[$id])) {
@@ -1584,7 +1584,7 @@ elseif ($form === 'teacher_card'):
     $sfdOf = function ($r) use ($sfdAsOf) {
         if ((int)($r['income_tax_lbp'] ?? 0) + (int)($r['taxable_base_lbp'] ?? 0) === 0) return 0;
         // حصّة الشهر = السنوي ÷ 12 دائماً (القاعدة الرسمية: كل شهر معمول = 1/12 من التنزيل)
-        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $sfdAsOf, $r['gsa'] ?? 0, $r['gca'] ?? 0) / 12);
+        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $sfdAsOf, $r['gsa'] ?? 0, $r['gca'] ?? 0, (int)($r['employee_id'] ?? 0)) / 12);
     };
 ?>
     <form method="get" class="card no-print">
