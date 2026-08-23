@@ -3101,9 +3101,12 @@ check('تاريخ بدء عمل الزوج: الزيادة تسري قبله و�
       number_format($fd66a) . ' ← ' . number_format($fd66b));
 // (ملاحظة: الكاش الساكن داخل الدالة لكل طلب — بفحص CLI هذا كل نداء طلب مستقل فالقيم طازجة)
 $dec66 = renderPage('pages/tax_suggestions.php', [], [], [3]);
-check('صفحة القرارات: نعم/كلا لكل أستاذ + «تنزيله إلى تاريخ بلوغ 18» + إدارة الأولاد وتاريخ عمل الزوج',
+check('صفحة القرارات: نعم/كلا واضحة لكل أستاذ + «من (ولادته) إلى (بلوغه 18)» + إدارة الأولاد وتاريخ عمل الزوج',
       strpos($dec66, 'قرارات التنزيل العائلي') !== false
-      && strpos($dec66, 'تنزيله <strong>إلى') !== false
+      && strpos($dec66, 'تنزيله <strong>من') !== false
+      && strpos($dec66, '(بلوغه 18)') !== false
+      && (strpos($dec66, 'تنزيل الأولاد: نعم ✓') !== false || strpos($dec66, 'تنزيل الأولاد: كلا ✗') !== false)
+      && strpos($dec66, 'بيضل مطفياً حتى تضوّيه أنت') !== false
       && strpos($dec66, 'name="act" value="toggle_gca"') !== false
       && strpos($dec66, 'name="act" value="toggle_gsa"') !== false
       && strpos($dec66, 'name="act" value="add_child"') !== false

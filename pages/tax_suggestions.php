@@ -148,8 +148,8 @@ $multiS = (count(activeSchoolIds()) !== 1);
                             $b18 = date('Y-m-d', strtotime($k['birth_date'] . ' +18 years'));
                             $stillMinor = $b18 > $today; ?>
                             <div style="display:flex;justify-content:space-between;gap:6px;align-items:center;<?= $stillMinor ? '' : 'color:#94a3b8' ?>">
-                                <span><?= $stillMinor ? '🟢' : '⚪' ?> <?= e($k['child_name'] ?: 'ولد') ?> <small>(ولادة <?= e(formatDate($k['birth_date'])) ?>)</small>
-                                    — <small><?= $stillMinor ? 'تنزيله <strong>إلى ' . e(formatDate($b18)) . '</strong> (بلوغه 18)' : 'انتهى تنزيله بتاريخ ' . e(formatDate($b18)) ?></small></span>
+                                <span><?= $stillMinor ? '🟢' : '⚪' ?> <strong><?= e($k['child_name'] ?: 'ولد') ?></strong>
+                                    — <small>تنزيله <strong>من <?= e(formatDate($k['birth_date'])) ?></strong> (ولادته) <strong>إلى <?= e(formatDate($b18)) ?></strong> (بلوغه 18)<?= $stillMinor ? '' : ' — <strong>انتهى</strong>' ?></small></span>
                                 <?php if (canEdit()): ?>
                                 <form method="POST" style="display:inline"><?= csrfField() ?>
                                     <input type="hidden" name="act" value="del_child"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>"><input type="hidden" name="child_id" value="<?= (int)$k['id'] ?>">
@@ -169,12 +169,27 @@ $multiS = (count(activeSchoolIds()) !== 1);
                         </form>
                         <?php endif; ?>
                     </td>
-                    <td style="white-space:nowrap;text-align:center">
+                    <td style="white-space:nowrap;text-align:center;min-width:170px">
+                        <?php
+                        // «من تاريخ إلى تاريخ» للأولاد ككل: حتى بلوغ آخر قاصر الـ18
+                        $lastB18 = null;
+                        foreach ($kids as $k) {
+                            $b18k = date('Y-m-d', strtotime($k['birth_date'] . ' +18 years'));
+                            if ($b18k > $today && ($lastB18 === null || $b18k > $lastB18)) $lastB18 = $b18k;
+                        }
+                        ?>
                         <?php if ($e2['gca']): ?>
-                            <div style="color:#166534;font-weight:800">نعم ✓</div>
-                            <small><?= $kids ? ($activeKids ? 'محتسب الآن: ' . $activeKids . ' — ينقص تلقائياً ببلوغ كلٍّ 18' : 'لا أولاد دون 18 حالياً ⇒ صفر تلقائياً') : 'حسب وضعه العائلي' ?></small>
+                            <div style="background:#dcfce7;color:#166534;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">تنزيل الأولاد: نعم ✓</div>
+                            <div><small><?php
+                                if ($kids) {
+                                    echo $activeKids
+                                        ? 'سارٍ الآن (' . $activeKids . ' ولد) <strong>إلى ' . e(formatDate($lastB18)) . '</strong> — بعدها بيصير كلا تلقائياً'
+                                        : 'لا أولاد دون 18 ⇒ <strong>صفر تلقائياً</strong>';
+                                } else echo 'حسب وضعه العائلي (بلا تواريخ)';
+                            ?></small></div>
                         <?php else: ?>
-                            <div style="color:#991b1b;font-weight:800">كلا</div>
+                            <div style="background:#fee2e2;color:#991b1b;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">تنزيل الأولاد: كلا ✗</div>
+                            <div><small>بيضل مطفياً حتى تضوّيه أنت</small></div>
                         <?php endif; ?>
                         <?php if (canEdit()): ?>
                         <form method="POST" style="margin-top:4px"><?= csrfField() ?>
@@ -188,12 +203,14 @@ $multiS = (count(activeSchoolIds()) !== 1);
                             <small style="color:#94a3b8">— (أرمل/مطلق: لا زيادة زوج)</small>
                         <?php else: ?>
                             <?php if ($e2['gsa'] && (int)$e2['spouse_works'] === 1): ?>
-                                <div style="color:#991b1b;font-weight:800">كلا</div><small>«الزوج يعمل» ✓ يُسقطها حكماً</small>
+                                <div style="background:#fee2e2;color:#991b1b;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">زيادة الزوج: كلا ✗</div>
+                                <div><small>«الزوج يعمل» ✓ يُسقطها حكماً</small></div>
                             <?php elseif ($e2['gsa']): ?>
-                                <div style="color:#166534;font-weight:800">نعم ✓</div>
-                                <small><?= $sws ? 'إلى <strong>' . e(formatDate($sws)) . '</strong> (بدء عمل الزوج — تنشال تلقائياً)' : 'سارية بلا نهاية — حدّد تاريخ بدء عمل الزوج لتنشال تلقائياً' ?></small>
+                                <div style="background:#dcfce7;color:#166534;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">زيادة الزوج: نعم ✓</div>
+                                <div><small><?= $sws ? 'سارية <strong>إلى ' . e(formatDate($sws)) . '</strong> (بدء عمل الزوج — تنشال تلقائياً)' : 'سارية بلا نهاية — حدّد تاريخ بدء عمل الزوج لتنشال تلقائياً' ?></small></div>
                             <?php else: ?>
-                                <div style="color:#991b1b;font-weight:800">كلا</div>
+                                <div style="background:#fee2e2;color:#991b1b;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">زيادة الزوج: كلا ✗</div>
+                                <div><small>بتضل مطفية حتى تضوّيها أنت</small></div>
                             <?php endif; ?>
                             <?php if (canEdit()): ?>
                             <form method="POST" style="margin-top:4px"><?= csrfField() ?>
