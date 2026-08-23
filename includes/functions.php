@@ -1155,6 +1155,32 @@ function ensureEmployeeFlagColumns() {
  * الحالية والسنين المفتوحة اللاحقة، فتتصحّح ضريبتهم على المعادلة القانونية (×12/÷12).
  * ذوو الـ12 شهراً لا يتغيّرون (المعادلتان متطابقتان لهم). idempotent.
  */
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-23 — «ضريبة مايا ابي حبيب 0 وهيدا غلط»): مايا أبي حبيب
+ * (1754) قرّر المستخدم أن تنزيلها العائلي شخصي فقط («بس تنزيل الاستاذ لوحدو») — تُطفأ
+ * زيادة الزوج وتنزيل الأولاد بملفها ويُعاد احتساب أشهرها المخزّنة من السنة الدراسية
+ * 2025-2026 وما بعدها (فتظهر ضريبتها الفعلية بدل الصفر القديم المحسوب بالتنزيل الكامل).
+ * يعمل محلياً وأونلاين معاً (النشر يوصله والهيدر يشغّله مرة واحدة). idempotent.
+ */
+function healMayaTaxFlags20260823() {
+    $flag = 'maya_taxflags_2026_08_23';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        ensureEmployeeFlagColumns();
+        if (function_exists('set_time_limit')) @set_time_limit(300);
+        $ok = $db->query("SELECT id FROM employees WHERE id = 1754 AND last_name_ar LIKE '%حبيب%'")->fetch();
+        if ($ok) {
+            $db->exec("UPDATE employees SET grant_spouse_addition = 0, grant_children_addition = 0 WHERE id = 1754");
+            require_once __DIR__ . '/payroll_calculator.php';
+            foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = 1754 AND school_year >= '2025-2026' ORDER BY school_year")->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                try { recalcEmployeeYear(1754, $sy); } catch (Throwable $e) {}
+            }
+        }
+        setSetting($flag, date('Y-m-d H:i'));
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد بالفتحة التالية */ }
+}
+
 function healLawfulTaxProration20260806() {
     $flag = 'lawful_tax_proration_2026_08_06';
     if (getSetting($flag, '') !== '') return;

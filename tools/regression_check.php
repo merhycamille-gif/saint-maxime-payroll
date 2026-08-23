@@ -2986,6 +2986,20 @@ foreach (['pages/reports.php', 'pages/reports_export.php', 'pages/official_forms
 }
 check('تنزيل الأولاد اختياري: كل القارئين يمرّرونه (كشوف + تقرير الضريبة + ر5/ر6/ر10)', $gcaCount >= 6, 'ممرَّر بـ' . $gcaCount . ' مواضع');
 
+/* =====================================================================
+ * 62) 🩹 مايا أبي حبيب («الضريبة 0 وهيدا غلط» — 2026-08-23): تنزيلها شخصي
+ *     فقط (زيادة الزوج + الأولاد مطفيان) وشفاء ذاتي يعيد احتساب أشهرها من
+ *     2025-2026 محلياً وأونلاين — ضريبتها الشهرية المخزّنة 132,500 لا 0.
+ * =================================================================== */
+check('مايا أبي حبيب: الشفاء موصول بالهيدر (يعمل أونلاين بعد النشر)',
+      function_exists('healMayaTaxFlags20260823')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healMayaTaxFlags20260823();') !== false);
+$maya62 = $db->query("SELECT grant_spouse_addition gsa, grant_children_addition gca FROM employees WHERE id=1754")->fetch(PDO::FETCH_ASSOC);
+$tax62 = $db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=1754 AND school_year >= '2025-2026' AND school_year <= '2027-2028' AND taxable_base_lbp > 10000000 AND income_tax_lbp <= 0")->fetchColumn();
+check('مايا أبي حبيب: مفتاحا الزوج والأولاد مطفيان + لا شهر حقيقي بضريبة صفر من 2025-2026',
+      $maya62 && (int)$maya62['gsa'] === 0 && (int)$maya62['gca'] === 0 && (int)$tax62 === 0,
+      'أشهر بضريبة صفر: ' . $tax62);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
