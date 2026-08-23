@@ -1102,6 +1102,80 @@ function ensureMofProfile20260823() {
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
+/**
+ * 🏛️ محرّك تصحيح أسماء المناطق حسب قوائم أكواد الوزارة (2026-08-23 «لازم انت تصححهن
+ * متل ما كتبتهن الدولة» — البرنامج لكل المؤسسات فالتصحيح تلقائي عام لا يدوي):
+ * مطابقة بتطبيع عربي (ة/ه، أإآ/ا، ى/ي، «ال»، المسافات) على mof_r567_geo.json.
+ * 🔴 البلدة هي المرجع: إذا الوزارة حاطّتها بقضاء غير المخزَّن يتصحّح القضاء (والمحافظة) منها.
+ * يُصلَح فقط ما له حل وحيد أكيد — الملتبس (أكثر من مرشّح أو ولا واحد) يبقى لقرار المستخدم.
+ */
+function r567GeoNorm($s) {
+    $s = str_replace(['أ', 'إ', 'آ', 'ى', 'ة', 'ـ', ' ', '-'], ['ا', 'ا', 'ا', 'ي', 'ه', '', '', ''], trim((string)$s));
+    return preg_replace('/^ال/u', '', $s);
+}
+/** يعيد [محافظة، قضاء، بلدة] بتهجئة الوزارة إن وُجد حل وحيد، وإلا null */
+function r567GeoResolve($gv, $cz, $tw, array $geo) {
+    $gv = trim((string)$gv); $cz = trim((string)$cz); $tw = trim((string)$tw);
+    if ($tw === '') return null;
+    static $idx = null;
+    if ($idx === null || ($idx['sig'] ?? '') !== count($geo['towns'] ?? [])) {
+        $idx = ['sig' => count($geo['towns'] ?? []), 'gov' => [], 'caza' => [], 'town' => [], 'cazaById' => []];
+        foreach (($geo['govs'] ?? []) as $n => $id) $idx['gov'][r567GeoNorm($n)][] = ['name' => $n, 'id' => $id];
+        foreach (($geo['cazas'] ?? []) as $c) { $idx['caza'][r567GeoNorm($c['name'])][] = $c; $idx['cazaById'][$c['id']] = $c; }
+        foreach (($geo['towns'] ?? []) as $t) $idx['town'][r567GeoNorm($t['name'])][] = $t;
+    }
+    $govId = null;
+    foreach ($idx['gov'][r567GeoNorm($gv)] ?? [] as $g) { $govId = $g['id']; break; }
+    $cazaId = null;
+    foreach ($idx['caza'][r567GeoNorm($cz)] ?? [] as $c) {
+        if ($govId === null || $c['gov'] === $govId) { $cazaId = $c['id']; break; }
+    }
+    $cands = $idx['town'][r567GeoNorm($tw)] ?? [];
+    if (!$cands) return null;
+    // ١) ضمن القضاء المخزَّن → تصحيح تهجئة فقط
+    $inCaza = $cazaId !== null ? array_values(array_filter($cands, fn($t) => $t['caza'] === $cazaId)) : [];
+    // ٢) وإلا ضمن المحافظة (البلدة مرجع القضاء) ٣) وإلا الكل
+    $inGov = $govId !== null ? array_values(array_filter($cands, fn($t) => ($idx['cazaById'][$t['caza']]['gov'] ?? -1) === $govId)) : [];
+    $pick = count($inCaza) === 1 ? $inCaza[0] : (count($inGov) === 1 ? $inGov[0] : (count($cands) === 1 ? $cands[0] : null));
+    if (!$pick) return null;
+    $pc = $idx['cazaById'][$pick['caza']] ?? null;
+    if (!$pc) return null;
+    $pgName = array_search($pc['gov'], $geo['govs'] ?? [], true);
+    if ($pgName === false) return null;
+    $out = [$pgName, $pc['name'], $pick['name']];
+    return ($out[0] === $gv && $out[1] === $cz && $out[2] === $tw) ? null : $out;
+}
+/** يمسح الموظفين ويصحّح ما له حل وحيد — يعيد لائحة التصحيحات المطبَّقة */
+function r567GeoAutoFix($db, $whereSql = '1=1') {
+    $geo = json_decode((string)@file_get_contents(__DIR__ . '/../assets/templates/mof_r567_geo.json'), true) ?: [];
+    if (!$geo) return [];
+    $applied = [];
+    try {
+        $rows = $db->query("SELECT id, first_name_ar, first_name_fr, last_name_ar, last_name_fr, gouvernorat, district, ville
+            FROM employees WHERE is_deleted=0 AND COALESCE(ville,'') <> '' AND ($whereSql)")->fetchAll();
+        $upd = $db->prepare("UPDATE employees SET gouvernorat=?, district=?, ville=? WHERE id=?");
+        foreach ($rows as $r) {
+            $fix = r567GeoResolve($r['gouvernorat'], $r['district'], $r['ville'], $geo);
+            if (!$fix) continue;
+            $upd->execute([$fix[0], $fix[1], $fix[2], (int)$r['id']]);
+            $applied[] = [
+                'name' => trim((($r['first_name_ar'] ?? '') ?: ($r['first_name_fr'] ?? '')) . ' ' . (($r['last_name_ar'] ?? '') ?: ($r['last_name_fr'] ?? ''))),
+                'from' => trim($r['gouvernorat'] . ' / ' . $r['district'] . ' / ' . $r['ville']),
+                'to'   => implode(' / ', $fix),
+            ];
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+    return $applied;
+}
+/** شفاء لمرة واحدة: تصحيح أسماء المناطق لكل المدارس حسب قوائم الوزارة */
+function healR567GeoFix20260823() {
+    try {
+        if (getSetting('heal_r567_geo_20260823', '') !== '') return;
+        $n = count(r567GeoAutoFix(getDB()));
+        setSetting('heal_r567_geo_20260823', 'done:' . $n);
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
 /** يعيد ملف تعريف المؤسسة للمالية بكل المفاتيح (الفارغ = '') */
 function mofProfile($school): array {
     $defaults = ['gov'=>'','caza'=>'','town'=>'','quarter'=>'','street'=>'','cadastral'=>'','lot'=>'','building'=>'',

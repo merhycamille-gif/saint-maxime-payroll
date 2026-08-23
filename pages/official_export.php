@@ -585,6 +585,18 @@ if ($form === 'mof_r567') {
     $cazaNames = array_column($geo['cazas'] ?? [], 'name');
     $townNames = array_column($geo['towns'] ?? [], 'name');
     if (($_GET['check'] ?? '') === '1') {
+        // ✅ التصحيح التلقائي أولاً («صححهن متل ما كتبتهن الدولة»): كل بلدة لها حل وحيد
+        // بقوائم الوزارة تتصحّح فوراً بملف الموظف — والملتبس فقط يُعرض تحت لقراره
+        $autoFixed = r567GeoAutoFix($db, schoolScopeWhere('school_id'));
+        if ($autoFixed) {
+            // أعد بناء الصفوف بعد التصحيح حتى لا تُعرض القيم القديمة كمشاكل
+            foreach ($empRows as &$rr2) {
+                $q2r = $db->prepare("SELECT gouvernorat, district, ville FROM employees WHERE id=?");
+                $q2r->execute([(int)$rr2['e']['id']]);
+                if ($f2r = $q2r->fetch()) { $rr2['e']['gouvernorat'] = $f2r['gouvernorat']; $rr2['e']['district'] = $f2r['district']; $rr2['e']['ville'] = $f2r['ville']; }
+            }
+            unset($rr2);
+        }
         // 🔴 صيَغ الوزارة تطابق التسلسل لا الاسم وحده: القضاء ضمن محافظته والبلدة ضمن قضائها
         // (MATCH(بلدة & كود القضاء) — بلدة صحيحة بقضاء غلط = كود 0)
         $cazaByGov = []; $cazaId2Name = [];
@@ -640,6 +652,12 @@ if ($form === 'mof_r567') {
         echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تدقيق أسماء R567</title>'
            . '<style>body{font-family:"Segoe UI",Tahoma,sans-serif;background:#f1f5f9;padding:24px}table{border-collapse:collapse;background:#fff;width:100%;max-width:760px;margin:0 auto}td,th{border:1px solid #cbd5e1;padding:6px 12px;text-align:right}th{background:#1F4E5F;color:#fff}h2{text-align:center}</style></head><body>'
            . '<h2>تدقيق الأسماء الجغرافية على قوائم أكواد الوزارة — ' . $fy . '</h2>';
+        if ($autoFixed) {
+            echo '<p style="text-align:center;color:#166534;font-weight:700">✅ صحّحت تلقائياً ' . count($autoFixed) . ' عنواناً حسب تهجئة قوائم الوزارة:</p>'
+               . '<table style="margin-bottom:18px"><tr><th>الموظف</th><th>قبل</th><th>صار (تهجئة الوزارة)</th></tr>';
+            foreach ($autoFixed as $af) echo '<tr><td>' . e($af['name']) . '</td><td>' . e($af['from']) . '</td><td><strong>' . e($af['to']) . '</strong></td></tr>';
+            echo '</table>';
+        }
         if (!$probs) {
             echo '<p style="text-align:center;font-size:18px;color:#166534;font-weight:700">✅ كل أسماء المحافظات والأقضية والبلدات (' . count($empRows) . ' موظفاً) مطابقة لقوائم الوزارة — الأكواد رح تطلع صح.</p>';
         } else {
