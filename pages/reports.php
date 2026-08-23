@@ -174,6 +174,7 @@ function reportDocThumb($path) {
             ['url'=>$OF.'tax_r6t', 'icon'=>'fa-file-pen', 'color'=>'var(--warning)', 'fr'=>'R6/T — Rectificatif', 'ar'=>'ر6/ت تعديل'],
             ['url'=>$OF.'tax_r7', 'icon'=>'fa-user-xmark', 'color'=>'var(--danger)', 'fr'=>'R7 — Départs', 'ar'=>'ر7 تاركو العمل'],
             ['url'=>$OF.'tax_r10', 'icon'=>'fa-file-lines', 'color'=>'var(--success)', 'fr'=>'R10 — Décl. périodique', 'ar'=>'ر10 بيان دوري'],
+            ['url'=>$OF.'tax_emp_report', 'icon'=>'fa-table-list', 'color'=>'var(--danger)', 'fr'=>'État détaillé par employé', 'ar'=>'تقرير ضريبة الأستاذ - الموظف'],
         ]],
         ['title'=>'صندوق التعليم الخاص / Caisse EOC', 'icon'=>'fa-piggy-bank', 'color'=>'var(--gold)', 'tiles'=>[
             ['url'=>'?report=eoc_summary', 'icon'=>'fa-list', 'color'=>'var(--gold)', 'fr'=>'Caisse mensuelle', 'ar'=>'كشف صندوق شهري'],

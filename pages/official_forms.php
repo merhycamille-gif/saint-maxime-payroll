@@ -40,7 +40,7 @@ if (!$school && $employeeId > 0) {
 // 🔵 النماذج المؤسّسية (تصاريح الضريبة والضمان) تُصدَر باسم مؤسسة واحدة ورقمها لدى الضمان.
 // في وضع «كل المدارس» كان $school = null فتُطبَع الترويسة فارغة وتُدمَج أرقام كل المدارس
 // في تصريح واحد بلا رقم صاحب عمل. الآن نطلب اختيار مدرسة بوضوح.
-$institutionForms = ['tax_r5','tax_r10','tax_r7','cnss_annual','cnss_contrib_monthly','cnss_contrib_annual','cnss_nominative_monthly'];
+$institutionForms = ['tax_r5','tax_r10','tax_r7','tax_emp_report','cnss_annual','cnss_contrib_monthly','cnss_contrib_annual','cnss_nominative_monthly'];
 if (in_array($form, $institutionForms, true) && !$school) {
     $_SESSION['flash_error'] = 'هذا التصريح يُصدَر لمدرسة واحدة — اختر المدرسة من الأعلى أولاً. / Choisissez une seule école.';
     header('Location: ' . BASE_URL . 'pages/tax_declarations.php');
@@ -177,6 +177,7 @@ $titles = [
     'tax_r6t'        => 'Formulaire R6/T — état annuel individuel rectificatif / نموذج ر6/ت — تعديل كشف سنوي إفرادي',
     'tax_r4'         => 'Formulaire R4 — fiche de renseignements + charges de famille / نموذج ر4 — بيان معلومات + جدول العيال',
     'tax_r7'         => 'Formulaire R7 — état des départs en cours d\'année / نموذج ر7 — كشف تاركي العمل خلال السنة',
+    'tax_emp_report' => 'État nominatif détaillé de l\'impôt / تقرير ضريبة الأستاذ - الموظف (تفصيلي)',
     'tax_r10'        => 'Formulaire R10 — état périodique de versement de l\'impôt / نموذج ر10 — بيان دوري بتأدية الضريبة',
     'tax_register'   => 'Formulaire R3 — demande d\'inscription d\'un nouveau salarié / نموذج ر3 — طلب تسجيل مستخدم/أجير جديد',
     'teacher_card'   => 'Fiche de l\'enseignant / بطاقة الأستاذ',
@@ -283,7 +284,7 @@ echo officialFormStyles();
 $ofFilterableForms = ['salary_all', 'payment_list', 'full_register', 'general_report', 'differences',
     'employer_cost', 'general_info', 'salary_detail', 'teaching_staff', 'eoc_staff', 'eoc_quarterly',
     'cnss_nominative_monthly', 'cnss_annual', 'cnss_contrib_monthly', 'cnss_contrib_annual',
-    'tax_r5', 'tax_r10', 'tax_r7', 'staff_stats'];
+    'tax_r5', 'tax_r10', 'tax_r7', 'tax_emp_report', 'staff_stats'];
 if ($form !== '' && in_array($form, $ofFilterableForms, true)):
 ?>
 <form method="get" class="card no-print">
@@ -775,6 +776,168 @@ elseif ($form === 'tax_r5'):
             </div>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج ر5 الرسمي</strong> (قالب ملفك نفسه) معبّأً تلقائياً: المؤسسة ورقمها المالي وعنوانها والمكلف بتبليغ البريد ومحضّر التصريح والموقّع، وسطور السنة الميلادية ١٠٠–١٩٠ (مجموع الفصول الأربعة — يطابق نماذج ر10 بالمليم) و٢٥١–٢٩٠ من monthly_salaries حصراً<?= $ofFilterTitle !== '' ? ' — الفلتر: ' . e($ofFilterTitle) : '' ?>.</p>
         </div>
+    </div>
+<?php
+    include __DIR__ . '/../includes/footer.php';
+    exit;
+
+/* =====================================================================
+ * 🧾 تقرير ضريبة الأستاذ - الموظف («بدي تقرير مرتب بكامل التفاصيل» — رسمته
+ * Desktop\تقرير ضريبة الاستاذ-الموظف.xlsx ‏2026-08-23): كشف اسمي مفصّل بأعمدة
+ * سطور ر5/ر10 نفسها لكل موظف عن فترة من–إلى (أشهر ميلادية)، محسوباً فصلاً ففصلاً
+ * بمنطق ر10 المعتمد نفسه — فمجموعه يطابق ر10 للفصل ور5 للسنة الميلادية بالمليم.
+ * =================================================================== */
+elseif ($form === 'tax_emp_report'):
+    $rqNow = intdiv((int)date('n') - 1, 3) + 1;
+    $defQ = $rqNow - 1; $defY = (int)date('Y');
+    if ($defQ < 1) { $defQ = 4; $defY--; }
+    $qmMap = [1 => [1, 2, 3], 2 => [4, 5, 6], 3 => [7, 8, 9], 4 => [10, 11, 12]];
+    $fm  = (int)($_GET['fm'] ?? $qmMap[$defQ][0]);
+    $fyr = (int)($_GET['fyr'] ?? $defY);
+    $tm  = (int)($_GET['tm'] ?? $qmMap[$defQ][2]);
+    $tyr = (int)($_GET['tyr'] ?? $defY);
+    $fm = min(12, max(1, $fm)); $tm = min(12, max(1, $tm));
+    if ($fyr < 2000 || $fyr > 2100) $fyr = $defY;
+    if ($tyr < 2000 || $tyr > 2100) $tyr = $defY;
+    if ($tyr * 100 + $tm < $fyr * 100 + $fm) { $tyr = $fyr; $tm = $fm; }
+    // المدى يُقسَّم فصولاً ميلادية — كل فصل بفلتر سنته الدراسية وتنزيله العائلي المجزّأ (متل ر10)
+    $EMPR = [];
+    for ($y = $fyr; $y <= $tyr; $y++) {
+        foreach ($qmMap as $qq => $qmm) {
+            $months = array_values(array_filter($qmm, fn($m) => ($y * 100 + $m) >= ($fyr * 100 + $fm) && ($y * 100 + $m) <= ($tyr * 100 + $tm)));
+            if (!$months) continue;
+            $syQ = ($qq === 4) ? ($y . '-' . ($y + 1)) : (($y - 1) . '-' . $y);
+            [$yfq, $ypq] = yearEmploymentFilter($syQ, 'e.');
+            $inQ = implode(',', $months);
+            $st = $db->prepare("SELECT e.id, e.school_id, e.employee_type,
+                    e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+                    e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction,1) afd, COALESCE(e.grant_spouse_addition,1) gsa,
+                    SUM(ms.base_plus_echelon_lbp) base, SUM(ms.extra_lbp+ms.prime_fixe_lbp) extraw,
+                    SUM(ms.aide_complementaire_lbp) aide, SUM(ms.transport_lbp) trans,
+                    SUM(ms.caisse_amount_lbp+ms.eoc_grade_lbp) other,
+                    SUM(ms.taxable_base_lbp) tb, SUM(ms.income_tax_lbp) tax, COUNT(DISTINCT ms.month) mcnt
+                FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+                WHERE e.is_deleted=0 AND e.tax_subject=1" . $yfq . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($inQ)
+                  AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
+                GROUP BY e.id");
+            $st->execute(array_merge($ypq, [$y]));
+            $asOfQ = sprintf('%04d-%02d-01', $y, $months[0]);
+            foreach ($st->fetchAll() as $r) {
+                // المصدر الوحيد familyDeductionAnnual + تجزئة بأشهر الفصل المعمولة، بسقف خاضعه
+                $fda = familyDeductionAnnual($r['social_status'], $r['spouse_works'], $r['afd'], $asOfQ, $r['gsa'] ?? 1);
+                $fd = (int)min($fda / 12 * (int)$r['mcnt'], (float)$r['tb']);
+                $id = (int)$r['id'];
+                if (!isset($EMPR[$id])) {
+                    $EMPR[$id] = ['type' => $r['employee_type'], 'school_id' => (int)$r['school_id'],
+                        'name' => (trim($r['first_name_ar'] . ' ' . $r['last_name_ar']) ?: trim($r['first_name_fr'] . ' ' . $r['last_name_fr'])),
+                        'base' => 0, 'extraw' => 0, 'aide' => 0, 'trans' => 0, 'other' => 0, 'tb' => 0, 'tax' => 0, 'fd' => 0, 'months' => 0];
+                }
+                foreach (['base', 'extraw', 'aide', 'trans', 'other', 'tb', 'tax'] as $k) $EMPR[$id][$k] += (int)$r[$k];
+                $EMPR[$id]['fd'] += $fd;
+                $EMPR[$id]['months'] += (int)$r['mcnt'];
+            }
+        }
+    }
+    $typeOrd = ['enseignant_titulaire' => 0, 'enseignant_contractuel' => 1, 'employe' => 2];
+    uasort($EMPR, fn($a, $b) => [($typeOrd[$a['type']] ?? 9), $a['name']] <=> [($typeOrd[$b['type']] ?? 9), $b['name']]);
+    $multiS = (count(activeSchoolIds()) !== 1);
+    $lbpOrBlank = fn($v) => ((int)$v) ? formatLBP((int)$v, false) : '';
+    $monthsAr = []; for ($mm = 1; $mm <= 12; $mm++) $monthsAr[$mm] = monthName($mm, 'ar');
+?>
+    <form method="get" class="card no-print">
+        <input type="hidden" name="form" value="tax_emp_report">
+        <?php if ($empTypeSel !== ''): ?><input type="hidden" name="emp_type" value="<?= e($empTypeSel) ?>"><?php endif; ?>
+        <?php if ($taxSubSel !== ''): ?><input type="hidden" name="tax_sub" value="<?= e($taxSubSel) ?>"><?php endif; ?>
+        <div class="card-body form-row cols-3">
+            <div class="form-group mb-0"><label class="form-label">Du (mois) / الفترة من شهر</label>
+                <select name="fm" class="form-select"><?php foreach ($monthsAr as $mm => $mn): ?><option value="<?= $mm ?>" <?= $mm === $fm ? 'selected' : '' ?>><?= e($mn) ?></option><?php endforeach; ?></select></div>
+            <div class="form-group mb-0"><label class="form-label">Année / سنة</label>
+                <input type="number" name="fyr" class="form-control" value="<?= $fyr ?>" min="2000" max="2100"></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label></div>
+            <div class="form-group mb-0"><label class="form-label">Au (mois) / إلى شهر</label>
+                <select name="tm" class="form-select"><?php foreach ($monthsAr as $mm => $mn): ?><option value="<?= $mm ?>" <?= $mm === $tm ? 'selected' : '' ?>><?= e($mn) ?></option><?php endforeach; ?></select></div>
+            <div class="form-group mb-0"><label class="form-label">Année / سنة</label>
+                <input type="number" name="tyr" class="form-control" value="<?= $tyr ?>" min="2000" max="2100"></div>
+            <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
+        </div>
+    </form>
+    <div id="ppExportArea" class="land-report">
+    <?= docSheetStart('État nominatif détaillé de l\'impôt — enseignants & employés',
+                      'تقرير ضريبة الأستاذ - الموظف (تفصيلي)',
+                      ['الفترة من ' . monthName($fm, 'ar') . ' ' . $fyr . ' إلى ' . monthName($tm, 'ar') . ' ' . $tyr,
+                       'عدد الموظفين: ' . count($EMPR)], ['comp' => false]) ?>
+        <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
+            <thead><tr>
+                <th>الرقم</th>
+                <?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
+                <th>الاسم والشهرة</th>
+                <th>الأساسي<br><small>(أساس + درجات)</small></th>
+                <th>الأجر الإضافي</th>
+                <th>مكافأة ومساعدة</th>
+                <th>تعويض النقل</th>
+                <th style="background:#4338ca">الإجمالي</th>
+                <th>ينزل: تعويضات<br>نقل وانتقال</th>
+                <th>تعويضات تمثيل</th>
+                <th>تنزيلات أخرى<br><small>(صندوق + درجة)</small></th>
+                <th>المبالغ الصافية</th>
+                <th>التنزيل<br>العائلي</th>
+                <th>الرواتب الخاضعة<br>للضريبة</th>
+                <th style="background:#b91c1c">الضريبة المتوجبة</th>
+            </tr></thead>
+            <tbody>
+            <?php
+            $T = ['base' => 0, 'extraw' => 0, 'aide' => 0, 'trans' => 0, 'other' => 0, 'tb' => 0, 'tax' => 0, 'fd' => 0, 'gross' => 0, 'taxable' => 0];
+            $i = 0;
+            foreach ($EMPR as $er):
+                $i++;
+                $gross = $er['base'] + $er['extraw'] + $er['aide'] + $er['trans'];
+                $taxable = max(0, $er['tb'] - $er['fd']);
+                foreach (['base', 'extraw', 'aide', 'trans', 'other', 'tb', 'tax', 'fd'] as $k) $T[$k] += $er[$k];
+                $T['gross'] += $gross; $T['taxable'] += $taxable;
+            ?>
+                <tr>
+                    <td><?= $i ?></td>
+                    <?php if ($multiS): ?><td><small><?= e(schoolNameById($er['school_id'], 'ar')) ?></small></td><?php endif; ?>
+                    <td style="text-align:right"><?= e($er['name']) ?></td>
+                    <td class="num"><?= $lbpOrBlank($er['base']) ?></td>
+                    <td class="num"><?= $lbpOrBlank($er['extraw']) ?></td>
+                    <td class="num"><?= $lbpOrBlank($er['aide']) ?></td>
+                    <td class="num"><?= $lbpOrBlank($er['trans']) ?></td>
+                    <td class="num"><strong><?= formatLBP($gross, false) ?></strong></td>
+                    <td class="num"><?= $lbpOrBlank($er['trans']) ?></td>
+                    <td class="num"></td>
+                    <td class="num"><?= $lbpOrBlank($er['other']) ?></td>
+                    <td class="num"><?= formatLBP($er['tb'], false) ?></td>
+                    <td class="num"><?= $lbpOrBlank($er['fd']) ?></td>
+                    <td class="num"><strong><?= formatLBP($taxable, false) ?></strong></td>
+                    <td class="num"><strong><?= $lbpOrBlank($er['tax']) ?: '0' ?></strong></td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if (!$EMPR): ?><tr><td colspan="<?= $multiS ? 16 : 15 ?>" class="text-center">لا رواتب محتسبة بهذه الفترة / Aucun salaire calculé sur cette période</td></tr><?php endif; ?>
+            </tbody>
+            <?php if ($EMPR): ?>
+            <tfoot><tr class="total-row">
+                <td colspan="<?= $multiS ? 3 : 2 ?>">المجموع (<?= count($EMPR) ?> موظفاً)</td>
+                <td class="num"><strong><?= formatLBP($T['base'], false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP($T['extraw'], false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP($T['aide'], false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP($T['trans'], false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP($T['gross'], false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP($T['trans'], false) ?></strong></td>
+                <td class="num"></td>
+                <td class="num"><strong><?= formatLBP($T['other'], false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP($T['tb'], false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP($T['fd'], false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP($T['taxable'], false) ?></strong></td>
+                <td class="num"><strong><?= formatLBP($T['tax'], false) ?></strong></td>
+            </tr></tfoot>
+            <?php endif; ?>
+        </table></div>
+        <p style="font-size:12pt;margin-top:8px" class="doc-note">
+            الأعمدة بترابط سطور نموذج ر5/ر10 نفسه: الإجمالي (١٢٠) − النقل (١٣٠) − التمثيل (١٤٠) − التنزيلات الأخرى (١٥٠) = المبالغ الصافية (١٦٠)،
+            والصافية − التنزيل العائلي (١٧٠) = الخاضع للضريبة (١٨٠) — ومجاميع هذا الكشف تطابق نموذج ر10 للفصل ونموذج ر5 للسنة الميلادية نفسها بالمليم.
+        </p>
+    <?= docSheetEnd() ?>
     </div>
 <?php
     include __DIR__ . '/../includes/footer.php';
