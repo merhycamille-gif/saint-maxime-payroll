@@ -3101,14 +3101,14 @@ check('تاريخ بدء عمل الزوج: الزيادة تسري قبله و�
       number_format($fd66a) . ' ← ' . number_format($fd66b));
 // (ملاحظة: الكاش الساكن داخل الدالة لكل طلب — بفحص CLI هذا كل نداء طلب مستقل فالقيم طازجة)
 $dec66 = renderPage('pages/tax_suggestions.php', [], [], [3]);
-check('صفحة القرارات: نعم/كلا واضحة لكل أستاذ + «من (ولادته) إلى (بلوغه 18)» + إدارة الأولاد وتاريخ عمل الزوج',
+check('صفحة القرارات: تشاك مارك نعم/كلا يطبَّق فوراً بملف الأستاذ + «من (ولادته) إلى (بلوغه 18)» + إدارة الأولاد وتاريخ عمل الزوج',
       strpos($dec66, 'قرارات التنزيل العائلي') !== false
       && strpos($dec66, 'تنزيله <strong>من') !== false
       && strpos($dec66, '(بلوغه 18)') !== false
-      && (strpos($dec66, 'تنزيل الأولاد: نعم ✓') !== false || strpos($dec66, 'تنزيل الأولاد: كلا ✗') !== false)
-      && strpos($dec66, 'بيضل مطفياً حتى تضوّيه أنت') !== false
-      && strpos($dec66, 'name="act" value="toggle_gca"') !== false
-      && strpos($dec66, 'name="act" value="toggle_gsa"') !== false
+      && strpos($dec66, 'name="act" value="set_gca"') !== false
+      && strpos($dec66, 'name="act" value="set_gsa"') !== false
+      && strpos($dec66, 'type="radio" name="val"') !== false
+      && strpos($dec66, 'onchange="this.form.submit()"') !== false
       && strpos($dec66, 'name="act" value="add_child"') !== false
       && strpos($dec66, 'name="act" value="spouse_start"') !== false
       && strpos($dec66, 'FATAL') === false);

@@ -32,14 +32,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit()) {
     $empId = (int)($_POST['emp'] ?? 0);
     $empOk = $empId ? $db->query("SELECT id FROM employees WHERE id = $empId AND is_deleted = 0 AND " . schoolScopeWhere('school_id'))->fetch() : null;
 
-    if ($act === 'toggle_gca' && $empOk) {
-        $db->prepare("UPDATE employees SET grant_children_addition = 1 - COALESCE(grant_children_addition,0) WHERE id = ?")->execute([$empId]);
+    if ($act === 'set_gca' && $empOk) {
+        // ☑ تشاك مارك مباشر («بس حط تشاك مارك على نعم او كلا بطبقو بملف الاستاذ» — 2026-08-23)
+        $v = ((string)($_POST['val'] ?? '') === '1') ? 1 : 0;
+        $db->prepare("UPDATE employees SET grant_children_addition = ? WHERE id = ?")->execute([$v, $empId]);
         $recalcFrom($empId);
-        $_SESSION['flash_success'] = 'تبدّل تنزيل الأولاد وأُعيد احتساب رواتبه تلقائياً / Abattement enfants basculé et recalculé.';
-    } elseif ($act === 'toggle_gsa' && $empOk) {
-        $db->prepare("UPDATE employees SET grant_spouse_addition = 1 - COALESCE(grant_spouse_addition,0) WHERE id = ?")->execute([$empId]);
+        $_SESSION['flash_success'] = 'تنزيل الأولاد صار: ' . ($v ? 'نعم ✓' : 'كلا ✗') . ' — انطبق بملفه وأُعيد الاحتساب / Appliqué et recalculé.';
+    } elseif ($act === 'set_gsa' && $empOk) {
+        $v = ((string)($_POST['val'] ?? '') === '1') ? 1 : 0;
+        $db->prepare("UPDATE employees SET grant_spouse_addition = ? WHERE id = ?")->execute([$v, $empId]);
         $recalcFrom($empId);
-        $_SESSION['flash_success'] = 'تبدّلت زيادة الزوج/الزوجة وأُعيد الاحتساب / Majoration conjoint basculée et recalculée.';
+        $_SESSION['flash_success'] = 'زيادة الزوج صارت: ' . ($v ? 'نعم ✓' : 'كلا ✗') . ' — انطبقت بملفه وأُعيد الاحتساب / Appliqué et recalculé.';
     } elseif ($act === 'spouse_start' && $empOk) {
         $d = $_POST['spouse_work_start_date'] ?? '';
         $d = preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) ? $d : null;
@@ -178,45 +181,52 @@ $multiS = (count(activeSchoolIds()) !== 1);
                             if ($b18k > $today && ($lastB18 === null || $b18k > $lastB18)) $lastB18 = $b18k;
                         }
                         ?>
-                        <?php if ($e2['gca']): ?>
-                            <div style="background:#dcfce7;color:#166534;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">تنزيل الأولاد: نعم ✓</div>
-                            <div><small><?php
+                        <?php if (canEdit()): ?>
+                        <form method="POST"><?= csrfField() ?>
+                            <input type="hidden" name="act" value="set_gca"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>">
+                            <label style="display:inline-flex;align-items:center;gap:5px;background:<?= $e2['gca'] ? '#dcfce7' : '#f8fafc' ?>;border:2px solid <?= $e2['gca'] ? '#16a34a' : '#e2e8f0' ?>;border-radius:8px;padding:4px 12px;font-weight:800;color:#166534;cursor:pointer">
+                                <input type="radio" name="val" value="1" <?= $e2['gca'] ? 'checked' : '' ?> onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#16a34a"> نعم
+                            </label>
+                            <label style="display:inline-flex;align-items:center;gap:5px;background:<?= $e2['gca'] ? '#f8fafc' : '#fee2e2' ?>;border:2px solid <?= $e2['gca'] ? '#e2e8f0' : '#dc2626' ?>;border-radius:8px;padding:4px 12px;font-weight:800;color:#991b1b;cursor:pointer">
+                                <input type="radio" name="val" value="0" <?= $e2['gca'] ? '' : 'checked' ?> onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#dc2626"> كلا
+                            </label>
+                        </form>
+                        <?php else: ?>
+                            <div style="font-weight:800;color:<?= $e2['gca'] ? '#166534' : '#991b1b' ?>"><?= $e2['gca'] ? 'نعم ✓' : 'كلا ✗' ?></div>
+                        <?php endif; ?>
+                        <div><small><?php
+                            if ($e2['gca']) {
                                 if ($kids) {
                                     echo $activeKids
-                                        ? 'سارٍ الآن (' . $activeKids . ' ولد) <strong>إلى ' . e(formatDate($lastB18)) . '</strong> — بعدها بيصير كلا تلقائياً'
+                                        ? 'سارٍ <strong>من اليوم إلى ' . e(formatDate($lastB18)) . '</strong> (بلوغ آخر ولد 18 — بعدها كلا تلقائياً)'
                                         : 'لا أولاد دون 18 ⇒ <strong>صفر تلقائياً</strong>';
                                 } else echo 'حسب وضعه العائلي (بلا تواريخ)';
-                            ?></small></div>
-                        <?php else: ?>
-                            <div style="background:#fee2e2;color:#991b1b;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">تنزيل الأولاد: كلا ✗</div>
-                            <div><small>بيضل مطفياً حتى تضوّيه أنت</small></div>
-                        <?php endif; ?>
-                        <?php if (canEdit()): ?>
-                        <form method="POST" style="margin-top:4px"><?= csrfField() ?>
-                            <input type="hidden" name="act" value="toggle_gca"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>">
-                            <button class="btn <?= $e2['gca'] ? 'btn-secondary' : 'btn-success' ?>" style="padding:2px 10px" onclick="return confirm('يُبدَّل تنزيل الأولاد ويُعاد الاحتساب — أكيد؟')"><?= $e2['gca'] ? 'طفّيه' : 'ضوّيه' ?></button>
-                        </form>
-                        <?php endif; ?>
+                            } else echo 'كلا — ما بينزل';
+                        ?></small></div>
                     </td>
                     <td style="white-space:nowrap;text-align:center">
                         <?php if ($isVeuf): ?>
                             <small style="color:#94a3b8">— (أرمل/مطلق: لا زيادة زوج)</small>
                         <?php else: ?>
-                            <?php if ($e2['gsa'] && (int)$e2['spouse_works'] === 1): ?>
-                                <div style="background:#fee2e2;color:#991b1b;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">زيادة الزوج: كلا ✗</div>
-                                <div><small>«الزوج يعمل» ✓ يُسقطها حكماً</small></div>
-                            <?php elseif ($e2['gsa']): ?>
-                                <div style="background:#dcfce7;color:#166534;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">زيادة الزوج: نعم ✓</div>
-                                <div><small><?= $sws ? 'سارية <strong>إلى ' . e(formatDate($sws)) . '</strong> (بدء عمل الزوج — تنشال تلقائياً)' : 'سارية بلا نهاية — حدّد تاريخ بدء عمل الزوج لتنشال تلقائياً' ?></small></div>
-                            <?php else: ?>
-                                <div style="background:#fee2e2;color:#991b1b;font-weight:800;font-size:14px;border-radius:8px;padding:4px 10px;display:inline-block">زيادة الزوج: كلا ✗</div>
-                                <div><small>بتضل مطفية حتى تضوّيها أنت</small></div>
-                            <?php endif; ?>
                             <?php if (canEdit()): ?>
-                            <form method="POST" style="margin-top:4px"><?= csrfField() ?>
-                                <input type="hidden" name="act" value="toggle_gsa"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>">
-                                <button class="btn <?= $e2['gsa'] ? 'btn-secondary' : 'btn-success' ?>" style="padding:2px 10px" onclick="return confirm('تُبدَّل زيادة الزوج ويُعاد الاحتساب — أكيد؟')"><?= $e2['gsa'] ? 'طفّيها' : 'ضوّيها' ?></button>
+                            <form method="POST"><?= csrfField() ?>
+                                <input type="hidden" name="act" value="set_gsa"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>">
+                                <label style="display:inline-flex;align-items:center;gap:5px;background:<?= $e2['gsa'] ? '#dcfce7' : '#f8fafc' ?>;border:2px solid <?= $e2['gsa'] ? '#16a34a' : '#e2e8f0' ?>;border-radius:8px;padding:4px 12px;font-weight:800;color:#166534;cursor:pointer">
+                                    <input type="radio" name="val" value="1" <?= $e2['gsa'] ? 'checked' : '' ?> onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#16a34a"> نعم
+                                </label>
+                                <label style="display:inline-flex;align-items:center;gap:5px;background:<?= $e2['gsa'] ? '#f8fafc' : '#fee2e2' ?>;border:2px solid <?= $e2['gsa'] ? '#e2e8f0' : '#dc2626' ?>;border-radius:8px;padding:4px 12px;font-weight:800;color:#991b1b;cursor:pointer">
+                                    <input type="radio" name="val" value="0" <?= $e2['gsa'] ? '' : 'checked' ?> onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#dc2626"> كلا
+                                </label>
                             </form>
+                            <?php else: ?>
+                                <div style="font-weight:800;color:<?= $e2['gsa'] ? '#166534' : '#991b1b' ?>"><?= $e2['gsa'] ? 'نعم ✓' : 'كلا ✗' ?></div>
+                            <?php endif; ?>
+                            <div><small><?php
+                                if ($e2['gsa'] && (int)$e2['spouse_works'] === 1) echo '«الزوج يعمل» ✓ يُسقطها حكماً';
+                                elseif ($e2['gsa']) echo $sws ? 'سارية <strong>من اليوم إلى ' . e(formatDate($sws)) . '</strong> (بدء عمل الزوج — تنشال تلقائياً)' : 'سارية بلا نهاية — حدّد تاريخ بدء عمل الزوج لتنشال تلقائياً';
+                                else echo 'كلا — ما بتنزل';
+                            ?></small></div>
+                            <?php if (canEdit()): ?>
                             <form method="POST" style="display:flex;gap:4px;margin-top:4px;justify-content:center"><?= csrfField() ?>
                                 <input type="hidden" name="act" value="spouse_start"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>">
                                 <input type="date" name="spouse_work_start_date" class="form-control" style="max-width:150px;padding:3px 8px" value="<?= e($sws ?? '') ?>" title="تاريخ بدء عمل الزوج">
