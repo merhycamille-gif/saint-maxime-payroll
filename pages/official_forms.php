@@ -177,7 +177,7 @@ $titles = [
     'tax_r6t'        => 'Formulaire R6/T — état annuel individuel rectificatif / نموذج ر6/ت — تعديل كشف سنوي إفرادي',
     'tax_r4'         => 'Formulaire R4 — fiche de renseignements + charges de famille / نموذج ر4 — بيان معلومات + جدول العيال',
     'tax_r7'         => 'Formulaire R7 — état des départs en cours d\'année / نموذج ر7 — كشف تاركي العمل خلال السنة',
-    'tax_emp_report' => 'État nominatif détaillé de l\'impôt / تقرير ضريبة الأستاذ - الموظف (تفصيلي)',
+    'tax_emp_report' => 'Impôt sur le revenu — enseignant/employé (détaillé) / تقرير ضريبة الدخل - الأستاذ/الموظف',
     'tax_r10'        => 'Formulaire R10 — état périodique de versement de l\'impôt / نموذج ر10 — بيان دوري بتأدية الضريبة',
     'tax_register'   => 'Formulaire R3 — demande d\'inscription d\'un nouveau salarié / نموذج ر3 — طلب تسجيل مستخدم/أجير جديد',
     'teacher_card'   => 'Fiche de l\'enseignant / بطاقة الأستاذ',
@@ -862,8 +862,8 @@ elseif ($form === 'tax_emp_report'):
         </div>
     </form>
     <div id="ppExportArea" class="land-report">
-    <?= docSheetStart('État nominatif détaillé de l\'impôt — enseignants & employés',
-                      'تقرير ضريبة الأستاذ - الموظف (تفصيلي)',
+    <?= docSheetStart('Impôt sur le revenu — enseignant/employé (état nominatif détaillé)',
+                      'تقرير ضريبة الدخل - الأستاذ/الموظف',
                       ['الفترة من ' . monthName($fm, 'ar') . ' ' . $fyr . ' إلى ' . monthName($tm, 'ar') . ' ' . $tyr,
                        'عدد الموظفين: ' . count($EMPR)], ['comp' => false]) ?>
         <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
