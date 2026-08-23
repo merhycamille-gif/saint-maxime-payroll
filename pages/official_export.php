@@ -420,11 +420,13 @@ function mofOverlayServe($tplKey, $titleAr, array $vals, array $widths = []) {
         if ($v === '' || !isset($cells[$ref])) continue;
         $p = $cells[$ref];
         $fs = (float)$p['fs'];
-        // تصغير تلقائي للنص الطويل (متل shrinkToFit بخانات الأسماء بالقالب)
-        if (isset($widths[$ref])) {
+        // تصغير تلقائي للنص الطويل (متل shrinkToFit): الحدّ = المساحة المقيسة حتى أقرب
+        // تسمية مطبوعة (w بpos.json — «القيم فوق التسميات» p1 ‏2026-08-23) أو حدّ صريح
+        $maxw = $widths[$ref] ?? ($p['w'] ?? null);
+        if ($maxw !== null) {
             $len = function_exists('mb_strlen') ? mb_strlen($v, 'UTF-8') : strlen($v);
             $estPct = $len * $fs * 0.52 / 5.9532; // عرض تقريبي ٪ من عرض A4
-            if ($estPct > $widths[$ref]) $fs = max(6.0, round($fs * $widths[$ref] / $estPct, 1));
+            if ($estPct > $maxw) $fs = max(6.0, round($fs * $maxw / $estPct, 1));
         }
         $style = 'top:' . $p['y'] . '%;font-size:' . $fs . 'pt';
         if ($p['a'] === 'c') $style .= ';left:' . $p['x'] . '%;transform:translateX(-50%)';
