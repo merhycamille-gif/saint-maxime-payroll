@@ -475,6 +475,40 @@ function mofYearEmpData($db, $fy, $empFilter) {
     return ['rows' => $rows, 'sum' => $S];
 }
 
+/** 🟰 الفصل إفرادياً بالطريقة التراكمية («انتبه ر5 كمان بدها تكون مجموع ر10 على أربع
+ *  فصول» 2026-08-24): مبالغ الفصل = مجاميع أشهره موظفاً موظفاً، والتنزيل العائلي/الخاضع
+ *  = تراكمي السنة حتى آخر الفصل − تراكمي ما قبله (mofCumTax) — فمجموع الفصول الأربعة
+ *  يساوي السنوي الإفرادي (mofYearEmpData = ر5 = صفوف ر6) بالمليم حتماً. */
+function mofQuarterEmpData($db, $rq, $rqy, $empFilter) {
+    $S = ['paid' => 0, 'trans' => 0, 'fam' => 0, 'other' => 0, 'tb' => 0, 'fd' => 0, 'net' => 0, 'tax' => 0, 'cnt' => 0];
+    $ids = mofQuarterAgg($db, $rq, $rqy, $empFilter)['ids'];
+    if (!$ids) return ['sum' => $S];
+    $in = implode(',', array_map('intval', $ids));
+    $m1 = ($rq - 1) * 3 + 1; $m3 = $rq * 3;
+    $agg = $db->prepare("SELECT SUM(base_plus_echelon_lbp+extra_lbp+prime_fixe_lbp+aide_complementaire_lbp) tot3,
+            SUM(family_allowance_lbp) fam, SUM(transport_lbp) trans,
+            SUM(taxable_base_lbp) tb, SUM(income_tax_lbp) tax, COUNT(DISTINCT month) mcnt
+        FROM monthly_salaries WHERE employee_id=? AND year=? AND month BETWEEN ? AND ?
+          AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
+    foreach ($db->query("SELECT * FROM employees WHERE id IN ($in)")->fetchAll() as $e9) {
+        $agg->execute([(int)$e9['id'], $rqy, $m1, $m3]);
+        $q9 = $agg->fetch() ?: [];
+        if (!(int)($q9['mcnt'] ?? 0)) continue;
+        $C9 = mofCumTax($db, $e9, $rqy, $m3);
+        $P9 = mofCumTax($db, $e9, $rqy, $m1 - 1);
+        $tot39 = (int)$q9['tot3']; $tb9 = (int)$q9['tb'];
+        $S['paid'] += $tot39 + (int)$q9['fam'] + (int)$q9['trans'];
+        $S['trans'] += (int)$q9['trans']; $S['fam'] += (int)$q9['fam'];
+        $S['other'] += max(0, $tot39 - $tb9);
+        $S['tb'] += $tb9;
+        $S['fd'] += $C9['fd'] - $P9['fd'];
+        $S['net'] += $C9['net'] - $P9['net'];
+        $S['tax'] += (int)$q9['tax'];
+        $S['cnt']++;
+    }
+    return ['sum' => $S];
+}
+
 /** صفحة العرض/الطباعة طبق الأصل: صورة القالب + القيم بإحداثياتها المعايَرة */
 function mofOverlayServe($tplKey, $titleAr, array $vals, array $widths = []) {
     $posFile = __DIR__ . '/../assets/templates/' . $tplKey . '.pos.json';
@@ -1076,9 +1110,11 @@ if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
         $rqMonthsMap = [1 => [1, 2, 3], 2 => [4, 5, 6], 3 => [7, 8, 9], 4 => [10, 11, 12]];
         $rqEndDay = [1 => 31, 2 => 30, 3 => 30, 4 => 31];
         $rqM = $rqMonthsMap[$rq];
-        $qa = mofQuarterAgg($db, $rq, $rqy, $empFilter);
-        $paid = $qa['gross'] + $qa['trans'];
-        $cnt = count(array_unique($qa['ids']));
+        // 🟰 «انتبه ر5 كمان بدها تكون مجموع ر10 على أربع فصول» (2026-08-24): الفصل إفرادياً
+        // بالطريقة التراكمية — مجموع الفصول الأربعة = ر5 السنوي = مجموع صفوف ر6 بالمليم
+        $qd = mofQuarterEmpData($db, $rq, $rqy, $empFilter);
+        $Sq = $qd['sum'];
+        $cnt = (int)$Sq['cnt'];
         $common = [
             'D5' => $sch['name_ar'] ?? '', 'C6' => $finNum, 'D9' => $prof['trade_name'],
             'E10' => $prof['rep_name'], 'H10' => $prof['rep_title'], 'N10' => $prof['rep_phone'] ?? '',
@@ -1097,10 +1133,12 @@ if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
             'C55' => date('j'), 'D55' => date('n'), 'E55' => date('Y'),
         ];
         $money = [
-            'J27' => $qa['gross'], 'J28' => $qa['trans'] ?: '', 'J29' => $paid,
-            'J30' => $qa['trans'] ?: '', 'J32' => $qa['other'] ?: '', 'J33' => $qa['net'],
-            'J34' => $qa['exempt'] ?: '', 'J35' => $qa['taxable'], 'J36' => $qa['tax'],
-            'K43' => $qa['taxable'], 'K44' => $qa['tax'], 'K47' => $qa['tax'],
+            'J27' => $Sq['paid'] - $Sq['fam'] - $Sq['trans'],
+            'J28' => ($Sq['fam'] + $Sq['trans']) ?: '',
+            'J29' => $Sq['paid'],
+            'J30' => $Sq['trans'] ?: '', 'J32' => ($Sq['other'] + $Sq['fam']) ?: '', 'J33' => $Sq['tb'],
+            'J34' => $Sq['fd'] ?: '', 'J35' => $Sq['net'], 'J36' => $Sq['tax'],
+            'K43' => $Sq['net'], 'K44' => $Sq['tax'], 'K47' => $Sq['tax'],
         ];
         if ($isXlsx) {
             $cells = array_filter($common, function ($v) { return $v !== '' && $v !== null; });

@@ -823,19 +823,23 @@ elseif ($form === 'tax_emp_report'):
                   AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
                 GROUP BY e.id");
             $st->execute(array_merge($ypq, [$y]));
-            $asOfQ = sprintf('%04d-%02d-01', $y, $months[0]);
             foreach ($st->fetchAll() as $r) {
-                // المصدر الوحيد familyDeductionAnnual + تجزئة بأشهر الفصل المعمولة، بسقف خاضعه
-                $fda = familyDeductionAnnual($r['social_status'], $r['spouse_works'], $r['afd'], $asOfQ, $r['gsa'] ?? 0, $r['gca'] ?? 0, (int)$r['id']);
-                $fd = (int)min($fda / 12 * (int)$r['mcnt'], (float)$r['tb']);
+                // 🟰 نفس محرّك ر10 التراكمي (mofCumTax — «انتبه ر5 كمان بدها تكون مجموع ر10
+                // على أربع فصول» 2026-08-24): تنزيل الفترة = تراكمي السنة حتى آخر شهرها −
+                // تراكمي ما قبلها، فالتقرير يطابق ر10 للفصل ور5/ر6 للسنة بالمليم
+                $Cx = mofCumTax($db, $r, $y, (int)end($months));
+                $Px = mofCumTax($db, $r, $y, (int)$months[0] - 1);
                 $id = (int)$r['id'];
                 if (!isset($EMPR[$id])) {
                     $EMPR[$id] = ['type' => $r['employee_type'], 'school_id' => (int)$r['school_id'],
                         'name' => (trim($r['first_name_ar'] . ' ' . $r['last_name_ar']) ?: trim($r['first_name_fr'] . ' ' . $r['last_name_fr'])),
-                        'base' => 0, 'extraw' => 0, 'aide' => 0, 'trans' => 0, 'other' => 0, 'tb' => 0, 'tax' => 0, 'fd' => 0, 'months' => 0];
+                        'base' => 0, 'extraw' => 0, 'aide' => 0, 'trans' => 0, 'other' => 0, 'tb' => 0, 'tax' => 0, 'fd' => 0, 'net' => 0, 'months' => 0];
                 }
-                foreach (['base', 'extraw', 'aide', 'trans', 'other', 'tb', 'tax'] as $k) $EMPR[$id][$k] += (int)$r[$k];
-                $EMPR[$id]['fd'] += $fd;
+                foreach (['base', 'extraw', 'aide', 'trans', 'tb', 'tax'] as $k) $EMPR[$id][$k] += (int)$r[$k];
+                // «تنزيلات أخرى» = الفرق الحقيقي عن الأساس الخاضع المخزَّن (متل ر5/ر6/ر10)
+                $EMPR[$id]['other'] += max(0, (int)$r['base'] + (int)$r['extraw'] + (int)$r['aide'] - (int)$r['tb']);
+                $EMPR[$id]['fd'] += $Cx['fd'] - $Px['fd'];
+                $EMPR[$id]['net'] += $Cx['net'] - $Px['net'];
                 $EMPR[$id]['months'] += (int)$r['mcnt'];
             }
         }
@@ -893,7 +897,7 @@ elseif ($form === 'tax_emp_report'):
             foreach ($EMPR as $er):
                 $i++;
                 $gross = $er['base'] + $er['extraw'] + $er['aide'] + $er['trans'];
-                $taxable = max(0, $er['tb'] - $er['fd']);
+                $taxable = (int)$er['net']; // الخاضع التراكمي — يطابق ر10 للفصل ور5 للسنة
                 foreach (['base', 'extraw', 'aide', 'trans', 'other', 'tb', 'tax', 'fd'] as $k) $T[$k] += $er[$k];
                 $T['gross'] += $gross; $T['taxable'] += $taxable;
             ?>

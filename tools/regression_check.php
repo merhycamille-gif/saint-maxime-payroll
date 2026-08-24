@@ -842,14 +842,16 @@ $ofSrc = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
 // (منذ 2026-08-23 ر5/ر10 طبق الأصل بofficial_export: 100 رواتب بلا نقل + 110 نقل +
 //  120 المجموع − 130 النقل − 150 تنزيلات أخرى = 160 = مجموع الأساس الخاضع المخزَّن)
 $oxSrc16 = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
-// (2026-08-24 «شوف في فرق بين ر5 لحالها وR567؟» ⇒ توحيد: ر5 السنوي صار من المصدر
-//  الإفرادي الموحّد mofYearEmpData — نفس أرقام ورقة R5 بملف R567؛ ر10 الفصلي بقي فصلياً)
-check('تصريح ر5/ر10: لا تنزيل للنقل من مبلغ لا يحتويه + ر5 السنوي من المصدر الإفرادي الموحّد (mofYearEmpData)',
-      preg_match('/\$net\s+=\s+\$gross - \$other;/', $oxSrc16) === 1
-      && strpos($oxSrc16, "\$paid = \$qa['gross'] + \$qa['trans'];") !== false
-      && strpos($oxSrc16, '$yd5 = mofYearEmpData($db, $fy, $empFilter);') !== false
+// (2026-08-24 «شوف في فرق بين ر5 لحالها وR567؟» + «انتبه ر5 كمان بدها تكون مجموع ر10 على
+//  أربع فصول» ⇒ التوحيد الكامل: ر5 السنوي من mofYearEmpData، ر10 الفصلي من
+//  mofQuarterEmpData التراكمي، والتقرير الإفرادي من mofCumTax — كله مصدر واحد)
+check('تصريح ر5/ر10: المصدر الإفرادي الموحّد (سنوي mofYearEmpData / فصلي تراكمي mofQuarterEmpData / التقرير mofCumTax)',
+      strpos($oxSrc16, '$yd5 = mofYearEmpData($db, $fy, $empFilter);') !== false
       && strpos($oxSrc16, "'I31' => \$S5a['paid']") !== false
-      && strpos($oxSrc16, "\$yd567 = mofYearEmpData(\$db, \$fy, \$empFilter);") !== false);
+      && strpos($oxSrc16, "\$yd567 = mofYearEmpData(\$db, \$fy, \$empFilter);") !== false
+      && strpos($oxSrc16, '$qd = mofQuarterEmpData($db, $rq, $rqy, $empFilter);') !== false
+      && strpos($oxSrc16, "\$S['fd'] += \$C9['fd'] - \$P9['fd'];") !== false
+      && substr_count($ofSrc, 'mofCumTax($db, $r, $y,') === 2);
 // ترابط فعلي بالأرقام من ملف الإكسل المعبّى نفسه (خانات القالب: 100=I29 .. 190=I38)
 $r5x = renderPage('pages/official_export.php', ['form' => 'mof_r5', 'fy' => 2025, 'format' => 'xlsx'], [], [2], '', '', $PROJ . '/tmp/reg16.xlsx');
 $r5v = [];
@@ -2992,10 +2994,12 @@ check('تنزيل الأولاد اختياري: المحرّك يمرّره + �
       && strpos($emp61s, "'grant_children_addition' => isset(\$_POST['grant_children_addition'])") !== false
       && strpos($emp61s, "'grant_children_addition' => 0,") !== false);
 $gcaCount = 0;
-foreach (['pages/reports.php', 'pages/reports_export.php', 'pages/official_forms.php', 'pages/official_export.php'] as $f61) {
+// (2026-08-24: تقرير الضريبة صار يمرّره عبر mofCumTax التراكمية بfunctions.php — تُعدّ كمان)
+foreach (['pages/reports.php', 'pages/reports_export.php', 'pages/official_forms.php', 'pages/official_export.php', 'includes/functions.php'] as $f61) {
     $gcaCount += substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$r['gca'] ?? 0")
                + substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$de['gca'] ?? 0")
-               + substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$emp['grant_children_addition'] ?? 0");
+               + substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$emp['grant_children_addition'] ?? 0")
+               + substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$e['grant_children_addition'] ?? (\$e['gca'] ?? 0)");
 }
 check('تنزيل الأولاد اختياري: كل القارئين يمرّرونه (كشوف + تقرير الضريبة + ر5/ر6/ر10)', $gcaCount >= 6, 'ممرَّر بـ' . $gcaCount . ' مواضع');
 
@@ -3216,6 +3220,32 @@ check('ر5 المستقل = ورقة R5 بملف R567 خلية بخلية (ال�
       && $eq67($r5v['180'], $cell67($r5xml67, 'L39'))
       && $eq67($r5v['190'], $cell67($r5xml67, 'L40')),
       'ر5=' . json_encode($r5v));
+// 🟰 «انتبه ر5 كمان بدها تكون مجموع ر10 على أربع فصول» (2026-08-24): الفصول الأربعة
+// المولَّدة حياً تُجمَع خانة خانة وتُقارَن بر5 — التنزيل العائلي التراكمي يضمنها بالمليم
+$r10sum67 = ['J27' => 0.0, 'J28' => 0.0, 'J29' => 0.0, 'J30' => 0.0, 'J32' => 0.0, 'J33' => 0.0, 'J34' => 0.0, 'J35' => 0.0, 'J36' => 0.0];
+for ($q67 = 1; $q67 <= 4; $q67++) {
+    $bq67 = renderPage('pages/official_export.php', ['form' => 'mof_r10', 'rq' => $q67, 'rqy' => 2025, 'format' => 'xlsx'], [], [2], '', '', $PROJ . '/tools/_r10q.xlsx');
+    if (strncmp($bq67, 'PK', 2) !== 0) continue;
+    file_put_contents($PROJ . '/tools/_r10qb.xlsx', $bq67);
+    $zq67 = new ZipArchive();
+    if ($zq67->open($PROJ . '/tools/_r10qb.xlsx') === true) {
+        $shq67 = (string)$zq67->getFromName('xl/worksheets/sheet1.xml');
+        foreach ($r10sum67 as $ref67 => $v67) $r10sum67[$ref67] += $cell67($shq67, $ref67);
+        $zq67->close();
+    }
+    @unlink($PROJ . '/tools/_r10qb.xlsx');
+}
+check('ر5 = مجموع ر10 على أربعة فصول بالمليم (كل السطور: الرواتب/المنافع/المجموع/النقل/الأخرى/الأساس/العائلي/الخاضع/الضريبة)',
+      $eq67($r10sum67['J27'], $r5v['100'] ?? -1)
+      && $eq67($r10sum67['J28'], $r5v['110'] ?? 0)
+      && $eq67($r10sum67['J29'], $r5v['120'] ?? -1)
+      && $eq67($r10sum67['J30'], $r5v['130'] ?? 0)
+      && $eq67($r10sum67['J32'], $r5v['150'] ?? 0)
+      && $eq67($r10sum67['J33'], $r5v['160'] ?? -1)
+      && $eq67($r10sum67['J34'], $r5v['170'] ?? 0)
+      && $eq67($r10sum67['J35'], $r5v['180'] ?? -1)
+      && $eq67($r10sum67['J36'], $r5v['190'] ?? -1),
+      'Σر10=' . json_encode(array_map('intval', $r10sum67)));
 $chk67 = renderPage('pages/official_export.php', ['form' => 'mof_r567', 'fy' => '2025', 'check' => '1'], [], [2]);
 check('شاشة تدقيق أسماء المناطق تشتغل (عنوانها + جدول/رسالة نتيجتها)',
       strpos($chk67, 'تدقيق الأسماء الجغرافية على قوائم أكواد الوزارة') !== false

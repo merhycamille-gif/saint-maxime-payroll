@@ -1188,6 +1188,28 @@ function healAlineVille20260824() {
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
+/** 🟰 التراكمي الضريبي لموظف من أول السنة الميلادية حتى شهر معيّن («انتبه ر5 كمان بدها
+ *  تكون مجموع ر10 على أربع فصول» 2026-08-24): يعيد ['tb','fd','net'] — التنزيل العائلي
+ *  التراكمي بسقف الخاضع التراكمي (fda بتاريخ 1/1 لكل السنة). قيمة الفصل = تراكمي آخر
+ *  شهره − تراكمي ما قبله، فتجمع الفصول الأربعة إلى الحساب السنوي الإفرادي بالمليم حتماً
+ *  وكل فصل يبقى محسوباً بمعلومات وقته فقط (لا يحتاج مستقبل السنة). */
+function mofCumTax($db, array $e, int $y, int $mTo): array {
+    $z = ['tb' => 0, 'fd' => 0, 'net' => 0];
+    if ($mTo < 1) return $z;
+    $q = $db->prepare("SELECT SUM(taxable_base_lbp) tb, COUNT(DISTINCT month) mcnt FROM monthly_salaries
+        WHERE employee_id=? AND year=? AND month<=?
+          AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
+    $q->execute([(int)$e['id'], $y, $mTo]);
+    $r = $q->fetch() ?: [];
+    if (!(int)($r['mcnt'] ?? 0)) return $z;
+    $fda = familyDeductionAnnual($e['social_status'] ?? '', $e['spouse_works'] ?? 0,
+        $e['apply_family_deduction'] ?? ($e['afd'] ?? 1), $y . '-01-01',
+        $e['grant_spouse_addition'] ?? ($e['gsa'] ?? 0), $e['grant_children_addition'] ?? ($e['gca'] ?? 0), (int)$e['id']);
+    $tb = (int)$r['tb'];
+    $fd = (int)min($fda / 12 * min(12, (int)$r['mcnt']), (float)$tb);
+    return ['tb' => $tb, 'fd' => $fd, 'net' => max(0, $tb - $fd)];
+}
+
 /** يعيد ملف تعريف المؤسسة للمالية بكل المفاتيح (الفارغ = '') */
 function mofProfile($school): array {
     $defaults = ['gov'=>'','caza'=>'','town'=>'','quarter'=>'','street'=>'','cadastral'=>'','lot'=>'','building'=>'',
