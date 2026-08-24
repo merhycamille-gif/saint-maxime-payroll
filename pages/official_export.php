@@ -408,6 +408,73 @@ function mofQuarterAgg($db, $rq, $rqy, $empFilter) {
     ];
 }
 
+/** 🟰 المصدر السنوي الموحّد («الأرقام بر5 لازم يكونو مطابقين لر6» + «في فرق بين ر5 لحالها
+ *  وR567؟» 2026-08-24): صف لكل موظف بمجاميعه المخزّنة للسنة الميلادية + تنزيله العائلي
+ *  السنوي + المشتقات الجاهزة، ومجاميعها sum. نموذج ر5 المستقل وورقتا R5/R6 بملف R567
+ *  كلهم يقرأون من هنا حصراً — فأي رقم بر5 = مجموع عموده بصفوف ر6 بالمليم أينما فُتح. */
+function mofYearEmpData($db, $fy, $empFilter) {
+    $ids = [];
+    for ($q = 1; $q <= 4; $q++) $ids = array_merge($ids, mofQuarterAgg($db, $q, $fy, $empFilter)['ids']);
+    $ids = array_values(array_unique($ids));
+    $marLbl = function ($ss2) {
+        if (strpos((string)$ss2, 'marie') === 0) return 'متزوج';
+        if (strpos((string)$ss2, 'veuf') === 0) return 'أرمل';
+        if (strpos((string)$ss2, 'divorce') === 0) return 'مطلق';
+        return 'أعزب';
+    };
+    $rows = [];
+    $S = ['paid' => 0, 'trans' => 0, 'fam' => 0, 'other' => 0, 'tb' => 0, 'fd' => 0, 'net' => 0, 'tax' => 0];
+    if ($ids) {
+        $in = implode(',', array_map('intval', $ids));
+        // 🔴 ماكرو الوزارة يقف عند أول صف رقم ماليته فارغ (Exit For) — ناقصو الرقم آخر اللائحة
+        $le = $db->query("SELECT * FROM employees WHERE id IN ($in)
+            ORDER BY (COALESCE(finance_ministry_number,'') REGEXP '[0-9]') DESC,
+                COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)")->fetchAll();
+        $agQ = $db->prepare("SELECT SUM(base_plus_echelon_lbp) base,
+                SUM(extra_lbp+prime_fixe_lbp) extraw, SUM(aide_complementaire_lbp) aide,
+                SUM(family_allowance_lbp) family, SUM(transport_lbp) trans,
+                SUM(caisse_amount_lbp+eoc_grade_lbp) other,
+                SUM(taxable_base_lbp) tb, SUM(income_tax_lbp) tax,
+                COUNT(DISTINCT month) mcnt, MIN(month) m1, MAX(month) m2
+            FROM monthly_salaries WHERE employee_id=? AND year=?
+              AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
+        foreach ($le as $emp2) {
+            $agQ->execute([(int)$emp2['id'], $fy]);
+            $a2 = $agQ->fetch() ?: [];
+            if (!(int)($a2['mcnt'] ?? 0)) continue;
+            $isMar2 = strpos((string)($emp2['social_status'] ?? ''), 'marie') === 0;
+            $fda2 = familyDeductionAnnual($emp2['social_status'] ?? '', $emp2['spouse_works'] ?? 0,
+                $emp2['apply_family_deduction'] ?? 1, $fy . '-01-01',
+                $emp2['grant_spouse_addition'] ?? 0, $emp2['grant_children_addition'] ?? 0, (int)$emp2['id']);
+            $fd2 = (int)min($fda2 / 12 * min(12, (int)$a2['mcnt']), (float)$a2['tb']);
+            // عدد الأولاد دون 18 بأول السنة (المؤرَّخون أولاً وإلا العدد الثابت)
+            $kq2 = $db->prepare("SELECT COUNT(*) FROM employee_children WHERE employee_id=? AND DATE_ADD(birth_date, INTERVAL 18 YEAR) > ?");
+            $kq2->execute([(int)$emp2['id'], $fy . '-01-01']);
+            $hasKids = (int)$db->query("SELECT COUNT(*) FROM employee_children WHERE employee_id=" . (int)$emp2['id'])->fetchColumn();
+            $nKids = $hasKids ? (int)$kq2->fetchColumn() : (int)($emp2['number_of_children'] ?? 0);
+            $benef2 = $nKids + (($isMar2 && !(int)($emp2['spouse_works'] ?? 0) && (int)($emp2['grant_spouse_addition'] ?? 0) === 1) ? 1 : 0);
+            $base2 = (int)$a2['base']; $exw2 = (int)$a2['extraw']; $aide2 = (int)$a2['aide'];
+            $fam2 = (int)$a2['family']; $tr2 = (int)$a2['trans'];
+            $tb2 = (int)$a2['tb']; $tax2 = (int)$a2['tax'];
+            $tot3 = $base2 + $exw2 + $aide2;
+            $d2 = [
+                'base' => $base2, 'extraw' => $exw2, 'aide' => $aide2, 'fam' => $fam2, 'trans' => $tr2,
+                'tb' => $tb2, 'tax' => $tax2,
+                'tot1' => $tot3 + $fam2 + $tr2, 'tot2' => $fam2 + $tr2, 'tot3' => $tot3,
+                // «تنزيلات أخرى» = الفرق الحقيقي عن الأساس الخاضع المخزَّن (الصندوق+الدرجة
+                // + أي جزء غير خاضع بخيارات الموظف) — هكذا كل صف «يركب»: tot3−other = tb
+                'other' => max(0, $tot3 - $tb2),
+                'net350' => max(0, $tb2 - $fd2),
+            ];
+            $S['paid'] += $d2['tot1']; $S['trans'] += $tr2; $S['fam'] += $fam2; $S['other'] += $d2['other'];
+            $S['tb'] += $tb2; $S['fd'] += $fd2; $S['net'] += $d2['net350']; $S['tax'] += $tax2;
+            $rows[] = ['e' => $emp2, 'a' => $a2, 'fd' => $fd2, 'kids' => $nKids, 'benef' => $benef2,
+                'mar' => $marLbl($emp2['social_status'] ?? ''), 'd' => $d2];
+        }
+    }
+    return ['rows' => $rows, 'sum' => $S];
+}
+
 /** صفحة العرض/الطباعة طبق الأصل: صورة القالب + القيم بإحداثياتها المعايَرة */
 function mofOverlayServe($tplKey, $titleAr, array $vals, array $widths = []) {
     $posFile = __DIR__ . '/../assets/templates/' . $tplKey . '.pos.json';
@@ -516,58 +583,10 @@ if ($form === 'mof_r567') {
     $prof = mofProfile($sch);
     $finNum = preg_replace('/\D/', '', (string)($sch['finance_number'] ?? ''));
 
-    // ١) إجماليات السنة (نفس محرّك ر5 = مجموع الفصول الأربعة) + لائحة الموظفين
-    $sum = ['gross' => 0, 'trans' => 0, 'other' => 0, 'net' => 0, 'exempt' => 0, 'taxable' => 0, 'tax' => 0];
-    $ids = [];
-    for ($q = 1; $q <= 4; $q++) {
-        $qa = mofQuarterAgg($db, $q, $fy, $empFilter);
-        foreach ($sum as $k => $v) $sum[$k] += $qa[$k];
-        $ids = array_merge($ids, $qa['ids']);
-    }
-    $ids = array_values(array_unique($ids));
-    $cnt = count($ids);
-    $paid = $sum['gross'] + $sum['trans'];
-    $marLbl = function ($ss2) {
-        if (strpos((string)$ss2, 'marie') === 0) return 'متزوج';
-        if (strpos((string)$ss2, 'veuf') === 0) return 'أرمل';
-        if (strpos((string)$ss2, 'divorce') === 0) return 'مطلق';
-        return 'أعزب';
-    };
-
-    // ٢) صفوف الموظفين مرتّبة بالاسم + مجاميع كل موظف بالسنة الميلادية
-    $empRows = [];
-    if ($ids) {
-        $in = implode(',', array_map('intval', $ids));
-        // 🔴 ماكرو الوزارة يقف عند أول صف رقم ماليته فارغ (Exit For) — ناقصو الرقم آخر اللائحة
-        $le = $db->query("SELECT * FROM employees WHERE id IN ($in)
-            ORDER BY (COALESCE(finance_ministry_number,'') REGEXP '[0-9]') DESC,
-                COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)")->fetchAll();
-        $agQ = $db->prepare("SELECT SUM(base_plus_echelon_lbp) base,
-                SUM(extra_lbp+prime_fixe_lbp) extraw, SUM(aide_complementaire_lbp) aide,
-                SUM(family_allowance_lbp) family, SUM(transport_lbp) trans,
-                SUM(caisse_amount_lbp+eoc_grade_lbp) other,
-                SUM(taxable_base_lbp) tb, SUM(income_tax_lbp) tax,
-                COUNT(DISTINCT month) mcnt, MIN(month) m1, MAX(month) m2
-            FROM monthly_salaries WHERE employee_id=? AND year=?
-              AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
-        foreach ($le as $emp2) {
-            $agQ->execute([(int)$emp2['id'], $fy]);
-            $a2 = $agQ->fetch() ?: [];
-            if (!(int)($a2['mcnt'] ?? 0)) continue;
-            $isMar2 = strpos((string)($emp2['social_status'] ?? ''), 'marie') === 0;
-            $fda2 = familyDeductionAnnual($emp2['social_status'] ?? '', $emp2['spouse_works'] ?? 0,
-                $emp2['apply_family_deduction'] ?? 1, $fy . '-01-01',
-                $emp2['grant_spouse_addition'] ?? 0, $emp2['grant_children_addition'] ?? 0, (int)$emp2['id']);
-            $fd2 = (int)min($fda2 / 12 * min(12, (int)$a2['mcnt']), (float)$a2['tb']);
-            // عدد الأولاد دون 18 بأول السنة (المؤرَّخون أولاً وإلا العدد الثابت)
-            $kq2 = $db->prepare("SELECT COUNT(*) FROM employee_children WHERE employee_id=? AND DATE_ADD(birth_date, INTERVAL 18 YEAR) > ?");
-            $kq2->execute([(int)$emp2['id'], $fy . '-01-01']);
-            $hasKids = (int)$db->query("SELECT COUNT(*) FROM employee_children WHERE employee_id=" . (int)$emp2['id'])->fetchColumn();
-            $nKids = $hasKids ? (int)$kq2->fetchColumn() : (int)($emp2['number_of_children'] ?? 0);
-            $benef2 = $nKids + (($isMar2 && !(int)($emp2['spouse_works'] ?? 0) && (int)($emp2['grant_spouse_addition'] ?? 0) === 1) ? 1 : 0);
-            $empRows[] = ['e' => $emp2, 'a' => $a2, 'fd' => $fd2, 'kids' => $nKids, 'benef' => $benef2, 'mar' => $marLbl($emp2['social_status'] ?? '')];
-        }
-    }
+    // ١+٢) المصدر السنوي الموحّد: صفوف الموظفين ومجاميعها — نفس أرقام نموذج ر5 المستقل حرفياً
+    $yd567 = mofYearEmpData($db, $fy, $empFilter);
+    $empRows = $yd567['rows'];
+    $S5 = $yd567['sum'];
 
     // ٣) التاركون خلال السنة (ر7)
     $lv = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . "
@@ -779,26 +798,18 @@ JS
         'F8' => count($empRows), 'F12' => count($empRows),
     ];
     $rowN = 16;
-    // 🔴 «الأرقام بر5 لازم تطابق ر6» (2026-08-24): ورقة ر5 تنبنى من مجموع صفوف ر6 نفسها
-    // (مصدر واحد) — لا من التجميع الفصلي (التنزيل العائلي الفصلي يختلف عن السنوي الإفرادي)
-    $S5 = ['paid' => 0, 'trans' => 0, 'fam' => 0, 'other' => 0, 'tb' => 0, 'fd' => 0, 'net' => 0, 'tax' => 0];
+    // 🔴 «الأرقام بر5 لازم تطابق ر6» (2026-08-24): كل قيم الصف جاهزة من mofYearEmpData
+    // (المصدر الموحّد) — ومجاميعها $S5 هي نفسها التي تُكتب بورقة ر5
     foreach ($empRows as $i => $r2) {
-        $e2 = $r2['e']; $a2 = $r2['a'];
-        $base2 = (int)$a2['base']; $exw2 = (int)$a2['extraw']; $aide2 = (int)$a2['aide'];
-        $fam2 = (int)$a2['family']; $tr2 = (int)$a2['trans'];
-        $tb2 = (int)$a2['tb']; $tax2 = (int)$a2['tax'];
+        $e2 = $r2['e']; $a2 = $r2['a']; $d2 = $r2['d'];
+        $base2 = $d2['base']; $exw2 = $d2['extraw']; $aide2 = $d2['aide'];
+        $fam2 = $d2['fam']; $tr2 = $d2['trans'];
+        $tb2 = $d2['tb']; $tax2 = $d2['tax'];
         $isMar2 = ($r2['mar'] === 'متزوج');
         $famSp = $isMar2 ? $fam2 : 0; $famCh = $isMar2 ? 0 : $fam2;
-        $tot1 = $base2 + $exw2 + $aide2 + $fam2 + $tr2;
-        $tot2 = $fam2 + $tr2;
-        $tot3 = $base2 + $exw2 + $aide2;
-        // «تنزيلات أخرى» بالصف = الفرق الحقيقي بين المكوّنات والأساس الخاضع المخزَّن
-        // (الصندوق+الدرجة + أي جزء غير خاضع حسب خيارات الموظف) — هكذا كل صف «يركب»:
-        // CG − CI = CJ + CH بالمليم، ومجاميع الأعمدة تطابق ر5
-        $oth2 = max(0, $tot3 - $tb2);
-        $net350 = max(0, $tb2 - $r2['fd']);
-        $S5['paid'] += $tot1; $S5['trans'] += $tr2; $S5['fam'] += $fam2; $S5['other'] += $oth2;
-        $S5['tb'] += $tb2; $S5['fd'] += (int)$r2['fd']; $S5['net'] += $net350; $S5['tax'] += $tax2;
+        $tot1 = $d2['tot1']; $tot2 = $d2['tot2']; $tot3 = $d2['tot3'];
+        $oth2 = $d2['other'];
+        $net350 = $d2['net350'];
         $from2 = sprintf('%04d-%02d-01', $fy, (int)$a2['m1']);
         $to2 = date('d/m/Y', strtotime(date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $fy, (int)$a2['m2'])))));
         $R = $rowN + $i;
@@ -1005,16 +1016,13 @@ if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
     $finNum = preg_replace('/\D/', '', (string)($sch['finance_number'] ?? ''));
 
     if ($form === 'mof_r5') {
-        // السنة الميلادية = مجموع فصولها الأربعة (نفس محرّك ر10 — «الأرقام تركب»)
-        $sum = ['gross' => 0, 'trans' => 0, 'other' => 0, 'net' => 0, 'exempt' => 0, 'taxable' => 0, 'tax' => 0];
-        $ids = [];
-        for ($q = 1; $q <= 4; $q++) {
-            $qa = mofQuarterAgg($db, $q, $fy, $empFilter);
-            foreach ($sum as $k => $v) $sum[$k] += $qa[$k];
-            $ids = array_merge($ids, $qa['ids']);
-        }
-        $cnt = count(array_unique($ids));
-        $paid = $sum['gross'] + $sum['trans'];
+        // 🟰 نفس مصدر ملف R567 حرفياً («شوف في فرق بين ر5 لحالها وR567؟» 2026-08-24 ⇒ توحيد):
+        // السنة إفرادياً موظفاً موظفاً — كل سطر هنا = سطره بورقة R5 داخل R567 = مجموع
+        // عموده بصفوف R6 بالمليم. (كان فصلياً «مجموع فصول ر10» — ر10 الفصلي تصريح
+        // مرحلي يبقى فصلياً، والتصريح السنوي تصفية إفرادية توحّدت مصدراً)
+        $yd5 = mofYearEmpData($db, $fy, $empFilter);
+        $S5a = $yd5['sum'];
+        $cnt = count($yd5['rows']);
         $common = [
             'D6' => $sch['name_ar'] ?? '', 'C7' => $finNum, 'C10' => $prof['trade_name'],
             'J6' => '31/12/' . $fy, 'J8' => '31/12/' . $fy,
@@ -1035,11 +1043,13 @@ if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
             'I54' => $prof['signer_title'],
         ];
         $money = [
-            'I29' => $sum['gross'], 'I30' => $sum['trans'] ?: '', 'I31' => $paid,
-            'I32' => $sum['trans'] ?: '', 'I34' => $sum['other'] ?: '', 'I35' => $sum['net'],
-            'I36' => $sum['exempt'] ?: '', 'I37' => $sum['taxable'], 'I38' => $sum['tax'],
-            'J43' => $sum['taxable'], 'J44' => $sum['tax'], 'J45' => 0, 'J46' => $sum['tax'],
-            'J49' => $sum['tax'], 'C49' => 0,
+            'I29' => $S5a['paid'] - $S5a['fam'] - $S5a['trans'],
+            'I30' => ($S5a['fam'] + $S5a['trans']) ?: '',
+            'I31' => $S5a['paid'],
+            'I32' => $S5a['trans'] ?: '', 'I34' => ($S5a['other'] + $S5a['fam']) ?: '', 'I35' => $S5a['tb'],
+            'I36' => $S5a['fd'] ?: '', 'I37' => $S5a['net'], 'I38' => $S5a['tax'],
+            'J43' => $S5a['net'], 'J44' => $S5a['tax'], 'J45' => 0, 'J46' => $S5a['tax'],
+            'J49' => $S5a['tax'], 'C49' => 0,
         ];
         if ($isXlsx) {
             $cells = array_filter($common, function ($v) { return $v !== '' && $v !== null; });

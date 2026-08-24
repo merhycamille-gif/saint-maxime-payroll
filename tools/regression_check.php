@@ -842,10 +842,14 @@ $ofSrc = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
 // (منذ 2026-08-23 ر5/ر10 طبق الأصل بofficial_export: 100 رواتب بلا نقل + 110 نقل +
 //  120 المجموع − 130 النقل − 150 تنزيلات أخرى = 160 = مجموع الأساس الخاضع المخزَّن)
 $oxSrc16 = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
-check('تصريح ر5/ر10: لا تنزيل للنقل من مبلغ لا يحتويه (السطور تترابط)',
+// (2026-08-24 «شوف في فرق بين ر5 لحالها وR567؟» ⇒ توحيد: ر5 السنوي صار من المصدر
+//  الإفرادي الموحّد mofYearEmpData — نفس أرقام ورقة R5 بملف R567؛ ر10 الفصلي بقي فصلياً)
+check('تصريح ر5/ر10: لا تنزيل للنقل من مبلغ لا يحتويه + ر5 السنوي من المصدر الإفرادي الموحّد (mofYearEmpData)',
       preg_match('/\$net\s+=\s+\$gross - \$other;/', $oxSrc16) === 1
-      && strpos($oxSrc16, "\$paid = \$sum['gross'] + \$sum['trans'];") !== false
-      && strpos($oxSrc16, "\$paid = \$qa['gross'] + \$qa['trans'];") !== false);
+      && strpos($oxSrc16, "\$paid = \$qa['gross'] + \$qa['trans'];") !== false
+      && strpos($oxSrc16, '$yd5 = mofYearEmpData($db, $fy, $empFilter);') !== false
+      && strpos($oxSrc16, "'I31' => \$S5a['paid']") !== false
+      && strpos($oxSrc16, "\$yd567 = mofYearEmpData(\$db, \$fy, \$empFilter);") !== false);
 // ترابط فعلي بالأرقام من ملف الإكسل المعبّى نفسه (خانات القالب: 100=I29 .. 190=I38)
 $r5x = renderPage('pages/official_export.php', ['form' => 'mof_r5', 'fy' => 2025, 'format' => 'xlsx'], [], [2], '', '', $PROJ . '/tmp/reg16.xlsx');
 $r5v = [];
@@ -3200,6 +3204,18 @@ check('R567: ورقة ر5 = مجموع صفوف ر6 بالمليم (المدفو
       && $eq67($cell67($r5xml67, 'L37') - $cell67($r5xml67, 'L38'), $cell67($r5xml67, 'L39'))
       && $g67('CE') > 0,
       'ΣCE=' . number_format($g67('CE')) . ' ΣCJ=' . number_format($g67('CJ')) . ' ΣCK=' . number_format($g67('CK')));
+// 🟰 «شوف في فرق بين ر5 لحالها وR567؟» (2026-08-24): ممنوع يرجع الفرق — نموذج ر5 المستقل
+// (خانات قسم 16: 120=I31..190=I38) يطابق ورقة R5 داخل R567 خلية بخلية بالمليم
+check('ر5 المستقل = ورقة R5 بملف R567 خلية بخلية (المجموع/النقل/أخرى/الأساس/العائلي/الخاضع/الضريبة)',
+      isset($r5v['120'], $r5v['160'], $r5v['180'], $r5v['190'])
+      && $eq67($r5v['120'], $cell67($r5xml67, 'L33'))
+      && $eq67($r5v['130'] ?? 0, $cell67($r5xml67, 'L34'))
+      && $eq67($r5v['150'] ?? 0, $cell67($r5xml67, 'L36'))
+      && $eq67($r5v['160'], $cell67($r5xml67, 'L37'))
+      && $eq67($r5v['170'] ?? 0, $cell67($r5xml67, 'L38'))
+      && $eq67($r5v['180'], $cell67($r5xml67, 'L39'))
+      && $eq67($r5v['190'], $cell67($r5xml67, 'L40')),
+      'ر5=' . json_encode($r5v));
 $chk67 = renderPage('pages/official_export.php', ['form' => 'mof_r567', 'fy' => '2025', 'check' => '1'], [], [2]);
 check('شاشة تدقيق أسماء المناطق تشتغل (عنوانها + جدول/رسالة نتيجتها)',
       strpos($chk67, 'تدقيق الأسماء الجغرافية على قوائم أكواد الوزارة') !== false
