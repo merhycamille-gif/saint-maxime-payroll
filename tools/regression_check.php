@@ -3235,6 +3235,19 @@ for ($q67 = 1; $q67 <= 4; $q67++) {
     }
     @unlink($PROJ . '/tools/_r10qb.xlsx');
 }
+// 🎯 p1 ‏2026-08-24 («####» بالتسجيل + رقم عمودي بالفاكس): القيم بصناديق الإدخال الحقيقية
+// حصراً — بلوك التبليغ L..Q (I..K تسميات مدموجة) والمحضّر L23/J24/O24 وفاكس المكلف G24
+check('R567-ر5: المراسي بصناديق الإدخال الصح (L23/J24/O24/G24 + بلوك التبليغ L11-L19 + البلدة C13) لا بالخلايا الضيقة',
+      strpos($oe67, "'L23' => \$prof['preparer_reg']") !== false
+      && strpos($oe67, "'J24' => \$prof['preparer_phone']") !== false
+      && strpos($oe67, "'O24' => \$prof['preparer_fax']") !== false
+      && strpos($oe67, "'G24' => \$prof['contact_fax']") !== false
+      && strpos($oe67, "'L11' => \$prof['gov']") !== false
+      && strpos($oe67, "'L13' => \$prof['town']") !== false
+      && strpos($oe67, "'C13' => \$prof['town']") !== false
+      && strpos($oe67, "'K23' => \$prof['preparer_reg']") === false
+      && strpos($oe67, "'H24' => \$prof['contact_fax']") === false
+      && strpos($oe67, "'K11' => \$prof['gov']") === false);
 check('ر5 = مجموع ر10 على أربعة فصول بالمليم (كل السطور: الرواتب/المنافع/المجموع/النقل/الأخرى/الأساس/العائلي/الخاضع/الضريبة)',
       $eq67($r10sum67['J27'], $r5v['100'] ?? -1)
       && $eq67($r10sum67['J28'], $r5v['110'] ?? 0)

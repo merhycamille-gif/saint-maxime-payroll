@@ -873,17 +873,28 @@ JS
     }
     // ورقة ر5: كل سطر = مجموع عموده بورقة ر6 (120=ΣCE، 130=ΣAV، 150=ΣCI+العائلي،
     // 160=Σالأساس الخاضع، 170=ΣCH، 180=ΣCJ، 190=ΣCK) — السلسلة الحسابية تامة بالمليم
+    // 🎯 المراسي = صناديق الإدخال الحقيقية بالقالب (p1 ‏2026-08-24: «####» بالتسجيل ورقم
+    // عمودي بالفاكس — كنا نكتب بخلايا ضيقة/تسميات مدموجة): بلوك المركز الرئيسي أعمدة C..G
+    // وبلوك محل الإقامة المختار للتبليغ أعمدة L..Q (I..K تسميات مدموجة ممنوع الكتابة فيها)
+    $lotP567 = array_pad(explode('/', (string)$prof['lot'], 2), 2, '');
+    $lotA567 = trim($lotP567[0]); $lotB567 = trim($lotP567[1]);
     $r5c = [
         'C5' => $sch['name_ar'] ?? '', 'C7' => $finNum, 'C8' => $prof['trade_name'],
         'K6' => $serial567($fy . '-01-01'), 'P6' => '31/12/' . $fy,
         'K7' => $serial567($fy . '-01-01'), 'P7' => '31/12/' . $fy,
-        'C11' => $prof['gov'], 'K11' => $prof['gov'], 'C12' => $prof['caza'], 'K12' => $prof['caza'],
-        'G13' => $prof['town'], 'Q13' => $prof['town'], 'C14' => $prof['street'], 'L14' => $prof['street'],
+        'C11' => $prof['gov'], 'L11' => $prof['gov'], 'C12' => $prof['caza'], 'L12' => $prof['caza'],
+        'C13' => $prof['town'], 'L13' => $prof['town'], 'G13' => $prof['quarter'], 'Q13' => $prof['quarter'],
+        'C14' => $prof['street'], 'L14' => $prof['street'], 'G14' => $prof['cadastral'], 'Q14' => $prof['cadastral'],
+        'C15' => $lotA567, 'E15' => $lotB567, 'L15' => $lotA567, 'N15' => $lotB567,
         'Q15' => $prof['building'], 'C16' => $prof['floor'], 'L16' => $prof['floor'],
+        'G16' => $sch['phone'] ?? '', 'Q16' => $sch['phone'] ?? '',
+        'C17' => $prof['fax'], 'L17' => $prof['fax'],
+        'C18' => $prof['pob'], 'L18' => $prof['pob'], 'G18' => $prof['region'], 'Q18' => $prof['region'],
+        'C19' => $prof['email'], 'L19' => $prof['email'],
         'C22' => $prof['contact_name'], 'K22' => $prof['preparer_name'],
-        'C23' => $prof['contact_reg'], 'K23' => $prof['preparer_reg'],
-        'C24' => $prof['contact_phone'], 'H24' => $prof['contact_fax'],
-        'K24' => $prof['preparer_phone'], 'P24' => $prof['preparer_fax'],
+        'C23' => $prof['contact_reg'], 'L23' => $prof['preparer_reg'],
+        'C24' => $prof['contact_phone'], 'G24' => $prof['contact_fax'],
+        'J24' => $prof['preparer_phone'], 'O24' => $prof['preparer_fax'],
         'F28' => count($empRows),
         'L31' => $S5['paid'], 'L33' => $S5['paid'], 'L34' => $S5['trans'] ?: '',
         'L36' => ($S5['other'] + $S5['fam']) ?: '',
