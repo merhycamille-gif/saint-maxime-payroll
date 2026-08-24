@@ -30,7 +30,7 @@ $db = getDB();
 // ---------- عارض صفحات داخلي (كل صفحة بعملية فرعية لتفادي إعادة تعريف الدوال) ----------
 // $outFile: للمخرجات الثنائية (xlsx...) — أنبوب shell_exec بويندوز وضع نصي يقصّ عند أول
 // محرف 0x1A، فالثنائي يُكتب لملف عبر إعادة توجيه cmd ويُقرأ من القرص (2026-08-22)
-function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = '', string $schoolYear = '', string $outFile = ''): string {
+function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = '', string $schoolYear = '', string $outFile = '', array $files = []): string {
     global $PROJ;
     $runner = __DIR__ . '/_render_one.php';
     // الوسائط تمرَّر base64 (اقتباسات JSON تتخربط بسطر أوامر ويندوز)
@@ -49,6 +49,16 @@ if ($__cur !== '') $_SESSION['display_currency'] = $__cur; // وضع العمل�
 $__sy = $argv[6] ?? '';
 if ($__sy !== '') $_SESSION['active_school_year'] = $__sy; // السنة الدراسية المعروضة
 $_GET = json_decode(base64_decode($argv[2] ?? ''), true) ?: [];
+// رفع ملف (POST multipart) للصفحات التي تستقبل ملفات — مدقّق ملف الوزارة
+$__f = json_decode(base64_decode($argv[7] ?? ''), true) ?: [];
+if ($__f) {
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_POST['csrf'] = $_SESSION['csrf_token'] = 'regcheck-token';
+    foreach ($__f as $k => $path) {
+        $_FILES[$k] = ['name' => basename($path), 'type' => 'text/xml', 'tmp_name' => $path,
+                       'error' => UPLOAD_ERR_OK, 'size' => (int)@filesize($path)];
+    }
+}
 $_SERVER['REQUEST_URI'] = '/x';
 $_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET'; // CLI بلا REQUEST_METHOD — تحذيره كان يتصدّر مخرجات القياس
 chdir(dirname($PROJ . '/' . $argv[1]));
@@ -58,7 +68,8 @@ catch (Throwable $e) { ob_end_clean(); echo 'FATAL: ' . $e->getMessage(); }
 PHP);
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner) . ' '
          . escapeshellarg($rel) . ' ' . base64_encode(json_encode($get)) . ' ' . base64_encode(json_encode($comp))
-         . ' ' . base64_encode(json_encode($schoolIds)) . ' ' . escapeshellarg($currency) . ' ' . escapeshellarg($schoolYear);
+         . ' ' . base64_encode(json_encode($schoolIds)) . ' ' . escapeshellarg($currency) . ' ' . escapeshellarg($schoolYear)
+         . ' ' . base64_encode(json_encode($files));
     if ($outFile !== '') {
         @unlink($outFile);
         shell_exec($cmd . ' 2>NUL > ' . escapeshellarg($outFile));
@@ -842,6 +853,9 @@ $ofSrc = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
 // (منذ 2026-08-23 ر5/ر10 طبق الأصل بofficial_export: 100 رواتب بلا نقل + 110 نقل +
 //  120 المجموع − 130 النقل − 150 تنزيلات أخرى = 160 = مجموع الأساس الخاضع المخزَّن)
 $oxSrc16 = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
+// ملاحظة 2026-08-24: دوال mofQuarterAgg/mofYearEmpData/mofQuarterEmpData انتقلت
+// إلى includes/functions.php (ليستعملها مدقّق ملف الوزارة) — فحوص المحرّك تفتّش بالملفين معاً
+$oxAll16 = $oxSrc16 . (string)file_get_contents(__DIR__ . '/../includes/functions.php');
 // (2026-08-24 «شوف في فرق بين ر5 لحالها وR567؟» + «انتبه ر5 كمان بدها تكون مجموع ر10 على
 //  أربع فصول» ⇒ التوحيد الكامل: ر5 السنوي من mofYearEmpData، ر10 الفصلي من
 //  mofQuarterEmpData التراكمي، والتقرير الإفرادي من mofCumTax — كله مصدر واحد)
@@ -850,7 +864,7 @@ check('تصريح ر5/ر10: المصدر الإفرادي الموحّد (سنو
       && strpos($oxSrc16, "'I31' => \$S5a['paid']") !== false
       && strpos($oxSrc16, "\$yd567 = mofYearEmpData(\$db, \$fy, \$empFilter);") !== false
       && strpos($oxSrc16, '$qd = mofQuarterEmpData($db, $rq, $rqy, $empFilter);') !== false
-      && strpos($oxSrc16, "\$S['fd'] += \$C9['fd'] - \$P9['fd'];") !== false
+      && strpos($oxAll16, "\$S['fd'] += \$C9['fd'] - \$P9['fd'];") !== false
       && substr_count($ofSrc, 'mofCumTax($db, $r, $y,') === 2);
 // ترابط فعلي بالأرقام من ملف الإكسل المعبّى نفسه (خانات القالب: 100=I29 .. 190=I38)
 $r5x = renderPage('pages/official_export.php', ['form' => 'mof_r5', 'fy' => 2025, 'format' => 'xlsx'], [], [2], '', '', $PROJ . '/tmp/reg16.xlsx');
@@ -2182,7 +2196,7 @@ check('مصدر واحد (تجربة فعلية): «مجموع الأجور» ب
 // (منذ 2026-08-23 ر10 طبق الأصل بofficial_export — منتقي الفصل بشاشة official_forms
 //  والأرقام من أشهر الفصل حصراً بmofQuarterAgg)
 $of40 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
-$ox40 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+$ox40 = (string)file_get_contents($PROJ . '/pages/official_export.php') . (string)file_get_contents($PROJ . '/includes/functions.php'); // + functions.php (انتقلت دوال mof* 2026-08-24)
 check('ر10 فصلي: فرع مستقل بمنتقي الفصل (rq/rqy) وأشهر الفصل حصراً + طبق الأصل',
       strpos($of40, "elseif (\$form === 'tax_r10'):") !== false
       && strpos($of40, 'name="rq"') !== false
@@ -2252,7 +2266,7 @@ check('التنزيل العائلي اختياري: زرّ بملف الموظ�
       && strpos($emp41, "'apply_family_deduction' => isset(\$_POST['apply_family_deduction'])") !== false
       && strpos($emp41, "'apply_family_deduction' => 1,") !== false);
 // (منذ 2026-08-23 ر5/ر10 بofficial_export — المصدر الوحيد نفسه بmofQuarterAgg)
-$ox41 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+$ox41 = (string)file_get_contents($PROJ . '/pages/official_export.php') . (string)file_get_contents($PROJ . '/includes/functions.php');
 check('التنزيل العائلي اختياري: ر5 ور10 وعمود كشف الرواتب كلهم على المصدر الوحيد familyDeductionAnnual',
       substr_count($ox41, "COALESCE(e.apply_family_deduction,1) afd") === 1
       && substr_count($ox41, "familyDeductionAnnual(\$de['social_status'], \$de['spouse_works'], \$de['afd']") === 1
@@ -2590,7 +2604,7 @@ check('تجزئة القانون: المحرّك يُسنوِن ×12 ويقسم 
       && strpos($pc51, '$taxBase * $monthsPerYear') === false);
 check('تجزئة القانون: حصّة الشهر بالكشوف = السنوي ÷ 12 دائماً + ر5/ر10 بحصص الأشهر المعمولة + الشفاء مربوط',
       substr_count($rp51 . $of51 . (string)file_get_contents($PROJ . '/pages/reports_export.php'), '?? 0)) / 12)') >= 2
-      && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), '$exempt += (int)min($fda / 12 * (int)$de[\'mcnt\'], (float)$de[\'tb\']);') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), '$exempt += (int)min($fda / 12 * (int)$de[\'mcnt\'], (float)$de[\'tb\']);') !== false
       && function_exists('healLawfulTaxProration20260806')
       && strpos($hd51, 'healLawfulTaxProration20260806();') !== false);
 // (تكملة بقاعدة المستخدم «ما بيصير نيغاتيف»): التنزيل المعروض بحدّ الراتب الخاضع —
@@ -3069,7 +3083,7 @@ check('اقتراحات إخراج القيد: الإشارة تضوي بالق�
 check('زيادة الزوج مطفأة تلقائياً: الافتراضي بالعمود والمحرّك والقارئين = 0',
       (string)($db->query("SHOW COLUMNS FROM employees LIKE 'grant_spouse_addition'")->fetch(PDO::FETCH_ASSOC)['Default'] ?? '') === '0'
       && strpos((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), "\$this->employee['grant_spouse_addition'] ?? 0") !== false
-      && substr_count((string)file_get_contents($PROJ . '/pages/official_export.php'), "gsa'] ?? 0") >= 1
+      && substr_count((string)file_get_contents($PROJ . '/pages/official_export.php') . (string)file_get_contents($PROJ . '/includes/functions.php'), "gsa'] ?? 0") >= 1
       && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "'grant_spouse_addition' => 0,") !== false);
 check('زيادة الزوج: الشفاء موصول بالهيدر + رسائل القرار مزروعة للمتأثرين',
       function_exists('healSpouseAdditionOff20260823')
@@ -3122,7 +3136,7 @@ check('صفحة القرارات: تشاك مارك نعم/كلا يطبَّق �
       && strpos($dec66, 'FATAL') === false);
 check('المحرّك والقارئون يمرّرون رقم الموظف للأتمتة المؤرَّخة',
       strpos((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), "(int)(\$this->employee['id'] ?? 0)") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), "(int)\$de['id']") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "(int)\$de['id']") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "(int)(\$r['eid'] ?? 0)") !== false);
 
 /* ---------- ٦٧) ملف الوزارة السنوي R567 (ر5+ر6+ر7 بقالب الماكرو الرسمي — 2026-08-23) ---------- */
@@ -3136,12 +3150,80 @@ $oe67 = (string)file_get_contents($PROJ . '/pages/official_export.php');
 check('مولّد R567: الأوراق الثلاث منفصلة + حماية «الماكرو يقف عند رقم مالية فارغ» + شاشة التدقيق الهرمي',
       strpos($oe67, "form === 'mof_r567'") !== false
       && strpos($oe67, "phpFillXlsxTemplateSheets(\$tpl567, ['R5' => \$r5c, 'R6' => \$r6c, 'R7' => \$r7c]") !== false
-      && substr_count($oe67, "REGEXP '[0-9]') DESC") === 2
+      && substr_count($oe67 . (string)file_get_contents($PROJ . '/includes/functions.php'), "REGEXP '[0-9]') DESC") === 2
       && strpos($oe67, 'بقوائم الوزارة هالبلدة بقضاء') !== false);
 $of67 = renderPage('pages/official_forms.php', ['form' => 'tax_r5'], [], [2]);
 check('زرّا R567 (توليد + تدقيق أسماء) بشاشة ر5',
       strpos($of67, 'form=mof_r567') !== false && strpos($of67, 'تدقيق أسماء المناطق') !== false
       && strpos($of67, 'FATAL') === false);
+/* 🔍 مدقّق ملف الوزارة («بعد الجنريت ما بقدر اعرف الملف صح او غلط» — 2026-08-24):
+ *    يفكّ تشفير R567.xml (DES-CBC بمفتاح الماكرو) ويقارنه بأرقام البرنامج قبل الإرسال */
+$chkSrc68 = (string)@file_get_contents($PROJ . '/pages/r567_check.php');
+check('صفحة فحص ملف الوزارة موجودة (فكّ تشفير الماكرو + قراءة فقط) وزرّها بشاشة ر5',
+      $chkSrc68 !== ''
+      && strpos($chkSrc68, "openssl_decrypt(\$bin, 'des-cbc', R567_KEY, OPENSSL_RAW_DATA") !== false
+      && strpos($chkSrc68, "R567_IV_HEX = '1314531830a13d1f'") !== false
+      && strpos($chkSrc68, 'requireCsrf();') !== false
+      && preg_match('/\b(UPDATE|INSERT|DELETE)\b/i', $chkSrc68) === 0 // قراءة فقط حصراً
+      && strpos($of67, 'pages/r567_check.php') !== false);
+// تجربة حيّة: نولّد XML بنفس منطق الماكرو من أرقامنا ونمرّره بالمدقّق ⇒ لازم «سليم»
+// (بنفس نطاق الصفحة المرندَرة: مدرسة سان مكسيم وحدها — وإلا قارنّا 440 موظفاً بـ38)
+$savedScope68 = $_SESSION['active_schools'] ?? null;
+$_SESSION['active_schools'] = [2];
+$yd68 = mofYearEmpData($db, 2025, '');
+if ($yd68['rows']) {
+    $S68 = $yd68['sum'];
+    $r6x68 = '';
+    foreach ($yd68['rows'] as $r68) {
+        $d68 = $r68['d'];
+        $fin68 = preg_replace('/\D/', '', (string)($r68['e']['finance_ministry_number'] ?? '')) ?: '1';
+        $r6x68 .= '<Attached_Form FormNo="R6" Ver="2">'
+            . '<FCG Int_Line_No="1015"><Cell_Value>2</Cell_Value></FCG>'
+            . '<FCG Int_Line_No="1020"><Cell_Value>3</Cell_Value></FCG>'
+            . '<FCG Int_Line_No="1025"><Cell_Value>202127</Cell_Value></FCG>'
+            . '<FCG Int_Line_No="1384"><Cell_Value>تجربة</Cell_Value></FCG>'
+            . '<FCG Int_Line_No="1387"><Cell_Value>' . $fin68 . '</Cell_Value></FCG>'
+            . '<FCG Int_Line_No="1389"><Cell_Value>1</Cell_Value></FCG>'
+            . '<FC Int_Line_No="15"><Submitted_AMT>' . $d68['trans'] . '</Submitted_AMT></FC>'
+            . '<FC Int_Line_No="66"><Submitted_AMT>' . $d68['tot1'] . '</Submitted_AMT></FC>'
+            . '<FC Int_Line_No="80"><Submitted_AMT>' . $r68['fd'] . '</Submitted_AMT></FC>'
+            . '<FC Int_Line_No="81"><Submitted_AMT>' . ($d68['other'] + $d68['fam']) . '</Submitted_AMT></FC>'
+            . '<FC Int_Line_No="84"><Submitted_AMT>' . $d68['net350'] . '</Submitted_AMT></FC>'
+            . '<FC Int_Line_No="89"><Submitted_AMT>' . $d68['tax'] . '</Submitted_AMT></FC></Attached_Form>';
+    }
+    $fin68s = preg_replace('/\D/', '', (string)($db->query("SELECT finance_number FROM schools WHERE id=2")->fetchColumn() ?: ''));
+    $xml68 = '<?xml version="1.0" encoding="UTF-8"?><DSAssesment><Assessment>'
+        . '<Form_No>R5</Form_No><Version_No>6</Version_No><Tax_Payer_No>' . $fin68s . '</Tax_Payer_No>'
+        . '<TP_Start_Date>2025-01-01</TP_Start_Date><TP_End_Date>2025-12-31</TP_End_Date>'
+        . '<UserID>RegCheck</UserID><Declaration_Date>2026-01-01</Declaration_Date>'
+        . '<FC Int_Line_No="10"><Submitted_AMT>' . $S68['paid'] . '</Submitted_AMT></FC>'
+        . '<FC Int_Line_No="12"><Submitted_AMT>' . $S68['trans'] . '</Submitted_AMT></FC>'
+        . '<FC Int_Line_No="16"><Submitted_AMT>' . ($S68['other'] + $S68['fam']) . '</Submitted_AMT></FC>'
+        . '<FC Int_Line_No="22"><Submitted_AMT>' . $S68['tb'] . '</Submitted_AMT></FC>'
+        . '<FC Int_Line_No="24"><Submitted_AMT>' . $S68['fd'] . '</Submitted_AMT></FC>'
+        . '<FC Int_Line_No="26"><Submitted_AMT>' . $S68['net'] . '</Submitted_AMT></FC>'
+        . '<FC Int_Line_No="28"><Submitted_AMT>' . $S68['tax'] . '</Submitted_AMT></FC>'
+        . $r6x68 . '<Attached_Form FormNo="R7" Ver="1"><FCG Int_Line_No="1001"><Cell_Value>2025</Cell_Value></FCG></Attached_Form>'
+        . '</Assessment></DSAssesment>';
+    // شفّره بمفتاح الماكرو نفسه (تجربة الطريق الكامل: تشفير ⇒ رفع ⇒ فحص)
+    $enc68 = base64_encode(openssl_encrypt($xml68, 'des-cbc', '6E79A445', OPENSSL_RAW_DATA, hex2bin('1314531830a13d1f')));
+    $up68 = $PROJ . '/tools/_r567_test.xml';
+    file_put_contents($up68, $enc68);
+    $out68 = renderPage('pages/r567_check.php', [], [], [2], '', '', '', ['xml' => $up68]);
+    @unlink($up68);
+    check('مدقّق ملف الوزارة: ملف مطابق لأرقام البرنامج ⇒ «سليم» (فكّ التشفير + كل الفحوص خضراء)',
+          strpos($out68, 'الملف سليم') !== false && strpos($out68, '❌') === false
+          && strpos($out68, 'FATAL') === false, 'موظفون: ' . count($yd68['rows']));
+    // ونفس الملف بضريبة مبدَّلة ⇒ لازم يوقعه
+    $bad68 = str_replace('<FC Int_Line_No="28"><Submitted_AMT>' . $S68['tax'],
+                         '<FC Int_Line_No="28"><Submitted_AMT>' . ($S68['tax'] + 1000), $xml68);
+    file_put_contents($up68, base64_encode(openssl_encrypt($bad68, 'des-cbc', '6E79A445', OPENSSL_RAW_DATA, hex2bin('1314531830a13d1f'))));
+    $out68b = renderPage('pages/r567_check.php', [], [], [2], '', '', '', ['xml' => $up68]);
+    @unlink($up68);
+    check('مدقّق ملف الوزارة: رقم مبدَّل بالملف ⇒ «لا تبعتو» (ما بيمرق غلط)',
+          strpos($out68b, 'لا تبعتو') !== false && strpos($out68b, 'الضريبة المتوجبة') !== false);
+}
+if ($savedScope68 === null) unset($_SESSION['active_schools']); else $_SESSION['active_schools'] = $savedScope68;
 // تعبئة متعددة الأوراق: نصيّة (لا DOM — ورقة R6 ‏15MB) + ممنوع دهس خلايا الصيغ
 require_once $PROJ . '/includes/report_export.php';
 $x67 = '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
