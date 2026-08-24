@@ -1175,6 +1175,18 @@ function healR567GeoFix20260823() {
         setSetting('heal_r567_geo_20260823', 'done:' . $n);
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
+/** شفاء لمرة واحدة: بلدة الين منصور 191 «Beyrouth» غلط — سجلّها الأصلي (نسخة حزيران) ديك المحدي/المتن،
+ *  وخانة حيّها بملفها «ديك المحدي» تؤكّده (تصحيح 2026-08-24) */
+function healAlineVille20260824() {
+    try {
+        if (getSetting('heal_aline_ville_20260824', '') !== '') return;
+        $db = getDB();
+        $n = $db->prepare("UPDATE employees SET gouvernorat='جبل لبنان', district='المتن', ville='ديك المحدي'
+            WHERE id=191 AND last_name_ar='منصور' AND ville='Beyrouth'");
+        $n->execute();
+        setSetting('heal_aline_ville_20260824', 'done:' . $n->rowCount());
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
 
 /** يعيد ملف تعريف المؤسسة للمالية بكل المفاتيح (الفارغ = '') */
 function mofProfile($school): array {

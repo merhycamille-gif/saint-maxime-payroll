@@ -585,6 +585,42 @@ if ($form === 'mof_r567') {
     $cazaNames = array_column($geo['cazas'] ?? [], 'name');
     $townNames = array_column($geo['towns'] ?? [], 'name');
     if (($_GET['check'] ?? '') === '1') {
+        // ✍️ تصحيح مباشر من شاشة الفحص نفسها («بدون ما ارجع فوت على ملف الأستاذ» 2026-08-24):
+        // قوائم اختيار من لوائح الوزارة حصراً + تدقيق هرمي (القضاء ضمن محافظته والبلدة ضمن قضائها)
+        if (($_POST['geo_save'] ?? '') === '1') {
+            requireCsrf();
+            $gMsg = ''; $gErr = '';
+            if (!isAdmin()) { $gErr = 'صلاحية المدير مطلوبة للتصحيح'; }
+            else {
+                $eid4 = (int)($_POST['emp'] ?? 0);
+                $gvP = trim((string)($_POST['gov'] ?? '')); $czP = trim((string)($_POST['caza'] ?? '')); $twP = trim((string)($_POST['town'] ?? ''));
+                $finP = preg_replace('/[^0-9]/', '', (string)($_POST['fin'] ?? ''));
+                $st4 = $db->prepare("SELECT * FROM employees WHERE id=? AND is_deleted=0 AND " . schoolScopeWhere('school_id'));
+                $st4->execute([$eid4]);
+                if (!($tgt4 = $st4->fetch())) $gErr = 'الموظف غير موجود ضمن نطاق المدرسة الحالي';
+                else {
+                    $sets4 = []; $vals4 = [];
+                    if ($gvP !== '' || $czP !== '' || $twP !== '') {
+                        $govId4 = $geo['govs'][$gvP] ?? null; $cazaId4 = null; $okTown4 = false;
+                        if ($govId4 !== null) foreach (($geo['cazas'] ?? []) as $c4) if ($c4['name'] === $czP && $c4['gov'] === $govId4) { $cazaId4 = $c4['id']; break; }
+                        if ($cazaId4 !== null) foreach (($geo['towns'] ?? []) as $t4) if ($t4['name'] === $twP && $t4['caza'] === $cazaId4) { $okTown4 = true; break; }
+                        if ($okTown4) { $sets4[] = 'gouvernorat=?'; $vals4[] = $gvP; $sets4[] = 'district=?'; $vals4[] = $czP; $sets4[] = 'ville=?'; $vals4[] = $twP; }
+                        else $gErr = 'العنوان غير مطابق لتسلسل قوائم الوزارة (محافظة ← قضاء ← بلدة) — ما انحفظ شي';
+                    }
+                    if ($gErr === '' && $finP !== '') { $sets4[] = 'finance_ministry_number=?'; $vals4[] = $finP; }
+                    if ($gErr === '' && $sets4) {
+                        $vals4[] = $eid4;
+                        $db->prepare('UPDATE employees SET ' . implode(',', $sets4) . ' WHERE id=?')->execute($vals4);
+                        $gMsg = trim((($tgt4['first_name_ar'] ?? '') ?: ($tgt4['first_name_fr'] ?? '')) . ' ' . (($tgt4['last_name_ar'] ?? '') ?: ($tgt4['last_name_fr'] ?? '')));
+                    } elseif ($gErr === '') $gErr = 'ما في شي مختار للحفظ';
+                }
+            }
+            // PRG: إعادة توجيه حتى لا يتكرّر الحفظ عند تحديث الصفحة
+            $qs4 = $_GET; unset($qs4['gsaved'], $qs4['gerr']);
+            if ($gMsg !== '') $qs4['gsaved'] = $gMsg; elseif ($gErr !== '') $qs4['gerr'] = $gErr;
+            header('Location: ' . basename(strtok($_SERVER['REQUEST_URI'], '?')) . '?' . http_build_query($qs4));
+            exit;
+        }
         // ✅ التصحيح التلقائي أولاً («صححهن متل ما كتبتهن الدولة»): كل بلدة لها حل وحيد
         // بقوائم الوزارة تتصحّح فوراً بملف الموظف — والملتبس فقط يُعرض تحت لقراره
         $autoFixed = r567GeoAutoFix($db, schoolScopeWhere('school_id'));
@@ -609,9 +645,11 @@ if ($form === 'mof_r567') {
             return $bestP >= 55 ? ' ← الأقرب بقائمة الوزارة: «' . $best . '»' : '';
         };
         $probs = [];
+        $fixRows = []; $fixSeen = []; // صفوف التصحيح المباشر: موظف واحد بصفّ واحد مهما تعدّدت خاناته
         foreach ($empRows as $r2) {
             $e2 = $r2['e'];
             $nm2 = trim(($e2['first_name_ar'] ?: $e2['first_name_fr']) . ' ' . ($e2['last_name_ar'] ?: $e2['last_name_fr']));
+            $pc0 = count($probs);
             // 🔴 رقم المالية إلزامي: ماكرو الوزارة يقف عند أول صف بلا رقم فيسقط هو ومن بعده
             if (preg_replace('/\D/', '', (string)($e2['finance_ministry_number'] ?? '')) === '') {
                 $probs[] = [$nm2, 'رقم المالية (إلزامي — بدونه يسقط من ملف الوزارة)', '(فارغ)'];
@@ -641,17 +679,35 @@ if ($form === 'mof_r567') {
                     $probs[] = [$nm2, 'البلدة', $tw . ' — بقوائم الوزارة هالبلدة بقضاء «' . $where3 . '» لا «' . $cz . '»: صحّح القضاء أو البلدة'];
                 }
             }
+            if (count($probs) > $pc0) {
+                $newProbs = array_slice($probs, $pc0);
+                $fixSeen[(int)$e2['id']] = 1;
+                $fixRows[] = ['e' => $e2, 'name' => $nm2, 'issues' => $newProbs,
+                    'geo' => (bool)array_filter($newProbs, fn($p3) => strpos($p3[1], 'رقم المالية') !== 0),
+                    'fin' => (bool)array_filter($newProbs, fn($p3) => strpos($p3[1], 'رقم المالية') === 0)];
+            }
         }
         foreach ($leavers as $le2) {
             if (preg_replace('/\D/', '', (string)($le2['finance_ministry_number'] ?? '')) === '') {
                 $nm3 = trim((($le2['first_name_ar'] ?? '') ?: ($le2['first_name_fr'] ?? '')) . ' ' . (($le2['last_name_ar'] ?? '') ?: ($le2['last_name_fr'] ?? '')));
                 $probs[] = [$nm3, 'رقم المالية — تارك (ر7)', '(فارغ)'];
+                if (!isset($fixSeen[(int)$le2['id']])) {
+                    $fixSeen[(int)$le2['id']] = 1;
+                    $fixRows[] = ['e' => $le2, 'name' => $nm3, 'geo' => false, 'fin' => true,
+                        'issues' => [[$nm3, 'رقم المالية — تارك (ر7)', '(فارغ)']]];
+                }
             }
         }
         header('Content-Type: text/html; charset=UTF-8');
         echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تدقيق أسماء R567</title>'
-           . '<style>body{font-family:"Segoe UI",Tahoma,sans-serif;background:#f1f5f9;padding:24px}table{border-collapse:collapse;background:#fff;width:100%;max-width:760px;margin:0 auto}td,th{border:1px solid #cbd5e1;padding:6px 12px;text-align:right}th{background:#1F4E5F;color:#fff}h2{text-align:center}</style></head><body>'
+           . '<style>body{font-family:"Segoe UI",Tahoma,sans-serif;background:#f1f5f9;padding:24px}table{border-collapse:collapse;background:#fff;width:100%;max-width:1100px;margin:0 auto}td,th{border:1px solid #cbd5e1;padding:6px 12px;text-align:right}th{background:#1F4E5F;color:#fff}h2{text-align:center}'
+           . '.gfix{display:flex;flex-wrap:wrap;gap:5px;align-items:center}.gfix select,.gfix input{padding:5px 8px;border:1px solid #94a3b8;border-radius:6px;font-family:inherit;font-size:14px;max-width:170px}'
+           . '.gfix button{background:#166534;color:#fff;border:0;border-radius:6px;padding:6px 14px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}.gfix button:hover{background:#14532d}'
+           . '.flash-ok{max-width:1100px;margin:0 auto 14px;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:8px;padding:10px 16px;font-weight:700;text-align:center}'
+           . '.flash-err{max-width:1100px;margin:0 auto 14px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:8px;padding:10px 16px;font-weight:700;text-align:center}</style></head><body>'
            . '<h2>تدقيق الأسماء الجغرافية على قوائم أكواد الوزارة — ' . $fy . '</h2>';
+        if (($_GET['gsaved'] ?? '') !== '') echo '<div class="flash-ok">✅ انحفظ تصحيح «' . e($_GET['gsaved']) . '» بملف الموظف — والخطأ راح من اللائحة تحت.</div>';
+        if (($_GET['gerr'] ?? '') !== '') echo '<div class="flash-err">⚠️ ' . e($_GET['gerr']) . '</div>';
         if ($autoFixed) {
             echo '<p style="text-align:center;color:#166534;font-weight:700">✅ صحّحت تلقائياً ' . count($autoFixed) . ' عنواناً حسب تهجئة قوائم الوزارة:</p>'
                . '<table style="margin-bottom:18px"><tr><th>الموظف</th><th>قبل</th><th>صار (تهجئة الوزارة)</th></tr>';
@@ -660,10 +716,57 @@ if ($form === 'mof_r567') {
         }
         if (!$probs) {
             echo '<p style="text-align:center;font-size:18px;color:#166534;font-weight:700">✅ كل أسماء المحافظات والأقضية والبلدات (' . count($empRows) . ' موظفاً) مطابقة لقوائم الوزارة — الأكواد رح تطلع صح.</p>';
+        } elseif (isAdmin()) {
+            // ✍️ التصحيح المباشر: صف واحد لكل موظف — القوائم من لوائح الوزارة نفسها فما بينحفظ إلا الصح
+            echo '<p style="text-align:center;color:#b91c1c;font-weight:700">⚠️ ' . count($probs) . ' خانة غير مطابقة — الكود سيطلع 0 بالملف. صحّحها مباشرة من هون (بتنحفظ فوراً بملف الموظف، بلا ما تفوت عليه):</p>'
+               . '<table><tr><th>الموظف</th><th>المشكلة</th><th>التصحيح المباشر</th></tr>';
+            foreach ($fixRows as $fr) {
+                $e4 = $fr['e'];
+                $issues = implode('<br>', array_map(fn($p3) => '<strong>' . e($p3[1]) . '</strong>: ' . e($p3[2]), $fr['issues']));
+                $frm = '<form method="post" class="gfix">' . csrfField()
+                     . '<input type="hidden" name="geo_save" value="1"><input type="hidden" name="emp" value="' . (int)$e4['id'] . '">';
+                if ($fr['geo']) {
+                    $frm .= '<select name="gov" class="g-gov" data-v="' . e(trim((string)($e4['gouvernorat'] ?? ''))) . '"></select>'
+                          . '<select name="caza" class="g-caza" data-v="' . e(trim((string)($e4['district'] ?? ''))) . '"></select>'
+                          . '<select name="town" class="g-town" data-v="' . e(trim((string)($e4['ville'] ?? ''))) . '"></select>';
+                }
+                if ($fr['fin']) $frm .= '<input name="fin" inputmode="numeric" placeholder="رقم المالية" style="width:120px">';
+                $frm .= '<button type="submit">💾 حفظ / Enregistrer</button></form>';
+                echo '<tr><td style="white-space:nowrap">' . e($fr['name']) . '</td><td>' . $issues . '</td><td>' . $frm . '</td></tr>';
+            }
+            echo '</table>';
         } else {
             echo '<p style="text-align:center;color:#b91c1c;font-weight:700">⚠️ ' . count($probs) . ' خانة غير مطابقة — الكود سيطلع 0 بالملف. صحّحها بملف الموظف (عنوان السكن) بنفس تهجئة قوائم الوزارة:</p><table><tr><th>الموظف</th><th>الخانة</th><th>القيمة الحالية</th></tr>';
             foreach ($probs as $p2) echo '<tr><td>' . e($p2[0]) . '</td><td>' . e($p2[1]) . '</td><td><strong>' . e($p2[2]) . '</strong></td></tr>';
             echo '</table>';
+        }
+        // القوائم المتسلسلة: اختيار المحافظة يحصر الأقضية بأقضيتها، والقضاء يحصر البلدات ببلداته
+        if ($probs && isAdmin()) {
+            echo '<script>const GEO=' . json_encode(['govs' => $geo['govs'] ?? [], 'cazas' => array_values($geo['cazas'] ?? []), 'towns' => array_values($geo['towns'] ?? [])], JSON_UNESCAPED_UNICODE) . ';'
+               . <<<'JS'
+document.querySelectorAll('form.gfix').forEach(function(f){
+  var sg=f.querySelector('.g-gov'), sc=f.querySelector('.g-caza'), st=f.querySelector('.g-town');
+  if(sg){
+    function opt(sel, items, cur, ph){
+      sel.innerHTML='';
+      var o0=document.createElement('option'); o0.value=''; o0.textContent=ph; sel.appendChild(o0);
+      items.forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; if(n===cur) o.selected=true; sel.appendChild(o); });
+    }
+    function govId(){ return GEO.govs[sg.value]; }
+    function cazaId(){ var g=govId(); var c=GEO.cazas.find(function(x){return x.name===sc.value && x.gov===g;}); return c?c.id:null; }
+    function fillCaza(cur){ var g=govId(); opt(sc, GEO.cazas.filter(function(x){return x.gov===g;}).map(function(x){return x.name;}), cur, '— القضاء —'); }
+    function fillTown(cur){ var c=cazaId(); var ts=GEO.towns.filter(function(x){return x.caza===c;}).map(function(x){return x.name;}); ts.sort(function(a,b){return a.localeCompare(b,'ar');}); opt(st, ts, cur, '— البلدة —'); }
+    opt(sg, Object.keys(GEO.govs), sg.dataset.v, '— المحافظة —');
+    fillCaza(sc.dataset.v); fillTown(st.dataset.v);
+    sg.addEventListener('change', function(){ fillCaza(''); fillTown(''); });
+    sc.addEventListener('change', function(){ fillTown(''); });
+  }
+  f.addEventListener('submit', function(ev){
+    if(sg && (sg.value==='' || sc.value==='' || st.value==='')){ ev.preventDefault(); alert('اختر المحافظة والقضاء والبلدة الثلاثة قبل الحفظ'); }
+  });
+});
+JS
+               . '</script>';
         }
         echo '</body></html>';
         exit;

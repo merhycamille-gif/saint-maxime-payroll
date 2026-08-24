@@ -3186,6 +3186,20 @@ check('تصحيح المناطق: البلدة مرجع القضاء (صليما
 check('شفاء تصحيح المناطق معلَّق بالترويسة + التصحيح التلقائي بشاشة التدقيق',
       strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healR567GeoFix20260823()') !== false
       && strpos($oe67, 'r567GeoAutoFix($db, schoolScopeWhere(') !== false);
+// ✍️ التصحيح المباشر من شاشة التدقيق («بدون ما ارجع فوت على ملف الأستاذ» 2026-08-24):
+// معالج حفظ POST بحماية CSRF + مدير فقط + تدقيق هرمي، وفورم القوائم المتسلسلة بالشاشة
+check('شاشة التدقيق: تصحيح مباشر (geo_save بCSRF + مدير فقط + تدقيق هرمي + PRG) وقوائم متسلسلة من لوائح الوزارة',
+      strpos($oe67, "\$_POST['geo_save']") !== false
+      && strpos($oe67, 'requireCsrf();') !== false
+      && strpos($oe67, 'isAdmin()') !== false
+      && strpos($oe67, "\$t4['caza'] === \$cazaId4") !== false
+      && strpos($oe67, "header('Location: ' . basename(strtok(") !== false
+      && strpos($oe67, 'class="gfix"') !== false
+      && strpos($oe67, 'g-town') !== false);
+// عنوان الين منصور 191 استقرّ على تهجئة الوزارة (ديك المحدي/المتن) — كان «Beyrouth» (تصحيح 2026-08-24)
+$al67 = $db->query("SELECT gouvernorat, district, ville FROM employees WHERE id=191")->fetch();
+check('الين منصور 191: عنوان السكن ديك المحدي/المتن/جبل لبنان (مش Beyrouth)',
+      $al67 && $al67['gouvernorat'] === 'جبل لبنان' && $al67['district'] === 'المتن' && $al67['ville'] === 'ديك المحدي');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
