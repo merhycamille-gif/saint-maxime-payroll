@@ -17,3 +17,4 @@ deploy_exclude.txt
 launch.vbs
 make_online_deploy.py
 tools/_render_one.php
+_moved_block.txt
