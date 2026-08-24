@@ -773,41 +773,32 @@ JS
     }
 
     // ٥) بناء خانات الأوراق الثلاث
-    $r5c = [
-        'C5' => $sch['name_ar'] ?? '', 'C7' => $finNum, 'C8' => $prof['trade_name'],
-        'K6' => $serial567($fy . '-01-01'), 'P6' => '31/12/' . $fy,
-        'K7' => $serial567($fy . '-01-01'), 'P7' => '31/12/' . $fy,
-        'C11' => $prof['gov'], 'K11' => $prof['gov'], 'C12' => $prof['caza'], 'K12' => $prof['caza'],
-        'G13' => $prof['town'], 'Q13' => $prof['town'], 'C14' => $prof['street'], 'L14' => $prof['street'],
-        'Q15' => $prof['building'], 'C16' => $prof['floor'], 'L16' => $prof['floor'],
-        'C22' => $prof['contact_name'], 'K22' => $prof['preparer_name'],
-        'C23' => $prof['contact_reg'], 'K23' => $prof['preparer_reg'],
-        'C24' => $prof['contact_phone'], 'H24' => $prof['contact_fax'],
-        'K24' => $prof['preparer_phone'], 'P24' => $prof['preparer_fax'],
-        'F28' => $cnt,
-        'L31' => $paid, 'L33' => $paid, 'L34' => $sum['trans'] ?: '', 'L36' => $sum['other'] ?: '',
-        'L37' => $sum['net'], 'L38' => $sum['exempt'] ?: '', 'L39' => $sum['taxable'], 'L40' => $sum['tax'],
-        'K48' => $sum['taxable'], 'K49' => $sum['tax'], 'K50' => 0, 'K51' => $sum['tax'], 'K54' => $sum['tax'],
-        'B54' => 0, 'B60' => $prof['signer_name'], 'L60' => $prof['signer_title'] ?: 'المدير',
-        'C61' => $serial567(date('Y-m-d')),
-    ];
     $r6c = [
         'C6' => trim(($sch['name_ar'] ?? '') . ($prof['town'] !== '' ? ' - ' . $prof['town'] : '')),
         'F6' => $fy, 'C7' => $prof['trade_name'], 'C8' => $finNum,
         'F8' => count($empRows), 'F12' => count($empRows),
     ];
     $rowN = 16;
+    // 🔴 «الأرقام بر5 لازم تطابق ر6» (2026-08-24): ورقة ر5 تنبنى من مجموع صفوف ر6 نفسها
+    // (مصدر واحد) — لا من التجميع الفصلي (التنزيل العائلي الفصلي يختلف عن السنوي الإفرادي)
+    $S5 = ['paid' => 0, 'trans' => 0, 'fam' => 0, 'other' => 0, 'tb' => 0, 'fd' => 0, 'net' => 0, 'tax' => 0];
     foreach ($empRows as $i => $r2) {
         $e2 = $r2['e']; $a2 = $r2['a'];
         $base2 = (int)$a2['base']; $exw2 = (int)$a2['extraw']; $aide2 = (int)$a2['aide'];
-        $fam2 = (int)$a2['family']; $tr2 = (int)$a2['trans']; $oth2 = (int)$a2['other'];
+        $fam2 = (int)$a2['family']; $tr2 = (int)$a2['trans'];
         $tb2 = (int)$a2['tb']; $tax2 = (int)$a2['tax'];
         $isMar2 = ($r2['mar'] === 'متزوج');
         $famSp = $isMar2 ? $fam2 : 0; $famCh = $isMar2 ? 0 : $fam2;
         $tot1 = $base2 + $exw2 + $aide2 + $fam2 + $tr2;
         $tot2 = $fam2 + $tr2;
         $tot3 = $base2 + $exw2 + $aide2;
+        // «تنزيلات أخرى» بالصف = الفرق الحقيقي بين المكوّنات والأساس الخاضع المخزَّن
+        // (الصندوق+الدرجة + أي جزء غير خاضع حسب خيارات الموظف) — هكذا كل صف «يركب»:
+        // CG − CI = CJ + CH بالمليم، ومجاميع الأعمدة تطابق ر5
+        $oth2 = max(0, $tot3 - $tb2);
         $net350 = max(0, $tb2 - $r2['fd']);
+        $S5['paid'] += $tot1; $S5['trans'] += $tr2; $S5['fam'] += $fam2; $S5['other'] += $oth2;
+        $S5['tb'] += $tb2; $S5['fd'] += (int)$r2['fd']; $S5['net'] += $net350; $S5['tax'] += $tax2;
         $from2 = sprintf('%04d-%02d-01', $fy, (int)$a2['m1']);
         $to2 = date('d/m/Y', strtotime(date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $fy, (int)$a2['m2'])))));
         $R = $rowN + $i;
@@ -835,6 +826,27 @@ JS
             'CH' . $R => $r2['fd'] ?: '', 'CI' . $R => $oth2 ?: '', 'CJ' . $R => $net350, 'CK' . $R => $tax2,
         ];
     }
+    // ورقة ر5: كل سطر = مجموع عموده بورقة ر6 (120=ΣCE، 130=ΣAV، 150=ΣCI+العائلي،
+    // 160=Σالأساس الخاضع، 170=ΣCH، 180=ΣCJ، 190=ΣCK) — السلسلة الحسابية تامة بالمليم
+    $r5c = [
+        'C5' => $sch['name_ar'] ?? '', 'C7' => $finNum, 'C8' => $prof['trade_name'],
+        'K6' => $serial567($fy . '-01-01'), 'P6' => '31/12/' . $fy,
+        'K7' => $serial567($fy . '-01-01'), 'P7' => '31/12/' . $fy,
+        'C11' => $prof['gov'], 'K11' => $prof['gov'], 'C12' => $prof['caza'], 'K12' => $prof['caza'],
+        'G13' => $prof['town'], 'Q13' => $prof['town'], 'C14' => $prof['street'], 'L14' => $prof['street'],
+        'Q15' => $prof['building'], 'C16' => $prof['floor'], 'L16' => $prof['floor'],
+        'C22' => $prof['contact_name'], 'K22' => $prof['preparer_name'],
+        'C23' => $prof['contact_reg'], 'K23' => $prof['preparer_reg'],
+        'C24' => $prof['contact_phone'], 'H24' => $prof['contact_fax'],
+        'K24' => $prof['preparer_phone'], 'P24' => $prof['preparer_fax'],
+        'F28' => count($empRows),
+        'L31' => $S5['paid'], 'L33' => $S5['paid'], 'L34' => $S5['trans'] ?: '',
+        'L36' => ($S5['other'] + $S5['fam']) ?: '',
+        'L37' => $S5['tb'], 'L38' => $S5['fd'] ?: '', 'L39' => $S5['net'], 'L40' => $S5['tax'],
+        'K48' => $S5['net'], 'K49' => $S5['tax'], 'K50' => 0, 'K51' => $S5['tax'], 'K54' => $S5['tax'],
+        'B54' => 0, 'B60' => $prof['signer_name'], 'L60' => $prof['signer_title'] ?: 'المدير',
+        'C61' => $serial567(date('Y-m-d')),
+    ];
     $r7c = [
         'B6' => $sch['name_ar'] ?? '', 'E6' => $fy, 'B7' => $prof['trade_name'], 'B8' => $finNum,
         'E8' => trim((string)($sch['nssf_employer_number'] ?? '')),

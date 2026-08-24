@@ -3149,13 +3149,15 @@ check('التعبئة النصيّة: رقم + نصّ مهرَّب + صيغة م
 // توليد حي: ملف xlsm سليم بماكرو الوزارة والقيم بأوراقه
 $b67 = renderPage('pages/official_export.php', ['form' => 'mof_r567', 'fy' => '2025'], [], [2], '', '', $PROJ . '/tools/_r567_test.xlsm');
 $ok67 = strncmp($b67, 'PK', 2) === 0 && strlen($b67) > 1000000;
-$vba67 = false; $r6emp67 = false;
+$vba67 = false; $r6emp67 = false; $r5xml67 = ''; $r6xml67 = '';
 if ($ok67) {
     $tmp67 = $PROJ . '/tools/_r567_probe.xlsm';
     file_put_contents($tmp67, $b67);
     $z67 = new ZipArchive();
     if ($z67->open($tmp67) === true) {
         $vba67 = $z67->getFromName('xl/vbaProject.bin') !== false;
+        $r5xml67 = (string)$z67->getFromName('xl/worksheets/sheet1.xml');
+        $r6xml67 = (string)$z67->getFromName('xl/worksheets/sheet2.xml');
         for ($i67 = 1; $i67 <= 6; $i67++) {
             $sx67 = (string)$z67->getFromName("xl/worksheets/sheet$i67.xml");
             if (strpos($sx67, 'أعزب') !== false || strpos($sx67, 'متزوج') !== false) { $r6emp67 = true; break; }
@@ -3166,6 +3168,38 @@ if ($ok67) {
 }
 check('توليد R567 حي: ملف xlsm سليم + ماكرو الوزارة محفوظ + صفوف الموظفين بمفردات الوزارة (أعزب/متزوج)',
       $ok67 && $vba67 && $r6emp67, 'حجم ' . number_format(strlen($b67)));
+// 🔴 «الأرقام بر5 لازم يكونو مطابقين لر6» (2026-08-24): كل سطر مالي بورقة ر5 = مجموع
+// عموده بصفوف ر6 (16..54) بالمليم + السلسلة الحسابية تامة (120−130−150=160، 160−170=180)
+// ⚠️ regex بلا تراجع (لا .*? — ورقة R6 ‏15MB بتفجّر backtrack limit): خلية قيمة مباشرة
+// <c r=".." ...><v>..</v> فقط — خلايا الصيغ (<f> قبل <v>) لا تُلتقط أصلاً وهذا مقصود
+$cell67 = function ($xml, $ref) {
+    return preg_match('/<c r="' . $ref . '"[^>]*><v>([^<]+)<\/v>/', $xml, $m) ? (float)$m[1] : 0.0;
+};
+$sums67 = [];
+if (preg_match_all('/<c r="([A-Z]{1,2})(\d+)"[^>]*><v>([^<]+)<\/v>/', $r6xml67, $ms67, PREG_SET_ORDER)) {
+    foreach ($ms67 as $m67) {
+        $rw67 = (int)$m67[2];
+        if ($rw67 < 16 || $rw67 > 54) continue; // 55 = صف مجاميع القالب (صيَغ)
+        $sums67[$m67[1]] = ($sums67[$m67[1]] ?? 0.0) + (float)$m67[3];
+    }
+}
+$g67 = fn($c) => $sums67[$c] ?? 0.0;
+$eq67 = fn($a, $b) => abs($a - $b) < 0.5;
+$fam67 = $g67('CF') - $g67('AV');
+check('R567: ورقة ر5 = مجموع صفوف ر6 بالمليم (المدفوع/النقل/تنزيلات أخرى/الأساس/العائلي/الخاضع/الضريبة) + السلسلة الحسابية تامة',
+      $eq67($cell67($r5xml67, 'L31'), $g67('CE')) && $eq67($cell67($r5xml67, 'L33'), $g67('CE'))
+      && $eq67($cell67($r5xml67, 'L34'), $g67('AV'))
+      && $eq67($cell67($r5xml67, 'L36'), $g67('CI') + $fam67)
+      && $eq67($cell67($r5xml67, 'L37'), $g67('CH') + $g67('CJ'))
+      && $eq67($cell67($r5xml67, 'L38'), $g67('CH'))
+      && $eq67($cell67($r5xml67, 'L39'), $g67('CJ'))
+      && $eq67($cell67($r5xml67, 'L40'), $g67('CK'))
+      && $eq67($cell67($r5xml67, 'K48'), $cell67($r5xml67, 'L39'))
+      && $eq67($cell67($r5xml67, 'K51'), $cell67($r5xml67, 'L40'))
+      && $eq67($cell67($r5xml67, 'L33') - $cell67($r5xml67, 'L34') - $cell67($r5xml67, 'L36'), $cell67($r5xml67, 'L37'))
+      && $eq67($cell67($r5xml67, 'L37') - $cell67($r5xml67, 'L38'), $cell67($r5xml67, 'L39'))
+      && $g67('CE') > 0,
+      'ΣCE=' . number_format($g67('CE')) . ' ΣCJ=' . number_format($g67('CJ')) . ' ΣCK=' . number_format($g67('CK')));
 $chk67 = renderPage('pages/official_export.php', ['form' => 'mof_r567', 'fy' => '2025', 'check' => '1'], [], [2]);
 check('شاشة تدقيق أسماء المناطق تشتغل (عنوانها + جدول/رسالة نتيجتها)',
       strpos($chk67, 'تدقيق الأسماء الجغرافية على قوائم أكواد الوزارة') !== false
