@@ -351,7 +351,8 @@ include __DIR__ . '/../includes/header.php';
 .salary-slip-table .sub-lbp { display:block; font-weight:600; color:#111827; }
 /* أعمدة الليرة الصرفة (أساس/قيمة الدرجة/بعد التدرج): نفس حجم باقي مبالغ الليرة تماماً */
 .salary-slip-table .num-lbp { font-weight:700; color:#111827; }
-.salary-slip-table .cur-usd { display:block; font-size:0.8em; color:#047857; font-weight:600; line-height:1.2; }
+/* ✍️ (2026-08-25) «بدون ألوان بخطوط المبالغ»: الدولار أسود متل الليرة — لا أخضر */
+.salary-slip-table .cur-usd { display:block; font-size:0.8em; color:#111827; font-weight:600; line-height:1.2; }
 /* وضع العملة المختار من الزرّ العام: إظهار/إخفاء الليرة أو الدولار */
 .salary-slip-table.curmode-lbp .cur-usd { display:none; }
 .salary-slip-table.curmode-lbp .sub-lbp { color:#111; font-size:1em; }
@@ -414,7 +415,8 @@ include __DIR__ . '/../includes/header.php';
     .salary-slip-table .num-lbp, .salary-slip-table .num-lbp strong { font-size: 12pt !important; font-weight: 700 !important; white-space: nowrap; }
     /* 🔠 «مبالغ الدولار صغيرة كتير» (طلب المستخدم 2026-08-01): الدولار 11pt عريض واضح —
        يُقرأ بسهولة ومتناسق مع الليرة (14pt) والليرة تبقى الرئيسية */
-    .salary-slip-table .cur-usd { white-space: nowrap; color: #047857 !important; font-size: 11pt !important; font-weight: 700 !important; }
+    /* ✍️ (2026-08-25) «بدون ألوان بخطوط المبالغ»: كل الأرقام سوداء بالطباعة — لا أخضر */
+    .salary-slip-table .cur-usd { white-space: nowrap; color: #000 !important; font-size: 11pt !important; font-weight: 700 !important; }
     /* ✍️ (2026-08-25) سطور المبالغ تتنفّس أكثر (بدل 4px) — والباقي يوزَّع عليها بflex */
     .salary-slip-table td { padding: 5px 3px !important; }
     .salary-slip-table .row-month { white-space: nowrap; }

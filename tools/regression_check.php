@@ -1580,18 +1580,20 @@ check('الخط 12 على الورق: تقارير reports.php أعمدتها ح
 // 🎨🔒 التصميم النهائي المجمّد للبطاقة السنوية — اعتمده المستخدم حرفياً بقوله
 // «ما تغير بقى شي بالبطاقة احفظها منيح» (2026-08-01 مساءً). أي كسر لأحد هذه البنود
 // = خرق لقرار المستخدم الصريح — ممنوع تعديل تصميم البطاقة بدون طلبه المباشر:
-// بلا كحلي · رؤوس فاتحة · المحسومات أحمر فاتح · أرقام 14 عريضة والدولار تحتها ·
-// اسم الأستاذ 17pt أبرز عنصر · معلومات 13.5 عريضة · صفحة واحدة
+// بلا كحلي · رؤوس فاتحة · المحسومات أحمر فاتح · أرقام عريضة سوداء والدولار تحتها
+// بلا ألوان (بطلبه 2026-08-25) · اسم الأستاذ 17pt أبرز عنصر · معلومات 13.5 عريضة · صفحة واحدة
 // ✍️ تعديل وحيد بطلبه المباشر (2026-08-25): العربي صار بخط نسخي Noto Naskh Arabic
 // («الخط بالعربي بشع») والأرقام/اللاتيني بقيا Cairo — باقي التصميم مجمّد كما هو
 check('🔒 البطاقة السنوية (تصميم مجمّد بأمر المستخدم): رؤوس فاتحة والمحسومات بأحمر فاتح وبلا كحلي',
       strpos($asSrc29, '.salary-slip-table thead th { background: #f1f5f9 !important; color: #111 !important;') !== false
       && strpos($asSrc29, 'th.deduction-header { background: #ffe3e3 !important;') !== false
       && strpos($asSrc29, '#1F4E5F !important') === false);
-check('🔒 البطاقة السنوية (تصميم مجمّد): كل مبالغ الليرة 12 عريضة موحّدة والدولار 11 عريض أخضر تحتها',
+// ✍️ (2026-08-25) «بدون ألوان بخطوط المبالغ»: كل الأرقام سوداء — لا أخضر بالدولار
+check('🔒 البطاقة السنوية (تصميم مجمّد): كل مبالغ الليرة 12 عريضة موحّدة والدولار 11 عريض أسود تحتها — بلا ألوان بالأرقام',
       strpos($asSrc29, '.salary-slip-table .sub-lbp { white-space: nowrap; font-size: 12pt !important; font-weight: 700 !important; }') !== false
       && strpos($asSrc29, '.salary-slip-table .num-lbp, .salary-slip-table .num-lbp strong { font-size: 12pt !important;') !== false
       && strpos($asSrc29, "font-size: 11pt !important; font-weight: 700 !important;") !== false
+      && strpos($asSrc29, '#047857') === false
       && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);
 check('🔒 البطاقة السنوية (تصميم مجمّد): العربي نسخي Noto Naskh والأرقام Cairo + اسم الأستاذ 17pt أبرز عنصر + معلومات عريضة',
       strpos($asSrc29, ".salary-slip, .salary-slip-table, .slip-info { font-family:'Noto Naskh Arabic','Cairo'") !== false
