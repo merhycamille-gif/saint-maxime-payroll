@@ -389,12 +389,15 @@ include __DIR__ . '/../includes/header.php';
     .ssh-title h3 { font-size: 12pt !important; } .ssh-sub { font-size: 12pt !important; } .ssh-year { font-size: 12pt !important; }
     /* 🔠 «معلومات الأستاذ فوق أكبر» + «اسم الأستاذ واضح» (طلب المستخدم 2026-08-01):
        الاسم أبرز عنصر بالورقة (17pt أسود عريض بالنص)، والقيم كبار عريضة والتسميات أصغر */
-    .slip-emp-name { font-size: 12pt !important; background:#eff6ff !important; padding:6px 10px !important; margin-bottom:5px !important; }
+    /* ✍️ (2026-08-25) «خانات معلومات الأستاذ نضيقها شوي هيك بيتوسعوا سطور المبالغ»:
+       حشوات المعلومات أنحف — والفراغ المتوفّر ينزل تلقائياً لصفوف الجدول (flex) */
+    .slip-emp-name { font-size: 12pt !important; background:#eff6ff !important; padding:4px 8px !important; margin-bottom:3px !important; }
     .slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 800 !important; color: #000 !important; }
     .slip-emp-name .slip-school, .slip-emp-name .slip-rep { font-weight: 600 !important; color: #334155 !important; }
-    .slip-info { margin-bottom: 5px !important; }
-    .slip-info td { border:1px solid #888 !important; padding: 3px 8px !important; }
-    .slip-info .lbl { font-size: 10.5pt !important; margin-bottom: 1px !important; color:#555 !important; }
+    .slip-info { margin-bottom: 3px !important; }
+    .slip-info td { border:1px solid #888 !important; padding: 2px 6px !important; }
+    .slip-info .lbl { font-size: 10.5pt !important; margin-bottom: 0 !important; color:#555 !important; }
+    .slip-info .val { line-height: 1.25 !important; }
     /* بولد حقيقي غامق (طلب المستخدم) — العربي نسخي (2026-08-25) واللاتيني/الأرقام Cairo */
     .slip-info .val { font-size: 13.5pt !important; font-weight:800 !important;
                       font-family:'Noto Naskh Arabic','Cairo','Sakkal Majalla','Inter',sans-serif !important; color:#000 !important; }
@@ -412,7 +415,8 @@ include __DIR__ . '/../includes/header.php';
     /* 🔠 «مبالغ الدولار صغيرة كتير» (طلب المستخدم 2026-08-01): الدولار 11pt عريض واضح —
        يُقرأ بسهولة ومتناسق مع الليرة (14pt) والليرة تبقى الرئيسية */
     .salary-slip-table .cur-usd { white-space: nowrap; color: #047857 !important; font-size: 11pt !important; font-weight: 700 !important; }
-    .salary-slip-table td { padding: 4px 3px !important; }
+    /* ✍️ (2026-08-25) سطور المبالغ تتنفّس أكثر (بدل 4px) — والباقي يوزَّع عليها بflex */
+    .salary-slip-table td { padding: 5px 3px !important; }
     .salary-slip-table .row-month { white-space: nowrap; }
     .total-row td { background: #fff3cd !important; font-weight: bold; }
 }
