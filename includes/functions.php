@@ -544,8 +544,25 @@ function classLevelNames($csv, bool $frOnly = false) {
     static $map = null;
     if ($map === null) {
         $map = [];
+        // 🩹 شفاء ذاتي (طلب المستخدم 2026-08-25: «أسماء الصفوف بالفرنسي EB7,EB8...»): صفوف
+        // زُرعت بلا name_fr (البذر 015 لا يملأه) فكان الكشف يسقط للعربي — نملأ الفرنسي
+        // المعروف بالذاكرة دائماً، ونثبّته بقاعدة البيانات (محجوب عن حسابات القراءة-فقط)
+        $frDefaults = [
+            'روضة أولى'=>'PS','روضة ثانية'=>'MS','روضة ثالثة'=>'GS',
+            'الأول أساسي'=>'EB1','الثاني أساسي'=>'EB2','الثالث أساسي'=>'EB3','الرابع أساسي'=>'EB4',
+            'الخامس أساسي'=>'EB5','السادس أساسي'=>'EB6','السابع أساسي'=>'EB7','الثامن أساسي'=>'EB8','التاسع أساسي'=>'EB9',
+            'الأول ثانوي'=>'Secondaire 1','الثاني ثانوي'=>'Secondaire 2','الثالث ثانوي'=>'Secondaire 3',
+        ];
         try { foreach (getDB()->query("SELECT id, name, name_fr FROM class_levels") as $r) {
             $fr = trim((string)($r['name_fr'] ?? ''));
+            $ar = trim((string)$r['name']);
+            if ($fr === '' && isset($frDefaults[$ar])) {
+                $fr = $frDefaults[$ar];
+                if (!isViewer()) {
+                    try { getDB()->prepare("UPDATE class_levels SET name_fr = ? WHERE id = ? AND (name_fr IS NULL OR name_fr = '')")
+                                 ->execute([$fr, (int)$r['id']]); } catch (Exception $eH) {}
+                }
+            }
             $map[(int)$r['id']] = ['fr' => $fr, 'ar' => (string)$r['name']];
         } }
         catch (Exception $e) { $map = []; }

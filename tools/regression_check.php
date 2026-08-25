@@ -588,6 +588,20 @@ if ($regEid) {
           && strpos($hAn0, 'Total dû<br>المستحق') !== false && strpos($hAn0, 'Classes / الصفوف') !== false);
     $asdSrc = (string)file_get_contents(__DIR__ . '/../includes/annual_slip_data.php');
     check('الكشف السنوي: الصفوف بالفرنسي فقط', strpos($asdSrc, "classLevelNames(\$emp['classes_taught'] ?? '', true)") !== false);
+    // ✍️ (2026-08-25) «أسماء الصفوف بدها تكون بالفرنسي EB7,EB8,EB9»: شفاء ذاتي يملأ name_fr
+    // الفاضي بالأسماء المعروفة (زرع 015 كان يبذر بلا فرنسي فيسقط الكشف للعربي) — فحص حي بالقاعدة
+    $fnSrc25 = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
+    classLevelNames('1'); // يشغّل الشفاء
+    $clsMissing = 0;
+    try {
+        $clsMissing = (int)getDB()->query("SELECT COUNT(*) FROM class_levels WHERE (name_fr IS NULL OR name_fr='')
+            AND name IN ('روضة أولى','روضة ثانية','روضة ثالثة','الأول أساسي','الثاني أساسي','الثالث أساسي','الرابع أساسي',
+                         'الخامس أساسي','السادس أساسي','السابع أساسي','الثامن أساسي','التاسع أساسي','الأول ثانوي','الثاني ثانوي','الثالث ثانوي')")->fetchColumn();
+    } catch (Exception $e) {}
+    check('الصفوف بالفرنسي EB1-EB9: شفاء ذاتي بالكود (محجوب عن القراءة-فقط) + لا صفّ معروفاً بلا name_fr بالقاعدة',
+          strpos($fnSrc25, "'السابع أساسي'=>'EB7'") !== false
+          && strpos($fnSrc25, '!isViewer()') !== false
+          && $clsMissing === 0, $clsMissing ? "صفوف بلا فرنسي: $clsMissing" : 'كل الصفوف المعروفة إلها فرنسي');
     check('إفادة راتب: سطر «تعويض النقل» مفصول بالتفصيل', strpos($attSrc, "['تعويض النقل', \$transW]") !== false);
     // (2026-08-20) «بدو يكون عنا خيار لسبب ترك العمل» بإفادة صندوق التعويضات: خيار جاهز
     // (استقالة/صرف/بلوغ السن) أو نص حرّ يكتبه — والفاضي يبقى خطاً منقّطاً للتعبئة باليد
