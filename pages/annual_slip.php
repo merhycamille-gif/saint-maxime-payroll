@@ -346,7 +346,7 @@ include __DIR__ . '/../includes/header.php';
 .salary-slip-table th { font-size: 12pt; padding: 7px 6px; background:#f1f5f9; color:#111827; border:1px solid #94a3b8; }
 .salary-slip-table .deduction-header { background:#ffe3e3 !important; color:#7f1d1d !important; }
 .salary-slip-table td { padding: 8px 8px; }
-.salary-slip-table tbody tr:nth-child(even) { background:#f8fafc; }
+/* ✍️ (2026-08-25) «P1 بدون ألوان هون»: لا تخطيط متناوباً بصفوف المبالغ — كل السطور بيض */
 /* الليرة الرئيسية (سطر أول واضح) والدولار صغيراً بالأخضر تحتها — متل كل الكشوف */
 .salary-slip-table .sub-lbp { display:block; font-weight:600; color:#111827; }
 /* أعمدة الليرة الصرفة (أساس/قيمة الدرجة/بعد التدرج): نفس حجم باقي مبالغ الليرة تماماً */
