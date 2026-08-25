@@ -140,7 +140,10 @@ function reportDocThumb($path) {
     $categories = [
         ['title'=>'كشوف الرواتب / Bulletins de salaire', 'icon'=>'fa-money-check-alt', 'color'=>'var(--primary)', 'tiles'=>[
             ['url'=>$PG.'annual_slip.php', 'icon'=>'fa-file-invoice-dollar', 'color'=>'var(--primary)', 'fr'=>'Bulletin annuel', 'ar'=>'بطاقة راتب الأستاذ'],
-            ['url'=>'?report=monthly_summary', 'icon'=>'fa-calendar-check', 'color'=>'var(--info)', 'fr'=>'Résumé mensuel', 'ar'=>'كشف رواتب شهري'],
+            // ✍️ (2026-08-25) «في شي هون مكرر — انت بدك تعرف شو المكرر»: بطاقة «Résumé mensuel /
+            // كشف رواتب شهري» أُزيلت من المركز — أعمدتها كلها ضمن «État des salaires / كشف رواتب
+            // كل الموظفين» (الأغنى: تنزيل عائلي + خاضع للضريبة + محسومات + توقيع). الرابط القديم
+            // ?report=monthly_summary يبقى شغّالاً لمن يملكه ولفحوص regression.
             ['url'=>$OF.'salary_all', 'icon'=>'fa-table-list', 'color'=>'var(--success)', 'fr'=>'État des salaires', 'ar'=>'كشف رواتب كل الموظفين'],
             ['url'=>$OF.'salary_detail', 'icon'=>'fa-rectangle-list', 'color'=>'var(--primary)', 'fr'=>'Détail des salaires (par catégorie)', 'ar'=>'معلومات تفصيلية عن الراتب (جميع الأساتذة/الموظفون)'],
             ['url'=>'?report=annual_totals', 'icon'=>'fa-chart-pie', 'color'=>'var(--warning)', 'fr'=>'Totaux annuels', 'ar'=>'مجاميع سنوية'],

@@ -588,6 +588,12 @@ if ($regEid) {
           && strpos($hAn0, 'Total dû<br>المستحق') !== false && strpos($hAn0, 'Classes / الصفوف') !== false);
     $asdSrc = (string)file_get_contents(__DIR__ . '/../includes/annual_slip_data.php');
     check('الكشف السنوي: الصفوف بالفرنسي فقط', strpos($asdSrc, "classLevelNames(\$emp['classes_taught'] ?? '', true)") !== false);
+    // ✍️ (2026-08-25) «في شي مكرر بمركز التقارير»: بطاقة «Résumé mensuel» أُزيلت (مكرّرة —
+    // أعمدتها ضمن État des salaires) ولا ترجع؛ التقرير نفسه يبقى شغّالاً بالرابط المباشر
+    $repSrc25 = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+    check('مركز التقارير بلا مكرّر: لا بطاقة «Résumé mensuel» (ضمن كشف رواتب كل الموظفين) والرابط المباشر شغّال',
+          strpos($repSrc25, "'fr'=>'Résumé mensuel'") === false
+          && strpos($repSrc25, "report === 'monthly_summary'") !== false);
     // ✍️ (2026-08-25) «بدون الفراطات — داون للرقم بالراتب»: كل دولار معروض صحيح (تدوير لتحت)
     // — الأساس بالليرة حسب السلسلة لا يُمسّ، والتدوير على ناتج الجمع (أساس+إضافي قبل الضرائب)
     // والمجاميع جمع الأرقام الشهرية المدوّرة نفسها. فحص حي: لا سنتات بالكشف السنوي المعروض
