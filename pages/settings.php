@@ -56,8 +56,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // teacher_form_deadline أو علامات الشفاء الذاتي yr_additions_backfilled_*).
     $allowedSettings = ['current_exchange_rate', 'current_school_year', 'grades_baseline_year',
                         'minimum_wage_lbp', 'school_name_ar', 'school_name_fr', 'school_address',
-                        'school_phone', 'teacher_form_deadline', 'teacher_form_allow_after'];
+                        'school_phone', 'teacher_form_deadline', 'teacher_form_allow_after',
+                        'transport_start_month', 'transport_end_month'];
     $oldRate = getSetting('current_exchange_rate'); // لرصد تغيّر سعر الصرف الافتراضي
+    // لرصد تغيّر نافذة أشهر النقل (✍️ 2026-08-25: «إذا بدي عدل بعدل» — التعديل يعيد الحساب تلقائياً)
+    $oldTrWin = getSetting('transport_start_month', '10') . '-' . getSetting('transport_end_month', '6');
     foreach ($_POST as $k => $v) {
         if (!in_array($k, $allowedSettings, true) || is_array($v)) continue;
         setSetting($k, trim((string)$v));
@@ -67,6 +70,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['current_exchange_rate']) && (float)$oldRate !== (float)$_POST['current_exchange_rate']) {
         $nRec = recalcSalariesInRange($db, '2017-08-01', null);
         $msg = "تم الحفظ وإعادة حساب الرواتب المتأثّرة بسعر الصرف ($nRec). / Paramètres enregistrés, salaires recalculés.";
+    }
+    // نافذة أشهر النقل تغيّرت ⇒ إعادة حساب رواتب سريان القانون (من تشرين الأول 2026) تلقائياً
+    $newTrWin = getSetting('transport_start_month', '10') . '-' . getSetting('transport_end_month', '6');
+    if ($newTrWin !== $oldTrWin) {
+        $nRec2 = recalcSalariesInRange($db, '2026-10-01', null);
+        $msg .= " + أشهر النقل: أُعيد حساب الرواتب المتأثّرة ($nRec2). / Mois du transport modifiés, salaires recalculés.";
     }
     $_SESSION['flash'] = ['type' => 'success', 'msg' => $msg];
     header('Location: ' . BASE_URL . 'pages/settings.php');
@@ -111,6 +120,38 @@ include __DIR__ . '/../includes/header.php';
                 <label class="form-label">Année scolaire actuelle / السنة الدراسية</label>
                 <input type="text" name="current_school_year" class="form-control" value="<?= e(getSetting('current_school_year')) ?>" placeholder="2025-2026">
             </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-bus"></i> Mois du transport (enseignants)</span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">أشهر تعويض النقل (للأساتذة)</div>
+        </h3></div>
+        <div class="card-body">
+            <?php // ✍️ (2026-08-25) «النقل من تشرين الأول لحزيران ضمناً — وإذا بدي عدل بعدل»:
+                  // نافذة أشهر النقل للملاك والمتعاقدين (الموظف الإداري يداوم الصيف فنقله كل السنة).
+                  // سارية من 2026-2027 — سنة 2025-2026 المدفوعة لا تتأثّر.
+                  $trMonths = [10=>'Octobre / تشرين الأول',11=>'Novembre / تشرين الثاني',12=>'Décembre / كانون الأول',
+                               1=>'Janvier / كانون الثاني',2=>'Février / شباط',3=>'Mars / آذار',4=>'Avril / نيسان',
+                               5=>'Mai / أيار',6=>'Juin / حزيران',7=>'Juillet / تموز',8=>'Août / آب',9=>'Septembre / أيلول'];
+                  $trS = max(1, min(12, (int)getSetting('transport_start_month', 10)));
+                  $trE = max(1, min(12, (int)getSetting('transport_end_month', 6))); ?>
+            <div class="form-row cols-2">
+                <div class="form-group mb-0">
+                    <label class="form-label">Du mois / من شهر</label>
+                    <select name="transport_start_month" class="form-select">
+                        <?php foreach ($trMonths as $mv=>$ml): ?><option value="<?= $mv ?>" <?= $mv===$trS?'selected':'' ?>><?= $ml ?></option><?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label">Au mois (inclus) / إلى شهر (ضمناً)</label>
+                    <select name="transport_end_month" class="form-select">
+                        <?php foreach ($trMonths as $mv=>$ml): ?><option value="<?= $mv ?>" <?= $mv===$trE?'selected':'' ?>><?= $ml ?></option><?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <small class="text-muted">للملاك والمتعاقدين — خارج هذه الأشهر لا يُدفع تعويض نقل (الافتراضي: تشرين الأول → حزيران = 9 أشهر). الموظفون الإداريون نقلهم كل السنة. يسري من 2026-2027.</small>
         </div>
     </div>
 

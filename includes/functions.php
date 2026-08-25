@@ -1194,6 +1194,44 @@ function healR567GeoFix20260823() {
 }
 /** شفاء لمرة واحدة: بلدة الين منصور 191 «Beyrouth» غلط — سجلّها الأصلي (نسخة حزيران) ديك المحدي/المتن،
  *  وخانة حيّها بملفها «ديك المحدي» تؤكّده (تصحيح 2026-08-24) */
+/** ✍️ (2026-08-25) قانون أشهر تعويض النقل («من تشرين الأول لحزيران ضمناً يعني تسعة أشهر»):
+ *  للأساتذة (ملاك ومتعاقدون) النقل يُدفع فقط ضمن نافذة الأشهر 10→6 (قابلة للتعديل من
+ *  الإعدادات: transport_start_month/transport_end_month). الموظف الإداري يداوم الصيف
+ *  فنقله كل السنة. القانون مؤرَّخ يسري من 2026-2027 — سنة 2025-2026 المدفوعة والمطابقة
+ *  لسجلات المستخدم لا تُمسّ حتى عند إعادة الحساب. مصدر واحد للمنطق (المحرّك + الشفاء). */
+function transportMonthActive(int $month, string $employeeType, string $schoolYear): bool {
+    if ($employeeType === 'employe') return true;
+    if (strcmp($schoolYear, (string)getSetting('transport_window_from_sy', '2026-2027')) < 0) return true;
+    $start = max(1, min(12, (int)getSetting('transport_start_month', 10)));
+    $end   = max(1, min(12, (int)getSetting('transport_end_month', 6)));
+    return $start <= $end ? ($month >= $start && $month <= $end)
+                          : ($month >= $start || $month <= $end);
+}
+
+/** شفاء ذاتي (2026-08-25): تصفير النقل بالصفوف المولّدة مسبقاً خارج نافذة أشهر النقل
+ *  (أساتذة، من 2026-2027 وطالع فقط) مع إنقاص المستحق ومرآة دولاره — 2025-2026 لا تُمسّ. */
+function healTransportWindow20260825() {
+    try {
+        if (getSetting('heal_transport_window_20260825', '') !== '') return;
+        $db = getDB();
+        $rows = $db->query("SELECT ms.id, ms.month, ms.school_year, ms.transport_lbp, e.employee_type
+                            FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+                            WHERE ms.school_year >= '2026-2027' AND ms.transport_lbp > 0
+                              AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel')")->fetchAll();
+        $up = $db->prepare("UPDATE monthly_salaries SET transport_lbp=0, transport_complement_lbp=0,
+                              total_due_lbp = total_due_lbp - :tr,
+                              total_due_usd = CASE WHEN exchange_rate > 0 THEN ROUND(total_due_lbp / exchange_rate, 2) ELSE total_due_usd END
+                            WHERE id = :id");
+        $n = 0;
+        foreach ($rows as $r) {
+            if (transportMonthActive((int)$r['month'], (string)$r['employee_type'], (string)$r['school_year'])) continue;
+            $up->execute(['tr' => (int)$r['transport_lbp'], 'id' => (int)$r['id']]);
+            $n++;
+        }
+        setSetting('heal_transport_window_20260825', 'done:' . $n);
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
 function healAlineVille20260824() {
     try {
         if (getSetting('heal_aline_ville_20260824', '') !== '') return;

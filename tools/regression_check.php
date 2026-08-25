@@ -611,6 +611,41 @@ if ($regEid) {
     // والمجاميع جمع الأرقام الشهرية المدوّرة نفسها. فحص حي: لا سنتات بالكشف السنوي المعروض
     check('بدون فراطات بالدولار: الكشف السنوي المعروض بلا أي مبلغ دولار بكسور (X.XX $)',
           preg_match('/\d\.\d{2}\s*\$/u', $hAn0) === 0 && preg_match('/\$\s*[\d,]+\.\d{2}/u', $hAn0) === 0);
+    // ✍️ (2026-08-25) قانون أشهر تعويض النقل («من تشرين الأول لحزيران ضمناً يعني 9 أشهر
+    // للداخلين بالملاك... وكمان للمتعاقدين»): نافذة 10→6 للأساتذة، قابلة للتعديل بالإعدادات،
+    // سارية من 2026-2027 — الموظف الإداري يداوم الصيف فنقله كل السنة، و2025-2026 لا تُمسّ
+    check('أشهر النقل: المنطق الحي — تموز/آب/أيلول بلا نقل للأساتذة من 2026-2027، وحزيران وتشرين الأول ضمن النافذة',
+          transportMonthActive(7, 'enseignant_titulaire', '2026-2027') === false
+          && transportMonthActive(8, 'enseignant_contractuel', '2026-2027') === false
+          && transportMonthActive(9, 'enseignant_titulaire', '2026-2027') === false
+          && transportMonthActive(6, 'enseignant_titulaire', '2026-2027') === true
+          && transportMonthActive(10, 'enseignant_contractuel', '2026-2027') === true
+          && transportMonthActive(1, 'enseignant_titulaire', '2027-2028') === true);
+    check('أشهر النقل: الموظف الإداري نقله كل السنة + سنة 2025-2026 المدفوعة لا تُمسّ حتى عند إعادة الحساب',
+          transportMonthActive(7, 'employe', '2026-2027') === true
+          && transportMonthActive(8, 'employe', '2027-2028') === true
+          && transportMonthActive(7, 'enseignant_titulaire', '2025-2026') === true
+          && transportMonthActive(9, 'enseignant_contractuel', '2025-2026') === true);
+    $pcSrc25 = (string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php');
+    $stSrc25 = (string)file_get_contents(__DIR__ . '/../pages/settings.php');
+    check('أشهر النقل: بوابة المحرّك (bonusComponents) + شفاء الصفوف المولّدة + نافذة قابلة للتعديل بالإعدادات مع إعادة حساب تلقائية',
+          strpos($pcSrc25, 'transportMonthActive((int)$this->month') !== false
+          && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'healTransportWindow20260825();') !== false
+          && strpos($stSrc25, "'transport_start_month', 'transport_end_month'") !== false
+          && strpos($stSrc25, 'name="transport_start_month"') !== false
+          && strpos($stSrc25, "recalcSalariesInRange(\$db, '2026-10-01', null)") !== false);
+    // فحص حي بالقاعدة: لا صفّ أستاذ من 2026-2027 وطالع فيه نقل بشهر خارج النافذة
+    $trBad = 0;
+    try {
+        foreach (getDB()->query("SELECT ms.month, ms.school_year, e.employee_type FROM monthly_salaries ms
+                                  JOIN employees e ON e.id=ms.employee_id
+                                  WHERE ms.school_year >= '2026-2027' AND ms.transport_lbp > 0
+                                    AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel')") as $trR) {
+            if (!transportMonthActive((int)$trR['month'], (string)$trR['employee_type'], (string)$trR['school_year'])) $trBad++;
+        }
+    } catch (Exception $e) {}
+    check('أشهر النقل: لا نقل مخزّناً خارج النافذة بصفوف الأساتذة من 2026-2027 وطالع (الشفاء اشتغل)',
+          $trBad === 0, $trBad ? "صفوف مخالفة: $trBad" : 'نظيف');
     // ✍️ (2026-08-25) «أسماء الصفوف بدها تكون بالفرنسي EB7,EB8,EB9»: شفاء ذاتي يملأ name_fr
     // الفاضي بالأسماء المعروفة (زرع 015 كان يبذر بلا فرنسي فيسقط الكشف للعربي) — فحص حي بالقاعدة
     $fnSrc25 = (string)file_get_contents(__DIR__ . '/../includes/functions.php');

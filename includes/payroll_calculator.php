@@ -345,6 +345,11 @@ class PayrollCalculator {
         // (ب) تعويض النقل اليومي **المؤرّخ بالفترات** (employee_bonuses نوع transport_daily): يتغيّر
         // خلال السنة. لكل فترة سارية للشهر: القيمة اليومية × الأيام × الأسابيع (تُحوَّل إن دولار).
         $transportComp += $this->getDailyTransportForMonth($tDays, $tWeeks);
+        // ✍️ (2026-08-25) قانون أشهر النقل: للأساتذة النقل من تشرين الأول لحزيران ضمناً (9 أشهر،
+        // نافذة قابلة للتعديل بالإعدادات، سارية من 2026-2027) — خارجها لا تعويض نقل إطلاقاً.
+        // الموظف الإداري يداوم الصيف فلا تنطبق عليه. (transportMonthActive بfunctions.php)
+        $syTr = $this->month >= 10 ? $this->year . '-' . ($this->year + 1) : ($this->year - 1) . '-' . $this->year;
+        if (!transportMonthActive((int)$this->month, (string)($emp['employee_type'] ?? ''), $syTr)) $transportComp = 0;
         return [$primeFixe, $aideComp, $transportComp];
     }
 
