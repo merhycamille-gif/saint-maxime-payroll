@@ -718,12 +718,12 @@ function reportDocThumb($path) {
                               SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax, SUM(ms.caisse_amount_lbp) caisse,
                               SUM(ms.school_cnss_8_lbp) scnss, SUM(ms.school_eoc_6_lbp) seoc,
                               SUM(ms.base_salary_lbp) base_sal, SUM(ms.base_plus_echelon_lbp) bpe,
-                              SUM(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0)) bpe_usd,
+                              SUM(FLOOR(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0))) bpe_usd,
                               SUM(ms.extra_lbp + ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide,
                               SUM(ms.transport_lbp) transport,
-                              SUM((ms.extra_lbp + ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0)) extra_wage_usd,
-                              SUM(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) aide_usd,
-                              SUM(ms.transport_lbp/NULLIF(ms.exchange_rate,0)) transport_usd
+                              SUM(FLOOR((ms.extra_lbp + ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0))) extra_wage_usd,
+                              SUM(FLOOR(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0))) aide_usd,
+                              SUM(FLOOR(ms.transport_lbp/NULLIF(ms.exchange_rate,0))) transport_usd
                               FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                               WHERE e.is_deleted=0" . $annualEmpFilter . $empTypeSql . " AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql);
         $stmt->execute(array_merge($annualEmpParams, [$schoolYear]));

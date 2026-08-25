@@ -93,8 +93,9 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
             $s13['transport_lbp'] = 0;
             $s13['total_due_lbp'] = $s13['net_salary_lbp'];
             $rate13 = (float)$ref['exchange_rate'];
-            $s13['net_salary_usd'] = $rate13 > 0 ? round($s13['net_salary_lbp'] / $rate13, 2) : 0;
-            $s13['total_due_usd']  = $rate13 > 0 ? round($s13['total_due_lbp'] / $rate13, 2) : 0;
+            // ✍️ (2026-08-25) «بدون الفراطات»: دولار صحيح بالتدوير لتحت — الليرة كما هي بالمليم
+            $s13['net_salary_usd'] = $rate13 > 0 ? floor($s13['net_salary_lbp'] / $rate13) : 0;
+            $s13['total_due_usd']  = $rate13 > 0 ? floor($s13['total_due_lbp'] / $rate13) : 0;
             $displayRows[] = ['label' => 'شهر التعويض (13) / Indemnité', 's' => $s13];
         }
     }
@@ -117,7 +118,9 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         $s = $dr['s'];
         if (!$s) { $rows[] = ['label' => $dr['label'], 's' => null]; continue; }
         $rate = (float)$s['exchange_rate'];
-        $usd = function($lbp) use ($rate) { return $rate > 0 ? $lbp / $rate : 0; };
+        // ✍️ (2026-08-25) «بدون الفراطات — داون»: كل تحويل لدولار العرض ينزل لرقم صحيح،
+        // فمجموع البطاقة = جمع أشهرها المدوّرة نفسها (الأرقام تركب). الليرة لا تُمسّ.
+        $usd = function($lbp) use ($rate) { return $rate > 0 ? floor($lbp / $rate) : 0; };
 
         $primeAide = (int)$s['prime_fixe_lbp'] + (int)$s['aide_complementaire_lbp'];
         $extraWageSlip = (int)$s['extra_lbp'] + (int)$s['prime_fixe_lbp']; // الأجر الإضافي
@@ -165,9 +168,9 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         $tot['extra_wage_usd'] += $usd($extraWageSlip); $tot['aide_usd'] += $usd($aideSlip);
         $tot['brut_usd'] += $usd($brut); $tot['caisse_usd'] += $usd($row['caisse']); $tot['eoc_grade_usd'] += $usd($eocGrade);
         $tot['cnss_usd'] += $usd($row['cnss']); $tot['tax_usd'] += $usd($row['income_tax']);
-        $tot['totret_usd'] += $usd($row['total_retenues']); $tot['net_usd'] += (float)$s['net_salary_usd'];
+        $tot['totret_usd'] += $usd($row['total_retenues']); $tot['net_usd'] += floor((float)$s['net_salary_usd']);
         $tot['family_usd'] += $usd($row['family']); $tot['transport_usd'] += $usd($row['transport']);
-        $tot['total_due_usd'] += (float)$s['total_due_usd'];
+        $tot['total_due_usd'] += floor((float)$s['total_due_usd']);
     }
 
     $empNameAr = trim($emp['first_name_ar'].' '.$emp['last_name_ar']);

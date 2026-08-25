@@ -230,14 +230,15 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                         <td class="row-month"><?= e($r['label']) ?></td>
                         <?php if (!empty($r['s'])):
                             $rate = $r['rate'];
-                            $usd = function($lbp) use ($rate) { return $rate > 0 ? $lbp / $rate : 0; };
+                            // ✍️ (2026-08-25) «بدون الفراطات — داون»: الدولار صحيح بالتدوير لتحت؛ الليرة بالمليم كما هي
+                            $usd = function($lbp) use ($rate) { return $rate > 0 ? floor($lbp / $rate) : 0; };
                             // عرض القيمة: الليرة الرئيسية وتحتها الدولار صغيراً بالأخضر (— إن صفر)
                             // موحَّد مع كل كشوف البرنامج الرسمية (شكوى p1: الدولار فوق كان يعجّق الخانات)
                             $money = function($lbp, $bold = false) use ($rate) {
                                 $lbp = (int)$lbp; if ($lbp == 0) return '—';
                                 $l = formatLBP($lbp, false);
                                 if ($bold) $l = '<strong>' . $l . '</strong>';
-                                $u = number_format(($rate > 0 ? $lbp / $rate : 0), 2) . ' $';
+                                $u = number_format(($rate > 0 ? floor($lbp / $rate) : 0), 0) . ' $';
                                 // الدولار في span قابل للإخفاء (زرّ العملة يعرض الليرة فقط/الدولار فقط)
                                 return '<span class="sub-lbp">' . $l . '</span><span class="cur-usd">' . $u . '</span>';
                             };
@@ -249,8 +250,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td class="num-lbp"><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '—' ?></td>
                             <td class="num-lbp"><strong><?= formatLBP($r['cur_sal'], false) ?></strong></td>
                             <?php endif; ?>
-                            <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 2) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
-                            <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['aide']), 2) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
+                            <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 0) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
+                            <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['aide']), 0) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <?php $hR = $hidRow($r); ?>
                             <td><?= $money($r['brut'] - $hR, true) ?></td>
                             <?php if (!$isEmp): ?>
@@ -273,7 +274,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
 
                 <?php $moneyTot = function($lbp, $usd, $bold = true) {
                     $l = formatLBP((int)$lbp, false); if ($bold) $l = '<strong>' . $l . '</strong>';
-                    $u = number_format($usd, 2) . ' $';
+                    // المجموع بالدولار = جمع الأرقام الشهرية المدوّرة نفسها (الأرقام تركب) — عرضه صحيحاً
+                    $u = number_format(floor($usd), 0) . ' $';
                     return '<span class="sub-lbp">' . $l . '</span><span class="cur-usd">' . $u . '</span>';
                 }; ?>
                 <tr class="total-row">
@@ -283,8 +285,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <td class="num-lbp"><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
                     <td class="num-lbp"><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></td>
                     <?php endif; ?>
-                    <?php if (salaryCompHas('extra')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['extra_wage'], false) ?></strong></span><span class="cur-usd"><?= number_format($tot['extra_wage_usd'], 2) ?> $</span></td><?php endif; ?>
-                    <?php if (salaryCompHas('aide')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['aide'], false) ?></strong></span><span class="cur-usd"><?= number_format($tot['aide_usd'], 2) ?> $</span></td><?php endif; ?>
+                    <?php if (salaryCompHas('extra')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['extra_wage'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor($tot['extra_wage_usd']), 0) ?> $</span></td><?php endif; ?>
+                    <?php if (salaryCompHas('aide')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['aide'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor($tot['aide_usd']), 0) ?> $</span></td><?php endif; ?>
                     <td><?= $moneyTot($tot['brut'], $tot['brut_usd']) ?></td>
                     <?php if (!$isEmp): ?>
                     <td><?= $moneyTot($tot['caisse'], $tot['caisse_usd']) ?></td>

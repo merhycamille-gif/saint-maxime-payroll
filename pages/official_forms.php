@@ -1067,7 +1067,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
                             SUM(ms.cnss_amount_lbp) m3, SUM(ms.school_cnss_8_lbp) m8,
                             SUM(ms.school_end_of_service_8_5_lbp) eos, SUM(ms.school_family_comp_6_lbp) fam6,
                             SUM(ms.extra_lbp+ms.prime_fixe_lbp) ex, SUM(ms.aide_complementaire_lbp) ai,
-                            SUM((ms.extra_lbp+ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0)) ex_usd, SUM(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) ai_usd
+                            SUM(FLOOR((ms.extra_lbp+ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0))) ex_usd, SUM(FLOOR(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0))) ai_usd
                         FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
                         WHERE e.is_deleted=0 AND e.cnss_subject=1" . $yf . " AND ms.school_year=? AND " . schoolScopeWhere('e.school_id') . "
                         GROUP BY ms.month");
@@ -1694,13 +1694,13 @@ elseif ($form === 'teacher_card'):
                    SUM(CASE WHEN ms.school_year=? THEN ms.net_salary_lbp ELSE 0 END) AS cur,
                    SUM(CASE WHEN ms.school_year=? THEN ms.net_salary_lbp ELSE 0 END) AS prev,
                    SUM(CASE WHEN ms.school_year=? THEN ms.extra_lbp+ms.prime_fixe_lbp ELSE 0 END) AS extra_wage,
-                   SUM(CASE WHEN ms.school_year=? THEN (ms.extra_lbp+ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0) ELSE 0 END) AS extra_wage_usd,
+                   SUM(CASE WHEN ms.school_year=? THEN FLOOR((ms.extra_lbp+ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0)) ELSE 0 END) AS extra_wage_usd,
                    SUM(CASE WHEN ms.school_year=? THEN ms.aide_complementaire_lbp ELSE 0 END) AS aide,
-                   SUM(CASE WHEN ms.school_year=? THEN ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0) ELSE 0 END) AS aide_usd,
+                   SUM(CASE WHEN ms.school_year=? THEN FLOOR(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) ELSE 0 END) AS aide_usd,
                    SUM(CASE WHEN ms.school_year=? THEN ms.base_plus_echelon_lbp ELSE 0 END) AS bpe,
-                   SUM(CASE WHEN ms.school_year=? THEN ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0) ELSE 0 END) AS bpe_usd,
+                   SUM(CASE WHEN ms.school_year=? THEN FLOOR(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0)) ELSE 0 END) AS bpe_usd,
                    SUM(CASE WHEN ms.school_year=? THEN ms.transport_lbp ELSE 0 END) AS transport,
-                   SUM(CASE WHEN ms.school_year=? THEN ms.transport_lbp/NULLIF(ms.exchange_rate,0) ELSE 0 END) AS transport_usd,
+                   SUM(CASE WHEN ms.school_year=? THEN FLOOR(ms.transport_lbp/NULLIF(ms.exchange_rate,0)) ELSE 0 END) AS transport_usd,
                    SUM(CASE WHEN ms.school_year=? THEN ms.base_salary_lbp ELSE 0 END) AS base_salary
             FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
             WHERE e.is_deleted=0 AND ms.school_year IN (?, ?) AND " . schoolScopeWhere('e.school_id') . "
@@ -1763,14 +1763,14 @@ elseif ($form === 'teacher_card'):
     $q = $db->prepare("SELECT ms.school_id,
             SUM(ms.base_salary_lbp) base_salary,
             SUM(ms.base_plus_echelon_lbp) bpe,
-            SUM(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0)) bpe_usd,
+            SUM(FLOOR(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0))) bpe_usd,
             SUM(ms.net_salary_lbp) net,
             SUM(ms.extra_lbp + ms.prime_fixe_lbp) extra_wage,
-            SUM((ms.extra_lbp + ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0)) extra_wage_usd,
+            SUM(FLOOR((ms.extra_lbp + ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0))) extra_wage_usd,
             SUM(ms.aide_complementaire_lbp) aide,
-            SUM(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) aide_usd,
+            SUM(FLOOR(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0))) aide_usd,
             SUM(ms.transport_lbp) transport,
-            SUM(ms.transport_lbp/NULLIF(ms.exchange_rate,0)) transport_usd,
+            SUM(FLOOR(ms.transport_lbp/NULLIF(ms.exchange_rate,0))) transport_usd,
             SUM(ms.cnss_amount_lbp + ms.school_cnss_8_lbp) cnss,
             SUM(ms.caisse_amount_lbp + ms.eoc_grade_lbp + ms.school_eoc_6_lbp) eoc,
             SUM(ms.income_tax_lbp) tax

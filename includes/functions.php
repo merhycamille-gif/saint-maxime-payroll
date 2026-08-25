@@ -2331,8 +2331,10 @@ function numToArabicWords($num) {
     return implode(' و', $parts);
 }
 
+/* ✍️ (2026-08-25) قاعدة «بدون الفراطات — داون للرقم»: كل مبلغ دولار يُعرض صحيحاً
+   بالتدوير لتحت (20.5 ⇒ 20). التخزين/الضرائب/ملفات الوزارة (بالليرة) لا تُمسّ. */
 function formatUSD($amount, $withCurrency = true) {
-    $formatted = number_format((float)$amount, 2, '.', ',');
+    $formatted = number_format(floor((float)$amount), 0, '.', ',');
     return $withCurrency ? '$' . $formatted : $formatted;
 }
 
@@ -2348,10 +2350,12 @@ function displayCurrency(): string {
     return in_array($c, ['both', 'lbp', 'usd'], true) ? $c : 'both';
 }
 
-/** تحويل مبلغ مخزّن بالليرة إلى دولار حسب سعر صرف معطى (سعر شهر الراتب). */
+/** تحويل مبلغ مخزّن بالليرة إلى دولار حسب سعر صرف معطى (سعر شهر الراتب).
+ *  ✍️ (2026-08-25) «بدون الفراطات»: التحويل ينزل لدولار صحيح (تدوير لتحت دائماً)
+ *  — فتصير المجاميع جمعَ الأرقام المدوّرة نفسها (قاعدة «الأرقام تركب»). */
 function lbpToUsd($lbp, $rate): float {
     $rate = (float)$rate;
-    return $rate > 0 ? (float)$lbp / $rate : 0.0;
+    return $rate > 0 ? floor((float)$lbp / $rate) : 0.0;
 }
 
 /**
@@ -2387,10 +2391,12 @@ function rowRate(array $row): float {
  *   $usdKey مثل 'net_salary_usd' و $lbpKey مثل 'net_salary_lbp'
  */
 function rowUsd(array $row, string $usdKey, string $lbpKey): float {
+    // ✍️ (2026-08-25) «بدون الفراطات»: المرآة المخزّنة بسنتاتها تبقى كما هي بالقاعدة،
+    // لكن ما يُعرض/يُدفع دولار صحيح بالتدوير لتحت (580.39 ⇒ 580)
     $u = (float)($row[$usdKey] ?? 0);
-    if ($u > 0) return $u;
+    if ($u > 0) return floor($u);
     $rate = rowRate($row);
-    return $rate > 0 ? ((float)($row[$lbpKey] ?? 0)) / $rate : 0.0;
+    return $rate > 0 ? floor(((float)($row[$lbpKey] ?? 0)) / $rate) : 0.0;
 }
 
 /**
