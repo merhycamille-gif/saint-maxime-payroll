@@ -245,10 +245,15 @@ $multiS = (count(activeSchoolIds()) !== 1);
 
 <?php /* ===== ٢) اقتراحات قراءات إخراجات القيد ===== */
 // 🏫 «لازم يبين موظفين المدرسة اللي مختارها» (2026-08-25): الاقتراحات بنطاق المدرسة المختارة فقط
-$rows = $db->query("SELECT ts.*, s.name_ar school_name FROM tax_suggestions ts
+// 📅 «بدي اساتذة نفس السنة» (p1 — 2026-08-25): وبنفس فلتر السنة الموحّد كجدول القرارات فوق —
+//    موظفو السنة الدراسية المعروضة فقط (لا تاركين قدامى متل زينة نجم 2015 أو من بلا رواتب)
+$rowsQ = $db->prepare("SELECT ts.*, s.name_ar school_name FROM tax_suggestions ts
+                    JOIN employees e ON e.id = ts.employee_id AND e.is_deleted = 0
                     LEFT JOIN schools s ON s.id = ts.school_id
-                    WHERE " . schoolScopeWhere('ts.school_id') . "
-                    ORDER BY FIELD(ts.status,'pending','applied','dismissed'), ts.id")->fetchAll();
+                    WHERE " . schoolScopeWhere('ts.school_id') . $tsYf . "
+                    ORDER BY FIELD(ts.status,'pending','applied','dismissed'), ts.id");
+$rowsQ->execute($tsYp);
+$rows = $rowsQ->fetchAll();
 // 🟢 «شو يعني طبّق؟ الأفضل نعم أو كلا — نعم = بدي التنزيل، كلا = ما بدي» (2026-08-25)
 $statusBadge = function ($s) {
     return [
@@ -273,7 +278,7 @@ $fixDetails = fn($t) => str_replace('اكبس «طبّق»، وإلا «تجاه
 <div class="card">
     <div class="card-header"><h3>
         <span dir="ltr"><i class="fas fa-lightbulb"></i> Suggestions — extraits d'état civil familial</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">اقتراحات من قراءة إخراجات القيد العائلية — أنت بتقرّر: <b>نعم = بدي التنزيل/التعديل ينطبق</b> · <b>كلا = ما بدي</b> (مدرسة المختارة فقط)</div>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">اقتراحات من قراءة إخراجات القيد العائلية — أنت بتقرّر: <b>نعم = بدي التنزيل/التعديل ينطبق</b> · <b>كلا = ما بدي</b> (المدرسة المختارة وأساتذة السنة المعروضة فقط)</div>
     </h3></div>
     <div class="card-body">
         <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">

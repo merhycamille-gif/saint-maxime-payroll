@@ -3243,6 +3243,20 @@ check('صفحة القرارات: تشاك مارك نعم/كلا يطبَّق �
       && strpos($dec66, 'name="act" value="add_child"') !== false
       && strpos($dec66, 'name="act" value="spouse_start"') !== false
       && strpos($dec66, 'FATAL') === false);
+// 📅 «بدي اساتذة نفس السنة» (p1 — 2026-08-25): الاقتراحات مفلترة بأساتذة السنة المعروضة
+// (زينه نجم تركت 2015 — ما بتظهر بسنة 2025-2026، ودنيا القزي موظفة السنة بتظهر) + بكل
+// السنين «all» بيظهر الكل + العدّاد بالقائمة بنفس النطاق (مدرسة + سنة)
+$sg66y = renderPage('pages/tax_suggestions.php', [], [], [2], '', '2025-2026');
+$sg66a = renderPage('pages/tax_suggestions.php', [], [], [2], '', 'all');
+check('الاقتراحات: أساتذة السنة المعروضة فقط (لا تاركين قدامى) وبكل السنين يظهر الكل',
+      strpos($sg66y, 'دنيا القزي') !== false && strpos($sg66y, 'زينه نجم') === false
+      && strpos($sg66a, 'زينه نجم') !== false && strpos($sg66y, 'FATAL') === false,
+      'year=' . (strpos($sg66y, 'زينه نجم') === false ? 'ok' : 'leak') . ' all=' . (strpos($sg66a, 'زينه نجم') !== false ? 'ok' : 'miss'));
+check('عدّاد الاقتراحات بالقائمة بنفس نطاق الصفحة (مدرسة + سنة)',
+      strpos((string)file_get_contents($PROJ . '/includes/functions.php'),
+             "JOIN employees e ON e.id = ts.employee_id AND e.is_deleted = 0") !== false
+      && preg_match('/function taxSuggestionsPendingCount[^}]*yearEmploymentFilter/s',
+             (string)file_get_contents($PROJ . '/includes/functions.php')) === 1);
 check('المحرّك والقارئون يمرّرون رقم الموظف للأتمتة المؤرَّخة',
       strpos((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), "(int)(\$this->employee['id'] ?? 0)") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "(int)\$de['id']") !== false

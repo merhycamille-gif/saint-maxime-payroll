@@ -1591,11 +1591,18 @@ function ensureTaxSuggestions20260823() {
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
-/** عدد الاقتراحات المعلّقة (لإضاءة الإشارة بالقائمة) */
+/** عدد الاقتراحات المعلّقة (لإضاءة الإشارة بالقائمة) —
+ *  📅 «بدي اساتذة نفس السنة» (p1 — 2026-08-25): بنفس نطاق صفحة الاقتراحات
+ *  (المدرسة المختارة + موظفو السنة المعروضة فقط) حتى يطابق الرقمُ المعروضَ فيها */
 function taxSuggestionsPendingCount(): int {
     try {
         ensureTaxSuggestions20260823();
-        return (int)getDB()->query("SELECT COUNT(*) FROM tax_suggestions WHERE status='pending'")->fetchColumn();
+        [$yf, $yp] = yearEmploymentFilter(activeSchoolYear(), 'e.');
+        $q = getDB()->prepare("SELECT COUNT(*) FROM tax_suggestions ts
+            JOIN employees e ON e.id = ts.employee_id AND e.is_deleted = 0
+            WHERE ts.status = 'pending' AND " . schoolScopeWhere('ts.school_id') . $yf);
+        $q->execute($yp);
+        return (int)$q->fetchColumn();
     } catch (Throwable $e) { return 0; }
 }
 
