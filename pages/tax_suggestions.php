@@ -244,14 +244,17 @@ $multiS = (count(activeSchoolIds()) !== 1);
 </div>
 
 <?php /* ===== ٢) اقتراحات قراءات إخراجات القيد ===== */
+// 🏫 «لازم يبين موظفين المدرسة اللي مختارها» (2026-08-25): الاقتراحات بنطاق المدرسة المختارة فقط
 $rows = $db->query("SELECT ts.*, s.name_ar school_name FROM tax_suggestions ts
                     LEFT JOIN schools s ON s.id = ts.school_id
+                    WHERE " . schoolScopeWhere('ts.school_id') . "
                     ORDER BY FIELD(ts.status,'pending','applied','dismissed'), ts.id")->fetchAll();
+// 🟢 «شو يعني طبّق؟ الأفضل نعم أو كلا — نعم = بدي التنزيل، كلا = ما بدي» (2026-08-25)
 $statusBadge = function ($s) {
     return [
         'pending'   => '<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:999px;font-weight:700">⏳ بانتظار قرارك / En attente</span>',
-        'applied'   => '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:999px;font-weight:700">✓ مطبَّق / Appliqué</span>',
-        'dismissed' => '<span style="background:#e2e8f0;color:#475569;padding:3px 10px;border-radius:999px;font-weight:700">✗ متجاهَل / Ignoré</span>',
+        'applied'   => '<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:999px;font-weight:700">✓ نعم — مطبَّق / Oui</span>',
+        'dismissed' => '<span style="background:#e2e8f0;color:#475569;padding:3px 10px;border-radius:999px;font-weight:700">✗ كلا / Non</span>',
     ][$s] ?? e($s);
 };
 $propLabel = function ($json) {
@@ -260,15 +263,17 @@ $propLabel = function ($json) {
     $out = [];
     if (isset($p['social_status'])) $out[] = 'الوضع: <strong>' . e(socialStatusLabel($p['social_status'], 'ar')) . '</strong>';
     if (isset($p['number_of_children'])) $out[] = 'أولاد دون 18: <strong>' . (int)$p['number_of_children'] . '</strong>';
-    if (isset($p['grant_children_addition'])) $out[] = 'تنزيل الأولاد: <strong>' . ($p['grant_children_addition'] ? 'يُضوّى ✓' : 'مطفأ') . '</strong>';
-    if (isset($p['grant_spouse_addition'])) $out[] = 'زيادة الزوج: <strong>' . ($p['grant_spouse_addition'] ? 'تُعطى' : 'مطفأة') . '</strong>';
+    if (isset($p['grant_children_addition'])) $out[] = 'تنزيل الأولاد: <strong>' . ($p['grant_children_addition'] ? 'نعم ✓' : 'كلا ✗') . '</strong>';
+    if (isset($p['grant_spouse_addition'])) $out[] = 'زيادة الزوج: <strong>' . ($p['grant_spouse_addition'] ? 'نعم — تُعطى' : 'كلا — مطفأة') . '</strong>';
     return implode(' · ', $out);
 };
+// النصوص المخزّنة القديمة كانت تقول «اكبس طبّق وإلا تجاهل» — نعرضها بلغة نعم/كلا
+$fixDetails = fn($t) => str_replace('اكبس «طبّق»، وإلا «تجاهل»', 'اكبس «نعم»، وإذا ما بدك التنزيل «كلا»', (string)$t);
 ?>
 <div class="card">
     <div class="card-header"><h3>
         <span dir="ltr"><i class="fas fa-lightbulb"></i> Suggestions — extraits d'état civil familial</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">اقتراحات من قراءة إخراجات القيد العائلية — أنت بتقرّر: طبّق أو تجاهل</div>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">اقتراحات من قراءة إخراجات القيد العائلية — أنت بتقرّر: <b>نعم = بدي التنزيل/التعديل ينطبق</b> · <b>كلا = ما بدي</b> (مدرسة المختارة فقط)</div>
     </h3></div>
     <div class="card-body">
         <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
@@ -284,7 +289,7 @@ $propLabel = function ($json) {
                     <td style="font-weight:700;white-space:nowrap"><?= e($r['emp_name']) ?></td>
                     <td><small><?= e($r['school_name'] ?? '') ?></small></td>
                     <td style="text-align:right;font-weight:600"><?= e($r['title']) ?></td>
-                    <td style="text-align:right"><small><?= e($r['details']) ?></small></td>
+                    <td style="text-align:right"><small><?= e($fixDetails($r['details'])) ?></small></td>
                     <td style="text-align:right"><small><?= $propLabel($r['proposed']) ?></small></td>
                     <td><?= $statusBadge($r['status']) ?></td>
                     <?php if (canEdit()): ?>
@@ -292,11 +297,12 @@ $propLabel = function ($json) {
                         <?php if ($r['status'] === 'pending'): ?>
                             <form method="POST" style="display:inline"><?= csrfField() ?>
                                 <input type="hidden" name="sid" value="<?= (int)$r['id'] ?>"><input type="hidden" name="act" value="apply">
-                                <button class="btn btn-success" onclick="return confirm('يُطبَّق الاقتراح على ملف الموظف ويُعاد احتساب رواتبه — أكيد؟')"><i class="fas fa-check"></i> طبّق</button>
+                                <button class="btn btn-success" title="بدي التنزيل/التعديل ينطبق على ملف الموظف"
+                                        onclick="return confirm('نعم = يُطبَّق على ملف الموظف ويُعاد احتساب رواتبه — أكيد؟')"><i class="fas fa-check"></i> نعم</button>
                             </form>
                             <form method="POST" style="display:inline"><?= csrfField() ?>
                                 <input type="hidden" name="sid" value="<?= (int)$r['id'] ?>"><input type="hidden" name="act" value="dismiss">
-                                <button class="btn btn-secondary"><i class="fas fa-xmark"></i> تجاهل</button>
+                                <button class="btn btn-secondary" title="ما بدي — بيضل كل شي متل ما هو"><i class="fas fa-xmark"></i> كلا</button>
                             </form>
                         <?php elseif ($r['decided_at']): ?>
                             <small style="color:#64748b"><?= e(formatDate(substr($r['decided_at'], 0, 10))) ?></small>

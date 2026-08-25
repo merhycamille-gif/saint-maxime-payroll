@@ -3065,11 +3065,25 @@ check('اقتراحات إخراج القيد: الجدول ذاتي الترك�
       (int)$db->query("SELECT COUNT(*) FROM tax_suggestions WHERE source_key LIKE 'najat_%' AND status='applied'")->fetchColumn() === 13
       && (int)$db->query("SELECT COUNT(*) FROM tax_suggestions WHERE source_key IN ('najat_62','najat_1387','maxim_38')")->fetchColumn() === 3);
 $ts64 = renderPage('pages/tax_suggestions.php', [], []);
-check('اقتراحات إخراج القيد: الصفحة تعرض المعلَّق والمطبَّق بأزرار القرار',
+// «شو يعني طبّق؟ الأفضل نعم أو كلا» + «لازم يبين موظفين المدرسة اللي مختارها» (2026-08-25):
+// أزرار القرار نعم/كلا (نعم = بدي التنزيل) والاقتراحات بنطاق المدرسة المختارة فقط
+$tsSrc64 = (string)file_get_contents($PROJ . '/pages/tax_suggestions.php');
+check('اقتراحات إخراج القيد: الصفحة تعرض المعلَّق والمطبَّق بأزرار قرار «نعم/كلا» + مفلترة بالمدرسة المختارة',
       strpos($ts64, 'اقتراحات من قراءة إخراجات القيد') !== false
       && strpos($ts64, 'name="act" value="apply"') !== false
       && strpos($ts64, 'name="act" value="dismiss"') !== false
+      && strpos($ts64, '</i> نعم</button>') !== false
+      && strpos($ts64, '</i> كلا</button>') !== false
+      && strpos($ts64, '> طبّق</button>') === false
+      && strpos($tsSrc64, "schoolScopeWhere('ts.school_id')") !== false
       && strpos($ts64, 'FATAL') === false);
+// بنطاق مدرسة مكسيموس (2): ما بيبين ولا اقتراح لمدرسة النجاة (3) — مادونا عازار اقتراحها بالنجاة
+$ts64b = renderPage('pages/tax_suggestions.php', [], [], [2]);
+check('اقتراحات إخراج القيد: بنطاق سان مكسيم ما بتبين اقتراحات سيدة النجاة (مادونا عازار غايبة)',
+      strpos($ts64b, 'مادونا') === false
+      && (int)$db->query("SELECT COUNT(*) FROM tax_suggestions ts JOIN employees e ON e.id=ts.employee_id
+            WHERE e.first_name_ar LIKE '%مادونا%' AND ts.school_id <> 2")->fetchColumn() >= 1
+      && strpos($ts64b, 'FATAL') === false);
 check('اقتراحات إخراج القيد: الإشارة تضوي بالقائمة (عدّاد أحمر نابض) + التطبيق يعيد الاحتساب',
       strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'taxSuggestionsPendingCount()') !== false
       && strpos((string)file_get_contents($PROJ . '/assets/css/app.css'), '@keyframes pulse') !== false
