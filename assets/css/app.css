@@ -886,8 +886,9 @@ input:checked + .slider:before { transform: translateX(20px); }
     font-weight: 600;
 }
 
+/* ✍️ (2026-08-25) «P1 بدون لون»: صفّ المجموع بالبطاقة السنوية بلا خلفية — عريض فقط */
 .salary-slip-table .total-row {
-    background: var(--gold-light);
+    background: transparent;
     font-weight: 700;
 }
 

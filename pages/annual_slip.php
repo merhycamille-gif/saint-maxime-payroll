@@ -421,7 +421,8 @@ include __DIR__ . '/../includes/header.php';
     /* ✍️ (2026-08-25) سطور المبالغ تتنفّس أكثر (بدل 4px) — والباقي يوزَّع عليها بflex */
     .salary-slip-table td { padding: 5px 3px !important; }
     .salary-slip-table .row-month { white-space: nowrap; }
-    .total-row td { background: #fff3cd !important; font-weight: bold; }
+    /* ✍️ (2026-08-25) «P1 بدون لون»: صفّ المجموع بلا خلفية صفراء — أبيض عريض فقط */
+    .total-row td { background: #fff !important; font-weight: bold; }
 }
 .salary-slip + .salary-slip { margin-top: 24px; border-top: 3px dashed var(--gray-300); padding-top: 24px; }
 </style>

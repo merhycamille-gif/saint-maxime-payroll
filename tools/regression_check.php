@@ -1601,6 +1601,8 @@ check('🔒 البطاقة السنوية (تصميم مجمّد): كل مبال
       && strpos($asSrc29, '#047857') === false
       // «P1 بدون ألوان هون» (2026-08-25): لا تخطيط متناوباً بصفوف المبالغ — كل السطور بيض
       && strpos($asSrc29, 'tbody tr:nth-child(even)') === false
+      // «P1 بدون لون» (2026-08-25): صفّ المجموع TOTAL بلا خلفية صفراء
+      && strpos($asSrc29, '#fff3cd') === false
       && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);
 check('🔒 البطاقة السنوية (تصميم مجمّد): العربي نسخي Noto Naskh والأرقام Cairo + اسم الأستاذ 17pt أبرز عنصر + معلومات عريضة',
       strpos($asSrc29, ".salary-slip, .salary-slip-table, .slip-info { font-family:'Noto Naskh Arabic','Cairo'") !== false
