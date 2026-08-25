@@ -1606,11 +1606,11 @@ check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طو
 // ✍️ الخط النسخي (بطلبه 2026-08-25): ملف Noto Naskh Arabic محلي + معرَّف بfonts.css
 // للعربي فقط (unicode-range) حتى تبقى الأرقام واللاتيني على Cairo ولا يتلخبط الترتيب
 $fcSrc29 = (string)file_get_contents(__DIR__ . '/../assets/fonts/fonts.css');
-// ✍️ (2026-08-25) «خانات معلومات الأستاذ نضيقها شوي هيك بيتوسعوا سطور المبالغ»:
-// حشوات المعلومات أنحف (2px/4px) وسطور الجدول أوسع (5px) — الفراغ ينزل للصفوف بflex
-check('🔒 البطاقة السنوية: معلومات الأستاذ مضيَّقة (حشوة 2px 6px + اسم 4px 8px) وسطور المبالغ أوسع (5px 3px)',
-      strpos($asSrc29, '.slip-info td { border:1px solid #888 !important; padding: 2px 6px !important; }') !== false
-      && strpos($asSrc29, 'padding:4px 8px !important; margin-bottom:3px !important;') !== false
+// ✍️ (2026-08-25) «P1 بدون تضييق» (تراجُعه عن التضييق بنفس اليوم): خانات معلومات الأستاذ
+// بقياسها الأصلي (3px 8px + اسم 6px 10px) — وسطور المبالغ الأوسع (5px) بقيت بطلبه
+check('🔒 البطاقة السنوية: معلومات الأستاذ بلا تضييق (حشوة 3px 8px + اسم 6px 10px) وسطور المبالغ أوسع (5px 3px)',
+      strpos($asSrc29, '.slip-info td { border:1px solid #888 !important; padding: 3px 8px !important; }') !== false
+      && strpos($asSrc29, 'padding:6px 10px !important; margin-bottom:5px !important;') !== false
       && strpos($asSrc29, '.salary-slip-table td { padding: 5px 3px !important; }') !== false);
 check('🔒 البطاقة السنوية: الخط النسخي محلي (naskh-ar.woff2 موجود + @font-face للعربي فقط 400-700)',
       is_file(__DIR__ . '/../assets/fonts/naskh-ar.woff2')
