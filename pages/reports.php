@@ -193,7 +193,9 @@ function reportDocThumb($path) {
             ['url'=>$PG.'employee_history.php', 'icon'=>'fa-user-clock', 'color'=>'var(--warning)', 'fr'=>'Dossier enseignant', 'ar'=>'سيرة الأستاذ'],
             ['url'=>$PG.'attestations.php', 'icon'=>'fa-file-signature', 'color'=>'var(--gold)', 'fr'=>'Attestations', 'ar'=>'إفادات'],
             ['url'=>$OF.'staff_stats', 'icon'=>'fa-chart-simple', 'color'=>'var(--info)', 'fr'=>'Statistiques du personnel', 'ar'=>'إحصاءات الموظفين'],
-            ['url'=>$OF.'general_info', 'icon'=>'fa-table-list', 'color'=>'var(--gold)', 'fr'=>'Infos générales', 'ar'=>'معلومات عامة عن الموظفين'],
+            // ✍️ (2026-08-25) «وهون شو المكرر»: بطاقة «Infos générales / معلومات عامة عن الموظفين»
+            // أُزيلت — أعمدتها الثمانية كلها ضمن «لائحة الموظفين» (منتقي الأعمدة يغطيها وأكثر).
+            // النموذج نفسه (p13 مطابق Ecole.exe) باقٍ شغّالاً بالرابط المباشر ?form=general_info.
         ]],
         ['title'=>'فروقات وتقرير عام / Différences & Général', 'icon'=>'fa-scale-balanced', 'color'=>'var(--warning)', 'tiles'=>[
             ['url'=>$OF.'differences', 'icon'=>'fa-right-left', 'color'=>'var(--warning)', 'fr'=>'Différences / Augmentation', 'ar'=>'فروقات / زيادة'],
