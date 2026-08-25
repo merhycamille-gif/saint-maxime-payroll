@@ -83,22 +83,31 @@ function r567Analyze($db, SimpleXMLElement $x): array {
         'الفترة سنة ميلادية كاملة (1/1 → 31/12)', $from . ' → ' . $to);
 
     // ٢) النماذج المرفقة
-    $r6 = []; $r7 = 0;
+    $r6 = []; $r7 = 0; $r7fs = [];
     foreach ($x->xpath('//Attached_Form') ?: [] as $af) {
         if ((string)$af['FormNo'] === 'R6') $r6[] = $af;
-        elseif ((string)$af['FormNo'] === 'R7') $r7++;
+        elseif ((string)$af['FormNo'] === 'R7') { $r7++; $r7fs[] = $af; }
     }
     $add(count($r6) > 0, 'ملف الموظفين (ر6) موجود', count($r6) . ' موظفاً');
     $add($r7 > 0, 'كشف التاركين (ر7) موجود', $r7 ? 'موجود' : 'مفقود — الماكرو ما ولّده');
 
-    // خانات ر5 المالية بالملف
-    $L5 = [];
+    // خانات ر5 المالية والنصية بالملف
+    $L5 = []; $g5h = [];
     foreach ($as->FC as $fc) $L5[(string)$fc['Int_Line_No']] = (float)$fc->Submitted_AMT;
+    foreach ($as->FCG as $e) $g5h[(string)$e['Int_Line_No']] = trim((string)$e->Cell_Value);
     $g5 = fn($k) => $L5[$k] ?? 0.0;
 
+    // أسماء المناطق من لوائح الوزارة نفسها (للعرض التفصيلي — الكود هو المُرسَل فعلياً)
+    $geoJ = json_decode((string)@file_get_contents(__DIR__ . '/../assets/templates/mof_r567_geo.json'), true) ?: [];
+    $govNm = array_flip($geoJ['govs'] ?? []);
+    $cazaNm = []; foreach (($geoJ['cazas'] ?? []) as $c) $cazaNm[(int)$c['id']] = $c['name'];
+    $townNm = []; foreach (($geoJ['towns'] ?? []) as $t) $townNm[(int)$t['id']] = $t['name'];
+
     // ٣) قراءة صفوف الموظفين + الأخطاء القاتلة
+    // 🔴 خريطة أعمدة ورقة R6 بقالب الوزارة (الصف 15): G/H = نوع الأجر (1389، شهري=1)
+    //    وI/J = «الوضع العائلي*» (1391) — الوضع العائلي بالخانة 1391 لا 1389.
     $S6 = []; $bad = ['geo' => [], 'fin' => [], 'mar' => []];
-    $byFin = [];
+    $byFin = []; $emps = [];
     foreach ($r6 as $af) {
         $g = []; $fc = [];
         foreach ($af->FCG as $e) $g[(string)$e['Int_Line_No']] = trim((string)$e->Cell_Value);
@@ -116,8 +125,20 @@ function r567Analyze($db, SimpleXMLElement $x): array {
             if (!$gv) $miss[] = 'المحافظة'; if (!$cz) $miss[] = 'القضاء'; if (!$tw) $miss[] = 'البلدة';
             $bad['geo'][] = $nm . ' (' . implode(' + ', $miss) . ')';
         }
-        $ms = (int)($g['1389'] ?? 0);
+        $ms = (int)($g['1391'] ?? 0);
         if ($ms < 1 || $ms > 4) $bad['mar'][] = $nm;
+        $emps[] = [
+            'seq' => (int)($g['1382'] ?? 0) ?: count($emps) + 1,
+            'first' => $g['1384'] ?? '', 'father' => $g['1385'] ?? '', 'last' => $g['1386'] ?? '',
+            'fin' => $finN === '0' ? '' : $finN, 'job' => $g['1388'] ?? '',
+            'pay' => (int)($g['1389'] ?? 0), 'mar' => $ms,
+            'kids' => (int)($g['1392'] ?? 0), 'kidsDed' => (int)($g['1393'] ?? 0), 'days' => (int)($g['1394'] ?? 0),
+            'gov' => $gv, 'caza' => $cz, 'town' => $tw,
+            'govN' => $govNm[$gv] ?? '', 'cazaN' => $cazaNm[$cz] ?? '', 'townN' => $townNm[$tw] ?? '',
+            'quarter' => $g['1030'] ?? '', 'street' => $g['1035'] ?? '', 'bldg' => $g['1040'] ?? '',
+            'floor' => $g['1045'] ?? '', 'phone' => $g['1065'] ?? '', 'cell' => $g['1070'] ?? '', 'email' => $g['1080'] ?? '',
+            'fc' => $fc,
+        ];
     }
     $s6 = fn($k) => $S6[$k] ?? 0.0;
     $add(!$bad['geo'], 'أكواد المناطق كلها انحسبت (ما في كود صفر)',
@@ -165,9 +186,27 @@ function r567Analyze($db, SimpleXMLElement $x): array {
     $add(!$diff, 'مبالغ كل موظف بالملف = مبالغه بالبرنامج',
         $diff ? count($diff) . ' مختلفاً: ' . implode(' · ', array_slice($diff, 0, 5)) : 'كلها متطابقة');
 
+    // كشف التاركين (ر7): كل سطر «اسم ثلاثي|رقم مالية|رقم ضمان|تاريخ تعيين|تاريخ ترك»
+    $leavers = []; $r7cnss = '';
+    foreach ($r7fs as $af) {
+        foreach ($af->FCG as $e) if ((string)$e['Int_Line_No'] === '1390') $r7cnss = trim((string)$e->Cell_Value);
+        if (!isset($af->Table)) continue;
+        foreach ($af->Table->FCG as $row) {
+            $p = array_pad(explode('|', trim((string)$row->Cell_Value)), 5, '');
+            if (trim(implode('', $p)) === '') continue;
+            $leavers[] = ['name' => $p[0], 'fin' => $p[1], 'cnss' => $p[2], 'hired' => $p[3], 'left' => $p[4]];
+        }
+    }
+
     $ok = true;
     foreach ($C as $c) if (!$c['ok']) $ok = false;
-    return ['ok' => $ok, 'checks' => $C, 'fy' => $fy, 'info' => [
+    $detail = [
+        'g5h' => $g5h, 'L5' => $L5, 'atbp' => (float)$as->AmountToBePaid,
+        'govN' => $govNm[(int)($g5h['1015'] ?? 0)] ?? '', 'cazaN' => $cazaNm[(int)($g5h['1020'] ?? 0)] ?? '',
+        'townN' => $townNm[(int)($g5h['1025'] ?? 0)] ?? '',
+        'emps' => $emps, 'sums' => $S6, 'leavers' => $leavers, 'r7cnss' => $r7cnss, 'from' => $from, 'to' => $to,
+    ];
+    return ['ok' => $ok, 'checks' => $C, 'fy' => $fy, 'detail' => $detail, 'info' => [
         'السنة المالية' => $fy, 'رقم المكلّف' => $tp, 'المؤسسة' => (string)$as->UserID,
         'عدد الموظفين (ر6)' => count($r6), 'كشف التاركين (ر7)' => $r7 ? 'موجود' : 'مفقود',
         'تاريخ التصريح' => (string)$as->Declaration_Date,
@@ -237,5 +276,265 @@ include __DIR__ . '/../includes/header.php';
             </tbody>
         </table></div>
     </div>
+
+    <?php if (!empty($res['detail'])):
+        /* 🖥️ عرض مضمون الملف بالتفصيل متل ما بيبين على موقع المالية بعد الإرسال
+         * («لازم يبين بالتفصيل ر6 لكل موظف ور5 ور7 متل ما بيبينو بموقع المالية» — 2026-08-25):
+         * ر5 بسطوره الرسمية (100..190) + ر6 مستقل كامل لكل موظف (كبسة = نموذجه لحاله) + ر7 التاركون.
+         * التسميات حرفياً من ورقتي R5/R6 بقالب الوزارة الرسمي. */
+        $D = $res['detail']; $L5 = $D['L5']; $g5h = $D['g5h'];
+        $money = fn($v) => number_format((float)$v, 0, '.', ',');
+        $v5 = fn($k) => number_format((float)($L5[$k] ?? 0), 0, '.', ',');
+        $marL = [1 => 'أعزب', 2 => 'متزوج', 3 => 'أرمل', 4 => 'مطلق'];
+        $payL = [1 => 'شهري', 2 => 'يومي', 3 => 'بالساعة'];
+        // مدة العمل بالملف مخزّنة يوماً فلكياً (Julian Day — هيك بيبعتها الماكرو)
+        $jdDate = fn($j) => ((float)$j > 2000000) ? gmdate('d/m/Y', (int)round(((float)$j - 2440587.5) * 86400)) : '';
+        // سطور ر5 الرسمية: [رقم السطر بالنموذج، التسمية، خانة عمود ١ (مجلس الإدارة)، خانة عمود ٢ (المستخدمون)]
+        $r5Rows = [
+            ['100', 'الرواتب وملحقاتها', '5', '6'],
+            ['110', 'المنافع النقدية والعينية', '7', '8'],
+            ['120', 'مجموع المبالغ المدفوعة', '9', '10'],
+            ['130', 'ينزل: تعويضات نقل وانتقال', '11', '12'],
+            ['140', 'تعويضات تمثيل', '13', '14'],
+            ['150', 'تنزيلات أخرى', '15', '16'],
+            ['160', 'المبالغ الصافية', '21', '22'],
+            ['170', 'التنزيل العائلي', '23', '24'],
+            ['180', 'الرواتب والأجور الخاضعة للضريبة', '25', '26'],
+            ['190', 'الضريبة المتوجبة', '27', '28'],
+        ];
+        // بنود ر6 الرسمية: [رقم السطر، التسمية، إجمالي (١)، غير خاضع (٢)، خاضع (٣)] — null = ما في عمود ٢ بالنموذج
+        $r6Rows = [
+            ['100', 'الراتب الأساسي', '1', '2', '3'],
+            ['110', 'بدل تمثيل', '4', '5', '6'],
+            ['120', 'مكافآت وعمولات وساعات إضافية', '7', null, '8'],
+            ['130', 'تعويض عائلي عن الزوجة', '9', '10', '11'],
+            ['140', 'تعويض عائلي عن الأولاد', '12', '13', '14'],
+            ['150', 'تعويضات نقل وانتقال', '15', '16', '17'],
+            ['160', 'بدل سيارة', '18', null, '19'],
+            ['170', 'بدل سكن', '20', null, '21'],
+            ['180', 'بدل طعام', '22', '23', '24'],
+            ['190', 'بدل ملبس', '25', '26', '27'],
+            ['200', 'تعويض صندوق', '28', '29', '30'],
+            ['210', 'تأمينات صحية على أنواعها', '31', null, '32'],
+            ['220', 'منح تعليم', '33', '34', '35'],
+            ['230', 'منح زواج', '36', '37', '38'],
+            ['240', 'منح ولادة', '39', '40', '41'],
+            ['250', 'مساعدات مرضية', '42', null, '43'],
+            ['260', 'مساعدات وفاة', '44', '45', '46'],
+            ['300', 'منح وتقديمات أخرى', '47', '48', '49'],
+        ];
+        $S6 = $D['sums']; $s6 = fn($k) => number_format((float)($S6[$k] ?? 0), 0, '.', ',');
+        $thS = 'style="background:#1F4E5F;color:#fff;text-align:center"';
+        $tdL = 'style="text-align:right"'; $tdN = 'style="text-align:left;direction:ltr;font-variant-numeric:tabular-nums"';
+    ?>
+    <div class="card">
+        <div class="card-body" style="text-align:center;background:#f0f9ff;font-size:13pt;font-weight:700;color:#0c4a6e">
+            📋 هيدا شو رح يشوفو موظف الوزارة بالضبط — نفس تفاصيل موقع المالية بعد الإرسال
+        </div>
+    </div>
+
+    <!-- ر5: التصريح السنوي -->
+    <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-file-invoice-dollar"></i>
+            Déclaration annuelle R5 / التصريح السنوي ر5</h3></div>
+        <div class="card-body">
+            <table class="doc-table" dir="rtl" style="max-width:860px;margin:0 auto 14px">
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc;width:230px">إسم الشركة/المؤسسة</td>
+                    <td <?= $tdL ?>><?= e($g5h['1005'] ?? '') ?> (<?= e($g5h['1010'] ?? '') ?>)</td></tr>
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc">رقم التسجيل (لدى وزارة المالية)</td>
+                    <td <?= $tdL ?>><?= e($g5h['1090'] ?? '') ?></td></tr>
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc">السنة المالية</td>
+                    <td <?= $tdL ?>>من <?= e($D['from']) ?> إلى <?= e($D['to']) ?></td></tr>
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc">عنوان المركز الرئيسي</td>
+                    <td <?= $tdL ?>>محافظة <?= e($D['govN'] ?: ('كود ' . (int)($g5h['1015'] ?? 0))) ?> —
+                        قضاء <?= e($D['cazaN'] ?: ('كود ' . (int)($g5h['1020'] ?? 0))) ?> —
+                        بلدة <?= e($D['townN'] ?: ('كود ' . (int)($g5h['1025'] ?? 0))) ?>
+                        <?= ($g5h['1035'] ?? '') !== '' && ($g5h['1035'] ?? '') !== '0' ? '— الحي ' . e($g5h['1035']) : '' ?>
+                        <?= ($g5h['1060'] ?? '') !== '' && ($g5h['1060'] ?? '') !== '0' ? '— العقار ' . e($g5h['1060']) : '' ?></td></tr>
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc">الهاتف / البريد الإلكتروني</td>
+                    <td <?= $tdL ?>><?= e($g5h['1065'] ?? '') ?> / <?= e($g5h['1080'] ?? '') ?></td></tr>
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc">الشخص المكلف بتبليغ البريد</td>
+                    <td <?= $tdL ?>><?= e($g5h['1081'] ?? '') ?> — رقم التسجيل <?= e($g5h['1082'] ?? '') ?></td></tr>
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc">الشخص الذي ساهم بتحضير التصريح</td>
+                    <td <?= $tdL ?>><?= e($g5h['1200'] ?? '') ?> — رقم التسجيل <?= e($g5h['1210'] ?? '') ?>
+                        (<?= e($g5h['1270'] ?? '') ?> — <?= e($g5h['1280'] ?? '') ?>)</td></tr>
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc">عدد رئيس وأعضاء مجلس الإدارة (70)</td>
+                    <td <?= $tdN ?>><?= $v5('2') ?></td></tr>
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc">عدد المستخدمين والأجراء للفترة المصرح عنها (80)</td>
+                    <td <?= $tdN ?>><?= $v5('3') ?></td></tr>
+                <tr><td <?= $tdL ?> style="font-weight:700;background:#f8fafc">عدد العمال الذين يتقاضون أجوراً مقطوعة (90)</td>
+                    <td <?= $tdN ?>><?= $v5('4') ?></td></tr>
+            </table>
+            <table class="doc-table" dir="rtl" style="max-width:860px;margin:0 auto">
+                <thead><tr>
+                    <th style="background:#1F4E5F;color:#fff;text-align:right">ضريبة الباب الثاني</th>
+                    <th <?= $thS ?>>رئيس وأعضاء مجلس الإدارة (١)</th>
+                    <th <?= $thS ?>>المستخدمون والأجراء (٢)</th>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($r5Rows as [$ln, $lb, $c1, $c2]): $bold = in_array($ln, ['120', '160', '180', '190'], true); ?>
+                    <tr style="<?= $bold ? 'font-weight:700;background:#f8fafc' : '' ?>">
+                        <td <?= $tdL ?>><?= e($lb) ?> <span style="color:#94a3b8">(<?= $ln ?>)</span></td>
+                        <td <?= $tdN ?>><?= $v5($c1) ?></td>
+                        <td <?= $tdN ?>><?= $v5($c2) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                <tr style="font-weight:800;background:#fef9c3">
+                    <td <?= $tdL ?>>المبلغ الواجب دفعه</td>
+                    <td></td>
+                    <td <?= $tdN ?>><?= $money($D['atbp']) ?> ل.ل.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ر6: نموذج مستقل كامل لكل موظف -->
+    <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <h3 class="card-title"><i class="fas fa-users"></i>
+                Formulaires R6 / النماذج المرفقة — ر6 مستقل لكل موظف (<?= count($D['emps']) ?>)</h3>
+            <span>
+                <button type="button" class="btn btn-primary" style="padding:4px 12px;font-size:10pt"
+                        onclick="document.querySelectorAll('details.r6emp').forEach(d=>d.open=true)">افتح الكل</button>
+                <button type="button" class="btn btn-primary" style="padding:4px 12px;font-size:10pt"
+                        onclick="document.querySelectorAll('details.r6emp').forEach(d=>d.open=false)">سكّر الكل</button>
+            </span>
+        </div>
+        <div class="card-body">
+            <p style="margin-top:0;color:#475569">اكبس على أي موظف بيفتحلك نموذج ر6 الكامل تبعو لحالو — متل ما بيبين على موقع المالية.</p>
+            <?php foreach ($D['emps'] as $emp):
+                $fc = $emp['fc']; $fv = fn($k) => number_format((float)($fc[$k] ?? 0), 0, '.', ',');
+                $geoBad = !$emp['gov'] || !$emp['caza'] || !$emp['town'];
+                $prob = $geoBad || $emp['fin'] === '' || $emp['mar'] < 1 || $emp['mar'] > 4;
+                $fullNm = trim($emp['first'] . ' ' . $emp['father'] . ' ' . $emp['last']);
+            ?>
+            <details class="r6emp" style="border:1px solid <?= $prob ? '#fca5a5' : '#e2e8f0' ?>;border-radius:10px;margin-bottom:8px;background:<?= $prob ? '#fef2f2' : '#fff' ?>">
+                <summary style="cursor:pointer;padding:10px 14px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:11.5pt">
+                    <span style="background:#1F4E5F;color:#fff;border-radius:6px;padding:2px 10px;font-weight:700">ر6 — <?= (int)$emp['seq'] ?></span>
+                    <b><?= e($fullNm ?: '(بلا اسم)') ?></b>
+                    <span>رقم المالية: <?= $emp['fin'] !== '' ? e($emp['fin']) : '<b style="color:#b91c1c">⚠️ ناقص</b>' ?></span>
+                    <span style="color:#475569">الإجمالي: <?= $fv('66') ?></span>
+                    <span style="color:#475569">الضريبة: <?= $fv('89') ?></span>
+                    <?= $prob ? '<b style="color:#b91c1c">⚠️ فيه مشكلة</b>' : '' ?>
+                </summary>
+                <div style="padding:4px 14px 14px">
+                    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+                        <table class="doc-table" dir="rtl" style="flex:1;min-width:300px">
+                            <tr><td colspan="2" style="background:#1F4E5F;color:#fff;text-align:right;font-weight:700">هوية الأجير/المستخدم</td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc;width:170px">الاسم الكامل</td><td <?= $tdL ?>><?= e($fullNm) ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">رقم التسجيل الشخصي</td>
+                                <td <?= $tdL ?>><?= $emp['fin'] !== '' ? e($emp['fin']) : '<b style="color:#b91c1c">⚠️ ناقص — الماكرو بيوقف عندو وبيسقط اللي بعدو</b>' ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">نوع العمل</td><td <?= $tdL ?>><?= e($emp['job']) ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">نوع الأجر</td><td <?= $tdL ?>><?= e($payL[$emp['pay']] ?? ('كود ' . $emp['pay'])) ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">الوضع العائلي</td>
+                                <td <?= $tdL ?>><?= isset($marL[$emp['mar']]) ? e($marL[$emp['mar']]) : '<b style="color:#b91c1c">⚠️ غير محدَّد</b>' ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">عدد الأولاد / المستفيدون من التنزيل</td>
+                                <td <?= $tdL ?>><?= (int)$emp['kids'] ?> / <?= (int)$emp['kidsDed'] ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">مدة العمل</td>
+                                <td <?= $tdL ?>><?= $jdDate($fc['86'] ?? 0) !== '' ? 'من ' . $jdDate($fc['86'] ?? 0) . ' إلى ' . $jdDate($fc['87'] ?? 0) : '—' ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">عدد أيام العمل</td><td <?= $tdL ?>><?= $emp['days'] ?: '—' ?></td></tr>
+                        </table>
+                        <table class="doc-table" dir="rtl" style="flex:1;min-width:300px">
+                            <tr><td colspan="2" style="background:#1F4E5F;color:#fff;text-align:right;font-weight:700">عنوان المستخدم/الأجير</td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc;width:130px">محافظة</td>
+                                <td <?= $tdL ?>><?= $emp['gov'] ? e($emp['govN'] ?: ('كود ' . $emp['gov'])) : '<b style="color:#b91c1c">⚠️ كود صفر — الوزارة ما لقت الاسم</b>' ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">قضاء</td>
+                                <td <?= $tdL ?>><?= $emp['caza'] ? e($emp['cazaN'] ?: ('كود ' . $emp['caza'])) : '<b style="color:#b91c1c">⚠️ كود صفر — الوزارة ما لقت الاسم</b>' ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">بلدة</td>
+                                <td <?= $tdL ?>><?= $emp['town'] ? e($emp['townN'] ?: ('كود ' . $emp['town'])) : '<b style="color:#b91c1c">⚠️ كود صفر — الوزارة ما لقت الاسم</b>' ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">الحي / الشارع / المبنى</td>
+                                <td <?= $tdL ?>><?= e(trim($emp['quarter'] . ' / ' . $emp['street'] . ' / ' . $emp['bldg'], ' /')) ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">هاتف</td><td <?= $tdL ?>><?= e(trim($emp['phone'] . ' ' . $emp['cell'])) ?></td></tr>
+                            <tr><td <?= $tdL ?> style="background:#f8fafc">البريد الإلكتروني</td><td <?= $tdL ?>><?= e($emp['email']) ?></td></tr>
+                        </table>
+                    </div>
+                    <table class="doc-table" dir="rtl">
+                        <thead><tr>
+                            <th style="background:#1F4E5F;color:#fff;text-align:right">البند</th>
+                            <th <?= $thS ?>>إجمالي الإيرادات (١)</th>
+                            <th <?= $thS ?>>غير الخاضعة للضريبة (٢)</th>
+                            <th <?= $thS ?>>الخاضعة للضريبة (٣)</th>
+                        </tr></thead>
+                        <tbody>
+                        <?php foreach ($r6Rows as [$ln, $lb, $c1, $c2, $c3]):
+                            if (($fc[$c1] ?? 0) == 0 && ($c2 === null || ($fc[$c2] ?? 0) == 0) && ($fc[$c3] ?? 0) == 0) continue; ?>
+                            <tr>
+                                <td <?= $tdL ?>><?= e($lb) ?> <span style="color:#94a3b8">(السطر <?= $ln ?>)</span></td>
+                                <td <?= $tdN ?>><?= $fv($c1) ?></td>
+                                <td <?= $tdN ?>><?= $c2 !== null ? $fv($c2) : '—' ?></td>
+                                <td <?= $tdN ?>><?= $fv($c3) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <tr style="font-weight:700;background:#f8fafc">
+                            <td <?= $tdL ?>>المجموع <span style="color:#94a3b8">(السطر 310)</span></td>
+                            <td <?= $tdN ?>><?= $fv('66') ?></td>
+                            <td <?= $tdN ?>><?= $fv('78') ?></td>
+                            <td <?= $tdN ?>><?= $fv('79') ?></td>
+                        </tr>
+                        <tr><td <?= $tdL ?>>التنزيل العائلي <span style="color:#94a3b8">(الخانة 330)</span></td>
+                            <td></td><td></td><td <?= $tdN ?>><?= $fv('80') ?></td></tr>
+                        <tr><td <?= $tdL ?>>تنزيلات أخرى <span style="color:#94a3b8">(الخانة 340)</span></td>
+                            <td></td><td></td><td <?= $tdN ?>><?= $fv('81') ?></td></tr>
+                        <tr style="font-weight:700"><td <?= $tdL ?>>صافي الإيرادات الخاضعة للضريبة <span style="color:#94a3b8">(الخانة 350)</span></td>
+                            <td></td><td></td><td <?= $tdN ?>><?= $fv('84') ?></td></tr>
+                        <tr style="font-weight:800;background:#fef9c3"><td <?= $tdL ?>>الضريبة السنوية المتوجبة <span style="color:#94a3b8">(الخانة 360)</span></td>
+                            <td></td><td></td><td <?= $tdN ?>><?= $fv('89') ?></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            <?php endforeach; ?>
+            <table class="doc-table" dir="rtl" style="margin-top:14px">
+                <thead><tr>
+                    <th style="background:#1F4E5F;color:#fff;text-align:right">مجموع كل الموظفين (بيطابق ر5)</th>
+                    <th <?= $thS ?>>الإجمالي</th><th <?= $thS ?>>غير الخاضع</th><th <?= $thS ?>>الخاضع</th>
+                    <th <?= $thS ?>>التنزيل العائلي</th><th <?= $thS ?>>تنزيلات أخرى</th>
+                    <th <?= $thS ?>>صافي الخاضع</th><th <?= $thS ?>>الضريبة</th>
+                </tr></thead>
+                <tbody><tr style="font-weight:700">
+                    <td <?= $tdL ?>><?= count($D['emps']) ?> موظفاً</td>
+                    <td <?= $tdN ?>><?= $s6('66') ?></td><td <?= $tdN ?>><?= $s6('78') ?></td><td <?= $tdN ?>><?= $s6('79') ?></td>
+                    <td <?= $tdN ?>><?= $s6('80') ?></td><td <?= $tdN ?>><?= $s6('81') ?></td>
+                    <td <?= $tdN ?>><?= $s6('84') ?></td><td <?= $tdN ?>><?= $s6('89') ?></td>
+                </tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ر7: كشف التاركين -->
+    <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-person-walking-arrow-right"></i>
+            Formulaire R7 / كشف التاركين ر7 (<?= count($D['leavers']) ?>)</h3></div>
+        <div class="card-body">
+            <?php if ($D['r7cnss'] !== ''): ?>
+                <p style="margin-top:0;color:#475569">رقم المؤسسة بالضمان الاجتماعي: <b><?= e($D['r7cnss']) ?></b></p>
+            <?php endif; ?>
+            <?php if (!$D['leavers']): ?>
+                <p style="margin:0;color:#475569">ما في تاركين مسجّلين بالملف.</p>
+            <?php else: ?>
+            <table class="doc-table" dir="rtl">
+                <thead><tr>
+                    <th <?= $thS ?>>#</th><th style="background:#1F4E5F;color:#fff;text-align:right">الاسم الثلاثي</th>
+                    <th <?= $thS ?>>رقم المالية</th><th <?= $thS ?>>رقم الضمان</th>
+                    <th <?= $thS ?>>تاريخ التعيين</th><th <?= $thS ?>>تاريخ الترك</th>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($D['leavers'] as $i => $lv): ?>
+                    <tr>
+                        <td style="text-align:center"><?= $i + 1 ?></td>
+                        <td <?= $tdL ?>><?= e($lv['name']) ?></td>
+                        <td style="text-align:center"><?= e($lv['fin']) !== '' ? e($lv['fin']) : '<b style="color:#b91c1c">⚠️ ناقص</b>' ?></td>
+                        <td style="text-align:center"><?= e($lv['cnss']) ?></td>
+                        <td style="text-align:center"><?= e($lv['hired']) ?></td>
+                        <td style="text-align:center"><?= e($lv['left']) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 <?php endif; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

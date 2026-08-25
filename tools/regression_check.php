@@ -3184,6 +3184,7 @@ if ($yd68['rows']) {
             . '<FCG Int_Line_No="1384"><Cell_Value>تجربة</Cell_Value></FCG>'
             . '<FCG Int_Line_No="1387"><Cell_Value>' . $fin68 . '</Cell_Value></FCG>'
             . '<FCG Int_Line_No="1389"><Cell_Value>1</Cell_Value></FCG>'
+            . '<FCG Int_Line_No="1391"><Cell_Value>1</Cell_Value></FCG>'
             . '<FC Int_Line_No="15"><Submitted_AMT>' . $d68['trans'] . '</Submitted_AMT></FC>'
             . '<FC Int_Line_No="66"><Submitted_AMT>' . $d68['tot1'] . '</Submitted_AMT></FC>'
             . '<FC Int_Line_No="80"><Submitted_AMT>' . $r68['fd'] . '</Submitted_AMT></FC>'
@@ -3214,6 +3215,16 @@ if ($yd68['rows']) {
     check('مدقّق ملف الوزارة: ملف مطابق لأرقام البرنامج ⇒ «سليم» (فكّ التشفير + كل الفحوص خضراء)',
           strpos($out68, 'الملف سليم') !== false && strpos($out68, '❌') === false
           && strpos($out68, 'FATAL') === false, 'موظفون: ' . count($yd68['rows']));
+    // 🖥️ العرض التفصيلي متل موقع المالية («لازم يبين بالتفصيل ر6 لكل موظف ور5 ور7» — 2026-08-25):
+    // ر5 بسطوره + ر6 مستقل كامل لكل موظف (اسمه ووضعه العائلي من الخانة 1391 لا 1389) + ر7 التاركون
+    check('مدقّق الوزارة يعرض مضمون الملف بالتفصيل: ر5 سطوراً + ر6 مستقل لكل موظف + ر7 + الوضع العائلي من الخانة 1391',
+          strpos($out68, 'التصريح السنوي ر5') !== false
+          && strpos($out68, 'ر6 مستقل لكل موظف') !== false
+          && strpos($out68, 'تجربة') !== false                     // اسم الموظف ظاهر بنموذجه
+          && strpos($out68, 'الضريبة السنوية المتوجبة') !== false  // الخانة 360 بنموذج الموظف
+          && strpos($out68, 'كشف التاركين ر7') !== false
+          && strpos($chkSrc68, "\$g['1391']") !== false            // الوضع العائلي من خانته الصحيحة
+          && strpos($chkSrc68, '«الوضع العائلي*» (1391)') !== false);
     // ونفس الملف بضريبة مبدَّلة ⇒ لازم يوقعه
     $bad68 = str_replace('<FC Int_Line_No="28"><Submitted_AMT>' . $S68['tax'],
                          '<FC Int_Line_No="28"><Submitted_AMT>' . ($S68['tax'] + 1000), $xml68);
