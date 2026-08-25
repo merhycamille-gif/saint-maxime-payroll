@@ -337,10 +337,11 @@ include __DIR__ . '/../includes/header.php';
 .slip-info .lbl { display:block; color:var(--gray-500); font-weight:700; font-size:12pt; margin-bottom:2px; }
 .slip-info .val { font-weight:700; font-size:12pt; color:#111827; }
 
-/* 📄 بطاقة الراتب بذوق المستخدم النهائي (2026-08-01): خط Cairo موحّد على كامل البطاقة
-   (بولده حقيقي غامق — «خلي كل شي متناسق») + الليرة الرئيسية والدولار صغيراً تحتها +
-   بلا كحلي — رؤوس هادئة فاتحة وعناوين «المحسومات» وحدها بأحمر فاتح */
-.salary-slip, .salary-slip-table, .slip-info { font-family:'Cairo','Sakkal Majalla','Inter',sans-serif; }
+/* 📄 بطاقة الراتب بذوق المستخدم النهائي (2026-08-01): + الليرة الرئيسية والدولار صغيراً تحتها +
+   بلا كحلي — رؤوس هادئة فاتحة وعناوين «المحسومات» وحدها بأحمر فاتح.
+   ✍️ بطلبه (2026-08-25 عن p1.png): العربي بخط نسخي Noto Naskh Arabic بدل Cairo («الخط بالعربي بشع»)
+   — النسخي للعربي فقط (unicode-range) والأرقام واللاتيني يبقيان على Cairo فلا يتلخبط شيء بالترتيب */
+.salary-slip, .salary-slip-table, .slip-info { font-family:'Noto Naskh Arabic','Cairo','Sakkal Majalla','Inter',sans-serif; }
 .salary-slip-table { font-size: 12pt; }
 .salary-slip-table th { font-size: 12pt; padding: 7px 6px; background:#f1f5f9; color:#111827; border:1px solid #94a3b8; }
 .salary-slip-table .deduction-header { background:#ffe3e3 !important; color:#7f1d1d !important; }
@@ -394,9 +395,9 @@ include __DIR__ . '/../includes/header.php';
     .slip-info { margin-bottom: 5px !important; }
     .slip-info td { border:1px solid #888 !important; padding: 3px 8px !important; }
     .slip-info .lbl { font-size: 10.5pt !important; margin-bottom: 1px !important; color:#555 !important; }
-    /* بولد حقيقي غامق (طلب المستخدم): خط Cairo يملك وزناً ثقيلاً فعلياً — Sakkal بولده خفيف */
+    /* بولد حقيقي غامق (طلب المستخدم) — العربي نسخي (2026-08-25) واللاتيني/الأرقام Cairo */
     .slip-info .val { font-size: 13.5pt !important; font-weight:800 !important;
-                      font-family:'Cairo','Sakkal Majalla','Inter',sans-serif !important; color:#000 !important; }
+                      font-family:'Noto Naskh Arabic','Cairo','Sakkal Majalla','Inter',sans-serif !important; color:#000 !important; }
     /* الجدول: خط 12pt بلا قصّ (table-layout تلقائي فالأرقام تظهر كاملة)؛
        التصغير المحسوب --pz يضمن صفحة A4 أفقية واحدة بلا قصّ ولا انقسام */
     .salary-slip-table { font-size: 12pt !important; width: 100% !important; border-collapse: collapse; }

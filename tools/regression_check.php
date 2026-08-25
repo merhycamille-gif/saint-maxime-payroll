@@ -1567,7 +1567,9 @@ check('الخط 12 على الورق: تقارير reports.php أعمدتها ح
 // «ما تغير بقى شي بالبطاقة احفظها منيح» (2026-08-01 مساءً). أي كسر لأحد هذه البنود
 // = خرق لقرار المستخدم الصريح — ممنوع تعديل تصميم البطاقة بدون طلبه المباشر:
 // بلا كحلي · رؤوس فاتحة · المحسومات أحمر فاتح · أرقام 14 عريضة والدولار تحتها ·
-// خط Cairo موحّد · اسم الأستاذ 17pt أبرز عنصر · معلومات 13.5 عريضة · صفحة واحدة
+// اسم الأستاذ 17pt أبرز عنصر · معلومات 13.5 عريضة · صفحة واحدة
+// ✍️ تعديل وحيد بطلبه المباشر (2026-08-25): العربي صار بخط نسخي Noto Naskh Arabic
+// («الخط بالعربي بشع») والأرقام/اللاتيني بقيا Cairo — باقي التصميم مجمّد كما هو
 check('🔒 البطاقة السنوية (تصميم مجمّد بأمر المستخدم): رؤوس فاتحة والمحسومات بأحمر فاتح وبلا كحلي',
       strpos($asSrc29, '.salary-slip-table thead th { background: #f1f5f9 !important; color: #111 !important;') !== false
       && strpos($asSrc29, 'th.deduction-header { background: #ffe3e3 !important;') !== false
@@ -1577,14 +1579,23 @@ check('🔒 البطاقة السنوية (تصميم مجمّد): كل مبال
       && strpos($asSrc29, '.salary-slip-table .num-lbp, .salary-slip-table .num-lbp strong { font-size: 12pt !important;') !== false
       && strpos($asSrc29, "font-size: 11pt !important; font-weight: 700 !important;") !== false
       && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);
-check('🔒 البطاقة السنوية (تصميم مجمّد): خط Cairo موحّد + اسم الأستاذ 17pt أبرز عنصر + معلومات عريضة',
-      strpos($asSrc29, ".salary-slip, .salary-slip-table, .slip-info { font-family:'Cairo'") !== false
+check('🔒 البطاقة السنوية (تصميم مجمّد): العربي نسخي Noto Naskh والأرقام Cairo + اسم الأستاذ 17pt أبرز عنصر + معلومات عريضة',
+      strpos($asSrc29, ".salary-slip, .salary-slip-table, .slip-info { font-family:'Noto Naskh Arabic','Cairo'") !== false
       && strpos($asSrc29, '.slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 800 !important;') !== false
       && strpos($asSrc29, 'font-weight:800 !important') !== false);
 check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طول الورقة (188mm/pz + flex) وبلا fit القديم',
       strpos($asSrc29, 'min-height: calc(188mm / var(--pz, 1))') !== false
       && strpos($asSrc29, 'flex: 1 1 auto') !== false
       && strpos($asSrc29, '&fit=1') === false);
+// ✍️ الخط النسخي (بطلبه 2026-08-25): ملف Noto Naskh Arabic محلي + معرَّف بfonts.css
+// للعربي فقط (unicode-range) حتى تبقى الأرقام واللاتيني على Cairo ولا يتلخبط الترتيب
+$fcSrc29 = (string)file_get_contents(__DIR__ . '/../assets/fonts/fonts.css');
+check('🔒 البطاقة السنوية: الخط النسخي محلي (naskh-ar.woff2 موجود + @font-face للعربي فقط 400-700)',
+      is_file(__DIR__ . '/../assets/fonts/naskh-ar.woff2')
+      && filesize(__DIR__ . '/../assets/fonts/naskh-ar.woff2') > 50000
+      && strpos($fcSrc29, "font-family: 'Noto Naskh Arabic';") !== false
+      && strpos($fcSrc29, 'naskh-ar.woff2') !== false
+      && preg_match("/font-family: 'Noto Naskh Arabic';[^}]*unicode-range: U\\+0600-06FF/s", $fcSrc29) === 1);
 // «الأزرار مكرّرة وعجقة» (اختيار المستخدم 2026-08-01): شريط التصدير العام مخفي بصفحة
 // البطاقة السنوية — أزرار الصفحة الخاصة (PDF رسمي/Excel/طباعة) هي المجموعة الوحيدة
 check('البطاقة السنوية: لا أزرار مكرّرة — شريط التصدير العام مخفي والصفحة بأزرارها الخاصة فقط',
