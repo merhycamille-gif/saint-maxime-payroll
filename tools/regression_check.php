@@ -594,6 +594,13 @@ if ($regEid) {
     check('مركز التقارير بلا مكرّر: لا بطاقة «Résumé mensuel» (ضمن كشف رواتب كل الموظفين) والرابط المباشر شغّال',
           strpos($repSrc25, "'fr'=>'Résumé mensuel'") === false
           && strpos($repSrc25, "report === 'monthly_summary'") !== false);
+    // ✍️ (2026-08-25) «بدي المجموع» بلائحة الموظفين: سطر المجموع بالعملتين متل الخانات
+    // (دولار المجموع = جمع أرقام الصفوف المدوّرة — dualFromUsd يتبع زرّ العملة)
+    $hEL25 = renderPage('pages/reports.php', ['report' => 'employee_list', 'cols' => ['name', 'extra_wage', 'transport']], ['extra','transport']);
+    check('لائحة الموظفين: سطر المجموع موجود وبالعملتين للأعمدة المالية',
+          strpos($hEL25, 'المجموع (') !== false
+          && strpos($repSrc25, 'dualFromUsd($colTot[$k], $colTotUsd[$k])') !== false
+          && strpos($repSrc25, "\$colTotUsd = array_fill_keys(['extra_wage','aide','transport','composed'], 0.0);") !== false);
     // «وهون شو المكرر» (2026-08-25): بطاقة «Infos générales» أُزيلت (أعمدتها ضمن لائحة الموظفين)
     // — نموذج p13 نفسه يبقى شغّالاً بالرابط المباشر بofficial_forms
     check('مركز التقارير بلا مكرّر: لا بطاقة «Infos générales» (ضمن لائحة الموظفين) ونموذج p13 المباشر شغّال',

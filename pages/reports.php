@@ -692,6 +692,9 @@ function reportDocThumb($path) {
                             'composed'   => fn($r) => isset($bonusMap[(int)$r['id']]) ? composedSalaryLbp($bonusMap[(int)$r['id']]) : 0,
                         ];
                         $colTot = array_fill_keys(array_keys($sumCols), 0.0);
+                        // ✍️ (2026-08-25) «بدي المجموع»: مجموع الدولار للأعمدة التي خاناتها بالعملتين
+                        // = جمع أرقام الصفوف المدوّرة نفسها (الأرقام تركب) — عمود «الراتب (قانون)» ليرة فقط
+                        $colTotUsd = array_fill_keys(['extra_wage','aide','transport','composed'], 0.0);
                         $rn=0; $curCat=null; foreach ($data as $r): ?>
                             <?= categoryHeaderRow($curCat, $r['employee_type'], count($selectedCols) + 1 + ($multi?1:0)) ?>
                             <tr>
@@ -699,7 +702,11 @@ function reportDocThumb($path) {
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <?php foreach ($selectedCols as $k) {
                                     echo '<td>'.($availCols[$k][1])($r).'</td>';
-                                    if (isset($sumCols[$k])) $colTot[$k] += $sumCols[$k]($r);
+                                    if (isset($sumCols[$k])) {
+                                        $colTot[$k] += $sumCols[$k]($r);
+                                        if (isset($colTotUsd[$k]) && isset($bonusMap[(int)$r['id']]))
+                                            $colTotUsd[$k] += lbpToUsd($sumCols[$k]($r), rowRate($bonusMap[(int)$r['id']]));
+                                    }
                                 } ?>
                             </tr>
                         <?php endforeach; ?>
@@ -707,7 +714,8 @@ function reportDocThumb($path) {
                         <?php $hasMoneyCol = (bool)array_intersect($selectedCols, array_keys($sumCols)); ?>
                         <?php if ($hasMoneyCol): ?>
                         <tr class="total-row"><td colspan="<?= 1 + ($multi?1:0) ?>">المجموع (<?= count($data) ?>)</td>
-                            <?php foreach ($selectedCols as $k) echo '<td>'.(isset($sumCols[$k]) ? '<strong>'.formatLBP($colTot[$k]).'</strong>' : '').'</td>'; ?>
+                            <?php // المجموع بالعملتين متل الخانات (dualFromUsd يتبع زرّ العملة؛ «الراتب قانون» ليرة فقط)
+                            foreach ($selectedCols as $k) echo '<td>'.(isset($sumCols[$k]) ? '<strong>'.(isset($colTotUsd[$k]) ? dualFromUsd($colTot[$k], $colTotUsd[$k]) : formatLBP($colTot[$k])).'</strong>' : '').'</td>'; ?>
                         </tr>
                         <?php else: ?>
                         <tr class="total-row"><td colspan="<?= count($selectedCols) + 1 + ($multi?1:0) ?>">العدد الإجمالي / Total: <?= count($data) ?></td></tr>
