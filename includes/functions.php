@@ -1508,6 +1508,55 @@ function healCaisseImport4Schools20260826() {
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
+/** 🔢 «كل الارقام اكتبو بالفرنسي» (2026-08-26): تحويل الأرقام العربية/الفارسية إلى فرنسية */
+function arabicDigitsFr($v) {
+    return strtr((string)$v, ['٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9',
+                              '۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9']);
+}
+
+/** 🔢 تطبيع خانة رقم رسمي (صندوق/ضمان/مالية): أرقام فرنسية حتماً، وإن حُشر كلام معها
+ *  (متل «الرقم المالي: ١٢٥٩٠٤» بملف ميلي طنوس أونلاين) يُمسح الكلام وتبقى الأرقام وفواصلها. */
+function officialNumberFr($v) {
+    $v = trim(arabicDigitsFr($v));
+    if ($v === '') return $v;
+    if (preg_match('/[ء-ي]/u', $v)) $v = trim((string)preg_replace('/[^0-9\/\-]+/u', '', $v), '/- ');
+    return trim($v);
+}
+
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-26 «شوف كل الارقام اكتبو بالفرنسي» — p1 ميلي طنوس):
+ * تنقية كل خانات الأرقام الرسمية المخزّنة (موظفون: صندوق/ضمان/مالية + مدارس: صندوق/
+ * مالية/ضمان) بofficialNumberFr، والهواتف تُحوَّل أرقامها فقط (تبقى صيغتها 03/888849).
+ * يعمل أونلاين بعد النشر حيث الداتا الملوّثة (محلياً نظيفة). الحفظ الجديد يتطبّع
+ * تلقائياً من صفحتي الموظف والمدارس فلا تعود الحالة.
+ */
+function healFrenchDigits20260826() {
+    try {
+        if (getSetting('heal_french_digits_20260826', '') !== '') return;
+        $db = getDB();
+        $n = 0;
+        $targets = [
+            ['employees', 'id', ['caisse_number' => 'num', 'nssf_number' => 'num', 'finance_ministry_number' => 'num', 'phone1' => 'tel', 'phone2' => 'tel']],
+            ['schools',   'id', ['caisse_number' => 'num', 'finance_number' => 'num', 'nssf_employer_number' => 'num', 'phone' => 'tel']],
+        ];
+        foreach ($targets as [$table, $pk, $cols]) {
+            $rows = $db->query("SELECT `$pk`, `" . implode('`,`', array_keys($cols)) . "` FROM `$table`")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $r) {
+                foreach ($cols as $c => $kind) {
+                    $old = (string)($r[$c] ?? '');
+                    if ($old === '') continue;
+                    $new = ($kind === 'num') ? officialNumberFr($old) : trim(arabicDigitsFr($old));
+                    if ($new !== $old) {
+                        $db->prepare("UPDATE `$table` SET `$c`=? WHERE `$pk`=?")->execute([$new, $r[$pk]]);
+                        $n++;
+                    }
+                }
+            }
+        }
+        setSetting('heal_french_digits_20260826', 'done: fixed=' . $n);
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
 /** 🟰 التراكمي الضريبي لموظف من أول السنة الميلادية حتى شهر معيّن («انتبه ر5 كمان بدها
  *  تكون مجموع ر10 على أربع فصول» 2026-08-24): يعيد ['tb','fd','net'] — التنزيل العائلي
  *  التراكمي بسقف الخاضع التراكمي (fda بتاريخ 1/1 لكل السنة). قيمة الفصل = تراكمي آخر

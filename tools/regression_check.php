@@ -3597,6 +3597,36 @@ check('الأربع مدارس: عيّنة رقم صح بكل مدرسة + عد�
 check('احتياط الأب↔الشهرة المعكوسين: تيا (البشارة) أخذت 133694 رغم انعكاس ديب/نخلة بملفها',
       $c70('مدرسة%سيدة البشارة%', 'تيا', 'ديب', 'نخلة') === '133694');
 
+/* =====================================================================
+ * 71) 🔢 «كل الارقام اكتبو بالفرنسي» (p1 ميلي طنوس 2026-08-26): خانات
+ *     الأرقام الرسمية والهواتف بأرقام فرنسية — شفاء للداتا المخزّنة (أونلاين
+ *     حيث «الرقم المالي: ١٢٥٩٠٤») + تطبيع تلقائي عند كل حفظ جديد.
+ * =================================================================== */
+check('الأرقام بالفرنسي: الشفاء موصول بالهيدر + الدالتان موجودتان',
+      function_exists('officialNumberFr') && function_exists('arabicDigitsFr')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healFrenchDigits20260826();') !== false);
+check('الأرقام بالفرنسي: التحويل صحيح (حالة ميلي «الرقم المالي: ١٢٥٩٠٤» ⇒ 125904 + هاتف ٠٣/٨٨٨٨٤٩ يبقى بصيغته + النظيف لا يُمسّ)',
+      officialNumberFr('الرقم المالي: ١٢٥٩٠٤') === '125904'
+      && officialNumberFr('١٢٥٩٠٤') === '125904'
+      && officialNumberFr('125904') === '125904'
+      && officialNumberFr('') === ''
+      && trim(arabicDigitsFr('٠٣/٨٨٨٨٤٩')) === '03/888849'
+      && trim(arabicDigitsFr('+961 71 234567')) === '+961 71 234567');
+$emp71 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$sch71 = (string)file_get_contents($PROJ . '/pages/schools.php');
+check('الأرقام بالفرنسي: التطبيع مربوط بحفظ ملف الموظف (صندوق/ضمان/مالية/هاتفين) وصفحة المدارس',
+      strpos($emp71, "officialNumberFr(\$_POST['caisse_number']") !== false
+      && strpos($emp71, "officialNumberFr(\$_POST['nssf_number']") !== false
+      && strpos($emp71, "officialNumberFr(\$_POST['finance_ministry_number']") !== false
+      && strpos($emp71, "arabicDigitsFr(\$_POST['phone1']") !== false
+      && strpos($sch71, "officialNumberFr(\$_POST['caisse_number']") !== false
+      && strpos($sch71, "officialNumberFr(\$_POST['finance_number']") !== false
+      && strpos($sch71, "arabicDigitsFr(\$_POST['phone']") !== false);
+$mili71 = $db->query("SELECT COUNT(*) FROM employees WHERE is_deleted=0 AND
+    (caisse_number REGEXP '[^0-9/ -]' OR nssf_number REGEXP '[^0-9/ -]' OR finance_ministry_number REGEXP '[^0-9/ -]')")->fetchColumn();
+check('الأرقام بالفرنسي: لا خانة رقم رسمي فيها كلام أو أرقام غير فرنسية بالقاعدة',
+      (int)$mili71 === 0, 'ملفات ملوّثة: ' . $mili71);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
