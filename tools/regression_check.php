@@ -3513,6 +3513,25 @@ $al67 = $db->query("SELECT gouvernorat, district, ville FROM employees WHERE id=
 check('الين منصور 191: عنوان السكن ديك المحدي/المتن/جبل لبنان (مش Beyrouth)',
       $al67 && $al67['gouvernorat'] === 'جبل لبنان' && $al67['district'] === 'المتن' && $al67['ville'] === 'ديك المحدي');
 
+/* =====================================================================
+ * 68) 🏦 استيراد أرقام صندوق التعويضات (2026-08-26): بيان مدرسة القديس
+ *     مكسيموس الرسمي (18 ملاكاً، منظَّم 2025-02-10) يُستورَد بشفاء ذاتي
+ *     موصول بالهيدر (يعمل أونلاين بعد النشر) — المطابقة بالاسم الثلاثي
+ *     ولا يُكتب فوق رقم أدخله المستخدم يدوياً.
+ * =================================================================== */
+check('صندوق التعويضات: الشفاء موجود وموصول بالهيدر',
+      function_exists('healCaisseImport20260826')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healCaisseImport20260826();') !== false);
+$cn68 = $db->query("SELECT e.first_name_ar fn, e.caisse_number cn FROM employees e
+    JOIN schools s ON s.id=e.school_id
+    WHERE s.name_ar LIKE 'مدرسة%مكسيموس%' AND e.is_deleted=0
+      AND TRIM(e.first_name_ar)='اندره' AND TRIM(e.father_name_ar)='يوسف' AND TRIM(e.last_name_ar)='مراد'")->fetch(PDO::FETCH_ASSOC);
+$cnt68 = (int)$db->query("SELECT COUNT(*) FROM employees e JOIN schools s ON s.id=e.school_id
+    WHERE s.name_ar LIKE 'مدرسة%مكسيموس%' AND e.is_deleted=0 AND TRIM(COALESCE(e.caisse_number,'')) <> ''")->fetchColumn();
+check('صندوق التعويضات: أرقام البيان معبّأة (أندره مراد 3938 + ≥18 ملفاً برقم)',
+      $cn68 && trim((string)$cn68['cn']) === '3938' && $cnt68 >= 18,
+      'أندره=' . ($cn68['cn'] ?? '؟') . ' · معبّأ=' . $cnt68);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
