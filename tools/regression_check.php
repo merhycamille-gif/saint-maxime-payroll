@@ -3531,6 +3531,11 @@ $cnt68 = (int)$db->query("SELECT COUNT(*) FROM employees e JOIN schools s ON s.i
 check('صندوق التعويضات: أرقام البيان معبّأة (أندره مراد 3938 + ≥18 ملفاً برقم)',
       $cn68 && trim((string)$cn68['cn']) === '3938' && $cnt68 >= 18,
       'أندره=' . ($cn68['cn'] ?? '؟') . ' · معبّأ=' . $cnt68);
+// البيان العام (eoc_staff) هو نموذج الصندوق الرسمي نفسه: عمود «الرقم المالي» للملاك
+// = رقمه لدى صندوق التعويضات لا رقم وزارة المالية (المتعاقد يبقى برقم المالية)
+$of68 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+check('البيان العام للصندوق: عمود الرقم المالي للملاك = caisse_number (والمتعاقد رقم المالية)',
+      strpos($of68, "\$isMlk ? (\$r['caisse_number'] ?? '') : \$r['finance_ministry_number']") !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

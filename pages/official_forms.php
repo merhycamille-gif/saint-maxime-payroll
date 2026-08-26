@@ -1362,7 +1362,9 @@ elseif ($form === 'teacher_card'):
         ?>
             <tr>
                 <td><?= $i+1 ?></td>
-                <td><?= e($r['finance_ministry_number']) ?></td>
+                <?php /* بيان صندوق التعويضات: «الرقم المالي» للملاك = رقمه لدى الصندوق (بيانه الرسمي 2025-02-10)
+                         لا رقم وزارة المالية؛ المتعاقد ليس منتسباً للصندوق فيبقى رقم المالية */ ?>
+                <td><?= e($isMlk ? ($r['caisse_number'] ?? '') : $r['finance_ministry_number']) ?></td>
                 <td style="text-align:right"><?= e(trim(($r['first_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                 <td><?= e(diplomaLabel($r['diploma'],'ar')) ?></td>
                 <td><?= formatDate($isMlk ? ($r['titularization_date'] ?: $r['hire_date']) : $r['hire_date']) ?></td>
