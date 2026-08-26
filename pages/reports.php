@@ -167,6 +167,7 @@ function reportDocThumb($path) {
             ['url'=>$OF.'cnss_eos_settle', 'icon'=>'fa-file-invoice', 'color'=>'var(--gold)', 'fr'=>'Liquidation FDS (employé)', 'ar'=>'طلب تصفية نهاية الخدمة (موظف)'],
             ['url'=>$OF.'cnss_contrib_monthly', 'icon'=>'fa-table', 'color'=>'var(--info)', 'fr'=>'Déclaration mensuelle', 'ar'=>'تصريح الضمان الشهري'],
             ['url'=>$OF.'cnss_contrib_annual', 'icon'=>'fa-table-cells', 'color'=>'var(--primary)', 'fr'=>'Déclaration trimestrielle', 'ar'=>'تصريح الضمان الفصلي'],
+            ['url'=>$OF.'cnss_taswiya', 'icon'=>'fa-file-shield', 'color'=>'var(--danger)', 'fr'=>'Régularisation annuelle (officielle)', 'ar'=>'تسوية الضمان السنوية — طبق الأصل'],
         ]],
         ['title'=>'ضريبة الدخل / Impôt sur le revenu', 'icon'=>'fa-file-invoice-dollar', 'color'=>'var(--danger)', 'tiles'=>[
             ['url'=>'?report=tax_summary', 'icon'=>'fa-list', 'color'=>'var(--danger)', 'fr'=>'Impôt mensuel', 'ar'=>'كشف ضريبة شهري'],

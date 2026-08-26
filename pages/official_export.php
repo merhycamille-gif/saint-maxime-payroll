@@ -15,6 +15,218 @@ $form = $_GET['form'] ?? '';
 $format = ($_GET['format'] ?? 'pdf') === 'xlsx' ? 'xlsx' : 'pdf';
 $month = (int)($_GET['month'] ?? date('n'));
 $year = (int)($_GET['year'] ?? date('Y'));
+/* =====================================================================
+ * 🏛️ تسوية الضمان السنوية طبق الأصل (2026-08-26): قالب المستخدم الرسمي نفسه
+ * «تسوية الضمان 2025 القديس مكسيموس.xlsx» بأوراقه الأربع (فقرة 50 + التسوية +
+ * الرواتب والاجور + التصريح الاسمي) يُعبَّأ من monthly_salaries لسنة ميلادية
+ * ولمدارس تُختار بحرّية (كل مدرسة لحالها أو ذوات رقم الضمان المشترك مع بعض).
+ * 🔴 عدد الأسطر طبق الأصل: كتل 19 سطراً يليها «المجموع» — حتى 38 شخصاً القالب
+ * كما هو حرفياً (الكتلة الثالثة صفرية مثل ملفه)؛ أكثر من ذلك تُستنسَخ كتل
+ * إضافية بنفس التنسيق قبل الكتلة الصفرية ويصير المجموع العام قيماً محسوبة.
+ * صيَغ القالب نفسها تبقى حيّة (A العدّاد، P=O×8.5٪، المجاميع، والتصريح (ب)
+ * يقرأ من O68/Q68/R68) — لا نكتب فوق أي خلية صيغة إلا المجموع العام عند التوسّع.
+ * =================================================================== */
+if ($form === 'cnss_taswiya') {
+    $fy = (int)($_GET['fy'] ?? (date('Y') - 1));
+    $selIds = array_values(array_filter(array_map('intval', explode(',', (string)($_GET['schools'] ?? '')))));
+    if (!$selIds && currentSchool()) $selIds = [(int)currentSchool()['id']];
+    if (!$selIds) { http_response_code(400); exit('اختر مدرسة واحدة على الأقل'); }
+    $data = cnssTaswiyaData($db, $fy, $selIds);
+    $persons = $data['persons'];
+
+    // ترويسة المؤسسة: مدرسة واحدة = اسمها؛ مجموعة رقم مشترك = اسم صاحب العمل الرسمي (cnssEmployerSchool)
+    $selSchools = $db->query("SELECT * FROM schools WHERE id IN (" . implode(',', $selIds) . ")")->fetchAll(PDO::FETCH_ASSOC);
+    $keys = array_unique(array_map(fn($s) => cnssEmployerNumberKey($s['nssf_employer_number'] ?? ''), $selSchools));
+    $empSchool = cnssEmployerSchool($selSchools[0] ?? null);
+    $empName = (count($selSchools) === 1) ? (string)($selSchools[0]['name_ar'] ?? '')
+             : ((count($keys) === 1) ? (string)($empSchool['name_ar'] ?? '') : (string)($selSchools[0]['name_ar'] ?? ''));
+    $numParts = preg_split('/[^0-9]+/', arabicDigitsFr($selSchools[0]['nssf_employer_number'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+    $np1 = $numParts[0] ?? ''; $np2 = $numParts[1] ?? ''; $np3 = $numParts[2] ?? '';
+
+    // كتل الجدول الملحق: القالب فيه كتلتا بيانات (8-26 و28-46) + كتلة صفرية (48-66)
+    $need = count($persons);
+    $extraBlocks = max(0, (int)ceil(max(0, $need - 38) / 19)); // كل كتلة إضافية 19 سطراً
+    $delta = $extraBlocks * 20;
+
+    $tmpTs = tempnam(sys_get_temp_dir(), 'tsw') . '.xlsx';
+    if (!@copy(__DIR__ . '/../assets/templates/cnss_taswiya.xlsx', $tmpTs)) { http_response_code(500); exit('template?'); }
+    $zipTs = new ZipArchive();
+    if ($zipTs->open($tmpTs) !== true) { http_response_code(500); exit('zip?'); }
+
+    // خرائط أوراق القالب بالاسم (التصريح الاسمي باسمه الأصلي بمسافة أخيرة)
+    $wbxTs = (string)$zipTs->getFromName('xl/workbook.xml');
+    $relsTs = (string)$zipTs->getFromName('xl/_rels/workbook.xml.rels');
+    $rid2fileTs = [];
+    if (preg_match_all('#Id="(rId\d+)"[^>]*Target="(worksheets/sheet\d+\.xml)"#', $relsTs, $mmTs, PREG_SET_ORDER)) {
+        foreach ($mmTs as $mTs) $rid2fileTs[$mTs[1]] = 'xl/' . $mTs[2];
+    }
+    $name2fileTs = [];
+    if (preg_match_all('#<sheet name="([^"]+)"[^>]*r:id="(rId\d+)"#', $wbxTs, $mmTs, PREG_SET_ORDER)) {
+        foreach ($mmTs as $mTs) { if (isset($rid2fileTs[$mTs[2]])) $name2fileTs[$mTs[1]] = $rid2fileTs[$mTs[2]]; }
+    }
+    $sh3path = $name2fileTs['الرواتب والاجور'] ?? 'xl/worksheets/sheet3.xml';
+    $x3 = (string)$zipTs->getFromName($sh3path);
+
+    // === التوسّع: استنساخ كتلة البيانات الثانية (28-47) كتلاً حرفية قبل الكتلة الصفرية ===
+    if ($extraBlocks > 0) {
+        $grab = function ($rn) use ($x3) {
+            return preg_match('#<row r="' . $rn . '"[^>]*(?:/>|>.*?</row>)#s', $x3, $g) ? $g[0] : '';
+        };
+        $blockXml = '';
+        for ($r = 28; $r <= 47; $r++) $blockXml .= $grab($r);
+        // تجريد الصيَغ (الاستنساخ حرفي القيم — تُكتب قيمنا فوقه لاحقاً)
+        $stripF = fn($s) => preg_replace(['#<f\b[^>]*>.*?</f>#s', '#<f\b[^>]*/>#'], '', $s);
+        $renum = function ($s, $lo, $hi, $d) {
+            return preg_replace_callback('/(r="[A-Z]{0,3}|\$?[A-Z]{1,2}\$?)(\d+)/',
+                function ($mm2) use ($lo, $hi, $d) {
+                    $n = (int)$mm2[2];
+                    return $mm2[1] . (($n >= $lo && $n <= $hi) ? ($n + $d) : $n);
+                }, $s);
+        };
+        $clones = '';
+        for ($i = 0; $i < $extraBlocks; $i++) {
+            $clones .= $renum($stripF($blockXml), 28, 47, 20 + 20 * $i); // 28→48+20i ... 47→67+20i
+        }
+        // إزاحة الكتلة الصفرية والمجموع العام (48..70 → +delta) مع إزاحة مراجع صيَغها الداخلية
+        if (!preg_match('#<row r="48".*</sheetData>#s', $x3, $tailM)) { http_response_code(500); exit('tail?'); }
+        $tail = str_replace('</sheetData>', '', $tailM[0]);
+        $tailShifted = $renum($tail, 48, 70, $delta);
+        $x3 = str_replace($tailM[0], $clones . $tailShifted . '</sheetData>', $x3);
+        // مدى الورقة + مراجع الصيَغ المشتركة الممتدة (P8:P66 ⇒ P8:P86...) عولجت بالإزاحة أعلاه
+        $x3 = preg_replace('/<dimension ref="A1:T\d+"/', '<dimension ref="A1:T' . (70 + $delta) . '"', $x3, 1);
+        // صيَغ القالب انتقلت من أماكن calcChain — نحذفه ليعيد Excel بناءه بصمت
+        $zipTs->deleteName('xl/calcChain.xml');
+        $ct = (string)$zipTs->getFromName('[Content_Types].xml');
+        $zipTs->addFromString('[Content_Types].xml', str_replace('<Override PartName="/xl/calcChain.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"/>', '', $ct));
+    }
+
+    // === خانات الجدول الملحق ===
+    // صفوف البيانات المتاحة بالترتيب: 8-26، 28-46، ثم صفوف الكتل المستنسخة
+    $dataRows = [];
+    for ($r = 8; $r <= 26; $r++) $dataRows[] = $r;
+    for ($r = 28; $r <= 46; $r++) $dataRows[] = $r;
+    for ($i = 0; $i < $extraBlocks; $i++) for ($r = 0; $r < 19; $r++) $dataRows[] = 48 + 20 * $i + $r;
+    $cloneSubtotals = [];
+    for ($i = 0; $i < $extraBlocks; $i++) $cloneSubtotals[] = 67 + 20 * $i;
+    $grandRow = 68 + $delta;
+
+    $c3 = ['B3' => $fy, 'M2' => $np1, 'P2' => $np3, 'F2' => $empName];
+    $force3 = [];
+    $blockAgg = []; // مجاميع كل كتلة مستنسخة
+    foreach ($dataRows as $idx => $rn) {
+        $p = $persons[$idx] ?? null;
+        $inClone = $rn >= 48;
+        if ($p) {
+            $c3['B' . $rn] = $p['nssf'];
+            $c3['C' . $rn] = (string)$p['birth'];
+            $c3['D' . $rn] = $p['worker'] ? 1 : '';
+            $c3['E' . $rn] = $p['name'];
+            $c3['F' . $rn] = $p['hd']; $c3['G' . $rn] = $p['hm']; $c3['H' . $rn] = $p['hy'];
+            $c3['I' . $rn] = $p['ld']; $c3['J' . $rn] = $p['lm']; $c3['K' . $rn] = $p['ly'];
+            $c3['M' . $rn] = $p['months'];
+            $c3['N' . $rn] = $p['N']; $c3['O' . $rn] = $p['O'];
+            $c3['Q' . $rn] = $p['Q']; $c3['R' . $rn] = $p['R'];
+            // A وP يُكتبان دائماً: بكتل القالب الأولى هما قيم ملصوقة لا صيَغ (P8..P46/A8)،
+            // والكاتب يتخطى خلايا الصيَغ تلقائياً حيث بقيت صيَغاً — فلا ضرر من الكتابة
+            $c3['A' . $rn] = ($p['R'] > 0 ? 1 : 0);
+            $c3['P' . $rn] = $p['P'];
+            if ($inClone) $c3['L' . $rn] = 0;
+        } else {
+            // صف فارغ: نمط أصفار ملفه (صيَغ القالب الباقية تحسب 0)
+            foreach (['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'] as $cl) $c3[$cl . $rn] = '';
+            $c3['M' . $rn] = '';
+            foreach (['A', 'N', 'O', 'P', 'Q', 'R'] as $cl) $c3[$cl . $rn] = 0;
+            if ($inClone) $c3['L' . $rn] = 0;
+        }
+        if ($inClone && $p) {
+            $bi = intdiv($rn - 48, 20);
+            $ag = &$blockAgg[$bi];
+            if (!$ag) $ag = ['A' => 0, 'D' => 0, 'F' => 0, 'G' => 0, 'H' => 0, 'I' => 0, 'J' => 0, 'K' => 0, 'M' => 0, 'N' => 0, 'O' => 0, 'P' => 0, 'Q' => 0, 'R' => 0];
+            $ag['A'] += ($p['R'] > 0 ? 1 : 0); $ag['D'] += ($p['worker'] ? 1 : 0);
+            $ag['F'] += (int)$p['hd']; $ag['G'] += (int)$p['hm']; $ag['H'] += (int)$p['hy'];
+            $ag['I'] += (int)$p['ld']; $ag['J'] += (int)$p['lm']; $ag['K'] += (int)$p['ly'];
+            $ag['M'] += $p['months'];
+            $ag['N'] += $p['N']; $ag['O'] += $p['O']; $ag['P'] += $p['P']; $ag['Q'] += $p['Q']; $ag['R'] += $p['R'];
+            unset($ag);
+        }
+    }
+    // مجاميع الكتل المستنسخة (حرفية — القالب الأصلي مجاميعه صيَغ تحسب نفسها)
+    foreach ($cloneSubtotals as $bi => $rn) {
+        $ag = $blockAgg[$bi] ?? array_fill_keys(['A', 'D', 'F', 'G', 'H', 'I', 'J', 'K', 'M', 'N', 'O', 'P', 'Q', 'R'], 0);
+        foreach ($ag as $cl => $v) $c3[$cl . $rn] = $v;
+        $c3['L' . $rn] = 0;
+    }
+    // المجموع العام: مع التوسّع صيغته (A67+A47+A27) لا تعرف الكتل الجديدة ⇒ قيم محسوبة
+    if ($extraBlocks > 0) {
+        $t = $data['totals'];
+        foreach (['A' . $grandRow => $t['count'], 'D' . $grandRow => $t['workers'],
+                  'N' . $grandRow => $t['N'], 'O' . $grandRow => $t['O'], 'P' . $grandRow => $t['P'],
+                  'Q' . $grandRow => $t['Q'], 'R' . $grandRow => $t['R']] as $ref => $v) {
+            $c3[$ref] = $v; $force3[] = $ref;
+        }
+    }
+    $x3f = phpFillSheetXmlCells($x3, $c3);
+    if ($x3f === null) { $zipTs->close(); @unlink($tmpTs); http_response_code(500); exit('sheet3?'); }
+    // كتابة قسرية فوق خلية صيغة (تجريدها وكتابة القيمة) — <f/> الذاتية الإغلاق تُجرَّب أولاً
+    // حتى لا يبتلعها فرع <f>...</f> كوسمٍ مفتوح فيأكل الخلايا اللاحقة (علّة المجموع العام)
+    $tsForce = function ($xml, array $refVals) {
+        foreach ($refVals as $ref => $v) {
+            $xml = preg_replace_callback('#<c r="' . $ref . '"([^>]*)>(?:<f\b[^>]*/>|<f\b[^>]*>.*?</f>)?(?:<v>[^<]*</v>)?</c>#s',
+                function ($mF) use ($v, $ref) {
+                    $attrs = preg_replace('/\s+t="[^"]*"/', '', $mF[1]);
+                    return '<c r="' . $ref . '"' . $attrs . '><v>' . $v . '</v></c>';
+                }, $xml, 1);
+        }
+        return $xml;
+    };
+    if ($force3) $x3f = $tsForce($x3f, array_intersect_key($c3, array_flip($force3)));
+    $zipTs->addFromString($sh3path, $x3f);
+
+    // === التصريح الاسمي (أ): الشهور الاثنا عشر + الفروقات — والباقي صيَغ تقرأ من الملحق ===
+    $sh4path = $name2fileTs['التصريح الاسمي '] ?? ($name2fileTs['التصريح الاسمي'] ?? 'xl/worksheets/sheet4.xml');
+    $c4 = ['F2' => $np2, 'D24' => 0, 'E24' => 0, 'F24' => 0];
+    for ($m = 1; $m <= 12; $m++) {
+        $rn = 11 + $m;
+        $c4['D' . $rn] = (int)$data['monthly'][$m]['fin'];
+        $c4['E' . $rn] = (int)$data['monthly'][$m]['fam'];
+        $c4['F' . $rn] = (int)$data['monthly'][$m]['mal'];
+    }
+    $x4 = phpFillSheetXmlCells((string)$zipTs->getFromName($sh4path), $c4);
+    if ($x4 !== null) {
+        // مع التوسّع: صيَغ (ب) تشير إلى O68/Q68/R68 القديمة (صارت صف بيانات) ⇒ قيم محسوبة
+        if ($extraBlocks > 0) {
+            $t4 = $data['totals'];
+            $x4 = $tsForce($x4, ['D29' => $t4['O'], 'E29' => $t4['Q'], 'F29' => $t4['R']]);
+        }
+        $zipTs->addFromString($sh4path, $x4);
+    }
+
+    // === فقرة 50 + التسوية: السنة واسم المؤسسة (باقي الجدولين كما بملفه الرسمي) ===
+    $sh1path = $name2fileTs['فقرة 50'] ?? 'xl/worksheets/sheet1.xml';
+    $x1 = phpFillSheetXmlCells((string)$zipTs->getFromName($sh1path), ['AF2' => $fy, 'E9' => $empName]);
+    if ($x1 !== null) $zipTs->addFromString($sh1path, $x1);
+    $sh2path = $name2fileTs['التسوية'] ?? 'xl/worksheets/sheet2.xml';
+    $x2 = phpFillSheetXmlCells((string)$zipTs->getFromName($sh2path), ['AE2' => $fy]);
+    if ($x2 !== null) $zipTs->addFromString($sh2path, $x2);
+
+    // فرض إعادة حساب الصيَغ عند الفتح (المجاميع وP=O×8.5٪ والتصريح (ب))
+    if (strpos($wbxTs, '<calcPr') !== false) {
+        $wb2Ts = preg_replace('/<calcPr\b(?![^>]*fullCalcOnLoad)/', '<calcPr fullCalcOnLoad="1" ', $wbxTs, 1);
+    } elseif (strpos($wbxTs, '</sheets>') !== false) {
+        $wb2Ts = str_replace('</sheets>', '</sheets><calcPr fullCalcOnLoad="1"/>', $wbxTs);
+    } else { $wb2Ts = $wbxTs; }
+    if ($wb2Ts !== $wbxTs) $zipTs->addFromString('xl/workbook.xml', $wb2Ts);
+    $zipTs->close();
+
+    $fnTs = 'تسوية الضمان ' . $fy . ' ' . ($empName !== '' ? $empName : 'مدارس مختارة') . '.xlsx';
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . rawurlencode($fnTs) . '"; filename*=UTF-8\'\'' . rawurlencode($fnTs));
+    header('Content-Length: ' . filesize($tmpTs));
+    readfile($tmpTs);
+    @unlink($tmpTs);
+    exit;
+}
+
 $school = currentSchool();
 // 🔒 نموذج الضمان 190A يُصدَر لمؤسسة واحدة برقم صاحب عمل واحد — في وضع «كل المدارس»
 // كان يُبَثّ ملفٌ بترويسة فارغة يجمع أرقام كل المدارس. اطلب اختيار مدرسة.

@@ -168,6 +168,7 @@ $titles = [
     'salary_detail'  => 'Détail des salaires — tous les enseignants/employés / معلومات تفصيلية عن الراتب — جميع الأساتذة/الموظفون',
     'cnss_contrib_monthly' => 'Déclaration mensuelle CNSS (CNSS 190A) / تصريح الضمان الشهري (CNSS 190A)',
     'cnss_contrib_annual'  => 'Déclaration trimestrielle CNSS (CNSS 190A) / تصريح الضمان الفصلي (CNSS 190A)',
+    'cnss_taswiya'   => 'Régularisation annuelle CNSS (formulaire officiel, 4 feuilles) / تسوية الضمان السنوية — طبق الأصل (cnss 351)',
     'cnss_eos_invite'=> 'Convocation/attestation de fixation des salaires — fin de service (CNSS 215A) / دعوة/إفادة تحديد الأجور — نهاية الخدمة (CNSS 215A)',
     'cnss_eos_wage'  => 'Attestation du dernier salaire — fin de service (CNSS 207) / إفادة بالأجر الأخير — نهاية الخدمة (CNSS 207)',
     'cnss_eos_settle'=> 'Demande de liquidation de l\'indemnité de fin de service — employé (CNSS) / طلب تصفية تعويض نهاية الخدمة — للموظف (CNSS)',
@@ -1939,6 +1940,154 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         <div class="sign-row"><?= signatureBox('توقيع ممثل المؤسسة وخاتمها', $school['ville'] ?? 'بيروت', formatDate(date('Y-m-d'))) ?></div>
     </div>
 </div>
+
+<?php elseif ($form === 'cnss_taswiya'):
+    // 🏛️ تسوية الضمان السنوية طبق الأصل (2026-08-26): قالبه الرسمي بأوراقه الأربع يُعبَّأ
+    // لسنة ميلادية ولمدارس تُختار بحرّية — كل مدرسة لحالها أو ذوات رقم الضمان المشترك مع
+    // بعضها («خيار اي مدارس اختارها مع بعض وكل وحدة كمان لحالها»). الشاشة معاينة للتدقيق
+    // وزر Excel يبثّ الملف الرسمي نفسه (official_export.php?form=cnss_taswiya).
+    $tsFy = (int)($_GET['fy'] ?? (date('Y') - 1));
+    if ($tsFy < 2000 || $tsFy > 2100) $tsFy = (int)date('Y') - 1;
+    $tsSel = array_values(array_filter(array_map('intval', (array)($_GET['ts_schools'] ?? []))));
+    if (!$tsSel && $school) $tsSel = [(int)$school['id']];
+    $tsAll = $db->query("SELECT id, name_ar, nssf_employer_number FROM schools WHERE is_deleted=0 AND is_active=1 ORDER BY name_ar")->fetchAll(PDO::FETCH_ASSOC);
+    $tsGroups = [];
+    foreach ($tsAll as $s) $tsGroups[cnssEmployerNumberKey($s['nssf_employer_number'] ?? '') ?: ('id' . $s['id'])][] = (int)$s['id'];
+    $tsData = $tsSel ? cnssTaswiyaData($db, $tsFy, $tsSel) : null;
+    $tsSelSchools = $tsSel ? array_values(array_filter($tsAll, fn($s) => in_array((int)$s['id'], $tsSel, true))) : [];
+    $tsKeys = array_unique(array_map(fn($s) => cnssEmployerNumberKey($s['nssf_employer_number'] ?? ''), $tsSelSchools));
+    $tsEmp = $tsSelSchools ? cnssEmployerSchool($tsSelSchools[0]) : null;
+    $tsName = (count($tsSelSchools) === 1) ? ($tsSelSchools[0]['name_ar'] ?? '')
+            : ((count($tsKeys) === 1 && $tsEmp) ? ($tsEmp['name_ar'] ?? '') : '');
+    $tsExp = BASE_URL . 'pages/official_export.php?form=cnss_taswiya&fy=' . $tsFy . '&schools=' . implode(',', $tsSel);
+?>
+    <form method="get" class="card no-print">
+        <input type="hidden" name="form" value="cnss_taswiya">
+        <div class="card-body">
+            <div class="form-row cols-3">
+                <div class="form-group mb-0"><label class="form-label">Année (civile) / السنة الميلادية</label>
+                    <select name="fy" class="form-select">
+                        <?php for ($yv = (int)date('Y'); $yv >= 2024; $yv--): ?>
+                            <option value="<?= $yv ?>" <?= $yv === $tsFy ? 'selected' : '' ?>><?= $yv ?></option>
+                        <?php endfor; ?>
+                    </select></div>
+                <div class="form-group mb-0" style="grid-column:span 2"><label class="form-label">&nbsp;</label>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <?php foreach ($tsGroups as $gk => $gids): if (count($gids) < 2) continue; ?>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="tsPick([<?= implode(',', $gids) ?>])">
+                                🏛️ مجموعة الرقم <?= e($gk) ?> (<?= count($gids) ?> مؤسسات مع بعضها)</button>
+                        <?php endforeach; ?>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="tsPick([])">✖ إلغاء التحديد</button>
+                    </div></div>
+            </div>
+            <div class="form-group" style="margin-top:10px"><label class="form-label">Écoles incluses / المدارس المشمولة بالتسوية (اختر وحدة لحالها أو عدة مدارس مع بعضها)</label>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:6px">
+                <?php foreach ($tsAll as $s): ?>
+                    <label style="display:flex;align-items:center;gap:8px;border:1px solid var(--gray-200);border-radius:8px;padding:6px 10px;cursor:pointer">
+                        <input type="checkbox" class="ts-school" name="ts_schools[]" value="<?= (int)$s['id'] ?>" <?= in_array((int)$s['id'], $tsSel, true) ? 'checked' : '' ?>>
+                        <span style="flex:1"><?= e($s['name_ar']) ?></span>
+                        <small style="color:var(--gray-600);direction:ltr"><?= e($s['nssf_employer_number'] ?? '') ?></small>
+                    </label>
+                <?php endforeach; ?>
+                </div></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-primary"><i class="fas fa-eye"></i> Afficher / عرض المعاينة</button>
+                <?php if ($tsSel && $tsData && $tsData['totals']['count'] > 0): ?>
+                    <a class="btn btn-success" href="<?= e($tsExp) ?>"><i class="fas fa-file-excel"></i> Excel officiel (4 feuilles) / ملف التسوية الرسمي طبق الأصل</a>
+                <?php endif; ?>
+            </div>
+            <?php if (count($tsKeys) > 1): ?>
+                <div class="alert alert-warning" style="margin-top:10px">⚠️ المدارس المختارة أرقام ضمانها مختلفة — التسوية الرسمية تُنظَّم لرقم مؤسسة واحد. تأكد من اختيارك.</div>
+            <?php endif; ?>
+        </div>
+    </form>
+    <script>function tsPick(ids){document.querySelectorAll('.ts-school').forEach(c=>{c.checked=ids.includes(parseInt(c.value));});}</script>
+
+    <?php if ($tsData): $T = $tsData['totals']; ?>
+    <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12pt;margin-bottom:6px">
+            <div style="font-weight:700;line-height:1.6">الصندوق الوطني للضمان الاجتماعي<br><span style="font-weight:400">التسوية السنوية — معاينة للتدقيق قبل تنزيل الملف الرسمي</span></div>
+            <div style="text-align:left">
+                <div style="font-weight:700"><?= e($tsName ?: (count($tsSelSchools) . ' مدارس مختارة')) ?></div>
+                <div>رقم المؤسسة: <span dir="ltr"><?= e($tsSelSchools[0]['nssf_employer_number'] ?? '') ?></span> — عن سنة <?= $tsFy ?></div>
+                <div>عدد الأجراء: <?= (int)$T['count'] ?> (منهم <?= (int)$T['workers'] ?> عامل/إداري)</div>
+            </div>
+        </div>
+        <div class="doc-title" style="margin:6px 0">الجدول الملحق — الرواتب والأجور (<?= (int)$T['count'] ?> أجيراً، بكتل 19 سطراً طبق الأصل)</div>
+        <table class="doc-table">
+            <thead><tr><th>#</th><th>رقم المضمون</th><th>سنة الولادة</th><th>الفئة</th><th>الاسم والشهرة</th>
+                <th>بدء العمل</th><th>ترك العمل</th><th>مدة العمل (أشهر)</th><th>اجمالي الاجور السنوية</th>
+                <th>نهاية الخدمة (دون حد اقصى)</th><th>الاشتراكات 8.5%</th><th>التعويضات العائلية (ضمن الحد)</th><th>المرض والامومة</th></tr></thead>
+            <tbody>
+            <?php foreach ($tsData['persons'] as $i => $p): ?>
+                <tr><td><?= $i + 1 ?></td>
+                    <td><?= e($p['nssf']) ?></td>
+                    <td><?= e($p['birth']) ?></td>
+                    <td><?= $p['worker'] ? 'عامل' : 'مدرّس' ?></td>
+                    <td style="text-align:right"><?= e($p['name']) ?></td>
+                    <td><?= $p['hy'] ? sprintf('%02d/%02d/%d', $p['hd'], $p['hm'], $p['hy']) : '' ?></td>
+                    <td><?= $p['ly'] ? sprintf('%02d/%02d/%d', $p['ld'], $p['lm'], $p['ly']) : '' ?></td>
+                    <td><?= (int)$p['months'] ?></td>
+                    <td class="num"><?= formatLBP($p['N'], false) ?></td>
+                    <td class="num"><?= formatLBP($p['O'], false) ?></td>
+                    <td class="num"><?= formatLBP($p['P'], false) ?></td>
+                    <td class="num"><?= formatLBP($p['Q'], false) ?></td>
+                    <td class="num"><?= formatLBP($p['R'], false) ?></td></tr>
+            <?php endforeach; ?>
+            <?php if (!$tsData['persons']): ?><tr><td colspan="13" class="text-center">لا أجراء خاضعين للضمان بهذه السنة للمدارس المختارة</td></tr><?php endif; ?>
+            </tbody>
+            <?php if ($tsData['persons']): ?><tfoot><tr class="total-row">
+                <td colspan="3">المجموع — العدد: <?= (int)$T['count'] ?></td><td><?= (int)$T['workers'] ?> عامل</td><td></td><td></td><td></td><td></td>
+                <td class="num"><?= formatLBP($T['N'], false) ?></td>
+                <td class="num"><?= formatLBP($T['O'], false) ?></td>
+                <td class="num"><?= formatLBP($T['P'], false) ?></td>
+                <td class="num"><?= formatLBP($T['Q'], false) ?></td>
+                <td class="num"><?= formatLBP($T['R'], false) ?></td>
+            </tr></tfoot><?php endif; ?>
+        </table>
+
+        <div class="doc-title" style="margin:14px 0 6px">التصريح الاسمي — (أ) الأجور التي دفعت عنها الاشتراكات شهرياً + (ب) اشتراكات التسوية</div>
+        <table class="doc-table" style="max-width:760px">
+            <thead><tr><th>المدة</th><th>فرع نهاية الخدمة</th><th>فرع التعويضات العائلية</th><th>فرع المرض والامومة</th></tr></thead>
+            <tbody>
+            <?php for ($m = 1; $m <= 12; $m++): $mm = $tsData['monthly'][$m]; ?>
+                <tr><td><?= monthName($m, 'ar') ?></td>
+                    <td class="num"><?= formatLBP($mm['fin'], false) ?></td>
+                    <td class="num"><?= formatLBP($mm['fam'], false) ?></td>
+                    <td class="num"><?= formatLBP($mm['mal'], false) ?></td></tr>
+            <?php endfor; ?>
+            <tr class="total-row"><td>المجاميع (حقل 1/2/3)</td>
+                <td class="num"><?= formatLBP($T['aFin'], false) ?></td>
+                <td class="num"><?= formatLBP($T['aFam'], false) ?></td>
+                <td class="num"><?= formatLBP($T['aMal'], false) ?></td></tr>
+            <tr><td>مجموع الأجور وفقاً للجدول الملحق (حقل 4/5/6)</td>
+                <td class="num"><?= formatLBP($T['O'], false) ?></td>
+                <td class="num"><?= formatLBP($T['Q'], false) ?></td>
+                <td class="num"><?= formatLBP($T['R'], false) ?></td></tr>
+            <?php // النسب مؤرّخة من rate_history (نموذجه: 8.5٪ / 6٪ / 11٪)
+                $dFin = $T['O'] - $T['aFin']; $dFam = $T['Q'] - $T['aFam']; $dMal = $T['R'] - $T['aMal'];
+                $rFin = rateFrac('end_of_service_rate', 12, $tsFy, 8.5);
+                $rFam = rateFrac('family_compensation_rate', 12, $tsFy, 6);
+                $rMal = cnssTotalFrac(12, $tsFy);
+                $cFin = (int)round($dFin * $rFin); $cFam = (int)round($dFam * $rFam); $cMal = (int)round($dMal * $rMal); ?>
+            <tr><td>أجور التسوية (الفرق)</td>
+                <td class="num"><?= formatLBP($dFin, false) ?></td>
+                <td class="num"><?= formatLBP($dFam, false) ?></td>
+                <td class="num"><?= formatLBP($dMal, false) ?></td></tr>
+            <tr class="total-row"><td>اشتراكات التسوية (<?= rtrim(rtrim(number_format($rFin * 100, 1), '0'), '.') ?>% / <?= rtrim(rtrim(number_format($rFam * 100, 1), '0'), '.') ?>% / <?= rtrim(rtrim(number_format($rMal * 100, 1), '0'), '.') ?>%)</td>
+                <td class="num"><?= formatLBP($cFin, false) ?></td>
+                <td class="num"><?= formatLBP($cFam, false) ?></td>
+                <td class="num"><?= formatLBP($cMal, false) ?></td></tr>
+            <tr class="total-row"><td colspan="3">مجموع اشتراكات التسوية المتوجب دفعها</td>
+                <td class="num"><?= formatLBP($cFin + $cFam + $cMal, false) ?></td></tr>
+            </tbody>
+        </table>
+        <div class="alert alert-info no-print" style="margin-top:10px;font-size:13px">
+            ℹ️ ملف الـExcel الرسمي يحوي الأوراق الأربع طبق الأصل (فقرة 50 + التسوية + الرواتب والاجور + التصريح الاسمي)
+            بعدد الأسطر نفسه (كتل 19 سطراً يليها «المجموع»)، وصيَغ القالب الرسمية تبقى حيّة (P = O×8.5% والمجاميع والتصريح (ب) تُحسب تلقائياً في Excel).
+        </div>
+    </div>
+    <?php endif; ?>
 
 <?php elseif ($form === 'cnss_contrib_monthly' || $form === 'cnss_contrib_annual'):
     // تصريح الضمان — نفس فورمة Excel (CNSS 190A). شهري = شهر واحد، فصلي = 3 أشهر حسب الفصل.

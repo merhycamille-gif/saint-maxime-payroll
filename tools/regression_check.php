@@ -3627,6 +3627,77 @@ $mili71 = $db->query("SELECT COUNT(*) FROM employees WHERE is_deleted=0 AND
 check('الأرقام بالفرنسي: لا خانة رقم رسمي فيها كلام أو أرقام غير فرنسية بالقاعدة',
       (int)$mili71 === 0, 'ملفات ملوّثة: ' . $mili71);
 
+/* =====================================================================
+ * 72) 🏛️ تسوية الضمان السنوية طبق الأصل (2026-08-26): قالبه الرسمي بأوراقه
+ *     الأربع + اختيار حر للمدارس (كل وحدة لحالها أو ذوات رقم الضمان المشترك
+ *     مع بعضها) + كتل 19 سطراً + توسّع تلقائي فوق 38 أجيراً بمجموع عام محسوب.
+ * =================================================================== */
+check('تسوية الضمان: القالب والمحرّك والشاشة والبلاطة موجودون',
+      is_file($PROJ . '/assets/templates/cnss_taswiya.xlsx')
+      && function_exists('cnssTaswiyaData') && function_exists('cnssSchoolGroups')
+      && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), "form === 'cnss_taswiya'") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/official_forms.php'), "form === 'cnss_taswiya'") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), 'cnss_taswiya') !== false);
+$ts72 = cnssTaswiyaData($db, 2025, [2]);
+$tt72 = $ts72['totals'];
+$aMal72 = 0; foreach ($ts72['monthly'] as $mm72) $aMal72 += $mm72['mal'];
+check('تسوية الضمان: الأرقام تركب — P=O×نسبة نهاية الخدمة المؤرّخة وR=N والمرض الشهري (أ) = مجموع الملحق بالمليم',
+      $tt72['count'] > 0
+      && (int)$tt72['P'] === (int)array_sum(array_map(fn($p) => (int)round($p['O'] * rateFrac('end_of_service_rate', 12, 2025, 8.5)), $ts72['persons']))
+      && (int)$tt72['R'] === (int)$tt72['N']
+      && (int)$aMal72 === (int)$tt72['R'],
+      'أجراء=' . $tt72['count'] . ' N=' . $tt72['N'] . ' aMal=' . $aMal72);
+$tsx72 = renderPage('pages/official_export.php', ['form' => 'cnss_taswiya', 'fy' => '2025', 'schools' => '2', 'format' => 'xlsx'], [], [2], '', '', $PROJ . '/tools/_ts72.xlsx');
+$ok72 = strncmp($tsx72, 'PK', 2) === 0;
+$sh372 = '';
+if ($ok72) {
+    file_put_contents($PROJ . '/tools/_ts72b.xlsx', $tsx72);
+    $z72 = new ZipArchive();
+    if ($z72->open($PROJ . '/tools/_ts72b.xlsx') === true) {
+        $sh372 = (string)$z72->getFromName('xl/worksheets/sheet3.xml');
+        $z72->close();
+    }
+    @unlink($PROJ . '/tools/_ts72b.xlsx');
+}
+check('تسوية الضمان: ملف Excel يصدر (4 أوراق) وعدد الأسطر طبق الأصل — كتلتا 19 + الصفرية وصيَغ القالب حيّة (SUM/8.5%/العدّاد)',
+      $ok72
+      && strpos($sh372, '<v>2025</v>') !== false
+      && strpos($sh372, 'SUM(A8:A26)') !== false && strpos($sh372, 'SUM(A28:A46)') !== false
+      && strpos($sh372, 'SUM(A48:A66)') !== false && strpos($sh372, 'A67+A47+A27') !== false
+      && strpos($sh372, '$O48*8.5%') !== false
+      && preg_match('/<dimension ref="A1:T70"/', $sh372) === 1,
+      'PK=' . ($ok72 ? '1' : '0'));
+// التوسّع: مجموعة رقم الضمان المشترك (25-82-043) — مئات الأجراء بكتل مستنسخة ومجموع عام محسوب
+$grp72 = [];
+foreach (cnssSchoolGroups($db) as $gk72 => $gs72) if (count($gs72) >= 5) { $grp72 = array_map(fn($s) => (int)$s['id'], $gs72); break; }
+if ($grp72) {
+    $ts272 = cnssTaswiyaData($db, 2025, $grp72);
+    $tsx272 = renderPage('pages/official_export.php', ['form' => 'cnss_taswiya', 'fy' => '2025', 'schools' => implode(',', $grp72), 'format' => 'xlsx'], [], [], '', '', $PROJ . '/tools/_ts72c.xlsx');
+    $sh3g = '';
+    if (strncmp($tsx272, 'PK', 2) === 0) {
+        file_put_contents($PROJ . '/tools/_ts72d.xlsx', $tsx272);
+        $zg72 = new ZipArchive();
+        if ($zg72->open($PROJ . '/tools/_ts72d.xlsx') === true) { $sh3g = (string)$zg72->getFromName('xl/worksheets/sheet3.xml'); $zg72->close(); }
+        @unlink($PROJ . '/tools/_ts72d.xlsx');
+    }
+    $needG = count($ts272['persons']);
+    $extraG = max(0, (int)ceil(max(0, $needG - 38) / 19));
+    $grandG = 68 + $extraG * 20;
+    check('تسوية الضمان: مدارس الرقم المشترك مع بعضها — توسّع تلقائي والمجموع العام = عدد الأجراء المدموجين',
+          $needG > 38 && $sh3g !== ''
+          && preg_match('/<dimension ref="A1:T' . (70 + $extraG * 20) . '"/', $sh3g) === 1
+          && strpos($sh3g, '<c r="A' . $grandG . '"') !== false
+          && preg_match('#<c r="A' . $grandG . '"[^>]*><v>' . $needG . '</v></c>#', $sh3g) === 1
+          && preg_match('#<c r="R' . $grandG . '"[^>]*><v>' . (int)$ts272['totals']['R'] . '</v></c>#', $sh3g) === 1,
+          'أجراء المجموعة=' . $needG . ' كتل إضافية=' . $extraG);
+}
+$tsHtml72 = renderPage('pages/official_forms.php', ['form' => 'cnss_taswiya', 'fy' => '2025', 'ts_schools' => ['2']], [], [2]);
+check('تسوية الضمان: الشاشة تعرض المعاينة والاختيار الحر وزر الملف الرسمي',
+      strpos($tsHtml72, 'المدارس المشمولة بالتسوية') !== false
+      && strpos($tsHtml72, 'form=cnss_taswiya&amp;fy=2025&amp;schools=2') !== false
+      && strpos($tsHtml72, 'الجدول الملحق') !== false
+      && strpos($tsHtml72, 'اشتراكات التسوية') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

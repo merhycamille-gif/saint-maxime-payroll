@@ -1508,6 +1508,101 @@ function healCaisseImport4Schools20260826() {
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
+/**
+ * 🏛️ تسوية الضمان السنوية طبق الأصل («تسوية الضمان 2025 القديس مكسيموس.xlsx» — 2026-08-26):
+ * بيانات الجدول الملحق «الرواتب والاجور» + التصريح الاسمي (أ) الشهري، لسنة ميلادية
+ * ولمجموعة مدارس تُختار بحرّية (خاصة ذوات رقم الضمان المشترك — تسوية واحدة للمؤسسة).
+ * 🔴 مصدر واحد: الأجور تُشتقّ من الاشتراكات الشهرية المخزّنة (monthly_salaries) بالنسب
+ * المؤرّخة — أساس المرض = (حصة المضمون + حصة المدرسة) ÷ النسبة الإجمالية (نمط 190A)،
+ * أساس نهاية الخدمة = حصة 8.5٪ ÷ نسبتها (إداريون)، أساس العائلي = حصة 6٪ ÷ نسبتها.
+ * ذو الملفين (نفس رقم الضمان/الاسم عبر المدارس المختارة) = شخص واحد بمجموع أجوره.
+ */
+function cnssTaswiyaData($db, int $fy, array $schoolIds): array {
+    $schoolIds = array_values(array_filter(array_map('intval', $schoolIds)));
+    if (!$schoolIds) return ['persons' => [], 'monthly' => [], 'totals' => []];
+    $in = implode(',', $schoolIds);
+    $q = $db->query("SELECT ms.employee_id eid, ms.month m,
+            ms.cnss_amount_lbp cn, ms.school_cnss_8_lbp c8,
+            ms.school_family_comp_6_lbp f6, ms.school_end_of_service_8_5_lbp e85,
+            e.first_name_ar, e.father_name_ar, e.last_name_ar, e.nssf_number, e.birth_date,
+            e.hire_date, e.left_date_cnss, e.employee_type
+        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE e.is_deleted = 0 AND ms.year = " . (int)$fy . " AND ms.school_id IN ($in)
+          AND (ms.cnss_amount_lbp + ms.school_cnss_8_lbp + ms.school_family_comp_6_lbp + ms.school_end_of_service_8_5_lbp) > 0
+          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)");
+    $persons = []; $monthly = [];
+    for ($m = 1; $m <= 12; $m++) $monthly[$m] = ['fin' => 0, 'fam' => 0, 'mal' => 0];
+    foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $m = (int)$r['m'];
+        $malFrac = cnssTotalFrac($m, $fy);
+        $bmal = $malFrac > 0 ? (int)round(((float)$r['cn'] + (float)$r['c8']) / $malFrac) : 0;
+        $ff = rateFrac('family_compensation_rate', $m, $fy, 6);
+        $bfam = $ff > 0 ? (int)round((float)$r['f6'] / $ff) : 0;
+        $ef = rateFrac('end_of_service_rate', $m, $fy, 8.5);
+        $bfin = $ef > 0 ? (int)round((float)$r['e85'] / $ef) : 0;
+        $nssfDigits = preg_replace('/[^0-9]/', '', arabicDigitsFr($r['nssf_number'] ?? ''));
+        if ($nssfDigits !== '' && !preg_match('/[1-9]/', $nssfDigits)) $nssfDigits = ''; // «0» الخردة ليست رقم ضمان
+        $key = strlen($nssfDigits) >= 3 ? 'n' . $nssfDigits
+             : 'x' . caisseNameNorm($r['first_name_ar'] . ' ' . $r['father_name_ar'] . ' ' . $r['last_name_ar']);
+        if (!isset($persons[$key])) {
+            $persons[$key] = ['nssf' => $nssfDigits, 'name' => trim($r['first_name_ar'] . ' ' . $r['father_name_ar'] . ' ' . $r['last_name_ar']),
+                'birth' => ($r['birth_date'] ? (int)substr($r['birth_date'], 0, 4) : ''),
+                'worker' => 0, 'hire' => $r['hire_date'], 'left' => null, 'monthsSet' => [],
+                'N' => 0, 'O' => 0, 'Q' => 0];
+        }
+        $p = &$persons[$key];
+        if ($r['employee_type'] === 'employe') $p['worker'] = 1;
+        if ($r['hire_date'] && (!$p['hire'] || $r['hire_date'] < $p['hire'])) $p['hire'] = $r['hire_date'];
+        if (($l = $r['left_date_cnss'] ?? null) && substr($l, 0, 4) === (string)$fy && (!$p['left'] || $l > $p['left'])) $p['left'] = $l;
+        if ($bmal + $bfam + $bfin > 0) $p['monthsSet'][$m] = 1;
+        $p['N'] += $bmal; $p['O'] += $bfin; $p['Q'] += $bfam;
+        $monthly[$m]['mal'] += $bmal; $monthly[$m]['fam'] += $bfam; $monthly[$m]['fin'] += $bfin;
+        unset($p);
+    }
+    // إتمام حقول كل شخص: تاريخ الترك (المسجَّل، وإلا آخر يوم بآخر شهر معمول إن لم يكمل السنة) + P = O×8.5٪
+    foreach ($persons as &$p) {
+        $months = array_keys($p['monthsSet']);
+        sort($months);
+        $p['months'] = count($months);
+        $lastM = $months ? max($months) : 0;
+        if (!$p['left'] && $lastM > 0 && $lastM < 12) {
+            $p['left'] = sprintf('%04d-%02d-%02d', $fy, $lastM, (int)date('t', mktime(0, 0, 0, $lastM, 1, $fy)));
+        }
+        [$p['hy'], $p['hm'], $p['hd']] = $p['hire'] ? array_map('intval', explode('-', substr($p['hire'], 0, 10))) : ['', '', ''];
+        [$p['ly'], $p['lm'], $p['ld']] = $p['left'] ? array_map('intval', explode('-', substr($p['left'], 0, 10))) : ['', '', ''];
+        $p['P'] = (int)round($p['O'] * rateFrac('end_of_service_rate', 12, $fy, 8.5)); // النسبة مؤرّخة (نموذجه: P = O×8.5٪)
+        $p['R'] = $p['N'];
+        unset($p['monthsSet'], $p['hire'], $p['left']);
+    }
+    unset($p);
+    // الترتيب برقم المضمون تصاعدياً (نمط ملفه)، ومن بلا رقم آخر اللائحة بالاسم
+    uasort($persons, function ($a, $b) {
+        if ($a['nssf'] !== '' && $b['nssf'] !== '') return (float)$a['nssf'] <=> (float)$b['nssf'];
+        if ($a['nssf'] !== '') return -1;
+        if ($b['nssf'] !== '') return 1;
+        return strcmp($a['name'], $b['name']);
+    });
+    $persons = array_values($persons);
+    $tot = ['count' => count($persons), 'workers' => 0, 'N' => 0, 'O' => 0, 'P' => 0, 'Q' => 0, 'R' => 0,
+            'aFin' => 0, 'aFam' => 0, 'aMal' => 0];
+    foreach ($persons as $p) {
+        $tot['workers'] += $p['worker'];
+        foreach (['N', 'O', 'P', 'Q', 'R'] as $k) $tot[$k] += $p[$k];
+    }
+    foreach ($monthly as $mm) { $tot['aFin'] += $mm['fin']; $tot['aFam'] += $mm['fam']; $tot['aMal'] += $mm['mal']; }
+    return ['persons' => $persons, 'monthly' => $monthly, 'totals' => $tot];
+}
+
+/** مجموعات المدارس حسب رقم الضمان الموحّد (لخيارات «مع بعضها») — [key => [ids...]] */
+function cnssSchoolGroups($db): array {
+    $groups = [];
+    foreach ($db->query("SELECT id, name_ar, nssf_employer_number FROM schools WHERE is_deleted=0 AND is_active=1 ORDER BY id")->fetchAll(PDO::FETCH_ASSOC) as $s) {
+        $k = cnssEmployerNumberKey($s['nssf_employer_number'] ?? '');
+        $groups[$k !== '' ? $k : ('id' . $s['id'])][] = $s;
+    }
+    return $groups;
+}
+
 /** 🔢 «كل الارقام اكتبو بالفرنسي» (2026-08-26): تحويل الأرقام العربية/الفارسية إلى فرنسية */
 function arabicDigitsFr($v) {
     return strtr((string)$v, ['٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9',
