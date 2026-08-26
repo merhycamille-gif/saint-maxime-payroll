@@ -98,13 +98,32 @@ if ($form === 'cnss_taswiya') {
         $tail = str_replace('</sheetData>', '', $tailM[0]);
         $tailShifted = $renum($tail, 48, 70, $delta);
         $x3 = str_replace($tailM[0], $clones . $tailShifted . '</sheetData>', $x3);
-        // مدى الورقة + مراجع الصيَغ المشتركة الممتدة (P8:P66 ⇒ P8:P86...) عولجت بالإزاحة أعلاه
+        // مدى الورقة
         $x3 = preg_replace('/<dimension ref="A1:T\d+"/', '<dimension ref="A1:T' . (70 + $delta) . '"', $x3, 1);
-        // صيَغ القالب انتقلت من أماكن calcChain — نحذفه ليعيد Excel بناءه بصمت
-        $zipTs->deleteName('xl/calcChain.xml');
-        $ct = (string)$zipTs->getFromName('[Content_Types].xml');
-        $zipTs->addFromString('[Content_Types].xml', str_replace('<Override PartName="/xl/calcChain.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"/>', '', $ct));
+        // 🔴 مراجع الصيَغ المشتركة («انت شوف وصلح» 2026-08-26 — Excel كان يعتبر ملف التوسّع
+        // معطوباً ويطلب «إصلاحاً» يخرّب التنسيق): مجموعة العدّاد A (si=1) رئيسها بالكتل غير
+        // المزاحة (ref="A17:A62") وأعضاؤها المزاحون صاروا بصفوف 368+ خارج المدى المعلن.
+        // نعيد كتابة مدى كل مجموعة مشتركة ليطابق أعضاءها الفعليين (أدنى صف : أعلى صف).
+        $siRows = [];
+        if (preg_match_all('#<c r="[A-Z]+(\d+)"[^>]*><f t="shared"[^>]* si="(\d+)"#', $x3, $siM, PREG_SET_ORDER)) {
+            foreach ($siM as $sm3) $siRows[$sm3[2]][] = (int)$sm3[1];
+        }
+        $x3 = preg_replace_callback('#(<f t="shared" ref=")([A-Z]+)(\d+):([A-Z]+)(\d+)(" si=")(\d+)(")#',
+            function ($rf) use ($siRows) {
+                $rows = $siRows[$rf[7]] ?? [];
+                if (!$rows) return $rf[0];
+                return $rf[1] . $rf[2] . min($rows) . ':' . $rf[4] . max($rows) . $rf[6] . $rf[7] . $rf[8];
+            }, $x3);
     }
+    // صيَغ تُجرَّد من القالب دائماً (D4 المكسورة بالتصريح، والمجموع العام عند التوسّع) —
+    // يُحذف calcChain مع أثريه بأنواع المحتوى والعلاقات (العلاقة اليتيمة وحدها كانت تكفي
+    // لتحذير «إصلاح» يخرّب التنسيق) ليعيد Excel بناءه بصمت عند الفتح
+    $zipTs->deleteName('xl/calcChain.xml');
+    $ct = (string)$zipTs->getFromName('[Content_Types].xml');
+    $zipTs->addFromString('[Content_Types].xml', str_replace('<Override PartName="/xl/calcChain.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"/>', '', $ct));
+    $relsWb = (string)$zipTs->getFromName('xl/_rels/workbook.xml.rels');
+    $relsWb2 = preg_replace('#<Relationship[^>]*Target="calcChain\.xml"[^>]*/>#', '', $relsWb);
+    if ($relsWb2 !== null && $relsWb2 !== $relsWb) $zipTs->addFromString('xl/_rels/workbook.xml.rels', $relsWb2);
 
     // === خانات الجدول الملحق ===
     // صفوف البيانات المتاحة بالترتيب: 8-26، 28-46، ثم صفوف الكتل المستنسخة
@@ -156,11 +175,12 @@ if ($form === 'cnss_taswiya') {
             unset($ag);
         }
     }
-    // مجاميع الكتل المستنسخة (حرفية — القالب الأصلي مجاميعه صيَغ تحسب نفسها)
+    // مجاميع الكتل المستنسخة (حرفية — القالب الأصلي مجاميعه صيَغ تحسب نفسها).
+    // 🎨 «انت شوف وصلح»: سطر مجموع ملفه (صف 47) لا يجمع خانات التواريخ (H..M غائبة عنده)
+    // — كتابتها كانت تطلع ##### وضجيج تواريخ؛ نكتب خاناته نفسها فقط: العدد/العمال/يوم/شهر/المبالغ
     foreach ($cloneSubtotals as $bi => $rn) {
-        $ag = $blockAgg[$bi] ?? array_fill_keys(['A', 'D', 'F', 'G', 'H', 'I', 'J', 'K', 'M', 'N', 'O', 'P', 'Q', 'R'], 0);
-        foreach ($ag as $cl => $v) $c3[$cl . $rn] = $v;
-        $c3['L' . $rn] = 0;
+        $ag = $blockAgg[$bi] ?? array_fill_keys(['A', 'D', 'F', 'G', 'N', 'O', 'P', 'Q', 'R'], 0);
+        foreach (['A', 'D', 'F', 'G', 'N', 'O', 'P', 'Q', 'R'] as $cl) $c3[$cl . $rn] = (int)($ag[$cl] ?? 0);
     }
     // المجموع العام: مع التوسّع صيغته (A67+A47+A27) لا تعرف الكتل الجديدة ⇒ قيم محسوبة
     if ($extraBlocks > 0) {
@@ -173,19 +193,69 @@ if ($form === 'cnss_taswiya') {
     }
     $x3f = phpFillSheetXmlCells($x3, $c3);
     if ($x3f === null) { $zipTs->close(); @unlink($tmpTs); http_response_code(500); exit('sheet3?'); }
+    // 🖨️ فواصل صفحات إجبارية بعد كل سطر «مجموع» («انت شوف وصلح»): كل كتلة 19 سطراً بصفحتها
+    // مهما كانت الطابعة — بدل الاعتماد على القسمة الطبيعية للورق (مقياس ملفه 83% كما هو)
+    $brkRows = array_merge([27, 47], $cloneSubtotals, [67 + $delta]);
+    $brkXml = '<rowBreaks count="' . count($brkRows) . '" manualBreakCount="' . count($brkRows) . '">';
+    foreach ($brkRows as $brk) $brkXml .= '<brk id="' . $brk . '" max="16383" man="1"/>';
+    $brkXml .= '</rowBreaks>';
+    if (strpos($x3f, '<rowBreaks') === false) {
+        // موضعها بعد headerFooter إن وُجد وإلا بعد pageSetup (ترتيب مخطط XML للورقة)
+        if (preg_match('#<headerFooter[^>]*(?:/>|>.*?</headerFooter>)#s', $x3f, $hfM)) {
+            $x3f = str_replace($hfM[0], $hfM[0] . $brkXml, $x3f);
+        } elseif (preg_match('#<pageSetup[^>]*/>#', $x3f, $psM)) {
+            $x3f = str_replace($psM[0], $psM[0] . $brkXml, $x3f);
+        }
+    }
     // كتابة قسرية فوق خلية صيغة (تجريدها وكتابة القيمة) — <f/> الذاتية الإغلاق تُجرَّب أولاً
     // حتى لا يبتلعها فرع <f>...</f> كوسمٍ مفتوح فيأكل الخلايا اللاحقة (علّة المجموع العام)
-    $tsForce = function ($xml, array $refVals) {
+    $tsForce = function ($xml, array $refVals, array $styleOverride = []) {
         foreach ($refVals as $ref => $v) {
             $xml = preg_replace_callback('#<c r="' . $ref . '"([^>]*)>(?:<f\b[^>]*/>|<f\b[^>]*>.*?</f>)?(?:<v>[^<]*</v>)?</c>#s',
-                function ($mF) use ($v, $ref) {
+                function ($mF) use ($v, $ref, $styleOverride) {
                     $attrs = preg_replace('/\s+t="[^"]*"/', '', $mF[1]);
-                    return '<c r="' . $ref . '"' . $attrs . '><v>' . $v . '</v></c>';
+                    if (isset($styleOverride[$ref])) {
+                        $attrs = preg_replace('/\s+s="\d+"/', '', $attrs) . ' s="' . $styleOverride[$ref] . '"';
+                    }
+                    if ($v === '' || $v === null) return '<c r="' . $ref . '"' . $attrs . '/>';
+                    if (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+(\.\d+)?$/', $v))) {
+                        return '<c r="' . $ref . '"' . $attrs . '><v>' . $v . '</v></c>';
+                    }
+                    $tTs = htmlspecialchars((string)$v, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+                    return '<c r="' . $ref . '"' . $attrs . ' t="inlineStr"><is><t xml:space="preserve">' . $tTs . '</t></is></c>';
                 }, $xml, 1);
         }
         return $xml;
     };
-    if ($force3) $x3f = $tsForce($x3f, array_intersect_key($c3, array_flip($force3)));
+    if ($force3) {
+        // 🎨 «انت شوف وصلح»: أرقام المجموع العام المدموج أعرض من أعمدة ملفه (12,4 مليار
+        // بعمود O كانت تطلع ############) — ستايل مستنسخ بـ«تصغير ليلائم» لخانات مبالغه فقط
+        $shrinkSid = null;
+        if (preg_match('#<c r="N' . $grandRow . '" s="(\d+)"#', $x3f, $gsM)) {
+            $styTs = (string)$zipTs->getFromName('xl/styles.xml');
+            if (preg_match('#<cellXfs count="(\d+)">(.*)</cellXfs>#s', $styTs, $cxM)
+                && preg_match_all('#<xf\b[^>]*(?:/>|>.*?</xf>)#s', $cxM[2], $xfM)
+                && isset($xfM[0][(int)$gsM[1]])) {
+                $baseXf = $xfM[0][(int)$gsM[1]];
+                if (strpos($baseXf, '<alignment') !== false) {
+                    $newXf = preg_replace('/<alignment\b(?![^>]*shrinkToFit)/', '<alignment shrinkToFit="1" ', $baseXf, 1);
+                } elseif (substr($baseXf, -2) === '/>') {
+                    $newXf = substr($baseXf, 0, -2) . ' applyAlignment="1"><alignment shrinkToFit="1"/></xf>';
+                } else {
+                    $newXf = preg_replace('#</xf>$#', '<alignment shrinkToFit="1"/></xf>', $baseXf, 1);
+                }
+                $shrinkSid = (int)$cxM[1];
+                $styTs2 = str_replace('<cellXfs count="' . $cxM[1] . '">', '<cellXfs count="' . ($shrinkSid + 1) . '">', $styTs);
+                $styTs2 = preg_replace('#</cellXfs>#', $newXf . '</cellXfs>', $styTs2, 1);
+                $zipTs->addFromString('xl/styles.xml', $styTs2);
+            }
+        }
+        $ovr = [];
+        if ($shrinkSid !== null) foreach (['N', 'O', 'P', 'Q', 'R'] as $gc) $ovr[$gc . $grandRow] = $shrinkSid;
+        $x3f = $tsForce($x3f, array_intersect_key($c3, array_flip($force3)), $ovr);
+        // بقايا معادلته الخاصة D69 (=D68-3) كانت تطبع رقماً شارداً تحت المجموع — تُفرَّغ
+        $x3f = $tsForce($x3f, ['D' . (69 + $delta) => '']);
+    }
     $zipTs->addFromString($sh3path, $x3f);
 
     // === التصريح الاسمي (أ): الشهور الاثنا عشر + الفروقات — والباقي صيَغ تقرأ من الملحق ===
@@ -199,6 +269,8 @@ if ($form === 'cnss_taswiya') {
     }
     $x4 = phpFillSheetXmlCells((string)$zipTs->getFromName($sh4path), $c4);
     if ($x4 !== null) {
+        // «انت شوف وصلح»: خانة «جانب صاحب العمل» بقالبه مرجعها مكسور (تطبع #REF!) — اسم المؤسسة محلها
+        $x4 = $tsForce($x4, ['D4' => $empName]);
         // مع التوسّع: صيَغ (ب) تشير إلى O68/Q68/R68 القديمة (صارت صف بيانات) ⇒ قيم محسوبة
         if ($extraBlocks > 0) {
             $t4 = $data['totals'];
@@ -221,6 +293,14 @@ if ($form === 'cnss_taswiya') {
     } elseif (strpos($wbxTs, '</sheets>') !== false) {
         $wb2Ts = str_replace('</sheets>', '</sheets><calcPr fullCalcOnLoad="1"/>', $wbxTs);
     } else { $wb2Ts = $wbxTs; }
+    // 🖨️ منطقة طباعة لورقة الرواتب A..R («انت شوف وصلح»): عمودا ملاحظات الطرفيان كانا
+    // يفيضان على صفحات شبه فارغة لحالهما (مقياس ملفه 83% لا يتسعهما) — بلا مسّ الشكل
+    if (strpos($wb2Ts, "localSheetId=\"2\">'") !== false || strpos($wb2Ts, '<definedNames>') !== false) {
+        $paTs = '<definedName name="_xlnm.Print_Area" localSheetId="2">\'الرواتب والاجور\'!$A$1:$R$' . (70 + $delta) . '</definedName>';
+        if (strpos($wb2Ts, '_xlnm.Print_Area" localSheetId="2"') === false && strpos($wb2Ts, '<definedNames>') !== false) {
+            $wb2Ts = str_replace('<definedNames>', '<definedNames>' . $paTs, $wb2Ts);
+        }
+    }
     if ($wb2Ts !== $wbxTs) $zipTs->addFromString('xl/workbook.xml', $wb2Ts);
     $zipTs->close();
 
