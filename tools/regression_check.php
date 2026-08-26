@@ -3537,6 +3537,35 @@ $of68 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('البيان العام للصندوق: عمود الرقم المالي للملاك = caisse_number (والمتعاقد رقم المالية)',
       strpos($of68, "\$isMlk ? (\$r['caisse_number'] ?? '') : \$r['finance_ministry_number']") !== false);
 
+/* =====================================================================
+ * 69) 🏦 أرقام الصندوق — ثانوية السيدة عبرا (2026-08-26): بيانها الرسمي PDF
+ *     (129 ملاكاً) يُستورَد بمحرّك caisseImportForSchool (تطبيع الأسماء +
+ *     ملفات الأب المجهول عند وحدانية الاسم + الملتبس لا يُكتب) — «بس خود
+ *     منه ارقام الصندوق للاساتذة».
+ * =================================================================== */
+check('عبرا: الشفاء والمحرّك موجودان وموصولان بالهيدر',
+      function_exists('healCaisseImportAbra20260826') && function_exists('caisseImportForSchool')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healCaisseImportAbra20260826();') !== false);
+$ab69 = $db->query("SELECT e.first_name_ar fn, e.father_name_ar fa, e.caisse_number cn FROM employees e
+    JOIN schools s ON s.id=e.school_id
+    WHERE s.name_ar LIKE 'مدرسة%ثانوية السيدة%' AND e.is_deleted=0
+      AND TRIM(e.first_name_ar)='ريتا' AND TRIM(e.last_name_ar)='حليحل'")->fetchAll(PDO::FETCH_ASSOC);
+$abRita = ['يوسف' => [], 'مارون' => [], '.' => []];
+foreach ($ab69 as $r) $abRita[trim((string)$r['fa'])][] = trim((string)$r['cn']);
+$abCnt69 = (int)$db->query("SELECT COUNT(*) FROM employees e JOIN schools s ON s.id=e.school_id
+    WHERE s.name_ar LIKE 'مدرسة%ثانوية السيدة%' AND e.is_deleted=0 AND TRIM(COALESCE(e.caisse_number,'')) <> ''")->fetchColumn();
+check('عبرا: ≥180 ملفاً برقم + ريتا حليحل تفرّقتا بالأب (يوسف=101141، مارون=130587) والملتبسة الأب فاضية',
+      $abCnt69 >= 180
+      && !array_diff($abRita['يوسف'] ?? ['x'], ['101141']) && in_array('101141', $abRita['يوسف'] ?? [], true)
+      && !array_diff($abRita['مارون'] ?? ['x'], ['130587'])
+      && !array_filter($abRita['.'] ?? []),
+      'معبّأ=' . $abCnt69 . ' · ريتا=' . json_encode($abRita, JSON_UNESCAPED_UNICODE));
+check('عبرا: تطبيع الأسماء (عطاالله=عطالله، جوزيف=جوزف، ميريللا=ميريلا)',
+      caisseNameNorm('عطاالله') === caisseNameNorm('عطالله')
+      && caisseNameNorm('جوزف') === caisseNameNorm('جوزيف')
+      && caisseNameNorm('ميريللا') === caisseNameNorm('ميريلا')
+      && caisseNameNorm('سعد الدين') === caisseNameNorm('سعدالدين'));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
