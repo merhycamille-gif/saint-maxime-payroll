@@ -12,8 +12,11 @@ if (!isAdmin() && ($_SERVER["REQUEST_METHOD"] === "POST" || preg_grep("/^(delete
 requireCsrf();
 
 $currentPage = 'social_security';
-$pageTitle = 'Plafonds CNSS / حدود الضمان';
+$pageTitle = 'Plafonds CNSS / حدود الضمان (القصوى والدنيا)';
 $db = getDB();
+// تركيب ذاتي (2026-08-26 «والحدود القصوى والحدود الادنى»): عمود الحد الأدنى المؤرّخ لكل فرع
+try { $db->query("SELECT min_salary_lbp FROM cnss_brackets LIMIT 1"); }
+catch (Exception $e) { try { $db->exec("ALTER TABLE cnss_brackets ADD COLUMN min_salary_lbp BIGINT NULL COMMENT 'الحد الأدنى للأجر الخاضع (فارغ = بلا حد أدنى)' AFTER max_salary_lbp"); } catch (Exception $e2) {} }
 $lang = $_SESSION['lang'] ?? 'fr';
 $message = ''; $messageType = 'success';
 
@@ -32,6 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($branch, $branches, true)) throw new Exception('فرع غير صالح');
 
             $max = ssNum($_POST['max_salary_lbp'] ?? '');           // فارغ = بلا سقف
+            $min = ssNum($_POST['min_salary_lbp'] ?? '');           // فارغ = بلا حد أدنى
+            if ($max !== null && $min !== null && $min > $max) throw new Exception('الحد الأدنى أكبر من الأقصى');
             $from = $_POST['effective_from'] ?: null;
             $to   = $_POST['effective_to'] ?: null;
             $notes = trim($_POST['notes'] ?? '');
@@ -39,11 +44,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $db->prepare("UPDATE cnss_brackets SET branch=?, max_salary_lbp=?, effective_from=?, effective_to=?, notes=? WHERE id=?")
-                   ->execute([$branch, $max, $from, $to, $notes, $id]);
+                $db->prepare("UPDATE cnss_brackets SET branch=?, max_salary_lbp=?, min_salary_lbp=?, effective_from=?, effective_to=?, notes=? WHERE id=?")
+                   ->execute([$branch, $max, $min, $from, $to, $notes, $id]);
             } else {
-                $db->prepare("INSERT INTO cnss_brackets (branch, max_salary_lbp, effective_from, effective_to, notes) VALUES (?,?,?,?,?)")
-                   ->execute([$branch, $max, $from, $to, $notes]);
+                $db->prepare("INSERT INTO cnss_brackets (branch, max_salary_lbp, min_salary_lbp, effective_from, effective_to, notes) VALUES (?,?,?,?,?,?)")
+                   ->execute([$branch, $max, $min, $from, $to, $notes]);
             }
             $nRec = recalcSalariesInRange($db, $from, $to); // إعادة حساب تلقائية للمدى المتأثّر
             $_SESSION['flash_success'] = "تم الحفظ، وأُعيد حساب $nRec راتب تلقائياً / Enregistré + $nRec recalculés";
@@ -86,8 +91,8 @@ include __DIR__ . '/../includes/header.php';
 <div class="alert alert-info">
     <i class="fas fa-info-circle"></i>
     <?= $lang === 'ar'
-        ? 'هنا تُدخل الحد الأقصى (السقف) للأجر الخاضع لاشتراك كل فرع من الضمان، مع فترة كل قيمة (من تاريخ إلى تاريخ). البرنامج يحسب الاشتراك على الأجر بشرط ألّا يتجاوز هذا السقف حسب شهر الراتب. اترك السقف فارغاً إذا لا يوجد سقف للفرع.'
-        : 'Définissez le plafond du salaire soumis à chaque branche CNSS, avec une période (du / au). Le calcul plafonne le salaire à cette valeur selon le mois. Laissez vide s\'il n\'y a pas de plafond.' ?>
+        ? 'هنا تُدخل الحد الأقصى (السقف) والحد الأدنى للأجر الخاضع لاشتراك كل فرع، مع فترة كل قيمة (من تاريخ إلى تاريخ) — كل مذكرة أو قانون جديد يصدر عن الدولة يُضاف صفاً مؤرّخاً جديداً بلا مسّ القديم. البرنامج يطبّق الحدود الساري مفعولها حسب شهر الراتب تلقائياً (وتسوية الضمان السنوية تسقف كل شهر بسقفه). اترك الخانة فارغة إذا لا حدّ للفرع.'
+        : 'Définissez le plafond et le minimum du salaire soumis à chaque branche, avec une période (du / au) — chaque circulaire de l\'État s\'ajoute comme nouvelle ligne datée. Le calcul applique les limites en vigueur selon le mois. Laissez vide s\'il n\'y a pas de limite.' ?>
 </div>
 
 <div class="card">
@@ -119,10 +124,14 @@ include __DIR__ . '/../includes/header.php';
                     <input type="date" name="effective_to" class="form-control" value="<?= e($editRow['effective_to'] ?? '') ?>">
                 </div>
             </div>
-            <div class="form-row cols-2">
+            <div class="form-row cols-3">
                 <div class="form-group">
                     <label class="form-label">Plafond (L.L) / الحد الأقصى <small>(vide = sans plafond / فارغ = بلا سقف)</small></label>
                     <input type="number" name="max_salary_lbp" class="form-control" min="0" value="<?= e($editRow['max_salary_lbp'] ?? '') ?>">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Minimum (L.L) / الحد الأدنى <small>(vide = sans minimum / فارغ = بلا حد أدنى)</small></label>
+                    <input type="number" name="min_salary_lbp" class="form-control" min="0" value="<?= e($editRow['min_salary_lbp'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label class="form-label">&nbsp;</label>
@@ -151,16 +160,18 @@ include __DIR__ . '/../includes/header.php';
             <thead><tr>
                 <th>Du / من</th><th>Au / إلى</th>
                 <th>Plafond / الحد الأقصى</th>
+                <th>Minimum / الحد الأدنى</th>
                 <th>Note / ملاحظة</th><th>Action / إجراء</th>
             </tr></thead>
             <tbody>
                 <?php if (empty($byBranch[$key])): ?>
-                    <tr><td colspan="5" class="text-muted">Aucun / لا يوجد</td></tr>
+                    <tr><td colspan="6" class="text-muted">Aucun / لا يوجد</td></tr>
                 <?php else: foreach ($byBranch[$key] as $r): ?>
                     <tr>
                         <td><?= formatDate($r['effective_from']) ?></td>
                         <td><?= $r['effective_to'] ? formatDate($r['effective_to']) : '<span class="badge badge-success">En cours / حتى الآن</span>' ?></td>
                         <td><?= $r['max_salary_lbp'] !== null ? '<strong>'.formatLBP($r['max_salary_lbp']).'</strong>' : '<span class="text-muted">sans plafond / بلا سقف</span>' ?></td>
+                        <td><?= ($r['min_salary_lbp'] ?? null) !== null ? '<strong>'.formatLBP($r['min_salary_lbp']).'</strong>' : '<span class="text-muted">—</span>' ?></td>
                         <td><small><?= e($r['notes']) ?></small></td>
                         <td style="white-space:nowrap">
                             <a href="?edit=<?= $r['id'] ?>" class="btn btn-sm btn-light"><i class="fas fa-edit"></i></a>

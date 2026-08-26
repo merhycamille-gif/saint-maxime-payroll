@@ -1540,6 +1540,13 @@ function cnssTaswiyaData($db, int $fy, array $schoolIds): array {
         $bfam = $ff > 0 ? (int)round((float)$r['f6'] / $ff) : 0;
         $ef = rateFrac('end_of_service_rate', $m, $fy, 8.5);
         $bfin = $ef > 0 ? (int)round((float)$r['e85'] / $ef) : 0;
+        // 🔴 «مجموع الاجور السنوية لكل فرع ضمن الحد الاقصى المعتمد — وبيتغير خلال السنة»
+        // (تنبيه المستخدم 2026-08-26): كل شهر يُسقَف بسقف فرعه الساري بتاريخه (جدول حدود
+        // الضمان المؤرّخ) حتى لو كان المخزّن قد حُسب قبل إدخال السقف — فالمجموع السنوي
+        // = مجموع الأشهر المسقوفة شهراً بشهر لا سقفاً واحداً ×12.
+        $bmal = (int)clampCnssBase($bmal, 'maladie_maternite', $m, $fy);
+        $bfam = (int)clampCnssBase($bfam, 'allocations_familiales', $m, $fy);
+        $bfin = (int)clampCnssBase($bfin, 'fin_de_service', $m, $fy);
         $nssfDigits = preg_replace('/[^0-9]/', '', arabicDigitsFr($r['nssf_number'] ?? ''));
         if ($nssfDigits !== '' && !preg_match('/[1-9]/', $nssfDigits)) $nssfDigits = ''; // «0» الخردة ليست رقم ضمان
         $key = strlen($nssfDigits) >= 3 ? 'n' . $nssfDigits
@@ -1591,6 +1598,31 @@ function cnssTaswiyaData($db, int $fy, array $schoolIds): array {
     }
     foreach ($monthly as $mm) { $tot['aFin'] += $mm['fin']; $tot['aFam'] += $mm['fam']; $tot['aMal'] += $mm['mal']; }
     return ['persons' => $persons, 'monthly' => $monthly, 'totals' => $tot];
+}
+
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-08-26): السقفان التاريخيان لفرع التعويضات العائلية
+ * من تسوية الضمان الرسمية 2025 لمكسيموس نفسها (حنا 6 أشهر × 12م = 72م، ودايخ
+ * 6×12م + 6×18م = 180م): 12م حتى 2025-06-30 ثم 18م حتى ما قبل سقف المستخدم
+ * الحالي (28م من 2026-05-01). لا يُزرَع إلا إذا ما في أي سقف عائلي يغطي 2025
+ * (فلا يدهس إدخالاً يدوياً)، والفرعان بلا سقف (نهاية الخدمة/الصندوق) لا يُمسّان.
+ */
+function healCnssFamilyCeilings20260826() {
+    try {
+        if (getSetting('heal_cnss_family_ceilings_20260826', '') !== '') return;
+        $db = getDB();
+        $n = (int)$db->query("SELECT COUNT(*) FROM cnss_brackets WHERE branch='allocations_familiales'
+            AND effective_from <= '2025-12-31' AND (effective_to IS NULL OR effective_to >= '2025-01-01')")->fetchColumn();
+        if ($n === 0) {
+            $ins = $db->prepare("INSERT INTO cnss_brackets (branch, max_salary_lbp, effective_from, effective_to, notes)
+                VALUES ('allocations_familiales', ?, ?, ?, ?)");
+            $ins->execute([12000000, '2025-01-01', '2025-06-30', 'السقف التاريخي — من تسوية الضمان الرسمية 2025 (زُرع تلقائياً 2026-08-26)']);
+            $ins->execute([18000000, '2025-07-01', '2026-04-30', 'السقف التاريخي — من تسوية الضمان الرسمية 2025 (زُرع تلقائياً 2026-08-26)']);
+            setSetting('heal_cnss_family_ceilings_20260826', 'done: seeded 12m+18m');
+        } else {
+            setSetting('heal_cnss_family_ceilings_20260826', 'skip: يوجد سقف عائلي يغطي 2025 (' . $n . ')');
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
 /** مجموعات المدارس حسب رقم الضمان الموحّد (لخيارات «مع بعضها») — [key => [ids...]] */
@@ -3180,6 +3212,11 @@ function clampCnssBase($base, $branch, $month = null, $year = null) {
     if (!$b) return $base;
     if ($b['max_salary_lbp'] !== null && $base > (float)$b['max_salary_lbp']) {
         $base = (float)$b['max_salary_lbp'];
+    }
+    // الحد الأدنى المؤرّخ («والحدود الادنى» 2026-08-26): أجر خاضع فعلي أدنى من الحدّ ⇒ يُرفع
+    // إليه (الاشتراك يُحسب على الحد الأدنى). لا يسري على غير الخاضع أصلاً (base=0).
+    if (($b['min_salary_lbp'] ?? null) !== null && $base > 0 && $base < (float)$b['min_salary_lbp']) {
+        $base = (float)$b['min_salary_lbp'];
     }
     return $base;
 }

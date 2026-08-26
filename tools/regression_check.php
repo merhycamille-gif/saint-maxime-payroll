@@ -3691,12 +3691,56 @@ if ($grp72) {
           && preg_match('#<c r="R' . $grandG . '"[^>]*><v>' . (int)$ts272['totals']['R'] . '</v></c>#', $sh3g) === 1,
           'أجراء المجموعة=' . $needG . ' كتل إضافية=' . $extraG);
 }
+// 🔴 «مجموع الاجور السنوية لكل فرع ضمن الحد الاقصى — وبيتغير خلال السنة» (2026-08-26):
+// كل شهر يُسقَف بسقفه المؤرّخ، والسقفان التاريخيان للعائلي مزروعان من تسويته الرسمية
+check('تسوية الضمان: سقف العائلي مؤرّخ (12م حتى 6/2025 ثم 18م ثم 28م من 5/2026) + الشفاء موصول',
+      (float)(getCnssBracket('allocations_familiales', 3, 2025)['max_salary_lbp'] ?? 0) === 12000000.0
+      && (float)(getCnssBracket('allocations_familiales', 10, 2025)['max_salary_lbp'] ?? 0) === 18000000.0
+      && (float)(getCnssBracket('allocations_familiales', 3, 2026)['max_salary_lbp'] ?? 0) === 18000000.0
+      && (float)(getCnssBracket('allocations_familiales', 6, 2026)['max_salary_lbp'] ?? 0) === 28000000.0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healCnssFamilyCeilings20260826();') !== false);
+$tsC72 = cnssTaswiyaData($db, 2025, [2]);
+check('تسوية الضمان: العائلي الشهري مسقوف شهراً بشهر طبق ملفه الرسمي (1-6/2025 = 24م و7-12 = 18م)',
+      (int)$tsC72['monthly'][3]['fam'] === 24000000 && (int)$tsC72['monthly'][10]['fam'] === 18000000
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "clampCnssBase(\$bfam, 'allocations_familiales', \$m, \$fy)") !== false,
+      'شهر3=' . $tsC72['monthly'][3]['fam'] . ' شهر10=' . $tsC72['monthly'][10]['fam']);
 $tsHtml72 = renderPage('pages/official_forms.php', ['form' => 'cnss_taswiya', 'fy' => '2025', 'ts_schools' => ['2']], [], [2]);
 check('تسوية الضمان: الشاشة تعرض المعاينة والاختيار الحر وزر الملف الرسمي',
       strpos($tsHtml72, 'المدارس المشمولة بالتسوية') !== false
       && strpos($tsHtml72, 'form=cnss_taswiya&amp;fy=2025&amp;schools=2') !== false
       && strpos($tsHtml72, 'الجدول الملحق') !== false
       && strpos($tsHtml72, 'اشتراكات التسوية') !== false);
+
+/* =====================================================================
+ * 73) 🏛️ قوانين الدولة (2026-08-26): «الضمان وضريبة الدخل وصندوق التعويضات
+ *     كل واحد مستقل لحالو... والنسب المئوية والحدود القصوى والحدود الادنى»
+ *     — صفحة أركان ثلاثة + عمود الحد الأدنى المؤرّخ بحدود الفروع ويطبّقه المحرّك.
+ * =================================================================== */
+$sl73 = renderPage('pages/state_laws.php', [], []);
+check('قوانين الدولة: صفحة الأركان الثلاثة المستقلة (نسب + حدود قصوى ودنيا + شطور) مربوطة بالقائمة',
+      strpos($sl73, 'الضمان الاجتماعي — مستقل لحاله') !== false
+      && strpos($sl73, 'صندوق التعويضات (الهيئة التعليمية) — مستقل لحاله') !== false
+      && strpos($sl73, 'ضريبة الدخل (الباب الثاني') !== false
+      && strpos($sl73, 'الحد الأدنى') !== false && strpos($sl73, 'الشطور المؤرّخة') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'pages/state_laws.php') !== false);
+renderPage('pages/social_security.php', [], []); // يركّب عمود الحد الأدنى إن لم يوجد
+$min73 = $db->query("SHOW COLUMNS FROM cnss_brackets LIKE 'min_salary_lbp'")->fetch();
+check('الحد الأدنى المؤرّخ: العمود مركّب ذاتياً + صفحة الحدود تحفظه وتعرضه',
+      $min73 !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/social_security.php'), 'min_salary_lbp') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/social_security.php'), 'الحد الأدنى أكبر من الأقصى') !== false);
+// المحرّك يطبّق الحد الأدنى المؤرّخ: نجرّب بسطر مؤقت على فرع الصندوق بفترة ماضية بعيدة خالية
+$db->exec("DELETE FROM cnss_brackets WHERE branch='eoc' AND effective_from='1990-01-01'");
+$db->exec("INSERT INTO cnss_brackets (branch, max_salary_lbp, min_salary_lbp, effective_from, effective_to, notes)
+           VALUES ('eoc', 900, 100, '1990-01-01', '1990-12-31', 'فحص regression مؤقت')");
+$clampLo = clampCnssBase(50, 'eoc', 6, 1990);
+$clampHi = clampCnssBase(5000, 'eoc', 6, 1990);
+$clampZero = clampCnssBase(0, 'eoc', 6, 1990);
+$clampOut = clampCnssBase(50, 'eoc', 6, 1991);
+$db->exec("DELETE FROM cnss_brackets WHERE branch='eoc' AND effective_from='1990-01-01'");
+check('المحرّك يطبّق الحدود المؤرّخة الاثنين: الأدنى يرفع (50→100) والأقصى يسقف (5000→900) وغير الخاضع (0) لا يُرفع وخارج الفترة لا يسري',
+      (float)$clampLo === 100.0 && (float)$clampHi === 900.0 && (float)$clampZero === 0.0 && (float)$clampOut === 50.0,
+      "lo=$clampLo hi=$clampHi z=$clampZero out=$clampOut");
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

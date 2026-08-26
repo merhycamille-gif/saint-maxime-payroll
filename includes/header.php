@@ -31,6 +31,7 @@ healCaisseImport20260826(); // شفاء ذاتي مرّة واحدة: استير
 healCaisseImportAbra20260826(); // شفاء ذاتي مرّة واحدة: استيراد أرقام صندوق التعويضات لأساتذة ثانوية السيدة-عبرا من بيانها الرسمي (129 ملاكاً — «بس ارقام الصندوق») (2026-08-26)
 healCaisseImport4Schools20260826(); // شفاء ذاتي مرّة واحدة: أرقام الصندوق لأربع مدارس — النياح/ابلح 17 + الانتقال/الفرزل 14 + النجاة/الحدث 24 + البشارة/جون 19 («شوف ابلح فرزل حدث جون» 2026-08-26)
 healFrenchDigits20260826(); // شفاء ذاتي مرّة واحدة: كل خانات الأرقام الرسمية والهواتف بأرقام فرنسية + مسح الكلام المحشور («كل الارقام اكتبو بالفرنسي» — p1 ميلي طنوس 2026-08-26)
+healCnssFamilyCeilings20260826(); // شفاء ذاتي مرّة واحدة: السقفان التاريخيان للتعويضات العائلية 12م ثم 18م من تسوية 2025 الرسمية («الحد الاقصى بيتغير خلال السنة» 2026-08-26)
 
 $currentPage = $currentPage ?? '';
 $pageTitle = $pageTitle ?? 'MSA Payroll';
@@ -245,6 +246,11 @@ document.addEventListener('submit', function (e) {
             <a href="<?= BASE_URL ?>pages/exchange_rates.php" class="<?= $currentPage === 'rates' ? 'active' : '' ?>">
                 <i class="fas fa-coins"></i>
                 <span>Taux de change / أسعار الصرف</span>
+            </a>
+
+            <a href="<?= BASE_URL ?>pages/state_laws.php" class="<?= $currentPage === 'state_laws' ? 'active' : '' ?>">
+                <i class="fas fa-scale-balanced"></i>
+                <span>Lois de l'État / قوانين الدولة</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/social_security.php" class="<?= $currentPage === 'social_security' ? 'active' : '' ?>">
