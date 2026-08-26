@@ -3566,6 +3566,37 @@ check('عبرا: تطبيع الأسماء (عطاالله=عطالله، جوز
       && caisseNameNorm('ميريللا') === caisseNameNorm('ميريلا')
       && caisseNameNorm('سعد الدين') === caisseNameNorm('سعدالدين'));
 
+/* =====================================================================
+ * 70) 🏦 أرقام الصندوق — أربع مدارس («شوف ابلح فرزل حدث جون» 2026-08-26):
+ *     النياح/ابلح 17 + الانتقال/الفرزل 14 + النجاة/الحدث 24 + البشارة/جون 19
+ *     بشفاء واحد + احتياط الأب↔الشهرة المعكوسين بالمحرّك (تيا ديب/نخلة).
+ * =================================================================== */
+check('الأربع مدارس: الشفاء موجود وموصول بالهيدر',
+      function_exists('healCaisseImport4Schools20260826')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healCaisseImport4Schools20260826();') !== false);
+$c70 = function($like, $fn, $fa, $ln) use ($db) {
+    $q = $db->prepare("SELECT TRIM(COALESCE(e.caisse_number,'')) FROM employees e JOIN schools s ON s.id=e.school_id
+        WHERE s.name_ar LIKE ? AND e.is_deleted=0
+          AND TRIM(e.first_name_ar)=? AND TRIM(e.father_name_ar)=? AND TRIM(e.last_name_ar)=? LIMIT 1");
+    $q->execute([$like, $fn, $fa, $ln]);
+    return (string)$q->fetchColumn();
+};
+$n70 = function($like) use ($db) {
+    $q = $db->prepare("SELECT COUNT(DISTINCT e.caisse_number) FROM employees e JOIN schools s ON s.id=e.school_id
+        WHERE s.name_ar LIKE ? AND e.is_deleted=0 AND TRIM(COALESCE(e.caisse_number,'')) NOT IN ('','0')");
+    $q->execute([$like]);
+    return (int)$q->fetchColumn();
+};
+check('الأربع مدارس: عيّنة رقم صح بكل مدرسة + عدد الأرقام المميزة = عدد بيانها',
+      $c70('%سيدة النياح%', 'جوسلين', 'يوسف', 'عازار') === '36967' && $n70('%سيدة النياح%') === 17
+      && $c70('%سيدة الانتقال%', 'وفاء', 'توفيق', 'مهنا') === '14887' && $n70('%سيدة الانتقال%') === 14
+      && $c70('%سيدة النجاة%', 'جونا', 'فادي', 'زوبا') === '130695' && $n70('%سيدة النجاة%') === 24
+      && $n70('مدرسة%سيدة البشارة%') === 19,
+      'مميزة: نياح=' . $n70('%سيدة النياح%') . ' انتقال=' . $n70('%سيدة الانتقال%')
+      . ' نجاة=' . $n70('%سيدة النجاة%') . ' بشارة=' . $n70('مدرسة%سيدة البشارة%'));
+check('احتياط الأب↔الشهرة المعكوسين: تيا (البشارة) أخذت 133694 رغم انعكاس ديب/نخلة بملفها',
+      $c70('مدرسة%سيدة البشارة%', 'تيا', 'ديب', 'نخلة') === '133694');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
