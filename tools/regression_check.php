@@ -3941,6 +3941,37 @@ check('البشارة: كشف تشرين للمتعاقدين والموظفين
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healBecharaCw20260827') !== false,
       "n={$bcw76['n']} net={$bcw76['net']}");
 
+/* =====================================================================
+ * 77) 🏫 سيدة الانتقال-زحلة (2026-08-27 مساءً): «المتعاقد والموظف صحح» —
+ *     كشفه (13 متعاقداً + 4 موظفين، مجموع 762,850,410): 5 متعاقدين كانوا «ملاك»
+ *     خطأً حُوِّلوا وضُبطوا بقيم الكشف، وكلاريتا وبول غير الخاضعين شيلوا بالنمط.
+ * =================================================================== */
+healEntikalCw20260827();
+$ent77 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة الانتقال%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+$ecw77 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
+    FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.school_id=$ent77 AND e.employee_type <> 'enseignant_titulaire' AND ms.year=2025 AND ms.month=10")->fetch();
+check('الانتقال: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم (17 شخصاً، صافي 649,450,410 + نقل 113,400,000 = مجموع 762,850,410)',
+      (int)$ecw77['n'] === 17 && (float)$ecw77['net'] === 649450410.0
+      && (float)$ecw77['tr'] === 113400000.0 && (float)$ecw77['due'] === 762850410.0,
+      "n={$ecw77['n']} net={$ecw77['net']}");
+$who77 = function (string $first, string $last) use ($db, $ent77) {
+    $st = $db->prepare("SELECT e.id, e.employee_type FROM employees e WHERE e.school_id=$ent77 AND e.is_deleted=0
+        AND e.first_name_ar LIKE ? AND e.last_name_ar LIKE ? ORDER BY (SELECT COUNT(*) FROM monthly_salaries ms
+        WHERE ms.employee_id=e.id AND (ms.year*100+ms.month) BETWEEN 202510 AND 202609) DESC LIMIT 1");
+    $st->execute([$first . '%', '%' . $last . '%']);
+    return $st->fetch() ?: ['id'=>0,'employee_type'=>''];
+};
+$samir77 = $who77('سمير', 'اعزان'); $almas77 = $who77('الماس', 'فرح'); $clarita77 = $who77('كلاريتا', 'مساعد');
+$samOct77 = $db->query("SELECT net_salary_lbp nt, income_tax_lbp tx FROM monthly_salaries WHERE employee_id=" . (int)$samir77['id'] . " AND year=2025 AND month=10")->fetch();
+$clRows77 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=" . (int)$clarita77['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetchColumn();
+check('الانتقال: الخمسة صاروا متعاقدين حسب كشفه (الماس فرح وسمير اعزان نموذجاً) وسمير على ضريبة تنزيله العائلي (155,000 وصافي 47,375,000) + كلاريتا بلا أشهر + الشفاء موصول',
+      $almas77['employee_type'] === 'enseignant_contractuel' && $samir77['employee_type'] === 'enseignant_contractuel'
+      && (float)$samOct77['nt'] === 47375000.0 && (float)$samOct77['tx'] === 155000.0
+      && $clRows77 === 0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healEntikalCw20260827') !== false,
+      "سمير net={$samOct77['nt']} tax={$samOct77['tx']} كلاريتا=$clRows77");
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
