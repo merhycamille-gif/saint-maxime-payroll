@@ -1969,6 +1969,84 @@ function healAbraFixes20260827() {
 }
 
 /**
+ * 🏫 شفاء ذاتي مرّة واحدة (2026-08-27 مساءً): متعاقدو وموظفو عبرا الخاضعون على كشفه
+ * (a1..a4 — تشرين الأول 2025-2026: 24 متعاقداً + 28 موظفاً): كل الـ52 طلعوا مطابقين
+ * بالصافي والنقل بالمليم. بقراره الصريح («صحح» + «شيل غير الخاضعين متل النجاة»):
+ *  - فيوليت الحمصي وتريز حبقوق: تصحيح تقسيم الأساسي/السلفة فقط على كشفه (تريز
+ *    2,600,000+100م · فيوليت 2,225,000+78م) — المجموع والصافي لا يتغيّران، والتعديل
+ *    يصيب فقط الأشهر التي مجموعها = مجموع الكشف (صمّام أمان لاختلاف تقسيم بعض الأشهر).
+ *  - حذف أشهر 2025-2026 لغير الخاضعين الـ11 الزائدين عن الكشف (ضمان+ضريبة=0 بكل
+ *    السنة — شرط حماية لا يمسّ خاضعاً) مع نسخ للصفوف في _ms_bk_abra20260827.
+ *  - تينا شربل ايوب (خاضعة، دخلت 1/11/2025) تبقى — ويُحذف صف تشرين الوهمي
+ *    عندها (نقل بلا راتب، غير مدفوع) كنمط جيسيكا كنعان بالنجاة.
+ */
+function healAbraCw20260827() {
+    try {
+        if (getSetting('heal_abra_cw_20260827', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة ثانوية السيدة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) return;
+        $sid = (int)$sid;
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_abra20260827 LIKE monthly_salaries");
+        $byName = [];
+        foreach ($db->query("SELECT e.id, e.employee_type, e.first_name_ar, e.last_name_ar,
+                (SELECT COUNT(*) FROM monthly_salaries ms WHERE ms.employee_id = e.id
+                   AND (ms.year*100+ms.month) BETWEEN 202510 AND 202609) AS yr_rows
+            FROM employees e WHERE e.school_id = $sid")->fetchAll(PDO::FETCH_ASSOC) as $e) {
+            $byName[caisseNameNorm($e['first_name_ar'] . ' ' . $e['last_name_ar'])][] = $e;
+        }
+        $done = [];
+        // (١) تقسيم فيوليت وتريز على الكشف — الأشهر التي مجموعها مطابق فقط
+        $SPLIT = [
+            'فيوليت الحمصي' => [2225000, 78000000],
+            'تريز حبقوق'    => [2600000, 100000000],
+        ];
+        foreach ($SPLIT as $name => [$base, $prime]) {
+            $cands = array_values(array_filter($byName[caisseNameNorm($name)] ?? [], fn($x) => (int)$x['yr_rows'] > 0));
+            if (count($cands) !== 1) { $done[] = "تقسيم $name: غايب/ملتبس"; continue; }
+            $id = (int)$cands[0]['id'];
+            $db->exec("INSERT IGNORE INTO _ms_bk_abra20260827 SELECT * FROM monthly_salaries
+                       WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+            $st = $db->prepare("UPDATE monthly_salaries SET base_salary_lbp=?, echelon_value_lbp=0,
+                    base_plus_echelon_lbp=?, prime_fixe_lbp=?, echelon_to_caisse_lbp=0, eoc_grade_lbp=0
+                WHERE employee_id=? AND (year*100+month) BETWEEN 202510 AND 202609
+                  AND (base_plus_echelon_lbp + prime_fixe_lbp) = ?");
+            $st->execute([$base, $base, $prime, $id, $base + $prime]);
+            $db->prepare("UPDATE employee_bonuses SET amount=?, value_type='amount', currency='LBP'
+                WHERE employee_id=? AND bonus_type='prime_fixe' AND school_year='2025-2026'")->execute([$prime, $id]);
+            $done[] = "تقسيم $name=$id (أشهر " . $st->rowCount() . ")";
+        }
+        // (٢) غير الخاضعين الزائدون عن كشفه — بأمره «شيل غير الخاضعين متل النجاة»
+        $REMOVE = [['بلال','اسعد'],['مرسال','سلوم'],['جورج','خلف'],['وليد','حليحل'],['جان','الياس داود'],
+                   ['جوزيف','الاسمر'],['منى','حليحل'],['جوزيف','بولس'],['سهام','حليحل'],['جومانا','متى'],['ويلده','عيد']];
+        $removed = 0; $skip = [];
+        foreach ($REMOVE as [$fn, $ln]) {
+            foreach ($byName[caisseNameNorm($fn . ' ' . $ln)] ?? [] as $e) {
+                if (!in_array($e['employee_type'], ['enseignant_contractuel','employe'], true)) continue; // الملاك محميّون
+                if ((int)$e['yr_rows'] === 0) continue;
+                $id = (int)$e['id'];
+                $subj = $db->query("SELECT COALESCE(SUM(cnss_amount_lbp),0)+COALESCE(SUM(income_tax_lbp),0)
+                    FROM monthly_salaries WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609")->fetchColumn();
+                if ((float)$subj != 0.0) { $skip[] = "$fn $ln#$id"; continue; } // خاضع ⇒ لا يُمسّ
+                $db->exec("INSERT IGNORE INTO _ms_bk_abra20260827 SELECT * FROM monthly_salaries
+                           WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+                $removed += (int)$db->exec("DELETE FROM monthly_salaries
+                           WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+            }
+        }
+        // (٣) صف تشرين الوهمي عند تينا ايوب (نقل بلا راتب، غير مدفوع) — تبقى هي من 1/11
+        foreach ($byName[caisseNameNorm('تينا ايوب')] ?? [] as $e) {
+            $id = (int)$e['id'];
+            $db->exec("INSERT IGNORE INTO _ms_bk_abra20260827 SELECT * FROM monthly_salaries
+                       WHERE employee_id=$id AND year=2025 AND month=10 AND net_salary_lbp=0 AND is_paid=0");
+            $db->exec("DELETE FROM monthly_salaries WHERE employee_id=$id AND year=2025 AND month=10 AND net_salary_lbp=0 AND is_paid=0");
+        }
+        setSetting('heal_abra_cw_20260827', 'done: ' . implode('؛', $done) . ' | removedRows=' . $removed
+            . ($skip ? ' skip=' . implode('؛', $skip) : ''));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/**
  * 🏛️ تسوية الضمان السنوية طبق الأصل («تسوية الضمان 2025 القديس مكسيموس.xlsx» — 2026-08-26):
  * بيانات الجدول الملحق «الرواتب والاجور» + التصريح الاسمي (أ) الشهري، لسنة ميلادية
  * ولمجموعة مدارس تُختار بحرّية (خاصة ذوات رقم الضمان المشترك — تسوية واحدة للمؤسسة).

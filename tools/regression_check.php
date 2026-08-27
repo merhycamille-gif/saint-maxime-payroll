@@ -3885,6 +3885,26 @@ check('عبرا: فيوليت الحمصي وتريز حبقوق «اساتذة 
       $vio75['employee_type'] === 'enseignant_contractuel' && $ter75['employee_type'] === 'enseignant_contractuel'
       && (float)$db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id=" . (int)$vio75['id'] . " AND year=2025 AND month=10")->fetchColumn() === 76709250.0
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraFixes20260827') !== false);
+// كشف متعاقدي وموظفي عبرا (a1..a4): 52/52 مطابقون — بعد حذف غير الخاضعين بقراره،
+// مجموع تشرين لغير الملاك = سطر مجموع كشفه بالمليم + تقسيم فيوليت/تريز على الكشف
+healAbraCw20260827();
+$cw75 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
+    FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.school_id=$abra75 AND e.employee_type <> 'enseignant_titulaire' AND ms.year=2025 AND ms.month=10")->fetch();
+check('عبرا: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم (52 شخصاً، صافي 2,063,543,770 + نقل 376,200,000 = مجموع 2,439,743,770) بعد حذف غير الخاضعين الـ11 بقراره',
+      (int)$cw75['n'] === 52 && (float)$cw75['net'] === 2063543770.0
+      && (float)$cw75['tr'] === 376200000.0 && (float)$cw75['due'] === 2439743770.0,
+      "n={$cw75['n']} net={$cw75['net']}");
+$terSplit75 = $db->query("SELECT base_plus_echelon_lbp be, prime_fixe_lbp p, net_salary_lbp nt FROM monthly_salaries WHERE employee_id=" . (int)$ter75['id'] . " AND year=2025 AND month=10")->fetch();
+$vioSplit75 = $db->query("SELECT base_plus_echelon_lbp be, prime_fixe_lbp p, net_salary_lbp nt FROM monthly_salaries WHERE employee_id=" . (int)$vio75['id'] . " AND year=2025 AND month=10")->fetch();
+$bilal75 = $who75('بلال', 'علي', 'اسعد');
+$bilalRows75 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=" . (int)$bilal75['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetchColumn();
+check('عبرا: تقسيم تريز 2,600,000+100م وفيوليت 2,225,000+78م متل كشفه والصافي ما تغيّر + غير الخاضعين انشالوا (بلال اسعد بلا أشهر) + الشفاء موصول',
+      (float)$terSplit75['be'] === 2600000.0 && (float)$terSplit75['p'] === 100000000.0 && (float)$terSplit75['nt'] === 97518000.0
+      && (float)$vioSplit75['be'] === 2225000.0 && (float)$vioSplit75['p'] === 78000000.0 && (float)$vioSplit75['nt'] === 76709250.0
+      && $bilalRows75 === 0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraCw20260827') !== false,
+      "تريز={$terSplit75['be']}/{$terSplit75['p']} بلال=$bilalRows75");
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
