@@ -1647,6 +1647,42 @@ function healNajatSheet20260827() {
 }
 
 /**
+ * 🔘 شفاء ذاتي مرّة واحدة (2026-08-27): «طفي» — بأمر المستخدم بعد مطابقة كشفَي النجاة:
+ * مفتاح «تنزيل الأولاد بالضريبة» (grant_children_addition) يُطفأ عند ديانا شرو وكارين
+ * السكاف (متعاقدتا سيدة النجاة) — كان مضوّى من قراءة إخراجات القيد بآب، وكشف 2025-2026
+ * المدفوع يعطيهما تنزيل العازب فقط، فبقراره يبقى مطفأً للسنين الآتية أيضاً حتى يضويه هو.
+ * (أولادهما المؤرَّخون بemployee_children باقون — التضوية لاحقاً تعيد كل شيء.)
+ */
+function healNajatGcaOff20260827() {
+    try {
+        if (getSetting('heal_najat_gca_off_20260827', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة النجاة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) return;
+        $sid = (int)$sid;
+        $done = [];
+        foreach ([['ديانا', 'شرو'], ['كارين', 'السكاف']] as [$fn, $ln]) {
+            $st = $db->prepare("SELECT e.id,
+                    (SELECT COUNT(*) FROM monthly_salaries ms WHERE ms.employee_id = e.id
+                       AND (ms.year*100+ms.month) BETWEEN 202510 AND 202609) yr
+                FROM employees e
+                WHERE e.school_id = $sid AND e.is_deleted = 0 AND e.employee_type = 'enseignant_contractuel'
+                  AND e.first_name_ar LIKE ? AND e.last_name_ar LIKE ?
+                ORDER BY yr DESC LIMIT 1");
+            $st->execute([$fn . '%', '%' . $ln . '%']);
+            $id = (int)$st->fetchColumn();
+            if (!$id) continue;
+            $db->exec("UPDATE employees SET grant_children_addition = 0 WHERE id = $id");
+            // أي سنين لاحقة مخزّنة تُعاد على المفتاح الجديد (2025-2026 المطابقة للكشف لا تتأثر
+            // — أساسهما صفر بالإعداد فمسار إعادة الحساب يركّب العلاوات فقط ولا يمسّ الضريبة المخزّنة)
+            try { recalcEmployeeYear($id, null); } catch (Throwable $ex) {}
+            $done[] = "$fn $ln=$id";
+        }
+        setSetting('heal_najat_gca_off_20260827', 'done: ' . implode('؛', $done));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/**
  * 🏛️ تسوية الضمان السنوية طبق الأصل («تسوية الضمان 2025 القديس مكسيموس.xlsx» — 2026-08-26):
  * بيانات الجدول الملحق «الرواتب والاجور» + التصريح الاسمي (أ) الشهري، لسنة ميلادية
  * ولمجموعة مدارس تُختار بحرّية (خاصة ذوات رقم الضمان المشترك — تسوية واحدة للمؤسسة).

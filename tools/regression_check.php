@@ -3816,6 +3816,13 @@ check('النجاة «طابق نفس الاسماء»: غير الخاضعين 
       && (int)$db->query("SELECT COUNT(*) FROM _ms_bk_najat20260827")->fetchColumn() > 0
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNajatSheet20260827') !== false,
       "قاصوف={$aline74['yr']} كنعان={$jes74['yr']}");
+healNajatGcaOff20260827();
+$diana74 = $who74('ديانا', 'شرو'); $karin74 = $who74('كارين', 'السكاف');
+$gca74 = $db->query("SELECT SUM(grant_children_addition) FROM employees WHERE id IN (" . (int)$diana74['id'] . "," . (int)$karin74['id'] . ")")->fetchColumn();
+check('النجاة «طفي» (2026-08-27): مفتاح تنزيل الأولاد مطفأ عند ديانا شرو وكارين السكاف (كشف 2025-2026 المدفوع بتنزيل العازب فقط) والشفاء موصول بالهيدر',
+      (int)$gca74 === 0 && (int)$diana74['id'] > 0 && (int)$karin74['id'] > 0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNajatGcaOff20260827') !== false,
+      "gca_sum=$gca74");
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
