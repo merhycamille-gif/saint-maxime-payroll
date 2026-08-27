@@ -3847,6 +3847,33 @@ check('النجاة — الشفاء التكميلي يخلق الشهر الن
       $fillOk74 && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNajatSheetFill20260827') !== false,
       $pamRow74 ? 'أُعيد خلق تشرين ٢' : 'صف باميلا الأصلي غائب');
 
+/* =====================================================================
+ * 75) 🏫 تدقيق ملاك عبرا على كشفه (2026-08-27 مساءً): «شيك على رواتب الملاك
+ *     مدرسة السيدة عبرا» — 102/131 مطابقين؛ بقراره الصريح: تصليح ريتا مارون
+ *     حليحل (أخذت سلفة ريتا يوسف 138م ⇒ 80م) وماريا الياس حليحل (سلفة صفر ⇒
+ *     53م) على الكشف بالمليم + فيوليت الحمصي وتريز حبقوق «اساتذة تعاقد».
+ * =================================================================== */
+healAbraFixes20260827();
+$abra75 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة ثانوية السيدة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+$who75 = function (string $first, string $father, string $last) use ($db, $abra75) {
+    $st = $db->prepare("SELECT e.id, e.employee_type FROM employees e
+        WHERE e.school_id=$abra75 AND e.is_deleted=0 AND e.first_name_ar LIKE ? AND e.father_name_ar LIKE ? AND e.last_name_ar LIKE ? LIMIT 1");
+    $st->execute([$first . '%', $father . '%', '%' . $last . '%']);
+    return $st->fetch() ?: ['id'=>0,'employee_type'=>''];
+};
+$ritaM75 = $who75('ريتا', 'مارون', 'حليحل'); $mariaE75 = $who75('ماريا', 'الياس', 'حليحل');
+$rr75 = $db->query("SELECT COUNT(*) n, SUM(net_salary_lbp) s, MAX(prime_fixe_lbp) p FROM monthly_salaries WHERE employee_id=" . (int)$ritaM75['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetch();
+$mm75 = $db->query("SELECT COUNT(*) n, SUM(net_salary_lbp) s, MAX(prime_fixe_lbp) p FROM monthly_salaries WHERE employee_id=" . (int)$mariaE75['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetch();
+check('عبرا: ريتا مارون حليحل صحّت على كشفه (سلفة 80م لا 138م، صافي 73,710,954×12) وماريا الياس حليحل أخذت سلفتها (53م، صافي 49,160,000×12)',
+      (int)$rr75['n'] === 12 && (float)$rr75['s'] === 884531448.0 && (float)$rr75['p'] === 80000000.0
+      && (int)$mm75['n'] === 12 && (float)$mm75['s'] === 589920000.0 && (float)$mm75['p'] === 53000000.0,
+      "ريتا s={$rr75['s']} ماريا s={$mm75['s']}");
+$vio75 = $who75('فيوليت', 'جميل', 'الحمصي'); $ter75 = $who75('تريز', 'جوزيف', 'حبقوق');
+check('عبرا: فيوليت الحمصي وتريز حبقوق «اساتذة تعاقد» بقراره — الفئة متعاقد والأرقام المخزّنة بلا مسّ + الشفاء موصول بالهيدر',
+      $vio75['employee_type'] === 'enseignant_contractuel' && $ter75['employee_type'] === 'enseignant_contractuel'
+      && (float)$db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id=" . (int)$vio75['id'] . " AND year=2025 AND month=10")->fetchColumn() === 76709250.0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraFixes20260827') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

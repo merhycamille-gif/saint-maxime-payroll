@@ -1773,6 +1773,83 @@ function healNajatSheetFill20260827() {
 }
 
 /**
+ * 🏫 شفاء ذاتي مرّة واحدة (2026-08-27 مساءً): تدقيق ملاك ثانوية السيدة-عبرا على كشفَي
+ * البرنامج القديم (تشرين الأول 2025-2026، 131 ملاكاً خاضعاً — p1..p9) كشف 102/131 مطابقين
+ * بالمليم، وبقرار المستخدم الصريح تُصلَّح حالتان فقط + تحويل فئة لاثنتين (الباقي بلا مسّ):
+ *  - ريتا مارون حليحل: سلفة غلائها عندنا 138م = سلفة ريتا «يوسف» حليحل (تشابه أسماء
+ *    بالاستيراد) — الصحيح من كشفه: سلفة 80م وصافي 73,710,954 (سطر 59).
+ *  - ماريا الياس حليحل: سلفتها عندنا صفر (صافي 1,205,750!) — الصحيح: سلفة 53م وصافي
+ *    49,160,000 (سطر 99). وهي وماريا سمير شخصان حقيقيان (كلتاهما على كشفه).
+ *  - فيوليت جميل الحمصي وتريز جوزيف حبقوق: قال «هودي اساتذة تعاقد» ⇒ فئتهما تتحول
+ *    enseignant_contractuel («حوّلهن متعاقدات هلق») — أرقامهما المخزّنة لا تُمسّ
+ *    حتى يرسل كشف متعاقدي عبرا.
+ * المطابقة بالاسم الثلاثي المطبَّع (ريتا/ماريا لكل منهما شبيهة اسم بالمدرسة!) والصفوف
+ * المعدَّلة تُنسخ أولاً إلى جدول الاسترجاع _ms_bk_abra20260827.
+ */
+function healAbraFixes20260827() {
+    try {
+        if (getSetting('heal_abra_fixes_20260827', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة ثانوية السيدة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) return;
+        $sid = (int)$sid;
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_abra20260827 LIKE monthly_salaries");
+        $trio = [];
+        foreach ($db->query("SELECT id, employee_type, first_name_ar, COALESCE(father_name_ar,'') fa, last_name_ar
+                FROM employees WHERE school_id=$sid AND is_deleted=0")->fetchAll(PDO::FETCH_ASSOC) as $e) {
+            $trio[caisseNameNorm($e['first_name_ar'] . ' ' . $e['fa'] . ' ' . $e['last_name_ar'])][] = $e;
+        }
+        $one = function ($name) use ($trio) {
+            $c = $trio[caisseNameNorm($name)] ?? [];
+            return count($c) === 1 ? $c[0] : null; // الاسم الثلاثي يجب أن يكون وحيداً
+        };
+        // [الاسم الثلاثي => قيم كشفه: base, ech, prime, e2c/eocg, caisse, cnss, tb, tax, ret, net, tr, due, cn8, eoc6]
+        $FIX = [
+            'ريتا مارون حليحل'  => [2085000, 0,     80000000, 0,     4925100, 2462550, 77159900, 986396, 8374046, 73710954, 9000000, 82710954, 6566800, 4925100],
+            'ماريا الياس حليحل' => [1325000, 50000, 53000000, 50000, 3262500, 1631250, 51062500, 271250, 5215000, 49160000, 9000000, 58160000, 4350000, 3262500],
+        ];
+        $done = [];
+        $upd = $db->prepare("UPDATE monthly_salaries SET
+                base_salary_lbp=?, echelon_value_lbp=?, base_plus_echelon_lbp=?,
+                prime_fixe_lbp=?, transport_complement_lbp=?, echelon_to_caisse_lbp=?, eoc_grade_lbp=?,
+                caisse_amount_lbp=?, cnss_amount_lbp=?, taxable_base_lbp=?, income_tax_lbp=?,
+                total_retenues_lbp=?, net_salary_lbp=?, transport_lbp=?, total_due_lbp=?,
+                school_cnss_8_lbp=?, school_eoc_6_lbp=?,
+                net_salary_usd = IF(exchange_rate>0, ROUND(?/exchange_rate,2), net_salary_usd),
+                total_due_usd  = IF(exchange_rate>0, ROUND(?/exchange_rate,2), total_due_usd)
+            WHERE employee_id=? AND (year*100+month) BETWEEN 202510 AND 202609");
+        foreach ($FIX as $name => [$base,$ech,$prime,$ded,$caisse,$cnss,$tb,$tax,$ret,$net,$tr,$due,$cn8,$eoc6]) {
+            $e = $one($name);
+            if (!$e) { $done[] = "غايب/ملتبس: $name"; continue; }
+            $id = (int)$e['id'];
+            $db->exec("INSERT IGNORE INTO _ms_bk_abra20260827 SELECT * FROM monthly_salaries
+                       WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+            $upd->execute([$base,$ech,$base+$ech, $prime,$tr,$ded,$ded, $caisse,$cnss,$tb,$tax, $ret,$net,$tr,$due, $cn8,$eoc6, $net,$due, $id]);
+            // سلفة الغلاء بسجل العلاوات = رقم الكشف
+            $c = (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id=$id
+                AND bonus_type='prime_fixe' AND school_year='2025-2026'")->fetchColumn();
+            if ($c) {
+                $db->prepare("UPDATE employee_bonuses SET amount=?, value_type='amount', currency='LBP'
+                    WHERE employee_id=? AND bonus_type='prime_fixe' AND school_year='2025-2026'")->execute([$prime, $id]);
+            } else {
+                $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year,
+                    amount, value_type, currency, start_month, end_month, is_active)
+                    VALUES (?,'prime_fixe',1,'2025-2026',?,'amount','LBP',NULL,NULL,1)")->execute([$id, $prime]);
+            }
+            $done[] = "$name=$id";
+        }
+        // فيوليت وتريز: «هودي اساتذة تعاقد» — تحويل الفئة فقط، الأرقام كما هي
+        foreach (['فيوليت جميل الحمصي', 'تريز جوزيف حبقوق'] as $name) {
+            $e = $one($name);
+            if (!$e) { $done[] = "غايب/ملتبس: $name"; continue; }
+            $db->exec("UPDATE employees SET employee_type='enseignant_contractuel' WHERE id=" . (int)$e['id']);
+            $done[] = $name . '⇒متعاقد';
+        }
+        setSetting('heal_abra_fixes_20260827', 'done: ' . implode('؛', $done));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/**
  * 🏛️ تسوية الضمان السنوية طبق الأصل («تسوية الضمان 2025 القديس مكسيموس.xlsx» — 2026-08-26):
  * بيانات الجدول الملحق «الرواتب والاجور» + التصريح الاسمي (أ) الشهري، لسنة ميلادية
  * ولمجموعة مدارس تُختار بحرّية (خاصة ذوات رقم الضمان المشترك — تسوية واحدة للمؤسسة).
