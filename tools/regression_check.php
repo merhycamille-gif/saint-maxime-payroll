@@ -3768,6 +3768,55 @@ check('المحرّك يطبّق الحدود المؤرّخة الاثنين: �
       (float)$clampLo === 100.0 && (float)$clampHi === 900.0 && (float)$clampZero === 0.0 && (float)$clampOut === 50.0,
       "lo=$clampLo hi=$clampHi z=$clampZero out=$clampOut");
 
+/* =====================================================================
+ * 74) 🏫 سيدة النجاة 2025-2026 (2026-08-27): «رواتب وتعويض نقل المتعاقدين...
+ *     بدك تحطن بسنة 2025-2026» + «طابق نفس الاسماء... اسماء زيادة بدك تشيلهن»
+ *     — كشفا البرنامج القديم (13 متعاقداً + 6 موظفين خاضعين) هما المرجع بالمليم،
+ *     وغير الخاضعين الزائدين شيلوا بقراره، وجيسيكا كنعان (دخلت 1/11/2025) باقية.
+ * =================================================================== */
+healNajatSheet20260827();
+$naj74 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة النجاة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+$sum74 = function (string $type) use ($db, $naj74) {
+    return $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.total_due_lbp),0) due, COALESCE(SUM(ms.net_salary_lbp),0) net,
+            COALESCE(SUM(ms.income_tax_lbp),0) tax, COALESCE(SUM(ms.cnss_amount_lbp),0) cnss, COALESCE(SUM(ms.transport_lbp),0) tr
+        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE e.school_id = $naj74 AND e.employee_type = '$type' AND ms.year = 2025 AND ms.month = 10")->fetch();
+};
+$c74 = $sum74('enseignant_contractuel'); $e74 = $sum74('employe');
+check('النجاة: كشف تشرين الأول 2025 للمتعاقدين الخاضعين = كشفه القديم بالمليم (13 أستاذاً، صافي 791,810,000 + نقل 108,000,000 = مجموع 899,810,000، ضريبة 9,410,000، ضمان 24,780,000)',
+      (int)$c74['n'] === 13 && (float)$c74['due'] === 899810000.0 && (float)$c74['net'] === 791810000.0
+      && (float)$c74['tr'] === 108000000.0 && (float)$c74['tax'] === 9410000.0 && (float)$c74['cnss'] === 24780000.0,
+      "n={$c74['n']} due={$c74['due']}");
+check('النجاة: كشف تشرين الأول 2025 للموظفين الخاضعين = كشفه القديم بالمليم (6 موظفين، صافي 166,995,200 + نقل 54,000,000 = مجموع 220,995,200، ضريبة 0)',
+      (int)$e74['n'] === 6 && (float)$e74['due'] === 220995200.0 && (float)$e74['net'] === 166995200.0
+      && (float)$e74['tr'] === 54000000.0 && (float)$e74['tax'] === 0.0,
+      "n={$e74['n']} due={$e74['due']}");
+$who74 = function (string $first, string $last) use ($db, $naj74) {
+    $st = $db->prepare("SELECT e.id, e.employee_type, e.apply_family_deduction,
+            (SELECT COUNT(*) FROM monthly_salaries ms WHERE ms.employee_id=e.id AND (ms.year*100+ms.month) BETWEEN 202510 AND 202609) yr
+        FROM employees e WHERE e.school_id=$naj74 AND e.is_deleted=0 AND e.first_name_ar LIKE ? AND e.last_name_ar LIKE ? ORDER BY yr DESC LIMIT 1");
+    $st->execute([$first . '%', '%' . $last . '%']);
+    return $st->fetch() ?: ['id'=>0,'employee_type'=>'','apply_family_deduction'=>-1,'yr'=>0];
+};
+$alaa74 = $who74('علاء', 'شمعون'); $claude74 = $who74('كلود', 'كامل'); $camil74 = $who74('كميل', 'مرعي');
+$camTax74 = (int)$db->query("SELECT income_tax_lbp FROM monthly_salaries WHERE employee_id=" . (int)$camil74['id'] . " AND year=2025 AND month=10")->fetchColumn();
+check('النجاة: علاء شمعون وكلود كامل وكميل مرعي متعاقدون حسب كشفه (كانوا «ملاك» خطأً) وكميل بلا تنزيل عائلي وضريبته 2,240,000',
+      $alaa74['employee_type'] === 'enseignant_contractuel' && $claude74['employee_type'] === 'enseignant_contractuel'
+      && $camil74['employee_type'] === 'enseignant_contractuel' && (int)$camil74['apply_family_deduction'] === 0
+      && $camTax74 === 2240000,
+      "كميل tax=$camTax74");
+$hanan74 = $who74('حنان', 'تحومي');
+$hanNet74 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(net_salary_lbp),0) s FROM monthly_salaries WHERE employee_id=" . (int)$hanan74['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetch();
+check('النجاة: حنان تحومي مكمَّلة كل السنة بقراره (12 شهراً × 27,160,000 = 325,920,000 — كانت أيار-أيلول نقلاً بلا راتب)',
+      (int)$hanNet74['n'] === 12 && (float)$hanNet74['s'] === 325920000.0, "n={$hanNet74['n']} s={$hanNet74['s']}");
+$aline74 = $who74('الين', 'قاصوف'); $jes74 = $who74('جيسيكا', 'كنعان');
+$jesOct74 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=" . (int)$jes74['id'] . " AND year=2025 AND month=10")->fetchColumn();
+check('النجاة «طابق نفس الاسماء»: غير الخاضعين الزائدين بلا أشهر 2025-2026 (الين قاصوف نموذجاً) + جيسيكا كنعان باقية 11 شهراً من دخولها 1/11/2025 بلا صف تشرين وهمي + نسخة الاسترجاع _ms_bk_najat20260827 موجودة',
+      (int)$aline74['yr'] === 0 && (int)$jes74['yr'] === 11 && $jesOct74 === 0
+      && (int)$db->query("SELECT COUNT(*) FROM _ms_bk_najat20260827")->fetchColumn() > 0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNajatSheet20260827') !== false,
+      "قاصوف={$aline74['yr']} كنعان={$jes74['yr']}");
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
