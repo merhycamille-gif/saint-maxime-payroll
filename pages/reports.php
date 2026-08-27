@@ -191,6 +191,7 @@ function reportDocThumb($path) {
             ['url'=>'?report=employee_list', 'icon'=>'fa-users', 'color'=>'var(--success)', 'fr'=>'Liste du personnel', 'ar'=>'لائحة الموظفين'],
             ['url'=>$OF.'teacher_card', 'icon'=>'fa-address-card', 'color'=>'var(--primary)', 'fr'=>'Carte enseignant', 'ar'=>'بطاقة الأستاذ'],
             ['url'=>$OF.'teaching_staff', 'icon'=>'fa-chalkboard-user', 'color'=>'var(--info)', 'fr'=>'Corps enseignant', 'ar'=>'لائحة الهيئة التعليمية'],
+            ['url'=>'?report=titularized', 'icon'=>'fa-user-check', 'color'=>'var(--primary)', 'fr'=>'Entrés au cadre (par date)', 'ar'=>'الداخلون في الملاك بتاريخ'],
             ['url'=>$PG.'employee_history.php', 'icon'=>'fa-user-clock', 'color'=>'var(--warning)', 'fr'=>'Dossier enseignant', 'ar'=>'سيرة الأستاذ'],
             ['url'=>$PG.'attestations.php', 'icon'=>'fa-file-signature', 'color'=>'var(--gold)', 'fr'=>'Attestations', 'ar'=>'إفادات'],
             ['url'=>$OF.'staff_stats', 'icon'=>'fa-chart-simple', 'color'=>'var(--info)', 'fr'=>'Statistiques du personnel', 'ar'=>'إحصاءات الموظفين'],
@@ -805,6 +806,68 @@ function reportDocThumb($path) {
                     <tr><td>صندوق التعويضات — الأجير ٦٪</td><td><?= formatLBP($tot['caisse']) ?></td></tr>
                     <tr><td>صندوق التعويضات — المدرسة ٦٪</td><td><?= formatLBP($tot['seoc']) ?></td></tr>
                     <tr><td>ضريبة الدخل</td><td><?= formatLBP($tot['tax']) ?></td></tr>
+                </table></div>
+        <?= docSheetEnd() ?>
+    <?php elseif ($report === 'titularized'):
+        // 🎓 الداخلون في الملاك بتاريخ معيّن — لكل مدرسة (طلب المستخدم 2026-08-27: «تقرير
+        // بأسماء الأساتذة اللي دخلو في الملاك لكل مدرسة بتاريخ 1/10/2023»).
+        // فلتر التاريخ حرّ (الافتراضي 1/10/2023) — المصدر titularization_date بملف الأستاذ،
+        // والفئة أساتذة الملاك حصراً (الدخول في الملاك لا يعني المتعاقدين/الإداريين).
+        $tdate = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['tdate'] ?? '')) ? $_GET['tdate'] : '2023-10-01';
+        $stmtT = $db->prepare("SELECT e.* FROM employees e
+                               WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire'
+                                 AND e.titularization_date = ?" . $schoolSqlEmp . "
+                               ORDER BY e.school_id, COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+        $stmtT->execute([$tdate]);
+        $data = $stmtT->fetchAll();
+    ?>
+        <form method="GET" class="card no-print">
+            <input type="hidden" name="report" value="titularized">
+            <div class="card-body form-row cols-3">
+                <div class="form-group mb-0">
+                    <label class="form-label"><i class="fas fa-calendar-check"></i> Date d'entrée au cadre / تاريخ الدخول في الملاك</label>
+                    <input type="date" name="tdate" class="form-control" value="<?= e($tdate) ?>">
+                </div>
+                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
+                <?php reportSchoolPicker(); ?>
+            </div>
+        </form>
+        <?= docSheetStart('Entrés au cadre le ' . formatDate($tdate), 'الداخلون في الملاك بتاريخ ' . formatDate($tdate), ['العدد: ' . count($data)], ['comp' => false]) ?>
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
+                    <thead><tr>
+                        <th>#</th>
+                        <?php if ($multi): ?><th>المدرسة / École</th><?php endif; ?>
+                        <th>الاسم / Nom</th><th>الشهادة / Diplôme</th><th>الدرجة الحالية / Échelon</th>
+                        <th>دخول المدرسة / Embauche</th><th>دخول الملاك / Titularisation</th><th>الحالة / Statut</th>
+                    </tr></thead>
+                    <tbody>
+                        <?php
+                        $colsN = ($multi ? 8 : 7);
+                        $rn = 0; $curSch = null; $schN = 0;
+                        // صفّ عدد المدرسة (عند تعدد المدارس) — «لكل مدرسة» بمجموع فرعي
+                        $schSum = function($sid, $n) use ($colsN) {
+                            return '<tr class="subtotal-row" style="background:#e0e7ff;font-weight:700"><td colspan="' . $colsN . '" style="text-align:right">عدد الداخلين في الملاك — ' . e(schoolNameById($sid)) . ': ' . $n . '</td></tr>';
+                        };
+                        foreach ($data as $r):
+                            if ($multi && $curSch !== null && (int)$r['school_id'] !== $curSch) { echo $schSum($curSch, $schN); $schN = 0; }
+                            if ($multi && (int)$r['school_id'] !== $curSch): $curSch = (int)$r['school_id']; ?>
+                                <tr class="cat-row"><td colspan="<?= $colsN ?>" style="text-align:right;font-weight:700;background:#dbeafe"><i class="fas fa-school"></i> <?= e(schoolNameById($curSch)) ?></td></tr>
+                            <?php endif; $schN++; ?>
+                            <tr>
+                                <td><?= ++$rn ?></td>
+                                <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
+                                <td><strong><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></strong></td>
+                                <td><?= diplomaLabel($r['diploma']) ?></td>
+                                <td><?= e(gradeDisplay($r)) ?></td>
+                                <td><?= formatDate($r['hire_date']) ?></td>
+                                <td><?= formatDate($r['titularization_date']) ?></td>
+                                <td><span class="badge badge-<?= employeeStatusLabel($r['status'])['badge'] ?>"><?= e(employeeStatusLabel($r['status'])['label']) ?></span></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if ($multi && $curSch !== null) echo $schSum($curSch, $schN); ?>
+                        <?php if (!$data): ?><tr><td colspan="<?= $colsN ?>" class="text-center text-muted">لا يوجد أساتذة دخلوا الملاك بهذا التاريخ / Aucun enseignant titularisé à cette date</td></tr><?php endif; ?>
+                        <?php if ($data): ?><tr class="total-row"><td colspan="<?= $colsN ?>">العدد الإجمالي / Total: <?= $rn ?></td></tr><?php endif; ?>
+                    </tbody>
                 </table></div>
         <?= docSheetEnd() ?>
     <?php endif; ?>
