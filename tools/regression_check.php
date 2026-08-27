@@ -3905,6 +3905,25 @@ check('عبرا: تقسيم تريز 2,600,000+100م وفيوليت 2,225,000+78
       && $bilalRows75 === 0
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraCw20260827') !== false,
       "تريز={$terSplit75['be']}/{$terSplit75['p']} بلال=$bilalRows75");
+// النسخة الثانية (بلال/جوزيف بولس بداتا أونلاين منحرفة): تجربة فعلية — نزرع صف تشرين
+// مؤقتاً لبلال ثم نشغّل الشفاء فيمحوه رغم كونه «خاضعاً» (الصمّام لا يحميه بأمر المستخدم)
+healAbraCw2_20260827();
+$cw2Ok75 = false;
+if ((int)$bilal75['id'] > 0) {
+    $db->exec("INSERT INTO monthly_salaries (employee_id, school_id, month, year, school_year, grade_at_month,
+        base_salary_lbp, base_plus_echelon_lbp, prime_fixe_lbp, cnss_amount_lbp, taxable_base_lbp, income_tax_lbp,
+        total_retenues_lbp, net_salary_lbp, transport_lbp, total_due_lbp, exchange_rate, is_calculated, is_paid)
+        VALUES (" . (int)$bilal75['id'] . ", $abra75, 10, 2025, '2025-2026', 1,
+        0, 0, 49000000, 1470000, 49000000, 230000, 1700000, 47300000, 0, 47300000, 89500, 1, 1)");
+    $db->prepare("DELETE FROM settings WHERE `key`='heal_abra_cw2_20260827'")->execute();
+    $scCw75 = &settingsCache(); unset($scCw75['heal_abra_cw2_20260827']);
+    healAbraCw2_20260827();
+    $cw2Ok75 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=" . (int)$bilal75['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetchColumn() === 0;
+    if (!$cw2Ok75) $db->exec("DELETE FROM monthly_salaries WHERE employee_id=" . (int)$bilal75['id'] . " AND year=2025 AND month=10"); // تنظيف لو فشل
+}
+check('عبرا — النسخة الثانية تشيل صفوف بلال اسعد وجوزيف بولس حتى لو كانت «خاضعة» (داتا أونلاين منحرفة، بأمره الصريح) + موصولة بالهيدر',
+      $cw2Ok75 && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraCw2_20260827') !== false,
+      'زرعنا صف تشرين خاضعاً لبلال والشفاء محاه');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -2047,6 +2047,41 @@ function healAbraCw20260827() {
 }
 
 /**
+ * 🧹 (نسخة ثانية — 2026-08-27 مساءً): بلال علي اسعد وجوزيف بولس بولس (عبرا) صفوفهما
+ * **أونلاين** «خاضعة» بداتا قديمة منحرفة عن المحلي (ضمان وضريبة وأرقام مختلفة) فحماهما
+ * صمّام subject=0 في الشفاء الأول — لكنهما ليسا على كشف الخاضعين الرسمي (24 متعاقداً
+ * الذي طابقناه بالمليم) والمستخدم أمر صراحة بشيل أسمائهما («شيل غير الخاضعين متل
+ * النجاة») ⇒ حذف صفوف 2025-2026 لهذين الاسمين تحديداً بلا صمّام الخضوع، مع النسخ
+ * إلى _ms_bk_abra20260827 — النطاق متعاقد/موظف حصراً (الملاك محميّون).
+ */
+function healAbraCw2_20260827() {
+    try {
+        if (getSetting('heal_abra_cw2_20260827', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة ثانوية السيدة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) return;
+        $sid = (int)$sid;
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_abra20260827 LIKE monthly_salaries");
+        $removed = 0; $who = [];
+        foreach ([['بلال', 'اسعد'], ['جوزيف', 'بولس']] as [$fn, $ln]) {
+            $st = $db->prepare("SELECT e.id FROM employees e
+                WHERE e.school_id = $sid AND e.employee_type IN ('enseignant_contractuel','employe')
+                  AND e.first_name_ar LIKE ? AND e.last_name_ar LIKE ?");
+            $st->execute([$fn . '%', $ln . '%']);
+            foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) {
+                $id = (int)$id;
+                $db->exec("INSERT IGNORE INTO _ms_bk_abra20260827 SELECT * FROM monthly_salaries
+                           WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+                $n = (int)$db->exec("DELETE FROM monthly_salaries
+                           WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+                if ($n) { $removed += $n; $who[] = "$fn $ln#$id-$n"; }
+            }
+        }
+        setSetting('heal_abra_cw2_20260827', 'done: removedRows=' . $removed . ($who ? ' (' . implode('؛', $who) . ')' : ''));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/**
  * 🏛️ تسوية الضمان السنوية طبق الأصل («تسوية الضمان 2025 القديس مكسيموس.xlsx» — 2026-08-26):
  * بيانات الجدول الملحق «الرواتب والاجور» + التصريح الاسمي (أ) الشهري، لسنة ميلادية
  * ولمجموعة مدارس تُختار بحرّية (خاصة ذوات رقم الضمان المشترك — تسوية واحدة للمؤسسة).
