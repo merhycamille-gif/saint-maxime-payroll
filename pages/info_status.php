@@ -25,8 +25,31 @@ function isDate($d) {
 // المدارس المعطّلة/المحذوفة (مثل مغدوشة/سان نيقولا) لا تظهر في هذا التقرير.
 $activeSchoolCond = " AND sc.is_active = 1 AND sc.is_deleted = 0";
 
-// 1) أساتذة/موظفو السنة الحالية في المدارس الفعّالة ضمن النطاق (غير محذوفين، موجودون فعلاً بهذه السنة، غير تاركين)
-[$yf, $yp] = yearEmploymentFilter(activeSchoolYear(), 'e.');
+// 🗓️ فلتر «سنة التحديث» (طلب المستخدم 2026-08-27: «يبينو الأساتذة اللي بدون تحديث بنفس
+// السنة أو أنا كمان اختار السنة»): التحديث يُحسب للسنة المختارة فقط — يلي بعت السنة الماضية
+// وما بعت هالسنة يظهر مع «ما بعتوا». نافذة سنة التحديث Y1-Y2 = من 1 تموز Y1 حتى 30 حزيران Y2:
+// تحديثات الصيف (تموز-أيلول) تُحسب للسنة الجاية يلي عم تتحضّر لا للسنة يلي عم تخلص
+// (مثال: إرسال آب 2026 = حملة 2026-2027). و«كل السنين» = السلوك القديم (أي إرسال بالتاريخ كله).
+function updateYearOfToday() {
+    $m = (int)date('n'); $y = (int)date('Y');
+    return ($m >= 7) ? ($y . '-' . ($y + 1)) : (($y - 1) . '-' . $y);
+}
+$selYear = $_GET['sy'] ?? updateYearOfToday();
+if ($selYear !== 'all' && !preg_match('/^\d{4}-\d{4}$/', $selYear)) $selYear = updateYearOfToday();
+$syCond = ''; $syParams = [];
+if ($selYear !== 'all') {
+    [$sy1, $sy2] = schoolYearToYears($selYear);
+    $syCond = " AND s.submitted_at >= ? AND s.submitted_at < ?";
+    $syParams = [$sy1 . '-07-01 00:00:00', $sy2 . '-07-01 00:00:00'];
+}
+// لائحة السنين للمنتقي: سنين الرواتب الموجودة + سنة الحملة الحالية (بلا مكرّر، الأحدث أولاً)
+$yearOptions = $db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE school_year REGEXP '^[0-9]{4}-[0-9]{4}$' ORDER BY school_year DESC")->fetchAll(PDO::FETCH_COLUMN);
+foreach ([updateYearOfToday(), $selYear === 'all' ? null : $selYear] as $extraY)
+    if ($extraY && !in_array($extraY, $yearOptions, true)) { $yearOptions[] = $extraY; rsort($yearOptions); }
+$selYearLabel = ($selYear === 'all') ? 'Toutes les années / كل السنين' : $selYear;
+
+// 1) أساتذة/موظفو السنة المختارة في المدارس الفعّالة ضمن النطاق (غير محذوفين، موجودون فعلاً بهذه السنة، غير تاركين)
+[$yf, $yp] = yearEmploymentFilter($selYear !== 'all' ? $selYear : activeSchoolYear(), 'e.');
 $activeSql = "SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
         e.employee_type, e.phone1, e.phone2, e.school_id,
         COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
@@ -39,8 +62,8 @@ $st = $db->prepare($activeSql);
 $st->execute($yp);
 $active = $st->fetchAll();
 
-// 2) كل من بعت طلباً (موجود، applied أو pending) في المدارس الفعّالة ضمن النطاق —
-//    نقودها من جدول الطلبات مباشرةً حتى يظهر **كل** من بعت (ولو ما عاد ضمن فلتر السنة الحالية).
+// 2) كل من بعت طلباً (موجود، applied أو pending) **ضمن سنة التحديث المختارة** في المدارس
+//    الفعّالة ضمن النطاق — نقودها من جدول الطلبات مباشرةً حتى يظهر **كل** من بعت بهذه السنة.
 $rank = ['applied' => 2, 'pending' => 1];
 $sentByEmp = []; // employee_id => أفضل صفّ طلب (مع اسم الأستاذ ومدرسته)
 $sq = $db->prepare("SELECT s.status, s.submitted_at, e.id, e.first_name_ar, e.last_name_ar,
@@ -50,9 +73,9 @@ $sq = $db->prepare("SELECT s.status, s.submitted_at, e.id, e.first_name_ar, e.la
     JOIN employees e ON e.id = s.employee_id
     JOIN schools sc ON sc.id = e.school_id
     WHERE s.is_new_teacher = 0 AND s.status IN ('applied','pending') AND e.is_deleted = 0"
-    . $activeSchoolCond . schoolScopeSql('e.school_id') . "
+    . $syCond . $activeSchoolCond . schoolScopeSql('e.school_id') . "
     ORDER BY s.submitted_at");
-$sq->execute();
+$sq->execute($syParams);
 foreach ($sq->fetchAll() as $r) {
     $eid = (int)$r['id'];
     $cur = $sentByEmp[$eid] ?? null;
@@ -85,9 +108,9 @@ $newRows = $db->prepare("SELECT s.id, s.employee_id, s.school_id, s.status, s.su
     FROM info_submissions s
     JOIN schools sc ON sc.id = s.school_id
     LEFT JOIN employees e ON e.id = s.employee_id
-    WHERE s.is_new_teacher = 1 AND s.status <> 'rejected'" . $activeSchoolCond . schoolScopeSql('s.school_id') . "
+    WHERE s.is_new_teacher = 1 AND s.status <> 'rejected'" . $syCond . $activeSchoolCond . schoolScopeSql('s.school_id') . "
     ORDER BY school_name, FIELD(s.status,'pending','applied'), s.submitted_at DESC");
-$newRows->execute();
+$newRows->execute($syParams);
 $newRows = $newRows->fetchAll();
 
 $newBySchool = [];
@@ -141,8 +164,8 @@ foreach ($schoolKeys as $sk) {
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="alert alert-info no-print" style="margin-bottom:14px">
-  <span dir="ltr"><i class="fas fa-clipboard-check"></i> <strong>État des mises à jour</strong> par école : qui a envoyé et mis à jour, qui n'a pas encore envoyé, et les nouveaux enseignants — année <strong><?= e(currentSchoolYear()) ?></strong>.</span>
-  <br>تقرير <strong>حالة تحديث المعلومات</strong> لكل مدرسة: مين <strong>بعت وحدّث</strong> معلوماته (مقبول أو بانتظار اعتمادك)، مين <strong>ما بعت بعد</strong>، ومين <strong>الأساتذة الجدد</strong>.
+  <span dir="ltr"><i class="fas fa-clipboard-check"></i> <strong>État des mises à jour</strong> par école : qui a envoyé et mis à jour, qui n'a pas encore envoyé, et les nouveaux enseignants — année <strong><?= e($selYearLabel) ?></strong>.</span>
+  <br>تقرير <strong>حالة تحديث المعلومات</strong> لكل مدرسة <strong>للسنة المختارة</strong>: مين <strong>بعت وحدّث</strong> معلوماته بهذه السنة (مقبول أو بانتظار اعتمادك)، مين <strong>ما بعت بهذه السنة</strong> (ولو بعت بسنة قبل)، ومين <strong>الأساتذة الجدد</strong>.
 </div>
 
 <div class="card no-print" style="margin-bottom:14px">
@@ -154,13 +177,28 @@ include __DIR__ . '/../includes/header.php';
       <div><span class="badge" style="background:#0a7a37;color:#fff;font-size:14px"><i class="fas fa-user-plus"></i> Nouveaux / جدد</span> <strong style="font-size:20px"><?= $gNew ?></strong></div>
       <?php /* 🧹 زرّ «طباعة» أُزيل — مكرّر مع شريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
     </div>
+    <div style="margin-top:12px;border-top:1px solid var(--gray-200);padding-top:12px;display:flex;gap:8px 16px;flex-wrap:wrap;align-items:center">
+      <span style="font-weight:700;color:var(--gray-600)"><i class="fas fa-calendar-days"></i> Année de mise à jour / سنة التحديث:</span>
+      <form method="GET" style="display:inline-flex;align-items:center;gap:6px;margin:0">
+        <input type="hidden" name="show" value="<?= e($show) ?>">
+        <select name="sy" class="form-select" style="width:auto;min-width:170px" onchange="this.form.submit()">
+          <?php foreach ($yearOptions as $yOpt): ?>
+            <option value="<?= e($yOpt) ?>" <?= $selYear === $yOpt ? 'selected' : '' ?>><?= e($yOpt) ?></option>
+          <?php endforeach; ?>
+          <option value="all" <?= $selYear === 'all' ? 'selected' : '' ?>>Toutes les années / كل السنين</option>
+        </select>
+      </form>
+      <?php if ($selYear !== 'all'): ?>
+        <small style="color:var(--gray-500)">التحديث محسوب من 1/7/<?= (int)$sy1 ?> حتى 30/6/<?= (int)$sy2 ?> (إرسال الصيف يُحسب للسنة الجاية)</small>
+      <?php endif; ?>
+    </div>
     <div style="margin-top:12px;border-top:1px solid var(--gray-200);padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <span style="font-weight:700;color:var(--gray-600)"><i class="fas fa-filter"></i> Afficher / imprimer — اعرض / اطبع:</span>
       <?php foreach ($showLabels as $key => $lbl):
         $on = ($show === $key);
         $icon = ['all'=>'fa-list','sent'=>'fa-check','notsent'=>'fa-hourglass-half','new'=>'fa-user-plus'][$key];
       ?>
-        <a href="<?= BASE_URL ?>pages/info_status.php?show=<?= $key ?>"
+        <a href="<?= BASE_URL ?>pages/info_status.php?show=<?= $key ?>&sy=<?= e($selYear) ?>"
            class="btn btn-sm <?= $on ? 'btn-success' : 'btn-light' ?>"><i class="fas <?= $icon ?>"></i> <?= e($lbl) ?></a>
       <?php endforeach; ?>
     </div>
@@ -169,7 +207,7 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if ($show !== 'all'): ?>
 <div class="print-only" style="text-align:center;margin-bottom:10px">
-  <h2 style="margin:0" dir="ltr"><?= e($showLabelsFr[$show]) ?> — <?= e(currentSchoolYear()) ?></h2>
+  <h2 style="margin:0" dir="ltr"><?= e($showLabelsFr[$show]) ?> — <?= e($selYearLabel) ?></h2>
   <div style="font-size:0.8em;color:#444"><?= e($showLabelsAr[$show]) ?></div>
 </div>
 <?php endif; ?>
