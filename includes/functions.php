@@ -4239,6 +4239,11 @@ function currentSchoolYear() {
 function parseFlexibleDate($s) {
     $s = trim((string)$s);
     if ($s === '') return null;
+    // 🔴 (2026-08-28 — «ما عم يحفظ تغيير تاريخ المهلة»): الكتابة بالأرقام العربية (٣٠/٠٨/٢٠٢٦)
+    // أو بمسافات حول الفواصل كانت ترجع null فيُتجاهل التاريخ بصمت مع رسالة نجاح كاذبة.
+    // التطبيع أولاً: أرقام فرنسية + إزالة المسافات — يعمّ كل مستعملي الدالة.
+    if (function_exists('arabicDigitsFr')) $s = arabicDigitsFr($s);
+    $s = preg_replace('/\s+/u', '', $s);
     if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $s, $m))            { $y = $m[1]; $mo = $m[2]; $d = $m[3]; }
     elseif (preg_match('#^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$#', $s, $m)) { $d = $m[1]; $mo = $m[2]; $y = $m[3]; }
     else return null;

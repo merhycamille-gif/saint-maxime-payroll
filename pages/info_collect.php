@@ -120,10 +120,18 @@ function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
 // حفظ موعد إقفال باب تحديث/إدخال المعلومات + مفتاح السماح بعده (تحكّم الأدمن)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_form_deadline') {
     requireCsrf();
-    $d = parseFlexibleDate($_POST['deadline'] ?? '');
-    if ($d) setSetting('teacher_form_deadline', $d);
+    $raw = trim((string)($_POST['deadline'] ?? ''));
+    $d = parseFlexibleDate($raw);
     setSetting('teacher_form_allow_after', isset($_POST['allow_after']) ? '1' : '0');
-    $_SESSION['flash_success'] = 'تم حفظ إعدادات إقفال باب الإدخال.';
+    if ($d) {
+        setSetting('teacher_form_deadline', $d);
+        $_SESSION['flash_success'] = 'تم حفظ إعدادات إقفال باب الإدخال — تاريخ الإقفال: ' . displayDMY($d) . '.';
+    } elseif ($raw !== '') {
+        // 🔴 ممنوع رسالة نجاح كاذبة والتاريخ لم يُفهَم («ما عم يحفظ تغيير تاريخ المهلة» 2026-08-28)
+        $_SESSION['flash_error'] = 'ما قدرت افهم التاريخ «' . $raw . '» — اكتبه هكذا: يوم/شهر/سنة كاملة، مثلاً 30/08/2026. (التاريخ القديم بقي كما هو، وخيار السماح انحفظ.)';
+    } else {
+        $_SESSION['flash_success'] = 'تم حفظ إعدادات إقفال باب الإدخال.';
+    }
     header('Location: ' . BASE_URL . 'pages/info_collect.php'); exit;
 }
 

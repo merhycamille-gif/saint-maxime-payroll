@@ -4033,6 +4033,21 @@ check('الانتقال — النسخة الثانية تشيل صفوف كلا
       $claOk79 && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healEntikalCw2_20260827') !== false,
       'زرعنا صف تشرين خاضعاً لكلاريتا والشفاء محاه');
 
+/* =====================================================================
+ * 80) 📅 «ما عم يحفظ تغيير تاريخ المهلة» (2026-08-28): كتابة التاريخ بأرقام
+ *     عربية أو بمسافات كانت تُتجاهَل بصمت مع رسالة نجاح كاذبة — parseFlexibleDate
+ *     صار يطبّع الأرقام والمسافات (يعمّ كل البرنامج)، والمعالج يصارح بالخطأ.
+ * =================================================================== */
+check('التاريخ المرن: الأرقام العربية والمسافات وسنة-شهر-يوم كلها تُفهم، وغير المفهوم يبقى مرفوضاً',
+      parseFlexibleDate('٣٠/٠٨/٢٠٢٦') === '2026-08-30'
+      && parseFlexibleDate(' 15 / 9 / 2026 ') === '2026-09-15'
+      && parseFlexibleDate('2026-9-5') === '2026-09-05'
+      && parseFlexibleDate('15/9/26') === null && parseFlexibleDate('كلام') === null,
+      'ar=' . var_export(parseFlexibleDate('٣٠/٠٨/٢٠٢٦'), true));
+check('حفظ مهلة رابط المعلومات يصارح: نجاح باطل ممنوع (flash_error عند تاريخ غير مفهوم) والتطبيع موصول',
+      strpos((string)file_get_contents($PROJ . '/pages/info_collect.php'), 'ما قدرت افهم التاريخ') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'arabicDigitsFr($s)') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
