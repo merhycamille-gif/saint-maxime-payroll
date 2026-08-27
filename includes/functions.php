@@ -2318,6 +2318,52 @@ function healNiyahCw20260827() {
 }
 
 /**
+ * 🏫 شفاء ذاتي مرّة واحدة (2026-08-27 مساءً): موظفو دار السعادة-كسارة (زحلة) الخاضعون
+ * على كشفه («شوف وصحح» — تشرين الأول 2025-2026: 8 موظفين، مجموع 301,319,000):
+ * الثمانية كلهم مطابقون بالمليم (بمن فيهم Mado Tesema بالاسم اللاتيني) — التصحيح
+ * الوحيد بالنمط المقرَّر: حذف أشهر 2025-2026 للزائدين غير الخاضعين الـ12 (ضمان+ضريبة=0
+ * بكل السنة)، ومنهم ملفا جان عاد (1657/1794) والياس سمعان المحذوف ناعماً بصفوف يتيمة
+ * (الفهرس يشمل المحذوفين). صمّام «الخاضع لا يُمسّ» يحمي الياس منير سمعان (على الكشف)
+ * من تشابه الاسم. النسخ إلى _ms_bk_ksara20260827.
+ */
+function healKsaraCw20260827() {
+    try {
+        if (getSetting('heal_ksara_cw_20260827', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'دار السعادة للراهبات%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) return;
+        $sid = (int)$sid;
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_ksara20260827 LIKE monthly_salaries");
+        $byName = [];
+        foreach ($db->query("SELECT e.id, e.employee_type, e.first_name_ar, e.last_name_ar,
+                (SELECT COUNT(*) FROM monthly_salaries ms WHERE ms.employee_id = e.id
+                   AND (ms.year*100+ms.month) BETWEEN 202510 AND 202609) AS yr_rows
+            FROM employees e WHERE e.school_id = $sid")->fetchAll(PDO::FETCH_ASSOC) as $e) {
+            $byName[caisseNameNorm($e['first_name_ar'] . ' ' . $e['last_name_ar'])][] = $e;
+        }
+        $REMOVE = [['انطوانيت','الاثرم'], ['جان','عاد'], ['نورما','الحاج'], ['دنيز','قبلان'], ['هدية','المضاوي'],
+                   ['لينا','برهوم'], ['الياس','سمعان'], ['مارغريتا','مومجيان'], ['جاكلين','حوشان'], ['عماد','الياس']];
+        $removed = 0; $skip = [];
+        foreach ($REMOVE as [$fn, $ln]) {
+            foreach ($byName[caisseNameNorm($fn . ' ' . $ln)] ?? [] as $e) {
+                if (!in_array($e['employee_type'], ['enseignant_contractuel','employe'], true)) continue;
+                if ((int)$e['yr_rows'] === 0) continue;
+                $id = (int)$e['id'];
+                $subj = $db->query("SELECT COALESCE(SUM(cnss_amount_lbp),0)+COALESCE(SUM(income_tax_lbp),0)
+                    FROM monthly_salaries WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609")->fetchColumn();
+                if ((float)$subj != 0.0) { $skip[] = "$fn $ln#$id"; continue; } // خاضع ⇒ لا يُمسّ
+                $db->exec("INSERT IGNORE INTO _ms_bk_ksara20260827 SELECT * FROM monthly_salaries
+                           WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+                $removed += (int)$db->exec("DELETE FROM monthly_salaries
+                           WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+            }
+        }
+        setSetting('heal_ksara_cw_20260827', 'done: removedRows=' . $removed
+            . ($skip ? ' skip=' . implode('؛', $skip) : ''));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/**
  * 🏛️ تسوية الضمان السنوية طبق الأصل («تسوية الضمان 2025 القديس مكسيموس.xlsx» — 2026-08-26):
  * بيانات الجدول الملحق «الرواتب والاجور» + التصريح الاسمي (أ) الشهري، لسنة ميلادية
  * ولمجموعة مدارس تُختار بحرّية (خاصة ذوات رقم الضمان المشترك — تسوية واحدة للمؤسسة).

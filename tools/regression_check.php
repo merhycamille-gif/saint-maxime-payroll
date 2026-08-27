@@ -3992,6 +3992,26 @@ check('النياح: كشف تشرين للمتعاقدين والموظفين =
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNiyahCw20260827') !== false,
       "cw n={$ncw78['n']} net={$ncw78['net']} ملاك n={$nm78['n']}");
 
+/* =====================================================================
+ * 79) 🏫 دار السعادة-كسارة (2026-08-27 مساءً): «شوف وصحح» — كشف الموظفين
+ *     الخاضعين (8، مجموع 301,319,000): الثمانية مطابقون بالمليم، والزائدون
+ *     غير الخاضعين الـ12 شيلوا بالنمط (صمّام الخضوع حمى الياس منير سمعان).
+ * =================================================================== */
+healKsaraCw20260827();
+$ksa79 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'دار السعادة للراهبات%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+$kcw79 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
+    FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.school_id=$ksa79 AND ms.year=2025 AND ms.month=10")->fetch();
+$elias79 = $db->prepare("SELECT e.id FROM employees e WHERE e.school_id=$ksa79 AND e.is_deleted=0 AND e.first_name_ar LIKE 'الياس%' AND e.father_name_ar LIKE 'منير%' LIMIT 1");
+$elias79->execute(); $eliasId79 = (int)$elias79->fetchColumn();
+$eliasNet79 = (float)$db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id=$eliasId79 AND year=2025 AND month=10")->fetchColumn();
+check('كسارة: كشف تشرين للموظفين الخاضعين = كشفه بالمليم (8 موظفين، صافي 225,719,000 + نقل 75,600,000 = مجموع 301,319,000) والياس منير سمعان الخاضع محميّ (31,525,000)',
+      (int)$kcw79['n'] === 8 && (float)$kcw79['net'] === 225719000.0
+      && (float)$kcw79['tr'] === 75600000.0 && (float)$kcw79['due'] === 301319000.0
+      && $eliasNet79 === 31525000.0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healKsaraCw20260827') !== false,
+      "n={$kcw79['n']} net={$kcw79['net']} الياس=$eliasNet79");
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
