@@ -3972,6 +3972,26 @@ check('الانتقال: الخمسة صاروا متعاقدين حسب كشف�
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healEntikalCw20260827') !== false,
       "سمير net={$samOct77['nt']} tax={$samOct77['tx']} كلاريتا=$clRows77");
 
+/* =====================================================================
+ * 78) 🏫 سيدة النياح-زحلة (2026-08-27 مساءً): «تصحيح المتعاقد والموظف» —
+ *     كشفه (4 متعاقدين + موظفة، مجموع 293,326,600): بياره بوزيدان كانت «ملاك»
+ *     خطأً حُوِّلت بقيم الكشف، والزائدون الخمسة غير الخاضعين شيلوا بالنمط.
+ * =================================================================== */
+healNiyahCw20260827();
+$niy78 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة النياح%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+$ncw78 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
+    FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.school_id=$niy78 AND e.employee_type <> 'enseignant_titulaire' AND ms.year=2025 AND ms.month=10")->fetch();
+$nm78 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.cnss_amount_lbp),0) cn, COALESCE(SUM(ms.transport_lbp),0) tr
+    FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.school_id=$niy78 AND e.employee_type = 'enseignant_titulaire' AND ms.year=2025 AND ms.month=10")->fetch();
+check('النياح: كشف تشرين للمتعاقدين والموظفين = كشفه بالمليم (5 أشخاص، صافي 257,326,600 + نقل 36,000,000 = مجموع 293,326,600) وبياره متعاقدة والملاك صاروا 17 بضمان كشفهم 46,155,450',
+      (int)$ncw78['n'] === 5 && (float)$ncw78['net'] === 257326600.0
+      && (float)$ncw78['tr'] === 36000000.0 && (float)$ncw78['due'] === 293326600.0
+      && (int)$nm78['n'] === 17 && (float)$nm78['cn'] === 46155450.0 && (float)$nm78['tr'] === 153000000.0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNiyahCw20260827') !== false,
+      "cw n={$ncw78['n']} net={$ncw78['net']} ملاك n={$nm78['n']}");
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
