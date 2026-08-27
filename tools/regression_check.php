@@ -3925,6 +3925,22 @@ check('عبرا — النسخة الثانية تشيل صفوف بلال اس�
       $cw2Ok75 && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraCw2_20260827') !== false,
       'زرعنا صف تشرين خاضعاً لبلال والشفاء محاه');
 
+/* =====================================================================
+ * 76) 🏫 البشارة (2026-08-27 مساءً): «p1 شوف وصحح» — كشف المتعاقدين والموظفين
+ *     الخاضعين (7+4): الـ11 مطابقون بالمليم، وغير الخاضعين الأربعة الزائدون
+ *     شيلوا بنمط النجاة/عبرا الذي قرّره (تغريد غدار/ادي فرنسيس/جوسلين مرعي/عماد ديب).
+ * =================================================================== */
+healBecharaCw20260827();
+$bech76 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+$bcw76 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
+    FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    WHERE e.school_id=$bech76 AND e.employee_type <> 'enseignant_titulaire' AND ms.year=2025 AND ms.month=10")->fetch();
+check('البشارة: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم (11 شخصاً، صافي 358,842,750 + نقل 82,800,000 = مجموع 441,642,750) بعد حذف غير الخاضعين الأربعة بقراره',
+      (int)$bcw76['n'] === 11 && (float)$bcw76['net'] === 358842750.0
+      && (float)$bcw76['tr'] === 82800000.0 && (float)$bcw76['due'] === 441642750.0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healBecharaCw20260827') !== false,
+      "n={$bcw76['n']} net={$bcw76['net']}");
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
