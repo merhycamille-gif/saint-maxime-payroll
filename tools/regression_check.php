@@ -3846,6 +3846,18 @@ if ($pamRow74) {
 check('النجاة — الشفاء التكميلي يخلق الشهر الناقص كلياً بقيم الكشف مدفوعاً (حالة باميلا نضّور أونلاين بلا أي شهر) وهو موصول بالهيدر',
       $fillOk74 && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNajatSheetFill20260827') !== false,
       $pamRow74 ? 'أُعيد خلق تشرين ٢' : 'صف باميلا الأصلي غائب');
+// تواريخ ترك «مستحيلة» (أقدم من الدخول — حالة باميلا أونلاين 2024-01-12 قبل دخولها 2024-10-01):
+// الشفاء يمسحها + تجربة فعلية: نزرعها مؤقتاً محلياً ثم نتأكد أنها انمسحت وظهرت بالكشف
+healNajatPamelaLeft20260827();
+$db->exec("UPDATE employees SET left_date_cnss='2024-01-12', left_date_finance='2024-01-12', left_date_eoc='2024-01-12' WHERE id=" . (int)$pam74['id']);
+$db->prepare("DELETE FROM settings WHERE `key`='heal_najat_pamela_left_20260827'")->execute();
+$scPam74 = &settingsCache(); unset($scPam74['heal_najat_pamela_left_20260827']);
+healNajatPamelaLeft20260827();
+$pamLeft74 = $db->query("SELECT COALESCE(left_date_cnss, left_date_finance, left_date_eoc) FROM employees WHERE id=" . (int)$pam74['id'])->fetchColumn();
+check('النجاة — تواريخ الترك المستحيلة (أقدم من الدخول، حالة باميلا أونلاين) تُمسح بالشفاء فيرجع الظهور بالكشوف + موصول بالهيدر',
+      $pamLeft74 === null
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNajatPamelaLeft20260827') !== false,
+      'left=' . var_export($pamLeft74, true));
 
 /* =====================================================================
  * 75) 🏫 تدقيق ملاك عبرا على كشفه (2026-08-27 مساءً): «شيك على رواتب الملاك

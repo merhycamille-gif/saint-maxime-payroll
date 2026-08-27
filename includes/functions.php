@@ -1865,6 +1865,33 @@ function healNajatSheetFill2_20260827() {
 }
 
 /**
+ * 🧹 شفاء ذاتي مرّة واحدة (2026-08-27 مساءً): باميلا نضّور (النجاة) كانت مختفية من كل
+ * الكشوف أونلاين رغم زرع أشهرها — السبب: ملفها الأونلاين فيه تواريخ ترك 2024-01-12
+ * بالحقول الثلاثة، وهي **قبل تاريخ دخولها 2024-10-01** (خردة إدخال) وتناقض كشف
+ * المستخدم الذي يثبت أنها تعمل كل 2025-2026. يمسح تواريخ الترك الأقدم من الدخول
+ * (لأي موظف بهذه الحالة المستحيلة بالنجاة) فيعود الظهور بالكشوف.
+ */
+function healNajatPamelaLeft20260827() {
+    try {
+        if (getSetting('heal_najat_pamela_left_20260827', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة النجاة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) return;
+        $sid = (int)$sid;
+        // ترك أقدم من الدخول = حالة مستحيلة (خردة) — تُمسح الثلاثة معاً لمن كلُّ تواريخ تركه المسجّلة قبل دخوله
+        $ids = $db->query("SELECT id FROM employees WHERE school_id=$sid AND is_deleted=0 AND hire_date IS NOT NULL
+            AND COALESCE(left_date_cnss, left_date_finance, left_date_eoc) IS NOT NULL
+            AND COALESCE(left_date_cnss, '9999-12-31') < hire_date
+            AND COALESCE(left_date_finance, '9999-12-31') < hire_date
+            AND COALESCE(left_date_eoc, '9999-12-31') < hire_date")->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($ids as $id) {
+            $db->exec("UPDATE employees SET left_date_cnss=NULL, left_date_finance=NULL, left_date_eoc=NULL WHERE id=" . (int)$id);
+        }
+        setSetting('heal_najat_pamela_left_20260827', 'done: cleared=' . count($ids) . ($ids ? ' (ids ' . implode('،', $ids) . ')' : ''));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/**
  * 🏫 شفاء ذاتي مرّة واحدة (2026-08-27 مساءً): تدقيق ملاك ثانوية السيدة-عبرا على كشفَي
  * البرنامج القديم (تشرين الأول 2025-2026، 131 ملاكاً خاضعاً — p1..p9) كشف 102/131 مطابقين
  * بالمليم، وبقرار المستخدم الصريح تُصلَّح حالتان فقط + تحويل فئة لاثنتين (الباقي بلا مسّ):
