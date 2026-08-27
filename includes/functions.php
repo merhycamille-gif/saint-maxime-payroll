@@ -2364,6 +2364,37 @@ function healKsaraCw20260827() {
 }
 
 /**
+ * 🧹 (نسخة ثانية — 2026-08-27 ليلاً): كلاريتا مساعد (الانتقال-زحلة) صفوفها **أونلاين**
+ * «خاضعة» بداتا قديمة منحرفة (ضمان 510,000) فحماها صمّام subject=0 في شفاء الانتقال —
+ * لكنها ليست على كشف الخاضعين الرسمي والمستخدم أمر بالنمط ⇒ حذف صفوف 2025-2026
+ * باسمها بلا صمّام (نمط بلال/جوزيف بولس بعبرا)، مع النسخ إلى _ms_bk_entikal20260827.
+ */
+function healEntikalCw2_20260827() {
+    try {
+        if (getSetting('heal_entikal_cw2_20260827', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة الانتقال%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) return;
+        $sid = (int)$sid;
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_entikal20260827 LIKE monthly_salaries");
+        $removed = 0; $who = [];
+        $st = $db->prepare("SELECT e.id FROM employees e
+            WHERE e.school_id = $sid AND e.employee_type IN ('enseignant_contractuel','employe')
+              AND e.first_name_ar LIKE 'كلاريتا%' AND e.last_name_ar LIKE 'مساعد%'");
+        $st->execute();
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) {
+            $id = (int)$id;
+            $db->exec("INSERT IGNORE INTO _ms_bk_entikal20260827 SELECT * FROM monthly_salaries
+                       WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+            $n = (int)$db->exec("DELETE FROM monthly_salaries
+                       WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
+            if ($n) { $removed += $n; $who[] = "كلاريتا#$id-$n"; }
+        }
+        setSetting('heal_entikal_cw2_20260827', 'done: removedRows=' . $removed . ($who ? ' (' . implode('؛', $who) . ')' : ''));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/**
  * 🏛️ تسوية الضمان السنوية طبق الأصل («تسوية الضمان 2025 القديس مكسيموس.xlsx» — 2026-08-26):
  * بيانات الجدول الملحق «الرواتب والاجور» + التصريح الاسمي (أ) الشهري، لسنة ميلادية
  * ولمجموعة مدارس تُختار بحرّية (خاصة ذوات رقم الضمان المشترك — تسوية واحدة للمؤسسة).

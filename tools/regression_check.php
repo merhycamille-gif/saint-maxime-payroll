@@ -4012,6 +4012,27 @@ check('كسارة: كشف تشرين للموظفين الخاضعين = كشف�
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healKsaraCw20260827') !== false,
       "n={$kcw79['n']} net={$kcw79['net']} الياس=$eliasNet79");
 
+// كلاريتا (الانتقال) — النسخة الثانية تشيل صفوفها حتى الخاضعة (داتا أونلاين منحرفة):
+// تجربة فعلية بزرع صف خاضع ثم محوه
+healEntikalCw2_20260827();
+$cla79 = $db->prepare("SELECT id FROM employees WHERE school_id=$ent77 AND first_name_ar LIKE 'كلاريتا%' AND last_name_ar LIKE 'مساعد%' LIMIT 1");
+$cla79->execute(); $claId79 = (int)$cla79->fetchColumn();
+$claOk79 = false;
+if ($claId79 > 0) {
+    $db->exec("INSERT INTO monthly_salaries (employee_id, school_id, month, year, school_year, grade_at_month,
+        base_salary_lbp, base_plus_echelon_lbp, prime_fixe_lbp, cnss_amount_lbp, taxable_base_lbp, income_tax_lbp,
+        total_retenues_lbp, net_salary_lbp, transport_lbp, total_due_lbp, exchange_rate, is_calculated, is_paid)
+        VALUES ($claId79, $ent77, 10, 2025, '2025-2026', 1, 0, 0, 17000000, 510000, 17000000, 0, 510000, 16490000, 0, 16490000, 89500, 1, 1)");
+    $db->prepare("DELETE FROM settings WHERE `key`='heal_entikal_cw2_20260827'")->execute();
+    $scCla79 = &settingsCache(); unset($scCla79['heal_entikal_cw2_20260827']);
+    healEntikalCw2_20260827();
+    $claOk79 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=$claId79 AND (year*100+month) BETWEEN 202510 AND 202609")->fetchColumn() === 0;
+    if (!$claOk79) $db->exec("DELETE FROM monthly_salaries WHERE employee_id=$claId79 AND year=2025 AND month=10");
+}
+check('الانتقال — النسخة الثانية تشيل صفوف كلاريتا مساعد حتى «الخاضعة» (داتا أونلاين منحرفة، بالنمط المقرَّر) + موصولة بالهيدر',
+      $claOk79 && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healEntikalCw2_20260827') !== false,
+      'زرعنا صف تشرين خاضعاً لكلاريتا والشفاء محاه');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
