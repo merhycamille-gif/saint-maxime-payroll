@@ -3823,6 +3823,29 @@ check('النجاة «طفي» (2026-08-27): مفتاح تنزيل الأولا�
       (int)$gca74 === 0 && (int)$diana74['id'] > 0 && (int)$karin74['id'] > 0
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNajatGcaOff20260827') !== false,
       "gca_sum=$gca74");
+// الشفاء التكميلي (باميلا نضّور أونلاين بلا أي شهر): تجربة فعلية — نحذف شهر تشرين ٢ عندها
+// محلياً ونشغّل الشفاء فيعيد خلقه بقيم الكشف نفسها مدفوعاً (ثم لا حاجة لاسترجاع: القيم مطلقة)
+$pam74 = $who74('باميلا', 'نضّور');
+$pamRow74 = $db->query("SELECT * FROM monthly_salaries WHERE employee_id=" . (int)$pam74['id'] . " AND year=2025 AND month=11")->fetch();
+$fillOk74 = false;
+if ($pamRow74) {
+    $db->exec("DELETE FROM monthly_salaries WHERE employee_id=" . (int)$pam74['id'] . " AND year=2025 AND month=11");
+    $db->prepare("DELETE FROM settings WHERE `key`='heal_najat_sheet_fill_20260827'")->execute();
+    $sc74 = &settingsCache(); unset($sc74['heal_najat_sheet_fill_20260827']);
+    healNajatSheetFill20260827();
+    $re74 = $db->query("SELECT net_salary_lbp, income_tax_lbp, cnss_amount_lbp, transport_lbp, total_due_lbp, prime_fixe_lbp, is_paid FROM monthly_salaries WHERE employee_id=" . (int)$pam74['id'] . " AND year=2025 AND month=11")->fetch();
+    $fillOk74 = $re74 && (float)$re74['net_salary_lbp'] === 42550000.0 && (float)$re74['income_tax_lbp'] === 130000.0
+        && (float)$re74['cnss_amount_lbp'] === 1320000.0 && (float)$re74['transport_lbp'] === 9000000.0
+        && (float)$re74['total_due_lbp'] === 51550000.0 && (float)$re74['prime_fixe_lbp'] === 42000000.0 && (int)$re74['is_paid'] === 1;
+    if (!$re74) { // فشل الخلق ⇒ استرجاع الصف الأصلي كي لا تنقص الداتا
+        $cols74 = array_keys($pamRow74);
+        $db->prepare("INSERT INTO monthly_salaries (`" . implode('`,`', $cols74) . "`) VALUES (" . implode(',', array_fill(0, count($cols74), '?')) . ")")
+           ->execute(array_values($pamRow74));
+    }
+}
+check('النجاة — الشفاء التكميلي يخلق الشهر الناقص كلياً بقيم الكشف مدفوعاً (حالة باميلا نضّور أونلاين بلا أي شهر) وهو موصول بالهيدر',
+      $fillOk74 && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNajatSheetFill20260827') !== false,
+      $pamRow74 ? 'أُعيد خلق تشرين ٢' : 'صف باميلا الأصلي غائب');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
