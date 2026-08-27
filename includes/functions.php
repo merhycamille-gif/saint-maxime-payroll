@@ -1773,6 +1773,98 @@ function healNajatSheetFill20260827() {
 }
 
 /**
+ * 🏫 (نسخة ثانية مشخِّصة — 2026-08-27 مساءً): الشفاء التكميلي الأول اشتغل محلياً لكن
+ * باميلا نضّور بقيت بلا أشهر أونلاين والخطأ ينبلع بالـcatch الصامت. هذه النسخة:
+ * تعيد نفس منطق خلق الأشهر الناقصة + تلتقط أي خطأ (لكل شخص ولكل شهر) وتسجّله
+ * نصاً في فلاغ الإعدادات ليُقرأ من بطاقة «حالة الشفاءات» بصفحة فحص الصحة،
+ * + مطابقة احتياطية بالاسم الفرنسي إن غاب العربي.
+ */
+function healNajatSheetFill2_20260827() {
+    try {
+        if (getSetting('heal_najat_sheet_fill2_20260827', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة النجاة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) return;
+        $sid = (int)$sid;
+        $err = []; $added = 0; $log = [];
+        $emps = $db->query("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+                (SELECT COUNT(*) FROM monthly_salaries ms WHERE ms.employee_id = e.id
+                   AND (ms.year*100+ms.month) BETWEEN 202510 AND 202609) AS yr_rows
+            FROM employees e WHERE e.school_id = $sid AND e.is_deleted = 0")->fetchAll(PDO::FETCH_ASSOC);
+        $byName = [];
+        foreach ($emps as $e) $byName[caisseNameNorm($e['first_name_ar'] . ' ' . $e['last_name_ar'])][] = $e;
+        $FR = ['باميلا نضّور' => ['pam', 'addour']]; // احتياط فرنسي لمن قد يختلف رسم اسمه العربي
+        $allMonths = [[10,2025],[11,2025],[12,2025],[1,2026],[2,2026],[3,2026],[4,2026],[5,2026],[6,2026],[7,2026],[8,2026],[9,2026]];
+        $ins = $db->prepare("INSERT INTO monthly_salaries (
+                employee_id, school_id, month, year, school_year, grade_at_month,
+                base_salary_lbp, echelon_value_lbp, base_plus_echelon_lbp,
+                extra_lbp, prime_fixe_lbp, aide_complementaire_lbp, transport_complement_lbp,
+                echelon_to_caisse_lbp, caisse_amount_lbp, eoc_grade_lbp, cnss_amount_lbp,
+                taxable_base_lbp, income_tax_lbp, total_retenues_lbp,
+                net_salary_lbp, family_allowance_lbp, transport_lbp, total_due_lbp,
+                exchange_rate, net_salary_usd, total_due_usd,
+                school_cnss_8_lbp, school_eoc_6_lbp, school_family_comp_6_lbp, school_end_of_service_8_5_lbp,
+                is_calculated, is_paid, calculated_at
+            ) VALUES (?,?,?,?, '2025-2026', 1, ?,0,?, 0,?,0,?, 0,0,0,?, ?,?,?, ?,0,?,?, ?,?,?, ?,0,?,?, 1,1,NOW())");
+        foreach (najatSheet20260827Spec() as [$fn,$ln,$type,$base,$prime,$tb,$tax,$cnss,$ret,$net,$tr,$due,$m1,$m2,$afd]) {
+            try {
+                $c = $byName[caisseNameNorm($fn . ' ' . $ln)] ?? [];
+                usort($c, fn($a, $b) => (int)$b['yr_rows'] <=> (int)$a['yr_rows']);
+                $e = $c[0] ?? null;
+                if (!$e && isset($FR[$fn . ' ' . $ln])) {
+                    [$f1, $l1] = $FR[$fn . ' ' . $ln];
+                    foreach ($emps as $cand) {
+                        if (stripos((string)$cand['first_name_fr'], $f1) === 0 && stripos((string)$cand['last_name_fr'], $l1) !== false) { $e = $cand; break; }
+                    }
+                }
+                if (!$e) { $err[] = "غايب: $fn $ln"; continue; }
+                $id = (int)$e['id'];
+                $have = array_map('intval', $db->query("SELECT year*100+month FROM monthly_salaries
+                    WHERE employee_id=$id AND (year*100+month) BETWEEN $m1 AND $m2")->fetchAll(PDO::FETCH_COLUMN));
+                $isEmp = ($type === 'employe');
+                $addedThis = 0;
+                foreach ($allMonths as [$m, $y]) {
+                    $ym = $y * 100 + $m;
+                    if ($ym < $m1 || $ym > $m2 || in_array($ym, $have, true)) continue;
+                    try {
+                        $rate = (float)$db->query("SELECT ms.exchange_rate FROM monthly_salaries ms
+                            JOIN employees e2 ON e2.id = ms.employee_id
+                            WHERE e2.school_id=$sid AND ms.year=$y AND ms.month=$m AND ms.exchange_rate>0 LIMIT 1")->fetchColumn();
+                        if ($rate <= 0) $rate = (float)getSetting('default_exchange_rate', 89500);
+                        $ins->execute([$id,$sid,$m,$y, $base,$base, $prime,$tr, $cnss, $tb,$tax,$ret, $net,$tr,$due,
+                            $rate, round($net/$rate,2), round($due/$rate,2),
+                            (int)round($tb*0.08), $isEmp ? (int)round($tb*0.06) : 0, $isEmp ? (int)round($tb*0.085) : 0]);
+                        $added++; $addedThis++;
+                    } catch (Throwable $exM) { $err[] = "$fn $ln $ym: " . mb_substr($exM->getMessage(), 0, 160); }
+                }
+                if ($addedThis) {
+                    $log[] = "$fn $ln#$id+$addedThis";
+                    $db->exec("UPDATE employees SET employee_type='" . $type . "', apply_family_deduction=" . (int)$afd . " WHERE id=$id");
+                    foreach ([['prime_fixe', $prime, !$isEmp], ['transport_complement', $tr, true]] as [$bt, $amt, $want]) {
+                        if (!$want || $amt <= 0) continue;
+                        $cB = (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id=$id
+                            AND bonus_type='$bt' AND school_year='2025-2026'")->fetchColumn();
+                        if ($cB) {
+                            $db->prepare("UPDATE employee_bonuses SET amount=?, value_type='amount', currency='LBP'
+                                WHERE employee_id=? AND bonus_type=? AND school_year='2025-2026'")->execute([$amt, $id, $bt]);
+                        } else {
+                            $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year,
+                                amount, value_type, currency, start_month, end_month, is_active)
+                                VALUES (?,?,1,'2025-2026',?,'amount','LBP',NULL,NULL,1)")->execute([$id, $bt, $amt]);
+                        }
+                    }
+                }
+            } catch (Throwable $exP) { $err[] = "$fn $ln: " . mb_substr($exP->getMessage(), 0, 200); }
+        }
+        setSetting('heal_najat_sheet_fill2_20260827', 'done: added=' . $added
+            . ($log ? ' | ' . implode('؛', $log) : '')
+            . ($err ? ' | أخطاء: ' . implode(' ؛؛ ', $err) : ''));
+    } catch (Throwable $e) {
+        try { setSetting('heal_najat_sheet_fill2_err', mb_substr($e->getMessage(), 0, 400)); } catch (Throwable $e2) {}
+    }
+}
+
+/**
  * 🏫 شفاء ذاتي مرّة واحدة (2026-08-27 مساءً): تدقيق ملاك ثانوية السيدة-عبرا على كشفَي
  * البرنامج القديم (تشرين الأول 2025-2026، 131 ملاكاً خاضعاً — p1..p9) كشف 102/131 مطابقين
  * بالمليم، وبقرار المستخدم الصريح تُصلَّح حالتان فقط + تحويل فئة لاثنتين (الباقي بلا مسّ):

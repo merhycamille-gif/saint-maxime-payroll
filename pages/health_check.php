@@ -456,6 +456,31 @@ include __DIR__ . '/../includes/header.php';
   </div>
   <?php endforeach; ?>
 
+  <?php
+  // 🩺 حالة الشفاءات الذاتية الأخيرة (تشخيص — تُقرأ قيَم فلاغاتها كما سُجّلت، بما فيها أي خطأ ملتقَط)
+  $healFlags = [
+      'heal_najat_sheet_20260827'       => 'النجاة: كشفا الخاضعين 2025-2026',
+      'heal_najat_gca_off_20260827'     => 'النجاة: إطفاء تنزيل الأولاد (ديانا/كارين)',
+      'heal_najat_sheet_fill_20260827'  => 'النجاة: خلق الأشهر الناقصة (١)',
+      'heal_najat_sheet_fill2_20260827' => 'النجاة: خلق الأشهر الناقصة (٢ مشخِّصة)',
+      'heal_najat_sheet_fill2_err'      => 'النجاة: خطأ التكميلي الملتقَط',
+      'heal_abra_fixes_20260827'        => 'عبرا: ريتا مارون/ماريا الياس + فيوليت وتريز',
+  ];
+  ?>
+  <div class="card">
+    <div class="card-header"><h3><i class="fas fa-notes-medical"></i> حالة الشفاءات الذاتية الأخيرة (2026-08-27)</h3></div>
+    <div class="card-body" style="overflow-x:auto">
+      <table class="table" style="direction:rtl">
+        <?php foreach ($healFlags as $hk => $hl): $hv = getSetting($hk, ''); ?>
+        <tr>
+          <td style="white-space:nowrap"><strong><?= e($hl) ?></strong></td>
+          <td style="word-break:break-word"><?= $hv === '' ? '<span class="text-muted">— لم يعمل بعد</span>' : e($hv) ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-body">
       <p class="text-muted" style="margin:0">
