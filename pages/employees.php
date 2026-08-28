@@ -1798,7 +1798,7 @@ include __DIR__ . '/../includes/header.php';
                                 <tr>
                                     <td><?= $label ?></td>
                                     <td>P<?= $b['period_number'] ?></td>
-                                    <td><?= ($b['value_type'] ?? 'amount') === 'percent' ? rtrim(rtrim(number_format((float)$b['amount'], 2), '0'), '.') . '٪ <small style="color:var(--gray-500)">من الأساس (قاعدة ÷1500)</small>' : ($b['currency'] === 'USD' ? formatUSD($b['amount']) : formatLBP($b['amount'])) ?></td>
+                                    <td><?= ($b['value_type'] ?? 'amount') === 'percent' ? rtrim(rtrim(number_format((float)$b['amount'], 2), '0'), '.') . '٪ <small style="color:var(--gray-500)">من الأساس (قاعدة ÷' . e(officialUsdRateLbl()) . ')</small>' : ($b['currency'] === 'USD' ? formatUSD($b['amount']) : formatLBP($b['amount'])) ?></td>
                                     <td><?= $b['start_month'] ? monthName($b['start_month'], 'fr', true) : 'Tous' ?> → <?= $b['end_month'] ? monthName($b['end_month'], 'fr', true) : 'Tous' ?></td>
                                 </tr>
                             <?php endforeach; if (!$hasAny): ?>

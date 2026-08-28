@@ -3745,9 +3745,18 @@ function usdToLbp($usd, $rate): float {
  *  متحقَّقة على كل ملاك البشارة بنسبة 45٪ (كارمن 40م، جورجيت 61م، روز 68م... نهاية 112م).
  *  بس يتغيّر الأساس (درجة جديدة) يتغيّر الإضافي تلقائياً — «إذا نحنا مطبّقين النسبة المئوية».
  *  السعر الرسمي قابل للتعديل بالإعدادات (official_usd_rate_lbp، الافتراضي 1500). */
+/** السعر الرسمي القديم لقاعدة نسبة الإضافي — خيار بالإعدادات (طلبه «بدي 1500 يكون عندي خيار عدلها») */
+function officialUsdRate(): float {
+    $v = (float)getSetting('official_usd_rate_lbp', 1500);
+    return $v > 0 ? $v : 1500.0;
+}
+/** نص السعر الرسمي للعرض (1500 أو ما عدّله المستخدم) */
+function officialUsdRateLbl(): string {
+    return rtrim(rtrim(number_format(officialUsdRate(), 2, '.', ''), '0'), '.');
+}
+
 function bonusPercentLbp($pct, $basePlusEchelonLbp, $marketRate): float {
-    $official = (float)getSetting('official_usd_rate_lbp', 1500);
-    if ($official <= 0) $official = 1500;
+    $official = officialUsdRate();
     $usd = floor(((float)$basePlusEchelonLbp / $official) * ((float)$pct / 100)); // داون للدولار
     $lbp = usdToLbp($usd, (float)$marketRate);                                    // داون لليرة
     return floor($lbp / 1000000) * 1000000;                                       // داون للمليون

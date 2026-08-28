@@ -265,7 +265,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
             <?php foreach ($appliedLines as $al):
                 $isPct = ($al['value_type'] === 'percent');
                 $valStr = $isPct
-                    ? rtrim(rtrim(number_format((float)$al['amount'], 2), '0'), '.') . '٪ <small style="color:#64748b">من الأساس (قاعدة ÷1500)</small>'
+                    ? rtrim(rtrim(number_format((float)$al['amount'], 2), '0'), '.') . '٪ <small style="color:#64748b">من الأساس (قاعدة ÷<?= e(officialUsdRateLbl()) ?>)</small>'
                     : ($al['currency'] === 'USD' ? formatUSD($al['amount']) : formatLBP($al['amount']))
                       . ($al['bonus_type'] === 'transport_daily' ? ' <small style="color:#64748b">يومياً</small>' : '');
                 $perStr = ($al['start_month'] === null && $al['end_month'] === null)
@@ -319,7 +319,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     <div class="card-body">
         <div class="ba-hint">
             <strong>كيف؟</strong> ① اكبس «تعديل» ② شيّك على مين بدك تطبّق ③ بالسطر: اختار النوع، وقرّر «مبلغ ثابت» أو «نسبة ٪»، واكتب القيمة (النسبة: اكتب <strong>45 بس، بلا علامة ٪</strong>) ④ اكبس «طبّق».<br>
-            <strong>النسبة ٪ (قانون الإضافي):</strong> بتنحسب لحالها: (أساس الراتب بعد التدرّج ÷ 1500) × النسبة ← داون للدولار ← × سعر السوق ← داون للمليون — وبتتحرّك مع الدرجة تلقائياً.
+            <strong>النسبة ٪ (قانون الإضافي):</strong> بتنحسب لحالها: (أساس الراتب بعد التدرّج ÷ <?= e(officialUsdRateLbl()) ?>) × النسبة ← داون للدولار ← × سعر السوق ← داون للمليون — وبتتحرّك مع الدرجة تلقائياً.
         </div>
         <form method="POST" id="periodsForm" class="lockedit">
             <?= csrfField() ?>

@@ -61,6 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $oldRate = getSetting('current_exchange_rate'); // لرصد تغيّر سعر الصرف الافتراضي
     // لرصد تغيّر نافذة أشهر النقل (✍️ 2026-08-25: «إذا بدي عدل بعدل» — التعديل يعيد الحساب تلقائياً)
     $oldTrWin = getSetting('transport_start_month', '10') . '-' . getSetting('transport_end_month', '6');
+    // لرصد تغيّر السعر الرسمي لقاعدة نسبة الإضافي (✍️ 2026-08-28: «بدي 1500 يكون عندي خيار عدلها»)
+    $oldOfficial = (float)getSetting('official_usd_rate_lbp', 1500);
     foreach ($_POST as $k => $v) {
         if (!in_array($k, $allowedSettings, true) || is_array($v)) continue;
         setSetting($k, trim((string)$v));
@@ -76,6 +78,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($newTrWin !== $oldTrWin) {
         $nRec2 = recalcSalariesInRange($db, '2026-10-01', null);
         $msg .= " + أشهر النقل: أُعيد حساب الرواتب المتأثّرة ($nRec2). / Mois du transport modifiés, salaires recalculés.";
+    }
+    // ✍️ (2026-08-28) السعر الرسمي (قاعدة نسبة الإضافي ÷1500) تغيّر ⇒ إعادة حساب أصحاب النسب تلقائياً
+    $newOfficial = (float)getSetting('official_usd_rate_lbp', 1500);
+    if (isset($_POST['official_usd_rate_lbp']) && $newOfficial > 0 && $newOfficial !== $oldOfficial) {
+        @set_time_limit(0);
+        require_once __DIR__ . '/../includes/payroll_calculator.php';
+        $pctEmps = $db->query("SELECT DISTINCT b.employee_id, b.school_year FROM employee_bonuses b
+            JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0
+            WHERE b.is_active = 1 AND b.value_type = 'percent'")->fetchAll(PDO::FETCH_ASSOC);
+        $nRec3 = 0;
+        foreach ($pctEmps as $pe) {
+            $sy3 = $pe['school_year'] ?: currentSchoolYear();
+            if (recalcEmployeeYear((int)$pe['employee_id'], $sy3) > 0) $nRec3++;
+        }
+        $msg .= " + السعر الرسمي صار " . rtrim(rtrim(number_format($newOfficial, 2), '0'), '.') . ": أُعيد حساب أصحاب النسبة المئوية ($nRec3). / Taux officiel modifié, salaires en % recalculés.";
     }
     $_SESSION['flash'] = ['type' => 'success', 'msg' => $msg];
     header('Location: ' . BASE_URL . 'pages/settings.php');
@@ -169,7 +186,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="form-group">
                 <label class="form-label">Taux officiel (règle du % supplément) / السعر الرسمي القديم — قاعدة نسبة الأجر الإضافي</label>
                 <input type="number" name="official_usd_rate_lbp" class="form-control" value="<?= e(getSetting('official_usd_rate_lbp', 1500)) ?>" step="0.01">
-                <small class="text-muted">قاعدة النسبة المئوية للأجر الإضافي: الأساس بعد التدرّج ÷ هذا السعر (1500) × النسبة٪ ← داون للدولار ← × سعر السوق ← داون للمليون ليرة</small>
+                <small class="text-muted">قاعدة النسبة المئوية للأجر الإضافي: الأساس بعد التدرّج ÷ هذا السعر × النسبة٪ ← داون للدولار ← × سعر السوق ← داون للمليون ليرة. <strong>تغييره يعيد حساب رواتب أصحاب النسبة تلقائياً.</strong></small>
             </div>
         </div>
     </div>

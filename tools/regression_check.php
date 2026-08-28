@@ -1147,6 +1147,20 @@ check('قانون النسبة على الجميع: الشفاء موصول + م
       && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'healPercentLawAll20260828();') !== false
       && strpos($fnSrc3, "e.father_name_ar LIKE 'مارون%'") !== false
       && (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE value_type='percent' AND is_active=1")->fetchColumn() >= 150);
+// 🧮 (2026-08-28) «بدي 1500 يكون عندي خيار عدلها»: السعر الرسمي إعداد قابل للتعديل،
+// وتغييره يعيد حساب أصحاب النسبة تلقائياً، والقاعدة والليبلات تقرأه ديناميكياً
+$offOld28 = $db->query("SELECT value FROM settings WHERE `key`='official_usd_rate_lbp'")->fetchColumn();
+setSetting('official_usd_rate_lbp', '3000');
+$offProbe = bonusPercentLbp(45, 1755000, 89500); // ÷3000: 585×45٪=263.25⇒263$×89500=23,538,500⇒23م
+// الإرجاع بsetSetting (لا DELETE — الحذف المباشر يترك الكاش على 3000 لبقية الطلب)
+setSetting('official_usd_rate_lbp', $offOld28 !== false ? (string)$offOld28 : '1500');
+check('السعر الرسمي (÷1500) خيار بالإعدادات: القاعدة تقرأه حيّاً + تغييره يعيد حساب أصحاب النسبة + الليبلات ديناميكية',
+      $offProbe === 23000000.0
+      && bonusPercentLbp(45, 1755000, 89500) === 47000000.0
+      && strpos($fnSrc3, 'function officialUsdRate') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/settings.php'), "أُعيد حساب أصحاب النسبة المئوية") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/bulk_allowances.php'), 'officialUsdRateLbl()') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'officialUsdRateLbl()') !== false);
 // التفقيط بالإفادات يتبع نفس الرقم المعروض (floor لا round)
 $attSrcU = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
 check('الإفادات: تفقيط الدولار بالحروف = الرقم المعروض نفسه (floor)',
