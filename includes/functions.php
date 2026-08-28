@@ -4787,3 +4787,40 @@ function healTiaPercentPrime20260828() {
         try { setSetting('heal_tia_percent_20260828', 'err: ' . mb_substr($e->getMessage(), 0, 180)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🧮 نسخة مشخِّصة (2026-08-28 ب): أونلاين طلع إضافي تيا 0 بعد الشفاء الأول — هذه النسخة
+ * تقرأ حالتها الفعلية (بند العلاوة + سعر الصرف + ناتج القاعدة + شهر تشرين المخزّن)،
+ * وإن كان المخزّن لا يطابق القاعدة تعيد الحساب (احتمال opcache قديم لحظة الشفاء الأول)
+ * وتسجّل كل شيء نصاً بالفلاغ ليُقرأ من بطاقة «حالة الشفاءات» بصفحة فحص الصحة.
+ */
+function healTiaPercent2_20260828() {
+    try {
+        if (getSetting('heal_tia_percent2_20260828', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) { setSetting('heal_tia_percent2_20260828', 'skip: no school'); return; }
+        $emp = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0
+            AND first_name_ar='تيا' AND last_name_ar='نخلة' AND employee_type='enseignant_titulaire' LIMIT 1");
+        $emp->execute([(int)$sid]);
+        $eid = (int)$emp->fetchColumn();
+        if (!$eid) { setSetting('heal_tia_percent2_20260828', 'skip: no emp'); return; }
+        $b = $db->prepare("SELECT id, value_type, amount, currency, school_year, is_active FROM employee_bonuses
+            WHERE employee_id=? AND bonus_type='prime_fixe' ORDER BY is_active DESC, id DESC LIMIT 1");
+        $b->execute([$eid]);
+        $row = $b->fetch(PDO::FETCH_ASSOC) ?: [];
+        $rate = getExchangeRate(10, 2025);
+        $test = function_exists('bonusPercentLbp') ? bonusPercentLbp(45, 1755000, $rate) : -1;
+        $m10 = (int)$db->query("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id=$eid AND month=10 AND year=2025 LIMIT 1")->fetchColumn();
+        $log = 'emp=' . $eid . ' bonus=' . json_encode($row) . ' rate10/2025=' . $rate . ' ruleTest=' . $test . ' storedOct=' . $m10;
+        if (($row['value_type'] ?? '') === 'percent' && (float)($row['amount'] ?? 0) === 45.0 && $test > 0 && $m10 !== (int)$test) {
+            require_once __DIR__ . '/payroll_calculator.php';
+            $n = recalcEmployeeYear($eid, '2025-2026');
+            $m10b = (int)$db->query("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id=$eid AND month=10 AND year=2025 LIMIT 1")->fetchColumn();
+            $log .= ' | re-recalc=' . $n . ' afterOct=' . $m10b;
+        }
+        setSetting('heal_tia_percent2_20260828', $log);
+    } catch (Throwable $e) {
+        try { setSetting('heal_tia_percent2_20260828', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
