@@ -1822,9 +1822,12 @@ $lockPages30 = ['bonuses', 'bulk_allowances', 'classes', 'exchange_rates', 'info
                 'salary_scales', 'schools', 'settings', 'social_security', 'tax_brackets', 'users'];
 $noLock30 = [];
 foreach ($lockPages30 as $lp30) {
-    if (strpos((string)file_get_contents(__DIR__ . '/../pages/' . $lp30 . '.php'), 'lockedit') === false) $noLock30[] = $lp30;
+    $lpSrc30 = (string)file_get_contents(__DIR__ . '/../pages/' . $lp30 . '.php');
+    // ✍️ (2026-08-28) فورمات التعديل داخل نافذة منبثقة (ba-overlay/ba-modal) = قفل مكافئ وأقوى:
+    // لا تُفتح إلا بكبسة زر صريحة + تأكيد عند الحفظ (إعادة تصميم صفحة المكافآت «متل البرامج العالمية»)
+    if (strpos($lpSrc30, 'lockedit') === false && strpos($lpSrc30, 'ba-overlay') === false) $noLock30[] = $lp30;
 }
-check('القفل الشامل: كل صفحات التعديل الـ16 على آلية lockedit (مقفولة حتى كبسة «تعديل»)',
+check('القفل الشامل: كل صفحات التعديل الـ16 على آلية lockedit (أو فورمات بنوافذ منبثقة — قفل مكافئ)',
       empty($noLock30), $noLock30 ? ('بلا قفل: ' . implode(',', $noLock30)) : '16 صفحة مقفولة');
 $flSrc30 = (string)file_get_contents(__DIR__ . '/../assets/js/form-lock.js');
 check('القفل الشامل: القفل يلقط حقول السطور المربوطة بسمة form= ويقرأ المعرّف بـgetAttribute (حقل «id» كان يغطّيه)',
