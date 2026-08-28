@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $allowedSettings = ['current_exchange_rate', 'current_school_year', 'grades_baseline_year',
                         'minimum_wage_lbp', 'school_name_ar', 'school_name_fr', 'school_address',
                         'school_phone', 'teacher_form_deadline', 'teacher_form_allow_after',
-                        'transport_start_month', 'transport_end_month'];
+                        'transport_start_month', 'transport_end_month', 'official_usd_rate_lbp'];
     $oldRate = getSetting('current_exchange_rate'); // لرصد تغيّر سعر الصرف الافتراضي
     // لرصد تغيّر نافذة أشهر النقل (✍️ 2026-08-25: «إذا بدي عدل بعدل» — التعديل يعيد الحساب تلقائياً)
     $oldTrWin = getSetting('transport_start_month', '10') . '-' . getSetting('transport_end_month', '6');
@@ -165,6 +165,11 @@ include __DIR__ . '/../includes/header.php';
                 <label class="form-label">Taux de change actuel (par défaut) / سعر الصرف الحالي (افتراضي)</label>
                 <input type="number" name="current_exchange_rate" class="form-control" value="<?= e(getSetting('current_exchange_rate')) ?>" step="0.01">
                 <small class="text-muted"><?= $lang==='ar'?'الأسعار الشهرية المفصّلة في صفحة «Taux de change».':'Les taux mensuels détaillés sont dans la page « Taux de change ».' ?></small>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Taux officiel (règle du % supplément) / السعر الرسمي القديم — قاعدة نسبة الأجر الإضافي</label>
+                <input type="number" name="official_usd_rate_lbp" class="form-control" value="<?= e(getSetting('official_usd_rate_lbp', 1500)) ?>" step="0.01">
+                <small class="text-muted">قاعدة النسبة المئوية للأجر الإضافي: الأساس بعد التدرّج ÷ هذا السعر (1500) × النسبة٪ ← داون للدولار ← × سعر السوق ← داون للمليون ليرة</small>
             </div>
         </div>
     </div>

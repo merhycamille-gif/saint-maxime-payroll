@@ -3738,6 +3738,21 @@ function usdToLbp($usd, $rate): float {
     return floor((float)$usd * (float)$rate);
 }
 
+/** 🧮 (2026-08-28، شرحها المستخدم بمثال تيا نخلة — «قاعدة النسبة المئوية للأجر الإضافي»):
+ *  الإضافي بالنسبة = (أساس الراتب بعد التدرّج ÷ السعر الرسمي القديم 1500) × النسبة٪
+ *    ← داون للدولار (526.5 ⇒ 526) ← × سعر السوق (سعر شهر الراتب) ← داون للمليون ليرة
+ *    (47,077,000 ⇒ 47,000,000 — «فراطات الليرة» = ما دون المليون هنا).
+ *  متحقَّقة على كل ملاك البشارة بنسبة 45٪ (كارمن 40م، جورجيت 61م، روز 68م... نهاية 112م).
+ *  بس يتغيّر الأساس (درجة جديدة) يتغيّر الإضافي تلقائياً — «إذا نحنا مطبّقين النسبة المئوية».
+ *  السعر الرسمي قابل للتعديل بالإعدادات (official_usd_rate_lbp، الافتراضي 1500). */
+function bonusPercentLbp($pct, $basePlusEchelonLbp, $marketRate): float {
+    $official = (float)getSetting('official_usd_rate_lbp', 1500);
+    if ($official <= 0) $official = 1500;
+    $usd = floor(((float)$basePlusEchelonLbp / $official) * ((float)$pct / 100)); // داون للدولار
+    $lbp = usdToLbp($usd, (float)$marketRate);                                    // داون لليرة
+    return floor($lbp / 1000000) * 1000000;                                       // داون للمليون
+}
+
 /**
  * سعر صرف صف راتب: يفضّل اللقطة المخزّنة `exchange_rate` (الأدقّ لأنها سعر شهر الراتب)،
  * وإلا يجلب سعر شهر/سنة الصف، وإلا السعر الحالي.
@@ -4734,4 +4749,41 @@ function docBackUrl(string $fallback = ''): string {
         if (!$sameDoc) $_SESSION['doc_back'] = $ref;
     }
     return $_SESSION['doc_back'] ?? $fallback;
+}
+
+/**
+ * 🧮 شفاء ذاتي مرّة واحدة (2026-08-28): تيا نخلة (البشارة) — أجرها الإضافي كان رقماً جامداً
+ * غلطاً (48,060,000 = 540$×سعر قديم 89,000) والصحيح «نسبة مئوية 45٪» بقاعدة المستخدم
+ * (÷1500 ← نسبة ← داون دولار ← سعر السوق ← داون للمليون) متل كل رفقاتها بالبشارة،
+ * فتتحرّك مع درجتها تلقائياً (تشرين 47م → كانون 54م). يعمل بالاسم لا بالرقم (داتا الأونلاين).
+ */
+function healTiaPercentPrime20260828() {
+    try {
+        if (getSetting('heal_tia_percent_20260828', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) return;
+        $emp = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0
+            AND first_name_ar='تيا' AND last_name_ar='نخلة' AND employee_type='enseignant_titulaire' LIMIT 1");
+        $emp->execute([(int)$sid]);
+        $eid = (int)$emp->fetchColumn();
+        if (!$eid) { setSetting('heal_tia_percent_20260828', 'skip: not found'); return; }
+        $b = $db->prepare("SELECT id, value_type, amount FROM employee_bonuses
+            WHERE employee_id=? AND bonus_type='prime_fixe' AND school_year='2025-2026' AND is_active=1 LIMIT 1");
+        $b->execute([$eid]);
+        $row = $b->fetch();
+        $log = 'emp=' . $eid;
+        if ($row && !($row['value_type'] === 'percent' && (float)$row['amount'] === 45.0)) {
+            setSetting('bk_tia_prime_20260828', json_encode(['bonus_id' => $row['id'], 'old_type' => $row['value_type'], 'old_amount' => $row['amount']]));
+            $db->prepare("UPDATE employee_bonuses SET value_type='percent', amount=45, currency='LBP' WHERE id=?")->execute([$row['id']]);
+            require_once __DIR__ . '/payroll_calculator.php';
+            $n = recalcEmployeeYear($eid, '2025-2026');
+            $log .= ' updated bonus=' . $row['id'] . ' recalc=' . $n;
+        } else {
+            $log .= $row ? ' already percent' : ' no prime row';
+        }
+        setSetting('heal_tia_percent_20260828', 'done: ' . $log);
+    } catch (Throwable $e) {
+        try { setSetting('heal_tia_percent_20260828', 'err: ' . mb_substr($e->getMessage(), 0, 180)); } catch (Throwable $e2) {}
+    }
 }

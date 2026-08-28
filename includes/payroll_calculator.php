@@ -105,9 +105,10 @@ class PayrollCalculator {
                 $amount = (float)$row['amount'];
             }
             
-            // نسبة مئوية من الأساس، أو مبلغ ثابت (يُحوَّل للّيرة إن كان بالدولار — بلا فراطات: تدوير لتحت)
+            // نسبة مئوية: قاعدة المستخدم (÷1500 رسمي ← نسبة ← داون دولار ← سعر السوق ← داون للمليون)
+            // فتتحرّك مع الأساس/الدرجة تلقائياً. أو مبلغ ثابت (يُحوَّل للّيرة إن دولار — داون).
             if (($row['value_type'] ?? 'amount') === 'percent') {
-                $amount = ($amount / 100) * $baseForPercent;
+                $amount = bonusPercentLbp($amount, $baseForPercent, $this->exchangeRate);
             } elseif ($row['currency'] === 'USD') {
                 $amount = usdToLbp($amount, $this->exchangeRate);
             }

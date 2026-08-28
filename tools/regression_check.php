@@ -1124,6 +1124,22 @@ foreach ($usdSweep as $usLbl => [$usRel, $usGet]) {
     $mil = preg_match_all($usPat, $usArea);
     check("توحيد العملتين: $usLbl بوضع «دولار فقط» بلا أي خلية ليرة متروكة", strlen($hOfU) > 5000 && $mil === 0, "خلايا ليرة=$mil");
 }
+// 🧮 (2026-08-28) قاعدة النسبة المئوية للأجر الإضافي (شرحها المستخدم بمثال تيا نخلة):
+// (الأساس بعد التدرّج ÷ 1500 الرسمي) × النسبة٪ ← داون دولار ← × سعر السوق ← داون للمليون
+check('قاعدة نسبة الإضافي: ÷1500 ← نسبة ← داون دولار ← سعر السوق ← داون للمليون (أمثلة البشارة 45٪)',
+      bonusPercentLbp(45, 1755000, 89500) === 47000000.0   // تيا تشرين (526.5⇒526⇒47,077,000⇒47م)
+      && bonusPercentLbp(45, 2015000, 89500) === 54000000.0 // تيا من كانون (درجة 23)
+      && bonusPercentLbp(45, 2545000, 89500) === 68000000.0 // روز/ناتالي
+      && bonusPercentLbp(45, 1525000, 89500) === 40000000.0 // كارمن
+      && bonusPercentLbp(45, 4195000, 89500) === 112000000.0 // نهاية
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php'), 'bonusPercentLbp($amount, $baseForPercent, $this->exchangeRate)') !== false);
+check('تيا نخلة (1554): علاوتها نسبة 45٪ وأشهرها عالقاعدة (تشرين 47م / كانون 54م تتحرّك مع درجتها)',
+      (function () use ($db) {
+          $b = $db->query("SELECT value_type, amount FROM employee_bonuses WHERE employee_id=1554 AND bonus_type='prime_fixe' AND school_year='2025-2026' AND is_active=1")->fetch();
+          if (!$b || $b['value_type'] !== 'percent' || (float)$b['amount'] !== 45.0) return false;
+          $m = $db->query("SELECT month, prime_fixe_lbp FROM monthly_salaries WHERE employee_id=1554 AND school_year='2025-2026' AND month IN (10,1)")->fetchAll(PDO::FETCH_KEY_PAIR);
+          return (int)($m[10] ?? 0) === 47000000 && (int)($m[1] ?? 0) === 54000000;
+      })());
 // التفقيط بالإفادات يتبع نفس الرقم المعروض (floor لا round)
 $attSrcU = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
 check('الإفادات: تفقيط الدولار بالحروف = الرقم المعروض نفسه (floor)',
