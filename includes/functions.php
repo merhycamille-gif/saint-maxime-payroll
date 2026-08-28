@@ -4984,34 +4984,44 @@ function healPercentLawAll20260828() {
  */
 function healPrimeSnapshotSync20260828() {
     try {
-        if (strpos((string)getSetting('heal_prime_snapshot_20260828', ''), 'done') === 0) return;
         $file = dirname(__DIR__) . '/tools/data/prime_snapshot_20260828.json';
         if (!is_file($file)) { setSetting('heal_prime_snapshot_20260828', 'skip: no snapshot file'); return; }
+        // نسخة اللقطة جزء من فلاغ الإتمام — لقطة جديدة (مثلاً بعد إضافة اسم الأم للتمييز) تعيد التشغيل
+        $ver = substr(md5_file($file), 0, 8);
+        if (strpos((string)getSetting('heal_prime_snapshot_20260828', ''), 'done@' . $ver) === 0) return;
         $snap = json_decode((string)file_get_contents($file), true);
         if (!is_array($snap) || !$snap) { setSetting('heal_prime_snapshot_20260828', 'skip: empty snapshot'); return; }
         $db = getDB();
         require_once __DIR__ . '/payroll_calculator.php';
         // تجميع اللقطة موظفاً-موظفاً (المقارنة كمجموعة بنود كاملة — بند-ببند كان يتأرجح عند تعدّد البنود)
         $byEmp = [];
-        foreach ($snap as $r) $byEmp[$r['school'] . '|' . $r['f'] . '|' . $r['fa'] . '|' . $r['l']][] = $r;
+        foreach ($snap as $r) $byEmp[$r['school'] . '|' . $r['f'] . '|' . $r['fa'] . '|' . ($r['mo'] ?? '') . '|' . $r['l']][] = $r;
         $batch = 10; $didN = 0; $amb = []; $miss = [];
         $key = function ($vt, $a, $c, $sy, $sm, $em) {
             return $vt . '|' . number_format((float)$a, 2, '.', '') . '|' . $c . '|' . ($sy ?? '~') . '|' . ($sm ?? '~') . '|' . ($em ?? '~');
         };
         foreach ($byEmp as $ek => $rows) {
-            [$school, $f, $fa, $l] = explode('|', $ek);
+            [$school, $f, $fa, $mo, $l] = explode('|', $ek);
             // المحميّان (سلفتاهما موثّقتان بالمليم)
             if (($f === 'ريتا' && strpos($fa, 'مارون') === 0 && strpos($l, 'حليحل') !== false)
              || ($f === 'ماريا' && strpos($fa, 'الياس') === 0 && strpos($l, 'حليحل') !== false)) continue;
             $sid = (int)$db->query("SELECT id FROM schools WHERE name_ar = " . $db->quote($school) . " AND is_deleted=0 LIMIT 1")->fetchColumn();
             if (!$sid) { $miss[] = 'مدرسة:' . $school; continue; }
-            $st = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0 AND first_name_ar=? AND last_name_ar=? AND COALESCE(father_name_ar,'')=?");
-            $st->execute([$sid, $f, $l, $fa]);
-            $ids = $st->fetchAll(PDO::FETCH_COLUMN);
-            if (count($ids) !== 1) {
-                $st2 = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0 AND first_name_ar=? AND last_name_ar=?");
-                $st2->execute([$sid, $f, $l]);
-                $ids = $st2->fetchAll(PDO::FETCH_COLUMN);
+            // سلّم التمييز (تنبيه المستخدم: «في اسم وعيلة نفس الشي بس بيختلف اسم الأب أو الأم»):
+            // ١) اسم+شهرة+أب ٢) اسم+شهرة+أم ٣) اسم+شهرة+أب+أم ٤) اسم+شهرة فقط — أول درجة تعطي شخصاً واحداً بالضبط
+            $ladder = [
+                ["AND COALESCE(father_name_ar,'')=?", [$fa]],
+                ["AND COALESCE(mother_first_name,'')=?", [$mo]],
+                ["AND COALESCE(father_name_ar,'')=? AND COALESCE(mother_first_name,'')=?", [$fa, $mo]],
+                ["", []],
+            ];
+            $ids = [];
+            foreach ($ladder as [$cond, $extra]) {
+                $st = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0 AND first_name_ar=? AND last_name_ar=? $cond");
+                $st->execute(array_merge([$sid, $f, $l], $extra));
+                $got = $st->fetchAll(PDO::FETCH_COLUMN);
+                if (count($got) === 1) { $ids = $got; break; }
+                if (!$ids) $ids = $got; // للتقرير: آخر عدّ غير الصفري
             }
             if (count($ids) !== 1) { $amb[] = $f . ' ' . $l . '×' . count($ids); continue; }
             $eid = (int)$ids[0];
@@ -5039,7 +5049,7 @@ function healPrimeSnapshotSync20260828() {
             $didN++;
         }
         if ($didN >= $batch) { setSetting('heal_prime_snapshot_progress', 'working... batch=' . $didN); return; }
-        setSetting('heal_prime_snapshot_20260828', 'done: غامض=' . count($amb) . ($amb ? ' [' . implode('؛', array_slice($amb, 0, 20)) . ']' : '')
+        setSetting('heal_prime_snapshot_20260828', 'done@' . $ver . ': غامض=' . count($amb) . ($amb ? ' [' . implode('؛', array_slice($amb, 0, 20)) . ']' : '')
             . ' مفقود=' . count($miss) . ($miss ? ' [' . implode('؛', array_slice(array_unique($miss), 0, 10)) . ']' : ''));
         setSetting('heal_prime_snapshot_progress', 'done');
     } catch (Throwable $e) {
