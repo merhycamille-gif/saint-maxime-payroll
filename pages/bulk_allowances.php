@@ -186,6 +186,22 @@ if ($hasScope) {
     $preview = $q->fetchAll(PDO::FETCH_ASSOC);
 }
 $exchangeRate = (float)getExchangeRate();
+
+/* ✍️ (2026-08-28، طلبه «لازم يبين السطر اللي فيه النسبة بعد الحفظ»): جدول «المطبّق حالياً» —
+   كل تركيبة بنود سارية على النطاق (نوع/قيمة/نسبة أو مبلغ/عملة/فترة) مع عدد الموظفين،
+   فيشوف نتيجة حفظه فوراً بدل ما ترجع الصفحة فاضية وكأن شيئاً لم يكن. */
+$appliedLines = [];
+if ($hasScope) {
+    $qa = $db->prepare("SELECT b.bonus_type, b.value_type, b.amount, b.currency, b.start_month, b.end_month, COUNT(DISTINCT b.employee_id) n
+                        FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0
+                        WHERE b.is_active = 1 AND b.school_year = ?" . schoolWhere($scopeAll,$schoolId) . str_replace('employee_type','e.employee_type',catWhere($categories)) . yearFilter($schoolYear,'e.') . "
+                        GROUP BY b.bonus_type, b.value_type, b.amount, b.currency, b.start_month, b.end_month
+                        ORDER BY FIELD(b.bonus_type,'prime_fixe','aide_complementaire','transport_complement','transport_daily'), n DESC, b.amount DESC");
+    $qa->execute([$schoolYear]);
+    $appliedLines = $qa->fetchAll(PDO::FETCH_ASSOC);
+}
+$bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'aide_complementaire'=>'💰 مكافأة ومساعدة / Prime & aide',
+                 'transport_complement'=>'🚌 تعويض نقل (شهري) / Transport mensuel', 'transport_daily'=>'🚌 نقل يومي / Transport journalier'];
 ?>
 <div class="card">
     <div class="card-header"><h3>
@@ -232,6 +248,36 @@ $exchangeRate = (float)getExchangeRate();
         <div class="alert alert-info" style="font-size:12px">
             أضِف سطراً لكل قيمة وفترة. <strong>القيمة بتتغيّر خلال السنة؟</strong> ضيف سطرين بفترتين (مثلاً نقل: تشرين→كانون قيمة، شباط→أيلول قيمة أخرى).
             «تعويض نقل (شهري)» هون = مبلغ شهري ثابت للفترة (غير النقل اليومي حسب الأيام بالأسفل). النسبة % تُحسب من الراتب.
+        </div>
+        <?php /* ✍️ المطبّق حالياً — يظهر مباشرة بعد كل حفظ (طلبه: «لازم يبين السطر اللي فيه النسبة بعد الحفظ») */ ?>
+        <div style="margin-bottom:14px">
+            <div style="font-weight:700;margin-bottom:6px;color:#0f766e"><i class="fas fa-check-circle"></i> Lignes appliquées actuellement / المطبّق حالياً — <?= catLabel($categories) ?> — <?= e(scopeLabel($scopeAll,$schoolId)) ?> — <?= e($schoolYear) ?></div>
+            <?php if ($appliedLines): ?>
+            <div style="overflow:auto"><table class="table" style="font-size:13px;min-width:560px;background:#f0fdfa">
+                <thead><tr><th>Type / النوع</th><th>Valeur / القيمة</th><th>Période / الفترة</th><th>Employés / عدد الموظفين</th></tr></thead>
+                <tbody>
+                <?php foreach ($appliedLines as $al):
+                    $isPct = ($al['value_type'] === 'percent');
+                    $valStr = $isPct
+                        ? rtrim(rtrim(number_format((float)$al['amount'], 2), '0'), '.') . '٪ <small style="color:#64748b">من الأساس (قاعدة ÷1500)</small>'
+                        : ($al['currency'] === 'USD' ? formatUSD($al['amount']) : formatLBP($al['amount']))
+                          . ($al['bonus_type'] === 'transport_daily' ? ' <small style="color:#64748b">يومياً</small>' : '');
+                    $perStr = ($al['start_month'] === null && $al['end_month'] === null)
+                        ? 'كل السنة'
+                        : monthName((int)$al['start_month'], 'ar') . ' ← ' . monthName((int)$al['end_month'], 'ar');
+                ?>
+                    <tr>
+                        <td><?= $bonusTypeLbl[$al['bonus_type']] ?? e($al['bonus_type']) ?></td>
+                        <td><strong><?= $valStr ?></strong></td>
+                        <td><?= e($perStr) ?></td>
+                        <td><?= (int)$al['n'] ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table></div>
+            <?php else: ?>
+            <div class="text-muted" style="font-size:13px;padding:6px 2px">لا بنود مطبّقة على هذا النطاق لهذه السنة بعد / Aucune ligne appliquée.</div>
+            <?php endif; ?>
         </div>
         <form method="POST" id="periodsForm" class="lockedit">
             <?= csrfField() ?>
