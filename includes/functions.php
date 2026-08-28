@@ -4824,3 +4824,43 @@ function healTiaPercent2_20260828() {
         try { setSetting('heal_tia_percent2_20260828', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🧮 النسخة الثالثة الحاسمة (2026-08-28 ج): التشخيص الأونلاين بيّن أن تيا نخلة بلا بند
+ * prime_fixe إطلاقاً أونلاين (bonus=[] وأشهرها المخزّنة بإضافي 0) — النسختان السابقتان
+ * تعدّلان بنداً موجوداً فقط. هذه تخلق البند إن غاب (نسبة 45٪ بقاعدة ÷1500، 2025-2026)
+ * أو توحّده إن وُجد، ثم تعيد حساب سنتها، وتسجّل قبل/بعد بالفلاغ.
+ */
+function healTiaPercent3_20260828() {
+    try {
+        if (getSetting('heal_tia_percent3_20260828', '') !== '') return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) { setSetting('heal_tia_percent3_20260828', 'skip: no school'); return; }
+        $emp = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0
+            AND first_name_ar='تيا' AND last_name_ar='نخلة' AND employee_type='enseignant_titulaire' LIMIT 1");
+        $emp->execute([(int)$sid]);
+        $eid = (int)$emp->fetchColumn();
+        if (!$eid) { setSetting('heal_tia_percent3_20260828', 'skip: no emp'); return; }
+        $before = (int)$db->query("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id=$eid AND month=10 AND year=2025 LIMIT 1")->fetchColumn();
+        $b = $db->prepare("SELECT id FROM employee_bonuses WHERE employee_id=? AND bonus_type='prime_fixe' AND school_year='2025-2026' AND is_active=1 LIMIT 1");
+        $b->execute([$eid]);
+        $bid = (int)$b->fetchColumn();
+        if ($bid) {
+            $db->prepare("UPDATE employee_bonuses SET value_type='percent', amount=45, currency='LBP' WHERE id=?")->execute([$bid]);
+            $act = 'updated ' . $bid;
+        } else {
+            $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year,
+                amount, value_type, currency, start_month, end_month, is_active)
+                VALUES (?, 'prime_fixe', 1, '2025-2026', 45, 'percent', 'LBP', NULL, NULL, 1)")->execute([$eid]);
+            $act = 'inserted ' . $db->lastInsertId();
+        }
+        require_once __DIR__ . '/payroll_calculator.php';
+        $n = recalcEmployeeYear($eid, '2025-2026');
+        $oct = (int)$db->query("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id=$eid AND month=10 AND year=2025 LIMIT 1")->fetchColumn();
+        $jan = (int)$db->query("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id=$eid AND month=1 AND year=2026 LIMIT 1")->fetchColumn();
+        setSetting('heal_tia_percent3_20260828', "done: emp=$eid $act recalc=$n beforeOct=$before oct=$oct jan=$jan");
+    } catch (Throwable $e) {
+        try { setSetting('heal_tia_percent3_20260828', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
