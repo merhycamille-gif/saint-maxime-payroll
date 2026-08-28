@@ -319,7 +319,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     <div class="card-body">
         <div class="ba-hint">
             <strong>كيف؟</strong> ① اكبس «تعديل» ② شيّك على مين بدك تطبّق ③ بالسطر: اختار النوع، وقرّر «مبلغ ثابت» أو «نسبة ٪»، واكتب القيمة (النسبة: اكتب <strong>45 بس، بلا علامة ٪</strong>) ④ اكبس «طبّق».<br>
-            <strong>النسبة ٪ (قانون الإضافي):</strong> بتنحسب لحالها: (أساس الراتب بعد التدرّج ÷ <?= e(officialUsdRateLbl()) ?>) × النسبة ← داون للدولار ← × سعر السوق ← داون للمليون — وبتتحرّك مع الدرجة تلقائياً.
+            <strong>النسبة ٪ (قانون الإضافي) — فيها سعران معاً:</strong> ① الأساس بعد التدرّج ÷ <strong>السعر الرسمي القديم (<?= e(officialUsdRateLbl()) ?>)</strong> × النسبة ← داون = <strong>الإضافي بالدولار</strong> ② × <strong>السعر الجديد (سعر صرف الشهر — 89,500)</strong> ← داون للمليون = <strong>الإضافي بالليرة</strong> — وبيتحرّك مع الدرجة تلقائياً.
         </div>
         <form method="POST" id="periodsForm" class="lockedit">
             <?= csrfField() ?>

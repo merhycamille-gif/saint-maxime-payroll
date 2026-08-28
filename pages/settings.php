@@ -184,9 +184,9 @@ include __DIR__ . '/../includes/header.php';
                 <small class="text-muted"><?= $lang==='ar'?'الأسعار الشهرية المفصّلة في صفحة «Taux de change».':'Les taux mensuels détaillés sont dans la page « Taux de change ».' ?></small>
             </div>
             <div class="form-group">
-                <label class="form-label">Taux officiel (règle du % supplément) / السعر الرسمي القديم — قاعدة نسبة الأجر الإضافي</label>
+                <label class="form-label">Taux officiel ancien (règle du % supplément) / السعر الرسمي القديم (1500) — قاعدة نسبة الأجر الإضافي</label>
                 <input type="number" name="official_usd_rate_lbp" class="form-control" value="<?= e(getSetting('official_usd_rate_lbp', 1500)) ?>" step="0.01">
-                <small class="text-muted">قاعدة النسبة المئوية للأجر الإضافي: الأساس بعد التدرّج ÷ هذا السعر × النسبة٪ ← داون للدولار ← × سعر السوق ← داون للمليون ليرة. <strong>تغييره يعيد حساب رواتب أصحاب النسبة تلقائياً.</strong></small>
+                <small class="text-muted">🔴 <strong>القاعدة فيها سعران معاً:</strong> ① <strong>هذا السعر (القديم 1500)</strong> — فقط لتحويل أساس الراتب بعد التدرّج إلى دولار حتى يطلع الإضافي بالدولار (÷1500 × النسبة٪ ← داون للدولار). ② <strong>السعر الجديد (89,500)</strong> — لتحويل الإضافي الدولاري رجوعاً إلى الليرة (× سعر صرف شهر الراتب من صفحة «أسعار الصرف» ← داون للمليون). <strong>تغيير أيّ منهما يعيد حساب أصحاب النسبة تلقائياً.</strong></small>
             </div>
         </div>
     </div>
