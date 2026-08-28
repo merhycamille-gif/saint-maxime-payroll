@@ -1077,6 +1077,11 @@ check('تحويل دولار←ليرة بلا فراطات (usdToLbp تدوير
       && substr_count($pcSrcU, 'usdToLbp(') >= 5
       && strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), "usdToLbp(\$emp['base_salary_usd']") !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/bulk_allowances.php'), 'usdToLbp(') !== false);
+// والدولار المعروض من الجافاسكريبت أيضاً بلا فراطات (Math.floor لا سنتات)
+$appJsU = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
+check('formatUSD بالجافاسكريبت بلا فراطات (Math.floor + لا minimumFractionDigits)',
+      strpos($appJsU, 'Math.floor(n)') !== false
+      && strpos($appJsU, 'minimumFractionDigits') === false);
 // وضع العملة: «دولار فقط» لا يخلط الليرة بالدولار في الكشف الشهري
 $hUsd = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [], 'usd');
 $lbpHits = preg_match_all('/L\.L/u', $hUsd);

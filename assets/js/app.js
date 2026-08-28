@@ -8,7 +8,8 @@ function formatLBP(n) {
 }
 
 function formatUSD(n) {
-    return '$' + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+    // قاعدة «بدون فراطات — داون»: الدولار المعروض رقم صحيح بالتدوير لتحت (580.39 ⇒ 580)
+    return '$' + new Intl.NumberFormat('en-US').format(Math.floor(n));
 }
 
 // Tab switching
