@@ -62,6 +62,11 @@ include __DIR__ . '/../includes/header.php';
         <div style="font-size:0.85em;font-weight:600;opacity:0.9">إضافة / تعديل سعر صرف</div>
     </h3></div>
     <div class="card-body">
+        <div class="alert alert-info" style="font-size:12.5px">
+            🔴 هيدا هو <strong>«السعر الرسمي الجديد» (89,500)</strong> — سعر شهر الراتب: فيه بيتحوّل الإضافي الدولاري لليرة (قاعدة النسبة ٪ الخطوة ②)،
+            وكل عرض بالدولار بالكشوف. <strong>عدّل سعر أي شهر من هون والرواتب المتأثّرة بتنعاد لحالها.</strong>
+            (أما «السعر الرسمي القديم 1500» — قسمة الأساس لدولار — فتعديله بصفحة الإعدادات.)
+        </div>
         <form method="POST" class="lockedit">
             <input type="hidden" name="action" value="set">
             <div class="form-row cols-4">
