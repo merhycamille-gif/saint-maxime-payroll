@@ -4972,3 +4972,77 @@ function healPercentLawAll20260828() {
         try { setSetting('heal_percent_law_progress', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🔄 مزامنة بنود «الأجر الإضافي» من الكمبيوتر للأونلاين (2026-08-28، امتداد «طبق القانون
+ * على الجميع»): تبيّن أن ملاك البشارة (وربما غيرهم) أونلاين **بلا بنود إضافي إطلاقاً**
+ * وأشهرهم بإضافي 0 (متل قصة تيا) بينما الكمبيوتر هو المصدر الصحيح المطابق لكشوفه.
+ * يقرأ لقطة tools/data/prime_snapshot_20260828.json (كل بنود الإضافي الفعّالة محلياً بعد
+ * تطبيق القانون) ويطابق بالاسم (مدرسة+اسم+أب+شهرة)، يخلق/يوحّد البند ويعيد حساب سنته.
+ * دفعات + يتخطّى من بنده مطابقاً وإضافيه المخزّن ليس صفراً (فلا يلمس السليم) + يتخطّى
+ * المحميّين (ريتا مارون/ماريا الياس) والغامض اسمياً (يسجَّل).
+ */
+function healPrimeSnapshotSync20260828() {
+    try {
+        if (strpos((string)getSetting('heal_prime_snapshot_20260828', ''), 'done') === 0) return;
+        $file = dirname(__DIR__) . '/tools/data/prime_snapshot_20260828.json';
+        if (!is_file($file)) { setSetting('heal_prime_snapshot_20260828', 'skip: no snapshot file'); return; }
+        $snap = json_decode((string)file_get_contents($file), true);
+        if (!is_array($snap) || !$snap) { setSetting('heal_prime_snapshot_20260828', 'skip: empty snapshot'); return; }
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        // تجميع اللقطة موظفاً-موظفاً (المقارنة كمجموعة بنود كاملة — بند-ببند كان يتأرجح عند تعدّد البنود)
+        $byEmp = [];
+        foreach ($snap as $r) $byEmp[$r['school'] . '|' . $r['f'] . '|' . $r['fa'] . '|' . $r['l']][] = $r;
+        $batch = 10; $didN = 0; $amb = []; $miss = [];
+        $key = function ($vt, $a, $c, $sy, $sm, $em) {
+            return $vt . '|' . number_format((float)$a, 2, '.', '') . '|' . $c . '|' . ($sy ?? '~') . '|' . ($sm ?? '~') . '|' . ($em ?? '~');
+        };
+        foreach ($byEmp as $ek => $rows) {
+            [$school, $f, $fa, $l] = explode('|', $ek);
+            // المحميّان (سلفتاهما موثّقتان بالمليم)
+            if (($f === 'ريتا' && strpos($fa, 'مارون') === 0 && strpos($l, 'حليحل') !== false)
+             || ($f === 'ماريا' && strpos($fa, 'الياس') === 0 && strpos($l, 'حليحل') !== false)) continue;
+            $sid = (int)$db->query("SELECT id FROM schools WHERE name_ar = " . $db->quote($school) . " AND is_deleted=0 LIMIT 1")->fetchColumn();
+            if (!$sid) { $miss[] = 'مدرسة:' . $school; continue; }
+            $st = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0 AND first_name_ar=? AND last_name_ar=? AND COALESCE(father_name_ar,'')=?");
+            $st->execute([$sid, $f, $l, $fa]);
+            $ids = $st->fetchAll(PDO::FETCH_COLUMN);
+            if (count($ids) !== 1) {
+                $st2 = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0 AND first_name_ar=? AND last_name_ar=?");
+                $st2->execute([$sid, $f, $l]);
+                $ids = $st2->fetchAll(PDO::FETCH_COLUMN);
+            }
+            if (count($ids) !== 1) { $amb[] = $f . ' ' . $l . '×' . count($ids); continue; }
+            $eid = (int)$ids[0];
+            // مجموعة بنوده الحالية مقابل مجموعة اللقطة
+            $curRows = $db->query("SELECT value_type, amount, currency, school_year, start_month, end_month
+                FROM employee_bonuses WHERE employee_id=$eid AND bonus_type='prime_fixe' AND is_active=1")->fetchAll(PDO::FETCH_ASSOC);
+            $cur = []; $want = [];
+            foreach ($curRows as $c1) $cur[] = $key($c1['value_type'], $c1['amount'], $c1['currency'], $c1['school_year'], $c1['start_month'], $c1['end_month']);
+            foreach ($rows as $r1) $want[] = $key($r1['vt'], $r1['a'], $r1['c'], $r1['sy'], $r1['sm'], $r1['em']);
+            sort($cur); sort($want);
+            // إضافي أول أشهر 2025-2026 (يكشف «بند موجود لكن الأشهر بلا إضافي» — قصة تيا)
+            $octPrime = (int)$db->query("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id=$eid AND school_year='2025-2026' ORDER BY year, month LIMIT 1")->fetchColumn();
+            $n25 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=$eid AND school_year='2025-2026'")->fetchColumn();
+            $hasFullYear2526 = false;
+            foreach ($rows as $r1) if ($r1['sm'] === null && ($r1['sy'] === null || $r1['sy'] === '2025-2026')) $hasFullYear2526 = true;
+            if ($cur === $want && ($octPrime > 0 || !$hasFullYear2526 || $n25 === 0)) continue; // سليم — لا لمس
+            if ($didN >= $batch) { setSetting('heal_prime_snapshot_progress', 'working... batch=' . $didN); return; }
+            // إعادة بناء بنوده من اللقطة (المصدر الصحيح) ثم إعادة حساب سنته
+            $db->exec("UPDATE employee_bonuses SET is_active=0 WHERE employee_id=$eid AND bonus_type='prime_fixe' AND is_active=1");
+            $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+                VALUES (?, 'prime_fixe', ?, ?, ?, ?, ?, ?, ?, 1)");
+            $pn = 0;
+            foreach ($rows as $r1) $ins->execute([$eid, ++$pn, $r1['sy'], $r1['a'], $r1['vt'], $r1['c'], $r1['sm'], $r1['em']]);
+            if ($n25 > 0) recalcEmployeeYear($eid, '2025-2026');
+            $didN++;
+        }
+        if ($didN >= $batch) { setSetting('heal_prime_snapshot_progress', 'working... batch=' . $didN); return; }
+        setSetting('heal_prime_snapshot_20260828', 'done: غامض=' . count($amb) . ($amb ? ' [' . implode('؛', array_slice($amb, 0, 20)) . ']' : '')
+            . ' مفقود=' . count($miss) . ($miss ? ' [' . implode('؛', array_slice(array_unique($miss), 0, 10)) . ']' : ''));
+        setSetting('heal_prime_snapshot_progress', 'done');
+    } catch (Throwable $e) {
+        try { setSetting('heal_prime_snapshot_progress', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
