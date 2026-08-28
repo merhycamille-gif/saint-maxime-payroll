@@ -203,20 +203,31 @@ if ($hasScope) {
 $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'aide_complementaire'=>'💰 مكافأة ومساعدة / Prime & aide',
                  'transport_complement'=>'🚌 تعويض نقل (شهري) / Transport mensuel', 'transport_daily'=>'🚌 نقل يومي / Transport journalier'];
 ?>
+<style>
+/* ✍️ (2026-08-28، طلبه: «رتبها ونظمها بطريقة اقدر افهمها وتكون واضحة وبروفيسيونال») */
+.ba-step { display:flex; align-items:center; gap:10px; }
+.ba-badge { width:34px; height:34px; border-radius:50%; background:#1F4E5F; color:#fff; display:inline-flex;
+            align-items:center; justify-content:center; font-weight:800; font-size:16px; flex:0 0 34px; }
+.ba-sub { font-size:0.8em; font-weight:600; opacity:0.85; }
+.ba-hint { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:8px 12px; font-size:12.5px; color:#1e3a5f; margin:8px 0; }
+.ba-applied th { background:#0f766e !important; color:#fff !important; }
+.ba-applied tr td { background:#f0fdfa; }
+.ba-editor td { vertical-align:middle; }
+.ba-cats { display:flex; gap:16px; flex-wrap:wrap; align-items:center; padding:10px 14px;
+           background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; margin:10px 0; }
+.ba-cats strong { color:#9a3412; }
+.ba-cats label { font-weight:600; cursor:pointer; white-space:nowrap; }
+</style>
+
 <div class="card">
     <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-gift"></i> Tableau des primes &amp; transport groupés</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">تابلو المكافآت وتعويض النقل الجماعي</div>
+        <div class="ba-step"><span class="ba-badge">١</span>
+            <div>اختر المدرسة والسنة <div class="ba-sub" dir="ltr">École &amp; année scolaire</div></div>
+        </div>
     </h3></div>
     <div class="card-body">
-        <div class="alert alert-info" style="font-size:13px">
-            حُطّ القيمة مرّة وحدة وطبّقها على الفئة كلها بضغطة — لمدرسة أو <strong>لكل المدارس دفعة وحدة</strong> (للمدير العام).
-            التعديل الفردي يبقى من ملف الأستاذ ويتجاوز الجماعي. (إعادة الحساب تلقائية، والمنقولون يدوياً محميّون.)
-        </div>
-        <div class="alert" style="background:#fffbeb;border:1px solid #fde68a;font-size:12px;color:#92400e">
-            <i class="fas fa-info-circle"></i> الفئة تُختار <strong>داخل كل قسم على حدة</strong> (المكافأة لها فئاتها وتعويض النقل له فئاته) — مثلاً النقل للكل والمكافأة للملاك فقط.
-        </div>
-        <form method="GET" class="form-row cols-2 no-print" style="margin-bottom:10px">
+        <div class="ba-hint">من هون بتضيف مكافآت وأجر إضافي ونقل <strong>لمجموعة كاملة بضغطة وحدة</strong>. التعديل الفردي بيبقى من ملف الأستاذ وبيتجاوز الجماعي، والمنقولون يدوياً محميّون.</div>
+        <form method="GET" class="form-row cols-2 no-print" style="margin-bottom:0">
             <?php if (isSuperAdmin()): ?>
             <div class="form-group mb-0">
                 <label class="form-label">École / Portée / المدرسة والنطاق</label>
@@ -238,86 +249,124 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
 </div>
 
 <?php if ($hasScope): $scopeIn = ($scopeAll ? 'all' : $schoolId); ?>
-<!-- محرّر أسطر متعدّدة: مكافآت / تعويض نقل من شهر لشهر -->
+
 <div class="card">
     <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-coins"></i> Primes &amp; transport — lignes multiples (mois par mois)</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">مكافآت وتعويض نقل — أسطر متعدّدة (من شهر لشهر)</div>
+        <div class="ba-step"><span class="ba-badge">٢</span>
+            <div>شو المطبّق حالياً؟ <div class="ba-sub" dir="ltr">Lignes appliquées actuellement</div></div>
+        </div>
     </h3></div>
     <div class="card-body">
-        <div class="alert alert-info" style="font-size:12px">
-            أضِف سطراً لكل قيمة وفترة. <strong>القيمة بتتغيّر خلال السنة؟</strong> ضيف سطرين بفترتين (مثلاً نقل: تشرين→كانون قيمة، شباط→أيلول قيمة أخرى).
-            «تعويض نقل (شهري)» هون = مبلغ شهري ثابت للفترة (غير النقل اليومي حسب الأيام بالأسفل). النسبة % تُحسب من الراتب.
+        <div class="ba-hint">هيدا الجدول بيفرجيك كل البنود السارية على <strong><?= e(scopeLabel($scopeAll,$schoolId)) ?> — <?= e($schoolYear) ?></strong>. بعد أي حفظ بيتحدّث فوراً.</div>
+        <?php if ($appliedLines): ?>
+        <div style="overflow:auto"><table class="table ba-applied" style="font-size:13px;min-width:560px">
+            <thead><tr><th>النوع / Type</th><th>القيمة / Valeur</th><th>الفترة / Période</th><th>عدد الموظفين / Employés</th></tr></thead>
+            <tbody>
+            <?php foreach ($appliedLines as $al):
+                $isPct = ($al['value_type'] === 'percent');
+                $valStr = $isPct
+                    ? rtrim(rtrim(number_format((float)$al['amount'], 2), '0'), '.') . '٪ <small style="color:#64748b">من الأساس (قاعدة ÷1500)</small>'
+                    : ($al['currency'] === 'USD' ? formatUSD($al['amount']) : formatLBP($al['amount']))
+                      . ($al['bonus_type'] === 'transport_daily' ? ' <small style="color:#64748b">يومياً</small>' : '');
+                $perStr = ($al['start_month'] === null && $al['end_month'] === null)
+                    ? 'كل السنة'
+                    : monthName((int)$al['start_month'], 'ar') . ' ← ' . monthName((int)$al['end_month'], 'ar');
+            ?>
+                <tr>
+                    <td><?= $bonusTypeLbl[$al['bonus_type']] ?? e($al['bonus_type']) ?></td>
+                    <td><strong><?= $valStr ?></strong></td>
+                    <td><?= e($perStr) ?></td>
+                    <td><?= (int)$al['n'] ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table></div>
+        <?php else: ?>
+        <div class="text-muted" style="font-size:13px;padding:6px 2px">لا بنود مطبّقة على هذا النطاق لهذه السنة بعد / Aucune ligne appliquée.</div>
+        <?php endif; ?>
+        <details style="margin-top:10px">
+            <summary style="cursor:pointer;color:#b91c1c;font-size:13px;font-weight:600"><i class="fas fa-trash"></i> بدّك تشيل نوعاً كاملاً عن فئة؟ / Retirer un type</summary>
+            <form method="POST" onsubmit="return confirm('إزالة هذا النوع عن الفئات المشيّكة كلها؟')" style="margin-top:8px">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="remove_bonus"><input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+                <div class="ba-cats"><strong>عن مين؟</strong>
+                    <?php foreach (['titulaire'=>'الملاك','contractuel'=>'المتعاقدين','employe'=>'الموظفين'] as $k=>$l): ?>
+                    <label><input type="checkbox" name="cat[]" value="<?= $k ?>" <?= in_array($k,$categories,true)?'checked':'' ?>> <?= $l ?></label>
+                    <?php endforeach; ?>
+                </div>
+                <select name="bonus_type" class="form-select" style="display:inline-block;width:auto">
+                    <option value="prime_fixe">➕ الأجر الإضافي / Supplément</option>
+                    <option value="aide_complementaire">💰 مكافأة ومساعدة / Prime &amp; aide</option>
+                    <option value="transport_complement">🚌 تعويض نقل (شهري) / Transport mensuel</option>
+                </select>
+                <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-trash"></i> إزالة / Retirer</button>
+            </form>
+            <form method="POST" onsubmit="return confirm('إزالة كل النقل اليومي عن الفئات المشيّكة؟')" style="margin-top:8px">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="remove_transport_periods"><input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catHidden($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+                <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-bus"></i> إزالة كل النقل اليومي / Retirer transport journalier</button>
+            </form>
+        </details>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>
+        <div class="ba-step"><span class="ba-badge">٣</span>
+            <div>ضيف أجر إضافي أو مكافأة أو نقل شهري <div class="ba-sub" dir="ltr">Ajouter supplément / primes / transport mensuel</div></div>
         </div>
-        <?php /* ✍️ المطبّق حالياً — يظهر مباشرة بعد كل حفظ (طلبه: «لازم يبين السطر اللي فيه النسبة بعد الحفظ») */ ?>
-        <div style="margin-bottom:14px">
-            <div style="font-weight:700;margin-bottom:6px;color:#0f766e"><i class="fas fa-check-circle"></i> Lignes appliquées actuellement / المطبّق حالياً — <?= catLabel($categories) ?> — <?= e(scopeLabel($scopeAll,$schoolId)) ?> — <?= e($schoolYear) ?></div>
-            <?php if ($appliedLines): ?>
-            <div style="overflow:auto"><table class="table" style="font-size:13px;min-width:560px;background:#f0fdfa">
-                <thead><tr><th>Type / النوع</th><th>Valeur / القيمة</th><th>Période / الفترة</th><th>Employés / عدد الموظفين</th></tr></thead>
-                <tbody>
-                <?php foreach ($appliedLines as $al):
-                    $isPct = ($al['value_type'] === 'percent');
-                    $valStr = $isPct
-                        ? rtrim(rtrim(number_format((float)$al['amount'], 2), '0'), '.') . '٪ <small style="color:#64748b">من الأساس (قاعدة ÷1500)</small>'
-                        : ($al['currency'] === 'USD' ? formatUSD($al['amount']) : formatLBP($al['amount']))
-                          . ($al['bonus_type'] === 'transport_daily' ? ' <small style="color:#64748b">يومياً</small>' : '');
-                    $perStr = ($al['start_month'] === null && $al['end_month'] === null)
-                        ? 'كل السنة'
-                        : monthName((int)$al['start_month'], 'ar') . ' ← ' . monthName((int)$al['end_month'], 'ar');
-                ?>
-                    <tr>
-                        <td><?= $bonusTypeLbl[$al['bonus_type']] ?? e($al['bonus_type']) ?></td>
-                        <td><strong><?= $valStr ?></strong></td>
-                        <td><?= e($perStr) ?></td>
-                        <td><?= (int)$al['n'] ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table></div>
-            <?php else: ?>
-            <div class="text-muted" style="font-size:13px;padding:6px 2px">لا بنود مطبّقة على هذا النطاق لهذه السنة بعد / Aucune ligne appliquée.</div>
-            <?php endif; ?>
+    </h3></div>
+    <div class="card-body">
+        <div class="ba-hint">
+            <strong>كيف؟</strong> ① اكبس «تعديل» ② شيّك على مين بدك تطبّق ③ بالسطر: اختار النوع، وقرّر «مبلغ ثابت» أو «نسبة ٪»، واكتب القيمة (النسبة: اكتب <strong>45 بس، بلا علامة ٪</strong>) ④ اكبس «طبّق».<br>
+            <strong>النسبة ٪ (قانون الإضافي):</strong> بتنحسب لحالها: (أساس الراتب بعد التدرّج ÷ 1500) × النسبة ← داون للدولار ← × سعر السوق ← داون للمليون — وبتتحرّك مع الدرجة تلقائياً.
         </div>
         <form method="POST" id="periodsForm" class="lockedit">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="apply_periods">
-            <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+            <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+            <div class="ba-cats"><strong>على مين بدك تطبّق؟</strong>
+                <?php foreach (['titulaire'=>'الملاك','contractuel'=>'المتعاقدين','employe'=>'الموظفين'] as $k=>$l): ?>
+                <label><input type="checkbox" name="cat[]" value="<?= $k ?>" <?= in_array($k,$categories,true)?'checked':'' ?>> <?= $l ?></label>
+                <?php endforeach; ?>
+            </div>
             <div style="overflow:auto">
-            <table class="table" style="font-size:13px;min-width:640px">
-                <thead><tr><th>Type / النوع</th><th>Valeur / القيمة</th><th>Montant/% / مبلغ/نسبة</th><th>Devise / العملة</th><th>Du mois / من شهر</th><th>Au mois / إلى شهر</th><th></th></tr></thead>
+            <table class="table ba-editor" style="font-size:13px;min-width:680px">
+                <thead><tr><th>النوع / Type</th><th>مبلغ أو نسبة؟</th><th>القيمة / Valeur</th><th>العملة / Devise</th><th>من شهر / Du</th><th>إلى شهر / Au</th><th></th></tr></thead>
                 <tbody id="linesBody"></tbody>
             </table>
             </div>
-            <button type="button" class="btn btn-sm btn-light" onclick="addLine()"><i class="fas fa-plus"></i> Ajouter ligne / أضِف سطر</button>
-            <button type="submit" class="btn btn-primary" style="float:left" data-confirm="تطبيق هذه الأسطر على «الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?>»؟ (تستبدل الأنواع المُدخَلة لكامل السنة)"><i class="fas fa-check"></i> Appliquer / طبّق على الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?></button>
+            <button type="button" class="btn btn-sm btn-light" onclick="addLine()"><i class="fas fa-plus"></i> أضِف سطر تاني / Ajouter ligne</button>
+            <button type="submit" class="btn btn-primary" style="float:left" data-confirm="تطبيق هذه الأسطر على «الفئات المشيّكة — <?= e(scopeLabel($scopeAll,$schoolId)) ?>»؟ (تستبدل الأنواع المُدخَلة لكامل السنة)"><i class="fas fa-check"></i> طبّق / Appliquer</button>
             <div style="clear:both"></div>
-        </form>
-        <form method="POST" onsubmit="return confirm('إزالة هذا النوع عن الفئة كلها؟')" style="margin-top:10px">
-            <?= csrfField() ?>
-            <input type="hidden" name="action" value="remove_bonus"><input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
-            <select name="bonus_type" class="form-select" style="display:inline-block;width:auto"><option value="aide_complementaire">Prime &amp; aide / مكافأة ومساعدة</option><option value="prime_fixe">Salaire additionnel / الأجر الإضافي</option><option value="transport_complement">Transport (mensuel) / تعويض نقل (شهري)</option></select>
-            <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-trash"></i> Retirer ce type / إزالة هذا النوع عن الفئة</button>
         </form>
         <script>
         (function(){
             var MONTHS=['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
             var ORDER=[10,11,12,1,2,3,4,5,6,7,8,9]; var li=0;
             function mOpts(sel){var o='';ORDER.forEach(function(m){o+='<option value="'+m+'"'+(m==sel?' selected':'')+'>'+MONTHS[m]+'</option>';});return o;}
+            // النسبة ٪ = ليرة تلقائياً (القاعدة) — نطفي خانة العملة عندها لتوضيح أنها غير مطلوبة
+            window.baVt=function(sel){
+                var tr=sel.closest('tr'); var cur=tr.querySelector('.baCur');
+                if(sel.value==='percent'){ cur.disabled=true; cur.style.opacity=0.4; }
+                else { cur.disabled=false; cur.style.opacity=1; }
+            };
             window.addLine=function(type,val,vt,cur,from,to){
-                type=type||'aide_complementaire';from=from||10;to=to||9;cur=cur||'LBP';vt=vt||'amount';val=(val===undefined?'':val);
+                /* النوع الافتراضي «الأجر الإضافي» — الأكثر استعمالاً (كان «مكافأة» فسبّب لبساً) */
+                type=type||'prime_fixe';from=from||10;to=to||9;cur=cur||'LBP';vt=vt||'amount';val=(val===undefined?'':val);
                 var i=li++; var tr=document.createElement('tr');
                 tr.innerHTML='<td><select name="lines['+i+'][type]" class="form-select">'
-                  +'<option value="aide_complementaire"'+(type=='aide_complementaire'?' selected':'')+'>مكافأة ومساعدة</option>'
-                  +'<option value="prime_fixe"'+(type=='prime_fixe'?' selected':'')+'>الأجر الإضافي</option>'
-                  +'<option value="transport_complement"'+(type=='transport_complement'?' selected':'')+'>تعويض نقل (شهري)</option></select></td>'
-                  +'<td><input type="number" step="0.01" min="0" name="lines['+i+'][value]" class="form-control" value="'+val+'" style="min-width:90px"></td>'
-                  +'<td><select name="lines['+i+'][vtype]" class="form-select"><option value="amount"'+(vt=='amount'?' selected':'')+'>مبلغ</option><option value="percent"'+(vt=='percent'?' selected':'')+'>نسبة %</option></select></td>'
-                  +'<td><select name="lines['+i+'][currency]" class="form-select"><option value="LBP"'+(cur=='LBP'?' selected':'')+'>ل.ل</option><option value="USD"'+(cur=='USD'?' selected':'')+'>$</option></select></td>'
+                  +'<option value="prime_fixe"'+(type=='prime_fixe'?' selected':'')+'>\u2795 الأجر الإضافي</option>'
+                  +'<option value="aide_complementaire"'+(type=='aide_complementaire'?' selected':'')+'>\uD83D\uDCB0 مكافأة ومساعدة</option>'
+                  +'<option value="transport_complement"'+(type=='transport_complement'?' selected':'')+'>\uD83D\uDE8C تعويض نقل (شهري)</option></select></td>'
+                  +'<td><select name="lines['+i+'][vtype]" class="form-select baVtSel" onchange="baVt(this)"><option value="amount"'+(vt=='amount'?' selected':'')+'>مبلغ ثابت</option><option value="percent"'+(vt=='percent'?' selected':'')+'>نسبة \u066A</option></select></td>'
+                  +'<td><input type="number" step="0.01" min="0" name="lines['+i+'][value]" class="form-control" value="'+val+'" placeholder="مثلاً 45" style="min-width:100px"></td>'
+                  +'<td><select name="lines['+i+'][currency]" class="form-select baCur"><option value="LBP"'+(cur=='LBP'?' selected':'')+'>ل.ل</option><option value="USD"'+(cur=='USD'?' selected':'')+'>$</option></select></td>'
                   +'<td><select name="lines['+i+'][from]" class="form-select">'+mOpts(from)+'</select></td>'
                   +'<td><select name="lines['+i+'][to]" class="form-select">'+mOpts(to)+'</select></td>'
-                  +'<td><button type="button" class="btn btn-sm btn-light" style="color:#b91c1c" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+                  +'<td><button type="button" class="btn btn-sm btn-light" style="color:#b91c1c" onclick="this.closest(&quot;tr&quot;).remove()">\u2715</button></td>';
                 document.getElementById('linesBody').appendChild(tr);
+                baVt(tr.querySelector('.baVtSel'));
             };
             addLine(); // سطر افتراضي
         })();
@@ -325,54 +374,53 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     </div>
 </div>
 
-<!-- تعويض النقل اليومي — أسطر بفترات -->
-    <div class="card">
-        <div class="card-header"><h3>
-            <span dir="ltr"><i class="fas fa-bus"></i> Transport journalier — lignes (mois par mois)</span>
-            <div style="font-size:0.85em;font-weight:600;opacity:0.9">تعويض النقل اليومي — أسطر (من شهر لشهر)</div>
-        </h3></div>
-        <div class="card-body">
-            <div class="alert alert-info" style="font-size:12px">القيمة <strong>يومية</strong>؛ الشهري = اليومي × <strong>أيام الحضور</strong> (من ملف كل أستاذ) × 4 أسابيع. ضيف سطر لكل فترة إذا القيمة اليومية بتتغيّر خلال السنة.</div>
-            <form method="POST" id="tPeriodsForm" class="lockedit">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="apply_transport_periods">
-                <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
-                <div style="overflow:auto">
-                <table class="table" style="font-size:13px;min-width:440px">
-                    <thead><tr><th>Valeur journalière / القيمة اليومية</th><th>Devise / العملة</th><th>Du mois / من شهر</th><th>Au mois / إلى شهر</th><th></th></tr></thead>
-                    <tbody id="tLinesBody"></tbody>
-                </table>
-                </div>
-                <button type="button" class="btn btn-sm btn-light" onclick="addTLine()"><i class="fas fa-plus"></i> Ajouter ligne / أضِف سطر</button>
-                <button type="submit" class="btn btn-primary" style="float:left" data-confirm="تطبيق أسطر النقل اليومي على «الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?>»؟ (تستبدل النقل اليومي لكامل السنة)"><i class="fas fa-check"></i> Appliquer / طبّق على الفئات المختارة — <?= e(scopeLabel($scopeAll,$schoolId)) ?></button>
-                <div style="clear:both"></div>
-            </form>
-            <form method="POST" onsubmit="return confirm('إزالة كل النقل اليومي عن الفئة المختارة؟')" style="margin-top:10px">
-                <?= csrfField() ?>
-                <input type="hidden" name="action" value="remove_transport_periods"><input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catChecks($categories) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
-                <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-trash"></i> Retirer tout le transport journalier / إزالة كل النقل اليومي عن الفئة</button>
-            </form>
-            <p class="text-muted" style="font-size:12px;margin-top:8px">أيام الحضور من ملف كل أستاذ (Employés)، وكل أستاذ بياخد نقلو حسب أيامه.</p>
-            <script>
-            (function(){
-                var MONTHS=['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-                var ORDER=[10,11,12,1,2,3,4,5,6,7,8,9]; var ti=0;
-                function mOpts(sel){var o='';ORDER.forEach(function(m){o+='<option value="'+m+'"'+(m==sel?' selected':'')+'>'+MONTHS[m]+'</option>';});return o;}
-                window.addTLine=function(val,cur,from,to){
-                    from=from||10;to=to||9;cur=cur||'LBP';val=(val===undefined?'':val);
-                    var i=ti++; var tr=document.createElement('tr');
-                    tr.innerHTML='<td><input type="number" step="0.01" min="0" name="tlines['+i+'][value]" class="form-control" value="'+val+'" style="min-width:100px"></td>'
-                      +'<td><select name="tlines['+i+'][currency]" class="form-select"><option value="LBP"'+(cur=='LBP'?' selected':'')+'>ل.ل</option><option value="USD"'+(cur=='USD'?' selected':'')+'>$</option></select></td>'
-                      +'<td><select name="tlines['+i+'][from]" class="form-select">'+mOpts(from)+'</select></td>'
-                      +'<td><select name="tlines['+i+'][to]" class="form-select">'+mOpts(to)+'</select></td>'
-                      +'<td><button type="button" class="btn btn-sm btn-light" style="color:#b91c1c" onclick="this.closest(\'tr\').remove()">✕</button></td>';
-                    document.getElementById('tLinesBody').appendChild(tr);
-                };
-                addTLine(); // سطر افتراضي
-            })();
-            </script>
+<div class="card">
+    <div class="card-header"><h3>
+        <div class="ba-step"><span class="ba-badge">٤</span>
+            <div>النقل اليومي (حسب أيام الحضور) <div class="ba-sub" dir="ltr">Transport journalier</div></div>
         </div>
+    </h3></div>
+    <div class="card-body">
+        <div class="ba-hint">القيمة هون <strong>يومية</strong> — الشهري بينحسب لحالو: اليومي × أيام حضور كل أستاذ (من ملفه) × 4 أسابيع. القيمة بتتغيّر خلال السنة؟ ضيف سطر لكل فترة.</div>
+        <form method="POST" id="tPeriodsForm" class="lockedit">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" value="apply_transport_periods">
+            <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+            <div class="ba-cats"><strong>على مين بدك تطبّق؟</strong>
+                <?php foreach (['titulaire'=>'الملاك','contractuel'=>'المتعاقدين','employe'=>'الموظفين'] as $k=>$l): ?>
+                <label><input type="checkbox" name="cat[]" value="<?= $k ?>" <?= in_array($k,$categories,true)?'checked':'' ?>> <?= $l ?></label>
+                <?php endforeach; ?>
+            </div>
+            <div style="overflow:auto">
+            <table class="table ba-editor" style="font-size:13px;min-width:460px">
+                <thead><tr><th>القيمة اليومية / Valeur journalière</th><th>العملة / Devise</th><th>من شهر / Du</th><th>إلى شهر / Au</th><th></th></tr></thead>
+                <tbody id="tLinesBody"></tbody>
+            </table>
+            </div>
+            <button type="button" class="btn btn-sm btn-light" onclick="addTLine()"><i class="fas fa-plus"></i> أضِف سطر تاني / Ajouter ligne</button>
+            <button type="submit" class="btn btn-primary" style="float:left" data-confirm="تطبيق أسطر النقل اليومي على «الفئات المشيّكة — <?= e(scopeLabel($scopeAll,$schoolId)) ?>»؟ (تستبدل النقل اليومي لكامل السنة)"><i class="fas fa-check"></i> طبّق / Appliquer</button>
+            <div style="clear:both"></div>
+        </form>
+        <script>
+        (function(){
+            var MONTHS=['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+            var ORDER=[10,11,12,1,2,3,4,5,6,7,8,9]; var ti=0;
+            function mOpts(sel){var o='';ORDER.forEach(function(m){o+='<option value="'+m+'"'+(m==sel?' selected':'')+'>'+MONTHS[m]+'</option>';});return o;}
+            window.addTLine=function(val,cur,from,to){
+                from=from||10;to=to||9;cur=cur||'LBP';val=(val===undefined?'':val);
+                var i=ti++; var tr=document.createElement('tr');
+                tr.innerHTML='<td><input type="number" step="0.01" min="0" name="tlines['+i+'][value]" class="form-control" value="'+val+'" placeholder="مثلاً 4.5" style="min-width:100px"></td>'
+                  +'<td><select name="tlines['+i+'][currency]" class="form-select"><option value="LBP"'+(cur=='LBP'?' selected':'')+'>ل.ل</option><option value="USD"'+(cur=='USD'?' selected':'')+'>$</option></select></td>'
+                  +'<td><select name="tlines['+i+'][from]" class="form-select">'+mOpts(from)+'</select></td>'
+                  +'<td><select name="tlines['+i+'][to]" class="form-select">'+mOpts(to)+'</select></td>'
+                  +'<td><button type="button" class="btn btn-sm btn-light" style="color:#b91c1c" onclick="this.closest(&quot;tr&quot;).remove()">\u2715</button></td>';
+                document.getElementById('tLinesBody').appendChild(tr);
+            };
+            addTLine(); // سطر افتراضي
+        })();
+        </script>
     </div>
+</div>
 
 <!-- معاينة النطاق -->
 <div class="card">
