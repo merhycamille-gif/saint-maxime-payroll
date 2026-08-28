@@ -1086,6 +1086,15 @@ check('formatUSD بالجافاسكريبت بلا فراطات (Math.floor + ل
 $hUsd = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [], 'usd');
 $lbpHits = preg_match_all('/L\.L/u', $hUsd);
 check('وضع «دولار فقط»: الكشف الشهري بلا خلط عملات', $lbpHits <= 2, "خلايا ليرة=$lbpHits");
+// ✍️ (2026-08-28، p1 تيا نخلة) توحيد العملتين بالنماذج الرسمية: كل أعمدة المبالغ تتبع وضع
+// العملة (لا أعمدة «مبقّعة» بعضها بدولار وبعضها ليرة فقط). بوضع «دولار فقط» ممنوع يظهر أي
+// رقم بحجم الملايين (خلية ليرة متروكة formatLBP كانت تظهر هكذا).
+foreach (['salary_all', 'payment_list', 'full_register'] as $ofDual) {
+    $hOfU = renderPage('pages/official_forms.php', ['form' => $ofDual, 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [], 'usd');
+    $mil = 0;
+    if (preg_match('/<table class="doc-table".*?<\/table>/su', $hOfU, $mT)) $mil = preg_match_all('/\d{1,3},\d{3},\d{3}/', $mT[0]);
+    check("توحيد العملتين: $ofDual بوضع «دولار فقط» بلا أي خلية ليرة متروكة", strlen($hOfU) > 5000 && $mil === 0, "خلايا مليونية=$mil");
+}
 $repSrc3 = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
 check('الكشف الشهري: كل أعمدة المجاميع بالعملة المختارة (لا formatLBP ثابتة)',
       strpos($repSrc3, "\$dualTot(\$t['total'], \$t['total_usd'])") !== false
