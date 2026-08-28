@@ -172,10 +172,10 @@ if (!$emp):
                             <td><?= formatDate($r['date']) ?></td>
                             <td><?= e($evLabels[$r['type']] ?? $r['type']) ?><?= $r['law'] ? ' <small class="text-muted">('.e($r['law']).')</small>' : '' ?></td>
                             <td><?= rtrim(rtrim(number_format($r['grade_after'],1),'0'),'.') ?></td>
-                            <td class="text-end"><?= formatLBP($r['base'],false) ?></td>
-                            <td class="text-end"><?= $r['ordinary'] ? formatLBP($r['ordinary'],false) : '—' ?></td>
-                            <td class="text-end"><?= $r['exceptional'] ? formatLBP($r['exceptional'],false) : '—' ?></td>
-                            <td class="text-end"><strong><?= formatLBP($r['after'],false) ?></strong></td>
+                            <td class="text-end"><?= money($r['base'], null, ['withCur'=>false]) ?></td>
+                            <td class="text-end"><?= $r['ordinary'] ? money($r['ordinary'], null, ['withCur'=>false]) : '—' ?></td>
+                            <td class="text-end"><?= $r['exceptional'] ? money($r['exceptional'], null, ['withCur'=>false]) : '—' ?></td>
+                            <td class="text-end"><strong><?= money($r['after'], null, ['withCur'=>false]) ?></strong></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>

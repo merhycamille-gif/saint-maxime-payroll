@@ -39,17 +39,19 @@ $stats = [
 $scE = schoolScopeSql('e.school_id');
 $ayPaid = activeSchoolYear();
 if ($ayPaid === 'all') {
-    $stmtPaid = $db->prepare("SELECT COALESCE(SUM(ms.total_due_lbp), 0)
+    $stmtPaid = $db->prepare("SELECT COALESCE(SUM(ms.total_due_lbp), 0) t, COALESCE(SUM(FLOOR(ms.total_due_lbp/NULLIF(ms.exchange_rate,0))), 0) tu
         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0" . $scE);
     $stmtPaid->execute();
 } else {
-    $stmtPaid = $db->prepare("SELECT COALESCE(SUM(ms.total_due_lbp), 0)
+    $stmtPaid = $db->prepare("SELECT COALESCE(SUM(ms.total_due_lbp), 0) t, COALESCE(SUM(FLOOR(ms.total_due_lbp/NULLIF(ms.exchange_rate,0))), 0) tu
         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE ms.school_year = ? AND e.is_deleted = 0" . $scE);
     $stmtPaid->execute([$ayPaid]);
 }
-$totalPaid = (float)$stmtPaid->fetchColumn();
+$rowPaid = $stmtPaid->fetch();
+$totalPaid = (float)($rowPaid['t'] ?? 0);
+$totalPaidUsd = (float)($rowPaid['tu'] ?? 0);
 
 $exchangeRate = getExchangeRate();
 
@@ -113,7 +115,7 @@ $metaItem = function ($icon, $bg, $fg, $val, $fr, $ar) {
     $metaItem('fas fa-calendar-alt', 'rgba(8,145,178,.10)', '#0891b2', (activeSchoolYear() === 'all' ? '<span dir="ltr">Toutes</span> / كل السنين' : e(activeSchoolYear())), 'Année scolaire', 'السنة الدراسية');
     $metaItem('fas fa-coins', 'rgba(202,138,4,.12)', '#ca8a04', formatLBP($exchangeRate) . ' / $1', 'Taux de change', 'سعر الصرف');
     $metaItem('fas fa-money-bill-wave', 'rgba(219,39,119,.10)', '#db2777', formatLBP(getSetting('minimum_wage_lbp', 28000000)), 'Salaire min. (Loi)', 'الحد الأدنى للأجور');
-    $metaItem('fas fa-wallet', 'rgba(5,150,105,.10)', '#059669', formatLBP($totalPaid), 'Payé (année)', 'المدفوع بالسنة');
+    $metaItem('fas fa-wallet', 'rgba(5,150,105,.10)', '#059669', dualFromUsd($totalPaid, $totalPaidUsd), 'Payé (année)', 'المدفوع بالسنة');
     ?>
 </div>
 

@@ -746,7 +746,7 @@ if (!$emp):
         return formatLBP($lbp, false) . ' ل.ل';
     };
     $moneyWords = function ($lbp) use ($cur, $usdOf) {
-        if ($cur === 'usd') return numToArabicWords((int)round($usdOf($lbp))) . ' دولار أميركي';
+        if ($cur === 'usd') return numToArabicWords((int)floor($usdOf($lbp))) . ' دولار أميركي';
         // «الاثنين»: تُعتمد الليرة بالحروف (المبلغ القانوني)، والدولار يظهر رقماً في المتن
         return numToArabicWords((int)round($lbp)) . ' ليرة لبنانية';
     };
@@ -758,11 +758,11 @@ if (!$emp):
         return number_format((int)round($lbp)) . ' LBP';
     };
     $moneyWordsFr = function ($lbp) use ($cur, $usdOf) {
-        if ($cur === 'usd') return numToFrenchWords((int)round($usdOf($lbp))) . ' dollars américains';
+        if ($cur === 'usd') return numToFrenchWords((int)floor($usdOf($lbp))) . ' dollars américains';
         return numToFrenchWords((int)round($lbp)) . ' livres libanaises';
     };
     $moneyWordsEn = function ($lbp) use ($cur, $usdOf) {
-        if ($cur === 'usd') return numToEnglishWords((int)round($usdOf($lbp))) . ' US Dollars';
+        if ($cur === 'usd') return numToEnglishWords((int)floor($usdOf($lbp))) . ' US Dollars';
         return numToEnglishWords((int)round($lbp)) . ' Lebanese Pounds';
     };
     // مبلغ حرّ يكتبه المستخدم (تعويض الصرف المحسوب) — يُعرَض كما هو بالعملة المختارة بلا تحويل

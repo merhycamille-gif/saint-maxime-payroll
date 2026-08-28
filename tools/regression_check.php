@@ -600,7 +600,7 @@ if ($regEid) {
     check('لائحة الموظفين: سطر المجموع موجود وبالعملتين للأعمدة المالية',
           strpos($hEL25, 'المجموع (') !== false
           && strpos($repSrc25, 'dualFromUsd($colTot[$k], $colTotUsd[$k])') !== false
-          && strpos($repSrc25, "\$colTotUsd = array_fill_keys(['extra_wage','aide','transport','composed'], 0.0);") !== false);
+          && strpos($repSrc25, "\$colTotUsd = array_fill_keys(['salary','extra_wage','aide','transport','composed'], 0.0);") !== false);
     // «وهون شو المكرر» (2026-08-25): بطاقة «Infos générales» أُزيلت (أعمدتها ضمن لائحة الموظفين)
     // — نموذج p13 نفسه يبقى شغّالاً بالرابط المباشر بofficial_forms
     check('مركز التقارير بلا مكرّر: لا بطاقة «Infos générales» (ضمن لائحة الموظفين) ونموذج p13 المباشر شغّال',
@@ -1022,7 +1022,7 @@ check('تقرير الصندوق: لا صفّ مجاميع أصفار على ش�
       strpos($repSrc, 'لا تطبع صفّ مجاميع أصفار') !== false);
 // (تحديث 2026-08-06: الخاضع المعروض صار **بعد حسم حصّة التنزيل العائلي** بطلب المستخدم)
 check('الضريبة: مجموع «الراتب الخاضع للضريبة» يظهر بالشاشة (كان فارغاً)',
-      strpos($repSrc, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false && strpos($repSrc, "formatLBP(\$a['txb'])") !== false);
+      strpos($repSrc, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false && strpos($repSrc, "money(\$a['txb'], \$repRate)") !== false);
 check('رقم الصندوق: شفاء ذاتي يمنع كتابة رقم مدرسة على مؤسسات أخرى',
       strpos($fnSrc2, 'function healCaisseNumbers') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'healCaisseNumbers();') !== false
@@ -1089,12 +1089,46 @@ check('وضع «دولار فقط»: الكشف الشهري بلا خلط عم�
 // ✍️ (2026-08-28، p1 تيا نخلة) توحيد العملتين بالنماذج الرسمية: كل أعمدة المبالغ تتبع وضع
 // العملة (لا أعمدة «مبقّعة» بعضها بدولار وبعضها ليرة فقط). بوضع «دولار فقط» ممنوع يظهر أي
 // رقم بحجم الملايين (خلية ليرة متروكة formatLBP كانت تظهر هكذا).
-foreach (['salary_all', 'payment_list', 'full_register'] as $ofDual) {
-    $hOfU = renderPage('pages/official_forms.php', ['form' => $ofDual, 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [], 'usd');
-    $mil = 0;
-    if (preg_match('/<table class="doc-table".*?<\/table>/su', $hOfU, $mT)) $mil = preg_match_all('/\d{1,3},\d{3},\d{3}/', $mT[0]);
-    check("توحيد العملتين: $ofDual بوضع «دولار فقط» بلا أي خلية ليرة متروكة", strlen($hOfU) > 5000 && $mil === 0, "خلايا مليونية=$mil");
+// ✍️ (2026-08-28 «كل شي موحّد مش بس بتقرير معيّن»): المسح يشمل كل التقارير والكشوف والشاشات
+// المالية — أي رقم مليوني بوضع «دولار فقط» = خلية ليرة متروكة formatLBP (يُستثنى أكواد ألوان rgba
+// والقيم القانونية كالحد الأدنى، لذا يُفحص نطاق الجداول doc فقط حيث وُجد وإلا الصفحة كاملة منظّفة).
+// نطاق مدرسة واحدة وسنة معروفة: بمدرسة واحدة تبقى مجاميع الدولار تحت المليون، فأي رقم
+// مليوني = خلية ليرة متروكة فعلاً (على كل المدارس مجاميع الدولار السنوية نفسها تتجاوز المليون).
+$usSchool = (int)$db->query("SELECT ms.school_id FROM monthly_salaries ms
+    WHERE ms.school_year='2025-2026' AND ms.month=10 GROUP BY ms.school_id ORDER BY COUNT(*) DESC LIMIT 1")->fetchColumn();
+$usdSweep = [
+    'salary_all'      => ['pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025]],
+    'payment_list'    => ['pages/official_forms.php', ['form' => 'payment_list', 'month' => 10, 'year' => 2025]],
+    'full_register'   => ['pages/official_forms.php', ['form' => 'full_register', 'month' => 10, 'year' => 2025]],
+    'differences'     => ['pages/official_forms.php', ['form' => 'differences']],
+    'general_report'  => ['pages/official_forms.php', ['form' => 'general_report']],
+    'employer_cost'   => ['pages/official_forms.php', ['form' => 'employer_cost']],
+    'general_info'    => ['pages/official_forms.php', ['form' => 'general_info']],
+    'teaching_staff'  => ['pages/official_forms.php', ['form' => 'teaching_staff']],
+    'rep_monthly'     => ['pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025]],
+    'rep_cnss'        => ['pages/reports.php', ['report' => 'cnss_summary', 'month' => 10, 'year' => 2025]],
+    'rep_tax'         => ['pages/reports.php', ['report' => 'tax_summary', 'month' => 10, 'year' => 2025]],
+    'rep_eoc'         => ['pages/reports.php', ['report' => 'eoc_summary', 'month' => 10, 'year' => 2025]],
+    'rep_annual'      => ['pages/reports.php', ['report' => 'annual_totals']],
+    'rep_emp_list'    => ['pages/reports.php', ['report' => 'employee_list', 'cols' => ['name_ar','salary','extra_wage','aide','transport','composed']]],
+    'monthly_payroll' => ['pages/monthly_payroll.php', ['month' => 10, 'year' => 2025]],
+];
+// التقارير السنوية مجاميع دولارها الحقيقية قد تتجاوز المليون — عتبتها المليار (الليرة السنوية المتروكة مليارات)
+$usAnnual = ['differences', 'general_report', 'employer_cost', 'rep_annual'];
+foreach ($usdSweep as $usLbl => [$usRel, $usGet]) {
+    $hOfU = renderPage($usRel, $usGet, ['extra','aide','transport'], $usSchool ? [$usSchool] : [], 'usd', '2025-2026');
+    $usArea = $hOfU;
+    if (preg_match_all('/<table[^>]*class="[^"]*doc-table[^"]*".*?<\/table>/su', $hOfU, $mT) && $mT[0]) $usArea = implode('', $mT[0]);
+    $usArea = preg_replace('/rgba?\([^)]*\)/', '', $usArea);
+    $usPat = in_array($usLbl, $usAnnual, true) ? '/\d{1,3}(?:,\d{3}){3}/' : '/\d{1,3},\d{3},\d{3}/';
+    $mil = preg_match_all($usPat, $usArea);
+    check("توحيد العملتين: $usLbl بوضع «دولار فقط» بلا أي خلية ليرة متروكة", strlen($hOfU) > 5000 && $mil === 0, "خلايا ليرة=$mil");
 }
+// التفقيط بالإفادات يتبع نفس الرقم المعروض (floor لا round)
+$attSrcU = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
+check('الإفادات: تفقيط الدولار بالحروف = الرقم المعروض نفسه (floor)',
+      strpos($attSrcU, '(int)floor($usdOf($lbp))') !== false
+      && strpos($attSrcU, '(int)round($usdOf($lbp))') === false);
 $repSrc3 = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
 check('الكشف الشهري: كل أعمدة المجاميع بالعملة المختارة (لا formatLBP ثابتة)',
       strpos($repSrc3, "\$dualTot(\$t['total'], \$t['total_usd'])") !== false

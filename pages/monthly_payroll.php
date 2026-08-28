@@ -79,35 +79,35 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                 <div class="form-row cols-2">
                     <table class="table">
                         <tr><th colspan="2" style="background:#e3f0ff;color:#000">SALAIRE / الراتب</th></tr>
-                        <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= formatLBP($salary['base_salary_lbp']) ?></td></tr>
-                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
-                        <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr><?php endif; ?>
+                        <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= money($salary['base_salary_lbp'], rowRate($salary)) ?></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= money($salary['echelon_value_lbp'], rowRate($salary)) ?></td></tr><?php endif; ?>
+                        <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= money($salary['base_plus_echelon_lbp'], rowRate($salary)) ?></strong></td></tr><?php endif; ?>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= money((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp'], rowRate($salary)) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
                         <tr style="background:#eef2ff"><td><strong>الراتب المركّب / Salaire composé</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td class="text-end"><strong><?= money(composedSalaryLbp($salary), rowRate($salary)) ?></strong></td></tr>
                     </table>
                     <table class="table">
                         <tr><th colspan="2" style="background:#ffe3e3;color:#000">RETENUES / المحسومات</th></tr>
-                        <?php if (!$isAdminEmp): ?><tr><td>Caisse EOC (6%)</td><td class="text-end text-danger">-<?= formatLBP($salary['caisse_amount_lbp']) ?></td></tr><?php endif; ?>
-                        <?php if (!empty($salary['eoc_grade_lbp'])): ?><tr><td>درجة / نصف راتب (صندوق)</td><td class="text-end text-danger">-<?= formatLBP($salary['eoc_grade_lbp']) ?></td></tr><?php endif; ?>
-                        <tr><td>CNSS (3%)</td><td class="text-end text-danger">-<?= formatLBP($salary['cnss_amount_lbp']) ?></td></tr>
-                        <tr><td>Base imposable</td><td class="text-end"><?= formatLBP($salary['taxable_base_lbp']) ?></td></tr>
-                        <tr><td>Impôt sur le revenu</td><td class="text-end text-danger">-<?= formatLBP($salary['income_tax_lbp']) ?></td></tr>
-                        <tr style="background:#fef2f2"><td><strong>Total retenues</strong></td><td class="text-end"><strong class="text-danger">-<?= formatLBP($salary['total_retenues_lbp']) ?></strong></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr><td>Caisse EOC (6%)</td><td class="text-end text-danger">-<?= money($salary['caisse_amount_lbp'], rowRate($salary)) ?></td></tr><?php endif; ?>
+                        <?php if (!empty($salary['eoc_grade_lbp'])): ?><tr><td>درجة / نصف راتب (صندوق)</td><td class="text-end text-danger">-<?= money($salary['eoc_grade_lbp'], rowRate($salary)) ?></td></tr><?php endif; ?>
+                        <tr><td>CNSS (3%)</td><td class="text-end text-danger">-<?= money($salary['cnss_amount_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr><td>Base imposable</td><td class="text-end"><?= money($salary['taxable_base_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr><td>Impôt sur le revenu</td><td class="text-end text-danger">-<?= money($salary['income_tax_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr style="background:#fef2f2"><td><strong>Total retenues</strong></td><td class="text-end"><strong class="text-danger">-<?= money($salary['total_retenues_lbp'], rowRate($salary)) ?></strong></td></tr>
                     </table>
                 </div>
                 <table class="table" style="margin-top:16px">
                     <tr style="background:var(--gold-light)">
                         <td><strong>Salaire net</strong></td>
-                        <td class="text-end"><strong><?= formatLBP($salary['net_salary_lbp']) ?></strong></td>
-                        <td class="text-end text-muted"><?= formatUSD(rowUsd($salary, 'net_salary_usd', 'net_salary_lbp')) ?></td>
+                        <td class="text-end"><strong><?= money($salary['net_salary_lbp'], rowRate($salary)) ?></strong></td>
+                        <td class="text-end text-muted"><?= (displayCurrency()==='lbp' ? formatUSD(rowUsd($salary, 'net_salary_usd', 'net_salary_lbp')) : '') ?></td>
                     </tr>
-                    <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= formatLBP($salary['family_allowance_lbp']) ?></td><td></td></tr>
+                    <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= money($salary['family_allowance_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr><td>Transport</td><td class="text-end text-success">+<?= money($salary['transport_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr style="background:#fff3cd;color:#000">
                         <td style="font-size:18px"><strong>💰 TOTAL DÛ / صافي الراتب المستحق للدفع</strong></td>
-                        <td class="text-end" style="font-size:18px"><strong><?= formatLBP($salary['total_due_lbp']) ?></strong></td>
-                        <td class="text-end" style="font-size:16px"><strong><?= formatUSD(rowUsd($salary, 'total_due_usd', 'total_due_lbp')) ?></strong></td>
+                        <td class="text-end" style="font-size:18px"><strong><?= money($salary['total_due_lbp'], rowRate($salary)) ?></strong></td>
+                        <td class="text-end" style="font-size:16px"><strong><?= (displayCurrency()==='lbp' ? formatUSD(rowUsd($salary, 'total_due_usd', 'total_due_lbp')) : '') ?></strong></td>
                     </tr>
                 </table>
                 <div class="sign-row" style="margin-top:26px">
@@ -388,9 +388,9 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                 <div class="form-row cols-2">
                     <table class="table">
                         <tr><th colspan="2" style="background:#e3f0ff;color:#000">SALAIRE / الراتب</th></tr>
-                        <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= formatLBP($salary['base_salary_lbp']) ?></td></tr>
-                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= formatLBP($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
-                        <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= formatLBP($salary['base_plus_echelon_lbp']) ?></strong></td></tr><?php endif; ?>
+                        <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= money($salary['base_salary_lbp'], rowRate($salary)) ?></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= money($salary['echelon_value_lbp'], rowRate($salary)) ?></td></tr><?php endif; ?>
+                        <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= money($salary['base_plus_echelon_lbp'], rowRate($salary)) ?></strong></td></tr><?php endif; ?>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= money((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp'], rowRate($salary)) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
                         <tr style="background:#eef2ff"><td><strong>الراتب المركّب / Salaire composé</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td class="text-end"><strong><?= money(composedSalaryLbp($salary), rowRate($salary)) ?></strong></td></tr>
@@ -398,27 +398,27 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
 
                     <table class="table">
                         <tr><th colspan="2" style="background:#ffe3e3;color:#000">RETENUES / المحسومات</th></tr>
-                        <?php if (!$isAdminEmp): ?><tr><td>Caisse EOC (6%)</td><td class="text-end text-danger">-<?= formatLBP($salary['caisse_amount_lbp']) ?></td></tr><?php endif; ?>
-                        <?php if (!empty($salary['eoc_grade_lbp'])): ?><tr><td>درجة / نصف راتب (صندوق)</td><td class="text-end text-danger">-<?= formatLBP($salary['eoc_grade_lbp']) ?></td></tr><?php endif; ?>
-                        <tr><td>CNSS (3%)</td><td class="text-end text-danger">-<?= formatLBP($salary['cnss_amount_lbp']) ?></td></tr>
-                        <tr><td>Base imposable</td><td class="text-end"><?= formatLBP($salary['taxable_base_lbp']) ?></td></tr>
-                        <tr><td>Impôt sur le revenu</td><td class="text-end text-danger">-<?= formatLBP($salary['income_tax_lbp']) ?></td></tr>
-                        <tr style="background:#fef2f2"><td><strong>Total retenues</strong></td><td class="text-end"><strong class="text-danger">-<?= formatLBP($salary['total_retenues_lbp']) ?></strong></td></tr>
+                        <?php if (!$isAdminEmp): ?><tr><td>Caisse EOC (6%)</td><td class="text-end text-danger">-<?= money($salary['caisse_amount_lbp'], rowRate($salary)) ?></td></tr><?php endif; ?>
+                        <?php if (!empty($salary['eoc_grade_lbp'])): ?><tr><td>درجة / نصف راتب (صندوق)</td><td class="text-end text-danger">-<?= money($salary['eoc_grade_lbp'], rowRate($salary)) ?></td></tr><?php endif; ?>
+                        <tr><td>CNSS (3%)</td><td class="text-end text-danger">-<?= money($salary['cnss_amount_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr><td>Base imposable</td><td class="text-end"><?= money($salary['taxable_base_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr><td>Impôt sur le revenu</td><td class="text-end text-danger">-<?= money($salary['income_tax_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr style="background:#fef2f2"><td><strong>Total retenues</strong></td><td class="text-end"><strong class="text-danger">-<?= money($salary['total_retenues_lbp'], rowRate($salary)) ?></strong></td></tr>
                     </table>
                 </div>
                 
                 <table class="table" style="margin-top:20px">
                     <tr style="background:var(--gold-light)">
                         <td><strong>Salaire net</strong></td>
-                        <td class="text-end"><strong><?= formatLBP($salary['net_salary_lbp']) ?></strong></td>
-                        <td class="text-end text-muted"><?= formatUSD(rowUsd($salary, 'net_salary_usd', 'net_salary_lbp')) ?></td>
+                        <td class="text-end"><strong><?= money($salary['net_salary_lbp'], rowRate($salary)) ?></strong></td>
+                        <td class="text-end text-muted"><?= (displayCurrency()==='lbp' ? formatUSD(rowUsd($salary, 'net_salary_usd', 'net_salary_lbp')) : '') ?></td>
                     </tr>
-                    <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= formatLBP($salary['family_allowance_lbp']) ?></td><td></td></tr>
+                    <tr><td>Allocations familiales (exonérées)</td><td class="text-end text-success">+<?= money($salary['family_allowance_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr><td>Transport</td><td class="text-end text-success">+<?= money($salary['transport_lbp'], rowRate($salary)) ?></td><td></td></tr>
                     <tr style="background:#fff3cd;color:#000">
                         <td style="font-size:18px"><strong>💰 TOTAL DÛ / صافي الراتب المستحق للدفع</strong></td>
-                        <td class="text-end" style="font-size:18px"><strong><?= formatLBP($salary['total_due_lbp']) ?></strong></td>
-                        <td class="text-end" style="font-size:16px"><strong><?= formatUSD(rowUsd($salary, 'total_due_usd', 'total_due_lbp')) ?></strong></td>
+                        <td class="text-end" style="font-size:18px"><strong><?= money($salary['total_due_lbp'], rowRate($salary)) ?></strong></td>
+                        <td class="text-end" style="font-size:16px"><strong><?= (displayCurrency()==='lbp' ? formatUSD(rowUsd($salary, 'total_due_usd', 'total_due_lbp')) : '') ?></strong></td>
                     </tr>
                 </table>
 
@@ -432,15 +432,15 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                         <i class="fas fa-eye"></i> Charges patronales (cachées du bulletin) / أعباء رب العمل (مخفية عن القسيمة)
                     </summary>
                     <table class="table" style="margin-top:10px">
-                        <tr><td>CNSS École (8%)</td><td class="text-end"><?= formatLBP($salary['school_cnss_8_lbp']) ?></td></tr>
+                        <tr><td>CNSS École (8%)</td><td class="text-end"><?= money($salary['school_cnss_8_lbp'], rowRate($salary)) ?></td></tr>
                         <?php if ($salary['school_eoc_6_lbp'] > 0): ?>
-                        <tr><td>Caisse EOC École (6%)</td><td class="text-end"><?= formatLBP($salary['school_eoc_6_lbp']) ?></td></tr>
+                        <tr><td>Caisse EOC École (6%)</td><td class="text-end"><?= money($salary['school_eoc_6_lbp'], rowRate($salary)) ?></td></tr>
                         <?php endif; ?>
                         <?php if ($salary['school_family_comp_6_lbp'] > 0): ?>
-                        <tr><td>Allocations familiales (6%)</td><td class="text-end"><?= formatLBP($salary['school_family_comp_6_lbp']) ?></td></tr>
+                        <tr><td>Allocations familiales (6%)</td><td class="text-end"><?= money($salary['school_family_comp_6_lbp'], rowRate($salary)) ?></td></tr>
                         <?php endif; ?>
                         <?php if ($salary['school_end_of_service_8_5_lbp'] > 0): ?>
-                        <tr><td>Indemnité fin service (8.5%)</td><td class="text-end"><?= formatLBP($salary['school_end_of_service_8_5_lbp']) ?></td></tr>
+                        <tr><td>Indemnité fin service (8.5%)</td><td class="text-end"><?= money($salary['school_end_of_service_8_5_lbp'], rowRate($salary)) ?></td></tr>
                         <?php endif; ?>
                     </table>
                 </details>
@@ -484,7 +484,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
         </div>
         <div class="stat-card">
             <div class="stat-icon gold"><i class="fas fa-money-bill"></i></div>
-            <div><div class="stat-label">Total dû / الإجمالي المتوجب</div><div class="stat-value" style="font-size:18px"><?= formatLBP($totalDue) ?></div></div>
+            <div><div class="stat-label">Total dû / الإجمالي المتوجب</div><div class="stat-value" style="font-size:18px"><?= money($totalDue, getExchangeRate($month, $year)) ?></div></div>
         </div>
     </div>
     
@@ -526,7 +526,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                     <tbody>
                         <?php $mpT = ['net'=>0,'due'=>0,'due_usd'=>0.0,'n'=>0];
                         foreach ($list as $r):
-                            if ($r['is_calculated']) { $mpT['net'] += (int)$r['net_salary_lbp']; $mpT['due'] += (int)$r['total_due_lbp']; $mpT['due_usd'] += rowUsd($r, 'total_due_usd', 'total_due_lbp'); $mpT['n']++; }
+                            if ($r['is_calculated']) { $mpT['net'] += (int)$r['net_salary_lbp']; $mpT['due'] += (int)$r['total_due_lbp']; $mpT['due_usd'] += rowUsd($r, 'total_due_usd', 'total_due_lbp'); $mpT['net_usd'] = ($mpT['net_usd'] ?? 0.0) + rowUsd($r, 'net_salary_usd', 'net_salary_lbp'); $mpT['n']++; }
                         ?>
                             <tr>
                                 <td><strong><?= e($r['employee_code']) ?></strong></td>
@@ -534,8 +534,8 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                                 <td><?= e($r['first_name_fr'].' '.$r['last_name_fr']) ?></td>
                                 <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
                                 <td><?= e(gradeDisplay($r)) ?></td>
-                                <td><?= $r['is_calculated'] ? formatLBP($r['net_salary_lbp']) : '—' ?></td>
-                                <td><strong><?= $r['is_calculated'] ? formatLBP($r['total_due_lbp']) : '—' ?></strong></td>
+                                <td><?= $r['is_calculated'] ? money($r['net_salary_lbp'], rowRate($r)) : '—' ?></td>
+                                <td><strong><?= $r['is_calculated'] ? money($r['total_due_lbp'], rowRate($r)) : '—' ?></strong></td>
                                 <td><?= $r['is_calculated'] ? formatUSD(rowUsd($r, 'total_due_usd', 'total_due_lbp')) : '—' ?></td>
                                 <td>
                                     <?php if ($r['is_calculated']): ?>
@@ -559,8 +559,8 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                     </tbody>
                     <?php if ($mpT['n'] > 0): ?><tfoot><tr class="total-row" style="font-weight:700;background:var(--gold-light,#fdf6e3)">
                         <td colspan="<?= isAllSchools() ? 5 : 4 ?>" style="text-align:right">المجموع (المحتسَبون: <?= $mpT['n'] ?>) / Total</td>
-                        <td><?= formatLBP($mpT['net']) ?></td>
-                        <td><strong><?= formatLBP($mpT['due']) ?></strong></td>
+                        <td><?= dualFromUsd($mpT['net'], $mpT['net_usd'] ?? 0.0) ?></td>
+                        <td><strong><?= dualFromUsd($mpT['due'], $mpT['due_usd']) ?></strong></td>
                         <td><?= formatUSD($mpT['due_usd']) ?></td>
                         <td></td><td class="no-print"></td>
                     </tr></tfoot><?php endif; ?>
