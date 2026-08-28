@@ -4864,3 +4864,111 @@ function healTiaPercent3_20260828() {
         try { setSetting('heal_tia_percent3_20260828', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🧮⚖️ «طبق القانون على كل البرنامج وعلى الجميع» (أمره 2026-08-28):
+ * كل بند «أجر إضافي» مبلغاً ثابتاً (سنة كاملة، فعّال) يُحوَّل لنسبة مئوية بقاعدة ÷1500 —
+ * **النسبة تُستنتَج بحيث تُطلِّع رقمه المخزّن نفسه بالضبط** (لا تغيير باليوم الحاضر؛
+ * ومن الآن يتحرّك مع الأساس/الدرجة كقانون تيا). الغامض بين نسبتين يُرجَّح لنسبة مدرسته
+ * الغالبة (عبرا 65٪، النجاة 55٪، البشارة 45٪...). من لا نسبة نظيفة له (اتفاق خاص) يُترَك
+ * مبلغاً ويُدرَج بتقرير الاستثناءات بالفلاغ. المؤرّخة بفترات والبلا أساس تُترَك.
+ * دفعات (batch) لئلا يطول الطلب أونلاين + نسخ احتياطية (بونص + أشهر المعنيين).
+ */
+function percentLawMatchSet(float $stored, float $bpe, float $rate): array {
+    $set = [];
+    if ($stored <= 0 || $bpe <= 0 || $rate <= 0) return $set;
+    for ($p = 10; $p <= 1200; $p += 5) { // 1.0٪ .. 120.0٪ خطوة 0.5
+        $pct = $p / 10.0; // float دائماً (كان 450/10 يطلع int فتفشل المطابقة الصارمة مع 45.0)
+        if (bonusPercentLbp($pct, $bpe, $rate) == $stored) $set[] = (float)$pct;
+    }
+    return $set;
+}
+function healPercentLawAll20260828() {
+    try {
+        if (strpos((string)getSetting('heal_percent_law_20260828', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        // نسخ احتياطية (مرّة واحدة)
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_bonuses_pctlaw0828 LIKE employee_bonuses");
+        if (!(int)$db->query("SELECT COUNT(*) FROM _bk_bonuses_pctlaw0828")->fetchColumn()) {
+            $db->exec("INSERT INTO _bk_bonuses_pctlaw0828 SELECT * FROM employee_bonuses");
+        }
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_pctlaw0828 LIKE monthly_salaries");
+        // ⚠️ تنبيه المستخدم الصريح: «في مدارس مش عاطيين نسبة مئوية — إذا حاطين هني المبلغ بيبقى».
+        // لذلك: التحويل **لأساتذة الملاك فقط** وفي المدارس ذات النسبة الموحّدة الواضحة فقط
+        // (نسبة غالبة تشمل ≥50٪ من بنود ملاك المدرسة وعددها ≥5)، ولمن رقمه المخزّن يطابق
+        // نسبة مدرسته بالضبط. المتعاقدون والمدارس بلا نمط نسبة (مبالغ متفرقة) تبقى مبالغ ثابتة.
+        $cand = $db->query("
+            SELECT b.id bid, b.employee_id, b.amount, e.school_id,
+                   CONCAT(e.first_name_ar,' ',e.last_name_ar) nm,
+                   (SELECT ms.base_plus_echelon_lbp FROM monthly_salaries ms WHERE ms.employee_id=b.employee_id AND ms.school_year='2025-2026' ORDER BY ms.year, ms.month LIMIT 1) bpe,
+                   (SELECT ms.exchange_rate FROM monthly_salaries ms WHERE ms.employee_id=b.employee_id AND ms.school_year='2025-2026' ORDER BY ms.year, ms.month LIMIT 1) rate
+            FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id AND e.is_deleted=0
+            WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='amount'
+              AND e.employee_type='enseignant_titulaire'
+              AND b.start_month IS NULL AND b.end_month IS NULL
+              AND (b.school_year IS NULL OR b.school_year='2025-2026')
+              -- 🛡️ محميّان: ريتا مارون وماريا الياس حليحل (عبرا) — مبلغاهما «سلفة» موثّقة
+              -- على كشفه بالمليم بقراره الصريح (طابقا نسبة 65٪ صدفةً فتحوّلا غلطاً ورُجِعا)
+              AND NOT (e.first_name_ar LIKE 'ريتا%' AND e.father_name_ar LIKE 'مارون%' AND e.last_name_ar LIKE '%حليحل%')
+              AND NOT (e.first_name_ar LIKE 'ماريا%' AND e.father_name_ar LIKE 'الياس%' AND e.last_name_ar LIKE '%حليحل%')")->fetchAll(PDO::FETCH_ASSOC);
+        // النسبة الغالبة لكل مدرسة (تمريرة أولى — تُحسب مجموعات التطابق كاملة)
+        // 🔴 مهم: المحوَّلون نسبةً سابقاً يُحسبون بالغالبة أيضاً — وإلا كل دفعة تُنقص العدّ
+        // فيضيع النمط قبل اكتمال المدرسة (كان يترك روز وايلي بلا تحويل بلا سبب).
+        $freq = []; $cnt = []; $sets = [];
+        foreach ($db->query("SELECT e.school_id, b.amount pct, COUNT(*) n
+            FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id AND e.is_deleted=0
+            WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='percent'
+              AND e.employee_type='enseignant_titulaire'
+              AND (b.school_year IS NULL OR b.school_year='2025-2026')
+            GROUP BY e.school_id, b.amount") as $pr) {
+            $freq[$pr['school_id']][(string)(float)$pr['pct']] = ($freq[$pr['school_id']][(string)(float)$pr['pct']] ?? 0) + (int)$pr['n'];
+            $cnt[$pr['school_id']] = ($cnt[$pr['school_id']] ?? 0) + (int)$pr['n'];
+        }
+        foreach ($cand as $c) {
+            $rate = (float)$c['rate'] > 0 ? (float)$c['rate'] : 89500.0;
+            $s = percentLawMatchSet((float)$c['amount'], (float)$c['bpe'], $rate);
+            $sets[$c['bid']] = $s;
+            $cnt[$c['school_id']] = ($cnt[$c['school_id']] ?? 0) + 1;
+            foreach ($s as $p) $freq[$c['school_id']][(string)$p] = ($freq[$c['school_id']][(string)$p] ?? 0) + 1;
+        }
+        $domin = []; // مدرسة => نسبتها الموحّدة (أو غير موجودة = مدرسة مبالغ ثابتة)
+        foreach ($freq as $sidK => $m) {
+            arsort($m);
+            $top = (float)array_key_first($m); $topN = (int)$m[array_key_first($m)];
+            if ($topN >= 5 && $topN * 2 >= (int)$cnt[$sidK]) $domin[$sidK] = $top;
+        }
+        // التحويل بدفعات
+        $batch = 12; $didN = 0; $skips = [];
+        foreach ($cand as $c) {
+            if (!isset($domin[$c['school_id']])) continue; // مدرسة بلا نسبة — المبلغ يبقى (بأمره)
+            $best = $domin[$c['school_id']];
+            if (!in_array((float)$best, array_map('floatval', $sets[$c['bid']]), true)) {
+                $skips[] = $c['school_id'] . ':' . $c['nm'] . '=' . number_format((float)$c['amount']);
+                continue; // رقمه لا يطابق نسبة مدرسته — اتفاق خاص، يبقى مبلغاً وبتقرير الاستثناءات
+            }
+            if ($didN >= $batch) { setSetting('heal_percent_law_progress', 'working... last batch=' . $didN); return; }
+            $eid = (int)$c['employee_id'];
+            // نسخة أشهر المعنيّ قبل التعديل (إن لم تُنسخ)
+            if (!(int)$db->query("SELECT COUNT(*) FROM _ms_bk_pctlaw0828 WHERE employee_id=$eid")->fetchColumn()) {
+                $db->exec("INSERT INTO _ms_bk_pctlaw0828 SELECT * FROM monthly_salaries WHERE employee_id=$eid AND school_year IN ('2025-2026','2026-2027')");
+            }
+            $db->prepare("UPDATE employee_bonuses SET value_type='percent', amount=?, currency='LBP' WHERE id=?")->execute([$best, $c['bid']]);
+            // بند 2026-2027 المنسوخ (مبلغ) → نفس نسبته
+            $db->prepare("UPDATE employee_bonuses SET value_type='percent', amount=?, currency='LBP'
+                WHERE employee_id=? AND bonus_type='prime_fixe' AND is_active=1 AND value_type='amount'
+                  AND start_month IS NULL AND end_month IS NULL AND school_year='2026-2027'")->execute([$best, $eid]);
+            recalcEmployeeYear($eid, '2025-2026');
+            if ((int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=$eid AND school_year='2026-2027'")->fetchColumn()) {
+                recalcEmployeeYear($eid, '2026-2027');
+            }
+            $didN++;
+        }
+        if ($didN >= $batch) { setSetting('heal_percent_law_progress', 'working... last batch=' . $didN); return; }
+        // خلصت: كل الباقي استثناءات
+        setSetting('heal_percent_law_20260828', 'done: exceptions=' . count($skips) . ($skips ? ' | ' . implode('؛ ', array_slice($skips, 0, 60)) : ''));
+        setSetting('heal_percent_law_progress', 'done');
+    } catch (Throwable $e) {
+        try { setSetting('heal_percent_law_progress', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}

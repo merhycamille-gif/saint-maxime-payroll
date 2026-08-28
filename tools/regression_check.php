@@ -1140,6 +1140,13 @@ check('تيا نخلة (1554): علاوتها نسبة 45٪ وأشهرها عا�
           $m = $db->query("SELECT month, prime_fixe_lbp FROM monthly_salaries WHERE employee_id=1554 AND school_year='2025-2026' AND month IN (10,1)")->fetchAll(PDO::FETCH_KEY_PAIR);
           return (int)($m[10] ?? 0) === 47000000 && (int)($m[1] ?? 0) === 54000000;
       })());
+// ⚖️ (2026-08-28) «طبق القانون على الجميع»: ملاك المدارس ذات النسبة الموحّدة صاروا نسبةً
+// (النجاة 55٪/عبرا 65٪/البشارة 45٪/الانتقال 60٪/53٪) — والمبالغ الثابتة باقية حيث لا نسبة
+check('قانون النسبة على الجميع: الشفاء موصول + محميّا عبرا (ريتا مارون/ماريا الياس) + ≥150 بند نسبة',
+      strpos($fnSrc3, 'function healPercentLawAll20260828') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'healPercentLawAll20260828();') !== false
+      && strpos($fnSrc3, "e.father_name_ar LIKE 'مارون%'") !== false
+      && (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE value_type='percent' AND is_active=1")->fetchColumn() >= 150);
 // التفقيط بالإفادات يتبع نفس الرقم المعروض (floor لا round)
 $attSrcU = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
 check('الإفادات: تفقيط الدولار بالحروف = الرقم المعروض نفسه (floor)',
