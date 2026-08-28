@@ -701,7 +701,7 @@ if (!$emp):
         if ($emp['employee_type'] === 'enseignant_titulaire') {
             $basePlusEch = scaleSalaryLBP($emp['current_grade']);
         } elseif (($emp['salary_input_mode'] ?? '') === 'direct_usd' && (float)$emp['base_salary_usd'] > 0) {
-            $basePlusEch = round((float)$emp['base_salary_usd'] * getExchangeRate());
+            $basePlusEch = usdToLbp($emp['base_salary_usd'], getExchangeRate()); // دولار←ليرة بلا فراطات (تدوير لتحت)
         } else {
             $basePlusEch = (float)($emp['contract_salary_lbp'] ?? 0);
         }

@@ -105,11 +105,11 @@ class PayrollCalculator {
                 $amount = (float)$row['amount'];
             }
             
-            // نسبة مئوية من الأساس، أو مبلغ ثابت (يُحوَّل للّيرة إن كان بالدولار)
+            // نسبة مئوية من الأساس، أو مبلغ ثابت (يُحوَّل للّيرة إن كان بالدولار — بلا فراطات: تدوير لتحت)
             if (($row['value_type'] ?? 'amount') === 'percent') {
                 $amount = ($amount / 100) * $baseForPercent;
             } elseif ($row['currency'] === 'USD') {
-                $amount *= $this->exchangeRate;
+                $amount = usdToLbp($amount, $this->exchangeRate);
             }
             $total += $amount;
         }
@@ -137,7 +137,7 @@ class PayrollCalculator {
                 else { if ($this->month < $start && $this->month > $end) continue; }
             }
             $monthly = (float)$row['amount'] * $days * $weeks;
-            if ($row['currency'] === 'USD') $monthly *= $this->exchangeRate;
+            if ($row['currency'] === 'USD') $monthly = usdToLbp($monthly, $this->exchangeRate);
             $total += $monthly;
         }
         return $total;
@@ -193,9 +193,9 @@ class PayrollCalculator {
         $emp = $this->employee;
 
         if ($emp['employee_type'] === 'enseignant_titulaire') {
-            // اتفاق خاص بالدولار يتجاوز السلسلة
+            // اتفاق خاص بالدولار يتجاوز السلسلة (دولار←ليرة بلا فراطات: تدوير لتحت)
             if ($emp['salary_input_mode'] === 'direct_usd' && (float)$emp['base_salary_usd'] > 0) {
-                return [(float)$emp['base_salary_usd'] * $this->exchangeRate, 0.0, (float)$emp['current_grade']];
+                return [usdToLbp($emp['base_salary_usd'], $this->exchangeRate), 0.0, (float)$emp['current_grade']];
             }
             // اتفاق خاص بالليرة يتجاوز السلسلة
             if ($emp['salary_input_mode'] === 'direct_lbp' && (float)$emp['contract_salary_lbp'] > 0) {
@@ -259,7 +259,7 @@ class PayrollCalculator {
         // متعاقد / موظف: راتب مباشر فقط، بلا سلسلة ولا تدرّج (الموظف يخضع لقانون
         // العمل بحدّ أدنى يدوي «من تاريخ إلى تاريخ»، وليس لسلسلة الرتب والرواتب).
         if ($emp['salary_input_mode'] === 'direct_usd') {
-            return [(float)$emp['base_salary_usd'] * $this->exchangeRate, 0.0, (float)$emp['current_grade']];
+            return [usdToLbp($emp['base_salary_usd'], $this->exchangeRate), 0.0, (float)$emp['current_grade']];
         }
         // أي وضع آخر (direct_lbp أو ضبط خاطئ على «السلسلة») = الراتب المتفق عليه بالليرة مباشرةً.
         return [(float)$emp['contract_salary_lbp'], 0.0, (float)$emp['current_grade']];
@@ -339,7 +339,7 @@ class PayrollCalculator {
         $tDaily = (float)($emp['transport_daily_amount'] ?? 0);
         if ($tDaily > 0) {
             $dailyMonthly = $tDaily * $tDays * $tWeeks;
-            if (($emp['transport_daily_currency'] ?? 'LBP') === 'USD') $dailyMonthly *= $this->exchangeRate;
+            if (($emp['transport_daily_currency'] ?? 'LBP') === 'USD') $dailyMonthly = usdToLbp($dailyMonthly, $this->exchangeRate);
             $transportComp += $dailyMonthly;
         }
         // (ب) تعويض النقل اليومي **المؤرّخ بالفترات** (employee_bonuses نوع transport_daily): يتغيّر

@@ -1066,6 +1066,17 @@ check('اختبار فعلي: الحفظ ثم القراءة بنفس الطلب
 check('الدولار المخزَّن الصفري يُحسَب من الليرة عند العرض (لا $0.00)',
       strpos($fnSrc3, 'function rowUsd') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/monthly_payroll.php'), "rowUsd(\$salary, 'net_salary_usd'") !== false);
+// ✍️ (2026-08-28) «دولار←ليرة بلا فراطات — داون»: مصدر واحد usdToLbp (floor) بكل مواقع التحويل
+$pcSrcU = (string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php');
+check('تحويل دولار←ليرة بلا فراطات (usdToLbp تدوير لتحت + لا ضرب خام بسعر الصرف بالمحرّك)',
+      strpos($fnSrc3, 'function usdToLbp') !== false
+      && usdToLbp(2.5, 89501) === 223752.0
+      && usdToLbp(100, 89500) === 8950000.0
+      && strpos($pcSrcU, '*= $this->exchangeRate') === false
+      && preg_match('/base_salary_usd.{0,30}\*\s*\$this->exchangeRate/', $pcSrcU) === 0
+      && substr_count($pcSrcU, 'usdToLbp(') >= 5
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), "usdToLbp(\$emp['base_salary_usd']") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/bulk_allowances.php'), 'usdToLbp(') !== false);
 // وضع العملة: «دولار فقط» لا يخلط الليرة بالدولار في الكشف الشهري
 $hUsd = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [], 'usd');
 $lbpHits = preg_match_all('/L\.L/u', $hUsd);

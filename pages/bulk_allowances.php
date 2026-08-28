@@ -341,7 +341,7 @@ $exchangeRate = (float)getExchangeRate();
             <?php $i=1; $baTot=0.0; foreach ($preview as $p):
                 $nm = trim(($p['first_name_ar'] ?: $p['first_name_fr']).' '.($p['last_name_ar'] ?: $p['last_name_fr']));
                 $td = (float)$p['transport_daily_amount']; $days = (float)$p['days_per_week'];
-                $monthly = $td * $days * 4; if (($p['transport_daily_currency'] ?? 'LBP')==='USD') $monthly *= $exchangeRate;
+                $monthly = $td * $days * 4; if (($p['transport_daily_currency'] ?? 'LBP')==='USD') $monthly = usdToLbp($monthly, $exchangeRate);
                 $baTot += $monthly;
             ?>
                 <tr>
