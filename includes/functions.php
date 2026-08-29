@@ -4474,11 +4474,39 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
     $history = $st->fetchAll(PDO::FETCH_ASSOC);
     $fmtG = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.');
 
+    // 🪄 عرض «درجة كل سنتين» (طلبه 2026-08-29 — «بيكون أفضل بس انتبه ما تخرب الاحتساب»):
+    // التخزين والحساب يبقيان بالأنصاف (0.5 كل سنة) **بلا أي تغيير**؛ هنا **عرضاً فقط** نلمّ كل نصفَي
+    // تدرّج عادي متتاليين (نفس حالة الاحتساب) بسطر واحد «درجة عادية كاملة» بتاريخ اكتمالها (النصف الثاني).
+    // الصح/الحذف على السطر الملموم يطالان النصفين معاً؛ النصف الأخير المفرد يبقى ظاهراً «نص درجة».
+    $isPlainHalf = function ($h) {
+        return $h['reason'] === 'biennial_promotion'
+            && abs((float)($h['delta'] ?? ((float)$h['grade_after'] - (float)$h['grade_before'])) - 0.5) < 0.001
+            && strpos((string)$h['notes'], 'تقديم') === false;
+    };
+    // الأنصاف العادية تُزاوَج بالتسلسل الزمني (الأول مع الثاني، الثالث مع الرابع…) حتى لو فصلت بينها
+    // درجات استثنائية؛ السطر الملموم يظهر مكان النصف الثاني (تاريخ اكتمال الدرجة) ويُخفى الأول.
+    $pairOf = [];        // فهرس النصف الثاني → صفّ النصف الأول
+    $skip = [];          // فهارس الأنصاف الأولى المخفية
+    $pending = null;     // فهرس نصف أول بانتظار نصفه الثاني
+    foreach ($history as $i => $h) {
+        if (!$isPlainHalf($h)) continue;
+        if ($pending !== null && (int)$history[$pending]['counted'] === (int)$h['counted']) {
+            $pairOf[$i] = $history[$pending]; $skip[$pending] = true; $pending = null;
+        } else {
+            $pending = $i;
+        }
+    }
+    $display = [];
+    foreach ($history as $i => $h) {
+        if (isset($skip[$i])) continue;
+        $display[] = ['h' => $h, 'pair' => $pairOf[$i] ?? null, 'merged' => isset($pairOf[$i])];
+    }
+
     // نوع كل درجة بتسمية واضحة (الاستثنائية مخزّنة بـreason='' فنستدلّ عليها من law_reference/الملاحظة).
     $labelFor = function ($h) {
         $r = $h['reason'];
         if ($r === 'titularization')     return ['دخول الملاك', 'gold', true];
-        if ($r === 'biennial_promotion') return ['درجة عادية (تشرين)', 'success', false];
+        if ($r === 'biennial_promotion') return [strpos((string)$h['notes'], 'تقديم') !== false ? 'تقديم التدرّج (نص درجة — قانون 223)' : 'درجة عادية (تشرين)', 'success', false];
         if ($r === 'manual')             return ['درجة يدوية (بقرارك)', 'secondary', false];
         // ما تبقّى = درجة استثنائية: إمّا قانون مسمّى (244/102/223/2017) أو نظام الأساتذة الجدد (4+4+2).
         $lbl = !empty($h['law_reference'])
@@ -4539,17 +4567,23 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                 <th style="text-align:center;width:190px" class="no-print">إجراءات</th>
             </tr></thead>
             <tbody>
-            <?php foreach ($history as $h):
+            <?php foreach ($display as $drow):
+                $h = $drow['h']; $pairRow = $drow['pair'];
                 [$rlabel, $rcolor, $isTitul] = $labelFor($h);
                 $counted = $isTitul || (int)$h['counted'] === 1;
                 $amount  = ($h['delta'] !== null) ? (float)$h['delta'] : ((float)$h['grade_after'] - (float)$h['grade_before']);
+                if ($pairRow) { $rlabel = 'درجة عادية كاملة (كل سنتين)'; $amount = 1.0; }
+                elseif ($isTitul === false && $h['reason'] === 'biennial_promotion' && abs($amount - 0.5) < 0.001 && strpos((string)$h['notes'], 'تقديم') === false) { $rlabel = 'نص درجة عادية (تكتمل تشرين ' . ((int)substr($h['change_date'], 0, 4) + 1) . ')'; }
             ?>
                 <tr class="<?= $isTitul ? '' : 'gr-locked' ?>" style="<?= !$counted ? 'opacity:.55;background:#fbfbfb' : '' ?>">
                     <td style="text-align:center">
                         <?php if ($isTitul): ?>
                             <i class="fas fa-lock text-muted" title="درجة دخول الملاك — ثابتة دائماً"></i>
                         <?php else: ?>
-                            <input type="checkbox" name="keep[]" value="<?= (int)$h['id'] ?>" <?= $counted ? 'checked' : '' ?> tabindex="-1" style="width:20px;height:20px;cursor:pointer">
+                            <input type="checkbox" name="keep[]" value="<?= (int)$h['id'] ?>" <?= $counted ? 'checked' : '' ?> tabindex="-1" style="width:20px;height:20px;cursor:pointer"<?= $pairRow ? ' data-pair="' . (int)$pairRow['id'] . '"' : '' ?>>
+                            <?php if ($pairRow): /* النصف الأول (مخفي) يتبع صح السطر الملموم */ ?>
+                            <input type="checkbox" name="keep[]" value="<?= (int)$pairRow['id'] ?>" <?= $counted ? 'checked' : '' ?> class="gr-pair-mirror" style="display:none">
+                            <?php endif; ?>
                         <?php endif; ?>
                     </td>
                     <td>
@@ -4562,8 +4596,8 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                     </td>
                     <td><span class="badge badge-<?= $rcolor ?>"><?= e($rlabel) ?></span></td>
                     <td style="text-align:center">
-                        <?php if ($isTitul): ?>
-                            <span class="badge badge-success">+<?= $fmtG($amount) ?></span>
+                        <?php if ($isTitul || $pairRow): ?>
+                            <span class="badge badge-success" <?= $pairRow ? 'title="نصّان: تشرين ' . (int)substr($pairRow['change_date'], 0, 4) . ' + تشرين ' . (int)substr($h['change_date'], 0, 4) . '"' : '' ?>>+<?= $fmtG($amount) ?></span>
                         <?php else: ?>
                             <input type="number" name="gamt[<?= (int)$h['id'] ?>]" value="<?= $fmtG($amount) ?>" step="0.5" min="-52" max="52" readonly
                                    class="form-control gr-field" style="max-width:75px;padding:4px 6px;text-align:center;margin:0 auto">
@@ -4586,6 +4620,9 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                         } elseif ($rsn === 'titularization') {
                             $noteShort = 'درجة الدخول حسب الشهادة';
                             $noteTxt = 'درجة الدخول حسب الشهادة — سلسلة الرتب والرواتب (' . $scaleLaw . ') عند دخول الملاك';
+                        } elseif ($rsn === 'biennial_promotion' && $pairRow) {
+                            $noteShort = 'التدرّج الدوري (تشرين ' . (int)substr($pairRow['change_date'], 0, 4) . ' + تشرين ' . (int)substr($h['change_date'], 0, 4) . ') — ' . $scaleLaw;
+                            $noteTxt = 'درجة عادية كاملة كل سنتين (نصفان: ' . formatDate($pairRow['change_date']) . ' و' . formatDate($h['change_date']) . ') — سلسلة الرتب والرواتب (' . $scaleLaw . ')';
                         } elseif ($rsn === 'biennial_promotion') {
                             $noteShort = 'التدرّج الدوري — ' . $scaleLaw;
                             $noteTxt = 'التدرّج الدوري نصف درجة كل سنة — سلسلة الرتب والرواتب (' . $scaleLaw . ')';
@@ -4618,7 +4655,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                                     title="يحفظ تغييراتك فوراً ويعيد حساب الراتب">
                                 <i class="fas fa-save"></i> حفظ
                             </button>
-                            <button type="submit" name="row_delete" value="<?= (int)$h['id'] ?>" class="btn btn-sm btn-danger"
+                            <button type="submit" name="row_delete" value="<?= $pairRow ? (int)$pairRow['id'] . ',' . (int)$h['id'] : (int)$h['id'] ?>" class="btn btn-sm btn-danger"
                                     data-confirm="⚠️ حذف هذه الدرجة نهائياً؟ ستُعاد سلسلة الدرجات وحساب الراتب بدونها.">
                                 <i class="fas fa-trash-alt"></i> حذف
                             </button>
@@ -4698,7 +4735,14 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                 sv.style.display = '';
                 sv.classList.add('gr-pulse');
             }
-            f.addEventListener('change', function (e) { reveal(e.target); });
+            f.addEventListener('change', function (e) {
+                // السطر الملموم (درجة كل سنتين): صحّه يتبعه النصف الأول المخفي
+                if (e.target.matches && e.target.matches('input[type=checkbox][data-pair]')) {
+                    var m = e.target.closest('td').querySelector('.gr-pair-mirror');
+                    if (m) m.checked = e.target.checked;
+                }
+                reveal(e.target);
+            });
             f.addEventListener('input',  function (e) { reveal(e.target); });
         })();
         </script>

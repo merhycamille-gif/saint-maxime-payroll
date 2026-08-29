@@ -218,15 +218,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save'])
 // (زرّ «حفظ» قدّام كل صفّ يمرّ عبر معالج grade_save أعلاه — يحفظ كامل حالة الجدول المعروضة فوراً.)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['row_delete']) && $employeeId > 0) {
     requireWriteAction(BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
-    $rid = (int)$_POST['row_delete'];
+    // السطر الملموم «درجة كل سنتين» (عرض) = نصفان مخزّنان → يُحذفان معاً ("id1,id2")
+    $rids = array_values(array_filter(array_map('intval', explode(',', (string)$_POST['row_delete']))));
     try {
-        $rw = $db->prepare("SELECT * FROM employee_grade_history WHERE id = ? AND employee_id = ?");
-        $rw->execute([$rid, $employeeId]);
-        $rw = $rw->fetch();
-        if (!$rw) throw new Exception('الدرجة غير موجودة');
-        if ($rw['reason'] === 'titularization') throw new Exception('درجة دخول الملاك ثابتة — لا تُعدَّل ولا تُحذف');
-        $db->prepare("DELETE FROM employee_grade_history WHERE id = ? AND employee_id = ?")->execute([$rid, $employeeId]);
-        if (function_exists('logAudit')) logAudit('delete', 'employee_grade_history', $rid, $rw, null);
+        if (!$rids) throw new Exception('الدرجة غير موجودة');
+        $rws = [];
+        foreach ($rids as $rid) {
+            $rw = $db->prepare("SELECT * FROM employee_grade_history WHERE id = ? AND employee_id = ?");
+            $rw->execute([$rid, $employeeId]);
+            $rw = $rw->fetch();
+            if (!$rw) throw new Exception('الدرجة غير موجودة');
+            if ($rw['reason'] === 'titularization') throw new Exception('درجة دخول الملاك ثابتة — لا تُعدَّل ولا تُحذف');
+            $rws[$rid] = $rw;
+        }
+        foreach ($rws as $rid => $rw) {
+            $db->prepare("DELETE FROM employee_grade_history WHERE id = ? AND employee_id = ?")->execute([$rid, $employeeId]);
+            if (function_exists('logAudit')) logAudit('delete', 'employee_grade_history', $rid, $rw, null);
+        }
         $g = rechainGradeHistory($employeeId);      // يعيد ربط قبل/بعد والدرجة الحالية حسب الترتيب الزمني
         $eDate = $db->query("SELECT hire_date FROM employees WHERE id=" . (int)$employeeId)->fetchColumn();
         $y0 = $eDate ? (int)date('Y', strtotime($eDate)) : (int)date('Y') - 5;

@@ -1368,7 +1368,7 @@ check('أزرار الدرجات: حقلا التاريخ والمقدار مق�
       strpos($fnSrc23, 'readonly') !== false && strpos($fnSrc23, 'x.readOnly = false') !== false
       && strpos($fnSrc23, "name=\"gamt[") !== false);
 check('أزرار الدرجات: الحفظ الفوري — أي تغيير يُظهر زرّ «حفظ» بنفس السطر (change/input + نبض)',
-      strpos($fnSrc23, "f.addEventListener('change', function (e) { reveal(e.target); })") !== false
+      strpos($fnSrc23, "f.addEventListener('change', function (e) {") !== false && strpos($fnSrc23, "reveal(e.target);") !== false
       && strpos($fnSrc23, "f.addEventListener('input',  function (e) { reveal(e.target); })") !== false
       && strpos($fnSrc23, 'gr-pulse') !== false
       && strpos($fnSrc23, 'id="gradeUnitsTable"') !== false);
@@ -4243,6 +4243,30 @@ check('حفظ الدرجات من ملف الأستاذ يرجع لنفس الص
       substr_count((string)file_get_contents($PROJ . '/includes/functions.php'), 'name="return_url"') >= 2
       && strpos((string)file_get_contents($PROJ . '/pages/grades.php'), 'function gradeReturnToEmployee') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/grades.php'), "employees.php?action=edit&id=' . \$employeeId . '#gradesPanel'") === false);
+
+/* =====================================================================
+ * 85) 🪄 عرض «درجة كل سنتين» (2026-08-29): لوحة الدرجات تلمّ نصفَي التدرّج العادي بسطر واحد
+ *     **عرضاً فقط** — التخزين بالأنصاف والدرجة والراتب لا يتغيّرون؛ صح السطر الملموم يشمل
+ *     النصفين (مرآة مخفية) والحذف "id1,id2". تجربة على شيرا (11 نصفاً → 5 كاملة + نصف مفرد).
+ * =================================================================== */
+$chi85 = $db->query("SELECT e.* FROM employees e JOIN schools s ON s.id=e.school_id WHERE s.name_ar LIKE 'مدرسة سيدة البشارة%' AND e.is_deleted=0
+    AND e.employee_type='enseignant_titulaire' AND e.first_name_ar='شيرا' AND e.last_name_ar LIKE '%عاقوري%' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$ok85 = false; $why85 = 'no emp';
+if ($chi85) {
+    $gBefore = (float)$chi85['current_grade'];
+    $halves = (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id=" . (int)$chi85['id'] . " AND reason='biennial_promotion' AND delta=0.5 AND notes NOT LIKE '%تقديم%'")->fetchColumn();
+    ob_start(); renderGradeChecklist($chi85, 'grades'); $html85 = ob_get_clean();
+    $full = substr_count($html85, 'درجة عادية كاملة (كل سنتين)');
+    $single = substr_count($html85, 'نص درجة عادية (تكتمل');
+    $mirrors = substr_count($html85, 'class="gr-pair-mirror"');
+    $keepN = preg_match_all('/name="keep\[\]"/', $html85);
+    $storedRows = (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id=" . (int)$chi85['id'] . " AND reason<>'titularization'")->fetchColumn();
+    $gAfter = (float)$db->query("SELECT current_grade FROM employees WHERE id=" . (int)$chi85['id'])->fetchColumn();
+    $ok85 = $full === intdiv($halves, 2) && $single === ($halves % 2) && $mirrors === $full && $keepN === $storedRows && $gAfter === $gBefore
+         && strpos((string)file_get_contents($PROJ . '/pages/grades.php'), "explode(',', (string)\$_POST['row_delete'])") !== false;
+    $why85 = "halves=$halves full=$full single=$single mirrors=$mirrors keep=$keepN stored=$storedRows grade=$gBefore→$gAfter";
+}
+check('عرض «درجة كل سنتين»: النصفان بسطر واحد عرضاً + صح لكل نصف مخزّن (مرآة) + الحذف المزدوج + الدرجة لا تتغيّر', $ok85, $why85);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
