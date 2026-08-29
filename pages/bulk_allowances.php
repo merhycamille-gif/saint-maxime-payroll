@@ -574,7 +574,8 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     <td style="white-space:nowrap"><strong><?= e($nm) ?></strong> <small class="text-muted"><?= e($catLblI[$pr['employee_type']] ?? '') ?></small></td>
                     <?php foreach (['prime','aide','trans'] as $k): $c = $indivCur[$eid][$k] ?? null;
                         $fmtN = fn($v) => ($v === null) ? '' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
-                        $vp = $fmtN($c['pct'] ?? null); $va = $fmtN($c['amount'] ?? null); $cu = $c['cur'] ?? 'LBP'; ?>
+                        $vp = $fmtN($c['pct'] ?? null); $va = $fmtN($c['amount'] ?? null); $cu = $c['cur'] ?? 'LBP';
+                        if ($va !== '') { $vaP = explode('.', $va); $vaP[0] = number_format((float)$vaP[0]); $va = implode('.', $vaP); } ?>
                     <td style="white-space:nowrap">
                         <span class="ind-cell">
                             <input type="text" inputmode="decimal" name="ind[<?= $eid ?>][<?= $k ?>_pct]" value="<?= e($vp) ?>" placeholder="٪" title="نسبة ٪ من الأساس بعد التدرّج" class="form-control ind-pct" dir="ltr">
