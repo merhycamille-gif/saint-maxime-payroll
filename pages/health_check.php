@@ -482,8 +482,38 @@ include __DIR__ . '/../includes/header.php';
       'heal_chira_taalimiya_20260829'   => '🎓 شيرا العاقوري: إجازة تعليمية → درجة 31 + إضافي 45٪ (2026-08-29)',
       'heal_maria_malak_20260829'       => '🎓 ماريا اسعد: الملاك = دخول المدرسة → درجة 39 + إضافي بند واحد 45٪ + إطفاء الازدواج (2026-08-29)',
       'heal_gladis_ghost_20260829'      => '👻 كلاديس الصباغ: إضافي عالق بلا سطر → 0 + أشباح مماثلة (2026-08-29)',
+      'heal_restore_zeroed_20260829'    => '🚑 استرجاع الرواتب المصفَّرة (20-08) من اللقطة المدقَّقة + إضافي البشارة (2026-08-29)',
+      'heal_postleave_orphans_20260829' => '🧹 رواتب بعد الترك ضمن السنة + صفوف يتيمة للمحذوفين (2026-08-29)',
   ];
   ?>
+  <?php
+  // 🔎 الفحص الرسمي النهائي للبيانات (2026-08-29): 20 قاعدة على السنة المعروضة — صفر = سليم
+  require_once __DIR__ . '/../includes/data_audit.php';
+  $auditSy = activeSchoolYear(); if ($auditSy === 'all') $auditSy = currentSchoolYear();
+  $auditRows = dataAuditRules(getDB(), $auditSy);
+  $auditInfo = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes'];   // للمراجعة (ليست أخطاء حساب)
+  $auditErrors = 0; foreach ($auditRows as $ar) if ($ar['n'] > 0 && !in_array($ar['key'], $auditInfo, true)) $auditErrors += $ar['n'];
+  ?>
+  <div class="card" id="officialAudit">
+    <div class="card-header"><h3><i class="fas fa-clipboard-check"></i> الفحص الرسمي النهائي للبيانات — <?= e($auditSy) ?>
+      <span class="badge badge-<?= $auditErrors ? 'danger' : 'success' ?>" style="margin-right:8px"><?= $auditErrors ? ($auditErrors . ' خطأ') : 'سليم 100٪' ?></span></h3></div>
+    <div class="card-body" style="overflow-x:auto">
+      <p class="text-muted" style="margin:0 0 8px">20 قاعدة تُفحص على بيانات هذه النسخة مباشرةً (السنة المعروضة). الأحمر = خطأ بالحساب أو بالبيانات يلزم تصحيحه · الأصفر = للمراجعة (ليس خطأ حساب) · الأخضر = سليم.</p>
+      <table class="table" style="direction:rtl">
+        <thead><tr><th>القاعدة</th><th style="width:90px;text-align:center">العدد</th><th>عيّنة</th></tr></thead>
+        <tbody>
+        <?php foreach ($auditRows as $ar): $isInfo = in_array($ar['key'], $auditInfo, true); $cls = $ar['n'] ? ($isInfo ? 'warning' : 'danger') : 'success'; ?>
+          <tr>
+            <td><?= e($ar['label']) ?></td>
+            <td style="text-align:center"><span class="badge badge-<?= $cls ?>"><?= $ar['n'] ? number_format($ar['n']) : '✓ 0' ?></span></td>
+            <td style="font-size:12px;color:#64748b"><?= e(implode(' · ', $ar['samples'])) ?></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header"><h3><i class="fas fa-notes-medical"></i> حالة الشفاءات الذاتية الأخيرة (2026-08-27)</h3></div>
     <div class="card-body" style="overflow-x:auto">

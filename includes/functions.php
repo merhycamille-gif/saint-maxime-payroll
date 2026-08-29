@@ -512,11 +512,9 @@ function healBonusBackfill20260820() {
                 $recalcYears[(string)$b['sy']] = 1; $insTot++;
             }
             foreach (array_keys($recalcYears) as $sy) {
-                $mq = $db->prepare("SELECT month, year FROM monthly_salaries WHERE employee_id=? AND school_year=?");
-                $mq->execute([$eid, $sy]);
-                foreach ($mq->fetchAll(PDO::FETCH_ASSOC) as $mrow) {
-                    try { (new PayrollCalculator($eid, (int)$mrow['month'], (int)$mrow['year']))->calculateAndSave(); } catch (Exception $e) {}
-                }
+                // 🔴 (2026-08-29) كان يستدعي المحرّك الكامل مباشرةً فصفّر أساس المنقولين بلا إعداد أونلاين
+                // (عبرا/الانتقال/النياح/البشارة — 2026-08-20). المسار الآمن الوحيد: recalcEmployeeYear.
+                try { recalcEmployeeYear($eid, $sy); } catch (Throwable $e) {}
             }
         }
         setSetting($flagKey, 'done ' . date('Y-m-d H:i') . " (+$insTot علاوة)");
@@ -656,6 +654,8 @@ function pruneSalariesAfterDeparture($db, $empId) {
     // رتبة صفّ (year,month) = (month>=10 ? year : year-1). نحذف كل صفّ رتبته > رتبة الترك.
     $del = $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND ((month >= 10 AND year > ?) OR (month < 10 AND year - 1 > ?))");
     $del->execute([$empId, $depRank, $depRank]);
+    // (2026-08-29) الأشهر التي تلي شهر الترك **ضمن نفس السنة** لا تُحذف تلقائياً: قد يكون بقرار المستخدم
+    // (حنان تحومي مكمَّلة كل السنة رغم تاريخ تركها) — تُعرض «للمراجعة» بالفحص الرسمي فقط.
     return $del->rowCount();
 }
 
@@ -5299,5 +5299,148 @@ function healGladisGhostPrime20260829() {
         setSetting('heal_gladis_ghost_20260829', 'done: ' . implode(' | ', $log) . ($others ? ' | أشباح أخرى (بلا لمس): ' . implode('؛ ', array_slice($others, 0, 15)) : ' | لا أشباح أخرى'));
     } catch (Throwable $e) {
         try { setSetting('heal_gladis_ghost_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
+
+/**
+ * 🚑 استرجاع الرواتب المصفَّرة أونلاين (2026-08-29 — «شيك على كل البرنامج، ما بدي أغلاط»):
+ * بتاريخ 2026-08-20 شفاء تكميل العلاوات استدعى المحرّك الكامل مباشرةً لموظفين ومتعاقدين «منقولين
+ * بلا إعداد» (أساسهم بالإعداد صفر) فصفّر أساسهم وصافيهم بأشهر 2025-2026 أونلاين (عبرا 43، الانتقال 11،
+ * النياح 7، البشارة 8، النجاة 7…) بينما النسخة المحلية (المدقَّقة على كشوفه بالمليم) سليمة.
+ * هذا الشفاء يسترجع من لقطة tools/data/rows_snapshot_20260829.json (الصفوف المحلية السليمة) فقط
+ * الصفوف التي أساسها صفر هنا وأساسها > 0 باللقطة (نفس الموظف/السنة/الشهر) — كل الأعمدة المالية —
+ * ثم يعيد «تركيب العلاوات» بأسطر الموظف الحالية. ويعيد أسطر الإضافي الناقصة لخمسة متعاقدين بالبشارة
+ * ويحوّل إضافي غادة باصيلا وابتسام أبو ضاهر إلى نسبة 45٪ (= كشفه بالمليم). نسخة قبل التعديل:
+ * _ms_bk_restore20260829. يعمل بالمعرّف + تحقّق الاسم (الاسم والشهرة نفسهما).
+ */
+function healRestoreZeroedRows20260829() {
+    try {
+        if (strpos((string)getSetting('heal_restore_zeroed_20260829', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $file = dirname(__DIR__) . '/tools/data/rows_snapshot_20260829.json';
+        if (!is_file($file)) { setSetting('heal_restore_zeroed_20260829', 'err: no snapshot'); return; }
+        $snap = json_decode((string)file_get_contents($file), true);
+        if (!$snap || empty($snap['rows'])) { setSetting('heal_restore_zeroed_20260829', 'err: bad snapshot'); return; }
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_restore20260829 LIKE monthly_salaries");
+        $cols = ['base_salary_lbp','echelon_value_lbp','base_plus_echelon_lbp','extra_lbp','prime_fixe_lbp','aide_complementaire_lbp','transport_complement_lbp','echelon_to_caisse_lbp','caisse_amount_lbp','eoc_grade_lbp','cnss_amount_lbp','taxable_base_lbp','income_tax_lbp','total_retenues_lbp','net_salary_lbp','family_allowance_lbp','transport_lbp','total_due_lbp','exchange_rate','net_salary_usd','total_due_usd','school_cnss_8_lbp','school_eoc_6_lbp','school_family_comp_6_lbp','school_end_of_service_8_5_lbp','grade_at_month'];
+        $empQ = $db->prepare("SELECT id, first_name_ar, last_name_ar, employee_type, base_salary_usd, contract_salary_lbp, is_deleted FROM employees WHERE id=?");
+        $rowQ = $db->prepare("SELECT id, base_plus_echelon_lbp, extra_lbp, prime_fixe_lbp, aide_complementaire_lbp, total_retenues_lbp, net_salary_lbp, transport_lbp, family_allowance_lbp, total_due_lbp FROM monthly_salaries WHERE employee_id=? AND year=? AND month=? LIMIT 1");
+        // الصف «غير المتّسق» = صافيه ≠ (الإجمالي − المحسومات) أو مستحقّه ≠ (الصافي + النقل + العائلية) — يُستبدل بالصف المدقَّق
+        $inconsistent = function (array $c): bool {
+            $gross = (int)$c['base_plus_echelon_lbp'] + (int)$c['extra_lbp'] + (int)$c['prime_fixe_lbp'] + (int)$c['aide_complementaire_lbp'];
+            return abs($gross - (int)$c['total_retenues_lbp'] - (int)$c['net_salary_lbp']) > 1
+                || abs((int)$c['net_salary_lbp'] + (int)$c['transport_lbp'] + (int)($c['family_allowance_lbp'] ?? 0) - (int)$c['total_due_lbp']) > 1;
+        };
+        $upd = $db->prepare("UPDATE monthly_salaries SET " . implode(', ', array_map(fn($c) => "$c=?", $cols)) . ", is_calculated=1 WHERE id=?");
+        $touched = []; $restored = 0; $skipName = []; $configured = []; $recalcCfg = 0; $prunedCfg = 0;
+        $empCache = [];
+        foreach ($snap['rows'] as $r) {
+            $eid = (int)$r['employee_id'];
+            if (!isset($empCache[$eid])) { $empQ->execute([$eid]); $empCache[$eid] = $empQ->fetch(PDO::FETCH_ASSOC) ?: false; }
+            $e = $empCache[$eid];
+            if (!$e || (int)$e['is_deleted'] === 1) continue;
+            if ($e['employee_type'] === 'enseignant_titulaire' || (float)$e['base_salary_usd'] > 0 || (float)$e['contract_salary_lbp'] > 0) { $configured[$eid] = 1; continue; } // له إعداد → المحرّك سيّده (أدناه)
+            if (trim((string)$e['first_name_ar']) !== trim((string)$r['f']) || trim((string)$e['last_name_ar']) !== trim((string)$r['l'])) { $skipName[$eid] = $r['f'] . ' ' . $r['l']; continue; }
+            $rowQ->execute([$eid, (int)$r['year'], (int)$r['month']]);
+            $cur = $rowQ->fetch(PDO::FETCH_ASSOC);
+            if (!$cur || (int)$r['base_plus_echelon_lbp'] <= 0) continue;
+            if ((int)$cur['base_plus_echelon_lbp'] > 0 && !$inconsistent($cur)) continue; // فقط المصفَّر أو غير المتّسق هنا، والسليم باللقطة
+            $db->exec("INSERT IGNORE INTO _ms_bk_restore20260829 SELECT * FROM monthly_salaries WHERE id=" . (int)$cur['id']);
+            $vals = []; foreach ($cols as $c) $vals[] = $r[$c];
+            $vals[] = (int)$cur['id'];
+            $upd->execute($vals);
+            $restored++; $touched[$eid] = 1;
+        }
+        // أعِد تركيب العلاوات الحالية (أسطر الملف أونلاين) على الصفوف المسترجَعة
+        foreach (array_keys($touched) as $eid) { try { recalcEmployeeYear($eid, '2025-2026'); } catch (Throwable $e) {} }
+        // من له إعداد راتب هنا (عقد/دولار أدخله المستخدم): صفوفه المصفَّرة/غير المتّسقة تُعاد من المحرّك نفسه،
+        // وصفوف الأشهر خارج أشهر دفعه (عقد 10 أشهر → لا آب/أيلول) تُزال (بنسخة) — كانت بقايا تصفير 20-08.
+        foreach (array_keys($configured) as $eid) {
+            $pm = (int)$db->query("SELECT payment_months_per_year FROM employees WHERE id=$eid")->fetchColumn();
+            $bad = $db->query("SELECT id, month FROM monthly_salaries WHERE employee_id=$eid AND school_year='2025-2026' AND (base_plus_echelon_lbp=0
+                OR ABS((base_plus_echelon_lbp+extra_lbp+prime_fixe_lbp+aide_complementaire_lbp)-total_retenues_lbp-net_salary_lbp)>1
+                OR ABS(net_salary_lbp+transport_lbp+COALESCE(family_allowance_lbp,0)-total_due_lbp)>1)")->fetchAll(PDO::FETCH_ASSOC);
+            if (!$bad) continue;
+            if ($pm === 10) {
+                foreach ($bad as $b) if (in_array((int)$b['month'], [8, 9], true)) {
+                    $db->exec("INSERT IGNORE INTO _ms_bk_restore20260829 SELECT * FROM monthly_salaries WHERE id=" . (int)$b['id']);
+                    $prunedCfg += (int)$db->exec("DELETE FROM monthly_salaries WHERE id=" . (int)$b['id']);
+                }
+            }
+            try { recalcEmployeeYear($eid, '2025-2026'); $recalcCfg++; } catch (Throwable $e) {}
+        }
+        // تغريد غدار (البشارة، متعاقدة غير خاضعة بكشفه — قرار 2026-08-27): لا صفوف لها بالنسخة المدقَّقة → تُزال صفوفها هنا (بنسخة)
+        $tg = 0;
+        $sidB = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if ($sidB) {
+            $st = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0 AND first_name_ar='تغريد' AND last_name_ar LIKE 'غدار%' AND employee_type='enseignant_contractuel' LIMIT 1");
+            $st->execute([(int)$sidB]); $tid = (int)$st->fetchColumn();
+            if ($tid) {
+                $db->exec("INSERT IGNORE INTO _ms_bk_restore20260829 SELECT * FROM monthly_salaries WHERE employee_id=$tid AND school_year='2025-2026'");
+                $tg = $db->exec("DELETE FROM monthly_salaries WHERE employee_id=$tid AND school_year='2025-2026'");
+            }
+        }
+        // أسطر الإضافي الناقصة (البشارة) — إن غاب سطر إضافي فعّال بنفس السنة
+        $insB = 0;
+        foreach ($snap['bonuses'] ?? [] as $b) {
+            $eid = (int)$b['employee_id'];
+            $empQ->execute([$eid]); $e = $empQ->fetch(PDO::FETCH_ASSOC);
+            if (!$e || (int)$e['is_deleted'] === 1) continue;
+            if (trim((string)$e['first_name_ar']) !== trim((string)$b['f']) || trim((string)$e['last_name_ar']) !== trim((string)$b['l'])) continue;
+            $has = $db->prepare("SELECT 1 FROM employee_bonuses WHERE employee_id=? AND bonus_type='prime_fixe' AND is_active=1 AND (school_year IS NULL OR school_year='2025-2026') LIMIT 1");
+            $has->execute([$eid]);
+            if ($has->fetchColumn()) continue;
+            $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, 'prime_fixe', 1, '2025-2026', ?, ?, ?, ?, ?, 1)")
+               ->execute([$eid, $b['amount'], $b['value_type'], $b['currency'], $b['start_month'], $b['end_month']]);
+            $insB++; try { recalcEmployeeYear($eid, '2025-2026'); } catch (Throwable $e2) {}
+        }
+        // غادة باصيلا وابتسام أبو ضاهر (ملاك البشارة): إضافيهما = نسبة المدرسة 45٪ (= كشفه بالمليم على درجتيهما الحاليتين)
+        $pct = 0;
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if ($sid) {
+            foreach ([['غادة', 'باصيلا']] as [$fn, $ln]) {
+                // عند تكرار الاسم: الملف الذي له رواتب هذه السنة هو الفعلي
+                $st = $db->prepare("SELECT e.id FROM employees e WHERE e.school_id=? AND e.is_deleted=0 AND e.employee_type='enseignant_titulaire' AND e.first_name_ar=? AND e.last_name_ar LIKE ?
+                    ORDER BY (SELECT COUNT(*) FROM monthly_salaries m WHERE m.employee_id=e.id AND m.school_year='2025-2026') DESC, e.id LIMIT 1");
+                $st->execute([(int)$sid, $fn, '%' . $ln . '%']);
+                $eid = (int)$st->fetchColumn();
+                if (!$eid) continue;
+                $has = $db->prepare("SELECT id, value_type, amount FROM employee_bonuses WHERE employee_id=? AND bonus_type='prime_fixe' AND is_active=1 AND (school_year IS NULL OR school_year='2025-2026') AND (start_month IS NULL OR (start_month=10 AND end_month=9)) ORDER BY id");
+                $has->execute([$eid]);
+                $rows = $has->fetchAll(PDO::FETCH_ASSOC);
+                $ok = false;
+                foreach ($rows as $rw) if ($rw['value_type'] === 'percent' && (float)$rw['amount'] == 45.0) $ok = true;
+                if ($ok) continue;
+                foreach ($rows as $rw) $db->exec("UPDATE employee_bonuses SET is_active=0 WHERE id=" . (int)$rw['id']);
+                $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, 'prime_fixe', 1, '2025-2026', 45, 'percent', 'LBP', NULL, NULL, 1)")->execute([$eid]);
+                try { recalcEmployeeYear($eid, '2025-2026'); } catch (Throwable $e2) {}
+                $pct++;
+            }
+        }
+        setSetting('heal_restore_zeroed_20260829', 'done: restoredRows=' . $restored . ' employees=' . count($touched) . ' cfgRecalc=' . $recalcCfg . ' cfgPruned=' . $prunedCfg . ' bonusRows=' . $insB . ' pct45=' . $pct . ' taghridRows=' . $tg
+            . ($skipName ? ' | اسم مختلف (لم يُلمس): ' . implode('؛', array_slice(array_values($skipName), 0, 10)) : ''));
+    } catch (Throwable $e) {
+        try { setSetting('heal_restore_zeroed_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
+
+/**
+ * 🧹 (2026-08-29 — الفحص الرسمي) رواتب بعد الترك ضمن السنة + صفوف يتيمة لموظفين محذوفين:
+ * يحذف رواتب الموظفين المحذوفين (is_deleted=1) بنسخة _ms_bk_orphans20260829. (أشهر ما بعد الترك ضمن
+ * السنة تبقى للمراجعة — قد تكون بقرار المستخدم متل حنان تحومي.)
+ */
+function healPostDepartureOrphans20260829() {
+    try {
+        if (strpos((string)getSetting('heal_postleave_orphans_20260829', ''), 'done') === 0) return;
+        $db = getDB();
+        $n1 = 0; $who = [];
+        // (أشهر ما بعد الترك ضمن السنة لا تُحذف — قد تكون بقراره؛ تبقى للمراجعة بالفحص الرسمي)
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_orphans20260829 LIKE monthly_salaries");
+        $db->exec("INSERT IGNORE INTO _ms_bk_orphans20260829 SELECT ms.* FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=1");
+        $n2 = (int)$db->exec("DELETE ms FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=1");
+        setSetting('heal_postleave_orphans_20260829', 'done: postLeaveRows=' . $n1 . ' [' . implode('؛', array_slice($who, 0, 25)) . '] orphanRows=' . $n2);
+    } catch (Throwable $e) {
+        try { setSetting('heal_postleave_orphans_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }

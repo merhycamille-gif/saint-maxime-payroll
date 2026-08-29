@@ -4356,6 +4356,29 @@ check('حذف بند العلاوة = إطفاء لا محو (bonuses/bulk/emplo
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healGladisGhostPrime20260829();') !== false);
 check('تجربة حيّة (موظفة بلا إعداد): إضافة سطر إضافي يظهر بالشهر، وإطفاؤه يصفّره ويرجّع الصافي', $live89, $why89);
 
+/* =====================================================================
+ * 90) 🚑 الفحص الرسمي + استرجاع المصفَّر (2026-08-29): قواعد الفحص (20) صفر أخطاء حساب محلياً
+ *     (المعلوماتية مستثناة)، شفاء التكميل لا يستدعي المحرّك الكامل مباشرةً، الشفاء موصول،
+ *     واللقطة موجودة وبطاقة الفحص بصفحة الصحة.
+ * =================================================================== */
+require_once $PROJ . '/includes/data_audit.php';
+$aud90 = dataAuditRules($db, '2025-2026');
+$info90 = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'orphan_rows', 'row_rate0'];
+$bad90 = []; foreach ($aud90 as $a) if ($a['n'] > 0 && !in_array($a['key'], $info90, true)) $bad90[] = $a['key'] . '=' . $a['n'];
+check('الفحص الرسمي (20 قاعدة) على النسخة المحلية 2025-2026: صفر أخطاء حساب (المعلوماتية للمراجعة مستثناة)', !$bad90, implode(' ', $bad90));
+check('شفاء تكميل العلاوات لا يستدعي المحرّك الكامل مباشرةً (سبب تصفير الأساس أونلاين) + شفاء الاسترجاع موصول + اللقطة + بطاقة الفحص',
+      strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "(new PayrollCalculator(\$eid, (int)\$mrow['month'], (int)\$mrow['year']))->calculateAndSave()") === false
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healRestoreZeroedRows20260829();') !== false
+      && is_file($PROJ . '/tools/data/rows_snapshot_20260829.json')
+      && strpos((string)file_get_contents($PROJ . '/pages/health_check.php'), 'id="officialAudit"') !== false);
+
+check('التارك: أشهر ما بعد الترك ضمن السنة لا تُحذف تلقائياً (قد تكون بقراره — حنان تحومي) + شفاء اليتامى موصول',
+      strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "(year * 100 + month) > ?") === false
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healPostDepartureOrphans20260829();') !== false);
+$aud91 = dataAuditRules($db, '2025-2026'); $or91 = 0;
+foreach ($aud91 as $a) { if ($a['key'] === 'orphan_rows') $or91 = $a['n']; }
+check('بعد الشفاء محلياً: لا صفوف رواتب يتيمة لموظفين محذوفين (2025-2026)', $or91 === 0, "orphan=$or91");
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
