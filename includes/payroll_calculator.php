@@ -87,6 +87,7 @@ class PayrollCalculator {
         $stmt->execute([$this->employee['id'], $bonusType, $sy]);
         
         $total = 0;
+        $pctSum = 0.0;   // 🧮 مجموع النسب المنطبقة على الشهر — تُدوَّر مرّة واحدة (45٪ + 5٪ = 50٪ بالضبط)
         while ($row = $stmt->fetch()) {
             // Check if month falls in period
             $start = $row['start_month'];
@@ -107,13 +108,17 @@ class PayrollCalculator {
             
             // نسبة مئوية: قاعدة المستخدم (÷1500 رسمي ← نسبة ← داون دولار ← سعر السوق ← داون للمليون)
             // فتتحرّك مع الأساس/الدرجة تلقائياً. أو مبلغ ثابت (يُحوَّل للّيرة إن دولار — داون).
+            // (2026-08-29، طلبه «إذا زدت 5٪ وما حطّيت 50»): النسب المتعدّدة لنفس الشهر تُجمَع أولاً ثم
+            // تُطبَّق القاعدة مرّة واحدة على مجموعها — لا تدوير لكل سطر لحاله (كان يضيّع لغاية مليون).
             if (($row['value_type'] ?? 'amount') === 'percent') {
-                $amount = bonusPercentLbp($amount, $baseForPercent, $this->exchangeRate);
+                $pctSum += $amount;
+                continue;
             } elseif ($row['currency'] === 'USD') {
                 $amount = usdToLbp($amount, $this->exchangeRate);
             }
             $total += $amount;
         }
+        if ($pctSum > 0) $total += bonusPercentLbp($pctSum, $baseForPercent, $this->exchangeRate);
         return $total;
     }
 

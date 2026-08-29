@@ -1132,7 +1132,7 @@ check('قاعدة نسبة الإضافي: ÷1500 ← نسبة ← داون دو
       && bonusPercentLbp(45, 2545000, 89500) === 68000000.0 // روز/ناتالي
       && bonusPercentLbp(45, 1525000, 89500) === 40000000.0 // كارمن
       && bonusPercentLbp(45, 4195000, 89500) === 112000000.0 // نهاية
-      && strpos((string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php'), 'bonusPercentLbp($amount, $baseForPercent, $this->exchangeRate)') !== false);
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php'), 'bonusPercentLbp($pctSum, $baseForPercent, $this->exchangeRate)') !== false);
 check('تيا نخلة (1554): علاوتها نسبة 45٪ وأشهرها عالقاعدة (تشرين 47م / كانون 54م تتحرّك مع درجتها)',
       (function () use ($db) {
           $b = $db->query("SELECT value_type, amount FROM employee_bonuses WHERE employee_id=1554 AND bonus_type='prime_fixe' AND school_year='2025-2026' AND is_active=1")->fetch();
@@ -4198,6 +4198,35 @@ $dup82 = (int)$db->query("SELECT COUNT(*) FROM (SELECT b.employee_id FROM employ
 check('لا ازدواج «أجر إضافي» نسبة + مبلغ لكل السنة عند أي موظف + حارس الازدواج بمحرّر الموظف',
       $dup82 === 0 && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), '$hasPctPrime') !== false,
       'dups=' . $dup82);
+
+/* =====================================================================
+ * 83) 🧮 نِسَب متعدّدة لنفس الشهر تُجمَع قبل التدوير (2026-08-29، «إذا زدت 5٪ وما حطّيت 50»):
+ *     45٪ + 5٪ = 50٪ بالضبط (كان كل سطر يُدوَّر لحاله فيضيع لغاية مليون). فحص بالمصدر +
+ *     تجربة حيّة على شيرا (2,625,000: سطران 45+5 = 78م لا 77م) ثم الإرجاع.
+ * =================================================================== */
+$src83 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$chi83 = $db->query("SELECT e.id FROM employees e JOIN schools s ON s.id=e.school_id WHERE s.name_ar LIKE 'مدرسة سيدة البشارة%' AND e.is_deleted=0
+    AND e.employee_type='enseignant_titulaire' AND e.first_name_ar='شيرا' AND e.last_name_ar LIKE '%عاقوري%' LIMIT 1")->fetchColumn();
+$live83 = false;
+if ($chi83) {
+    $chi83 = (int)$chi83;
+    $db->exec("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+        VALUES ($chi83, 'prime_fixe', 9, '2025-2026', 5, 'percent', 'LBP', 11, 11, 1)");
+    $newId83 = (int)$db->lastInsertId();
+    try {
+        recalcEmployeeYear($chi83, '2025-2026');
+        $p83 = (int)$db->query("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id=$chi83 AND year=2025 AND month=11")->fetchColumn();
+        $b83 = (int)$db->query("SELECT base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id=$chi83 AND year=2025 AND month=11")->fetchColumn();
+        $r83 = (float)$db->query("SELECT exchange_rate FROM monthly_salaries WHERE employee_id=$chi83 AND year=2025 AND month=11")->fetchColumn();
+        $live83 = ($p83 === (int)bonusPercentLbp(50, $b83, $r83)) && ($p83 > (int)bonusPercentLbp(45, $b83, $r83));
+    } finally {
+        $db->exec("DELETE FROM employee_bonuses WHERE id=$newId83");
+        recalcEmployeeYear($chi83, '2025-2026');
+    }
+}
+check('نِسَب متعدّدة لنفس الشهر تُجمَع ثم تُدوَّر مرّة واحدة (45٪+5٪ = 50٪ بالضبط) — مصدر + تجربة حيّة',
+      strpos($src83, '$pctSum += $amount;') !== false && strpos($src83, 'bonusPercentLbp($pctSum') !== false && $live83,
+      'live=' . var_export($live83, true));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
