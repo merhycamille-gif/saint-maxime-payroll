@@ -263,25 +263,13 @@ function saveEmployeeBonuses($db, $employeeId) {
     $allowed = ['prime_fixe', 'aide_complementaire', 'transport_complement'];
     $counters = [];
     $n = is_array($types) ? count($types) : 0;
-    // 🛡️ حارس الازدواج (2026-08-29، قصة ماريا اسعد أونلاين): «الأجر الإضافي» نسبةً لكل السنة + مبلغاً
-    // ثابتاً لكل السنة معاً = يُدفع مرّتين (181م بدل 92م). النسبة (القانون) تحلّ محلّ المبلغ، فيُتجاهَل المبلغ.
-    $fullYear = function ($f, $t) { return ($f === null || $f === '') || ((int)$f === 10 && (int)$t === 9); };
-    $hasPctPrime = false;
-    for ($i = 0; $i < $n; $i++) {
-        if (($types[$i] ?? '') === 'prime_fixe' && (($rows['vtype'][$i] ?? 'amount') === 'percent')
-            && (float)str_replace(',', '', $rows['value'][$i] ?? '') > 0
-            && $fullYear($rows['from'][$i] ?? null, $rows['to'][$i] ?? null)) $hasPctPrime = true;
-    }
     for ($i = 0; $i < $n; $i++) {
         $bt = $types[$i] ?? '';
         if (!in_array($bt, $allowed, true)) continue;
         $val = (float)str_replace(',', '', $rows['value'][$i] ?? '');
         if ($val <= 0) continue;
         $vt = (($rows['vtype'][$i] ?? 'amount') === 'percent') ? 'percent' : 'amount';
-        if ($bt === 'prime_fixe' && $vt === 'amount' && $hasPctPrime && $fullYear($rows['from'][$i] ?? null, $rows['to'][$i] ?? null)) {
-            $_SESSION['flash_info'] = 'الأجر الإضافي: عندك نسبة ٪ لكل السنة، فتجاهلتُ سطر المبلغ الثابت حتى لا يُدفع مرّتين. / Prime en % conservée, le montant fixe en double a été ignoré.';
-            continue;
-        }
+        // (2026-08-29) نسبة ٪ + مبلغ ثابت معاً لنفس الشخص مسموحان بقراره («قدّام كل أستاذ خيار لكل شي») — المحرّك يجمعهما.
         $cur = (($rows['currency'][$i] ?? 'USD') === 'LBP') ? 'LBP' : 'USD';
         // 🛡️ حارس خطأ العملة: مبلغ ضخم بالدولار = مبلغ ليرة كُتب والعملة بقيت دولاراً
         $cur = sanitizeAmountCurrency($val, $cur, $curWarn);

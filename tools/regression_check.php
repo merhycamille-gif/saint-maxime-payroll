@@ -4195,8 +4195,9 @@ $dup82 = (int)$db->query("SELECT COUNT(*) FROM (SELECT b.employee_id FROM employ
     WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND (b.school_year IS NULL OR b.school_year='2025-2026')
       AND (b.start_month IS NULL OR (b.start_month=10 AND b.end_month=9)) AND e.is_deleted=0
     GROUP BY b.employee_id HAVING SUM(b.value_type='percent')>=1 AND SUM(b.value_type='amount')>=1) t")->fetchColumn();
-check('لا ازدواج «أجر إضافي» نسبة + مبلغ لكل السنة عند أي موظف + حارس الازدواج بمحرّر الموظف',
-      $dup82 === 0 && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), '$hasPctPrime') !== false,
+check('محرّر الموظف: نسبة ٪ + مبلغ ثابت معاً مسموحان (قراره 2026-08-29 — لا حارس يُسقط المبلغ)',
+      strpos((string)file_get_contents($PROJ . '/pages/employees.php'), '$hasPctPrime') === false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'مسموحان بقراره') !== false,
       'dups=' . $dup82);
 
 /* =====================================================================
@@ -4281,6 +4282,18 @@ check('صفحة المكافآت: المودال لا يُثبَّت رأسه + 
       && strpos($ba86, 'id="baReplaceNote"') !== false
       && strpos($ba86, 'كيف بشتغل بهالصفحة؟') !== false
       && strpos($ba86, 'byType[type].pct+=val') !== false);
+
+/* =====================================================================
+ * 87) 🧍 «مبالغ فردية (لكل واحد)» بصفحة المكافآت (2026-08-29): جدول بأسماء الفئة، خانة لكل نوع،
+ *     فاضي = لا تغيير، 0 = إزالة، يُستبدل بند «مبلغ لكل السنة» فقط (النسب والفترات لا تُمسّ).
+ * =================================================================== */
+$ba87 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
+check('المكافآت: زرّ ومودال «مبالغ فردية» + معالج apply_individual يحمي النسب/الفترات ويعيد الحساب',
+      strpos($ba87, "action === 'apply_individual'") !== false
+      && strpos($ba87, 'id="baModalIndiv"') !== false
+      && strpos($ba87, "value_type = ? AND \$fullYearSql") !== false && strpos($ba87, "[\$k . '_pct']") !== false
+      && strpos($ba87, 'recalcEmployeeYear($eid, $schoolYear)') !== false
+      && strpos($ba87, 'window.baIndivFilter=function') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -205,6 +205,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
         } else $_SESSION['flash_error'] = 'أضِف سطر نقل واحد على الأقل بقيمة أكبر من صفر';
     }
 
+    /* 🧍 (2026-08-29، طلبه «المتعاقدين ما في مبلغ ثابت للكل، كل واحد عندو مبلغ — وين بحط؟»):
+       مبالغ فردية لكل موظف بجدول واحد (أجر إضافي / مكافأة / نقل شهري، لكل السنة). فاضي = لا تغيير،
+       0 = شيل المبلغ. يُستبدل فقط بند «مبلغ لكل السنة» من نفس النوع للموظف؛ النسب والفترات لا تُمسّ. */
+    elseif ($action === 'apply_individual') {
+        $ind = is_array($_POST['ind'] ?? null) ? $_POST['ind'] : [];
+        $scopeIds = array_map('intval', scopeEmployeeIds($db, $scopeAll, $schoolId, ['titulaire','contractuel','employe'], $schoolYear));
+        $typesMap = ['prime' => 'prime_fixe', 'aide' => 'aide_complementaire', 'trans' => 'transport_complement'];
+        $fullYearSql = "(start_month IS NULL OR (start_month = 10 AND end_month = 9))";
+        $delI = $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND bonus_type = ? AND school_year = ? AND value_type = ? AND $fullYearSql");
+        $insI = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, ?, 1, ?, ?, ?, ?, NULL, NULL, 1)");
+        $norm = fn($v) => trim(str_replace(',', '', (string)$v));
+        $changed = 0; $warns = [];
+        foreach ($ind as $eid => $vals) {
+            $eid = (int)$eid;
+            if (!in_array($eid, $scopeIds, true) || !is_array($vals)) continue;
+            $touched = false;
+            foreach ($typesMap as $k => $bt) {
+                // (أ) النسبة ٪ لكل السنة — خانة مستقلة
+                if (array_key_exists($k . '_pct', $vals)) {
+                    $raw = $norm($vals[$k . '_pct']); $orig = $norm($vals[$k . '_pct_orig'] ?? '');
+                    if ($raw !== '' && !($orig !== '' && (float)$raw == (float)$orig)) {
+                        $delI->execute([$eid, $bt, $schoolYear, 'percent']);
+                        if ((float)$raw > 0) $insI->execute([$eid, $bt, $schoolYear, (float)$raw, 'percent', 'LBP']);
+                        $touched = true;
+                    }
+                }
+                // (ب) المبلغ الثابت لكل السنة — خانة مستقلة (يجتمع مع النسبة إن وُجدت: المحرّك يجمعهما)
+                if (array_key_exists($k, $vals)) {
+                    $raw = $norm($vals[$k]); $orig = $norm($vals[$k . '_orig'] ?? '');
+                    $cur = (($vals[$k . '_cur'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP';
+                    $origCur = (($vals[$k . '_origcur'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP';
+                    if ($raw !== '' && !($orig !== '' && (float)$raw == (float)$orig && $cur === $origCur)) {
+                        $val = (float)$raw;
+                        $delI->execute([$eid, $bt, $schoolYear, 'amount']);
+                        if ($val > 0) {
+                            $w = null; $cur = sanitizeAmountCurrency($val, $cur, $w); if ($w) $warns[] = $w;
+                            $insI->execute([$eid, $bt, $schoolYear, $val, 'amount', $cur]);
+                        }
+                        $touched = true;
+                    }
+                }
+            }
+            if ($touched) { recalcEmployeeYear($eid, $schoolYear); $changed++; }
+        }
+        $_SESSION['flash_success'] = "حُفظت المبالغ الفردية لـ $changed موظف (" . scopeLabel($scopeAll,$schoolId) . ") — أُعيد حساب رواتبهم.";
+        if ($warns) $_SESSION['flash_info'] = implode(' · ', array_unique($warns));
+    }
+
     elseif ($action === 'remove_transport_periods') {
         $ids = scopeEmployeeIds($db, $scopeAll, $schoolId, $categories, $schoolYear);
         $del = $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND bonus_type = 'transport_daily' AND school_year = ?");
@@ -235,6 +283,36 @@ if ($hasScope) {
     $preview = $q->fetchAll(PDO::FETCH_ASSOC);
 }
 $exchangeRate = (float)getExchangeRate();
+
+// 🧍 القيم الفردية الحالية لكل موظف (بند «لكل السنة» لكل نوع) — لجدول «مبالغ فردية»
+$indivCur = [];
+if ($hasScope && $preview) {
+    $qi = $db->prepare("SELECT employee_id, bonus_type, value_type, amount, currency FROM employee_bonuses
+                        WHERE school_year = ? AND is_active = 1 AND bonus_type IN ('prime_fixe','aide_complementaire','transport_complement')
+                          AND (start_month IS NULL OR (start_month = 10 AND end_month = 9))
+                          AND employee_id IN (" . implode(',', array_map(fn($r) => (int)$r['id'], $preview)) . ")
+                        ORDER BY value_type DESC, id");
+    $qi->execute([$schoolYear]);
+    // البنود المؤرّخة بفترات (ليست لكل السنة) — تُعرَض للعلم فقط (تُعدَّل من ملف الموظف)
+    $indivPer = [];
+    $qp = $db->prepare("SELECT employee_id, bonus_type, value_type, amount, currency, start_month, end_month FROM employee_bonuses
+                        WHERE school_year = ? AND is_active = 1 AND bonus_type IN ('prime_fixe','aide_complementaire','transport_complement')
+                          AND NOT (start_month IS NULL OR (start_month = 10 AND end_month = 9))
+                          AND employee_id IN (" . implode(',', array_map(fn($r) => (int)$r['id'], $preview)) . ") ORDER BY id");
+    $qp->execute([$schoolYear]);
+    foreach ($qp as $r) {
+        $k = ['prime_fixe'=>'prime','aide_complementaire'=>'aide','transport_complement'=>'trans'][$r['bonus_type']];
+        $indivPer[(int)$r['employee_id']][$k][] = ($r['value_type'] === 'percent' ? rtrim(rtrim(number_format((float)$r['amount'], 2), '0'), '.') . '٪' : number_format((float)$r['amount']) . ($r['currency'] === 'USD' ? ' $' : ''))
+            . ' (' . monthName((int)$r['start_month'], 'ar') . ' ← ' . monthName((int)$r['end_month'], 'ar') . ')';
+    }
+    foreach ($qi as $r) {
+        $k = ['prime_fixe'=>'prime','aide_complementaire'=>'aide','transport_complement'=>'trans'][$r['bonus_type']];
+        $e = (int)$r['employee_id'];
+        if (!isset($indivCur[$e][$k])) $indivCur[$e][$k] = ['pct' => null, 'amount' => null, 'cur' => 'LBP'];
+        if ($r['value_type'] === 'percent') { $indivCur[$e][$k]['pct'] = ($indivCur[$e][$k]['pct'] ?? 0) + (float)$r['amount']; }
+        else { $indivCur[$e][$k]['amount'] = ($indivCur[$e][$k]['amount'] ?? 0) + (float)$r['amount']; $indivCur[$e][$k]['cur'] = $r['currency']; }
+    }
+}
 
 /* ✍️ (2026-08-28، طلبه «لازم يبين السطر اللي فيه النسبة بعد الحفظ»): جدول «المطبّق حالياً» —
    كل تركيبة بنود سارية على النطاق (نوع/قيمة/نسبة أو مبلغ/عملة/فترة) مع عدد الموظفين،
@@ -289,6 +367,11 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
 .ba-editor select[name$="[type]"] { min-width:170px; }
 .ba-editor select[name$="[vtype]"] { min-width:110px; }
 .ba-editor select[name$="[from]"], .ba-editor select[name$="[to]"] { min-width:100px; }
+.ind-cell { display:inline-flex; align-items:center; gap:4px; }
+.ind-cell .ind-pct { width:58px; padding:4px 6px; text-align:center; }
+.ind-cell .ind-amt { width:128px; padding:4px 8px; text-align:left; }
+.ind-cell .ind-cur { width:60px; padding:4px; }
+.ind-plus { color:#94a3b8; font-weight:800; }
 .ba-step { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px dashed #e2e8f0; }
 .ba-step:last-child { border-bottom:none; }
 .ba-step > div { flex:1; min-width:0; }
@@ -342,6 +425,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <li><b>«+ بند جديد»</b> ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
                 <li><b>النسبة ٪</b> بتنحسب من أساس الراتب بعد التدرّج (÷<?= e(officialUsdRateLbl()) ?> ← × سعر الشهر) وبتتحرّك مع الدرجة — منطقية للملاك. <b>المبلغ الثابت</b> بالليرة أو بالدولار — للمتعاقدين والموظفين أو لأي زيادة ثابتة.</li>
                 <li><b>نسبة + مبلغ ثابت مع بعض</b> (مثلاً 45٪ + 2,000,000 ثابت): حطّهم <b>سطرين بنفس النافذة</b> وكبس طبّق مرّة وحدة. (لو طبّقتهم بمرّتين منفصلتين، التانية بتشيل الأولى لأنها من نفس النوع.)</li>
+                <li><b>كل واحد إلو رقمه</b> (المتعاقدون، أو أستاذ ملاك بدّك تعطيه شي خاص): زرّ <b>«مبالغ فردية (لكل واحد)»</b> ← جدول بأسماء الفئة، قدّام كل اسم ولكل نوع خانتان <b>نسبة ٪ + مبلغ ثابت</b> — عبّي وحدة أو الاتنين واحفظ مرّة وحدة. فاضي = ما بيتغيّر، 0 = شيله.</li>
                 <li>الجدول تحت = <b>البنود السارية</b>: <i class="fas fa-pen" style="color:#1d4ed8"></i> تعديل سطر لحاله · <i class="fas fa-trash" style="color:#b91c1c"></i> حذفه. <b>«نقل يومي»</b> للمتعاقدين حسب أيام الحضور. <b>استثناء لشخص واحد</b>: من ملفه ← تبويب «المالي».</li>
             </ol>
         </details>
@@ -350,6 +434,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
             <div style="font-weight:800;color:#1F4E5F;font-size:14.5px"><i class="fas fa-table-list"></i> البنود السارية — <?= e(scopeLabel($scopeAll,$schoolId)) ?> — <?= e($schoolYear) ?></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button type="button" class="btn btn-primary" onclick="baOpen('baModalAdd')"><i class="fas fa-plus"></i> بند جديد / Ajouter</button>
+                <button type="button" class="btn btn-success" onclick="baOpen('baModalIndiv')"><i class="fas fa-user-pen"></i> مبالغ فردية (لكل واحد)</button>
                 <button type="button" class="btn btn-light" onclick="baOpen('baModalDaily')"><i class="fas fa-bus"></i> نقل يومي</button>
                 <button type="button" class="btn btn-light" style="color:#b91c1c" onclick="baOpen('baModalRemove')"><i class="fas fa-trash"></i> إزالة</button>
             </div>
@@ -452,6 +537,67 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         <div class="ba-modal-foot">
             <button type="button" class="btn btn-light" onclick="baClose('baModalAdd')">إلغاء / Annuler</button>
             <button type="submit" class="btn btn-primary" data-confirm="تطبيق هذه الأسطر على الفئات المشيّكة — <?= e(scopeLabel($scopeAll,$schoolId)) ?>؟ (تستبدل الأنواع المُدخَلة لكامل السنة)"><i class="fas fa-check"></i> طبّق / Appliquer</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ مودال: مبالغ فردية لكل موظف ═══ -->
+<div class="ba-overlay" id="baModalIndiv">
+  <div class="ba-modal" style="max-width:1100px">
+    <div class="ba-modal-head"><h4><i class="fas fa-user-pen"></i> مبالغ فردية — لكل موظف رقمه</h4><button type="button" class="ba-x" onclick="baClose('baModalIndiv')">✕</button></div>
+    <form method="POST" id="indivForm">
+        <?= csrfField() ?>
+        <input type="hidden" name="action" value="apply_individual">
+        <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><?= catHidden($validCats) ?>
+        <div class="ba-modal-body">
+            <div class="ba-hint" style="margin-bottom:6px">قدّام كل اسم ولكل نوع خانتان: <b>نسبة ٪</b> (من أساس الراتب بعد التدرّج) <b>+ مبلغ ثابت</b> (ليرة أو دولار) — عبّي وحدة أو الاتنين، والبرنامج بيجمعهم. القيم <b>شهرية لكل السنة</b> (تشرين ← أيلول). <b>فاضي</b> = ما بيتغيّر · <b>0</b> = شيله. للفترات (قيمة بتتغيّر بنص السنة): من ملف الموظف ← تبويب «المالي».</div>
+            <div class="ba-cats"><strong>عرض:</strong>
+                <?php $indivCats = []; foreach ($preview as $pr) $indivCats[$pr['employee_type']] = true;
+                      $catLblI = ['enseignant_titulaire'=>'الملاك','enseignant_contractuel'=>'المتعاقدين','employe'=>'الموظفين']; ?>
+                <label><input type="radio" name="indiv_cat_view" value="" checked onchange="baIndivFilter()"> الكل (كل الموظفين والأساتذة)</label>
+                <?php foreach ($catLblI as $ek => $el): if (!isset($indivCats[$ek])) continue; ?>
+                <label><input type="radio" name="indiv_cat_view" value="<?= $ek ?>" onchange="baIndivFilter()"> <?= $el ?> فقط</label>
+                <?php endforeach; ?>
+                <span class="ba-hint" id="baIndivCount"></span>
+            </div>
+            <div style="overflow:auto;max-height:60vh">
+            <table class="table ba-editor" id="indivTable" style="font-size:13px;min-width:1000px">
+                <thead><tr><th>#</th><th>الاسم</th><th>➕ الأجر الإضافي <small>(٪ + ثابت)</small></th><th>💰 مكافأة ومساعدة <small>(٪ + ثابت)</small></th><th>🚌 نقل شهري <small>(٪ + ثابت)</small></th></tr></thead>
+                <tbody>
+                <?php $ri = 0; $lastEty = null; foreach ($preview as $pr): $ri++; $eid = (int)$pr['id']; $nm = trim(($pr['first_name_ar'] ?: $pr['first_name_fr']) . ' ' . ($pr['last_name_ar'] ?: $pr['last_name_fr']));
+                      if ($pr['employee_type'] !== $lastEty): $lastEty = $pr['employee_type']; ?>
+                <tr data-ety="<?= e($lastEty) ?>" class="ind-cat-row"><td colspan="5" style="background:#f1f5f9;font-weight:800;color:#1F4E5F"><?= e($catLblI[$lastEty] ?? $lastEty) ?></td></tr>
+                <?php endif; ?>
+                <tr data-ety="<?= e($pr['employee_type']) ?>">
+                    <td><?= $ri ?></td>
+                    <td style="white-space:nowrap"><strong><?= e($nm) ?></strong> <small class="text-muted"><?= e($catLblI[$pr['employee_type']] ?? '') ?></small></td>
+                    <?php foreach (['prime','aide','trans'] as $k): $c = $indivCur[$eid][$k] ?? null;
+                        $fmtN = fn($v) => ($v === null) ? '' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
+                        $vp = $fmtN($c['pct'] ?? null); $va = $fmtN($c['amount'] ?? null); $cu = $c['cur'] ?? 'LBP'; ?>
+                    <td style="white-space:nowrap">
+                        <span class="ind-cell">
+                            <input type="text" inputmode="decimal" name="ind[<?= $eid ?>][<?= $k ?>_pct]" value="<?= e($vp) ?>" placeholder="٪" title="نسبة ٪ من الأساس بعد التدرّج" class="form-control ind-pct" dir="ltr">
+                            <input type="hidden" name="ind[<?= $eid ?>][<?= $k ?>_pct_orig]" value="<?= e($vp) ?>">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[<?= $eid ?>][<?= $k ?>]" value="<?= e($va) ?>" placeholder="مبلغ ثابت" title="مبلغ ثابت شهري" class="form-control ind-amt" dir="ltr">
+                            <select name="ind[<?= $eid ?>][<?= $k ?>_cur]" class="form-select ind-cur"><option value="LBP" <?= $cu==='LBP'?'selected':'' ?>>ل.ل</option><option value="USD" <?= $cu==='USD'?'selected':'' ?>>$</option></select>
+                            <input type="hidden" name="ind[<?= $eid ?>][<?= $k ?>_orig]" value="<?= e($va) ?>"><input type="hidden" name="ind[<?= $eid ?>][<?= $k ?>_origcur]" value="<?= e($cu) ?>">
+                        </span>
+                        <?php if (!empty($indivPer[$eid][$k])): ?>
+                            <div style="font-size:11px;color:#b45309;margin-top:2px" title="بند بفترة محدّدة — يُعدَّل من ملف الموظف ← تبويب المالي">📅 فترة: <?= e(implode(' · ', $indivPer[$eid][$k])) ?></div>
+                        <?php endif; ?>
+                    </td>
+                    <?php endforeach; ?>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            </div>
+        </div>
+        <div class="ba-modal-foot">
+            <button type="button" class="btn btn-light" onclick="baClose('baModalIndiv')">إلغاء / Annuler</button>
+            <button type="submit" class="btn btn-primary" data-confirm="حفظ المبالغ الفردية المعدَّلة وإعادة حساب رواتب أصحابها؟"><i class="fas fa-save"></i> احفظ الكل / Enregistrer</button>
         </div>
     </form>
   </div>
@@ -598,7 +744,14 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         }
         baLiveCalc();
     };
-    window.baOpen=function(id){document.getElementById(id).classList.add('open'); if(id==='baModalAdd') baPrefill();};
+    window.baIndivFilter=function(){
+        var sel=document.querySelector('input[name="indiv_cat_view"]:checked'); var ety=sel?sel.value:'';
+        var n=0; document.querySelectorAll('#indivTable tbody tr').forEach(function(tr){var show=!ety||tr.dataset.ety===ety; tr.style.display=show?'':'none'; if(show&&!tr.classList.contains('ind-cat-row'))n++;});
+        var c=document.getElementById('baIndivCount'); if(c) c.textContent='('+n+' موظف)';
+    };
+    // تنسيق الأرقام بالفواصل أثناء الكتابة بخانات المبالغ الفردية (مثلاً 33,000,000)
+    document.addEventListener('input',function(e){ if(e.target.classList&&e.target.classList.contains('ind-amt')){ var v=e.target.value.replace(/[^\d.]/g,''); var parts=v.split('.'); parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,','); e.target.value=parts.join('.'); } });
+    window.baOpen=function(id){document.getElementById(id).classList.add('open'); if(id==='baModalAdd') baPrefill(); if(id==='baModalIndiv') baIndivFilter();};
     window.baClose=function(id){document.getElementById(id).classList.remove('open');};
     document.querySelectorAll('.ba-overlay').forEach(function(ov){ov.addEventListener('click',function(e){if(e.target===ov)ov.classList.remove('open');});});
     window.baVt=function(sel){
