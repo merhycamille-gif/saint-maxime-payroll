@@ -5127,3 +5127,79 @@ function healChiraTaalimiya20260829() {
         try { setSetting('heal_chira_taalimiya_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🎓 ماريا اديب اسعد (البشارة) — «حطّيتلها تاريخ دخول الملاك = تاريخ دخول المدرسة» + «طبّق 45٪ على راتبها
+ * بعد التدرّج مرّة وحدة لنفس الفترة» (المستخدم 2026-08-29). أونلاين صار ملاكها 1/10/2009 → درجة 39 (3,445,000)
+ * بالقانون، لكن إضافيها انحسب مرّتين (بند نسبة 45٪ + البند القديم الجامد 89,610,000 فعّالان معاً = 181,610,000).
+ * الشفاء (بالاسم، مرّة واحدة):
+ * ① الملاك = دخول المدرسة (يعمّم قراره على النسختين) → إعادة بناء الدرجات حسب القانون
+ * ② الإضافي بند واحد = نسبة 45٪ لكل السنة (يُطفأ أي مبلغ ثابت لكل السنة) → إعادة حساب 2025-2026
+ * ③ عام: أي موظف عنده «أجر إضافي» نسبةً لكل السنة + مبلغاً ثابتاً لكل السنة معاً (ازدواج) → يُطفأ المبلغ
+ *    ويُعاد حسابه، وتُسجَّل الأسماء بالفلاغ. نسخة قبل التعديل: bk_maria_20260829.
+ */
+function healMariaMalak20260829() {
+    try {
+        if (strpos((string)getSetting('heal_maria_malak_20260829', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $log = [];
+        $fullYearSql = "(start_month IS NULL OR (start_month=10 AND end_month=9))";
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        $emp = null;
+        if ($sid) {
+            $st = $db->prepare("SELECT * FROM employees WHERE school_id=? AND is_deleted=0 AND employee_type='enseignant_titulaire'
+                AND first_name_ar='ماريا' AND last_name_ar LIKE 'اسعد%' AND father_name_ar LIKE 'اديب%' LIMIT 1");
+            $st->execute([(int)$sid]);
+            $emp = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+        if ($emp) {
+            $eid = (int)$emp['id'];
+            setSetting('bk_maria_20260829', json_encode([
+                'emp' => ['titularization_date' => $emp['titularization_date'], 'current_grade' => $emp['current_grade'], 'diploma' => $emp['diploma']],
+                'grades' => $db->query("SELECT * FROM employee_grade_history WHERE employee_id=$eid ORDER BY id")->fetchAll(PDO::FETCH_ASSOC),
+                'bonuses' => $db->query("SELECT * FROM employee_bonuses WHERE employee_id=$eid")->fetchAll(PDO::FETCH_ASSOC),
+                'months' => $db->query("SELECT year, month, grade_at_month, base_plus_echelon_lbp, prime_fixe_lbp, net_salary_lbp, total_due_lbp FROM monthly_salaries WHERE employee_id=$eid AND (year*100+month)>=202510 ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC),
+            ], JSON_UNESCAPED_UNICODE));
+            $before = $db->query("SELECT base_plus_echelon_lbp b, prime_fixe_lbp p FROM monthly_salaries WHERE employee_id=$eid AND year=2025 AND month=11 LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: ['b'=>0,'p'=>0];
+            // ① الملاك = دخول المدرسة (قراره)
+            if (!empty($emp['hire_date']) && $emp['titularization_date'] !== $emp['hire_date']) {
+                $db->prepare("UPDATE employees SET titularization_date=? WHERE id=?")->execute([$emp['hire_date'], $eid]);
+            }
+            if (empty($emp['diploma'])) $db->prepare("UPDATE employees SET diploma='ijaza_taalimiya', starting_grade=15 WHERE id=?")->execute([$eid]);
+            $r = buildLegalGradeHistory($eid);
+            // ② بند واحد: نسبة 45٪ لكل السنة
+            $pct = $db->query("SELECT id FROM employee_bonuses WHERE employee_id=$eid AND bonus_type='prime_fixe' AND is_active=1 AND value_type='percent'
+                AND (school_year IS NULL OR school_year='2025-2026') AND $fullYearSql ORDER BY id LIMIT 1")->fetchColumn();
+            if ($pct) {
+                $db->exec("UPDATE employee_bonuses SET amount=45, currency='LBP' WHERE id=" . (int)$pct);
+            } else {
+                $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+                    VALUES (?, 'prime_fixe', 1, '2025-2026', 45, 'percent', 'LBP', NULL, NULL, 1)")->execute([$eid]);
+                $pct = (int)$db->lastInsertId();
+            }
+            $off = $db->exec("UPDATE employee_bonuses SET is_active=0 WHERE employee_id=$eid AND bonus_type='prime_fixe' AND is_active=1 AND id<>" . (int)$pct
+                . " AND (school_year IS NULL OR school_year='2025-2026') AND $fullYearSql");
+            $n = (int)recalcEmployeeYear($eid, '2025-2026');
+            $after = $db->query("SELECT base_plus_echelon_lbp b, prime_fixe_lbp p, net_salary_lbp n FROM monthly_salaries WHERE employee_id=$eid AND year=2025 AND month=11 LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: ['b'=>0,'p'=>0,'n'=>0];
+            $log[] = 'ماريا emp=' . $eid . ' grade ' . $emp['current_grade'] . '→' . $r['final_grade'] . ' | Nov base ' . $before['b'] . '→' . $after['b']
+                . ' prime ' . $before['p'] . '→' . $after['p'] . ' net=' . $after['n'] . ' off=' . (int)$off . ' recalc=' . $n;
+        } else {
+            $log[] = 'ماريا: not found';
+        }
+        // ③ عام: ازدواج نسبة + مبلغ لكل السنة عند غيرها
+        $dups = $db->query("SELECT b.employee_id, CONCAT(e.first_name_ar,' ',e.last_name_ar) nm FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id
+            WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND (b.school_year IS NULL OR b.school_year='2025-2026') AND $fullYearSql AND e.is_deleted=0
+            GROUP BY b.employee_id HAVING SUM(b.value_type='percent')>=1 AND SUM(b.value_type='amount')>=1")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($dups as $d) {
+            $eid2 = (int)$d['employee_id'];
+            $db->exec("UPDATE employee_bonuses SET is_active=0 WHERE employee_id=$eid2 AND bonus_type='prime_fixe' AND is_active=1 AND value_type='amount'
+                AND (school_year IS NULL OR school_year='2025-2026') AND $fullYearSql");
+            recalcEmployeeYear($eid2, '2025-2026');
+            $log[] = 'ازدواج مُطفأ: ' . $d['nm'] . ' (' . $eid2 . ')';
+        }
+        setSetting('heal_maria_malak_20260829', 'done: ' . implode(' | ', $log));
+    } catch (Throwable $e) {
+        try { setSetting('heal_maria_malak_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}

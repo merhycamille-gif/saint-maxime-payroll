@@ -4171,6 +4171,34 @@ check('حفظ الموظف: تعبئة شهادة كانت فاضية تُعدّ
       strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "\$diplomaChanged = ((string)\$oldDiploma !== (string)\$data['diploma']);") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "\$oldDiploma !== null && \$oldDiploma !== \$data['diploma']") === false);
 
+/* =====================================================================
+ * 82) 🎓 ماريا اسعد (البشارة) — «الملاك = دخول المدرسة» + «45٪ مرّة وحدة» (2026-08-29):
+ *     درجتها = القانون، أساس تشرين الثاني = السلسلة، الإضافي بند نسبة واحد (لا ازدواج
+ *     نسبة+مبلغ)، وحارس الازدواج بمحرّر الموظف + الشفاء موصولان.
+ * =================================================================== */
+$mar82 = $db->query("SELECT e.id, e.hire_date, e.titularization_date, e.current_grade, ms.base_plus_echelon_lbp b, ms.prime_fixe_lbp p, ms.exchange_rate r
+    FROM employees e JOIN schools s ON s.id=e.school_id
+    LEFT JOIN monthly_salaries ms ON ms.employee_id=e.id AND ms.year=2025 AND ms.month=11
+    WHERE s.name_ar LIKE 'مدرسة سيدة البشارة%' AND e.is_deleted=0 AND e.employee_type='enseignant_titulaire'
+      AND e.first_name_ar='ماريا' AND e.last_name_ar LIKE 'اسعد%' AND e.father_name_ar LIKE 'اديب%' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$law82 = $mar82 ? buildLegalGradeHistory((int)$mar82['id'], null, true) : null;
+$scale82 = $mar82 ? (int)$db->query("SELECT new_salary_2017 FROM salary_scale_2017 WHERE version_id=1 AND grade=" . (int)floor((float)$mar82['current_grade']))->fetchColumn() : 0;
+$nPrime82 = $mar82 ? (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id=" . (int)$mar82['id'] . " AND bonus_type='prime_fixe' AND is_active=1 AND (school_year IS NULL OR school_year='2025-2026')")->fetchColumn() : 0;
+check('ماريا اسعد: الملاك = دخول المدرسة + الدرجة = القانون + الأساس = السلسلة + إضافي بند نسبة 45٪ واحد بقاعدة ÷1500 + الشفاء موصول',
+      $mar82 && $mar82['titularization_date'] === $mar82['hire_date']
+      && $law82 && (float)$law82['final_grade'] === (float)$mar82['current_grade']
+      && (int)$mar82['b'] === $scale82 && $scale82 > 0 && $nPrime82 === 1
+      && (int)$mar82['p'] === (int)bonusPercentLbp(45, (int)$mar82['b'], (float)$mar82['r'])
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healMariaMalak20260829();') !== false,
+      'row=' . json_encode($mar82, JSON_UNESCAPED_UNICODE) . ' nPrime=' . $nPrime82);
+$dup82 = (int)$db->query("SELECT COUNT(*) FROM (SELECT b.employee_id FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id
+    WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND (b.school_year IS NULL OR b.school_year='2025-2026')
+      AND (b.start_month IS NULL OR (b.start_month=10 AND b.end_month=9)) AND e.is_deleted=0
+    GROUP BY b.employee_id HAVING SUM(b.value_type='percent')>=1 AND SUM(b.value_type='amount')>=1) t")->fetchColumn();
+check('لا ازدواج «أجر إضافي» نسبة + مبلغ لكل السنة عند أي موظف + حارس الازدواج بمحرّر الموظف',
+      $dup82 === 0 && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), '$hasPctPrime') !== false,
+      'dups=' . $dup82);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
