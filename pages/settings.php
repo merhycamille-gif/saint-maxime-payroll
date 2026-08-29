@@ -111,21 +111,6 @@ include __DIR__ . '/../includes/header.php';
 <?php if ($message): ?><div class="alert alert-<?= $messageType ?>"><?= e($message) ?></div><?php endif; ?>
 
 <?php if (canEdit()): ?>
-<div class="card">
-    <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-school"></i> Informations des écoles</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">معلومات المدارس</div>
-    </h3></div>
-    <div class="card-body">
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i>
-            Le nom, l'adresse et les infos de chaque école se gèrent désormais dans la page
-            <a href="<?= BASE_URL ?>pages/schools.php"><strong>Écoles / المدارس</strong></a>
-            (chaque école a ses propres données).
-        </div>
-    </div>
-</div>
-
 <form method="POST" class="lockedit">
     <div class="card">
         <div class="card-header"><h3>
@@ -188,14 +173,11 @@ include __DIR__ . '/../includes/header.php';
                 <input type="number" name="official_usd_rate_lbp" class="form-control" value="<?= e(getSetting('official_usd_rate_lbp', 1500)) ?>" step="0.01">
                 <small class="text-muted">🔴 <strong>القاعدة فيها سعران معاً:</strong> ① <strong>هذا السعر (القديم 1500)</strong> — فقط لتحويل أساس الراتب بعد التدرّج إلى دولار حتى يطلع الإضافي بالدولار (÷1500 × النسبة٪ ← داون للدولار). ② <strong>السعر الجديد (89,500)</strong> — لتحويل الإضافي الدولاري رجوعاً إلى الليرة (× سعر صرف شهر الراتب من صفحة «أسعار الصرف» ← داون للمليون). <strong>تغيير أيّ منهما يعيد حساب أصحاب النسبة تلقائياً.</strong></small>
             </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-body d-flex justify-end">
-            <button type="submit" class="btn btn-primary btn-lg">
-                <i class="fas fa-save"></i> Enregistrer / حفظ
-            </button>
+            <div class="d-flex justify-end" style="margin-top:8px">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-save"></i> Enregistrer / حفظ
+                </button>
+            </div>
         </div>
     </div>
 </form>

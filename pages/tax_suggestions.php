@@ -125,7 +125,7 @@ $multiS = (count(activeSchoolIds()) !== 1);
             <strong>تلقائي بالكامل:</strong> كل ولد مسجَّل بتاريخ ولادته — تنزيله يسقط من البرنامج <strong>من شهر بلوغه الـ18</strong> حتى لو المفتاح مضوّى.
             وزيادة الزوج تسقط تلقائياً <strong>من «تاريخ بدء عمل الزوج»</strong> إن حدّدته. أي تبديل هون يعيد احتساب رواتب الموظف فوراً.
         </p>
-        <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
+        <div class="report-table-wrap" dir="rtl"><table class="table" dir="rtl" style="font-size:13px">
             <thead><tr>
                 <th>الموظف</th>
                 <?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
@@ -281,7 +281,7 @@ $fixDetails = fn($t) => str_replace('اكبس «طبّق»، وإلا «تجاه
         <div style="font-size:0.85em;font-weight:600;opacity:0.9">اقتراحات من قراءة إخراجات القيد العائلية — أنت بتقرّر: <b>نعم = بدي التنزيل/التعديل ينطبق</b> · <b>كلا = ما بدي</b> (المدرسة المختارة وأساتذة السنة المعروضة فقط)</div>
     </h3></div>
     <div class="card-body">
-        <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
+        <div class="report-table-wrap" dir="rtl"><table class="table" dir="rtl" style="font-size:13px">
             <thead><tr>
                 <th>#</th><th>الموظف</th><th>المدرسة</th><th>الاكتشاف من إخراج القيد</th>
                 <th>التفاصيل</th><th>الاقتراح</th><th>الحالة</th>

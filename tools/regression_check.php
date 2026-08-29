@@ -884,7 +884,7 @@ check('أمان: مبدّلات العرض والبحث مسموحة لحساب 
 check('أمان: requireWriteAction معرَّفة (صلاحية + مصدر داخلي)',
       strpos($fnSrc2, 'function requireWriteAction') !== false
       && strpos($fnSrc2, 'HTTP_SEC_FETCH_SITE') !== false && strpos($fnSrc2, '!canEdit()') !== false);
-$getWritePages = ['annual_slip'=>3,'grades'=>4,'employees'=>1,'bonuses'=>1,'classes'=>1,'exceptional_laws'=>1,
+$getWritePages = ['annual_slip'=>3,'grades'=>3,'employees'=>1,'bonuses'=>1,'classes'=>1,'exceptional_laws'=>1,
                   'exchange_rates'=>1,'rates_history'=>1,'social_security'=>1,'salary_scales'=>1,'tax_brackets'=>2,
                   'users'=>2,'schools'=>1];
 $gwMissing = [];
@@ -4299,6 +4299,23 @@ check('تسميات أنواع العلاوات موحّدة بكل البرنا
       strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), 'مكافأة ثابتة') === false
       && strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), '➕ Supplément / الأجر الإضافي') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), 'مكافأة ومساعدة') !== false);
+
+/* =====================================================================
+ * 88) 🧹 تنظيف عام (2026-08-29، «ما تخلّي شي ما إلو معنى»): الدرجات بلا ترقية يدوية/تلقائية قديمة
+ *     (+1) وقواعدها محدّثة والراتب على الدرجة الكاملة؛ الإعدادات بلا بطاقة فارغة؛ النسخ الاحتياطي
+ *     يطوي الجداول الداخلية؛ شريط التصدير مخفي على صفحات الإعدادات؛ cols-5 موجود.
+ * =================================================================== */
+$gr88 = (string)file_get_contents($PROJ . '/pages/grades.php');
+check('تنظيف: صفحة الدرجات بلا «Promotion (+1)»/«ترقية تلقائية» + قواعد محدّثة (نص درجة/سنة) + السلسلة على FLOOR(الدرجة)',
+      strpos($gr88, 'auto_promote') === false && strpos($gr88, 'Promotion (+1)') === false
+      && strpos($gr88, 'نص درجة كل سنة') !== false
+      && strpos($gr88, 'FLOOR(e.current_grade) = sc.grade') !== false
+      && strpos($gr88, "(int)floor((float)\$emp['current_grade'])") !== false);
+check('تنظيف: الإعدادات بلا بطاقة «معلومات المدارس» + النسخ الاحتياطي يطوي الجداول الداخلية + شريط التصدير مخفي على صفحات الإعدادات + cols-5',
+      strpos((string)file_get_contents($PROJ . '/pages/settings.php'), 'Informations des écoles') === false
+      && strpos((string)file_get_contents($PROJ . '/pages/backup.php'), '$internalTables') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), "\$noToolbarPages") !== false
+      && strpos((string)file_get_contents($PROJ . '/assets/css/app.css'), '.form-row.cols-5') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

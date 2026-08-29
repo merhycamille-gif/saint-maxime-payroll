@@ -473,9 +473,10 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
 .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
 .form-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
 .form-row.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.form-row.cols-5 { grid-template-columns: 1fr 1fr 1fr 1fr 1fr; }
 
 @media (max-width: 768px) {
-    .form-row.cols-2, .form-row.cols-3, .form-row.cols-4 { grid-template-columns: 1fr; }
+    .form-row.cols-2, .form-row.cols-3, .form-row.cols-4, .form-row.cols-5 { grid-template-columns: 1fr; }
 }
 
 /* =================== Buttons =================== */

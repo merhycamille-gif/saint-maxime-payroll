@@ -137,6 +137,9 @@ foreach ($tables as $t) {
     $n = (int)$db->query("SELECT COUNT(*) FROM `$t`")->fetchColumn();
     $counts[$t] = $n; $totalRows += $n;
 }
+// (2026-08-29) الجداول الداخلية (نسخ احتياطية تلقائية تبدأ بـ _ أو _bk/_backup/…) تُطوى حتى لا تعجّق الصفحة
+$mainTables = array_values(array_filter($tables, fn($t) => $t[0] !== '_' && !preg_match('/(^|_)(bk|backup|bak)(_|$)/i', $t)));
+$internalTables = array_values(array_diff($tables, $mainTables));
 ?>
 
 <div class="card">
@@ -158,9 +161,19 @@ foreach ($tables as $t) {
         <table class="table">
             <thead><tr><th>Table / الجدول</th><th class="text-end">Enregistrements / عدد السجلات</th></tr></thead>
             <tbody>
-                <?php foreach ($counts as $t => $n): ?>
+                <?php foreach ($mainTables as $t): $n = $counts[$t]; ?>
                 <tr><td><?= e($t) ?></td><td class="text-end"><?= number_format($n) ?></td></tr>
                 <?php endforeach; ?>
+                <?php if ($internalTables): ?>
+                <tr><td colspan="2" style="padding:0;border:0">
+                    <details style="padding:8px 12px"><summary style="cursor:pointer;font-weight:700;color:#64748b">🗄️ جداول النسخ الاحتياطية الداخلية (<?= count($internalTables) ?>) — للاسترجاع عند الحاجة فقط / Tables de sauvegarde internes</summary>
+                    <table class="table" style="margin-top:6px"><tbody>
+                    <?php foreach ($internalTables as $t): ?>
+                    <tr><td><?= e($t) ?></td><td class="text-end"><?= number_format($counts[$t]) ?></td></tr>
+                    <?php endforeach; ?>
+                    </tbody></table></details>
+                </td></tr>
+                <?php endif; ?>
                 <tr class="total-row"><td><strong>TOTAL / الإجمالي</strong></td><td class="text-end"><strong><?= number_format($totalRows) ?></strong></td></tr>
             </tbody>
         </table>

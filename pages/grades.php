@@ -73,48 +73,7 @@ if (isset($_GET['rebuild_legal']) && $employeeId > 0) {
     exit;
 }
 
-// Apply biennial promotion
-if (isset($_GET['promote']) && $employeeId > 0) {
-    requireWriteAction();
-    try {
-        $effYear = (int)($_GET['eff_year'] ?? date('Y'));
-        $res = applyBiennialPromotion($employeeId, true, $effYear);
-        if ($res !== false) recalcEmployeeYear($employeeId); // إعادة حساب الراتب تلقائياً
-        if ($res === false) {
-            $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'Promotion impossible (non titulaire / sans titularisation / échelon max)'];
-        } elseif (!empty($res['deferred'])) {
-            $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'تم تطبيق التدرّج لكنه أُجِّل إلى 1/10/' . substr($res['change_date'],0,4) . ' (درجة استثنائية في نفس السنة) — الإشلون ' . $res['old_grade'] . ' → ' . $res['new_grade']];
-        } else {
-            $_SESSION['flash'] = ['type' => 'success', 'msg' => 'تم تطبيق التدرّج في ' . $res['change_date'] . ' — الإشلون ' . $res['old_grade'] . ' → ' . $res['new_grade']];
-        }
-    } catch (Exception $e) {
-        $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()];
-    }
-    header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
-    exit;
-}
-
-// Auto promotion: whole school + one year (كل مدرسة بمدرستها وكل سنة بسنتها)
-if (isset($_GET['auto_promote'])) {
-    requireWriteAction();
-    requireSchoolSelected();
-    try {
-        $year = (int)($_GET['year'] ?? date('Y'));
-        $r = autoPromoteSchoolYear(currentSchoolId(), $year);
-        // إعادة حساب تلقائية لرواتب السنة الحالية لكل أساتذة الملاك الفاعلين بالمدرسة (حسب القانون)
-        $cy = currentSchoolYear();
-        foreach ($db->query("SELECT id FROM employees WHERE employee_type='enseignant_titulaire' AND is_deleted=0 AND status='actif'" . schoolScopeSql())->fetchAll(PDO::FETCH_COLUMN) as $tid) {
-            recalcEmployeeYear((int)$tid, $cy);
-        }
-        $_SESSION['flash'] = ['type' => 'success', 'msg' =>
-            "ترقية تلقائية $year — تمّت ترقية {$r['promoted']} أستاذ"
-            . " (غير مستحق هذه السنة: {$r['not_due']} · مُرقّى سابقاً: {$r['already']} · بلغ الحدّ الأقصى: {$r['max']})"];
-    } catch (Exception $e) {
-        $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()];
-    }
-    header('Location: ' . BASE_URL . 'pages/grades.php');
-    exit;
-}
+// (2026-08-29) أُزيلت الترقية اليدوية «+1» والترقية التلقائية القديمة: التدرّج يُحسب حصراً من القانون (0.5/سنة) عبر «إعادة البناء حسب القانون».
 
 // تابلو الدرجات الاستثنائية (تشيك مارك): يطبّق المؤشَّر ويلغي غير المؤشَّر — تحكّم لكل أستاذ
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exc_save']) && $employeeId > 0) {
@@ -338,7 +297,7 @@ include __DIR__ . '/../includes/header.php';
     [$gyf, $gyp] = yearEmploymentFilter(activeSchoolYear(), 'e.'); // فلترة حسب السنة الدراسية المختارة
     $gStmt = $db->prepare("SELECT e.*, sc.new_salary_2017, sc.new_grade_value
                               FROM employees e
-                              LEFT JOIN salary_scale_2017 sc ON e.current_grade = sc.grade AND sc.version_id = " . (int)$curScaleVid . "
+                              LEFT JOIN salary_scale_2017 sc ON FLOOR(e.current_grade) = sc.grade AND sc.version_id = " . (int)$curScaleVid . "
                               WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire'" . schoolScopeSql('e.school_id') . $gyf . "
                               ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
     $gStmt->execute($gyp);
@@ -354,26 +313,11 @@ include __DIR__ . '/../includes/header.php';
         <div class="card-body">
             <div class="alert alert-info">
                 <strong>📜 قواعد التدرّج / Règles de promotion:</strong><br>
-                • التدرّج: +1 درجة كل سنتين، يأخذها الأستاذ في 1/10 (تشرين).<br>
-                • الدرجات الاستثنائية تُعطى في 1/1 (كانون) — يجوز اجتماعها مع الدرجة العادية في نفس السنة لأنهما بتاريخين مختلفين.<br>
-                • فقط إذا تصادفت درجة استثنائية في نفس تاريخ 1/10 بالضبط، تؤجَّل الدرجة العادية إلى 1/10 من السنة التالية تلقائياً.<br>
-                • Lois exceptionnelles: 244/2000 (+3), 344/2001 (+4), 102/2010 (+3), 223/2012 (+4½)<br>
-                • Échelle 2017 (Journal Officiel n°37)
+                • <strong>درجة الدخول</strong> حسب الشهادة (قسم ثاني 1 · جارديني ب.ت 6 · إجازة جامعية 6 · جارديني ت.س 11 · إجازة تعليمية 15 · كابس 16).<br>
+                • <strong>التدرّج العادي</strong>: نص درجة كل سنة من السنة التالية لدخول الملاك (= درجة كاملة كل سنتين) في 1/10. كل الشهادات تأخذ درجة عادية فورية عند دخول الملاك <strong>إلا الإجازة التعليمية</strong>.<br>
+                • <strong>الدرجات الاستثنائية</strong> تلقائياً حسب تاريخ الملاك: القدامى قوانين 244/2000 (+3)، 102/2010 (+3)، 223/2012 (+4½) وقانون 2017 (6/2/0 حسب التاريخ والشهادة)؛ الداخلون بعد 2/4/2012: 4+4+2 بكانون ثم تقديم التدرّج نص درجة. قانون 344 يدوي فقط.<br>
+                • الراتب دائماً على الدرجة الكاملة (39.5 = راتب 39)، والنص يكمّل السنة التالية. Échelle 2017 (JO n°37).
             </div>
-            <?php if (!isAllSchools()): ?>
-            <div class="alert" style="background:#fffbeb;border:1px solid #fde68a;margin-bottom:16px">
-                <form method="GET" onsubmit="return confirm('ترقية تلقائية: +1 درجة لكل أستاذ ملاك مستحقّ في هذه المدرسة للسنة المختارة. متابعة؟');"
-                      class="d-flex gap-2" style="align-items:flex-end;flex-wrap:wrap;margin:0">
-                    <input type="hidden" name="auto_promote" value="1">
-                    <div class="form-group mb-0" style="max-width:170px">
-                        <label class="form-label" style="font-size:12px">سنة الترقية (1/10) / Année</label>
-                        <input type="number" name="year" class="form-control" value="<?= max(2026, (int)date('Y')) ?>" min="2026" max="2099" required>
-                    </div>
-                    <button type="submit" class="btn btn-gold"><i class="fas fa-arrow-up"></i> ترقية تلقائية لكل أساتذة المدرسة</button>
-                </form>
-                <small style="color:var(--gray-600)">يطبّق التدرّج (+1) لكل أستاذ ملاك مستحقّ هذه السنة (دورة سنتين من تاريخ الترسيم)، ويتخطّى من رُقّي سابقاً. مدرسة واحدة وسنة واحدة في كل مرّة.</small>
-            </div>
-            <?php endif; ?>
             <div class="table-wrapper">
                 <table class="table">
                     <thead>
@@ -423,7 +367,7 @@ include __DIR__ . '/../includes/header.php';
     $history = $history->fetchAll();
     
     $stmt = $db->prepare("SELECT * FROM salary_scale_2017 WHERE version_id = ? AND grade = ?");
-    $stmt->execute([scaleVersionIdAsOf(), $emp['current_grade']]);
+    $stmt->execute([scaleVersionIdAsOf(), (int)floor((float)$emp['current_grade'])]);   // الراتب على الدرجة الكاملة (39.5 = 39)
     $currentScale = $stmt->fetch();
     
     $laws = $db->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1 ORDER BY law_date")->fetchAll();
@@ -491,17 +435,6 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="card-body">
                 <?php if ($emp['employee_type'] === 'enseignant_titulaire'): ?>
-                    <div class="d-flex gap-2 mb-3" style="align-items:flex-end">
-                        <div class="form-group mb-0" style="flex:1">
-                            <label class="form-label" style="font-size:12px">Année d'effet (1/10) / سنة المفعول</label>
-                            <input type="number" id="effYear" class="form-control" value="<?= date('Y') ?>" min="2000" max="2099">
-                        </div>
-                        <a href="#" onclick="this.href='?employee_id=<?= $employeeId ?>&promote=1&eff_year='+document.getElementById('effYear').value"
-                           class="btn btn-primary"
-                           data-confirm="Appliquer le التدرّج (+1 échelon) le 1/10 ?">
-                            <i class="fas fa-arrow-up"></i> Promotion (+1) / التدرّج (+1)
-                        </a>
-                    </div>
                     <div class="mb-3">
                         <a href="?employee_id=<?= $employeeId ?>&rebuild_legal=1"
                            class="btn btn-warning btn-sm"

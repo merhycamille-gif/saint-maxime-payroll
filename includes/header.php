@@ -568,7 +568,12 @@ document.addEventListener('submit', function (e) {
         ?>
         <?php
         // شريط الطباعة والتصدير — يظهر تلقائياً بكل صفحة (طباعة/PDF/Excel/Word/واتساب/إيميل)
-        if (empty($hideExportToolbar)) {
+        // (2026-08-29، «ما تخلّي شي ما إلو معنى») صفحات الإعدادات/الإدارة ليست مطبوعات: بلا شريط طباعة/تصدير
+        $noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','exchange_rates.php','rates_history.php',
+                           'tax_brackets.php','social_security.php','salary_scales.php','schools.php','classes.php','exceptional_laws.php',
+                           'health_check.php','info_collect.php','bonuses.php','bulk_allowances.php','tax_declarations.php','tax_suggestions.php',
+                           'r567_check.php'];
+        if (empty($hideExportToolbar) && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), $noToolbarPages, true)) {
             echo exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);
         }
         ?>
