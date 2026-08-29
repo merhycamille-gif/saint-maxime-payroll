@@ -61,14 +61,14 @@ if ($report === 'monthly_summary') {
     if (salaryCompHas('extra')) { $head[] = 'الأجر الإضافي'; $w[] = 14; }
     if (salaryCompHas('aide'))  { $head[] = 'مكافأة ومساعدة'; $w[] = 14; }
     $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')'; $w[] = 18;
-    $head = array_merge($head, ['الضمان ٣٪', 'الصندوق ٦٪', 'الضريبة', 'الصافي', 'تعويض عائلي']);
-    $w = array_merge($w, [14, 14, 12, 16, 14]);
+    $head = array_merge($head, ['الضمان ٣٪', 'الصندوق ٦٪', 'درجة / نصف راتب (إلى الصندوق)', 'الضريبة', 'الصافي', 'تعويض عائلي']);
+    $w = array_merge($w, [14, 14, 14, 12, 16, 14]);
     if (salaryCompHas('transport')) { $head[] = 'تعويض النقل'; $w[] = 14; }
     $head[] = 'الإجمالي المتوجب'; $w[] = 18;
     $rep->head($head);
     $rep->widths($w);
 
-    $z = ['base' => 0, 'ech' => 0, 'bpe' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'cnss' => 0, 'caisse' => 0, 'tax' => 0, 'net' => 0, 'fam' => 0, 'tr' => 0, 'tot' => 0];
+    $z = ['base' => 0, 'ech' => 0, 'bpe' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'cnss' => 0, 'caisse' => 0, 'eocg' => 0, 'tax' => 0, 'net' => 0, 'fam' => 0, 'tr' => 0, 'tot' => 0];
     $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
     $emit = function ($label, $a, $n) use ($rep, $schCol) {
         // محاذاة الأعمدة: بعد (#,[school],name,type,grade) تبدأ الأرقام
@@ -77,7 +77,7 @@ if ($report === 'monthly_summary') {
         if (salaryCompHas('extra')) $row[] = $a['extra'];
         if (salaryCompHas('aide'))  $row[] = $a['aide'];
         $row[] = $a['composed'];
-        $row = array_merge($row, [$a['cnss'], $a['caisse'], $a['tax'], $a['net'], $a['fam']]);
+        $row = array_merge($row, [$a['cnss'], $a['caisse'], $a['eocg'], $a['tax'], $a['net'], $a['fam']]);
         if (salaryCompHas('transport')) $row[] = $a['tr'];
         $row[] = $a['tot'];
         $rep->totalRow($row);
@@ -86,7 +86,7 @@ if ($report === 'monthly_summary') {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
         $tr = (int)$r['transport_lbp'];
-        $v = ['base' => (int)$r['base_salary_lbp'], 'ech' => (int)$r['echelon_value_lbp'], 'bpe' => (int)$r['base_plus_echelon_lbp'], 'extra' => extraWageLbp($r), 'aide' => aideCompLbp($r), 'composed' => composedSalaryLbp($r), 'cnss' => (int)$r['cnss_amount_lbp'], 'caisse' => (int)$r['caisse_amount_lbp'], 'tax' => (int)$r['income_tax_lbp'], 'net' => (int)$r['net_salary_lbp'], 'fam' => (int)$r['family_allowance_lbp'], 'tr' => $tr, 'tot' => dueShownLbp($r)];
+        $v = ['base' => (int)$r['base_salary_lbp'], 'ech' => (int)$r['echelon_value_lbp'], 'bpe' => (int)$r['base_plus_echelon_lbp'], 'extra' => extraWageLbp($r), 'aide' => aideCompLbp($r), 'composed' => composedSalaryLbp($r), 'eocg' => (int)$r['eoc_grade_lbp'], 'cnss' => (int)$r['cnss_amount_lbp'], 'caisse' => (int)$r['caisse_amount_lbp'], 'tax' => (int)$r['income_tax_lbp'], 'net' => (int)$r['net_salary_lbp'], 'fam' => (int)$r['family_allowance_lbp'], 'tr' => $tr, 'tot' => dueShownLbp($r)];
         foreach ($v as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
@@ -94,7 +94,7 @@ if ($report === 'monthly_summary') {
         if (salaryCompHas('extra')) $row[] = $v['extra'];
         if (salaryCompHas('aide'))  $row[] = $v['aide'];
         $row[] = $v['composed'];
-        $row = array_merge($row, [$v['cnss'], $v['caisse'], $v['tax'], $v['net'], $v['fam']]);
+        $row = array_merge($row, [$v['cnss'], $v['caisse'], $v['eocg'], $v['tax'], $v['net'], $v['fam']]);
         if (salaryCompHas('transport')) $row[] = $v['tr'];
         $row[] = $v['tot'];
         $rep->row($row);

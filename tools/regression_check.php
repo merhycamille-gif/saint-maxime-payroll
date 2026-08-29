@@ -4399,6 +4399,17 @@ check('النياح ٣: شفاء اسبر منصور/ندى باصيل/زويا 
             WHERE s.name_ar LIKE 'مدرسة سيدة النياح%' AND ms.school_year='2025-2026' AND e.is_deleted=0
               AND ((e.first_name_ar='اسبر' AND e.last_name_ar LIKE '%منصور%') OR (e.first_name_ar='ندى' AND e.last_name_ar LIKE '%باصيل%') OR (e.first_name_ar='زويا' AND e.last_name_ar LIKE '%سمعان%'))")->fetchColumn() === 0);
 
+/* =====================================================================
+ * 93) 🧾 «وين عامود الدرجة اللي بدو يروح على صندوق التعويضات» (p1 2026-08-29): عمود «درجة / نصف
+ *     راتب (إلى الصندوق)» بكشف الرواتب الشهري الرسمي + الكشف الشهري بالتقارير + تصدير Excel/Word.
+ * =================================================================== */
+$sa93 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], ['extra','aide','transport'], [5], 'lbp', '2025-2026');
+$ms93 = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], ['extra','aide','transport'], [5], 'lbp', '2025-2026');
+check('عمود «درجة / نصف راتب → صندوق التعويضات» موجود بكشف الرواتب الشهري الرسمي وبالكشف الشهري بالتقارير وبالتصدير',
+      strpos($sa93, 'إلى صندوق التعويضات') !== false && strpos($sa93, '95,000') !== false
+      && strpos($ms93, 'درجة / نصف راتب') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/reports_export.php'), "'درجة / نصف راتب (إلى الصندوق)'") !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

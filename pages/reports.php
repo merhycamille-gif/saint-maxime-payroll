@@ -269,9 +269,9 @@ function reportDocThumb($path) {
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
-        $totals = ['cnss'=>0,'caisse'=>0,'tax'=>0,'net'=>0,'family'=>0,'total'=>0,'extra'=>0,'aide'=>0,'base'=>0,'ech'=>0,'bpe'=>0,'trans'=>0,
+        $totals = ['cnss'=>0,'caisse'=>0,'eocg'=>0,'tax'=>0,'net'=>0,'family'=>0,'total'=>0,'extra'=>0,'aide'=>0,'base'=>0,'ech'=>0,'bpe'=>0,'trans'=>0,
                    'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,
-                                  'base_usd'=>0.0,'ech_usd'=>0.0,'bpe_usd'=>0.0,'cnss_usd'=>0.0,'caisse_usd'=>0.0,'tax_usd'=>0.0,'net_usd'=>0.0,'family_usd'=>0.0,'total_usd'=>0.0];
+                                  'base_usd'=>0.0,'ech_usd'=>0.0,'bpe_usd'=>0.0,'cnss_usd'=>0.0,'caisse_usd'=>0.0,'eocg_usd'=>0.0,'tax_usd'=>0.0,'net_usd'=>0.0,'family_usd'=>0.0,'total_usd'=>0.0];
         $rn = 0;
     ?>
         <form method="GET" class="card no-print">
@@ -305,7 +305,7 @@ function reportDocThumb($path) {
                         <th>أساس الراتب</th><th>قيمة الدرجة</th><th>الراتب بعد التدرّج</th>
                         <?= extraAideHeads() ?>
                         <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
-                        <th>الضمان (٣٪)</th><th>الصندوق (٦٪)</th><th>الضريبة</th>
+                        <th>الضمان (٣٪)</th><th>الصندوق (٦٪)</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى الصندوق</small></th><th>الضريبة</th>
                         <th>الصافي</th><th>التعويضات العائلية</th><?= transportHead() ?><th>الإجمالي المتوجب</th>
                     </tr></thead>
                     <tbody>
@@ -313,7 +313,7 @@ function reportDocThumb($path) {
                         $colspanLbl = $multi ? 5 : 4;
                         $zeroT = ['base'=>0,'ech'=>0,'bpe'=>0,'extra'=>0,'aide'=>0,'cnss'=>0,'caisse'=>0,'tax'=>0,'net'=>0,'family'=>0,'trans'=>0,'total'=>0,
                                   'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,
-                                  'base_usd'=>0.0,'ech_usd'=>0.0,'bpe_usd'=>0.0,'cnss_usd'=>0.0,'caisse_usd'=>0.0,'tax_usd'=>0.0,'net_usd'=>0.0,'family_usd'=>0.0,'total_usd'=>0.0];
+                                  'base_usd'=>0.0,'ech_usd'=>0.0,'bpe_usd'=>0.0,'cnss_usd'=>0.0,'caisse_usd'=>0.0,'eocg_usd'=>0.0,'tax_usd'=>0.0,'net_usd'=>0.0,'family_usd'=>0.0,'total_usd'=>0.0];
                         // عرض مبلغ بند بالعملتين انطلاقاً من مجموعَي الليرة والدولار المتراكمَين (لصفوف المجاميع)
                         $dualTot = function($lbp, $usd) {
                             $m = displayCurrency();
@@ -330,7 +330,7 @@ function reportDocThumb($path) {
                                 <td><?= $dualTot($t['base'], $t['base_usd']) ?></td><td><?= $dualTot($t['ech'], $t['ech_usd']) ?></td><td><?= $dualTot($t['bpe'], $t['bpe_usd']) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= $dualTot($t['extra'], $t['extra_usd']) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= $dualTot($t['aide'], $t['aide_usd']) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= $dualTot($t['composed'], $t['composed_usd']) ?></strong></td>
-                                <td><?= $dualTot($t['cnss'], $t['cnss_usd']) ?></td><td><?= $dualTot($t['caisse'], $t['caisse_usd']) ?></td><td><?= $dualTot($t['tax'], $t['tax_usd']) ?></td>
+                                <td><?= $dualTot($t['cnss'], $t['cnss_usd']) ?></td><td><?= $dualTot($t['caisse'], $t['caisse_usd']) ?></td><td><?= $dualTot($t['eocg'] ?? 0, $t['eocg_usd'] ?? 0) ?></td><td><?= $dualTot($t['tax'], $t['tax_usd']) ?></td>
                                 <td><?= $dualTot($t['net'], $t['net_usd']) ?></td><td><?= $dualTot($t['family'], $t['family_usd']) ?></td><?php if (salaryCompHas('transport')): ?><td><?= $dualTot($t['trans'], $t['trans_usd']) ?></td><?php endif; ?>
                                 <td><strong><?= $dualTot($t['total'], $t['total_usd']) ?></strong></td>
                             </tr>
@@ -342,14 +342,14 @@ function reportDocThumb($path) {
                             $rTrans = (int)$r['transport_lbp']; // من ملف الأستاذ — transport_lbp = transport_complement_lbp فلا تجمعهما (دوبل)
                             $rRate = rowRate($r);
                             $v = ['base'=>(int)$r['base_salary_lbp'],'ech'=>(int)$r['echelon_value_lbp'],'bpe'=>(int)$r['base_plus_echelon_lbp'],
-                                  'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'cnss'=>(int)$r['cnss_amount_lbp'],'caisse'=>(int)$r['caisse_amount_lbp'],
+                                  'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'cnss'=>(int)$r['cnss_amount_lbp'],'caisse'=>(int)$r['caisse_amount_lbp'],'eocg'=>(int)$r['eoc_grade_lbp'],
                                   'tax'=>(int)$r['income_tax_lbp'],'net'=>(int)$r['net_salary_lbp'],'family'=>(int)$r['family_allowance_lbp'],
                                   'trans'=>$rTrans,'total'=>dueShownLbp($r),
                                   'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd($rTrans,$rRate),
                                   'composed'=>composedSalaryLbp($r),'composed_usd'=>lbpToUsd(composedSalaryLbp($r),$rRate),
                                   'base_usd'=>lbpToUsd((int)$r['base_salary_lbp'],$rRate),'ech_usd'=>lbpToUsd((int)$r['echelon_value_lbp'],$rRate),
                                   'bpe_usd'=>lbpToUsd((int)$r['base_plus_echelon_lbp'],$rRate),'cnss_usd'=>lbpToUsd((int)$r['cnss_amount_lbp'],$rRate),
-                                  'caisse_usd'=>lbpToUsd((int)$r['caisse_amount_lbp'],$rRate),'tax_usd'=>lbpToUsd((int)$r['income_tax_lbp'],$rRate),
+                                  'caisse_usd'=>lbpToUsd((int)$r['caisse_amount_lbp'],$rRate),'eocg_usd'=>lbpToUsd((int)$r['eoc_grade_lbp'],$rRate),'tax_usd'=>lbpToUsd((int)$r['income_tax_lbp'],$rRate),
                                   'net_usd'=>lbpToUsd((int)$r['net_salary_lbp'],$rRate),'family_usd'=>lbpToUsd((int)$r['family_allowance_lbp'],$rRate),
                                   'total_usd'=>lbpToUsd(dueShownLbp($r),$rRate)];
                             foreach ($v as $k=>$val) { $catTot[$k]+=$val; $totals[$k]+=$val; }
@@ -370,6 +370,7 @@ function reportDocThumb($path) {
                                 <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $rRate) ?></strong></td>
                                 <td><?= money($r['cnss_amount_lbp'], $rRate) ?></td>
                                 <td><?= money($r['caisse_amount_lbp'], $rRate) ?></td>
+                                <td><?= (int)$r['eoc_grade_lbp'] > 0 ? money($r['eoc_grade_lbp'], $rRate) : '—' ?></td>
                                 <td><?= money($r['income_tax_lbp'], $rRate) ?></td>
                                 <td><?= money($r['net_salary_lbp'], $rRate) ?></td>
                                 <td><?= money($r['family_allowance_lbp'], $rRate) ?></td>

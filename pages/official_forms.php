@@ -1619,7 +1619,7 @@ elseif ($form === 'teacher_card'):
             <th>#</th><th>الاسم</th><th>أساس الراتب</th><th>درجة عادية واستثنائية</th><th>الراتب بعد التدرّج</th>
             <?= extraAideHeads() ?>
             <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
-            <th>صندوق التعويضات ٦٪</th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>ضريبة الدخل</th><th>الضمان الاجتماعي</th>
+            <th>صندوق التعويضات ٦٪</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى صندوق التعويضات</small></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>ضريبة الدخل</th><th>الضمان الاجتماعي</th>
             <th>مجموع المحسومات</th><th>تعويض عائلي</th><?= transportHead('', 'تعويض نقل') ?><th>مجموع المدفوعات</th><th>الصافي</th>
             <th>توقيع الموظف</th>
         </tr></thead>
@@ -1629,7 +1629,7 @@ elseif ($form === 'teacher_card'):
         // ✍️ (2026-08-28، p1 تيا نخلة) توحيد العملتين: كل أعمدة المبالغ تعرض الدولار (تدوير لتحت)
         // حسب وضع العملة — لا أعمدة «مبقّعة» (بعضها بدولار وبعضها بلاه). المجاميع = جمع دولارات
         // الصفوف المدوّرة نفسها (قاعدة «الأرقام تركب»).
-        foreach (['base_usd','ech_usd','bpe_usd','caisse_usd','fded_usd','txb_usd','tax_usd','cnss_usd','ded_usd','fam_usd','due_usd','net_usd','extra_usd','aide_usd','trans_usd','composed','composed_usd'] as $uk) { $zeroT[$uk]=0.0; if(!isset($T[$uk])) $T[$uk]=0.0; }
+        foreach (['base_usd','ech_usd','bpe_usd','caisse_usd','eocg','eocg_usd','fded_usd','txb_usd','tax_usd','cnss_usd','ded_usd','fam_usd','due_usd','net_usd','extra_usd','aide_usd','trans_usd','composed','composed_usd'] as $uk) { $zeroT[$uk]=0.0; if(!isset($T[$uk])) $T[$uk]=0.0; }
         // صفّ مجاميع (فرعي لفئة أو إجمالي عام) بنفس ترتيب أعمدة الجدول
         $drawTotal = function($label, $a, $isGrand) {
             $bg = $isGrand ? '' : 'background:#e0e7ff;'; $cls = $isGrand ? 'total-row' : 'subtotal-row'; ?>
@@ -1639,6 +1639,7 @@ elseif ($form === 'teacher_card'):
                 <?= extraAideTotalCells($a['extra'],$a['extra_usd'],$a['aide'],$a['aide_usd']) ?>
                 <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($a['composed'],$a['composed_usd'],false) ?></strong></td>
                 <td class="num"><?= dualFromUsd($a['caisse'],$a['caisse_usd'],false) ?></td>
+                <td class="num"><?= dualFromUsd($a['eocg'],$a['eocg_usd'],false) ?></td>
                 <td class="num"><?= dualFromUsd($a['fded'],$a['fded_usd'],false) ?></td>
                 <td class="num"><?= dualFromUsd($a['txb'],$a['txb_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['tax'],$a['tax_usd'],false) ?></td>
                 <td class="num"><?= dualFromUsd($a['cnss'],$a['cnss_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['ded'],$a['ded_usd'],false) ?></td>
@@ -1653,16 +1654,16 @@ elseif ($form === 'teacher_card'):
             if ($cat !== $curCat):
                 if ($curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
                 $sub = $zeroT; $curCat = $cat;
-                ?><tr class="cat-row"><td colspan="<?= 16 + compColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
+                ?><tr class="cat-row"><td colspan="<?= 17 + compColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
             $rRate = rowRate($r);
             // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55)
             $sfd = min($sfdOf($r), (int)$r['taxable_base_lbp']);
-            $add = ['base'=>$r['base_salary_lbp'],'ech'=>$r['echelon_value_lbp'],'bpe'=>$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'caisse'=>$r['caisse_amount_lbp'],'fded'=>$sfd,'txb'=>max(0,(int)$r['taxable_base_lbp']-$sfd),'tax'=>$r['income_tax_lbp'],'cnss'=>$r['cnss_amount_lbp'],'ded'=>$r['total_retenues_lbp'],'fam'=>$r['family_allowance_lbp'],'trans'=>$r['transport_lbp'],'due'=>dueShownLbp($r),'net'=>$r['net_salary_lbp'],
+            $add = ['base'=>$r['base_salary_lbp'],'ech'=>$r['echelon_value_lbp'],'bpe'=>$r['base_plus_echelon_lbp'],'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'caisse'=>$r['caisse_amount_lbp'],'eocg'=>(int)$r['eoc_grade_lbp'],'fded'=>$sfd,'txb'=>max(0,(int)$r['taxable_base_lbp']-$sfd),'tax'=>$r['income_tax_lbp'],'cnss'=>$r['cnss_amount_lbp'],'ded'=>$r['total_retenues_lbp'],'fam'=>$r['family_allowance_lbp'],'trans'=>$r['transport_lbp'],'due'=>dueShownLbp($r),'net'=>$r['net_salary_lbp'],
                     'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd((int)$r['transport_lbp'],$rRate),
                     'composed'=>composedSalaryLbp($r),'composed_usd'=>lbpToUsd(composedSalaryLbp($r),$rRate)];
             // مرايا الدولار لكل الأعمدة (تدوير لتحت) — للمجاميع «الأرقام تركب»
-            foreach (['base','ech','bpe','caisse','fded','txb','tax','cnss','ded','fam','due','net'] as $uk) $add[$uk.'_usd'] = lbpToUsd((float)$add[$uk], $rRate);
+            foreach (['base','ech','bpe','caisse','eocg','fded','txb','tax','cnss','ded','fam','due','net'] as $uk) $add[$uk.'_usd'] = lbpToUsd((float)$add[$uk], $rRate);
             foreach ($add as $k=>$val) { $T[$k]+=$val; $sub[$k]+=$val; } ?>
             <tr><td><?= ++$nn ?></td>
                 <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
@@ -1672,6 +1673,7 @@ elseif ($form === 'teacher_card'):
                 <?= extraAideCells($r) ?>
                 <td class="num" style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $rRate, ['withCur'=>false]) ?></strong></td>
                 <td class="num"><?= money($r['caisse_amount_lbp'], $rRate, ['withCur'=>false]) ?></td>
+                <td class="num"><?= (int)$r['eoc_grade_lbp'] > 0 ? money($r['eoc_grade_lbp'], $rRate, ['withCur'=>false]) : '—' ?></td>
                 <td class="num"><?= money($add['fded'], $rRate, ['withCur'=>false]) ?></td>
                 <td class="num"><?= money($add['txb'], $rRate, ['withCur'=>false]) ?></td>
                 <td class="num"><?= money($r['income_tax_lbp'], $rRate, ['withCur'=>false]) ?></td>
@@ -1684,7 +1686,7 @@ elseif ($form === 'teacher_card'):
                 <td style="min-width:60px"></td></tr>
         <?php endforeach;
         if ($rows && $curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
-        if(!$rows): ?><tr><td colspan="<?= 16 + compColsCount() ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif; ?>
+        if(!$rows): ?><tr><td colspan="<?= 17 + compColsCount() ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif; ?>
         </tbody>
         <?php if ($rows): ?><tfoot><?php $drawTotal('المجموع العام ('.count($rows).')', $T, true); ?></tfoot><?php endif; ?>
     </table>
