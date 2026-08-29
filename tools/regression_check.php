@@ -4147,6 +4147,30 @@ check('حفظ مهلة رابط المعلومات يصارح: نجاح باطل
       strpos((string)file_get_contents($PROJ . '/pages/info_collect.php'), 'ما قدرت افهم التاريخ') !== false
       && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'arabicDigitsFr($s)') !== false);
 
+/* =====================================================================
+ * 81) 🎓 شيرا انطوان العاقوري (البشارة) — «عندها إجازة تعليمية» (2026-08-29):
+ *     شهادتها كانت فاضية → درجة 18 وإضافي جامد يعوّض. صارت إجازة تعليمية → درجة 31
+ *     حسب القانون (2,625,000) + إضافي 45٪ بقاعدة ÷1500 + الشفاء موصول بالهيدر.
+ * =================================================================== */
+$chi81 = $db->query("SELECT e.id, e.diploma, e.current_grade, ms.base_plus_echelon_lbp b, ms.prime_fixe_lbp p, ms.exchange_rate r
+    FROM employees e JOIN schools s ON s.id=e.school_id
+    LEFT JOIN monthly_salaries ms ON ms.employee_id=e.id AND ms.year=2025 AND ms.month=11
+    WHERE s.name_ar LIKE 'مدرسة سيدة البشارة%' AND e.is_deleted=0 AND e.employee_type='enseignant_titulaire'
+      AND e.first_name_ar='شيرا' AND e.last_name_ar LIKE '%عاقوري%' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$law81 = $chi81 ? buildLegalGradeHistory((int)$chi81['id'], null, true) : null;
+$scale81 = $chi81 ? (int)$db->query("SELECT new_salary_2017 FROM salary_scale_2017 WHERE version_id=1 AND grade=" . (int)floor((float)$chi81['current_grade']))->fetchColumn() : 0;
+check('شيرا العاقوري: إجازة تعليمية + درجتها = القانون (31) + أساس تشرين الثاني = السلسلة + الإضافي 45٪ بقاعدة ÷1500 + الشفاء موصول',
+      $chi81 && $chi81['diploma'] === 'ijaza_taalimiya'
+      && $law81 && (float)$law81['final_grade'] === (float)$chi81['current_grade'] && (float)$chi81['current_grade'] >= 31
+      && (int)$chi81['b'] === $scale81 && $scale81 > 0
+      && (int)$chi81['p'] === (int)bonusPercentLbp(45, (int)$chi81['b'], (float)$chi81['r'])
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healChiraTaalimiya20260829();') !== false,
+      'row=' . json_encode($chi81, JSON_UNESCAPED_UNICODE) . ' law=' . json_encode($law81 ? $law81['final_grade'] : null));
+
+check('حفظ الموظف: تعبئة شهادة كانت فاضية تُعدّ تغييراً → إعادة بناء الدرجات والراتب تلقائياً (لا شرط !== null)',
+      strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "\$diplomaChanged = ((string)\$oldDiploma !== (string)\$data['diploma']);") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "\$oldDiploma !== null && \$oldDiploma !== \$data['diploma']") === false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

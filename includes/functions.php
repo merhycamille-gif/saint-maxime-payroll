@@ -5065,3 +5065,65 @@ function healPrimeSnapshotSync20260828() {
         try { setSetting('heal_prime_snapshot_progress', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🎓 شيرا انطوان العاقوري (البشارة) — «عندها إجازة تعليمية» (المستخدم 2026-08-29).
+ * خانة شهادتها كانت فاضية فعاملها البرنامج كدرجة دخول 1 → درجة 18 (أساس 1,695,000) بدل
+ * القانون، والإضافي انحطّ رقماً جامداً (68,850,000) يعوّض النقص فيطلع المجموع صحيحاً والتقسيم غلط.
+ * الشفاء (بالاسم، مرّة واحدة): الشهادة = إجازة تعليمية (درجة دخول 15) → إعادة بناء الدرجات حسب
+ * القانون (15 + 5.5 عادية + 10.5 استثنائية = 31 → 2,625,000) → الإضافي نسبة 45٪ متل رفقاتها
+ * بقاعدة ÷1500 (= 70,000,000) → إعادة حساب 2025-2026 وما بعدها. نسخة قبل التعديل بالإعداد bk_chira_20260829.
+ */
+function healChiraTaalimiya20260829() {
+    try {
+        if (strpos((string)getSetting('heal_chira_taalimiya_20260829', ''), 'done') === 0) return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) { setSetting('heal_chira_taalimiya_20260829', 'done: skip no school'); return; }
+        $st = $db->prepare("SELECT * FROM employees WHERE school_id=? AND is_deleted=0 AND employee_type='enseignant_titulaire'
+            AND first_name_ar='شيرا' AND last_name_ar LIKE '%عاقوري%' AND father_name_ar LIKE 'انطوان%' LIMIT 1");
+        $st->execute([(int)$sid]);
+        $emp = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$emp) { setSetting('heal_chira_taalimiya_20260829', 'done: skip not found'); return; }
+        $eid = (int)$emp['id'];
+        require_once __DIR__ . '/payroll_calculator.php';
+        // نسخة قبل التعديل (الشهادة/الدرجات/سجلّ الدرجات/بند الإضافي/أشهر 2025-2026)
+        $bk = [
+            'emp' => ['diploma' => $emp['diploma'], 'starting_grade' => $emp['starting_grade'], 'current_grade' => $emp['current_grade']],
+            'grades' => $db->query("SELECT * FROM employee_grade_history WHERE employee_id=$eid ORDER BY id")->fetchAll(PDO::FETCH_ASSOC),
+            'bonuses' => $db->query("SELECT * FROM employee_bonuses WHERE employee_id=$eid")->fetchAll(PDO::FETCH_ASSOC),
+            'months' => $db->query("SELECT year, month, grade_at_month, base_salary_lbp, echelon_value_lbp, base_plus_echelon_lbp, prime_fixe_lbp, net_salary_lbp, total_due_lbp
+                FROM monthly_salaries WHERE employee_id=$eid AND (year*100+month) >= 202510 ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC),
+        ];
+        setSetting('bk_chira_20260829', json_encode($bk, JSON_UNESCAPED_UNICODE));
+        $before = $db->query("SELECT base_plus_echelon_lbp b, prime_fixe_lbp p FROM monthly_salaries WHERE employee_id=$eid AND year=2025 AND month=11 LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: ['b' => 0, 'p' => 0];
+        // ① الشهادة = إجازة تعليمية (درجة الدخول من جدول الشهادات)
+        $sg = $db->query("SELECT starting_grade FROM diploma_starting_grades WHERE diploma_code='ijaza_taalimiya'")->fetchColumn();
+        $sg = ($sg === false) ? 15 : (float)$sg;
+        $db->prepare("UPDATE employees SET diploma='ijaza_taalimiya', starting_grade=? WHERE id=?")->execute([$sg, $eid]);
+        // ② إعادة بناء الدرجات حسب القانون (المصدر الواحد)
+        $r = buildLegalGradeHistory($eid);
+        // ③ الإضافي = نسبة 45٪ متل رفقاتها (بند 2025-2026 الفعّال، وإلا يُخلَق)
+        $b = $db->prepare("SELECT id FROM employee_bonuses WHERE employee_id=? AND bonus_type='prime_fixe' AND is_active=1
+            AND (school_year IS NULL OR school_year='2025-2026') ORDER BY id LIMIT 1");
+        $b->execute([$eid]);
+        $bid = (int)$b->fetchColumn();
+        if ($bid > 0) {
+            $db->prepare("UPDATE employee_bonuses SET value_type='percent', amount=45, currency='LBP', start_month=NULL, end_month=NULL WHERE id=?")->execute([$bid]);
+            $db->prepare("UPDATE employee_bonuses SET is_active=0 WHERE employee_id=? AND bonus_type='prime_fixe' AND is_active=1 AND id<>? AND (school_year IS NULL OR school_year='2025-2026')")->execute([$eid, $bid]);
+        } else {
+            $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+                VALUES (?, 'prime_fixe', 1, '2025-2026', 45, 'percent', 'LBP', NULL, NULL, 1)")->execute([$eid]);
+        }
+        // ④ إعادة حساب 2025-2026 وأي سنة لاحقة مخزّنة
+        $years = $db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id=$eid AND (year*100+month) >= 202510 ORDER BY school_year")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('2025-2026', $years, true)) $years[] = '2025-2026';
+        $n = 0;
+        foreach ($years as $sy) $n += (int)recalcEmployeeYear($eid, $sy);
+        $after = $db->query("SELECT base_plus_echelon_lbp b, prime_fixe_lbp p, net_salary_lbp n FROM monthly_salaries WHERE employee_id=$eid AND year=2025 AND month=11 LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: ['b' => 0, 'p' => 0, 'n' => 0];
+        setSetting('heal_chira_taalimiya_20260829', 'done: emp=' . $eid . ' grade ' . $emp['current_grade'] . '→' . $r['final_grade']
+            . ' | Nov base ' . $before['b'] . '→' . $after['b'] . ' prime ' . $before['p'] . '→' . $after['p'] . ' net=' . $after['n'] . ' recalc=' . $n);
+    } catch (Throwable $e) {
+        try { setSetting('heal_chira_taalimiya_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}

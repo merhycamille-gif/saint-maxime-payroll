@@ -499,7 +499,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             logAudit('update', 'employees', $id, null, $data);
 
             // أستاذ ملاك: إذا تغيّرت الشهادة أو تاريخ دخول الملاك/الترسيم → أعِد بناء الدرجات حسب القانون تلقائياً
-            $diplomaChanged = ($oldDiploma !== null && $oldDiploma !== $data['diploma']);
+            // 🔴 (2026-08-29، قصة شيرا العاقوري) كان الشرط `$oldDiploma !== null` يُسقِط حالة «الشهادة كانت فاضية
+            // ثم عُبّيت» فلا تُعاد الدرجات ولا الراتب رغم رسالة الحفظ — الفراغ يُعامَل كقيمة تتغيّر.
+            $diplomaChanged = ((string)$oldDiploma !== (string)$data['diploma']);
             $datesChanged = ($oldDates && (
                 ($oldDates['titularization_date'] ?? null) != $data['titularization_date'] ||
                 ($oldDates['hire_date'] ?? null) != $data['hire_date'] ||
