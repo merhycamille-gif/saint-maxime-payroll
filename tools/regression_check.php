@@ -4317,6 +4317,45 @@ check('تنظيف: الإعدادات بلا بطاقة «معلومات الم�
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), "\$noToolbarPages") !== false
       && strpos((string)file_get_contents($PROJ . '/assets/css/app.css'), '.form-row.cols-5') !== false);
 
+/* =====================================================================
+ * 89) 👻 «إضافي عالق بلا سطر» (كلاديس الصباغ 2026-08-29): حذف بند العلاوة = إطفاء (is_active=0)
+ *     لا محو، فيُصفَّر من الأشهر المخزّنة عبر تركيب العلاوات؛ المحرّرات تعرض الفعّال فقط؛
+ *     تجربة حيّة على موظفة بلا إعداد: إضافة سطر → يظهر، إطفاؤه → يصير 0 والصافي يرجع.
+ * =================================================================== */
+$noHardDel89 = true;
+foreach (['pages/bonuses.php', 'pages/bulk_allowances.php', 'pages/employees.php'] as $f89) {
+    $src89 = (string)file_get_contents($PROJ . '/' . $f89);
+    $src89 = preg_replace('/DELETE FROM employee_bonuses WHERE employee_id = \? AND school_year = \? AND is_active = 0/', '', $src89); // تنظيف المطفأ المتراكم مسموح
+    if (strpos($src89, 'DELETE FROM employee_bonuses') !== false) $noHardDel89 = false;
+}
+$live89 = false; $why89 = '';
+$gl89 = $db->query("SELECT e.id FROM employees e JOIN schools s ON s.id=e.school_id WHERE s.name_ar LIKE 'مدرسة سيدة البشارة%' AND e.is_deleted=0
+    AND e.employee_type='employe' AND COALESCE(e.base_salary_usd,0)=0 AND COALESCE(e.contract_salary_lbp,0)=0 AND e.first_name_ar LIKE 'كلاديس%' LIMIT 1")->fetchColumn();
+if ($gl89) {
+    $gl89 = (int)$gl89;
+    $b0 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp FROM monthly_salaries WHERE employee_id=$gl89 AND year=2025 AND month=11")->fetch(PDO::FETCH_ASSOC);
+    $db->exec("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES ($gl89, 'prime_fixe', 98, '2025-2026', 1000000, 'amount', 'LBP', NULL, NULL, 1)");
+    $bid89 = (int)$db->lastInsertId();
+    try {
+        recalcEmployeeYear($gl89, '2025-2026');
+        $b1 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp FROM monthly_salaries WHERE employee_id=$gl89 AND year=2025 AND month=11")->fetch(PDO::FETCH_ASSOC);
+        $db->exec("UPDATE employee_bonuses SET is_active=0 WHERE id=$bid89");
+        recalcEmployeeYear($gl89, '2025-2026');
+        $b2 = $db->query("SELECT prime_fixe_lbp, net_salary_lbp FROM monthly_salaries WHERE employee_id=$gl89 AND year=2025 AND month=11")->fetch(PDO::FETCH_ASSOC);
+        $live89 = $b0 && (int)$b1['prime_fixe_lbp'] === (int)$b0['prime_fixe_lbp'] + 1000000 && (int)$b2['prime_fixe_lbp'] === (int)$b0['prime_fixe_lbp'] && (int)$b2['net_salary_lbp'] === (int)$b0['net_salary_lbp'];
+        $why89 = json_encode([$b0, $b1, $b2]);
+    } finally {
+        $db->exec("DELETE FROM employee_bonuses WHERE id=$bid89");
+        recalcEmployeeYear($gl89, '2025-2026');
+    }
+}
+check('حذف بند العلاوة = إطفاء لا محو (bonuses/bulk/employees) + المحرّرات تعرض الفعّال فقط + الشفاء موصول',
+      $noHardDel89
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "WHERE employee_id = ? AND is_active = 1 AND (school_year = ? OR school_year IS NULL)") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), "AND is_active = 1 AND (school_year = ? OR school_year IS NULL)") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healGladisGhostPrime20260829();') !== false);
+check('تجربة حيّة (موظفة بلا إعداد): إضافة سطر إضافي يظهر بالشهر، وإطفاؤه يصفّره ويرجّع الصافي', $live89, $why89);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
 // Delete bonus
 if (isset($_GET['delete'])) {
     requireWriteAction();
-    $db->prepare("DELETE FROM employee_bonuses WHERE id = ? AND employee_id = ?")->execute([(int)$_GET['delete'], $employeeId]);
+    $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE id = ? AND employee_id = ?")->execute([(int)$_GET['delete'], $employeeId]);
     recalcEmployeeYear($employeeId, writeSchoolYear()); // إعادة حساب الراتب تلقائياً
     $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Supprimée'];
     header("Location: ?employee_id=$employeeId");
@@ -73,7 +73,7 @@ if (!empty($_SESSION['flash'])) {
     unset($_SESSION['flash']);
 }
 
-$bonuses = $db->prepare("SELECT * FROM employee_bonuses WHERE employee_id = ? AND (school_year = ? OR school_year IS NULL) ORDER BY bonus_type, period_number");
+$bonuses = $db->prepare("SELECT * FROM employee_bonuses WHERE employee_id = ? AND is_active = 1 AND (school_year = ? OR school_year IS NULL) ORDER BY bonus_type, period_number");
 $bonuses->execute([$employeeId, activeSchoolYear()]);
 $bonuses = $bonuses->fetchAll();
 

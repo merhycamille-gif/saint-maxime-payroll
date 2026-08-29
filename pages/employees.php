@@ -257,7 +257,10 @@ function renderBonusRow($r = null) {
 function saveEmployeeBonuses($db, $employeeId) {
     if (empty($_POST['bonus_editor'])) return; // المحرّر المباشر لم يكن ظاهراً
     $sy = writeSchoolYear(); // المكافآت مربوطة بالسنة المختارة («كل السنين» → السنة الحالية، لا 'all')
-    $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND school_year = ?")->execute([$employeeId, $sy]);
+    $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ?")->execute([$employeeId, $sy]);
+    // تنظيف: لا نُبقي إلا آخر 10 أسطر مطفأة للسنة (تكفي لتصفير الأشهر المخزّنة ولا تتكدّس)
+    $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND is_active = 0 AND id NOT IN (
+        SELECT id FROM (SELECT id FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND is_active = 0 ORDER BY id DESC LIMIT 10) t)")->execute([$employeeId, $sy, $employeeId, $sy]);
     $rows = $_POST['bonus_rows'] ?? [];
     $types = $rows['type'] ?? [];
     $allowed = ['prime_fixe', 'aide_complementaire', 'transport_complement'];
@@ -994,7 +997,9 @@ if ($id > 0) {
 // Get bonuses
 $bonuses = ['prime_fixe' => [], 'aide_complementaire' => [], 'transport_complement' => [], 'transport_daily' => []];
 if ($id > 0) {
-    $stmt = $db->prepare("SELECT * FROM employee_bonuses WHERE employee_id = ? AND (school_year = ? OR school_year IS NULL)");
+    // (2026-08-29) الحذف صار «إطفاء» (is_active=0) لا محواً — حتى يصفّر البرنامج الرقم من الأشهر المخزّنة
+    // (قصة كلاديس الصباغ: إضافي 751م بقي عالقاً بعد حذف سطره). المحرّر يعرض الفعّال فقط.
+    $stmt = $db->prepare("SELECT * FROM employee_bonuses WHERE employee_id = ? AND is_active = 1 AND (school_year = ? OR school_year IS NULL)");
     $stmt->execute([$id, activeSchoolYear()]);
     while ($row = $stmt->fetch()) {
         $bonuses[$row['bonus_type']][] = $row;

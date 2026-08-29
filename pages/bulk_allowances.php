@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
         if ($valid) {
             $ids = scopeEmployeeIds($db, $scopeAll, $schoolId, $categories, $schoolYear);
             $typesUsed = array_values(array_unique(array_map(fn($v)=>$v['type'], $valid)));
-            $del = $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND bonus_type = ? AND school_year = ?");
+            $del = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = ? AND school_year = ?");
             $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
             foreach ($ids as $id) {
                 foreach ($typesUsed as $t) $del->execute([$id, $t, $schoolYear]);   // امسح الأنواع المستعملة ثم أعد بناءها بالأسطر
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
             if ($bidList) {
                 $in = implode(',', $bidList);
                 if ($action === 'row_delete') {
-                    $db->exec("DELETE FROM employee_bonuses WHERE id IN ($in)");
+                    $db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE id IN ($in)");
                     $verb = 'حُذف السطر';
                 } else {
                     $nval = (float)str_replace(',', '', $_POST['value'] ?? '');
@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
     elseif ($action === 'remove_bonus') {
         $bonusType = in_array($_POST['bonus_type'] ?? '', ['aide_complementaire','prime_fixe','transport_complement'], true) ? $_POST['bonus_type'] : 'aide_complementaire';
         $ids = scopeEmployeeIds($db, $scopeAll, $schoolId, $categories, $schoolYear);
-        $del = $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND bonus_type = ? AND school_year = ?");
+        $del = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = ? AND school_year = ?");
         foreach ($ids as $id) $del->execute([$id, $bonusType, $schoolYear]);
         [$tot, $done] = recalcScope($db, $scopeAll, $schoolId, $categories, $schoolYear);
         $_SESSION['flash_success'] = "أُزيلت المكافأة عن " . count($ids) . " (" . catLabel($categories) . " — " . scopeLabel($scopeAll,$schoolId) . ") — أُعيد حساب $done.";
@@ -190,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
         }
         if ($valid) {
             $ids = scopeEmployeeIds($db, $scopeAll, $schoolId, $categories, $schoolYear);
-            $del = $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND bonus_type = 'transport_daily' AND school_year = ?");
+            $del = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = 'transport_daily' AND school_year = ?");
             // امسح النقل اليومي الثابت (العمود) للمختارين لتفادي ازدواج مع الفترات
             $delCol = $db->prepare("UPDATE employees SET transport_daily_amount = 0 WHERE id = ?");
             $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, 'transport_daily', ?, ?, ?, 'amount', ?, ?, ?, 1)");
@@ -213,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
         $scopeIds = array_map('intval', scopeEmployeeIds($db, $scopeAll, $schoolId, ['titulaire','contractuel','employe'], $schoolYear));
         $typesMap = ['prime' => 'prime_fixe', 'aide' => 'aide_complementaire', 'trans' => 'transport_complement'];
         $fullYearSql = "(start_month IS NULL OR (start_month = 10 AND end_month = 9))";
-        $delI = $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND bonus_type = ? AND school_year = ? AND value_type = ? AND $fullYearSql");
+        $delI = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = ? AND school_year = ? AND value_type = ? AND $fullYearSql");
         $insI = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, ?, 1, ?, ?, ?, ?, NULL, NULL, 1)");
         $norm = fn($v) => trim(str_replace(',', '', (string)$v));
         $changed = 0; $warns = [];
@@ -255,7 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
 
     elseif ($action === 'remove_transport_periods') {
         $ids = scopeEmployeeIds($db, $scopeAll, $schoolId, $categories, $schoolYear);
-        $del = $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND bonus_type = 'transport_daily' AND school_year = ?");
+        $del = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = 'transport_daily' AND school_year = ?");
         $delCol = $db->prepare("UPDATE employees SET transport_daily_amount = 0 WHERE id = ?");
         foreach ($ids as $id) { $del->execute([$id, $schoolYear]); $delCol->execute([$id]); }
         [$tot, $done] = recalcScope($db, $scopeAll, $schoolId, $categories, $schoolYear);

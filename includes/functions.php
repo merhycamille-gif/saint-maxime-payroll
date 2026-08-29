@@ -5249,3 +5249,55 @@ function healMariaMalak20260829() {
         try { setSetting('heal_maria_malak_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 👻 كلاديس الصباغ (البشارة، موظفة) — «وين محطّطلها أجر إضافي مش مبيّن بملفها» (2026-08-29):
+ * أونلاين أشهرها المخزّنة فيها إضافي 751,000,000 بلا أي سطر بملفها: سطرٌ أُدخل ثم حُذف محواً،
+ * و«تركيب العلاوات» للمنقولين لا يلمس الأشهر إن لم يجد أي سطر (حماية المنقول) فبقي الرقم عالقاً.
+ * الحل الجذري بالكود: الحذف صار إطفاءً (is_active=0) فيُصفَّر تلقائياً. وهذا الشفاء (بالاسم، مرّة):
+ * يزرع لها سطراً مطفأً لكل سنة فيها إضافي عالق بلا أسطر ثم يعيد الحساب → يصير الإضافي 0 والصافي يتصحّح.
+ * ويسجّل بالفلاغ أسماء أي «أشباح» مماثلة عند غيرها (بلا لمس) للمراجعة.
+ */
+function healGladisGhostPrime20260829() {
+    try {
+        if (strpos((string)getSetting('heal_gladis_ghost_20260829', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $log = [];
+        $ghostSql = "SELECT ms.employee_id, ms.school_year, MAX(ms.prime_fixe_lbp) p, MAX(ms.aide_complementaire_lbp) a
+            FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire'
+              AND COALESCE(e.base_salary_usd,0) = 0 AND COALESCE(e.contract_salary_lbp,0) = 0
+              AND ms.school_year >= '2025-2026' AND (ms.prime_fixe_lbp > 0 OR ms.aide_complementaire_lbp > 0)
+              AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = ms.employee_id
+                    AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND (b.school_year IS NULL OR b.school_year = ms.school_year))
+            GROUP BY ms.employee_id, ms.school_year";
+        $ghosts = $db->query($ghostSql)->fetchAll(PDO::FETCH_ASSOC);
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة البشارة%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        $gid = 0;
+        if ($sid) {
+            $st = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0 AND first_name_ar LIKE 'كلاديس%' AND last_name_ar LIKE '%الصباغ%' LIMIT 1");
+            $st->execute([(int)$sid]); $gid = (int)$st->fetchColumn();
+        }
+        $fixed = 0; $others = [];
+        foreach ($ghosts as $g) {
+            $eid = (int)$g['employee_id'];
+            if ($eid === $gid && $gid > 0) {
+                $before = $db->query("SELECT prime_fixe_lbp, net_salary_lbp FROM monthly_salaries WHERE employee_id=$eid AND school_year=" . $db->quote($g['school_year']) . " ORDER BY year, month LIMIT 1 OFFSET 1")->fetch(PDO::FETCH_ASSOC);
+                $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+                    VALUES (?, 'prime_fixe', 99, ?, 0, 'amount', 'LBP', NULL, NULL, 0)")->execute([$eid, $g['school_year']]);
+                $n = recalcEmployeeYear($eid, $g['school_year']);
+                $after = $db->query("SELECT prime_fixe_lbp, net_salary_lbp FROM monthly_salaries WHERE employee_id=$eid AND school_year=" . $db->quote($g['school_year']) . " ORDER BY year, month LIMIT 1 OFFSET 1")->fetch(PDO::FETCH_ASSOC);
+                $log[] = 'كلاديس ' . $g['school_year'] . ': prime ' . ($before['prime_fixe_lbp'] ?? '?') . '→' . ($after['prime_fixe_lbp'] ?? '?') . ' net ' . ($before['net_salary_lbp'] ?? '?') . '→' . ($after['net_salary_lbp'] ?? '?') . ' (' . $n . ')';
+                $fixed++;
+            } else {
+                $nm = $db->query("SELECT CONCAT(first_name_ar,' ',last_name_ar) FROM employees WHERE id=$eid")->fetchColumn();
+                $others[] = $nm . ' [' . $g['school_year'] . ': ' . (int)$g['p'] . '/' . (int)$g['a'] . ']';
+            }
+        }
+        if (!$fixed) $log[] = 'كلاديس: لا إضافي عالق';
+        setSetting('heal_gladis_ghost_20260829', 'done: ' . implode(' | ', $log) . ($others ? ' | أشباح أخرى (بلا لمس): ' . implode('؛ ', array_slice($others, 0, 15)) : ' | لا أشباح أخرى'));
+    } catch (Throwable $e) {
+        try { setSetting('heal_gladis_ghost_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
