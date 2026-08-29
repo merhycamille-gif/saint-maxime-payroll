@@ -4393,6 +4393,12 @@ foreach ($exp92 as $id92 => [$b92, $p92]) {
 check('شهادات الملاك من برنامجه القديم: الستّة يطابقون كشفه بالمليم (الأساس والإضافي بتشرين الثاني) + الشفاء موصول',
       $ok92 && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healDiplomaFromOldProgram20260829();') !== false, implode(' ', $why92));
 
+check('النياح ٣: شفاء اسبر منصور/ندى باصيل/زويا سمعان موصول + محلياً لا رواتب لهم بالنياح 2025-2026',
+      strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNiyahCw3_20260829();') !== false
+      && (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id JOIN schools s ON s.id=e.school_id
+            WHERE s.name_ar LIKE 'مدرسة سيدة النياح%' AND ms.school_year='2025-2026' AND e.is_deleted=0
+              AND ((e.first_name_ar='اسبر' AND e.last_name_ar LIKE '%منصور%') OR (e.first_name_ar='ندى' AND e.last_name_ar LIKE '%باصيل%') OR (e.first_name_ar='زويا' AND e.last_name_ar LIKE '%سمعان%'))")->fetchColumn() === 0);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

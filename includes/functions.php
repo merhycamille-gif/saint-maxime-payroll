@@ -5499,3 +5499,35 @@ function healDiplomaFromOldProgram20260829() {
         try { setSetting('heal_diploma_oldprog_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🧹 النياح — النسخة الثالثة (2026-08-29، «بسنة 2025-2026 في أساتذة مكرّرة»): اسبر شبل منصور (مكرّر — هو
+ * متعاقد بالانتقال 1740 وله ملف ثانٍ بالنياح بـ10 أشهر رواتب)، ندى الياس باصيل، زويا عبدالله سمعان —
+ * الثلاثة «زائدون غير خاضعين» بكشف النياح (قرار 2026-08-27) لكن الشفاء الأول تخطّاهم أونلاين لأن ملفاتهم
+ * بدت «خاضعة» بداتا منحرفة. هنا (بالاسم + الأب، مدرسة النياح): تُزال رواتبهم 2025-2026 (نسخة
+ * _ms_bk_niyah3_20260829) وتُطفأ بنودهم كي لا تعود.
+ */
+function healNiyahCw3_20260829() {
+    try {
+        if (strpos((string)getSetting('heal_niyah_cw3_20260829', ''), 'done') === 0) return;
+        $db = getDB();
+        $sid = $db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة سيدة النياح%' AND is_deleted=0 LIMIT 1")->fetchColumn();
+        if (!$sid) { setSetting('heal_niyah_cw3_20260829', 'done: skip no school'); return; }
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_niyah3_20260829 LIKE monthly_salaries");
+        $log = []; $removed = 0;
+        foreach ([['اسبر', 'شبل', 'منصور'], ['ندى', 'الياس', 'باصيل'], ['زويا', 'عبدالله', 'سمعان']] as [$fn, $fa, $ln]) {
+            $st = $db->prepare("SELECT id FROM employees WHERE school_id=? AND is_deleted=0 AND first_name_ar=? AND father_name_ar LIKE ? AND last_name_ar LIKE ?");
+            $st->execute([(int)$sid, $fn, $fa . '%', '%' . $ln . '%']);
+            foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $eid) {
+                $eid = (int)$eid;
+                $db->exec("INSERT IGNORE INTO _ms_bk_niyah3_20260829 SELECT * FROM monthly_salaries WHERE employee_id=$eid AND school_year='2025-2026'");
+                $n = (int)$db->exec("DELETE FROM monthly_salaries WHERE employee_id=$eid AND school_year='2025-2026'");
+                $db->exec("UPDATE employee_bonuses SET is_active=0 WHERE employee_id=$eid AND (school_year IS NULL OR school_year='2025-2026')");
+                $removed += $n; $log[] = "$fn $ln#$eid-$n";
+            }
+        }
+        setSetting('heal_niyah_cw3_20260829', 'done: removedRows=' . $removed . ' (' . implode('؛', $log) . ')');
+    } catch (Throwable $e) {
+        try { setSetting('heal_niyah_cw3_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
