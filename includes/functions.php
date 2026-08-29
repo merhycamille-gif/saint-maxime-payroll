@@ -4529,6 +4529,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         <?= csrfField() ?>
         <input type="hidden" name="grade_save" value="1">
         <input type="hidden" name="return_to" value="<?= e($returnTo) ?>">
+        <input type="hidden" name="return_url" value="<?= e($_SERVER['REQUEST_URI'] ?? '') ?>">
         <?php if (!empty($history)): ?>
         <table class="table" id="gradeRowsTable">
             <thead><tr>
@@ -4714,6 +4715,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         <?= csrfField() ?>
         <input type="hidden" name="manual_add" value="1">
         <input type="hidden" name="return_to" value="<?= e($returnTo) ?>">
+        <input type="hidden" name="return_url" value="<?= e($_SERVER['REQUEST_URI'] ?? '') ?>">
         <h4 style="margin:0 0 4px;color:var(--primary)"><i class="fas fa-plus-circle"></i> أضف درجة يدوية (بقرارك، خارج القانون)</h4>
         <p class="text-muted" style="font-size:12px;margin:0 0 10px">
             درجة تحطّها انت بمقدار وتاريخ من اختيارك (تشرين 1/10 أو كانون 1/1 أو أي تاريخ). بمجرّد الحفظ

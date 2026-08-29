@@ -4239,6 +4239,11 @@ check('البقاء بنفس المحل بعد الحفظ: ppStay موجود بa
       && strpos($js84, 'scrollRestoration') !== false
       && strpos($js84, 'window.scrollTo(0, st.y)') !== false);
 
+check('حفظ الدرجات من ملف الأستاذ يرجع لنفس الصفحة والتبويب (return_url بالنموذجين + gradeReturnToEmployee بكل معالجات grades.php)',
+      substr_count((string)file_get_contents($PROJ . '/includes/functions.php'), 'name="return_url"') >= 2
+      && strpos((string)file_get_contents($PROJ . '/pages/grades.php'), 'function gradeReturnToEmployee') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/grades.php'), "employees.php?action=edit&id=' . \$employeeId . '#gradesPanel'") === false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

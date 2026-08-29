@@ -39,6 +39,24 @@ if (isset($_GET['apply_law']) && $employeeId > 0) {
 }
 
 // إعادة بناء الدرجات حسب القانون (تلقائياً) — دخول الملاك → تدرّج عادي بتشرين → استثنائية بكانون بعد التثبيت
+/**
+ * 📌 العودة بعد حفظ درجة من ملف الأستاذ **لنفس الصفحة ونفس التبويب** (طلبه 2026-08-29: «بعد الحفظ
+ * بينطّ على صفحة غيرها»): نرجع للرابط الذي أتى منه الطلب (return_url، داخلي فقط) + #gradesPanel،
+ * وإلا لملف الأستاذ بتبويب الدرجات. (كانت بعض المعالجات ترجع بلا &tab=grades فيفتح التبويب الأول.)
+ */
+function gradeReturnToEmployee($employeeId) {
+    $ru = (string)($_POST['return_url'] ?? '');
+    $ru = preg_replace('/#.*$/', '', $ru);
+    $ok = $ru !== '' && strpos($ru, '/pages/employees.php') !== false && strpos($ru, '//') === false && strpos($ru, 'action=edit') !== false;
+    if ($ok) {
+        if (strpos($ru, 'tab=') === false) $ru .= '&tab=grades';
+        header('Location: ' . $ru . '#gradesPanel');
+    } else {
+        header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . (int)$employeeId . '&tab=grades#gradesPanel');
+    }
+    exit;
+}
+
 if (isset($_GET['rebuild_legal']) && $employeeId > 0) {
     requireWriteAction();
     try {
@@ -189,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save'])
     }
     // العودة لملف الأستاذ إن أتى الطلب منه، وإلا لصفحة الدرجات
     if (($_POST['return_to'] ?? '') === 'employee') {
-        header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $employeeId . '#gradesPanel');
+        gradeReturnToEmployee($employeeId);
     } else {
         header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
     }
@@ -221,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['row_delete']) && $emp
         else { $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()]; }
     }
     if (($_POST['return_to'] ?? '') === 'employee') {
-        header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $employeeId . '&tab=grades#gradesPanel');
+        gradeReturnToEmployee($employeeId);
     } else {
         header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
     }
@@ -254,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['manual_add']) && $emp
         else { $_SESSION['flash'] = ['type' => 'danger', 'msg' => $e->getMessage()]; }
     }
     if (($_POST['return_to'] ?? '') === 'employee') {
-        header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $employeeId . '#gradesPanel');
+        gradeReturnToEmployee($employeeId);
     } else {
         header('Location: ' . BASE_URL . 'pages/grades.php?employee_id=' . $employeeId);
     }
