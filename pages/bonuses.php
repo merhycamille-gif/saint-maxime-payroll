@@ -39,11 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
            ->execute([
                $employeeId,
                $_POST['bonus_type'],
-               (int)$_POST['period_number'],
+               // (2026-08-29) رقم الفترة تسلسلي تلقائي (كان خانة بلا فائدة عملية — الأشهر تحدّدها من/إلى)
+               (int)$db->query("SELECT COALESCE(MAX(period_number),0)+1 FROM employee_bonuses WHERE employee_id=" . (int)$employeeId . " AND bonus_type=" . $db->quote($_POST['bonus_type']))->fetchColumn(),
                writeSchoolYear(), // «كل السنين» → السنة الحالية (لا تُخزَّن 'all' فلا يراها المحرّك)
                (float)str_replace(',', '', $_POST['amount']),
                $vtype,
-               ($vtype === 'percent') ? 'LBP' : sanitizeAmountCurrency((float)str_replace(',', '', $_POST['amount']), ($_POST['currency'] ?? 'USD')),
+               ($vtype === 'percent') ? 'LBP' : sanitizeAmountCurrency((float)str_replace(',', '', $_POST['amount']), ($_POST['currency'] ?? 'LBP')),
                $_POST['start_month'] ?: null,
                $_POST['end_month'] ?: null
            ]);
@@ -109,14 +110,6 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Période / الفترة</label>
-                    <select name="period_number" class="form-select" required>
-                        <option value="1">Période 1 / الفترة 1</option>
-                        <option value="2">Période 2 / الفترة 2</option>
-                        <option value="3">Période 3 / الفترة 3</option>
-                    </select>
-                </div>
-                <div class="form-group">
                     <label class="form-label">Type de valeur / النوع</label>
                     <select name="value_type" id="b_value_type" class="form-select" onchange="bonusValTypeChange()">
                         <option value="amount">مبلغ ثابت / Montant</option>
@@ -132,8 +125,8 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-group">
                     <label class="form-label">Devise / العملة</label>
                     <select name="currency" class="form-select">
-                        <option value="USD">USD ($)</option>
-                        <option value="LBP">LBP (ل.ل)</option>
+                        <option value="LBP" selected>ل.ل (LBP)</option>
+                        <option value="USD">$ (USD)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -172,7 +165,7 @@ include __DIR__ . '/../includes/header.php';
             </h4></div>
         <?php else: ?>
             <table class="table">
-                <thead><tr><th>Type / النوع</th><th>Période / الفترة</th><th>Montant / المبلغ</th><th>Devise / العملة</th><th>Du / من</th><th>Au / إلى</th><th>Action / إجراء</th></tr></thead>
+                <thead><tr><th>Type / النوع</th><th>Montant / المبلغ</th><th>Devise / العملة</th><th>Du / من</th><th>Au / إلى</th><th>Action / إجراء</th></tr></thead>
                 <tbody>
                     <?php 
                     // (2026-08-29) نفس التسميات الموحّدة بكل البرنامج: prime_fixe = الأجر الإضافي، aide = مكافأة ومساعدة
@@ -180,7 +173,6 @@ include __DIR__ . '/../includes/header.php';
                     foreach ($bonuses as $b): ?>
                         <tr>
                             <td><?= $typeLabels[$b['bonus_type']] ?? $b['bonus_type'] ?></td>
-                            <td>P<?= $b['period_number'] ?></td>
                             <td><strong><?= number_format($b['amount'], 2) ?><?= ($b['value_type'] ?? 'amount')==='percent' ? ' %' : '' ?></strong></td>
                             <td><?= ($b['value_type'] ?? 'amount')==='percent' ? '% من الأساس' : $b['currency'] ?></td>
                             <td><?= $b['start_month'] ? monthName($b['start_month'], 'fr', true) : 'Tous' ?></td>
