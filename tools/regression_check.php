@@ -4228,6 +4228,17 @@ check('نِسَب متعدّدة لنفس الشهر تُجمَع ثم تُدو�
       strpos($src83, '$pctSum += $amount;') !== false && strpos($src83, 'bonusPercentLbp($pctSum') !== false && $live83,
       'live=' . var_export($live83, true));
 
+/* =====================================================================
+ * 84) 📌 «بعد الحفظ بضلّ بنفس المحل» (2026-08-29): app.js يخزّن موضع التمرير عند أي إرسال فورم
+ *     أو رابط إجراء على نفس الصفحة ويرجّعه بعد إعادة التحميل (عام لكل البرنامج).
+ * =================================================================== */
+$js84 = (string)file_get_contents($PROJ . '/assets/js/app.js');
+check('البقاء بنفس المحل بعد الحفظ: ppStay موجود بapp.js (submit + روابط نفس الصفحة + استرجاع بعد التحميل)',
+      strpos($js84, "'ppStay:' + location.pathname") !== false
+      && strpos($js84, "document.addEventListener('submit'") !== false
+      && strpos($js84, 'scrollRestoration') !== false
+      && strpos($js84, 'window.scrollTo(0, st.y)') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

@@ -367,3 +367,46 @@ function showAlert(msg, type = 'info') {
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 4000);
 }
+
+// 📌 «بعد الحفظ بضلّ بنفس المحل» (طلب المستخدم 2026-08-29): أي حفظ/إجراء يرجّع للصفحة نفسها بنفس
+// موضع التمرير — لا ينطّ لفوق ولا يضيّع السطر اللي كان يعدّله. عام لكل البرنامج: عند إرسال أي فورم
+// (أو كبس رابط إجراء على نفس الصفحة) نخزّن موضع التمرير، وبعد إعادة التحميل نرجّعه (خلال دقيقة).
+(function () {
+    var KEY = 'ppStay:' + location.pathname;
+    function remember() {
+        try { sessionStorage.setItem(KEY, JSON.stringify({ y: window.pageYOffset || document.documentElement.scrollTop || 0, t: Date.now() })); } catch (e) {}
+    }
+    document.addEventListener('submit', function (ev) {
+        var f = ev.target;
+        if (!f || f.tagName !== 'FORM') return;
+        if ((f.getAttribute('target') || '') === '_blank') return;
+        remember();
+    }, true);
+    document.addEventListener('click', function (ev) {
+        var a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+        if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+        var href = a.getAttribute('href') || '';
+        if (href.charAt(0) === '#' || /^(javascript:|mailto:|tel:)/i.test(href)) return;
+        try {
+            var u = new URL(a.href, location.href);
+            // رابط إجراء على نفس الصفحة (promote/rebuild/حذف...) = يرجع لنفس الصفحة → خزّن الموضع
+            if (u.pathname === location.pathname && u.search && u.search !== location.search) remember();
+        } catch (e) {}
+    }, true);
+    function restore() {
+        var raw = null;
+        try { raw = sessionStorage.getItem(KEY); sessionStorage.removeItem(KEY); } catch (e) {}
+        if (!raw) return;
+        var st = null;
+        try { st = JSON.parse(raw); } catch (e) { return; }
+        if (!st || typeof st.y !== 'number' || (Date.now() - (st.t || 0)) > 60000) return;
+        if (st.y < 1) return;
+        var go = function () { window.scrollTo(0, st.y); };
+        go();
+        requestAnimationFrame(go);
+        setTimeout(go, 60);
+        window.addEventListener('load', function () { setTimeout(go, 0); }, { once: true });
+    }
+    if ('scrollRestoration' in history) { try { history.scrollRestoration = 'manual'; } catch (e) {} }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', restore); else restore();
+})();
