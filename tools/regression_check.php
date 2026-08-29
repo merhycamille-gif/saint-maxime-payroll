@@ -4295,6 +4295,11 @@ check('المكافآت: زرّ ومودال «مبالغ فردية» + معا�
       && strpos($ba87, 'recalcEmployeeYear($eid, $schoolYear)') !== false
       && strpos($ba87, 'window.baIndivFilter=function') !== false);
 
+check('تسميات أنواع العلاوات موحّدة بكل البرنامج (prime_fixe = الأجر الإضافي، aide = مكافأة ومساعدة) — صفحة bonuses.php أيضاً (p1 2026-08-29)',
+      strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), 'مكافأة ثابتة') === false
+      && strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), '➕ Supplément / الأجر الإضافي') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), 'مكافأة ومساعدة') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

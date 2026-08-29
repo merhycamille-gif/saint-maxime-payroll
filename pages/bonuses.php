@@ -103,9 +103,9 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-group">
                     <label class="form-label">Type / النوع</label>
                     <select name="bonus_type" class="form-select" required>
-                        <option value="prime_fixe">💰 Prime fixe / مكافأة ثابتة</option>
-                        <option value="aide_complementaire">🤝 Aide complémentaire / مساعدة</option>
-                        <option value="transport_complement">🚌 Transport / تعويض نقل</option>
+                        <option value="prime_fixe">➕ Supplément / الأجر الإضافي</option>
+                        <option value="aide_complementaire">💰 Prime &amp; aide / مكافأة ومساعدة</option>
+                        <option value="transport_complement">🚌 Transport / تعويض نقل (شهري)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -175,7 +175,8 @@ include __DIR__ . '/../includes/header.php';
                 <thead><tr><th>Type / النوع</th><th>Période / الفترة</th><th>Montant / المبلغ</th><th>Devise / العملة</th><th>Du / من</th><th>Au / إلى</th><th>Action / إجراء</th></tr></thead>
                 <tbody>
                     <?php 
-                    $typeLabels = ['prime_fixe'=>'💰 Prime fixe','aide_complementaire'=>'🤝 Aide','transport_complement'=>'🚌 Transport'];
+                    // (2026-08-29) نفس التسميات الموحّدة بكل البرنامج: prime_fixe = الأجر الإضافي، aide = مكافأة ومساعدة
+                    $typeLabels = ['prime_fixe'=>'➕ Supplément / الأجر الإضافي','aide_complementaire'=>'💰 Prime & aide / مكافأة ومساعدة','transport_complement'=>'🚌 Transport / تعويض نقل','transport_daily'=>'🚌 نقل يومي'];
                     foreach ($bonuses as $b): ?>
                         <tr>
                             <td><?= $typeLabels[$b['bonus_type']] ?? $b['bonus_type'] ?></td>
