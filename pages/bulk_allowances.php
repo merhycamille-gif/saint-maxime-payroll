@@ -286,6 +286,18 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
 .ba-live { background:#f0fdf4; border:1px dashed #86efac; border-radius:10px; padding:10px 14px; font-size:13px; margin-top:10px; }
 .ba-live strong { color:#166534; }
 .ba-editor td { vertical-align:middle; }
+.ba-editor select[name$="[type]"] { min-width:170px; }
+.ba-editor select[name$="[vtype]"] { min-width:110px; }
+.ba-editor select[name$="[from]"], .ba-editor select[name$="[to]"] { min-width:100px; }
+.ba-step { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px dashed #e2e8f0; }
+.ba-step:last-child { border-bottom:none; }
+.ba-step > div { flex:1; min-width:0; }
+.ba-num { flex:0 0 30px; width:30px; height:30px; border-radius:50%; background:#1F4E5F; color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.ba-hint { color:#64748b; font-size:12.5px; line-height:1.8; }
+.ba-warn { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; font-size:12.5px; line-height:1.8; margin-top:8px; color:#78350f; }
+.ba-help { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin:0 0 12px; font-size:13px; line-height:2; }
+.ba-help summary { cursor:pointer; font-weight:800; color:#1F4E5F; }
+.ba-help ol { margin:6px 18px 0 0; padding:0; }
 </style>
 
 <div class="card">
@@ -323,6 +335,16 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
             <div class="ba-kpi"><span class="ic" style="background:#cffafe;color:#155e75"><i class="fas fa-money-bill-trend-up"></i></span>
                 <span><div class="v"><?= number_format($exchangeRate) ?></div><div class="l">السعر الجديد — سعر الشهر (تحويل لليرة) — <a href="<?= BASE_URL ?>pages/exchange_rates.php">تعديل</a></div></span></div>
         </div>
+
+        <details class="ba-help no-print">
+            <summary><i class="fas fa-circle-question"></i> كيف بشتغل بهالصفحة؟ (اكبس للشرح)</summary>
+            <ol>
+                <li><b>«+ بند جديد»</b> ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
+                <li><b>النسبة ٪</b> بتنحسب من أساس الراتب بعد التدرّج (÷<?= e(officialUsdRateLbl()) ?> ← × سعر الشهر) وبتتحرّك مع الدرجة — منطقية للملاك. <b>المبلغ الثابت</b> بالليرة أو بالدولار — للمتعاقدين والموظفين أو لأي زيادة ثابتة.</li>
+                <li><b>نسبة + مبلغ ثابت مع بعض</b> (مثلاً 45٪ + 2,000,000 ثابت): حطّهم <b>سطرين بنفس النافذة</b> وكبس طبّق مرّة وحدة. (لو طبّقتهم بمرّتين منفصلتين، التانية بتشيل الأولى لأنها من نفس النوع.)</li>
+                <li>الجدول تحت = <b>البنود السارية</b>: <i class="fas fa-pen" style="color:#1d4ed8"></i> تعديل سطر لحاله · <i class="fas fa-trash" style="color:#b91c1c"></i> حذفه. <b>«نقل يومي»</b> للمتعاقدين حسب أيام الحضور. <b>استثناء لشخص واحد</b>: من ملفه ← تبويب «المالي».</li>
+            </ol>
+        </details>
 
         <div class="ba-toolbar">
             <div style="font-weight:800;color:#1F4E5F;font-size:14.5px"><i class="fas fa-table-list"></i> البنود السارية — <?= e(scopeLabel($scopeAll,$schoolId)) ?> — <?= e($schoolYear) ?></div>
@@ -394,24 +416,38 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         <input type="hidden" name="action" value="apply_periods">
         <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
         <div class="ba-modal-body">
-            <div class="ba-cats"><strong>على مين؟</strong>
+            <div class="ba-step"><span class="ba-num">١</span><div>
+                <strong>على مين؟</strong> <span class="ba-hint">اختر الفئة — البند بينطبق على كل موظفي هالفئة بالمدرسة. (لأستاذ واحد بس: من ملفه ← تبويب «المالي».)</span>
+                <div class="ba-cats" style="margin:6px 0 0">
                 <?php foreach (['titulaire'=>'الملاك','contractuel'=>'المتعاقدين','employe'=>'الموظفين'] as $k=>$l): ?>
-                <label><input type="checkbox" name="cat[]" value="<?= $k ?>" <?= $k==='titulaire'?'checked':'' ?>> <?= $l ?></label>
+                <label><input type="checkbox" name="cat[]" value="<?= $k ?>" <?= $k==='titulaire'?'checked':'' ?> onchange="baPrefill()"> <?= $l ?></label>
                 <?php endforeach; ?>
-            </div>
-            <div style="overflow:auto">
-            <table class="table ba-editor" style="font-size:13px;min-width:640px">
-                <thead><tr><th>النوع</th><th>مبلغ أو نسبة؟</th><th>القيمة</th><th>العملة</th><th>من شهر</th><th>إلى شهر</th><th></th></tr></thead>
-                <tbody id="linesBody"></tbody>
-            </table>
-            </div>
-            <button type="button" class="btn btn-sm btn-light" onclick="addLine()"><i class="fas fa-plus"></i> أضِف فترة تانية</button>
-            <div class="ba-live" id="baLive">
-                🧮 <strong>معاينة حيّة (نسبة ٪):</strong> جرّب على أساس راتب
-                <input type="number" id="baSampleBase" value="1755000" style="width:110px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:6px"> ل.ل ←
-                <span id="baLiveOut" style="font-weight:800;color:#166534">—</span>
-                <div style="font-size:11.5px;color:#64748b;margin-top:4px">القاعدة: الأساس ÷ <?= e(officialUsdRateLbl()) ?> × النسبة ← داون بالدولار ← × <?= number_format($exchangeRate) ?> ← داون للمليون. النسبة بتتحرّك مع الدرجة لحالها.</div>
-            </div>
+                </div>
+            </div></div>
+
+            <div class="ba-step"><span class="ba-num">٢</span><div style="min-width:0">
+                <strong>شو بدّك تعطي؟</strong> <span class="ba-hint">كل سطر = بند: النوع + نسبة ٪ <u>أو</u> مبلغ ثابت + الفترة. بدّك نسبة <u>و</u>مبلغ ثابت مع بعض؟ حطّهم سطرين هون (بنفس الكبسة).</span>
+                <div style="overflow:auto;margin-top:6px">
+                <table class="table ba-editor" style="font-size:13px;min-width:760px">
+                    <thead><tr><th>النوع</th><th>نسبة أو مبلغ؟</th><th>القيمة</th><th>العملة</th><th>من شهر</th><th>إلى شهر</th><th></th></tr></thead>
+                    <tbody id="linesBody"></tbody>
+                </table>
+                </div>
+                <button type="button" class="btn btn-sm btn-light" onclick="addLine()"><i class="fas fa-plus"></i> أضِف سطراً (بند تاني أو فترة تانية)</button>
+                <div class="ba-hint" style="margin-top:6px">• <b>نسبة ٪</b> = من أساس الراتب <u>بعد التدرّج</u> (للملاك)، وبتتحرّك مع الدرجة لحالها. &nbsp;• <b>مبلغ ثابت</b> = رقم بالليرة أو بالدولار كل شهر. &nbsp;• <b>الفترة</b>: افتراضياً كل السنة (تشرين ← أيلول)؛ قيمة بتتغيّر بنص السنة = سطرين بفترتين.</div>
+            </div></div>
+
+            <div class="ba-step"><span class="ba-num">٣</span><div>
+                <strong>تأكّد وطبّق.</strong>
+                <div class="ba-live" id="baLive" style="margin-top:6px">
+                    🧮 <strong>معاينة حيّة:</strong> جرّب على أساس راتب
+                    <input type="number" id="baSampleBase" value="1755000" style="width:110px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:6px"> ل.ل ←
+                    <span id="baLiveOut" style="font-weight:800;color:#166534">—</span>
+                    <div style="font-size:11.5px;color:#64748b;margin-top:4px">قاعدة النسبة: الأساس ÷ <?= e(officialUsdRateLbl()) ?> × النسبة ← داون بالدولار ← × <?= number_format($exchangeRate) ?> ← داون للمليون (النسب المتعدّدة تُجمَع ثم تُدوَّر مرّة وحدة).</div>
+                </div>
+                <div class="ba-warn" id="baIndivNote" style="display:none;background:#fef2f2;border-color:#fecaca;color:#7f1d1d"></div>
+                <div class="ba-warn" id="baReplaceNote">⚠️ عند «طبّق»: الأسطر يلي هون <b>تحلّ محلّ</b> بنود <b>نفس النوع</b> الحالية لهالفئة (مثلاً أجر إضافي جديد بيشيل الأجر الإضافي القديم عند كل الملاك). الأنواع التانية ما بتتأثّر. لهيك النافذة بتفتح <b>معبّاية بالبنود الحالية</b> للفئة — عدّل عليها أو زيد.</div>
+            </div></div>
         </div>
         <div class="ba-modal-foot">
             <button type="button" class="btn btn-light" onclick="baClose('baModalAdd')">إلغاء / Annuler</button>
@@ -525,7 +561,44 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     var ORDER=[10,11,12,1,2,3,4,5,6,7,8,9]; var li=0; var ti=0;
     var OFFICIAL=<?= json_encode(officialUsdRate()) ?>, RATE=<?= json_encode($exchangeRate) ?>;
     function mOpts(sel){var o='';ORDER.forEach(function(m){o+='<option value="'+m+'"'+(m==sel?' selected':'')+'>'+MONTHS[m]+'</option>';});return o;}
-    window.baOpen=function(id){document.getElementById(id).classList.add('open');};
+    // البنود السارية (للتعبئة المسبقة بنافذة «بند جديد» حسب الفئة المختارة)
+    var BA_LINES=<?= json_encode(array_values(array_map(function ($al) {
+        return ['type'=>$al['bonus_type'],'vt'=>$al['value_type'],'amount'=>(float)$al['amount'],'cur'=>$al['currency'],
+                'from'=>$al['start_month']===null?null:(int)$al['start_month'],'to'=>$al['end_month']===null?null:(int)$al['end_month'],'ety'=>$al['employee_type'],'n'=>(int)$al['n']];
+    }, $appliedLines ?? [])), JSON_UNESCAPED_UNICODE) ?>;
+    // عدد موظفي كل فئة بالنطاق (لتمييز البند العام عن البنود الفردية)
+    var BA_CAT_N=<?= json_encode((function () use ($preview) { $c = []; foreach ($preview as $pr) { $c[$pr['employee_type']] = ($c[$pr['employee_type']] ?? 0) + 1; } return $c; })(), JSON_UNESCAPED_UNICODE) ?>;
+    var ETY={titulaire:'enseignant_titulaire',contractuel:'enseignant_contractuel',employe:'employe'};
+    window.baPrefill=function(){
+        var body=document.getElementById('linesBody'); if(!body) return;
+        var cats=[].slice.call(document.querySelectorAll('#baModalAdd input[name="cat[]"]:checked')).map(function(c){return ETY[c.value];});
+        body.innerHTML=''; li=0;
+        var all=BA_LINES.filter(function(r){return r.type!=='transport_daily' && cats.indexOf(r.ety)>=0;});
+        // البند «العام» = مطبّق على كل موظفي فئته → يُعبّأ؛ البند الفردي (على أشخاص معيّنين) لا يُعبّأ بل يُنبَّه عليه
+        // البند العام لكل (فئة+نوع) = الأكثر انتشاراً (على نصف الفئة أو أكثر)؛ ما عداه فردي (استثناءات أشخاص)
+        var best={};
+        all.forEach(function(r){var k=r.ety+'|'+r.type; if(!best[k]||r.n>best[k].n) best[k]=r;});
+        var general=[], indiv=[];
+        all.forEach(function(r){var k=r.ety+'|'+r.type; var cn=BA_CAT_N[r.ety]||0;
+            if(best[k]===r && cn>0 && r.n*2>=cn) general.push(r); else indiv.push(r);});
+        var seen={}; var added=0;
+        general.forEach(function(r){var k=[r.type,r.vt,r.amount,r.cur,r.from,r.to].join('|'); if(seen[k]) return; seen[k]=1;
+            addLine(r.type,r.amount,r.vt,r.cur,r.from===null?10:r.from,r.to===null?9:r.to); added++;});
+        if(!added) addLine();
+        var note=document.getElementById('baReplaceNote'); if(note) note.style.display=(added||indiv.length)?'':'none';
+        var iv=document.getElementById('baIndivNote');
+        if(iv){
+            if(indiv.length){
+                var names={prime_fixe:'أجر إضافي',aide_complementaire:'مكافأة',transport_complement:'نقل شهري'};
+                var who={}; indiv.forEach(function(r){who[r.ety]=(who[r.ety]||0)+r.n;});
+                var lst=indiv.slice(0,6).map(function(r){return names[r.type]+' '+(r.vt==='percent'?r.amount+'٪':r.amount.toLocaleString('en-US'))+' ('+r.n+')';}).join(' · ');
+                iv.innerHTML='🧍 <b>بنود فردية موجودة بهالفئة</b> (لأشخاص معيّنين، ما انعبّت هون): '+lst+(indiv.length>6?' …':'')+'<br>«طبّق» على الفئة <b>بيشيلها</b> عن أصحابها وبيوحّدهم مع الكل — إذا بدّك تخلّيها، عدّل البند العام من زرّ ✏️ بجدول البنود بدل هون، أو رجّع بند الشخص من ملفه بعدين.';
+                iv.style.display='';
+            } else iv.style.display='none';
+        }
+        baLiveCalc();
+    };
+    window.baOpen=function(id){document.getElementById(id).classList.add('open'); if(id==='baModalAdd') baPrefill();};
     window.baClose=function(id){document.getElementById(id).classList.remove('open');};
     document.querySelectorAll('.ba-overlay').forEach(function(ov){ov.addEventListener('click',function(e){if(e.target===ov)ov.classList.remove('open');});});
     window.baVt=function(sel){
@@ -536,16 +609,24 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     window.baLiveCalc=function(){
         var out=document.getElementById('baLiveOut'); if(!out) return;
         var base=parseFloat((document.getElementById('baSampleBase')||{}).value)||0;
-        var row=document.querySelector('#linesBody tr'); if(!row||!base){out.textContent='—';return;}
-        var vt=row.querySelector('.baVtSel').value, val=parseFloat(row.querySelector('input[type=number]').value)||0;
-        if(!val){out.textContent='—';return;}
-        if(vt==='percent'){
-            var usd=Math.floor((base/OFFICIAL)*(val/100));
-            var lbp=Math.floor(Math.floor(usd*RATE)/1000000)*1000000;
-            out.textContent=val+'٪ = '+usd.toLocaleString('en-US')+'$ = '+lbp.toLocaleString('en-US')+' ل.ل';
-        } else {
-            out.textContent='مبلغ ثابت: '+val.toLocaleString('en-US');
-        }
+        var rows=[].slice.call(document.querySelectorAll('#linesBody tr')); if(!rows.length||!base){out.textContent='—';return;}
+        // متل المحرّك: النسب (لنفس النوع) تُجمَع ثم تُدوَّر مرّة وحدة؛ المبالغ الثابتة تُضاف كما هي
+        var parts=[]; var byType={};
+        rows.forEach(function(row){
+            var type=row.querySelector('select[name$="[type]"]').value, vt=row.querySelector('.baVtSel').value;
+            var val=parseFloat(row.querySelector('input[type=number]').value)||0; if(!val) return;
+            var cur=row.querySelector('.baCur').value;
+            byType[type]=byType[type]||{pct:0,fixed:0};
+            if(vt==='percent') byType[type].pct+=val; else byType[type].fixed+=(cur==='USD'?Math.floor(val*RATE):val);
+        });
+        var names={prime_fixe:'الأجر الإضافي',aide_complementaire:'مكافأة ومساعدة',transport_complement:'نقل شهري'};
+        Object.keys(byType).forEach(function(t){
+            var b=byType[t], txt=[];
+            if(b.pct>0){var usd=Math.floor(Math.floor(base/OFFICIAL)*(b.pct/100)); var lbp=Math.floor(Math.floor(usd*RATE)/1000000)*1000000; txt.push(b.pct+'٪ = '+usd.toLocaleString('en-US')+'$ = '+lbp.toLocaleString('en-US')+' ل.ل');}
+            if(b.fixed>0) txt.push('ثابت '+b.fixed.toLocaleString('en-US')+' ل.ل');
+            if(txt.length) parts.push(names[t]+': '+txt.join(' + '));
+        });
+        out.textContent=parts.length?parts.join(' · '):'—';
     };
     document.addEventListener('input',function(e){ if(e.target.closest('#baModalAdd')||e.target.id==='baSampleBase') baLiveCalc(); });
     window.addLine=function(type,val,vt,cur,from,to){

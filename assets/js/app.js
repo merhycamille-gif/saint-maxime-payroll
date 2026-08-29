@@ -96,6 +96,9 @@ document.addEventListener('change', function(e) {
         for (var k = 0; k < tables.length; k++) {
             var t = tables[k];
             if (!t.tHead || t.tHead.rows.length === 0) continue;
+            // الجداول داخل النوافذ المنبثقة (مودال) لا تُثبَّت رؤوسها: الرأس اللاصق كان يغطي خانات
+            // الإدخال بنافذة «بند جديد» فتبدو النافذة فاضية (قصة صفحة المكافآت 2026-08-29)
+            if (t.closest('.ba-overlay, .modal, [role="dialog"]')) continue;
             // فتح كل حاويات الجداول المقصوصة/المتمرّرة على السلسلة: الصفحة نفسها هي
             // الأسانسور الوحيد عمودياً — لا صناديق تمرير داخلية بعد اليوم
             var p = t.parentElement;
