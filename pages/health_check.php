@@ -484,6 +484,7 @@ include __DIR__ . '/../includes/header.php';
       'heal_gladis_ghost_20260829'      => '👻 كلاديس الصباغ: إضافي عالق بلا سطر → 0 + أشباح مماثلة (2026-08-29)',
       'heal_restore_zeroed_20260829'    => '🚑 استرجاع الرواتب المصفَّرة (20-08) من اللقطة المدقَّقة + إضافي البشارة (2026-08-29)',
       'heal_postleave_orphans_20260829' => '🧹 رواتب بعد الترك ضمن السنة + صفوف يتيمة للمحذوفين (2026-08-29)',
+      'heal_diploma_oldprog_20260829'   => '🎓 شهادات فاضية من برنامجه القديم (15: 6 يطابقون كشفه + 9 بلا رواتب) (2026-08-29)',
   ];
   ?>
   <?php
@@ -491,12 +492,13 @@ include __DIR__ . '/../includes/header.php';
   require_once __DIR__ . '/../includes/data_audit.php';
   $auditSy = activeSchoolYear(); if ($auditSy === 'all') $auditSy = currentSchoolYear();
   $auditRows = dataAuditRules(getDB(), $auditSy);
-  $auditInfo = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes'];   // للمراجعة (ليست أخطاء حساب)
-  $auditErrors = 0; foreach ($auditRows as $ar) if ($ar['n'] > 0 && !in_array($ar['key'], $auditInfo, true)) $auditErrors += $ar['n'];
+  $auditInfo = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'row_rate0'];   // للمراجعة (قرارات/إدخال — ليست أخطاء حساب)
+  $auditErrors = 0; $auditReview = 0;
+  foreach ($auditRows as $ar) { if ($ar['n'] <= 0) continue; if (in_array($ar['key'], $auditInfo, true)) $auditReview += $ar['n']; else $auditErrors += $ar['n']; }
   ?>
   <div class="card" id="officialAudit">
     <div class="card-header"><h3><i class="fas fa-clipboard-check"></i> الفحص الرسمي النهائي للبيانات — <?= e($auditSy) ?>
-      <span class="badge badge-<?= $auditErrors ? 'danger' : 'success' ?>" style="margin-right:8px"><?= $auditErrors ? ($auditErrors . ' خطأ') : 'سليم 100٪' ?></span></h3></div>
+      <span class="badge badge-<?= $auditErrors ? 'danger' : ($auditReview ? 'warning' : 'success') ?>" style="margin-right:8px"><?= $auditErrors ? ($auditErrors . ' خطأ حساب') : ($auditReview ? ('الحساب سليم — ' . $auditReview . ' للمراجعة') : 'سليم 100٪') ?></span></h3></div>
     <div class="card-body" style="overflow-x:auto">
       <p class="text-muted" style="margin:0 0 8px">20 قاعدة تُفحص على بيانات هذه النسخة مباشرةً (السنة المعروضة). الأحمر = خطأ بالحساب أو بالبيانات يلزم تصحيحه · الأصفر = للمراجعة (ليس خطأ حساب) · الأخضر = سليم.</p>
       <table class="table" style="direction:rtl">

@@ -5444,3 +5444,58 @@ function healPostDepartureOrphans20260829() {
         try { setSetting('heal_postleave_orphans_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🎓 شهادات الملاك الفاضية من برنامجه القديم (2026-08-29 — الفحص الرسمي: 22 أستاذاً بلا شهادة فدرجتهم
+ * تُحسب من 1). برنامجه القديم (EcoleNew.EmployeeDiplome) يسجّل شهادتهم: «امتياز فني» = جارديني ت.س (11)،
+ * «قسم ثاني» = قسم ثاني (1)، «تربية حضانية» = جارديني ب.ت (6). طُبِّق هنا **فقط** على من يعطي القانون
+ * بشهادته درجةً مطابقة لكشفه القديم بالمليم (6 أساتذة) — ونسبة مدرستهم تعيد إضافيهم بالضبط كما بكشفه —
+ * وعلى من لا رواتب له هذه السنة (9، ضبط الملف فقط). الباقون (7) يبقون لقراره (القانون ≠ كشفه).
+ * التحقّق بالاسم + الشهرة. نسخة الحالة السابقة بالإعداد bk_diploma_20260829.
+ */
+function healDiplomaFromOldProgram20260829() {
+    try {
+        if (strpos((string)getSetting('heal_diploma_oldprog_20260829', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        // [id, الاسم, الشهرة, الشهادة, نسبة الإضافي (٪) أو null = لا تغيير بالإضافي]
+        $plan = [
+            [155,  'نادين',   'فيّاض',   'jardinier_ts', 65],   // عبرا: القانون 39.5→39 = كشفه 3,445,000 · 65٪ = 133م = كشفه
+            [400,  'ميرنا',   'ايوب',    'jardinier_ts', 65],   // عبرا: 37.5→37 = 3,215,000 · 65٪ = 124م
+            [585,  'ايليز',   'الخوري',  'jardinier_ts', 65],   // عبرا: 31 = 2,625,000 · 65٪ = 101م
+            [697,  'هبه',     'الشامية', 'jardinier_ts', 65],   // عبرا: 30 = 2,545,000 · 65٪ = 98م
+            [942,  'غريس',    'بركات',   'jardinier_ts', 65],   // عبرا: 29 = 2,465,000 · 65٪ = 95م
+            [1056, 'مي',      'خاطر',    'jardinier_ts', 60],   // الانتقال: 26.5→26 = 2,225,000 · 60٪ = 79م
+            // بلا رواتب هذه السنة — ضبط الشهادة فقط (من برنامجه القديم)
+            [249,  'غادة',    'باصيلا',  'jardinier_ts', null], [356, 'مايا', 'مهنّا', 'jardinier_ts', null], [532, 'جوزيانا', 'حرفوش', 'jardinier_ts', null],
+            [705,  'ليال',    'السيقلي', 'jardinier_ts', null], [803, 'نسرين', 'حرفوش', 'jardinier_ts', null], [1024, 'حنان', 'القلعاني', 'jardinier_ts', null],
+            [1048, 'سندريلا', 'سعيد',    'jardinier_ts', null], [1406, 'نور', 'بو نادر', 'jardinier_ts', null], [1415, 'منال', 'براك', 'jardinier_ts', null],
+        ];
+        $sg = []; foreach ($db->query("SELECT diploma_code, starting_grade FROM diploma_starting_grades") as $r) $sg[$r['diploma_code']] = (float)$r['starting_grade'];
+        $bk = []; $log = []; $done = 0;
+        foreach ($plan as [$id, $fn, $ln, $dip, $pct]) {
+            $e = $db->query("SELECT id, first_name_ar, last_name_ar, diploma, starting_grade, current_grade, employee_type, is_deleted FROM employees WHERE id=" . (int)$id)->fetch(PDO::FETCH_ASSOC);
+            if (!$e || (int)$e['is_deleted'] === 1 || $e['employee_type'] !== 'enseignant_titulaire') { $log[] = "$fn $ln: skip"; continue; }
+            if (trim($e['first_name_ar']) !== $fn || mb_strpos($e['last_name_ar'], $ln) === false) { $log[] = "$fn $ln: اسم مختلف"; continue; }
+            if (!empty($e['diploma'])) { $log[] = "$fn $ln: عنده شهادة (" . $e['diploma'] . ") — لم يُلمس"; continue; }
+            $bk[$id] = ['diploma' => $e['diploma'], 'starting_grade' => $e['starting_grade'], 'current_grade' => $e['current_grade'],
+                        'bonuses' => $db->query("SELECT * FROM employee_bonuses WHERE employee_id=$id AND is_active=1")->fetchAll(PDO::FETCH_ASSOC)];
+            $db->prepare("UPDATE employees SET diploma=?, starting_grade=? WHERE id=?")->execute([$dip, $sg[$dip] ?? 1, $id]);
+            $r = buildLegalGradeHistory($id);
+            $hasRows = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=$id AND school_year='2025-2026'")->fetchColumn();
+            if ($pct !== null && $hasRows) {
+                $fy = "(start_month IS NULL OR (start_month=10 AND end_month=9))";
+                $db->exec("UPDATE employee_bonuses SET is_active=0 WHERE employee_id=$id AND bonus_type='prime_fixe' AND is_active=1 AND (school_year IS NULL OR school_year='2025-2026') AND $fy");
+                $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, 'prime_fixe', 1, '2025-2026', ?, 'percent', 'LBP', NULL, NULL, 1)")->execute([$id, $pct]);
+            }
+            if ($hasRows) { foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id=$id AND school_year>='2025-2026'")->fetchAll(PDO::FETCH_COLUMN) as $sy) recalcEmployeeYear($id, $sy); }
+            $nov = $db->query("SELECT base_plus_echelon_lbp, prime_fixe_lbp, net_salary_lbp FROM monthly_salaries WHERE employee_id=$id AND year=2025 AND month=11")->fetch(PDO::FETCH_ASSOC);
+            $log[] = "$fn $ln: " . $e['current_grade'] . '→' . $r['final_grade'] . ($nov ? ' base=' . $nov['base_plus_echelon_lbp'] . ' prime=' . $nov['prime_fixe_lbp'] . ' net=' . $nov['net_salary_lbp'] : ' (بلا رواتب)');
+            $done++;
+        }
+        setSetting('bk_diploma_20260829', json_encode($bk, JSON_UNESCAPED_UNICODE));
+        setSetting('heal_diploma_oldprog_20260829', 'done: ' . $done . ' | ' . implode(' ؛ ', $log));
+    } catch (Throwable $e) {
+        try { setSetting('heal_diploma_oldprog_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
