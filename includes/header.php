@@ -76,7 +76,7 @@ $sectionIcons = ['dashboard'=>'fa-gauge-high','personnel'=>'fa-users','paie'=>'f
 $pageSection = [
     'dashboard'=>'dashboard',
     'employees'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','law_check'=>'personnel',
-    'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie',
+    'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie','hours_reduction'=>'paie',
     'reports'=>'rapports','tax'=>'rapports',
     'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
 ];
@@ -229,6 +229,10 @@ document.addEventListener('submit', function (e) {
             <a href="<?= BASE_URL ?>pages/retirement_64.php" class="<?= $currentPage === 'retirement_64' ? 'active' : '' ?>">
                 <i class="fas fa-hourglass-half"></i>
                 <span>Retraite 64 / بلوغ سنّ الـ64</span>
+            </a>
+            <a href="<?= BASE_URL ?>pages/hours_reduction.php" class="<?= $currentPage === 'hours_reduction' ? 'active' : '' ?>">
+                <i class="fas fa-clock"></i>
+                <span>Réduction d'horaire / تناقص ساعات التدريس</span>
             </a>
             <?php endif; ?>
 

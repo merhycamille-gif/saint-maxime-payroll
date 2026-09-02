@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/payroll_calculator.php';
 require_once __DIR__ . '/../includes/translit_ar_fr.php';
+require_once __DIR__ . '/../includes/hours_reduction.php'; // 🕐 تناقص ساعات التدريس (مرسوم 2601/2018) — عرض فقط
 requireLogin();
 
 // AJAX: ترجمة اسم عربي → فرنسي للتعبئة الفورية في النموذج (GET، بلا CSRF)
@@ -1017,6 +1018,28 @@ include __DIR__ . '/../includes/header.php';
     <div class="alert alert-<?= $messageType ?>"><?= e($message) ?></div>
 <?php endif; ?>
 
+<?php
+// 🕐 مساج تناقص ساعات التدريس (مرسوم 2601/2018) — يظهر للأستاذ الملاك الذي له تناقص بالسنة المعروضة.
+// عرض ومعلومات فقط: لا يغيّر أي راتب ولا خانة «ساعات بالأسبوع».
+$hrMsg = null; $hrSy = null;
+if ($id > 0 && ($employee['employee_type'] ?? '') === 'enseignant_titulaire') {
+    $hrSy = activeSchoolYear(); if ($hrSy === 'all') $hrSy = currentSchoolYear();
+    $hrSchoolName = '';
+    try { $hrSchoolName = (string)$db->query("SELECT name_ar FROM schools WHERE id = " . (int)$employee['school_id'])->fetchColumn(); } catch (Exception $e) {}
+    $hrMsg = hoursReductionFor($employee, $hrSy, $hrSchoolName);
+}
+if ($hrMsg && $hrMsg['reduction'] > 0): ?>
+    <div class="alert alert-warning" id="hoursReductionMsg" style="border-right:4px solid #d97706">
+        <i class="fas fa-clock"></i>
+        <strong>Réduction d'horaire / تناقص ساعات التدريس — سنة <?= e($hrSy) ?>:</strong>
+        هذا الأستاذ خلال <strong>سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?></strong> بالملاك،
+        ويحقّ له تناقص <strong>−<?= (int)$hrMsg['reduction'] ?> ساعات</strong> —
+        ساعاته الأسبوعية القانونية <strong><?= (int)$hrMsg['lawHours'] ?></strong> بدل <?= (int)$hrMsg['baseHours'] ?>
+        (<?= e($hrMsg['stageLabel']) ?> — الجدول <?= (int)$hrMsg['table'] ?> من المرسوم 2601/2018<?= $hrMsg['assumed'] ? ' — المرحلة افتراضية: حدّد «المرحلة» أو «الصفوف» بملفه للتدقيق' : '' ?>).
+        <a href="<?= BASE_URL ?>pages/hours_reduction.php" class="no-print">كل المستحقّين بكل مدرسة ←</a>
+    </div>
+<?php endif; ?>
+
 <div class="d-flex justify-between align-center mb-3">
     <a href="<?= BASE_URL ?>pages/employees.php" class="btn btn-light">
         <i class="fas fa-arrow-left"></i> Retour à la liste / العودة إلى اللائحة
@@ -1388,6 +1411,16 @@ include __DIR__ . '/../includes/header.php';
                     <div class="form-group">
                         <label class="form-label">Heures/semaine / ساعات بالأسبوع</label>
                         <input type="number" name="hours_per_week" class="form-control" value="<?= (float)$employee['hours_per_week'] ?>" step="0.5" min="0">
+                        <?php if (!empty($hrMsg)): // 🕐 قانون التناقص (مرسوم 2601/2018) — معلومة فقط، لا تغيّر الخانة ?>
+                            <small style="display:block;margin-top:3px;color:<?= $hrMsg['reduction'] > 0 ? '#b45309' : 'var(--muted,#6b7280)' ?>">
+                                <i class="fas fa-clock"></i> قانون التناقص:
+                                <?php if ($hrMsg['reduction'] > 0): ?>
+                                    ساعاته القانونية <strong><?= (int)$hrMsg['lawHours'] ?></strong> بدل <?= (int)$hrMsg['baseHours'] ?> (تناقص −<?= (int)$hrMsg['reduction'] ?>، سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>)
+                                <?php else: ?>
+                                    لا تناقص بسنة <?= e($hrSy) ?> (سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>) — يبدأ من سنة <?= e($hrMsg['startSy']) ?>
+                                <?php endif; ?>
+                            </small>
+                        <?php endif; ?>
                     </div>
                 </div>
 

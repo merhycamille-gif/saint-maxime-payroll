@@ -4447,6 +4447,43 @@ check('شفاء المكرّرين نجح (done لا err) + تكملة الدم�
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healDedupFill20260902();') !== false,
       (string)getSetting('heal_dedup_2526_20260902', '') . ' // ' . (string)getSetting('heal_dedup_fill_20260902', ''));
 
+/* =====================================================================
+ * 95) 🕐 تناقص ساعات التدريس (مرسوم 2601/2018 — طلبه 2026-09-03): جداول المرسوم الثلاثة صحيحة
+ *     رقماً برقم، سلّم الاستدلال (مرحلة → صفوف → افتراضي المدرسة)، الصفحة والمساج موصولان،
+ *     والميزة عرض فقط (لا كتابة بقاعدة البيانات إطلاقاً — «انتبه ما تخرب شي»).
+ * =================================================================== */
+require_once $PROJ . '/includes/hours_reduction.php';
+$mk95 = fn($malak, $niv = '', $cls = '') => ['employee_type' => 'enseignant_titulaire', 'titularization_date' => $malak, 'niveau_scolaire' => $niv, 'classes_taught' => $cls];
+$a95 = hoursReductionFor($mk95('2009-10-01', 'secondaire'), '2025-2026');                    // ثانوي سنة 17 → 19 (−1)
+$b95 = hoursReductionFor($mk95('2010-10-01', 'secondaire'), '2025-2026');                    // سنة 16 → لا تناقص، يبدأ 2026-2027
+$c95 = hoursReductionFor($mk95('1994-10-01', 'intermediaire'), '2025-2026');                 // حلقة 3 سنة 32 → 18 (−6)
+$d95 = hoursReductionFor($mk95('1990-10-01', 'primaire'), '2025-2026');                      // روضة/حلقتان سنة 36 → 19 (−8)
+$e95 = hoursReductionFor($mk95('1997-10-01', 'maternelle'), '2025-2026');                    // سنة 29 → 23 (−4)
+$f95 = hoursReductionFor($mk95('1990-10-01', '', '9,10'), '2025-2026');                      // من الصفوف: EB7 → جدول 2
+$g95 = hoursReductionFor($mk95('2000-10-01'), '2025-2026', 'مدرسة ثانوية السيدة');           // افتراضي ثانوية → جدول 1 assumed
+$h95 = hoursReductionFor(['employee_type' => 'enseignant_contractuel', 'titularization_date' => '1990-10-01'], '2025-2026'); // غير ملاك → null
+check('جداول المرسوم 2601/2018: ثانوي 17→19(−1) · عتبة 16 سنة لم تُبلغ → 0 ويبدأ بسنته · حلقة3 32→18(−6) · روضة/حلقتان 36→19(−8) · 29→23(−4)',
+      $a95 && (int)$a95['lawHours'] === 19 && (int)$a95['reduction'] === 1 && (int)$a95['serviceYear'] === 17
+      && $b95 && (int)$b95['reduction'] === 0 && $b95['startSy'] === '2026-2027'
+      && $c95 && (int)$c95['lawHours'] === 18 && (int)$c95['reduction'] === 6
+      && $d95 && (int)$d95['lawHours'] === 19 && (int)$d95['reduction'] === 8
+      && $e95 && (int)$e95['lawHours'] === 23 && (int)$e95['reduction'] === 4,
+      json_encode([$a95, $b95, $c95, $d95, $e95]));
+check('سلّم الاستدلال: الصفوف 9,10 → جدول 2 · افتراضي «ثانوية» → جدول 1 موسوم افتراضياً · غير الملاك لا يشمله القانون',
+      $f95 && (int)$f95['table'] === 2 && !$f95['assumed']
+      && $g95 && (int)$g95['table'] === 1 && $g95['assumed']
+      && $h95 === null);
+$hrPage95 = renderPage('pages/hours_reduction.php', [], ['extra','aide','transport'], [], 'lbp', '2025-2026');
+$hrSrc95 = (string)file_get_contents($PROJ . '/includes/hours_reduction.php') . (string)file_get_contents($PROJ . '/pages/hours_reduction.php');
+check('صفحة تناقص الساعات تعرض المرسوم والمستحقّين بكل مدرسة + الرابط بالقائمة + مساج ملف الأستاذ موصول',
+      strpos($hrPage95, '2601') !== false && strpos($hrPage95, 'تناقص') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'pages/hours_reduction.php') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'hoursReductionMsg') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "require_once __DIR__ . '/../includes/hours_reduction.php'") !== false);
+check('الميزة عرض فقط: لا أي كتابة (INSERT/UPDATE/DELETE/exec) بملفَي تناقص الساعات — «انتبه ما تخرب شي»',
+      stripos($hrSrc95, 'INSERT ') === false && stripos($hrSrc95, 'UPDATE ') === false
+      && stripos($hrSrc95, 'DELETE ') === false && stripos($hrSrc95, '->exec(') === false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
