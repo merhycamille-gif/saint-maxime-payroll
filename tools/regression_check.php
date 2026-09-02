@@ -3672,8 +3672,16 @@ $abRita = ['يوسف' => [], 'مارون' => [], '.' => []];
 foreach ($ab69 as $r) $abRita[trim((string)$r['fa'])][] = trim((string)$r['cn']);
 $abCnt69 = (int)$db->query("SELECT COUNT(*) FROM employees e JOIN schools s ON s.id=e.school_id
     WHERE s.name_ar LIKE 'مدرسة%ثانوية السيدة%' AND e.is_deleted=0 AND TRIM(COALESCE(e.caisse_number,'')) <> ''")->fetchColumn();
-check('عبرا: ≥180 ملفاً برقم + ريتا حليحل تفرّقتا بالأب (يوسف=101141، مارون=130587) والملتبسة الأب فاضية',
-      $abCnt69 >= 180
+// بعد تنظيف المكرّرين (2026-09-02) صار العدّ أشخاصاً حقيقيين لا ملفات (الرقم نفسه كان بملفين) — العتبة 160،
+// مع صمام: أي رقم صندوق كان على ملف مُزال لازم يبقى موجوداً على ملف فاعل بنفس المدرسة (lost=0)
+$lostCn69 = 0;
+try {
+    $lostCn69 = (int)$db->query("SELECT COUNT(*) FROM _emp_bk_dedup20260902 bk
+        WHERE TRIM(COALESCE(bk.caisse_number,'')) NOT IN ('','.','0')
+          AND NOT EXISTS (SELECT 1 FROM employees e WHERE e.is_deleted=0 AND e.school_id=bk.school_id AND e.caisse_number=bk.caisse_number)")->fetchColumn();
+} catch (Throwable $e69) {}
+check('عبرا: ≥160 شخصاً برقم (بعد لمّ المكرّرين) + لا رقم صندوق ضاع بالدمج + ريتا حليحل تفرّقتا بالأب (يوسف=101141، مارون=130587) والملتبسة الأب فاضية',
+      $abCnt69 >= 160 && $lostCn69 === 0
       && !array_diff($abRita['يوسف'] ?? ['x'], ['101141']) && in_array('101141', $abRita['يوسف'] ?? [], true)
       && !array_diff($abRita['مارون'] ?? ['x'], ['130587'])
       && !array_filter($abRita['.'] ?? []),
@@ -4409,6 +4417,35 @@ check('عمود «درجة / نصف راتب → صندوق التعويضات»
       strpos($sa93, 'إلى صندوق التعويضات') !== false && strpos($sa93, '95,000') !== false
       && strpos($ms93, 'درجة / نصف راتب') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/reports_export.php'), "'درجة / نصف راتب (إلى الصندوق)'") !== false);
+
+/* =====================================================================
+ * 94) 🧹 تنظيف المكرّرين (أمره 2026-09-02 «المكرر بهيدي السنة بنفس المدرسة ينشال»): الشفاء موصول،
+ *     بعد تشغيله محلياً لا يبقى مكرّرون فاعلون بنفس المدرسة إلا المستثنيين بقراره (جوزيف ابي عيد/جان عاد)،
+ *     المستثنون لم يُمَسّوا، ولا صفوف رواتب معلّقة بملفات شالها الشفاء (كلها اندمجت تحت الملف الباقي).
+ * =================================================================== */
+healDedup2526_20260902();
+healDedupFill20260902();
+$dup94 = (int)$db->query("SELECT COUNT(*) FROM employees e1 JOIN employees e2 ON e2.id>e1.id AND e2.school_id=e1.school_id
+      AND e2.first_name_ar=e1.first_name_ar AND e2.last_name_ar=e1.last_name_ar AND COALESCE(e2.father_name_ar,'')=COALESCE(e1.father_name_ar,'')
+    WHERE e1.is_deleted=0 AND e2.is_deleted=0 AND e1.status='actif' AND e2.status='actif'
+      AND NOT (e1.first_name_ar='جوزيف' AND e1.last_name_ar LIKE '%ابي عيد%')
+      AND NOT (e1.first_name_ar='جان' AND e1.last_name_ar LIKE '%عاد%')")->fetchColumn();
+$kept94 = 0; $orph94 = 0;
+try {
+    $kept94 = (int)$db->query("SELECT COUNT(*) FROM _emp_bk_dedup20260902 WHERE (first_name_ar='جوزيف' AND last_name_ar LIKE '%ابي عيد%') OR (first_name_ar='جان' AND last_name_ar LIKE '%عاد%')")->fetchColumn();
+    $orph94 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN _emp_bk_dedup20260902 bk ON bk.id=ms.employee_id JOIN employees e ON e.id=bk.id AND e.is_deleted=1")->fetchColumn();
+} catch (Throwable $e94) { /* لا نسخة = لم يشل أحداً محلياً */ }
+check('المكرّرون: الشفاء موصول + أداة المعاينة موجودة + الحذف حذف ناعم لا محو',
+      strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healDedup2526_20260902();') !== false
+      && is_file($PROJ . '/tools/dedup_dryrun.php')
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "UPDATE employees SET is_deleted=1 WHERE id=\$lid") !== false);
+check('بعد الشفاء محلياً: صفر مكرّرين فاعلين بنفس المدرسة (عدا المستثنيين بقراره) + المستثنون لم يُمَسّوا + لا رواتب معلّقة بملف مُزال (اندمجت كلها)',
+      $dup94 === 0 && $kept94 === 0 && $orph94 === 0, "dup=$dup94 kept=$kept94 orph=$orph94");
+check('شفاء المكرّرين نجح (done لا err) + تكملة الدمج (استكمال خانات الهوية من نسخة المُزال) موصولة وناجحة',
+      strpos((string)getSetting('heal_dedup_2526_20260902', ''), 'done') === 0
+      && strpos((string)getSetting('heal_dedup_fill_20260902', ''), 'done') === 0
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healDedupFill20260902();') !== false,
+      (string)getSetting('heal_dedup_2526_20260902', '') . ' // ' . (string)getSetting('heal_dedup_fill_20260902', ''));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

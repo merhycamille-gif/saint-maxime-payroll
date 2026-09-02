@@ -5531,3 +5531,146 @@ function healNiyahCw3_20260829() {
         try { setSetting('heal_niyah_cw3_20260829', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🧹 تنظيف المكرّرين — «التصحيح بسنة 2025-2026: المكرر بهيدي السنة بنفس المدرسة ينشال» (أمره 2026-09-02).
+ * موظفان فاعلان بنفس الاسم والأب والشهرة بنفس المدرسة = شخص واحد بملفين؛ يبقى ملف واحد:
+ *  - يبقى الملف الذي عليه رواتب 2025-2026 (وإلا الأكثر رواتب مخزّنة، وإلا الأكمل بيانات، وإلا الأقدم id).
+ *  - رواتب الملف الزائد (كل السنوات) تُنقَل للملف الباقي (دمج التاريخ تحت ملف واحد)؛ الشهر الموجود
+ *    أصلاً عند الباقي يُحذف من الزائد بعد نسخه (كان مكرّراً بالملفين — جورج محفوظ 4 أشهر).
+ *  - بنود الزائد تُطفأ (is_active=0 — الحذف=إطفاء) وملفه حذف ناعم (is_deleted=1) قابل للاسترجاع.
+ *  - مستثنيان بقراره السابق (2026-07-30 «تركهما»): جوزيف ابي عيد + جان عاد — لا يُلمسان.
+ *  - صمام أمان: إذا ملفّان بنفس المجموعة كلاهما عليه رواتب 2025-2026 → تُتخطّى المجموعة وتُسجَّل للمراجعة.
+ * نسخ أمان: _emp_bk_dedup20260902 + _ms_bk_dedup20260902 + _bon_bk_dedup20260902 (+ دمب أونلاين بDownloads).
+ * $dryRun=true: يرجع ما سيحدث بلا أي كتابة (لأداة tools/dedup_dryrun.php ولفحص regression).
+ */
+function dedupSameSchool2526($db, $dryRun = false) {
+    $sy = '2025-2026';
+    $out = ['groups' => 0, 'removed' => 0, 'moved' => 0, 'dropped' => 0, 'bonOff' => 0, 'skipped' => [], 'log' => []];
+    $pairs = $db->query("SELECT e1.id a, e2.id b FROM employees e1 JOIN employees e2 ON e2.id>e1.id AND e2.school_id=e1.school_id
+          AND e2.first_name_ar=e1.first_name_ar AND e2.last_name_ar=e1.last_name_ar AND COALESCE(e2.father_name_ar,'')=COALESCE(e1.father_name_ar,'')
+        WHERE e1.is_deleted=0 AND e2.is_deleted=0 AND e1.status='actif' AND e2.status='actif'")->fetchAll(PDO::FETCH_ASSOC);
+    if (!$pairs) return $out;
+    if (!$dryRun) {
+        $db->exec("CREATE TABLE IF NOT EXISTS _emp_bk_dedup20260902 LIKE employees");
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_dedup20260902 LIKE monthly_salaries");
+        $db->exec("CREATE TABLE IF NOT EXISTS _bon_bk_dedup20260902 LIKE employee_bonuses");
+    }
+    // مجموعات (union-find): المكرّر قد يكون ثلاثياً (عماد القائد ×3)
+    $par = [];
+    $root = function ($x) use (&$par) { while (isset($par[$x]) && $par[$x] !== $x) $x = $par[$x]; return $x; };
+    foreach ($pairs as $p) {
+        $a = (int)$p['a']; $b = (int)$p['b'];
+        $par += [$a => $a, $b => $b];
+        $ra = $root($a); $rb = $root($b);
+        if ($ra !== $rb) $par[$rb] = $ra;
+    }
+    $groups = [];
+    foreach (array_keys($par) as $id) $groups[$root($id)][] = $id;
+    $stInfo = $db->prepare("SELECT e.id, e.first_name_ar fn, COALESCE(e.father_name_ar,'') fa, e.last_name_ar ln,
+          (SELECT COUNT(*) FROM monthly_salaries ms WHERE ms.employee_id=e.id AND ms.school_year=?) r2526,
+          (SELECT COUNT(*) FROM monthly_salaries ms WHERE ms.employee_id=e.id) rall,
+          ((e.mother_first_name IS NOT NULL AND e.mother_first_name NOT IN ('','.')) + (e.birth_date IS NOT NULL)
+           + (COALESCE(e.nssf_number,'') <> '') + (COALESCE(e.finance_ministry_number,'') <> '')
+           + (COALESCE(e.phone1,'') <> '') + (COALESCE(e.diploma,'') <> '') + (e.hire_date IS NOT NULL)) filled
+        FROM employees e WHERE e.id=?");
+    foreach ($groups as $ids) {
+        $mem = [];
+        foreach ($ids as $id) { $stInfo->execute([$sy, $id]); if ($r = $stInfo->fetch(PDO::FETCH_ASSOC)) $mem[] = $r; }
+        if (count($mem) < 2) continue;
+        $nm = $mem[0]['fn'] . ' ' . $mem[0]['ln'];
+        // مستثنيان بقراره السابق
+        $isKept = function ($m) {
+            return ($m['fn'] === 'جوزيف' && mb_strpos($m['ln'], 'ابي عيد') !== false)
+                || ($m['fn'] === 'جان' && mb_strpos($m['ln'], 'عاد') !== false);
+        };
+        if (array_filter($mem, $isKept)) { $out['skipped'][] = "مستثنى بقراره: $nm"; continue; }
+        // صمام: ملفّان كلاهما برواتب 2025-2026 = قرار يدوي
+        $with2526 = array_values(array_filter($mem, fn($m) => (int)$m['r2526'] > 0));
+        if (count($with2526) >= 2) { $out['skipped'][] = "ملفان برواتب $sy: $nm (" . implode('/', array_column($mem, 'id')) . ')'; continue; }
+        usort($mem, function ($x, $y) {
+            return [(int)$y['r2526'] > 0, (int)$y['rall'], (int)$y['filled'], -(int)$y['id']]
+               <=> [(int)$x['r2526'] > 0, (int)$x['rall'], (int)$x['filled'], -(int)$x['id']];
+        });
+        $sv = (int)$mem[0]['id'];
+        $out['groups']++;
+        $have = [];
+        foreach ($db->query("SELECT year, month FROM monthly_salaries WHERE employee_id=$sv")->fetchAll(PDO::FETCH_ASSOC) as $k) $have[$k['year'] . '|' . $k['month']] = 1;
+        foreach (array_slice($mem, 1) as $loser) {
+            $lid = (int)$loser['id'];
+            $mv = []; $dp = [];
+            foreach ($db->query("SELECT id, year, month FROM monthly_salaries WHERE employee_id=$lid")->fetchAll(PDO::FETCH_ASSOC) as $k) {
+                $key = $k['year'] . '|' . $k['month'];
+                if (isset($have[$key])) $dp[] = (int)$k['id']; else { $mv[] = (int)$k['id']; $have[$key] = 1; }
+            }
+            if (!$dryRun) {
+                $db->exec("INSERT IGNORE INTO _emp_bk_dedup20260902 SELECT * FROM employees WHERE id=$lid");
+                if ($mv || $dp) $db->exec("INSERT IGNORE INTO _ms_bk_dedup20260902 SELECT * FROM monthly_salaries WHERE employee_id=$lid");
+                if ($mv) $db->exec("UPDATE monthly_salaries SET employee_id=$sv WHERE id IN (" . implode(',', $mv) . ")");
+                if ($dp) $db->exec("DELETE FROM monthly_salaries WHERE id IN (" . implode(',', $dp) . ")");
+                $db->exec("INSERT IGNORE INTO _bon_bk_dedup20260902 SELECT * FROM employee_bonuses WHERE employee_id=$lid");
+                $out['bonOff'] += (int)$db->exec("UPDATE employee_bonuses SET is_active=0 WHERE employee_id=$lid AND is_active=1");
+                $db->exec("UPDATE employees SET is_deleted=1 WHERE id=$lid");
+            } else {
+                $out['bonOff'] += (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id=$lid AND is_active=1")->fetchColumn();
+            }
+            $out['removed']++; $out['moved'] += count($mv); $out['dropped'] += count($dp);
+            $out['log'][] = "$nm#{$lid}→{$sv}" . ($mv ? ' نقل' . count($mv) : '') . ($dp ? ' حذف' . count($dp) : '');
+        }
+    }
+    return $out;
+}
+
+function healDedup2526_20260902() {
+    try {
+        if (strpos((string)getSetting('heal_dedup_2526_20260902', ''), 'done') === 0) return;
+        $r = dedupSameSchool2526(getDB(), false);
+        setSetting('heal_dedup_2526_20260902', mb_substr('done: groups=' . $r['groups'] . ' removed=' . $r['removed']
+            . ' movedRows=' . $r['moved'] . ' droppedRows=' . $r['dropped'] . ' bonusOff=' . $r['bonOff']
+            . ($r['skipped'] ? ' | تخطّى: ' . implode('؛ ', $r['skipped']) : '')
+            . ' | ' . implode('؛ ', $r['log']), 0, 8000));
+    } catch (Throwable $e) {
+        try { setSetting('heal_dedup_2526_20260902', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
+
+/**
+ * 🧩 تكملة دمج المكرّرين (2026-09-02): الملف المُزال كان أحياناً حامل أرقام وبيانات هوية ناقصة عند
+ * الملف الباقي (رقم الصندوق/الضمان/المالية، اسم الأم، المواليد، السجل، الهاتف، الأسماء بالفرنسي،
+ * مسارات المستندات...) — هنا تُستكمَل خانات الباقي **الفاضية فقط** من نسخة المُزال بـ_emp_bk_dedup20260902.
+ * لا يُلمس أي حقل يغذّي محرّك الحساب (الشهادة/التواريخ/الفئة/الاتفاقات تبقى كما هي عند الباقي).
+ */
+function healDedupFill20260902() {
+    try {
+        if (strpos((string)getSetting('heal_dedup_fill_20260902', ''), 'done') === 0) return;
+        $db = getDB();
+        if (!$db->query("SHOW TABLES LIKE '_emp_bk_dedup20260902'")->fetchColumn()) { setSetting('heal_dedup_fill_20260902', 'done: skip no backup'); return; }
+        $fields = ['first_name_fr', 'father_name_fr', 'last_name_fr', 'mother_first_name', 'mother_last_name',
+            'nationality', 'birth_date', 'birth_place', 'civil_registry_number', 'civil_registry_place', 'social_status',
+            'gouvernorat', 'district', 'ville', 'quartier', 'rue', 'immeuble', 'etage', 'phone1', 'phone2', 'email',
+            'nssf_number', 'finance_ministry_number', 'caisse_number',
+            'photo_path', 'id_document_path', 'family_doc_path', 'diploma_doc_path'];
+        $isEmpty = function ($v) { $v = trim((string)$v); return $v === '' || $v === '.' || $v === '0'; };
+        $stSv = $db->prepare("SELECT * FROM employees WHERE school_id=? AND is_deleted=0 AND first_name_ar=? AND last_name_ar=? AND COALESCE(father_name_ar,'')=? AND id<>? LIMIT 1");
+        $filled = 0; $log = [];
+        foreach ($db->query("SELECT * FROM _emp_bk_dedup20260902")->fetchAll(PDO::FETCH_ASSOC) as $b) {
+            $stSv->execute([(int)$b['school_id'], $b['first_name_ar'], $b['last_name_ar'], (string)($b['father_name_ar'] ?? ''), (int)$b['id']]);
+            $sv = $stSv->fetch(PDO::FETCH_ASSOC);
+            if (!$sv) continue;
+            $set = []; $vals = [];
+            foreach ($fields as $f) {
+                if (!array_key_exists($f, $b) || !array_key_exists($f, $sv)) continue;
+                if (!$isEmpty($b[$f]) && $isEmpty($sv[$f])) { $set[] = "`$f`=?"; $vals[] = $b[$f]; }
+            }
+            if ($set) {
+                $vals[] = (int)$sv['id'];
+                $db->prepare("UPDATE employees SET " . implode(',', $set) . " WHERE id=?")->execute($vals);
+                $filled += count($set);
+                $log[] = $b['first_name_ar'] . ' ' . $b['last_name_ar'] . '#' . $sv['id'] . '+' . count($set);
+            }
+        }
+        setSetting('heal_dedup_fill_20260902', mb_substr('done: filledFields=' . $filled . ' | ' . implode('؛ ', $log), 0, 8000));
+    } catch (Throwable $e) {
+        try { setSetting('heal_dedup_fill_20260902', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
