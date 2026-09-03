@@ -184,7 +184,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
             <tr>
                 <td><span class="lbl">Embauche / تاريخ الدخول</span><span class="val"><?= e($meta['hire']) ?></span></td>
                 <td><span class="lbl">Titularisation / تاريخ الملاك</span><span class="val"><?= e($meta['titul']) ?></span></td>
-                <td><span class="lbl">Heures / jours par semaine — الساعات / الأيام أسبوعياً</span><span class="val"><?= e($meta['hours']) ?> h / <?= e($meta['days']) ?> j<?php if (($meta['hours_red'] ?? '') !== ''): // 🕐 التناقص وحضوره بنفس الخانة (بلا تغيير بحجم البطاقة) ?> · تناقص <span dir="ltr"><?= e($meta['hours_red']) ?> h</span> · حضور <span dir="ltr"><?= e($meta['hours_pres']) ?> h</span><?php endif; ?></span></td>
+                <td><span class="lbl">Heures / jours par semaine — الساعات / الأيام أسبوعياً</span><span class="val"><?= e($meta['hours']) ?> h / <?= e($meta['days']) ?> j<?php if (($meta['hours_red'] ?? '') !== ''): // 🕐 التناقص وحضوره بنفس الخانة (بلا تغيير بحجم البطاقة) ?> <span dir="rtl" style="unicode-bidi:isolate"> · تناقص <?= e($meta['hours_red']) ?> س · حضور <?= e($meta['hours_pres']) ?> س</span><?php endif; ?></span></td>
                 <td><span class="lbl">Classes / الصفوف</span><span class="val"><?= e($meta['classes']) ?></span></td>
             </tr>
             <tr>
