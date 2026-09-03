@@ -4546,7 +4546,7 @@ check('ساعات التناقص خانة بملف الأستاذ (للداخل�
       && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "number_format((int)\$r['cur_sal_old_usd'], 0) ?> $</span>") !== false
       // 🧮 («نعم» 2026-09-03) دولار الإضافي لأصحاب النسبة = دولار القانون: 2,305,000÷1500=1,536 ×55٪ = 844 $ (لا 75,000,000÷89,500 = 837)
       && extraPercentLawUsd(55, 2305000) === 844 && extraPercentLawUsd(0, 2305000) === 0
-      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'extra_law_usd'   => \$hasPct ? (extraPercentLawUsd(") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'extra_law_usd'   => \$hasPct ? ((int)(\$s['prime_fixe_usd_law'] ?? 0) > 0 ? (int)extraWageUsd(\$s) : (extraPercentLawUsd(") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "\$r['extra_law_usd'] !== null ? (int)\$r['extra_law_usd'] : \$usd(\$r['extra_wage'])") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'hours_pres'  =>") !== false);
 
@@ -4568,6 +4568,46 @@ check('«النسبة اللي بتطلع صح»: الدالة الصافية ت
 check('بعد الشفاء محلياً: لا يبقى ملاك بمبلغ ثابت بمدارس النسبة (الخطّة فارغة) والفلاغ done',
       count($own96['plan']) === 0 && strpos((string)getSetting('heal_percent_law_own_20260903', ''), 'done') === 0,
       (string)getSetting('heal_percent_law_own_20260903', '') . ' | ' . (string)getSetting('heal_percent_law_own_progress', ''));
+
+/* =====================================================================
+ * 97) 🧮 «صحّح النسبة بكل التقارير والإفادات» (أمره 2026-09-03): دولار الأجر الإضافي لأصحاب النسبة = دولار القانون
+ *     (floor(floor(الأساس÷1500)×النسبة) — 844 $ لا 837) بكل البرنامج عبر مصدر واحد: عمود prime_fixe_usd_law يكتبه
+ *     المحرّك + extraWageUsd()/extraWageMoney()/extraWageUsdSql() — ممنوع أي قسمة مباشرة للإضافي على السعر بالتقارير.
+ * =================================================================== */
+ensurePrimeUsdLawColumn();
+$rowLaw97 = ['prime_fixe_lbp' => 75000000, 'extra_lbp' => 0, 'exchange_rate' => 89500, 'prime_fixe_usd_law' => 844];
+$rowNo97  = ['prime_fixe_lbp' => 75000000, 'extra_lbp' => 0, 'exchange_rate' => 89500, 'prime_fixe_usd_law' => 0];
+$rowMix97 = ['prime_fixe_lbp' => 75000000, 'extra_lbp' => 895000, 'exchange_rate' => 89500, 'prime_fixe_usd_law' => 844];
+$_SESSION['display_currency'] = 'usd';
+$mUsd97 = strip_tags(extraWageMoney($rowLaw97));
+$_SESSION['display_currency'] = 'both';
+check('دولار الإضافي الموحّد: بعمود القانون 844 · بلا نسبة 837 (÷السعر داون) · مع ساعات إضافية قديمة 844+10 · عرض «دولار فقط» يطبع 844 · تعبير SQL بنفس القاعدة',
+      (int)extraWageUsd($rowLaw97) === 844 && (int)extraWageUsd($rowNo97) === 837 && (int)extraWageUsd($rowMix97) === 854
+      && strpos($mUsd97, '844') !== false && strpos($mUsd97, '837') === false
+      && strpos(extraWageUsdSql('ms.'), 'ms.prime_fixe_usd_law > 0') !== false && strpos(extraWageUsdSql(''), 'FLOOR((extra_lbp+prime_fixe_lbp)') !== false,
+      "usd=" . extraWageUsd($rowLaw97) . " shown=" . $mUsd97);
+$allSrc97 = '';
+foreach (glob($PROJ . '/pages/*.php') as $f97) $allSrc97 .= file_get_contents($f97);
+foreach (glob($PROJ . '/includes/*.php') as $f97) if (basename($f97) !== 'functions.php') $allSrc97 .= file_get_contents($f97);
+$calcSrc97 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+check('لا بقايا قسمة مباشرة للإضافي على السعر بأي تقرير/نموذج/إفادة (money(extraWageLbp / lbpToUsd(extraWageLbp / FLOOR((extra+prime)/rate)) + المحرّك يخزّن prime_fixe_usd_law (حفظ + overlay) + الشفاء موصول',
+      strpos($allSrc97, 'money(extraWageLbp(') === false && strpos($allSrc97, 'lbpToUsd(extraWageLbp(') === false
+      && preg_match('/FLOOR\(\((ms\.)?extra_lbp\s*\+\s*(ms\.)?prime_fixe_lbp\)/', $allSrc97) === 0
+      && strpos($allSrc97, '(extra_lbp+prime_fixe_lbp)/NULLIF') === false
+      && strpos($calcSrc97, "'prime_fixe_usd_law' => (int)\$this->primeUsdLaw") !== false
+      && strpos($calcSrc97, 'prime_fixe_usd_law = VALUES(prime_fixe_usd_law)') !== false
+      && strpos($calcSrc97, 'total_due_usd = ?, prime_fixe_usd_law = ?') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healPrimeUsdLaw20260903();') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), '$extraWUsd = ($sal && (int)($sal[\'prime_fixe_usd_law\'] ?? 0) > 0) ? extraWageUsd($sal) : null;') !== false);
+// حيّ: بعد شفاء التعبئة محلياً، كل صف بإضافي نسبةٍ له عمود قانون = floor(floor(bpe/1500)×pct) — عيّنة أصحاب النسبة
+$miss97 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employee_bonuses b ON b.employee_id=ms.employee_id AND b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='percent' AND (b.school_year IS NULL OR b.school_year=ms.school_year) AND b.start_month IS NULL
+    WHERE ms.prime_fixe_lbp > 0 AND ms.prime_fixe_usd_law = 0")->fetchColumn();
+$smp97 = $db->query("SELECT ms.base_plus_echelon_lbp bpe, ms.prime_fixe_usd_law law, b.amount pct FROM monthly_salaries ms JOIN employee_bonuses b ON b.employee_id=ms.employee_id AND b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='percent' AND (b.school_year IS NULL OR b.school_year=ms.school_year) AND b.start_month IS NULL
+    WHERE ms.school_year='2025-2026' AND ms.prime_fixe_lbp > 0 ORDER BY ms.employee_id, ms.month LIMIT 40")->fetchAll(PDO::FETCH_ASSOC);
+$okSmp97 = true; foreach ($smp97 as $r97) if ((int)$r97['law'] !== (int)floor(floor((float)$r97['bpe'] / officialUsdRate()) * (float)$r97['pct'] / 100)) $okSmp97 = false;
+check('بعد الشفاء محلياً: لا صف إضافي نسبةٍ بلا عمود قانون + العيّنة تطابق القاعدة floor(floor(bpe/1500)×pct) + الفلاغ done',
+      $miss97 === 0 && $smp97 && $okSmp97 && strpos((string)getSetting('heal_prime_usd_law_20260903', ''), 'done') === 0,
+      "missing=$miss97 sample=" . count($smp97) . ' flag=' . getSetting('heal_prime_usd_law_20260903', ''));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

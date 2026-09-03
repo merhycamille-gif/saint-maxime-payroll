@@ -76,6 +76,7 @@ class PayrollCalculator {
     /**
      * Get bonus amount for a specific month
      */
+    public $primeUsdLaw = 0; // 🧮 دولار القانون لإضافي الشهر (آخر حساب prime_fixe)
     private function getBonusForMonth($bonusType, $baseForPercent = 0) {
         $sy = $this->month >= 10 ? $this->year . '-' . ($this->year + 1) : ($this->year - 1) . '-' . $this->year;
         $stmt = getDB()->prepare("
@@ -119,6 +120,8 @@ class PayrollCalculator {
             $total += $amount;
         }
         if ($pctSum > 0) $total += bonusPercentLbp($pctSum, $baseForPercent, $this->exchangeRate);
+        // 🧮 دولار القانون للإضافي (يُخزَّن بعمود prime_fixe_usd_law ليقرأه كل البرنامج): 1,536 × 55٪ = 844 $
+        if ($bonusType === 'prime_fixe') $this->primeUsdLaw = $pctSum > 0 ? extraPercentLawUsd($pctSum, $baseForPercent) : 0;
         return $total;
     }
 
@@ -517,6 +520,7 @@ class PayrollCalculator {
             'base_plus_echelon_lbp' => round($basePlusEchelon),
             'extra_lbp' => round($extra),
             'prime_fixe_lbp' => round($primeFixe),
+            'prime_fixe_usd_law' => (int)$this->primeUsdLaw,
             'aide_complementaire_lbp' => round($aideComp),
             'transport_complement_lbp' => round($transportComp),
             
@@ -573,10 +577,11 @@ class PayrollCalculator {
         }
         $data = $this->calculate();
         
+        ensurePrimeUsdLawColumn();
         $sql = "INSERT INTO monthly_salaries (
             employee_id, school_id, month, year, school_year, grade_at_month,
             base_salary_lbp, echelon_value_lbp, base_plus_echelon_lbp,
-            extra_lbp, prime_fixe_lbp, aide_complementaire_lbp, transport_complement_lbp,
+            extra_lbp, prime_fixe_lbp, prime_fixe_usd_law, aide_complementaire_lbp, transport_complement_lbp,
             echelon_to_caisse_lbp, caisse_amount_lbp, eoc_grade_lbp, cnss_amount_lbp,
             taxable_base_lbp, income_tax_lbp, total_retenues_lbp,
             net_salary_lbp, family_allowance_lbp, transport_lbp, total_due_lbp,
@@ -586,7 +591,7 @@ class PayrollCalculator {
         ) VALUES (
             :employee_id, :school_id, :month, :year, :school_year, :grade_at_month,
             :base_salary_lbp, :echelon_value_lbp, :base_plus_echelon_lbp,
-            :extra_lbp, :prime_fixe_lbp, :aide_complementaire_lbp, :transport_complement_lbp,
+            :extra_lbp, :prime_fixe_lbp, :prime_fixe_usd_law, :aide_complementaire_lbp, :transport_complement_lbp,
             :echelon_to_caisse_lbp, :caisse_amount_lbp, :eoc_grade_lbp, :cnss_amount_lbp,
             :taxable_base_lbp, :income_tax_lbp, :total_retenues_lbp,
             :net_salary_lbp, :family_allowance_lbp, :transport_lbp, :total_due_lbp,
@@ -600,6 +605,7 @@ class PayrollCalculator {
             base_plus_echelon_lbp = VALUES(base_plus_echelon_lbp),
             extra_lbp = VALUES(extra_lbp),
             prime_fixe_lbp = VALUES(prime_fixe_lbp),
+            prime_fixe_usd_law = VALUES(prime_fixe_usd_law),
             aide_complementaire_lbp = VALUES(aide_complementaire_lbp),
             transport_complement_lbp = VALUES(transport_complement_lbp),
             echelon_to_caisse_lbp = VALUES(echelon_to_caisse_lbp),
@@ -733,9 +739,10 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
     $rows = $db->prepare("SELECT * FROM monthly_salaries
         WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month, 0) = 0");
     $rows->execute([$employeeId, $schoolYear]);
+    ensurePrimeUsdLawColumn();
     $upd = $db->prepare("UPDATE monthly_salaries SET
             prime_fixe_lbp = ?, aide_complementaire_lbp = ?, transport_complement_lbp = ?, transport_lbp = ?,
-            net_salary_lbp = ?, total_due_lbp = ?, net_salary_usd = ?, total_due_usd = ?
+            net_salary_lbp = ?, total_due_lbp = ?, net_salary_usd = ?, total_due_usd = ?, prime_fixe_usd_law = ?
         WHERE id = ?");
     $n = 0;
     foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $r) {
@@ -749,7 +756,8 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
         $dAdd = ($newPrime + $newAide) - ((int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']);
         // 🔴 النقل داخل المستحق مرّة واحدة (العمودان نفس القيمة) — الفرق من transport_lbp وحده
         $dTr = $newTr - (int)$r['transport_lbp'];
-        if ($dAdd === 0 && $dTr === 0 && $newTrC === (int)$r['transport_complement_lbp']) continue;
+        $newLawUsd = $doAdd ? (int)$calc->primeUsdLaw : (int)($r['prime_fixe_usd_law'] ?? 0);
+        if ($dAdd === 0 && $dTr === 0 && $newTrC === (int)$r['transport_complement_lbp'] && $newLawUsd === (int)($r['prime_fixe_usd_law'] ?? 0)) continue;
         // 🔴 امتصاص الفجوة (المنقول من القديم): إذا كان الصافي المخزّن أكبر من (الأساس+الإضافات)
         // فالفرق «أجر إضافي مخفي» موجود داخل الصافي أصلاً — تسجيله بالملف يملأ العمود
         // ولا يُضاف للصافي مرّة ثانية؛ فقط ما يزيد عن الفجوة يُعتبر علاوة جديدة فعلية.
@@ -762,6 +770,7 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
         $upd->execute([$newPrime, $newAide, $newTrC, $newTr, $newNet, $newDue,
             $rate > 0 ? round($newNet / $rate, 2) : $r['net_salary_usd'],
             $rate > 0 ? round($newDue / $rate, 2) : $r['total_due_usd'],
+            $newLawUsd,
             $r['id']]);
         $n++;
     }

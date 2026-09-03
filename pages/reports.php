@@ -345,7 +345,7 @@ function reportDocThumb($path) {
                                   'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'cnss'=>(int)$r['cnss_amount_lbp'],'caisse'=>(int)$r['caisse_amount_lbp'],'eocg'=>(int)$r['eoc_grade_lbp'],
                                   'tax'=>(int)$r['income_tax_lbp'],'net'=>(int)$r['net_salary_lbp'],'family'=>(int)$r['family_allowance_lbp'],
                                   'trans'=>$rTrans,'total'=>dueShownLbp($r),
-                                  'extra_usd'=>lbpToUsd(extraWageLbp($r),$rRate),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd($rTrans,$rRate),
+                                  'extra_usd'=>extraWageUsd($r),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd($rTrans,$rRate),
                                   'composed'=>composedSalaryLbp($r),'composed_usd'=>lbpToUsd(composedSalaryLbp($r),$rRate),
                                   'base_usd'=>lbpToUsd((int)$r['base_salary_lbp'],$rRate),'ech_usd'=>lbpToUsd((int)$r['echelon_value_lbp'],$rRate),
                                   'bpe_usd'=>lbpToUsd((int)$r['base_plus_echelon_lbp'],$rRate),'cnss_usd'=>lbpToUsd((int)$r['cnss_amount_lbp'],$rRate),
@@ -365,7 +365,7 @@ function reportDocThumb($path) {
                                 <td><?= money($r['base_salary_lbp'], $rRate) ?></td>
                                 <td><?= money($r['echelon_value_lbp'], $rRate) ?></td>
                                 <td><?= money($r['base_plus_echelon_lbp'], $rRate) ?></td>
-                                <?php if (salaryCompHas('extra')): ?><td><?= money(extraWageLbp($r), $rRate) ?></td><?php endif; ?>
+                                <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $rRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $rRate) ?></strong></td>
                                 <td><?= money($r['cnss_amount_lbp'], $rRate) ?></td>
@@ -434,7 +434,7 @@ function reportDocThumb($path) {
                                 <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'])) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                                 <td><?= money($r['base_salary_lbp'], $repRate) ?></td>
-                                <?php if (salaryCompHas('extra')): ?><td><?= money(extraWageLbp($r), $repRate) ?></td><?php endif; ?>
+                                <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $repRate) ?></strong></td>
                                 <?php /* وعاء الضمان الفعلي مشتقّاً من اشتراك ٣٪ المخزّن — لا وعاء الضريبة (يطلع صفر تحت العتبة) */ ?>
@@ -508,7 +508,7 @@ function reportDocThumb($path) {
                                 <td><?= e($r['finance_ministry_number']) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                                 <td><?= money($r['base_salary_lbp'], $repRate) ?></td>
-                                <?php if (salaryCompHas('extra')): ?><td><?= money(extraWageLbp($r), $repRate) ?></td><?php endif; ?>
+                                <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $repRate) ?></strong></td>
                                 <td><?= money($add['fded'], $repRate) ?></td>
@@ -551,7 +551,7 @@ function reportDocThumb($path) {
                                 <td><?= e($r['caisse_number']) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                                 <td><?= money($r['base_salary_lbp'], $repRate) ?></td>
-                                <?php if (salaryCompHas('extra')): ?><td><?= money(extraWageLbp($r), $repRate) ?></td><?php endif; ?>
+                                <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $repRate) ?></strong></td>
                                 <td><?= money($r['caisse_amount_lbp'], $repRate) ?></td>
@@ -592,14 +592,14 @@ function reportDocThumb($path) {
         $bonusSy = activeSchoolYear();
         if ($bonusSy === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$bonusSy)) $bonusSy = currentSchoolYear();
         $bonusMap = [];
-        $bmQ = $db->prepare("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.exchange_rate, ms.year, ms.month
+        $bmQ = $db->prepare("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.exchange_rate, ms.year, ms.month
                              FROM monthly_salaries ms
                              JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE is_calculated=1 AND school_year=? GROUP BY employee_id) lt
                                ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym AND ms.school_year=?");
         $bmQ->execute([$bonusSy, $bonusSy]);
         foreach ($bmQ as $b) $bonusMap[(int)$b['employee_id']] = $b;
         // من ليس له رواتب بالسنة النشطة → آخر راتب بالمطلق (متل السابق)
-        foreach ($db->query("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.exchange_rate, ms.year, ms.month
+        foreach ($db->query("SELECT ms.employee_id, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.exchange_rate, ms.year, ms.month
                              FROM monthly_salaries ms
                              JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE is_calculated=1 GROUP BY employee_id) lt
                                ON lt.employee_id=ms.employee_id AND (ms.year*12+ms.month)=lt.ym") as $b) {
@@ -634,7 +634,7 @@ function reportDocThumb($path) {
             'salary'  => ['الراتب (قانون) / Salaire', fn($r) => $r['employee_type'] === 'employe'
                             ? money((float)($bonusMap[(int)$r['id']]['base_plus_echelon_lbp'] ?? 0), isset($bonusMap[(int)$r['id']]) ? rowRate($bonusMap[(int)$r['id']]) : null)
                             : money($scaleMap[(int)round($r['current_grade'])] ?? 0)],
-            'extra_wage' => ['الأجر الإضافي / Supplément', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(extraWageLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : money(0)],
+            'extra_wage' => ['الأجر الإضافي / Supplément', fn($r) => isset($bonusMap[(int)$r['id']]) ? extraWageMoney($bonusMap[(int)$r['id']]) : money(0)],
             'aide'    => ['مكافأة ومساعدة / Prime & aide', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(aideCompLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : money(0)],
             'transport' => ['تعويض النقل / Transport', fn($r) => isset($bonusMap[(int)$r['id']]) ? money((float)$bonusMap[(int)$r['id']]['transport_lbp'], rowRate($bonusMap[(int)$r['id']])) : money(0)],
             'composed' => ['الراتب المركّب / Salaire composé', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(composedSalaryLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : money(0)],
@@ -747,7 +747,7 @@ function reportDocThumb($path) {
                               SUM(FLOOR(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0))) bpe_usd,
                               SUM(ms.extra_lbp + ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide,
                               SUM(ms.transport_lbp) transport,
-                              SUM(FLOOR((ms.extra_lbp + ms.prime_fixe_lbp)/NULLIF(ms.exchange_rate,0))) extra_wage_usd,
+                              SUM(" . extraWageUsdSql('ms.') . ") extra_wage_usd,
                               SUM(FLOOR(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0))) aide_usd,
                               SUM(FLOOR(ms.transport_lbp/NULLIF(ms.exchange_rate,0))) transport_usd
                               FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id

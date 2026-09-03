@@ -13,6 +13,7 @@ function isLoggedIn() {
 }
 
 function requireLogin() {
+    ensurePrimeUsdLawColumn(); // 🧮 عمود دولار القانون للإضافي — يتركّب ذاتياً قبل أي استعلام
     // منع المتصفّح من تخبئة الصفحات: حتى تنعكس تبديلات العملة/«الراتب يشمل» فوراً بلا Ctrl+F5،
     // وأماناً لأنّ الصفحات فيها بيانات رواتب حسّاسة يجب ألّا تُخزَّن بذاكرة المتصفّح.
     if (!headers_sent()) {
@@ -3790,6 +3791,80 @@ function employeeExtraPercentByMonth($db, $employeeId, $schoolYear) {
 function extraPercentLawUsd($pct, $basePlusEchelonLbp) {
     if ($pct <= 0 || $basePlusEchelonLbp <= 0) return 0;
     return (int)floor(floor($basePlusEchelonLbp / officialUsdRate()) * $pct / 100);
+}
+/**
+ * 🧮 عمود «دولار القانون للإضافي» بالرواتب المخزّنة (طلبه 2026-09-03 «صحّح النسبة بكل التقارير والإفادات»):
+ * prime_fixe_usd_law = floor(floor(الأساس÷1500) × النسبة٪) — يكتبه المحرّك مع كل حساب، وتقرؤه كل التقارير/القسائم/الإفادات
+ * عبر extraWageUsd()/extraWageMoney()/extraWageUsdSql() بدل قسمة الليرة المدوّرة على السعر (844 $ لا 837 $).
+ * يتركّب ذاتياً. 0 = لا نسبة → الدولار كالمعتاد (الليرة ÷ سعر الشهر، داون).
+ */
+function ensurePrimeUsdLawColumn() {
+    static $done = false; if ($done) return; $done = true;
+    try {
+        $db = getDB();
+        if (!$db->query("SHOW COLUMNS FROM monthly_salaries LIKE 'prime_fixe_usd_law'")->fetch())
+            $db->exec("ALTER TABLE monthly_salaries ADD COLUMN prime_fixe_usd_law INT NOT NULL DEFAULT 0");
+        // 🔴 النسخ الاحتياطية/المرايا المصنوعة سابقاً بـ CREATE TABLE ... LIKE monthly_salaries (‏_ms_bk_*…) لا تحمل العمود
+        // فتكسر أي شفاء يعمل INSERT ... SELECT * منها/إليها (عدد الأعمدة لا يتطابق) — نضيفه لكلّ جدول بشكل الرواتب (مرّة واحدة)
+        if (getSetting('prime_usd_law_bk_synced', '') === '') {
+            foreach ($db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN) as $t) {
+                if ($t === 'monthly_salaries') continue;
+                try {
+                    $cols = $db->query("SHOW COLUMNS FROM `$t`")->fetchAll(PDO::FETCH_COLUMN);
+                    if (in_array('prime_fixe_lbp', $cols, true) && in_array('net_salary_usd', $cols, true) && in_array('total_due_usd', $cols, true) && !in_array('prime_fixe_usd_law', $cols, true))
+                        $db->exec("ALTER TABLE `$t` ADD COLUMN prime_fixe_usd_law INT NOT NULL DEFAULT 0");
+                } catch (Exception $e2) {}
+            }
+            setSetting('prime_usd_law_bk_synced', date('Y-m-d H:i'));
+        }
+    } catch (Exception $e) { /* صلاحيات → الصفحات محصّنة بـ ?? */ }
+}
+/** دولار الأجر الإضافي لصف راتب: دولار القانون (إن وُجد) + دولار الساعات الإضافية القديمة، وإلا الليرة ÷ السعر (داون). */
+function extraWageUsd(array $r): float {
+    $rate = rowRate($r);
+    $law = (int)($r['prime_fixe_usd_law'] ?? 0);
+    if ($law > 0) return $law + lbpToUsd((int)($r['extra_lbp'] ?? 0), $rate);
+    return lbpToUsd((int)($r['extra_lbp'] ?? 0) + (int)($r['prime_fixe_lbp'] ?? 0), $rate);
+}
+/** خلية الأجر الإضافي بوضع العملة الموحّد (المصدر الواحد لكل التقارير — بدل money(extraWageLbp) ). */
+function extraWageMoney(array $r, array $opts = []): string {
+    $lbp = (int)($r['extra_lbp'] ?? 0) + (int)($r['prime_fixe_lbp'] ?? 0);
+    $mode = $opts['mode'] ?? displayCurrency(); $withCur = $opts['withCur'] ?? true;
+    if ($mode === 'lbp') return formatLBP($lbp, $withCur);
+    $usd = extraWageUsd($r);
+    if ($mode === 'usd') return formatUSD($usd, $withCur);
+    return formatLBP($lbp, $withCur) . '<span class="money-usd">' . formatUSD($usd, true) . '</span>';
+}
+/** تعبير SQL لدولار الأجر الإضافي (للمجاميع SUM(...)) — نفس قاعدة extraWageUsd. $p = بادئة الجدول ('ms.' أو ''). */
+function extraWageUsdSql(string $p = 'ms.'): string {
+    return "(CASE WHEN {$p}prime_fixe_usd_law > 0 THEN {$p}prime_fixe_usd_law + FLOOR({$p}extra_lbp/NULLIF({$p}exchange_rate,0)) ELSE FLOOR(({$p}extra_lbp+{$p}prime_fixe_lbp)/NULLIF({$p}exchange_rate,0)) END)";
+}
+/**
+ * شفاء تعبئة العمود للرواتب المخزّنة سابقاً لأصحاب النسبة (كل السنوات) — دفعات 25 أستاذاً، فلاغ heal_prime_usd_law_20260903.
+ */
+function healPrimeUsdLaw20260903() {
+    try {
+        if (strpos((string)getSetting('heal_prime_usd_law_20260903', ''), 'done') === 0) return;
+        $db = getDB(); ensurePrimeUsdLawColumn();
+        $last = (int)getSetting('heal_prime_usd_law_progress', 0);
+        $emps = $db->query("SELECT DISTINCT b.employee_id FROM employee_bonuses b WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='percent' AND b.employee_id > $last ORDER BY b.employee_id LIMIT 25")->fetchAll(PDO::FETCH_COLUMN);
+        if (!$emps) { setSetting('heal_prime_usd_law_20260903', 'done@' . date('Y-m-d H:i')); return; }
+        $upd = $db->prepare("UPDATE monthly_salaries SET prime_fixe_usd_law = ? WHERE id = ? AND prime_fixe_usd_law <> ?");
+        foreach ($emps as $eid) {
+            $eid = (int)$eid;
+            $rows = $db->query("SELECT id, school_year, month, base_plus_echelon_lbp, prime_fixe_usd_law FROM monthly_salaries WHERE employee_id = $eid")->fetchAll(PDO::FETCH_ASSOC);
+            $pm = [];
+            foreach ($rows as $r) {
+                $sy = (string)$r['school_year'];
+                if (!isset($pm[$sy])) $pm[$sy] = employeeExtraPercentByMonth($db, $eid, $sy);
+                $law = extraPercentLawUsd((float)($pm[$sy][(int)$r['month']] ?? 0), (float)$r['base_plus_echelon_lbp']);
+                $upd->execute([$law, (int)$r['id'], $law]);
+            }
+            setSetting('heal_prime_usd_law_progress', (string)$eid);
+        }
+    } catch (Throwable $e) {
+        try { setSetting('heal_prime_usd_law_err', mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
 }
 function employeeExtraPercentForYear($db, $employeeId, $schoolYear) {
     if (!preg_match('/^(\d{4})-(\d{4})$/', (string)$schoolYear, $m)) return '';

@@ -150,7 +150,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
             // 🧮 قيمة «الراتب بعد التدرج» بالدولار القديم (÷ السعر الرسمي 1500، داون) — أساس قانون نسبة الإضافي (طلبه 2026-09-03)
             'cur_sal_old_usd' => (int)floor($curSal / officialUsdRate()),
             // 🧮 دولار الإضافي بالقانون لهذا الشهر (null لغير أصحاب النسبة → يُعرض ÷ السعر كالمعتاد)
-            'extra_law_usd'   => $hasPct ? (extraPercentLawUsd((float)($pctByMonth[(int)$s['month']] ?? 0), $curSal) + $usd((int)$s['extra_lbp'])) : null,
+            'extra_law_usd'   => $hasPct ? ((int)($s['prime_fixe_usd_law'] ?? 0) > 0 ? (int)extraWageUsd($s) : (extraPercentLawUsd((float)($pctByMonth[(int)$s['month']] ?? 0), $curSal) + $usd((int)$s['extra_lbp']))) : null,
             'extra_wage'   => $extraWageSlip,
             'aide'         => $aideSlip,
             'brut'         => $brut,

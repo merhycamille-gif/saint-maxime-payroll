@@ -144,7 +144,7 @@ if (!$emp):
                     <?php $slRate = $sal ? rowRate($sal) : null; ?>
                     <tr><td>Salaire actuel (base+échelon) / الراتب الحالي</td><td><strong><?= money($curBase, $slRate) ?></strong></td></tr>
                     <?php if ($sal): // سطور «+» تتبع زرّ «الراتب يشمل» — فيبقى الراتب المركّب = مجموع السطور الظاهرة ?>
-                    <?php if (salaryCompHas('extra')): ?><tr><td>+ Supplément / الأجر الإضافي</td><td><?= money((int)$sal['extra_lbp'] + (int)$sal['prime_fixe_lbp'], $slRate) ?></td></tr><?php endif; ?>
+                    <?php if (salaryCompHas('extra')): ?><tr><td>+ Supplément / الأجر الإضافي</td><td><?= extraWageMoney($sal) ?></td></tr><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><tr><td>+ Prime &amp; aide / المكافأة والمساعدة</td><td><?= money((int)$sal['aide_complementaire_lbp'], $slRate) ?></td></tr><?php endif; ?>
                     <?php if (salaryCompHas('transport')): ?><tr><td>+ Transport / تعويض النقل</td><td><?= money((int)$sal['transport_lbp'], $slRate) ?></td></tr><?php endif; ?>
                     <tr style="background:#eef2ff"><td><strong>Salaire composé / الراتب المركّب</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td><strong><?= money(composedSalaryLbp($sal), $slRate) ?></strong></td></tr>

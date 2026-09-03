@@ -57,7 +57,7 @@ function extraAideCells(array $r, bool $num = true): string {
     $cls = $num ? ' class="num"' : '';
     $rate = rowRate($r);
     $h = '';
-    if (salaryCompHas('extra')) $h .= '<td' . $cls . '>' . money(extraWageLbp($r), $rate, ['withCur' => false]) . '</td>';
+    if (salaryCompHas('extra')) $h .= '<td' . $cls . '>' . extraWageMoney($r, ['withCur' => false]) . '</td>'; // 🧮 دولار القانون لأصحاب النسبة
     if (salaryCompHas('aide'))  $h .= '<td' . $cls . '>' . money(aideCompLbp($r), $rate, ['withCur' => false]) . '</td>';
     return $h;
 }

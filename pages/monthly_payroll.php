@@ -83,7 +83,7 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= money($salary['base_salary_lbp'], rowRate($salary)) ?></td></tr>
                         <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= money($salary['echelon_value_lbp'], rowRate($salary)) ?></td></tr><?php endif; ?>
                         <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= money($salary['base_plus_echelon_lbp'], rowRate($salary)) ?></strong></td></tr><?php endif; ?>
-                        <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= money((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= extraWageMoney($salary) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
                         <tr style="background:#eef2ff"><td><strong>الراتب المركّب / Salaire composé</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td class="text-end"><strong><?= money(composedSalaryLbp($salary), rowRate($salary)) ?></strong></td></tr>
                     </table>
@@ -392,7 +392,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= money($salary['base_salary_lbp'], rowRate($salary)) ?></td></tr>
                         <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= money($salary['echelon_value_lbp'], rowRate($salary)) ?></td></tr><?php endif; ?>
                         <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= money($salary['base_plus_echelon_lbp'], rowRate($salary)) ?></strong></td></tr><?php endif; ?>
-                        <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= money((int)$salary['extra_lbp'] + (int)$salary['prime_fixe_lbp'], rowRate($salary)) ?></td></tr>
+                        <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= extraWageMoney($salary) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
                         <tr style="background:#eef2ff"><td><strong>الراتب المركّب / Salaire composé</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td class="text-end"><strong><?= money(composedSalaryLbp($salary), rowRate($salary)) ?></strong></td></tr>
                     </table>
