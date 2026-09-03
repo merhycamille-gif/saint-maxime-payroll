@@ -3,6 +3,7 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/payroll_calculator.php'; // recalcEmployeeYear لإجراءات الـ64
 require_once __DIR__ . '/includes/age64.php';               // أدوات تنبيه بلوغ الـ64 (مشتركة)
+require_once __DIR__ . '/includes/hours_reduction.php';     // 🕐 مساج تناقص ساعات التدريس «قرار مطلوب» بكل مدرسة
 requireLogin();
 
 $currentPage = 'dashboard';
@@ -12,6 +13,8 @@ $db = getDB();
 
 // إجراءات تنبيه بلوغ الـ64 (يبقى/إلغاء/ترك) — تُعالَج وتعيد التوجيه للرئيسية
 handleAge64Post($db, BASE_URL . 'index.php');
+// 🕐 إذن تسجيل تناقص الساعات (موافق/لاحقاً) — يُعالَج ويعيد التوجيه للرئيسية
+handleHoursReductionPost($db, BASE_URL . 'index.php');
 
 // Stats (مقيّدة بالمدرسة الحالية — أو كل المدارس للمدير العام)
 // 🔢 الأعداد حسب **السنة الدراسية المختارة** + المدرسة/المدارس المختارة (نفس فلتر السنة المستعمَل بكل البرنامج).
@@ -58,6 +61,10 @@ $exchangeRate = getExchangeRate();
 // تنبيه بلوغ سنّ الـ64 — الرئيسية تعرض **فقط** من بلغوا 64 ضمن السنة الدراسية المختارة؛
 // أما القائمة الكاملة (كل من بلغوا 64) ففي صفحتها الخاصة pages/retirement_64.php.
 $home64 = age64List($db, true);
+
+// 🕐 تناقص ساعات التدريس: من صار عنده تناقص جديد ببداية السنة المعروضة — مساج بكل مدرسة يطلب الإذن
+$homeHrSy = activeSchoolYear(); if ($homeHrSy === 'all') $homeHrSy = currentSchoolYear();
+$homeHrPending = viewerCanSeePage('hours_reduction.php') ? hoursReductionPending($db, $homeHrSy) : [];
 
 // أساتذة لبطاقة «ملف الأستاذ الكامل» على الداشبورد — تشمل كل المدارس المسموحة (حتى في وضع «كل المدارس»
 // يقدر يفتّش عن الأستاذ؛ عند اختياره تُبدَّل المدرسة تلقائياً لمدرسته). schoolScopeSql تقيّد تلقائياً حسب المسموح.
@@ -176,6 +183,8 @@ $dashSections = [
     </div>
 </section>
 <?php endforeach; ?>
+
+<?php renderHoursReductionPending($homeHrPending, $homeHrSy, true); ?>
 
 <?php if ($home64): ?>
 <details class="reg-details no-print">

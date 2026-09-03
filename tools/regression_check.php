@@ -4480,9 +4480,45 @@ check('صفحة تناقص الساعات تعرض المرسوم والمستح
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'pages/hours_reduction.php') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'hoursReductionMsg') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "require_once __DIR__ . '/../includes/hours_reduction.php'") !== false);
-check('الميزة عرض فقط: لا أي كتابة (INSERT/UPDATE/DELETE/exec) بملفَي تناقص الساعات — «انتبه ما تخرب شي»',
-      stripos($hrSrc95, 'INSERT ') === false && stripos($hrSrc95, 'UPDATE ') === false
-      && stripos($hrSrc95, 'DELETE ') === false && stripos($hrSrc95, '->exec(') === false);
+// 🔔 (2026-09-03) الكتابة الوحيدة المسموحة = تسجيل ساعات الملاك/التناقص **بإذنه** داخل handleHoursReductionPost
+//    (CSRF + canEdit + نطاق المدرسة) + التركيب الذاتي للأعمدة؛ لا INSERT/DELETE ولا لمس أي راتب.
+$hrInc95 = (string)file_get_contents($PROJ . '/includes/hours_reduction.php');
+$hrPg95  = (string)file_get_contents($PROJ . '/pages/hours_reduction.php');
+$hrHandlerPos = strpos($hrInc95, 'function handleHoursReductionPost');
+$hrBeforeHandler = substr($hrInc95, 0, (int)$hrHandlerPos);
+check('الكتابة الوحيدة = تسجيل التناقص بإذنه: UPDATE فقط داخل handleHoursReductionPost (requireCsrf + canEdit + schoolScopeSql)، لا INSERT/DELETE، الصفحة نفسها بلا كتابة، ولا لمس للرواتب',
+      $hrHandlerPos !== false
+      && stripos($hrBeforeHandler, 'UPDATE ') === false && stripos($hrInc95, 'INSERT ') === false && stripos($hrInc95, 'DELETE ') === false
+      && substr_count($hrInc95, 'UPDATE employees SET') === 2
+      && strpos($hrInc95, 'requireCsrf();') !== false && strpos($hrInc95, 'if (!canEdit())') !== false
+      && strpos($hrInc95, "schoolScopeSql('e.school_id'));") !== false
+      && stripos($hrInc95, 'monthly_salaries') === false && stripos($hrInc95, 'recalcEmployeeYear') === false && stripos($hrInc95, 'calculateAndSave') === false
+      && stripos($hrPg95, 'UPDATE ') === false && stripos($hrPg95, 'INSERT ') === false && stripos($hrPg95, '->exec(') === false);
+// قاعدة «قرار مطلوب» (دالة صافية): يظهر فقط من صار عنده تناقص جديد/أكبر ولم يُسجَّل بملفه، ويختفي بعد الموافقة أو «لاحقاً» لهذه السنة فقط
+$hrE95 = ['employee_type' => 'enseignant_titulaire', 'titularization_date' => '1990-10-01', 'niveau_scolaire' => 'primaire', 'hours_per_week' => 27, 'hours_reduction' => 0];
+$hrR95 = hoursReductionFor($hrE95, '2025-2026');                                                   // سنة 36 → 19 (−8)
+$hrApplied95 = $hrE95 + []; $hrApplied95['hours_per_week'] = 19; $hrApplied95['hours_reduction'] = 8;   // بعد الموافقة
+$hrLater95 = $hrE95; $hrLater95['hours_reduction_later_sy'] = '2025-2026';                          // «لاحقاً» لهذه السنة
+$hrNext95 = hoursReductionFor($hrApplied95, '2026-2027');                                           // سنة 37 → 19 (نفس الساعات) → لا مساج
+$hrStep95 = hoursReductionFor(['employee_type' => 'enseignant_titulaire', 'titularization_date' => '2002-10-01', 'niveau_scolaire' => 'primaire', 'hours_per_week' => 26, 'hours_reduction' => 1], '2026-2027'); // سنة 25 → 25 (−2): تناقص أكبر → مساج
+$hrNone95 = hoursReductionFor(['employee_type' => 'enseignant_titulaire', 'titularization_date' => '2010-10-01', 'niveau_scolaire' => 'primaire', 'hours_per_week' => 18, 'hours_reduction' => 0], '2025-2026'); // سنة 16 → لا تناقص → لا مساج
+check('قاعدة «قرار مطلوب»: جديد غير مسجّل → مساج · بعد الموافقة (19/8) → لا · «لاحقاً» لهذه السنة → لا (ويرجع السنة الجاية) · السنة الجاية بنفس الساعات → لا · صعود درجة تناقص (−1→−2) → مساج · بلا تناقص → لا',
+      hoursReductionNeedsDecision($hrE95, $hrR95, '2025-2026') === true
+      && hoursReductionNeedsDecision($hrApplied95, $hrR95, '2025-2026') === false
+      && hoursReductionNeedsDecision($hrLater95, $hrR95, '2025-2026') === false
+      && hoursReductionNeedsDecision($hrLater95, $hrR95, '2026-2027') === true
+      && hoursReductionNeedsDecision($hrApplied95, $hrNext95, '2026-2027') === false
+      && hoursReductionNeedsDecision(['hours_per_week' => 26, 'hours_reduction' => 1], $hrStep95, '2026-2027') === true && (int)$hrStep95['reduction'] === 2
+      && hoursReductionNeedsDecision(['hours_per_week' => 18, 'hours_reduction' => 0], $hrNone95, '2025-2026') === false);
+check('مساج «قرار مطلوب» بكل مدرسة موصول: لوحة القيادة + صفحة التناقص (hr_apply/hr_later + «موافق على الكل بهذه المدرسة») + ملف الأستاذ (زرّا موافق/لاحقاً يرجعان لملفه) + الأعمدة تتركّب ذاتياً',
+      strpos((string)file_get_contents($PROJ . '/index.php'), 'handleHoursReductionPost($db') !== false
+      && strpos((string)file_get_contents($PROJ . '/index.php'), 'renderHoursReductionPending(') !== false
+      && strpos($hrPg95, 'handleHoursReductionPost($db') !== false && strpos($hrPg95, 'renderHoursReductionPending(') !== false
+      && strpos($hrInc95, 'موافق على الكل بهذه المدرسة') !== false && strpos($hrInc95, "value=\"hr_apply\"") !== false && strpos($hrInc95, "value=\"hr_later\"") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'hoursReductionDecisionButtons($employee, $hrMsg') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'hoursReductionNeedsDecision($employee') !== false
+      && strpos($hrInc95, "ADD COLUMN hours_reduction DECIMAL(4,1)") !== false && strpos($hrInc95, "ADD COLUMN hours_reduction_sy") !== false
+      && strpos($hrPage95, 'المسجّل بملفه') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

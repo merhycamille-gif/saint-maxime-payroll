@@ -1021,12 +1021,14 @@ include __DIR__ . '/../includes/header.php';
 <?php
 // 🕐 مساج تناقص ساعات التدريس (مرسوم 2601/2018) — يظهر للأستاذ الملاك الذي له تناقص بالسنة المعروضة.
 // عرض ومعلومات فقط: لا يغيّر أي راتب ولا خانة «ساعات بالأسبوع».
-$hrMsg = null; $hrSy = null;
+$hrMsg = null; $hrSy = null; $hrNeeds = false;
 if ($id > 0 && ($employee['employee_type'] ?? '') === 'enseignant_titulaire') {
     $hrSy = activeSchoolYear(); if ($hrSy === 'all') $hrSy = currentSchoolYear();
     $hrSchoolName = '';
     try { $hrSchoolName = (string)$db->query("SELECT name_ar FROM schools WHERE id = " . (int)$employee['school_id'])->fetchColumn(); } catch (Exception $e) {}
     $hrMsg = hoursReductionFor($employee, $hrSy, $hrSchoolName);
+    hoursReductionEnsureColumns($db);
+    $hrNeeds = hoursReductionNeedsDecision($employee, $hrMsg, $hrSy);
 }
 if ($hrMsg && $hrMsg['reduction'] > 0): ?>
     <div class="alert alert-warning" id="hoursReductionMsg" style="border-right:4px solid #d97706">
@@ -1037,6 +1039,18 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
         ساعاته الأسبوعية القانونية <strong><?= (int)$hrMsg['lawHours'] ?></strong> بدل <?= (int)$hrMsg['baseHours'] ?>
         (<?= e($hrMsg['stageLabel']) ?> — الجدول <?= (int)$hrMsg['table'] ?> من المرسوم 2601/2018<?= $hrMsg['assumed'] ? ' — المرحلة افتراضية: حدّد «المرحلة» أو «الصفوف» بملفه للتدقيق' : '' ?>).
         <a href="<?= BASE_URL ?>pages/hours_reduction.php" class="no-print">كل المستحقّين بكل مدرسة ←</a>
+        <?php $fmtH = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.'); if ($hrNeeds): ?>
+            <div class="no-print" style="margin-top:8px;padding-top:8px;border-top:1px dashed #d97706">
+                <strong><i class="fas fa-bell"></i> قرار مطلوب:</strong> صار عنده تناقص جديد ببداية سنة <?= e($hrSy) ?> —
+                المسجّل بملفه الآن <strong><?= $fmtH($employee['hours_per_week']) ?></strong> ساعة ملاك / تناقص <strong><?= $fmtH($employee['hours_reduction'] ?? 0) ?></strong>.
+                بإذنك يسجّل البرنامج: <strong><?= (int)$hrMsg['lawHours'] ?></strong> ساعة ملاك و<strong>−<?= (int)$hrMsg['reduction'] ?></strong> تناقص (لا يتغيّر أي راتب).
+                <div style="margin-top:6px"><?= hoursReductionDecisionButtons($employee, $hrMsg, 'employees.php?action=edit&id=' . (int)$id . '#hoursReductionMsg') ?></div>
+            </div>
+        <?php elseif (($employee['hours_reduction_later_sy'] ?? '') === $hrSy && abs((float)($employee['hours_reduction'] ?? 0) - $hrMsg['reduction']) > 0.01): ?>
+            <div style="margin-top:6px"><span class="badge" style="background:#6b7280;color:#fff">مؤجَّل لسنة <?= e($hrSy) ?></span> <small>المسجّل بملفه <?= $fmtH($employee['hours_per_week']) ?> ساعة / تناقص <?= $fmtH($employee['hours_reduction'] ?? 0) ?> — يعود المساج السنة الجاية أو عند تغيّر التناقص.</small></div>
+        <?php else: ?>
+            <div style="margin-top:6px"><span class="badge badge-success">✓ مسجّل بملفه</span> <small><?= $fmtH($employee['hours_per_week']) ?> ساعة ملاك / تناقص <?= $fmtH($employee['hours_reduction'] ?? 0) ?><?= !empty($employee['hours_reduction_sy']) ? ' (سنة ' . e($employee['hours_reduction_sy']) . ')' : '' ?></small></div>
+        <?php endif; ?>
     </div>
 <?php endif; ?>
 
@@ -1409,13 +1423,14 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                         <small id="dpwTransport" class="text-muted" style="display:block;margin-top:3px"></small>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Heures/semaine / ساعات بالأسبوع</label>
+                        <label class="form-label">Heures/semaine / ساعات بالأسبوع<?= ($employee['employee_type'] ?? '') === 'enseignant_titulaire' ? ' <small>(ساعات الملاك)</small>' : '' ?></label>
                         <input type="number" name="hours_per_week" class="form-control" value="<?= (float)$employee['hours_per_week'] ?>" step="0.5" min="0">
-                        <?php if (!empty($hrMsg)): // 🕐 قانون التناقص (مرسوم 2601/2018) — معلومة فقط، لا تغيّر الخانة ?>
+                        <?php if (!empty($hrMsg)): // 🕐 قانون التناقص (مرسوم 2601/2018) — الخانة لا تُكتب إلا بإذنه (زرّ «موافق» بالمساج أعلاه) ?>
                             <small style="display:block;margin-top:3px;color:<?= $hrMsg['reduction'] > 0 ? '#b45309' : 'var(--muted,#6b7280)' ?>">
                                 <i class="fas fa-clock"></i> قانون التناقص:
                                 <?php if ($hrMsg['reduction'] > 0): ?>
                                     ساعاته القانونية <strong><?= (int)$hrMsg['lawHours'] ?></strong> بدل <?= (int)$hrMsg['baseHours'] ?> (تناقص −<?= (int)$hrMsg['reduction'] ?>، سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>)
+                                    — ساعات التناقص المسجّلة: <strong><?= rtrim(rtrim(number_format((float)($employee['hours_reduction'] ?? 0), 1), '0'), '.') ?></strong><?= $hrNeeds ? ' <span class="badge badge-warning">⏳ قرار مطلوب أعلاه</span>' : '' ?>
                                 <?php else: ?>
                                     لا تناقص بسنة <?= e($hrSy) ?> (سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>) — يبدأ من سنة <?= e($hrMsg['startSy']) ?>
                                 <?php endif; ?>

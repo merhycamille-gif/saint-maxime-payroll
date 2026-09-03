@@ -2,7 +2,8 @@
 /**
  * صفحة «تناقص ساعات التدريس» — المرسوم 2601/2018: أساتذة الملاك الذين يحقّ لهم تناقص
  * عدد ساعات التدريس الأسبوعية بالسنة الدراسية المعروضة، مجمّعين لكل مدرسة.
- * عرض ومعلومات فقط — لا تغيّر أي حساب راتب.
+ * لا تغيّر أي حساب راتب. أعلى الصفحة مساج «قرار مطلوب» بكل مدرسة لمن صار عنده تناقص جديد
+ * بالسنة المعروضة: بإذن المستخدم يُسجَّل له ساعات الملاك الجديدة وساعات التناقص (طلبه 2026-09-03).
  */
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -10,6 +11,7 @@ require_once __DIR__ . '/../includes/hours_reduction.php';
 requireLogin();
 
 $db = getDB();
+handleHoursReductionPost($db, BASE_URL . 'pages/hours_reduction.php'); // موافق / لاحقاً ثم يعيد التوجيه
 $currentPage = 'hours_reduction';
 $pageTitle = 'Réduction d\'horaire / تناقص ساعات التدريس';
 
@@ -17,16 +19,20 @@ $sy = activeSchoolYear();
 if ($sy === 'all') $sy = currentSchoolYear();
 $bySchool = hoursReductionList($db, $sy);
 $total = 0; foreach ($bySchool as $rows) $total += count($rows);
+$pending = hoursReductionPending($db, $sy);
 
 include __DIR__ . '/../includes/header.php';
 ?>
+
+<?php renderHoursReductionPending($pending, $sy); ?>
 
 <div class="alert alert-info no-print" style="margin-bottom:14px">
     <i class="fas fa-info-circle"></i>
     <strong>المرسوم رقم 2601 تاريخ 27/3/2018:</strong> يتناقص عدد ساعات التدريس الأسبوعية للأستاذ في <strong>الملاك الدائم</strong> تدريجياً حسب سنوات خدمته —
     بعد <strong>16 سنة</strong> خدمة فعلية في التعليم الثانوي (الأساس 20 ساعة)، وبعد <strong>20 سنة</strong> في الروضة والتعليم الأساسي
     (الحلقة الثالثة: الأساس 24 · الروضة والحلقتان الأولى والثانية: الأساس 27).
-    الجدول أدناه يعرض مستحقّي التناقص بسنة <strong><?= e($sy) ?></strong> وعددهم بكل مدرسة. هذا عرض معلوماتي — لا يغيّر أي راتب.
+    الجدول أدناه يعرض مستحقّي التناقص بسنة <strong><?= e($sy) ?></strong> وعددهم بكل مدرسة — لا يغيّر أي راتب.
+    كل من <strong>صار عنده تناقص جديد ببداية السنة</strong> يظهر أعلاه بمساج «قرار مطلوب» ينتظر إذنك ليُسجَّل بملفه عدد ساعات الملاك وساعات التناقص.
 </div>
 
 <?php if (!$bySchool): ?>
@@ -53,6 +59,7 @@ include __DIR__ . '/../includes/header.php';
                 <th>Cycle / المرحلة (الجدول)</th>
                 <th>Heures légales / ساعاته القانونية أسبوعياً</th>
                 <th>Réduction / التناقص</th>
+                <th>Enregistré / المسجّل بملفه</th>
             </tr></thead>
             <tbody>
             <?php foreach ($rows as $r): $e = $r['emp']; $hr = $r['hr'];
@@ -66,6 +73,15 @@ include __DIR__ . '/../includes/header.php';
                     <?php endif; ?></td>
                     <td><strong><?= (int)$hr['lawHours'] ?></strong> بدل <?= (int)$hr['baseHours'] ?></td>
                     <td><span class="badge badge-danger" style="font-size:12px">−<?= (int)$hr['reduction'] ?> ساعات</span></td>
+                    <td style="white-space:nowrap"><?php $fmtH = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.');
+                        if (hoursReductionNeedsDecision($e, $hr, $sy)): ?>
+                            <span class="badge badge-warning" title="ينتظر إذنك بالمساج أعلى الصفحة">⏳ قرار مطلوب</span>
+                            <small><?= $fmtH($e['hours_per_week']) ?> ساعة / تناقص <?= $fmtH($e['hours_reduction'] ?? 0) ?></small>
+                        <?php elseif (($e['hours_reduction_later_sy'] ?? '') === $sy && abs((float)($e['hours_reduction'] ?? 0) - $hr['reduction']) > 0.01): ?>
+                            <span class="badge" style="background:#6b7280;color:#fff">مؤجَّل لسنة <?= e($sy) ?></span>
+                        <?php else: ?>
+                            <span class="badge badge-success">✓ مسجّل</span> <small><?= $fmtH($e['hours_per_week']) ?> ساعة ملاك / تناقص <?= $fmtH($e['hours_reduction'] ?? 0) ?><?= !empty($e['hours_reduction_sy']) ? ' (سنة ' . e($e['hours_reduction_sy']) . ')' : '' ?></small>
+                        <?php endif; ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
