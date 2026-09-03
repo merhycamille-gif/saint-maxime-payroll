@@ -2347,7 +2347,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
 
 <?php elseif ($form === 'cnss_work_detail'): // 2M إفادة عمل — مرض (مفصّلة)
     // 🔴 الأشهر الفعلية الماضية فقط (حتى شهر اليوم) — لا أشهر مستقبلية من سنة مفتوحة للتجهيز
-    $rows = $db->prepare("SELECT month, year, base_plus_echelon_lbp, extra_lbp, prime_fixe_lbp, aide_complementaire_lbp
+    $rows = $db->prepare("SELECT month, year, base_plus_echelon_lbp, extra_lbp, prime_fixe_lbp, prime_fixe_usd_law, aide_complementaire_lbp
                           FROM monthly_salaries WHERE employee_id=? AND is_calculated=1
                             AND (year * 100 + month) <= ?
                           ORDER BY year DESC, month DESC LIMIT 6");
@@ -2409,7 +2409,7 @@ elseif ($form === 'payment_list'):
     // كشف الدفع: لائحة الرواتب الصافية للموظفين (لشهر) — للدفع/التحويل المصرفي + توقيع
     $stmt = $db->prepare("SELECT e.employee_type, e.employee_code, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
                                  e.nssf_number, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.exchange_rate, ms.net_salary_lbp, ms.total_due_lbp, ms.family_allowance_lbp, ms.transport_lbp,
-                                 ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp
+                                 ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
                           ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
@@ -2751,7 +2751,7 @@ elseif ($form === 'payment_list'):
     // فلتر «موظفي الفترة» الموحّد محسوب بأعلى الملف حسب شهر/سنة الكشف ($ofMonthFilter/$ofMonthParams).
     $sql = "SELECT e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
                    e.nssf_number, e.birth_date, e.employee_type, e.hire_date,
-                   ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.transport_lbp, ms.taxable_base_lbp,
+                   ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp, ms.transport_lbp, ms.taxable_base_lbp,
                    ms.cnss_amount_lbp, ms.school_cnss_8_lbp,
                    ms.school_end_of_service_8_5_lbp, ms.school_family_comp_6_lbp, ms.family_allowance_lbp
             FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id

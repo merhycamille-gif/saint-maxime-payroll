@@ -4599,6 +4599,20 @@ check('لا بقايا قسمة مباشرة للإضافي على السعر ب
       && strpos($calcSrc97, 'total_due_usd = ?, prime_fixe_usd_law = ?') !== false
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healPrimeUsdLaw20260903();') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), '$extraWUsd = ($sal && (int)($sal[\'prime_fixe_usd_law\'] ?? 0) > 0) ? extraWageUsd($sal) : null;') !== false);
+// 🔴 («كل شي مطابق ونفس الأرقام بكل التقارير» 2026-09-03) أي SELECT يجيب أعمدة الإضافي صراحةً لعرضها يجب أن يجيب prime_fixe_usd_law معها
+//    (لائحة الدفع كانت 837 $ لأن استعلامها بلا العمود) + المجاميع الفرعية تجمع دولارات القانون لا تقسم الليرة (cnss/tax/eoc summaries)
+$bad97 = [];
+foreach (['pages/reports.php', 'pages/official_forms.php', 'pages/reports_export.php', 'pages/monthly_payroll.php', 'pages/attestations.php', 'pages/employee_history.php'] as $f97) {
+    foreach (explode("\n", (string)file_get_contents($PROJ . '/' . $f97)) as $ln97 => $line97) {
+        if (preg_match('/(ms\.)?extra_lbp,\s*(ms\.)?prime_fixe_lbp,\s*(ms\.)?aide_complementaire_lbp/', $line97) && strpos($line97, 'prime_fixe_usd_law') === false) $bad97[] = $f97 . ':' . ($ln97 + 1);
+    }
+}
+$repSrc97 = (string)file_get_contents($PROJ . '/pages/reports.php');
+check('كل استعلام عرض يجيب extra_lbp/prime_fixe_lbp صراحةً يجيب prime_fixe_usd_law معه + المجاميع الفرعية بالكشوف تجمع دولارات القانون (لا money($a[extra]) ولا money($teEx)) + الإفادة: الإضافي وحده بدولار القانون والمجاميع ÷ السعر كباقي التقارير',
+      !$bad97 && strpos($repSrc97, "money(\$a['extra'], \$repRate)") === false && strpos($repSrc97, "money(\$teEx, \$repRate)") === false
+      && strpos($repSrc97, "dualFromUsd(\$a['extra'], \$a['extra_usd'])") !== false && strpos($repSrc97, "dualFromUsd(\$teEx, \$teExU)") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), "if (\$extraWUsd !== null && \$extraW > 0 && (int)\$lbp === (int)\$extraW) return \$extraWUsd;") !== false,
+      $bad97 ? implode(', ', $bad97) : 'ok');
 // حيّ: بعد شفاء التعبئة محلياً، كل صف بإضافي نسبةٍ له عمود قانون = floor(floor(bpe/1500)×pct) — عيّنة أصحاب النسبة
 $miss97 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employee_bonuses b ON b.employee_id=ms.employee_id AND b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='percent' AND (b.school_year IS NULL OR b.school_year=ms.school_year) AND b.start_month IS NULL
     WHERE ms.prime_fixe_lbp > 0 AND ms.prime_fixe_usd_law = 0")->fetchColumn();

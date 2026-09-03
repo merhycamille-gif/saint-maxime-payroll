@@ -737,14 +737,9 @@ if (!$emp):
     // 🧮 (2026-09-03 «صحّح النسبة بكل التقارير والإفادات») لأصحاب النسبة: دولار الإضافي = دولار القانون (844 $ لا 837)،
     // والمبالغ المركّبة (الراتب المعروض / الملحقات) = جمع دولارات مكوّناتها (الأرقام تركب). غيرهم: الليرة ÷ السعر كالمعتاد.
     $extraWUsd = ($sal && (int)($sal['prime_fixe_usd_law'] ?? 0) > 0) ? extraWageUsd($sal) : null;
-    $usdOf   = function ($lbp) use ($fxRate, $extraWUsd, $extraW, $aideW, $transW, $basePlusEch, $incExtra, $incAide, $incTrans, $salShown) {
-        if ($extraWUsd !== null && $extraW > 0) {
-            $suppLbp = ($incExtra ? $extraW : 0) + ($incAide ? $aideW : 0);
-            $u = fn($v) => $fxRate > 0 ? floor($v / $fxRate) : 0;
-            if ((int)$lbp === (int)$extraW) return $extraWUsd;
-            if ((int)$lbp === (int)$salShown) return $u($basePlusEch) + ($incExtra ? $extraWUsd : 0) + ($incAide ? $u($aideW) : 0) + ($incTrans ? $u($transW) : 0);
-            if ($suppLbp > 0 && (int)$lbp === (int)$suppLbp) return ($incExtra ? $extraWUsd : 0) + ($incAide ? $u($aideW) : 0);
-        }
+    // المجاميع (الراتب المعتمد/الملحقات) تبقى ÷ السعر كباقي التقارير (الإجمالي 863 $ بكل مكان) — الإضافي وحده 844 $
+    $usdOf   = function ($lbp) use ($fxRate, $extraWUsd, $extraW) {
+        if ($extraWUsd !== null && $extraW > 0 && (int)$lbp === (int)$extraW) return $extraWUsd;
         return $fxRate > 0 ? $lbp / $fxRate : 0;
     };
     $money   = function ($lbp) use ($cur, $usdOf) {
