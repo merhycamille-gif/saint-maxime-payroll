@@ -254,7 +254,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td class="num-lbp"><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '—' ?></td>
                             <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): // 🧮 تحته قيمته بالدولار القديم (÷1500 داون) — أساس قانون النسبة ?><span class="sub-lbp"><strong><?= formatLBP($r['cur_sal'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$r['cur_sal_old_usd'], 0) ?> $</span><?php else: ?><strong><?= formatLBP($r['cur_sal'], false) ?></strong><?php endif; ?></td>
                             <?php endif; ?>
-                            <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 0) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
+                            <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><span class="cur-usd"><?= number_format($r['extra_law_usd'] !== null ? (int)$r['extra_law_usd'] : $usd($r['extra_wage']), 0) /* 🧮 لأصحاب النسبة: دولار القانون (844 $) */ ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['aide']), 0) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <?php $hR = $hidRow($r); ?>
                             <td><?= $money($r['brut'] - $hR, true) ?></td>
@@ -289,7 +289,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <td class="num-lbp"><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
                     <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): ?><span class="sub-lbp"><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$tot['bpe_old_usd'], 0) ?> $</span><?php else: ?><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong><?php endif; ?></td>
                     <?php endif; ?>
-                    <?php if (salaryCompHas('extra')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['extra_wage'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor($tot['extra_wage_usd']), 0) ?> $</span></td><?php endif; ?>
+                    <?php if (salaryCompHas('extra')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['extra_wage'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor(!empty($meta['has_pct']) ? $tot['extra_law_usd'] : $tot['extra_wage_usd']), 0) ?> $</span></td><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['aide'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor($tot['aide_usd']), 0) ?> $</span></td><?php endif; ?>
                     <td><?= $moneyTot($tot['brut'], $tot['brut_usd']) ?></td>
                     <?php if (!$isEmp): ?>

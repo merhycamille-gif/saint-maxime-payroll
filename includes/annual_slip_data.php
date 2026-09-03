@@ -108,11 +108,14 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'family'=>0,'transport'=>0,'total_due'=>0,
         // نُسخ بالدولار للعرض على الشاشة فقط
         'brut_usd'=>0,'caisse_usd'=>0,'eoc_grade_usd'=>0,'cnss_usd'=>0,'tax_usd'=>0,'totret_usd'=>0,
-        'net_usd'=>0,'family_usd'=>0,'transport_usd'=>0,'total_due_usd'=>0,'extra_wage_usd'=>0,'aide_usd'=>0,
+        'net_usd'=>0,'family_usd'=>0,'transport_usd'=>0,'total_due_usd'=>0,'extra_wage_usd'=>0,'aide_usd'=>0,'extra_law_usd'=>0,
     ];
 
     // سعر الصرف المعروض (آخر سعر غير صفري في السنة)
     $slipRate = 0; foreach ($salaries as $s2) { if ((float)$s2['exchange_rate'] > 0) $slipRate = (float)$s2['exchange_rate']; }
+    // 🧮 نسبة الإضافي لكل شهر (لأصحاب النسبة): دولار الإضافي بالبطاقة = دولار القانون (1,536 × 55٪ = 844 $) لا الليرة المدوّرة ÷ السعر (837 $)
+    $pctByMonth = employeeExtraPercentByMonth($db, (int)$emp['id'], $schoolYear);
+    $hasPct = max($pctByMonth) > 0;
 
     $prevSal = null;
     $rows = [];
@@ -146,6 +149,8 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
             'cur_sal'      => $curSal,
             // 🧮 قيمة «الراتب بعد التدرج» بالدولار القديم (÷ السعر الرسمي 1500، داون) — أساس قانون نسبة الإضافي (طلبه 2026-09-03)
             'cur_sal_old_usd' => (int)floor($curSal / officialUsdRate()),
+            // 🧮 دولار الإضافي بالقانون لهذا الشهر (null لغير أصحاب النسبة → يُعرض ÷ السعر كالمعتاد)
+            'extra_law_usd'   => $hasPct ? (extraPercentLawUsd((float)($pctByMonth[(int)$s['month']] ?? 0), $curSal) + $usd((int)$s['extra_lbp'])) : null,
             'extra_wage'   => $extraWageSlip,
             'aide'         => $aideSlip,
             'brut'         => $brut,
@@ -170,6 +175,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         $tot['family'] += $row['family']; $tot['transport'] += $row['transport']; $tot['total_due'] += $row['total_due'];
         // دولار (شاشة)
         $tot['extra_wage_usd'] += $usd($extraWageSlip); $tot['aide_usd'] += $usd($aideSlip);
+        $tot['extra_law_usd'] += (int)($row['extra_law_usd'] ?? 0);
         $tot['brut_usd'] += $usd($brut); $tot['caisse_usd'] += $usd($row['caisse']); $tot['eoc_grade_usd'] += $usd($eocGrade);
         $tot['cnss_usd'] += $usd($row['cnss']); $tot['tax_usd'] += $usd($row['income_tax']);
         $tot['totret_usd'] += $usd($row['total_retenues']); $tot['net_usd'] += floor((float)$s['net_salary_usd']);
@@ -194,6 +200,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'grade'       => gradeDisplay($emp), // — للموظف الإداري (لا درجة، قانون العمل)
         // 🧮 النسبة المئوية للأجر الإضافي المعطاة له بهذه السنة (بخانة الدرجة نفسها — '' إن لا نسبة)
         'extra_pct'   => employeeExtraPercentForYear($db, $emp['id'], $schoolYear),
+        'has_pct'     => $hasPct,
         // 🧮 سعرا قانون النسبة للترويسة: القديم (1500 الرسمي) والجديد (سعر/أسعار صرف أشهر السنة المخزّنة، فريدة)
         'old_rate'    => officialUsdRateLbl(),
         'new_rates'   => implode(' / ', array_unique(array_map(fn($x) => number_format($x, 0), array_values(array_filter(array_map(fn($r) => (float)($r['rate'] ?? 0), $rows)))))),

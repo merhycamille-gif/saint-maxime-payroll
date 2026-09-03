@@ -4095,7 +4095,8 @@ $nm78 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.cnss_amount_lbp),0) cn, C
 check('النياح: كشف تشرين للمتعاقدين والموظفين = كشفه بالمليم (5 أشخاص، صافي 257,326,600 + نقل 36,000,000 = مجموع 293,326,600) وبياره متعاقدة والملاك صاروا 17 بضمان كشفهم 46,155,450',
       (int)$ncw78['n'] === 5 && (float)$ncw78['net'] === 257326600.0
       && (float)$ncw78['tr'] === 36000000.0 && (float)$ncw78['due'] === 293326600.0
-      && (int)$nm78['n'] === 17 && (float)$nm78['cn'] === 46155450.0 && (float)$nm78['tr'] === 153000000.0
+      // 🧮 (2026-09-03) بعد «طبّق النسبة اللي بتطلع صح»: 5 من ملاك النياح تحوّلوا لنسبتهم (فرق فراطات ≤490 ألفاً بالإضافي) فصار ضمانهم 46,165,350 (كان 46,155,450 بكشفه)
+      && (int)$nm78['n'] === 17 && in_array((float)$nm78['cn'], [46155450.0, 46165350.0], true) && (float)$nm78['tr'] === 153000000.0
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNiyahCw20260827') !== false,
       "cw n={$ncw78['n']} net={$ncw78['net']} ملاك n={$nm78['n']}");
 
@@ -4543,7 +4544,30 @@ check('ساعات التناقص خانة بملف الأستاذ (للداخل�
       && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "الراتب بعد التدرج<?= (\$meta['extra_pct'] ?? '') !== '' ? '<br><span dir=\"ltr\">1 $ = ' . e(\$meta['old_rate'])") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "'<br><span dir=\"ltr\">1 $ = ' . e(\$meta['new_rates'])") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "number_format((int)\$r['cur_sal_old_usd'], 0) ?> $</span>") !== false
+      // 🧮 («نعم» 2026-09-03) دولار الإضافي لأصحاب النسبة = دولار القانون: 2,305,000÷1500=1,536 ×55٪ = 844 $ (لا 75,000,000÷89,500 = 837)
+      && extraPercentLawUsd(55, 2305000) === 844 && extraPercentLawUsd(0, 2305000) === 0
+      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'extra_law_usd'   => \$hasPct ? (extraPercentLawUsd(") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "\$r['extra_law_usd'] !== null ? (int)\$r['extra_law_usd'] : \$usd(\$r['extra_wage'])") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'hours_pres'  =>") !== false);
+
+/* =====================================================================
+ * 96) 🧮 «طبّق النسبة المئوية اللي بتطلع صح» (أمره 2026-09-03): الملاك الباقون بمبلغ ثابت بمدارس النسبة
+ *     → نسبة المدرسة إن كان الفرق فراطات (<5 مليون) وإلا نسبتهم الخاصة الأقرب لرقمهم (خطوة 0.5٪)؛
+ *     المدارس بلا نسبة والمحميّتان لا تُمسّ. الشفاء موصول بheader بدفعات + نسخ احتياطية.
+ * =================================================================== */
+$own96 = choosePercentLawOwn($db, '2025-2026', true);
+$fnSrc96 = (string)file_get_contents($PROJ . '/includes/functions.php');
+check('«النسبة اللي بتطلع صح»: الدالة الصافية تعمل + كل نسبة مختارة تُخرج رقماً بفرق < 5 مليون عن المخزّن + لا تلمس المدارس بلا نسبة + الشفاء موصول بheader بنسخ احتياطية',
+      is_array($own96['plan']) && is_array($own96['skips'])
+      && array_reduce($own96['plan'], fn($ok, $p) => $ok && abs($p['law'] - $p['amount']) < 5000000 && $p['pct'] > 0, true)
+      && strpos($fnSrc96, "AND NOT (e.first_name_ar LIKE 'ريتا%' AND e.father_name_ar LIKE 'مارون%'") !== false
+      && strpos($fnSrc96, "_bk_bonuses_pctown0903") !== false && strpos($fnSrc96, "_ms_bk_pctown0903") !== false
+      && strpos($fnSrc96, "recalcEmployeeYear(\$eid, '2025-2026');") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healPercentLawOwn20260903();') !== false,
+      'plan=' . count($own96['plan']) . ' skips=' . count($own96['skips']));
+check('بعد الشفاء محلياً: لا يبقى ملاك بمبلغ ثابت بمدارس النسبة (الخطّة فارغة) والفلاغ done',
+      count($own96['plan']) === 0 && strpos((string)getSetting('heal_percent_law_own_20260903', ''), 'done') === 0,
+      (string)getSetting('heal_percent_law_own_20260903', '') . ' | ' . (string)getSetting('heal_percent_law_own_progress', ''));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

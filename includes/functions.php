@@ -3760,6 +3760,37 @@ function officialUsdRateLbl(): string {
  * مجموع بنود prime_fixe الفاعلة من نوع percent المنطبقة على كل شهر من أشهر السنة (10←9، نفس منطق getBonusForMonth).
  * يرجع نصاً مثل «45» أو «45 / 50» (إذا اختلفت بين الأشهر) أو '' إن لا نسبة.
  */
+/** 🧮 نسبة الإضافي المنطبقة على كل شهر من أشهر السنة: [month => pct] (0 إن لا نسبة) — نفس منطق getBonusForMonth. */
+function employeeExtraPercentByMonth($db, $employeeId, $schoolYear) {
+    $out = array_fill_keys([10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9], 0.0);
+    if (!preg_match('/^(\d{4})-(\d{4})$/', (string)$schoolYear)) return $out;
+    try {
+        $st = $db->prepare("SELECT amount, start_month, end_month FROM employee_bonuses
+            WHERE employee_id = ? AND bonus_type = 'prime_fixe' AND is_active = 1 AND value_type = 'percent'
+              AND (school_year IS NULL OR school_year = ?)");
+        $st->execute([(int)$employeeId, $schoolYear]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { return $out; }
+    foreach ($out as $month => $_) {
+        $pct = 0.0;
+        foreach ($rows as $r) {
+            $s = $r['start_month']; $e = $r['end_month'];
+            if ($s !== null && $e !== null) {
+                $s = (int)$s; $e = (int)$e;
+                if ($s <= $e) { if ($month < $s || $month > $e) continue; }
+                else { if ($month < $s && $month > $e) continue; }
+            }
+            $pct += (float)$r['amount'];
+        }
+        $out[$month] = $pct;
+    }
+    return $out;
+}
+/** 🧮 الدولار «بالقانون» للإضافي بالنسبة: floor(floor(الأساس÷1500) × النسبة٪) — الرقم الذي يُضرب بسعر الشهر (طلبه 2026-09-03: البطاقة تُظهر 844 $ لا 837 $). */
+function extraPercentLawUsd($pct, $basePlusEchelonLbp) {
+    if ($pct <= 0 || $basePlusEchelonLbp <= 0) return 0;
+    return (int)floor(floor($basePlusEchelonLbp / officialUsdRate()) * $pct / 100);
+}
 function employeeExtraPercentForYear($db, $employeeId, $schoolYear) {
     if (!preg_match('/^(\d{4})-(\d{4})$/', (string)$schoolYear, $m)) return '';
     try {
@@ -4973,6 +5004,97 @@ function percentLawMatchSet(float $stored, float $bpe, float $rate): array {
     }
     return $set;
 }
+/**
+ * 🧮 «طبّق النسبة المئوية اللي بتطلع صح» (أمره 2026-09-03 بعد جدول الاستثناءات الـ34 أونلاين):
+ * لكل أستاذ ملاك ما زال «مبلغاً ثابتاً» بمدرسة لها نسبة موحّدة، نختار النسبة التي تُخرج رقمه صحيحاً:
+ *   ① إذا نسبة مدرسته تعطي رقمه بفرق < 5 ملايين (فراطات قديمة، والقاعدة داون) → نسبة المدرسة (70,060,000 ← 65٪ = 68,000,000)
+ *   ② وإلا (اتفاق خاص: الياس عطاالله 129,610,000...) → أقرب نسبة (خطوة 0.5٪) تُخرج رقمه الحالي — فلا يتغيّر راتبه فعلياً
+ * المدارس بلا نسبة (كوليج مكسيموس) والمتعاقدون والمؤرّخة بفترات لا تُمسّ («إذا حاطين هني المبلغ بيبقى»)،
+ * والمحميّتان ريتا مارون وماريا الياس حليحل (سلفة موثّقة) لا تُمسّان.
+ * $dry = true يرجع الخطّة فقط بلا أي كتابة (تُستعمل للمعاينة وبفحص regression).
+ */
+function choosePercentLawOwn($db, $sy = '2025-2026', $dry = true) {
+    $plan = []; $skips = []; $schools = [];
+    $cand = $db->query("
+        SELECT b.id bid, b.employee_id, b.amount, e.school_id,
+               CONCAT(e.first_name_ar,' ',COALESCE(e.father_name_ar,''),' ',e.last_name_ar) nm,
+               (SELECT ms.base_plus_echelon_lbp FROM monthly_salaries ms WHERE ms.employee_id=b.employee_id AND ms.school_year='$sy' ORDER BY ms.year, ms.month LIMIT 1) bpe,
+               (SELECT ms.exchange_rate FROM monthly_salaries ms WHERE ms.employee_id=b.employee_id AND ms.school_year='$sy' ORDER BY ms.year, ms.month LIMIT 1) rate
+        FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id AND e.is_deleted=0 AND e.status='actif'
+        WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='amount' AND b.currency='LBP'
+          AND e.employee_type='enseignant_titulaire'
+          AND b.start_month IS NULL AND b.end_month IS NULL
+          AND (b.school_year IS NULL OR b.school_year='$sy')
+          AND NOT (e.first_name_ar LIKE 'ريتا%' AND e.father_name_ar LIKE 'مارون%' AND e.last_name_ar LIKE '%حليحل%')
+          AND NOT (e.first_name_ar LIKE 'ماريا%' AND e.father_name_ar LIKE 'الياس%' AND e.last_name_ar LIKE '%حليحل%')
+        ORDER BY e.school_id, b.employee_id")->fetchAll(PDO::FETCH_ASSOC);
+    // النسبة الغالبة لكل مدرسة من بنود النسبة الحالية لملاكها (≥5 أساتذة)
+    $freq = [];
+    foreach ($db->query("SELECT e.school_id, b.amount pct, COUNT(DISTINCT b.employee_id) n
+        FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id AND e.is_deleted=0 AND e.status='actif'
+        WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='percent'
+          AND e.employee_type='enseignant_titulaire' AND (b.school_year IS NULL OR b.school_year='$sy')
+        GROUP BY e.school_id, b.amount") as $pr) {
+        $freq[$pr['school_id']][(string)(float)$pr['pct']] = ($freq[$pr['school_id']][(string)(float)$pr['pct']] ?? 0) + (int)$pr['n'];
+    }
+    foreach ($freq as $sidK => $m) { arsort($m); $top = array_key_first($m); if ((int)$m[$top] >= 5) $schools[$sidK] = ['dom' => (float)$top, 'n' => (int)$m[$top]]; }
+    foreach ($cand as $c) {
+        $sid = (int)$c['school_id']; $amount = (float)$c['amount']; $bpe = (float)$c['bpe']; $rate = (float)$c['rate'];
+        if (!isset($schools[$sid])) { $skips[] = $c['nm'] . ' (مدرسة بلا نسبة)'; continue; }
+        if ($bpe <= 0 || $rate <= 0 || $amount <= 0) { $skips[] = $c['nm'] . ' (بلا أساس/سعر)'; continue; }
+        $dom = $schools[$sid]['dom'];
+        $lawDom = bonusPercentLbp($dom, $bpe, $rate);
+        if (abs($lawDom - $amount) < 5000000) { $pct = $dom; $law = $lawDom; $why = 'نسبة المدرسة (فرق فراطات)'; }
+        else {
+            $best = null; $bestD = null;
+            for ($p = 10; $p <= 2000; $p += 5) { // 1٪..200٪ خطوة 0.5
+                $pp = $p / 10.0; $v = bonusPercentLbp($pp, $bpe, $rate); $d = abs($v - $amount);
+                // الأقرب لرقمه؛ عند التساوي: النسبة الصحيحة (بلا نصف) ثم الأقرب لنسبة المدرسة
+                if ($best === null || $d < $bestD || ($d == $bestD && (fmod($pp, 1.0) == 0 && fmod($best, 1.0) != 0))) { $best = $pp; $bestD = $d; }
+            }
+            $pct = $best; $law = bonusPercentLbp($best, $bpe, $rate); $why = 'نسبته الخاصة (اتفاق خاص)';
+        }
+        $plan[] = ['bid' => (int)$c['bid'], 'eid' => (int)$c['employee_id'], 'nm' => $c['nm'], 'sid' => $sid, 'amount' => (int)$amount, 'pct' => $pct, 'law' => (int)$law, 'why' => $why];
+    }
+    return ['plan' => $plan, 'skips' => $skips, 'schools' => $schools];
+}
+
+function healPercentLawOwn20260903() {
+    try {
+        if (strpos((string)getSetting('heal_percent_law_own_20260903', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_bonuses_pctown0903 LIKE employee_bonuses");
+        if (!(int)$db->query("SELECT COUNT(*) FROM _bk_bonuses_pctown0903")->fetchColumn()) {
+            $db->exec("INSERT INTO _bk_bonuses_pctown0903 SELECT * FROM employee_bonuses");
+        }
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_pctown0903 LIKE monthly_salaries");
+        $res = choosePercentLawOwn($db, '2025-2026', true);
+        $batch = 10; $didN = 0; $log = [];
+        $prev = (string)getSetting('heal_percent_law_own_log', '');
+        foreach ($res['plan'] as $p) {
+            if ($didN >= $batch) { setSetting('heal_percent_law_own_progress', 'working... batch=' . $didN); setSetting('heal_percent_law_own_log', $prev . implode('؛ ', $log) . '؛ '); return; }
+            $eid = $p['eid'];
+            if (!(int)$db->query("SELECT COUNT(*) FROM _ms_bk_pctown0903 WHERE employee_id=$eid")->fetchColumn()) {
+                $db->exec("INSERT INTO _ms_bk_pctown0903 SELECT * FROM monthly_salaries WHERE employee_id=$eid AND school_year IN ('2025-2026','2026-2027')");
+            }
+            $db->prepare("UPDATE employee_bonuses SET value_type='percent', amount=?, currency='LBP' WHERE id=?")->execute([$p['pct'], $p['bid']]);
+            $db->prepare("UPDATE employee_bonuses SET value_type='percent', amount=?, currency='LBP'
+                WHERE employee_id=? AND bonus_type='prime_fixe' AND is_active=1 AND value_type='amount'
+                  AND start_month IS NULL AND end_month IS NULL AND school_year='2026-2027'")->execute([$p['pct'], $eid]);
+            recalcEmployeeYear($eid, '2025-2026');
+            if ((int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=$eid AND school_year='2026-2027'")->fetchColumn()) recalcEmployeeYear($eid, '2026-2027');
+            $log[] = $p['nm'] . ' ' . number_format($p['amount']) . '→' . rtrim(rtrim(number_format($p['pct'], 1, '.', ''), '0'), '.') . '٪=' . number_format($p['law']);
+            $didN++;
+        }
+        setSetting('heal_percent_law_own_log', $prev . implode('؛ ', $log));
+        setSetting('heal_percent_law_own_20260903', 'done: converted=' . (substr_count($prev . implode('؛ ', $log), '→')) . ' skipped=' . count($res['skips']) . ($res['skips'] ? ' | ' . implode('؛ ', array_slice($res['skips'], 0, 40)) : ''));
+        setSetting('heal_percent_law_own_progress', 'done');
+    } catch (Throwable $e) {
+        try { setSetting('heal_percent_law_own_progress', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
+
 function healPercentLawAll20260828() {
     try {
         if (strpos((string)getSetting('heal_percent_law_20260828', ''), 'done') === 0) return;
