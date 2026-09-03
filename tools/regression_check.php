@@ -4529,7 +4529,7 @@ check('ساعات التناقص خانة بملف الأستاذ (للداخل�
       && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), "'hours_reduction_presence_factor'") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/monthly_payroll.php'), 'hoursReductionSlipText($emp') !== false
       // 🔒 البطاقة السنوية: بطلبه الصريح («بدي التناقص يطلع ببطاقة الأستاذ والحضور كمان بدون ما تغير بحجم البطاقة») — بنفس خانة الساعات فقط، بلا أي خانة/صف جديد
-      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "j · <?= e(\$meta['hours_red']) ?> h / <?= e(\$meta['hours_pres']) ?> h</span></td>") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "j · Réduction <?= e(\$meta['hours_red']) ?> h · Présence <?= e(\$meta['hours_pres']) ?> h</span></td>") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'التناقص / الحضور</span>') !== false
       && substr_count((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'hours_red') === 2
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'hours_pres'  =>") !== false);
