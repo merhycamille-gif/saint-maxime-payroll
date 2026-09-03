@@ -178,11 +178,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
             <tr>
                 <td><span class="lbl"><?= ($emp['employee_type'] === 'employe') ? 'Fonction / الوظيفة' : 'Diplôme / الشهادة العلمية' ?></span><span class="val"><?= e($meta['diploma']) ?></span></td>
                 <td><span class="lbl">Type / الفئة</span><span class="val"><?= e($meta['type']) ?></span></td>
-                <?php if (($meta['extra_pct'] ?? '') !== ''): // 🧮 نسبة الإضافي المعطاة له بنفس خانة الدرجة (بلا خانة/صف جديد) ?>
-                <td><span class="lbl">Échelon · % supplément — الدرجة · نسبة الإضافي</span><span class="val"><?= e($meta['grade']) ?> · <?= e($meta['extra_pct']) ?> %</span></td>
-                <?php else: ?>
                 <td><span class="lbl">Échelon / الدرجة</span><span class="val"><?= e($meta['grade']) ?></span></td>
-                <?php endif; ?>
                 <td><span class="lbl">Code / الرمز</span><span class="val"><?= e($meta['code']) ?></span></td>
             </tr>
             <tr>
@@ -212,7 +208,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <th rowspan="2">Valeur échelon<br>قيمة الدرجة (ل.ل)</th>
                     <th rowspan="2">Après échelon<br>الراتب بعد التدرج</th>
                     <?php endif; ?>
-                    <?php if (salaryCompHas('extra')): ?><th rowspan="2">Supplément<br>الأجر الإضافي</th><?php endif; ?>
+                    <?php if (salaryCompHas('extra')): ?><th rowspan="2">Supplément<br>الأجر الإضافي<?= ($meta['extra_pct'] ?? '') !== '' ? '<br><span dir="ltr">' . e($meta['extra_pct']) . ' %</span>' : '' /* 🧮 نسبة الإضافي المعطاة له تحت عنوان العمود (p1 — 2026-09-03) */ ?></th><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><th rowspan="2">Prime &amp; aide<br>مكافأة ومساعدة</th><?php endif; ?>
                     <th rowspan="2">Brut<br>الإجمالي</th>
                     <th colspan="<?= $isEmp ? 3 : 5 ?>" class="deduction-header">Retenues / المحسومات</th>

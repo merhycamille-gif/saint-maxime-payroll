@@ -4534,7 +4534,8 @@ check('ساعات التناقص خانة بملف الأستاذ (للداخل�
       && substr_count((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'hours_red') === 2
       // 🧮 نسبة الإضافي المعطاة له بالبطاقة (طلبه 2026-09-03) بخانة الدرجة نفسها: «38 · 45 %» — الدالة employeeExtraPercentForYear
       && function_exists('employeeExtraPercentForYear') && employeeExtraPercentForYear($db, -1, '2025-2026') === '' && employeeExtraPercentForYear($db, 1, 'all') === ''
-      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "<?= e(\$meta['grade']) ?> · <?= e(\$meta['extra_pct']) ?> %</span></td>") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "الأجر الإضافي<?= (\$meta['extra_pct'] ?? '') !== '' ? '<br><span dir=\"ltr\">' . e(\$meta['extra_pct']) . ' %</span>' : ''") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "<td><span class=\"lbl\">Échelon / الدرجة</span><span class=\"val\"><?= e(\$meta['grade']) ?></span></td>") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'extra_pct'   => employeeExtraPercentForYear(\$db, \$emp['id'], \$schoolYear)") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'hours_pres'  =>") !== false);
 
