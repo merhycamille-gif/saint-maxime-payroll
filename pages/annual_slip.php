@@ -184,7 +184,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
             <tr>
                 <td><span class="lbl">Embauche / تاريخ الدخول</span><span class="val"><?= e($meta['hire']) ?></span></td>
                 <td><span class="lbl">Titularisation / تاريخ الملاك</span><span class="val"><?= e($meta['titul']) ?></span></td>
-                <td><span class="lbl">Heures / jours par semaine — الساعات / الأيام أسبوعياً</span><span class="val"><?= e($meta['hours']) ?> h / <?= e($meta['days']) ?> j</span></td>
+                <td><span class="lbl">Heures / jours par semaine — الساعات / الأيام أسبوعياً</span><span class="val"><?= e($meta['hours']) ?> h / <?= e($meta['days']) ?> j<?php if (($meta['hours_red'] ?? '') !== ''): // 🕐 التناقص وحضوره بنفس الخانة (بلا تغيير بحجم البطاقة) ?> · تناقص <?= e($meta['hours_red']) ?> h · حضور <?= e($meta['hours_pres']) ?> h<?php endif; ?></span></td>
                 <td><span class="lbl">Classes / الصفوف</span><span class="val"><?= e($meta['classes']) ?></span></td>
             </tr>
             <tr>

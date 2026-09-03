@@ -4521,16 +4521,17 @@ check('مساج «قرار مطلوب» بكل مدرسة موصول: لوحة �
       && strpos($hrPage95, 'المسجّل بملفه') !== false);
 // ⏱️ (2026-09-03) ساعات التناقص بملفه + ساعات حضور التناقص = التناقص × 1.5 («4 ساعات تناقص بيصير حضور التناقص 6») بملفه وببطاقة الرواتب والقسيمة بجانب الساعات الفعلية
 $hrEmpSrc95 = (string)file_get_contents($PROJ . '/pages/employees.php');
-check('ساعات التناقص خانة بملف الأستاذ (للداخلين بالملاك فقط) + حضور التناقص ×1.5 (4→6، 3→4.5، 0→بلا نص) + معامل بالإعدادات + النص بقسيمة الراتب الشهرية بجانب الساعات + البطاقة السنوية لم تُمسّ',
+check('ساعات التناقص خانة بملف الأستاذ (للداخلين بالملاك فقط) + حضور التناقص ×1.5 (4→6، 3→4.5، 0→بلا نص) + معامل بالإعدادات + النص بقسيمة الراتب الشهرية وبخانة الساعات نفسها بالبطاقة السنوية (بلا خانة/صف جديد)',
       abs(hoursReductionPresence(4) - 6) < 0.01 && abs(hoursReductionPresence(3) - 4.5) < 0.01 && abs(hoursReductionPresence(1) - 1.5) < 0.01
       && hoursReductionSlipText(['hours_reduction' => 4]) === 'تناقص 4 س — حضور التناقص 6 س' && hoursReductionSlipText(['hours_reduction' => 0]) === ''
       && strpos($hrEmpSrc95, 'name="hours_reduction"') !== false && strpos($hrEmpSrc95, "'hours_reduction' => ((\$_POST['employee_type'] ?? '') === 'enseignant_titulaire')") !== false
       && strpos($hrEmpSrc95, 'hoursReductionEnsureColumns($db); // 🕐 عمود') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), "'hours_reduction_presence_factor'") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/monthly_payroll.php'), 'hoursReductionSlipText($emp') !== false
-      // 🔒 البطاقة السنوية مجمّدة بأمره («ما تخرب بالبطاقة السنوية») — التناقص لا يظهر فيها
-      && stripos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'hours_red') === false
-      && stripos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), 'hoursReduction') === false);
+      // 🔒 البطاقة السنوية: بطلبه الصريح («بدي التناقص يطلع ببطاقة الأستاذ والحضور كمان بدون ما تغير بحجم البطاقة») — بنفس خانة الساعات فقط، بلا أي خانة/صف جديد
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "· تناقص <?= e(\$meta['hours_red']) ?> h · حضور <?= e(\$meta['hours_pres']) ?> h") !== false
+      && substr_count((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'hours_red') === 2
+      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'hours_pres'  =>") !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/hours_reduction.php'; // 🕐 التناقص + حضور التناقص بجانب الساعات بالبطاقة (طلبه 2026-09-03 — بنفس الخانة، بلا تغيير بحجم البطاقة)
+
 /**
  * حساب أرقام «كشف الراتب السنوي» لأستاذ واحد — مصدر موحّد للعرض على الشاشة وللتصدير الرسمي
  * (annual_slip.php للعرض، annual_slip_export.php لتوليد Excel/Word/PDF عبر ReportTable).
@@ -192,6 +194,9 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'hire'        => formatDate($emp['hire_date']),
         'titul'       => formatDate($emp['titularization_date']),
         'hours'       => rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.'),
+        // 🕐 ساعات التناقص + حضور التناقص (×1.5) — للملاك ذي التناقص المسجّل فقط، وإلا ''
+        'hours_red'   => (float)($emp['hours_reduction'] ?? 0) > 0 ? hoursFmt($emp['hours_reduction']) : '',
+        'hours_pres'  => (float)($emp['hours_reduction'] ?? 0) > 0 ? hoursFmt(hoursReductionPresence($emp['hours_reduction'])) : '',
         'days'        => (int)$emp['days_per_week'],
         'classes'     => classLevelNames($emp['classes_taught'] ?? '', true), // الكشف السنوي: الصفوف بالفرنسي فقط (بطلب المستخدم)
         'subjects'    => $emp['subjects_taught'] ?: '—',
