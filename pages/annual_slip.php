@@ -178,7 +178,11 @@ function annualSlipHtml($db, $emp, $schoolYear) {
             <tr>
                 <td><span class="lbl"><?= ($emp['employee_type'] === 'employe') ? 'Fonction / الوظيفة' : 'Diplôme / الشهادة العلمية' ?></span><span class="val"><?= e($meta['diploma']) ?></span></td>
                 <td><span class="lbl">Type / الفئة</span><span class="val"><?= e($meta['type']) ?></span></td>
+                <?php if (($meta['extra_pct'] ?? '') !== ''): // 🧮 نسبة الإضافي المعطاة له بنفس خانة الدرجة (بلا خانة/صف جديد) ?>
+                <td><span class="lbl">Échelon · % supplément — الدرجة · نسبة الإضافي</span><span class="val"><?= e($meta['grade']) ?> · <?= e($meta['extra_pct']) ?> %</span></td>
+                <?php else: ?>
                 <td><span class="lbl">Échelon / الدرجة</span><span class="val"><?= e($meta['grade']) ?></span></td>
+                <?php endif; ?>
                 <td><span class="lbl">Code / الرمز</span><span class="val"><?= e($meta['code']) ?></span></td>
             </tr>
             <tr>

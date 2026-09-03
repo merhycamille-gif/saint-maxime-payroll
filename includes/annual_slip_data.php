@@ -190,6 +190,8 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
                             : (!empty($emp['diploma']) ? diplomaLabel($emp['diploma'], 'ar') : '—'),
         'type'        => employeeTypeLabel($emp['employee_type']),
         'grade'       => gradeDisplay($emp), // — للموظف الإداري (لا درجة، قانون العمل)
+        // 🧮 النسبة المئوية للأجر الإضافي المعطاة له بهذه السنة (بخانة الدرجة نفسها — '' إن لا نسبة)
+        'extra_pct'   => employeeExtraPercentForYear($db, $emp['id'], $schoolYear),
         'code'        => $emp['employee_code'] ?: '—',
         'hire'        => formatDate($emp['hire_date']),
         'titul'       => formatDate($emp['titularization_date']),

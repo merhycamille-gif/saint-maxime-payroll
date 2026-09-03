@@ -3755,6 +3755,41 @@ function officialUsdRateLbl(): string {
     return rtrim(rtrim(number_format(officialUsdRate(), 2, '.', ''), '0'), '.');
 }
 
+/**
+ * 🧮 النسبة المئوية للأجر الإضافي المعطاة للأستاذ بسنة دراسية (طلبه 2026-09-03 «حط النسبة المئوية المعطاة للأستاذ بالبطاقة»):
+ * مجموع بنود prime_fixe الفاعلة من نوع percent المنطبقة على كل شهر من أشهر السنة (10←9، نفس منطق getBonusForMonth).
+ * يرجع نصاً مثل «45» أو «45 / 50» (إذا اختلفت بين الأشهر) أو '' إن لا نسبة.
+ */
+function employeeExtraPercentForYear($db, $employeeId, $schoolYear) {
+    if (!preg_match('/^(\d{4})-(\d{4})$/', (string)$schoolYear, $m)) return '';
+    try {
+        $st = $db->prepare("SELECT amount, start_month, end_month FROM employee_bonuses
+            WHERE employee_id = ? AND bonus_type = 'prime_fixe' AND is_active = 1 AND value_type = 'percent'
+              AND (school_year IS NULL OR school_year = ?)");
+        $st->execute([(int)$employeeId, $schoolYear]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { return ''; }
+    if (!$rows) return '';
+    $seen = [];
+    foreach ([10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9] as $month) {
+        $pct = 0.0;
+        foreach ($rows as $r) {
+            $s = $r['start_month']; $e = $r['end_month'];
+            if ($s !== null && $e !== null) {
+                $s = (int)$s; $e = (int)$e;
+                if ($s <= $e) { if ($month < $s || $month > $e) continue; }
+                else { if ($month < $s && $month > $e) continue; }
+            }
+            $pct += (float)$r['amount'];
+        }
+        if ($pct > 0) {
+            $k = rtrim(rtrim(number_format($pct, 2, '.', ''), '0'), '.');
+            if (!in_array($k, $seen, true)) $seen[] = $k;
+        }
+    }
+    return implode(' / ', $seen);
+}
+
 function bonusPercentLbp($pct, $basePlusEchelonLbp, $marketRate): float {
     $official = officialUsdRate();
     $usd = floor(((float)$basePlusEchelonLbp / $official) * ((float)$pct / 100)); // داون للدولار
