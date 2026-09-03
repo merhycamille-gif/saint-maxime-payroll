@@ -5134,6 +5134,43 @@ function choosePercentLawOwn($db, $sy = '2025-2026', $dry = true) {
     return ['plan' => $plan, 'skips' => $skips, 'schools' => $schools];
 }
 
+/**
+ * 📜 تصحيح جدول السلسلة 2017 (الجدول رقم 17 بالجريدة الرسمية العدد 37 — 21/8/2017، صفحة 3019) — اكتشفه المستخدم 2026-09-03
+ * (مريم ريشا/النجاة، تشرين 2026: «حاطتلها قيمة الدرجة 145,000 وما في قيمة درجة هالقد بالقانون»):
+ * الجدول المخزّن كان فيه ثلاث غلطات بـ5,000 ل.ل: الدرجة 47 = 4,470,000 (الصح 4,475,000)، 49 = 4,770,000 (4,775,000)، 50 = 4,920,000 (4,925,000)،
+ * وقيم الدرجات 47-51 كلها 150,000 بالقانون (كانت 145/155/145/150/155). يصحّح الجدول ويعيد حساب سنتَي 2025-2026 و2026-2027 لمن درجته ≥ 46.5
+ * (السنوات القديمة المنقولة لا تُمسّ). مرّة واحدة (فلاغ heal_scale47_20260903).
+ */
+function healScale47_20260903() {
+    try {
+        if (strpos((string)getSetting('heal_scale47_20260903', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $fix = [47 => [4475000, 150000], 48 => [4625000, 150000], 49 => [4775000, 150000], 50 => [4925000, 150000], 51 => [5075000, 150000], 52 => [5245000, 170000]];
+        $changed = [];
+        foreach ($fix as $g => [$sal, $val]) {
+            $cur = $db->query("SELECT new_salary_2017, new_grade_value FROM salary_scale_2017 WHERE grade = $g AND version_id = 1")->fetch(PDO::FETCH_ASSOC);
+            if (!$cur) continue;
+            if ((int)$cur['new_salary_2017'] !== $sal || (int)$cur['new_grade_value'] !== $val) {
+                $db->prepare("UPDATE salary_scale_2017 SET new_salary_2017 = ?, new_grade_value = ? WHERE grade = ? AND version_id = 1")->execute([$sal, $val, $g]);
+                $changed[] = "$g:{$cur['new_salary_2017']}→$sal/{$cur['new_grade_value']}→$val";
+            }
+        }
+        // إعادة حساب من تطاله الدرجات المصحَّحة بالسنتين الجارية والجاية
+        $emps = $db->query("SELECT DISTINCT e.id FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire'
+            AND (e.current_grade >= 46.5 OR EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.grade_at_month >= 47 AND ms.school_year IN ('2025-2026','2026-2027')))")->fetchAll(PDO::FETCH_COLUMN);
+        $n = 0;
+        foreach ($emps as $eid) {
+            $eid = (int)$eid;
+            foreach (['2025-2026', '2026-2027'] as $sy) {
+                if ((int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $eid AND school_year = '$sy'")->fetchColumn()) { recalcEmployeeYear($eid, $sy); $n++; }
+            }
+        }
+        setSetting('heal_scale47_20260903', 'done: fixed=' . count($changed) . ' [' . implode('؛ ', $changed) . '] recalc=' . $n . ' emps=' . count($emps));
+    } catch (Throwable $e) {
+        try { setSetting('heal_scale47_20260903', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
 function healPercentLawOwn20260903() {
     try {
         if (strpos((string)getSetting('heal_percent_law_own_20260903', ''), 'done') === 0) return;
