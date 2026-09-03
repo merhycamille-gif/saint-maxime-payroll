@@ -4534,9 +4534,15 @@ check('ساعات التناقص خانة بملف الأستاذ (للداخل�
       && substr_count((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'hours_red') === 2
       // 🧮 نسبة الإضافي المعطاة له بالبطاقة (طلبه 2026-09-03) بخانة الدرجة نفسها: «38 · 45 %» — الدالة employeeExtraPercentForYear
       && function_exists('employeeExtraPercentForYear') && employeeExtraPercentForYear($db, -1, '2025-2026') === '' && employeeExtraPercentForYear($db, 1, 'all') === ''
-      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "الأجر الإضافي<?= (\$meta['extra_pct'] ?? '') !== '' ? '<br><span dir=\"ltr\">' . e(\$meta['extra_pct']) . ' %</span>' : ''") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "الأجر الإضافي<?= (\$meta['extra_pct'] ?? '') !== '' ? '<br><span dir=\"ltr\">' . e(\$meta['extra_pct']) . ' %</span>' . ((\$meta['new_rates'] ?? '') !== ''") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "<td><span class=\"lbl\">Échelon / الدرجة</span><span class=\"val\"><?= e(\$meta['grade']) ?></span></td>") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'extra_pct'   => employeeExtraPercentForYear(\$db, \$emp['id'], \$schoolYear)") !== false
+      // 🧮 (طلبه بعدها) قانون النسبة ظاهر بالبطاقة: تحت «الراتب بعد التدرج» قيمته بالدولار القديم (÷1500 داون) + السعر القديم بترويسته، والسعر الجديد (سعر الشهر) تحت النسبة — لأصحاب النسبة فقط
+      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'cur_sal_old_usd' => (int)floor(\$curSal / officialUsdRate())") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "\$tot['bpe_old_usd'] += (int)floor(\$curSal / officialUsdRate())") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "الراتب بعد التدرج<?= (\$meta['extra_pct'] ?? '') !== '' ? '<br><span dir=\"ltr\">1 $ = ' . e(\$meta['old_rate'])") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "'<br><span dir=\"ltr\">1 $ = ' . e(\$meta['new_rates'])") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "number_format((int)\$r['cur_sal_old_usd'], 0) ?> $</span>") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'hours_pres'  =>") !== false);
 
 /* ---------- الخلاصة ---------- */

@@ -206,9 +206,9 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <th rowspan="2">Salaire<br>أساس الراتب</th>
                     <?php if (!$isEmp): ?>
                     <th rowspan="2">Valeur échelon<br>قيمة الدرجة (ل.ل)</th>
-                    <th rowspan="2">Après échelon<br>الراتب بعد التدرج</th>
+                    <th rowspan="2">Après échelon<br>الراتب بعد التدرج<?= ($meta['extra_pct'] ?? '') !== '' ? '<br><span dir="ltr">1 $ = ' . e($meta['old_rate']) . '</span>' : '' /* 🧮 السعر الرسمي القديم (قانون النسبة) */ ?></th>
                     <?php endif; ?>
-                    <?php if (salaryCompHas('extra')): ?><th rowspan="2">Supplément<br>الأجر الإضافي<?= ($meta['extra_pct'] ?? '') !== '' ? '<br><span dir="ltr">' . e($meta['extra_pct']) . ' %</span>' : '' /* 🧮 نسبة الإضافي المعطاة له تحت عنوان العمود (p1 — 2026-09-03) */ ?></th><?php endif; ?>
+                    <?php if (salaryCompHas('extra')): ?><th rowspan="2">Supplément<br>الأجر الإضافي<?= ($meta['extra_pct'] ?? '') !== '' ? '<br><span dir="ltr">' . e($meta['extra_pct']) . ' %</span>' . (($meta['new_rates'] ?? '') !== '' ? '<br><span dir="ltr">1 $ = ' . e($meta['new_rates']) . '</span>' : '') : '' /* 🧮 نسبة الإضافي المعطاة له + السعر الجديد (سعر صرف الشهر) تحت عنوان العمود (p1 — 2026-09-03) */ ?></th><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><th rowspan="2">Prime &amp; aide<br>مكافأة ومساعدة</th><?php endif; ?>
                     <th rowspan="2">Brut<br>الإجمالي</th>
                     <th colspan="<?= $isEmp ? 3 : 5 ?>" class="deduction-header">Retenues / المحسومات</th>
@@ -252,7 +252,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td class="num-lbp"><strong><?= formatLBP($r['base_shown'], false) ?></strong></td>
                             <?php if (!$isEmp): ?>
                             <td class="num-lbp"><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '—' ?></td>
-                            <td class="num-lbp"><strong><?= formatLBP($r['cur_sal'], false) ?></strong></td>
+                            <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): // 🧮 تحته قيمته بالدولار القديم (÷1500 داون) — أساس قانون النسبة ?><span class="sub-lbp"><strong><?= formatLBP($r['cur_sal'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$r['cur_sal_old_usd'], 0) ?> $</span><?php else: ?><strong><?= formatLBP($r['cur_sal'], false) ?></strong><?php endif; ?></td>
                             <?php endif; ?>
                             <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['extra_wage']), 0) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['aide']), 0) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
@@ -287,7 +287,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <td class="num-lbp"><strong><?= formatLBP($tot['base_shown'], false) ?></strong></td>
                     <?php if (!$isEmp): ?>
                     <td class="num-lbp"><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
-                    <td class="num-lbp"><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></td>
+                    <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): ?><span class="sub-lbp"><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$tot['bpe_old_usd'], 0) ?> $</span><?php else: ?><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong><?php endif; ?></td>
                     <?php endif; ?>
                     <?php if (salaryCompHas('extra')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['extra_wage'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor($tot['extra_wage_usd']), 0) ?> $</span></td><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['aide'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor($tot['aide_usd']), 0) ?> $</span></td><?php endif; ?>

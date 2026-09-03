@@ -103,7 +103,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
     }
 
     $tot = [
-        'base_shown'=>0,'grade_inc'=>0,'base_plus_echelon'=>0,'extra_wage'=>0,'aide'=>0,'brut'=>0,
+        'base_shown'=>0,'grade_inc'=>0,'base_plus_echelon'=>0,'bpe_old_usd'=>0,'extra_wage'=>0,'aide'=>0,'brut'=>0,
         'caisse'=>0,'eoc_grade'=>0,'cnss'=>0,'income_tax'=>0,'total_retenues'=>0,'net'=>0,
         'family'=>0,'transport'=>0,'total_due'=>0,
         // نُسخ بالدولار للعرض على الشاشة فقط
@@ -144,6 +144,8 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
             'base_shown'   => $baseShown,
             'grade_inc'    => $gradeInc,
             'cur_sal'      => $curSal,
+            // 🧮 قيمة «الراتب بعد التدرج» بالدولار القديم (÷ السعر الرسمي 1500، داون) — أساس قانون نسبة الإضافي (طلبه 2026-09-03)
+            'cur_sal_old_usd' => (int)floor($curSal / officialUsdRate()),
             'extra_wage'   => $extraWageSlip,
             'aide'         => $aideSlip,
             'brut'         => $brut,
@@ -161,7 +163,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
 
         // مجاميع
         $tot['base_shown'] += $baseShown; $tot['grade_inc'] += $gradeInc;
-        $tot['base_plus_echelon'] += $curSal; $tot['extra_wage'] += $extraWageSlip; $tot['aide'] += $aideSlip;
+        $tot['base_plus_echelon'] += $curSal; $tot['bpe_old_usd'] += (int)floor($curSal / officialUsdRate()); $tot['extra_wage'] += $extraWageSlip; $tot['aide'] += $aideSlip;
         $tot['brut'] += $brut; $tot['caisse'] += $row['caisse']; $tot['eoc_grade'] += $eocGrade;
         $tot['cnss'] += $row['cnss']; $tot['income_tax'] += $row['income_tax'];
         $tot['total_retenues'] += $row['total_retenues']; $tot['net'] += $row['net'];
@@ -192,6 +194,9 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'grade'       => gradeDisplay($emp), // — للموظف الإداري (لا درجة، قانون العمل)
         // 🧮 النسبة المئوية للأجر الإضافي المعطاة له بهذه السنة (بخانة الدرجة نفسها — '' إن لا نسبة)
         'extra_pct'   => employeeExtraPercentForYear($db, $emp['id'], $schoolYear),
+        // 🧮 سعرا قانون النسبة للترويسة: القديم (1500 الرسمي) والجديد (سعر/أسعار صرف أشهر السنة المخزّنة، فريدة)
+        'old_rate'    => officialUsdRateLbl(),
+        'new_rates'   => implode(' / ', array_unique(array_map(fn($x) => number_format($x, 0), array_values(array_filter(array_map(fn($r) => (float)($r['rate'] ?? 0), $rows)))))),
         'code'        => $emp['employee_code'] ?: '—',
         'hire'        => formatDate($emp['hire_date']),
         'titul'       => formatDate($emp['titularization_date']),
