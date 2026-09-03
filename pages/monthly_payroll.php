@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/payroll_calculator.php';
 require_once __DIR__ . '/../includes/report_helpers.php';
+require_once __DIR__ . '/../includes/hours_reduction.php'; // 🕐 التناقص + حضور التناقص بجانب الساعات الأسبوعية بالقسيمة
 requireLogin();
 
 $currentPage = 'monthly';
@@ -365,7 +366,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                     <?php endif; ?>
                 </tr>
                 <tr>
-                    <td>Heures/semaine / عدد الساعات الأسبوعية</td><td><strong><?= rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.') ?></strong></td>
+                    <td>Heures/semaine / عدد الساعات الأسبوعية</td><td><strong><?= rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.') ?></strong><?php $hrSlip = hoursReductionSlipText($emp, 'ar'); if ($hrSlip !== ''): ?> <small style="color:#b45309">— <?= e($hrSlip) ?></small><?php endif; ?></td>
                     <td>Jours/semaine / أيام الحضور الأسبوعية</td><td><strong><?= (int)$emp['days_per_week'] ?></strong></td>
                 </tr>
                 <tr>

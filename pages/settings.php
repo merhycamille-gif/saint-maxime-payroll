@@ -57,7 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $allowedSettings = ['current_exchange_rate', 'current_school_year', 'grades_baseline_year',
                         'minimum_wage_lbp', 'school_name_ar', 'school_name_fr', 'school_address',
                         'school_phone', 'teacher_form_deadline', 'teacher_form_allow_after',
-                        'transport_start_month', 'transport_end_month', 'official_usd_rate_lbp'];
+                        'transport_start_month', 'transport_end_month', 'official_usd_rate_lbp',
+                        'hours_reduction_presence_factor']; // ⏱️ معامل حضور التناقص (1.5)
     $oldRate = getSetting('current_exchange_rate'); // لرصد تغيّر سعر الصرف الافتراضي
     // لرصد تغيّر نافذة أشهر النقل (✍️ 2026-08-25: «إذا بدي عدل بعدل» — التعديل يعيد الحساب تلقائياً)
     $oldTrWin = getSetting('transport_start_month', '10') . '-' . getSetting('transport_end_month', '6');
@@ -172,6 +173,11 @@ include __DIR__ . '/../includes/header.php';
                 <label class="form-label">Taux officiel ancien (règle du % supplément) / السعر الرسمي القديم (1500) — قاعدة نسبة الأجر الإضافي</label>
                 <input type="number" name="official_usd_rate_lbp" class="form-control" value="<?= e(getSetting('official_usd_rate_lbp', 1500)) ?>" step="0.01">
                 <small class="text-muted">🔴 <strong>القاعدة فيها سعران معاً:</strong> ① <strong>هذا السعر (القديم 1500)</strong> — فقط لتحويل أساس الراتب بعد التدرّج إلى دولار حتى يطلع الإضافي بالدولار (÷1500 × النسبة٪ ← داون للدولار). ② <strong>السعر الجديد (89,500)</strong> — لتحويل الإضافي الدولاري رجوعاً إلى الليرة (× سعر صرف شهر الراتب من صفحة «أسعار الصرف» ← داون للمليون). <strong>تغيير أيّ منهما يعيد حساب أصحاب النسبة تلقائياً.</strong></small>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Présence par heure de réduction / ساعات الحضور مقابل كل ساعة تناقص</label>
+                <input type="number" name="hours_reduction_presence_factor" class="form-control" value="<?= e(getSetting('hours_reduction_presence_factor', 1.5)) ?>" step="0.1" min="0.1">
+                <small class="text-muted">⏱️ <strong>كل ساعة تناقص = ساعة ونصف حضور</strong> (افتراضي 1.5): أستاذ عنده 4 ساعات تناقص ← ساعات حضور التناقص 6. تُحسب تلقائياً بملف الأستاذ وببطاقة الرواتب من ساعات التناقص المسجّلة.</small>
             </div>
             <div class="d-flex justify-end" style="margin-top:8px">
                 <button type="submit" class="btn btn-primary btn-lg">

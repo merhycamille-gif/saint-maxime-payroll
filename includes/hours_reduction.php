@@ -202,6 +202,33 @@ function handleHoursReductionPost($db, $redirectTo) {
     header('Location: ' . $redirectTo); exit;
 }
 
+/**
+ * ⏱️ ساعات حضور التناقص (طلبه 2026-09-03): «كل ساعة تناقص بتصير ساعة ونص» — 4 ساعات تناقص = 6 ساعات حضور.
+ * المعامل إعداد عام قابل للتعديل (hours_reduction_presence_factor، افتراضي 1.5) — البرنامج يحسبها تلقائياً من ساعات التناقص المسجّلة بملفه.
+ */
+function hoursReductionPresenceFactor() {
+    $f = (float)getSetting('hours_reduction_presence_factor', 1.5);
+    return $f > 0 ? $f : 1.5;
+}
+function hoursReductionPresence($reductionHours) {
+    return round((float)$reductionHours * hoursReductionPresenceFactor(), 1);
+}
+/** رقم ساعات بلا أصفار زائدة (4 · 6 · 1.5). */
+function hoursFmt($v) {
+    return rtrim(rtrim(number_format((float)$v, 1), '0'), '.');
+}
+/**
+ * نص سطر التناقص لبطاقة الرواتب/القسيمة بجانب الساعات الفعلية: «تناقص 4 س — حضور التناقص 6 س»، أو '' إن لا تناقص مسجّلاً.
+ */
+function hoursReductionSlipText(array $emp, $lang = 'ar') {
+    $red = (float)($emp['hours_reduction'] ?? 0);
+    if ($red <= 0) return '';
+    $pres = hoursReductionPresence($red);
+    return $lang === 'fr'
+        ? 'Réduction ' . hoursFmt($red) . ' h — présence de réduction ' . hoursFmt($pres) . ' h'
+        : 'تناقص ' . hoursFmt($red) . ' س — حضور التناقص ' . hoursFmt($pres) . ' س';
+}
+
 /** اسم الأستاذ الثلاثي للعرض. */
 function hoursReductionEmpName(array $e) {
     return trim((($e['first_name_ar'] ?: $e['first_name_fr']) . ' ' . ($e['father_name_ar'] ?: '') . ' ' . ($e['last_name_ar'] ?: $e['last_name_fr'])));

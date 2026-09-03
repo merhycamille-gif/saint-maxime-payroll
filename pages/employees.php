@@ -161,6 +161,7 @@ $action = $_GET['action'] ?? 'list';
 $id = (int)($_GET['id'] ?? 0);
 
 $db = getDB();
+hoursReductionEnsureColumns($db); // 🕐 عمود «ساعات التناقص» يتركّب ذاتياً قبل أي حفظ
 $message = '';
 $messageType = 'success';
 
@@ -370,6 +371,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'current_grade' => (float)($_POST['current_grade'] ?? 1),
         'days_per_week' => (int)($_POST['days_per_week'] ?? 5),
         'hours_per_week' => (float)($_POST['hours_per_week'] ?? 18),
+        'hours_reduction' => (($_POST['employee_type'] ?? '') === 'enseignant_titulaire') ? max(0, (float)($_POST['hours_reduction'] ?? 0)) : 0, // 🕐 ساعات التناقص (للملاك فقط)
         'status' => $_POST['status'] ?? 'actif',
         // «كل الارقام اكتبو بالفرنسي»: الأرقام الرسمية تُطبَّع عند الحفظ (عربي→فرنسي + مسح الكلام المحشور)
         'nssf_number' => officialNumberFr($_POST['nssf_number'] ?? ''),
@@ -1429,14 +1431,27 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                             <small style="display:block;margin-top:3px;color:<?= $hrMsg['reduction'] > 0 ? '#b45309' : 'var(--muted,#6b7280)' ?>">
                                 <i class="fas fa-clock"></i> قانون التناقص:
                                 <?php if ($hrMsg['reduction'] > 0): ?>
-                                    ساعاته القانونية <strong><?= (int)$hrMsg['lawHours'] ?></strong> بدل <?= (int)$hrMsg['baseHours'] ?> (تناقص −<?= (int)$hrMsg['reduction'] ?>، سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>)
-                                    — ساعات التناقص المسجّلة: <strong><?= rtrim(rtrim(number_format((float)($employee['hours_reduction'] ?? 0), 1), '0'), '.') ?></strong><?= $hrNeeds ? ' <span class="badge badge-warning">⏳ قرار مطلوب أعلاه</span>' : '' ?>
+                                    ساعاته القانونية <strong><?= (int)$hrMsg['lawHours'] ?></strong> بدل <?= (int)$hrMsg['baseHours'] ?> (تناقص −<?= (int)$hrMsg['reduction'] ?>، سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>)<?= $hrNeeds ? ' <span class="badge badge-warning">⏳ قرار مطلوب أعلاه</span>' : '' ?>
                                 <?php else: ?>
                                     لا تناقص بسنة <?= e($hrSy) ?> (سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>) — يبدأ من سنة <?= e($hrMsg['startSy']) ?>
                                 <?php endif; ?>
                             </small>
                         <?php endif; ?>
                     </div>
+                    <?php if (($employee['employee_type'] ?? '') === 'enseignant_titulaire'): // للداخلين بالملاك فقط
+                        // 🕐 ساعات التناقص المسجّلة (تُكتب بزرّ «موافق» أو يدوياً) + ساعات حضور التناقص = التناقص × 1.5 (تلقائياً) — للملاك فقط
+                        $hrRedStored = (float)($employee['hours_reduction'] ?? 0); $hrFactor = hoursReductionPresenceFactor(); ?>
+                    <div class="form-group" id="hoursReductionFields" data-factor="<?= e($hrFactor) ?>">
+                        <label class="form-label">Heures de réduction / ساعات التناقص <small>(مرسوم 2601/2018)</small></label>
+                        <input type="number" name="hours_reduction" id="hoursReductionInput" class="form-control" value="<?= hoursFmt($hrRedStored) ?>" step="0.5" min="0">
+                        <small style="display:block;margin-top:3px;color:#b45309">
+                            <i class="fas fa-user-clock"></i> Présence de réduction / ساعات حضور التناقص: <strong id="hoursReductionPresence"><?= hoursFmt(hoursReductionPresence($hrRedStored)) ?></strong>
+                            <span class="text-muted">(كل ساعة تناقص = <?= hoursFmt($hrFactor) ?> ساعة حضور — تلقائياً)</span>
+                        </small>
+                        <script>(function(){var i=document.getElementById('hoursReductionInput'),o=document.getElementById('hoursReductionPresence'),f=parseFloat(document.getElementById('hoursReductionFields').dataset.factor)||1.5;
+                            function u(){var v=parseFloat(i.value)||0,p=Math.round(v*f*10)/10;o.textContent=String(p);}i.addEventListener('input',u);})();</script>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="form-row emp-teacher-only">
