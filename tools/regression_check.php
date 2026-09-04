@@ -1778,8 +1778,11 @@ check('🔒 البطاقة السنوية (تصميم مجمّد): كل مبال
       // «P1 بدون لون» (2026-08-25): صفّ المجموع TOTAL بلا خلفية صفراء
       && strpos($asSrc29, '#fff3cd') === false
       && strpos($asSrc29, "'<span class=\"sub-lbp\">' . \$l . '</span><span class=\"cur-usd\">'") !== false);
-check('🔒 البطاقة السنوية (تصميم مجمّد): العربي نسخي Noto Naskh والأرقام Cairo + اسم الأستاذ 17pt أبرز عنصر + معلومات عريضة',
-      strpos($asSrc29, ".salary-slip, .salary-slip-table, .slip-info { font-family:'Noto Naskh Arabic','Cairo'") !== false
+// ✍️ (2026-09-04) بطلبه المباشر: خط البطاقة Arial بكل اللغات متل التقارير والإفادات — الخط فقط، الباقي مجمّد
+check('🔒 البطاقة السنوية (تصميم مجمّد): الخط Arial بكل اللغات (الجدول + المعلومات) + اسم الأستاذ 17pt أبرز عنصر + معلومات عريضة',
+      strpos($asSrc29, ".salary-slip, .salary-slip-table, .slip-info { font-family:Arial,'Segoe UI',Tahoma,sans-serif; }") !== false
+      && strpos($asSrc29, "font-family:Arial,'Segoe UI',Tahoma,sans-serif !important; color:#000 !important;") !== false
+      && strpos($asSrc29, 'Noto Naskh') === false
       && strpos($asSrc29, '.slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 800 !important;') !== false
       && strpos($asSrc29, 'font-weight:800 !important') !== false);
 check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طول الورقة (188mm/pz + flex) وبلا fit القديم',
