@@ -488,10 +488,21 @@ class PayrollCalculator {
         $familyAllowance = $famSpouse + $famChildren;
 
         // === 8. Totals ===
+        // 🔴 «بدون فراطات — داون» (طلبه 2026-09-04: «بس يطلع الراتب الصافي فيه كسور كمان عملو داون»):
+        // كل محسوم يُنزَّل لتحت (floor) أولاً، ثم المجموع = جمع المحسومات المنزَّلة، والصافي = الإجمالي − المجموع،
+        // والمستحق = الصافي + العائلي + النقل — فكل الأرقام صحيحة وتركب على بعضها بالمليم (لا round نصفي).
+        // «المحسومات القانونية ما بتتغير» (قوله بعدها): المحسومات تبقى بحسابها القانوني كما كانت (round)،
+        // والمجموع = جمعها كما تُعرض، والصافي = الإجمالي − المجموع (داون)، والمستحق = الصافي + العائلي + النقل.
+        $cnssAmount        = round($cnssAmount);
+        $caisseAmount      = round($caisseAmount);
+        $monthlyTax        = round($monthlyTax);
+        $eocGradeDeduction = round($eocGradeDeduction);
+        $familyAllowance   = floor($familyAllowance);
+        $transportComp     = floor($transportComp);
         $totalRetenues = $cnssAmount + $caisseAmount + $monthlyTax + $eocGradeDeduction;
-        $grossEarnings = $basePlusEchelon + $extra + $primeAideTotal;
-        $netSalary = $grossEarnings - $totalRetenues;
-        $totalDue = $netSalary + $familyAllowance + $transportComp;
+        $grossEarnings = floor($basePlusEchelon) + floor($extra) + floor($primeAideTotal);
+        $netSalary = floor($grossEarnings - $totalRetenues);
+        $totalDue = floor($netSalary + $familyAllowance + $transportComp);
         
         // === 9. Employer charges (نِسَب مؤرّخة + أسس محدودة بالحدود لكل فرع) ===
         $schoolCnss = $maladieBase * (getRateAsOf('cnss_employer_rate', $this->month, $this->year, 8) / 100);
@@ -515,29 +526,29 @@ class PayrollCalculator {
             'grade_at_month' => $effectiveGrade,
             
             // Salary
-            'base_salary_lbp' => round($baseSalary),
-            'echelon_value_lbp' => round($echelonValue),
-            'base_plus_echelon_lbp' => round($basePlusEchelon),
-            'extra_lbp' => round($extra),
-            'prime_fixe_lbp' => round($primeFixe),
+            'base_salary_lbp' => floor($baseSalary),
+            'echelon_value_lbp' => floor($echelonValue),
+            'base_plus_echelon_lbp' => floor($basePlusEchelon),
+            'extra_lbp' => floor($extra),
+            'prime_fixe_lbp' => floor($primeFixe),
             'prime_fixe_usd_law' => (int)$this->primeUsdLaw,
-            'aide_complementaire_lbp' => round($aideComp),
-            'transport_complement_lbp' => round($transportComp),
+            'aide_complementaire_lbp' => floor($aideComp),
+            'transport_complement_lbp' => (int)$transportComp,
             
             // Deductions
-            'echelon_to_caisse_lbp' => round($emp['eoc_includes_echelon'] ? $echelonValue : 0),
-            'caisse_amount_lbp' => round($caisseAmount),
-            'eoc_grade_lbp' => round($eocGradeDeduction),
-            'cnss_amount_lbp' => round($cnssAmount),
-            'taxable_base_lbp' => round($taxBase),
-            'income_tax_lbp' => round($monthlyTax),
-            'total_retenues_lbp' => round($totalRetenues),
+            'echelon_to_caisse_lbp' => floor($emp['eoc_includes_echelon'] ? $echelonValue : 0),
+            'caisse_amount_lbp' => (int)$caisseAmount,
+            'eoc_grade_lbp' => (int)$eocGradeDeduction,
+            'cnss_amount_lbp' => (int)$cnssAmount,
+            'taxable_base_lbp' => floor($taxBase),
+            'income_tax_lbp' => (int)$monthlyTax,
+            'total_retenues_lbp' => (int)$totalRetenues,
             
             // Result
-            'net_salary_lbp' => round($netSalary),
-            'family_allowance_lbp' => round($familyAllowance),
-            'transport_lbp' => round($transportComp),
-            'total_due_lbp' => round($totalDue),
+            'net_salary_lbp' => (int)$netSalary,
+            'family_allowance_lbp' => (int)$familyAllowance,
+            'transport_lbp' => (int)$transportComp,
+            'total_due_lbp' => (int)$totalDue,
             
             // Exchange rate
             'exchange_rate' => $this->exchangeRate,
@@ -545,10 +556,10 @@ class PayrollCalculator {
             'total_due_usd' => round($totalDue / $this->exchangeRate, 2),
             
             // Employer charges
-            'school_cnss_8_lbp' => round($schoolCnss),
-            'school_eoc_6_lbp' => round($schoolEoc),
-            'school_family_comp_6_lbp' => round($schoolFamilyComp),
-            'school_end_of_service_8_5_lbp' => round($schoolEndOfService),
+            'school_cnss_8_lbp' => floor($schoolCnss),
+            'school_eoc_6_lbp' => floor($schoolEoc),
+            'school_family_comp_6_lbp' => floor($schoolFamilyComp),
+            'school_end_of_service_8_5_lbp' => floor($schoolEndOfService),
             
             'is_calculated' => 1,
             'calculated_at' => date('Y-m-d H:i:s')
@@ -749,10 +760,10 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
         try { $calc = new PayrollCalculator($employeeId, (int)$r['month'], (int)$r['year']); }
         catch (Exception $ex) { continue; }
         [$primeFixe, $aideComp, $transportComp] = $calc->bonusComponents((float)$r['base_plus_echelon_lbp']);
-        $newPrime = $doAdd ? (int)round($primeFixe) : (int)$r['prime_fixe_lbp'];
-        $newAide  = $doAdd ? (int)round($aideComp)  : (int)$r['aide_complementaire_lbp'];
-        $newTr    = $doTr  ? (int)round($transportComp) : (int)$r['transport_lbp'];
-        $newTrC   = $doTr  ? (int)round($transportComp) : (int)$r['transport_complement_lbp'];
+        $newPrime = $doAdd ? (int)floor($primeFixe) : (int)$r['prime_fixe_lbp'];
+        $newAide  = $doAdd ? (int)floor($aideComp)  : (int)$r['aide_complementaire_lbp'];
+        $newTr    = $doTr  ? (int)floor($transportComp) : (int)$r['transport_lbp'];
+        $newTrC   = $doTr  ? (int)floor($transportComp) : (int)$r['transport_complement_lbp'];
         $dAdd = ($newPrime + $newAide) - ((int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']);
         // 🔴 النقل داخل المستحق مرّة واحدة (العمودان نفس القيمة) — الفرق من transport_lbp وحده
         $dTr = $newTr - (int)$r['transport_lbp'];
@@ -848,7 +859,7 @@ function backfillEmployerCharges($db, $fromDate = null, $toDate = null) {
         $c8  = clampCnssBase($subjBase, 'maladie_maternite', $m, $y) * (getRateAsOf('cnss_employer_rate', $m, $y, 8) / 100);
         $fam = $isEmploye ? clampCnssBase($subjBase, 'allocations_familiales', $m, $y) * (getRateAsOf('family_compensation_rate', $m, $y, 6) / 100) : 0;
         $eos = $isEmploye ? clampCnssBase($subjBase, 'fin_de_service', $m, $y) * (getRateAsOf('end_of_service_rate', $m, $y, 8.5) / 100) : 0;
-        $upd->execute([':c8' => round($c8), ':fam' => round($fam), ':eos' => round($eos), ':id' => $r['id']]);
+        $upd->execute([':c8' => floor($c8), ':fam' => floor($fam), ':eos' => floor($eos), ':id' => $r['id']]);
         $n++;
     }
     return $n;

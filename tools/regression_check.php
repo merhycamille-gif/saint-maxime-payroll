@@ -256,6 +256,17 @@ check('حجم الخط 12pt بالإفادات (أجسام الإفادات ال
 check('خط الإفادات Arial بكل اللغات (٣ مواضع، بلا Sakkal بصفحة الإفادات)',
       substr_count($attSrc, "#ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}") >= 3
       && strpos($attSrc, 'Sakkal') === false);
+// (2026-09-04) «بس يطلع الراتب الصافي فيه كسور كمان عملو داون»: المحرّك بلا round نصفي —
+// كل محسوم floor أولاً، المجموع = جمع المنزَّل، الصافي = الإجمالي − المجموع، المستحق = الصافي + العائلي + النقل
+$pcSrcFl = (string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php');
+check('المحرّك: الصافي والمستحق داون (floor) والمحسومات القانونية كما كانت، والمجموع = جمعها — لا round على الصافي/المستحق',
+      strpos($pcSrcFl, '$cnssAmount        = round($cnssAmount);') !== false   // المحسومات القانونية كما كانت
+      && strpos($pcSrcFl, '$monthlyTax        = round($monthlyTax);') !== false
+      && strpos($pcSrcFl, '$totalRetenues = $cnssAmount + $caisseAmount + $monthlyTax + $eocGradeDeduction;') !== false
+      && strpos($pcSrcFl, '$netSalary = floor($grossEarnings - $totalRetenues);') !== false
+      && strpos($pcSrcFl, '$totalDue = floor($netSalary + $familyAllowance + $transportComp);') !== false
+      && strpos($pcSrcFl, "'net_salary_lbp' => (int)\$netSalary,") !== false
+      && !preg_match("/'[a-z_0-9]+_lbp' => round\(/", $pcSrcFl));
 // (2026-09-04) بطلب المستخدم (p1: كشف برنامجه القديم بخط Arial): خط التقارير والقسائم والورقة
 // الموحّدة Arial بكل اللغات متل الإفادات — بلا Sakkal بملف التقارير؛ البطاقة السنوية مجمّدة ولها خطّها
 check('خط التقارير Arial (official-doc + doc-table/ppExportArea/payslip-card/doc-sheet، بلا Sakkal بملف التقارير)',
@@ -4539,8 +4550,9 @@ check('ساعات التناقص خانة بملف الأستاذ (للداخل�
       && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), "'hours_reduction_presence_factor'") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/monthly_payroll.php'), 'hoursReductionSlipText($emp') !== false
       // 🔒 البطاقة السنوية: بطلبه الصريح («بدي التناقص يطلع ببطاقة الأستاذ والحضور كمان بدون ما تغير بحجم البطاقة») — بنفس خانة الساعات فقط، بلا أي خانة/صف جديد
-      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "j · Réduction <?= e(\$meta['hours_red']) ?> h · Présence <?= e(\$meta['hours_pres']) ?> h</span></td>") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'التناقص / الحضور</span>') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), '<span class="val" dir="ltr" style="white-space:nowrap;unicode-bidi:isolate">') !== false // سطر واحد LTR (2026-09-04: الخط الأعرض كان يلفّه ويلخبطه)
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "j · Réduction <?= e(\$meta['hours_red']) ?> h = Présence <?= e(\$meta['hours_pres']) ?> h</span></td>") !== false
+      && substr_count((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'Heures / jours par semaine — الساعات / الأيام أسبوعياً</span>') === 2 // نفس العنوان بالحالتين (2026-09-04: العنوان الطويل كان يلفّ سطرين فيطول الصف ويدفع المجموع لصفحة ثانية)
       && substr_count((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'hours_red') === 2
       // 🧮 نسبة الإضافي المعطاة له بالبطاقة (طلبه 2026-09-03) بخانة الدرجة نفسها: «38 · 45 %» — الدالة employeeExtraPercentForYear
       && function_exists('employeeExtraPercentForYear') && employeeExtraPercentForYear($db, -1, '2025-2026') === '' && employeeExtraPercentForYear($db, 1, 'all') === ''
