@@ -334,6 +334,11 @@ include __DIR__ . '/../includes/header.php';
 /* سطر واحد: الاسم بالنص، المدرسة والتقرير على الطرفين (بارز فوق الجدول) */
 .slip-emp-name { display:flex; align-items:center; gap:10px; font-weight:700; color:var(--primary); background:#eff6ff; border:1px solid var(--gray-300); border-radius:6px; padding:8px 12px; margin-bottom:12px; font-size:16px; }
 .slip-emp-name .slip-school { flex:1; text-align:start; color:#0a2240; }
+/* 🔤 «المخلصيات لازم تكون على نفس السطر» (بطلبه 2026-09-04 عن p1): اسم المدرسة وعنوان الكشف لا ينكسران
+   لسطرين أبداً — سطر واحد لكل جزء (أطول اسم مدرسة 92 حرفاً مفحوص بالورق)؛ وعالشاشة الضيّقة ينزل
+   عنوان الكشف كاملاً لسطر تحت بدل كسر الاسم بنصّه */
+.slip-emp-name { flex-wrap:wrap; }
+.slip-emp-name .slip-school, .slip-emp-name .slip-rep, .slip-emp-name .slip-pname { white-space:nowrap; }
 .slip-emp-name .slip-rep { flex:1; text-align:end; color:var(--gray-700); font-weight:700; }
 .slip-emp-name .slip-pname { flex:0 0 auto; text-align:center; color:var(--primary); font-size:1.12em; }
 

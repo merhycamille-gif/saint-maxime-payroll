@@ -1810,6 +1810,11 @@ check('🔒 البطاقة السنوية (تصميم مجمّد): الخط Aria
 // العربي على Tahoma — ممنوع أي 800 بالبطاقة؛ 700 = Arial Bold بحروفها العربية متل كشف برنامجه القديم
 check('🔒 البطاقة السنوية: الحرف العربي Arial Bold متل p1 — لا وزن 800 بالبطاقة (يقفز على Arial Black بلا عربي → Tahoma)',
       !preg_match('/font-weight:\s*800/', $asSrc29));
+// 🔤 «المخلصيات لازم تكون على نفس السطر» (2026-09-04 عن p1): اسم المدرسة/الاسم/عنوان الكشف لا ينكسرون —
+// مفحوص: 358 كشفاً 2025-2026 كلها ترويسة بسطر واحد وصفحة واحدة (أطول اسم مدرسة 92 حرفاً)
+check('🔒 البطاقة السنوية: ترويسة الاسم/المدرسة/العنوان بسطر واحد (nowrap) والصفّ يلفّ ككل عالشاشة الضيّقة',
+      strpos($asSrc29, '.slip-emp-name .slip-school, .slip-emp-name .slip-rep, .slip-emp-name .slip-pname { white-space:nowrap; }') !== false
+      && strpos($asSrc29, '.slip-emp-name { flex-wrap:wrap; }') !== false);
 check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طول الورقة (188mm/pz + grid 1fr للجدول) وبلا fit القديم',
       strpos($asSrc29, 'min-height: calc(188mm / var(--pz, 1))') !== false
       && strpos($asSrc29, '.salary-slip { display: grid; grid-template-columns: 100%; grid-template-rows: auto auto 1fr;') !== false
