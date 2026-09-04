@@ -25,7 +25,7 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
     // 2) العكس: سطر إضافي/مكافأة فعّال لكل السنة بمبلغ لكن الأشهر المخزّنة بصفر (لم يُطبَّق)
     $add('missing_add', 'سطر إضافي/مكافأة فعّال بملفه لكن أشهره بصفر (لم يُطبَّق)', $q("
         SELECT $nm nm FROM employees e
-        WHERE e.is_deleted=0 AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id=e.id AND b.is_active=1 AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND b.school_year=? AND b.start_month IS NULL)
+        WHERE e.is_deleted=0 AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id=e.id AND b.is_active=1 AND b.amount>0 AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND b.school_year=? AND b.start_month IS NULL)
           AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id=e.id AND ms.school_year=?)
           AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id=e.id AND ms.school_year=? AND (ms.prime_fixe_lbp>0 OR ms.aide_complementaire_lbp>0))", [$sy, $sy, $sy]));
 

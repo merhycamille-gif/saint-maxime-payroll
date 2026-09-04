@@ -274,6 +274,35 @@ check('🛡️ لا بند نسبة مكرّر أبداً: صمام bonusDuplica
       && count(findDuplicatePercentBonusGroups($db)) === 0
       && strpos((string)getSetting('heal_dup_percent_20260904', ''), 'done') === 0,
       (string)getSetting('heal_dup_percent_20260904', ''));
+// 🩹 «ما بدي أخطاء أبداً» (2026-09-04): بنود بصفر تُطفأ ولا تُنسخ + أشهر السنوات المشتقّة تطابق بنودها الثابتة (مارسيلا داود)
+check('🩹 بنود بصفر: healFutureYearConsistency20260904 موصول ونُفِّذ + لا بند فاعل بصفر + لا نسخ لبند بصفر (فتح السنة/نسخ الملف)',
+      strpos($fnSrcDup, 'function healFutureYearConsistency20260904()') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'healFutureYearConsistency20260904();') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/open_year.php'), "if ((float)\$b['amount'] <= 0) continue;") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), "if ((float)\$b['amount'] <= 0) continue; // بند بصفر") !== false
+      && strpos((string)getSetting('heal_future_consistency_20260904', ''), 'done') === 0
+      && (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE is_active = 1 AND value_type = 'amount' AND amount <= 0")->fetchColumn() === 0,
+      (string)getSetting('heal_future_consistency_20260904', ''));
+// ⚖️ تقرير المخالفات والتصحيحات (طلبه 2026-09-04): «مساج بس افتح البرنامج: هيدا الأستاذ مخالف القانون، نوع المخالفة، التصحيح، موافق أو لا — ودايماً في تقرير»
+require_once __DIR__ . '/../includes/compliance.php';
+complianceEnsureTable($db);
+$cpItems = complianceItems($db, currentSchoolYear());
+$cpRules = complianceRules();
+$cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
+$cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 17 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 17
+      && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
+      && is_array($cpItems) && count($cpBadRule) === 0
+      && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
+      && strpos($cpSrc, "in_array(\$_POST['action'] ?? '', ['comp_approve', 'comp_reject', 'comp_reopen', 'comp_approve_rule'], true)") !== false
+      && strpos($cpSrc, 'requireCsrf();') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../index.php'), 'handleCompliancePost($db, BASE_URL . \'index.php\');') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../index.php'), 'renderCompliancePending($homeComp, true);') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/compliance.php'), 'complianceBuild($db)') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'pages/compliance.php') !== false
+      && strpos($fnSrcDup, "complianceLogAuto(\$db, 'dup_percent'") !== false,
+      'items=' . count($cpItems) . ' rules=' . implode(',', array_unique(array_column($cpItems, 'rule'))));
 check('المحرّك: الصافي داون للألف (قراره 2026-09-04) والمستحق = الصافي + العائلي + النقل، المحسومات القانونية كما كانت + الشفاء الذاتي للمخزّن بكل السنوات نُفِّذ',
       strpos($pcSrcFl, '$cnssAmount        = round($cnssAmount);') !== false   // المحسومات القانونية كما كانت
       && strpos($pcSrcFl, '$monthlyTax        = round($monthlyTax);') !== false
@@ -653,6 +682,15 @@ if ($regEid) {
           strpos($repSrc25, "'fr'=>'Entrés au cadre (par date)'") !== false
           && strpos($hTit27, 'الداخلون في الملاك بتاريخ') !== false
           && strpos($hTit27, 'name="tdate"') !== false);
+    // 🏫 (2026-09-04) «مين داخل على المدرسة بتاريخ/بسنة لكل مدرسة»: وضع الدخول إلى المدرسة (hire_date، كل الفئات) + مدى «كل السنة الدراسية»
+    $hHire04 = renderPage('pages/reports.php', ['report' => 'titularized', 'tmode' => 'hire', 'tspan' => 'year', 'tdate' => '2023-10-01'], []);
+    $nHire04 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND hire_date BETWEEN '2023-10-01' AND '2024-09-30'")->fetchColumn();
+    check('تقرير الداخلين إلى المدرسة: بطاقة بالمركز + وضع hire (كل الفئات) + مدى السنة الدراسية 1/10→30/9 + العدد = استعلام مباشر',
+          strpos($repSrc25, "'fr'=>\"Entrés à l'école (par date)\"") !== false
+          && strpos($hHire04, 'الداخلون إلى المدرسة خلال السنة الدراسية 2023-2024') !== false
+          && strpos($hHire04, 'name="tmode"') !== false && strpos($hHire04, 'name="tspan"') !== false
+          && strpos($hHire04, 'العدد: ' . $nHire04) !== false,
+          "n=$nHire04");
     // 🗓️ (2026-08-27) حالة تحديث الأساتذة بسنة التحديث («يبينو اللي بدون تحديث بنفس السنة
     // أو اختار السنة»): منتقي السنة + «ما بعتوا» = ما بعتوا بالسنة المختارة (نافذة 1/7→30/6،
     // إرسال الصيف يُحسب للسنة الجاية) + خيار «كل السنين» = السلوك القديم

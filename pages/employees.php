@@ -655,6 +655,7 @@ if ($action === 'copy_year' && $id > 0) {
                     $bchk->execute([$id, $target, $b['bonus_type'], $b['period_number']]);
                     if ($bchk->fetchColumn()) continue;
                     if (bonusDuplicateExists($db, (int)$id, $target, $b)) continue; // 🛡️ (2026-09-04) لا نسبة مكرّرة بالسنة الهدف
+                    if ((float)$b['amount'] <= 0) continue; // بند بصفر بلا معنى — لا يُنسخ
                     $bins->execute([$id, $b['bonus_type'], $b['period_number'], $target, $b['amount'], $b['value_type'] ?? 'amount', $b['currency'], $b['start_month'], $b['end_month']]);
                     $bonusCopied++;
                 }

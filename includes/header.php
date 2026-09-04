@@ -52,6 +52,7 @@ healPercentLawAll20260828(); // ⚖️ «طبق القانون على الجمي
 healPrimeSnapshotSync20260828();
 healPercentLawOwn20260903();
 healDuplicatePercent20260904(); // 🩹 نسبة مكرّرة فاعلة بنفس السنة (أنطوني جبور 110 %) — تُطفأ ويُعاد الحساب، عند كل فتح
+healFutureYearConsistency20260904(); // 🩹 بنود بمبلغ صفر تُطفأ + أشهر السنوات المشتقّة (2026-2027+) التي لا تطابق بنودها الثابتة يُعاد حسابها (مارسيلا داود) — مرّة واحدة
 healPrimeUsdLaw20260903();
 healScale47_20260903(); healNetFloor1000_20260904(); // 🔴 الصافي داون للألف بكل السنوات (قراره 2026-09-04) // 📜 تصحيح الدرجات 47/49/50 بجدول السلسلة 2017 طبق الجريدة الرسمية (150,000 لا 145,000) + إعادة حساب المعنيين 2025-2027 (2026-09-03) // 🧮 تعبئة عمود دولار القانون للإضافي (prime_fixe_usd_law) للرواتب المخزّنة لأصحاب النسبة — دفعات (2026-09-03 «صحّح النسبة بكل التقارير والإفادات») // 🧮 «طبّق النسبة المئوية اللي بتطلع صح» (2026-09-03): الملاك الباقون بمبلغ ثابت بمدارس النسبة → نسبة المدرسة إن كان الفرق فراطات (<5م) وإلا نسبتهم الخاصة التي تُخرج رقمهم — دفعات + نسخ _bk_bonuses_pctown0903/_ms_bk_pctown0903 // 🔄 مزامنة بنود الإضافي من لقطة الكمبيوتر (المصدر الصحيح): ملاك البشارة وغيرهم أونلاين كانوا بلا بنود وإضافيهم 0 — خلق/توحيد البند وإعادة حساب سنته، بدفعات، ويتخطّى السليم والمحميّين (2026-08-28)
 healChiraTaalimiya20260829(); // 🎓 شيرا العاقوري (البشارة): «عندها إجازة تعليمية» — شهادتها كانت فاضية فطلعت درجة 18 والإضافي رقماً يعوّض؛ صارت إجازة تعليمية → درجة 31 حسب القانون + إضافي 45٪ + إعادة حساب سنتها (2026-08-29)
@@ -160,6 +161,13 @@ document.addEventListener('submit', function (e) {
                 <i class="fas fa-lightbulb" <?= $tsPend ? 'style="color:#f59e0b"' : '' ?>></i>
                 <span>Suggestions état civil / اقتراحات من إخراج القيد</span>
                 <?php if ($tsPend): ?><span style="background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite"><?= $tsPend ?></span><?php endif; ?>
+            </a>
+
+            <?php require_once __DIR__ . '/compliance.php'; $cpPend = compliancePendingCount(); // ⚖️ (2026-09-04) شارة المخالفات المعلّقة بانتظار قراره ?>
+            <a href="<?= BASE_URL ?>pages/compliance.php" class="<?= $currentPage === 'compliance' ? 'active' : '' ?>">
+                <i class="fas fa-scale-balanced" <?= $cpPend ? 'style="color:#ef4444"' : '' ?>></i>
+                <span>Rapport de conformité / تقرير المخالفات والتصحيحات</span>
+                <?php if ($cpPend): ?><span style="background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite"><?= $cpPend ?></span><?php endif; ?>
             </a>
 
             <a href="<?= BASE_URL ?>pages/grades.php" class="<?= $currentPage === 'grades' ? 'active' : '' ?>">

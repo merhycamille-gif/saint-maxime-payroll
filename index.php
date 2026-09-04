@@ -4,6 +4,7 @@ require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/payroll_calculator.php'; // recalcEmployeeYear لإجراءات الـ64
 require_once __DIR__ . '/includes/age64.php';               // أدوات تنبيه بلوغ الـ64 (مشتركة)
 require_once __DIR__ . '/includes/hours_reduction.php';     // 🕐 مساج تناقص ساعات التدريس «قرار مطلوب» بكل مدرسة
+require_once __DIR__ . '/includes/compliance.php';          // ⚖️ تقرير المخالفات والتصحيحات «موافق/لا» عند كل فتح (طلبه 2026-09-04)
 requireLogin();
 
 $currentPage = 'dashboard';
@@ -15,6 +16,9 @@ $db = getDB();
 handleAge64Post($db, BASE_URL . 'index.php');
 // 🕐 إذن تسجيل تناقص الساعات (موافق/لاحقاً) — يُعالَج ويعيد التوجيه للرئيسية
 handleHoursReductionPost($db, BASE_URL . 'index.php');
+// ⚖️ قرارات تقرير المخالفات (موافق — صحّح / لا — اتركه) — تُعالَج وتعيد التوجيه للرئيسية
+handleCompliancePost($db, BASE_URL . 'index.php');
+$homeComp = canEdit() ? complianceBuild($db) : null; // التقرير يُبنى عند كل فتح للوحة القيادة
 
 // Stats (مقيّدة بالمدرسة الحالية — أو كل المدارس للمدير العام)
 // 🔢 الأعداد حسب **السنة الدراسية المختارة** + المدرسة/المدارس المختارة (نفس فلتر السنة المستعمَل بكل البرنامج).
@@ -183,6 +187,8 @@ $dashSections = [
     </div>
 </section>
 <?php endforeach; ?>
+
+<?php if ($homeComp) renderCompliancePending($homeComp, true); ?>
 
 <?php renderHoursReductionPending($homeHrPending, $homeHrSy, true); ?>
 

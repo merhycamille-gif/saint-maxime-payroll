@@ -916,6 +916,27 @@ function findDuplicatePercentBonusGroups(PDO $db): array {
 }
 
 /**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-09-04 «ما بدي أخطاء أبداً» — الفحص الرسمي على دمب الأونلاين):
+ *  (أ) بنود علاوة فاعلة بمبلغ صفر (جوزيف ابي عيد ×2) — بلا أثر وتضلّل الفحص → تُطفأ.
+ *  (ب) الأشهر التي لا تطابق بنود الملف (مارسيلا داود: البند 54,060,000 والأشهر 54,000,000) **لا تُصحَّح هنا** —
+ *      تظهر بتقرير المخالفات (includes/compliance.php، قاعدة add_stale) بانتظار موافقته «موافق — صحّح».
+ * لا يحذف صفوفاً ولا يلمس التارِكين (قراره أولاً — قاعدة أندره مراد).
+ */
+function healFutureYearConsistency20260904() {
+    $flag = 'heal_future_consistency_20260904';
+    if (getSetting($flag, '') !== '') return;
+    if (function_exists('isViewer') && isViewer()) return;
+    try {
+        $db = getDB();
+        @set_time_limit(600);
+        $zero = (int)$db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE is_active = 1 AND value_type = 'amount' AND amount <= 0");
+        // (ب) الأشهر التي لا تطابق بنودها (مارسيلا داود) لا تُصحَّح تلقائياً — تظهر بتقرير المخالفات «add_stale» بانتظار موافقته
+        if (function_exists('logAudit') && $zero) logAudit('heal_future_consistency', 'employee_bonuses', 0, null, ['zero_bonus_off' => $zero]);
+        setSetting($flag, "done: zeroOff=$zero @" . date('Y-m-d H:i'));
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
+/**
  * 🩹 شفاء ذاتي (2026-09-04، أنطوني جبور 55 % ×2 = 110 % بـ2026-2027): بنود النسبة الفاعلة المكرّرة تُطفأ ما عدا
  * الأقدم، ويُعاد حساب أشهر تلك السنة المخزّنة. يعمل عند كل فتح صفحة (رخيص: استعلام واحد) فلا يبقى مكرَّر أبداً —
  * والسجل بالإعداد heal_dup_percent_20260904 آخر مرّة أطفأ شيئاً.
@@ -942,6 +963,13 @@ function healDuplicatePercent20260904() {
                 try { (new PayrollCalculator($eid, (int)$r['month'], (int)$r['year']))->calculateAndSave(); $recalc++; } catch (Exception $e) {}
             }
             $names[] = (string)$g['emp_name'] . "#$eid $sy (أطفئت $in)";
+            // ⚖️ يظهر بتقرير المخالفات «صُحِّح تلقائياً» (طلبه: دايماً في تقرير)
+            try {
+                require_once __DIR__ . '/compliance.php';
+                complianceLogAuto($db, 'dup_percent', $eid, $sy, (string)$g['emp_name'],
+                    'بند نسبة ' . rtrim(rtrim((string)$g['amount'], '0'), '.') . ' % مكرّر فاعل (' . $g['ids'] . ') فكانت النسبة تُجمع مرّتين',
+                    'إطفاء المكرّر والإبقاء على الأقدم وإعادة حساب السنة', 'أُطفئ ' . count($extra) . ' وأُعيد حساب ' . $recalc . ' شهراً');
+            } catch (Throwable $e) {}
         }
         if (function_exists('logAudit') && $off) logAudit('heal_dup_percent', 'employee_bonuses', 0, null, ['off' => $off, 'recalc' => $recalc, 'who' => $names]);
         setSetting('heal_dup_percent_20260904', 'done: off=' . $off . ' recalc=' . $recalc . ' @' . date('Y-m-d H:i') . ($names ? ' | ' . implode('؛ ', $names) : ''));
