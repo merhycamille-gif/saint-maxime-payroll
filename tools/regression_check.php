@@ -244,7 +244,7 @@ check('كشف الرواتب: تواقيع إعداد/تدقيق/اعتماد', 
       && strpos($hSA, 'تدقيق: مدير الموارد البشرية') !== false && strpos($hSA, 'اعتماد: المدير العام') !== false);
 $hlpSrc = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php');
 check('رؤوس الجداول كحلية #1F4E5F (شاشة + طباعة)', substr_count($hlpSrc, '#1F4E5F') >= 2);
-check('الخط العربي الرسمي (Sakkal Majalla) معرَّف', strpos($hlpSrc, 'Sakkal Majalla') !== false);
+// (2026-09-04) فحص Sakkal القديم أُلغي — الخط صار Arial (الفحص الجديد تحت)
 // حجم الخط 12pt (متل «12» بالوورد) بالتقارير والإفادات — بطلب المستخدم 2026-07-29
 check('حجم الخط 12pt بالتقارير (doc-table + رؤوس + فقرات النماذج)',
       strpos($hlpSrc, 'font-size:12pt;margin:10px 0') !== false          // .doc-table
@@ -256,6 +256,12 @@ check('حجم الخط 12pt بالإفادات (أجسام الإفادات ال
 check('خط الإفادات Arial بكل اللغات (٣ مواضع، بلا Sakkal بصفحة الإفادات)',
       substr_count($attSrc, "#ppExportArea{font-family:Arial,'Segoe UI',Tahoma,sans-serif}") >= 3
       && strpos($attSrc, 'Sakkal') === false);
+// (2026-09-04) بطلب المستخدم (p1: كشف برنامجه القديم بخط Arial): خط التقارير والقسائم والورقة
+// الموحّدة Arial بكل اللغات متل الإفادات — بلا Sakkal بملف التقارير؛ البطاقة السنوية مجمّدة ولها خطّها
+check('خط التقارير Arial (official-doc + doc-table/ppExportArea/payslip-card/doc-sheet، بلا Sakkal بملف التقارير)',
+      strpos($hlpSrc, ".doc-table,#ppExportArea,.payslip-card,.doc-sheet{font-family:Arial,'Segoe UI',Tahoma,sans-serif;}") !== false
+      && preg_match("/\.official-doc\{[^}]*font-family:Arial,'Segoe UI',Tahoma,sans-serif/s", $hlpSrc) === 1
+      && strpos($hlpSrc, 'Sakkal') === false);
 // (2026-08-20) «وقت عم اطبع وورد ما عم يبين لوغو المدرسة»: وورد لا يعرض خلفيات CSS ولا روابط نسبية —
 // ترويسة .word-head مخفية تُكشف بتصدير الوورد فقط + خط Arial إنلاين على أجسام الإفادات لينتقل للوورد
 check('تصدير وورد: ترويسة .word-head البديلة (موضعا الضمان ونمط مكسيموس) + Arial إنلاين بأجسام الإفادات',

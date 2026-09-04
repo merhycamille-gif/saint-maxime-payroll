@@ -384,7 +384,7 @@ function officialFormStyles(): string {
    ورقته يصغّر نفسه محسوباً (--pz) فلا يُقصّ عمود. المستثنى الوحيد: النماذج طبق الأصل
    (xlsf من إكسل + ofs فوق صورة رسمية) لأن محاذاتها على النموذج الرسمي أهم من حجم خطها. */
 .official-doc{background:#fff;color:#111;max-width:210mm;margin:0 auto;padding:14mm 14mm;font-size:12pt;
-  border:1px solid #e5e7eb;border-radius:10px;font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo','Inter',sans-serif;line-height:1.7;}
+  border:1px solid #e5e7eb;border-radius:10px;font-family:Arial,'Segoe UI',Tahoma,sans-serif;line-height:1.7;}
 .official-doc.rtl,.official-doc[dir="rtl"]{direction:rtl;text-align:right;}
 
 /* ترويسة المدرسة */
@@ -434,8 +434,9 @@ function officialFormStyles(): string {
 .report-table-wrap::-webkit-scrollbar-thumb,.card-body::-webkit-scrollbar-thumb{background:var(--primary,#1e3a8a);border-radius:8px;border:2px solid #e8edf3;}
 /* حجم الخط 12pt (متل «12» بالوورد) بطلب المستخدم — للتقارير والإفادات كلها */
 .doc-table{width:100%;border-collapse:collapse;font-size:12pt;margin:10px 0;}
-/* خط عربي واضح موحّد للمستندات والتقارير المطبوعة */
-.doc-table,#ppExportArea,.payslip-card{font-family:'Sakkal Majalla','Traditional Arabic','Amiri','Cairo','Inter',sans-serif;}
+/* خط التقارير والقسائم والورقة الموحّدة Arial بكل اللغات — متل الإفادات ومتل برنامجه القديم
+   (بطلب المستخدم 2026-09-04، p1: كشف البرنامج القديم بخط Arial) — البطاقة السنوية مجمّدة ولها خطّها */
+.doc-table,#ppExportArea,.payslip-card,.doc-sheet{font-family:Arial,'Segoe UI',Tahoma,sans-serif;}
 .doc-table th{background:#1F4E5F;color:#fff;padding:7px 8px;text-align:center;
   font-weight:600;border:1px solid #1F4E5F;font-size:12pt;}
 .doc-table td{border:1px solid #94a3b8;padding:6px 8px;text-align:center;}
