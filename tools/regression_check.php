@@ -1699,7 +1699,9 @@ check('الخط 12 بكل شي: لا تكبير فوق خط 12 بالقسائم/
 check('قد الورقة: البطاقة السنوية تملأ طول الورقة (188mm معوَّضة بالتصغير) والجدول يوزّع الفراغ على صفوفه',
       ($asSrc29 = (string)file_get_contents(__DIR__ . '/../pages/annual_slip.php')) !== ''
       && strpos($asSrc29, 'min-height: calc(188mm / var(--pz, 1))') !== false
-      && strpos($asSrc29, 'flex: 1 1 auto') !== false);
+      // 🗏 (2026-09-04) grid بصفّ 1fr للجدول بدل flex (الجدول كان يفيض عن الصندوق فيطلع المجموع بصفحة ثانية)
+      && strpos($asSrc29, 'grid-template-rows: auto auto 1fr') !== false
+      && !preg_match('/\.salary-slip-table \{ flex: 1 1 auto; \}/', $asSrc29));
 // 🖨️ إصلاح «البطاقة أونلاين صغيرة بنص ورقة فاضية» (شكوى المستخدم p1 بتاريخ 2026-08-01):
 // beforeprint يقيس على تنسيق الشاشة فيغلط (~0.42) — القياس الصحيح يقلب قواعد @media print
 // مؤقتاً ويقيس على مقاس الورقة، دفعةً واحدة لكل البطاقات (الطباعة الجماعية لا تعلّق)
@@ -1802,11 +1804,15 @@ check('🔒 البطاقة السنوية (تصميم مجمّد): الخط Aria
       strpos($asSrc29, ".salary-slip, .salary-slip-table, .slip-info { font-family:Arial,'Segoe UI',Tahoma,sans-serif; }") !== false
       && strpos($asSrc29, "font-family:Arial,'Segoe UI',Tahoma,sans-serif !important; color:#000 !important;") !== false
       && strpos($asSrc29, 'Noto Naskh') === false
-      && strpos($asSrc29, '.slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 800 !important;') !== false
-      && strpos($asSrc29, 'font-weight:800 !important') !== false);
-check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طول الورقة (188mm/pz + flex) وبلا fit القديم',
+      && strpos($asSrc29, '.slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 700 !important;') !== false
+      && strpos($asSrc29, '.slip-info .val { font-size: 13.5pt !important; font-weight:700 !important;') !== false);
+// 🔤 «بدي الحرف بالعربي ببطاقة الأستاذ متل p1» (2026-09-04): الوزن 800 يقفز على Arial Black (بلا عربي) فينزل
+// العربي على Tahoma — ممنوع أي 800 بالبطاقة؛ 700 = Arial Bold بحروفها العربية متل كشف برنامجه القديم
+check('🔒 البطاقة السنوية: الحرف العربي Arial Bold متل p1 — لا وزن 800 بالبطاقة (يقفز على Arial Black بلا عربي → Tahoma)',
+      !preg_match('/font-weight:\s*800/', $asSrc29));
+check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طول الورقة (188mm/pz + grid 1fr للجدول) وبلا fit القديم',
       strpos($asSrc29, 'min-height: calc(188mm / var(--pz, 1))') !== false
-      && strpos($asSrc29, 'flex: 1 1 auto') !== false
+      && strpos($asSrc29, '.salary-slip { display: grid; grid-template-columns: 100%; grid-template-rows: auto auto 1fr;') !== false
       && strpos($asSrc29, '&fit=1') === false);
 // ✍️ الخط النسخي (بطلبه 2026-08-25): ملف Noto Naskh Arabic محلي + معرَّف بfonts.css
 // للعربي فقط (unicode-range) حتى تبقى الأرقام واللاتيني على Cairo ولا يتلخبط الترتيب

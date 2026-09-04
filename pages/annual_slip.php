@@ -329,10 +329,10 @@ include __DIR__ . '/../includes/header.php';
 .ssh-title { text-align:end; }
 .ssh-title h3 { margin:0; color:var(--primary); font-size:18px; }
 .ssh-sub { color:var(--gray-700); font-weight:700; font-size:14px; margin:2px 0 0; }
-.ssh-year { margin:6px 0 0; font-weight:800; font-size:15px; color:var(--primary); }
+.ssh-year { margin:6px 0 0; font-weight:700; font-size:15px; color:var(--primary); }
 
 /* سطر واحد: الاسم بالنص، المدرسة والتقرير على الطرفين (بارز فوق الجدول) */
-.slip-emp-name { display:flex; align-items:center; gap:10px; font-weight:800; color:var(--primary); background:#eff6ff; border:1px solid var(--gray-300); border-radius:6px; padding:8px 12px; margin-bottom:12px; font-size:16px; }
+.slip-emp-name { display:flex; align-items:center; gap:10px; font-weight:700; color:var(--primary); background:#eff6ff; border:1px solid var(--gray-300); border-radius:6px; padding:8px 12px; margin-bottom:12px; font-size:16px; }
 .slip-emp-name .slip-school { flex:1; text-align:start; color:#0a2240; }
 .slip-emp-name .slip-rep { flex:1; text-align:end; color:var(--gray-700); font-weight:700; }
 .slip-emp-name .slip-pname { flex:0 0 auto; text-align:center; color:var(--primary); font-size:1.12em; }
@@ -346,7 +346,10 @@ include __DIR__ . '/../includes/header.php';
 /* 📄 بطاقة الراتب بذوق المستخدم النهائي (2026-08-01): + الليرة الرئيسية والدولار صغيراً تحتها +
    بلا كحلي — رؤوس هادئة فاتحة وعناوين «المحسومات» وحدها بأحمر فاتح.
    ✍️ بطلبه (2026-09-04 عن p1.png = كشف برنامجه القديم): الخط Arial بكل اللغات متل التقارير والإفادات
-   («البطاقة السنوية ولكن غير الخط بس، أوعى تلخبط الصفحة») — الخط فقط تغيّر، باقي التصميم مجمّد كما هو */
+   («البطاقة السنوية ولكن غير الخط بس، أوعى تلخبط الصفحة») — الخط فقط تغيّر، باقي التصميم مجمّد كما هو
+   🔤 «بدي الحرف بالعربي ببطاقة الأستاذ متل p1» (2026-09-04): الوزن 800 ممنوع بالبطاقة — ويندوز يعدّ Arial Black
+   وزن 900 من عائلة Arial، فأي 800 يقفز إليها وهي بلا حروف عربية فينزل العربي على Tahoma (مش متل p1).
+   الوزن 700 = Arial Bold بحروفها العربية (p1 كله Arial Bold) — الاسم والقيم 700 بالشاشة والورق */
 .salary-slip, .salary-slip-table, .slip-info { font-family:Arial,'Segoe UI',Tahoma,sans-serif; }
 .salary-slip-table { font-size: 12pt; }
 .salary-slip-table th { font-size: 12pt; padding: 7px 6px; background:#f1f5f9; color:#111827; border:1px solid #94a3b8; }
@@ -386,10 +389,14 @@ include __DIR__ . '/../includes/header.php';
     .salary-slip { page-break-inside: avoid; page-break-after: always; padding: 0 !important;
                    width: 100%; zoom: var(--pz, 1); }
     .salary-slip:last-child { page-break-after: auto; }
-    .salary-slip { display: flex; flex-direction: column; min-height: calc(188mm / var(--pz, 1)); }
+    /* 🗏 (2026-09-04) صفّ المجموع كان يطلع على صفحة ثانية بالكشوف الممتلئة: مع flex الجدول يفيض
+       ~13px عن صندوق البطاقة (min-height) وكروم يرمي الفائض على صفحة جديدة. شبكة grid بصفّ 1fr
+       للجدول = نفس التوزيع (الجدول يأخذ باقي الورقة ويوزّعه على صفوفه) بلا أي فيضان — مفحوص
+       بPDF كروم: اليانا 2025-2026 (12 شهراً + مجموع) صفحتان → صفحة واحدة */
+    .salary-slip { display: grid; grid-template-columns: 100%; grid-template-rows: auto auto 1fr; min-height: calc(188mm / var(--pz, 1)); }
     /* صمام: لو ضاقت مساحة الورقة (هوامش مستخدم كبيرة) لا ينقسم صفّ مفرد على صفحتين */
     .salary-slip-table tr { page-break-inside: avoid; }
-    .salary-slip-table { flex: 1 1 auto; }
+    .salary-slip-table { align-self: stretch; }
     .salary-slip-header { border-bottom: none !important; padding-bottom: 0 !important; margin-bottom: 3px !important; }
     .salary-slip-header .ssh-school h2 { font-size: 15pt !important; }
     .ssh-ar { font-size: 12pt !important; } .ssh-addr { font-size: 12pt !important; }
@@ -399,13 +406,13 @@ include __DIR__ . '/../includes/header.php';
     /* ✍️ (2026-08-25) «P1 بدون تضييق»: خانات المعلومات رجعت لقياسها الأصلي —
        وتوسيع سطور المبالغ بقي (حشوة 5px بالجدول والفراغ يتوزّع بflex) */
     .slip-emp-name { font-size: 12pt !important; background:#eff6ff !important; padding:6px 10px !important; margin-bottom:5px !important; }
-    .slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 800 !important; color: #000 !important; }
+    .slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 700 !important; color: #000 !important; }
     .slip-emp-name .slip-school, .slip-emp-name .slip-rep { font-weight: 600 !important; color: #334155 !important; }
     .slip-info { margin-bottom: 5px !important; }
     .slip-info td { border:1px solid #888 !important; padding: 3px 8px !important; }
     .slip-info .lbl { font-size: 10.5pt !important; margin-bottom: 1px !important; color:#555 !important; }
-    /* بولد حقيقي غامق (طلب المستخدم) — الخط Arial بكل اللغات (2026-09-04) */
-    .slip-info .val { font-size: 13.5pt !important; font-weight:800 !important;
+    /* بولد حقيقي غامق (طلب المستخدم) — الخط Arial بكل اللغات (2026-09-04)، الوزن 700 = Arial Bold بحروفها العربية متل p1 */
+    .slip-info .val { font-size: 13.5pt !important; font-weight:700 !important;
                       font-family:Arial,'Segoe UI',Tahoma,sans-serif !important; color:#000 !important; }
     /* الجدول: خط 12pt بلا قصّ (table-layout تلقائي فالأرقام تظهر كاملة)؛
        التصغير المحسوب --pz يضمن صفحة A4 أفقية واحدة بلا قصّ ولا انقسام */
