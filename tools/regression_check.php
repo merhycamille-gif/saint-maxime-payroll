@@ -259,6 +259,21 @@ check('خط الإفادات Arial بكل اللغات (٣ مواضع، بلا S
 // (2026-09-04) «بس يطلع الراتب الصافي فيه كسور كمان عملو داون»: المحرّك بلا round نصفي —
 // كل محسوم floor أولاً، المجموع = جمع المنزَّل، الصافي = الإجمالي − المجموع، المستحق = الصافي + العائلي + النقل
 $pcSrcFl = (string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php');
+// 🛡️ حادثة أنطوني جبور (2026-09-04): نسبة 55 % مكرّرة فاعلة بـ2026-2027 = 110 % بعد نسخ فتح السنة (فحص «نفس الفترة» فقط)
+$fnSrcDup = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
+check('🛡️ لا بند نسبة مكرّر أبداً: صمام bonusDuplicateExists بفتح السنة و«نسخ الملف لسنة» + شفاء healDuplicatePercent20260904 عند كل فتح (موصول بالهيدر) + قاعدتا الفحص الرسمي dup_percent/multi_percent + محلياً صفر مكرّر',
+      strpos($fnSrcDup, 'function bonusDuplicateExists(PDO $db, int $empId, string $targetSY, array $b): bool') !== false
+      && strpos($fnSrcDup, "OR (value_type = 'percent' AND ? = 'percent')") !== false
+      && strpos($fnSrcDup, 'function findDuplicatePercentBonusGroups(PDO $db): array') !== false
+      && strpos($fnSrcDup, 'function healDuplicatePercent20260904()') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'healDuplicatePercent20260904();') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/open_year.php'), 'if (bonusDuplicateExists($db, (int)$empId, $newSY, $b)) continue;') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'if (bonusDuplicateExists($db, (int)$id, $target, $b)) continue;') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/data_audit.php'), "\$add('dup_percent'") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/data_audit.php'), "\$add('multi_percent'") !== false
+      && count(findDuplicatePercentBonusGroups($db)) === 0
+      && strpos((string)getSetting('heal_dup_percent_20260904', ''), 'done') === 0,
+      (string)getSetting('heal_dup_percent_20260904', ''));
 check('المحرّك: الصافي داون للألف (قراره 2026-09-04) والمستحق = الصافي + العائلي + النقل، المحسومات القانونية كما كانت + الشفاء الذاتي للمخزّن بكل السنوات نُفِّذ',
       strpos($pcSrcFl, '$cnssAmount        = round($cnssAmount);') !== false   // المحسومات القانونية كما كانت
       && strpos($pcSrcFl, '$monthlyTax        = round($monthlyTax);') !== false

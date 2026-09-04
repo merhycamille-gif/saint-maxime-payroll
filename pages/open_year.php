@@ -98,6 +98,8 @@ function copyYearBonuses($db, $empId, $prevSY, $newSY, array $types, $mode, $pct
         $chk = $db->prepare("SELECT 1 FROM employee_bonuses WHERE employee_id=? AND school_year=? AND bonus_type=? AND period_number=? LIMIT 1");
         $chk->execute([$empId, $newSY, $b['bonus_type'], $b['period_number']]);
         if ($chk->fetchColumn()) continue;
+        // 🛡️ (2026-09-04) صمام أنطوني: نسبة فاعلة موجودة بالسنة الجديدة (ولو بفترة أخرى) = لا تنسخ ثانيةً
+        if (bonusDuplicateExists($db, (int)$empId, $newSY, $b)) continue;
         $amt = ($b['value_type'] === 'percent') ? (float)$b['amount'] : round((float)$b['amount'] * $factor, 2);
         $db->prepare("INSERT INTO employee_bonuses (employee_id,bonus_type,period_number,school_year,amount,value_type,currency,start_month,end_month,is_active)
                       VALUES (?,?,?,?,?,?,?,?,?,1)")

@@ -133,5 +133,18 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
     $add('orphan_rows', 'رواتب مخزّنة لموظف محذوف (صفوف يتيمة)', $q("
         SELECT $nm nm FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=1 AND ms.school_year=? GROUP BY ms.employee_id", [$sy]));
 
+    // 21) بند نسبة مئوية فاعل مكرّر بنفس السنة (يُجمع بالمحرّك: 55 % + 55 % = 110 % — حادثة أنطوني جبور 2026-09-04) — كل السنوات
+    // (SQL مضمّن لا دالة: الأداة tools/data_audit.php تعمل على دمب الأونلاين بـPDO مجرّد بلا functions.php)
+    $add('dup_percent', 'بند نسبة مئوية فاعل مكرّر لنفس الموظف والسنة (تتضاعف نسبة الإضافي)', $q("
+        SELECT CONCAT($nm,' ',b.school_year,' (',GROUP_CONCAT(b.id ORDER BY b.id),')') nm FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id
+        WHERE b.is_active=1 AND b.value_type='percent' AND b.school_year IS NOT NULL
+        GROUP BY b.employee_id, b.school_year, b.bonus_type, b.amount, COALESCE(b.start_month,0), COALESCE(b.end_month,0) HAVING COUNT(*)>1"));
+
+    // 22) نسبتان مختلفتان فاعلتان بنفس السنة بلا نافذة شهرية (تُجمعان معاً) — تحتاج قراره
+    $add('multi_percent', 'أكثر من نسبة إضافي فاعلة لنفس الموظف والسنة بلا نافذة شهرية (تُجمع معاً)', $q("
+        SELECT CONCAT($nm,' ',b.school_year,' (',GROUP_CONCAT(b.amount ORDER BY b.id),')') nm FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id
+        WHERE e.is_deleted=0 AND b.is_active=1 AND b.value_type='percent' AND b.bonus_type='prime_fixe' AND b.start_month IS NULL AND b.school_year IS NOT NULL
+        GROUP BY b.employee_id, b.school_year HAVING COUNT(*)>1"));
+
     return $out;
 }

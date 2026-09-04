@@ -883,6 +883,72 @@ function healYearAdditions2627() {
 }
 
 /**
+ * 🛡️ صمام تكرار البنود عند نسخ سنة → سنة (2026-09-04، حادثة أنطوني جبور: نسبة 55 % مرّتين بـ2026-2027 = 110 %).
+ * نسخ فتح السنة و«نسخ الملف لسنة» كانا يفحصان «نفس النوع + نفس رقم الفترة» فقط؛ بند النسبة القديم فترته 1
+ * والمصدر فترته 2 فاعتُبرا مختلفَين ونُسخ ثانيةً. القاعدة: البند مكرَّر إذا وُجد بالسنة الهدف بند فاعل بنفس النوع و:
+ *   (أ) نفس رقم الفترة، أو (ب) نسبة مئوية — نسبة واحدة فاعلة لكل نوع بالسنة، أو
+ *   (ج) نفس القيمة ونوع القيمة والنافذة الشهرية.
+ */
+function bonusDuplicateExists(PDO $db, int $empId, string $targetSY, array $b): bool {
+    $st = $db->prepare("SELECT 1 FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND bonus_type = ? AND is_active = 1
+        AND (period_number = ?
+             OR (value_type = 'percent' AND ? = 'percent')
+             OR (value_type = ? AND amount = ? AND COALESCE(start_month,0) = ? AND COALESCE(end_month,0) = ?))
+        LIMIT 1");
+    $vt = (string)($b['value_type'] ?? 'amount');
+    $st->execute([$empId, $targetSY, (string)$b['bonus_type'], (int)($b['period_number'] ?? 1), $vt, $vt,
+                  (float)$b['amount'], (int)($b['start_month'] ?? 0), (int)($b['end_month'] ?? 0)]);
+    return (bool)$st->fetchColumn();
+}
+
+/**
+ * 🔎 فحص برنامجي: بنود نسبة مئوية فاعلة مكرّرة (نفس الموظف/السنة/النوع/النسبة/النافذة) — تُجمع بالمحرّك فتضاعف
+ * الإضافي (حادثة أنطوني 110 %). يُستعمل بالشفاء وبفحص الصحة/الفحص الرسمي.
+ */
+function findDuplicatePercentBonusGroups(PDO $db): array {
+    return $db->query("SELECT b.employee_id, b.school_year, b.bonus_type, b.amount, COALESCE(b.start_month,0) sm, COALESCE(b.end_month,0) em,
+                              MIN(b.id) keep_id, GROUP_CONCAT(b.id ORDER BY b.id) ids, COUNT(*) n,
+                              (SELECT CONCAT(first_name_ar,' ',last_name_ar) FROM employees e WHERE e.id = b.employee_id) emp_name
+                       FROM employee_bonuses b
+                       WHERE b.is_active = 1 AND b.value_type = 'percent' AND b.school_year IS NOT NULL
+                       GROUP BY b.employee_id, b.school_year, b.bonus_type, b.amount, COALESCE(b.start_month,0), COALESCE(b.end_month,0)
+                       HAVING n > 1")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * 🩹 شفاء ذاتي (2026-09-04، أنطوني جبور 55 % ×2 = 110 % بـ2026-2027): بنود النسبة الفاعلة المكرّرة تُطفأ ما عدا
+ * الأقدم، ويُعاد حساب أشهر تلك السنة المخزّنة. يعمل عند كل فتح صفحة (رخيص: استعلام واحد) فلا يبقى مكرَّر أبداً —
+ * والسجل بالإعداد heal_dup_percent_20260904 آخر مرّة أطفأ شيئاً.
+ */
+function healDuplicatePercent20260904() {
+    if (function_exists('isViewer') && isViewer()) return;
+    try {
+        $db = getDB();
+        $groups = findDuplicatePercentBonusGroups($db);
+        if (!$groups) { if (getSetting('heal_dup_percent_20260904', '') === '') setSetting('heal_dup_percent_20260904', 'done: off=0 @' . date('Y-m-d H:i')); return; }
+        @set_time_limit(600);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $off = 0; $recalc = 0; $names = [];
+        foreach ($groups as $g) {
+            $ids = array_map('intval', explode(',', (string)$g['ids']));
+            $extra = array_values(array_filter($ids, fn($i) => $i !== (int)$g['keep_id']));
+            if (!$extra) continue;
+            $in = implode(',', $extra);
+            $off += (int)$db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE id IN ($in)");
+            $eid = (int)$g['employee_id']; $sy = (string)$g['school_year'];
+            $ms = $db->prepare("SELECT month, year FROM monthly_salaries WHERE employee_id = ? AND school_year = ? ORDER BY year, month");
+            $ms->execute([$eid, $sy]);
+            foreach ($ms->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                try { (new PayrollCalculator($eid, (int)$r['month'], (int)$r['year']))->calculateAndSave(); $recalc++; } catch (Exception $e) {}
+            }
+            $names[] = (string)$g['emp_name'] . "#$eid $sy (أطفئت $in)";
+        }
+        if (function_exists('logAudit') && $off) logAudit('heal_dup_percent', 'employee_bonuses', 0, null, ['off' => $off, 'recalc' => $recalc, 'who' => $names]);
+        setSetting('heal_dup_percent_20260904', 'done: off=' . $off . ' recalc=' . $recalc . ' @' . date('Y-m-d H:i') . ($names ? ' | ' . implode('؛ ', $names) : ''));
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
+/**
  * 🩹 شفاء ذاتي مرّة واحدة (2026-07-31، طلب المستخدم p1 — مارغريتا بونصار):
  * درجات كانون الاستثنائية كانت تُدمج دغري بأساس الراتب بالكشوف لمن درجته كسرية (X.5)
  * بسبب early-return قديم بالمحرّك (نصف الدرجة = تدرّج 0) — أُزيل من payroll_calculator.
