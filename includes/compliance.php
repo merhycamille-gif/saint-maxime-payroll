@@ -32,14 +32,21 @@ function complianceEnsureTable(PDO $db): void {
             decided_at DATETIME NULL,
             created_at DATETIME NULL
         ) DEFAULT CHARSET=utf8mb4");
-        // بذر: التصحيح التلقائي الذي جرى قبل وجود التقرير (أنطوني جبور 110 % — الشفاء healDuplicatePercent20260904 سجّله بالإعداد فقط)
-        $flag = (string)getSetting('heal_dup_percent_20260904', '');
-        if (preg_match('/off=(\d+)/', $flag, $m) && (int)$m[1] > 0 && (int)$db->query("SELECT COUNT(*) FROM compliance_decisions WHERE rule_key = 'dup_percent' AND decision = 'auto'")->fetchColumn() === 0) {
-            $who = trim((string)(explode('|', $flag)[1] ?? ''));
-            if (preg_match('/^(.*?)#(\d+)\s+(\d{4}-\d{4})/u', $who, $mm)) {
-                complianceLogAuto($db, 'dup_percent', (int)$mm[2], $mm[3], trim($mm[1]),
-                    'بند نسبة مكرّر فاعل بنفس السنة فكانت النسبة تُجمع مرّتين (55 % + 55 % = 110 %)',
-                    'إطفاء المكرّر والإبقاء على الأقدم وإعادة حساب السنة', $flag);
+        // بذر: التصحيح التلقائي الذي جرى قبل وجود التقرير (أنطوني جبور 110 % — الشفاء healDuplicatePercent20260904 أطفأ المكرّر):
+        // يُستدلّ عليه من القاعدة نفسها = بند نسبة مطفأ له توأم فاعل بنفس الموظف/السنة/النوع/النسبة/النافذة وأقدم منه
+        if ((int)$db->query("SELECT COUNT(*) FROM compliance_decisions WHERE rule_key = 'dup_percent' AND decision = 'auto'")->fetchColumn() === 0) {
+            $seed = $db->query("SELECT b.employee_id, b.school_year, b.amount, GROUP_CONCAT(b.id ORDER BY b.id) off_ids, MIN(a.id) kept,
+                                       (SELECT CONCAT(first_name_ar,' ',last_name_ar) FROM employees e WHERE e.id = b.employee_id) nm
+                                FROM employee_bonuses b JOIN employee_bonuses a ON a.employee_id = b.employee_id AND a.school_year = b.school_year AND a.bonus_type = b.bonus_type
+                                     AND a.value_type = 'percent' AND a.amount = b.amount AND a.is_active = 1 AND a.id < b.id
+                                     AND COALESCE(a.start_month,0) = COALESCE(b.start_month,0) AND COALESCE(a.end_month,0) = COALESCE(b.end_month,0)
+                                WHERE b.is_active = 0 AND b.value_type = 'percent' AND b.school_year IS NOT NULL
+                                GROUP BY b.employee_id, b.school_year, b.amount")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($seed as $s) {
+                $pct = rtrim(rtrim((string)$s['amount'], '0'), '.');
+                complianceLogAuto($db, 'dup_percent', (int)$s['employee_id'], (string)$s['school_year'], (string)$s['nm'],
+                    'بند نسبة ' . $pct . ' % مكرّر فاعل بنفس السنة (#' . $s['off_ids'] . ' مع #' . $s['kept'] . ') فكانت النسبة تُجمع مرّتين (' . $pct . ' % + ' . $pct . ' % = ' . (2 * (float)$s['amount']) . ' %)',
+                    'إطفاء المكرّر والإبقاء على الأقدم وإعادة حساب السنة', 'أُطفئ #' . $s['off_ids'] . ' وأُعيد حساب سنة ' . $s['school_year'] . ' (شفاء ذاتي 2026-09-04)');
             }
         }
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
