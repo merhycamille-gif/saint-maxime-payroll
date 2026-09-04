@@ -501,7 +501,9 @@ class PayrollCalculator {
         $transportComp     = floor($transportComp);
         $totalRetenues = $cnssAmount + $caisseAmount + $monthlyTax + $eocGradeDeduction;
         $grossEarnings = floor($basePlusEchelon) + floor($extra) + floor($primeAideTotal);
-        $netSalary = floor($grossEarnings - $totalRetenues);
+        // 🔴 قراره (2026-09-04 «بعدو الصافي مش داون» → «للألف»): الصافي يُنزَّل لأقرب ألف لتحت
+        // (69,540,882 → 69,540,000)؛ المحسومات كما هي، والمستحق = الصافي المنزَّل + العائلي + النقل.
+        $netSalary = floor(($grossEarnings - $totalRetenues) / 1000) * 1000;
         $totalDue = floor($netSalary + $familyAllowance + $transportComp);
         
         // === 9. Employer charges (نِسَب مؤرّخة + أسس محدودة بالحدود لكل فرع) ===
@@ -775,8 +777,8 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
         $gap = max(0, ((int)$r['net_salary_lbp'] + (int)$r['total_retenues_lbp'])
                     - ((int)$r['base_plus_echelon_lbp'] + (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']));
         $dNet = ($dAdd > 0) ? max(0, $dAdd - $gap) : $dAdd;
-        $newNet = max(0, (int)$r['net_salary_lbp'] + $dNet);
-        $newDue = max(0, (int)$r['total_due_lbp'] + $dNet + $dTr);
+        $newNet = max(0, (int)(floor(((int)$r['net_salary_lbp'] + $dNet) / 1000) * 1000)); // الصافي داون للألف (2026-09-04)
+        $newDue = max(0, $newNet + (int)$r['family_allowance_lbp'] + $newTr); // المستحق = الصافي المنزَّل + العائلي + النقل
         $rate = (float)$r['exchange_rate'];
         $upd->execute([$newPrime, $newAide, $newTrC, $newTr, $newNet, $newDue,
             $rate > 0 ? round($newNet / $rate, 2) : $r['net_salary_usd'],

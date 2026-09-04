@@ -5141,6 +5141,34 @@ function choosePercentLawOwn($db, $sy = '2025-2026', $dry = true) {
  * وقيم الدرجات 47-51 كلها 150,000 بالقانون (كانت 145/155/145/150/155). يصحّح الجدول ويعيد حساب سنتَي 2025-2026 و2026-2027 لمن درجته ≥ 46.5
  * (السنوات القديمة المنقولة لا تُمسّ). مرّة واحدة (فلاغ heal_scale47_20260903).
  */
+/** 🔴 «بعدو الصافي مش داون» → قراره «للألف» (2026-09-04): الصافي المخزّن يُنزَّل لأقرب ألف لتحت
+ *  بكل السنوات («بكل البرنامج والسنين بدو يكون الصافي داون»)،
+ *  والمستحق = الصافي المنزَّل + العائلي + النقل، ومرآتا الدولار تُحدَّثان. المحسومات القانونية لا تتغيّر.
+ *  نسخة احتياطية للصفوف المتأثّرة بـ _ms_bk_netfloor0904_all قبل التعديل. يعمل مرّة واحدة (فلاغ). */
+function healNetFloor1000_20260904() {
+    try {
+        if (strpos((string)getSetting('heal_net_floor1000_all_20260904', ''), 'done') === 0) return;
+        $db = getDB();
+        // «بكل البرنامج والسنين بدو يكون الصافي داون» (قوله بعدها 2026-09-04) → كل السنوات
+        $where = "is_calculated = 1 AND (net_salary_lbp % 1000) <> 0";
+        $n = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE $where")->fetchColumn();
+        if ($n > 0) {
+            $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_netfloor0904_all LIKE monthly_salaries");
+            if (!(int)$db->query("SELECT COUNT(*) FROM _ms_bk_netfloor0904_all")->fetchColumn()) {
+                $db->exec("INSERT INTO _ms_bk_netfloor0904_all SELECT * FROM monthly_salaries WHERE $where");
+            }
+            $db->exec("UPDATE monthly_salaries SET
+                    net_salary_lbp = FLOOR(net_salary_lbp / 1000) * 1000,
+                    total_due_lbp  = FLOOR(net_salary_lbp / 1000) * 1000 + family_allowance_lbp + transport_lbp,
+                    net_salary_usd = IF(exchange_rate > 0, ROUND((FLOOR(net_salary_lbp / 1000) * 1000) / exchange_rate, 2), net_salary_usd),
+                    total_due_usd  = IF(exchange_rate > 0, ROUND((FLOOR(net_salary_lbp / 1000) * 1000 + family_allowance_lbp + transport_lbp) / exchange_rate, 2), total_due_usd)
+                WHERE $where");
+        }
+        setSetting('heal_net_floor1000_all_20260904', 'done: rows=' . $n . ' @' . date('Y-m-d H:i'));
+    } catch (Throwable $e) {
+        try { setSetting('heal_net_floor1000_all_20260904', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
 function healScale47_20260903() {
     try {
         if (strpos((string)getSetting('heal_scale47_20260903', ''), 'done') === 0) return;
