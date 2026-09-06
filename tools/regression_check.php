@@ -4822,7 +4822,8 @@ if ($mbZ99->open($mbXl99) === true) {
 @unlink($mbXl99);
 check('موازنة الوزارة: تصدير إكسل سليم (11 ورقة، صيغ SUM×الأشهر، إعادة حساب عند الفتح) + الرابط بقائمة التقارير',
       strpos($mbX99, 'PK') === 0 && $mbSheets99 === 11 && $mbFormulas99
-      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'pages/mehe_budget.php') !== false,
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'pages/mehe_budget.php') !== false
+      && strpos((string)file_get_contents($PROJ . '/index.php'), "['pages/mehe_budget.php','fas fa-landmark'") !== false, // بطاقة بلوحة القيادة (طلبه: «اسم موازنة وزارة التربية مش موجود بالأيقونات»)
       "sheets=$mbSheets99");
 
 /* ---------- الخلاصة ---------- */

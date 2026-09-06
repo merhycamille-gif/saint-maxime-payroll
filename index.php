@@ -153,6 +153,7 @@ $dashSections = [
     ])],
     ['Rapports', 'التقارير', 'fa-chart-column', '#7c3aed', 'rgba(124,58,237,.10)', array_filter([
         viewerCanSeePage('reports.php') ? ['pages/reports.php','fas fa-chart-bar','Rapports','التقارير'] : null,
+        viewerCanSeePage('mehe_budget.php') ? ['pages/mehe_budget.php','fas fa-landmark','Budget MEHE','موازنة وزارة التربية'] : null,
         canEdit() ? ['pages/tax_declarations.php','fas fa-file-contract','Déclarations','التصاريح'] : null,
     ])],
     ['Système', 'النظام', 'fa-gear', '#d97706', 'rgba(217,119,6,.10)', array_filter([
