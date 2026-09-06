@@ -670,3 +670,98 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
 </script>
 CSS;
 }
+
+/* =====================================================================
+ * 📊 تقرير المجاميع السنوية — بنود قابلة للاختيار (طلبه 2026-09-06):
+ * «بدي مجاميع لكل بند + أقدر حط اللي بدي ياه بالتقرير من رواتب وإضافات وضمان وتعويضات
+ *  ونقل + أختار مدرسة لحالها أو مع بعض + أختار السنة لأنه تقرير سنوي».
+ * مصدر واحد للشاشة (reports.php) والتصدير (reports_export.php):
+ *   annualTotalItems()    — البنود (المفتاح → التسمية + المجموعة + SQL الليرة/الدولار)
+ *   annualTotalGroups()   — مجموعات الاختيار بالنموذج
+ *   annualTotalSelected() — البنود المختارة من items[] (فارغ = الكل)
+ *   annualTotalRows()     — صفّ لكل مدرسة + صفّ المجاميع (كل البنود بالعملتين)
+ * =================================================================== */
+function annualTotalItems(): array {
+    $u = fn(string $c) => "SUM(FLOOR(($c)/NULLIF(ms.exchange_rate,0)))";
+    return [
+        'base_sal'   => ['g' => 'salaires',  'ar' => 'أساس الراتب',                    'fr' => 'Salaire de base',        'lbp' => 'SUM(ms.base_salary_lbp)',                  'usd' => $u('ms.base_salary_lbp')],
+        'bpe'        => ['g' => 'salaires',  'ar' => 'الراتب بعد التدرّج',              'fr' => 'Base + échelons',        'lbp' => 'SUM(ms.base_plus_echelon_lbp)',            'usd' => $u('ms.base_plus_echelon_lbp')],
+        'composed'   => ['g' => 'salaires',  'ar' => 'الراتب المركّب',                 'fr' => 'Salaire composé',        'calc' => true],
+        'extra_wage' => ['g' => 'additions', 'ar' => 'الأجر الإضافي',                  'fr' => 'Supplément',             'lbp' => 'SUM(ms.extra_lbp + ms.prime_fixe_lbp)',    'usd' => 'SUM(' . extraWageUsdSql('ms.') . ')'],
+        'aide'       => ['g' => 'additions', 'ar' => 'مكافأة ومساعدة',                 'fr' => 'Prime & aide',           'lbp' => 'SUM(ms.aide_complementaire_lbp)',          'usd' => $u('ms.aide_complementaire_lbp')],
+        'transport'  => ['g' => 'transport', 'ar' => 'تعويض النقل',                    'fr' => 'Transport',              'lbp' => 'SUM(ms.transport_lbp)',                    'usd' => $u('ms.transport_lbp')],
+        'fam'        => ['g' => 'indemn',    'ar' => 'التعويضات العائلية',             'fr' => 'Allocations familiales', 'lbp' => 'SUM(ms.family_allowance_lbp)',             'usd' => $u('ms.family_allowance_lbp')],
+        'cnss'       => ['g' => 'cnss',      'ar' => 'الضمان — الأجير ٣٪',             'fr' => 'CNSS salarié 3%',        'lbp' => 'SUM(ms.cnss_amount_lbp)',                  'usd' => $u('ms.cnss_amount_lbp')],
+        'scnss'      => ['g' => 'cnss',      'ar' => 'الضمان — المدرسة ٨٪',            'fr' => 'CNSS école 8%',          'lbp' => 'SUM(ms.school_cnss_8_lbp)',                'usd' => $u('ms.school_cnss_8_lbp')],
+        'caisse'     => ['g' => 'eoc',       'ar' => 'صندوق التعويضات — الأجير ٦٪',    'fr' => 'Fonds salarié 6%',       'lbp' => 'SUM(ms.caisse_amount_lbp)',                'usd' => $u('ms.caisse_amount_lbp')],
+        'seoc'       => ['g' => 'eoc',       'ar' => 'صندوق التعويضات — المدرسة ٦٪',   'fr' => 'Fonds école 6%',         'lbp' => 'SUM(ms.school_eoc_6_lbp)',                 'usd' => $u('ms.school_eoc_6_lbp')],
+        'tax'        => ['g' => 'impot',     'ar' => 'ضريبة الدخل',                    'fr' => 'Impôt sur le revenu',    'lbp' => 'SUM(ms.income_tax_lbp)',                   'usd' => $u('ms.income_tax_lbp')],
+        'net'        => ['g' => 'paye',      'ar' => 'إجمالي المدفوع (الصافي)',        'fr' => 'Net payé',               'lbp' => 'SUM(ms.net_salary_lbp)',                   'usd' => $u('ms.net_salary_lbp')],
+        'total'      => ['g' => 'paye',      'ar' => 'الإجمالي المتوجب',               'fr' => 'Total dû',               'lbp' => 'SUM(ms.total_due_lbp)',                    'usd' => $u('ms.total_due_lbp')],
+    ];
+}
+function annualTotalGroups(): array {
+    return [
+        'salaires'  => ['Salaires',                 'الرواتب'],
+        'additions' => ['Suppléments',              'الإضافات'],
+        'transport' => ['Transport',                'النقل'],
+        'indemn'    => ['Allocations familiales',   'التعويضات العائلية'],
+        'cnss'      => ['CNSS',                     'الضمان'],
+        'eoc'       => ['Fonds de fin de service',  'صندوق التعويضات'],
+        'impot'     => ['Impôt',                    'الضريبة'],
+        'paye'      => ['Payé / dû',                'المدفوع والمتوجب'],
+    ];
+}
+/** تسمية البند للعرض — «الإجمالي المتوجب» توضح مكوّناته حسب زرّ «الراتب يشمل» (النقل يُضاف عند تفعيله فقط) */
+function annualTotalLabel(string $key, string $lang = 'ar'): string {
+    $it = annualTotalItems()[$key] ?? null;
+    if (!$it) return $key;
+    if ($key === 'total') {
+        return $lang === 'ar'
+            ? 'الإجمالي المتوجب (الصافي + التعويضات' . (salaryCompHas('transport') ? ' + النقل' : '') . ')'
+            : 'Total dû (net + allocations' . (salaryCompHas('transport') ? ' + transport' : '') . ')';
+    }
+    if ($key === 'composed') return ($lang === 'ar' ? 'الراتب المركّب' : 'Salaire composé') . ' (' . salaryCompLabel() . ')';
+    return $it[$lang] ?? $it['ar'];
+}
+/** البنود المختارة من items[] — فارغ أو غير موجود = كل البنود */
+function annualTotalSelected(): array {
+    $all = array_keys(annualTotalItems());
+    $sel = $_GET['items'] ?? null;
+    if (!is_array($sel) || !$sel) return $all;
+    $sel = array_values(array_intersect($all, array_map('strval', $sel)));
+    return $sel ?: $all;
+}
+/**
+ * صفّ لكل مدرسة بالنطاق + صفّ المجاميع. كل صفّ: school_id, cnt, ولكل بند [key] (ليرة) و[key_usd].
+ * النقل يُطرح من «المتوجب» عند تعطيله بزرّ «الراتب يشمل» (قاعدة «الأرقام تركب»)، والراتب المركّب
+ * = بعد التدرّج + ما فعّله الزرّ من إضافي/مكافأة/نقل.
+ */
+function annualTotalRows(PDO $db, string $schoolYear, string $empFilter, array $empParams, string $empTypeSql, string $schoolSql): array {
+    $items = annualTotalItems();
+    $sel = [];
+    foreach ($items as $k => $it) {
+        if (!empty($it['calc'])) continue;
+        $sel[] = $it['lbp'] . ' `' . $k . '`';
+        $sel[] = $it['usd'] . ' `' . $k . '_usd`';
+    }
+    $st = $db->prepare("SELECT ms.school_id, COUNT(*) cnt, " . implode(', ', $sel) . "
+                        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+                        WHERE e.is_deleted = 0" . $empFilter . $empTypeSql . " AND ms.school_year = ?
+                          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . "
+                        GROUP BY ms.school_id ORDER BY ms.school_id");
+    $st->execute(array_merge($empParams, [$schoolYear]));
+    $rows = $st->fetchAll();
+    $hasT = salaryCompHas('transport'); $hasE = salaryCompHas('extra'); $hasA = salaryCompHas('aide');
+    $tot = ['school_id' => 0, 'cnt' => 0];
+    foreach ($items as $k => $_) { $tot[$k] = 0; $tot[$k . '_usd'] = 0; }
+    foreach ($rows as &$r) {
+        if (!$hasT) { $r['total'] = (int)$r['total'] - (int)$r['transport']; $r['total_usd'] = (float)$r['total_usd'] - (float)$r['transport_usd']; }
+        $r['composed']     = (int)$r['bpe'] + ($hasE ? (int)$r['extra_wage'] : 0) + ($hasA ? (int)$r['aide'] : 0) + ($hasT ? (int)$r['transport'] : 0);
+        $r['composed_usd'] = (float)$r['bpe_usd'] + ($hasE ? (float)$r['extra_wage_usd'] : 0) + ($hasA ? (float)$r['aide_usd'] : 0) + ($hasT ? (float)$r['transport_usd'] : 0);
+        $tot['cnt'] += (int)$r['cnt'];
+        foreach ($items as $k => $_) { $tot[$k] += (int)$r[$k]; $tot[$k . '_usd'] += (float)$r[$k . '_usd']; }
+    }
+    unset($r);
+    return [$rows, $tot];
+}

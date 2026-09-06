@@ -59,6 +59,7 @@ if ($report && in_array($report, $exportableReports, true)) {
     ], fn($v) => $v !== null && $v !== ''));
     $colsQ = '';
     if (!empty($_GET['cols']) && is_array($_GET['cols'])) foreach ($_GET['cols'] as $c) $colsQ .= '&cols[]=' . urlencode($c);
+    if (!empty($_GET['items']) && is_array($_GET['items'])) foreach ($_GET['items'] as $c) $colsQ .= '&items[]=' . urlencode($c); // بنود المجاميع السنوية المختارة
     $exportOpts['server'] = BASE_URL . 'pages/reports_export.php?' . $qs . $colsQ;
     $exportTitle = 'تقرير';
 }
@@ -729,98 +730,86 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'annual_totals'):
-        [$y1,$y2] = schoolYearToYears($schoolYear);
-        // إجمالي عام
-        $stmt = $db->prepare("SELECT COUNT(*) cnt, SUM(ms.net_salary_lbp) net, SUM(ms.total_due_lbp) total,
-                              SUM(ms.family_allowance_lbp) fam,
-                              SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax, SUM(ms.caisse_amount_lbp) caisse,
-                              SUM(ms.school_cnss_8_lbp) scnss, SUM(ms.school_eoc_6_lbp) seoc,
-                              SUM(ms.base_salary_lbp) base_sal, SUM(ms.base_plus_echelon_lbp) bpe,
-                              SUM(FLOOR(ms.net_salary_lbp/NULLIF(ms.exchange_rate,0))) net_usd,
-                              SUM(FLOOR(ms.total_due_lbp/NULLIF(ms.exchange_rate,0))) total_usd,
-                              SUM(FLOOR(ms.family_allowance_lbp/NULLIF(ms.exchange_rate,0))) fam_usd,
-                              SUM(FLOOR(ms.cnss_amount_lbp/NULLIF(ms.exchange_rate,0))) cnss_usd,
-                              SUM(FLOOR(ms.income_tax_lbp/NULLIF(ms.exchange_rate,0))) tax_usd,
-                              SUM(FLOOR(ms.caisse_amount_lbp/NULLIF(ms.exchange_rate,0))) caisse_usd,
-                              SUM(FLOOR(ms.school_cnss_8_lbp/NULLIF(ms.exchange_rate,0))) scnss_usd,
-                              SUM(FLOOR(ms.school_eoc_6_lbp/NULLIF(ms.exchange_rate,0))) seoc_usd,
-                              SUM(FLOOR(ms.base_salary_lbp/NULLIF(ms.exchange_rate,0))) base_sal_usd,
-                              SUM(FLOOR(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0))) bpe_usd,
-                              SUM(ms.extra_lbp + ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide,
-                              SUM(ms.transport_lbp) transport,
-                              SUM(" . extraWageUsdSql('ms.') . ") extra_wage_usd,
-                              SUM(FLOOR(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0))) aide_usd,
-                              SUM(FLOOR(ms.transport_lbp/NULLIF(ms.exchange_rate,0))) transport_usd
-                              FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-                              WHERE e.is_deleted=0" . $annualEmpFilter . $empTypeSql . " AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql);
-        $stmt->execute(array_merge($annualEmpParams, [$schoolYear]));
-        $tot = $stmt->fetch();
-        // تفصيل لكل مدرسة (عند تعدد المدارس)
-        $perSchool = [];
-        if ($multi) {
-            $ps = $db->prepare("SELECT ms.school_id, COUNT(*) cnt, SUM(ms.total_due_lbp) total, SUM(ms.transport_lbp) trans, SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax,
-                                SUM(FLOOR(ms.total_due_lbp/NULLIF(ms.exchange_rate,0))) total_usd, SUM(FLOOR(ms.transport_lbp/NULLIF(ms.exchange_rate,0))) trans_usd,
-                                SUM(FLOOR(ms.cnss_amount_lbp/NULLIF(ms.exchange_rate,0))) cnss_usd, SUM(FLOOR(ms.income_tax_lbp/NULLIF(ms.exchange_rate,0))) tax_usd
-                                FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-                                WHERE e.is_deleted=0" . $annualEmpFilter . $empTypeSql . " AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . " GROUP BY ms.school_id ORDER BY ms.school_id");
-            $ps->execute(array_merge($annualEmpParams, [$schoolYear]));
-            $perSchool = $ps->fetchAll();
-        }
+        // 📊 المجاميع السنوية — بنود قابلة للاختيار + صفّ لكل مدرسة + صفّ مجاميع لكل بند (طلبه 2026-09-06)
+        // المنطق والبنود بـincludes/report_helpers.php (annualTotalItems/annualTotalRows) — نفسها للتصدير.
+        $atItems = annualTotalItems();
+        $atGroups = annualTotalGroups();
+        $atSel = annualTotalSelected();
+        [$atRows, $atTot] = annualTotalRows($db, $schoolYear, $annualEmpFilter, $annualEmpParams, $empTypeSql, $schoolSql);
+        $atCur = displayCurrency();
+        $atCell = function ($lbp, $usd) use ($atCur) {
+            if ($atCur === 'lbp') return formatLBP($lbp);
+            if ($atCur === 'usd') return formatUSD($usd);
+            return formatLBP($lbp) . '<span class="money-usd">' . formatUSD($usd) . '</span>';
+        };
+        $cyA = (int)date('Y'); $startA = ((int)date('n') >= 10) ? $cyA : $cyA - 1;
     ?>
         <form method="GET" class="card no-print">
             <input type="hidden" name="report" value="annual_totals">
             <div class="card-body form-row cols-3">
-                <div class="form-group mb-0"><label class="form-label">Année scolaire / السنة الدراسية</label><input type="text" name="school_year" class="form-control" value="<?= e($schoolYear) ?>"></div>
+                <div class="form-group mb-0">
+                    <label class="form-label"><i class="fas fa-calendar-alt"></i> Année scolaire / السنة الدراسية</label>
+                    <select name="school_year" class="form-select">
+                        <?php for ($ya = $startA + 1; $ya >= 2006; $ya--): $syA = $ya . '-' . ($ya + 1); ?>
+                            <option value="<?= $syA ?>" <?= $syA === $schoolYear ? 'selected' : '' ?>><?= $syA ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
                 <?php empTypePicker(); ?>
-                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100">Afficher / عرض</button></div>
+                <div class="form-group mb-0" style="grid-column:1 / -1">
+                    <label class="form-label"><i class="fas fa-list-check"></i> Rubriques du rapport / بنود التقرير — <small class="text-muted">اختر ما تريده بالتقرير (الكل افتراضياً)</small></label>
+                    <div class="school-checks at-items" style="flex-wrap:wrap;gap:6px 14px">
+                        <label class="chk all"><input type="checkbox" onclick="atToggleAll(this)" <?= count($atSel) === count($atItems) ? 'checked' : '' ?>> <strong>Toutes / الكل</strong></label>
+                        <?php foreach ($atGroups as $gk => $gl): ?>
+                            <span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 8px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0">
+                                <strong style="color:#1F4E5F;font-size:12px"><?= e($gl[0]) ?> / <?= e($gl[1]) ?>:</strong>
+                                <?php foreach ($atItems as $k => $it): if ($it['g'] !== $gk) continue; ?>
+                                    <label class="chk" style="margin:0"><input type="checkbox" name="items[]" value="<?= e($k) ?>" onclick="atOnCheck()" <?= in_array($k, $atSel, true) ? 'checked' : '' ?>> <?= e($it['ar']) ?></label>
+                                <?php endforeach; ?>
+                            </span>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
                 <?php reportSchoolPicker(); ?>
+                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
             </div>
         </form>
+        <script>
+        function atToggleAll(b){ document.querySelectorAll('.at-items input[name="items[]"]').forEach(c=>c.checked=b.checked); }
+        function atOnCheck(){ var all=document.querySelectorAll('.at-items input[name="items[]"]'); var n=Array.from(all).filter(c=>c.checked).length; var ab=document.querySelector('.at-items .all input'); if(ab) ab.checked=(n===all.length); }
+        </script>
 
-        <?php if ($multi && $perSchool): ?>
-        <?= docSheetStart('Détail par école', 'تفصيل لكل مدرسة', [$schoolYear . $empTypeTitle], ['comp' => false]) ?>
+        <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند']) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><th>المدرسة</th><th>عدد الكشوف</th><th>الإجمالي المتوجب</th><th>الضمان</th><th>الضريبة</th></tr></thead>
+                    <thead><tr>
+                        <th>#</th><th>المدرسة / École</th><th>عدد الكشوف</th>
+                        <?php foreach ($atSel as $k): ?><th><?= e(annualTotalLabel($k, 'ar')) ?><br><small style="font-weight:400;opacity:.8"><?= e(annualTotalLabel($k, 'fr')) ?></small></th><?php endforeach; ?>
+                    </tr></thead>
                     <tbody>
-                        <?php $rn=0; foreach ($perSchool as $p): ?>
+                        <?php $rn = 0; foreach ($atRows as $r): ?>
                         <tr>
                             <td><?= ++$rn ?></td>
-                            <td><strong><?= e(schoolNameById($p['school_id'])) ?></strong></td>
-                            <td><?= $p['cnt'] ?></td>
-                            <td><?= dualFromUsd((int)$p['total'] - (salaryCompHas('transport') ? 0 : (int)$p['trans']), (float)$p['total_usd'] - (salaryCompHas('transport') ? 0 : (float)$p['trans_usd'])) ?></td>
-                            <td><?= dualFromUsd($p['cnss'], $p['cnss_usd']) ?></td>
-                            <td><?= dualFromUsd($p['tax'], $p['tax_usd']) ?></td>
+                            <td style="white-space:nowrap;text-align:right"><strong><?= e(schoolNameById($r['school_id'])) ?></strong></td>
+                            <td><?= (int)$r['cnt'] ?></td>
+                            <?php foreach ($atSel as $k): ?><td style="white-space:nowrap"><?= $atCell($r[$k], $r[$k . '_usd']) ?></td><?php endforeach; ?>
                         </tr>
                         <?php endforeach; ?>
-                        <tr class="total-row"><td colspan="6">عدد المدارس / Écoles: <?= count($perSchool) ?></td></tr>
+                        <?php if (!$atRows): ?><tr><td colspan="<?= 3 + count($atSel) ?>" class="text-center">لا كشوف محسوبة بهذا النطاق / Aucune fiche</td></tr><?php endif; ?>
+                        <?php if (count($atRows) > 1): ?>
+                        <tr class="total-row" style="background:var(--gold-light);font-weight:800">
+                            <td colspan="2">المجموع / Total — <?= count($atRows) ?> مدارس</td>
+                            <td><?= (int)$atTot['cnt'] ?></td>
+                            <?php foreach ($atSel as $k): ?><td style="white-space:nowrap"><?= $atCell($atTot[$k], $atTot[$k . '_usd']) ?></td><?php endforeach; ?>
+                        </tr>
+                        <?php endif; ?>
                     </tbody>
                 </table></div>
-        <?= docSheetEnd() ?>
-        <?php endif; ?>
-
-        <?= docSheetStart('Totaux annuels (cumulés)', 'المجاميع السنوية', [$schoolYear . $empTypeTitle]) ?>
-                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <tr><td><strong>عدد الكشوف المحسوبة</strong></td><td><?= $tot['cnt'] ?: 0 ?></td></tr>
-                    <?php $dualTotA = function($lbp,$usd){ $m=displayCurrency(); if($m==='lbp')return formatLBP($lbp); if($m==='usd')return formatUSD($usd); return formatLBP($lbp).'<span class="money-usd">'.formatUSD($usd).'</span>'; }; ?>
-                    <tr style="background:var(--gold-light)"><td><strong>إجمالي المدفوع (الصافي)</strong></td><td><strong><?= $dualTotA($tot['net'], $tot['net_usd']) ?></strong></td></tr>
-                    <tr><td>التعويضات العائلية</td><td><?= $dualTotA($tot['fam'], $tot['fam_usd']) ?></td></tr>
-                    <tr style="background:var(--gold-light)"><td><strong>الإجمالي المتوجب (الصافي + التعويضات<?= salaryCompHas('transport') ? ' + النقل' : '' ?>)</strong></td><td><strong><?= $dualTotA((int)$tot['total'] - (salaryCompHas('transport') ? 0 : (int)$tot['transport']), (float)$tot['total_usd'] - (salaryCompHas('transport') ? 0 : (float)$tot['transport_usd'])) ?></strong></td></tr>
-                    <tr><td>أساس الراتب</td><td><?= $dualTotA($tot['base_sal'], $tot['base_sal_usd']) ?></td></tr>
-                    <tr><td>الراتب بعد التدرّج</td><td><?= $dualTotA($tot['bpe'], $tot['bpe_usd']) ?></td></tr>
-                    <?php if (salaryCompHas('extra')): ?><tr><td>الأجر الإضافي</td><td><?= $dualTotA($tot['extra_wage'], $tot['extra_wage_usd']) ?></td></tr><?php endif; ?>
-                    <?php if (salaryCompHas('aide')): ?><tr><td>مكافأة ومساعدة</td><td><?= $dualTotA($tot['aide'], $tot['aide_usd']) ?></td></tr><?php endif; ?>
-                    <?php if (salaryCompHas('transport')): ?><tr><td>تعويض النقل</td><td><?= $dualTotA($tot['transport'], $tot['transport_usd']) ?></td></tr><?php endif; ?>
-                    <?php
-                        $compLbp = (int)$tot['bpe'] + (salaryCompHas('extra')?(int)$tot['extra_wage']:0) + (salaryCompHas('aide')?(int)$tot['aide']:0) + (salaryCompHas('transport')?(int)$tot['transport']:0);
-                        $compUsd = (float)$tot['bpe_usd'] + (salaryCompHas('extra')?(float)$tot['extra_wage_usd']:0) + (salaryCompHas('aide')?(float)$tot['aide_usd']:0) + (salaryCompHas('transport')?(float)$tot['transport_usd']:0);
-                    ?>
-                    <tr style="background:#eef2ff"><td><strong>الراتب المركّب</strong> <small style="color:#64748b">(<?= e(salaryCompLabel()) ?>)</small></td><td><strong><?= $dualTotA($compLbp, $compUsd) ?></strong></td></tr>
-                    <tr><td>الضمان — الأجير ٣٪</td><td><?= $dualTotA($tot['cnss'], $tot['cnss_usd']) ?></td></tr>
-                    <tr><td>الضمان — المدرسة ٨٪</td><td><?= $dualTotA($tot['scnss'], $tot['scnss_usd']) ?></td></tr>
-                    <tr><td>صندوق التعويضات — الأجير ٦٪</td><td><?= $dualTotA($tot['caisse'], $tot['caisse_usd']) ?></td></tr>
-                    <tr><td>صندوق التعويضات — المدرسة ٦٪</td><td><?= $dualTotA($tot['seoc'], $tot['seoc_usd']) ?></td></tr>
-                    <tr><td>ضريبة الدخل</td><td><?= $dualTotA($tot['tax'], $tot['tax_usd']) ?></td></tr>
-                </table></div>
+                <?php if ($atRows): ?>
+                <p class="text-muted" style="margin:10px 0 0;font-size:12px"><i class="fas fa-circle-info"></i>
+                    كل خانة = مجموع الشهور المحسوبة للسنة الدراسية <?= e($schoolYear) ?> بالمدرسة. الدولار يُجمع شهراً بشهر بسعر صرف كل شهر (بلا فراطات).
+                    <?php if (in_array('total', $atSel, true) && !salaryCompHas('transport')): ?>النقل غير مشمول بالمتوجب لأن زرّ «الراتب يشمل» لا يتضمّنه.<?php endif; ?>
+                </p>
+                <?php endif; ?>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'titularized'):
         // 🎓 الداخلون في الملاك بتاريخ معيّن — لكل مدرسة (طلب المستخدم 2026-08-27: «تقرير

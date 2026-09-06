@@ -343,30 +343,20 @@ if ($report === 'monthly_summary') {
     }
 
 } elseif ($report === 'annual_totals') {
-    $st = $db->prepare("SELECT COUNT(*) cnt, SUM(ms.net_salary_lbp) net, SUM(ms.total_due_lbp) total, SUM(ms.family_allowance_lbp) fam, SUM(ms.cnss_amount_lbp) cnss, SUM(ms.income_tax_lbp) tax, SUM(ms.caisse_amount_lbp) caisse, SUM(ms.school_cnss_8_lbp) scnss, SUM(ms.school_eoc_6_lbp) seoc, SUM(ms.base_salary_lbp) base_sal, SUM(ms.base_plus_echelon_lbp) bpe, SUM(ms.extra_lbp+ms.prime_fixe_lbp) extra_wage, SUM(ms.aide_complementaire_lbp) aide, SUM(ms.transport_lbp) transport
-        FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=0" . $annualEmpFilter . $empTypeSql . " AND ms.school_year=? AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $schoolSql);
-    $st->execute(array_merge($annualEmpParams, [$schoolYear]));
-    $t = $st->fetch();
-    $rep = new ReportTable('المجاميع السنوية — ' . $schoolYear . $empTypeTitle, false);
+    // 📊 مدارس × بنود مختارة + صفّ مجاميع لكل بند — نفس مصدر الشاشة (annualTotalRows) (2026-09-06)
+    $atSel = annualTotalSelected();
+    [$atRows, $atTot] = annualTotalRows($db, $schoolYear, $annualEmpFilter, $annualEmpParams, $empTypeSql, $schoolSql);
+    $rep = new ReportTable('المجاميع السنوية — لكل مدرسة ولكل بند — ' . $schoolYear . $empTypeTitle, true);
     $rep->schoolHeader($school);
-    $rep->head(['البيان', 'القيمة (ل.ل)']);
-    $rep->widths([40, 28]);
-    $rep->row(['عدد الكشوف المحسوبة', (int)$t['cnt']]);
-    $rep->totalRow(['إجمالي المدفوع (الصافي)', (int)$t['net']]);
-    $rep->row(['التعويضات العائلية', (int)$t['fam']]);
-    $rep->totalRow(['الإجمالي المتوجب (الصافي + التعويضات' . (salaryCompHas('transport') ? ' + النقل' : '') . ')', (int)$t['total'] - (salaryCompHas('transport') ? 0 : (int)$t['transport'])]);
-    $rep->row(['أساس الراتب', (int)$t['base_sal']]);
-    $rep->row(['الراتب بعد التدرّج', (int)$t['bpe']]);
-    if (salaryCompHas('extra')) $rep->row(['الأجر الإضافي', (int)$t['extra_wage']]);
-    if (salaryCompHas('aide'))  $rep->row(['مكافأة ومساعدة', (int)$t['aide']]);
-    if (salaryCompHas('transport')) $rep->row(['تعويض النقل', (int)$t['transport']]);
-    $compAnn = (int)$t['bpe'] + (salaryCompHas('extra') ? (int)$t['extra_wage'] : 0) + (salaryCompHas('aide') ? (int)$t['aide'] : 0) + (salaryCompHas('transport') ? (int)$t['transport'] : 0);
-    $rep->totalRow(['الراتب المركّب (' . salaryCompLabel() . ')', $compAnn]);
-    $rep->row(['الضمان (حصة الأجير ٣٪)', (int)$t['cnss']]);
-    $rep->row(['الضمان (حصة المدرسة ٨٪)', (int)$t['scnss']]);
-    $rep->row(['صندوق التعويضات (الأجير)', (int)$t['caisse']]);
-    $rep->row(['صندوق التعويضات (المدرسة ٦٪)', (int)$t['seoc']]);
-    $rep->row(['ضريبة الدخل', (int)$t['tax']]);
+    $rep->head(array_merge(['#', 'المدرسة', 'عدد الكشوف'], array_map(fn($k) => annualTotalLabel($k, 'ar') . ' (ل.ل)', $atSel)));
+    $rep->widths(array_merge([5, 30, 10], array_fill(0, count($atSel), 18)));
+    $rn = 0;
+    foreach ($atRows as $r) {
+        $rep->row(array_merge([++$rn, schoolNameById($r['school_id']), (int)$r['cnt']], array_map(fn($k) => (int)$r[$k], $atSel)));
+    }
+    if (count($atRows) > 1) {
+        $rep->totalRow(array_merge(['', 'المجموع', (int)$atTot['cnt']], array_map(fn($k) => (int)$atTot[$k], $atSel)));
+    }
 
 } else {
     http_response_code(400);

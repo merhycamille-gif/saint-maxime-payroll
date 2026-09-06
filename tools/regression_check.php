@@ -866,6 +866,33 @@ $hAtOff = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_
 check('المجاميع السنوية: المتوجب «+ النقل» مع الخيار فقط',
       strpos($hAtOn, 'الصافي + التعويضات + النقل') !== false && strpos($hAtOff, 'الصافي + التعويضات + النقل') === false);
 check('المجاميع السنوية: سطر التعويضات العائلية موجود', strpos($hAtOff, 'التعويضات العائلية') !== false);
+// 📊 «بدي مجاميع لكل بند + أقدر حط اللي بدي ياه بالتقرير + أختار مدرسة لحالها أو مع بعض + أختار السنة» (2026-09-06):
+//     صفّ لكل مدرسة + صفّ «المجموع» + اختيار البنود items[] + قائمة السنة + التصدير بنفس البنود
+$hAtSel = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026', 'items' => ['cnss', 'scnss']], ['extra', 'aide', 'transport']);
+check('المجاميع السنوية: جدول مدارس × بنود مع صفّ المجموع + قائمة السنة + منتقي البنود بالمجموعات',
+      strpos($hAtOn, 'المجاميع السنوية — لكل مدرسة ولكل بند') !== false
+      && strpos($hAtOn, 'المجموع / Total') !== false
+      && strpos($hAtOn, '<select name="school_year"') !== false
+      && strpos($hAtOn, 'name="items[]" value="cnss"') !== false
+      && strpos($hAtOn, 'name="schools[]"') !== false
+      && strpos($hAtOn, '<th>أساس الراتب') !== false && strpos($hAtOn, '<th>ضريبة الدخل') !== false
+      && strpos($hAtOn, 'FATAL') === false);
+check('المجاميع السنوية: اختيار بنود الضمان فقط يخفي باقي الأعمدة (أساس الراتب/الضريبة) ويُبقي الضمان',
+      strpos($hAtSel, '<th>الضمان — الأجير ٣٪') !== false && strpos($hAtSel, '<th>الضمان — المدرسة ٨٪') !== false
+      && strpos($hAtSel, '<th>أساس الراتب') === false && strpos($hAtSel, '<th>ضريبة الدخل') === false
+      && strpos($hAtSel, 'FATAL') === false);
+$xAtSel = renderPage('pages/reports_export.php', ['report' => 'annual_totals', 'format' => 'xlsx', 'school_year' => '2025-2026', 'items' => ['cnss']], ['extra', 'aide', 'transport']);
+check('المجاميع السنوية: التصدير يحمل البنود المختارة (items[]) وملف Excel سليم',
+      strpos($xAtSel, 'PK') !== false && strpos($xAtSel, 'FATAL') !== 0
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/reports.php'), "'&items[]='") !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/reports_export.php'), 'annualTotalSelected()') !== false);
+// صحّة المجاميع: صفّ المجموع = مجموع صفوف المدارس (الضمان 3٪ بالليرة) — من المصدر نفسه
+require_once __DIR__ . '/../includes/report_helpers.php';
+[$rowsChk, $totChk] = annualTotalRows($db, '2025-2026', '', [], '', ' ');
+check('المجاميع السنوية: صفّ المجموع = مجموع صفوف المدارس (الضمان ٣٪ + عدد الكشوف)',
+      (int)$totChk['cnss'] === array_sum(array_map(fn($r) => (int)$r['cnss'], $rowsChk))
+      && (int)$totChk['cnt'] === array_sum(array_map(fn($r) => (int)$r['cnt'], $rowsChk)) && (int)$totChk['cnt'] > 0,
+      'cnt=' . $totChk['cnt'] . ' cnss=' . number_format((int)$totChk['cnss']));
 // فتح السنة: فرق النقل يُحسب من transport_lbp وحده (العمودان نفس القيمة — الجمع = دوبل)
 $oySrc = (string)file_get_contents(__DIR__ . '/../pages/open_year.php');
 check('فتح السنة: لا جمع لعمودَي النقل عند تصحيح total_due', strpos($oySrc, "transport_complement_lbp'] + (float)") === false
