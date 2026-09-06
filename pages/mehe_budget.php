@@ -17,17 +17,26 @@ $db = getDB();
 $currentPage = 'mehe_budget';
 $pageTitle = 'Budget MEHE / موازنة وزارة التربية';
 $hideExportToolbar = true;
-$school = currentSchool();
 $sy = activeSchoolYear();
 if ($sy === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$sy)) $sy = currentSchoolYear();
-
-if (!$school) {
-    $_SESSION['flash_error'] = 'موازنة الوزارة تُعدّ لمدرسة واحدة — اختر المدرسة من الأعلى أولاً. / Choisissez une seule école.';
+// 🏫 النطاق: مدرسة واحدة أو مجموعة أو الكل (من مبدّل المدارس بالأعلى) — «ليش ما فيّي اختار مجموعة
+// مدارس مع بعضها» (2026-09-06): موازنة مجمّعة لكل النطاق، وبياناتها تُحفظ لهذه المجموعة بعينها
+$ids = activeSchoolIds();
+if (!$ids) $ids = allActiveSchoolIdsCached();
+$ids = array_values(array_map('intval', $ids));
+$schools = [];
+if ($ids) { $q = $db->query("SELECT * FROM schools WHERE id IN (" . implode(',', $ids) . ") AND is_deleted = 0 ORDER BY FIELD(id," . implode(',', $ids) . ")"); $schools = $q->fetchAll(); }
+if (!$schools) {
+    $_SESSION['flash_error'] = 'لا مدارس بالنطاق المختار / Aucune école.';
     header('Location: ' . BASE_URL . 'pages/reports.php');
     exit;
 }
+$multi = count($schools) > 1;
+$school = $multi
+    ? ['id' => (int)$schools[0]['id'], 'name_ar' => implode(' + ', array_map(fn($x) => $x['name_ar'], $schools)), 'name_fr' => implode(' + ', array_map(fn($x) => $x['name_fr'], $schools))]
+    : $schools[0];
 $sid = (int)$school['id'];
-$data = meheLoad($db, $sid, $sy);
+$data = meheLoad($db, $ids, $sy);
 
 /* ===== حفظ النموذج ===== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit() && isset($_POST['mehe_save'])) {
@@ -56,16 +65,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit() && isset($_POST['mehe_sav
     $data['revenues'] = $rows('rev', ['program' => 's', 'class' => 's', 'fee_ll' => 'n', 'fee_usd' => 'n', 'students' => 'n'], 'class');
     $data['grants'] = $rows('gr', ['student' => 's', 'teacher' => 's', 'cat' => 's', 'class' => 's', 'll' => 'n', 'usd' => 'n'], 'student');
     $data['severance'] = $rows('sev', ['name' => 's', 'eos_ll' => 'n', 'eos_usd' => 'n', 'tasks_ll' => 'n', 'tasks_usd' => 'n', 'receipt_no' => 's', 'receipt_date' => 's', 'notes' => 's'], 'name');
-    $data['manual_admins'] = $rows('ma', ['name' => 's', 'mode' => 's', 'start_date' => 's', 'type' => 's', 'cnss_type' => 's', 'base' => 'n', 'extra_ll' => 'n', 'tasks_ll' => 'n', 'grants_ll' => 'n', 'transport' => 'n', 'cnss' => 'n', 'months' => 'n'], 'name');
+    $data['manual_admins'] = $rows('ma', ['name' => 's', 'school' => 's', 'mode' => 's', 'start_date' => 's', 'type' => 's', 'cnss_type' => 's', 'base' => 'n', 'extra_ll' => 'n', 'tasks_ll' => 'n', 'grants_ll' => 'n', 'transport' => 'n', 'cnss' => 'n', 'months' => 'n'], 'name');
     $data['base_mode'] = (($P['base_mode'] ?? 'avg') === 'oct') ? 'oct' : 'avg';
     $data['excluded'] = array_values(array_map('intval', (array)($P['excluded'] ?? [])));
-    meheSave($db, $sid, $sy, $data);
+    meheSave($db, $ids, $sy, $data);
     $_SESSION['flash_success'] = 'انحفظت بيانات موازنة ' . $sy . ' لـ' . $school['name_ar'] . ' / Budget enregistré.';
     header('Location: ' . BASE_URL . 'pages/mehe_budget.php');
     exit;
 }
 
-$p = mehePayroll($db, $sid, $sy, $data);
+$p = mehePayroll($db, $ids, $sy, $data);
 $s = meheSummary($data, $p);
 [$y1, $y2] = schoolYearToYears($sy);
 
@@ -74,7 +83,7 @@ if (($_GET['export'] ?? '') === 'xlsx') {
     $bytes = meheBuildXlsx($data, $p, $s, $school, $sy);
     while (ob_get_level()) ob_end_clean();
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    header('Content-Disposition: attachment; filename="Budget ' . $sy . ' ' . preg_replace('/[^A-Za-z0-9 _-]/', '', (string)($school['name_fr'] ?? 'school')) . ' (mehe).xlsx"');
+    header('Content-Disposition: attachment; filename="Budget ' . $sy . ' ' . ($multi ? 'Groupe ' . count($schools) . ' ecoles' : preg_replace('/[^A-Za-z0-9 _-]/', '', (string)($school['name_fr'] ?? 'school'))) . ' (mehe).xlsx"');
     header('Content-Length: ' . strlen($bytes));
     echo $bytes;
     exit;
@@ -87,8 +96,8 @@ $fmt0 = fn($v) => number_format((float)$v, 0);
 $fmt2 = fn($v) => number_format((float)$v, 2);
 $allEmps = array_merge($p['tit'], $p['con'], array_filter($p['adm'], fn($a) => empty($a['manual'])));
 // كل موظفي السنة (لخيار الاستثناء) — بمن فيهم المستثنون حالياً
-$empList = $db->prepare("SELECT DISTINCT e.id, CONCAT(e.first_name_ar,' ',e.last_name_ar) nm, e.employee_type FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ? WHERE e.school_id = ? AND e.is_deleted = 0 ORDER BY e.employee_type, nm");
-$empList->execute([$sy, $sid]);
+$empList = $db->prepare("SELECT DISTINCT e.id, e.school_id, CONCAT(e.first_name_ar,' ',e.last_name_ar) nm, e.employee_type FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ? WHERE e.school_id IN (" . implode(',', $ids) . ") AND e.is_deleted = 0 ORDER BY e.school_id, e.employee_type, nm");
+$empList->execute([$sy]);
 $empList = $empList->fetchAll();
 ?>
 <style>
@@ -136,7 +145,7 @@ $empList = $empList->fetchAll();
     <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <a class="btn btn-success" href="?export=xlsx"><i class="fas fa-file-excel"></i> Excel (صيغ حيّة)</a>
         <button type="button" class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Imprimer / PDF</button>
-        <span class="text-muted" style="font-size:12.5px">جداول الأساتذة والموظفين والملخّص (أ، ب) تُقرأ من رواتب <?= e($sy) ?> تلقائياً — المدرسة والسنة من الأعلى. الباقي تعبّيه مرّة بالنموذج تحت (تعديل ← حفظ) ويبقى محفوظاً لهذه المدرسة والسنة.</span>
+        <span class="text-muted" style="font-size:12.5px">جداول الأساتذة والموظفين والملخّص (أ، ب) تُقرأ من رواتب <?= e($sy) ?> تلقائياً — المدرسة (أو مجموعة مدارس أو الكل) والسنة من الأعلى<?= $multi ? '؛ الآن موازنة مجمّعة لـ' . count($schools) . ' مدارس' : '' ?>. الباقي تعبّيه مرّة بالنموذج تحت (تعديل ← حفظ) ويبقى محفوظاً لهذه المدرسة والسنة.</span>
     </div>
 </div>
 
@@ -257,10 +266,10 @@ $empList = $empList->fetchAll();
         </details>
         <details>
             <summary>٨) إداريون خارج الرواتب (يُضافون لجدول الموظفين الإداريين) + خيارات الرواتب</summary>
-            <table class="mini" id="tblMa"><tr><th>الاسم</th><th>نمط العمل</th><th>تاريخ مباشرة العمل</th><th>نوع الموظف</th><th>نوع الضمان</th><th>أساس الراتب (شهري)</th><th>الأجور الإضافية ل.ل (شهري)</th><th>مهام إضافية ل.ل</th><th>منح مدرسية ل.ل</th><th>تعويض نقل (شهري)</th><th>مساهمة الضمان (شهري)</th><th>عدد الأشهر</th></tr>
+            <table class="mini" id="tblMa"><tr><th>الاسم</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>نمط العمل</th><th>تاريخ مباشرة العمل</th><th>نوع الموظف</th><th>نوع الضمان</th><th>أساس الراتب (شهري)</th><th>الأجور الإضافية ل.ل (شهري)</th><th>مهام إضافية ل.ل</th><th>منح مدرسية ل.ل</th><th>تعويض نقل (شهري)</th><th>مساهمة الضمان (شهري)</th><th>عدد الأشهر</th></tr>
             <?php $ma = array_merge((array)$data['manual_admins'], array_fill(0, 1, ['name' => '', 'mode' => '', 'start_date' => '', 'type' => 'عادي', 'cnss_type' => 'غير مضمون', 'base' => 0, 'extra_ll' => 0, 'tasks_ll' => 0, 'grants_ll' => 0, 'transport' => 0, 'cnss' => 0, 'months' => 12]));
             foreach ($ma as $i => $x): ?>
-                <tr><td><input name="ma[<?= $i ?>][name]" value="<?= e($x['name']) ?>"></td><td><input name="ma[<?= $i ?>][mode]" value="<?= e($x['mode']) ?>" placeholder="مدير / اداري"></td><td><input name="ma[<?= $i ?>][start_date]" value="<?= e($x['start_date']) ?>" placeholder="1/10/2025"></td>
+                <tr><td><input name="ma[<?= $i ?>][name]" value="<?= e($x['name']) ?>"></td><?php if ($multi): ?><td><input name="ma[<?= $i ?>][school]" value="<?= e($x['school'] ?? '') ?>" placeholder="اسم المدرسة"></td><?php endif; ?><td><input name="ma[<?= $i ?>][mode]" value="<?= e($x['mode']) ?>" placeholder="مدير / اداري"></td><td><input name="ma[<?= $i ?>][start_date]" value="<?= e($x['start_date']) ?>" placeholder="1/10/2025"></td>
                 <td><input name="ma[<?= $i ?>][type]" value="<?= e($x['type']) ?>"></td><td><input name="ma[<?= $i ?>][cnss_type]" value="<?= e($x['cnss_type']) ?>"></td>
                 <?php foreach (['base', 'extra_ll', 'tasks_ll', 'grants_ll', 'transport', 'cnss', 'months'] as $f): ?><td><input type="number" step="any" name="ma[<?= $i ?>][<?= $f ?>]" value="<?= (float)($x[$f] ?? 0) ?>"></td><?php endforeach; ?></tr>
             <?php endforeach; ?></table>
@@ -277,7 +286,7 @@ $empList = $empList->fetchAll();
                     <label class="lb">استثناء موظفين من الموازنة (بقرارك)</label>
                     <div style="max-height:160px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px;font-size:12.5px">
                         <?php foreach ($empList as $em): ?>
-                            <label style="display:block"><input type="checkbox" name="excluded[]" value="<?= (int)$em['id'] ?>" <?= in_array((int)$em['id'], (array)$data['excluded'], true) ? 'checked' : '' ?>> <?= e($em['nm']) ?> <small class="text-muted">(<?= e(empCategoryTitle($em['employee_type'])) ?>)</small></label>
+                            <label style="display:block"><input type="checkbox" name="excluded[]" value="<?= (int)$em['id'] ?>" <?= in_array((int)$em['id'], (array)$data['excluded'], true) ? 'checked' : '' ?>> <?= e($em['nm']) ?> <small class="text-muted">(<?= e(empCategoryTitle($em['employee_type'])) ?><?= $multi ? ' — ' . e(schoolNameById((int)$em['school_id'])) : '' ?>)</small></label>
                         <?php endforeach; ?>
                     </div>
                 </div>
@@ -329,7 +338,8 @@ function meheAddRow(id){
 /* ===================== المعاينة / الطباعة ===================== */
 $chips = [$sy];
 $optsDoc = ['comp' => false, 'no_letterhead' => true];
-$staffTable = function (string $title, array $cols, array $keys, array $rows, array $months, int $firstNum, array $dec2) use ($fmt0, $fmt2) {
+$staffTable = function (string $title, array $cols, array $keys, array $rows, array $months, int $firstNum, array $dec2) use ($fmt0, $fmt2, $multi) {
+    if ($multi) { $cols = array_merge([$cols[0], 'المدرسة'], array_slice($cols, 1)); $keys = array_merge([$keys[0], 'school'], array_slice($keys, 1)); $firstNum++; }
     ob_start(); ?>
     <h4 class="sec"><?= e($title) ?></h4>
     <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
@@ -337,7 +347,7 @@ $staffTable = function (string $title, array $cols, array $keys, array $rows, ar
         <tbody>
         <?php foreach ($rows as $r): ?><tr>
             <?php foreach ($keys as $i => $k): $col = $i + 1; ?>
-                <td style="<?= $col === 1 ? 'text-align:right;font-weight:700;white-space:nowrap' : 'text-align:center' ?>"><?= $col >= $firstNum ? (in_array($k, $dec2, true) ? $fmt2($r[$k] ?? 0) : $fmt0($r[$k] ?? 0)) : e((string)($r[$k] ?? '')) ?></td>
+                <td style="<?= $col === 1 ? 'text-align:right;font-weight:700;white-space:nowrap' : ($k === 'school' ? 'text-align:right;white-space:nowrap' : 'text-align:center') ?>"><?= $col >= $firstNum ? (in_array($k, $dec2, true) ? $fmt2($r[$k] ?? 0) : $fmt0($r[$k] ?? 0)) : e((string)($r[$k] ?? '')) ?></td>
             <?php endforeach; ?></tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?><tr><td colspan="<?= count($cols) ?>" style="text-align:center">لا صفوف / Aucun</td></tr><?php endif; ?>

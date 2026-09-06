@@ -28,8 +28,18 @@ function ensureMeheBudget20260906(): void {
             updated_at DATETIME NULL,
             UNIQUE KEY uq_mehe (school_id, school_year)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // 🏫 «ليش ما فيّي اختار مجموعة مدارس مع بعضها» (2026-09-06): النطاق = مدرسة أو مجموعة أو الكل —
+        // عمود scope ("2" أو "2,3,4") هو مفتاح الحفظ؛ يُركَّب ذاتياً ويُعبّأ من school_id للصفوف القديمة
+        if (!$db->query("SHOW COLUMNS FROM mehe_budget LIKE 'scope'")->fetch()) {
+            $db->exec("ALTER TABLE mehe_budget ADD COLUMN scope VARCHAR(120) NULL AFTER school_id");
+            $db->exec("UPDATE mehe_budget SET scope = CAST(school_id AS CHAR) WHERE scope IS NULL");
+            try { $db->exec("ALTER TABLE mehe_budget DROP INDEX uq_mehe"); } catch (Throwable $e) {}
+            $db->exec("ALTER TABLE mehe_budget ADD UNIQUE KEY uq_mehe_scope (scope, school_year)");
+        }
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
+/** مفتاح النطاق من قائمة المدارس (مرتّبة) */
+function meheScopeKey(array $ids): string { $ids = array_values(array_unique(array_map('intval', $ids))); sort($ids); return implode(',', $ids); }
 
 /* ===================== القوائم الثابتة بنموذج الوزارة (بنفس الترتيب) ===================== */
 function meheRoomTypes(): array {
@@ -126,12 +136,13 @@ function meheDefaults(PDO $db, int $schoolId, string $sy): array {
         'excluded' => [],          // موظفون يُستثنون من الجداول (بقراره)
     ];
 }
-function meheLoad(PDO $db, int $schoolId, string $sy): array {
+function meheLoad(PDO $db, array $ids, string $sy): array {
     ensureMeheBudget20260906();
+    $schoolId = (int)($ids[0] ?? 0);
     $def = meheDefaults($db, $schoolId, $sy);
     try {
-        $st = $db->prepare("SELECT data FROM mehe_budget WHERE school_id = ? AND school_year = ?");
-        $st->execute([$schoolId, $sy]);
+        $st = $db->prepare("SELECT data FROM mehe_budget WHERE scope = ? AND school_year = ?");
+        $st->execute([meheScopeKey($ids), $sy]);
         $j = $st->fetchColumn();
         if ($j) {
             $saved = json_decode((string)$j, true) ?: [];
@@ -144,17 +155,17 @@ function meheLoad(PDO $db, int $schoolId, string $sy): array {
             }
         }
     } catch (Throwable $e) {}
-    // مدير المدرسة الافتراضي من ملف المدرسة إن وُجد
-    if ($def['director'] === '') {
+    // مدير المدرسة الافتراضي من ملف المدرسة إن وُجد (مدرسة واحدة)
+    if ($def['director'] === '' && count($ids) === 1) {
         try { $s = $db->query("SELECT director_name FROM schools WHERE id = $schoolId")->fetchColumn(); if ($s) $def['director'] = (string)$s; } catch (Throwable $e) {}
     }
     return $def;
 }
-function meheSave(PDO $db, int $schoolId, string $sy, array $data): void {
+function meheSave(PDO $db, array $ids, string $sy, array $data): void {
     ensureMeheBudget20260906();
-    $db->prepare("INSERT INTO mehe_budget (school_id, school_year, data, updated_at) VALUES (?,?,?,NOW())
-                  ON DUPLICATE KEY UPDATE data = VALUES(data), updated_at = NOW()")
-       ->execute([$schoolId, $sy, json_encode($data, JSON_UNESCAPED_UNICODE)]);
+    $db->prepare("INSERT INTO mehe_budget (school_id, scope, school_year, data, updated_at) VALUES (?,?,?,?,NOW())
+                  ON DUPLICATE KEY UPDATE data = VALUES(data), school_id = VALUES(school_id), updated_at = NOW()")
+       ->execute([(int)($ids[0] ?? 0), meheScopeKey($ids), $sy, json_encode($data, JSON_UNESCAPED_UNICODE)]);
 }
 
 /* ===================== نصوص الموظف بمصطلحات الوزارة ===================== */
@@ -202,7 +213,9 @@ function meheRoleText(array $e): string {
  * الأول (base_mode=oct)، وعدد الأشهر = الأشهر التي فيها قيمة > 0، والمجموع = الشهري × الأشهر
  * (بوضع المعدل = مجموع السنة الفعلي بالضبط).
  */
-function mehePayroll(PDO $db, int $schoolId, string $sy, array $data): array {
+function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
+    $ids = array_values(array_filter(array_map('intval', $ids))); if (!$ids) $ids = [-1];
+    $in = implode(',', $ids);
     [$y1, $y2] = schoolYearToYears($sy);
     $mode = ($data['base_mode'] ?? 'avg') === 'oct' ? 'oct' : 'avg';
     $excluded = array_map('intval', (array)($data['excluded'] ?? []));
@@ -216,18 +229,19 @@ function mehePayroll(PDO $db, int $schoolId, string $sy, array $data): array {
         $sel[] = "SUM(($expr) > 0) `{$k}_m`";
         $sel[] = "SUM(CASE WHEN ms.month = 10 AND ms.year = $y1 THEN ($expr) ELSE 0 END) `{$k}_oct`";
     }
-    $st = $db->prepare("SELECT e.*, COUNT(ms.id) months_all, " . implode(', ', $sel) . "
+    $st = $db->prepare("SELECT e.*, s.name_ar school_name, COUNT(ms.id) months_all, " . implode(', ', $sel) . "
                         FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
-                        WHERE e.school_id = ? AND e.is_deleted = 0
+                        LEFT JOIN schools s ON s.id = e.school_id
+                        WHERE e.school_id IN ($in) AND e.is_deleted = 0
                           AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)
                         GROUP BY e.id
-                        ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), e.first_name_ar, e.last_name_ar");
-    $st->execute([$sy, $schoolId]);
+                        ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), e.school_id, e.first_name_ar, e.last_name_ar");
+    $st->execute([$sy]);
     $tit = []; $con = []; $adm = [];
     foreach ($st->fetchAll() as $r) {
         if (in_array((int)$r['id'], $excluded, true)) continue;
         $row = [
-            'id' => (int)$r['id'],
+            'id' => (int)$r['id'], 'school' => (string)($r['school_name'] ?? ''),
             'name' => trim((string)$r['first_name_ar'] . ' ' . (string)$r['father_name_ar'] . ' ' . (string)$r['last_name_ar']) ?: trim($r['first_name_fr'] . ' ' . $r['last_name_fr']),
             'role' => meheRoleText($r), 'qual' => meheQualText($r['diploma'] ?? ''), 'level' => meheLevelText($r),
             'cadre_date' => ($r['titularization_date'] && $r['titularization_date'] !== '0000-00-00') ? formatDate($r['titularization_date'], 'j/n/Y') : '',
@@ -259,7 +273,7 @@ function mehePayroll(PDO $db, int $schoolId, string $sy, array $data): array {
     foreach ((array)($data['manual_admins'] ?? []) as $ma) {
         if (trim((string)($ma['name'] ?? '')) === '') continue;
         $mm = max(1, (int)($ma['months'] ?? 12));
-        $row = ['id' => 0, 'name' => (string)$ma['name'], 'admin_mode' => (string)($ma['mode'] ?? ''), 'start_date' => (string)($ma['start_date'] ?? ''),
+        $row = ['id' => 0, 'school' => (string)($ma['school'] ?? ''), 'name' => (string)$ma['name'], 'admin_mode' => (string)($ma['mode'] ?? ''), 'start_date' => (string)($ma['start_date'] ?? ''),
                 'admin_type' => (string)($ma['type'] ?? 'عادي'), 'cnss_type' => (string)($ma['cnss_type'] ?? 'غير مضمون'), 'extra_usd' => 0, 'months' => [], 'manual' => true];
         foreach (['base', 'extra_ll', 'tasks_ll', 'grants_ll', 'transport', 'cnss'] as $k) {
             $v = (float)($ma[$k] ?? 0);
@@ -282,7 +296,7 @@ function mehePayroll(PDO $db, int $schoolId, string $sy, array $data): array {
     [$am, $at] = $mk($adm, ['base', 'extra_ll', 'extra_usd', 'tasks_ll', 'grants_ll', 'transport', 'cnss']);
     foreach (['tm', 'cm', 'am'] as $v) foreach ($$v as $k => $m) if ($m === 0) $$v[$k] = 12; // عمود فارغ ⇒ 12 كالنموذج
     return ['tit' => $tit, 'con' => $con, 'adm' => $adm, 'tit_months' => $tm, 'tit_tot' => $tt, 'con_months' => $cm, 'con_tot' => $ct,
-            'adm_months' => $am, 'adm_tot' => $at, 'mode' => $mode];
+            'adm_months' => $am, 'adm_tot' => $at, 'mode' => $mode, 'multi' => count($ids) > 1];
 }
 
 /* ===================== الملخّص (الفئات أ/ب/ج/د + ملخّص الميزانية + الإيرادات + المنح) ===================== */
@@ -579,7 +593,7 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
             foreach ($keys as $i => $k) {
                 $col = $i + 1;
                 if ($col >= $firstNum) $cells[] = $n((float)($r[$k] ?? 0), in_array($k, $dec2, true) ? 5 : 4);
-                elseif ($col <= 1) $cells[] = $c((string)($r[$k] ?? ''), 3);
+                elseif ($col <= 1 || $k === 'school') $cells[] = $c((string)($r[$k] ?? ''), 3);
                 else $cells[] = $c((string)($r[$k] ?? ''), 13);
             }
             $X->row($si, $cells, 20);
@@ -603,20 +617,26 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
         foreach ($keys as $i => $k) if ($i + 1 >= $firstNum) $refs[$k] = "'" . $name . "'!" . $L($i + 1) . $trow;
         return $refs;
     };
+    // عند مجموعة مدارس: عمود «المدرسة» بعد الاسم بكل جدول موظفين
+    $multi = !empty($p['multi']);
+    $mc = fn(array $cols) => $multi ? array_merge([$cols[0], 'المدرسة'], array_slice($cols, 1)) : $cols;
+    $mk = fn(array $keys) => $multi ? array_merge([$keys[0], 'school'], array_slice($keys, 1)) : $keys;
+    $mw = fn(array $w) => $multi ? array_merge([$w[0], 24], array_slice($w, 1)) : $w;
+    $mf = fn(int $f) => $multi ? $f + 1 : $f;
     $TIT = $staffSheet('هيئة التدريس في الملاك', 'أعضاء هيئة التدريس في الملاك',
-        ['الاسم', 'دور الموظف', 'مؤهلات المعلم', 'مستوى التعليم', 'تاريخ الدخول الى الملاك', 'تاريخ مباشرة العمل', 'ساعات أسبوعية (ملاك)', 'ساعات أسبوعية (اضافية)',
+        $mc(['الاسم', 'دور الموظف', 'مؤهلات المعلم', 'مستوى التعليم', 'تاريخ الدخول الى الملاك', 'تاريخ مباشرة العمل', 'ساعات أسبوعية (ملاك)', 'ساعات أسبوعية (اضافية)',
          'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'الأثر الرجعي', 'أجور مهمات تتجاوز نصاب العمل ل.ل', 'أجور مهمات تجاوز الـ35 ساعه', 'المكافآت', 'مهام إضافية ل.ل',
-         'تعويض نقل', 'تعويض عائلي', 'مساهمة الصندوق الوطني للضمان الاجتماعي', 'صندوق التعويضات'],
-        ['name', 'role', 'qual', 'level', 'cadre_date', 'start_date', 'h_cadre', 'h_extra', 'base', 'extra_ll', 'extra_usd', 'retro', 'missions_ll', 'missions35', 'bonus', 'tasks_ll', 'transport', 'family', 'cnss', 'fund'],
-        $p['tit'], $p['tit_months'], [22, 12, 18, 12, 12, 12, 9, 9, 16, 19, 12, 10, 13, 13, 11, 11, 18, 14, 18, 17], 9, ['missions_ll', 'missions35', 'cnss', 'fund'], 12);
+         'تعويض نقل', 'تعويض عائلي', 'مساهمة الصندوق الوطني للضمان الاجتماعي', 'صندوق التعويضات']),
+        $mk(['name', 'role', 'qual', 'level', 'cadre_date', 'start_date', 'h_cadre', 'h_extra', 'base', 'extra_ll', 'extra_usd', 'retro', 'missions_ll', 'missions35', 'bonus', 'tasks_ll', 'transport', 'family', 'cnss', 'fund']),
+        $p['tit'], $p['tit_months'], $mw([22, 12, 18, 12, 12, 12, 9, 9, 16, 19, 12, 10, 13, 13, 11, 11, 18, 14, 18, 17]), $mf(9), ['missions_ll', 'missions35', 'cnss', 'fund'], 12);
     $CON = $staffSheet('هيئة التدريس المتعاقدون', 'أعضاء هيئة التدريس المتعاقدين',
-        ['الاسم', 'دور الموظف', 'نمط العمل', 'نوع الضمان', 'مؤهلات المعلم', 'مستوى التعليم', 'تاريخ مباشرة العمل', 'ساعات أسبوعية', 'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'المكافآت', 'مهام إضافية ل.ل', 'تعويض نقل', 'مساهمة الصندوق الوطني للضمان الاجتماعي'],
-        ['name', 'role', 'mode', 'cnss_type', 'qual', 'level', 'start_date', 'h_cadre', 'base', 'extra_ll', 'extra_usd', 'bonus', 'tasks_ll', 'transport', 'cnss'],
-        $p['con'], $p['con_months'], [22, 12, 10, 10, 18, 12, 12, 9, 16, 19, 13, 11, 12, 17, 18], 9, ['cnss'], 10);
+        $mc(['الاسم', 'دور الموظف', 'نمط العمل', 'نوع الضمان', 'مؤهلات المعلم', 'مستوى التعليم', 'تاريخ مباشرة العمل', 'ساعات أسبوعية', 'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'المكافآت', 'مهام إضافية ل.ل', 'تعويض نقل', 'مساهمة الصندوق الوطني للضمان الاجتماعي']),
+        $mk(['name', 'role', 'mode', 'cnss_type', 'qual', 'level', 'start_date', 'h_cadre', 'base', 'extra_ll', 'extra_usd', 'bonus', 'tasks_ll', 'transport', 'cnss']),
+        $p['con'], $p['con_months'], $mw([22, 12, 10, 10, 18, 12, 12, 9, 16, 19, 13, 11, 12, 17, 18]), $mf(9), ['cnss'], 10);
     $ADM = $staffSheet('الموظفون الإداريون', 'الموظفون الإداريون',
-        ['الاسم', 'نمط العمل', 'تاريخ مباشرة العمل', 'نوع الموظف الاداري', 'نوع الضمان', 'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'مهام إضافية ل.ل', 'منح مدرسية ل.ل', 'تعويض نقل', 'مساهمة الصندوق الوطني للضمان الاجتماعي'],
-        ['name', 'admin_mode', 'start_date', 'admin_type', 'cnss_type', 'base', 'extra_ll', 'extra_usd', 'tasks_ll', 'grants_ll', 'transport', 'cnss'],
-        $p['adm'], $p['adm_months'], [22, 20, 13, 14, 12, 16, 19, 13, 13, 13, 17, 18], 6, ['cnss'], 8);
+        $mc(['الاسم', 'نمط العمل', 'تاريخ مباشرة العمل', 'نوع الموظف الاداري', 'نوع الضمان', 'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'مهام إضافية ل.ل', 'منح مدرسية ل.ل', 'تعويض نقل', 'مساهمة الصندوق الوطني للضمان الاجتماعي']),
+        $mk(['name', 'admin_mode', 'start_date', 'admin_type', 'cnss_type', 'base', 'extra_ll', 'extra_usd', 'tasks_ll', 'grants_ll', 'transport', 'cnss']),
+        $p['adm'], $p['adm_months'], $mw([22, 20, 13, 14, 12, 16, 19, 13, 13, 13, 17, 18]), $mf(6), ['cnss'], 8);
 
     // ٦) الهيكل
     $si = $X->sheet('الهيكل الإداري والتعليمي', [50, 16]);

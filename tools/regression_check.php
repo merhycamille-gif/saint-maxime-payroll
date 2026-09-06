@@ -4787,8 +4787,8 @@ check('موازنة الوزارة: الصفحة ترندر لمدرسة واح�
       && strpos($mb99, 'class="card no-print mehe-form"') !== false && strpos($mb99, 'meheWireRow') !== false && strpos($mb99, 'landscapePage') !== false
       && strpos($mb99, 'name="mehe_save"') !== false && strpos($mb99, 'FATAL') === false);
 // المجاميع من الرواتب = مجاميع monthly_salaries الفعلية (وضع «معدل الأشهر» ⇒ الشهري × الأشهر = مجموع السنة بالضبط)
-$mbData99 = meheLoad($db, 2, '2025-2026'); $mbData99['excluded'] = []; $mbData99['base_mode'] = 'avg'; $mbData99['manual_admins'] = [];
-$mbP99 = mehePayroll($db, 2, '2025-2026', $mbData99);
+$mbData99 = meheLoad($db, [2], '2025-2026'); $mbData99['excluded'] = []; $mbData99['base_mode'] = 'avg'; $mbData99['manual_admins'] = [];
+$mbP99 = mehePayroll($db, [2], '2025-2026', $mbData99);
 $q99 = $db->query("SELECT e.employee_type t, SUM(ms.base_plus_echelon_lbp) bpe, SUM(ms.extra_lbp+ms.prime_fixe_lbp) ex, SUM(ms.transport_lbp) tr, SUM(ms.school_cnss_8_lbp) c8, SUM(ms.school_eoc_6_lbp) e6
     FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.school_id=2 AND e.is_deleted=0 AND ms.school_year='2025-2026'
       AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) GROUP BY e.employee_type")->fetchAll(PDO::FETCH_ASSOC);
@@ -4820,6 +4820,15 @@ if ($mbZ99->open($mbXl99) === true) {
     $mbZ99->close();
 }
 @unlink($mbXl99);
+// 🏫 مجموعة مدارس مع بعضها: موازنة مجمّعة (عمود «المدرسة» بالجداول + الموظفون من كل النطاق + الحفظ بمفتاح النطاق)
+$mbG99 = renderPage('pages/mehe_budget.php', [], [], [2, 3], '', '2025-2026');
+$mbPG99 = mehePayroll($db, [2, 3], '2025-2026', ['base_mode' => 'avg', 'excluded' => [], 'manual_admins' => []]);
+$mbP3 = mehePayroll($db, [3], '2025-2026', ['base_mode' => 'avg', 'excluded' => [], 'manual_admins' => []]);
+check('موازنة الوزارة: مجموعة مدارس (مكسيموس + النجاة) = موازنة مجمّعة — عمود المدرسة بالجداول + عدد الملاك = مجموع المدرستين + مفتاح النطاق "2,3"',
+      strpos($mbG99, '<th>المدرسة</th>') !== false && strpos($mbG99, 'موازنة مجمّعة لـ2 مدارس') !== false && strpos($mbG99, 'FATAL') === false
+      && count($mbPG99['tit']) === count($mbP99['tit']) + count($mbP3['tit']) && !empty($mbPG99['multi']) && empty($mbP99['multi'])
+      && meheScopeKey([3, 2]) === '2,3',
+      'tit=' . count($mbPG99['tit']));
 check('موازنة الوزارة: تصدير إكسل سليم (11 ورقة، صيغ SUM×الأشهر، إعادة حساب عند الفتح) + الرابط بقائمة التقارير',
       strpos($mbX99, 'PK') === 0 && $mbSheets99 === 11 && $mbFormulas99
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'pages/mehe_budget.php') !== false
