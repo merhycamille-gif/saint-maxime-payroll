@@ -4779,12 +4779,12 @@ check('السلسلة 2017 الدرجات 41-52 = الجريدة الرسمية 
 require_once __DIR__ . '/../includes/mehe_budget.php';
 ensureMeheBudget20260906();
 $mb99 = renderPage('pages/mehe_budget.php', [], [], [2], '', '2025-2026');
-check('موازنة الوزارة: الصفحة ترندر لمدرسة واحدة بكل أقسام النموذج (الطلب، معلومات المدرسة، الملاك، المتعاقدون، الإداريون، الهيكل، المعفيون، الصرف، التكاليف، الإيرادات، الملخّص) + نموذج مقفول + ستايلات الطباعة',
+check('موازنة الوزارة: الصفحة ترندر لمدرسة واحدة بكل أقسام النموذج (الطلب، معلومات المدرسة، الملاك، المتعاقدون، الإداريون، الهيكل، المعفيون، الصرف، التكاليف، الإيرادات، الملخّص) + نموذج بأزرار تعديل/حفظ لكل سطر + ستايلات الطباعة',
       strpos($mb99, 'أعضاء هيئة التدريس في الملاك') !== false && strpos($mb99, 'أعضاء هيئة التدريس المتعاقدين') !== false
       && strpos($mb99, 'الموظفون الإداريون') !== false && strpos($mb99, 'الهيكل الإداري والتعليمي') !== false
       && strpos($mb99, 'قائمة الطلاب المعفيين') !== false && strpos($mb99, 'تعويضات الصرف للداخلين في الملاك') !== false
       && strpos($mb99, 'تكاليف التشغيل') !== false && strpos($mb99, 'ملخص الميزانية') !== false
-      && strpos($mb99, 'class="card no-print mehe-form lockedit"') !== false && strpos($mb99, 'landscapePage') !== false
+      && strpos($mb99, 'class="card no-print mehe-form"') !== false && strpos($mb99, 'meheWireRow') !== false && strpos($mb99, 'landscapePage') !== false
       && strpos($mb99, 'name="mehe_save"') !== false && strpos($mb99, 'FATAL') === false);
 // المجاميع من الرواتب = مجاميع monthly_salaries الفعلية (وضع «معدل الأشهر» ⇒ الشهري × الأشهر = مجموع السنة بالضبط)
 $mbData99 = meheLoad($db, 2, '2025-2026'); $mbData99['excluded'] = []; $mbData99['base_mode'] = 'avg'; $mbData99['manual_admins'] = [];

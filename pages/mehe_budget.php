@@ -107,12 +107,25 @@ $empList = $empList->fetchAll();
 .mehe-doc .doc-table th{background:#f2f2f2}
 .mehe-doc .tot td{background:#fff4d6;font-weight:800}
 .mehe-doc .kv td:first-child{font-weight:700;background:#fafafa;width:40%}
-.mehe-doc h4.sec{margin:14px 0 6px;color:#1F4E5F;font-size:14px}
+.mehe-doc h4.sec{margin:14px 0 6px;color:#000;font-size:14px}
+.mehe-doc .doc-head .dh-fr,.mehe-doc .doc-head .dh-ar,.mehe-doc .doc-head,.mehe-doc .mehe-cover .h,.mehe-doc .doc-table th{color:#000 !important}
+.mehe-doc .doc-table th{background:#f2f2f2 !important}
+.mehe-form .rowctl{white-space:nowrap;flex:0 0 auto}
+.mehe-form td.rowctl,.mehe-form th.rowctl{width:1%}
+.mehe-form .rowctl button,.mehe-form .fld .rowctl button{border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:2px 7px;font-size:12px;cursor:pointer;margin-inline-end:3px}
+.mehe-form .rowctl button.sv{background:#16a34a;color:#fff;border-color:#16a34a;display:none}
+.mehe-form .rowctl.editing button.sv{display:inline-block}
+.mehe-form .rowctl.editing button.ed{display:none}
+.mehe-form .fld{display:flex;align-items:flex-end;gap:6px;min-width:0}
+.mehe-form .fld>div{flex:1;min-width:0}
+.mehe-form .fld .rowctl{padding-bottom:3px;flex:0 0 auto;white-space:nowrap;overflow:visible}
+.mehe-form input[readonly],.mehe-form textarea[readonly]{background:#f8fafc;color:#334155}
+.mehe-form select:disabled,.mehe-form input:disabled{background:#f8fafc;color:#334155;opacity:1}
 .mehe-doc .note{color:#c00000;font-size:12px;margin:8px 0}
 .mehe-doc .sig{display:flex;justify-content:space-between;margin-top:14px;font-size:12px}
 .mehe-doc .mehe-cover{max-width:760px;margin:0 auto}
 .mehe-doc .mehe-cover .h{font-weight:800;font-size:15px;margin:6px 0;text-align:center}
-@media print{@page{size:A4 landscape;margin:8mm}.no-print{display:none !important}.mehe-doc .doc-sheet{page-break-after:always;page-break-inside:auto}.mehe-doc .doc-sheet:last-child{page-break-after:auto}.mehe-doc .report-table-wrap{overflow:visible !important}}
+@media print{@page{size:A4 landscape;margin:8mm}.mehe-doc .doc-table th{background:#f2f2f2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.mehe-doc .doc-head .dh-fr,.mehe-doc .doc-head .dh-ar{color:#000 !important}.no-print{display:none !important}.mehe-doc .doc-sheet{page-break-after:always;page-break-inside:auto}.mehe-doc .doc-sheet:last-child{page-break-after:auto}.mehe-doc .report-table-wrap{overflow:visible !important}}
 </style>
 
 <div class="card no-print">
@@ -128,7 +141,7 @@ $empList = $empList->fetchAll();
 </div>
 
 <?php if (canEdit()): ?>
-<form method="POST" class="card no-print mehe-form lockedit" id="meheForm">
+<form method="POST" class="card no-print mehe-form" id="meheForm">
     <?= csrfField() ?>
     <input type="hidden" name="mehe_save" value="1">
     <div class="card-header"><h3><i class="fas fa-pen-to-square"></i> Données du budget / بيانات الموازنة (تُعبّأ مرّة لكل سنة)</h3></div>
@@ -270,17 +283,44 @@ $empList = $empList->fetchAll();
                 </div>
             </div>
         </details>
-        <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
-            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
-        </div>
     </div>
 </form>
 <script>
+/* ✏️💾 «قدام كل سطر تعديل حفظ» (2026-09-06): كل سطر بالنموذج (خانة أو صفّ جدول) مقفول، زرّ «تعديل»
+   يفتح السطر وحده، و«حفظ» يحفظ فوراً (يرسل النموذج كله — القيم غير المعدَّلة تبقى كما هي). */
+(function(){
+    var form=document.getElementById('meheForm'); if(!form) return;
+    function fields(scope){ return scope.querySelectorAll('input:not([type=hidden]):not([type=button]):not([type=submit]),select,textarea'); }
+    function lock(scope,on){ fields(scope).forEach(function(el){ if(el.tagName==='SELECT'||el.type==='radio'||el.type==='checkbox'){ el.disabled=on; } else { el.readOnly=on; } }); }
+    function ctl(){ var sp=document.createElement('span'); sp.className='rowctl';
+        sp.innerHTML='<button type="button" class="ed" title="تعديل / Modifier">✏️ تعديل</button><button type="button" class="sv" title="حفظ / Enregistrer">💾 حفظ</button>'; return sp; }
+    function wire(scope, sp){ lock(scope,true);
+        sp.querySelector('.ed').onclick=function(){ lock(scope,false); sp.classList.add('editing'); var f=fields(scope)[0]; if(f) f.focus(); };
+        sp.querySelector('.sv').onclick=function(){ lock(form,false); form.submit(); }; }
+    // خانات الشبكات: كل خانة سطر
+    form.querySelectorAll('.grid3>div,.grid2>div').forEach(function(d){
+        if(d.querySelector('table.mini')||!fields(d).length) return;
+        var wrap=document.createElement('div'); wrap.className='fld'; wrap.style.cssText=d.getAttribute('style')||''; d.removeAttribute('style'); d.parentNode.insertBefore(wrap,d); wrap.appendChild(d);
+        var sp=ctl(); wrap.insertBefore(sp,d); wire(d,sp);
+    });
+    // صفوف الجداول الصغيرة: خلية أزرار بأول كل صف
+    form.querySelectorAll('table.mini').forEach(function(t){
+        t.querySelectorAll('tr').forEach(function(tr){
+            if(!fields(tr).length){ var th=document.createElement('th'); th.className='rowctl'; tr.insertBefore(th,tr.firstChild); return; }
+            var td=document.createElement('td'); td.className='rowctl'; var sp=ctl(); td.appendChild(sp); tr.insertBefore(td,tr.firstChild); wire(tr,sp);
+        });
+    });
+    // قائمة الاستثناء (خانات تفتيش) كسطر واحد
+    form.querySelectorAll('.grid2>div').forEach(function(d){ /* معالَجة أعلاه */ });
+    window.meheWireRow=function(tr){ var old=tr.querySelector('td.rowctl'); if(old) old.remove(); var td=document.createElement('td'); td.className='rowctl'; var sp=ctl(); td.appendChild(sp); tr.insertBefore(td,tr.firstChild); wire(tr,sp); sp.querySelector('.ed').click(); };
+    form.addEventListener('submit',function(){ lock(form,false); });
+})();
 function meheAddRow(id){
     var t=document.getElementById(id); var rows=t.querySelectorAll('tr'); var last=rows[rows.length-1]; var clone=last.cloneNode(true);
     var n=rows.length-1;
     clone.querySelectorAll('input,select').forEach(function(el){ el.name=el.name.replace(/\[\d+\]/, '['+n+']'); if(el.type==='number'){el.value=el.name.indexOf('[months]')>0?12:0;} else if(el.tagName==='SELECT'){el.selectedIndex=0;} else if(el.name.indexOf('[program]')>0){} else {el.value='';} el.disabled=false; el.readOnly=false; });
     t.appendChild(clone);
+    if(window.meheWireRow) window.meheWireRow(clone);
 }
 </script>
 <?php endif; ?>
