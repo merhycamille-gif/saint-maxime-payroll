@@ -43,6 +43,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit()) {
         $db->prepare("UPDATE employees SET grant_spouse_addition = ? WHERE id = ?")->execute([$v, $empId]);
         $recalcFrom($empId);
         $_SESSION['flash_success'] = 'زيادة الزوج صارت: ' . ($v ? 'نعم ✓' : 'كلا ✗') . ' — انطبقت بملفه وأُعيد الاحتساب / Appliqué et recalculé.';
+    } elseif ($act === 'set_married' && $empOk) {
+        // 💍 «إذا تزوّج نعم/كلا» (2026-09-06): نعم ⇒ متزوج (عدد أولاده القاصرين المسجَّلين)، كلا ⇒ أعزب
+        $v = ((string)($_POST['val'] ?? '') === '1') ? 1 : 0;
+        $cur = (string)$db->query("SELECT social_status FROM employees WHERE id = $empId")->fetchColumn();
+        if ($v) {
+            $nk = (int)$db->query("SELECT COUNT(*) FROM employee_children WHERE employee_id = $empId AND birth_date > DATE_SUB(CURDATE(), INTERVAL 18 YEAR)")->fetchColumn();
+            $nk = min(5, $nk);
+            $new = strpos($cur, 'marie') === 0 ? $cur : ('marie' . ($nk === 0 ? '_sans_enfants' : ($nk === 1 ? '_1_enfant' : '_' . $nk . '_enfants')));
+        } else {
+            $new = 'celibataire';
+        }
+        $db->prepare("UPDATE employees SET social_status = ? WHERE id = ?")->execute([$new, $empId]);
+        $recalcFrom($empId);
+        $_SESSION['flash_success'] = 'الوضع العائلي صار: ' . socialStatusLabel($new, 'ar') . ' — انحفظ بملفه وأُعيد الاحتساب / Enregistré et recalculé.';
+    } elseif ($act === 'set_spouse_works' && $empOk) {
+        // 👔 «الزوج يعمل نعم/كلا» (2026-09-06): نعم ⇒ تسقط زيادة الزوج حكماً
+        $v = ((string)($_POST['val'] ?? '') === '1') ? 1 : 0;
+        $db->prepare("UPDATE employees SET spouse_works = ? WHERE id = ?")->execute([$v, $empId]);
+        $recalcFrom($empId);
+        $_SESSION['flash_success'] = 'الزوج/الزوجة يعمل: ' . ($v ? 'نعم ✓ (تسقط زيادة الزوج)' : 'كلا ✗') . ' — انحفظ بملفه وأُعيد الاحتساب / Enregistré et recalculé.';
     } elseif ($act === 'spouse_start' && $empOk) {
         $d = $_POST['spouse_work_start_date'] ?? '';
         $d = preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) ? $d : null;
@@ -94,150 +114,197 @@ $currentPage = 'tax_suggestions';
 $hideExportToolbar = true;
 include __DIR__ . '/../includes/header.php';
 
-/* ===== ١) قرارات التنزيل لكل أستاذ (متزوج/أرمل أو له أولاد مسجّلون) =====
+/* ===== ١) قرارات التنزيل لكل أستاذ — الجدول المفهوم (طلبه 2026-09-06):
+ * «بدي حط قدام كل أستاذ: إذا تزوّج نعم/كلا → إذا نعم عدد الأولاد المستحقين تنزيل عائلي →
+ *  الزوج يعمل نعم/كلا → وبعدين قدام الأولاد تنزيل عائلي نعم/كلا وقدام الزوج تنزيل عائلي نعم/كلا
+ *  — هيك بيكون التقرير مفهوم أكتر». كل الأعمدة قرارات مباشرة (نعم/كلا) تنحفظ بملفه وتعيد
+ * الاحتساب فوراً، وآخر عمود يعرض التنزيل السنوي الفعلي الناتج (نفس ما تحسبه الرواتب).
  * 📅 «لازم يبينو الاساتذة بالسنة اللي انا فيها مش بكل السنين» (2026-08-23): الفلتر
- * الموحّد yearEmploymentFilter — موظفو السنة الدراسية المعروضة فقط (لهم رواتب فيها،
- * بلا تاركين/قدامى)، كسائر شاشات الاختيار. */
+ * الموحّد yearEmploymentFilter — كل موظفي السنة الدراسية المعروضة (العازب يظهر «كلا»). */
 [$tsYf, $tsYp] = yearEmploymentFilter(activeSchoolYear(), 'e.');
 $empsQ = $db->prepare("SELECT e.id, e.school_id, e.social_status, e.spouse_works, e.spouse_work_start_date,
+        COALESCE(e.apply_family_deduction,1) afd,
         COALESCE(e.grant_children_addition,0) gca, COALESCE(e.grant_spouse_addition,0) gsa,
         COALESCE(NULLIF(TRIM(CONCAT(e.first_name_ar,' ',e.last_name_ar)),''), TRIM(CONCAT(e.first_name_fr,' ',e.last_name_fr))) nm,
         s.name_ar school_name
     FROM employees e JOIN schools s ON s.id = e.school_id
     WHERE e.is_deleted = 0 AND " . schoolScopeWhere('e.school_id') . $tsYf . "
-      AND (e.social_status LIKE 'marie%' OR e.social_status LIKE 'veuf%' OR e.social_status LIKE 'divorce%'
-           OR EXISTS (SELECT 1 FROM employee_children c WHERE c.employee_id = e.id))
-    ORDER BY s.id, nm");
+    ORDER BY s.id, (e.social_status LIKE 'marie%' OR e.social_status LIKE 'veuf%' OR e.social_status LIKE 'divorce%') DESC, nm");
 $empsQ->execute($tsYp);
 $emps = $empsQ->fetchAll();
 $kidsByEmp = [];
 foreach ($db->query("SELECT * FROM employee_children ORDER BY birth_date") as $k) $kidsByEmp[(int)$k['employee_id']][] = $k;
 $today = date('Y-m-d');
 $multiS = (count(activeSchoolIds()) !== 1);
+$canE = canEdit();
+/* زوج أزرار نعم/كلا (راديو يحفظ فوراً) */
+$yesNo = function (string $act, int $empId, bool $on) use ($canE): string {
+    if (!$canE) return '<div style="font-weight:800;color:' . ($on ? '#166534' : '#991b1b') . '">' . ($on ? 'نعم ✓' : 'كلا ✗') . '</div>';
+    $h  = '<form method="POST" style="display:inline-flex;gap:4px">' . csrfField() . '<input type="hidden" name="act" value="' . e($act) . '"><input type="hidden" name="emp" value="' . $empId . '">';
+    $h .= '<label style="display:inline-flex;align-items:center;gap:5px;background:' . ($on ? '#dcfce7' : '#f8fafc') . ';border:2px solid ' . ($on ? '#16a34a' : '#e2e8f0') . ';border-radius:8px;padding:2px 8px;font-weight:800;color:#166534;cursor:pointer">'
+        . '<input type="radio" name="val" value="1"' . ($on ? ' checked' : '') . ' onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#16a34a"> نعم</label>';
+    $h .= '<label style="display:inline-flex;align-items:center;gap:5px;background:' . ($on ? '#f8fafc' : '#fee2e2') . ';border:2px solid ' . ($on ? '#e2e8f0' : '#dc2626') . ';border-radius:8px;padding:2px 8px;font-weight:800;color:#991b1b;cursor:pointer">'
+        . '<input type="radio" name="val" value="0"' . ($on ? '' : ' checked') . ' onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#dc2626"> كلا</label>';
+    return $h . '</form>';
+};
+$dash = '<span style="color:#94a3b8">—</span>';
 ?>
 <div class="card">
     <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-sliders"></i> Décisions d'abattement par enseignant/employé</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">قرارات التنزيل العائلي — قدام كل أستاذ: تنزيل الأولاد نعم/كلا وزيادة الزوج نعم/كلا، مع «ابتداءً من — إلى» تلقائياً</div>
+        <span dir="ltr"><i class="fas fa-sliders"></i> Décisions d'abattement familial par enseignant/employé</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">قرارات التنزيل العائلي — قدام كل أستاذ: متزوج؟ → عدد الأولاد المستحقين → الزوج يعمل؟ → تنزيل الأولاد نعم/كلا → تنزيل الزوج نعم/كلا → التنزيل السنوي الناتج</div>
     </h3></div>
     <div class="card-body">
         <p class="text-muted" style="margin-bottom:12px"><i class="fas fa-wand-magic-sparkles"></i>
-            <strong>تلقائي بالكامل:</strong> كل ولد مسجَّل بتاريخ ولادته — تنزيله يسقط من البرنامج <strong>من شهر بلوغه الـ18</strong> حتى لو المفتاح مضوّى.
-            وزيادة الزوج تسقط تلقائياً <strong>من «تاريخ بدء عمل الزوج»</strong> إن حدّدته. أي تبديل هون يعيد احتساب رواتب الموظف فوراً.
+            أي تبديل هون ينحفظ بملف الموظف ويعيد احتساب رواتبه فوراً.
+            <strong>الأولاد المستحقون</strong> = من لم يبلغ 18 (كل ولد بتاريخ ولادته — تنزيله يسقط تلقائياً من شهر بلوغه الـ18).
+            <strong>الزوج يعمل = نعم</strong> ⇒ تنزيل الزوج يسقط حكماً (ومن «تاريخ بدء عمله» إن حدّدته).
         </p>
-        <div class="report-table-wrap" dir="rtl"><table class="table" dir="rtl" style="font-size:13px">
+        <style>.ts-dec td,.ts-dec th{padding:7px 8px !important}</style>
+        <div class="report-table-wrap" dir="rtl"><table class="table ts-dec" dir="rtl" style="font-size:12px">
             <thead><tr>
                 <th>الموظف</th>
                 <?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
-                <th>الوضع العائلي</th>
-                <th>الأولاد (كلٌّ بتاريخه — التنزيل حتى بلوغه 18)</th>
+                <th>متزوج؟</th>
+                <th>الأولاد المستحقون تنزيلاً<br><small>(دون 18)</small></th>
+                <th>الزوج/الزوجة<br>يعمل؟</th>
                 <th>تنزيل الأولاد</th>
-                <th>زيادة الزوج/الزوجة</th>
+                <th>تنزيل<br>الزوج/الزوجة</th>
+                <th>التنزيل السنوي<br>الناتج</th>
             </tr></thead>
             <tbody>
             <?php foreach ($emps as $e2):
-                $kids = $kidsByEmp[(int)$e2['id']] ?? [];
-                $activeKids = 0;
-                foreach ($kids as $k) { if (date('Y-m-d', strtotime($k['birth_date'] . ' +18 years')) > $today) $activeKids++; }
-                $isVeuf = (strpos((string)$e2['social_status'], 'veuf') === 0 || strpos((string)$e2['social_status'], 'divorce') === 0);
+                $id2 = (int)$e2['id'];
+                $ss = (string)$e2['social_status'];
+                $isMarried = strpos($ss, 'marie') === 0;
+                $isVeuf = (strpos($ss, 'veuf') === 0 || strpos($ss, 'divorce') === 0);
+                $hasSpouseCat = $isMarried || $isVeuf; // فئة فيها أولاد محتملون
+                $kids = $kidsByEmp[$id2] ?? [];
+                $activeKids = 0; $lastB18 = null;
+                foreach ($kids as $k) {
+                    $b18k = date('Y-m-d', strtotime($k['birth_date'] . ' +18 years'));
+                    if ($b18k > $today) { $activeKids++; if ($lastB18 === null || $b18k > $lastB18) $lastB18 = $b18k; }
+                }
+                // بلا أولاد مؤرَّخين: العدد الثابت من وضعه العائلي
+                $fixedKids = 0;
+                if (!$kids && $hasSpouseCat && preg_match('/_(\d)_enfant/', $ss, $mk)) $fixedKids = (int)$mk[1];
+                $eligibleKids = $kids ? $activeKids : $fixedKids;
                 $sws = ($e2['spouse_work_start_date'] && $e2['spouse_work_start_date'] !== '0000-00-00') ? $e2['spouse_work_start_date'] : null;
+                $spouseWorks = ((int)$e2['spouse_works'] === 1) || ($sws !== null && $today >= $sws);
+                $dedAnnual = (int)familyDeductionAnnual($ss, $e2['spouse_works'], $e2['afd'], $today, $e2['gsa'], $e2['gca'], $id2);
             ?>
-                <tr>
+                <tr<?= $hasSpouseCat ? '' : ' style="background:#fafafa"' ?>>
                     <td style="font-weight:700;white-space:nowrap"><?= e($e2['nm']) ?></td>
                     <?php if ($multiS): ?><td><small><?= e($e2['school_name']) ?></small></td><?php endif; ?>
-                    <td style="white-space:nowrap"><?= e(socialStatusLabel($e2['social_status'], 'ar')) ?></td>
-                    <td style="text-align:right;min-width:260px">
-                        <?php if ($kids): foreach ($kids as $k):
-                            $b18 = date('Y-m-d', strtotime($k['birth_date'] . ' +18 years'));
-                            $stillMinor = $b18 > $today; ?>
-                            <div style="display:flex;justify-content:space-between;gap:6px;align-items:center;<?= $stillMinor ? '' : 'color:#94a3b8' ?>">
-                                <span><?= $stillMinor ? '🟢' : '⚪' ?> <strong><?= e($k['child_name'] ?: 'ولد') ?></strong>
-                                    — <small>تنزيله <strong>من <?= e(formatDate($k['birth_date'])) ?></strong> (ولادته) <strong>إلى <?= e(formatDate($b18)) ?></strong> (بلوغه 18)<?= $stillMinor ? '' : ' — <strong>انتهى</strong>' ?></small></span>
-                                <?php if (canEdit()): ?>
-                                <form method="POST" style="display:inline"><?= csrfField() ?>
-                                    <input type="hidden" name="act" value="del_child"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>"><input type="hidden" name="child_id" value="<?= (int)$k['id'] ?>">
-                                    <button class="btn btn-danger" style="padding:1px 7px" title="حذف الولد" onclick="return confirm('يُحذف الولد ويُعاد الاحتساب — أكيد؟')">✕</button>
-                                </form>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; else: ?>
-                            <small style="color:#94a3b8">لا أولاد مسجّلين بتواريخ — <?= strpos((string)$e2['social_status'], '_enfant') !== false && strpos((string)$e2['social_status'], 'sans') === false ? 'يُحتسب العدد الثابت من وضعه العائلي' : '—' ?></small>
-                        <?php endif; ?>
-                        <?php if (canEdit()): ?>
-                        <form method="POST" style="display:flex;gap:4px;margin-top:5px"><?= csrfField() ?>
-                            <input type="hidden" name="act" value="add_child"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>">
-                            <input type="text" name="child_name" class="form-control" placeholder="اسم الولد" style="max-width:130px;padding:3px 8px">
-                            <input type="date" name="child_birth" class="form-control" required style="max-width:150px;padding:3px 8px">
-                            <button class="btn btn-primary" style="padding:3px 10px">+ ولد</button>
-                        </form>
-                        <?php endif; ?>
-                    </td>
-                    <td style="white-space:nowrap;text-align:center;min-width:170px">
-                        <?php
-                        // «من تاريخ إلى تاريخ» للأولاد ككل: حتى بلوغ آخر قاصر الـ18
-                        $lastB18 = null;
-                        foreach ($kids as $k) {
-                            $b18k = date('Y-m-d', strtotime($k['birth_date'] . ' +18 years'));
-                            if ($b18k > $today && ($lastB18 === null || $b18k > $lastB18)) $lastB18 = $b18k;
-                        }
-                        ?>
-                        <?php if (canEdit()): ?>
-                        <form method="POST"><?= csrfField() ?>
-                            <input type="hidden" name="act" value="set_gca"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>">
-                            <label style="display:inline-flex;align-items:center;gap:5px;background:<?= $e2['gca'] ? '#dcfce7' : '#f8fafc' ?>;border:2px solid <?= $e2['gca'] ? '#16a34a' : '#e2e8f0' ?>;border-radius:8px;padding:4px 12px;font-weight:800;color:#166534;cursor:pointer">
-                                <input type="radio" name="val" value="1" <?= $e2['gca'] ? 'checked' : '' ?> onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#16a34a"> نعم
-                            </label>
-                            <label style="display:inline-flex;align-items:center;gap:5px;background:<?= $e2['gca'] ? '#f8fafc' : '#fee2e2' ?>;border:2px solid <?= $e2['gca'] ? '#e2e8f0' : '#dc2626' ?>;border-radius:8px;padding:4px 12px;font-weight:800;color:#991b1b;cursor:pointer">
-                                <input type="radio" name="val" value="0" <?= $e2['gca'] ? '' : 'checked' ?> onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#dc2626"> كلا
-                            </label>
-                        </form>
-                        <?php else: ?>
-                            <div style="font-weight:800;color:<?= $e2['gca'] ? '#166534' : '#991b1b' ?>"><?= $e2['gca'] ? 'نعم ✓' : 'كلا ✗' ?></div>
-                        <?php endif; ?>
-                        <div><small><?php
-                            if ($e2['gca']) {
-                                if ($kids) {
-                                    echo $activeKids
-                                        ? 'سارٍ <strong>من اليوم إلى ' . e(formatDate($lastB18)) . '</strong> (بلوغ آخر ولد 18 — بعدها كلا تلقائياً)'
-                                        : 'لا أولاد دون 18 ⇒ <strong>صفر تلقائياً</strong>';
-                                } else echo 'حسب وضعه العائلي (بلا تواريخ)';
-                            } else echo 'كلا — ما بينزل';
-                        ?></small></div>
-                    </td>
+
                     <td style="white-space:nowrap;text-align:center">
                         <?php if ($isVeuf): ?>
-                            <small style="color:#94a3b8">— (أرمل/مطلق: لا زيادة زوج)</small>
+                            <div style="font-weight:800;color:#475569"><?= strpos($ss, 'veuf') === 0 ? 'أرمل/ة' : 'مطلّق/ة' ?></div>
+                            <small style="color:#94a3b8">(لا زوج — تُحتسب حصة الأولاد فقط)</small>
                         <?php else: ?>
-                            <?php if (canEdit()): ?>
-                            <form method="POST"><?= csrfField() ?>
-                                <input type="hidden" name="act" value="set_gsa"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>">
-                                <label style="display:inline-flex;align-items:center;gap:5px;background:<?= $e2['gsa'] ? '#dcfce7' : '#f8fafc' ?>;border:2px solid <?= $e2['gsa'] ? '#16a34a' : '#e2e8f0' ?>;border-radius:8px;padding:4px 12px;font-weight:800;color:#166534;cursor:pointer">
-                                    <input type="radio" name="val" value="1" <?= $e2['gsa'] ? 'checked' : '' ?> onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#16a34a"> نعم
-                                </label>
-                                <label style="display:inline-flex;align-items:center;gap:5px;background:<?= $e2['gsa'] ? '#f8fafc' : '#fee2e2' ?>;border:2px solid <?= $e2['gsa'] ? '#e2e8f0' : '#dc2626' ?>;border-radius:8px;padding:4px 12px;font-weight:800;color:#991b1b;cursor:pointer">
-                                    <input type="radio" name="val" value="0" <?= $e2['gsa'] ? '' : 'checked' ?> onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#dc2626"> كلا
-                                </label>
+                            <?= $yesNo('set_married', $id2, $isMarried) ?>
+                        <?php endif; ?>
+                    </td>
+
+                    <td style="text-align:right;min-width:200px">
+                        <?php if (!$hasSpouseCat): ?>
+                            <?= $dash ?>
+                        <?php else: ?>
+                            <div style="font-weight:800;font-size:1.05em;color:<?= $eligibleKids ? '#166534' : '#64748b' ?>">
+                                <?= $eligibleKids ?> <?= $eligibleKids === 1 ? 'ولد مستحقّ' : 'أولاد مستحقّون' ?>
+                                <?php if (!$kids && $fixedKids): ?><small style="font-weight:600;color:#94a3b8">(من وضعه العائلي — بلا تواريخ)</small><?php endif; ?>
+                            </div>
+                            <details style="margin-top:3px"><summary style="cursor:pointer;color:#1F4E5F;font-weight:700"><small><?= $kids ? 'الأولاد بالتواريخ (' . count($kids) . ') ▾' : '+ سجّل الأولاد بتواريخهم ▾' ?></small></summary>
+                            <div style="padding:4px 0 2px">
+                            <?php foreach ($kids as $k):
+                                $b18 = date('Y-m-d', strtotime($k['birth_date'] . ' +18 years'));
+                                $stillMinor = $b18 > $today; ?>
+                                <div style="display:flex;justify-content:space-between;gap:6px;align-items:center;<?= $stillMinor ? '' : 'color:#94a3b8' ?>">
+                                    <span><?= $stillMinor ? '🟢' : '⚪' ?> <strong><?= e($k['child_name'] ?: 'ولد') ?></strong>
+                                        <small><?= e(formatDate($k['birth_date'])) ?> → 18: <strong><?= e(formatDate($b18)) ?></strong><?= $stillMinor ? '' : ' (انتهى)' ?></small></span>
+                                    <?php if ($canE): ?>
+                                    <form method="POST" style="display:inline"><?= csrfField() ?>
+                                        <input type="hidden" name="act" value="del_child"><input type="hidden" name="emp" value="<?= $id2 ?>"><input type="hidden" name="child_id" value="<?= (int)$k['id'] ?>">
+                                        <button class="btn btn-danger" style="padding:1px 7px" title="حذف الولد" onclick="return confirm('يُحذف الولد ويُعاد الاحتساب — أكيد؟')">✕</button>
+                                    </form>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                            <?php if ($canE): ?>
+                            <form method="POST" style="display:flex;gap:4px;margin-top:5px"><?= csrfField() ?>
+                                <input type="hidden" name="act" value="add_child"><input type="hidden" name="emp" value="<?= $id2 ?>">
+                                <input type="text" name="child_name" class="form-control" placeholder="اسم الولد" style="max-width:95px;padding:2px 6px;font-size:12px">
+                                <input type="date" name="child_birth" class="form-control" required style="max-width:125px;padding:2px 6px;font-size:12px">
+                                <button class="btn btn-primary" style="padding:2px 8px">+ ولد</button>
                             </form>
-                            <?php else: ?>
-                                <div style="font-weight:800;color:<?= $e2['gsa'] ? '#166534' : '#991b1b' ?>"><?= $e2['gsa'] ? 'نعم ✓' : 'كلا ✗' ?></div>
                             <?php endif; ?>
+                            </div></details>
+                        <?php endif; ?>
+                    </td>
+
+                    <td style="white-space:nowrap;text-align:center">
+                        <?php if (!$isMarried): ?>
+                            <?= $dash ?>
+                        <?php else: ?>
+                            <?= $yesNo('set_spouse_works', $id2, (int)$e2['spouse_works'] === 1) ?>
                             <div><small><?php
-                                if ($e2['gsa'] && (int)$e2['spouse_works'] === 1) echo '«الزوج يعمل» ✓ يُسقطها حكماً';
-                                elseif ($e2['gsa']) echo $sws ? 'سارية <strong>من اليوم إلى ' . e(formatDate($sws)) . '</strong> (بدء عمل الزوج — تنشال تلقائياً)' : 'سارية بلا نهاية — حدّد تاريخ بدء عمل الزوج لتنشال تلقائياً';
-                                else echo 'كلا — ما بتنزل';
+                                if ($sws) echo 'يعمل من <strong>' . e(formatDate($sws)) . '</strong>' . ($today >= $sws ? '' : ' (لاحقاً)');
                             ?></small></div>
-                            <?php if (canEdit()): ?>
+                            <?php if ($canE): ?>
+                            <details style="margin-top:3px"><summary style="cursor:pointer;color:#1F4E5F;font-weight:700"><small>تاريخ بدء عمله ▾</small></summary>
                             <form method="POST" style="display:flex;gap:4px;margin-top:4px;justify-content:center"><?= csrfField() ?>
-                                <input type="hidden" name="act" value="spouse_start"><input type="hidden" name="emp" value="<?= (int)$e2['id'] ?>">
-                                <input type="date" name="spouse_work_start_date" class="form-control" style="max-width:150px;padding:3px 8px" value="<?= e($sws ?? '') ?>" title="تاريخ بدء عمل الزوج">
-                                <button class="btn btn-primary" style="padding:3px 10px" title="حفظ تاريخ بدء عمل الزوج">📅</button>
-                            </form>
+                                <input type="hidden" name="act" value="spouse_start"><input type="hidden" name="emp" value="<?= $id2 ?>">
+                                <input type="date" name="spouse_work_start_date" class="form-control" style="max-width:125px;padding:2px 6px;font-size:12px" value="<?= e($sws ?? '') ?>" title="تاريخ بدء عمل الزوج">
+                                <button class="btn btn-primary" style="padding:2px 8px" title="حفظ تاريخ بدء عمل الزوج">📅</button>
+                            </form></details>
                             <?php endif; ?>
                         <?php endif; ?>
+                    </td>
+
+                    <td style="white-space:nowrap;text-align:center">
+                        <?php if (!$hasSpouseCat): ?>
+                            <?= $dash ?>
+                        <?php else: ?>
+                            <?= $yesNo('set_gca', $id2, (bool)$e2['gca']) ?>
+                            <div><small><?php
+                                if ($e2['gca']) {
+                                    if (!$eligibleKids) echo 'لا أولاد دون 18 ⇒ <strong>صفر تلقائياً</strong>';
+                                    elseif ($kids) echo 'سارٍ <strong>إلى ' . e(formatDate($lastB18)) . '</strong> (بلوغ آخر ولد 18)';
+                                    else echo 'حسب وضعه العائلي';
+                                } else echo 'كلا — ما بينزل';
+                            ?></small></div>
+                        <?php endif; ?>
+                    </td>
+
+                    <td style="white-space:nowrap;text-align:center">
+                        <?php if (!$isMarried): ?>
+                            <?= $dash ?>
+                        <?php else: ?>
+                            <?= $yesNo('set_gsa', $id2, (bool)$e2['gsa']) ?>
+                            <div><small><?php
+                                if ($e2['gsa'] && $spouseWorks) echo '«الزوج يعمل» ⇒ <strong>تسقط حكماً</strong>';
+                                elseif ($e2['gsa']) echo $sws ? 'سارية <strong>إلى ' . e(formatDate($sws)) . '</strong> (بدء عمل الزوج)' : 'سارية';
+                                else echo 'كلا — ما بتنزل';
+                            ?></small></div>
+                        <?php endif; ?>
+                    </td>
+
+                    <td style="white-space:nowrap;text-align:center;font-weight:800;color:<?= $dedAnnual > 0 ? '#1F4E5F' : '#94a3b8' ?>">
+                        <?= money($dedAnnual, null, ['mode' => 'lbp', 'withCur' => false]) ?>
+                        <div><small style="font-weight:600;color:#64748b"><?php
+                            if ((int)$e2['afd'] !== 1) echo 'التنزيل العائلي مطفأ بملفه';
+                            elseif (!$hasSpouseCat) echo 'تنزيل العازب (الشخصي)';
+                            else {
+                                $parts = ['الشخصي'];
+                                if ($isMarried && $e2['gsa'] && !$spouseWorks) $parts[] = 'الزوج';
+                                if ($e2['gca'] && $eligibleKids) $parts[] = 'الأولاد';
+                                echo implode(' + ', $parts);
+                            }
+                        ?></small></div>
                     </td>
                 </tr>
             <?php endforeach; ?>
-            <?php if (!$emps): ?><tr><td colspan="6" class="text-center">لا متزوجين/أرامل بالمدرسة المختارة / Aucun</td></tr><?php endif; ?>
+            <?php if (!$emps): ?><tr><td colspan="8" class="text-center">لا موظفين بالنطاق المختار / Aucun</td></tr><?php endif; ?>
             </tbody>
         </table></div>
     </div>
