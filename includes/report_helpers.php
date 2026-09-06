@@ -673,6 +673,7 @@ CSS;
 
 /* =====================================================================
  * 📊 تقرير المجاميع السنوية — بنود قابلة للاختيار (طلبه 2026-09-06):
+ * ترتيب الأعمدة = ترتيب هذه المصفوفة — «الأجر الإضافي قبل الراتب المركّب» (p1): المركّب بعد مكوّناته.
  * «بدي مجاميع لكل بند + أقدر حط اللي بدي ياه بالتقرير من رواتب وإضافات وضمان وتعويضات
  *  ونقل + أختار مدرسة لحالها أو مع بعض + أختار السنة لأنه تقرير سنوي».
  * مصدر واحد للشاشة (reports.php) والتصدير (reports_export.php):
@@ -686,10 +687,10 @@ function annualTotalItems(): array {
     return [
         'base_sal'   => ['g' => 'salaires',  'ar' => 'أساس الراتب',                    'fr' => 'Salaire de base',        'lbp' => 'SUM(ms.base_salary_lbp)',                  'usd' => $u('ms.base_salary_lbp')],
         'bpe'        => ['g' => 'salaires',  'ar' => 'الراتب بعد التدرّج',              'fr' => 'Base + échelons',        'lbp' => 'SUM(ms.base_plus_echelon_lbp)',            'usd' => $u('ms.base_plus_echelon_lbp')],
-        'composed'   => ['g' => 'salaires',  'ar' => 'الراتب المركّب',                 'fr' => 'Salaire composé',        'calc' => true],
         'extra_wage' => ['g' => 'additions', 'ar' => 'الأجر الإضافي',                  'fr' => 'Supplément',             'lbp' => 'SUM(ms.extra_lbp + ms.prime_fixe_lbp)',    'usd' => 'SUM(' . extraWageUsdSql('ms.') . ')'],
         'aide'       => ['g' => 'additions', 'ar' => 'مكافأة ومساعدة',                 'fr' => 'Prime & aide',           'lbp' => 'SUM(ms.aide_complementaire_lbp)',          'usd' => $u('ms.aide_complementaire_lbp')],
         'transport'  => ['g' => 'transport', 'ar' => 'تعويض النقل',                    'fr' => 'Transport',              'lbp' => 'SUM(ms.transport_lbp)',                    'usd' => $u('ms.transport_lbp')],
+        'composed'   => ['g' => 'salaires',  'ar' => 'الراتب المركّب',                 'fr' => 'Salaire composé',        'calc' => true],
         'fam'        => ['g' => 'indemn',    'ar' => 'التعويضات العائلية',             'fr' => 'Allocations familiales', 'lbp' => 'SUM(ms.family_allowance_lbp)',             'usd' => $u('ms.family_allowance_lbp')],
         'cnss'       => ['g' => 'cnss',      'ar' => 'الضمان — الأجير ٣٪',             'fr' => 'CNSS salarié 3%',        'lbp' => 'SUM(ms.cnss_amount_lbp)',                  'usd' => $u('ms.cnss_amount_lbp')],
         'scnss'      => ['g' => 'cnss',      'ar' => 'الضمان — المدرسة ٨٪',            'fr' => 'CNSS école 8%',          'lbp' => 'SUM(ms.school_cnss_8_lbp)',                'usd' => $u('ms.school_cnss_8_lbp')],
