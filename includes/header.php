@@ -256,6 +256,12 @@ document.addEventListener('submit', function (e) {
                 <span>Rapports / التقارير</span>
             </a>
             <?php endif; ?>
+            <?php if (viewerCanSeePage('mehe_budget.php')): ?>
+            <a href="<?= BASE_URL ?>pages/mehe_budget.php" class="<?= $currentPage === 'mehe_budget' ? 'active' : '' ?>">
+                <i class="fas fa-landmark"></i>
+                <span>Budget MEHE / موازنة وزارة التربية</span>
+            </a>
+            <?php endif; ?>
 
             <?php if (canEdit()): ?>
             <a href="<?= BASE_URL ?>pages/tax_declarations.php" class="<?= $currentPage === 'tax' ? 'active' : '' ?>">

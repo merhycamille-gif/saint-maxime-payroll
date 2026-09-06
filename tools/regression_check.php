@@ -4771,6 +4771,60 @@ check('السلسلة 2017 الدرجات 41-52 = الجريدة الرسمية 
       && strpos((string)getSetting('heal_scale47_20260903', ''), 'done') === 0,
       json_encode($sc98) . ' | ' . getSetting('heal_scale47_20260903', ''));
 
+/* =====================================================================
+ * 99) 🏛️ موازنة وزارة التربية (MEHE) — «خلّي البرنامج يطلّع هالموازنة لحاله من داتا كل مدرسة
+ *     متل نماذج ر5 ور6، إكسل وPDF وبدون أي خطأ» (2026-09-06): صفحة mehe_budget لمدرسة وسنة —
+ *     جداول الملاك/المتعاقدين/الإداريين من الرواتب + ملخّص أ/ب/ج/د + إكسل متعدّد الأوراق بصيغ.
+ * =================================================================== */
+require_once __DIR__ . '/../includes/mehe_budget.php';
+ensureMeheBudget20260906();
+$mb99 = renderPage('pages/mehe_budget.php', [], [], [2], '', '2025-2026');
+check('موازنة الوزارة: الصفحة ترندر لمدرسة واحدة بكل أقسام النموذج (الطلب، معلومات المدرسة، الملاك، المتعاقدون، الإداريون، الهيكل، المعفيون، الصرف، التكاليف، الإيرادات، الملخّص) + نموذج مقفول + ستايلات الطباعة',
+      strpos($mb99, 'أعضاء هيئة التدريس في الملاك') !== false && strpos($mb99, 'أعضاء هيئة التدريس المتعاقدين') !== false
+      && strpos($mb99, 'الموظفون الإداريون') !== false && strpos($mb99, 'الهيكل الإداري والتعليمي') !== false
+      && strpos($mb99, 'قائمة الطلاب المعفيين') !== false && strpos($mb99, 'تعويضات الصرف للداخلين في الملاك') !== false
+      && strpos($mb99, 'تكاليف التشغيل') !== false && strpos($mb99, 'ملخص الميزانية') !== false
+      && strpos($mb99, 'class="card no-print mehe-form lockedit"') !== false && strpos($mb99, 'landscapePage') !== false
+      && strpos($mb99, 'name="mehe_save"') !== false && strpos($mb99, 'FATAL') === false);
+// المجاميع من الرواتب = مجاميع monthly_salaries الفعلية (وضع «معدل الأشهر» ⇒ الشهري × الأشهر = مجموع السنة بالضبط)
+$mbData99 = meheLoad($db, 2, '2025-2026'); $mbData99['excluded'] = []; $mbData99['base_mode'] = 'avg'; $mbData99['manual_admins'] = [];
+$mbP99 = mehePayroll($db, 2, '2025-2026', $mbData99);
+$q99 = $db->query("SELECT e.employee_type t, SUM(ms.base_plus_echelon_lbp) bpe, SUM(ms.extra_lbp+ms.prime_fixe_lbp) ex, SUM(ms.transport_lbp) tr, SUM(ms.school_cnss_8_lbp) c8, SUM(ms.school_eoc_6_lbp) e6
+    FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.school_id=2 AND e.is_deleted=0 AND ms.school_year='2025-2026'
+      AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) GROUP BY e.employee_type")->fetchAll(PDO::FETCH_ASSOC);
+$sums99 = []; foreach ($q99 as $r99) $sums99[$r99['t']] = $r99;
+$eq99 = fn($a, $b) => abs((float)$a - (float)$b) < 1;
+check('موازنة الوزارة: مجاميع الملاك/المتعاقدين/الإداريين (الأساس، الإضافي، النقل، ضمان 8٪، صندوق 6٪) = مجاميع الرواتب الفعلية بالمليم',
+      $eq99($mbP99['tit_tot']['base'], $sums99['enseignant_titulaire']['bpe'] ?? -1) && $eq99($mbP99['tit_tot']['extra_ll'], $sums99['enseignant_titulaire']['ex'] ?? -1)
+      && $eq99($mbP99['tit_tot']['transport'], $sums99['enseignant_titulaire']['tr'] ?? -1) && $eq99($mbP99['tit_tot']['cnss'], $sums99['enseignant_titulaire']['c8'] ?? -1)
+      && $eq99($mbP99['tit_tot']['fund'], $sums99['enseignant_titulaire']['e6'] ?? -1)
+      && $eq99($mbP99['con_tot']['base'], $sums99['enseignant_contractuel']['bpe'] ?? -1) && $eq99($mbP99['con_tot']['cnss'], $sums99['enseignant_contractuel']['c8'] ?? -1)
+      && $eq99($mbP99['adm_tot']['base'], $sums99['employe']['bpe'] ?? -1) && count($mbP99['tit']) === 20 && count($mbP99['con']) === 8,
+      'tit=' . count($mbP99['tit']) . ' con=' . count($mbP99['con']) . ' adm=' . count($mbP99['adm']) . ' base=' . number_format((float)$mbP99['tit_tot']['base']));
+// الملخّص: أ+ب = مجموع بنود الفئتين، والإجمالي = أ+ب+ج+د، ومساهمة الصندوق مقرَّبة للألف صعوداً كالوزارة
+$mbS99 = meheSummary($mbData99, $mbP99);
+$sumA99 = array_sum(array_map(fn($r) => $r[1], $mbS99['A'])); $sumB99 = array_sum(array_map(fn($r) => $r[1], $mbS99['B']));
+$sumC99 = array_sum(array_map(fn($r) => $r[1], $mbS99['C'])); $sumD99 = array_sum(array_map(fn($r) => $r[1], $mbS99['D']));
+check('موازنة الوزارة: الملخّص — أ+ب وأ+ب+ج والإجمالي متّسقة + صندوق التعويضات بالملخّص = ROUNDUP للألف + الملاك رواتب = مجموع الأساس',
+      $eq99($mbS99['abL'], $sumA99 + $sumB99) && $eq99($mbS99['abcL'], $sumA99 + $sumB99 + $sumC99) && $eq99($mbS99['allL'], $sumA99 + $sumB99 + $sumC99 + $sumD99)
+      && $eq99($mbS99['A'][0][1], $mbP99['tit_tot']['base']) && $eq99($mbS99['B'][3][1], ceil($mbP99['tit_tot']['fund'] / 1000) * 1000)
+      && $eq99($mbS99['B'][0][1], $mbP99['tit_tot']['transport'] + $mbP99['con_tot']['transport'] + $mbP99['adm_tot']['transport']));
+// الإكسل: ملف سليم (PK) متعدّد الأوراق (11 ورقة) بصيغ حيّة + الرابط بالقائمة
+// (عبر ملف: shell_exec على ويندوز يحوّل سطر الإرجاع فيخرّب الـzip — الكتابة بملف تحفظ البايتات)
+$mbX99 = renderPage('pages/mehe_budget.php', ['export' => 'xlsx'], [], [2], '', '2025-2026', tempnam(sys_get_temp_dir(), 'mehe'));
+$mbXl99 = tempnam(sys_get_temp_dir(), 'mehe'); file_put_contents($mbXl99, $mbX99);
+$mbZ99 = new ZipArchive(); $mbSheets99 = 0; $mbFormulas99 = false;
+if ($mbZ99->open($mbXl99) === true) {
+    for ($zi = 0; $zi < $mbZ99->numFiles; $zi++) { $zn = $mbZ99->getNameIndex($zi); if (strpos($zn, 'xl/worksheets/sheet') === 0) $mbSheets99++; }
+    $mbFormulas99 = strpos((string)$mbZ99->getFromName('xl/worksheets/sheet3.xml'), '<f>SUM(') !== false && strpos((string)$mbZ99->getFromName('xl/workbook.xml'), 'fullCalcOnLoad') !== false;
+    $mbZ99->close();
+}
+@unlink($mbXl99);
+check('موازنة الوزارة: تصدير إكسل سليم (11 ورقة، صيغ SUM×الأشهر، إعادة حساب عند الفتح) + الرابط بقائمة التقارير',
+      strpos($mbX99, 'PK') === 0 && $mbSheets99 === 11 && $mbFormulas99
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'pages/mehe_budget.php') !== false,
+      "sheets=$mbSheets99");
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
