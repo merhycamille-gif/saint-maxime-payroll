@@ -4787,7 +4787,7 @@ check('موازنة الوزارة: الصفحة ترندر لمدرسة واح�
       && strpos($mb99, 'class="card no-print mehe-form"') !== false && strpos($mb99, 'meheWireRow') !== false && strpos($mb99, 'landscapePage') !== false
       && strpos($mb99, 'name="mehe_save"') !== false && strpos($mb99, 'FATAL') === false);
 // المجاميع من الرواتب = مجاميع monthly_salaries الفعلية (وضع «معدل الأشهر» ⇒ الشهري × الأشهر = مجموع السنة بالضبط)
-$mbData99 = meheLoad($db, [2], '2025-2026'); $mbData99['excluded'] = []; $mbData99['base_mode'] = 'avg'; $mbData99['manual_admins'] = [];
+$mbData99 = meheLoad($db, [2], '2025-2026'); $mbData99['excluded'] = []; $mbData99['base_mode'] = 'avg'; $mbData99['manual_admins'] = []; $mbData99['overrides'] = ['emp' => [], 'months' => [], 'sum' => []];
 $mbP99 = mehePayroll($db, [2], '2025-2026', $mbData99);
 $q99 = $db->query("SELECT e.employee_type t, SUM(ms.base_plus_echelon_lbp) bpe, SUM(ms.extra_lbp+ms.prime_fixe_lbp) ex, SUM(ms.transport_lbp) tr, SUM(ms.school_cnss_8_lbp) c8, SUM(ms.school_eoc_6_lbp) e6
     FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.school_id=2 AND e.is_deleted=0 AND ms.school_year='2025-2026'
@@ -4829,6 +4829,39 @@ check('موازنة الوزارة: مجموعة مدارس (مكسيموس + ا
       && count($mbPG99['tit']) === count($mbP99['tit']) + count($mbP3['tit']) && !empty($mbPG99['multi']) && empty($mbP99['multi'])
       && meheScopeKey([3, 2]) === '2,3',
       'tit=' . count($mbPG99['tit']));
+// ✏️💾 «بدي قدام كل سطر من صفحات الموازنة الخيار تعديل وحفظ» (2026-09-07): كل سطر بأوراق الموازنة قدّامه تعديل/حفظ
+//   (موظفون emp، أشهر الأعمدة months، ملخّص sum، خانات field، نفقات exp، قوائم list) + معالج fetch + JS الصفحة
+$mbRows99 = []; foreach (['emp|e', 'months|tit', 'sum|A|0', 'field|serial', 'field|languages|fr', 'field|equipment|', 'field|rooms|', 'exp|phone', 'list|grants|new', 'list|revenues|', 'list|severance|new', 'list|manual_admins|new'] as $mk99) $mbRows99[$mk99] = strpos($mb99, 'data-mrow="' . $mk99) !== false;
+check('موازنة الوزارة: زرّا «تعديل/حفظ» قدّام كل سطر بالأوراق نفسها (موظفون، أشهر الأعمدة، ملخّص، خانات المدرسة، اللغات، المعدات، الغرف، النفقات، منح/إيرادات/صرف/إداريون يدويون) + أزرار «+ سطر» + المعالج والـJS + الأزرار مخفية بالطباعة',
+      !in_array(false, $mbRows99, true) && substr_count($mb99, 'class="rowctl no-print"') > 150 && strpos($mb99, "fd.append('mehe_row'") !== false
+      && strpos($mb99, 'meheAddSheetRow') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/mehe_budget.php'), "isset(\$_POST['mehe_row'])") !== false
+      && strpos($mb99, '.no-print{display:none !important}') !== false,
+      json_encode(array_keys(array_filter($mbRows99, fn($v) => !$v))));
+// المنطق: تعديل موظف يبدّل شهريّه ومجموعه ومجموع العمود؛ أشهر عمود مفروضة تسري على كل من له قيمة؛ سطر ملخّص مفروض ثم رجوع؛ خانة/نفقة/قائمة (إضافة + تعديل + حذف بإفراغ الإلزامي)؛ الرجوع التلقائي يمسح القيم اليدوية
+$mbE99 = $mbData99; $mbE0 = $mbP99['tit'][0];
+$mbR1 = meheApplyRowEdit($mbE99, ['mehe_row' => 'emp', 'key' => $mbE0['key'], 'f' => ['base' => '10,000,000', 'role' => 'ناظر']]);
+$mbPE = mehePayroll($db, [2], '2025-2026', $mbE99); $mbE1 = $mbPE['tit'][0];
+meheApplyRowEdit($mbE99, ['mehe_row' => 'months', 'key' => 'tit', 'f' => ['transport' => '10']]);
+$mbPM = mehePayroll($db, [2], '2025-2026', $mbE99);
+$mbSM0 = meheSummary($mbE99, $mbPM); meheApplyRowEdit($mbE99, ['mehe_row' => 'sum', 'key' => 'A|6', 'f' => ['usd' => '1234']]); $mbSM1 = meheSummary($mbE99, $mbPM);
+meheApplyRowEdit($mbE99, ['mehe_row' => 'sum', 'key' => 'A|6', 'reset' => '1']); $mbSM2 = meheSummary($mbE99, $mbPM);
+meheApplyRowEdit($mbE99, ['mehe_row' => 'field', 'key' => 'rooms|مسرح', 'f' => ['v' => '2']]); meheApplyRowEdit($mbE99, ['mehe_row' => 'exp', 'key' => 'phone', 'f' => ['ll' => '3,000,000']]);
+$mbG0 = count($mbE99['grants']); meheApplyRowEdit($mbE99, ['mehe_row' => 'list', 'key' => 'grants|new', 'f' => ['student' => 'طالب فحص', 'll' => '5000000']]); $mbGi = count($mbE99['grants']) - 1;
+meheApplyRowEdit($mbE99, ['mehe_row' => 'list', 'key' => "grants|$mbGi", 'f' => ['cat' => 'بقية الكادر']]); $mbGcat = $mbE99['grants'][$mbGi]['cat'] ?? '';
+meheApplyRowEdit($mbE99, ['mehe_row' => 'list', 'key' => "grants|$mbGi", 'f' => ['student' => '']]); $mbG2 = count($mbE99['grants']);
+meheApplyRowEdit($mbE99, ['mehe_row' => 'emp', 'key' => $mbE0['key'], 'reset' => '1']); $mbPR = mehePayroll($db, [2], '2025-2026', $mbE99);
+$mbBad = meheApplyRowEdit($mbE99, ['mehe_row' => 'field', 'key' => 'bogus', 'f' => ['v' => '1']]);
+check('موازنة الوزارة: منطق التعديل من الورقة — موظف (الشهري 10,000,000 × أشهره = المجموع، الدور «ناظر»، مجموع العمود يتحرّك بالفرق) + أشهر النقل 10 لكل العمود + سطر ملخّص مفروض 1234 $ ثم يرجع 0 + غرفة/نفقة + قائمة منح (إضافة/تعديل/حذف) + «↺ تلقائي» يرجّع الأساس + خانة مجهولة مرفوضة',
+      $mbR1['ok'] && (float)$mbE1['base'] === 10000000.0 && $mbE1['role'] === 'ناظر' && !empty($mbE1['overridden'])
+      && $eq99($mbE1['base_total'], 10000000 * (int)$mbE0['months']['base'])
+      && $eq99($mbPE['tit_tot']['base'] - $mbP99['tit_tot']['base'], (10000000 - (float)$mbE0['base']) * (int)$mbE0['months']['base'])
+      && (int)$mbPM['tit_months']['transport'] === 10 && $eq99($mbPM['tit_tot']['transport'], array_sum(array_map(fn($x) => (float)$x['transport'] * 10, $mbPM['tit'])))
+      && (float)$mbSM1['A'][6][2] === 1234.0 && !empty($mbSM1['A'][6][3]['ov']) && $eq99($mbSM1['abU'], $mbSM0['abU'] + 1234) && (float)$mbSM2['A'][6][2] === 0.0 && empty($mbSM2['A'][6][3]['ov'])
+      && (int)$mbE99['rooms']['مسرح'] === 2 && (float)$mbE99['expenses']['phone']['ll'] === 3000000.0
+      && $mbGi === $mbG0 && $mbGcat === 'بقية الكادر' && $mbG2 === $mbG0
+      && $eq99($mbPR['tit'][0]['base'], $mbE0['base']) && empty($mbPR['tit'][0]['overridden']) && !$mbBad['ok'],
+      'base=' . $mbE1['base'] . ' tm=' . $mbPM['tit_months']['transport'] . ' A6usd=' . $mbSM1['A'][6][2] . ' grants=' . $mbGi . '/' . $mbG2);
 check('موازنة الوزارة: تصدير إكسل سليم (11 ورقة، صيغ SUM×الأشهر، إعادة حساب عند الفتح) + الرابط بقائمة التقارير',
       strpos($mbX99, 'PK') === 0 && $mbSheets99 === 11 && $mbFormulas99
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'pages/mehe_budget.php') !== false

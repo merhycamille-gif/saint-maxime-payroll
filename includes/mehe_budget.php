@@ -134,6 +134,10 @@ function meheDefaults(PDO $db, int $schoolId, string $sy): array {
         'manual_admins' => [],     // إداريون خارج الرواتب [{name, mode, start_date, type, cnss_type, base, extra_ll, extra_usd, tasks_ll, grants_ll, transport, cnss, months}]
         'base_mode' => 'avg',      // avg = معدل الأشهر (تعريف النموذج) · oct = شهر تشرين الأول
         'excluded' => [],          // موظفون يُستثنون من الجداول (بقراره)
+        // ✏️ تعديلات يدوية من أوراق الموازنة نفسها («قدام كل سطر تعديل وحفظ» 2026-09-07):
+        //   emp[<employee_id>][field] قيم موظف تحلّ محلّ المحسوب من الرواتب · months[tit|con|adm][col] عدد أشهر العمود
+        //   sum[A|B|D][idx] = [ll, usd] سطر ملخّص مفروض يدوياً
+        'overrides' => ['emp' => [], 'months' => [], 'sum' => []],
     ];
 }
 function meheLoad(PDO $db, array $ids, string $sy): array {
@@ -241,7 +245,7 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
     foreach ($st->fetchAll() as $r) {
         if (in_array((int)$r['id'], $excluded, true)) continue;
         $row = [
-            'id' => (int)$r['id'], 'school' => (string)($r['school_name'] ?? ''),
+            'id' => (int)$r['id'], 'key' => 'e' . (int)$r['id'], 'school' => (string)($r['school_name'] ?? ''),
             'name' => trim((string)$r['first_name_ar'] . ' ' . (string)$r['father_name_ar'] . ' ' . (string)$r['last_name_ar']) ?: trim($r['first_name_fr'] . ' ' . $r['last_name_fr']),
             'role' => meheRoleText($r), 'qual' => meheQualText($r['diploma'] ?? ''), 'level' => meheLevelText($r),
             'cadre_date' => ($r['titularization_date'] && $r['titularization_date'] !== '0000-00-00') ? formatDate($r['titularization_date'], 'j/n/Y') : '',
@@ -264,23 +268,33 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
             $row['months'][$k] = $m;
             $row[$k . '_total'] = $monthly * $m;
         }
+        $row['months_all'] = (int)$r['months_all'];
+        meheApplyEmpOverride($row, (array)($data['overrides']['emp'][(string)(int)$r['id']] ?? []));
         $t = (string)$r['employee_type'];
         if ($t === 'enseignant_titulaire') $tit[] = $row;
         elseif ($t === 'enseignant_contractuel') $con[] = $row;
         else $adm[] = $row;
     }
     // إداريون خارج الرواتب (أُدخلوا يدوياً بالصفحة)
-    foreach ((array)($data['manual_admins'] ?? []) as $ma) {
+    foreach (array_values((array)($data['manual_admins'] ?? [])) as $mi => $ma) {
         if (trim((string)($ma['name'] ?? '')) === '') continue;
         $mm = max(1, (int)($ma['months'] ?? 12));
-        $row = ['id' => 0, 'school' => (string)($ma['school'] ?? ''), 'name' => (string)$ma['name'], 'admin_mode' => (string)($ma['mode'] ?? ''), 'start_date' => (string)($ma['start_date'] ?? ''),
-                'admin_type' => (string)($ma['type'] ?? 'عادي'), 'cnss_type' => (string)($ma['cnss_type'] ?? 'غير مضمون'), 'extra_usd' => 0, 'months' => [], 'manual' => true];
-        foreach (['base', 'extra_ll', 'tasks_ll', 'grants_ll', 'transport', 'cnss'] as $k) {
+        $row = ['id' => 0, 'key' => 'm' . $mi, 'school' => (string)($ma['school'] ?? ''), 'name' => (string)$ma['name'], 'admin_mode' => (string)($ma['mode'] ?? ''), 'start_date' => (string)($ma['start_date'] ?? ''),
+                'admin_type' => (string)($ma['type'] ?? 'عادي'), 'cnss_type' => (string)($ma['cnss_type'] ?? 'غير مضمون'), 'months' => [], 'manual' => true];
+        foreach (['base', 'extra_ll', 'extra_usd', 'tasks_ll', 'grants_ll', 'transport', 'cnss'] as $k) {
             $v = (float)($ma[$k] ?? 0);
             $row[$k] = $v; $row['months'][$k] = $v > 0 ? $mm : 0; $row[$k . '_total'] = $v * ($v > 0 ? $mm : 0);
         }
-        $row['extra_usd_total'] = 0;
         $adm[] = $row;
+    }
+    // ✏️ عدد أشهر العمود مفروض يدوياً من الورقة (مثلاً النقل 10 أشهر كالوزارة): يسري على كل موظف له قيمة بالعمود
+    $ovM = (array)($data['overrides']['months'] ?? []);
+    foreach (['tit', 'con', 'adm'] as $tk) {
+        foreach ((array)($ovM[$tk] ?? []) as $k => $m) {
+            $m = (int)$m; if ($m <= 0) continue;
+            foreach ($$tk as &$row) { if ((float)($row[$k] ?? 0) > 0) { $row['months'][$k] = $m; $row[$k . '_total'] = (float)$row[$k] * $m; } }
+            unset($row);
+        }
     }
     // عدد الأشهر لكل عمود (كما بالنموذج: رقم واحد للعمود = أكبر عدد أشهر بين الموظفين) + المجاميع
     $mk = function (array $rows, array $keys): array {
@@ -297,6 +311,103 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
     foreach (['tm', 'cm', 'am'] as $v) foreach ($$v as $k => $m) if ($m === 0) $$v[$k] = 12; // عمود فارغ ⇒ 12 كالنموذج
     return ['tit' => $tit, 'con' => $con, 'adm' => $adm, 'tit_months' => $tm, 'tit_tot' => $tt, 'con_months' => $cm, 'con_tot' => $ct,
             'adm_months' => $am, 'adm_tot' => $at, 'mode' => $mode, 'multi' => count($ids) > 1];
+}
+
+/* ===================== ✏️ التعديل اليدوي من أوراق الموازنة («قدام كل سطر تعديل وحفظ» 2026-09-07) ===================== */
+/** أعمدة الموظف القابلة للتعديل من الورقة: نصّية / رقمية (شهري) */
+function meheEmpTextFields(): array { return ['name', 'role', 'qual', 'level', 'cadre_date', 'start_date', 'mode', 'cnss_type', 'admin_type', 'admin_mode']; }
+function meheEmpNumFields(): array { return ['h_cadre', 'h_extra', 'base', 'extra_ll', 'extra_usd', 'retro', 'missions_ll', 'missions35', 'bonus', 'tasks_ll', 'grants_ll', 'transport', 'family', 'cnss', 'fund']; }
+/** يحلّ القيم اليدوية محلّ المحسوب لصفّ موظف (الشهري × أشهره = المجموع) */
+function meheApplyEmpOverride(array &$row, array $ov): void {
+    if (!$ov) return;
+    $row['overridden'] = true;
+    foreach (meheEmpTextFields() as $f) if (array_key_exists($f, $ov)) $row[$f] = (string)$ov[$f];
+    foreach (['h_cadre', 'h_extra'] as $f) if (array_key_exists($f, $ov)) { $v = (float)$ov[$f]; $row[$f] = $v == floor($v) ? (int)$v : $v; }
+    foreach (meheEmpNumFields() as $f) {
+        if (in_array($f, ['h_cadre', 'h_extra'], true) || !array_key_exists($f, $ov)) continue;
+        $v = (float)$ov[$f];
+        $m = (int)($row['months'][$f] ?? 0);
+        if ($v > 0 && $m <= 0) $m = (int)($row['months']['base'] ?? 0) ?: (int)($row['months_all'] ?? 0) ?: 12;
+        if ($v <= 0) $m = 0;
+        $row[$f] = $v; $row['months'][$f] = $m; $row[$f . '_total'] = $v * $m;
+    }
+}
+/** مواصفات صفوف القوائم (الإيرادات/المنح/الصرف/الإداريون اليدويون): الحقول وأنواعها + الحقل الإلزامي */
+function meheListSpecs(): array {
+    return [
+        'revenues'      => [['program' => 's', 'class' => 's', 'fee_ll' => 'n', 'fee_usd' => 'n', 'students' => 'n'], 'class'],
+        'grants'        => [['student' => 's', 'teacher' => 's', 'cat' => 's', 'class' => 's', 'll' => 'n', 'usd' => 'n'], 'student'],
+        'severance'     => [['name' => 's', 'eos_ll' => 'n', 'eos_usd' => 'n', 'tasks_ll' => 'n', 'tasks_usd' => 'n', 'receipt_no' => 's', 'receipt_date' => 's', 'notes' => 's'], 'name'],
+        'manual_admins' => [['name' => 's', 'school' => 's', 'mode' => 's', 'start_date' => 's', 'type' => 's', 'cnss_type' => 's', 'base' => 'n', 'extra_ll' => 'n', 'extra_usd' => 'n', 'tasks_ll' => 'n', 'grants_ll' => 'n', 'transport' => 'n', 'cnss' => 'n', 'months' => 'n'], 'name'],
+    ];
+}
+/**
+ * يطبّق حفظ سطر واحد من الورقة على بيانات الموازنة (بلا DB — المُستدعي يحفظ).
+ *   $P: mehe_row = field|exp|list|emp|months|sum · key · f[<حقل>] القيم المتغيّرة · reset=1 رجوع للتلقائي
+ * يعيد ['ok' => bool, 'msg' => نص]
+ */
+function meheApplyRowEdit(array &$data, array $P): array {
+    $kind = (string)($P['mehe_row'] ?? ''); $key = (string)($P['key'] ?? ''); $f = (array)($P['f'] ?? []); $reset = !empty($P['reset']);
+    $num = fn($v) => (float)str_replace([',', ' ', '٬'], '', (string)$v);
+    $txt = fn($v) => trim((string)$v);
+    $ok = fn($m = 'انحفظ السطر / Ligne enregistrée') => ['ok' => true, 'msg' => $m];
+    $bad = fn($m) => ['ok' => false, 'msg' => $m];
+    $data['overrides'] = array_replace(['emp' => [], 'months' => [], 'sum' => []], (array)($data['overrides'] ?? []));
+    $parts = explode('|', $key);
+    switch ($kind) {
+        case 'field': // خانة مفردة: serial · rooms|<غرفة> · equipment|<معدّة>|admin · languages|fr · classes_per_level|<مرحلة>
+            if (!array_key_exists('v', $f)) return $bad('لا قيمة');
+            $v = $f['v']; $k0 = $parts[0] ?? '';
+            $strs = ['serial', 'center_no', 'subject', 'reference', 'director', 'parents_head', 'parents_phone', 'programs', 'levels', 'classes', 'fin_committee', 'owner', 'shared_with', 'internet', 'other_details', 'building_owner'];
+            $ints = ['playground_open', 'playground_closed', 'buildings_school', 'buildings_res', 'struct_admin_law', 'struct_workers_law', 'struct_others', 'staff_mgmt', 'staff_supervision'];
+            if (in_array($k0, $strs, true) && count($parts) === 1) { $data[$k0] = $txt($v); return $ok(); }
+            if (in_array($k0, $ints, true) && count($parts) === 1) { $data[$k0] = (int)$num($v); return $ok(); }
+            if ($k0 === 'rooms' && isset($parts[1]) && in_array($parts[1], meheRoomTypes(), true)) { $data['rooms'][$parts[1]] = (int)$num($v); return $ok(); }
+            if ($k0 === 'classes_per_level' && isset($parts[1]) && in_array($parts[1], meheLevels(), true)) { $data['classes_per_level'][$parts[1]] = (int)$num($v); return $ok(); }
+            if ($k0 === 'languages' && isset($parts[1]) && isset(meheLanguages()[$parts[1]])) { $data['languages'][$parts[1]] = in_array((int)$v, [1, 2, 3], true) ? (int)$v : 3; return $ok(); }
+            if ($k0 === 'equipment' && isset($parts[1], $parts[2]) && in_array($parts[1], meheEquipmentTypes(), true) && in_array($parts[2], ['admin', 'edu'], true)) { $data['equipment'][$parts[1]][$parts[2]] = (int)$num($v); return $ok(); }
+            return $bad('خانة غير معروفة: ' . $key);
+        case 'exp': // بند نفقات: key = رمز البند، f[ll] و/أو f[usd]
+            if (!isset(meheExpenseItems()[$key])) return $bad('بند غير معروف');
+            $cur = (array)($data['expenses'][$key] ?? ['ll' => 0, 'usd' => 0]);
+            foreach (['ll', 'usd'] as $c) if (array_key_exists($c, $f)) $cur[$c] = $num($f[$c]);
+            $data['expenses'][$key] = $cur; return $ok();
+        case 'list': // صفّ قائمة: key = revenues|3 أو grants|new — الحقل الإلزامي فارغ ⇒ يُحذف السطر
+            [$lst, $idx] = [$parts[0] ?? '', $parts[1] ?? ''];
+            if (!isset(meheListSpecs()[$lst])) return $bad('قائمة غير معروفة');
+            [$spec, $req] = meheListSpecs()[$lst];
+            $rows = array_values((array)($data[$lst] ?? []));
+            if ($idx === 'new') { $row = []; foreach ($spec as $fk => $t) $row[$fk] = $t === 'n' ? ($fk === 'months' ? 12 : 0) : ''; if ($lst === 'grants') $row['cat'] = 'ملاك'; if ($lst === 'revenues') $row['program'] = 'منهاج لبناني'; if ($lst === 'manual_admins') { $row['type'] = 'عادي'; $row['cnss_type'] = 'غير مضمون'; } $i = count($rows); }
+            else { $i = (int)$idx; if (!isset($rows[$i])) return $bad('السطر غير موجود — أعد تحميل الصفحة'); $row = $rows[$i]; }
+            foreach ($spec as $fk => $t) if (array_key_exists($fk, $f)) $row[$fk] = $t === 'n' ? $num($f[$fk]) : $txt($f[$fk]);
+            if ($txt($row[$req] ?? '') === '') { if ($idx !== 'new') array_splice($rows, $i, 1); $data[$lst] = $rows; return $ok('انحذف السطر / Ligne supprimée'); }
+            $rows[$i] = $row; $data[$lst] = $rows; return $ok();
+        case 'emp': // موظف من الرواتب: key = e<id> — تُخزَّن القيم المتغيّرة فقط؛ reset يرجّع كل شي تلقائياً
+            if (!preg_match('/^e(\d+)$/', $key, $m)) return $bad('موظف غير معروف');
+            $id = $m[1];
+            if ($reset) { unset($data['overrides']['emp'][$id]); return $ok('رجع السطر تلقائياً من الرواتب'); }
+            $cur = (array)($data['overrides']['emp'][$id] ?? []);
+            foreach (meheEmpTextFields() as $fk) if (array_key_exists($fk, $f)) $cur[$fk] = $txt($f[$fk]);
+            foreach (meheEmpNumFields() as $fk) if (array_key_exists($fk, $f)) $cur[$fk] = $num($f[$fk]);
+            if ($cur) $data['overrides']['emp'][$id] = $cur; else unset($data['overrides']['emp'][$id]);
+            return $ok();
+        case 'months': // صفّ «عدد الاشهر» لجدول: key = tit|con|adm، f[<عمود>] = أشهر
+            if (!in_array($key, ['tit', 'con', 'adm'], true)) return $bad('جدول غير معروف');
+            if ($reset) { unset($data['overrides']['months'][$key]); return $ok('رجعت الأشهر تلقائياً'); }
+            $cur = (array)($data['overrides']['months'][$key] ?? []);
+            foreach (meheEmpNumFields() as $fk) if (array_key_exists($fk, $f)) { $m = (int)$num($f[$fk]); if ($m > 0) $cur[$fk] = $m; else unset($cur[$fk]); }
+            if ($cur) $data['overrides']['months'][$key] = $cur; else unset($data['overrides']['months'][$key]);
+            return $ok();
+        case 'sum': // سطر ملخّص محسوب (أ/ب/د): key = A|3 — يُفرض يدوياً [ll, usd]؛ reset يرجّعه محسوباً
+            [$cat, $i] = [$parts[0] ?? '', (int)($parts[1] ?? -1)];
+            if (!in_array($cat, ['A', 'B', 'D'], true) || $i < 0) return $bad('سطر غير معروف');
+            if ($reset) { unset($data['overrides']['sum'][$cat][(string)$i]); return $ok('رجع السطر محسوباً تلقائياً'); }
+            $cur = (array)($data['overrides']['sum'][$cat][(string)$i] ?? [null, null]);
+            if (array_key_exists('ll', $f)) $cur[0] = $num($f['ll']);
+            if (array_key_exists('usd', $f)) $cur[1] = $num($f['usd']);
+            $data['overrides']['sum'][$cat][(string)$i] = $cur; return $ok();
+    }
+    return $bad('نوع غير معروف');
 }
 
 /* ===================== الملخّص (الفئات أ/ب/ج/د + ملخّص الميزانية + الإيرادات + المنح) ===================== */
@@ -319,10 +430,10 @@ function meheSummary(array $d, array $p): array {
     }
     // الإيرادات
     $revRows = []; $students = 0; $revLL = $revUSD = 0;
-    foreach ((array)$d['revenues'] as $rv) {
+    foreach (array_values((array)$d['revenues']) as $ri => $rv) {
         if (trim((string)($rv['class'] ?? '')) === '') continue;
         $n = (int)($rv['students'] ?? 0); $fl = (float)($rv['fee_ll'] ?? 0); $fu = (float)($rv['fee_usd'] ?? 0);
-        $revRows[] = ['program' => (string)($rv['program'] ?? ''), 'class' => (string)$rv['class'], 'fee_ll' => $fl, 'fee_usd' => $fu, 'students' => $n, 'tot_ll' => $fl * $n, 'tot_usd' => $fu * $n];
+        $revRows[] = ['idx' => $ri, 'program' => (string)($rv['program'] ?? ''), 'class' => (string)$rv['class'], 'fee_ll' => $fl, 'fee_usd' => $fu, 'students' => $n, 'tot_ll' => $fl * $n, 'tot_usd' => $fu * $n];
         $students += $n; $revLL += $fl * $n; $revUSD += $fu * $n;
     }
     $revAfterLL = $revLL - $grTitLL; $revAfterUSD = $revUSD - $grTitUSD;
@@ -343,10 +454,10 @@ function meheSummary(array $d, array $p): array {
         ['تعويض عائلي', $tt['family'], 0],
         ['اشتراكات الصندوق الوطني للضمان الاجتماعي', $tt['cnss'] + $ct['cnss'] + $at['cnss'], 0],
         ['مساهمة المدرسة في صندوق التعويضات لأفراد الهيئة التعليمية', ceil($tt['fund'] / 1000) * 1000, 0], // الوزارة تقرّبها للألف صعوداً
-        [meheExpenseItems()['cnss_extra'][0], $g('cnss_extra', 'll'), $g('cnss_extra', 'usd')],
+        [meheExpenseItems()['cnss_extra'][0], $g('cnss_extra', 'll'), $g('cnss_extra', 'usd'), ['exp' => 'cnss_extra']],
     ];
     $C = [];
-    foreach (meheSummaryCOrder() as $k) $C[] = [meheExpenseItems()[$k][0], $g($k, 'll'), $g($k, 'usd')];
+    foreach (meheSummaryCOrder() as $k) $C[] = [meheExpenseItems()[$k][0], $g($k, 'll'), $g($k, 'usd'), ['exp' => $k]];
     $dl = meheDLabels();
     $Dm = [
         'over_limits' => [0, 0], 'grants_contr' => [$grOthLL, $grOthUSD], 'grants_admin_kids' => [0, 0],
@@ -355,7 +466,22 @@ function meheSummary(array $d, array $p): array {
     $D = [];
     foreach (meheSummaryDOrder() as $k) {
         if (isset($Dm[$k])) $D[] = [$dl[$k], $Dm[$k][0], $Dm[$k][1]];
-        else $D[] = [meheExpenseItems()[$k][0], $g($k, 'll'), $g($k, 'usd')];
+        else $D[] = [meheExpenseItems()[$k][0], $g($k, 'll'), $g($k, 'usd'), ['exp' => $k]];
+    }
+    // ✏️ أسطر ملخّص مفروضة يدوياً من الورقة (المحسوبة فقط؛ بنود النفقات تُعدَّل من بندها مباشرة)
+    $ovS = (array)($d['overrides']['sum'] ?? []);
+    foreach (['A', 'B', 'D'] as $cat) {
+        foreach ($$cat as $i => &$r) {
+            if (isset($r[3]['exp'])) continue;
+            $r[3] = ['ov' => false];
+            if (isset($ovS[$cat][(string)$i]) && is_array($ovS[$cat][(string)$i])) {
+                $o = $ovS[$cat][(string)$i];
+                if (isset($o[0]) && $o[0] !== '') $r[1] = (float)$o[0];
+                if (isset($o[1]) && $o[1] !== '') $r[2] = (float)$o[1];
+                $r[3] = ['ov' => true];
+            }
+        }
+        unset($r);
     }
     $sum = fn(array $rows, int $i) => array_sum(array_map(fn($r) => (float)$r[$i], $rows));
     $abL = $sum($A, 1) + $sum($B, 1); $abU = $sum($A, 2) + $sum($B, 2);
@@ -742,7 +868,7 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
         ['الأجور الإضافية للمعلمين المتعاقدين', $CON['extra_ll'], $CON['extra_usd']],
         ['الأجور الإضافية للموظفين الإداريين', $ADM['extra_ll'], $ADM['extra_usd']],
     ];
-    foreach ($A as [$lb, $fl, $fu]) $X->row($si, [$c($lb, 6), $fx($fl, 4), $fx($fu, 4)]);
+    foreach ($A as $ai => [$lb, $fl, $fu]) $X->row($si, !empty($s['A'][$ai][3]['ov']) ? [$c($lb, 6), $n((float)$s['A'][$ai][1], 4), $n((float)$s['A'][$ai][2], 4)] : [$c($lb, 6), $fx($fl, 4), $fx($fu, 4)]); // ✏️ سطر مفروض يدوياً ⇒ قيمة ثابتة
     $a2 = $X->rowCount($si); $X->row($si, []);
     $b1 = $section('النفقات من الفئة ب');
     $B = [
@@ -752,7 +878,7 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
         ['مساهمة المدرسة في صندوق التعويضات لأفراد الهيئة التعليمية', 'ROUNDUP(' . $TIT['fund'] . ',-3)', '0'],
         [meheExpenseItems()['cnss_extra'][0], $EXP['cnss_extra'][0], $EXP['cnss_extra'][1]],
     ];
-    foreach ($B as [$lb, $fl, $fu]) $X->row($si, [$c($lb, 6), $fx($fl, 5), $fx($fu, 5)]);
+    foreach ($B as $bi => [$lb, $fl, $fu]) $X->row($si, !empty($s['B'][$bi][3]['ov']) ? [$c($lb, 6), $n((float)$s['B'][$bi][1], 5), $n((float)$s['B'][$bi][2], 5)] : [$c($lb, 6), $fx($fl, 5), $fx($fu, 5)]);
     $b2 = $X->rowCount($si); $X->row($si, []);
     $X->pageBreak($si, $X->rowCount($si));
     $c1 = $section('النفقات من الفئة ج');
@@ -763,8 +889,9 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
     $dl = meheDLabels();
     $Dm = ['over_limits' => ['0', '0'], 'grants_contr' => [$GR['oth']['ll'], $GR['oth']['usd']], 'grants_admin_kids' => ['0', '0'],
            'grants_admin' => [$ADM['grants_ll'], '0'], 'severance' => [$SEV['ll'], $SEV['usd']], 'admin_tasks' => [$ADM['tasks_ll'], '0']];
-    foreach (meheSummaryDOrder() as $k) {
-        if (isset($Dm[$k])) $X->row($si, [$c($dl[$k], 6), $fx($Dm[$k][0], 5), $fx($Dm[$k][1], 5)]);
+    foreach (meheSummaryDOrder() as $di => $k) {
+        if (!empty($s['D'][$di][3]['ov'])) $X->row($si, [$c($dl[$k] ?? meheExpenseItems()[$k][0], 6), $n((float)$s['D'][$di][1], 5), $n((float)$s['D'][$di][2], 5)]);
+        elseif (isset($Dm[$k])) $X->row($si, [$c($dl[$k], 6), $fx($Dm[$k][0], 5), $fx($Dm[$k][1], 5)]);
         else $X->row($si, [$c(meheExpenseItems()[$k][0], 6), $fx($EXP[$k][0], 5), $fx($EXP[$k][1], 5)]);
     }
     $d2 = $X->rowCount($si); $X->row($si, []);
