@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/local_sync.php'; // 🔁 مزامنة بيانات الأونلاين → الكمبيوتر تلقائياً (محلياً فقط)
 requireLogin();
 healYearAdditions2627(); // شفاء ذاتي مرّة واحدة: علاوات 2026-2027 (لا يفعل شيئاً بعد تمامه)
 healCaisseNumbers();     // شفاء ذاتي مرّة واحدة: إفراغ رقم الصندوق الذي كُتب آلياً على مؤسسات غير المدرسة
@@ -568,6 +569,15 @@ document.addEventListener('submit', function (e) {
         <div class="page-content" id="pageContent" style="--accent: <?= $accentColor ?>; --accent-bg: <?= $accentBg ?>;">
         <?php
         // رسائل التنبيه (flash) — تنبيهات عائمة عصرية تختفي لحالها (الأخطاء تبقى ليكبس ×)
+        // 🔁 نسخة الكمبيوتر: مزامنة بيانات الأونلاين تلقائياً بالخلفية (المدير، كل ONLINE_SYNC_HOURS ساعات) + سطر الحالة بلوحة القيادة
+        if (localSyncEnabled() && isAdmin()):
+            if (localSyncDue()): ?>
+        <script>fetch(<?= json_encode(BASE_URL . 'sync_local.php') ?>, {credentials:'same-origin', keepalive:true}).catch(function(){});</script>
+            <?php endif;
+            if (($currentPage ?? '') === 'dashboard'): ?>
+        <div class="alert alert-info no-print" style="margin:0 0 10px;font-size:12.5px;padding:6px 12px"><i class="fas fa-rotate"></i> نسخة الكمبيوتر — بيانات الأونلاين تُسحب تلقائياً كل <?= rtrim(rtrim(number_format(localSyncHours(), 2, '.', ''), '0'), '.') ?> ساعات: <?= e(localSyncStatusText()) ?></div>
+            <?php endif;
+        endif;
         $hasFlash = !empty($_SESSION['flash_success']) || !empty($_SESSION['flash_error']) || !empty($_SESSION['flash_info']);
         if ($hasFlash): ?>
         <div class="toast-stack no-print" id="toastStack">

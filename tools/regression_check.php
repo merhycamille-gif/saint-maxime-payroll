@@ -4868,6 +4868,24 @@ check('موازنة الوزارة: تصدير إكسل سليم (11 ورقة، 
       && strpos((string)file_get_contents($PROJ . '/index.php'), "['pages/mehe_budget.php','fas fa-landmark'") !== false, // بطاقة بلوحة القيادة (طلبه: «اسم موازنة وزارة التربية مش موجود بالأيقونات»)
       "sheets=$mbSheets99");
 
+/* =====================================================================
+ * 100) 🔁 مزامنة بيانات الأونلاين → الكمبيوتر تلقائياً («انا بدي كل شي تلقائي» 2026-09-07):
+ *      includes/local_sync.php + sync_local.php + إطلاق خلفي من الهيدر محلياً فقط (لا أونلاين ولا CLI)
+ * =================================================================== */
+require_once __DIR__ . '/../includes/local_sync.php';
+$ls100 = (string)file_get_contents($PROJ . '/includes/local_sync.php');
+$hd100 = (string)file_get_contents($PROJ . '/includes/header.php');
+$sl100 = renderPage('sync_local.php', [], [], [2], '', '2025-2026');
+check('مزامنة الأونلاين→الكمبيوتر: الدوال معرَّفة + معطّلة بـCLI/أونلاين (localSyncEnabled=false) + الهيدر يطلقها خلفياً للمدير محلياً + سطر الحالة بلوحة القيادة + النقطة sync_local.php تردّ JSON «disabled» بـCLI + التحقّق من اكتمال الملف والجداول والأرقام قبل التبديل الذرّي + الحالة بملف لا بجدول settings',
+      function_exists('localSyncEnabled') && function_exists('localSyncRun') && function_exists('localSyncDue') && !localSyncEnabled()
+      && strpos($hd100, "require_once __DIR__ . '/local_sync.php'") !== false && strpos($hd100, "sync_local.php') ?>, {credentials:'same-origin', keepalive:true}") !== false
+      && strpos($hd100, 'localSyncStatusText()') !== false && strpos($hd100, "=== 'dashboard'") !== false
+      && strpos($sl100, '"msg":"disabled"') !== false && strpos($sl100, 'FATAL') === false
+      && strpos($ls100, 'SET FOREIGN_KEY_CHECKS=1;') !== false && strpos($ls100, '$got !== $ntab') !== false && strpos($ls100, 'RENAME TABLE') !== false
+      && strpos($ls100, 'smp_pc_archive_first') !== false && strpos($ls100, 'local_sync_state.json') !== false
+      && strpos($ls100, "strpos(\$host, 'localhost') === false") !== false,
+      $sl100 === '' ? 'no output' : mb_substr($sl100, 0, 80));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
