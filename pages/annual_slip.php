@@ -65,7 +65,7 @@ if ($action === 'calc_year' && $employeeId > 0) {
     $eC = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
     $eC->execute([$employeeId]);
     $eC = $eC->fetch();
-    $hasConfig = $eC && ($eC['employee_type'] === 'enseignant_titulaire' || (float)$eC['base_salary_usd'] > 0 || (float)$eC['contract_salary_lbp'] > 0);
+    $hasConfig = $eC && salaryEngineAllowed($eC, $db); // المصدر الواحد (الجديد بلا أساس منقول يُحسب من ملفه)
     if ($eC && !$hasConfig) {
         // المنقول: لا حساب كامل (يُصفَّر أساسه) — لكن علاواته المسجّلة تُركَّب على أشهره المخزّنة
         $nOv = overlayStoredYearBonuses($employeeId, $schoolYear);
@@ -91,10 +91,10 @@ if ($action === 'calc_range' && $employeeId > 0) {
     requireSchoolSelected();
     $fm = (int)($_GET['from_m'] ?? 0); $fy = (int)($_GET['from_y'] ?? 0);
     $tm = (int)($_GET['to_m'] ?? 0);   $ty = (int)($_GET['to_y'] ?? 0);
-    $okEmp = $db->prepare("SELECT employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
+    $okEmp = $db->prepare("SELECT id, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
     $okEmp->execute([$employeeId]);
     $ec = $okEmp->fetch();
-    $hasConfig = $ec && ($ec['employee_type'] === 'enseignant_titulaire' || (float)$ec['base_salary_usd'] > 0 || (float)$ec['contract_salary_lbp'] > 0);
+    $hasConfig = $ec && salaryEngineAllowed($ec, $db); // المصدر الواحد
     if ($ec && !$hasConfig) {
         $_SESSION['flash_error'] = 'راتب هذا الموظف مُدخَل يدوياً (منقول) — لا يُعاد حسابه تلقائياً لئلا يُصفَّر.';
     } elseif ($hasConfig && $fm >= 1 && $fm <= 12 && $tm >= 1 && $tm <= 12 && $fy >= 2000 && $ty >= 2000) {

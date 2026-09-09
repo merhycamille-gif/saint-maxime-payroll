@@ -299,9 +299,9 @@ function complianceItems(PDO $db, string $sy): array {
           AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ?)
           AND EXISTS (SELECT 1 FROM monthly_salaries m2 JOIN employees e2 ON e2.id = m2.employee_id WHERE e2.school_id = e.school_id AND m2.school_year = ?)
         ORDER BY e.school_id, e.id", array_merge($yp, [$sy, $sy])) as $r) {
-        $hasCfg = ($r['employee_type'] === 'enseignant_titulaire') || (float)$r['base_salary_usd'] > 0 || (float)$r['contract_salary_lbp'] > 0;
+        $hasCfg = salaryEngineAllowed($r, $db) && (($r['employee_type'] === 'enseignant_titulaire') || (float)$r['base_salary_usd'] > 0 || (float)$r['contract_salary_lbp'] > 0 || salaryYearPayable((int)$r['id'], $sy, $db));
         $add('active_nomonths', $r, 'فاعل بملفه ولا راتب مخزّناً له بسنة ' . $sy . ' مع أنّ مدرسته سنتها مفتوحة',
-            $hasCfg ? 'احتساب رواتب سنة ' . $sy . ' من ملفه' : 'أدخل إعداد راتبه (الأساس/العقد) بملفه أو تاريخ تركه — لا يُحتسب بلا إعداد', $hasCfg);
+            $hasCfg ? 'احتساب رواتب سنة ' . $sy . ' من ملفه' : 'أدخل إعداد راتبه (الأساس/العقد أو علاوة/نقل) بملفه أو تاريخ تركه — لا يُحتسب بلا إعداد', $hasCfg);
     }
 
     // ── 14) ملاك بلا شهادة ──

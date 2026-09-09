@@ -145,9 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
                 ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
                 : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
             // الموظف المُعَدّ (ملاك أو أساس>0) يُحسب بالقانون الساري؛ المنقول بلا إعداد يُنقل راتبه كما هو
-            $hasConfig = ($emp['employee_type'] === 'enseignant_titulaire'
-                       || (float)$emp['base_salary_usd'] > 0
-                       || (float)$emp['contract_salary_lbp'] > 0);
+            $hasConfig = salaryEngineAllowed($emp, $db); // المصدر الواحد (الجديد بلا أساس منقول يُحسب من ملفه)
             if ($hasConfig) {
                 // الملاك: طبّق درجات القانون المستحقّة لهذه السنة (تدرّج عادي 1/10 + استثنائية 1/1) قبل الحساب
                 if ($emp['employee_type'] === 'enseignant_titulaire'
@@ -286,7 +284,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
             if ($transOn) copyYearBonuses($db, $id, $prevSY, $yr, $trTypes, 'same', 0);
             else $db->prepare("DELETE FROM employee_bonuses WHERE employee_id=? AND school_year=? AND bonus_type IN ('transport_complement','transport_daily')")->execute([$id, $yr]);
 
-            $hasConfig = ($emp['employee_type'] === 'enseignant_titulaire' || (float)$emp['base_salary_usd'] > 0 || (float)$emp['contract_salary_lbp'] > 0);
+            $hasConfig = salaryEngineAllowed($emp, $db); // المصدر الواحد
             $months = ((int)$emp['payment_months_per_year'] === 10)
                 ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
                 : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];

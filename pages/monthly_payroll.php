@@ -133,9 +133,9 @@ if (in_array($action, ['calc', 'calc_all'])) {
 if ($action === 'calc' && $employeeId > 0) {
     try {
         // حماية المنقول يدوياً: لا تُعِد حساب متعاقد/موظف بلا إعداد فعلي (يُصفَّر راتبه المخزّن)
-        $cfg = $db->prepare("SELECT employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ?");
+        $cfg = $db->prepare("SELECT id, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ?");
         $cfg->execute([$employeeId]); $cfg = $cfg->fetch();
-        $hasConfig = $cfg && ($cfg['employee_type'] === 'enseignant_titulaire' || (float)$cfg['base_salary_usd'] > 0 || (float)$cfg['contract_salary_lbp'] > 0);
+        $hasConfig = $cfg && salaryEngineAllowed($cfg, $db); // المصدر الواحد (الجديد بلا أساس منقول يُحسب من ملفه)
         if (!$hasConfig) {
             $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'راتب هذا الموظف مُدخَل يدوياً (منقول) — لا يُعاد حسابه تلقائياً لئلا يُصفَّر. عدّله من بطاقته إن لزم.'];
         } else {

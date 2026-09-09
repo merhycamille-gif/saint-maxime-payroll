@@ -4886,6 +4886,67 @@ check('مزامنة الأونلاين→الكمبيوتر: الدوال معر
       && strpos($ls100, "strpos(\$host, 'localhost') === false") !== false,
       $sl100 === '' ? 'no output' : mb_substr($sl100, 0, 80));
 
+/* =====================================================================
+ * 101) 🆕 الأستاذ الجديد بلا أساس بالإعداد يُحسب من ملفه (ريتا بو عاصي/مكسيموس 2026-09-09
+ *      «أستاذ جديد ما عم ببين رواتب بالبطاقة»): المصدر الواحد salaryEngineAllowed() بكل الصفحات —
+ *      المنقول بأساس مخزّن يبقى محميّاً (تركيب العلاوات فقط)، والجديد بلا أي أساس مخزّن يُحسب
+ *      (أساس 0 + الإضافي + النقل + محسوماتها)، وبلا ما يُدفَع لا تُولَّد أشهر أصفار + شفاء ذاتي عند كل فتح
+ * =================================================================== */
+require_once $PROJ . '/includes/payroll_calculator.php';
+$src101 = [];
+foreach (['includes/payroll_calculator.php', 'pages/annual_slip.php', 'pages/monthly_payroll.php', 'pages/open_year.php', 'includes/compliance.php', 'includes/header.php', 'includes/functions.php'] as $f101) $src101[$f101] = (string)file_get_contents($PROJ . '/' . $f101);
+$raw101 = 0; // لا نسخة يدوية من الشرط القديم خارج المصدر الواحد
+foreach (['pages/annual_slip.php', 'pages/monthly_payroll.php', 'pages/open_year.php', 'includes/compliance.php'] as $f101) $raw101 += preg_match_all("/=== 'enseignant_titulaire'\s*\|\|\s*\(float\)\\\$\w+\['base_salary_usd'\] > 0/", $src101[$f101]);
+check('الجديد بلا أساس (ريتا بو عاصي): المصدر الواحد salaryEngineAllowed/salaryYearPayable معرَّفان ومستعملان بالبطاقة السنوية (×2) والكشف الشهري وفتح السنة (×2) وتقرير المخالفات + recalcEmployeeYear يمرّ بهما + الشفاء موصول بالهيدر + لا نسخة يدوية من الشرط القديم بالصفحات',
+      function_exists('salaryEngineAllowed') && function_exists('salaryYearPayable') && function_exists('healNewHiresNoRows20260909')
+      && substr_count($src101['pages/annual_slip.php'], 'salaryEngineAllowed(') === 2 && substr_count($src101['pages/open_year.php'], 'salaryEngineAllowed(') === 2
+      && strpos($src101['pages/monthly_payroll.php'], 'salaryEngineAllowed(') !== false && strpos($src101['includes/compliance.php'], 'salaryEngineAllowed($r, $db)') !== false
+      && strpos($src101['includes/payroll_calculator.php'], '$hasConfig = salaryEngineAllowed($e, $db);') !== false
+      && strpos($src101['includes/payroll_calculator.php'], '!$hasBaseCfg && !salaryYearPayable(') !== false
+      && strpos($src101['includes/header.php'], 'healNewHiresNoRows20260909();') !== false && $raw101 === 0,
+      "raw=$raw101");
+// المنقول بأساس مخزّن بلا إعداد يبقى محميّاً؛ والملاك/صاحب الأساس مسموح دائماً
+$tr101 = $db->query("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire'
+    AND COALESCE(e.base_salary_usd,0) <= 0 AND COALESCE(e.contract_salary_lbp,0) <= 0
+    AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.base_plus_echelon_lbp > 0) LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+check('الجديد بلا أساس: المنقول بأساس مخزّن (بلا إعداد) يبقى محميّاً من المحرّك الكامل + الملاك مسموح + صاحب العقد بالليرة مسموح',
+      $tr101 && !salaryEngineAllowed($tr101, $db)
+      && salaryEngineAllowed(['id' => 0, 'employee_type' => 'enseignant_titulaire'], $db)
+      && salaryEngineAllowed(['id' => 0, 'employee_type' => 'enseignant_contractuel', 'contract_salary_lbp' => 3025000], $db),
+      'transferred#' . ($tr101['id'] ?? '-'));
+// تجربة حيّة: متعاقدة جديدة بمكسيموس (دخول 2026-10-01، أساس 0، إضافي 550 $ من 10 إلى 6، نقل يومي 5 $ × 4 أيام × 4 أسابيع)
+$db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, status, salary_input_mode, base_salary_usd, contract_salary_lbp, payment_months_per_year, days_per_week, transport_weeks, tax_subject, tax_includes_extra, cnss_subject, cnss_includes_extra, eoc_subject, is_deleted)
+    VALUES (2, '__REG101', 'enseignant_contractuel', 'فحص', 'ريتا101', 'Reg', 'Test101', '2026-10-01', 'actif', 'percent_of_lbp', 0, 0, 10, 4, 4, 1, 1, 1, 1, 0, 0)");
+$rid101 = (int)$db->lastInsertId();
+try {
+    $n0 = recalcEmployeeYear($rid101); // بلا ما يُدفَع → لا أشهر أصفار
+    $z101 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $rid101")->fetchColumn();
+    $db->exec("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES
+        ($rid101, 'prime_fixe', 1, '2026-2027', 550, 'amount', 'USD', 10, 6, 1), ($rid101, 'transport_daily', 1, '2026-2027', 5, 'amount', 'USD', 10, 9, 1)");
+    $n1 = recalcEmployeeYear($rid101);
+    $rw101 = []; foreach ($db->query("SELECT * FROM monthly_salaries WHERE employee_id = $rid101 ORDER BY year, month") as $r) $rw101[(int)$r['month']] = $r;
+    $oct = $rw101[10] ?? []; $jul = $rw101[7] ?? [];
+    $rateOct = getExchangeRate(10, 2026);
+    $expPrime = usdToLbp(550, $rateOct); $expTr = usdToLbp(5 * 4 * 4, $rateOct);
+    $expNet = floor(($expPrime - (float)$oct['total_retenues_lbp']) / 1000) * 1000;
+    // ثم الأستاذ نفسه بعد إطفاء بنوده: صفوفه صارت مخزّنة بأساس 0 → ما زال مسموحاً (لا أساس منقول) والإعادة تُصفّر الإضافي بدل تركه عالقاً
+    $db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = $rid101");
+    $n2 = recalcEmployeeYear($rid101);
+    $stuck = (float)$db->query("SELECT COALESCE(SUM(prime_fixe_lbp + transport_lbp), 0) FROM monthly_salaries WHERE employee_id = $rid101")->fetchColumn();
+    check('الجديد بلا أساس (تجربة حيّة ريتا101): بلا علاوة = 0 صف · مع إضافي 550 $ ونقل 5 $ = 10 أشهر: تشرين الأول أساس 0 + إضافي ' . number_format($expPrime) . ' + نقل ' . number_format($expTr) . ' + ضمان 3٪ على الإضافي + الصافي داون للألف + المستحق = الصافي + النقل · تموز بلا إضافي ولا نقل (10→6 والنافذة) · إطفاء البنود يصفّر الإضافي والنقل',
+          $n0 === 0 && $z101 === 0 && $n1 === 10 && count($rw101) === 10
+          && (float)$oct['base_plus_echelon_lbp'] === 0.0 && (float)$oct['prime_fixe_lbp'] === (float)$expPrime && (float)$oct['transport_lbp'] === (float)$expTr
+          && (float)$oct['cnss_amount_lbp'] === round($expPrime * 0.03) && (float)$oct['net_salary_lbp'] === (float)$expNet && fmod((float)$oct['net_salary_lbp'], 1000) === 0.0
+          && (float)$oct['total_due_lbp'] === (float)$expNet + (float)$expTr
+          && $jul && (float)$jul['prime_fixe_lbp'] === 0.0 && (float)$jul['transport_lbp'] === 0.0
+          && $n2 === 10 && $stuck === 0.0,
+          "n0=$n0 z=$z101 n1=$n1 rows=" . count($rw101) . ' oct=' . json_encode(['b' => $oct['base_plus_echelon_lbp'] ?? null, 'p' => $oct['prime_fixe_lbp'] ?? null, 't' => $oct['transport_lbp'] ?? null, 'cnss' => $oct['cnss_amount_lbp'] ?? null, 'net' => $oct['net_salary_lbp'] ?? null, 'due' => $oct['total_due_lbp'] ?? null]) . " n2=$n2 stuck=$stuck");
+} finally {
+    $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid101");
+    $db->exec("DELETE FROM employee_bonuses WHERE employee_id = $rid101");
+    $db->exec("DELETE FROM employees WHERE id = $rid101");
+}
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

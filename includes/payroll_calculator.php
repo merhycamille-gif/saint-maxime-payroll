@@ -655,16 +655,49 @@ class PayrollCalculator {
  * مخزَّن منقول من القديم) لئلا يُصفَّر. الأستاذ الملاك يُعاد دائماً (أساسه = السلسلة).
  * $schoolYear = null ⇒ السنة الدراسية الحالية.
  */
+/**
+ * 🔑 المصدر الواحد لسؤال «هل يجوز للمحرّك الكامل أن يحسب هذا الموظف؟» (تستعمله كل الصفحات:
+ * إعادة الحساب عند الحفظ، البطاقة السنوية، الكشف الشهري، فتح السنة، تقرير المخالفات).
+ *  - الملاك، أو من له أساس بالدولار/عقد بالليرة بالإعداد → نعم دائماً.
+ *  - بلا إعداد **وعنده صفوف مخزّنة بأساس > 0** (منقول من برنامجه القديم بالمليم) → لا:
+ *    المحرّك يُصفِّر أساسه — تُركَّب علاواته فقط على أشهره المخزّنة (overlayStoredYearBonuses).
+ *  - بلا إعداد **وبلا أي صف مخزّن بأساس** (أستاذ جديد أُدخل بملفه علاوة/نقل فقط — حالة ريتا
+ *    بو عاصي بمكسيموس 2026-09-09 «ما عم ببين رواتب بالبطاقة») → نعم: يُحسب من ملفه
+ *    (أساس 0 + الأجر الإضافي + النقل + محسوماتها) — لا شيء يُصفَّر لأن لا شيء منقولاً.
+ */
+function salaryEngineAllowed(array $emp, ?PDO $db = null): bool {
+    if (($emp['employee_type'] ?? '') === 'enseignant_titulaire') return true;
+    if ((float)($emp['base_salary_usd'] ?? 0) > 0 || (float)($emp['contract_salary_lbp'] ?? 0) > 0) return true;
+    $id = (int)($emp['id'] ?? 0);
+    if ($id <= 0) return false;
+    $db = $db ?: getDB();
+    $q = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND base_plus_echelon_lbp > 0 LIMIT 1");
+    $q->execute([$id]);
+    return $q->fetchColumn() === false; // لا أساس منقول → المحرّك سيّده
+}
+
+/** هل لهذا الموظف بلا إعداد أساس ما يُدفَع بهذه السنة (بند علاوة فعّال أو نقل يومي بملفه)؟ — يمنع توليد أشهر كلّها أصفار */
+function salaryYearPayable(int $employeeId, string $schoolYear, ?PDO $db = null): bool {
+    $db = $db ?: getDB();
+    $q = $db->prepare("SELECT (SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = ? AND is_active = 1 AND amount > 0
+                          AND (school_year IS NULL OR school_year = ?))
+                        + (SELECT COUNT(*) FROM employees WHERE id = ? AND COALESCE(transport_daily_amount, 0) > 0)");
+    $q->execute([$employeeId, $schoolYear, $employeeId]);
+    return (int)$q->fetchColumn() > 0;
+}
+
 function recalcEmployeeYear($employeeId, $schoolYear = null) {
     $db = getDB();
-    $e = $db->prepare("SELECT employee_type, base_salary_usd, contract_salary_lbp, payment_months_per_year, hire_date, is_deleted FROM employees WHERE id = ?");
+    $e = $db->prepare("SELECT id, employee_type, base_salary_usd, contract_salary_lbp, payment_months_per_year, hire_date, is_deleted FROM employees WHERE id = ?");
     $e->execute([$employeeId]);
     $e = $e->fetch();
     if (!$e || (int)$e['is_deleted'] === 1) return 0;
 
-    // أمان: لا حساب كامل لمن أساسه صفر بالإعداد (راتبه مخزَّن منقول) لئلا يُصفَّر.
+    // أمان: لا حساب كامل لمن أساسه صفر بالإعداد **وله أساس مخزَّن منقول** لئلا يُصفَّر.
     // لكنه لا يُهمَل: علاواته المسجّلة (أجر إضافي/مكافأة/نقل) تُركَّب على أشهره المخزّنة (أدناه).
-    $hasConfig = ($e['employee_type'] === 'enseignant_titulaire')
+    // الجديد بلا أي أساس مخزّن (ريتا بو عاصي 2026-09-09) يُحسب من ملفه (salaryEngineAllowed).
+    $hasConfig = salaryEngineAllowed($e, $db);
+    $hasBaseCfg = ($e['employee_type'] === 'enseignant_titulaire')
               || (float)$e['base_salary_usd'] > 0
               || (float)$e['contract_salary_lbp'] > 0;
 
@@ -706,6 +739,13 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
     // المسجّلة على أشهره المخزّنة، فيظهر الأجر الإضافي الذي يدخله المستخدم في ملفه
     // على البطاقة السنوية وكل الكشوف (حالة ديانا شرو 2026-08-04).
     if (!$hasConfig) return overlayStoredYearBonuses($employeeId, $sy);
+    // بلا أساس بالإعداد (يُحسب من علاواته فقط): إن لم يكن له ما يُدفَع هذه السنة فلا تولّد أشهراً كلّها أصفار
+    if (!$hasBaseCfg && !salaryYearPayable((int)$employeeId, $sy, $db)) {
+        $hasRows = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND school_year = ? LIMIT 1");
+        $hasRows->execute([$employeeId, $sy]);
+        if ($hasRows->fetchColumn() === false) return 0; // لا شيء يُدفَع ولا صفوف → لا تولّد أصفاراً
+        // صفوفه موجودة (حُسبت من علاوات أُطفئت لاحقاً) → يُعاد حسابها فتصير أصفاراً بدل بقاء الإضافي عالقاً
+    }
 
     $y1 = (int)$mm[1]; $y2 = (int)$mm[2];
     $months = ((int)$e['payment_months_per_year'] === 10)

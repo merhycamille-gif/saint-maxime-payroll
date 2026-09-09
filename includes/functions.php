@@ -6065,3 +6065,46 @@ function healDedupFill20260902() {
         try { setSetting('heal_dedup_fill_20260902', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 🆕 (2026-09-09 «ريتا بو عاصي بمدرسة القديس مكسيموس أستاذ جديد ما عم ببين رواتب بالبطاقة»)
+ * المتعاقد/الموظف الجديد الذي أُدخل بملفه **بلا أساس** (لا دولار ولا عقد بالليرة) ومعه بند علاوة فعّال
+ * أو نقل يومي — كان صمام «الأساس صفر = منقول» يمنع حسابه كلياً، ولا صفوف مخزّنة تُركَّب عليها علاواته،
+ * فتطلع بطاقته فاضية. المصدر الواحد صار salaryEngineAllowed() (payroll_calculator.php): بلا أساس منقول
+ * مخزّن = المحرّك يحسبه من ملفه (أساس 0 + الإضافي + النقل + محسوماتها).
+ * هذا الشفاء يلتقط من أُدخل قبل الإصلاح: الفاعلون الداخلون من 2026-2027 فصاعداً (hire_date ≥ 2026-10-01 —
+ * سنوات 2025-2026 وما قبلها مقفولة بالمليم على كشوفه ولا تُمسّ تلقائياً؛ أصحابها بتقرير المخالفات «فاعل بلا رواتب» بقراره)
+ * بلا أي صف راتب، ولهم ما يُدفَع — يُحسبون بمسار recalcEmployeeYear الآمن. يعمل عند كل فتح (استعلام واحد رخيص)،
+ * ويتخطّى من جُرِّب خلال آخر ساعة (لئلا يُعاد على من تعذّر حسابه بكل صفحة). السجلّ بالإعداد heal_new_hires_norows_20260909.
+ */
+function healNewHiresNoRows20260909() {
+    try {
+        $db = getDB();
+        $rows = $db->query("SELECT e.id, CONCAT(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),' ',COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)) nm
+            FROM employees e
+            WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type <> 'enseignant_titulaire'
+              AND COALESCE(e.base_salary_usd, 0) <= 0 AND COALESCE(e.contract_salary_lbp, 0) <= 0
+              AND e.hire_date IS NOT NULL AND e.hire_date >= '2026-10-01'
+              AND NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id)
+              AND (EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id AND b.is_active = 1 AND b.amount > 0)
+                   OR COALESCE(e.transport_daily_amount, 0) > 0)
+            ORDER BY e.id LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) return;
+        $tried = json_decode((string)getSetting('heal_new_hires_norows_tried', ''), true) ?: [];
+        $now = time(); $todo = [];
+        foreach ($rows as $r) if (($tried[(string)$r['id']] ?? 0) < $now - 3600) $todo[] = $r;
+        if (!$todo) return;
+        require_once __DIR__ . '/payroll_calculator.php';
+        $log = [];
+        foreach ($todo as $r) {
+            $tried[(string)$r['id']] = $now;
+            $n = 0;
+            try { $n = (int)recalcEmployeeYear((int)$r['id']); } catch (Throwable $e) {}
+            $log[] = $r['nm'] . '#' . $r['id'] . '=' . $n;
+        }
+        setSetting('heal_new_hires_norows_tried', json_encode(array_slice($tried, -50, null, true)));
+        setSetting('heal_new_hires_norows_20260909', mb_substr(date('Y-m-d H:i') . ' ' . implode('؛ ', $log) . ' | ' . (string)getSetting('heal_new_hires_norows_20260909', ''), 0, 4000));
+    } catch (Throwable $e) {
+        try { setSetting('heal_new_hires_norows_20260909', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
