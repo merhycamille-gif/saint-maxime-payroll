@@ -340,10 +340,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'birth_place' => trim($_POST['birth_place'] ?? ''),
         'civil_registry_number' => trim($_POST['civil_registry_number'] ?? ''),
         'civil_registry_place' => trim($_POST['civil_registry_place'] ?? ''),
-        'social_status' => $_POST['social_status'] ?? 'celibataire',
+        // 👨‍👩‍👧 الوضع العائلي بخانات واضحة (2026-09-10): النوع (أعزب/متزوج/أرمل) + عدد الأولاد ⇒ مفتاح القانون
+        'social_status' => composeSocialStatus($_POST['marital_kind'] ?? ($_POST['social_status'] ?? 'celibataire'), (int)($_POST['number_of_children'] ?? 0)),
         'spouse_work_start_date' => (preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['spouse_work_start_date'] ?? '') ? $_POST['spouse_work_start_date'] : null),
-        'spouse_works' => isset($_POST['spouse_works']) ? 1 : 0,
-        'number_of_children' => (int)($_POST['number_of_children'] ?? 0),
+        'spouse_works' => ((string)($_POST['spouse_works'] ?? '0') === '1') ? 1 : 0,
+        'number_of_children' => max(0, (int)($_POST['number_of_children'] ?? 0)),
         'gouvernorat' => trim($_POST['gouvernorat'] ?? ''),
         'district' => trim($_POST['district'] ?? ''),
         'ville' => trim($_POST['ville'] ?? ''),
@@ -1250,37 +1251,48 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     <div style="font-size:0.85em;font-weight:600;opacity:0.9">الحالة العائلية</div>
                 </h4>
                 
+                <?php
+                // 👨‍👩‍👧 خانات واضحة (2026-09-10): النوع + الزوج يعمل نعم/كلا + عدد الأولاد. المخزّن يبقى مفتاح القانون
+                // social_status ويُعاد تركيبه عند الحفظ (composeSocialStatus). عدد الأولاد المعروض = العدد بالملف،
+                // وإن كان فارغاً يُؤخذ من فئة الوضع (marie_2_enfants ⇒ 2) حتى لا يُحفَظ صفر بالغلط.
+                [$fsKind, $fsKids] = splitSocialStatus($employee['social_status'] ?? 'celibataire');
+                $fsChildren = (int)($employee['number_of_children'] ?? 0);
+                if ($fsChildren === 0 && $fsKids > 0) $fsChildren = $fsKids;
+                ?>
                 <div class="form-row cols-3">
                     <div class="form-group">
-                        <label class="form-label">Situation / الوضع العائلي</label>
-                        <select name="social_status" class="form-select">
-                            <option value="celibataire" <?= $employee['social_status'] === 'celibataire' ? 'selected' : '' ?>>Célibataire / أعزب</option>
-                            <option value="marie_sans_enfants" <?= $employee['social_status'] === 'marie_sans_enfants' ? 'selected' : '' ?>>Marié sans enfants / متزوج بلا أولاد</option>
-                            <option value="marie_1_enfant" <?= $employee['social_status'] === 'marie_1_enfant' ? 'selected' : '' ?>>Marié 1 enfant / متزوج وولد</option>
-                            <option value="marie_2_enfants" <?= $employee['social_status'] === 'marie_2_enfants' ? 'selected' : '' ?>>Marié 2 enfants / متزوج وولدان</option>
-                            <option value="marie_3_enfants" <?= $employee['social_status'] === 'marie_3_enfants' ? 'selected' : '' ?>>Marié 3 enfants / متزوج و3 أولاد</option>
-                            <option value="marie_4_enfants" <?= $employee['social_status'] === 'marie_4_enfants' ? 'selected' : '' ?>>Marié 4 enfants / متزوج و4 أولاد</option>
-                            <option value="marie_5_enfants" <?= $employee['social_status'] === 'marie_5_enfants' ? 'selected' : '' ?>>Marié 5 enfants / متزوج و5 أولاد</option>
-                            <option value="veuf_sans_enfants" <?= $employee['social_status'] === 'veuf_sans_enfants' ? 'selected' : '' ?>>Veuf(ve) sans enfants / أرمل بلا أولاد</option>
-                            <option value="veuf_1_enfant" <?= $employee['social_status'] === 'veuf_1_enfant' ? 'selected' : '' ?>>Veuf(ve) 1 enfant / أرمل وولد</option>
-                            <option value="veuf_2_enfants" <?= $employee['social_status'] === 'veuf_2_enfants' ? 'selected' : '' ?>>Veuf(ve) 2 enfants / أرمل وولدان</option>
-                            <option value="veuf_3_enfants" <?= $employee['social_status'] === 'veuf_3_enfants' ? 'selected' : '' ?>>Veuf(ve) 3 enfants / أرمل و3 أولاد</option>
+                        <label class="form-label">Marié(e) ? / متزوج؟</label>
+                        <select name="marital_kind" id="maritalKind" class="form-select">
+                            <option value="celibataire" <?= $fsKind === 'celibataire' ? 'selected' : '' ?>>Non — célibataire / كلا — أعزب</option>
+                            <option value="marie" <?= $fsKind === 'marie' ? 'selected' : '' ?>>Oui — marié(e) / نعم — متزوج</option>
+                            <option value="veuf" <?= $fsKind === 'veuf' ? 'selected' : '' ?>>Veuf(ve) / أرمل(ة)</option>
+                            <?php if ($fsKind === 'divorce'): ?><option value="divorce" selected>Divorcé(e) / مطلّق(ة)</option><?php endif; ?>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Conjoint travaille ? / هل يعمل الزوج؟</label>
-                        <small style="display:block;color:var(--gray-500);margin-bottom:4px">إذا بدأ الزوج العمل بتاريخ معيّن حدّده — الزيادة تنشال تلقائياً من ذاك التاريخ:</small>
-                        <input type="date" name="spouse_work_start_date" class="form-control" style="margin-bottom:6px" value="<?= e($employee['spouse_work_start_date'] ?? '') ?>">
-                        <label class="switch">
-                            <input type="checkbox" name="spouse_works" value="1" <?= $employee['spouse_works'] ? 'checked' : '' ?>>
-                            <span class="slider"></span>
-                        </label>
+                    <div class="form-group" id="spouseWorksGroup">
+                        <label class="form-label">Conjoint travaille ? / الزوج/الزوجة يعمل؟</label>
+                        <select name="spouse_works" class="form-select">
+                            <option value="0" <?= empty($employee['spouse_works']) ? 'selected' : '' ?>>Non / كلا</option>
+                            <option value="1" <?= !empty($employee['spouse_works']) ? 'selected' : '' ?>>Oui / نعم</option>
+                        </select>
+                        <small style="display:block;color:var(--gray-500);margin:6px 0 4px">إذا بدأ العمل بتاريخ معيّن حدّده — زيادة الزوج تنشال تلقائياً من ذاك التاريخ:</small>
+                        <?php $swsd = (string)($employee['spouse_work_start_date'] ?? ''); if ($swsd < '1900-01-01') $swsd = ''; /* 0000-00-00 / 0001-01-01 = لا تاريخ */ ?>
+                        <input type="date" name="spouse_work_start_date" class="form-control" value="<?= e($swsd) ?>">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Nombre d'enfants / عدد الأولاد</label>
-                        <input type="number" name="number_of_children" class="form-control" value="<?= (int)$employee['number_of_children'] ?>" min="0" max="20">
+                        <input type="number" name="number_of_children" class="form-control" value="<?= $fsChildren ?>" min="0" max="20">
+                        <small style="display:block;color:var(--gray-500);margin-top:4px">تنزيل الأولاد بالضريبة يُحسب حتى 5 أولاد للمتزوج/الأرمل فقط (والقاصرون دون 18 بالتأريخ)</small>
                     </div>
                 </div>
+                <script>
+                (function(){
+                    var k = document.getElementById('maritalKind'), g = document.getElementById('spouseWorksGroup');
+                    if (!k || !g) return;
+                    function sync(){ g.style.display = (k.value === 'marie') ? '' : 'none'; }
+                    k.addEventListener('change', sync); sync();
+                })();
+                </script>
 
                 <?php /* قسم المستندات والصور — منقول إلى التبويب الشخصي (personnel) */ echo renderEmployeeScans($employee, $id); ?>
             </div>
@@ -1572,6 +1584,77 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
     <!-- ========== Finance Tab ========== -->
     <div class="tab-content" data-tab-content="finance">
         <?php $empTabBar(); ?>
+        <?php
+        // 💰 «خلّينا نشوف بالملف المالي قدّيش مجموع التنزيلات العائلية الشهرية وقيمة صندوق التعويضات وقيمة الضمان»
+        // (طلبه 2026-09-10): قراءة فقط — التنزيل من المصدر الواحد familyDeductionAnnual (السنوي ÷ 12)،
+        // والصندوق/الضمان من آخر شهر راتب مخزّن بالسنة المختارة (أرقام المحرّك نفسها التي بالقسيمة).
+        $finSum = null;
+        if (!empty($id)) {
+            try {
+                $fsSy = activeSchoolYear(); if ($fsSy === 'all') $fsSy = currentSchoolYear();
+                $fsQ = $db->prepare("SELECT month, year, school_year, caisse_amount_lbp, cnss_amount_lbp, income_tax_lbp
+                                     FROM monthly_salaries WHERE employee_id = ? AND school_year = ?
+                                       AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0)
+                                     ORDER BY year DESC, month DESC LIMIT 1");
+                $fsQ->execute([(int)$id, $fsSy]);
+                $fsRow = $fsQ->fetch(PDO::FETCH_ASSOC);
+                if (!$fsRow) {
+                    $fsQ2 = $db->prepare("SELECT month, year, school_year, caisse_amount_lbp, cnss_amount_lbp, income_tax_lbp
+                                          FROM monthly_salaries WHERE employee_id = ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0)
+                                          ORDER BY year DESC, month DESC LIMIT 1");
+                    $fsQ2->execute([(int)$id]);
+                    $fsRow = $fsQ2->fetch(PDO::FETCH_ASSOC);
+                }
+                $fsAsOf = $fsRow ? sprintf('%04d-%02d-01', (int)$fsRow['year'], (int)$fsRow['month']) : date('Y-m-01');
+                $fsAnnual = (int)familyDeductionAnnual($employee['social_status'] ?? '', $employee['spouse_works'] ?? 0,
+                    $employee['apply_family_deduction'] ?? 1, $fsAsOf, $employee['grant_spouse_addition'] ?? 0,
+                    $employee['grant_children_addition'] ?? 0, (int)$id);
+                $fsOpts = $fsRow ? ['month' => (int)$fsRow['month'], 'year' => (int)$fsRow['year']] : [];
+                $finSum = [
+                    'annual'  => $fsAnnual,
+                    'monthly' => (int)floor($fsAnnual / 12),
+                    'caisse'  => $fsRow ? (float)$fsRow['caisse_amount_lbp'] : null,
+                    'cnss'    => $fsRow ? (float)$fsRow['cnss_amount_lbp'] : null,
+                    'tax'     => $fsRow ? (float)$fsRow['income_tax_lbp'] : null,
+                    'label'   => $fsRow ? (monthName((int)$fsRow['month'], 'ar') . ' ' . (int)$fsRow['year']) : '',
+                    'opts'    => $fsOpts,
+                ];
+            } catch (Throwable $e) { $finSum = null; }
+        }
+        if ($finSum): $fsV = function ($v) use ($finSum) { return $v === null ? '—' : money($v, null, $finSum['opts']); }; ?>
+        <div class="card" id="finSummaryCard">
+            <div class="card-header">
+                <h3>
+                    <span dir="ltr"><i class="fas fa-calculator"></i> Retenues et abattement en vigueur</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">المحسومات والتنزيل العائلي الساري<?= $finSum['label'] !== '' ? ' — بحسب راتب ' . e($finSum['label']) : '' ?></div>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row cols-4">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Abattement familial / mois / التنزيل العائلي الشهري</label>
+                        <div class="form-control" style="background:#f1f5f9;font-weight:700"><?= $fsV($finSum['monthly']) ?></div>
+                        <small class="text-muted d-block">السنوي <?= formatLBP($finSum['annual']) ?> ÷ 12</small>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Impôt sur le revenu / ضريبة الدخل الشهرية</label>
+                        <div class="form-control" style="background:#fef2f2;font-weight:700"><?= $fsV($finSum['tax']) ?></div>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Caisse EOC 6 % / صندوق التعويضات</label>
+                        <div class="form-control" style="background:#fffbeb;font-weight:700"><?= $fsV($finSum['caisse']) ?></div>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">CNSS 3 % / الضمان الاجتماعي</label>
+                        <div class="form-control" style="background:#eff6ff;font-weight:700"><?= $fsV($finSum['cnss']) ?></div>
+                    </div>
+                </div>
+                <?php if ($finSum['caisse'] === null): ?>
+                <small class="text-muted d-block" style="margin-top:8px">ما في شهر راتب مخزّن بعد لهذا الملف — الصندوق والضمان يظهران بعد أول احتساب.</small>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
         <div class="card">
             <div class="card-header">
                 <h3>

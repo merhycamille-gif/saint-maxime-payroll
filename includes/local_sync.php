@@ -132,16 +132,26 @@ function localSyncRun(): array {
         $nsal = (int)$pdo->query("SELECT COUNT(*) FROM `$tmpdb`.monthly_salaries")->fetchColumn();
         if ($nemp < 500 || $nsal < 10000) { $pdo->exec("DROP DATABASE IF EXISTS `$tmpdb`"); return $done(false, "أرقام غير منطقية (موظفون $nemp، رواتب $nsal) — الكمبيوتر لم يُمسّ"); }
 
-        // 4) التبديل الذرّي
+        // 4) التبديل الذرّي — 🔴 بيان RENAME TABLE **واحد** يحرّك القديم → prev والجديد → القاعدة معاً (حادثة
+        //    2026-09-10 09:00: كان بيانين، وبين الأول والثاني فتحت صفحة أخرى فخلق شفاء ذاتي جدولَي employee_children
+        //    وtax_suggestions بالقاعدة الفارغة، ففشل الثاني «already exists» وبقيت القاعدة بجدولين). البيان الواحد
+        //    ذرّي: إمّا ينجح كله أو لا يتحرّك شيء.
         $hasFirst = (bool)$pdo->query("SHOW DATABASES LIKE '$firstdb'")->fetchColumn();
-        if ($hasFirst) { $target = $prevdb; $pdo->exec("DROP DATABASE IF EXISTS `$prevdb`"); $pdo->exec("CREATE DATABASE `$prevdb` CHARACTER SET utf8mb4"); }
-        else { $target = $firstdb; $pdo->exec("CREATE DATABASE `$firstdb` CHARACTER SET utf8mb4"); localSyncLog("أول مزامنة: القاعدة القديمة بكل جداولها تُحفظ نهائياً بـ $firstdb"); }
         $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbname` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
         $cur = $pdo->query("SELECT table_name FROM information_schema.tables WHERE table_schema='$dbname' AND table_type='BASE TABLE'")->fetchAll(PDO::FETCH_COLUMN);
-        if ($cur) $pdo->exec('RENAME TABLE ' . implode(',', array_map(fn($t) => "`$dbname`.`$t` TO `$target`.`$t`", $cur)));
         $new = $pdo->query("SELECT table_name FROM information_schema.tables WHERE table_schema='$tmpdb' AND table_type='BASE TABLE'")->fetchAll(PDO::FETCH_COLUMN);
-        $pdo->exec('RENAME TABLE ' . implode(',', array_map(fn($t) => "`$tmpdb`.`$t` TO `$dbname`.`$t`", $new)));
+        if (!$hasFirst) { $target = $firstdb; $pdo->exec("CREATE DATABASE `$firstdb` CHARACTER SET utf8mb4"); localSyncLog("أول مزامنة: القاعدة القديمة بكل جداولها تُحفظ نهائياً بـ $firstdb"); }
+        elseif (count($cur) < (int)ceil(count($new) / 2)) {
+            // القاعدة الحالية ناقصة (مزامنة سابقة انقطعت بعد نقل القديم إلى prev): لا نمحو prev — ما بقي يُحفظ بقاعدة إنقاذ مؤرّخة
+            $target = 'smp_pc_rescue_' . date('Ymd_His'); $pdo->exec("CREATE DATABASE `$target` CHARACTER SET utf8mb4");
+            localSyncLog('القاعدة الحالية ناقصة (' . count($cur) . ' جداول) — smp_pc_prev محفوظة كما هي، والبقايا إلى ' . $target);
+        }
+        else { $target = $prevdb; $pdo->exec("DROP DATABASE IF EXISTS `$prevdb`"); $pdo->exec("CREATE DATABASE `$prevdb` CHARACTER SET utf8mb4"); }
+        $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
+        $pairs = [];
+        foreach ($cur as $t) $pairs[] = "`$dbname`.`$t` TO `$target`.`$t`";
+        foreach ($new as $t) $pairs[] = "`$tmpdb`.`$t` TO `$dbname`.`$t`";
+        $pdo->exec('RENAME TABLE ' . implode(',', $pairs));
         $pdo->exec("DROP DATABASE IF EXISTS `$tmpdb`");
         $final = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$dbname'")->fetchColumn();
     } catch (Throwable $e) {

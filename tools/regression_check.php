@@ -3378,8 +3378,9 @@ check('فئة الأرمل: المعادلة تحسبها (شخصي + أولاد
       familyDeductionAnnual('veuf_2_enfants', 0, 1, '2026-01-01', 1, 1) === familyDeductionAnnual('marie_2_enfants', 1, 1, '2026-01-01', 1, 1)
       && familyDeductionAnnual('veuf_sans_enfants', 0, 1, '2026-01-01', 1, 1) === familyDeductionAnnual('celibataire', 0, 1, '2026-01-01', 1, 1)
       && familyDeductionAnnual('veuf_2_enfants', 0, 1, '2026-01-01', 1, 0) === familyDeductionAnnual('celibataire', 0, 1, '2026-01-01', 1, 1));
-check('فئة الأرمل: خياراتها بملف الموظف + تسمياتها',
-      strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'value="veuf_2_enfants"') !== false
+check('فئة الأرمل: خيارها بملف الموظف (أرمل(ة) بقائمة «متزوج؟» منذ 2026-09-10، والعدد من «عدد الأولاد») + تسمياتها',
+      strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'value="veuf"') !== false
+      && composeSocialStatus('veuf', 2) === 'veuf_2_enfants'
       && socialStatusLabel('veuf_2_enfants', 'ar') === 'أرمل وله ولدان');
 check('حالات سيدة النجاة: الشفاء موصول بالهيدر (يعمل أونلاين بعد النشر)',
       function_exists('healNajatCivilStatus20260823')
@@ -4946,6 +4947,40 @@ try {
     $db->exec("DELETE FROM employee_bonuses WHERE employee_id = $rid101");
     $db->exec("DELETE FROM employees WHERE id = $rid101");
 }
+
+/* ===================================================================
+ * 102) 👨‍👩‍👧 الوضع العائلي بخانات واضحة (طلبه 2026-09-10 «متزوج أم أعزب؟ نعم/كلا — الزوجة تعمل؟
+ *      نعم/كلا — عدد الأولاد») + بطاقة «المحسومات والتنزيل العائلي الساري» بالتبويب المالي:
+ *      المخزّن يبقى مفتاح القانون social_status ويُركَّب عند الحفظ (composeSocialStatus) —
+ *      العازب بأولاد يبقى celibataire (لا يتغيّر تنزيل أحد من الـ79)، والمتزوج/الأرمل بسقف 5.
+ * =================================================================== */
+$src102 = (string)file_get_contents($PROJ . '/pages/employees.php');
+check('الوضع العائلي الواضح: composeSocialStatus/splitSocialStatus معرَّفتان وتُركّبان مفتاح القانون بالضبط (عازب+3 = celibataire · متزوج+2 = marie_2_enfants · متزوج+7 = marie_5_enfants · أرمل+0 = veuf_sans_enfants · أرمل+1 = veuf_1_enfant · قيمة قديمة كاملة تمرّ كما هي) والتفكيك عكسها',
+      function_exists('composeSocialStatus') && function_exists('splitSocialStatus')
+      && composeSocialStatus('celibataire', 3) === 'celibataire' && composeSocialStatus('marie', 2) === 'marie_2_enfants'
+      && composeSocialStatus('marie', 7) === 'marie_5_enfants' && composeSocialStatus('marie', 0) === 'marie_sans_enfants'
+      && composeSocialStatus('veuf', 0) === 'veuf_sans_enfants' && composeSocialStatus('veuf', 1) === 'veuf_1_enfant'
+      && composeSocialStatus('marie_3_enfants', 0) === 'marie_3_enfants' && composeSocialStatus('', 2) === 'celibataire'
+      && splitSocialStatus('marie_2_enfants') === ['marie', 2] && splitSocialStatus('veuf_1_enfant') === ['veuf', 1]
+      && splitSocialStatus('marie_sans_enfants') === ['marie', 0] && splitSocialStatus('celibataire') === ['celibataire', 0]);
+// كل مفتاح مخزّن بالقاعدة يعود لنفسه بعد تفكيك ثم تركيب (لا يتغيّر تنزيل أحد عند إعادة الحفظ)
+$rt102 = 0; $bad102 = [];
+foreach ($db->query("SELECT DISTINCT social_status FROM employees WHERE is_deleted = 0")->fetchAll(PDO::FETCH_COLUMN) as $ss102) {
+    [$k102, $n102] = splitSocialStatus($ss102);
+    if (composeSocialStatus($k102, $n102) !== (string)$ss102) $bad102[] = $ss102; else $rt102++;
+}
+check('الوضع العائلي الواضح: كل مفاتيح القاعدة تعود لنفسها بعد تفكيك/تركيب (إعادة حفظ الملف لا تغيّر فئة أحد)', !$bad102 && $rt102 > 0, "ok=$rt102 bad=" . implode(',', $bad102));
+check('الوضع العائلي الواضح: الفورم يعرض «متزوج؟» (marital_kind) + «الزوج/الزوجة يعمل؟» كقائمة نعم/كلا + عدد الأولاد، بلا القائمة القديمة الـ12 خياراً، والحفظ يركّب social_status من النوع + العدد ويقرأ spouse_works من القيمة لا من isset',
+      strpos($src102, 'name="marital_kind" id="maritalKind"') !== false && strpos($src102, '<select name="spouse_works" class="form-select">') !== false
+      && strpos($src102, 'name="number_of_children"') !== false && strpos($src102, 'name="social_status"') === false
+      && strpos($src102, "'social_status' => composeSocialStatus(\$_POST['marital_kind'] ?? (\$_POST['social_status'] ?? 'celibataire'), (int)(\$_POST['number_of_children'] ?? 0))") !== false
+      && strpos($src102, "'spouse_works' => ((string)(\$_POST['spouse_works'] ?? '0') === '1') ? 1 : 0") !== false
+      && strpos($src102, "isset(\$_POST['spouse_works'])") === false);
+check('الملف المالي: بطاقة «المحسومات والتنزيل العائلي الساري» (finSummaryCard) تقرأ التنزيل من المصدر الواحد familyDeductionAnnual (÷12) والصندوق/الضمان/الضريبة من آخر شهر مخزّن بالسنة المختارة عبر money() لا formatLBP للخانة',
+      strpos($src102, 'id="finSummaryCard"') !== false && substr_count($src102, "familyDeductionAnnual(\$employee['social_status'] ?? '', \$employee['spouse_works'] ?? 0,") === 1
+      && strpos($src102, "'monthly' => (int)floor(\$fsAnnual / 12)") !== false
+      && strpos($src102, "return \$v === null ? '—' : money(\$v, null, \$finSum['opts']);") !== false
+      && strpos($src102, "SELECT month, year, school_year, caisse_amount_lbp, cnss_amount_lbp, income_tax_lbp") !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

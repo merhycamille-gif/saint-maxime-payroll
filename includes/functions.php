@@ -3197,6 +3197,31 @@ function healRemoveNoFatherDuplicates20260806() {
 }
 
 /**
+ * 👨‍👩‍👧 الوضع العائلي بخانات واضحة (طلبه 2026-09-10 «متزوج أم أعزب؟ نعم/كلا — الزوجة تعمل؟ نعم/كلا — عدد الأولاد»):
+ * المخزّن يبقى مفتاح القانون social_status (celibataire / marie_N_enfants / veuf_N_enfants) لأن جدول
+ * التنزيل العائلي وكل الكشوف تقرأه — الفورم يعرضه نوعاً + عدد أولاد ويعيد تركيبه عند الحفظ.
+ *   - splitSocialStatus('marie_2_enfants') = ['marie', 2] · 'celibataire' = ['celibataire', 0]
+ *   - composeSocialStatus('marie', 7) = 'marie_5_enfants' (سقف القانون 5) · ('celibataire', 3) = 'celibataire'
+ *     (العازب لا فئة أولاد له بالقانون — العدد يُحفظ بـnumber_of_children فقط، فلا يتغيّر تنزيل أحد).
+ */
+function splitSocialStatus($status): array {
+    $s = (string)$status;
+    if (preg_match('/^(marie|veuf|divorce)(?:_(sans_enfants|(\d+)_enfants?))?$/', $s, $m)) {
+        return [$m[1], isset($m[3]) && $m[3] !== '' ? (int)$m[3] : 0];
+    }
+    return ['celibataire', 0];
+}
+function composeSocialStatus($kind, $children): string {
+    $kind = (string)$kind;
+    if (!in_array($kind, ['marie', 'veuf', 'divorce'], true)) {
+        // قيمة كاملة قديمة (marie_2_enfants…) تمرّ كما هي؛ وإلا عازب
+        return preg_match('/^(marie|veuf|divorce)_/', $kind) ? $kind : 'celibataire';
+    }
+    $n = max(0, min(5, (int)$children));
+    return $kind . ($n === 0 ? '_sans_enfants' : ($n === 1 ? '_1_enfant' : '_' . $n . '_enfants'));
+}
+
+/**
  * 🔴 المصدر الوحيد للتنزيل العائلي السنوي الساري لموظف (2026-08-06، حالة زاهية الحاج):
  * يعتمده المحرّك وكل الكشوف وتصاريح ر5/ر10 — فلا يختلف رقم عن رقم.
  *   - زرّ «تطبيق التنزيل العائلي» بملفه مطفأ ⇒ 0.
@@ -3228,7 +3253,8 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
                 $sq = $db->prepare("SELECT spouse_work_start_date FROM employees WHERE id = ?");
                 $sq->execute([$eid]);
                 $sw = $sq->fetchColumn();
-                $fdSws = ($sw && $sw !== '0000-00-00') ? $sw : null;
+                // تاريخ وهمي (0000-00-00 / 0001-01-01 — جورج العموري 119 بالأونلاين 2026-09-10) = لا تاريخ، وإلا يُسقط زيادة الزوج بالغلط
+                $fdSws = ($sw && (string)$sw >= '1900-01-01') ? $sw : null;
             } catch (Throwable $e) {}
             if ($fdKids && preg_match('/^(marie|veuf|divorce)/', $socialStatus, $mPre)) {
                 $n = 0;
