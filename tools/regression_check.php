@@ -4117,10 +4117,12 @@ $who75 = function (string $first, string $father, string $last) use ($db, $abra7
 $ritaM75 = $who75('ريتا', 'مارون', 'حليحل'); $mariaE75 = $who75('ماريا', 'الياس', 'حليحل');
 $rr75 = $db->query("SELECT COUNT(*) n, SUM(net_salary_lbp) s, MAX(prime_fixe_lbp) p FROM monthly_salaries WHERE employee_id=" . (int)$ritaM75['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetch();
 $mm75 = $db->query("SELECT COUNT(*) n, SUM(net_salary_lbp) s, MAX(prime_fixe_lbp) p FROM monthly_salaries WHERE employee_id=" . (int)$mariaE75['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetch();
-check('عبرا: ريتا مارون حليحل صحّت على كشفه (سلفة 80م لا 138م، صافي 73,710,000×12 داون للألف) وماريا الياس حليحل أخذت سلفتها (53م، صافي 49,160,000×12)',
-      (int)$rr75['n'] === 12 && (float)$rr75['s'] === 884520000.0 && (float)$rr75['p'] === 80000000.0
-      && (int)$mm75['n'] === 12 && (float)$mm75['s'] === 589920000.0 && (float)$mm75['p'] === 53000000.0,
-      "ريتا s={$rr75['s']} ماريا s={$mm75['s']}");
+// 🔄 (2026-09-10 «دايما طبّق القانون بكل البرنامج» + «أكيد كلهم 65»): القفل صار على القانون لا على الكشف القديم —
+//    ريتا: نسبة 65٪ (80م تشرين→كانون ثم 86م من كانون 2026 بدرجة 26) مجموع الصافي 932,532,000؛ ماريا: 65٪ (51م ثم 59م من كانون بدرجة 15.5) مجموع 674,375,000.
+check('عبرا: ريتا مارون حليحل وماريا الياس حليحل بالقانون (65٪ + درجات كانون 2026): ريتا صافي السنة 932,532,000 وإضافي حتى 86م · ماريا 674,375,000 وإضافي حتى 59م',
+      (int)$rr75['n'] === 12 && (float)$rr75['s'] === 932532000.0 && (float)$rr75['p'] === 86000000.0
+      && (int)$mm75['n'] === 12 && (float)$mm75['s'] === 674375000.0 && (float)$mm75['p'] === 59000000.0,
+      "ريتا s={$rr75['s']} p={$rr75['p']} ماريا s={$mm75['s']} p={$mm75['p']}");
 $vio75 = $who75('فيوليت', 'جميل', 'الحمصي'); $ter75 = $who75('تريز', 'جوزيف', 'حبقوق');
 check('عبرا: فيوليت الحمصي وتريز حبقوق «اساتذة تعاقد» بقراره — الفئة متعاقد والأرقام المخزّنة بلا مسّ + الشفاء موصول بالهيدر',
       $vio75['employee_type'] === 'enseignant_contractuel' && $ter75['employee_type'] === 'enseignant_contractuel'
@@ -5140,22 +5142,26 @@ check('نظام 4+4+2: تابلو الدرجات لا يلغي قانوناً ل
  *      قفل: جوزف السرّوع تشرين 2025 إضافي 105,000,000 (كان 130م بنسبة 80.5٪) بأساس 2,720,000.
  * =================================================================== */
 $fn106 = (string)file_get_contents($PROJ . '/includes/functions.php');
-check('عبرا 65٪: الشفاء موجود وموصول بالهيدر ويستثني المحميّتين بالاسم ويحدّد المدرسة بـ«ثانوية السيدة»',
+check('عبرا 65٪: الشفاء موجود وموصول بالهيدر (v2 بلا محميّين — «دايما طبّق القانون بكل البرنامج») ويحدّد المدرسة بـ«ثانوية السيدة»',
       strpos($fn106, 'function healAbraPct65_20260910()') !== false
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraPct65_20260910();') !== false
-      && substr_count(substr($fn106, strpos($fn106, 'function healAbraPct65_20260910()'), 4000), "LIKE '%حليحل%'") === 2
+      && substr_count(substr($fn106, strpos($fn106, 'function healAbraPct65_20260910()'), 4000), "LIKE '%حليحل%'") === 0
+      && strpos($fn106, "heal_abra_pct65v2_20260910") !== false
       && strpos($fn106, "name_ar LIKE '%ثانوية السيدة%'") !== false);
 $abra106 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE '%ثانوية السيدة%' ORDER BY id LIMIT 1")->fetchColumn();
 $non65 = $db->query("SELECT CONCAT(e.first_name_ar,' ',e.last_name_ar) nm FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id
     WHERE e.school_id=$abra106 AND e.employee_type='enseignant_titulaire' AND e.is_deleted=0 AND b.is_active=1 AND b.bonus_type='prime_fixe'
       AND b.start_month IS NULL AND b.end_month IS NULL AND (b.school_year IS NULL OR b.school_year='2025-2026')
       AND NOT (b.value_type='percent' AND ROUND(b.amount,2)=65.00)")->fetchAll(PDO::FETCH_COLUMN);
-$only2 = count($non65) === 2 && count(array_filter($non65, fn($n) => mb_strpos($n, 'حليحل') !== false)) === 2;
 $jos106 = $db->query("SELECT ms.base_plus_echelon_lbp bpe, ms.prime_fixe_lbp p FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
     WHERE e.school_id=$abra106 AND e.first_name_ar='جوزف' AND e.last_name_ar LIKE '%السر%وع%' AND e.is_deleted=0 AND ms.year=2025 AND ms.month=10 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-check('عبرا 65٪ (داتا حيّة): كل ملاك عبرا على 65٪ إلا المحميّتين حليحل + قفل جوزف السرّوع تشرين 2025 = 105,000,000 (أساس 2,720,000)',
-      $abra106 > 0 && $only2 && $jos106 && (int)$jos106['p'] === 105000000 && (int)$jos106['bpe'] === 2720000,
-      'non65=' . implode('؛', $non65) . ' jos=' . json_encode($jos106));
+// ريتا مارون حليحل: كانون 2026 بالقانون = درجة 26 (4+4+2 بكانون) → أساس 2,225,000 وإضافي 65٪ = 86,000,000 (كان مجمّداً 2,085,000/80م على الكشف القديم)
+$rita106 = $db->query("SELECT ms.base_plus_echelon_lbp bpe, ms.prime_fixe_lbp p FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+    WHERE e.school_id=$abra106 AND e.first_name_ar LIKE 'ريتا%' AND e.father_name_ar LIKE 'مارون%' AND e.last_name_ar LIKE '%حليحل%' AND e.is_deleted=0 AND ms.year=2026 AND ms.month=1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+check('عبرا 65٪ (داتا حيّة): كل ملاك عبرا على 65٪ بلا استثناء + قفل جوزف السرّوع تشرين 2025 = 105,000,000 (أساس 2,720,000) + ريتا مارون حليحل كانون 2026 = 2,225,000/86,000,000 بالقانون',
+      $abra106 > 0 && count($non65) === 0 && $jos106 && (int)$jos106['p'] === 105000000 && (int)$jos106['bpe'] === 2720000
+      && $rita106 && (int)$rita106['bpe'] === 2225000 && (int)$rita106['p'] === 86000000,
+      'non65=' . implode('؛', $non65) . ' jos=' . json_encode($jos106) . ' rita=' . json_encode($rita106));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
