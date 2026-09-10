@@ -290,8 +290,8 @@ $cpItems = complianceItems($db, currentSchoolYear());
 $cpRules = complianceRules();
 $cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
 $cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
-check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 17 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
-      count($cpRules) === 17
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 18 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 18
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
@@ -2846,7 +2846,7 @@ check('زيادة الزوج اختيارية: العمود grant_spouse_additio
       && strpos($fn47, "(!empty(\$spouseWorks) || (int)(\$grantSpouseAdd ?? 1) !== 1)") !== false);
 check('زيادة الزوج اختيارية: زرّ بملف الموظف + يُحفَظ + المحرّك يمرّره',
       strpos($emp47, 'name="grant_spouse_addition"') !== false
-      && strpos($emp47, "'grant_spouse_addition' => isset(\$_POST['grant_spouse_addition'])") !== false
+      && strpos($emp47, "'grant_spouse_addition' => ((string)(\$_POST['grant_spouse_addition'] ?? '0') === '1') ? 1 : 0") !== false // قائمة نعم/كلا منذ 2026-09-10
       && strpos($pc47, "\$this->employee['grant_spouse_addition'] ?? 0") !== false);
 // تجربة فعلية على زاهية (متأهلة بلا أولاد، زوجها لا يعمل، ضريبتها 0) مع ترجيع كامل:
 // إطفاء «زيادة الزوج» وحده ⇒ تنزيلها 450م ⇒ تظهر ضريبة — والدالة مباشرة: 675م → 450م
@@ -3343,7 +3343,7 @@ $emp61s = (string)file_get_contents($PROJ . '/pages/employees.php');
 check('تنزيل الأولاد اختياري: المحرّك يمرّره + مفتاح بملف الموظف (يُحفَظ مع الملف)',
       strpos($pc61, "\$this->employee['grant_children_addition'] ?? 0") !== false
       && strpos($emp61s, 'name="grant_children_addition"') !== false
-      && strpos($emp61s, "'grant_children_addition' => isset(\$_POST['grant_children_addition'])") !== false
+      && strpos($emp61s, "'grant_children_addition' => ((string)(\$_POST['grant_children_addition'] ?? '0') === '1') ? 1 : 0") !== false // قائمة نعم/كلا منذ 2026-09-10
       && strpos($emp61s, "'grant_children_addition' => 0,") !== false);
 $gcaCount = 0;
 // (2026-08-24: تقرير الضريبة صار يمرّره عبر mofCumTax التراكمية بfunctions.php — تُعدّ كمان)
@@ -4981,6 +4981,35 @@ check('الملف المالي: بطاقة «المحسومات والتنزيل
       && strpos($src102, "'monthly' => (int)floor(\$fsAnnual / 12)") !== false
       && strpos($src102, "return \$v === null ? '—' : money(\$v, null, \$finSum['opts']);") !== false
       && strpos($src102, "SELECT month, year, school_year, caisse_amount_lbp, cnss_amount_lbp, income_tax_lbp") !== false);
+
+/* ===================================================================
+ * 103) 👨‍👩‍👧 زيادة الزوج/تنزيل الأولاد تحت الحالة العائلية (جورج العموري 2026-09-10 «حطينا الزوجة لا تعمل
+ *      وعندو ولدين ما حسبلهن التنزيل»): قائمتا نعم/كلا بالتبويب الشخصي (لا بتبويب المحسومات) + الحفظ بالقيمة
+ *      + قاعدة تقرير المخالفات family_ded_off (بند بالفرق السنوي + تصحيح بكبسة = تضوية + إعادة حساب السنة، بلا تضوية جماعية)
+ *      + قفل القانون: متزوج + ولدان + الزرّان = 765,000,000 سنوياً (63,750,000 شهرياً = كشفه القديم).
+ * =================================================================== */
+$src103 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$cmp103 = (string)file_get_contents($PROJ . '/includes/compliance.php');
+check('زيادة الزوج/تنزيل الأولاد: قائمتان نعم/كلا داخل الحالة العائلية (famDedGroup) بالتبويب الشخصي، غير مكرّرتين بتبويب المحسومات، والحفظ يقرأ القيمة لا isset',
+      strpos($src103, 'id="famDedGroup"') !== false
+      && substr_count($src103, '<select name="grant_spouse_addition" class="form-select">') === 1 && substr_count($src103, '<select name="grant_children_addition" class="form-select">') === 1
+      && strpos($src103, 'type="checkbox" name="grant_spouse_addition"') === false && strpos($src103, 'type="checkbox" name="grant_children_addition"') === false
+      && strpos($src103, "'grant_spouse_addition' => ((string)(\$_POST['grant_spouse_addition'] ?? '0') === '1') ? 1 : 0") !== false
+      && strpos($src103, "'grant_children_addition' => ((string)(\$_POST['grant_children_addition'] ?? '0') === '1') ? 1 : 0") !== false
+      && strpos($src103, "isset(\$_POST['grant_spouse_addition'])") === false);
+check('قانون التنزيل العائلي (جورج العموري): متزوج + ولدان + الزوجة لا تعمل + الزرّان = 765,000,000 سنوياً (63,750,000 شهرياً = كشفه القديم) · زيادة الزوج وحدها 675م · الأولاد وحدهم 540م · بلا الزرّين 450م كالعازب · تاريخ عمل زوج وهمي (0001-01-01) لا يُسقط الزيادة',
+      familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-09-01', 1, 1) === 765000000
+      && familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-09-01', 1, 0) === 675000000
+      && familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-09-01', 0, 1) === 540000000
+      && familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-09-01', 0, 0) === 450000000
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "\$fdSws = (\$sw && (string)\$sw >= '1900-01-01') ? \$sw : null;") !== false);
+check('تقرير المخالفات: قاعدة family_ded_off معرَّفة (مراجعة) + بندها يحسب الفرق بالمصدر الواحد familyDeductionAnnual + التصحيح يضوّي الزرّين المطفأين فقط ويعيد حساب السنة + مستثناة من «تصحيح الكل» + الملف المالي يعرض حالة الزرّين',
+      isset(complianceRules()['family_ded_off'])
+      && strpos($cmp103, "\$add('family_ded_off', \$r,") !== false && substr_count($cmp103, 'familyDeductionAnnual($r[\'social_status\'], $r[\'spouse_works\'] ?? 0, 1, $fdAsOf,') === 2
+      && strpos($cmp103, "case 'family_ded_off':") !== false && strpos($cmp103, "if (!empty(\$d['spouse'])) \$set[] = 'grant_spouse_addition = 1';") !== false
+      && strpos($cmp103, "&& \$rule !== 'family_ded_off') \$keys[] = \$it['key'];") !== false
+      && strpos($cmp103, "&& \$rk !== 'family_ded_off' && count(array_filter(") !== false
+      && strpos($src103, '· تنزيل الأولاد: <b>') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

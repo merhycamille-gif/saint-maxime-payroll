@@ -392,8 +392,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'keep_working_past_64' => isset($_POST['keep_working_past_64']) ? 1 : 0,
         'tax_subject' => isset($_POST['tax_subject']) ? 1 : 0,
         'apply_family_deduction' => isset($_POST['apply_family_deduction']) ? 1 : 0,
-        'grant_spouse_addition' => isset($_POST['grant_spouse_addition']) ? 1 : 0,
-        'grant_children_addition' => isset($_POST['grant_children_addition']) ? 1 : 0,
+        // قائمتا نعم/كلا بالحالة العائلية (2026-09-10 جورج العموري «ما حسبلهن التنزيل») — القيمة لا isset
+        'grant_spouse_addition' => ((string)($_POST['grant_spouse_addition'] ?? '0') === '1') ? 1 : 0,
+        'grant_children_addition' => ((string)($_POST['grant_children_addition'] ?? '0') === '1') ? 1 : 0,
         'tax_includes_echelon' => isset($_POST['tax_includes_echelon']) ? 1 : 0,
         'tax_includes_extra' => isset($_POST['tax_includes_extra']) ? 1 : 0,
         'tax_includes_prime_aide' => isset($_POST['tax_includes_prime_aide']) ? 1 : 0,
@@ -1285,11 +1286,37 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                         <small style="display:block;color:var(--gray-500);margin-top:4px">تنزيل الأولاد بالضريبة يُحسب حتى 5 أولاد للمتزوج/الأرمل فقط (والقاصرون دون 18 بالتأريخ)</small>
                     </div>
                 </div>
+                <?php /* 👨‍👩‍👧 زيادة الزوج وتنزيل الأولاد بالضريبة — هنا تحت الحالة العائلية مباشرة (كانا مخبّأين بتبويب المحسومات فبقي
+                         تنزيل جورج العموري كالعازب رغم «الزوجة لا تعمل + ولدان» — 2026-09-10). المعادلة familyDeductionAnnual تقرأهما. */ ?>
+                <div class="form-row cols-3" id="famDedGroup">
+                    <div class="form-group" id="grantSpouseGroup">
+                        <label class="form-label">Majoration conjoint (impôt) / زيادة الزوج/الزوجة بالتنزيل العائلي؟</label>
+                        <select name="grant_spouse_addition" class="form-select">
+                            <option value="0" <?= empty($employee['grant_spouse_addition']) ? 'selected' : '' ?>>Non / كلا</option>
+                            <option value="1" <?= !empty($employee['grant_spouse_addition']) ? 'selected' : '' ?>>Oui / نعم</option>
+                        </select>
+                        <small style="display:block;color:var(--gray-500);margin-top:4px">قانوناً للزوج/الزوجة الذي لا يعمل (المادة 31) — و«يعمل: نعم» يُسقطها حكماً</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Abattement enfants (impôt) / تنزيل الأولاد بالضريبة؟</label>
+                        <select name="grant_children_addition" class="form-select">
+                            <option value="0" <?= empty($employee['grant_children_addition']) ? 'selected' : '' ?>>Non / كلا</option>
+                            <option value="1" <?= !empty($employee['grant_children_addition']) ? 'selected' : '' ?>>Oui / نعم</option>
+                        </select>
+                        <small style="display:block;color:var(--gray-500);margin-top:4px">كلا = الزوج الآخر يأخذ تنزيل الأولاد (المعتاد عند الأستاذة المتزوجة)</small>
+                    </div>
+                </div>
                 <script>
                 (function(){
-                    var k = document.getElementById('maritalKind'), g = document.getElementById('spouseWorksGroup');
+                    var k = document.getElementById('maritalKind'), g = document.getElementById('spouseWorksGroup'),
+                        fd = document.getElementById('famDedGroup'), gs = document.getElementById('grantSpouseGroup');
                     if (!k || !g) return;
-                    function sync(){ g.style.display = (k.value === 'marie') ? '' : 'none'; }
+                    function sync(){
+                        var m = k.value === 'marie';
+                        g.style.display = m ? '' : 'none';
+                        if (fd) fd.style.display = (k.value === 'celibataire') ? 'none' : '';
+                        if (gs) gs.style.display = m ? '' : 'none';
+                    }
                     k.addEventListener('change', sync); sync();
                 })();
                 </script>
@@ -1634,7 +1661,9 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     <div class="form-group" style="margin:0">
                         <label class="form-label">Abattement familial / mois / التنزيل العائلي الشهري</label>
                         <div class="form-control" style="background:#f1f5f9;font-weight:700"><?= $fsV($finSum['monthly']) ?></div>
-                        <small class="text-muted d-block">السنوي <?= formatLBP($finSum['annual']) ?> ÷ 12</small>
+                        <small class="text-muted d-block">السنوي <?= formatLBP($finSum['annual']) ?> ÷ 12<?php [$fsK] = splitSocialStatus($employee['social_status'] ?? ''); if ($fsK !== 'celibataire'): ?>
+                            · زيادة الزوج: <b><?= !empty($employee['grant_spouse_addition']) && empty($employee['spouse_works']) && $fsK === 'marie' ? 'نعم' : 'لا' ?></b>
+                            · تنزيل الأولاد: <b><?= !empty($employee['grant_children_addition']) ? 'نعم' : 'لا' ?></b> <span style="color:var(--gray-500)">(بالحالة العائلية)</span><?php endif; ?></small>
                     </div>
                     <div class="form-group" style="margin:0">
                         <label class="form-label">Impôt sur le revenu / ضريبة الدخل الشهرية</label>
@@ -2002,16 +2031,7 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                                     <small style="display:block;color:var(--gray-500)">مطفأ = الضريبة تُحسب بلا تنزيل عائلي لهذا الموظف</small></span>
                                 <label class="switch"><input type="checkbox" name="apply_family_deduction" value="1" <?= !isset($employee['apply_family_deduction']) || $employee['apply_family_deduction'] ? 'checked' : '' ?>><span class="slider"></span></label>
                             </label>
-                            <label class="d-flex justify-between align-center mb-3">
-                                <span><strong>زيادة الزوج/الزوجة بالتنزيل: تُعطى</strong> / Majoration conjoint
-                                    <small style="display:block;color:var(--gray-500)">مطفأة تلقائياً لكل الموظفين — ضوّيها أنت لمن تريد إعطاءه زيادة الزوج/الزوجة (و«الزوج يعمل» ✓ يُسقطها حكماً حتى لو مضوّاة)</small></span>
-                                <label class="switch"><input type="checkbox" name="grant_spouse_addition" value="1" <?= !empty($employee['grant_spouse_addition']) ? 'checked' : '' ?>><span class="slider"></span></label>
-                            </label>
-                            <label class="d-flex justify-between align-center mb-3">
-                                <span><strong>تنزيل الأولاد بالضريبة: يُعطى</strong> / Abattement enfants
-                                    <small style="display:block;color:var(--gray-500)">مطفأ تلقائياً لكل الموظفين — ضوّيه أنت لمن تريد إعطاءه تنزيل الأولاد (مطفأ = تنزيل الموظف الشخصي وزيادة الزوج إن حقّت فقط)</small></span>
-                                <label class="switch"><input type="checkbox" name="grant_children_addition" value="1" <?= !empty($employee['grant_children_addition']) ? 'checked' : '' ?>><span class="slider"></span></label>
-                            </label>
+                            <?php /* زيادة الزوج/تنزيل الأولاد انتقلا إلى «الحالة العائلية» بالتبويب الشخصي (2026-09-10) — مجموعة وحدة بلا تكرار */ ?>
                             <p style="font-size:12px;color:var(--gray-500)">Inclure dans la base:</p>
                             <label><input type="checkbox" name="tax_includes_echelon" value="1" <?= $employee['tax_includes_echelon'] ? 'checked' : '' ?>> الدرجة والتدرّج / Échelon</label><br>
                             <label><input type="checkbox" name="tax_includes_extra" value="1" <?= $employee['tax_includes_extra'] ? 'checked' : '' ?>> الأجر الإضافي / Supplément</label><br>

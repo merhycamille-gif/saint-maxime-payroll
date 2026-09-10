@@ -69,6 +69,7 @@ function complianceRules(): array {
         'row_rate0'      => ['Taux = 0',                   'صف راتب بسعر صرف صفر أو فارغ',                        '#b45309'],
         'left_rows'      => ['Salaires après départ',      'تارك عنده رواتب بعد تركه',                            '#7c3aed'],
         'active_nomonths'=> ['Actif sans salaires',        'موظف فاعل بلا رواتب بسنة مفتوحة',                     '#64748b'],
+        'family_ded_off' => ['Abattement familial non accordé', 'متزوج/أرمل بأولاد أو زوج لا يعمل — وتنزيلهم العائلي بالضريبة مطفأ بملفه', '#b45309'],
         'no_diploma'     => ['Sans diplôme',               'أستاذ ملاك بلا شهادة بملفه (يُفترض قسم ثاني)',        '#64748b'],
         'dupes'          => ['Doublon',                    'موظفان فاعلان بنفس الاسم بنفس المدرسة',               '#64748b'],
         'rate_missing'   => ['Taux manquant',              'شهر بلا سعر صرف مسجّل',                               '#64748b'],
@@ -304,6 +305,29 @@ function complianceItems(PDO $db, string $sy): array {
             $hasCfg ? 'احتساب رواتب سنة ' . $sy . ' من ملفه' : 'أدخل إعداد راتبه (الأساس/العقد أو علاوة/نقل) بملفه أو تاريخ تركه — لا يُحتسب بلا إعداد', $hasCfg);
     }
 
+    // ── 13ب) متزوج/أرمل وتنزيله العائلي مطفأ (2026-09-10 جورج العموري «الزوجة لا تعمل وعندو ولدين ما حسبلهن التنزيل») ──
+    //  الزرّان «زيادة الزوج»/«تنزيل الأولاد» مطفآن افتراضياً (قرار 2026-08-23 لأن الزوج الآخر يأخذهما عادةً عند الأستاذة
+    //  المتزوجة) — هنا يظهر كل من ينطبق عليه القانون وزرّه مطفأ، بالفرق السنوي، والقرار بيده: تصحيح (تضوية + إعادة حساب السنة) أو ترك.
+    $fdAsOf = preg_match('/^(\d{4})-/', $sy, $mSy) ? ($mSy[1] . '-10-01') : date('Y-m-01');
+    foreach ($q("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND COALESCE(e.tax_subject,1) = 1 AND COALESCE(e.apply_family_deduction,1) = 1
+          AND (e.social_status LIKE 'marie%' OR e.social_status LIKE 'veuf%' OR e.social_status LIKE 'divorce%')
+          AND ((e.social_status LIKE 'marie%' AND COALESCE(e.spouse_works,0) = 0 AND COALESCE(e.grant_spouse_addition,0) = 0)
+            OR (e.social_status NOT LIKE '%sans_enfants' AND COALESCE(e.grant_children_addition,0) = 0))" . $sc . $yf . " ORDER BY e.school_id, e.id", $yp) as $r) {
+        $isMar = strpos((string)$r['social_status'], 'marie') === 0;
+        $spouseOff = $isMar && (int)($r['spouse_works'] ?? 0) === 0 && (int)($r['grant_spouse_addition'] ?? 0) === 0;
+        $kidsOff = strpos((string)$r['social_status'], 'sans_enfants') === false && (int)($r['grant_children_addition'] ?? 0) === 0;
+        $now = (int)familyDeductionAnnual($r['social_status'], $r['spouse_works'] ?? 0, 1, $fdAsOf, $r['grant_spouse_addition'] ?? 0, $r['grant_children_addition'] ?? 0, (int)$r['id']);
+        $full = (int)familyDeductionAnnual($r['social_status'], $r['spouse_works'] ?? 0, 1, $fdAsOf, $spouseOff ? 1 : ($r['grant_spouse_addition'] ?? 0), $kidsOff ? 1 : ($r['grant_children_addition'] ?? 0), (int)$r['id']);
+        if ($full <= $now) continue; // لا فرق فعلياً (أولاد فوق 18 مثلاً)
+        $what = [];
+        if ($spouseOff) $what[] = 'زيادة الزوج/الزوجة (لا يعمل)';
+        if ($kidsOff) $what[] = 'تنزيل الأولاد';
+        $add('family_ded_off', $r,
+            socialStatusLabel($r['social_status'], 'ar') . ' — ' . implode(' + ', $what) . ' مطفأ بملفه: التنزيل السنوي ' . complianceFmt($now) . ' بدل ' . complianceFmt($full) . ' — ينقصه ' . complianceFmt($full - $now) . ' سنوياً (' . complianceFmt(intdiv($full - $now, 12)) . ' شهرياً) من التنزيل، فضريبته أعلى',
+            'ضوّي ' . implode(' و', $what) . ' بالحالة العائلية بملفه وأعد حساب سنة ' . $sy . ' — أو اتركه إن كان الزوج الآخر يأخذ التنزيل',
+            true, ['spouse' => $spouseOff ? 1 : 0, 'kids' => $kidsOff ? 1 : 0, 'now' => $now, 'full' => $full]);
+    }
+
     // ── 14) ملاك بلا شهادة ──
     foreach ($q("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND (e.diploma IS NULL OR e.diploma = '')" . $sc . $yf . " ORDER BY e.school_id, e.id", $yp) as $r) {
         $add('no_diploma', $r, 'أستاذ ملاك بلا شهادة بملفه — البرنامج يفترض «قسم ثاني» (درجة دخول 1) فقد تكون درجته وراتبه أقل من حقّه', 'أدخل شهادته بملفه (تُحسب درجته وراتبه تلقائياً)', false);
@@ -401,6 +425,15 @@ function complianceApply(PDO $db, array $it): string {
             $n = $recalcYear();
             logAudit('compliance_bonus_off', 'employee_bonuses', $eid, null, ['off' => $off, 'sy' => $sy]);
             return 'أُطفئت ' . count($off) . ' بند وأُعيد حساب ' . $n . ' شهراً';
+        case 'family_ded_off':
+            $set = [];
+            if (!empty($d['spouse'])) $set[] = 'grant_spouse_addition = 1';
+            if (!empty($d['kids'])) $set[] = 'grant_children_addition = 1';
+            if (!$set) return 'لا شيء لتضويته';
+            $db->exec("UPDATE employees SET " . implode(', ', $set) . " WHERE id = $eid");
+            $n = $recalcYear();
+            logAudit('compliance_family_ded_on', 'employees', $eid, ['now' => $d['now'] ?? null], ['set' => $set, 'full' => $d['full'] ?? null, 'sy' => $sy]);
+            return 'ضُوّي ' . (!empty($d['spouse']) ? 'زيادة الزوج' : '') . (!empty($d['spouse']) && !empty($d['kids']) ? ' و' : '') . (!empty($d['kids']) ? 'تنزيل الأولاد' : '') . ' (التنزيل ' . complianceFmt($d['now'] ?? 0) . ' → ' . complianceFmt($d['full'] ?? 0) . ') وأُعيد حساب ' . $n . ' شهراً';
         case 'bonus_nosy':
             $ids = array_map('intval', (array)($d['ids'] ?? []));
             if ($ids) $db->prepare("UPDATE employee_bonuses SET school_year = ? WHERE id IN (" . implode(',', $ids) . ")")->execute([$sy]);
@@ -446,7 +479,8 @@ function handleCompliancePost(PDO $db, string $redirectTo): void {
     $keys = [];
     if ($act === 'comp_approve_rule') {
         $rule = (string)($_POST['rule'] ?? '');
-        foreach ($items as $it) if ($it['rule'] === $rule && $it['auto'] && $rule !== 'left_rows' && $rule !== 'net_math') $keys[] = $it['key'];
+        // family_ded_off: قرار شخص بشخص (الأستاذة المتزوجة عادةً زوجها يأخذ التنزيل) — لا تضوية جماعية
+        foreach ($items as $it) if ($it['rule'] === $rule && $it['auto'] && $rule !== 'left_rows' && $rule !== 'net_math' && $rule !== 'family_ded_off') $keys[] = $it['key'];
         $act = 'comp_approve';
     } else {
         $keys = [(string)($_POST['key'] ?? '')];
@@ -502,7 +536,7 @@ function renderComplianceTable(array $items, string $formAction = '', bool $coll
         if (empty($byRule[$rk])) continue;
         $rows = $byRule[$rk];
         $n = count($rows);
-        $canBulk = canEdit() && $rk !== 'left_rows' && $rk !== 'net_math' && count(array_filter($rows, fn($r) => $r['auto'])) > 1;
+        $canBulk = canEdit() && $rk !== 'left_rows' && $rk !== 'net_math' && $rk !== 'family_ded_off' && count(array_filter($rows, fn($r) => $r['auto'])) > 1;
         $tag = $collapsed ? 'details' : 'div';
         echo '<' . $tag . ' class="comp-rule" style="margin-bottom:10px;border:1px solid var(--gray-200);border-radius:8px;padding:6px 10px"' . ($collapsed && $n <= 3 ? ' open' : '') . '>';
         echo ($collapsed ? '<summary style="cursor:pointer;padding:4px 0">' : '<div style="padding:4px 0">')
