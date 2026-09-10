@@ -1657,13 +1657,24 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                 </h3>
             </div>
             <div class="card-body">
-                <div class="form-row cols-4">
+                <div class="form-row cols-4" style="grid-template-columns:2fr 1fr 1fr 1fr">
                     <div class="form-group" style="margin:0">
                         <label class="form-label">Abattement familial / mois / التنزيل العائلي الشهري</label>
-                        <div class="form-control" style="background:#f1f5f9;font-weight:700"><?= $fsV($finSum['monthly']) ?></div>
-                        <small class="text-muted d-block">السنوي <?= formatLBP($finSum['annual']) ?> ÷ 12<?php [$fsK] = splitSocialStatus($employee['social_status'] ?? ''); if ($fsK !== 'celibataire'): ?>
-                            · زيادة الزوج: <b><?= !empty($employee['grant_spouse_addition']) && empty($employee['spouse_works']) && $fsK === 'marie' ? 'نعم' : 'لا' ?></b>
-                            · تنزيل الأولاد: <b><?= !empty($employee['grant_children_addition']) ? 'نعم' : 'لا' ?></b> <span style="color:var(--gray-500)">(بالحالة العائلية)</span><?php endif; ?></small>
+                        <?php /* 👨‍👩‍👧 «فصلهن: الزوج قديش، الزوجة قديش، الأولاد قديش، وتحتهن المجموع» (2026-09-10) — المصدر الواحد familyDeductionBreakdown */
+                        $fdB = familyDeductionBreakdown($employee + ['id' => (int)$id], $fsAsOf); [$fsK] = splitSocialStatus($employee['social_status'] ?? '');
+                        $fdRows = [['الموظف الشخصي / Personnel', $fdB['personal']]];
+                        if ($fsK === 'marie') $fdRows[] = ['زيادة الزوج/الزوجة / Conjoint', $fdB['spouse']];
+                        if ($fsK !== 'celibataire') $fdRows[] = ['الأولاد / Enfants' . ($fdB['children'] > 0 && !empty($employee['spouse_works']) && $fsK === 'marie' ? ' (نصف الحصة — الزوج يعمل)' : ''), $fdB['children']]; ?>
+                        <table class="table" style="margin:0;font-size:12.5px" id="famDedBreakdown">
+                            <thead><tr><th></th><th style="text-align:left">سنوياً</th><th style="text-align:left">شهرياً</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($fdRows as [$lbl, $v]): ?>
+                            <tr><td><?= $lbl ?></td><td style="text-align:left;white-space:nowrap"><?= number_format($v) ?></td><td style="text-align:left;white-space:nowrap"><?= number_format(intdiv($v, 12)) ?></td></tr>
+                            <?php endforeach; ?>
+                            <tr style="font-weight:700;background:#f1f5f9"><td>المجموع / Total</td><td style="text-align:left;white-space:nowrap"><?= number_format($fdB['total']) ?></td><td style="text-align:left;white-space:nowrap"><?= $fsV($finSum['monthly']) ?></td></tr>
+                            </tbody>
+                        </table>
+                        <?php if ($fsK !== 'celibataire'): ?><small class="text-muted d-block" style="margin-top:4px">زيادة الزوج: <b><?= !empty($employee['grant_spouse_addition']) && empty($employee['spouse_works']) && $fsK === 'marie' ? 'نعم' : 'لا' ?></b> · تنزيل الأولاد: <b><?= !empty($employee['grant_children_addition']) ? 'نعم' : 'لا' ?></b> (بالحالة العائلية)</small><?php endif; ?>
                     </div>
                     <div class="form-group" style="margin:0">
                         <label class="form-label">Impôt sur le revenu / ضريبة الدخل الشهرية</label>

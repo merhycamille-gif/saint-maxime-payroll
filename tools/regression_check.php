@@ -5013,6 +5013,17 @@ check('قانون التنزيل العائلي: الزوج يعمل ⇒ نصف 
       && familyDeductionAnnual('marie_2_enfants', 1, 1, '2026-09-01', 1, 0) === 450000000
       && familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-09-01', 1, 1) === 765000000
       && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'if ($spouseActuallyWorks && $ded > $single) $ded = $single + ($ded - $single) / 2;') !== false);
+// 👨‍👩‍👧 «فصلهن: الزوج قديش، الزوجة قديش، الأولاد قديش، وتحتهن المجموع» (2026-09-10): التفصيل بالملف المالي يركب على المجموع دائماً
+$bd103a = familyDeductionBreakdown(['id' => 0, 'social_status' => 'marie_2_enfants', 'spouse_works' => 0, 'apply_family_deduction' => 1, 'grant_spouse_addition' => 1, 'grant_children_addition' => 1], '2026-09-01');
+$bd103b = familyDeductionBreakdown(['id' => 0, 'social_status' => 'marie_2_enfants', 'spouse_works' => 1, 'apply_family_deduction' => 1, 'grant_spouse_addition' => 0, 'grant_children_addition' => 1], '2026-09-01');
+$bd103c = familyDeductionBreakdown(['id' => 0, 'social_status' => 'celibataire', 'spouse_works' => 0, 'apply_family_deduction' => 1, 'grant_spouse_addition' => 0, 'grant_children_addition' => 0], '2026-09-01');
+check('تفصيل التنزيل العائلي بالملف المالي: جورج (الزوجة لا تعمل + الزرّان) = 450م شخصي + 225م زوج + 90م أولاد = 765م · جوزيف (الزوجة تعمل + الأولاد) = 450م + 0 + 45م = 495م · عازب = 450م فقط · والجدول famDedBreakdown بالصفحة',
+      $bd103a === ['personal' => 450000000, 'spouse' => 225000000, 'children' => 90000000, 'total' => 765000000]
+      && $bd103b === ['personal' => 450000000, 'spouse' => 0, 'children' => 45000000, 'total' => 495000000]
+      && $bd103c === ['personal' => 450000000, 'spouse' => 0, 'children' => 0, 'total' => 450000000]
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'id="famDedBreakdown"') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "familyDeductionBreakdown(\$employee + ['id' => (int)\$id], \$fsAsOf)") !== false,
+      json_encode([$bd103a, $bd103b]));
 check('قانون تقاسم تنزيل الأولاد: شفاء healChildrenSplit20260910 معرَّف وموصول بالهيدر (يعيد حساب من أشهره مخزّنة بالحصة الكاملة — جوزيف حليحل أونلاين) ويستهدف المتزوج+أولاد+الزوج يعمل+الأولاد نعم فقط',
       function_exists('healChildrenSplit20260910')
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healChildrenSplit20260910();') !== false

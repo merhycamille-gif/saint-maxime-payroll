@@ -3303,6 +3303,23 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
 }
 
 /**
+ * 👨‍👩‍👧 تفصيل التنزيل العائلي السنوي (طلبه 2026-09-10 «فصلهن: للزوج قديش، الزوجة قديش، الأولاد قديش، وتحتهن المجموع»):
+ * الشخصي = المعادلة بلا الزرّين · زيادة الزوج/الزوجة = (مع زرّ الزوج، بلا الأولاد) − الشخصي · الأولاد = المجموع − ما قبله
+ * (تشمل تنصيف الحصة عند الزوج العامل). المجموع = familyDeductionAnnual بإعدادات ملفه كما هي — فالتفصيل يركب دائماً.
+ */
+function familyDeductionBreakdown(array $emp, string $asOf): array {
+    $id = (int)($emp['id'] ?? 0);
+    $ss = $emp['social_status'] ?? ''; $sw = $emp['spouse_works'] ?? 0; $afd = $emp['apply_family_deduction'] ?? 1;
+    $gsa = (int)($emp['grant_spouse_addition'] ?? 0); $gca = (int)($emp['grant_children_addition'] ?? 0);
+    $total    = (int)familyDeductionAnnual($ss, $sw, $afd, $asOf, $gsa, $gca, $id);
+    $personal = (int)familyDeductionAnnual($ss, $sw, $afd, $asOf, 0, 0, $id);
+    $withSp   = (int)familyDeductionAnnual($ss, $sw, $afd, $asOf, $gsa, 0, $id);
+    $spouse   = max(0, $withSp - $personal);
+    $children = max(0, $total - $withSp);
+    return ['personal' => $personal, 'spouse' => $spouse, 'children' => $children, 'total' => $total];
+}
+
+/**
  * 🔴 المصدر الوحيد لشطور ضريبة الدخل (2026-09-10 «ما بدي ضل أعمل أنا تست»): الضريبة السنوية على الوعاء
  * **بعد** التنزيل العائلي، بأحدث مجموعة شطور سارية بتاريخ $asOf (لا خلط مجموعتين). يستعملها المحرّك
  * (calculateIncomeTax) وقاعدة «الضريبة المخزّنة ≠ القانون» (expectedMonthlyTax) وannualLawTaxAsOf — فلا يختلف رقم عن رقم.
