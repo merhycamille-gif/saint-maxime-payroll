@@ -5133,6 +5133,30 @@ check('نظام 4+4+2: تابلو الدرجات لا يلغي قانوناً ل
       && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), 'لا ينطبق عليه — بديله نظام 4+4+2') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php'), "\$isNew = isNewSystemTeacher(\$emp);") !== false);
 
+/* =====================================================================
+ * 106) ⚖️ «أكيد كلهم 65» (2026-09-10): كل ملاك عبرا على نسبة 65٪ — شفاء healAbraPct65_20260910 (مرّة واحدة،
+ *      نسخ _bk_bonuses_abra65_0910/_ms_bk_abra65_0910، موصول بالهيدر) يحوّل النِّسَب الخاصة السبع (34.5/41.5/80/80.5/91/91/99)
+ *      لـ65٪ ويعيد الحساب؛ المحميّتان ريتا مارون وماريا الياس حليحل (سلفة موثّقة = 65٪ أصلاً) لا تُمسّان.
+ *      قفل: جوزف السرّوع تشرين 2025 إضافي 105,000,000 (كان 130م بنسبة 80.5٪) بأساس 2,720,000.
+ * =================================================================== */
+$fn106 = (string)file_get_contents($PROJ . '/includes/functions.php');
+check('عبرا 65٪: الشفاء موجود وموصول بالهيدر ويستثني المحميّتين بالاسم ويحدّد المدرسة بـ«ثانوية السيدة»',
+      strpos($fn106, 'function healAbraPct65_20260910()') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healAbraPct65_20260910();') !== false
+      && substr_count(substr($fn106, strpos($fn106, 'function healAbraPct65_20260910()'), 4000), "LIKE '%حليحل%'") === 2
+      && strpos($fn106, "name_ar LIKE '%ثانوية السيدة%'") !== false);
+$abra106 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE '%ثانوية السيدة%' ORDER BY id LIMIT 1")->fetchColumn();
+$non65 = $db->query("SELECT CONCAT(e.first_name_ar,' ',e.last_name_ar) nm FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id
+    WHERE e.school_id=$abra106 AND e.employee_type='enseignant_titulaire' AND e.is_deleted=0 AND b.is_active=1 AND b.bonus_type='prime_fixe'
+      AND b.start_month IS NULL AND b.end_month IS NULL AND (b.school_year IS NULL OR b.school_year='2025-2026')
+      AND NOT (b.value_type='percent' AND ROUND(b.amount,2)=65.00)")->fetchAll(PDO::FETCH_COLUMN);
+$only2 = count($non65) === 2 && count(array_filter($non65, fn($n) => mb_strpos($n, 'حليحل') !== false)) === 2;
+$jos106 = $db->query("SELECT ms.base_plus_echelon_lbp bpe, ms.prime_fixe_lbp p FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+    WHERE e.school_id=$abra106 AND e.first_name_ar='جوزف' AND e.last_name_ar LIKE '%السر%وع%' AND e.is_deleted=0 AND ms.year=2025 AND ms.month=10 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+check('عبرا 65٪ (داتا حيّة): كل ملاك عبرا على 65٪ إلا المحميّتين حليحل + قفل جوزف السرّوع تشرين 2025 = 105,000,000 (أساس 2,720,000)',
+      $abra106 > 0 && $only2 && $jos106 && (int)$jos106['p'] === 105000000 && (int)$jos106['bpe'] === 2720000,
+      'non65=' . implode('؛', $non65) . ' jos=' . json_encode($jos106));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

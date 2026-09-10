@@ -5484,6 +5484,62 @@ function healPercentLawOwn20260903() {
     }
 }
 
+/**
+ * ⚖️ «أكيد كلهم 65» (أمره 2026-09-10): كل ملاك مدرسة عبرا (السيدة للراهبات المخلصيات) على نسبة 65٪ للأجر الإضافي.
+ * التسعة الباقون (نِسَب خاصة 34.5/41.5/80/80.5/91/91/99 + مبلغا ريتا مارون وماريا الياس حليحل) يتحوّلون لبند نسبة 65٪
+ * بقاعدة ÷1500 ويُعاد حساب 2025-2026 و2026-2027. نسخ احتياطية: _bk_bonuses_abra65_0910 (كل البنود مرّة) + _ms_bk_abra65_0910 (أشهر المعنيين).
+ * مرّة واحدة (فلاغ heal_abra_pct65_20260910 done: …) — بلا زرّ، يشتغل بأول فتح صفحة أونلاين.
+ */
+function healAbraPct65_20260910() {
+    try {
+        if (strpos((string)getSetting('heal_abra_pct65_20260910', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $sid = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE '%ثانوية السيدة%' ORDER BY id LIMIT 1")->fetchColumn();
+        if ($sid <= 0) { setSetting('heal_abra_pct65_20260910', 'done: no school'); return; }
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_bonuses_abra65_0910 LIKE employee_bonuses");
+        if (!(int)$db->query("SELECT COUNT(*) FROM _bk_bonuses_abra65_0910")->fetchColumn()) {
+            $db->exec("INSERT INTO _bk_bonuses_abra65_0910 SELECT * FROM employee_bonuses");
+        }
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_abra65_0910 LIKE monthly_salaries");
+        $targets = $db->query("SELECT b.id bid, b.employee_id eid, b.value_type, b.amount,
+                                      CONCAT(e.first_name_ar,' ',COALESCE(e.father_name_ar,''),' ',e.last_name_ar) nm
+            FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id AND e.is_deleted=0
+            WHERE e.school_id=$sid AND e.employee_type='enseignant_titulaire'
+              AND b.bonus_type='prime_fixe' AND b.is_active=1 AND b.start_month IS NULL AND b.end_month IS NULL
+              AND (b.school_year IS NULL OR b.school_year IN ('2025-2026','2026-2027'))
+              AND NOT (b.value_type='percent' AND ROUND(b.amount,2)=65.00)
+              -- 🛡️ محميّتان بقراره السابق (مبلغ «سلفة» موثّق بالمليم على كشفه = 65٪ أصلاً؛ أشهرهما مجمّدة على الكشف رغم درجات كانون 2026): لا تُمسّان هنا — قراره
+              AND NOT (e.first_name_ar LIKE 'ريتا%' AND e.father_name_ar LIKE 'مارون%' AND e.last_name_ar LIKE '%حليحل%')
+              AND NOT (e.first_name_ar LIKE 'ماريا%' AND e.father_name_ar LIKE 'الياس%' AND e.last_name_ar LIKE '%حليحل%')
+            ORDER BY b.employee_id, b.id")->fetchAll(PDO::FETCH_ASSOC);
+        $log = []; $done = [];
+        $prev = (string)getSetting('heal_abra_pct65_log', '');
+        $n = 0;
+        foreach ($targets as $t) {
+            $eid = (int)$t['eid'];
+            if ($n >= 6 && !isset($done[$eid])) { setSetting('heal_abra_pct65_log', $prev . implode('؛ ', $log) . '؛ '); setSetting('heal_abra_pct65_progress', 'working... ' . count($done)); return; }
+            if (!(int)$db->query("SELECT COUNT(*) FROM _ms_bk_abra65_0910 WHERE employee_id=$eid")->fetchColumn()) {
+                $db->exec("INSERT INTO _ms_bk_abra65_0910 SELECT * FROM monthly_salaries WHERE employee_id=$eid AND school_year IN ('2025-2026','2026-2027')");
+            }
+            $db->prepare("UPDATE employee_bonuses SET value_type='percent', amount=65, currency='LBP' WHERE id=?")->execute([(int)$t['bid']]);
+            if (!isset($done[$eid])) {
+                recalcEmployeeYear($eid, '2025-2026');
+                if ((int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=$eid AND school_year='2026-2027'")->fetchColumn()) recalcEmployeeYear($eid, '2026-2027');
+                $after = (int)$db->query("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id=$eid AND year=2025 AND month=10")->fetchColumn();
+                $log[] = $t['nm'] . ' ' . ($t['value_type'] === 'percent' ? rtrim(rtrim(number_format((float)$t['amount'], 2, '.', ''), '0'), '.') . '٪' : number_format((float)$t['amount'])) . '→65٪=' . number_format($after);
+                $done[$eid] = true; $n++;
+            }
+        }
+        setSetting('heal_abra_pct65_log', $prev . implode('؛ ', $log));
+        $all = (string)getSetting('heal_abra_pct65_log', '');
+        setSetting('heal_abra_pct65_20260910', 'done: converted=' . substr_count($all, '→65٪') . ' | ' . mb_substr($all, 0, 1500));
+        setSetting('heal_abra_pct65_progress', 'done');
+    } catch (Throwable $e) {
+        try { setSetting('heal_abra_pct65_progress', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
+
 function healPercentLawAll20260828() {
     try {
         if (strpos((string)getSetting('heal_percent_law_20260828', ''), 'done') === 0) return;
