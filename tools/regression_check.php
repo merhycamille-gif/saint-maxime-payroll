@@ -5013,6 +5013,10 @@ check('قانون التنزيل العائلي: الزوج يعمل ⇒ نصف 
       && familyDeductionAnnual('marie_2_enfants', 1, 1, '2026-09-01', 1, 0) === 450000000
       && familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-09-01', 1, 1) === 765000000
       && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'if ($spouseActuallyWorks && $ded > $single) $ded = $single + ($ded - $single) / 2;') !== false);
+check('قانون تقاسم تنزيل الأولاد: شفاء healChildrenSplit20260910 معرَّف وموصول بالهيدر (يعيد حساب من أشهره مخزّنة بالحصة الكاملة — جوزيف حليحل أونلاين) ويستهدف المتزوج+أولاد+الزوج يعمل+الأولاد نعم فقط',
+      function_exists('healChildrenSplit20260910')
+      && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healChildrenSplit20260910();') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "AND e.social_status LIKE 'marie%' AND e.social_status NOT LIKE '%sans_enfants' AND COALESCE(e.grant_children_addition,0) = 1") !== false);
 check('تقرير المخالفات: قاعدة family_ded_off معرَّفة (مراجعة) + بندها يحسب الفرق بالمصدر الواحد familyDeductionAnnual + التصحيح يضوّي الزرّين المطفأين فقط ويعيد حساب السنة + مستثناة من «تصحيح الكل» + الملف المالي يعرض حالة الزرّين',
       isset(complianceRules()['family_ded_off'])
       && strpos($cmp103, "\$add('family_ded_off', \$r,") !== false && substr_count($cmp103, 'familyDeductionAnnual($r[\'social_status\'], $r[\'spouse_works\'] ?? 0, 1, $fdAsOf,') === 2

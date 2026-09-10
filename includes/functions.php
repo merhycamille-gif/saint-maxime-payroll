@@ -5325,6 +5325,34 @@ function healScale47_20260903() {
         try { setSetting('heal_scale47_20260903', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+/**
+ * ⚖️ قانون تقاسم تنزيل الأولاد (2026-09-10): من أشهره مخزّنة قبل نشر القانون وهو «متزوج + أولاد + الزوج يعمل +
+ * تنزيل الأولاد نعم» كانت ضريبته محسوبة بحصة الأولاد كاملة (جوزيف حليحل أونلاين: 2,978,081 بدل 3,240,581 = كشفه
+ * القديم) — إعادة حساب سنواته المخزّنة 2025-2026/2026-2027 مرّة واحدة بالمعادلة الجديدة.
+ */
+function healChildrenSplit20260910() {
+    try {
+        if (strpos((string)getSetting('heal_children_split_20260910', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $emps = $db->query("SELECT e.id, CONCAT(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),' ',COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)) nm
+            FROM employees e WHERE e.is_deleted = 0 AND COALESCE(e.tax_subject,1) = 1 AND COALESCE(e.apply_family_deduction,1) = 1
+              AND e.social_status LIKE 'marie%' AND e.social_status NOT LIKE '%sans_enfants' AND COALESCE(e.grant_children_addition,0) = 1
+              AND (COALESCE(e.spouse_works,0) = 1 OR (e.spouse_work_start_date IS NOT NULL AND e.spouse_work_start_date >= '1900-01-01' AND e.spouse_work_start_date <= CURDATE()))")->fetchAll(PDO::FETCH_ASSOC);
+        $n = 0; $names = [];
+        foreach ($emps as $e) {
+            $eid = (int)$e['id']; $did = false;
+            foreach (['2025-2026', '2026-2027'] as $sy) {
+                if ((int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $eid AND school_year = '$sy'")->fetchColumn()) { recalcEmployeeYear($eid, $sy); $n++; $did = true; }
+            }
+            if ($did) $names[] = $e['nm'] . ' #' . $eid;
+        }
+        setSetting('heal_children_split_20260910', 'done: emps=' . count($names) . ' years=' . $n . ' [' . implode('؛ ', array_slice($names, 0, 40)) . '] @' . date('Y-m-d H:i'));
+        if ($names) logAudit('heal_children_split_20260910', 'monthly_salaries', 0, null, ['emps' => $names, 'years' => $n]);
+    } catch (Throwable $e) {
+        try { setSetting('heal_children_split_20260910', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
 function healPercentLawOwn20260903() {
     try {
         if (strpos((string)getSetting('heal_percent_law_own_20260903', ''), 'done') === 0) return;
