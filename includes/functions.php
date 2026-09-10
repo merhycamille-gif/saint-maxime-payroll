@@ -3302,17 +3302,17 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
     } catch (Exception $e) { return 0; }
 }
 
-/** ضريبة الدخل السنوية بشطور البرنامج المؤرّخة (تُستعمل للتحقّق من المحسومات المنقولة). */
-function annualLawTaxAsOf($db, $annualTaxable, $socialStatus, $m, $y) {
-    if ($annualTaxable <= 0) return 0;
-    $asOf = sprintf('%04d-%02d-01', $y, $m);
-    $st = $db->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
-    $st->execute([$socialStatus, $asOf]);
-    $rem = max(0, $annualTaxable - (float)($st->fetchColumn() ?: 0));
-    if ($rem <= 0) return 0;
+/**
+ * 🔴 المصدر الوحيد لشطور ضريبة الدخل (2026-09-10 «ما بدي ضل أعمل أنا تست»): الضريبة السنوية على الوعاء
+ * **بعد** التنزيل العائلي، بأحدث مجموعة شطور سارية بتاريخ $asOf (لا خلط مجموعتين). يستعملها المحرّك
+ * (calculateIncomeTax) وقاعدة «الضريبة المخزّنة ≠ القانون» (expectedMonthlyTax) وannualLawTaxAsOf — فلا يختلف رقم عن رقم.
+ */
+function lawIncomeTaxAnnual($db, $annualAfterDeduction, $asOf) {
+    $rem = (float)$annualAfterDeduction;
+    if ($rem <= 0) return 0.0;
     $st = $db->prepare("SELECT * FROM tax_brackets WHERE effective_from = (SELECT MAX(effective_from) FROM tax_brackets WHERE effective_from <= ?) ORDER BY bracket_number ASC");
-    $st->execute([$asOf]);
-    $tax = 0;
+    $st->execute([(string)$asOf]);
+    $tax = 0.0;
     foreach ($st->fetchAll() as $b) {
         $size = $b['annual_to'] ? ($b['annual_to'] - $b['annual_from']) : PHP_INT_MAX;
         $in = min($rem, $size);
@@ -3322,6 +3322,32 @@ function annualLawTaxAsOf($db, $annualTaxable, $socialStatus, $m, $y) {
         if ($rem <= 0) break;
     }
     return $tax;
+}
+
+/**
+ * ضريبة الشهر المتوقَّعة بالقانون الحيّ من الوعاء الشهري المخزّن (taxable_base_lbp، قبل التنزيل) — نفس مسار
+ * المحرّك حرفياً: ×12 − التنزيل العائلي الساري (familyDeductionAnnual بإعدادات ملفه الحالية) → الشطور → ÷12 → round.
+ * تُستعمل بقاعدة tax_stale (تقرير المخالفات + فحص الصحة): أي شهر مخزّن قبل تغيير القانون/ملفه يظهر لحاله.
+ */
+function expectedMonthlyTax(array $emp, $taxableBaseMonthly, int $m, int $y, $db = null): int {
+    if (!(int)($emp['tax_subject'] ?? 1)) return 0;
+    $base = (float)$taxableBaseMonthly;
+    if ($base <= 0) return 0;
+    $db = $db ?: getDB();
+    $asOf = sprintf('%04d-%02d-01', $y, $m);
+    $fd = (float)familyDeductionAnnual($emp['social_status'] ?? '', $emp['spouse_works'] ?? 0, $emp['apply_family_deduction'] ?? 1, $asOf,
+        $emp['grant_spouse_addition'] ?? 0, $emp['grant_children_addition'] ?? 0, (int)($emp['id'] ?? 0));
+    $annual = lawIncomeTaxAnnual($db, max(0, $base * 12 - $fd), $asOf);
+    return (int)round($annual / 12);
+}
+
+/** ضريبة الدخل السنوية بشطور البرنامج المؤرّخة على فئة وضع عائلي خام (تُستعمل للتحقّق من المحسومات المنقولة). */
+function annualLawTaxAsOf($db, $annualTaxable, $socialStatus, $m, $y) {
+    if ($annualTaxable <= 0) return 0;
+    $asOf = sprintf('%04d-%02d-01', $y, $m);
+    $st = $db->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+    $st->execute([$socialStatus, $asOf]);
+    return lawIncomeTaxAnnual($db, max(0, $annualTaxable - (float)($st->fetchColumn() ?: 0)), $asOf);
 }
 
 /**

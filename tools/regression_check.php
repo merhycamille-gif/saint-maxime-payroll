@@ -290,8 +290,8 @@ $cpItems = complianceItems($db, currentSchoolYear());
 $cpRules = complianceRules();
 $cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
 $cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
-check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 18 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
-      count($cpRules) === 18
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 19 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 19
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
@@ -2962,18 +2962,18 @@ check('تجزئة القانون + السقف (تجربة فعلية): تنزي�
       && strpos($row51, '45,000,000') === false && strpos($row51, '37,500,000') === false);
 // تجربة فعلية: كل معدٍّ غير ذي 12 شهراً خاضع وضريبته > 0 بحزيران — ضريبته المخزّنة
 // = القانون بالضبط (شطور ×12 − التنزيل الكامل ثم ÷12) ضمن ±1 ل.ل. للتقريب
-$law51 = $db->query("SELECT ms.employee_id, ms.taxable_base_lbp txb, ms.income_tax_lbp tax, e.social_status ss
+// (2026-09-10: صار بالمصدر الواحد expectedMonthlyTax — كل الأوضاع العائلية وإعدادات الملف، لا العازب فقط)
+$law51 = $db->query("SELECT e.*, ms.taxable_base_lbp txb, ms.income_tax_lbp tax
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
     WHERE e.is_deleted = 0 AND e.payment_months_per_year <> 12 AND e.tax_subject = 1
       AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
-      AND e.social_status = 'celibataire' AND COALESCE(e.apply_family_deduction, 1) = 1
       AND ms.month = 6 AND ms.year = 2026 AND ms.income_tax_lbp > 0")->fetchAll(PDO::FETCH_ASSOC);
 $bad51 = [];
 foreach ($law51 as $r51x) {
-    $exp51 = (int)round(annualLawTaxAsOf($db, (float)$r51x['txb'] * 12, $r51x['ss'], 6, 2026) / 12);
-    if (abs((int)$r51x['tax'] - $exp51) > 1) $bad51[] = $r51x['employee_id'] . ':' . number_format((int)$r51x['tax']) . '≠' . number_format($exp51);
+    $exp51 = expectedMonthlyTax($r51x, (float)$r51x['txb'], 6, 2026, $db);
+    if (abs((int)$r51x['tax'] - $exp51) > 1) $bad51[] = $r51x['id'] . ':' . number_format((int)$r51x['tax']) . '≠' . number_format($exp51);
 }
-check('تجزئة القانون (تجربة فعلية): ضريبة كل المعدّين غير ذوي الـ12 شهراً المخزّنة = المعادلة القانونية بالمليم',
+check('تجزئة القانون (تجربة فعلية): ضريبة كل المعدّين غير ذوي الـ12 شهراً المخزّنة بحزيران 2026 = القانون الحيّ بإعدادات ملفهم (expectedMonthlyTax) بالمليم',
       count($law51) > 0 && !$bad51, count($law51) . ' موظفاً' . ($bad51 ? ' — خلل: ' . implode(' · ', $bad51) : ' كلهم مطابقون'));
 
 /* =====================================================================
@@ -4508,7 +4508,7 @@ require_once $PROJ . '/includes/data_audit.php';
 $aud90 = dataAuditRules($db, '2025-2026');
 $info90 = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'orphan_rows', 'row_rate0'];
 $bad90 = []; foreach ($aud90 as $a) if ($a['n'] > 0 && !in_array($a['key'], $info90, true)) $bad90[] = $a['key'] . '=' . $a['n'];
-check('الفحص الرسمي (20 قاعدة) على النسخة المحلية 2025-2026: صفر أخطاء حساب (المعلوماتية للمراجعة مستثناة)', !$bad90, implode(' ', $bad90));
+check('الفحص الرسمي (21 قاعدة، منها tax_stale الضريبة ≠ القانون الحيّ منذ 2026-09-10) على النسخة المحلية 2025-2026: صفر أخطاء حساب (المعلوماتية للمراجعة مستثناة)', !$bad90, implode(' ', $bad90));
 check('شفاء تكميل العلاوات لا يستدعي المحرّك الكامل مباشرةً (سبب تصفير الأساس أونلاين) + شفاء الاسترجاع موصول + اللقطة + بطاقة الفحص',
       strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "(new PayrollCalculator(\$eid, (int)\$mrow['month'], (int)\$mrow['year']))->calculateAndSave()") === false
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healRestoreZeroedRows20260829();') !== false
@@ -5024,6 +5024,58 @@ check('تقرير المخالفات: قاعدة family_ded_off معرَّفة (
       && strpos($cmp103, "&& \$rule !== 'family_ded_off') \$keys[] = \$it['key'];") !== false
       && strpos($cmp103, "&& \$rk !== 'family_ded_off' && count(array_filter(") !== false
       && strpos($src103, '· تنزيل الأولاد: <b>') !== false);
+
+/* ===================================================================
+ * 104) 🧾 صمام «الضريبة المخزّنة ≠ القانون الحيّ» (2026-09-10 «انتبه هيدا برنامج يا أستاذ ما بدي ضل أعمل أنا تست»):
+ *      المصدر الواحد lawIncomeTaxAnnual (المحرّك + annualLawTaxAsOf + expectedMonthlyTax) + قاعدة tax_stale
+ *      بتقرير المخالفات (تصحيح = إعادة حساب السنة) وبالفحص الرسمي (data_audit، خطأ حساب) + تجربة حيّة.
+ * =================================================================== */
+$cp104 = (string)file_get_contents($PROJ . '/includes/compliance.php');
+$da104 = (string)file_get_contents($PROJ . '/includes/data_audit.php');
+$pc104 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$fn104 = (string)file_get_contents($PROJ . '/includes/functions.php');
+check('صمام الضريبة: lawIncomeTaxAnnual/expectedMonthlyTax معرَّفتان، المحرّك وannualLawTaxAsOf يستدعيان lawIncomeTaxAnnual (لا حلقة شطور مكرّرة)، قاعدة tax_stale بتقرير المخالفات (19) وبالفحص الرسمي، وcomplianceApply يعيد حساب السنة لها',
+      function_exists('lawIncomeTaxAnnual') && function_exists('expectedMonthlyTax')
+      && strpos($pc104, 'return lawIncomeTaxAnnual(getDB(), $taxableAfterDeduction, $asOfDed);') !== false && substr_count($pc104, 'FROM tax_brackets') === 0
+      && substr_count($fn104, 'FROM tax_brackets WHERE effective_from = (SELECT MAX(effective_from)') === 1
+      && isset(complianceRules()['tax_stale']) && strpos($cp104, "\$add('tax_stale', \$r,") !== false && strpos($cp104, "case 'active_nomonths': case 'tax_stale':") !== false
+      && strpos($da104, "\$add('tax_stale',") !== false && strpos($da104, 'expectedMonthlyTax($e, (float)$mrow[\'taxable_base_lbp\']') !== false);
+// قفل رقمي (جوزيف حليحل 958، تشرين 2025: وعاء 136,445,000 − صندوق 8,186,700 = 128,258,300؛ متزوج + ولدان + الزوجة تعمل + الأولاد نعم ⇒ تنزيل 495م ⇒ ضريبة كشفه القديم 3,240,581)
+$jh104 = ['id' => 0, 'tax_subject' => 1, 'apply_family_deduction' => 1, 'social_status' => 'marie_2_enfants', 'spouse_works' => 1, 'grant_spouse_addition' => 0, 'grant_children_addition' => 1];
+check('صمام الضريبة (قفل جوزيف حليحل): expectedMonthlyTax(وعاء 128,258,300، تشرين 2025، متزوج+ولدان+الزوجة تعمل+الأولاد نعم) = 3,240,581 = كشفه القديم · والأولاد كلا = 3,503,081 · غير خاضع = 0',
+      expectedMonthlyTax($jh104, 128258300, 10, 2025, $db) === 3240581
+      && expectedMonthlyTax($jh104 + ['x' => 1], 128258300, 10, 2025, $db) === 3240581
+      && expectedMonthlyTax(array_merge($jh104, ['grant_children_addition' => 0]), 128258300, 10, 2025, $db) === 3503081
+      && expectedMonthlyTax(array_merge($jh104, ['tax_subject' => 0]), 128258300, 10, 2025, $db) === 0,
+      'got=' . expectedMonthlyTax($jh104, 128258300, 10, 2025, $db) . '/' . expectedMonthlyTax(array_merge($jh104, ['grant_children_addition' => 0]), 128258300, 10, 2025, $db));
+// تجربة حيّة: ملاك مؤقت متزوج+ولدان بإضافي 133م — يُحسب ⇒ لا بند؛ تُضوّى الأزرار بلا إعادة حساب ⇒ بند tax_stale؛ التصحيح يزيله والضريبة = القانون
+$db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, titularization_date, status, salary_input_mode, current_grade, diploma, social_status, number_of_children, spouse_works, grant_spouse_addition, grant_children_addition, payment_months_per_year, tax_subject, tax_includes_extra, tax_includes_echelon, cnss_subject, eoc_subject, eoc_includes_extra, is_deleted)
+    VALUES (2, '__REG104', 'enseignant_titulaire', 'فحص', 'ضريبة104', 'Reg', 'Tax104', '2015-10-01', '2015-10-01', 'actif', 'percent_of_lbp', 20, 'licence', 'marie_2_enfants', 2, 0, 0, 0, 10, 1, 1, 1, 1, 1, 1, 0)");
+$rid104 = (int)$db->lastInsertId();
+try {
+    $db->exec("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, is_active) VALUES ($rid104, 'prime_fixe', 1, '2025-2026', 133000000, 'amount', 'LBP', 1)");
+    $n104 = recalcEmployeeYear($rid104, '2025-2026');
+    $find104 = function () use ($db, $rid104) { foreach (complianceItems($db, '2025-2026') as $it) if ($it['rule'] === 'tax_stale' && (int)$it['emp_id'] === $rid104) return $it; return null; };
+    $row104 = $db->query("SELECT taxable_base_lbp, income_tax_lbp FROM monthly_salaries WHERE employee_id = $rid104 AND month = 10 AND year = 2025")->fetch(PDO::FETCH_ASSOC);
+    $before104 = $find104();
+    $db->exec("UPDATE employees SET grant_spouse_addition = 1, grant_children_addition = 1 WHERE id = $rid104"); // تغيير بالملف بلا إعادة حساب = أشهر قديمة
+    $e104 = $db->query("SELECT * FROM employees WHERE id = $rid104")->fetch(PDO::FETCH_ASSOC);
+    $exp104 = expectedMonthlyTax($e104, (float)$row104['taxable_base_lbp'], 10, 2025, $db);
+    $stale104 = $find104();
+    $res104 = $stale104 ? complianceApply($db, $stale104) : 'no item';
+    $after104 = $find104();
+    $row104b = $db->query("SELECT income_tax_lbp FROM monthly_salaries WHERE employee_id = $rid104 AND month = 10 AND year = 2025")->fetch(PDO::FETCH_ASSOC);
+    check('صمام الضريبة (تجربة حيّة ضريبة104): بعد الاحتساب لا بند · تضوية زيادة الزوج والأولاد بالملف بلا إعادة حساب ⇒ الضريبة المتوقّعة أقل من المخزّنة وبند tax_stale يظهر بتقرير المخالفات · «موافق — صحّح» يعيد حساب السنة فيزول البند والضريبة المخزّنة = القانون الحيّ',
+          $n104 === 10 && $row104 && (int)$row104['income_tax_lbp'] > 0 && $before104 === null
+          && $exp104 < (int)$row104['income_tax_lbp'] && $stale104 !== null && $stale104['auto'] === true
+          && $after104 === null && (int)$row104b['income_tax_lbp'] === $exp104,
+          "n=$n104 stored=" . ($row104['income_tax_lbp'] ?? '-') . " exp=$exp104 before=" . ($before104 ? 'item' : 'none') . ' stale=' . ($stale104 ? 'item' : 'none') . " apply=$res104 after=" . ($after104 ? 'item' : 'none') . ' now=' . ($row104b['income_tax_lbp'] ?? '-'));
+} finally {
+    $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid104");
+    $db->exec("DELETE FROM employee_bonuses WHERE employee_id = $rid104");
+    $db->exec("DELETE FROM compliance_decisions WHERE employee_id = $rid104");
+    $db->exec("DELETE FROM employees WHERE id = $rid104");
+}
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -299,34 +299,9 @@ class PayrollCalculator {
         $taxableAfterDeduction = max(0, $annualTaxableBase - $familyDeduction);
         if ($taxableAfterDeduction <= 0) return 0;
         
-        // Get brackets — أحدث مجموعة شطور سارية فقط (تجنّب خلط مجموعتين)
-        $asOf = $this->year . '-' . str_pad($this->month, 2, '0', STR_PAD_LEFT) . '-01';
-        $stmt = getDB()->prepare("
-            SELECT * FROM tax_brackets
-            WHERE effective_from = (SELECT MAX(effective_from) FROM tax_brackets WHERE effective_from <= ?)
-            ORDER BY bracket_number ASC
-        ");
-        $stmt->execute([$asOf]);
-        $brackets = $stmt->fetchAll();
-        
-        $tax = 0;
-        $remaining = $taxableAfterDeduction;
-        
-        foreach ($brackets as $bracket) {
-            $bracketSize = $bracket['annual_to'] 
-                ? ($bracket['annual_to'] - $bracket['annual_from']) 
-                : PHP_INT_MAX;
-            
-            $taxableInBracket = min($remaining, $bracketSize);
-            if ($taxableInBracket <= 0) break;
-            
-            $tax += $taxableInBracket * ((float)$bracket['rate_percent'] / 100);
-            $remaining -= $taxableInBracket;
-            
-            if ($remaining <= 0) break;
-        }
-        
-        return $tax;
+        // الشطور — المصدر الوحيد lawIncomeTaxAnnual (2026-09-10): أحدث مجموعة سارية فقط، نفس الحلقة
+        // التي تفحص بها قاعدة «الضريبة المخزّنة ≠ القانون» (expectedMonthlyTax) فلا يختلف رقم عن رقم
+        return lawIncomeTaxAnnual(getDB(), $taxableAfterDeduction, $asOfDed);
     }
     
     /**

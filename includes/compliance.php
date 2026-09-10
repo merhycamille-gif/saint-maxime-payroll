@@ -66,6 +66,7 @@ function complianceRules(): array {
         'pct_nontit'     => ['% hors titulaire',           'نسبة مئوية عند متعاقد أو موظف (للملاك فقط)',          '#b45309'],
         'bonus_nosy'     => ['Prime sans année',           'بند علاوة بلا سنة دراسية (ينطبق على كل السنين)',      '#b45309'],
         'net_math'       => ['Net incohérent',             'صافي أو مستحق لا يساوي مكوّناته',                    '#b91c1c'],
+        'tax_stale'      => ['Impôt ≠ loi',                'ضريبة الدخل المخزّنة لا تطابق القانون الحيّ (ملفه أو القانون تغيّر بعد الاحتساب)', '#b91c1c'],
         'row_rate0'      => ['Taux = 0',                   'صف راتب بسعر صرف صفر أو فارغ',                        '#b45309'],
         'left_rows'      => ['Salaires après départ',      'تارك عنده رواتب بعد تركه',                            '#7c3aed'],
         'active_nomonths'=> ['Actif sans salaires',        'موظف فاعل بلا رواتب بسنة مفتوحة',                     '#64748b'],
@@ -121,6 +122,7 @@ function compliancePercentForMonth(array $rows, int $month): float {
  * كل بند: key, rule, emp_id, emp_name, school_id, school_name, sy, violation, fix, auto (تصحيح آلي متاح؟), link, data
  */
 function complianceItems(PDO $db, string $sy): array {
+    require_once __DIR__ . '/payroll_calculator.php'; // salaryEngineAllowed (tax_stale/active_nomonths) — لازم بالـCLI أيضاً
     $items = [];
     $sc = schoolScopeSql('e.school_id');
     $schools = [];
@@ -285,6 +287,32 @@ function complianceItems(PDO $db, string $sy): array {
             true, ['month' => $mo, 'year' => $yr, 'delete' => $del], $yr . '-' . $mo);
     }
 
+    // ── 11ب) الضريبة المخزّنة ≠ القانون الحيّ (2026-09-10 «ما بدي ضل أعمل أنا تست» — جوزيف حليحل بقيت ضريبته
+    //  بالمعادلة القديمة بعد نشر قانون التقاسم): لكل موظف مسموح للمحرّك، كل شهر حقيقي مخزّن تُعاد ضريبته من وعائه
+    //  المخزّن بالقانون الحيّ وإعدادات ملفه الحالية (expectedMonthlyTax = مسار المحرّك نفسه) — فرق > 1 ⇒ بند واحد له.
+    //  المنقولون بأساس مخزّن مستثنون (recalcEmployeeYear لا يلمس محسوماتهم المخزّنة).
+    $txEmps = $q("SELECT DISTINCT e.* FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
+        WHERE e.is_deleted = 0 AND COALESCE(e.tax_subject,1) = 1" . $sc . "
+          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) ORDER BY e.school_id, e.id", [$sy]);
+    $txRows = $db->prepare("SELECT month, year, taxable_base_lbp, income_tax_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ?
+        AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0) ORDER BY year, month");
+    foreach ($txEmps as $r) {
+        if (!salaryEngineAllowed($r, $db)) continue;
+        $txRows->execute([(int)$r['id'], $sy]);
+        $bad = []; $stored = null; $law = null;
+        foreach ($txRows->fetchAll(PDO::FETCH_ASSOC) as $mrow) {
+            $exp = expectedMonthlyTax($r, (float)$mrow['taxable_base_lbp'], (int)$mrow['month'], (int)$mrow['year'], $db);
+            if (abs((int)$mrow['income_tax_lbp'] - $exp) > 1) {
+                $bad[] = complianceMonthLabel((int)$mrow['month'], (int)$mrow['year']);
+                if ($stored === null) { $stored = (int)$mrow['income_tax_lbp']; $law = $exp; }
+            }
+        }
+        if (!$bad) continue;
+        $add('tax_stale', $r,
+            'ضريبة ' . count($bad) . ' شهراً مخزّنة بغير القانون الحيّ (' . implode('، ', array_slice($bad, 0, 4)) . (count($bad) > 4 ? '…' : '') . '): مثلاً ' . complianceFmt($stored) . ' والقانون بإعدادات ملفه الحالية ' . complianceFmt($law) . ' (فرق ' . complianceFmt($law - $stored) . ' شهرياً) — ملفه أو القانون تغيّر بعد الاحتساب',
+            'إعادة حساب سنة ' . $sy . ' بالقانون الحيّ', true, ['months' => count($bad), 'stored' => $stored, 'law' => $law]);
+    }
+
     // ── 12) صف بسعر صرف صفر (لغير التاركين) ──
     foreach ($q("SELECT e.*, ms.month, ms.year FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0 AND ms.school_year = ? AND COALESCE(ms.exchange_rate,0) <= 0" . $sc . "
@@ -416,7 +444,7 @@ function complianceApply(PDO $db, array $it): string {
             $n = $recalcYear();
             logAudit('compliance_grade_law', 'employees', $eid, ['current_grade' => $old], ['current_grade' => (float)$d['law'], 'sy' => $sy]);
             return 'الدرجة ' . rtrim(rtrim(number_format($old, 1), '0'), '.') . ' → ' . rtrim(rtrim(number_format((float)$d['law'], 1), '0'), '.') . ' وأُعيد حساب ' . $n . ' شهراً';
-        case 'base_scale': case 'pct_law': case 'add_stale': case 'ghost_add': case 'missing_add': case 'row_rate0': case 'active_nomonths':
+        case 'base_scale': case 'pct_law': case 'add_stale': case 'ghost_add': case 'missing_add': case 'row_rate0': case 'active_nomonths': case 'tax_stale':
             $n = $recalcYear();
             return 'أُعيد حساب ' . $n . ' شهراً بسنة ' . $sy;
         case 'multi_percent': case 'pct_nontit':

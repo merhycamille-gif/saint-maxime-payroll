@@ -47,6 +47,22 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
            OR ABS(ms.net_salary_lbp + ms.transport_lbp + COALESCE(ms.family_allowance_lbp,0) - ms.total_due_lbp) > 1)
         GROUP BY ms.employee_id", [$sy]));
 
+    // 4ب) الضريبة المخزّنة ≠ القانون الحيّ (2026-09-10): كل شهر حقيقي لمن هو مسموح للمحرّك تُعاد ضريبته من وعائه
+    //     المخزّن بالقانون الحيّ وإعدادات ملفه الحالية (expectedMonthlyTax = مسار المحرّك) — فرق > 1 = شهر قديم يلزمه إعادة حساب
+    require_once __DIR__ . '/payroll_calculator.php';
+    $txBad = [];
+    $txRows = $db->prepare("SELECT month, year, taxable_base_lbp, income_tax_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ?
+        AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
+    foreach ($q("SELECT DISTINCT e.*, $nm nm FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
+        WHERE e.is_deleted = 0 AND COALESCE(e.tax_subject,1) = 1 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)", [$sy]) as $e) {
+        if (!salaryEngineAllowed($e, $db)) continue;
+        $txRows->execute([(int)$e['id'], $sy]);
+        foreach ($txRows->fetchAll(PDO::FETCH_ASSOC) as $mrow) {
+            if (abs((int)$mrow['income_tax_lbp'] - expectedMonthlyTax($e, (float)$mrow['taxable_base_lbp'], (int)$mrow['month'], (int)$mrow['year'], $db)) > 1) { $txBad[] = ['nm' => $e['nm']]; break; }
+        }
+    }
+    $add('tax_stale', 'ضريبة الدخل المخزّنة بشهر لا تطابق القانون الحيّ بإعدادات ملفه الحالية (شهر قديم يلزمه إعادة حساب)', $txBad);
+
     // 5) الملاك: الأساس بعد التدرّج ≠ سلسلة الدرجة الكاملة للشهر
     $add('base_scale', 'أستاذ ملاك أساسه بعد التدرّج لا يطابق السلسلة عند درجته (الدرجة الكاملة)', $q("
         SELECT $nm nm, ms.month, ms.grade_at_month g, ms.base_plus_echelon_lbp b, sc.new_salary_2017 s
