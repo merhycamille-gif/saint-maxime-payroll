@@ -3269,10 +3269,12 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
         // 🖤 الأرمل/المطلق (2026-08-23 — أرملتا سيدة النجاة): جدول القانون فيه فئات المتزوج فقط،
         // فالأرمل يُحسب على فئة المتزوج المقابلة **بلا زيادة الزوج دائماً** (لا زوج): الشخصي
         // + حصة الأولاد (تتبع مفتاح «تنزيل الأولاد» كالمعتاد). veuf/divorce بلا أولاد = الشخصي.
+        $spouseActuallyWorks = !empty($spouseWorks); // زوج موجود ويعمل (لا أرمل/مطلق)
         if (strpos($socialStatus, 'veuf') === 0 || strpos($socialStatus, 'divorce') === 0) {
             $mapped = preg_replace('/^(veuf|divorce)/', 'marie', $socialStatus);
             $socialStatus = (strpos($mapped, 'marie_') === 0) ? $mapped : 'marie_sans_enfants';
             $spouseWorks = 1; // يُسقط زيادة الزوج حكماً
+            $spouseActuallyWorks = false; // لا زوج ⇒ حصة الأولاد كاملة، لا تُقسَم
         }
         $q = $db->prepare("SELECT annual_deduction FROM family_tax_deductions
                            WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
@@ -3291,6 +3293,10 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
             $q->execute(['celibataire', $asOf]);
             $single = (float)($q->fetchColumn() ?: 0);
             $ded = max($single, $ded - max(0, $married0 - $single));
+            // ⚖️ القانون (تنبيهه 2026-09-10 «إذا الزوجة تعمل تنزيل الأولاد بينقسم على اثنين بين الزوج والزوجة»):
+            // الزوجان العاملان يتقاسمان حصة الأولاد مناصفة — نصفها هنا (الأرمل/المطلق لا زوج فحصته كاملة).
+            // متزوج + ولدان + الزوجة تعمل = 450م + 90م÷2 = 495,000,000 (= كشف جوزيف حليحل القديم 41,250,000 شهرياً).
+            if ($spouseActuallyWorks && $ded > $single) $ded = $single + ($ded - $single) / 2;
         }
         return (int)round($ded);
     } catch (Exception $e) { return 0; }

@@ -3374,8 +3374,9 @@ check('مايا أبي حبيب: مفتاحا الزوج والأولاد مطف
  *     من إخراجات القيد (14 موظفاً) + فئة «أرمل» مدعومة بالمعادلة (تُحسب على
  *     فئة المتزوج المقابلة بلا زيادة زوج دائماً) + خياراتها بملف الموظف.
  * =================================================================== */
-check('فئة الأرمل: المعادلة تحسبها (شخصي + أولاد بمفتاحهم، بلا زيادة زوج)',
-      familyDeductionAnnual('veuf_2_enfants', 0, 1, '2026-01-01', 1, 1) === familyDeductionAnnual('marie_2_enfants', 1, 1, '2026-01-01', 1, 1)
+check('فئة الأرمل: المعادلة تحسبها (شخصي + أولاد كاملين بمفتاحهم، بلا زيادة زوج — ولا تقاسم لأن لا زوج، بخلاف المتزوج الذي زوجه يعمل منذ 2026-09-10)',
+      familyDeductionAnnual('veuf_2_enfants', 0, 1, '2026-01-01', 1, 1) === familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-01-01', 0, 1)
+      && familyDeductionAnnual('veuf_2_enfants', 0, 1, '2026-01-01', 1, 1) === 540000000
       && familyDeductionAnnual('veuf_sans_enfants', 0, 1, '2026-01-01', 1, 1) === familyDeductionAnnual('celibataire', 0, 1, '2026-01-01', 1, 1)
       && familyDeductionAnnual('veuf_2_enfants', 0, 1, '2026-01-01', 1, 0) === familyDeductionAnnual('celibataire', 0, 1, '2026-01-01', 1, 1));
 check('فئة الأرمل: خيارها بملف الموظف (أرمل(ة) بقائمة «متزوج؟» منذ 2026-09-10، والعدد من «عدد الأولاد») + تسمياتها',
@@ -5003,6 +5004,15 @@ check('قانون التنزيل العائلي (جورج العموري): مت�
       && familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-09-01', 0, 1) === 540000000
       && familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-09-01', 0, 0) === 450000000
       && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "\$fdSws = (\$sw && (string)\$sw >= '1900-01-01') ? \$sw : null;") !== false);
+// ⚖️ «إذا الزوجة تعمل تنزيل الأولاد بينقسم على اثنين بين الزوج والزوجة» (تنبيهه 2026-09-10): الزوجان العاملان يتقاسمان
+// حصة الأولاد مناصفة — الأرمل/المطلق لا زوج فحصته كاملة، و«تنزيل الأولاد: كلا» يبقى الشخصي فقط
+check('قانون التنزيل العائلي: الزوج يعمل ⇒ نصف حصة الأولاد — متزوج+ولدان+الزوجة تعمل+الأولاد نعم = 495,000,000 (= كشف جوزيف حليحل 41,250,000 شهرياً) · ولد واحد = 472,500,000 · أرمل+ولدان = 540م كاملة · الزوج يعمل والأولاد كلا = 450م · الزوج لا يعمل = 765م كاملة',
+      familyDeductionAnnual('marie_2_enfants', 1, 1, '2026-09-01', 1, 1) === 495000000
+      && familyDeductionAnnual('marie_1_enfant', 1, 1, '2026-09-01', 1, 1) === 472500000
+      && familyDeductionAnnual('veuf_2_enfants', 0, 1, '2026-09-01', 1, 1) === 540000000
+      && familyDeductionAnnual('marie_2_enfants', 1, 1, '2026-09-01', 1, 0) === 450000000
+      && familyDeductionAnnual('marie_2_enfants', 0, 1, '2026-09-01', 1, 1) === 765000000
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'if ($spouseActuallyWorks && $ded > $single) $ded = $single + ($ded - $single) / 2;') !== false);
 check('تقرير المخالفات: قاعدة family_ded_off معرَّفة (مراجعة) + بندها يحسب الفرق بالمصدر الواحد familyDeductionAnnual + التصحيح يضوّي الزرّين المطفأين فقط ويعيد حساب السنة + مستثناة من «تصحيح الكل» + الملف المالي يعرض حالة الزرّين',
       isset(complianceRules()['family_ded_off'])
       && strpos($cmp103, "\$add('family_ded_off', \$r,") !== false && substr_count($cmp103, 'familyDeductionAnnual($r[\'social_status\'], $r[\'spouse_works\'] ?? 0, 1, $fdAsOf,') === 2

@@ -1303,7 +1303,7 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                             <option value="0" <?= empty($employee['grant_children_addition']) ? 'selected' : '' ?>>Non / كلا</option>
                             <option value="1" <?= !empty($employee['grant_children_addition']) ? 'selected' : '' ?>>Oui / نعم</option>
                         </select>
-                        <small style="display:block;color:var(--gray-500);margin-top:4px">كلا = الزوج الآخر يأخذ تنزيل الأولاد (المعتاد عند الأستاذة المتزوجة)</small>
+                        <small style="display:block;color:var(--gray-500);margin-top:4px">كلا = الزوج الآخر يأخذ تنزيل الأولاد (المعتاد عند الأستاذة المتزوجة) · نعم و«الزوج يعمل: نعم» = <strong>نصف</strong> حصة الأولاد (تُقسم بين الزوجين قانوناً)</small>
                     </div>
                 </div>
                 <script>
