@@ -4406,9 +4406,20 @@ if ($chi85) {
     $keepN = preg_match_all('/name="keep\[\]"/', $html85);
     $storedRows = (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id=" . (int)$chi85['id'] . " AND reason<>'titularization'")->fetchColumn();
     $gAfter = (float)$db->query("SELECT current_grade FROM employees WHERE id=" . (int)$chi85['id'])->fetchColumn();
-    $ok85 = $full === intdiv($halves, 2) && $single === ($halves % 2) && $mirrors === $full && $keepN === $storedRows && $gAfter === $gBefore
+    // 🔴 (2026-09-10 «ترتيب الدرجات أوضح»): يُلمّ النصفان فقط إذا كانا **متتاليَين** بلا درجة بينهما —
+    // المتوقَّع يُحسب من السجلّ نفسه بنفس القاعدة (نصف عادي غير «تقديم» + نفس حالة الاحتساب + متجاوران).
+    $expFull = 0; $expSingle = 0; $pend85 = null;
+    foreach ($db->query("SELECT reason, delta, counted, notes FROM employee_grade_history WHERE employee_id=" . (int)$chi85['id'] . " ORDER BY change_date, id") as $r85) {
+        $isHalf = $r85['reason'] === 'biennial_promotion' && abs((float)$r85['delta'] - 0.5) < 0.001 && strpos((string)$r85['notes'], 'تقديم') === false;
+        if (!$isHalf) { if ($pend85 !== null) $expSingle++; $pend85 = null; continue; }
+        if ($pend85 !== null && (int)$pend85 === (int)$r85['counted']) { $expFull++; $pend85 = null; }
+        else { if ($pend85 !== null) $expSingle++; $pend85 = (int)$r85['counted']; }
+    }
+    if ($pend85 !== null) $expSingle++;
+    $ok85 = $full === $expFull && $single === $expSingle && $mirrors === $full && $keepN === $storedRows && $gAfter === $gBefore
+         && ($expFull * 2 + $expSingle) === $halves
          && strpos((string)file_get_contents($PROJ . '/pages/grades.php'), "explode(',', (string)\$_POST['row_delete'])") !== false;
-    $why85 = "halves=$halves full=$full single=$single mirrors=$mirrors keep=$keepN stored=$storedRows grade=$gBefore→$gAfter";
+    $why85 = "halves=$halves full=$full/$expFull single=$single/$expSingle mirrors=$mirrors keep=$keepN stored=$storedRows grade=$gBefore→$gAfter";
 }
 check('عرض «درجة كل سنتين»: النصفان بسطر واحد عرضاً + صح لكل نصف مخزّن (مرآة) + الحذف المزدوج + الدرجة لا تتغيّر', $ok85, $why85);
 
@@ -5087,6 +5098,39 @@ try {
     $db->exec("DELETE FROM compliance_decisions WHERE employee_id = $rid104");
     $db->exec("DELETE FROM employees WHERE id = $rid104");
 }
+
+/* =====================================================================
+ * 105) 🆕 نظام الأساتذة الجدد (4+4+2) بديل القوانين 244/102/223 (جوزف السرّوع 2026-09-10
+ *      «p1 بتقول عاطيهن وp2 مش عاطيهن»): من دخل الملاك بعد 2/4/2012 لا تُعرَض له هذه القوانين
+ *      «بعدها ما أُعطيت» ولا تُطبَّق عليه (lawGradesForEmployee = 0 = المصدر الواحد isNewSystemTeacher)،
+ *      وتابلو الدرجات لا يلغي قانوناً معطّلاً (لا ينطبق) عند الحفظ. قانون 344 اليدوي و2017 كما هما.
+ * =================================================================== */
+$lawsBy105 = [];
+foreach ($db->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1") as $L105) $lawsBy105[(string)$L105['law_number']] = $L105;
+$empNew105 = ['id' => 0, 'hire_date' => '2010-10-01', 'titularization_date' => '2012-10-01', 'diploma' => 'ijaza_taalimiya', 'employee_type' => 'enseignant_titulaire'];
+$empOld105 = ['id' => 0, 'hire_date' => '2003-10-01', 'titularization_date' => '2005-10-01', 'diploma' => 'ijaza_taalimiya', 'employee_type' => 'enseignant_titulaire'];
+$empEdge105 = ['id' => 0, 'hire_date' => '2010-04-02', 'titularization_date' => '2012-04-02', 'diploma' => 'ijaza_taalimiya', 'employee_type' => 'enseignant_titulaire'];
+check('نظام 4+4+2: isNewSystemTeacher = دخول الملاك بعد 2/4/2012 (01/10/2012 جديد · 02/04/2012 قديم · 2005 قديم · بلا hire_date بلا تثبيت = لا)',
+      isNewSystemTeacher($empNew105) === true && isNewSystemTeacher($empEdge105) === false
+      && isNewSystemTeacher($empOld105) === false && isNewSystemTeacher(['id' => 0]) === false);
+check('نظام 4+4+2: القوانين 244/102/223 = 0 درجة للجديد، وكاملة للقديم (3/3/4.5)، و344 اليدوي 4 للاثنين',
+      isset($lawsBy105['244'], $lawsBy105['102'], $lawsBy105['223'], $lawsBy105['344'])
+      && lawGradesForEmployee($lawsBy105['244'], $empNew105) == 0 && lawGradesForEmployee($lawsBy105['102'], $empNew105) == 0
+      && lawGradesForEmployee($lawsBy105['223'], $empNew105) == 0
+      && lawGradesForEmployee($lawsBy105['244'], $empOld105) == 3 && lawGradesForEmployee($lawsBy105['102'], $empOld105) == 3
+      && lawGradesForEmployee($lawsBy105['223'], $empOld105) == 4.5
+      && lawGradesForEmployee($lawsBy105['344'], $empNew105) == 4 && lawGradesForEmployee($lawsBy105['344'], $empOld105) == 4,
+      'new=' . lawGradesForEmployee($lawsBy105['244'] ?? ['law_number' => 'x', 'grades_count' => 0], $empNew105)
+      . ' old=' . lawGradesForEmployee($lawsBy105['244'] ?? ['law_number' => 'x', 'grades_count' => 0], $empOld105));
+check('نظام 4+4+2: لائحة «بعدها ما أُعطيت» فارغة للجديد على 244/102/223 وممتلئة للقديم (3 وحدات لـ244)',
+      isset($lawsBy105['244']) && exceptionalGrantUnits($empNew105, $lawsBy105['244']) === []
+      && exceptionalGrantUnits($empNew105, $lawsBy105['223']) === []
+      && count(exceptionalGrantUnits($empOld105, $lawsBy105['244'])) === 3);
+$grSrc105 = (string)file_get_contents(__DIR__ . '/../pages/grades.php');
+check('نظام 4+4+2: تابلو الدرجات لا يلغي قانوناً لا ينطبق عند الحفظ (حارس lawGradesForEmployee ≤ 0 → continue) + ملاحظة التوضيح بلوحة الدرجات',
+      strpos($grSrc105, 'lawGradesForEmployee($lawRow, $empExc) <= 0) continue;') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), 'بديلها <strong>نظام الأساتذة الجدد 4+4+2</strong>') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php'), "\$isNew = isNewSystemTeacher(\$emp);") !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

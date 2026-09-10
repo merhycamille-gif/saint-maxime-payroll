@@ -4793,13 +4793,14 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
             && abs((float)($h['delta'] ?? ((float)$h['grade_after'] - (float)$h['grade_before'])) - 0.5) < 0.001
             && strpos((string)$h['notes'], 'تقديم') === false;
     };
-    // الأنصاف العادية تُزاوَج بالتسلسل الزمني (الأول مع الثاني، الثالث مع الرابع…) حتى لو فصلت بينها
-    // درجات استثنائية؛ السطر الملموم يظهر مكان النصف الثاني (تاريخ اكتمال الدرجة) ويُخفى الأول.
+    // 🔴 (طلبه 2026-09-10 «ترتيب الدرجات يكون أوضح» — جوزف السرّوع): يُلمّ النصفان **فقط إذا كانا متتاليَين**
+    // بلا أي درجة أخرى بينهما؛ أي درجة استثنائية/يدوية بينهما تقطع اللمّ فيبقى كل نصف بسطره وتاريخه.
+    // هكذا كل سطر: الدرجة بعده = الدرجة قبله + مقداره (كان اللمّ عبر الاستثنائية يخفي نصفاً فتقفز الدرجة 19 → 20.5).
     $pairOf = [];        // فهرس النصف الثاني → صفّ النصف الأول
     $skip = [];          // فهارس الأنصاف الأولى المخفية
-    $pending = null;     // فهرس نصف أول بانتظار نصفه الثاني
+    $pending = null;     // فهرس نصف أول بانتظار نصفه الثاني (المباشر)
     foreach ($history as $i => $h) {
-        if (!$isPlainHalf($h)) continue;
+        if (!$isPlainHalf($h)) { $pending = null; continue; }
         if ($pending !== null && (int)$history[$pending]['counted'] === (int)$h['counted']) {
             $pairOf[$i] = $history[$pending]; $skip[$pending] = true; $pending = null;
         } else {
@@ -4871,13 +4872,14 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         <?php if (!empty($history)): ?>
         <table class="table" id="gradeRowsTable">
             <thead><tr>
+                <th style="text-align:center;width:40px">#</th>
                 <th style="text-align:center;width:70px">محسوبة؟</th>
                 <th style="width:150px">التاريخ</th><th>نوع الدرجة</th><th style="text-align:center;width:90px">مقدارها</th>
                 <th style="text-align:center;width:90px">الدرجة بعدها</th><th>الأساس القانوني</th>
-                <th style="text-align:center;width:190px" class="no-print">إجراءات</th>
+                <th style="text-align:center;width:230px" class="no-print">إجراءات</th>
             </tr></thead>
             <tbody>
-            <?php foreach ($display as $drow):
+            <?php $seq = 0; foreach ($display as $drow): $seq++;
                 $h = $drow['h']; $pairRow = $drow['pair'];
                 [$rlabel, $rcolor, $isTitul] = $labelFor($h);
                 $counted = $isTitul || (int)$h['counted'] === 1;
@@ -4886,6 +4888,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                 elseif ($isTitul === false && $h['reason'] === 'biennial_promotion' && abs($amount - 0.5) < 0.001 && strpos((string)$h['notes'], 'تقديم') === false) { $rlabel = 'نص درجة عادية (تكتمل تشرين ' . ((int)substr($h['change_date'], 0, 4) + 1) . ')'; }
             ?>
                 <tr class="<?= $isTitul ? '' : 'gr-locked' ?>" style="<?= !$counted ? 'opacity:.55;background:#fbfbfb' : '' ?>">
+                    <td style="text-align:center"><span class="text-muted" style="font-weight:700"><?= $seq ?></span></td>
                     <td style="text-align:center">
                         <?php if ($isTitul): ?>
                             <i class="fas fa-lock text-muted" title="درجة دخول الملاك — ثابتة دائماً"></i>
@@ -4961,8 +4964,8 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                             <button type="button" class="btn btn-sm btn-warning gr-edit" title="فتح تاريخ ومقدار هذه الدرجة للتعديل">
                                 <i class="fas fa-pen"></i> تعديل
                             </button>
-                            <button type="submit" class="btn btn-sm btn-success gr-save" style="display:none"
-                                    title="يحفظ تغييراتك فوراً ويعيد حساب الراتب">
+                            <button type="submit" class="btn btn-sm btn-success gr-save" disabled
+                                    title="اكبس «تعديل» أولاً — ثم «حفظ» يحفظ تغييراتك فوراً ويعيد حساب الراتب">
                                 <i class="fas fa-save"></i> حفظ
                             </button>
                             <button type="submit" name="row_delete" value="<?= $pairRow ? (int)$pairRow['id'] . ',' . (int)$h['id'] : (int)$h['id'] ?>" class="btn btn-sm btn-danger"
@@ -4975,6 +4978,15 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?php endif; ?>
+
+        <?php if (isNewSystemTeacher($emp)): ?>
+        <p class="text-muted" style="font-size:12px;margin:10px 0 0;line-height:1.9">
+            <i class="fas fa-info-circle" style="color:#2563eb"></i>
+            <strong>أستاذ داخل الملاك بعد 2/4/2012</strong> (<?= formatDate(employeeEntryDate($emp)) ?>):
+            القوانين القديمة <strong>244 و102 و223</strong> لا تنطبق عليه — بديلها <strong>نظام الأساتذة الجدد 4+4+2</strong>
+            (10 درجات استثنائية، تظهر أعلاه بتواريخها) فلا تُعرَض ضمن «بعدها ما أُعطيت».
+        </p>
         <?php endif; ?>
 
         <?php if (!empty($grantable)): ?>
@@ -4999,8 +5011,8 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                         <button type="button" class="btn btn-sm btn-warning gr-edit" title="فتح هذه الدرجة (الصح والتاريخ) للإعطاء">
                             <i class="fas fa-pen"></i> تعديل
                         </button>
-                        <button type="submit" class="btn btn-sm btn-success gr-save" style="display:none"
-                                title="يحفظ تغييراتك فوراً ويعيد حساب الراتب">
+                        <button type="submit" class="btn btn-sm btn-success gr-save" disabled
+                                title="اكبس «تعديل» أولاً — ثم «حفظ» يعطي الدرجة فوراً ويعيد حساب الراتب">
                             <i class="fas fa-save"></i> حفظ
                         </button>
                     </td>
@@ -5013,6 +5025,8 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         <style>
         /* 🔒 كل الصفوف مقفولة افتراضياً: الصحّات لا تُكبس والحقول لا تُكتب حتى «تعديل» على الصفّ نفسه */
         #gradeChecklistForm tr.gr-locked input[type=checkbox]{pointer-events:none;opacity:.45;cursor:default}
+        /* الأزرار الثلاثة (تعديل/حفظ/حذف) ظاهرة دائماً قدّام كل درجة (طلبه 2026-09-10) — «حفظ» باهت حتى تُفتح الدرجة بـ«تعديل» */
+        #gradeChecklistForm .gr-save[disabled],#gradeChecklistForm .gr-edit[disabled]{opacity:.4;cursor:not-allowed}
         /* زرّ الحفظ الفوري يلفت النظر لمّا يظهر قدّام الشي المتغيّر */
         .gr-pulse{animation:grPulse .9s ease infinite alternate}
         @keyframes grPulse{from{box-shadow:0 0 0 0 rgba(22,163,74,.55)}to{box-shadow:0 0 0 7px rgba(22,163,74,0)}}
@@ -5034,15 +5048,15 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                 tr.querySelectorAll('.gr-field').forEach(function (x) { x.readOnly = false; x.style.background = '#fef9c3'; });
                 tr.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.removeAttribute('tabindex'); });
                 var sv = tr.querySelector('.gr-save');
-                if (sv) sv.style.display = '';
-                btn.style.display = 'none';
+                if (sv) sv.disabled = false;                          // «حفظ» يصير فعّالاً (كان باهتاً)
+                btn.disabled = true;                                  // «تعديل» يبقى ظاهراً لكن مستهلَكاً لهذا الصفّ
             });
             function reveal(el) {
                 var tr = el.closest ? el.closest('tr') : null;
                 if (!tr || tr.classList.contains('gr-locked')) return; // الصفوف المقفولة لا تتغيّر أصلاً
                 var sv = tr.querySelector('.gr-save');
                 if (!sv) return;
-                sv.style.display = '';
+                sv.disabled = false;
                 sv.classList.add('gr-pulse');
             }
             f.addEventListener('change', function (e) {

@@ -78,12 +78,16 @@ if (isset($_GET['rebuild_legal']) && $employeeId > 0) {
 // تابلو الدرجات الاستثنائية (تشيك مارك): يطبّق المؤشَّر ويلغي غير المؤشَّر — تحكّم لكل أستاذ
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exc_save']) && $employeeId > 0) {
     $checked = array_map('strval', (array)($_POST['exc_laws'] ?? []));
-    $lawNums = $db->query("SELECT law_number FROM exceptional_grades_laws WHERE is_active = 1")->fetchAll(PDO::FETCH_COLUMN);
+    $lawRows = $db->query("SELECT * FROM exceptional_grades_laws WHERE is_active = 1")->fetchAll(PDO::FETCH_ASSOC);
+    $empExc  = $db->query("SELECT * FROM employees WHERE id = " . (int)$employeeId)->fetch(PDO::FETCH_ASSOC);
     $appl = $db->prepare("SELECT DISTINCT law_reference FROM employee_grade_history WHERE employee_id = ? AND law_reference IS NOT NULL");
     $appl->execute([$employeeId]);
     $appliedNow = array_map('strval', $appl->fetchAll(PDO::FETCH_COLUMN));
     $nApp = 0; $nRem = 0;
-    foreach ($lawNums as $ln) {
+    foreach ($lawRows as $lawRow) {
+        $ln = $lawRow['law_number'];
+        // قانون لا ينطبق على هذا الأستاذ (صحّه معطّل بالتابلو فلا يصل بالـPOST): لا يُطبَّق ولا يُلغى — يبقى كما هو.
+        if ($empExc && lawGradesForEmployee($lawRow, $empExc) <= 0) continue;
         $want = in_array((string)$ln, $checked, true);
         $has  = in_array((string)$ln, $appliedNow, true);
         try {
