@@ -4916,7 +4916,10 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                                    class="form-control gr-field" style="max-width:75px;padding:4px 6px;text-align:center;margin:0 auto">
                         <?php endif; ?>
                     </td>
-                    <td style="text-align:center"><?= $counted ? '<strong>' . $fmtG($h['grade_after']) . '</strong>' : '<span class="text-muted" title="غير محسوبة">—</span>' ?></td>
+                    <td style="text-align:center"><?= $counted ? '<strong>' . $fmtG($h['grade_after']) . '</strong>' : '<span class="text-muted" title="غير محسوبة">—</span>' ?>
+                        <?php if ($counted && !$isTitul && $h['change_date'] > date('Y-m-d')): /* ⏳ تاريخ مستقبلي: لا تدخل الدرجة الحالية ولا الراتب قبل شهرها (جوزف السرّوع 2026-09-10 «عاطيتو 11 درجة بس ما حسبهن») */ ?>
+                            <br><small style="color:#b45309;font-weight:700" title="تاريخها لم يحلّ بعد — تُحسب بالراتب ابتداءً من شهرها؛ عدّل التاريخ لتاريخ أقدم إذا بدك تدخل من الآن">⏳ من راتب <?= date('m/Y', strtotime($h['change_date'])) ?></small>
+                        <?php endif; ?></td>
                     <td><small><?php
                         // عمود الملاحظة: الأساس القانوني لكل درجة (لكل الحالات) —
                         //  • قانون استثنائي مسمّى (244/102/223/2017=قانون 46): «قانون X — الاسم».
@@ -5121,7 +5124,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         <input type="hidden" name="return_url" value="<?= e($_SERVER['REQUEST_URI'] ?? '') ?>">
         <h4 style="margin:0 0 4px;color:var(--primary)"><i class="fas fa-plus-circle"></i> أضف درجة يدوية (بقرارك، خارج القانون)</h4>
         <p class="text-muted" style="font-size:12px;margin:0 0 10px">
-            درجة تحطّها انت بمقدار وتاريخ من اختيارك (تشرين 1/10 أو كانون 1/1 أو أي تاريخ). بمجرّد الحفظ
+            درجة تحطّها انت بمقدار وتاريخ من اختيارك (تشرين 1/10 أو كانون 1/1 أو أي تاريخ). <strong style="color:#b45309">انتبه: تاريخ بعد اليوم = تُحسب بالراتب من شهرها فقط (تظهر ⏳)</strong>؛ إذا بدّك تدخل من الآن اختر تاريخاً أقدم. بمجرّد الحفظ
             <strong>تُضاف فوراً لأساس الراتب ويتدرّج الراتب من بعدها تلقائياً</strong>، وتقدر تشيلها لاحقاً بالشك-مارك.
         </p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
@@ -5131,7 +5134,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
             </div>
             <div class="form-group mb-0">
                 <label class="form-label" style="font-size:12px">التاريخ</label>
-                <input type="date" name="manual_date" value="<?= date('Y') ?>-10-01" class="form-control" style="max-width:170px" required>
+                <input type="date" name="manual_date" value="<?= ((int)date('n') >= 10 ? date('Y') : date('Y') - 1) ?>-10-01" class="form-control" style="max-width:170px" required>
             </div>
             <div class="form-group mb-0" style="flex:1;min-width:160px">
                 <label class="form-label" style="font-size:12px">ملاحظة (اختياري)</label>
