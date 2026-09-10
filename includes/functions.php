@@ -4980,15 +4980,50 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
         </table>
         <?php endif; ?>
 
-        <?php if (isNewSystemTeacher($emp)): ?>
-        <p class="text-muted" style="font-size:12px;margin:10px 0 0;line-height:1.9">
-            <i class="fas fa-info-circle" style="color:#2563eb"></i>
-            <strong>أستاذ داخل الملاك بعد 2/4/2012</strong> (<?= formatDate(employeeEntryDate($emp)) ?>):
-            القوانين القديمة <strong>244 و102 و223</strong> لا تنطبق عليه — بديلها <strong>نظام الأساتذة الجدد 4+4+2</strong>
-            (10 درجات استثنائية، تظهر أعلاه بتواريخها) فلا تُعرَض ضمن «بعدها ما أُعطيت».
-        </p>
-        <?php endif; ?>
-
+        <?php
+        // 📜 «القوانين لازم يكونوا مكتوبين كمان وتاريخهن حتى نضلّ متذكّرين شو هني» (طلبه 2026-09-10):
+        // جدول تذكير ثابت بكل القوانين الاستثنائية (الرقم + تاريخ الصدور + الدرجات + الوصف) مع حالة كل قانون عند هذا الأستاذ.
+        $isNewSys = isNewSystemTeacher($emp);
+        $grantedByLaw = [];
+        foreach ($history as $hh) {
+            if ($hh['reason'] === 'titularization' || $hh['reason'] === 'biennial_promotion' || $hh['reason'] === 'manual') continue;
+            $k = ($hh['law_reference'] !== null && $hh['law_reference'] !== '') ? (string)$hh['law_reference'] : '4+4+2';
+            if ((int)$hh['counted'] === 1) $grantedByLaw[$k] = ($grantedByLaw[$k] ?? 0) + (float)($hh['delta'] ?? ((float)$hh['grade_after'] - (float)$hh['grade_before']));
+        }
+        $remainingByLaw = [];
+        foreach ($grantable as $gb) { $remainingByLaw[(string)$gb['law']['law_number']] = array_sum(array_column($gb['units'], 'delta')); }
+        $lawRef = [];
+        if ($isNewSys) {
+            $lawRef[] = ['num' => 'نظام الأساتذة الجدد (4+4+2)', 'date' => '', 'n' => 10, 'desc' => 'من دخل الملاك بعد 2/4/2012: 4 درجات بكانون الذي يلي الدخول ثم 4 ثم 2، ويُقدَّم تدرّجه سنة — بديل القوانين 244 و102 و223',
+                         'status' => isset($grantedByLaw['4+4+2']) ? ('مُعطى: ' . $fmtG($grantedByLaw['4+4+2']) . ' درجة (أعلاه)') : 'لم يُعطَ بعد', 'cls' => isset($grantedByLaw['4+4+2']) ? 'success' : 'warning'];
+        }
+        foreach ($laws as $L) {
+            $ln = (string)$L['law_number'];
+            $given = $grantedByLaw[$ln] ?? 0;
+            $nFor = lawGradesForEmployee($L, $emp);
+            if ($given > 0) { $status = 'مُعطى: ' . $fmtG($given) . ' درجة (أعلاه)'; $cls = 'success'; }
+            elseif ($isNewSys && in_array($ln, ['244', '102', '223'], true)) { $status = 'لا ينطبق عليه — بديله نظام 4+4+2'; $cls = 'secondary'; }
+            elseif ($nFor <= 0) { $status = 'لا ينطبق عليه'; $cls = 'secondary'; }
+            elseif (isset($remainingByLaw[$ln])) { $status = 'بعدها ما أُعطيت (' . $fmtG($remainingByLaw[$ln]) . ' درجة) — تعطيها من اللائحة أدناه'; $cls = 'warning'; }
+            else { $status = 'مُعطى'; $cls = 'success'; }
+            $lawRef[] = ['num' => 'قانون ' . $ln, 'date' => $L['law_date'], 'n' => $nFor > 0 ? $nFor : (float)$L['grades_count'], 'desc' => $L['description_ar'] ?: $L['description_fr'], 'status' => $status, 'cls' => $cls];
+        }
+        ?>
+        <h4 style="color:var(--primary);margin:18px 0 6px"><i class="fas fa-book"></i> القوانين الاستثنائية — للتذكير (كل قانون برقمه وتاريخه وحالته عند هذا الأستاذ)</h4>
+        <table class="table" id="gradeLawsRefTable" style="font-size:12.5px">
+            <thead><tr><th style="width:190px">القانون</th><th style="width:110px">تاريخ صدوره</th><th style="text-align:center;width:80px">درجاته</th><th>الوصف</th><th style="width:260px">حالته عند هذا الأستاذ</th></tr></thead>
+            <tbody>
+            <?php foreach ($lawRef as $lr): ?>
+                <tr>
+                    <td><strong><?= e($lr['num']) ?></strong></td>
+                    <td><?= $lr['date'] ? formatDate($lr['date']) : '<span class="text-muted">—</span>' ?></td>
+                    <td style="text-align:center"><span class="badge badge-gold">+<?= $fmtG($lr['n']) ?></span></td>
+                    <td><small><?= e($lr['desc']) ?></small></td>
+                    <td><span class="badge badge-<?= $lr['cls'] ?>"><?= e($lr['status']) ?></span></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
         <?php if (!empty($grantable)): ?>
         <h4 style="color:var(--primary);margin:18px 0 6px"><i class="fas fa-plus-circle"></i> درجات استثنائية بعدها ما أُعطيت (متاحة لهذا الأستاذ)</h4>
         <p class="text-muted" style="font-size:12px;margin:0 0 8px"><strong>كل درجة لحالها.</strong> الشك-مارك فاضي = ما انعطت بعد. كبس الصح واختر تاريخ الإعطاء لكل درجة بدّك ياها فتُضاف وتُحسب.</p>

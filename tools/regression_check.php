@@ -5127,9 +5127,10 @@ check('نظام 4+4+2: لائحة «بعدها ما أُعطيت» فارغة ل
       && exceptionalGrantUnits($empNew105, $lawsBy105['223']) === []
       && count(exceptionalGrantUnits($empOld105, $lawsBy105['244'])) === 3);
 $grSrc105 = (string)file_get_contents(__DIR__ . '/../pages/grades.php');
-check('نظام 4+4+2: تابلو الدرجات لا يلغي قانوناً لا ينطبق عند الحفظ (حارس lawGradesForEmployee ≤ 0 → continue) + ملاحظة التوضيح بلوحة الدرجات',
+check('نظام 4+4+2: تابلو الدرجات لا يلغي قانوناً لا ينطبق عند الحفظ (حارس lawGradesForEmployee ≤ 0 → continue) + جدول القوانين للتذكير (gradeLawsRefTable) بلوحة الدرجات',
       strpos($grSrc105, 'lawGradesForEmployee($lawRow, $empExc) <= 0) continue;') !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), 'بديلها <strong>نظام الأساتذة الجدد 4+4+2</strong>') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), 'id="gradeLawsRefTable"') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), 'لا ينطبق عليه — بديله نظام 4+4+2') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../includes/payroll_calculator.php'), "\$isNew = isNewSystemTeacher(\$emp);") !== false);
 
 /* ---------- الخلاصة ---------- */
