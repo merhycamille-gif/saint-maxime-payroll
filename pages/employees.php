@@ -233,25 +233,32 @@ if (in_array($action, ['new', 'edit', 'delete', 'copy_year'])) {
     requireSchoolSelected();
 }
 
-// ===== محرّر الأجر الإضافي/المكافآت المباشر (inline) — سطر لكل مرحلة، بالليرة أو الدولار =====
-function renderBonusRow($r = null) {
-    // ثلاثة أنواع مستقلة: «مكافأة ومساعدة» (aide_complementaire) · «الأجر الإضافي» (prime_fixe) · «نقل».
-    $types = ['aide_complementaire' => '💰 Prime & aide / مكافأة ومساعدة', 'prime_fixe' => '➕ Supplément / الأجر الإضافي', 'transport_complement' => '🚌 Transport / نقل'];
-    $t = $r['bonus_type'] ?? 'aide_complementaire';
+// ===== محرّر المكافآت والمساعدات والنقل (inline) — سطر لكل مرحلة، بالليرة أو الدولار أو نسبة٪ =====
+// (2026-09-11 «الصفحة مش واضحة كيفية استعمالها») قسم مستقل لكل نوع بتبويب «المكافآت»: النوع ثابت
+// بالقسم (حقل مخفي بالسطر) بدل منتقي نوع بكل سطر؛ الأشهر بترتيب السنة الدراسية (تشرين ← أيلول).
+function renderBonusRow($r = null, $type = 'aide_complementaire') {
+    $t = $r['bonus_type'] ?? $type;
+    if (!in_array($t, ['prime_fixe', 'aide_complementaire', 'transport_complement'], true)) $t = $type;
     $cur = $r['currency'] ?? 'LBP';
     $vt = $r['value_type'] ?? 'amount';
     $val = $r ? rtrim(rtrim(number_format((float)$r['amount'], 2, '.', ''), '0'), '.') : '';
     $from = $r ? (int)$r['start_month'] : 0;
     $to = $r ? (int)$r['end_month'] : 0;
+    $order = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    $mSel = function ($name, $sel) use ($order) {
+        $h = '<select name="bonus_rows[' . $name . '][]" class="form-select"><option value="">Toute l\'année / كل السنة</option>';
+        foreach ($order as $mm) $h .= '<option value="' . $mm . '"' . ($sel === $mm ? ' selected' : '') . '>' . monthName($mm) . '</option>';
+        return $h . '</select>';
+    };
     ob_start(); ?>
-    <tr>
-        <td><select name="bonus_rows[type][]" class="form-select"><?php foreach ($types as $k => $lbl): ?><option value="<?= $k ?>" <?= $t === $k ? 'selected' : '' ?>><?= $lbl ?></option><?php endforeach; ?></select></td>
-        <td><select name="bonus_rows[currency][]" class="form-select"><option value="LBP" <?= $cur === 'LBP' ? 'selected' : '' ?>>ل.ل</option><option value="USD" <?= $cur === 'USD' ? 'selected' : '' ?>>$</option></select></td>
-        <td><select name="bonus_rows[vtype][]" class="form-select"><option value="amount" <?= $vt === 'amount' ? 'selected' : '' ?>>Montant / مبلغ</option><option value="percent" <?= $vt === 'percent' ? 'selected' : '' ?>>Taux % / نسبة</option></select></td>
-        <td><input type="number" step="0.01" min="0" name="bonus_rows[value][]" value="<?= $val ?>" class="form-control" style="min-width:90px" placeholder="0"></td>
-        <td><select name="bonus_rows[from][]" class="form-select"><option value="">—</option><?php for ($mm = 1; $mm <= 12; $mm++): ?><option value="<?= $mm ?>" <?= $from === $mm ? 'selected' : '' ?>><?= monthName($mm) ?></option><?php endfor; ?></select></td>
-        <td><select name="bonus_rows[to][]" class="form-select"><option value="">—</option><?php for ($mm = 1; $mm <= 12; $mm++): ?><option value="<?= $mm ?>" <?= $to === $mm ? 'selected' : '' ?>><?= monthName($mm) ?></option><?php endfor; ?></select></td>
-        <td><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">✕</button></td>
+    <tr class="bnRow">
+        <td><input type="hidden" name="bonus_rows[type][]" value="<?= $t ?>"><input type="number" step="0.01" min="0" name="bonus_rows[value][]" value="<?= $val ?>" class="form-control bnVal" style="min-width:110px" placeholder="0"></td>
+        <td><select name="bonus_rows[currency][]" class="form-select bnCur"><option value="LBP" <?= $cur === 'LBP' ? 'selected' : '' ?>>ل.ل</option><option value="USD" <?= $cur === 'USD' ? 'selected' : '' ?>>$</option></select></td>
+        <td><select name="bonus_rows[vtype][]" class="form-select bnVt"><option value="amount" <?= $vt === 'amount' ? 'selected' : '' ?>>Montant / مبلغ</option><option value="percent" <?= $vt === 'percent' ? 'selected' : '' ?>>% de la base / نسبة من الأساس</option></select></td>
+        <td><?= $mSel('from', $from) ?></td>
+        <td><?= $mSel('to', $to) ?></td>
+        <td class="bnPrev" style="white-space:nowrap;color:var(--primary);font-weight:600">—</td>
+        <td><button type="button" class="btn btn-sm btn-danger" title="حذف السطر / Supprimer" onclick="this.closest('tr').remove()">✕</button></td>
     </tr>
     <?php return ob_get_clean();
 }
@@ -1115,7 +1122,7 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
         <button type="button" class="tab" data-tab="address">🏠 Adresse / العنوان</button>
         <button type="button" class="tab" data-tab="employment">🎓 Emploi / التوظيف</button>
         <button type="button" class="tab" data-tab="finance">💰 Financier / مالي</button>
-        <button type="button" class="tab" data-tab="bonuses">🎁 Primes & Indemnités / مكافآت وتعويضات</button>
+        <button type="button" class="tab" data-tab="bonuses">🎁 Primes, aides & transport / المكافآت والمساعدات والنقل</button>
         <button type="button" class="tab" data-tab="deductions">🧾 Retenues / محسومات</button>
         <?php if ($id > 0 && $employee['employee_type'] === 'enseignant_titulaire'): ?>
         <button type="button" class="tab" data-tab="grades">🏆 الدرجات / Échelons</button>
@@ -1814,6 +1821,114 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     </div>
                 </div>
 
+                <?php /* «الحفظ دغري بس قدّام يلي غيّرتو»: زرّ حفظ بنفس التبويب — يحفظ ملف الأستاذ كاملاً */ ?>
+                <div style="margin-top:18px"><button type="submit" class="btn btn-success btn-sm"><i class="fas fa-save"></i> حفظ / Enregistrer</button></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ========== Bonuses Tab — المكان الواحد للمكافآت والمساعدات والنقل ========== -->
+    <?php
+    // (2026-09-11) «صفحة المكافآت والمساعدات بدها ترتيب لأن مش واضح كيفية استعمالها»:
+    // كانت البنود موزّعة على ثلاثة أماكن (محرّر بالتبويب المالي + جدول قراءة هنا + صفحة bonuses.php مستقلة).
+    // صار هذا التبويب هو المكان الواحد: قسم لكل نوع (الأجر الإضافي · مكافأة ومساعدة · النقل شهري/يومي)
+    // مع شرح كيف بتشتغل ومعاينة حيّة للشهري (قانون النسبة ÷1500 × سعر الشهر). bonuses.php تحوّل إلى هنا.
+    $pvBase = 0.0; $pvRate = 0.0;
+    if ($id > 0) {
+        try {
+            $pvSy = activeSchoolYear(); if ($pvSy === 'all') $pvSy = currentSchoolYear();
+            $pvQ = $db->prepare("SELECT base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND base_plus_echelon_lbp > 0 ORDER BY year DESC, month DESC LIMIT 1");
+            $pvQ->execute([(int)$id, $pvSy]);
+            $pvBase = (float)$pvQ->fetchColumn();
+            $pvRate = (float)getExchangeRate();
+        } catch (Throwable $e) { $pvBase = 0.0; $pvRate = 0.0; }
+    }
+    $bonusSection = function ($type, $titleFr, $titleAr, $hint) use ($bonuses) {
+        $rows = $bonuses[$type] ?? []; ?>
+        <div class="bnSection" style="margin-top:16px;padding:14px 16px;border:1px solid var(--gray-200);border-radius:10px;background:#fff">
+            <h4 style="color:var(--primary);margin:0 0 2px">
+                <span dir="ltr"><?= $titleFr ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= $titleAr ?></div>
+            </h4>
+            <p style="color:var(--gray-500);font-size:13px;margin:0 0 8px"><?= $hint ?></p>
+            <div class="table-wrapper">
+                <table class="table" style="min-width:760px">
+                    <thead><tr>
+                        <th>Valeur / القيمة</th><th>Devise / العملة</th><th>Montant ou % / مبلغ أو نسبة</th><th>Du mois / من شهر</th><th>Au mois / إلى شهر</th><th>Mensuel ≈ / الشهري ≈</th><th></th>
+                    </tr></thead>
+                    <tbody id="bnBody_<?= $type ?>">
+                        <?php foreach ($rows as $r) echo renderBonusRow($r, $type);
+                        if (!$rows): ?><tr class="bnEmpty"><td colspan="7" style="color:var(--gray-400)">Aucune ligne / لا يوجد — اضغط «إضافة سطر»</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-light btn-sm" onclick="addBnRow('<?= $type ?>')"><i class="fas fa-plus"></i> Ajouter une ligne / إضافة سطر</button>
+            <template id="bnTpl_<?= $type ?>"><?= renderBonusRow(null, $type) ?></template>
+        </div>
+    <?php }; ?>
+    <div class="tab-content" data-tab-content="bonuses">
+        <?php $empTabBar(); ?>
+        <div class="card">
+            <div class="card-header">
+                <h3>
+                    <span dir="ltr"><i class="fas fa-gift"></i> Primes, aides & transport</span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">المكافآت والمساعدات والنقل</div>
+                </h3>
+                <?php if ($id > 0 && canEdit()): ?>
+                    <a href="<?= BASE_URL ?>pages/bulk_allowances.php" class="btn btn-light btn-sm" title="تطبيق بند على كل أساتذة المدرسة دفعة واحدة">
+                        <i class="fas fa-users"></i> Pour toute l'école / لكل المدرسة دفعة وحدة
+                    </a>
+                <?php endif; ?>
+            </div>
+            <div class="card-body">
+                <?php if ($id == 0): ?>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Enregistrez d'abord l'employé, puis ajoutez les primes / احفظ الأستاذ أولاً، ثم أضِف المكافآت والنقل من هذا التبويب.
+                    </div>
+                <?php else: ?>
+                <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:13px;line-height:1.7">
+                    <strong style="color:var(--primary)">Comment ça marche / كيف بتشتغل هالصفحة</strong>
+                    <ul style="margin:6px 0 0;padding-inline-start:20px">
+                        <li>البنود هنا تخصّ <strong>السنة الدراسية المختارة بالأعلى (<?= e(activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()) ?>)</strong> وتدخل بالراتب الشهري تلقائياً.</li>
+                        <li>ثلاثة أنواع، لكلٍّ قسمه: <strong>➕ الأجر الإضافي</strong> · <strong>💰 مكافأة ومساعدة</strong> · <strong>🚌 تعويض النقل</strong> (شهري مقطوع <em>أو</em> يومي).</li>
+                        <li>كل سطر = قيمة (ل.ل أو $ أو نسبة٪ من الأساس) + <strong>من شهر إلى شهر</strong>. «كل السنة» = يُدفع كل الأشهر. إذا تغيّرت القيمة خلال السنة أضِف سطراً لكل فترة.</li>
+                        <li>النسبة٪ تُحسب حسب القانون: الأساس ÷ <?= e(officialUsdRateLbl()) ?> × النسبة ← دولار ← × سعر صرف الشهر ← داون للمليون. المعاينة بعمود «الشهري ≈».</li>
+                        <li>بعد <strong>«حفظ»</strong> يعيد البرنامج حساب رواتب السنة تلقائياً. حذف سطر (✕) ثم حفظ = يُصفَّر من الأشهر.</li>
+                    </ul>
+                </div>
+                <input type="hidden" name="bonus_editor" value="1">
+
+                <?php
+                $bonusSection('prime_fixe', '➕ Supplément de salaire', 'الأجر الإضافي',
+                    'الإضافي الشهري فوق الأساس (مبلغ مقطوع، أو نسبة٪ من الأساس تتحرّك مع الدرجة). يدخل بحساب الضمان والصندوق والضريبة كالراتب.');
+                $bonusSection('aide_complementaire', '💰 Prime & aide', 'مكافأة ومساعدة',
+                    'مكافأة أو مساعدة شهرية (مبلغ أو نسبة٪). تُعامَل بحسب إعدادات المحسومات (يمكن استثناؤها من الصندوق بتبويب «محسومات»).');
+                ?>
+
+                <div class="bnSection" style="margin-top:16px;padding:14px 16px;border:1px solid var(--gray-200);border-radius:10px;background:#fff">
+                    <h4 style="color:var(--primary);margin:0 0 2px">
+                        <span dir="ltr">🚌 Transport</span>
+                        <div style="font-size:0.85em;font-weight:600;opacity:0.9">تعويض النقل</div>
+                    </h4>
+                    <p style="color:var(--gray-500);font-size:13px;margin:0 0 8px">طريقتان — استعمل <strong>واحدة</strong> منهما: (أ) مبلغ شهري مقطوع، أو (ب) قيمة يومية يحسبها البرنامج بعدد أيام الحضور.</p>
+                    <h5 style="color:var(--gray-700);margin:10px 0 4px;font-size:14px">
+                        <span dir="ltr">A) Transport mensuel (forfait)</span>
+                        <div style="font-size:0.9em;font-weight:600;opacity:0.9">أ) نقل شهري مقطوع</div>
+                    </h5>
+                    <div class="table-wrapper">
+                        <table class="table" style="min-width:760px">
+                            <thead><tr>
+                                <th>Valeur / القيمة</th><th>Devise / العملة</th><th>Montant ou % / مبلغ أو نسبة</th><th>Du mois / من شهر</th><th>Au mois / إلى شهر</th><th>Mensuel ≈ / الشهري ≈</th><th></th>
+                            </tr></thead>
+                            <tbody id="bnBody_transport_complement">
+                                <?php foreach (($bonuses['transport_complement'] ?? []) as $r) echo renderBonusRow($r, 'transport_complement');
+                                if (empty($bonuses['transport_complement'])): ?><tr class="bnEmpty"><td colspan="7" style="color:var(--gray-400)">Aucune ligne / لا يوجد — اضغط «إضافة سطر»</td></tr><?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-light btn-sm" onclick="addBnRow('transport_complement')"><i class="fas fa-plus"></i> Ajouter une ligne / إضافة سطر</button>
+                    <template id="bnTpl_transport_complement"><?= renderBonusRow(null, 'transport_complement') ?></template>
+
                 <?php
                 // بذور محرّر فترات النقل اليومي: الفترات الموجودة، وإلا القيمة القديمة (العمود) كفترة كاملة السنة.
                 $tdSeed = [];
@@ -1833,19 +1948,18 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     ];
                 }
                 ?>
-                <h4 style="color:var(--primary);margin-top:24px;">
-                    <span dir="ltr">🚌 Transport journalier</span>
-                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">تعويض النقل اليومي</div>
-                </h4>
-                <p style="color:var(--gray-500);font-size:13px;margin-top:0">
-                    القيمة <strong>يومية</strong>، والبرنامج يحسب النقل الشهري = <strong>اليومي × الأيام × الأسابيع</strong>.
-                    أضِف <strong>سطر لكل فترة (من شهر إلى شهر)</strong> إذا تغيّرت القيمة اليومية خلال السنة. (اتركه فاضي إذا ما في نقل.)
+                <h5 style="color:var(--gray-700);margin:18px 0 4px;font-size:14px">
+                    <span dir="ltr">B) Transport journalier</span>
+                    <div style="font-size:0.9em;font-weight:600;opacity:0.9">ب) نقل يومي — البرنامج يحسب الشهري = اليومي × الأيام × الأسابيع</div>
+                </h5>
+                <p style="color:var(--gray-500);font-size:13px;margin:0 0 8px">
+                    اكتب <strong>قيمة اليوم الواحد</strong>. أضِف سطراً لكل فترة إذا تغيّرت القيمة خلال السنة. (اتركه فاضياً إذا النقل شهري مقطوع.)
                 </p>
                 <div class="form-row cols-2">
                     <div class="form-group">
                         <label class="form-label">أيام بالأسبوع / Jours/sem.</label>
                         <input type="number" id="trDays" name="transport_days_per_week" class="form-control" value="<?= (int)($employee['transport_days_per_week'] ?? 0) ?>" min="0" max="7">
-                        <small class="text-muted">إذا 0 يُعتمد «أيام الحضور» أعلاه</small>
+                        <small class="text-muted">إذا 0 يُعتمد «أيام الحضور» من تبويب التوظيف</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">عدد الأسابيع / Semaines</label>
@@ -1861,9 +1975,6 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     </table>
                 </div>
                 <button type="button" class="btn btn-light btn-sm" onclick="addTLine()"><i class="fas fa-plus"></i> أضِف فترة نقل / Ajouter</button>
-                <?php /* «الحفظ دغري بس قدّام يلي غيّرتو» (قاعدة المستخدم): زرّ حفظ بنفس القسم —
-                       يحفظ ملف الأستاذ كاملاً (نفس زرّ الحفظ الرئيسي) فلا يضيع أي تغيير آخر */ ?>
-                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-save"></i> حفظ تعويض النقل / Enregistrer</button>
                 <p style="font-size:12px;color:var(--gray-500);margin-top:6px">كل فترة تُحسب بشهورها فقط؛ الأيام والأسابيع مشتركة للكل.</p>
                 <script>
                 (function(){
@@ -1910,103 +2021,51 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     calcAll();
                 })();
                 </script>
-
-                <h4 style="color:var(--primary);margin-top:24px;">
-                    <span dir="ltr">Prime, aide & transport</span>
-                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">مكافأة ومساعدة وتعويض النقل</div>
-                </h4>
-                <p style="color:var(--gray-500);font-size:13px;margin-top:0">
-                    كل سطر: النوع · العملة (ل.ل أو $) · مبلغ أو نسبة % · من شهر إلى شهر.
-                    أضِف أسطر للّيرة وللدولار وعلى مراحل. (النسبة % تُحسب من الراتب الأساسي · شهر فاضي = كل الأشهر)
-                </p>
-                <input type="hidden" name="bonus_editor" value="1">
-                <div class="table-wrapper">
-                    <table class="table" style="min-width:680px">
-                        <thead><tr>
-                            <th>Type / النوع</th><th>Devise / العملة</th><th>Montant/Taux / مبلغ/نسبة</th><th>Valeur / القيمة</th><th>De (mois) / من شهر</th><th>À (mois) / إلى شهر</th><th></th>
-                        </tr></thead>
-                        <tbody id="bonusBody">
-                            <?php
-                            $bonusCount = 0;
-                            foreach (['prime_fixe', 'aide_complementaire', 'transport_complement'] as $bt) {
-                                foreach ($bonuses[$bt] as $r) { echo renderBonusRow($r); $bonusCount++; }
-                            }
-                            if ($bonusCount === 0) { for ($z = 0; $z < 3; $z++) echo renderBonusRow(null); } // ٣ فترات جاهزة
-                            ?>
-                        </tbody>
-                    </table>
                 </div>
-                <button type="button" class="btn btn-light btn-sm" onclick="addBonusRow()"><i class="fas fa-plus"></i> إضافة سطر / Ajouter</button>
-                <?php /* زرّ حفظ بنفس القسم (قاعدة «الحفظ دغري بس قدّام يلي غيّرتو») — يحفظ الملف كاملاً */ ?>
-                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-save"></i> حفظ المكافآت والنقل / Enregistrer</button>
-                <template id="bonusRowTpl"><?= renderBonusRow(null) ?></template>
+
+                <div style="margin-top:18px">
+                    <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> حفظ المكافآت والنقل / Enregistrer</button>
+                </div>
+
                 <script>
-                function addBonusRow(){
-                    var tpl = document.getElementById('bonusRowTpl');
-                    document.getElementById('bonusBody').insertAdjacentHTML('beforeend', tpl.innerHTML);
-                }
+                (function(){
+                    var BASE=<?= json_encode((float)$pvBase) ?>, RATE=<?= json_encode((float)$pvRate) ?>, OFFICIAL=<?= json_encode((float)officialUsdRate()) ?>;
+                    function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+                    function preview(tr){
+                        var out=tr.querySelector('.bnPrev'); if(!out) return;
+                        var v=parseFloat(tr.querySelector('.bnVal').value)||0;
+                        var curEl=tr.querySelector('.bnCur'); var cur=curEl.value;
+                        var vtEl=tr.querySelector('.bnVt'); var vt=vtEl?vtEl.value:'amount';
+                        // النسبة٪ بلا عملة (تُحسب بالليرة حسب القانون) — نخفيها بصرياً فقط، تبقى مرسَلة لتبقى المصفوفات متراصفة
+                        curEl.style.visibility = (vt==='percent') ? 'hidden' : 'visible';
+                        if(v<=0){ out.textContent='—'; return; }
+                        if(vt==='percent'){
+                            if(!(BASE>0) || !(RATE>0)){ out.textContent=v+'٪ من الأساس (يُحسب عند الحفظ)'; return; }
+                            var usd=Math.floor((BASE/OFFICIAL)*(v/100)); var lbp=Math.floor(usd*RATE); lbp=Math.floor(lbp/1000000)*1000000;
+                            out.innerHTML='≈ '+fmt(lbp)+' ل.ل <small style="color:var(--gray-500);font-weight:400">('+fmt(BASE)+' ÷ '+fmt(OFFICIAL)+' × '+v+'٪ = '+fmt(usd)+'$ × '+fmt(RATE)+')</small>';
+                        } else if(cur==='USD'){
+                            out.innerHTML = (RATE>0) ? ('≈ '+fmt(Math.floor(v*RATE))+' ل.ل <small style="color:var(--gray-500);font-weight:400">('+fmt(v)+'$ × '+fmt(RATE)+')</small>') : (fmt(v)+' $');
+                        } else { out.textContent=fmt(v)+' ل.ل'; }
+                    }
+                    function previewAll(){ document.querySelectorAll('.bnRow').forEach(preview); }
+                    window.addBnRow=function(type){
+                        var body=document.getElementById('bnBody_'+type), tpl=document.getElementById('bnTpl_'+type); if(!body||!tpl) return;
+                        var em=body.querySelector('.bnEmpty'); if(em) em.remove();
+                        body.insertAdjacentHTML('beforeend', tpl.innerHTML);
+                        var tr=body.lastElementChild; preview(tr);
+                        var inp=tr.querySelector('.bnVal'); if(inp) inp.focus();
+                    };
+                    var pane=document.querySelector('.tab-content[data-tab-content="bonuses"]');
+                    if(pane){ pane.addEventListener('input', function(e){ var tr=e.target.closest('.bnRow'); if(tr) preview(tr); });
+                              pane.addEventListener('change', function(e){ var tr=e.target.closest('.bnRow'); if(tr) preview(tr); }); }
+                    previewAll();
+                })();
                 </script>
-            </div>
-        </div>
-    </div>
-    
-    <!-- ========== Bonuses Tab ========== -->
-    <div class="tab-content" data-tab-content="bonuses">
-        <?php $empTabBar(); ?>
-        <div class="card">
-            <div class="card-header">
-                <h3>
-                    <span dir="ltr"><i class="fas fa-gift"></i> Primes & Aides & Transport</span>
-                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">المكافآت والمساعدات والنقل</div>
-                </h3>
-                <?php if ($id > 0): ?>
-                    <a href="<?= BASE_URL ?>pages/bonuses.php?employee_id=<?= $id ?>" class="btn btn-primary btn-sm">
-                        <i class="fas fa-edit"></i> Gérer les primes / إدارة المكافآت
-                    </a>
-                <?php endif; ?>
-            </div>
-            <div class="card-body">
-                <?php if ($id == 0): ?>
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> Enregistrez d'abord l'employé, puis vous pourrez ajouter les primes et indemnités.
-                    </div>
-                <?php else: ?>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Type / النوع</th>
-                                <th>Période / الفترة</th>
-                                <th>Montant / المبلغ</th>
-                                <th>Mois / الأشهر</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php
-                            $bonusLabels = [
-                                'prime_fixe' => '➕ الأجر الإضافي / Supplément',
-                                'aide_complementaire' => '💰 مكافأة ومساعدة / Prime &amp; aide',
-                                'transport_complement' => '🚌 Complément transport / تعويض نقل'
-                            ];
-                            foreach ($bonusLabels as $type => $label):
-                                $hasAny = false;
-                                foreach ($bonuses[$type] as $b): $hasAny = true;
-                            ?>
-                                <tr>
-                                    <td><?= $label ?></td>
-                                    <td>P<?= $b['period_number'] ?></td>
-                                    <td><?= ($b['value_type'] ?? 'amount') === 'percent' ? rtrim(rtrim(number_format((float)$b['amount'], 2), '0'), '.') . '٪ <small style="color:var(--gray-500)">من الأساس (قاعدة ÷' . e(officialUsdRateLbl()) . ')</small>' : ($b['currency'] === 'USD' ? formatUSD($b['amount']) : formatLBP($b['amount'])) ?></td>
-                                    <td><?= $b['start_month'] ? monthName($b['start_month'], 'fr', true) : 'Tous' ?> → <?= $b['end_month'] ? monthName($b['end_month'], 'fr', true) : 'Tous' ?></td>
-                                </tr>
-                            <?php endforeach; if (!$hasAny): ?>
-                                <tr><td><?= $label ?></td><td colspan="3" style="color:var(--gray-400)">Aucune / لا يوجد</td></tr>
-                            <?php endif; endforeach; ?>
-                        </tbody>
-                    </table>
                 <?php endif; ?>
             </div>
         </div>
     </div>
-    
+
     <!-- ========== Deductions Tab ========== -->
     <div class="tab-content" data-tab-content="deductions">
         <?php $empTabBar(); ?>

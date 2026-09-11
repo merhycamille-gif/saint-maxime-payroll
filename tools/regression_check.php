@@ -995,7 +995,7 @@ check('أمان: مبدّلات العرض والبحث مسموحة لحساب 
 check('أمان: requireWriteAction معرَّفة (صلاحية + مصدر داخلي)',
       strpos($fnSrc2, 'function requireWriteAction') !== false
       && strpos($fnSrc2, 'HTTP_SEC_FETCH_SITE') !== false && strpos($fnSrc2, '!canEdit()') !== false);
-$getWritePages = ['annual_slip'=>3,'grades'=>3,'employees'=>1,'bonuses'=>1,'classes'=>1,'exceptional_laws'=>1,
+$getWritePages = ['annual_slip'=>3,'grades'=>3,'employees'=>1,'classes'=>1,'exceptional_laws'=>1,
                   'exchange_rates'=>1,'rates_history'=>1,'social_security'=>1,'salary_scales'=>1,'tax_brackets'=>2,
                   'users'=>2,'schools'=>1];
 $gwMissing = [];
@@ -1003,7 +1003,7 @@ foreach ($getWritePages as $pg => $minN) {
     $c = preg_match_all('/requireWriteAction\(/', (string)file_get_contents(__DIR__ . "/../pages/$pg.php"));
     if ($c < $minN) $gwMissing[] = "$pg($c/$minN)";
 }
-check('أمان: كل عمليات التعديل عبر الروابط محميّة بـrequireWriteAction', empty($gwMissing), $gwMissing ? implode(' ', $gwMissing) : '13 صفحة');
+check('أمان: كل عمليات التعديل عبر الروابط محميّة بـrequireWriteAction', empty($gwMissing), $gwMissing ? implode(' ', $gwMissing) : '12 صفحة');
 check('أمان: القوانين الوطنية (نِسَب/ضمان/سلسلة/شطور) تعديلها للمدير فقط',
       count(array_filter(['rates_history','social_security','salary_scales','tax_brackets'],
         fn($p) => strpos((string)file_get_contents(__DIR__ . "/../pages/$p.php"), 'قوانين وطنية مشتركة') !== false)) === 4);
@@ -1120,7 +1120,6 @@ check('التقارير: منتقي المدارس لا يعرض المعطّل�
       strpos((string)file_get_contents(__DIR__ . '/../pages/reports.php'), '$schools = allSchools();') !== false);
 check('حفظ العلاوات: «كل السنين» تُخزَّن بالسنة الحالية لا \'all\'',
       strpos($fnSrc2, 'function writeSchoolYear') !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/bonuses.php'), 'writeSchoolYear()') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'writeSchoolYear()') !== false);
 $noAllYear = (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE school_year = 'all'")->fetchColumn();
 check('لا علاوة مخزَّنة بسنة \'all\' بالبيانات', $noAllYear === 0, "n=$noAllYear");
@@ -1305,8 +1304,7 @@ check('حارس خطأ العملة: مبلغ ضخم بالدولار يُفهَ
       strpos($fnSrc3, 'function sanitizeAmountCurrency') !== false
       && sanitizeAmountCurrency(54000000, 'USD') === 'LBP'
       && sanitizeAmountCurrency(1500, 'USD') === 'USD'
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'sanitizeAmountCurrency(') !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/bonuses.php'), 'sanitizeAmountCurrency(') !== false);
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'sanitizeAmountCurrency(') !== false);
 check('حماية: الحقول المصفوفة بالفورمات محصّنة ((array) cast)',
       strpos((string)file_get_contents(__DIR__ . '/../pages/tax_brackets.php'), "(array)(\$_POST['rate']") !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/schools.php'), "(array)(\$_POST['sig_name']") !== false
@@ -1942,7 +1940,7 @@ check('البطاقة السنوية: زرّا PDF الرسمي (فردي/جما
  * 30) القفل الشامل («كل البرنامج مسكّر إلا إذا بدي أعمل تعديل لشي معيّن
  *     ويفتح بس على التعديل البدي ياه» — قاعدة المستخدم 2026-08-01)
  * =================================================================== */
-$lockPages30 = ['bonuses', 'bulk_allowances', 'classes', 'exchange_rates', 'info_collect',
+$lockPages30 = ['bulk_allowances', 'classes', 'exchange_rates', 'info_collect',
                 'email_settings', 'employees', 'exceptional_laws', 'grades', 'rates_history',
                 'salary_scales', 'schools', 'settings', 'social_security', 'tax_brackets', 'users'];
 $noLock30 = [];
@@ -4451,10 +4449,35 @@ check('المكافآت: زرّ ومودال «مبالغ فردية» + معا�
       && strpos($ba87, 'recalcEmployeeYear($eid, $schoolYear)') !== false
       && strpos($ba87, 'window.baIndivFilter=function') !== false);
 
-check('تسميات أنواع العلاوات موحّدة بكل البرنامج (prime_fixe = الأجر الإضافي، aide = مكافأة ومساعدة) — صفحة bonuses.php أيضاً (p1 2026-08-29)',
-      strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), 'مكافأة ثابتة') === false
-      && strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), '➕ Supplément / الأجر الإضافي') !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), 'مكافأة ومساعدة') !== false);
+check('تسميات أنواع العلاوات موحّدة بكل البرنامج (prime_fixe = الأجر الإضافي، aide = مكافأة ومساعدة) — المحرّر الموحّد بملف الأستاذ (p1 2026-08-29 / 2026-09-11)',
+      strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'مكافأة ثابتة') === false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "'➕ Supplément de salaire', 'الأجر الإضافي'") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "'💰 Prime & aide', 'مكافأة ومساعدة'") !== false);
+
+/* =====================================================================
+ * 🎁 (2026-09-11) «صفحة المكافآت والمساعدات بدها ترتيب لأن مش واضح كيفية استعمالها»:
+ *     مكان واحد للمكافآت/المساعدات/النقل = تبويب «المكافآت» بملف الأستاذ (قسم لكل نوع + شرح + معاينة حيّة)؛
+ *     التبويب المالي بلا محرّر بنود؛ bonuses.php تحويل فقط؛ لا زرّ «إدارة المكافآت» مكرّر.
+ * =================================================================== */
+$emp0911 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$bn0911  = (string)file_get_contents($PROJ . '/pages/bonuses.php');
+check('المكافآت 2026-09-11: تبويب واحد بأقسام لكل نوع (prime_fixe/aide/transport_complement + النقل اليومي) + شرح «كيف بتشتغل» + معاينة الشهري',
+      strpos($emp0911, "\$bonusSection('prime_fixe'") !== false
+      && strpos($emp0911, "\$bonusSection('aide_complementaire'") !== false
+      && strpos($emp0911, 'id="bnBody_transport_complement"') !== false
+      && strpos($emp0911, 'id="tLinesBody"') !== false
+      && strpos($emp0911, 'كيف بتشتغل هالصفحة') !== false
+      && strpos($emp0911, 'class="bnPrev"') !== false
+      && strpos($emp0911, 'data-tab="bonuses">🎁 Primes, aides & transport / المكافآت والمساعدات والنقل') !== false);
+$finTab0911 = substr($emp0911, strpos($emp0911, 'data-tab-content="finance"'), strpos($emp0911, 'Bonuses Tab') - strpos($emp0911, 'data-tab-content="finance"'));
+check('المكافآت 2026-09-11: لا تكرار — التبويب المالي بلا محرّر بنود/نقل يومي، لا زرّ «إدارة المكافآت»، bonuses.php تحويل لتبويب المكافآت',
+      strpos($finTab0911, 'bonus_editor') === false && strpos($finTab0911, 'tLinesBody') === false
+      && strpos($emp0911, 'Gérer les primes') === false && strpos($emp0911, 'pages/bonuses.php?') === false
+      && strpos($bn0911, '&tab=bonuses') !== false && strpos($bn0911, 'INSERT INTO') === false);
+check('المكافآت 2026-09-11: كل سطر يرسل الحقول الستّة متراصفة (type مخفي بالخلية الأولى) + المحرّر يعرض الفعّال فقط',
+      substr_count($emp0911, 'name="bonus_rows[type][]"') === 1
+      && strpos($emp0911, '<td><input type="hidden" name="bonus_rows[type][]"') !== false
+      && preg_match('/name="bonus_rows\[(currency|vtype|from|to|value)\]\[\]"/', $emp0911) === 1);
 
 /* =====================================================================
  * 88) 🧹 تنظيف عام (2026-08-29، «ما تخلّي شي ما إلو معنى»): الدرجات بلا ترقية يدوية/تلقائية قديمة
@@ -4479,7 +4502,7 @@ check('تنظيف: الإعدادات بلا بطاقة «معلومات الم�
  *     تجربة حيّة على موظفة بلا إعداد: إضافة سطر → يظهر، إطفاؤه → يصير 0 والصافي يرجع.
  * =================================================================== */
 $noHardDel89 = true;
-foreach (['pages/bonuses.php', 'pages/bulk_allowances.php', 'pages/employees.php'] as $f89) {
+foreach (['pages/bulk_allowances.php', 'pages/employees.php'] as $f89) {
     $src89 = (string)file_get_contents($PROJ . '/' . $f89);
     $src89 = preg_replace('/DELETE FROM employee_bonuses WHERE employee_id = \? AND school_year = \? AND is_active = 0/', '', $src89); // تنظيف المطفأ المتراكم مسموح
     if (strpos($src89, 'DELETE FROM employee_bonuses') !== false) $noHardDel89 = false;
@@ -4508,7 +4531,6 @@ if ($gl89) {
 check('حذف بند العلاوة = إطفاء لا محو (bonuses/bulk/employees) + المحرّرات تعرض الفعّال فقط + الشفاء موصول',
       $noHardDel89
       && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "WHERE employee_id = ? AND is_active = 1 AND (school_year = ? OR school_year IS NULL)") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/bonuses.php'), "AND is_active = 1 AND (school_year = ? OR school_year IS NULL)") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healGladisGhostPrime20260829();') !== false);
 check('تجربة حيّة (موظفة بلا إعداد): إضافة سطر إضافي يظهر بالشهر، وإطفاؤه يصفّره ويرجّع الصافي', $live89, $why89);
 

@@ -257,7 +257,7 @@ hc($groups, $G3, strpos($inst, 'http_response_code(410)') !== false && strpos($i
 hc($groups, $G3, strpos($fn, 'function requireWriteAction') !== false,
    'حماية عمليات التعديل عبر الروابط', 'موجودة',
    'لو فشل: حساب «قراءة فقط» يستطيع إعادة حساب الرواتب أو الحذف برابط.');
-$guarded = 0; $pagesNeed = ['annual_slip','grades','employees','bonuses','classes','exceptional_laws','exchange_rates',
+$guarded = 0; $pagesNeed = ['annual_slip','grades','employees','classes','exceptional_laws','exchange_rates',
                             'rates_history','social_security','salary_scales','tax_brackets','users','schools'];
 foreach ($pagesNeed as $pg) {
     $src = @file_get_contents($PROJ . "/pages/$pg.php") ?: '';
