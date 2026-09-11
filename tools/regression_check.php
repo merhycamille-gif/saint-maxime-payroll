@@ -4477,7 +4477,9 @@ check('المكافآت 2026-09-11: لا تكرار — التبويب الما�
 $ba0911 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
 check('المكافآت الجماعية 2026-09-11: بطاقة «نسبة واحدة للأجر الإضافي لكل ملاك المدرسة» (خانة واحدة + زرّ واحد عبر apply_periods) + الوضع الحالي + مثال حيّ بمعادلة المحرّك + تبديل الجلسة تلقائياً للمدرسة المختارة + رسالة تقول ماذا طُبّق',
       strpos($ba0911, 'id="baOnePct"') !== false && strpos($ba0911, 'id="baOnePctForm"') !== false
-      && strpos($ba0911, 'name="lines[0][vtype]" value="percent"') !== false && strpos($ba0911, 'name="lines[0][type]" value="prime_fixe"') !== false
+      && strpos($ba0911, 'name="lines[0][vtype]" value="percent"') !== false && strpos($ba0911, 'name="lines[0][vtype]" value="amount"') !== false
+      && strpos($ba0911, 'id="opCur"') !== false && strpos($ba0911, "\$op['defMode'] = (\$nAmt > \$nPct) ? 'amount' : 'percent'") !== false
+      && strpos($ba0911, 'name="lines[0][type]" value="prime_fixe"') !== false
       && strpos($ba0911, 'name="cat[]" value="titulaire"') !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(pct/100))') !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(b.pct/100))') !== false

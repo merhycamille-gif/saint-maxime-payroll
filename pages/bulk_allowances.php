@@ -436,26 +436,31 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         $op = null;
         if (!$scopeAll) {
             $opIds = array_map('intval', scopeEmployeeIds($db, false, $schoolId, ['titulaire'], $schoolYear));
-            $op = ['n' => count($opIds), 'pct' => [], 'amt' => 0, 'none' => 0, 'mixed' => 0, 'lo' => null, 'hi' => null, 'def' => ''];
+            $op = ['n' => count($opIds), 'pct' => [], 'amt' => 0, 'amtv' => [], 'none' => 0, 'mixed' => 0, 'lo' => null, 'hi' => null, 'def' => '', 'defMode' => 'percent', 'defAmt' => '', 'defCur' => 'LBP'];
             if ($opIds) {
                 $in = implode(',', $opIds);
-                $rows = $db->query("SELECT employee_id, value_type, amount FROM employee_bonuses
+                $rows = $db->query("SELECT employee_id, value_type, amount, currency FROM employee_bonuses
                                     WHERE is_active = 1 AND bonus_type = 'prime_fixe' AND school_year = " . $db->quote($schoolYear) . " AND employee_id IN ($in)")->fetchAll(PDO::FETCH_ASSOC);
                 $st = [];
                 foreach ($rows as $r) {
                     $eid = (int)$r['employee_id'];
-                    if (!isset($st[$eid])) $st[$eid] = ['pct' => 0.0, 'amt' => false];
-                    if ($r['value_type'] === 'percent') $st[$eid]['pct'] += (float)$r['amount']; else $st[$eid]['amt'] = true;
+                    if (!isset($st[$eid])) $st[$eid] = ['pct' => 0.0, 'amt' => false, 'amtv' => 0.0, 'cur' => 'LBP'];
+                    if ($r['value_type'] === 'percent') $st[$eid]['pct'] += (float)$r['amount'];
+                    else { $st[$eid]['amt'] = true; $st[$eid]['amtv'] += (float)$r['amount']; $st[$eid]['cur'] = ($r['currency'] === 'USD') ? 'USD' : 'LBP'; }
                 }
                 foreach ($opIds as $eid) {
                     if (!isset($st[$eid])) { $op['none']++; continue; }
                     $x = $st[$eid];
                     if ($x['pct'] > 0 && $x['amt']) $op['mixed']++;
                     elseif ($x['pct'] > 0) { $k = rtrim(rtrim(number_format($x['pct'], 2, '.', ''), '0'), '.'); $op['pct'][$k] = ($op['pct'][$k] ?? 0) + 1; }
-                    else $op['amt']++;
+                    else { $op['amt']++; $ka = number_format($x['amtv'], 2, '.', '') . '|' . $x['cur']; $op['amtv'][$ka] = ($op['amtv'][$ka] ?? 0) + 1; }
                 }
-                arsort($op['pct']);
+                arsort($op['pct']); arsort($op['amtv']);
                 if ($op['pct']) $op['def'] = (string)array_key_first($op['pct']);
+                if ($op['amtv']) { [$av, $ac] = explode('|', (string)array_key_first($op['amtv'])); $op['defAmt'] = rtrim(rtrim($av, '0'), '.'); $op['defCur'] = $ac; }
+                // (2026-09-11 «بدي خيار نسبة أو مبلغ») الوضع الافتراضي بالبطاقة = ما هو سائد فعلاً بالمدرسة
+                $nPct = array_sum($op['pct']); $nAmt = array_sum($op['amtv']);
+                $op['defMode'] = ($nAmt > $nPct) ? 'amount' : 'percent';
                 // أدنى وأعلى أساس (بعد التدرّج) بين ملاك المدرسة — من آخر راتب مخزّن بالسنة — للمثال الحيّ
                 $bq = $db->query("SELECT e.id, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr) fn, COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr) ln,
                                          (SELECT ms.base_plus_echelon_lbp FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = " . $db->quote($schoolYear) . "
@@ -472,13 +477,13 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         if ($op): $opCur = [];
             foreach ($op['pct'] as $k => $n) $opCur[] = "<b>$n</b> على <b>{$k}٪</b>";
             if ($op['mixed']) $opCur[] = "<b>{$op['mixed']}</b> نسبة + مبلغ";
-            if ($op['amt']) $opCur[] = "<b>{$op['amt']}</b> على مبلغ مقطوع";
+            foreach ($op['amtv'] as $ka => $n) { [$av, $ac] = explode('|', $ka); $opCur[] = "<b>$n</b> على مبلغ <b>" . number_format((float)$av) . ($ac === 'USD' ? ' $' : ' ل.ل') . "</b>"; }
             if ($op['none']) $opCur[] = "<b>{$op['none']}</b> بلا أجر إضافي";
         ?>
         <div class="card no-print" id="baOnePct" style="margin:0 0 14px;border:2px solid #1F4E5F;box-shadow:none">
             <div class="card-header" style="background:#1F4E5F;color:#fff"><h3 style="color:#fff">
-                <span dir="ltr"><i class="fas fa-bolt"></i> Un seul taux % de supplément pour tous les titulaires</span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.95">نسبة واحدة للأجر الإضافي لكل ملاك المدرسة — <?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?></div>
+                <span dir="ltr"><i class="fas fa-bolt"></i> Un seul supplément (taux % ou montant) pour tous les titulaires</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.95">أجر إضافي واحد (نسبة ٪ أو مبلغ) لكل ملاك المدرسة — <?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?></div>
             </h3></div>
             <div class="card-body">
                 <?php if ($op['n'] === 0): ?>
@@ -490,27 +495,30 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     <input type="hidden" name="sch" value="<?= (int)$schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
                     <input type="hidden" name="cat[]" value="titulaire">
                     <input type="hidden" name="lines[0][type]" value="prime_fixe">
-                    <input type="hidden" name="lines[0][vtype]" value="percent">
-                    <input type="hidden" name="lines[0][currency]" value="LBP">
                     <input type="hidden" name="lines[0][from]" value="10"><input type="hidden" name="lines[0][to]" value="9">
                     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
                         <div style="flex:1 1 260px;min-width:0">
                             <div style="font-size:13px;line-height:1.9">
                                 <b>الوضع الحالي:</b> <?= (int)$op['n'] ?> أستاذ ملاك — <?= $opCur ? implode(' · ', $opCur) : '—' ?>.
                             </div>
-                            <label class="form-label" style="margin-top:8px">النسبة ٪ من الأساس بعد التدرّج / Taux % de la base</label>
-                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                                <input type="number" step="0.01" min="0.01" max="1000" name="lines[0][value]" id="opPct" class="form-control" value="<?= e($op['def']) ?>" placeholder="مثلاً 65" required style="max-width:140px;font-size:18px;font-weight:800;text-align:center" dir="ltr">
-                                <span style="font-weight:800">٪</span>
-                                <button type="submit" class="btn btn-primary" style="font-weight:800" data-confirm="تطبيق نسبة واحدة للأجر الإضافي على كل الملاك (<?= (int)$op['n'] ?>) بـ<?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?>؟ الأجر الإضافي الحالي عندهم (نسب أو مبالغ) يُستبدل بهذه النسبة لكل السنة، ثم تُعاد الرواتب تلقائياً."><i class="fas fa-check"></i> طبّق على كل الملاك (<?= (int)$op['n'] ?>) / Appliquer</button>
+                            <label class="form-label" style="margin-top:8px">شو بدّك تعطي لكل ملاك؟ / Que donner à tous les titulaires ?</label>
+                            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px" id="opModeWrap">
+                                <label style="font-weight:700;cursor:pointer"><input type="radio" name="lines[0][vtype]" value="percent" <?= $op['defMode'] === 'percent' ? 'checked' : '' ?>> نسبة ٪ من الأساس بعد التدرّج <small style="color:#64748b;font-weight:400">(بتتحرّك مع الدرجة)</small></label>
+                                <label style="font-weight:700;cursor:pointer"><input type="radio" name="lines[0][vtype]" value="amount" <?= $op['defMode'] === 'amount' ? 'checked' : '' ?>> مبلغ ثابت كل شهر <small style="color:#64748b;font-weight:400">(ليرة أو دولار)</small></label>
                             </div>
-                            <div class="ba-warn" style="margin-top:10px">⚠️ الزرّ يستبدل <b>الأجر الإضافي</b> الحالي عند <b>كل</b> ملاك المدرسة بهذه النسبة (لكل السنة). المكافآت والنقل ما بيتأثّروا. أستاذ بدّك تخلّيه على مبلغ مقطوع؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
+                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                                <input type="number" step="0.01" min="0.01" name="lines[0][value]" id="opPct" class="form-control" value="<?= e($op['defMode'] === 'amount' ? $op['defAmt'] : $op['def']) ?>" placeholder="<?= $op['defMode'] === 'amount' ? 'مثلاً 54000000' : 'مثلاً 65' ?>" required style="max-width:190px;font-size:18px;font-weight:800;text-align:center" dir="ltr" data-def-pct="<?= e($op['def']) ?>" data-def-amt="<?= e($op['defAmt']) ?>">
+                                <span style="font-weight:800" id="opUnitPct">٪</span>
+                                <select name="lines[0][currency]" id="opCur" class="form-select" style="max-width:110px;font-weight:700"><option value="LBP" <?= $op['defCur'] === 'LBP' ? 'selected' : '' ?>>ل.ل</option><option value="USD" <?= $op['defCur'] === 'USD' ? 'selected' : '' ?>>$</option></select>
+                                <button type="submit" class="btn btn-primary" style="font-weight:800" data-confirm="تطبيق أجر إضافي واحد على كل الملاك (<?= (int)$op['n'] ?>) بـ<?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?>؟ الأجر الإضافي الحالي عندهم (نسب أو مبالغ) يُستبدل بهذه القيمة لكل السنة، ثم تُعاد الرواتب تلقائياً."><i class="fas fa-check"></i> طبّق على كل الملاك (<?= (int)$op['n'] ?>) / Appliquer</button>
+                            </div>
+                            <div class="ba-warn" style="margin-top:10px">⚠️ الزرّ يستبدل <b>الأجر الإضافي</b> الحالي عند <b>كل</b> ملاك المدرسة بهذه القيمة (لكل السنة). المكافآت والنقل ما بيتأثّروا. أستاذ بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
                         </div>
                         <div style="flex:1 1 280px;min-width:0;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.9" id="opLive"
                              data-lo='<?= e(json_encode($op['lo'], JSON_UNESCAPED_UNICODE)) ?>' data-hi='<?= e(json_encode($op['hi'], JSON_UNESCAPED_UNICODE)) ?>'>
-                            <b>🧮 مثال حيّ بهذه النسبة:</b>
+                            <b>🧮 مثال حيّ:</b>
                             <div id="opLiveOut">—</div>
-                            <div style="font-size:11.5px;color:#64748b">القاعدة: الأساس ÷ <?= e(officialUsdRateLbl()) ?> × النسبة ← داون بالدولار ← × <?= number_format($exchangeRate) ?> (سعر الشهر) ← داون للمليون. بتتحرّك مع الدرجة لحالها.</div>
+                            <div style="font-size:11.5px;color:#64748b" id="opRule">القاعدة: الأساس ÷ <?= e(officialUsdRateLbl()) ?> × النسبة ← داون بالدولار ← × <?= number_format($exchangeRate) ?> (سعر الشهر) ← داون للمليون. بتتحرّك مع الدرجة لحالها.</div>
                         </div>
                     </div>
                 </form>
@@ -518,14 +526,32 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 (function(){
                     var OFFICIAL=<?= json_encode(officialUsdRate()) ?>, RATE=<?= json_encode($exchangeRate) ?>;
                     var box=document.getElementById('opLive'), out=document.getElementById('opLiveOut'), inp=document.getElementById('opPct');
+                    var cur=document.getElementById('opCur'), unit=document.getElementById('opUnitPct'), rule=document.getElementById('opRule');
                     if(!box||!out||!inp) return;
                     var lo=JSON.parse(box.dataset.lo||'null'), hi=JSON.parse(box.dataset.hi||'null');
+                    var RULE_PCT=rule?rule.innerHTML:'', RULE_AMT='مبلغ ثابت كل شهر لكل أستاذ ملاك مهما كانت درجته. بالدولار: يُحوَّل بسعر الشهر ('+RATE.toLocaleString('en-US')+') — داون لليرة.';
+                    function mode(){ var r=document.querySelector('#opModeWrap input[name="lines[0][vtype]"]:checked'); return r?r.value:'percent'; }
                     function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
                     function calc(base,pct){ var usd=Math.floor((base/OFFICIAL)*(pct/100)); var lbp=Math.floor(usd*RATE); return {usd:usd, lbp:Math.floor(lbp/1000000)*1000000}; }
                     function line(it,pct){ var c=calc(it.base,pct); return '<div>'+it.name+' — أساس '+fmt(it.base)+' ⇒ '+fmt(c.usd)+'$ ⇒ <b style="color:#166534">'+fmt(c.lbp)+' ل.ل</b> بالشهر</div>'; }
-                    function upd(){ var pct=parseFloat(inp.value)||0; if(!pct||!lo){ out.textContent='—'; return; }
-                        var h=line(lo,pct); if(hi && hi.name!==lo.name) h+=line(hi,pct); out.innerHTML=h; }
-                    inp.addEventListener('input',upd); upd();
+                    function upd(){
+                        var m=mode(), v=parseFloat(inp.value)||0;
+                        // نسبة: العملة مخفية بصرياً فقط (تبقى مرسَلة — المعالج يتجاهلها للنسبة)؛ مبلغ: علامة ٪ مخفية
+                        if(cur) cur.style.display=(m==='amount')?'':'none'; if(unit) unit.style.display=(m==='percent')?'':'none';
+                        if(rule) rule.innerHTML=(m==='amount')?RULE_AMT:RULE_PCT;
+                        if(!v){ out.textContent='—'; return; }
+                        if(m==='amount'){
+                            var c=cur?cur.value:'LBP';
+                            out.innerHTML='<div>كل أستاذ ملاك = <b style="color:#166534">'+fmt(v)+(c==='USD'?' $':' ل.ل')+'</b> بالشهر'+(c==='USD'?' ≈ '+fmt(Math.floor(v*RATE))+' ل.ل':'')+' (نفس الرقم للكل، لا يتحرّك مع الدرجة)</div>';
+                            return;
+                        }
+                        if(!lo){ out.textContent='—'; return; }
+                        var h=line(lo,v); if(hi && hi.name!==lo.name) h+=line(hi,v); out.innerHTML=h;
+                    }
+                    document.querySelectorAll('#opModeWrap input').forEach(function(r){ r.addEventListener('change',function(){
+                        // عند التبديل: تعبئة القيمة السائدة لهذا الوضع (إن وُجدت) + placeholder مناسب
+                        var d=(mode()==='amount')?inp.dataset.defAmt:inp.dataset.defPct; inp.value=d||''; inp.placeholder=(mode()==='amount')?'مثلاً 54000000':'مثلاً 65'; upd(); }); });
+                    inp.addEventListener('input',upd); if(cur) cur.addEventListener('change',upd); upd();
                 })();
                 </script>
                 <?php endif; ?>
@@ -536,7 +562,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         <details class="ba-help no-print">
             <summary><i class="fas fa-circle-question"></i> كيف بشتغل بهالصفحة؟ (اكبس للشرح)</summary>
             <ol>
-                <li><b>نسبة واحدة للأجر الإضافي لكل الملاك؟</b> البطاقة الكحلية فوق: اكتب النسبة ← «طبّق على كل الملاك». خلص.</li>
+                <li><b>أجر إضافي واحد لكل الملاك (نسبة ٪ أو مبلغ ثابت)؟</b> البطاقة الكحلية فوق: اختر نسبة أو مبلغ ← اكتب الرقم ← «طبّق على كل الملاك». خلص.</li>
                 <li><b>«+ بند جديد»</b> (لأي نوع/فئة/فترة) ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
                 <li><b>النسبة ٪</b> بتنحسب من أساس الراتب بعد التدرّج (÷<?= e(officialUsdRateLbl()) ?> ← × سعر الشهر) وبتتحرّك مع الدرجة — منطقية للملاك. <b>المبلغ الثابت</b> بالليرة أو بالدولار — للمتعاقدين والموظفين أو لأي زيادة ثابتة.</li>
                 <li><b>نسبة + مبلغ ثابت مع بعض</b> (مثلاً 45٪ + 2,000,000 ثابت): حطّهم <b>سطرين بنفس النافذة</b> وكبس طبّق مرّة وحدة. (لو طبّقتهم بمرّتين منفصلتين، التانية بتشيل الأولى لأنها من نفس النوع.)</li>
