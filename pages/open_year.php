@@ -111,9 +111,12 @@ function copyYearBonuses($db, $empId, $prevSY, $newSY, array $types, $mode, $pct
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open') {
-    $schoolId = isSuperAdmin() ? (int)($_POST['school_id'] ?? 0) : currentSchoolId();
+    // (2026-09-11 «بس افتح السنة الجديدة بكل المدارس ينقل نفس الرواتب مع التدرّج تلقائياً — هيك لازم يشتغل البرنامج»)
+    // school_id = all ⇒ فتح السنة لكل المدارس الفاعلة دفعة واحدة بنفس الخيارات (الافتراضي: نقل كل شي كما كان).
+    $allSchoolsOpen = isSuperAdmin() && (($_POST['school_id'] ?? '') === 'all');
+    $schoolId = $allSchoolsOpen ? -1 : (isSuperAdmin() ? (int)($_POST['school_id'] ?? 0) : currentSchoolId());
     $newYear  = trim($_POST['new_year'] ?? '');
-    if ($schoolId <= 0) {
+    if ($schoolId === 0) {
         $_SESSION['flash_error'] = 'اختر مدرسة';
     } elseif (!preg_match('/^\d{4}-\d{4}$/', $newYear)) {
         $_SESSION['flash_error'] = 'اختر سنة دراسية صحيحة';
@@ -130,6 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         // الأساتذة/الموظفون الفاعلون بهالمدرسة — قاعدة التارك (§١٠): مَن ترك **قبل بداية**
         // السنة المفتوحة (1/10) لا يُنقَل إليها؛ ومَن ترك خلالها أو بعدها يُشمَل (يبقى بسنة
         // عمله حتى 30-9) — فيصحّ أيضاً فتح سنين قديمة كان يعمل فيها تارك لاحق.
+        $openOne = function (int $schoolId) use ($db, $y1, $y2, $prevSY, $newYear, $addMode, $transMode, $addPct, $transPct, $addFactor, $transFactor) {
         $emps = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp FROM employees
                               WHERE school_id = ? AND is_deleted = 0 AND status = 'actif'
                                 AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'),
@@ -173,6 +177,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
                     unset($src['id'], $src['created_at'], $src['updated_at']);
                     $src['month'] = $m; $src['year'] = $y; $src['school_year'] = $newYear;
                     $src['is_paid'] = 0; $src['paid_date'] = null;
+                    // §٠-ب أشهر النقل (2026-09-11 كشفه فحص الانحدار عند فتح 2026-2027 محلياً): المتعاقد المنقول بالصفّ لا يأخذ
+                    // نقلاً بالأشهر خارج نافذة النقل (تموز/آب/أيلول…) حتى لو كان بصفوف السنة السابقة — يُصفَّر مع إنقاص المستحق ومرآة دولاره
+                    if (!transportMonthActive($m, (string)$emp['employee_type'], $newYear) && (float)($src['transport_lbp'] ?? 0) > 0) {
+                        $oldT = (float)$src['transport_lbp'];
+                        $src['transport_lbp'] = 0; if (isset($src['transport_complement_lbp'])) $src['transport_complement_lbp'] = 0;
+                        if (isset($src['total_due_lbp'])) $src['total_due_lbp'] = max(0, round((float)$src['total_due_lbp'] - $oldT));
+                        if (isset($src['total_due_usd']) && (float)($src['exchange_rate'] ?? 0) > 0) $src['total_due_usd'] = round((float)$src['total_due_lbp'] / (float)$src['exchange_rate'], 2);
+                    }
                     // المتعاقد المنقول بالصفّ: طبّق اختيار الإضافات/النقل (none=صفّر، pct=نسبة) وصحّح الصافي/المجموع
                     if ($addMode !== 'same' || $transMode !== 'same') {
                         $oldAdd = (float)($src['extra_lbp'] ?? 0) + (float)($src['prime_fixe_lbp'] ?? 0) + (float)($src['aide_complementaire_lbp'] ?? 0);
@@ -196,11 +208,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
                 if ($anyCarried) $carried++;
             }
         }
+        return [$n, $promoted, $carried];
+        };
+        $targets = $allSchoolsOpen ? array_map(fn($sc) => (int)$sc['id'], allSchools()) : [$schoolId];
+        $n = 0; $promoted = 0; $carried = 0; $perSchool = [];
+        foreach ($targets as $sid) {
+            [$a1, $b1, $c1] = $openOne($sid);
+            $n += $a1; $promoted += $b1; $carried += $c1;
+            if ($allSchoolsOpen) $perSchool[] = schoolNameById($sid, 'ar') . ' (' . ($a1 + $c1) . ')';
+        }
         $_SESSION['active_school_year'] = $newYear;
-        $_SESSION['flash_success'] = "تم فتح السنة $newYear للمدرسة — $n موظف محسوب بالقانون (منهم $promoted أستاذ ملاك طُبّقت درجاتهم المستحقّة تلقائياً: تدرّج عادي + درجات استثنائية بالقانون) و $carried موظف نُقِل راتبه كما هو (التاركون لم يُنقَلوا).";
+        // 📅 السنة المفتوحة تصير السنة الحالية للبرنامج كله (التقارير/الإفادات/القسائم/لوحة القيادة) — لا رجوع لسنة أقدم من التقويم
+        if (strcmp($newYear, calendarSchoolYear()) >= 0 && strcmp($newYear, currentSchoolYear()) >= 0) setSetting('program_school_year', $newYear);
+        $_SESSION['flash_success'] = "تم فتح السنة $newYear " . ($allSchoolsOpen ? 'لكل المدارس (' . implode(' · ', $perSchool) . ')' : 'للمدرسة')
+            . " — $n موظف محسوب بالقانون (منهم $promoted أستاذ ملاك طُبّقت درجاتهم المستحقّة) + $carried متعاقد نُقل راتبه كما كان"
+            . " — الإضافات وتعويض النقل " . ($addMode === 'same' && $transMode === 'same' ? 'نُقلت كما كانت' : 'حسب اختيارك') . ". عدّل بالسنة الجديدة ما تريد (المكافآت الجماعية / ملف الأستاذ).";
         header('Location: ' . BASE_URL . 'pages/open_year.php');
         exit;
     }
+    header('Location: ' . BASE_URL . 'pages/open_year.php');
+    exit;
+}
+
+// 📅 تبديل السنة الحالية للبرنامج يدوياً (المدير العام): كل التقارير والإفادات تصير عليها
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_program_year' && isSuperAdmin()) {
+    $py = trim($_POST['program_year'] ?? '');
+    if ($py === '' || $py === 'auto') { setSetting('program_school_year', ''); $_SESSION['flash_success'] = 'صارت السنة الحالية للبرنامج حسب التقويم: ' . calendarSchoolYear(); }
+    elseif (preg_match('/^\d{4}-\d{4}$/', $py) && strcmp($py, calendarSchoolYear()) >= 0) { setSetting('program_school_year', $py); $_SESSION['active_school_year'] = $py; $_SESSION['flash_success'] = "صارت السنة الحالية للبرنامج كله $py (التقارير، الإفادات، القسائم، لوحة القيادة)."; }
+    else $_SESSION['flash_error'] = 'لا يمكن اعتماد سنة أقدم من سنة التقويم ' . calendarSchoolYear();
     header('Location: ' . BASE_URL . 'pages/open_year.php');
     exit;
 }
@@ -213,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear
     $schoolId = $allSch ? 0 : (isSuperAdmin() ? (int)($_POST['clear_school_id'] ?? 0) : currentSchoolId());
     if (!preg_match('/^\d{4}-\d{4}$/', $clrYear)) {
         $_SESSION['flash_error'] = 'اختر سنة دراسية صحيحة';
-    } elseif ($clrYear <= currentSchoolYear()) {
+    } elseif ($clrYear <= calendarSchoolYear()) {
         $_SESSION['flash_error'] = 'لا يمكن تفريغ السنة الجارية أو سنة سابقة — فقط السنين المستقبلية.';
     } elseif (!$allSch && $schoolId <= 0) {
         $_SESSION['flash_error'] = 'اختر مدرسة (أو «كل المدارس»)';
@@ -241,11 +276,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear
                           AND employee_id IN (SELECT id FROM employees WHERE school_id = ?)")
                ->execute([$clrYear, $schoolId]);
         }
+        if ((string)getSetting('program_school_year', '') === $clrYear) setSetting('program_school_year', ''); // فُرِّغت السنة الحالية للبرنامج → الافتراضي حسب التقويم
         $deleted = $st->rowCount();
         $scope = $allSch ? 'كل المدارس' : ('مدرسة ' . (currentSchool()['name_ar'] ?? $schoolId));
         $_SESSION['flash_success'] = "تم تفريغ السنة $clrYear ($scope) — حُذف $deleted صفّ راتب. صارت السنة فاضية، فيك تفتحها من جديد وقت تجهّز أساتذتها.";
     }
-    header('Location: ' . BASE_URL . 'pages/open_year.php');
+header('Location: ' . BASE_URL . 'pages/open_year.php');
     exit;
 }
 
@@ -259,7 +295,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
     $transOn = !empty($_POST['ba_trans']);
     if (!preg_match('/^\d{4}-\d{4}$/', $yr)) {
         $_SESSION['flash_error'] = 'اختر سنة صحيحة';
-    } elseif ($yr <= currentSchoolYear()) {
+    } elseif ($yr <= calendarSchoolYear()) {
         $_SESSION['flash_error'] = 'هذا الخيار للسنين المستقبلية (المفتوحة للتجهيز) فقط.';
     } elseif ($schoolId <= 0) {
         $_SESSION['flash_error'] = 'اختر مدرسة';
@@ -328,26 +364,84 @@ foreach ($existing as $r) $bySchool[$r['school_id']][$r['school_year']] = $r['em
 
 $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $cyN - 1;
 ?>
+<?php if (isSuperAdmin()): $pyForced = (string)getSetting('program_school_year', ''); $pyNow = currentSchoolYear(); ?>
+<div class="card" style="border:2px solid #1F4E5F">
+    <div class="card-header" style="background:#1F4E5F;color:#fff"><h3 style="color:#fff">
+        <span dir="ltr"><i class="fas fa-calendar-check"></i> Année en cours du programme</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.95">السنة الحالية للبرنامج كله — <?= e($pyNow) ?><?= $pyForced !== '' && $pyForced === $pyNow ? ' (مثبّتة بعد فتح السنة)' : ' (حسب التقويم)' ?></div>
+    </h3></div>
+    <div class="card-body">
+        <div style="font-size:13px;line-height:1.8;margin-bottom:8px">كل التقارير والإفادات والقسائم ولوحة القيادة تفتح افتراضياً على هذه السنة. تتبدّل <b>تلقائياً</b> بمجرّد فتح السنة الجديدة من الأسفل، وفيك تبدّلها هون يدوياً إذا احتجت.</div>
+        <form method="POST" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <?= csrfField() ?><input type="hidden" name="action" value="set_program_year">
+            <select name="program_year" class="form-select" style="max-width:220px">
+                <option value="auto" <?= $pyForced === '' ? 'selected' : '' ?>>حسب التقويم (<?= e(calendarSchoolYear()) ?>)</option>
+                <?php for ($yy = $startN + 2; $yy >= $startN; $yy--): $sy = $yy . '-' . ($yy + 1); ?>
+                    <option value="<?= $sy ?>" <?= $pyForced === $sy ? 'selected' : '' ?>><?= $sy ?></option>
+                <?php endfor; ?>
+            </select>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> اعتمد / Appliquer</button>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="card">
     <div class="card-header"><h3>
         <span dir="ltr"><i class="fas fa-folder-plus"></i> Ouvrir une nouvelle année</span>
         <div style="font-size:0.85em;font-weight:600;opacity:0.9">فتح سنة دراسية جديدة</div>
     </h3></div>
     <div class="card-body">
+        <?php
+        // 📊 حالة السنة الجديدة بكل مدرسة (كم موظفاً فاعلاً وكم منهم فُتحت له السنة) — ليرى بعينه أين فُتحت وأين لم تُفتح
+        $stY = ($startN + 1) . '-' . ($startN + 2);
+        $stRows = [];
+        if (isSuperAdmin()) {
+            foreach (allSchools() as $sc) {
+                $sid = (int)$sc['id'];
+                $act = (int)$db->query("SELECT COUNT(*) FROM employees WHERE school_id = $sid AND is_deleted = 0 AND status = 'actif'
+                    AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= '" . ($startN + 1) . "-10-01'")->fetchColumn();
+                $opn = (int)$db->query("SELECT COUNT(DISTINCT ms.employee_id) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id AND e.is_deleted = 0
+                    WHERE e.school_id = $sid AND ms.school_year = " . $db->quote($stY) . " AND (ms.net_salary_lbp > 0 OR ms.base_plus_echelon_lbp > 0)")->fetchColumn();
+                $stRows[] = ['name' => $sc['name_ar'] ?: $sc['name_fr'], 'id' => $sid, 'act' => $act, 'opn' => $opn];
+            }
+        }
+        ?>
+        <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:13px;line-height:1.8;margin-bottom:12px">
+            <strong style="color:var(--primary)">Comment ça marche / كيف بتشتغل</strong>
+            <ul style="margin:6px 0 0;padding-inline-start:20px">
+                <li><b>«كل المدارس»</b> + السنة الجديدة + «افتح» = البرنامج ينقل <b>كل شي تلقائياً</b>: كل الأساتذة والموظفين الفاعلين، رواتبهم، <b>التدرّج المستحقّ حسب القانون</b> (درجة عادية بتشرين + استثنائية بكانون)، الأجر الإضافي والمكافآت وتعويض النقل <b>كما كانت بالسنة السابقة</b>.</li>
+                <li>بعدين بالسنة الجديدة غيّر ما تريد: نسبة واحدة للكل من «المكافآت والنقل» (البطاقة الكحلية)، أو شخصاً بشخص من ملفه.</li>
+                <li>فتح سنة مفتوحة جزئياً آمن: يكمّل الناقصين ويعيد حساب الموجودين بلا تكرار بنودهم.</li>
+                <li>بمجرّد الفتح تصير السنة الجديدة <b>السنة الحالية للبرنامج كله</b>: التقارير والإفادات والقسائم ولوحة القيادة تفتح عليها تلقائياً.</li>
+            </ul>
+        </div>
+        <?php if ($stRows): ?>
+        <div class="table-wrapper" style="margin-bottom:14px">
+            <table class="table" style="font-size:13px">
+                <thead><tr><th>École / المدرسة</th><th>الفاعلون / Actifs</th><th>مفتوح لهم <?= e($stY) ?> / Ouverte pour</th><th>الحالة / État</th></tr></thead>
+                <tbody>
+                <?php foreach ($stRows as $sr): $st = $sr['act'] === 0 ? '—' : ($sr['opn'] >= $sr['act'] ? '✅ مفتوحة' : ($sr['opn'] > 0 ? '⚠️ جزئياً (' . $sr['opn'] . ' من ' . $sr['act'] . ')' : '❌ غير مفتوحة')); ?>
+                    <tr><td><?= e($sr['name']) ?></td><td><?= $sr['act'] ?></td><td><?= $sr['opn'] ?></td><td style="font-weight:700"><?= $st ?></td></tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
         <div class="alert alert-info">
             <i class="fas fa-info-circle"></i>
-            اختر مدرسة وسنة دراسية جديدة. البرنامج بينقل **كل الأساتذة والموظفين الفاعلين** للسنة الجديدة بدرجتهم الحالية — والتارك اللي تاريخ تركه قبل بداية السنة المختارة (1 تشرين الأول) **ما بينتقل أبداً**.
+            اختر مدرسة (أو كل المدارس) وسنة دراسية جديدة. البرنامج بينقل **كل الأساتذة والموظفين الفاعلين** للسنة الجديدة بدرجتهم الحالية — والتارك اللي تاريخ تركه قبل بداية السنة المختارة (1 تشرين الأول) **ما بينتقل أبداً**.
         </div>
-        <form method="POST" onsubmit="return confirm('فتح السنة المختارة لهذه المدرسة ونقل الموظفين الفاعلين؟');">
+        <form method="POST" onsubmit="var s=this.querySelector('[name=school_id]'); var all=s&&s.value==='all'; return confirm(all ? 'فتح السنة المختارة لكل المدارس ونقل كل الموظفين الفاعلين برواتبهم وتدرّجهم وإضافاتهم كما كانت؟ (قد يستغرق دقائق)' : 'فتح السنة المختارة لهذه المدرسة ونقل الموظفين الفاعلين؟');">
             <input type="hidden" name="action" value="open">
             <div class="form-row cols-2">
                 <?php if (isSuperAdmin()): ?>
                 <div class="form-group mb-0">
                     <label class="form-label">المدرسة / École</label>
                     <select name="school_id" class="form-select" required>
-                        <option value="">— Choisir / اختر —</option>
+                        <option value="all" style="font-weight:700">🌐 كل المدارس دفعة وحدة / Toutes les écoles</option>
                         <?php foreach (allSchools() as $s): ?>
-                            <option value="<?= (int)$s['id'] ?>" <?= currentSchoolId() === (int)$s['id'] ? 'selected' : '' ?>><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
+                            <option value="<?= (int)$s['id'] ?>"><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -446,7 +540,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
     <div class="card-body">
         <div class="alert" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b">
             <i class="fas fa-exclamation-triangle"></i>
-            بيحذف <strong>كل رواتب السنة المختارة</strong> فتصير فاضية (مثلاً إذا انفتحت بالغلط أو بدّك تجهّزها من جديد). للأمان: <strong>بس السنين المستقبلية</strong> (السنة الجارية <?= e(currentSchoolYear()) ?> والسابقة ما بتنحذف من هون). ملفات الأساتذة ودرجاتهم بتضل سليمة — بس بيتفضّى حساب رواتب تلك السنة.
+            بيحذف <strong>كل رواتب السنة المختارة</strong> فتصير فاضية (مثلاً إذا انفتحت بالغلط أو بدّك تجهّزها من جديد). للأمان: <strong>بس السنين المستقبلية</strong> (سنة التقويم الجارية <?= e(calendarSchoolYear()) ?> والسابقة ما بتنحذف من هون). ملفات الأساتذة ودرجاتهم بتضل سليمة — بس بيتفضّى حساب رواتب تلك السنة.
         </div>
         <form method="POST" onsubmit="return confirm('متأكّد إنّك بدّك تفرّغ كل رواتب السنة المختارة؟ بترجع تفتحها وقت بدّك.');">
             <?= csrfField() ?>

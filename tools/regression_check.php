@@ -4118,8 +4118,8 @@ $mm75 = $db->query("SELECT COUNT(*) n, SUM(net_salary_lbp) s, MAX(prime_fixe_lbp
 // 🔄 (2026-09-10 «دايما طبّق القانون بكل البرنامج» + «أكيد كلهم 65»): القفل صار على القانون لا على الكشف القديم —
 //    ريتا: نسبة 65٪ (80م تشرين→كانون ثم 86م من كانون 2026 بدرجة 26) مجموع الصافي 932,532,000؛ ماريا: 65٪ (53م ثم 61م من كانون بدرجة 16) مجموع 656,026,000
 //    (2026-09-11: صندوقها صار يشمل الأجر الإضافي بقراره بتقرير المخالفات eoc_base_only — 3,262,500 بتشرين = كشفه القديم).
-check('عبرا: ريتا مارون حليحل وماريا الياس حليحل بالقانون (65٪ + درجات كانون 2026 + صندوق ماريا يشمل الإضافي): ريتا صافي السنة 932,532,000 وإضافي حتى 86م · ماريا 656,026,000 وإضافي حتى 61م',
-      (int)$rr75['n'] === 12 && (float)$rr75['s'] === 932532000.0 && (float)$rr75['p'] === 86000000.0
+check('عبرا: ريتا مارون حليحل وماريا الياس حليحل بالقانون (65٪ + درجات كانون 2026 + صندوق ماريا يشمل الإضافي): ريتا صافي السنة 932,599,000 (بعد ضبطه توقيت درجتها أونلاين 2026-09-11) وإضافي حتى 86م · ماريا 656,026,000 وإضافي حتى 61م',
+      (int)$rr75['n'] === 12 && (float)$rr75['s'] === 932599000.0 && (float)$rr75['p'] === 86000000.0
       && (int)$mm75['n'] === 12 && (float)$mm75['s'] === 656026000.0 && (float)$mm75['p'] === 61000000.0,
       "ريتا s={$rr75['s']} p={$rr75['p']} ماريا s={$mm75['s']} p={$mm75['p']}");
 $vio75 = $who75('فيوليت', 'جميل', 'الحمصي'); $ter75 = $who75('تريز', 'جوزيف', 'حبقوق');
@@ -4512,6 +4512,23 @@ check('المخالفات: قاعدة eoc_base_only (ملاك بإضافي وص�
       && strpos($cp0911, "UPDATE employees SET eoc_includes_extra = 1 WHERE id = \$eid") !== false
       && strpos($cp0911, "\$rk !== 'eoc_base_only'") !== false && strpos($cp0911, "\$rule !== 'eoc_base_only'") !== false
       && (empty($maria0911) || in_array(1651, $eocItems0911, true)), $eocWhy);
+$oy0911 = (string)file_get_contents($PROJ . '/pages/open_year.php');
+check('فتح السنة 2026-09-11 «بكل المدارس ينقل نفس الرواتب مع التدرّج تلقائياً»: خيار «كل المدارس» + حلقة openOne لكل مدرسة + جدول حالة السنة بكل مدرسة + الافتراضي نقل كل شي',
+      strpos($oy0911, '<option value="all"') !== false && strpos($oy0911, "\$allSchoolsOpen = isSuperAdmin()") !== false
+      && strpos($oy0911, '$openOne = function (int $schoolId)') !== false && strpos($oy0911, "array_map(fn(\$sc) => (int)\$sc['id'], allSchools())") !== false
+      && strpos($oy0911, 'مفتوح لهم') !== false && strpos($oy0911, 'name="add_mode" value="same" checked') !== false && strpos($oy0911, 'name="trans_mode" value="same" checked') !== false);
+$fn0911b = (string)file_get_contents($PROJ . '/includes/functions.php');
+$prevPY = (string)getSetting('program_school_year', '');
+try {
+    setSetting('program_school_year', '2030-2031'); $pyA = currentSchoolYear();
+    setSetting('program_school_year', '2001-2002'); $pyB = currentSchoolYear();
+    setSetting('program_school_year', '');          $pyC = currentSchoolYear();
+} finally { setSetting('program_school_year', $prevPY); }
+check('السنة الحالية للبرنامج 2026-09-11 «بس نفتح السنة الجديدة تصير كل التقارير والإفادات عليها»: currentSchoolYear يتبع program_school_year (لا أقدم من التقويم)، فتح السنة يثبّتها، تفريغها يرجّع الافتراضي، بطاقة تبديل يدوي',
+      function_exists('calendarSchoolYear') && $pyA === '2030-2031' && $pyB === calendarSchoolYear() && $pyC === calendarSchoolYear()
+      && strpos($oy0911, "setSetting('program_school_year', \$newYear)") !== false
+      && strpos($oy0911, "=== 'set_program_year'") !== false && strpos($oy0911, "=== \$clrYear) setSetting('program_school_year', '')") !== false
+      && strpos($oy0911, "\$clrYear <= calendarSchoolYear()") !== false && strpos($oy0911, "\$yr <= calendarSchoolYear()") !== false);
 check('المكافآت 2026-09-11: كل سطر يرسل الحقول الستّة متراصفة (type مخفي بالخلية الأولى) + المحرّر يعرض الفعّال فقط',
       substr_count($emp0911, 'name="bonus_rows[type][]"') === 1
       && strpos($emp0911, '<td><input type="hidden" name="bonus_rows[type][]"') !== false
