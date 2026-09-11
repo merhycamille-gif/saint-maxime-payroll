@@ -425,9 +425,9 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
 .form-label {
     display: block;
     margin-bottom: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--gray-700);
+    font-size: 14px;
+    font-weight: 700;
+    color: #000;
 }
 
 .form-label .req {
@@ -446,8 +446,10 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
     display: block;
     width: 100%;
     padding: 9px 12px;
-    font-size: 14px;
-    color: var(--gray-800);
+    /* 🔤 (2026-09-11 «بملف الموظف الأسماء والمعلومات تكون بولد وكبير الخط وأسود لأن ما عم بقرأها») — بكل فورمات البرنامج */
+    font-size: 17px;
+    font-weight: 700;
+    color: #000;
     background: white;
     border: 1px solid var(--gray-300);
     border-radius: var(--radius);
@@ -460,9 +462,12 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
     box-shadow: 0 0 0 3px rgba(31,90,158,0.14);
 }
 
-.form-control:disabled {
+.form-control:disabled, .form-select:disabled, .form-control[readonly] {
+    /* الفورم المقفول (قبل «تعديل») يعرض القيم المحفوظة — تبقى سوداء وعريضة مقروءة، الخلفية وحدها تدلّ على القفل */
     background: var(--gray-100);
-    color: var(--gray-500);
+    color: #000;
+    -webkit-text-fill-color: #000;
+    opacity: 1;
 }
 
 .form-row {
