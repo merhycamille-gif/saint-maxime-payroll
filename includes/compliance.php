@@ -71,6 +71,7 @@ function complianceRules(): array {
         'left_rows'      => ['Salaires après départ',      'تارك عنده رواتب بعد تركه',                            '#7c3aed'],
         'active_nomonths'=> ['Actif sans salaires',        'موظف فاعل بلا رواتب بسنة مفتوحة',                     '#64748b'],
         'family_ded_off' => ['Abattement familial non accordé', 'متزوج/أرمل بأولاد أو زوج لا يعمل — وتنزيلهم العائلي بالضريبة مطفأ بملفه', '#b45309'],
+        'transport_pct'  => ['Transport en %',             'بند تعويض نقل كنسبة ٪ من الأساس (النقل مبلغ لا نسبة) — يضاعف المستحق', '#b91c1c'],
         'eoc_base_only'  => ['Caisse sur la base seule',   'ملاك يتقاضى أجراً إضافياً وصندوق التعويضات يُحسم من الأساس وحده (مفتاح «يشمل الأجر الإضافي» مطفأ بملفه)', '#b45309'],
         'no_diploma'     => ['Sans diplôme',               'أستاذ ملاك بلا شهادة بملفه (يُفترض قسم ثاني)',        '#64748b'],
         'dupes'          => ['Doublon',                    'موظفان فاعلان بنفس الاسم بنفس المدرسة',               '#64748b'],
@@ -357,6 +358,15 @@ function complianceItems(PDO $db, string $sy): array {
             true, ['spouse' => $spouseOff ? 1 : 0, 'kids' => $kidsOff ? 1 : 0, 'now' => $now, 'full' => $full]);
     }
 
+    // ── 13د) نقل كنسبة ٪ (2026-09-11 عبرا 2026-2027: 23 ملاكاً عندهم «نقل شهري 85٪» بالغلط مع «أجر إضافي 85٪» ⇒ النقل 168م والمستحق مضاعف) ──
+    //  تعويض النقل مبلغ دائماً؛ أي بند transport_complement بنسبة = خطأ إدخال، التصحيح = إطفاؤه وإعادة حساب السنة (يجوز «موافق على الكل»).
+    foreach ($q("SELECT e.*, b.id bid, b.amount pct, b.start_month bfrom, b.end_month bto FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0
+        WHERE b.is_active = 1 AND b.bonus_type = 'transport_complement' AND b.value_type = 'percent' AND b.school_year = ?" . $sc . " ORDER BY e.school_id, e.id", [$sy]) as $r) {
+        $add('transport_pct', $r,
+            'بند تعويض نقل شهري بنسبة ' . rtrim(rtrim(number_format((float)$r['pct'], 2, '.', ''), '0'), '.') . '٪ من الأساس' . ($r['bfrom'] ? ' (' . monthName((int)$r['bfrom'], 'ar') . ' ← ' . monthName((int)$r['bto'], 'ar') . ')' : '') . ' — النقل مبلغ لا نسبة، وهذا يضيف مبلغاً يساوي الأجر الإضافي كنقل',
+            'إطفاء هذا البند وإعادة حساب سنة ' . $sy . ' (الأجر الإضافي بنسبته يبقى)', true, ['bid' => (int)$r['bid']], (string)$r['bid']);
+    }
+
     // ── 13ج) صندوق التعويضات على الأساس فقط (2026-09-11 مقارنة كشف عبرا: ماريا الياس حليحل — وقبلها إلسي موسى/الياس عطاالله/جومانة طنّوس
     //  صُحّحوا يدوياً) ── ملاك خاضع للصندوق يتقاضى أجراً إضافياً بأشهر السنة ومفتاح «الصندوق يشمل الأجر الإضافي» مطفأ بملفه
     //  (الافتراضي عند إنشاء الملف = مطفأ!) ⇒ يُحسم 6٪ من الأساس وحده وصافيه أعلى من كشوفه. القرار شخصاً بشخص (زرّ تصحيح = تضوية + إعادة حساب).
@@ -479,6 +489,13 @@ function complianceApply(PDO $db, array $it): string {
             $n = $recalcYear();
             logAudit('compliance_family_ded_on', 'employees', $eid, ['now' => $d['now'] ?? null], ['set' => $set, 'full' => $d['full'] ?? null, 'sy' => $sy]);
             return 'ضُوّي ' . (!empty($d['spouse']) ? 'زيادة الزوج' : '') . (!empty($d['spouse']) && !empty($d['kids']) ? ' و' : '') . (!empty($d['kids']) ? 'تنزيل الأولاد' : '') . ' (التنزيل ' . complianceFmt($d['now'] ?? 0) . ' → ' . complianceFmt($d['full'] ?? 0) . ') وأُعيد حساب ' . $n . ' شهراً';
+        case 'transport_pct':
+            $bid = (int)($d['bid'] ?? 0);
+            if ($bid <= 0) return 'لا بند';
+            $db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE id = $bid AND employee_id = $eid AND bonus_type = 'transport_complement' AND value_type = 'percent'");
+            $n = $recalcYear();
+            logAudit('compliance_transport_pct_off', 'employee_bonuses', $eid, null, ['bid' => $bid, 'sy' => $sy]);
+            return 'أُطفئ بند النقل بالنسبة وأُعيد حساب ' . $n . ' شهراً';
         case 'eoc_base_only':
             $db->exec("UPDATE employees SET eoc_includes_extra = 1 WHERE id = $eid");
             $n = $recalcYear();

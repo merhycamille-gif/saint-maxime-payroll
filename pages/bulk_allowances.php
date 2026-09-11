@@ -109,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
             $from = max(1, min(12, (int)($ln['from'] ?? 10)));
             $to   = max(1, min(12, (int)($ln['to'] ?? 9)));
             $vt   = ($ln['vtype'] ?? 'amount') === 'percent' ? 'percent' : 'amount';
+            if ($type === 'transport_complement') $vt = 'amount'; // 🚌 النقل مبلغ دائماً (2026-09-11: «نقل شهري 85٪» ضاعف مستحقّات 23 ملاكاً)
             $cur  = ($ln['currency'] ?? 'LBP') === 'USD' ? 'USD' : 'LBP';
             $valid[] = ['type'=>$type, 'val'=>$val, 'from'=>$from, 'to'=>$to, 'vt'=>$vt, 'cur'=>$cur];
         }
@@ -581,6 +582,9 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     function cats(){ return [].slice.call(document.querySelectorAll('#opCats input:checked')).map(function(c){return c.value;}); }
                     function type(){ var r=document.querySelector('#opTypes input:checked'); return r?r.value:'prime_fixe'; }
                     function mode(){ var r=document.querySelector('#opModeWrap input:checked'); return r?r.value:'percent'; }
+                    // 🚌 النقل مبلغ دائماً: عند اختيار النقل تُقفل خانة النسبة
+                    function guardTransport(){ var t=type(); var pr=document.querySelector('#opModeWrap input[value="percent"]'), am=document.querySelector('#opModeWrap input[value="amount"]');
+                        if(t==='transport_complement'){ pr.disabled=true; pr.parentNode.style.opacity=0.45; if(pr.checked){ am.checked=true; } } else { pr.disabled=false; pr.parentNode.style.opacity=1; } }
                     function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
                     function calc(base,pct){ var usd=Math.floor((base/OFFICIAL)*(pct/100)); var lbp=Math.floor(usd*RATE); return {usd:usd, lbp:Math.floor(lbp/1000000)*1000000}; }
                     function line(it,pct){ var c=calc(it.base,pct); return '<div>'+it.name+' — أساس '+fmt(it.base)+' ⇒ '+fmt(c.usd)+'$ ⇒ <b style="color:#166534">'+fmt(c.lbp)+' ل.ل</b> بالشهر</div>'; }
@@ -626,7 +630,8 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                         var h=line(lo,v); if(hi && hi.name!==lo.name) h+=line(hi,v); out.innerHTML=h;
                     }
                     function suggest(){ // عند تغيير الفئة/النوع: اقترح القيمة السائدة الحالية (نسبة أو مبلغ) — المستخدم يعدّلها كما يشاء
-                        var d=dominant(agg());
+                        guardTransport();
+                        var d=dominant(agg()); if(d && d.m==='percent' && type()==='transport_complement') d=null;
                         if(d){ document.querySelector('#opModeWrap input[value="'+d.m+'"]').checked=true; inp.value=d.v; if(d.m==='amount'&&cur) cur.value=d.c||'LBP'; }
                         else { inp.value=''; }
                         inp.placeholder=(mode()==='amount')?'مثلاً 54000000':'مثلاً 65';

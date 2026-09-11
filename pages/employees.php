@@ -254,7 +254,7 @@ function renderBonusRow($r = null, $type = 'aide_complementaire') {
     <tr class="bnRow">
         <td><input type="hidden" name="bonus_rows[type][]" value="<?= $t ?>"><input type="number" step="0.01" min="0" name="bonus_rows[value][]" value="<?= $val ?>" class="form-control bnVal" style="min-width:110px" placeholder="0"></td>
         <td><select name="bonus_rows[currency][]" class="form-select bnCur"><option value="LBP" <?= $cur === 'LBP' ? 'selected' : '' ?>>ل.ل</option><option value="USD" <?= $cur === 'USD' ? 'selected' : '' ?>>$</option></select></td>
-        <td><select name="bonus_rows[vtype][]" class="form-select bnVt"><option value="amount" <?= $vt === 'amount' ? 'selected' : '' ?>>Montant / مبلغ</option><option value="percent" <?= $vt === 'percent' ? 'selected' : '' ?>>% de la base / نسبة من الأساس</option></select></td>
+        <td><?php if ($t === 'transport_complement'): ?><input type="hidden" name="bonus_rows[vtype][]" value="amount"><span style="color:var(--gray-500)">مبلغ (النقل لا يكون نسبة)</span><?php else: ?><select name="bonus_rows[vtype][]" class="form-select bnVt"><option value="amount" <?= $vt === 'amount' ? 'selected' : '' ?>>Montant / مبلغ</option><option value="percent" <?= $vt === 'percent' ? 'selected' : '' ?>>% de la base / نسبة من الأساس</option></select><?php endif; ?></td>
         <td><?= $mSel('from', $from) ?></td>
         <td><?= $mSel('to', $to) ?></td>
         <td class="bnPrev" style="white-space:nowrap;color:var(--primary);font-weight:600">—</td>
@@ -281,6 +281,7 @@ function saveEmployeeBonuses($db, $employeeId) {
         $val = (float)str_replace(',', '', $rows['value'][$i] ?? '');
         if ($val <= 0) continue;
         $vt = (($rows['vtype'][$i] ?? 'amount') === 'percent') ? 'percent' : 'amount';
+        if ($bt === 'transport_complement') $vt = 'amount'; // 🚌 النقل مبلغ دائماً
         // (2026-08-29) نسبة ٪ + مبلغ ثابت معاً لنفس الشخص مسموحان بقراره («قدّام كل أستاذ خيار لكل شي») — المحرّك يجمعهما.
         $cur = (($rows['currency'][$i] ?? 'USD') === 'LBP') ? 'LBP' : 'USD';
         // 🛡️ حارس خطأ العملة: مبلغ ضخم بالدولار = مبلغ ليرة كُتب والعملة بقيت دولاراً

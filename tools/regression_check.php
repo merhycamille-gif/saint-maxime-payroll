@@ -290,8 +290,8 @@ $cpItems = complianceItems($db, currentSchoolYear());
 $cpRules = complianceRules();
 $cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
 $cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
-check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 20 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
-      count($cpRules) === 20
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 21 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 21
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
@@ -4529,6 +4529,11 @@ check('السنة الحالية للبرنامج 2026-09-11 «بس نفتح ا�
       && strpos($oy0911, "setSetting('program_school_year', \$newYear)") !== false
       && strpos($oy0911, "=== 'set_program_year'") !== false && strpos($oy0911, "=== \$clrYear) setSetting('program_school_year', '')") !== false
       && strpos($oy0911, "\$clrYear <= calendarSchoolYear()") !== false && strpos($oy0911, "\$yr <= calendarSchoolYear()") !== false);
+$cp0911b = (string)file_get_contents($PROJ . '/includes/compliance.php'); $ba0911b = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php'); $emp0911b = (string)file_get_contents($PROJ . '/pages/employees.php');
+check('النقل مبلغ دائماً 2026-09-11 (عبرا: «نقل شهري 85٪» ضاعف المستحق): قاعدة transport_pct بالتقرير + تصحيحها إطفاء البند + البطاقة الجماعية وapply_periods وملف الأستاذ يمنعون النسبة على النقل',
+      isset(complianceRules()['transport_pct']) && strpos($cp0911b, "case 'transport_pct':") !== false
+      && strpos($ba0911b, "if (\$type === 'transport_complement') \$vt = 'amount';") !== false && strpos($ba0911b, 'function guardTransport()') !== false
+      && strpos($emp0911b, "if (\$bt === 'transport_complement') \$vt = 'amount';") !== false && strpos($emp0911b, 'مبلغ (النقل لا يكون نسبة)') !== false);
 check('المكافآت 2026-09-11: كل سطر يرسل الحقول الستّة متراصفة (type مخفي بالخلية الأولى) + المحرّر يعرض الفعّال فقط',
       substr_count($emp0911, 'name="bonus_rows[type][]"') === 1
       && strpos($emp0911, '<td><input type="hidden" name="bonus_rows[type][]"') !== false
