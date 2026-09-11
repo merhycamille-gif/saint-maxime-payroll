@@ -71,6 +71,7 @@ function complianceRules(): array {
         'left_rows'      => ['Salaires après départ',      'تارك عنده رواتب بعد تركه',                            '#7c3aed'],
         'active_nomonths'=> ['Actif sans salaires',        'موظف فاعل بلا رواتب بسنة مفتوحة',                     '#64748b'],
         'family_ded_off' => ['Abattement familial non accordé', 'متزوج/أرمل بأولاد أو زوج لا يعمل — وتنزيلهم العائلي بالضريبة مطفأ بملفه', '#b45309'],
+        'eoc_base_only'  => ['Caisse sur la base seule',   'ملاك يتقاضى أجراً إضافياً وصندوق التعويضات يُحسم من الأساس وحده (مفتاح «يشمل الأجر الإضافي» مطفأ بملفه)', '#b45309'],
         'no_diploma'     => ['Sans diplôme',               'أستاذ ملاك بلا شهادة بملفه (يُفترض قسم ثاني)',        '#64748b'],
         'dupes'          => ['Doublon',                    'موظفان فاعلان بنفس الاسم بنفس المدرسة',               '#64748b'],
         'rate_missing'   => ['Taux manquant',              'شهر بلا سعر صرف مسجّل',                               '#64748b'],
@@ -356,6 +357,22 @@ function complianceItems(PDO $db, string $sy): array {
             true, ['spouse' => $spouseOff ? 1 : 0, 'kids' => $kidsOff ? 1 : 0, 'now' => $now, 'full' => $full]);
     }
 
+    // ── 13ج) صندوق التعويضات على الأساس فقط (2026-09-11 مقارنة كشف عبرا: ماريا الياس حليحل — وقبلها إلسي موسى/الياس عطاالله/جومانة طنّوس
+    //  صُحّحوا يدوياً) ── ملاك خاضع للصندوق يتقاضى أجراً إضافياً بأشهر السنة ومفتاح «الصندوق يشمل الأجر الإضافي» مطفأ بملفه
+    //  (الافتراضي عند إنشاء الملف = مطفأ!) ⇒ يُحسم 6٪ من الأساس وحده وصافيه أعلى من كشوفه. القرار شخصاً بشخص (زرّ تصحيح = تضوية + إعادة حساب).
+    foreach ($q("SELECT e.*, m.month, m.year, m.base_plus_echelon_lbp bpe, m.prime_fixe_lbp prime, m.caisse_amount_lbp caisse
+        FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.school_year = ? AND m.prime_fixe_lbp > 0 AND m.caisse_amount_lbp > 0
+          AND m.id = (SELECT m2.id FROM monthly_salaries m2 WHERE m2.employee_id = e.id AND m2.school_year = ? AND m2.prime_fixe_lbp > 0 AND m2.caisse_amount_lbp > 0 ORDER BY m2.year DESC, m2.month DESC LIMIT 1)
+        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND COALESCE(e.eoc_subject,1) = 1 AND COALESCE(e.eoc_includes_extra,0) = 0" . $sc . $yf . "
+        ORDER BY e.school_id, e.id", array_merge([$sy, $sy], $yp)) as $r) {
+        $now = (int)$r['caisse']; $full = (int)round(((float)$r['bpe'] + (float)$r['prime']) * 0.06);
+        if ($full <= $now) continue; // الصندوق المخزّن يشمل الإضافي فعلاً (قيم مثبّتة يدوياً) — لا فرق
+        $add('eoc_base_only', $r,
+            'الصندوق 6٪ بشهر ' . complianceMonthLabel((int)$r['month'], (int)$r['year']) . ' = ' . complianceFmt($now) . ' (على الأساس ' . complianceFmt($r['bpe']) . ' وحده) بينما مع الأجر الإضافي ' . complianceFmt($r['prime']) . ' يكون ' . complianceFmt($full) . ' — صافيه أعلى بنحو ' . complianceFmt($full - $now) . ' شهرياً',
+            'ضوّي «الصندوق يشمل الأجر الإضافي» بملفه (تبويب محسومات) وأعد حساب سنة ' . $sy . ' — أو اتركه إن كان مقصوداً لهذه المدرسة',
+            true, ['now' => $now, 'full' => $full]);
+    }
+
     // ── 14) ملاك بلا شهادة ──
     foreach ($q("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND (e.diploma IS NULL OR e.diploma = '')" . $sc . $yf . " ORDER BY e.school_id, e.id", $yp) as $r) {
         $add('no_diploma', $r, 'أستاذ ملاك بلا شهادة بملفه — البرنامج يفترض «قسم ثاني» (درجة دخول 1) فقد تكون درجته وراتبه أقل من حقّه', 'أدخل شهادته بملفه (تُحسب درجته وراتبه تلقائياً)', false);
@@ -462,6 +479,11 @@ function complianceApply(PDO $db, array $it): string {
             $n = $recalcYear();
             logAudit('compliance_family_ded_on', 'employees', $eid, ['now' => $d['now'] ?? null], ['set' => $set, 'full' => $d['full'] ?? null, 'sy' => $sy]);
             return 'ضُوّي ' . (!empty($d['spouse']) ? 'زيادة الزوج' : '') . (!empty($d['spouse']) && !empty($d['kids']) ? ' و' : '') . (!empty($d['kids']) ? 'تنزيل الأولاد' : '') . ' (التنزيل ' . complianceFmt($d['now'] ?? 0) . ' → ' . complianceFmt($d['full'] ?? 0) . ') وأُعيد حساب ' . $n . ' شهراً';
+        case 'eoc_base_only':
+            $db->exec("UPDATE employees SET eoc_includes_extra = 1 WHERE id = $eid");
+            $n = $recalcYear();
+            logAudit('compliance_eoc_includes_extra_on', 'employees', $eid, ['now' => $d['now'] ?? null], ['full' => $d['full'] ?? null, 'sy' => $sy]);
+            return 'ضُوّي «الصندوق يشمل الأجر الإضافي» وأُعيد حساب ' . $n . ' شهراً';
         case 'bonus_nosy':
             $ids = array_map('intval', (array)($d['ids'] ?? []));
             if ($ids) $db->prepare("UPDATE employee_bonuses SET school_year = ? WHERE id IN (" . implode(',', $ids) . ")")->execute([$sy]);
@@ -508,7 +530,7 @@ function handleCompliancePost(PDO $db, string $redirectTo): void {
     if ($act === 'comp_approve_rule') {
         $rule = (string)($_POST['rule'] ?? '');
         // family_ded_off: قرار شخص بشخص (الأستاذة المتزوجة عادةً زوجها يأخذ التنزيل) — لا تضوية جماعية
-        foreach ($items as $it) if ($it['rule'] === $rule && $it['auto'] && $rule !== 'left_rows' && $rule !== 'net_math' && $rule !== 'family_ded_off') $keys[] = $it['key'];
+        foreach ($items as $it) if ($it['rule'] === $rule && $it['auto'] && $rule !== 'left_rows' && $rule !== 'net_math' && $rule !== 'family_ded_off' && $rule !== 'eoc_base_only') $keys[] = $it['key'];
         $act = 'comp_approve';
     } else {
         $keys = [(string)($_POST['key'] ?? '')];
@@ -564,7 +586,7 @@ function renderComplianceTable(array $items, string $formAction = '', bool $coll
         if (empty($byRule[$rk])) continue;
         $rows = $byRule[$rk];
         $n = count($rows);
-        $canBulk = canEdit() && $rk !== 'left_rows' && $rk !== 'net_math' && $rk !== 'family_ded_off' && count(array_filter($rows, fn($r) => $r['auto'])) > 1;
+        $canBulk = canEdit() && $rk !== 'left_rows' && $rk !== 'net_math' && $rk !== 'family_ded_off' && $rk !== 'eoc_base_only' && count(array_filter($rows, fn($r) => $r['auto'])) > 1;
         $tag = $collapsed ? 'details' : 'div';
         echo '<' . $tag . ' class="comp-rule" style="margin-bottom:10px;border:1px solid var(--gray-200);border-radius:8px;padding:6px 10px"' . ($collapsed && $n <= 3 ? ' open' : '') . '>';
         echo ($collapsed ? '<summary style="cursor:pointer;padding:4px 0">' : '<div style="padding:4px 0">')

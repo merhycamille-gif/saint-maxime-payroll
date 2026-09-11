@@ -290,8 +290,8 @@ $cpItems = complianceItems($db, currentSchoolYear());
 $cpRules = complianceRules();
 $cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
 $cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
-check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 19 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
-      count($cpRules) === 19
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 20 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 20
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
@@ -4497,6 +4497,20 @@ check('المكافآت 2026-09-11 «بكل البرنامج»: فورم الأ�
       && strpos($ic0911, "'new_aide' => 'aide_complementaire'") !== false && strpos($ic0911, "=== 'PCT') ? 'percent' : 'amount'") !== false
       && strpos($tf0911, 'name="new_from"') !== false && strpos($tf0911, 'name="new_to"') !== false
       && strpos($ic0911, "(\$nFull ? 'NULL, NULL' : \"\$nFrom, \$nTo\")") !== false);
+/* ⚖️ (2026-09-11 مقارنة كشف عبرا 113/131) قاعدة «الصندوق على الأساس فقط» بتقرير المخالفات — بلا شفاء صامت */
+$cp0911 = (string)file_get_contents($PROJ . '/includes/compliance.php');
+$eocItems0911 = []; $eocWhy = '';
+try {
+    $itemsAll0911 = complianceItems($db, '2025-2026');
+    foreach ($itemsAll0911 as $it) if ($it['rule'] === 'eoc_base_only') $eocItems0911[] = $it['emp_id'];
+    $maria0911 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE id = 1651 AND is_deleted = 0 AND COALESCE(eoc_includes_extra,0) = 0")->fetchColumn();
+    $eocWhy = 'items=' . count($eocItems0911) . ' maria_flag0=' . $maria0911;
+} catch (Throwable $e) { $eocWhy = $e->getMessage(); }
+check('المخالفات: قاعدة eoc_base_only (ملاك بإضافي وصندوقه على الأساس وحده) موجودة + تصحيحها تضوية المفتاح وإعادة الحساب + بلا «موافق على الكل» + تكشف ماريا حليحل 1651 محلياً ما دام مفتاحها مطفأ',
+      strpos($cp0911, "'eoc_base_only'  => [") !== false && strpos($cp0911, "case 'eoc_base_only':") !== false
+      && strpos($cp0911, "UPDATE employees SET eoc_includes_extra = 1 WHERE id = \$eid") !== false
+      && strpos($cp0911, "\$rk !== 'eoc_base_only'") !== false && strpos($cp0911, "\$rule !== 'eoc_base_only'") !== false
+      && (empty($maria0911) || in_array(1651, $eocItems0911, true)), $eocWhy);
 check('المكافآت 2026-09-11: كل سطر يرسل الحقول الستّة متراصفة (type مخفي بالخلية الأولى) + المحرّر يعرض الفعّال فقط',
       substr_count($emp0911, 'name="bonus_rows[type][]"') === 1
       && strpos($emp0911, '<td><input type="hidden" name="bonus_rows[type][]"') !== false
@@ -5090,8 +5104,8 @@ check('تقرير المخالفات: قاعدة family_ded_off معرَّفة (
       isset(complianceRules()['family_ded_off'])
       && strpos($cmp103, "\$add('family_ded_off', \$r,") !== false && substr_count($cmp103, 'familyDeductionAnnual($r[\'social_status\'], $r[\'spouse_works\'] ?? 0, 1, $fdAsOf,') === 2
       && strpos($cmp103, "case 'family_ded_off':") !== false && strpos($cmp103, "if (!empty(\$d['spouse'])) \$set[] = 'grant_spouse_addition = 1';") !== false
-      && strpos($cmp103, "&& \$rule !== 'family_ded_off') \$keys[] = \$it['key'];") !== false
-      && strpos($cmp103, "&& \$rk !== 'family_ded_off' && count(array_filter(") !== false
+      && strpos($cmp103, "&& \$rule !== 'family_ded_off' && \$rule !== 'eoc_base_only') \$keys[] = \$it['key'];") !== false
+      && strpos($cmp103, "&& \$rk !== 'family_ded_off' && \$rk !== 'eoc_base_only' && count(array_filter(") !== false
       && strpos($src103, '· تنزيل الأولاد: <b>') !== false);
 
 /* ===================================================================
