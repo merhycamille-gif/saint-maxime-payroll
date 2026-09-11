@@ -85,6 +85,9 @@ function recalcScope($db, $scopeAll, $schoolId, $cat, $sy) {
 
 // ===== المعالجات =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
+    // (2026-09-11) المدرسة المختارة بالصفحة هي القصد الصريح: لو الجلسة على «كل المدارس» نبدّلها لهذه المدرسة تلقائياً
+    // (متل autoSwitchToEmployeeSchool) بدل رفض الحفظ برسالة «اختر مدرسة من الأعلى» — كانت تربك المستخدم.
+    if (!$scopeAll && $schoolId > 0 && isAllSchools()) { $_SESSION['active_schools'] = [$schoolId]; unset($_SESSION['report_schools']); }
     if (!$scopeAll) requireSchoolSelected();   // نطاق مدرسة واحدة يتطلّب اختيارها؛ «كل المدارس» للمدير العام فقط
     $action = $_POST['action'] ?? '';
 
@@ -114,7 +117,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
                 foreach ($valid as $v) { $pn++; $ins->execute([$id, $v['type'], $pn, $schoolYear, $v['val'], $v['vt'], ($v['vt']==='percent'?'LBP':$v['cur']), $v['from'], $v['to']]); }
             }
             [$tot, $done] = recalcScope($db, $scopeAll, $schoolId, $categories, $schoolYear);
-            $_SESSION['flash_success'] = "طُبّقت " . count($valid) . " سطور (مكافأة/نقل) على " . count($ids) . " (" . catLabel($categories) . " — " . scopeLabel($scopeAll,$schoolId) . ") — أُعيد حساب $done (المنقولون يدوياً لم يُمَسّوا).";
+            // (2026-09-11) رسالة تقول ماذا طُبّق بالضبط («الأجر الإضافي 65٪ — كل السنة») لا «1 سطور»
+            $tl = ['prime_fixe'=>'الأجر الإضافي','aide_complementaire'=>'مكافأة ومساعدة','transport_complement'=>'نقل شهري'];
+            $desc = implode(' · ', array_map(function ($v) use ($tl) {
+                $val = $v['vt'] === 'percent' ? rtrim(rtrim(number_format($v['val'], 2, '.', ''), '0'), '.') . '٪' : number_format($v['val']) . ($v['cur'] === 'USD' ? ' $' : ' ل.ل');
+                $per = ($v['from'] === 10 && $v['to'] === 9) ? 'كل السنة' : monthName($v['from'], 'ar') . ' ← ' . monthName($v['to'], 'ar');
+                return $tl[$v['type']] . ' ' . $val . ' (' . $per . ')';
+            }, $valid));
+            $_SESSION['flash_success'] = "✅ طُبّق: $desc — على " . count($ids) . " (" . catLabel($categories) . " — " . scopeLabel($scopeAll,$schoolId) . " — $schoolYear) وأُعيد حساب رواتب $done تلقائياً (المنقولون يدوياً لم يُمَسّوا).";
         } else $_SESSION['flash_error'] = 'أضِف سطراً واحداً على الأقل بقيمة أكبر من صفر';
     }
 
@@ -419,10 +429,115 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <span><div class="v"><?= number_format($exchangeRate) ?></div><div class="l">السعر الجديد — سعر الشهر (تحويل لليرة) — <a href="<?= BASE_URL ?>pages/exchange_rates.php">تعديل</a></div></span></div>
         </div>
 
+        <?php
+        // ⚡ (2026-09-11) «إذا بدي حط لكل الأساتذة بنفس المدرسة نسبة مئوية واحدة للأجر الإضافي شو بعمل؟ هيدي كمان لازم تكون واضحة»:
+        // بطاقة مباشرة بمدخل واحد (النسبة ٪) + الوضع الحالي للملاك + مثال حيّ على أدنى/أعلى أساس بالمدرسة + زرّ واحد.
+        // تستعمل نفس المعالج apply_periods (cat=titulaire، سطر واحد prime_fixe نسبة، كل السنة) — لا مسار حفظ جديد.
+        $op = null;
+        if (!$scopeAll) {
+            $opIds = array_map('intval', scopeEmployeeIds($db, false, $schoolId, ['titulaire'], $schoolYear));
+            $op = ['n' => count($opIds), 'pct' => [], 'amt' => 0, 'none' => 0, 'mixed' => 0, 'lo' => null, 'hi' => null, 'def' => ''];
+            if ($opIds) {
+                $in = implode(',', $opIds);
+                $rows = $db->query("SELECT employee_id, value_type, amount FROM employee_bonuses
+                                    WHERE is_active = 1 AND bonus_type = 'prime_fixe' AND school_year = " . $db->quote($schoolYear) . " AND employee_id IN ($in)")->fetchAll(PDO::FETCH_ASSOC);
+                $st = [];
+                foreach ($rows as $r) {
+                    $eid = (int)$r['employee_id'];
+                    if (!isset($st[$eid])) $st[$eid] = ['pct' => 0.0, 'amt' => false];
+                    if ($r['value_type'] === 'percent') $st[$eid]['pct'] += (float)$r['amount']; else $st[$eid]['amt'] = true;
+                }
+                foreach ($opIds as $eid) {
+                    if (!isset($st[$eid])) { $op['none']++; continue; }
+                    $x = $st[$eid];
+                    if ($x['pct'] > 0 && $x['amt']) $op['mixed']++;
+                    elseif ($x['pct'] > 0) { $k = rtrim(rtrim(number_format($x['pct'], 2, '.', ''), '0'), '.'); $op['pct'][$k] = ($op['pct'][$k] ?? 0) + 1; }
+                    else $op['amt']++;
+                }
+                arsort($op['pct']);
+                if ($op['pct']) $op['def'] = (string)array_key_first($op['pct']);
+                // أدنى وأعلى أساس (بعد التدرّج) بين ملاك المدرسة — من آخر راتب مخزّن بالسنة — للمثال الحيّ
+                $bq = $db->query("SELECT e.id, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr) fn, COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr) ln,
+                                         (SELECT ms.base_plus_echelon_lbp FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = " . $db->quote($schoolYear) . "
+                                            AND ms.base_plus_echelon_lbp > 0 ORDER BY ms.year DESC, ms.month DESC LIMIT 1) b
+                                  FROM employees e WHERE e.id IN ($in)")->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($bq as $r) {
+                    if ((float)$r['b'] <= 0) continue;
+                    $it = ['name' => trim($r['fn'] . ' ' . $r['ln']), 'base' => (float)$r['b']];
+                    if ($op['lo'] === null || $it['base'] < $op['lo']['base']) $op['lo'] = $it;
+                    if ($op['hi'] === null || $it['base'] > $op['hi']['base']) $op['hi'] = $it;
+                }
+            }
+        }
+        if ($op): $opCur = [];
+            foreach ($op['pct'] as $k => $n) $opCur[] = "<b>$n</b> على <b>{$k}٪</b>";
+            if ($op['mixed']) $opCur[] = "<b>{$op['mixed']}</b> نسبة + مبلغ";
+            if ($op['amt']) $opCur[] = "<b>{$op['amt']}</b> على مبلغ مقطوع";
+            if ($op['none']) $opCur[] = "<b>{$op['none']}</b> بلا أجر إضافي";
+        ?>
+        <div class="card no-print" id="baOnePct" style="margin:0 0 14px;border:2px solid #1F4E5F;box-shadow:none">
+            <div class="card-header" style="background:#1F4E5F;color:#fff"><h3 style="color:#fff">
+                <span dir="ltr"><i class="fas fa-bolt"></i> Un seul taux % de supplément pour tous les titulaires</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.95">نسبة واحدة للأجر الإضافي لكل ملاك المدرسة — <?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?></div>
+            </h3></div>
+            <div class="card-body">
+                <?php if ($op['n'] === 0): ?>
+                    <div class="alert alert-warning" style="margin:0">لا ملاك بهذه المدرسة بالسنة <?= e($schoolYear) ?> (لا رواتب مخزّنة) — افتح السنة أولاً.</div>
+                <?php else: ?>
+                <form method="POST" id="baOnePctForm">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="apply_periods">
+                    <input type="hidden" name="sch" value="<?= (int)$schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+                    <input type="hidden" name="cat[]" value="titulaire">
+                    <input type="hidden" name="lines[0][type]" value="prime_fixe">
+                    <input type="hidden" name="lines[0][vtype]" value="percent">
+                    <input type="hidden" name="lines[0][currency]" value="LBP">
+                    <input type="hidden" name="lines[0][from]" value="10"><input type="hidden" name="lines[0][to]" value="9">
+                    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+                        <div style="flex:1 1 260px;min-width:0">
+                            <div style="font-size:13px;line-height:1.9">
+                                <b>الوضع الحالي:</b> <?= (int)$op['n'] ?> أستاذ ملاك — <?= $opCur ? implode(' · ', $opCur) : '—' ?>.
+                            </div>
+                            <label class="form-label" style="margin-top:8px">النسبة ٪ من الأساس بعد التدرّج / Taux % de la base</label>
+                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                                <input type="number" step="0.01" min="0.01" max="1000" name="lines[0][value]" id="opPct" class="form-control" value="<?= e($op['def']) ?>" placeholder="مثلاً 65" required style="max-width:140px;font-size:18px;font-weight:800;text-align:center" dir="ltr">
+                                <span style="font-weight:800">٪</span>
+                                <button type="submit" class="btn btn-primary" style="font-weight:800" data-confirm="تطبيق نسبة واحدة للأجر الإضافي على كل الملاك (<?= (int)$op['n'] ?>) بـ<?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?>؟ الأجر الإضافي الحالي عندهم (نسب أو مبالغ) يُستبدل بهذه النسبة لكل السنة، ثم تُعاد الرواتب تلقائياً."><i class="fas fa-check"></i> طبّق على كل الملاك (<?= (int)$op['n'] ?>) / Appliquer</button>
+                            </div>
+                            <div class="ba-warn" style="margin-top:10px">⚠️ الزرّ يستبدل <b>الأجر الإضافي</b> الحالي عند <b>كل</b> ملاك المدرسة بهذه النسبة (لكل السنة). المكافآت والنقل ما بيتأثّروا. أستاذ بدّك تخلّيه على مبلغ مقطوع؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
+                        </div>
+                        <div style="flex:1 1 280px;min-width:0;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.9" id="opLive"
+                             data-lo='<?= e(json_encode($op['lo'], JSON_UNESCAPED_UNICODE)) ?>' data-hi='<?= e(json_encode($op['hi'], JSON_UNESCAPED_UNICODE)) ?>'>
+                            <b>🧮 مثال حيّ بهذه النسبة:</b>
+                            <div id="opLiveOut">—</div>
+                            <div style="font-size:11.5px;color:#64748b">القاعدة: الأساس ÷ <?= e(officialUsdRateLbl()) ?> × النسبة ← داون بالدولار ← × <?= number_format($exchangeRate) ?> (سعر الشهر) ← داون للمليون. بتتحرّك مع الدرجة لحالها.</div>
+                        </div>
+                    </div>
+                </form>
+                <script>
+                (function(){
+                    var OFFICIAL=<?= json_encode(officialUsdRate()) ?>, RATE=<?= json_encode($exchangeRate) ?>;
+                    var box=document.getElementById('opLive'), out=document.getElementById('opLiveOut'), inp=document.getElementById('opPct');
+                    if(!box||!out||!inp) return;
+                    var lo=JSON.parse(box.dataset.lo||'null'), hi=JSON.parse(box.dataset.hi||'null');
+                    function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+                    function calc(base,pct){ var usd=Math.floor((base/OFFICIAL)*(pct/100)); var lbp=Math.floor(usd*RATE); return {usd:usd, lbp:Math.floor(lbp/1000000)*1000000}; }
+                    function line(it,pct){ var c=calc(it.base,pct); return '<div>'+it.name+' — أساس '+fmt(it.base)+' ⇒ '+fmt(c.usd)+'$ ⇒ <b style="color:#166534">'+fmt(c.lbp)+' ل.ل</b> بالشهر</div>'; }
+                    function upd(){ var pct=parseFloat(inp.value)||0; if(!pct||!lo){ out.textContent='—'; return; }
+                        var h=line(lo,pct); if(hi && hi.name!==lo.name) h+=line(hi,pct); out.innerHTML=h; }
+                    inp.addEventListener('input',upd); upd();
+                })();
+                </script>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <details class="ba-help no-print">
             <summary><i class="fas fa-circle-question"></i> كيف بشتغل بهالصفحة؟ (اكبس للشرح)</summary>
             <ol>
-                <li><b>«+ بند جديد»</b> ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
+                <li><b>نسبة واحدة للأجر الإضافي لكل الملاك؟</b> البطاقة الكحلية فوق: اكتب النسبة ← «طبّق على كل الملاك». خلص.</li>
+                <li><b>«+ بند جديد»</b> (لأي نوع/فئة/فترة) ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
                 <li><b>النسبة ٪</b> بتنحسب من أساس الراتب بعد التدرّج (÷<?= e(officialUsdRateLbl()) ?> ← × سعر الشهر) وبتتحرّك مع الدرجة — منطقية للملاك. <b>المبلغ الثابت</b> بالليرة أو بالدولار — للمتعاقدين والموظفين أو لأي زيادة ثابتة.</li>
                 <li><b>نسبة + مبلغ ثابت مع بعض</b> (مثلاً 45٪ + 2,000,000 ثابت): حطّهم <b>سطرين بنفس النافذة</b> وكبس طبّق مرّة وحدة. (لو طبّقتهم بمرّتين منفصلتين، التانية بتشيل الأولى لأنها من نفس النوع.)</li>
                 <li><b>كل واحد إلو رقمه</b> (المتعاقدون، أو أستاذ ملاك بدّك تعطيه شي خاص): زرّ <b>«مبالغ فردية (لكل واحد)»</b> ← جدول بأسماء الفئة، قدّام كل اسم ولكل نوع خانتان <b>نسبة ٪ + مبلغ ثابت</b> — عبّي وحدة أو الاتنين واحفظ مرّة وحدة. فاضي = ما بيتغيّر، 0 = شيله.</li>
@@ -776,7 +891,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         var names={prime_fixe:'الأجر الإضافي',aide_complementaire:'مكافأة ومساعدة',transport_complement:'نقل شهري'};
         Object.keys(byType).forEach(function(t){
             var b=byType[t], txt=[];
-            if(b.pct>0){var usd=Math.floor(Math.floor(base/OFFICIAL)*(b.pct/100)); var lbp=Math.floor(Math.floor(usd*RATE)/1000000)*1000000; txt.push(b.pct+'٪ = '+usd.toLocaleString('en-US')+'$ = '+lbp.toLocaleString('en-US')+' ل.ل');}
+            if(b.pct>0){var usd=Math.floor((base/OFFICIAL)*(b.pct/100)); /* = bonusPercentLbp بالضبط */ var lbp=Math.floor(Math.floor(usd*RATE)/1000000)*1000000; txt.push(b.pct+'٪ = '+usd.toLocaleString('en-US')+'$ = '+lbp.toLocaleString('en-US')+' ل.ل');}
             if(b.fixed>0) txt.push('ثابت '+b.fixed.toLocaleString('en-US')+' ل.ل');
             if(txt.length) parts.push(names[t]+': '+txt.join(' + '));
         });

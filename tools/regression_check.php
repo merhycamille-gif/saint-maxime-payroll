@@ -4474,6 +4474,16 @@ check('المكافآت 2026-09-11: لا تكرار — التبويب الما�
       strpos($finTab0911, 'bonus_editor') === false && strpos($finTab0911, 'tLinesBody') === false
       && strpos($emp0911, 'Gérer les primes') === false && strpos($emp0911, 'pages/bonuses.php?') === false
       && strpos($bn0911, '&tab=bonuses') !== false && strpos($bn0911, 'INSERT INTO') === false);
+$ba0911 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
+check('المكافآت الجماعية 2026-09-11: بطاقة «نسبة واحدة للأجر الإضافي لكل ملاك المدرسة» (خانة واحدة + زرّ واحد عبر apply_periods) + الوضع الحالي + مثال حيّ بمعادلة المحرّك + تبديل الجلسة تلقائياً للمدرسة المختارة + رسالة تقول ماذا طُبّق',
+      strpos($ba0911, 'id="baOnePct"') !== false && strpos($ba0911, 'id="baOnePctForm"') !== false
+      && strpos($ba0911, 'name="lines[0][vtype]" value="percent"') !== false && strpos($ba0911, 'name="lines[0][type]" value="prime_fixe"') !== false
+      && strpos($ba0911, 'name="cat[]" value="titulaire"') !== false
+      && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(pct/100))') !== false
+      && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(b.pct/100))') !== false
+      && strpos($ba0911, "isAllSchools()) { \$_SESSION['active_schools'] = [\$schoolId];") !== false
+      && strpos($ba0911, '"✅ طُبّق: $desc') !== false
+      && strpos($emp0911, 'bulk_allowances.php?sch=') !== false && strpos($emp0911, '#baOnePct') !== false);
 check('المكافآت 2026-09-11: كل سطر يرسل الحقول الستّة متراصفة (type مخفي بالخلية الأولى) + المحرّر يعرض الفعّال فقط',
       substr_count($emp0911, 'name="bonus_rows[type][]"') === 1
       && strpos($emp0911, '<td><input type="hidden" name="bonus_rows[type][]"') !== false
