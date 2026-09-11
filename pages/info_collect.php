@@ -227,19 +227,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         $db->prepare("UPDATE info_submissions SET status='applied', applied_at=NOW(), employee_id=? WHERE id=?")->execute([$newId, $sub['id']]);
         // الأجر الإضافي + تعويض النقل كعلاوات لسنة الدخول (بالعملة المختارة) — قبل إعادة الحساب
         $insBonus = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
-                                  VALUES (?, ?, 1, ?, ?, 'amount', ?, NULL, NULL, 1)");
-        // الأجر الإضافي = علاوة شهرية (prime_fixe)؛ تعويض النقل = علاوة يومية (transport_daily)
-        // تُضرَب بأيام الحضور × الأسابيع تلقائياً في المحرّك.
-        foreach (['new_extra' => 'prime_fixe', 'new_transport' => 'transport_daily'] as $dk => $btype) {
+                                  VALUES (?, ?, 1, ?, ?, ?, ?, NULL, NULL, 1)");
+        // الأجر الإضافي = علاوة شهرية (prime_fixe)؛ المكافأة والمساعدة (aide_complementaire)؛ تعويض النقل = علاوة يومية (transport_daily)
+        // تُضرَب بأيام الحضور × الأسابيع تلقائياً في المحرّك. (2026-09-11 «بكل البرنامج») العملة PCT = نسبة ٪ من الأساس (value_type=percent).
+        foreach (['new_extra' => 'prime_fixe', 'new_aide' => 'aide_complementaire', 'new_transport' => 'transport_daily'] as $dk => $btype) {
             $amt = (float)($data[$dk] ?? 0);
             if ($amt > 0) {
-                $cur = (($data[$dk . '_cur'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP';
-                $insBonus->execute([$newId, $btype, $entryYear, $amt, $cur]);
+                $c = (string)($data[$dk . '_cur'] ?? 'LBP');
+                $vt = ($c === 'PCT') ? 'percent' : 'amount';
+                if ($vt === 'percent' && $btype === 'transport_daily') $vt = 'amount'; // النقل اليومي مبلغ فقط
+                $cur = ($vt === 'percent') ? 'LBP' : (($c === 'USD') ? 'USD' : 'LBP');
+                $insBonus->execute([$newId, $btype, $entryYear, $amt, $vt, $cur]);
             }
         }
-        // ولّد رواتب سنة الدخول (تشمل الراتب + الإضافي + النقل المُدخَلة بالفورم)
+        // ولّد رواتب سنة الدخول (تشمل الراتب + الإضافي + المكافأة + النقل المُدخَلة بالفورم)
         try { recalcEmployeeYear($newId, $entryYear); } catch (Exception $ex) {}
-        $hadPay = ($salAmt > 0) || ((float)($data['new_extra'] ?? 0) > 0) || ((float)($data['new_transport'] ?? 0) > 0);
+        $hadPay = ($salAmt > 0) || ((float)($data['new_extra'] ?? 0) > 0) || ((float)($data['new_aide'] ?? 0) > 0) || ((float)($data['new_transport'] ?? 0) > 0);
         $_SESSION['flash_success'] = "تم إنشاء ملف الأستاذ الجديد لسنة الدخول $entryYear" . ($hadPay ? ' مع راتبه وإضافاته ونقله. راجِع ملفه للتأكّد.' : '. أكمِل الإعداد المالي من ملف الأستاذ ليظهر في تلك السنة.');
         header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $newId); exit;
     }

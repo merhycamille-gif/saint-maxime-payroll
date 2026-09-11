@@ -4475,17 +4475,24 @@ check('المكافآت 2026-09-11: لا تكرار — التبويب الما�
       && strpos($emp0911, 'Gérer les primes') === false && strpos($emp0911, 'pages/bonuses.php?') === false
       && strpos($bn0911, '&tab=bonuses') !== false && strpos($bn0911, 'INSERT INTO') === false);
 $ba0911 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
-check('المكافآت الجماعية 2026-09-11: بطاقة «نسبة واحدة للأجر الإضافي لكل ملاك المدرسة» (خانة واحدة + زرّ واحد عبر apply_periods) + الوضع الحالي + مثال حيّ بمعادلة المحرّك + تبديل الجلسة تلقائياً للمدرسة المختارة + رسالة تقول ماذا طُبّق',
+check('المكافآت الجماعية 2026-09-11: بطاقة «طبّق على الكل دفعة وحدة» (على مين × شو × نسبة/مبلغ + زرّ واحد عبر apply_periods) + الوضع الحالي + مثال حيّ بمعادلة المحرّك + تبديل الجلسة تلقائياً للمدرسة المختارة + رسالة تقول ماذا طُبّق',
       strpos($ba0911, 'id="baOnePct"') !== false && strpos($ba0911, 'id="baOnePctForm"') !== false
       && strpos($ba0911, 'name="lines[0][vtype]" value="percent"') !== false && strpos($ba0911, 'name="lines[0][vtype]" value="amount"') !== false
-      && strpos($ba0911, 'id="opCur"') !== false && strpos($ba0911, "\$op['defMode'] = (\$nAmt > \$nPct) ? 'amount' : 'percent'") !== false
-      && strpos($ba0911, 'name="lines[0][type]" value="prime_fixe"') !== false
-      && strpos($ba0911, 'name="cat[]" value="titulaire"') !== false
+      && strpos($ba0911, 'id="opCur"') !== false && strpos($ba0911, 'id="opCats"') !== false && strpos($ba0911, 'id="opTypes"') !== false
+      && strpos($ba0911, 'name="lines[0][type]" value="prime_fixe"') !== false && strpos($ba0911, 'name="lines[0][type]" value="aide_complementaire"') !== false
+      && strpos($ba0911, 'name="lines[0][type]" value="transport_complement"') !== false
+      && strpos($ba0911, "SELECT employee_id, bonus_type, value_type, amount, currency FROM employee_bonuses") !== false
+      && strpos($ba0911, 'name="cat[]" value="<?= $ck ?>"') !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(pct/100))') !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(b.pct/100))') !== false
       && strpos($ba0911, "isAllSchools()) { \$_SESSION['active_schools'] = [\$schoolId];") !== false
       && strpos($ba0911, '"✅ طُبّق: $desc') !== false
       && strpos($emp0911, 'bulk_allowances.php?sch=') !== false && strpos($emp0911, '#baOnePct') !== false);
+$tf0911 = (string)file_get_contents($PROJ . '/pages/teacher_form.php'); $ic0911 = (string)file_get_contents($PROJ . '/pages/info_collect.php');
+check('المكافآت 2026-09-11 «بكل البرنامج»: فورم الأستاذ الجديد فيه الأجر الإضافي + مكافأة ومساعدة بخيار (ل.ل / $ / ٪ من الأساس) والإنشاء يترجم ٪ إلى value_type=percent',
+      strpos($tf0911, "'new_aide'") !== false && strpos($tf0911, 'value="PCT"') !== false
+      && strpos($tf0911, "['new_salary','new_extra','new_aide','new_transport']") !== false
+      && strpos($ic0911, "'new_aide' => 'aide_complementaire'") !== false && strpos($ic0911, "=== 'PCT') ? 'percent' : 'amount'") !== false);
 check('المكافآت 2026-09-11: كل سطر يرسل الحقول الستّة متراصفة (type مخفي بالخلية الأولى) + المحرّر يعرض الفعّال فقط',
       substr_count($emp0911, 'name="bonus_rows[type][]"') === 1
       && strpos($emp0911, '<td><input type="hidden" name="bonus_rows[type][]"') !== false

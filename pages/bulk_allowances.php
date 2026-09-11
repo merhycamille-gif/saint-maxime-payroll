@@ -430,128 +430,191 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         </div>
 
         <?php
-        // ⚡ (2026-09-11) «إذا بدي حط لكل الأساتذة بنفس المدرسة نسبة مئوية واحدة للأجر الإضافي شو بعمل؟ هيدي كمان لازم تكون واضحة»:
-        // بطاقة مباشرة بمدخل واحد (النسبة ٪) + الوضع الحالي للملاك + مثال حيّ على أدنى/أعلى أساس بالمدرسة + زرّ واحد.
-        // تستعمل نفس المعالج apply_periods (cat=titulaire، سطر واحد prime_fixe نسبة، كل السنة) — لا مسار حفظ جديد.
+        // ⚡ (2026-09-11) «إذا بدي حط لكل الأساتذة بنفس المدرسة نسبة مئوية واحدة للأجر الإضافي شو بعمل؟ هيدي كمان لازم تكون واضحة»
+        //   + «بدي يكون عندي خيار حط نسبة أو مبلغ معيّن» + «انتبه هيدا برنامج بدو يطبّق على كل البرنامج»:
+        // بطاقة واحدة مباشرة لكل الفئات وكل الأنواع: على مين؟ (ملاك/متعاقدين/موظفين) · شو؟ (الأجر الإضافي/مكافأة ومساعدة/نقل شهري)
+        // · نسبة ٪ أو مبلغ (ليرة/دولار) · القيمة ← زرّ واحد. الوضع الحالي والمثال الحيّ يتغيّران مع الاختيار.
+        // تستعمل نفس المعالج apply_periods (سطر واحد، كل السنة) — لا مسار حفظ جديد.
         $op = null;
         if (!$scopeAll) {
-            $opIds = array_map('intval', scopeEmployeeIds($db, false, $schoolId, ['titulaire'], $schoolYear));
-            $op = ['n' => count($opIds), 'pct' => [], 'amt' => 0, 'amtv' => [], 'none' => 0, 'mixed' => 0, 'lo' => null, 'hi' => null, 'def' => '', 'defMode' => 'percent', 'defAmt' => '', 'defCur' => 'LBP'];
-            if ($opIds) {
-                $in = implode(',', $opIds);
-                $rows = $db->query("SELECT employee_id, value_type, amount, currency FROM employee_bonuses
-                                    WHERE is_active = 1 AND bonus_type = 'prime_fixe' AND school_year = " . $db->quote($schoolYear) . " AND employee_id IN ($in)")->fetchAll(PDO::FETCH_ASSOC);
+            $opCats = ['titulaire' => 'الملاك', 'contractuel' => 'المتعاقدين', 'employe' => 'الموظفين'];
+            $opTypes = ['prime_fixe' => 'الأجر الإضافي', 'aide_complementaire' => 'مكافأة ومساعدة', 'transport_complement' => 'نقل شهري'];
+            $op = ['ids' => [], 'stats' => [], 'lohi' => []];
+            $allIds = [];
+            foreach ($opCats as $ck => $cl) {
+                $ids = array_map('intval', scopeEmployeeIds($db, false, $schoolId, [$ck], $schoolYear));
+                $op['ids'][$ck] = $ids; $allIds = array_merge($allIds, $ids);
+                foreach ($opTypes as $tk => $tl) $op['stats'][$ck][$tk] = ['n' => count($ids), 'pct' => [], 'amt' => [], 'mixed' => 0, 'none' => count($ids)];
+                $op['lohi'][$ck] = ['lo' => null, 'hi' => null];
+            }
+            if ($allIds) {
+                $in = implode(',', array_unique($allIds));
+                $catOf = []; foreach ($op['ids'] as $ck => $ids) foreach ($ids as $i) $catOf[$i] = $ck;
+                $rows = $db->query("SELECT employee_id, bonus_type, value_type, amount, currency FROM employee_bonuses
+                                    WHERE is_active = 1 AND bonus_type IN ('prime_fixe','aide_complementaire','transport_complement')
+                                      AND school_year = " . $db->quote($schoolYear) . " AND employee_id IN ($in)")->fetchAll(PDO::FETCH_ASSOC);
                 $st = [];
                 foreach ($rows as $r) {
-                    $eid = (int)$r['employee_id'];
-                    if (!isset($st[$eid])) $st[$eid] = ['pct' => 0.0, 'amt' => false, 'amtv' => 0.0, 'cur' => 'LBP'];
-                    if ($r['value_type'] === 'percent') $st[$eid]['pct'] += (float)$r['amount'];
-                    else { $st[$eid]['amt'] = true; $st[$eid]['amtv'] += (float)$r['amount']; $st[$eid]['cur'] = ($r['currency'] === 'USD') ? 'USD' : 'LBP'; }
+                    $eid = (int)$r['employee_id']; $tk = $r['bonus_type'];
+                    if (!isset($st[$eid][$tk])) $st[$eid][$tk] = ['pct' => 0.0, 'amt' => false, 'amtv' => 0.0, 'cur' => 'LBP'];
+                    if ($r['value_type'] === 'percent') $st[$eid][$tk]['pct'] += (float)$r['amount'];
+                    else { $st[$eid][$tk]['amt'] = true; $st[$eid][$tk]['amtv'] += (float)$r['amount']; $st[$eid][$tk]['cur'] = ($r['currency'] === 'USD') ? 'USD' : 'LBP'; }
                 }
-                foreach ($opIds as $eid) {
-                    if (!isset($st[$eid])) { $op['none']++; continue; }
-                    $x = $st[$eid];
-                    if ($x['pct'] > 0 && $x['amt']) $op['mixed']++;
-                    elseif ($x['pct'] > 0) { $k = rtrim(rtrim(number_format($x['pct'], 2, '.', ''), '0'), '.'); $op['pct'][$k] = ($op['pct'][$k] ?? 0) + 1; }
-                    else { $op['amt']++; $ka = number_format($x['amtv'], 2, '.', '') . '|' . $x['cur']; $op['amtv'][$ka] = ($op['amtv'][$ka] ?? 0) + 1; }
+                foreach ($st as $eid => $byType) {
+                    $ck = $catOf[$eid] ?? null; if (!$ck) continue;
+                    foreach ($byType as $tk => $x) {
+                        if (!isset($op['stats'][$ck][$tk])) continue;
+                        $S = &$op['stats'][$ck][$tk]; $S['none']--;
+                        if ($x['pct'] > 0 && $x['amt']) $S['mixed']++;
+                        elseif ($x['pct'] > 0) { $k = rtrim(rtrim(number_format($x['pct'], 2, '.', ''), '0'), '.'); $S['pct'][$k] = ($S['pct'][$k] ?? 0) + 1; }
+                        else { $k = rtrim(rtrim(number_format($x['amtv'], 2, '.', ''), '0'), '.') . '|' . $x['cur']; $S['amt'][$k] = ($S['amt'][$k] ?? 0) + 1; }
+                        unset($S);
+                    }
                 }
-                arsort($op['pct']); arsort($op['amtv']);
-                if ($op['pct']) $op['def'] = (string)array_key_first($op['pct']);
-                if ($op['amtv']) { [$av, $ac] = explode('|', (string)array_key_first($op['amtv'])); $op['defAmt'] = rtrim(rtrim($av, '0'), '.'); $op['defCur'] = $ac; }
-                // (2026-09-11 «بدي خيار نسبة أو مبلغ») الوضع الافتراضي بالبطاقة = ما هو سائد فعلاً بالمدرسة
-                $nPct = array_sum($op['pct']); $nAmt = array_sum($op['amtv']);
-                $op['defMode'] = ($nAmt > $nPct) ? 'amount' : 'percent';
-                // أدنى وأعلى أساس (بعد التدرّج) بين ملاك المدرسة — من آخر راتب مخزّن بالسنة — للمثال الحيّ
+                foreach ($op['stats'] as $ck => &$byT) foreach ($byT as $tk => &$S) { arsort($S['pct']); arsort($S['amt']); }
+                unset($byT, $S);
+                // أدنى وأعلى أساس (بعد التدرّج) لكل فئة — من آخر راتب مخزّن بالسنة — للمثال الحيّ بالنسبة
                 $bq = $db->query("SELECT e.id, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr) fn, COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr) ln,
                                          (SELECT ms.base_plus_echelon_lbp FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = " . $db->quote($schoolYear) . "
                                             AND ms.base_plus_echelon_lbp > 0 ORDER BY ms.year DESC, ms.month DESC LIMIT 1) b
                                   FROM employees e WHERE e.id IN ($in)")->fetchAll(PDO::FETCH_ASSOC);
                 foreach ($bq as $r) {
                     if ((float)$r['b'] <= 0) continue;
+                    $ck = $catOf[(int)$r['id']] ?? null; if (!$ck) continue;
                     $it = ['name' => trim($r['fn'] . ' ' . $r['ln']), 'base' => (float)$r['b']];
-                    if ($op['lo'] === null || $it['base'] < $op['lo']['base']) $op['lo'] = $it;
-                    if ($op['hi'] === null || $it['base'] > $op['hi']['base']) $op['hi'] = $it;
+                    $L = &$op['lohi'][$ck];
+                    if ($L['lo'] === null || $it['base'] < $L['lo']['base']) $L['lo'] = $it;
+                    if ($L['hi'] === null || $it['base'] > $L['hi']['base']) $L['hi'] = $it;
+                    unset($L);
                 }
             }
+            $opTotal = count(array_unique($allIds));
         }
-        if ($op): $opCur = [];
-            foreach ($op['pct'] as $k => $n) $opCur[] = "<b>$n</b> على <b>{$k}٪</b>";
-            if ($op['mixed']) $opCur[] = "<b>{$op['mixed']}</b> نسبة + مبلغ";
-            foreach ($op['amtv'] as $ka => $n) { [$av, $ac] = explode('|', $ka); $opCur[] = "<b>$n</b> على مبلغ <b>" . number_format((float)$av) . ($ac === 'USD' ? ' $' : ' ل.ل') . "</b>"; }
-            if ($op['none']) $opCur[] = "<b>{$op['none']}</b> بلا أجر إضافي";
-        ?>
+        if ($op): ?>
         <div class="card no-print" id="baOnePct" style="margin:0 0 14px;border:2px solid #1F4E5F;box-shadow:none">
             <div class="card-header" style="background:#1F4E5F;color:#fff"><h3 style="color:#fff">
-                <span dir="ltr"><i class="fas fa-bolt"></i> Un seul supplément (taux % ou montant) pour tous les titulaires</span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.95">أجر إضافي واحد (نسبة ٪ أو مبلغ) لكل ملاك المدرسة — <?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?></div>
+                <span dir="ltr"><i class="fas fa-bolt"></i> Appliquer à tous d'un coup — taux % ou montant</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.95">طبّق على الكل دفعة وحدة (نسبة ٪ أو مبلغ) — <?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?></div>
             </h3></div>
             <div class="card-body">
-                <?php if ($op['n'] === 0): ?>
-                    <div class="alert alert-warning" style="margin:0">لا ملاك بهذه المدرسة بالسنة <?= e($schoolYear) ?> (لا رواتب مخزّنة) — افتح السنة أولاً.</div>
+                <?php if ($opTotal === 0): ?>
+                    <div class="alert alert-warning" style="margin:0">لا موظفين بهذه المدرسة بالسنة <?= e($schoolYear) ?> (لا رواتب مخزّنة) — افتح السنة أولاً.</div>
                 <?php else: ?>
                 <form method="POST" id="baOnePctForm">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="apply_periods">
                     <input type="hidden" name="sch" value="<?= (int)$schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
-                    <input type="hidden" name="cat[]" value="titulaire">
-                    <input type="hidden" name="lines[0][type]" value="prime_fixe">
                     <input type="hidden" name="lines[0][from]" value="10"><input type="hidden" name="lines[0][to]" value="9">
                     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
-                        <div style="flex:1 1 260px;min-width:0">
-                            <div style="font-size:13px;line-height:1.9">
-                                <b>الوضع الحالي:</b> <?= (int)$op['n'] ?> أستاذ ملاك — <?= $opCur ? implode(' · ', $opCur) : '—' ?>.
-                            </div>
-                            <label class="form-label" style="margin-top:8px">شو بدّك تعطي لكل ملاك؟ / Que donner à tous les titulaires ?</label>
-                            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px" id="opModeWrap">
-                                <label style="font-weight:700;cursor:pointer"><input type="radio" name="lines[0][vtype]" value="percent" <?= $op['defMode'] === 'percent' ? 'checked' : '' ?>> نسبة ٪ من الأساس بعد التدرّج <small style="color:#64748b;font-weight:400">(بتتحرّك مع الدرجة)</small></label>
-                                <label style="font-weight:700;cursor:pointer"><input type="radio" name="lines[0][vtype]" value="amount" <?= $op['defMode'] === 'amount' ? 'checked' : '' ?>> مبلغ ثابت كل شهر <small style="color:#64748b;font-weight:400">(ليرة أو دولار)</small></label>
-                            </div>
-                            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                                <input type="number" step="0.01" min="0.01" name="lines[0][value]" id="opPct" class="form-control" value="<?= e($op['defMode'] === 'amount' ? $op['defAmt'] : $op['def']) ?>" placeholder="<?= $op['defMode'] === 'amount' ? 'مثلاً 54000000' : 'مثلاً 65' ?>" required style="max-width:190px;font-size:18px;font-weight:800;text-align:center" dir="ltr" data-def-pct="<?= e($op['def']) ?>" data-def-amt="<?= e($op['defAmt']) ?>">
-                                <span style="font-weight:800" id="opUnitPct">٪</span>
-                                <select name="lines[0][currency]" id="opCur" class="form-select" style="max-width:110px;font-weight:700"><option value="LBP" <?= $op['defCur'] === 'LBP' ? 'selected' : '' ?>>ل.ل</option><option value="USD" <?= $op['defCur'] === 'USD' ? 'selected' : '' ?>>$</option></select>
-                                <button type="submit" class="btn btn-primary" style="font-weight:800" data-confirm="تطبيق أجر إضافي واحد على كل الملاك (<?= (int)$op['n'] ?>) بـ<?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?>؟ الأجر الإضافي الحالي عندهم (نسب أو مبالغ) يُستبدل بهذه القيمة لكل السنة، ثم تُعاد الرواتب تلقائياً."><i class="fas fa-check"></i> طبّق على كل الملاك (<?= (int)$op['n'] ?>) / Appliquer</button>
-                            </div>
-                            <div class="ba-warn" style="margin-top:10px">⚠️ الزرّ يستبدل <b>الأجر الإضافي</b> الحالي عند <b>كل</b> ملاك المدرسة بهذه القيمة (لكل السنة). المكافآت والنقل ما بيتأثّروا. أستاذ بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
+                        <div style="flex:1 1 300px;min-width:0">
+                            <div class="ba-step"><span class="ba-num">١</span><div>
+                                <strong>على مين؟</strong>
+                                <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px" id="opCats">
+                                    <?php foreach ($opCats as $ck => $cl): ?>
+                                    <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="checkbox" name="cat[]" value="<?= $ck ?>" <?= $ck === 'titulaire' ? 'checked' : '' ?>> <?= $cl ?> <small style="color:#64748b;font-weight:400">(<?= count($op['ids'][$ck]) ?>)</small></label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div></div>
+                            <div class="ba-step"><span class="ba-num">٢</span><div>
+                                <strong>شو؟</strong>
+                                <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px" id="opTypes">
+                                    <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="lines[0][type]" value="prime_fixe" checked> ➕ الأجر الإضافي</label>
+                                    <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="lines[0][type]" value="aide_complementaire"> 💰 مكافأة ومساعدة</label>
+                                    <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="lines[0][type]" value="transport_complement"> 🚌 نقل شهري</label>
+                                </div>
+                            </div></div>
+                            <div class="ba-step"><span class="ba-num">٣</span><div style="min-width:0">
+                                <strong>قدّيش؟</strong>
+                                <div style="display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 6px" id="opModeWrap">
+                                    <label style="font-weight:700;cursor:pointer"><input type="radio" name="lines[0][vtype]" value="percent" checked> نسبة ٪ من الأساس بعد التدرّج <small style="color:#64748b;font-weight:400">(بتتحرّك مع الدرجة)</small></label>
+                                    <label style="font-weight:700;cursor:pointer"><input type="radio" name="lines[0][vtype]" value="amount"> مبلغ ثابت كل شهر <small style="color:#64748b;font-weight:400">(ليرة أو دولار)</small></label>
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                                    <input type="number" step="0.01" min="0.01" name="lines[0][value]" id="opPct" class="form-control" value="" placeholder="مثلاً 65" required style="max-width:190px;font-size:18px;font-weight:800;text-align:center" dir="ltr">
+                                    <span style="font-weight:800" id="opUnitPct">٪</span>
+                                    <select name="lines[0][currency]" id="opCur" class="form-select" style="max-width:110px;font-weight:700"><option value="LBP">ل.ل</option><option value="USD">$</option></select>
+                                    <button type="submit" class="btn btn-primary" id="opBtn" style="font-weight:800" data-confirm="تطبيق؟"><i class="fas fa-check"></i> <span id="opBtnTxt">طبّق</span> / Appliquer</button>
+                                </div>
+                            </div></div>
+                            <div class="ba-warn" style="margin-top:6px" id="opWarn">⚠️ الزرّ يستبدل <b id="opWarnType">الأجر الإضافي</b> الحالي عند <b>كل</b> موظفي الفئات المختارة بهذه القيمة (لكل السنة). الأنواع التانية ما بتتأثّر. شخص بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
                         </div>
-                        <div style="flex:1 1 280px;min-width:0;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.9" id="opLive"
-                             data-lo='<?= e(json_encode($op['lo'], JSON_UNESCAPED_UNICODE)) ?>' data-hi='<?= e(json_encode($op['hi'], JSON_UNESCAPED_UNICODE)) ?>'>
+                        <div style="flex:1 1 280px;min-width:0;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.9" id="opLive">
+                            <div id="opState" style="margin-bottom:6px"><b>الوضع الحالي:</b> —</div>
                             <b>🧮 مثال حيّ:</b>
                             <div id="opLiveOut">—</div>
-                            <div style="font-size:11.5px;color:#64748b" id="opRule">القاعدة: الأساس ÷ <?= e(officialUsdRateLbl()) ?> × النسبة ← داون بالدولار ← × <?= number_format($exchangeRate) ?> (سعر الشهر) ← داون للمليون. بتتحرّك مع الدرجة لحالها.</div>
+                            <div style="font-size:11.5px;color:#64748b" id="opRule"></div>
                         </div>
                     </div>
                 </form>
                 <script>
                 (function(){
-                    var OFFICIAL=<?= json_encode(officialUsdRate()) ?>, RATE=<?= json_encode($exchangeRate) ?>;
-                    var box=document.getElementById('opLive'), out=document.getElementById('opLiveOut'), inp=document.getElementById('opPct');
-                    var cur=document.getElementById('opCur'), unit=document.getElementById('opUnitPct'), rule=document.getElementById('opRule');
-                    if(!box||!out||!inp) return;
-                    var lo=JSON.parse(box.dataset.lo||'null'), hi=JSON.parse(box.dataset.hi||'null');
-                    var RULE_PCT=rule?rule.innerHTML:'', RULE_AMT='مبلغ ثابت كل شهر لكل أستاذ ملاك مهما كانت درجته. بالدولار: يُحوَّل بسعر الشهر ('+RATE.toLocaleString('en-US')+') — داون لليرة.';
-                    function mode(){ var r=document.querySelector('#opModeWrap input[name="lines[0][vtype]"]:checked'); return r?r.value:'percent'; }
+                    var OFFICIAL=<?= json_encode(officialUsdRate()) ?>, RATE=<?= json_encode($exchangeRate) ?>, OFFLBL=<?= json_encode(officialUsdRateLbl()) ?>;
+                    var STATS=<?= json_encode($op['stats'], JSON_UNESCAPED_UNICODE) ?>, LOHI=<?= json_encode($op['lohi'], JSON_UNESCAPED_UNICODE) ?>;
+                    var CATL={titulaire:'الملاك',contractuel:'المتعاقدين',employe:'الموظفين'}, TYPEL={prime_fixe:'الأجر الإضافي',aide_complementaire:'مكافأة ومساعدة',transport_complement:'النقل الشهري'};
+                    var SCHOOL=<?= json_encode(scopeLabel(false, $schoolId) . ' — ' . $schoolYear, JSON_UNESCAPED_UNICODE) ?>;
+                    var inp=document.getElementById('opPct'), cur=document.getElementById('opCur'), unit=document.getElementById('opUnitPct');
+                    var out=document.getElementById('opLiveOut'), rule=document.getElementById('opRule'), state=document.getElementById('opState');
+                    var btn=document.getElementById('opBtn'), btnTxt=document.getElementById('opBtnTxt'), warnType=document.getElementById('opWarnType');
+                    if(!inp||!out) return;
+                    var RULE_PCT='القاعدة: الأساس ÷ '+OFFLBL+' × النسبة ← داون بالدولار ← × '+RATE.toLocaleString('en-US')+' (سعر الشهر) ← داون للمليون. بتتحرّك مع الدرجة لحالها.';
+                    var RULE_AMT='مبلغ ثابت كل شهر لكل شخص مهما كانت درجته. بالدولار: يُحوَّل بسعر الشهر ('+RATE.toLocaleString('en-US')+') — داون لليرة.';
+                    function cats(){ return [].slice.call(document.querySelectorAll('#opCats input:checked')).map(function(c){return c.value;}); }
+                    function type(){ var r=document.querySelector('#opTypes input:checked'); return r?r.value:'prime_fixe'; }
+                    function mode(){ var r=document.querySelector('#opModeWrap input:checked'); return r?r.value:'percent'; }
                     function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
                     function calc(base,pct){ var usd=Math.floor((base/OFFICIAL)*(pct/100)); var lbp=Math.floor(usd*RATE); return {usd:usd, lbp:Math.floor(lbp/1000000)*1000000}; }
                     function line(it,pct){ var c=calc(it.base,pct); return '<div>'+it.name+' — أساس '+fmt(it.base)+' ⇒ '+fmt(c.usd)+'$ ⇒ <b style="color:#166534">'+fmt(c.lbp)+' ل.ل</b> بالشهر</div>'; }
+                    // الوضع الحالي للفئات المختارة + النوع المختار (مجموع من STATS)
+                    function agg(){
+                        var t=type(), n=0, pct={}, amt={}, mixed=0, none=0;
+                        cats().forEach(function(c){ var S=(STATS[c]||{})[t]; if(!S) return; n+=S.n; mixed+=S.mixed; none+=S.none;
+                            Object.keys(S.pct).forEach(function(k){pct[k]=(pct[k]||0)+S.pct[k];}); Object.keys(S.amt).forEach(function(k){amt[k]=(amt[k]||0)+S.amt[k];}); });
+                        return {n:n,pct:pct,amt:amt,mixed:mixed,none:none};
+                    }
+                    function dominant(a){ // القيمة السائدة للاقتراح: نسبة أو مبلغ
+                        var best=null; Object.keys(a.pct).forEach(function(k){ if(!best||a.pct[k]>best.n) best={m:'percent',v:k,n:a.pct[k]}; });
+                        Object.keys(a.amt).forEach(function(k){ if(!best||a.amt[k]>best.n){ var p=k.split('|'); best={m:'amount',v:p[0],c:p[1],n:a.amt[k]}; } });
+                        return best;
+                    }
+                    function renderState(a){
+                        var parts=[]; Object.keys(a.pct).sort(function(x,y){return a.pct[y]-a.pct[x];}).forEach(function(k){parts.push('<b>'+a.pct[k]+'</b> على <b>'+k+'٪</b>');});
+                        Object.keys(a.amt).sort(function(x,y){return a.amt[y]-a.amt[x];}).forEach(function(k){var p=k.split('|'); parts.push('<b>'+a.amt[k]+'</b> على مبلغ <b>'+fmt(parseFloat(p[0]))+(p[1]==='USD'?' $':' ل.ل')+'</b>');});
+                        if(a.mixed) parts.push('<b>'+a.mixed+'</b> نسبة + مبلغ'); if(a.none) parts.push('<b>'+a.none+'</b> بلا '+TYPEL[type()]);
+                        var who=cats().map(function(c){return CATL[c];}).join(' + ')||'—';
+                        state.innerHTML='<b>الوضع الحالي</b> ('+who+' — '+TYPEL[type()]+'): <b>'+a.n+'</b> شخص — '+(parts.length?parts.join(' · '):'—')+'.';
+                    }
                     function upd(){
-                        var m=mode(), v=parseFloat(inp.value)||0;
-                        // نسبة: العملة مخفية بصرياً فقط (تبقى مرسَلة — المعالج يتجاهلها للنسبة)؛ مبلغ: علامة ٪ مخفية
+                        var m=mode(), v=parseFloat(inp.value)||0, a=agg(), t=type();
                         if(cur) cur.style.display=(m==='amount')?'':'none'; if(unit) unit.style.display=(m==='percent')?'':'none';
-                        if(rule) rule.innerHTML=(m==='amount')?RULE_AMT:RULE_PCT;
+                        if(rule) rule.textContent=(m==='amount')?RULE_AMT:RULE_PCT;
+                        renderState(a);
+                        btnTxt.textContent='طبّق على '+a.n+' ('+(cats().map(function(c){return CATL[c];}).join(' + ')||'—')+')';
+                        btn.disabled=(a.n===0);
+                        warnType.textContent=TYPEL[t];
+                        var valTxt=v?(m==='percent'?(v+'٪'):(fmt(v)+(cur&&cur.value==='USD'?' $':' ل.ل'))):'…';
+                        btn.setAttribute('data-confirm','تطبيق «'+TYPEL[t]+' = '+valTxt+'» على '+a.n+' ('+(cats().map(function(c){return CATL[c];}).join(' + ')||'—')+') بـ'+SCHOOL+'؟ '+TYPEL[t]+' الحالي عندهم (نسب أو مبالغ) يُستبدل بهذه القيمة لكل السنة، ثم تُعاد الرواتب تلقائياً.');
                         if(!v){ out.textContent='—'; return; }
                         if(m==='amount'){
                             var c=cur?cur.value:'LBP';
-                            out.innerHTML='<div>كل أستاذ ملاك = <b style="color:#166534">'+fmt(v)+(c==='USD'?' $':' ل.ل')+'</b> بالشهر'+(c==='USD'?' ≈ '+fmt(Math.floor(v*RATE))+' ل.ل':'')+' (نفس الرقم للكل، لا يتحرّك مع الدرجة)</div>';
+                            out.innerHTML='<div>كل شخص = <b style="color:#166534">'+fmt(v)+(c==='USD'?' $':' ل.ل')+'</b> بالشهر'+(c==='USD'?' ≈ '+fmt(Math.floor(v*RATE))+' ل.ل':'')+' (نفس الرقم للكل، لا يتحرّك مع الدرجة)</div>';
                             return;
                         }
-                        if(!lo){ out.textContent='—'; return; }
+                        // نسبة: أدنى وأعلى أساس بين الفئات المختارة
+                        var lo=null, hi=null; cats().forEach(function(c){ var L=LOHI[c]||{}; if(L.lo&&(!lo||L.lo.base<lo.base)) lo=L.lo; if(L.hi&&(!hi||L.hi.base>hi.base)) hi=L.hi; });
+                        if(!lo){ out.textContent='لا أساس مخزّن للفئات المختارة بهذه السنة'; return; }
                         var h=line(lo,v); if(hi && hi.name!==lo.name) h+=line(hi,v); out.innerHTML=h;
                     }
-                    document.querySelectorAll('#opModeWrap input').forEach(function(r){ r.addEventListener('change',function(){
-                        // عند التبديل: تعبئة القيمة السائدة لهذا الوضع (إن وُجدت) + placeholder مناسب
-                        var d=(mode()==='amount')?inp.dataset.defAmt:inp.dataset.defPct; inp.value=d||''; inp.placeholder=(mode()==='amount')?'مثلاً 54000000':'مثلاً 65'; upd(); }); });
-                    inp.addEventListener('input',upd); if(cur) cur.addEventListener('change',upd); upd();
+                    function suggest(){ // عند تغيير الفئة/النوع: اقترح القيمة السائدة الحالية (نسبة أو مبلغ) — المستخدم يعدّلها كما يشاء
+                        var d=dominant(agg());
+                        if(d){ document.querySelector('#opModeWrap input[value="'+d.m+'"]').checked=true; inp.value=d.v; if(d.m==='amount'&&cur) cur.value=d.c||'LBP'; }
+                        else { inp.value=''; }
+                        inp.placeholder=(mode()==='amount')?'مثلاً 54000000':'مثلاً 65';
+                        upd();
+                    }
+                    document.querySelectorAll('#opCats input, #opTypes input').forEach(function(el){ el.addEventListener('change',suggest); });
+                    document.querySelectorAll('#opModeWrap input').forEach(function(r){ r.addEventListener('change',function(){ inp.value=''; inp.placeholder=(mode()==='amount')?'مثلاً 54000000':'مثلاً 65'; upd(); }); });
+                    inp.addEventListener('input',upd); if(cur) cur.addEventListener('change',upd);
+                    suggest();
                 })();
                 </script>
                 <?php endif; ?>
@@ -562,7 +625,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         <details class="ba-help no-print">
             <summary><i class="fas fa-circle-question"></i> كيف بشتغل بهالصفحة؟ (اكبس للشرح)</summary>
             <ol>
-                <li><b>أجر إضافي واحد لكل الملاك (نسبة ٪ أو مبلغ ثابت)؟</b> البطاقة الكحلية فوق: اختر نسبة أو مبلغ ← اكتب الرقم ← «طبّق على كل الملاك». خلص.</li>
+                <li><b>بند واحد للكل دفعة وحدة؟</b> البطاقة الكحلية فوق: على مين (ملاك/متعاقدين/موظفين) ← شو (أجر إضافي/مكافأة/نقل شهري) ← نسبة ٪ أو مبلغ ← الرقم ← «طبّق». خلص.</li>
                 <li><b>«+ بند جديد»</b> (لأي نوع/فئة/فترة) ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
                 <li><b>النسبة ٪</b> بتنحسب من أساس الراتب بعد التدرّج (÷<?= e(officialUsdRateLbl()) ?> ← × سعر الشهر) وبتتحرّك مع الدرجة — منطقية للملاك. <b>المبلغ الثابت</b> بالليرة أو بالدولار — للمتعاقدين والموظفين أو لأي زيادة ثابتة.</li>
                 <li><b>نسبة + مبلغ ثابت مع بعض</b> (مثلاً 45٪ + 2,000,000 ثابت): حطّهم <b>سطرين بنفس النافذة</b> وكبس طبّق مرّة وحدة. (لو طبّقتهم بمرّتين منفصلتين، التانية بتشيل الأولى لأنها من نفس النوع.)</li>

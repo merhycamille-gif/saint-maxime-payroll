@@ -263,9 +263,11 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
         $ey = trim((string)($_POST['entry_school_year'] ?? ''));
         $data['entry_school_year'] = in_array($ey, $entryYearOptions, true) ? $ey : $defaultEntryYear;
         // الراتب الأساسي + الأجر الإضافي + تعويض النقل (كلٌّ بعملته) — تُجهَّز عند إنشاء الملف
-        foreach (['new_salary','new_extra','new_transport'] as $nf) {
+        // (2026-09-11 «بكل البرنامج») الأجر الإضافي والمكافأة: ليرة أو دولار أو نسبة ٪ من الأساس (PCT)
+        foreach (['new_salary','new_extra','new_aide','new_transport'] as $nf) {
             $data[$nf] = (float)($_POST[$nf] ?? 0);
-            $data[$nf . '_cur'] = (($_POST[$nf . '_cur'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP';
+            $c = (string)($_POST[$nf . '_cur'] ?? 'LBP');
+            $data[$nf . '_cur'] = ($c === 'USD') ? 'USD' : (($c === 'PCT' && in_array($nf, ['new_extra','new_aide'], true)) ? 'PCT' : 'LBP');
         }
     }
 
@@ -499,22 +501,24 @@ if ($nameSchoolId) {
         <span dir="ltr">Salaire et indemnités (nouvel enseignant)</span>
         <div style="font-size:0.85em;font-weight:600;opacity:0.9">الراتب والإضافات (للأستاذ الجديد)</div>
       </h3>
-      <div class="note" style="margin-bottom:8px">الراتب والأجر الإضافي <strong>شهريان</strong>؛ تعويض النقل <strong>لليوم الواحد</strong> (يُضرَب تلقائياً بعدد أيام الحضور الأسبوعية × 4). كلٌّ بعملته (ليرة أو دولار). تُجهَّز تلقائياً عند إنشاء الملف، وفيك تعدّلها لاحقاً من ملف الأستاذ.<br><span dir="ltr">Le salaire et l'indemnité supplémentaire sont <strong>mensuels</strong> ; le transport est <strong>par jour</strong> (multiplié automatiquement par le nombre de jours de présence × 4). Chacun dans sa devise (LL ou USD).</span></div>
+      <div class="note" style="margin-bottom:8px">الراتب والأجر الإضافي والمكافأة <strong>شهريون</strong>؛ تعويض النقل <strong>لليوم الواحد</strong> (يُضرَب تلقائياً بعدد أيام الحضور الأسبوعية × 4). كلٌّ بعملته (ليرة أو دولار)، والأجر الإضافي والمكافأة يقبلان أيضاً <strong>نسبة ٪ من الأساس</strong> (تتحرّك مع الدرجة). تُجهَّز تلقائياً عند إنشاء الملف، وفيك تعدّلها لاحقاً من ملف الأستاذ.<br><span dir="ltr">Le salaire et l'indemnité supplémentaire sont <strong>mensuels</strong> ; le transport est <strong>par jour</strong> (multiplié automatiquement par le nombre de jours de présence × 4). Chacun dans sa devise (LL ou USD).</span></div>
       <div class="grid">
         <?php
           $newPayFields = [
             'new_salary'    => 'الراتب الأساسي الشهري / Salaire de base',
-            'new_extra'     => 'الأجر الإضافي الشهري / Indemnité supplémentaire',
+            'new_extra'     => 'الأجر الإضافي الشهري / Supplément',
+            'new_aide'      => 'مكافأة ومساعدة شهرية / Prime & aide',
             'new_transport' => 'تعويض النقل — لليوم الواحد / Transport (par jour)',
           ];
-          foreach ($newPayFields as $nf => $nlbl): $curName = $nf . '_cur'; ?>
+          foreach ($newPayFields as $nf => $nlbl): $curName = $nf . '_cur'; $allowPct = in_array($nf, ['new_extra','new_aide'], true); ?>
           <div>
             <label><?= e($nlbl) ?></label>
             <div style="display:flex;gap:6px">
               <input type="number" name="<?= $nf ?>" value="<?= e($_POST[$nf] ?? '') ?>" step="any" min="0" placeholder="0" style="flex:1;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px">
-              <select name="<?= $curName ?>" style="width:80px;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px">
+              <select name="<?= $curName ?>" style="width:<?= $allowPct ? '130px' : '80px' ?>;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px">
                 <option value="LBP" <?= (($_POST[$curName] ?? 'LBP') === 'LBP') ? 'selected' : '' ?>>ل.ل</option>
                 <option value="USD" <?= (($_POST[$curName] ?? '') === 'USD') ? 'selected' : '' ?>>$</option>
+                <?php if ($allowPct): ?><option value="PCT" <?= (($_POST[$curName] ?? '') === 'PCT') ? 'selected' : '' ?>>٪ من الأساس</option><?php endif; ?>
               </select>
             </div>
           </div>
