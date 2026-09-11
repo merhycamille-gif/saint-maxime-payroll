@@ -4445,7 +4445,7 @@ $ba87 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
 check('المكافآت: زرّ ومودال «مبالغ فردية» + معالج apply_individual يحمي النسب/الفترات ويعيد الحساب',
       strpos($ba87, "action === 'apply_individual'") !== false
       && strpos($ba87, 'id="baModalIndiv"') !== false
-      && strpos($ba87, "value_type = ? AND \$fullYearSql") !== false && strpos($ba87, "[\$k . '_pct']") !== false
+      && strpos($ba87, "value_type = ? AND \$perSql") !== false && strpos($ba87, "[\$k . '_pct']") !== false
       && strpos($ba87, 'recalcEmployeeYear($eid, $schoolYear)') !== false
       && strpos($ba87, 'window.baIndivFilter=function') !== false);
 
@@ -4483,6 +4483,8 @@ check('المكافآت الجماعية 2026-09-11: بطاقة «طبّق عل�
       && strpos($ba0911, 'name="lines[0][type]" value="transport_complement"') !== false
       && strpos($ba0911, "SELECT employee_id, bonus_type, value_type, amount, currency FROM employee_bonuses") !== false
       && strpos($ba0911, 'name="cat[]" value="<?= $ck ?>"') !== false
+      && strpos($ba0911, "baMonthSel('lines[0][from]', 10") !== false && strpos($ba0911, "baMonthSel('lines[0][to]', 9") !== false
+      && strpos($ba0911, "baMonthSel('ind_from', 10") !== false && strpos($ba0911, "\$perSql = \$iFull ? \$fullYearSql : \"(start_month = \$iFrom AND end_month = \$iTo)\"") !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(pct/100))') !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(b.pct/100))') !== false
       && strpos($ba0911, "isAllSchools()) { \$_SESSION['active_schools'] = [\$schoolId];") !== false
@@ -4492,7 +4494,9 @@ $tf0911 = (string)file_get_contents($PROJ . '/pages/teacher_form.php'); $ic0911 
 check('المكافآت 2026-09-11 «بكل البرنامج»: فورم الأستاذ الجديد فيه الأجر الإضافي + مكافأة ومساعدة بخيار (ل.ل / $ / ٪ من الأساس) والإنشاء يترجم ٪ إلى value_type=percent',
       strpos($tf0911, "'new_aide'") !== false && strpos($tf0911, 'value="PCT"') !== false
       && strpos($tf0911, "['new_salary','new_extra','new_aide','new_transport']") !== false
-      && strpos($ic0911, "'new_aide' => 'aide_complementaire'") !== false && strpos($ic0911, "=== 'PCT') ? 'percent' : 'amount'") !== false);
+      && strpos($ic0911, "'new_aide' => 'aide_complementaire'") !== false && strpos($ic0911, "=== 'PCT') ? 'percent' : 'amount'") !== false
+      && strpos($tf0911, 'name="new_from"') !== false && strpos($tf0911, 'name="new_to"') !== false
+      && strpos($ic0911, "(\$nFull ? 'NULL, NULL' : \"\$nFrom, \$nTo\")") !== false);
 check('المكافآت 2026-09-11: كل سطر يرسل الحقول الستّة متراصفة (type مخفي بالخلية الأولى) + المحرّر يعرض الفعّال فقط',
       substr_count($emp0911, 'name="bonus_rows[type][]"') === 1
       && strpos($emp0911, '<td><input type="hidden" name="bonus_rows[type][]"') !== false

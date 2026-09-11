@@ -226,8 +226,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         $db->prepare("UPDATE employees SET employee_code = ? WHERE id = ?")->execute(['EMP' . str_pad($newId, 4, '0', STR_PAD_LEFT), $newId]);
         $db->prepare("UPDATE info_submissions SET status='applied', applied_at=NOW(), employee_id=? WHERE id=?")->execute([$newId, $sub['id']]);
         // الأجر الإضافي + تعويض النقل كعلاوات لسنة الدخول (بالعملة المختارة) — قبل إعادة الحساب
+        // 📅 الفترة المُدخَلة بالفورم (من شهر ← إلى شهر) — كل السنة = NULL/NULL
+        $nFrom = max(1, min(12, (int)($data['new_from'] ?? 10))); $nTo = max(1, min(12, (int)($data['new_to'] ?? 9)));
+        $nFull = ($nFrom === 10 && $nTo === 9);
         $insBonus = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
-                                  VALUES (?, ?, 1, ?, ?, ?, ?, NULL, NULL, 1)");
+                                  VALUES (?, ?, 1, ?, ?, ?, ?, " . ($nFull ? 'NULL, NULL' : "$nFrom, $nTo") . ", 1)");
         // الأجر الإضافي = علاوة شهرية (prime_fixe)؛ المكافأة والمساعدة (aide_complementaire)؛ تعويض النقل = علاوة يومية (transport_daily)
         // تُضرَب بأيام الحضور × الأسابيع تلقائياً في المحرّك. (2026-09-11 «بكل البرنامج») العملة PCT = نسبة ٪ من الأساس (value_type=percent).
         foreach (['new_extra' => 'prime_fixe', 'new_aide' => 'aide_complementaire', 'new_transport' => 'transport_daily'] as $dk => $btype) {

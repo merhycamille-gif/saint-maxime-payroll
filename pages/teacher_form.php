@@ -269,6 +269,9 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
             $c = (string)($_POST[$nf . '_cur'] ?? 'LBP');
             $data[$nf . '_cur'] = ($c === 'USD') ? 'USD' : (($c === 'PCT' && in_array($nf, ['new_extra','new_aide'], true)) ? 'PCT' : 'LBP');
         }
+        // 📅 الفترة (من شهر ← إلى شهر) للإضافي/المكافأة/النقل — افتراضياً كل السنة (تشرين ← أيلول)
+        $data['new_from'] = max(1, min(12, (int)($_POST['new_from'] ?? 10)));
+        $data['new_to']   = max(1, min(12, (int)($_POST['new_to'] ?? 9)));
     }
 
     // ارفع السكانات (اختياري) إلى uploads/submissions
@@ -523,6 +526,16 @@ if ($nameSchoolId) {
             </div>
           </div>
         <?php endforeach; ?>
+          <div>
+            <label>الفترة: من شهر ← إلى شهر / Période (du mois → au mois)</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <?php $nfFrom = (int)($_POST['new_from'] ?? 10); $nfTo = (int)($_POST['new_to'] ?? 9); $nfMonths = [10,11,12,1,2,3,4,5,6,7,8,9]; ?>
+              <select name="new_from" style="flex:1;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px"><?php foreach ($nfMonths as $m): ?><option value="<?= $m ?>" <?= $nfFrom === $m ? 'selected' : '' ?>><?= monthName($m, 'ar') ?></option><?php endforeach; ?></select>
+              <span>←</span>
+              <select name="new_to" style="flex:1;padding:11px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px"><?php foreach ($nfMonths as $m): ?><option value="<?= $m ?>" <?= $nfTo === $m ? 'selected' : '' ?>><?= monthName($m, 'ar') ?></option><?php endforeach; ?></select>
+            </div>
+            <small style="color:#64748b">تنطبق على الأجر الإضافي والمكافأة والنقل. افتراضياً كل السنة (تشرين ← أيلول).</small>
+          </div>
       </div>
       <?php endif; ?>
       <h3>

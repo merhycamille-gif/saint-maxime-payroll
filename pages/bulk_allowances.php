@@ -55,6 +55,12 @@ function catChecks($selected) {
     }
     return $out . '</div>';
 }
+// 📅 (2026-09-11 «انتبه دايما بدنا نحدد من تاريخ إلى تاريخ») منتقي شهر بترتيب السنة الدراسية (تشرين ← أيلول) لكل نقاط الإدخال
+function baMonthSel($name, $sel, $attrs = '') {
+    $h = '<select name="' . $name . '" class="form-select" ' . $attrs . '>';
+    foreach ([10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9] as $m) $h .= '<option value="' . $m . '"' . ((int)$sel === $m ? ' selected' : '') . '>' . monthName($m, 'ar') . '</option>';
+    return $h . '</select>';
+}
 function schoolWhere($scopeAll, $schoolId) {
     return $scopeAll ? '' : (' AND school_id = ' . (int)$schoolId);
 }
@@ -223,8 +229,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
         $scopeIds = array_map('intval', scopeEmployeeIds($db, $scopeAll, $schoolId, ['titulaire','contractuel','employe'], $schoolYear));
         $typesMap = ['prime' => 'prime_fixe', 'aide' => 'aide_complementaire', 'trans' => 'transport_complement'];
         $fullYearSql = "(start_month IS NULL OR (start_month = 10 AND end_month = 9))";
-        $delI = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = ? AND school_year = ? AND value_type = ? AND $fullYearSql");
-        $insI = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, ?, 1, ?, ?, ?, ?, NULL, NULL, 1)");
+        // 📅 (2026-09-11) الفترة للدفعة كلها: كل السنة (افتراضي) أو من شهر ← إلى شهر — تستبدل بنود نفس الفترة فقط
+        $iFrom = max(1, min(12, (int)($_POST['ind_from'] ?? 10))); $iTo = max(1, min(12, (int)($_POST['ind_to'] ?? 9)));
+        $iFull = ($iFrom === 10 && $iTo === 9);
+        $perSql = $iFull ? $fullYearSql : "(start_month = $iFrom AND end_month = $iTo)";
+        $delI = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = ? AND school_year = ? AND value_type = ? AND $perSql");
+        $insI = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, ?, 1, ?, ?, ?, ?, " . ($iFull ? 'NULL, NULL' : "$iFrom, $iTo") . ", 1)");
         $norm = fn($v) => trim(str_replace(',', '', (string)$v));
         $changed = 0; $warns = [];
         foreach ($ind as $eid => $vals) {
@@ -259,7 +269,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
             }
             if ($touched) { recalcEmployeeYear($eid, $schoolYear); $changed++; }
         }
-        $_SESSION['flash_success'] = "حُفظت المبالغ الفردية لـ $changed موظف (" . scopeLabel($scopeAll,$schoolId) . ") — أُعيد حساب رواتبهم.";
+        $_SESSION['flash_success'] = "حُفظت المبالغ الفردية لـ $changed موظف (" . scopeLabel($scopeAll,$schoolId) . " — " . ($iFull ? 'كل السنة' : monthName($iFrom, 'ar') . ' ← ' . monthName($iTo, 'ar')) . ") — أُعيد حساب رواتبهم.";
         if ($warns) $_SESSION['flash_info'] = implode(' · ', array_unique($warns));
     }
 
@@ -504,7 +514,6 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="apply_periods">
                     <input type="hidden" name="sch" value="<?= (int)$schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
-                    <input type="hidden" name="lines[0][from]" value="10"><input type="hidden" name="lines[0][to]" value="9">
                     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
                         <div style="flex:1 1 300px;min-width:0">
                             <div class="ba-step"><span class="ba-num">١</span><div>
@@ -533,10 +542,18 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                                     <input type="number" step="0.01" min="0.01" name="lines[0][value]" id="opPct" class="form-control" value="" placeholder="مثلاً 65" required style="max-width:190px;font-size:18px;font-weight:800;text-align:center" dir="ltr">
                                     <span style="font-weight:800" id="opUnitPct">٪</span>
                                     <select name="lines[0][currency]" id="opCur" class="form-select" style="max-width:110px;font-weight:700"><option value="LBP">ل.ل</option><option value="USD">$</option></select>
-                                    <button type="submit" class="btn btn-primary" id="opBtn" style="font-weight:800" data-confirm="تطبيق؟"><i class="fas fa-check"></i> <span id="opBtnTxt">طبّق</span> / Appliquer</button>
                                 </div>
                             </div></div>
-                            <div class="ba-warn" style="margin-top:6px" id="opWarn">⚠️ الزرّ يستبدل <b id="opWarnType">الأجر الإضافي</b> الحالي عند <b>كل</b> موظفي الفئات المختارة بهذه القيمة (لكل السنة). الأنواع التانية ما بتتأثّر. شخص بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
+                            <div class="ba-step"><span class="ba-num">٤</span><div style="min-width:0">
+                                <strong>من شهر ← إلى شهر؟</strong> <span class="ba-hint">افتراضياً كل السنة (تشرين ← أيلول). قيمة بتتغيّر بنص السنة = طبّق مرّتين بفترتين مختلفتين.</span>
+                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+                                    <span>من</span><?= baMonthSel('lines[0][from]', 10, 'id="opFrom" style="max-width:150px;font-weight:700"') ?>
+                                    <span>إلى</span><?= baMonthSel('lines[0][to]', 9, 'id="opTo" style="max-width:150px;font-weight:700"') ?>
+                                    <span id="opPeriodTxt" style="color:#166534;font-weight:700"></span>
+                                </div>
+                                <div style="margin-top:10px"><button type="submit" class="btn btn-primary" id="opBtn" style="font-weight:800" data-confirm="تطبيق؟"><i class="fas fa-check"></i> <span id="opBtnTxt">طبّق</span> / Appliquer</button></div>
+                            </div></div>
+                            <div class="ba-warn" style="margin-top:6px" id="opWarn">⚠️ الزرّ يستبدل <b id="opWarnType">الأجر الإضافي</b> الحالي عند <b>كل</b> موظفي الفئات المختارة (كل فتراته) بهذا السطر الواحد. الأنواع التانية ما بتتأثّر. شخص بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
                         </div>
                         <div style="flex:1 1 280px;min-width:0;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.9" id="opLive">
                             <div id="opState" style="margin-bottom:6px"><b>الوضع الحالي:</b> —</div>
@@ -555,6 +572,9 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     var inp=document.getElementById('opPct'), cur=document.getElementById('opCur'), unit=document.getElementById('opUnitPct');
                     var out=document.getElementById('opLiveOut'), rule=document.getElementById('opRule'), state=document.getElementById('opState');
                     var btn=document.getElementById('opBtn'), btnTxt=document.getElementById('opBtnTxt'), warnType=document.getElementById('opWarnType');
+                    var fromSel=document.getElementById('opFrom'), toSel=document.getElementById('opTo'), perTxt=document.getElementById('opPeriodTxt');
+                    function periodTxt(){ var f=parseInt(fromSel.value,10), t=parseInt(toSel.value,10); if(f===10&&t===9) return 'كل السنة';
+                        return fromSel.options[fromSel.selectedIndex].text+' ← '+toSel.options[toSel.selectedIndex].text; }
                     if(!inp||!out) return;
                     var RULE_PCT='القاعدة: الأساس ÷ '+OFFLBL+' × النسبة ← داون بالدولار ← × '+RATE.toLocaleString('en-US')+' (سعر الشهر) ← داون للمليون. بتتحرّك مع الدرجة لحالها.';
                     var RULE_AMT='مبلغ ثابت كل شهر لكل شخص مهما كانت درجته. بالدولار: يُحوَّل بسعر الشهر ('+RATE.toLocaleString('en-US')+') — داون لليرة.';
@@ -592,7 +612,8 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                         btn.disabled=(a.n===0);
                         warnType.textContent=TYPEL[t];
                         var valTxt=v?(m==='percent'?(v+'٪'):(fmt(v)+(cur&&cur.value==='USD'?' $':' ل.ل'))):'…';
-                        btn.setAttribute('data-confirm','تطبيق «'+TYPEL[t]+' = '+valTxt+'» على '+a.n+' ('+(cats().map(function(c){return CATL[c];}).join(' + ')||'—')+') بـ'+SCHOOL+'؟ '+TYPEL[t]+' الحالي عندهم (نسب أو مبالغ) يُستبدل بهذه القيمة لكل السنة، ثم تُعاد الرواتب تلقائياً.');
+                        var per=periodTxt(); if(perTxt) perTxt.textContent='('+per+')';
+                        btn.setAttribute('data-confirm','تطبيق «'+TYPEL[t]+' = '+valTxt+' — '+per+'» على '+a.n+' ('+(cats().map(function(c){return CATL[c];}).join(' + ')||'—')+') بـ'+SCHOOL+'؟ '+TYPEL[t]+' الحالي عندهم (نسب أو مبالغ، كل الفترات) يُستبدل بهذا السطر، ثم تُعاد الرواتب تلقائياً.');
                         if(!v){ out.textContent='—'; return; }
                         if(m==='amount'){
                             var c=cur?cur.value:'LBP';
@@ -614,6 +635,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     document.querySelectorAll('#opCats input, #opTypes input').forEach(function(el){ el.addEventListener('change',suggest); });
                     document.querySelectorAll('#opModeWrap input').forEach(function(r){ r.addEventListener('change',function(){ inp.value=''; inp.placeholder=(mode()==='amount')?'مثلاً 54000000':'مثلاً 65'; upd(); }); });
                     inp.addEventListener('input',upd); if(cur) cur.addEventListener('change',upd);
+                    if(fromSel) fromSel.addEventListener('change',upd); if(toSel) toSel.addEventListener('change',upd);
                     suggest();
                 })();
                 </script>
@@ -625,7 +647,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         <details class="ba-help no-print">
             <summary><i class="fas fa-circle-question"></i> كيف بشتغل بهالصفحة؟ (اكبس للشرح)</summary>
             <ol>
-                <li><b>بند واحد للكل دفعة وحدة؟</b> البطاقة الكحلية فوق: على مين (ملاك/متعاقدين/موظفين) ← شو (أجر إضافي/مكافأة/نقل شهري) ← نسبة ٪ أو مبلغ ← الرقم ← «طبّق». خلص.</li>
+                <li><b>بند واحد للكل دفعة وحدة؟</b> البطاقة الكحلية فوق: على مين (ملاك/متعاقدين/موظفين) ← شو (أجر إضافي/مكافأة/نقل شهري) ← نسبة ٪ أو مبلغ ← الرقم ← من شهر إلى شهر ← «طبّق». خلص.</li>
                 <li><b>«+ بند جديد»</b> (لأي نوع/فئة/فترة) ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
                 <li><b>النسبة ٪</b> بتنحسب من أساس الراتب بعد التدرّج (÷<?= e(officialUsdRateLbl()) ?> ← × سعر الشهر) وبتتحرّك مع الدرجة — منطقية للملاك. <b>المبلغ الثابت</b> بالليرة أو بالدولار — للمتعاقدين والموظفين أو لأي زيادة ثابتة.</li>
                 <li><b>نسبة + مبلغ ثابت مع بعض</b> (مثلاً 45٪ + 2,000,000 ثابت): حطّهم <b>سطرين بنفس النافذة</b> وكبس طبّق مرّة وحدة. (لو طبّقتهم بمرّتين منفصلتين، التانية بتشيل الأولى لأنها من نفس النوع.)</li>
@@ -755,7 +777,11 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         <input type="hidden" name="action" value="apply_individual">
         <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><?= catHidden($validCats) ?>
         <div class="ba-modal-body">
-            <div class="ba-hint" style="margin-bottom:6px">قدّام كل اسم ولكل نوع خانتان: <b>نسبة ٪</b> (من أساس الراتب بعد التدرّج) <b>+ مبلغ ثابت</b> (ليرة أو دولار) — عبّي وحدة أو الاتنين، والبرنامج بيجمعهم. القيم <b>شهرية لكل السنة</b> (تشرين ← أيلول). <b>فاضي</b> = ما بيتغيّر · <b>0</b> = شيله. للفترات (قيمة بتتغيّر بنص السنة): من ملف الموظف ← تبويب «المالي».</div>
+            <div class="ba-hint" style="margin-bottom:6px">قدّام كل اسم ولكل نوع خانتان: <b>نسبة ٪</b> (من أساس الراتب بعد التدرّج) <b>+ مبلغ ثابت</b> (ليرة أو دولار) — عبّي وحدة أو الاتنين، والبرنامج بيجمعهم. القيم <b>شهرية</b>. <b>فاضي</b> = ما بيتغيّر · <b>0</b> = شيله. الخانات تعرض قيم «كل السنة»؛ لتفاصيل فترات شخص: من ملفه ← تبويب «المكافآت».</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px">
+                <strong>📅 الفترة لكل ما تحفظه الآن:</strong> <span>من</span><?= baMonthSel('ind_from', 10, 'style="max-width:140px"') ?> <span>إلى</span><?= baMonthSel('ind_to', 9, 'style="max-width:140px"') ?>
+                <span class="ba-hint">افتراضياً كل السنة (تشرين ← أيلول). فترة أقصر = يُضاف/يُستبدل بند لهذه الفترة فقط.</span>
+            </div>
             <div class="ba-cats"><strong>عرض:</strong>
                 <?php $indivCats = []; foreach ($preview as $pr) $indivCats[$pr['employee_type']] = true;
                       $catLblI = ['enseignant_titulaire'=>'الملاك','enseignant_contractuel'=>'المتعاقدين','employe'=>'الموظفين']; ?>
