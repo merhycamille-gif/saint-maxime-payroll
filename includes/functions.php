@@ -6530,6 +6530,47 @@ function healOpenYear2627b_20260912(float $budget = 6.0): ?array {
 /** أي تجهيز 2026-2027 غير مكتمل (الجزء الأوّل أو الثاني)؟ — لنبض footer */
 function openYearHealPending20260912(): bool { return openYearHealState20260912() !== null || openYearHealState2b_20260912() !== null; }
 
+/**
+ * 🧑‍🏫 سامر مارون ابونادر (840، عبرا، ملاك درجة 30) — «مش موجود عندك بالبرنامج 2026-2027 ما عم شوفو» (2026-09-12):
+ * تواريخ تركه الثلاثة = 1984-08-01 (تاريخ ولادته، قبل دخوله 2014) فحُجب من كل الكشوف ولم يُحسب له أي راتب. الشفاء (مرّة واحدة، بالاسم):
+ * يمسح تواريخ الترك المستحيلة (= الولادة أو قبل دخول المدرسة)، يضيف بند الأجر الإضافي 85٪ (قاعدة ملاك عبرا) وبند النقل 7,200,000
+ * (كشفه) لسنة 2026-2027 إن لم يكونا، ويحسب سنته 2026-2027. الملفان المكرّران الفارغان (1102 «سامر . ابونادر»، 1234 «سامر مارون بونادر»)
+ * لا يُمسّان هنا — الحذف بقراره («أي محي يسألني قبل»).
+ */
+function healSamerAbounader20260912() {
+    try {
+        if (strpos((string)getSetting('heal_samer_abounader_20260912', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $sid = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE '%ثانوية السيدة%' AND is_deleted = 0 ORDER BY id LIMIT 1")->fetchColumn();
+        $e = $sid ? $db->query("SELECT * FROM employees WHERE school_id = $sid AND is_deleted = 0 AND employee_type = 'enseignant_titulaire' AND first_name_ar = 'سامر' AND father_name_ar LIKE 'مارون%' AND last_name_ar LIKE '%ابونادر%' ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC) : null;
+        if (!$e) { setSetting('heal_samer_abounader_20260912', 'done: not found'); return; }
+        $id = (int)$e['id']; $log = [];
+        if (isSchoolYearLocked($sid, '2026-2027')) { setSetting('heal_samer_abounader_20260912', 'done: locked'); return; }
+        setSetting('bk_samer_20260912', json_encode(['emp' => $e, 'bonuses' => $db->query("SELECT * FROM employee_bonuses WHERE employee_id = $id")->fetchAll(PDO::FETCH_ASSOC)], JSON_UNESCAPED_UNICODE));
+        // ① تواريخ الترك المستحيلة (= الولادة أو قبل دخول المدرسة) تُمسح
+        $bd = (string)$e['birth_date']; $hd = (string)$e['hire_date']; $set = [];
+        foreach (['left_date_cnss', 'left_date_finance', 'left_date_eoc'] as $c) {
+            $v = (string)$e[$c];
+            if ($v !== '' && $v !== '0000-00-00' && ($v === $bd || ($hd && $v < $hd))) $set[] = "$c = NULL";
+        }
+        if ($set) { $db->exec("UPDATE employees SET " . implode(', ', $set) . " WHERE id = $id"); $log[] = 'مسح ' . count($set) . ' تواريخ ترك'; }
+        // ①ب صندوق التعويضات على الأساس + الإضافي (قاعدة ملاك عبرا بكشفه: 6٪ × (الأساس + الإضافي) — كان المفتاح مطفأً فطلع 152,700 بدل 7,892,700)
+        if ((int)($e['eoc_includes_extra'] ?? 0) !== 1) { $db->exec("UPDATE employees SET eoc_includes_extra = 1 WHERE id = $id"); $log[] = 'الصندوق يشمل الإضافي'; }
+        // ② بنود 2026-2027: إضافي 85٪ + نقل 7,200,000 (إن لم يكن له بند فعّال من النوع)
+        $has = fn($t) => (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = $id AND school_year = '2026-2027' AND bonus_type = '$t' AND is_active = 1")->fetchColumn() > 0;
+        $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?,?,1,'2026-2027',?,?,'LBP',?,?,1)");
+        if (!$has('prime_fixe')) { $ins->execute([$id, 'prime_fixe', 85, 'percent', 10, 9]); $log[] = 'إضافي 85٪'; }
+        if (!$has('transport_complement') && !$has('transport_daily')) { $ins->execute([$id, 'transport_complement', 7200000, 'amount', null, null]); $log[] = 'نقل 7,200,000'; }
+        // ③ حساب 2026-2027
+        $n = (int)recalcEmployeeYear($id, '2026-2027');
+        $oct = $db->query("SELECT base_plus_echelon_lbp b, prime_fixe_lbp p, net_salary_lbp n, transport_lbp t FROM monthly_salaries WHERE employee_id = $id AND year = 2026 AND month = 10")->fetch(PDO::FETCH_ASSOC);
+        setSetting('heal_samer_abounader_20260912', 'done ' . date('Y-m-d H:i') . ': emp=' . $id . ' | ' . implode('، ', $log) . ' | recalc=' . $n . ' | تشرين 2026: ' . json_encode($oct));
+    } catch (Throwable $e) {
+        try { setSetting('heal_samer_abounader_20260912', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
+
 /* =============================================================================
  * 🏆 «لازم أي درجة أو نص درجة أنا بزيدها تثبت ما تتغيّر أبداً بكل البرنامج إلا إذا أنا بدي غيّر» (أمره 2026-09-12)
  *  - عمود employee_grade_history.user_edited (ذاتي التركيب من الهيدر): يُوسم 1 عند أي لمسة من المستخدم بلوحة الدرجات
