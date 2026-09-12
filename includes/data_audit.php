@@ -88,6 +88,13 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
         SELECT $nm nm FROM employees e WHERE e.is_deleted=0 AND e.status='actif' AND e.employee_type='enseignant_titulaire'
           AND (e.titularization_date IS NULL OR (e.hire_date IS NOT NULL AND e.titularization_date < e.hire_date))"));
 
+    // 8ب) تاريخ ترك مستحيل (= تاريخ الولادة أو قبل دخول المدرسة) — يخفي الموظف من كل الكشوف (سامر ابونادر/عبرا 2026-09-12، «بكل البرنامج»)
+    $add('left_impossible', 'موظف فاعل بتاريخ ترك مستحيل (= تاريخ ولادته أو قبل دخوله المدرسة) — يختفي من الكشوف ولا يُحسب', $q("
+        SELECT $nm nm FROM employees e WHERE e.is_deleted=0 AND e.status='actif' AND (
+            (e.left_date_cnss    IS NOT NULL AND e.left_date_cnss    <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_cnss    = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_cnss    < e.hire_date))) OR
+            (e.left_date_finance IS NOT NULL AND e.left_date_finance <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_finance = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_finance < e.hire_date))) OR
+            (e.left_date_eoc     IS NOT NULL AND e.left_date_eoc     <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_eoc     = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_eoc     < e.hire_date))))"));
+
     // 9) نسبة ٪ عند غير الملاك (النسبة من أساس السلسلة — لا معنى لها للمتعاقد/الموظف)
     $add('pct_nontit', 'سطر نسبة ٪ فعّال عند متعاقد أو موظف (النسبة للملاك فقط)', $q("
         SELECT $nm nm FROM employees e JOIN employee_bonuses b ON b.employee_id=e.id AND b.is_active=1 AND b.value_type='percent' AND (b.school_year IS NULL OR b.school_year=?)

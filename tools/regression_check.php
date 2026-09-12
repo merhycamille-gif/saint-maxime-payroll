@@ -290,8 +290,8 @@ $cpItems = complianceItems($db, currentSchoolYear());
 $cpRules = complianceRules();
 $cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
 $cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
-check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 21 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
-      count($cpRules) === 21
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 22 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 22
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
@@ -5436,6 +5436,35 @@ check('سامر ابونادر: الشفاء موجود وموصول بالهي�
       && strpos($fn111, "first_name_ar = 'سامر' AND father_name_ar LIKE 'مارون%' AND last_name_ar LIKE '%ابونادر%'") !== false
       && strpos($fn111, "(\$v === \$bd || (\$hd && \$v < \$hd))") !== false && strpos($fn111, "UPDATE employees SET eoc_includes_extra = 1 WHERE id = \$id") !== false
       && substr_count(substr($fn111, strpos($fn111, 'function healSamerAbounader20260912')), 'is_deleted = 1') === 0);
+
+/* =====================================================================
+ * 112) 🚪 «انتبه بدك تحطّو بكل البرنامج» (2026-09-12): قاعدة عامّة «تاريخ ترك مستحيل» (= الولادة أو قبل دخول المدرسة) بتقرير
+ *      المخالفات (تصحيح آلي: مسح التواريخ + إعادة الحساب، يجوز «موافق على الكل») وبالفحص الرسمي — كل المدارس، لا بالاسم.
+ * =================================================================== */
+$cp112 = (string)file_get_contents($PROJ . '/includes/compliance.php'); $da112 = (string)file_get_contents($PROJ . '/includes/data_audit.php');
+check('تاريخ ترك مستحيل: قاعدة left_impossible بالمخالفات (بانية + تصحيح آلي يمسح التواريخ ويعيد الحساب) + قاعدة بالفحص الرسمي',
+      isset(complianceRules()['left_impossible']) && strpos($cp112, "\$add('left_impossible', \$r,") !== false && strpos($cp112, "case 'left_impossible':") !== false
+      && strpos($cp112, "array_intersect((array)(\$d['cols'] ?? []), ['left_date_cnss', 'left_date_finance', 'left_date_eoc'])") !== false
+      && strpos($da112, "\$add('left_impossible',") !== false);
+// تجربة حيّة تُرجَع: موظف فاعل بتاريخ ترك = ولادته يظهر بالقاعدة، والتصحيح يمسحه
+$why112 = ''; $ok112 = false;
+try {
+    $e112 = $db->query("SELECT id, school_id, birth_date, hire_date, left_date_cnss, left_date_finance, left_date_eoc FROM employees WHERE is_deleted = 0 AND status = 'actif' AND birth_date IS NOT NULL AND birth_date <> '0000-00-00'
+        AND COALESCE(NULLIF(left_date_cnss,'0000-00-00'), NULLIF(left_date_finance,'0000-00-00'), NULLIF(left_date_eoc,'0000-00-00')) IS NULL ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$e112) { $why112 = 'لا عيّنة'; $ok112 = true; }
+    else {
+        $eid = (int)$e112['id'];
+        $db->exec("UPDATE employees SET left_date_cnss = birth_date WHERE id = $eid");
+        try {
+            $hit = null; foreach (complianceItems($db, currentSchoolYear()) as $it) if ($it['rule'] === 'left_impossible' && (int)$it['emp_id'] === $eid) $hit = $it;
+            $res = $hit ? complianceApply($db, $hit) : 'لم يظهر';
+            $after = $db->query("SELECT left_date_cnss FROM employees WHERE id = $eid")->fetchColumn();
+            $ok112 = $hit && !empty($hit['auto']) && ($after === null || $after === '') ;
+            $why112 = "emp=$eid hit=" . var_export((bool)$hit, true) . " res=$res after=" . var_export($after, true);
+        } finally { $db->prepare("UPDATE employees SET left_date_cnss = ?, left_date_finance = ?, left_date_eoc = ? WHERE id = ?")->execute([$e112['left_date_cnss'], $e112['left_date_finance'], $e112['left_date_eoc'], $eid]); }
+    }
+} catch (Throwable $e) { $why112 = $e->getMessage(); }
+check('تاريخ ترك مستحيل (تجربة حيّة تُرجَع): يظهر بالتقرير بتصحيح آلي، والتصحيح يمسح التاريخ', $ok112, $why112);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

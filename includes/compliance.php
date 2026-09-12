@@ -72,6 +72,7 @@ function complianceRules(): array {
         'active_nomonths'=> ['Actif sans salaires',        'موظف فاعل بلا رواتب بسنة مفتوحة',                     '#64748b'],
         'family_ded_off' => ['Abattement familial non accordé', 'متزوج/أرمل بأولاد أو زوج لا يعمل — وتنزيلهم العائلي بالضريبة مطفأ بملفه', '#b45309'],
         'transport_pct'  => ['Transport en %',             'بند تعويض نقل كنسبة ٪ من الأساس (النقل مبلغ لا نسبة) — يضاعف المستحق', '#b91c1c'],
+        'left_impossible'=> ['Date de départ impossible',  'تاريخ ترك مستحيل (= تاريخ الولادة أو قبل دخول المدرسة) — الموظف يختفي من كل الكشوف ولا يُحسب راتبه', '#b91c1c'],
         'eoc_base_only'  => ['Caisse sur la base seule',   'ملاك يتقاضى أجراً إضافياً وصندوق التعويضات يُحسم من الأساس وحده (مفتاح «يشمل الأجر الإضافي» مطفأ بملفه)', '#b45309'],
         'no_diploma'     => ['Sans diplôme',               'أستاذ ملاك بلا شهادة بملفه (يُفترض قسم ثاني)',        '#64748b'],
         'dupes'          => ['Doublon',                    'موظفان فاعلان بنفس الاسم بنفس المدرسة',               '#64748b'],
@@ -368,6 +369,29 @@ function complianceItems(PDO $db, string $sy): array {
             'إطفاء هذا البند وإعادة حساب سنة ' . $sy . ' (الأجر الإضافي بنسبته يبقى)', true, ['bid' => (int)$r['bid']], (string)$r['bid']);
     }
 
+    // ── 13هـ) تاريخ ترك مستحيل (2026-09-12 سامر ابونادر/عبرا: تواريخ تركه الثلاثة = تاريخ ولادته 1984 فاختفى من كل الكشوف ولم يُحسب —
+    //  «انتبه بدك تحطّو بكل البرنامج») ── أي تاريخ ترك = تاريخ الولادة أو قبل دخول المدرسة = خطأ إدخال/استيراد؛ التصحيح = مسح ذاك التاريخ
+    //  وإعادة حساب السنة (يجوز «موافق على الكل»). كل المدارس، الفاعلون غير المحذوفين.
+    foreach ($q("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif'" . $sc . " AND (
+            (e.left_date_cnss    IS NOT NULL AND e.left_date_cnss    <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_cnss    = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_cnss    < e.hire_date))) OR
+            (e.left_date_finance IS NOT NULL AND e.left_date_finance <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_finance = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_finance < e.hire_date))) OR
+            (e.left_date_eoc     IS NOT NULL AND e.left_date_eoc     <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_eoc     = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_eoc     < e.hire_date)))
+        ) ORDER BY e.school_id, e.id") as $r) {
+        $bad = [];
+        foreach (['left_date_cnss' => 'الضمان', 'left_date_finance' => 'المالية', 'left_date_eoc' => 'الصندوق'] as $c => $lbl) {
+            $v = (string)$r[$c];
+            if ($v !== '' && $v !== '0000-00-00' && (($r['birth_date'] && $v === (string)$r['birth_date']) || ($r['hire_date'] && $r['hire_date'] !== '0000-00-00' && $v < (string)$r['hire_date']))) $bad[$c] = $lbl . ' ' . $v;
+        }
+        if (!$bad) continue;
+        // = تاريخ الولادة ⇒ خطأ استيراد أكيد (تصحيح آلي)؛ قبل الدخول فقط ⇒ قد يكون تارك حقيقي بتاريخ دخول غلط ⇒ للمراجعة بلا تصحيح آلي
+        $allBirth = $r['birth_date'] && count(array_filter(array_keys($bad), fn($c) => (string)$r[$c] === (string)$r['birth_date'])) === count($bad);
+        $add('left_impossible', $r,
+            'تاريخ ترك مستحيل: ' . implode('، ', $bad) . ' (ولادته ' . ($r['birth_date'] ?: '—') . '، دخوله ' . ($r['hire_date'] ?: '—') . ') — البرنامج يعتبره تاركاً قبل دخوله فيخفيه من الكشوف',
+            $allBirth ? 'مسح تاريخ/تواريخ الترك (= تاريخ ولادته: خطأ استيراد) وإعادة حساب سنة ' . $sy
+                      : 'راجع ملفه: إن كان تاركاً فعلاً صحّح تاريخ الدخول أو الترك، وإن كان فاعلاً امسح تاريخ الترك — لا تصحيح آلي',
+            $allBirth, ['cols' => array_keys($bad)]);
+    }
+
     // ── 13ج) صندوق التعويضات على الأساس فقط (2026-09-11 مقارنة كشف عبرا: ماريا الياس حليحل — وقبلها إلسي موسى/الياس عطاالله/جومانة طنّوس
     //  صُحّحوا يدوياً) ── ملاك خاضع للصندوق يتقاضى أجراً إضافياً بأشهر السنة ومفتاح «الصندوق يشمل الأجر الإضافي» مطفأ بملفه
     //  (الافتراضي عند إنشاء الملف = مطفأ!) ⇒ يُحسم 6٪ من الأساس وحده وصافيه أعلى من كشوفه. القرار شخصاً بشخص (زرّ تصحيح = تضوية + إعادة حساب).
@@ -490,6 +514,13 @@ function complianceApply(PDO $db, array $it): string {
             $n = $recalcYear();
             logAudit('compliance_family_ded_on', 'employees', $eid, ['now' => $d['now'] ?? null], ['set' => $set, 'full' => $d['full'] ?? null, 'sy' => $sy]);
             return 'ضُوّي ' . (!empty($d['spouse']) ? 'زيادة الزوج' : '') . (!empty($d['spouse']) && !empty($d['kids']) ? ' و' : '') . (!empty($d['kids']) ? 'تنزيل الأولاد' : '') . ' (التنزيل ' . complianceFmt($d['now'] ?? 0) . ' → ' . complianceFmt($d['full'] ?? 0) . ') وأُعيد حساب ' . $n . ' شهراً';
+        case 'left_impossible':
+            $cols = array_values(array_intersect((array)($d['cols'] ?? []), ['left_date_cnss', 'left_date_finance', 'left_date_eoc']));
+            if (!$cols) return 'لا تاريخ';
+            $db->exec("UPDATE employees SET " . implode(', ', array_map(fn($c) => "$c = NULL", $cols)) . " WHERE id = $eid");
+            $n = $recalcYear();
+            logAudit('compliance_left_impossible', 'employees', $eid, null, ['cleared' => $cols, 'sy' => $sy]);
+            return 'مُسح ' . count($cols) . ' تاريخ ترك مستحيل وأُعيد حساب ' . $n . ' شهراً';
         case 'transport_pct':
             $bid = (int)($d['bid'] ?? 0);
             if ($bid <= 0) return 'لا بند';
