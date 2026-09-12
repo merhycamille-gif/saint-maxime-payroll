@@ -60,7 +60,7 @@ function gradeReturnToEmployee($employeeId) {
 if (isset($_GET['rebuild_legal']) && $employeeId > 0) {
     requireWriteAction();
     try {
-        $r = buildLegalGradeHistory($employeeId);
+        $r = buildLegalGradeHistory($employeeId, null, false, true); // زرّ صريح من المستخدم = force (درجاته المعدَّلة تُستبدَل بالقانون بقراره)
         // إعادة حساب كل سنوات الأستاذ من سنة دخول المدرسة (hire_date) حتى السنة الحالية
         $eDate = getDB()->query("SELECT hire_date FROM employees WHERE id=" . (int)$employeeId)->fetchColumn();
         $y0 = $eDate ? (int)date('Y', strtotime($eDate)) : (int)date('Y') - 5;
@@ -115,20 +115,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save'])
         $db->prepare("UPDATE employee_grade_history SET delta=ROUND(grade_after-grade_before,1) WHERE employee_id=? AND delta IS NULL")->execute([$employeeId]);
         // 2) اضبط counted حسب الشيك-بوكس للأسطر **الموجودة حالياً** (قبل إضافة أي درجة جديدة!
         //    وإلا الدرجات المُعطاة تحت تنحسب صفر لأنها ما كانت ضمن keep[]). دخول الملاك دائماً محسوب.
-        $all = $db->prepare("SELECT id, reason FROM employee_grade_history WHERE employee_id=?");
+        $all = $db->prepare("SELECT id, reason, counted, change_date, delta FROM employee_grade_history WHERE employee_id=?");
         $all->execute([$employeeId]);
         $upd = $db->prepare("UPDATE employee_grade_history SET counted=? WHERE id=?");
         $setDate = $db->prepare("UPDATE employee_grade_history SET change_date=? WHERE id=? AND employee_id=? AND reason<>'titularization'");
         $setAmt  = $db->prepare("UPDATE employee_grade_history SET delta=? WHERE id=? AND employee_id=? AND reason<>'titularization'");
+        $touched = []; // 🏆 صفوف لمسها المستخدم (شك-مارك/تاريخ/مقدار) تُوسم user_edited=1 فلا يعيد البرنامج بناءها أبداً
         foreach ($all as $r) {
             $rid = (int)$r['id'];
             $on = ($r['reason'] === 'titularization') ? 1 : (in_array($rid, $keep, true) ? 1 : 0);
+            if ((int)$r['counted'] !== $on) $touched[] = $rid;
             $upd->execute([$on, $rid]);
             // تعديل تاريخ/مقدار الدرجة إن غيّرهما المستخدم (عدا دخول الملاك)
             if ($r['reason'] !== 'titularization' && isset($gdate[$rid]) && strtotime($gdate[$rid])) {
-                $setDate->execute([date('Y-m-d', strtotime($gdate[$rid])), $rid, $employeeId]);
+                $nd = date('Y-m-d', strtotime($gdate[$rid]));
+                if ($nd !== (string)$r['change_date']) $touched[] = $rid;
+                $setDate->execute([$nd, $rid, $employeeId]);
             }
             if ($r['reason'] !== 'titularization' && isset($gamt[$rid]) && round((float)$gamt[$rid], 1) != 0.0) {
+                if (abs(round((float)$gamt[$rid], 1) - (float)$r['delta']) >= 0.01) $touched[] = $rid;
                 $setAmt->execute([round((float)$gamt[$rid], 1), $rid, $employeeId]);
             }
         }
@@ -150,10 +155,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['grade_save'])
                     $key = $ln . '__' . $i;
                     $d = (isset($gudate[$key]) && strtotime($gudate[$key])) ? date('Y-m-d', strtotime($gudate[$key])) : $units[$i]['date'];
                     $insU->execute([$employeeId, $u, $u, $d, $ln, 'قانون ' . $ln]);
+                    $touched[] = (int)$db->lastInsertId(); // 🏆 منحها بيده — تثبت أبداً
                     $granted++;
                 }
             }
         }
+        markGradeRowsUserEdited($touched); // 🏆 كل ما لمسه المستخدم يُوسم فلا يُعاد بناؤه آلياً أبداً
         // 3) أعِد ربط السلسلة + الدرجة الحالية (المحرّك، يحترم counted والترتيب الزمني)
         $g = rechainGradeHistory($employeeId);
         // 4) أعِد حساب الراتب لكل سنوات الأستاذ
@@ -230,6 +237,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['manual_add']) && $emp
         $mdate = date('Y-m-d', strtotime($mdate));
         $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,0,?,?,1,?,'manual',NULL,?)")
            ->execute([$employeeId, $amt, $amt, $mdate, $mnote]);
+        markGradeRowsUserEdited([(int)$db->lastInsertId()]); // 🏆 درجة بيده — تثبت أبداً
         $g = rechainGradeHistory($employeeId);  // يعيد ربط السلسلة والأساس حسب الترتيب الزمني
         $eDate = $db->query("SELECT hire_date FROM employees WHERE id=" . (int)$employeeId)->fetchColumn();
         $y0 = $eDate ? (int)date('Y', strtotime($eDate)) : (int)date('Y') - 5;
@@ -270,7 +278,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['exc_save']) && !isse
             $db->prepare("UPDATE employees SET current_grade = ? WHERE id = ?")->execute([$newGrade, $employeeId]);
             $db->prepare("INSERT INTO employee_grade_history (employee_id, grade_before, grade_after, change_date, reason, notes) VALUES (?,?,?,?,?,?)")
                ->execute([$employeeId, $oldGrade, $newGrade, $changeDate, $reason, $notes]);
+            $lastRow = (int)$db->lastInsertId();
             $db->commit();
+            markGradeRowsUserEdited([$lastRow]); // 🏆 تغيير بيده — يثبت أبداً
             recalcEmployeeYear($employeeId); // إعادة حساب الراتب تلقائياً حسب الدرجة الجديدة
             $_SESSION['flash'] = ['type' => 'success', 'msg' => "Échelon changé: $oldGrade → $newGrade"];
         } catch (Exception $e) {

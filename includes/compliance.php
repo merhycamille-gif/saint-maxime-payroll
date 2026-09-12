@@ -151,6 +151,7 @@ function complianceItems(PDO $db, string $sy): array {
         $ids = activeSchoolIds();
         foreach (lawConsistencyCheck($ids ?: null, $sy) as $r) {
             if ($r['ok']) continue;
+            if (gradesUserAdjusted((int)$r['id'])) continue; // 🏆 درجات عدّلها المستخدم بيده = قراره، ليست مخالفة (2026-09-12)
             $e = ['id' => $r['id'], 'first_name_ar' => $r['name_ar'], 'last_name_ar' => '', 'first_name_fr' => $r['name_fr'], 'last_name_fr' => '', 'school_id' => $r['school_id']];
             if ($r['err'] !== null) {
                 $add('grade_law', $e, 'تعذّر حساب درجته من القانون: ' . $r['err'], 'أكمل بملفه الشهادة وتاريخ الدخول وتاريخ الملاك ثم أعد الفحص', false);

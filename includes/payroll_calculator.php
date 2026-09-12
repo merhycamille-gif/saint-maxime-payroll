@@ -1026,12 +1026,18 @@ function tenureReferenceDate($emp) {
  * على السنين فقط، فيظهر الراتب متدرّجاً بدل أن يكون ثابتاً. يرجّع ملخّصاً للتحقّق.
  * @param string|null $todayOverride للاختبار فقط (تثبيت «اليوم»)، وإلا تاريخ النظام.
  */
-function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false) {
+function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, $force = false) {
     $db = getDB();
     $st = $db->prepare("SELECT * FROM employees WHERE id=?");
     $st->execute([$empId]); $emp = $st->fetch(PDO::FETCH_ASSOC);
     if (!$emp) throw new Exception("الموظف غير موجود");
     if ($emp['employee_type'] !== 'enseignant_titulaire') throw new Exception("ليس أستاذاً ملاكاً — لا تُبنى له درجات");
+    // 🏆 (2026-09-12 «أي درجة بزيدها تثبت ما تتغيّر أبداً إلا إذا أنا بدي غيّر»): أستاذ لمس المستخدم درجاته لا يُعاد بناؤها آلياً
+    // من أي مسار — فقط بزرّ «ابنِ حسب القانون» الصريح ($force). الحساب التقديري (dryRun) يبقى متاحاً للمقارنة.
+    if (!$dryRun && !$force && function_exists('gradesUserAdjusted') && gradesUserAdjusted((int)$empId)) {
+        return ['start' => (float)$emp['starting_grade'], 'entry_date' => employeeEntryDate($emp), 'ordinary' => 0.0, 'exceptional' => 0.0,
+                'final_grade' => (float)$emp['current_grade'], 'events' => 0, 'by_law' => [], 'skipped' => true];
+    }
     $entryDate = employeeEntryDate($emp);                      // دخول المدرسة = hire_date
     if (!$entryDate) throw new Exception("لا يوجد تاريخ دخول المدرسة (hire_date)");
 
@@ -1437,11 +1443,12 @@ function applyLegalGradesForNewYear($db, $empId, $y1, $y2) {
     //  - «(فتح السنة)» = آلية من هنا: مطابقة للمستحقّ ⇒ لا شيء؛ غير مطابقة (قاعدة قديمة) ⇒ تُستبدَل؛
     //    لمسها المستخدم (counted=0، أو delta ≠ المقدار المكتوب بالملاحظة [+x]) ⇒ تُترَك
     //  - أي صفّ آخر (بناء قانوني/إدخال يدوي بغير reason) = المستخدم أو القانون رتّب هذا التاريخ ⇒ لا نلمس شيئاً
-    $ex = $db->prepare("SELECT id, change_date, grade_before, grade_after, delta, counted, reason, notes FROM employee_grade_history WHERE employee_id=? AND change_date IN (?,?) ORDER BY change_date, id");
+    $ex = $db->prepare("SELECT * FROM employee_grade_history WHERE employee_id=? AND change_date IN (?,?) ORDER BY change_date, id");
     $ex->execute([$empId, $ordDate, $excDate]);
     $existing = []; $hasManualAt = false;
     foreach ($ex->fetchAll(PDO::FETCH_ASSOC) as $r) {
         if ($r['reason'] === 'manual') { $hasManualAt = true; continue; }
+        if ((int)($r['user_edited'] ?? 0) === 1) return 0; // 🏆 لمسها المستخدم بيده — لا نلمس شيئاً
         if (mb_strpos((string)$r['notes'], '(فتح السنة)') === false) return 0;
         if ((int)$r['counted'] !== 1) return 0;
         if (preg_match('/\[\+([0-9.]+)\]/', (string)$r['notes'], $mm) && $r['delta'] !== null && abs((float)$r['delta'] - (float)$mm[1]) >= 0.01) return 0;

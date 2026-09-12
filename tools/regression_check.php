@@ -5383,6 +5383,48 @@ check('تجهيز 2026-2027 الجزء الثاني: healOpenYear2627b بثلا�
       && strpos((string)file_get_contents($PROJ . '/pages/heal_tick.php'), "if (\$s === null) \$s = healOpenYear2627b_20260912(6.0);") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/footer.php'), "openYearHealPending20260912()): ?>") !== false);
 
+/* =====================================================================
+ * 110) 🏆 «أي درجة أو نص درجة أنا بزيدها تثبت ما تتغيّر أبداً بكل البرنامج إلا إذا أنا بدي غيّر» (2026-09-12):
+ *      عمود user_edited + gradesUserAdjusted المصدر الواحد + buildLegalGradeHistory لا يعيد البناء آلياً (إلا force من زرّ الصفحة)
+ *      + المخالفات لا تعرض «الدرجة ≠ القانون» للمعدَّل + ملف الموظف لا يعيد البناء عند تغيير الشهادة/التواريخ + لوحة الدرجات توسم كل لمسة.
+ * =================================================================== */
+ensureGradeUserEditedColumn();
+$gr110 = (string)file_get_contents($PROJ . '/pages/grades.php'); $pc110 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+check('الدرجات المعدَّلة بيده ثابتة (مصدر): العمود ذاتي التركيب + gradesUserAdjusted + buildLegalGradeHistory(force) يتخطّى المعدَّل + المخالفات/ملف الموظف/الشفاء يحترمونه + لوحة الدرجات توسم (شك-مارك/تاريخ/مقدار/يدوية/وحدات) + زرّ «ابنِ» force',
+      (bool)$db->query("SHOW COLUMNS FROM employee_grade_history LIKE 'user_edited'")->fetch() && function_exists('gradesUserAdjusted') && function_exists('markGradeRowsUserEdited')
+      && strpos($pc110, 'function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, $force = false)') !== false
+      && strpos($pc110, "if (!\$dryRun && !\$force && function_exists('gradesUserAdjusted') && gradesUserAdjusted((int)\$empId)) {") !== false
+      && strpos($pc110, "if ((int)(\$r['user_edited'] ?? 0) === 1) return 0;") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/compliance.php'), "if (gradesUserAdjusted((int)\$r['id'])) continue;") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "&& gradesUserAdjusted((int)\$id)) {") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "|| gradesUserAdjusted(\$id)) continue;") !== false
+      && substr_count($gr110, 'markGradeRowsUserEdited(') === 3 && strpos($gr110, 'buildLegalGradeHistory($employeeId, null, false, true)') !== false
+      && strpos($gr110, "if ((int)\$r['counted'] !== \$on) \$touched[] = \$rid;") !== false);
+// تجربة حيّة (تُرجَع): صفّ يدوي غير محسوب (counted=0 فلا تتغيّر الدرجة) → buildLegalGradeHistory بلا force = تخطٍّ بلا أي حذف؛ dryRun يبقى يحسب؛ المخالفات لا تعرضه
+$why110 = ''; $ok110 = false;
+try {
+    $e110 = $db->query("SELECT e.id, e.current_grade FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.status = 'actif'
+        AND NOT EXISTS (SELECT 1 FROM employee_grade_history h WHERE h.employee_id = e.id AND (h.reason = 'manual' OR h.user_edited = 1)) AND EXISTS (SELECT 1 FROM employee_grade_history h2 WHERE h2.employee_id = e.id) ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$e110) { $why110 = 'لا عيّنة'; $ok110 = true; }
+    else {
+        $eid = (int)$e110['id'];
+        $rowsBefore = $db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = $eid")->fetchColumn();
+        $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes,user_edited) VALUES (?,0,0,1,0,'2019-01-01','manual','regcheck',1)")->execute([$eid]);
+        $rid = (int)$db->lastInsertId();
+        try {
+            $adj = gradesUserAdjusted($eid);
+            $r1 = buildLegalGradeHistory($eid);                 // بلا force ⇒ تخطٍّ
+            $rowsAfter = $db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = $eid")->fetchColumn();
+            $cgAfter = (float)$db->query("SELECT current_grade FROM employees WHERE id = $eid")->fetchColumn();
+            $dry = buildLegalGradeHistory($eid, null, true);    // dryRun يبقى متاحاً
+            $inComp = false; foreach (complianceItems($db, currentSchoolYear()) as $it) if ($it['rule'] === 'grade_law' && (int)$it['emp_id'] === $eid) $inComp = true;
+            $ok110 = $adj && !empty($r1['skipped']) && (int)$rowsAfter === (int)$rowsBefore + 1 && abs($cgAfter - (float)$e110['current_grade']) < 0.01 && isset($dry['final_grade']) && !$inComp;
+            $why110 = "emp=$eid adj=" . var_export($adj, true) . " skipped=" . var_export(!empty($r1['skipped']), true) . " rows=$rowsBefore→$rowsAfter cg=" . $e110['current_grade'] . "→$cgAfter inComp=" . var_export($inComp, true);
+        } finally { $db->exec("DELETE FROM employee_grade_history WHERE id = $rid"); }
+    }
+} catch (Throwable $e) { $why110 = $e->getMessage(); }
+check('الدرجات المعدَّلة بيده ثابتة (تجربة حيّة تُرجَع): بعد لمسة يدوية لا يعيد البرنامج بناء درجاته ولا يعرضه كمخالفة، والحساب التقديري يبقى', $ok110, $why110);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

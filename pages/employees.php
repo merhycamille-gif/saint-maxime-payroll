@@ -527,7 +527,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 ($oldDates['hire_date'] ?? null) != $data['hire_date'] ||
                 ($oldDates['tenure_confirmation_date'] ?? null) != $data['tenure_confirmation_date']
             ));
-            if (($diplomaChanged || $datesChanged) && $data['employee_type'] === 'enseignant_titulaire' && $data['titularization_date']) {
+            if (($diplomaChanged || $datesChanged) && $data['employee_type'] === 'enseignant_titulaire' && $data['titularization_date'] && gradesUserAdjusted((int)$id)) {
+                // 🏆 (2026-09-12) درجاته معدَّلة بيد المستخدم — لا إعادة بناء آلية؛ يُعاد حساب رواتبه فقط (recalcEmployeeYear أدناه)
+                $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'حُفظ التعديل — درجاته المعدَّلة بيدك بقيت كما هي (لم يُعَد بناؤها بالقانون). إذا بدّك إعادة البناء استعمل زرّ «ابنِ حسب القانون» بلوحة الدرجات.'];
+            } elseif (($diplomaChanged || $datesChanged) && $data['employee_type'] === 'enseignant_titulaire' && $data['titularization_date']) {
                 // إن تغيّرت الشهادة، اضبط درجة الدخول من الشهادة الجديدة (أرضية)
                 if ($diplomaChanged) {
                     $dipG = $db->prepare("SELECT starting_grade FROM diploma_starting_grades WHERE diploma_code = ?");

@@ -6472,7 +6472,7 @@ function healOpenYear2627b_20260912(float $budget = 6.0): ?array {
                     if (!isNewSystemTeacher($e)) continue;
                     if (isSchoolYearLocked((int)$e['school_id'], $prevSy) || isSchoolYearLocked((int)$e['school_id'], $sy)) continue;
                     $edited->execute([$id]); $ed = $edited->fetch(PDO::FETCH_ASSOC);
-                    if ((int)($ed['m'] ?? 0) > 0 || (int)($ed['z'] ?? 0) > 0) continue; // عدّله المستخدم — يبقى كما هو
+                    if ((int)($ed['m'] ?? 0) > 0 || (int)($ed['z'] ?? 0) > 0 || gradesUserAdjusted($id)) continue; // عدّله المستخدم — يبقى كما هو
                     try { $law = buildLegalGradeHistory($id, null, true); } catch (Throwable $ex) { continue; }
                     $gap = round((float)$law['final_grade'] - (float)$e['current_grade'], 1);
                     if (abs($gap - 0.5) > 0.01) continue; // ليس فرق نصف التقديم بالضبط — لا نلمسه
@@ -6529,6 +6529,37 @@ function healOpenYear2627b_20260912(float $budget = 6.0): ?array {
 }
 /** أي تجهيز 2026-2027 غير مكتمل (الجزء الأوّل أو الثاني)؟ — لنبض footer */
 function openYearHealPending20260912(): bool { return openYearHealState20260912() !== null || openYearHealState2b_20260912() !== null; }
+
+/* =============================================================================
+ * 🏆 «لازم أي درجة أو نص درجة أنا بزيدها تثبت ما تتغيّر أبداً بكل البرنامج إلا إذا أنا بدي غيّر» (أمره 2026-09-12)
+ *  - عمود employee_grade_history.user_edited (ذاتي التركيب من الهيدر): يُوسم 1 عند أي لمسة من المستخدم بلوحة الدرجات
+ *    (درجة يدوية، تعديل مقدار/تاريخ/شك-مارك درجة، منح وحدات استثنائية بيده).
+ *  - المصدر الواحد gradesUserAdjusted($empId): عنده صفّ manual أو user_edited=1 ⇒ **لا إعادة بناء آلية لدرجاته** من أي مسار
+ *    (تغيير الشهادة/التواريخ بملفه، تقرير المخالفات «الدرجة ≠ القانون» لا يعرضه أصلاً، الشفاءات) — فقط زرّ «ابنِ حسب القانون» الصريح
+ *    (force=true). التدرّج السنوي عند فتح السنة يكمّل فوق درجته كما هي (applyLegalGradesForNewYear لا يلمس صفوفه الموسومة).
+ * =========================================================================== */
+function ensureGradeUserEditedColumn(): void {
+    static $done = false; if ($done) return;
+    if (getDB()->inTransaction()) return; // DDL داخل معاملة = COMMIT ضمني
+    $done = true;
+    try { $db = getDB(); if (!$db->query("SHOW COLUMNS FROM employee_grade_history LIKE 'user_edited'")->fetch()) $db->exec("ALTER TABLE employee_grade_history ADD COLUMN user_edited TINYINT(1) NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
+}
+function gradesUserAdjusted(int $empId): bool {
+    try {
+        $st = getDB()->prepare("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = ? AND (reason = 'manual' OR COALESCE(user_edited, 0) = 1)");
+        $st->execute([$empId]);
+        return (int)$st->fetchColumn() > 0;
+    } catch (Throwable $e) {
+        $st = getDB()->prepare("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = ? AND reason = 'manual'"); $st->execute([$empId]);
+        return (int)$st->fetchColumn() > 0;
+    }
+}
+/** وسم صفوف درجات كـ«معدَّلة بيد المستخدم» (تُستدعى من لوحة الدرجات عند كل لمسة). */
+function markGradeRowsUserEdited(array $rowIds): void {
+    $rowIds = array_values(array_filter(array_map('intval', $rowIds)));
+    if (!$rowIds) return;
+    try { getDB()->exec("UPDATE employee_grade_history SET user_edited = 1 WHERE id IN (" . implode(',', $rowIds) . ")"); } catch (Throwable $e) {}
+}
 
 /* =============================================================================
  * 🔒 قفل السنة الدراسية لكل مدرسة بكلمة سرّ (أمره 2026-09-12 «بدي لوك لكل مدرسة عن السنة الدراسية وحط أنا باسوورد
