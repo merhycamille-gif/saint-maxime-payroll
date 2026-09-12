@@ -5353,11 +5353,35 @@ check('تجهيز 2026-2027 التلقائي: healOpenYear2627_20260912 بثلا
       function_exists('healOpenYear2627_20260912') && is_file($PROJ . '/pages/heal_tick.php')
       && strpos($fn108, "if (\$s['stage'] === 'grades')") !== false && strpos($fn108, "if (\$s['stage'] === 'transport')") !== false && strpos($fn108, "if (\$s['stage'] === 'abra85')") !== false
       && substr_count(substr($fn108, strpos($fn108, 'function healOpenYear2627_20260912')), 'isSchoolYearLocked(') >= 3
-      && strpos($ft108, "openYearHealState20260912() !== null): ?>") !== false && strpos($ft108, "pages/heal_tick.php") !== false);
+      && strpos($ft108, "openYearHealPending20260912()): ?>") !== false && strpos($ft108, "pages/heal_tick.php") !== false);
 check('صفحة فتح السنة مرتّبة (2026-09-12 «واضحة ومش معجقة»): ٣ خطوات + خيارات الإضافات مطوية (details) + الأدوات الإضافية مطوية + زرّ افتح بارز',
       substr_count($oy108, '<details') === 2 && strpos($oy108, 'خيارات إضافية (الافتراضي: الإضافات والنقل نفس السنة الماضية)') !== false
       && strpos($oy108, 'أدوات إضافية (تعديل الإضافات لسنة مفتوحة') !== false && strpos($oy108, 'font-size:17px;font-weight:800;padding:10px 26px') !== false
       && strpos($oy108, 'Comment ça marche') === false);
+
+/* =====================================================================
+ * 109) 🏆 نصف «تقديم التدرّج» لنظام 4+4+2 عند أوّل تشرين بعد دخول الملاك (mAY+1) لا mAY+3 — كشف ملاك عبرا تشرين 2026
+ *      (2026-09-12): ايليو نوفل 20 بتشرين 2025، اندي يونان 20 بتشرين 2026، ماريا حليحل 16 بكانون 2026. + الجزء الثاني من التجهيز
+ *      (lawshift لغير المعدَّلين فقط + grades2 + transport_restore) عبر heal_tick.
+ * =================================================================== */
+$pc109 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php'); $fn109 = (string)file_get_contents($PROJ . '/includes/functions.php');
+check('4+4+2: نصف تقديم التدرّج عند mAY+1 بالمصدر (لا mAY+3)',
+      strpos($pc109, "\$compYear = \$mAY + 1;") !== false && strpos($pc109, "\$compYear . '-10-01', 'type' => 'ordinary', 'delta' => 0.5, 'comp' => true") !== false
+      && strpos($pc109, "\$lastBatchYear") === false);
+// حساب حيّ (dryRun) على ماريا الياس حليحل 1651 إن وُجدت محلياً بنفس معطياتها (إجازة جامعية، درجة دخول 6، ملاك 1/10/2024):
+// تشرين 2024 +1 → 7، كانون 2025 +4 → 11، تشرين 2025 +0.5+0.5 → 12، كانون 2026 +4 → 16 (كشفه: 16 لا 15.5)؛ بنهاية 2026-2027: تشرين 2026 +0.5 → 16.5، كانون 2027 +2 → 18.5
+$m109 = $db->query("SELECT id, diploma, starting_grade, titularization_date, employee_type FROM employees WHERE id = 1651 AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+if ($m109 && $m109['employee_type'] === 'enseignant_titulaire' && $m109['diploma'] === 'ijaza_jamiya' && (float)$m109['starting_grade'] === 6.0 && $m109['titularization_date'] === '2024-10-01') {
+    try { $d1 = buildLegalGradeHistory(1651, '2026-09-30', true); $d2 = buildLegalGradeHistory(1651, '2027-09-30', true); $why109 = 'end2526=' . $d1['final_grade'] . ' end2627=' . $d2['final_grade']; }
+    catch (Throwable $e) { $d1 = $d2 = null; $why109 = $e->getMessage(); }
+    check('4+4+2 (حساب حيّ): ماريا الياس حليحل بالقانون = 16 بنهاية 2025-2026 و18.5 بنهاية 2026-2027 (كشف عبرا)',
+          $d1 && $d2 && abs((float)$d1['final_grade'] - 16.0) < 0.01 && abs((float)$d2['final_grade'] - 18.5) < 0.01, $why109);
+} else check('4+4+2 (حساب حيّ): ماريا الياس حليحل', true, 'العيّنة غير متاحة محلياً بنفس المعطيات — تخطٍّ');
+check('تجهيز 2026-2027 الجزء الثاني: healOpenYear2627b بثلاث مراحل (lawshift لغير المعدَّلين فقط: بلا manual وبلا counted=0 وفرق +0.5 بالضبط) + heal_tick يشغّل الجزأين + footer يعتمد openYearHealPending',
+      function_exists('healOpenYear2627b_20260912') && strpos($fn109, "if (\$s['stage'] === 'lawshift')") !== false && strpos($fn109, "if (\$s['stage'] === 'transport_restore')") !== false
+      && strpos($fn109, "if (abs(\$gap - 0.5) > 0.01) continue;") !== false && strpos($fn109, "SUM(reason = 'manual') m, SUM(counted = 0 AND reason <> 'titularization') z") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/heal_tick.php'), "if (\$s === null) \$s = healOpenYear2627b_20260912(6.0);") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/footer.php'), "openYearHealPending20260912()): ?>") !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

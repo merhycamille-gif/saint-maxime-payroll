@@ -7,7 +7,7 @@
 <script src="<?= BASE_URL ?>assets/js/form-lock.js?v=<?= @filemtime(__DIR__ . '/../assets/js/form-lock.js') ?: '1' ?>"></script>
 <script src="<?= BASE_URL ?>assets/js/select-search.js?v=<?= @filemtime(__DIR__ . '/../assets/js/select-search.js') ?: '1' ?>"></script>
 <script>window.BASE_URL = <?= json_encode(BASE_URL) ?>;</script>
-<?php if (function_exists('openYearHealState20260912') && openYearHealState20260912() !== null): ?>
+<?php if (function_exists('openYearHealPending20260912') && openYearHealPending20260912()): ?>
 <script>
 // 📅 تجهيز 2026-2027 التلقائي (2026-09-12): نبض خلفي كل 4 ثوانٍ يشغّل دفعة من الشفاء حتى يكتمل — شريط صغير يُظهر التقدّم ثم يختفي
 (function () {
@@ -21,7 +21,8 @@
     fetch(window.BASE_URL + 'pages/heal_tick.php', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) {
       busy = false;
       if (!s || s.done) { stop = true; bar.textContent = '✅ خلص تجهيز 2026-2027 — الدرجات والنقل و85٪ عبرا'; setTimeout(function () { bar.remove(); }, 6000); return; }
-      var st = { grades: 'تصحيح درجات الملاك (' + s.grades + ' من ' + s.seen + ')', transport: 'إطفاء النقل بالنسبة (' + s.transport + ')', abra85: 'عبرا 85٪ (' + s.abra + ')', finish: 'إنهاء' }[s.stage] || s.stage;
+      var st = { grades: 'تصحيح درجات الملاك (' + s.grades + ' من ' + s.seen + ')', transport: 'إطفاء النقل بالنسبة (' + s.transport + ')', abra85: 'عبرا 85٪ (' + s.abra + ')', finish: 'إنهاء',
+                 lawshift: 'نصف تقديم التدرّج بأوّل تشرين (' + s.lawshift + ' من ' + s.seen + ')', grades2: 'مراجعة درجات 2026-2027 (' + s.grades + ')', transport_restore: 'إرجاع النقل المطفأ (' + s.transport + ')' }[s.stage] || s.stage;
       bar.textContent = '⏳ البرنامج عم يجهّز 2026-2027 تلقائياً: ' + st;
     }).catch(function () { busy = false; });
   }

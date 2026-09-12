@@ -6427,6 +6427,109 @@ function healOpenYear2627_20260912(float $budget = 6.0): ?array {
     }
 }
 
+/**
+ * 📅 تجهيز 2026-2027 — الجزء الثاني (بعد مقارنة كشف ملاك عبرا تشرين 2026 بالأونلاين، 2026-09-12 «لازم يطلعوا هني ذاتهن تبع السنة»
+ * + «النص درجة إذا أنا معدّلها بسنة القبل تركها معدّلة»). ثلاث مراحل بدفعات، نفس آلية heal_tick:
+ *   ① lawshift        : نصف «تقديم التدرّج» صار عند mAY+1 (المحرّك). لأساتذة نظام 4+4+2 **الذين لم يعدّل المستخدم درجاتهم**
+ *                        (بلا صفوف manual وبلا صفوف مطفأة counted=0) وكانت درجتهم المخزّنة = القانون القديم (الفرق عن القانون
+ *                        الجديد +0.5 بالضبط) ⇒ إعادة بناء الدرجات بالقانون + صفوف فتح 2026-2027 + إعادة حساب 2025-2026 و2026-2027.
+ *                        مَن عدّله المستخدم يبقى كما عدّله (تيا نخلة: 19→20 بتشرين 2025 بيدها = القانون الجديد نفسه).
+ *   ② grades2         : كل ملاك له رواتب 2026-2027 ← applyLegalGradesForNewYear (ذاتي التصحيح: اندي يونان 19→20 بدل 19.5) + recalc إن تغيّر.
+ *   ③ transport_restore: مَن عنده بند «نقل بنسبة» مطفأ بـ2026-2027 (غلطة البطاقة الكحلية 2026-09-11 عطّلت بند المبلغ) وبلا أي بند
+ *                        نقل فعّال ⇒ يُنسخ بند النقل الفعّال من 2025-2026 (المبلغ نفسه 9م/5.4م/7.2م) + recalc.
+ * الفلاغ heal_openyear2627b_20260912. يحترم قفل السنة.
+ */
+function openYearHealState2b_20260912(): ?array {
+    $v = (string)getSetting('heal_openyear2627b_20260912', '');
+    if (strpos($v, 'done') === 0 || strpos($v, 'err') === 0) return null;
+    $s = $v !== '' ? json_decode($v, true) : null;
+    return is_array($s) ? $s : ['stage' => 'lawshift', 'cursor' => 0, 'lawshift' => 0, 'grades' => 0, 'transport' => 0, 'seen' => 0];
+}
+function healOpenYear2627b_20260912(float $budget = 6.0): ?array {
+    $s = null;
+    try {
+        $s = openYearHealState2b_20260912();
+        if ($s === null) return null;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $sy = '2026-2027'; $prevSy = '2025-2026'; $t0 = microtime(true);
+        $save = function () use (&$s) { setSetting('heal_openyear2627b_20260912', json_encode($s, JSON_UNESCAPED_UNICODE)); };
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_grades_oy0912b LIKE employee_grade_history");
+        if (!(int)$db->query("SELECT COUNT(*) FROM _bk_grades_oy0912b")->fetchColumn()) $db->exec("INSERT INTO _bk_grades_oy0912b SELECT * FROM employee_grade_history");
+        $activeSql = "e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND e.id > ?
+                AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= '2025-10-01'";
+
+        if ($s['stage'] === 'lawshift') {
+            $q = $db->prepare("SELECT e.* FROM employees e WHERE $activeSql AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year IN (?, ?)) ORDER BY e.id LIMIT 25");
+            $edited = $db->prepare("SELECT SUM(reason = 'manual') m, SUM(counted = 0 AND reason <> 'titularization') z FROM employee_grade_history WHERE employee_id = ?");
+            while (microtime(true) - $t0 < $budget) {
+                $q->execute([(int)$s['cursor'], $prevSy, $sy]);
+                $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+                if (!$rows) { $s['stage'] = 'grades2'; $s['cursor'] = 0; break; }
+                foreach ($rows as $e) {
+                    $id = (int)$e['id']; $s['seen']++; $s['cursor'] = $id;
+                    if (microtime(true) - $t0 >= $budget) break;
+                    if (!isNewSystemTeacher($e)) continue;
+                    if (isSchoolYearLocked((int)$e['school_id'], $prevSy) || isSchoolYearLocked((int)$e['school_id'], $sy)) continue;
+                    $edited->execute([$id]); $ed = $edited->fetch(PDO::FETCH_ASSOC);
+                    if ((int)($ed['m'] ?? 0) > 0 || (int)($ed['z'] ?? 0) > 0) continue; // عدّله المستخدم — يبقى كما هو
+                    try { $law = buildLegalGradeHistory($id, null, true); } catch (Throwable $ex) { continue; }
+                    $gap = round((float)$law['final_grade'] - (float)$e['current_grade'], 1);
+                    if (abs($gap - 0.5) > 0.01) continue; // ليس فرق نصف التقديم بالضبط — لا نلمسه
+                    try { buildLegalGradeHistory($id); } catch (Throwable $ex) { continue; }
+                    applyLegalGradesForNewYear($db, $id, 2026, 2027);
+                    foreach ([$prevSy, $sy] as $ry) if ((int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $id AND school_year = '$ry'")->fetchColumn()) recalcEmployeeYear($id, $ry);
+                    $s['lawshift']++;
+                }
+            }
+            $save(); return $s;
+        }
+        if ($s['stage'] === 'grades2') {
+            $q = $db->prepare("SELECT e.id, e.school_id FROM employees e WHERE $activeSql AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ?) ORDER BY e.id LIMIT 40");
+            while (microtime(true) - $t0 < $budget) {
+                $q->execute([(int)$s['cursor'], $sy]);
+                $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+                if (!$rows) { $s['stage'] = 'transport_restore'; $s['cursor'] = 0; break; }
+                foreach ($rows as $r) {
+                    $id = (int)$r['id']; $s['cursor'] = $id;
+                    if (!isSchoolYearLocked((int)$r['school_id'], $sy) && applyLegalGradesForNewYear($db, $id, 2026, 2027) > 0) { recalcEmployeeYear($id, $sy); $s['grades']++; }
+                    if (microtime(true) - $t0 >= $budget) break;
+                }
+            }
+            $save(); return $s;
+        }
+        if ($s['stage'] === 'transport_restore') {
+            $q = $db->prepare("SELECT DISTINCT e.id, e.school_id FROM employees e JOIN employee_bonuses b ON b.employee_id = e.id AND b.school_year = ? AND b.bonus_type = 'transport_complement' AND b.value_type = 'percent' AND b.is_active = 0
+                WHERE e.is_deleted = 0 AND e.id > ?
+                  AND NOT EXISTS (SELECT 1 FROM employee_bonuses a WHERE a.employee_id = e.id AND a.school_year = ? AND a.bonus_type IN ('transport_complement','transport_daily') AND a.is_active = 1)
+                ORDER BY e.id LIMIT 40");
+            $src = $db->prepare("SELECT * FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND bonus_type IN ('transport_complement','transport_daily') AND is_active = 1 AND value_type <> 'percent' AND amount > 0");
+            $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?,?,?,?,?,?,?,?,?,1)");
+            while (microtime(true) - $t0 < $budget) {
+                $q->execute([$sy, (int)$s['cursor'], $sy]);
+                $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+                if (!$rows) { $s['stage'] = 'finish'; $s['cursor'] = 0; break; }
+                foreach ($rows as $r) {
+                    $id = (int)$r['id']; $s['cursor'] = $id;
+                    if (isSchoolYearLocked((int)$r['school_id'], $sy)) continue;
+                    $src->execute([$id, $prevSy]); $n = 0;
+                    foreach ($src->fetchAll(PDO::FETCH_ASSOC) as $b) { $ins->execute([$id, $b['bonus_type'], $b['period_number'], $sy, $b['amount'], $b['value_type'], $b['currency'], $b['start_month'], $b['end_month']]); $n++; }
+                    if ($n) { recalcEmployeeYear($id, $sy); $s['transport']++; }
+                    if (microtime(true) - $t0 >= $budget) break;
+                }
+            }
+            $save(); return $s;
+        }
+        setSetting('heal_openyear2627b_20260912', 'done ' . date('Y-m-d H:i') . ': lawshift=' . (int)$s['lawshift'] . '/' . (int)$s['seen'] . ' grades=' . (int)$s['grades'] . ' transport=' . (int)$s['transport']);
+        return null;
+    } catch (Throwable $e) {
+        try { setSetting('heal_openyear2627b_20260912', 'err: ' . mb_substr($e->getMessage(), 0, 300) . ' | ' . json_encode($s)); } catch (Throwable $e2) {}
+        return null;
+    }
+}
+/** أي تجهيز 2026-2027 غير مكتمل (الجزء الأوّل أو الثاني)؟ — لنبض footer */
+function openYearHealPending20260912(): bool { return openYearHealState20260912() !== null || openYearHealState2b_20260912() !== null; }
+
 /* =============================================================================
  * 🔒 قفل السنة الدراسية لكل مدرسة بكلمة سرّ (أمره 2026-09-12 «بدي لوك لكل مدرسة عن السنة الدراسية وحط أنا باسوورد
  *    حتى ما نخلص حسابات المدرسة بتضلّ متل ما هي ما بتتغيّر إلا إذا أنا عملت أن-لوك وغيّرت»)
