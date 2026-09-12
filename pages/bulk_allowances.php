@@ -161,7 +161,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
         foreach ($validCats as $ck) {
             $row = is_array($pc[$ck] ?? null) ? $pc[$ck] : [];
             if (empty($row['on'])) continue;
-            $ln = $cleanLine(['type' => $ptype, 'value' => $row['value'] ?? 0, 'from' => $pfrom, 'to' => $pto, 'vtype' => $row['vtype'] ?? 'percent', 'currency' => $row['currency'] ?? 'LBP']);
+            // (2026-09-12 «قدّام كل نسبة أو مبلغ من شهر إلى شهر») الفترة لكل فئة سطرها؛ pfrom/pto القديمة احتياط
+            $ln = $cleanLine(['type' => $ptype, 'value' => $row['value'] ?? 0, 'from' => $row['from'] ?? $pfrom, 'to' => $row['to'] ?? $pto, 'vtype' => $row['vtype'] ?? 'percent', 'currency' => $row['currency'] ?? 'LBP']);
             if (!$ln) continue;
             [$n, $done] = $applyLinesTo([$ck], [$ln]);
             $nAll += $n; $doneAll += $done; $catsDone[] = $ck;
@@ -564,7 +565,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                         <div class="table-scroll" style="margin-top:6px">
                         <table class="table" id="opCats" style="margin:0;min-width:760px">
                             <thead><tr style="background:#f1f5f9">
-                                <th style="width:34px"></th><th>الفئة</th><th>نسبة ٪ أو مبلغ؟</th><th>القيمة</th><th>الوضع الحالي</th><th>🧮 مثال حيّ (بالشهر)</th>
+                                <th style="width:34px"></th><th>الفئة</th><th>نسبة ٪ أو مبلغ؟</th><th>القيمة</th><th>من شهر ← إلى شهر</th><th>الوضع الحالي</th><th>🧮 مثال حيّ (بالشهر)</th>
                             </tr></thead>
                             <tbody>
                             <?php foreach ($opCats as $ck => $cl): $nC = count($op['ids'][$ck]); ?>
@@ -582,6 +583,14 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                                         <select name="pc[<?= $ck ?>][currency]" class="form-select opCur" style="max-width:95px;font-weight:700;display:none"><option value="LBP">ل.ل</option><option value="USD">$</option></select>
                                     </div>
                                 </td>
+                                <td style="white-space:nowrap">
+                                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+                                        <?= baMonthSel('pc[' . $ck . '][from]', 10, 'style="max-width:118px;font-weight:700"') ?>
+                                        <span>←</span>
+                                        <?= baMonthSel('pc[' . $ck . '][to]', 9, 'style="max-width:118px;font-weight:700"') ?>
+                                    </div>
+                                    <div class="opPer" style="color:#166534;font-weight:700;font-size:12px;margin-top:2px">(كل السنة)</div>
+                                </td>
                                 <td class="opState" style="font-size:12.5px;line-height:1.7;min-width:170px">—</td>
                                 <td class="opLive" style="font-size:12.5px;line-height:1.7;min-width:220px;background:#f0fdf4">—</td>
                             </tr>
@@ -592,12 +601,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                         <div style="font-size:11.5px;color:#64748b;margin-top:4px" id="opRule"></div>
                     </div></div>
                     <div class="ba-step"><span class="ba-num">٣</span><div style="min-width:0">
-                        <strong>من شهر ← إلى شهر؟</strong> <span class="ba-hint">افتراضياً كل السنة (تشرين ← أيلول). قيمة بتتغيّر بنص السنة = طبّق مرّتين بفترتين مختلفتين.</span>
-                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
-                            <span>من</span><?= baMonthSel('pfrom', 10, 'id="opFrom" style="max-width:150px;font-weight:700"') ?>
-                            <span>إلى</span><?= baMonthSel('pto', 9, 'id="opTo" style="max-width:150px;font-weight:700"') ?>
-                            <span id="opPeriodTxt" style="color:#166534;font-weight:700"></span>
-                        </div>
+                        <span class="ba-hint">قيمة بتتغيّر بنص السنة عند فئة = طبّق مرّتين بفترتين مختلفتين. الفترة قدّام كل فئة (افتراضياً كل السنة تشرين ← أيلول).</span>
                         <div style="margin-top:10px"><button type="submit" class="btn btn-primary" id="opBtn" style="font-weight:800" data-confirm="تطبيق؟"><i class="fas fa-check"></i> <span id="opBtnTxt">طبّق</span> / Appliquer</button></div>
                     </div></div>
                     <div class="ba-warn" style="margin-top:6px" id="opWarn">⚠️ الزرّ يستبدل <b id="opWarnType">الأجر الإضافي</b> الحالي عند <b>كل</b> موظفي كل فئة مؤشَّرة (كل فتراته) بسطرها. الفئات غير المؤشَّرة والأنواع التانية ما بتتأثّر. شخص بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
@@ -610,17 +614,16 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     var SCHOOL=<?= json_encode(scopeLabel(false, $schoolId) . ' — ' . $schoolYear, JSON_UNESCAPED_UNICODE) ?>;
                     var rows=[].slice.call(document.querySelectorAll('#opCats tr.opRow'));
                     var btn=document.getElementById('opBtn'), btnTxt=document.getElementById('opBtnTxt'), warnType=document.getElementById('opWarnType'), rule=document.getElementById('opRule');
-                    var fromSel=document.getElementById('opFrom'), toSel=document.getElementById('opTo'), perTxt=document.getElementById('opPeriodTxt');
                     if(!rows.length||!btn) return;
                     var RULE_PCT='النسبة ٪: الأساس ÷ '+OFFLBL+' × النسبة ← داون بالدولار ← × '+RATE.toLocaleString('en-US')+' (سعر الشهر) ← داون للمليون — بتتحرّك مع الدرجة لحالها.';
                     var RULE_AMT='المبلغ الثابت: نفس الرقم كل شهر لكل شخص مهما كانت درجته؛ بالدولار يُحوَّل بسعر الشهر ('+RATE.toLocaleString('en-US')+') — داون لليرة.';
-                    function periodTxt(){ var f=parseInt(fromSel.value,10), t=parseInt(toSel.value,10); if(f===10&&t===9) return 'كل السنة';
-                        return fromSel.options[fromSel.selectedIndex].text+' ← '+toSel.options[toSel.selectedIndex].text; }
+                    function periodTxt(r){ var f=parseInt(r.from.value,10), t=parseInt(r.to.value,10); if(f===10&&t===9) return 'كل السنة';
+                        return r.from.options[r.from.selectedIndex].text+' ← '+r.to.options[r.to.selectedIndex].text; }
                     function type(){ var r=document.querySelector('#opTypes input:checked'); return r?r.value:'prime_fixe'; }
                     function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
                     function calc(base,pct){ var usd=Math.floor((base/OFFICIAL)*(pct/100)); var lbp=Math.floor(usd*RATE); return {usd:usd, lbp:Math.floor(lbp/1000000)*1000000}; }
                     function line(it,pct){ var c=calc(it.base,pct); return '<div>'+it.name+' — أساس '+fmt(it.base)+' ⇒ '+fmt(c.usd)+'$ ⇒ <b style="color:#166534">'+fmt(c.lbp)+' ل.ل</b></div>'; }
-                    function R(tr){ return {tr:tr, cat:tr.getAttribute('data-cat'), on:tr.querySelector('.opOn'), modes:[].slice.call(tr.querySelectorAll('.opMode')), val:tr.querySelector('.opVal'), cur:tr.querySelector('.opCur'), unit:tr.querySelector('.opUnit'), state:tr.querySelector('.opState'), live:tr.querySelector('.opLive')}; }
+                    function R(tr){ return {tr:tr, cat:tr.getAttribute('data-cat'), on:tr.querySelector('.opOn'), modes:[].slice.call(tr.querySelectorAll('.opMode')), val:tr.querySelector('.opVal'), cur:tr.querySelector('.opCur'), unit:tr.querySelector('.opUnit'), state:tr.querySelector('.opState'), live:tr.querySelector('.opLive'), from:tr.querySelector('select[name$="[from]"]'), to:tr.querySelector('select[name$="[to]"]'), per:tr.querySelector('.opPer')}; }
                     var RS=rows.map(R);
                     function mode(r){ var m=r.modes.filter(function(x){return x.checked;})[0]; return m?m.value:'percent'; }
                     function dominant(S){ // القيمة السائدة بالفئة لهذا النوع (نسبة أو مبلغ) للاقتراح
@@ -646,7 +649,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                         var m=mode(r), v=parseFloat(r.val.value)||0, on=r.on.checked&&!r.on.disabled;
                         r.cur.style.display=(m==='amount')?'':'none'; r.unit.style.display=(m==='percent')?'':'none';
                         r.val.placeholder=(m==='amount')?'مثلاً 54000000':'مثلاً 65';
-                        r.tr.style.background=on?'#fffbeb':''; r.val.required=on;
+                        r.tr.style.background=on?'#fffbeb':''; r.val.required=on; if(r.per) r.per.textContent='('+periodTxt(r)+')';
                         renderState(r);
                         if(!on){ r.live.innerHTML='<span style="color:#94a3b8">غير مؤشَّرة — ما بتتأثّر</span>'; return; }
                         if(!v){ r.live.textContent='—'; return; }
@@ -655,13 +658,12 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                         var h=line(L.lo,v); if(L.hi&&L.hi.name!==L.lo.name) h+=line(L.hi,v); r.live.innerHTML=h;
                     }
                     function upd(){
-                        var t=type(), per=periodTxt(), n=0, who=[], what=[];
+                        var t=type(), n=0, who=[], what=[];
                         RS.forEach(function(r){ updRow(r); if(r.on.checked&&!r.on.disabled){ var S=(STATS[r.cat]||{})[t]; n+=S?S.n:0; who.push(CATL[r.cat]);
-                            var v=parseFloat(r.val.value)||0, m=mode(r); what.push(CATL[r.cat]+' '+(v?(m==='percent'?v+'٪':fmt(v)+(r.cur.value==='USD'?' $':' ل.ل')):'…')); } });
+                            var v=parseFloat(r.val.value)||0, m=mode(r); what.push(CATL[r.cat]+' '+(v?(m==='percent'?v+'٪':fmt(v)+(r.cur.value==='USD'?' $':' ل.ل')):'…')+' ('+periodTxt(r)+')'); } });
                         warnType.textContent=TYPEL[t]; if(rule) rule.textContent=RULE_PCT+' '+RULE_AMT;
-                        if(perTxt) perTxt.textContent='('+per+')';
                         btnTxt.textContent='طبّق على '+n+' ('+(who.join(' + ')||'—')+')'; btn.disabled=(n===0);
-                        btn.setAttribute('data-confirm','تطبيق «'+TYPEL[t]+' — '+per+'»: '+(what.join(' · ')||'—')+' — بـ'+SCHOOL+'؟ '+TYPEL[t]+' الحالي عند كل فئة مؤشَّرة (نسب أو مبالغ، كل الفترات) يُستبدل بسطرها، ثم تُعاد الرواتب تلقائياً.');
+                        btn.setAttribute('data-confirm','تطبيق «'+TYPEL[t]+'»: '+(what.join(' · ')||'—')+' — بـ'+SCHOOL+'؟ '+TYPEL[t]+' الحالي عند كل فئة مؤشَّرة (نسب أو مبالغ، كل الفترات) يُستبدل بسطرها، ثم تُعاد الرواتب تلقائياً.');
                     }
                     function suggest(){ // عند تغيير النوع: اقترح لكل فئة قيمتها السائدة الحالية — المستخدم يعدّلها كما يشاء
                         guardTransport();
@@ -671,8 +673,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     }
                     document.querySelectorAll('#opTypes input').forEach(function(el){ el.addEventListener('change',suggest); });
                     RS.forEach(function(r){ r.on.addEventListener('change',upd); r.modes.forEach(function(x){ x.addEventListener('change',function(){ r.val.value=''; upd(); }); });
-                        r.val.addEventListener('input',upd); r.cur.addEventListener('change',upd); });
-                    if(fromSel) fromSel.addEventListener('change',upd); if(toSel) toSel.addEventListener('change',upd);
+                        r.val.addEventListener('input',upd); r.cur.addEventListener('change',upd); if(r.from) r.from.addEventListener('change',upd); if(r.to) r.to.addEventListener('change',upd); });
                     suggest();
                 })();
                 </script>
@@ -700,6 +701,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <button type="button" class="btn btn-success" onclick="baOpen('baModalIndiv')"><i class="fas fa-user-pen"></i> مبالغ فردية (لكل واحد)</button>
                 <button type="button" class="btn btn-light" onclick="baOpen('baModalDaily')"><i class="fas fa-bus"></i> نقل يومي</button>
                 <button type="button" class="btn btn-light" style="color:#b91c1c" onclick="baOpen('baModalRemove')"><i class="fas fa-trash"></i> إزالة</button>
+                <?php if (!$scopeAll): ?><a class="btn btn-light" style="color:#166534" href="<?= BASE_URL ?>pages/excel_salaries.php?sch=<?= (int)$schoolId ?>&sy=<?= urlencode($schoolYear) ?>" title="إكسل بأسماء المتعاقدين والموظفين: الراتب والأجر الإضافي وعدد الأيام — تعبّيه وترفعه"><i class="fas fa-file-excel"></i> إكسل (متعاقدين/موظفين)</a><?php endif; ?>
             </div>
         </div>
 

@@ -88,7 +88,7 @@ $sectionColors = [
 $sectionIcons = ['dashboard'=>'fa-gauge-high','personnel'=>'fa-users','paie'=>'fa-money-check-dollar','rapports'=>'fa-chart-column','systeme'=>'fa-gear'];
 $pageSection = [
     'dashboard'=>'dashboard',
-    'employees'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','law_check'=>'personnel',
+    'employees'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel',
     'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie','hours_reduction'=>'paie',
     'reports'=>'rapports','tax'=>'rapports',
     'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
@@ -196,6 +196,11 @@ document.addEventListener('submit', function (e) {
             <a href="<?= BASE_URL ?>pages/bulk_allowances.php" class="<?= $currentPage === 'bulk_allowances' ? 'active' : '' ?>">
                 <i class="fas fa-gift"></i>
                 <span>Primes & transport / المكافآت والنقل</span>
+            </a>
+
+            <a href="<?= BASE_URL ?>pages/excel_salaries.php" class="<?= $currentPage === 'excel_salaries' ? 'active' : '' ?>">
+                <i class="fas fa-file-excel"></i>
+                <span>Excel salaires & primes / إكسل الرواتب والإضافي</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/law_check.php" class="<?= $currentPage === 'law_check' ? 'active' : '' ?>">
@@ -620,7 +625,7 @@ document.addEventListener('submit', function (e) {
         // (2026-08-29، «ما تخلّي شي ما إلو معنى») صفحات الإعدادات/الإدارة ليست مطبوعات: بلا شريط طباعة/تصدير
         $noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','exchange_rates.php','rates_history.php',
                            'tax_brackets.php','social_security.php','salary_scales.php','schools.php','classes.php','exceptional_laws.php',
-                           'health_check.php','info_collect.php','bonuses.php','bulk_allowances.php','tax_declarations.php','tax_suggestions.php',
+                           'health_check.php','info_collect.php','bonuses.php','bulk_allowances.php','excel_salaries.php','tax_declarations.php','tax_suggestions.php',
                            'r567_check.php'];
         if (empty($hideExportToolbar) && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), $noToolbarPages, true)) {
             echo exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);

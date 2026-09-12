@@ -4486,7 +4486,8 @@ check('المكافآت الجماعية 2026-09-11/12: بطاقة «طبّق ع
       && strpos($ba0911, "SELECT employee_id, bonus_type, value_type, amount, currency FROM employee_bonuses") !== false
       && strpos($ba0911, "=== 'apply_percats'") !== false && substr_count($ba0911, '$applyLinesTo(') === 2 && strpos($ba0911, "foreach (\$validCats as \$ck) {") !== false
       && strpos($ba0911, "if (empty(\$row['on'])) continue;") !== false && strpos($ba0911, '$applyLinesTo([$ck], [$ln])') !== false
-      && strpos($ba0911, "baMonthSel('pfrom', 10") !== false && strpos($ba0911, "baMonthSel('pto', 9") !== false
+      && strpos($ba0911, "baMonthSel('pc[' . \$ck . '][from]', 10") !== false && strpos($ba0911, "baMonthSel('pc[' . \$ck . '][to]', 9") !== false
+      && strpos($ba0911, "'from' => \$row['from'] ?? \$pfrom, 'to' => \$row['to'] ?? \$pto") !== false
       && strpos($ba0911, "baMonthSel('ind_from', 10") !== false && strpos($ba0911, "\$perSql = \$iFull ? \$fullYearSql : \"(start_month = \$iFrom AND end_month = \$iTo)\"") !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(pct/100))') !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(b.pct/100))') !== false
@@ -5499,6 +5500,63 @@ try {
     }
 } catch (Throwable $e) { $why112 = $e->getMessage(); }
 check('تاريخ ترك مستحيل (تجربة حيّة تُرجَع): يظهر بالتقرير بتصحيح آلي، والتصحيح يمسح التاريخ', $ok112, $why112);
+
+/* =====================================================================
+ * 114) 📗 إكسل الرواتب والأجر الإضافي للمتعاقدين والموظفين (2026-09-12 «بدي ملف إكسل فيه أسماء المتعاقد أو الموظف ومحلّ أنا حطّ الراتب
+ *      والأجر الإضافي وعدد الأيام بالأسبوع… وانت بترجع بتوزّعهن على ملفاتهم — خليها أوبسيون زيادة»):
+ *      includes/excel_salaries.php (بناء xlsx بـZipArchive · قراءة · مقارنة قديم←جديد · تطبيق + recalc) + pages/excel_salaries.php (نزّل ← ارفع ← معاينة ← طبّق)
+ *      + رابط بالقائمة وبصفحة المكافآت الجماعية. الأعمدة ثابتة (المصدر الواحد excelSalariesColumns) ومنها «الإضافي من شهر ← إلى شهر».
+ * =================================================================== */
+require_once $PROJ . '/includes/excel_salaries.php';
+$xsPage = (string)file_get_contents($PROJ . '/pages/excel_salaries.php'); $xsInc = (string)file_get_contents($PROJ . '/includes/excel_salaries.php');
+$hdr114 = (string)file_get_contents($PROJ . '/includes/header.php'); $ba114 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
+check('إكسل الرواتب: الوحدة (بناء/قراءة/مقارنة/تطبيق) + الصفحة (نزّل/ارفع/معاينة/طبّق بتوكن) + رابط بالقائمة وبالمكافآت الجماعية + الأعمدة الثابتة فيها من←إلى + يحترم القفل + المتعاقدون والموظفون فقط',
+      function_exists('excelSalariesBuild') && function_exists('excelSalariesParse') && function_exists('excelSalariesDiff') && function_exists('excelSalariesApply')
+      && isset(excelSalariesColumns()['from'], excelSalariesColumns()['to'], excelSalariesColumns()['days'], excelSalariesColumns()['pct'], excelSalariesColumns()['sal_usd'], excelSalariesColumns()['sal_lbp'])
+      && strpos($xsInc, "employee_type IN ('enseignant_contractuel','employe')") !== false && strpos($xsInc, 'isSchoolYearLocked($schoolId, $sy)') !== false
+      && strpos($xsInc, 'recalcEmployeeYear($id, $sy)') !== false
+      && strpos($xsPage, "\$action === 'download'") !== false && strpos($xsPage, "\$action === 'upload'") !== false && strpos($xsPage, "\$action === 'apply'") !== false
+      && strpos($xsPage, "excel_import_' . \$token . '.json'") !== false && strpos($xsPage, 'enctype="multipart/form-data"') !== false
+      && strpos($hdr114, 'pages/excel_salaries.php') !== false && strpos($hdr114, "'excel_salaries.php'") !== false && strpos($ba114, 'pages/excel_salaries.php?sch=') !== false);
+// تجربة حيّة: بناء الملف لمدرسة ← قراءته ← مقارنته = صفر فروقات (idempotent)؛ ثم تعديل (أجر إضافي بفترة + أيام) ← تطبيق ← تحقّق ← إرجاع بالأداة نفسها ← مطابق للأصل
+$why114 = ''; $ok114 = false;
+try {
+    $sch114 = (int)$db->query("SELECT e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026'
+        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type IN ('enseignant_contractuel','employe') AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+        GROUP BY e.school_id ORDER BY COUNT(DISTINCT e.id) DESC LIMIT 1")->fetchColumn();
+    $sy114 = '2025-2026';
+    if (!$sch114) { $ok114 = true; $why114 = 'لا عيّنة'; }
+    else {
+        $tmp114 = sys_get_temp_dir() . '/reg114_' . uniqid() . '.xlsx';
+        file_put_contents($tmp114, excelSalariesBuild($db, $sch114, $sy114));
+        $parsed114 = excelSalariesParse($tmp114); @unlink($tmp114);
+        $d0 = excelSalariesDiff($db, $sch114, $sy114, $parsed114);
+        $before = excelSalariesRows($db, $sch114, $sy114);
+        $vict = null; foreach ($before as $r) if ($r['sal_lbp'] !== null || $r['sal_usd'] !== null) { $vict = $r; break; }
+        if (!$vict) { $ok114 = count($d0['changes']) === 0 && !$d0['errors']; $why114 = "school=$sch114 rows=" . count($parsed114) . ' roundtrip=' . count($d0['changes']) . ' (لا عيّنة للتعديل)'; }
+        else {
+            $id114 = (int)$vict['id'];
+            $mod = ['id' => $id114, 'pct' => '12.5', 'amt_lbp' => '0', 'amt_usd' => '0', 'from' => 'كانون الثاني', 'to' => '3', 'days' => (string)((($vict['days'] ?? 5) % 7) + 1)];
+            $d1 = excelSalariesDiff($db, $sch114, $sy114, [$mod]);
+            $r1 = excelSalariesApply($db, $sch114, $sy114, $d1['changes']);
+            $after = excelSalariesRows($db, $sch114, $sy114)[$id114];
+            $bon = $db->query("SELECT value_type, amount, start_month, end_month FROM employee_bonuses WHERE employee_id = $id114 AND bonus_type = 'prime_fixe' AND school_year = '$sy114' AND is_active = 1")->fetchAll(PDO::FETCH_ASSOC);
+            $okApply = (float)$after['pct'] === 12.5 && $after['amt_lbp'] === null && $after['amt_usd'] === null && $after['from'] === monthName(1, 'ar') && $after['to'] === monthName(3, 'ar')
+                       && (int)$after['days'] === (int)$mod['days'] && count($bon) === 1 && (int)$bon[0]['start_month'] === 1 && (int)$bon[0]['end_month'] === 3;
+            // إرجاع بالأداة نفسها: صفّ الأصل كنصوص (مع 0 للإضافي إن كان بلا)
+            $restore = ['id' => $id114, 'sal_usd' => $vict['sal_usd'] !== null ? (string)$vict['sal_usd'] : '', 'sal_lbp' => $vict['sal_lbp'] !== null ? (string)$vict['sal_lbp'] : '',
+                        'pct' => (string)(float)($vict['pct'] ?? 0), 'amt_lbp' => (string)(float)($vict['amt_lbp'] ?? 0), 'amt_usd' => (string)(float)($vict['amt_usd'] ?? 0),
+                        'from' => (string)($vict['from'] ?? ''), 'to' => (string)($vict['to'] ?? ''), 'days' => (string)($vict['days'] ?? '')];
+            $d2 = excelSalariesDiff($db, $sch114, $sy114, [$restore]);
+            excelSalariesApply($db, $sch114, $sy114, $d2['changes']);
+            $final = excelSalariesRows($db, $sch114, $sy114)[$id114];
+            $cmp = fn($r) => [$r['sal_usd'], $r['sal_lbp'], (float)($r['pct'] ?? 0), (float)($r['amt_lbp'] ?? 0), (float)($r['amt_usd'] ?? 0), $r['from'], $r['to'], $r['days']];
+            $ok114 = count($d0['changes']) === 0 && !$d0['errors'] && count($parsed114) === count($before) && count($d1['changes']) === 1 && $r1['applied'] === 1 && $okApply && $cmp($final) === $cmp($vict);
+            $why114 = "school=$sch114 rows=" . count($parsed114) . ' roundtrip=' . count($d0['changes']) . " emp=$id114 apply=" . json_encode($r1) . ' okApply=' . var_export($okApply, true) . ' restored=' . var_export($cmp($final) === $cmp($vict), true);
+        }
+    }
+} catch (Throwable $e) { $why114 = $e->getMessage(); }
+check('إكسل الرواتب (تجربة حيّة تُرجَع): بناء ← قراءة ← صفر فروقات، ثم تعديل (12.5٪ كانون2←آذار + أيام) ← تطبيق ← بند واحد بالفترة ← إرجاع بالأداة نفسها = الأصل', $ok114, $why114);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
