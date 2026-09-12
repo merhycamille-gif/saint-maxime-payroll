@@ -96,6 +96,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
     if (!$scopeAll && $schoolId > 0 && isAllSchools()) { $_SESSION['active_schools'] = [$schoolId]; unset($_SESSION['report_schools']); }
     if (!$scopeAll) requireSchoolSelected();   // نطاق مدرسة واحدة يتطلّب اختيارها؛ «كل المدارس» للمدير العام فقط
     $action = $_POST['action'] ?? '';
+    // 🔒 قفل السنة (2026-09-12): مدرسة مقفولة على هذه السنة = لا تعديل جماعي (ولا على «كل المدارس» إن كان بينها مقفولة)
+    $lkSchools = $scopeAll ? array_map(fn($sc) => (int)$sc['id'], allSchools()) : [(int)$schoolId];
+    $lkHit = array_values(array_filter($lkSchools, fn($sid) => isSchoolYearLocked($sid, (string)$schoolYear)));
+    if ($lkHit) { $_SESSION['flash_error'] = yearLockedMsg($lkHit[0], (string)$schoolYear) . ($scopeAll ? ' — اختر المدارس غير المقفولة واحدة واحدة.' : ''); header('Location: ' . $_SERVER['REQUEST_URI']); exit; }
 
     if ($action === 'apply_periods') {
         // أسطر متعدّدة، كل سطر = نوع + من شهر + إلى شهر + قيمة + (مبلغ/نسبة) + عملة.

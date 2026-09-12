@@ -563,6 +563,8 @@ class PayrollCalculator {
             $rowRank = ($this->month >= 10) ? $this->year : $this->year - 1;
             if ($rowRank > $depRank) return $this->calculate(); // بلا أي حفظ — سنة بعد الترك
         }
+        // 🔒 قفل السنة (2026-09-12): سنة مقفولة لمدرسة الموظف = الحسابات ما بتتغيّر من أي مسار (احتساب/فتح/شفاء/مكافآت) — بلا حفظ
+        if (isSchoolYearLocked((int)($this->employee['school_id'] ?? 0), schoolYearOfMonth((int)$this->year, (int)$this->month))) return $this->calculate();
         $data = $this->calculate();
         
         ensurePrimeUsdLawColumn();
@@ -749,6 +751,9 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
 function overlayStoredYearBonuses($employeeId, $schoolYear) {
     $db = getDB();
     if (!preg_match('/^\d{4}-\d{4}$/', (string)$schoolYear)) return 0;
+    // 🔒 قفل السنة: لا تركيب على أشهر سنة مقفولة لمدرسة الموظف
+    $lkSid = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$employeeId)->fetchColumn();
+    if (isSchoolYearLocked($lkSid, (string)$schoolYear)) return 0;
 
     // أي عائلات علاوات مسجّلة له هذه السنة؟ (تشمل غير الفعّالة كي يُصفَّر المطفأ)
     $fam = $db->prepare("SELECT

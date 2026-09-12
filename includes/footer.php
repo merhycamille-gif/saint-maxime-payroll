@@ -7,6 +7,28 @@
 <script src="<?= BASE_URL ?>assets/js/form-lock.js?v=<?= @filemtime(__DIR__ . '/../assets/js/form-lock.js') ?: '1' ?>"></script>
 <script src="<?= BASE_URL ?>assets/js/select-search.js?v=<?= @filemtime(__DIR__ . '/../assets/js/select-search.js') ?: '1' ?>"></script>
 <script>window.BASE_URL = <?= json_encode(BASE_URL) ?>;</script>
+<?php if (function_exists('openYearHealState20260912') && openYearHealState20260912() !== null): ?>
+<script>
+// 📅 تجهيز 2026-2027 التلقائي (2026-09-12): نبض خلفي كل 4 ثوانٍ يشغّل دفعة من الشفاء حتى يكتمل — شريط صغير يُظهر التقدّم ثم يختفي
+(function () {
+  var bar = document.createElement('div'); bar.className = 'no-print';
+  bar.style.cssText = 'position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:99998;background:#1F4E5F;color:#fff;padding:8px 16px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.25);direction:rtl';
+  bar.textContent = '⏳ البرنامج عم يجهّز سنة 2026-2027 تلقائياً…';
+  window.addEventListener('load', function () { document.body.appendChild(bar); });
+  var busy = false, stop = false;
+  function tick() {
+    if (busy || stop) return; busy = true;
+    fetch(window.BASE_URL + 'pages/heal_tick.php', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) {
+      busy = false;
+      if (!s || s.done) { stop = true; bar.textContent = '✅ خلص تجهيز 2026-2027 — الدرجات والنقل و85٪ عبرا'; setTimeout(function () { bar.remove(); }, 6000); return; }
+      var st = { grades: 'تصحيح درجات الملاك (' + s.grades + ' من ' + s.seen + ')', transport: 'إطفاء النقل بالنسبة (' + s.transport + ')', abra85: 'عبرا 85٪ (' + s.abra + ')', finish: 'إنهاء' }[s.stage] || s.stage;
+      bar.textContent = '⏳ البرنامج عم يجهّز 2026-2027 تلقائياً: ' + st;
+    }).catch(function () { busy = false; });
+  }
+  setInterval(tick, 4000); setTimeout(tick, 800);
+})();
+</script>
+<?php endif; ?>
 <script src="<?= BASE_URL ?>assets/js/pdf-save.js?v=<?= @filemtime(__DIR__ . '/../assets/js/pdf-save.js') ?: '1' ?>"></script>
 <script>
 // وضع المعاينة قبل الطباعة (_autoprint): عند المجيء من زرّ «PDF رسمي» في بيئة بلا أدوات

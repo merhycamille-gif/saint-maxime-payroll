@@ -136,7 +136,10 @@ if ($action === 'calc' && $employeeId > 0) {
         $cfg = $db->prepare("SELECT id, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ?");
         $cfg->execute([$employeeId]); $cfg = $cfg->fetch();
         $hasConfig = $cfg && salaryEngineAllowed($cfg, $db); // المصدر الواحد (الجديد بلا أساس منقول يُحسب من ملفه)
-        if (!$hasConfig) {
+        $lkSid = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$employeeId)->fetchColumn();
+        if (isSchoolYearLocked($lkSid, schoolYearOfMonth((int)$year, (int)$month))) {
+            $_SESSION['flash'] = ['type' => 'danger', 'msg' => yearLockedMsg($lkSid, schoolYearOfMonth((int)$year, (int)$month))];
+        } elseif (!$hasConfig) {
             $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'راتب هذا الموظف مُدخَل يدوياً (منقول) — لا يُعاد حسابه تلقائياً لئلا يُصفَّر. عدّله من بطاقته إن لزم.'];
         } else {
             (new PayrollCalculator($employeeId, $month, $year))->calculateAndSave();
@@ -167,15 +170,18 @@ if ($action === 'calc_all') {
     $stmtC = $db->prepare($sqlC);
     $stmtC->execute($paramsC);
     $employees = $stmtC->fetchAll();
-    $count = 0;
+    $count = 0; $lockedN = 0; $syCalc = schoolYearOfMonth((int)$year, (int)$month);
     foreach ($employees as $e) {
         try {
             $calc = new PayrollCalculator($e['id'], $month, $year);
+            // 🔒 قفل السنة: مدرسة مقفولة = المحرّك لا يحفظ؛ نعدّها لنقولها بالرسالة
+            $sidC = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$e['id'])->fetchColumn();
+            if (isSchoolYearLocked($sidC, $syCalc)) { $lockedN++; continue; }
             $calc->calculateAndSave();
             $count++;
         } catch (Exception $ex) {}
     }
-    $_SESSION['flash'] = ['type' => 'success', 'msg' => "$count salaires calculés pour " . monthName($month) . " $year"];
+    $_SESSION['flash'] = ['type' => $lockedN && !$count ? 'danger' : 'success', 'msg' => "$count salaires calculés pour " . monthName($month) . " $year" . ($lockedN ? " — 🔒 $lockedN تُركوا كما هم لأن سنتهم مقفولة لمدرستهم" : '')];
     header('Location: ' . BASE_URL . 'pages/monthly_payroll.php?month=' . $month . '&year=' . $year . '&type=' . urlencode($typeFilter));
     exit;
 }

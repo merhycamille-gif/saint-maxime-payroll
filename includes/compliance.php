@@ -555,9 +555,12 @@ function handleCompliancePost(PDO $db, string $redirectTo): void {
     $done = 0; $msgs = [];
     $ins = $db->prepare("INSERT INTO compliance_decisions (item_key, rule_key, employee_id, school_id, school_year, emp_name, violation, fix, decision, result, decided_by, decided_at, created_at)
                          VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW()) ON DUPLICATE KEY UPDATE decision = VALUES(decision), result = VALUES(result), decided_by = VALUES(decided_by), decided_at = NOW(), violation = VALUES(violation), fix = VALUES(fix)");
+    $lockedSkipped = 0;
     foreach ($keys as $k) {
         $it = $byKey[$k] ?? null;
         if (!$it) continue;
+        // 🔒 قفل السنة (2026-09-12): بند لمدرسة مقفولة على هذه السنة لا يُصحَّح ولا يُقرَّر
+        if ($it['school_id'] && isSchoolYearLocked((int)$it['school_id'], $sy)) { $lockedSkipped++; continue; }
         if ($act === 'comp_approve') {
             if (!$it['auto']) continue;
             try { $res = complianceApply($db, $it); } catch (Throwable $e) { $res = 'خطأ: ' . $e->getMessage(); }
@@ -573,6 +576,7 @@ function handleCompliancePost(PDO $db, string $redirectTo): void {
     try { complianceBuild($db); } catch (Throwable $e) {}
     if ($done) $_SESSION['flash_success'] = ($act === 'comp_approve' ? '✅ صُحِّح ' : '⏸️ تُرك ') . $done . ' — ' . implode(' · ', array_slice($msgs, 0, 8)) . (count($msgs) > 8 ? '…' : '');
     else $_SESSION['flash_error'] = 'لم يُنفَّذ شيء — المخالفة لم تعد موجودة أو لا تصحيح آلياً لها.';
+    if ($lockedSkipped) $_SESSION['flash_error'] = '🔒 ' . $lockedSkipped . ' بند تُرك كما هو لأن سنته مقفولة لمدرسته (افتح القفل من «فتح سنة دراسية» إذا بدّك تصحّحه).' . (!empty($_SESSION['flash_error']) && $done ? '' : '');
     header('Location: ' . $redirectTo); exit;
 }
 

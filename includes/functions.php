@@ -6331,3 +6331,151 @@ function healNewHiresNoRows20260909() {
         try { setSetting('heal_new_hires_norows_20260909', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+
+/**
+ * 📅 تجهيز 2026-2027 تلقائياً (أمره 2026-09-12 «عمول انت كل شي أحلى ما أنا أغلط») — شفاء ذاتي بدفعات مؤقّتة
+ * (≈6 ثوانٍ بكل نبضة من footer.php عبر pages/heal_tick.php حتى يكتمل) بثلاث مراحل:
+ *   ① grades   : كل ملاك فاعل له رواتب 2026-2027 ← applyLegalGradesForNewYear (درجته كما رتّبها + تدرّج القانون لهذه السنة؛
+ *                يصحّح صفوف الفتح القديمة «نصف درجة بلا استثنائي» للـ23) ثم إعادة حساب سنته إن تغيّر شيء.
+ *   ② transport: بنود «نقل بنسبة ٪» بـ2026-2027 (26 بعبرا) = تقرير المخالفات «موافق على الكل» (complianceApply + قرار مسجَّل).
+ *   ③ abra85   : كل ملاك عبرا (ثانوية السيدة) له رواتب 2026-2027 ← أجر إضافي 85٪ كل السنة (يستبدل 65٪) + إعادة الحساب — كما البطاقة الكحلية.
+ * الحالة بالفلاغ heal_openyear2627_20260912 (JSON: stage/cursor/عدّادات) ثم 'done …'. نسخة بنود قبل التعديل: _bk_bonuses_oy0912.
+ * idempotent: إعادة تشغيله لا تكرّر شيئاً (الدرجات ذاتية المطابقة، البنود المطفأة لا تعود، 85٪ الموجودة تُتخطّى). يحترم قفل السنة.
+ */
+function openYearHealState20260912(): ?array {
+    $v = (string)getSetting('heal_openyear2627_20260912', '');
+    if (strpos($v, 'done') === 0 || strpos($v, 'err') === 0) return null;
+    $s = $v !== '' ? json_decode($v, true) : null;
+    return is_array($s) ? $s : ['stage' => 'grades', 'cursor' => 0, 'grades' => 0, 'transport' => 0, 'abra' => 0, 'seen' => 0];
+}
+function healOpenYear2627_20260912(float $budget = 6.0): ?array {
+    $s = null;
+    try {
+        $s = openYearHealState20260912();
+        if ($s === null) return null;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        require_once __DIR__ . '/compliance.php';
+        $sy = '2026-2027'; $t0 = microtime(true);
+        $save = function () use (&$s) { setSetting('heal_openyear2627_20260912', json_encode($s, JSON_UNESCAPED_UNICODE)); };
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_bonuses_oy0912 LIKE employee_bonuses");
+        if (!(int)$db->query("SELECT COUNT(*) FROM _bk_bonuses_oy0912")->fetchColumn()) $db->exec("INSERT INTO _bk_bonuses_oy0912 SELECT * FROM employee_bonuses");
+
+        if ($s['stage'] === 'grades') {
+            $q = $db->prepare("SELECT e.id, e.school_id FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND e.id > ?
+                AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ?)
+                AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= '2026-10-01'
+                ORDER BY e.id LIMIT 40");
+            while (microtime(true) - $t0 < $budget) {
+                $q->execute([(int)$s['cursor'], $sy]);
+                $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+                if (!$rows) { $s['stage'] = 'transport'; $s['cursor'] = 0; break; }
+                foreach ($rows as $r) {
+                    $id = (int)$r['id']; $s['seen']++; $s['cursor'] = $id;
+                    if (!isSchoolYearLocked((int)$r['school_id'], $sy) && applyLegalGradesForNewYear($db, $id, 2026, 2027) > 0) { recalcEmployeeYear($id, $sy); $s['grades']++; }
+                    if (microtime(true) - $t0 >= $budget) break;
+                }
+            }
+            $save(); return $s;
+        }
+        if ($s['stage'] === 'transport') {
+            $items = complianceItems($db, $sy);
+            $ins = $db->prepare("INSERT INTO compliance_decisions (item_key, rule_key, employee_id, school_id, school_year, emp_name, violation, fix, decision, result, decided_by, decided_at, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW()) ON DUPLICATE KEY UPDATE decision = VALUES(decision), result = VALUES(result), decided_by = VALUES(decided_by), decided_at = NOW()");
+            $left = 0;
+            foreach ($items as $it) {
+                if ($it['rule'] !== 'transport_pct' || empty($it['auto'])) continue;
+                if (isSchoolYearLocked((int)$it['school_id'], $sy)) continue;
+                if (microtime(true) - $t0 >= $budget) { $left++; continue; }
+                try { $res = complianceApply($db, $it); } catch (Throwable $e) { $res = 'خطأ: ' . $e->getMessage(); }
+                $ins->execute([$it['key'], $it['rule'], $it['emp_id'] ?: null, $it['school_id'] ?: null, $sy, $it['emp_name'], $it['violation'], $it['fix'], 'approved', $res, 'auto-2026-09-12']);
+                $s['transport']++;
+            }
+            if ($left === 0) { $s['stage'] = 'abra85'; $s['cursor'] = 0; }
+            $save(); return $s;
+        }
+        if ($s['stage'] === 'abra85') {
+            $sid = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE '%ثانوية السيدة%' AND is_deleted = 0 ORDER BY id LIMIT 1")->fetchColumn();
+            if ($sid <= 0 || isSchoolYearLocked($sid, $sy)) { $s['stage'] = 'finish'; $save(); return $s; }
+            $q = $db->prepare("SELECT e.id FROM employees e WHERE e.school_id = ? AND e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.id > ?
+                AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ?) ORDER BY e.id LIMIT 40");
+            $cur = $db->prepare("SELECT value_type, amount, start_month, end_month FROM employee_bonuses WHERE employee_id = ? AND bonus_type = 'prime_fixe' AND school_year = ? AND is_active = 1");
+            $off = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = 'prime_fixe' AND school_year = ?");
+            $add = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, 'prime_fixe', 1, ?, 85, 'percent', 'LBP', 10, 9, 1)");
+            while (microtime(true) - $t0 < $budget) {
+                $q->execute([$sid, (int)$s['cursor'], $sy]);
+                $ids = $q->fetchAll(PDO::FETCH_COLUMN);
+                if (!$ids) { $s['stage'] = 'finish'; $s['cursor'] = 0; break; }
+                foreach ($ids as $id) {
+                    $id = (int)$id; $s['cursor'] = $id;
+                    $cur->execute([$id, $sy]); $rows = $cur->fetchAll(PDO::FETCH_ASSOC);
+                    $ok85 = count($rows) === 1 && $rows[0]['value_type'] === 'percent' && abs((float)$rows[0]['amount'] - 85) < 0.001
+                          && (($rows[0]['start_month'] === null && $rows[0]['end_month'] === null) || ((int)$rows[0]['start_month'] === 10 && (int)$rows[0]['end_month'] === 9));
+                    if (!$ok85) { $off->execute([$id, $sy]); $add->execute([$id, $sy]); recalcEmployeeYear($id, $sy); $s['abra']++; }
+                    if (microtime(true) - $t0 >= $budget) break;
+                }
+            }
+            $save(); return $s;
+        }
+        // finish
+        try { complianceBuild($db); } catch (Throwable $e) {}
+        setSetting('heal_openyear2627_20260912', 'done ' . date('Y-m-d H:i') . ': grades=' . (int)$s['grades'] . '/' . (int)$s['seen'] . ' transport=' . (int)$s['transport'] . ' abra85=' . (int)$s['abra']);
+        return null;
+    } catch (Throwable $e) {
+        try { setSetting('heal_openyear2627_20260912', 'err: ' . mb_substr($e->getMessage(), 0, 300) . ' | ' . json_encode($s)); } catch (Throwable $e2) {}
+        return null;
+    }
+}
+
+/* =============================================================================
+ * 🔒 قفل السنة الدراسية لكل مدرسة بكلمة سرّ (أمره 2026-09-12 «بدي لوك لكل مدرسة عن السنة الدراسية وحط أنا باسوورد
+ *    حتى ما نخلص حسابات المدرسة بتضلّ متل ما هي ما بتتغيّر إلا إذا أنا عملت أن-لوك وغيّرت»)
+ *  - جدول school_year_locks (يتركّب ذاتياً) + كلمة سرّ واحدة للقفل (إعداد year_lock_password_hash) يضعها المدير العام.
+ *  - المصدر الواحد للفحص: isSchoolYearLocked($schoolId, $sy) — يستعمله محرّك الرواتب (لا حفظ لشهر بسنة مقفولة)،
+ *    وفتح السنة، والمكافآت الجماعية، وملف الأستاذ (بنوده)، وتقرير المخالفات، وكشف الرواتب الشهري (التعديل اليدوي)، والتفريغ.
+ *  - القفل/الفتح من صفحة «فتح سنة دراسية» (بطاقة الأقفال) بكلمة السرّ.
+ * =========================================================================== */
+function ensureYearLockTable(): void {
+    static $done = false; if ($done) return;
+    // 🔴 DDL داخل معاملة مفتوحة = COMMIT ضمني بMySQL (كسر ترجيع تجربة ديانا بregression) — يُركَّب من الهيدر خارج أي معاملة
+    if (getDB()->inTransaction()) return;
+    $done = true;
+    try {
+        getDB()->exec("CREATE TABLE IF NOT EXISTS school_year_locks (
+            id INT AUTO_INCREMENT PRIMARY KEY, school_id INT NOT NULL, school_year VARCHAR(9) NOT NULL,
+            locked_by VARCHAR(100) NULL, locked_at DATETIME NULL, UNIQUE KEY uq_sy (school_id, school_year)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Throwable $e) {}
+}
+/** كل الأقفال [school_id => [sy => locked_at]] — تُقرأ مرّة بالطلب. */
+function yearLocksMap(bool $refresh = false): array {
+    static $map = null;
+    if ($map !== null && !$refresh) return $map;
+    ensureYearLockTable(); $map = [];
+    try { foreach (getDB()->query("SELECT school_id, school_year, locked_at, locked_by FROM school_year_locks") as $r) $map[(int)$r['school_id']][(string)$r['school_year']] = $r; } catch (Throwable $e) {}
+    return $map;
+}
+function isSchoolYearLocked(int $schoolId, ?string $sy): bool {
+    if ($schoolId <= 0 || !$sy || !preg_match('/^\d{4}-\d{4}$/', $sy)) return false;
+    return isset(yearLocksMap()[$schoolId][$sy]);
+}
+/** السنة الدراسية لشهر معيّن (تشرين→أيلول). */
+function schoolYearOfMonth(int $year, int $month): string { return $month >= 10 ? $year . '-' . ($year + 1) : ($year - 1) . '-' . $year; }
+function yearLockPasswordSet(): bool { return (string)getSetting('year_lock_password_hash', '') !== ''; }
+function yearLockPasswordOk(string $pw): bool { $h = (string)getSetting('year_lock_password_hash', ''); return $h !== '' && $pw !== '' && password_verify($pw, $h); }
+function lockSchoolYear(int $schoolId, string $sy, string $who): void {
+    ensureYearLockTable();
+    getDB()->prepare("INSERT INTO school_year_locks (school_id, school_year, locked_by, locked_at) VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE locked_by = VALUES(locked_by), locked_at = NOW()")->execute([$schoolId, $sy, $who]);
+    yearLocksMap(true);
+    try { logAudit('year_lock', 'school_year_locks', $schoolId, null, ['sy' => $sy, 'by' => $who]); } catch (Throwable $e) {}
+}
+function unlockSchoolYear(int $schoolId, string $sy, string $who): void {
+    ensureYearLockTable();
+    getDB()->prepare("DELETE FROM school_year_locks WHERE school_id = ? AND school_year = ?")->execute([$schoolId, $sy]);
+    yearLocksMap(true);
+    try { logAudit('year_unlock', 'school_year_locks', $schoolId, null, ['sy' => $sy, 'by' => $who]); } catch (Throwable $e) {}
+}
+/** رسالة موحّدة للرفض. */
+function yearLockedMsg(int $schoolId, string $sy): string {
+    return '🔒 سنة ' . $sy . ' مقفولة لمدرسة «' . schoolNameById($schoolId, 'ar') . '» — الحسابات ما بتتغيّر. لتعديلها افتح القفل بكلمة السرّ من صفحة «فتح سنة دراسية».';
+}

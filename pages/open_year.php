@@ -152,7 +152,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         }
         return [$n, $promoted, $carried];
         };
-        $targets = $chosen;
+        // 🔒 قفل السنة (2026-09-12): المدرسة المقفولة على هذه السنة تُتخطّى (حساباتها ما بتتغيّر)
+        $lockedT = array_values(array_filter($chosen, fn($sid) => isSchoolYearLocked((int)$sid, $newYear)));
+        $targets = array_values(array_diff($chosen, $lockedT));
         $n = 0; $promoted = 0; $carried = 0; $perSchool = [];
         foreach ($targets as $sid) {
             [$a1, $b1, $c1] = $openOne($sid);
@@ -164,7 +166,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         if (strcmp($newYear, calendarSchoolYear()) >= 0 && strcmp($newYear, currentSchoolYear()) >= 0) setSetting('program_school_year', $newYear);
         $_SESSION['flash_success'] = "تم فتح السنة $newYear " . ($allSchoolsOpen ? 'لكل المدارس' : (count($targets) > 1 ? 'للمدارس المختارة' : 'للمدرسة')) . ' (' . implode(' · ', $perSchool) . ')'
             . " — $n موظف محسوب بالقانون (منهم $promoted أستاذ ملاك كُمِّل تدرّجهم على درجتهم كما رتّبتها) + $carried متعاقد نُقل راتبه كما كان"
-            . " — الإضافات وتعويض النقل " . ($addMode === 'same' && $transMode === 'same' ? 'نُقلت كما كانت' : 'حسب اختيارك') . ". ما تغيّر شي إلا إذا عدّلته أنت بالسنة الجديدة (المكافآت الجماعية / ملف الأستاذ).";
+            . " — الإضافات وتعويض النقل " . ($addMode === 'same' && $transMode === 'same' ? 'نُقلت كما كانت' : 'حسب اختيارك') . ". ما تغيّر شي إلا إذا عدّلته أنت بالسنة الجديدة (المكافآت الجماعية / ملف الأستاذ)."
+            . ($lockedT ? ' 🔒 تُركت مقفولة كما هي: ' . implode(' · ', array_map(fn($sid) => schoolNameById($sid, 'ar'), $lockedT)) . '.' : '');
+        if (!$targets) { unset($_SESSION['flash_success']); $_SESSION['flash_error'] = '🔒 كل المدارس المختارة مقفولة على سنة ' . $newYear . ' — ما تغيّر شي. افتح القفل أوّلاً إذا بدّك.'; }
         header('Location: ' . BASE_URL . 'pages/open_year.php');
         exit;
     }
@@ -194,6 +198,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear
         $_SESSION['flash_error'] = 'لا يمكن تفريغ السنة الجارية أو سنة سابقة — فقط السنين المستقبلية.';
     } elseif (!$allSch && $schoolId <= 0) {
         $_SESSION['flash_error'] = 'اختر مدرسة (أو «كل المدارس»)';
+    } elseif ($lkC = array_values(array_filter($allSch ? array_map(fn($sc) => (int)$sc['id'], allSchools()) : [$schoolId], fn($sid) => isSchoolYearLocked((int)$sid, $clrYear)))) {
+        $_SESSION['flash_error'] = yearLockedMsg($lkC[0], $clrYear) . ' (لا تفريغ لسنة مقفولة)'; // 🔒
     } else {
         // تواريخ درجات القانون المضافة آلياً لهذه السنة عند فتحها: التدرّج العادي (1/10 من سنة البدء)
         // والدرجات الاستثنائية (1/1 من سنة الانتهاء). بما أنّ السنة مستقبلية، أي حدث بهذين التاريخين
@@ -241,6 +247,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
         $_SESSION['flash_error'] = 'هذا الخيار للسنين المستقبلية (المفتوحة للتجهيز) فقط.';
     } elseif ($schoolId <= 0) {
         $_SESSION['flash_error'] = 'اختر مدرسة';
+    } elseif (isSchoolYearLocked($schoolId, $yr)) {
+        $_SESSION['flash_error'] = yearLockedMsg($schoolId, $yr); // 🔒
     } else {
         [$y1, $y2] = schoolYearToYears($yr);
         $prevSY = ($y1 - 1) . '-' . $y1;
@@ -293,6 +301,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
         $_SESSION['flash_success'] = "تم تحديث $cnt موظف لسنة $yr — الأجر الإضافي والمكافأة: " . ($addOn ? 'موجودة ✓' : 'مشيولة ✗') . "، تعويض النقل: " . ($transOn ? 'موجود ✓' : 'مشيول ✗') . ".";
     }
     header('Location: ' . BASE_URL . 'pages/open_year.php');
+    exit;
+}
+
+// 🔒 قفل/فتح السنة الدراسية لمدرسة بكلمة سرّ (أمره 2026-09-12): «حتى ما نخلص حسابات المدرسة بتضلّ متل ما هي ما بتتغيّر إلا إذا أنا عملت أن-لوك»
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['lock_pw', 'lock_year', 'unlock_year'], true)) {
+    $la = $_POST['action']; $who = (string)($_SESSION['username'] ?? '');
+    if (!isSuperAdmin()) { $_SESSION['flash_error'] = 'الأقفال للمدير العام فقط.'; header('Location: ' . BASE_URL . 'pages/open_year.php#yearLocks'); exit; }
+    if ($la === 'lock_pw') {
+        $old = (string)($_POST['pw_old'] ?? ''); $new = (string)($_POST['pw_new'] ?? ''); $new2 = (string)($_POST['pw_new2'] ?? '');
+        if (yearLockPasswordSet() && !yearLockPasswordOk($old)) $_SESSION['flash_error'] = 'كلمة السرّ الحالية غير صحيحة.';
+        elseif (strlen($new) < 4) $_SESSION['flash_error'] = 'كلمة السرّ الجديدة قصيرة (4 أحرف على الأقل).';
+        elseif ($new !== $new2) $_SESSION['flash_error'] = 'كلمتا السرّ غير متطابقتين.';
+        else { setSetting('year_lock_password_hash', password_hash($new, PASSWORD_DEFAULT)); $_SESSION['flash_success'] = '🔑 حُفظت كلمة سرّ الأقفال. استعملها للقفل والفتح.'; }
+    } else {
+        $lsid = (int)($_POST['lock_school_id'] ?? 0); $lsy = trim((string)($_POST['lock_year'] ?? '')); $pw = (string)($_POST['lock_pw'] ?? '');
+        $validL = in_array($lsid, array_map(fn($sc) => (int)$sc['id'], allSchools()), true);
+        if (!$validL || !preg_match('/^\d{4}-\d{4}$/', $lsy)) $_SESSION['flash_error'] = 'اختر مدرسة وسنة صحيحتين.';
+        elseif (!yearLockPasswordSet()) $_SESSION['flash_error'] = 'حطّ كلمة سرّ الأقفال أوّلاً (البطاقة نفسها).';
+        elseif (!yearLockPasswordOk($pw)) $_SESSION['flash_error'] = '❌ كلمة السرّ غير صحيحة — ما تغيّر شي.';
+        elseif ($la === 'lock_year') { lockSchoolYear($lsid, $lsy, $who); $_SESSION['flash_success'] = '🔒 قُفلت سنة ' . $lsy . ' لمدرسة «' . schoolNameById($lsid, 'ar') . '» — حساباتها ما بتتغيّر من أي مكان بالبرنامج حتى تفتح القفل.'; }
+        else { unlockSchoolYear($lsid, $lsy, $who); $_SESSION['flash_success'] = '🔓 فُتح قفل سنة ' . $lsy . ' لمدرسة «' . schoolNameById($lsid, 'ar') . '» — صار التعديل ممكناً.'; }
+    }
+    header('Location: ' . BASE_URL . 'pages/open_year.php#yearLocks');
     exit;
 }
 
@@ -349,31 +380,10 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
             }
         }
         ?>
-        <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:13px;line-height:1.8;margin-bottom:12px">
-            <strong style="color:var(--primary)">Comment ça marche / كيف بتشتغل</strong>
-            <ul style="margin:6px 0 0;padding-inline-start:20px">
-                <li><b>«كل المدارس»</b> (أو أشّر المدارس اللي بدّك ياها) + السنة الجديدة + «افتح» = البرنامج ينقل <b>كل شي تلقائياً كما هو</b>: كل الأساتذة والموظفين الفاعلين، رواتبهم، الأجر الإضافي والمكافآت وتعويض النقل <b>كما كانت بالسنة السابقة</b> — <b>ما بيتغيّر شي إلا إذا عدّلته أنت</b>.</li>
-                <li><b>درجات الملاك:</b> البرنامج <b>ما بيغيّر درجة حدا</b> — بياخد درجة الأستاذ <b>كما رتّبتها</b> (مع أي زيادة عطيتها من عندك) وبيكمّل عليها <b>التدرّج العادي</b> لهالسنة (نصّ درجة بتشرين) + الاستثنائية المستحقّة بالقانون بكانون إن وُجدت. الزيادات اليدوية بتضلّ.</li>
-                <li>بعدين بالسنة الجديدة غيّر ما تريد: نسبة واحدة للكل من «المكافآت والنقل» (البطاقة الكحلية)، أو شخصاً بشخص من ملفه.</li>
-                <li>فتح سنة مفتوحة جزئياً آمن: يكمّل الناقصين ويعيد حساب الموجودين بلا تكرار بنودهم.</li>
-                <li>بمجرّد الفتح تصير السنة الجديدة <b>السنة الحالية للبرنامج كله</b>: التقارير والإفادات والقسائم ولوحة القيادة تفتح عليها تلقائياً.</li>
-            </ul>
-        </div>
-        <?php if ($stRows): ?>
-        <div class="table-wrapper" style="margin-bottom:14px">
-            <table class="table" style="font-size:13px">
-                <thead><tr><th>École / المدرسة</th><th>الفاعلون / Actifs</th><th>مفتوح لهم <?= e($stY) ?> / Ouverte pour</th><th>الحالة / État</th></tr></thead>
-                <tbody>
-                <?php foreach ($stRows as $sr): $st = $sr['act'] === 0 ? '—' : ($sr['opn'] >= $sr['act'] ? '✅ مفتوحة' : ($sr['opn'] > 0 ? '⚠️ جزئياً (' . $sr['opn'] . ' من ' . $sr['act'] . ')' : '❌ غير مفتوحة')); ?>
-                    <tr><td><?= e($sr['name']) ?></td><td><?= $sr['act'] ?></td><td><?= $sr['opn'] ?></td><td style="font-weight:700"><?= $st ?></td></tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php endif; ?>
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i>
-            أشّر كل المدارس (أو اختر مدرسة أو أكثر) وسنة دراسية جديدة. البرنامج بينقل **كل الأساتذة والموظفين الفاعلين** للسنة الجديدة بدرجتهم كما هي مع تكملة التدرّج — والتارك اللي تاريخ تركه قبل بداية السنة المختارة (1 تشرين الأول) **ما بينتقل أبداً**.
+        <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.9;margin-bottom:14px">
+            <b>١</b> أشّر المدارس (أو «كل المدارس») &nbsp;→&nbsp; <b>٢</b> اختر السنة الجديدة &nbsp;→&nbsp; <b>٣</b> اكبس «افتح».<br>
+            البرنامج بينقل <b>كل شي كما هو</b> من السنة الماضية (الرواتب، الإضافي، المكافآت، النقل) — <b>ما بيتغيّر شي إلا إذا عدّلته أنت</b> بعد الفتح.<br>
+            <b>الدرجات:</b> بياخد درجة كل أستاذ ملاك <b>كما رتّبتها</b> (مع أي زيادة عطيتها) وبيكمّل عليها تدرّج هالسنة بس. التارك قبل 1 تشرين ما بينتقل. الفتح مرّة تانية آمن (بيكمّل الناقص بلا تكرار).
         </div>
         <form method="POST" id="openYearForm" onsubmit="var all=document.getElementById('oy_all'); var n=this.querySelectorAll('input[name=&quot;school_ids[]&quot;]:checked').length; if(all&&!all.checked&&n===0){alert('أشّر «كل المدارس» أو اختر مدرسة واحدة على الأقل');return false;} return confirm((all&&all.checked) ? 'فتح السنة المختارة لكل المدارس ونقل كل الموظفين الفاعلين برواتبهم وتدرّجهم وإضافاتهم كما كانت؟ (قد يستغرق دقائق)' : 'فتح السنة المختارة للمدارس المؤشَّرة ونقل موظفيها الفاعلين كما كانوا؟');">
             <input type="hidden" name="action" value="open">
@@ -406,8 +416,10 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                 </div>
             </div>
 
-            <!-- خيارات نقل الإضافات وتعويض النقل للسنة الجديدة -->
-            <div style="margin-top:14px;padding:12px 14px;background:#f0f9f6;border:1px solid #b6e3d4;border-radius:8px">
+            <!-- خيارات نقل الإضافات وتعويض النقل للسنة الجديدة — مطوية (الافتراضي: نفس السنة الماضية) -->
+            <details style="margin-top:14px">
+            <summary style="cursor:pointer;font-weight:700;color:#0a6b5e;font-size:14px"><i class="fas fa-sliders-h"></i> خيارات إضافية (الافتراضي: الإضافات والنقل نفس السنة الماضية) / Options</summary>
+            <div style="margin-top:10px;padding:12px 14px;background:#f0f9f6;border:1px solid #b6e3d4;border-radius:8px">
                 <strong style="color:#0a6b5e"><i class="fas fa-coins"></i> Primes &amp; transport dans la nouvelle année / الإضافات وتعويض النقل في السنة الجديدة:</strong>
                 <div class="form-row cols-2" style="margin-top:10px;gap:18px">
                     <div>
@@ -427,14 +439,68 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                 </div>
                 <small style="color:#64748b;display:block;margin-top:8px">«نفس السنة الماضية» = ينقل قيمة كل أستاذ كما هي. «بلا» = تبدأ السنة بلا إضافات/نقل (تُدخلها لاحقاً). «بنسبة» = ينقلها مع زيادة/نقص (مثال: 10 = +10٪، -5 = ‑5٪). وبأي حال فيك تعدّل قيمة أي أستاذ من ملفه بعد الفتح.</small>
             </div>
+            </details>
 
-            <div style="margin-top:14px">
-                <button type="submit" class="btn btn-primary"><i class="fas fa-folder-plus"></i> افتح السنة / Ouvrir</button>
+            <div style="margin-top:16px">
+                <button type="submit" class="btn btn-primary" style="font-size:17px;font-weight:800;padding:10px 26px"><i class="fas fa-folder-plus"></i> افتح السنة / Ouvrir</button>
             </div>
         </form>
     </div>
 </div>
 
+<?php if (isSuperAdmin()): $locksAll = yearLocksMap(true); $pwSet = yearLockPasswordSet(); ?>
+<!-- 🔒 حالة كل مدرسة على السنة + الأقفال بكلمة سرّ (2026-09-12) -->
+<div class="card" id="yearLocks" style="border:2px solid #991b1b">
+    <div class="card-header" style="background:#fef2f2"><h3 style="color:#991b1b">
+        <span dir="ltr"><i class="fas fa-lock"></i> Verrouillage des comptes par école et par année</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">قفل حسابات كل مدرسة على السنة الدراسية — بكلمة سرّ</div>
+    </h3></div>
+    <div class="card-body">
+        <div style="font-size:14px;line-height:1.9;margin-bottom:12px">
+            بس تخلّص حسابات مدرسة على سنة، <b>اقفلها</b>: رواتبها وبنودها ودرجاتها بتضلّ <b>متل ما هي</b> — ما بيغيّرها لا احتساب ولا فتح سنة ولا مكافآت جماعية ولا تقرير مخالفات ولا تصليح تلقائي — لغاية ما <b>تفتح القفل بكلمة السرّ</b> وتعدّل. المقفولة بتبيّن 🔒 بأعلى الشاشة.
+        </div>
+        <form method="POST" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;background:#fff;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;margin-bottom:12px" onsubmit="return confirm('حفظ كلمة سرّ الأقفال؟');">
+            <?= csrfField() ?><input type="hidden" name="action" value="lock_pw">
+            <div style="font-weight:800;color:#991b1b;align-self:center">🔑 كلمة سرّ الأقفال<?= $pwSet ? ' (موجودة — لتغييرها)' : ' (حطّها أوّل مرّة)' ?>:</div>
+            <?php if ($pwSet): ?><div><label class="form-label" style="margin:0">الحالية</label><input type="password" name="pw_old" class="form-control" style="max-width:150px" autocomplete="current-password"></div><?php endif; ?>
+            <div><label class="form-label" style="margin:0">الجديدة</label><input type="password" name="pw_new" class="form-control" style="max-width:150px" required minlength="4" autocomplete="new-password"></div>
+            <div><label class="form-label" style="margin:0">تأكيد</label><input type="password" name="pw_new2" class="form-control" style="max-width:150px" required minlength="4" autocomplete="new-password"></div>
+            <button type="submit" class="btn" style="background:#991b1b;color:#fff;font-weight:700"><i class="fas fa-key"></i> احفظ</button>
+        </form>
+        <form method="POST" id="lockForm" onsubmit="var a=document.getElementById('lockAct').value; return confirm(a==='lock_year' ? 'قفل حسابات هذه المدرسة على السنة المختارة؟' : 'فتح القفل؟ بعدها بتقدر تعدّل حساباتها.');">
+            <?= csrfField() ?><input type="hidden" name="action" id="lockAct" value=""><input type="hidden" name="lock_school_id" id="lockSid" value="">
+            <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:10px">
+                <div><label class="form-label">السنة / Année</label>
+                    <select name="lock_year" id="lockYear" class="form-select" style="max-width:160px">
+                        <?php for ($yl = $startN + 2; $yl >= $startN - 3; $yl--): $syl = $yl . '-' . ($yl + 1); ?><option value="<?= $syl ?>" <?= $syl === $stY ? 'selected' : '' ?>><?= $syl ?></option><?php endfor; ?>
+                    </select></div>
+                <div><label class="form-label">كلمة السرّ / Mot de passe</label><input type="password" name="lock_pw" class="form-control" style="max-width:180px" <?= $pwSet ? '' : 'disabled placeholder="حطّ كلمة السرّ فوق أوّلاً"' ?> autocomplete="off"></div>
+            </div>
+            <div class="table-wrapper">
+            <table class="table" style="font-size:14px">
+                <thead><tr><th>École / المدرسة</th><th>الفاعلون</th><th>مفتوح لهم <?= e($stY) ?></th><th>حالة <?= e($stY) ?></th><th>السنوات المقفولة 🔒</th><th>القفل على السنة المختارة</th></tr></thead>
+                <tbody>
+                <?php foreach ($stRows as $sr): $st = $sr['act'] === 0 ? '—' : ($sr['opn'] >= $sr['act'] ? '✅ مفتوحة' : ($sr['opn'] > 0 ? '⚠️ جزئياً (' . $sr['opn'] . ' من ' . $sr['act'] . ')' : '❌ غير مفتوحة'));
+                      $lks = array_keys($locksAll[$sr['id']] ?? []); rsort($lks); ?>
+                    <tr>
+                        <td><strong><?= e($sr['name']) ?></strong></td><td><?= $sr['act'] ?></td><td><?= $sr['opn'] ?></td><td style="font-weight:700"><?= $st ?></td>
+                        <td style="font-weight:700;color:#991b1b"><?= $lks ? '🔒 ' . implode('، ', $lks) : '<span style="color:#94a3b8">—</span>' ?></td>
+                        <td style="white-space:nowrap">
+                            <button type="submit" class="btn btn-sm" data-lk="1" style="background:#991b1b;color:#fff;font-weight:700" <?= $pwSet ? '' : 'disabled' ?> onclick="document.getElementById('lockAct').value='lock_year';document.getElementById('lockSid').value='<?= (int)$sr['id'] ?>'">🔒 اقفل</button>
+                            <button type="submit" class="btn btn-sm btn-light" data-lk="1" style="font-weight:700" <?= $pwSet ? '' : 'disabled' ?> onclick="document.getElementById('lockAct').value='unlock_year';document.getElementById('lockSid').value='<?= (int)$sr['id'] ?>'">🔓 افتح</button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
+<details style="margin-top:6px">
+<summary style="cursor:pointer;font-weight:700;color:#475569;font-size:14px;padding:8px 4px"><i class="fas fa-tools"></i> أدوات إضافية (تعديل الإضافات لسنة مفتوحة · تفريغ سنة مستقبلية · السنوات الموجودة) / Outils</summary>
 <!-- ⭐ شك مارك: إضافة/إزالة الإضافات وتعويض النقل لسنة مفتوحة بلا تفريغها -->
 <div class="card" style="border:2px solid #0a6b5e">
     <div class="card-header" style="background:#e6f4f1"><h3 style="color:#0a6b5e">
@@ -543,5 +609,6 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
         </table>
     </div>
 </div>
+</details>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

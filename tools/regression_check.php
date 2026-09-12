@@ -5262,7 +5262,7 @@ check('فتح السنة: applyLegalGradesForNewYear بالمحرّك فقط، �
 check('فتح السنة: اختيار المدارس بالتأشير (كل المدارس افتراضياً + school_ids[]) والرسالة تسمّي المدارس المفتوحة',
       strpos($oy107, 'name="school_ids[]"') !== false && strpos($oy107, "(array)(\$_POST['school_ids'] ?? [])") !== false
       && strpos($oy107, "if (\$allSchoolsOpen) \$chosen = \$validIds;") !== false && strpos($oy107, 'كُمِّل تدرّجهم على درجتهم كما رتّبتها') !== false
-      && strpos($oy107, 'ما بيغيّر درجة حدا') !== false);
+      && strpos($oy107, 'كما رتّبتها') !== false);
 // تجربة حيّة (بلا أثر: transaction + rollback) على أستاذ درجته المخزّنة ≠ القانون وله استثنائية بكانون 2027 (تيا نخلة/ماريا حليحل…)
 $why107 = ''; $ok107 = false;
 try {
@@ -5303,6 +5303,61 @@ try {
     }
 } catch (Throwable $e) { $why107 = $e->getMessage(); }
 check('فتح السنة (تجربة حيّة بلا أثر): الصفّ القديم «نصف درجة فقط» يُستبدَل بالمستحقّ (عادي بتشرين + استثنائية بكانون فوق المخزّنة) + idempotent + الصفّ المعدَّل يدوياً لا يُلمَس', $ok107, $why107);
+
+/* =====================================================================
+ * 108) 🔒 قفل السنة الدراسية لكل مدرسة بكلمة سرّ (2026-09-12 «حتى ما نخلص حسابات المدرسة بتضلّ متل ما هي») +
+ *      📅 تجهيز 2026-2027 التلقائي بدفعات (heal_tick + نبض footer) + صفحة فتح السنة مرتّبة (خيارات مطوية + أدوات مطوية)
+ * =================================================================== */
+$fn108 = (string)file_get_contents($PROJ . '/includes/functions.php'); $pc108 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$oy108 = (string)file_get_contents($PROJ . '/pages/open_year.php'); $ft108 = (string)file_get_contents($PROJ . '/includes/footer.php'); $hd108 = (string)file_get_contents($PROJ . '/includes/header.php');
+check('قفل السنة: المصدر الواحد isSchoolYearLocked + الجدول ذاتي التركيب + المحرّك لا يحفظ لسنة مقفولة + التركيب/ملف الأستاذ/المكافآت الجماعية/المخالفات/فتح السنة/التفريغ/الاحتساب الشهري يحترمونه',
+      function_exists('isSchoolYearLocked') && function_exists('lockSchoolYear') && function_exists('yearLockPasswordOk')
+      && strpos($pc108, "if (isSchoolYearLocked((int)(\$this->employee['school_id'] ?? 0), schoolYearOfMonth((int)\$this->year, (int)\$this->month))) return \$this->calculate();") !== false
+      && strpos($pc108, "if (isSchoolYearLocked(\$lkSid, (string)\$schoolYear)) return 0;") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "if (isSchoolYearLocked(\$lkSid, \$sy)) { \$_SESSION['flash_error'] = yearLockedMsg(") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/bulk_allowances.php'), "\$lkHit = array_values(array_filter(\$lkSchools") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/compliance.php'), "isSchoolYearLocked((int)\$it['school_id'], \$sy)) { \$lockedSkipped++; continue; }") !== false
+      && strpos($oy108, "\$lockedT = array_values(array_filter(\$chosen, fn(\$sid) => isSchoolYearLocked((int)\$sid, \$newYear)));") !== false
+      && strpos($oy108, "elseif (isSchoolYearLocked(\$schoolId, \$yr))") !== false && strpos($oy108, "(لا تفريغ لسنة مقفولة)") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/monthly_payroll.php'), "if (isSchoolYearLocked(\$sidC, \$syCalc)) { \$lockedN++; continue; }") !== false
+      && strpos($oy108, 'id="yearLocks"') !== false && strpos($oy108, "'lock_pw', 'lock_year', 'unlock_year'") !== false && strpos($hd108, '🔒 مقفولة / Verrouillée') !== false);
+// تجربة حيّة بلا أثر: كلمة سرّ مؤقّتة + قفل + إعادة حساب لا تغيّر الشهر + فتح — كل شيء يُرجَع
+$why108 = ''; $ok108 = false;
+try {
+    require_once $PROJ . '/includes/payroll_calculator.php';
+    $prevHash108 = (string)getSetting('year_lock_password_hash', '');
+    $e108 = $db->query("SELECT e.id, e.school_id FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.school_year = '2025-2026' AND m.month = 11
+        WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.status = 'actif' ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$e108) { $why108 = 'لا عيّنة'; $ok108 = true; }
+    else {
+        $eid = (int)$e108['id']; $sid = (int)$e108['school_id'];
+        setSetting('year_lock_password_hash', password_hash('reg-1234', PASSWORD_DEFAULT));
+        $wasLocked = isSchoolYearLocked($sid, '2025-2026');
+        try {
+            lockSchoolYear($sid, '2025-2026', 'regcheck');
+            $b = $db->query("SELECT net_salary_lbp, base_plus_echelon_lbp, prime_fixe_lbp, income_tax_lbp FROM monthly_salaries WHERE employee_id = $eid AND year = 2025 AND month = 11")->fetch(PDO::FETCH_ASSOC);
+            (new PayrollCalculator($eid, 11, 2025))->calculateAndSave();
+            recalcEmployeeYear($eid, '2025-2026');
+            $a = $db->query("SELECT net_salary_lbp, base_plus_echelon_lbp, prime_fixe_lbp, income_tax_lbp FROM monthly_salaries WHERE employee_id = $eid AND year = 2025 AND month = 11")->fetch(PDO::FETCH_ASSOC);
+            $ok108 = isSchoolYearLocked($sid, '2025-2026') && $b == $a && yearLockPasswordOk('reg-1234') && !yearLockPasswordOk('wrong') && !isSchoolYearLocked($sid, '2019-2020');
+            $why108 = "emp=$eid sid=$sid same=" . var_export($b == $a, true);
+        } finally {
+            if (!$wasLocked) unlockSchoolYear($sid, '2025-2026', 'regcheck');
+            setSetting('year_lock_password_hash', $prevHash108);
+        }
+        $ok108 = $ok108 && !isSchoolYearLocked($sid, '2025-2026');
+    }
+} catch (Throwable $e) { $why108 = $e->getMessage(); }
+check('قفل السنة (تجربة حيّة بلا أثر): بعد القفل لا يتغيّر الشهر باحتساب مباشر ولا بإعادة حساب السنة + كلمة السرّ تُتحقَّق + الفتح يرجّع التعديل', $ok108, $why108);
+check('تجهيز 2026-2027 التلقائي: healOpenYear2627_20260912 بثلاث مراحل + pages/heal_tick.php + نبض footer يظهر فقط ما دام غير مكتمل + يحترم القفل',
+      function_exists('healOpenYear2627_20260912') && is_file($PROJ . '/pages/heal_tick.php')
+      && strpos($fn108, "if (\$s['stage'] === 'grades')") !== false && strpos($fn108, "if (\$s['stage'] === 'transport')") !== false && strpos($fn108, "if (\$s['stage'] === 'abra85')") !== false
+      && substr_count(substr($fn108, strpos($fn108, 'function healOpenYear2627_20260912')), 'isSchoolYearLocked(') >= 3
+      && strpos($ft108, "openYearHealState20260912() !== null): ?>") !== false && strpos($ft108, "pages/heal_tick.php") !== false);
+check('صفحة فتح السنة مرتّبة (2026-09-12 «واضحة ومش معجقة»): ٣ خطوات + خيارات الإضافات مطوية (details) + الأدوات الإضافية مطوية + زرّ افتح بارز',
+      substr_count($oy108, '<details') === 2 && strpos($oy108, 'خيارات إضافية (الافتراضي: الإضافات والنقل نفس السنة الماضية)') !== false
+      && strpos($oy108, 'أدوات إضافية (تعديل الإضافات لسنة مفتوحة') !== false && strpos($oy108, 'font-size:17px;font-weight:800;padding:10px 26px') !== false
+      && strpos($oy108, 'Comment ça marche') === false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

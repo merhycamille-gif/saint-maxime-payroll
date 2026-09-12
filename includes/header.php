@@ -14,6 +14,7 @@ healImportedTaxColumn20260804d(); // شفاء ذاتي مرّة واحدة: نس
 healFreshUsdColumn20260804e(); // شفاء ذاتي مرّة واحدة: الفريش دولار المنقول يُحفظ بملاحظات الملف ثم يُوحَّد عمود صافي الدولار على المرآة
 healLeaverPhantomRows(); // شفاء ذاتي مستمرّ (مرّة بالجلسة): مسح الرواتب الوهمية غير المدفوعة للتاركين بعد سنة تركهم (قاعدة التارك §١٠)
 healStaleYearMirror20260806(); // شفاء ذاتي مرّة واحدة: إعادة حساب السنين المفتوحة والسنين التي مخزّنها لا يطابق علاوات الملف (حالة مارسيلا — الكشف يطابق الملف)
+ensureYearLockTable();         // 🔒 تركيب ذاتي: جدول أقفال السنة الدراسية لكل مدرسة (2026-09-12) — خارج أي معاملة
 ensureEmployeeFlagColumns();   // تركيب ذاتي: أعمدة خيارات ملف الموظف (التنزيل/زيادة الزوج/التعويض العائلي)
 ensureSpouseColumns20260821(); // تركيب ذاتي: أعمدة معلومات الزوج/الزوجة (لنموذج المالية ر3)
 healRemoveNoFatherDuplicates20260806(); // شفاء ذاتي مرّة واحدة بأمر المستخدم: شيل الملف المكرّر الذي بلا اسم أب حقيقي (حذف ناعم قابل للاسترجاع)
@@ -450,6 +451,9 @@ document.addEventListener('submit', function (e) {
                 </div>
                 <?php endif; ?>
 
+                <?php if (function_exists('isSchoolYearLocked') && currentSchoolId() > 0 && isSchoolYearLocked(currentSchoolId(), activeSchoolYear())): ?>
+                <a href="<?= BASE_URL ?>pages/open_year.php#yearLocks" class="school-switcher" title="🔒 هذه السنة مقفولة لهذه المدرسة — الحسابات ما بتتغيّر (افتح القفل من صفحة فتح سنة دراسية)" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-weight:800;text-decoration:none;padding:4px 10px;border-radius:8px">🔒 مقفولة / Verrouillée</a>
+                <?php endif; ?>
                 <form method="get" action="<?= BASE_URL ?>switch_year.php" class="school-switcher" title="<?= $lang === 'ar' ? 'السنة الدراسية' : 'Année scolaire' ?>">
                     <i class="fas fa-calendar-alt" style="color:#fff;background:#d97706;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
                     <select name="school_year" onchange="this.form.submit()" class="form-control form-control-sm">

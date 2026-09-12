@@ -266,6 +266,9 @@ function renderBonusRow($r = null, $type = 'aide_complementaire') {
 function saveEmployeeBonuses($db, $employeeId) {
     if (empty($_POST['bonus_editor'])) return; // المحرّر المباشر لم يكن ظاهراً
     $sy = writeSchoolYear(); // المكافآت مربوطة بالسنة المختارة («كل السنين» → السنة الحالية، لا 'all')
+    // 🔒 قفل السنة (2026-09-12): بنود سنة مقفولة لمدرسة الموظف لا تُمَسّ
+    $lkSid = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$employeeId)->fetchColumn();
+    if (isSchoolYearLocked($lkSid, $sy)) { $_SESSION['flash_error'] = yearLockedMsg($lkSid, $sy) . ' (بنود المكافآت لم تُحفَظ)'; return; }
     $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ?")->execute([$employeeId, $sy]);
     // تنظيف: لا نُبقي إلا آخر 10 أسطر مطفأة للسنة (تكفي لتصفير الأشهر المخزّنة ولا تتكدّس)
     $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND is_active = 0 AND id NOT IN (
