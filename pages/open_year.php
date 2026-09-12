@@ -13,74 +13,8 @@ $currentPage = 'open_year';
 $pageTitle = 'Ouvrir une année / فتح سنة دراسية';
 $db = getDB();
 
-/**
- * يطبّق «درجات القانون» المستحقّة للأستاذ الملاك عند فتح سنة جديدة:
- *   (1) التدرّج العادي  → مؤرّخ {y1}-10-01 (تشرين الأول)
- *   (2) الدرجات الاستثنائية → مؤرّخة {y2}-01-01 (كانون الثاني)
- * يعتمد على **دالة القانون المعتمدة المختبَرة `buildLegalGradeHistory` (وضع dryRun، بلا أي كتابة)**
- * لتحديد مقدار كل نوع للسنة الجديدة = الفرق بين (درجة نهاية السنة الجديدة) و(درجة نهاية السنة السابقة)
- * قانوناً — فلا تخمين، ونفس منطق 4+4+2 والقوانين والإجازة التعليمية والحقب يُحترَم تماماً.
- *  - الأساس (grade_before) = درجة الأستاذ في نهاية السنة السابقة من السجلّ (تشمل سنين فُتحت سابقاً)
- *    فيصحّ عند فتح سنين متتالية. لا يلمس current_grade ولا السنين السابقة. السقف 52.
- *  - idempotent: إن وُجد حدث بتاريخ السنة الجديدة (فُتحت سابقاً) لا يُعاد.
- *  - أمان: إن كانت الدرجة المخزّنة لا تطابق القانون (مضبوطة يدوياً/منقولة) → تدرّج عادي بسيط (≤0.5)
- *    فقط بلا استثنائي (لا نخمّن استثنائياً لأستاذ خارج القانون).
- * يُرجع عدد الأحداث المضافة (0/1/2).
- */
-function applyLegalGradesForNewYear($db, $empId, $y1, $y2) {
-    $e = $db->prepare("SELECT employee_type, current_grade FROM employees WHERE id = ?");
-    $e->execute([$empId]);
-    $e = $e->fetch(PDO::FETCH_ASSOC);
-    if (!$e || $e['employee_type'] !== 'enseignant_titulaire') return 0;
-
-    $ordDate = sprintf('%04d-10-01', $y1);  // تشرين الأول للسنة الجديدة
-    $excDate = sprintf('%04d-01-01', $y2);  // كانون الثاني للسنة الجديدة
-    // idempotent: السنة الجديدة فُتحت سابقاً لهذا الأستاذ؟ (الأحداث المضافة من «فتح السنة» تُعلَّم
-    // بالـnotes؛ ملاحظة: العمود reason ENUM لا يقبل 'exceptional' فيُخزَّن فارغاً — لذا نعتمد notes).
-    $chk = $db->prepare("SELECT 1 FROM employee_grade_history WHERE employee_id=? AND change_date IN (?,?) AND notes LIKE '%(فتح السنة)%' LIMIT 1");
-    $chk->execute([$empId, $ordDate, $excDate]);
-    if ($chk->fetchColumn()) return 0;
-
-    // الأساس = درجة نهاية السنة السابقة من السجلّ (تشمل أي سنين فُتحت سابقاً)
-    $rs = $db->prepare("SELECT grade_after FROM employee_grade_history WHERE employee_id=? AND grade_after>=1 AND change_date<? ORDER BY change_date DESC, id DESC LIMIT 1");
-    $rs->execute([$empId, $ordDate]);
-    $running = $rs->fetchColumn();
-    $running = ($running === false || $running === null) ? (float)$e['current_grade'] : (float)$running;
-    if ($running >= 52) return 0;
-
-    // مقدار درجات السنة الجديدة قانوناً (بلا كتابة): فرق نهاية السنة الجديدة عن نهاية السنة السابقة
-    try {
-        $prev = buildLegalGradeHistory($empId, sprintf('%04d-09-30', $y1), true); // cAY = y1-1 (نهاية السنة السابقة)
-        $new  = buildLegalGradeHistory($empId, sprintf('%04d-09-30', $y2), true); // cAY = y1   (نهاية السنة الجديدة)
-    } catch (Exception $ex) { return 0; }
-    $ordDelta = round((float)$new['ordinary']    - (float)$prev['ordinary'], 1);
-    $excDelta = round((float)$new['exceptional'] - (float)$prev['exceptional'], 1);
-    // أمان: درجة مخزّنة لا تطابق القانون → تدرّج عادي بسيط فقط
-    if (abs((float)$prev['final_grade'] - $running) >= 0.01) { $ordDelta = min(max($ordDelta, 0.0), 0.5); $excDelta = 0.0; }
-
-    $applied = 0;
-    // (1) التدرّج العادي — تشرين الأول
-    if ($ordDelta > 0 && $running < 52) {
-        $after = min(52.0, round($running + $ordDelta, 1));
-        if ($after > $running) {
-            $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes)
-                          VALUES (?,?,?,?,1,?,'biennial_promotion','تدرّج عادي سنوي (فتح السنة)')")
-               ->execute([$empId, $running, $after, round($after-$running,1), $ordDate]);
-            $running = $after; $applied++;
-        }
-    }
-    // (2) الدرجات الاستثنائية — كانون الثاني
-    if ($excDelta > 0 && $running < 52) {
-        $after = min(52.0, round($running + $excDelta, 1));
-        if ($after > $running) {
-            $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes)
-                          VALUES (?,?,?,?,1,?,'exceptional','درجات استثنائية بالقانون (فتح السنة)')")
-               ->execute([$empId, $running, $after, round($after-$running,1), $excDate]);
-            $applied++;
-        }
-    }
-    return $applied;
-}
+// 📅 درجات الملاك عند فتح السنة: applyLegalGradesForNewYear() بـincludes/payroll_calculator.php (المصدر الواحد —
+// «درجته كما رتّبتها + ما يضيفه القانون لهذه السنة»، لا إعادة بناء ولا مقارنة بالقانون؛ 2026-09-12).
 
 /**
  * نسخ علاوات أستاذ (إضافات/تعويض نقل) من السنة السابقة إلى السنة الجديدة عند فتحها.
@@ -112,12 +46,20 @@ function copyYearBonuses($db, $empId, $prevSY, $newSY, array $types, $mode, $pct
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open') {
     // (2026-09-11 «بس افتح السنة الجديدة بكل المدارس ينقل نفس الرواتب مع التدرّج تلقائياً — هيك لازم يشتغل البرنامج»)
-    // school_id = all ⇒ فتح السنة لكل المدارس الفاعلة دفعة واحدة بنفس الخيارات (الافتراضي: نقل كل شي كما كان).
-    $allSchoolsOpen = isSuperAdmin() && (($_POST['school_id'] ?? '') === 'all');
-    $schoolId = $allSchoolsOpen ? -1 : (isSuperAdmin() ? (int)($_POST['school_id'] ?? 0) : currentSchoolId());
+    // (2026-09-12 «يكون عنا خيار نفتح الكل أو نختار») المدير العام يؤشّر «كل المدارس» أو يختار مدرسة أو أكثر (school_ids[])؛
+    // school_id=all/رقم يبقى مقبولاً. مدير المدرسة: مدرسته فقط.
+    $validIds = array_map(fn($sc) => (int)$sc['id'], allSchools());
+    if (isSuperAdmin()) {
+        $allSchoolsOpen = !empty($_POST['all_schools']) || (($_POST['school_id'] ?? '') === 'all');
+        $chosen = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['school_ids'] ?? [])), fn($i) => in_array($i, $validIds, true))));
+        if (!$allSchoolsOpen && !$chosen && (int)($_POST['school_id'] ?? 0) > 0) $chosen = [(int)$_POST['school_id']];
+        if ($allSchoolsOpen) $chosen = $validIds;
+    } else {
+        $allSchoolsOpen = false; $chosen = [currentSchoolId()];
+    }
     $newYear  = trim($_POST['new_year'] ?? '');
-    if ($schoolId === 0) {
-        $_SESSION['flash_error'] = 'اختر مدرسة';
+    if (!$chosen) {
+        $_SESSION['flash_error'] = 'أشّر «كل المدارس» أو اختر مدرسة واحدة على الأقل';
     } elseif (!preg_match('/^\d{4}-\d{4}$/', $newYear)) {
         $_SESSION['flash_error'] = 'اختر سنة دراسية صحيحة';
     } else {
@@ -210,19 +152,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         }
         return [$n, $promoted, $carried];
         };
-        $targets = $allSchoolsOpen ? array_map(fn($sc) => (int)$sc['id'], allSchools()) : [$schoolId];
+        $targets = $chosen;
         $n = 0; $promoted = 0; $carried = 0; $perSchool = [];
         foreach ($targets as $sid) {
             [$a1, $b1, $c1] = $openOne($sid);
             $n += $a1; $promoted += $b1; $carried += $c1;
-            if ($allSchoolsOpen) $perSchool[] = schoolNameById($sid, 'ar') . ' (' . ($a1 + $c1) . ')';
+            $perSchool[] = schoolNameById($sid, 'ar') . ' (' . ($a1 + $c1) . ')';
         }
         $_SESSION['active_school_year'] = $newYear;
         // 📅 السنة المفتوحة تصير السنة الحالية للبرنامج كله (التقارير/الإفادات/القسائم/لوحة القيادة) — لا رجوع لسنة أقدم من التقويم
         if (strcmp($newYear, calendarSchoolYear()) >= 0 && strcmp($newYear, currentSchoolYear()) >= 0) setSetting('program_school_year', $newYear);
-        $_SESSION['flash_success'] = "تم فتح السنة $newYear " . ($allSchoolsOpen ? 'لكل المدارس (' . implode(' · ', $perSchool) . ')' : 'للمدرسة')
-            . " — $n موظف محسوب بالقانون (منهم $promoted أستاذ ملاك طُبّقت درجاتهم المستحقّة) + $carried متعاقد نُقل راتبه كما كان"
-            . " — الإضافات وتعويض النقل " . ($addMode === 'same' && $transMode === 'same' ? 'نُقلت كما كانت' : 'حسب اختيارك') . ". عدّل بالسنة الجديدة ما تريد (المكافآت الجماعية / ملف الأستاذ).";
+        $_SESSION['flash_success'] = "تم فتح السنة $newYear " . ($allSchoolsOpen ? 'لكل المدارس' : (count($targets) > 1 ? 'للمدارس المختارة' : 'للمدرسة')) . ' (' . implode(' · ', $perSchool) . ')'
+            . " — $n موظف محسوب بالقانون (منهم $promoted أستاذ ملاك كُمِّل تدرّجهم على درجتهم كما رتّبتها) + $carried متعاقد نُقل راتبه كما كان"
+            . " — الإضافات وتعويض النقل " . ($addMode === 'same' && $transMode === 'same' ? 'نُقلت كما كانت' : 'حسب اختيارك') . ". ما تغيّر شي إلا إذا عدّلته أنت بالسنة الجديدة (المكافآت الجماعية / ملف الأستاذ).";
         header('Location: ' . BASE_URL . 'pages/open_year.php');
         exit;
     }
@@ -410,7 +352,8 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
         <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:13px;line-height:1.8;margin-bottom:12px">
             <strong style="color:var(--primary)">Comment ça marche / كيف بتشتغل</strong>
             <ul style="margin:6px 0 0;padding-inline-start:20px">
-                <li><b>«كل المدارس»</b> + السنة الجديدة + «افتح» = البرنامج ينقل <b>كل شي تلقائياً</b>: كل الأساتذة والموظفين الفاعلين، رواتبهم، <b>التدرّج المستحقّ حسب القانون</b> (درجة عادية بتشرين + استثنائية بكانون)، الأجر الإضافي والمكافآت وتعويض النقل <b>كما كانت بالسنة السابقة</b>.</li>
+                <li><b>«كل المدارس»</b> (أو أشّر المدارس اللي بدّك ياها) + السنة الجديدة + «افتح» = البرنامج ينقل <b>كل شي تلقائياً كما هو</b>: كل الأساتذة والموظفين الفاعلين، رواتبهم، الأجر الإضافي والمكافآت وتعويض النقل <b>كما كانت بالسنة السابقة</b> — <b>ما بيتغيّر شي إلا إذا عدّلته أنت</b>.</li>
+                <li><b>درجات الملاك:</b> البرنامج <b>ما بيغيّر درجة حدا</b> — بياخد درجة الأستاذ <b>كما رتّبتها</b> (مع أي زيادة عطيتها من عندك) وبيكمّل عليها <b>التدرّج العادي</b> لهالسنة (نصّ درجة بتشرين) + الاستثنائية المستحقّة بالقانون بكانون إن وُجدت. الزيادات اليدوية بتضلّ.</li>
                 <li>بعدين بالسنة الجديدة غيّر ما تريد: نسبة واحدة للكل من «المكافآت والنقل» (البطاقة الكحلية)، أو شخصاً بشخص من ملفه.</li>
                 <li>فتح سنة مفتوحة جزئياً آمن: يكمّل الناقصين ويعيد حساب الموجودين بلا تكرار بنودهم.</li>
                 <li>بمجرّد الفتح تصير السنة الجديدة <b>السنة الحالية للبرنامج كله</b>: التقارير والإفادات والقسائم ولوحة القيادة تفتح عليها تلقائياً.</li>
@@ -430,20 +373,25 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
         <?php endif; ?>
         <div class="alert alert-info">
             <i class="fas fa-info-circle"></i>
-            اختر مدرسة (أو كل المدارس) وسنة دراسية جديدة. البرنامج بينقل **كل الأساتذة والموظفين الفاعلين** للسنة الجديدة بدرجتهم الحالية — والتارك اللي تاريخ تركه قبل بداية السنة المختارة (1 تشرين الأول) **ما بينتقل أبداً**.
+            أشّر كل المدارس (أو اختر مدرسة أو أكثر) وسنة دراسية جديدة. البرنامج بينقل **كل الأساتذة والموظفين الفاعلين** للسنة الجديدة بدرجتهم كما هي مع تكملة التدرّج — والتارك اللي تاريخ تركه قبل بداية السنة المختارة (1 تشرين الأول) **ما بينتقل أبداً**.
         </div>
-        <form method="POST" onsubmit="var s=this.querySelector('[name=school_id]'); var all=s&&s.value==='all'; return confirm(all ? 'فتح السنة المختارة لكل المدارس ونقل كل الموظفين الفاعلين برواتبهم وتدرّجهم وإضافاتهم كما كانت؟ (قد يستغرق دقائق)' : 'فتح السنة المختارة لهذه المدرسة ونقل الموظفين الفاعلين؟');">
+        <form method="POST" id="openYearForm" onsubmit="var all=document.getElementById('oy_all'); var n=this.querySelectorAll('input[name=&quot;school_ids[]&quot;]:checked').length; if(all&&!all.checked&&n===0){alert('أشّر «كل المدارس» أو اختر مدرسة واحدة على الأقل');return false;} return confirm((all&&all.checked) ? 'فتح السنة المختارة لكل المدارس ونقل كل الموظفين الفاعلين برواتبهم وتدرّجهم وإضافاتهم كما كانت؟ (قد يستغرق دقائق)' : 'فتح السنة المختارة للمدارس المؤشَّرة ونقل موظفيها الفاعلين كما كانوا؟');">
             <input type="hidden" name="action" value="open">
             <div class="form-row cols-2">
                 <?php if (isSuperAdmin()): ?>
                 <div class="form-group mb-0">
-                    <label class="form-label">المدرسة / École</label>
-                    <select name="school_id" class="form-select" required>
-                        <option value="all" style="font-weight:700">🌐 كل المدارس دفعة وحدة / Toutes les écoles</option>
+                    <label class="form-label">المدارس / Écoles — أشّر الكل أو اختر</label>
+                    <div style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;background:#fff">
+                        <label style="display:block;cursor:pointer;margin:2px 0;font-weight:700;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px">
+                            <input type="checkbox" id="oy_all" name="all_schools" value="1" checked onchange="document.querySelectorAll('#openYearForm input[name=&quot;school_ids[]&quot;]').forEach(function(c){c.checked=this.checked;c.disabled=this.checked;}.bind(this))" title="مؤشَّر = كل المدارس؛ شيل الصحّ واختر"> 🌐 كل المدارس دفعة وحدة / Toutes les écoles
+                        </label>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:2px 14px">
                         <?php foreach (allSchools() as $s): ?>
-                            <option value="<?= (int)$s['id'] ?>"><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
+                            <label style="display:block;cursor:pointer;margin:2px 0"><input type="checkbox" name="school_ids[]" value="<?= (int)$s['id'] ?>" checked disabled> <?= e($s['name_ar'] ?: $s['name_fr']) ?></label>
                         <?php endforeach; ?>
-                    </select>
+                        </div>
+                        <small style="color:#64748b;display:block;margin-top:6px">شيل صحّ «كل المدارس» لتختار مدرسة أو أكثر.</small>
+                    </div>
                 </div>
                 <?php else: ?>
                     <input type="hidden" name="school_id" value="<?= currentSchoolId() ?>">

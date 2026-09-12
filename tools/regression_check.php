@@ -4514,7 +4514,7 @@ check('المخالفات: قاعدة eoc_base_only (ملاك بإضافي وص�
       && (empty($maria0911) || in_array(1651, $eocItems0911, true)), $eocWhy);
 $oy0911 = (string)file_get_contents($PROJ . '/pages/open_year.php');
 check('فتح السنة 2026-09-11 «بكل المدارس ينقل نفس الرواتب مع التدرّج تلقائياً»: خيار «كل المدارس» + حلقة openOne لكل مدرسة + جدول حالة السنة بكل مدرسة + الافتراضي نقل كل شي',
-      strpos($oy0911, '<option value="all"') !== false && strpos($oy0911, "\$allSchoolsOpen = isSuperAdmin()") !== false
+      strpos($oy0911, 'id="oy_all" name="all_schools"') !== false && strpos($oy0911, "\$allSchoolsOpen = !empty(\$_POST['all_schools'])") !== false
       && strpos($oy0911, '$openOne = function (int $schoolId)') !== false && strpos($oy0911, "array_map(fn(\$sc) => (int)\$sc['id'], allSchools())") !== false
       && strpos($oy0911, 'مفتوح لهم') !== false && strpos($oy0911, 'name="add_mode" value="same" checked') !== false && strpos($oy0911, 'name="trans_mode" value="same" checked') !== false);
 $fn0911b = (string)file_get_contents($PROJ . '/includes/functions.php');
@@ -5244,6 +5244,65 @@ check('عبرا 65٪ (داتا حيّة): كل ملاك عبرا على 65٪ ب�
       $abra106 > 0 && count($non65) === 0 && $jos106 && (int)$jos106['p'] === 105000000 && (int)$jos106['bpe'] === 2720000
       && $rita106 && (int)$rita106['bpe'] === 2225000 && (int)$rita106['p'] === 86000000,
       'non65=' . implode('؛', $non65) . ' jos=' . json_encode($jos106) . ' rita=' . json_encode($rita106));
+
+/* =====================================================================
+ * 107) 📅 فتح السنة 2026-09-12 «كمّل التدرّج عادي وخلّي الزيادة اللي عطيتها»: applyLegalGradesForNewYear صار
+ *      بالمحرّك (المصدر الواحد) — الدرجة الجديدة = المخزّنة كما رتّبها + ما يضيفه القانون لهذه السنة (عادي بتشرين
+ *      + استثنائية بكانون) بلا «أمان» يحرم مَن درجته ≠ القانون من الاستثنائية (كان يحرم 23 أستاذاً من دفعة 2023-2024).
+ *      ذاتي التصحيح: صفوف «(فتح السنة)» القديمة الخاطئة تُستبدَل، والمعدَّلة يدوياً تُترَك. + اختيار المدارس بالتأشير (الكل أو بعضها).
+ * =================================================================== */
+require_once $PROJ . '/includes/payroll_calculator.php';
+$pc107 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$oy107 = (string)file_get_contents($PROJ . '/pages/open_year.php');
+check('فتح السنة: applyLegalGradesForNewYear بالمحرّك فقط، بلا قيد «≠ القانون ⇒ 0.5 بلا استثنائي»، مع استبدال الصفوف الآلية الخاطئة واحترام المعدَّلة يدوياً',
+      function_exists('applyLegalGradesForNewYear') && strpos($oy107, 'function applyLegalGradesForNewYear') === false
+      && strpos($pc107, "if (abs((float)\$prev['final_grade'] - \$running) >= 0.01)") === false
+      && strpos($pc107, "if (mb_strpos((string)\$r['notes'], '(فتح السنة)') === false) return 0;") !== false && strpos($pc107, "\$note . ' [+' . \$dl . ']'") !== false
+      && strpos($pc107, "\$ordDelta = max(0.0, round((float)\$new['ordinary']") !== false);
+check('فتح السنة: اختيار المدارس بالتأشير (كل المدارس افتراضياً + school_ids[]) والرسالة تسمّي المدارس المفتوحة',
+      strpos($oy107, 'name="school_ids[]"') !== false && strpos($oy107, "(array)(\$_POST['school_ids'] ?? [])") !== false
+      && strpos($oy107, "if (\$allSchoolsOpen) \$chosen = \$validIds;") !== false && strpos($oy107, 'كُمِّل تدرّجهم على درجتهم كما رتّبتها') !== false
+      && strpos($oy107, 'ما بيغيّر درجة حدا') !== false);
+// تجربة حيّة (بلا أثر: transaction + rollback) على أستاذ درجته المخزّنة ≠ القانون وله استثنائية بكانون 2027 (تيا نخلة/ماريا حليحل…)
+$why107 = ''; $ok107 = false;
+try {
+    $cand = null;
+    foreach ([1651, 1554, 1595, 1677] as $cid) {
+        $ce = $db->query("SELECT id, employee_type, is_deleted FROM employees WHERE id=$cid")->fetch(PDO::FETCH_ASSOC);
+        if (!$ce || (int)$ce['is_deleted'] === 1 || $ce['employee_type'] !== 'enseignant_titulaire') continue;
+        $p = buildLegalGradeHistory($cid, '2026-09-30', true); $n = buildLegalGradeHistory($cid, '2027-09-30', true);
+        $od = round($n['ordinary'] - $p['ordinary'], 1); $xd = round($n['exceptional'] - $p['exceptional'], 1);
+        if ($od > 0 && $xd > 0) { $cand = [$cid, $od, $xd]; break; }
+    }
+    if (!$cand) { $why107 = 'لا عيّنة محلياً'; $ok107 = true; }
+    else {
+        [$cid, $od, $xd] = $cand;
+        $db->beginTransaction();
+        try {
+            $db->exec("DELETE FROM employee_grade_history WHERE employee_id=$cid AND change_date IN ('2026-10-01','2027-01-01') AND notes LIKE '%(فتح السنة)%'");
+            $run = $db->query("SELECT grade_after FROM employee_grade_history WHERE employee_id=$cid AND grade_after>=1 AND change_date<'2026-10-01' ORDER BY change_date DESC, id DESC LIMIT 1")->fetchColumn();
+            $run = ($run === false) ? (float)$db->query("SELECT current_grade FROM employees WHERE id=$cid")->fetchColumn() : (float)$run;
+            // صفّ قديم بالقاعدة القديمة (نصف درجة فقط) → يجب أن يُستبدَل
+            $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes) VALUES (?,?,?,0.5,1,'2026-10-01','biennial_promotion','تدرّج عادي سنوي (فتح السنة)')")->execute([$cid, $run, $run + 0.5]);
+            $r1 = applyLegalGradesForNewYear($db, $cid, 2026, 2027);
+            $rows = $db->query("SELECT change_date d, grade_before b, grade_after a FROM employee_grade_history WHERE employee_id=$cid AND change_date IN ('2026-10-01','2027-01-01') AND notes LIKE '%(فتح السنة)%' ORDER BY change_date")->fetchAll(PDO::FETCH_ASSOC);
+            $r2 = applyLegalGradesForNewYear($db, $cid, 2026, 2027); // idempotent
+            // تعديل يدوي على صفّ آلي (المقدار من لوحة الدرجات) → لا يُلمَس ولا يُكرَّر
+            $db->exec("UPDATE employee_grade_history SET delta=delta+3, grade_after=grade_after+3 WHERE employee_id=$cid AND change_date='2027-01-01' AND notes LIKE '%(فتح السنة)%'");
+            $r3 = applyLegalGradesForNewYear($db, $cid, 2026, 2027);
+            $kept = (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id=$cid AND change_date='2027-01-01'")->fetchColumn();
+            // صفّ بغير ملاحظتنا بنفس التاريخ (بناء قانوني/يدوي) → لا نلمس شيئاً
+            $db->exec("UPDATE employee_grade_history SET notes='عدّلها المستخدم' WHERE employee_id=$cid AND change_date='2027-01-01'");
+            $r4 = applyLegalGradesForNewYear($db, $cid, 2026, 2027);
+            $kept2 = (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id=$cid AND change_date IN ('2026-10-01','2027-01-01')")->fetchColumn();
+            $expOrd = min(52, round($run + $od, 1)); $expExc = min(52, round($expOrd + $xd, 1));
+            $ok107 = $r1 === 2 && count($rows) === 2 && $rows[0]['d'] === '2026-10-01' && abs((float)$rows[0]['b'] - $run) < 0.01 && abs((float)$rows[0]['a'] - $expOrd) < 0.01
+                  && $rows[1]['d'] === '2027-01-01' && abs((float)$rows[1]['a'] - $expExc) < 0.01 && $r2 === 0 && $r3 === 0 && $kept === 1 && $r4 === 0 && $kept2 === 2;
+            $why107 = "emp=$cid run=$run ord=+$od exc=+$xd r1=$r1 rows=" . json_encode($rows) . " r2=$r2 r3=$r3 kept=$kept r4=$r4 kept2=$kept2";
+        } finally { $db->rollBack(); }
+    }
+} catch (Throwable $e) { $why107 = $e->getMessage(); }
+check('فتح السنة (تجربة حيّة بلا أثر): الصفّ القديم «نصف درجة فقط» يُستبدَل بالمستحقّ (عادي بتشرين + استثنائية بكانون فوق المخزّنة) + idempotent + الصفّ المعدَّل يدوياً لا يُلمَس', $ok107, $why107);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

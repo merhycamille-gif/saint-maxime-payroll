@@ -1377,6 +1377,94 @@ function rechainGradeHistory($empId) {
 }
 
 /**
+ * 📅 درجات الأستاذ الملاك عند **فتح سنة دراسية جديدة** — المصدر الواحد (يستعمله pages/open_year.php).
+ *
+ * 🔴 قاعدة المستخدم (2026-09-12): «أنا قبل بسنة بكون مرتّب الدرجات — ما تغيّر، انت بس تفتح سنة جديدة
+ * كمّل التدرّج عادي؛ إذا عاطي زيادة درجة من عندي بدّي ياها تضلّ». أي:
+ *   الدرجة بالسنة الجديدة = **درجته المخزّنة كما رتّبها** (بما فيها أي زيادة يدوية) + **ما يضيفه القانون لهذه السنة فقط**:
+ *   (1) التدرّج العادي (0.5، أو 1.0 مع نصف «تقديم التدرّج» لنظام 4+4+2) → مؤرّخ {y1}-10-01
+ *   (2) الدرجات الاستثنائية المستحقّة بالقانون (دفعات 4+4+2…) → مؤرّخة {y2}-01-01
+ * مقدار كل نوع = فرق (نهاية السنة الجديدة − نهاية السنة السابقة) من `buildLegalGradeHistory` (dryRun، بلا كتابة)
+ * فيُحترَم نفس منطق 4+4+2 والقوانين والإجازة التعليمية. **لا يُعاد بناء الدرجات من الصفر ولا تُقارَن بالقانون**:
+ * كان هنا «أمان» يعطي مَن درجته ≠ القانون نصف درجة فقط بلا استثنائي — فحرم 23 أستاذاً (دفعة 2023-2024 أعطاهم
+ * درجة كاملة بدل نصف) من درجتَي كانون 2027 — أُزيل بطلبه.
+ *  - الأساس = درجة نهاية السنة السابقة من السجلّ (تشمل سنين فُتحت سابقاً) — لا يلمس current_grade ولا السنين السابقة. السقف 52.
+ *  - idempotent وذاتي التصحيح: صفوف «(فتح السنة)» الموجودة بنفس التاريخين إن طابقت المستحقّ لا تُعاد؛ وإن خالفته
+ *    (فُتحت بالقاعدة القديمة) وكانت بنصّها الآلي (لم يلمسها المستخدم) تُستبدَل؛ وإن عدّلها المستخدم تُترَك كما هي.
+ * يُرجع عدد الأحداث المضافة/المصحَّحة (0/1/2).
+ */
+function applyLegalGradesForNewYear($db, $empId, $y1, $y2) {
+    $e = $db->prepare("SELECT employee_type, current_grade FROM employees WHERE id = ?");
+    $e->execute([$empId]);
+    $e = $e->fetch(PDO::FETCH_ASSOC);
+    if (!$e || $e['employee_type'] !== 'enseignant_titulaire') return 0;
+
+    $ordDate = sprintf('%04d-10-01', $y1);  // تشرين الأول للسنة الجديدة
+    $excDate = sprintf('%04d-01-01', $y2);  // كانون الثاني للسنة الجديدة
+    $ordNote = 'تدرّج عادي سنوي (فتح السنة)';
+    $excNote = 'درجات استثنائية بالقانون (فتح السنة)';
+
+    // الأساس = درجته كما رتّبها المستخدم بنهاية السنة السابقة (آخر صفّ قبل 1/10 — يشمل الزيادات اليدوية)
+    // (زيادة يدوية بتاريخ 1/10 نفسه — الافتراضي بنموذج الدرجة اليدوية — تُحسب ضمن الأساس فلا تضيع)
+    $rs = $db->prepare("SELECT grade_after FROM employee_grade_history WHERE employee_id=? AND grade_after>=1 AND (change_date<? OR (change_date=? AND reason='manual')) ORDER BY change_date DESC, id DESC LIMIT 1");
+    $rs->execute([$empId, $ordDate, $ordDate]);
+    $running = $rs->fetchColumn();
+    $running = ($running === false || $running === null) ? (float)$e['current_grade'] : (float)$running;
+
+    // ما يضيفه القانون لهذه السنة (بلا كتابة): فرق نهاية السنة الجديدة عن نهاية السنة السابقة — مستقلّ عن الدرجة المخزّنة
+    try {
+        $prev = buildLegalGradeHistory($empId, sprintf('%04d-09-30', $y1), true); // cAY = y1-1 (نهاية السنة السابقة)
+        $new  = buildLegalGradeHistory($empId, sprintf('%04d-09-30', $y2), true); // cAY = y1   (نهاية السنة الجديدة)
+    } catch (Exception $ex) { return 0; }
+    $ordDelta = max(0.0, round((float)$new['ordinary']    - (float)$prev['ordinary'], 1));
+    $excDelta = max(0.0, round((float)$new['exceptional'] - (float)$prev['exceptional'], 1));
+
+    // الصفوف المستحقّة (تسلسل: العادية بتشرين ثم الاستثنائية بكانون، بسقف 52)
+    $want = []; $g = $running;
+    if ($ordDelta > 0 && $g < 52) { $after = min(52.0, round($g + $ordDelta, 1)); if ($after > $g) { $want[] = [$ordDate, $g, $after, 'biennial_promotion', $ordNote]; $g = $after; } }
+    if ($excDelta > 0 && $g < 52) { $after = min(52.0, round($g + $excDelta, 1)); if ($after > $g) { $want[] = [$excDate, $g, $after, 'exceptional', $excNote]; $g = $after; } }
+
+    // الصفوف الموجودة بهذين التاريخين:
+    //  - reason='manual' = زيادة يدوية من المستخدم (تبقى، ولا تمنع التدرّج فوقها)
+    //  - «(فتح السنة)» = آلية من هنا: مطابقة للمستحقّ ⇒ لا شيء؛ غير مطابقة (قاعدة قديمة) ⇒ تُستبدَل؛
+    //    لمسها المستخدم (counted=0، أو delta ≠ المقدار المكتوب بالملاحظة [+x]) ⇒ تُترَك
+    //  - أي صفّ آخر (بناء قانوني/إدخال يدوي بغير reason) = المستخدم أو القانون رتّب هذا التاريخ ⇒ لا نلمس شيئاً
+    $ex = $db->prepare("SELECT id, change_date, grade_before, grade_after, delta, counted, reason, notes FROM employee_grade_history WHERE employee_id=? AND change_date IN (?,?) ORDER BY change_date, id");
+    $ex->execute([$empId, $ordDate, $excDate]);
+    $existing = []; $hasManualAt = false;
+    foreach ($ex->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        if ($r['reason'] === 'manual') { $hasManualAt = true; continue; }
+        if (mb_strpos((string)$r['notes'], '(فتح السنة)') === false) return 0;
+        if ((int)$r['counted'] !== 1) return 0;
+        if (preg_match('/\[\+([0-9.]+)\]/', (string)$r['notes'], $mm) && $r['delta'] !== null && abs((float)$r['delta'] - (float)$mm[1]) >= 0.01) return 0;
+        $existing[] = $r;
+    }
+    if ($existing) {
+        $same = count($existing) === count($want);
+        if ($same) foreach ($existing as $i => $r) {
+            if ($r['change_date'] !== $want[$i][0] || abs((float)$r['grade_before'] - $want[$i][1]) >= 0.01 || abs((float)$r['grade_after'] - $want[$i][2]) >= 0.01) { $same = false; break; }
+        }
+        if ($same) return 0;
+        $del = $db->prepare("DELETE FROM employee_grade_history WHERE id=?");
+        foreach ($existing as $r) $del->execute([(int)$r['id']]);
+    }
+    if (!$want) return 0;
+
+    $ins = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes) VALUES (?,?,?,?,1,?,?,?)");
+    foreach ($want as [$d, $b, $a, $reason, $note]) { $dl = round($a - $b, 1); $ins->execute([$empId, $b, $a, $dl, $d, $reason, $note . ' [+' . $dl . ']']); }
+    // زيادة يدوية بنفس التاريخين، أو صفوف لاحقة (درجة يدوية بتاريخ أبعد) بعد استبدال: أعِد ربط السلسلة من الـdelta
+    // (فقط لسجلّ مرتكز على صفّ الترسيم — وإلا لا يُلمَس حتى لا تُصفَّر current_grade)
+    $later = $db->prepare("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id=? AND change_date>?");
+    $later->execute([$empId, $excDate]);
+    if ($hasManualAt || ($existing && (int)$later->fetchColumn() > 0)) {
+        $anch = $db->prepare("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id=? AND reason='titularization'");
+        $anch->execute([$empId]);
+        if ((int)$anch->fetchColumn() > 0) { try { rechainGradeHistory($empId); } catch (Throwable $t) {} }
+    }
+    return count($want);
+}
+
+/**
  * عدد درجات **قانون 2017** الاستثنائية لأستاذ معيّن (شطور مشروطة حسب ورقة المستخدم):
  *  - دخل الملاك **قبل 1/1/2010** (أي شهادة) → **6 درجات**.
  *  - دخل الملاك **1/1/2010 → 30/9/2017**: قسم ثاني → **6**؛ إجازة جامعية أو جاردينير ب.ت أو جاردينير ت.س → **2**.
