@@ -5435,7 +5435,39 @@ check('سامر ابونادر: الشفاء موجود وموصول بالهي�
       function_exists('healSamerAbounader20260912') && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healSamerAbounader20260912();') !== false
       && strpos($fn111, "first_name_ar = 'سامر' AND father_name_ar LIKE 'مارون%' AND last_name_ar LIKE '%ابونادر%'") !== false
       && strpos($fn111, "(\$v === \$bd || (\$hd && \$v < \$hd))") !== false && strpos($fn111, "UPDATE employees SET eoc_includes_extra = 1 WHERE id = \$id") !== false
-      && substr_count(substr($fn111, strpos($fn111, 'function healSamerAbounader20260912')), 'is_deleted = 1') === 0);
+      && substr_count(substr($fn111, strpos($fn111, 'function healSamerAbounader20260912'), strpos($fn111, 'function healSamerAllYears20260912') - strpos($fn111, 'function healSamerAbounader20260912')), 'is_deleted = 1') === 0);
+
+/* =====================================================================
+ * 113) 🧑‍🏫 سامر ابونادر — الجزء الثاني (2026-09-12 «بس بعد ما وصل سامر أونلاين» + «بدو يكون موجود بكل البرنامج» + قراره «1» = محي المكرّرَين):
+ *      الشفاء الأوّل أعطاه 2026-2027 فقط. الثاني: بنود 2025-2026 كرفاقه (65٪ + نقل 7,200,000) + كل سنة من ترسيمه 2016-2017 حتى 2025-2026
+ *      بالمحرّك (موسومة مدفوعة كرفاقه) + تدرّج تشرين 2026 + حذف ناعم للمكرّرَين الفارغين (نسخة _emp_bk_samerdup0912) — يحترم قفل السنة.
+ *      متحقَّق على النسخة طبق الأصل مقابل توأمه 934 (نفس الدخول/الترسيم/الدرجة): كل سنة بالمليم؛ تشرين 2025 = 89,738,000 = كشفه؛ ملاك عبرا تشرين 2025 = 131.
+ * =================================================================== */
+$fn113 = substr($fn111, strpos($fn111, 'function healSamerAllYears20260912'));
+$fn113 = substr($fn113, 0, strpos($fn113, "\nfunction ", 10) ?: null);
+check('سامر — الجزء الثاني: الشفاء موجود وموصول بالهيدر، بالاسم، يبدأ من سنة الترسيم، بنود 65٪ + نقل 7,200,000 لـ2025-2026، تدرّج 2026-2027 بالمصدر الواحد، حذف ناعم بنسخة احتياطية للمتعاقدَين الفارغَين فقط، ويحترم القفل',
+      function_exists('healSamerAllYears20260912') && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healSamerAllYears20260912();') !== false
+      && strpos($fn113, "schoolYearOfDate(\$e['titularization_date'])") !== false
+      && strpos($fn113, "[\$id, 'prime_fixe', '2025-2026', 65, 'percent', 10, 9]") !== false && strpos($fn113, "[\$id, 'transport_complement', '2025-2026', 7200000, 'amount', null, null]") !== false
+      && strpos($fn113, "applyLegalGradesForNewYear(\$db, \$id, 2026, 2027)") !== false
+      && strpos($fn113, "employee_type = 'enseignant_contractuel'") !== false && strpos($fn113, "if ((float)\$d['mx'] > 0 || (int)\$d['nb'] > 0)") !== false
+      && strpos($fn113, "INSERT IGNORE INTO _emp_bk_samerdup0912") !== false && substr_count($fn113, 'isSchoolYearLocked($sid, $sy)') === 1);
+// تجربة حيّة على قاعدة هذا الجهاز (مرآة الأونلاين): بعد الشفاء سامر موجود بكل سنة من ترسيمه، تشرين 2025 = كشفه، ولا مكرّر فاعل
+$why113 = ''; $ok113 = false;
+try {
+    healSamerAllYears20260912();
+    $s113 = $db->query("SELECT id FROM employees WHERE is_deleted = 0 AND employee_type = 'enseignant_titulaire' AND first_name_ar = 'سامر' AND father_name_ar LIKE 'مارون%' AND last_name_ar LIKE '%ابونادر%' ORDER BY id LIMIT 1")->fetchColumn();
+    if (!$s113) { $ok113 = true; $why113 = 'لا سامر بهذه القاعدة'; }
+    else {
+        $sid113 = (int)$s113;
+        $yrs = $db->query("SELECT GROUP_CONCAT(DISTINCT school_year ORDER BY school_year) FROM monthly_salaries WHERE employee_id = $sid113")->fetchColumn();
+        $oct25 = $db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id = $sid113 AND year = 2025 AND month = 10")->fetchColumn();
+        $dupAct = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND id <> $sid113 AND employee_type = 'enseignant_contractuel' AND first_name_ar = 'سامر' AND last_name_ar LIKE '%نادر%' AND school_id = (SELECT school_id FROM employees WHERE id = $sid113)")->fetchColumn();
+        $ok113 = strpos((string)$yrs, '2016-2017') === 0 && strpos((string)$yrs, '2025-2026') !== false && strpos((string)$yrs, '2026-2027') !== false && (int)$oct25 === 89738000 && $dupAct === 0;
+        $why113 = "emp=$sid113 years=$yrs oct2025=$oct25 dupsActive=$dupAct | " . mb_substr((string)getSetting('heal_samer_allyears_20260912', ''), 0, 160);
+    }
+} catch (Throwable $e) { $why113 = $e->getMessage(); }
+check('سامر — الجزء الثاني (تجربة حيّة): موجود بكل سنة من 2016-2017 حتى 2026-2027، تشرين 2025 = 89,738,000 = كشفه، والمكرّران غير فاعلَين', $ok113, $why113);
 
 /* =====================================================================
  * 112) 🚪 «انتبه بدك تحطّو بكل البرنامج» (2026-09-12): قاعدة عامّة «تاريخ ترك مستحيل» (= الولادة أو قبل دخول المدرسة) بتقرير

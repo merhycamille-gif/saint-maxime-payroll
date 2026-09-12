@@ -6571,6 +6571,83 @@ function healSamerAbounader20260912() {
     }
 }
 
+/**
+ * 🧑‍🏫 سامر ابونادر — الجزء الثاني (2026-09-12 «بس بعد ما وصل سامر أونلاين» + «بدو يكون موجود بكل البرنامج» + قراره «1» = محي المكرّرَين):
+ * الشفاء الأوّل أعطاه 2026-2027 فقط، فبقي غائباً عن 2025-2026 (كان الناقص بكشف عبرا 2025-2026: صافي 89,738,658) وعن كل
+ * السنين منذ دخوله 2014-10-01 — بينما رفاقه بالملاك (التوأم 934: نفس الدخول/الترسيم/الدرجة) عندهم كل سنة من الدخول.
+ *  ① بنود 2025-2026 كرفاقه بملاك عبرا: إضافي 65٪ (تشرين→أيلول) + نقل 7,200,000 (كشفه) — إن لم يكن له بند من النوع.
+ *  ② كل سنة دراسية من سنة دخوله حتى 2025-2026 بلا أيّ صفّ ⇒ تُحسب بالمحرّك (السنين القديمة أساس فقط كرفاقه) وتُوسم مدفوعة كصفوف رفاقه.
+ *  ③ تدرّج تشرين 2026 (+0.5) الذي فاته لأنّ تجهيز 2026-2027 جرى قبل ظهوره ⇒ applyLegalGradesForNewYear (المصدر الواحد) + إعادة حساب 2026-2027.
+ *  ④ المكرّران الفارغان (متعاقدان بلا أيّ راتب غير صفر، من استيراد 2026-06-09) ⇒ حذف ناعم بالنمط المقرَّر (نسخة احتياطية + إطفاء البنود
+ *     + حذف صفوفهما الصفرية + is_deleted) — بقراره الصريح 2026-09-12 («أي محي يسألني قبل»).
+ * يحترم قفل السنة لكل خطوة. مرّة واحدة بفلاغ heal_samer_allyears_20260912. متحقَّق على النسخة طبق الأصل: تشرين 2025 = 89,738,000 = كشفه.
+ */
+function healSamerAllYears20260912() {
+    try {
+        if (strpos((string)getSetting('heal_samer_allyears_20260912', ''), 'done') === 0) return;
+        $db = getDB();
+        if ($db->inTransaction()) return; // فيه CREATE TABLE (نسخة احتياطية) — لا داخل معاملة
+        require_once __DIR__ . '/payroll_calculator.php';
+        $sid = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE '%ثانوية السيدة%' AND is_deleted = 0 ORDER BY id LIMIT 1")->fetchColumn();
+        $e = $sid ? $db->query("SELECT * FROM employees WHERE school_id = $sid AND is_deleted = 0 AND employee_type = 'enseignant_titulaire' AND first_name_ar = 'سامر' AND father_name_ar LIKE 'مارون%' AND last_name_ar LIKE '%ابونادر%' ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC) : null;
+        if (!$e) { setSetting('heal_samer_allyears_20260912', 'done: not found'); return; }
+        $id = (int)$e['id']; $log = [];
+        $lockedSy = fn($sy) => isSchoolYearLocked($sid, $sy);
+        // ① بنود 2025-2026 كرفاقه
+        if (!$lockedSy('2025-2026')) {
+            $has = fn($sy, $t) => (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = $id AND school_year = '$sy' AND bonus_type = '$t' AND is_active = 1")->fetchColumn() > 0;
+            $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?,?,1,?,?,?,'LBP',?,?,1)");
+            if (!$has('2025-2026', 'prime_fixe')) { $ins->execute([$id, 'prime_fixe', '2025-2026', 65, 'percent', 10, 9]); $log[] = 'إضافي 65٪ 2025-2026'; }
+            if (!$has('2025-2026', 'transport_complement') && !$has('2025-2026', 'transport_daily')) { $ins->execute([$id, 'transport_complement', '2025-2026', 7200000, 'amount', null, null]); $log[] = 'نقل 7,200,000 2025-2026'; }
+        } else $log[] = '2025-2026 مقفولة';
+        // ② كل سنة من دخوله حتى 2025-2026 بلا صفوف ⇒ حساب + وسم مدفوع كرفاقه
+        // البداية = سنة الترسيم (قبلها لا درجة له بالسجلّ فيرجع المحرّك لدرجته الحالية 30 بسنة 2014 — غلط)، وإلا سنة الدخول
+        $startSy = !empty($e['titularization_date']) ? schoolYearOfDate($e['titularization_date']) : (!empty($e['hire_date']) ? schoolYearOfDate($e['hire_date']) : null);
+        $y = $startSy ? (int)substr($startSy, 0, 4) : 2025; $built = [];
+        $cnt = $db->prepare("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = ? AND school_year = ?");
+        for (; $y <= 2025; $y++) {
+            $sy = $y . '-' . ($y + 1);
+            if ($lockedSy($sy)) { $log[] = "$sy مقفولة"; continue; }
+            $cnt->execute([$id, $sy]);
+            if ((int)$cnt->fetchColumn() > 0) continue;
+            $n = (int)recalcEmployeeYear($id, $sy);
+            if ($n > 0) { $db->exec("UPDATE monthly_salaries SET is_paid = 1 WHERE employee_id = $id AND school_year = '$sy'"); $built[] = "$sy:$n"; }
+        }
+        if ($built) $log[] = 'سنين مبنيّة ' . implode(' ', $built);
+        // ③ تدرّج تشرين 2026 الذي فاته + إعادة حساب 2026-2027
+        if (!$lockedSy('2026-2027')) {
+            $g = (int)applyLegalGradesForNewYear($db, $id, 2026, 2027);
+            if ($g > 0) { $log[] = 'درجة 2026-2027 +' . $g . ' | recalc 2026-2027=' . (int)recalcEmployeeYear($id, '2026-2027'); }
+        }
+        // ④ المكرّران الفارغان — بقراره
+        $dups = $db->query("SELECT e2.id, e2.first_name_ar, e2.father_name_ar, e2.last_name_ar,
+                (SELECT COALESCE(MAX(ABS(net_salary_lbp)), 0) FROM monthly_salaries WHERE employee_id = e2.id) mx,
+                (SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = e2.id AND is_active = 1 AND amount > 0) nb
+            FROM employees e2 WHERE e2.school_id = $sid AND e2.is_deleted = 0 AND e2.id <> $id AND e2.employee_type = 'enseignant_contractuel'
+              AND e2.first_name_ar = 'سامر' AND e2.last_name_ar LIKE '%نادر%'")->fetchAll(PDO::FETCH_ASSOC);
+        $removed = [];
+        foreach ($dups as $d) {
+            if ((float)$d['mx'] > 0 || (int)$d['nb'] > 0) { $log[] = 'مكرّر برواتب/بنود لم يُمَسّ #' . $d['id']; continue; }
+            $lid = (int)$d['id'];
+            $db->exec("CREATE TABLE IF NOT EXISTS _emp_bk_samerdup0912 LIKE employees");
+            $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_samerdup0912 LIKE monthly_salaries");
+            $db->exec("INSERT IGNORE INTO _emp_bk_samerdup0912 SELECT * FROM employees WHERE id = $lid");
+            $db->exec("INSERT IGNORE INTO _ms_bk_samerdup0912 SELECT * FROM monthly_salaries WHERE employee_id = $lid");
+            $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $lid");
+            $db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = $lid");
+            $db->exec("UPDATE employees SET is_deleted = 1 WHERE id = $lid");
+            $removed[] = $lid . ' ' . trim($d['first_name_ar'] . ' ' . $d['father_name_ar'] . ' ' . $d['last_name_ar']);
+        }
+        if ($removed) $log[] = 'مكرّران محذوفان (ناعم، نسخة _emp_bk_samerdup0912): ' . implode('؛ ', $removed);
+        $oct25 = $db->query("SELECT base_plus_echelon_lbp b, prime_fixe_lbp p, net_salary_lbp n, transport_lbp t FROM monthly_salaries WHERE employee_id = $id AND year = 2025 AND month = 10")->fetch(PDO::FETCH_ASSOC);
+        $oct26 = $db->query("SELECT net_salary_lbp n, grade_at_month g FROM monthly_salaries WHERE employee_id = $id AND year = 2026 AND month = 10")->fetch(PDO::FETCH_ASSOC);
+        $years = (int)$db->query("SELECT COUNT(DISTINCT school_year) FROM monthly_salaries WHERE employee_id = $id")->fetchColumn();
+        setSetting('heal_samer_allyears_20260912', mb_substr('done ' . date('Y-m-d H:i') . ': emp=' . $id . ' | ' . implode('، ', $log) . ' | سنين=' . $years . ' | تشرين 2025: ' . json_encode($oct25) . ' | تشرين 2026: ' . json_encode($oct26), 0, 4000));
+    } catch (Throwable $e) {
+        try { setSetting('heal_samer_allyears_20260912', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
+
 /* =============================================================================
  * 🏆 «لازم أي درجة أو نص درجة أنا بزيدها تثبت ما تتغيّر أبداً بكل البرنامج إلا إذا أنا بدي غيّر» (أمره 2026-09-12)
  *  - عمود employee_grade_history.user_edited (ذاتي التركيب من الهيدر): يُوسم 1 عند أي لمسة من المستخدم بلوحة الدرجات
