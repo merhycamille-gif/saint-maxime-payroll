@@ -101,42 +101,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
     $lkHit = array_values(array_filter($lkSchools, fn($sid) => isSchoolYearLocked($sid, (string)$schoolYear)));
     if ($lkHit) { $_SESSION['flash_error'] = yearLockedMsg($lkHit[0], (string)$schoolYear) . ($scopeAll ? ' — اختر المدارس غير المقفولة واحدة واحدة.' : ''); header('Location: ' . $_SERVER['REQUEST_URI']); exit; }
 
+    // سطر بند من حقول POST → مصفوفة نظيفة أو null (المصدر الواحد لتنقية أسطر البنود بهذه الصفحة)
+    $cleanLine = function (array $ln) {
+        $type = in_array($ln['type'] ?? '', ['aide_complementaire','prime_fixe','transport_complement'], true) ? $ln['type'] : null;
+        $val  = (float)str_replace(',', '', (string)($ln['value'] ?? 0));
+        if (!$type || $val <= 0) return null;
+        $from = max(1, min(12, (int)($ln['from'] ?? 10)));
+        $to   = max(1, min(12, (int)($ln['to'] ?? 9)));
+        $vt   = ($ln['vtype'] ?? 'amount') === 'percent' ? 'percent' : 'amount';
+        if ($type === 'transport_complement') $vt = 'amount'; // 🚌 النقل مبلغ دائماً (2026-09-11: «نقل شهري 85٪» ضاعف مستحقّات 23 ملاكاً)
+        $cur  = ($ln['currency'] ?? 'LBP') === 'USD' ? 'USD' : 'LBP';
+        return ['type'=>$type, 'val'=>$val, 'from'=>$from, 'to'=>$to, 'vt'=>$vt, 'cur'=>$cur];
+    };
+    // وصف سطر للرسالة («الأجر الإضافي 65٪ (كل السنة)») — (2026-09-11) الرسالة تقول ماذا طُبّق بالضبط لا «1 سطور»
+    $describeLines = function (array $valid) {
+        $tl = ['prime_fixe'=>'الأجر الإضافي','aide_complementaire'=>'مكافأة ومساعدة','transport_complement'=>'نقل شهري'];
+        return implode(' · ', array_map(function ($v) use ($tl) {
+            $val = $v['vt'] === 'percent' ? rtrim(rtrim(number_format($v['val'], 2, '.', ''), '0'), '.') . '٪' : number_format($v['val']) . ($v['cur'] === 'USD' ? ' $' : ' ل.ل');
+            $per = ($v['from'] === 10 && $v['to'] === 9) ? 'كل السنة' : monthName($v['from'], 'ar') . ' ← ' . monthName($v['to'], 'ar');
+            return $tl[$v['type']] . ' ' . $val . ' (' . $per . ')';
+        }, $valid));
+    };
+    // 🔧 المعالج الواحد لتطبيق أسطر على فئات: يمسح الأنواع المستعملة عند كل موظف بالنطاق ثم يبنيها بالأسطر، ويعيد الحساب.
+    // يُرجع [عدد الموظفين، عدد المحسوبين]. تستعمله «طبّق على الكل» و«بند جديد» (apply_periods) و«لكل فئة رقمها» (apply_percats).
+    $applyLinesTo = function (array $cats, array $valid) use ($db, $scopeAll, $schoolId, $schoolYear) {
+        $ids = scopeEmployeeIds($db, $scopeAll, $schoolId, $cats, $schoolYear);
+        $typesUsed = array_values(array_unique(array_map(fn($v)=>$v['type'], $valid)));
+        $del = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = ? AND school_year = ?");
+        $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
+        foreach ($ids as $id) {
+            foreach ($typesUsed as $t) $del->execute([$id, $t, $schoolYear]);   // امسح الأنواع المستعملة ثم أعد بناءها بالأسطر
+            $pn = 0;
+            foreach ($valid as $v) { $pn++; $ins->execute([$id, $v['type'], $pn, $schoolYear, $v['val'], $v['vt'], ($v['vt']==='percent'?'LBP':$v['cur']), $v['from'], $v['to']]); }
+        }
+        [$tot, $done] = recalcScope($db, $scopeAll, $schoolId, $cats, $schoolYear);
+        return [count($ids), $done];
+    };
+
     if ($action === 'apply_periods') {
         // أسطر متعدّدة، كل سطر = نوع + من شهر + إلى شهر + قيمة + (مبلغ/نسبة) + عملة.
         // يدعم تغيّر القيمة خلال السنة (مثلاً نقل تشرين-كانون قيمة، ومن شباط قيمة أخرى).
         $lines = is_array($_POST['lines'] ?? null) ? $_POST['lines'] : [];
-        $valid = [];
-        foreach ($lines as $ln) {
-            $type = in_array($ln['type'] ?? '', ['aide_complementaire','prime_fixe','transport_complement'], true) ? $ln['type'] : null;
-            $val  = (float)($ln['value'] ?? 0);
-            if (!$type || $val <= 0) continue;
-            $from = max(1, min(12, (int)($ln['from'] ?? 10)));
-            $to   = max(1, min(12, (int)($ln['to'] ?? 9)));
-            $vt   = ($ln['vtype'] ?? 'amount') === 'percent' ? 'percent' : 'amount';
-            if ($type === 'transport_complement') $vt = 'amount'; // 🚌 النقل مبلغ دائماً (2026-09-11: «نقل شهري 85٪» ضاعف مستحقّات 23 ملاكاً)
-            $cur  = ($ln['currency'] ?? 'LBP') === 'USD' ? 'USD' : 'LBP';
-            $valid[] = ['type'=>$type, 'val'=>$val, 'from'=>$from, 'to'=>$to, 'vt'=>$vt, 'cur'=>$cur];
-        }
+        $valid = array_values(array_filter(array_map($cleanLine, array_values($lines))));
         if ($valid) {
-            $ids = scopeEmployeeIds($db, $scopeAll, $schoolId, $categories, $schoolYear);
-            $typesUsed = array_values(array_unique(array_map(fn($v)=>$v['type'], $valid)));
-            $del = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = ? AND school_year = ?");
-            $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
-            foreach ($ids as $id) {
-                foreach ($typesUsed as $t) $del->execute([$id, $t, $schoolYear]);   // امسح الأنواع المستعملة ثم أعد بناءها بالأسطر
-                $pn = 0;
-                foreach ($valid as $v) { $pn++; $ins->execute([$id, $v['type'], $pn, $schoolYear, $v['val'], $v['vt'], ($v['vt']==='percent'?'LBP':$v['cur']), $v['from'], $v['to']]); }
-            }
-            [$tot, $done] = recalcScope($db, $scopeAll, $schoolId, $categories, $schoolYear);
-            // (2026-09-11) رسالة تقول ماذا طُبّق بالضبط («الأجر الإضافي 65٪ — كل السنة») لا «1 سطور»
-            $tl = ['prime_fixe'=>'الأجر الإضافي','aide_complementaire'=>'مكافأة ومساعدة','transport_complement'=>'نقل شهري'];
-            $desc = implode(' · ', array_map(function ($v) use ($tl) {
-                $val = $v['vt'] === 'percent' ? rtrim(rtrim(number_format($v['val'], 2, '.', ''), '0'), '.') . '٪' : number_format($v['val']) . ($v['cur'] === 'USD' ? ' $' : ' ل.ل');
-                $per = ($v['from'] === 10 && $v['to'] === 9) ? 'كل السنة' : monthName($v['from'], 'ar') . ' ← ' . monthName($v['to'], 'ar');
-                return $tl[$v['type']] . ' ' . $val . ' (' . $per . ')';
-            }, $valid));
-            $_SESSION['flash_success'] = "✅ طُبّق: $desc — على " . count($ids) . " (" . catLabel($categories) . " — " . scopeLabel($scopeAll,$schoolId) . " — $schoolYear) وأُعيد حساب رواتب $done تلقائياً (المنقولون يدوياً لم يُمَسّوا).";
+            [$n, $done] = $applyLinesTo($categories, $valid);
+            $desc = $describeLines($valid);
+            $_SESSION['flash_success'] = "✅ طُبّق: $desc — على $n (" . catLabel($categories) . " — " . scopeLabel($scopeAll,$schoolId) . " — $schoolYear) وأُعيد حساب رواتب $done تلقائياً (المنقولون يدوياً لم يُمَسّوا).";
         } else $_SESSION['flash_error'] = 'أضِف سطراً واحداً على الأقل بقيمة أكبر من صفر';
+    }
+
+    /* 🎯 (2026-09-12 «بدي تزيد على الإضافي نسبة مئوية تانية وتالتة: المتعاقد نسبة أو مبلغ مختلف عن الملاك، والموظف مختلف عن الاتنين»)
+       البطاقة الكحلية صارت سطراً لكل فئة: كل فئة مؤشَّرة تأخذ قيمتها هي (نسبة ٪ أو مبلغ بعملتها) لنفس النوع ونفس الفترة.
+       نفس المعالج الواحد $applyLinesTo لكل فئة على حدة — لا مسار حفظ جديد. الفئة غير المؤشَّرة أو الفارغة لا تُمسّ. */
+    elseif ($action === 'apply_percats') {
+        $ptype = in_array($_POST['ptype'] ?? '', ['aide_complementaire','prime_fixe','transport_complement'], true) ? $_POST['ptype'] : 'prime_fixe';
+        $pfrom = (int)($_POST['pfrom'] ?? 10); $pto = (int)($_POST['pto'] ?? 9);
+        $pc = is_array($_POST['pc'] ?? null) ? $_POST['pc'] : [];
+        $parts = []; $nAll = 0; $doneAll = 0; $catsDone = [];
+        foreach ($validCats as $ck) {
+            $row = is_array($pc[$ck] ?? null) ? $pc[$ck] : [];
+            if (empty($row['on'])) continue;
+            $ln = $cleanLine(['type' => $ptype, 'value' => $row['value'] ?? 0, 'from' => $pfrom, 'to' => $pto, 'vtype' => $row['vtype'] ?? 'percent', 'currency' => $row['currency'] ?? 'LBP']);
+            if (!$ln) continue;
+            [$n, $done] = $applyLinesTo([$ck], [$ln]);
+            $nAll += $n; $doneAll += $done; $catsDone[] = $ck;
+            $parts[] = catLabel([$ck]) . ' (' . $n . '): ' . $describeLines([$ln]);
+        }
+        if ($parts) $_SESSION['flash_success'] = "✅ طُبّق لكل فئة رقمها — " . implode(' · ', $parts) . " — " . scopeLabel($scopeAll,$schoolId) . " — $schoolYear — على $nAll وأُعيد حساب رواتب $doneAll تلقائياً (المنقولون يدوياً لم يُمَسّوا). الفئات غير المؤشَّرة لم تُمَسّ.";
+        else $_SESSION['flash_error'] = 'أشّر فئة واحدة على الأقل واكتب لها قيمة أكبر من صفر';
     }
 
     /* ✍️ (2026-08-28، طلبه «مقابل كل سطر اعمل ايديت وحفظ وديليت»): تعديل/حذف سطر واحد من
@@ -508,8 +540,8 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         if ($op): ?>
         <div class="card no-print" id="baOnePct" style="margin:0 0 14px;border:2px solid #1F4E5F;box-shadow:none">
             <div class="card-header" style="background:#1F4E5F;color:#fff"><h3 style="color:#fff">
-                <span dir="ltr"><i class="fas fa-bolt"></i> Appliquer à tous d'un coup — taux % ou montant</span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.95">طبّق على الكل دفعة وحدة (نسبة ٪ أو مبلغ) — <?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?></div>
+                <span dir="ltr"><i class="fas fa-bolt"></i> Appliquer à tous d'un coup — un taux % ou montant par catégorie</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.95">طبّق على الكل دفعة وحدة — لكل فئة رقمها (الملاك / المتعاقدين / الموظفين، نسبة ٪ أو مبلغ) —<?= e(scopeLabel(false, $schoolId)) ?> — <?= e($schoolYear) ?></div>
             </h3></div>
             <div class="card-body">
                 <?php if ($opTotal === 0): ?>
@@ -517,56 +549,58 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <?php else: ?>
                 <form method="POST" id="baOnePctForm">
                     <?= csrfField() ?>
-                    <input type="hidden" name="action" value="apply_periods">
+                    <input type="hidden" name="action" value="apply_percats">
                     <input type="hidden" name="sch" value="<?= (int)$schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
-                    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
-                        <div style="flex:1 1 300px;min-width:0">
-                            <div class="ba-step"><span class="ba-num">١</span><div>
-                                <strong>على مين؟</strong>
-                                <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px" id="opCats">
-                                    <?php foreach ($opCats as $ck => $cl): ?>
-                                    <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="checkbox" name="cat[]" value="<?= $ck ?>" <?= $ck === 'titulaire' ? 'checked' : '' ?>> <?= $cl ?> <small style="color:#64748b;font-weight:400">(<?= count($op['ids'][$ck]) ?>)</small></label>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div></div>
-                            <div class="ba-step"><span class="ba-num">٢</span><div>
-                                <strong>شو؟</strong>
-                                <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px" id="opTypes">
-                                    <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="lines[0][type]" value="prime_fixe" checked> ➕ الأجر الإضافي</label>
-                                    <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="lines[0][type]" value="aide_complementaire"> 💰 مكافأة ومساعدة</label>
-                                    <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="lines[0][type]" value="transport_complement"> 🚌 نقل شهري</label>
-                                </div>
-                            </div></div>
-                            <div class="ba-step"><span class="ba-num">٣</span><div style="min-width:0">
-                                <strong>قدّيش؟</strong>
-                                <div style="display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 6px" id="opModeWrap">
-                                    <label style="font-weight:700;cursor:pointer"><input type="radio" name="lines[0][vtype]" value="percent" checked> نسبة ٪ من الأساس بعد التدرّج <small style="color:#64748b;font-weight:400">(بتتحرّك مع الدرجة)</small></label>
-                                    <label style="font-weight:700;cursor:pointer"><input type="radio" name="lines[0][vtype]" value="amount"> مبلغ ثابت كل شهر <small style="color:#64748b;font-weight:400">(ليرة أو دولار)</small></label>
-                                </div>
-                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                                    <input type="number" step="0.01" min="0.01" name="lines[0][value]" id="opPct" class="form-control" value="" placeholder="مثلاً 65" required style="max-width:190px;font-size:18px;font-weight:800;text-align:center" dir="ltr">
-                                    <span style="font-weight:800" id="opUnitPct">٪</span>
-                                    <select name="lines[0][currency]" id="opCur" class="form-select" style="max-width:110px;font-weight:700"><option value="LBP">ل.ل</option><option value="USD">$</option></select>
-                                </div>
-                            </div></div>
-                            <div class="ba-step"><span class="ba-num">٤</span><div style="min-width:0">
-                                <strong>من شهر ← إلى شهر؟</strong> <span class="ba-hint">افتراضياً كل السنة (تشرين ← أيلول). قيمة بتتغيّر بنص السنة = طبّق مرّتين بفترتين مختلفتين.</span>
-                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
-                                    <span>من</span><?= baMonthSel('lines[0][from]', 10, 'id="opFrom" style="max-width:150px;font-weight:700"') ?>
-                                    <span>إلى</span><?= baMonthSel('lines[0][to]', 9, 'id="opTo" style="max-width:150px;font-weight:700"') ?>
-                                    <span id="opPeriodTxt" style="color:#166534;font-weight:700"></span>
-                                </div>
-                                <div style="margin-top:10px"><button type="submit" class="btn btn-primary" id="opBtn" style="font-weight:800" data-confirm="تطبيق؟"><i class="fas fa-check"></i> <span id="opBtnTxt">طبّق</span> / Appliquer</button></div>
-                            </div></div>
-                            <div class="ba-warn" style="margin-top:6px" id="opWarn">⚠️ الزرّ يستبدل <b id="opWarnType">الأجر الإضافي</b> الحالي عند <b>كل</b> موظفي الفئات المختارة (كل فتراته) بهذا السطر الواحد. الأنواع التانية ما بتتأثّر. شخص بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
+                    <div class="ba-step"><span class="ba-num">١</span><div>
+                        <strong>شو؟</strong>
+                        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px" id="opTypes">
+                            <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="ptype" value="prime_fixe" checked> ➕ الأجر الإضافي</label>
+                            <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="ptype" value="aide_complementaire"> 💰 مكافأة ومساعدة</label>
+                            <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="ptype" value="transport_complement"> 🚌 نقل شهري</label>
                         </div>
-                        <div style="flex:1 1 280px;min-width:0;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.9" id="opLive">
-                            <div id="opState" style="margin-bottom:6px"><b>الوضع الحالي:</b> —</div>
-                            <b>🧮 مثال حيّ:</b>
-                            <div id="opLiveOut">—</div>
-                            <div style="font-size:11.5px;color:#64748b" id="opRule"></div>
+                    </div></div>
+                    <div class="ba-step"><span class="ba-num">٢</span><div style="min-width:0;flex:1">
+                        <strong>لكل فئة رقمها</strong> <span class="ba-hint">أشّر الفئة واكتب لها نسبتها ٪ أو مبلغها — الملاك شي، المتعاقدون شي، الموظفون شي. الفئة غير المؤشَّرة ما بتتأثّر.</span>
+                        <div class="table-scroll" style="margin-top:6px">
+                        <table class="table" id="opCats" style="margin:0;min-width:760px">
+                            <thead><tr style="background:#f1f5f9">
+                                <th style="width:34px"></th><th>الفئة</th><th>نسبة ٪ أو مبلغ؟</th><th>القيمة</th><th>الوضع الحالي</th><th>🧮 مثال حيّ (بالشهر)</th>
+                            </tr></thead>
+                            <tbody>
+                            <?php foreach ($opCats as $ck => $cl): $nC = count($op['ids'][$ck]); ?>
+                            <tr class="opRow" data-cat="<?= $ck ?>" style="<?= $nC ? '' : 'opacity:0.55' ?>">
+                                <td style="text-align:center"><input type="checkbox" name="pc[<?= $ck ?>][on]" value="1" class="opOn" <?= ($ck === 'titulaire' && $nC) ? 'checked' : '' ?> <?= $nC ? '' : 'disabled' ?> style="width:20px;height:20px;cursor:pointer"></td>
+                                <td style="font-weight:800;white-space:nowrap"><?= $cl ?> <small style="color:#64748b;font-weight:400">(<?= $nC ?>)</small></td>
+                                <td style="white-space:nowrap">
+                                    <label style="font-weight:700;cursor:pointer;display:block"><input type="radio" name="pc[<?= $ck ?>][vtype]" value="percent" class="opMode" checked> نسبة ٪ من الأساس</label>
+                                    <label style="font-weight:700;cursor:pointer;display:block"><input type="radio" name="pc[<?= $ck ?>][vtype]" value="amount" class="opMode"> مبلغ ثابت كل شهر</label>
+                                </td>
+                                <td style="white-space:nowrap">
+                                    <div style="display:flex;gap:6px;align-items:center">
+                                        <input type="number" step="0.01" min="0.01" name="pc[<?= $ck ?>][value]" class="form-control opVal" placeholder="مثلاً 65" style="width:200px;max-width:200px;font-size:16px;font-weight:800;text-align:center" dir="ltr" <?= $nC ? '' : 'disabled' ?>>
+                                        <span class="opUnit" style="font-weight:800">٪</span>
+                                        <select name="pc[<?= $ck ?>][currency]" class="form-select opCur" style="max-width:95px;font-weight:700;display:none"><option value="LBP">ل.ل</option><option value="USD">$</option></select>
+                                    </div>
+                                </td>
+                                <td class="opState" style="font-size:12.5px;line-height:1.7;min-width:170px">—</td>
+                                <td class="opLive" style="font-size:12.5px;line-height:1.7;min-width:220px;background:#f0fdf4">—</td>
+                            </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
                         </div>
-                    </div>
+                        <div style="font-size:11.5px;color:#64748b;margin-top:4px" id="opRule"></div>
+                    </div></div>
+                    <div class="ba-step"><span class="ba-num">٣</span><div style="min-width:0">
+                        <strong>من شهر ← إلى شهر؟</strong> <span class="ba-hint">افتراضياً كل السنة (تشرين ← أيلول). قيمة بتتغيّر بنص السنة = طبّق مرّتين بفترتين مختلفتين.</span>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+                            <span>من</span><?= baMonthSel('pfrom', 10, 'id="opFrom" style="max-width:150px;font-weight:700"') ?>
+                            <span>إلى</span><?= baMonthSel('pto', 9, 'id="opTo" style="max-width:150px;font-weight:700"') ?>
+                            <span id="opPeriodTxt" style="color:#166534;font-weight:700"></span>
+                        </div>
+                        <div style="margin-top:10px"><button type="submit" class="btn btn-primary" id="opBtn" style="font-weight:800" data-confirm="تطبيق؟"><i class="fas fa-check"></i> <span id="opBtnTxt">طبّق</span> / Appliquer</button></div>
+                    </div></div>
+                    <div class="ba-warn" style="margin-top:6px" id="opWarn">⚠️ الزرّ يستبدل <b id="opWarnType">الأجر الإضافي</b> الحالي عند <b>كل</b> موظفي كل فئة مؤشَّرة (كل فتراته) بسطرها. الفئات غير المؤشَّرة والأنواع التانية ما بتتأثّر. شخص بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
                 </form>
                 <script>
                 (function(){
@@ -574,76 +608,70 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     var STATS=<?= json_encode($op['stats'], JSON_UNESCAPED_UNICODE) ?>, LOHI=<?= json_encode($op['lohi'], JSON_UNESCAPED_UNICODE) ?>;
                     var CATL={titulaire:'الملاك',contractuel:'المتعاقدين',employe:'الموظفين'}, TYPEL={prime_fixe:'الأجر الإضافي',aide_complementaire:'مكافأة ومساعدة',transport_complement:'النقل الشهري'};
                     var SCHOOL=<?= json_encode(scopeLabel(false, $schoolId) . ' — ' . $schoolYear, JSON_UNESCAPED_UNICODE) ?>;
-                    var inp=document.getElementById('opPct'), cur=document.getElementById('opCur'), unit=document.getElementById('opUnitPct');
-                    var out=document.getElementById('opLiveOut'), rule=document.getElementById('opRule'), state=document.getElementById('opState');
-                    var btn=document.getElementById('opBtn'), btnTxt=document.getElementById('opBtnTxt'), warnType=document.getElementById('opWarnType');
+                    var rows=[].slice.call(document.querySelectorAll('#opCats tr.opRow'));
+                    var btn=document.getElementById('opBtn'), btnTxt=document.getElementById('opBtnTxt'), warnType=document.getElementById('opWarnType'), rule=document.getElementById('opRule');
                     var fromSel=document.getElementById('opFrom'), toSel=document.getElementById('opTo'), perTxt=document.getElementById('opPeriodTxt');
+                    if(!rows.length||!btn) return;
+                    var RULE_PCT='النسبة ٪: الأساس ÷ '+OFFLBL+' × النسبة ← داون بالدولار ← × '+RATE.toLocaleString('en-US')+' (سعر الشهر) ← داون للمليون — بتتحرّك مع الدرجة لحالها.';
+                    var RULE_AMT='المبلغ الثابت: نفس الرقم كل شهر لكل شخص مهما كانت درجته؛ بالدولار يُحوَّل بسعر الشهر ('+RATE.toLocaleString('en-US')+') — داون لليرة.';
                     function periodTxt(){ var f=parseInt(fromSel.value,10), t=parseInt(toSel.value,10); if(f===10&&t===9) return 'كل السنة';
                         return fromSel.options[fromSel.selectedIndex].text+' ← '+toSel.options[toSel.selectedIndex].text; }
-                    if(!inp||!out) return;
-                    var RULE_PCT='القاعدة: الأساس ÷ '+OFFLBL+' × النسبة ← داون بالدولار ← × '+RATE.toLocaleString('en-US')+' (سعر الشهر) ← داون للمليون. بتتحرّك مع الدرجة لحالها.';
-                    var RULE_AMT='مبلغ ثابت كل شهر لكل شخص مهما كانت درجته. بالدولار: يُحوَّل بسعر الشهر ('+RATE.toLocaleString('en-US')+') — داون لليرة.';
-                    function cats(){ return [].slice.call(document.querySelectorAll('#opCats input:checked')).map(function(c){return c.value;}); }
                     function type(){ var r=document.querySelector('#opTypes input:checked'); return r?r.value:'prime_fixe'; }
-                    function mode(){ var r=document.querySelector('#opModeWrap input:checked'); return r?r.value:'percent'; }
-                    // 🚌 النقل مبلغ دائماً: عند اختيار النقل تُقفل خانة النسبة
-                    function guardTransport(){ var t=type(); var pr=document.querySelector('#opModeWrap input[value="percent"]'), am=document.querySelector('#opModeWrap input[value="amount"]');
-                        if(t==='transport_complement'){ pr.disabled=true; pr.parentNode.style.opacity=0.45; if(pr.checked){ am.checked=true; } } else { pr.disabled=false; pr.parentNode.style.opacity=1; } }
                     function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
                     function calc(base,pct){ var usd=Math.floor((base/OFFICIAL)*(pct/100)); var lbp=Math.floor(usd*RATE); return {usd:usd, lbp:Math.floor(lbp/1000000)*1000000}; }
-                    function line(it,pct){ var c=calc(it.base,pct); return '<div>'+it.name+' — أساس '+fmt(it.base)+' ⇒ '+fmt(c.usd)+'$ ⇒ <b style="color:#166534">'+fmt(c.lbp)+' ل.ل</b> بالشهر</div>'; }
-                    // الوضع الحالي للفئات المختارة + النوع المختار (مجموع من STATS)
-                    function agg(){
-                        var t=type(), n=0, pct={}, amt={}, mixed=0, none=0;
-                        cats().forEach(function(c){ var S=(STATS[c]||{})[t]; if(!S) return; n+=S.n; mixed+=S.mixed; none+=S.none;
-                            Object.keys(S.pct).forEach(function(k){pct[k]=(pct[k]||0)+S.pct[k];}); Object.keys(S.amt).forEach(function(k){amt[k]=(amt[k]||0)+S.amt[k];}); });
-                        return {n:n,pct:pct,amt:amt,mixed:mixed,none:none};
-                    }
-                    function dominant(a){ // القيمة السائدة للاقتراح: نسبة أو مبلغ
-                        var best=null; Object.keys(a.pct).forEach(function(k){ if(!best||a.pct[k]>best.n) best={m:'percent',v:k,n:a.pct[k]}; });
-                        Object.keys(a.amt).forEach(function(k){ if(!best||a.amt[k]>best.n){ var p=k.split('|'); best={m:'amount',v:p[0],c:p[1],n:a.amt[k]}; } });
+                    function line(it,pct){ var c=calc(it.base,pct); return '<div>'+it.name+' — أساس '+fmt(it.base)+' ⇒ '+fmt(c.usd)+'$ ⇒ <b style="color:#166534">'+fmt(c.lbp)+' ل.ل</b></div>'; }
+                    function R(tr){ return {tr:tr, cat:tr.getAttribute('data-cat'), on:tr.querySelector('.opOn'), modes:[].slice.call(tr.querySelectorAll('.opMode')), val:tr.querySelector('.opVal'), cur:tr.querySelector('.opCur'), unit:tr.querySelector('.opUnit'), state:tr.querySelector('.opState'), live:tr.querySelector('.opLive')}; }
+                    var RS=rows.map(R);
+                    function mode(r){ var m=r.modes.filter(function(x){return x.checked;})[0]; return m?m.value:'percent'; }
+                    function dominant(S){ // القيمة السائدة بالفئة لهذا النوع (نسبة أو مبلغ) للاقتراح
+                        var best=null; if(!S) return null;
+                        Object.keys(S.pct).forEach(function(k){ if(!best||S.pct[k]>best.n) best={m:'percent',v:k,n:S.pct[k]}; });
+                        Object.keys(S.amt).forEach(function(k){ if(!best||S.amt[k]>best.n){ var p=k.split('|'); best={m:'amount',v:p[0],c:p[1],n:S.amt[k]}; } });
                         return best;
                     }
-                    function renderState(a){
-                        var parts=[]; Object.keys(a.pct).sort(function(x,y){return a.pct[y]-a.pct[x];}).forEach(function(k){parts.push('<b>'+a.pct[k]+'</b> على <b>'+k+'٪</b>');});
-                        Object.keys(a.amt).sort(function(x,y){return a.amt[y]-a.amt[x];}).forEach(function(k){var p=k.split('|'); parts.push('<b>'+a.amt[k]+'</b> على مبلغ <b>'+fmt(parseFloat(p[0]))+(p[1]==='USD'?' $':' ل.ل')+'</b>');});
-                        if(a.mixed) parts.push('<b>'+a.mixed+'</b> نسبة + مبلغ'); if(a.none) parts.push('<b>'+a.none+'</b> بلا '+TYPEL[type()]);
-                        var who=cats().map(function(c){return CATL[c];}).join(' + ')||'—';
-                        state.innerHTML='<b>الوضع الحالي</b> ('+who+' — '+TYPEL[type()]+'): <b>'+a.n+'</b> شخص — '+(parts.length?parts.join(' · '):'—')+'.';
+                    function renderState(r){
+                        var S=(STATS[r.cat]||{})[type()]; if(!S){ r.state.textContent='—'; return; }
+                        var parts=[]; Object.keys(S.pct).sort(function(x,y){return S.pct[y]-S.pct[x];}).forEach(function(k){parts.push('<b>'+S.pct[k]+'</b> على <b>'+k+'٪</b>');});
+                        Object.keys(S.amt).sort(function(x,y){return S.amt[y]-S.amt[x];}).forEach(function(k){var p=k.split('|'); parts.push('<b>'+S.amt[k]+'</b> على مبلغ <b>'+fmt(parseFloat(p[0]))+(p[1]==='USD'?' $':' ل.ل')+'</b>');});
+                        // أكثر من 3 قيم مختلفة (المتعاقدون: كل واحد رقمه) = الأكثر شيوعاً ثم «و N قيمة أخرى» بدل قائمة طويلة
+                        var extra=0; if(parts.length>3){ var rest=parts.slice(3); parts=parts.slice(0,3); rest.forEach(function(h){ var m=h.match(/<b>(\d+)<\/b>/); extra+=m?parseInt(m[1],10):1; }); }
+                        if(extra) parts.push('<b>'+extra+'</b> على قيم فردية أخرى');
+                        if(S.mixed) parts.push('<b>'+S.mixed+'</b> نسبة + مبلغ'); if(S.none) parts.push('<b>'+S.none+'</b> بلا '+TYPEL[type()]);
+                        r.state.innerHTML=parts.length?parts.join('<br>'):'—';
+                    }
+                    // 🚌 النقل مبلغ دائماً: عند اختيار النقل تُقفل خانة النسبة بكل السطور
+                    function guardTransport(){ var t=type(); RS.forEach(function(r){ var pr=r.modes[0], am=r.modes[1];
+                        if(t==='transport_complement'){ pr.disabled=true; pr.parentNode.style.opacity=0.45; if(pr.checked) am.checked=true; } else { pr.disabled=false; pr.parentNode.style.opacity=1; } }); }
+                    function updRow(r){
+                        var m=mode(r), v=parseFloat(r.val.value)||0, on=r.on.checked&&!r.on.disabled;
+                        r.cur.style.display=(m==='amount')?'':'none'; r.unit.style.display=(m==='percent')?'':'none';
+                        r.val.placeholder=(m==='amount')?'مثلاً 54000000':'مثلاً 65';
+                        r.tr.style.background=on?'#fffbeb':''; r.val.required=on;
+                        renderState(r);
+                        if(!on){ r.live.innerHTML='<span style="color:#94a3b8">غير مؤشَّرة — ما بتتأثّر</span>'; return; }
+                        if(!v){ r.live.textContent='—'; return; }
+                        if(m==='amount'){ var c=r.cur.value; r.live.innerHTML='<div>كل شخص = <b style="color:#166534">'+fmt(v)+(c==='USD'?' $':' ل.ل')+'</b>'+(c==='USD'?' ≈ '+fmt(Math.floor(v*RATE))+' ل.ل':'')+'</div>'; return; }
+                        var L=LOHI[r.cat]||{}; if(!L.lo){ r.live.textContent='لا أساس مخزّن لهذه الفئة بهذه السنة'; return; }
+                        var h=line(L.lo,v); if(L.hi&&L.hi.name!==L.lo.name) h+=line(L.hi,v); r.live.innerHTML=h;
                     }
                     function upd(){
-                        var m=mode(), v=parseFloat(inp.value)||0, a=agg(), t=type();
-                        if(cur) cur.style.display=(m==='amount')?'':'none'; if(unit) unit.style.display=(m==='percent')?'':'none';
-                        if(rule) rule.textContent=(m==='amount')?RULE_AMT:RULE_PCT;
-                        renderState(a);
-                        btnTxt.textContent='طبّق على '+a.n+' ('+(cats().map(function(c){return CATL[c];}).join(' + ')||'—')+')';
-                        btn.disabled=(a.n===0);
-                        warnType.textContent=TYPEL[t];
-                        var valTxt=v?(m==='percent'?(v+'٪'):(fmt(v)+(cur&&cur.value==='USD'?' $':' ل.ل'))):'…';
-                        var per=periodTxt(); if(perTxt) perTxt.textContent='('+per+')';
-                        btn.setAttribute('data-confirm','تطبيق «'+TYPEL[t]+' = '+valTxt+' — '+per+'» على '+a.n+' ('+(cats().map(function(c){return CATL[c];}).join(' + ')||'—')+') بـ'+SCHOOL+'؟ '+TYPEL[t]+' الحالي عندهم (نسب أو مبالغ، كل الفترات) يُستبدل بهذا السطر، ثم تُعاد الرواتب تلقائياً.');
-                        if(!v){ out.textContent='—'; return; }
-                        if(m==='amount'){
-                            var c=cur?cur.value:'LBP';
-                            out.innerHTML='<div>كل شخص = <b style="color:#166534">'+fmt(v)+(c==='USD'?' $':' ل.ل')+'</b> بالشهر'+(c==='USD'?' ≈ '+fmt(Math.floor(v*RATE))+' ل.ل':'')+' (نفس الرقم للكل، لا يتحرّك مع الدرجة)</div>';
-                            return;
-                        }
-                        // نسبة: أدنى وأعلى أساس بين الفئات المختارة
-                        var lo=null, hi=null; cats().forEach(function(c){ var L=LOHI[c]||{}; if(L.lo&&(!lo||L.lo.base<lo.base)) lo=L.lo; if(L.hi&&(!hi||L.hi.base>hi.base)) hi=L.hi; });
-                        if(!lo){ out.textContent='لا أساس مخزّن للفئات المختارة بهذه السنة'; return; }
-                        var h=line(lo,v); if(hi && hi.name!==lo.name) h+=line(hi,v); out.innerHTML=h;
+                        var t=type(), per=periodTxt(), n=0, who=[], what=[];
+                        RS.forEach(function(r){ updRow(r); if(r.on.checked&&!r.on.disabled){ var S=(STATS[r.cat]||{})[t]; n+=S?S.n:0; who.push(CATL[r.cat]);
+                            var v=parseFloat(r.val.value)||0, m=mode(r); what.push(CATL[r.cat]+' '+(v?(m==='percent'?v+'٪':fmt(v)+(r.cur.value==='USD'?' $':' ل.ل')):'…')); } });
+                        warnType.textContent=TYPEL[t]; if(rule) rule.textContent=RULE_PCT+' '+RULE_AMT;
+                        if(perTxt) perTxt.textContent='('+per+')';
+                        btnTxt.textContent='طبّق على '+n+' ('+(who.join(' + ')||'—')+')'; btn.disabled=(n===0);
+                        btn.setAttribute('data-confirm','تطبيق «'+TYPEL[t]+' — '+per+'»: '+(what.join(' · ')||'—')+' — بـ'+SCHOOL+'؟ '+TYPEL[t]+' الحالي عند كل فئة مؤشَّرة (نسب أو مبالغ، كل الفترات) يُستبدل بسطرها، ثم تُعاد الرواتب تلقائياً.');
                     }
-                    function suggest(){ // عند تغيير الفئة/النوع: اقترح القيمة السائدة الحالية (نسبة أو مبلغ) — المستخدم يعدّلها كما يشاء
+                    function suggest(){ // عند تغيير النوع: اقترح لكل فئة قيمتها السائدة الحالية — المستخدم يعدّلها كما يشاء
                         guardTransport();
-                        var d=dominant(agg()); if(d && d.m==='percent' && type()==='transport_complement') d=null;
-                        if(d){ document.querySelector('#opModeWrap input[value="'+d.m+'"]').checked=true; inp.value=d.v; if(d.m==='amount'&&cur) cur.value=d.c||'LBP'; }
-                        else { inp.value=''; }
-                        inp.placeholder=(mode()==='amount')?'مثلاً 54000000':'مثلاً 65';
+                        RS.forEach(function(r){ var d=dominant((STATS[r.cat]||{})[type()]); if(d&&d.m==='percent'&&type()==='transport_complement') d=null;
+                            if(d){ r.modes.forEach(function(x){ x.checked=(x.value===d.m); }); r.val.value=d.v; if(d.m==='amount') r.cur.value=d.c||'LBP'; } else { r.val.value=''; } });
                         upd();
                     }
-                    document.querySelectorAll('#opCats input, #opTypes input').forEach(function(el){ el.addEventListener('change',suggest); });
-                    document.querySelectorAll('#opModeWrap input').forEach(function(r){ r.addEventListener('change',function(){ inp.value=''; inp.placeholder=(mode()==='amount')?'مثلاً 54000000':'مثلاً 65'; upd(); }); });
-                    inp.addEventListener('input',upd); if(cur) cur.addEventListener('change',upd);
+                    document.querySelectorAll('#opTypes input').forEach(function(el){ el.addEventListener('change',suggest); });
+                    RS.forEach(function(r){ r.on.addEventListener('change',upd); r.modes.forEach(function(x){ x.addEventListener('change',function(){ r.val.value=''; upd(); }); });
+                        r.val.addEventListener('input',upd); r.cur.addEventListener('change',upd); });
                     if(fromSel) fromSel.addEventListener('change',upd); if(toSel) toSel.addEventListener('change',upd);
                     suggest();
                 })();
@@ -656,7 +684,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         <details class="ba-help no-print">
             <summary><i class="fas fa-circle-question"></i> كيف بشتغل بهالصفحة؟ (اكبس للشرح)</summary>
             <ol>
-                <li><b>بند واحد للكل دفعة وحدة؟</b> البطاقة الكحلية فوق: على مين (ملاك/متعاقدين/موظفين) ← شو (أجر إضافي/مكافأة/نقل شهري) ← نسبة ٪ أو مبلغ ← الرقم ← من شهر إلى شهر ← «طبّق». خلص.</li>
+                <li><b>لكل فئة رقمها دفعة وحدة؟</b> البطاقة الكحلية فوق: شو (أجر إضافي/مكافأة/نقل شهري) ← أشّر الفئات وحطّ لكل واحدة رقمها (الملاك نسبة ٪ مثلاً، المتعاقدون نسبة تانية أو مبلغ، الموظفون مبلغ تالت) ← من شهر إلى شهر ← «طبّق». الفئة غير المؤشَّرة ما بتتأثّر. خلص.</li>
                 <li><b>«+ بند جديد»</b> (لأي نوع/فئة/فترة) ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
                 <li><b>النسبة ٪</b> بتنحسب من أساس الراتب بعد التدرّج (÷<?= e(officialUsdRateLbl()) ?> ← × سعر الشهر) وبتتحرّك مع الدرجة — منطقية للملاك. <b>المبلغ الثابت</b> بالليرة أو بالدولار — للمتعاقدين والموظفين أو لأي زيادة ثابتة.</li>
                 <li><b>نسبة + مبلغ ثابت مع بعض</b> (مثلاً 45٪ + 2,000,000 ثابت): حطّهم <b>سطرين بنفس النافذة</b> وكبس طبّق مرّة وحدة. (لو طبّقتهم بمرّتين منفصلتين، التانية بتشيل الأولى لأنها من نفس النوع.)</li>

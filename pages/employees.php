@@ -1882,8 +1882,8 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     <div style="font-size:0.85em;font-weight:600;opacity:0.9">المكافآت والمساعدات والنقل</div>
                 </h3>
                 <?php if ($id > 0 && canEdit()): ?>
-                    <a href="<?= BASE_URL ?>pages/bulk_allowances.php?sch=<?= (int)($employee['school_id'] ?? 0) ?>#baOnePct" class="btn btn-light btn-sm" title="نسبة واحدة للأجر الإضافي لكل الملاك، أو بند لكل فئة دفعة واحدة">
-                        <i class="fas fa-users"></i> Pour toute l'école / لكل المدرسة دفعة وحدة (نسبة واحدة للكل)
+                    <a href="<?= BASE_URL ?>pages/bulk_allowances.php?sch=<?= (int)($employee['school_id'] ?? 0) ?>#baOnePct" class="btn btn-light btn-sm" title="لكل فئة رقمها دفعة وحدة: الملاك نسبتهم، المتعاقدون نسبتهم أو مبلغهم، الموظفون رقمهم">
+                        <i class="fas fa-users"></i> Pour toute l'école / لكل المدرسة دفعة وحدة (لكل فئة رقمها)
                     </a>
                 <?php endif; ?>
             </div>

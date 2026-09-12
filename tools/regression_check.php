@@ -4476,15 +4476,17 @@ check('المكافآت 2026-09-11: لا تكرار — التبويب الما�
       && strpos($emp0911, 'Gérer les primes') === false && strpos($emp0911, 'pages/bonuses.php?') === false
       && strpos($bn0911, '&tab=bonuses') !== false && strpos($bn0911, 'INSERT INTO') === false);
 $ba0911 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
-check('المكافآت الجماعية 2026-09-11: بطاقة «طبّق على الكل دفعة وحدة» (على مين × شو × نسبة/مبلغ + زرّ واحد عبر apply_periods) + الوضع الحالي + مثال حيّ بمعادلة المحرّك + تبديل الجلسة تلقائياً للمدرسة المختارة + رسالة تقول ماذا طُبّق',
+check('المكافآت الجماعية 2026-09-11/12: بطاقة «طبّق على الكل دفعة وحدة» صارت سطراً لكل فئة (ملاك/متعاقدين/موظفين كل واحدة نسبتها ٪ أو مبلغها — «نسبة تانية وتالتة») × شو × من←إلى، معالج apply_percats على نفس $applyLinesTo + الوضع الحالي + مثال حيّ بمعادلة المحرّك + تبديل الجلسة تلقائياً + رسالة تقول ماذا طُبّق',
       strpos($ba0911, 'id="baOnePct"') !== false && strpos($ba0911, 'id="baOnePctForm"') !== false
-      && strpos($ba0911, 'name="lines[0][vtype]" value="percent"') !== false && strpos($ba0911, 'name="lines[0][vtype]" value="amount"') !== false
-      && strpos($ba0911, 'id="opCur"') !== false && strpos($ba0911, 'id="opCats"') !== false && strpos($ba0911, 'id="opTypes"') !== false
-      && strpos($ba0911, 'name="lines[0][type]" value="prime_fixe"') !== false && strpos($ba0911, 'name="lines[0][type]" value="aide_complementaire"') !== false
-      && strpos($ba0911, 'name="lines[0][type]" value="transport_complement"') !== false
+      && strpos($ba0911, 'name="pc[<?= $ck ?>][vtype]" value="percent"') !== false && strpos($ba0911, 'name="pc[<?= $ck ?>][vtype]" value="amount"') !== false
+      && strpos($ba0911, 'name="pc[<?= $ck ?>][value]"') !== false && strpos($ba0911, 'name="pc[<?= $ck ?>][currency]"') !== false && strpos($ba0911, 'name="pc[<?= $ck ?>][on]"') !== false
+      && strpos($ba0911, 'id="opCats"') !== false && strpos($ba0911, 'id="opTypes"') !== false && substr_count($ba0911, 'class="opRow" data-cat="<?= $ck ?>"') === 1
+      && strpos($ba0911, 'name="ptype" value="prime_fixe"') !== false && strpos($ba0911, 'name="ptype" value="aide_complementaire"') !== false
+      && strpos($ba0911, 'name="ptype" value="transport_complement"') !== false
       && strpos($ba0911, "SELECT employee_id, bonus_type, value_type, amount, currency FROM employee_bonuses") !== false
-      && strpos($ba0911, 'name="cat[]" value="<?= $ck ?>"') !== false
-      && strpos($ba0911, "baMonthSel('lines[0][from]', 10") !== false && strpos($ba0911, "baMonthSel('lines[0][to]', 9") !== false
+      && strpos($ba0911, "=== 'apply_percats'") !== false && substr_count($ba0911, '$applyLinesTo(') === 2 && strpos($ba0911, "foreach (\$validCats as \$ck) {") !== false
+      && strpos($ba0911, "if (empty(\$row['on'])) continue;") !== false && strpos($ba0911, '$applyLinesTo([$ck], [$ln])') !== false
+      && strpos($ba0911, "baMonthSel('pfrom', 10") !== false && strpos($ba0911, "baMonthSel('pto', 9") !== false
       && strpos($ba0911, "baMonthSel('ind_from', 10") !== false && strpos($ba0911, "\$perSql = \$iFull ? \$fullYearSql : \"(start_month = \$iFrom AND end_month = \$iTo)\"") !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(pct/100))') !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(b.pct/100))') !== false
