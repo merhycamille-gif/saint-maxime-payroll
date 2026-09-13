@@ -16,7 +16,7 @@ healLeaverPhantomRows(); // شفاء ذاتي مستمرّ (مرّة بالجل�
 healStaleYearMirror20260806(); // شفاء ذاتي مرّة واحدة: إعادة حساب السنين المفتوحة والسنين التي مخزّنها لا يطابق علاوات الملف (حالة مارسيلا — الكشف يطابق الملف)
 ensureYearLockTable();         // 🔒 تركيب ذاتي: جدول أقفال السنة الدراسية لكل مدرسة (2026-09-12) — خارج أي معاملة
 ensureGradeUserEditedColumn(); // 🏆 تركيب ذاتي: عمود «معدَّلة بيد المستخدم» بسجلّ الدرجات (2026-09-12 «أي درجة بزيدها تثبت ما تتغيّر أبداً»)
-require_once __DIR__ . '/cadre_due.php'; cadreDueEnsureColumns(); // 🎓 تركيب ذاتي: عمود «ملاك من سنة» (الترسيم الحكمي بعد سنتين تعاقد 2026-09-13) — خارج أي معاملة
+require_once __DIR__ . '/cadre_due.php'; cadreDueEnsureColumns(); healJanaRestore20260913(); healCadreNew20260913(); // 🎓 🚑 جنى لبوس: استرجاع سنتَيها كمتعاقدة (حُوِّلت بيده قبل الصمام) — تركيب ذاتي: عمود «ملاك من سنة» + شفاء: من صار ملاكاً هذه السنة يُستكمَل له قانون الملاك (درجات السنة + نقل ونسبة كرفاقه) — مرّة لكل أستاذ (2026-09-13)
 ensureEmployeeFlagColumns();   // تركيب ذاتي: أعمدة خيارات ملف الموظف (التنزيل/زيادة الزوج/التعويض العائلي)
 ensureSpouseColumns20260821(); // تركيب ذاتي: أعمدة معلومات الزوج/الزوجة (لنموذج المالية ر3)
 healRemoveNoFatherDuplicates20260806(); // شفاء ذاتي مرّة واحدة بأمر المستخدم: شيل الملف المكرّر الذي بلا اسم أب حقيقي (حذف ناعم قابل للاسترجاع)
@@ -129,6 +129,35 @@ document.addEventListener('submit', function (e) {
         f.appendChild(i);
     }
 }, true);
+// 📌 «بدي ما تنطّ الصفحة على مكان آخر وأنا عم اشتغل فيها — إذا صلّحت شي لازم تضلّ بنفس الصفحة، بكل البرنامج» (أمره 2026-09-13):
+// عند إرسال أي نموذج POST نحفظ موضع التمرير والأقسام المفتوحة (details) لهذه الصفحة، وبعد الرجوع (إعادة التوجيه) نرجّعها كما كانت.
+(function () {
+    var key = 'msa_stay:' + location.pathname;
+    document.addEventListener('submit', function (e) {
+        var f = e.target;
+        if (!f || !f.method || f.method.toLowerCase() !== 'post') return;
+        try {
+            var open = []; var ds = document.querySelectorAll('details');
+            for (var i = 0; i < ds.length; i++) if (ds[i].open) open.push(i);
+            sessionStorage.setItem(key, JSON.stringify({ y: window.scrollY || window.pageYOffset || 0, open: open, t: Date.now() }));
+        } catch (err) {}
+    }, true);
+    function restore() {
+        var raw = null;
+        try { raw = sessionStorage.getItem(key); if (raw !== null) sessionStorage.removeItem(key); } catch (err) { return; }
+        if (!raw) return;
+        var s; try { s = JSON.parse(raw); } catch (err) { return; }
+        if (!s || (Date.now() - (s.t || 0)) > 120000) return; // حفظ قديم (تنقّل عادي) — تجاهله
+        var ds = document.querySelectorAll('details');
+        if (s.open) for (var i = 0; i < s.open.length; i++) if (ds[s.open[i]]) ds[s.open[i]].open = true;
+        if (location.hash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (err) {} }
+        var y = parseInt(s.y, 10) || 0;
+        window.scrollTo(0, y);
+        setTimeout(function () { window.scrollTo(0, y); }, 60);
+        setTimeout(function () { window.scrollTo(0, y); }, 300);
+    }
+    if (document.readyState === 'complete') restore(); else window.addEventListener('load', restore);
+})();
 </script>
 
 <div class="app-layout">

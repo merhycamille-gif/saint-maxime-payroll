@@ -20,7 +20,7 @@ handleHoursReductionPost($db, BASE_URL . 'index.php');
 // ⚖️ قرارات تقرير المخالفات (موافق — صحّح / لا — اتركه) — تُعالَج وتعيد التوجيه للرئيسية
 handleCompliancePost($db, BASE_URL . 'index.php');
 // 🎓 قرارات الترسيم الحكمي بالملاك (وافق — رسّمه / لا — يبقى متعاقداً) — تُعالَج وتعيد التوجيه للرئيسية
-handleCadreDuePost($db, BASE_URL . 'index.php#cadreDue');
+handleCadreDuePost($db, BASE_URL . 'index.php'); // بلا مرساة — الصفحة ترجع لمكانها نفسه (msa_stay بالهيدر)
 $homeComp = canEdit() ? complianceBuild($db) : null; // التقرير يُبنى عند كل فتح للوحة القيادة
 // 🎓 المتعاقدون الذين أكملوا سنتين بالسنة الحالية للبرنامج (أو المختارة إن كانت أحدث) — بانتظار قراره
 $homeCdSy = activeSchoolYear(); if ($homeCdSy === 'all' || strcmp($homeCdSy, currentSchoolYear()) < 0) $homeCdSy = currentSchoolYear();

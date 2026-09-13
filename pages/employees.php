@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/payroll_calculator.php';
 require_once __DIR__ . '/../includes/translit_ar_fr.php';
 require_once __DIR__ . '/../includes/hours_reduction.php'; // 🕐 تناقص ساعات التدريس (مرسوم 2601/2018) — عرض فقط
+require_once __DIR__ . '/../includes/cadre_due.php'; // 🎓 صمام cadre_from_sy لمن صار ملاكاً بيده (2026-09-13)
 requireLogin();
 
 // AJAX: ترجمة اسم عربي → فرنسي للتعبئة الفورية في النموذج (GET، بلا CSRF)
@@ -526,6 +527,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             $becameCadre = ($oldDates && ($oldDates['employee_type'] ?? '') !== 'enseignant_titulaire' && $data['employee_type'] === 'enseignant_titulaire'
                             && (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = " . (int)$id)->fetchColumn() === 0);
             if ($becameCadre) $diplomaChanged = true; // نفس مسار «تغيّرت الشهادة»: درجة الدخول من الشهادة + بناء + إعادة حساب
+            // 🛡️ (2026-09-13، حادثة جنى لبوس) صار ملاكاً بيده وله رواتب سنين سابقة كمتعاقد ⇒ صمام cadre_from_sy قبل أي إعادة حساب
+            //    حتى لا تُستبدَل سنواته السابقة بالسلسلة (يُحسب كملاك من سنة ملاكه فقط)
+            if ($becameCadre && $data['titularization_date']) {
+                try {
+                    if (function_exists('cadreDueEnsureColumns')) cadreDueEnsureColumns($db);
+                    $cfsNew = schoolYearOfDate($data['titularization_date']);
+                    $hasPrevRows = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND school_year < ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) LIMIT 1");
+                    $hasPrevRows->execute([$id, $cfsNew]);
+                    if ($cfsNew && $hasPrevRows->fetchColumn()) $db->prepare("UPDATE employees SET cadre_from_sy = ? WHERE id = ?")->execute([$cfsNew, $id]);
+                } catch (Throwable $t) {}
+            }
             $datesChanged = ($oldDates && (
                 ($oldDates['titularization_date'] ?? null) != $data['titularization_date'] ||
                 ($oldDates['hire_date'] ?? null) != $data['hire_date'] ||

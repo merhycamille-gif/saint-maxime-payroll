@@ -89,6 +89,110 @@ function schoolCadrePercent(PDO $db, int $schoolId, string $sy): ?array {
     return $cache[$k] = $res;
 }
 
+/** خطوط النقل الفاعلة (نقل يومي/تعويض نقل) لأستاذ بسنة — قائمة موحَّدة الشكل للمقارنة والنسخ */
+function cadreDueTransportLines(PDO $db, int $empId, string $sy): array {
+    $st = $db->prepare("SELECT bonus_type, amount, value_type, currency, COALESCE(start_month,0) sm, COALESCE(end_month,0) em FROM employee_bonuses
+                        WHERE employee_id = ? AND school_year = ? AND is_active = 1 AND amount > 0 AND bonus_type IN ('transport_daily','transport_complement')
+                        ORDER BY bonus_type, amount, sm, em");
+    $st->execute([$empId, $sy]);
+    $out = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $out[] = ['type' => $r['bonus_type'], 'amount' => round((float)$r['amount'], 2), 'vt' => $r['value_type'], 'cur' => $r['currency'], 'sm' => (int)$r['sm'], 'em' => (int)$r['em']];
+    return $out;
+}
+
+/**
+ * 🚌 قالب تعويض النقل لملاك المدرسة (أمره 2026-09-13 «اللي بيصيروا بالملاك لازم طبّق عليهن تعويض النقل على 5 أيام — كل القانون اللي بيطبّق على الملاك»):
+ * التوقيع الأكثر شيوعاً بين أساتذة الملاك الفاعلين بالمدرسة = مجموعة خطوط النقل (النوع/المبلغ/العملة/النافذة) + حقول النقل بملفهم
+ * (اليومي/أيام الأسبوع/الأسابيع). مثلاً عبرا: تعويض نقل 9,000,000 ل.ل. شهرياً (= 450,000 × 5 أيام × 4 أسابيع). إن لم تُنسخ خطوط السنة بعد
+ * تُؤخذ من السنة السابقة. يرجّع ['lines'=>[...], 'fields'=>[...], 'n'=>عدد الملاك بهذا التوقيع, 'total'=>كل الملاك, 'sy'=>السنة المصدر] أو null بلا ملاك.
+ */
+function schoolCadreTransportTemplate(PDO $db, int $schoolId, string $sy): ?array {
+    static $cache = [];
+    $k = $schoolId . '|' . $sy;
+    if (array_key_exists($k, $cache)) return $cache[$k];
+    $y1 = (int)substr($sy, 0, 4);
+    $emps = $db->query("SELECT id, transport_daily_amount, transport_daily_currency, transport_days_per_week, transport_weeks FROM employees
+                        WHERE school_id = " . (int)$schoolId . " AND is_deleted = 0 AND status = 'actif' AND employee_type = 'enseignant_titulaire'
+                          AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= '" . $y1 . "-10-01'")->fetchAll(PDO::FETCH_ASSOC);
+    if (!$emps) return $cache[$k] = null;
+    $try = [$sy, ($y1 - 1) . '-' . $y1];
+    $res = null;
+    foreach ($try as $ySy) {
+        $sig = []; $byKey = []; $withAny = 0;
+        foreach ($emps as $e) {
+            $lines = cadreDueTransportLines($db, (int)$e['id'], $ySy);
+            if ($lines) $withAny++;
+            $key = json_encode($lines);
+            $sig[$key] = ($sig[$key] ?? 0) + 1;
+            $byKey[$key][] = $e;
+        }
+        if ($withAny === 0 && $ySy === $sy) continue; // خطوط السنة الجديدة لم تُنسخ بعد → السنة السابقة
+        arsort($sig);
+        $top = array_key_first($sig);
+        $members = $byKey[$top];
+        $fields = [];
+        foreach (['transport_daily_amount', 'transport_daily_currency', 'transport_days_per_week', 'transport_weeks'] as $f) {
+            $fr = [];
+            foreach ($members as $m) { $v = (string)$m[$f]; $fr[$v] = ($fr[$v] ?? 0) + 1; }
+            arsort($fr);
+            $fields[$f] = array_key_first($fr);
+        }
+        $res = ['lines' => json_decode($top, true) ?: [], 'fields' => $fields, 'n' => (int)$sig[$top], 'total' => count($emps), 'sy' => $ySy];
+        break;
+    }
+    return $cache[$k] = $res;
+}
+
+/** نصّ موجز لقالب النقل */
+function cadreDueTransportText(?array $t): string {
+    if (!$t) return 'بلا ملاك بالمدرسة للمقارنة';
+    if (!$t['lines'] && (float)$t['fields']['transport_daily_amount'] <= 0) return 'ملاك المدرسة بلا تعويض نقل';
+    $parts = [];
+    foreach ($t['lines'] as $l) {
+        $amt = ($l['cur'] === 'USD' ? '$ ' : '') . number_format((float)$l['amount'], $l['cur'] === 'USD' ? 2 : 0) . ($l['cur'] === 'USD' ? '' : ' ل.ل.');
+        $parts[] = ($l['type'] === 'transport_daily' ? 'نقل يومي ' . $amt : 'تعويض نقل ' . $amt . ' شهرياً') . ($l['sm'] && $l['em'] ? ' (' . monthName($l['sm'], 'ar') . ' ← ' . monthName($l['em'], 'ar') . ')' : '');
+    }
+    if ((float)$t['fields']['transport_daily_amount'] > 0) $parts[] = 'يومي بالملف ' . number_format((float)$t['fields']['transport_daily_amount'], 0) . ' × ' . (int)$t['fields']['transport_days_per_week'] . ' أيام';
+    return implode(' + ', $parts) . ' — كـ' . (int)$t['n'] . ' من ' . (int)$t['total'] . ' ملاك المدرسة';
+}
+
+/**
+ * يطبّق قالب نقل ملاك المدرسة على أستاذ لسنة (يطفئ خطوط نقله ويضع خطوط القالب + حقول النقل بملفه). يرجّع نصّاً بما تغيّر أو null إن كان مطابقاً أصلاً.
+ */
+function cadreDueApplyTransport(PDO $db, int $empId, int $schoolId, string $sy): ?string {
+    $t = schoolCadreTransportTemplate($db, $schoolId, $sy);
+    if (!$t) return null;
+    $cur = cadreDueTransportLines($db, $empId, $sy);
+    $e = $db->query("SELECT transport_daily_amount, transport_daily_currency, transport_days_per_week, transport_weeks FROM employees WHERE id = " . (int)$empId)->fetch(PDO::FETCH_ASSOC);
+    $sameLines = json_encode($cur) === json_encode($t['lines']);
+    $sameFields = $e && (float)$e['transport_daily_amount'] == (float)$t['fields']['transport_daily_amount'] && (int)$e['transport_days_per_week'] == (int)$t['fields']['transport_days_per_week'] && (float)$e['transport_weeks'] == (float)$t['fields']['transport_weeks'];
+    if ($sameLines && $sameFields) return null;
+    if (!$sameLines) {
+        $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type IN ('transport_daily','transport_complement')")->execute([$empId, $sy]);
+        $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?,?,?,?,?,?,?,?,?,1)");
+        $pn = 0;
+        foreach ($t['lines'] as $l) { $pn++; $ins->execute([$empId, $l['type'], $pn, $sy, $l['amount'], $l['vt'], $l['cur'], $l['sm'] ?: null, $l['em'] ?: null]); }
+    }
+    $db->prepare("UPDATE employees SET transport_daily_amount = ?, transport_daily_currency = ?, transport_days_per_week = ?, transport_weeks = ? WHERE id = ?")
+       ->execute([(float)$t['fields']['transport_daily_amount'], $t['fields']['transport_daily_currency'] ?: 'LBP', (int)$t['fields']['transport_days_per_week'], (float)$t['fields']['transport_weeks'] ?: 4, $empId]);
+    return 'نقل كملاك المدرسة: ' . cadreDueTransportText($t);
+}
+
+/** نسبة الإضافي كملاك المدرسة (بند واحد بدل أي إضافي كان له بهذه السنة). يرجّع النسبة أو null إن كانت المدرسة بلا نسبة أو كان عليها أصلاً. */
+function cadreDueApplyPercent(PDO $db, int $empId, int $schoolId, string $sy): ?float {
+    $pct = schoolCadrePercent($db, $schoolId, $sy);
+    if (!$pct) return null;
+    $has = $db->prepare("SELECT amount FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND bonus_type = 'prime_fixe' AND value_type = 'percent' AND is_active = 1");
+    $has->execute([$empId, $sy]);
+    $rows = $has->fetchAll(PDO::FETCH_COLUMN);
+    if (count($rows) === 1 && abs((float)$rows[0] - (float)$pct['pct']) < 0.01) return null; // عليها أصلاً
+    $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type = 'prime_fixe'")->execute([$empId, $sy]);
+    $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+                  VALUES (?, 'prime_fixe', 1, ?, ?, 'percent', 'LBP', ?, ?, 1)")
+       ->execute([$empId, $sy, $pct['pct'], $pct['start_month'], $pct['end_month']]);
+    return (float)$pct['pct'];
+}
+
 /**
  * قالب محسومات الملاك بالمدرسة (القيمة الأكثر شيوعاً بين أساتذة الملاك الفاعلين) — حتى يُعامَل المرسَّم كرفاقه تماماً.
  * بلا ملاك بالمدرسة: افتراضيات الملاك (صندوق + ضمان + ضريبة على الأساس والدرجة والإضافي، 12 شهراً).
@@ -176,6 +280,7 @@ function cadreDueCandidates(PDO $db, string $sy, ?array $schoolIds = null, bool 
             'immediate' => $dip ? (int)$dip['gets_immediate_grade'] : 1,
             'pay' => $pay, 'tit' => $yearStart,
             'pct' => schoolCadrePercent($db, (int)$e['school_id'], $sy),
+            'transport' => schoolCadreTransportTemplate($db, (int)$e['school_id'], $sy),
             'can' => $can, 'why' => $why, 'decision' => $d, 'has_grades' => (int)$gh->fetchColumn(),
         ];
     }
@@ -250,18 +355,16 @@ function titularizeContractTeacher(PDO $db, int $empId, string $sy, string $who 
 
     // 💯 نسبة الملاك بالمدرسة (بند واحد بدل أي إضافي كان له كمتعاقد بهذه السنة) — إن كانت المدرسة بالمبالغ يبقى ما له كما هو
     $pct = schoolCadrePercent($db, (int)$emp['school_id'], $sy);
-    if ($pct) {
-        $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type = 'prime_fixe'")->execute([$empId, $sy]);
-        $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
-                      VALUES (?, 'prime_fixe', 1, ?, ?, 'percent', 'LBP', ?, ?, 1)")
-           ->execute([$empId, $sy, $pct['pct'], $pct['start_month'], $pct['end_month']]);
-    }
+    cadreDueApplyPercent($db, $empId, (int)$emp['school_id'], $sy);
+    // 🚌 تعويض النقل كملاك المدرسة (5 أيام — «كل القانون اللي بيطبّق على الملاك»)
+    $trText = cadreDueApplyTransport($db, $empId, (int)$emp['school_id'], $sy);
     // 🧮 إعادة حساب سنة الترسيم فقط — سنواته السابقة كمتعاقد لا تُلمَس (صمام cadre_from_sy بالمحرّك)
     $months = (int)recalcEmployeeYear($empId, $sy);
     $name = cadreDueEmpName($emp);
     $res = 'رُسِّم بالملاك من ' . $tit . ': درجة الدخول ' . rtrim(rtrim(number_format($startG, 1), '0'), '.') . ' ← ' . rtrim(rtrim(number_format($gEnd, 1), '0'), '.') . ' بنهاية ' . $sy
-         . ($pct ? ' + إضافي ' . rtrim(rtrim((string)$pct['pct'], '0'), '.') . ' % كملاك المدرسة' : ' (المدرسة بلا نسبة — بنوده كما هي)') . ' — حُسب ' . $months . ' شهراً';
-    logAudit('cadre_titularize', 'employees', $empId, $old, ['employee_type' => 'enseignant_titulaire', 'titularization_date' => $tit, 'sy' => $sy, 'starting_grade' => $startG, 'grade_end' => $gEnd, 'pct' => $pct['pct'] ?? null, 'months' => $months]);
+         . ($pct ? ' + إضافي ' . rtrim(rtrim((string)$pct['pct'], '0'), '.') . ' % كملاك المدرسة' : ' (المدرسة بلا نسبة — بنوده كما هي)')
+         . ($trText ? ' + ' . $trText : '') . ' — حُسب ' . $months . ' شهراً';
+    logAudit('cadre_titularize', 'employees', $empId, $old, ['employee_type' => 'enseignant_titulaire', 'titularization_date' => $tit, 'sy' => $sy, 'starting_grade' => $startG, 'grade_end' => $gEnd, 'pct' => $pct['pct'] ?? null, 'transport' => $trText, 'months' => $months]);
     cadreDueRecordDecision($db, ['id' => $empId, 'school_id' => (int)$emp['school_id'], 'name' => $name, 'hire_date' => $emp['hire_date'], 'years' => 0, 'tit' => $tit], $sy, 'approved', $res, $who);
     return ['ok' => true, 'id' => $empId, 'name' => $name, 'grade_start' => $startG, 'grade_now' => $gradeNow, 'grade_end' => $gEnd, 'pct' => $pct['pct'] ?? null, 'months' => $months, 'msg' => $res];
 }
@@ -318,24 +421,6 @@ function cadreDuePctText(?array $pct): string {
     return $t . ' — كـ' . (int)$pct['n'] . ' أستاذ ملاك بالمدرسة';
 }
 
-/** زرّا القرار لأستاذ واحد */
-function cadreDueDecisionButtons(array $c, string $sy, string $formAction = ''): string {
-    if (!canEdit()) return '<span class="text-muted">قراءة فقط</span>';
-    $act = $formAction !== '' ? ' action="' . e($formAction) . '"' : '';
-    $h = '';
-    if ($c['can']) {
-        $h .= '<form method="post"' . $act . ' style="display:inline" onsubmit="return confirm(\'ترسيم ' . e($c['name']) . ' بالملاك من ' . e($c['tit']) . '؟ (السلسلة بدل الراتب المتفق عليه + الدرجات بالقانون + نسبة الملاك بالمدرسة — سنواته السابقة لا تتغيّر)\')">'
-            . csrfField() . '<input type="hidden" name="action" value="cd_approve"><input type="hidden" name="cd_sy" value="' . e($sy) . '"><input type="hidden" name="emp_id" value="' . (int)$c['id'] . '">'
-            . '<button class="btn btn-sm btn-success"><i class="fas fa-check"></i> وافق — رسّمه بالملاك</button></form> ';
-    } else {
-        $h .= '<a class="btn btn-sm btn-primary" href="' . BASE_URL . 'pages/employees.php?action=edit&id=' . (int)$c['id'] . '"><i class="fas fa-pen"></i> افتح الملف</a> ';
-    }
-    $h .= '<form method="post"' . $act . ' style="display:inline">' . csrfField()
-        . '<input type="hidden" name="action" value="cd_reject"><input type="hidden" name="cd_sy" value="' . e($sy) . '"><input type="hidden" name="emp_id" value="' . (int)$c['id'] . '">'
-        . '<button class="btn btn-sm btn-light" title="يبقى متعاقداً هذه السنة — يُسجَّل قرارك ويمكن إعادة فتحه"><i class="fas fa-xmark"></i> لا — يبقى متعاقداً</button></form>';
-    return $h;
-}
-
 /** صفوف جدول المرشَّحين (مشتركة بين المساج وصفحة المراجعة) */
 function cadreDueRowCells(array $c): string {
     $gs = $c['grade_start'] !== null ? rtrim(rtrim(number_format($c['grade_start'], 1), '0'), '.') : '—';
@@ -345,8 +430,119 @@ function cadreDueRowCells(array $c): string {
        . '<td>' . e($c['diploma_label']) . ($c['can'] ? '<br><small>درجة الدخول <strong>' . $gs . '</strong>' . ($c['immediate'] ? ' + درجة فورية بتشرين' : ' (تعليمية: بلا فورية)') . ' + 4 بكانون</small>' : '<br><span class="badge badge-warning">⚠️ ' . e($c['why']) . '</span>') . '</td>'
        . '<td>' . e($c['pay']) . '</td>'
        . '<td style="white-space:nowrap">' . e($c['tit']) . '</td>'
-       . '<td>' . e(cadreDuePctText($c['pct'])) . '</td>';
+       . '<td>' . e(cadreDuePctText($c['pct'])) . '<br><small style="color:#0a6b5e">🚌 ' . e(cadreDueTransportText($c['transport'] ?? null)) . '</small></td>';
     return $h;
+}
+
+/**
+ * 🚑 شفاء ذاتي مرّة واحدة (2026-09-13): جنى لبوس (عبرا، 1785) حوّلها المستخدم بيده من متعاقدة إلى ملاك أونلاين (2026-10-01) قبل وجود
+ * صمام cadre_from_sy، فأعاد البرنامج حساب سنتَيها كمتعاقدة بمحرّك الملاك (2024-2025 صارت 12 شهراً بدل 9، وتشرين 2025 صافيها 57,702,000
+ * بدل 58,248,000 فاختلف كشف عبرا عن كشفه القديم بالمليم). الاسترجاع من لقطة الأونلاين 2026-09-12 (tools/data/rows_1785_pre2627_20260913.json)
+ * لسنواتها قبل 2026-2027 فقط + cadre_from_sy = 2026-2027 حتى لا يتكرّر. نسخة _ms_bk_jana0913. لا يمسّ 2026-2027 (سنة ملاكها).
+ */
+function healJanaRestore20260913(): void {
+    $flag = 'heal_jana_restore_20260913';
+    if (strpos((string)getSetting($flag, ''), 'done') === 0) return;
+    try {
+        $db = getDB();
+        if ($db->inTransaction()) return;
+        $file = __DIR__ . '/../tools/data/rows_1785_pre2627_20260913.json';
+        if (!is_file($file)) return;
+        $e = $db->query("SELECT id, first_name_ar, last_name_ar, school_id, employee_type FROM employees WHERE id = 1785 AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+        if (!$e || mb_strpos((string)$e['first_name_ar'], 'جنى') === false || mb_strpos((string)$e['last_name_ar'], 'لبوس') === false) { setSetting($flag, 'done ' . date('Y-m-d H:i') . ' (ليست جنى لبوس — لا شيء)'); return; }
+        if (isSchoolYearLocked((int)$e['school_id'], '2025-2026') || isSchoolYearLocked((int)$e['school_id'], '2024-2025')) return; // يُعاد عند فتح القفل
+        $rows = json_decode((string)file_get_contents($file), true);
+        if (!is_array($rows) || !$rows) { setSetting($flag, 'err: ملف اللقطة فارغ'); return; }
+        $want = 0; foreach ($rows as $r) $want += (float)$r['net_salary_lbp'];
+        $cur = $db->query("SELECT COUNT(*) n, COALESCE(SUM(net_salary_lbp),0) s FROM monthly_salaries WHERE employee_id = 1785 AND school_year < '2026-2027'")->fetch(PDO::FETCH_ASSOC);
+        cadreDueEnsureColumns($db);
+        if ((int)$cur['n'] === count($rows) && abs((float)$cur['s'] - $want) < 1) {
+            $db->exec("UPDATE employees SET cadre_from_sy = COALESCE(cadre_from_sy, '2026-2027') WHERE id = 1785 AND employee_type = 'enseignant_titulaire'");
+            setSetting($flag, 'done ' . date('Y-m-d H:i') . ' (سليمة أصلاً)'); return;
+        }
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_jana0913 LIKE monthly_salaries");
+        $db->exec("INSERT IGNORE INTO _ms_bk_jana0913 SELECT * FROM monthly_salaries WHERE employee_id = 1785 AND school_year < '2026-2027'");
+        $cols = $db->query("SHOW COLUMNS FROM monthly_salaries")->fetchAll(PDO::FETCH_COLUMN);
+        $db->exec("DELETE FROM monthly_salaries WHERE employee_id = 1785 AND school_year < '2026-2027'");
+        $n = 0;
+        foreach ($rows as $r) {
+            unset($r['id']);
+            $r = array_intersect_key($r, array_flip($cols));
+            $c = '`' . implode('`,`', array_keys($r)) . '`';
+            $db->prepare("INSERT INTO monthly_salaries ($c) VALUES (" . implode(',', array_fill(0, count($r), '?')) . ")")->execute(array_values($r));
+            $n++;
+        }
+        if ($e['employee_type'] === 'enseignant_titulaire') $db->exec("UPDATE employees SET cadre_from_sy = COALESCE(cadre_from_sy, '2026-2027') WHERE id = 1785");
+        complianceLogAuto($db, 'cadre_due', 1785, '2025-2026', cadreDueEmpName($e), 'حُوِّلت بيده لملاك فأُعيد حساب سنتَيها كمتعاقدة بمحرّك الملاك (' . (int)$cur['n'] . ' شهراً، صافي ' . number_format((float)$cur['s']) . ')',
+                          'استرجاع رواتب 2024-2025 و2025-2026 كما كانت من لقطة 2026-09-12 + صمام السنين السابقة', 'استُرجع ' . $n . ' شهراً (صافي ' . number_format($want) . ') — نسخة _ms_bk_jana0913 (شفاء ذاتي 2026-09-13)');
+        setSetting($flag, 'done ' . date('Y-m-d H:i') . " ($n صفاً، كان {$cur['n']}/" . (float)$cur['s'] . ')');
+    } catch (Throwable $ex) { try { setSetting($flag, 'err: ' . mb_substr($ex->getMessage(), 0, 150)); } catch (Throwable $t) {} }
+}
+
+/**
+ * 🩹 شفاء ذاتي (2026-09-13، بعد ملاحظته «اللي بيصيروا بالملاك لازم طبّق عليهن تعويض النقل على 5 أيام — كل القانون»):
+ * كل أستاذ ملاك صار ملاكاً بالسنة الحالية للبرنامج (titularization_date ضمنها) — سواء رُسِّم من هنا قبل هذا التصحيح أو حوّله المستخدم
+ * بيده من ملفه (جنى لبوس بعبرا) — يُستكمَل له قانون الملاك مرّة واحدة: (1) درجات سنة الترسيم كاملة (الفورية + 4 بكانون) إن كانت ناقصة
+ * ولم يلمس المستخدم درجاته، (2) لمن كان موظّفاً قبلها (له رواتب سنين سابقة = مُحوَّل من تعاقد): cadre_from_sy + تعويض النقل ونسبة
+ * الإضافي كملاك مدرسته، ثم إعادة حساب السنة. يحترم قفل السنة. يُسجَّل بتقرير المخالفات «صُحِّح تلقائياً». مرّة لكل أستاذ/سنة.
+ */
+function healCadreNew20260913(): void {
+    $flag = 'heal_cadre_new_20260913';
+    try {
+        $db = getDB();
+        if ($db->inTransaction()) return;
+        cadreDueEnsureColumns($db);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $sy = currentSchoolYear();
+        if (!preg_match('/^(\d{4})-(\d{4})$/', $sy, $m)) return;
+        $y1 = (int)$m[1]; $y2 = (int)$m[2];
+        $done = json_decode((string)getSetting($flag, '[]'), true); if (!is_array($done)) $done = [];
+        $st = $db->prepare("SELECT * FROM employees WHERE is_deleted = 0 AND status = 'actif' AND employee_type = 'enseignant_titulaire'
+                            AND titularization_date BETWEEN ? AND ? ORDER BY id");
+        $st->execute([sprintf('%04d-10-01', $y1), sprintf('%04d-09-30', $y2)]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $n = 0;
+        foreach ($rows as $emp) {
+            $id = (int)$emp['id']; $key = $id . '|' . $sy;
+            if (in_array($key, $done, true)) continue;
+            if ($n >= 15) break; // دفعات خفيفة عند كل فتح
+            if (isSchoolYearLocked((int)$emp['school_id'], $sy)) continue;
+            $log = [];
+            try {
+                // (1) درجات سنة الترسيم كاملة — فقط إن لم يلمسها المستخدم وكان الناقص واضحاً (القانون يعطي أكثر مما بالسجلّ)
+                if (!gradesUserAdjusted($id) && !empty($emp['diploma'])) {
+                    $dry = buildLegalGradeHistory($id, sprintf('%04d-09-30', $y2), true);
+                    $maxStored = (float)$db->query("SELECT COALESCE(MAX(grade_after),0) FROM employee_grade_history WHERE employee_id = $id")->fetchColumn();
+                    if ((float)$dry['final_grade'] - $maxStored > 0.01) {
+                        buildLegalGradeHistory($id, sprintf('%04d-09-30', $y2));
+                        $g0 = $db->prepare("SELECT grade_after FROM employee_grade_history WHERE employee_id = ? AND grade_after >= 1 AND change_date <= ? ORDER BY change_date DESC, id DESC LIMIT 1");
+                        $g0->execute([$id, sprintf('%04d-10-01', $y1)]);
+                        $gNow = (float)($g0->fetchColumn() ?: $emp['starting_grade']);
+                        $db->prepare("UPDATE employees SET current_grade = ? WHERE id = ?")->execute([$gNow, $id]);
+                        $log[] = 'درجات سنة الترسيم بالقانون (' . rtrim(rtrim(number_format($maxStored, 1), '0'), '.') . ' ← ' . rtrim(rtrim(number_format((float)$dry['final_grade'], 1), '0'), '.') . ')';
+                    }
+                }
+                // (2) المُحوَّل من تعاقد (له رواتب قبل سنة الترسيم): نقل + نسبة كملاك مدرسته + صمام السنين السابقة
+                $prev = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND school_year < ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) LIMIT 1");
+                $prev->execute([$id, $sy]);
+                if ($prev->fetchColumn()) {
+                    if (empty($emp['cadre_from_sy'])) $db->prepare("UPDATE employees SET cadre_from_sy = ? WHERE id = ?")->execute([$sy, $id]);
+                    $p = cadreDueApplyPercent($db, $id, (int)$emp['school_id'], $sy);
+                    if ($p !== null) $log[] = 'إضافي ' . rtrim(rtrim((string)$p, '0'), '.') . ' % كملاك المدرسة';
+                    $t = cadreDueApplyTransport($db, $id, (int)$emp['school_id'], $sy);
+                    if ($t !== null) $log[] = $t;
+                }
+                if ($log) {
+                    $months = (int)recalcEmployeeYear($id, $sy);
+                    complianceLogAuto($db, 'cadre_due', $id, $sy, cadreDueEmpName($emp), 'صار ملاكاً بسنة ' . $sy . ' وينقصه من قانون الملاك: ' . implode(' · ', $log),
+                                      'استكمال قانون الملاك كرفاقه بالمدرسة وإعادة حساب السنة', implode(' · ', $log) . ' — حُسب ' . $months . ' شهراً (شفاء ذاتي 2026-09-13)');
+                    logAudit('cadre_heal_new', 'employees', $id, null, ['sy' => $sy, 'log' => $log]);
+                }
+            } catch (Throwable $e) { /* أستاذ واحد لا يوقف الباقي */ }
+            $done[] = $key; $n++;
+        }
+        if ($n) setSetting($flag, json_encode(array_slice($done, -400)));
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
 /**
@@ -365,27 +561,31 @@ function renderCadreDuePending(array $cands, string $sy, bool $collapsed = false
             <p style="color:var(--gray-600);margin-top:0">القانون: المتعاقد الذي أكمل <strong>سنتين دراسيتين كاملتين</strong> بالمدرسة نفسها (دخلها قبل 1 تشرين الثاني <?= (int)substr($sy, 0, 4) - 2 ?>) يصير <strong>بالملاك حكماً</strong> من السنة الثالثة <?= e($sy) ?>.
                 <strong style="color:#166534">وافق</strong> ⇒ يصير ملاكاً من <?= (int)substr($sy, 0, 4) ?>/10/1: راتب <strong>السلسلة حسب درجته</strong> بدل الراتب المتفق عليه، درجاته <strong>بالقانون</strong> (درجة الدخول حسب الشهادة + الفورية + 4+4+2)، محسومات الملاك كرفاقه، و<strong>نسبة الإضافي المعطاة لملاك مدرسته</strong> — وسنواته السابقة كمتعاقد لا تتغيّر أبداً.
                 <strong>لا</strong> ⇒ يبقى متعاقداً هذه السنة (يُسجَّل قرارك ويمكن إعادة فتحه). لا يتغيّر شي بلا موافقتك.</p>
-            <?php foreach ($bySchool as $schoolName => $rows): $canIds = array_map(fn($r) => (int)$r['id'], array_filter($rows, fn($r) => $r['can'])); ?>
+            <?php foreach ($bySchool as $schoolName => $rows): $fid = 'cdf' . (int)$rows[0]['school_id']; $nCan = count(array_filter($rows, fn($r) => $r['can'])); ?>
             <<?= $collapsed ? 'details' : 'div' ?> style="margin-bottom:<?= $collapsed ? '8px' : '14px' ?>">
-                <?php if ($collapsed): ?><summary style="cursor:pointer;color:#5b21b6;font-weight:700;padding:6px 0"><i class="fas fa-school"></i> <?= e($schoolName) ?> — <?= count($rows) ?> أستاذاً <small style="font-weight:600;opacity:.8">(اكبس لرؤية الأسماء والقرار)</small></summary><?php endif; ?>
-                <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:6px;margin-bottom:6px">
-                    <strong style="color:#5b21b6"><?= $collapsed ? '' : '<i class="fas fa-school"></i> ' . e($schoolName) . ' — ' . count($rows) . ' أستاذاً' ?></strong>
-                    <?php if (canEdit() && count($canIds) > 1): ?>
-                    <form method="post"<?= $formAction !== '' ? ' action="' . e($formAction) . '"' : '' ?> style="margin:0" onsubmit="return confirm('ترسيم كل المؤهَّلين بمدرسة <?= e($schoolName) ?> (<?= count($canIds) ?>) بالملاك من سنة <?= e($sy) ?>؟')">
-                        <?= csrfField() ?><input type="hidden" name="action" value="cd_approve"><input type="hidden" name="cd_sy" value="<?= e($sy) ?>">
-                        <?php foreach ($canIds as $cid): ?><input type="hidden" name="emp_ids[]" value="<?= $cid ?>"><?php endforeach; ?>
-                        <button class="btn btn-sm btn-success"><i class="fas fa-check-double"></i> وافق على الكل بهذه المدرسة (<?= count($canIds) ?>)</button>
-                    </form>
-                    <?php endif; ?>
-                </div>
-                <div class="table-wrapper"><table class="table">
-                    <thead><tr><th>الأستاذ</th><th>بالمدرسة منذ</th><th>الشهادة ← الدرجات بالقانون</th><th>راتبه الآن (متعاقد)</th><th>بالملاك من</th><th>نسبة الملاك بالمدرسة</th><th>القرار</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($rows as $c): ?>
-                    <tr><?= cadreDueRowCells($c) ?><td style="white-space:nowrap"><?= cadreDueDecisionButtons($c, $sy, $formAction) ?></td></tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table></div>
+                <?php if ($collapsed): ?><summary style="cursor:pointer;color:#5b21b6;font-weight:700;padding:6px 0"><i class="fas fa-school"></i> <?= e($schoolName) ?> — <?= count($rows) ?> أستاذاً <small style="font-weight:600;opacity:.8">(اكبس لرؤية الأسماء وتأشير قرارك)</small></summary><?php endif; ?>
+                <?php // ☑️ «قدّام كل أستاذ حطّ شك مارك هيك بختار الأساتذة اللي بدي ياهن أو بدي يضلّو متل ما هني» (أمره 2026-09-13): نموذج واحد للمدرسة، صناديق تأشير، وزرّان للمؤشَّرين ?>
+                <form method="post" id="<?= $fid ?>"<?= $formAction !== '' ? ' action="' . e($formAction) . '"' : '' ?> style="margin:0" onsubmit="var n=this.querySelectorAll('input[name=&quot;emp_ids[]&quot;]:checked').length; if(!n){alert('أشّر أستاذاً واحداً على الأقل');return false;} var a=this.querySelector('input[name=cd_act]').value; return confirm(a==='cd_approve' ? ('ترسيم '+n+' أستاذاً مؤشَّراً بالملاك من سنة <?= e($sy) ?>؟ (السلسلة + الدرجات بالقانون + نسبة الملاك بالمدرسة — سنواتهم السابقة لا تتغيّر)') : ('المؤشَّرون ('+n+') يبقون متعاقدين بسنة <?= e($sy) ?>؟ (يُسجَّل قرارك ويمكن إعادة فتحه)'));">
+                    <?= csrfField() ?><input type="hidden" name="cd_sy" value="<?= e($sy) ?>"><input type="hidden" name="action" value=""><input type="hidden" name="cd_act" value="">
+                    <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:6px;margin-bottom:6px">
+                        <strong style="color:#5b21b6"><?= $collapsed ? '' : '<i class="fas fa-school"></i> ' . e($schoolName) . ' — ' . count($rows) . ' أستاذاً' ?></strong>
+                        <?php if (canEdit() && $nCan > 0): ?>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                            <label style="cursor:pointer;font-size:13px;margin:0"><input type="checkbox" onchange="document.querySelectorAll('#<?= $fid ?> input[name=&quot;emp_ids[]&quot;]:not(:disabled)').forEach(function(c){c.checked=this.checked;}.bind(this))"> أشّر الكل</label>
+                            <button type="submit" class="btn btn-sm btn-success" onclick="var f=this.form; f.querySelector('input[name=action]').value='cd_approve'; f.querySelector('input[name=cd_act]').value='cd_approve';"><i class="fas fa-check"></i> وافق — رسّم المؤشَّرين بالملاك</button>
+                            <button type="submit" class="btn btn-sm btn-light" onclick="var f=this.form; f.querySelector('input[name=action]').value='cd_reject'; f.querySelector('input[name=cd_act]').value='cd_reject';" title="يبقون متعاقدين هذه السنة — يُسجَّل قرارك ويمكن إعادة فتحه"><i class="fas fa-xmark"></i> المؤشَّرون يبقون متعاقدين</button>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="table-wrapper"><table class="table">
+                        <thead><tr><th style="width:36px">✓</th><th>الأستاذ</th><th>بالمدرسة منذ</th><th>الشهادة ← الدرجات بالقانون</th><th>راتبه الآن (متعاقد)</th><th>بالملاك من</th><th>نسبة الملاك بالمدرسة</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($rows as $c): ?>
+                        <tr><td><?php if (canEdit()): ?><input type="checkbox" name="emp_ids[]" value="<?= (int)$c['id'] ?>" <?= $c['can'] ? '' : 'disabled title="' . e($c['why']) . '"' ?> style="width:18px;height:18px"><?php endif; ?></td><?= cadreDueRowCells($c) ?></tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table></div>
+                </form>
             </<?= $collapsed ? 'details' : 'div' ?>>
             <?php endforeach; ?>
             <?php if ($rejected): ?>

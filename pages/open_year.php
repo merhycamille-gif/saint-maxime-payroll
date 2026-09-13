@@ -15,7 +15,7 @@ $pageTitle = 'Ouvrir une année / فتح سنة دراسية';
 $db = getDB();
 
 // 🎓 قرارات بطاقة «أساتذة استحقّوا الملاك» بهذه الصفحة (وافق/لا/أعد الفتح)
-handleCadreDuePost($db, BASE_URL . 'pages/open_year.php#cadreDue');
+handleCadreDuePost($db, BASE_URL . 'pages/open_year.php'); // بلا مرساة — الصفحة ترجع لمكانها نفسه
 
 // 📅 درجات الملاك عند فتح السنة: applyLegalGradesForNewYear() بـincludes/payroll_calculator.php (المصدر الواحد —
 // «درجته كما رتّبتها + ما يضيفه القانون لهذه السنة»، لا إعادة بناء ولا مقارنة بالقانون؛ 2026-09-12).
@@ -487,7 +487,7 @@ $cdSy = activeSchoolYear(); if ($cdSy === 'all' || strcmp($cdSy, currentSchoolYe
 if (canEdit()) {
     $cdPend = cadreDueCandidates($db, $cdSy, null, false, true);
     $cdRej = array_values(array_filter(cadreDueCandidates($db, $cdSy, null, true, true), fn($c) => $c['decision'] && $c['decision']['decision'] === 'rejected'));
-    renderCadreDuePending($cdPend, $cdSy, false, BASE_URL . 'pages/open_year.php#cadreDue', $cdRej);
+    renderCadreDuePending($cdPend, $cdSy, false, BASE_URL . 'pages/open_year.php', $cdRej);
 }
 ?>
 <?php if (isSuperAdmin()): $locksAll = yearLocksMap(true); $pwSet = yearLockPasswordSet(); ?>
