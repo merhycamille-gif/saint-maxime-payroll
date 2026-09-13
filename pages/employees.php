@@ -536,6 +536,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                     $hasPrevRows = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND school_year < ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) LIMIT 1");
                     $hasPrevRows->execute([$id, $cfsNew]);
                     if ($cfsNew && $hasPrevRows->fetchColumn()) $db->prepare("UPDATE employees SET cadre_from_sy = ? WHERE id = ?")->execute([$cfsNew, $id]);
+                    // 🏦 محسومات الملاك كرفاقه بالمدرسة فوراً (صندوق التعويضات ٦٪ + نصف راتب الترسيم + الضمان/الضريبة، 12 شهراً) —
+                    //    «ما عملتهن حسم لصندوق التعويضات… هودي أرزاق الناس» (2026-09-13): مفاتيح المتعاقد لا تبقى على الملاك
+                    if (function_exists('cadreDueTemplate')) {
+                        $tplC = cadreDueTemplate($db, currentSchoolId());
+                        $setC = implode(', ', array_map(fn($f) => "`$f` = ?", array_keys($tplC)));
+                        $db->prepare("UPDATE employees SET $setC WHERE id = ?")->execute(array_merge(array_map('intval', array_values($tplC)), [$id]));
+                    }
                 } catch (Throwable $t) {}
             }
             $datesChanged = ($oldDates && (

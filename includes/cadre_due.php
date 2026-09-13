@@ -487,7 +487,7 @@ function healJanaRestore20260913(): void {
  * الإضافي كملاك مدرسته، ثم إعادة حساب السنة. يحترم قفل السنة. يُسجَّل بتقرير المخالفات «صُحِّح تلقائياً». مرّة لكل أستاذ/سنة.
  */
 function healCadreNew20260913(): void {
-    $flag = 'heal_cadre_new_20260913';
+    $flag = 'heal_cadre_new_20260913b'; // b = بعد إضافة محسومات الملاك (يعيد فحص الجميع مرّة)
     try {
         $db = getDB();
         if ($db->inTransaction()) return;
@@ -527,6 +527,16 @@ function healCadreNew20260913(): void {
                 $prev->execute([$id, $sy]);
                 if ($prev->fetchColumn()) {
                     if (empty($emp['cadre_from_sy'])) $db->prepare("UPDATE employees SET cadre_from_sy = ? WHERE id = ?")->execute([$sy, $id]);
+                    // 🏦 محسومات الملاك كرفاقه (صندوق التعويضات ٦٪ + نصف راتب الترسيم + الضمان/الضريبة على الأساس والدرجة والإضافي، 12 شهراً)
+                    //    — ملاحظته 2026-09-13 «ما عملتهن حسم لصندوق التعويضات… هودي أرزاق الناس»: المُحوَّل بيده من ملفه كان يبقى بمفاتيح المتعاقد
+                    $tplF = cadreDueTemplate($db, (int)$emp['school_id']);
+                    $diffF = [];
+                    foreach ($tplF as $f => $v) if ((int)($emp[$f] ?? 0) !== (int)$v) $diffF[$f] = (int)$v;
+                    if ($diffF) {
+                        $setF = implode(', ', array_map(fn($f) => "`$f` = ?", array_keys($diffF)));
+                        $db->prepare("UPDATE employees SET $setF WHERE id = ?")->execute(array_merge(array_values($diffF), [$id]));
+                        $log[] = 'محسومات الملاك كرفاقه (' . (isset($diffF['eoc_subject']) ? 'صندوق التعويضات ٦٪ + نصف راتب الترسيم' : implode('، ', array_keys($diffF))) . ')';
+                    }
                     $p = cadreDueApplyPercent($db, $id, (int)$emp['school_id'], $sy);
                     if ($p !== null) $log[] = 'إضافي ' . rtrim(rtrim((string)$p, '0'), '.') . ' % كملاك المدرسة';
                     $t = cadreDueApplyTransport($db, $id, (int)$emp['school_id'], $sy);

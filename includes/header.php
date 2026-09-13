@@ -446,7 +446,7 @@ document.addEventListener('submit', function (e) {
             <?php $gsCanDossier = viewerCanSeePage('attestations.php'); ?>
             <div class="global-search no-print" id="globalSearch">
                 <i class="fas fa-magnifying-glass gs-ic"></i>
-                <input type="text" id="gsInput" placeholder="Recherche / بحث: أستاذ أو صفحة..." autocomplete="off">
+                <input type="text" id="gsInput" placeholder="Recherche / بحث: اكتب أوّل حرف من اسم الأستاذ..." autocomplete="off">
                 <span class="gs-kbd">Ctrl+K</span>
                 <div class="gs-panel" id="gsPanel"></div>
             </div>
@@ -592,7 +592,7 @@ document.addEventListener('submit', function (e) {
             inp.addEventListener('input', function () {
                 var q = inp.value.trim();
                 clearTimeout(timer);
-                if (q.length < 2) { close(); return; }
+                if (q.length < 1) { close(); return; } // 🔍 «بس أحطّ أوّل حرف من اسمه لازم دغري يعطيني اللائحة» (2026-09-13)
                 timer = setTimeout(function () {
                     var pg = findPages(q.toLowerCase());
                     if (canDossier) {
@@ -601,8 +601,9 @@ document.addEventListener('submit', function (e) {
                             .then(function (emps) { render(pg, emps); })
                             .catch(function () { render(pg, []); });
                     } else { render(pg, []); }
-                }, 220);
+                }, 120);
             });
+            inp.addEventListener('focus', function () { if (inp.value.trim().length >= 1) inp.dispatchEvent(new Event('input')); });
             document.addEventListener('keydown', function (e) {
                 if ((e.ctrlKey || e.metaKey) && e.key && e.key.toLowerCase() === 'k') { e.preventDefault(); inp.focus(); inp.select(); }
                 if (e.key === 'Escape') close();

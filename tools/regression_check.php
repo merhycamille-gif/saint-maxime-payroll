@@ -938,6 +938,18 @@ check('البحث الشامل: ajax_search.php موجود ومقيّد بنطا
       is_file(__DIR__ . '/../ajax_search.php')
       && strpos((string)file_get_contents(__DIR__ . '/../ajax_search.php'), 'schoolScopeSql()') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../ajax_search.php'), 'requireLogin()') !== false);
+// 🔍 (2026-09-13 «بس أحطّ أوّل حرف من اسمه لازم دغري يعطيني اللائحة»): من أوّل حرف + الأسماء التي تبدأ بالحرف أوّلاً (تجربة حيّة على الخادم نفسه)
+$gs1 = ''; $gsOk = false;
+try {
+    $gsSrc = (string)file_get_contents(__DIR__ . '/../ajax_search.php'); $hdSrc = (string)file_get_contents(__DIR__ . '/../includes/header.php');
+    $_GET['q'] = 'ج'; ob_start(); include __DIR__ . '/../ajax_search.php'; $gsOut = ob_get_clean(); unset($_GET['q']);
+    $gsRows = json_decode($gsOut, true) ?: [];
+    $gsFirst = $gsRows ? mb_substr((string)$gsRows[0]['ar'], 0, 1) : '';
+    $gsOk = strpos($gsSrc, 'mb_strlen($q) < 1') !== false && strpos($gsSrc, 'ORDER BY rk,') !== false && strpos($hdSrc, 'q.length < 1') !== false
+         && count($gsRows) >= 5 && $gsFirst === 'ج';
+    $gs1 = 'n=' . count($gsRows) . ' first=' . ($gsRows[0]['ar'] ?? '-');
+} catch (Throwable $e) { $gs1 = $e->getMessage(); }
+check('البحث الشامل: من أوّل حرف (حرف واحد يعطي اللائحة) والأسماء التي تبدأ بالحرف أوّلاً — الهيدر والخادم', $gsOk, $gs1);
 check('البحث الشامل: مربوط بالشريط العلوي (globalSearch + Ctrl+K)',
       strpos($hdSrc, 'globalSearch') !== false && strpos($hdSrc, "toLowerCase() === 'k'") !== false);
 check('التنبيهات العائمة: toast-stack بالهيدر + ستايلها بالـCSS',
@@ -5576,7 +5588,7 @@ check('الترسيم الحكمي: الوحدة (مرشَّحون/ترسيم/ق
       && strpos($oy115, 'handleCadreDuePost($db, BASE_URL . \'pages/open_year.php\')') !== false && strpos($oy115, 'renderCadreDuePending($cdPend, $cdSy, false') !== false
       && strpos($ix115, 'handleCadreDuePost($db, BASE_URL . \'index.php\')') !== false && strpos($ix115, 'renderCadreDuePending($homeCd, $homeCdSy, true') !== false
       && strpos($pc115, "\$cfs = (string)(\$this->employee['cadre_from_sy'] ?? '')") !== false && strpos($pc115, 'SELECT cadre_from_sy FROM employees WHERE id = ') !== false
-      && strpos($hd115, 'cadreDueEnsureColumns(); healJanaRestore20260913(); healCadreNew20260913();') !== false && function_exists('healJanaRestore20260913') && function_exists('healCadreNew20260913') && is_file($PROJ . '/tools/data/rows_1785_pre2627_20260913.json') && strpos($em115, 'UPDATE employees SET cadre_from_sy = ? WHERE id = ?') !== false && isset(complianceRules()['cadre_due']) && function_exists('schoolCadreTransportTemplate') && function_exists('cadreDueApplyTransport') && strpos($cd115, "cadreDueApplyTransport(\$db, \$empId, (int)\$emp['school_id'], \$sy)") !== false
+      && strpos($hd115, 'cadreDueEnsureColumns(); healJanaRestore20260913(); healCadreNew20260913();') !== false && function_exists('healJanaRestore20260913') && function_exists('healCadreNew20260913') && is_file($PROJ . '/tools/data/rows_1785_pre2627_20260913.json') && strpos($em115, 'UPDATE employees SET cadre_from_sy = ? WHERE id = ?') !== false && strpos($em115, 'cadreDueTemplate($db, currentSchoolId())') !== false && strpos($cd115, 'heal_cadre_new_20260913b') !== false && strpos($cd115, '$tplF = cadreDueTemplate($db, (int)$emp[\'school_id\'])') !== false && isset(complianceRules()['cadre_due']) && function_exists('schoolCadreTransportTemplate') && function_exists('cadreDueApplyTransport') && strpos($cd115, "cadreDueApplyTransport(\$db, \$empId, (int)\$emp['school_id'], \$sy)") !== false
       && strpos($em115, '$becameCadre = (') !== false && strpos($cd115, "isSchoolYearLocked((int)\$emp['school_id'], \$sy)") !== false
       && strpos($cd115, "buildLegalGradeHistory(\$empId, sprintf('%04d-09-30', \$y2), false, true)") !== false && strpos($cd115, 'recalcEmployeeYear($empId, $sy)') !== false);
 // تجربة حيّة تُرجَع بالكامل (لقطة + استرجاع): مرشَّح حقيقي لسنة 2026-2027 ← ترسيم ← ملاك من 1/10 + السلسلة + الدرجات (دخول + فورية لغير التعليمية بتشرين + 4 بكانون)
@@ -5603,7 +5615,10 @@ try {
             $nTit = count(array_filter($gh, fn($g) => $g['reason'] === 'titularization' && $g['change_date'] === '2026-10-01'));
             $nOrd = count(array_filter($gh, fn($g) => $g['reason'] === 'biennial_promotion' && $g['change_date'] === '2026-10-01'));
             $excJan = array_sum(array_map(fn($g) => (float)$g['delta'], array_filter($gh, fn($g) => $g['change_date'] === '2027-01-01' && $g['reason'] !== 'manual')));
-            $mOct = $db->query("SELECT grade_at_month, base_plus_echelon_lbp, prime_fixe_lbp FROM monthly_salaries WHERE employee_id = $id115 AND year = 2026 AND month = 10")->fetch(PDO::FETCH_ASSOC);
+            $mOct = $db->query("SELECT grade_at_month, base_plus_echelon_lbp, prime_fixe_lbp, caisse_amount_lbp, eoc_grade_lbp FROM monthly_salaries WHERE employee_id = $id115 AND year = 2026 AND month = 10")->fetch(PDO::FETCH_ASSOC);
+            $tplE = cadreDueTemplate($db, (int)$c115['school_id']);
+            // 🏦 صندوق التعويضات ٦٪ + نصف راتب الترسيم بتشرين (إن كان ملاك المدرسة خاضعين) — «ما عملتهن حسم لصندوق التعويضات» 2026-09-13
+            $okEoc = !(int)$tplE['eoc_subject'] || ((float)$mOct['caisse_amount_lbp'] > 0 && abs((float)$mOct['caisse_amount_lbp'] - round(((float)$mOct['base_plus_echelon_lbp'] + ((int)$tplE['eoc_includes_extra'] ? (float)$mOct['prime_fixe_lbp'] : 0)) * 0.06)) < 2 && (float)$mOct['eoc_grade_lbp'] >= round((float)$mOct['base_plus_echelon_lbp'] / 2) - 2); // نصف الراتب (+ قيمة الدرجة الفورية إن وُجدت)
             $mJan = $db->query("SELECT grade_at_month FROM monthly_salaries WHERE employee_id = $id115 AND year = 2027 AND month = 1")->fetch(PDO::FETCH_ASSOC);
             $pctRows = $db->query("SELECT amount FROM employee_bonuses WHERE employee_id = $id115 AND school_year = '$sy115' AND bonus_type = 'prime_fixe' AND value_type = 'percent' AND is_active = 1")->fetchAll(PDO::FETCH_COLUMN);
             $okPct = $c115['pct'] ? (count($pctRows) === 1 && abs((float)$pctRows[0] - (float)$c115['pct']['pct']) < 0.01) : true;
@@ -5621,10 +5636,10 @@ try {
                   && $nTit === 1 && $nOrd === ($c115['immediate'] ? 1 : 0) && abs($excJan - 4.0) < 0.01
                   && $mOct && (float)$mOct['grade_at_month'] == (float)$c115['grade_start'] + ($c115['immediate'] ? 1 : 0) && (float)$mOct['base_plus_echelon_lbp'] > 0
                   && $mJan && (float)$mJan['grade_at_month'] == (float)$c115['grade_start'] + ($c115['immediate'] ? 1 : 0) + 4
-                  && $okPct && $okTr && $h0 === $h1 && $h0 === $h2 && $law['ok'] && $again === 0 && $dec === 'approved' && !$stillCand
+                  && $okPct && $okTr && $okEoc && $h0 === $h1 && $h0 === $h2 && $law['ok'] && $again === 0 && $dec === 'approved' && !$stillCand
                   && abs((float)$e['current_grade'] - ((float)$c115['grade_start'] + ($c115['immediate'] ? 1 : 0))) < 0.01;
             $why115 = "emp=$id115 {$c115['name']} dip={$c115['diploma']} gs={$c115['grade_start']} imm={$c115['immediate']} tit=$nTit ord=$nOrd jan=$excJan oct=" . json_encode($mOct) . " janG=" . ($mJan['grade_at_month'] ?? '?')
-                    . " pct=" . json_encode($pctRows) . '/' . ($c115['pct']['pct'] ?? '-') . " tr=" . var_export($okTr, true) . " prevSame=" . var_export($h0 === $h1 && $h0 === $h2, true) . " law=" . var_export($law['ok'], true) . " again=$again dec=$dec cand=" . var_export($stillCand, true);
+                    . " pct=" . json_encode($pctRows) . '/' . ($c115['pct']['pct'] ?? '-') . " tr=" . var_export($okTr, true) . " eoc=" . var_export($okEoc, true) . " prevSame=" . var_export($h0 === $h1 && $h0 === $h2, true) . " law=" . var_export($law['ok'], true) . " again=$again dec=$dec cand=" . var_export($stillCand, true);
         } finally {
             // 🔁 استرجاع كامل
             $db->prepare("DELETE FROM employees WHERE id = ?")->execute([$id115]);
@@ -5644,7 +5659,7 @@ try {
         $why115 .= ' restored=' . var_export($eR == $snapE, true);
     }
 } catch (Throwable $e) { $why115 = $e->getMessage(); }
-check('الترسيم الحكمي (تجربة حيّة تُرجَع): متعاقد أكمل سنتين ← ملاك من 1/10/2026 بالسلسلة + الدرجات بالقانون (دخول + فورية + 4 بكانون) + نسبة المدرسة + 🚌 النقل كملاك المدرسة (5 أيام) + سنواته السابقة بالمليم + الصمام يمنع إعادة حساب 2025-2026 + مطابق للقانون + لا تكرار + قرار مسجَّل', $ok115, $why115);
+check('الترسيم الحكمي (تجربة حيّة تُرجَع): متعاقد أكمل سنتين ← ملاك من 1/10/2026 بالسلسلة + الدرجات بالقانون (دخول + فورية + 4 بكانون) + نسبة المدرسة + 🚌 النقل كملاك المدرسة (5 أيام) + 🏦 صندوق التعويضات ٦٪ ونصف راتب الترسيم + سنواته السابقة بالمليم + الصمام يمنع إعادة حساب 2025-2026 + مطابق للقانون + لا تكرار + قرار مسجَّل', $ok115, $why115);
 // صفحة المراجعة والمساج تُرسمان بلا خطأ (بمخزن مؤقّت) + صفحة فتح السنة ولوحة القيادة تفتحان
 $okR115 = false; $whyR115 = '';
 try {
