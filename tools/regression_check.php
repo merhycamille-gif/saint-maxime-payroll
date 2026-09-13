@@ -5675,6 +5675,31 @@ try {
 } catch (Throwable $e) { $whyR115 = $e->getMessage(); }
 check('الترسيم الحكمي: صفحة المراجعة (صناديق + حقول الفتح المخفيّة) والمساج (شك مارك قدّام كل أستاذ + وافق/يبقون) يُرسمان + open_year وindex بلا Fatal + 📌 الصفحة ترجع لمكانها بعد أي POST (msa_stay بالهيدر، بلا مرساة)', $okR115, $whyR115);
 
+/* =====================================================================
+ * 116) 🖨️📤 أزرار التقارير (2026-09-13 «كبسة احفظها على الكمبيوتر عم تطلع متل طباعة على الورق، والإيميل والواتساب مش شغالين»):
+ *      PDF حقيقي بالمتصفّح لأي صفحة (pdf-save.js: buildGenericPdf بتقطيع على حدود الصفوف + أفقي للجداول العريضة + msaPdfBlob)
+ *      + زرّ الشريط «PDF — احفظ عالكمبيوتر» + نافذة واتساب (رابط حقيقي + تنزيل الملف) + نافذة إيميل تُرسل من الخادم مع المرفق (pages/send_report.php)
+ * =================================================================== */
+$ps116 = (string)file_get_contents($PROJ . '/assets/js/pdf-save.js'); $ex116 = (string)file_get_contents($PROJ . '/assets/js/export.js');
+$fn116 = (string)file_get_contents($PROJ . '/includes/functions.php'); $ft116 = (string)file_get_contents($PROJ . '/includes/footer.php');
+$sr116 = (string)file_get_contents($PROJ . '/pages/send_report.php');
+check('أزرار التقارير: PDF حقيقي لأي صفحة (تقطيع على الصفوف + عريض = أفقي + blob للإرسال) + زرّ الشريط + نافذتا واتساب/إيميل + إرسال من الخادم بالمرفق (CSRF + canEdit + SMTP ثم mail)',
+      strpos($ps116, 'function buildGenericPdf(area)') !== false && strpos($ps116, 'window.msaPdfBlob = function') !== false && strpos($ps116, "cuts[k] > y + Math.floor(want * 0.45)") !== false
+      && strpos($ps116, "rows[i].children.length >= 9") !== false && strpos($ps116, "w.style.overflow = 'visible'") !== false
+      && strpos($ex116, 'function shareModal(html)') !== false && strpos($ex116, "'https://wa.me/' + n + '?text='") !== false && strpos($ex116, "pages/send_report.php") !== false && strpos($ex116, 'window.msaPdfBlob()') !== false
+      && strpos($fn116, 'onclick="msaSavePdfStart(this)"') !== false && strpos($ft116, 'window.CSRF_TOKEN') !== false
+      && strpos($sr116, "verifyCsrf(\$_POST['csrf'] ?? '')") !== false && strpos($sr116, '!canEdit()') !== false && strpos($sr116, 'smtpSendMail($cfg, $to, $subject, $text, $att)') !== false && strpos($sr116, '@mail($to') !== false
+      && strpos($sr116, "substr(\$data, 0, 4) !== '%PDF'") !== false);
+// الخادم يرفض بلا ملف/بلا CSRF (تجربة حيّة بلا أثر)
+$why116 = ''; $ok116 = false;
+try {
+    $o = renderPage('pages/send_report.php', [], []);
+    $j = json_decode(trim($o), true);
+    $ok116 = is_array($j) && empty($j['ok']) && !empty($j['msg']);
+    $why116 = 'GET→' . substr(trim($o), 0, 80);
+} catch (Throwable $e) { $why116 = $e->getMessage(); }
+check('إرسال التقرير بالإيميل: الخادم يرفض الطلب غير الصالح برسالة JSON (لا يرسل شيئاً)', $ok116, $why116);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

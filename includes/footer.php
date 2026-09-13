@@ -6,7 +6,7 @@
 <script src="<?= BASE_URL ?>assets/js/export.js?v=<?= @filemtime(__DIR__ . '/../assets/js/export.js') ?: '1' ?>"></script>
 <script src="<?= BASE_URL ?>assets/js/form-lock.js?v=<?= @filemtime(__DIR__ . '/../assets/js/form-lock.js') ?: '1' ?>"></script>
 <script src="<?= BASE_URL ?>assets/js/select-search.js?v=<?= @filemtime(__DIR__ . '/../assets/js/select-search.js') ?: '1' ?>"></script>
-<script>window.BASE_URL = <?= json_encode(BASE_URL) ?>;</script>
+<script>window.BASE_URL = <?= json_encode(BASE_URL) ?>; window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
 <?php if (function_exists('openYearHealPending20260912') && openYearHealPending20260912()): ?>
 <script>
 // 📅 تجهيز 2026-2027 التلقائي (2026-09-12): نبض خلفي كل 4 ثوانٍ يشغّل دفعة من الشفاء حتى يكتمل — شريط صغير يُظهر التقدّم ثم يختفي

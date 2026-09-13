@@ -3743,10 +3743,12 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php if (!$viewerOnly): ?>
         <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint()"><i class="fas fa-print"></i> Imprimer / طباعة</button>
         <?php endif; ?>
-        <?php if ($officialPdf): ?>
-        <a class="btn btn-sm btn-danger" href="<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>" target="_blank" title="PDF رسمي طبق الأصل — يفتح ويطبع"><i class="fas fa-file-pdf"></i> PDF<?= $viewerOnly ? '' : ' رسمي' ?></a>
-        <?php else: ?>
-        <button type="button" class="btn btn-sm btn-danger" onclick="ppPdf()" title="اختر: حفظ كـ PDF"><i class="fas fa-file-pdf"></i> PDF</button>
+        <?php // 💾 (2026-09-13 «كبسة احفظها على الكمبيوتر عم تطلع متل طباعة على الورق») زرّ PDF = تنزيل ملف حقيقي فوراً بالمتصفّح
+              // (pdf-save.js لأي صفحة)؛ «PDF رسمي» عبر Chrome يبقى حيث الأداة متوفّرة (الكمبيوتر) لأن الأونلاين بلا node يرجع لحوار الطباعة
+              $hasPup = is_file(__DIR__ . '/../tools/page_to_pdf.js') && is_dir(__DIR__ . '/../tools/node_modules/puppeteer-core') && (@is_file('C:/Program Files/nodejs/node.exe') || stripos(PHP_OS, 'WIN') === 0); ?>
+        <button type="button" class="btn btn-sm btn-danger" onclick="msaSavePdfStart(this)" title="ينزّل ملف PDF عالكمبيوتر فوراً (بلا شاشة طباعة)"><i class="fas fa-file-pdf"></i> PDF — احفظ عالكمبيوتر</button>
+        <?php if ($officialPdf && $hasPup): ?>
+        <a class="btn btn-sm btn-light" href="<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>" target="_blank" title="PDF رسمي طبق الأصل عبر Chrome — يفتح ويطبع"><i class="fas fa-file-pdf"></i> PDF رسمي</a>
         <?php endif; ?>
         <?php if (!$viewerOnly): ?>
             <?php if ($server): ?>

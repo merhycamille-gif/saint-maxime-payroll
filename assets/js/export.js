@@ -177,30 +177,102 @@
         if (area) return (area.innerText || area.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
         return '';
     }
+    // ===== 📤 نافذة الإرسال الموحّدة (واتساب / إيميل) — «تكون شغالة ومظبوطة وسهلة الاستعمال» (2026-09-13) =====
+    // واتساب عبر الرابط لا يرفق ملفات: النافذة تنزّل ملف الـPDF (msaPdfBlob من pdf-save.js) وتفتح المحادثة برابط حقيقي
+    // (لا window.open بعد prompt — كان يُحجَب). الإيميل: يُرسَل من الخادم (إعدادات البريد) مع الـPDF مرفقاً.
+    function shareModal(html) {
+        var old = document.getElementById('ppShare'); if (old) old.remove();
+        var w = document.createElement('div'); w.id = 'ppShare'; w.className = 'no-print';
+        w.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+        w.innerHTML = '<div dir="rtl" style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(560px,100%);padding:18px 20px;font-family:inherit;position:relative">'
+            + '<button type="button" data-x="1" style="position:absolute;top:8px;left:10px;border:0;background:none;font-size:22px;cursor:pointer;color:#64748b" title="إغلاق">&times;</button>' + html + '</div>';
+        document.body.appendChild(w);
+        function close() { w.remove(); }
+        w.addEventListener('click', function (e) { if (e.target === w || e.target.getAttribute('data-x')) close(); });
+        document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
+        return { el: w, close: close };
+    }
+    function escH(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function waNumber(v) {
+        var num = String(v || '').replace(/[^0-9]/g, '');
+        if (num.length === 8 && /^(03|70|71|76|78|79|81)/.test(num)) num = '961' + num.replace(/^0/, '');
+        else if (num.length === 7 && /^(3|70|71|76|78|79|81)/.test(num)) num = '961' + num;
+        else if (num.length === 8 && /^0/.test(num)) num = '961' + num.slice(1);
+        return num;
+    }
+    function shortDoc() { var d = ppDocText(); return d.length > 900 ? d.slice(0, 900) + '…' : d; }
+    function pdfBtnHandler(btn, after) {
+        btn.disabled = true; var old = btn.innerHTML; btn.textContent = '⏳ عم نجهّز ملف الـPDF...';
+        if (!window.msaPdfBlob) { btn.innerHTML = old; btn.disabled = false; window.print(); return; }
+        window.msaPdfBlob().then(function (r) {
+            var url = URL.createObjectURL(r.blob); var a = document.createElement('a'); a.href = url; a.download = r.name; document.body.appendChild(a); a.click();
+            setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1500);
+            btn.innerHTML = '✅ نزل الملف: ' + escH(r.name); if (after) after(r);
+        }).catch(function (e) { btn.innerHTML = old; btn.disabled = false; try { console.error(e); } catch (_) {} window.print(); });
+    }
+
+    // ===== WhatsApp =====
     window.ppWhatsApp = function (title, phone) {
-        var txt = title || document.title;
-        var doc = ppDocText();
-        if (doc) txt += '\n\n' + doc;
-        var def = phone ? String(phone).replace(/[^0-9]/g, '') : '';
-        // اسأل المستخدم عن الرقم (معبّى مسبقاً برقم الأستاذ، ويقدر يكتب أي رقم)
-        var input = window.prompt('رقم الواتساب المُرسَل إليه (رقم لبناني أو مع رمز البلد):', def);
-        if (input === null) return; // أُلغي
-        var num = String(input).replace(/[^0-9]/g, '');
-        // أرقام لبنان: حوّل البادئة 03/70/71/76/78/79/81 إلى صيغة دولية 961 إن لزم
-        if (num && num.length === 8 && /^(03|70|71|76|78|79|81)/.test(num)) num = '961' + num.replace(/^0/, '');
-        window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(txt), '_blank');
+        var t = title || document.title;
+        var text = t + '\n\n' + shortDoc();
+        var m = shareModal(
+            '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:6px"><i class="fab fa-whatsapp"></i> إرسال عبر واتساب / Envoyer par WhatsApp</div>'
+            + '<div style="font-size:13.5px;color:#475569;line-height:1.8;margin-bottom:10px">واتساب ما بيقبل إرفاق ملف من الرابط. الطريقة: <b>١</b> نزّل الملف PDF (بينزل عالكمبيوتر) ← <b>٢</b> افتح المحادثة ← ارفق الملف من واتساب (📎).</div>'
+            + '<label style="display:block;font-weight:700;margin-bottom:4px">رقم الواتساب / Numéro</label>'
+            + '<input type="tel" id="ppWaNum" class="form-control" dir="ltr" value="' + escH(phone || '') + '" placeholder="03 123 456 أو 961…" style="margin-bottom:10px">'
+            + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+            + '<button type="button" id="ppWaPdf" class="btn btn-primary" style="font-weight:700">💾 ١ — نزّل الملف PDF</button>'
+            + '<a id="ppWaOpen" class="btn" target="_blank" rel="noopener" style="background:#25D366;color:#fff;font-weight:700" href="#"><i class="fab fa-whatsapp"></i> ٢ — افتح المحادثة</a>'
+            + '</div><div id="ppWaHint" style="font-size:12.5px;color:#64748b;margin-top:8px"></div>');
+        var num = m.el.querySelector('#ppWaNum'), open = m.el.querySelector('#ppWaOpen'), hint = m.el.querySelector('#ppWaHint');
+        function upd() {
+            var n = waNumber(num.value);
+            open.href = 'https://wa.me/' + n + '?text=' + encodeURIComponent(text);
+            hint.textContent = n ? ('بيفتح محادثة الرقم +' + n + ' مع نصّ المستند — وبعدين ارفق الملف من 📎') : 'بلا رقم: بيفتح واتساب لتختار جهة الاتصال ثم الصق النصّ وارفق الملف';
+            if (!n) open.href = 'https://wa.me/?text=' + encodeURIComponent(text);
+        }
+        num.addEventListener('input', upd); upd(); num.focus();
+        m.el.querySelector('#ppWaPdf').addEventListener('click', function () { pdfBtnHandler(this); });
     };
 
-    // ===== WhatsApp + PDF (لحسابات المدارس) =====
-    // واتساب عبر الرابط لا يرفق ملفات؛ لذا نفتح ملف الـPDF بتبويب جاهزاً ليُرفَق، ثم نفتح محادثة واتساب.
-    window.ppWhatsAppPdf = function (title, phone, pdfUrl) {
-        // 1) افتح ملف الـPDF أولاً (ضمن ضغطة المستخدم = لا يُحجَب) ليحفظه/يرفقه
-        if (pdfUrl) window.open(pdfUrl, '_blank');
-        else window.print(); // احتياط: لا PDF رسمي → حوار "حفظ كـ PDF"
-        // 2) افتح محادثة واتساب (يسأل عن الرقم ثم يفتح المحادثة)
-        ppWhatsApp(title, phone);
-    };
+    // ===== WhatsApp + PDF (لحسابات المدارس) — نفس النافذة =====
+    window.ppWhatsAppPdf = function (title, phone) { ppWhatsApp(title, phone); };
 
+    // ===== Email — يُرسَل من الخادم مع الـPDF مرفقاً (pages/send_report.php + إعدادات البريد) =====
+    window.ppEmail = function (title, to) {
+        var t = title || document.title;
+        var m = shareModal(
+            '<div style="font-size:18px;font-weight:800;color:#1e3a5f;margin-bottom:6px"><i class="fas fa-envelope"></i> إرسال بالإيميل مع الملف PDF / Envoyer par e-mail</div>'
+            + '<label style="display:block;font-weight:700;margin-bottom:4px">إلى / À</label>'
+            + '<input type="email" id="ppEmTo" class="form-control" dir="ltr" value="' + escH(to || '') + '" placeholder="name@example.com" style="margin-bottom:8px">'
+            + '<label style="display:block;font-weight:700;margin-bottom:4px">الموضوع / Objet</label>'
+            + '<input type="text" id="ppEmSub" class="form-control" value="' + escH(t) + '" style="margin-bottom:8px">'
+            + '<label style="display:block;font-weight:700;margin-bottom:4px">الرسالة / Message</label>'
+            + '<textarea id="ppEmBody" class="form-control" rows="3" style="margin-bottom:10px">مرفق ' + escH(t) + ' بصيغة PDF.</textarea>'
+            + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+            + '<button type="button" id="ppEmSend" class="btn btn-primary" style="font-weight:700"><i class="fas fa-paper-plane"></i> أرسل مع الملف مرفقاً</button>'
+            + '<button type="button" id="ppEmPdf" class="btn btn-light">💾 أو نزّل الملف فقط</button>'
+            + '</div><div id="ppEmMsg" style="font-size:13.5px;margin-top:10px;line-height:1.7"></div>');
+        var toEl = m.el.querySelector('#ppEmTo'), msg = m.el.querySelector('#ppEmMsg'), send = m.el.querySelector('#ppEmSend');
+        toEl.focus();
+        m.el.querySelector('#ppEmPdf').addEventListener('click', function () { pdfBtnHandler(this); });
+        send.addEventListener('click', function () {
+            var to = toEl.value.trim();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { msg.innerHTML = '<span style="color:#b91c1c">اكتب إيميلاً صحيحاً</span>'; toEl.focus(); return; }
+            if (!window.msaPdfBlob) { msg.innerHTML = '<span style="color:#b91c1c">تعذّر تجهيز الملف — أعد تحميل الصفحة</span>'; return; }
+            send.disabled = true; var old = send.innerHTML; send.textContent = '⏳ عم نجهّز الملف ونرسل...';
+            window.msaPdfBlob().then(function (r) {
+                var fd = new FormData();
+                fd.append('csrf', window.CSRF_TOKEN || ''); fd.append('to', to);
+                fd.append('subject', m.el.querySelector('#ppEmSub').value); fd.append('body', m.el.querySelector('#ppEmBody').value);
+                fd.append('pdf', r.blob, r.name);
+                return fetch((window.BASE_URL || '') + 'pages/send_report.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (x) { return x.json(); });
+            }).then(function (j) {
+                if (j && j.ok) { msg.innerHTML = '<span style="color:#166534;font-weight:700">✅ ' + escH(j.msg || 'أُرسل') + '</span>'; send.textContent = '✅ أُرسل'; }
+                else { msg.innerHTML = '<span style="color:#b91c1c;font-weight:700">✕ ' + escH((j && j.msg) || 'تعذّر الإرسال') + '</span>' + (j && j.settings ? ' <a href="' + escH(j.settings) + '">إعدادات البريد</a>' : ''); send.innerHTML = old; send.disabled = false; }
+            }).catch(function (e) { msg.innerHTML = '<span style="color:#b91c1c">تعذّر الإرسال: ' + escH(e && e.message) + '</span>'; send.innerHTML = old; send.disabled = false; });
+        });
+    };
     // ===== طباعة ملف مرفوع (صورة/PDF) عبر إطار مخفي — بلا نوافذ منبثقة =====
     window.ppPrintFile = function (url, isImg) {
         var frame = document.createElement('iframe');
@@ -230,15 +302,4 @@
         setTimeout(function () { try { document.body.removeChild(frame); } catch (e) {} }, 120000);
     };
 
-    // ===== Email =====
-    window.ppEmail = function (title, to) {
-        var doc = ppDocText();
-        var body = doc ? doc : (title || '');
-        // اسأل المستخدم عن الإيميل (معبّى مسبقاً بإيميل المدرسة، ويقدر يكتب أي إيميل)
-        var input = window.prompt('البريد الإلكتروني المُرسَل إليه:', to || '');
-        if (input === null) return; // أُلغي
-        window.location.href = 'mailto:' + String(input).trim()
-            + '?subject=' + encodeURIComponent(title || document.title)
-            + '&body=' + encodeURIComponent(body);
-    };
 })();
