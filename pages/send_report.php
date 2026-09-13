@@ -28,7 +28,8 @@ if (substr($data, 0, 4) !== '%PDF') $out(false, 'الملف ليس PDF');
 $name = preg_replace('/[^A-Za-z0-9_.\-]+/', '_', (string)($f['name'] ?: 'document.pdf'));
 if (substr($name, -4) !== '.pdf') $name .= '.pdf';
 
-$schoolName = (string)getSetting('school_name_ar', currentSchool()['name_ar'] ?? '');
+// اسم المدرسة المختارة (عبرا…) لا الاسم العام للمؤسسة — إلا في وضع «كل المدارس»
+$schoolName = (!isAllSchools() && currentSchool()) ? (string)(currentSchool()['name_ar'] ?: currentSchool()['name_fr']) : (string)getSetting('school_name_ar', '');
 $text = ($body !== '' ? $body : 'مرفق المستند المطلوب بصيغة PDF.') . "\n\n" . $schoolName;
 $att = [['name' => $name, 'data' => $data, 'mime' => 'application/pdf']];
 $settingsUrl = BASE_URL . 'pages/email_settings.php';
@@ -37,6 +38,7 @@ $settingsUrl = BASE_URL . 'pages/email_settings.php';
 $cfg = smtpConfigFromSettings();
 $err = '';
 if ($cfg) {
+    if ($schoolName !== '') $cfg['from_name'] = $schoolName; // المرسِل باسم المدرسة المختارة
     [$ok, $err] = smtpSendMail($cfg, $to, $subject, $text, $att);
     if ($ok) { logAudit('send_report_email', 'settings', 0, null, ['to' => $to, 'subject' => $subject, 'file' => $name, 'via' => 'smtp']); $out(true, 'أُرسل إلى ' . $to . ' مع الملف ' . $name . ' (عبر ' . $cfg['user'] . ')'); }
 }

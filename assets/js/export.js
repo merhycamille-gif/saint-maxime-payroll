@@ -201,6 +201,17 @@
         return num;
     }
     function shortDoc() { var d = ppDocText(); return d.length > 900 ? d.slice(0, 900) + '…' : d; }
+    // عنوان المستند الحقيقي للإرسال («عم ابعت رواتب عبرا بس عم يحطّ العنوان كشف رواتب سان مكسيم» 2026-09-13):
+    // عنوان الورقة (.doc-head) + اسم المدرسة من الترويسة/نطاق المدارس + الفترة (أوّل شريحة ليست تاريخ الإصدار/العملة/الراتب يشمل)
+    function docTitle(fallback) {
+        var h = document.querySelector('.doc-head .dh-ar') || document.querySelector('.doc-head .dh-fr') || document.querySelector('#ppExportArea h1, #ppExportArea h2');
+        var t = h ? h.textContent.trim() : (fallback || document.title || '').split(/[—|]/)[0].trim();
+        var sc = document.querySelector('.letterhead .lh-name-ar') || document.querySelector('.report-scope') || document.querySelector('.slip-school, .school-name');
+        var school = sc ? sc.textContent.replace(/^[\s\S]*?:/, '').replace(/\s+/g, ' ').trim() : '';
+        var period = '';
+        document.querySelectorAll('.doc-head .dh-chip').forEach(function (c) { var x = c.textContent.trim(); if (!period && !/^(صدر|العملة|الراتب يشمل|العدد)/.test(x)) period = x; });
+        return t + (school ? ' — ' + school : '') + (period ? ' — ' + period : '');
+    }
     function pdfBtnHandler(btn, after) {
         btn.disabled = true; var old = btn.innerHTML; btn.textContent = '⏳ عم نجهّز ملف الـPDF...';
         if (!window.msaPdfBlob) { btn.innerHTML = old; btn.disabled = false; window.print(); return; }
@@ -213,7 +224,7 @@
 
     // ===== WhatsApp =====
     window.ppWhatsApp = function (title, phone) {
-        var t = title || document.title;
+        var t = docTitle(title);
         var text = t + '\n\n' + shortDoc();
         var m = shareModal(
             '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:6px"><i class="fab fa-whatsapp"></i> إرسال عبر واتساب / Envoyer par WhatsApp</div>'
@@ -240,7 +251,7 @@
 
     // ===== Email — يُرسَل من الخادم مع الـPDF مرفقاً (pages/send_report.php + إعدادات البريد) =====
     window.ppEmail = function (title, to) {
-        var t = title || document.title;
+        var t = docTitle(title);
         var m = shareModal(
             '<div style="font-size:18px;font-weight:800;color:#1e3a5f;margin-bottom:6px"><i class="fas fa-envelope"></i> إرسال بالإيميل مع الملف PDF / Envoyer par e-mail</div>'
             + '<label style="display:block;font-weight:700;margin-bottom:4px">إلى / À</label>'
