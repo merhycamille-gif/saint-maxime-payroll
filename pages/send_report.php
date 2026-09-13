@@ -52,7 +52,7 @@ if ($host !== 'localhost' && strpos($host, '127.') !== 0 && strpos($host, '192.'
     $m  = "--$boundary\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($text)) . "\r\n";
     $m .= "--$boundary\r\nContent-Type: application/pdf; name=\"$name\"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"$name\"\r\n\r\n" . chunk_split(base64_encode($data)) . "\r\n--$boundary--\r\n";
     $sent = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $m, $h, '-f' . $from);
-    if ($sent) { logAudit('send_report_email', 'settings', 0, null, ['to' => $to, 'subject' => $subject, 'file' => $name, 'via' => 'mail']); $out(true, 'أُرسل إلى ' . $to . ' مع الملف ' . $name . ' (من بريد الموقع ' . $from . ')' . ($err ? ' — ملاحظة: إيميل الإعدادات رُفض: ' . $err : '')); }
+    if ($sent) { logAudit('send_report_email', 'settings', 0, null, ['to' => $to, 'subject' => $subject, 'file' => $name, 'via' => 'mail']); $out(true, 'أُرسل إلى ' . $to . ' مع الملف ' . $name . ' (من بريد الموقع ' . $from . ' — إذا ما لقيته افحص Spam)'); }
 }
 if (!$cfg) $out(false, 'لم تُضبَط إعدادات البريد بعد — افتح «إعدادات البريد» وأدخل إيميل المدرسة وكلمة مرور التطبيق', ['settings' => $settingsUrl]);
 $out(false, 'تعذّر الإرسال: ' . ($err ?: 'خطأ غير معروف'), ['settings' => $settingsUrl]);
