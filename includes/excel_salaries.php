@@ -38,26 +38,41 @@ function excelSalariesMonth($v): ?int {
     return null;
 }
 function excelSalariesCatLabel(string $t): string { return $t === 'enseignant_contractuel' ? 'متعاقد' : ($t === 'employe' ? 'موظف' : 'ملاك'); }
+/** 🧑‍🏫 (2026-09-13 «بدك تعطيني خيار الملاك لوحدون أو المتعاقد أو الموظف أو كلهن») خيارات الفئة بالإكسل — المصدر الواحد */
+function excelSalariesCats(): array {
+    return ['all' => ['label' => 'الكل (ملاك + متعاقدون + موظفون)', 'types' => ['enseignant_titulaire','enseignant_contractuel','employe']],
+            'titulaire' => ['label' => 'الملاك لوحدهم', 'types' => ['enseignant_titulaire']],
+            'contractuel' => ['label' => 'المتعاقدون لوحدهم', 'types' => ['enseignant_contractuel']],
+            'employe' => ['label' => 'الموظفون لوحدهم', 'types' => ['employe']]];
+}
+function excelSalariesCat($v): string { $v = (string)$v; return isset(excelSalariesCats()[$v]) ? $v : 'all'; }
+/** 🧾 (2026-09-13 «كمان بدك تحط ميزة خاضع للضريبة / لا يخضع / الكل») فلتر الضريبة — يقرأ e.tax_subject من ملف الموظف كفلتر التقارير */
+function excelSalariesTaxes(): array { return ['' => 'الكل (خاضع وغير خاضع)', '1' => 'الخاضعون للضريبة فقط', '0' => 'غير الخاضعين للضريبة فقط']; }
+function excelSalariesTax($v): string { $v = (string)$v; return in_array($v, ['1', '0'], true) ? $v : ''; }
+/** وصف الفلترين للعنوان: «الملاك لوحدهم — الخاضعون للضريبة فقط» */
+function excelSalariesFilterLabel(string $cat, string $tax): string { $l = excelSalariesCats()[excelSalariesCat($cat)]['label']; $t = excelSalariesTax($tax); return $l . ($t !== '' ? ' — ' . excelSalariesTaxes()[$t] : ''); }
 
-/** المتعاقدون والموظفون الفاعلون بالمدرسة (غير التاركين) مع قيمهم الحالية للسنة. */
-function excelSalariesRows(PDO $db, int $schoolId, string $sy): array {
+/** الفاعلون بالمدرسة (غير التاركين) حسب الفئة المختارة مع قيمهم الحالية للسنة. الملاك: راتبهم بالسلسلة (خانتا الراتب لا تُعدَّلان)، إضافيهم وأيامهم نعم. */
+function excelSalariesRows(PDO $db, int $schoolId, string $sy, string $cat = 'all', string $tax = ''): array {
+    $types = excelSalariesCats()[excelSalariesCat($cat)]['types']; $tax = excelSalariesTax($tax);
     $st = $db->prepare("SELECT e.id, e.employee_type, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr) fn, COALESCE(NULLIF(e.father_name_ar,''), '') fa,
                 COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr) ln, e.salary_input_mode, e.base_salary_usd, e.contract_salary_lbp, e.days_per_week
-            FROM employees e WHERE e.school_id = ? AND e.is_deleted = 0 AND e.employee_type IN ('enseignant_contractuel','employe')
+            FROM employees e WHERE e.school_id = ? AND e.is_deleted = 0 AND e.employee_type IN (" . implode(',', array_map([$db, 'quote'], $types)) . ")
               AND e.status = 'actif' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+              " . ($tax !== '' ? " AND e.tax_subject = " . (int)$tax : '') . "
               -- موجود بهذه السنة: له رواتب فيها، أو جديد لم يُحسب له شيء بعد (بلا أي صفّ بأي سنة) ودخوله قبل نهايتها —
               -- لا مَن عُيِّن لسنة لاحقة (وإلا خلق التطبيق له رواتب بسنة لم يعمل فيها)
               AND (EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ?)
                    OR (NOT EXISTS (SELECT 1 FROM monthly_salaries ms2 WHERE ms2.employee_id = e.id) AND (e.hire_date IS NULL OR e.hire_date <= ?)))
-            ORDER BY FIELD(e.employee_type,'enseignant_contractuel','employe'), e.last_name_ar, e.first_name_ar, e.id");
+            ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), e.last_name_ar, e.first_name_ar, e.id");
     $st->execute([$schoolId, $sy, substr($sy, 5, 4) . '-09-30']);
     $rows = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $rows[(int)$r['id']] = [
             'id' => (int)$r['id'], 'cat' => excelSalariesCatLabel($r['employee_type']), 'type' => $r['employee_type'],
             'name' => trim(preg_replace('/\s+/u', ' ', $r['fn'] . ' ' . $r['fa'] . ' ' . $r['ln'])),
-            'sal_usd' => ($r['salary_input_mode'] === 'direct_usd' && (float)$r['base_salary_usd'] > 0) ? (float)$r['base_salary_usd'] : null,
-            'sal_lbp' => ($r['salary_input_mode'] !== 'direct_usd' && (float)$r['contract_salary_lbp'] > 0) ? (float)$r['contract_salary_lbp'] : null,
+            'sal_usd' => ($r['employee_type'] !== 'enseignant_titulaire' && $r['salary_input_mode'] === 'direct_usd' && (float)$r['base_salary_usd'] > 0) ? (float)$r['base_salary_usd'] : null,
+            'sal_lbp' => ($r['employee_type'] !== 'enseignant_titulaire' && $r['salary_input_mode'] !== 'direct_usd' && (float)$r['contract_salary_lbp'] > 0) ? (float)$r['contract_salary_lbp'] : null,
             'pct' => null, 'amt_lbp' => null, 'amt_usd' => null, 'from' => null, 'to' => null, 'multi' => false,
             'days' => (int)$r['days_per_week'] ?: null,
         ];
@@ -99,8 +114,8 @@ function excelSalariesRows(PDO $db, int $schoolId, string $sy): array {
 }
 
 /** بناء ملف xlsx (بايتات) — سطر 1 عنوان، سطر 2 شرح، سطر 3 رؤوس، البيانات من سطر 4. */
-function excelSalariesBuild(PDO $db, int $schoolId, string $sy): string {
-    $cols = excelSalariesColumns(); $rows = excelSalariesRows($db, $schoolId, $sy);
+function excelSalariesBuild(PDO $db, int $schoolId, string $sy, string $cat = 'all', string $tax = ''): string {
+    $cat = excelSalariesCat($cat); $tax = excelSalariesTax($tax); $cols = excelSalariesColumns(); $rows = excelSalariesRows($db, $schoolId, $sy, $cat, $tax);
     $xa = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES | ENT_XML1, 'UTF-8');
     $n = count($cols); $last = chr(64 + $n);
     $cell = function ($ref, $v, $s) use ($xa) {
@@ -109,8 +124,9 @@ function excelSalariesBuild(PDO $db, int $schoolId, string $sy): string {
         return '<c r="' . $ref . '" s="' . $s . '" t="inlineStr"><is><t xml:space="preserve">' . $xa($v) . '</t></is></c>';
     };
     $school = schoolNameById($schoolId, 'ar');
-    $xml = '<row r="1">' . $cell('A1', "الرواتب والأجر الإضافي — المتعاقدون والموظفون — $school — $sy", 1) . '</row>';
-    $xml .= '<row r="2">' . $cell('A2', 'عبّي الخانات الصفراء وارفع الملف بالبرنامج. فاضي = لا تغيير · 0 بالأجر الإضافي = شيله · الراتب: عمود $ أو عمود ل.ل (واحد منهما) · الأجر الإضافي: مبلغ ل.ل و/أو مبلغ $ لكل شخص (فيك تعبّي الاتنين معاً = جزء بالليرة + جزء بالدولار، البرنامج بيجمعهم) · الإضافي من شهر إلى شهر: فاضي = كل السنة (تشرين الأول ← أيلول) · لا تغيّر رقم الملف ولا ترتيب الأعمدة.', 2) . '</row>';
+    $catLbl = excelSalariesFilterLabel($cat, $tax);
+    $xml = '<row r="1">' . $cell('A1', "الرواتب والأجر الإضافي — $catLbl — $school — $sy", 1) . '</row>';
+    $xml .= '<row r="2">' . $cell('A2', 'عبّي الخانات الصفراء وارفع الملف بالبرنامج. فاضي = لا تغيير · 0 بالأجر الإضافي = شيله · الراتب: عمود $ أو عمود ل.ل (واحد منهما — للمتعاقد والموظف؛ الملاك راتبهم بالسلسلة فخانتاهما رمادية لا تُقرآن) · الأجر الإضافي: مبلغ ل.ل و/أو مبلغ $ لكل شخص (فيك تعبّي الاتنين معاً = جزء بالليرة + جزء بالدولار، البرنامج بيجمعهم) · الإضافي من شهر إلى شهر: فاضي = كل السنة (تشرين الأول ← أيلول) · لا تغيّر رقم الملف ولا ترتيب الأعمدة.', 2) . '</row>';
     $xml .= '<row r="3">';
     $i = 0; foreach ($cols as $k => $c) { $xml .= $cell($c[0] . '3', $c[1], 3); $i++; }
     $xml .= '</row>';
@@ -119,7 +135,8 @@ function excelSalariesBuild(PDO $db, int $schoolId, string $sy): string {
         $r++; $xml .= '<row r="' . $r . '">';
         foreach ($cols as $k => $c) {
             $v = $row[$k] ?? null;
-            $editable = in_array($k, ['sal_usd','sal_lbp','pct','amt_lbp','amt_usd','from','to','days','note'], true);
+            $editable = in_array($k, ['sal_usd','sal_lbp','pct','amt_lbp','amt_usd','from','to','days','note'], true)
+                        && !($row['type'] === 'enseignant_titulaire' && in_array($k, ['sal_usd','sal_lbp'], true)); // الملاك: الراتب بالسلسلة
             $xml .= $cell($c[0] . $r, $v, $editable ? 5 : 4);
         }
         $xml .= '</row>';
@@ -232,16 +249,17 @@ function excelSalariesNum($v): ?float {
  * مقارنة الملف المرفوع بالوضع الحالي → ['changes' => [emp_id => [...]], 'errors' => [...], 'unchanged' => n]
  * كل تغيير: name, cat, fields: [['what'=>'الراتب', 'old'=>'…', 'new'=>'…']], ops: تعليمات التطبيق.
  */
-function excelSalariesDiff(PDO $db, int $schoolId, string $sy, array $parsed): array {
-    $cur = excelSalariesRows($db, $schoolId, $sy);
+function excelSalariesDiff(PDO $db, int $schoolId, string $sy, array $parsed, string $cat = 'all', string $tax = ''): array {
+    $cur = excelSalariesRows($db, $schoolId, $sy, $cat, $tax);
     $fmt = function ($v, $suf = '') { return $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.', ','), '0'), '.') . $suf; };
     $changes = []; $errors = []; $unchanged = 0;
     foreach ($parsed as $p) {
         $id = (int)$p['id'];
-        if (!isset($cur[$id])) { $errors[] = "رقم الملف $id ليس متعاقداً/موظفاً فاعلاً بهذه المدرسة — تُرك"; continue; }
+        if (!isset($cur[$id])) { $errors[] = "رقم الملف $id ليس من الفئة/الضريبة المختارة الفاعلة بهذه المدرسة — تُرك"; continue; }
         $c = $cur[$id]; $fields = []; $ops = [];
-        // الراتب: عمود $ أو عمود ل.ل
+        // الراتب: عمود $ أو عمود ل.ل — للمتعاقد والموظف فقط (الملاك بالسلسلة والدرجات)
         $su = excelSalariesNum($p['sal_usd'] ?? ''); $sl = excelSalariesNum($p['sal_lbp'] ?? '');
+        if ($c['type'] === 'enseignant_titulaire' && (($su !== null && $su > 0) || ($sl !== null && $sl > 0))) { $errors[] = "{$c['name']} (#$id): ملاك — راتبه بالسلسلة والدرجات لا من الإكسل (تُرك راتبه؛ إضافيه وأيامه يُقرآن)"; $su = $sl = null; }
         if ($su !== null && $su > 0 && $sl !== null && $sl > 0) { $errors[] = "{$c['name']} (#$id): الراتب بالدولار وبالليرة معاً — حدّد عملة واحدة (تُرك راتبه)"; $su = $sl = null; }
         if ($su !== null && $su > 0 && (float)($c['sal_usd'] ?? 0) !== $su) { $fields[] = ['what' => 'الراتب الأساسي', 'old' => $c['sal_usd'] !== null ? $fmt($c['sal_usd'], ' $') : ($c['sal_lbp'] !== null ? $fmt($c['sal_lbp'], ' ل.ل') : '—'), 'new' => $fmt($su, ' $')]; $ops['salary'] = ['mode' => 'direct_usd', 'usd' => $su]; }
         elseif ($sl !== null && $sl > 0 && (float)($c['sal_lbp'] ?? 0) !== $sl) { $fields[] = ['what' => 'الراتب الأساسي', 'old' => $c['sal_lbp'] !== null ? $fmt($c['sal_lbp'], ' ل.ل') : ($c['sal_usd'] !== null ? $fmt($c['sal_usd'], ' $') : '—'), 'new' => $fmt($sl, ' ل.ل')]; $ops['salary'] = ['mode' => 'direct_lbp', 'lbp' => $sl]; }
@@ -288,13 +306,14 @@ function excelSalariesApply(PDO $db, int $schoolId, string $sy, array $changes):
     require_once __DIR__ . '/payroll_calculator.php';
     $applied = 0; $recalc = 0; $skipped = [];
     if (isSchoolYearLocked($schoolId, $sy)) return ['applied' => 0, 'recalc' => 0, 'skipped' => [yearLockedMsg($schoolId, $sy)]];
-    $chk = $db->prepare("SELECT id FROM employees WHERE id = ? AND school_id = ? AND is_deleted = 0 AND employee_type IN ('enseignant_contractuel','employe')");
+    $chk = $db->prepare("SELECT employee_type FROM employees WHERE id = ? AND school_id = ? AND is_deleted = 0 AND employee_type IN ('enseignant_titulaire','enseignant_contractuel','employe')");
     $delP = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = 'prime_fixe' AND school_year = ?");
     $insP = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, 'prime_fixe', ?, ?, ?, ?, ?, ?, ?, 1)");
     foreach ($changes as $ch) {
-        $id = (int)$ch['id']; $chk->execute([$id, $schoolId]);
-        if (!$chk->fetchColumn()) { $skipped[] = ($ch['name'] ?? $id) . ': لم يعد بالمدرسة'; continue; }
+        $id = (int)$ch['id']; $chk->execute([$id, $schoolId]); $ety = $chk->fetchColumn();
+        if (!$ety) { $skipped[] = ($ch['name'] ?? $id) . ': لم يعد بالمدرسة'; continue; }
         $ops = $ch['ops'] ?? [];
+        if ($ety === 'enseignant_titulaire') unset($ops['salary']); // 🛡️ الملاك: الراتب بالسلسلة دائماً
         if (!empty($ops['salary'])) {
             if ($ops['salary']['mode'] === 'direct_usd') $db->prepare("UPDATE employees SET salary_input_mode = 'direct_usd', base_salary_usd = ? WHERE id = ?")->execute([(float)$ops['salary']['usd'], $id]);
             else $db->prepare("UPDATE employees SET salary_input_mode = 'direct_lbp', contract_salary_lbp = ? WHERE id = ?")->execute([(int)round((float)$ops['salary']['lbp']), $id]);

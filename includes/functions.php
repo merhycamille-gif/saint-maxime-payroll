@@ -5334,6 +5334,8 @@ function choosePercentLawOwn($db, $sy = '2025-2026', $dry = true) {
         FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id AND e.is_deleted=0 AND e.status='actif'
         WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='amount' AND b.currency='LBP'
           AND e.employee_type='enseignant_titulaire'
+          -- 🎓 (2026-09-13) المرسَّم بالملاك من سنة لاحقة (cadre_from_sy): سنوات تعاقده لا تُمسّ — مبلغه الثابت بسنة التعاقد يبقى (مريانا سالم موسى 59م بـ2025-2026، ملاك من 2026-2027)
+          AND (e.cadre_from_sy IS NULL OR e.cadre_from_sy = '' OR e.cadre_from_sy <= '$sy')
           AND b.start_month IS NULL AND b.end_month IS NULL
           AND (b.school_year IS NULL OR b.school_year='$sy')
           AND NOT (e.first_name_ar LIKE 'ريتا%' AND e.father_name_ar LIKE 'مارون%' AND e.last_name_ar LIKE '%حليحل%')
@@ -5345,6 +5347,7 @@ function choosePercentLawOwn($db, $sy = '2025-2026', $dry = true) {
         FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id AND e.is_deleted=0 AND e.status='actif'
         WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='percent'
           AND e.employee_type='enseignant_titulaire' AND (b.school_year IS NULL OR b.school_year='$sy')
+          AND (e.cadre_from_sy IS NULL OR e.cadre_from_sy = '' OR e.cadre_from_sy <= '$sy')
         GROUP BY e.school_id, b.amount") as $pr) {
         $freq[$pr['school_id']][(string)(float)$pr['pct']] = ($freq[$pr['school_id']][(string)(float)$pr['pct']] ?? 0) + (int)$pr['n'];
     }

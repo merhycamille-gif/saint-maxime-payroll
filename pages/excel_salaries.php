@@ -23,18 +23,22 @@ $schoolId = $schParam !== '' ? (int)$schParam : (int)currentSchoolId();
 if (!isSuperAdmin()) $schoolId = (int)currentSchoolId();
 $schoolYear = (string)($_GET['sy'] ?? $_POST['sy'] ?? currentSchoolYear());
 if (!preg_match('/^\d{4}-\d{4}$/', $schoolYear)) $schoolYear = currentSchoolYear();
+// 🧑‍🏫 الفئة: الكل / الملاك لوحدهم / المتعاقدون / الموظفون (2026-09-13)
+$xsCat = excelSalariesCat($_GET['cat'] ?? $_POST['cat'] ?? 'all');
+$xsTax = excelSalariesTax($_GET['tax'] ?? $_POST['tax'] ?? ''); // 🧾 خاضع للضريبة / لا يخضع / الكل
 $tmpDir = dirname(__DIR__) . '/tmp';
 if (!is_dir($tmpDir)) @mkdir($tmpDir, 0775, true);
 foreach (glob($tmpDir . '/excel_import_*.json') ?: [] as $old) if (filemtime($old) < time() - 86400) @unlink($old);
-$self = BASE_URL . 'pages/excel_salaries.php?sch=' . $schoolId . '&sy=' . urlencode($schoolYear);
+$self = BASE_URL . 'pages/excel_salaries.php?sch=' . $schoolId . '&sy=' . urlencode($schoolYear) . '&cat=' . $xsCat . '&tax=' . $xsTax;
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 $preview = null; $token = '';
 
 // ① تنزيل الملف
 if ($action === 'download' && $schoolId > 0) {
-    $data = excelSalariesBuild($db, $schoolId, $schoolYear);
-    $name = 'رواتب-واضافي-' . preg_replace('/[\\\\\/:*?"<>|]+/', '_', schoolNameById($schoolId, 'ar')) . '-' . $schoolYear . '.xlsx';
+    $data = excelSalariesBuild($db, $schoolId, $schoolYear, $xsCat, $xsTax);
+    $catFile = ['all' => 'الكل', 'titulaire' => 'الملاك', 'contractuel' => 'المتعاقدون', 'employe' => 'الموظفون'][$xsCat] . ($xsTax === '1' ? '-خاضعون' : ($xsTax === '0' ? '-غير-خاضعين' : ''));
+    $name = 'رواتب-واضافي-' . $catFile . '-' . preg_replace('/[\\\\\/:*?"<>|]+/', '_', schoolNameById($schoolId, 'ar')) . '-' . $schoolYear . '.xlsx';
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode($name) . '; filename="salaires_' . $schoolId . '_' . $schoolYear . '.xlsx"');
     header('Content-Length: ' . strlen($data));
@@ -51,11 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $schoolId > 0) {
             try {
                 $parsed = excelSalariesParse($f['tmp_name']);
                 if (!$parsed) throw new RuntimeException('الملف بلا أسطر أساتذة — نزّل الملف من هنا وعبّيه ثم ارفعه نفسه.');
-                $preview = excelSalariesDiff($db, $schoolId, $schoolYear, $parsed);
+                $preview = excelSalariesDiff($db, $schoolId, $schoolYear, $parsed, $xsCat, $xsTax);
                 $preview['file'] = (string)$f['name']; $preview['rows'] = count($parsed);
                 if ($preview['changes']) {
                     $token = bin2hex(random_bytes(12));
-                    file_put_contents($tmpDir . '/excel_import_' . $token . '.json', json_encode(['sch' => $schoolId, 'sy' => $schoolYear, 'user' => (int)($_SESSION['user_id'] ?? 0), 'changes' => $preview['changes']], JSON_UNESCAPED_UNICODE));
+                    file_put_contents($tmpDir . '/excel_import_' . $token . '.json', json_encode(['sch' => $schoolId, 'sy' => $schoolYear, 'cat' => $xsCat, 'tax' => $xsTax, 'user' => (int)($_SESSION['user_id'] ?? 0), 'changes' => $preview['changes']], JSON_UNESCAPED_UNICODE));
                 }
             } catch (Throwable $ex) { $_SESSION['flash_error'] = 'تعذّر قراءة الملف: ' . $ex->getMessage(); }
         }
@@ -76,8 +80,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $schoolId > 0) {
     }
 }
 
-$rowsNow = $schoolId > 0 ? excelSalariesRows($db, $schoolId, $schoolYear) : [];
-$nC = count(array_filter($rowsNow, fn($r) => $r['type'] === 'enseignant_contractuel')); $nE = count($rowsNow) - $nC;
+$rowsNow = $schoolId > 0 ? excelSalariesRows($db, $schoolId, $schoolYear, $xsCat, $xsTax) : [];
+$nT = count(array_filter($rowsNow, fn($r) => $r['type'] === 'enseignant_titulaire'));
+$nC = count(array_filter($rowsNow, fn($r) => $r['type'] === 'enseignant_contractuel')); $nE = count($rowsNow) - $nC - $nT;
+$xsCounts = implode(' + ', array_filter([$nT ? "$nT ملاك" : '', $nC ? "$nC متعاقد" : '', $nE ? "$nE موظف" : ''])) ?: '0';
 require_once __DIR__ . '/../includes/header.php';
 ?>
 <style>
@@ -95,11 +101,11 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="card">
     <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-file-excel"></i> Excel — salaires, supplément &amp; jours (contractuels &amp; employés)</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إكسل — الرواتب والأجر الإضافي وعدد الأيام للمتعاقدين والموظفين، دفعة وحدة</div>
+        <span dir="ltr"><i class="fas fa-file-excel"></i> Excel — salaires, supplément &amp; jours (titulaires, contractuels, employés)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إكسل — الرواتب والأجر الإضافي وعدد الأيام: الملاك لوحدهم أو المتعاقدون أو الموظفون أو الكل، دفعة وحدة</div>
     </h3></div>
     <div class="card-body">
-        <form method="GET" class="form-row cols-2 no-print" style="margin-bottom:12px">
+        <form method="GET" class="form-row cols-4 no-print" style="margin-bottom:12px">
             <?php if (isSuperAdmin()): ?>
             <div class="form-group mb-0">
                 <label class="form-label">École / المدرسة</label>
@@ -115,6 +121,22 @@ require_once __DIR__ . '/../includes/header.php';
                 <label class="form-label">Année scolaire / السنة الدراسية</label>
                 <input type="text" name="sy" class="form-control" value="<?= e($schoolYear) ?>" onchange="this.form.submit()">
             </div>
+            <div class="form-group mb-0">
+                <label class="form-label">Catégorie / الفئة (مين بالملف؟)</label>
+                <select name="cat" class="form-select" onchange="this.form.submit()" style="font-weight:800">
+                    <?php foreach (excelSalariesCats() as $ck => $cv): ?>
+                        <option value="<?= $ck ?>" <?= $xsCat === $ck ? 'selected' : '' ?>><?= e($cv['label']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group mb-0">
+                <label class="form-label"><i class="fas fa-file-invoice-dollar"></i> Impôt / الضريبة</label>
+                <select name="tax" class="form-select" onchange="this.form.submit()" style="font-weight:800">
+                    <?php foreach (excelSalariesTaxes() as $tk => $tl): ?>
+                        <option value="<?= $tk ?>" <?= $xsTax === (string)$tk ? 'selected' : '' ?>><?= e($tl) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         </form>
 
         <?php if ($schoolId <= 0): ?>
@@ -123,14 +145,14 @@ require_once __DIR__ . '/../includes/header.php';
         <?php if (isSchoolYearLocked($schoolId, $schoolYear)): ?>
             <div class="alert alert-warning">🔒 <?= e(yearLockedMsg($schoolId, $schoolYear)) ?> — التنزيل ممكن، التطبيق مرفوض حتى تفتح القفل.</div>
         <?php endif; ?>
-        <div class="xs-hint" style="margin-bottom:6px">هذا خيار زيادة: بدل ما تفوت على كل ملف، تعبّي إكسل واحد للمدرسة كلّها وترفعه. <b><?= e(schoolNameById($schoolId, 'ar')) ?> — <?= e($schoolYear) ?>:</b> <?= $nC ?> متعاقد + <?= $nE ?> موظف فاعلون (الملاك غير مشمولين — رواتبهم بالسلسلة والدرجات).</div>
+        <div class="xs-hint" style="margin-bottom:6px">هذا خيار زيادة: بدل ما تفوت على كل ملف، تعبّي إكسل واحد للمدرسة كلّها وترفعه. <b><?= e(schoolNameById($schoolId, 'ar')) ?> — <?= e($schoolYear) ?> — <?= e(excelSalariesFilterLabel($xsCat, $xsTax)) ?>:</b> <?= e($xsCounts) ?> فاعلون بالملف. <?= $nT ? '<b>الملاك:</b> راتبهم بالسلسلة والدرجات (خانتا الراتب رمادية لا تُقرآن) — أجرهم الإضافي (٪ / ل.ل / $) وأيامهم من الإكسل نعم.' : '' ?></div>
 
         <div class="xs-step"><span class="xs-num">١</span><div>
-            <strong>نزّل الملف</strong> <span class="xs-hint">— سطر لكل متعاقد وموظف، والخانات الصفراء معبّأة بقيمه الحالية كي تعدّل ما تريد فقط.</span>
+            <strong>نزّل الملف</strong> <span class="xs-hint">— سطر لكل واحد من الفئة المختارة (<?= e(excelSalariesFilterLabel($xsCat, $xsTax)) ?>)، والخانات الصفراء معبّأة بقيمه الحالية كي تعدّل ما تريد فقط.</span>
             <div style="margin-top:8px"><a class="btn btn-primary" href="<?= $self ?>&action=download" style="font-weight:800"><i class="fas fa-download"></i> Télécharger / نزّل الإكسل (<?= count($rowsNow) ?>)</a></div>
             <div class="xs-cols">
                 <div class="xs-col ro">رقم الملف (لا تغيّره)</div><div class="xs-col ro">الفئة · الاسم</div>
-                <div class="xs-col">الراتب الأساسي $ <u>أو</u> ل.ل</div><div class="xs-col">الأجر الإضافي ٪</div><div class="xs-col">الأجر الإضافي: جزء ل.ل <u>و/أو</u> جزء $</div>
+                <div class="xs-col">الراتب الأساسي $ <u>أو</u> ل.ل <small>(متعاقد/موظف)</small></div><div class="xs-col">الأجر الإضافي ٪</div><div class="xs-col">الأجر الإضافي: جزء ل.ل <u>و/أو</u> جزء $</div>
                 <div class="xs-col">الإضافي من شهر ← إلى شهر</div><div class="xs-col">عدد الأيام بالأسبوع</div>
             </div>
             <div class="xs-hint" style="margin-top:6px">فاضي = لا تغيير · <b>0</b> بالأجر الإضافي = شيله · <b>كل أستاذ رقمه</b>: مبلغ بالليرة و/أو مبلغ بالدولار (الاتنين معاً = يُجمعان) · الشهر بالاسم أو بالرقم، فاضي = كل السنة (تشرين الأول ← أيلول) · لا تحذف أعمدة ولا تغيّر ترتيبها.</div>
@@ -143,7 +165,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="xs-step"><span class="xs-num">٣</span><div>
             <strong>ارفع الملف المعبّى</strong> <span class="xs-hint">— بيطلع لك جدول بكل تغيير (قديم ← جديد) قبل ما يتغيّر شي.</span>
             <form method="POST" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
-                <?= csrfField() ?><input type="hidden" name="action" value="upload"><input type="hidden" name="sch" value="<?= $schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+                <?= csrfField() ?><input type="hidden" name="action" value="upload"><input type="hidden" name="sch" value="<?= $schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><input type="hidden" name="cat" value="<?= e($xsCat) ?>"><input type="hidden" name="tax" value="<?= e($xsTax) ?>">
                 <input type="file" name="xlsx" accept=".xlsx" class="form-control" required style="max-width:380px">
                 <button type="submit" class="btn btn-success" style="font-weight:800"><i class="fas fa-upload"></i> Vérifier / ارفع وشوف الفروقات</button>
             </form>
@@ -170,7 +192,7 @@ require_once __DIR__ . '/../includes/header.php';
             </table>
             </div>
             <form method="POST" style="margin-top:10px">
-                <?= csrfField() ?><input type="hidden" name="action" value="apply"><input type="hidden" name="sch" value="<?= $schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><input type="hidden" name="token" value="<?= e($token) ?>">
+                <?= csrfField() ?><input type="hidden" name="action" value="apply"><input type="hidden" name="sch" value="<?= $schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><input type="hidden" name="cat" value="<?= e($xsCat) ?>"><input type="hidden" name="tax" value="<?= e($xsTax) ?>"><input type="hidden" name="token" value="<?= e($token) ?>">
                 <button type="submit" class="btn btn-primary" style="font-weight:800" data-confirm="توزيع <?= count($preview['changes']) ?> تغييراً على ملفات الأساتذة والموظفين بـ<?= e(schoolNameById($schoolId, 'ar')) ?> — <?= e($schoolYear) ?> وإعادة حساب رواتبهم؟"><i class="fas fa-check"></i> Appliquer / طبّق ووزّع على الملفات (<?= count($preview['changes']) ?>)</button>
                 <span class="xs-hint" style="margin-right:10px">الأجر الإضافي الجديد يستبدل الحالي عند الشخص (كل فتراته) ويُحسب من تشرين الأول. الرواتب تُعاد بالمحرّك فتطلع نفسها بالبطاقة السنوية وكل التقارير.</span>
             </form>

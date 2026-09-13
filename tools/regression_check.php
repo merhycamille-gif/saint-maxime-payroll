@@ -5522,10 +5522,10 @@ check('تاريخ ترك مستحيل (تجربة حيّة تُرجَع): يظه
 require_once $PROJ . '/includes/excel_salaries.php';
 $xsPage = (string)file_get_contents($PROJ . '/pages/excel_salaries.php'); $xsInc = (string)file_get_contents($PROJ . '/includes/excel_salaries.php');
 $hdr114 = (string)file_get_contents($PROJ . '/includes/header.php'); $ba114 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
-check('إكسل الرواتب: الوحدة (بناء/قراءة/مقارنة/تطبيق) + الصفحة (نزّل/ارفع/معاينة/طبّق بتوكن) + رابط بالقائمة وبالمكافآت الجماعية + الأعمدة الثابتة فيها من←إلى + يحترم القفل + المتعاقدون والموظفون فقط',
+check('إكسل الرواتب: الوحدة (بناء/قراءة/مقارنة/تطبيق) + الصفحة (نزّل/ارفع/معاينة/طبّق بتوكن) + رابط بالقائمة وبالمكافآت الجماعية + الأعمدة الثابتة فيها من←إلى + يحترم القفل + الفئة خيار (المصدر الواحد excelSalariesCats)',
       function_exists('excelSalariesBuild') && function_exists('excelSalariesParse') && function_exists('excelSalariesDiff') && function_exists('excelSalariesApply')
       && isset(excelSalariesColumns()['from'], excelSalariesColumns()['to'], excelSalariesColumns()['days'], excelSalariesColumns()['pct'], excelSalariesColumns()['sal_usd'], excelSalariesColumns()['sal_lbp'])
-      && strpos($xsInc, "employee_type IN ('enseignant_contractuel','employe')") !== false && strpos($xsInc, 'isSchoolYearLocked($schoolId, $sy)') !== false
+      && strpos($xsInc, "'types' => ['enseignant_contractuel']") !== false && strpos($xsInc, 'isSchoolYearLocked($schoolId, $sy)') !== false // (2026-09-13) الفئة صارت خياراً: excelSalariesCats
       && strpos($xsInc, 'recalcEmployeeYear($id, $sy)') !== false
       && strpos($xsPage, "\$action === 'download'") !== false && strpos($xsPage, "\$action === 'upload'") !== false && strpos($xsPage, "\$action === 'apply'") !== false
       && strpos($xsPage, "excel_import_' . \$token . '.json'") !== false && strpos($xsPage, 'enctype="multipart/form-data"') !== false
@@ -5748,6 +5748,88 @@ try {
     }
 } catch (Throwable $e) { $why117 = $e->getMessage(); }
 check('الإضافي بالعملتين (تجربة حيّة تُرجَع): متعاقد ← 100 $ + 5,000,000 ل.ل بالإكسل ⇒ سطران (LBP+USD) والمخزّن كل شهر = 5,000,000 + usdToLbp(100، سعر الشهر) ⇒ إرجاع بالمليم', $ok117, $why117);
+
+/* =====================================================================
+ * 118) 🧑‍🏫🧾 إكسل الرواتب والأجر الإضافي — خيار الفئة (2026-09-13 «بدك تعطيني خيار الملاك لوحدون أو المتعاقد أو الموظف أو كلهن»)
+ *      + فلتر الضريبة («كمان بدك تحط ميزة خاضع للضريبة / لا يخضع / الكل»): excelSalariesCats/excelSalariesTaxes المصدر الواحد،
+ *      الملاك مشمولون بإضافيهم وأيامهم فقط (راتبهم بالسلسلة: خانتاه رمادية، أي رقم يُكتب = تنبيه ولا يُطبَّق، والتطبيق يحذف op الراتب لهم).
+ * =================================================================== */
+$xs118 = (string)file_get_contents($PROJ . '/includes/excel_salaries.php'); $xp118 = (string)file_get_contents($PROJ . '/pages/excel_salaries.php');
+check('إكسل الفئة/الضريبة: المصدر الواحد (cats/taxes/filterLabel) + rows/build/diff تقبل الفئة والضريبة + الصفحة منتقيان (cat/tax) يمرّان بالتنزيل والرفع والتطبيق والمعاينة + الملاك بلا راتب من الإكسل (rows/diff/apply)',
+      function_exists('excelSalariesCats') && function_exists('excelSalariesTaxes') && function_exists('excelSalariesFilterLabel')
+      && array_keys(excelSalariesCats()) === ['all', 'titulaire', 'contractuel', 'employe'] && array_keys(excelSalariesTaxes()) === ['', 1, 0]
+      && strpos($xs118, "function excelSalariesRows(PDO \$db, int \$schoolId, string \$sy, string \$cat = 'all', string \$tax = '')") !== false
+      && strpos($xs118, "function excelSalariesBuild(PDO \$db, int \$schoolId, string \$sy, string \$cat = 'all', string \$tax = '')") !== false
+      && strpos($xs118, "function excelSalariesDiff(PDO \$db, int \$schoolId, string \$sy, array \$parsed, string \$cat = 'all', string \$tax = '')") !== false
+      && strpos($xs118, "AND e.tax_subject = \" . (int)\$tax") !== false
+      && strpos($xs118, "if (\$ety === 'enseignant_titulaire') unset(\$ops['salary']);") !== false
+      && strpos($xs118, "ملاك — راتبه بالسلسلة والدرجات لا من الإكسل") !== false
+      && strpos($xp118, "\$xsCat = excelSalariesCat(") !== false && strpos($xp118, "\$xsTax = excelSalariesTax(") !== false
+      && strpos($xp118, "excelSalariesBuild(\$db, \$schoolId, \$schoolYear, \$xsCat, \$xsTax)") !== false && strpos($xp118, "excelSalariesDiff(\$db, \$schoolId, \$schoolYear, \$parsed, \$xsCat, \$xsTax)") !== false
+      && strpos($xp118, "excelSalariesRows(\$db, \$schoolId, \$schoolYear, \$xsCat, \$xsTax)") !== false && strpos($xp118, "'cat' => \$xsCat, 'tax' => \$xsTax") !== false
+      && substr_count($xp118, '<input type="hidden" name="cat" value="<?= e($xsCat) ?>"><input type="hidden" name="tax" value="<?= e($xsTax) ?>">') === 2
+      && strpos($xp118, '<select name="cat"') !== false && strpos($xp118, '<select name="tax"') !== false);
+// تجربة حيّة تُرجَع: مدرسة فيها ملاك ومتعاقدون — كل فئة تعطي أنواعها فقط + ذهاب/إياب صفر فروقات + الملاك بلا راتب + راتب مكتوب لملاك = تنبيه بلا op
+// + فلتر الضريبة: قلب tax_subject لموظف واحد مؤقتاً ⇒ يظهر وحده بـ«غير الخاضعين» ويغيب عن «الخاضعين» ⇒ إرجاع
+// + تطبيق نسبة على ملاك واحد عبر الإكسل ⇒ بند percent واحد ⇒ إرجاع بالمليم
+$ok118 = false; $why118 = '';
+try {
+    $sch118 = (int)$db->query("SELECT e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026'
+        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+        GROUP BY e.school_id HAVING SUM(e.employee_type = 'enseignant_titulaire') > 0 AND SUM(e.employee_type = 'enseignant_contractuel') > 0 ORDER BY COUNT(DISTINCT e.id) DESC LIMIT 1")->fetchColumn();
+    $sy118 = '2025-2026';
+    if (!$sch118) { $ok118 = true; $why118 = 'لا عيّنة'; }
+    else {
+        $parts = []; $okCats = true;
+        foreach (excelSalariesCats() as $ck => $cv) {
+            $rows = excelSalariesRows($db, $sch118, $sy118, $ck);
+            $types = array_values(array_unique(array_map(fn($r) => $r['type'], $rows)));
+            $tmp = sys_get_temp_dir() . '/reg118_' . $ck . '.xlsx'; file_put_contents($tmp, excelSalariesBuild($db, $sch118, $sy118, $ck));
+            $d = excelSalariesDiff($db, $sch118, $sy118, excelSalariesParse($tmp), $ck); @unlink($tmp);
+            $titSal = count(array_filter($rows, fn($r) => $r['type'] === 'enseignant_titulaire' && ($r['sal_usd'] !== null || $r['sal_lbp'] !== null)));
+            $okC = count($rows) > 0 && !array_diff($types, $cv['types']) && count($d['changes']) === 0 && !$d['errors'] && $titSal === 0;
+            if ($ck === 'all') $okC = $okC && count($types) === 3;
+            $okCats = $okCats && $okC; $parts[] = "$ck=" . count($rows) . ($okC ? '' : '✗');
+        }
+        // ملاك كتب راتباً ⇒ تنبيه ولا تغيير
+        $tit = null; foreach (excelSalariesRows($db, $sch118, $sy118, 'titulaire') as $r) { $tit = $r; break; }
+        $dS = excelSalariesDiff($db, $sch118, $sy118, [['id' => $tit['id'], 'sal_usd' => '500']], 'titulaire');
+        $okGuard = count($dS['changes']) === 0 && count($dS['errors']) === 1 && strpos($dS['errors'][0], 'راتبه بالسلسلة') !== false;
+        // متعاقد بملف الملاك ⇒ «ليس من الفئة»
+        $con = null; foreach (excelSalariesRows($db, $sch118, $sy118, 'contractuel') as $r) { $con = $r; break; }
+        $dW = excelSalariesDiff($db, $sch118, $sy118, [['id' => $con['id'], 'pct' => '5']], 'titulaire');
+        $okWrong = count($dW['changes']) === 0 && count($dW['errors']) === 1;
+        // فلتر الضريبة (قلب مؤقت لموظف واحد ثم إرجاع)
+        $cid = (int)$con['id']; $tsOrig = (int)$db->query("SELECT tax_subject FROM employees WHERE id = $cid")->fetchColumn();
+        $db->exec("UPDATE employees SET tax_subject = 0 WHERE id = $cid");
+        $r0 = excelSalariesRows($db, $sch118, $sy118, 'contractuel', '0'); $r1 = excelSalariesRows($db, $sch118, $sy118, 'contractuel', '1'); $rA = excelSalariesRows($db, $sch118, $sy118, 'contractuel', '');
+        $db->exec("UPDATE employees SET tax_subject = $tsOrig WHERE id = $cid");
+        $okTax = isset($r0[$cid]) && !isset($r1[$cid]) && isset($rA[$cid]) && count($r0) + count($r1) === count($rA)
+                 && (int)$db->query("SELECT tax_subject FROM employees WHERE id = $cid")->fetchColumn() === $tsOrig;
+        // تطبيق نسبة على ملاك عبر الإكسل ثم إرجاع بالمليم
+        $tid = (int)$tit['id']; $okLive = false; $whyLive = '';
+        if (isSchoolYearLocked($sch118, $sy118)) { $okLive = true; $whyLive = 'مقفولة'; }
+        else {
+            $origIds = array_map('intval', $db->query("SELECT id FROM employee_bonuses WHERE employee_id = $tid AND bonus_type = 'prime_fixe' AND school_year = '$sy118' AND is_active = 1")->fetchAll(PDO::FETCH_COLUMN));
+            $msQ = "SELECT month, extra_lbp + prime_fixe_lbp t, net_salary_lbp n, total_due_lbp d FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$sy118' ORDER BY year, month";
+            $before = $db->query($msQ)->fetchAll(PDO::FETCH_ASSOC);
+            $newPct = ((float)($tit['pct'] ?? 0) == 12.5) ? '15' : '12.5';
+            $dL = excelSalariesDiff($db, $sch118, $sy118, [['id' => $tid, 'sal_usd' => '', 'sal_lbp' => '', 'pct' => $newPct, 'amt_lbp' => '0', 'amt_usd' => '0', 'from' => '', 'to' => '', 'days' => '']], 'titulaire');
+            $rL = excelSalariesApply($db, $sch118, $sy118, $dL['changes']);
+            $bon = $db->query("SELECT value_type, amount FROM employee_bonuses WHERE employee_id = $tid AND bonus_type = 'prime_fixe' AND school_year = '$sy118' AND is_active = 1")->fetchAll(PDO::FETCH_ASSOC);
+            $salSame = $db->query("SELECT salary_input_mode, base_salary_usd, contract_salary_lbp FROM employees WHERE id = $tid")->fetch(PDO::FETCH_ASSOC);
+            $db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = $tid AND bonus_type = 'prime_fixe' AND school_year = '$sy118'");
+            if ($origIds) $db->exec("UPDATE employee_bonuses SET is_active = 1 WHERE id IN (" . implode(',', $origIds) . ")");
+            recalcEmployeeYear($tid, $sy118);
+            $after = $db->query($msQ)->fetchAll(PDO::FETCH_ASSOC);
+            $okLive = count($dL['changes']) === 1 && !$dL['errors'] && $rL['applied'] === 1 && count($bon) === 1 && $bon[0]['value_type'] === 'percent' && (float)$bon[0]['amount'] == (float)$newPct && ($before == $after);
+            $whyLive = "tit=$tid pct=$newPct bon=" . json_encode($bon) . ' restored=' . var_export($before == $after, true);
+        }
+        $ok118 = $okCats && $okGuard && $okWrong && $okTax && $okLive;
+        $why118 = "school=$sch118 " . implode(' ', $parts) . " guard=" . var_export($okGuard, true) . " wrong=" . var_export($okWrong, true) . " tax=" . var_export($okTax, true) . " live[$whyLive]";
+    }
+} catch (Throwable $e) { $why118 = $e->getMessage(); }
+check('إكسل الفئة/الضريبة (تجربة حيّة تُرجَع): كل فئة أنواعها فقط + ذهاب/إياب صفر + ملاك بلا راتب (رقم مكتوب = تنبيه) + متعاقد بملف الملاك = ليس من الفئة + فلتر الضريبة يعزل غير الخاضع + نسبة لملاك عبر الإكسل = بند percent واحد ⇒ إرجاع بالمليم', $ok118, $why118);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
