@@ -1610,7 +1610,10 @@ elseif ($form === 'teacher_card'):
     $curMode = displayCurrency();
     $curLbl = ($curMode === 'usd') ? 'العملة: دولار أميركي' : (($curMode === 'both') ? 'العملة: ليرة لبنانية + دولار أميركي' : 'العملة: ليرة لبنانية');
 ?>
-<div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
+<?php // ↔️ (2026-09-13 «تقارير كشف الرواتب للأساتذة غير التابعين للدولة من الشمال لليمين — الاتجاه بس»):
+      // فلتر الضريبة على «غير الخاضعين» ⇒ الكشف كله LTR (الاتجاه فقط؛ الأعمدة والأرقام والنصوص كما هي). البطاقة السنوية لا تُمَسّ.
+      $ofLtr = ($taxSubSel === '0'); ?>
+<div class="official-doc <?= $ofLtr ? 'ltr' : 'rtl' ?> land-report" id="ppExportArea" style="max-width:100%" dir="<?= $ofLtr ? 'ltr' : 'rtl' ?>">
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الرواتب والأجور الشهري — <?= monthName($month,'ar').' '.$year ?></div>
     <div class="doc-subtitle"><?= e($curLbl) ?></div>

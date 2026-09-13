@@ -298,8 +298,9 @@ function reportDocThumb($path) {
             </div>
         </form>
 
-        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year . $empTypeTitle]) ?>
-                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
+        <?php $rsDir = ($taxSubSel === '0') ? 'ltr' : 'rtl'; // ↔️ (2026-09-13) غير الخاضعين للضريبة ⇒ الكشف من الشمال لليمين (الاتجاه فقط) ?>
+        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['dir' => $rsDir]) ?>
+                <div class="report-table-wrap" dir="<?= $rsDir ?>"><table class="doc-table" dir="<?= $rsDir ?>">
                     <thead><tr>
                         <th>#</th>
                         <?php if ($multi): ?><th>المدرسة</th><?php endif; ?>
