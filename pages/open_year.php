@@ -6,12 +6,16 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/payroll_calculator.php';
+require_once __DIR__ . '/../includes/cadre_due.php'; // 🎓 الترسيم الحكمي بالملاك بعد سنتين تعاقد (2026-09-13)
 requireLogin();
 requireCsrf();
 
 $currentPage = 'open_year';
 $pageTitle = 'Ouvrir une année / فتح سنة دراسية';
 $db = getDB();
+
+// 🎓 قرارات بطاقة «أساتذة استحقّوا الملاك» بهذه الصفحة (وافق/لا/أعد الفتح)
+handleCadreDuePost($db, BASE_URL . 'pages/open_year.php#cadreDue');
 
 // 📅 درجات الملاك عند فتح السنة: applyLegalGradesForNewYear() بـincludes/payroll_calculator.php (المصدر الواحد —
 // «درجته كما رتّبتها + ما يضيفه القانون لهذه السنة»، لا إعادة بناء ولا مقارنة بالقانون؛ 2026-09-12).
@@ -155,19 +159,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         // 🔒 قفل السنة (2026-09-12): المدرسة المقفولة على هذه السنة تُتخطّى (حساباتها ما بتتغيّر)
         $lockedT = array_values(array_filter($chosen, fn($sid) => isSchoolYearLocked((int)$sid, $newYear)));
         $targets = array_values(array_diff($chosen, $lockedT));
+        // 🎓 (2026-09-13 «بس افتح المدرسة على سنة جديدة لازم يطلعلي مساج بأسماء الأساتذة اللازم يكونوا بالملاك ويكون عندي خيار وافق أو ما وافق»)
+        // المتعاقدون الذين أكملوا سنتين بالمدارس المفتوحة ⇒ صفحة مراجعة قبل الفتح (بلا أي تغيير حتى يقرّر)، ثم تُنفَّذ قراراته بعد الفتح.
+        $cdCands = $targets ? cadreDueCandidates($db, $newYear, $targets, false, false) : [];
+        if ($cdCands && empty($_POST['cadre_reviewed'])) {
+            $hidden = ['action' => 'open', 'new_year' => $newYear, 'add_mode' => $addMode, 'trans_mode' => $transMode, 'add_pct' => $addPct, 'trans_pct' => $transPct];
+            if (isSuperAdmin()) { if ($allSchoolsOpen) $hidden['all_schools'] = '1'; else $hidden['school_ids'] = $chosen; } else $hidden['school_id'] = currentSchoolId();
+            $pageTitle = 'Titularisation avant ouverture / الترسيم الحكمي قبل فتح السنة';
+            $hideExportToolbar = true;
+            include __DIR__ . '/../includes/header.php';
+            renderCadreDueReview($cdCands, $newYear, $hidden);
+            include __DIR__ . '/../includes/footer.php';
+            exit;
+        }
+        $cdApprove = []; $cdLeave = [];
+        if ($cdCands) {
+            $okIds = !empty($_POST['cadre_none']) ? [] : array_map('intval', (array)($_POST['cadre_ok'] ?? []));
+            foreach ($cdCands as $c) { if ($c['can'] && in_array($c['id'], $okIds, true)) $cdApprove[] = $c; elseif ($c['can']) $cdLeave[] = $c; }
+        }
         $n = 0; $promoted = 0; $carried = 0; $perSchool = [];
         foreach ($targets as $sid) {
             [$a1, $b1, $c1] = $openOne($sid);
             $n += $a1; $promoted += $b1; $carried += $c1;
             $perSchool[] = schoolNameById($sid, 'ar') . ' (' . ($a1 + $c1) . ')';
         }
+        // 🎓 تنفيذ قراراته بعد الفتح (حتى تكون نسب الملاك منسوخة للسنة الجديدة فيأخذها المرسَّم): وافق ⇒ ترسيم، وإلا ⇒ يبقى متعاقداً (قرار مسجَّل)
+        $cdDone = []; $cdErr = []; $whoCd = (string)($_SESSION['username'] ?? '');
+        foreach ($cdApprove as $c) {
+            try { $r = titularizeContractTeacher($db, (int)$c['id'], $newYear, $whoCd); $cdDone[] = $r['name'] . ' (درجة ' . rtrim(rtrim(number_format($r['grade_start'], 1), '0'), '.') . ($r['pct'] !== null ? '، ' . rtrim(rtrim((string)$r['pct'], '0'), '.') . ' %' : '') . ')'; }
+            catch (Throwable $e) { $cdErr[] = $c['name'] . ': ' . $e->getMessage(); }
+        }
+        foreach ($cdLeave as $c) cadreDueRecordDecision($db, $c, $newYear, 'rejected', 'بقراره عند فتح السنة: يبقى متعاقداً بسنة ' . $newYear, $whoCd);
         $_SESSION['active_school_year'] = $newYear;
         // 📅 السنة المفتوحة تصير السنة الحالية للبرنامج كله (التقارير/الإفادات/القسائم/لوحة القيادة) — لا رجوع لسنة أقدم من التقويم
         if (strcmp($newYear, calendarSchoolYear()) >= 0 && strcmp($newYear, currentSchoolYear()) >= 0) setSetting('program_school_year', $newYear);
         $_SESSION['flash_success'] = "تم فتح السنة $newYear " . ($allSchoolsOpen ? 'لكل المدارس' : (count($targets) > 1 ? 'للمدارس المختارة' : 'للمدرسة')) . ' (' . implode(' · ', $perSchool) . ')'
             . " — $n موظف محسوب بالقانون (منهم $promoted أستاذ ملاك كُمِّل تدرّجهم على درجتهم كما رتّبتها) + $carried متعاقد نُقل راتبه كما كان"
             . " — الإضافات وتعويض النقل " . ($addMode === 'same' && $transMode === 'same' ? 'نُقلت كما كانت' : 'حسب اختيارك') . ". ما تغيّر شي إلا إذا عدّلته أنت بالسنة الجديدة (المكافآت الجماعية / ملف الأستاذ)."
-            . ($lockedT ? ' 🔒 تُركت مقفولة كما هي: ' . implode(' · ', array_map(fn($sid) => schoolNameById($sid, 'ar'), $lockedT)) . '.' : '');
+            . ($lockedT ? ' 🔒 تُركت مقفولة كما هي: ' . implode(' · ', array_map(fn($sid) => schoolNameById($sid, 'ar'), $lockedT)) . '.' : '')
+            . ($cdDone ? ' 🎓 رُسِّم بالملاك ' . count($cdDone) . ' من 1/10/' . $y1 . ' (السلسلة + الدرجات بالقانون + نسبة المدرسة): ' . implode(' · ', array_slice($cdDone, 0, 12)) . (count($cdDone) > 12 ? '…' : '') . '.' : '')
+            . ($cdLeave ? ' ⏸️ بقي متعاقداً هذه السنة بقرارك ' . count($cdLeave) . '.' : '');
+        if ($cdErr) $_SESSION['flash_error'] = '⚠️ تعذّر ترسيم: ' . implode(' · ', array_slice($cdErr, 0, 6));
         if (!$targets) { unset($_SESSION['flash_success']); $_SESSION['flash_error'] = '🔒 كل المدارس المختارة مقفولة على سنة ' . $newYear . ' — ما تغيّر شي. افتح القفل أوّلاً إذا بدّك.'; }
         header('Location: ' . BASE_URL . 'pages/open_year.php');
         exit;
@@ -383,7 +415,8 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
         <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.9;margin-bottom:14px">
             <b>١</b> أشّر المدارس (أو «كل المدارس») &nbsp;→&nbsp; <b>٢</b> اختر السنة الجديدة &nbsp;→&nbsp; <b>٣</b> اكبس «افتح».<br>
             البرنامج بينقل <b>كل شي كما هو</b> من السنة الماضية (الرواتب، الإضافي، المكافآت، النقل) — <b>ما بيتغيّر شي إلا إذا عدّلته أنت</b> بعد الفتح.<br>
-            <b>الدرجات:</b> بياخد درجة كل أستاذ ملاك <b>كما رتّبتها</b> (مع أي زيادة عطيتها) وبيكمّل عليها تدرّج هالسنة بس. التارك قبل 1 تشرين ما بينتقل. الفتح مرّة تانية آمن (بيكمّل الناقص بلا تكرار).
+            <b>الدرجات:</b> بياخد درجة كل أستاذ ملاك <b>كما رتّبتها</b> (مع أي زيادة عطيتها) وبيكمّل عليها تدرّج هالسنة بس. التارك قبل 1 تشرين ما بينتقل. الفتح مرّة تانية آمن (بيكمّل الناقص بلا تكرار).<br>
+            <b>🎓 الملاك حكماً:</b> قبل الفتح بيطلعلك مساج بأسماء المتعاقدين اللي أكملوا <b>سنتين</b> بالمدرسة — <b>وافق</b> بيصيروا ملاك من 1 تشرين (السلسلة + الدرجات بالقانون + نسبة ملاك المدرسة)، <b>ما وافق</b> بيبقوا متعاقدين هالسنة. ما بيتغيّر شي بلا موافقتك.
         </div>
         <form method="POST" id="openYearForm" onsubmit="var all=document.getElementById('oy_all'); var n=this.querySelectorAll('input[name=&quot;school_ids[]&quot;]:checked').length; if(all&&!all.checked&&n===0){alert('أشّر «كل المدارس» أو اختر مدرسة واحدة على الأقل');return false;} return confirm((all&&all.checked) ? 'فتح السنة المختارة لكل المدارس ونقل كل الموظفين الفاعلين برواتبهم وتدرّجهم وإضافاتهم كما كانت؟ (قد يستغرق دقائق)' : 'فتح السنة المختارة للمدارس المؤشَّرة ونقل موظفيها الفاعلين كما كانوا؟');">
             <input type="hidden" name="action" value="open">
@@ -448,6 +481,15 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
     </div>
 </div>
 
+<?php
+// 🎓 أساتذة استحقّوا الملاك بالسنة الحالية للبرنامج (أو المختارة إن كانت أحدث) — للسنة المفتوحة أصلاً بلا مساج الفتح (2026-09-13)
+$cdSy = activeSchoolYear(); if ($cdSy === 'all' || strcmp($cdSy, currentSchoolYear()) < 0) $cdSy = currentSchoolYear();
+if (canEdit()) {
+    $cdPend = cadreDueCandidates($db, $cdSy, null, false, true);
+    $cdRej = array_values(array_filter(cadreDueCandidates($db, $cdSy, null, true, true), fn($c) => $c['decision'] && $c['decision']['decision'] === 'rejected'));
+    renderCadreDuePending($cdPend, $cdSy, false, BASE_URL . 'pages/open_year.php#cadreDue', $cdRej);
+}
+?>
 <?php if (isSuperAdmin()): $locksAll = yearLocksMap(true); $pwSet = yearLockPasswordSet(); ?>
 <!-- 🔒 حالة كل مدرسة على السنة + الأقفال بكلمة سرّ (2026-09-12) -->
 <div class="card" id="yearLocks" style="border:2px solid #991b1b">

@@ -290,8 +290,8 @@ $cpItems = complianceItems($db, currentSchoolYear());
 $cpRules = complianceRules();
 $cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
 $cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
-check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 22 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
-      count($cpRules) === 22
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 23 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 23
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
@@ -5557,6 +5557,105 @@ try {
     }
 } catch (Throwable $e) { $why114 = $e->getMessage(); }
 check('إكسل الرواتب (تجربة حيّة تُرجَع): بناء ← قراءة ← صفر فروقات، ثم تعديل (12.5٪ كانون2←آذار + أيام) ← تطبيق ← بند واحد بالفترة ← إرجاع بالأداة نفسها = الأصل', $ok114, $why114);
+
+/* =====================================================================
+ * 115) 🎓 الترسيم الحكمي بالملاك بعد سنتين تعاقد (2026-09-13 «إذا صرلو الأستاذ سنتين بالمدرسة لازم تالت سنة يصير حكماً بالملاك تلقائياً
+ *      وطبّق عليه كل الدرجات حسب القوانين والنسب المئوية المعطاة للملاك بنفس المدرسة — وبس افتح السنة يطلعلي مساج بالأسماء ويكون عندي
+ *      خيار وافق أو ما وافق»): includes/cadre_due.php (المرشَّحون = متعاقد تقاضى راتباً بالسنتين السابقتين بمدرسته ودخلها قبل 1/11 من Y1−2 ·
+ *      titularizeContractTeacher · قرارات cadre_due بجدول compliance_decisions) + صفحة مراجعة قبل الفتح بopen_year.php + بطاقة بلوحة القيادة
+ *      وبصفحة فتح السنة + صمام cadre_from_sy بالمحرّك (سنوات التعاقد السابقة لا تُلمَس) + ملف الأستاذ: صار ملاكاً بيده ⇒ بناء الدرجات.
+ * =================================================================== */
+require_once $PROJ . '/includes/cadre_due.php';
+$cd115 = (string)file_get_contents($PROJ . '/includes/cadre_due.php'); $oy115 = (string)file_get_contents($PROJ . '/pages/open_year.php');
+$ix115 = (string)file_get_contents($PROJ . '/index.php'); $pc115 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$hd115 = (string)file_get_contents($PROJ . '/includes/header.php'); $em115 = (string)file_get_contents($PROJ . '/pages/employees.php');
+check('الترسيم الحكمي: الوحدة (مرشَّحون/ترسيم/قرارات/مساج/مراجعة) + مراجعة قبل الفتح بopen_year (cadre_reviewed) + تنفيذ بعد الفتح + بطاقة لوحة القيادة وفتح السنة + صمام cadre_from_sy بالمحرّك وrecalc + تركيب ذاتي بالهيدر + قاعدة cadre_due بالتقرير + ملف الأستاذ يبني الدرجات لمن صار ملاكاً بيده',
+      function_exists('cadreDueCandidates') && function_exists('titularizeContractTeacher') && function_exists('handleCadreDuePost') && function_exists('renderCadreDuePending') && function_exists('renderCadreDueReview') && function_exists('schoolCadrePercent')
+      && strpos($oy115, "empty(\$_POST['cadre_reviewed'])") !== false && strpos($oy115, 'renderCadreDueReview($cdCands, $newYear, $hidden)') !== false
+      && strpos($oy115, 'titularizeContractTeacher($db, (int)$c[\'id\'], $newYear, $whoCd)') !== false && strpos($oy115, "cadreDueRecordDecision(\$db, \$c, \$newYear, 'rejected'") !== false
+      && strpos($oy115, 'handleCadreDuePost($db, BASE_URL . \'pages/open_year.php#cadreDue\')') !== false && strpos($oy115, 'renderCadreDuePending($cdPend, $cdSy, false') !== false
+      && strpos($ix115, 'handleCadreDuePost($db, BASE_URL . \'index.php#cadreDue\')') !== false && strpos($ix115, 'renderCadreDuePending($homeCd, $homeCdSy, true') !== false
+      && strpos($pc115, "\$cfs = (string)(\$this->employee['cadre_from_sy'] ?? '')") !== false && strpos($pc115, 'SELECT cadre_from_sy FROM employees WHERE id = ') !== false
+      && strpos($hd115, 'cadreDueEnsureColumns();') !== false && isset(complianceRules()['cadre_due'])
+      && strpos($em115, '$becameCadre = (') !== false && strpos($cd115, "isSchoolYearLocked((int)\$emp['school_id'], \$sy)") !== false
+      && strpos($cd115, "buildLegalGradeHistory(\$empId, sprintf('%04d-09-30', \$y2), false, true)") !== false && strpos($cd115, 'recalcEmployeeYear($empId, $sy)') !== false);
+// تجربة حيّة تُرجَع بالكامل (لقطة + استرجاع): مرشَّح حقيقي لسنة 2026-2027 ← ترسيم ← ملاك من 1/10 + السلسلة + الدرجات (دخول + فورية لغير التعليمية بتشرين + 4 بكانون)
+// + نسبة المدرسة (إن وُجدت) + سنواته السابقة بالمليم كما كانت + إعادة حساب 2025-2026 كملاك ممنوعة (الصمام) + مطابق للقانون + لا تكرار + قرار مسجَّل
+$why115 = ''; $ok115 = false;
+try {
+    require_once $PROJ . '/includes/payroll_calculator.php';
+    $sy115 = '2026-2027';
+    $cands115 = cadreDueCandidates($db, $sy115, null, false, false);
+    $c115 = null; foreach ($cands115 as $c) if ($c['can'] && !isSchoolYearLocked((int)$c['school_id'], $sy115)) { $c115 = $c; break; }
+    if (!$c115) { $ok115 = true; $why115 = 'لا مرشَّح (' . count($cands115) . ')'; }
+    else {
+        $id115 = (int)$c115['id'];
+        $snapE = $db->query("SELECT * FROM employees WHERE id = $id115")->fetch(PDO::FETCH_ASSOC);
+        $snapG = $db->query("SELECT * FROM employee_grade_history WHERE employee_id = $id115")->fetchAll(PDO::FETCH_ASSOC);
+        $snapB = $db->query("SELECT * FROM employee_bonuses WHERE employee_id = $id115")->fetchAll(PDO::FETCH_ASSOC);
+        $snapM = $db->query("SELECT * FROM monthly_salaries WHERE employee_id = $id115")->fetchAll(PDO::FETCH_ASSOC);
+        $prevHash = fn() => md5(json_encode($db->query("SELECT * FROM monthly_salaries WHERE employee_id = $id115 AND school_year < '$sy115' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC)));
+        $h0 = $prevHash();
+        try {
+            $r = titularizeContractTeacher($db, $id115, $sy115, 'regcheck');
+            $e = $db->query("SELECT employee_type, titularization_date, salary_input_mode, contract_salary_lbp, base_salary_usd, current_grade, cadre_from_sy FROM employees WHERE id = $id115")->fetch(PDO::FETCH_ASSOC);
+            $gh = $db->query("SELECT change_date, reason, delta FROM employee_grade_history WHERE employee_id = $id115 ORDER BY change_date, id")->fetchAll(PDO::FETCH_ASSOC);
+            $nTit = count(array_filter($gh, fn($g) => $g['reason'] === 'titularization' && $g['change_date'] === '2026-10-01'));
+            $nOrd = count(array_filter($gh, fn($g) => $g['reason'] === 'biennial_promotion' && $g['change_date'] === '2026-10-01'));
+            $excJan = array_sum(array_map(fn($g) => (float)$g['delta'], array_filter($gh, fn($g) => $g['change_date'] === '2027-01-01' && $g['reason'] !== 'manual')));
+            $mOct = $db->query("SELECT grade_at_month, base_plus_echelon_lbp, prime_fixe_lbp FROM monthly_salaries WHERE employee_id = $id115 AND year = 2026 AND month = 10")->fetch(PDO::FETCH_ASSOC);
+            $mJan = $db->query("SELECT grade_at_month FROM monthly_salaries WHERE employee_id = $id115 AND year = 2027 AND month = 1")->fetch(PDO::FETCH_ASSOC);
+            $pctRows = $db->query("SELECT amount FROM employee_bonuses WHERE employee_id = $id115 AND school_year = '$sy115' AND bonus_type = 'prime_fixe' AND value_type = 'percent' AND is_active = 1")->fetchAll(PDO::FETCH_COLUMN);
+            $okPct = $c115['pct'] ? (count($pctRows) === 1 && abs((float)$pctRows[0] - (float)$c115['pct']['pct']) < 0.01) : true;
+            $h1 = $prevHash();
+            recalcEmployeeYear($id115, '2025-2026'); (new PayrollCalculator($id115, 11, 2025))->calculateAndSave();
+            $h2 = $prevHash();
+            $law = lawConsistencyCheckOne($id115);
+            $again = applyLegalGradesForNewYear($db, $id115, 2026, 2027);
+            $dec = $db->query("SELECT decision FROM compliance_decisions WHERE item_key = 'cadre_due|$id115|$sy115'")->fetchColumn();
+            $stillCand = in_array($id115, array_map(fn($x) => $x['id'], cadreDueCandidates($db, $sy115, null, false, false)), true);
+            $ok115 = $e['employee_type'] === 'enseignant_titulaire' && $e['titularization_date'] === '2026-10-01' && $e['salary_input_mode'] === 'percent_of_lbp'
+                  && (float)$e['contract_salary_lbp'] == 0 && (float)$e['base_salary_usd'] == 0 && $e['cadre_from_sy'] === $sy115
+                  && $nTit === 1 && $nOrd === ($c115['immediate'] ? 1 : 0) && abs($excJan - 4.0) < 0.01
+                  && $mOct && (float)$mOct['grade_at_month'] == (float)$c115['grade_start'] + ($c115['immediate'] ? 1 : 0) && (float)$mOct['base_plus_echelon_lbp'] > 0
+                  && $mJan && (float)$mJan['grade_at_month'] == (float)$c115['grade_start'] + ($c115['immediate'] ? 1 : 0) + 4
+                  && $okPct && $h0 === $h1 && $h0 === $h2 && $law['ok'] && $again === 0 && $dec === 'approved' && !$stillCand
+                  && abs((float)$e['current_grade'] - ((float)$c115['grade_start'] + ($c115['immediate'] ? 1 : 0))) < 0.01;
+            $why115 = "emp=$id115 {$c115['name']} dip={$c115['diploma']} gs={$c115['grade_start']} imm={$c115['immediate']} tit=$nTit ord=$nOrd jan=$excJan oct=" . json_encode($mOct) . " janG=" . ($mJan['grade_at_month'] ?? '?')
+                    . " pct=" . json_encode($pctRows) . '/' . ($c115['pct']['pct'] ?? '-') . " prevSame=" . var_export($h0 === $h1 && $h0 === $h2, true) . " law=" . var_export($law['ok'], true) . " again=$again dec=$dec cand=" . var_export($stillCand, true);
+        } finally {
+            // 🔁 استرجاع كامل
+            $db->prepare("DELETE FROM employees WHERE id = ?")->execute([$id115]);
+            $cols = '`' . implode('`,`', array_keys($snapE)) . '`';
+            $db->prepare("INSERT INTO employees ($cols) VALUES (" . implode(',', array_fill(0, count($snapE), '?')) . ")")->execute(array_values($snapE));
+            foreach ([['employee_grade_history', $snapG], ['employee_bonuses', $snapB], ['monthly_salaries', $snapM]] as [$tbl, $rows]) {
+                $db->prepare("DELETE FROM $tbl WHERE employee_id = ?")->execute([$id115]);
+                foreach ($rows as $row) { $cc = '`' . implode('`,`', array_keys($row)) . '`'; $db->prepare("INSERT INTO $tbl ($cc) VALUES (" . implode(',', array_fill(0, count($row), '?')) . ")")->execute(array_values($row)); }
+            }
+            $db->prepare("DELETE FROM compliance_decisions WHERE item_key = ?")->execute(["cadre_due|$id115|$sy115"]);
+            foreach (['_emp_bk_cadre_due' => 'id', '_gh_bk_cadre_due' => 'employee_id', '_bon_bk_cadre_due' => 'employee_id'] as $bt => $bc) { try { $db->exec("DELETE FROM $bt WHERE $bc = $id115"); } catch (Throwable $t) {} }
+            try { $db->exec("DELETE FROM audit_log WHERE action = 'cadre_titularize' AND record_id = $id115"); } catch (Throwable $t) {}
+        }
+        $eR = $db->query("SELECT * FROM employees WHERE id = $id115")->fetch(PDO::FETCH_ASSOC);
+        $ok115 = $ok115 && $eR == $snapE && (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = $id115")->fetchColumn() === count($snapG)
+              && (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $id115")->fetchColumn() === count($snapM);
+        $why115 .= ' restored=' . var_export($eR == $snapE, true);
+    }
+} catch (Throwable $e) { $why115 = $e->getMessage(); }
+check('الترسيم الحكمي (تجربة حيّة تُرجَع): متعاقد أكمل سنتين ← ملاك من 1/10/2026 بالسلسلة + الدرجات بالقانون (دخول + فورية + 4 بكانون) + نسبة المدرسة + سنواته السابقة بالمليم + الصمام يمنع إعادة حساب 2025-2026 + مطابق للقانون + لا تكرار + قرار مسجَّل', $ok115, $why115);
+// صفحة المراجعة والمساج تُرسمان بلا خطأ (بمخزن مؤقّت) + صفحة فتح السنة ولوحة القيادة تفتحان
+$okR115 = false; $whyR115 = '';
+try {
+    $cs = cadreDueCandidates($db, '2026-2027', null, false, false);
+    ob_start(); renderCadreDueReview(array_slice($cs, 0, 3), '2026-2027', ['action' => 'open', 'new_year' => '2026-2027', 'school_ids' => [2, 4]]); $h1 = ob_get_clean();
+    ob_start(); renderCadreDuePending(array_slice($cs, 0, 3), '2026-2027', true, ''); $h2 = ob_get_clean();
+    $pg = renderPage('pages/open_year.php', [], []); $ix = renderPage('index.php', [], []);
+    $okR115 = (!$cs || (strpos($h1, 'cadre_reviewed') !== false && strpos($h1, 'name="cadre_ok[]"') !== false && strpos($h1, 'name="school_ids[]" value="4"') !== false
+                        && strpos($h2, 'cd_approve') !== false && strpos($h2, 'cd_reject') !== false))
+             && strpos($pg, 'FATAL') === false && strpos($pg, 'الملاك حكماً') !== false && strpos($ix, 'FATAL') === false;
+    $whyR115 = 'cands=' . count($cs) . ' review=' . strlen($h1) . ' pending=' . strlen($h2) . ' open_year=' . strlen($pg) . ' index=' . strlen($ix);
+} catch (Throwable $e) { $whyR115 = $e->getMessage(); }
+check('الترسيم الحكمي: صفحة المراجعة (صناديق + حقول الفتح المخفيّة) والمساج (وافق/لا) يُرسمان + open_year وindex بلا Fatal', $okR115, $whyR115);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

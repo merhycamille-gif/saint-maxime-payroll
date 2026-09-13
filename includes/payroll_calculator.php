@@ -547,6 +547,13 @@ class PayrollCalculator {
      * Save calculation to database
      */
     public function calculateAndSave() {
+        // 🎓 صمام المرسَّم من متعاقد (2026-09-13): سنواته **قبل** سنة ترسيمه (cadre_from_sy) كانت رواتب متعاقد مخزّنة —
+        // لا يُعاد حسابها بمحرّك الملاك من أي مسار (إعادة حساب كل السنين/فتح سنة قديمة/شفاء) حتى لا تُستبدَل بالسلسلة.
+        $cfs = (string)($this->employee['cadre_from_sy'] ?? '');
+        if (preg_match('/^(\d{4})-\d{4}$/', $cfs, $cm)) {
+            $rowRankC = ($this->month >= 10) ? $this->year : $this->year - 1;
+            if ($rowRankC < (int)$cm[1]) return $this->calculate(); // بلا أي حفظ — سنة كان فيها متعاقداً
+        }
         // 🔴 قاعدة التارك (§١٠): مَن له تاريخ ترك لا يُحفَظ له راتب في سنة دراسية تبدأ
         // **بعد** تاريخ تركه — من أي مسار كان (فتح سنة/إعادة حساب/زرّ احتساب/شفاء ذاتي).
         // يبقى راتبه يُحسب لكل أشهر سنة تركه حتى 30-9 (رتبة السنة نفسها مسموحة).
@@ -692,6 +699,9 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
         if ($hireSy && $hireSy > $sy) $sy = $hireSy; // مقارنة نصّية صحيحة لصيغة YYYY-YYYY
     }
     if ($sy === 'all' || !preg_match('/^(\d{4})-(\d{4})$/', (string)$sy, $mm)) return 0;
+    // 🎓 المرسَّم من متعاقد: سنواته قبل سنة ترسيمه لا تُحسب (الصمام نفسه بـcalculateAndSave — هنا اختصار)
+    try { $cfsR = (string)$db->query("SELECT cadre_from_sy FROM employees WHERE id = " . (int)$employeeId)->fetchColumn(); } catch (Throwable $ex) { $cfsR = ''; }
+    if (preg_match('/^(\d{4})-\d{4}$/', $cfsR, $cfm) && (int)$mm[1] < (int)$cfm[1]) return 0;
 
     if (!$schoolYear) {
         $others = [];

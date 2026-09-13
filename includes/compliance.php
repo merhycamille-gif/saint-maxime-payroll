@@ -77,6 +77,7 @@ function complianceRules(): array {
         'no_diploma'     => ['Sans diplôme',               'أستاذ ملاك بلا شهادة بملفه (يُفترض قسم ثاني)',        '#64748b'],
         'dupes'          => ['Doublon',                    'موظفان فاعلان بنفس الاسم بنفس المدرسة',               '#64748b'],
         'rate_missing'   => ['Taux manquant',              'شهر بلا سعر صرف مسجّل',                               '#64748b'],
+        'cadre_due'      => ['Titularisation d\'office (2 ans)', 'متعاقد أكمل سنتين بالمدرسة — يصير بالملاك حكماً (قراره بلوحة القيادة/فتح السنة)', '#6d28d9'],
     ];
 }
 

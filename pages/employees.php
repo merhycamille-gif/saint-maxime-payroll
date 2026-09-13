@@ -438,7 +438,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     // الشهادة القديمة (لكشف تغييرها عند التعديل وإعادة ضبط التدرّج)
     $oldDiploma = null; $oldDates = null;
     if ($action === 'edit' && $id) {
-        $stOld = $db->prepare("SELECT diploma, hire_date, titularization_date, tenure_confirmation_date FROM employees WHERE id = ? AND school_id = ?");
+        $stOld = $db->prepare("SELECT diploma, hire_date, titularization_date, tenure_confirmation_date, employee_type FROM employees WHERE id = ? AND school_id = ?");
         $stOld->execute([$id, currentSchoolId()]);
         $oldRow = $stOld->fetch(PDO::FETCH_ASSOC) ?: [];
         $oldDiploma = $oldRow['diploma'] ?? null;
@@ -522,6 +522,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             // 🔴 (2026-08-29، قصة شيرا العاقوري) كان الشرط `$oldDiploma !== null` يُسقِط حالة «الشهادة كانت فاضية
             // ثم عُبّيت» فلا تُعاد الدرجات ولا الراتب رغم رسالة الحفظ — الفراغ يُعامَل كقيمة تتغيّر.
             $diplomaChanged = ((string)$oldDiploma !== (string)$data['diploma']);
+            // 🎓 (2026-09-13) صار ملاكاً بيد المستخدم (كان متعاقداً/موظفاً) وبلا أي سجلّ درجات ⇒ تُبنى درجاته بالقانون كالجديد
+            $becameCadre = ($oldDates && ($oldDates['employee_type'] ?? '') !== 'enseignant_titulaire' && $data['employee_type'] === 'enseignant_titulaire'
+                            && (int)$db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = " . (int)$id)->fetchColumn() === 0);
+            if ($becameCadre) $diplomaChanged = true; // نفس مسار «تغيّرت الشهادة»: درجة الدخول من الشهادة + بناء + إعادة حساب
             $datesChanged = ($oldDates && (
                 ($oldDates['titularization_date'] ?? null) != $data['titularization_date'] ||
                 ($oldDates['hire_date'] ?? null) != $data['hire_date'] ||

@@ -5,6 +5,7 @@ require_once __DIR__ . '/includes/payroll_calculator.php'; // recalcEmployeeYear
 require_once __DIR__ . '/includes/age64.php';               // أدوات تنبيه بلوغ الـ64 (مشتركة)
 require_once __DIR__ . '/includes/hours_reduction.php';     // 🕐 مساج تناقص ساعات التدريس «قرار مطلوب» بكل مدرسة
 require_once __DIR__ . '/includes/compliance.php';          // ⚖️ تقرير المخالفات والتصحيحات «موافق/لا» عند كل فتح (طلبه 2026-09-04)
+require_once __DIR__ . '/includes/cadre_due.php';           // 🎓 مساج «متعاقدون أكملوا سنتين — يصيرون بالملاك حكماً» وافق/لا (2026-09-13)
 requireLogin();
 
 $currentPage = 'dashboard';
@@ -18,7 +19,12 @@ handleAge64Post($db, BASE_URL . 'index.php');
 handleHoursReductionPost($db, BASE_URL . 'index.php');
 // ⚖️ قرارات تقرير المخالفات (موافق — صحّح / لا — اتركه) — تُعالَج وتعيد التوجيه للرئيسية
 handleCompliancePost($db, BASE_URL . 'index.php');
+// 🎓 قرارات الترسيم الحكمي بالملاك (وافق — رسّمه / لا — يبقى متعاقداً) — تُعالَج وتعيد التوجيه للرئيسية
+handleCadreDuePost($db, BASE_URL . 'index.php#cadreDue');
 $homeComp = canEdit() ? complianceBuild($db) : null; // التقرير يُبنى عند كل فتح للوحة القيادة
+// 🎓 المتعاقدون الذين أكملوا سنتين بالسنة الحالية للبرنامج (أو المختارة إن كانت أحدث) — بانتظار قراره
+$homeCdSy = activeSchoolYear(); if ($homeCdSy === 'all' || strcmp($homeCdSy, currentSchoolYear()) < 0) $homeCdSy = currentSchoolYear();
+$homeCd = canEdit() ? cadreDueCandidates($db, $homeCdSy, null, false, true) : [];
 
 // Stats (مقيّدة بالمدرسة الحالية — أو كل المدارس للمدير العام)
 // 🔢 الأعداد حسب **السنة الدراسية المختارة** + المدرسة/المدارس المختارة (نفس فلتر السنة المستعمَل بكل البرنامج).
@@ -190,6 +196,8 @@ $dashSections = [
 <?php endforeach; ?>
 
 <?php if ($homeComp) renderCompliancePending($homeComp, true); ?>
+
+<?php renderCadreDuePending($homeCd, $homeCdSy, true, BASE_URL . 'index.php'); ?>
 
 <?php renderHoursReductionPending($homeHrPending, $homeHrSy, true); ?>
 
