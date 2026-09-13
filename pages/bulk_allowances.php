@@ -289,18 +289,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
                         $touched = true;
                     }
                 }
-                // (ب) المبلغ الثابت لكل السنة — خانة مستقلة (يجتمع مع النسبة إن وُجدت: المحرّك يجمعهما)
-                if (array_key_exists($k, $vals)) {
-                    $raw = $norm($vals[$k]); $orig = $norm($vals[$k . '_orig'] ?? '');
-                    $cur = (($vals[$k . '_cur'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP';
-                    $origCur = (($vals[$k . '_origcur'] ?? 'LBP') === 'USD') ? 'USD' : 'LBP';
-                    if ($raw !== '' && !($orig !== '' && (float)$raw == (float)$orig && $cur === $origCur)) {
-                        $val = (float)$raw;
+                // (ب) المبلغ الثابت لكل السنة — خانتان: جزء بالليرة + جزء بالدولار (يجتمعان معاً ومع النسبة: المحرّك يجمعهم)
+                // 💵 (2026-09-13 «كل أستاذ بدي أعطيه مبلغ معيّن بالدولار وبالليرة»): سطر لكل عملة. فاضي = يبقى كما هو، 0 = شيله.
+                if (array_key_exists($k . '_lbp', $vals) || array_key_exists($k . '_usd', $vals)) {
+                    $fin = []; $chg = false;
+                    foreach (['lbp' => 'LBP', 'usd' => 'USD'] as $ck => $cc) {
+                        $raw = $norm($vals[$k . '_' . $ck] ?? ''); $orig = $norm($vals[$k . '_' . $ck . '_orig'] ?? '');
+                        $fin[$cc] = ($raw === '') ? (($orig === '') ? 0.0 : (float)$orig) : (float)$raw;
+                        if ($raw !== '' && !($orig !== '' && (float)$raw == (float)$orig) && !($orig === '' && (float)$raw == 0)) $chg = true;
+                    }
+                    if ($chg) {
                         $delI->execute([$eid, $bt, $schoolYear, 'amount']);
-                        if ($val > 0) {
-                            $w = null; $cur = sanitizeAmountCurrency($val, $cur, $w); if ($w) $warns[] = $w;
-                            $insI->execute([$eid, $bt, $schoolYear, $val, 'amount', $cur]);
-                        }
+                        // حارس العملة: رقم ضخم بخانة الدولار = ليرة كُتبت بالخانة الغلط → يُضاف لجزء الليرة
+                        if ($fin['USD'] > 0) { $w = null; if (sanitizeAmountCurrency($fin['USD'], 'USD', $w) === 'LBP') { $fin['LBP'] += $fin['USD']; $fin['USD'] = 0.0; $warns[] = $w; } }
+                        foreach (['LBP', 'USD'] as $cc) if ($fin[$cc] > 0) $insI->execute([$eid, $bt, $schoolYear, $fin[$cc], 'amount', $cc]);
                         $touched = true;
                     }
                 }
@@ -366,9 +368,11 @@ if ($hasScope && $preview) {
     foreach ($qi as $r) {
         $k = ['prime_fixe'=>'prime','aide_complementaire'=>'aide','transport_complement'=>'trans'][$r['bonus_type']];
         $e = (int)$r['employee_id'];
-        if (!isset($indivCur[$e][$k])) $indivCur[$e][$k] = ['pct' => null, 'amount' => null, 'cur' => 'LBP'];
+        // 💵 (2026-09-13) المبلغ بجزأين: ليرة ودولار معاً لنفس الشخص (كانا يُجمعان بخانة واحدة بعملة الأخير — غلط)
+        if (!isset($indivCur[$e][$k])) $indivCur[$e][$k] = ['pct' => null, 'lbp' => null, 'usd' => null];
         if ($r['value_type'] === 'percent') { $indivCur[$e][$k]['pct'] = ($indivCur[$e][$k]['pct'] ?? 0) + (float)$r['amount']; }
-        else { $indivCur[$e][$k]['amount'] = ($indivCur[$e][$k]['amount'] ?? 0) + (float)$r['amount']; $indivCur[$e][$k]['cur'] = $r['currency']; }
+        elseif ($r['currency'] === 'USD') { $indivCur[$e][$k]['usd'] = ($indivCur[$e][$k]['usd'] ?? 0) + (float)$r['amount']; }
+        else { $indivCur[$e][$k]['lbp'] = ($indivCur[$e][$k]['lbp'] ?? 0) + (float)$r['amount']; }
     }
 }
 
@@ -427,8 +431,9 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
 .ba-editor select[name$="[from]"], .ba-editor select[name$="[to]"] { min-width:100px; }
 .ind-cell { display:inline-flex; align-items:center; gap:4px; }
 .ind-cell .ind-pct { width:58px; padding:4px 6px; text-align:center; }
-.ind-cell .ind-amt { width:128px; padding:4px 8px; text-align:left; }
-.ind-cell .ind-cur { width:60px; padding:4px; }
+.ind-cell .ind-amt { width:118px; padding:4px 8px; text-align:left; }
+.ind-cell .ind-usd { width:84px; }
+.ind-unit { font-size:11.5px; color:#64748b; font-weight:700; }
 .ind-plus { color:#94a3b8; font-weight:800; }
 .ba-step { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px dashed #e2e8f0; }
 .ba-step:last-child { border-bottom:none; }
@@ -604,7 +609,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                         <span class="ba-hint">قيمة بتتغيّر بنص السنة عند فئة = طبّق مرّتين بفترتين مختلفتين. الفترة قدّام كل فئة (افتراضياً كل السنة تشرين ← أيلول).</span>
                         <div style="margin-top:10px"><button type="submit" class="btn btn-primary" id="opBtn" style="font-weight:800" data-confirm="تطبيق؟"><i class="fas fa-check"></i> <span id="opBtnTxt">طبّق</span> / Appliquer</button></div>
                     </div></div>
-                    <div class="ba-warn" style="margin-top:6px" id="opWarn">⚠️ الزرّ يستبدل <b id="opWarnType">الأجر الإضافي</b> الحالي عند <b>كل</b> موظفي كل فئة مؤشَّرة (كل فتراته) بسطرها. الفئات غير المؤشَّرة والأنواع التانية ما بتتأثّر. شخص بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت».</div>
+                    <div class="ba-warn" style="margin-top:6px" id="opWarn">⚠️ الزرّ يستبدل <b id="opWarnType">الأجر الإضافي</b> الحالي عند <b>كل</b> موظفي كل فئة مؤشَّرة (كل فتراته) بسطرها. الفئات غير المؤشَّرة والأنواع التانية ما بتتأثّر. شخص بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت». <b>كل متعاقد إلو رقمه</b> (مبلغ بالدولار و/أو بالليرة)؟ ما تستعمل هالبطاقة — زرّ <b>«مبالغ فردية (لكل واحد)»</b> تحت، أو <b>إكسل</b>.</div>
                 </form>
                 <script>
                 (function(){
@@ -689,7 +694,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <li><b>«+ بند جديد»</b> (لأي نوع/فئة/فترة) ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
                 <li><b>النسبة ٪</b> بتنحسب من أساس الراتب بعد التدرّج (÷<?= e(officialUsdRateLbl()) ?> ← × سعر الشهر) وبتتحرّك مع الدرجة — منطقية للملاك. <b>المبلغ الثابت</b> بالليرة أو بالدولار — للمتعاقدين والموظفين أو لأي زيادة ثابتة.</li>
                 <li><b>نسبة + مبلغ ثابت مع بعض</b> (مثلاً 45٪ + 2,000,000 ثابت): حطّهم <b>سطرين بنفس النافذة</b> وكبس طبّق مرّة وحدة. (لو طبّقتهم بمرّتين منفصلتين، التانية بتشيل الأولى لأنها من نفس النوع.)</li>
-                <li><b>كل واحد إلو رقمه</b> (المتعاقدون، أو أستاذ ملاك بدّك تعطيه شي خاص): زرّ <b>«مبالغ فردية (لكل واحد)»</b> ← جدول بأسماء الفئة، قدّام كل اسم ولكل نوع خانتان <b>نسبة ٪ + مبلغ ثابت</b> — عبّي وحدة أو الاتنين واحفظ مرّة وحدة. فاضي = ما بيتغيّر، 0 = شيله.</li>
+                <li><b>كل واحد إلو رقمه</b> (المتعاقدون، أو أستاذ ملاك بدّك تعطيه شي خاص): زرّ <b>«مبالغ فردية (لكل واحد)»</b> ← جدول بأسماء الفئة، قدّام كل اسم ولكل نوع ثلاث خانات <b>نسبة ٪ + مبلغ بالليرة + مبلغ بالدولار</b> — عبّي وحدة أو أكثر (متعاقد بياخد جزء بالدولار وجزء بالليرة = عبّي الخانتين) واحفظ مرّة وحدة. فاضي = ما بيتغيّر، 0 = شيله.</li>
                 <li>الجدول تحت = <b>البنود السارية</b>: <i class="fas fa-pen" style="color:#1d4ed8"></i> تعديل سطر لحاله · <i class="fas fa-trash" style="color:#b91c1c"></i> حذفه. <b>«نقل يومي»</b> للمتعاقدين حسب أيام الحضور. <b>استثناء لشخص واحد</b>: من ملفه ← تبويب «المالي».</li>
             </ol>
         </details>
@@ -809,14 +814,14 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
 
 <!-- ═══ مودال: مبالغ فردية لكل موظف ═══ -->
 <div class="ba-overlay" id="baModalIndiv">
-  <div class="ba-modal" style="max-width:1100px">
+  <div class="ba-modal" style="max-width:1340px">
     <div class="ba-modal-head"><h4><i class="fas fa-user-pen"></i> مبالغ فردية — لكل موظف رقمه</h4><button type="button" class="ba-x" onclick="baClose('baModalIndiv')">✕</button></div>
     <form method="POST" id="indivForm">
         <?= csrfField() ?>
         <input type="hidden" name="action" value="apply_individual">
         <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><?= catHidden($validCats) ?>
         <div class="ba-modal-body">
-            <div class="ba-hint" style="margin-bottom:6px">قدّام كل اسم ولكل نوع خانتان: <b>نسبة ٪</b> (من أساس الراتب بعد التدرّج) <b>+ مبلغ ثابت</b> (ليرة أو دولار) — عبّي وحدة أو الاتنين، والبرنامج بيجمعهم. القيم <b>شهرية</b>. <b>فاضي</b> = ما بيتغيّر · <b>0</b> = شيله. الخانات تعرض قيم «كل السنة»؛ لتفاصيل فترات شخص: من ملفه ← تبويب «المكافآت».</div>
+            <div class="ba-hint" style="margin-bottom:6px">قدّام كل اسم ولكل نوع ثلاث خانات: <b>نسبة ٪</b> (من أساس الراتب بعد التدرّج) <b>+ مبلغ بالليرة + مبلغ بالدولار</b> — عبّي وحدة أو الاتنين أو التلاتة، والبرنامج بيجمعهم (مثلاً متعاقد: 100 $ + 5,000,000 ل.ل بالشهر). القيم <b>شهرية</b>. <b>فاضي</b> = ما بيتغيّر · <b>0</b> = شيله. الخانات تعرض قيم «كل السنة»؛ لتفاصيل فترات شخص: من ملفه ← تبويب «المكافآت».</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px">
                 <strong>📅 الفترة لكل ما تحفظه الآن:</strong> <span>من</span><?= baMonthSel('ind_from', 10, 'style="max-width:140px"') ?> <span>إلى</span><?= baMonthSel('ind_to', 9, 'style="max-width:140px"') ?>
                 <span class="ba-hint">افتراضياً كل السنة (تشرين ← أيلول). فترة أقصر = يُضاف/يُستبدل بند لهذه الفترة فقط.</span>
@@ -831,8 +836,8 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <span class="ba-hint" id="baIndivCount"></span>
             </div>
             <div style="overflow:auto;max-height:60vh">
-            <table class="table ba-editor" id="indivTable" style="font-size:13px;min-width:1000px">
-                <thead><tr><th>#</th><th>الاسم</th><th>➕ الأجر الإضافي <small>(٪ + ثابت)</small></th><th>💰 مكافأة ومساعدة <small>(٪ + ثابت)</small></th><th>🚌 نقل شهري <small>(٪ + ثابت)</small></th></tr></thead>
+            <table class="table ba-editor" id="indivTable" style="font-size:13px;min-width:1240px">
+                <thead><tr><th>#</th><th>الاسم</th><th>➕ الأجر الإضافي <small>(٪ + ل.ل + $)</small></th><th>💰 مكافأة ومساعدة <small>(٪ + ل.ل + $)</small></th><th>🚌 نقل شهري <small>(٪ + ل.ل + $)</small></th></tr></thead>
                 <tbody>
                 <?php $ri = 0; $lastEty = null; foreach ($preview as $pr): $ri++; $eid = (int)$pr['id']; $nm = trim(($pr['first_name_ar'] ?: $pr['first_name_fr']) . ' ' . ($pr['last_name_ar'] ?: $pr['last_name_fr']));
                       if ($pr['employee_type'] !== $lastEty): $lastEty = $pr['employee_type']; ?>
@@ -843,16 +848,18 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     <td style="white-space:nowrap"><strong><?= e($nm) ?></strong> <small class="text-muted"><?= e($catLblI[$pr['employee_type']] ?? '') ?></small></td>
                     <?php foreach (['prime','aide','trans'] as $k): $c = $indivCur[$eid][$k] ?? null;
                         $fmtN = fn($v) => ($v === null) ? '' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
-                        $vp = $fmtN($c['pct'] ?? null); $va = $fmtN($c['amount'] ?? null); $cu = $c['cur'] ?? 'LBP';
-                        if ($va !== '') { $vaP = explode('.', $va); $vaP[0] = number_format((float)$vaP[0]); $va = implode('.', $vaP); } ?>
+                        $fmtA = function ($v) use ($fmtN) { $s = $fmtN($v); if ($s !== '') { $p = explode('.', $s); $p[0] = number_format((float)$p[0]); $s = implode('.', $p); } return $s; };
+                        $vp = $fmtN($c['pct'] ?? null); $vl = $fmtA($c['lbp'] ?? null); $vu = $fmtA($c['usd'] ?? null); ?>
                     <td style="white-space:nowrap">
                         <span class="ind-cell">
                             <input type="text" inputmode="decimal" name="ind[<?= $eid ?>][<?= $k ?>_pct]" value="<?= e($vp) ?>" placeholder="٪" title="نسبة ٪ من الأساس بعد التدرّج" class="form-control ind-pct" dir="ltr">
                             <input type="hidden" name="ind[<?= $eid ?>][<?= $k ?>_pct_orig]" value="<?= e($vp) ?>">
                             <span class="ind-plus">+</span>
-                            <input type="text" inputmode="decimal" name="ind[<?= $eid ?>][<?= $k ?>]" value="<?= e($va) ?>" placeholder="مبلغ ثابت" title="مبلغ ثابت شهري" class="form-control ind-amt" dir="ltr">
-                            <select name="ind[<?= $eid ?>][<?= $k ?>_cur]" class="form-select ind-cur"><option value="LBP" <?= $cu==='LBP'?'selected':'' ?>>ل.ل</option><option value="USD" <?= $cu==='USD'?'selected':'' ?>>$</option></select>
-                            <input type="hidden" name="ind[<?= $eid ?>][<?= $k ?>_orig]" value="<?= e($va) ?>"><input type="hidden" name="ind[<?= $eid ?>][<?= $k ?>_origcur]" value="<?= e($cu) ?>">
+                            <input type="text" inputmode="decimal" name="ind[<?= $eid ?>][<?= $k ?>_lbp]" value="<?= e($vl) ?>" placeholder="ل.ل" title="الجزء بالليرة (شهري)" class="form-control ind-amt" dir="ltr"><span class="ind-unit">ل.ل</span>
+                            <input type="hidden" name="ind[<?= $eid ?>][<?= $k ?>_lbp_orig]" value="<?= e($vl) ?>">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[<?= $eid ?>][<?= $k ?>_usd]" value="<?= e($vu) ?>" placeholder="$" title="الجزء بالدولار (شهري)" class="form-control ind-amt ind-usd" dir="ltr"><span class="ind-unit">$</span>
+                            <input type="hidden" name="ind[<?= $eid ?>][<?= $k ?>_usd_orig]" value="<?= e($vu) ?>">
                         </span>
                         <?php if (!empty($indivPer[$eid][$k])): ?>
                             <div style="font-size:11px;color:#b45309;margin-top:2px" title="بند بفترة محدّدة — يُعدَّل من ملف الموظف ← تبويب المالي">📅 فترة: <?= e(implode(' · ', $indivPer[$eid][$k])) ?></div>

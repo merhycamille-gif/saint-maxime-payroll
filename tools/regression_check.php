@@ -4509,7 +4509,7 @@ check('المكافآت الجماعية 2026-09-11/12: بطاقة «طبّق ع
 $tf0911 = (string)file_get_contents($PROJ . '/pages/teacher_form.php'); $ic0911 = (string)file_get_contents($PROJ . '/pages/info_collect.php');
 check('المكافآت 2026-09-11 «بكل البرنامج»: فورم الأستاذ الجديد فيه الأجر الإضافي + مكافأة ومساعدة بخيار (ل.ل / $ / ٪ من الأساس) والإنشاء يترجم ٪ إلى value_type=percent',
       strpos($tf0911, "'new_aide'") !== false && strpos($tf0911, 'value="PCT"') !== false
-      && strpos($tf0911, "['new_salary','new_extra','new_aide','new_transport']") !== false
+      && strpos($tf0911, "['new_salary','new_extra','new_extra2','new_aide','new_transport']") !== false // (2026-09-13) + الجزء الثاني بالعملة الأخرى
       && strpos($ic0911, "'new_aide' => 'aide_complementaire'") !== false && strpos($ic0911, "=== 'PCT') ? 'percent' : 'amount'") !== false
       && strpos($tf0911, 'name="new_from"') !== false && strpos($tf0911, 'name="new_to"') !== false
       && strpos($ic0911, "(\$nFull ? 'NULL, NULL' : \"\$nFrom, \$nTo\")") !== false);
@@ -5699,6 +5699,55 @@ try {
     $why116 = 'GET→' . substr(trim($o), 0, 80);
 } catch (Throwable $e) { $why116 = $e->getMessage(); }
 check('إرسال التقرير بالإيميل: الخادم يرفض الطلب غير الصالح برسالة JSON (لا يرسل شيئاً)', $ok116, $why116);
+
+/* =====================================================================
+ * 117) 💵 الأجر الإضافي بالدولار وبالليرة معاً لنفس الشخص (2026-09-13 «الأجر الإضافي للمتعاقدين ما بدي متل أنا حطّو ثابت ولا نسبة مئوية —
+ *      كل أستاذ بدي أعطيه مبلغ معيّن بالدولار وبالليرة»): سطر لكل عملة بنفس الفترة والمحرّك يجمعهما. بكل نقاط الإدخال:
+ *      الإكسل (العمودان G+H معاً، كان يُرفَض) + «مبالغ فردية» (خانتا ل.ل + $ بدل خانة بعملة واحدة) + ملف الأستاذ (سطران) + فورم الأستاذ الجديد (new_extra2).
+ * =================================================================== */
+$xs117 = (string)file_get_contents($PROJ . '/includes/excel_salaries.php'); $ba117 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
+$tf117 = (string)file_get_contents($PROJ . '/pages/teacher_form.php'); $ic117 = (string)file_get_contents($PROJ . '/pages/info_collect.php');
+check('الإضافي بالعملتين معاً: الإكسل لا يرفض G+H + «مبالغ فردية» خانتا ل.ل/$ (سطر لكل عملة، حارس العملة يضمّ للّيرة) + فورم الأستاذ الجديد new_extra2 يُقرأ ويُخزَّن prime_fixe + تلميح ملف الأستاذ',
+      strpos($xs117, 'بالليرة وبالدولار معاً — حدّد عملة واحدة') === false && strpos($xs117, "if (\$newAu > 0) \$lines[] = ['vt' => 'amount', 'val' => \$newAu, 'cur' => 'USD'") !== false
+      && strpos($ba117, "array_key_exists(\$k . '_lbp', \$vals) || array_key_exists(\$k . '_usd', \$vals)") !== false && strpos($ba117, 'name="ind[<?= $eid ?>][<?= $k ?>_usd]"') !== false && strpos($ba117, "['pct' => null, 'lbp' => null, 'usd' => null]") !== false
+      && strpos($ba117, "foreach (['LBP', 'USD'] as \$cc) if (\$fin[\$cc] > 0) \$insI->execute") !== false && strpos($ba117, "\$fin['LBP'] += \$fin['USD']") !== false
+      && strpos($ba117, "[\$k . '_cur']") === false
+      && strpos($tf117, "'new_extra2'") !== false && strpos($tf117, "['new_salary','new_extra','new_extra2','new_aide','new_transport']") !== false
+      && strpos($ic117, "'new_extra2' => 'prime_fixe'") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'جزء بالدولار وجزء بالليرة؟') !== false);
+// تجربة حيّة تُرجَع: متعاقد ← 100 $ + 5,000,000 ل.ل عبر الإكسل ⇒ سطران فاعلان والمخزّن بالشهر = 5,000,000 + usdToLbp(100, سعر الشهر)
+$ok117 = false; $why117 = '';
+try {
+    $v117 = $db->query("SELECT e.id, e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.exchange_rate > 0
+        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_contractuel' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+          AND e.salary_input_mode IN ('direct_usd','direct_lbp') AND (e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+        GROUP BY e.id HAVING COUNT(*) >= 12 ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$v117) { $ok117 = true; $why117 = 'لا عيّنة'; }
+    elseif (isSchoolYearLocked((int)$v117['school_id'], '2025-2026')) { $ok117 = true; $why117 = 'السنة مقفولة — تخطّي'; }
+    else {
+        $id117 = (int)$v117['id']; $sch117 = (int)$v117['school_id']; $sy117 = '2025-2026';
+        $origIds = array_map('intval', $db->query("SELECT id FROM employee_bonuses WHERE employee_id = $id117 AND bonus_type = 'prime_fixe' AND school_year = '$sy117' AND is_active = 1")->fetchAll(PDO::FETCH_COLUMN));
+        $before117 = $db->query("SELECT month, extra_lbp + prime_fixe_lbp t, net_salary_lbp n FROM monthly_salaries WHERE employee_id = $id117 AND school_year = '$sy117' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC);
+        $d117 = excelSalariesDiff($db, $sch117, $sy117, [['id' => $id117, 'pct' => '0', 'amt_lbp' => '5000000', 'amt_usd' => '100', 'from' => '', 'to' => '']]);
+        $r117 = excelSalariesApply($db, $sch117, $sy117, $d117['changes']);
+        $rows117 = $db->query("SELECT value_type, amount, currency, start_month, end_month FROM employee_bonuses WHERE employee_id = $id117 AND bonus_type = 'prime_fixe' AND school_year = '$sy117' AND is_active = 1 ORDER BY currency")->fetchAll(PDO::FETCH_ASSOC);
+        $ms117 = $db->query("SELECT month, extra_lbp + prime_fixe_lbp t, exchange_rate r FROM monthly_salaries WHERE employee_id = $id117 AND school_year = '$sy117' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC);
+        $byCur117 = []; foreach ($rows117 as $rw) $byCur117[$rw['currency']] = $rw; // العملة ENUM فترتيبها ليس أبجدياً
+        $okRows = count($rows117) === 2 && isset($byCur117['LBP'], $byCur117['USD']) && (float)$byCur117['LBP']['amount'] == 5000000 && $byCur117['LBP']['value_type'] === 'amount'
+                  && (float)$byCur117['USD']['amount'] == 100 && $byCur117['USD']['value_type'] === 'amount';
+        $okMs = count($ms117) > 0; $bad = '';
+        foreach ($ms117 as $m) { $exp = 5000000 + usdToLbp(100, (float)$m['r']); if ((int)$m['t'] !== (int)$exp) { $okMs = false; $bad = "m{$m['month']}: {$m['t']}≠$exp"; break; } }
+        // إرجاع: إطفاء أسطر التجربة + تفعيل الأصلية بأرقامها + إعادة الحساب ⇒ الأشهر بالمليم كما كانت
+        $db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = $id117 AND bonus_type = 'prime_fixe' AND school_year = '$sy117'");
+        if ($origIds) $db->exec("UPDATE employee_bonuses SET is_active = 1 WHERE id IN (" . implode(',', $origIds) . ")");
+        recalcEmployeeYear($id117, $sy117);
+        $after117 = $db->query("SELECT month, extra_lbp + prime_fixe_lbp t, net_salary_lbp n FROM monthly_salaries WHERE employee_id = $id117 AND school_year = '$sy117' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC);
+        $restored = ($before117 == $after117);
+        $ok117 = !$d117['errors'] && count($d117['changes']) === 1 && $r117['applied'] === 1 && $okRows && $okMs && $restored;
+        $why117 = "emp=$id117 school=$sch117 errors=" . count($d117['errors']) . ' rows=' . json_encode($rows117) . " okMs=" . var_export($okMs, true) . " $bad restored=" . var_export($restored, true);
+    }
+} catch (Throwable $e) { $why117 = $e->getMessage(); }
+check('الإضافي بالعملتين (تجربة حيّة تُرجَع): متعاقد ← 100 $ + 5,000,000 ل.ل بالإكسل ⇒ سطران (LBP+USD) والمخزّن كل شهر = 5,000,000 + usdToLbp(100، سعر الشهر) ⇒ إرجاع بالمليم', $ok117, $why117);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

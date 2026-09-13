@@ -130,10 +130,10 @@ require_once __DIR__ . '/../includes/header.php';
             <div style="margin-top:8px"><a class="btn btn-primary" href="<?= $self ?>&action=download" style="font-weight:800"><i class="fas fa-download"></i> Télécharger / نزّل الإكسل (<?= count($rowsNow) ?>)</a></div>
             <div class="xs-cols">
                 <div class="xs-col ro">رقم الملف (لا تغيّره)</div><div class="xs-col ro">الفئة · الاسم</div>
-                <div class="xs-col">الراتب الأساسي $ <u>أو</u> ل.ل</div><div class="xs-col">الأجر الإضافي ٪</div><div class="xs-col">الأجر الإضافي مبلغ ل.ل <u>أو</u> $</div>
+                <div class="xs-col">الراتب الأساسي $ <u>أو</u> ل.ل</div><div class="xs-col">الأجر الإضافي ٪</div><div class="xs-col">الأجر الإضافي: جزء ل.ل <u>و/أو</u> جزء $</div>
                 <div class="xs-col">الإضافي من شهر ← إلى شهر</div><div class="xs-col">عدد الأيام بالأسبوع</div>
             </div>
-            <div class="xs-hint" style="margin-top:6px">فاضي = لا تغيير · <b>0</b> بالأجر الإضافي = شيله · الشهر بالاسم أو بالرقم، فاضي = كل السنة (تشرين الأول ← أيلول) · لا تحذف أعمدة ولا تغيّر ترتيبها.</div>
+            <div class="xs-hint" style="margin-top:6px">فاضي = لا تغيير · <b>0</b> بالأجر الإضافي = شيله · <b>كل أستاذ رقمه</b>: مبلغ بالليرة و/أو مبلغ بالدولار (الاتنين معاً = يُجمعان) · الشهر بالاسم أو بالرقم، فاضي = كل السنة (تشرين الأول ← أيلول) · لا تحذف أعمدة ولا تغيّر ترتيبها.</div>
         </div></div>
 
         <div class="xs-step"><span class="xs-num">٢</span><div>

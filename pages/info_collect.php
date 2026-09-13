@@ -233,7 +233,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
                                   VALUES (?, ?, 1, ?, ?, ?, ?, " . ($nFull ? 'NULL, NULL' : "$nFrom, $nTo") . ", 1)");
         // الأجر الإضافي = علاوة شهرية (prime_fixe)؛ المكافأة والمساعدة (aide_complementaire)؛ تعويض النقل = علاوة يومية (transport_daily)
         // تُضرَب بأيام الحضور × الأسابيع تلقائياً في المحرّك. (2026-09-11 «بكل البرنامج») العملة PCT = نسبة ٪ من الأساس (value_type=percent).
-        foreach (['new_extra' => 'prime_fixe', 'new_aide' => 'aide_complementaire', 'new_transport' => 'transport_daily'] as $dk => $btype) {
+        // 💵 (2026-09-13) new_extra2 = الجزء الثاني من الأجر الإضافي بالعملة الأخرى (جزء $ + جزء ل.ل) — سطر ثانٍ من نفس النوع
+        foreach (['new_extra' => 'prime_fixe', 'new_extra2' => 'prime_fixe', 'new_aide' => 'aide_complementaire', 'new_transport' => 'transport_daily'] as $dk => $btype) {
             $amt = (float)($data[$dk] ?? 0);
             if ($amt > 0) {
                 $c = (string)($data[$dk . '_cur'] ?? 'LBP');
@@ -245,7 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         }
         // ولّد رواتب سنة الدخول (تشمل الراتب + الإضافي + المكافأة + النقل المُدخَلة بالفورم)
         try { recalcEmployeeYear($newId, $entryYear); } catch (Exception $ex) {}
-        $hadPay = ($salAmt > 0) || ((float)($data['new_extra'] ?? 0) > 0) || ((float)($data['new_aide'] ?? 0) > 0) || ((float)($data['new_transport'] ?? 0) > 0);
+        $hadPay = ($salAmt > 0) || ((float)($data['new_extra'] ?? 0) > 0) || ((float)($data['new_extra2'] ?? 0) > 0) || ((float)($data['new_aide'] ?? 0) > 0) || ((float)($data['new_transport'] ?? 0) > 0);
         $_SESSION['flash_success'] = "تم إنشاء ملف الأستاذ الجديد لسنة الدخول $entryYear" . ($hadPay ? ' مع راتبه وإضافاته ونقله. راجِع ملفه للتأكّد.' : '. أكمِل الإعداد المالي من ملف الأستاذ ليظهر في تلك السنة.');
         header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $newId); exit;
     }
