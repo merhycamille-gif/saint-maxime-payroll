@@ -135,6 +135,11 @@ $empTypeSel = in_array($_GET['emp_type'] ?? '', $empTypesAllowed, true) ? $_GET[
 $taxSubSel = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
 $ofEmpFilter = ($empTypeSel ? " AND e.employee_type = " . $db->quote($empTypeSel) : '')
              . ($taxSubSel !== '' ? " AND e.tax_subject = " . (int)$taxSubSel : '');
+// ↔️ (2026-09-13 «اللوائح اللي منقدّمها للدولة اللبنانية — المالية والضمان وصندوق التعويضات — بس اللي بخانة كشوف الرواتب
+//    ما عدا بطاقة الأستاذ السنوية: من الشمال لليمين — الاتجاه بس»): كشوف خانة «كشوف الرواتب» بمركز التقارير تُعرَض LTR دائماً.
+//    الاتجاه فقط (الأعمدة والأرقام والنصوص كما هي). البطاقة السنوية (annual_slip) لا تُمَسّ. المصدر الواحد: ofStateLtrForms().
+function ofStateLtrForms(): array { return ['salary_all', 'salary_detail', 'payment_list', 'employer_cost', 'full_register']; }
+$ofDir = in_array($form, ofStateLtrForms(), true) ? 'ltr' : 'rtl';
 // نسخة لاستعلامات بلا alias (FROM employees WHERE ...)
 $ofEmpFilterPlain = str_replace(' e.', ' ', $ofEmpFilter);
 // نسخة لاستعلامات الرواتب بلا join مع الموظفين (FROM monthly_salaries ms WHERE ...)
@@ -1610,10 +1615,7 @@ elseif ($form === 'teacher_card'):
     $curMode = displayCurrency();
     $curLbl = ($curMode === 'usd') ? 'العملة: دولار أميركي' : (($curMode === 'both') ? 'العملة: ليرة لبنانية + دولار أميركي' : 'العملة: ليرة لبنانية');
 ?>
-<?php // ↔️ (2026-09-13 «تقارير كشف الرواتب للأساتذة غير التابعين للدولة من الشمال لليمين — الاتجاه بس»):
-      // فلتر الضريبة على «غير الخاضعين» ⇒ الكشف كله LTR (الاتجاه فقط؛ الأعمدة والأرقام والنصوص كما هي). البطاقة السنوية لا تُمَسّ.
-      $ofLtr = ($taxSubSel === '0'); ?>
-<div class="official-doc <?= $ofLtr ? 'ltr' : 'rtl' ?> land-report" id="ppExportArea" style="max-width:100%" dir="<?= $ofLtr ? 'ltr' : 'rtl' ?>">
+<div class="official-doc <?= $ofDir ?> land-report" id="ppExportArea" style="max-width:100%" dir="<?= $ofDir ?>">
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الرواتب والأجور الشهري — <?= monthName($month,'ar').' '.$year ?></div>
     <div class="doc-subtitle"><?= e($curLbl) ?></div>
@@ -2428,7 +2430,7 @@ elseif ($form === 'payment_list'):
             <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
-<div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
+<div class="official-doc <?= $ofDir ?> land-report" id="ppExportArea" dir="<?= $ofDir ?>" style="max-width:100%">
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الدفع — رواتب <?= monthName($month,'ar').' '.$year ?></div>
     <table class="doc-table">
@@ -2502,7 +2504,7 @@ elseif ($form === 'payment_list'):
             <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
-<div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
+<div class="official-doc <?= $ofDir ?> land-report" id="ppExportArea" dir="<?= $ofDir ?>" style="max-width:100%">
     <?php if (!$multiS) echo schoolLetterhead($school); ?>
     <div class="doc-title">جميع الأساتذة — كشف شامل بالرواتب وكلفة المؤسسة</div>
     <div style="text-align:center;font-size:12pt;margin-bottom:8px"><?= monthName($month,'ar').' '.$year ?></div>
@@ -2637,7 +2639,7 @@ elseif ($form === 'payment_list'):
         ['الكلفة الإجمالية على المؤسسة', $totalCost, false, $totalCostU],
     ]);
 ?>
-<div class="official-doc rtl" id="ppExportArea">
+<div class="official-doc <?= $ofDir ?>" id="ppExportArea" dir="<?= $ofDir ?>">
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كلفة المؤسسة الإجمالية — للعام الدراسي <?= e($schoolYear) ?></div>
     <div class="kv">عدد الموظفين المشمولين: <strong><?= (int)($g['n']??0) ?></strong></div>
@@ -2953,7 +2955,7 @@ elseif ($form === 'payment_list'):
             <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
         </div>
     </form>
-<div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
+<div class="official-doc <?= $ofDir ?> land-report" id="ppExportArea" dir="<?= $ofDir ?>" style="max-width:100%">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12pt;margin-bottom:6px">
         <div style="border:1px solid #333;padding:6px 10px;font-size:12pt;line-height:1.7">
             <div style="font-weight:700">معلومات تفصيلية عن الراتب</div>

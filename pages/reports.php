@@ -298,9 +298,8 @@ function reportDocThumb($path) {
             </div>
         </form>
 
-        <?php $rsDir = ($taxSubSel === '0') ? 'ltr' : 'rtl'; // ↔️ (2026-09-13) غير الخاضعين للضريبة ⇒ الكشف من الشمال لليمين (الاتجاه فقط) ?>
-        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['dir' => $rsDir]) ?>
-                <div class="report-table-wrap" dir="<?= $rsDir ?>"><table class="doc-table" dir="<?= $rsDir ?>">
+        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year . $empTypeTitle]) ?>
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>
                         <th>#</th>
                         <?php if ($multi): ?><th>المدرسة</th><?php endif; ?>
@@ -780,8 +779,9 @@ function reportDocThumb($path) {
         function atOnCheck(){ var all=document.querySelectorAll('.at-items input[name="items[]"]'); var n=Array.from(all).filter(c=>c.checked).length; var ab=document.querySelector('.at-items .all input'); if(ab) ab.checked=(n===all.length); }
         </script>
 
-        <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند']) ?>
-                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
+        <?php // ↔️ (2026-09-13) «مجاميع سنوية» من خانة كشوف الرواتب (لوائح الدولة) ⇒ من الشمال لليمين — الاتجاه فقط ?>
+        <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند'], ['dir' => 'ltr']) ?>
+                <div class="report-table-wrap" dir="ltr"><table class="doc-table" dir="ltr">
                     <thead><tr>
                         <th>#</th><th>المدرسة / École</th><th>عدد الكشوف</th>
                         <?php foreach ($atSel as $k): ?><th><?= e(annualTotalLabel($k, 'ar')) ?><br><small style="font-weight:400;opacity:.8"><?= e(annualTotalLabel($k, 'fr')) ?></small></th><?php endforeach; ?>

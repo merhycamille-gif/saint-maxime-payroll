@@ -289,7 +289,7 @@ function docSheetStart(string $titleFr, string $titleAr, array $chips = [], arra
     if ($cur !== 'both') $auto[] = 'العملة: ' . ($cur === 'usd' ? 'دولار فقط' : 'ليرة فقط');
     if (($opts['comp'] ?? true) && function_exists('salaryCompLabel')) $auto[] = 'الراتب يشمل: ' . salaryCompLabel();
     $auto[] = 'صدر بتاريخ ' . formatDate(date('Y-m-d'));
-    $ltr = (($opts['dir'] ?? 'rtl') === 'ltr'); // ↔️ (2026-09-13) اتجاه الورقة: 'ltr' = من الشمال لليمين (كشف الرواتب لغير الخاضعين للضريبة)
+    $ltr = (($opts['dir'] ?? 'rtl') === 'ltr'); // ↔️ (2026-09-13) اتجاه الورقة: 'ltr' = من الشمال لليمين (كشوف خانة «كشوف الرواتب» = لوائح الدولة)
     ob_start(); ?>
     <div class="doc-sheet<?= $ltr ? ' doc-ltr' : '' ?>"<?= $ltr ? ' dir="ltr"' : '' ?>>
         <?php if (empty($opts['no_letterhead'])): ?>
@@ -387,7 +387,7 @@ function officialFormStyles(): string {
 .official-doc{background:#fff;color:#111;max-width:210mm;margin:0 auto;padding:14mm 14mm;font-size:12pt;
   border:1px solid #e5e7eb;border-radius:10px;font-family:Arial,'Segoe UI',Tahoma,sans-serif;line-height:1.7;}
 .official-doc.rtl,.official-doc[dir="rtl"]{direction:rtl;text-align:right;}
-/* ↔️ (2026-09-13) كشف الرواتب لغير الخاضعين للضريبة: من الشمال لليمين — الاتجاه فقط */
+/* ↔️ (2026-09-13) كشوف الرواتب (لوائح الدولة: المالية/الضمان/الصندوق) من الشمال لليمين — الاتجاه فقط؛ البطاقة السنوية لا تُمَسّ */
 .official-doc.ltr,.official-doc[dir="ltr"]{direction:ltr;text-align:left;}
 .doc-sheet.doc-ltr{direction:ltr;text-align:left;}
 

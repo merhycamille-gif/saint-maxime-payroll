@@ -5832,36 +5832,44 @@ try {
 check('إكسل الفئة/الضريبة (تجربة حيّة تُرجَع): كل فئة أنواعها فقط + ذهاب/إياب صفر + ملاك بلا راتب (رقم مكتوب = تنبيه) + متعاقد بملف الملاك = ليس من الفئة + فلتر الضريبة يعزل غير الخاضع + نسبة لملاك عبر الإكسل = بند percent واحد ⇒ إرجاع بالمليم', $ok118, $why118);
 
 /* =====================================================================
- * 119) ↔️ كشف الرواتب لغير الخاضعين للضريبة من الشمال لليمين (2026-09-13 «بدي تقارير الأساتذة غير التابعة للدولة تكون من الشمال لليمين —
- *      الاتجاه بس، وبس بتقارير كشف الرواتب، وبطاقة راتب الأستاذ ما تغيّر فيها شي»): فلتر الضريبة = غير الخاضعين ⇒ salary_all (official_forms)
- *      وResumé mensuel (reports) بـdir=ltr والصنف ltr/doc-ltr؛ الخاضعون/الكل يبقون rtl. البطاقة السنوية والقسيمة لا تُمَسّ (فحوص التجميد قائمة).
+ * 119) ↔️ كشوف الرواتب (لوائح الدولة) من الشمال لليمين (2026-09-13 «قصدي اللوائح اللي منقدّمها للدولة اللبنانية — المالية والضمان وصندوق
+ *      التعويضات — بس اللي موجودين بخانة كشوف الرواتب ما عدا بطاقة الأستاذ السنوية ما تقرب صوبها — الاتجاه بس»):
+ *      خانة «كشوف الرواتب» بمركز التقارير = salary_all/salary_detail/payment_list/employer_cost/full_register (official_forms، المصدر الواحد
+ *      ofStateLtrForms) + annual_totals (reports، docSheetStart dir) ⇒ dir=ltr دائماً. غيرها rtl كما كان. البطاقة السنوية والقسيمة لا تُمَسّ.
  * =================================================================== */
 $of119 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp119 = (string)file_get_contents($PROJ . '/pages/reports.php'); $rh119 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
-check('كشف الرواتب LTR لغير الخاضعين: salary_all يقلب الاتجاه بفلتر الضريبة فقط + Résumé mensuel عبر docSheetStart([dir]) + CSS ltr/doc-ltr + البطاقة السنوية والقسيمة بلا أي dir=ltr جديد',
-      strpos($of119, "\$ofLtr = (\$taxSubSel === '0');") !== false && strpos($of119, '<div class="official-doc <?= $ofLtr ? \'ltr\' : \'rtl\' ?> land-report" id="ppExportArea"') !== false
-      && strpos($rp119, "\$rsDir = (\$taxSubSel === '0') ? 'ltr' : 'rtl';") !== false && strpos($rp119, "['dir' => \$rsDir]") !== false
+$tiles119 = []; if (preg_match("/'tiles'=>\[(.*?)\]\],/su", preg_replace('~^\s*//.*$~mu', '', substr($rp119, strpos($rp119, "'كشوف الرواتب / Bulletins de salaire'"))), $mt)) preg_match_all("/\\\$OF\.'([a-z_]+)'|\?report=([a-z_]+)|\\\$PG\.'([a-z_]+)\.php'/", $mt[1], $mm);
+$tiles119 = array_values(array_filter(array_merge($mm[1] ?? [], $mm[2] ?? [], $mm[3] ?? [])));
+check('كشوف الرواتب LTR: خانة «كشوف الرواتب» بالمركز = البطاقة السنوية (مستثناة) + 5 نماذج ofStateLtrForms + مجاميع سنوية — كلها dir=ltr بالكود (لا ربط بفلتر الضريبة)، Résumé mensuel rtl، البطاقة السنوية بلا dir=ltr',
+      function_exists('ofStateLtrForms') === false /* دالة محلية بالصفحة لا بfunctions */
+      && strpos($of119, "function ofStateLtrForms(): array { return ['salary_all', 'salary_detail', 'payment_list', 'employer_cost', 'full_register']; }") !== false
+      && strpos($of119, "\$ofDir = in_array(\$form, ofStateLtrForms(), true) ? 'ltr' : 'rtl';") !== false
+      && substr_count($of119, 'class="official-doc <?= $ofDir ?>') === 5 && substr_count($of119, 'id="ppExportArea" dir="<?= $ofDir ?>"') === 4 && substr_count($of119, 'id="ppExportArea" style="max-width:100%" dir="<?= $ofDir ?>"') === 1
+      && strpos($of119, '$ofLtr') === false && strpos($rp119, '$rsDir') === false
+      && strpos($rp119, "docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName(\$month) . ' ' . \$year . \$empTypeTitle]) ?>") !== false
+      && preg_match("/docSheetStart\('Totaux annuels par école et par rubrique'.*?\['dir' => 'ltr'\]\) \?>/su", $rp119) === 1
       && strpos($rh119, "\$ltr = ((\$opts['dir'] ?? 'rtl') === 'ltr');") !== false && strpos($rh119, '.official-doc.ltr,.official-doc[dir="ltr"]{direction:ltr;text-align:left;}') !== false && strpos($rh119, '.doc-sheet.doc-ltr{direction:ltr;text-align:left;}') !== false
-      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), 'dir="ltr"') === false
-      && substr_count($of119, 'official-doc ltr') === 0 /* لا كشف آخر يُثبَّت LTR */);
-// تشغيل فعلي: الكشفان بفلتر غير الخاضعين = LTR، وبالخاضعين/الكل = RTL (بلا تغيير داتا)
+      && sort($tiles119) !== null && $tiles119 === ['annual_slip', 'annual_totals', 'employer_cost', 'full_register', 'payment_list', 'salary_all', 'salary_detail']
+      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), 'dir="ltr"') === false && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'doc-ltr') === false,
+      'tiles=' . implode(',', $tiles119));
+// تشغيل فعلي: الخمسة + المجاميع السنوية ⇒ ltr؛ Résumé mensuel وكشف الضمان ⇒ rtl؛ بلا Fatal
 $ok119 = false; $why119 = '';
 try {
     $m119 = (int)$db->query("SELECT month FROM monthly_salaries WHERE school_year = '2025-2026' ORDER BY year, month LIMIT 1")->fetchColumn() ?: 10;
-    $y119 = $m119 >= 10 ? 2025 : 2026;
-    $a0 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => $m119, 'year' => $y119, 'tax_sub' => '0'], []);
-    $a1 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => $m119, 'year' => $y119, 'tax_sub' => '1'], []);
-    $aA = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => $m119, 'year' => $y119], []);
-    $r0 = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => $m119, 'year' => $y119, 'tax_sub' => '0'], []);
-    $r1 = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => $m119, 'year' => $y119], []);
-    $ok119 = strpos($a0, 'class="official-doc ltr land-report" id="ppExportArea" style="max-width:100%" dir="ltr"') !== false
-          && strpos($a1, 'class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%" dir="rtl"') !== false
-          && strpos($aA, 'class="official-doc rtl land-report"') !== false
-          && strpos($r0, '<div class="doc-sheet doc-ltr" dir="ltr">') !== false && strpos($r0, '<table class="doc-table" dir="ltr">') !== false
-          && strpos($r1, '<div class="doc-sheet doc-ltr"') === false && strpos($r1, '<table class="doc-table" dir="rtl">') !== false
-          && stripos($a0 . $r0, 'Fatal error') === false;
-    $why119 = "month=$m119/$y119 sa0=" . strlen($a0) . " sa1=" . strlen($a1) . " rs0=" . strlen($r0);
+    $y119 = $m119 >= 10 ? 2025 : 2026; $bad119 = [];
+    foreach (['salary_all', 'salary_detail', 'payment_list', 'employer_cost', 'full_register'] as $f) {
+        $o = renderPage('pages/official_forms.php', ['form' => $f, 'month' => $m119, 'year' => $y119], []);
+        if (!preg_match('/class="official-doc ltr[^"]*" id="ppExportArea"[^>]*dir="ltr"/', $o) || stripos($o, 'Fatal error') !== false) $bad119[] = $f;
+    }
+    $o = renderPage('pages/reports.php', ['report' => 'annual_totals'], []);
+    if (strpos($o, '<div class="doc-sheet doc-ltr" dir="ltr">') === false || strpos($o, '<table class="doc-table" dir="ltr">') === false || stripos($o, 'Fatal error') !== false) $bad119[] = 'annual_totals';
+    $o = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => $m119, 'year' => $y119], []);
+    if (strpos($o, 'class="doc-sheet doc-ltr"') !== false || strpos($o, '<table class="doc-table" dir="rtl">') === false) $bad119[] = 'monthly_summary(rtl)';
+    $o = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => $m119, 'year' => $y119], []);
+    if (strpos($o, 'official-doc ltr') !== false) $bad119[] = 'cnss(rtl)';
+    $ok119 = !$bad119; $why119 = "month=$m119/$y119 bad=" . implode(',', $bad119);
 } catch (Throwable $e) { $why119 = $e->getMessage(); }
-check('كشف الرواتب LTR (تشغيل فعلي): غير الخاضعين ⇒ dir=ltr بالكشفين، الخاضعون/الكل ⇒ rtl كما كان، بلا Fatal', $ok119, $why119);
+check('كشوف الرواتب LTR (تشغيل فعلي): الخمسة + المجاميع السنوية dir=ltr، Résumé mensuel والضمان rtl كما كانا، بلا Fatal', $ok119, $why119);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
