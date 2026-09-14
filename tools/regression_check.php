@@ -5904,6 +5904,50 @@ try {
 } catch (Throwable $e) { $why120 = $e->getMessage(); }
 check('أسماء لوائح الدولة بالفرنسي (تشغيل فعلي): الأربعة تعرض العربي + الفرنسي تحته لأستاذ حقيقي؛ الضمان وResumé mensuel بلا', $ok120, $why120);
 
+/* ===================================================================
+ * 121) 📅 إكسل الرواتب = أساتذة السنة لا أساتذة كل البرنامج (2026-09-14 «وقت اللي بختار متعاقد أو ملاك أو الثنين يكونوا أساتذة
+ *      نفس السنة بس مش أساتذة كل البرنامج»): فتح السنة نسخ كل «فاعل» بلا تاريخ ترك حتى مَن لم يُدفَع له بالسنة السابقة، فصار
+ *      الإكسل يعرضهم. المصدر الواحد excelSalariesInYearSql/Params: مستمرّ (راتب فعلي بالسنة السابقة) | جديد (دخوله منذ بداية
+ *      السنة السابقة) | راتب فعلي بالسنة نفسها إن بدأت أو بلا راتب أقدم | جديد كلياً بلا صفوف. لا يلمس فتح السنة ولا التقارير.
+ * =================================================================== */
+$xs121 = (string)file_get_contents($PROJ . '/includes/excel_salaries.php');
+check('إكسل أساتذة السنة (كود): excelSalariesInYearSql/Params مصدر واحد داخل excelSalariesRows (rows/build/diff/apply عبره) + المعايير الأربعة بالـSQL',
+      function_exists('excelSalariesInYearSql') && function_exists('excelSalariesInYearParams')
+      && strpos($xs121, 'AND " . excelSalariesInYearSql($sy) . "') !== false && strpos($xs121, '$st->execute(array_merge([$schoolId], excelSalariesInYearParams($sy)));') !== false
+      && substr_count($xs121, 'excelSalariesInYearSql(') === 2 && strpos($xs121, "OR e.hire_date >= ?") !== false
+      && strpos($xs121, "AND (? = 1 OR NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year < ? AND \$nz)))") !== false
+      && excelSalariesInYearParams('2026-2027', '2026-09-14') === ['2026-2027', '2025-2026', '2025-10-01', '2026-2027', 0, '2025-2026', '2027-09-30']
+      && excelSalariesInYearParams('2026-2027', '2026-10-01')[4] === 1 && excelSalariesInYearParams('2025-2026', '2026-09-14')[4] === 1);
+$ok121 = false; $why121 = '';
+try {
+    $nz121 = '(m.base_plus_echelon_lbp > 0 OR m.net_salary_lbp > 0 OR m.total_due_lbp > 0)';
+    $sy121 = currentSchoolYear(); $y121 = (int)substr($sy121, 0, 4); $prev121 = ($y121 - 1) . '-' . $y121; $bad121 = [];
+    $actv = "e.is_deleted = 0 AND e.status = 'actif' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel','employe')";
+    // أ) راكد: له صفوف بالسنة الحالية، بلا أي راتب فعلي بالسنة السابقة، دخوله قديم ⇒ ليس من السنة (إلا إذا كانت السنة بدأت وله راتب فعلي فيها)
+    $stale = $db->query("SELECT e.id, e.school_id FROM employees e WHERE $actv AND e.hire_date < '" . ($y121 - 1) . "-10-01'
+        AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$sy121')
+        AND NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$prev121' AND $nz121)
+        AND NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$sy121' AND $nz121) LIMIT 1")->fetch();
+    // ب) مستمرّ: راتب فعلي بالسنة السابقة وصفوف بالحالية ⇒ من السنة
+    $cont = $db->query("SELECT e.id, e.school_id FROM employees e WHERE $actv
+        AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$sy121')
+        AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$prev121' AND $nz121) LIMIT 1")->fetch();
+    // ج) السنة السابقة (بدأت وانتهت): كل مَن له راتب فعلي فيها من السنة، حتى بلا راتب بالتي قبلها
+    $paidPrev = $db->query("SELECT e.id, e.school_id FROM employees e WHERE $actv
+        AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$prev121' AND $nz121)
+        AND NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '" . ($y121 - 2) . '-' . ($y121 - 1) . "' AND $nz121) AND e.hire_date < '" . ($y121 - 2) . "-10-01' LIMIT 1")->fetch();
+    if ($stale) { $rows = excelSalariesRows($db, (int)$stale['school_id'], $sy121); if (isset($rows[(int)$stale['id']])) $bad121[] = 'stale#' . $stale['id'] . ' مدرج'; } else $bad121[] = 'لا عيّنة راكدة';
+    if ($cont) { $rows = excelSalariesRows($db, (int)$cont['school_id'], $sy121); if (!isset($rows[(int)$cont['id']])) $bad121[] = 'cont#' . $cont['id'] . ' غائب'; } else $bad121[] = 'لا عيّنة مستمرّة';
+    if ($paidPrev) { $rows = excelSalariesRows($db, (int)$paidPrev['school_id'], $prev121); if (!isset($rows[(int)$paidPrev['id']])) $bad121[] = 'paidPrev#' . $paidPrev['id'] . ' غائب'; }
+    // د) لا أحد بالإكسل خارج فلتر الفاعلين/التاركين، ولا أحد بلا صفوف بالسنة إلا الجديد كلياً
+    foreach (excelSalariesRows($db, (int)($cont['school_id'] ?? 0), $sy121) as $id => $r) {
+        $x = $db->query("SELECT (SELECT COUNT(*) FROM monthly_salaries m WHERE m.employee_id = $id) alln, (SELECT COUNT(*) FROM monthly_salaries m WHERE m.employee_id = $id AND m.school_year = '$sy121') syn FROM dual")->fetch();
+        if ((int)$x['syn'] === 0 && (int)$x['alln'] > 0) { $bad121[] = "#$id بلا صفوف بالسنة"; break; }
+    }
+    $ok121 = !$bad121; $why121 = "sy=$sy121 stale=" . ($stale['id'] ?? '-') . " cont=" . ($cont['id'] ?? '-') . " paidPrev=" . ($paidPrev['id'] ?? '-') . ' bad=' . implode(',', $bad121);
+} catch (Throwable $e) { $why121 = $e->getMessage(); }
+check('إكسل أساتذة السنة (تشغيل فعلي): الراكد (صفوف بلا راتب فعلي ولا راتب بالسنة السابقة، دخوله قديم) خارج الإكسل؛ المستمرّ داخله؛ مَن دُفع له بالسنة السابقة داخل إكسلها', $ok121, $why121);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

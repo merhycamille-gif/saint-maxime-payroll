@@ -53,6 +53,26 @@ function excelSalariesTax($v): string { $v = (string)$v; return in_array($v, ['1
 function excelSalariesFilterLabel(string $cat, string $tax): string { $l = excelSalariesCats()[excelSalariesCat($cat)]['label']; $t = excelSalariesTax($tax); return $l . ($t !== '' ? ' — ' . excelSalariesTaxes()[$t] : ''); }
 
 /** الفاعلون بالمدرسة (غير التاركين) حسب الفئة المختارة مع قيمهم الحالية للسنة. الملاك: راتبهم بالسلسلة (خانتا الراتب لا تُعدَّلان)، إضافيهم وأيامهم نعم. */
+// 📅 «أستاذ السنة» (2026-09-14 «وقت اللي بختار متعاقد أو ملاك أو الثنين يكونوا أساتذة نفس السنة بس مش أساتذة كل البرنامج»):
+//    فتح السنة ينسخ كل مَن حالته «فاعل» بلا تاريخ ترك — حتى مَن لم يُدفَع له شيء بالسنة السابقة (229 بـ2026-2027) — فصار الإكسل
+//    يعرض أساتذة كل البرنامج. المصدر الواحد لعضوية السنة بالإكسل (rows/build/diff/apply عبر rows):
+//    له صفوف بالسنة المطلوبة و(راتب فعلي بالسنة السابقة — مستمرّ | دخوله منذ بداية السنة السابقة — جديد |
+//    راتب فعلي بالسنة نفسها بشرط أنّ السنة بدأت فعلاً (1/10) أو لا راتب أقدم من السنة السابقة — لا نسخة راكدة من سنين قديمة)،
+//    أو جديد كلياً بلا أي صفّ بأي سنة ودخوله قبل نهاية السنة (لا مَن عُيِّن لسنة لاحقة).
+function excelSalariesInYearSql(string $sy): string {
+    $nz = '(m.base_plus_echelon_lbp > 0 OR m.net_salary_lbp > 0 OR m.total_due_lbp > 0)';
+    return "((EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ?)
+              AND (EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ? AND $nz)
+                   OR e.hire_date >= ?
+                   OR (EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ? AND $nz)
+                       AND (? = 1 OR NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year < ? AND $nz)))))
+             OR (NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id) AND (e.hire_date IS NULL OR e.hire_date <= ?)))";
+}
+function excelSalariesInYearParams(string $sy, ?string $today = null): array {
+    $y1 = (int)substr($sy, 0, 4); $prev = ($y1 - 1) . '-' . $y1; $prevStart = ($y1 - 1) . '-10-01';
+    $started = (($today ?? date('Y-m-d')) >= $y1 . '-10-01') ? 1 : 0;
+    return [$sy, $prev, $prevStart, $sy, $started, $prev, ($y1 + 1) . '-09-30'];
+}
 function excelSalariesRows(PDO $db, int $schoolId, string $sy, string $cat = 'all', string $tax = ''): array {
     $types = excelSalariesCats()[excelSalariesCat($cat)]['types']; $tax = excelSalariesTax($tax);
     $st = $db->prepare("SELECT e.id, e.employee_type, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr) fn, COALESCE(NULLIF(e.father_name_ar,''), '') fa,
@@ -60,12 +80,9 @@ function excelSalariesRows(PDO $db, int $schoolId, string $sy, string $cat = 'al
             FROM employees e WHERE e.school_id = ? AND e.is_deleted = 0 AND e.employee_type IN (" . implode(',', array_map([$db, 'quote'], $types)) . ")
               AND e.status = 'actif' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
               " . ($tax !== '' ? " AND e.tax_subject = " . (int)$tax : '') . "
-              -- موجود بهذه السنة: له رواتب فيها، أو جديد لم يُحسب له شيء بعد (بلا أي صفّ بأي سنة) ودخوله قبل نهايتها —
-              -- لا مَن عُيِّن لسنة لاحقة (وإلا خلق التطبيق له رواتب بسنة لم يعمل فيها)
-              AND (EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ?)
-                   OR (NOT EXISTS (SELECT 1 FROM monthly_salaries ms2 WHERE ms2.employee_id = e.id) AND (e.hire_date IS NULL OR e.hire_date <= ?)))
+              AND " . excelSalariesInYearSql($sy) . "
             ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), e.last_name_ar, e.first_name_ar, e.id");
-    $st->execute([$schoolId, $sy, substr($sy, 5, 4) . '-09-30']);
+    $st->execute(array_merge([$schoolId], excelSalariesInYearParams($sy)));
     $rows = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $rows[(int)$r['id']] = [
