@@ -5871,6 +5871,39 @@ try {
 } catch (Throwable $e) { $why119 = $e->getMessage(); }
 check('كشوف الرواتب LTR (تشغيل فعلي): الخمسة + المجاميع السنوية dir=ltr، Résumé mensuel والضمان rtl كما كانا، بلا Fatal', $ok119, $why119);
 
+/* ===================================================================
+ * 120) 🔤 أسماء الأساتذة بلوائح الدولة LTR بالفرنسي كمان (2026-09-14 «بدي أسماء الأساتذة اللي بالتقارير من الشمال إلى اليمين
+ *      يكون باللغة الأجنبية كمان»): خانة الاسم بـsalary_all/payment_list/full_register/salary_detail = العربي + الفرنسي تحته
+ *      (المصدر الواحد ofStateNameCell). employer_cost/annual_totals بلا أسماء. غير لوائح الدولة (الضمان/الضريبة/القسيمة/البطاقة) لا تُمَسّ.
+ * =================================================================== */
+$of120 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rh120 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+check('أسماء لوائح الدولة بالفرنسي (كود): ofStateNameCell مصدر واحد + 3 خلايا + salary_detail عبر drawRow + CSS .nm-fr، بلا اسم فرنسي بغير لوائح الدولة',
+      strpos($of120, "function ofStateNameCell(array \$r): string {") !== false
+      && substr_count($of120, '<td style="text-align:right"><?= ofStateNameCell($r) ?></td>') === 3
+      && strpos($of120, '$drawRow(++$n, ofStateNameCell($r), $v);') !== false
+      && substr_count($of120, '<?= $name /* HTML جاهز من ofStateNameCell */ ?>') === 1
+      && substr_count($of120, 'ofStateNameCell(') === 5
+      && strpos($rh120, '.official-doc .nm-fr{display:block;') !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), 'nm-fr') === false && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), 'ofStateNameCell') === false);
+$ok120 = false; $why120 = '';
+try {
+    $e120 = $db->query("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, ms.month, ms.year FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+                        WHERE e.is_deleted = 0 AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 AND TRIM(e.first_name_ar) <> '' AND TRIM(e.first_name_fr) <> '' AND TRIM(e.last_name_fr) <> '' ORDER BY ms.year, ms.month LIMIT 1")->fetch();
+    if (!$e120) throw new RuntimeException('لا أستاذ باسم عربي وفرنسي معاً');
+    $ar = trim($e120['first_name_ar'] . ' ' . $e120['last_name_ar']); $fr = trim($e120['first_name_fr'] . ' ' . $e120['last_name_fr']);
+    $bad120 = [];
+    foreach (['salary_all', 'payment_list', 'full_register', 'salary_detail'] as $f) {
+        $o = renderPage('pages/official_forms.php', ['form' => $f, 'month' => (int)$e120['month'], 'year' => (int)$e120['year']], [], [], '', '', '', []);
+        if (strpos($o, e($ar) . '<br><span class="nm-fr" dir="ltr">' . e($fr) . '</span>') === false || stripos($o, 'Fatal error') !== false) $bad120[] = $f;
+    }
+    $o = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => (int)$e120['month'], 'year' => (int)$e120['year']], []);
+    if (strpos($o, 'class="nm-fr"') !== false) $bad120[] = 'cnss(no-fr)';
+    $o = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => (int)$e120['month'], 'year' => (int)$e120['year']], []);
+    if (strpos($o, 'class="nm-fr"') !== false) $bad120[] = 'monthly_summary(no-fr)';
+    $ok120 = !$bad120; $why120 = "emp={$e120['id']} $ar / $fr bad=" . implode(',', $bad120);
+} catch (Throwable $e) { $why120 = $e->getMessage(); }
+check('أسماء لوائح الدولة بالفرنسي (تشغيل فعلي): الأربعة تعرض العربي + الفرنسي تحته لأستاذ حقيقي؛ الضمان وResumé mensuel بلا', $ok120, $why120);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

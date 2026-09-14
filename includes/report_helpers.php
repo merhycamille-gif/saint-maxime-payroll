@@ -390,6 +390,8 @@ function officialFormStyles(): string {
 /* ↔️ (2026-09-13) كشوف الرواتب (لوائح الدولة: المالية/الضمان/الصندوق) من الشمال لليمين — الاتجاه فقط؛ البطاقة السنوية لا تُمَسّ */
 .official-doc.ltr,.official-doc[dir="ltr"]{direction:ltr;text-align:left;}
 .doc-sheet.doc-ltr{direction:ltr;text-align:left;}
+/* 🔤 الاسم الفرنسي تحت العربي بلوائح الدولة (ofStateNameCell) — نفس الخط والحجم */
+.official-doc .nm-fr{display:block;font-family:Arial,Helvetica,sans-serif;direction:ltr;unicode-bidi:isolate;}
 
 /* ترويسة المدرسة */
 .letterhead{display:flex;align-items:center;gap:14px;border-bottom:2px solid var(--primary,#1e3a8a);

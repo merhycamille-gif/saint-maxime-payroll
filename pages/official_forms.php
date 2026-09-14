@@ -139,6 +139,15 @@ $ofEmpFilter = ($empTypeSel ? " AND e.employee_type = " . $db->quote($empTypeSel
 //    ما عدا بطاقة الأستاذ السنوية: من الشمال لليمين — الاتجاه بس»): كشوف خانة «كشوف الرواتب» بمركز التقارير تُعرَض LTR دائماً.
 //    الاتجاه فقط (الأعمدة والأرقام والنصوص كما هي). البطاقة السنوية (annual_slip) لا تُمَسّ. المصدر الواحد: ofStateLtrForms().
 function ofStateLtrForms(): array { return ['salary_all', 'salary_detail', 'payment_list', 'employer_cost', 'full_register']; }
+// 🔤 (2026-09-14 «أسماء الأساتذة باللوائح اللي من الشمال لليمين يكونوا باللغة الأجنبية كمان»): خانة الاسم بلوائح الدولة الأربع
+//    (salary_all/payment_list/full_register/salary_detail) = الاسم العربي + الاسم الفرنسي تحته بسطر ثانٍ (المصدر الواحد). employer_cost بلا أسماء.
+function ofStateNameCell(array $r): string {
+    $ar = trim(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? ''));
+    $fr = trim(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? ''));
+    if ($ar === '') return '<span class="nm-fr" dir="ltr">' . e($fr) . '</span>';
+    if ($fr === '') return e($ar);
+    return e($ar) . '<br><span class="nm-fr" dir="ltr">' . e($fr) . '</span>';
+}
 $ofDir = in_array($form, ofStateLtrForms(), true) ? 'ltr' : 'rtl';
 // نسخة لاستعلامات بلا alias (FROM employees WHERE ...)
 $ofEmpFilterPlain = str_replace(' e.', ' ', $ofEmpFilter);
@@ -1671,7 +1680,7 @@ elseif ($form === 'teacher_card'):
             foreach (['base','ech','bpe','caisse','eocg','fded','txb','tax','cnss','ded','fam','due','net'] as $uk) $add[$uk.'_usd'] = lbpToUsd((float)$add[$uk], $rRate);
             foreach ($add as $k=>$val) { $T[$k]+=$val; $sub[$k]+=$val; } ?>
             <tr><td><?= ++$nn ?></td>
-                <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                <td style="text-align:right"><?= ofStateNameCell($r) ?></td>
                 <td class="num"><?= money($r['base_salary_lbp'], $rRate, ['withCur'=>false]) ?></td>
                 <td class="num"><?= money($r['echelon_value_lbp'], $rRate, ['withCur'=>false]) ?></td>
                 <td class="num"><?= money($r['base_plus_echelon_lbp'], $rRate, ['withCur'=>false]) ?></td>
@@ -2465,7 +2474,7 @@ elseif ($form === 'payment_list'):
             <tr>
                 <td><?= ++$nn ?></td>
                 <td><?= e($r['employee_code']) ?></td>
-                <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                <td style="text-align:right"><?= ofStateNameCell($r) ?></td>
                 <td><?= e($r['nssf_number']) ?></td>
                 <td class="num"><?= money($r['base_salary_lbp'], $rRate, ['withCur'=>false]) ?></td>
                 <?= extraAideCells($r) ?>
@@ -2554,7 +2563,7 @@ elseif ($form === 'payment_list'):
             <tr>
                 <td><?= ++$nn ?></td>
                 <?php if ($multiS): ?><td><small><?= e(schoolNameById($r['school_id'],'ar')) ?></small></td><?php endif; ?>
-                <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                <td style="text-align:right"><?= ofStateNameCell($r) ?></td>
                 <td><?= rtrim(rtrim((string)$r['hours_per_week'],'0'),'.') ?></td>
                 <td class="num"><?= money($r['base_salary_lbp'], $rRate, ['withCur'=>false]) ?></td>
                 <td class="num"><?= money($r['echelon_value_lbp'], $rRate, ['withCur'=>false]) ?></td>
@@ -2998,7 +3007,7 @@ elseif ($form === 'payment_list'):
         $drawRow = function($n, $name, $v) use ($fmt, $fmtEx) { ?>
             <tr>
                 <td><?= $n ?></td>
-                <td style="text-align:right;white-space:nowrap"><?= e($name) ?></td>
+                <td style="text-align:right;white-space:nowrap"><?= $name /* HTML جاهز من ofStateNameCell */ ?></td>
                 <td class="num"><?= $fmt($v['base']) ?></td>
                 <td class="num"><?= $fmt($v['ech']) ?></td>
                 <td class="num"><?= $fmt($v['bpe']) ?></td>
@@ -3045,8 +3054,7 @@ elseif ($form === 'payment_list'):
             endif;
             $v = $rowVals($r);
             foreach ($keys as $k) { $sub[$k]+=$v[$k]; $grand[$k]+=$v[$k]; }
-            $name = trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr']);
-            $drawRow(++$n, $name, $v);
+            $drawRow(++$n, ofStateNameCell($r), $v);
         endforeach;
         if ($curCat !== null) $drawTotal('المجموع', $sub);
         if (!$rows): ?><tr><td colspan="<?= $sdCols ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif;
