@@ -691,8 +691,8 @@ CSS;
 function annualTotalItems(): array {
     $u = fn(string $c) => "SUM(FLOOR(($c)/NULLIF(ms.exchange_rate,0)))";
     return [
-        'base_sal'   => ['g' => 'salaires',  'ar' => 'أساس الراتب',                    'fr' => 'Salaire de base',        'lbp' => 'SUM(ms.base_salary_lbp)',                  'usd' => $u('ms.base_salary_lbp')],
-        'bpe'        => ['g' => 'salaires',  'ar' => 'الراتب بعد التدرّج',              'fr' => 'Base + échelons',        'lbp' => 'SUM(ms.base_plus_echelon_lbp)',            'usd' => $u('ms.base_plus_echelon_lbp')],
+        'base_sal'   => ['g' => 'salaires',  'ar' => 'أساس الراتب',                    'fr' => 'Salaire de base',        'lbp' => 'SUM(ms.base_salary_lbp)',                  'usd' => 'SUM(' . lawUsdSql('ms.base_salary_lbp') . ')'],
+        'bpe'        => ['g' => 'salaires',  'ar' => 'الراتب بعد التدرّج',              'fr' => 'Base + échelons',        'lbp' => 'SUM(ms.base_plus_echelon_lbp)',            'usd' => 'SUM(' . lawUsdSql('ms.base_plus_echelon_lbp') . ')'],
         'extra_wage' => ['g' => 'additions', 'ar' => 'الأجر الإضافي',                  'fr' => 'Supplément',             'lbp' => 'SUM(ms.extra_lbp + ms.prime_fixe_lbp)',    'usd' => 'SUM(' . extraWageUsdSql('ms.') . ')'],
         'aide'       => ['g' => 'additions', 'ar' => 'مكافأة ومساعدة',                 'fr' => 'Prime & aide',           'lbp' => 'SUM(ms.aide_complementaire_lbp)',          'usd' => $u('ms.aide_complementaire_lbp')],
         'transport'  => ['g' => 'transport', 'ar' => 'تعويض النقل',                    'fr' => 'Transport',              'lbp' => 'SUM(ms.transport_lbp)',                    'usd' => $u('ms.transport_lbp')],

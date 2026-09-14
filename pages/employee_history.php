@@ -147,7 +147,7 @@ if (!$emp):
                     <?php if (salaryCompHas('extra')): ?><tr><td>+ Supplément / الأجر الإضافي</td><td><?= extraWageMoney($sal) ?></td></tr><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><tr><td>+ Prime &amp; aide / المكافأة والمساعدة</td><td><?= money((int)$sal['aide_complementaire_lbp'], $slRate) ?></td></tr><?php endif; ?>
                     <?php if (salaryCompHas('transport')): ?><tr><td>+ Transport / تعويض النقل</td><td><?= money((int)$sal['transport_lbp'], $slRate) ?></td></tr><?php endif; ?>
-                    <tr style="background:#eef2ff"><td><strong>Salaire composé / الراتب المركّب</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td><strong><?= money(composedSalaryLbp($sal), $slRate) ?></strong></td></tr>
+                    <tr style="background:#eef2ff"><td><strong>Salaire composé / الراتب المركّب</strong><br><small style="color:#64748b"><?= e(salaryCompLabel()) ?></small></td><td><strong><?= dualFromUsd(composedSalaryLbp($sal), composedSalaryUsd($sal)) ?></strong></td></tr>
                     <?php endif; ?>
                     <tr><td>Salaire net / الصافي</td><td><strong><?= money($curNet, $slRate) ?></strong><?= $sal ? ' — '.monthName((int)$sal['month'],$lang).' '.$sal['year'] : '' ?></td></tr>
                 </table>

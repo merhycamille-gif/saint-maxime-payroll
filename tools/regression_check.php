@@ -6042,6 +6042,47 @@ try {
 } catch (Throwable $e) { $why124 = $e->getMessage(); }
 check('إكسل/وورد للكشوف (تشغيل فعلي): زرّا Excel/Word مرّة واحدة بالكشوف الجدولية، وغائبان بالنماذج الرسمية الثابتة', $ok124, $why124);
 
+/* ===================================================================
+ * 125) 💵 «p1 لازم يكون أساس الراتب والراتب بعد التدرّج على أساس دولار 1500 — انتبه» (2026-09-14): دولار الأساس/الدرجة/بعد التدرّج
+ *      بكل الكشوف والتقارير = ÷ السعر الرسمي (1500) داون — المصدر الواحد lawUsd/lawUsdSql/moneyLaw/composedSalaryUsd. الصافي والمحسومات
+ *      والنقل تبقى بسعر الشهر. البطاقة السنوية كانت أصلاً ÷1500 (cur_sal_old_usd) ولم تُمَسّ.
+ * =================================================================== */
+$of125 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp125 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$mp125 = (string)file_get_contents($PROJ . '/pages/monthly_payroll.php'); $rh125 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+check('دولار القانون للأساس (كود): lawUsd/lawUsdSql/moneyLaw/composedSalaryUsd + لا بقايا تحويل الأساس بسعر الشهر بالكشوف/التقارير/الراتب الشهري/المجاميع السنوية',
+      function_exists('lawUsd') && function_exists('lawUsdSql') && function_exists('moneyLaw') && function_exists('composedSalaryUsd')
+      && lawUsd(3445000) === 2296.0 && lawUsd(1499) === 0.0 && lawUsdSql('x') === 'FLOOR((x)/1500)'
+      && strpos($of125, "money(\$r['base_salary_lbp'], \$rRate") === false && strpos($of125, "money(\$r['echelon_value_lbp'], \$rRate") === false && strpos($of125, "money(\$r['base_plus_echelon_lbp'], \$rRate") === false
+      && strpos($of125, "lbpToUsd(composedSalaryLbp(") === false && strpos($of125, "base_plus_echelon_lbp/NULLIF") === false && strpos($of125, "base_salary_lbp/NULLIF") === false
+      && strpos($of125, "foreach (['base','ech','bpe'] as \$uk) \$add[\$uk.'_usd'] = lawUsd(\$add[\$uk]);") !== false
+      && strpos($of125, "\$fmtL = fn(\$v) => (int)\$v ? moneyLaw((int)\$v, ['withCur'=>false]) : '0';") !== false
+      && strpos($rp125, "money(\$r['base_salary_lbp'], \$r") === false && strpos($rp125, "lbpToUsd((int)\$r['base_salary_lbp']") === false && strpos($rp125, "lbpToUsd(composedSalaryLbp(") === false
+      && substr_count($rp125, "dualFromUsd(composedSalaryLbp(\$r), composedSalaryUsd(\$r))") === 4 && strpos($rp125, "money(composedSalaryLbp(") === false && strpos($of125, "money(composedSalaryLbp(") === false
+      && strpos($mp125, "money(\$salary['base_salary_lbp']") === false && substr_count($mp125, "moneyLaw(\$salary['base_plus_echelon_lbp'])") === 2
+      && strpos($rh125, "'usd' => 'SUM(' . lawUsdSql('ms.base_plus_echelon_lbp') . ')'") !== false && strpos($rh125, "\$u('ms.base_salary_lbp')") === false
+      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'cur_sal_old_usd' => (int)floor(\$curSal / officialUsdRate())") !== false);
+$ok125 = false; $why125 = '';
+try {
+    $r125 = $db->query("SELECT ms.*, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE ms.school_year = '2025-2026' AND ms.base_salary_lbp > 0 AND ms.exchange_rate > 2000 AND e.is_deleted = 0 ORDER BY ms.year, ms.month, e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$r125) throw new RuntimeException('لا صفّ');
+    $lawB = number_format(lawUsd($r125['base_salary_lbp'])); $mktB = number_format(lbpToUsd($r125['base_salary_lbp'], $r125['exchange_rate']));
+    $bad125 = [];
+    $_SESSION['display_currency'] = 'both';
+    foreach ([['pages/official_forms.php', ['form' => 'payment_list']], ['pages/official_forms.php', ['form' => 'salary_all']], ['pages/official_forms.php', ['form' => 'salary_detail']],
+              ['pages/official_forms.php', ['form' => 'full_register']], ['pages/reports.php', ['report' => 'monthly_summary']], ['pages/reports.php', ['report' => 'cnss_summary']]] as [$pg, $g]) {
+        $o = renderPage($pg, $g + ['month' => (int)$r125['month'], 'year' => (int)$r125['year']], [], [], 'both');
+        $seg = ''; $i = false; // الاسم بالعربي (تقارير المركز) أو بالفرنسي (لوائح الدولة)
+        foreach ([trim($r125['first_name_ar'] . ' ' . $r125['last_name_ar']), trim($r125['first_name_fr'] . ' ' . $r125['last_name_fr'])] as $nm) { if ($nm !== '' && ($i = strpos($o, $nm)) !== false) break; }
+        if ($i !== false) $seg = substr($o, $i, 1500);
+        if ($seg === '' || strpos($seg, '$' . $lawB) === false || ($mktB !== $lawB && strpos($seg, '$' . $mktB . '<') !== false)) $bad125[] = ($g['form'] ?? $g['report']);
+        if (stripos($o, 'Fatal error') !== false) $bad125[] = ($g['form'] ?? $g['report']) . '(fatal)';
+    }
+    unset($_SESSION['display_currency']);
+    $ok125 = !$bad125; $why125 = "emp={$r125['employee_id']} base={$r125['base_salary_lbp']} law=\$$lawB mkt=\$$mktB bad=" . implode(',', $bad125);
+} catch (Throwable $e) { $why125 = $e->getMessage(); }
+check('دولار القانون للأساس (تشغيل فعلي): أساس أوّل أستاذ يظهر ÷1500 لا بسعر الشهر بكشف الدفع/كل الموظفين/التفصيلي/الشامل/Résumé mensuel/الضمان', $ok125, $why125);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

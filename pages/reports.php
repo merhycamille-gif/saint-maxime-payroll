@@ -348,9 +348,9 @@ function reportDocThumb($path) {
                                   'tax'=>(int)$r['income_tax_lbp'],'net'=>(int)$r['net_salary_lbp'],'family'=>(int)$r['family_allowance_lbp'],
                                   'trans'=>$rTrans,'total'=>dueShownLbp($r),
                                   'extra_usd'=>extraWageUsd($r),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd($rTrans,$rRate),
-                                  'composed'=>composedSalaryLbp($r),'composed_usd'=>lbpToUsd(composedSalaryLbp($r),$rRate),
-                                  'base_usd'=>lbpToUsd((int)$r['base_salary_lbp'],$rRate),'ech_usd'=>lbpToUsd((int)$r['echelon_value_lbp'],$rRate),
-                                  'bpe_usd'=>lbpToUsd((int)$r['base_plus_echelon_lbp'],$rRate),'cnss_usd'=>lbpToUsd((int)$r['cnss_amount_lbp'],$rRate),
+                                  'composed'=>composedSalaryLbp($r),'composed_usd'=>composedSalaryUsd($r),
+                                  'base_usd'=>lawUsd((int)$r['base_salary_lbp']),'ech_usd'=>lawUsd((int)$r['echelon_value_lbp']),
+                                  'bpe_usd'=>lawUsd((int)$r['base_plus_echelon_lbp']),'cnss_usd'=>lbpToUsd((int)$r['cnss_amount_lbp'],$rRate),
                                   'caisse_usd'=>lbpToUsd((int)$r['caisse_amount_lbp'],$rRate),'eocg_usd'=>lbpToUsd((int)$r['eoc_grade_lbp'],$rRate),'tax_usd'=>lbpToUsd((int)$r['income_tax_lbp'],$rRate),
                                   'net_usd'=>lbpToUsd((int)$r['net_salary_lbp'],$rRate),'family_usd'=>lbpToUsd((int)$r['family_allowance_lbp'],$rRate),
                                   'total_usd'=>lbpToUsd(dueShownLbp($r),$rRate)];
@@ -364,12 +364,12 @@ function reportDocThumb($path) {
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                                 <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
                                 <td><?= e(gradeDisplay($r['employee_type'], $r['grade_at_month'])) ?></td>
-                                <td><?= money($r['base_salary_lbp'], $rRate) ?></td>
-                                <td><?= money($r['echelon_value_lbp'], $rRate) ?></td>
-                                <td><?= money($r['base_plus_echelon_lbp'], $rRate) ?></td>
+                                <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
+                                <td><?= moneyLaw($r['echelon_value_lbp']) ?></td>
+                                <td><?= moneyLaw($r['base_plus_echelon_lbp']) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $rRate) ?></td><?php endif; ?>
-                                <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $rRate) ?></strong></td>
+                                <td style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r)) ?></strong></td>
                                 <td><?= money($r['cnss_amount_lbp'], $rRate) ?></td>
                                 <td><?= money($r['caisse_amount_lbp'], $rRate) ?></td>
                                 <td><?= (int)$r['eoc_grade_lbp'] > 0 ? money($r['eoc_grade_lbp'], $rRate) : '—' ?></td>
@@ -412,12 +412,12 @@ function reportDocThumb($path) {
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
                     <tbody>
                         <?php
-                        $zC = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'cnss'=>0,'school'=>0]; $G = $zC; $csL = $multi?4:3;
+                        $zC = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'composed_usd'=>0,'cnss'=>0,'school'=>0]; $G = $zC; $csL = $multi?4:3;
                         $drawTotal = function($label,$a,$isGrand) use ($csL, $repRate){
                             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; ?>
                             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="<?= $csL ?>" style="text-align:right"><?= e($label) ?></td>
-                                <td><?= money($a['base'], $repRate) ?></td><?php if (salaryCompHas('extra')): ?><td><?= dualFromUsd($a['extra'], $a['extra_usd']) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($a['aide'], $repRate) ?></td><?php endif; ?>
-                                <td style="background:#eef2ff"><strong><?= money($a['composed'], $repRate) ?></strong></td>
+                                <td><?= moneyLaw($a['base']) ?></td><?php if (salaryCompHas('extra')): ?><td><?= dualFromUsd($a['extra'], $a['extra_usd']) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($a['aide'], $repRate) ?></td><?php endif; ?>
+                                <td style="background:#eef2ff"><strong><?= dualFromUsd($a['composed'], $a['composed_usd']) ?></strong></td>
                                 <td></td><td><?= money($a['cnss'], $repRate) ?></td><td><?= money($a['school'], $repRate) ?></td></tr>
                         <?php };
                         $rn=0; $curCat=null; $sub=$zC;
@@ -428,17 +428,17 @@ function reportDocThumb($path) {
                                 $sub=$zC; $curCat=$cat;
                                 ?><tr class="cat-row"><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
                             endif;
-                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'extra_usd'=>extraWageUsd($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'cnss'=>(int)$r['cnss_amount_lbp'],'school'=>(int)$r['school_cnss_8_lbp']];
+                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'extra_usd'=>extraWageUsd($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'composed_usd'=>composedSalaryUsd($r),'cnss'=>(int)$r['cnss_amount_lbp'],'school'=>(int)$r['school_cnss_8_lbp']];
                             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; } ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'])) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
-                                <td><?= money($r['base_salary_lbp'], $repRate) ?></td>
+                                <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
-                                <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $repRate) ?></strong></td>
+                                <td style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r)) ?></strong></td>
                                 <?php /* وعاء الضمان الفعلي مشتقّاً من اشتراك ٣٪ المخزّن — لا وعاء الضريبة (يطلع صفر تحت العتبة) */ ?>
                                 <td><?= money($r['cnss_amount_lbp'] ? (int)round($r['cnss_amount_lbp']/0.03) : 0, $repRate) ?></td>
                                 <td><?= money($r['cnss_amount_lbp'], $repRate) ?></td>
@@ -484,12 +484,12 @@ function reportDocThumb($path) {
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>الضريبة</th></tr></thead>
                     <tbody>
                         <?php
-                        $zX = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'txb'=>0,'fded'=>0,'tax'=>0]; $G = $zX; $csL = $multi?4:3;
+                        $zX = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'composed_usd'=>0,'txb'=>0,'fded'=>0,'tax'=>0]; $G = $zX; $csL = $multi?4:3;
                         $drawTotal = function($label,$a,$isGrand) use ($csL, $repRate){
                             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; ?>
                             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="<?= $csL ?>" style="text-align:right"><?= e($label) ?></td>
-                                <td><?= money($a['base'], $repRate) ?></td><?php if (salaryCompHas('extra')): ?><td><?= dualFromUsd($a['extra'], $a['extra_usd']) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($a['aide'], $repRate) ?></td><?php endif; ?>
-                                <td style="background:#eef2ff"><strong><?= money($a['composed'], $repRate) ?></strong></td>
+                                <td><?= moneyLaw($a['base']) ?></td><?php if (salaryCompHas('extra')): ?><td><?= dualFromUsd($a['extra'], $a['extra_usd']) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($a['aide'], $repRate) ?></td><?php endif; ?>
+                                <td style="background:#eef2ff"><strong><?= dualFromUsd($a['composed'], $a['composed_usd']) ?></strong></td>
                                 <td><strong><?= money($a['fded'], $repRate) ?></strong></td><td><strong><?= money($a['txb'], $repRate) ?></strong></td><td><strong><?= money($a['tax'], $repRate) ?></strong></td></tr>
                         <?php };
                         $rn=0; $curCat=null; $sub=$zX;
@@ -502,17 +502,17 @@ function reportDocThumb($path) {
                             endif;
                             // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55)
                             $fded43=min($fdOf($r), (int)$r['taxable_base_lbp']);
-                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'extra_usd'=>extraWageUsd($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'fded'=>$fded43,'txb'=>max(0,(int)$r['taxable_base_lbp']-$fded43),'tax'=>(int)$r['income_tax_lbp']];
+                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'extra_usd'=>extraWageUsd($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'composed_usd'=>composedSalaryUsd($r),'fded'=>$fded43,'txb'=>max(0,(int)$r['taxable_base_lbp']-$fded43),'tax'=>(int)$r['income_tax_lbp']];
                             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; } ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e($r['finance_ministry_number']) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
-                                <td><?= money($r['base_salary_lbp'], $repRate) ?></td>
+                                <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
-                                <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $repRate) ?></strong></td>
+                                <td style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r)) ?></strong></td>
                                 <td><?= money($add['fded'], $repRate) ?></td>
                                 <td><?= money($add['txb'], $repRate) ?></td>
                                 <td><strong><?= money($r['income_tax_lbp'], $repRate) ?></strong></td>
@@ -531,7 +531,7 @@ function reportDocThumb($path) {
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
-        $te=0;$ts=0;$teg=0;$teEx=0;$teExU=0;$teAi=0;$teBaseE=0;$teComposed=0;
+        $te=0;$ts=0;$teg=0;$teEx=0;$teExU=0;$teAi=0;$teBaseE=0;$teComposed=0;$teComposedU=0;
     ?>
         <form method="GET" class="card no-print">
             <input type="hidden" name="report" value="eoc_summary">
@@ -546,16 +546,16 @@ function reportDocThumb($path) {
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
                     <tbody>
-                        <?php $rn=0; foreach ($data as $r): $te += $r['caisse_amount_lbp']; $ts += $r['school_eoc_6_lbp']; $teg += $r['eoc_grade_lbp']; $teEx += extraWageLbp($r); $teExU += extraWageUsd($r); $teAi += aideCompLbp($r); $teBaseE += (int)$r['base_salary_lbp']; $teComposed += composedSalaryLbp($r); ?>
+                        <?php $rn=0; foreach ($data as $r): $te += $r['caisse_amount_lbp']; $ts += $r['school_eoc_6_lbp']; $teg += $r['eoc_grade_lbp']; $teEx += extraWageLbp($r); $teExU += extraWageUsd($r); $teAi += aideCompLbp($r); $teBaseE += (int)$r['base_salary_lbp']; $teComposed += composedSalaryLbp($r); $teComposedU += composedSalaryUsd($r); ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e($r['caisse_number']) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
-                                <td><?= money($r['base_salary_lbp'], $repRate) ?></td>
+                                <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
-                                <td style="background:#eef2ff"><strong><?= money(composedSalaryLbp($r), $repRate) ?></strong></td>
+                                <td style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r)) ?></strong></td>
                                 <td><?= money($r['caisse_amount_lbp'], $repRate) ?></td>
                                 <td><?= (int)$r['eoc_grade_lbp'] > 0 ? money($r['eoc_grade_lbp'], $repRate) : '—' ?></td>
                                 <td><?= money($r['school_eoc_6_lbp'], $repRate) ?></td>
@@ -563,7 +563,7 @@ function reportDocThumb($path) {
                         <?php endforeach; ?>
                         <?php if (!$data): ?><tr><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
                         <?php if ($data): // لا تطبع صفّ مجاميع أصفار على شهر بلا بيانات (كان يظهر تحت «لا توجد بيانات») ?>
-                        <tr class="total-row"><td colspan="<?= $multi?4:3 ?>">المجاميع — العدد: <?= $rn ?></td><td><?= money($teBaseE, $repRate) ?></td><?php if (salaryCompHas('extra')): ?><td><?= dualFromUsd($teEx, $teExU) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($teAi, $repRate) ?></td><?php endif; ?><td style="background:#eef2ff"><strong><?= money($teComposed, $repRate) ?></strong></td><td><?= money($te, $repRate) ?></td><td><?= money($teg, $repRate) ?></td><td><?= money($ts, $repRate) ?></td></tr>
+                        <tr class="total-row"><td colspan="<?= $multi?4:3 ?>">المجاميع — العدد: <?= $rn ?></td><td><?= moneyLaw($teBaseE) ?></td><?php if (salaryCompHas('extra')): ?><td><?= dualFromUsd($teEx, $teExU) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($teAi, $repRate) ?></td><?php endif; ?><td style="background:#eef2ff"><strong><?= dualFromUsd($teComposed, $teComposedU) ?></strong></td><td><?= money($te, $repRate) ?></td><td><?= money($teg, $repRate) ?></td><td><?= money($ts, $repRate) ?></td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table></div>
@@ -639,7 +639,7 @@ function reportDocThumb($path) {
             'extra_wage' => ['الأجر الإضافي / Supplément', fn($r) => isset($bonusMap[(int)$r['id']]) ? extraWageMoney($bonusMap[(int)$r['id']]) : money(0)],
             'aide'    => ['مكافأة ومساعدة / Prime & aide', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(aideCompLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : money(0)],
             'transport' => ['تعويض النقل / Transport', fn($r) => isset($bonusMap[(int)$r['id']]) ? money((float)$bonusMap[(int)$r['id']]['transport_lbp'], rowRate($bonusMap[(int)$r['id']])) : money(0)],
-            'composed' => ['الراتب المركّب / Salaire composé', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(composedSalaryLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : money(0)],
+            'composed' => ['الراتب المركّب / Salaire composé', fn($r) => isset($bonusMap[(int)$r['id']]) ? dualFromUsd(composedSalaryLbp($bonusMap[(int)$r['id']]), composedSalaryUsd($bonusMap[(int)$r['id']])) : money(0)],
             'nssf'    => ['ضمان / N° CNSS', fn($r) => e($r['nssf_number'])],
             'mof'     => ['مالية / N° MOF', fn($r) => e($r['finance_ministry_number'])],
             'caisse'  => ['صندوق / N° Caisse', fn($r) => e($r['caisse_number'])],

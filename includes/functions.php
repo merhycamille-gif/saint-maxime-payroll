@@ -4187,6 +4187,20 @@ function compColsCount(bool $withTransport = true): int {
 /** الراتب المركّب بالليرة = أساس+درجة + المكوّنات المختارة (إضافي/مكافأة-مساعدة).
  *  🔴 قاعدة المستخدم (2026-08-06): تعويض النقل **لا يدخل بالمركّب أبداً** — النقل عمود
  *  مستقل يوضع قبل «الإجمالي المتوجب» فيُجمع فيه (خيار transport بالشريط يتحكّم بعموده فقط). */
+// 💵 «p1: أساس الراتب والراتب بعد التدرّج على أساس دولار 1500 — انتبه» (2026-09-14): دولار الأساس/الدرجة/الراتب بعد التدرّج
+//    بكل الكشوف والتقارير = ÷ السعر الرسمي القديم (officialUsdRate، 1500) داون — لا بسعر الشهر. الصافي/المحسومات/النقل تبقى بسعر الشهر.
+//    المصدر الواحد: lawUsd (PHP) + lawUsdSql (SQL) + moneyLaw (خلية ليرة+دولار) + composedSalaryUsd (المركّب = مجموع دولارات مكوّناته الظاهرة).
+function lawUsd($lbp): float { return floor((float)$lbp / officialUsdRate()); }
+function lawUsdSql(string $expr): string { return 'FLOOR((' . $expr . ')/' . officialUsdRate() . ')'; }
+function moneyLaw($lbp, array $opts = []): string { return money($lbp, officialUsdRate(), $opts); }
+/** دولار «الراتب المركّب» = دولار القانون للأساس بعد التدرّج + دولار الإضافي بالقانون + دولار المكافأة بسعر الشهر (الأرقام تركب) */
+function composedSalaryUsd(array $row): float {
+    $u = lawUsd($row['base_plus_echelon_lbp'] ?? 0);
+    if (salaryCompHas('extra')) $u += extraWageUsd($row);
+    if (salaryCompHas('aide'))  $u += lbpToUsd((int)($row['aide_complementaire_lbp'] ?? 0), rowRate($row));
+    return $u;
+}
+
 function composedSalaryLbp(array $row): int {
     $s = (int)($row['base_plus_echelon_lbp'] ?? 0);
     if (salaryCompHas('extra'))     $s += (int)($row['extra_lbp'] ?? 0) + (int)($row['prime_fixe_lbp'] ?? 0);
