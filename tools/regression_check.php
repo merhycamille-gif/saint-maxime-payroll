@@ -6013,6 +6013,35 @@ try {
 } catch (Throwable $e) { $why123 = $e->getMessage(); }
 check('زرّ اتجاه الورقة (تشغيل فعلي): يظهر مرّة واحدة بكشف الدفع وبـRésumé mensuel مع export.js', $ok123, $why123);
 
+/* ===================================================================
+ * 124) 📄📗 (2026-09-14 «وقت عم نحفظ PDF على الكمبيوتر ما عم تظهر عناوين الصفحة بكل ورقة، وما بقى في طباعة إكسل ولا وورد»):
+ *      pdf-save.js: كل ورقة بعد الأولى تعيد ترويسة المستند (ما قبل أوّل جدول) + رأس الجدول (thead) الذي انقطع فيه.
+ *      official_forms: الكشوف الجدولية الـ12 (ofOfficeForms) ترجع لها أزرار Excel/Word بالمتصفّح؛ النماذج الرسمية الثابتة بلا.
+ * =================================================================== */
+$ps124 = (string)file_get_contents($PROJ . '/assets/js/pdf-save.js'); $of124 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+check('PDF بعناوين بكل ورقة + إكسل/وورد للكشوف (كود): headEnd/thead بالتقطيع + ofOfficeForms مصدر واحد لـno_office',
+      strpos($ps124, "var headEnd = firstTbl ? Math.max(0, firstTbl.getBoundingClientRect().top - top0) : 0;") !== false && strpos($ps124, "var fy = canvas.height / areaHm;") !== false && strpos($ps124, "cuts = cuts.map(P).filter(") !== false
+      && strpos($ps124, "var repH = idx > 0 ? headEnd : 0, thTop = 0, thH = 0;") !== false
+      && strpos($ps124, "if (repH > 0) { cc.drawImage(canvas, 0, 0, canvas.width, repH, 0, 0, canvas.width, repH); oy += repH; }") !== false
+      && strpos($ps124, "if (thH > 0) { cc.drawImage(canvas, 0, thTop, canvas.width, thH, 0, oy, canvas.width, thH); oy += thH; }") !== false
+      && strpos($ps124, "doc.addImage(c.toDataURL('image/jpeg', canvas.height > 9000 ? 0.8 : 0.92), 'JPEG', M, M, boxW, c.height * scale);") !== false
+      && strpos($of124, "function ofOfficeForms(): array { return ['salary_all', 'salary_detail', 'payment_list', 'employer_cost', 'full_register', 'teaching_staff', 'eoc_staff', 'eoc_quarterly', 'differences', 'general_report', 'staff_stats', 'general_info']; }") !== false
+      && strpos($of124, "\$exportOpts['no_office'] = !in_array(\$form, ofOfficeForms(), true);") !== false);
+$ok124 = false; $why124 = '';
+try {
+    $bad124 = [];
+    foreach (['salary_all', 'payment_list', 'full_register', 'staff_stats'] as $f) {
+        $o = renderPage('pages/official_forms.php', ['form' => $f, 'month' => 10, 'year' => 2025], []);
+        if (substr_count($o, 'onclick="ppExcel(') !== 1 || substr_count($o, 'onclick="ppWord(') !== 1 || substr_count($o, 'id="ppExportArea"') !== 1) $bad124[] = $f;
+    }
+    foreach (['tax_r6t', 'cnss_annual'] as $f) {
+        $o = renderPage('pages/official_forms.php', ['form' => $f, 'month' => 10, 'year' => 2025], []);
+        if (strpos($o, 'onclick="ppExcel(') !== false || strpos($o, 'onclick="ppWord(') !== false) $bad124[] = $f . '(office!)';
+    }
+    $ok124 = !$bad124; $why124 = 'bad=' . implode(',', $bad124);
+} catch (Throwable $e) { $why124 = $e->getMessage(); }
+check('إكسل/وورد للكشوف (تشغيل فعلي): زرّا Excel/Word مرّة واحدة بالكشوف الجدولية، وغائبان بالنماذج الرسمية الثابتة', $ok124, $why124);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

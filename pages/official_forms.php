@@ -285,7 +285,10 @@ $isMarried = strpos($famStatus, 'marie') === 0;
 
 // النماذج الحكومية ثابتة التصميم — أخفِ Excel/Word العامّين (يطلعان متل بلوك)؛ محلّهما PDF رسمي
 // + أزرار التعبئة من القالب الرسمي (للنماذج المدعومة مثل الضمان).
-$exportOpts['no_office'] = true;
+// 📗 (2026-09-14 «ما بقى في طباعة إكسل ولا وورد»): الكشوف الجدولية (doc-table داخل ppExportArea) ترجع لها أزرار
+//    Excel/Word بالمتصفّح — المصدر الواحد ofOfficeForms(); النماذج الرسمية الثابتة تبقى بلا.
+function ofOfficeForms(): array { return ['salary_all', 'salary_detail', 'payment_list', 'employer_cost', 'full_register', 'teaching_staff', 'eoc_staff', 'eoc_quarterly', 'differences', 'general_report', 'staff_stats', 'general_info']; }
+$exportOpts['no_office'] = !in_array($form, ofOfficeForms(), true);
 
 // وضع «عرض المستند»: عند فتح نموذج/تقرير تختفي القوائم ويصير الرجوع لنفس الصفحة الأصلية
 if ($form !== '') $docFocus = true;

@@ -103,6 +103,11 @@
         var designW = landscape ? 1040 : 720;                 // عرض ورقة A4 داخل الهوامش (px)
         var prevW = area.style.width, prevMax = area.style.maxWidth, prevMg = area.style.margin;
         area.style.width = designW + 'px'; area.style.maxWidth = 'none'; area.style.margin = '0';
+        // صفّ «عنوان التقرير بكل ورقة» الذي يحقنه app.js برأس الجدول للطباعة الورقية — هنا نعيد الترويسة بأنفسنا
+        // فوق كل ورقة فيُخفى وقت القياس والتصوير معاً (وإلا ظهر العنوان مرّتين)
+        var prRows = []; area.querySelectorAll('.pr-title-row').forEach(function (r) { prRows.push([r, r.style.display]); r.style.display = 'none'; });
+        // رؤوس الأعمدة اللاصقة (position:sticky من app.js) تنزاح بالتصوير فتترك صفّاً فارغاً فوقها — ثابتة وقت التصوير فقط
+        var stStyle = document.createElement('style'); stStyle.textContent = '#ppExportArea th, .doc-sheet th, .land-report th { position: static !important; }'; document.head.appendChild(stStyle);
         // الجداول العريضة داخل حاويات تمرير (table-wrapper) كانت تُقصّ — نكشف الفيض ونوسّع الورقة على قدّ أعرض جدول (تُلاءَم بالـPDF)
         var wraps = [], need = designW;
         area.querySelectorAll('.table-wrapper, [style*="overflow"]').forEach(function (w) { wraps.push([w, w.style.overflow, w.style.overflowX]); w.style.overflow = 'visible'; w.style.overflowX = 'visible'; });
@@ -110,32 +115,75 @@
         if (need > designW) area.style.width = need + 'px';
         var sw = area.scrollWidth; if (sw > need + 2) area.style.width = sw + 'px';
         var ratio = 2; var hPx = area.scrollHeight; if (hPx * ratio > 28000) ratio = Math.max(1, 28000 / hPx);
-        function undo() { area.style.width = prevW; area.style.maxWidth = prevMax; area.style.margin = prevMg; wraps.forEach(function (x) { x[0].style.overflow = x[1]; x[0].style.overflowX = x[2]; }); restore(); cur.done(); }
+        function undo() { area.style.width = prevW; area.style.maxWidth = prevMax; area.style.margin = prevMg; wraps.forEach(function (x) { x[0].style.overflow = x[1]; x[0].style.overflowX = x[2]; }); prRows.forEach(function (x) { x[0].style.display = x[1]; }); if (stStyle.parentNode) stStyle.parentNode.removeChild(stStyle); restore(); cur.done(); }
         // مواضع القطع الآمنة = بدايات صفوف الجداول والفقرات (بالبكسل بعد التصوير) — الصفحة تنتهي عند حدّ صفّ لا وسطه
-        var top0 = area.getBoundingClientRect().top, cuts = [];
-        area.querySelectorAll('tr, .doc-head, h1, h2, h3, h4, p, .card, .alert, .table-wrapper, section').forEach(function (el) { var r = el.getBoundingClientRect(); if (r.height > 0) cuts.push(Math.round((r.top - top0) * ratio)); });
-        cuts = cuts.filter(function (v, i, a) { return v > 0 && a.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
+        // 🔴 المواضع تُقاس بالـCSS px ثم تُحوَّل بعد التصوير بالنسبة الفعلية (canvas.height ÷ ارتفاع المنطقة): المتصفّح يسقف
+        //    اللوحة عند 16384px فيصغّرها كلها — الضرب بـratio وحده كان يخطئ بالتقارير الطويلة (عناوين مكرّرة/صفوف مقطوعة)
+        var aRect = area.getBoundingClientRect(), top0 = aRect.top, areaHm = Math.max(1, aRect.height), cuts = [];
+        area.querySelectorAll('tr, .doc-head, h1, h2, h3, h4, p, .card, .alert, .table-wrapper, section').forEach(function (el) { var r = el.getBoundingClientRect(); if (r.height > 0) cuts.push(r.top - top0); });
+        // 🔁 «وقت عم نحفظ PDF ما عم تظهر عناوين الصفحة بكل ورقة» (2026-09-14): كل ورقة بعد الأولى تعيد فوقها
+        // ترويسة المستند (كل ما قبل أوّل جدول: الشعار + عنوان التقرير + معلوماته) ثم رأس الجدول (thead) الذي
+        // انقطع فيه — كما تفعل الطباعة على الورق. تُقاس المواضع بالبكسل بعد التصوير (ratio).
+        var tblSel = area.querySelector('table.doc-table') ? 'table.doc-table' : 'table';
+        var firstTbl = area.querySelector(tblSel);
+        var headEnd = firstTbl ? Math.max(0, firstTbl.getBoundingClientRect().top - top0) : 0;
+        var tbls = [];
+        area.querySelectorAll(tblSel).forEach(function (t) {
+            var r = t.getBoundingClientRect(), th = t.querySelector('thead'), tr = th ? th.getBoundingClientRect() : null;
+            tbls.push({ top: r.top - top0, bottom: r.bottom - top0, thTop: tr ? tr.top - top0 : 0, thBot: tr ? tr.bottom - top0 : 0 });
+        });
         step('toCanvas generic');
         return window.htmlToImage.toCanvas(area, { pixelRatio: ratio, backgroundColor: '#ffffff' }).then(function (canvas) {
+            var fy = canvas.height / areaHm;                   // النسبة الفعلية CSS px → px اللوحة
+            var P = function (v) { return Math.round(v * fy); };
+            cuts = cuts.map(P).filter(function (v, i, a) { return v > 0 && a.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
+            headEnd = P(headEnd);
+            tbls = tbls.map(function (t) { return { top: P(t.top), bottom: P(t.bottom), thTop: P(t.thTop), thBot: P(t.thBot) }; });
+            var ctx0 = canvas.getContext('2d');
+            // 🎯 ضبط رأس الجدول بالبكسل من اللوحة نفسها: رأس doc-table شريط داكن (#1F4E5F) — نبحث عنه حول الموضع المقيس
+            //    فتصير حدوده مضبوطة مهما اختلف القياس عن التصوير ببضع بكسلات (كان يطلع ذيل العنوان مقصوصاً فوق الرأس)
+            function darkBand(from, to) {
+                from = Math.max(0, from); to = Math.min(canvas.height - 1, to);
+                var w = canvas.width, top = -1, miss = 0;
+                function dark(y) { var d = ctx0.getImageData(0, y, w, 1).data, n = 0, k = 0; for (var x = 0; x < d.length; x += 32) { k++; if (d[x] * 0.3 + d[x + 1] * 0.59 + d[x + 2] * 0.11 < 110) n++; } return n > k * 0.5; }
+                for (var y = from; y <= to; y++) {
+                    if (top < 0) { if (dark(y)) top = y; continue; }
+                    if (dark(y)) { miss = 0; continue; }
+                    if (++miss >= 3) return [top, y - miss + 1];
+                }
+                return top >= 0 ? [top, to + 1] : null;
+            }
+            tbls.forEach(function (t) { if (t.thBot > t.thTop) { var b = darkBand(t.thTop - 40, t.thBot + 40); if (b && b[1] - b[0] >= 8) { t.thTop = b[0]; t.thBot = b[1]; } } });
+            if (tbls.length && tbls[0].thBot > tbls[0].thTop) headEnd = tbls[0].thTop; // الترويسة = كل ما فوق رأس الجدول الأوّل
+            step('generic fy=' + fy.toFixed(3) + ' canvas=' + canvas.width + 'x' + canvas.height + ' head=' + headEnd);
             var doc = new window.jspdf.jsPDF({ orientation: landscape ? 'l' : 'p', unit: 'mm', format: 'a4' });
             var pageW = landscape ? 297 : 210, pageH = landscape ? 210 : 297, M = 8;
             var boxW = pageW - 2 * M, boxH = pageH - 2 * M;
             var scale = boxW / canvas.width;                   // mm لكل px
             var pagePx = Math.floor(boxH / scale);
+            if (headEnd > pagePx * 0.4) headEnd = 0;           // ترويسة أطول من ٤٠٪ الورقة → لا تُعاد
             var ctx = canvas.getContext('2d');
             var y = 0, idx = 0;
             while (y < canvas.height) {
-                var want = Math.min(pagePx, canvas.height - y);
+                // ما يُعاد فوق هذه الورقة (بعد الأولى): الترويسة + رأس الجدول الذي نحن داخله
+                var repH = idx > 0 ? headEnd : 0, thTop = 0, thH = 0;
+                if (idx > 0) for (var q = 0; q < tbls.length; q++) { var tb = tbls[q]; if (y > tb.thBot && y < tb.bottom && tb.thBot > tb.thTop) { thTop = tb.thTop; thH = tb.thBot - tb.thTop; break; } }
+                if (repH + thH > pagePx * 0.5) { repH = 0; thH = 0; }
+                var avail = pagePx - repH - thH;
+                var want = Math.min(avail, canvas.height - y);
                 var h = want;
                 if (y + want < canvas.height) {
                     var best = 0;
                     for (var k = 0; k < cuts.length; k++) { if (cuts[k] > y + Math.floor(want * 0.45) && cuts[k] <= y + want - 2) best = cuts[k] - y; if (cuts[k] > y + want) break; }
                     h = best > 0 ? best : safeCut(canvas, ctx, y, want);
                 }
-                var c = document.createElement('canvas'); c.width = canvas.width; c.height = h;
-                c.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+                var c = document.createElement('canvas'); c.width = canvas.width; c.height = repH + thH + h;
+                var cc = c.getContext('2d'), oy = 0;
+                if (repH > 0) { cc.drawImage(canvas, 0, 0, canvas.width, repH, 0, 0, canvas.width, repH); oy += repH; }
+                if (thH > 0) { cc.drawImage(canvas, 0, thTop, canvas.width, thH, 0, oy, canvas.width, thH); oy += thH; }
+                cc.drawImage(canvas, 0, y, canvas.width, h, 0, oy, canvas.width, h);
                 if (idx > 0) doc.addPage('a4', landscape ? 'l' : 'p');
-                doc.addImage(c.toDataURL('image/jpeg', canvas.height > 9000 ? 0.8 : 0.92), 'JPEG', M, M, boxW, h * scale); // الطويل بجودة أخفّ (حجم أصغر للإيميل)
+                doc.addImage(c.toDataURL('image/jpeg', canvas.height > 9000 ? 0.8 : 0.92), 'JPEG', M, M, boxW, c.height * scale); // الطويل بجودة أخفّ (حجم أصغر للإيميل)
                 y += h; idx++;
                 if (idx > 60) break;                          // صمام: 60 صفحة كحدّ أقصى
             }
