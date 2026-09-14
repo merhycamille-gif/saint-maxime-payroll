@@ -6053,13 +6053,14 @@ check('دولار القانون للأساس (كود): lawUsd/lawUsdSql/moneyLa
       function_exists('lawUsd') && function_exists('lawUsdSql') && function_exists('moneyLaw') && function_exists('composedSalaryUsd')
       && lawUsd(3445000) === 2296.0 && lawUsd(1499) === 0.0 && lawUsdSql('x') === 'FLOOR((x)/1500)'
       && strpos($of125, "money(\$r['base_salary_lbp'], \$rRate") === false && strpos($of125, "money(\$r['echelon_value_lbp'], \$rRate") === false && strpos($of125, "money(\$r['base_plus_echelon_lbp'], \$rRate") === false
-      && strpos($of125, "lbpToUsd(composedSalaryLbp(") === false && strpos($of125, "base_plus_echelon_lbp/NULLIF") === false && strpos($of125, "base_salary_lbp/NULLIF") === false
+      && strpos($of125, "lbpToUsd(composedSalaryLbp(") === false && substr_count($of125, "base_plus_echelon_lbp/NULLIF(") === 2 && substr_count($of125, "AS bpe_usd_mkt,") === 1 && substr_count($of125, ") bpe_usd_mkt,") === 1 && strpos($of125, "base_salary_lbp/NULLIF") === false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "function composedSalaryUsd(array \$row): float { return lbpToUsd(composedSalaryLbp(\$row), rowRate(\$row)); }") !== false
       && strpos($of125, "foreach (['base','ech','bpe'] as \$uk) \$add[\$uk.'_usd'] = lawUsd(\$add[\$uk]);") !== false
       && strpos($of125, "\$fmtL = fn(\$v) => (int)\$v ? moneyLaw((int)\$v, ['withCur'=>false]) : '0';") !== false
       && strpos($rp125, "money(\$r['base_salary_lbp'], \$r") === false && strpos($rp125, "lbpToUsd((int)\$r['base_salary_lbp']") === false && strpos($rp125, "lbpToUsd(composedSalaryLbp(") === false
       && substr_count($rp125, "dualFromUsd(composedSalaryLbp(\$r), composedSalaryUsd(\$r))") === 4 && strpos($rp125, "money(composedSalaryLbp(") === false && strpos($of125, "money(composedSalaryLbp(") === false
       && strpos($mp125, "money(\$salary['base_salary_lbp']") === false && substr_count($mp125, "moneyLaw(\$salary['base_plus_echelon_lbp'])") === 2
-      && strpos($rh125, "'usd' => 'SUM(' . lawUsdSql('ms.base_plus_echelon_lbp') . ')'") !== false && strpos($rh125, "\$u('ms.base_salary_lbp')") === false
+      && strpos($rh125, "'usd' => 'SUM(' . lawUsdSql('ms.base_plus_echelon_lbp') . ')'") !== false && strpos($rh125, "\$u('ms.base_salary_lbp')") === false && strpos($rh125, "\$r['composed_usd'] = (float)\$r['bpe_usd_mkt'] + (\$hasE") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'cur_sal_old_usd' => (int)floor(\$curSal / officialUsdRate())") !== false);
 $ok125 = false; $why125 = '';
 try {
@@ -6089,10 +6090,11 @@ check('دولار القانون للأساس (تشغيل فعلي): أساس أ
  *      بكل الكشوف الجدولية ومركز التقارير؛ يختفي بوضع «ليرة فقط»؛ التقرير العام السنوي بلا سعر شهر.
  * =================================================================== */
 $of126 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp126 = (string)file_get_contents($PROJ . '/pages/reports.php'); $rh126 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
-check('سعر الصرف بالعناوين (كود): rateHead مصدر واحد + 16 law/7 mkt/7 مركّب بالنماذج + 6/1/4 بالمركز + CSS .rate-head + بلا سعر شهر بالتقرير العام السنوي',
+check('سعر الصرف بالعناوين (كود): rateHead مصدر واحد + 15 law (أساس/درجة/بعد التدرّج) و13 mkt (المركّب/الإجمالي/الصافي/المستحق) بالنماذج + 6/5 بالمركز + CSS .rate-head + الفروقات والتقرير العام السنويان بلا سعر شهر تحت المركّب',
       function_exists('rateHead') && strpos($rh126, '.doc-table th .rate-head{display:block;') !== false
-      && substr_count($of126, "<?= rateHead('law') ?></th>") === 23 && substr_count($of126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 7
-      && substr_count($rp126, "<?= rateHead('law') ?></th>") === 10 && substr_count($rp126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 1
+      && substr_count($of126, "<?= rateHead('law') ?></th>") === 15 && substr_count($of126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 13
+      && substr_count($of126, "</small><?= rateHead('mkt', \$month, \$year) ?></th>") === 5 && substr_count($of126, "</small><?= rateHead('law') ?></th>") === 0 && strpos($of126, "<th>الأجر الإجمالي<?= rateHead('mkt', \$month, \$year) ?></th>") !== false
+      && substr_count($rp126, "<?= rateHead('law') ?></th>") === 6 && substr_count($rp126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 5 && substr_count($rp126, "</small><?= rateHead('mkt', \$month, \$year) ?></th>") === 4
       && strpos($of126, "الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th>") !== false
       && rateHead('law') === '<br><small class="rate-head" dir="ltr">1 $ = ' . number_format(officialUsdRate(), 0, '.', ',') . '</small>');
 $ok126 = false; $why126 = '';
@@ -6100,14 +6102,14 @@ try {
     $bad126 = [];
     $o = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], [], [], 'both');
     $mk = number_format((float)getExchangeRate(10, 2025), 0, '.', ',');
-    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 4 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 2) $bad126[] = 'salary_all(both)';
+    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 3 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 3) $bad126[] = 'salary_all(both)';
     $o = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], [], [], 'lbp');
     if (strpos($o, 'class="rate-head"') !== false) $bad126[] = 'salary_all(lbp يعرض)'; // (نصّ CSS يحوي rate-head — نفحص الصنف بالخلية)
     $o = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], [], [], 'both');
-    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 4 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 1) $bad126[] = 'monthly_summary';
+    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 3 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 2) $bad126[] = 'monthly_summary';
     $ok126 = !$bad126; $why126 = "mkt=$mk bad=" . implode(',', $bad126);
 } catch (Throwable $e) { $why126 = $e->getMessage(); }
-check('سعر الصرف بالعناوين (تشغيل فعلي): كشف كل الموظفين 4×1,500 + 2×سعر الشهر، يختفي بوضع الليرة، Résumé mensuel 4 + 1', $ok126, $why126);
+check('سعر الصرف بالعناوين (تشغيل فعلي): كشف كل الموظفين 3×1,500 (أساس/درجة/بعد التدرّج) + 3×سعر الشهر (المركّب/الصافي/المدفوعات)، يختفي بوضع الليرة، Résumé mensuel 3 + 2', $ok126, $why126);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

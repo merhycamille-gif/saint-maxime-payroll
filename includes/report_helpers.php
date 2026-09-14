@@ -753,6 +753,7 @@ function annualTotalRows(PDO $db, string $schoolYear, string $empFilter, array $
         $sel[] = $it['lbp'] . ' `' . $k . '`';
         $sel[] = $it['usd'] . ' `' . $k . '_usd`';
     }
+    $sel[] = 'SUM(FLOOR(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0))) `bpe_usd_mkt`'; // للمركّب بسعر الشهر (bpe_usd = دولار القانون للعرض)
     $st = $db->prepare("SELECT ms.school_id, COUNT(*) cnt, " . implode(', ', $sel) . "
                         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                         WHERE e.is_deleted = 0" . $empFilter . $empTypeSql . " AND ms.school_year = ?
@@ -766,7 +767,7 @@ function annualTotalRows(PDO $db, string $schoolYear, string $empFilter, array $
     foreach ($rows as &$r) {
         if (!$hasT) { $r['total'] = (int)$r['total'] - (int)$r['transport']; $r['total_usd'] = (float)$r['total_usd'] - (float)$r['transport_usd']; }
         $r['composed']     = (int)$r['bpe'] + ($hasE ? (int)$r['extra_wage'] : 0) + ($hasA ? (int)$r['aide'] : 0) + ($hasT ? (int)$r['transport'] : 0);
-        $r['composed_usd'] = (float)$r['bpe_usd'] + ($hasE ? (float)$r['extra_wage_usd'] : 0) + ($hasA ? (float)$r['aide_usd'] : 0) + ($hasT ? (float)$r['transport_usd'] : 0);
+        $r['composed_usd'] = (float)$r['bpe_usd_mkt'] + ($hasE ? (float)$r['extra_wage_usd'] : 0) + ($hasA ? (float)$r['aide_usd'] : 0) + ($hasT ? (float)$r['transport_usd'] : 0);
         $tot['cnt'] += (int)$r['cnt'];
         foreach ($items as $k => $_) { $tot[$k] += (int)$r[$k]; $tot[$k . '_usd'] += (float)$r[$k . '_usd']; }
     }

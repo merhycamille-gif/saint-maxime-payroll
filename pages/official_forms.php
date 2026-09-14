@@ -1346,7 +1346,7 @@ elseif ($form === 'teacher_card'):
                 <th rowspan="2">عدد ساعات التعليم</th>
                 <th rowspan="2">أساس الراتب<?= rateHead('law') ?></th>
                 <?= extraAideHeads(' rowspan="2"') ?><?= transportHead(' rowspan="2"') ?>
-                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th>
+                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
                 <?php if (!$isMlk): ?><th rowspan="2">تعاقد رسمي</th><?php endif; ?>
                 <th rowspan="2">التوقيع</th>
             </tr>
@@ -1635,7 +1635,7 @@ elseif ($form === 'teacher_card'):
         <thead><tr>
             <th>#</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><th>درجة عادية واستثنائية<?= rateHead('law') ?></th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
             <?= extraAideHeads() ?>
-            <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th>
+            <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
             <th>صندوق التعويضات ٦٪</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى صندوق التعويضات</small></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>ضريبة الدخل</th><th>الضمان الاجتماعي</th>
             <th>مجموع المحسومات</th><th>تعويض عائلي</th><?= transportHead('', 'تعويض نقل') ?><th>مجموع المدفوعات<?= rateHead('mkt', $month, $year) ?></th><th>الصافي<?= rateHead('mkt', $month, $year) ?></th>
             <th>توقيع الموظف</th>
@@ -1727,6 +1727,7 @@ elseif ($form === 'teacher_card'):
                    SUM(CASE WHEN ms.school_year=? THEN FLOOR(ms.aide_complementaire_lbp/NULLIF(ms.exchange_rate,0)) ELSE 0 END) AS aide_usd,
                    SUM(CASE WHEN ms.school_year=? THEN ms.base_plus_echelon_lbp ELSE 0 END) AS bpe,
                    SUM(CASE WHEN ms.school_year=? THEN " . lawUsdSql('ms.base_plus_echelon_lbp') . " ELSE 0 END) AS bpe_usd,
+                   SUM(CASE WHEN ms.school_year=? THEN FLOOR(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0)) ELSE 0 END) AS bpe_usd_mkt,
                    SUM(CASE WHEN ms.school_year=? THEN ms.transport_lbp ELSE 0 END) AS transport,
                    SUM(CASE WHEN ms.school_year=? THEN FLOOR(ms.transport_lbp/NULLIF(ms.exchange_rate,0)) ELSE 0 END) AS transport_usd,
                    SUM(CASE WHEN ms.school_year=? THEN ms.base_salary_lbp ELSE 0 END) AS base_salary,
@@ -1736,7 +1737,7 @@ elseif ($form === 'teacher_card'):
             FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
             WHERE e.is_deleted=0 AND ms.school_year IN (?, ?) AND " . schoolScopeWhere('e.school_id') . "
             GROUP BY e.id, e.employee_type HAVING (cur>0 OR prev>0) ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
-    $q->execute([$schoolYear, $prevSY, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $prevSY, $schoolYear, $prevSY]);
+    $q->execute([$schoolYear, $prevSY, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $prevSY, $schoolYear, $prevSY]);
     $rows = $q->fetchAll();
     $tc=0;$tp=0;$tEx=0;$tAi=0;$tBase=0;
 ?>
@@ -1744,7 +1745,7 @@ elseif ($form === 'teacher_card'):
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الفروقات — <?= e($prevSY) ?> مقابل <?= e($schoolYear) ?></div>
     <table class="doc-table">
-        <thead><tr><th>#</th><th>الاسم والشهرة</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th><th>صافي <?= e($prevSY) ?></th><th>صافي <?= e($schoolYear) ?></th><th>الفرق</th></tr></thead>
+        <thead><tr><th>#</th><th>الاسم والشهرة</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>صافي <?= e($prevSY) ?></th><th>صافي <?= e($schoolYear) ?></th><th>الفرق</th></tr></thead>
         <tbody>
         <?php
         $zD = ['base'=>0,'ex'=>0,'ai'=>0,'prev'=>0,'cur'=>0,'ex_usd'=>0.0,'ai_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,'base_usd'=>0.0,'prev_usd'=>0.0,'cur_usd'=>0.0]; $G=$zD;
@@ -1766,7 +1767,7 @@ elseif ($form === 'teacher_card'):
                 ?><tr class="cat-row"><td colspan="<?= 7 + compColsCount(false) ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
             $compL = (int)$r['bpe'] + (salaryCompHas('extra')?(int)$r['extra_wage']:0) + (salaryCompHas('aide')?(int)$r['aide']:0) + (salaryCompHas('transport')?(int)$r['transport']:0);
-            $compU = (float)$r['bpe_usd'] + (salaryCompHas('extra')?(float)$r['extra_wage_usd']:0) + (salaryCompHas('aide')?(float)$r['aide_usd']:0) + (salaryCompHas('transport')?(float)$r['transport_usd']:0);
+            $compU = (float)$r['bpe_usd_mkt'] + (salaryCompHas('extra')?(float)$r['extra_wage_usd']:0) + (salaryCompHas('aide')?(float)$r['aide_usd']:0) + (salaryCompHas('transport')?(float)$r['transport_usd']:0);
             $add=['base'=>(int)$r['base_salary'],'ex'=>(int)$r['extra_wage'],'ai'=>(int)$r['aide'],'prev'=>(int)$r['prev'],'cur'=>(int)$r['cur'],'ex_usd'=>(float)$r['extra_wage_usd'],'ai_usd'=>(float)$r['aide_usd'],'composed'=>$compL,'composed_usd'=>$compU,
                   'base_usd'=>(float)$r['base_salary_usd'],'prev_usd'=>(float)$r['prev_usd'],'cur_usd'=>(float)$r['cur_usd']];
             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; }
@@ -1834,7 +1835,7 @@ elseif ($form === 'teacher_card'):
         <thead><tr>
             <th>اسم المؤسسة</th>
             <th>أساس الراتب<?= rateHead('law') ?></th>
-            <th>الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th><?= transportHead() ?><?php if (salaryCompHas('transport')): ?><th>الرواتب الصافية<br>مع تعويض النقل</th><?php endif; ?>
+            <th>الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><?= transportHead() ?><?php if (salaryCompHas('transport')): ?><th>الرواتب الصافية<br>مع تعويض النقل</th><?php endif; ?>
             <th>الضمان الاجتماعي</th><th>صندوق التعويضات</th><th>ضريبة الدخل</th><th>المجموع</th>
         </tr></thead>
         <tbody>
@@ -2447,7 +2448,7 @@ elseif ($form === 'payment_list'):
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الدفع — رواتب <?= monthName($month,'ar').' '.$year ?></div>
     <table class="doc-table">
-        <thead><tr><th>#</th><th>الرمز</th><th>الاسم والشهرة</th><th>رقم الضمان</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th><?= transportHead() ?><th>الصافي (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>الإجمالي المتوجب (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>التوقيع بالاستلام</th></tr></thead>
+        <thead><tr><th>#</th><th>الرمز</th><th>الاسم والشهرة</th><th>رقم الضمان</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><?= transportHead() ?><th>الصافي (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>الإجمالي المتوجب (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>التوقيع بالاستلام</th></tr></thead>
         <tbody>
         <?php
         $zP = ['base'=>0,'ex'=>0,'ai'=>0,'trans'=>0,'net'=>0,'due'=>0,'ex_usd'=>0.0,'ai_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,'base_usd'=>0.0,'net_usd'=>0.0,'due_usd'=>0.0]; $G = $zP;
@@ -2526,7 +2527,7 @@ elseif ($form === 'payment_list'):
             <th>#</th><?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
             <th>اسم الأستاذ</th><th>عدد الساعات</th><th>أساس الراتب<?= rateHead('law') ?></th><th>درجة وتدرّج<?= rateHead('law') ?></th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
             <?= extraAideHeads() ?>
-            <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th>
+            <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
             <th>مساهمة الضمان ٨٪</th><th>صندوق التعويضات ٦٪</th><th>نهاية الخدمة ٨.٥٪</th><th>تعويضات عائلية ٦٪</th>
             <th>التعويضات العائلية</th><?= transportHead() ?><th>ضريبة الدخل</th><th>الكلفة على المؤسسة<?= rateHead('mkt', $month, $year) ?></th>
         </tr></thead>
@@ -2606,6 +2607,7 @@ elseif ($form === 'payment_list'):
             SUM(net_salary_lbp) net, COUNT(DISTINCT ms.employee_id) n,
             SUM(" . lawUsdSql('base_salary_lbp') . ") baseS_usd,
             SUM(" . lawUsdSql('base_plus_echelon_lbp') . ") bpe_usd,
+            SUM(FLOOR(base_plus_echelon_lbp/NULLIF(exchange_rate,0))) bpe_usd_mkt,
             SUM(" . extraWageUsdSql('') . ") extraWage_usd,
             SUM(FLOOR(aide_complementaire_lbp/NULLIF(exchange_rate,0))) aideC_usd,
             SUM(FLOOR(family_allowance_lbp/NULLIF(exchange_rate,0))) family_usd,
@@ -2627,7 +2629,7 @@ elseif ($form === 'payment_list'):
     $gross = (int)($g['bpe']??0)
            + (salaryCompHas('extra') ? (int)($g['extraWage']??0) : 0)
            + (salaryCompHas('aide')  ? (int)($g['aideC']??0) : 0);
-    $grossU = (float)($g['bpe_usd']??0)
+    $grossU = (float)($g['bpe_usd_mkt']??0) // الإجمالي بسعر الشهر (bpe_usd = دولار القانون لسطر «منها: الراتب بعد التدرّج» فقط)
             + (salaryCompHas('extra') ? (float)($g['extraWage_usd']??0) : 0)
             + (salaryCompHas('aide')  ? (float)($g['aideC_usd']??0) : 0);
     $totalCost = $gross+$fam+(salaryCompHas('transport') ? $trans : 0)+$employerCharges;
@@ -2989,7 +2991,7 @@ elseif ($form === 'payment_list'):
                 <th rowspan="2">درجة عادية واستثنائية<?= rateHead('law') ?></th>
                 <th rowspan="2">الراتب بعد الدرج<?= rateHead('law') ?></th>
                 <?= extraAideHeads(' rowspan="2"') ?>
-                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th>
+                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
                 <th colspan="7">المحسومات القانونية</th>
                 <th rowspan="2">الصافي<?= rateHead('mkt', $month, $year) ?></th>
                 <th rowspan="2">تعويض عائلي</th>
@@ -2999,7 +3001,7 @@ elseif ($form === 'payment_list'):
             <tr>
                 <th>نصف راتب،درجة</th>
                 <th>صندوق التعويضات 6%</th>
-                <th>الأجر الإجمالي<?= rateHead('law') ?></th>
+                <th>الأجر الإجمالي<?= rateHead('mkt', $month, $year) ?></th>
                 <th>الراتب الخاضع لضريبة الدخل</th>
                 <th>ضريبة الدخل</th>
                 <th>الضمان الاجتماعي<br>المرض الأمومة 3%</th>

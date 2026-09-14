@@ -4202,13 +4202,9 @@ function rateHead(string $which, $month = null, $year = null): string {
 function lawUsd($lbp): float { return floor((float)$lbp / officialUsdRate()); }
 function lawUsdSql(string $expr): string { return 'FLOOR((' . $expr . ')/' . officialUsdRate() . ')'; }
 function moneyLaw($lbp, array $opts = []): string { return money($lbp, officialUsdRate(), $opts); }
-/** دولار «الراتب المركّب» = دولار القانون للأساس بعد التدرّج + دولار الإضافي بالقانون + دولار المكافأة بسعر الشهر (الأرقام تركب) */
-function composedSalaryUsd(array $row): float {
-    $u = lawUsd($row['base_plus_echelon_lbp'] ?? 0);
-    if (salaryCompHas('extra')) $u += extraWageUsd($row);
-    if (salaryCompHas('aide'))  $u += lbpToUsd((int)($row['aide_complementaire_lbp'] ?? 0), rowRate($row));
-    return $u;
-}
+/** دولار «الراتب المركّب» = بسعر الشهر (🔴 تصحيحه 2026-09-14: «1500 بس على أساس الراتب والراتب بعد التدرّج — من بعد الإضافي وكل شي
+ *  بسعر صرف اليوم 89,500») — المركّب والأجر الإجمالي والصافي والمحسومات كلها بسعر الشهر؛ دولار القانون للأساس/الدرجة/بعد التدرّج فقط. */
+function composedSalaryUsd(array $row): float { return lbpToUsd(composedSalaryLbp($row), rowRate($row)); }
 
 function composedSalaryLbp(array $row): int {
     $s = (int)($row['base_plus_echelon_lbp'] ?? 0);
