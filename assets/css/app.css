@@ -1500,3 +1500,17 @@ body.doc-view .page-content { max-width: 1320px; margin: 0 auto; }
 
 /* إشارة الاقتراحات المعلّقة تضوي (2026-08-23) */
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+
+/* 🔄 اتجاه الورقة بزرّ الشريط (2026-09-14 «وقت عم اطبع بتضل لاندسكيب ما بيغير على بورتريه بالبرنت»):
+   الاتجاه المثبّت بالـCSS يمنع حوار المتصفّح من تغييره — body.print-portrait / .print-landscape (msaToggleOrient)
+   تفرض صفحة مسمّاة على كل الحاويات فتغلب @page الافتراضية و.land-report/.xls-sheet، وتضبط عرض الورقة لتصغير الجداول */
+@page msaPortrait{size:A4 portrait !important;margin:10mm;}
+@page msaLandscape{size:A4 landscape !important;margin:8mm;}
+@media print{
+  body.print-portrait,body.print-portrait .land-report,body.print-portrait .xls-sheet,body.print-portrait .doc-sheet,
+  body.print-portrait .official-doc,body.print-portrait .mehe-doc,body.print-portrait #ppExportArea{page:msaPortrait !important;}
+  body.print-landscape,body.print-landscape .doc-sheet,body.print-landscape .official-doc,body.print-landscape #ppExportArea{page:msaLandscape !important;}
+}
+body.print-portrait .doc-table{--pz-target:718 !important;}
+body.print-landscape .doc-table{--pz-target:1062 !important;}

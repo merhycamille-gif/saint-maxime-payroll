@@ -46,6 +46,47 @@
     // ===== طباعة =====
     window.ppPrint = function () { window.print(); };
 
+    // ===== 🔄 اتجاه الورقة (2026-09-14 «وقت عم اطبع بتضل لاندسكيب ما بيغير على بورتريه بالبرنت») =====
+    // الاتجاه مثبّت بالـCSS (@page landscape للعريض) فحوار الطباعة يرفض تغييره. الزرّ يقلبه: يضيف
+    // body.print-portrait / .print-landscape (app.css يفرض @page مسمّاة + عرض الورقة --pz-target) ويعيد
+    // حساب تصغير الجداول. pdf-save.js يقرأ window.msaOrientForced فيتبع نفس الاتجاه. لا يُحفَظ: كل صفحة تبدأ بافتراضها.
+    window.msaOrientForced = '';
+    function msaDefaultOrient() {
+        if (document.querySelector('.land-report, .xls-sheet')) return 'landscape';
+        try {
+            var walk = function (rules) {
+                for (var i = 0; i < rules.length; i++) {
+                    var r = rules[i];
+                    if (r.type === CSSRule.PAGE_RULE && !r.selectorText && /landscape/.test(r.cssText)) return true;
+                    if (r.cssRules && walk(r.cssRules)) return true;
+                }
+                return false;
+            };
+            for (var s = 0; s < document.styleSheets.length; s++) { try { if (walk(document.styleSheets[s].cssRules || [])) return 'landscape'; } catch (e) {} }
+        } catch (e) {}
+        return 'portrait';
+    }
+    window.msaPrintOrient = function () { return window.msaOrientForced || msaDefaultOrient(); };
+    function msaOrientApply() {
+        var o = window.msaPrintOrient();
+        document.body.classList.toggle('print-portrait', !!window.msaOrientForced && o === 'portrait');
+        document.body.classList.toggle('print-landscape', !!window.msaOrientForced && o === 'landscape');
+        var b = document.getElementById('msaOrientBtn');
+        if (b) {
+            var sp = b.querySelector('span');
+            if (sp) sp.textContent = (o === 'landscape' ? 'Paysage / أفقي' : 'Portrait / عمودي') + ' ⇄';
+            b.classList.toggle('btn-warning', !!window.msaOrientForced);
+            b.classList.toggle('btn-light', !window.msaOrientForced);
+        }
+        window.dispatchEvent(new Event('resize')); // fitDocTables يعيد --pz على عرض الورقة الجديد
+    }
+    window.msaToggleOrient = function () {
+        window.msaOrientForced = (window.msaPrintOrient() === 'landscape') ? 'portrait' : 'landscape';
+        msaOrientApply();
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', msaOrientApply); else msaOrientApply();
+    window.addEventListener('load', msaOrientApply);
+
     // ===== PDF (عبر حوار الطباعة → حفظ كـPDF) =====
     window.ppPdf = function () {
         // معظم المتصفحات: اختر "حفظ كـ PDF / Save as PDF" من وجهة الطباعة

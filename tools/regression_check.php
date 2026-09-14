@@ -5990,6 +5990,29 @@ try {
 } catch (Throwable $e) { $why122 = $e->getMessage(); }
 check('منقول بلا راتب سابق (تشغيل فعلي): الراكد يظهر بالقاعدة الصحيحة بالسنة الحالية لا السابقة، وفتح السنة يستبعده ويُبقي المستمرّ', $ok122, $why122);
 
+/* ===================================================================
+ * 123) 🔄 زرّ اتجاه الورقة (2026-09-14 «وقت عم اطبع بتضل لاندسكيب ما بيغير على بورتريه بالبرنت»): الاتجاه مثبّت بالـCSS فحوار المتصفّح
+ *      يرفض تغييره — زرّ واحد بشريط التصدير (exportToolbar) يقلب أفقي ⇄ عمودي: body.print-portrait/.print-landscape (app.css صفحة
+ *      مسمّاة تغلب الافتراضي + --pz-target) + pdf-save.js يتبع الزرّ (msaOrientForced). لا يُحفَظ بين الصفحات. البطاقة السنوية لم تُمَسّ.
+ * =================================================================== */
+$fn123 = (string)file_get_contents($PROJ . '/includes/functions.php'); $ex123 = (string)file_get_contents($PROJ . '/assets/js/export.js');
+$ps123 = (string)file_get_contents($PROJ . '/assets/js/pdf-save.js'); $css123 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+check('زرّ اتجاه الورقة (كود): زرّ واحد بشريط التصدير + msaToggleOrient/msaPrintOrient بـexport.js + CSS الصفحتين المسمّاتين بـapp.css + PDF يتبع الزرّ + البطاقة السنوية بلا تغيير',
+      substr_count($fn123, 'id="msaOrientBtn" onclick="msaToggleOrient()"') === 1
+      && strpos($ex123, 'window.msaToggleOrient = function () {') !== false && strpos($ex123, 'window.msaPrintOrient = function () {') !== false && strpos($ex123, "if (document.querySelector('.land-report, .xls-sheet')) return 'landscape';") !== false
+      && strpos($css123, '@page msaPortrait{size:A4 portrait !important;margin:10mm;}') !== false && strpos($css123, '@page msaLandscape{size:A4 landscape !important;margin:8mm;}') !== false
+      && strpos($css123, 'body.print-portrait .doc-table{--pz-target:718 !important;}') !== false && strpos($css123, 'body.print-portrait .land-report') !== false && strpos($css123, 'body.print-portrait .xls-sheet') !== false
+      && strpos($ps123, "var landscape = window.msaOrientForced ? (window.msaOrientForced === 'landscape') : genericWide(area);") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), '@page { size: A4 landscape; margin: 4mm; }') !== false);
+$ok123 = false; $why123 = '';
+try {
+    $o = renderPage('pages/official_forms.php', ['form' => 'payment_list', 'month' => 10, 'year' => 2025], []);
+    $o2 = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], []);
+    $ok123 = substr_count($o, 'id="msaOrientBtn"') === 1 && substr_count($o2, 'id="msaOrientBtn"') === 1 && strpos($o, 'assets/js/export.js') !== false && stripos($o, 'Fatal error') === false;
+    $why123 = 'btn=' . substr_count($o, 'id="msaOrientBtn"') . '/' . substr_count($o2, 'id="msaOrientBtn"');
+} catch (Throwable $e) { $why123 = $e->getMessage(); }
+check('زرّ اتجاه الورقة (تشغيل فعلي): يظهر مرّة واحدة بكشف الدفع وبـRésumé mensuel مع export.js', $ok123, $why123);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

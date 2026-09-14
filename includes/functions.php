@@ -3757,6 +3757,9 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php if (!$viewerOnly): ?>
         <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint()"><i class="fas fa-print"></i> Imprimer / طباعة</button>
         <?php endif; ?>
+        <?php // 🔄 (2026-09-14 «وقت عم اطبع بتضل لاندسكيب ما بيغير على بورتريه بالبرنت»): اتجاه الورقة كان مثبّتاً بالـCSS فحوار
+              // المتصفّح يرفض تغييره — زرّ واحد بكل البرنامج يقلب أفقي ⇄ عمودي للطباعة ولـPDF معاً (msaToggleOrient بـexport.js) ?>
+        <button type="button" class="btn btn-sm btn-light" id="msaOrientBtn" onclick="msaToggleOrient()" title="اتجاه الورقة بالطباعة وPDF — اكبس للتبديل"><i class="fas fa-rotate"></i> <span>Orientation / الورقة</span></button>
         <?php // 💾 (2026-09-13 «كبسة احفظها على الكمبيوتر عم تطلع متل طباعة على الورق») زرّ PDF = تنزيل ملف حقيقي فوراً بالمتصفّح
               // (pdf-save.js لأي صفحة)؛ «PDF رسمي» عبر Chrome يبقى حيث الأداة متوفّرة (الكمبيوتر) لأن الأونلاين بلا node يرجع لحوار الطباعة
               $hasPup = is_file(__DIR__ . '/../tools/page_to_pdf.js') && is_dir(__DIR__ . '/../tools/node_modules/puppeteer-core') && (@is_file('C:/Program Files/nodejs/node.exe') || stripos(PHP_OS, 'WIN') === 0); ?>

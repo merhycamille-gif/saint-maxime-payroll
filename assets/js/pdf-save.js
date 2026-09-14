@@ -99,7 +99,7 @@
     function buildGenericPdf(area) {
         var cur = curtain('⏳ عم نجهّز ملف الـPDF... لحظة');
         var restore = flipPrintRules();
-        var landscape = genericWide(area);
+        var landscape = window.msaOrientForced ? (window.msaOrientForced === 'landscape') : genericWide(area); // 🔄 زرّ الاتجاه أولاً
         var designW = landscape ? 1040 : 720;                 // عرض ورقة A4 داخل الهوامش (px)
         var prevW = area.style.width, prevMax = area.style.maxWidth, prevMg = area.style.margin;
         area.style.width = designW + 'px'; area.style.maxWidth = 'none'; area.style.margin = '0';
