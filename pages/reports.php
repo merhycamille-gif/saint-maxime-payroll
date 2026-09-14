@@ -304,11 +304,11 @@ function reportDocThumb($path) {
                         <th>#</th>
                         <?php if ($multi): ?><th>المدرسة</th><?php endif; ?>
                         <th>الاسم</th><th>الفئة</th><th>الدرجة</th>
-                        <th>أساس الراتب</th><th>قيمة الدرجة</th><th>الراتب بعد التدرّج</th>
+                        <th>أساس الراتب<?= rateHead('law') ?></th><th>قيمة الدرجة<?= rateHead('law') ?></th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
                         <?= extraAideHeads() ?>
-                        <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
+                        <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th>
                         <th>الضمان (٣٪)</th><th>الصندوق (٦٪)</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى الصندوق</small></th><th>الضريبة</th>
-                        <th>الصافي</th><th>التعويضات العائلية</th><?= transportHead() ?><th>الإجمالي المتوجب</th>
+                        <th>الصافي<?= rateHead('mkt', $month, $year) ?></th><th>التعويضات العائلية</th><?= transportHead() ?><th>الإجمالي المتوجب</th>
                     </tr></thead>
                     <tbody>
                         <?php
@@ -409,7 +409,7 @@ function reportDocThumb($path) {
         <?php /* 🏛️ ترويسة كشف الضمان باسم صاحب العمل لدى الصندوق (25-82-043 ⇒ الجمعية) */ ?>
         <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['school' => cnssEmployerSchool(currentSchool())]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
                     <tbody>
                         <?php
                         $zC = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'composed_usd'=>0,'cnss'=>0,'school'=>0]; $G = $zC; $csL = $multi?4:3;
@@ -481,7 +481,7 @@ function reportDocThumb($path) {
         </form>
         <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year . $empTypeTitle]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>الضريبة</th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>الضريبة</th></tr></thead>
                     <tbody>
                         <?php
                         $zX = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'composed_usd'=>0,'txb'=>0,'fded'=>0,'tax'=>0]; $G = $zX; $csL = $multi?4:3;
@@ -544,7 +544,7 @@ function reportDocThumb($path) {
         </form>
         <?= docSheetStart('Caisse EOC — retenues mensuelles', 'كشف صندوق التعليم الخاص الشهري', [monthName($month) . ' ' . $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
                     <tbody>
                         <?php $rn=0; foreach ($data as $r): $te += $r['caisse_amount_lbp']; $ts += $r['school_eoc_6_lbp']; $teg += $r['eoc_grade_lbp']; $teEx += extraWageLbp($r); $teExU += extraWageUsd($r); $teAi += aideCompLbp($r); $teBaseE += (int)$r['base_salary_lbp']; $teComposed += composedSalaryLbp($r); $teComposedU += composedSalaryUsd($r); ?>
                             <tr>

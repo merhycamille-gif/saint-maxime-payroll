@@ -4190,6 +4190,15 @@ function compColsCount(bool $withTransport = true): int {
 // 💵 «p1: أساس الراتب والراتب بعد التدرّج على أساس دولار 1500 — انتبه» (2026-09-14): دولار الأساس/الدرجة/الراتب بعد التدرّج
 //    بكل الكشوف والتقارير = ÷ السعر الرسمي القديم (officialUsdRate، 1500) داون — لا بسعر الشهر. الصافي/المحسومات/النقل تبقى بسعر الشهر.
 //    المصدر الواحد: lawUsd (PHP) + lawUsdSql (SQL) + moneyLaw (خلية ليرة+دولار) + composedSalaryUsd (المركّب = مجموع دولارات مكوّناته الظاهرة).
+// 🏷️ «ليش ما بتخلّي سعر صرف الدولار يبيّن كمان بالعناوين» (2026-09-14): سطر صغير تحت رأس العمود بسعر الدولار المعتمد فيه —
+//    'law' = السعر الرسمي (1 $ = 1,500) لأعمدة الأساس/الدرجة/بعد التدرّج/المركّب، 'mkt' = سعر الشهر (1 $ = 89,500) لأعمدة الصافي/المستحق.
+//    يظهر فقط حين تُعرض الدولارات (وضع العملة ≠ ليرة فقط). المصدر الواحد لكل الكشوف.
+function rateHead(string $which, $month = null, $year = null): string {
+    if (displayCurrency() === 'lbp') return '';
+    $rate = $which === 'law' ? officialUsdRate() : (float)getExchangeRate($month, $year);
+    if ($rate <= 0) return '';
+    return '<br><small class="rate-head" dir="ltr">1 $ = ' . number_format($rate, 0, '.', ',') . '</small>';
+}
 function lawUsd($lbp): float { return floor((float)$lbp / officialUsdRate()); }
 function lawUsdSql(string $expr): string { return 'FLOOR((' . $expr . ')/' . officialUsdRate() . ')'; }
 function moneyLaw($lbp, array $opts = []): string { return money($lbp, officialUsdRate(), $opts); }

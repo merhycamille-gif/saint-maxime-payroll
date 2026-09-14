@@ -6083,6 +6083,32 @@ try {
 } catch (Throwable $e) { $why125 = $e->getMessage(); }
 check('دولار القانون للأساس (تشغيل فعلي): أساس أوّل أستاذ يظهر ÷1500 لا بسعر الشهر بكشف الدفع/كل الموظفين/التفصيلي/الشامل/Résumé mensuel/الضمان', $ok125, $why125);
 
+/* ===================================================================
+ * 126) 🏷️ «ليش ما بتخلّي سعر صرف الدولار يبيّن كمان بالعناوين» (2026-09-14): rateHead('law') تحت رؤوس الأساس/الدرجة/بعد التدرّج/
+ *      الأجر الإجمالي/المركّب (1 $ = 1,500) وrateHead('mkt',$month,$year) تحت الصافي/المستحق/مجموع المدفوعات/الكلفة (1 $ = سعر الشهر)
+ *      بكل الكشوف الجدولية ومركز التقارير؛ يختفي بوضع «ليرة فقط»؛ التقرير العام السنوي بلا سعر شهر.
+ * =================================================================== */
+$of126 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp126 = (string)file_get_contents($PROJ . '/pages/reports.php'); $rh126 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+check('سعر الصرف بالعناوين (كود): rateHead مصدر واحد + 16 law/7 mkt/7 مركّب بالنماذج + 6/1/4 بالمركز + CSS .rate-head + بلا سعر شهر بالتقرير العام السنوي',
+      function_exists('rateHead') && strpos($rh126, '.doc-table th .rate-head{display:block;') !== false
+      && substr_count($of126, "<?= rateHead('law') ?></th>") === 23 && substr_count($of126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 7
+      && substr_count($rp126, "<?= rateHead('law') ?></th>") === 10 && substr_count($rp126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 1
+      && strpos($of126, "الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th>") !== false
+      && rateHead('law') === '<br><small class="rate-head" dir="ltr">1 $ = ' . number_format(officialUsdRate(), 0, '.', ',') . '</small>');
+$ok126 = false; $why126 = '';
+try {
+    $bad126 = [];
+    $o = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], [], [], 'both');
+    $mk = number_format((float)getExchangeRate(10, 2025), 0, '.', ',');
+    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 4 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 2) $bad126[] = 'salary_all(both)';
+    $o = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], [], [], 'lbp');
+    if (strpos($o, 'class="rate-head"') !== false) $bad126[] = 'salary_all(lbp يعرض)'; // (نصّ CSS يحوي rate-head — نفحص الصنف بالخلية)
+    $o = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], [], [], 'both');
+    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 4 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 1) $bad126[] = 'monthly_summary';
+    $ok126 = !$bad126; $why126 = "mkt=$mk bad=" . implode(',', $bad126);
+} catch (Throwable $e) { $why126 = $e->getMessage(); }
+check('سعر الصرف بالعناوين (تشغيل فعلي): كشف كل الموظفين 4×1,500 + 2×سعر الشهر، يختفي بوضع الليرة، Résumé mensuel 4 + 1', $ok126, $why126);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

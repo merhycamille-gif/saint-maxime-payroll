@@ -434,6 +434,7 @@ function officialFormStyles(): string {
 .report-table-wrap{overflow-x:auto;}
 /* صفّ عنوان التقرير المتكرّر بالطباعة — مخفيّ على الشاشة (يُظهره بلوك الطباعة أدناه) */
 .pr-title-row{display:none;}
+.doc-table th .rate-head{display:block;font-weight:400;font-size:10px;opacity:.9;white-space:nowrap;}
 /* شريط تمرير بارز وواضح ليعرف المستخدم أن في أعمدة إضافية */
 .report-table-wrap::-webkit-scrollbar,.card-body::-webkit-scrollbar{height:12px;}
 .report-table-wrap::-webkit-scrollbar-track,.card-body::-webkit-scrollbar-track{background:#e8edf3;border-radius:8px;}

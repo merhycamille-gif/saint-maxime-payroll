@@ -1235,7 +1235,7 @@ elseif ($form === 'teacher_card'):
                 <th rowspan="2">تاريخ المباشرة</th><th rowspan="2">الفئة</th>
                 <th colspan="4">المرحلة التي يعلّم فيها</th>
                 <th rowspan="2">مادة التدريس</th><th rowspan="2">عدد الساعات</th>
-                <th rowspan="2">خاضع للضريبة</th><th rowspan="2">أساس الراتب</th><?= extraAideHeads(' rowspan="2"') ?><?= transportHead(' rowspan="2"') ?><th rowspan="2">الراتب</th><th rowspan="2">توقيع</th>
+                <th rowspan="2">خاضع للضريبة</th><th rowspan="2">أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads(' rowspan="2"') ?><?= transportHead(' rowspan="2"') ?><th rowspan="2">الراتب</th><th rowspan="2">توقيع</th>
             </tr>
             <tr><th>حضانة</th><th>ابتدائي</th><th>متوسط</th><th>ثانوي</th></tr>
         </thead>
@@ -1344,9 +1344,9 @@ elseif ($form === 'teacher_card'):
                 <th colspan="4">الفئة</th>
                 <th colspan="4">المرحلة</th>
                 <th rowspan="2">عدد ساعات التعليم</th>
-                <th rowspan="2">أساس الراتب</th>
+                <th rowspan="2">أساس الراتب<?= rateHead('law') ?></th>
                 <?= extraAideHeads(' rowspan="2"') ?><?= transportHead(' rowspan="2"') ?>
-                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
+                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th>
                 <?php if (!$isMlk): ?><th rowspan="2">تعاقد رسمي</th><?php endif; ?>
                 <th rowspan="2">التوقيع</th>
             </tr>
@@ -1633,11 +1633,11 @@ elseif ($form === 'teacher_card'):
     <div class="doc-subtitle"><?= e($curLbl) ?></div>
     <table class="doc-table">
         <thead><tr>
-            <th>#</th><th>الاسم</th><th>أساس الراتب</th><th>درجة عادية واستثنائية</th><th>الراتب بعد التدرّج</th>
+            <th>#</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><th>درجة عادية واستثنائية<?= rateHead('law') ?></th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
             <?= extraAideHeads() ?>
-            <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
+            <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th>
             <th>صندوق التعويضات ٦٪</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى صندوق التعويضات</small></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>ضريبة الدخل</th><th>الضمان الاجتماعي</th>
-            <th>مجموع المحسومات</th><th>تعويض عائلي</th><?= transportHead('', 'تعويض نقل') ?><th>مجموع المدفوعات</th><th>الصافي</th>
+            <th>مجموع المحسومات</th><th>تعويض عائلي</th><?= transportHead('', 'تعويض نقل') ?><th>مجموع المدفوعات<?= rateHead('mkt', $month, $year) ?></th><th>الصافي<?= rateHead('mkt', $month, $year) ?></th>
             <th>توقيع الموظف</th>
         </tr></thead>
         <tbody>
@@ -1744,7 +1744,7 @@ elseif ($form === 'teacher_card'):
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الفروقات — <?= e($prevSY) ?> مقابل <?= e($schoolYear) ?></div>
     <table class="doc-table">
-        <thead><tr><th>#</th><th>الاسم والشهرة</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>صافي <?= e($prevSY) ?></th><th>صافي <?= e($schoolYear) ?></th><th>الفرق</th></tr></thead>
+        <thead><tr><th>#</th><th>الاسم والشهرة</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th><th>صافي <?= e($prevSY) ?></th><th>صافي <?= e($schoolYear) ?></th><th>الفرق</th></tr></thead>
         <tbody>
         <?php
         $zD = ['base'=>0,'ex'=>0,'ai'=>0,'prev'=>0,'cur'=>0,'ex_usd'=>0.0,'ai_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,'base_usd'=>0.0,'prev_usd'=>0.0,'cur_usd'=>0.0]; $G=$zD;
@@ -1833,8 +1833,8 @@ elseif ($form === 'teacher_card'):
     <table class="doc-table" style="margin-top:8px">
         <thead><tr>
             <th>اسم المؤسسة</th>
-            <th>أساس الراتب</th>
-            <th>الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><?= transportHead() ?><?php if (salaryCompHas('transport')): ?><th>الرواتب الصافية<br>مع تعويض النقل</th><?php endif; ?>
+            <th>أساس الراتب<?= rateHead('law') ?></th>
+            <th>الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th><?= transportHead() ?><?php if (salaryCompHas('transport')): ?><th>الرواتب الصافية<br>مع تعويض النقل</th><?php endif; ?>
             <th>الضمان الاجتماعي</th><th>صندوق التعويضات</th><th>ضريبة الدخل</th><th>المجموع</th>
         </tr></thead>
         <tbody>
@@ -2447,7 +2447,7 @@ elseif ($form === 'payment_list'):
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الدفع — رواتب <?= monthName($month,'ar').' '.$year ?></div>
     <table class="doc-table">
-        <thead><tr><th>#</th><th>الرمز</th><th>الاسم والشهرة</th><th>رقم الضمان</th><th>أساس الراتب</th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><?= transportHead() ?><th>الصافي (ل.ل)</th><th>الإجمالي المتوجب (ل.ل)</th><th>التوقيع بالاستلام</th></tr></thead>
+        <thead><tr><th>#</th><th>الرمز</th><th>الاسم والشهرة</th><th>رقم الضمان</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads() ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th><?= transportHead() ?><th>الصافي (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>الإجمالي المتوجب (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>التوقيع بالاستلام</th></tr></thead>
         <tbody>
         <?php
         $zP = ['base'=>0,'ex'=>0,'ai'=>0,'trans'=>0,'net'=>0,'due'=>0,'ex_usd'=>0.0,'ai_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,'base_usd'=>0.0,'net_usd'=>0.0,'due_usd'=>0.0]; $G = $zP;
@@ -2524,11 +2524,11 @@ elseif ($form === 'payment_list'):
     <table class="doc-table">
         <thead><tr>
             <th>#</th><?php if ($multiS): ?><th>المدرسة</th><?php endif; ?>
-            <th>اسم الأستاذ</th><th>عدد الساعات</th><th>أساس الراتب</th><th>درجة وتدرّج</th><th>الراتب بعد التدرّج</th>
+            <th>اسم الأستاذ</th><th>عدد الساعات</th><th>أساس الراتب<?= rateHead('law') ?></th><th>درجة وتدرّج<?= rateHead('law') ?></th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
             <?= extraAideHeads() ?>
-            <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
+            <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th>
             <th>مساهمة الضمان ٨٪</th><th>صندوق التعويضات ٦٪</th><th>نهاية الخدمة ٨.٥٪</th><th>تعويضات عائلية ٦٪</th>
-            <th>التعويضات العائلية</th><?= transportHead() ?><th>ضريبة الدخل</th><th>الكلفة على المؤسسة</th>
+            <th>التعويضات العائلية</th><?= transportHead() ?><th>ضريبة الدخل</th><th>الكلفة على المؤسسة<?= rateHead('mkt', $month, $year) ?></th>
         </tr></thead>
         <tbody>
         <?php
@@ -2813,7 +2813,7 @@ elseif ($form === 'payment_list'):
                 <th rowspan="2">رقمها في الضمان</th>
                 <th rowspan="2">الاسم والشهرة</th>
                 <th rowspan="2">ملاك / متعاقد / مستخدم</th>
-                <th rowspan="2">أساس الراتب</th>
+                <th rowspan="2">أساس الراتب<?= rateHead('law') ?></th>
                 <th rowspan="2">رواتب الأساتذة</th>
                 <?= extraAideHeads(' rowspan="2"') ?><?= transportHead(' rowspan="2"') ?>
                 <th rowspan="2">رواتب العمال</th>
@@ -2985,21 +2985,21 @@ elseif ($form === 'payment_list'):
             <tr>
                 <th rowspan="2">رقم</th>
                 <th rowspan="2">الاسم و الشهرة</th>
-                <th rowspan="2">أساس الراتب</th>
-                <th rowspan="2">درجة عادية واستثنائية</th>
-                <th rowspan="2">الراتب بعد الدرج</th>
+                <th rowspan="2">أساس الراتب<?= rateHead('law') ?></th>
+                <th rowspan="2">درجة عادية واستثنائية<?= rateHead('law') ?></th>
+                <th rowspan="2">الراتب بعد الدرج<?= rateHead('law') ?></th>
                 <?= extraAideHeads(' rowspan="2"') ?>
-                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th>
+                <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('law') ?></th>
                 <th colspan="7">المحسومات القانونية</th>
-                <th rowspan="2">الصافي</th>
+                <th rowspan="2">الصافي<?= rateHead('mkt', $month, $year) ?></th>
                 <th rowspan="2">تعويض عائلي</th>
                 <?= transportHead(' rowspan="2"', 'تعويض نقل') ?>
-                <th rowspan="2">مجموع المدفوعات</th>
+                <th rowspan="2">مجموع المدفوعات<?= rateHead('mkt', $month, $year) ?></th>
             </tr>
             <tr>
                 <th>نصف راتب،درجة</th>
                 <th>صندوق التعويضات 6%</th>
-                <th>الأجر الإجمالي</th>
+                <th>الأجر الإجمالي<?= rateHead('law') ?></th>
                 <th>الراتب الخاضع لضريبة الدخل</th>
                 <th>ضريبة الدخل</th>
                 <th>الضمان الاجتماعي<br>المرض الأمومة 3%</th>
