@@ -622,6 +622,20 @@ function selectedReportSchoolIds() {
  * السنة الدراسية تبدأ 1 تشرين الأول وتنتهي 30 أيلول. «all» أو فارغ = بلا فلترة.
  * $prefix: بادئة الأعمدة (مثلاً 'e.').
  */
+// 📅 شرط «مَن يُفتَح له العام الجديد» (2026-09-14 «أساتذة نفس السنة مش أساتذة كل البرنامج»): فتح السنة كان يأخذ كل «فاعل» بلا تاريخ
+//    ترك فنسخ 229 موظفاً لـ2026-2027 لم يُدفَع لهم شيء بـ2025-2026 (41 براتب قديم). القاعدة: راتب فعلي بالسنة السابقة (مستمرّ) أو
+//    دخوله منذ بداية السنة السابقة (جديد). إن لم يكن للمدرسة أي راتب فعلي بالسنة السابقة (أوّل سنة لها بالبرنامج) يبقى الشرط القديم.
+//    يُرجع جزء SQL يبدأ بـ" AND " (أو '' ) لاستعمال داخل استعلام على employees بلا alias.
+function openYearCarrySql(PDO $db, int $schoolId, int $y1): string {
+    $prevSy = ($y1 - 1) . '-' . $y1;
+    $nz = '(m.base_plus_echelon_lbp > 0 OR m.net_salary_lbp > 0 OR m.total_due_lbp > 0)';
+    $st = $db->prepare("SELECT 1 FROM monthly_salaries m JOIN employees e2 ON e2.id = m.employee_id WHERE e2.school_id = ? AND m.school_year = ? AND $nz LIMIT 1");
+    $st->execute([$schoolId, $prevSy]);
+    if (!$st->fetchColumn()) return '';
+    return " AND (EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = employees.id AND m.school_year = " . $db->quote($prevSy) . " AND $nz)
+                 OR hire_date >= " . $db->quote(($y1 - 1) . '-10-01') . ")";
+}
+
 function yearEmploymentFilter($schoolYear, $prefix = '') {
     if ($schoolYear === 'all' || !preg_match('/^(\d{4})-(\d{4})$/', (string)$schoolYear, $m)) {
         return ['', []];

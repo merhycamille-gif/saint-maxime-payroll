@@ -70,6 +70,8 @@ function complianceRules(): array {
         'row_rate0'      => ['Taux = 0',                   'صف راتب بسعر صرف صفر أو فارغ',                        '#b45309'],
         'left_rows'      => ['Salaires après départ',      'تارك عنده رواتب بعد تركه',                            '#7c3aed'],
         'active_nomonths'=> ['Actif sans salaires',        'موظف فاعل بلا رواتب بسنة مفتوحة',                     '#64748b'],
+        'carried_stale'  => ['Reporté avec un ancien salaire', 'منقول للسنة الجديدة براتب مع أنّه لم يُدفَع له شيء بالسنة السابقة (راتب قديم أو من إعداد ملفه)', '#b91c1c'],
+        'carried_zero'   => ['Reporté à zéro',              'منقول للسنة الجديدة بصفوف صفرية ولم يُدفَع له شيء بالسنة السابقة (ملف قديم بلا رواتب)', '#64748b'],
         'family_ded_off' => ['Abattement familial non accordé', 'متزوج/أرمل بأولاد أو زوج لا يعمل — وتنزيلهم العائلي بالضريبة مطفأ بملفه', '#b45309'],
         'transport_pct'  => ['Transport en %',             'بند تعويض نقل كنسبة ٪ من الأساس (النقل مبلغ لا نسبة) — يضاعف المستحق', '#b91c1c'],
         'left_impossible'=> ['Date de départ impossible',  'تاريخ ترك مستحيل (= تاريخ الولادة أو قبل دخول المدرسة) — الموظف يختفي من كل الكشوف ولا يُحسب راتبه', '#b91c1c'],
@@ -338,6 +340,30 @@ function complianceItems(PDO $db, string $sy): array {
             $hasCfg ? 'احتساب رواتب سنة ' . $sy . ' من ملفه' : 'أدخل إعداد راتبه (الأساس/العقد أو علاوة/نقل) بملفه أو تاريخ تركه — لا يُحتسب بلا إعداد', $hasCfg);
     }
 
+    // ── 13أ) منقول للسنة الجديدة بلا راتب بالسنة السابقة (2026-09-14 «يكونوا أساتذة نفس السنة مش أساتذة كل البرنامج») ──
+    //  فتح السنة كان ينسخ كل «فاعل» بلا تاريخ ترك: 229 موظفاً بـ2026-2027 لم يُدفَع لهم شيء بـ2025-2026 (41 منهم براتب قديم نُقل كما هو).
+    //  القاعدة (للسنة الحالية/المفتوحة فقط، ومدرسته لها رواتب فعلية بالسنة السابقة): له صفوف بالسنة، لا راتب فعلي بالسنة السابقة،
+    //  دخوله قبل بدايتها (ليس جديداً). التصحيح بقراره: حذف صفوفه بهذه السنة (ملفه يبقى). الصفري بالجملة، وذو الراتب واحداً واحداً.
+    if (strcmp($sy, currentSchoolYear()) >= 0) {
+        $nzC = '(m.base_plus_echelon_lbp > 0 OR m.net_salary_lbp > 0 OR m.total_due_lbp > 0)';
+        foreach ($q("SELECT e.*, (SELECT COUNT(*) FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ?) n_rows,
+                (SELECT MAX(m.net_salary_lbp) FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ?) net_max,
+                (SELECT MAX(m.school_year) FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year < ? AND $nzC) last_paid
+            FROM employees e
+            WHERE e.is_deleted = 0" . $sc . "
+              AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ?)
+              AND NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ? AND $nzC)
+              AND (e.hire_date IS NULL OR e.hire_date < ?)
+              AND EXISTS (SELECT 1 FROM monthly_salaries m JOIN employees e2 ON e2.id = m.employee_id WHERE e2.school_id = e.school_id AND m.school_year = ? AND $nzC)
+            ORDER BY e.school_id, (net_max > 0) DESC, e.id", [$sy, $sy, $prevSy, $sy, $prevSy, ($y1 - 1) . '-10-01', $prevSy]) as $r) {
+            $stale = (float)$r['net_max'] > 0;
+            $why = 'لم يُدفَع له شيء بسنة ' . $prevSy . ' (' . ($r['last_paid'] ? 'آخر راتب فعلي ' . $r['last_paid'] : 'لا راتب بأي سنة') . ') ومع ذلك نُقل لـ' . $sy
+                 . ' بـ' . (int)$r['n_rows'] . ' أشهر ' . ($stale ? 'صافيها حتى ' . complianceFmt($r['net_max']) . ' ل.ل شهرياً' : 'صفرية');
+            $add($stale ? 'carried_stale' : 'carried_zero', $r, $why,
+                'حذف أشهره الـ' . (int)$r['n_rows'] . ' بسنة ' . $sy . ' (ملفه يبقى؛ إن عاد يُدخَل من الإكسل أو فتح السنة)', true, ['n' => (int)$r['n_rows'], 'net_max' => (float)$r['net_max']]);
+        }
+    }
+
     // ── 13ب) متزوج/أرمل وتنزيله العائلي مطفأ (2026-09-10 جورج العموري «الزوجة لا تعمل وعندو ولدين ما حسبلهن التنزيل») ──
     //  الزرّان «زيادة الزوج»/«تنزيل الأولاد» مطفآن افتراضياً (قرار 2026-08-23 لأن الزوج الآخر يأخذهما عادةً عند الأستاذة
     //  المتزوجة) — هنا يظهر كل من ينطبق عليه القانون وزرّه مطفأ، بالفرق السنوي، والقرار بيده: تصحيح (تضوية + إعادة حساب السنة) أو ترك.
@@ -539,6 +565,11 @@ function complianceApply(PDO $db, array $it): string {
             if ($ids) $db->prepare("UPDATE employee_bonuses SET school_year = ? WHERE id IN (" . implode(',', $ids) . ")")->execute([$sy]);
             $n = $recalcYear();
             return 'ثُبّت ' . count($ids) . ' بند على ' . $sy . ' وأُعيد حساب ' . $n . ' شهراً';
+        case 'carried_stale': case 'carried_zero':
+            $st = $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND school_year = ?");
+            $st->execute([$eid, $sy]);
+            logAudit('compliance_carried_delete', 'monthly_salaries', $eid, null, ['sy' => $sy, 'deleted' => $st->rowCount(), 'rule' => $it['rule']]);
+            return 'حُذف ' . $st->rowCount() . ' شهراً بسنة ' . $sy . ' (لم يكن من أساتذة السنة)';
         case 'left_rows':
             $ld = (string)($d['ld'] ?? '');
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $ld)) return 'تاريخ ترك غير صالح';
@@ -580,7 +611,7 @@ function handleCompliancePost(PDO $db, string $redirectTo): void {
     if ($act === 'comp_approve_rule') {
         $rule = (string)($_POST['rule'] ?? '');
         // family_ded_off: قرار شخص بشخص (الأستاذة المتزوجة عادةً زوجها يأخذ التنزيل) — لا تضوية جماعية
-        foreach ($items as $it) if ($it['rule'] === $rule && $it['auto'] && $rule !== 'left_rows' && $rule !== 'net_math' && $rule !== 'family_ded_off' && $rule !== 'eoc_base_only') $keys[] = $it['key'];
+        foreach ($items as $it) if ($it['rule'] === $rule && $it['auto'] && $rule !== 'left_rows' && $rule !== 'net_math' && $rule !== 'family_ded_off' && $rule !== 'eoc_base_only' && $rule !== 'carried_stale') $keys[] = $it['key'];
         $act = 'comp_approve';
     } else {
         $keys = [(string)($_POST['key'] ?? '')];
@@ -640,7 +671,7 @@ function renderComplianceTable(array $items, string $formAction = '', bool $coll
         if (empty($byRule[$rk])) continue;
         $rows = $byRule[$rk];
         $n = count($rows);
-        $canBulk = canEdit() && $rk !== 'left_rows' && $rk !== 'net_math' && $rk !== 'family_ded_off' && $rk !== 'eoc_base_only' && count(array_filter($rows, fn($r) => $r['auto'])) > 1;
+        $canBulk = canEdit() && $rk !== 'left_rows' && $rk !== 'net_math' && $rk !== 'family_ded_off' && $rk !== 'eoc_base_only' && $rk !== 'carried_stale' && count(array_filter($rows, fn($r) => $r['auto'])) > 1;
         $tag = $collapsed ? 'details' : 'div';
         echo '<' . $tag . ' class="comp-rule" style="margin-bottom:10px;border:1px solid var(--gray-200);border-radius:8px;padding:6px 10px"' . ($collapsed && $n <= 3 ? ' open' : '') . '>';
         echo ($collapsed ? '<summary style="cursor:pointer;padding:4px 0">' : '<div style="padding:4px 0">')

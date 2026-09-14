@@ -290,8 +290,8 @@ $cpItems = complianceItems($db, currentSchoolYear());
 $cpRules = complianceRules();
 $cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
 $cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
-check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 23 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
-      count($cpRules) === 23
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 25 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 25
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
@@ -5142,8 +5142,8 @@ check('تقرير المخالفات: قاعدة family_ded_off معرَّفة (
       isset(complianceRules()['family_ded_off'])
       && strpos($cmp103, "\$add('family_ded_off', \$r,") !== false && substr_count($cmp103, 'familyDeductionAnnual($r[\'social_status\'], $r[\'spouse_works\'] ?? 0, 1, $fdAsOf,') === 2
       && strpos($cmp103, "case 'family_ded_off':") !== false && strpos($cmp103, "if (!empty(\$d['spouse'])) \$set[] = 'grant_spouse_addition = 1';") !== false
-      && strpos($cmp103, "&& \$rule !== 'family_ded_off' && \$rule !== 'eoc_base_only') \$keys[] = \$it['key'];") !== false
-      && strpos($cmp103, "&& \$rk !== 'family_ded_off' && \$rk !== 'eoc_base_only' && count(array_filter(") !== false
+      && strpos($cmp103, "&& \$rule !== 'family_ded_off' && \$rule !== 'eoc_base_only' && \$rule !== 'carried_stale') \$keys[] = \$it['key'];") !== false
+      && strpos($cmp103, "&& \$rk !== 'family_ded_off' && \$rk !== 'eoc_base_only' && \$rk !== 'carried_stale' && count(array_filter(") !== false
       && strpos($src103, '· تنزيل الأولاد: <b>') !== false);
 
 /* ===================================================================
@@ -5947,6 +5947,48 @@ try {
     $ok121 = !$bad121; $why121 = "sy=$sy121 stale=" . ($stale['id'] ?? '-') . " cont=" . ($cont['id'] ?? '-') . " paidPrev=" . ($paidPrev['id'] ?? '-') . ' bad=' . implode(',', $bad121);
 } catch (Throwable $e) { $why121 = $e->getMessage(); }
 check('إكسل أساتذة السنة (تشغيل فعلي): الراكد (صفوف بلا راتب فعلي ولا راتب بالسنة السابقة، دخوله قديم) خارج الإكسل؛ المستمرّ داخله؛ مَن دُفع له بالسنة السابقة داخل إكسلها', $ok121, $why121);
+
+/* ===================================================================
+ * 122) 🚫 المنقول للسنة الجديدة بلا راتب بالسنة السابقة (2026-09-14 «اوك» على المقترح): قاعدتا مخالفات carried_stale (براتب — واحداً واحداً،
+ *      بلا «موافق على الكل») وcarried_zero (صفري — بالجملة) للسنة الحالية فقط، التصحيح = حذف صفوفه بالسنة؛ وفتح السنة لا يعيدها:
+ *      openYearCarrySql (راتب فعلي بالسنة السابقة أو دخوله منذ بدايتها؛ مدرسة بلا رواتب سابقة = الشرط القديم) بالمواضع الثلاثة.
+ * =================================================================== */
+$cp122 = (string)file_get_contents($PROJ . '/includes/compliance.php'); $oy122 = (string)file_get_contents($PROJ . '/pages/open_year.php');
+check('منقول بلا راتب سابق (كود): قاعدتان بالتقرير + حذف الصفوف بالتصحيح + الراتبي مستثنى من الجملة + openYearCarrySql بفتح السنة (3 مواضع) للسنة الحالية فقط',
+      isset(complianceRules()['carried_stale']) && isset(complianceRules()['carried_zero'])
+      && strpos($cp122, "case 'carried_stale': case 'carried_zero':") !== false && strpos($cp122, 'DELETE FROM monthly_salaries WHERE employee_id = ? AND school_year = ?");') !== false
+      && strpos($cp122, "&& \$rule !== 'carried_stale'") !== false && strpos($cp122, "&& \$rk !== 'carried_stale'") !== false
+      && strpos($cp122, "if (strcmp(\$sy, currentSchoolYear()) >= 0) {") !== false
+      && function_exists('openYearCarrySql') && substr_count($oy122, 'openYearCarrySql($db, ') === 3);
+$ok122 = false; $why122 = '';
+try {
+    $sy122 = currentSchoolYear(); $y122 = (int)substr($sy122, 0, 4); $prev122 = ($y122 - 1) . '-' . $y122; $bad122 = [];
+    $nz = '(m.base_plus_echelon_lbp > 0 OR m.net_salary_lbp > 0 OR m.total_due_lbp > 0)';
+    $st122 = $db->query("SELECT e.id, e.school_id, (SELECT MAX(m.net_salary_lbp) FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$sy122') nm FROM employees e
+        WHERE e.is_deleted = 0 AND (e.hire_date IS NULL OR e.hire_date < '" . ($y122 - 1) . "-10-01')
+          AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$sy122')
+          AND NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$prev122' AND $nz)
+          AND EXISTS (SELECT 1 FROM monthly_salaries m JOIN employees e2 ON e2.id = m.employee_id WHERE e2.school_id = e.school_id AND m.school_year = '$prev122' AND $nz) ORDER BY nm DESC LIMIT 1")->fetch();
+    $cont122 = $db->query("SELECT e.id, e.school_id FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif'
+          AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$prev122' AND $nz) LIMIT 1")->fetch();
+    if ($st122) {
+        $_SESSION['active_schools'] = [(int)$st122['school_id']];
+        $items = complianceItems($db, $sy122); $found = null;
+        foreach ($items as $i) if ((int)$i['emp_id'] === (int)$st122['id'] && in_array($i['rule'], ['carried_stale', 'carried_zero'], true)) $found = $i;
+        if (!$found) $bad122[] = 'stale#' . $st122['id'] . ' غير مدرج';
+        elseif ($found['rule'] !== ((float)$st122['nm'] > 0 ? 'carried_stale' : 'carried_zero')) $bad122[] = 'rule=' . $found['rule'];
+        elseif (!$found['auto'] || strpos($found['fix'], 'حذف أشهره') === false) $bad122[] = 'fix';
+        // بالسنة السابقة (بدأت) لا تُطبَّق القاعدة
+        foreach (complianceItems($db, $prev122) as $i) if (in_array($i['rule'], ['carried_stale', 'carried_zero'], true)) { $bad122[] = 'prev-year flagged'; break; }
+        // فتح السنة: الشرط يستبعده ويُبقي المستمرّ
+        $c = openYearCarrySql($db, (int)$st122['school_id'], $y122);
+        if ($c === '' || (int)$db->query("SELECT COUNT(*) FROM employees WHERE id = " . (int)$st122['id'] . $c)->fetchColumn() !== 0) $bad122[] = 'openYear يشمل الراكد';
+        if ($cont122 && (int)$db->query("SELECT COUNT(*) FROM employees WHERE id = " . (int)$cont122['id'] . openYearCarrySql($db, (int)$cont122['school_id'], $y122))->fetchColumn() !== 1) $bad122[] = 'openYear يستبعد المستمرّ';
+        unset($_SESSION['active_schools']);
+    } else $bad122[] = 'لا عيّنة';
+    $ok122 = !$bad122; $why122 = "sy=$sy122 stale=" . ($st122['id'] ?? '-') . " bad=" . implode(',', $bad122);
+} catch (Throwable $e) { $why122 = $e->getMessage(); }
+check('منقول بلا راتب سابق (تشغيل فعلي): الراكد يظهر بالقاعدة الصحيحة بالسنة الحالية لا السابقة، وفتح السنة يستبعده ويُبقي المستمرّ', $ok122, $why122);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
                               WHERE school_id = ? AND is_deleted = 0 AND status = 'actif'
                                 AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'),
                                           COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'),
-                                          COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= ?");
+                                          COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= ?" . openYearCarrySql($db, $schoolId, $y1));
         $emps->execute([$schoolId, $y1 . '-10-01']);
         // مصدر النقل للموظف المنقول بلا إعداد: آخر راتب فعلي معروف قبل السنة الجديدة
         $srcStmt = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND net_salary_lbp > 0
@@ -291,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
             FROM employees WHERE school_id = ? AND is_deleted = 0 AND status = 'actif'
               AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'),
                         COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'),
-                        COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= ?");
+                        COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= ?" . openYearCarrySql($db, $schoolId, $y1));
         $emps->execute([$schoolId, $y1 . '-10-01']);
         $cnt = 0;
         foreach ($emps->fetchAll(PDO::FETCH_ASSOC) as $emp) {
@@ -405,7 +405,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
             foreach (allSchools() as $sc) {
                 $sid = (int)$sc['id'];
                 $act = (int)$db->query("SELECT COUNT(*) FROM employees WHERE school_id = $sid AND is_deleted = 0 AND status = 'actif'
-                    AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= '" . ($startN + 1) . "-10-01'")->fetchColumn();
+                    AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= '" . ($startN + 1) . "-10-01'" . openYearCarrySql($db, $sid, $startN + 1))->fetchColumn();
                 $opn = (int)$db->query("SELECT COUNT(DISTINCT ms.employee_id) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id AND e.is_deleted = 0
                     WHERE e.school_id = $sid AND ms.school_year = " . $db->quote($stY) . " AND (ms.net_salary_lbp > 0 OR ms.base_plus_echelon_lbp > 0)")->fetchColumn();
                 $stRows[] = ['name' => $sc['name_ar'] ?: $sc['name_fr'], 'id' => $sid, 'act' => $act, 'opn' => $opn];
