@@ -1044,6 +1044,11 @@ if (!$emp):
     // إفادة الضمان الرسمية «لمن يهمه الأمر» — بنفس نصّ نموذج المستخدم بالضبط.
     $attBase = (int)round($basePlusEch);
     $attSupp = ($incExtra ? $extraW : 0) + ($incAide ? $aideW : 0);
+    // 🔴 «شيّكت إفادة الضمان وشلت الإضافي — بعدو بيحطّو فيها» (2026-09-15): كان سطر «الأجر الإضافي» يُطبع
+    // دائماً (بصفر إن شيله)، والمكافأة مدموجة فيه. صار سطر مستقل لكل مكوّن **مختار وموجود** فقط — كإفادة الراتب.
+    $cnssParts = [];
+    if ($incExtra && $extraW > 0) $cnssParts[] = ['ar' => 'الأجر الإضافي', 'fr' => 'Rémunération supplémentaire', 'en' => 'Additional remuneration', 'v' => (int)round($extraW)];
+    if ($incAide  && $aideW  > 0) $cnssParts[] = ['ar' => 'مكافأة ومساعدة', 'fr' => 'Prime et aide', 'en' => 'Bonus and assistance', 'v' => (int)round($aideW)];
     // 🔴 «الأرقام تركب» (2026-07-30): خانة «+ تعويض النقل» كانت تُعرَض للإفادة والشاشة تقول
     // إنّ المبلغ يشمله، لكن نصّ الوثيقة يجمع الأساس والملحقات فقط — فيظهر المجموع أقلّ
     // بمقدار النقل (٩ ملايين بمثال حقيقي) في ورقةٍ موقّعة ومختومة. الآن النقل سطر مستقل
@@ -1085,7 +1090,9 @@ if (!$emp):
               <p><?= $FR ? 'à compter du' : 'as of' ?> <strong><?= $hireFmt ?></strong> <?= $FR ? 'en qualité de' : 'in the capacity of' ?> (<strong><?= e($FR ? $fnFr['fr'] : $fnFr['en']) ?></strong>)</p>
               <p><?= $FR ? 'et perçoit un salaire mensuel :' : 'and receives a monthly salary of:' ?></p>
               <p style="margin-left:34px">- <?= $FR ? 'Salaire de base conformément à la loi' : 'Basic salary in accordance with the law' ?> : <strong><?= $moneyLat($attBase) ?></strong></p>
-              <p style="margin-left:34px">- <?= $FR ? 'Rémunération supplémentaire' : 'Additional remuneration' ?> : <strong><?= $moneyLat($attSupp) ?></strong></p>
+              <?php foreach ($cnssParts as $cp): ?>
+              <p style="margin-left:34px">- <?= $FR ? $cp['fr'] : $cp['en'] ?> : <strong><?= $moneyLat($cp['v']) ?></strong></p>
+              <?php endforeach; ?>
               <?php if ($attTrans > 0): ?>
               <p style="margin-left:34px">- <?= $FR ? 'Indemnité de transport' : 'Transport allowance' ?> : <strong><?= $moneyLat($attTrans) ?></strong></p>
               <?php endif; ?>
@@ -1113,8 +1120,10 @@ if (!$emp):
             <p>اعتباراً من تاريخ <strong><?= $hireFmt ?></strong> بصفة (<strong><?= e($fnFr['ar']) ?></strong>)</p>
             <p>ويتقاضى راتباً شهرياً :</p>
             <p style="margin-right:34px;text-align:right">- أساس راتب عملاً بالقانون : <strong><?= $moneyAr($attBase) ?></strong></p>
-            <?php /* «مكان جملة ملحقات مدفوعة بدو يكون الأجر الإضافي» (بطلبه 2026-08-20) */ ?>
-            <p style="margin-right:34px;text-align:right">- الأجر الإضافي : <strong><?= $moneyAr($attSupp) ?></strong></p>
+            <?php /* «مكان جملة ملحقات مدفوعة بدو يكون الأجر الإضافي» (بطلبه 2026-08-20) — سطر لكل مكوّن مختار فقط (2026-09-15) */ ?>
+            <?php foreach ($cnssParts as $cp): ?>
+            <p style="margin-right:34px;text-align:right">- <?= e($cp['ar']) ?> : <strong><?= $moneyAr($cp['v']) ?></strong></p>
+            <?php endforeach; ?>
             <?php if ($attTrans > 0): ?>
             <p style="margin-right:34px;text-align:right">- تعويض نقل : <strong><?= $moneyAr($attTrans) ?></strong></p>
             <?php endif; ?>
@@ -1470,7 +1479,7 @@ if (!$emp):
         <?php elseif ($type === 'aqd_taalim'):
         $cExtra  = $incExtra ? $extraW : 0;
         $cAide   = $incAide  ? $aideW  : 0;
-        $cTrans  = $sal ? (int)$sal['transport_lbp'] : 0;
+        $cTrans  = ($incTrans && $sal) ? (int)$sal['transport_lbp'] : 0; // يتبع خيار «+ تعويض النقل» بالشريط (2026-09-15)
         $cFamily = $sal ? (int)$sal['family_allowance_lbp'] : 0;
         $cTotal  = (int)round($basePlusEch) + $cExtra + $cAide + $cTrans + $cFamily;
         $cDailyTrans = (float)($emp['transport_daily_amount'] ?? 0);
@@ -1791,7 +1800,7 @@ if (!$emp):
         // الأجر الإضافي والمكافأة يظهران حسب خيار «مكوّنات الراتب» أعلى الصفحة ($incExtra/$incAide).
         $cExtra  = $incExtra ? $extraW : 0;
         $cAide   = $incAide  ? $aideW  : 0;
-        $cTrans  = $sal ? (int)$sal['transport_lbp'] : 0;
+        $cTrans  = ($incTrans && $sal) ? (int)$sal['transport_lbp'] : 0; // يتبع خيار «+ تعويض النقل» بالشريط (2026-09-15)
         $cFamily = $sal ? (int)$sal['family_allowance_lbp'] : 0;
         $cTotal  = (int)round($basePlusEch) + $cExtra + $cAide + $cTrans + $cFamily;
         // قيمة تعويض النقل اليومي من ملف الأستاذ (بعملته الخاصة كما أُدخِلت)

@@ -371,7 +371,8 @@ check('نموذج الاستخدام-المضمون: الرقم قبل التف�
 // (2026-08-20) «مكان جملة ملحقات مدفوعة بدو يكون الأجر الإضافي» بإفادة الضمان
 check('إفادة الضمان: سطر «الأجر الإضافي» بدل «ملحقات مدفوعة من أشخاص ثالثين»',
       strpos($attSrc, 'ملحقات مدفوعة من أشخاص ثالثين') === false
-      && strpos($attSrc, '- الأجر الإضافي : <strong><?= $moneyAr($attSupp)') !== false);
+      && strpos($attSrc, "\$cnssParts[] = ['ar' => 'الأجر الإضافي'") !== false // (2026-09-15) سطر لكل مكوّن مختار فقط — لا سطر بصفر
+      && strpos($attSrc, '- الأجر الإضافي : <strong><?= $moneyAr($attSupp)') === false);
 // (2026-08-21) p1: خانة «الرقم/N°» انشالت من رأس إفادتي الراتب والعمل + التاريخ وحده سطراً
 // (شمال الصفحة بالعربي بdir=rtl حتى تسبق كلمة «التاريخ» الرقم، ويمينها باللاتيني) — بلا flex
 // لأن الوورد لا يفهمه فتتكوّم السطور بجهة وحدة + كلمة «هاتف» قبل الرقم (سطر الهاتف dir=rtl)
@@ -6333,6 +6334,34 @@ foreach (['cnss', 'salaire', 'tadris', 'embassy', 'riaaya', 'anhaa_khedme', 'anh
         || substr_count($h, 'name="cur"') < 3 || strpos($h, 'الراتب المعتمد') === false) $bad131[] = $ty131;
 }
 check('خيارات الإفادات موحّدة (تشغيل فعلي): 15 نوعاً كلها تعرض الإضافي/المكافأة/النقل + ليرة/دولار/الاثنين + سطر الراتب المعتمد', !$bad131, $bad131 ? implode(',', $bad131) : 'كلها');
+
+/* =====================================================================
+ * 132) 🔴 «شيّكت إفادة الضمان اللي منقدّمها للضمان وشلت الإضافي — بعدو بيحطّو فيها، شيّك على كل البرنامج وصحّح»
+ *     (2026-09-15): إفادة الضمان كانت تطبع سطر «الأجر الإضافي» دائماً (بصفر) والمكافأة مدموجة فيه؛ وعقد التعليم
+ *     كان يجمع النقل ولو شِيل خياره. صار كل مكوّن يتبع مربّعه بكل الإفادات: مشيول = لا سطر ولا بالمجموع.
+ * =================================================================== */
+$at132 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+check('خيارات المكوّنات تُحترَم (كود): إفادة الضمان سطر لكل مكوّن مختار + عقد التعليم النقل يتبع مربّعه',
+      substr_count($at132, "foreach (\$cnssParts as \$cp)") === 2
+      && substr_count($at132, "\$cTrans  = (\$incTrans && \$sal) ? (int)\$sal['transport_lbp'] : 0;") === 2
+      && strpos($at132, "\$attSupp = (\$incExtra ? \$extraW : 0) + (\$incAide ? \$aideW : 0);") !== false);
+$ok132 = false; $why132 = '';
+try {
+    $r132 = getDB()->query("SELECT prime_fixe_lbp + extra_lbp ex, transport_lbp tr FROM monthly_salaries WHERE employee_id = 1387 AND year = 2026 AND month = 10")->fetch(PDO::FETCH_ASSOC);
+    if ($r132 && (int)$r132['ex'] > 0 && (int)$r132['tr'] > 0) {
+        $base132 = ['employee_id' => 1387, 'lang_doc' => 'ar', 'date' => '2026-09-15', 'opts_set' => 1];
+        $exS = number_format((int)$r132['ex']); $trS = number_format((int)$r132['tr']);
+        $hOn  = renderPage('pages/attestations.php', $base132 + ['type' => 'cnss', 'inc_extra' => 1], ['extra'], [3], 'lbp', '2026-2027');
+        $hOff = renderPage('pages/attestations.php', $base132 + ['type' => 'cnss'], ['extra'], [3], 'lbp', '2026-2027');
+        $cOn  = renderPage('pages/attestations.php', $base132 + ['type' => 'aqd_taalim', 'inc_trans' => 1], ['transport'], [3], 'lbp', '2026-2027');
+        $cOff = renderPage('pages/attestations.php', $base132 + ['type' => 'aqd_taalim'], ['transport'], [3], 'lbp', '2026-2027');
+        $doc132 = function (string $h): string { $p = strpos($h, 'id="ppExportArea"'); return $p === false ? $h : substr($h, $p); }; // نصّ الوثيقة فقط (لا شريط الخيارات الذي يعرض المبالغ للعلم)
+        $okCn = strpos($doc132($hOn), '- الأجر الإضافي : <strong>' . $exS) !== false && strpos($doc132($hOff), '- الأجر الإضافي :') === false && strpos($doc132($hOff), $exS) === false;
+        $okCt = strpos($doc132($cOn), $trS) !== false && strpos($doc132($cOff), '<strong>' . $trS . ' ل.ل</strong> شهرياً') === false;
+        $ok132 = $okCn && $okCt; $why132 = "ضمان: مع الإضافي $exS " . ($okCn ? '✓' : '✗') . " / عقد: النقل $trS " . ($okCt ? '✓' : '✗');
+    } else { $ok132 = true; $why132 = 'لا صفّ تشرين 2026 لـ1387 بإضافي ونقل — تخطٍّ'; }
+} catch (Throwable $e) { $why132 = $e->getMessage(); }
+check('خيارات المكوّنات تُحترَم (تشغيل فعلي): إفادة الضمان بلا الإضافي لا تذكره ولا بالمجموع، وعقد التعليم بلا النقل لا يجمعه', $ok132, $why132);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
