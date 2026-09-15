@@ -114,14 +114,16 @@ foreach ($pages as $name => [$rel, $get]) {
 foreach (['eoc_staff', 'teaching_staff', 'salary_all', 'monthly_rep', 'cnss_rep'] as $p) {
     $hAll  = $html["$p|all"] ?? '';
     $hNone = $html["$p|none"] ?? '';
-    check("عمود الإضافي يظهر مع الخيار — $p", substr_count($hAll, 'الأجر الإضافي</th>') >= 1);
-    check("عمود الإضافي يختفي بلا الخيار — $p", substr_count($hNone, 'الأجر الإضافي</th>') === 0);
+    // (2026-09-15) الرأس قد يحمل تحته سطر النسبة (extraPctHead) — نقبل الصيغتين
+    $exHead = '/الأجر الإضافي(<br><small class="rate-head" dir="ltr">[^<]*<\/small>)?<\/th>/u';
+    check("عمود الإضافي يظهر مع الخيار — $p", preg_match($exHead, $hAll) === 1);
+    check("عمود الإضافي يختفي بلا الخيار — $p", preg_match($exHead, $hNone) === 0);
     check("عمود المكافأة يختفي بلا الخيار — $p", substr_count($hNone, 'مكافأة ومساعدة</th>') === 0);
 }
 // الحالة الجزئية: إضافي فقط
 $hEx = renderPage('pages/official_forms.php', ['form' => 'eoc_staff', 'cat' => 'titulaire'], ['extra']);
 check('إضافي فقط: عمود الإضافي ظاهر والمكافأة مخفية — eoc_staff',
-    substr_count($hEx, 'الأجر الإضافي</th>') >= 1 && substr_count($hEx, 'مكافأة ومساعدة</th>') === 0);
+    preg_match('/الأجر الإضافي(<br><small class="rate-head" dir="ltr">[^<]*<\/small>)?<\/th>/u', $hEx) === 1 && substr_count($hEx, 'مكافأة ومساعدة</th>') === 0);
 
 /* =====================================================================
  * 3) ofLatestSalary يفضّل السنة الدراسية النشطة (إصلاح «الإضافي = 0»)
@@ -592,10 +594,10 @@ check('لا ورقة أخيرة بيضاء بالتقارير الطويلة (co
 // (2026-08-20) جردة ب: (١) هدف التصغير = عرض الورقة الفعلي داخل هوامش @page (كان 745/1075
 // أعرض من الورقة فيُقصّ طرف الجدول المصغَّر صمتاً — عمود «الباقي للصندوق» بالاسمي الشهري)
 // + هامش أمان 0.98 بمعادلة --pz (٢) sign-row جدولاً بالطباعة (flex لا يحترم منع الانقسام)
-check('لا قصّ صامت بالجداول المصغَّرة (أهداف 718/1062 + أمان 0.98) + صفوف التواقيع جدول بالطباعة',
+check('لا قصّ صامت بالجداول المصغَّرة (أهداف 718/1062 + أمان 0.98 لـdoc-table و0.96 للجداول العادية داخل البطاقات) + صفوف التواقيع جدول بالطباعة',
       strpos($rhSrc, '--pz-target:718') !== false
       && strpos($rhSrc, '--pz-target:1062') !== false
-      && substr_count($rhSrc . $appJs, '(target * 0.98) / natW') >= 2
+      && strpos($rhSrc, '(target * 0.98) / natW') !== false && strpos($appJs, '(target * 0.96) / natW') !== false
       && strpos($appJs, "? 1062 : 718") !== false
       && strpos($rhSrc, '.sign-row{display:table;width:100%;table-layout:fixed') !== false);
 // (2026-08-20) «قلنالك بدون هيدا الخط الأسود تحت اللوغو»: بلا أي خط صلب تحت ترويسات الإفادات
@@ -1447,7 +1449,7 @@ check('خط 12: طباعة الجداول العادية 12pt لا 12px (app.css
     }
     /* النماذج الرسمية') === false);
 check('خط 12: الجدول العريض يصغّر نفسه بالطباعة (--pz للجداول العادية + القسائم)',
-      strpos($cssSrc22, '.table { zoom: var(--pz, 1); }') !== false
+      strpos($cssSrc22, '.table { zoom: var(--pz, 1) !important; }') !== false
       && strpos($cssSrc22, '.payslip-card, .salary-slip { zoom: var(--pz, 1); }') !== false
       && strpos($jsSrc22, 'function fitPrintZoom') !== false
       && strpos($jsSrc22, "addEventListener('beforeprint', fitPrintZoom)") !== false);
@@ -1632,7 +1634,7 @@ try {
  * =================================================================== */
 $ofSrc26 = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
 check('الراتب يشمل: كشف الضمان الاسمي يستعمل extraAideHeads/transportHead (لا أعمدة مقصوصة بالكود)',
-      substr_count($ofSrc26, 'extraAideHeads(\' rowspan="2"\')') >= 4
+      substr_count($ofSrc26, 'extraAideHeads(\' rowspan="2"\',') >= 4
       && strpos($ofSrc26, "\$nomCols = 19 + compColsCount();") !== false);
 check('الراتب يشمل: «معلومات تفصيلية عن الراتب» — المحسومات 7 أعمدة برؤوس صحيحة (مجموع المحسومات موجود)',
       strpos($ofSrc26, '<th colspan="7">المحسومات القانونية</th>') !== false
@@ -6110,6 +6112,73 @@ try {
     $ok126 = !$bad126; $why126 = "mkt=$mk bad=" . implode(',', $bad126);
 } catch (Throwable $e) { $why126 = $e->getMessage(); }
 check('سعر الصرف بالعناوين (تشغيل فعلي): كشف كل الموظفين 3×1,500 (أساس/درجة/بعد التدرّج) + 3×سعر الشهر (المركّب/الصافي/المدفوعات)، يختفي بوضع الليرة، Résumé mensuel 3 + 2', $ok126, $why126);
+
+/* =====================================================================
+ * 127) 🖥️ «في تقارير وقت بدي شوفها على شاشة الكمبيوتر ما بتطلع كلها قبل الطبع — أوعى تخرب البطاقة السنوية» (2026-09-15):
+ *      الجدول الأعرض من حاويته يصغّر نفسه على الشاشة (msaFitScreenTables بapp.js: zoom = عرض الحاوية ÷ عرضه، حدّ 0.5)
+ *      فتظهر كل أعمدته دفعة واحدة؛ الطباعة/PDF على --pz (!important) ووورد/إكسل يمسحان zoom؛ doc-view أوسع (1600)؛
+ *      قياس الجداول العادية للطباعة بالقواعد المقلوبة (كالبطاقة) وبخصم حشوة البطاقة (عمود الحالة كان يُقصّ على الورق)
+ *      + البطاقة وحاوية الجدول لا تقصّان بالطباعة. 🔒 البطاقة السنوية (.salary-slip) مستثناة من كل ذلك.
+ *      🧮 «بالتقارير حطّ تحت عنوان الأجر الإضافي قديش النسبة الحاطينها»: extraPctHead تحت رأس العمود بكل الكشوف
+ *      (extraAideHeads بصفوف/شهر/سنة) — الأكثر شيوعاً أوّلاً لغاية 4 نِسَب ثم «…».
+ * =================================================================== */
+$js127 = (string)file_get_contents($PROJ . '/assets/js/app.js'); $css127 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$rh127 = (string)file_get_contents($PROJ . '/includes/report_helpers.php'); $of127 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp127 = (string)file_get_contents($PROJ . '/pages/reports.php');
+check('الجدول العريض على الشاشة (كود): msaFitScreenTables بapp.js (table/doc-table/xlsf، يستثني .salary-slip والقسيمة والإفادات، حدّ 0.5) + تُستدعى من initStickyHeads وfitDocTables + doc-view 1600',
+      strpos($js127, 'window.msaFitScreenTables = function ()') !== false
+      && strpos($js127, "querySelectorAll('table.table, table.doc-table, table.xlsf')") !== false
+      && strpos($js127, "t.closest('.salary-slip, .payslip-card, [data-fit1], .no-print, .ba-overlay, .modal, [role=\"dialog\"]')") !== false
+      && strpos($js127, 'Math.max((avail - 2) / natW, 0.5).toFixed(3)') !== false
+      && strpos($js127, 'window.msaFitScreenTables();   // 🖥️') !== false
+      && strpos($rh127, 'if (window.msaFitScreenTables) window.msaFitScreenTables();') !== false
+      && strpos($css127, 'body.doc-view .page-content { max-width: 1600px; margin: 0 auto; }') !== false);
+check('الجدول العريض على الشاشة: الطباعة وPDF لا يرثان تصغير الشاشة (--pz !important للجداول العادية وdoc-table، xlsf zoom:1) + وورد/إكسل يمسحان zoom',
+      strpos($css127, '.table { zoom: var(--pz, 1) !important; }') !== false
+      && strpos($rh127, '@media print{ .doc-table{zoom:var(--pz,1) !important;} }') !== false
+      && strpos($rh127, '@media print{ table.xlsf{zoom:1 !important;} }') !== false
+      && strpos((string)file_get_contents($PROJ . '/assets/js/export.js'), "querySelectorAll('[style*=\"zoom\"]').forEach(function (n) { n.style.zoom = ''; })") !== false);
+check('طباعة الجداول العادية: القياس بالقواعد المقلوبة + خصم حشوة البطاقة + أمان 0.96 + البطاقة وحاوية الجدول لا تقصّان على الورق',
+      preg_match('/var flipped1 = \[\];.*?rule1\.media\.mediaText = \'all\'/s', $js127) === 1
+      && strpos($js127, 'if (over1 > 0 && over1 < target / 2) target -= over1;') !== false
+      && strpos($js127, 'var pz = (target * 0.96) / natW;') !== false
+      && strpos($js127, "t.style.zoom = '';                                    // تصغير الشاشة") !== false
+      && strpos($css127, '.card, .table-wrapper { overflow: visible !important; }') !== false);
+check('🔒 البطاقة السنوية لم تُمَسّ (annual_slip.php وقياسها ٢-أ بapp.js كما هما)',
+      strpos($js127, '// (٢-أ) 🔒 البطاقات السنوية تُقاس **بشروط الطباعة الحقيقية** لا بتنسيق الشاشة:') !== false
+      && strpos($js127, 'var twS = 1085, thS = 710, k;') !== false
+      && strpos($css127, '.payslip-card, .salary-slip { zoom: var(--pz, 1); }') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'class="salary-slip-table') !== false);
+check('نسبة الأجر الإضافي تحت العنوان (كود): extraPctHead مصدر واحد + extraAideHeads بصفوف/شهر/سنة بكل مواقع النداء (4 بالمركز + 9 بالنماذج) + الرأسان الحرفيان (ضريبة الأستاذ/الصندوق الفصلي)',
+      function_exists('extraPctHead') && function_exists('extraAideHeads')
+      && substr_count($rp127, "extraAideHeads('', \$data, \$month, \$year)") === 4
+      && substr_count($of127, 'extraAideHeads(') === 9 && substr_count($of127, 'extraAideHeads()') === 0 && substr_count($of127, "extraAideHeads(' rowspan=\"2\"')") === 0
+      && substr_count($of127, 'extraPctHead(') === 2
+      && strpos($rh127, "implode(' / ', array_slice(\$keys, 0, 4)) . ' %' . (count(\$keys) > 4 ? ' …' : '')") !== false);
+$ok127 = false; $why127 = '';
+try {
+    $db127 = getDB();
+    // مدرسة واحدة بنسبة موحّدة: المتوقّع من القاعدة نفسها (الأكثر شيوعاً أوّلاً) — تشرين الأوّل 2025 (سنة 2025-2026)
+    $st127 = $db127->query("SELECT b.amount, COUNT(DISTINCT b.employee_id) n FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id
+        WHERE b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='percent' AND (b.school_year IS NULL OR b.school_year='2025-2026') AND e.is_deleted=0 AND e.school_id=4
+          AND (b.start_month IS NULL OR b.end_month IS NULL OR ((b.start_month<=b.end_month AND 10 BETWEEN b.start_month AND b.end_month) OR (b.start_month>b.end_month AND (10>=b.start_month OR 10<=b.end_month))))
+        GROUP BY b.amount ORDER BY n DESC, b.amount DESC");
+    $exp = []; foreach ($st127->fetchAll(PDO::FETCH_ASSOC) as $r) $exp[] = rtrim(rtrim(number_format((float)$r['amount'], 2, '.', ''), '0'), '.');
+    $expTxt = $exp ? (implode(' / ', array_slice($exp, 0, 4)) . ' %' . (count($exp) > 4 ? ' …' : '')) : '';
+    $bad = [];
+    foreach ([['pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025]],
+              ['pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025]],
+              ['pages/official_forms.php', ['form' => 'payment_list', 'month' => 10, 'year' => 2025]],
+              ['pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => 10, 'year' => 2025]]] as $pg) {
+        $o = renderPage($pg[0], $pg[1], ['extra', 'aide', 'transport'], [4], 'both');
+        $has = strpos($o, 'الأجر الإضافي<br><small class="rate-head" dir="ltr">' . $expTxt . '</small>') !== false;
+        if (!$has || $expTxt === '') $bad[] = $pg[1]['report'] ?? $pg[1]['form'];
+    }
+    // بوضع «ليرة فقط» النسبة تبقى (ليست سعر صرف)
+    $o = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], ['extra', 'aide', 'transport'], [4], 'lbp');
+    if (strpos($o, 'rate-head" dir="ltr">' . $expTxt . '</small>') === false) $bad[] = 'lbp-mode';
+    $ok127 = !$bad; $why127 = "exp=$expTxt bad=" . implode(',', $bad);
+} catch (Throwable $e) { $why127 = $e->getMessage(); }
+check('نسبة الأجر الإضافي تحت العنوان (تشغيل فعلي): مدرسة 4 تشرين 2025 — Résumé mensuel + كشف كل الموظفين + كشف الدفع + الضمان الاسمي يعرضون نسبة القاعدة نفسها، وتبقى بوضع الليرة', $ok127, $why127);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

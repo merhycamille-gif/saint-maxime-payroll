@@ -75,6 +75,29 @@ document.addEventListener('change', function(e) {
     }
 });
 
+// 🖥️ «في تقارير وقت بدي شوفها على شاشة الكمبيوتر ما بتطلع كلها قبل الطبع» (2026-09-15):
+// الجدول الأعرض من حاويته كان يُقصّ طرفه على الشاشة، وشريط التمرير الأفقي مدفون بآخر
+// الحاوية (بعد آلاف البكسلات بالكشوف الطويلة) فلا يراه أحد. الحلّ على كل البرنامج: الجدول
+// الأعرض من شاشته يصغّر نفسه (zoom = عرض الحاوية ÷ عرضه الطبيعي، حدّ أدنى 0.5) فتظهر
+// كل أعمدته دفعة واحدة — كما على الورق. الطباعة وPDF لهما تصغيرهما المحسوب (--pz) الذي
+// يغلب هذا التصغير (!important بقواعد @media print)، ووورد/إكسل يمسحانه (cleanHtml).
+// 🔒 البطاقة السنوية (.salary-slip) والقسيمة الشهرية والإفادات مستثناة تماماً — لا تُلمَس.
+window.msaFitScreenTables = function () {
+    var tables = document.querySelectorAll('table.table, table.doc-table, table.xlsf');
+    for (var i = 0; i < tables.length; i++) {
+        var t = tables[i], host = t.parentElement;
+        if (!host) continue;
+        if (t.closest('.salary-slip, .payslip-card, [data-fit1], .no-print, .ba-overlay, .modal, [role="dialog"]')) continue;
+        t.style.zoom = '';                                   // القياس بالحجم الطبيعي (خط 12)
+        var hs = getComputedStyle(host);   // عرض المحتوى الحقيقي للحاوية (بلا حشوتها) — وإلا فاض الطرف بقدر الحشوة
+        var avail = host.clientWidth - (parseFloat(hs.paddingLeft) || 0) - (parseFloat(hs.paddingRight) || 0);
+        var natW = t.scrollWidth;
+        if (!natW || avail <= 0) continue;
+        // تسامح 4px (حدود الجدول): الجدول الذي يسع حاويته يبقى بحجمه 12 تماماً — الأعرض وحده يتصغّر
+        if (natW > avail + 4) t.style.zoom = Math.max((avail - 2) / natW, 0.5).toFixed(3);
+    }
+};
+
 // 📌 تثبيت رؤوس الجداول أثناء التمرير (على كل البرنامج):
 // «العناوين تبقى براس الصفحة مش بنص الصفحة» (2026-08-03): الصفحة نفسها هي الأسانسور،
 // والرأس يلتصق بأعلى الشاشة تحت الشريط العلوي (لا صناديق تمرير داخلية إلا للجدول
@@ -88,6 +111,7 @@ document.addEventListener('change', function(e) {
         var prev = document.querySelectorAll('[data-stkvis]');
         for (var r0 = 0; r0 < prev.length; r0++) { prev[r0].style.overflow = ''; prev[r0].style.overflowX = ''; prev[r0].removeAttribute('data-stkvis'); }
         xTables = [];
+        window.msaFitScreenTables();   // 🖥️ الجدول الأعرض من شاشته يصغّر نفسه أوّلاً (ثم الرأس يُحسب على تصغيره)
         // ارتفاع الشريط العلوي الملتصق — الرأس يلتصق تحته لا خلفه
         topOffG = 0;
         var tb = document.querySelector('.topbar');
@@ -168,23 +192,56 @@ document.addEventListener('change', function(e) {
     function fitPrintZoom() {
         // (١) الجداول العادية (.table) خارج القسائم و doc-table
         var tables = document.querySelectorAll('table.table');
+        // 🖨️ «ما بتطلع كلها قبل الطبع» (2026-09-15): القياس القديم كان بتنسيق الشاشة (pz-measure يكبّر
+        // خط الخلايا وحده) بينما الورق يكبّر أيضاً الشارات (badge) والعريض والروابط إلى 12pt — فكان
+        // العرض المقيس أقلّ من الحقيقي (~1040 بدل ~1160 بجدول الرواتب الشهرية) ويُقصّ طرف الجدول
+        // (عمود الحالة) على الورق. الآن: قلب قواعد @media print إلى الشاشة لحظياً (خطوة متزامنة لا
+        // تُرى — نفس أسلوب البطاقة السنوية ٢-أ) فالقياس = تدفّق الطباعة الحقيقي نفسه.
+        var flipped1 = [];
+        if (tables.length) {
+            try {
+                for (var s1 = 0; s1 < document.styleSheets.length; s1++) {
+                    var rules1; try { rules1 = document.styleSheets[s1].cssRules; } catch (e1) { continue; }
+                    if (!rules1) continue;
+                    for (var r1 = 0; r1 < rules1.length; r1++) {
+                        var rule1 = rules1[r1];
+                        if (rule1.media && /print/.test(rule1.media.mediaText)) { flipped1.push([rule1, rule1.media.mediaText]); rule1.media.mediaText = 'all'; }
+                    }
+                }
+            } catch (e0) {}
+        }
+        try {
         for (var i = 0; i < tables.length; i++) {
             var t = tables[i];
             if (t.classList.contains('doc-table') || t.closest('.payslip-card, .salary-slip, .no-print')) continue;
             var target = t.closest('.land-report') ? 1062 : 718;   // عرض A4 الفعلي داخل هوامش @page (كان 1075/745 أعرض من الورقة فيُقصّ الطرف — 2026-08-20)
+            // 🖨️ الجدول داخل بطاقة (card-body) لا يأخذ عرض الورقة كله: حشوة البطاقة وحدودها تُخصم
+            // (تُقاس بالقواعد المقلوبة = كما على الورق) — جدول الرواتب الشهرية كان يُقصّ عمود الحالة
+            var host1 = t.parentElement, hs1 = host1 ? getComputedStyle(host1) : null;
+            if (hs1) {
+                var inner1 = host1.clientWidth - (parseFloat(hs1.paddingLeft) || 0) - (parseFloat(hs1.paddingRight) || 0);
+                var over1 = document.documentElement.clientWidth - inner1;
+                if (over1 > 0 && over1 < target / 2) target -= over1;
+            }
             // شروط الطباعة الحقيقية: خط 12 + عرض الورقة + لفّ الرؤوس + إخفاء أعمدة الأزرار —
             // فلا يُصغَّر إلا الجدول الذي لا تسعه الورقة فعلاً (أرقامه لا تلتفّ)
             t.classList.add('pz-measure');
-            var prevW = t.style.width;
+            var prevW = t.style.width, prevZ = t.style.zoom;
+            t.style.zoom = '';                                    // تصغير الشاشة (msaFitScreenTables) لا يدخل بالقياس
+            t.style.setProperty('--pz', 1);                       // ولا تصغير الورق السابق (القواعد مقلوبة الآن)
             t.style.setProperty('width', target + 'px', 'important');
             var natW = Math.max(t.scrollWidth, Math.ceil(t.getBoundingClientRect().width), 1);
-            t.style.width = prevW;
+            t.style.width = prevW; t.style.zoom = prevZ;
             t.classList.remove('pz-measure');
-            // ×0.98 هامش أمان: قياس المحاكاة يختلف عن تدفّق الطباعة الحقيقي قليلاً (جردة 2026-08-20)
-            var pz = (target * 0.98) / natW;
+            // ×0.96 هامش أمان: قياس المحاكاة يختلف عن تدفّق الطباعة الحقيقي قليلاً (جردة 2026-08-20 كان 0.98؛
+            // 2026-09-15: عمود الحالة بجدول الرواتب الشهرية كان يُقصّ بضعة بكسلات — الجداول داخل البطاقات تحتاج هامشاً أوسع)
+            var pz = (target * 0.96) / natW;
             // 🔠 «حجم الخط 12 بكل شي» (2026-08-01): لا تكبير فوق خط 12 — الجدول الأصغر من
             // الورقة يملؤها بتوسيع أعمدته وخطه 12 تماماً؛ الأعرض وحده يتصغّر حتى لا يُقصّ
             t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
+        }
+        } finally {
+            for (var f1 = 0; f1 < flipped1.length; f1++) flipped1[f1][0].media.mediaText = flipped1[f1][1];
         }
         // (٢-أ) 🔒 البطاقات السنوية تُقاس **بشروط الطباعة الحقيقية** لا بتنسيق الشاشة:
         // beforeprint يشتغل والصفحة بعدها بتنسيق الشاشة فتلتفّ الأسطر ويطلع ارتفاع

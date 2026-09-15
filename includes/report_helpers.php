@@ -44,11 +44,56 @@ function aideCompLbp(array $r): int {
 /** رأسا العمودين (يُدرجان في <thead><tr>).
  *  يتبعان زرّ «الراتب المركّب يشمل» بالترويسة: العمود غير المختار يُخفى كلياً من التقرير.
  *  $attrs: سمات إضافية للـ<th> (مثل ' rowspan="2"'). */
-function extraAideHeads(string $attrs = ''): string {
+function extraAideHeads(string $attrs = '', $rows = null, $month = null, $year = null, ?string $sy = null): string {
     $h = '';
-    if (salaryCompHas('extra')) $h .= '<th' . $attrs . '>الأجر الإضافي</th>';
+    if (salaryCompHas('extra')) $h .= '<th' . $attrs . '>الأجر الإضافي' . extraPctHead($rows, $month, $year, $sy) . '</th>';
     if (salaryCompHas('aide'))  $h .= '<th' . $attrs . '>مكافأة ومساعدة</th>';
     return $h;
+}
+/** 🧮 «بالتقارير بدك تحط تحت عنوان الأجر الإضافي قديش النسبة الحاطينها» (2026-09-15):
+ *  سطر صغير تحت رأس العمود (كسطر سعر الصرف rateHead) يعرض نسبة/نسب الأجر الإضافي المعطاة (٪ من الأساس)
+ *  لأساتذة التقرير: «65 %» إن كانت واحدة، أو «85 / 65 / 55 %» إن تعدّدت (من الأعلى للأدنى). لا شيء إن لا نسب (مبالغ مقطوعة فقط).
+ *  $rows: صفوف التقرير (يُقرأ منها employee_id أو id) — وإلا نطاق المدارس المختارة. $month/$year: شهر التقرير
+ *  (النسبة السارية فيه)، وإلا $sy (أو السنة النشطة) بكل أشهرها. البطاقة السنوية لها سطرها الخاصّ ولا تُمَسّ. */
+function extraPctHead($rows = null, $month = null, $year = null, ?string $sy = null): string {
+    $month = $month !== null ? (int)$month : 0;
+    if ($sy === null || $sy === '') $sy = ($month && $year) ? schoolYearOfMonth((int)$year, $month) : (string)activeSchoolYear();
+    $ids = null;
+    if (is_array($rows)) {
+        $ids = [];
+        foreach ($rows as $r) { if (!is_array($r)) continue; $id = (int)($r['employee_id'] ?? $r['id'] ?? 0); if ($id > 0) $ids[$id] = 1; }
+        $ids = array_keys($ids);
+        if (!$ids) $ids = null;                      // صفوف بلا معرّفات (مجاميع مدارس…) ← نطاق المدارس
+    }
+    try {
+        $sql = "SELECT b.employee_id, b.amount, b.start_month, b.end_month FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id
+                WHERE b.bonus_type = 'prime_fixe' AND b.is_active = 1 AND b.value_type = 'percent'
+                  AND (b.school_year IS NULL OR b.school_year = ?) AND e.is_deleted = 0";
+        if ($ids !== null) $sql .= ' AND b.employee_id IN (' . implode(',', array_map('intval', $ids)) . ')';
+        else $sql .= schoolScopeSql('e.school_id');
+        $st = getDB()->prepare($sql); $st->execute([$sy]); $bon = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { return ''; }
+    if (!$bon) return '';
+    $seen = [];   // النسبة ← عدد الأساتذة عليها
+    foreach ($month ? [$month] : [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9] as $m) {
+        $per = [];
+        foreach ($bon as $r) {
+            $s = $r['start_month']; $e = $r['end_month'];
+            if ($s !== null && $e !== null) {
+                $s = (int)$s; $e = (int)$e;
+                if ($s <= $e) { if ($m < $s || $m > $e) continue; }
+                else { if ($m < $s && $m > $e) continue; }
+            }
+            $per[(int)$r['employee_id']] = ($per[(int)$r['employee_id']] ?? 0) + (float)$r['amount'];
+        }
+        foreach ($per as $pct) if ($pct > 0) { $k = rtrim(rtrim(number_format($pct, 2, '.', ''), '0'), '.'); $seen[$k] = ($seen[$k] ?? 0) + 1; }
+    }
+    if (!$seen) return '';
+    // الأكثر شيوعاً أوّلاً (عدد الأساتذة)، ولغاية 4 نِسَب — الباقي «…» (كل المدارس معاً = 12 نسبة، لا تُحشر برأس عمود)
+    uksort($seen, fn($a, $b) => ($seen[$b] <=> $seen[$a]) ?: ((float)$b <=> (float)$a));
+    $keys = array_keys($seen);
+    $txt = implode(' / ', array_slice($keys, 0, 4)) . ' %' . (count($keys) > 4 ? ' …' : '');
+    return '<br><small class="rate-head" dir="ltr">' . $txt . '</small>';
 }
 /** خليّتا العمودين لصف الجسم (تتبعان زرّ «الراتب المركّب يشمل» — تُخفيان إن لم تُختارا).
  *  $num=true يضيف class="num" (للنماذج الرسمية ذات الأرقام يساراً).
@@ -609,6 +654,8 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
 /* الطباعة: تصغير محسوب خاص بها (--pz يحسبه السكربت أدناه = عرض الورقة ÷ عرض الجدول الطبيعي)
    فلا يُقصّ أي عمود على الورق مهما اتّسع الجدول؛ الجدول الذي يسع ورقته يبقى بحجمه (--pz=1) */
 @media print{ .doc-table{zoom:var(--pz,1) !important;} }
+/* النماذج طبق الأصل (xlsf) تُطبع بحجمها المصمّم — تصغير الشاشة (msaFitScreenTables) لا يتسرّب للورق */
+@media print{ table.xlsf{zoom:1 !important;} }
 /* عرض الورقة المستهدف بالبكسل (A4 ناقص الهوامش): أفقي للتقارير العريضة، عمودي لسواها */
 /* 🔴 الهدف = عرض الورقة الفعلي داخل هوامش @page (عمودي 10mm → 190mm=718px،
    أفقي 8mm → 281mm=1062px) — كان 745/1075 أعرض من الورقة فيُقصّ طرف الجدول المصغَّر
@@ -668,6 +715,9 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             // والجدول الأعرض من الورقة وحده يتصغّر بالمحسوب حتى لا يُقصّ عمود (كما كان)
             t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
         }
+        // 🖥️ الشاشة: الجدول الأعرض من شاشته يصغّر نفسه ليظهر كاملاً (msaFitScreenTables في app.js —
+        // «ما بتطلع كلها قبل الطبع» 2026-09-15). الطباعة تبقى على --pz أعلاه (!important)
+        if (window.msaFitScreenTables) window.msaFitScreenTables();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitDocTables);
     else fitDocTables();

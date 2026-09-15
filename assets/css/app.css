@@ -807,6 +807,8 @@ body.rtl .table th { text-align: right; }
        الحدود الدنيا فلا يمتد شيء أبعد من آخر سطر فعلي */
     .app-layout, .main-content { display: block !important; min-height: 0 !important; height: auto !important; overflow: visible !important; }
     .card { box-shadow: none; border: none; }
+    /* 🖨️ «ما بتطلع كلها قبل الطبع» (2026-09-15): البطاقة وحاوية الجدول لا تقصّان الجدول على الورق — الأعرض بقليل يتجاوز الحافة بدل أن يُقطع عموده الأخير */
+    .card, .table-wrapper { overflow: visible !important; }
     body { background: white; }
     /* اطبع الخلفيات والألوان والترويسات الرسمية كما تظهر (صور الترويسة، الرؤوس الملوّنة) */
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -1124,7 +1126,7 @@ h1, h2, h3, h4, h5, h6,
         font-size: inherit !important;
     }
     /* الجدول العريض يصغّر نفسه محسوباً (--pz من app.js) فلا يُقصّ عمود — كنظام doc-table نفسه */
-    .table { zoom: var(--pz, 1); }
+    .table { zoom: var(--pz, 1) !important; }   /* !important: يغلب تصغير الشاشة (msaFitScreenTables) على الورق وبالـPDF */
     /* الرأس الثنائي (Nom / الاسم) يلفّ عند « / » على الورق فلا يعرّض العمود بلا داعٍ */
     .table th { white-space: normal; }
     .payslip-card, .salary-slip { zoom: var(--pz, 1); }
@@ -1467,7 +1469,7 @@ body.doc-view form[action*="switch_year"],
 body.doc-view a[href*="switch_lang"],
 body.doc-view .user-menu { display: none !important; }
 body.doc-view .main-content { margin: 0; }
-body.doc-view .page-content { max-width: 1320px; margin: 0 auto; }
+body.doc-view .page-content { max-width: 1600px; margin: 0 auto; }   /* أوسع (كان 1320): الشاشة كلها للتقرير فيقلّ تصغير الجداول العريضة (2026-09-15) */
 /* (الخلفية تبقى خلفية البرنامج المعهودة — الرمادي الغامق كان يعطي إحساساً «مغبّراً»، شكوى p1) */
 
 /* الورقة الموحّدة: خلفية بيضاء بظل خفيف متل ورقة حقيقية — بالطباعة تصير عادية */
