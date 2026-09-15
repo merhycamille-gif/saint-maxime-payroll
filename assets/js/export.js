@@ -290,6 +290,43 @@
     // ===== WhatsApp + PDF (لحسابات المدارس) — نفس النافذة =====
     window.ppWhatsAppPdf = function (title, phone) { ppWhatsApp(title, phone); };
 
+    // 🏛️ «تصريح باستخدام أجير ما مشي الحال» (2026-09-15): على شاشات النماذج الرسمية (ضمان/ر3) كانت أزرار الشريط
+    // العلوي (PDF/Excel/Word/واتساب/إيميل) تعمل على صفحة الخيارات لا على النموذج نفسه. هذه الدالة تجعل الشريط
+    // نفسه (مجموعة أزرار وحدة بالصفحة) يعمل على النموذج الرسمي المعبّأ بخيارات الشاشة الحالية.
+    // o = {pdf, xlsx, target (مسار داخلي للنموذج HTML للإيميل/الواتساب), title, phone, email, base}
+    window.msaOfficialToolbar = function (o) {
+        var tb = document.querySelector('.export-toolbar'); if (!tb) return;
+        tb.innerHTML = ''
+            + '<a class="btn btn-sm btn-danger" href="' + escH(o.pdf) + '" target="_blank" rel="noopener"><i class="fas fa-print"></i> النموذج الرسمي — طباعة / PDF</a>'
+            + (o.xlsx ? '<a class="btn btn-sm btn-success" href="' + escH(o.xlsx) + '"><i class="fas fa-file-excel"></i> Excel رسمي (معبّى) / Excel officiel</a>' : '')
+            + '<button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" id="msaOffWa"><i class="fab fa-whatsapp"></i> WhatsApp</button>'
+            + '<button type="button" class="btn btn-sm btn-light" id="msaOffMail"><i class="fas fa-envelope"></i> Email</button>';
+        tb.querySelector('#msaOffWa').addEventListener('click', function () {
+            var text = (o.title || '') + '\n' + location.origin + o.base + o.target;
+            var m = shareModal(
+                '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:6px"><i class="fab fa-whatsapp"></i> إرسال عبر واتساب / Envoyer par WhatsApp</div>'
+                + '<div style="font-size:13.5px;color:#475569;line-height:1.8;margin-bottom:10px">واتساب ما بيقبل إرفاق ملف من الرابط. الطريقة: <b>١</b> افتح النموذج واحفظه PDF، <b>٢</b> افتح المحادثة وارفق الملف من 📎.</div>'
+                + '<label style="display:block;font-weight:700;margin-bottom:4px">رقم الواتساب / Numéro</label>'
+                + '<input type="tel" id="ppWaNum" class="form-control" dir="ltr" value="' + escH(o.phone || '') + '" placeholder="03 123 456 أو 961…" style="margin-bottom:10px">'
+                + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+                + '<a class="btn btn-primary" target="_blank" rel="noopener" style="font-weight:700" href="' + escH(o.pdf) + '">💾 ١ — افتح النموذج واحفظه PDF</a>'
+                + '<a id="ppWaOpen" class="btn" target="_blank" rel="noopener" style="background:#25D366;color:#fff;font-weight:700" href="#"><i class="fab fa-whatsapp"></i> ٢ — افتح المحادثة</a>'
+                + '</div><div id="ppWaHint" style="font-size:12.5px;color:#64748b;margin-top:8px"></div>');
+            var num = m.el.querySelector('#ppWaNum'), open = m.el.querySelector('#ppWaOpen'), hint = m.el.querySelector('#ppWaHint');
+            function upd() {
+                var n = waNumber(num.value);
+                open.href = 'https://wa.me/' + (n || '') + '?text=' + encodeURIComponent(text);
+                hint.textContent = n ? ('بيفتح محادثة الرقم +' + n + ' — وبعدين ارفق الملف من 📎') : 'بلا رقم: بيفتح واتساب لتختار المحادثة';
+            }
+            num.addEventListener('input', upd); upd(); num.focus();
+        });
+        tb.querySelector('#msaOffMail').addEventListener('click', function () {
+            var to = window.prompt('إرسال النموذج (PDF مرفق) إلى بريد:', o.email || '');
+            if (to === null || !to.trim()) return;
+            window.location.href = o.base + 'pages/send_attestation.php?target=' + encodeURIComponent(o.target) + '&to=' + encodeURIComponent(to.trim()) + '&name=' + encodeURIComponent(o.title || 'formulaire');
+        });
+    };
+
     // ===== Email — يُرسَل من الخادم مع الـPDF مرفقاً (pages/send_report.php + إعدادات البريد) =====
     window.ppEmail = function (title, to) {
         var t = docTitle(title);

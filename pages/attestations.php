@@ -448,10 +448,11 @@ if (!$emp):
                 الأشهر السبعة المحتسَبة تلقائياً من التاريخ (من الأقدم للأحدث): <strong><?= e(implode(' ، ', $mlist)) ?></strong> — كلّها «دوام كامل».<br>
                 التاريخ تحت الإفادة: <strong><?= $d . ' / ' . $mo . ' / ' . $yr ?></strong>
             </div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>" target="_blank"><i class="fas fa-print"></i> Attestation officielle (Impression / PDF) / الإفادة الرسمية (طباعة / PDF)</a>
-                <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> Télécharger Excel (modifiable) / تحميل Excel (للتعديل)</a>
-            </div>
+            <?php /* 🏛️ (2026-09-15) مجموعة أزرار وحدة = الشريط العلوي يعمل على إفادة عمل الضمان الرسمية المعبّأة (لا أزرار مكرّرة) */ ?>
+            <div style="margin:4px 0 10px;color:#1e40af;font-weight:700"><i class="fas fa-arrow-up"></i> الطباعة وPDF وExcel والإرسال: من الشريط أعلى الصفحة.</div>
+            <script>document.addEventListener('DOMContentLoaded', function () { msaOfficialToolbar({pdf: <?= json_encode($expBase . '&format=pdf') ?>, xlsx: <?= json_encode($expBase . '&format=xlsx') ?>,
+                target: <?= json_encode(substr($expBase, strlen(BASE_URL)) . '&format=pdf&mode=image') ?>, base: <?= json_encode(BASE_URL) ?>,
+                title: <?= json_encode('إفادة عمل للضمان — ' . $nm) ?>, phone: <?= json_encode((string)($exportOpts['phone'] ?? '')) ?>, email: <?= json_encode((string)($exportOpts['email'] ?? '')) ?>}); });</script>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> «الإفادة الرسمية» تفتح النموذج الرسمي كاملاً معبّأً (المدرسة ورقمها في الضمان، اسم الأجير ورقم ضمانه وسنة ولادته، والأشهر) جاهز للطباعة — <strong>نفس الشكل تماماً أونلاين وعلى الكمبيوتر</strong>. زر Excel للتحميل والتعديل.</p>
         </div>
     </div>
@@ -536,10 +537,11 @@ if (!$emp):
                 </div>
                 <button class="btn btn-primary"><i class="fas fa-floppy-disk"></i> احفظ معلومات الزوج/الزوجة بملف الموظف</button>
             </form>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <a class="btn btn-danger btn-lg" href="<?= e($expR3) ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي ر3 (طباعة / PDF) / Formulaire officiel R3 (PDF)</a>
-                <a class="btn btn-success btn-lg" href="<?= e($expR3) ?>&format=xlsx"><i class="fas fa-file-excel"></i> Excel رسمي (معبّى) / Excel officiel rempli</a>
-            </div>
+            <?php /* 🏛️ (2026-09-15) مجموعة أزرار وحدة = الشريط العلوي يعمل على نموذج ر3 المعبّأ بخيارات الشاشة */ ?>
+            <div style="margin:4px 0 10px;color:#1e40af;font-weight:700"><i class="fas fa-arrow-up"></i> الطباعة وPDF وExcel والإرسال: من الشريط أعلى الصفحة — بالخيارات المؤشَّرة هنا.</div>
+            <script>document.addEventListener('DOMContentLoaded', function () { msaOfficialToolbar({pdf: <?= json_encode($expR3 . '&format=pdf') ?>, xlsx: <?= json_encode($expR3 . '&format=xlsx') ?>,
+                target: <?= json_encode(substr($expR3, strlen(BASE_URL)) . '&format=pdf&mode=image') ?>, base: <?= json_encode(BASE_URL) ?>,
+                title: <?= json_encode('ر3 تسجيل أجير — ' . $nm) ?>, phone: <?= json_encode((string)($exportOpts['phone'] ?? '')) ?>, email: <?= json_encode((string)($exportOpts['email'] ?? '')) ?>}); });</script>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج ر3 الرسمي</strong> معبّأً تلقائياً من ملف الموظف: المؤسسة ورقمها المالي، والاسم والشهرة والأهل والولادة والسجل، والوضع العائلي وعدد الأولاد وتاريخ بدء العمل ورقم الضمان، ومعلومات الزوج/الزوجة كاملة (من الخانات أعلاه)، والمستفيدين من التنزيل العائلي وعمل الزوج، وعنوان السكن والهاتف، وقسم «خاص بالإدارة» (الرقم المالي بالخانات + تاريخ التسجيل). <?= $hasMof ? 'رقمه المالي موجود بملفه وسيُعبّأ («نعم»).' : 'ما في رقم مالي بملفه — سيُعلَّم «كلا» (وهذا هو المطلوب لهذا النموذج).' ?></p>
         </div>
     </div>
@@ -669,10 +671,12 @@ if (!$emp):
                         (الأساس <?= formatLBP($decBase,false) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?><?= $incTrans?' + النقل':'' ?><?= $decSal ? ' — شهر ' . monthName((int)$decSal['month'],'ar') . ' ' . $decSal['year'] : ' — لا راتب محسوب' ?>)</div>
                 </div>
             </form>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي (طباعة / PDF) / Formulaire officiel (PDF)</a>
-                <a class="btn btn-success btn-lg" href="<?= e($expBase . '&format=xlsx') ?>"><i class="fas fa-file-excel"></i> Télécharger Excel (modifiable) / تحميل Excel (للتعديل)</a>
-            </div>
+            <?php /* 🏛️ «ما مشي الحال» (2026-09-15): مجموعة أزرار وحدة بالصفحة = الشريط العلوي، ويعمل على النموذج الرسمي
+                     بخيارات هذه الشاشة (PDF/Excel/واتساب/إيميل) — لا أزرار مكرّرة هنا. الإيميل/الواتساب بنسخة الصورة (mode=image). */ ?>
+            <div style="margin:4px 0 10px;color:#1e40af;font-weight:700"><i class="fas fa-arrow-up"></i> الطباعة وPDF وExcel والإرسال: من الشريط أعلى الصفحة — وكلها بالخيارات المؤشَّرة هنا.</div>
+            <script>document.addEventListener('DOMContentLoaded', function () { msaOfficialToolbar({pdf: <?= json_encode($expBase . '&format=pdf') ?>, xlsx: <?= json_encode($expBase . '&format=xlsx') ?>,
+                target: <?= json_encode(substr($expBase, strlen(BASE_URL)) . '&format=pdf&mode=image') ?>, base: <?= json_encode(BASE_URL) ?>,
+                title: <?= json_encode($ATT_TYPES[$type]['ar'] . ' — ' . $nm) ?>, phone: <?= json_encode((string)($exportOpts['phone'] ?? '')) ?>, email: <?= json_encode((string)($exportOpts['email'] ?? '')) ?>}); });</script>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج الضمان الرسمي</strong> معبّأً تلقائياً: المدرسة ورقمها في الضمان وهاتفها وعنوانها، واسم الأجير وأهله وولادته وسجلّه وعنوانه، وتاريخ الاستخدام وراتبه الخاضع للضمان رقماً وحروفاً<?= $isLeave ? '، وتاريخ الترك وسببه' : '' ?>. عدّل الخيارات فوق قبل الطباعة إذا لزم.</p>
         </div>
     </div>

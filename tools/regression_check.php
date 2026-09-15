@@ -6404,6 +6404,24 @@ try {
 } catch (Throwable $e) { $why133 = $e->getMessage(); }
 check('تصريح استخدام أجير (تشغيل فعلي): كميل مرعي 15/9/2026 — الأساس وحده، ثم +الإضافي، ثم +النقل بالدولار (رقماً وحروفاً)', $ok133, $why133);
 
+/* =====================================================================
+ * 134) 🏛️ «ما مشي الحال» (2026-09-15، على تصريح استخدام أجير): أزرار الشريط العلوي (PDF/Excel/Word/واتساب/إيميل) كانت
+ *     تعمل على صفحة الخيارات لا على النموذج الرسمي. صار الشريط نفسه (مجموعة أزرار وحدة — الكبيرة انشالت) يعمل على
+ *     النموذج المعبّأ بخيارات الشاشة الحالية عبر msaOfficialToolbar (export.js) — بالضمان الثلاثة ور3.
+ * =================================================================== */
+$at134 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$js134 = (string)file_get_contents($PROJ . '/assets/js/export.js');
+check('شريط النماذج الرسمية (كود): msaOfficialToolbar بـexport.js + 3 نداءات بالصفحة (ضمان الثلاثة + إفادة عمل الضمان + ر3) بعد DOMContentLoaded + لا أزرار كبيرة مكرّرة',
+      strpos($js134, 'window.msaOfficialToolbar = function (o) {') !== false
+      && substr_count($at134, "document.addEventListener('DOMContentLoaded', function () { msaOfficialToolbar({") === 3
+      && strpos($at134, "&format=pdf&mode=image') ?>") !== false
+      && strpos($at134, 'btn btn-danger btn-lg') === false && strpos($at134, 'btn btn-success btn-lg') === false);
+$h134 = renderPage('pages/attestations.php', ['employee_id' => 1387, 'type' => 'cnss_hire_new', 'date' => '2026-09-15', 'opts_set' => 1, 'inc_extra' => 1, 'cur' => 'usd'], [], [3], 'lbp', '2026-2027');
+check('شريط النماذج الرسمية (تشغيل فعلي): رابط PDF بالشريط يحمل خيارات الشاشة نفسها (opts_set + inc_extra + cur=usd)',
+      preg_match('/msaOfficialToolbar\(\{pdf: "([^"]+)"/', $h134, $m134) === 1
+      && strpos($m134[1], 'form=cnss_hire_new') !== false && strpos($m134[1], '&opts_set=1&inc_extra=1&cur=usd&format=pdf') !== false,
+      $m134[1] ?? 'لا نداء');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
