@@ -1146,7 +1146,7 @@ check('تقرير الصندوق: لا صفّ مجاميع أصفار على ش�
       strpos($repSrc, 'لا تطبع صفّ مجاميع أصفار') !== false);
 // (تحديث 2026-08-06: الخاضع المعروض صار **بعد حسم حصّة التنزيل العائلي** بطلب المستخدم)
 check('الضريبة: مجموع «الراتب الخاضع للضريبة» يظهر بالشاشة (كان فارغاً)',
-      strpos($repSrc, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false && strpos($repSrc, "money(\$a['txb'], \$repRate)") !== false);
+      strpos($repSrc, "'txb'=>taxableAfterFamilyDed(\$r,\$fded43)") !== false && strpos($repSrc, "money(\$a['txb'], \$repRate)") !== false);
 check('رقم الصندوق: شفاء ذاتي يمنع كتابة رقم مدرسة على مؤسسات أخرى',
       strpos($fnSrc2, 'function healCaisseNumbers') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'healCaisseNumbers();') !== false
@@ -1636,13 +1636,16 @@ $ofSrc26 = (string)file_get_contents(__DIR__ . '/../pages/official_forms.php');
 check('الراتب يشمل: كشف الضمان الاسمي يستعمل extraAideHeads/transportHead (لا أعمدة مقصوصة بالكود)',
       substr_count($ofSrc26, 'extraAideHeads(\' rowspan="2"\',') >= 4
       && strpos($ofSrc26, "\$nomCols = 19 + compColsCount();") !== false);
-check('الراتب يشمل: «معلومات تفصيلية عن الراتب» — المحسومات 7 أعمدة برؤوس صحيحة (مجموع المحسومات موجود)',
-      strpos($ofSrc26, '<th colspan="7">المحسومات القانونية</th>') !== false
+// (تحديث 2026-09-15 «p1 بهيدا التقرير مافي عامود للتنزيل العائلي»: المحسومات صارت 8 أعمدة —
+//  التنزيل العائلي (حصّة الشهر) قبل الخاضع بعد الحسم — رأسان بمقابلهما خليّتان، لا رأس بلا خلية)
+check('الراتب يشمل: «معلومات تفصيلية عن الراتب» — المحسومات 8 أعمدة برؤوس صحيحة (مجموع المحسومات + التنزيل العائلي موجودان)',
+      strpos($ofSrc26, '<th colspan="8">المحسومات القانونية</th>') !== false
       && strpos($ofSrc26, '<th>مجموع المحسومات</th>') !== false
-      && strpos($ofSrc26, '<th>التنزيل العائلي</th>') === false);
+      && strpos($ofSrc26, '<th>التنزيل العائلي</th>') === false
+      && preg_match('/<th>الأجر الإجمالي<\?= rateHead\(\'mkt\', \$month, \$year\) \?><\/th>\s*<\?= familyDedHeads\(\) \?>\s*<th>ضريبة الدخل<\/th>/u', $ofSrc26) === 1);
 check('الراتب يشمل: «معلومات تفصيلية» — المستحق المعروض عبر dueShownLbp والأجر الإجمالي من الظاهر فقط',
       strpos($ofSrc26, "'due'=>dueShownLbp(\$r),") !== false
-      && strpos($ofSrc26, "\$sdCols = 16 + compColsCount();") !== false);
+      && strpos($ofSrc26, "\$sdCols = 17 + compColsCount();") !== false);
 // فحص فعلي: توازن الرؤوس/الخلايا بكل تركيبات الزر للنموذجين (يمسك أي عمود ناقص/زائد فوراً)
 $colBalance = function (string $html): array {
     if (!preg_match('#<table[^>]*doc-table[^>]*>(.*?)</table>#s', $html, $tm)) return [-1, -1];
@@ -2620,7 +2623,8 @@ $ox41 = (string)file_get_contents($PROJ . '/pages/official_export.php') . (strin
 check('التنزيل العائلي اختياري: ر5 ور10 وعمود كشف الرواتب كلهم على المصدر الوحيد familyDeductionAnnual',
       substr_count($ox41, "COALESCE(e.apply_family_deduction,1) afd") === 1
       && substr_count($ox41, "familyDeductionAnnual(\$de['social_status'], \$de['spouse_works'], \$de['afd']") === 1
-      && strpos($of41, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0, (int)(\$r['employee_id'] ?? 0))") !== false);
+      && strpos($of41, "\$sfdOf = fn(\$r) => familyDedMonthShare(\$r, (int)\$month, (int)\$year);") !== false
+      && strpos((string)file_get_contents($PROJ . '/includes/report_helpers.php'), "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$asOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0, \$eid)") !== false);
 // تجربة فعلية (مع ترجيع كامل): موظف خاضع بضريبة موجبة وتنزيل ساري > 0 — طفي الخيار
 // يرفع ضريبته الشهرية، وإرجاعه يعيدها كما كانت بالمليم
 ensureEmployeeFlagColumns();
@@ -2662,12 +2666,12 @@ $rx42 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 // وعموده **قبل** «الخاضع للضريبة» لأنه يُحسم منه، والخاضع المعروض = بعد الحسم
 check('عمود التنزيل العائلي: حصّة الشهر + قبل «الخاضع» + الخاضع بعد الحسم (شاشة، بالمصدر الوحيد)',
       strpos($rp42, 'التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small>') !== false
-      && strpos($rp42, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$fded43)") !== false
-      && strpos($rp42, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$fdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0, (int)(\$r['eid'] ?? 0))") !== false);
+      && strpos($rp42, "'txb'=>taxableAfterFamilyDed(\$r,\$fded43)") !== false
+      && strpos($rp42, "\$fdOf = fn(\$r) => familyDedMonthShare(\$r, (int)\$month, (int)\$year);") !== false);
 check('عمود التنزيل العائلي: بتصدير Excel/Word بنفس الترتيب والمنطق',
       strpos($rx42, "'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)'") !== false
       && strpos($rx42, "COALESCE(e.apply_family_deduction,1) afd") !== false
-      && strpos($rx42, "\$txb = max(0, (int)\$r['taxable_base_lbp'] - \$fded)") !== false
+      && strpos($rx42, "\$txb = taxableAfterFamilyDed(\$r, \$fded)") !== false
       && strpos($rx42, '[$comp, $fded, $txb, $tax]') !== false);
 // تجربة فعلية: كشف حزيران 2026 مدرسة 2 — مارسيلا (12 شهر دفع): حصّة الشهر = السنوي ÷ 12
 // والخاضع الظاهر = المخزّن − الحصّة، والعمود قبل الخاضع بترتيب الخلايا
@@ -2760,8 +2764,8 @@ if ($c43) {
 $of44 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('كشف رواتب كل الموظفين: عمود التنزيل العائلي (حصّة الشهر) قبل الخاضع والخاضع بعد الحسم',
       strpos($of44, '<th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th>') !== false
-      && strpos($of44, "'txb'=>max(0,(int)\$r['taxable_base_lbp']-\$sfd)") !== false
-      && strpos($of44, "familyDeductionAnnual(\$r['social_status'] ?? '', \$r['spouse_works'] ?? 0, \$r['afd'] ?? 1, \$sfdAsOf, \$r['gsa'] ?? 0, \$r['gca'] ?? 0, (int)(\$r['employee_id'] ?? 0))") !== false);
+      && strpos($of44, "'txb'=>taxableAfterFamilyDed(\$r,\$sfd)") !== false
+      && strpos($of44, "\$sfdOf = fn(\$r) => familyDedMonthShare(\$r, (int)\$month, (int)\$year);") !== false);
 // تجربة فعلية: صف مارسيلا بكشف 6/2026 — الحصّة ثم الخاضع بعدها بهذا الترتيب (نفس أرقام كشف الضريبة)
 $h44 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [2]);
 $p44 = mb_strpos($h44, 'مارسيلا');
@@ -2953,17 +2957,19 @@ check('تجزئة القانون: المحرّك يُسنوِن ×12 ويقسم 
       && strpos($pc51, '$monthlyTax = $annualTax / 12;') !== false
       && strpos($pc51, '$taxBase * $monthsPerYear') === false);
 check('تجزئة القانون: حصّة الشهر بالكشوف = السنوي ÷ 12 دائماً + ر5/ر10 بحصص الأشهر المعمولة + الشفاء مربوط',
-      substr_count($rp51 . $of51 . (string)file_get_contents($PROJ . '/pages/reports_export.php'), '?? 0)) / 12)') >= 2
+      substr_count((string)file_get_contents($PROJ . '/includes/report_helpers.php'), '$eid) / 12);') === 1
+      && substr_count($rp51 . $of51 . (string)file_get_contents($PROJ . '/pages/reports_export.php'), 'familyDedMonthShare($r, (int)$month, (int)$year)') >= 6
       && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), '$exempt += (int)min($fda / 12 * (int)$de[\'mcnt\'], (float)$de[\'tb\']);') !== false
       && function_exists('healLawfulTaxProration20260806')
       && strpos($hd51, 'healLawfulTaxProration20260806();') !== false);
 // (تكملة بقاعدة المستخدم «ما بيصير نيغاتيف»): التنزيل المعروض بحدّ الراتب الخاضع —
 // طانوس القزي (عازب 10 أشهر، خاضعه 32م < حصة 37.5م): تنزيله المعروض = 32,000,000
 // والخاضع بعده = 0 — لا 45,000,000 القديمة ولا 37,500,000 غير المسقّفة
-check('التنزيل بحدّ الخاضع: السقف min() مطبَّق بالكشوف الثلاثة (شاشة/تصدير/رواتب)',
-      strpos($rp51, "min(\$fdOf(\$r), (int)\$r['taxable_base_lbp'])") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/reports_export.php'), "min(\$fdOf(\$r), (int)\$r['taxable_base_lbp'])") !== false
-      && strpos($of51, "min(\$sfdOf(\$r), (int)\$r['taxable_base_lbp'])") !== false);
+// (منذ 2026-09-15 السقف داخل المصدر الواحد familyDedMonthShare بreport_helpers — فيعمّ كل الكشوف)
+check('التنزيل بحدّ الخاضع: السقف min() مطبَّق بالمصدر الواحد familyDedMonthShare (كل الكشوف)',
+      strpos((string)file_get_contents($PROJ . '/includes/report_helpers.php'), 'return min($share, $txb);') !== false
+      && strpos($rp51, "min(\$fdOf(\$r), (int)\$r['taxable_base_lbp'])") === false
+      && strpos($of51, "min(\$sfdOf(\$r), (int)\$r['taxable_base_lbp'])") === false);
 $h51 = renderPage('pages/reports.php', ['report' => 'tax_summary', 'month' => 6, 'year' => 2026], [], [2]);
 $p51 = mb_strpos($h51, 'طانوس القزي');
 $row51 = $p51 !== false ? mb_substr($h51, $p51, 1200) : '';
@@ -3359,13 +3365,16 @@ check('تنزيل الأولاد اختياري: المحرّك يمرّره + �
       && strpos($emp61s, "'grant_children_addition' => 0,") !== false);
 $gcaCount = 0;
 // (2026-08-24: تقرير الضريبة صار يمرّره عبر mofCumTax التراكمية بfunctions.php — تُعدّ كمان)
-foreach (['pages/reports.php', 'pages/reports_export.php', 'pages/official_forms.php', 'pages/official_export.php', 'includes/functions.php'] as $f61) {
+// (2026-09-15: كشوف الرواتب/الضريبة الخمسة صارت على المصدر الواحد familyDedMonthShare بreport_helpers — يُعدّ هو، ومواضع نداءاته ≥ 7)
+$fdShareCalls61 = 0;
+foreach (['pages/reports.php', 'pages/reports_export.php', 'pages/official_forms.php'] as $f61) $fdShareCalls61 += substr_count((string)file_get_contents($PROJ . '/' . $f61), 'familyDedMonthShare($r, (int)$month, (int)$year)');
+foreach (['pages/reports.php', 'pages/reports_export.php', 'pages/official_forms.php', 'pages/official_export.php', 'includes/functions.php', 'includes/report_helpers.php'] as $f61) {
     $gcaCount += substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$r['gca'] ?? 0")
                + substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$de['gca'] ?? 0")
                + substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$emp['grant_children_addition'] ?? 0")
                + substr_count((string)file_get_contents($PROJ . '/' . $f61), "\$e['grant_children_addition'] ?? (\$e['gca'] ?? 0)");
 }
-check('تنزيل الأولاد اختياري: كل القارئين يمرّرونه (كشوف + تقرير الضريبة + ر5/ر6/ر10)', $gcaCount >= 6, 'ممرَّر بـ' . $gcaCount . ' مواضع');
+check('تنزيل الأولاد اختياري: كل القارئين يمرّرونه (كشوف + تقرير الضريبة + ر5/ر6/ر10)', $gcaCount >= 4 && $fdShareCalls61 >= 7, 'ممرَّر بـ' . $gcaCount . ' مواضع + ' . $fdShareCalls61 . ' نداءات للمصدر الواحد');
 
 /* =====================================================================
  * 62) 🩹 مايا أبي حبيب («الضريبة 0 وهيدا غلط» — 2026-08-23): تنزيلها شخصي
@@ -3524,7 +3533,7 @@ check('عدّاد الاقتراحات بالقائمة بنفس نطاق الص
 check('المحرّك والقارئون يمرّرون رقم الموظف للأتمتة المؤرَّخة',
       strpos((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), "(int)(\$this->employee['id'] ?? 0)") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "(int)\$de['id']") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "(int)(\$r['eid'] ?? 0)") !== false);
+      && strpos((string)file_get_contents($PROJ . '/includes/report_helpers.php'), "\$eid = (int)(\$r['employee_id'] ?? (\$r['eid'] ?? 0));") !== false);
 
 /* ---------- ٦٧) ملف الوزارة السنوي R567 (ر5+ر6+ر7 بقالب الماكرو الرسمي — 2026-08-23) ---------- */
 check('قالب الوزارة mof_r567.xlsm موجود ومعه قوائم الأكواد الجغرافية',
@@ -6179,6 +6188,55 @@ try {
     $ok127 = !$bad; $why127 = "exp=$expTxt bad=" . implode(',', $bad);
 } catch (Throwable $e) { $why127 = $e->getMessage(); }
 check('نسبة الأجر الإضافي تحت العنوان (تشغيل فعلي): مدرسة 4 تشرين 2025 — Résumé mensuel + كشف كل الموظفين + كشف الدفع + الضمان الاسمي يعرضون نسبة القاعدة نفسها، وتبقى بوضع الليرة', $ok127, $why127);
+
+/* =====================================================================
+ * 128) 👨‍👩‍👧 «p1 بهيدا التقرير مافي عامود للتنزيل العائلي» (2026-09-15): الثلاثية الملزمة (التنزيل حصّة الشهر ←
+ *     الخاضع بعد الحسم ← الضريبة) صارت بكل كشف شهري فيه ضريبة: «معلومات تفصيلية عن الراتب» (salary_detail)
+ *     + «الكشف الشامل بالكلفة» (full_register) + Résumé mensuel (شاشة + Excel/Word) — إضافةً لكشف الضريبة
+ *     وكشف كل الموظفين القديمَين — كلها على مصدر واحد familyDedMonthShare/taxableAfterFamilyDed/familyDedHeads.
+ * =================================================================== */
+$rh128 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$of128 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+$rp128 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rx128 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+check('التنزيل العائلي بكل الكشوف (كود): المصدر الواحد بreport_helpers + الرأسان بالترتيب الملزم',
+      function_exists('familyDedSelectCols') && function_exists('familyDedMonthShare') && function_exists('taxableAfterFamilyDed') && function_exists('familyDedHeads')
+      && strpos($rh128, "return '<th' . \$attrs . '>التنزيل العائلي<br><small style=\"font-weight:400\">حصّة الشهر</small></th>'") !== false
+      && strpos($rh128, "if ((int)(\$r['income_tax_lbp'] ?? 0) + \$txb === 0) return 0;") !== false
+      && substr_count($of128, "familyDedSelectCols('e')") === 2 && substr_count($of128, 'familyDedHeads()') === 2
+      && substr_count($rp128, "familyDedSelectCols('e')") === 1 && substr_count($rp128, 'familyDedHeads()') === 1
+      && substr_count($rx128, "familyDedSelectCols('e')") === 1
+      && strpos($rx128, "'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)', 'الضريبة'") !== false
+      && strpos($rx128, "[\$v['cnss'], \$v['caisse'], \$v['eocg'], \$v['fded'], \$v['txb'], \$v['tax'], \$v['net'], \$v['fam']]") !== false
+      && strpos($of128, "(\$multiS?17:16) + compColsCount()") !== false && strpos($rp128, "(\$multi?17:16) + compColsCount()") !== false);
+// تجربة فعلية: مارسيلا (1677) بحزيران 2026 مدرسة 2 — بالكشوف الثلاثة الجديدة نفس حصّة كشف الضريبة (قسم 42)
+// ثم الخاضع بعد حسمها بهذا الترتيب، وعدد خلايا صفّها = عدد رؤوس الجدول (لا رأس بلا خلية)
+$ok128 = isset($share42, $after42) && $share42 > 0; $why128 = [];
+$cells128 = function (string $html, string $needle): array {
+    $p = mb_strpos($html, $needle); if ($p === false) return [];
+    $s = mb_strrpos(mb_substr($html, 0, $p), '<tr'); $e = mb_strpos($html, '</tr>', $p);
+    preg_match_all('/<td[^>]*>(.*?)<\/td>/su', mb_substr($html, $s, $e - $s), $m);
+    return array_map(fn($c) => trim(preg_replace('/\s+/', ' ', strip_tags($c))), $m[1]);
+};
+$heads128 = function (string $html): int {
+    if (!preg_match('/<thead>.*?<\/thead>/su', $html, $mh)) return 0;
+    preg_match_all('/<th\b([^>]*)>/su', $mh[0], $mt);
+    $n = 0; foreach ($mt[1] as $attrs) { if (strpos($attrs, 'colspan') === false) $n++; } // رؤوس المجموعات لا تُعدّ
+    return $n;
+};
+foreach ([['pages/official_forms.php', ['form' => 'salary_detail', 'month' => 6, 'year' => 2026]],
+          ['pages/official_forms.php', ['form' => 'full_register', 'month' => 6, 'year' => 2026]],
+          ['pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026]]] as $pg) {
+    $h = renderPage($pg[0], $pg[1], ['extra', 'aide', 'transport'], [2], 'lbp');
+    $cells = $cells128($h, 'مارسيلا'); $joined = implode('|', $cells);
+    $iS = array_search(number_format($share42), array_map(fn($c) => preg_replace('/ L\.L$/u', '', $c), $cells), true);
+    $iA = array_search(number_format($after42), array_map(fn($c) => preg_replace('/ L\.L$/u', '', $c), $cells), true);
+    $nH = $heads128($h);
+    $good = $cells && $iS !== false && $iA !== false && $iA === $iS + 1 && $nH === count($cells);
+    if (!$good) { $ok128 = false; $why128[] = ($pg[1]['form'] ?? $pg[1]['report']) . " heads=$nH cells=" . count($cells) . " iS=" . var_export($iS, true) . " iA=" . var_export($iA, true); }
+}
+check('التنزيل العائلي بكل الكشوف (تشغيل فعلي): التفصيلي + الشامل + Résumé mensuel — حصّة مارسيلا ثم الخاضع بعدها متجاورَين، ورؤوس = خلايا',
+      $ok128, $why128 ? implode(' ; ', $why128) : ('حصّة ' . number_format($share42 ?? 0) . ' / خاضع بعدها ' . number_format($after42 ?? 0)));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

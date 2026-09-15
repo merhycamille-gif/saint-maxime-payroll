@@ -45,7 +45,7 @@ $schCol = $multi;
 $rep = null;
 
 if ($report === 'monthly_summary') {
-    $st = $db->prepare("SELECT e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.employee_type,e.school_id,ms.*
+    $st = $db->prepare("SELECT e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.employee_type,e.school_id," . familyDedSelectCols('e') . ",ms.*
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $schoolSql . $empYearFilter . $empTypeSql . "
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
@@ -61,14 +61,15 @@ if ($report === 'monthly_summary') {
     if (salaryCompHas('extra')) { $head[] = 'الأجر الإضافي'; $w[] = 14; }
     if (salaryCompHas('aide'))  { $head[] = 'مكافأة ومساعدة'; $w[] = 14; }
     $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')'; $w[] = 18;
-    $head = array_merge($head, ['الضمان ٣٪', 'الصندوق ٦٪', 'درجة / نصف راتب (إلى الصندوق)', 'الضريبة', 'الصافي', 'تعويض عائلي']);
-    $w = array_merge($w, [14, 14, 14, 12, 16, 14]);
+    // 👨‍👩‍👧 التنزيل العائلي (حصّة الشهر) ثم الخاضع بعد حسمه قبل الضريبة — كالشاشة (2026-09-15)
+    $head = array_merge($head, ['الضمان ٣٪', 'الصندوق ٦٪', 'درجة / نصف راتب (إلى الصندوق)', 'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)', 'الضريبة', 'الصافي', 'تعويض عائلي']);
+    $w = array_merge($w, [14, 14, 14, 14, 16, 12, 16, 14]);
     if (salaryCompHas('transport')) { $head[] = 'تعويض النقل'; $w[] = 14; }
     $head[] = 'الإجمالي المتوجب'; $w[] = 18;
     $rep->head($head);
     $rep->widths($w);
 
-    $z = ['base' => 0, 'ech' => 0, 'bpe' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'cnss' => 0, 'caisse' => 0, 'eocg' => 0, 'tax' => 0, 'net' => 0, 'fam' => 0, 'tr' => 0, 'tot' => 0];
+    $z = ['base' => 0, 'ech' => 0, 'bpe' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'cnss' => 0, 'caisse' => 0, 'eocg' => 0, 'fded' => 0, 'txb' => 0, 'tax' => 0, 'net' => 0, 'fam' => 0, 'tr' => 0, 'tot' => 0];
     $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
     $emit = function ($label, $a, $n) use ($rep, $schCol) {
         // محاذاة الأعمدة: بعد (#,[school],name,type,grade) تبدأ الأرقام
@@ -77,7 +78,7 @@ if ($report === 'monthly_summary') {
         if (salaryCompHas('extra')) $row[] = $a['extra'];
         if (salaryCompHas('aide'))  $row[] = $a['aide'];
         $row[] = $a['composed'];
-        $row = array_merge($row, [$a['cnss'], $a['caisse'], $a['eocg'], $a['tax'], $a['net'], $a['fam']]);
+        $row = array_merge($row, [$a['cnss'], $a['caisse'], $a['eocg'], $a['fded'], $a['txb'], $a['tax'], $a['net'], $a['fam']]);
         if (salaryCompHas('transport')) $row[] = $a['tr'];
         $row[] = $a['tot'];
         $rep->totalRow($row);
@@ -86,7 +87,8 @@ if ($report === 'monthly_summary') {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
         $tr = (int)$r['transport_lbp'];
-        $v = ['base' => (int)$r['base_salary_lbp'], 'ech' => (int)$r['echelon_value_lbp'], 'bpe' => (int)$r['base_plus_echelon_lbp'], 'extra' => extraWageLbp($r), 'aide' => aideCompLbp($r), 'composed' => composedSalaryLbp($r), 'eocg' => (int)$r['eoc_grade_lbp'], 'cnss' => (int)$r['cnss_amount_lbp'], 'caisse' => (int)$r['caisse_amount_lbp'], 'tax' => (int)$r['income_tax_lbp'], 'net' => (int)$r['net_salary_lbp'], 'fam' => (int)$r['family_allowance_lbp'], 'tr' => $tr, 'tot' => dueShownLbp($r)];
+        $msFded = familyDedMonthShare($r, (int)$month, (int)$year); // حصّة الشهر من التنزيل العائلي (المصدر الواحد)
+        $v = ['base' => (int)$r['base_salary_lbp'], 'ech' => (int)$r['echelon_value_lbp'], 'bpe' => (int)$r['base_plus_echelon_lbp'], 'extra' => extraWageLbp($r), 'aide' => aideCompLbp($r), 'composed' => composedSalaryLbp($r), 'eocg' => (int)$r['eoc_grade_lbp'], 'cnss' => (int)$r['cnss_amount_lbp'], 'caisse' => (int)$r['caisse_amount_lbp'], 'fded' => $msFded, 'txb' => taxableAfterFamilyDed($r, $msFded), 'tax' => (int)$r['income_tax_lbp'], 'net' => (int)$r['net_salary_lbp'], 'fam' => (int)$r['family_allowance_lbp'], 'tr' => $tr, 'tot' => dueShownLbp($r)];
         foreach ($v as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
@@ -94,7 +96,7 @@ if ($report === 'monthly_summary') {
         if (salaryCompHas('extra')) $row[] = $v['extra'];
         if (salaryCompHas('aide'))  $row[] = $v['aide'];
         $row[] = $v['composed'];
-        $row = array_merge($row, [$v['cnss'], $v['caisse'], $v['eocg'], $v['tax'], $v['net'], $v['fam']]);
+        $row = array_merge($row, [$v['cnss'], $v['caisse'], $v['eocg'], $v['fded'], $v['txb'], $v['tax'], $v['net'], $v['fam']]);
         if (salaryCompHas('transport')) $row[] = $v['tr'];
         $row[] = $v['tot'];
         $rep->row($row);
@@ -150,13 +152,9 @@ if ($report === 'monthly_summary') {
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
-    // عمود «التنزيل العائلي» (2026-08-06): المصدر الوحيد familyDeductionAnnual — حصّة الشهر
-    // (السنوي ÷ أشهر دفعه)، يتبع زرّ ملفه والزوج العامل، ثم «الخاضع» = بعد حسم الحصّة
-    $fdAsOf = sprintf('%04d-%02d-01', $year, $month);
-    $fdOf = function ($r) use ($fdAsOf) {
-        // حصّة الشهر = السنوي ÷ 12 دائماً (القاعدة الرسمية: كل شهر معمول = 1/12 من التنزيل)
-        return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $fdAsOf, $r['gsa'] ?? 0, $r['gca'] ?? 0, (int)($r['eid'] ?? 0)) / 12);
-    };
+    // عمود «التنزيل العائلي» (2026-08-06): المصدر الوحيد familyDedMonthShare (report_helpers) — حصّة الشهر
+    // (السنوي ÷ 12)، يتبع زرّ ملفه والزوج العامل، ثم «الخاضع» = بعد حسم الحصّة
+    $fdOf = fn($r) => familyDedMonthShare($r, (int)$month, (int)$year);
     $rep = new ReportTable('كشف ضريبة الدخل — ' . monthName($month, 'ar') . ' ' . $year . $empTypeTitle, true);
     $rep->schoolHeader($school);
     $head = ['#']; if ($schCol) $head[] = 'المدرسة';
@@ -180,8 +178,8 @@ if ($report === 'monthly_summary') {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
         $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r);
-        // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55)
-        $fded = min($fdOf($r), (int)$r['taxable_base_lbp']); $txb = max(0, (int)$r['taxable_base_lbp'] - $fded); $tax = (int)$r['income_tax_lbp'];
+        // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55) — داخل familyDedMonthShare
+        $fded = $fdOf($r); $txb = taxableAfterFamilyDed($r, $fded); $tax = (int)$r['income_tax_lbp'];
         foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'fded' => $fded, 'txb' => $txb, 'tax' => $tax] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);

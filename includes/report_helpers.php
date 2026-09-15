@@ -131,6 +131,38 @@ function transportTotalCell($lbp, $usd, bool $num = true): string {
     return '<td' . $cls . '>' . dualFromUsd($lbp, $usd, false) . '</td>';
 }
 /**
+ * 👨‍👩‍👧 عمود «التنزيل العائلي» بكل كشف شهري فيه ضريبة دخل — المصدر الواحد
+ * (قاعدة المستخدم 2026-08-06، ثم «p1 بهيدا التقرير مافي عامود للتنزيل العائلي» 2026-09-15):
+ *   الثلاثية الملزمة: حصّة الشهر (السنوي الساري ÷ 12 — دليل المالية ص55) ← عمودها **قبل**
+ *   «الراتب الخاضع للضريبة» ← والخاضع المعروض = المخزّن − الحصّة (ما بيصير نيغاتيف).
+ *   قانون التنزيل نفسه من familyDeductionAnnual حصراً (زرّ «تطبيق التنزيل» بملفه، الزوج
+ *   العامل، الأولاد المؤرَّخون) — غير الخاضع للضريبة (لا وعاء ولا ضريبة) = 0.
+ *   أي كشف جديد فيه ضريبة: familyDedSelectCols() بالـSELECT + familyDedMonthShare($r) للصف.
+ */
+function familyDedSelectCols(string $e = 'e'): string {
+    return "$e.social_status, $e.spouse_works, COALESCE($e.apply_family_deduction,1) afd, COALESCE($e.grant_spouse_addition,0) gsa, COALESCE($e.grant_children_addition,0) gca";
+}
+/** حصّة الشهر من التنزيل العائلي لصف راتب (يحوي أعمدة familyDedSelectCols + taxable_base_lbp/income_tax_lbp + employee_id أو eid)،
+ *  بحدّ الراتب الخاضع المخزّن. */
+function familyDedMonthShare(array $r, int $month, int $year): int {
+    $txb = (int)($r['taxable_base_lbp'] ?? 0);
+    if ((int)($r['income_tax_lbp'] ?? 0) + $txb === 0) return 0; // غير خاضع للضريبة / لا وعاء
+    $asOf = sprintf('%04d-%02d-01', $year, $month);
+    $eid = (int)($r['employee_id'] ?? ($r['eid'] ?? 0));
+    // حصّة الشهر = السنوي ÷ 12 دائماً (القاعدة الرسمية: كل شهر معمول = 1/12 من التنزيل)
+    $share = (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $asOf, $r['gsa'] ?? 0, $r['gca'] ?? 0, $eid) / 12);
+    return min($share, $txb); // التنزيل المعروض بحدّ الخاضع (ما بيصير نيغاتيف)
+}
+/** «الخاضع للضريبة» المعروض بعد حسم حصّة الشهر. */
+function taxableAfterFamilyDed(array $r, int $fded): int {
+    return max(0, (int)($r['taxable_base_lbp'] ?? 0) - $fded);
+}
+/** رأسا العمودين بالترتيب الملزم: التنزيل (حصّة الشهر) ثم الخاضع (بعد الحسم). */
+function familyDedHeads(string $attrs = ''): string {
+    return '<th' . $attrs . '>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th>'
+         . '<th' . $attrs . '>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th>';
+}
+/**
  * مجموع المكوّنات **المخفية** بزرّ «الراتب يشمل» — يُطرَح من الإجماليات المعروضة
  * (المستحق/الكلفة) كي يبقى كل رقم إجمالي = مجموع الأعمدة الظاهرة أمام المستخدم
  * («الأرقام تركب» — نمط الكشف السنوي المعتمد). $extraAide=true يشمل أيضاً

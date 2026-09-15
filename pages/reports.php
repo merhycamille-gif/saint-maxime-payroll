@@ -264,16 +264,17 @@ function reportDocThumb($path) {
 <?php /* الملاءمة التلقائية للجداول الواسعة صارت مشتركة في officialFormStyles() — تعمل هنا وفي النماذج الرسمية */ ?>
     <?php /* الترويسة (مدرسة واحدة/بانر المدارس) صارت داخل الورقة الموحّدة docSheetStart */ ?>
     <?php if ($report === 'monthly_summary'):
-        $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.employee_type, e.school_id, ms.*
+        $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.employee_type, e.school_id, " . familyDedSelectCols('e') . ", ms.*
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . $empYearFilter . $empTypeSql . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
-        $totals = ['cnss'=>0,'caisse'=>0,'eocg'=>0,'tax'=>0,'net'=>0,'family'=>0,'total'=>0,'extra'=>0,'aide'=>0,'base'=>0,'ech'=>0,'bpe'=>0,'trans'=>0,
+        // 👨‍👩‍👧 عمودا التنزيل العائلي (حصّة الشهر) والخاضع بعد حسمه قبل الضريبة (الثلاثية الملزمة — 2026-09-15)
+        $totals = ['cnss'=>0,'caisse'=>0,'eocg'=>0,'fded'=>0,'txb'=>0,'tax'=>0,'net'=>0,'family'=>0,'total'=>0,'extra'=>0,'aide'=>0,'base'=>0,'ech'=>0,'bpe'=>0,'trans'=>0,
                    'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,
-                                  'base_usd'=>0.0,'ech_usd'=>0.0,'bpe_usd'=>0.0,'cnss_usd'=>0.0,'caisse_usd'=>0.0,'eocg_usd'=>0.0,'tax_usd'=>0.0,'net_usd'=>0.0,'family_usd'=>0.0,'total_usd'=>0.0];
+                                  'base_usd'=>0.0,'ech_usd'=>0.0,'bpe_usd'=>0.0,'cnss_usd'=>0.0,'caisse_usd'=>0.0,'eocg_usd'=>0.0,'fded_usd'=>0.0,'txb_usd'=>0.0,'tax_usd'=>0.0,'net_usd'=>0.0,'family_usd'=>0.0,'total_usd'=>0.0];
         $rn = 0;
     ?>
         <form method="GET" class="card no-print">
@@ -307,15 +308,15 @@ function reportDocThumb($path) {
                         <th>أساس الراتب<?= rateHead('law') ?></th><th>قيمة الدرجة<?= rateHead('law') ?></th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
                         <?= extraAideHeads('', $data, $month, $year) ?>
                         <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
-                        <th>الضمان (٣٪)</th><th>الصندوق (٦٪)</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى الصندوق</small></th><th>الضريبة</th>
+                        <th>الضمان (٣٪)</th><th>الصندوق (٦٪)</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى الصندوق</small></th><?= familyDedHeads() ?><th>الضريبة</th>
                         <th>الصافي<?= rateHead('mkt', $month, $year) ?></th><th>التعويضات العائلية</th><?= transportHead() ?><th>الإجمالي المتوجب</th>
                     </tr></thead>
                     <tbody>
                         <?php
                         $colspanLbl = $multi ? 5 : 4;
-                        $zeroT = ['base'=>0,'ech'=>0,'bpe'=>0,'extra'=>0,'aide'=>0,'cnss'=>0,'caisse'=>0,'tax'=>0,'net'=>0,'family'=>0,'trans'=>0,'total'=>0,
+                        $zeroT = ['base'=>0,'ech'=>0,'bpe'=>0,'extra'=>0,'aide'=>0,'cnss'=>0,'caisse'=>0,'eocg'=>0,'fded'=>0,'txb'=>0,'tax'=>0,'net'=>0,'family'=>0,'trans'=>0,'total'=>0,
                                   'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,
-                                  'base_usd'=>0.0,'ech_usd'=>0.0,'bpe_usd'=>0.0,'cnss_usd'=>0.0,'caisse_usd'=>0.0,'eocg_usd'=>0.0,'tax_usd'=>0.0,'net_usd'=>0.0,'family_usd'=>0.0,'total_usd'=>0.0];
+                                  'base_usd'=>0.0,'ech_usd'=>0.0,'bpe_usd'=>0.0,'cnss_usd'=>0.0,'caisse_usd'=>0.0,'eocg_usd'=>0.0,'fded_usd'=>0.0,'txb_usd'=>0.0,'tax_usd'=>0.0,'net_usd'=>0.0,'family_usd'=>0.0,'total_usd'=>0.0];
                         // عرض مبلغ بند بالعملتين انطلاقاً من مجموعَي الليرة والدولار المتراكمَين (لصفوف المجاميع)
                         $dualTot = function($lbp, $usd) {
                             $m = displayCurrency();
@@ -332,7 +333,8 @@ function reportDocThumb($path) {
                                 <td><?= $dualTot($t['base'], $t['base_usd']) ?></td><td><?= $dualTot($t['ech'], $t['ech_usd']) ?></td><td><?= $dualTot($t['bpe'], $t['bpe_usd']) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= $dualTot($t['extra'], $t['extra_usd']) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= $dualTot($t['aide'], $t['aide_usd']) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= $dualTot($t['composed'], $t['composed_usd']) ?></strong></td>
-                                <td><?= $dualTot($t['cnss'], $t['cnss_usd']) ?></td><td><?= $dualTot($t['caisse'], $t['caisse_usd']) ?></td><td><?= $dualTot($t['eocg'] ?? 0, $t['eocg_usd'] ?? 0) ?></td><td><?= $dualTot($t['tax'], $t['tax_usd']) ?></td>
+                                <td><?= $dualTot($t['cnss'], $t['cnss_usd']) ?></td><td><?= $dualTot($t['caisse'], $t['caisse_usd']) ?></td><td><?= $dualTot($t['eocg'] ?? 0, $t['eocg_usd'] ?? 0) ?></td>
+                                <td><?= $dualTot($t['fded'], $t['fded_usd']) ?></td><td><?= $dualTot($t['txb'], $t['txb_usd']) ?></td><td><?= $dualTot($t['tax'], $t['tax_usd']) ?></td>
                                 <td><?= $dualTot($t['net'], $t['net_usd']) ?></td><td><?= $dualTot($t['family'], $t['family_usd']) ?></td><?php if (salaryCompHas('transport')): ?><td><?= $dualTot($t['trans'], $t['trans_usd']) ?></td><?php endif; ?>
                                 <td><strong><?= $dualTot($t['total'], $t['total_usd']) ?></strong></td>
                             </tr>
@@ -343,8 +345,10 @@ function reportDocThumb($path) {
                             if ($curCat !== null && $cat !== $curCat) { echo $sumRow('مجموع '.empCategoryTitle($curCat).' — العدد: '.$catN, $catTot, false); $catTot=$zeroT; $catN=0; }
                             $rTrans = (int)$r['transport_lbp']; // من ملف الأستاذ — transport_lbp = transport_complement_lbp فلا تجمعهما (دوبل)
                             $rRate = rowRate($r);
+                            $msFded = familyDedMonthShare($r, (int)$month, (int)$year); // حصّة الشهر من التنزيل العائلي (المصدر الواحد)
                             $v = ['base'=>(int)$r['base_salary_lbp'],'ech'=>(int)$r['echelon_value_lbp'],'bpe'=>(int)$r['base_plus_echelon_lbp'],
                                   'extra'=>extraWageLbp($r),'aide'=>aideCompLbp($r),'cnss'=>(int)$r['cnss_amount_lbp'],'caisse'=>(int)$r['caisse_amount_lbp'],'eocg'=>(int)$r['eoc_grade_lbp'],
+                                  'fded'=>$msFded,'txb'=>taxableAfterFamilyDed($r,$msFded),'fded_usd'=>lbpToUsd($msFded,$rRate),'txb_usd'=>lbpToUsd(taxableAfterFamilyDed($r,$msFded),$rRate),
                                   'tax'=>(int)$r['income_tax_lbp'],'net'=>(int)$r['net_salary_lbp'],'family'=>(int)$r['family_allowance_lbp'],
                                   'trans'=>$rTrans,'total'=>dueShownLbp($r),
                                   'extra_usd'=>extraWageUsd($r),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd($rTrans,$rRate),
@@ -356,7 +360,7 @@ function reportDocThumb($path) {
                                   'total_usd'=>lbpToUsd(dueShownLbp($r),$rRate)];
                             foreach ($v as $k=>$val) { $catTot[$k]+=$val; $totals[$k]+=$val; }
                             $catN++;
-                            echo categoryHeaderRow($curCat, $cat, ($multi?15:14) + compColsCount());
+                            echo categoryHeaderRow($curCat, $cat, ($multi?17:16) + compColsCount());
                         ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
@@ -373,6 +377,8 @@ function reportDocThumb($path) {
                                 <td><?= money($r['cnss_amount_lbp'], $rRate) ?></td>
                                 <td><?= money($r['caisse_amount_lbp'], $rRate) ?></td>
                                 <td><?= (int)$r['eoc_grade_lbp'] > 0 ? money($r['eoc_grade_lbp'], $rRate) : '—' ?></td>
+                                <td><?= money($v['fded'], $rRate) ?></td>
+                                <td><?= money($v['txb'], $rRate) ?></td>
                                 <td><?= money($r['income_tax_lbp'], $rRate) ?></td>
                                 <td><?= money($r['net_salary_lbp'], $rRate) ?></td>
                                 <td><?= money($r['family_allowance_lbp'], $rRate) ?></td>
@@ -381,7 +387,7 @@ function reportDocThumb($path) {
                             </tr>
                         <?php endforeach; ?>
                         <?php if ($data) echo $sumRow('مجموع '.empCategoryTitle($curCat).' — العدد: '.$catN, $catTot, false); ?>
-                        <?php if (!$data): ?><tr><td colspan="<?= ($multi?15:14) + compColsCount() ?>" class="text-center text-muted">لا توجد بيانات — احسب رواتب هذا الشهر أولاً</td></tr><?php endif; ?>
+                        <?php if (!$data): ?><tr><td colspan="<?= ($multi?17:16) + compColsCount() ?>" class="text-center text-muted">لا توجد بيانات — احسب رواتب هذا الشهر أولاً</td></tr><?php endif; ?>
                         <?php if ($data) echo $sumRow('الإجمالي العام — مجموع كل الفئات (العدد: '.$rn.')', $totals, true); ?>
                     </tbody>
                 </table></div>
@@ -460,14 +466,10 @@ function reportDocThumb($path) {
         $data = $stmt->fetchAll();
         $t=0;$txExtra=0;$txAide=0;$txBase=0;
         // عمود «التنزيل العائلي» (طلب 2026-08-06 + تصحيحه: «الكشف شهري ⇒ التنزيل شهري،
-        // وعموده قبل الخاضع للضريبة لأنه يُحسم منه»): حصّة الشهر = السنوي الساري ÷ عدد أشهر
-        // دفعه (نفس قسمة المحرّك بالضبط) — ويتبع زرّ «تطبيق التنزيل العائلي» بملفه (مطفأ = 0).
-        // و«الراتب الخاضع للضريبة» المعروض = بعد حسم حصّة التنزيل (فتركب الأعمدة كالتصريح).
-        $fdAsOf = sprintf('%04d-%02d-01', $year, $month);
-        $fdOf = function ($r) use ($fdAsOf) {
-            // حصّة الشهر = السنوي ÷ 12 دائماً (القاعدة الرسمية: كل شهر معمول = 1/12 من التنزيل)
-            return (int)round(familyDeductionAnnual($r['social_status'] ?? '', $r['spouse_works'] ?? 0, $r['afd'] ?? 1, $fdAsOf, $r['gsa'] ?? 0, $r['gca'] ?? 0, (int)($r['eid'] ?? 0)) / 12);
-        };
+        // وعموده قبل الخاضع للضريبة لأنه يُحسم منه»): حصّة الشهر = السنوي الساري ÷ 12
+        // — ويتبع زرّ «تطبيق التنزيل العائلي» بملفه (مطفأ = 0). و«الراتب الخاضع للضريبة»
+        // المعروض = بعد حسم حصّة التنزيل (فتركب الأعمدة كالتصريح). المصدر الواحد familyDedMonthShare.
+        $fdOf = fn($r) => familyDedMonthShare($r, (int)$month, (int)$year);
     ?>
         <form method="GET" class="card no-print">
             <input type="hidden" name="report" value="tax_summary">
@@ -500,9 +502,9 @@ function reportDocThumb($path) {
                                 $sub=$zX; $curCat=$cat;
                                 ?><tr class="cat-row"><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
                             endif;
-                            // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55)
-                            $fded43=min($fdOf($r), (int)$r['taxable_base_lbp']);
-                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'extra_usd'=>extraWageUsd($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'composed_usd'=>composedSalaryUsd($r),'fded'=>$fded43,'txb'=>max(0,(int)$r['taxable_base_lbp']-$fded43),'tax'=>(int)$r['income_tax_lbp']];
+                            // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55) — داخل familyDedMonthShare
+                            $fded43=$fdOf($r);
+                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'extra_usd'=>extraWageUsd($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'composed_usd'=>composedSalaryUsd($r),'fded'=>$fded43,'txb'=>taxableAfterFamilyDed($r,$fded43),'tax'=>(int)$r['income_tax_lbp']];
                             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; } ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
