@@ -520,7 +520,7 @@ check('الجنس تلقائياً من ملف الموظف: عمود gender + �
 $oeR3g = (string)file_get_contents(__DIR__ . '/../pages/official_export.php');
 check('الجنس المجهول بر3: لا × على ذكر/أنثى + شاشة «حدّد الجنس» + أسماء النساء المفقودة بالتعبئة',
       strpos($oeR3g, "if (\$sex !== '') \$X(") !== false
-      && substr_count($oeR3g, "in_array(\$sexQ, ['m', 'f'], true) ? \$sexQ : ''") >= 2
+      && substr_count($oeR3g, "= genderSexOf(\$sexQ);") >= 2 // (2026-09-15) المصدر الواحد: الآنسة (d) ⇒ أنثى، مجهول ⇒ ''
       && substr_count($attSrc, 'حدّد الجنس') >= 2
       && strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), "'إلسي'") !== false
       && $db->query("SELECT COUNT(*) FROM employees WHERE first_name_ar IN ('تيا','اسمهان','السي') AND is_deleted=0 AND gender='f'")->fetchColumn() >= 3);
@@ -6246,8 +6246,13 @@ check('التنزيل العائلي بكل الكشوف (تشغيل فعلي): 
  * =================================================================== */
 $at129 = (string)file_get_contents($PROJ . '/pages/attestations.php');
 check('جنس الإفادات (كود): $g(مذكّر, مؤنّث, مزدوج) مصدر واحد + خانة الجنس بشريط الخيارات تُحفَظ بالملف + لا صيغة مزدوجة خام بالنصوص',
-      strpos($at129, "\$g = function (string \$m, string \$f, string \$both) use (\$attGender): string {") !== false
+      strpos($at129, "\$g = function (string \$m, string \$f, string \$both, ?string \$miss = null) use (\$attGender): string {") !== false
       && substr_count($at129, "\$g('") >= 30
+      // «بعد بدك تضيف الآنسة على الجنس»: القيمة d بكل المداخل (ملف الموظف + شاشات الإفادات) ونماذج الدولة تعاملها أنثى
+      && function_exists('genderSexOf') && genderSexOf('d') === 'f' && genderSexOf('m') === 'm' && genderSexOf('x') === ''
+      && substr_count($at129, '>Mlle / الآنسة</option>') === 3 && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), '>Mlle / الآنسة</option>') !== false
+      && substr_count((string)file_get_contents($PROJ . '/pages/official_export.php'), '= genderSexOf($sexQ);') === 2
+      && strpos($at129, "\$g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة')") !== false && strpos($at129, "\$g('M.', 'Mme', 'M./Mme', 'Mlle')") !== false
       && strpos($at129, "UPDATE employees SET gender=? WHERE id=? AND \" . schoolScopeWhere('school_id'))->execute([\$_GET['sex'], (int)\$employeeId]);") !== false
       && preg_match('/<select name="sex" onchange="this\.form\.submit\(\)"[^>]*\$attGender===\'\'/u', $at129) === 1
       && preg_match_all('/(السيّد\(ة\)|يعمل\(تعمل\)|مدرّس\(ة\)|طلبه\(ا\)|الأستاذ\(ة\)|المحترم\(ة\)|الموقّع\(ة\)|المولود\(ة\))/u', preg_replace('/\$g\([^)]*\)/u', '', preg_replace('#//.*$#mu', '', $at129))) === 0);
@@ -6269,6 +6274,14 @@ try {
     } else $why129[] = 'no-m';
     if ($f129) { [$h, $t] = $txt129($f129, 'tadris', 'ar');
         if (!(mb_strpos($t, 'بأنّ السيّدة ') !== false && mb_strpos($t, ' تعمل لديها بوظيفة مدرّسة لمادة') !== false && mb_strpos($t, 'ولا تزال حتى تاريخه ، وهي على حسن سلوك والتزام في أداء عملها') !== false && mb_strpos($t, 'بناءً على طلبها .') !== false && mb_strpos($t, '(ة)') === false)) { $ok129 = false; $why129[] = "f=$f129"; }
+        // الآنسة (تجربة فعلية مع ترجيع كامل): نفس الموظفة مؤقتاً 'd' ⇒ «الآنسة … تعمل … طلبها» وMlle بالفرنسي
+        $db129->prepare("UPDATE employees SET gender='d' WHERE id=?")->execute([$f129]);
+        try {
+            [$h, $t] = $txt129($f129, 'salaire', 'ar');
+            if (!(mb_strpos($t, 'بأنّ الآنسة ') !== false && mb_strpos($t, ' تعمل لديها بوظيفة مدرّسة لمادة') !== false && mb_strpos($t, 'بناءً على طلبها .') !== false && mb_strpos($t, 'السيّدة') === false)) { $ok129 = false; $why129[] = "d=$f129"; }
+            [$h, $t] = $txt129($f129, 'salaire', 'fr');
+            if (!(mb_strpos($t, 'atteste que Mlle ') !== false)) { $ok129 = false; $why129[] = "d-fr=$f129"; }
+        } finally { $db129->prepare("UPDATE employees SET gender='f' WHERE id=?")->execute([$f129]); }
     } else $why129[] = 'no-f';
     if ($u129) { [$h, $t] = $txt129($u129, 'salaire', 'ar');
         if (!(mb_strpos($t, 'بأنّ السيّد(ة) ') !== false && mb_strpos($t, 'يعمل(تعمل) لديها بوظيفة مدرّس(ة)') !== false && mb_strpos($t, 'بناءً على طلبه(ا) .') !== false

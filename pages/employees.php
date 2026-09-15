@@ -347,7 +347,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'mother_first_name' => trim($_POST['mother_first_name'] ?? ''),
         'mother_last_name' => trim($_POST['mother_last_name'] ?? ''),
         'nationality' => trim($_POST['nationality'] ?? 'lebanese'),
-        'gender' => in_array($_POST['gender'] ?? '', ['m', 'f'], true) ? $_POST['gender'] : null,
+        'gender' => in_array($_POST['gender'] ?? '', genderValues(), true) ? $_POST['gender'] : null,
         'birth_date' => $_POST['birth_date'] ?: null,
         'birth_place' => trim($_POST['birth_place'] ?? ''),
         'civil_registry_number' => trim($_POST['civil_registry_number'] ?? ''),
@@ -1258,7 +1258,8 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                         <select name="gender" class="form-select">
                             <option value="">— حدّد / Choisir —</option>
                             <option value="m" <?= ($employee['gender'] ?? '') === 'm' ? 'selected' : '' ?>>Homme / ذكر</option>
-                            <option value="f" <?= ($employee['gender'] ?? '') === 'f' ? 'selected' : '' ?>>Femme / أنثى</option>
+                            <option value="f" <?= ($employee['gender'] ?? '') === 'f' ? 'selected' : '' ?>>Femme / أنثى (السيّدة)</option>
+                            <option value="d" <?= ($employee['gender'] ?? '') === 'd' ? 'selected' : '' ?>>Mlle / الآنسة</option>
                         </select>
                     </div>
                     <div class="form-group">

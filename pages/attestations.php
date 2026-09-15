@@ -467,8 +467,8 @@ if (!$emp):
         // gender بملف الموظف (تتعبّى ذاتياً من الاسم للأسماء المعروفة)، وأي تغيير من
         // هالشاشة يُحفَظ بالملف فيصير تلقائياً بكل النماذج من بعدها.
         ensureGenderColumn20260822();
-        $sexFile = in_array(($emp['gender'] ?? ''), ['m', 'f'], true) ? $emp['gender'] : '';
-        if (isset($_GET['sex']) && in_array($_GET['sex'], ['m', 'f'], true)) {
+        $sexFile = in_array(($emp['gender'] ?? ''), genderValues(), true) ? $emp['gender'] : '';
+        if (isset($_GET['sex']) && in_array($_GET['sex'], genderValues(), true)) {
             $sexSel = $_GET['sex'];
             if ($sexSel !== $sexFile) {
                 $db->prepare("UPDATE employees SET gender=? WHERE id=? AND " . schoolScopeWhere('school_id'))->execute([$sexSel, (int)$employeeId]);
@@ -478,7 +478,7 @@ if (!$emp):
             $sexSel = $sexFile; // '' = غير محدد → النموذج يطلع بلا × على الجنس
         }
         $wageSel = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? ($_GET['wage'] ?? 'm') : 'm';
-        $expR3 = BASE_URL . 'pages/official_export.php?form=mof_r3&emp=' . (int)$employeeId . '&sex=' . $sexSel . '&wage=' . $wageSel;
+        $expR3 = BASE_URL . 'pages/official_export.php?form=mof_r3&emp=' . (int)$employeeId . '&sex=' . genderSexOf($sexSel) . '&wage=' . $wageSel; // الآنسة ⇒ × أنثى
         $hasMof = trim((string)($emp['finance_ministry_number'] ?? '')) !== '';
     ?>
     <div class="card no-print" style="max-width:760px;margin:0 auto">
@@ -496,6 +496,7 @@ if (!$emp):
                         <?php if ($sexSel === ''): ?><option value="" selected>⚠ حدّد الجنس — بلا تحديد يطلع النموذج بلا × / Sexe non défini</option><?php endif; ?>
                         <option value="m" <?= $sexSel==='m'?'selected':'' ?>>Homme / ذكر</option>
                         <option value="f" <?= $sexSel==='f'?'selected':'' ?>>Femme / أنثى</option>
+                        <option value="d" <?= $sexSel==='d'?'selected':'' ?>>Mlle / الآنسة</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -555,8 +556,8 @@ if (!$emp):
         if ($nm === '') $nm = trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? ''));
         // 🧑 الجنس تلقائياً من ملف الموظف (خانة gender) — وأي تغيير يُحفَظ بالملف (2026-08-22)
         ensureGenderColumn20260822();
-        $sexFile = in_array(($emp['gender'] ?? ''), ['m', 'f'], true) ? $emp['gender'] : '';
-        if (isset($_GET['sex']) && in_array($_GET['sex'], ['m', 'f'], true)) {
+        $sexFile = in_array(($emp['gender'] ?? ''), genderValues(), true) ? $emp['gender'] : '';
+        if (isset($_GET['sex']) && in_array($_GET['sex'], genderValues(), true)) {
             $sexSel = $_GET['sex'];
             if ($sexSel !== $sexFile) {
                 $db->prepare("UPDATE employees SET gender=? WHERE id=? AND " . schoolScopeWhere('school_id'))->execute([$sexSel, (int)$employeeId]);
@@ -572,7 +573,7 @@ if (!$emp):
         $reasonSel = (int)($_GET['reason'] ?? 1); if ($reasonSel < 1 || $reasonSel > 7) $reasonSel = 1;
         $REASONS = [1=>'استقالة / Démission',2=>'بلوغ السن / Âge légal',3=>'عجز / Invalidité',4=>'زواج / Mariage',5=>'وفاة / Décès',6=>'هجرة / Émigration',7=>'عمل آخر / Autre emploi'];
         $expBase = BASE_URL . 'pages/official_export.php?form=' . e($type) . '&emp=' . (int)$employeeId
-                 . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr . '&sex=' . $sexSel . '&hrs=' . urlencode($hrsDef)
+                 . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr . '&sex=' . genderSexOf($sexSel) . '&hrs=' . urlencode($hrsDef)
                  . ($isLeave ? '&reason=' . $reasonSel : '');
     ?>
     <div class="card no-print" style="max-width:760px;margin:0 auto">
@@ -611,6 +612,7 @@ if (!$emp):
                         <?php if ($sexSel === ''): ?><option value="" selected>⚠ حدّد الجنس — بلا تحديد يطلع النموذج بلا × / Sexe non défini</option><?php endif; ?>
                         <option value="m" <?= $sexSel==='m'?'selected':'' ?>>Homme / ذكر</option>
                         <option value="f" <?= $sexSel==='f'?'selected':'' ?>>Femme / أنثى</option>
+                        <option value="d" <?= $sexSel==='d'?'selected':'' ?>>Mlle / الآنسة</option>
                     </select>
                 </div>
                 <?php if (!$isLeave): ?>
@@ -658,13 +660,14 @@ if (!$emp):
     // مجهول ⇒ الصيغة المزدوجة القديمة كما هي. الجنس يتعبّى ذاتياً من الاسم (ensureGenderColumn20260822)،
     // وخانة «الجنس» بشريط الخيارات (نفس ?sex= بنماذج الضمان/ر3) تُحفَظ بالملف فتصحّ كل الإفادات بعدها.
     ensureGenderColumn20260822();
-    $attGender = in_array(($emp['gender'] ?? ''), ['m', 'f'], true) ? $emp['gender'] : '';
-    if (isset($_GET['sex']) && in_array($_GET['sex'], ['m', 'f'], true) && $_GET['sex'] !== $attGender) {
+    $attGender = in_array(($emp['gender'] ?? ''), genderValues(), true) ? $emp['gender'] : '';
+    if (isset($_GET['sex']) && in_array($_GET['sex'], genderValues(), true) && $_GET['sex'] !== $attGender) {
         $db->prepare("UPDATE employees SET gender=? WHERE id=? AND " . schoolScopeWhere('school_id'))->execute([$_GET['sex'], (int)$employeeId]);
         $emp['gender'] = $attGender = $_GET['sex'];
     }
-    /** $g('مذكّر', 'مؤنّث', 'مزدوج عند الجهل') */
-    $g = function (string $m, string $f, string $both) use ($attGender): string {
+    /** $g('مذكّر', 'مؤنّث', 'مزدوج عند الجهل', 'الآنسة إن اختلف اللقب') — 'd' الآنسة (2026-09-15): مؤنّث بكل شيء إلا اللقب */
+    $g = function (string $m, string $f, string $both, ?string $miss = null) use ($attGender): string {
+        if ($attGender === 'd') return $miss ?? $f;
         return $attGender === 'm' ? $m : ($attGender === 'f' ? $f : $both);
     };
     $jobT = trim((string)($emp['job_title'] ?? ''));
@@ -936,7 +939,8 @@ if (!$emp):
             <select name="sex" onchange="this.form.submit()" style="padding:3px 6px;margin-right:6px<?= $attGender==='' ? ';border:2px solid #dc2626;background:#fef2f2' : '' ?>" title="تلقائي من ملف الموظف — تغييره يُحفَظ بالملف">
                 <?php if ($attGender === ''): ?><option value="" selected>⚠ حدّد الجنس — بلا تحديد تطلع الصيغة المزدوجة (ة)</option><?php endif; ?>
                 <option value="m" <?= $attGender==='m'?'selected':'' ?>>Homme / ذكر</option>
-                <option value="f" <?= $attGender==='f'?'selected':'' ?>>Femme / أنثى</option>
+                <option value="f" <?= $attGender==='f'?'selected':'' ?>>Femme / أنثى (السيّدة)</option>
+                <option value="d" <?= $attGender==='d'?'selected':'' ?>>Mlle / الآنسة</option>
             </select>
             <?php if (count($signatories) > 1): ?>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
@@ -1241,7 +1245,7 @@ if (!$emp):
                      'صرف من الخدمة' => $FR ? 'Licenciement' : 'Dismissal from service',
                      'بلوغ السن القانوني' => $FR ? 'Atteinte de l\'âge légal' : 'Reaching the legal age'];
         $lvLat = $lvFinal !== '' ? ($lvMapLat[$lvFinal] ?? $lvFinal) : '';
-        $mrsLat = $FR ? $g('M.', 'Mme', 'M./Mme') : $g('Mr.', 'Mrs.', 'Mr./Mrs.');
+        $mrsLat = $FR ? $g('M.', 'Mme', 'M./Mme', 'Mlle') : $g('Mr.', 'Mrs.', 'Mr./Mrs.', 'Miss');
         $reqLine = $FR ? 'La présente attestation lui est délivrée à sa demande.' : ('This certificate is issued upon ' . $g('his', 'her', 'his/her') . ' request.');
         $stillLine = $FR ? 'toujours en fonction à ce jour' : 'and is still in service to date';
         $salParts = [];
@@ -1475,7 +1479,7 @@ if (!$emp):
         ?>
         <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline"><?= $FR ? 'Contrat d\'enseignement' : 'Teaching Contract' ?></h2>
         <p><?= $FR ? 'Entre l\'école' : 'Between' ?> : <strong><?= e($schoolNameFr) ?></strong> &nbsp; <?= $FR ? 'représentée par' : 'represented by' ?> : <?= $directorFr ? '<strong>'.e($directorFr).'</strong>' : $blank(150) ?> &nbsp; ( <strong><?= $FR ? 'Première partie' : 'First party' ?></strong> )</p>
-        <p><?= $FR ? $g('et M.', 'et Mme', 'et M./Mme/Mlle') : $g('and Mr.', 'and Mrs.', 'and Mr./Mrs./Miss') ?> : <strong><?= e($nomFr) ?></strong> &nbsp; <?= $FR ? 'de nationalité' : 'of nationality' ?> : <?= $vb($natLat, 90) ?> &nbsp; ( <strong><?= $FR ? 'Seconde partie' : 'Second party' ?></strong> )</p>
+        <p><?= $FR ? $g('et M.', 'et Mme', 'et M./Mme/Mlle', 'et Mlle') : $g('and Mr.', 'and Mrs.', 'and Mr./Mrs./Miss', 'and Miss') ?> : <strong><?= e($nomFr) ?></strong> &nbsp; <?= $FR ? 'de nationalité' : 'of nationality' ?> : <?= $vb($natLat, 90) ?> &nbsp; ( <strong><?= $FR ? 'Seconde partie' : 'Second party' ?></strong> )</p>
         <p><?= $FR ? 'né(e) le' : 'born on' ?> : <strong><?= $dob ?></strong> &nbsp; <?= $FR ? 'à' : 'in' ?> : <strong><?= $bplaceLat ?></strong> &nbsp; <?= $FR ? 'domicile' : 'residence' ?> : <?= $vb($villeLat, 110) ?> &nbsp; <?= $FR ? 'registre n°' : 'registry No.' ?> : <?= $vb($regNoLat, 90) ?></p>
         <p><?= $FR ? 'demeurant à l\'adresse suivante' : 'residing at the following address' ?> : &nbsp; <?= $FR ? 'hiver' : 'winter' ?> : <?= $vb($addrLat, 170) ?> <?= $FR ? 'tél' : 'phone' ?> <?= $phone1 ?> &nbsp;&nbsp; <?= $FR ? 'été' : 'summer' ?> : <?= $blank(120) ?> <?= $FR ? 'tél' : 'phone' ?> <?= $vb($emp['phone2'] ?? '', 90) ?></p>
         <p><?= $FR ? 'En date du' : 'On' ?> : <strong><?= $effFmt ?></strong> <?= $FR ? 'il a été convenu entre les deux parties susmentionnées ce qui suit :' : 'it has been agreed between the two above-mentioned parties as follows:' ?></p>
@@ -1565,7 +1569,7 @@ if (!$emp):
                dir=rtl على السطر حتى تبقى كلمة «التاريخ» قبل الرقم (يمينه) بالشاشة والوورد سواء */ ?>
         <div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : <?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة راتب</h2>
-        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') ?> حتى تاريخه ، <?= $g('ويتقاضى', 'وتتقاضى', 'ويتقاضى') ?> راتباً شهرياً<?= $salParts ? ' وفق التفصيل الآتي :' : ' قدره <strong>' . $moneyAr($salShown) . '</strong> .' ?></p>
+        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') ?> حتى تاريخه ، <?= $g('ويتقاضى', 'وتتقاضى', 'ويتقاضى') ?> راتباً شهرياً<?= $salParts ? ' وفق التفصيل الآتي :' : ' قدره <strong>' . $moneyAr($salShown) . '</strong> .' ?></p>
         <?php if ($salParts): ?>
         <?php /* كل مكوّن مختار سطر مستقل واضح (الإضافي/المكافأة/النقل) — لا يُدمج بسطر «بدلات» عام */ ?>
         <p style="margin-right:34px;text-align:right">- الراتب الأساسي<?= $isEmploye ? '' : ' (بعد التدرّج)' ?> : <strong><?= $moneyAr((int)$basePlusEch) ?></strong></p>
@@ -1586,7 +1590,7 @@ if (!$emp):
                dir=rtl على السطر حتى تبقى كلمة «التاريخ» قبل الرقم (يمينه) بالشاشة والوورد سواء */ ?>
         <div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : <?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? 'إفادة عمل' : 'إفادة عمل وتدريس' ?></h2>
-        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') ?> حتى تاريخه ، <?= $g('وهو', 'وهي', 'وهو(هي)') ?> على حسن سلوك والتزام في أداء <?= $g('عمله', 'عملها', 'عمله(ا)') ?> .</p>
+        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') ?> حتى تاريخه ، <?= $g('وهو', 'وهي', 'وهو(هي)') ?> على حسن سلوك والتزام في أداء <?= $g('عمله', 'عملها', 'عمله(ا)') ?> .</p>
         <?php /* صيغة «لمن يلزم» وجملة عدم المسؤولية شِيلتا من كل الإفادات (بطلبه 2026-08-20) */ ?>
         <p>وقد أُعطيت هذه الإفادة بناءً على <?= $g('طلبه', 'طلبها', 'طلبه(ا)') ?> .</p>
         <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
@@ -1597,7 +1601,7 @@ if (!$emp):
         <div style="text-align:left;margin-bottom:10px"><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إلى من يهمه الأمر</h2>
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> <?= e($assocTxt) ?> ،</p>
-        <p>أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا<?php else: ?><?= $g('هو معلّم', 'هي معلّمة', 'هو(هي) معلّم(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا<?php endif; ?> .</p>
+        <p>أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا<?php else: ?><?= $g('هو معلّم', 'هي معلّمة', 'هو(هي) معلّم(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا<?php endif; ?> .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
         <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong>الإدارة</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
@@ -1693,7 +1697,7 @@ if (!$emp):
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفـادة مدرسية</h2>
         <p>أنا الموقّعة أدناه : <strong><?= $director ? e($director) : $blank(180) ?></strong></p>
         <p>رئيسة أو مديرة مدرسة : <strong><?= e($schoolNameAr) ?></strong></p>
-        <p>أُثبت أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)') ?> : <strong><?= e($nomAr) ?></strong> &nbsp; <?= $g('حامل', 'حاملة', 'حامل') ?> بطاقة الهوية رقم <?= $blank(150) ?></p>
+        <p>أُثبت أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> : <strong><?= e($nomAr) ?></strong> &nbsp; <?= $g('حامل', 'حاملة', 'حامل') ?> بطاقة الهوية رقم <?= $blank(150) ?></p>
         <p>قد <?= $g('باشر', 'باشرت', 'باشر') ?> التدريس في مدرستنا بتاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(120) ?></strong></p>
         <p><?= $g('وانقطع', 'وانقطعت', 'وانقطع') ?> عن العمل بتاريخ <strong><?= $effFmt ?></strong></p>
         <?php /* سبب الترك من الخيار/النص الحرّ (2026-08-20) — والفاضي = خط منقّط يُعبّأ باليد */ ?>
@@ -1797,7 +1801,7 @@ if (!$emp):
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
         <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline">عقــد تعليــم</h2>
         <p>بين مدرسة : <strong><?= e($schoolNameAr) ?></strong> &nbsp; الممثَّلة بشخص: <?= $director ? '<strong>'.e($director).'</strong>' : $blank(150) ?> &nbsp; ( <strong>فريق أول</strong> )</p>
-        <p><?= $g('والسيّد', 'والسيّدة', 'والسيّد / السيّدة / الآنسة') ?> : <strong><?= e($nomAr) ?></strong> &nbsp; من الجنسية: <?= $vb($natAr, 90) ?> &nbsp; ( <strong>فريق ثانٍ</strong> )</p>
+        <p><?= $g('والسيّد', 'والسيّدة', 'والسيّد / السيّدة / الآنسة', 'والآنسة') ?> : <strong><?= e($nomAr) ?></strong> &nbsp; من الجنسية: <?= $vb($natAr, 90) ?> &nbsp; ( <strong>فريق ثانٍ</strong> )</p>
         <p><?= $g('المولود', 'المولودة', 'المولود(ة)') ?> بتاريخ : <strong><?= $dob ?></strong> &nbsp; في : <strong><?= $bplace ?></strong> &nbsp; محل الإقامة: <?= $vb($emp['ville'] ?? '', 110) ?> &nbsp; رقم السجل: <?= $vb($regNo, 90) ?></p>
         <p><?= $g('والمقيم', 'والمقيمة', 'والمقيم') ?> في العنوان التالي : &nbsp; شتاءً : <?= $vb($addr, 170) ?> هاتف <?= $phone1 ?> &nbsp;&nbsp; صيفاً : <?= $blank(120) ?> هاتف <?= $vb($emp['phone2'] ?? '', 90) ?></p>
         <p>بتاريخ : <strong><?= $effFmt ?></strong> تمّ الاتفاق بين الفريقين المحدَّدَين أعلاه على ما يلي :</p>

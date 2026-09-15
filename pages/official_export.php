@@ -450,7 +450,7 @@ if ($form === 'mof_r3') {
     // الجنس: من الرابط إن حُدِّد وإلا من خانة gender بملفه — وإن كان مجهولاً فلا علامة ×
     // إطلاقاً (تعليم «ذكر» افتراضياً كان يغلّط بنماذج الإناث — «إلسي/تيا/اسمهان» 2026-08-22)
     $sexQ = (string)($_GET['sex'] ?? ($emp['gender'] ?? ''));
-    $sex  = in_array($sexQ, ['m', 'f'], true) ? $sexQ : '';
+    $sex  = genderSexOf($sexQ); // الآنسة (d) ⇒ أنثى بنماذج الدولة
     $wage = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? ($_GET['wage'] ?? 'm') : 'm';
     $social = (string)($emp['social_status'] ?? 'celibataire');
     $isMar = (strpos($social, 'marie') === 0);
@@ -1491,7 +1491,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     if (!$emp) { http_response_code(404); die('الموظف غير موجود أو خارج صلاحيتك'); }
     // الجنس: من الرابط أو من ملفه — مجهول = '' فلا يُعلَّم X على أي جنس (خانتا 1/2 تبقيان)
     $sexQ = (string)($_GET['sex'] ?? ($emp['gender'] ?? ''));
-    $sex = in_array($sexQ, ['m', 'f'], true) ? $sexQ : '';
+    $sex = genderSexOf($sexQ); // الآنسة (d) ⇒ أنثى بنماذج الدولة
 
     // مدرسة الموظف هي صاحب العمل (اسمها ورقمها في الضمان وهاتفها وعنوانها)
     // — والاسم باسم صاحب الرقم لدى الصندوق (cnssEmployerSchool)
