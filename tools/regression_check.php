@@ -6363,6 +6363,47 @@ try {
 } catch (Throwable $e) { $why132 = $e->getMessage(); }
 check('خيارات المكوّنات تُحترَم (تشغيل فعلي): إفادة الضمان بلا الإضافي لا تذكره ولا بالمجموع، وعقد التعليم بلا النقل لا يجمعه', $ok132, $why132);
 
+/* =====================================================================
+ * 133) 🔴 «شوف تصريح باستخدام أجير ما عم بيغيّر — صحّح» (2026-09-15): نماذج الضمان الرسمية الثلاثة (استخدام أجير
+ *     جديد/مضمون + ترك أجير) صار راتبها يتبع خيارات الشاشة نفسها (الإضافي/المكافأة/النقل + ليرة/دولار/الاثنين)
+ *     — أوّل فتح = زرّا ملف الموظف «الضمان يشمل…» وبلا نقل؛ والشهر = آخر شهر ≤ تاريخ التصريح.
+ * =================================================================== */
+$oe133 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+$at133 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+check('تصريح استخدام أجير (كود): الراتب من مربّعات الشاشة + العملة + الشهر ≤ تاريخ التصريح، والشاشة تمرّرها بالرابط',
+      strpos($oe133, "\$incExtra = \$decOpts ? !empty(\$_GET['inc_extra']) : !empty(\$emp['cnss_includes_extra']);") !== false
+      && strpos($oe133, "(\$incTrans ? (int)(\$sal['transport_lbp'] ?? 0) : 0)) : 0;") !== false
+      && strpos($oe133, "(year*100+month <= \$decYm) DESC,") !== false
+      && strpos($oe133, "numToArabicWords((int)\$wageUsd) . ' دولار أميركي'") !== false
+      && strpos($at133, "'&opts_set=1' . (\$incExtra ? '&inc_extra=1' : '') . (\$incAide ? '&inc_aide=1' : '') . (\$incTrans ? '&inc_trans=1' : '') . '&cur=' . \$decCur;") !== false
+      && strpos($at133, 'الراتب المعتمد بالتصريح:') !== false);
+$ok133 = false; $why133 = '';
+try {
+    $r133 = getDB()->query("SELECT base_plus_echelon_lbp b, prime_fixe_lbp + extra_lbp ex, transport_lbp tr, exchange_rate fx FROM monthly_salaries WHERE employee_id = 1387 AND year = 2026 AND month = 10")->fetch(PDO::FETCH_ASSOC);
+    if ($r133 && (int)$r133['ex'] > 0 && (int)$r133['tr'] > 0) {
+        $g133 = ['form' => 'cnss_hire_new', 'emp' => 1387, 'd' => 15, 'mo' => 9, 'yr' => 2026, 'opts_set' => 1, 'format' => 'xlsx'];
+        // الإكسل الرسمي (محلياً PDF حقيقي بـLibreOffice فلا يُقرأ نصّه) — نصوص الخانات من sharedStrings (كيانات HTML للعربي)
+        $vals = function (string $bin): string {
+            $tmp = tempnam(sys_get_temp_dir(), 'r133'); file_put_contents($tmp, $bin);
+            $z = new ZipArchive(); $out = '';
+            if ($z->open($tmp) === true) { $out = html_entity_decode((string)$z->getFromName('xl/sharedStrings.xml') . (string)$z->getFromName('xl/worksheets/sheet1.xml'), ENT_QUOTES | ENT_HTML5, 'UTF-8'); $z->close(); }
+            @unlink($tmp); return $out;
+        };
+        // 🔴 المخرجات ثنائية (xlsx): shell_exec على ويندوز يقطعها عند 0x1A — لذلك عبر ملف ($outFile بـrenderPage)
+        $xf133 = sys_get_temp_dir() . '/r133_out.xlsx';
+        $hB = $vals(renderPage('pages/official_export.php', $g133 + ['cur' => 'lbp'], [], [3], 'lbp', '2026-2027', $xf133));
+        $hE = $vals(renderPage('pages/official_export.php', $g133 + ['inc_extra' => 1, 'cur' => 'lbp'], [], [3], 'lbp', '2026-2027', $xf133));
+        $hT = $vals(renderPage('pages/official_export.php', $g133 + ['inc_extra' => 1, 'inc_trans' => 1, 'cur' => 'usd'], [], [3], 'lbp', '2026-2027', $xf133));
+        $b = (int)$r133['b']; $be = $b + (int)$r133['ex']; $bet = $be + (int)$r133['tr']; $usd = (int)floor($bet / (float)$r133['fx']);
+        $okB = strpos($hB, number_format($b)) !== false && strpos($hB, number_format($be)) === false;
+        $okE = strpos($hE, number_format($be)) !== false;
+        $okT = strpos($hT, '$' . number_format($usd)) !== false && strpos($hT, 'دولار أميركي') !== false && strpos($hT, 'ليرة لبنانية') === false;
+        $ok133 = $okB && $okE && $okT;
+        $why133 = 'أساس ' . number_format($b) . ($okB ? ' ✓' : ' ✗') . ' / +إضافي ' . number_format($be) . ($okE ? ' ✓' : ' ✗') . ' / +نقل بالدولار $' . number_format($usd) . ($okT ? ' ✓' : ' ✗');
+    } else { $ok133 = true; $why133 = 'لا صفّ تشرين 2026 لـ1387 — تخطٍّ'; }
+} catch (Throwable $e) { $why133 = $e->getMessage(); }
+check('تصريح استخدام أجير (تشغيل فعلي): كميل مرعي 15/9/2026 — الأساس وحده، ثم +الإضافي، ثم +النقل بالدولار (رقماً وحروفاً)', $ok133, $why133);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

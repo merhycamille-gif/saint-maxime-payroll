@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/payroll_calculator.php';
+require_once __DIR__ . '/../includes/report_helpers.php'; // extraWageLbp/aideCompLbp/rowRate لشاشة نماذج الضمان (2026-09-15)
 require_once __DIR__ . '/../includes/translit_ar_fr.php';
 requireLogin();
 
@@ -572,9 +573,26 @@ if (!$emp):
         $leaveDate = $emp['left_date_cnss'] ?: '';
         $reasonSel = (int)($_GET['reason'] ?? 1); if ($reasonSel < 1 || $reasonSel > 7) $reasonSel = 1;
         $REASONS = [1=>'استقالة / Démission',2=>'بلوغ السن / Âge légal',3=>'عجز / Invalidité',4=>'زواج / Mariage',5=>'وفاة / Décès',6=>'هجرة / Émigration',7=>'عمل آخر / Autre emploi'];
+        // 🔴 «تصريح باستخدام أجير ما عم بيغيّر — صحّح» (2026-09-15): خيارات المكوّنات والعملة هنا أيضاً (كل الخيارات بكل المحلات)
+        //     — أوّل فتح = زرّا ملف الموظف «الضمان يشمل الإضافي/المكافأة» وبلا نقل؛ بعدها المربّعات كما يؤشّرها.
+        $decOpts  = !empty($_GET['opts_set']);
+        $incExtra = $decOpts ? !empty($_GET['inc_extra']) : !empty($emp['cnss_includes_extra']);
+        $incAide  = $decOpts ? !empty($_GET['inc_aide'])  : !empty($emp['cnss_includes_prime_aide']);
+        $incTrans = $decOpts ? !empty($_GET['inc_trans']) : false;
+        $decCur   = (string)($_GET['cur'] ?? 'lbp'); if (!in_array($decCur, ['lbp', 'usd', 'both'], true)) $decCur = 'lbp';
+        // مبالغ المكوّنات للعرض بجانب المربّعات (نفس صفّ الراتب الذي يعتمده التصريح: ≤ تاريخه وإلا أوّل شهر مستقبلي)
+        $decYm = $yr * 100 + $mo;
+        $decPick = "ORDER BY (prime_fixe_lbp > 0 OR extra_lbp > 0) DESC, (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) DESC, (year*100+month <= $decYm) DESC, CASE WHEN year*100+month <= $decYm THEN -(year*100+month) ELSE (year*100+month) END ASC LIMIT 1";
+        $decSal = null; $decSy = activeSchoolYear();
+        if ($decSy !== 'all') { $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? " . $decPick); $q->execute([(int)$employeeId, $decSy]); $decSal = $q->fetch(); }
+        if (!$decSal) { $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? " . $decPick); $q->execute([(int)$employeeId]); $decSal = $q->fetch(); }
+        $decBase = $decSal ? (int)$decSal['base_plus_echelon_lbp'] : 0; $decExtra = $decSal ? extraWageLbp($decSal) : 0; $decAide = $decSal ? aideCompLbp($decSal) : 0; $decTrans = $decSal ? (int)$decSal['transport_lbp'] : 0;
+        $decWage = $decBase + ($incExtra ? $decExtra : 0) + ($incAide ? $decAide : 0) + ($incTrans ? $decTrans : 0);
+        $decWageUsd = $decSal ? lbpToUsd($decWage, rowRate($decSal)) : 0;
         $expBase = BASE_URL . 'pages/official_export.php?form=' . e($type) . '&emp=' . (int)$employeeId
                  . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr . '&sex=' . genderSexOf($sexSel) . '&hrs=' . urlencode($hrsDef)
-                 . ($isLeave ? '&reason=' . $reasonSel : '');
+                 . ($isLeave ? '&reason=' . $reasonSel : '')
+                 . '&opts_set=1' . ($incExtra ? '&inc_extra=1' : '') . ($incAide ? '&inc_aide=1' : '') . ($incTrans ? '&inc_trans=1' : '') . '&cur=' . $decCur;
     ?>
     <div class="card no-print" style="max-width:760px;margin:0 auto">
         <div class="card-header"><h3>
@@ -636,6 +654,20 @@ if (!$emp):
                     </select>
                 </div>
                 <?php endif; ?>
+                <input type="hidden" name="opts_set" value="1">
+                <div class="form-group" style="grid-column:1 / -1">
+                    <label class="form-label">Composantes du salaire / مكوّنات الراتب بالتصريح:</label>
+                    <label style="margin:0 12px 0 0;cursor:pointer"><input type="checkbox" name="inc_extra" value="1" <?= $incExtra?'checked':'' ?> onchange="this.form.submit()"> + Rémunération suppl. / + الأجر الإضافي (<?= formatLBP($decExtra,false) ?>)</label>
+                    <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_aide" value="1" <?= $incAide?'checked':'' ?> onchange="this.form.submit()"> + Prime et aide / + مكافأة ومساعدة (<?= formatLBP($decAide,false) ?>)</label>
+                    <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_trans" value="1" <?= $incTrans?'checked':'' ?> onchange="this.form.submit()"> + Transport / + تعويض النقل (<?= formatLBP($decTrans,false) ?>)</label>
+                    <span style="margin:0 12px;color:#cbd5e1">|</span>
+                    <strong>Devise / العملة:</strong>
+                    <label style="margin:0 8px;cursor:pointer"><input type="radio" name="cur" value="lbp" <?= $decCur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> ليرة (ل.ل)</label>
+                    <label style="margin:0 8px;cursor:pointer"><input type="radio" name="cur" value="usd" <?= $decCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> دولار ($)</label>
+                    <label style="margin:0 8px;cursor:pointer"><input type="radio" name="cur" value="both" <?= $decCur==='both'?'checked':'' ?> onchange="this.form.submit()"> الاثنين</label>
+                    <div style="margin-top:6px;color:#1e40af">الراتب المعتمد بالتصريح: <strong><?= $decCur==='usd' ? ('$' . number_format((int)$decWageUsd)) : (formatLBP($decWage,false) . ' ل.ل' . ($decCur==='both' ? ' ($' . number_format((int)$decWageUsd) . ')' : '')) ?></strong>
+                        (الأساس <?= formatLBP($decBase,false) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?><?= $incTrans?' + النقل':'' ?><?= $decSal ? ' — شهر ' . monthName((int)$decSal['month'],'ar') . ' ' . $decSal['year'] : ' — لا راتب محسوب' ?>)</div>
+                </div>
             </form>
             <div style="display:flex;gap:12px;flex-wrap:wrap">
                 <a class="btn btn-danger btn-lg" href="<?= e($expBase . '&format=pdf') ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي (طباعة / PDF) / Formulaire officiel (PDF)</a>

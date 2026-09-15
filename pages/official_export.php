@@ -1534,9 +1534,12 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     if ($hrs === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrs = (string)round((float)$emp['hours_per_week'] * 52 / 12);
 
     // 🔴 مصدر واحد: الراتب الخاضع للضمان من رواتب **السنة الدراسية المعروضة** (نفس اختيار الإفادات)
+    // 🗓️ (2026-09-15) الشهر = آخر شهر لا يتجاوز تاريخ التصريح (وإلا أوّل شهر مستقبلي) — لا آخر شهر بالسنة (صيفي بلا نقل)
+    $decYm = $yr * 100 + $mo;
     $salPickSql = "ORDER BY (prime_fixe_lbp > 0 OR extra_lbp > 0) DESC,
                  (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) DESC,
-                 year DESC, month DESC LIMIT 1";
+                 (year*100+month <= $decYm) DESC,
+                 CASE WHEN year*100+month <= $decYm THEN -(year*100+month) ELSE (year*100+month) END ASC LIMIT 1";
     $sal = null;
     $attSy = activeSchoolYear();
     if ($attSy !== 'all') {
@@ -1549,9 +1552,23 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
         $q->execute([$empId]);
         $sal = $q->fetch();
     }
-    $wage = $sal ? cnssSubjectWageLbp($sal, $emp) : 0;
-    $wageNum = $wage > 0 ? number_format($wage) : '';
-    $wageWords = $wage > 0 ? (numToArabicWords($wage) . ' ليرة لبنانية') : '';
+    // 🔴 «تصريح باستخدام أجير ما عم بيغيّر — صحّح» (2026-09-15): الراتب بالتصريح يتبع خيارات الشاشة نفسها كباقي
+    //     الإفادات (الإضافي/المكافأة/النقل + ليرة/دولار/الاثنين). أوّل فتح (بلا opts_set) = زرّا ملف الموظف
+    //     «الضمان يشمل الإضافي/المكافأة» (cnss_includes_*) وبلا نقل — ثم مربّعات الشاشة تُحترَم كما هي.
+    $decOpts  = !empty($_GET['opts_set']);
+    $incExtra = $decOpts ? !empty($_GET['inc_extra']) : !empty($emp['cnss_includes_extra']);
+    $incAide  = $decOpts ? !empty($_GET['inc_aide'])  : !empty($emp['cnss_includes_prime_aide']);
+    $incTrans = $decOpts ? !empty($_GET['inc_trans']) : false;
+    $decCur   = (string)($_GET['cur'] ?? 'lbp'); if (!in_array($decCur, ['lbp', 'usd', 'both'], true)) $decCur = 'lbp';
+    $wage = $sal ? ((int)($sal['base_plus_echelon_lbp'] ?? 0) + ($incExtra ? extraWageLbp($sal) : 0) + ($incAide ? aideCompLbp($sal) : 0) + ($incTrans ? (int)($sal['transport_lbp'] ?? 0) : 0)) : 0;
+    $wageUsd = ($sal && $wage > 0) ? lbpToUsd($wage, rowRate($sal)) : 0;
+    if ($decCur === 'usd') {
+        $wageNum = $wage > 0 ? ('$' . number_format((int)$wageUsd)) : '';
+        $wageWords = $wage > 0 ? (numToArabicWords((int)$wageUsd) . ' دولار أميركي') : '';
+    } else {
+        $wageNum = $wage > 0 ? (number_format($wage) . ($decCur === 'both' ? ' ل.ل ($' . number_format((int)$wageUsd) . ')' : '')) : '';
+        $wageWords = $wage > 0 ? (numToArabicWords($wage) . ' ليرة لبنانية') : '';
+    }
 
     // اسم المسؤول الموقّع (المدير/الرئيسة — أول مسؤولي المدرسة)
     $sigs = schoolSignatories($esch);
@@ -1576,7 +1593,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'C21' => trim(($emp['immeuble'] ?? '') . (trim((string)($emp['etage'] ?? '')) !== '' ? ' طابق ' . $emp['etage'] : '')),
             'D22' => $hD, 'E22' => $hM, 'F22' => $hY, 'L22' => $hrs,
             'D23' => 'X',
-            'D24' => $fnAr, 'J24' => $wageNum,
+            'D24' => $fnAr, 'J24' => $wageNum, 'L24' => ($decCur === 'lbp' ? 'ل.ل' : ' '), // بالدولار/الاثنين العملة داخل الرقم — تُمحى تسمية «ل.ل» (بالإكسل؛ صورة النموذج الرسمي تبقى)
             'E25' => $wageWords,
             'D26' => 'X',
             // سطر التوقيع: الاسم ملحق بخانة النص الطويلة (تفيض بحرية — H33 الضيقة تقصّه)،
@@ -1639,7 +1656,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             $reasonCells[4] => '4', $reasonCells[5] => '5', $reasonCells[6] => '6', $reasonCells[7] => '7',
             $reasonCells[$reason] => 'X',
             'D21' => $fnAr,
-            'F22' => $wageNum, 'I22' => $wageWords,
+            'F22' => $wageNum, 'I22' => $wageWords, 'H22' => ($decCur === 'lbp' ? 'ل.ل' : ' '),
             'A23' => trim((string)($esch['ville'] ?? '') ?: 'صيدا') . ' في ' . $d . '/' . $mo . '/' . $yr
                    . str_repeat(' ', 20) . 'خاتم المؤسسة       اسم المسؤول عن المؤسسة وتوقيعه',
             'K25' => $first, 'L25' => $last,
