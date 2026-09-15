@@ -628,11 +628,11 @@ if ($regEid) {
     // (2026-08-16) بطلب المستخدم: جملة «دون أدنى مسؤولية...» انشالت من إفادة الراتب فقط
     // (2026-08-20) «بدون تابلو»: الأساس وحده = جملة «قدره» بلا تفصيل ولا جدول
     check('إفادة راتب: الصيغة الرسمية (الأساس وحده = جملة قدره، بلا جملة عدم المسؤولية، بلا جدول، بلا «لاستعمالها لدى من يلزم»)',
-          strpos($hAt, 'ويتقاضى راتباً شهرياً قدره') !== false
+          preg_match('/و[يت]تقاضى راتباً شهرياً قدره/u', $hAt) === 1 // (2026-09-15) ويتقاضى/وتتقاضى حسب جنس الموظف
           && strpos($hAt, 'دون أدنى مسؤولية') === false
           && strpos($hAt, '<table dir="rtl"') === false
           && strpos($hAt, 'لاستعمالها لدى من يلزم') === false
-          && strpos($hAt, 'بناءً على طلبه(ا) .') !== false);
+          && preg_match('/بناءً على طلبه(ا|\(ا\))? \./u', $hAt) === 1); // (2026-09-15) طلبه/طلبها/طلبه(ا) حسب جنس الموظف بملفه
     // (2026-08-20) «بدون تابلو»: مع المكوّنات المختارة = تفصيل سطوراً (أساس + إضافي + الإجمالي) لا جدولاً
     $hAtC = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire'], ['extra']);
     check('إفادة راتب بلا تابلو: التفصيل سطوراً مع المكوّنات (أساس + الأجر الإضافي + الإجمالي)',
@@ -2021,7 +2021,7 @@ check('الإفادات: لا رقم هاتف تحت توقيع المدير/ا�
       strpos($atSrc32, 'e($sigPhone)') === false);
 check('الإفادات: «على رأس عمله» استُبدلت بـ«حتى تاريخه» (راتب/عمل/ملاك)',
       strpos($atSrc32, 'على رأس عمله') === false
-      && substr_count($atSrc32, 'ولا يزال(تزال) حتى تاريخه') === 2
+      && substr_count($atSrc32, "\$g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') ?> حتى تاريخه") === 2 // (2026-09-15) الصيغة حسب الجنس
       && strpos($atSrc32, 'ولا يزال حتى تاريخه') !== false);
 check('الإفادة المدرسية: لا «راجع ظهر الصفحة» بأسفلها',
       strpos($atSrc32, 'راجع ظهر الصفحة') === false);
@@ -2506,8 +2506,9 @@ check('مصدر واحد: إفادة عمل الضمان (٦ أشهر ×٢) + م
       && substr_count($ofSrc39, '(year * 100 + month) <= " . ((int)date') === 1);
 // تجربة فعلية: إفادة راتب مارسيلا (1677، لها 2025-2026 بأساس 2,085,000 و2026-2027
 // بأساس 2,225,000) — أرقام الإفادة تتبع السنة المعروضة نفسها التي تعرضها كل الكشوف
-$h39a = renderPage('pages/attestations.php', ['type' => 'salaire', 'employee_id' => 1677], [], [2], '', '2025-2026');
-$h39b = renderPage('pages/attestations.php', ['type' => 'salaire', 'employee_id' => 1677], [], [2], '', '2026-2027');
+// (2026-09-15) الشهر المختار = آخر شهر لا يتجاوز تاريخ الإفادة (قسم 130) — فتاريخ الإفادة يُمرَّر صراحةً بآخر السنة
+$h39a = renderPage('pages/attestations.php', ['type' => 'salaire', 'employee_id' => 1677, 'date' => '2026-09-15'], [], [2], '', '2025-2026');
+$h39b = renderPage('pages/attestations.php', ['type' => 'salaire', 'employee_id' => 1677, 'date' => '2027-09-15'], [], [2], '', '2026-2027');
 check('مصدر واحد (تجربة فعلية): إفادة الراتب تتبع السنة المعروضة (2025-2026 → أساس 2,085,000)',
       strpos($h39a, '2,085,000') !== false && strpos($h39a, '2,225,000') === false,
       strlen($h39a) . ' حرف');
@@ -6237,6 +6238,71 @@ foreach ([['pages/official_forms.php', ['form' => 'salary_detail', 'month' => 6,
 }
 check('التنزيل العائلي بكل الكشوف (تشغيل فعلي): التفصيلي + الشامل + Résumé mensuel — حصّة مارسيلا ثم الخاضع بعدها متجاورَين، ورؤوس = خلايا',
       $ok128, $why128 ? implode(' ; ', $why128) : ('حصّة ' . number_format($share42 ?? 0) . ' / خاضع بعدها ' . number_format($after42 ?? 0)));
+
+/* =====================================================================
+ * 129) 🧑 «p1 شوف هيك صح شي» (2026-09-15، على إفادة راتب كميل مرعي 1387): صيغة المذكّر/المؤنّث بكل
+ *     الإفادات من خانة الجنس بملف الموظف — معروف ⇒ «السيّد… يعمل… مدرّس… طلبه» أو «السيّدة… تعمل…
+ *     مدرّسة… طلبها» (وM./Mme بالفرنسي)؛ مجهول ⇒ الصيغة المزدوجة (ة) كما كانت + خانة جنس حمراء تُحفَظ بالملف.
+ * =================================================================== */
+$at129 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+check('جنس الإفادات (كود): $g(مذكّر, مؤنّث, مزدوج) مصدر واحد + خانة الجنس بشريط الخيارات تُحفَظ بالملف + لا صيغة مزدوجة خام بالنصوص',
+      strpos($at129, "\$g = function (string \$m, string \$f, string \$both) use (\$attGender): string {") !== false
+      && substr_count($at129, "\$g('") >= 30
+      && strpos($at129, "UPDATE employees SET gender=? WHERE id=? AND \" . schoolScopeWhere('school_id'))->execute([\$_GET['sex'], (int)\$employeeId]);") !== false
+      && preg_match('/<select name="sex" onchange="this\.form\.submit\(\)"[^>]*\$attGender===\'\'/u', $at129) === 1
+      && preg_match_all('/(السيّد\(ة\)|يعمل\(تعمل\)|مدرّس\(ة\)|طلبه\(ا\)|الأستاذ\(ة\)|المحترم\(ة\)|الموقّع\(ة\)|المولود\(ة\))/u', preg_replace('/\$g\([^)]*\)/u', '', preg_replace('#//.*$#mu', '', $at129))) === 0);
+$ok129 = true; $why129 = [];
+try {
+    $db129 = getDB();
+    $m129 = (int)$db129->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id WHERE e.is_deleted=0 AND e.gender='m' AND e.employee_type<>'employe' AND e.hire_date IS NOT NULL ORDER BY (e.id=1387) DESC, e.id LIMIT 1")->fetchColumn();
+    $f129 = (int)$db129->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id WHERE e.is_deleted=0 AND e.gender='f' AND e.employee_type<>'employe' AND e.hire_date IS NOT NULL ORDER BY e.id LIMIT 1")->fetchColumn();
+    $u129 = (int)$db129->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id WHERE e.is_deleted=0 AND e.gender IS NULL AND e.employee_type<>'employe' AND e.hire_date IS NOT NULL ORDER BY e.id LIMIT 1")->fetchColumn();
+    $txt129 = function (int $eid, string $type, string $lang) {
+        $h = renderPage('pages/attestations.php', ['employee_id' => $eid, 'type' => $type, 'lang_doc' => $lang, 'date' => '2026-09-15'], ['extra'], [], '', 'all');
+        $p = mb_strpos($h, 'id="ppExportArea"');
+        return [$h, preg_replace('/\s+/u', ' ', strip_tags(mb_substr($h, $p === false ? 0 : $p, 5000)))];
+    };
+    if ($m129) { [$h, $t] = $txt129($m129, 'salaire', 'ar');
+        if (!(mb_strpos($t, 'بأنّ السيّد ') !== false && mb_strpos($t, ' يعمل لديها بوظيفة مدرّس لمادة') !== false && mb_strpos($t, 'ولا يزال حتى تاريخه ، ويتقاضى') !== false && mb_strpos($t, 'بناءً على طلبه .') !== false && mb_strpos($t, '(ة)') === false && mb_strpos($t, '(ا)') === false)) { $ok129 = false; $why129[] = "m=$m129"; }
+        [$h, $t] = $txt129($m129, 'salaire', 'fr');
+        if (!(mb_strpos($t, 'atteste que M. ') !== false && mb_strpos($t, 'M./Mme') === false)) { $ok129 = false; $why129[] = "m-fr=$m129"; }
+    } else $why129[] = 'no-m';
+    if ($f129) { [$h, $t] = $txt129($f129, 'tadris', 'ar');
+        if (!(mb_strpos($t, 'بأنّ السيّدة ') !== false && mb_strpos($t, ' تعمل لديها بوظيفة مدرّسة لمادة') !== false && mb_strpos($t, 'ولا تزال حتى تاريخه ، وهي على حسن سلوك والتزام في أداء عملها') !== false && mb_strpos($t, 'بناءً على طلبها .') !== false && mb_strpos($t, '(ة)') === false)) { $ok129 = false; $why129[] = "f=$f129"; }
+    } else $why129[] = 'no-f';
+    if ($u129) { [$h, $t] = $txt129($u129, 'salaire', 'ar');
+        if (!(mb_strpos($t, 'بأنّ السيّد(ة) ') !== false && mb_strpos($t, 'يعمل(تعمل) لديها بوظيفة مدرّس(ة)') !== false && mb_strpos($t, 'بناءً على طلبه(ا) .') !== false
+              && strpos($h, 'name="sex" onchange="this.form.submit()" style="padding:3px 6px;margin-right:6px;border:2px solid #dc2626') !== false)) { $ok129 = false; $why129[] = "u=$u129"; }
+    }
+} catch (Throwable $e) { $ok129 = false; $why129[] = $e->getMessage(); }
+check('جنس الإفادات (تشغيل فعلي): ذكر ⇒ صيغة المذكّر وحدها (عربي + M. بالفرنسي) · أنثى ⇒ المؤنّث وحدها · مجهول ⇒ المزدوجة + خانة حمراء', $ok129, implode(' ; ', $why129) ?: "m=$m129 f=$f129 u=$u129");
+
+/* =====================================================================
+ * 130) 🗓️ «انتبه أنا حاطط مثلاً مع نقل ما عم يحطها» (2026-09-15): إفادة كميل مرعي (1387) بتاريخ 15/9/2026 وسنة
+ *     2026-2027 كانت تأخذ آخر شهر بالسنة (أيلول 2027 صيفي بلا نقل ⇒ النقل 0 رغم تأشيره). صار الشهر = آخر شهر
+ *     لا يتجاوز تاريخ الإفادة، وإن كانت السنة كلها مستقبلية فأوّل شهر فيها (تشرين الأول بنقله 18,000,000).
+ * =================================================================== */
+$at130 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+check('شهر الإفادة (كود): الاختيار مقيَّد بتاريخ الإفادة (≤ attYm أوّلاً، ثم أقرب شهر مستقبلي)',
+      strpos($at130, "\$attYm = (int)date('Ym', strtotime(\$effDate) ?: time());") !== false
+      && strpos($at130, "(year*100+month <= \$attYm) DESC,") !== false
+      && strpos($at130, "CASE WHEN year*100+month <= \$attYm THEN -(year*100+month) ELSE (year*100+month) END ASC LIMIT 1") !== false);
+$ok130 = false; $why130 = '';
+try {
+    $db130 = getDB();
+    $oct130 = $db130->query("SELECT transport_lbp, prime_fixe_lbp FROM monthly_salaries WHERE employee_id = 1387 AND year = 2026 AND month = 10")->fetch(PDO::FETCH_ASSOC);
+    $sep130 = $db130->query("SELECT transport_lbp FROM monthly_salaries WHERE employee_id = 1387 AND year = 2026 AND month = 9")->fetch(PDO::FETCH_ASSOC);
+    if ($oct130 && (int)$oct130['transport_lbp'] > 0) {
+        $g130 = ['employee_id' => 1387, 'type' => 'salaire', 'lang_doc' => 'ar', 'date' => '2026-09-15', 'opts_set' => 1, 'inc_extra' => 1, 'inc_trans' => 1];
+        $hNew = renderPage('pages/attestations.php', $g130, ['extra', 'transport'], [3], 'lbp', '2026-2027'); // السنة لم تبدأ ⇒ تشرين الأول
+        $hAll = renderPage('pages/attestations.php', $g130, ['extra', 'transport'], [3], 'lbp', 'all');       // كل السنين ⇒ آخر شهر ≤ أيلول 2026
+        $okNew = strpos($hNew, '- تعويض النقل : <strong>' . number_format((int)$oct130['transport_lbp']) . ' ل.ل</strong>') !== false
+              && strpos($hNew, '- الأجر الإضافي : <strong>' . number_format((int)$oct130['prime_fixe_lbp']) . ' ل.ل</strong>') !== false;
+        $okAll = !$sep130 || (int)$sep130['transport_lbp'] === 0 || strpos($hAll, '- تعويض النقل : <strong>' . number_format((int)$sep130['transport_lbp']) . ' ل.ل</strong>') !== false;
+        $ok130 = $okNew && $okAll; $why130 = 'تشرين 2026 نقل ' . number_format((int)$oct130['transport_lbp']) . ($okNew ? ' ✓' : ' ✗') . ' / كل السنين أيلول 2026 نقل ' . number_format((int)($sep130['transport_lbp'] ?? 0)) . ($okAll ? ' ✓' : ' ✗');
+    } else { $ok130 = true; $why130 = 'لا صفّ تشرين 2026 لـ1387 بنقل — تخطٍّ'; }
+} catch (Throwable $e) { $why130 = $e->getMessage(); }
+check('شهر الإفادة (تشغيل فعلي): كميل مرعي 15/9/2026 — سنة 2026-2027 ⇒ نقل تشرين الأول لا صفر أيلول 2027، وكل السنين ⇒ أيلول 2026', $ok130, $why130);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
