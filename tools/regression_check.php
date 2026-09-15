@@ -6317,6 +6317,23 @@ try {
 } catch (Throwable $e) { $why130 = $e->getMessage(); }
 check('شهر الإفادة (تشغيل فعلي): كميل مرعي 15/9/2026 — سنة 2026-2027 ⇒ نقل تشرين الأول لا صفر أيلول 2027، وكل السنين ⇒ أيلول 2026', $ok130, $why130);
 
+/* =====================================================================
+ * 131) 🧾 «دايماً بأي إفادة بدي أصدرها يكون عندي خيار حطّ الإضافي أو المكافأة أو النقل، دولار أو ليرة أو الاثنين —
+ *     البرنامج موحّد وكل الخيارات بكل المحلات» (2026-09-15): شريط المكوّنات + العملة بكل الإفادات العامة (16 نوعاً)
+ *     — النماذج الرسمية الثابتة (ضمان/ر3) لها شاشاتها الخاصة.
+ * =================================================================== */
+$at131 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+check('خيارات الإفادات موحّدة (كود): $hasComponents و$hasCurrency = true بلا قوائم أنواع',
+      strpos($at131, "\$hasComponents = true;") !== false && strpos($at131, "\$hasCurrency   = true;") !== false
+      && strpos($at131, "\$printsSalary  = in_array(\$type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'salaire', 'embassy', 'aqd_taalim'], true);") !== false);
+$bad131 = [];
+foreach (['cnss', 'salaire', 'tadris', 'embassy', 'riaaya', 'anhaa_khedme', 'anhaa_mail', 'talab_istiqala', 'afade_madrasiya', 'isqat_haq', 'baraa_zimma', 'iqrar', 'aqd_taalim', 'notice_school', 'notice_mail'] as $ty131) {
+    $h = renderPage('pages/attestations.php', ['employee_id' => 1387, 'type' => $ty131, 'date' => '2026-09-15'], ['extra'], [3], '', '2026-2027');
+    if (strpos($h, 'name="inc_extra"') === false || strpos($h, 'name="inc_aide"') === false || strpos($h, 'name="inc_trans"') === false
+        || substr_count($h, 'name="cur"') < 3 || strpos($h, 'الراتب المعتمد') === false) $bad131[] = $ty131;
+}
+check('خيارات الإفادات موحّدة (تشغيل فعلي): 15 نوعاً كلها تعرض الإضافي/المكافأة/النقل + ليرة/دولار/الاثنين + سطر الراتب المعتمد', !$bad131, $bad131 ? implode(',', $bad131) : 'كلها');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

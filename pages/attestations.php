@@ -819,8 +819,12 @@ if (!$emp):
     $logoUrl = schoolLogoUrl($school);
     $logoImg = $logoUrl ? '<img src="' . htmlspecialchars($logoUrl, ENT_QUOTES) . '" alt="" style="max-height:88px;max-width:150px;object-fit:contain">' : '';
     // مجموعات حسب نوع الإفادة + خيار «رأس/شعار المدرسة» (يختاره المستخدم لكل إفادة)
-    $hasComponents = in_array($type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'salaire', 'embassy', 'aqd_taalim'], true);
-    $hasCurrency   = in_array($type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'aqd_taalim', 'salaire', 'embassy'], true);
+    // 🔴 «دايماً بأي إفادة بدي أصدرها يكون عندي خيار حطّ الإضافي أو المكافأة أو النقل، دولار أو ليرة أو الاثنين —
+    //     البرنامج موحّد وكل الخيارات بكل المحلات» (2026-09-15): الشريط نفسه بكل الإفادات بلا استثناء.
+    //     $printsSalary = الإفادات التي يظهر المبلغ بنصّها (الباقي يعرض «الراتب المعتمد» للعلم فقط).
+    $hasComponents = true;
+    $hasCurrency   = true;
+    $printsSalary  = in_array($type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'salaire', 'embassy', 'aqd_taalim'], true);
     $isNotice      = in_array($type, ['notice_school', 'notice_mail'], true);
     $defaultLogo   = in_array($type, ['anhaa_khedme', 'anhaa_mail', 'aqd_taalim', 'cnss', 'notice_school', 'notice_mail', 'salaire', 'tadris', 'embassy', 'riaaya'], true); // الصادرة عن المدرسة: الشعار افتراضياً
     $showLogo      = isset($_GET['logo']) ? ($_GET['logo'] === '1') : $defaultLogo;
@@ -1021,7 +1025,7 @@ if (!$emp):
             <?php if ($grant>0): ?><div style="margin-top:6px;color:#1e40af"><?= number_format($grant) ?> دولار أميركي — بالحروف: <strong><?= e(numToArabicWords($grant)) ?> دولار أميركي</strong></div><?php endif; ?>
             <?php endif; ?>
             <?php if ($hasComponents): ?>
-            <div style="margin-top:6px;color:#1e40af">الراتب المعتمد بالإفادة: <strong><?= $moneyAr($salShown) ?></strong> (<?= $isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج' ?> <?= $moneyAr((int)$basePlusEch) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?><?= $incTrans?' + النقل':'' ?>)<?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
+            <div style="margin-top:6px;color:#1e40af"><?= $printsSalary ? 'الراتب المعتمد بالإفادة' : 'الراتب المعتمد (هذه الإفادة بلا مبلغ بنصّها — للعلم)' ?>: <strong><?= $moneyAr($salShown) ?></strong> (<?= $isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج' ?> <?= $moneyAr((int)$basePlusEch) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?><?= $incTrans?' + النقل':'' ?>)<?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php elseif ($type === 'aqd_taalim'): ?>
             <div style="margin-top:6px;color:#1e40af">أساس الراتب بالعقد: <strong><?= $moneyAr((int)$basePlusEch) ?></strong><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php endif; ?>
