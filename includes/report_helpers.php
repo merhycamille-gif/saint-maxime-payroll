@@ -784,6 +784,9 @@ function annualTotalItems(): array {
         'cnss'       => ['g' => 'cnss',      'ar' => 'الضمان — الأجير ٣٪',             'fr' => 'CNSS salarié 3%',        'lbp' => 'SUM(ms.cnss_amount_lbp)',                  'usd' => $u('ms.cnss_amount_lbp')],
         'scnss'      => ['g' => 'cnss',      'ar' => 'الضمان — المدرسة ٨٪',            'fr' => 'CNSS école 8%',          'lbp' => 'SUM(ms.school_cnss_8_lbp)',                'usd' => $u('ms.school_cnss_8_lbp')],
         'caisse'     => ['g' => 'eoc',       'ar' => 'صندوق التعويضات — الأجير ٦٪',    'fr' => 'Fonds salarié 6%',       'lbp' => 'SUM(ms.caisse_amount_lbp)',                'usd' => $u('ms.caisse_amount_lbp')],
+        // 🧾 (2026-09-17 «p1,p2 قارن لازم يكون نفس النتيجة»): درجة/نصف راتب إلى الصندوق بند مستقل — كي يساوي مجموع بنود الصندوق الثلاثة
+        //    عمود «صندوق التعويضات» بالتقرير العام (الأجير ٦٪ + الدرجة/نصف الراتب + المدرسة ٦٪).
+        'eocg'       => ['g' => 'eoc',       'ar' => 'درجة / نصف راتب إلى الصندوق',    'fr' => 'Échelon / ½ salaire au fonds', 'lbp' => 'SUM(ms.eoc_grade_lbp)',              'usd' => $u('ms.eoc_grade_lbp')],
         'seoc'       => ['g' => 'eoc',       'ar' => 'صندوق التعويضات — المدرسة ٦٪',   'fr' => 'Fonds école 6%',         'lbp' => 'SUM(ms.school_eoc_6_lbp)',                 'usd' => $u('ms.school_eoc_6_lbp')],
         'tax'        => ['g' => 'impot',     'ar' => 'ضريبة الدخل',                    'fr' => 'Impôt sur le revenu',    'lbp' => 'SUM(ms.income_tax_lbp)',                   'usd' => $u('ms.income_tax_lbp')],
         'net'        => ['g' => 'paye',      'ar' => 'إجمالي المدفوع (الصافي)',        'fr' => 'Net payé',               'lbp' => 'SUM(ms.net_salary_lbp)',                   'usd' => $u('ms.net_salary_lbp')],

@@ -1869,7 +1869,7 @@ elseif ($form === 'teacher_card'):
             <?php if (transportColShown()): ?><th><?= $grBi('Transport', 'تعويض النقل') ?></th><?php endif; ?>
             <th style="background:#4338ca"><?= $grBi('Total', 'المجموع') ?><?= $grSub('salaire après échelon' . ($grCompFr !== '' ? ' + ' . $grCompFr : ''), 'الراتب بعد التدرّج' . ($grCompAr !== '' ? ' + ' . $grCompAr : '')) ?></th>
             <th><?= $grBi('Salaires nets', 'الرواتب الصافية') ?><?= $grTransAmt ? $grSub('avec transport', 'مع تعويض النقل') : '' ?></th>
-            <th><?= $grBi('CNSS', 'الضمان الاجتماعي') ?></th><th><?= $grBi('Caisse des indemnités', 'صندوق التعويضات') ?></th><th><?= $grBi('Impôt sur le revenu', 'ضريبة الدخل') ?></th>
+            <th><?= $grBi('CNSS', 'الضمان الاجتماعي') ?><?= $grSub('salarié 3% + école 8%', 'الأجير ٣٪ + المدرسة ٨٪') ?></th><th><?= $grBi('Caisse des indemnités', 'صندوق التعويضات') ?><?= $grSub('salarié 6% + échelon/½ salaire + école 6%', 'الأجير ٦٪ + درجة/نصف راتب + المدرسة ٦٪') ?></th><th><?= $grBi('Impôt sur le revenu', 'ضريبة الدخل') ?></th>
             <th><?= $grBi('Total', 'المجموع') ?><?= $grSub('net + CNSS + caisse + impôt', 'الصافي + الضمان + الصندوق + الضريبة') ?></th>
         </tr></thead>
         <tbody>
