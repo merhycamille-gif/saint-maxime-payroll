@@ -6543,6 +6543,37 @@ check('الدرجات العادية/الاستثنائية (شاشة): الرأ
       && strpos($hAt137, '<th>أساس الراتب') < strpos($hAt137, '<th>الدرجات العادية') && strpos($hAt137, '<th>الدرجات العادية') < strpos($hAt137, '<th>الدرجات الاستثنائية')
       && strpos($hAt137, '<th>الدرجات الاستثنائية') < strpos($hAt137, '<th>الراتب بعد التدرّج'));
 
+/* =====================================================================
+ * 138) 🚪 «أنا غيّرت وحطّيت 55 لازم يكون 55 — لازم يغيّر لكل أساتذة الملاك» (2026-09-17): رأس «الأجر الإضافي» كان يعرض
+ *     «55 / 60 %» لأن بند 60٪ لأستاذتين تركتا 30/9/2026 بقي فعّالاً بسنة 2026-2027. صار: (١) نطاق المدارس بـextraPctHead =
+ *     أساتذة السنة فقط (yearEmploymentFilter) (٢) حفظ تاريخ الترك يطفئ علاوات السنين اللاحقة فوراً (pruneSalariesAfterDeparture).
+ * =================================================================== */
+$rh138 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$fn138 = (string)file_get_contents($PROJ . '/includes/functions.php');
+check('نسبة الإضافي برأس التقرير تتجاهل التاركين (كود): yearEmploymentFilter بنطاق المدارس + إطفاء علاوات ما بعد الترك مع الحفظ',
+      strpos($rh138, "[\$yf, \$yp] = yearEmploymentFilter(\$sy, 'e.');") !== false
+      && strpos($rh138, "\$sql .= schoolScopeSql('e.school_id') . \$yf; \$prm = array_merge(\$prm, \$yp);") !== false
+      && strpos($fn138, "UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND is_active = 1 AND school_year IS NOT NULL") !== false);
+// تجربة حيّة: تارك قبل بداية السنة النشطة يُعطى بند 97.5٪ مؤقّتاً — لا يظهر بالرأس؛ ثم يُمسح
+$ok138 = false; $why138 = '';
+try {
+    $syA = (string)activeSchoolYear(); $ys = substr($syA, 0, 4) . '-10-01';
+    $lv = $db->query("SELECT e.id, e.school_id FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire'
+                      AND LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) < '$ys'
+                      AND e.school_id IN (SELECT school_id FROM monthly_salaries WHERE school_year = '$syA' AND base_plus_echelon_lbp > 0) LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($lv) {
+        $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, 'prime_fixe', 9, ?, 97.5, 'percent', 'LBP', 10, 9, 1)")->execute([(int)$lv['id'], $syA]);
+        $bid = (int)$db->lastInsertId();
+        $_SESSION['active_schools'] = [(int)$lv['school_id']];
+        $hdr = extraPctHead(null, null, null, $syA);
+        $db->exec("DELETE FROM employee_bonuses WHERE id = $bid");
+        unset($_SESSION['active_schools']);
+        $ok138 = strpos($hdr, '97.5') === false;
+        $why138 = 'تارك #' . $lv['id'] . ' مدرسة ' . $lv['school_id'] . ' — الرأس: ' . strip_tags($hdr);
+    } else { $ok138 = true; $why138 = 'لا تارك بالمحلي — تخطٍّ'; }
+} catch (Throwable $e) { $why138 = $e->getMessage(); }
+check('نسبة الإضافي برأس التقرير (تشغيل فعلي): بند 97.5٪ لتارك قبل السنة لا يظهر بالرأس', $ok138, $why138);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

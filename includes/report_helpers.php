@@ -69,9 +69,15 @@ function extraPctHead($rows = null, $month = null, $year = null, ?string $sy = n
         $sql = "SELECT b.employee_id, b.amount, b.start_month, b.end_month FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id
                 WHERE b.bonus_type = 'prime_fixe' AND b.is_active = 1 AND b.value_type = 'percent'
                   AND (b.school_year IS NULL OR b.school_year = ?) AND e.is_deleted = 0";
+        $prm = [$sy];
         if ($ids !== null) $sql .= ' AND b.employee_id IN (' . implode(',', array_map('intval', $ids)) . ')';
-        else $sql .= schoolScopeSql('e.school_id');
-        $st = getDB()->prepare($sql); $st->execute([$sy]); $bon = $st->fetchAll(PDO::FETCH_ASSOC);
+        else {
+            // 🚪 (2026-09-17 «أنا غيّرت وحطّيت 55 لازم يكون 55»): بند 60٪ لأستاذتين تركتا 30/9/2026 كان يظهر برأس تقرير 2026-2027 —
+            //    نطاق المدارس = أساتذة السنة فقط (yearEmploymentFilter: راتب فعلي بالسنة ولم يترك قبل بدايتها)، كما تفلتر التقارير نفسها.
+            [$yf, $yp] = yearEmploymentFilter($sy, 'e.');
+            $sql .= schoolScopeSql('e.school_id') . $yf; $prm = array_merge($prm, $yp);
+        }
+        $st = getDB()->prepare($sql); $st->execute($prm); $bon = $st->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) { return ''; }
     if (!$bon) return '';
     $seen = [];   // النسبة ← عدد الأساتذة عليها

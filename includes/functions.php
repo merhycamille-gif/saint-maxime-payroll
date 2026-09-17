@@ -669,6 +669,12 @@ function pruneSalariesAfterDeparture($db, $empId) {
     // رتبة صفّ (year,month) = (month>=10 ? year : year-1). نحذف كل صفّ رتبته > رتبة الترك.
     $del = $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND ((month >= 10 AND year > ?) OR (month < 10 AND year - 1 > ?))");
     $del->execute([$empId, $depRank, $depRank]);
+    // 🚪 (2026-09-17) علاوات/نِسَب السنين اللاحقة لسنة الترك تُطفأ فوراً معه (كانت تنتظر شفاء healLeaverPhantomRows مرّة بالجلسة،
+    //    فبقي بند 60٪ لتاركتين فعّالاً بسنة 2026-2027 وظهر برأس الأجر الإضافي بعدما غيّر المستخدم المدرسة إلى 55٪).
+    try {
+        $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND is_active = 1 AND school_year IS NOT NULL
+                      AND CAST(SUBSTRING(school_year, 1, 4) AS UNSIGNED) > ?")->execute([$empId, $depRank]);
+    } catch (Exception $e) { /* لا نُعطّل الحفظ */ }
     // (2026-08-29) الأشهر التي تلي شهر الترك **ضمن نفس السنة** لا تُحذف تلقائياً: قد يكون بقرار المستخدم
     // (حنان تحومي مكمَّلة كل السنة رغم تاريخ تركها) — تُعرض «للمراجعة» بالفحص الرسمي فقط.
     return $del->rowCount();
