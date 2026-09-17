@@ -6516,6 +6516,33 @@ if (preg_match('/<tbody>\s*<tr>(.*?)<\/tr>/s', $h136, $mr)) {
 check('التقرير العام (تشغيل فعلي 2025-2026): 11 عموداً بالترتيب المطلوب فرنسي فوق عربي + dir=ltr + المجموع = الأربعة + الأخير = الصافي+الضمان+الصندوق+الضريبة + منتقي المدارس ظاهر',
       $noFatal($h136) && $okOrder && $okAr && $okRow && strpos($h136, 'name="schools[]"') !== false && strpos($h136, 'id="ppExportArea" dir="ltr"') !== false, $why136);
 
+/* =====================================================================
+ * 137) 🏆 «p1 بدي بهيدا التقرير الدرجات العادية والدرجات الاستثنائية والراتب بعد التدرّج» (2026-09-17، المجاميع السنوية):
+ *     بندان جديدان بمجموعة الرواتب (grade_ord/grade_exc من annualGradeSplit) بين أساس الراتب والراتب بعد التدرّج —
+ *     أساس + عادية + استثنائية = الراتب بعد التدرّج لكل مدرسة (الأرقام تركب)، والتصدير يحملهما تلقائياً (annualTotalSelected).
+ * =================================================================== */
+$rh137 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$keys137 = array_keys(annualTotalItems());
+check('الدرجات العادية/الاستثنائية بالمجاميع السنوية (كود): بندان calc بين أساس الراتب والراتب بعد التدرّج + annualGradeSplit مصدر واحد',
+      function_exists('annualGradeSplit')
+      && array_search('grade_ord', $keys137, true) === array_search('base_sal', $keys137, true) + 1
+      && array_search('grade_exc', $keys137, true) === array_search('grade_ord', $keys137, true) + 1
+      && array_search('bpe', $keys137, true) === array_search('grade_exc', $keys137, true) + 1
+      && strpos($rh137, "\$r['grade_ord'] = \$g['ord']; \$r['grade_ord_usd'] = \$g['ord_usd']; \$r['grade_exc'] = \$g['exc']; \$r['grade_exc_usd'] = \$g['exc_usd'];") !== false
+      && strpos($rh137, "AND ms.echelon_value_lbp > 0") !== false);
+[$rows137, $tot137] = annualTotalRows($db, '2025-2026', '', [], '', ' ');
+$bad137 = [];
+foreach ($rows137 as $r) if ((int)$r['base_sal'] + (int)$r['grade_ord'] + (int)$r['grade_exc'] !== (int)$r['bpe']) $bad137[] = $r['school_id'] . ':' . ((int)$r['base_sal'] + (int)$r['grade_ord'] + (int)$r['grade_exc'] - (int)$r['bpe']);
+check('الدرجات العادية/الاستثنائية (داتا 2025-2026): أساس + عادية + استثنائية = الراتب بعد التدرّج بكل مدرسة + المجموع يركب + في درجات فعلاً',
+      !$bad137 && count($rows137) > 0 && (int)$tot137['grade_ord'] + (int)$tot137['grade_exc'] > 0
+      && (int)$tot137['grade_ord'] === array_sum(array_map(fn($r) => (int)$r['grade_ord'], $rows137)),
+      ($bad137 ? 'فروق: ' . implode(' ', $bad137) : '') . ' عادية=' . number_format((int)$tot137['grade_ord']) . ' استثنائية=' . number_format((int)$tot137['grade_exc']));
+$hAt137 = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026'], ['extra', 'aide', 'transport'], [], 'lbp');
+check('الدرجات العادية/الاستثنائية (شاشة): الرأسان بين أساس الراتب والراتب بعد التدرّج',
+      strpos($hAt137, '<th>أساس الراتب') !== false && strpos($hAt137, '<th>الدرجات العادية') !== false && strpos($hAt137, '<th>الدرجات الاستثنائية') !== false
+      && strpos($hAt137, '<th>أساس الراتب') < strpos($hAt137, '<th>الدرجات العادية') && strpos($hAt137, '<th>الدرجات العادية') < strpos($hAt137, '<th>الدرجات الاستثنائية')
+      && strpos($hAt137, '<th>الدرجات الاستثنائية') < strpos($hAt137, '<th>الراتب بعد التدرّج'));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

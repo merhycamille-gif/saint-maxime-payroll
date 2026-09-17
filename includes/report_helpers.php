@@ -771,6 +771,10 @@ function annualTotalItems(): array {
     $u = fn(string $c) => "SUM(FLOOR(($c)/NULLIF(ms.exchange_rate,0)))";
     return [
         'base_sal'   => ['g' => 'salaires',  'ar' => 'أساس الراتب',                    'fr' => 'Salaire de base',        'lbp' => 'SUM(ms.base_salary_lbp)',                  'usd' => 'SUM(' . lawUsdSql('ms.base_salary_lbp') . ')'],
+        // 🏆 (p1 2026-09-17 «بدي بهيدا التقرير الدرجات العادية والدرجات الاستثنائية والراتب بعد التدرّج»): قيمة درجات السنة مقسومة
+        //    بنوعها (annualGradeSplit) — أساس الراتب + العادية + الاستثنائية = الراتب بعد التدرّج (الأرقام تركب).
+        'grade_ord'  => ['g' => 'salaires',  'ar' => 'الدرجات العادية',                'fr' => 'Échelons ordinaires',    'calc' => true],
+        'grade_exc'  => ['g' => 'salaires',  'ar' => 'الدرجات الاستثنائية',            'fr' => 'Échelons exceptionnels', 'calc' => true],
         'bpe'        => ['g' => 'salaires',  'ar' => 'الراتب بعد التدرّج',              'fr' => 'Base + échelons',        'lbp' => 'SUM(ms.base_plus_echelon_lbp)',            'usd' => 'SUM(' . lawUsdSql('ms.base_plus_echelon_lbp') . ')'],
         'extra_wage' => ['g' => 'additions', 'ar' => 'الأجر الإضافي',                  'fr' => 'Supplément',             'lbp' => 'SUM(ms.extra_lbp + ms.prime_fixe_lbp)',    'usd' => 'SUM(' . extraWageUsdSql('ms.') . ')'],
         'aide'       => ['g' => 'additions', 'ar' => 'مكافأة ومساعدة',                 'fr' => 'Prime & aide',           'lbp' => 'SUM(ms.aide_complementaire_lbp)',          'usd' => $u('ms.aide_complementaire_lbp')],
@@ -823,6 +827,45 @@ function annualTotalSelected(): array {
  * النقل يُطرح من «المتوجب» عند تعطيله بزرّ «الراتب يشمل» (قاعدة «الأرقام تركب»)، والراتب المركّب
  * = بعد التدرّج + ما فعّله الزرّ من إضافي/مكافأة/نقل.
  */
+/**
+ * 🏆 قيمة درجات السنة الدراسية مقسومة بنوعها، لكل مدرسة — المصدر الواحد لبندَي «الدرجات العادية/الاستثنائية».
+ * لكل شهر فيه قيمة درجة (echelon_value_lbp > 0 = ما اكتسبه الأستاذ ذلك الشهر): تُقرأ أحداث الدرجات المحسوبة (counted=1)
+ * الواقعة بنفس الشهر من employee_grade_history — العادية = التدرّج الدوري (biennial_promotion) بقيمتها من السلسلة
+ * (بعد − قبل بتاريخها)، والاستثنائية = باقي قيمة الشهر (قوانين 244/102/223/2017/344 + الوحدات بلا reason + اليدوية).
+ * بلا أي حدث بالشهر ⇒ تُعدّ عادية. القاعدة: أساس + عادية + استثنائية = الراتب بعد التدرّج (مجموع الشهور).
+ * الدولار = دولار القانون (÷1500 داون) كأعمدة الأساس/بعد التدرّج. يعيد [school_id => [ord, exc, ord_usd, exc_usd]].
+ */
+function annualGradeSplit(PDO $db, string $schoolYear, string $empFilter, array $empParams, string $empTypeSql, string $schoolSql): array {
+    $out = [];
+    $st = $db->prepare("SELECT ms.school_id, ms.employee_id, ms.year, ms.month, ms.echelon_value_lbp ev,
+                               h.reason, h.law_reference, h.grade_before, h.grade_after, h.change_date
+                        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+                        LEFT JOIN employee_grade_history h ON h.employee_id = ms.employee_id AND h.counted = 1
+                             AND YEAR(h.change_date) = ms.year AND MONTH(h.change_date) = ms.month
+                        WHERE e.is_deleted = 0" . $empFilter . $empTypeSql . " AND ms.school_year = ? AND ms.echelon_value_lbp > 0" . $schoolSql . "
+                        ORDER BY ms.school_id, ms.employee_id, ms.year, ms.month");
+    $st->execute(array_merge($empParams, [$schoolYear]));
+    $months = []; // school|emp|y|m => ['ev'=>, 'ord'=>]
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $key = $r['school_id'] . '|' . $r['employee_id'] . '|' . $r['year'] . '|' . $r['month'];
+        if (!isset($months[$key])) $months[$key] = ['sid' => (int)$r['school_id'], 'ev' => (int)$r['ev'], 'ord' => 0, 'any' => false];
+        if ($r['reason'] === null) continue;
+        $months[$key]['any'] = true;
+        $isExc = $r['reason'] === '' || strpos((string)$r['reason'], 'exceptional') === 0 || $r['reason'] === 'manual' || !empty($r['law_reference']);
+        if ($r['reason'] === 'biennial_promotion' && !$isExc) {
+            $months[$key]['ord'] += max(0, (int)scaleSalaryLBP((float)$r['grade_after'], $r['change_date']) - (int)scaleSalaryLBP((float)$r['grade_before'], $r['change_date']));
+        }
+    }
+    foreach ($months as $m) {
+        $ord = $m['any'] ? min($m['ev'], $m['ord']) : $m['ev'];
+        $exc = $m['ev'] - $ord;
+        $sid = $m['sid'];
+        if (!isset($out[$sid])) $out[$sid] = ['ord' => 0, 'exc' => 0, 'ord_usd' => 0.0, 'exc_usd' => 0.0];
+        $out[$sid]['ord'] += $ord; $out[$sid]['exc'] += $exc;
+        $out[$sid]['ord_usd'] += lawUsd($ord); $out[$sid]['exc_usd'] += lawUsd($exc);
+    }
+    return $out;
+}
 function annualTotalRows(PDO $db, string $schoolYear, string $empFilter, array $empParams, string $empTypeSql, string $schoolSql): array {
     $items = annualTotalItems();
     $sel = [];
@@ -839,10 +882,13 @@ function annualTotalRows(PDO $db, string $schoolYear, string $empFilter, array $
                         GROUP BY ms.school_id ORDER BY ms.school_id");
     $st->execute(array_merge($empParams, [$schoolYear]));
     $rows = $st->fetchAll();
+    $gs = annualGradeSplit($db, $schoolYear, $empFilter, $empParams, $empTypeSql, $schoolSql);
     $hasT = salaryCompHas('transport'); $hasE = salaryCompHas('extra'); $hasA = salaryCompHas('aide');
     $tot = ['school_id' => 0, 'cnt' => 0];
     foreach ($items as $k => $_) { $tot[$k] = 0; $tot[$k . '_usd'] = 0; }
     foreach ($rows as &$r) {
+        $g = $gs[(int)$r['school_id']] ?? ['ord' => 0, 'exc' => 0, 'ord_usd' => 0.0, 'exc_usd' => 0.0];
+        $r['grade_ord'] = $g['ord']; $r['grade_ord_usd'] = $g['ord_usd']; $r['grade_exc'] = $g['exc']; $r['grade_exc_usd'] = $g['exc_usd'];
         if (!$hasT) { $r['total'] = (int)$r['total'] - (int)$r['transport']; $r['total_usd'] = (float)$r['total_usd'] - (float)$r['transport_usd']; }
         $r['composed']     = (int)$r['bpe'] + ($hasE ? (int)$r['extra_wage'] : 0) + ($hasA ? (int)$r['aide'] : 0) + ($hasT ? (int)$r['transport'] : 0);
         $r['composed_usd'] = (float)$r['bpe_usd_mkt'] + ($hasE ? (float)$r['extra_wage_usd'] : 0) + ($hasA ? (float)$r['aide_usd'] : 0) + ($hasT ? (float)$r['transport_usd'] : 0);
