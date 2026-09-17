@@ -135,6 +135,8 @@ $empTypeSel = in_array($_GET['emp_type'] ?? '', $empTypesAllowed, true) ? $_GET[
 $taxSubSel = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
 $ofEmpFilter = ($empTypeSel ? " AND e.employee_type = " . $db->quote($empTypeSel) : '')
              . ($taxSubSel !== '' ? " AND e.tax_subject = " . (int)$taxSubSel : '');
+// 🏫 منتقي المدارس بالتقرير العام: «الكل» (بلا schools[]) = تصفير الاختيار المحفوظ بالجلسة — قبل رسم المنتقي والاستعلام
+if (isset($_GET['schools_set']) && !isset($_GET['schools'])) $_SESSION['report_schools'] = [];
 // ↔️ (2026-09-13 «اللوائح اللي منقدّمها للدولة اللبنانية — المالية والضمان وصندوق التعويضات — بس اللي بخانة كشوف الرواتب
 //    ما عدا بطاقة الأستاذ السنوية: من الشمال لليمين — الاتجاه بس»): كشوف خانة «كشوف الرواتب» بمركز التقارير تُعرَض LTR دائماً.
 //    الاتجاه فقط (الأعمدة والأرقام والنصوص كما هي). البطاقة السنوية (annual_slip) لا تُمَسّ. المصدر الواحد: ofStateLtrForms().
@@ -307,7 +309,7 @@ if ($form !== '' && in_array($form, $ofFilterableForms, true)):
 ?>
 <form method="get" class="card no-print">
     <div class="card-body form-row cols-3">
-        <?php foreach ($_GET as $gk => $gv): if (in_array($gk, ['emp_type', 'tax_sub'], true) || is_array($gv)) continue; ?>
+        <?php foreach ($_GET as $gk => $gv): if (in_array($gk, ['emp_type', 'tax_sub', 'schools_set'], true) || is_array($gv)) continue; ?>
             <input type="hidden" name="<?= e($gk) ?>" value="<?= e((string)$gv) ?>">
         <?php endforeach; ?>
         <div class="form-group mb-0">
@@ -328,6 +330,23 @@ if ($form !== '' && in_array($form, $ofFilterableForms, true)):
             </select>
         </div>
         <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filtrer / فلترة</button></div>
+        <?php if ($form === 'general_report' && isSuperAdmin()): // 🏫 منتقي المدارس بالتقرير العام («وكمان اختار مدارس» 2026-09-17) — نفس منتقي مركز التقارير
+            $ofPickSel = selectedReportSchoolIds(); ?>
+        <input type="hidden" name="schools_set" value="1">
+        <div class="form-group mb-0" style="grid-column:1 / -1">
+            <label class="form-label"><i class="fas fa-school"></i> Écoles / المدارس</label>
+            <div class="school-checks">
+                <label class="chk all"><input type="checkbox" value="all" onclick="ofToggleAllSchools(this)" <?= empty($ofPickSel) ? 'checked' : '' ?>> <strong>Toutes / الكل</strong></label>
+                <?php foreach (allSchools() as $s): ?>
+                <label class="chk"><input type="checkbox" name="schools[]" value="<?= (int)$s['id'] ?>" onclick="ofOnSchoolCheck()" <?= in_array((int)$s['id'], $ofPickSel, true) ? 'checked' : '' ?>> <?= e($s['name_fr']) ?></label>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <script>
+        function ofToggleAllSchools(a){ if(a.checked){ document.querySelectorAll('input[name="schools[]"]').forEach(function(c){c.checked=false;}); } }
+        function ofOnSchoolCheck(){ var any=Array.from(document.querySelectorAll('input[name="schools[]"]')).some(function(c){return c.checked;}); var b=document.querySelector('.school-checks .all input'); if(b) b.checked=!any; }
+        </script>
+        <?php endif; ?>
     </div>
 </form>
 <?php if ($ofFilterTitle !== ''): ?>
@@ -1788,10 +1807,14 @@ elseif ($form === 'teacher_card'):
 <?php elseif ($form === 'general_report'):
     // الموازنة السنوية المقدّرة على الرواتب والأجور والمحسومات القانونية (مطابق Ecole.exe — p12)
     // سطر لكل مدرسة مختارة + سطر مجموع.
+    // 📐 ترتيب الأعمدة بطلبه (p1 2026-09-17): المؤسسة ← الراتب بعد التدرّج ← الأجر الإضافي ← المكافأة ← النقل ← المجموع
+    //    ← الصافي ← الضمان ← صندوق التعويضات ← ضريبة الدخل ← المجموع الأخير (= الصافي + الضمان + الصندوق + الضريبة).
+    //    الإضافي/المكافأة/النقل تتبع شريط «الراتب يشمل» (أعمدة اختيارية)، والمدارس من منتقي المدارس أعلاه (schools[]).
     $q = $db->prepare("SELECT ms.school_id,
             SUM(ms.base_salary_lbp) base_salary,
             SUM(ms.base_plus_echelon_lbp) bpe,
             SUM(" . lawUsdSql('ms.base_plus_echelon_lbp') . ") bpe_usd,
+            SUM(FLOOR(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0))) bpe_usd_mkt,
             SUM(ms.net_salary_lbp) net,
             SUM(ms.extra_lbp + ms.prime_fixe_lbp) extra_wage,
             SUM(" . extraWageUsdSql('ms.') . ") extra_wage_usd,
@@ -1808,81 +1831,94 @@ elseif ($form === 'teacher_card'):
             SUM(FLOOR((ms.caisse_amount_lbp + ms.eoc_grade_lbp + ms.school_eoc_6_lbp)/NULLIF(ms.exchange_rate,0))) eoc_usd,
             SUM(FLOOR(ms.income_tax_lbp/NULLIF(ms.exchange_rate,0))) tax_usd
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.is_deleted=0" . $ofYearFilter . $ofEmpFilter . " AND ms.school_year=? AND " . schoolScopeWhere('ms.school_id') . " GROUP BY ms.school_id ORDER BY ms.school_id");
+        WHERE e.is_deleted=0" . $ofYearFilter . $ofEmpFilter . " AND ms.school_year=?" . reportSchoolSql('ms.school_id') . " GROUP BY ms.school_id ORDER BY ms.school_id");
     $q->execute(array_merge($ofYearParams, [$schoolYear]));
     $sdata = $q->fetchAll();
-    $T = ['base'=>0,'netNo'=>0,'extra'=>0,'aide'=>0,'trans'=>0,'netWith'=>0,'cnss'=>0,'eoc'=>0,'tax'=>0,'total'=>0,'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,
-          'base_usd'=>0.0,'netNo_usd'=>0.0,'netWith_usd'=>0.0,'cnss_usd'=>0.0,'eoc_usd'=>0.0,'tax_usd'=>0.0,'total_usd'=>0.0];
-    $boxName = (count($sdata)===1) ? schoolNameById($sdata[0]['school_id'],'ar') : 'المدارس المختارة';
+    $T = ['bpe'=>0,'extra'=>0,'aide'=>0,'trans'=>0,'composed'=>0,'netWith'=>0,'cnss'=>0,'eoc'=>0,'tax'=>0,'total'=>0,
+          'bpe_usd'=>0.0,'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0,'composed_usd'=>0.0,'netWith_usd'=>0.0,'cnss_usd'=>0.0,'eoc_usd'=>0.0,'tax_usd'=>0.0,'total_usd'=>0.0];
+    $boxName   = (count($sdata)===1) ? schoolNameById($sdata[0]['school_id'],'ar') : 'المدارس المختارة';
+    $boxNameFr = (count($sdata)===1) ? schoolNameById($sdata[0]['school_id'],'fr') : 'Écoles sélectionnées';
+    $grTransAmt = salaryCompHas('transport'); // النقل بالمبلغ = يدخل بالمجموع والصافي؛ «بلا مبلغ»/«غير موجود» = لا يدخل (الأرقام تركب)
 ?>
-<div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
+<?php // ↔️ بطلبه (2026-09-17): هذا التقرير من الشمال لليمين، وكل عنوان بالفرنسية فوق العربية (grBi = سطر فرنسي ثم عربي)
+      $grBi = fn(string $fr, string $ar) => '<span class="bi-fr" dir="ltr">' . e($fr) . '</span><span class="bi-ar" dir="rtl">' . e($ar) . '</span>';
+      $grSub = fn(string $fr, string $ar) => '<small class="bi-fr" style="font-weight:400">' . e($fr) . '</small><small class="bi-ar" style="font-weight:400">' . e($ar) . '</small>';
+      $grCompFr = implode(' + ', array_map(fn($k) => ['extra' => 'supplément', 'aide' => 'prime'][$k], array_values(array_intersect(salaryComp(), ['extra', 'aide'])))) . ($grTransAmt ? ' + transport' : '');
+      $grCompAr = str_replace('الأساسي + ', '', salaryCompLabel()) . ($grTransAmt ? ' + النقل' : '');
+      if ($grCompFr === '' || $grCompFr === ' + transport') { $grCompFr = trim($grCompFr, ' +'); $grCompAr = trim(str_replace('الأساسي فقط', '', $grCompAr), ' +'); }
+?>
+<style>.official-doc .bi-fr{display:block;font-family:Arial,Helvetica,sans-serif;direction:ltr;unicode-bidi:isolate;}.official-doc .bi-ar{display:block;direction:rtl;unicode-bidi:isolate;}</style>
+<div class="official-doc ltr land-report" id="ppExportArea" dir="ltr" style="max-width:100%">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:8px">
-        <div style="flex:1;text-align:center">
-            <div style="font-weight:700;font-size:13pt">الموازنة السنوية المقدّرة على الرواتب والأجور</div>
-            <div style="font-size:12pt">والمحسومات القانونية المتوجبة</div>
-            <div style="font-weight:700;margin-top:6px"><?= e($schoolYear) ?></div>
-        </div>
         <div style="border:1.5px solid #b8860b;border-radius:6px;padding:10px 16px;font-weight:700;text-align:center;min-width:160px">
-            <?= e($boxName) ?>
+            <?= $grBi($boxNameFr, $boxName) ?>
+        </div>
+        <div style="flex:1;text-align:center">
+            <div style="font-weight:700;font-size:13pt">Budget annuel prévisionnel des salaires et traitements</div>
+            <div style="font-weight:700;font-size:13pt">الموازنة السنوية المقدّرة على الرواتب والأجور</div>
+            <div style="font-size:12pt">et des retenues légales dues<br>والمحسومات القانونية المتوجبة</div>
+            <div style="font-weight:700;margin-top:6px"><?= e($schoolYear) ?></div>
         </div>
     </div>
     <table class="doc-table" style="margin-top:8px">
         <thead><tr>
-            <th>اسم المؤسسة</th>
-            <th>أساس الراتب<?= rateHead('law') ?></th>
-            <th>الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th><?= extraAideHeads('', null, null, null, $schoolYear) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><?= transportHead() ?><?php if (salaryCompHas('transport')): ?><th>الرواتب الصافية<br>مع تعويض النقل</th><?php endif; ?>
-            <th>الضمان الاجتماعي</th><th>صندوق التعويضات</th><th>ضريبة الدخل</th><th>المجموع</th>
+            <th><?= $grBi('Établissement', 'اسم المؤسسة') ?></th>
+            <th><?= $grBi('Salaire après échelon', 'الراتب بعد التدرّج') ?><?= rateHead('law') ?></th>
+            <?php if (salaryCompHas('extra')): ?><th><?= $grBi('Supplément', 'الأجر الإضافي') ?><?= extraPctHead(null, null, null, $schoolYear) ?></th><?php endif; ?>
+            <?php if (salaryCompHas('aide')): ?><th><?= $grBi('Prime et aide', 'مكافأة ومساعدة') ?></th><?php endif; ?>
+            <?php if (transportColShown()): ?><th><?= $grBi('Transport', 'تعويض النقل') ?></th><?php endif; ?>
+            <th style="background:#4338ca"><?= $grBi('Total', 'المجموع') ?><?= $grSub('salaire après échelon' . ($grCompFr !== '' ? ' + ' . $grCompFr : ''), 'الراتب بعد التدرّج' . ($grCompAr !== '' ? ' + ' . $grCompAr : '')) ?></th>
+            <th><?= $grBi('Salaires nets', 'الرواتب الصافية') ?><?= $grTransAmt ? $grSub('avec transport', 'مع تعويض النقل') : '' ?></th>
+            <th><?= $grBi('CNSS', 'الضمان الاجتماعي') ?></th><th><?= $grBi('Caisse des indemnités', 'صندوق التعويضات') ?></th><th><?= $grBi('Impôt sur le revenu', 'ضريبة الدخل') ?></th>
+            <th><?= $grBi('Total', 'المجموع') ?><?= $grSub('net + CNSS + caisse + impôt', 'الصافي + الضمان + الصندوق + الضريبة') ?></th>
         </tr></thead>
         <tbody>
         <?php foreach ($sdata as $sd):
             $net=(int)$sd['net']; $trans=(int)$sd['transport']; $cnss=(int)$sd['cnss']; $eoc=(int)$sd['eoc']; $tax=(int)$sd['tax'];
-            $exW=(int)$sd['extra_wage']; $aid=(int)$sd['aide']; $bse=(int)$sd['base_salary'];
+            $exW=(int)$sd['extra_wage']; $aid=(int)$sd['aide'];
             $exWu=(float)($sd['extra_wage_usd']??0); $aidu=(float)($sd['aide_usd']??0); $transu=(float)($sd['transport_usd']??0);
-            $bpe=(int)($sd['bpe']??0); $bpeu=(float)($sd['bpe_usd']??0);
-            $composed = $bpe + (salaryCompHas('extra')?$exW:0) + (salaryCompHas('aide')?$aid:0) + (salaryCompHas('transport')?$trans:0);
-            $composedu = $bpeu + (salaryCompHas('extra')?$exWu:0) + (salaryCompHas('aide')?$aidu:0) + (salaryCompHas('transport')?$transu:0);
-            // 🔴 «الأرقام تركب»: عمود النقل يتبع زرّ «الراتب يشمل»، فإن كان مخفياً وجب
-            // ألّا يدخل في «الصافية مع النقل» ولا في «المجموع» — وإلّا ظهرت قفزة بلا عمود يفسّرها.
+            $bpe=(int)($sd['bpe']??0); $bpeu=(float)($sd['bpe_usd']??0); $bpeuM=(float)($sd['bpe_usd_mkt']??0);
+            // المجموع = الراتب بعد التدرّج + الأعمدة الظاهرة (الإضافي/المكافأة بالزرّ، والنقل إن كان بالمبلغ) — دولاره بسعر الشهر
+            $composed = $bpe + (salaryCompHas('extra')?$exW:0) + (salaryCompHas('aide')?$aid:0) + ($grTransAmt?$trans:0);
+            $composedu = $bpeuM + (salaryCompHas('extra')?$exWu:0) + (salaryCompHas('aide')?$aidu:0) + ($grTransAmt?$transu:0);
+            // 🔴 «الأرقام تركب»: عمود النقل يتبع زرّ «الراتب يشمل»، فإن كان مخفياً أو بلا مبلغ وجب
+            // ألّا يدخل في «الصافية» ولا في «المجموع» — وإلّا ظهرت قفزة بلا عمود يفسّرها.
             $transShown = salaryCompHas('transport') ? $trans : 0;
             $netWith=$net+$transShown; $tot=$netWith+$cnss+$eoc+$tax;
-            $bseu=(float)($sd['base_salary_usd']??0); $netu=(float)($sd['net_usd']??0); $cnssu=(float)($sd['cnss_usd']??0); $eocu=(float)($sd['eoc_usd']??0); $taxu=(float)($sd['tax_usd']??0);
-            $netWithu=$netu+(salaryCompHas('transport')?$transu:0); $totu=$netWithu+$cnssu+$eocu+$taxu;
-            $T['base']+=$bse;$T['netNo']+=$net;$T['extra']+=$exW;$T['aide']+=$aid;$T['trans']+=$trans;$T['netWith']+=$netWith;$T['cnss']+=$cnss;$T['eoc']+=$eoc;$T['tax']+=$tax;$T['total']+=$tot;
-            $T['extra_usd']+=$exWu;$T['aide_usd']+=$aidu;$T['trans_usd']+=$transu;$T['composed']+=$composed;$T['composed_usd']+=$composedu;
-            $T['base_usd']+=$bseu;$T['netNo_usd']+=$netu;$T['netWith_usd']+=$netWithu;$T['cnss_usd']+=$cnssu;$T['eoc_usd']+=$eocu;$T['tax_usd']+=$taxu;$T['total_usd']+=$totu;
+            $netu=(float)($sd['net_usd']??0); $cnssu=(float)($sd['cnss_usd']??0); $eocu=(float)($sd['eoc_usd']??0); $taxu=(float)($sd['tax_usd']??0);
+            $netWithu=$netu+($grTransAmt?$transu:0); $totu=$netWithu+$cnssu+$eocu+$taxu;
+            $T['bpe']+=$bpe;$T['extra']+=$exW;$T['aide']+=$aid;$T['trans']+=$trans;$T['composed']+=$composed;$T['netWith']+=$netWith;$T['cnss']+=$cnss;$T['eoc']+=$eoc;$T['tax']+=$tax;$T['total']+=$tot;
+            $T['bpe_usd']+=$bpeu;$T['extra_usd']+=$exWu;$T['aide_usd']+=$aidu;$T['trans_usd']+=$transu;$T['composed_usd']+=$composedu;$T['netWith_usd']+=$netWithu;$T['cnss_usd']+=$cnssu;$T['eoc_usd']+=$eocu;$T['tax_usd']+=$taxu;$T['total_usd']+=$totu;
         ?>
             <tr>
-                <td style="text-align:right;font-weight:600"><?= e(schoolNameById($sd['school_id'],'ar')) ?></td>
-                <td class="num"><?= dualFromUsd($bse,$bseu,false) ?></td>
-                <td class="num"><?= dualFromUsd($net,$netu,false) ?></td>
-                <?php if (salaryCompHas('extra')): ?><td class="num"><?= dualFromUsd($exW,$exWu,false) ?></td><?php endif; ?>
-                <?php if (salaryCompHas('aide')): ?><td class="num"><?= dualFromUsd($aid,$aidu,false) ?></td><?php endif; ?>
-                <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($composed,$composedu,false) ?></strong></td>
+                <td style="text-align:left;font-weight:600"><?= $grBi(schoolNameById($sd['school_id'],'fr'), schoolNameById($sd['school_id'],'ar')) ?></td>
+                <td class="num"><?= dualFromUsd($bpe,$bpeu,false) ?></td>
+                <?= extraAideTotalCells($exW,$exWu,$aid,$aidu) ?>
                 <?= transportTd(dualFromUsd($trans,$transu,false)) ?>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= dualFromUsd($netWith,$netWithu,false) ?></td><?php endif; ?>
+                <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($composed,$composedu,false) ?></strong></td>
+                <td class="num"><?= dualFromUsd($netWith,$netWithu,false) ?></td>
                 <td class="num"><?= dualFromUsd($cnss,$cnssu,false) ?></td>
                 <td class="num"><?= dualFromUsd($eoc,$eocu,false) ?></td>
                 <td class="num"><?= dualFromUsd($tax,$taxu,false) ?></td>
                 <td class="num"><strong><?= dualFromUsd($tot,$totu,false) ?></strong></td>
             </tr>
         <?php endforeach; ?>
-        <?php if(!$sdata): ?><tr><td colspan="<?= 8 + compColsCount() + (salaryCompHas('transport') ? 1 : 0) ?>" class="text-center">لا توجد بيانات لهذه السنة</td></tr><?php endif; ?>
+        <?php if(!$sdata): ?><tr><td colspan="<?= 7 + compColsCount() ?>" class="text-center">Aucune donnée pour cette année / لا توجد بيانات لهذه السنة</td></tr><?php endif; ?>
         </tbody>
         <tfoot><tr class="total-row">
-            <td>المجموع</td>
-            <td class="num"><?= dualFromUsd($T['base'],$T['base_usd'],false) ?></td>
-            <td class="num"><?= dualFromUsd($T['netNo'],$T['netNo_usd'],false) ?></td>
+            <td style="text-align:left"><?= $grBi('Total', 'المجموع') ?></td>
+            <td class="num"><?= dualFromUsd($T['bpe'],$T['bpe_usd'],false) ?></td>
             <?= extraAideTotalCells($T['extra'],$T['extra_usd'],$T['aide'],$T['aide_usd']) ?>
-            <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($T['composed'],$T['composed_usd'],false) ?></strong></td>
             <?= transportTotalCell($T['trans'],$T['trans_usd']) ?>
-            <?php if (salaryCompHas('transport')): ?><td class="num"><?= dualFromUsd($T['netWith'],$T['netWith_usd'],false) ?></td><?php endif; ?>
+            <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($T['composed'],$T['composed_usd'],false) ?></strong></td>
+            <td class="num"><?= dualFromUsd($T['netWith'],$T['netWith_usd'],false) ?></td>
             <td class="num"><?= dualFromUsd($T['cnss'],$T['cnss_usd'],false) ?></td>
             <td class="num"><?= dualFromUsd($T['eoc'],$T['eoc_usd'],false) ?></td>
             <td class="num"><?= dualFromUsd($T['tax'],$T['tax_usd'],false) ?></td>
             <td class="num"><strong><?= dualFromUsd($T['total'],$T['total_usd'],false) ?></strong></td>
         </tr></tfoot>
     </table>
-    <div class="sign-row"><?= signatureBox('المحاسب', '', '') ?><?= signatureBox('المدير', $school['ville'] ?? '', formatDate(date('Y-m-d'))) ?></div>
+    <div class="sign-row" dir="ltr"><div class="sign-box"><div class="sign-label"><?= $grBi('Comptable', 'المحاسب') ?></div><div class="sign-line">&nbsp;</div></div><div class="sign-box"><div class="sign-place"><?= e(($school['ville'] ?? '') ?: '..............') ?>, le / في <?= e(formatDate(date('Y-m-d'))) ?></div><div class="sign-label"><?= $grBi('Directeur', 'المدير') ?></div><div class="sign-line">&nbsp;</div></div></div>
 </div>
 
 <?php

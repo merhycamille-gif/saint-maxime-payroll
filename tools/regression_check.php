@@ -1698,9 +1698,9 @@ check('الراتب يشمل: سيرة الأستاذ — سطور «+ إضاف�
       strpos($ehSrc26, "if (salaryCompHas('extra')): ?><tr><td>+ Supplément") !== false
       && strpos($ehSrc26, "if (salaryCompHas('aide')): ?><tr><td>+ Prime") !== false
       && strpos($ehSrc26, "if (salaryCompHas('transport')): ?><tr><td>+ Transport") !== false);
-check('الراتب يشمل: التقرير العام — عمود «الصافية مع تعويض النقل» مشروط بالنقل (لا ذكر للنقل والزرّ مطفأ)',
-      strpos($ofSrc26, "if (salaryCompHas('transport')): ?><th>الرواتب الصافية<br>مع تعويض النقل</th>") !== false
-      && strpos($ofSrc26, "<th>الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th>") !== false);
+check('الراتب يشمل: التقرير العام — «الرواتب الصافية» تذكر النقل فقط حين يكون بالمبلغ (لا ذكر للنقل والزرّ مطفأ)',
+      strpos($ofSrc26, "<th><?= \$grBi('Salaires nets', 'الرواتب الصافية') ?><?= \$grTransAmt ? \$grSub('avec transport', 'مع تعويض النقل') : '' ?></th>") !== false
+      && strpos($ofSrc26, "\$grTransAmt = salaryCompHas('transport');") !== false);
 // النقل يظهر عند اختياره ويختفي عند إلغائه (نص الرأس نفسه)
 $hT26 = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => '7', 'year' => '2026'], ['transport'], [2]);
 $hN26 = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => '7', 'year' => '2026'], [], [2]);
@@ -6066,7 +6066,7 @@ check('دولار القانون للأساس (كود): lawUsd/lawUsdSql/moneyLa
       function_exists('lawUsd') && function_exists('lawUsdSql') && function_exists('moneyLaw') && function_exists('composedSalaryUsd')
       && lawUsd(3445000) === 2296.0 && lawUsd(1499) === 0.0 && lawUsdSql('x') === 'FLOOR((x)/1500)'
       && strpos($of125, "money(\$r['base_salary_lbp'], \$rRate") === false && strpos($of125, "money(\$r['echelon_value_lbp'], \$rRate") === false && strpos($of125, "money(\$r['base_plus_echelon_lbp'], \$rRate") === false
-      && strpos($of125, "lbpToUsd(composedSalaryLbp(") === false && substr_count($of125, "base_plus_echelon_lbp/NULLIF(") === 2 && substr_count($of125, "AS bpe_usd_mkt,") === 1 && substr_count($of125, ") bpe_usd_mkt,") === 1 && strpos($of125, "base_salary_lbp/NULLIF") === false
+      && strpos($of125, "lbpToUsd(composedSalaryLbp(") === false && substr_count($of125, "base_plus_echelon_lbp/NULLIF(") === 3 && substr_count($of125, "AS bpe_usd_mkt,") === 1 && substr_count($of125, ") bpe_usd_mkt,") === 2 && strpos($of125, "base_salary_lbp/NULLIF") === false
       && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "function composedSalaryUsd(array \$row): float { return lbpToUsd(composedSalaryLbp(\$row), rowRate(\$row)); }") !== false
       && strpos($of125, "foreach (['base','ech','bpe'] as \$uk) \$add[\$uk.'_usd'] = lawUsd(\$add[\$uk]);") !== false
       && strpos($of125, "\$fmtL = fn(\$v) => (int)\$v ? moneyLaw((int)\$v, ['withCur'=>false]) : '0';") !== false
@@ -6108,7 +6108,7 @@ check('سعر الصرف بالعناوين (كود): rateHead مصدر واحد
       && substr_count($of126, "<?= rateHead('law') ?></th>") === 15 && substr_count($of126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 13
       && substr_count($of126, "</small><?= rateHead('mkt', \$month, \$year) ?></th>") === 5 && substr_count($of126, "</small><?= rateHead('law') ?></th>") === 0 && strpos($of126, "<th>الأجر الإجمالي<?= rateHead('mkt', \$month, \$year) ?></th>") !== false
       && substr_count($rp126, "<?= rateHead('law') ?></th>") === 6 && substr_count($rp126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 5 && substr_count($rp126, "</small><?= rateHead('mkt', \$month, \$year) ?></th>") === 4
-      && strpos($of126, "الرواتب الصافية<?= salaryCompHas('transport') ? '<br>بدون النقل' : '' ?></th>") !== false
+      && strpos($of126, "<th><?= \$grBi('Salaire après échelon', 'الراتب بعد التدرّج') ?><?= rateHead('law') ?></th>") !== false
       && rateHead('law') === '<br><small class="rate-head" dir="ltr">1 $ = ' . number_format(officialUsdRate(), 0, '.', ',') . '</small>');
 $ok126 = false; $why126 = '';
 try {
@@ -6162,8 +6162,8 @@ check('🔒 البطاقة السنوية لم تُمَسّ (annual_slip.php و�
 check('نسبة الأجر الإضافي تحت العنوان (كود): extraPctHead مصدر واحد + extraAideHeads بصفوف/شهر/سنة بكل مواقع النداء (4 بالمركز + 9 بالنماذج) + الرأسان الحرفيان (ضريبة الأستاذ/الصندوق الفصلي)',
       function_exists('extraPctHead') && function_exists('extraAideHeads')
       && substr_count($rp127, "extraAideHeads('', \$data, \$month, \$year)") === 4
-      && substr_count($of127, 'extraAideHeads(') === 9 && substr_count($of127, 'extraAideHeads()') === 0 && substr_count($of127, "extraAideHeads(' rowspan=\"2\"')") === 0
-      && substr_count($of127, 'extraPctHead(') === 2
+      && substr_count($of127, 'extraAideHeads(') === 8 && substr_count($of127, 'extraAideHeads()') === 0 && substr_count($of127, "extraAideHeads(' rowspan=\"2\"')") === 0
+      && substr_count($of127, 'extraPctHead(') === 3 /* +التقرير العام برأسه الثنائي (2026-09-17) */
       && strpos($rh127, "implode(' / ', array_slice(\$keys, 0, 4)) . ' %' . (count(\$keys) > 4 ? ' …' : '')") !== false);
 $ok127 = false; $why127 = '';
 try {
@@ -6210,7 +6210,7 @@ check('التنزيل العائلي بكل الكشوف (كود): المصدر 
       && substr_count($rx128, "familyDedSelectCols('e')") === 1
       && strpos($rx128, "'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)', 'الضريبة'") !== false
       && strpos($rx128, "[\$v['cnss'], \$v['caisse'], \$v['eocg'], \$v['fded'], \$v['txb'], \$v['tax'], \$v['net'], \$v['fam']]") !== false
-      && strpos($of128, "(\$multiS?17:16) + compColsCount()") !== false && strpos($rp128, "(\$multi?17:16) + compColsCount()") !== false);
+      && strpos($of128, "(\$multiS?17:16) + compColsCount()") !== false && strpos($rp128, "(\$multi?18:17) + compColsCount()") !== false);
 // تجربة فعلية: مارسيلا (1677) بحزيران 2026 مدرسة 2 — بالكشوف الثلاثة الجديدة نفس حصّة كشف الضريبة (قسم 42)
 // ثم الخاضع بعد حسمها بهذا الترتيب، وعدد خلايا صفّها = عدد رؤوس الجدول (لا رأس بلا خلية)
 $ok128 = isset($share42, $after42) && $share42 > 0; $why128 = [];
@@ -6477,10 +6477,44 @@ check('عمود النقل الثلاثي (تشغيل فعلي، كشف حزير
 $okOf = true; $whyOf = [];
 foreach (['payment_list' => ['month' => 6, 'year' => 2026], 'salary_all' => ['month' => 6, 'year' => 2026], 'general_report' => [], 'full_register' => ['month' => 6, 'year' => 2026], 'teaching_staff' => []] as $f => $g) {
     $h = renderPage('pages/official_forms.php', ['form' => $f] + $g, ['extra', 'aide', 'transport_blank'], [], 'lbp');
-    $ok = $noFatal($h) && preg_match('/<th[^>]*>تعويض نقل<\/th>|<th[^>]*>تعويض النقل<\/th>/u', $h) === 1;
+    $ok = $noFatal($h) && preg_match('/<th[^>]*>تعويض نقل<\/th>|<th[^>]*>تعويض النقل<\/th>|تعويض النقل<\/span><\/th>/u', $h) === 1;
     if (!$ok) { $okOf = false; $whyOf[] = $f; }
 }
 check('عمود النقل الثلاثي (النماذج الرسمية بوضع «بلا مبلغ»): 5 كشوف ترندر برأس النقل بلا خطأ', $okOf, implode(',', $whyOf));
+
+/* =====================================================================
+ * 136) 📐 «p1 بدي ترتب هيدا التقرير» (2026-09-17، التقرير العام = الموازنة السنوية المقدّرة): ترتيب الأعمدة الملزم
+ *     المؤسسة ← الراتب بعد التدرّج ← الإضافي ← المكافأة ← النقل ← المجموع (= مجموع الأربعة الظاهرة) ← الصافي ← الضمان ← الصندوق
+ *     ← الضريبة ← المجموع الأخير (= الصافي + الضمان + الصندوق + الضريبة) + منتقي المدارس (schools[]) + فلتر الفئة/الضريبة
+ *     + الاتجاه من الشمال لليمين + كل عنوان فرنسي فوق العربي (grBi).
+ * =================================================================== */
+$of136 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+check('التقرير العام (كود): dir=ltr + grBi + منتقي المدارس داخل شريط الفلترة + «الكل» يصفّر الاختيار + الاستعلام على reportSchoolSql',
+      strpos($of136, '<div class="official-doc ltr land-report" id="ppExportArea" dir="ltr" style="max-width:100%">') !== false
+      && strpos($of136, "\$grBi = fn(string \$fr, string \$ar) =>") !== false
+      && strpos($of136, "if (\$form === 'general_report' && isSuperAdmin()):") !== false
+      && strpos($of136, "if (isset(\$_GET['schools_set']) && !isset(\$_GET['schools'])) \$_SESSION['report_schools'] = [];") !== false
+      && strpos($of136, "AND ms.school_year=?\" . reportSchoolSql('ms.school_id') . \" GROUP BY ms.school_id") !== false
+      && strpos($of136, "\$composed = \$bpe + (salaryCompHas('extra')?\$exW:0) + (salaryCompHas('aide')?\$aid:0) + (\$grTransAmt?\$trans:0);") !== false
+      && strpos($of136, "\$netWith=\$net+\$transShown; \$tot=\$netWith+\$cnss+\$eoc+\$tax;") !== false);
+$h136 = renderPage('pages/official_forms.php', ['form' => 'general_report'], ['extra', 'aide', 'transport'], [], 'lbp', '2025-2026');
+$heads136 = preg_match('/<thead>(.*?)<\/thead>/s', $h136, $mh) ? array_map(fn($x) => trim(strip_tags($x)), preg_split('/<\/th>/', $mh[1], -1, PREG_SPLIT_NO_EMPTY)) : [];
+$heads136 = array_values(array_filter($heads136, fn($x) => $x !== ''));
+$expFr = ['Établissement', 'Salaire après échelon', 'Supplément', 'Prime et aide', 'Transport', 'Total', 'Salaires nets', 'CNSS', 'Caisse des indemnités', 'Impôt sur le revenu', 'Total'];
+$okOrder = count($heads136) === 11;
+foreach ($expFr as $i => $fr) if ($okOrder && strpos($heads136[$i], $fr) !== 0) $okOrder = false;
+$okAr = $okOrder && strpos($heads136[1], 'الراتب بعد التدرّج') !== false && strpos($heads136[5], 'المجموع') !== false && strpos($heads136[6], 'الرواتب الصافية') !== false;
+// الأرقام تركب: بأوّل صف مدرسة، المجموع = الأربعة قبله، والمجموع الأخير = الصافي + الضمان + الصندوق + الضريبة
+$okRow = false; $why136 = 'heads=' . count($heads136);
+if (preg_match('/<tbody>\s*<tr>(.*?)<\/tr>/s', $h136, $mr)) {
+    $cells = array_map(fn($c) => (int)preg_replace('/\D+/', '', strip_tags($c)), array_slice(preg_split('/<\/td>/', $mr[1], -1, PREG_SPLIT_NO_EMPTY), 1));
+    if (count($cells) >= 10) {
+        $okRow = ($cells[0] + $cells[1] + $cells[2] + $cells[3] === $cells[4]) && ($cells[5] + $cells[6] + $cells[7] + $cells[8] === $cells[9]);
+        $why136 .= ' row=' . implode('|', $cells);
+    }
+}
+check('التقرير العام (تشغيل فعلي 2025-2026): 11 عموداً بالترتيب المطلوب فرنسي فوق عربي + dir=ltr + المجموع = الأربعة + الأخير = الصافي+الضمان+الصندوق+الضريبة + منتقي المدارس ظاهر',
+      $noFatal($h136) && $okOrder && $okAr && $okRow && strpos($h136, 'name="schools[]"') !== false && strpos($h136, 'id="ppExportArea" dir="ltr"') !== false, $why136);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
