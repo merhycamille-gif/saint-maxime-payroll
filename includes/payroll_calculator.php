@@ -341,14 +341,21 @@ class PayrollCalculator {
      * Main calculation
      */
     public function calculate() {
-        $emp = $this->employee;
-        
         // === 1. أساس الراتب + الدرجة (تراكمي حسب تاريخ الشهر، من سلسلة 2017) ===
         [$baseSalary, $echelonValue, $effectiveGrade] = $this->calculateBaseAndEchelon();
-        $basePlusEchelon = $baseSalary + $echelonValue;
-        
         // === 3. Suppléments ===
-        [$primeFixe, $aideComp, $transportComp] = $this->bonusComponents($basePlusEchelon);
+        [$primeFixe, $aideComp, $transportComp] = $this->bonusComponents($baseSalary + $echelonValue);
+        return $this->computeFrom($baseSalary, $echelonValue, $effectiveGrade, $primeFixe, $aideComp, $transportComp);
+    }
+
+    /**
+     * 🧮 (2026-09-17) قلب المحرّك من الأساس والمكوّنات إلى المحسومات والصافي والمستحق وحصص المؤسسة — المصدر الواحد.
+     * يستعمله calculate() (الأساس من السلسلة/الإعداد) **و**مسار «المنقولين» overlayStoredYearBonuses بأساسهم المخزّن
+     * حين تتغيّر إضافاتهم (كريستوف شلهوب تموز 2027: صار الإضافي 0 وبقيت حسومات 4,130,000 وصافي 0 — الأرقام ما كانت تركب).
+     */
+    public function computeFrom($baseSalary, $echelonValue, $effectiveGrade, $primeFixe, $aideComp, $transportComp) {
+        $emp = $this->employee;
+        $basePlusEchelon = $baseSalary + $echelonValue;
         $extra = 0; // can be customized
         // عمودان مستقلان بالخضوع (بطلب المستخدم): «الأجر الإضافي» = extra + prime_fixe (فلاغ *_includes_extra)،
         // «مكافأة ومساعدة» = aide_complementaire (فلاغ *_includes_prime_aide). كلٌّ يدخل القاعدة بزرّه الأخضر المستقل.
@@ -800,12 +807,37 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
         // 🔴 النقل داخل المستحق مرّة واحدة (العمودان نفس القيمة) — الفرق من transport_lbp وحده
         $dTr = $newTr - (int)$r['transport_lbp'];
         $newLawUsd = $doAdd ? (int)$calc->primeUsdLaw : (int)($r['prime_fixe_usd_law'] ?? 0);
-        if ($dAdd === 0 && $dTr === 0 && $newTrC === (int)$r['transport_complement_lbp'] && $newLawUsd === (int)($r['prime_fixe_usd_law'] ?? 0)) continue;
+        // شهر لا معنى له (صافي 0 وحسومات > 0 على أساس > 0 — بقايا تصفير الإضافي بلا إعادة المحسومات): يُعاد حسابه كاملاً ولو لم يتغيّر شيء
+        $nonsense = $doAdd && (int)$r['net_salary_lbp'] === 0 && (int)$r['total_retenues_lbp'] > 0 && (int)$r['base_plus_echelon_lbp'] > 0;
+        if (!$nonsense && $dAdd === 0 && $dTr === 0 && $newTrC === (int)$r['transport_complement_lbp'] && $newLawUsd === (int)($r['prime_fixe_usd_law'] ?? 0)) continue;
         // 🔴 امتصاص الفجوة (المنقول من القديم): إذا كان الصافي المخزّن أكبر من (الأساس+الإضافات)
         // فالفرق «أجر إضافي مخفي» موجود داخل الصافي أصلاً — تسجيله بالملف يملأ العمود
         // ولا يُضاف للصافي مرّة ثانية؛ فقط ما يزيد عن الفجوة يُعتبر علاوة جديدة فعلية.
         $gap = max(0, ((int)$r['net_salary_lbp'] + (int)$r['total_retenues_lbp'])
                     - ((int)$r['base_plus_echelon_lbp'] + (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']));
+        // 🧮 (2026-09-17 «ما بدي أخطاء») تغيّر الإضافي/المكافأة بشهر أرقامه راكبة (بلا فجوة منقولة) ⇒ المحسومات تتبعه:
+        //    يُعاد حساب الشهر بقلب المحرّك (computeFrom) على أساسه المخزّن — ضمان/صندوق/ضريبة/صافي/مستحق/حصص المؤسسة
+        //    بالقانون وبإعدادات ملفه. الشهر ذو الفجوة (منقول من القديم بصافٍ أكبر من مكوّناته) يبقى على فرق الصافي كما كان.
+        if (($dAdd !== 0 && $gap === 0 && $doAdd) || $nonsense) {
+            try {
+                $res = $calc->computeFrom((float)$r['base_salary_lbp'], (float)$r['echelon_value_lbp'], $r['grade_at_month'], (float)$primeFixe, (float)$aideComp, (float)$newTr);
+                $db->prepare("UPDATE monthly_salaries SET prime_fixe_lbp = ?, aide_complementaire_lbp = ?, transport_complement_lbp = ?, transport_lbp = ?,
+                        caisse_amount_lbp = ?, eoc_grade_lbp = ?, cnss_amount_lbp = ?, taxable_base_lbp = ?, income_tax_lbp = ?, total_retenues_lbp = ?,
+                        net_salary_lbp = ?, total_due_lbp = ?, net_salary_usd = ?, total_due_usd = ?, prime_fixe_usd_law = ?,
+                        school_cnss_8_lbp = ?, school_eoc_6_lbp = ?, school_family_comp_6_lbp = ?, school_end_of_service_8_5_lbp = ?
+                    WHERE id = ?")->execute([
+                        (int)$res['prime_fixe_lbp'], (int)$res['aide_complementaire_lbp'], $newTrC, $newTr,
+                        (int)$res['caisse_amount_lbp'], (int)$res['eoc_grade_lbp'], (int)$res['cnss_amount_lbp'], (int)$res['taxable_base_lbp'], (int)$res['income_tax_lbp'], (int)$res['total_retenues_lbp'],
+                        (int)$res['net_salary_lbp'], (int)$res['total_due_lbp'],
+                        ((float)$r['exchange_rate'] > 0 ? round((int)$res['net_salary_lbp'] / (float)$r['exchange_rate'], 2) : $r['net_salary_usd']),
+                        ((float)$r['exchange_rate'] > 0 ? round((int)$res['total_due_lbp'] / (float)$r['exchange_rate'], 2) : $r['total_due_usd']),
+                        $newLawUsd,
+                        (int)$res['school_cnss_8_lbp'], (int)$res['school_eoc_6_lbp'], (int)$res['school_family_comp_6_lbp'], (int)$res['school_end_of_service_8_5_lbp'],
+                        $r['id']]);
+                $n++;
+                continue;
+            } catch (Throwable $ex) { /* يسقط للمسار القديم (فرق الصافي) */ }
+        }
         $dNet = ($dAdd > 0) ? max(0, $dAdd - $gap) : $dAdd;
         $newNet = max(0, (int)(floor(((int)$r['net_salary_lbp'] + $dNet) / 1000) * 1000)); // الصافي داون للألف (2026-09-04)
         $newDue = max(0, $newNet + (int)$r['family_allowance_lbp'] + $newTr); // المستحق = الصافي المنزَّل + العائلي + النقل

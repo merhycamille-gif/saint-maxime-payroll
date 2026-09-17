@@ -692,8 +692,11 @@ function pruneSalariesAfterDeparture($db, $empId) {
  * قاعدة التارك §١٠: يبقى بسنة عمله (حتى 30-9) ويُشال ممّا بعدها فقط.
  */
 function healLeaverPhantomRows() {
-    if (!empty($_SESSION['heal_leaver_phantoms_done'])) return;
+    // (2026-09-17) كان مرّة بالجلسة فقط — والمستخدم لا يسجّل خروجاً فبقيت علاوات تاركتين فعّالة أسابيع؛ صار كل 3 ساعات على الأكثر (خفيف)
+    $lastRun = (string)getSetting('heal_leaver_phantoms_at', '');
+    if (!empty($_SESSION['heal_leaver_phantoms_done']) && $lastRun !== '' && (time() - (int)$lastRun) < 3 * 3600) return;
     $_SESSION['heal_leaver_phantoms_done'] = 1;
+    try { setSetting('heal_leaver_phantoms_at', (string)time()); } catch (Exception $e) {}
     try {
         $db = getDB();
         $ldExpr = "LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),"
@@ -714,6 +717,115 @@ function healLeaverPhantomRows() {
                      ['salaries' => $d1, 'grade_events' => $d2, 'bonuses' => $d3]);
         }
     } catch (Exception $e) { /* لا نُعطّل الصفحة */ }
+}
+
+/**
+ * 🩹 شفاءات ذاتية مستمرّة (2026-09-17 — «انت بدك تشوف وتشيّك، أنا تعبت من التشييك»): بعد فحص دمب الأونلاين
+ * (data_audit على smp_online) طلعت ثلاث حالات بنيوية تُصلَّح ذاتياً كلّما ظهرت (مرّة بالجلسة، خفيفة):
+ *   (١) healGhostAdditionsFromPrevYear — إضافي/مكافأة مخزّنان بأشهر سنة (17 متعاقداً بالنياح/الانتقال 2026-2027) بلا أي سطر
+ *       علاوة لتلك السنة (سنتهم فُتحت بعد شفاء 2627 الذي يعمل مرّة واحدة): تُنسَخ أسطر السنة السابقة الفعّالة حين يساوي
+ *       مبلغها الشهري المخزّنَ بالضبط (دليل أن النقل مقصود) — الملف = الكشف بلا تغيير أي رقم. لا إعادة حساب.
+ *   (٢) healNullExchangeRates — صفوف رواتب بسعر صرف فارغ/صفر (بول نصراللّه/دنيز نصّار 2026-2027 — مرآة الدولار 0):
+ *       يُعبَّأ بسعر الشهر (getExchangeRate، بآخر سعر عند غيابه) وتُعاد مرايا الدولار ROUND(x/rate,2) كالمحرّك.
+ *   (٣) healNetMathRows — شهر غير مدفوع لا تركب أرقامه (كريستوف شلهوب تموز 2027: إضافي 0 وحسومات 4,130,000 وصافي 0 —
+ *       شهر قديم): يُعاد حسابه بالمسار الآمن الوحيد recalcEmployeeYear (يحمي المنقولين والتاركين) — بحدّ 15 موظفاً بالتحميل.
+ */
+/** بوّابة الشفاءات المستمرّة: مرّة بالعملية + مرّة كل 3 ساعات على مستوى القاعدة (settings) — لا تثقل الصفحات ولا أدوات الفحص */
+function healGateOpen(string $key, int $hours = 3): bool {
+    static $ran = [];
+    if (!empty($ran[$key]) || !empty($_SESSION[$key . '_done'])) return false;
+    $ran[$key] = 1; $_SESSION[$key . '_done'] = 1;
+    try {
+        $last = (int)getSetting($key . '_at', '0');
+        if ($last > 0 && (time() - $last) < $hours * 3600) return false;
+        setSetting($key . '_at', (string)time());
+    } catch (Throwable $e) { return false; }
+    return true;
+}
+function healGhostAdditionsFromPrevYear(): int {
+    if (!healGateOpen('heal_ghost_add')) return 0;
+    $n = 0;
+    try {
+        $db = getDB();
+        $ghosts = $db->query("SELECT ms.employee_id, ms.school_year, COUNT(*) months, SUM(ms.prime_fixe_lbp) pf, SUM(ms.aide_complementaire_lbp) ai
+            FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND (ms.prime_fixe_lbp > 0 OR ms.aide_complementaire_lbp > 0)
+              AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = ms.employee_id
+                              AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND (b.school_year IS NULL OR b.school_year = ms.school_year))
+            GROUP BY ms.employee_id, ms.school_year")->fetchAll(PDO::FETCH_ASSOC);
+        if (!$ghosts) return 0;
+        $prevSel = $db->prepare("SELECT * FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND is_active = 1
+                                 AND bonus_type IN ('prime_fixe','aide_complementaire') AND value_type = 'amount' AND currency = 'LBP'");
+        $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id,bonus_type,period_number,school_year,amount,value_type,currency,start_month,end_month,is_active) VALUES (?,?,?,?,?,'amount','LBP',?,?,1)");
+        $mSel = $db->prepare("SELECT month, prime_fixe_lbp, aide_complementaire_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ?");
+        $inWin = function ($b, int $mo): bool { // هل الشهر داخل نافذة السطر (10←9 = كل السنة؛ 10←6 = تشرين..حزيران)
+            if ($b['start_month'] === null || $b['end_month'] === null) return true;
+            $s = (int)$b['start_month']; $e = (int)$b['end_month'];
+            return $s <= $e ? ($mo >= $s && $mo <= $e) : ($mo >= $s || $mo <= $e);
+        };
+        require_once __DIR__ . '/payroll_calculator.php';
+        foreach ($ghosts as $g) {
+            if (!preg_match('/^(\d{4})-(\d{4})$/', (string)$g['school_year'], $m)) continue;
+            $prevSY = ($m[1] - 1) . '-' . ($m[2] - 1);
+            $prevSel->execute([(int)$g['employee_id'], $prevSY]);
+            $rows = $prevSel->fetchAll(PDO::FETCH_ASSOC);
+            if (!$rows) continue;
+            // الدليل: بكل شهر داخل النافذة، المخزّن = مجموع أسطر السنة السابقة الفعّالة لنفس النوع (بالضبط).
+            // الأشهر خارج النافذة (تموز لسطر تشرين←حزيران) قد تحمل الرقم القديم من فتح السنة — تُصفَّر بإعادة الحساب الآمنة بعد النسخ.
+            $mSel->execute([(int)$g['employee_id'], $g['school_year']]);
+            $ok = true; $needRecalc = false;
+            foreach ($mSel->fetchAll(PDO::FETCH_ASSOC) as $mr) {
+                $mo = (int)$mr['month']; $exp = ['prime_fixe' => 0, 'aide_complementaire' => 0]; $any = false;
+                foreach ($rows as $b) if ($inWin($b, $mo)) { $exp[$b['bonus_type']] += (int)round((float)$b['amount']); $any = true; }
+                $stP = (int)$mr['prime_fixe_lbp']; $stA = (int)$mr['aide_complementaire_lbp'];
+                if ($any) { if ($stP !== $exp['prime_fixe'] || $stA !== $exp['aide_complementaire']) { $ok = false; break; } }
+                elseif ($stP + $stA > 0) $needRecalc = true; // خارج النافذة ويحمل رقماً ⇒ يُصفَّر بعد النسخ
+            }
+            if (!$ok) continue;
+            foreach ($rows as $b) $ins->execute([(int)$g['employee_id'], $b['bonus_type'], (int)$b['period_number'], $g['school_year'], $b['amount'], $b['start_month'], $b['end_month']]);
+            if ($needRecalc) { try { recalcEmployeeYear((int)$g['employee_id'], (string)$g['school_year']); } catch (Throwable $e2) {} }
+            $n++;
+        }
+        if ($n) logAudit('heal_ghost_additions', 'employee_bonuses', 0, null, ['employees' => $n]);
+    } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
+    return $n;
+}
+function healNullExchangeRates(): int {
+    if (!healGateOpen('heal_null_rate')) return 0;
+    $n = 0;
+    try {
+        $db = getDB();
+        $ym = $db->query("SELECT DISTINCT year, month FROM monthly_salaries WHERE COALESCE(exchange_rate, 0) <= 0")->fetchAll(PDO::FETCH_ASSOC);
+        $up = $db->prepare("UPDATE monthly_salaries SET exchange_rate = ?, net_salary_usd = ROUND(net_salary_lbp / ?, 2), total_due_usd = ROUND(total_due_lbp / ?, 2)
+                            WHERE year = ? AND month = ? AND COALESCE(exchange_rate, 0) <= 0");
+        foreach ($ym as $r) {
+            $rate = (float)getExchangeRate((int)$r['month'], (int)$r['year']);
+            if ($rate <= 0) continue;
+            $up->execute([$rate, $rate, $rate, (int)$r['year'], (int)$r['month']]);
+            $n += $up->rowCount();
+        }
+        if ($n) logAudit('heal_null_exchange_rate', 'monthly_salaries', 0, null, ['rows' => $n]);
+    } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
+    return $n;
+}
+function healNetMathRows(): int {
+    if (!healGateOpen('heal_net_math')) return 0;
+    $n = 0;
+    try {
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $bad = $db->query("SELECT DISTINCT ms.employee_id, ms.school_year FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND COALESCE(ms.is_paid, 0) = 0 AND ms.school_year >= '2025-2026'
+              AND (((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp - ms.net_salary_lbp) NOT BETWEEN -1 AND 999
+                   OR (ms.net_salary_lbp % 1000) <> 0
+                   OR ABS(ms.net_salary_lbp + ms.transport_lbp + COALESCE(ms.family_allowance_lbp, 0) - ms.total_due_lbp) > 1)
+            LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
+        if (!$bad) return 0;
+        @set_time_limit(300);
+        foreach ($bad as $r) { try { if (recalcEmployeeYear((int)$r['employee_id'], $r['school_year']) > 0) $n++; } catch (Throwable $e2) {} }
+        if ($n) logAudit('heal_net_math_recalc', 'monthly_salaries', 0, null, ['employees' => $n]);
+    } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
+    return $n;
 }
 
 /**

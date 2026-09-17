@@ -2068,7 +2068,8 @@ check('تركيب العلاوات: دالة overlayStoredYearBonuses موجود
       function_exists('overlayStoredYearBonuses')
       && strpos($pcSrc33, 'if (!$hasConfig) return overlayStoredYearBonuses($employeeId, $sy);') !== false);
 check('تركيب العلاوات: مصدر واحد لمنطق العلاوات (calculate يستعمل bonusComponents نفسها)',
-      strpos($pcSrc33, '= $this->bonusComponents($basePlusEchelon);') !== false
+      strpos($pcSrc33, '= $this->bonusComponents($baseSalary + $echelonValue);') !== false
+      && strpos($pcSrc33, 'return $this->computeFrom($baseSalary, $echelonValue, $effectiveGrade, $primeFixe, $aideComp, $transportComp);') !== false
       && strpos($pcSrc33, 'public function bonusComponents(') !== false);
 check('تركيب العلاوات: شفاء ذاتي بالبطاقة السنوية (computeAnnualSlip) محجوب عن حسابات القراءة-فقط',
       strpos($asdSrc33, 'overlayStoredYearBonuses((int)$emp[\'id\'], $schoolYear)') !== false
@@ -2186,12 +2187,22 @@ try {
                - ((int)$b33['base_plus_echelon_lbp'] + (int)$b33['extra_lbp'] + (int)$b33['prime_fixe_lbp'] + (int)$b33['aide_complementaire_lbp']));
     $dAdd33 = 50000000 - ((int)$b33['prime_fixe_lbp'] + (int)$b33['aide_complementaire_lbp']);
     $dNet33 = max(0, $dAdd33 - $gap33); // المتوقّع: 50م − 43م فجوة = 7م فقط تُضاف
+    $a33r = $db->query("SELECT total_retenues_lbp, cnss_amount_lbp, income_tax_lbp, caisse_amount_lbp, eoc_grade_lbp, family_allowance_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2025 AND month = 10")->fetch();
+    if ($gap33 > 0) {
+        // فجوة منقولة: فرق الصافي فقط (المحسومات المخزّنة لا تُمَسّ)
+        $okNet33 = (int)$a33['net_salary_lbp'] === (int)$b33['net_salary_lbp'] + $dNet33 && (int)$a33['total_due_lbp'] === (int)$b33['total_due_lbp'] + $dNet33;
+    } else {
+        // 🧮 (2026-09-17) بلا فجوة (العمود مسجَّل بالملف أصلاً): تغيّر الإضافي يعيد حساب الشهر بقلب المحرّك — المحسومات تتبع الإجمالي والأرقام تركب
+        $okNet33 = $a33r && (int)$a33r['total_retenues_lbp'] === (int)$a33r['cnss_amount_lbp'] + (int)$a33r['income_tax_lbp'] + (int)$a33r['caisse_amount_lbp'] + (int)$a33r['eoc_grade_lbp']
+            && (int)$a33['net_salary_lbp'] === (int)floor(((int)$b33['base_plus_echelon_lbp'] + 50000000 - (int)$a33r['total_retenues_lbp']) / 1000) * 1000
+            && (int)$a33['total_due_lbp'] === (int)$a33['net_salary_lbp'] + (int)$a33r['family_allowance_lbp'] + (int)$a33['transport_lbp']
+            && (int)$a33r['total_retenues_lbp'] !== (int)$b33['total_retenues_lbp']; // المحسومات تحرّكت مع الإجمالي فعلاً
+    }
     $tx33Ok = $b33 && $a33 && $n33 > 0
         && (int)$a33['prime_fixe_lbp'] === 50000000
-        && (int)$a33['net_salary_lbp'] === (int)$b33['net_salary_lbp'] + $dNet33
-        && (int)$a33['total_due_lbp'] === (int)$b33['total_due_lbp'] + $dNet33
+        && $okNet33
         && (int)$a33['transport_lbp'] === (int)$b33['transport_lbp'];
-    $tx33Detail = $a33 ? ('prime=' . $a33['prime_fixe_lbp'] . ' net=' . $a33['net_salary_lbp'] . ' فائض=' . $dNet33) : 'صف مفقود';
+    $tx33Detail = $a33 ? ('prime=' . $a33['prime_fixe_lbp'] . ' net=' . $a33['net_salary_lbp'] . ' فجوة=' . $gap33 . ' حسومات ' . ($b33['total_retenues_lbp'] ?? '?') . '→' . ($a33r['total_retenues_lbp'] ?? '?')) : 'صف مفقود';
 } catch (Throwable $e33) { $tx33Detail = 'خطأ: ' . $e33->getMessage(); }
 finally { if ($db->inTransaction()) $db->rollBack(); }
 check('امتصاص الفجوة (تجربة فعلية مع ترجيع): علاوة 50م فوق فجوة 43م ⇒ العمود 50م والصافي +7م فقط والنقل ثابت', $tx33Ok, $tx33Detail);
@@ -6573,6 +6584,48 @@ try {
     } else { $ok138 = true; $why138 = 'لا تارك بالمحلي — تخطٍّ'; }
 } catch (Throwable $e) { $why138 = $e->getMessage(); }
 check('نسبة الإضافي برأس التقرير (تشغيل فعلي): بند 97.5٪ لتارك قبل السنة لا يظهر بالرأس', $ok138, $why138);
+
+/* =====================================================================
+ * 139) 🩹 «انت بدك تشوف وتشيّك، أنا تعبت من التشييك» (2026-09-17): فحص دمب الأونلاين (smp_online) وإصلاح ما طلع بنيوياً:
+ *     (١) computeFrom = قلب المحرّك المشترك؛ مسار المنقولين overlayStoredYearBonuses يعيد حساب الشهر به حين يتغيّر الإضافي بلا
+ *         فجوة أو حين يكون الشهر بلا معنى (صافي 0 وحسومات > 0 — كريستوف شلهوب تموز 2027)
+ *     (٢) شفاءات مستمرّة ببوّابة زمنية healGateOpen: إضافي عالق بلا سطر (17 متعاقداً) / سعر صرف فارغ (1,291 صفاً) / شهر لا تركب أرقامه
+ *     (٣) قاعدة الفحص base_scale تستثني أشهر ما قبل دخول الملاك (ريتا طنوس 2025-2026)
+ * =================================================================== */
+$pc139 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$fn139 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$hd139 = (string)file_get_contents($PROJ . '/includes/header.php');
+$da139 = (string)file_get_contents($PROJ . '/includes/data_audit.php');
+check('الفحص الذاتي (كود): computeFrom + إعادة حساب شهر المنقول عند تغيّر الإضافي/شهر بلا معنى + 3 شفاءات ببوّابة زمنية موصولة بالهيدر + استثناء ما قبل الملاك بالفحص الرسمي',
+      strpos($pc139, 'public function computeFrom($baseSalary, $echelonValue, $effectiveGrade, $primeFixe, $aideComp, $transportComp) {') !== false
+      && strpos($pc139, "\$nonsense = \$doAdd && (int)\$r['net_salary_lbp'] === 0 && (int)\$r['total_retenues_lbp'] > 0 && (int)\$r['base_plus_echelon_lbp'] > 0;") !== false
+      && strpos($pc139, "if ((\$dAdd !== 0 && \$gap === 0 && \$doAdd) || \$nonsense) {") !== false
+      && strpos($fn139, 'function healGateOpen(string $key, int $hours = 3): bool {') !== false
+      && strpos($fn139, "if (!healGateOpen('heal_ghost_add')) return 0;") !== false && strpos($fn139, "if (!healGateOpen('heal_null_rate')) return 0;") !== false && strpos($fn139, "if (!healGateOpen('heal_net_math')) return 0;") !== false
+      && strpos($hd139, 'healGhostAdditionsFromPrevYear();') !== false && strpos($hd139, 'healNullExchangeRates();') !== false && strpos($hd139, 'healNetMathRows();') !== false
+      && strpos($da139, "AND (e.titularization_date IS NULL OR CONCAT(ms.year,'-',LPAD(ms.month,2,'0'),'-01') >= e.titularization_date)") !== false);
+// تجربة فعلية مع ترجيع: شهر منقول «بلا معنى» (صافي 0 وحسومات 4,130,000 وإضافي 0 لأن سطره ينتهي بحزيران) → التركيب يعيد حسابه بالقانون
+$ok139 = false; $why139 = '';
+try {
+    $db->beginTransaction();
+    $db->prepare("DELETE FROM employee_bonuses WHERE employee_id = 1826 AND school_year = '2025-2026' AND bonus_type IN ('prime_fixe','aide_complementaire')")->execute();
+    $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
+                  VALUES (1826, 'prime_fixe', 1, '2025-2026', 43000000, 'amount', 'LBP', 10, 6, 1)")->execute();
+    // تموز 2026: نجعله بلا معنى كما كان كريستوف
+    $db->prepare("UPDATE monthly_salaries SET prime_fixe_lbp = 0, total_retenues_lbp = 4130000, cnss_amount_lbp = 2670000, income_tax_lbp = 1460000, net_salary_lbp = 0, total_due_lbp = 0 WHERE employee_id = 1826 AND year = 2026 AND month = 7")->execute();
+    $had = $db->query("SELECT base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = 1826 AND year = 2026 AND month = 7")->fetchColumn();
+    if ($had === false) { $ok139 = true; $why139 = 'لا صفّ تموز 2026 لديانا — تخطٍّ'; }
+    else {
+        overlayStoredYearBonuses(1826, '2025-2026');
+        $j = $db->query("SELECT base_plus_echelon_lbp bpe, prime_fixe_lbp pf, cnss_amount_lbp cnss, income_tax_lbp tax, total_retenues_lbp ret, net_salary_lbp net, total_due_lbp due, transport_lbp tr, family_allowance_lbp fam FROM monthly_salaries WHERE employee_id = 1826 AND year = 2026 AND month = 7")->fetch();
+        $ok139 = $j && (int)$j['pf'] === 0 && (int)$j['net'] > 0 && (int)$j['ret'] < 4130000
+            && (int)$j['net'] === (int)floor(((int)$j['bpe'] - (int)$j['ret']) / 1000) * 1000
+            && (int)$j['due'] === (int)$j['net'] + (int)$j['fam'] + (int)$j['tr'];
+        $why139 = $j ? ('تموز: أساس ' . number_format((int)$j['bpe']) . ' حسومات ' . number_format((int)$j['ret']) . ' صافي ' . number_format((int)$j['net'])) : 'صف مفقود';
+    }
+} catch (Throwable $e) { $why139 = 'خطأ: ' . $e->getMessage(); }
+finally { if ($db->inTransaction()) $db->rollBack(); }
+check('الفحص الذاتي (تشغيل فعلي مع ترجيع): شهر منقول صافيه 0 وحسوماته 4,130,000 بلا إضافي → يُعاد حسابه: حسومات على الأساس وصافٍ > 0 والأرقام تركب', $ok139, $why139);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

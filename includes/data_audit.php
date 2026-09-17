@@ -70,6 +70,7 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
         JOIN salary_scale_2017 sc ON sc.version_id=1 AND sc.grade=FLOOR(ms.grade_at_month)
         WHERE e.is_deleted=0 AND e.employee_type='enseignant_titulaire' AND ms.school_year=? AND ms.grade_at_month IS NOT NULL
           AND ms.base_plus_echelon_lbp <> sc.new_salary_2017
+          AND (e.titularization_date IS NULL OR CONCAT(ms.year,'-',LPAD(ms.month,2,'0'),'-01') >= e.titularization_date) -- (2026-09-17) أشهر ما قبل دخول الملاك (كان متعاقداً بأجر اتفاق) ليست على السلسلة — ريتا طنوس 2025-2026
           AND NOT (e.last_name_ar LIKE '%حليحل%' AND e.first_name_ar IN ('ريتا','ماريا') AND e.father_name_ar IN ('مارون','الياس'))  -- استثناء موثّق: كشفه بالمليم (سلفة) 2026-08-27
         GROUP BY ms.employee_id", [$sy]));
 
