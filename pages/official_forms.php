@@ -1277,7 +1277,7 @@ elseif ($form === 'teacher_card'):
                 <td class="num"><?= moneyLaw($sal ? (int)$sal['base_salary_lbp'] : 0, ['withCur'=>false]) ?></td>
                 <?php if (salaryCompHas('extra')): ?><td class="num"><?= ($sal ? extraWageMoney($sal, ['withCur'=>false]) : money(0, $ttRate, ['withCur'=>false])) ?></td><?php endif; ?>
                 <?php if (salaryCompHas('aide')): ?><td class="num"><?= money($sal ? aideCompLbp($sal) : 0, $ttRate, ['withCur'=>false]) ?></td><?php endif; ?>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= money($sal ? (int)$sal['transport_lbp'] : 0, $ttRate, ['withCur'=>false]) ?></td><?php endif; ?>
+                <?= transportTd(money($sal ? (int)$sal['transport_lbp'] : 0, $ttRate, ['withCur'=>false])) ?>
                 <td class="num"><?= moneyLaw($rsal, ['withCur'=>false]) ?></td>
                 <td>&nbsp;</td>
             </tr>
@@ -1398,7 +1398,7 @@ elseif ($form === 'teacher_card'):
                 <td class="num"><?= formatLBP($sal ? (int)$sal['base_salary_lbp'] : 0,false) ?></td>
                 <?php if (salaryCompHas('extra')): ?><td class="num"><?= ($sal ? extraWageMoney($sal, ['withCur'=>false]) : money(0, null, ['withCur'=>false])) ?></td><?php endif; ?>
                 <?php if (salaryCompHas('aide')): ?><td class="num"><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td><?php endif; ?>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= money($sal ? (int)$sal['transport_lbp'] : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td><?php endif; ?>
+                <?= transportTd(money($sal ? (int)$sal['transport_lbp'] : 0, $sal ? rowRate($sal) : null, ['withCur'=>false])) ?>
                 <td class="num" style="background:#eef2ff"><strong><?= $sal ? dualFromUsd(composedSalaryLbp($sal), composedSalaryUsd($sal), false) : formatLBP($rsal,false) ?></strong></td>
                 <?php if (!$isMlk): ?><td class="num"><?= $contract>0?formatLBP($contract,false):'' ?></td><?php endif; ?>
                 <td>&nbsp;</td>
@@ -1858,8 +1858,8 @@ elseif ($form === 'teacher_card'):
                 <?php if (salaryCompHas('extra')): ?><td class="num"><?= dualFromUsd($exW,$exWu,false) ?></td><?php endif; ?>
                 <?php if (salaryCompHas('aide')): ?><td class="num"><?= dualFromUsd($aid,$aidu,false) ?></td><?php endif; ?>
                 <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($composed,$composedu,false) ?></strong></td>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= dualFromUsd($trans,$transu,false) ?></td>
-                <td class="num"><?= dualFromUsd($netWith,$netWithu,false) ?></td><?php endif; ?>
+                <?= transportTd(dualFromUsd($trans,$transu,false)) ?>
+                <?php if (salaryCompHas('transport')): ?><td class="num"><?= dualFromUsd($netWith,$netWithu,false) ?></td><?php endif; ?>
                 <td class="num"><?= dualFromUsd($cnss,$cnssu,false) ?></td>
                 <td class="num"><?= dualFromUsd($eoc,$eocu,false) ?></td>
                 <td class="num"><?= dualFromUsd($tax,$taxu,false) ?></td>
@@ -2872,7 +2872,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($teach) ?></td>
                 <?php if (salaryCompHas('extra')): ?><td class="num"><?= $fmt($cola) ?></td><?php endif; ?>
                 <?php if (salaryCompHas('aide')): ?><td class="num"><?= $fmt($bonus) ?></td><?php endif; ?>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= $fmt($trans) ?></td><?php endif; ?>
+                <?= transportTd($fmt($trans)) ?>
                 <td class="num"><?= $fmt($work) ?></td>
                 <td class="num"><?= $fmt($capped) ?></td>
                 <td><?= $isTeacher?1:0 ?></td>
@@ -2898,7 +2898,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($T['teach']) ?></td>
                 <?php if (salaryCompHas('extra')): ?><td class="num"><?= $fmt($T['cola']) ?></td><?php endif; ?>
                 <?php if (salaryCompHas('aide')): ?><td class="num"><?= $fmt($T['bonus']) ?></td><?php endif; ?>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= $fmt($T['trans']) ?></td><?php endif; ?>
+                <?= transportTd($fmt($T['trans'])) ?>
                 <td class="num"><?= $fmt($T['work']) ?></td>
                 <td class="num"><?= $fmt($T['base']) ?></td>
                 <td><?= $T['nT'] ?></td>
@@ -3034,7 +3034,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($v['ret']) ?></td>
                 <td class="num"><?= $fmt($v['net']) ?></td>
                 <td class="num"><?= $fmt($v['fam']) ?></td>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= $fmt($v['trans']) ?></td><?php endif; ?>
+                <?= transportTd($fmt($v['trans'])) ?>
                 <td class="num"><?= $fmt($v['due']) ?></td>
             </tr>
         <?php };
@@ -3051,7 +3051,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($a['fded']) ?></td><td class="num"><?= $fmt($a['txb']) ?></td><td class="num"><?= $fmt($a['tax']) ?></td>
                 <td class="num"><?= $fmt($a['cnss']) ?></td><td class="num"><?= $fmt($a['ret']) ?></td>
                 <td class="num"><?= $fmt($a['net']) ?></td><td class="num"><?= $fmt($a['fam']) ?></td>
-                <?php if (salaryCompHas('transport')): ?><td class="num"><?= $fmt($a['trans']) ?></td><?php endif; ?>
+                <?= transportTd($fmt($a['trans'])) ?>
                 <td class="num"><?= $fmt($a['due']) ?></td>
             </tr>
         <?php };

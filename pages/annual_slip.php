@@ -146,7 +146,9 @@ function annualSlipHtml($db, $emp, $schoolYear) {
     $isEmp = ($emp['employee_type'] === 'employe');
     // عدد أعمدة الجدول (تُطرح 4 أعمدة الأستاذ للموظف الإداري) — أعمدة الإضافي/المكافأة/النقل تتبع زرّ «الراتب يشمل»
     // (بطلب المستخدم: النقل خيار بإيده). ولما يكون النقل مخفياً، يُعرض «المستحق» بلا النقل لتبقى الأرقام راكبة.
-    $showTrans = salaryCompHas('transport');
+    // 🚌 خيار ثلاثي (2026-09-17): $showTrans = العمود ظاهر (بالمبلغ أو فارغاً)؛ $transAmt = فيه مبلغ (ويُجمع بالمستحق).
+    $showTrans = transportColShown();
+    $transAmt  = salaryCompHas('transport');
     // 🔴 «الأرقام تركب» (قاعدة ملزِمة): الإضافي والمكافأة داخلان في الإجمالي والصافي والمستحق،
     // فإذا أُخفي عمودهما وجب طرحهما من الثلاثة أيضاً — وإلّا ظهر إجماليٌّ لا يفسّره أي عمود
     // (مثال حقيقي: أساس 1,695,000 وإجمالي 100,545,000 لأنّ 98.85 مليون إضافي مخفيّة).
@@ -267,8 +269,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td><?= $money($r['total_retenues']) ?></td>
                             <td><?= $money($r['net'] - $hR, true) ?></td>
                             <td><?= $money($r['family']) ?></td>
-                            <?php if ($showTrans): ?><td><?= $money($r['transport']) ?></td><?php endif; ?>
-                            <td><?= $money($r['total_due'] - $hR - ($showTrans ? 0 : $r['transport']), true) ?></td>
+                            <?php if ($showTrans): ?><td><?= $transAmt ? $money($r['transport']) : '&nbsp;' ?></td><?php endif; ?>
+                            <td><?= $money($r['total_due'] - $hR - ($transAmt ? 0 : $r['transport']), true) ?></td>
                             <td class="sig-cell">&nbsp;</td>
                         <?php else: ?>
                             <td colspan="<?= $slipCols ?>" class="text-muted">—</td>
@@ -301,8 +303,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <td><?= $moneyTot($tot['total_retenues'], $tot['totret_usd']) ?></td>
                     <td><?= $moneyTot($tot['net'], $tot['net_usd']) ?></td>
                     <td><?= $moneyTot($tot['family'], $tot['family_usd']) ?></td>
-                    <?php if ($showTrans): ?><td><?= $moneyTot($tot['transport'], $tot['transport_usd']) ?></td><?php endif; ?>
-                    <td><?= $moneyTot($tot['total_due'] - ($showTrans ? 0 : $tot['transport']), $tot['total_due_usd'] - ($showTrans ? 0 : $tot['transport_usd'])) ?></td>
+                    <?php if ($showTrans): ?><td><?= $transAmt ? $moneyTot($tot['transport'], $tot['transport_usd']) : '&nbsp;' ?></td><?php endif; ?>
+                    <td><?= $moneyTot($tot['total_due'] - ($transAmt ? 0 : $tot['transport']), $tot['total_due_usd'] - ($transAmt ? 0 : $tot['transport_usd'])) ?></td>
                     <td class="sig-cell"></td>
                 </tr>
             </tbody>

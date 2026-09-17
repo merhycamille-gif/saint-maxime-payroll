@@ -114,21 +114,17 @@ function extraAideTotalCells($exLbp, $exUsd, $aiLbp, $aiUsd, bool $num = true): 
     if (salaryCompHas('aide'))  $h .= '<td' . $cls . '>' . dualFromUsd($aiLbp, $aiUsd, false) . '</td>';
     return $h;
 }
-/** رأس عمود «تعويض النقل» (يتبع زرّ «الراتب المركّب يشمل» — يُخفى إن لم يُختَر النقل). */
+/** رأس عمود «تعويض النقل» — 🚌 خيار ثلاثي (2026-09-17): يظهر إن كان العمود «موجوداً» (بالمبلغ أو فارغاً)، ويُخفى إن «غير موجود». */
 function transportHead(string $attrs = '', string $label = 'تعويض النقل'): string {
-    return salaryCompHas('transport') ? '<th' . $attrs . '>' . $label . '</th>' : '';
+    return transportColShown() ? '<th' . $attrs . '>' . $label . '</th>' : '';
 }
-/** خلية «تعويض النقل» لصف الجسم (تُخفى إن لم يُختَر النقل). */
+/** خلية «تعويض النقل» لصف الجسم — فارغة بوضع «موجود بلا مبلغ»، محذوفة بوضع «غير موجود». */
 function transportCell(array $r, bool $num = true): string {
-    if (!salaryCompHas('transport')) return '';
-    $cls = $num ? ' class="num"' : '';
-    return '<td' . $cls . '>' . money((int)($r['transport_lbp'] ?? 0), rowRate($r), ['withCur' => false]) . '</td>';
+    return transportTd(money((int)($r['transport_lbp'] ?? 0), rowRate($r), ['withCur' => false]), $num ? ' class="num"' : '');
 }
-/** خلية مجموع «تعويض النقل» (لصفوف المجاميع). */
+/** خلية مجموع «تعويض النقل» (لصفوف المجاميع) — نفس الحالات الثلاث. */
 function transportTotalCell($lbp, $usd, bool $num = true): string {
-    if (!salaryCompHas('transport')) return '';
-    $cls = $num ? ' class="num"' : '';
-    return '<td' . $cls . '>' . dualFromUsd($lbp, $usd, false) . '</td>';
+    return transportTd(dualFromUsd($lbp, $usd, false), $num ? ' class="num"' : '');
 }
 /**
  * 👨‍👩‍👧 عمود «التنزيل العائلي» بكل كشف شهري فيه ضريبة دخل — المصدر الواحد

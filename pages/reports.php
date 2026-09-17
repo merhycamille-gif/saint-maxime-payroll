@@ -335,7 +335,7 @@ function reportDocThumb($path) {
                                 <td style="background:#eef2ff"><strong><?= $dualTot($t['composed'], $t['composed_usd']) ?></strong></td>
                                 <td><?= $dualTot($t['cnss'], $t['cnss_usd']) ?></td><td><?= $dualTot($t['caisse'], $t['caisse_usd']) ?></td><td><?= $dualTot($t['eocg'] ?? 0, $t['eocg_usd'] ?? 0) ?></td>
                                 <td><?= $dualTot($t['fded'], $t['fded_usd']) ?></td><td><?= $dualTot($t['txb'], $t['txb_usd']) ?></td><td><?= $dualTot($t['tax'], $t['tax_usd']) ?></td>
-                                <td><?= $dualTot($t['net'], $t['net_usd']) ?></td><td><?= $dualTot($t['family'], $t['family_usd']) ?></td><?php if (salaryCompHas('transport')): ?><td><?= $dualTot($t['trans'], $t['trans_usd']) ?></td><?php endif; ?>
+                                <td><?= $dualTot($t['net'], $t['net_usd']) ?></td><td><?= $dualTot($t['family'], $t['family_usd']) ?></td><?= transportTd($dualTot($t['trans'], $t['trans_usd']), '') ?>
                                 <td><strong><?= $dualTot($t['total'], $t['total_usd']) ?></strong></td>
                             </tr>
                         <?php return ob_get_clean(); };
@@ -360,7 +360,7 @@ function reportDocThumb($path) {
                                   'total_usd'=>lbpToUsd(dueShownLbp($r),$rRate)];
                             foreach ($v as $k=>$val) { $catTot[$k]+=$val; $totals[$k]+=$val; }
                             $catN++;
-                            echo categoryHeaderRow($curCat, $cat, ($multi?17:16) + compColsCount());
+                            echo categoryHeaderRow($curCat, $cat, ($multi?18:17) + compColsCount());
                         ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
@@ -382,12 +382,12 @@ function reportDocThumb($path) {
                                 <td><?= money($r['income_tax_lbp'], $rRate) ?></td>
                                 <td><?= money($r['net_salary_lbp'], $rRate) ?></td>
                                 <td><?= money($r['family_allowance_lbp'], $rRate) ?></td>
-                                <?php if (salaryCompHas('transport')): ?><td><?= money($rTrans, $rRate) ?></td><?php endif; ?>
+                                <?= transportTd(money($rTrans, $rRate), '') ?>
                                 <td><strong><?= money(dueShownLbp($r), $rRate) ?></strong></td>
                             </tr>
                         <?php endforeach; ?>
                         <?php if ($data) echo $sumRow('مجموع '.empCategoryTitle($curCat).' — العدد: '.$catN, $catTot, false); ?>
-                        <?php if (!$data): ?><tr><td colspan="<?= ($multi?17:16) + compColsCount() ?>" class="text-center text-muted">لا توجد بيانات — احسب رواتب هذا الشهر أولاً</td></tr><?php endif; ?>
+                        <?php if (!$data): ?><tr><td colspan="<?= ($multi?18:17) + compColsCount() ?>" class="text-center text-muted">لا توجد بيانات — احسب رواتب هذا الشهر أولاً</td></tr><?php endif; ?>
                         <?php if ($data) echo $sumRow('الإجمالي العام — مجموع كل الفئات (العدد: '.$rn.')', $totals, true); ?>
                     </tbody>
                 </table></div>

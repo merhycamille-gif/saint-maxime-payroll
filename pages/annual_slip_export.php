@@ -42,7 +42,7 @@ function annualCompDropIdx(): array {
     $d = [];
     if (!salaryCompHas('extra'))     $d[] = 4;
     if (!salaryCompHas('aide'))      $d[] = 5;
-    if (!salaryCompHas('transport')) $d[] = 14;
+    if (!transportColShown())        $d[] = 14; // 🚌 «موجود بلا مبلغ» يُبقي العمود فارغاً
     return $d;
 }
 function annualDropCols(array $row, bool $dropTeacher): array {
@@ -86,7 +86,7 @@ function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $
             $r['brut'] - $hR, ($r['caisse'] > 0 ? $r['caisse'] : ''), ($r['eoc_grade'] > 0 ? $r['eoc_grade'] : ''),
             ($r['cnss'] > 0 ? $r['cnss'] : ''), ($r['income_tax'] > 0 ? $r['income_tax'] : ''),
             $r['total_retenues'], $r['net'] - $hR, ($r['family'] > 0 ? $r['family'] : ''),
-            ($r['transport'] > 0 ? $r['transport'] : ''),
+            ($r['transport'] > 0 && salaryCompHas('transport') ? $r['transport'] : ''),
             $r['total_due'] - $hR - (salaryCompHas('transport') ? 0 : $r['transport']), '',
         ]);
     }
@@ -96,7 +96,7 @@ function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $
     $emit([
         'المجموع', $t['base_shown'], $t['grade_inc'], $t['base_plus_echelon'], $t['extra_wage'], $t['aide'],
         $t['brut'] - $hT, $t['caisse'], $t['eoc_grade'], $t['cnss'], $t['income_tax'], $t['total_retenues'], $t['net'] - $hT,
-        $t['family'], $t['transport'],
+        $t['family'], (salaryCompHas('transport') ? $t['transport'] : ''),
         $t['total_due'] - $hT - (salaryCompHas('transport') ? 0 : $t['transport']), '',
     ], true);
 }

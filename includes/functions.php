@@ -4183,14 +4183,38 @@ function dualFromUsd($lbp, $usd, bool $withCur = true): string {
 /** المكوّنات المختارة لإضافتها للأساس: مجموعة فرعية من ['extra','aide','transport']. */
 function salaryComp(): array {
     $c = $_SESSION['salary_comp'] ?? ['extra', 'aide']; // الافتراضي: الأساسي + الإضافي + المكافأة/المساعدة
-    return array_values(array_intersect((array)$c, ['extra', 'aide', 'transport']));
+    $c = array_values(array_intersect((array)$c, ['extra', 'aide', 'transport', 'transport_blank']));
+    // 🚌 عمود النقل بثلاث حالات (طلبه 2026-09-17): 'transport' = موجود بالمبلغ · 'transport_blank' = موجود بلا مبلغ · لا شيء = غير موجود.
+    //    الحالتان متنافيتان — «بالمبلغ» تغلب.
+    if (in_array('transport', $c, true)) $c = array_values(array_diff($c, ['transport_blank']));
+    return $c;
 }
 function salaryCompHas(string $k): bool { return in_array($k, salaryComp(), true); }
 
-/** عدد أعمدة المكوّنات الظاهرة (إضافي/مكافأة/نقل) — لضبط colspan الجداول ديناميكياً حسب «الراتب يشمل». */
+/** 🚌 حالة عمود «تعويض النقل» بالتقارير (خيار ثلاثي بشريط «الراتب المركّب يشمل» — طلبه 2026-09-17):
+ *  'amount' = العمود موجود وفيه مبلغ التعويض (ويُجمع بالمستحق) · 'blank' = العمود موجود بس بلا مبلغ (خانات فارغة،
+ *  ولا يُجمع بالمستحق — الأرقام تركب) · 'none' = العمود غير موجود.
+ *  🔴 كل منطق الجمع يبقى على salaryCompHas('transport') (= 'amount' فقط)؛ الرأس/الخانات على transportColShown(). */
+function transportColMode(): string {
+    if (salaryCompHas('transport')) return 'amount';
+    if (salaryCompHas('transport_blank')) return 'blank';
+    return 'none';
+}
+/** هل عمود النقل ظاهر (بالمبلغ أو فارغاً)؟ — للرؤوس وcolspan. */
+function transportColShown(): bool { return transportColMode() !== 'none'; }
+/** خلية عمود النقل لصف جسم/مجموع: '' إن كان العمود غير موجود، خلية فارغة بوضع «بلا مبلغ»، وإلا الخلية بمحتواها $html.
+ *  المصدر الواحد لكل `if (salaryCompHas('transport')): <td>…</td>` بالتقارير. */
+function transportTd(string $html, string $attrs = ' class="num"'): string {
+    $m = transportColMode();
+    if ($m === 'none') return '';
+    return '<td' . $attrs . '>' . ($m === 'blank' ? '&nbsp;' : $html) . '</td>';
+}
+
+/** عدد أعمدة المكوّنات الظاهرة (إضافي/مكافأة/نقل) — لضبط colspan الجداول ديناميكياً حسب «الراتب يشمل».
+ *  عمود النقل يُعدّ إن كان ظاهراً بأي حالة (بالمبلغ أو فارغاً). */
 function compColsCount(bool $withTransport = true): int {
     $n = (salaryCompHas('extra') ? 1 : 0) + (salaryCompHas('aide') ? 1 : 0);
-    if ($withTransport) $n += salaryCompHas('transport') ? 1 : 0;
+    if ($withTransport) $n += transportColShown() ? 1 : 0;
     return $n;
 }
 
@@ -4235,7 +4259,14 @@ function salaryCompToolbar(): string {
         <span class="scb-label"><i class="fas fa-layer-group"></i> <?= $lang==='ar' ? 'الراتب المركّب يشمل:' : 'Le salaire composé inclut :' ?></span>
         <label class="scb-opt"><input type="checkbox" name="comp[]" value="extra" <?= in_array('extra',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> + <?= $lang==='ar'?'الأجر الإضافي':'Supplément' ?></label>
         <label class="scb-opt"><input type="checkbox" name="comp[]" value="aide" <?= in_array('aide',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> + <?= $lang==='ar'?'المكافأة والمساعدة':'Prime & aide' ?></label>
-        <label class="scb-opt"><input type="checkbox" name="comp[]" value="transport" <?= in_array('transport',$sel,true)?'checked':'' ?> onchange="this.form.submit()"> <?= $lang==='ar'?'عمود تعويض النقل (يُجمع بالمستحق)':'Colonne transport (dans le dû)' ?></label>
+        <?php $tm = transportColMode(); ?>
+        <label class="scb-opt scb-sel"><i class="fas fa-bus"></i> <?= $lang==='ar'?'عمود تعويض النقل:':'Colonne transport :' ?>
+            <select name="transport_mode" onchange="this.form.submit()">
+                <option value="none"   <?= $tm==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
+                <option value="blank"  <?= $tm==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
+                <option value="amount" <?= $tm==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ (يُجمع بالمستحق)':'Présente avec montant (dans le dû)' ?></option>
+            </select>
+        </label>
         <span class="scb-hint"><?= $lang==='ar'?'(الأساس + الدرجة دائماً — النقل لا يدخل بالمركّب)':'(Base + échelon toujours — transport hors salaire composé)' ?></span>
     </form>
     <?php return ob_get_clean();

@@ -64,7 +64,7 @@ if ($report === 'monthly_summary') {
     // 👨‍👩‍👧 التنزيل العائلي (حصّة الشهر) ثم الخاضع بعد حسمه قبل الضريبة — كالشاشة (2026-09-15)
     $head = array_merge($head, ['الضمان ٣٪', 'الصندوق ٦٪', 'درجة / نصف راتب (إلى الصندوق)', 'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)', 'الضريبة', 'الصافي', 'تعويض عائلي']);
     $w = array_merge($w, [14, 14, 14, 14, 16, 12, 16, 14]);
-    if (salaryCompHas('transport')) { $head[] = 'تعويض النقل'; $w[] = 14; }
+    if (transportColShown()) { $head[] = 'تعويض النقل'; $w[] = 14; } // 🚌 موجود (بالمبلغ أو فارغاً) / غير موجود
     $head[] = 'الإجمالي المتوجب'; $w[] = 18;
     $rep->head($head);
     $rep->widths($w);
@@ -79,7 +79,7 @@ if ($report === 'monthly_summary') {
         if (salaryCompHas('aide'))  $row[] = $a['aide'];
         $row[] = $a['composed'];
         $row = array_merge($row, [$a['cnss'], $a['caisse'], $a['eocg'], $a['fded'], $a['txb'], $a['tax'], $a['net'], $a['fam']]);
-        if (salaryCompHas('transport')) $row[] = $a['tr'];
+        if (transportColShown()) $row[] = salaryCompHas('transport') ? $a['tr'] : '';
         $row[] = $a['tot'];
         $rep->totalRow($row);
     };
@@ -97,7 +97,7 @@ if ($report === 'monthly_summary') {
         if (salaryCompHas('aide'))  $row[] = $v['aide'];
         $row[] = $v['composed'];
         $row = array_merge($row, [$v['cnss'], $v['caisse'], $v['eocg'], $v['fded'], $v['txb'], $v['tax'], $v['net'], $v['fam']]);
-        if (salaryCompHas('transport')) $row[] = $v['tr'];
+        if (transportColShown()) $row[] = salaryCompHas('transport') ? $v['tr'] : '';
         $row[] = $v['tot'];
         $rep->row($row);
     }

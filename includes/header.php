@@ -527,8 +527,15 @@ document.addEventListener('submit', function (e) {
                             <div class="sm-list">
                                 <label><input type="checkbox" name="comp[]" value="extra" <?= in_array('extra',$salSel,true)?'checked':'' ?>> <?= $lang==='ar'?'الأجر الإضافي':'Supplément' ?></label>
                                 <label><input type="checkbox" name="comp[]" value="aide" <?= in_array('aide',$salSel,true)?'checked':'' ?>> <?= $lang==='ar'?'المكافأة والمساعدة':'Prime & aide' ?></label>
-                                <label><input type="checkbox" name="comp[]" value="transport" <?= in_array('transport',$salSel,true)?'checked':'' ?>> <?= $lang==='ar'?'تعويض النقل':'Transport' ?></label>
                             </div>
+                            <?php $tmH = transportColMode(); // 🚌 عمود النقل بثلاث حالات (2026-09-17) ?>
+                            <label style="display:block;font-size:12px;color:#4c1d95;padding:4px 4px 2px"><i class="fas fa-bus"></i> <?= $lang==='ar'?'عمود تعويض النقل':'Colonne transport' ?>
+                                <select name="transport_mode" class="form-control form-control-sm" style="margin-top:3px">
+                                    <option value="none"   <?= $tmH==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
+                                    <option value="blank"  <?= $tmH==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
+                                    <option value="amount" <?= $tmH==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
+                                </select>
+                            </label>
                             <div style="font-size:11px;color:#64748b;padding:2px 4px 6px"><?= $lang==='ar'?'الأساس + الدرجة يبقى دائماً':'Base + échelon toujours inclus' ?></div>
                             <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> Appliquer / تطبيق</button>
                         </form>

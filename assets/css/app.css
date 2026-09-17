@@ -1283,6 +1283,8 @@ input:focus, select:focus, textarea:focus {
 .salcomp-bar .scb-opt { cursor:pointer; display:inline-flex; align-items:center; gap:5px;
   background:#fff; border:1px solid #ddd6fe; border-radius:8px; padding:4px 10px; user-select:none; }
 .salcomp-bar .scb-opt input { cursor:pointer; width:16px; height:16px; accent-color:#7c3aed; }
+.salcomp-bar .scb-sel select { cursor:pointer; border:1px solid #c4b5fd; border-radius:6px; padding:2px 6px;
+  font:inherit; color:#4c1d95; background:#faf5ff; }
 .salcomp-bar .scb-hint { color:#8b8b8b; font-size:12px; }
 
 /* =====================================================

@@ -2790,8 +2790,8 @@ check('المركّب بلا نقل: composedSalaryLbp المركزية لا ت�
       && preg_match('/function composedSalaryLbp.*?^}/ms', $fn45, $m45) === 1
       && strpos($m45[0], 'transport_lbp') === false
       && strpos($fn45, "array_intersect(salaryComp(), ['extra', 'aide'])") !== false);
-check('المركّب بلا نقل: خيار النقل بالشريط صار «عمود تعويض النقل (يُجمع بالمستحق)»',
-      strpos($fn45, 'عمود تعويض النقل (يُجمع بالمستحق)') !== false);
+check('المركّب بلا نقل: خيار النقل بالشريط مستقل عن المركّب («عمود تعويض النقل:» بثلاث حالات، و«موجود مع المبلغ (يُجمع بالمستحق)»)',
+      strpos($fn45, 'عمود تعويض النقل:') !== false && strpos($fn45, 'موجود مع المبلغ (يُجمع بالمستحق)') !== false);
 // تجربة فعلية: كشف رواتب كل الموظفين 6/2026 بكل الخيارات — مركّب مارسيلا 56,145,000
 // (بلا النقل 9,000,000) لا 65,145,000، وعمود النقل مستقل والمستحق 59,786,424 يجمعه
 $h45 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], ['extra','aide','transport'], [2]);
@@ -6421,6 +6421,66 @@ check('شريط النماذج الرسمية (تشغيل فعلي): رابط PD
       preg_match('/msaOfficialToolbar\(\{pdf: "([^"]+)"/', $h134, $m134) === 1
       && strpos($m134[1], 'form=cnss_hire_new') !== false && strpos($m134[1], '&opts_set=1&inc_extra=1&cur=usd&format=pdf') !== false,
       $m134[1] ?? 'لا نداء');
+
+/* =====================================================================
+ * 135) 🚌 «بدي بالتقارير بعامود تعويض النقل خيار: موجود بلا مبلغ / موجود مع المبلغ / غير موجود» (2026-09-17):
+ *     خيار ثلاثي بالشريط (transport_mode) بدل مربّع النقل — 'transport' = بالمبلغ (يُجمع بالمستحق)،
+ *     'transport_blank' = العمود ظاهر بخانات فارغة ولا يُجمع (الأرقام تركب)، لا شيء = العمود غير موجود.
+ *     المصدر الواحد: transportColMode/transportColShown/transportTd (functions) + transportHead/Cell/TotalCell (report_helpers).
+ * =================================================================== */
+$fn135 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$rh135 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$sw135 = (string)file_get_contents($PROJ . '/switch_salarycomp.php');
+$of135 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+$rp135 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rx135 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+$ax135 = (string)file_get_contents($PROJ . '/pages/annual_slip_export.php');
+check('عمود النقل الثلاثي (كود): الدوال المركزية + الشريط select + المبدّل + لا خلية نقل مباشرة بـsalaryCompHas بالتقارير + الإكسل يتبع الحالة',
+      strpos($fn135, 'function transportColMode(): string {') !== false
+      && strpos($fn135, 'function transportColShown(): bool { return transportColMode() !== \'none\'; }') !== false
+      && strpos($fn135, 'function transportTd(string $html, string $attrs = \' class="num"\'): string {') !== false
+      && strpos($fn135, '<select name="transport_mode" onchange="this.form.submit()">') !== false
+      && strpos($fn135, "if (\$withTransport) \$n += transportColShown() ? 1 : 0;") !== false
+      && strpos($rh135, "return transportColShown() ? '<th' . \$attrs . '>' . \$label . '</th>' : '';") !== false
+      && strpos($rh135, "return transportTd(money((int)(\$r['transport_lbp'] ?? 0), rowRate(\$r), ['withCur' => false]), \$num ? ' class=\"num\"' : '');") !== false
+      && strpos($rh135, "if (!salaryCompHas('transport')) \$h += (int)(\$r['transport_lbp'] ?? 0);") !== false // الجمع على «بالمبلغ» فقط
+      && strpos($sw135, "if (\$tm === 'amount')     \$comp[] = 'transport';") !== false
+      && strpos($sw135, "elseif (\$tm === 'blank')  \$comp[] = 'transport_blank';") !== false
+      && preg_match("/if \(salaryCompHas\('transport'\)\): \?><td[^>]*><\?= (money|\\\$fmt|dualFromUsd\(\\\$trans|\\\$dualTot)/", $of135 . $rp135) === 0
+      && substr_count($of135, 'transportTd(') >= 7 && substr_count($rp135, 'transportTd(') === 2
+      && strpos($rx135, "if (transportColShown()) { \$head[] = 'تعويض النقل'; \$w[] = 14; }") !== false
+      && substr_count($rx135, "if (transportColShown()) \$row[] = salaryCompHas('transport') ?") === 2
+      && strpos($ax135, "if (!transportColShown())        \$d[] = 14;") !== false);
+// تشغيل فعلي: الكشف الشهري بالحالات الثلاث — عدد رؤوس الجدول: بلا مبلغ = بالمبلغ = غير موجود + 1؛
+// والإجمالي المتوجب بوضع «بلا مبلغ» = وضع «غير موجود» (النقل غير مجموع) وأصغر من «بالمبلغ».
+$ths = function (string $h): int { return preg_match('/<thead>.*?<\/thead>/s', $h, $m) ? substr_count($m[0], '<th') : -1; };
+$grand = function (string $h): string {
+    if (!preg_match_all('/<tr class="total-row"[^>]*>.*?<\/tr>/s', $h, $mm)) return '';
+    $row = end($mm[0]);
+    return preg_match_all('/<strong>(.*?)<\/strong>/s', $row, $s) ? strip_tags(end($s[1])) : '';
+};
+$g135 = ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026];
+$hN = renderPage('pages/reports.php', $g135, ['extra', 'aide'], [], 'lbp');
+$hB = renderPage('pages/reports.php', $g135, ['extra', 'aide', 'transport_blank'], [], 'lbp');
+$hA = renderPage('pages/reports.php', $g135, ['extra', 'aide', 'transport'], [], 'lbp');
+$toNum = fn(string $s) => (int)preg_replace('/\D+/', '', $s);
+$okShape = $noFatal($hB) && $ths($hB) === $ths($hA) && $ths($hB) === $ths($hN) + 1
+        && strpos($hB, '<th>تعويض النقل</th>') !== false && strpos($hN, '<th>تعويض النقل</th>') === false;
+$okSum = $toNum($grand($hB)) === $toNum($grand($hN)) && $toNum($grand($hA)) > $toNum($grand($hB));
+// خانات النقل فارغة بوضع «بلا مبلغ»: عدد خلايا الجسم <td>&nbsp;</td> بعد خلية العائلي ≥ عدد الصفوف
+$rowsB = preg_match_all('/<td><strong>[^<]+<\/strong><\/td>\s*<\/tr>/', $hB); // خلية المتوجب بكل صف
+$blankB = preg_match_all('/<td>&nbsp;<\/td>\s*<td><strong>/', $hB);            // خلية نقل فارغة قبلها
+check('عمود النقل الثلاثي (تشغيل فعلي، كشف حزيران 2026): الرؤوس بلا مبلغ = بالمبلغ = غير موجود+1، والخانات فارغة، والمتوجب بلا مبلغ = غير موجود < بالمبلغ',
+      $okShape && $okSum && $rowsB > 0 && $blankB === $rowsB,
+      'رؤوس ' . $ths($hN) . '/' . $ths($hB) . '/' . $ths($hA) . ' · متوجب ' . $grand($hN) . ' / ' . $grand($hB) . ' / ' . $grand($hA) . ' · فارغة ' . $blankB . '/' . $rowsB);
+// النماذج الرسمية (كشف الدفع + كشف الرواتب + كلفة المؤسسات + الكلفة التفصيلية + الأساتذة) بوضع «بلا مبلغ» بلا خطأ وبرأس النقل
+$okOf = true; $whyOf = [];
+foreach (['payment_list' => ['month' => 6, 'year' => 2026], 'salary_all' => ['month' => 6, 'year' => 2026], 'general_report' => [], 'full_register' => ['month' => 6, 'year' => 2026], 'teaching_staff' => []] as $f => $g) {
+    $h = renderPage('pages/official_forms.php', ['form' => $f] + $g, ['extra', 'aide', 'transport_blank'], [], 'lbp');
+    $ok = $noFatal($h) && preg_match('/<th[^>]*>تعويض نقل<\/th>|<th[^>]*>تعويض النقل<\/th>/u', $h) === 1;
+    if (!$ok) { $okOf = false; $whyOf[] = $f; }
+}
+check('عمود النقل الثلاثي (النماذج الرسمية بوضع «بلا مبلغ»): 5 كشوف ترندر برأس النقل بلا خطأ', $okOf, implode(',', $whyOf));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
