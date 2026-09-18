@@ -156,8 +156,7 @@ if ($probe) {
  * 4) فلترة الترك: التارك يبقى بسنة عمله ويختفي من السنين بعدها
  * =================================================================== */
 [$m1] = array_map('intval', explode('-', $sy));
-$leaver = $db->query("SELECT id,
-        LEAST(COALESCE(left_date_cnss,'9999-12-31'),COALESCE(left_date_finance,'9999-12-31'),COALESCE(left_date_eoc,'9999-12-31')) ld
+$leaver = $db->query("SELECT id, " . leftDateSql() . " ld
     FROM employees WHERE is_deleted = 0
     HAVING ld >= '{$m1}-10-01' AND ld <> '9999-12-31' LIMIT 1")->fetch();
 if ($leaver) {
@@ -1380,7 +1379,7 @@ check('رؤوس ثابتة: تكرار رأس الجدول بالطباعة با
  * =================================================================== */
 $lv = $db->query("SELECT id, employee_code FROM employees
     WHERE is_deleted = 0 AND status = 'actif'
-      AND LEAST(COALESCE(left_date_cnss,'9999-12-31'),COALESCE(left_date_finance,'9999-12-31'),COALESCE(left_date_eoc,'9999-12-31')) BETWEEN '2025-10-01' AND '2026-09-30'
+      AND " . leftDateSql() . " BETWEEN '2025-10-01' AND '2026-09-30'
       AND id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = '2025-2026'
                  AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))
     LIMIT 1")->fetch();
@@ -1399,7 +1398,7 @@ $mpSrc20  = (string)file_get_contents(__DIR__ . '/../pages/monthly_payroll.php')
 $oySrc20  = (string)file_get_contents(__DIR__ . '/../pages/open_year.php');
 $isNullTrio = "left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL";
 check('قاعدة التارك: لائحة الموظفين تفلتر ببداية السنة الدراسية لا باستبعاد كلّي',
-      strpos($empSrc20, "LEAST(COALESCE(left_date_cnss") !== false && strpos($empSrc20, $isNullTrio) === false);
+      strpos($empSrc20, 'AND " . leftDateSql() . " >= ?"') !== false && strpos($empSrc20, $isNullTrio) === false);
 check('قاعدة التارك: عدّادات الرئيسية تستبعد التاركين فقط في وضع «كل السنين»',
       preg_match('/\$notLeft = \(\$yfStat === \'\'\)/', $idxSrc20) === 1);
 check('قاعدة التارك: «احسب للكل» يحسب التارك لأشهر سنة تركه (حدّ بداية السنة)',
@@ -2309,7 +2308,7 @@ $hnd36 = ($h36s !== false && $h36e !== false && $h36e > $h36s) ? substr($empSrc3
 check('نسخ الملف لسنة: المعالج يرجّع التارك «فاعلاً» ويحفظ تواريخ التّرك بالملاحظات وينسخ العلاوات والصفوف ويحسب بالمحرّك الموحّد',
       $hnd36 !== ''
       && strpos($hnd36, 'تواريخ التّرك السابقة') !== false
-      && strpos($hnd36, "left_date_cnss = NULL, left_date_finance = NULL, left_date_eoc = NULL") !== false
+      && strpos($hnd36, "left_date_all = NULL, left_date_cnss = NULL, left_date_finance = NULL, left_date_eoc = NULL") !== false
       && strpos($hnd36, "status = 'actif'") !== false
       && strpos($hnd36, "\$src['is_paid'] = 0") !== false
       && strpos($hnd36, 'ON DUPLICATE KEY UPDATE') !== false
@@ -2361,9 +2360,7 @@ unset($_SESSION['heal_leaver_phantoms_done']);
 healLeaverPhantomRows();
 
 // اختر تاركاً ملاكاً ما إله أي صف بعد سنة تركه (بعد الشفاء يبقى فقط أصحاب المدفوع فيُستثنون)
-$lv37 = $db->query("SELECT e.id, LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
-                                       COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
-                                       COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31')) ld
+$lv37 = $db->query("SELECT e.id, " . leftDateSql('e.') . " ld
                     FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire'
                     HAVING ld < '9999-12-31' ORDER BY ld DESC LIMIT 20")->fetchAll();
 $pick37 = null; $ty37 = 0;
@@ -2412,9 +2409,7 @@ if ($pick37) {
     check('قاعدة التارك (تجارب فعلية)', true, 'لا تارك ملاك مناسب بالبيانات — تخطٍّ');
 }
 // (ج) البيانات كلها نظيفة بعد الشفاء: صفر رواتب وهمية (غير مدفوعة) لتاركين بعد سنة تركهم
-$ldAll37 = "LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
-                  COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
-                  COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31'))";
+$ldAll37 = leftDateSql('e.');
 $phAll37 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
     WHERE e.is_deleted = 0 AND $ldAll37 < '9999-12-31' AND COALESCE(ms.is_paid, 0) = 0
       AND (CASE WHEN ms.month >= 10 THEN ms.year ELSE ms.year - 1 END)
@@ -2453,9 +2448,7 @@ $cand38 = $db->query("SELECT b.id bid, b.employee_id eid, b.amount, b.school_yea
       AND b.value_type = 'amount' AND b.currency = 'LBP' AND b.start_month IS NULL AND b.end_month IS NULL
       AND b.school_year > '$cur38'
       AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
-      AND LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
-                COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
-                COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31')) = '9999-12-31'
+      AND " . leftDateSql('e.') . " = '9999-12-31'
       AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = b.employee_id AND ms.school_year = b.school_year)
     LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 if ($cand38) {
@@ -2577,7 +2570,7 @@ check('ر5 بقي سنوياً (مجموع الفصول الأربعة — فر�
 $dbTax40 = (int)$db->query("SELECT COALESCE(SUM(ms.income_tax_lbp),0) FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
     WHERE e.is_deleted=0 AND e.tax_subject=1 AND ms.year=2026 AND ms.month IN (4,5,6) AND ms.school_id=2
       AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)
-      AND LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) >= '2025-10-01'
+      AND " . leftDateSql('e.') . " >= '2025-10-01'
       AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year='2025-2026'
                      AND (base_plus_echelon_lbp>0 OR net_salary_lbp>0 OR total_due_lbp>0))")->fetchColumn();
 $x40 = renderPage('pages/official_export.php', ['form' => 'mof_r10', 'rq' => 2, 'rqy' => 2026, 'format' => 'xlsx'], [], [2], '', '', $PROJ . '/tmp/reg40.xlsx');
@@ -2645,9 +2638,7 @@ $cand41 = $db->query("SELECT e.id, ms.income_tax_lbp t0 FROM employees e
     JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.year = 2026 AND ms.month = 6
     WHERE e.is_deleted = 0 AND e.tax_subject = 1 AND e.employee_type = 'enseignant_titulaire'
       AND ms.income_tax_lbp > 0 AND COALESCE(e.apply_family_deduction, 1) = 1
-      AND LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
-                COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
-                COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31')) = '9999-12-31'
+      AND " . leftDateSql('e.') . " = '9999-12-31'
       AND EXISTS (SELECT 1 FROM family_tax_deductions f WHERE f.social_status = e.social_status
                     AND f.effective_from <= '2026-06-01' AND f.annual_deduction > 0)
     LIMIT 1")->fetch(PDO::FETCH_ASSOC);
@@ -2733,9 +2724,7 @@ $c43 = $db->query("SELECT e.id, e.spouse_works, e.family_allowance_spouse_lbp sp
                           COALESCE(e.count_spouse_allowance,1) cs, COALESCE(e.count_children_allowance,1) cc
     FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.year = 2026 AND ms.month = 6
     WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND ms.net_salary_lbp > 0
-      AND LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
-                COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
-                COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31')) = '9999-12-31'
+      AND " . leftDateSql('e.') . " = '9999-12-31'
     LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 if ($c43) {
     $cid43 = (int)$c43['id'];
@@ -3037,7 +3026,7 @@ check('نماذج الضمان الثلاثة (تجربة فعلية): شاشة 
 // والتصدير يأخذ left_date_cnss من الملف — وإن كان فارغاً تبقى خانات النموذج فارغة (لا تاريخ اليوم)
 check('نماذج الضمان الثلاثة: تاريخ الترك من ملف الموظف حصراً (عرض للعلم فقط، بلا خانة يدوية)',
       strpos($h52, 'name="ld"') === false
-      && strpos($oe52, "\$ldTs = \$emp['left_date_cnss'] ? strtotime(\$emp['left_date_cnss']) : 0;") !== false
+      && strpos($oe52, "\$ldCnss = leftDateOfFor(\$emp, 'cnss');") !== false && strpos($oe52, "\$ldTs = \$ldCnss ? strtotime(\$ldCnss) : 0;") !== false
       && strpos($oe52, "\$_GET['ld']") === false);
 // «بعدك ما عم بتحط تاريخ الترك» (2026-08-18): إن كان ملف الموظف بلا تاريخ ترك، شاشة
 // إعلام الترك تعرض خانة تحفظه **بملف الموظف نفسه** (left_date_cnss عبر POST بحماية CSRF)
@@ -5515,13 +5504,13 @@ check('سامر — الجزء الثاني (تجربة حيّة): موجود ب
 $cp112 = (string)file_get_contents($PROJ . '/includes/compliance.php'); $da112 = (string)file_get_contents($PROJ . '/includes/data_audit.php');
 check('تاريخ ترك مستحيل: قاعدة left_impossible بالمخالفات (بانية + تصحيح آلي يمسح التواريخ ويعيد الحساب) + قاعدة بالفحص الرسمي',
       isset(complianceRules()['left_impossible']) && strpos($cp112, "\$add('left_impossible', \$r,") !== false && strpos($cp112, "case 'left_impossible':") !== false
-      && strpos($cp112, "array_intersect((array)(\$d['cols'] ?? []), ['left_date_cnss', 'left_date_finance', 'left_date_eoc'])") !== false
+      && strpos($cp112, "array_intersect((array)(\$d['cols'] ?? []), array_keys(leftDateColumns()))") !== false
       && strpos($da112, "\$add('left_impossible',") !== false);
 // تجربة حيّة تُرجَع: موظف فاعل بتاريخ ترك = ولادته يظهر بالقاعدة، والتصحيح يمسحه
 $why112 = ''; $ok112 = false;
 try {
     $e112 = $db->query("SELECT id, school_id, birth_date, hire_date, left_date_cnss, left_date_finance, left_date_eoc FROM employees WHERE is_deleted = 0 AND status = 'actif' AND birth_date IS NOT NULL AND birth_date <> '0000-00-00'
-        AND COALESCE(NULLIF(left_date_cnss,'0000-00-00'), NULLIF(left_date_finance,'0000-00-00'), NULLIF(left_date_eoc,'0000-00-00')) IS NULL ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        AND COALESCE(NULLIF(left_date_all,'0000-00-00'), NULLIF(left_date_cnss,'0000-00-00'), NULLIF(left_date_finance,'0000-00-00'), NULLIF(left_date_eoc,'0000-00-00')) IS NULL ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     if (!$e112) { $why112 = 'لا عيّنة'; $ok112 = true; }
     else {
         $eid = (int)$e112['id'];
@@ -5558,7 +5547,7 @@ check('إكسل الرواتب: الوحدة (بناء/قراءة/مقارنة/�
 $why114 = ''; $ok114 = false;
 try {
     $sch114 = (int)$db->query("SELECT e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026'
-        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type IN ('enseignant_contractuel','employe') AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type IN ('enseignant_contractuel','employe') AND " . leftDateSql('e.') . " = '9999-12-31'
         GROUP BY e.school_id ORDER BY COUNT(DISTINCT e.id) DESC LIMIT 1")->fetchColumn();
     $sy114 = '2025-2026';
     if (!$sch114) { $ok114 = true; $why114 = 'لا عيّنة'; }
@@ -5743,7 +5732,7 @@ check('الإضافي بالعملتين معاً: الإكسل لا يرفض G+
 $ok117 = false; $why117 = '';
 try {
     $v117 = $db->query("SELECT e.id, e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.exchange_rate > 0
-        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_contractuel' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_contractuel' AND " . leftDateSql('e.') . " = '9999-12-31'
           AND e.salary_input_mode IN ('direct_usd','direct_lbp') AND (e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
         GROUP BY e.id HAVING COUNT(*) >= 12 ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     if (!$v117) { $ok117 = true; $why117 = 'لا عيّنة'; }
@@ -5799,7 +5788,7 @@ check('إكسل الفئة/الضريبة: المصدر الواحد (cats/taxes
 $ok118 = false; $why118 = '';
 try {
     $sch118 = (int)$db->query("SELECT e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026'
-        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+        WHERE e.is_deleted = 0 AND e.status = 'actif' AND " . leftDateSql('e.') . " = '9999-12-31'
         GROUP BY e.school_id HAVING SUM(e.employee_type = 'enseignant_titulaire') > 0 AND SUM(e.employee_type = 'enseignant_contractuel') > 0 ORDER BY COUNT(DISTINCT e.id) DESC LIMIT 1")->fetchColumn();
     $sy118 = '2025-2026';
     if (!$sch118) { $ok118 = true; $why118 = 'لا عيّنة'; }
@@ -5946,7 +5935,7 @@ $ok121 = false; $why121 = '';
 try {
     $nz121 = '(m.base_plus_echelon_lbp > 0 OR m.net_salary_lbp > 0 OR m.total_due_lbp > 0)';
     $sy121 = currentSchoolYear(); $y121 = (int)substr($sy121, 0, 4); $prev121 = ($y121 - 1) . '-' . $y121; $bad121 = [];
-    $actv = "e.is_deleted = 0 AND e.status = 'actif' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel','employe')";
+    $actv = "e.is_deleted = 0 AND e.status = 'actif' AND " . leftDateSql('e.') . " = '9999-12-31' AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel','employe')";
     // أ) راكد: له صفوف بالسنة الحالية، بلا أي راتب فعلي بالسنة السابقة، دخوله قديم ⇒ ليس من السنة (إلا إذا كانت السنة بدأت وله راتب فعلي فيها)
     $stale = $db->query("SELECT e.id, e.school_id FROM employees e WHERE $actv AND e.hire_date < '" . ($y121 - 1) . "-10-01'
         AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = '$sy121')
@@ -6570,7 +6559,7 @@ $ok138 = false; $why138 = '';
 try {
     $syA = (string)activeSchoolYear(); $ys = substr($syA, 0, 4) . '-10-01';
     $lv = $db->query("SELECT e.id, e.school_id FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire'
-                      AND LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) < '$ys'
+                      AND " . leftDateSql('e.') . " < '$ys'
                       AND e.school_id IN (SELECT school_id FROM monthly_salaries WHERE school_year = '$syA' AND base_plus_echelon_lbp > 0) LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     if ($lv) {
         $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, 'prime_fixe', 9, ?, 97.5, 'percent', 'LBP', 10, 9, 1)")->execute([(int)$lv['id'], $syA]);
@@ -6626,6 +6615,82 @@ try {
 } catch (Throwable $e) { $why139 = 'خطأ: ' . $e->getMessage(); }
 finally { if ($db->inTransaction()) $db->rollBack(); }
 check('الفحص الذاتي (تشغيل فعلي مع ترجيع): شهر منقول صافيه 0 وحسوماته 4,130,000 بلا إضافي → يُعاد حسابه: حسومات على الأساس وصافٍ > 0 والأرقام تركب', $ok139, $why139);
+
+/* =====================================================================
+ * 140) 🚪 «ترك من الكل» (2026-09-18 «لازم يكون فيه تاريخ ترك للضمان وتاريخ لصندوق التعويضات وتاريخ للكل — ومن بعدها حسب
+ *      موضوع الترك بيصير، وإذا الترك من الكل يعني ما في اسم ولا رواتب من بعده»):
+ *      أربعة تواريخ ترك — «الكل» (left_date_all) وحده يُخرج الاسم والرواتب من السنين اللاحقة (yearEmploymentFilter/المحرّك/الشفاء/فتح السنة/
+ *      اللوائح)؛ ترك الضمان/المالية/الصندوق يوقف جهته فقط (الاشتراك بالمحرّك + لوائحها ونماذجها) من الشهر التالي، والراتب والاسم يكمّلان.
+ *      العمود يتركّب ذاتياً ويُعبَّأ مرّة واحدة بالأبكر من الثلاثة لكل الموجودين (لا يتغيّر أي سلوك قائم). المصدر الواحد: leftDateSql/leftDateOf.
+ * =================================================================== */
+$fn140 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$pc140 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$em140 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$hd140 = (string)file_get_contents($PROJ . '/includes/header.php');
+check('ترك من الكل (كود): عمود left_date_all يتركّب ذاتياً + تعبئة مرّة واحدة + المصدر الواحد leftDateSql/leftDateOf/monthSubjectTo + الخانة الرابعة بملف الموظف + المحرّك يوقف الجهة فقط',
+      function_exists('ensureLeftDateAllColumn') && function_exists('leftDateSql') && function_exists('leftDateSqlFor') && function_exists('leftDateOf') && function_exists('leftDateOfFor') && function_exists('monthSubjectTo')
+      && strpos($fn140, "ADD COLUMN left_date_all DATE NULL") !== false && strpos($fn140, "left_date_all_migrated_20260918") !== false
+      && strpos($fn140, '$leftDate = leftDateSql($prefix);') !== false
+      && strpos($hd140, 'ensureLeftDateAllColumn();') !== false
+      && strpos($em140, 'name="left_date_all"') !== false && strpos($em140, "'left_date_all' => (\$_POST['left_date_all'] ?? '') ?: null,") !== false
+      && strpos($pc140, '$ld = leftDateOf($this->employee);') !== false
+      && strpos($pc140, "if (\$emp['tax_subject'] && \$subjTax) {") !== false
+      && strpos($pc140, "if (\$emp['cnss_subject'] && \$subjCnss) {") !== false
+      && strpos($pc140, "if (\$emp['eoc_subject'] && \$subjEoc && \$emp['employee_type'] === 'enseignant_titulaire') {") !== false
+      && (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'left_date_all'")->fetch()
+      && strpos((string)getSetting('left_date_all_migrated_20260918', ''), 'done') === 0);
+// كنس البرنامج كله: لا يبقى أي تعبير «أبكر الثلاثة» (LEAST) ولا «الثلاثة NULL» خارج المصدر الواحد (استثناء وحيد: سطر التعبئة بـensureLeftDateAllColumn)
+$sweep140 = []; $least140 = 0;
+$it140 = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($PROJ, FilesystemIterator::SKIP_DOTS));
+foreach ($it140 as $f140) {
+    $p140 = str_replace('\\', '/', $f140->getPathname());
+    if (substr($p140, -4) !== '.php' || strpos($p140, '/tools/') !== false || strpos($p140, '/tmp/') !== false || strpos($p140, '/vendor/') !== false
+        || preg_match('~/(fix_departures_once|migrate|cleanup_ghosts)\.php$~', $p140)) continue;
+    $s140 = (string)file_get_contents($p140);
+    $least140 += preg_match_all('/LEAST\(COALESCE\((NULLIF\()?(e\.|\{\$prefix\})?left_date_cnss/', $s140);
+    if (preg_match('/left_date_cnss IS NULL AND (\{\$prefix\}|e\.)?left_date_finance IS NULL/', $s140)) $sweep140[] = basename($p140);
+}
+check('ترك من الكل (كنس البرنامج): لا تعبير «أبكر الثلاثة» خارج سطر التعبئة الواحد ولا «الثلاثة NULL» بأي ملف', $least140 === 1 && !$sweep140,
+      "LEAST=$least140" . ($sweep140 ? ' · IS NULL: ' . implode('، ', $sweep140) : ''));
+// وحدات PHP: تاريخ الجهة = الأبكر بين تاريخها وتاريخ الكل؛ شهر الترك خاضع والذي يليه لا
+$u140 = ['left_date_all' => '2026-06-30', 'left_date_cnss' => '2026-09-30', 'left_date_finance' => null, 'left_date_eoc' => '0000-00-00'];
+check('ترك من الكل (وحدات): leftDateOfFor = الأبكر بين الجهة والكل · monthSubjectTo: شهر الترك خاضع والتالي لا · بلا أي تاريخ = خاضع دائماً',
+      leftDateOf($u140) === '2026-06-30' && leftDateOfFor($u140, 'cnss') === '2026-06-30' && leftDateOfFor($u140, 'finance') === '2026-06-30'
+      && leftDateOfFor(['left_date_cnss' => '2026-03-15'], 'cnss') === '2026-03-15' && leftDateOf(['left_date_cnss' => '2026-03-15']) === null
+      && monthSubjectTo($u140, 'cnss', 2026, 6) === true && monthSubjectTo($u140, 'cnss', 2026, 7) === false
+      && monthSubjectTo(['left_date_cnss' => '2026-03-15'], 'cnss', 2026, 3) === true && monthSubjectTo(['left_date_cnss' => '2026-03-15'], 'cnss', 2026, 4) === false
+      && monthSubjectTo([], 'eoc', 2030, 1) === true);
+// تجربة حيّة تُرجَع: ملاك خاضع للضمان بلا تواريخ — (أ) ترك الضمان 31/1/2026 ⇒ آذار 2026: الضمان 0 والأساس والصندوق كما هما، وكانون الثاني ما زال بضمانه؛
+// وما زال ضمن أساتذة 2025-2026 (yearEmploymentFilter) — (ب) ترك من الكل 2020 ⇒ يختفي من السنة
+$ok140 = false; $why140 = '';
+try {
+    $db->beginTransaction();
+    $t140 = $db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.year = 2026 AND ms.month = 3
+        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND e.cnss_subject = 1 AND e.eoc_subject = 1
+          AND ms.cnss_amount_lbp > 0 AND ms.caisse_amount_lbp > 0 AND ms.base_plus_echelon_lbp > 0
+          AND " . leftDateSql('e.') . " = '9999-12-31' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+          AND (e.keep_working_past_64 IS NULL OR e.keep_working_past_64 = 0) ORDER BY e.id LIMIT 1")->fetchColumn();
+    if (!$t140) { $ok140 = true; $why140 = 'لا عيّنة — تخطٍّ'; }
+    else {
+        $tid = (int)$t140;
+        $c0 = (new PayrollCalculator($tid, 3, 2026))->calculate();
+        $db->exec("UPDATE employees SET left_date_cnss = '2026-01-31' WHERE id = $tid");
+        $c1 = (new PayrollCalculator($tid, 3, 2026))->calculate();
+        $cJan = (new PayrollCalculator($tid, 1, 2026))->calculate();
+        [$yf140, $yp140] = yearEmploymentFilter('2025-2026', 'e.');
+        $in1 = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.id = ?" . $yf140); $in1->execute(array_merge([$tid], $yp140)); $in1 = (int)$in1->fetchColumn();
+        $db->exec("UPDATE employees SET left_date_all = '2020-01-01' WHERE id = $tid");
+        $in2 = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.id = ?" . $yf140); $in2->execute(array_merge([$tid], $yp140)); $in2 = (int)$in2->fetchColumn();
+        $ok140 = (int)$c0['cnss_amount_lbp'] > 0 && (int)$c1['cnss_amount_lbp'] === 0 && (int)$cJan['cnss_amount_lbp'] > 0
+              && (int)$c1['base_plus_echelon_lbp'] === (int)$c0['base_plus_echelon_lbp'] && (int)$c1['caisse_amount_lbp'] === (int)$c0['caisse_amount_lbp']
+              && (int)$c1['net_salary_lbp'] > (int)$c0['net_salary_lbp']
+              && $in1 === 1 && $in2 === 0;
+        $why140 = "#$tid آذار: ضمان " . number_format((int)$c0['cnss_amount_lbp']) . ' → ' . number_format((int)$c1['cnss_amount_lbp']) . ' · ك٢ ' . number_format((int)$cJan['cnss_amount_lbp'])
+                . ' · صندوق ' . number_format((int)$c0['caisse_amount_lbp']) . '=' . number_format((int)$c1['caisse_amount_lbp']) . " · بالسنة: ضمان فقط=$in1 · الكل=$in2";
+    }
+} catch (Throwable $e) { $why140 = 'خطأ: ' . $e->getMessage(); }
+finally { if ($db->inTransaction()) $db->rollBack(); }
+check('ترك من الكل (تجربة حيّة تُرجَع): ترك الضمان وحده يصفّر الضمان من الشهر التالي فقط ويُبقي الاسم بالسنة والأساس والصندوق؛ الترك من الكل يخفيه', $ok140, $why140);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

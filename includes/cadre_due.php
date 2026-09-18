@@ -113,7 +113,7 @@ function schoolCadreTransportTemplate(PDO $db, int $schoolId, string $sy): ?arra
     $y1 = (int)substr($sy, 0, 4);
     $emps = $db->query("SELECT id, transport_daily_amount, transport_daily_currency, transport_days_per_week, transport_weeks FROM employees
                         WHERE school_id = " . (int)$schoolId . " AND is_deleted = 0 AND status = 'actif' AND employee_type = 'enseignant_titulaire'
-                          AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= '" . $y1 . "-10-01'")->fetchAll(PDO::FETCH_ASSOC);
+                          AND " . leftDateSql() . " >= '" . $y1 . "-10-01'")->fetchAll(PDO::FETCH_ASSOC);
     if (!$emps) return $cache[$k] = null;
     $try = [$sy, ($y1 - 1) . '-' . $y1];
     $res = null;
@@ -234,9 +234,7 @@ function cadreDueCandidates(PDO $db, string $sy, ?array $schoolIds = null, bool 
     $sql = "SELECT e.*, s.name_ar school_name_ar, s.name_fr school_name_fr FROM employees e JOIN schools s ON s.id = e.school_id
             WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_contractuel'
               AND e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.hire_date <= ?
-              AND LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),
-                        COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),
-                        COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31')) >= ?
+              AND " . leftDateSql('e.') . " >= ?
               AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND school_id = e.school_id AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0))
               AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND school_id = e.school_id AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0))";
     $p = [$cut, $yearStart, $syA, $syB];

@@ -265,11 +265,12 @@ function complianceItems(PDO $db, string $sy): array {
     }
 
     // ── 10) تارك عنده رواتب بعد تركه (بنفس السنة — الأشهر التالية لشهر الترك +1) ──
-    foreach ($q("SELECT e.*, LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) ld,
+    $ldAll = leftDateSql('e.'); // 🚪 الترك من الكل فقط (2026-09-18)
+    foreach ($q("SELECT e.*, $ldAll ld,
             COUNT(*) n, SUM(ms.net_salary_lbp) net, MIN(ms.year*100+ms.month) m1, MAX(ms.year*100+ms.month) m2
         FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
-        WHERE e.is_deleted = 0" . $sc . " AND LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) < '9999-12-31'
-          AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > DATE_ADD(LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')), INTERVAL 1 MONTH)
+        WHERE e.is_deleted = 0" . $sc . " AND $ldAll < '9999-12-31'
+          AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > DATE_ADD($ldAll, INTERVAL 1 MONTH)
         GROUP BY e.id", [$sy]) as $r) {
         $m1 = (int)$r['m1']; $m2 = (int)$r['m2'];
         $add('left_rows', $r, 'ترك بتاريخ ' . formatDate($r['ld']) . ' وعنده ' . (int)$r['n'] . ' أشهر مخزّنة بعد تركه (' . complianceMonthLabel($m1 % 100, intdiv($m1, 100)) . ' → ' . complianceMonthLabel($m2 % 100, intdiv($m2, 100)) . ') مجموع صافيها ' . complianceFmt($r['net']) . ' ل.ل',
@@ -323,7 +324,7 @@ function complianceItems(PDO $db, string $sy): array {
     // ── 12) صف بسعر صرف صفر (لغير التاركين) ──
     foreach ($q("SELECT e.*, ms.month, ms.year FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0 AND ms.school_year = ? AND COALESCE(ms.exchange_rate,0) <= 0" . $sc . "
-          AND LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) = '9999-12-31'
+          AND $ldAll = '9999-12-31'
         GROUP BY e.id ORDER BY ms.year, ms.month", [$sy]) as $r) {
         $add('row_rate0', $r, 'صف ' . complianceMonthLabel((int)$r['month'], (int)$r['year']) . ' مخزّن بسعر صرف صفر أو فارغ (الدولار فيه غلط)', 'إعادة حساب سنة ' . $sy . ' بأسعار الصرف المسجّلة', true);
     }
@@ -331,7 +332,7 @@ function complianceItems(PDO $db, string $sy): array {
     // ── 13) موظف فاعل بلا رواتب بسنة مفتوحة لمدرسته ──
     foreach ($q("SELECT e.* FROM employees e
         WHERE e.is_deleted = 0 AND e.status = 'actif'" . $sc . $yf . "
-          AND LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) = '9999-12-31'
+          AND $ldAll = '9999-12-31'
           AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ?)
           AND EXISTS (SELECT 1 FROM monthly_salaries m2 JOIN employees e2 ON e2.id = m2.employee_id WHERE e2.school_id = e.school_id AND m2.school_year = ?)
         ORDER BY e.school_id, e.id", array_merge($yp, [$sy, $sy])) as $r) {
@@ -399,13 +400,11 @@ function complianceItems(PDO $db, string $sy): array {
     // ── 13هـ) تاريخ ترك مستحيل (2026-09-12 سامر ابونادر/عبرا: تواريخ تركه الثلاثة = تاريخ ولادته 1984 فاختفى من كل الكشوف ولم يُحسب —
     //  «انتبه بدك تحطّو بكل البرنامج») ── أي تاريخ ترك = تاريخ الولادة أو قبل دخول المدرسة = خطأ إدخال/استيراد؛ التصحيح = مسح ذاك التاريخ
     //  وإعادة حساب السنة (يجوز «موافق على الكل»). كل المدارس، الفاعلون غير المحذوفين.
-    foreach ($q("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif'" . $sc . " AND (
-            (e.left_date_cnss    IS NOT NULL AND e.left_date_cnss    <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_cnss    = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_cnss    < e.hire_date))) OR
-            (e.left_date_finance IS NOT NULL AND e.left_date_finance <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_finance = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_finance < e.hire_date))) OR
-            (e.left_date_eoc     IS NOT NULL AND e.left_date_eoc     <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_eoc     = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_eoc     < e.hire_date)))
-        ) ORDER BY e.school_id, e.id") as $r) {
+    // 🚪 (2026-09-18) الأعمدة الأربعة: الكل + الضمان + المالية + الصندوق
+    $impossibleSql = implode(' OR ', array_map(fn($c) => "(e.$c IS NOT NULL AND e.$c <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.$c = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.$c < e.hire_date)))", array_keys(leftDateColumns())));
+    foreach ($q("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif'" . $sc . " AND ($impossibleSql) ORDER BY e.school_id, e.id") as $r) {
         $bad = [];
-        foreach (['left_date_cnss' => 'الضمان', 'left_date_finance' => 'المالية', 'left_date_eoc' => 'الصندوق'] as $c => $lbl) {
+        foreach (leftDateColumns() as $c => $lbl) {
             $v = (string)$r[$c];
             if ($v !== '' && $v !== '0000-00-00' && (($r['birth_date'] && $v === (string)$r['birth_date']) || ($r['hire_date'] && $r['hire_date'] !== '0000-00-00' && $v < (string)$r['hire_date']))) $bad[$c] = $lbl . ' ' . $v;
         }
@@ -542,7 +541,7 @@ function complianceApply(PDO $db, array $it): string {
             logAudit('compliance_family_ded_on', 'employees', $eid, ['now' => $d['now'] ?? null], ['set' => $set, 'full' => $d['full'] ?? null, 'sy' => $sy]);
             return 'ضُوّي ' . (!empty($d['spouse']) ? 'زيادة الزوج' : '') . (!empty($d['spouse']) && !empty($d['kids']) ? ' و' : '') . (!empty($d['kids']) ? 'تنزيل الأولاد' : '') . ' (التنزيل ' . complianceFmt($d['now'] ?? 0) . ' → ' . complianceFmt($d['full'] ?? 0) . ') وأُعيد حساب ' . $n . ' شهراً';
         case 'left_impossible':
-            $cols = array_values(array_intersect((array)($d['cols'] ?? []), ['left_date_cnss', 'left_date_finance', 'left_date_eoc']));
+            $cols = array_values(array_intersect((array)($d['cols'] ?? []), array_keys(leftDateColumns())));
             if (!$cols) return 'لا تاريخ';
             $db->exec("UPDATE employees SET " . implode(', ', array_map(fn($c) => "$c = NULL", $cols)) . " WHERE id = $eid");
             $n = $recalcYear();

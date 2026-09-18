@@ -74,7 +74,7 @@ function yearFilter($schoolYear, $prefix = '') {
     if ($schoolYear === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$schoolYear)) return '';
     return " AND {$prefix}id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = '" . $schoolYear . "'"
          . " AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))"
-         . " AND {$prefix}left_date_cnss IS NULL AND {$prefix}left_date_finance IS NULL AND {$prefix}left_date_eoc IS NULL";
+         . " AND " . leftDateSql($prefix) . " = '9999-12-31'"; // 🚪 الترك من الكل فقط (2026-09-18)
 }
 
 // معرّفات موظفي النطاق+الفئة **الموجودين بالسنة المختارة فقط**

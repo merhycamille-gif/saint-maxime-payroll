@@ -147,9 +147,7 @@ try {
     // قاعدة التارك §١٠ (شكوى 2026-08-06): التارك يبقى بسنة تركه فقط — لا رواتب له في
     // سنة دراسية تبدأ بعد تاريخ تركه. غير المدفوع يُنظَّف تلقائياً (شفاء + حماية المحرّك)؛
     // المدفوع لا يُمسّ آلياً فيُعرَض هنا لقرار المستخدم.
-    $hcLd = "LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),"
-          . "COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),"
-          . "COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31'))";
+    $hcLd = leftDateSql('e.'); // 🚪 الترك من الكل فقط (2026-09-18)
     $hcDep = "(CASE WHEN MONTH($hcLd) >= 10 THEN YEAR($hcLd) ELSE YEAR($hcLd) - 1 END)";
     $hcPh = "FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
              WHERE e.is_deleted = 0 AND $hcLd < '9999-12-31'

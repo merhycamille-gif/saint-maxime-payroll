@@ -91,10 +91,9 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
 
     // 8ب) تاريخ ترك مستحيل (= تاريخ الولادة أو قبل دخول المدرسة) — يخفي الموظف من كل الكشوف (سامر ابونادر/عبرا 2026-09-12، «بكل البرنامج»)
     $add('left_impossible', 'موظف فاعل بتاريخ ترك مستحيل (= تاريخ ولادته أو قبل دخوله المدرسة) — يختفي من الكشوف ولا يُحسب', $q("
-        SELECT $nm nm FROM employees e WHERE e.is_deleted=0 AND e.status='actif' AND (
-            (e.left_date_cnss    IS NOT NULL AND e.left_date_cnss    <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_cnss    = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_cnss    < e.hire_date))) OR
-            (e.left_date_finance IS NOT NULL AND e.left_date_finance <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_finance = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_finance < e.hire_date))) OR
-            (e.left_date_eoc     IS NOT NULL AND e.left_date_eoc     <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.left_date_eoc     = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.left_date_eoc     < e.hire_date))))"));
+        SELECT $nm nm FROM employees e WHERE e.is_deleted=0 AND e.status='actif' AND ("
+        . implode(' OR ', array_map(fn($c) => "(e.$c IS NOT NULL AND e.$c <> '0000-00-00' AND ((e.birth_date IS NOT NULL AND e.$c = e.birth_date) OR (e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.$c < e.hire_date)))", array_keys(leftDateColumns())))
+        . ")")); // 🚪 الأعمدة الأربعة (2026-09-18)
 
     // 9) نسبة ٪ عند غير الملاك (النسبة من أساس السلسلة — لا معنى لها للمتعاقد/الموظف)
     $add('pct_nontit', 'سطر نسبة ٪ فعّال عند متعاقد أو موظف (النسبة للملاك فقط)', $q("
@@ -123,15 +122,15 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
     // 14) موظف فاعل بلا أي شهر بالسنة (ما دخل السنة بعد) — للمراجعة
     $add('active_nomonths', 'موظف فاعل بلا أي راتب مخزّن بالسنة', $q("
         SELECT $nm nm FROM employees e WHERE e.is_deleted=0 AND e.status='actif'
-          AND COALESCE(e.left_date_cnss, e.left_date_finance, e.left_date_eoc) IS NULL
+          AND " . leftDateSql('e.') . " = '9999-12-31'
           AND (e.hire_date IS NULL OR e.hire_date < ?)
           AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id=e.id AND ms.school_year=?)", [substr($sy, 5, 4) . '-10-01', $sy]));
 
     // 15) تارك عنده رواتب بعد تركه
     $add('left_rows', 'تارك عنده رواتب مخزّنة بعد تاريخ تركه', $q("
         SELECT $nm nm FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
-        WHERE e.is_deleted=0 AND LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')) < '9999-12-31'
-          AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > DATE_ADD(LEAST(COALESCE(e.left_date_cnss,'9999-12-31'),COALESCE(e.left_date_finance,'9999-12-31'),COALESCE(e.left_date_eoc,'9999-12-31')), INTERVAL 1 MONTH)
+        WHERE e.is_deleted=0 AND " . leftDateSql('e.') . " < '9999-12-31'
+          AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > DATE_ADD(" . leftDateSql('e.') . ", INTERVAL 1 MONTH)
         GROUP BY e.id"));
 
     // 16) أسماء مكرّرة فاعلة بنفس المدرسة (اسم + شهرة + أب)

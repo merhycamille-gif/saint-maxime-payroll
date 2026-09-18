@@ -18,22 +18,26 @@ function ltDate($d) {
     return $t ? date('d/m/Y', $t) : e($d);
 }
 
-// كل التاركين ضمن نطاق المدرسة: عنده أيّ تاريخ ترك. مرتَّبون حسب المدرسة ثم الفئة ثم الاسم.
+// كل التاركين ضمن نطاق المدرسة: عنده أيّ تاريخ ترك (الكل/ضمان/مالية/صندوق). مرتَّبون حسب المدرسة ثم الفئة ثم الاسم.
+ensureLeftDateAllColumn();
 $sql = "SELECT e.*, COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
         FROM employees e LEFT JOIN schools sc ON sc.id = e.school_id
         WHERE e.is_deleted = 0
-          AND (e.left_date_cnss IS NOT NULL OR e.left_date_finance IS NOT NULL OR e.left_date_eoc IS NOT NULL)"
+          AND (e.left_date_all IS NOT NULL OR e.left_date_cnss IS NOT NULL OR e.left_date_finance IS NOT NULL OR e.left_date_eoc IS NOT NULL)"
      . schoolScopeSql('e.school_id')
      . " ORDER BY school_name,
          FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
          COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)";
 $allRows = $db->query($sql)->fetchAll();
 
-// تاريخ الترك الأساسي لكل صفّ = الأبكر بين تواريخه، والسنة الدراسية المشتقّة منه
+// 🚪 (2026-09-18) تاريخ الترك الأساسي = «الترك من الكل» (هو الذي يُخرج الاسم والرواتب)؛ مَن ترك جهةً فقط
+// (ضمان/مالية/صندوق) يظهر هنا للعلم بتاريخ جهته الأبكر ويبقى فاعلاً بالرواتب — والسنة الدراسية تُشتقّ من الأساسي
 foreach ($allRows as &$r) {
+    $all = leftDateOf($r);
     $ds = array_filter([$r['left_date_cnss'], $r['left_date_finance'], $r['left_date_eoc']],
             fn($d) => !empty($d) && $d !== '0000-00-00');
-    $r['_primary_ts'] = $ds ? min(array_map('strtotime', $ds)) : 0;
+    $r['_partial'] = ($all === null);
+    $r['_primary_ts'] = $all !== null ? strtotime($all) : ($ds ? min(array_map('strtotime', $ds)) : 0);
     $r['_sy'] = $r['_primary_ts'] ? schoolYearOfDate(date('Y-m-d', $r['_primary_ts'])) : null;
 }
 unset($r);
@@ -61,7 +65,7 @@ if ($allRows) {
                      FROM monthly_salaries WHERE employee_id IN (" . implode(',', $ids) . ") GROUP BY employee_id");
     foreach ($q as $row) { $maxRank[(int)$row['employee_id']] = (int)$row['mr']; }
     foreach ($allRows as $r) {
-        if (!$r['_primary_ts']) continue;
+        if (!$r['_primary_ts'] || $r['_partial']) continue; // الترك الجزئي لا يوقف الراتب — لا تناقض
         $ly = (int)date('Y', $r['_primary_ts']); $lm = (int)date('n', $r['_primary_ts']);
         $depRank = ($lm >= 10) ? $ly : $ly - 1;
         $mr = $maxRank[(int)$r['id']] ?? null;
@@ -84,7 +88,7 @@ $grandTotal = count($allRows);
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="alert alert-info no-print" style="margin-bottom:14px">
-  <i class="fas fa-door-open"></i> لائحة <strong>الأساتذة والموظفين الذين تركوا العمل</strong> (سُجِّل لهم تاريخ ترك عبر ملف الأستاذ أو عبر رابط تحديث المعلومات) — مصنّفة <strong>حسب السنة الدراسية</strong> التي وقع فيها الترك. الافتراضي: السنة الحالية <strong><?= e(currentSchoolYear()) ?></strong>.<br>
+  <i class="fas fa-door-open"></i> لائحة <strong>الأساتذة والموظفين الذين تركوا العمل</strong> (سُجِّل لهم تاريخ ترك عبر ملف الأستاذ أو عبر رابط تحديث المعلومات) — مصنّفة <strong>حسب السنة الدراسية</strong> التي وقع فيها الترك. الافتراضي: السنة الحالية <strong><?= e(currentSchoolYear()) ?></strong>. «ترك من الكل» وحده يُخرج الاسم والرواتب؛ مَن ترك الضمان أو المالية أو الصندوق فقط يظهر «ترك جزئي» ويبقى براتبه.<br>
   <span dir="ltr">Liste des enseignants / employés ayant quitté, classée par année scolaire du départ. Par défaut : l'année en cours.</span>
 </div>
 
@@ -144,7 +148,7 @@ include __DIR__ . '/../includes/header.php';
           <th>#</th>
           <th>Nom / الاسم</th>
           <th>Catégorie / الفئة</th>
-          <th>Date de départ / تاريخ الترك</th>
+          <th>Départ définitif / ترك من الكل</th>
           <th>CNSS / ترك الضمان</th>
           <th>Finances / ترك المالية</th>
           <th>EOC / ترك الصندوق</th>
@@ -160,7 +164,7 @@ include __DIR__ . '/../includes/header.php';
             <td><?= $i ?></td>
             <td><strong><?= e($nm) ?></strong></td>
             <td><?= e(employeeTypeLabel($emp['employee_type'], 'ar')) ?></td>
-            <td><strong style="color:#b91c1c"><?= $primary ? date('d/m/Y', $primary) : '—' ?></strong></td>
+            <td><?php if ($emp['_partial']): ?><span style="color:#92400e" title="ترك جهة فقط — الراتب والاسم مستمرّان">ترك جزئي / partiel</span><?php else: ?><strong style="color:#b91c1c"><?= $primary ? date('d/m/Y', $primary) : '—' ?></strong><?php endif; ?></td>
             <td><?= ltDate($emp['left_date_cnss']) ?></td>
             <td><?= ltDate($emp['left_date_finance']) ?></td>
             <td><?= ltDate($emp['left_date_eoc']) ?></td>

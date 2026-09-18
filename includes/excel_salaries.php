@@ -78,7 +78,7 @@ function excelSalariesRows(PDO $db, int $schoolId, string $sy, string $cat = 'al
     $st = $db->prepare("SELECT e.id, e.employee_type, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr) fn, COALESCE(NULLIF(e.father_name_ar,''), '') fa,
                 COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr) ln, e.salary_input_mode, e.base_salary_usd, e.contract_salary_lbp, e.days_per_week
             FROM employees e WHERE e.school_id = ? AND e.is_deleted = 0 AND e.employee_type IN (" . implode(',', array_map([$db, 'quote'], $types)) . ")
-              AND e.status = 'actif' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+              AND e.status = 'actif' AND " . leftDateSql('e.') . " = '9999-12-31'
               " . ($tax !== '' ? " AND e.tax_subject = " . (int)$tax : '') . "
               AND " . excelSalariesInYearSql($sy) . "
             ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), e.last_name_ar, e.first_name_ar, e.id");

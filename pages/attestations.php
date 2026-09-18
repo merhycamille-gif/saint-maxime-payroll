@@ -254,6 +254,7 @@ if ($emp && !empty($_GET['dossier'])):
             $o  = $row2('رقم الضمان (CNSS)', $emp['nssf_number']??'');
             $o .= $row2('الرقم المالي (MOF)', $emp['finance_ministry_number']??'');
             $o .= $row2('رقم الصندوق (Caisse)', $emp['caisse_number']??'');
+            $o .= $row2('تاريخ الترك من الكل', !empty($emp['left_date_all']) ? formatDate($emp['left_date_all']) : '');
             $o .= $row2('تاريخ ترك الضمان', $emp['left_date_cnss'] ? formatDate($emp['left_date_cnss']) : '');
             $o .= $row2('تاريخ ترك المالية', $emp['left_date_finance'] ? formatDate($emp['left_date_finance']) : '');
             $o .= $row2('تاريخ ترك الصندوق', $emp['left_date_eoc'] ? formatDate($emp['left_date_eoc']) : '');
@@ -571,8 +572,8 @@ if (!$emp):
         }
         $hrsDef = trim((string)($_GET['hrs'] ?? ''));
         if ($hrsDef === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrsDef = (string)round((float)$emp['hours_per_week'] * 52 / 12);
-        // 🔴 تاريخ الترك من ملف الموظف (تاريخ ترك الضمان) حصراً — يُعرض للعلم فقط ويُعدَّل من ملف الموظف
-        $leaveDate = $emp['left_date_cnss'] ?: '';
+        // 🔴 تاريخ الترك من ملف الموظف (ترك الضمان، أو الترك من الكل إن كان أبكر) حصراً — يُعرض للعلم فقط ويُعدَّل من ملف الموظف
+        $leaveDate = leftDateOfFor($emp, 'cnss') ?: '';
         $reasonSel = (int)($_GET['reason'] ?? 1); if ($reasonSel < 1 || $reasonSel > 7) $reasonSel = 1;
         $REASONS = [1=>'استقالة / Démission',2=>'بلوغ السن / Âge légal',3=>'عجز / Invalidité',4=>'زواج / Mariage',5=>'وفاة / Décès',6=>'هجرة / Émigration',7=>'عمل آخر / Autre emploi'];
         // 🔴 «تصريح باستخدام أجير ما عم بيغيّر — صحّح» (2026-09-15): خيارات المكوّنات والعملة هنا أيضاً (كل الخيارات بكل المحلات)

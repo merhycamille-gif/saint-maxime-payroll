@@ -636,6 +636,71 @@ function openYearCarrySql(PDO $db, int $schoolId, int $y1): string {
                  OR hire_date >= " . $db->quote(($y1 - 1) . '-10-01') . ")";
 }
 
+/**
+ * 🚪 تواريخ الترك الأربعة (2026-09-18 — «لازم يكون فيه تاريخ ترك للضمان وتاريخ لصندوق التعويضات وتاريخ للكل،
+ * ومن بعدها حسب موضوع الترك بيصير — وإذا الترك من الكل يعني ما في اسم ولا رواتب من بعده»):
+ *   • left_date_all     = ترك من الكل (نهائي): هو وحده الذي يُخرج الاسم والرواتب من السنين اللاحقة (قاعدة التارك §١٠).
+ *   • left_date_cnss    = ترك الضمان: يوقف اشتراكات الضمان ولوائحه/إفاداته من الشهر التالي فقط — الاسم والراتب يكمّلان.
+ *   • left_date_finance = ترك المالية: يوقف الضريبة ونماذج المالية فقط.
+ *   • left_date_eoc     = ترك صندوق التعويضات: يوقف الصندوق ولوائحه فقط.
+ * تاريخ الجهة الفعلي = الأبكر بين تاريخ الجهة وتاريخ «الكل» (مَن ترك الكل ترك كل جهة).
+ * قبل هذا التاريخ كان أيّ تاريخ من الثلاثة = ترك كامل؛ فعند تركيب العمود يُعبَّأ «الكل» مرّة واحدة بالأبكر من
+ * الثلاثة لكل الموجودين (لا يتغيّر أي سلوك قائم) — والقاعدة الجديدة تسري على ما يُدخَل بعدها.
+ * العمود يتركّب ذاتياً (منهج DB self-install) — لا خطوة يدوية.
+ */
+function ensureLeftDateAllColumn(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        $fresh = false;
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'left_date_all'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN left_date_all DATE NULL COMMENT 'ترك من الكل (نهائي) — وحده يُخرج الاسم والرواتب' AFTER left_date_eoc");
+            $fresh = true;
+        }
+        if ($fresh || getSetting('left_date_all_migrated_20260918', '') === '') {
+            $trio = "LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'),COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'),COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31'))";
+            $n = (int)$db->exec("UPDATE employees SET left_date_all = NULLIF($trio, '9999-12-31') WHERE (left_date_all IS NULL OR left_date_all = '0000-00-00') AND $trio < '9999-12-31'");
+            setSetting('left_date_all_migrated_20260918', 'done ' . date('Y-m-d H:i') . ' rows=' . $n);
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+/** تعبير SQL لتاريخ «الترك من الكل» (9999-12-31 = لم يترك) — المصدر الواحد لقاعدة التارك بكل البرنامج */
+function leftDateSql(string $prefix = ''): string {
+    ensureLeftDateAllColumn();
+    return "COALESCE(NULLIF({$prefix}left_date_all,'0000-00-00'),'9999-12-31')";
+}
+/** أعمدة تواريخ الترك الأربعة مع تسمياتها (للفحوص والتقارير) */
+function leftDateColumns(): array {
+    return ['left_date_all' => 'الكل', 'left_date_cnss' => 'الضمان', 'left_date_finance' => 'المالية', 'left_date_eoc' => 'الصندوق'];
+}
+/** تعبير SQL لتاريخ ترك جهة معيّنة (cnss | finance | eoc) = الأبكر بين تاريخ الجهة وتاريخ الكل */
+function leftDateSqlFor(string $kind, string $prefix = ''): string {
+    $col = ['cnss' => 'left_date_cnss', 'finance' => 'left_date_finance', 'eoc' => 'left_date_eoc'][$kind] ?? null;
+    if ($col === null) return leftDateSql($prefix);
+    return "LEAST(COALESCE(NULLIF({$prefix}{$col},'0000-00-00'),'9999-12-31'), " . leftDateSql($prefix) . ")";
+}
+/** PHP: تاريخ «الترك من الكل» لصفّ موظف (null = لم يترك) */
+function leftDateOf(array $emp): ?string {
+    $v = (string)($emp['left_date_all'] ?? '');
+    return ($v !== '' && $v !== '0000-00-00') ? substr($v, 0, 10) : null;
+}
+/** PHP: تاريخ ترك جهة معيّنة (cnss | finance | eoc) = الأبكر بين تاريخ الجهة وتاريخ الكل (null = لم يتركها) */
+function leftDateOfFor(array $emp, string $kind): ?string {
+    $col = ['cnss' => 'left_date_cnss', 'finance' => 'left_date_finance', 'eoc' => 'left_date_eoc'][$kind] ?? null;
+    $ds = [leftDateOf($emp)];
+    if ($col !== null) { $v = (string)($emp[$col] ?? ''); $ds[] = ($v !== '' && $v !== '0000-00-00') ? substr($v, 0, 10) : null; }
+    $ds = array_filter($ds);
+    return $ds ? min($ds) : null;
+}
+/** هل شهر الراتب (year,month) ما زال خاضعاً لجهة معيّنة؟ شهر الترك نفسه يبقى خاضعاً، ويتوقّف من الشهر التالي */
+function monthSubjectTo(array $emp, string $kind, int $year, int $month): bool {
+    $ld = leftDateOfFor($emp, $kind);
+    if ($ld === null) return true;
+    return sprintf('%04d-%02d-01', $year, $month) <= $ld;
+}
+
 function yearEmploymentFilter($schoolYear, $prefix = '') {
     if ($schoolYear === 'all' || !preg_match('/^(\d{4})-(\d{4})$/', (string)$schoolYear, $m)) {
         return ['', []];
@@ -646,9 +711,7 @@ function yearEmploymentFilter($schoolYear, $prefix = '') {
     // التي تبدأ 1-10-2026). ولرؤية كل السابقين يُستعمل «كل السنين» (بلا فلترة).
     // شرط القيمة>0 يستبعد الصفوف الصفرية (الأشباح).
     $yearStart = $m[1] . '-10-01'; // بداية السنة الدراسية (تشرين الأول)
-    $leftDate = "LEAST(COALESCE({$prefix}left_date_cnss,'9999-12-31'),"
-              . "COALESCE({$prefix}left_date_finance,'9999-12-31'),"
-              . "COALESCE({$prefix}left_date_eoc,'9999-12-31'))";
+    $leftDate = leftDateSql($prefix); // 🚪 «الترك من الكل» وحده يُخرج الاسم (2026-09-18)
     $sql = " AND {$prefix}id IN (SELECT employee_id FROM monthly_salaries"
          . " WHERE school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))"
          . " AND {$leftDate} >= ?";
@@ -662,7 +725,7 @@ function yearEmploymentFilter($schoolYear, $prefix = '') {
 // تحافظ على أشهر سنة الترك نفسها (مثلاً ترك 30/6 ورواتب الصيف حتى 30/9 من نفس السنة الدراسية).
 function pruneSalariesAfterDeparture($db, $empId) {
     $empId = (int)$empId;
-    $row = $db->query("SELECT LEAST(COALESCE(left_date_cnss,'9999-12-31'),COALESCE(left_date_finance,'9999-12-31'),COALESCE(left_date_eoc,'9999-12-31')) ld FROM employees WHERE id = $empId")->fetch();
+    $row = $db->query("SELECT " . leftDateSql() . " ld FROM employees WHERE id = $empId")->fetch(); // 🚪 الترك من الكل فقط
     if (!$row || empty($row['ld']) || $row['ld'] === '9999-12-31') return 0; // ليس تاركاً → لا شيء
     $y = (int)substr($row['ld'], 0, 4); $m = (int)substr($row['ld'], 5, 2);
     $depRank = ($m >= 10) ? $y : $y - 1; // رتبة السنة الدراسية للترك (تبدأ في تشرين الأول)
@@ -699,9 +762,7 @@ function healLeaverPhantomRows() {
     try { setSetting('heal_leaver_phantoms_at', (string)time()); } catch (Exception $e) {}
     try {
         $db = getDB();
-        $ldExpr = "LEAST(COALESCE(NULLIF(e.left_date_cnss,'0000-00-00'),'9999-12-31'),"
-                . "COALESCE(NULLIF(e.left_date_finance,'0000-00-00'),'9999-12-31'),"
-                . "COALESCE(NULLIF(e.left_date_eoc,'0000-00-00'),'9999-12-31'))";
+        $ldExpr = leftDateSql('e.'); // 🚪 الترك من الكل فقط (2026-09-18)
         $depRank = "(CASE WHEN MONTH($ldExpr) >= 10 THEN YEAR($ldExpr) ELSE YEAR($ldExpr) - 1 END)";
         $d1 = (int)$db->exec("DELETE ms FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
             WHERE e.is_deleted = 0 AND $ldExpr < '9999-12-31' AND COALESCE(ms.is_paid, 0) = 0
@@ -2122,7 +2183,7 @@ function healNajatPamelaLeft20260827() {
             AND COALESCE(left_date_finance, '9999-12-31') < hire_date
             AND COALESCE(left_date_eoc, '9999-12-31') < hire_date")->fetchAll(PDO::FETCH_COLUMN);
         foreach ($ids as $id) {
-            $db->exec("UPDATE employees SET left_date_cnss=NULL, left_date_finance=NULL, left_date_eoc=NULL WHERE id=" . (int)$id);
+            $db->exec("UPDATE employees SET left_date_all=NULL, left_date_cnss=NULL, left_date_finance=NULL, left_date_eoc=NULL WHERE id=" . (int)$id);
         }
         setSetting('heal_najat_pamela_left_20260827', 'done: cleared=' . count($ids) . ($ids ? ' (ids ' . implode('،', $ids) . ')' : ''));
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
@@ -2648,7 +2709,7 @@ function cnssTaswiyaData($db, int $fy, array $schoolIds): array {
             ms.cnss_amount_lbp cn, ms.school_cnss_8_lbp c8,
             ms.school_family_comp_6_lbp f6, ms.school_end_of_service_8_5_lbp e85,
             e.first_name_ar, e.father_name_ar, e.last_name_ar, e.nssf_number, e.birth_date,
-            e.hire_date, e.left_date_cnss, e.employee_type
+            e.hire_date, " . leftDateSqlFor('cnss', 'e.') . " left_cnss, e.employee_type
         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0 AND ms.year = " . (int)$fy . " AND ms.school_id IN ($in)
           AND (ms.cnss_amount_lbp + ms.school_cnss_8_lbp + ms.school_family_comp_6_lbp + ms.school_end_of_service_8_5_lbp) > 0
@@ -2683,7 +2744,8 @@ function cnssTaswiyaData($db, int $fy, array $schoolIds): array {
         $p = &$persons[$key];
         if ($r['employee_type'] === 'employe') $p['worker'] = 1;
         if ($r['hire_date'] && (!$p['hire'] || $r['hire_date'] < $p['hire'])) $p['hire'] = $r['hire_date'];
-        if (($l = $r['left_date_cnss'] ?? null) && substr($l, 0, 4) === (string)$fy && (!$p['left'] || $l > $p['left'])) $p['left'] = $l;
+        // 🚪 تاريخ ترك الضمان الفعلي = الأبكر بين «ترك الضمان» و«الترك من الكل» (2026-09-18)
+        if (($l = $r['left_cnss'] ?? null) && $l !== '9999-12-31' && substr($l, 0, 4) === (string)$fy && (!$p['left'] || $l > $p['left'])) $p['left'] = $l;
         if ($bmal + $bfam + $bfin > 0) $p['monthsSet'][$m] = 1;
         $p['N'] += $bmal; $p['O'] += $bfin; $p['Q'] += $bfam;
         $monthly[$m]['mal'] += $bmal; $monthly[$m]['fam'] += $bfam; $monthly[$m]['fin'] += $bfin;
@@ -6564,7 +6626,7 @@ function healOpenYear2627_20260912(float $budget = 6.0): ?array {
         if ($s['stage'] === 'grades') {
             $q = $db->prepare("SELECT e.id, e.school_id FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND e.id > ?
                 AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ?)
-                AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= '2026-10-01'
+                AND " . leftDateSql('e.') . " >= '2026-10-01'
                 ORDER BY e.id LIMIT 40");
             while (microtime(true) - $t0 < $budget) {
                 $q->execute([(int)$s['cursor'], $sy]);
@@ -6657,7 +6719,7 @@ function healOpenYear2627b_20260912(float $budget = 6.0): ?array {
         $db->exec("CREATE TABLE IF NOT EXISTS _bk_grades_oy0912b LIKE employee_grade_history");
         if (!(int)$db->query("SELECT COUNT(*) FROM _bk_grades_oy0912b")->fetchColumn()) $db->exec("INSERT INTO _bk_grades_oy0912b SELECT * FROM employee_grade_history");
         $activeSql = "e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND e.id > ?
-                AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'), COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) >= '2025-10-01'";
+                AND " . leftDateSql('e.') . " >= '2025-10-01'";
 
         if ($s['stage'] === 'lawshift') {
             $q = $db->prepare("SELECT e.* FROM employees e WHERE $activeSql AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year IN (?, ?)) ORDER BY e.id LIMIT 25");
@@ -6750,8 +6812,8 @@ function healSamerAbounader20260912() {
         setSetting('bk_samer_20260912', json_encode(['emp' => $e, 'bonuses' => $db->query("SELECT * FROM employee_bonuses WHERE employee_id = $id")->fetchAll(PDO::FETCH_ASSOC)], JSON_UNESCAPED_UNICODE));
         // ① تواريخ الترك المستحيلة (= الولادة أو قبل دخول المدرسة) تُمسح
         $bd = (string)$e['birth_date']; $hd = (string)$e['hire_date']; $set = [];
-        foreach (['left_date_cnss', 'left_date_finance', 'left_date_eoc'] as $c) {
-            $v = (string)$e[$c];
+        foreach (['left_date_all', 'left_date_cnss', 'left_date_finance', 'left_date_eoc'] as $c) {
+            $v = (string)($e[$c] ?? '');
             if ($v !== '' && $v !== '0000-00-00' && ($v === $bd || ($hd && $v < $hd))) $set[] = "$c = NULL";
         }
         if ($set) { $db->exec("UPDATE employees SET " . implode(', ', $set) . " WHERE id = $id"); $log[] = 'مسح ' . count($set) . ' تواريخ ترك'; }

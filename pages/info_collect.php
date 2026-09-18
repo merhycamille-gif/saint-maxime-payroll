@@ -99,11 +99,12 @@ function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
     foreach ($uploadCols as $c) {
         if (!empty($sub[$c])) { $set[] = "$c = ?"; $vals[] = $sub[$c]; }
     }
-    // تاريخ ترك العمل: إن أدخله الأستاذ عبر الفورم → سجّله كتاريخ ترك (ضمان/مالية/صندوق)
-    // فيخرج من السنة الجارية (yearEmploymentFilter يعتبره تاركاً بمجرّد أيّ تاريخ ترك).
+    // تاريخ ترك العمل: إن أدخله الأستاذ عبر الفورم → «ترك من الكل» (+ الجهات الثلاث بنفس التاريخ)
+    // فيخرج من السنة الجارية (yearEmploymentFilter يعتبره تاركاً بتاريخ الترك من الكل — 2026-09-18).
     if (!empty($data['leave_date']) && strtotime($data['leave_date'])) {
+        ensureLeftDateAllColumn();
         $ld = date('Y-m-d', strtotime($data['leave_date']));
-        foreach (['left_date_cnss','left_date_finance','left_date_eoc'] as $lc) { $set[] = "$lc = ?"; $vals[] = $ld; }
+        foreach (['left_date_all','left_date_cnss','left_date_finance','left_date_eoc'] as $lc) { $set[] = "$lc = ?"; $vals[] = $ld; }
     }
     if ($set) {
         $vals[] = $sub['employee_id'];

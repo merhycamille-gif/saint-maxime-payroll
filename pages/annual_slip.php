@@ -47,7 +47,7 @@ function getYearCalcRoster($db, $typeFilter = '') {
     // 🔴 حماية المنقولين يدوياً: الاحتساب الجماعي يشمل فقط ذوي الإعداد الفعلي (ملاك أو أساس>0)؛
     // المتعاقد/الموظف ذو الراتب المنقول (بلا إعداد) لا يُعاد حسابه لئلا يُصفَّر راتبه المخزّن.
     $sql = "SELECT e.id, e.payment_months_per_year FROM employees e WHERE e.is_deleted = 0"
-         . " AND e.status = 'actif' AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL"
+         . " AND e.status = 'actif' AND " . leftDateSql('e.') . " = '9999-12-31'"
          . " AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)"
          . schoolScopeSql('e.school_id');
     $params = [];

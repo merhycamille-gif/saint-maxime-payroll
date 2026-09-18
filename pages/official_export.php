@@ -773,9 +773,7 @@ if ($form === 'mof_r567') {
 
     // ٣) التاركون خلال السنة (ر7)
     $lv = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . "
-        AND LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'),
-                  COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'),
-                  COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31')) BETWEEN ? AND ?
+        AND " . leftDateSqlFor('finance') . " BETWEEN ? AND ?
         ORDER BY (COALESCE(finance_ministry_number,'') REGEXP '[0-9]') DESC,
             COALESCE(NULLIF(first_name_ar,''),first_name_fr)");
     $lv->execute([$fy . '-01-01', $fy . '-12-31']);
@@ -1058,11 +1056,7 @@ JS
     ];
     foreach ($leavers as $j => $le2) {
         $R = 13 + $j;
-        $left2 = min(array_filter([
-            ($le2['left_date_cnss'] ?? null) ?: null,
-            ($le2['left_date_finance'] ?? null) ?: null,
-            ($le2['left_date_eoc'] ?? null) ?: null,
-        ]) ?: [$fy . '-12-31']);
+        $left2 = leftDateOfFor($le2, 'finance') ?: ($fy . '-12-31'); // 🚪 ترك المالية (أو من الكل)
         $nm3 = preg_replace('/\s+/', ' ', trim(($le2['first_name_ar'] ?? '') . ' ' . ($le2['father_name_ar'] ?? '') . ' ' . ($le2['last_name_ar'] ?? '')));
         if ($nm3 === '') $nm3 = trim(($le2['first_name_fr'] ?? '') . ' ' . ($le2['last_name_fr'] ?? ''));
         $r7c += [
@@ -1634,7 +1628,8 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
         // إعلام عن ترك أجير عمله في المؤسسة
         // 🔴 تاريخ الترك يُقرأ من ملف الموظف (تاريخ ترك الضمان) حصراً — لا من الشاشة
         // (بطلب المستخدم 2026-08-18)؛ إن لم يكن محطوطاً بالملف تبقى الخانات فارغة (لا تاريخ اليوم).
-        $ldTs = $emp['left_date_cnss'] ? strtotime($emp['left_date_cnss']) : 0;
+        $ldCnss = leftDateOfFor($emp, 'cnss'); // 🚪 ترك الضمان، أو الترك من الكل إن كان أبكر (2026-09-18)
+        $ldTs = $ldCnss ? strtotime($ldCnss) : 0;
         $reason = (int)($_GET['reason'] ?? 1); if ($reason < 1 || $reason > 7) $reason = 1;
         $reasonCells = [1 => 'C20', 2 => 'E20', 3 => 'G20', 4 => 'I20', 5 => 'K20', 6 => 'M20', 7 => 'O20'];
         $cells = [

@@ -163,7 +163,7 @@ if ($action === 'calc_all') {
     // (نفس حماية recalcEmployeeYear / recalcSalariesInRange).
     $syStartC = ($month >= 10 ? $year : $year - 1) . '-10-01'; // بداية السنة الدراسية للشهر المحسوب
     $sqlC = "SELECT id FROM employees WHERE is_deleted = 0 AND status = 'actif'"
-          . " AND LEAST(COALESCE(left_date_cnss,'9999-12-31'),COALESCE(left_date_finance,'9999-12-31'),COALESCE(left_date_eoc,'9999-12-31')) >= ?"
+          . " AND " . leftDateSql() . " >= ?"
           . " AND (employee_type = 'enseignant_titulaire' OR base_salary_usd > 0 OR contract_salary_lbp > 0)" . schoolScopeSql();
     $paramsC = [$syStartC];
     if ($typeFilter) { $sqlC .= " AND employee_type = ?"; $paramsC[] = $typeFilter; }

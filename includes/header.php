@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/local_sync.php'; // 🔁 مزامنة بيانات الأونلاين → الكمبيوتر تلقائياً (محلياً فقط)
 requireLogin();
+ensureLeftDateAllColumn(); // 🚪 تركيب ذاتي: عمود «ترك من الكل» + تعبئته مرّة من الثلاثة (2026-09-18)
 healYearAdditions2627(); // شفاء ذاتي مرّة واحدة: علاوات 2026-2027 (لا يفعل شيئاً بعد تمامه)
 healCaisseNumbers();     // شفاء ذاتي مرّة واحدة: إفراغ رقم الصندوق الذي كُتب آلياً على مؤسسات غير المدرسة
 healPurgeClosedSchools20260731(); // شفاء ذاتي مرّة واحدة: حذف نهائي لمغدوشة + سان نيقولا بكل بياناتهما

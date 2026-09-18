@@ -455,7 +455,7 @@ if (in_array($form, $imageForms)) {
             'nationality' => $natAr,
             'finance'     => $emp['finance_ministry_number'] ?? '',
             'hire'        => formatDate($emp['hire_date']),
-            'leftdate'    => formatDate($emp['left_date_cnss'] ?: ($emp['left_date_finance'] ?: $emp['left_date_eoc'])),
+            'leftdate'    => formatDate(leftDateOf($emp) ?: ($emp['left_date_cnss'] ?: ($emp['left_date_finance'] ?: $emp['left_date_eoc']))),
             'children'    => (string)($emp['number_of_children'] ?? ''),
             'salary'      => $salary ? formatLBP($salary, false) : '',
             'job'         => employeeTypeLabel($emp['employee_type'], 'ar'),
@@ -558,15 +558,15 @@ if (in_array($form, $imageForms)) {
         [$y1f,$y2f] = schoolYearToYears($schoolYear);
         $st = "$y1f-10-01"; $en = "$y2f-09-30";
         $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $ofEmpFilterPlain . "
-            AND ((left_date_cnss BETWEEN ? AND ?) OR (left_date_finance BETWEEN ? AND ?) OR (left_date_eoc BETWEEN ? AND ?))
+            AND " . leftDateSqlFor('finance') . " BETWEEN ? AND ?
             ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
-        $q->execute([$st,$en,$st,$en,$st,$en]);
+        $q->execute([$st,$en]);
         $lrows = $q->fetchAll();
         $ys = 26.0; $dy = 3.62;
         foreach ($lrows as $i => $r) {
             if ($i > 15) break;
             $y = $ys + $i*$dy;
-            $left = $r['left_date_cnss'] ?: ($r['left_date_finance'] ?: $r['left_date_eoc']);
+            $left = leftDateOfFor($r, 'finance'); // 🚪 ترك المالية (أو من الكل)
             $nm = trim(($r['first_name_ar'].' '.$r['father_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr']);
             $extra[] = ['x'=>72,'y'=>$y,'val'=>$nm,'s'=>2.1];
             $extra[] = ['x'=>54,'y'=>$y,'val'=>$r['finance_ministry_number'],'s'=>2.0];
@@ -1030,7 +1030,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     <div class="fline"><span class="lbl">هل يعمل حسب معرفتك لدى صاحب عمل آخر :</span> <?= fopt('نعم',1) ?> <?= fopt('كلا',2) ?></div>
     <?php else: ?>
     <div class="fline"><span class="lbl">استُخدم فيها منذ</span> <?= fval(formatDate($emp['hire_date'])) ?></div>
-    <div class="fline"><span class="lbl">ترك العمل بها منذ</span> <?= fval(formatDate($emp['left_date_cnss'])) ?></div>
+    <div class="fline"><span class="lbl">ترك العمل بها منذ</span> <?= fval(formatDate(leftDateOfFor($emp, 'cnss'))) ?></div>
     <div class="fline"><span class="lbl">سبب ترك العمل :</span> <?= fopt('استقالة',1) ?> <?= fopt('بلوغ السن',2) ?> <?= fopt('عجز',3) ?> <?= fopt('زواج',4) ?> <?= fopt('وفاة',5) ?> <?= fopt('هجرة',6) ?> <?= fopt('عمل آخر',7) ?></div>
     <div class="fline"><span class="lbl">إن راتب الأجير بتاريخ ترك العمل هو</span> <?= fval($salary?formatLBP($salary,false):'') ?> <span class="lbl">ل.ل</span></div>
     <div class="fline"><span class="lbl">منها الأجر الإضافي</span> <?= fval($exW?formatLBP($exW,false):'—','g') ?> <span class="lbl">ل.ل — ومكافأة ومساعدة</span> <?= fval($aid?formatLBP($aid,false):'—','g') ?> <span class="lbl">ل.ل</span></div>
@@ -1976,9 +1976,9 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     [$y1,$y2] = schoolYearToYears($schoolYear);
     $start = "$y1-10-01"; $end = "$y2-09-30";
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $ofEmpFilterPlain . "
-        AND ( (left_date_cnss BETWEEN ? AND ?) OR (left_date_finance BETWEEN ? AND ?) OR (left_date_eoc BETWEEN ? AND ?) )
+        AND " . leftDateSqlFor('finance') . " BETWEEN ? AND ?
         ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
-    $q->execute([$start,$end,$start,$end,$start,$end]);
+    $q->execute([$start,$end]);
     $rows = $q->fetchAll();
 ?>
 <div class="official-doc mof-form rtl" id="ppExportArea">
@@ -1996,7 +1996,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
             <thead><tr><th>#</th><th>إسم المستخدم/الأجير (الثلاثي)</th><th>رقم التسجيل الشخصي</th><th>رقم الانتساب (الضمان)</th><th>تاريخ بدء العمل</th><th>تاريخ انتهاء العمل</th></tr></thead>
             <tbody>
             <?php foreach ($rows as $i=>$r):
-                $left = $r['left_date_cnss'] ?: ($r['left_date_finance'] ?: $r['left_date_eoc']); ?>
+                $left = leftDateOfFor($r, 'finance'); ?>
                 <tr><td><?= $i+1 ?></td>
                     <td><?= e(trim(($r['first_name_ar'].' '.$r['father_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                     <td><?= e($r['finance_ministry_number']) ?></td>
@@ -2267,7 +2267,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     // (نصوص متراكبة وخانات بلا محلها — جردة الطباعة الشاملة) — أُعيد بناؤها نموذجاً
     // مبنياً نظيفاً بنمط نماذج الضمان (fline/cbox) بنفس بنود النموذج الرسمي حرفياً.
     $hireD = $emp['hire_date'];
-    $leftD = $emp['left_date_cnss'] ?: ($emp['left_date_finance'] ?: ($emp['left_date_eoc'] ?: date('Y-m-d')));
+    $leftD = leftDateOfFor($emp, 'cnss') ?: date('Y-m-d'); // 🚪 ترك الضمان (أو من الكل)
     $years = ($hireD && strtotime($hireD)) ? (int)floor((strtotime($leftD)-strtotime($hireD))/(365.25*86400)) : 0;
 ?>
     <div class="alert alert-info no-print"><i class="fas fa-info-circle"></i> Formulaire réservé à l'employé administratif (l'enseignant perçoit son indemnité de fin de service de la Caisse d'indemnités, non de la CNSS). / نموذج خاص بالموظف الإداري (الأستاذ ياخذ تعويض نهاية الخدمة من صندوق التعويضات لا من الضمان).</div>
@@ -2327,7 +2327,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         تفيد مؤسسة <?= fillVal($school['name_ar']) ?> رقمها <?= fillVal($school['nssf_employer_number']) ?>،
         أن المضمون <?= fillVal(empFullNameAr($emp)) ?> رقمه <?= fillVal($emp['nssf_number']) ?>
         عمل لحسابها من تاريخ <?= fillVal(formatDate($emp['hire_date'])) ?>
-        لغاية <?= fillVal(formatDate($emp['left_date_cnss'] ?: $emp['left_date_eoc'])) ?>.
+        لغاية <?= fillVal(formatDate(leftDateOfFor($emp, 'cnss'))) ?>.
     </p>
     <?php if ($isWage): ?>
     <div class="info-grid">
@@ -2768,7 +2768,7 @@ elseif ($form === 'payment_list'):
             if (!empty($r['birth_date']) && strtotime($r['birth_date'])) {
                 $age = $today->diff(new DateTime($r['birth_date']))->y;
             }
-            $left = $r['left_date_cnss'] ?: ($r['left_date_finance'] ?: $r['left_date_eoc']);
+            $left = leftDateOf($r); // 🚪 الترك من الكل
             $sal = ofLatestSalary($db, $r['id']);
             // fallback عند غياب صف راتب: الأستاذ من السلسلة، والموظف الإداري لا سلسلة له (راتبه مباشر) → 0
             $rsalFallback = ($r['employee_type'] === 'enseignant_titulaire') ? (int)scaleSalaryLBP($r['current_grade']) : 0;

@@ -34,7 +34,7 @@ $sc = schoolScopeSql();
 // 🔴 قاعدة التارك (لا تُغيَّر): في سنة محدّدة يُحتسب مَن عمل فيها ولو شهراً واحداً حتى لو ترك خلالها
 // (yearEmploymentFilter يتكفّل بإخفائه من السنين بعد تركه). استبعاد التاركين كلياً يُطبَّق فقط في
 // وضع «كل السنين» — حتى لا تُحتسب صفوف موظفين سابقين تركها الاستيراد.
-$notLeft = ($yfStat === '') ? " AND left_date_cnss IS NULL AND left_date_finance IS NULL AND left_date_eoc IS NULL" : "";
+$notLeft = ($yfStat === '') ? " AND " . leftDateSql() . " = '9999-12-31'" : ""; // 🚪 الترك من الكل فقط (2026-09-18)
 $dashCount = function ($typeSql) use ($db, $notLeft, $sc, $yfStat, $ypStat) {
     $st = $db->prepare("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND status = 'actif'" . $typeSql . $notLeft . $sc . $yfStat);
     $st->execute($ypStat);

@@ -702,7 +702,7 @@ if ($nameSchoolId) {
       </div>
       <div style="max-width:300px">
         <label>تاريخ ترك العمل / Date de départ</label>
-        <input type="text" name="leave_date" inputmode="numeric" autocomplete="off" class="date-manual" placeholder="يوم/شهر/سنة — مثلاً 30/09/2026" value="<?= e(displayDMY($emp['left_date_cnss'] ?? '')) ?>">
+        <input type="text" name="leave_date" inputmode="numeric" autocomplete="off" class="date-manual" placeholder="يوم/شهر/سنة — مثلاً 30/09/2026" value="<?= e(displayDMY(($emp['left_date_all'] ?? '') ?: ($emp['left_date_cnss'] ?? ''))) ?>">
       </div>
       <?php endif; ?>
       <h3>

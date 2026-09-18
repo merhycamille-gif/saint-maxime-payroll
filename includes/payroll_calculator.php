@@ -363,9 +363,14 @@ class PayrollCalculator {
         $primeAideTotal = $primeFixe + $aideComp;  // الإجمالي (للراتب الشامل gross فقط)
         
         // === 4. Build deduction bases ===
+        // 🚪 تواريخ الترك الجزئية (2026-09-18 «حسب موضوع الترك بيصير»): ترك الضمان يوقف الضمان من الشهر التالي،
+        // ترك المالية يوقف الضريبة، ترك الصندوق يوقف صندوق التعويضات — والراتب والاسم يكمّلان (الترك من الكل وحده يوقفهما).
+        $subjTax  = monthSubjectTo($emp, 'finance', (int)$this->year, (int)$this->month);
+        $subjCnss = monthSubjectTo($emp, 'cnss',    (int)$this->year, (int)$this->month);
+        $subjEoc  = monthSubjectTo($emp, 'eoc',     (int)$this->year, (int)$this->month);
         // Tax base
         $taxBase = 0;
-        if ($emp['tax_subject']) {
+        if ($emp['tax_subject'] && $subjTax) {
             $taxBase = $baseSalary;
             if ($emp['tax_includes_echelon']) $taxBase += $echelonValue;
             if ($emp['tax_includes_extra']) $taxBase += $extraWage;       // الأجر الإضافي
@@ -374,7 +379,7 @@ class PayrollCalculator {
         
         // CNSS base
         $cnssBase = 0;
-        if ($emp['cnss_subject']) {
+        if ($emp['cnss_subject'] && $subjCnss) {
             $cnssBase = $baseSalary;
             if ($emp['cnss_includes_echelon']) $cnssBase += $echelonValue;
             if ($emp['cnss_includes_extra']) $cnssBase += $extraWage;       // الأجر الإضافي
@@ -383,7 +388,7 @@ class PayrollCalculator {
         
         // EOC base (only for titulaire)
         $eocBase = 0;
-        if ($emp['eoc_subject'] && $emp['employee_type'] === 'enseignant_titulaire') {
+        if ($emp['eoc_subject'] && $subjEoc && $emp['employee_type'] === 'enseignant_titulaire') {
             $eocBase = $baseSalary;
             if ($emp['eoc_includes_echelon']) $eocBase += $echelonValue;
             if ($emp['eoc_includes_extra']) $eocBase += $extraWage;       // الأجر الإضافي
@@ -427,7 +432,7 @@ class PayrollCalculator {
         // درجة / نصف راتب → اشتراك صندوق التعويضات لمرّة واحدة عند حدث درجة هذا الشهر:
         // شهر الترسيم = نصف الراتب + الدرجة العادية الفورية؛ شهر الترقية = قيمة الدرجة. للملاك الخاضع للصندوق فقط.
         $eocGradeDeduction = 0;
-        if ($emp['eoc_subject'] && $emp['employee_type'] === 'enseignant_titulaire' && !$past64Titulaire) {
+        if ($emp['eoc_subject'] && $subjEoc && $emp['employee_type'] === 'enseignant_titulaire' && !$past64Titulaire) {
             $mStart = sprintf('%04d-%02d-01', $this->year, $this->month);
             $mEnd   = date('Y-m-t', strtotime($mStart));
             $evStmt = getDB()->prepare("SELECT grade_before, grade_after, reason FROM employee_grade_history WHERE employee_id = ? AND change_date BETWEEN ? AND ?");
@@ -566,13 +571,9 @@ class PayrollCalculator {
         // يبقى راتبه يُحسب لكل أشهر سنة تركه حتى 30-9 (رتبة السنة نفسها مسموحة).
         // زرّ «نسخ الملف لسنة» للتارك الراجع يمسح تواريخ التّرك قبل الحساب فلا يتأثّر.
         // نفس مبدأ pruneSalariesAfterDeparture و yearEmploymentFilter.
-        $lds = array_filter([
-            $this->employee['left_date_cnss'] ?? null,
-            $this->employee['left_date_finance'] ?? null,
-            $this->employee['left_date_eoc'] ?? null,
-        ], fn($d) => !empty($d) && $d !== '0000-00-00');
-        if ($lds) {
-            $ld = min($lds);
+        // 🚪 (2026-09-18) «الترك من الكل» وحده يوقف الراتب — ترك الضمان/المالية/الصندوق يوقف جهته فقط (computeFrom).
+        $ld = leftDateOf($this->employee);
+        if ($ld !== null) {
             $depRank = ((int)substr($ld, 5, 2) >= 10) ? (int)substr($ld, 0, 4) : (int)substr($ld, 0, 4) - 1;
             $rowRank = ($this->month >= 10) ? $this->year : $this->year - 1;
             if ($rowRank > $depRank) return $this->calculate(); // بلا أي حفظ — سنة بعد الترك

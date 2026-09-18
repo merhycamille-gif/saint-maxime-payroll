@@ -37,8 +37,10 @@ function handleAge64Post($db, $redirectTo) {
                 if ($bd) $d = $bd->modify('+64 years')->format('Y-m-d');
             }
             if ($d) {
-                $db->prepare("UPDATE employees SET left_date_cnss = ?, left_date_finance = ?, left_date_eoc = ? WHERE id = ?")
-                   ->execute([$d, $d, $d, $eid]);
+                ensureLeftDateAllColumn();
+                // 🚪 التقاعد = ترك من الكل (+ الجهات الثلاث بنفس التاريخ) — 2026-09-18
+                $db->prepare("UPDATE employees SET left_date_all = ?, left_date_cnss = ?, left_date_finance = ?, left_date_eoc = ? WHERE id = ?")
+                   ->execute([$d, $d, $d, $d, $eid]);
                 pruneSalariesAfterDeparture($db, $eid);
                 $_SESSION['flash_success'] = 'تم تسجيل ترك العمل بتاريخ ' . displayDMY($d) . ' — خرج من السنة الجارية وحُذفت رواتبه بعد هذا التاريخ.';
             } else {
@@ -86,7 +88,7 @@ function age64List($db, $activeYearOnly = false) {
                 COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
             FROM employees e LEFT JOIN schools sc ON sc.id = e.school_id
             WHERE e.is_deleted = 0 AND e.status = 'actif'
-              AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL
+              AND " . leftDateSql('e.') . " = '9999-12-31'
               AND e.birth_date IS NOT NULL AND e.birth_date NOT IN ('0000-00-00','1900-01-01')"
               . $ageCond . schoolScopeSql('e.school_id')
             . " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),

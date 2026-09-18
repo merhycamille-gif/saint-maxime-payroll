@@ -163,6 +163,7 @@ $id = (int)($_GET['id'] ?? 0);
 
 $db = getDB();
 hoursReductionEnsureColumns($db); // 🕐 عمود «ساعات التناقص» يتركّب ذاتياً قبل أي حفظ
+ensureLeftDateAllColumn();         // 🚪 عمود «ترك من الكل» يتركّب ذاتياً قبل أي حفظ (2026-09-18)
 $message = '';
 $messageType = 'success';
 
@@ -390,6 +391,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'nssf_number' => officialNumberFr($_POST['nssf_number'] ?? ''),
         'finance_ministry_number' => officialNumberFr($_POST['finance_ministry_number'] ?? ''),
         'caisse_number' => officialNumberFr($_POST['caisse_number'] ?? ''),
+        'left_date_all' => ($_POST['left_date_all'] ?? '') ?: null, // 🚪 ترك من الكل (نهائي) — 2026-09-18
         'left_date_cnss' => ($_POST['left_date_cnss'] ?? '') ?: null,
         'left_date_finance' => ($_POST['left_date_finance'] ?? '') ?: null,
         'left_date_eoc' => ($_POST['left_date_eoc'] ?? '') ?: null,
@@ -672,12 +674,13 @@ if ($action === 'copy_year' && $id > 0) {
             [$ty1, $ty2] = [(int)$tm[1], (int)$tm[2]];
             $targetStart = $tm[1] . '-10-01';
             // (١) تواريخ التّرك القديمة تخفيه عن السنة الهدف → رجّعه «فاعلاً» واحفظ القديم بالملاحظات
-            $leftMin = min($cEmp['left_date_cnss'] ?: '9999-12-31', $cEmp['left_date_finance'] ?: '9999-12-31', $cEmp['left_date_eoc'] ?: '9999-12-31');
+            // 🚪 (2026-09-18) «الترك من الكل» هو الذي يخفيه؛ عند الرجوع تُمسح التواريخ الأربعة وتُحفظ بالملاحظات
+            $leftMin = leftDateOf($cEmp) ?: '9999-12-31';
             $reactivated = false;
             if ($leftMin !== '9999-12-31' && $leftMin < $targetStart) {
-                $oldLefts = 'ضمان: ' . ($cEmp['left_date_cnss'] ?: '—') . ' · مالية: ' . ($cEmp['left_date_finance'] ?: '—') . ' · صندوق: ' . ($cEmp['left_date_eoc'] ?: '—');
+                $oldLefts = 'الكل: ' . ($cEmp['left_date_all'] ?: '—') . ' · ضمان: ' . ($cEmp['left_date_cnss'] ?: '—') . ' · مالية: ' . ($cEmp['left_date_finance'] ?: '—') . ' · صندوق: ' . ($cEmp['left_date_eoc'] ?: '—');
                 $noteLine = "↩️ عاد للعمل بسنة $target (نُسخ ملفه بتاريخ " . date('Y-m-d') . ") — تواريخ التّرك السابقة: $oldLefts";
-                $db->prepare("UPDATE employees SET left_date_cnss = NULL, left_date_finance = NULL, left_date_eoc = NULL,
+                $db->prepare("UPDATE employees SET left_date_all = NULL, left_date_cnss = NULL, left_date_finance = NULL, left_date_eoc = NULL,
                               status = 'actif', notes = TRIM(CONCAT(COALESCE(notes,''), '\n', ?)) WHERE id = ?")
                    ->execute([$noteLine, $id]);
                 $reactivated = true;
@@ -846,7 +849,7 @@ if ($action === 'list') {
                 id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))
                 OR (id NOT IN (SELECT employee_id FROM monthly_salaries WHERE base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0) AND hire_date >= ?)
             )
-            AND LEAST(COALESCE(left_date_cnss,'9999-12-31'),COALESCE(left_date_finance,'9999-12-31'),COALESCE(left_date_eoc,'9999-12-31')) >= ?";
+            AND " . leftDateSql() . " >= ?"; // 🚪 الترك من الكل وحده يخفي الاسم (2026-09-18)
         $params[] = $activeSY;
         $params[] = $syStart;
         $params[] = substr($activeSY, 0, 4) . '-10-01'; // بداية السنة الدراسية (تشرين الأول)
@@ -1595,20 +1598,30 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
 
                 <h4 style="color:var(--primary);margin-top:16px;">
                     <span dir="ltr">Dates de départ</span>
-                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">تواريخ الترك <small style="font-weight:normal;color:var(--gray-500)">(اتركها فاضية إذا الموظف ما زال على رأس عمله — والمتروك ما بينتقل للسنة الجديدة)</small></div>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">تواريخ الترك <small style="font-weight:normal;color:var(--gray-500)">(اتركها فاضية إذا الموظف ما زال على رأس عمله)</small></div>
                 </h4>
-                <div class="form-row cols-3">
+                <?php /* 🚪 (2026-09-18) أربعة تواريخ: «ترك من الكل» وحده يُخرج الاسم والرواتب من السنين اللاحقة؛
+                        ترك الضمان/المالية/الصندوق يوقف جهته فقط (الاشتراك + لوائحها) من الشهر التالي، والراتب والاسم يكمّلان. */ ?>
+                <div class="form-row cols-4">
+                    <div class="form-group" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px">
+                        <label class="form-label" style="color:#b91c1c;font-weight:700">ترك من الكل (نهائي) / Départ définitif</label>
+                        <input type="date" name="left_date_all" class="form-control" value="<?= e($employee['left_date_all'] ?? '') ?>">
+                        <small style="color:#991b1b">وحده يشيل الاسم والرواتب من السنين اللي بعده</small>
+                    </div>
                     <div class="form-group">
                         <label class="form-label">ترك الضمان / Départ CNSS</label>
                         <input type="date" name="left_date_cnss" class="form-control" value="<?= e($employee['left_date_cnss'] ?? '') ?>">
+                        <small style="color:var(--gray-500)">يوقف الضمان فقط من الشهر التالي</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">ترك المالية / Départ Finances</label>
                         <input type="date" name="left_date_finance" class="form-control" value="<?= e($employee['left_date_finance'] ?? '') ?>">
+                        <small style="color:var(--gray-500)">يوقف الضريبة فقط من الشهر التالي</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">ترك صندوق التعويضات / Départ EOC <small>(ملاك)</small></label>
                         <input type="date" name="left_date_eoc" class="form-control" value="<?= e($employee['left_date_eoc'] ?? '') ?>">
+                        <small style="color:var(--gray-500)">يوقف الصندوق فقط من الشهر التالي</small>
                     </div>
                 </div>
                 
