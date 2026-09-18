@@ -164,6 +164,7 @@ $id = (int)($_GET['id'] ?? 0);
 $db = getDB();
 hoursReductionEnsureColumns($db); // 🕐 عمود «ساعات التناقص» يتركّب ذاتياً قبل أي حفظ
 ensureLeftDateAllColumn();         // 🚪 عمود «ترك من الكل» يتركّب ذاتياً قبل أي حفظ (2026-09-18)
+ensureSalaryLaborLawColumn();      // ⚖️ عمود «راتب الموظف حسب قانون العمل» يتركّب ذاتياً قبل أي حفظ (2026-09-18)
 $message = '';
 $messageType = 'success';
 
@@ -337,8 +338,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             exit;
         }
     }
+    // 🧑‍🏫 نوع الوظيفة على مستويين (2026-09-18 «أستاذ أو موظف؛ الأستاذ ملاك أو متعاقد؛ الموظف بنوع وظيفته»):
+    // الشاشة ترسل emp_kind (+ teacher_kind) وتزامن employee_type المخفي — الخادم يشتقّه بنفسه أيضاً (لا اعتماد على JS)
+    $empType = (string)($_POST['employee_type'] ?? 'enseignant_titulaire');
+    $kindP = (string)($_POST['emp_kind'] ?? '');
+    if ($kindP === 'employe') $empType = 'employe';
+    elseif ($kindP === 'enseignant') { $tkP = (string)($_POST['teacher_kind'] ?? ''); if (in_array($tkP, ['enseignant_titulaire', 'enseignant_contractuel'], true)) $empType = $tkP; }
+    if (!in_array($empType, ['enseignant_titulaire', 'enseignant_contractuel', 'employe'], true)) $empType = 'enseignant_titulaire';
+    // ⚖️ طريقة الراتب: الملاك على السلسلة دائماً (القانون) · المتعاقد يحدّده المستخدم (ليرة/دولار) ·
+    //    الموظف الإداري: «قانون العمل» (الحد الأدنى الساري تلقائياً، salary_labor_law=1) أو مبلغ يحدّده المستخدم
+    $modeP = (string)($_POST['salary_input_mode'] ?? 'percent_of_lbp');
+    $laborLawP = ($empType === 'employe' && $modeP === 'labor_law') ? 1 : 0;
+    if ($modeP === 'labor_law') $modeP = 'direct_lbp';
+    if ($empType === 'enseignant_titulaire') $modeP = 'percent_of_lbp';
+    if (!in_array($modeP, ['percent_of_lbp', 'direct_lbp', 'direct_usd'], true)) $modeP = 'percent_of_lbp';
     $data = [
-        'employee_type' => $_POST['employee_type'] ?? 'enseignant_titulaire',
+        'employee_type' => $empType,
         'first_name_ar' => trim($_POST['first_name_ar'] ?? ''),
         'first_name_fr' => trim($_POST['first_name_fr'] ?? ''),
         'father_name_ar' => trim($_POST['father_name_ar'] ?? ''),
@@ -374,7 +389,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'niveau_scolaire' => is_array($_POST['niveau_scolaire'] ?? null) ? implode(',', $_POST['niveau_scolaire']) : '',
         'classes_taught' => is_array($_POST['classes_taught'] ?? null) ? implode(',', array_map('intval', $_POST['classes_taught'])) : '',
         // وظيفة الموظف الإداري: قيمة القائمة، أو النص الحر عند اختيار «أخرى». تُحفظ فقط للموظف الإداري، وتُفرَّغ للأستاذ.
-        'job_title' => (($_POST['employee_type'] ?? '') === 'employe')
+        'job_title' => ($empType === 'employe')
             ? (($_POST['job_title'] ?? '') === '__other__' ? trim($_POST['job_title_other'] ?? '') : trim($_POST['job_title'] ?? ''))
             : null,
         'hire_date' => $_POST['hire_date'] ?: null,
@@ -385,7 +400,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'current_grade' => (float)($_POST['current_grade'] ?? 1),
         'days_per_week' => (int)($_POST['days_per_week'] ?? 5),
         'hours_per_week' => (float)($_POST['hours_per_week'] ?? 18),
-        'hours_reduction' => (($_POST['employee_type'] ?? '') === 'enseignant_titulaire') ? max(0, (float)($_POST['hours_reduction'] ?? 0)) : 0, // 🕐 ساعات التناقص (للملاك فقط)
+        'hours_reduction' => ($empType === 'enseignant_titulaire') ? max(0, (float)($_POST['hours_reduction'] ?? 0)) : 0, // 🕐 ساعات التناقص (للملاك فقط)
         'status' => $_POST['status'] ?? 'actif',
         // «كل الارقام اكتبو بالفرنسي»: الأرقام الرسمية تُطبَّع عند الحفظ (عربي→فرنسي + مسح الكلام المحشور)
         'nssf_number' => officialNumberFr($_POST['nssf_number'] ?? ''),
@@ -395,7 +410,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'left_date_cnss' => ($_POST['left_date_cnss'] ?? '') ?: null,
         'left_date_finance' => ($_POST['left_date_finance'] ?? '') ?: null,
         'left_date_eoc' => ($_POST['left_date_eoc'] ?? '') ?: null,
-        'salary_input_mode' => $_POST['salary_input_mode'] ?? 'percent_of_lbp',
+        'salary_input_mode' => $modeP,
+        'salary_labor_law' => $laborLawP, // ⚖️ موظف على قانون العمل (2026-09-18)
         'base_salary_usd' => (float)str_replace(',', '', $_POST['base_salary_usd'] ?? 0),
         'base_salary_lbp_percent' => (float)($_POST['base_salary_lbp_percent'] ?? 0),
         'contract_salary_lbp' => (int)str_replace(',', '', $_POST['contract_salary_lbp'] ?? 0),
@@ -460,7 +476,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     // عمود job_title قد لا يكون موجوداً قبل migration 018 أونلاين → أزِله من الحفظ لتفادي الكسر
     try {
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) unset($data['job_title']);
-    } catch (Exception $e) { unset($data['job_title']); }
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'salary_labor_law'")->fetch()) unset($data['salary_labor_law']);
+    } catch (Exception $e) { unset($data['job_title'], $data['salary_labor_law']); }
     // أعمدة الخيارات (التنزيل العائلي + احتساب تعويض الزوجة/الأولاد): ركّبها ذاتياً،
     // وإن تعذّر أزِلها من الحفظ لتفادي الكسر
     ensureEmployeeChildren20260823();
@@ -1002,7 +1019,7 @@ $employee = [
     'hire_date' => '', 'titularization_date' => '', 'tenure_confirmation_date' => '', 'starting_grade' => 1, 'current_grade' => 1,
     'days_per_week' => 5, 'hours_per_week' => 18, 'status' => 'actif',
     'nssf_number' => '', 'finance_ministry_number' => '', 'caisse_number' => '',
-    'salary_input_mode' => 'percent_of_lbp', 'base_salary_usd' => 0, 'base_salary_lbp_percent' => 100, 'contract_salary_lbp' => 0,
+    'salary_input_mode' => 'percent_of_lbp', 'salary_labor_law' => 0, 'base_salary_usd' => 0, 'base_salary_lbp_percent' => 100, 'contract_salary_lbp' => 0,
     'payment_months_per_year' => 10, 'has_13th_month' => 0, 'm13_include_extra' => 0, 'm13_include_aide' => 0,
     'tax_subject' => 1, 'apply_family_deduction' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
@@ -1174,23 +1191,40 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
             </div>
             <div class="card-body">
                 <div class="form-row cols-3">
+                    <?php /* 🧑‍🏫 (2026-09-18) نوع الوظيفة على مستويين: أستاذ ← ملاك (سلسلة الرتب والرواتب) / متعاقد (راتب يحدّده المستخدم) ·
+                            موظف ← نوع الوظيفة إلزامي + راتبه حسب قانون العمل (قابل للتغيير). employee_type المخفي يُزامَن ويشتقّه الخادم أيضاً */
+                          $isEmpK = ($employee['employee_type'] === 'employe'); ?>
                     <div class="form-group">
                         <label class="form-label">النوع: أستاذ أو موظف / Type <span class="req">*</span></label>
-                        <select name="employee_type" class="form-select" required>
-                            <option value="enseignant_titulaire" <?= $employee['employee_type'] === 'enseignant_titulaire' ? 'selected' : '' ?>>
-                                👨‍🏫 أستاذ في الملاك / Enseignant titulaire
-                            </option>
-                            <option value="enseignant_contractuel" <?= $employee['employee_type'] === 'enseignant_contractuel' ? 'selected' : '' ?>>
-                                📝 أستاذ متعاقد / Enseignant contractuel
-                            </option>
-                            <option value="employe" <?= $employee['employee_type'] === 'employe' ? 'selected' : '' ?>>
-                                🏢 موظف إداري / Employé
-                            </option>
+                        <select name="emp_kind" id="empKind" class="form-select" required>
+                            <option value="enseignant" <?= !$isEmpK ? 'selected' : '' ?>>👨‍🏫 أستاذ / Enseignant</option>
+                            <option value="employe" <?= $isEmpK ? 'selected' : '' ?>>🏢 موظف / Employé</option>
                         </select>
+                        <div id="teacherKindWrap" style="margin-top:8px;display:<?= $isEmpK ? 'none' : 'block' ?>">
+                            <label class="form-label">الأستاذ: ملاك أو متعاقد / Titulaire ou contractuel <span class="req">*</span></label>
+                            <select name="teacher_kind" id="teacherKind" class="form-select">
+                                <option value="enseignant_titulaire" <?= $employee['employee_type'] === 'enseignant_titulaire' ? 'selected' : '' ?>>🎓 في الملاك — سلسلة الرتب والرواتب / Titulaire (échelle légale)</option>
+                                <option value="enseignant_contractuel" <?= $employee['employee_type'] === 'enseignant_contractuel' ? 'selected' : '' ?>>📝 متعاقد — راتب تحدّده أنت / Contractuel (salaire convenu)</option>
+                            </select>
+                        </div>
+                        <input type="hidden" name="employee_type" id="employeeTypeHidden" value="<?= e($employee['employee_type']) ?>">
                         <small style="color:var(--gray-500);font-size:11.5px;display:block;margin-top:4px;line-height:1.5">
-                            ℹ️ <strong>الأستاذ</strong>: يخضع للضمان لفرع <strong>المرض والأمومة</strong> فقط، ونهاية خدمته من <strong>صندوق التعويضات</strong>.
-                            <br><strong>الموظف</strong>: يخضع لكل فروع الضمان (مرض + <strong>نهاية الخدمة</strong> + تعويضات عائلية).
+                            ℹ️ <strong>الأستاذ</strong>: يخضع للضمان لفرع <strong>المرض والأمومة</strong> فقط، ونهاية خدمته من <strong>صندوق التعويضات</strong>. الملاك راتبه من <strong>سلسلة الرتب والرواتب</strong>، والمتعاقد راتبه تحدّده أنت.
+                            <br><strong>الموظف</strong>: يخضع لكل فروع الضمان (مرض + <strong>نهاية الخدمة</strong> + تعويضات عائلية)، ونوع وظيفته إلزامي، وراتبه حسب <strong>قانون العمل</strong> (وتقدر تغيّره).
                         </small>
+                        <script>
+                        (function(){
+                            var k = document.getElementById('empKind'), t = document.getElementById('teacherKind'), h = document.getElementById('employeeTypeHidden'), w = document.getElementById('teacherKindWrap');
+                            function sync(){
+                                var isE = k.value === 'employe';
+                                w.style.display = isE ? 'none' : 'block';
+                                var v = isE ? 'employe' : t.value;
+                                if (h.value !== v) { h.value = v; h.dispatchEvent(new Event('change')); }
+                            }
+                            k.addEventListener('change', sync); t.addEventListener('change', sync);
+                            sync();
+                        })();
+                        </script>
                     </div>
                     
                     <div class="form-group">
@@ -1755,13 +1789,23 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
             </div>
             <div class="card-body">
                 <div class="form-row cols-3">
+                    <?php // ⚖️ (2026-09-18) الموظف الإداري: خيار «قانون العمل» = الحد الأدنى الساري تلقائياً (salary_labor_law) — والمستخدم يغيّره لمبلغ محدّد إن شاء
+                          $modeShown = isLaborLawSalary($employee) ? 'labor_law' : $employee['salary_input_mode'];
+                          $minWageNow = laborLawMinWage((int)date('n'), (int)date('Y')); ?>
                     <div class="form-group">
                         <label class="form-label">طريقة احتساب الراتب / Mode de salaire</label>
                         <select name="salary_input_mode" id="salaryModeSelect" class="form-select">
-                            <option value="percent_of_lbp" <?= $employee['salary_input_mode'] === 'percent_of_lbp' ? 'selected' : '' ?>>📊 السلسلة حسب القانون (ملاك) / Échelle légale</option>
-                            <option value="direct_lbp" <?= $employee['salary_input_mode'] === 'direct_lbp' ? 'selected' : '' ?>>💷 Salaire convenu en LBP / راتب متفق عليه بالليرة (متعاقد)</option>
-                            <option value="direct_usd" <?= $employee['salary_input_mode'] === 'direct_usd' ? 'selected' : '' ?>>💵 Salaire convenu en USD / راتب متفق عليه بالدولار</option>
+                            <option value="percent_of_lbp" data-for="enseignant_titulaire" <?= $modeShown === 'percent_of_lbp' ? 'selected' : '' ?>>📊 السلسلة حسب القانون (ملاك) / Échelle légale</option>
+                            <option value="labor_law" data-for="employe" <?= $modeShown === 'labor_law' ? 'selected' : '' ?>>⚖️ قانون العمل — الحد الأدنى للأجور الساري تلقائياً / Loi du travail (SMIG)</option>
+                            <option value="direct_lbp" data-for="enseignant_contractuel employe" <?= $modeShown === 'direct_lbp' ? 'selected' : '' ?>>💷 Salaire convenu en LBP / راتب تحدّده أنت بالليرة</option>
+                            <option value="direct_usd" data-for="enseignant_contractuel employe" <?= $modeShown === 'direct_usd' ? 'selected' : '' ?>>💵 Salaire convenu en USD / راتب تحدّده أنت بالدولار</option>
                         </select>
+                        <small class="text-muted d-block" id="salModeHint"></small>
+                    </div>
+                    <div class="form-group salmode-field" data-mode="labor_law">
+                        <label class="form-label">الحد الأدنى للأجور الساري اليوم / SMIG en vigueur</label>
+                        <input type="text" class="form-control" value="<?= e(formatLBP($minWageNow)) ?>" readonly style="background:#f1f5f9;font-weight:700">
+                        <small class="text-muted d-block">يُطبَّق تلقائياً بقيمته السارية بتاريخ كل شهر (من «النِّسَب حسب التاريخ»). بدّك راتباً مختلفاً؟ اختر «راتب تحدّده أنت».</small>
                     </div>
                     <div class="form-group salmode-field" data-mode="direct_lbp">
                         <label class="form-label">الراتب المتفق عليه (ل.ل) / Salaire convenu LBP</label>
@@ -1776,7 +1820,7 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                         <label class="form-label">أساس الراتب حسب السلسلة (ل.ل) / Échelle</label>
                         <input type="text" id="scaleSalaryDisplay" class="form-control" value="" readonly style="background:#f1f5f9;font-weight:700">
                         <small class="text-muted d-block">يُحتسب تلقائياً حسب درجة الأستاذ والقانون. النسبة:
-                            <input type="number" name="base_salary_lbp_percent" value="<?= e($employee['base_salary_lbp_percent']) ?>" step="0.01" min="0" max="200" style="width:70px;display:inline-block" class="form-control form-control-sm"> %
+                            <input type="number" name="base_salary_lbp_percent" value="<?= e((float)$employee['base_salary_lbp_percent'] > 0 ? $employee['base_salary_lbp_percent'] : 100) ?>" step="0.01" min="0" max="200" style="width:70px;display:inline-block" class="form-control form-control-sm"> %
                         </small>
                     </div>
                 </div>
@@ -1784,7 +1828,22 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                 (function(){
                     var modeSel = document.getElementById('salaryModeSelect');
                     var typeSel = document.querySelector('[name="employee_type"]');
+                    // ⚖️🧑‍🏫 (2026-09-18) خيارات طريقة الراتب حسب النوع: ملاك = السلسلة فقط (مقفولة) · متعاقد = ليرة/دولار · موظف = قانون العمل/ليرة/دولار
+                    function syncSalOptions(){
+                        var ty = typeSel ? typeSel.value : 'enseignant_titulaire', first = null, ok = false;
+                        Array.prototype.forEach.call(modeSel.options, function(o){
+                            var allow = (o.getAttribute('data-for') || '').split(' ').indexOf(ty) !== -1;
+                            o.hidden = !allow; o.disabled = !allow;
+                            if (allow && first === null) first = o.value;
+                            if (allow && o.value === modeSel.value) ok = true;
+                        });
+                        if (!ok && first !== null) modeSel.value = first;
+                        var hint = document.getElementById('salModeHint');
+                        if (ty === 'enseignant_titulaire') { modeSel.style.display = 'none'; if (hint) hint.textContent = 'الأستاذ في الملاك يخضع لسلسلة الرتب والرواتب حسب القانون — لا خيار آخر.'; }
+                        else { modeSel.style.display = ''; if (hint) hint.textContent = (ty === 'employe') ? 'الموظف يخضع لقانون العمل (الحد الأدنى الساري) — وتقدر تحدّد له راتباً مختلفاً.' : 'المتعاقد راتبه تحدّده أنت بالليرة أو بالدولار.'; }
+                    }
                     function syncSalMode(){
+                        syncSalOptions();
                         var m = modeSel.value;
                         document.querySelectorAll('.salmode-field').forEach(function(el){
                             el.style.display = (el.getAttribute('data-mode') === m) ? '' : 'none';
@@ -1806,7 +1865,8 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     // عند اختيار نوع الأستاذ: ملاك ⇐ السلسلة حسب القانون · متعاقد ⇐ ليرة متفق عليها
                     if (typeSel) typeSel.addEventListener('change', function(){
                         if (typeSel.value === 'enseignant_titulaire') modeSel.value = 'percent_of_lbp';
-                        else if (modeSel.value === 'percent_of_lbp') modeSel.value = 'direct_lbp';
+                        else if (typeSel.value === 'employe') modeSel.value = 'labor_law'; // ⚖️ الموظف: قانون العمل افتراضياً
+                        else if (modeSel.value === 'percent_of_lbp' || modeSel.value === 'labor_law') modeSel.value = 'direct_lbp';
                         syncSalMode();
                         syncEmpType();
                     });

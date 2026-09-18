@@ -164,7 +164,7 @@ if ($action === 'calc_all') {
     $syStartC = ($month >= 10 ? $year : $year - 1) . '-10-01'; // بداية السنة الدراسية للشهر المحسوب
     $sqlC = "SELECT id FROM employees WHERE is_deleted = 0 AND status = 'actif'"
           . " AND " . leftDateSql() . " >= ?"
-          . " AND (employee_type = 'enseignant_titulaire' OR base_salary_usd > 0 OR contract_salary_lbp > 0)" . schoolScopeSql();
+          . " AND " . salaryConfigSql('') . schoolScopeSql();
     $paramsC = [$syStartC];
     if ($typeFilter) { $sqlC .= " AND employee_type = ?"; $paramsC[] = $typeFilter; }
     $stmtC = $db->prepare($sqlC);

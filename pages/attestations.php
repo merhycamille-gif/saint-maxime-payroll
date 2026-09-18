@@ -208,7 +208,8 @@ if ($emp && !empty($_GET['dossier'])):
             ]))));
             $registry = trim(($emp['civil_registry_number']??'') . (($emp['civil_registry_place']??'')?(' / '.$emp['civil_registry_place']):''));
             $mother = trim(($emp['mother_first_name']??'').' '.($emp['mother_last_name']??''));
-            $modeLbl = ['direct_usd'=>'راتب مباشر بالدولار','percent_of_lbp'=>'نسبة من راتب الليرة','direct_lbp'=>'راتب مباشر بالليرة'][$emp['salary_input_mode']??''] ?? ($emp['salary_input_mode']??'');
+            $modeLbl = isLaborLawSalary($emp) ? 'قانون العمل (الحد الأدنى للأجور الساري)'
+                     : (['direct_usd'=>'راتب مباشر بالدولار','percent_of_lbp'=>'نسبة من راتب الليرة','direct_lbp'=>'راتب مباشر بالليرة'][$emp['salary_input_mode']??''] ?? ($emp['salary_input_mode']??''));
             $transport = ((float)($emp['transport_daily_amount']??0) > 0)
                 ? (rtrim(rtrim(number_format((float)$emp['transport_daily_amount'],2),'0'),'.').' '.($emp['transport_daily_currency']??'LBP').' × '.(int)($emp['transport_days_per_week']??0).' يوم/أسبوع × '.rtrim(rtrim(number_format((float)($emp['transport_weeks']??0),1),'0'),'.').' أسبوع')
                 : '';

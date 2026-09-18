@@ -161,7 +161,7 @@ try {
     $mir = (int)$db->query("SELECT COUNT(*) FROM (SELECT ms.employee_id FROM monthly_salaries ms
         JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0 AND COALESCE(ms.is_indemnity_month, 0) = 0
-          AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+          AND " . salaryConfigSql('e.') . "
           AND NOT EXISTS (SELECT 1 FROM employee_bonuses b2 WHERE b2.employee_id = e.id AND b2.school_year = ms.school_year AND b2.is_active = 1
               AND b2.bonus_type IN ('prime_fixe','aide_complementaire')
               AND (b2.value_type <> 'amount' OR b2.currency <> 'LBP' OR b2.start_month IS NOT NULL OR b2.end_month IS NOT NULL))

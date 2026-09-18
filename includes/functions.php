@@ -701,6 +701,36 @@ function monthSubjectTo(array $emp, string $kind, int $year, int $month): bool {
     return sprintf('%04d-%02d-01', $year, $month) <= $ld;
 }
 
+/**
+ * ⚖️ راتب الموظف الإداري حسب قانون العمل (2026-09-18 «إذا موظف لازم يخضع راتبه لقانون العمل وأنا إذا بدي غيّرو بغيّرو»):
+ * عمود salary_labor_law (1 = أساس راتبه = الحد الأدنى للأجور الساري بتاريخ الشهر من «النِّسَب حسب التاريخ»، يتغيّر
+ * تلقائياً مع القانون). 0 = راتب محدّد بيده (ليرة/دولار) كما كان. يتركّب ذاتياً. الموظفون القدامى لا يتغيّرون (0).
+ */
+function ensureSalaryLaborLawColumn(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'salary_labor_law'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN salary_labor_law TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'موظف إداري: الأساس = الحد الأدنى للأجور الساري (قانون العمل)' AFTER contract_salary_lbp");
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+/** هل هذا الموظف على «قانون العمل» (أساسه الحد الأدنى الساري)؟ — للموظف الإداري فقط */
+function isLaborLawSalary(array $emp): bool {
+    return (($emp['employee_type'] ?? '') === 'employe') && !empty($emp['salary_labor_law']);
+}
+/** الحد الأدنى للأجور الساري بتاريخ الشهر (ل.ل، بلا فراطات) */
+function laborLawMinWage(?int $month = null, ?int $year = null): int {
+    return (int)floor(getRateAsOf('minimum_wage_lbp', $month, $year, 0));
+}
+/** شرط SQL «له إعداد راتب» (المصدر الواحد): ملاك أو أساس محدّد أو قانون العمل */
+function salaryConfigSql(string $prefix = 'e.'): string {
+    ensureSalaryLaborLawColumn();
+    return "({$prefix}employee_type = 'enseignant_titulaire' OR {$prefix}base_salary_usd > 0 OR {$prefix}contract_salary_lbp > 0 OR {$prefix}salary_labor_law = 1)";
+}
+
 function yearEmploymentFilter($schoolYear, $prefix = '') {
     if ($schoolYear === 'all' || !preg_match('/^(\d{4})-(\d{4})$/', (string)$schoolYear, $m)) {
         return ['', []];
@@ -922,7 +952,7 @@ function healStaleYearMirror20260806() {
         $mm = $db->query("SELECT ms.employee_id, ms.school_year FROM monthly_salaries ms
             JOIN employees e ON e.id = ms.employee_id
             WHERE e.is_deleted = 0 AND COALESCE(ms.is_indemnity_month, 0) = 0
-              AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+              AND " . salaryConfigSql('e.') . "
               AND NOT EXISTS (SELECT 1 FROM employee_bonuses b2 WHERE b2.employee_id = e.id AND b2.school_year = ms.school_year AND b2.is_active = 1
                   AND b2.bonus_type IN ('prime_fixe','aide_complementaire')
                   AND (b2.value_type <> 'amount' OR b2.currency <> 'LBP' OR b2.start_month IS NOT NULL OR b2.end_month IS NOT NULL))
@@ -3352,7 +3382,7 @@ function healLawfulTaxProration20260806() {
         $q = $db->prepare("SELECT DISTINCT ms.employee_id, ms.school_year FROM monthly_salaries ms
             JOIN employees e ON e.id = ms.employee_id
             WHERE e.is_deleted = 0 AND e.payment_months_per_year <> 12 AND e.tax_subject = 1
-              AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
+              AND " . salaryConfigSql('e.') . "
               AND ms.school_year >= ?");
         $q->execute([currentSchoolYear()]);
         $n = 0;
@@ -6216,7 +6246,7 @@ function healRestoreZeroedRows20260829() {
             if (!isset($empCache[$eid])) { $empQ->execute([$eid]); $empCache[$eid] = $empQ->fetch(PDO::FETCH_ASSOC) ?: false; }
             $e = $empCache[$eid];
             if (!$e || (int)$e['is_deleted'] === 1) continue;
-            if ($e['employee_type'] === 'enseignant_titulaire' || (float)$e['base_salary_usd'] > 0 || (float)$e['contract_salary_lbp'] > 0) { $configured[$eid] = 1; continue; } // له إعداد → المحرّك سيّده (أدناه)
+            if ($e['employee_type'] === 'enseignant_titulaire' || (float)$e['base_salary_usd'] > 0 || (float)$e['contract_salary_lbp'] > 0 || isLaborLawSalary($e)) { $configured[$eid] = 1; continue; } // له إعداد → المحرّك سيّده (أدناه)
             if (trim((string)$e['first_name_ar']) !== trim((string)$r['f']) || trim((string)$e['last_name_ar']) !== trim((string)$r['l'])) { $skipName[$eid] = $r['f'] . ' ' . $r['l']; continue; }
             $rowQ->execute([$eid, (int)$r['year'], (int)$r['month']]);
             $cur = $rowQ->fetch(PDO::FETCH_ASSOC);

@@ -48,7 +48,7 @@ function getYearCalcRoster($db, $typeFilter = '') {
     // المتعاقد/الموظف ذو الراتب المنقول (بلا إعداد) لا يُعاد حسابه لئلا يُصفَّر راتبه المخزّن.
     $sql = "SELECT e.id, e.payment_months_per_year FROM employees e WHERE e.is_deleted = 0"
          . " AND e.status = 'actif' AND " . leftDateSql('e.') . " = '9999-12-31'"
-         . " AND (e.employee_type = 'enseignant_titulaire' OR e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)"
+         . " AND " . salaryConfigSql('e.')
          . schoolScopeSql('e.school_id');
     $params = [];
     if ($typeFilter) { $sql .= " AND e.employee_type = ?"; $params[] = $typeFilter; }

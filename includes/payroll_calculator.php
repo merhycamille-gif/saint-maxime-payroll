@@ -267,6 +267,10 @@ class PayrollCalculator {
 
         // متعاقد / موظف: راتب مباشر فقط، بلا سلسلة ولا تدرّج (الموظف يخضع لقانون
         // العمل بحدّ أدنى يدوي «من تاريخ إلى تاريخ»، وليس لسلسلة الرتب والرواتب).
+        // ⚖️ (2026-09-18) الموظف الإداري على «قانون العمل»: الأساس = الحد الأدنى للأجور الساري بتاريخ الشهر (يتغيّر تلقائياً مع القانون)
+        if (isLaborLawSalary($emp)) {
+            return [(float)laborLawMinWage((int)$this->month, (int)$this->year), 0.0, (float)$emp['current_grade']];
+        }
         if ($emp['salary_input_mode'] === 'direct_usd') {
             return [usdToLbp($emp['base_salary_usd'], $this->exchangeRate), 0.0, (float)$emp['current_grade']];
         }
@@ -660,6 +664,7 @@ class PayrollCalculator {
 function salaryEngineAllowed(array $emp, ?PDO $db = null): bool {
     if (($emp['employee_type'] ?? '') === 'enseignant_titulaire') return true;
     if ((float)($emp['base_salary_usd'] ?? 0) > 0 || (float)($emp['contract_salary_lbp'] ?? 0) > 0) return true;
+    if (isLaborLawSalary($emp)) return true; // ⚖️ موظف على قانون العمل = له إعداد (2026-09-18)
     $id = (int)($emp['id'] ?? 0);
     if ($id <= 0) return false;
     $db = $db ?: getDB();
@@ -680,7 +685,8 @@ function salaryYearPayable(int $employeeId, string $schoolYear, ?PDO $db = null)
 
 function recalcEmployeeYear($employeeId, $schoolYear = null) {
     $db = getDB();
-    $e = $db->prepare("SELECT id, employee_type, base_salary_usd, contract_salary_lbp, payment_months_per_year, hire_date, is_deleted FROM employees WHERE id = ?");
+    ensureSalaryLaborLawColumn();
+    $e = $db->prepare("SELECT id, employee_type, base_salary_usd, contract_salary_lbp, salary_labor_law, payment_months_per_year, hire_date, is_deleted FROM employees WHERE id = ?");
     $e->execute([$employeeId]);
     $e = $e->fetch();
     if (!$e || (int)$e['is_deleted'] === 1) return 0;
@@ -691,7 +697,8 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
     $hasConfig = salaryEngineAllowed($e, $db);
     $hasBaseCfg = ($e['employee_type'] === 'enseignant_titulaire')
               || (float)$e['base_salary_usd'] > 0
-              || (float)$e['contract_salary_lbp'] > 0;
+              || (float)$e['contract_salary_lbp'] > 0
+              || isLaborLawSalary($e);
 
     // 🔴 (2026-08-06 — حالة مارسيلا داود «الإضافي بالملف صح وبالكشف مش هوي») النداء بلا سنة
     // صريحة كان يعيد حساب السنة **التقويمية** فقط، بينما العلاوات تُحفَظ على السنة **المعروضة**

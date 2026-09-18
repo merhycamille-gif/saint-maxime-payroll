@@ -4782,7 +4782,7 @@ $hrEmpSrc95 = (string)file_get_contents($PROJ . '/pages/employees.php');
 check('ساعات التناقص خانة بملف الأستاذ (للداخلين بالملاك فقط) + حضور التناقص ×1.5 (4→6، 3→4.5، 0→بلا نص) + معامل بالإعدادات + النص بقسيمة الراتب الشهرية وبخانة الساعات نفسها بالبطاقة السنوية (بلا خانة/صف جديد)',
       abs(hoursReductionPresence(4) - 6) < 0.01 && abs(hoursReductionPresence(3) - 4.5) < 0.01 && abs(hoursReductionPresence(1) - 1.5) < 0.01
       && hoursReductionSlipText(['hours_reduction' => 4]) === 'تناقص 4 س — حضور التناقص 6 س' && hoursReductionSlipText(['hours_reduction' => 0]) === ''
-      && strpos($hrEmpSrc95, 'name="hours_reduction"') !== false && strpos($hrEmpSrc95, "'hours_reduction' => ((\$_POST['employee_type'] ?? '') === 'enseignant_titulaire')") !== false
+      && strpos($hrEmpSrc95, 'name="hours_reduction"') !== false && strpos($hrEmpSrc95, "'hours_reduction' => (\$empType === 'enseignant_titulaire')") !== false
       && strpos($hrEmpSrc95, 'hoursReductionEnsureColumns($db); // 🕐 عمود') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), "'hours_reduction_presence_factor'") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/monthly_payroll.php'), 'hoursReductionSlipText($emp') !== false
@@ -6691,6 +6691,51 @@ try {
 } catch (Throwable $e) { $why140 = 'خطأ: ' . $e->getMessage(); }
 finally { if ($db->inTransaction()) $db->rollBack(); }
 check('ترك من الكل (تجربة حيّة تُرجَع): ترك الضمان وحده يصفّر الضمان من الشهر التالي فقط ويُبقي الاسم بالسنة والأساس والصندوق؛ الترك من الكل يخفيه', $ok140, $why140);
+
+/* =====================================================================
+ * 141) 🧑‍🏫⚖️ نوع الوظيفة على مستويين + راتب الموظف حسب قانون العمل (2026-09-18 «نوع الوظيف بدي يكون أو موظف أو أستاذ؛ إذا موظف لازم
+ *      نحطّ نوع الوظيفة ويخضع راتبه لقانون العمل وأنا إذا بدي غيّرو بغيّرو؛ إذا أستاذ ملاك أو متعاقد: الملاك سلسلة الرتب والرواتب،
+ *      والمتعاقد أنا بحدّد قدّيش»): الشاشة emp_kind (+teacher_kind) وemployee_type مخفي يشتقّه الخادم؛ الملاك مقفول على السلسلة؛
+ *      الموظف: عمود salary_labor_law (يتركّب ذاتياً) = الأساس الحد الأدنى للأجور الساري بتاريخ الشهر — القدامى لا يتغيّرون (0).
+ * =================================================================== */
+$fn141 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$pc141 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$em141 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$hd141 = (string)file_get_contents($PROJ . '/includes/header.php');
+check('نوع الوظيفة على مستويين + قانون العمل (كود): العمود يتركّب ذاتياً + isLaborLawSalary/laborLawMinWage/salaryConfigSql + المحرّك + اشتقاق الخادم + الشاشة',
+      function_exists('ensureSalaryLaborLawColumn') && function_exists('isLaborLawSalary') && function_exists('laborLawMinWage') && function_exists('salaryConfigSql')
+      && strpos($fn141, "ADD COLUMN salary_labor_law TINYINT(1) NOT NULL DEFAULT 0") !== false
+      && strpos($hd141, 'ensureSalaryLaborLawColumn();') !== false
+      && strpos($pc141, "if (isLaborLawSalary(\$emp)) {") !== false && strpos($pc141, "return [(float)laborLawMinWage((int)\$this->month, (int)\$this->year), 0.0, (float)\$emp['current_grade']];") !== false
+      && strpos($pc141, "if (isLaborLawSalary(\$emp)) return true;") !== false
+      && strpos($em141, "if (\$kindP === 'employe') \$empType = 'employe';") !== false
+      && strpos($em141, "if (\$empType === 'enseignant_titulaire') \$modeP = 'percent_of_lbp';") !== false
+      && strpos($em141, "\$laborLawP = (\$empType === 'employe' && \$modeP === 'labor_law') ? 1 : 0;") !== false
+      && strpos($em141, 'name="emp_kind"') !== false && strpos($em141, 'name="teacher_kind"') !== false && strpos($em141, 'id="employeeTypeHidden"') !== false
+      && strpos($em141, 'value="labor_law" data-for="employe"') !== false
+      && (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'salary_labor_law'")->fetch()
+      && (int)$db->query("SELECT COUNT(*) FROM employees WHERE salary_labor_law = 1 AND employee_type <> 'employe'")->fetchColumn() === 0);
+// تجربة حيّة تُرجَع: موظف إداري جديد على «قانون العمل» ⇒ أساس حزيران 2026 = الحد الأدنى الساري بتاريخه (> 0) والمحرّك يسمح؛ وبإطفائه بلا مبلغ ⇒ لا إعداد (أساس 0)
+$ok141 = false; $why141 = '';
+try {
+    $db->beginTransaction();
+    $db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, status, salary_input_mode, salary_labor_law, base_salary_usd, contract_salary_lbp, payment_months_per_year, days_per_week, transport_weeks, tax_subject, tax_includes_extra, cnss_subject, cnss_includes_extra, eoc_subject, is_deleted)
+        VALUES (2, '__REG141', 'employe', 'فحص', 'موظف141', 'Reg', 'Test141', '2025-10-01', 'actif', 'direct_lbp', 1, 0, 0, 12, 5, 4, 1, 1, 1, 1, 0, 0)");
+    $rid141 = (int)$db->lastInsertId();
+    $mw141 = laborLawMinWage(6, 2026);
+    $c141 = (new PayrollCalculator($rid141, 6, 2026))->calculate();
+    $e141 = $db->query("SELECT * FROM employees WHERE id = $rid141")->fetch(PDO::FETCH_ASSOC);
+    $allow1 = salaryEngineAllowed($e141, $db);
+    $db->exec("UPDATE employees SET salary_labor_law = 0 WHERE id = $rid141");
+    $c141b = (new PayrollCalculator($rid141, 6, 2026))->calculate();
+    $e141b = $db->query("SELECT * FROM employees WHERE id = $rid141")->fetch(PDO::FETCH_ASSOC);
+    $allow0 = salaryEngineAllowed($e141b, $db);
+    $ok141 = $mw141 > 0 && (int)$c141['base_plus_echelon_lbp'] === $mw141 && (int)$c141['net_salary_lbp'] > 0 && $allow1
+          && (int)$c141b['base_plus_echelon_lbp'] === 0 && $allow0 === true /* جديد بلا أي صفّ مخزّن: المحرّك سيّده (ريتا بو عاصي) */;
+    $why141 = 'الحد الأدنى 6/2026 = ' . number_format($mw141) . ' · الأساس ' . number_format((int)$c141['base_plus_echelon_lbp']) . ' · صافي ' . number_format((int)$c141['net_salary_lbp']) . ' · مطفأ: أساس ' . number_format((int)$c141b['base_plus_echelon_lbp']);
+} catch (Throwable $e) { $why141 = 'خطأ: ' . $e->getMessage(); }
+finally { if ($db->inTransaction()) $db->rollBack(); }
+check('قانون العمل (تجربة حيّة تُرجَع): موظف على قانون العمل ⇒ أساسه = الحد الأدنى الساري بتاريخ الشهر وصافيه > 0؛ مطفأ بلا مبلغ ⇒ أساس 0', $ok141, $why141);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
