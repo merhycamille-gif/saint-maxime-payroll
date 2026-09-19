@@ -6901,6 +6901,46 @@ check('🏦 البطاقة السنوية للمتعاقد بلا عمود صن�
       && strpos($sT, 'deduction-header">Caisse') !== false && strpos($sT, 'colspan="5" class="deduction-header"') !== false,
       "contract=$con145 titulaire=$tit146");
 
+/**
+ * 147) 🏦 نماذج تعويض نهاية الخدمة p1/p2/p3 (2026-09-19 «بدي متلهون طبق الأصل ينعملو ويتعبّوا ويكون عندي خيار عبّيهون أو غيّر فيهن واحفظ واحذف
+ *      وأكيد الطبع PDF أو إكسل أو وورد»): includes/eos_forms.php المصدر الواحد (eosData) + 3 نماذج بـofficial_forms (cnss_eos_doc/2y/annual،
+ *      للموظف والمتعاقد فقط) + خانات ofe قابلة للتعديل تُحفظ JSON بجدول official_form_edits (يتركّب ذاتياً) وتُحذف + بلاطات بمركز التقارير.
+ */
+require_once $PROJ . '/includes/eos_forms.php';
+ensureOfficialFormEdits();
+$of147 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp147 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$e147 = $db->query("SELECT e.id, e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.is_calculated = 1 AND ms.net_salary_lbp > 0
+                    WHERE e.employee_type = 'employe' AND e.is_deleted = 0 AND e.nssf_number <> '' GROUP BY e.id HAVING COUNT(*) >= 12 LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: [];
+$ok147 = (bool)$e147; $why147 = 'emp=' . json_encode($e147);
+if ($e147) {
+    $eid = (int)$e147['id']; $sid = (int)$e147['school_id'];
+    $emp147 = $db->query("SELECT * FROM employees WHERE id = $eid")->fetch(PDO::FETCH_ASSOC); $sch147 = $db->query("SELECT * FROM schools WHERE id = $sid")->fetch(PDO::FETCH_ASSOC);
+    $d147 = eosData($db, $emp147, $sch147);
+    $consistent = (int)$d147['total'] === (int)array_sum($d147['years']) && $d147['contrib'] === (int)round($d147['total'] * $d147['rate_pct'] / 100);
+    foreach (['cnss_eos_doc', 'cnss_eos_2y', 'cnss_eos_annual'] as $f147) {
+        $h = renderPage('pages/official_forms.php', ['form' => $f147, 'employee_id' => $eid], [], [$sid], 'lbp', '2025-2026');
+        if (strpos($h, 'FATAL') !== false || strpos($h, 'id="ppExportArea"') === false || strpos($h, 'data-k="inst_no"') === false || strpos($h, 'id="ofeSaveForm"') === false) { $ok147 = false; $why147 .= " $f147:render"; }
+        if ($f147 === 'cnss_eos_doc' && strpos($h, 'data-k="total">' . eosNum($d147['total']) . '<') === false) { $ok147 = false; $why147 .= ' doc:total'; }
+        if ($f147 === 'cnss_eos_annual' && strpos($h, 'data-k="yr_tot">' . eosNum($d147['total']) . '<') === false) { $ok147 = false; $why147 .= ' annual:total'; }
+    }
+    // حفظ ← يظهر المحفوظ بدل التلقائي ← حذف ← يرجع التلقائي (على موظف وهمي 999999 لا يلمس داتا حقيقية)
+    ofeSave($db, 999999, 'cnss_eos_doc', ['inst_no' => 'REG-147', 'b_week' => 'X'], 'regcheck');
+    $sv = ofeLoad($db, 999999, 'cnss_eos_doc');
+    $GLOBALS['OFE_DATA'] = $sv['data'];
+    $okSave = ($sv['data']['inst_no'] ?? '') === 'REG-147' && strpos(ofe('inst_no', 'AUTO'), '>REG-147<') !== false && strpos(ofeBox('b_week', 'x', false), 'data-v="X"') !== false && strpos(ofe('other', 'AUTO'), '>AUTO<') !== false;
+    ofeDelete($db, 999999, 'cnss_eos_doc'); $GLOBALS['OFE_DATA'] = [];
+    $okDel = ofeLoad($db, 999999, 'cnss_eos_doc')['updated_at'] === null;
+    if (!$consistent) { $ok147 = false; $why147 .= ' consistency'; }
+    if (!$okSave || !$okDel) { $ok147 = false; $why147 .= " save=" . (int)$okSave . " del=" . (int)$okDel; }
+}
+check('🏦 نماذج نهاية الخدمة p1/p2/p3: تُرندَر بلا خطأ لموظف حقيقي + مجموع الأجور = مجموع السنوات والاشتراك = المجموع × النسبة + حفظ/حذف الخانات المعدَّلة + قصر النموذج على الموظف والمتعاقد + بلاطات التقارير',
+      $ok147 && strpos($of147, "\$laborLawOnly = ['cnss_eos_doc','cnss_eos_2y','cnss_eos_annual'];") !== false
+      && strpos($of147, "in_array(\$form, \$laborLawOnly) ? \" AND employee_type IN ('employe','enseignant_contractuel')\"") !== false
+      && strpos($of147, 'eosHandlePost($db);') !== false && strpos($of147, "elseif (in_array(\$form, ['cnss_eos_doc','cnss_eos_2y','cnss_eos_annual'], true)):") !== false
+      && substr_count($rp147, "\$OF.'cnss_eos_doc'") === 1 && substr_count($rp147, "\$OF.'cnss_eos_2y'") === 1 && substr_count($rp147, "\$OF.'cnss_eos_annual'") === 1
+      && (bool)$db->query("SHOW TABLES LIKE 'official_form_edits'")->fetch(),
+      $why147);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

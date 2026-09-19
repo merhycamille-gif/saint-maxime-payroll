@@ -11,6 +11,7 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/report_helpers.php';
+require_once __DIR__ . '/../includes/eos_forms.php'; // 🏦 نماذج تعويض نهاية الخدمة p1/p2/p3 (2026-09-19)
 require_once __DIR__ . '/../includes/report_export.php';
 requireLogin();
 // لا نشترط مدرسة واحدة — التقارير المجمّعة تعمل مع عدة مدارس/الكل،
@@ -48,6 +49,7 @@ if (in_array($form, $institutionForms, true) && !$school) {
 }
 $lang = $_SESSION['lang'] ?? 'fr';
 
+eosHandlePost($db); // 🏦 حفظ/حذف خانات نماذج نهاية الخدمة المعدَّلة يدوياً (قبل أي إخراج)
 // 🏛️ حفظ «معلومات المؤسسة للنماذج الرسمية» (mof_profile — ر5/ر6/ر10 طبق الأصل 2026-08-23)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_mof_profile']) && $school) {
     requireCsrf();
@@ -164,7 +166,9 @@ $ofFilterTitle = ($empTypeSel ? (empCategoryTitle($empTypeSel)) : '')
 $perEmployee = ['cnss_employ','cnss_terminate','cnss_work','cnss_wife',
                 'teacher_card','eoc_card','tax_register','tax_r6','tax_r6t',
                 'tax_r4','cnss_employ2','cnss_work_detail','cnss_eos_invite',
-                'cnss_eos_wage','cnss_parent','cnss_eos_settle'];
+                'cnss_eos_wage','cnss_parent','cnss_eos_settle','cnss_eos_doc','cnss_eos_2y','cnss_eos_annual'];
+// 🏦 نماذج نهاية الخدمة (الضمان) للخاضعين لقانون العمل فقط = الموظف الإداري والأستاذ المتعاقد (الملاك نهاية خدمته من صندوق التعويضات)
+$laborLawOnly = ['cnss_eos_doc','cnss_eos_2y','cnss_eos_annual'];
 // نماذج خاصة بالموظف الإداري فقط (الأستاذ ياخذ نهاية خدمته من صندوق التعويضات)
 $employeeOnly = ['cnss_eos_settle'];
 // نماذج خاصة بالملاك فقط (صندوق التعويضات = الأستاذ الملاك)
@@ -211,6 +215,7 @@ $titles = [
     'staff_stats'    => 'Statistiques du personnel / إحصاءات الموظفين',
     'general_info'   => 'Informations générales sur le personnel / معلومات عامة عن الموظفين',
 ];
+$titles += eosForms(); // 🏦 مستند التصفية + جدول السنتين + جدول الأجور السنوية
 $pageTitle = $titles[$form] ?? 'Rapports officiels / تقارير رسمية';
 $currentPage = 'reports';
 
@@ -370,8 +375,9 @@ if (in_array($form, $perEmployee) && !$emp):
     [$yearWhere, $yearParams] = yearEmploymentFilter(activeSchoolYear());
     // تقييد لائحة الاختيار حسب النموذج: خاص بالموظف الإداري / بالملاك / بالأساتذة
     $onlyEmp = in_array($form, $employeeOnly) ? " AND employee_type='employe'"
+             : (in_array($form, $laborLawOnly) ? " AND employee_type IN ('employe','enseignant_contractuel')"
              : (in_array($form, $titulaireOnly) ? " AND employee_type='enseignant_titulaire'"
-             : (in_array($form, $teacherOnly) ? " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')" : ''));
+             : (in_array($form, $teacherOnly) ? " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')" : '')));
     $list = $db->prepare("SELECT id, first_name_fr, last_name_fr, first_name_ar, last_name_ar, employee_code, phone1, phone2
                           FROM employees WHERE is_deleted = 0 AND " . schoolScopeWhere('school_id') . $onlyEmp . $yearWhere . "
                           ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
@@ -2351,6 +2357,16 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         <?= signatureBox('إفادة المضمون / صاحب الحق — التوقيع','','') ?>
     </div>
 </div>
+
+<?php elseif (in_array($form, ['cnss_eos_doc','cnss_eos_2y','cnss_eos_annual'], true)): // 🏦 p1/p2/p3 نماذج تعويض نهاية الخدمة (2026-09-19)
+    $eosSaved = ofeLoad($db, (int)$emp['id'], $form);
+    $GLOBALS['OFE_DATA'] = $eosSaved['data'];
+    $eosD = eosData($db, $emp, $school);
+    echo eosEditBar($form, (int)$emp['id'], $eosSaved);
+    if ($form === 'cnss_eos_doc') echo eosRenderDoc($emp, $eosD);
+    elseif ($form === 'cnss_eos_2y') echo eosRender2y($emp, $eosD);
+    else echo eosRenderAnnual($emp, $eosD);
+?>
 
 <?php elseif ($form === 'cnss_employ2'): // 2-AA تصريح باستخدام أجير + جدول العيال
     $sal = ofLatestSalary($db, $emp['id']);
