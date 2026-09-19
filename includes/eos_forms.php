@@ -194,7 +194,7 @@ function eosEditBar(string $form, int $empId, array $saved): string {
         var on = bx.getAttribute('data-v')==='X' ? '' : 'X'; bx.setAttribute('data-v',on); bx.querySelector('.bx').innerHTML = on || '&nbsp;'; });
     function ofeCollect(f){ var o={}; document.querySelectorAll('#ppExportArea .ofe').forEach(function(x){ o[x.getAttribute('data-k')] = x.innerText.trim(); });
         document.querySelectorAll('#ppExportArea .ofe-box').forEach(function(x){ o[x.getAttribute('data-k')] = x.getAttribute('data-v')||''; });
-        f.querySelector('input[name=ofe_data]').value = JSON.stringify(o); return true; }
+        f.querySelector('input[name=ofe_data]').value = 'b64:' + btoa(unescape(encodeURIComponent(JSON.stringify(o)))); return true; } // base64: البرنامج يعقّم $_POST (يحوّل الاقتباسات) فيتخرّب JSON الخام
     </script>
     <?php return ob_get_clean();
 }
@@ -209,7 +209,10 @@ function eosHandlePost(PDO $db): void {
     if (!isset(eosForms()[$form]) || $empId <= 0) return;
     $who = (string)($_SESSION['username'] ?? '');
     if ($_POST['ofe_action'] === 'save') {
-        $data = json_decode((string)($_POST['ofe_data'] ?? ''), true);
+        $raw = (string)($_POST['ofe_data'] ?? '');
+        if (strpos($raw, 'b64:') === 0) $raw = (string)base64_decode(substr($raw, 4));
+        else $raw = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8'); // JSON خام مرّ بتعقيم $_POST
+        $data = json_decode($raw, true);
         if (!is_array($data)) { $_SESSION['flash_error'] = 'لم يُحفَظ شيء — البيانات غير مقروءة.'; }
         else { ofeSave($db, $empId, $form, $data, $who); $_SESSION['flash_success'] = '💾 حُفظت خانات النموذج لهذا الموظف — تظهر بدل التلقائية.'; }
     } elseif ($_POST['ofe_action'] === 'delete') {
