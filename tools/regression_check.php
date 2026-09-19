@@ -6869,11 +6869,37 @@ foreach ($docs145 as [$pg, $get, $law, $scope145, $sy145]) {
     if (!$hasB || $lawB !== $law || $hasL || $fat) { $ok145 = false; $why145[] = basename($pg) . ':' . json_encode($get) . " both=" . (int)$hasB . " law=" . (int)$lawB . " lbp=" . (int)$hasL . " fatal=" . (int)$fat; }
 }
 $hTad = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'tadris'], [], [$sch145], 'both', '2025-2026'); // إفادة بلا مبلغ ⇒ بلا سطر سعر
+// 🏷️ «مش موجود ببطاقة المتعاقد» (2026-09-19): البطاقة السنوية — سطر واحد (.slip-rate) لكل الفئات؛ 1,500 لأصحاب النسبة فقط؛ لا يظهر بوضع الليرة (التصميم المجمّد لم يُمسّ)
+$con145 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0
+                           WHERE e.employee_type = 'enseignant_contractuel' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
+$slipB = $con145 ? renderPage('pages/annual_slip.php', ['employee_id' => $con145, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026') : '';
+$slipL = $con145 ? renderPage('pages/annual_slip.php', ['employee_id' => $con145, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'lbp', '2025-2026') : '';
+$slipOk = $con145 && preg_match('/<div class="slip-rate" dir="rtl">سعر الصرف المعتمد: سعر كل شهر — آخر سعر 1 \$ = [0-9,]+ ل\.ل\.<\/div>/u', $slipB) === 1
+          && strpos($slipL, 'slip-rate"') === false && strpos($slipB, 'FATAL') === false;
+if (!$slipOk) $why145[] = 'annual_slip contract=' . $con145;
 check('🏷️ سعر الصرف المعتمد بعنوان كل مستند فيه دولار (كشف/تقرير/إفادة/قسيمة/بطاقة): يظهر بوضع الدولار ولا يظهر بوضع الليرة، والسعر الرسمي 1,500 فقط حيث أعمدة الأساس، وإفادة بلا مبلغ بلا سطر',
       function_exists('rateTitleText') && function_exists('rateSubtitle') && strpos($rh145, "rateTitleText(\$opts['month'] ?? null") !== false
       && substr_count($of145, 'rateSubtitle(') === 13 && substr_count($at145, '<?= $rateLine ?>') === substr_count($at145, '</h2>')
-      && $ok145 && strpos($hTad, 'سعر الصرف المعتمد') === false,
+      && $ok145 && $slipOk && strpos($hTad, 'سعر الصرف المعتمد') === false,
       implode(' · ', $why145) ?: 'ok');
+
+/**
+ * 146) 🏦 «ببطاقة المتعاقد ما لازم يكون فيه عمود لصندوق التعويضات — بس انتبه أوعى تخرب البطاقة» (2026-09-19): $noCaisse = موظف أو متعاقد ⇒
+ *      عمودا Caisse ودرجة/نصف راتب مخفيان (المحسومات colspan 3) — الملاك كما هو (5 + Caisse). أعمدة الدرجة/التدرّج تبقى للمتعاقد. لا تغيير آخر.
+ */
+$as146 = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
+$tit146 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0
+                           WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
+$sC = $con145 ? renderPage('pages/annual_slip.php', ['employee_id' => $con145, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026') : '';
+$sT = $tit146 ? renderPage('pages/annual_slip.php', ['employee_id' => $tit146, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026') : '';
+check('🏦 البطاقة السنوية للمتعاقد بلا عمود صندوق التعويضات (المحسومات = ضمان/ضريبة/مجموع، colspan 3، أعمدة الدرجة باقية) — الملاك كما هو (Caisse + colspan 5) — بلا Fatal',
+      strpos($as146, "\$noCaisse = \$isEmp || \$emp['employee_type'] === 'enseignant_contractuel';") !== false
+      && strpos($as146, '<th colspan="<?= $noCaisse ? 3 : 5 ?>" class="deduction-header">') !== false
+      && substr_count($as146, '<?php if (!$noCaisse): ?>') === 3 && strpos($as146, "(\$isEmp ? 10 : (\$noCaisse ? 12 : 14))") !== false
+      && $con145 && $tit146 && strpos($sC, 'FATAL') === false && strpos($sT, 'FATAL') === false
+      && strpos($sC, 'deduction-header">Caisse') === false && strpos($sC, 'colspan="3" class="deduction-header"') !== false && strpos($sC, 'Valeur échelon<br>قيمة الدرجة') !== false
+      && strpos($sT, 'deduction-header">Caisse') !== false && strpos($sT, 'colspan="5" class="deduction-header"') !== false,
+      "contract=$con145 titulaire=$tit146");
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

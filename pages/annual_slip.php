@@ -144,6 +144,9 @@ function annualSlipHtml($db, $emp, $schoolYear) {
     $slipRate = $meta['rate'];
     // موظف إداري: لا أعمدة درجة/تدرّج ولا صندوق تعويضات (يخضع لقانون العمل — راتب مباشر، نهاية خدمته من الضمان).
     $isEmp = ($emp['employee_type'] === 'employe');
+    // 🏦 «ببطاقة المتعاقد ما لازم يكون فيه عمود لصندوق التعويضات — أوعى تخرب البطاقة» (2026-09-19): الصندوق للملاك فقط (المحرّك: enseignant_titulaire)
+    //    ⇒ عمودا الصندوق ودرجة/نصف راتب يُخفَيان للمتعاقد كما للموظف الإداري؛ أعمدة الدرجة/التدرّج تبقى له. لا تغيير آخر بالتصميم.
+    $noCaisse = $isEmp || $emp['employee_type'] === 'enseignant_contractuel';
     // عدد أعمدة الجدول (تُطرح 4 أعمدة الأستاذ للموظف الإداري) — أعمدة الإضافي/المكافأة/النقل تتبع زرّ «الراتب يشمل»
     // (بطلب المستخدم: النقل خيار بإيده). ولما يكون النقل مخفياً، يُعرض «المستحق» بلا النقل لتبقى الأرقام راكبة.
     // 🚌 خيار ثلاثي (2026-09-17): $showTrans = العمود ظاهر (بالمبلغ أو فارغاً)؛ $transAmt = فيه مبلغ (ويُجمع بالمستحق).
@@ -165,7 +168,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
         return (salaryCompHas('extra') ? 0.0 : (float)($t['extra_wage_usd'] ?? 0))
              + (salaryCompHas('aide')  ? 0.0 : (float)($t['aide_usd'] ?? 0));
     };
-    $slipCols = ($isEmp ? 10 : 14) + compColsCount();
+    $slipCols = ($isEmp ? 10 : ($noCaisse ? 12 : 14)) + compColsCount();
 
     ob_start();
     ?>
@@ -176,6 +179,10 @@ function annualSlipHtml($db, $emp, $schoolYear) {
             <span class="slip-pname"><?= e($meta['name']) ?></span>
             <span class="slip-rep">Relevé annuel <?= e($schoolYear) ?> / كشف الراتب السنوي</span>
         </div>
+        <?php // 🏷️ «مش موجود ببطاقة المتعاقد» (2026-09-19): سعر الصرف المعتمد بعنوان البطاقة لكل الفئات — بطاقة النسبة كانت تعرضه برؤوس الأعمدة فقط.
+              //    سطر واحد فقط يُضاف (التصميم المجمّد لم يُمسّ): سعر كل شهر + آخر سعر؛ و1,500 الرسمي فقط لأصحاب النسبة (بعد التدرّج ÷1500).
+              $slipRateTxt = rateTitleText(null, null, true, (float)($meta['rate'] ?? 0) > 0 ? (float)$meta['rate'] : null, ($meta['extra_pct'] ?? '') !== ''); ?>
+        <?php if ($slipRateTxt !== ''): ?><div class="slip-rate" dir="rtl"><?= e($slipRateTxt) ?></div><?php endif; ?>
         <table class="slip-info">
             <tr>
                 <td><span class="lbl"><?= ($emp['employee_type'] === 'employe') ? 'Fonction / الوظيفة' : 'Diplôme / الشهادة العلمية' ?></span><span class="val"><?= e($meta['diploma']) ?></span></td>
@@ -213,7 +220,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <?php if (salaryCompHas('extra')): ?><th rowspan="2">Supplément<br>الأجر الإضافي<?= ($meta['extra_pct'] ?? '') !== '' ? '<br><span dir="ltr">' . e($meta['extra_pct']) . ' %</span>' . (($meta['new_rates'] ?? '') !== '' ? '<br><span dir="ltr">1 $ = ' . e($meta['new_rates']) . '</span>' : '') : '' /* 🧮 نسبة الإضافي المعطاة له + السعر الجديد (سعر صرف الشهر) تحت عنوان العمود (p1 — 2026-09-03) */ ?></th><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><th rowspan="2">Prime &amp; aide<br>مكافأة ومساعدة</th><?php endif; ?>
                     <th rowspan="2">Brut<br>الإجمالي</th>
-                    <th colspan="<?= $isEmp ? 3 : 5 ?>" class="deduction-header">Retenues / المحسومات</th>
+                    <th colspan="<?= $noCaisse ? 3 : 5 ?>" class="deduction-header">Retenues / المحسومات</th>
                     <th rowspan="2">Net<br>الصافي</th>
                     <th rowspan="2">Alloc. fam.<br>عائلي</th>
                     <?php if ($showTrans): ?><th rowspan="2">Transport<br>نقل</th><?php endif; ?>
@@ -221,7 +228,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <th rowspan="2" class="sig-col">Signature<br>التوقيع</th>
                 </tr>
                 <tr>
-                    <?php if (!$isEmp): ?>
+                    <?php if (!$noCaisse): ?>
                     <th class="deduction-header">Caisse</th>
                     <th class="deduction-header">Échelon / ½ sal.<br>درجة / نصف راتب</th>
                     <?php endif; ?>
@@ -260,7 +267,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['aide']), 0) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <?php $hR = $hidRow($r); ?>
                             <td><?= $money($r['brut'] - $hR, true) ?></td>
-                            <?php if (!$isEmp): ?>
+                            <?php if (!$noCaisse): ?>
                             <td><?= $money($r['caisse']) ?></td>
                             <td><?= $money($r['eoc_grade']) ?></td>
                             <?php endif; ?>
@@ -294,7 +301,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <?php if (salaryCompHas('extra')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['extra_wage'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor(!empty($meta['has_pct']) ? $tot['extra_law_usd'] : $tot['extra_wage_usd']), 0) ?> $</span></td><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['aide'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor($tot['aide_usd']), 0) ?> $</span></td><?php endif; ?>
                     <td><?= $moneyTot($tot['brut'], $tot['brut_usd']) ?></td>
-                    <?php if (!$isEmp): ?>
+                    <?php if (!$noCaisse): ?>
                     <td><?= $moneyTot($tot['caisse'], $tot['caisse_usd']) ?></td>
                     <td><?= $moneyTot($tot['eoc_grade'], $tot['eoc_grade_usd']) ?></td>
                     <?php endif; ?>
@@ -342,6 +349,7 @@ include __DIR__ . '/../includes/header.php';
 .slip-emp-name { flex-wrap:wrap; }
 .slip-emp-name .slip-school, .slip-emp-name .slip-rep, .slip-emp-name .slip-pname { white-space:nowrap; }
 .slip-emp-name .slip-rep { flex:1; text-align:end; color:var(--gray-700); font-weight:700; }
+.salary-slip .slip-rate { text-align:center; color:var(--gray-700); font-weight:700; font-size:10.5pt; margin:2px 0 4px; } /* 🏷️ سعر الصرف المعتمد (2026-09-19) */
 .slip-emp-name .slip-pname { flex:0 0 auto; text-align:center; color:var(--primary); font-size:1.12em; }
 
 /* معلومات الموظف: شبكة مرتّبة بحدود (تسمية صغيرة + قيمة) */
