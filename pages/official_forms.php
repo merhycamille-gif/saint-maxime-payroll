@@ -1651,7 +1651,8 @@ elseif ($form === 'teacher_card'):
             <?= extraAideHeads('', $rows, $month, $year) ?>
             <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
             <th>صندوق التعويضات ٦٪</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى صندوق التعويضات</small></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>ضريبة الدخل</th><th>الضمان الاجتماعي</th>
-            <th>مجموع المحسومات</th><th>تعويض عائلي</th><?= transportHead('', 'تعويض نقل') ?><th>مجموع المدفوعات<?= rateHead('mkt', $month, $year) ?></th><th>الصافي<?= rateHead('mkt', $month, $year) ?></th>
+            <?php // 📐 (2026-09-19 p1) «عمود الصافي دغري بعد عمود المحسومات بكل البرنامج»: محسومات ← صافي ← عائلي ← نقل ← مجموع المدفوعات ?>
+            <th>مجموع المحسومات</th><th>الصافي<?= rateHead('mkt', $month, $year) ?></th><th>تعويض عائلي</th><?= transportHead('', 'تعويض نقل') ?><th>مجموع المدفوعات<?= rateHead('mkt', $month, $year) ?></th>
             <th>توقيع الموظف</th>
         </tr></thead>
         <tbody>
@@ -1674,8 +1675,9 @@ elseif ($form === 'teacher_card'):
                 <td class="num"><?= dualFromUsd($a['fded'],$a['fded_usd'],false) ?></td>
                 <td class="num"><?= dualFromUsd($a['txb'],$a['txb_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['tax'],$a['tax_usd'],false) ?></td>
                 <td class="num"><?= dualFromUsd($a['cnss'],$a['cnss_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['ded'],$a['ded_usd'],false) ?></td>
+                <td class="num"><strong><?= dualFromUsd($a['net'],$a['net_usd'],false) ?></strong></td>
                 <td class="num"><?= dualFromUsd($a['fam'],$a['fam_usd'],false) ?></td><?= transportTotalCell($a['trans'],$a['trans_usd']) ?>
-                <td class="num"><?= dualFromUsd($a['due'],$a['due_usd'],false) ?></td><td class="num"><strong><?= dualFromUsd($a['net'],$a['net_usd'],false) ?></strong></td>
+                <td class="num"><?= dualFromUsd($a['due'],$a['due_usd'],false) ?></td>
                 <td></td>
             </tr>
         <?php };
@@ -1711,10 +1713,10 @@ elseif ($form === 'teacher_card'):
                 <td class="num"><?= money($r['income_tax_lbp'], $rRate, ['withCur'=>false]) ?></td>
                 <td class="num"><?= money($r['cnss_amount_lbp'], $rRate, ['withCur'=>false]) ?></td>
                 <td class="num"><?= money($r['total_retenues_lbp'], $rRate, ['withCur'=>false]) ?></td>
+                <td class="num"><strong><?= money($r['net_salary_lbp'], $rRate, ['withCur'=>false]) ?></strong></td>
                 <td class="num"><?= money($r['family_allowance_lbp'], $rRate, ['withCur'=>false]) ?></td>
                 <?= transportCell($r) ?>
                 <td class="num"><?= money(dueShownLbp($r), $rRate, ['withCur'=>false]) ?></td>
-                <td class="num"><strong><?= money($r['net_salary_lbp'], $rRate, ['withCur'=>false]) ?></strong></td>
                 <td style="min-width:60px"></td></tr>
         <?php endforeach;
         if ($rows && $curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);

@@ -6824,6 +6824,23 @@ check('🚪🔴 تاريخ ترك وهمي = لا تاريخ + التقليم ل
       && ((string)($r143['last_name_ar'] ?? '') !== 'عون' || ((int)$r143['rows_'] === 43 && (int)$r143['bon'] === 2 && $r143['left_date_all'] === null && $r143['left_date_eoc'] === null)),
       $why143 . ' · bogus=' . $bogus143 . ' · 1438=' . json_encode($r143, JSON_UNESCAPED_UNICODE));
 
+/**
+ * 144) 📐 «p1: عمود الصافي لازم يكون بكل التقارير وكل البرنامج دغري بعد عمود المحسومات» (2026-09-19):
+ *      كشف الرواتب والأجور الشهري (salary_all) كان: محسومات ← عائلي ← نقل ← مجموع المدفوعات ← صافي ⇒ صار محسومات ← صافي ← عائلي ← نقل ← مدفوعات
+ *      (رأس + صفوف + مجاميع). كنس: أي <th> «مجموع المحسومات» بأي صفحة يليه مباشرة «الصافي».
+ */
+$h144 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], ['extra', 'aide', 'transport'], [3]);
+$hdr144 = preg_match('/<th>مجموع المحسومات<\/th><th>الصافي/u', $h144) === 1;
+$rowOk144 = preg_match_all('/<td class="num">(?:(?!<\/td>).)*<\/td>\s*<td class="num"><strong>(?:(?!<\/td>).)*<\/td>\s*(?:<td[^>]*>(?:(?!<\/td>).)*<\/td>\s*){3}<td style="min-width:60px">/su', $h144); // محسومات ← صافي (bold) ← 3 خلايا ← توقيع
+$sweep144 = [];
+foreach (glob($PROJ . '/pages/*.php') as $f144) {
+    $src144 = (string)file_get_contents($f144);
+    if (preg_match_all('/<th>مجموع المحسومات<\/th>\s*<th>([^<]{0,20})/u', $src144, $m144)) foreach ($m144[1] as $nx) if (strpos($nx, 'الصافي') !== 0) $sweep144[] = basename($f144) . ':' . $nx;
+}
+check('📐 الصافي دغري بعد المحسومات: كشف الرواتب والأجور الشهري (رأس + صفوف + مجاميع) + كنس الصفحات (كل «مجموع المحسومات» يليه «الصافي»)',
+      strpos($h144, 'FATAL') === false && $hdr144 && $rowOk144 > 0 && strpos($h144, '<th>مجموع المحسومات</th><th>تعويض عائلي</th>') === false && !$sweep144,
+      'rows=' . $rowOk144 . ($sweep144 ? ' · ' . implode('، ', $sweep144) : ''));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
