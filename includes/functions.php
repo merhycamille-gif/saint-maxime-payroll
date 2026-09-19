@@ -4507,7 +4507,8 @@ function dueColsCount(): int { return dueColShown() ? 1 : 0; }
 function dueTd(string $html, string $attrs = ' class="num"'): string {
     $m = dueColMode();
     if ($m === 'none') return '';
-    return '<td' . $attrs . '>' . ($m === 'blank' ? '&nbsp;' : $html) . '</td>';
+    // 💰 «العمود طلع ضيق — وسّعه حتى إذا كتبت المبلغ يساع» (2026-09-19): بوضع «بلا مبلغ» الخلية تحفظ عرضاً يكفي لكتابة المبلغ بالقلم
+    return '<td' . $attrs . ($m === 'blank' ? ' style="min-width:110px"' : '') . '>' . ($m === 'blank' ? '&nbsp;' : $html) . '</td>';
 }
 
 /** عدد أعمدة المكوّنات الظاهرة (إضافي/مكافأة/نقل) — لضبط colspan الجداول ديناميكياً حسب «الراتب يشمل».

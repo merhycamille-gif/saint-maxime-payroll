@@ -226,7 +226,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <th rowspan="2">Net<br>الصافي</th>
                     <th rowspan="2">Alloc. fam.<br>عائلي</th>
                     <?php if ($showTrans): ?><th rowspan="2">Transport<br>نقل</th><?php endif; ?>
-                    <?php if ($showDue): ?><th rowspan="2">Total dû<br>المستحق</th><?php endif; ?>
+                    <?php if ($showDue): ?><th rowspan="2"<?= $dueAmt ? '' : ' class="due-blank"' ?>>Total dû<br>المستحق</th><?php endif; ?>
                     <th rowspan="2" class="sig-col">Signature<br>التوقيع</th>
                 </tr>
                 <tr>
@@ -279,7 +279,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td><?= $money($r['net'] - $hR, true) ?></td>
                             <td><?= $money($r['family']) ?></td>
                             <?php if ($showTrans): ?><td><?= $transAmt ? $money($r['transport']) : '&nbsp;' ?></td><?php endif; ?>
-                            <?php if ($showDue): ?><td><?= $dueAmt ? $money($r['total_due'] - $hR - ($transAmt ? 0 : $r['transport']), true) : '&nbsp;' ?></td><?php endif; ?>
+                            <?php if ($showDue): ?><td<?= $dueAmt ? '' : ' class="due-blank"' ?>><?= $dueAmt ? $money($r['total_due'] - $hR - ($transAmt ? 0 : $r['transport']), true) : '&nbsp;' ?></td><?php endif; ?>
                             <td class="sig-cell">&nbsp;</td>
                         <?php else: ?>
                             <td colspan="<?= $slipCols ?>" class="text-muted">—</td>
@@ -313,7 +313,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <td><?= $moneyTot($tot['net'], $tot['net_usd']) ?></td>
                     <td><?= $moneyTot($tot['family'], $tot['family_usd']) ?></td>
                     <?php if ($showTrans): ?><td><?= $transAmt ? $moneyTot($tot['transport'], $tot['transport_usd']) : '&nbsp;' ?></td><?php endif; ?>
-                    <?php if ($showDue): ?><td><?= $dueAmt ? $moneyTot($tot['total_due'] - ($transAmt ? 0 : $tot['transport']), $tot['total_due_usd'] - ($transAmt ? 0 : $tot['transport_usd'])) : '&nbsp;' ?></td><?php endif; ?>
+                    <?php if ($showDue): ?><td<?= $dueAmt ? '' : ' class="due-blank"' ?>><?= $dueAmt ? $moneyTot($tot['total_due'] - ($transAmt ? 0 : $tot['transport']), $tot['total_due_usd'] - ($transAmt ? 0 : $tot['transport_usd'])) : '&nbsp;' ?></td><?php endif; ?>
                     <td class="sig-cell"></td>
                 </tr>
             </tbody>
@@ -386,6 +386,7 @@ include __DIR__ . '/../includes/header.php';
 .salary-slip-table.curmode-usd .cur-usd { font-size:1em; color:#111827; }
 /* عمود التوقيع أوسع شوي */
 .salary-slip-table .sig-col, .salary-slip-table .sig-cell { min-width: 120px; }
+.salary-slip-table .due-blank { min-width: 130px; } /* 💰 «عمود المستحق طلع ضيق — وسّعه حتى إذا كتبت المبلغ يساع» (2026-09-19): بوضع «بلا مبلغ» فقط؛ بالمبلغ العمود كما كان */
 
 /* الطباعة: صفحة A4 أفقية + ألوان فاتحة لتوفير الحبر
    🔠 الخط 12pt («12» متل الوورد، بطلب المستخدم 2026-07-31) — والقسيمة الأعرض/الأطول من

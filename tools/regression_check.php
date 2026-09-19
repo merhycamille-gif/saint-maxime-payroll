@@ -6961,7 +6961,9 @@ foreach (['amount', 'blank', 'none'] as $dm) {
     $ha = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], ['extra', 'aide', 'transport'], [3], 'lbp', '2025-2026', '', [], $dm);
     $thR = substr_count($hr, '<th>الإجمالي المتوجب</th>'); $thS = substr_count($hs, 'Total dû<br>المستحق'); $thA = substr_count($ha, 'مجموع المدفوعات');
     $fat = strpos($hr . $hs . $ha, 'FATAL') !== false;
-    $blankR = substr_count($hr, '<td>&nbsp;</td>');
+    $blankR = substr_count($hr, '<td style="min-width:110px">&nbsp;</td>'); // 💰 «طلع ضيق — وسّعه» (2026-09-19): الخلية الفارغة تحفظ عرضاً للكتابة
+    if ($dm === 'blank' && $con148 && substr_count($hs, 'class="due-blank"') < 3) { $ok148 = false; $why148 .= ' slip:due-blank'; }
+    if ($dm === 'amount' && $con148 && strpos($hs, 'class="due-blank"') !== false) { $ok148 = false; $why148 .= ' slip:due-blank-in-amount'; }
     $exp = $dm === 'none' ? 0 : 1;
     if ($fat || $thR !== $exp || ($con148 && $thS !== $exp) || $thA !== $exp || ($dm === 'blank' && $blankR < 10) || ($dm !== 'blank' && $blankR > 0)) { $ok148 = false; $why148 .= " $dm: thR=$thR thS=$thS thA=$thA blank=$blankR fatal=" . (int)$fat; }
     // عدد <th> بالكشف الشهري ينقص عموداً واحداً فقط بوضع «غير موجود» (الجدول لا يتخربط)
@@ -6975,7 +6977,7 @@ check('💰 عمود المستحق بثلاث حالات (كود + تشغيل �
       && substr_count($of148, 'dueHead(') === 3 && substr_count($of148, 'dueCell(') === 2 && substr_count($of148, 'dueTotalCell(') === 2 && substr_count($of148, 'dueTd(') === 2
       && strpos($of148, 'colspan="<?= 16 + compColsCount() + dueColsCount() ?>"') !== false && strpos($of148, 'colspan="<?= 8 + compColsCount() + dueColsCount() ?>"') !== false && strpos($of148, '$sdCols = 16 + compColsCount() + dueColsCount();') !== false
       && strpos($rp148, '<?= transportHead() ?><?= dueHead() ?>') !== false && substr_count($rp148, 'dueTd(') === 2 && strpos($rp148, '($multi?17:16) + compColsCount() + dueColsCount()') !== false
-      && strpos($as148, "\$showDue = dueColShown(); \$dueAmt = (dueColMode() === 'amount');") !== false && substr_count($as148, '<?php if ($showDue): ?>') === 3 && strpos($as148, "(\$isEmp ? 9 : (\$noCaisse ? 11 : 13)) + compColsCount() + (\$showDue ? 1 : 0)") !== false
+      && strpos($as148, "\$showDue = dueColShown(); \$dueAmt = (dueColMode() === 'amount');") !== false && strpos($as148, '.salary-slip-table .due-blank { min-width: 130px; }') !== false && substr_count($as148, '<?php if ($showDue): ?>') === 3 && strpos($as148, "(\$isEmp ? 9 : (\$noCaisse ? 11 : 13)) + compColsCount() + (\$showDue ? 1 : 0)") !== false
       && strpos($ax148, "if (!dueColShown())              \$d[] = 15;") !== false && substr_count($ax148, "dueColMode() === 'amount' ?") === 2
       && strpos($rx148, "if (dueColShown()) { \$head[] = 'الإجمالي المتوجب'; \$w[] = 18; }") !== false && substr_count($rx148, "if (dueColShown()) \$row[] = dueColMode() === 'amount' ?") === 2,
       $why148 ?: 'ok ths=' . json_encode($ths148 ?? []));
