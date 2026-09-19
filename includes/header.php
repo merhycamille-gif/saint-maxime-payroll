@@ -548,6 +548,14 @@ document.addEventListener('submit', function (e) {
                                     <option value="amount" <?= $tmH==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
                                 </select>
                             </label>
+                            <?php $dmH = dueColMode(); // 💰 عمود المستحق بثلاث حالات (2026-09-19) ?>
+                            <label style="display:block;font-size:12px;color:#4c1d95;padding:4px 4px 2px"><i class="fas fa-sack-dollar"></i> <?= $lang==='ar'?'عمود المستحق (المجموع)':'Colonne total dû' ?>
+                                <select name="due_mode" class="form-control form-control-sm" style="margin-top:3px">
+                                    <option value="none"   <?= $dmH==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
+                                    <option value="blank"  <?= $dmH==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
+                                    <option value="amount" <?= $dmH==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
+                                </select>
+                            </label>
                             <div style="font-size:11px;color:#64748b;padding:2px 4px 6px"><?= $lang==='ar'?'الأساس + الدرجة يبقى دائماً':'Base + échelon toujours inclus' ?></div>
                             <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> Appliquer / تطبيق</button>
                         </form>

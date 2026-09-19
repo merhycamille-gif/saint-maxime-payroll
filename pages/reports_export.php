@@ -65,7 +65,7 @@ if ($report === 'monthly_summary') {
     $head = array_merge($head, ['الضمان ٣٪', 'الصندوق ٦٪', 'درجة / نصف راتب (إلى الصندوق)', 'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)', 'الضريبة', 'الصافي', 'تعويض عائلي']);
     $w = array_merge($w, [14, 14, 14, 14, 16, 12, 16, 14]);
     if (transportColShown()) { $head[] = 'تعويض النقل'; $w[] = 14; } // 🚌 موجود (بالمبلغ أو فارغاً) / غير موجود
-    $head[] = 'الإجمالي المتوجب'; $w[] = 18;
+    if (dueColShown()) { $head[] = 'الإجمالي المتوجب'; $w[] = 18; } // 💰 موجود (بالمبلغ أو فارغاً) / غير موجود
     $rep->head($head);
     $rep->widths($w);
 
@@ -80,7 +80,7 @@ if ($report === 'monthly_summary') {
         $row[] = $a['composed'];
         $row = array_merge($row, [$a['cnss'], $a['caisse'], $a['eocg'], $a['fded'], $a['txb'], $a['tax'], $a['net'], $a['fam']]);
         if (transportColShown()) $row[] = salaryCompHas('transport') ? $a['tr'] : '';
-        $row[] = $a['tot'];
+        if (dueColShown()) $row[] = dueColMode() === 'amount' ? $a['tot'] : '';
         $rep->totalRow($row);
     };
     foreach ($data as $r) {
@@ -98,7 +98,7 @@ if ($report === 'monthly_summary') {
         $row[] = $v['composed'];
         $row = array_merge($row, [$v['cnss'], $v['caisse'], $v['eocg'], $v['fded'], $v['txb'], $v['tax'], $v['net'], $v['fam']]);
         if (transportColShown()) $row[] = salaryCompHas('transport') ? $v['tr'] : '';
-        $row[] = $v['tot'];
+        if (dueColShown()) $row[] = dueColMode() === 'amount' ? $v['tot'] : '';
         $rep->row($row);
     }
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('الإجمالي العام', $G, $rn); }

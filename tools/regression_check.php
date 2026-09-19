@@ -30,7 +30,7 @@ $db = getDB();
 // ---------- عارض صفحات داخلي (كل صفحة بعملية فرعية لتفادي إعادة تعريف الدوال) ----------
 // $outFile: للمخرجات الثنائية (xlsx...) — أنبوب shell_exec بويندوز وضع نصي يقصّ عند أول
 // محرف 0x1A، فالثنائي يُكتب لملف عبر إعادة توجيه cmd ويُقرأ من القرص (2026-08-22)
-function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = '', string $schoolYear = '', string $outFile = '', array $files = []): string {
+function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = '', string $schoolYear = '', string $outFile = '', array $files = [], string $dueMode = ''): string {
     global $PROJ;
     $runner = __DIR__ . '/_render_one.php';
     // الوسائط تمرَّر base64 (اقتباسات JSON تتخربط بسطر أوامر ويندوز)
@@ -50,6 +50,8 @@ $__sy = $argv[6] ?? '';
 if ($__sy !== '') $_SESSION['active_school_year'] = $__sy; // السنة الدراسية المعروضة
 $_GET = json_decode(base64_decode($argv[2] ?? ''), true) ?: [];
 // رفع ملف (POST multipart) للصفحات التي تستقبل ملفات — مدقّق ملف الوزارة
+$__dm = $argv[8] ?? '';
+if ($__dm !== '') $_SESSION['due_col_mode'] = $__dm; // 💰 حالة عمود المستحق (2026-09-19)
 $__f = json_decode(base64_decode($argv[7] ?? ''), true) ?: [];
 if ($__f) {
     $_SERVER['REQUEST_METHOD'] = 'POST';
@@ -69,7 +71,7 @@ PHP);
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner) . ' '
          . escapeshellarg($rel) . ' ' . base64_encode(json_encode($get)) . ' ' . base64_encode(json_encode($comp))
          . ' ' . base64_encode(json_encode($schoolIds)) . ' ' . escapeshellarg($currency) . ' ' . escapeshellarg($schoolYear)
-         . ' ' . base64_encode(json_encode($files));
+         . ' ' . base64_encode(json_encode($files)) . ($dueMode !== '' ? ' ' . escapeshellarg($dueMode) : '');
     if ($outFile !== '') {
         @unlink($outFile);
         shell_exec($cmd . ' 2>NUL > ' . escapeshellarg($outFile));
@@ -1645,7 +1647,7 @@ check('الراتب يشمل: «معلومات تفصيلية عن الراتب�
       && preg_match('/<th>الأجر الإجمالي<\?= rateHead\(\'mkt\', \$month, \$year\) \?><\/th>\s*<\?= familyDedHeads\(\) \?>\s*<th>ضريبة الدخل<\/th>/u', $ofSrc26) === 1);
 check('الراتب يشمل: «معلومات تفصيلية» — المستحق المعروض عبر dueShownLbp والأجر الإجمالي من الظاهر فقط',
       strpos($ofSrc26, "'due'=>dueShownLbp(\$r),") !== false
-      && strpos($ofSrc26, "\$sdCols = 17 + compColsCount();") !== false);
+      && strpos($ofSrc26, "\$sdCols = 16 + compColsCount() + dueColsCount();") !== false); // (2026-09-19 + عمود المستحق الثلاثي)
 // فحص فعلي: توازن الرؤوس/الخلايا بكل تركيبات الزر للنموذجين (يمسك أي عمود ناقص/زائد فوراً)
 $colBalance = function (string $html): array {
     if (!preg_match('#<table[^>]*doc-table[^>]*>(.*?)</table>#s', $html, $tm)) return [-1, -1];
@@ -2806,7 +2808,7 @@ check('المركّب بلا نقل (تجربة فعلية): مركّب مارس
 // والكشف الشهري العام أيضاً: النقل قبل «الإجمالي المتوجب» مباشرة (بنية الرأس)
 $rp45 = (string)file_get_contents($PROJ . '/pages/reports.php');
 check('الكشف الشهري: عمود النقل يسبق «الإجمالي المتوجب» مباشرة',
-      strpos($rp45, 'transportHead() ?><th>الإجمالي المتوجب</th>') !== false);
+      strpos($rp45, 'transportHead() ?><?= dueHead() ?>') !== false); // (2026-09-19) رأس المستحق صار dueHead
 
 /* =====================================================================
  * 46) «الزوج/الزوجة يعمل» يُسقط زيادة الزوج من التنزيل العائلي (حالة زاهية الحاج
@@ -6105,7 +6107,7 @@ check('دولار القانون للأساس (تشغيل فعلي): أساس أ
 $of126 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp126 = (string)file_get_contents($PROJ . '/pages/reports.php'); $rh126 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 check('سعر الصرف بالعناوين (كود): rateHead مصدر واحد + 15 law (أساس/درجة/بعد التدرّج) و13 mkt (المركّب/الإجمالي/الصافي/المستحق) بالنماذج + 6/5 بالمركز + CSS .rate-head + الفروقات والتقرير العام السنويان بلا سعر شهر تحت المركّب',
       function_exists('rateHead') && strpos($rh126, '.doc-table th .rate-head{display:block;') !== false
-      && substr_count($of126, "<?= rateHead('law') ?></th>") === 15 && substr_count($of126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 13
+      && substr_count($of126, "<?= rateHead('law') ?></th>") === 15 && substr_count($of126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 10 && substr_count($of126, ". rateHead('mkt', \$month, \$year)) ?>") === 3 /* رؤوس المستحق عبر dueHead (2026-09-19) */
       && substr_count($of126, "</small><?= rateHead('mkt', \$month, \$year) ?></th>") === 5 && substr_count($of126, "</small><?= rateHead('law') ?></th>") === 0 && strpos($of126, "<th>الأجر الإجمالي<?= rateHead('mkt', \$month, \$year) ?></th>") !== false
       && substr_count($rp126, "<?= rateHead('law') ?></th>") === 6 && substr_count($rp126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 5 && substr_count($rp126, "</small><?= rateHead('mkt', \$month, \$year) ?></th>") === 4
       && strpos($of126, "<th><?= \$grBi('Salaire après échelon', 'الراتب بعد التدرّج') ?><?= rateHead('law') ?></th>") !== false
@@ -6895,7 +6897,7 @@ $sT = $tit146 ? renderPage('pages/annual_slip.php', ['employee_id' => $tit146, '
 check('🏦 البطاقة السنوية للمتعاقد بلا عمود صندوق التعويضات (المحسومات = ضمان/ضريبة/مجموع، colspan 3، أعمدة الدرجة باقية) — الملاك كما هو (Caisse + colspan 5) — بلا Fatal',
       strpos($as146, "\$noCaisse = \$isEmp || \$emp['employee_type'] === 'enseignant_contractuel';") !== false
       && strpos($as146, '<th colspan="<?= $noCaisse ? 3 : 5 ?>" class="deduction-header">') !== false
-      && substr_count($as146, '<?php if (!$noCaisse): ?>') === 3 && strpos($as146, "(\$isEmp ? 10 : (\$noCaisse ? 12 : 14))") !== false
+      && substr_count($as146, '<?php if (!$noCaisse): ?>') === 3 && strpos($as146, "(\$isEmp ? 9 : (\$noCaisse ? 11 : 13)) + compColsCount() + (\$showDue ? 1 : 0)") !== false
       && $con145 && $tit146 && strpos($sC, 'FATAL') === false && strpos($sT, 'FATAL') === false
       && strpos($sC, 'deduction-header">Caisse') === false && strpos($sC, 'colspan="3" class="deduction-header"') !== false && strpos($sC, 'Valeur échelon<br>قيمة الدرجة') !== false
       && strpos($sT, 'deduction-header">Caisse') !== false && strpos($sT, 'colspan="5" class="deduction-header"') !== false,
@@ -6940,6 +6942,43 @@ check('🏦 نماذج نهاية الخدمة p1/p2/p3: تُرندَر بلا �
       && substr_count($rp147, "\$OF.'cnss_eos_doc'") === 1 && substr_count($rp147, "\$OF.'cnss_eos_2y'") === 1 && substr_count($rp147, "\$OF.'cnss_eos_annual'") === 1
       && (bool)$db->query("SHOW TABLES LIKE 'official_form_edits'")->fetch(),
       $why147);
+
+/**
+ * 148) 💰 عمود «المستحق / مجموع المدفوعات» بثلاث حالات متل النقل (2026-09-19 «بدي بعمود المستحق كمان خيار: حطّ المبلغ أو ما حطّو بس
+ *      العمود يضلّ موجود أو ما حطّو كلّو — أوعى تخربطلي بطاقة الراتب»): dueColMode/dueColShown/dueColsCount/dueTd (functions) +
+ *      dueHead/dueCell/dueTotalCell (report_helpers) + select due_mode بالشريط والترويسة + switch_salarycomp — عرض فقط، لا حساب يتغيّر.
+ *      مطبَّق: كشف الرواتب الشهري (reports + إكسل) + salary_all + payment_list + ofState + البطاقة السنوية (+ إكسلها).
+ */
+$fn148 = (string)file_get_contents($PROJ . '/includes/functions.php'); $rh148 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$of148 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp148 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$as148 = (string)file_get_contents($PROJ . '/pages/annual_slip.php'); $ax148 = (string)file_get_contents($PROJ . '/pages/annual_slip_export.php');
+$rx148 = (string)file_get_contents($PROJ . '/pages/reports_export.php'); $hd148 = (string)file_get_contents($PROJ . '/includes/header.php');
+$ok148 = true; $why148 = ''; $ths148 = [];
+$con148 = $con145 ?: 0;
+foreach (['amount', 'blank', 'none'] as $dm) {
+    $hr = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], ['extra', 'aide', 'transport'], [3], 'lbp', '2025-2026', '', [], $dm);
+    $hs = $con148 ? renderPage('pages/annual_slip.php', ['employee_id' => $con148, 'school_year' => '2025-2026'], ['extra', 'aide', 'transport'], [3], 'lbp', '2025-2026', '', [], $dm) : '';
+    $ha = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], ['extra', 'aide', 'transport'], [3], 'lbp', '2025-2026', '', [], $dm);
+    $thR = substr_count($hr, '<th>الإجمالي المتوجب</th>'); $thS = substr_count($hs, 'Total dû<br>المستحق'); $thA = substr_count($ha, 'مجموع المدفوعات');
+    $fat = strpos($hr . $hs . $ha, 'FATAL') !== false;
+    $blankR = substr_count($hr, '<td>&nbsp;</td>');
+    $exp = $dm === 'none' ? 0 : 1;
+    if ($fat || $thR !== $exp || ($con148 && $thS !== $exp) || $thA !== $exp || ($dm === 'blank' && $blankR < 10) || ($dm !== 'blank' && $blankR > 0)) { $ok148 = false; $why148 .= " $dm: thR=$thR thS=$thS thA=$thA blank=$blankR fatal=" . (int)$fat; }
+    // عدد <th> بالكشف الشهري ينقص عموداً واحداً فقط بوضع «غير موجود» (الجدول لا يتخربط)
+    $ths148[$dm] = substr_count($hr, '<th');
+}
+if (!isset($ths148['amount'], $ths148['none']) || $ths148['amount'] - $ths148['none'] !== 1 || $ths148['blank'] !== $ths148['amount']) { $ok148 = false; $why148 .= ' ths=' . json_encode($ths148 ?? []); }
+check('💰 عمود المستحق بثلاث حالات (كود + تشغيل فعلي بالكشف الشهري وsalary_all والبطاقة السنوية للمتعاقد: بالمبلغ/فارغ/غير موجود، عمود واحد يزيد أو ينقص فقط، بلا Fatal)',
+      $ok148 && function_exists('dueColMode') && function_exists('dueTd') && function_exists('dueHead') && function_exists('dueCell') && function_exists('dueTotalCell')
+      && strpos($fn148, '<select name="due_mode" onchange="this.form.submit()">') !== false && strpos($hd148, '<select name="due_mode" class="form-control form-control-sm"') !== false
+      && strpos((string)file_get_contents($PROJ . '/switch_salarycomp.php'), "\$_SESSION['due_col_mode'] = (string)\$_GET['due_mode'];") !== false
+      && substr_count($of148, 'dueHead(') === 3 && substr_count($of148, 'dueCell(') === 2 && substr_count($of148, 'dueTotalCell(') === 2 && substr_count($of148, 'dueTd(') === 2
+      && strpos($of148, 'colspan="<?= 16 + compColsCount() + dueColsCount() ?>"') !== false && strpos($of148, 'colspan="<?= 8 + compColsCount() + dueColsCount() ?>"') !== false && strpos($of148, '$sdCols = 16 + compColsCount() + dueColsCount();') !== false
+      && strpos($rp148, '<?= transportHead() ?><?= dueHead() ?>') !== false && substr_count($rp148, 'dueTd(') === 2 && strpos($rp148, '($multi?17:16) + compColsCount() + dueColsCount()') !== false
+      && strpos($as148, "\$showDue = dueColShown(); \$dueAmt = (dueColMode() === 'amount');") !== false && substr_count($as148, '<?php if ($showDue): ?>') === 3 && strpos($as148, "(\$isEmp ? 9 : (\$noCaisse ? 11 : 13)) + compColsCount() + (\$showDue ? 1 : 0)") !== false
+      && strpos($ax148, "if (!dueColShown())              \$d[] = 15;") !== false && substr_count($ax148, "dueColMode() === 'amount' ?") === 2
+      && strpos($rx148, "if (dueColShown()) { \$head[] = 'الإجمالي المتوجب'; \$w[] = 18; }") !== false && substr_count($rx148, "if (dueColShown()) \$row[] = dueColMode() === 'amount' ?") === 2,
+      $why148 ?: 'ok ths=' . json_encode($ths148 ?? []));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

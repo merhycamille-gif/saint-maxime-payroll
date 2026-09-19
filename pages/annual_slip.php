@@ -151,6 +151,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
     // (بطلب المستخدم: النقل خيار بإيده). ولما يكون النقل مخفياً، يُعرض «المستحق» بلا النقل لتبقى الأرقام راكبة.
     // 🚌 خيار ثلاثي (2026-09-17): $showTrans = العمود ظاهر (بالمبلغ أو فارغاً)؛ $transAmt = فيه مبلغ (ويُجمع بالمستحق).
     $showTrans = transportColShown();
+    // 💰 عمود المستحق بثلاث حالات (2026-09-19 «أوعى تخربطلي بطاقة الراتب»): نفس نمط النقل — $showDue = العمود ظاهر؛ $dueAmt = فيه مبلغ. عرض فقط.
+    $showDue = dueColShown(); $dueAmt = (dueColMode() === 'amount');
     $transAmt  = salaryCompHas('transport');
     // 🔴 «الأرقام تركب» (قاعدة ملزِمة): الإضافي والمكافأة داخلان في الإجمالي والصافي والمستحق،
     // فإذا أُخفي عمودهما وجب طرحهما من الثلاثة أيضاً — وإلّا ظهر إجماليٌّ لا يفسّره أي عمود
@@ -168,7 +170,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
         return (salaryCompHas('extra') ? 0.0 : (float)($t['extra_wage_usd'] ?? 0))
              + (salaryCompHas('aide')  ? 0.0 : (float)($t['aide_usd'] ?? 0));
     };
-    $slipCols = ($isEmp ? 10 : ($noCaisse ? 12 : 14)) + compColsCount();
+    $slipCols = ($isEmp ? 9 : ($noCaisse ? 11 : 13)) + compColsCount() + ($showDue ? 1 : 0);
 
     ob_start();
     ?>
@@ -224,7 +226,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <th rowspan="2">Net<br>الصافي</th>
                     <th rowspan="2">Alloc. fam.<br>عائلي</th>
                     <?php if ($showTrans): ?><th rowspan="2">Transport<br>نقل</th><?php endif; ?>
-                    <th rowspan="2">Total dû<br>المستحق</th>
+                    <?php if ($showDue): ?><th rowspan="2">Total dû<br>المستحق</th><?php endif; ?>
                     <th rowspan="2" class="sig-col">Signature<br>التوقيع</th>
                 </tr>
                 <tr>
@@ -277,7 +279,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <td><?= $money($r['net'] - $hR, true) ?></td>
                             <td><?= $money($r['family']) ?></td>
                             <?php if ($showTrans): ?><td><?= $transAmt ? $money($r['transport']) : '&nbsp;' ?></td><?php endif; ?>
-                            <td><?= $money($r['total_due'] - $hR - ($transAmt ? 0 : $r['transport']), true) ?></td>
+                            <?php if ($showDue): ?><td><?= $dueAmt ? $money($r['total_due'] - $hR - ($transAmt ? 0 : $r['transport']), true) : '&nbsp;' ?></td><?php endif; ?>
                             <td class="sig-cell">&nbsp;</td>
                         <?php else: ?>
                             <td colspan="<?= $slipCols ?>" class="text-muted">—</td>
@@ -311,7 +313,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                     <td><?= $moneyTot($tot['net'], $tot['net_usd']) ?></td>
                     <td><?= $moneyTot($tot['family'], $tot['family_usd']) ?></td>
                     <?php if ($showTrans): ?><td><?= $transAmt ? $moneyTot($tot['transport'], $tot['transport_usd']) : '&nbsp;' ?></td><?php endif; ?>
-                    <td><?= $moneyTot($tot['total_due'] - ($transAmt ? 0 : $tot['transport']), $tot['total_due_usd'] - ($transAmt ? 0 : $tot['transport_usd'])) ?></td>
+                    <?php if ($showDue): ?><td><?= $dueAmt ? $moneyTot($tot['total_due'] - ($transAmt ? 0 : $tot['transport']), $tot['total_due_usd'] - ($transAmt ? 0 : $tot['transport_usd'])) : '&nbsp;' ?></td><?php endif; ?>
                     <td class="sig-cell"></td>
                 </tr>
             </tbody>

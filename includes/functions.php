@@ -4494,6 +4494,22 @@ function transportTd(string $html, string $attrs = ' class="num"'): string {
     return '<td' . $attrs . '>' . ($m === 'blank' ? '&nbsp;' : $html) . '</td>';
 }
 
+/** 💰 حالة عمود «المستحق / مجموع المدفوعات» (المجموع بعد النقل) — خيار ثلاثي متل عمود النقل (طلبه 2026-09-19 «بدي بعمود
+ *  المستحق كمان يكون عندي خيار متل ما عملتلي عمود النقل: حطّ المبلغ أو ما حطّو بس العمود يضلّ موجود أو ما حطّو كلّو — أوعى تخربطلي
+ *  بطاقة الراتب»): 'amount' = موجود بالمبلغ (الافتراضي) · 'blank' = موجود بلا مبلغ · 'none' = غير موجود. عرض فقط — لا يمسّ أي حساب. */
+function dueColMode(): string {
+    $m = (string)($_SESSION['due_col_mode'] ?? 'amount');
+    return in_array($m, ['amount', 'blank', 'none'], true) ? $m : 'amount';
+}
+function dueColShown(): bool { return dueColMode() !== 'none'; }
+function dueColsCount(): int { return dueColShown() ? 1 : 0; }
+/** خلية عمود المستحق لصف جسم/مجموع: '' إن كان غير موجود، فارغة بوضع «بلا مبلغ»، وإلا $html. المصدر الواحد لكل خلايا المستحق. */
+function dueTd(string $html, string $attrs = ' class="num"'): string {
+    $m = dueColMode();
+    if ($m === 'none') return '';
+    return '<td' . $attrs . '>' . ($m === 'blank' ? '&nbsp;' : $html) . '</td>';
+}
+
 /** عدد أعمدة المكوّنات الظاهرة (إضافي/مكافأة/نقل) — لضبط colspan الجداول ديناميكياً حسب «الراتب يشمل».
  *  عمود النقل يُعدّ إن كان ظاهراً بأي حالة (بالمبلغ أو فارغاً). */
 function compColsCount(bool $withTransport = true): int {
@@ -4566,6 +4582,14 @@ function salaryCompToolbar(): string {
                 <option value="none"   <?= $tm==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
                 <option value="blank"  <?= $tm==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
                 <option value="amount" <?= $tm==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ (يُجمع بالمستحق)':'Présente avec montant (dans le dû)' ?></option>
+            </select>
+        </label>
+        <?php $dm = dueColMode(); // 💰 عمود المستحق بثلاث حالات (2026-09-19) ?>
+        <label class="scb-opt scb-sel"><i class="fas fa-sack-dollar"></i> <?= $lang==='ar'?'عمود المستحق (المجموع):':'Colonne total dû :' ?>
+            <select name="due_mode" onchange="this.form.submit()">
+                <option value="none"   <?= $dm==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
+                <option value="blank"  <?= $dm==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
+                <option value="amount" <?= $dm==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
             </select>
         </label>
         <span class="scb-hint"><?= $lang==='ar'?'(الأساس + الدرجة دائماً — النقل لا يدخل بالمركّب)':'(Base + échelon toujours — transport hors salaire composé)' ?></span>

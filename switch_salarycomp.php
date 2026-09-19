@@ -11,6 +11,8 @@ if (isset($_GET['transport_mode'])) {
     if ($tm === 'amount')     $comp[] = 'transport';
     elseif ($tm === 'blank')  $comp[] = 'transport_blank';
 }
+// 💰 عمود المستحق بثلاث حالات (2026-09-19): none / blank / amount — عرض فقط
+if (isset($_GET['due_mode']) && in_array((string)$_GET['due_mode'], ['none', 'blank', 'amount'], true)) $_SESSION['due_col_mode'] = (string)$_GET['due_mode'];
 $_SESSION['salary_comp'] = $comp;
 header('Location: ' . safeBackUrl());
 exit;

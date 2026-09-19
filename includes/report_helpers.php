@@ -132,6 +132,20 @@ function transportCell(array $r, bool $num = true): string {
 function transportTotalCell($lbp, $usd, bool $num = true): string {
     return transportTd(dualFromUsd($lbp, $usd, false), $num ? ' class="num"' : '');
 }
+/** 💰 رأس عمود «المستحق / مجموع المدفوعات» — ثلاث حالات متل النقل (2026-09-19). */
+function dueHead(string $attrs = '', string $label = 'الإجمالي المتوجب'): string {
+    return dueColShown() ? '<th' . $attrs . '>' . $label . '</th>' : '';
+}
+/** خلية «المستحق» لصف الجسم (dueShownLbp = الصافي + العائلي + النقل الظاهر بالمبلغ) — فارغة بوضع «بلا مبلغ»، محذوفة بوضع «غير موجود». */
+function dueCell(array $r, bool $num = true, bool $bold = false): string {
+    $h = money(dueShownLbp($r), rowRate($r), ['withCur' => false]);
+    return dueTd($bold ? '<strong>' . $h . '</strong>' : $h, $num ? ' class="num"' : '');
+}
+/** خلية مجموع «المستحق» (لصفوف المجاميع) — نفس الحالات الثلاث. */
+function dueTotalCell($lbp, $usd, bool $num = true, bool $bold = false): string {
+    $h = dualFromUsd($lbp, $usd, false);
+    return dueTd($bold ? '<strong>' . $h . '</strong>' : $h, $num ? ' class="num"' : '');
+}
 /**
  * 👨‍👩‍👧 عمود «التنزيل العائلي» بكل كشف شهري فيه ضريبة دخل — المصدر الواحد
  * (قاعدة المستخدم 2026-08-06، ثم «p1 بهيدا التقرير مافي عامود للتنزيل العائلي» 2026-09-15):

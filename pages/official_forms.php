@@ -1658,7 +1658,7 @@ elseif ($form === 'teacher_card'):
             <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
             <th>صندوق التعويضات ٦٪</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى صندوق التعويضات</small></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>ضريبة الدخل</th><th>الضمان الاجتماعي</th>
             <?php // 📐 (2026-09-19 p1) «عمود الصافي دغري بعد عمود المحسومات بكل البرنامج»: محسومات ← صافي ← عائلي ← نقل ← مجموع المدفوعات ?>
-            <th>مجموع المحسومات</th><th>الصافي<?= rateHead('mkt', $month, $year) ?></th><th>تعويض عائلي</th><?= transportHead('', 'تعويض نقل') ?><th>مجموع المدفوعات<?= rateHead('mkt', $month, $year) ?></th>
+            <th>مجموع المحسومات</th><th>الصافي<?= rateHead('mkt', $month, $year) ?></th><th>تعويض عائلي</th><?= transportHead('', 'تعويض نقل') ?><?= dueHead('', 'مجموع المدفوعات' . rateHead('mkt', $month, $year)) ?>
             <th>توقيع الموظف</th>
         </tr></thead>
         <tbody>
@@ -1683,7 +1683,7 @@ elseif ($form === 'teacher_card'):
                 <td class="num"><?= dualFromUsd($a['cnss'],$a['cnss_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['ded'],$a['ded_usd'],false) ?></td>
                 <td class="num"><strong><?= dualFromUsd($a['net'],$a['net_usd'],false) ?></strong></td>
                 <td class="num"><?= dualFromUsd($a['fam'],$a['fam_usd'],false) ?></td><?= transportTotalCell($a['trans'],$a['trans_usd']) ?>
-                <td class="num"><?= dualFromUsd($a['due'],$a['due_usd'],false) ?></td>
+                <?= dueTotalCell($a['due'], $a['due_usd']) ?>
                 <td></td>
             </tr>
         <?php };
@@ -1693,7 +1693,7 @@ elseif ($form === 'teacher_card'):
             if ($cat !== $curCat):
                 if ($curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
                 $sub = $zeroT; $curCat = $cat;
-                ?><tr class="cat-row"><td colspan="<?= 17 + compColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
+                ?><tr class="cat-row"><td colspan="<?= 16 + compColsCount() + dueColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
             $rRate = rowRate($r);
             // التنزيل المعروض بحدّ الراتب الخاضع (ما بيصير نيغاتيف — قاعدة المستخدم + دليل المالية ص55) — داخل familyDedMonthShare
@@ -1722,11 +1722,11 @@ elseif ($form === 'teacher_card'):
                 <td class="num"><strong><?= money($r['net_salary_lbp'], $rRate, ['withCur'=>false]) ?></strong></td>
                 <td class="num"><?= money($r['family_allowance_lbp'], $rRate, ['withCur'=>false]) ?></td>
                 <?= transportCell($r) ?>
-                <td class="num"><?= money(dueShownLbp($r), $rRate, ['withCur'=>false]) ?></td>
+                <?= dueCell($r) ?>
                 <td style="min-width:60px"></td></tr>
         <?php endforeach;
         if ($rows && $curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
-        if(!$rows): ?><tr><td colspan="<?= 17 + compColsCount() ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif; ?>
+        if(!$rows): ?><tr><td colspan="<?= 16 + compColsCount() + dueColsCount() ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif; ?>
         </tbody>
         <?php if ($rows): ?><tfoot><?php $drawTotal('المجموع العام ('.count($rows).')', $T, true); ?></tfoot><?php endif; ?>
     </table>
@@ -2497,7 +2497,7 @@ elseif ($form === 'payment_list'):
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الدفع — رواتب <?= monthName($month,'ar').' '.$year ?></div><?= rateSubtitle($month, $year) ?>
     <table class="doc-table">
-        <thead><tr><th>#</th><th>الرمز</th><th>الاسم والشهرة</th><th>رقم الضمان</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $rows, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><?= transportHead() ?><th>الصافي (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>الإجمالي المتوجب (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>التوقيع بالاستلام</th></tr></thead>
+        <thead><tr><th>#</th><th>الرمز</th><th>الاسم والشهرة</th><th>رقم الضمان</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $rows, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><?= transportHead() ?><th>الصافي (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><?= dueHead('', 'الإجمالي المتوجب (ل.ل)' . rateHead('mkt', $month, $year)) ?><th>التوقيع بالاستلام</th></tr></thead>
         <tbody>
         <?php
         $zP = ['base'=>0,'ex'=>0,'ai'=>0,'trans'=>0,'net'=>0,'due'=>0,'ex_usd'=>0.0,'ai_usd'=>0.0,'trans_usd'=>0.0,'composed'=>0,'composed_usd'=>0.0,'base_usd'=>0.0,'net_usd'=>0.0,'due_usd'=>0.0]; $G = $zP;
@@ -2508,7 +2508,7 @@ elseif ($form === 'payment_list'):
                 <?= extraAideTotalCells($a['ex'],$a['ex_usd'],$a['ai'],$a['ai_usd']) ?>
                 <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($a['composed'],$a['composed_usd'],false) ?></strong></td>
                 <?= transportTotalCell($a['trans'],$a['trans_usd']) ?>
-                <td class="num"><?= dualFromUsd($a['net'],$a['net_usd'],false) ?></td><td class="num"><?= dualFromUsd($a['due'],$a['due_usd'],false) ?></td><td></td>
+                <td class="num"><?= dualFromUsd($a['net'],$a['net_usd'],false) ?></td><?= dueTotalCell($a['due'], $a['due_usd']) ?><td></td>
             </tr>
         <?php };
         $nn=0; $curCat=null; $sub=$zP;
@@ -2517,7 +2517,7 @@ elseif ($form === 'payment_list'):
             if ($cat !== $curCat):
                 if ($curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
                 $sub=$zP; $curCat=$cat;
-                ?><tr class="cat-row"><td colspan="<?= 9 + compColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
+                ?><tr class="cat-row"><td colspan="<?= 8 + compColsCount() + dueColsCount() ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
             endif;
             $rRate=rowRate($r);
             $add=['base'=>(int)$r['base_salary_lbp'],'ex'=>extraWageLbp($r),'ai'=>aideCompLbp($r),'trans'=>(int)$r['transport_lbp'],'net'=>(int)$r['net_salary_lbp'],'due'=>dueShownLbp($r),
@@ -2535,12 +2535,12 @@ elseif ($form === 'payment_list'):
                 <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r), false) ?></strong></td>
                 <?= transportCell($r) ?>
                 <td class="num"><?= money($r['net_salary_lbp'], $rRate, ['withCur'=>false]) ?></td>
-                <td class="num"><strong><?= money(dueShownLbp($r), $rRate, ['withCur'=>false]) ?></strong></td>
+                <?= dueCell($r, true, true) ?>
                 <td style="min-width:90px">&nbsp;</td>
             </tr>
         <?php endforeach;
         if ($rows && $curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
-        if(!$rows): ?><tr><td colspan="<?= 9 + compColsCount() ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif; ?>
+        if(!$rows): ?><tr><td colspan="<?= 8 + compColsCount() + dueColsCount() ?>" class="text-center">لا توجد رواتب محسوبة لهذا الشهر</td></tr><?php endif; ?>
         </tbody>
         <?php if ($rows): ?><tfoot><?php $drawTotal('المجموع العام ('.count($rows).' موظف)', $G, true); ?></tfoot><?php endif; ?>
     </table>
@@ -3017,7 +3017,7 @@ elseif ($form === 'payment_list'):
         ];
     };
     // عدد الأعمدة الظاهرة (لصفوف عناوين الفئات): 17 ثابتاً (منها التنزيل العائلي) + أعمدة «الراتب يشمل» المختارة
-    $sdCols = 17 + compColsCount();
+    $sdCols = 16 + compColsCount() + dueColsCount();
 ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="salary_detail">
@@ -3052,7 +3052,7 @@ elseif ($form === 'payment_list'):
                 <th rowspan="2">الصافي<?= rateHead('mkt', $month, $year) ?></th>
                 <th rowspan="2">تعويض عائلي</th>
                 <?= transportHead(' rowspan="2"', 'تعويض نقل') ?>
-                <th rowspan="2">مجموع المدفوعات<?= rateHead('mkt', $month, $year) ?></th>
+                <?= dueHead(' rowspan="2"', 'مجموع المدفوعات' . rateHead('mkt', $month, $year)) ?>
             </tr>
             <tr>
                 <th>نصف راتب،درجة</th>
@@ -3089,7 +3089,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($v['net']) ?></td>
                 <td class="num"><?= $fmt($v['fam']) ?></td>
                 <?= transportTd($fmt($v['trans'])) ?>
-                <td class="num"><?= $fmt($v['due']) ?></td>
+                <?= dueTd($fmt($v['due'])) ?>
             </tr>
         <?php };
         // صفّ مجموع
@@ -3106,7 +3106,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($a['cnss']) ?></td><td class="num"><?= $fmt($a['ret']) ?></td>
                 <td class="num"><?= $fmt($a['net']) ?></td><td class="num"><?= $fmt($a['fam']) ?></td>
                 <?= transportTd($fmt($a['trans'])) ?>
-                <td class="num"><?= $fmt($a['due']) ?></td>
+                <?= dueTd($fmt($a['due'])) ?>
             </tr>
         <?php };
         $n = 0; $curCat = null; $sub = $zero; $grand = $zero;
