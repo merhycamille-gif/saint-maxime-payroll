@@ -6647,7 +6647,7 @@ foreach ($it140 as $f140) {
     if (substr($p140, -4) !== '.php' || strpos($p140, '/tools/') !== false || strpos($p140, '/tmp/') !== false || strpos($p140, '/vendor/') !== false
         || preg_match('~/(fix_departures_once|migrate|cleanup_ghosts)\.php$~', $p140)) continue;
     $s140 = (string)file_get_contents($p140);
-    $least140 += preg_match_all('/LEAST\(COALESCE\((NULLIF\()?(e\.|\{\$prefix\})?left_date_cnss/', $s140);
+    $least140 += preg_match_all('/LEAST\(COALESCE\((NULLIF\()?(e\.|\{\$prefix\})?left_date_cnss|LEAST\(COALESCE\(" \. validDateSql\(\'left_date_cnss\'\)/', $s140); // (2026-09-19) التعبئة صارت عبر validDateSql
     if (preg_match('/left_date_cnss IS NULL AND (\{\$prefix\}|e\.)?left_date_finance IS NULL/', $s140)) $sweep140[] = basename($p140);
 }
 check('ترك من الكل (كنس البرنامج): لا تعبير «أبكر الثلاثة» خارج سطر التعبئة الواحد ولا «الثلاثة NULL» بأي ملف', $least140 === 1 && !$sweep140,
@@ -6768,6 +6768,59 @@ check('🎓 صفحة اقتراحات الدخول بالملاك (كود + رن
       && strpos($html142, 'pages/cadre_due.php" class="active"') !== false
       && strpos($html142i, 'FATAL') === false && ($n142b === 0 || strpos($html142i, 'الصفحة الكاملة / Page complète') !== false),
       'معلّق=' . $n142 . '/' . $n142b . ' · الشارة ' . round($ms142) . ' ms');
+
+// 🔢 «إضافي 6 %» بدل 60 % (2026-09-19، ظهر بتجربة الترسيم على اسبر منصور بالانتقال): rtrim('60','0') = '6' ⇒ pctFmt بكل المواضع + شفاء نصوص القرارات/التدقيق المخزّنة
+$fn142 = (string)file_get_contents($PROJ . '/includes/functions.php'); $cp142 = (string)file_get_contents($PROJ . '/includes/compliance.php');
+check('🔢 pctFmt: 60 ⇒ «60» لا «6» + لا rtrim مباشر على النِّسَب بالترسيم/المخالفات + الشفاء المخزّن مركَّب بالهيدر ولا نصّ «إضافي 6 %» باقٍ لمدرسة نسبتها 60',
+      function_exists('pctFmt') && pctFmt(60) === '60' && pctFmt('60.00') === '60' && pctFmt(12.5) === '12.5' && pctFmt('85') === '85' && pctFmt(100) === '100'
+      && strpos($cd142, "rtrim(rtrim((string)\$pct") === false && strpos($cd142, "rtrim(rtrim((string)\$p,") === false
+      && strpos($cd142, "pctFmt(\$pct['pct'])") !== false && strpos($cp142, "pctFmt(\$s['amount'])") !== false && strpos($fn142, "pctFmt(\$g['amount'])") !== false
+      && function_exists('healCadrePctText20260919') && strpos($hd142, 'healCadrePctText20260919();') !== false
+      && (int)$db->query("SELECT COUNT(*) FROM compliance_decisions d WHERE d.rule_key = 'cadre_due' AND d.school_id IN (3,6) AND (d.result LIKE '%إضافي 6 \\% كملاك%' OR d.violation LIKE '%إضافي 6 \\% كملاك%')")->fetchColumn() === 0,
+      'heal=' . getSetting('heal_cadre_pct_text_20260919', '—'));
+
+/**
+ * 143) 🚪🔴 تاريخ ترك وهمي = لا تاريخ + التقليم لا يمحو المدفوع (2026-09-19 — حادثة كرستيان عون 1438، النجاة): ترك صندوق «0001-01-01»
+ *      نسخته تعبئة «الكل» (2026-09-18) ⇒ pruneSalariesAfterDeparture اعتبره تاركاً منذ الأزل ومحا 43 شهراً أونلاين (33 مدفوعاً) بلا أثر.
+ *      الإصلاح: validDateSql بكل تعابير الترك (SQL + PHP) + التقليم يستثني is_paid=1 ويسجّل بالتدقيق + شفاء مرّة: تصفير الوهمي واسترجاع
+ *      1438 من tools/data/rows_1438_20260919.json (نسخة الأونلاين 2026-09-18 14:31) — «ترك من الكل» فارغ؛ الضمان/المالية موقوفان بقراره.
+ */
+$fn143 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$hd143 = (string)file_get_contents($PROJ . '/includes/header.php');
+$r143 = $db->query("SELECT (SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = 1438) rows_, (SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = 1438) bon,
+                    left_date_all, left_date_eoc, last_name_ar FROM employees WHERE id = 1438")->fetch(PDO::FETCH_ASSOC) ?: [];
+$bogus143 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE (left_date_all IS NOT NULL AND left_date_all < '1900-01-01') OR (left_date_cnss IS NOT NULL AND left_date_cnss < '1900-01-01') OR (left_date_finance IS NOT NULL AND left_date_finance < '1900-01-01') OR (left_date_eoc IS NOT NULL AND left_date_eoc < '1900-01-01')")->fetchColumn();
+// تجربة حيّة تُرجَع: موظف تاركٌ من الكل 2024-06-30 وله بسنة 2025-2026 شهر مدفوع وشهر غير مدفوع ⇒ التقليم يمحو غير المدفوع فقط؛ وبتاريخ وهمي لا يمحو شيئاً
+$ok143 = false; $why143 = '';
+try {
+    $db->beginTransaction();
+    $db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, status, left_date_all)
+               VALUES (2, '__REG143', 'employe', 'فحص', 'ترك143', 'Reg', 'Left143', '2020-10-01', 'actif', '2024-06-30')");
+    $rid = (int)$db->lastInsertId();
+    $db->exec("INSERT INTO monthly_salaries (school_id, employee_id, month, year, school_year, net_salary_lbp, total_due_lbp, is_paid) VALUES (2, $rid, 10, 2025, '2025-2026', 1000, 1000, 1), (2, $rid, 11, 2025, '2025-2026', 1000, 1000, 0)");
+    $d1 = pruneSalariesAfterDeparture($db, $rid);
+    $left1 = $db->query("SELECT GROUP_CONCAT(month ORDER BY month) FROM monthly_salaries WHERE employee_id = $rid")->fetchColumn();
+    $db->exec("UPDATE employees SET left_date_all = '0001-01-01' WHERE id = $rid");
+    $db->exec("INSERT INTO monthly_salaries (school_id, employee_id, month, year, school_year, net_salary_lbp, total_due_lbp, is_paid) VALUES (2, $rid, 12, 2025, '2025-2026', 1000, 1000, 0)");
+    $d2 = pruneSalariesAfterDeparture($db, $rid);
+    $ld2 = $db->query("SELECT " . leftDateSql() . " FROM employees WHERE id = $rid")->fetchColumn();
+    $emp2 = $db->query("SELECT * FROM employees WHERE id = $rid")->fetch(PDO::FETCH_ASSOC);
+    $ok143 = $d1 === 1 && (string)$left1 === '10' && $d2 === 0 && $ld2 === '9999-12-31' && leftDateOf($emp2) === null && leftDateOfFor($emp2, 'eoc') === null;
+    $why143 = "d1=$d1 left=$left1 d2=$d2 ld2=$ld2";
+} catch (Throwable $e) { $why143 = 'خطأ: ' . $e->getMessage(); }
+finally { if ($db->inTransaction()) $db->rollBack(); }
+check('🚪🔴 تاريخ ترك وهمي = لا تاريخ + التقليم لا يمحو المدفوع (كود + تجربة حيّة تُرجَع + شفاء كرستيان عون: 43 شهراً + بندا نقل + لا تاريخ وهمي بالبرنامج)',
+      function_exists('validDateSql') && function_exists('healBogusLeftDates20260919')
+      && strpos($fn143, "return \"COALESCE(\" . validDateSql(\"{\$prefix}left_date_all\") . \",'9999-12-31')\";") !== false
+      && strpos($fn143, "LEAST(COALESCE(\" . validDateSql(\"{\$prefix}{\$col}\")") !== false
+      && strpos($fn143, "\$trio = \"LEAST(COALESCE(\" . validDateSql('left_date_cnss')") !== false
+      && strpos($fn143, "DELETE FROM monthly_salaries WHERE employee_id = ? AND COALESCE(is_paid, 0) = 0 AND ((month >= 10 AND year > ?)") !== false
+      && strpos($fn143, "logAudit('prune_after_departure'") !== false
+      && strpos($hd143, 'healBogusLeftDates20260919();') !== false
+      && is_file($PROJ . '/tools/data/rows_1438_20260919.json')
+      && $ok143 && $bogus143 === 0
+      && ((string)($r143['last_name_ar'] ?? '') !== 'عون' || ((int)$r143['rows_'] === 43 && (int)$r143['bon'] === 2 && $r143['left_date_all'] === null && $r143['left_date_eoc'] === null)),
+      $why143 . ' · bogus=' . $bogus143 . ' · 1438=' . json_encode($r143, JSON_UNESCAPED_UNICODE));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

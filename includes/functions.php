@@ -660,16 +660,78 @@ function ensureLeftDateAllColumn(): void {
             $fresh = true;
         }
         if ($fresh || getSetting('left_date_all_migrated_20260918', '') === '') {
-            $trio = "LEAST(COALESCE(NULLIF(left_date_cnss,'0000-00-00'),'9999-12-31'),COALESCE(NULLIF(left_date_finance,'0000-00-00'),'9999-12-31'),COALESCE(NULLIF(left_date_eoc,'0000-00-00'),'9999-12-31'))";
+            $trio = "LEAST(COALESCE(" . validDateSql('left_date_cnss') . ",'9999-12-31'),COALESCE(" . validDateSql('left_date_finance') . ",'9999-12-31'),COALESCE(" . validDateSql('left_date_eoc') . ",'9999-12-31'))";
             $n = (int)$db->exec("UPDATE employees SET left_date_all = NULLIF($trio, '9999-12-31') WHERE (left_date_all IS NULL OR left_date_all = '0000-00-00') AND $trio < '9999-12-31'");
             setSetting('left_date_all_migrated_20260918', 'done ' . date('Y-m-d H:i') . ' rows=' . $n);
         }
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 /** تعبير SQL لتاريخ «الترك من الكل» (9999-12-31 = لم يترك) — المصدر الواحد لقاعدة التارك بكل البرنامج */
+/**
+ * 🔴 تاريخ وهمي (0000-00-00 / 0001-01-01…) = لا تاريخ (2026-09-19): كرستيان عون (1438، النجاة) كان عنده ترك صندوق «0001-01-01»
+ * فنسخته تعبئة «الكل» ثم اعتبره التقليم تاركاً منذ الأزل ومحا 43 شهراً من رواتبه أونلاين (منها 33 مدفوعاً). كل تعبير ترك يمرّ من هنا.
+ */
+/**
+ * 🩹 شفاء ذاتي مرّة واحدة (2026-09-19): تواريخ الترك الوهمية (< 1900) تُصفَّر بكل الأعمدة الأربعة (تُسجَّل بتقرير المخالفات «صُحِّح تلقائياً»)،
+ * واسترجاع رواتب كرستيان عون (1438، النجاة) الـ43 شهراً + بندَي النقل من نسخة الأونلاين 2026-09-18 14:31 (tools/data/rows_1438_20260919.json)
+ * — إدراج الناقص فقط (لا يلمس الموجود). «ترك من الكل» عنده يصير فارغاً؛ الضمان والمالية يبقيان موقوفين من 2026-06-30 — قراره إن كان تركاً نهائياً.
+ */
+function healBogusLeftDates20260919(): void {
+    try {
+        if (getSetting('heal_bogus_left_dates_20260919', '') !== '') return;
+        $db = getDB();
+        ensureLeftDateAllColumn();
+        $fixed = [];
+        $cols = ['left_date_all', 'left_date_cnss', 'left_date_finance', 'left_date_eoc'];
+        $where = implode(' OR ', array_map(fn($c) => "($c IS NOT NULL AND $c < '1900-01-01')", $cols));
+        foreach ($db->query("SELECT id, first_name_ar, last_name_ar, first_name_fr, last_name_fr, school_id, " . implode(',', $cols) . " FROM employees WHERE $where") as $e) {
+            $bad = []; foreach ($cols as $c) if ($e[$c] !== null && (string)$e[$c] < '1900-01-01') $bad[] = $c . '=' . $e[$c];
+            $fixed[] = (int)$e['id'];
+            $nm = trim(($e['first_name_ar'] ?: $e['first_name_fr']) . ' ' . ($e['last_name_ar'] ?: $e['last_name_fr']));
+            if (function_exists('complianceLogAuto')) complianceLogAuto($db, 'left_impossible', (int)$e['id'], currentSchoolYear(), $nm,
+                'تاريخ ترك وهمي (' . implode(' · ', $bad) . ') — كان يُعتبر تاركاً منذ الأزل فتُمحى رواتبه', 'تصفير التاريخ الوهمي (لا تاريخ)', 'صُفِّر تلقائياً 2026-09-19');
+        }
+        $n = 0;
+        foreach ($cols as $c) $n += (int)$db->exec("UPDATE employees SET $c = NULL WHERE $c IS NOT NULL AND $c < '1900-01-01'");
+        // استرجاع كرستيان عون
+        $rest = ['rows' => 0, 'bonuses' => 0];
+        $f = __DIR__ . '/../tools/data/rows_1438_20260919.json';
+        $emp = $db->query("SELECT id, last_name_ar, is_deleted FROM employees WHERE id = 1438")->fetch(PDO::FETCH_ASSOC);
+        if ($emp && !(int)$emp['is_deleted'] && (string)$emp['last_name_ar'] === 'عون' && is_file($f)) {
+            $j = json_decode((string)file_get_contents($f), true) ?: [];
+            $msCols = array_column($db->query("SHOW COLUMNS FROM monthly_salaries")->fetchAll(PDO::FETCH_ASSOC), 'Field');
+            $has = $db->prepare("SELECT id FROM monthly_salaries WHERE employee_id = 1438 AND year = ? AND month = ?");
+            foreach ($j['monthly_salaries'] ?? [] as $r) {
+                $has->execute([(int)$r['year'], (int)$r['month']]); if ($has->fetchColumn()) continue;
+                unset($r['id']); $r = array_intersect_key($r, array_flip($msCols));
+                $db->prepare("INSERT INTO monthly_salaries (" . implode(',', array_keys($r)) . ") VALUES (" . implode(',', array_fill(0, count($r), '?')) . ")")->execute(array_values($r));
+                $rest['rows']++;
+            }
+            $bCols = array_column($db->query("SHOW COLUMNS FROM employee_bonuses")->fetchAll(PDO::FETCH_ASSOC), 'Field');
+            $hasB = $db->prepare("SELECT id FROM employee_bonuses WHERE employee_id = 1438 AND bonus_type = ? AND school_year = ? AND period_number = ?");
+            foreach ($j['employee_bonuses'] ?? [] as $b) {
+                $hasB->execute([(string)$b['bonus_type'], (string)$b['school_year'], (int)$b['period_number']]); if ($hasB->fetchColumn()) continue;
+                unset($b['id']); $b = array_intersect_key($b, array_flip($bCols));
+                $db->prepare("INSERT INTO employee_bonuses (" . implode(',', array_keys($b)) . ") VALUES (" . implode(',', array_fill(0, count($b), '?')) . ")")->execute(array_values($b));
+                $rest['bonuses']++;
+            }
+            if ($rest['rows'] || $rest['bonuses']) {
+                if (function_exists('complianceLogAuto')) complianceLogAuto($db, 'left_impossible', 1438, '2025-2026', 'كرستيان عون',
+                    'مُحيت رواتبه (43 شهراً منها 33 مدفوعاً) وبندا النقل بسبب تاريخ الترك الوهمي 0001-01-01', 'استرجاعها من نسخة الأونلاين 2026-09-18',
+                    'استُرجع ' . $rest['rows'] . ' شهراً و' . $rest['bonuses'] . ' بند نقل — «ترك من الكل» فارغ؛ الضمان والمالية موقوفان من 2026-06-30 بقراره');
+            }
+        }
+        setSetting('heal_bogus_left_dates_20260919', 'done ' . date('Y-m-d H:i') . ' dates=' . $n . ' rows=' . $rest['rows'] . ' bon=' . $rest['bonuses']);
+        if ($n || $rest['rows'] || $rest['bonuses']) logAudit('heal_bogus_left_dates', 'employees', 0, null, ['ids' => $fixed, 'dates' => $n, 'restored' => $rest]);
+    } catch (Throwable $e) {}
+}
+
+function validDateSql(string $expr): string {
+    return "CASE WHEN $expr IS NULL OR $expr < '1900-01-01' THEN NULL ELSE $expr END";
+}
 function leftDateSql(string $prefix = ''): string {
     ensureLeftDateAllColumn();
-    return "COALESCE(NULLIF({$prefix}left_date_all,'0000-00-00'),'9999-12-31')";
+    return "COALESCE(" . validDateSql("{$prefix}left_date_all") . ",'9999-12-31')";
 }
 /** أعمدة تواريخ الترك الأربعة مع تسمياتها (للفحوص والتقارير) */
 function leftDateColumns(): array {
@@ -679,18 +741,18 @@ function leftDateColumns(): array {
 function leftDateSqlFor(string $kind, string $prefix = ''): string {
     $col = ['cnss' => 'left_date_cnss', 'finance' => 'left_date_finance', 'eoc' => 'left_date_eoc'][$kind] ?? null;
     if ($col === null) return leftDateSql($prefix);
-    return "LEAST(COALESCE(NULLIF({$prefix}{$col},'0000-00-00'),'9999-12-31'), " . leftDateSql($prefix) . ")";
+    return "LEAST(COALESCE(" . validDateSql("{$prefix}{$col}") . ",'9999-12-31'), " . leftDateSql($prefix) . ")";
 }
 /** PHP: تاريخ «الترك من الكل» لصفّ موظف (null = لم يترك) */
 function leftDateOf(array $emp): ?string {
     $v = (string)($emp['left_date_all'] ?? '');
-    return ($v !== '' && $v !== '0000-00-00') ? substr($v, 0, 10) : null;
+    return ($v !== '' && $v >= '1900-01-01') ? substr($v, 0, 10) : null; // وهمي (< 1900) = لا تاريخ
 }
 /** PHP: تاريخ ترك جهة معيّنة (cnss | finance | eoc) = الأبكر بين تاريخ الجهة وتاريخ الكل (null = لم يتركها) */
 function leftDateOfFor(array $emp, string $kind): ?string {
     $col = ['cnss' => 'left_date_cnss', 'finance' => 'left_date_finance', 'eoc' => 'left_date_eoc'][$kind] ?? null;
     $ds = [leftDateOf($emp)];
-    if ($col !== null) { $v = (string)($emp[$col] ?? ''); $ds[] = ($v !== '' && $v !== '0000-00-00') ? substr($v, 0, 10) : null; }
+    if ($col !== null) { $v = (string)($emp[$col] ?? ''); $ds[] = ($v !== '' && $v >= '1900-01-01') ? substr($v, 0, 10) : null; }
     $ds = array_filter($ds);
     return $ds ? min($ds) : null;
 }
@@ -760,8 +822,10 @@ function pruneSalariesAfterDeparture($db, $empId) {
     $y = (int)substr($row['ld'], 0, 4); $m = (int)substr($row['ld'], 5, 2);
     $depRank = ($m >= 10) ? $y : $y - 1; // رتبة السنة الدراسية للترك (تبدأ في تشرين الأول)
     // رتبة صفّ (year,month) = (month>=10 ? year : year-1). نحذف كل صفّ رتبته > رتبة الترك.
-    $del = $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND ((month >= 10 AND year > ?) OR (month < 10 AND year - 1 > ?))");
+    // 🔴 (2026-09-19) الأشهر المدفوعة لا تُمحى أبداً بلا قرار (كرستيان عون: 33 شهراً مدفوعاً محاها تاريخ وهمي) + كل محي يُسجَّل
+    $del = $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND COALESCE(is_paid, 0) = 0 AND ((month >= 10 AND year > ?) OR (month < 10 AND year - 1 > ?))");
     $del->execute([$empId, $depRank, $depRank]);
+    if ($del->rowCount() > 0) { try { logAudit('prune_after_departure', 'monthly_salaries', $empId, null, ['left' => $row['ld'], 'deleted' => $del->rowCount()]); } catch (Throwable $e) {} }
     // 🚪 (2026-09-17) علاوات/نِسَب السنين اللاحقة لسنة الترك تُطفأ فوراً معه (كانت تنتظر شفاء healLeaverPhantomRows مرّة بالجلسة،
     //    فبقي بند 60٪ لتاركتين فعّالاً بسنة 2026-2027 وظهر برأس الأجر الإضافي بعدما غيّر المستخدم المدرسة إلى 55٪).
     try {
@@ -822,6 +886,16 @@ function healLeaverPhantomRows() {
  *       شهر قديم): يُعاد حسابه بالمسار الآمن الوحيد recalcEmployeeYear (يحمي المنقولين والتاركين) — بحدّ 15 موظفاً بالتحميل.
  */
 /** بوّابة الشفاءات المستمرّة: مرّة بالعملية + مرّة كل 3 ساعات على مستوى القاعدة (settings) — لا تثقل الصفحات ولا أدوات الفحص */
+/**
+ * 🔢 نسبة/رقم للعرض بلا أصفار زائدة (2026-09-19): 60 ⇒ «60»، 12.50 ⇒ «12.5». 🔴 لا تستعمل rtrim(rtrim($v,'0'),'.') مباشرة:
+ * على «60» (بلا كسور) كانت تعطي «6» — ظهرت «إضافي 6 ٪» بدل 60 ٪ برسائل الترسيم.
+ */
+function pctFmt($v): string {
+    $f = (float)$v;
+    if (floor($f) == $f) return (string)(int)$f;
+    return rtrim(rtrim(number_format($f, 4, '.', ''), '0'), '.');
+}
+
 function healGateOpen(string $key, int $hours = 3): bool {
     static $ran = [];
     if (!empty($ran[$key]) || !empty($_SESSION[$key . '_done'])) return false;
@@ -1190,7 +1264,7 @@ function healDuplicatePercent20260904() {
             try {
                 require_once __DIR__ . '/compliance.php';
                 complianceLogAuto($db, 'dup_percent', $eid, $sy, (string)$g['emp_name'],
-                    'بند نسبة ' . rtrim(rtrim((string)$g['amount'], '0'), '.') . ' % مكرّر فاعل (' . $g['ids'] . ') فكانت النسبة تُجمع مرّتين',
+                    'بند نسبة ' . pctFmt($g['amount']) . ' % مكرّر فاعل (' . $g['ids'] . ') فكانت النسبة تُجمع مرّتين',
                     'إطفاء المكرّر والإبقاء على الأقدم وإعادة حساب السنة', 'أُطفئ ' . count($extra) . ' وأُعيد حساب ' . $recalc . ' شهراً');
             } catch (Throwable $e) {}
         }

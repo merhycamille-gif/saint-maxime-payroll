@@ -360,7 +360,7 @@ function titularizeContractTeacher(PDO $db, int $empId, string $sy, string $who 
     $months = (int)recalcEmployeeYear($empId, $sy);
     $name = cadreDueEmpName($emp);
     $res = 'رُسِّم بالملاك من ' . $tit . ': درجة الدخول ' . rtrim(rtrim(number_format($startG, 1), '0'), '.') . ' ← ' . rtrim(rtrim(number_format($gEnd, 1), '0'), '.') . ' بنهاية ' . $sy
-         . ($pct ? ' + إضافي ' . rtrim(rtrim((string)$pct['pct'], '0'), '.') . ' % كملاك المدرسة' : ' (المدرسة بلا نسبة — بنوده كما هي)')
+         . ($pct ? ' + إضافي ' . pctFmt($pct['pct']) . ' % كملاك المدرسة' : ' (المدرسة بلا نسبة — بنوده كما هي)')
          . ($trText ? ' + ' . $trText : '') . ' — حُسب ' . $months . ' شهراً';
     logAudit('cadre_titularize', 'employees', $empId, $old, ['employee_type' => 'enseignant_titulaire', 'titularization_date' => $tit, 'sy' => $sy, 'starting_grade' => $startG, 'grade_end' => $gEnd, 'pct' => $pct['pct'] ?? null, 'transport' => $trText, 'months' => $months]);
     cadreDueRecordDecision($db, ['id' => $empId, 'school_id' => (int)$emp['school_id'], 'name' => $name, 'hire_date' => $emp['hire_date'], 'years' => 0, 'tit' => $tit], $sy, 'approved', $res, $who);
@@ -452,10 +452,37 @@ function cadreDueApprovedList(PDO $db, string $sy): array {
     } catch (Throwable $e) { return []; }
 }
 
+/**
+ * 🩹 شفاء مرّة واحدة (2026-09-19): نصوص «إضافي 6 % كملاك المدرسة» المخزّنة بسجلّ القرارات/التدقيق لمدارس نسبتها 60 ٪ (النجاة/الانتقال)
+ * كانت من خطأ العرض (rtrim على «60») — الأرقام الفعلية بالبنود صحيحة (60 ٪)؛ يُصحَّح النصّ فقط ويُسجَّل.
+ */
+function healCadrePctText20260919(): void {
+    try {
+        if (getSetting('heal_cadre_pct_text_20260919', '') !== '') return;
+        $db = getDB();
+        $sixty = [];
+        foreach ($db->query("SELECT DISTINCT school_id, school_year FROM compliance_decisions WHERE rule_key = 'cadre_due'") as $r) {
+            $p = schoolCadrePercent($db, (int)$r['school_id'], (string)$r['school_year']);
+            if ($p && (float)$p['pct'] == 60.0) $sixty[] = [(int)$r['school_id'], (string)$r['school_year']];
+        }
+        $n = 0;
+        foreach ($sixty as [$sid, $sy]) {
+            $st = $db->prepare("UPDATE compliance_decisions SET result = REPLACE(result, 'إضافي 6 % كملاك', 'إضافي 60 % كملاك'), violation = REPLACE(violation, 'إضافي 6 % كملاك', 'إضافي 60 % كملاك')
+                                WHERE rule_key = 'cadre_due' AND school_id = ? AND school_year = ? AND (result LIKE '%إضافي 6 \% كملاك%' OR violation LIKE '%إضافي 6 \% كملاك%')");
+            $st->execute([$sid, $sy]); $n += $st->rowCount();
+            $st = $db->prepare("UPDATE audit_log a JOIN employees e ON e.id = a.record_id SET a.new_value = REPLACE(a.new_value, 'إضافي 6 % كملاك', 'إضافي 60 % كملاك')
+                                WHERE a.table_name = 'employees' AND a.action IN ('cadre_titularize','cadre_heal_new') AND e.school_id = ? AND a.new_value LIKE '%إضافي 6 \% كملاك%'");
+            $st->execute([$sid]); $n += $st->rowCount();
+        }
+        setSetting('heal_cadre_pct_text_20260919', (string)$n);
+        if ($n) logAudit('heal_cadre_pct_text', 'compliance_decisions', 0, null, ['fixed' => $n, 'schools' => array_map(fn($x) => $x[0], $sixty)]);
+    } catch (Throwable $e) {}
+}
+
 /** نصّ موجز لنسبة المدرسة */
 function cadreDuePctText(?array $pct): string {
     if (!$pct) return 'بلا نسبة (مدرسة بالمبالغ) — بنوده تبقى';
-    $t = rtrim(rtrim((string)$pct['pct'], '0'), '.') . ' %';
+    $t = pctFmt($pct['pct']) . ' %';
     if ($pct['start_month'] && $pct['end_month']) $t .= ' (' . monthName((int)$pct['start_month'], 'ar') . ' ← ' . monthName((int)$pct['end_month'], 'ar') . ')';
     return $t . ' — كـ' . (int)$pct['n'] . ' أستاذ ملاك بالمدرسة';
 }
@@ -577,7 +604,7 @@ function healCadreNew20260913(): void {
                         $log[] = 'محسومات الملاك كرفاقه (' . (isset($diffF['eoc_subject']) ? 'صندوق التعويضات ٦٪ + نصف راتب الترسيم' : implode('، ', array_keys($diffF))) . ')';
                     }
                     $p = cadreDueApplyPercent($db, $id, (int)$emp['school_id'], $sy);
-                    if ($p !== null) $log[] = 'إضافي ' . rtrim(rtrim((string)$p, '0'), '.') . ' % كملاك المدرسة';
+                    if ($p !== null) $log[] = 'إضافي ' . pctFmt($p) . ' % كملاك المدرسة';
                     $t = cadreDueApplyTransport($db, $id, (int)$emp['school_id'], $sy);
                     if ($t !== null) $log[] = $t;
                 }

@@ -43,7 +43,7 @@ function complianceEnsureTable(PDO $db): void {
                                 WHERE b.is_active = 0 AND b.value_type = 'percent' AND b.school_year IS NOT NULL
                                 GROUP BY b.employee_id, b.school_year, b.amount")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($seed as $s) {
-                $pct = rtrim(rtrim((string)$s['amount'], '0'), '.');
+                $pct = pctFmt($s['amount']);
                 complianceLogAuto($db, 'dup_percent', (int)$s['employee_id'], (string)$s['school_year'], (string)$s['nm'],
                     'بند نسبة ' . $pct . ' % مكرّر فاعل بنفس السنة (#' . $s['off_ids'] . ' مع #' . $s['kept'] . ') فكانت النسبة تُجمع مرّتين (' . $pct . ' % + ' . $pct . ' % = ' . (2 * (float)$s['amount']) . ' %)',
                     'إطفاء المكرّر والإبقاء على الأقدم وإعادة حساب السنة', 'أُطفئ #' . $s['off_ids'] . ' وأُعيد حساب سنة ' . $s['school_year'] . ' (شفاء ذاتي 2026-09-04)');
