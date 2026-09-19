@@ -366,6 +366,11 @@ function docSheetStart(string $titleFr, string $titleAr, array $chips = [], arra
     $auto = [];
     $cur = displayCurrency();
     if ($cur !== 'both') $auto[] = 'العملة: ' . ($cur === 'usd' ? 'دولار فقط' : 'ليرة فقط');
+    // 🏷️ (2026-09-19) سعر الصرف المعتمد بعنوان كل تقرير فيه دولار — opts: month/year (شهري) · annual (سنوي) · law (أعمدة الأساس بـ1,500)
+    if ($cur !== 'lbp' && ($opts['comp'] ?? true) && function_exists('rateTitleText')) {
+        $rt = rateTitleText($opts['month'] ?? null, $opts['year'] ?? null, !empty($opts['annual']), null, $opts['law'] ?? true);
+        if ($rt !== '') $auto[] = $rt;
+    }
     if (($opts['comp'] ?? true) && function_exists('salaryCompLabel')) $auto[] = 'الراتب يشمل: ' . salaryCompLabel();
     $auto[] = 'صدر بتاريخ ' . formatDate(date('Y-m-d'));
     $ltr = (($opts['dir'] ?? 'rtl') === 'ltr'); // ↔️ (2026-09-13) اتجاه الورقة: 'ltr' = من الشمال لليمين (كشوف خانة «كشوف الرواتب» = لوائح الدولة)

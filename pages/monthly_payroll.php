@@ -50,7 +50,7 @@ function payslipCardHtml($emp, $salary, $month, $year) {
         </div>
         <div class="card-body">
             <?= $slipSchool ? schoolLetterhead($slipSchool) : '' ?>
-            <div class="doc-title" style="margin:2px 0 12px">Bulletin de paie mensuel / قسيمة الراتب الشهرية — <?= monthName($month, 'ar') ?> <?= $year ?></div>
+            <div class="doc-title" style="margin:2px 0 12px">Bulletin de paie mensuel / قسيمة الراتب الشهرية — <?= monthName($month, 'ar') ?> <?= $year ?></div><?= rateSubtitle($month, $year) ?>
             <table class="table" style="margin-bottom:16px">
                 <tr><th colspan="4" style="background:#eef3fb;color:#000"><i class="fas fa-id-badge"></i> Informations / المعلومات</th></tr>
                 <tr>
@@ -352,7 +352,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
             }
             ?>
             <?= $slipSchool1 ? schoolLetterhead($slipSchool1) : '' ?>
-            <div class="doc-title" style="margin:2px 0 12px">Bulletin de paie mensuel / قسيمة الراتب الشهرية — <?= monthName($month, 'ar') ?> <?= $year ?></div>
+            <div class="doc-title" style="margin:2px 0 12px">Bulletin de paie mensuel / قسيمة الراتب الشهرية — <?= monthName($month, 'ar') ?> <?= $year ?></div><?= rateSubtitle($month, $year) ?>
             <table class="table" style="margin-bottom:16px">
                 <tr><th colspan="4" style="background:#eef3fb;color:#000"><i class="fas fa-id-badge"></i> Informations de l'enseignant / معلومات الأستاذ</th></tr>
                 <tr>

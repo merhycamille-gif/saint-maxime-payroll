@@ -5859,8 +5859,8 @@ check('كشوف الرواتب LTR: خانة «كشوف الرواتب» بال�
       && strpos($of119, "\$ofDir = in_array(\$form, ofStateLtrForms(), true) ? 'ltr' : 'rtl';") !== false
       && substr_count($of119, 'class="official-doc <?= $ofDir ?>') === 5 && substr_count($of119, 'id="ppExportArea" dir="<?= $ofDir ?>"') === 4 && substr_count($of119, 'id="ppExportArea" style="max-width:100%" dir="<?= $ofDir ?>"') === 1
       && strpos($of119, '$ofLtr') === false && strpos($rp119, '$rsDir') === false
-      && strpos($rp119, "docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName(\$month) . ' ' . \$year . \$empTypeTitle]) ?>") !== false
-      && preg_match("/docSheetStart\('Totaux annuels par école et par rubrique'.*?\['dir' => 'ltr'\]\) \?>/su", $rp119) === 1
+      && strpos($rp119, "docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName(\$month) . ' ' . \$year . \$empTypeTitle], ['month' => \$month, 'year' => \$year]) ?>") !== false // (2026-09-19 + سعر الصرف بالعنوان)
+      && preg_match("/docSheetStart\('Totaux annuels par école et par rubrique'.*?\['dir' => 'ltr', 'annual' => true, 'law' => false\]\) \?>/su", $rp119) === 1
       && strpos($rh119, "\$ltr = ((\$opts['dir'] ?? 'rtl') === 'ltr');") !== false && strpos($rh119, '.official-doc.ltr,.official-doc[dir="ltr"]{direction:ltr;text-align:left;}') !== false && strpos($rh119, '.doc-sheet.doc-ltr{direction:ltr;text-align:left;}') !== false
       && sort($tiles119) !== null && $tiles119 === ['annual_slip', 'annual_totals', 'employer_cost', 'full_register', 'payment_list', 'salary_all', 'salary_detail']
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), 'dir="ltr"') === false && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'doc-ltr') === false,
@@ -6840,6 +6840,40 @@ foreach (glob($PROJ . '/pages/*.php') as $f144) {
 check('📐 الصافي دغري بعد المحسومات: كشف الرواتب والأجور الشهري (رأس + صفوف + مجاميع) + كنس الصفحات (كل «مجموع المحسومات» يليه «الصافي»)',
       strpos($h144, 'FATAL') === false && $hdr144 && $rowOk144 > 0 && strpos($h144, '<th>مجموع المحسومات</th><th>تعويض عائلي</th>') === false && !$sweep144,
       'rows=' . $rowOk144 . ($sweep144 ? ' · ' . implode('، ', $sweep144) : ''));
+
+/**
+ * 145) 🏷️ «اتفقنا بكل عناوين التقارير والإفادات والبرنامج: بس نحطّ الراتب بالدولار لازم يكون بالعنوان سعر الدولار اللي حاسبها» (2026-09-19):
+ *      rateTitleText/rateSubtitle (functions.php) = المصدر الواحد؛ docSheetStart يضيفه تلقائياً (opts month/year/annual/law)؛ عناوين official_forms
+ *      الـ13 + القسيمة + كل الإفادات التي تطبع مبلغاً ($rateLine بعد كل <h2>) + ملف الأستاذ. يظهر فقط حين تُعرض الدولارات.
+ */
+$fn145 = (string)file_get_contents($PROJ . '/includes/functions.php'); $rh145 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$of145 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $at145 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$sch145 = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$regEid)->fetchColumn() ?: 3; // مستندات الموظف بمدرسته وشهره (6/2026)
+$docs145 = [
+    ['pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], true, [3], '2025-2026'],
+    ['pages/official_forms.php', ['form' => 'payment_list', 'month' => 10, 'year' => 2025], true, [3], '2025-2026'],
+    ['pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], true, [3], '2025-2026'],
+    ['pages/reports.php', ['report' => 'annual_totals'], false, [3], '2025-2026'],
+    ['pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire'], false, [$sch145], '2025-2026'],
+    ['pages/monthly_payroll.php', ['employee_id' => $regEid, 'month' => 6, 'year' => 2026], true, [$sch145], '2025-2026'],
+    ['pages/official_forms.php', ['form' => 'teacher_card', 'employee_id' => $regEid], false, [$sch145], '2025-2026'],
+];
+$ok145 = true; $why145 = [];
+foreach ($docs145 as [$pg, $get, $law, $scope145, $sy145]) {
+    $hb = renderPage($pg, $get, ['extra', 'aide', 'transport'], $scope145, 'both', $sy145);
+    $hl = renderPage($pg, $get, ['extra', 'aide', 'transport'], $scope145, 'lbp', $sy145);
+    $hasB = preg_match('/سعر الصرف المعتمد: (سعر كل شهر — آخر سعر )?1 \$ = [0-9,]+ ل\.ل\./u', $hb) === 1;
+    $lawB = strpos($hb, 'الأساس والدرجة بالسعر الرسمي 1 $ = 1,500') !== false;
+    $hasL = strpos($hl, 'سعر الصرف المعتمد') !== false;
+    $fat = strpos($hb, 'FATAL') !== false || strpos($hl, 'FATAL') !== false;
+    if (!$hasB || $lawB !== $law || $hasL || $fat) { $ok145 = false; $why145[] = basename($pg) . ':' . json_encode($get) . " both=" . (int)$hasB . " law=" . (int)$lawB . " lbp=" . (int)$hasL . " fatal=" . (int)$fat; }
+}
+$hTad = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'tadris'], [], [$sch145], 'both', '2025-2026'); // إفادة بلا مبلغ ⇒ بلا سطر سعر
+check('🏷️ سعر الصرف المعتمد بعنوان كل مستند فيه دولار (كشف/تقرير/إفادة/قسيمة/بطاقة): يظهر بوضع الدولار ولا يظهر بوضع الليرة، والسعر الرسمي 1,500 فقط حيث أعمدة الأساس، وإفادة بلا مبلغ بلا سطر',
+      function_exists('rateTitleText') && function_exists('rateSubtitle') && strpos($rh145, "rateTitleText(\$opts['month'] ?? null") !== false
+      && substr_count($of145, 'rateSubtitle(') === 13 && substr_count($at145, '<?= $rateLine ?>') === substr_count($at145, '</h2>')
+      && $ok145 && strpos($hTad, 'سعر الصرف المعتمد') === false,
+      implode(' · ', $why145) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

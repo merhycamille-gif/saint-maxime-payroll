@@ -143,6 +143,7 @@ if (!$emp):
                     <?php endif; ?>
                     <?php $slRate = $sal ? rowRate($sal) : null; ?>
                     <tr><td>Salaire actuel (base+échelon) / الراتب الحالي</td><td><strong><?= money($curBase, $slRate) ?></strong></td></tr>
+                    <?php if (($rtl = rateTitleText($sal['month'] ?? null, $sal['year'] ?? null, false, $slRate ? (float)$slRate : null, false)) !== ''): ?><tr><td>Taux appliqué / سعر الصرف المعتمد</td><td style="color:#1e40af;font-weight:700"><?= e($rtl) ?></td></tr><?php endif; ?>
                     <?php if ($sal): // سطور «+» تتبع زرّ «الراتب يشمل» — فيبقى الراتب المركّب = مجموع السطور الظاهرة ?>
                     <?php if (salaryCompHas('extra')): ?><tr><td>+ Supplément / الأجر الإضافي</td><td><?= extraWageMoney($sal) ?></td></tr><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><tr><td>+ Prime &amp; aide / المكافأة والمساعدة</td><td><?= money((int)$sal['aide_complementaire_lbp'], $slRate) ?></td></tr><?php endif; ?>

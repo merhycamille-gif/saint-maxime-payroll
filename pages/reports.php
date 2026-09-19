@@ -299,7 +299,7 @@ function reportDocThumb($path) {
             </div>
         </form>
 
-        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year . $empTypeTitle]) ?>
+        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>
                         <th>#</th>
@@ -413,7 +413,7 @@ function reportDocThumb($path) {
             </div>
         </form>
         <?php /* 🏛️ ترويسة كشف الضمان باسم صاحب العمل لدى الصندوق (25-82-043 ⇒ الجمعية) */ ?>
-        <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['school' => cnssEmployerSchool(currentSchool())]) ?>
+        <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year, 'school' => cnssEmployerSchool(currentSchool())]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
                     <tbody>
@@ -481,7 +481,7 @@ function reportDocThumb($path) {
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
-        <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year . $empTypeTitle]) ?>
+        <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>الضريبة</th></tr></thead>
                     <tbody>
@@ -544,7 +544,7 @@ function reportDocThumb($path) {
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
-        <?= docSheetStart('Caisse EOC — retenues mensuelles', 'كشف صندوق التعليم الخاص الشهري', [monthName($month) . ' ' . $year]) ?>
+        <?= docSheetStart('Caisse EOC — retenues mensuelles', 'كشف صندوق التعليم الخاص الشهري', [monthName($month) . ' ' . $year], ['month' => $month, 'year' => $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
                     <tbody>
@@ -782,7 +782,7 @@ function reportDocThumb($path) {
         </script>
 
         <?php // ↔️ (2026-09-13) «مجاميع سنوية» من خانة كشوف الرواتب (لوائح الدولة) ⇒ من الشمال لليمين — الاتجاه فقط ?>
-        <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند'], ['dir' => 'ltr']) ?>
+        <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند'], ['dir' => 'ltr', 'annual' => true, 'law' => false]) ?>
                 <div class="report-table-wrap" dir="ltr"><table class="doc-table" dir="ltr">
                     <thead><tr>
                         <th>#</th><th>المدرسة / École</th><th>عدد الكشوف</th>

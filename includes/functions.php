@@ -4511,6 +4511,23 @@ function compColsCount(bool $withTransport = true): int {
 // 🏷️ «ليش ما بتخلّي سعر صرف الدولار يبيّن كمان بالعناوين» (2026-09-14): سطر صغير تحت رأس العمود بسعر الدولار المعتمد فيه —
 //    'law' = السعر الرسمي (1 $ = 1,500) لأعمدة الأساس/الدرجة/بعد التدرّج/المركّب، 'mkt' = سعر الشهر (1 $ = 89,500) لأعمدة الصافي/المستحق.
 //    يظهر فقط حين تُعرض الدولارات (وضع العملة ≠ ليرة فقط). المصدر الواحد لكل الكشوف.
+// 🏷️ «اتفقنا بكل عناوين التقارير والإفادات والبرنامج: بس نحطّ الراتب بالدولار لازم يكون بالعنوان سعر الدولار اللي حاسبها» (2026-09-19):
+//    سطر واحد تحت عنوان كل مستند فيه دولار = سعر الصرف المعتمد بالحساب (سعر الشهر؛ للمستندات السنوية: سعر كل شهر + آخر سعر)
+//    + السعر الرسمي 1,500 لأعمدة الأساس/الدرجة حين تكون موجودة ($law). لا يظهر بوضع «ليرة فقط». المصدر الواحد لكل البرنامج.
+function rateTitleText($month = null, $year = null, bool $annual = false, ?float $rate = null, bool $law = true): string {
+    if (displayCurrency() === 'lbp') return '';
+    $r = $rate !== null ? (float)$rate : (float)getExchangeRate($month, $year);
+    if ($r <= 0) return '';
+    $txt = $annual
+        ? 'سعر الصرف المعتمد: سعر كل شهر — آخر سعر 1 $ = ' . number_format($r, 0, '.', ',') . ' ل.ل.'
+        : 'سعر الصرف المعتمد: 1 $ = ' . number_format($r, 0, '.', ',') . ' ل.ل.';
+    if ($law) $txt .= ' · الأساس والدرجة بالسعر الرسمي 1 $ = ' . number_format(officialUsdRate(), 0, '.', ',') . ' ل.ل.';
+    return $txt;
+}
+function rateSubtitle($month = null, $year = null, bool $annual = false, ?float $rate = null, bool $law = true): string {
+    $t = rateTitleText($month, $year, $annual, $rate, $law);
+    return $t === '' ? '' : '<div class="doc-subtitle rate-subtitle" dir="rtl" style="font-weight:700;color:#1e40af">' . e($t) . '</div>';
+}
 function rateHead(string $which, $month = null, $year = null): string {
     if (displayCurrency() === 'lbp') return '';
     $rate = $which === 'law' ? officialUsdRate() : (float)getExchangeRate($month, $year);

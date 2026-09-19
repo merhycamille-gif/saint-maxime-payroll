@@ -1174,7 +1174,7 @@ elseif ($form === 'teacher_card'):
   .tcard .sign-row{margin-top:10px;page-break-inside:avoid} .tcard .sign-box .sign-label{margin-bottom:20px} }</style>
 <div class="official-doc rtl tcard" id="ppExportArea">
     <?= schoolLetterhead($school) ?>
-    <div class="doc-title">بطاقة الأستاذ — للعام الدراسي <?= e($schoolYear) ?></div>
+    <div class="doc-title">بطاقة الأستاذ — للعام الدراسي <?= e($schoolYear) ?></div><?= rateSubtitle(null, null, true, null, false) ?>
     <div class="doc-section">الهوية</div>
     <div class="info-grid">
         <div><span class="k">الاسم والشهرة:</span> <?= fillVal(empFullNameAr($emp)) ?></div>
@@ -1245,7 +1245,7 @@ elseif ($form === 'teacher_card'):
             <div><?= e($school['address'] ?? '') ?><?= !empty($school['phone'])?' — هاتف: '.e($school['phone']):'' ?></div>
         </div>
     </div>
-    <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div>
+    <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div><?= rateSubtitle(null, null, true) ?>
     <div style="text-align:center;font-size:12pt;margin-bottom:8px">عن السنة المدرسية <?= e($sy) ?></div>
     <table class="doc-table">
         <thead>
@@ -1351,7 +1351,7 @@ elseif ($form === 'teacher_card'):
             <div>الرقم المالي: <?= e($school['finance_number'] ?? '') ?></div>
         </div>
     </div>
-    <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div>
+    <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div><?= rateSubtitle(null, null, true) ?>
     <div style="text-align:center;font-size:12pt;margin-bottom:8px">عن السنة المدرسية <?= e($sy) ?></div>
     <table class="doc-table">
         <thead>
@@ -1447,7 +1447,7 @@ elseif ($form === 'teacher_card'):
 ?>
 <div class="official-doc rtl" id="ppExportArea">
     <?= schoolLetterhead($school) ?>
-    <div class="doc-title">بطاقة ملاك — صندوق التعويضات لأساتذة التعليم الخاص</div>
+    <div class="doc-title">بطاقة ملاك — صندوق التعويضات لأساتذة التعليم الخاص</div><?= rateSubtitle(null, null, true, null, false) ?>
     <div class="info-grid">
         <div><span class="k">الاسم والشهرة:</span> <?= fillVal(empFullNameAr($emp)) ?></div>
         <div><span class="k">اسم الأب:</span> <?= fillVal($emp['father_name_ar']) ?></div>
@@ -1644,7 +1644,7 @@ elseif ($form === 'teacher_card'):
 <div class="official-doc <?= $ofDir ?> land-report" id="ppExportArea" style="max-width:100%" dir="<?= $ofDir ?>">
     <?= schoolLetterhead($school) ?>
     <div class="doc-title">كشف الرواتب والأجور الشهري — <?= monthName($month,'ar').' '.$year ?></div>
-    <div class="doc-subtitle"><?= e($curLbl) ?></div>
+    <div class="doc-subtitle"><?= e($curLbl) ?></div><?= rateSubtitle($month, $year) ?>
     <table class="doc-table">
         <thead><tr>
             <th>#</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><th>درجة عادية واستثنائية<?= rateHead('law') ?></th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
@@ -1759,7 +1759,7 @@ elseif ($form === 'teacher_card'):
 ?>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
     <?= schoolLetterhead($school) ?>
-    <div class="doc-title">كشف الفروقات — <?= e($prevSY) ?> مقابل <?= e($schoolYear) ?></div>
+    <div class="doc-title">كشف الفروقات — <?= e($prevSY) ?> مقابل <?= e($schoolYear) ?></div><?= rateSubtitle(null, null, true) ?>
     <table class="doc-table">
         <thead><tr><th>#</th><th>الاسم والشهرة</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $rows, null, null, $schoolYear) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small></th><th>صافي <?= e($prevSY) ?></th><th>صافي <?= e($schoolYear) ?></th><th>الفرق</th></tr></thead>
         <tbody>
@@ -2085,7 +2085,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
                 <div>عدد الأجراء: <?= (int)$T['count'] ?> (منهم <?= (int)$T['workers'] ?> عامل/إداري)</div>
             </div>
         </div>
-        <div class="doc-title" style="margin:6px 0">الجدول الملحق — الرواتب والأجور (<?= (int)$T['count'] ?> أجيراً، بكتل 19 سطراً طبق الأصل)</div>
+        <div class="doc-title" style="margin:6px 0">الجدول الملحق — الرواتب والأجور (<?= (int)$T['count'] ?> أجيراً، بكتل 19 سطراً طبق الأصل)</div><?= rateSubtitle(null, null, true, null, false) ?>
         <table class="doc-table">
             <thead><tr><th>#</th><th>رقم المضمون</th><th>سنة الولادة</th><th>الفئة</th><th>الاسم والشهرة</th>
                 <th>بدء العمل</th><th>ترك العمل</th><th>مدة العمل (أشهر)</th><th>اجمالي الاجور السنوية</th>
@@ -2479,7 +2479,7 @@ elseif ($form === 'payment_list'):
     </form>
 <div class="official-doc <?= $ofDir ?> land-report" id="ppExportArea" dir="<?= $ofDir ?>" style="max-width:100%">
     <?= schoolLetterhead($school) ?>
-    <div class="doc-title">كشف الدفع — رواتب <?= monthName($month,'ar').' '.$year ?></div>
+    <div class="doc-title">كشف الدفع — رواتب <?= monthName($month,'ar').' '.$year ?></div><?= rateSubtitle($month, $year) ?>
     <table class="doc-table">
         <thead><tr><th>#</th><th>الرمز</th><th>الاسم والشهرة</th><th>رقم الضمان</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $rows, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><?= transportHead() ?><th>الصافي (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>الإجمالي المتوجب (ل.ل)<?= rateHead('mkt', $month, $year) ?></th><th>التوقيع بالاستلام</th></tr></thead>
         <tbody>
@@ -2554,7 +2554,7 @@ elseif ($form === 'payment_list'):
     </form>
 <div class="official-doc <?= $ofDir ?> land-report" id="ppExportArea" dir="<?= $ofDir ?>" style="max-width:100%">
     <?php if (!$multiS) echo schoolLetterhead($school); ?>
-    <div class="doc-title">جميع الأساتذة — كشف شامل بالرواتب وكلفة المؤسسة</div>
+    <div class="doc-title">جميع الأساتذة — كشف شامل بالرواتب وكلفة المؤسسة</div><?= rateSubtitle(null, null, true) ?>
     <div style="text-align:center;font-size:12pt;margin-bottom:8px"><?= monthName($month,'ar').' '.$year ?></div>
     <table class="doc-table">
         <thead><tr>
@@ -2695,7 +2695,7 @@ elseif ($form === 'payment_list'):
 ?>
 <div class="official-doc <?= $ofDir ?>" id="ppExportArea" dir="<?= $ofDir ?>">
     <?= schoolLetterhead($school) ?>
-    <div class="doc-title">كلفة المؤسسة الإجمالية — للعام الدراسي <?= e($schoolYear) ?></div>
+    <div class="doc-title">كلفة المؤسسة الإجمالية — للعام الدراسي <?= e($schoolYear) ?></div><?= rateSubtitle(null, null, true, null, false) ?>
     <div class="kv">عدد الموظفين المشمولين: <strong><?= (int)($g['n']??0) ?></strong></div>
     <table class="doc-table" style="max-width:620px;margin:14px auto">
         <thead><tr><th>البيان</th><th>المبلغ</th></tr></thead>
@@ -2758,7 +2758,7 @@ elseif ($form === 'payment_list'):
 ?>
 <div class="official-doc rtl land-report" id="ppExportArea" style="max-width:100%">
     <?= schoolLetterhead($school) ?>
-    <div class="doc-title">معلومات عامة عن الموظفين — <?= e(activeSchoolYear()==='all'?'كل السنين':activeSchoolYear()) ?></div>
+    <div class="doc-title">معلومات عامة عن الموظفين — <?= e(activeSchoolYear()==='all'?'كل السنين':activeSchoolYear()) ?></div><?= rateSubtitle(null, null, true, null, false) ?>
     <table class="doc-table">
         <thead><tr>
             <th>#</th><th>الإسم والشهرة</th><th>تاريخ الولادة</th><th>العمر</th>
@@ -2845,7 +2845,7 @@ elseif ($form === 'payment_list'):
              <div>رقمها في الضمان: <?= e($school['nssf_employer_number'] ?? '') ?></div></div>
         <div style="text-align:left">الصندوق الوطني للضمان الاجتماعي</div>
     </div>
-    <div class="doc-title" style="margin:4px 0">اشتراكات الضمان المتوجبة عن شهر <?= e(monthName($month,'ar')) ?> <?= (int)$year ?></div>
+    <div class="doc-title" style="margin:4px 0">اشتراكات الضمان المتوجبة عن شهر <?= e(monthName($month,'ar')) ?> <?= (int)$year ?></div><?= rateSubtitle($month, $year) ?>
     <table class="doc-table">
         <thead>
             <tr>
@@ -3021,7 +3021,7 @@ elseif ($form === 'payment_list'):
         </div>
         <div style="text-align:left;font-weight:700"><?= e($school['name_ar'] ?? '') ?></div>
     </div>
-    <div class="doc-title" style="margin:4px 0">جميع الأساتذة / الموظفون</div>
+    <div class="doc-title" style="margin:4px 0">جميع الأساتذة / الموظفون</div><?= rateSubtitle($month, $year) ?>
     <table class="doc-table">
         <thead>
             <tr>

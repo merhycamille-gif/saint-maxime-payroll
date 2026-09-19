@@ -863,6 +863,8 @@ if (!$emp):
     $hasComponents = true;
     $hasCurrency   = true;
     $printsSalary  = in_array($type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'salaire', 'embassy', 'aqd_taalim'], true);
+    // 🏷️ (2026-09-19) سعر الصرف المعتمد تحت عنوان الإفادة حين يظهر المبلغ بالدولار (نفس $fxRate الذي حُسبت به المبالغ — بلا سعر 1,500 لأن الإفادة ÷ سعر الشهر)
+    $rateLine = ($printsSalary && $cur !== 'lbp' && $fxRate > 0) ? '<div class="rate-subtitle" dir="rtl" style="text-align:center;font-weight:700;color:#1e40af;margin:-14px 0 16px">' . e(rateTitleText(null, null, false, (float)$fxRate, false)) . '</div>' : '';
     $isNotice      = in_array($type, ['notice_school', 'notice_mail'], true);
     $defaultLogo   = in_array($type, ['anhaa_khedme', 'anhaa_mail', 'aqd_taalim', 'cnss', 'notice_school', 'notice_mail', 'salaire', 'tadris', 'embassy', 'riaaya'], true); // الصادرة عن المدرسة: الشعار افتراضياً
     $showLogo      = isset($_GET['logo']) ? ($_GET['logo'] === '1') : $defaultLogo;
@@ -1121,7 +1123,7 @@ if (!$emp):
                   <span style="font-weight:400"><?= $FR ? 'N° d\'entrée' : 'Entry No.' ?> : ــــــــ</span><br>
                   <span style="font-weight:400">Date : ــــــــ</span>
               </div>
-              <h2 style="text-align:center;margin:18px 0 26px;text-decoration:underline"><?= $FR ? 'Attestation — À qui de droit' : 'Attestation — To whom it may concern' ?></h2>
+              <h2 style="text-align:center;margin:18px 0 26px;text-decoration:underline"><?= $FR ? 'Attestation — À qui de droit' : 'Attestation — To whom it may concern' ?></h2><?= $rateLine ?>
               <p><?= $FR ? 'L\'institution' : 'The institution' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
               <p><?= $FR ? 'immatriculée à la Caisse Nationale de Sécurité Sociale sous le n°' : 'registered with the National Social Security Fund under No.' ?> <strong><?= e($employerNssf) ?></strong></p>
               <p><?= $FR ? 'atteste que l\'assuré(e)' : 'certifies that the insured' ?> <strong><?= e($nomFr) ?></strong>, <?= $FR ? 'n°' : 'No.' ?> <strong><?= e($emp['nssf_number']) ?></strong>, <?= $FR ? 'a commencé à travailler chez nous à plein temps' : 'started working with us on a full-time basis' ?></p>
@@ -1151,7 +1153,7 @@ if (!$emp):
                 <span style="font-weight:400">رقم الوارد : ــــــــ</span><br>
                 <span style="font-weight:400">تاريــــــخ : ــــــــ</span>
             </div>
-            <h2 style="text-align:center;margin:18px 0 26px;text-decoration:underline">إفـــادة لمن يهمه الأمر</h2>
+            <h2 style="text-align:center;margin:18px 0 26px;text-decoration:underline">إفـــادة لمن يهمه الأمر</h2><?= $rateLine ?>
             <p>تفيد مؤسسة : <strong><?= e($schoolNameAr) ?></strong></p>
             <p>المسجَّلة في الصندوق الوطني للضمان الاجتماعي تحت الرقم <strong><?= e($employerNssf) ?></strong></p>
             <p>أنّ المضمون <strong><?= e($nomAr) ?></strong> رقمه <strong><?= e($emp['nssf_number']) ?></strong> قد بدأ العمل لدينا بدوام كامل</p>
@@ -1314,7 +1316,7 @@ if (!$emp):
                div بمحاذاة نصية لا flex حتى يثبت مكانه بالشاشة والوورد سواء */ ?>
         <?php /* متل مثال p1.png: اسم المدينة قبل التاريخ («Mansourieh, le ...» / «Mansourieh: ...») */ ?>
         <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : 'Date : ' ?><?= $today ?></div>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation de salaire' : 'Salary Certificate' ?></h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation de salaire' : 'Salary Certificate' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille au sein de son établissement en qualité de' : 'has been working there as' ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $FR ? 'enseigne au sein de son établissement la matière' : 'has been teaching' ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'toujours en fonction à ce jour, et perçoit un salaire mensuel' : 'is still in service to date, and receives a monthly salary' ?><?= $salParts ? ($FR ? ' détaillé comme suit :' : ' detailed as follows:') : ($FR ? ' de <strong>' . $moneyLat($salShown) . '</strong>.' : ' of <strong>' . $moneyLat($salShown) . '</strong>.') ?></p>
         <?php if ($salParts): ?>
         <p style="margin-left:34px">- <?= $FR ? 'Salaire de base' . ($isEmploye ? '' : ' (après échelons)') : 'Basic salary' . ($isEmploye ? '' : ' (after increments)') ?> : <strong><?= $moneyLat((int)$basePlusEch) ?></strong></p>
@@ -1332,14 +1334,14 @@ if (!$emp):
                div بمحاذاة نصية لا flex حتى يثبت مكانه بالشاشة والوورد سواء */ ?>
         <?php /* متل مثال p1.png: اسم المدينة قبل التاريخ («Mansourieh, le ...» / «Mansourieh: ...») */ ?>
         <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : 'Date : ' ?><?= $today ?></div>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? ($FR ? 'Attestation de travail' : 'Work Certificate') : ($FR ? 'Attestation de travail et d\'enseignement' : 'Work and Teaching Certificate') ?></h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? ($FR ? 'Attestation de travail' : 'Work Certificate') : ($FR ? 'Attestation de travail et d\'enseignement' : 'Work and Teaching Certificate') ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille au sein de son établissement en qualité de' : 'has been working there as' ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $FR ? 'enseigne au sein de son établissement la matière' : 'has been teaching' ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'toujours en fonction à ce jour. Il/Elle fait preuve de bonne conduite et d\'assiduité dans l\'accomplissement de son travail.' : 'and is still in service to date. He/She has shown good conduct and commitment in the performance of his/her duties.' ?></p>
         <p><?= $reqLine ?></p>
         <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= $FR ? 'Le Directeur — Signature et cachet' : 'The Director — Signature & stamp' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
 
         <?php elseif ($type === 'riaaya'): ?>
         <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : '' ?><?= $today ?></div>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'À qui de droit' : 'To whom it may concern' ?></h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'À qui de droit' : 'To whom it may concern' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= strpos($assocTxt, 'التابعة لجمعية') === 0 ? ($FR ? 'relevant de l\'Association des Religieuses Salvatoriennes de Notre-Dame de l\'Annonciation, enregistrée auprès de vos services sous le n° (.....)' : 'affiliated to the Association of the Salvatorian Sisters of Our Lady of the Annunciation, registered with you under No. (.....)') : e($assocTxt) ?>,</p>
         <p><?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille en qualité de' : 'works as' ?> <strong><?= e($funcLat) ?></strong> <?= $FR ? 'dans notre école' : 'at our school' ?><?php else: ?><?= $FR ? 'est enseignant(e) de la matière' : 'is a teacher of' ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?> <?= $FR ? 'dans notre école' : 'at our school' ?><?php endif; ?>.</p>
         <p><?= $FR ? 'La présente attestation est délivrée à cet effet.' : 'This attestation is issued accordingly.' ?></p>
@@ -1362,7 +1364,7 @@ if (!$emp):
           <p style="margin:2px 0"><?= $FR ? 'Tél' : 'Phone' ?> : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong><span dir="ltr">' . e($emp['phone1']) . '</span></strong>' : $blank(150) ?></p>
         </div>
         <?php endif; ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Lettre de fin de service' : 'End-of-Service Letter' ?></h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Lettre de fin de service' : 'End-of-Service Letter' ?></h2><?= $rateLine ?>
         <?php if ($type === 'anhaa_khedme'): ?><p><?= $FR ? 'Cher(ère) Professeur(e)' : 'Dear Teacher' ?> : <strong><?= e($nomFr) ?></strong></p><?php endif; ?>
         <p><?= $FR ? 'En vertu des lois en vigueur, notamment la loi sur le corps enseignant des écoles privées, et en application de l\'article 29 de ladite loi et de ses amendements,' : 'Pursuant to the laws in force, in particular the law on the teaching staff of private schools, and in application of Article 29 thereof as amended,' ?></p>
         <p><?= $FR ? 'nous vous informons, avant le cinq juillet' : 'we hereby inform you, before the fifth of July' ?> <strong><?= $effYear ?></strong>, <?= $FR ? 'de la décision à laquelle se voit contrainte l\'école' : 'of the unavoidable decision of the school' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
@@ -1385,7 +1387,7 @@ if (!$emp):
         <?php endif; ?>
 
         <?php elseif ($type === 'talab_istiqala'): ?>
-        <h2 style="text-align:center;margin:6px 0 24px;text-decoration:underline"><?= $FR ? 'Demande de démission' : 'Resignation Request' ?></h2>
+        <h2 style="text-align:center;margin:6px 0 24px;text-decoration:underline"><?= $FR ? 'Demande de démission' : 'Resignation Request' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'Madame la Directrice de l\'école' : 'To the Principal of' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
         <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= e($nomFr) ?></strong></p>
         <p><?= $FR ? 'vous informe de ma démission de mes fonctions à l\'école' : 'hereby inform you of my resignation from my duties at' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'à compter de la prochaine année scolaire' : 'as of the coming academic year' ?> <strong><?= $nextSY ?></strong>, <?= $FR ? 'et ce pour des raisons personnelles.' : 'for personal reasons.' ?></p>
@@ -1396,7 +1398,7 @@ if (!$emp):
         </div>
 
         <?php elseif ($type === 'afade_madrasiya'): ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation scolaire' : 'School Attestation' ?></h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation scolaire' : 'School Attestation' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= $directorFr ? e($directorFr) : $blank(180) ?></strong></p>
         <p><?= $FR ? 'Chef d\'établissement de l\'école' : 'Head of' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
         <p><?= $FR ? 'certifie que' : 'certify that' ?> <?= $mrsLat ?> : <strong><?= e($nomFr) ?></strong> &nbsp; <?= $FR ? 'titulaire de la carte d\'identité n°' : 'holder of ID card No.' ?> <?= $blank(150) ?></p>
@@ -1429,7 +1431,7 @@ if (!$emp):
         <p style="text-align:center;font-size:12pt;color:#444"><?= $FR ? 'Ministère de l\'Éducation Nationale, de la Jeunesse et des Sports — Beyrouth' : 'Ministry of National Education, Youth and Sports — Beirut' ?></p>
 
         <?php elseif ($type === 'isqat_haq'): ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Renonciation de droits' : 'Waiver of Rights' ?></h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Renonciation de droits' : 'Waiver of Rights' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> <strong><?= e($nomFr) ?></strong></p>
         <p><?= $FR ? 'selon ma carte d\'identité, registre n°' : 'as per my identity card, registry No.' ?> <?= $blank(150) ?> &nbsp; <?= $FR ? 'déclare ce qui suit :' : 'declare the following:' ?></p>
         <p><strong>1)</strong> <?= $FR ? 'J\'ai travaillé à l\'école' : 'I worked at' ?> : <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'en qualité de' : 'as' ?> : <strong><?= e($funcLat) ?></strong> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'mon salaire à la date de la présente renonciation s\'élevant (en chiffres) à' : 'my salary as of the date of this waiver amounting (in figures) to' ?> <strong><?= $moneyLat($salShown) ?></strong>, <?= $FR ? 'soit (en lettres)' : 'in words' ?> <strong><?= e($wordsLat($salShown)) ?> <?= $uniq ?>.</strong></p>
@@ -1444,7 +1446,7 @@ if (!$emp):
         </div>
 
         <?php elseif ($type === 'baraa_zimma'): $bzMonthLat = $FR ? monthName($eMo, 'fr') : monthName($eMo, 'en'); ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Quittance, décharge et renonciation de droits' : 'Acknowledgment, Full Release and Waiver of Rights' ?></h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Quittance, décharge et renonciation de droits' : 'Acknowledgment, Full Release and Waiver of Rights' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= e($nomFr) ?></strong></p>
         <p><?= $FR ? 'déclare, en pleine capacité juridique, ce qui suit :' : 'declare, with full legal capacity, the following:' ?></p>
         <p><?= $FR ? 'J\'ai travaillé à l\'école' : 'I worked at' ?> : <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'en qualité de' : 'as' ?> <strong><?= e($funcLat) ?></strong>, <?= $FR ? 'et je reconnais avoir perçu l\'intégralité de mes droits financiers de ladite école, y compris les salaires mensuels et leurs accessoires, les indemnités — notamment les aides et rémunérations supplémentaires versées en compensation de l\'effondrement de la monnaie libanaise —, les droits et toutes les sommes qui m\'étaient dues au titre de ma période de travail ; ces montants ne constituent nullement une avance sur indemnité mais une indemnisation complète et définitive à cet égard, et ce jusqu\'à la fin du mois de' : 'and I acknowledge having received all my financial dues from the said school, including monthly salaries and their accessories, indemnities — in particular aids and additional remunerations paid in compensation for the collapse of the Lebanese currency —, rights and all amounts due to me for my period of work; these amounts shall in no way be considered an advance on indemnity but a full and final compensation in this respect, up to the end of the month of' ?> <strong><?= e($bzMonthLat) ?></strong> <?= $FR ? 'de l\'année' : 'of the year' ?> <strong><?= $effYear ?></strong>.</p>
@@ -1457,7 +1459,7 @@ if (!$emp):
         </div>
 
         <?php elseif ($type === 'iqrar'): $iqEndYear = $syStart + 2; ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Déclaration' : 'Declaration' ?></h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Déclaration' : 'Declaration' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'Je soussigné(e),' : 'I, the undersigned,' ?></p>
         <p><?= $FR ? 'Nom complet' : 'Full name' ?> : <strong><?= e($nomFr) ?></strong></p>
         <p><?= $FR ? 'ai contracté avec l\'école' : 'contracted with' ?> : <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'pour l\'année scolaire' : 'for the academic year' ?> : <strong><?= $nextSY ?></strong> <?= $FR ? 'en qualité de' : 'as' ?> <strong><?= e($funcLat) ?></strong>.</p>
@@ -1494,7 +1496,7 @@ if (!$emp):
           <p style="margin:2px 0"><?= $FR ? 'Tél' : 'Phone' ?> : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong><span dir="ltr">' . e($emp['phone1']) . '</span></strong>' : $blank(150) ?></p>
         </div>
         <?php endif; ?>
-        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline"><?= $FR ? 'Avertissement' : 'Warning' ?></h2>
+        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline"><?= $FR ? 'Avertissement' : 'Warning' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'Cher(ère) Professeur(e)' : 'Dear Teacher' ?> : <strong><?= e($nomFr) ?></strong></p>
         <p><?= $FR ? 'Objet' : 'Subject' ?> : <strong><?= e($subjLat) ?></strong>.</p>
         <p><?= $FR ? 'Référence' : 'Reference' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
@@ -1528,7 +1530,7 @@ if (!$emp):
             : '';
         $natLat = $FR ? (in_array(mb_strtolower((string)($emp['nationality'] ?? '')), ['lebanese','lebanaise','libanaise','لبنانية','لبناني']) ? 'libanaise' : (string)($emp['nationality'] ?? '')) : (in_array(mb_strtolower((string)($emp['nationality'] ?? '')), ['lebanese','lebanaise','libanaise','لبنانية','لبناني']) ? 'Lebanese' : (string)($emp['nationality'] ?? ''));
         ?>
-        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline"><?= $FR ? 'Contrat d\'enseignement' : 'Teaching Contract' ?></h2>
+        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline"><?= $FR ? 'Contrat d\'enseignement' : 'Teaching Contract' ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'Entre l\'école' : 'Between' ?> : <strong><?= e($schoolNameFr) ?></strong> &nbsp; <?= $FR ? 'représentée par' : 'represented by' ?> : <?= $directorFr ? '<strong>'.e($directorFr).'</strong>' : $blank(150) ?> &nbsp; ( <strong><?= $FR ? 'Première partie' : 'First party' ?></strong> )</p>
         <p><?= $FR ? $g('et M.', 'et Mme', 'et M./Mme/Mlle', 'et Mlle') : $g('and Mr.', 'and Mrs.', 'and Mr./Mrs./Miss', 'and Miss') ?> : <strong><?= e($nomFr) ?></strong> &nbsp; <?= $FR ? 'de nationalité' : 'of nationality' ?> : <?= $vb($natLat, 90) ?> &nbsp; ( <strong><?= $FR ? 'Seconde partie' : 'Second party' ?></strong> )</p>
         <p><?= $FR ? 'né(e) le' : 'born on' ?> : <strong><?= $dob ?></strong> &nbsp; <?= $FR ? 'à' : 'in' ?> : <strong><?= $bplaceLat ?></strong> &nbsp; <?= $FR ? 'domicile' : 'residence' ?> : <?= $vb($villeLat, 110) ?> &nbsp; <?= $FR ? 'registre n°' : 'registry No.' ?> : <?= $vb($regNoLat, 90) ?></p>
@@ -1619,7 +1621,7 @@ if (!$emp):
         <?php /* p1 (2026-08-21): خانة «الرقم» انشالت + التاريخ على شمال الصفحة بالإفادة العربية —
                dir=rtl على السطر حتى تبقى كلمة «التاريخ» قبل الرقم (يمينه) بالشاشة والوورد سواء */ ?>
         <div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : <?= $today ?></div>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة راتب</h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة راتب</h2><?= $rateLine ?>
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') ?> حتى تاريخه ، <?= $g('ويتقاضى', 'وتتقاضى', 'ويتقاضى') ?> راتباً شهرياً<?= $salParts ? ' وفق التفصيل الآتي :' : ' قدره <strong>' . $moneyAr($salShown) . '</strong> .' ?></p>
         <?php if ($salParts): ?>
         <?php /* كل مكوّن مختار سطر مستقل واضح (الإضافي/المكافأة/النقل) — لا يُدمج بسطر «بدلات» عام */ ?>
@@ -1640,7 +1642,7 @@ if (!$emp):
         <?php /* p1 (2026-08-21): خانة «الرقم» انشالت + التاريخ على شمال الصفحة بالإفادة العربية —
                dir=rtl على السطر حتى تبقى كلمة «التاريخ» قبل الرقم (يمينه) بالشاشة والوورد سواء */ ?>
         <div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : <?= $today ?></div>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? 'إفادة عمل' : 'إفادة عمل وتدريس' ?></h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? 'إفادة عمل' : 'إفادة عمل وتدريس' ?></h2><?= $rateLine ?>
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') ?> حتى تاريخه ، <?= $g('وهو', 'وهي', 'وهو(هي)') ?> على حسن سلوك والتزام في أداء <?= $g('عمله', 'عملها', 'عمله(ا)') ?> .</p>
         <?php /* صيغة «لمن يلزم» وجملة عدم المسؤولية شِيلتا من كل الإفادات (بطلبه 2026-08-20) */ ?>
         <p>وقد أُعطيت هذه الإفادة بناءً على <?= $g('طلبه', 'طلبها', 'طلبه(ا)') ?> .</p>
@@ -1650,7 +1652,7 @@ if (!$emp):
       <?php elseif ($type === 'riaaya'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
         <div style="text-align:left;margin-bottom:10px"><?= $today ?></div>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إلى من يهمه الأمر</h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إلى من يهمه الأمر</h2><?= $rateLine ?>
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> <?= e($assocTxt) ?> ،</p>
         <p>أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا<?php else: ?><?= $g('هو معلّم', 'هي معلّمة', 'هو(هي) معلّم(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا<?php endif; ?> .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
@@ -1662,7 +1664,7 @@ if (!$emp):
         <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
         <div dir="ltr" style="text-align:justify">
           <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? e($cityFr) . ', le ' : '' ?><?= date('d/m/Y') ?></div>
-          <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">Attestation</h2>
+          <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">Attestation</h2><?= $rateLine ?>
           <p>À qui de droit,</p>
           <p>Nous certifions par la présente que <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>est employé(e) en qualité de <strong><?= e($fnFr['fr']) ?></strong> à <strong><?= e($schoolNameFr) ?></strong>, à raison de <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> par <?= $embPerWordFr ?></strong><?= $embRate !== '' ? ' (' . e($embWordsFr) . ')' : '' ?><?php else: ?>est enseignant(e) à <strong><?= e($schoolNameFr) ?></strong>. Il/Elle enseigne <strong><?= $subj !== '' ? e($subjFr) : $blank(140) ?></strong> <?= $levelsFr ?>, à raison de <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> par <?= $embPerWordFr ?></strong><?= $embRate !== '' ? ' (' . e($embWordsFr) . ')' : '' ?><?php endif; ?>. Nous confirmons également qu'il/elle est engagé(e) dans notre établissement pour l'année scolaire <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">Cette attestation lui est délivrée à sa demande.</p>
@@ -1674,7 +1676,7 @@ if (!$emp):
         <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
         <div dir="ltr" style="text-align:justify">
           <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? e($cityFr) . ': ' : '' ?><?= date('d/m/Y') ?></div>
-          <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">Attestation</h2>
+          <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">Attestation</h2><?= $rateLine ?>
           <p>To whom it may concern,</p>
           <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?= $embRate !== '' ? ' (' . e($embWords) . ')' : '' ?><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subjEn) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?= $embRate !== '' ? ' (' . e($embWords) . ')' : '' ?><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">This certificate is issued upon his/her request.</p>
@@ -1684,7 +1686,7 @@ if (!$emp):
 
       <?php elseif ($type === 'anhaa_khedme'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">كتاب إنهاء خدمات</h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">كتاب إنهاء خدمات</h2><?= $rateLine ?>
         <p>حضرة <?= $g('الأستاذ', 'الأستاذة', 'الأستاذ(ة)') ?> : <strong><?= e($nomAr) ?></strong></p>
         <p>استناداً إلى القوانين المرعية الإجراء وخاصةً قانون الهيئة التعليمية للمدارس الخاصة ، وعملاً بالمادة 29 وتعديلاتها من القانون المذكور ،</p>
         <p>نُعلمكم قبل الخامس من شهر تموز <strong><?= $effYear ?></strong> قرار اضطرار مدرسة : <strong><?= e($schoolNameAr) ?></strong></p>
@@ -1720,7 +1722,7 @@ if (!$emp):
           <p style="margin:2px 0">العنوان : <?= $addr !== '' ? '<strong>' . e($addr) . '</strong>' : $blank(320) ?></p>
           <p style="margin:2px 0">الهاتف : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong>' . e($emp['phone1']) . '</strong>' : $blank(150) ?></p>
         </div>
-        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline">كتاب إنهاء خدمات</h2>
+        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline">كتاب إنهاء خدمات</h2><?= $rateLine ?>
         <p>استناداً إلى القوانين المرعية الإجراء وخاصةً قانون الهيئة التعليمية للمدارس الخاصة ، وعملاً بالمادة 29 وتعديلاتها من القانون المذكور ،</p>
         <p>نُعلمكم قبل الخامس من شهر تموز <strong><?= $effYear ?></strong> قرار اضطرار مدرسة : <strong><?= e($schoolNameAr) ?></strong></p>
         <p>إنهاء خدماتكم التعليمية لديها عن العام الدراسي <strong><?= $curSY ?></strong> وما يليه .</p>
@@ -1733,7 +1735,7 @@ if (!$emp):
 
       <?php elseif ($type === 'talab_istiqala'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <h2 style="text-align:center;margin:6px 0 24px;text-decoration:underline">طلب استقالة</h2>
+        <h2 style="text-align:center;margin:6px 0 24px;text-decoration:underline">طلب استقالة</h2><?= $rateLine ?>
         <p>حضرة مديرة مدرسة : <strong><?= e($schoolNameAr) ?></strong></p>
         <p>أنا الموقّع أدناه : <strong><?= e($nomAr) ?></strong></p>
         <p>أُبلغكم استقالتي من الخدمة في مدرسة <strong><?= e($schoolNameAr) ?></strong> اعتباراً من السنة المدرسية المقبلة <strong><?= $nextSY ?></strong> ، وذلك لأسبابٍ شخصية .</p>
@@ -1745,7 +1747,7 @@ if (!$emp):
 
       <?php elseif ($type === 'afade_madrasiya'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفـادة مدرسية</h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفـادة مدرسية</h2><?= $rateLine ?>
         <p>أنا الموقّعة أدناه : <strong><?= $director ? e($director) : $blank(180) ?></strong></p>
         <p>رئيسة أو مديرة مدرسة : <strong><?= e($schoolNameAr) ?></strong></p>
         <p>أُثبت أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> : <strong><?= e($nomAr) ?></strong> &nbsp; <?= $g('حامل', 'حاملة', 'حامل') ?> بطاقة الهوية رقم <?= $blank(150) ?></p>
@@ -1783,7 +1785,7 @@ if (!$emp):
         <p style="text-align:center;font-size:12pt;color:#444">وزارة التربية الوطنية والشباب والرياضة - بيروت</p>
       <?php elseif ($type === 'isqat_haq'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفـادة إسقاط حـق</h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفـادة إسقاط حـق</h2><?= $rateLine ?>
         <p>أنا الموقّع أدناه <strong><?= e($nomAr) ?></strong></p>
         <p>حسب تذكرة هويتي ، رقم السجل <?= $blank(150) ?> &nbsp; أُصرّح بما يلي :</p>
         <p><strong>1)</strong> عملت لدى مدرسة : <strong><?= e($schoolNameAr) ?></strong> بصفة : <strong><?= e($fnFr['ar']) ?></strong> منذ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong> ، وأصبح راتبي بتاريخ هذا الإسقاط بالغاً ( بالأرقام ) <strong><?= $salFig ?></strong> ، بالحروف <strong><?= e($salWrd) ?> لا غير .</strong></p>
@@ -1800,7 +1802,7 @@ if (!$emp):
       <?php elseif ($type === 'baraa_zimma'):
         $bzMonth = monthName($eMo, 'ar'); ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إقـرار وإبـراء ذمّـة وإسقـاط حـق</h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إقـرار وإبـراء ذمّـة وإسقـاط حـق</h2><?= $rateLine ?>
         <p>أنا الموقّع أدناه : <strong><?= e($nomAr) ?></strong></p>
         <p>أُصرّح وأنا بكامل الأهلية القانونية بما يلي :</p>
         <p>إنني قد عملت لدى مدرسة : <strong><?= e($schoolNameAr) ?></strong> بصفة <strong><?= e($fnFr['ar']) ?></strong> ، وأُقرّ وأعترف بأنني قد قبضت كامل مستحقاتي المالية من المدرسة المذكورة أعلاه ، بما في ذلك الرواتب الشهرية ولواحقها ، والتعويضات لا سيّما منها المساعدات والأجور الإضافية تعويضاً عن انهيار العملة اللبنانية ، والحقوق ، وجميع المبالغ التي كانت مترتبة لي عن فترة عملي لديها ، ولا يُعتبر ذلك أبداً كسلفة على حساب التعويض بل تعويضاً كاملاً لا رجوع عنه بهذا الخصوص ، وذلك حتى نهاية شهر <strong><?= e($bzMonth) ?></strong> من العام <strong><?= $effYear ?></strong> .</p>
@@ -1815,7 +1817,7 @@ if (!$emp):
       <?php elseif ($type === 'iqrar'):
         $iqEndYear = $syStart + 2; ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إقــرار</h2>
+        <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إقــرار</h2><?= $rateLine ?>
         <p>أنا الموقّع أدناه ،</p>
         <p>الاسم الكامل : <strong><?= e($nomAr) ?></strong></p>
         <p>تعاقدت مع مدرسة : <strong><?= e($schoolNameAr) ?></strong> للعام الدراسي : <strong><?= $nextSY ?></strong> بصفة <strong><?= e($fnFr['ar']) ?></strong> .</p>
@@ -1850,7 +1852,7 @@ if (!$emp):
             : '';
       ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
-        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline">عقــد تعليــم</h2>
+        <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline">عقــد تعليــم</h2><?= $rateLine ?>
         <p>بين مدرسة : <strong><?= e($schoolNameAr) ?></strong> &nbsp; الممثَّلة بشخص: <?= $director ? '<strong>'.e($director).'</strong>' : $blank(150) ?> &nbsp; ( <strong>فريق أول</strong> )</p>
         <p><?= $g('والسيّد', 'والسيّدة', 'والسيّد / السيّدة / الآنسة', 'والآنسة') ?> : <strong><?= e($nomAr) ?></strong> &nbsp; من الجنسية: <?= $vb($natAr, 90) ?> &nbsp; ( <strong>فريق ثانٍ</strong> )</p>
         <p><?= $g('المولود', 'المولودة', 'المولود(ة)') ?> بتاريخ : <strong><?= $dob ?></strong> &nbsp; في : <strong><?= $bplace ?></strong> &nbsp; محل الإقامة: <?= $vb($emp['ville'] ?? '', 110) ?> &nbsp; رقم السجل: <?= $vb($regNo, 90) ?></p>
@@ -2000,7 +2002,7 @@ if (!$emp):
 
             <h2 style="text-align:center;margin:6px 0 26px;text-decoration:underline">
                 <?= e($ATT_TYPES[$type][$docLang]) ?>
-            </h2>
+            </h2><?= $rateLine ?>
 
             <?php if ($docLang === 'ar'): ?>
                 <p>نشهد نحن، <strong><?= e($schoolNameAr) ?></strong>، بأنّ:</p>
