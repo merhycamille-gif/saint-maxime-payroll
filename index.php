@@ -141,6 +141,7 @@ $metaItem = function ($icon, $bg, $fg, $val, $fr, $ar) {
 $dashSections = [
     ['Personnel', 'الموظفون', 'fa-users', '#0284c7', 'rgba(2,132,199,.10)', array_filter([
         canEdit() ? ['pages/employees.php','fas fa-users','Employés & Enseignants','الموظفون والأساتذة'] : null,
+        canEdit() ? ['pages/cadre_due.php','fas fa-graduation-cap','Titularisation','اقتراحات الدخول بالملاك'] : null,
         canEdit() ? ['pages/grades.php','fas fa-layer-group','Échelons & Promotions','الدرجات والترقيات'] : null,
         canEdit() ? ['pages/classes.php','fas fa-chalkboard','Classes','الصفوف'] : null,
         canEdit() ? ['pages/exceptional_laws.php','fas fa-scroll','Lois exceptionnelles','القوانين الاستثنائية'] : null,

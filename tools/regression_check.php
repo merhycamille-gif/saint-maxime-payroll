@@ -6737,6 +6737,38 @@ try {
 finally { if ($db->inTransaction()) $db->rollBack(); }
 check('قانون العمل (تجربة حيّة تُرجَع): موظف على قانون العمل ⇒ أساسه = الحد الأدنى الساري بتاريخ الشهر وصافيه > 0؛ مطفأ بلا مبلغ ⇒ أساس 0', $ok141, $why141);
 
+/**
+ * 142) 🎓 صفحة «اقتراحات الدخول بالملاك» (2026-09-19 «بدي اقتراح للدخول في الملاك للأساتذة اللي بيكون صارلون سنتين داخلين على المدرسة
+ *      وأنا ساعتها بوافق دخّلهن بالملاك أو لا»): الميزة (cadre_due.php) كانت مدفونة ببطاقة مطوية بلوحة القيادة ⇒ صفحة دائمة
+ *      pages/cadre_due.php بالقائمة الجانبية مع شارة العدد المعلّق (cadreDuePendingCount = الاستعلام نفسه بلا نسب/نقل، ≤ 0.5 ث)
+ *      + قائمة مَن دخل الملاك بموافقته (cadreDueApprovedList) + معاينة السنة القادمة (الجدد فقط) + رابط «الصفحة الكاملة» من البطاقة.
+ *      🔴 متغيّر الشارة بالهيدر اسمه $cdNavPend — لا $cdPend (الهيدر يُضمَّن بنطاق الصفحة فكان يدوس مصفوفتها).
+ */
+$hd142 = (string)file_get_contents($PROJ . '/includes/header.php');
+$pg142 = (string)file_get_contents($PROJ . '/pages/cadre_due.php');
+$cd142 = (string)file_get_contents($PROJ . '/includes/cadre_due.php');
+$t142 = microtime(true); $n142 = cadreDuePendingCount($db, currentSchoolYear()); $ms142 = (microtime(true) - $t142) * 1000;
+$n142b = count(cadreDueCandidates($db, currentSchoolYear(), null, false, true));
+$html142 = renderPage('pages/cadre_due.php', [], [], [], '', currentSchoolYear());
+$html142i = renderPage('index.php', [], [], [], '', currentSchoolYear());
+check('🎓 صفحة اقتراحات الدخول بالملاك (كود + رندر): الصفحة بالقائمة مع شارة العدد ($cdNavPend) + الشارة = عدد المرشَّحين المعلّقين فعلاً + الصفحة تُرندَر بلا خطأ بالنموذج والأزرار + بطاقة لوحة القيادة تربط إليها',
+      file_exists($PROJ . '/pages/cadre_due.php')
+      && function_exists('cadreDuePendingCount') && function_exists('cadreDueApprovedList')
+      && strpos($hd142, 'pages/cadre_due.php') !== false && strpos($hd142, '$cdNavPend = cadreDuePendingCount();') !== false
+      && strpos($hd142, "'cadre_due'=>'personnel'") !== false && strpos($hd142, "'cadre_due.php'") !== false
+      && strpos($pg142, "handleCadreDuePost(\$db, BASE_URL . 'pages/cadre_due.php');") !== false
+      && strpos($pg142, "renderCadreDuePending(\$cdPend, \$cdSy, false, BASE_URL . 'pages/cadre_due.php', \$cdRej);") !== false
+      && strpos($pg142, 'cadreDueApprovedList($db, $cdSy)') !== false
+      && strpos($cd142, "pages/cadre_due.php\" class=\"btn btn-sm\"") !== false
+      && strpos((string)file_get_contents($PROJ . '/index.php'), "'pages/cadre_due.php'") !== false
+      && $n142 === $n142b && $ms142 < 1500
+      && strpos($html142, 'FATAL') === false && strpos($html142, 'اقتراحات الدخول بالملاك') !== false
+      && strpos($html142, 'بانتظار قرارك: ' . $n142b . '</span>') !== false
+      && ($n142b === 0 || (substr_count($html142, 'name="emp_ids[]"') === $n142b && strpos($html142, 'name="cd_act"') !== false))
+      && strpos($html142, 'pages/cadre_due.php" class="active"') !== false
+      && strpos($html142i, 'FATAL') === false && ($n142b === 0 || strpos($html142i, 'الصفحة الكاملة / Page complète') !== false),
+      'معلّق=' . $n142 . '/' . $n142b . ' · الشارة ' . round($ms142) . ' ms');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

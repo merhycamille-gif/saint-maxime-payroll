@@ -411,6 +411,47 @@ function handleCadreDuePost(PDO $db, string $redirectTo): void {
     header('Location: ' . $redirectTo); exit;
 }
 
+/**
+ * 🎓 عدد الاقتراحات المعلّقة بانتظار قراره (للشارة بالقائمة الجانبية — 2026-09-19 «بدي اقتراح للدخول في الملاك…»):
+ * الاستعلام نفسه بلا نسب/نقل (خفيف) — مرّة بالعملية.
+ */
+function cadreDuePendingCount(?PDO $db = null, ?string $sy = null): int {
+    static $cache = [];
+    if (!canEdit()) return 0;
+    $db = $db ?: getDB();
+    if ($sy === null) { $sy = activeSchoolYear(); if ($sy === 'all' || strcmp($sy, currentSchoolYear()) < 0) $sy = currentSchoolYear(); }
+    $key = $sy . '|' . implode(',', activeSchoolIds() ?: []);
+    if (isset($cache[$key])) return $cache[$key];
+    if (!preg_match('/^(\d{4})-(\d{4})$/', $sy, $m)) return $cache[$key] = 0;
+    $y1 = (int)$m[1];
+    try {
+        $sql = "SELECT COUNT(*) FROM employees e
+                WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_contractuel'
+                  AND e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.hire_date <= ?
+                  AND " . leftDateSql('e.') . " >= ?
+                  AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND school_id = e.school_id AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0))
+                  AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND school_id = e.school_id AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0))
+                  AND e.id NOT IN (SELECT employee_id FROM compliance_decisions WHERE rule_key = 'cadre_due' AND school_year = ? AND employee_id IS NOT NULL AND decision IN ('approved','rejected'))"
+             . schoolScopeSql('e.school_id');
+        $st = $db->prepare($sql);
+        $st->execute([cadreDueHireCutoff($y1), sprintf('%04d-10-01', $y1), ($y1 - 2) . '-' . ($y1 - 1), ($y1 - 1) . '-' . $y1, $sy]);
+        return $cache[$key] = (int)$st->fetchColumn();
+    } catch (Throwable $e) { return $cache[$key] = 0; }
+}
+
+/** 🎓 مَن رُسِّم بالملاك بموافقته بهذه السنة (من سجلّ القرارات) — ضمن نطاق المدارس المختارة */
+function cadreDueApprovedList(PDO $db, string $sy): array {
+    complianceEnsureTable($db);
+    try {
+        $st = $db->prepare("SELECT d.*, e.hire_date, e.titularization_date, e.current_grade, s.name_ar school_name_ar, s.name_fr school_name_fr
+                            FROM compliance_decisions d LEFT JOIN employees e ON e.id = d.employee_id LEFT JOIN schools s ON s.id = d.school_id
+                            WHERE d.rule_key = 'cadre_due' AND d.school_year = ? AND d.decision = 'approved' AND d.employee_id IS NOT NULL" . schoolScopeSql('d.school_id') . "
+                            ORDER BY s.name_ar, d.decided_at DESC");
+        $st->execute([$sy]);
+        return $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { return []; }
+}
+
 /** نصّ موجز لنسبة المدرسة */
 function cadreDuePctText(?array $pct): string {
     if (!$pct) return 'بلا نسبة (مدرسة بالمبالغ) — بنوده تبقى';
@@ -564,7 +605,7 @@ function renderCadreDuePending(array $cands, string $sy, bool $collapsed = false
     ?>
     <div class="card no-print" id="cadreDue" style="border:2px solid #6d28d9;margin-bottom:16px">
         <div class="card-header" style="background:#f5f3ff"><h3 style="color:#5b21b6"><i class="fas fa-graduation-cap"></i>
-            <span dir="ltr">Titularisation d'office après 2 ans — décision requise</span> / أساتذة متعاقدون أكملوا سنتين — يصيرون بالملاك حكماً بسنة <?= e($sy) ?><?= $total ? ' — <span style="background:#6d28d9;color:#fff;border-radius:999px;padding:1px 10px">' . $total . ' قرار مطلوب</span>' : '' ?></h3></div>
+            <span dir="ltr">Titularisation d'office après 2 ans — décision requise</span> / أساتذة متعاقدون أكملوا سنتين — يصيرون بالملاك حكماً بسنة <?= e($sy) ?><?= $total ? ' — <span style="background:#6d28d9;color:#fff;border-radius:999px;padding:1px 10px">' . $total . ' قرار مطلوب</span>' : '' ?><?= $collapsed ? ' <a href="' . BASE_URL . 'pages/cadre_due.php" class="btn btn-sm" style="background:#6d28d9;color:#fff;margin-inline-start:8px;font-weight:700"><i class="fas fa-up-right-from-square"></i> الصفحة الكاملة / Page complète</a>' : '' ?></h3></div>
         <div class="card-body">
             <p style="color:var(--gray-600);margin-top:0">القانون: المتعاقد الذي أكمل <strong>سنتين دراسيتين كاملتين</strong> بالمدرسة نفسها (دخلها قبل 1 تشرين الثاني <?= (int)substr($sy, 0, 4) - 2 ?>) يصير <strong>بالملاك حكماً</strong> من السنة الثالثة <?= e($sy) ?>.
                 <strong style="color:#166534">وافق</strong> ⇒ يصير ملاكاً من <?= (int)substr($sy, 0, 4) ?>/10/1: راتب <strong>السلسلة حسب درجته</strong> بدل الراتب المتفق عليه، درجاته <strong>بالقانون</strong> (درجة الدخول حسب الشهادة + الفورية + 4+4+2)، محسومات الملاك كرفاقه، و<strong>نسبة الإضافي المعطاة لملاك مدرسته</strong> — وسنواته السابقة كمتعاقد لا تتغيّر أبداً.

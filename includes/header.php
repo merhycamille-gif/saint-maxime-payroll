@@ -94,7 +94,7 @@ $sectionColors = [
 $sectionIcons = ['dashboard'=>'fa-gauge-high','personnel'=>'fa-users','paie'=>'fa-money-check-dollar','rapports'=>'fa-chart-column','systeme'=>'fa-gear'];
 $pageSection = [
     'dashboard'=>'dashboard',
-    'employees'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel',
+    'employees'=>'personnel','cadre_due'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel',
     'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie','hours_reduction'=>'paie',
     'reports'=>'rapports','tax'=>'rapports',
     'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
@@ -211,6 +211,13 @@ document.addEventListener('submit', function (e) {
                 <i class="fas fa-scale-balanced" <?= $cpPend ? 'style="color:#ef4444"' : '' ?>></i>
                 <span>Rapport de conformité / تقرير المخالفات والتصحيحات</span>
                 <?php if ($cpPend): ?><span style="background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite"><?= $cpPend ?></span><?php endif; ?>
+            </a>
+
+            <?php $cdNavPend = cadreDuePendingCount(); // 🎓 (2026-09-19) شارة اقتراحات الدخول بالملاك بعد سنتين — بانتظار موافقته ?>
+            <a href="<?= BASE_URL ?>pages/cadre_due.php" class="<?= $currentPage === 'cadre_due' ? 'active' : '' ?>">
+                <i class="fas fa-graduation-cap" <?= $cdNavPend ? 'style="color:#7c3aed"' : '' ?>></i>
+                <span>Propositions de titularisation / اقتراحات الدخول بالملاك</span>
+                <?php if ($cdNavPend): ?><span style="background:#6d28d9;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite"><?= $cdNavPend ?></span><?php endif; ?>
             </a>
 
             <a href="<?= BASE_URL ?>pages/grades.php" class="<?= $currentPage === 'grades' ? 'active' : '' ?>">
@@ -668,7 +675,7 @@ document.addEventListener('submit', function (e) {
         // (2026-08-29، «ما تخلّي شي ما إلو معنى») صفحات الإعدادات/الإدارة ليست مطبوعات: بلا شريط طباعة/تصدير
         $noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','exchange_rates.php','rates_history.php',
                            'tax_brackets.php','social_security.php','salary_scales.php','schools.php','classes.php','exceptional_laws.php',
-                           'health_check.php','info_collect.php','bonuses.php','bulk_allowances.php','excel_salaries.php','tax_declarations.php','tax_suggestions.php',
+                           'health_check.php','info_collect.php','bonuses.php','bulk_allowances.php','excel_salaries.php','tax_declarations.php','tax_suggestions.php','cadre_due.php',
                            'r567_check.php'];
         if (empty($hideExportToolbar) && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), $noToolbarPages, true)) {
             echo exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);
