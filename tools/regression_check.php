@@ -6764,8 +6764,10 @@ check('🎓 صفحة اقتراحات الدخول بالملاك (كود + رن
       && $n142 === $n142b && $ms142 < 1500
       && strpos($html142, 'FATAL') === false && strpos($html142, 'اقتراحات الدخول بالملاك') !== false
       && strpos($html142, 'بانتظار قرارك: ' . $n142b . '</span>') !== false
-      && ($n142b === 0 || (substr_count($html142, 'name="emp_ids[]"') === $n142b && strpos($html142, 'name="cd_act"') !== false))
+      && ($n142b === 0 || (substr_count($html142, '<input type="checkbox" name="emp_ids[]"') === $n142b /* الاسم يظهر أيضاً بـJS msaCdOne */ && strpos($html142, 'name="cd_act"') !== false))
       && strpos($html142, 'pages/cadre_due.php" class="active"') !== false
+      && substr_count($html142, '<th>أساسه بالملاك حسب القانون (السلسلة)</th>') === substr_count($html142, '<th>راتبه الآن (متعاقد)</th>') // 🧮 عمود القانون (ماريا اسكندر 2026-09-19)
+      && ($n142b === 0 || preg_match('/<strong>1,[0-9]{3},000<\/strong> <small>\(درجة [0-9.]+\)<\/small><br><small>كانون: <strong>1,[0-9]{3},000<\/strong>/u', $html142) === 1)
       && strpos($html142i, 'FATAL') === false && ($n142b === 0 || strpos($html142i, 'الصفحة الكاملة / Page complète') !== false),
       'معلّق=' . $n142 . '/' . $n142b . ' · الشارة ' . round($ms142) . ' ms');
 

@@ -63,8 +63,8 @@ include __DIR__ . '/../includes/header.php';
 <?php if (canEdit()) renderCadreDuePending($cdPend, $cdSy, false, BASE_URL . 'pages/cadre_due.php', $cdRej); ?>
 
 <?php if (canEdit()): ?>
-<div class="card" style="margin-bottom:16px">
-    <div class="card-header"><h3><i class="fas fa-user-check" style="color:#166534"></i> Titularisés sur votre accord / دخلوا الملاك بموافقتك — سنة <?= e($cdSy) ?> (<?= count($cdApp) ?>)</h3></div>
+<details class="card" style="margin-bottom:16px">
+    <summary style="cursor:pointer;padding:12px 16px;font-weight:800;color:#166534"><i class="fas fa-user-check"></i> Titularisés sur votre accord / دخلوا الملاك بموافقتك — سنة <?= e($cdSy) ?> (<?= count($cdApp) ?>) <small style="font-weight:600;opacity:.8">— خلصوا، ما عادوا اقتراحات (اكبس للاطّلاع)</small></summary>
     <div class="card-body">
         <?php if (!$cdApp): ?>
             <p class="text-muted" style="margin:0">لا أحد بعد.</p>
@@ -87,7 +87,7 @@ include __DIR__ . '/../includes/header.php';
         </table></div>
         <?php endif; ?>
     </div>
-</div>
+</details>
 
 <details class="card" style="margin-bottom:16px">
     <summary style="cursor:pointer;padding:12px 16px;font-weight:800;color:#0369a1"><i class="fas fa-calendar-plus"></i> Aperçu année prochaine / معاينة: مَن سيكمل سنتين بالسنة القادمة <?= e($nextSy) ?> (<?= count($cdNext) ?>) <small style="font-weight:600;opacity:.8">— للعلم فقط، الاقتراح بيطلع لمّا تنفتح السنة</small></summary>
@@ -96,7 +96,7 @@ include __DIR__ . '/../includes/header.php';
             <p class="text-muted" style="margin:0">لا أحد حسب الرواتب المخزّنة حتى الآن.</p>
         <?php else: ?>
         <div class="table-wrapper"><table class="table" style="margin:0">
-            <thead><tr><th>الأستاذ</th><th>المدرسة</th><th>بالمدرسة منذ</th><th>الشهادة ← درجة الدخول</th><th>راتبه الآن (متعاقد)</th><th>يستحقّ الملاك من</th></tr></thead>
+            <thead><tr><th>الأستاذ</th><th>المدرسة</th><th>بالمدرسة منذ</th><th>الشهادة ← درجة الدخول</th><th>راتبه الآن (متعاقد)</th><th>أساسه بالملاك حسب القانون (السلسلة)</th><th>يستحقّ الملاك من</th></tr></thead>
             <tbody>
             <?php foreach ($cdNext as $c): ?>
             <tr>
@@ -105,6 +105,7 @@ include __DIR__ . '/../includes/header.php';
                 <td style="white-space:nowrap"><?= e($c['hire_date']) ?> <small class="text-muted">(<?= (int)$c['years'] ?> سنة)</small></td>
                 <td><?= e($c['diploma_label']) ?><?= $c['grade_start'] !== null ? ' — درجة ' . e(rtrim(rtrim(number_format($c['grade_start'], 1), '0'), '.')) : ' <small style="color:#b45309">' . e($c['why']) . '</small>' ?></td>
                 <td><?= e($c['pay']) ?></td>
+                <td style="white-space:nowrap"><?= $c['base_oct'] !== null ? '<strong>' . number_format($c['base_oct']) . '</strong> <small>(درجة ' . pctFmt($c['g_oct']) . ')</small>' : '—' ?></td>
                 <td style="white-space:nowrap"><?= e($c['tit']) ?></td>
             </tr>
             <?php endforeach; ?>

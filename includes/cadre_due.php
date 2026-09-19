@@ -277,6 +277,12 @@ function cadreDueCandidates(PDO $db, string $sy, ?array $schoolIds = null, bool 
             'grade_start' => $dip ? max((float)$e['starting_grade'], (float)$dip['starting_grade']) : null,
             'immediate' => $dip ? (int)$dip['gets_immediate_grade'] : 1,
             'pay' => $pay, 'tit' => $yearStart,
+            // 🧮 أساسه بالملاك حسب القانون (2026-09-19 «ليش حاطط لماريا اسكندر 2,000,000؟» — كان راتبها كمتعاقدة يُقرأ كأساس الملاك):
+            //    تشرين = السلسلة عند درجة الدخول (+ الفورية لغير التعليمية) · كانون = بعد 4 درجات
+            'g_oct' => $dip ? max((float)$e['starting_grade'], (float)$dip['starting_grade']) + ((int)$dip['gets_immediate_grade'] ? 1 : 0) : null,
+            'base_oct' => $dip ? (float)scaleSalaryLBP(max((float)$e['starting_grade'], (float)$dip['starting_grade']) + ((int)$dip['gets_immediate_grade'] ? 1 : 0), $yearStart) : null,
+            'g_jan' => $dip ? max((float)$e['starting_grade'], (float)$dip['starting_grade']) + ((int)$dip['gets_immediate_grade'] ? 1 : 0) + 4 : null,
+            'base_jan' => $dip ? (float)scaleSalaryLBP(max((float)$e['starting_grade'], (float)$dip['starting_grade']) + ((int)$dip['gets_immediate_grade'] ? 1 : 0) + 4, sprintf('%04d-01-01', $y1 + 1)) : null,
             'pct' => schoolCadrePercent($db, (int)$e['school_id'], $sy),
             'transport' => schoolCadreTransportTemplate($db, (int)$e['school_id'], $sy),
             'can' => $can, 'why' => $why, 'decision' => $d, 'has_grades' => (int)$gh->fetchColumn(),
@@ -494,7 +500,10 @@ function cadreDueRowCells(array $c): string {
        . ($c['has_grades'] ? '<br><small style="color:#b45309">⚠️ له سجلّ درجات قديم (' . (int)$c['has_grades'] . ' صفّاً) — يُستبدَل بسجلّ ملاك جديد من ' . e($c['tit']) . ' (اليدوية تبقى، والقديم بنسخة احتياطية)</small>' : '') . '</td>'
        . '<td style="white-space:nowrap">' . e($c['hire_date']) . '<br><small class="text-muted">' . (int)$c['years'] . ' سنة</small></td>'
        . '<td>' . e($c['diploma_label']) . ($c['can'] ? '<br><small>درجة الدخول <strong>' . $gs . '</strong>' . ($c['immediate'] ? ' + درجة فورية بتشرين' : ' (تعليمية: بلا فورية)') . ' + 4 بكانون</small>' : '<br><span class="badge badge-warning">⚠️ ' . e($c['why']) . '</span>') . '</td>'
-       . '<td>' . e($c['pay']) . '</td>'
+       . '<td>' . e($c['pay']) . '<br><small class="text-muted">يُلغى عند الموافقة</small></td>'
+       . '<td style="white-space:nowrap">' . (isset($c['base_oct']) && $c['base_oct'] !== null
+            ? '<strong>' . number_format($c['base_oct']) . '</strong> <small>(درجة ' . pctFmt($c['g_oct']) . ')</small><br><small>كانون: <strong>' . number_format($c['base_jan']) . '</strong> (درجة ' . pctFmt($c['g_jan']) . ')</small>'
+            : '<small style="color:#b45309">بلا شهادة</small>') . '</td>'
        . '<td style="white-space:nowrap">' . e($c['tit']) . '</td>'
        . '<td>' . e(cadreDuePctText($c['pct'])) . '<br><small style="color:#0a6b5e">🚌 ' . e(cadreDueTransportText($c['transport'] ?? null)) . '</small></td>';
     return $h;
@@ -654,16 +663,23 @@ function renderCadreDuePending(array $cands, string $sy, bool $collapsed = false
                         <?php endif; ?>
                     </div>
                     <div class="table-wrapper"><table class="table">
-                        <thead><tr><th style="width:36px">✓</th><th>الأستاذ</th><th>بالمدرسة منذ</th><th>الشهادة ← الدرجات بالقانون</th><th>راتبه الآن (متعاقد)</th><th>بالملاك من</th><th>نسبة الملاك بالمدرسة</th></tr></thead>
+                        <thead><tr><th style="width:36px">✓</th><?php if (canEdit()): ?><th>القرار</th><?php endif; ?><th>الأستاذ</th><th>بالمدرسة منذ</th><th>الشهادة ← الدرجات بالقانون</th><th>راتبه الآن (متعاقد)</th><th>أساسه بالملاك حسب القانون (السلسلة)</th><th>بالملاك من</th><th>نسبة الملاك بالمدرسة</th></tr></thead>
                         <tbody>
                         <?php foreach ($rows as $c): ?>
-                        <tr><td><?php if (canEdit()): ?><input type="checkbox" name="emp_ids[]" value="<?= (int)$c['id'] ?>" <?= $c['can'] ? '' : 'disabled title="' . e($c['why']) . '"' ?> style="width:18px;height:18px"><?php endif; ?></td><?= cadreDueRowCells($c) ?></tr>
+                        <tr><td><?php if (canEdit()): ?><input type="checkbox" name="emp_ids[]" value="<?= (int)$c['id'] ?>" <?= $c['can'] ? '' : 'disabled title="' . e($c['why']) . '"' ?> style="width:18px;height:18px"><?php endif; ?></td>
+                            <?php if (canEdit()): // ✅❌ قرار فردي لكل أستاذ (طلبه 2026-09-19 «خيار وافق أو ما وافق») — بجانب الاسم، يؤشّر صفّه وحده ويرسل النموذج نفسه ?>
+                            <td style="white-space:nowrap"><?php if ($c['can']): ?>
+                                <button type="button" class="btn btn-sm btn-success" style="display:block;width:100%;margin-bottom:4px" title="وافق — يدخل الملاك الآن" onclick="msaCdOne(this,'cd_approve')"><i class="fas fa-check"></i> وافق</button>
+                                <button type="button" class="btn btn-sm btn-light" style="display:block;width:100%" title="ما وافق — يبقى متعاقداً هذه السنة" onclick="msaCdOne(this,'cd_reject')"><i class="fas fa-xmark"></i> ما وافق</button>
+                            <?php else: ?><a class="btn btn-sm btn-light" href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$c['id'] ?>"><i class="fas fa-folder-open"></i> افتح الملف</a><?php endif; ?></td>
+                            <?php endif; ?><?= cadreDueRowCells($c) ?></tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table></div>
                 </form>
             </<?= $collapsed ? 'details' : 'div' ?>>
             <?php endforeach; ?>
+            <script>function msaCdOne(btn, act){ var f=btn.form||btn.closest('form'); var tr=btn.closest('tr'); f.querySelectorAll('input[name="emp_ids[]"]').forEach(function(c){c.checked=false;}); var me=tr.querySelector('input[name="emp_ids[]"]'); if(!me||me.disabled) return; me.checked=true; f.querySelector('input[name=action]').value=act; f.querySelector('input[name=cd_act]').value=act; if (typeof f.requestSubmit==='function') f.requestSubmit(); else f.submit(); }</script>
             <?php if ($rejected): ?>
             <details style="margin-top:8px"><summary style="cursor:pointer;color:#6b7280;font-weight:700"><i class="fas fa-user-clock"></i> تركتهم متعاقدين بسنة <?= e($sy) ?> بقرارك — <?= count($rejected) ?> <small style="font-weight:600">(اكبس لإعادة فتح قرار)</small></summary>
                 <div class="table-wrapper" style="margin-top:6px"><table class="table" style="margin:0"><thead><tr><th>الأستاذ</th><th>المدرسة</th><th>بالمدرسة منذ</th><th>القرار</th><th></th></tr></thead><tbody>
@@ -710,7 +726,7 @@ function renderCadreDueReview(array $cands, string $newYear, array $hidden): voi
                         <label style="cursor:pointer;font-size:13px"><input type="checkbox" checked onchange="this.closest('div[style]').parentNode.querySelectorAll('input[name=&quot;cadre_ok[]&quot;]:not(:disabled)').forEach(function(c){c.checked=this.checked;}.bind(this))"> أشّر/شيل الكل بهذه المدرسة</label>
                     </div>
                     <div class="table-wrapper"><table class="table">
-                        <thead><tr><th style="width:36px">✓</th><th>الأستاذ</th><th>بالمدرسة منذ</th><th>الشهادة ← الدرجات بالقانون</th><th>راتبه الآن (متعاقد)</th><th>بالملاك من</th><th>نسبة الملاك بالمدرسة</th></tr></thead>
+                        <thead><tr><th style="width:36px">✓</th><th>الأستاذ</th><th>بالمدرسة منذ</th><th>الشهادة ← الدرجات بالقانون</th><th>راتبه الآن (متعاقد)</th><th>أساسه بالملاك حسب القانون (السلسلة)</th><th>بالملاك من</th><th>نسبة الملاك بالمدرسة</th></tr></thead>
                         <tbody>
                         <?php foreach ($rows as $c): ?>
                         <tr><td><input type="checkbox" name="cadre_ok[]" value="<?= (int)$c['id'] ?>" <?= $c['can'] ? 'checked' : 'disabled title="' . e($c['why']) . '"' ?> style="width:18px;height:18px"></td><?= cadreDueRowCells($c) ?></tr>
