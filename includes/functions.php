@@ -6095,6 +6095,51 @@ function healPaymentMonths12_20260920() {
         try { setSetting('heal_pm12_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+/**
+ * 💵 (2026-09-20 «في ملف إكسل اسمو متعاقد عبرا 2026-2027 في رواتب متعاقدين بالدولار — حطلي ياهن بملفاتهن بأساس الراتب»):
+ * 16 متعاقداً بعبرا (المدرسة 4) — أساس الراتب بالدولار كما بالإكسل (salary_input_mode=direct_usd + base_salary_usd).
+ * رواتبهم كانت مركّبة: أساس صغير بالليرة + «أجر إضافي» بالدولار يوصل للمجموع ⇒ حتى لا يتضاعف الراتب: سطور الإضافي/المكافأة
+ * لسنة 2026-2027 تُطفأ (النقل يبقى)، والسطور بلا سنة تُحصر بـ2025-2026 (تاريخهم لا يُمسّ). ثم تُعاد حساب 2026-2027 فقط
+ * (واللاحقة إن وُجدت) بالمحرّك. نسخة احتياطية _bk_abra_cw_usd_20260920 (ملفات + سطور + أشهر) — مرّة واحدة، بالأسماء والأرقام.
+ */
+function healAbraContractUsd20260920() {
+    try {
+        if (strpos((string)getSetting('heal_abra_cw_usd_20260920', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $map = [1815 => [400, 'عيد'], 1821 => [400, 'متى'], 1397 => [498, 'غدار'], 1816 => [702, 'حرب'], 1847 => [750, 'بولس'], 1106 => [667, 'دمج'],
+                1817 => [400, 'روفايل'], 1822 => [400, 'غزال'], 175 => [812, 'منصور'], 141 => [857, 'الحمصي'], 1819 => [462, 'بركات'],
+                1820 => [400, 'متى'], 1560 => [698, 'انطون'], 1000016 => [600, 'جبور'], 1000017 => [600, 'عون'], 1000018 => [600, 'ايوب']];
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_abra_cw_usd_20260920_emp LIKE employees");
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_abra_cw_usd_20260920_bon LIKE employee_bonuses");
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_abra_cw_usd_20260920_ms LIKE monthly_salaries");
+        $norm = function ($s) { $s = preg_replace('/[\x{064B}-\x{0652}\x{0640}]/u', '', (string)$s); return str_replace(['أ','إ','آ','ة','ى','ئ'], ['ا','ا','ا','ه','ي','ي'], $s); };
+        $done = []; $skip = [];
+        foreach ($map as $eid => [$usd, $last]) {
+            $e = $db->query("SELECT * FROM employees WHERE id = $eid AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+            if (!$e || (int)$e['school_id'] !== 4 || $e['employee_type'] !== 'enseignant_contractuel'
+                || mb_strpos($norm($e['last_name_ar']), $norm($last)) === false) { $skip[] = "#$eid"; continue; }
+            $db->exec("INSERT IGNORE INTO _bk_abra_cw_usd_20260920_emp SELECT * FROM employees WHERE id = $eid");
+            $db->exec("INSERT IGNORE INTO _bk_abra_cw_usd_20260920_bon SELECT * FROM employee_bonuses WHERE employee_id = $eid");
+            $db->exec("INSERT IGNORE INTO _bk_abra_cw_usd_20260920_ms SELECT * FROM monthly_salaries WHERE employee_id = $eid AND school_year >= '2026-2027'");
+            $db->prepare("UPDATE employees SET salary_input_mode = 'direct_usd', base_salary_usd = ? WHERE id = ?")->execute([$usd, $eid]);
+            // الإضافي/المكافأة: سطور بلا سنة تُحصر بالسنة الماضية، وسطور 2026-2027 تُطفأ — النقل كما هو
+            $db->exec("UPDATE employee_bonuses SET school_year = '2025-2026' WHERE employee_id = $eid AND school_year IS NULL AND bonus_type IN ('prime_fixe','aide_complementaire')");
+            $db->exec("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = $eid AND school_year >= '2026-2027' AND bonus_type IN ('prime_fixe','aide_complementaire') AND is_active = 1");
+            $n = 0;
+            foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = $eid AND school_year >= '2026-2027'")->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                try { $n += (int)recalcEmployeeYear($eid, (string)$sy); } catch (Throwable $ex) {}
+            }
+            if ($n === 0) { try { $n = (int)recalcEmployeeYear($eid, '2026-2027'); } catch (Throwable $ex) {} }
+            $net = $db->query("SELECT ROUND(net_salary_lbp/NULLIF(exchange_rate,0)) FROM monthly_salaries WHERE employee_id = $eid AND school_year = '2026-2027' AND month = 10")->fetchColumn();
+            $done[] = trim($e['first_name_ar'] . ' ' . $e['last_name_ar']) . " #$eid {$usd}$ ⇒ صافي ت1 " . (int)$net . '$ (' . $n . ' شهراً)';
+        }
+        setSetting('heal_abra_cw_usd_20260920', 'done: ' . count($done) . ' [' . implode('؛ ', $done) . ']' . ($skip ? ' skip=' . implode(',', $skip) : '') . ' @' . date('Y-m-d H:i'));
+        logAudit('heal_abra_cw_usd_20260920', 'employees', 0, null, ['done' => $done, 'skip' => $skip]);
+    } catch (Throwable $e) {
+        try { setSetting('heal_abra_cw_usd_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
 function healPercentLawOwn20260903() {
     try {
         if (strpos((string)getSetting('heal_percent_law_own_20260903', ''), 'done') === 0) return;

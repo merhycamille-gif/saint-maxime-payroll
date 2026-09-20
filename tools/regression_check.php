@@ -7215,6 +7215,27 @@ check('📆 السنة الدراسية ت1 ← أيلول للجميع: الا�
       && ($pmBad152 === 0 || $healSt152 === '') && $okPast152,
       "sel=" . (int)$sel152 . " pmBad=$pmBad152 heal=" . mb_substr($healSt152, 0, 40) . " pastDash=$dash152");
 
+/**
+ * 153) 💵 متعاقدو عبرا 2026-2027 بأساس الراتب بالدولار من إكسله (2026-09-20): 16 ملفاً direct_usd بالمبلغ + إضافيهم 2026-2027 مطفأ
+ *      (لا تضاعف) + صافي تشرين الأول 2026 لا يتجاوز الأساس بالدولار + 2025-2026 لم تُمسّ (نسخة احتياطية موجودة).
+ */
+$hd153 = (string)file_get_contents($PROJ . '/includes/header.php');
+$map153 = [1815 => 400, 1821 => 400, 1397 => 498, 1816 => 702, 1847 => 750, 1106 => 667, 1817 => 400, 1822 => 400, 175 => 812, 141 => 857, 1819 => 462, 1820 => 400, 1560 => 698, 1000016 => 600, 1000017 => 600, 1000018 => 600];
+$st153 = (string)getSetting('heal_abra_cw_usd_20260920', '');
+$ok153 = function_exists('healAbraContractUsd20260920') && strpos($hd153, 'healAbraContractUsd20260920();') !== false; $why153 = 'heal=' . mb_substr($st153, 0, 12);
+if (strpos($st153, 'done') === 0) {
+    $bad153 = [];
+    foreach ($map153 as $eid => $usd) {
+        $e = $db->query("SELECT salary_input_mode m, base_salary_usd u, school_id s FROM employees WHERE id = $eid AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+        if (!$e) continue; // غير موجود بهذه القاعدة
+        $act = (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = $eid AND is_active = 1 AND bonus_type IN ('prime_fixe','aide_complementaire') AND (school_year IS NULL OR school_year >= '2026-2027')")->fetchColumn();
+        $oct = $db->query("SELECT base_salary_lbp b, ROUND(net_salary_lbp/NULLIF(exchange_rate,0)) n, exchange_rate r, extra_lbp + prime_fixe_lbp + aide_complementaire_lbp ex FROM monthly_salaries WHERE employee_id = $eid AND school_year = '2026-2027' AND month = 10")->fetch(PDO::FETCH_ASSOC);
+        if ($e['m'] !== 'direct_usd' || (float)$e['u'] !== (float)$usd || $act !== 0 || !$oct || (int)$oct['ex'] !== 0 || (int)$oct['n'] > $usd + 1 || abs((int)$oct['b'] - (int)floor($usd * (float)$oct['r'])) > 1) $bad153[] = "#$eid m={$e['m']} u={$e['u']} act=$act oct=" . json_encode($oct);
+    }
+    $ok153 = $ok153 && !$bad153; $why153 .= $bad153 ? ' bad=' . implode(' · ', $bad153) : ' 16 ok';
+}
+check('💵 متعاقدو عبرا بأساس دولار (كود + بعد الشفاء: 16 ملفاً direct_usd بمبلغ الإكسل، الإضافي 2026-2027 مطفأ، أساس ت1 = $×سعر الشهر، صافي ≤ الأساس بالدولار)', $ok153, $why153);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
