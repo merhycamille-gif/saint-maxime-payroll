@@ -7021,6 +7021,7 @@ check('👨‍👩‍👧 التعويض العائلي المؤرَّخ (كود
       && strpos($em149, 'name="family_allowance_children_from"') !== false && strpos($em149, 'name="family_allowance_children_to"') !== false && strpos($em149, 'name="family_allowance_from"') === false
       && substr_count($em149, 'applyFamilyAllowanceDates($db, $id, $data);') === 2 && strpos($em149, '$dflt = $dflt ?: defaultFamilyAllowanceFrom($id, $db); $from = $dflt;') !== false
       && strpos($pc149, '$famFromKey = familyAllowanceFromKeyMin($empRow);') !== false && strpos($cp149, '$fromKey = familyAllowanceFromKeyMin($r);') !== false
+      && strpos($em149, 'id="famAllowTotal"') !== false && strpos($em149, "\$famTotNow = isset(\$employee['id']) ? familyAllowanceForMonth(\$employee, (int)date('n'), (int)date('Y')) : 0;") !== false /* 🧮 مجموع التعويضات بالملف (2026-09-20) */
       && strpos($hd149, 'ensureFamilyAllowanceDateColumns();') !== false && strpos($hd149, 'healFamilyAllowanceFrom20260920();') !== false
       && strpos($cp149, "'family_allow_stale' => ['Alloc. familiales ≠ dossier'") !== false && strpos($cp149, "case 'tax_stale': case 'family_allow_stale':") !== false
       && strpos($hc149, "ms.family_allowance_lbp > 0 AND e.employee_type = 'enseignant_contractuel'") !== false);

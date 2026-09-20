@@ -1976,6 +1976,23 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                         <small style="display:block;color:var(--gray-500);margin-top:4px">مدّة تعويض الأولاد لحالها · فارغ مع مبلغ = من أوّل شهر غير مدفوع (لا يُعدَّل شهر مدفوع) · «إلى» فارغ = مستمرّ</small>
                     </div>
                 </div>
+                <?php // 🧮 «لازم يكون بملف الموظف بجانب التعويضات العائلية تعطيني المجموع كمان» (2026-09-20): المجموع الشهري = زوجة + أولاد
+                      //    (المصدر الواحد familyAllowanceForMonth لهذا الشهر: الفئة + المدّتان + الزرّان + الزوج العامل) + مجموع مباشر بالـJS وأنت تكتب
+                      $famTotNow = isset($employee['id']) ? familyAllowanceForMonth($employee, (int)date('n'), (int)date('Y')) : 0;
+                      $famTotRaw = (int)($employee['family_allowance_spouse_lbp'] ?? 0) + (int)($employee['family_allowance_children_lbp'] ?? 0); ?>
+                <div id="famAllowTotal" style="margin-top:10px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span><strong>Total allocations familiales / مجموع التعويضات العائلية</strong>
+                        <small style="display:block;color:var(--gray-600)">زوجة + أولاد شهرياً — الساري هذا الشهر بحسب المدّتين والزرّين: <strong id="famTotNow"><?= number_format($famTotNow) ?></strong> ل.ل</small></span>
+                    <span style="font-size:18px;font-weight:700;color:var(--primary);white-space:nowrap"><span id="famTotSum"><?= number_format($famTotRaw) ?></span> ل.ل</span>
+                </div>
+                <script>
+                (function(){
+                    var sp=document.querySelector('input[name=family_allowance_spouse_lbp]'), ch=document.querySelector('input[name=family_allowance_children_lbp]'), out=document.getElementById('famTotSum');
+                    if(!sp||!ch||!out) return;
+                    function upd(){ var v=(parseInt(sp.value,10)||0)+(parseInt(ch.value,10)||0); out.textContent=v.toLocaleString('en-US'); }
+                    sp.addEventListener('input',upd); ch.addEventListener('input',upd);
+                })();
+                </script>
 
                 <?php /* «الحفظ دغري بس قدّام يلي غيّرتو»: زرّ حفظ بنفس التبويب — يحفظ ملف الأستاذ كاملاً */ ?>
                 <div style="margin-top:18px"><button type="submit" class="btn btn-success btn-sm"><i class="fas fa-save"></i> حفظ / Enregistrer</button></div>
