@@ -46,6 +46,13 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
     $salaries = $stmt->fetchAll();
 
     $expectedMonths = schoolYearMonthsFor($emp['payment_months_per_year'], $y1, $y2);
+    // 📆 (2026-09-20) صار الجميع 12 شهراً؛ السنة **الماضية** المدفوعة بـ10 أشهر لا تُعرض بصفوف «—» لآب/أيلول بعد آخر شهر مخزّن
+    //    (ليست خطأ ولا تُستكمل) — الفجوات بين أشهر موجودة تبقى ظاهرة، والسنة الجارية/اللاحقة تعرض أشهرها كلّها (تُستكمل تلقائياً)
+    if (strcmp((string)$schoolYear, (string)currentSchoolYear()) < 0 && $salaries) {
+        $lastK = 0;
+        foreach ($salaries as $s0) if (!(int)($s0['is_indemnity_month'] ?? 0)) $lastK = max($lastK, (int)$s0['year'] * 12 + (int)$s0['month']);
+        if ($lastK > 0) $expectedMonths = array_values(array_filter($expectedMonths, fn($my) => $my[1] * 12 + $my[0] <= $lastK));
+    }
 
     $byMonth = [];
     foreach ($salaries as $s) { $byMonth["{$s['year']}-{$s['month']}"] = $s; }

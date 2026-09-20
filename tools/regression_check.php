@@ -3014,7 +3014,7 @@ foreach ($law51 as $r51x) {
     if (abs((int)$r51x['tax'] - $exp51) > 1) $bad51[] = $r51x['id'] . ':' . number_format((int)$r51x['tax']) . '≠' . number_format($exp51);
 }
 check('تجزئة القانون (تجربة فعلية): ضريبة كل المعدّين غير ذوي الـ12 شهراً المخزّنة بحزيران 2026 = القانون الحيّ بإعدادات ملفهم (expectedMonthlyTax) بالمليم',
-      count($law51) > 0 && !$bad51, count($law51) . ' موظفاً' . ($bad51 ? ' — خلل: ' . implode(' · ', $bad51) : ' كلهم مطابقون'));
+      !$bad51 /* 📆 2026-09-20: صار الجميع 12 شهراً فقد تكون العيّنة فارغة — القانون نفسه يُفحص بتجزئة الـ12 بفحوص الضريبة الأخرى */, count($law51) . ' موظفاً' . ($bad51 ? ' — خلل: ' . implode(' · ', $bad51) : ' كلهم مطابقون'));
 
 /* =====================================================================
  * 52) 📜 نماذج الضمان الرسمية الثلاثة بملف إفادات الأستاذ (2026-08-18):
@@ -6841,7 +6841,7 @@ check('🚪🔴 تاريخ ترك وهمي = لا تاريخ + التقليم ل
       && strpos($hd143, 'healBogusLeftDates20260919();') !== false
       && is_file($PROJ . '/tools/data/rows_1438_20260919.json')
       && $ok143 && $bogus143 === 0
-      && ((string)($r143['last_name_ar'] ?? '') !== 'عون' || ((int)$r143['rows_'] === 43 && (int)$r143['bon'] === 2 && $r143['left_date_all'] === null && $r143['left_date_eoc'] === null)),
+      && ((string)($r143['last_name_ar'] ?? '') !== 'عون' || ((int)$r143['rows_'] === 45 /* 43 + آب/أيلول 2027 بعد قاعدة 12 شهراً للجميع (2026-09-20) */ && (int)$r143['bon'] === 2 && $r143['left_date_all'] === null && $r143['left_date_eoc'] === null)),
       $why143 . ' · bogus=' . $bogus143 . ' · 1438=' . json_encode($r143, JSON_UNESCAPED_UNICODE));
 
 /**
@@ -7185,6 +7185,35 @@ if ($t151) {
     $why151 .= " #$tid $tsy rows=" . (int)$okRows . " (n=$n12) slip=" . (int)$okSlip . " (dash=$dash) again=$again back=$nBack";
 } else { $why151 .= ' · لا عيّنة (skipped)'; }
 check('📅 المنقول الذي صار «12 شهراً»: آب/أيلول يُخلقان نسخةً عن آخر شهر (غير مدفوعين) تلقائياً + البطاقة بلا «—» + idempotent + لا حذف بالكود + شفاء بالهيدر', $ok151, $why151);
+
+/**
+ * 152) 📆 «السنة الدراسية من ت1 لغاية أيلول لازم تطبّق تلقائياً على الجميع أساتذة مع موظفين — إذا بدّي أعطي حدا لتاريخ محدّد بفوت على ملفه
+ *      وبغيّر» (2026-09-20): الافتراضي 12 (فورم + حفظ) + تسميات المدى + شفاء تدريجي (الكل 12 + استكمال السنة الجارية/اللاحقة) +
+ *      بطاقة السنة الماضية بلا «—» بعد آخر شهر مخزّن.
+ */
+$em152 = (string)file_get_contents($PROJ . '/pages/employees.php'); $fn152 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$hd152 = (string)file_get_contents($PROJ . '/includes/header.php'); $ad152 = (string)file_get_contents($PROJ . '/includes/annual_slip_data.php');
+$hNew152 = renderPage('pages/employees.php', ['action' => 'new'], [], [3]);
+$sel152 = preg_match('/<option value="12" selected>12 mois — Oct\. → Sept\./u', $hNew152) === 1;
+$pmBad152 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND COALESCE(payment_months_per_year,10) <> 12")->fetchColumn();
+$healSt152 = (string)getSetting('heal_pm12_20260920', '');
+// بطاقة سنة ماضية بـ10 أشهر مخزّنة: لا صفوف «—» لآب/أيلول
+$past152 = $db->query("SELECT e.id, e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND COALESCE(ms.is_indemnity_month,0) = 0
+    WHERE e.is_deleted = 0 GROUP BY e.id HAVING COUNT(*) = 10 AND MAX(ms.year*12+ms.month) = 2026*12+7 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$okPast152 = true; $dash152 = -1;
+if ($past152 && strcmp('2025-2026', currentSchoolYear()) < 0) {
+    $hp152 = renderPage('pages/annual_slip.php', ['employee_id' => (int)$past152['id'], 'school_year' => '2025-2026'], ['extra', 'aide', 'transport'], [(int)$past152['school_id']], 'lbp', '2025-2026');
+    $dash152 = preg_match_all('/<td colspan="\d+" class="text-muted">—<\/td>/u', $hp152);
+    $okPast152 = $dash152 === 0 && strpos($hp152, 'FATAL') === false && strpos($hp152, 'Juil. 2026') !== false && strpos($hp152, 'Août 2026') === false;
+}
+check('📆 السنة الدراسية ت1 ← أيلول للجميع: الافتراضي 12 بالفورم والحفظ + التسميات بالمدى + الشفاء التدريجي مربوط + لا فاعل على غير 12 بعد الخطوة ١ + بطاقة السنة الماضية بلا «—» بعد آخر شهر',
+      $sel152 && strpos($em152, "'payment_months_per_year' => (int)(\$_POST['payment_months_per_year'] ?? 12)") !== false
+      && strpos($em152, '12 mois — Oct. → Sept. / 12 شهراً (ت1 ← أيلول) — للجميع تلقائياً') !== false
+      && function_exists('healPaymentMonths12_20260920') && strpos($hd152, 'healPaymentMonths12_20260920();') !== false
+      && strpos($fn152, "UPDATE employees SET payment_months_per_year = 12 WHERE is_deleted = 0 AND COALESCE(payment_months_per_year, 10) <> 12") !== false
+      && strpos($ad152, "if (strcmp((string)\$schoolYear, (string)currentSchoolYear()) < 0 && \$salaries) {") !== false
+      && ($pmBad152 === 0 || $healSt152 === '') && $okPast152,
+      "sel=" . (int)$sel152 . " pmBad=$pmBad152 heal=" . mb_substr($healSt152, 0, 40) . " pastDash=$dash152");
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -435,7 +435,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'base_salary_usd' => (float)str_replace(',', '', $_POST['base_salary_usd'] ?? 0),
         'base_salary_lbp_percent' => (float)($_POST['base_salary_lbp_percent'] ?? 0),
         'contract_salary_lbp' => (int)str_replace(',', '', $_POST['contract_salary_lbp'] ?? 0),
-        'payment_months_per_year' => (int)($_POST['payment_months_per_year'] ?? 10),
+        'payment_months_per_year' => (int)($_POST['payment_months_per_year'] ?? 12), // 📆 السنة الدراسية ت1 ← أيلول للجميع تلقائياً (2026-09-20)
         'has_13th_month' => isset($_POST['has_13th_month']) ? 1 : 0,
         'm13_include_extra' => isset($_POST['m13_include_extra']) ? 1 : 0,
         'm13_include_aide' => isset($_POST['m13_include_aide']) ? 1 : 0,
@@ -1048,7 +1048,7 @@ $employee = [
     'days_per_week' => 5, 'hours_per_week' => 18, 'status' => 'actif',
     'nssf_number' => '', 'finance_ministry_number' => '', 'caisse_number' => '',
     'salary_input_mode' => 'percent_of_lbp', 'salary_labor_law' => 0, 'base_salary_usd' => 0, 'base_salary_lbp_percent' => 100, 'contract_salary_lbp' => 0,
-    'payment_months_per_year' => 10, 'has_13th_month' => 0, 'm13_include_extra' => 0, 'm13_include_aide' => 0,
+    'payment_months_per_year' => 12, 'has_13th_month' => 0, 'm13_include_extra' => 0, 'm13_include_aide' => 0, // 📆 12 = ت1 ← أيلول للجميع (2026-09-20)
     'tax_subject' => 1, 'apply_family_deduction' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
     'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0,
@@ -1906,11 +1906,13 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                 <div class="form-row cols-3">
                     <div class="form-group">
                         <label class="form-label">Nombre de mois payés/an / عدد الأشهر المدفوعة سنوياً</label>
+                        <?php // 📆 (2026-09-20) «السنة الدراسية من ت1 لغاية أيلول تطبّق تلقائياً على الجميع أساتذة وموظفين — إذا بدّي أعطي حدا لتاريخ محدّد بفوت على ملفه وبغيّر» ?>
                         <select name="payment_months_per_year" class="form-select">
-                            <option value="10" <?= $employee['payment_months_per_year'] == 10 ? 'selected' : '' ?>>10 mois (Enseignant) / 10 أشهر (أستاذ)</option>
-                            <option value="11" <?= $employee['payment_months_per_year'] == 11 ? 'selected' : '' ?>>11 mois / 11 شهراً</option>
-                            <option value="12" <?= $employee['payment_months_per_year'] == 12 ? 'selected' : '' ?>>12 mois (Employé) / 12 شهراً (موظف)</option>
+                            <option value="12" <?= $employee['payment_months_per_year'] == 12 ? 'selected' : '' ?>>12 mois — Oct. → Sept. / 12 شهراً (ت1 ← أيلول) — للجميع تلقائياً</option>
+                            <option value="11" <?= $employee['payment_months_per_year'] == 11 ? 'selected' : '' ?>>11 mois — Oct. → Août / 11 شهراً (ت1 ← آب)</option>
+                            <option value="10" <?= $employee['payment_months_per_year'] == 10 ? 'selected' : '' ?>>10 mois — Oct. → Juil. / 10 أشهر (ت1 ← تموز)</option>
                         </select>
+                        <small style="display:block;color:var(--gray-500);margin-top:4px">السنة الدراسية ت1 ← أيلول للجميع تلقائياً · غيّرها هنا فقط لمن تريد دفعه حتى شهر محدّد</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">13ème mois / شهر التعويض</label>

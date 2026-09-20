@@ -6056,6 +6056,45 @@ function healCarriedMissingMonths20260920() {
         try { setSetting('heal_carried_missing_months_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+/**
+ * 📆 (2026-09-20 «السنة الدراسية من ت1 لغاية أيلول لازم تطبّق تلقائياً على الجميع أساتذة مع موظفين — إذا بدّي أعطي حدا لتاريخ
+ * محدّد بفوت على ملفه وبغيّر»): الخطوة ١ مرّة واحدة: كل موظف/أستاذ فاعل على 12 شهراً. الخطوة ٢ بدفعات (25 لكل فتحة صفحة):
+ * من له بالسنة الجارية أو اللاحقة أقلّ من 12 شهراً مخزّناً تُستكمَل أشهره بالمسار الآمن recalcEmployeeYear (المُعَدّ بالمحرّك،
+ * المنقول نسخةً عن آخر شهر) — السنين السابقة لا تُمسّ، والمقفولة محمية أصلاً.
+ */
+function healPaymentMonths12_20260920() {
+    try {
+        $st = (string)getSetting('heal_pm12_20260920', '');
+        if (strpos($st, 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        if ($st === '') {
+            $n = (int)$db->exec("UPDATE employees SET payment_months_per_year = 12 WHERE is_deleted = 0 AND COALESCE(payment_months_per_year, 10) <> 12");
+            $st = "working: set12=$n last=0 filled=0";
+            setSetting('heal_pm12_20260920', $st);
+            logAudit('heal_pm12_set', 'employees', 0, null, ['set12' => $n]);
+        }
+        preg_match('/last=(\d+)/', $st, $m1); $last = (int)($m1[1] ?? 0);
+        preg_match('/filled=(\d+)/', $st, $m2); $filled = (int)($m2[1] ?? 0);
+        preg_match('/set12=(\d+)/', $st, $m3); $set12 = (int)($m3[1] ?? 0);
+        $cur = currentSchoolYear();
+        $rows = $db->query("SELECT e.id, e.school_id, ms.school_year sy, COUNT(*) n FROM employees e
+            JOIN monthly_salaries ms ON ms.employee_id = e.id AND COALESCE(ms.is_indemnity_month,0) = 0
+            WHERE e.is_deleted = 0 AND e.id > $last AND ms.school_year >= " . $db->quote($cur) . " AND COALESCE(e.payment_months_per_year,12) = 12
+            GROUP BY e.id, ms.school_year HAVING n < 12 ORDER BY e.id LIMIT 25")->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) { setSetting('heal_pm12_20260920', "done: set12=$set12 filled=$filled @" . date('Y-m-d H:i')); return; }
+        @set_time_limit(300);
+        $lastId = $last;
+        foreach ($rows as $r) {
+            $lastId = max($lastId, (int)$r['id']);
+            if (isSchoolYearLocked((int)$r['school_id'], (string)$r['sy'])) continue;
+            try { if ((int)recalcEmployeeYear((int)$r['id'], (string)$r['sy']) > 0) $filled++; } catch (Throwable $ex) {}
+        }
+        setSetting('heal_pm12_20260920', "working: set12=$set12 last=$lastId filled=$filled");
+    } catch (Throwable $e) {
+        try { setSetting('heal_pm12_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
 function healPercentLawOwn20260903() {
     try {
         if (strpos((string)getSetting('heal_percent_law_own_20260903', ''), 'done') === 0) return;
