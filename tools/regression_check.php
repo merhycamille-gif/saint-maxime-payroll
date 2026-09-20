@@ -7141,7 +7141,7 @@ check('👨‍👩‍👧➕ عمود «الصافي + التعويض العائ
 $pc151 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php'); $hd151 = (string)file_get_contents($PROJ . '/includes/header.php');
 $ok151 = function_exists('fillCarriedMissingMonths') && strpos($pc151, 'fillCarriedMissingMonths((int)$employeeId, (string)$schoolYear);') !== false
        && strpos($pc151, "if (\$k <= \$lastKey || isset(\$have[\$k])) continue;") !== false && (preg_match('/function fillCarriedMissingMonths\(.*?
-\}/s', $pc151, $fb151) === 1 && stripos($fb151[0], 'DELETE') === false) /* لا حذف داخل دالة الاستكمال نفسها */
+\}/s', $pc151, $fb151) === 1 && !preg_match('/DELETE\s+FROM/i', $fb151[0])) /* لا حذف داخل دالة الاستكمال نفسها (is_deleted ليس حذفاً) */
        && strpos($hd151, 'healCarriedMissingMonths20260920();') !== false && function_exists('healCarriedMissingMonths20260920');
 $why151 = 'code=' . (int)$ok151;
 // تجربة فعلية (مع ترجيع كامل): منقول «10 أشهر» بـ10 صفوف بسنة غير مقفولة ⇒ 12 شهراً ⇒ آب/أيلول يُخلقان نسخةً عن تموز، غير مدفوعين، والبطاقة بلا «—»
