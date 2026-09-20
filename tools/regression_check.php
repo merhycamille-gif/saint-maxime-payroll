@@ -7010,32 +7010,40 @@ $em149 = (string)file_get_contents($PROJ . '/pages/employees.php'); $cp149 = (st
 $hd149 = (string)file_get_contents($PROJ . '/includes/header.php'); $hc149 = (string)file_get_contents($PROJ . '/pages/health_check.php');
 ensureFamilyAllowanceDateColumns();
 check('👨‍👩‍👧 التعويض العائلي المؤرَّخ (كود): العمودان يتركّبان ذاتياً + المصدر الواحد بالمحرّك ومسار المنقولين + الفورم يحفظ من/إلى مع بداية افتراضية + الهيدر يركّب ويشفي + قاعدة المخالفات + فحص الصحّة للمتعاقد',
-      (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_from'")->fetch() && (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_to'")->fetch()
-      && function_exists('familyAllowanceForMonth') && function_exists('defaultFamilyAllowanceFrom') && function_exists('familyAllowanceEligible')
+      (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_spouse_from'")->fetch() && (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_spouse_to'")->fetch()
+      && (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_children_from'")->fetch() && (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_children_to'")->fetch() /* 👫 مدّتان مستقلّتان */
+      && function_exists('familyAllowanceForMonth') && function_exists('defaultFamilyAllowanceFrom') && function_exists('familyAllowanceEligible') && function_exists('familyAllowanceFromKeyMin')
       && strpos($pc149, '$familyAllowance = familyAllowanceForMonth($emp, (int)$this->month, (int)$this->year);') !== false
       && strpos($pc149, "elseif (\$doFam && (\$famFromKey === null || \$mKey >= \$famFromKey)) \$newFam = familyAllowanceForMonth(\$empRow, (int)\$r['month'], (int)\$r['year']);") !== false
       && strpos($pc149, 'if (!$doAdd && !$doTr && !$doFam && !$famZeroAll) return 0;') !== false
       && strpos($pc149, '$newDue = max(0, $newNet + $newFam + $newTr);') !== false
-      && strpos($em149, 'name="family_allowance_from"') !== false && strpos($em149, 'name="family_allowance_to"') !== false
-      && substr_count($em149, 'applyFamilyAllowanceDates($db, $id, $data);') === 2 && strpos($em149, 'if ($hasAmt && empty($from)) $from = defaultFamilyAllowanceFrom($id, $db);') !== false
+      && strpos($em149, 'name="family_allowance_spouse_from"') !== false && strpos($em149, 'name="family_allowance_spouse_to"') !== false
+      && strpos($em149, 'name="family_allowance_children_from"') !== false && strpos($em149, 'name="family_allowance_children_to"') !== false && strpos($em149, 'name="family_allowance_from"') === false
+      && substr_count($em149, 'applyFamilyAllowanceDates($db, $id, $data);') === 2 && strpos($em149, '$dflt = $dflt ?: defaultFamilyAllowanceFrom($id, $db); $from = $dflt;') !== false
+      && strpos($pc149, '$famFromKey = familyAllowanceFromKeyMin($empRow);') !== false && strpos($cp149, '$fromKey = familyAllowanceFromKeyMin($r);') !== false
       && strpos($hd149, 'ensureFamilyAllowanceDateColumns();') !== false && strpos($hd149, 'healFamilyAllowanceFrom20260920();') !== false
       && strpos($cp149, "'family_allow_stale' => ['Alloc. familiales ≠ dossier'") !== false && strpos($cp149, "case 'tax_stale': case 'family_allow_stale':") !== false
       && strpos($hc149, "ms.family_allowance_lbp > 0 AND e.employee_type = 'enseignant_contractuel'") !== false);
 // الدالة الواحدة على حالات صريحة
-$e149 = ['employee_type' => 'employe', 'family_allowance_spouse_lbp' => 600000, 'family_allowance_children_lbp' => 900000, 'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'spouse_works' => 0, 'family_allowance_from' => '2026-10-01', 'family_allowance_to' => '2026-12-01'];
-$okF149 = familyAllowanceForMonth($e149, 10, 2026) === 1500000 && familyAllowanceForMonth($e149, 9, 2026) === 0 && familyAllowanceForMonth($e149, 12, 2026) === 1500000 && familyAllowanceForMonth($e149, 1, 2027) === 0
+// 👫 مدّتان مستقلّتان: الزوجة تشرين الأول ← كانون الأول 2026، الأولاد تشرين الأول 2026 ← آذار 2027
+$e149 = ['employee_type' => 'employe', 'family_allowance_spouse_lbp' => 600000, 'family_allowance_children_lbp' => 900000, 'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'spouse_works' => 0,
+         'family_allowance_spouse_from' => '2026-10-01', 'family_allowance_spouse_to' => '2026-12-01', 'family_allowance_children_from' => '2026-10-01', 'family_allowance_children_to' => '2027-03-01'];
+$okF149 = familyAllowanceForMonth($e149, 10, 2026) === 1500000 && familyAllowanceForMonth($e149, 9, 2026) === 0 && familyAllowanceForMonth($e149, 12, 2026) === 1500000
+       && familyAllowanceForMonth($e149, 1, 2027) === 900000 /* الزوجة انتهت، الأولاد مستمرّون */ && familyAllowanceForMonth($e149, 3, 2027) === 900000 && familyAllowanceForMonth($e149, 4, 2027) === 0
+       && familyAllowanceForMonth(['family_allowance_children_from' => '2027-01-01'] + $e149, 11, 2026) === 600000 /* الأولاد لم يبدؤوا بعد، الزوجة نعم */
        && familyAllowanceForMonth(['spouse_works' => 1] + $e149, 11, 2026) === 900000
        && familyAllowanceForMonth(['employee_type' => 'enseignant_contractuel'] + $e149, 11, 2026) === 0
        && familyAllowanceForMonth(['employee_type' => 'enseignant_titulaire'] + $e149, 11, 2026) === 1500000
-       && familyAllowanceForMonth(['family_allowance_from' => null, 'family_allowance_to' => null] + $e149, 1, 2020) === 1500000
-       && familyAllowanceForMonth(['count_children_allowance' => 0] + $e149, 11, 2026) === 600000;
-check('👨‍👩‍👧 familyAllowanceForMonth: داخل المدّة كامل / قبلها وبعدها صفر / الزوج يعمل = الأولاد كاملاً بلا تقسيم / المتعاقد صفر / الملاك يأخذ / بلا تواريخ = من الأزل / زرّ الأولاد مطفأ', $okF149);
+       && familyAllowanceForMonth(['family_allowance_spouse_from' => null, 'family_allowance_spouse_to' => null, 'family_allowance_children_from' => null, 'family_allowance_children_to' => null] + $e149, 1, 2020) === 1500000
+       && familyAllowanceForMonth(['count_children_allowance' => 0] + $e149, 11, 2026) === 600000
+       && familyAllowanceFromKeyMin($e149) === 2026 * 12 + 10 && familyAllowanceFromKeyMin(['family_allowance_spouse_from' => null] + $e149) === null && familyAllowanceFromKeyMin(['family_allowance_spouse_lbp' => 0, 'family_allowance_spouse_from' => null] + $e149) === 2026 * 12 + 10;
+check('👨‍👩‍👧 familyAllowanceForMonth: مدّتان مستقلّتان (الزوجة تنتهي والأولاد يكمّلون / الأولاد يبدؤون لاحقاً) / قبل وبعد صفر / الزوج يعمل = الأولاد كاملاً / المتعاقد صفر / الملاك يأخذ / بلا تواريخ = من الأزل / زرّ الأولاد مطفأ / أبكر بداية', $okF149);
 // تجربة فعلية (مع ترجيع كامل) على منقول بلا إعداد وبلا علاوات/نقل (فقط مسار التعويض يشتغل)
 $t149 = null;
 foreach ($db->query("SELECT e.id, e.school_id, ms.school_year sy, COUNT(*) n FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
     WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND COALESCE(e.base_salary_usd,0) = 0 AND COALESCE(e.contract_salary_lbp,0) = 0 AND COALESCE(e.salary_labor_law,0) = 0
       AND ms.base_plus_echelon_lbp > 0 AND COALESCE(ms.is_indemnity_month,0) = 0
-      AND COALESCE(e.family_allowance_spouse_lbp,0) = 0 AND COALESCE(e.family_allowance_children_lbp,0) = 0 AND e.family_allowance_from IS NULL
+      AND COALESCE(e.family_allowance_spouse_lbp,0) = 0 AND COALESCE(e.family_allowance_children_lbp,0) = 0 AND e.family_allowance_children_from IS NULL AND e.family_allowance_spouse_from IS NULL
       AND COALESCE(e.transport_daily_amount,0) = 0 AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id)
       AND " . leftDateSql('e.') . " = '9999-12-31'
     GROUP BY e.id, ms.school_year HAVING n >= 10 ORDER BY ms.school_year DESC, e.id LIMIT 8")->fetchAll(PDO::FETCH_ASSOC) as $cand149) {
@@ -7043,9 +7051,9 @@ foreach ($db->query("SELECT e.id, e.school_id, ms.school_year sy, COUNT(*) n FRO
 }
 if ($t149) {
     $tid = (int)$t149['id']; $tsy = (string)$t149['sy']; [$ty1, $ty2] = schoolYearToYears($tsy);
-    $snapE = $db->query("SELECT family_allowance_spouse_lbp sp, family_allowance_children_lbp ch, count_spouse_allowance cs, count_children_allowance cc, spouse_works sw, family_allowance_from ff, family_allowance_to ft FROM employees WHERE id = $tid")->fetch(PDO::FETCH_ASSOC);
+    $snapE = $db->query("SELECT family_allowance_spouse_lbp sp, family_allowance_children_lbp ch, count_spouse_allowance cs, count_children_allowance cc, spouse_works sw, family_allowance_children_from ff, family_allowance_children_to ft, family_allowance_spouse_from sf, family_allowance_spouse_to st FROM employees WHERE id = $tid")->fetch(PDO::FETCH_ASSOC);
     $snapR = $db->query("SELECT id, family_allowance_lbp, total_due_lbp, total_due_usd, net_salary_lbp, net_salary_usd, transport_lbp FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy'")->fetchAll(PDO::FETCH_ASSOC);
-    $setF = function ($sw, $from, $to) use ($db, $tid) { $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = 0, family_allowance_children_lbp = 2310000, count_spouse_allowance = 1, count_children_allowance = 1, spouse_works = ?, family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")->execute([$sw, $from, $to, $tid]); };
+    $setF = function ($sw, $from, $to) use ($db, $tid) { $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = 0, family_allowance_children_lbp = 2310000, count_spouse_allowance = 1, count_children_allowance = 1, spouse_works = ?, family_allowance_children_from = ?, family_allowance_children_to = ?, family_allowance_spouse_from = NULL, family_allowance_spouse_to = NULL WHERE id = ?")->execute([$sw, $from, $to, $tid]); };
     $famRows = function () use ($db, $tid, $tsy) { $o = []; foreach ($db->query("SELECT month, year, family_allowance_lbp f, net_salary_lbp n, transport_lbp t, total_due_lbp d FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy' AND COALESCE(is_indemnity_month,0)=0 ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC) as $r) $o[(int)$r['year']*12+(int)$r['month']] = $r; return $o; };
     // أ) مبلغ من تشرين الأول بلا نهاية — قبل إعادة الحساب يظهر ببند المخالفات، وبعدها كل الأشهر 2,310,000 والمستحق يركب
     $setF(0, "$ty1-10-01", null);
@@ -7062,7 +7070,7 @@ if ($t149) {
     $setF(1, "$ty1-10-01", null); recalcEmployeeYear($tid, $tsy); $rc = $famRows();
     $okC = $rc && count(array_filter($rc, fn($r) => (int)$r['f'] === 2310000)) === count($rc);
     // ترجيع كامل (الملف + الصفوف)
-    $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = ?, family_allowance_children_lbp = ?, count_spouse_allowance = ?, count_children_allowance = ?, spouse_works = ?, family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")->execute([$snapE['sp'], $snapE['ch'], $snapE['cs'], $snapE['cc'], $snapE['sw'], $snapE['ff'], $snapE['ft'], $tid]);
+    $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = ?, family_allowance_children_lbp = ?, count_spouse_allowance = ?, count_children_allowance = ?, spouse_works = ?, family_allowance_children_from = ?, family_allowance_children_to = ?, family_allowance_spouse_from = ?, family_allowance_spouse_to = ? WHERE id = ?")->execute([$snapE['sp'], $snapE['ch'], $snapE['cs'], $snapE['cc'], $snapE['sw'], $snapE['ff'], $snapE['ft'], $snapE['sf'], $snapE['st'], $tid]);
     $rs149 = $db->prepare("UPDATE monthly_salaries SET family_allowance_lbp = ?, total_due_lbp = ?, total_due_usd = ?, net_salary_lbp = ?, net_salary_usd = ?, transport_lbp = ? WHERE id = ?");
     foreach ($snapR as $r) $rs149->execute([$r['family_allowance_lbp'], $r['total_due_lbp'], $r['total_due_usd'], $r['net_salary_lbp'], $r['net_salary_usd'], $r['transport_lbp'], $r['id']]);
     $back = $db->query("SELECT SUM(family_allowance_lbp) f, SUM(total_due_lbp) d FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy'")->fetch(PDO::FETCH_ASSOC);

@@ -799,7 +799,7 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
     $empRow = $db->query("SELECT * FROM employees WHERE id = " . (int)$employeeId)->fetch(PDO::FETCH_ASSOC) ?: [];
     $famZeroAll = $empRow && !familyAllowanceEligible($empRow);
     $doFam = $empRow && !$famZeroAll && ((float)($empRow['family_allowance_spouse_lbp'] ?? 0) > 0 || (float)($empRow['family_allowance_children_lbp'] ?? 0) > 0);
-    $famFromKey = familyAllowanceDateKey($empRow['family_allowance_from'] ?? '');
+    $famFromKey = familyAllowanceFromKeyMin($empRow); // 👫 أبكر «من شهر» بين مدّتَي الزوجة والأولاد
     if (!$doAdd && !$doTr && !$doFam && !$famZeroAll) return 0; // لا علاوات مسجّلة → لا تلمس الصفوف المنقولة أبداً
 
     $rows = $db->prepare("SELECT * FROM monthly_salaries

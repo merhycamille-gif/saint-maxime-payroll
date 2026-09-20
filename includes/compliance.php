@@ -403,7 +403,7 @@ function complianceItems(PDO $db, string $sy): array {
             $hasAmt = (float)$r['family_allowance_spouse_lbp'] > 0 || (float)$r['family_allowance_children_lbp'] > 0;
             $eligible = familyAllowanceEligible($r);
             if (!$engine && !$hasAmt && $eligible) continue; // منقول بلا مبلغ بملفه: مخزّنه القديم ليس خطأ
-            $fromKey = familyAllowanceDateKey($r['family_allowance_from'] ?? '');
+            $fromKey = familyAllowanceFromKeyMin($r); // 👫 أبكر «من شهر» بين المدّتين
             $faRows->execute([(int)$r['id'], $sy]);
             $bad = []; $stored = null; $law = null;
             foreach ($faRows->fetchAll(PDO::FETCH_ASSOC) as $mrow) {
@@ -418,7 +418,8 @@ function complianceItems(PDO $db, string $sy): array {
             if (!$bad) continue;
             $why = !$eligible ? 'أستاذ متعاقد (قانون المعلمين) لا يستحقّ تعويضاً عائلياً ومخزّن له ' . complianceFmt($stored)
                  : 'التعويض العائلي بـ' . count($bad) . ' شهراً (' . implode('، ', array_slice($bad, 0, 4)) . (count($bad) > 4 ? '…' : '') . ') مخزّن ' . complianceFmt($stored) . ' وملفه يعطي ' . complianceFmt($law)
-                   . ' (المبلغ' . ($r['family_allowance_from'] ? ' من ' . substr((string)$r['family_allowance_from'], 0, 7) : '') . ($r['family_allowance_to'] ? ' إلى ' . substr((string)$r['family_allowance_to'], 0, 7) : '') . ')';
+                   . ' (الزوجة' . ($r['family_allowance_spouse_from'] ? ' من ' . substr((string)$r['family_allowance_spouse_from'], 0, 7) : '') . ($r['family_allowance_spouse_to'] ? ' إلى ' . substr((string)$r['family_allowance_spouse_to'], 0, 7) : '')
+                   . ' · الأولاد' . ($r['family_allowance_children_from'] ? ' من ' . substr((string)$r['family_allowance_children_from'], 0, 7) : '') . ($r['family_allowance_children_to'] ? ' إلى ' . substr((string)$r['family_allowance_children_to'], 0, 7) : '') . ')';
             $add('family_allow_stale', $r, $why, 'إعادة حساب سنة ' . $sy . ' فيتطابق كل شهر مع ملفه', true,
                  ['months' => count($bad), 'stored' => $stored, 'law' => $law]);
         }

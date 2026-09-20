@@ -23,12 +23,18 @@ ensureFamilyAllowanceDateColumns(); // 👨‍👩‍👧 مدّة التعوي�
  * لا يُعدَّل شهر مدفوع أبداً، والمستخدم يراها بملفه ويغيّرها)، و«إلى» قبل «من» تُلغى. تُستدعى قبل recalcEmployeeYear.
  */
 function applyFamilyAllowanceDates($db, int $id, array $data): void {
-    $from = $data['family_allowance_from'] ?? null;
-    $to   = $data['family_allowance_to'] ?? null;
-    $hasAmt = (int)($data['family_allowance_spouse_lbp'] ?? 0) > 0 || (int)($data['family_allowance_children_lbp'] ?? 0) > 0;
-    if ($hasAmt && empty($from)) $from = defaultFamilyAllowanceFrom($id, $db);
-    if ($from && $to && $to < $from) $to = null;
-    try { $db->prepare("UPDATE employees SET family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")->execute([$from ?: null, $to ?: null, $id]); } catch (Throwable $e) {}
+    // 👫 مدّتان مستقلّتان: الزوجة لحالها والأولاد لحالهم (2026-09-20 مساءً «تاريخ الزوجة لحال وتاريخ الأولاد لحال»)
+    $dflt = null; $set = [];
+    foreach (['spouse', 'children'] as $kind) {
+        $from = $data["family_allowance_{$kind}_from"] ?? null;
+        $to   = $data["family_allowance_{$kind}_to"] ?? null;
+        if ((int)($data["family_allowance_{$kind}_lbp"] ?? 0) > 0 && empty($from)) { $dflt = $dflt ?: defaultFamilyAllowanceFrom($id, $db); $from = $dflt; }
+        if ($from && $to && $to < $from) $to = null;
+        $set[$kind] = [$from ?: null, $to ?: null];
+    }
+    try { $db->prepare("UPDATE employees SET family_allowance_spouse_from = ?, family_allowance_spouse_to = ?, family_allowance_children_from = ?, family_allowance_children_to = ?,
+                        family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")
+             ->execute([$set['spouse'][0], $set['spouse'][1], $set['children'][0], $set['children'][1], $set['children'][0] ?: $set['spouse'][0], $set['children'][1] ?: $set['spouse'][1], $id]); } catch (Throwable $e) {}
 }
 
 /**
@@ -453,8 +459,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'family_allowance_spouse_lbp' => (int)str_replace(',', '', $_POST['family_allowance_spouse_lbp'] ?? 0),
         'family_allowance_children_lbp' => (int)str_replace(',', '', $_POST['family_allowance_children_lbp'] ?? 0),
         // 👨‍👩‍👧 مدّة التعويض العائلي «من شهر ← إلى شهر» (2026-09-20) — input type=month يرسل YYYY-MM ⇒ أوّل الشهر
-        'family_allowance_from' => (preg_match('/^(\d{4})-(\d{2})$/', (string)($_POST['family_allowance_from'] ?? ''), $mFaF) ? $mFaF[1] . '-' . $mFaF[2] . '-01' : null),
-        'family_allowance_to'   => (preg_match('/^(\d{4})-(\d{2})$/', (string)($_POST['family_allowance_to'] ?? ''), $mFaT) ? $mFaT[1] . '-' . $mFaT[2] . '-01' : null),
+        // 👫 مدّتان مستقلّتان: الزوجة / الأولاد (2026-09-20 مساءً)
+        'family_allowance_spouse_from'   => (preg_match('/^(\d{4})-(\d{2})$/', (string)($_POST['family_allowance_spouse_from'] ?? ''), $mF1) ? $mF1[1] . '-' . $mF1[2] . '-01' : null),
+        'family_allowance_spouse_to'     => (preg_match('/^(\d{4})-(\d{2})$/', (string)($_POST['family_allowance_spouse_to'] ?? ''), $mF2) ? $mF2[1] . '-' . $mF2[2] . '-01' : null),
+        'family_allowance_children_from' => (preg_match('/^(\d{4})-(\d{2})$/', (string)($_POST['family_allowance_children_from'] ?? ''), $mF3) ? $mF3[1] . '-' . $mF3[2] . '-01' : null),
+        'family_allowance_children_to'   => (preg_match('/^(\d{4})-(\d{2})$/', (string)($_POST['family_allowance_children_to'] ?? ''), $mF4) ? $mF4[1] . '-' . $mF4[2] . '-01' : null),
         'count_spouse_allowance' => isset($_POST['count_spouse_allowance']) ? 1 : 0,
         'count_children_allowance' => isset($_POST['count_children_allowance']) ? 1 : 0,
         // تعويض النقل اليومي: الشهري = اليومي × أيام الأسبوع × عدد الأسابيع
@@ -1043,7 +1052,7 @@ $employee = [
     'tax_subject' => 1, 'apply_family_deduction' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
     'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0,
-    'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0, 'family_allowance_from' => '', 'family_allowance_to' => '',
+    'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0, 'family_allowance_spouse_from' => '', 'family_allowance_spouse_to' => '', 'family_allowance_children_from' => '', 'family_allowance_children_to' => '',
     'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'grant_spouse_addition' => 0, 'grant_children_addition' => 0,
     'transport_daily_amount' => 0, 'transport_daily_currency' => 'LBP', 'transport_days_per_week' => 0, 'transport_weeks' => 4,
     'notes' => ''
@@ -1940,6 +1949,14 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                                 <small style="display:block;color:var(--gray-500)">مطفأ = لا يُدفع تعويض الزوجة (والزوج/الزوجة العامل لا تعويض له تلقائياً)</small></span>
                             <label class="switch"><input type="checkbox" name="count_spouse_allowance" value="1" <?= !isset($employee['count_spouse_allowance']) || $employee['count_spouse_allowance'] ? 'checked' : '' ?>><span class="slider"></span></label>
                         </label>
+                        <?php /* 👫 مدّة تعويض الزوجة لحالها (2026-09-20 «تاريخ الزوجة لحال وتاريخ الأولاد لحال») */ ?>
+                        <div class="form-row cols-2" style="margin-top:8px">
+                            <div class="form-group mb-0"><label class="form-label">Du mois / من شهر</label>
+                                <input type="month" name="family_allowance_spouse_from" class="form-control" value="<?= e(substr((string)($employee['family_allowance_spouse_from'] ?? ''), 0, 7)) ?>"></div>
+                            <div class="form-group mb-0"><label class="form-label">Au mois / إلى شهر</label>
+                                <input type="month" name="family_allowance_spouse_to" class="form-control" value="<?= e(substr((string)($employee['family_allowance_spouse_to'] ?? ''), 0, 7)) ?>"></div>
+                        </div>
+                        <small style="display:block;color:var(--gray-500);margin-top:4px">مدّة تعويض الزوجة لحالها · فارغ مع مبلغ = من أوّل شهر غير مدفوع · «إلى» فارغ = مستمرّ</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Allocation enfants (L.L) / تعويض الأولاد</label>
@@ -1949,19 +1966,14 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                                 <small style="display:block;color:var(--gray-500)">أدخِل المبلغ الكامل — <strong>لا يُقسَّم</strong> بين الزوجين (الذي يُقسَّم هو تنزيل الأولاد بالضريبة)</small></span>
                             <label class="switch"><input type="checkbox" name="count_children_allowance" value="1" <?= !isset($employee['count_children_allowance']) || $employee['count_children_allowance'] ? 'checked' : '' ?>><span class="slider"></span></label>
                         </label>
-                    </div>
-                </div>
-                <?php /* 👨‍👩‍👧 مدّة التعويض العائلي «من شهر ← إلى شهر» (2026-09-20 «لازم نحطّ تاريخ للتعويض العائلي من ← إلى وبيضلّ ياخد») */ ?>
-                <div class="form-row cols-2">
-                    <div class="form-group">
-                        <label class="form-label">Du mois / من شهر</label>
-                        <input type="month" name="family_allowance_from" class="form-control" value="<?= e(substr((string)($employee['family_allowance_from'] ?? ''), 0, 7)) ?>">
-                        <small style="display:block;color:var(--gray-500);margin-top:4px">فارغ مع مبلغ = يبدأ تلقائياً من أوّل شهر غير مدفوع (لا يُعدَّل شهر مدفوع)</small>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Au mois / إلى شهر</label>
-                        <input type="month" name="family_allowance_to" class="form-control" value="<?= e(substr((string)($employee['family_allowance_to'] ?? ''), 0, 7)) ?>">
-                        <small style="display:block;color:var(--gray-500);margin-top:4px">فارغ = مستمرّ · الشهر المكتوب يدخل بالمدّة</small>
+                        <?php /* 👫 مدّة تعويض الأولاد لحالها (2026-09-20 «لازم نحطّ تاريخ من ← إلى وبيضلّ ياخد» ثم «تاريخ الزوجة لحال وتاريخ الأولاد لحال») */ ?>
+                        <div class="form-row cols-2" style="margin-top:8px">
+                            <div class="form-group mb-0"><label class="form-label">Du mois / من شهر</label>
+                                <input type="month" name="family_allowance_children_from" class="form-control" value="<?= e(substr((string)($employee['family_allowance_children_from'] ?? ''), 0, 7)) ?>"></div>
+                            <div class="form-group mb-0"><label class="form-label">Au mois / إلى شهر</label>
+                                <input type="month" name="family_allowance_children_to" class="form-control" value="<?= e(substr((string)($employee['family_allowance_children_to'] ?? ''), 0, 7)) ?>"></div>
+                        </div>
+                        <small style="display:block;color:var(--gray-500);margin-top:4px">مدّة تعويض الأولاد لحالها · فارغ مع مبلغ = من أوّل شهر غير مدفوع (لا يُعدَّل شهر مدفوع) · «إلى» فارغ = مستمرّ</small>
                     </div>
                 </div>
 
