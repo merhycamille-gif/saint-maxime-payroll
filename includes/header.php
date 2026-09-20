@@ -558,6 +558,14 @@ document.addEventListener('submit', function (e) {
                                     <option value="amount" <?= $dmH==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
                                 </select>
                             </label>
+                            <?php $nfmH = netFamColMode(); // 👨‍👩‍👧➕ عمود «الصافي + التعويض العائلي» بثلاث حالات (2026-09-20) ?>
+                            <label style="display:block;font-size:12px;color:#4c1d95;padding:4px 4px 2px"><i class="fas fa-people-roof"></i> <?= $lang==='ar'?'عمود الصافي + التعويض العائلي':'Colonne net + alloc. fam.' ?>
+                                <select name="netfam_mode" class="form-control form-control-sm" style="margin-top:3px">
+                                    <option value="none"   <?= $nfmH==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
+                                    <option value="blank"  <?= $nfmH==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
+                                    <option value="amount" <?= $nfmH==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
+                                </select>
+                            </label>
                             <div style="font-size:11px;color:#64748b;padding:2px 4px 6px"><?= $lang==='ar'?'الأساس + الدرجة يبقى دائماً':'Base + échelon toujours inclus' ?></div>
                             <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> Appliquer / تطبيق</button>
                         </form>

@@ -312,7 +312,7 @@ function reportDocThumb($path) {
                         <?= extraAideHeads('', $data, $month, $year) ?>
                         <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
                         <th>الضمان (٣٪)</th><th>الصندوق (٦٪)</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى الصندوق</small></th><?= familyDedHeads() ?><th>الضريبة</th>
-                        <th>الصافي<?= rateHead('mkt', $month, $year) ?></th><th>التعويضات العائلية</th><?= transportHead() ?><?= dueHead() ?>
+                        <th>الصافي<?= rateHead('mkt', $month, $year) ?></th><th>التعويضات العائلية</th><?= netFamHead('', 'الصافي + التعويض العائلي' . rateHead('mkt', $month, $year)) ?><?= transportHead() ?><?= dueHead() ?>
                     </tr></thead>
                     <tbody>
                         <?php
@@ -338,7 +338,7 @@ function reportDocThumb($path) {
                                 <td style="background:#eef2ff"><strong><?= $dualTot($t['composed'], $t['composed_usd']) ?></strong></td>
                                 <td><?= $dualTot($t['cnss'], $t['cnss_usd']) ?></td><td><?= $dualTot($t['caisse'], $t['caisse_usd']) ?></td><td><?= $dualTot($t['eocg'] ?? 0, $t['eocg_usd'] ?? 0) ?></td>
                                 <td><?= $dualTot($t['fded'], $t['fded_usd']) ?></td><td><?= $dualTot($t['txb'], $t['txb_usd']) ?></td><td><?= $dualTot($t['tax'], $t['tax_usd']) ?></td>
-                                <td><?= $dualTot($t['net'], $t['net_usd']) ?></td><td><?= $dualTot($t['family'], $t['family_usd']) ?></td><?= transportTd($dualTot($t['trans'], $t['trans_usd']), '') ?>
+                                <td><?= $dualTot($t['net'], $t['net_usd']) ?></td><td><?= $dualTot($t['family'], $t['family_usd']) ?></td><?= netFamTd($dualTot($t['net'] + $t['family'], $t['net_usd'] + $t['family_usd']), '') ?><?= transportTd($dualTot($t['trans'], $t['trans_usd']), '') ?>
                                 <?= dueTd('<strong>' . $dualTot($t['total'], $t['total_usd']) . '</strong>', '') ?>
                             </tr>
                         <?php return ob_get_clean(); };
@@ -363,7 +363,7 @@ function reportDocThumb($path) {
                                   'total_usd'=>lbpToUsd(dueShownLbp($r),$rRate)];
                             foreach ($v as $k=>$val) { $catTot[$k]+=$val; $totals[$k]+=$val; }
                             $catN++;
-                            echo categoryHeaderRow($curCat, $cat, ($multi?18:17) + compColsCount());
+                            echo categoryHeaderRow($curCat, $cat, ($multi?18:17) + compColsCount() + netFamColsCount());
                         ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
@@ -385,12 +385,13 @@ function reportDocThumb($path) {
                                 <td><?= money($r['income_tax_lbp'], $rRate) ?></td>
                                 <td><?= money($r['net_salary_lbp'], $rRate) ?></td>
                                 <td><?= money($r['family_allowance_lbp'], $rRate) ?></td>
+                                <?= netFamTd(money(netFamLbp($r), $rRate), '') ?>
                                 <?= transportTd(money($rTrans, $rRate), '') ?>
                                 <?= dueTd('<strong>' . money(dueShownLbp($r), $rRate) . '</strong>', '') ?>
                             </tr>
                         <?php endforeach; ?>
                         <?php if ($data) echo $sumRow('مجموع '.empCategoryTitle($curCat).' — العدد: '.$catN, $catTot, false); ?>
-                        <?php if (!$data): ?><tr><td colspan="<?= ($multi?17:16) + compColsCount() + dueColsCount() ?>" class="text-center text-muted">لا توجد بيانات — احسب رواتب هذا الشهر أولاً</td></tr><?php endif; ?>
+                        <?php if (!$data): ?><tr><td colspan="<?= ($multi?17:16) + compColsCount() + dueColsCount() + netFamColsCount() ?>" class="text-center text-muted">لا توجد بيانات — احسب رواتب هذا الشهر أولاً</td></tr><?php endif; ?>
                         <?php if ($data) echo $sumRow('الإجمالي العام — مجموع كل الفئات (العدد: '.$rn.')', $totals, true); ?>
                     </tbody>
                 </table></div>

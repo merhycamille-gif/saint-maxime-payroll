@@ -146,6 +146,20 @@ function dueTotalCell($lbp, $usd, bool $num = true, bool $bold = false): string 
     $h = dualFromUsd($lbp, $usd, false);
     return dueTd($bold ? '<strong>' . $h . '</strong>' : $h, $num ? ' class="num"' : '');
 }
+/** 👨‍👩‍👧➕ رأس عمود «الصافي + التعويض العائلي» (بجانب عمود التعويض العائلي) — ثلاث حالات متل النقل والمستحق (2026-09-20). */
+function netFamHead(string $attrs = '', string $label = 'الصافي + التعويض العائلي'): string {
+    return netFamColShown() ? '<th' . $attrs . '>' . $label . '</th>' : '';
+}
+/** خلية «الصافي + العائلي» لصف الجسم — فارغة بوضع «بلا مبلغ»، محذوفة بوضع «غير موجود». */
+function netFamCell(array $r, bool $num = true, bool $bold = false): string {
+    $h = money(netFamLbp($r), rowRate($r), ['withCur' => false]);
+    return netFamTd($bold ? '<strong>' . $h . '</strong>' : $h, $num ? ' class="num"' : '');
+}
+/** خلية مجموع «الصافي + العائلي» (لصفوف المجاميع) — نفس الحالات الثلاث. */
+function netFamTotalCell($lbp, $usd, bool $num = true, bool $bold = false): string {
+    $h = dualFromUsd($lbp, $usd, false);
+    return netFamTd($bold ? '<strong>' . $h . '</strong>' : $h, $num ? ' class="num"' : '');
+}
 /**
  * 👨‍👩‍👧 عمود «التنزيل العائلي» بكل كشف شهري فيه ضريبة دخل — المصدر الواحد
  * (قاعدة المستخدم 2026-08-06، ثم «p1 بهيدا التقرير مافي عامود للتنزيل العائلي» 2026-09-15):

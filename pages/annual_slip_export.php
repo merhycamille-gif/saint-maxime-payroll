@@ -28,22 +28,24 @@ $head = [
     'Supplément / الأجر الإضافي', 'Prime & aide / مكافأة ومساعدة',
     'Brut / الإجمالي', 'Caisse / الصندوق', 'Échelon-½ / درجة-نصف راتب', 'CNSS / الضمان', 'Impôt / الضريبة',
     'Total ret. / مجموع الحسومات', 'Net / الصافي',
-    'Alloc. fam. / عائلي', 'Transport / النقل', 'Total dû / المستحق', 'Signature / التوقيع',
+    'Alloc. fam. / عائلي', 'Net + alloc. / الصافي + عائلي', 'Transport / النقل', 'Total dû / المستحق', 'Signature / التوقيع',
 ];
 // عرض الأعمدة: الشهر أوسع شوي، التوقيع للإمضاء، أعمدة المبالغ واسعة (fitToWidth يصغّر تلقائياً على A4)
-$widths = [12, 14, 12, 15, 14, 13, 15, 12, 12, 13, 12, 14, 15, 12, 14, 15, 12];
+// 👨‍👩‍👧➕ (2026-09-20) العمود 14 = الصافي + العائلي (اختياري متل النقل والمستحق) — صار التخطيط 18 عموداً
+$widths = [12, 14, 12, 15, 14, 13, 15, 12, 12, 13, 12, 14, 15, 12, 15, 14, 15, 12];
 
 // أعمدة الأستاذ التي تُحذف للموظف الإداري (قيمة الدرجة، الراتب بعد التدرّج، الصندوق، درجة/نصف راتب) — مؤشّرات 0-based.
 const ANNUAL_TEACHER_COLS = [2, 3, 7, 8];
-// أعمدة المكوّنات في التخطيط الأصلي (17 عموداً): الأجر الإضافي=4، مكافأة ومساعدة=5، النقل=14 —
+// أعمدة المكوّنات في التخطيط الأصلي (18 عموداً): الأجر الإضافي=4، مكافأة ومساعدة=5، الصافي+العائلي=14، النقل=15، المستحق=16 —
 // تُحذف حسب زرّ «الراتب المركّب يشمل» (متل الشاشة — النقل خيار بإيد المستخدم).
 // لما يكون النقل مخفياً يُصدَّر «المستحق» بلا النقل لتبقى الأرقام راكبة (متل الشاشة).
 function annualCompDropIdx(): array {
     $d = [];
     if (!salaryCompHas('extra'))     $d[] = 4;
     if (!salaryCompHas('aide'))      $d[] = 5;
-    if (!transportColShown())        $d[] = 14; // 🚌 «موجود بلا مبلغ» يُبقي العمود فارغاً
-    if (!dueColShown())              $d[] = 15; // 💰 عمود المستحق: «غير موجود» يُحذف، «بلا مبلغ» يبقى فارغاً
+    if (!netFamColShown())           $d[] = 14; // 👨‍👩‍👧➕ عمود الصافي + العائلي: «غير موجود» يُحذف، «بلا مبلغ» يبقى فارغاً (2026-09-20)
+    if (!transportColShown())        $d[] = 15; // 🚌 «موجود بلا مبلغ» يُبقي العمود فارغاً
+    if (!dueColShown())              $d[] = 16; // 💰 عمود المستحق: «غير موجود» يُحذف، «بلا مبلغ» يبقى فارغاً
     return $d;
 }
 function annualDropCols(array $row, bool $dropTeacher): array {
@@ -74,7 +76,7 @@ function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $
 
     foreach ($slip['rows'] as $r) {
         if (empty($r['s'])) { // شهر بلا احتساب
-            $emit([$r['label'], '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+            $emit([$r['label'], '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
             continue;
         }
         // 🔴 «الأرقام تركب» (مطابق للشاشة تماماً): الإضافي/المكافأة داخلان في الإجمالي
@@ -87,6 +89,7 @@ function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $
             $r['brut'] - $hR, ($r['caisse'] > 0 ? $r['caisse'] : ''), ($r['eoc_grade'] > 0 ? $r['eoc_grade'] : ''),
             ($r['cnss'] > 0 ? $r['cnss'] : ''), ($r['income_tax'] > 0 ? $r['income_tax'] : ''),
             $r['total_retenues'], $r['net'] - $hR, ($r['family'] > 0 ? $r['family'] : ''),
+            netFamColMode() === 'amount' ? $r['net'] - $hR + $r['family'] : '',
             ($r['transport'] > 0 && salaryCompHas('transport') ? $r['transport'] : ''),
             dueColMode() === 'amount' ? $r['total_due'] - $hR - (salaryCompHas('transport') ? 0 : $r['transport']) : '', '',
         ]);
@@ -97,7 +100,7 @@ function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $
     $emit([
         'المجموع', $t['base_shown'], $t['grade_inc'], $t['base_plus_echelon'], $t['extra_wage'], $t['aide'],
         $t['brut'] - $hT, $t['caisse'], $t['eoc_grade'], $t['cnss'], $t['income_tax'], $t['total_retenues'], $t['net'] - $hT,
-        $t['family'], (salaryCompHas('transport') ? $t['transport'] : ''),
+        $t['family'], netFamColMode() === 'amount' ? $t['net'] - $hT + $t['family'] : '', (salaryCompHas('transport') ? $t['transport'] : ''),
         dueColMode() === 'amount' ? $t['total_due'] - $hT - (salaryCompHas('transport') ? 0 : $t['transport']) : '', '',
     ], true);
 }

@@ -4588,6 +4588,24 @@ function dueTd(string $html, string $attrs = ' class="num"'): string {
     return '<td' . $attrs . ($m === 'blank' ? ' style="min-width:110px"' : '') . '>' . ($m === 'blank' ? '&nbsp;' : $html) . '</td>';
 }
 
+/** 👨‍👩‍👧➕ عمود «الصافي + التعويض العائلي» بجانب عمود التعويض العائلي — خيار ثلاثي متل النقل والمستحق (طلبه 2026-09-20 «فينا نزيد
+ *  عامود بجانب التعويض العائلي عنوانو الصافي + تعويض العائلي وكمان يكون عندي خيار أقدر أتحكّم فيه متل عامود النقل وعامود المستحق»):
+ *  'amount' = موجود بالمبلغ (الافتراضي) · 'blank' = موجود بلا مبلغ · 'none' = غير موجود. عرض فقط = الصافي + العائلي المخزّنان — لا حساب يتغيّر. */
+function netFamColMode(): string {
+    $m = (string)($_SESSION['netfam_col_mode'] ?? 'amount');
+    return in_array($m, ['amount', 'blank', 'none'], true) ? $m : 'amount';
+}
+function netFamColShown(): bool { return netFamColMode() !== 'none'; }
+function netFamColsCount(): int { return netFamColShown() ? 1 : 0; }
+/** الصافي + التعويض العائلي لصفّ راتب مخزّن (المصدر الواحد) */
+function netFamLbp(array $r): int { return (int)($r['net_salary_lbp'] ?? 0) + (int)($r['family_allowance_lbp'] ?? 0); }
+/** خلية عمود «الصافي + العائلي» لصف جسم/مجموع: '' إن كان غير موجود، فارغة (بعرض للكتابة) بوضع «بلا مبلغ»، وإلا $html. */
+function netFamTd(string $html, string $attrs = ' class="num"'): string {
+    $m = netFamColMode();
+    if ($m === 'none') return '';
+    return '<td' . $attrs . ($m === 'blank' ? ' style="min-width:110px"' : '') . '>' . ($m === 'blank' ? '&nbsp;' : $html) . '</td>';
+}
+
 /** عدد أعمدة المكوّنات الظاهرة (إضافي/مكافأة/نقل) — لضبط colspan الجداول ديناميكياً حسب «الراتب يشمل».
  *  عمود النقل يُعدّ إن كان ظاهراً بأي حالة (بالمبلغ أو فارغاً). */
 function compColsCount(bool $withTransport = true): int {
@@ -4668,6 +4686,14 @@ function salaryCompToolbar(): string {
                 <option value="none"   <?= $dm==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
                 <option value="blank"  <?= $dm==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
                 <option value="amount" <?= $dm==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
+            </select>
+        </label>
+        <?php $nfm = netFamColMode(); // 👨‍👩‍👧➕ عمود «الصافي + التعويض العائلي» بثلاث حالات (2026-09-20) ?>
+        <label class="scb-opt scb-sel"><i class="fas fa-people-roof"></i> <?= $lang==='ar'?'عمود الصافي + التعويض العائلي:':'Colonne net + alloc. fam. :' ?>
+            <select name="netfam_mode" onchange="this.form.submit()">
+                <option value="none"   <?= $nfm==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
+                <option value="blank"  <?= $nfm==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
+                <option value="amount" <?= $nfm==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
             </select>
         </label>
         <span class="scb-hint"><?= $lang==='ar'?'(الأساس + الدرجة دائماً — النقل لا يدخل بالمركّب)':'(Base + échelon toujours — transport hors salaire composé)' ?></span>
