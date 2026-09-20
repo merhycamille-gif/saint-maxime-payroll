@@ -16,6 +16,20 @@ if (($_GET['action'] ?? '') === 'translit') {
 }
 requireCsrf();
 ensureGenderColumn20260822(); // 🧑 خانة الجنس بملف الموظف — تركيب ذاتي + تعبئة تلقائية من الاسم (2026-08-22)
+ensureFamilyAllowanceDateColumns(); // 👨‍👩‍👧 مدّة التعويض العائلي «من شهر ← إلى شهر» — تركيب ذاتي (2026-09-20)
+
+/**
+ * 👨‍👩‍👧 (2026-09-20) مدّة التعويض العائلي بعد الحفظ: مبلغ بلا «من شهر» يأخذ البداية الافتراضية (أوّل شهر غير مدفوع —
+ * لا يُعدَّل شهر مدفوع أبداً، والمستخدم يراها بملفه ويغيّرها)، و«إلى» قبل «من» تُلغى. تُستدعى قبل recalcEmployeeYear.
+ */
+function applyFamilyAllowanceDates($db, int $id, array $data): void {
+    $from = $data['family_allowance_from'] ?? null;
+    $to   = $data['family_allowance_to'] ?? null;
+    $hasAmt = (int)($data['family_allowance_spouse_lbp'] ?? 0) > 0 || (int)($data['family_allowance_children_lbp'] ?? 0) > 0;
+    if ($hasAmt && empty($from)) $from = defaultFamilyAllowanceFrom($id, $db);
+    if ($from && $to && $to < $from) $to = null;
+    try { $db->prepare("UPDATE employees SET family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")->execute([$from ?: null, $to ?: null, $id]); } catch (Throwable $e) {}
+}
 
 /**
  * رفع ملفات الأستاذ: صورة، إخراج قيد/تذكرة، إخراج قيد عائلي.
@@ -438,6 +452,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'eoc_includes_prime_aide' => isset($_POST['eoc_includes_prime_aide']) ? 1 : 0,
         'family_allowance_spouse_lbp' => (int)str_replace(',', '', $_POST['family_allowance_spouse_lbp'] ?? 0),
         'family_allowance_children_lbp' => (int)str_replace(',', '', $_POST['family_allowance_children_lbp'] ?? 0),
+        // 👨‍👩‍👧 مدّة التعويض العائلي «من شهر ← إلى شهر» (2026-09-20) — input type=month يرسل YYYY-MM ⇒ أوّل الشهر
+        'family_allowance_from' => (preg_match('/^(\d{4})-(\d{2})$/', (string)($_POST['family_allowance_from'] ?? ''), $mFaF) ? $mFaF[1] . '-' . $mFaF[2] . '-01' : null),
+        'family_allowance_to'   => (preg_match('/^(\d{4})-(\d{2})$/', (string)($_POST['family_allowance_to'] ?? ''), $mFaT) ? $mFaT[1] . '-' . $mFaT[2] . '-01' : null),
         'count_spouse_allowance' => isset($_POST['count_spouse_allowance']) ? 1 : 0,
         'count_children_allowance' => isset($_POST['count_children_allowance']) ? 1 : 0,
         // تعويض النقل اليومي: الشهري = اليومي × أيام الأسبوع × عدد الأسابيع
@@ -516,6 +533,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             logAudit('create', 'employees', $id, null, $data);
             $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Employé créé avec succès / تم إنشاء الموظف بنجاح'];
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
+            applyFamilyAllowanceDates($db, $id, $data); // 👨‍👩‍👧 مدّة التعويض العائلي (بداية افتراضية إن غابت)
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
             // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
             // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
@@ -590,6 +608,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Modifications enregistrées / تم حفظ التعديلات'];
             }
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
+            applyFamilyAllowanceDates($db, $id, $data); // 👨‍👩‍👧 مدّة التعويض العائلي (بداية افتراضية إن غابت)
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
             // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
             // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
@@ -1024,7 +1043,7 @@ $employee = [
     'tax_subject' => 1, 'apply_family_deduction' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
     'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0,
-    'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0,
+    'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0, 'family_allowance_from' => '', 'family_allowance_to' => '',
     'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'grant_spouse_addition' => 0, 'grant_children_addition' => 0,
     'transport_daily_amount' => 0, 'transport_daily_currency' => 'LBP', 'transport_days_per_week' => 0, 'transport_weeks' => 4,
     'notes' => ''
@@ -1903,7 +1922,15 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     <div style="font-size:0.85em;font-weight:600;opacity:0.9">التعويضات العائلية (معفاة من كل المحسومات)</div>
                 </h4>
                 <p style="color:var(--gray-500);font-size:13px;">معفاة من كل المحسومات والضرائب</p>
-                
+                <?php /* 👨‍👩‍👧 (2026-09-20) القانون بلسان المستخدم: التعويض العائلي ≠ التنزيل العائلي بالضريبة؛ لا يُقسَّم بين الزوجين؛
+                         الملاك من المدرسة (إن أُعطي) · المتعاقد لا يستحقّ (قانون المعلمين) · موظف قانون العمل من الضمان */ ?>
+                <div style="padding:8px 10px;background:#f8fafc;border:1px solid var(--gray-200);border-radius:6px;font-size:12.5px;color:var(--gray-600);margin-bottom:10px;line-height:1.7">
+                    <div dir="ltr" style="text-align:left"><strong>Allocations familiales ≠ abattement familial (impôt)</strong> — jamais partagées entre les époux.</div>
+                    <div dir="rtl" style="text-align:right"><strong>التعويض العائلي غير التنزيل العائلي بالضريبة</strong> — لا يُقسَّم بين الزوجين أبداً. المصدر حسب الفئة:
+                    <strong>ملاك</strong> من المدرسة · <strong>متعاقد</strong> لا يستحقّ (قانون المعلمين — لا يُحسب له) · <strong>موظف</strong> خاضع لقانون العمل من الضمان.
+                    يُحسب لكل شهر ضمن المدّة «من شهر ← إلى شهر» تلقائياً؛ لإيقافه حطّ «إلى شهر» (لا تصفّر المبلغ).</div>
+                </div>
+
                 <div class="form-row cols-2">
                     <div class="form-group">
                         <label class="form-label">Allocation épouse (L.L) / تعويض الزوجة</label>
@@ -1919,9 +1946,22 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                         <input type="number" name="family_allowance_children_lbp" class="form-control" value="<?= (int)$employee['family_allowance_children_lbp'] ?>" min="0">
                         <label class="d-flex justify-between align-center" style="margin-top:6px">
                             <span><strong>احتساب تعويض الأولاد</strong> / Compter
-                                <small style="display:block;color:var(--gray-500)">أدخِل المبلغ الكامل — إذا «الزوج/الزوجة يعمل» ✓ يُحسب <strong>النصف تلقائياً</strong> (يتقاسمانه)</small></span>
+                                <small style="display:block;color:var(--gray-500)">أدخِل المبلغ الكامل — <strong>لا يُقسَّم</strong> بين الزوجين (الذي يُقسَّم هو تنزيل الأولاد بالضريبة)</small></span>
                             <label class="switch"><input type="checkbox" name="count_children_allowance" value="1" <?= !isset($employee['count_children_allowance']) || $employee['count_children_allowance'] ? 'checked' : '' ?>><span class="slider"></span></label>
                         </label>
+                    </div>
+                </div>
+                <?php /* 👨‍👩‍👧 مدّة التعويض العائلي «من شهر ← إلى شهر» (2026-09-20 «لازم نحطّ تاريخ للتعويض العائلي من ← إلى وبيضلّ ياخد») */ ?>
+                <div class="form-row cols-2">
+                    <div class="form-group">
+                        <label class="form-label">Du mois / من شهر</label>
+                        <input type="month" name="family_allowance_from" class="form-control" value="<?= e(substr((string)($employee['family_allowance_from'] ?? ''), 0, 7)) ?>">
+                        <small style="display:block;color:var(--gray-500);margin-top:4px">فارغ مع مبلغ = يبدأ تلقائياً من أوّل شهر غير مدفوع (لا يُعدَّل شهر مدفوع)</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Au mois / إلى شهر</label>
+                        <input type="month" name="family_allowance_to" class="form-control" value="<?= e(substr((string)($employee['family_allowance_to'] ?? ''), 0, 7)) ?>">
+                        <small style="display:block;color:var(--gray-500);margin-top:4px">فارغ = مستمرّ · الشهر المكتوب يدخل بالمدّة</small>
                     </div>
                 </div>
 

@@ -293,8 +293,8 @@ $cpItems = complianceItems($db, currentSchoolYear());
 $cpRules = complianceRules();
 $cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
 $cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
-check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 25 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
-      count($cpRules) === 25
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 26 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة/تعويض عائلي ≠ ملفه…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 26 /* 👨‍👩‍👧 2026-09-20 + family_allow_stale */
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
@@ -2088,7 +2088,7 @@ check('تركيب العلاوات: شفاء ذاتي بالبطاقة السن�
       strpos($asdSrc33, 'overlayStoredYearBonuses((int)$emp[\'id\'], $schoolYear)') !== false
       && strpos($asdSrc33, '!isViewer()') !== false);
 check('تركيب العلاوات: حارس العائلات — لا تصفير نقل منقول لا سجلّ له (الفرق من transport_lbp وحده)',
-      strpos($pcSrc33, "if (!\$doAdd && !\$doTr) return 0;") !== false
+      strpos($pcSrc33, "if (!\$doAdd && !\$doTr && !\$doFam && !\$famZeroAll) return 0;") !== false /* 👨‍👩‍👧 2026-09-20 عائلة التعويض العائلي */
       && strpos($pcSrc33, 'الفرق من transport_lbp وحده') !== false);
 check('تركيب العلاوات: فحص انعكاس العلاوات مُضاف بصفحة «فحص صحّة البرنامج»',
       strpos((string)file_get_contents($PROJ . '/pages/health_check.php'), 'منعكسة على أشهرهم') !== false);
@@ -2714,7 +2714,8 @@ check('عمود التنزيل العائلي (تجربة فعلية): بصف م
 /* =====================================================================
  * 43) خيارا التعويض العائلي بملف الموظف (طلب 2026-08-06): زرّ «احتساب تعويض
  *     الزوج/الزوجة» + زرّ «احتساب تعويض الأولاد» + قاعدة: الزوج/الزوجة يعمل ⇒
- *     لا تعويض زوجة + تعويض الأولاد مناصفةً (النصف تلقائياً).
+ *     لا تعويض زوجة. 👨‍👩‍👧 (2026-09-20 القانون بلسانه) تعويض الأولاد **كاملاً — لا يُقسَّم**
+ *     (الذي يُقسَّم هو تنزيل الأولاد بالضريبة) — يبطل تنصيف 2026-08-06؛ المصدر الواحد familyAllowanceForMonth.
  * =================================================================== */
 $fn43 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $pc43 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
@@ -2722,15 +2723,17 @@ $emp43 = (string)file_get_contents($PROJ . '/pages/employees.php');
 check('تعويض عائلي اختياري: العمودان يتركّبان ذاتياً (count_spouse/children_allowance)',
       strpos($fn43, "ADD COLUMN count_spouse_allowance TINYINT(1) NOT NULL DEFAULT 1") !== false
       && strpos($fn43, "ADD COLUMN count_children_allowance TINYINT(1) NOT NULL DEFAULT 1") !== false);
-check('تعويض عائلي اختياري: المحرّك يحترم الزرّين + الزوج العامل = لا تعويض زوجة ونصف تعويض الأولاد',
-      strpos($pc43, "(int)(\$emp['count_spouse_allowance'] ?? 1) !== 1) \$famSpouse = 0;") !== false
-      && strpos($pc43, "(int)(\$emp['count_children_allowance'] ?? 1) !== 1) \$famChildren = 0;") !== false
-      && strpos($pc43, "\$famChildren = round(\$famChildren / 2);") !== false);
+check('تعويض عائلي اختياري: المصدر الواحد يحترم الزرّين + الزوج العامل = لا تعويض زوجة والأولاد كاملاً (لا تقسيم — 2026-09-20)',
+      strpos($fn43, "if ((int)(\$emp['count_spouse_allowance'] ?? 1) !== 1) \$sp = 0;") !== false
+      && strpos($fn43, "if ((int)(\$emp['count_children_allowance'] ?? 1) !== 1) \$ch = 0;") !== false
+      && strpos($fn43, "if (!empty(\$emp['spouse_works'])) \$sp = 0;") !== false
+      && strpos($pc43, "\$familyAllowance = familyAllowanceForMonth(\$emp, (int)\$this->month, (int)\$this->year);") !== false
+      && strpos($pc43, "\$famChildren = round(\$famChildren / 2);") === false);
 check('تعويض عائلي اختياري: زرّان بملف الموظف عند حقلي التعويض ويُحفَظان مع الملف',
       strpos($emp43, 'name="count_spouse_allowance"') !== false
       && strpos($emp43, 'name="count_children_allowance"') !== false
       && strpos($emp43, "'count_spouse_allowance' => isset(\$_POST['count_spouse_allowance'])") !== false
-      && strpos($emp43, 'يُحسب <strong>النصف تلقائياً</strong>') !== false);
+      && strpos($emp43, '<strong>لا يُقسَّم</strong> بين الزوجين') !== false);
 // تجربة فعلية (مع ترجيع كامل): موظف فاعل معدّ — نركّب عليه مبلغَي زوجة 600,000 وأولاد 900,000
 // ونجرّب الحالات الأربع على شهر 6/2026 عبر عمود family_allowance_lbp المخزّن
 ensureEmployeeFlagColumns();
@@ -2755,19 +2758,19 @@ if ($c43) {
     $set43(0, 1, 1); $fA = $famOf();   // زوجة لا تعمل + الزرّان مفعّلان = 1,500,000
     $set43(0, 0, 1); $fB = $famOf();   // زرّ الزوجة مطفأ = 900,000
     $set43(0, 1, 0); $fC = $famOf();   // زرّ الأولاد مطفأ = 600,000
-    $set43(1, 1, 1); $fD = $famOf();   // الزوجة تعمل = 0 زوجة + نصّ الأولاد = 450,000
+    $set43(1, 1, 1); $fD = $famOf();   // الزوجة تعمل = 0 زوجة + الأولاد كاملاً = 900,000 (لا تقسيم — 2026-09-20)
     // ترجيع كامل
     $db->exec("UPDATE employees SET spouse_works = " . (int)$c43['spouse_works'] . ", count_spouse_allowance = " . (int)$c43['cs'] . ",
                count_children_allowance = " . (int)$c43['cc'] . ", family_allowance_spouse_lbp = " . (int)$c43['sp'] . ",
                family_allowance_children_lbp = " . (int)$c43['ch'] . " WHERE id = $cid43");
     $fR = $famOf();
     $expR = ((int)$c43['spouse_works'] ? 0 : ((int)$c43['cs'] ? (int)$c43['sp'] : 0))
-          + ((int)$c43['cc'] ? (int)round(((int)$c43['ch']) / ((int)$c43['spouse_works'] ? 2 : 1)) : 0);
+          + ((int)$c43['cc'] ? (int)$c43['ch'] : 0);
     check('تعويض عائلي (تجربة فعلية): الزرّان يتحكّمان بالمبلغ (كامل/بلا زوجة/بلا أولاد)',
           $fA === 1500000 && $fB === 900000 && $fC === 600000,
           "id $cid43 — كامل: " . number_format($fA) . " / بلا زوجة: " . number_format($fB) . " / بلا أولاد: " . number_format($fC));
-    check('تعويض عائلي (تجربة فعلية): الزوج/الزوجة يعمل ⇒ صفر زوجة + نصف الأولاد (450,000 من 900,000)',
-          $fD === 450000, number_format($fD));
+    check('تعويض عائلي (تجربة فعلية): الزوج/الزوجة يعمل ⇒ صفر زوجة + الأولاد كاملاً بلا تقسيم (900,000 — القانون بلسانه 2026-09-20)',
+          $fD === 900000, number_format($fD));
     check('تعويض عائلي (تجربة فعلية): الترجيع أعاد كل شيء كما كان', $fR === $expR, number_format($fR));
 } else {
     check('تعويض عائلي (تجربة فعلية)', true, 'لا مرشّح — تخطٍّ');
@@ -6993,6 +6996,93 @@ check('💰 عمود المستحق بثلاث حالات (كود + تشغيل �
       && strpos($ax148, "if (!dueColShown())              \$d[] = 15;") !== false && substr_count($ax148, "dueColMode() === 'amount' ?") === 2
       && strpos($rx148, "if (dueColShown()) { \$head[] = 'الإجمالي المتوجب'; \$w[] = 18; }") !== false && substr_count($rx148, "if (dueColShown()) \$row[] = dueColMode() === 'amount' ?") === 2,
       $why148 ?: 'ok ths=' . json_encode($ths148 ?? []));
+
+/**
+ * 149) 👨‍👩‍👧 التعويض العائلي مؤرَّخ «من شهر ← إلى شهر» (2026-09-20 طانيوس طنوس/عبرا «حطّيت تعويضاً عائلياً وما بيّن ببطاقته السنوية»
+ *      ⇒ «لازم نحطّ تاريخ من ← إلى وبيضلّ ياخد» + القانون بلسانه: لا يُقسَّم بين الزوجين · المتعاقد لا يستحقّ · موظف قانون العمل من الضمان):
+ *      المصدر الواحد familyAllowanceForMonth بالمحرّك + مسار المنقولين (كان يركّب الإضافي والنقل فقط) + الفورم + الهيدر (تركيب/شفاء) + المخالفات + الصحّة.
+ */
+$fn149 = (string)file_get_contents($PROJ . '/includes/functions.php'); $pc149 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$em149 = (string)file_get_contents($PROJ . '/pages/employees.php'); $cp149 = (string)file_get_contents($PROJ . '/includes/compliance.php');
+$hd149 = (string)file_get_contents($PROJ . '/includes/header.php'); $hc149 = (string)file_get_contents($PROJ . '/pages/health_check.php');
+ensureFamilyAllowanceDateColumns();
+check('👨‍👩‍👧 التعويض العائلي المؤرَّخ (كود): العمودان يتركّبان ذاتياً + المصدر الواحد بالمحرّك ومسار المنقولين + الفورم يحفظ من/إلى مع بداية افتراضية + الهيدر يركّب ويشفي + قاعدة المخالفات + فحص الصحّة للمتعاقد',
+      (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_from'")->fetch() && (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_to'")->fetch()
+      && function_exists('familyAllowanceForMonth') && function_exists('defaultFamilyAllowanceFrom') && function_exists('familyAllowanceEligible')
+      && strpos($pc149, '$familyAllowance = familyAllowanceForMonth($emp, (int)$this->month, (int)$this->year);') !== false
+      && strpos($pc149, "elseif (\$doFam && (\$famFromKey === null || \$mKey >= \$famFromKey)) \$newFam = familyAllowanceForMonth(\$empRow, (int)\$r['month'], (int)\$r['year']);") !== false
+      && strpos($pc149, 'if (!$doAdd && !$doTr && !$doFam && !$famZeroAll) return 0;') !== false
+      && strpos($pc149, '$newDue = max(0, $newNet + $newFam + $newTr);') !== false
+      && strpos($em149, 'name="family_allowance_from"') !== false && strpos($em149, 'name="family_allowance_to"') !== false
+      && substr_count($em149, 'applyFamilyAllowanceDates($db, $id, $data);') === 2 && strpos($em149, 'if ($hasAmt && empty($from)) $from = defaultFamilyAllowanceFrom($id, $db);') !== false
+      && strpos($hd149, 'ensureFamilyAllowanceDateColumns();') !== false && strpos($hd149, 'healFamilyAllowanceFrom20260920();') !== false
+      && strpos($cp149, "'family_allow_stale' => ['Alloc. familiales ≠ dossier'") !== false && strpos($cp149, "case 'tax_stale': case 'family_allow_stale':") !== false
+      && strpos($hc149, "ms.family_allowance_lbp > 0 AND e.employee_type = 'enseignant_contractuel'") !== false);
+// الدالة الواحدة على حالات صريحة
+$e149 = ['employee_type' => 'employe', 'family_allowance_spouse_lbp' => 600000, 'family_allowance_children_lbp' => 900000, 'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'spouse_works' => 0, 'family_allowance_from' => '2026-10-01', 'family_allowance_to' => '2026-12-01'];
+$okF149 = familyAllowanceForMonth($e149, 10, 2026) === 1500000 && familyAllowanceForMonth($e149, 9, 2026) === 0 && familyAllowanceForMonth($e149, 12, 2026) === 1500000 && familyAllowanceForMonth($e149, 1, 2027) === 0
+       && familyAllowanceForMonth(['spouse_works' => 1] + $e149, 11, 2026) === 900000
+       && familyAllowanceForMonth(['employee_type' => 'enseignant_contractuel'] + $e149, 11, 2026) === 0
+       && familyAllowanceForMonth(['employee_type' => 'enseignant_titulaire'] + $e149, 11, 2026) === 1500000
+       && familyAllowanceForMonth(['family_allowance_from' => null, 'family_allowance_to' => null] + $e149, 1, 2020) === 1500000
+       && familyAllowanceForMonth(['count_children_allowance' => 0] + $e149, 11, 2026) === 600000;
+check('👨‍👩‍👧 familyAllowanceForMonth: داخل المدّة كامل / قبلها وبعدها صفر / الزوج يعمل = الأولاد كاملاً بلا تقسيم / المتعاقد صفر / الملاك يأخذ / بلا تواريخ = من الأزل / زرّ الأولاد مطفأ', $okF149);
+// تجربة فعلية (مع ترجيع كامل) على منقول بلا إعداد وبلا علاوات/نقل (فقط مسار التعويض يشتغل)
+$t149 = null;
+foreach ($db->query("SELECT e.id, e.school_id, ms.school_year sy, COUNT(*) n FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+    WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND COALESCE(e.base_salary_usd,0) = 0 AND COALESCE(e.contract_salary_lbp,0) = 0 AND COALESCE(e.salary_labor_law,0) = 0
+      AND ms.base_plus_echelon_lbp > 0 AND COALESCE(ms.is_indemnity_month,0) = 0
+      AND COALESCE(e.family_allowance_spouse_lbp,0) = 0 AND COALESCE(e.family_allowance_children_lbp,0) = 0 AND e.family_allowance_from IS NULL
+      AND COALESCE(e.transport_daily_amount,0) = 0 AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id)
+      AND " . leftDateSql('e.') . " = '9999-12-31'
+    GROUP BY e.id, ms.school_year HAVING n >= 10 ORDER BY ms.school_year DESC, e.id LIMIT 8")->fetchAll(PDO::FETCH_ASSOC) as $cand149) {
+    if (!isSchoolYearLocked((int)$cand149['school_id'], (string)$cand149['sy'])) { $t149 = $cand149; break; }
+}
+if ($t149) {
+    $tid = (int)$t149['id']; $tsy = (string)$t149['sy']; [$ty1, $ty2] = schoolYearToYears($tsy);
+    $snapE = $db->query("SELECT family_allowance_spouse_lbp sp, family_allowance_children_lbp ch, count_spouse_allowance cs, count_children_allowance cc, spouse_works sw, family_allowance_from ff, family_allowance_to ft FROM employees WHERE id = $tid")->fetch(PDO::FETCH_ASSOC);
+    $snapR = $db->query("SELECT id, family_allowance_lbp, total_due_lbp, total_due_usd, net_salary_lbp, net_salary_usd, transport_lbp FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy'")->fetchAll(PDO::FETCH_ASSOC);
+    $setF = function ($sw, $from, $to) use ($db, $tid) { $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = 0, family_allowance_children_lbp = 2310000, count_spouse_allowance = 1, count_children_allowance = 1, spouse_works = ?, family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")->execute([$sw, $from, $to, $tid]); };
+    $famRows = function () use ($db, $tid, $tsy) { $o = []; foreach ($db->query("SELECT month, year, family_allowance_lbp f, net_salary_lbp n, transport_lbp t, total_due_lbp d FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy' AND COALESCE(is_indemnity_month,0)=0 ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC) as $r) $o[(int)$r['year']*12+(int)$r['month']] = $r; return $o; };
+    // أ) مبلغ من تشرين الأول بلا نهاية — قبل إعادة الحساب يظهر ببند المخالفات، وبعدها كل الأشهر 2,310,000 والمستحق يركب
+    $setF(0, "$ty1-10-01", null);
+    $okCp = false; try { foreach (complianceItems($db, $tsy) as $it) if ($it['rule'] === 'family_allow_stale' && (int)$it['emp_id'] === $tid) $okCp = true; } catch (Throwable $e) {}
+    recalcEmployeeYear($tid, $tsy); $ra = $famRows();
+    $okA = $ra && count(array_filter($ra, fn($r) => (int)$r['f'] === 2310000)) === count($ra) && count(array_filter($ra, fn($r) => (int)$r['d'] === (int)$r['n'] + (int)$r['f'] + (int)$r['t'])) === count($ra);
+    $okCp2 = true; try { foreach (complianceItems($db, $tsy) as $it) if ($it['rule'] === 'family_allow_stale' && (int)$it['emp_id'] === $tid) $okCp2 = false; } catch (Throwable $e) {}
+    $hs149 = renderPage('pages/annual_slip.php', ['employee_id' => $tid, 'school_year' => $tsy], ['extra', 'aide', 'transport'], [(int)$t149['school_id']], 'lbp', $tsy);
+    $okSlip = strpos($hs149, '2,310,000') !== false && strpos($hs149, 'FATAL') === false;
+    // ب) «إلى كانون الأول» ⇒ تشرين الأول-كانون الأول 2,310,000 وما بعدها صفر
+    $setF(0, "$ty1-10-01", "$ty1-12-01"); recalcEmployeeYear($tid, $tsy); $rb = $famRows();
+    $okB = (bool)$rb; foreach ($rb as $k => $r) { $exp = ($k <= $ty1 * 12 + 12) ? 2310000 : 0; if ((int)$r['f'] !== $exp || (int)$r['d'] !== (int)$r['n'] + (int)$r['f'] + (int)$r['t']) { $okB = false; break; } }
+    // ج) الزوج يعمل ⇒ الأولاد كاملاً (لا تقسيم)
+    $setF(1, "$ty1-10-01", null); recalcEmployeeYear($tid, $tsy); $rc = $famRows();
+    $okC = $rc && count(array_filter($rc, fn($r) => (int)$r['f'] === 2310000)) === count($rc);
+    // ترجيع كامل (الملف + الصفوف)
+    $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = ?, family_allowance_children_lbp = ?, count_spouse_allowance = ?, count_children_allowance = ?, spouse_works = ?, family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")->execute([$snapE['sp'], $snapE['ch'], $snapE['cs'], $snapE['cc'], $snapE['sw'], $snapE['ff'], $snapE['ft'], $tid]);
+    $rs149 = $db->prepare("UPDATE monthly_salaries SET family_allowance_lbp = ?, total_due_lbp = ?, total_due_usd = ?, net_salary_lbp = ?, net_salary_usd = ?, transport_lbp = ? WHERE id = ?");
+    foreach ($snapR as $r) $rs149->execute([$r['family_allowance_lbp'], $r['total_due_lbp'], $r['total_due_usd'], $r['net_salary_lbp'], $r['net_salary_usd'], $r['transport_lbp'], $r['id']]);
+    $back = $db->query("SELECT SUM(family_allowance_lbp) f, SUM(total_due_lbp) d FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy'")->fetch(PDO::FETCH_ASSOC);
+    $okR = (int)$back['f'] === (int)array_sum(array_column($snapR, 'family_allowance_lbp')) && (int)$back['d'] === (int)array_sum(array_column($snapR, 'total_due_lbp'));
+    check("👨‍👩‍👧 تجربة فعلية على منقول بلا إعداد (#$tid $tsy): مبلغ بملفه من تشرين الأول ⇒ يظهر بالمخالفات ثم بعد إعادة الحساب كل أشهره 2,310,000 والمستحق يركب والبند يختفي + البطاقة السنوية تعرضه + «إلى كانون الأول» يصفّر ما بعده + الزوج يعمل = كاملاً + الترجيع",
+          $okA && $okCp && $okCp2 && $okSlip && $okB && $okC && $okR,
+          "A=" . (int)$okA . " comp=" . (int)$okCp . "/" . (int)$okCp2 . " slip=" . (int)$okSlip . " B=" . (int)$okB . " C=" . (int)$okC . " R=" . (int)$okR . " n=" . count($ra));
+} else {
+    check('👨‍👩‍👧 تجربة فعلية على منقول بلا إعداد: لا عيّنة مناسبة بالقاعدة', true, 'skipped');
+}
+// المتعاقد لا يستحقّ — المحرّك بلا حفظ على متعاقد حقيقي
+$c149 = $db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_contractuel' AND ms.year = 2026 AND ms.month = 6 LIMIT 1")->fetchColumn();
+if ($c149) {
+    $cid149 = (int)$c149;
+    $sn149 = $db->query("SELECT family_allowance_spouse_lbp sp, family_allowance_children_lbp ch FROM employees WHERE id = $cid149")->fetch(PDO::FETCH_ASSOC);
+    $db->exec("UPDATE employees SET family_allowance_spouse_lbp = 500000, family_allowance_children_lbp = 700000 WHERE id = $cid149");
+    $calcC149 = null; try { $calcC149 = (new PayrollCalculator($cid149, 6, 2026))->calculate(); } catch (Throwable $e) {}
+    $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = ?, family_allowance_children_lbp = ? WHERE id = ?")->execute([$sn149['sp'], $sn149['ch'], $cid149]);
+    check("👨‍👩‍👧 المتعاقد لا يستحقّ تعويضاً عائلياً (قانون المعلمين — تجربة فعلية #$cid149 بالمحرّك بلا حفظ): مبلغ بملفه ⇒ 0",
+          is_array($calcC149) && (int)$calcC149['family_allowance_lbp'] === 0, json_encode($calcC149['family_allowance_lbp'] ?? null));
+}
+check('👨‍👩‍👧 لا تعويض عائلي مخزّن لأي متعاقد (داتا حيّة)',
+      (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_contractuel' AND ms.family_allowance_lbp > 0")->fetchColumn() === 0);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

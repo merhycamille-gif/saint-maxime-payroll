@@ -14,6 +14,7 @@ class PayrollCalculator {
     private $exchangeRate;
     
     public function __construct($employeeId, $month, $year) {
+        ensureFamilyAllowanceDateColumns(); // 👨‍👩‍👧 مدّة التعويض العائلي «من ← إلى» تتركّب ذاتياً (2026-09-20)
         $stmt = getDB()->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0");
         $stmt->execute([$employeeId]);
         $this->employee = $stmt->fetch();
@@ -465,18 +466,12 @@ class PayrollCalculator {
         $monthlyTax = $annualTax / 12;
 
         // === 7. Family Allowances (NOT subject to any deduction) ===
-        // 🔵 خيارا الملف (2026-08-06): «احتساب تعويض الزوج/الزوجة» و«احتساب تعويض الأولاد»
-        // (الافتراضي محسوبان) + قاعدة المستخدم: الزوج/الزوجة يعمل ⇒ لا تعويض زوجة إطلاقاً
-        // (يأخذه من جهة عمله) وتعويضُ الأولاد **مناصفةً** بين الوالدَين (النصف هنا).
-        $famSpouse   = (float)$emp['family_allowance_spouse_lbp'];
-        $famChildren = (float)$emp['family_allowance_children_lbp'];
-        if ((int)($emp['count_spouse_allowance'] ?? 1) !== 1) $famSpouse = 0;
-        if ((int)($emp['count_children_allowance'] ?? 1) !== 1) $famChildren = 0;
-        if (!empty($emp['spouse_works'])) {
-            $famSpouse = 0;
-            $famChildren = round($famChildren / 2);
-        }
-        $familyAllowance = $famSpouse + $famChildren;
+        // 🔵 خيارا الملف (2026-08-06): «احتساب تعويض الزوج/الزوجة» و«احتساب تعويض الأولاد» + الزوج/الزوجة يعمل ⇒ لا تعويض زوجة.
+        // 👨‍👩‍👧 (2026-09-20) المصدر الواحد familyAllowanceForMonth: الفئة (المتعاقد لا يستحقّ — قانون المعلمين) + المدّة
+        //    «من شهر ← إلى شهر» بملفه + الزرّان + الزوج العامل ⇒ لا تعويض زوج **والأولاد كاملاً — لا يُقسَّم**
+        //    (القانون بلسانه: «التعويض العائلي ما بينقسم بين الزوج والزوجة؛ يلي بينقسم هو تنزيل الأولاد بالضريبة») —
+        //    يبطل تنصيف 2026-08-06. نفس الدالة يستعملها مسار المنقولين وتقرير المخالفات.
+        $familyAllowance = familyAllowanceForMonth($emp, (int)$this->month, (int)$this->year);
 
         // === 8. Totals ===
         // 🔴 «بدون فراطات — داون» (طلبه 2026-09-04: «بس يطلع الراتب الصافي فيه كسور كمان عملو داون»):
@@ -792,7 +787,16 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
     $tFixed = $db->prepare("SELECT COALESCE(transport_daily_amount, 0) FROM employees WHERE id = ?");
     $tFixed->execute([$employeeId]);
     $doTr = ((int)$f['n_tr'] > 0) || ((float)$tFixed->fetchColumn() > 0);
-    if (!$doAdd && !$doTr) return 0; // لا علاوات مسجّلة → لا تلمس الصفوف المنقولة أبداً
+    // 👨‍👩‍👧 (2026-09-20 طانيوس طنوس/عبرا «حطّيت تعويضاً عائلياً وما بيّن ببطاقته») التعويض العائلي للمنقول: المسار القديم كان
+    //    يركّب الإضافي والنقل فقط فبقي تعويض ملفه حبراً على ورق. مبلغ بملفه = «سجلّ من عائلته» ⇒ يُركَّب على أشهره من
+    //    «من شهر» فصاعداً بالمصدر الواحد familyAllowanceForMonth (ما قبلها منقول يبقى كما هو). بلا مبلغ بملفه لا نلمس
+    //    مخزّنه القديم (الإيقاف يكون بـ«إلى شهر» لا بتصفير المبلغ). المتعاقد (لا يستحقّ بالقانون) يُصفَّر له أي تعويض مخزّن.
+    ensureFamilyAllowanceDateColumns();
+    $empRow = $db->query("SELECT * FROM employees WHERE id = " . (int)$employeeId)->fetch(PDO::FETCH_ASSOC) ?: [];
+    $famZeroAll = $empRow && !familyAllowanceEligible($empRow);
+    $doFam = $empRow && !$famZeroAll && ((float)($empRow['family_allowance_spouse_lbp'] ?? 0) > 0 || (float)($empRow['family_allowance_children_lbp'] ?? 0) > 0);
+    $famFromKey = familyAllowanceDateKey($empRow['family_allowance_from'] ?? '');
+    if (!$doAdd && !$doTr && !$doFam && !$famZeroAll) return 0; // لا علاوات مسجّلة → لا تلمس الصفوف المنقولة أبداً
 
     $rows = $db->prepare("SELECT * FROM monthly_salaries
         WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month, 0) = 0");
@@ -800,7 +804,7 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
     ensurePrimeUsdLawColumn();
     $upd = $db->prepare("UPDATE monthly_salaries SET
             prime_fixe_lbp = ?, aide_complementaire_lbp = ?, transport_complement_lbp = ?, transport_lbp = ?,
-            net_salary_lbp = ?, total_due_lbp = ?, net_salary_usd = ?, total_due_usd = ?, prime_fixe_usd_law = ?
+            net_salary_lbp = ?, total_due_lbp = ?, net_salary_usd = ?, total_due_usd = ?, prime_fixe_usd_law = ?, family_allowance_lbp = ?
         WHERE id = ?");
     $n = 0;
     foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $r) {
@@ -814,10 +818,16 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
         $dAdd = ($newPrime + $newAide) - ((int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']);
         // 🔴 النقل داخل المستحق مرّة واحدة (العمودان نفس القيمة) — الفرق من transport_lbp وحده
         $dTr = $newTr - (int)$r['transport_lbp'];
+        // 👨‍👩‍👧 التعويض العائلي لهذا الشهر (المصدر الواحد) — أشهر ما قبل «من شهر» تبقى على مخزّنها المنقول
+        $mKey = (int)$r['year'] * 12 + (int)$r['month'];
+        $newFam = (int)$r['family_allowance_lbp'];
+        if ($famZeroAll) $newFam = 0;
+        elseif ($doFam && ($famFromKey === null || $mKey >= $famFromKey)) $newFam = familyAllowanceForMonth($empRow, (int)$r['month'], (int)$r['year']);
+        $dFam = $newFam - (int)$r['family_allowance_lbp'];
         $newLawUsd = $doAdd ? (int)$calc->primeUsdLaw : (int)($r['prime_fixe_usd_law'] ?? 0);
         // شهر لا معنى له (صافي 0 وحسومات > 0 على أساس > 0 — بقايا تصفير الإضافي بلا إعادة المحسومات): يُعاد حسابه كاملاً ولو لم يتغيّر شيء
         $nonsense = $doAdd && (int)$r['net_salary_lbp'] === 0 && (int)$r['total_retenues_lbp'] > 0 && (int)$r['base_plus_echelon_lbp'] > 0;
-        if (!$nonsense && $dAdd === 0 && $dTr === 0 && $newTrC === (int)$r['transport_complement_lbp'] && $newLawUsd === (int)($r['prime_fixe_usd_law'] ?? 0)) continue;
+        if (!$nonsense && $dAdd === 0 && $dTr === 0 && $dFam === 0 && $newTrC === (int)$r['transport_complement_lbp'] && $newLawUsd === (int)($r['prime_fixe_usd_law'] ?? 0)) continue;
         // 🔴 امتصاص الفجوة (المنقول من القديم): إذا كان الصافي المخزّن أكبر من (الأساس+الإضافات)
         // فالفرق «أجر إضافي مخفي» موجود داخل الصافي أصلاً — تسجيله بالملف يملأ العمود
         // ولا يُضاف للصافي مرّة ثانية؛ فقط ما يزيد عن الفجوة يُعتبر علاوة جديدة فعلية.
@@ -829,17 +839,19 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
         if (($dAdd !== 0 && $gap === 0 && $doAdd) || $nonsense) {
             try {
                 $res = $calc->computeFrom((float)$r['base_salary_lbp'], (float)$r['echelon_value_lbp'], $r['grade_at_month'], (float)$primeFixe, (float)$aideComp, (float)$newTr);
+                // 👨‍👩‍👧 المستحق بالتعويض العائلي المقرَّر أعلاه (المحرّك يعطي تعويض ملفه لكل شهر؛ أشهر ما قبل «من شهر» تبقى على مخزّنها)
+                $dueRes = max(0, (int)$res['total_due_lbp'] - (int)$res['family_allowance_lbp'] + $newFam);
                 $db->prepare("UPDATE monthly_salaries SET prime_fixe_lbp = ?, aide_complementaire_lbp = ?, transport_complement_lbp = ?, transport_lbp = ?,
                         caisse_amount_lbp = ?, eoc_grade_lbp = ?, cnss_amount_lbp = ?, taxable_base_lbp = ?, income_tax_lbp = ?, total_retenues_lbp = ?,
-                        net_salary_lbp = ?, total_due_lbp = ?, net_salary_usd = ?, total_due_usd = ?, prime_fixe_usd_law = ?,
+                        net_salary_lbp = ?, total_due_lbp = ?, net_salary_usd = ?, total_due_usd = ?, prime_fixe_usd_law = ?, family_allowance_lbp = ?,
                         school_cnss_8_lbp = ?, school_eoc_6_lbp = ?, school_family_comp_6_lbp = ?, school_end_of_service_8_5_lbp = ?
                     WHERE id = ?")->execute([
                         (int)$res['prime_fixe_lbp'], (int)$res['aide_complementaire_lbp'], $newTrC, $newTr,
                         (int)$res['caisse_amount_lbp'], (int)$res['eoc_grade_lbp'], (int)$res['cnss_amount_lbp'], (int)$res['taxable_base_lbp'], (int)$res['income_tax_lbp'], (int)$res['total_retenues_lbp'],
-                        (int)$res['net_salary_lbp'], (int)$res['total_due_lbp'],
+                        (int)$res['net_salary_lbp'], $dueRes,
                         ((float)$r['exchange_rate'] > 0 ? round((int)$res['net_salary_lbp'] / (float)$r['exchange_rate'], 2) : $r['net_salary_usd']),
-                        ((float)$r['exchange_rate'] > 0 ? round((int)$res['total_due_lbp'] / (float)$r['exchange_rate'], 2) : $r['total_due_usd']),
-                        $newLawUsd,
+                        ((float)$r['exchange_rate'] > 0 ? round($dueRes / (float)$r['exchange_rate'], 2) : $r['total_due_usd']),
+                        $newLawUsd, $newFam,
                         (int)$res['school_cnss_8_lbp'], (int)$res['school_eoc_6_lbp'], (int)$res['school_family_comp_6_lbp'], (int)$res['school_end_of_service_8_5_lbp'],
                         $r['id']]);
                 $n++;
@@ -848,12 +860,12 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
         }
         $dNet = ($dAdd > 0) ? max(0, $dAdd - $gap) : $dAdd;
         $newNet = max(0, (int)(floor(((int)$r['net_salary_lbp'] + $dNet) / 1000) * 1000)); // الصافي داون للألف (2026-09-04)
-        $newDue = max(0, $newNet + (int)$r['family_allowance_lbp'] + $newTr); // المستحق = الصافي المنزَّل + العائلي + النقل
+        $newDue = max(0, $newNet + $newFam + $newTr); // المستحق = الصافي المنزَّل + العائلي (المقرَّر أعلاه) + النقل
         $rate = (float)$r['exchange_rate'];
         $upd->execute([$newPrime, $newAide, $newTrC, $newTr, $newNet, $newDue,
             $rate > 0 ? round($newNet / $rate, 2) : $r['net_salary_usd'],
             $rate > 0 ? round($newDue / $rate, 2) : $r['total_due_usd'],
-            $newLawUsd,
+            $newLawUsd, $newFam,
             $r['id']]);
         $n++;
     }

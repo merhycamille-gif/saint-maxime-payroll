@@ -73,6 +73,7 @@ function complianceRules(): array {
         'carried_stale'  => ['Reporté avec un ancien salaire', 'منقول للسنة الجديدة براتب مع أنّه لم يُدفَع له شيء بالسنة السابقة (راتب قديم أو من إعداد ملفه)', '#b91c1c'],
         'carried_zero'   => ['Reporté à zéro',              'منقول للسنة الجديدة بصفوف صفرية ولم يُدفَع له شيء بالسنة السابقة (ملف قديم بلا رواتب)', '#64748b'],
         'family_ded_off' => ['Abattement familial non accordé', 'متزوج/أرمل بأولاد أو زوج لا يعمل — وتنزيلهم العائلي بالضريبة مطفأ بملفه', '#b45309'],
+        'family_allow_stale' => ['Alloc. familiales ≠ dossier', 'التعويض العائلي المخزّن بالأشهر لا يطابق ملفه (المبلغ / المدّة من←إلى / الفئة: المتعاقد لا يستحقّ)', '#b45309'],
         'transport_pct'  => ['Transport en %',             'بند تعويض نقل كنسبة ٪ من الأساس (النقل مبلغ لا نسبة) — يضاعف المستحق', '#b91c1c'],
         'left_impossible'=> ['Date de départ impossible',  'تاريخ ترك مستحيل (= تاريخ الولادة أو قبل دخول المدرسة) — الموظف يختفي من كل الكشوف ولا يُحسب راتبه', '#b91c1c'],
         'eoc_base_only'  => ['Caisse sur la base seule',   'ملاك يتقاضى أجراً إضافياً وصندوق التعويضات يُحسم من الأساس وحده (مفتاح «يشمل الأجر الإضافي» مطفأ بملفه)', '#b45309'],
@@ -388,6 +389,41 @@ function complianceItems(PDO $db, string $sy): array {
             true, ['spouse' => $spouseOff ? 1 : 0, 'kids' => $kidsOff ? 1 : 0, 'now' => $now, 'full' => $full]);
     }
 
+    // ── 13ج) التعويض العائلي المخزّن ≠ ملفه (2026-09-20 طانيوس طنوس/عبرا «حطّيت تعويضاً عائلياً وما بيّن ببطاقته السنوية») ──
+    //  المصدر الواحد familyAllowanceForMonth (المبلغ + الزرّان + المدّة من←إلى + الفئة: المتعاقد لا يستحقّ). المنقول بلا مبلغ بملفه
+    //  لا نحكم على مخزّنه القديم؛ وبمبلغ يُحكَم على أشهره من «من شهر» فصاعداً. التصحيح = إعادة حساب السنة (المسار الآمن نفسه).
+    try {
+        ensureFamilyAllowanceDateColumns();
+        $faRows = $db->prepare("SELECT month, year, family_allowance_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month,0) = 0 ORDER BY year, month");
+        foreach ($q("SELECT DISTINCT e.* FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
+            WHERE e.is_deleted = 0" . $sc . "
+              AND (COALESCE(e.family_allowance_spouse_lbp,0) > 0 OR COALESCE(e.family_allowance_children_lbp,0) > 0 OR ms.family_allowance_lbp > 0)
+            ORDER BY e.school_id, e.id", [$sy]) as $r) {
+            $engine = salaryEngineAllowed($r, $db);
+            $hasAmt = (float)$r['family_allowance_spouse_lbp'] > 0 || (float)$r['family_allowance_children_lbp'] > 0;
+            $eligible = familyAllowanceEligible($r);
+            if (!$engine && !$hasAmt && $eligible) continue; // منقول بلا مبلغ بملفه: مخزّنه القديم ليس خطأ
+            $fromKey = familyAllowanceDateKey($r['family_allowance_from'] ?? '');
+            $faRows->execute([(int)$r['id'], $sy]);
+            $bad = []; $stored = null; $law = null;
+            foreach ($faRows->fetchAll(PDO::FETCH_ASSOC) as $mrow) {
+                $mk = (int)$mrow['year'] * 12 + (int)$mrow['month'];
+                if (!$engine && $eligible && $fromKey !== null && $mk < $fromKey) continue; // ما قبل «من شهر» منقول كما هو
+                $exp = familyAllowanceForMonth($r, (int)$mrow['month'], (int)$mrow['year']);
+                if ((int)$mrow['family_allowance_lbp'] !== $exp) {
+                    $bad[] = complianceMonthLabel((int)$mrow['month'], (int)$mrow['year']);
+                    if ($stored === null) { $stored = (int)$mrow['family_allowance_lbp']; $law = $exp; }
+                }
+            }
+            if (!$bad) continue;
+            $why = !$eligible ? 'أستاذ متعاقد (قانون المعلمين) لا يستحقّ تعويضاً عائلياً ومخزّن له ' . complianceFmt($stored)
+                 : 'التعويض العائلي بـ' . count($bad) . ' شهراً (' . implode('، ', array_slice($bad, 0, 4)) . (count($bad) > 4 ? '…' : '') . ') مخزّن ' . complianceFmt($stored) . ' وملفه يعطي ' . complianceFmt($law)
+                   . ' (المبلغ' . ($r['family_allowance_from'] ? ' من ' . substr((string)$r['family_allowance_from'], 0, 7) : '') . ($r['family_allowance_to'] ? ' إلى ' . substr((string)$r['family_allowance_to'], 0, 7) : '') . ')';
+            $add('family_allow_stale', $r, $why, 'إعادة حساب سنة ' . $sy . ' فيتطابق كل شهر مع ملفه', true,
+                 ['months' => count($bad), 'stored' => $stored, 'law' => $law]);
+        }
+    } catch (Throwable $e) {}
+
     // ── 13د) نقل كنسبة ٪ (2026-09-11 عبرا 2026-2027: 23 ملاكاً عندهم «نقل شهري 85٪» بالغلط مع «أجر إضافي 85٪» ⇒ النقل 168م والمستحق مضاعف) ──
     //  تعويض النقل مبلغ دائماً؛ أي بند transport_complement بنسبة = خطأ إدخال، التصحيح = إطفاؤه وإعادة حساب السنة (يجوز «موافق على الكل»).
     foreach ($q("SELECT e.*, b.id bid, b.amount pct, b.start_month bfrom, b.end_month bto FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0
@@ -522,7 +558,7 @@ function complianceApply(PDO $db, array $it): string {
             $n = $recalcYear();
             logAudit('compliance_grade_law', 'employees', $eid, ['current_grade' => $old], ['current_grade' => (float)$d['law'], 'sy' => $sy]);
             return 'الدرجة ' . rtrim(rtrim(number_format($old, 1), '0'), '.') . ' → ' . rtrim(rtrim(number_format((float)$d['law'], 1), '0'), '.') . ' وأُعيد حساب ' . $n . ' شهراً';
-        case 'base_scale': case 'pct_law': case 'add_stale': case 'ghost_add': case 'missing_add': case 'row_rate0': case 'active_nomonths': case 'tax_stale':
+        case 'base_scale': case 'pct_law': case 'add_stale': case 'ghost_add': case 'missing_add': case 'row_rate0': case 'active_nomonths': case 'tax_stale': case 'family_allow_stale':
             $n = $recalcYear();
             return 'أُعيد حساب ' . $n . ' شهراً بسنة ' . $sy;
         case 'multi_percent': case 'pct_nontit':

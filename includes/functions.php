@@ -787,6 +787,83 @@ function isLaborLawSalary(array $emp): bool {
 function laborLawMinWage(?int $month = null, ?int $year = null): int {
     return (int)floor(getRateAsOf('minimum_wage_lbp', $month, $year, 0));
 }
+/**
+ * 👨‍👩‍👧 التعويض العائلي مؤرَّخ «من شهر ← إلى شهر» (2026-09-20 — طانيوس طنوس/عبرا: «حطّيت تعويضاً عائلياً وما بيّن ببطاقته
+ * السنوية» ⇒ «لازم نحطّ تاريخ للتعويض العائلي من ← إلى وبيضلّ ياخد»). القانون بلسانه (نفس اليوم):
+ *  - التعويض العائلي (يُدفَع) ≠ التنزيل العائلي (إعفاء ضريبي). التعويض **لا يُقسَّم** بين الزوجين إذا الزوج يعمل
+ *    (الذي يُقسَّم هو تنزيل الأولاد بالضريبة) — يبطل تنصيف 2026-08-06.
+ *  - المصدر حسب الفئة: الملاك من المدرسة (إن أعطاه) · **المتعاقد لا يستحقّ شيئاً** (قانون المعلمين) · موظف قانون العمل من الضمان.
+ * العمودان يتركّبان ذاتياً؛ from فارغ = من الأزل (السلوك القديم)، to فارغ = مستمرّ. المقارنة بالشهر (اليوم دائماً 01).
+ */
+function ensureFamilyAllowanceDateColumns(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_from'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN family_allowance_from DATE NULL DEFAULT NULL COMMENT 'التعويض العائلي: من شهر (أول الشهر)' AFTER family_allowance_children_lbp");
+        }
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_to'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN family_allowance_to DATE NULL DEFAULT NULL COMMENT 'التعويض العائلي: إلى شهر (فارغ = مستمرّ)' AFTER family_allowance_from");
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+/** هل يستحقّ هذا الموظف تعويضاً عائلياً بحسب فئته؟ — المتعاقد (قانون المعلمين) لا: لا من المدرسة ولا من الضمان */
+function familyAllowanceEligible(array $emp): bool {
+    return (($emp['employee_type'] ?? '') !== 'enseignant_contractuel');
+}
+/** مفتاح شهر (سنة×12+شهر) من تاريخ 'YYYY-MM-DD'، أو null إن فارغاً/وهمياً */
+function familyAllowanceDateKey($d): ?int {
+    $d = (string)$d;
+    if ($d === '' || $d === '0000-00-00' || $d < '1900-01-01' || !preg_match('/^(\d{4})-(\d{2})/', $d, $m)) return null;
+    return (int)$m[1] * 12 + (int)$m[2];
+}
+/** هل الشهر ضمن مدّة التعويض العائلي بملفه؟ (from فارغ = من الأزل، to فارغ = مستمرّ؛ to شامل لشهره) */
+function familyAllowanceMonthInWindow(array $emp, int $month, int $year): bool {
+    $k = $year * 12 + $month;
+    $f = familyAllowanceDateKey($emp['family_allowance_from'] ?? '');
+    $t = familyAllowanceDateKey($emp['family_allowance_to'] ?? '');
+    if ($f !== null && $k < $f) return false;
+    if ($t !== null && $k > $t) return false;
+    return true;
+}
+/**
+ * 🔑 المصدر الواحد: التعويض العائلي المستحقّ لشهر معيّن (ل.ل، بلا فراطات) — يستعمله المحرّك (computeFrom)
+ * ومسار المنقولين (overlayStoredYearBonuses) وتقرير المخالفات، فلا يختلف رقم عن رقم.
+ * الفئة ← المدّة ← الزرّان ← الزوج العامل: لا تعويض زوج (يأخذه من جهة عمله)، وتعويض الأولاد **كاملاً** (لا يُقسَّم).
+ */
+function familyAllowanceForMonth(array $emp, int $month, int $year): int {
+    if (!familyAllowanceEligible($emp)) return 0;
+    if (!familyAllowanceMonthInWindow($emp, $month, $year)) return 0;
+    $sp = max(0.0, (float)($emp['family_allowance_spouse_lbp'] ?? 0));
+    $ch = max(0.0, (float)($emp['family_allowance_children_lbp'] ?? 0));
+    if ((int)($emp['count_spouse_allowance'] ?? 1) !== 1) $sp = 0;
+    if ((int)($emp['count_children_allowance'] ?? 1) !== 1) $ch = 0;
+    if (!empty($emp['spouse_works'])) $sp = 0;
+    return (int)floor($sp + $ch);
+}
+/**
+ * بداية افتراضية لمدّة التعويض حين يُدخَل مبلغ بلا «من شهر»: أوّل شهر **غير مدفوع** بعد آخر شهر مدفوع له،
+ * ولا أقلّ من أوّل السنة الدراسية الحالية ولا من سنة دخوله — فالتعويض الجديد لا يعدّل شهراً مدفوعاً أبداً،
+ * والمستخدم يرى التاريخ بملفه ويغيّره متى شاء.
+ */
+function defaultFamilyAllowanceFrom(int $empId, ?PDO $db = null): string {
+    $db = $db ?: getDB();
+    $cands = [];
+    [$cy] = schoolYearToYears(currentSchoolYear());
+    $cands[] = sprintf('%04d-10-01', (int)$cy);
+    try {
+        if ($empId > 0) {
+            $r = $db->query("SELECT e.hire_date, (SELECT MAX(year*12+month) FROM monthly_salaries WHERE employee_id = e.id AND is_paid = 1) lp FROM employees e WHERE e.id = " . (int)$empId)->fetch(PDO::FETCH_ASSOC);
+            if ($r) {
+                if (!empty($r['hire_date']) && (string)$r['hire_date'] >= '1900-01-01') { $hs = schoolYearOfDate($r['hire_date']); if ($hs) $cands[] = substr($hs, 0, 4) . '-10-01'; }
+                if (!empty($r['lp'])) { $k = (int)$r['lp']; $cands[] = sprintf('%04d-%02d-01', intdiv($k, 12), ($k % 12) + 1); } // الشهر التالي لآخر مدفوع
+            }
+        }
+    } catch (Throwable $e) {}
+    return max($cands);
+}
 /** شرط SQL «له إعداد راتب» (المصدر الواحد): ملاك أو أساس محدّد أو قانون العمل */
 function salaryConfigSql(string $prefix = 'e.'): string {
     ensureSalaryLaborLawColumn();
@@ -5867,6 +5944,36 @@ function healChildrenSplit20260910() {
         if ($names) logAudit('heal_children_split_20260910', 'monthly_salaries', 0, null, ['emps' => $names, 'years' => $n]);
     } catch (Throwable $e) {
         try { setSetting('heal_children_split_20260910', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
+/**
+ * 👨‍👩‍👧 شفاء مرّة واحدة (2026-09-20): من له مبلغ تعويض عائلي بملفه بلا «من شهر» (أُدخل قبل التأريخ — طانيوس طنوس أونلاين)
+ * يأخذ البداية الافتراضية = أوّل شهر غير مدفوع (لا يُعدَّل شهر مدفوع، وتعويضه المنقول القديم من البرنامج السابق —
+ * 2024-2025 عند طانيوس — يبقى تاريخاً كما هو) ثم تُعاد حساب سنواته المعروضة/الجارية/اللاحقة فيظهر التعويض
+ * بالبطاقة السنوية وكل الكشوف (مسار المنقولين صار يركّب التعويض). المستخدم يرى التاريخ بملفه ويغيّره متى شاء.
+ */
+function healFamilyAllowanceFrom20260920() {
+    try {
+        if (strpos((string)getSetting('heal_family_allowance_from_20260920', ''), 'done') === 0) return;
+        ensureFamilyAllowanceDateColumns();
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $emps = $db->query("SELECT e.id, CONCAT(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),' ',COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)) nm
+            FROM employees e WHERE e.is_deleted = 0 AND e.family_allowance_from IS NULL
+              AND (COALESCE(e.family_allowance_spouse_lbp,0) > 0 OR COALESCE(e.family_allowance_children_lbp,0) > 0)")->fetchAll(PDO::FETCH_ASSOC);
+        $names = [];
+        foreach ($emps as $e) {
+            $eid = (int)$e['id'];
+            $from = defaultFamilyAllowanceFrom($eid, $db);
+            $db->prepare("UPDATE employees SET family_allowance_from = ? WHERE id = ?")->execute([$from, $eid]);
+            $n = 0;
+            try { $n = (int)recalcEmployeeYear($eid); } catch (Throwable $ex) {}
+            $names[] = $e['nm'] . ' #' . $eid . ' من ' . substr($from, 0, 7) . ' (' . $n . ' شهراً)';
+        }
+        setSetting('heal_family_allowance_from_20260920', 'done: emps=' . count($names) . ' [' . implode('؛ ', array_slice($names, 0, 40)) . '] @' . date('Y-m-d H:i'));
+        if ($names) logAudit('heal_family_allowance_from_20260920', 'employees', 0, null, ['emps' => $names]);
+    } catch (Throwable $e) {
+        try { setSetting('heal_family_allowance_from_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
 function healPercentLawOwn20260903() {

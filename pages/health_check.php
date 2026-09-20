@@ -86,6 +86,10 @@ $dataChecks = [
     ['عمودا تعويض النقل متطابقان (لا احتساب مضاعف)',
      'ms.transport_lbp > 0 AND ms.transport_complement_lbp > 0 AND ms.transport_lbp <> ms.transport_complement_lbp',
      'لو فشل: النقل قد يُحتسب مرّتين في المستحق.'],
+    // 👨‍👩‍👧 (2026-09-20) القانون بلسانه: الأستاذ المتعاقد (قانون المعلمين) لا يستحقّ تعويضاً عائلياً — لا من المدرسة ولا من الضمان
+    ['لا تعويض عائلي لأستاذ متعاقد (قانون المعلمين)',
+     "ms.family_allowance_lbp > 0 AND e.employee_type = 'enseignant_contractuel'",
+     'لو فشل: متعاقد يتقاضى تعويضاً عائلياً لا يستحقّه — إعادة حساب سنته تصفّره (تقرير المخالفات: التعويض العائلي ≠ ملفه).'],
 ];
 foreach ($dataChecks as [$nm, $w, $mean]) {
     $n = $cnt($w);
