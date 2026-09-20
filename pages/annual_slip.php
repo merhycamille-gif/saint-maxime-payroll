@@ -411,10 +411,14 @@ include __DIR__ . '/../includes/header.php';
        ~13px عن صندوق البطاقة (min-height) وكروم يرمي الفائض على صفحة جديدة. شبكة grid بصفّ 1fr
        للجدول = نفس التوزيع (الجدول يأخذ باقي الورقة ويوزّعه على صفوفه) بلا أي فيضان — مفحوص
        بPDF كروم: اليانا 2025-2026 (12 شهراً + مجموع) صفحتان → صفحة واحدة */
-    .salary-slip { display: grid; grid-template-columns: 100%; grid-template-rows: auto auto 1fr; min-height: calc(188mm / var(--pz, 1)); }
+    .salary-slip { display: grid; grid-template-columns: 100%; grid-template-rows: auto auto auto 1fr; min-height: calc(188mm / var(--pz, 1)); }
     /* صمام: لو ضاقت مساحة الورقة (هوامش مستخدم كبيرة) لا ينقسم صفّ مفرد على صفحتين */
     .salary-slip-table tr { page-break-inside: avoid; }
-    .salary-slip-table { align-self: stretch; }
+    /* 📏 (2026-09-20) جدول المبالغ مثبَّت بالصفّ الأخير (1fr) صراحةً: سطر سعر الصرف المضاف 2026-09-19 صار
+       العنصر الثالث فأخذ جدولُ معلومات الأستاذ صفَّ 1fr وانتفخت سطوره بالفراغ الفائض بدل سطور المبالغ
+       (شكواه «ضيّق أسطر المعلومات ووسّع أسطر المبالغ»). مع grid-row:4 يبقى الجدول آخِذَ باقي الورقة
+       سواء وُجد سطر السعر (4 عناصر) أو لا (3 عناصر بوضع الليرة — الصفّ الثالث يبقى فارغاً بارتفاع صفر) */
+    .salary-slip-table { align-self: stretch; grid-row: 4; }
     .salary-slip-header { border-bottom: none !important; padding-bottom: 0 !important; margin-bottom: 3px !important; }
     .salary-slip-header .ssh-school h2 { font-size: 15pt !important; }
     .ssh-ar { font-size: 12pt !important; } .ssh-addr { font-size: 12pt !important; }
@@ -422,13 +426,19 @@ include __DIR__ . '/../includes/header.php';
     /* 🔠 «معلومات الأستاذ فوق أكبر» + «اسم الأستاذ واضح» (طلب المستخدم 2026-08-01):
        الاسم أبرز عنصر بالورقة (17pt أسود عريض بالنص)، والقيم كبار عريضة والتسميات أصغر */
     /* ✍️ (2026-08-25) «P1 بدون تضييق»: خانات المعلومات رجعت لقياسها الأصلي —
-       وتوسيع سطور المبالغ بقي (حشوة 5px بالجدول والفراغ يتوزّع بflex) */
-    .slip-emp-name { font-size: 12pt !important; background:#eff6ff !important; padding:6px 10px !important; margin-bottom:5px !important; }
+       وتوسيع سطور المبالغ بقي (حشوة 5px بالجدول والفراغ يتوزّع بflex)
+       📏 (2026-09-20 بطلبه الصريح «ضيّق شوي أسطر المعلومات وهيك منقدر نوسّع أسطر المبالغ بدون ما تتخطّى A4 —
+       العواميد اتركها»): الاتجاه العمودي فقط — line-height 1.2 بدل 1.5 الموروث + حشوة أقلّ بسطر الاسم
+       وسطر السعر وخانات المعلومات (الملاك 15: خانة المعلومات 56px ⇒ 41px، الكتلة 190 ⇒ ~125px).
+       ما يوفَّر فوق يذهب لسطور المبالغ (حشوتها 7px تحت + الجدول يأخذ باقي الورقة) والورقة A4 وحدة.
+       الخطوط والألوان والعواميد والترتيب كما هي — لا شيء آخر تغيّر */
+    .slip-emp-name { font-size: 12pt !important; background:#eff6ff !important; padding:3px 10px !important; margin-bottom:3px !important; line-height:1.2; }
     .slip-emp-name .slip-pname { font-size: 17pt !important; font-weight: 700 !important; color: #000 !important; }
     .slip-emp-name .slip-school, .slip-emp-name .slip-rep { font-weight: 600 !important; color: #334155 !important; }
-    .slip-info { margin-bottom: 5px !important; }
-    .slip-info td { border:1px solid #888 !important; padding: 3px 8px !important; }
-    .slip-info .lbl { font-size: 10.5pt !important; margin-bottom: 1px !important; color:#555 !important; }
+    .salary-slip .slip-rate { margin:1px 0 2px !important; line-height:1.2; }
+    .slip-info { margin-bottom: 3px !important; }
+    .slip-info td { border:1px solid #888 !important; padding: 1px 8px !important; line-height:1.2; }
+    .slip-info .lbl { font-size: 10.5pt !important; margin-bottom: 0 !important; color:#555 !important; line-height:1.2; }
     /* بولد حقيقي غامق (طلب المستخدم) — الخط Arial بكل اللغات (2026-09-04)، الوزن 700 = Arial Bold بحروفها العربية متل p1 */
     .slip-info .val { font-size: 13.5pt !important; font-weight:700 !important;
                       font-family:Arial,'Segoe UI',Tahoma,sans-serif !important; color:#000 !important; }
@@ -447,8 +457,12 @@ include __DIR__ . '/../includes/header.php';
        يُقرأ بسهولة ومتناسق مع الليرة (14pt) والليرة تبقى الرئيسية */
     /* ✍️ (2026-08-25) «بدون ألوان بخطوط المبالغ»: كل الأرقام سوداء بالطباعة — لا أخضر */
     .salary-slip-table .cur-usd { white-space: nowrap; color: #000 !important; font-size: 11pt !important; font-weight: 700 !important; }
-    /* ✍️ (2026-08-25) سطور المبالغ تتنفّس أكثر (بدل 4px) — والباقي يوزَّع عليها بflex */
-    .salary-slip-table td { padding: 5px 3px !important; }
+    /* ✍️ (2026-08-25) سطور المبالغ تتنفّس أكثر (بدل 4px) — والباقي يوزَّع عليها بflex
+       📏 (2026-09-20) 7px بدل 5px «وسّع أسطر المبالغ»: ما وفّرته سطور المعلومات (~72px) يذهب لسطور المبالغ
+       نفسها (14 سطراً × 4px) لا لتكبير --pz — لأنّ تكبير البطاقة كلّها كان يضيّق الجدول على رؤوسه فتنكسر
+       عناوين الأعمدة الفرنسية لسطرين (Valeur/échelon، Prime &/aide…) عند الملاك، وهو قال «العواميد اتركها».
+       مقيس: الملاك 15 سقف الرؤوس 0.719 و--pz صار 0.700 (كان 0.689)، الملاك 47 سقفه 0.704 و--pz 0.679 */
+    .salary-slip-table td { padding: 7px 3px !important; }
     .salary-slip-table .row-month { white-space: nowrap; }
     /* ✍️ (2026-08-25) «P1 بدون لون»: صفّ المجموع بلا خلفية صفراء — أبيض عريض فقط */
     .total-row td { background: #fff !important; font-weight: bold; }

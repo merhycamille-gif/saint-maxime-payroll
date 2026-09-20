@@ -1803,7 +1803,8 @@ check('قد الورقة: البطاقة السنوية تملأ طول الور
       ($asSrc29 = (string)file_get_contents(__DIR__ . '/../pages/annual_slip.php')) !== ''
       && strpos($asSrc29, 'min-height: calc(188mm / var(--pz, 1))') !== false
       // 🗏 (2026-09-04) grid بصفّ 1fr للجدول بدل flex (الجدول كان يفيض عن الصندوق فيطلع المجموع بصفحة ثانية)
-      && strpos($asSrc29, 'grid-template-rows: auto auto 1fr') !== false
+      // 📏 (2026-09-20) 4 صفوف (سطر السعر) والجدول مثبَّت بصفّ 1fr عبر grid-row:4
+      && strpos($asSrc29, 'grid-template-rows: auto auto auto 1fr') !== false
       && !preg_match('/\.salary-slip-table \{ flex: 1 1 auto; \}/', $asSrc29));
 // 🖨️ إصلاح «البطاقة أونلاين صغيرة بنص ورقة فاضية» (شكوى المستخدم p1 بتاريخ 2026-08-01):
 // beforeprint يقيس على تنسيق الشاشة فيغلط (~0.42) — القياس الصحيح يقلب قواعد @media print
@@ -1920,17 +1921,28 @@ check('🔒 البطاقة السنوية: ترويسة الاسم/المدرس�
       && strpos($asSrc29, '.slip-emp-name { flex-wrap:wrap; }') !== false);
 check('🔒 البطاقة السنوية (تصميم مجمّد): تملأ طول الورقة (188mm/pz + grid 1fr للجدول) وبلا fit القديم',
       strpos($asSrc29, 'min-height: calc(188mm / var(--pz, 1))') !== false
-      && strpos($asSrc29, '.salary-slip { display: grid; grid-template-columns: 100%; grid-template-rows: auto auto 1fr;') !== false
+      && strpos($asSrc29, '.salary-slip { display: grid; grid-template-columns: 100%; grid-template-rows: auto auto auto 1fr;') !== false
       && strpos($asSrc29, '&fit=1') === false);
 // ✍️ الخط النسخي (بطلبه 2026-08-25): ملف Noto Naskh Arabic محلي + معرَّف بfonts.css
 // للعربي فقط (unicode-range) حتى تبقى الأرقام واللاتيني على Cairo ولا يتلخبط الترتيب
 $fcSrc29 = (string)file_get_contents(__DIR__ . '/../assets/fonts/fonts.css');
 // ✍️ (2026-08-25) «P1 بدون تضييق» (تراجُعه عن التضييق بنفس اليوم): خانات معلومات الأستاذ
 // بقياسها الأصلي (3px 8px + اسم 6px 10px) — وسطور المبالغ الأوسع (5px) بقيت بطلبه
-check('🔒 البطاقة السنوية: معلومات الأستاذ بلا تضييق (حشوة 3px 8px + اسم 6px 10px) وسطور المبالغ أوسع (5px 3px)',
-      strpos($asSrc29, '.slip-info td { border:1px solid #888 !important; padding: 3px 8px !important; }') !== false
-      && strpos($asSrc29, 'padding:6px 10px !important; margin-bottom:5px !important;') !== false
-      && strpos($asSrc29, '.salary-slip-table td { padding: 5px 3px !important; }') !== false);
+// 📏 (2026-09-20) طلبه الصريح من جديد «ضيّق شوي أسطر المعلومات وهيك منقدر نوسّع أسطر المبالغ بدون ما
+// تتخطّى A4 — العواميد اتركها»: عمودياً فقط (line-height 1.2 + حشوة 1px 8px + اسم 3px 10px + سعر 1/2px)
+// وسطور المبالغ 7px 3px — البطاقة محكومة بالطول فيكبر --pz وتكبر سطور المبالغ
+check('🔒 البطاقة السنوية: معلومات الأستاذ مضيَّقة عمودياً (2026-09-20: line-height 1.2 + 1px 8px + اسم 3px 10px) وسطور المبالغ 7px 3px والعواميد كما هي',
+      strpos($asSrc29, '.slip-info td { border:1px solid #888 !important; padding: 1px 8px !important; line-height:1.2; }') !== false
+      && strpos($asSrc29, 'padding:3px 10px !important; margin-bottom:3px !important; line-height:1.2;') !== false
+      && strpos($asSrc29, '.salary-slip .slip-rate { margin:1px 0 2px !important; line-height:1.2; }') !== false
+      && strpos($asSrc29, '.slip-info .lbl { font-size: 10.5pt !important; margin-bottom: 0 !important; color:#555 !important; line-height:1.2; }') !== false
+      && strpos($asSrc29, '.salary-slip-table td { padding: 7px 3px !important; }') !== false
+      && strpos($asSrc29, '.slip-info td { border:1px solid var(--gray-300); padding:6px 10px; vertical-align:top; width:25%; }') !== false /* الشاشة بلا مسّ */);
+// 📏 (2026-09-20) جدول المبالغ هو من يأخذ باقي الورقة (1fr) لا جدول المعلومات: سطر السعر (2026-09-19) صار العنصر
+// الثالث فانتفخت خانات المعلومات بالفراغ الفائض — grid-row:4 يثبّت الجدول بالصفّ الأخير بوجود سطر السعر أو غيابه
+check('🔒 البطاقة السنوية: جدول المبالغ مثبَّت بصفّ 1fr الأخير (grid-row:4 + 4 صفوف) — الفراغ الفائض لسطور المبالغ لا لخانات المعلومات',
+      strpos($asSrc29, 'grid-template-rows: auto auto auto 1fr; min-height: calc(188mm / var(--pz, 1));') !== false
+      && strpos($asSrc29, '.salary-slip-table { align-self: stretch; grid-row: 4; }') !== false);
 check('🔒 البطاقة السنوية: الخط النسخي محلي (naskh-ar.woff2 موجود + @font-face للعربي فقط 400-700)',
       is_file(__DIR__ . '/../assets/fonts/naskh-ar.woff2')
       && filesize(__DIR__ . '/../assets/fonts/naskh-ar.woff2') > 50000
