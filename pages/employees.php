@@ -1979,10 +1979,17 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                 <?php // 🧮 «لازم يكون بملف الموظف بجانب التعويضات العائلية تعطيني المجموع كمان» (2026-09-20): المجموع الشهري = زوجة + أولاد
                       //    (المصدر الواحد familyAllowanceForMonth لهذا الشهر: الفئة + المدّتان + الزرّان + الزوج العامل) + مجموع مباشر بالـJS وأنت تكتب
                       $famTotNow = isset($employee['id']) ? familyAllowanceForMonth($employee, (int)date('n'), (int)date('Y')) : 0;
+                      $famTotLbl = 'الساري هذا الشهر';
+                      // المدّة لم تبدأ بعد (طانيوس: من تشرين الأول والشهر أيلول) ⇒ اعرض الساري من أوّل شهر بالمدّة بدل «0» المحيّر
+                      $famK0 = isset($employee['id']) ? familyAllowanceFromKeyMin($employee) : null;
+                      if ($famTotNow === 0 && $famK0 !== null && $famK0 > (int)date('Y') * 12 + (int)date('n')) {
+                          $famTotNow = familyAllowanceForMonth($employee, (($famK0 - 1) % 12) + 1, intdiv($famK0 - 1, 12));
+                          $famTotLbl = 'الساري من ' . sprintf('%04d-%02d', intdiv($famK0 - 1, 12), (($famK0 - 1) % 12) + 1);
+                      }
                       $famTotRaw = (int)($employee['family_allowance_spouse_lbp'] ?? 0) + (int)($employee['family_allowance_children_lbp'] ?? 0); ?>
                 <div id="famAllowTotal" style="margin-top:10px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
                     <span><strong>Total allocations familiales / مجموع التعويضات العائلية</strong>
-                        <small style="display:block;color:var(--gray-600)">زوجة + أولاد شهرياً — الساري هذا الشهر بحسب المدّتين والزرّين: <strong id="famTotNow"><?= number_format($famTotNow) ?></strong> ل.ل</small></span>
+                        <small style="display:block;color:var(--gray-600)">زوجة + أولاد شهرياً — <?= e($famTotLbl) ?> بحسب المدّتين والزرّين: <strong id="famTotNow"><?= number_format($famTotNow) ?></strong> ل.ل</small></span>
                     <span style="font-size:18px;font-weight:700;color:var(--primary);white-space:nowrap"><span id="famTotSum"><?= number_format($famTotRaw) ?></span> ل.ل</span>
                 </div>
                 <script>
