@@ -6140,6 +6140,35 @@ function healAbraContractUsd20260920() {
         try { setSetting('heal_abra_cw_usd_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+/**
+ * 💵 (2026-09-20 «شوف رجاع رواتب متعاقد عبرا — عدّلت بالراتب، رجاع عدّل عندك»): الإكسل نفسه صار فيه 7 أسماء بمبالغ مدوَّرة
+ * (500/700/670/815/860/460/700 بدل 498/702/667/812/857/462/698) — تحديث أساس الدولار وإعادة حساب 2026-2027 فقط. مرّة واحدة.
+ */
+function healAbraContractUsd2_20260920() {
+    try {
+        if (strpos((string)getSetting('heal_abra_cw_usd2_20260920', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $map = [1397 => [500, 'غدار'], 1816 => [700, 'حرب'], 1106 => [670, 'دمج'], 175 => [815, 'منصور'], 141 => [860, 'الحمصي'], 1819 => [460, 'بركات'], 1560 => [700, 'انطون']];
+        $norm = function ($s) { $s = preg_replace('/[\x{064B}-\x{0652}\x{0640}]/u', '', (string)$s); return str_replace(['أ','إ','آ','ة','ى','ئ'], ['ا','ا','ا','ه','ي','ي'], $s); };
+        $done = []; $skip = [];
+        foreach ($map as $eid => [$usd, $last]) {
+            $e = $db->query("SELECT * FROM employees WHERE id = $eid AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+            if (!$e || (int)$e['school_id'] !== 4 || $e['employee_type'] !== 'enseignant_contractuel' || mb_strpos($norm($e['last_name_ar']), $norm($last)) === false) { $skip[] = "#$eid"; continue; }
+            $old = (float)$e['base_salary_usd'];
+            $db->prepare("UPDATE employees SET salary_input_mode = 'direct_usd', base_salary_usd = ? WHERE id = ?")->execute([$usd, $eid]);
+            $n = 0;
+            foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = $eid AND school_year >= '2026-2027'")->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                try { $n += (int)recalcEmployeeYear($eid, (string)$sy); } catch (Throwable $ex) {}
+            }
+            $done[] = trim($e['first_name_ar'] . ' ' . $e['last_name_ar']) . " #$eid {$old}$ ⇒ {$usd}$ ($n شهراً)";
+        }
+        setSetting('heal_abra_cw_usd2_20260920', 'done: ' . count($done) . ' [' . implode('؛ ', $done) . ']' . ($skip ? ' skip=' . implode(',', $skip) : '') . ' @' . date('Y-m-d H:i'));
+        logAudit('heal_abra_cw_usd2_20260920', 'employees', 0, null, ['done' => $done, 'skip' => $skip]);
+    } catch (Throwable $e) {
+        try { setSetting('heal_abra_cw_usd2_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
 function healPercentLawOwn20260903() {
     try {
         if (strpos((string)getSetting('heal_percent_law_own_20260903', ''), 'done') === 0) return;

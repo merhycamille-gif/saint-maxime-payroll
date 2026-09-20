@@ -7220,9 +7220,9 @@ check('📆 السنة الدراسية ت1 ← أيلول للجميع: الا�
  *      (لا تضاعف) + صافي تشرين الأول 2026 لا يتجاوز الأساس بالدولار + 2025-2026 لم تُمسّ (نسخة احتياطية موجودة).
  */
 $hd153 = (string)file_get_contents($PROJ . '/includes/header.php');
-$map153 = [1815 => 400, 1821 => 400, 1397 => 498, 1816 => 702, 1847 => 750, 1106 => 667, 1817 => 400, 1822 => 400, 175 => 812, 141 => 857, 1819 => 462, 1820 => 400, 1560 => 698, 1000016 => 600, 1000017 => 600, 1000018 => 600];
-$st153 = (string)getSetting('heal_abra_cw_usd_20260920', '');
-$ok153 = function_exists('healAbraContractUsd20260920') && strpos($hd153, 'healAbraContractUsd20260920();') !== false; $why153 = 'heal=' . mb_substr($st153, 0, 12);
+$map153 = [1815 => 400, 1821 => 400, 1397 => 500, 1816 => 700, 1847 => 750, 1106 => 670, 1817 => 400, 1822 => 400, 175 => 815, 141 => 860, 1819 => 460, 1820 => 400, 1560 => 700, 1000016 => 600, 1000017 => 600, 1000018 => 600]; // 💵 تعديله الثاني (مدوَّرة)
+$st153 = (string)getSetting('heal_abra_cw_usd2_20260920', ''); // بعد التعديل الثاني
+$ok153 = function_exists('healAbraContractUsd20260920') && strpos($hd153, 'healAbraContractUsd20260920();') !== false && function_exists('healAbraContractUsd2_20260920') && strpos($hd153, 'healAbraContractUsd2_20260920();') !== false; $why153 = 'heal=' . mb_substr($st153, 0, 12);
 if (strpos($st153, 'done') === 0) {
     $bad153 = [];
     foreach ($map153 as $eid => $usd) {
