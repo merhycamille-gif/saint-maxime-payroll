@@ -7133,6 +7133,49 @@ check('👨‍👩‍👧➕ عمود «الصافي + التعويض العائ
       && strpos($rx150, "if (netFamColShown()) { \$head[] = 'الصافي + التعويض العائلي'; \$w[] = 18; }") !== false && substr_count($rx150, "if (netFamColShown()) \$row[] = netFamColMode() === 'amount' ?") === 2,
       $why150 ?: 'ok ths=' . json_encode($ths150));
 
+/**
+ * 151) 📅 «p1 قلتلك ما تخرب البطاقة شوف آب وأيلول» (2026-09-20 طانيوس طنّوس): منقول بلا إعداد صار «12 شهراً» بملفه بعدما انفتحت سنته بـ10
+ *      ⇒ آب/أيلول «—» بالبطاقة لأن لا صفّ لهما. fillCarriedMissingMonths (داخل overlayStoredYearBonuses): الأشهر المتوقّعة بعد آخر شهر مخزّن تُخلق
+ *      نسخةً عنه (غير مدفوعة) ثم يُركَّب ما بالملف — بلا حذف أبداً + شفاء مرّة واحدة بالهيدر.
+ */
+$pc151 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php'); $hd151 = (string)file_get_contents($PROJ . '/includes/header.php');
+$ok151 = function_exists('fillCarriedMissingMonths') && strpos($pc151, 'fillCarriedMissingMonths((int)$employeeId, (string)$schoolYear);') !== false
+       && strpos($pc151, "if (\$k <= \$lastKey || isset(\$have[\$k])) continue;") !== false && strpos($pc151, 'DELETE') === false
+       && strpos($hd151, 'healCarriedMissingMonths20260920();') !== false && function_exists('healCarriedMissingMonths20260920');
+$why151 = 'code=' . (int)$ok151;
+// تجربة فعلية (مع ترجيع كامل): منقول «10 أشهر» بـ10 صفوف بسنة غير مقفولة ⇒ 12 شهراً ⇒ آب/أيلول يُخلقان نسخةً عن تموز، غير مدفوعين، والبطاقة بلا «—»
+$t151 = null;
+foreach ($db->query("SELECT e.id, e.school_id, ms.school_year sy, COUNT(*) n, MAX(ms.year*12+ms.month) lk FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND COALESCE(ms.is_indemnity_month,0) = 0
+    WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND COALESCE(e.payment_months_per_year,10) = 10 AND COALESCE(e.base_salary_usd,0) = 0 AND COALESCE(e.contract_salary_lbp,0) = 0 AND COALESCE(e.salary_labor_law,0) = 0
+      AND ms.base_plus_echelon_lbp > 0 AND " . leftDateSql('e.') . " = '9999-12-31' AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id) AND COALESCE(e.transport_daily_amount,0) = 0
+    GROUP BY e.id, ms.school_year HAVING n = 10 ORDER BY ms.school_year DESC, e.id LIMIT 8")->fetchAll(PDO::FETCH_ASSOC) as $c151) {
+    [$cy1, $cy2] = schoolYearToYears($c151['sy']);
+    if ((int)$c151['lk'] === $cy2 * 12 + 7 && !isSchoolYearLocked((int)$c151['school_id'], (string)$c151['sy'])) { $t151 = $c151; break; }
+}
+if ($t151) {
+    $tid = (int)$t151['id']; $tsy = (string)$t151['sy']; [$ty1, $ty2] = schoolYearToYears($tsy);
+    $ids0 = $db->query("SELECT GROUP_CONCAT(id) FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy'")->fetchColumn();
+    $jul = $db->query("SELECT net_salary_lbp, total_due_lbp, base_salary_lbp FROM monthly_salaries WHERE employee_id = $tid AND year = $ty2 AND month = 7")->fetch(PDO::FETCH_ASSOC);
+    $db->exec("UPDATE employees SET payment_months_per_year = 12 WHERE id = $tid");
+    recalcEmployeeYear($tid, $tsy);
+    $after = $db->query("SELECT month, net_salary_lbp net, total_due_lbp due, base_salary_lbp b, is_paid p FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy' AND year = $ty2 AND month IN (8,9) ORDER BY month")->fetchAll(PDO::FETCH_ASSOC);
+    $n12 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy'")->fetchColumn();
+    $okRows = count($after) === 2 && $n12 === 12;
+    foreach ($after as $a) if ((int)$a['net'] !== (int)$jul['net_salary_lbp'] || (int)$a['b'] !== (int)$jul['base_salary_lbp'] || (int)$a['p'] !== 0) $okRows = false;
+    $hs151 = renderPage('pages/annual_slip.php', ['employee_id' => $tid, 'school_year' => $tsy], ['extra', 'aide', 'transport'], [(int)$t151['school_id']], 'lbp', $tsy);
+    $dash = preg_match_all('/<td colspan="\d+" class="text-muted">—<\/td>/u', $hs151);
+    $okSlip = $dash === 0 && strpos($hs151, 'FATAL') === false && strpos($hs151, 'Sept. ' . $ty2) !== false;
+    // إعادة التشغيل لا تخلق شيئاً (idempotent)
+    $again = fillCarriedMissingMonths($tid, $tsy);
+    // ترجيع: حذف الصفّين اللذين خلقتهما التجربة + الملف
+    $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy' AND id NOT IN ($ids0)");
+    $db->exec("UPDATE employees SET payment_months_per_year = 10 WHERE id = $tid");
+    $nBack = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$tsy'")->fetchColumn();
+    $ok151 = $ok151 && $okRows && $okSlip && $again === 0 && $nBack === 10;
+    $why151 .= " #$tid $tsy rows=" . (int)$okRows . " (n=$n12) slip=" . (int)$okSlip . " (dash=$dash) again=$again back=$nBack";
+} else { $why151 .= ' · لا عيّنة (skipped)'; }
+check('📅 المنقول الذي صار «12 شهراً»: آب/أيلول يُخلقان نسخةً عن آخر شهر (غير مدفوعين) تلقائياً + البطاقة بلا «—» + idempotent + لا حذف بالكود + شفاء بالهيدر', $ok151, $why151);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

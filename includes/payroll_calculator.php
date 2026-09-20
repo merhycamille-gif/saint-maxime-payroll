@@ -774,6 +774,10 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
     // 🔒 قفل السنة: لا تركيب على أشهر سنة مقفولة لمدرسة الموظف
     $lkSid = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$employeeId)->fetchColumn();
     if (isSchoolYearLocked($lkSid, (string)$schoolYear)) return 0;
+    // 📅 (2026-09-20 طانيوس طنّوس «شوف آب وأيلول» — p1) المنقول الذي صار «12 شهراً» بملفه بعدما انفتحت سنته بـ10 أشهر:
+    //    كانت بطاقته تعرض آب/أيلول «—» لأنّ لا صفّ لهما ولا أحد يخلقه (المحرّك ممنوع عليه). تُستكمَل أشهره الناقصة **بعد آخر شهر
+    //    مخزّن** نسخةً عنه (نفس منطق فتح السنة للمنقول)، غير مدفوعة، ثم يُركَّب عليها ما بملفه أدناه. لا حذف أبداً (10 أشهر بصفوف 12 تبقى).
+    fillCarriedMissingMonths((int)$employeeId, (string)$schoolYear);
 
     // أي عائلات علاوات مسجّلة له هذه السنة؟ (تشمل غير الفعّالة كي يُصفَّر المطفأ)
     $fam = $db->prepare("SELECT
@@ -869,6 +873,44 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
             $r['id']]);
         $n++;
     }
+    return $n;
+}
+
+/**
+ * 📅 استكمال الأشهر الناقصة لموظف منقول بلا إعداد (2026-09-20): أشهر السنة المتوقّعة (10 أو 12 حسب ملفه) التي تلي آخر شهر مخزّن
+ * له بهذه السنة وليست موجودة تُخلق نسخةً عن آخر شهر (أساس/محسومات/صافي/مستحق كما هي، غير مدفوعة)؛ التارك لا يُستكمل بعد تركه.
+ * الأشهر السابقة أو الفجوات بين أشهر موجودة لا تُمسّ (قد تكون مقصودة). يُرجع عدد الأشهر المخلوقة.
+ */
+function fillCarriedMissingMonths(int $employeeId, string $schoolYear): int {
+    $db = getDB();
+    if (!preg_match('/^(\d{4})-(\d{4})$/', $schoolYear, $mm)) return 0;
+    $e = $db->query("SELECT * FROM employees WHERE id = $employeeId AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+    if (!$e) return 0;
+    $y1 = (int)$mm[1]; $y2 = (int)$mm[2];
+    $months = ((int)$e['payment_months_per_year'] === 10)
+        ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
+        : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
+    $rows = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month,0) = 0 ORDER BY year, month");
+    $rows->execute([$employeeId, $schoolYear]);
+    $have = []; $last = null;
+    foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $r) { $have[(int)$r['year'] * 12 + (int)$r['month']] = true; $last = $r; }
+    if (!$last) return 0; // لا شهر مخزّناً → لا مصدر للنسخ (فتح السنة/الإكسل)
+    $lastKey = (int)$last['year'] * 12 + (int)$last['month'];
+    $ld = leftDateOf($e);
+    $n = 0;
+    foreach ($months as [$m, $y]) {
+        $k = $y * 12 + $m;
+        if ($k <= $lastKey || isset($have[$k])) continue;
+        if ($ld !== null && sprintf('%04d-%02d-01', $y, $m) > $ld) continue; // بعد تركه
+        $src = $last;
+        unset($src['id'], $src['created_at'], $src['updated_at']);
+        $src['month'] = $m; $src['year'] = $y; $src['school_year'] = $schoolYear;
+        $src['is_paid'] = 0; $src['paid_date'] = null; $src['is_calculated'] = 1; $src['calculated_at'] = date('Y-m-d H:i:s');
+        $cols = array_keys($src);
+        $sql = "INSERT INTO monthly_salaries (`" . implode('`,`', $cols) . "`) VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")";
+        try { $db->prepare($sql)->execute(array_values($src)); $n++; } catch (Throwable $ex) {}
+    }
+    if ($n) { try { logAudit('fill_carried_months', 'monthly_salaries', $employeeId, null, ['sy' => $schoolYear, 'created' => $n, 'from' => $last['year'] . '-' . $last['month']]); } catch (Throwable $ex) {} }
     return $n;
 }
 

@@ -6002,6 +6002,32 @@ function healFamilyAllowanceFrom20260920() {
         try { setSetting('heal_family_allowance_from_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
+/**
+ * 📅 شفاء مرّة واحدة (2026-09-20): منقولون بلا إعداد ملفهم «12 شهراً» وسنتهم الجارية/اللاحقة مخزّنة بأقلّ من أشهرها (انفتحت بـ10)
+ * ⇒ recalcEmployeeYear (يستكمل الأشهر الناقصة بعد آخر شهر ثم يركّب ما بالملف). طانيوس طنّوس/عبرا: آب وأيلول 2027.
+ */
+function healCarriedMissingMonths20260920() {
+    try {
+        if (strpos((string)getSetting('heal_carried_missing_months_20260920', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $cur = currentSchoolYear();
+        $emps = $db->query("SELECT e.*, ms.school_year sy, COUNT(*) n FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND COALESCE(ms.is_indemnity_month,0) = 0
+            WHERE e.is_deleted = 0 AND COALESCE(e.payment_months_per_year,10) <> 10 AND ms.school_year >= " . $db->quote($cur) . "
+            GROUP BY e.id, ms.school_year HAVING n < 12")->fetchAll(PDO::FETCH_ASSOC);
+        $names = [];
+        foreach ($emps as $e) {
+            if (salaryEngineAllowed($e, $db)) continue; // المُعَدّ يحسبه المحرّك أصلاً
+            $k = 0;
+            try { $k = (int)fillCarriedMissingMonths((int)$e['id'], (string)$e['sy']); if ($k) recalcEmployeeYear((int)$e['id'], (string)$e['sy']); } catch (Throwable $ex) {}
+            if ($k) $names[] = trim(($e['first_name_ar'] ?: $e['first_name_fr']) . ' ' . ($e['last_name_ar'] ?: $e['last_name_fr'])) . ' #' . $e['id'] . ' ' . $e['sy'] . ' (+' . $k . ')';
+        }
+        setSetting('heal_carried_missing_months_20260920', 'done: emps=' . count($names) . ' [' . implode('؛ ', array_slice($names, 0, 40)) . '] @' . date('Y-m-d H:i'));
+        if ($names) logAudit('heal_carried_missing_months_20260920', 'monthly_salaries', 0, null, ['emps' => $names]);
+    } catch (Throwable $e) {
+        try { setSetting('heal_carried_missing_months_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
 function healPercentLawOwn20260903() {
     try {
         if (strpos((string)getSetting('heal_percent_law_own_20260903', ''), 'done') === 0) return;
