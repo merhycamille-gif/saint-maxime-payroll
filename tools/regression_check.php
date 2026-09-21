@@ -7222,6 +7222,7 @@ check('📆 السنة الدراسية ت1 ← أيلول للجميع: الا�
 $hd153 = (string)file_get_contents($PROJ . '/includes/header.php');
 $map153 = [1815 => 400, 1821 => 400, 1397 => 500, 1816 => 700, 1847 => 750, 1106 => 670, 1817 => 400, 1822 => 400, 175 => 815, 141 => 860, 1819 => 460, 1820 => 400, 1560 => 700, 1000016 => 600, 1000017 => 600, 1000018 => 600]; // 💵 تعديله الثاني (مدوَّرة)
 $st153 = (string)getSetting('heal_abra_cw_usd2_20260920', ''); // بعد التعديل الثاني
+$net153 = strpos((string)getSetting('heal_abra_cw_net_20260921', ''), 'done') === 0;
 $ok153 = function_exists('healAbraContractUsd20260920') && strpos($hd153, 'healAbraContractUsd20260920();') !== false && function_exists('healAbraContractUsd2_20260920') && strpos($hd153, 'healAbraContractUsd2_20260920();') !== false; $why153 = 'heal=' . mb_substr($st153, 0, 12);
 if (strpos($st153, 'done') === 0) {
     $bad153 = [];
@@ -7230,11 +7231,49 @@ if (strpos($st153, 'done') === 0) {
         if (!$e) continue; // غير موجود بهذه القاعدة
         $act = (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = $eid AND is_active = 1 AND bonus_type IN ('prime_fixe','aide_complementaire') AND (school_year IS NULL OR school_year >= '2026-2027')")->fetchColumn();
         $oct = $db->query("SELECT base_salary_lbp b, ROUND(net_salary_lbp/NULLIF(exchange_rate,0)) n, exchange_rate r, extra_lbp + prime_fixe_lbp + aide_complementaire_lbp ex FROM monthly_salaries WHERE employee_id = $eid AND school_year = '2026-2027' AND month = 10")->fetch(PDO::FETCH_ASSOC);
+        if ($net153) $usd = (float)$e['u']; // 💵 بعد شفاء الصافي (2026-09-21) الأساس صار محسوباً من الصافي — يُفحص بالـ154
         if ($e['m'] !== 'direct_usd' || (float)$e['u'] !== (float)$usd || $act !== 0 || !$oct || (int)$oct['ex'] !== 0 || (int)$oct['n'] > $usd + 1 || abs((int)$oct['b'] - (int)floor($usd * (float)$oct['r'])) > 1) $bad153[] = "#$eid m={$e['m']} u={$e['u']} act=$act oct=" . json_encode($oct);
     }
     $ok153 = $ok153 && !$bad153; $why153 .= $bad153 ? ' bad=' . implode(' · ', $bad153) : ' 16 ok';
 }
 check('💵 متعاقدو عبرا بأساس دولار (كود + بعد الشفاء: 16 ملفاً direct_usd بمبلغ الإكسل، الإضافي 2026-2027 مطفأ، أساس ت1 = $×سعر الشهر، صافي ≤ الأساس بالدولار)', $ok153, $why153);
+
+/**
+ * 154) 💵 «هودي الرواتب بدي ياهن رواتب صافية بعد المحسومات — شوف قديش قيمة أساس الراتب وتحطو» (2026-09-21): إكسل «متعاقد عبرا.xlsx»
+ *      = الصافي بالدولار. بعد الشفاء: 16 ملفاً direct_usd، الأساس بالدولار ≥ الصافي المطلوب، وكل أشهر 2026-2027: الصافي داون للدولار
+ *      = المبلغ تماماً (لا أقلّ ولا دولار زيادة) + أساس الشهر = floor($ × السعر) + الصافي بالليرة داون للألف + النسخة الاحتياطية موجودة.
+ */
+$hd154 = (string)file_get_contents($PROJ . '/includes/header.php');
+$map154 = [1815 => 400, 1821 => 400, 1397 => 498, 1816 => 702, 1847 => 750, 1106 => 667, 1817 => 400, 1822 => 400, 175 => 812, 141 => 857, 1819 => 462, 1820 => 400, 1560 => 698, 1000016 => 600, 1000017 => 600, 1000018 => 600];
+$st154 = (string)getSetting('heal_abra_cw_net_20260921', '');
+$pc154 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$ok154 = function_exists('healAbraContractNet20260921') && strpos($hd154, 'healAbraContractNet20260921();') !== false
+    && function_exists('usdBaseAppliesForMonth') && function_exists('ensureUsdBaseFromSyColumn') && strpos($hd154, 'ensureUsdBaseFromSyColumn();') !== false
+    && substr_count($pc154, 'usdBaseAppliesForMonth($emp, (int)$this->month, (int)$this->year)') === 2
+    && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'name="usd_base_from_sy"') !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/excel_salaries.php'), 'usd_base_from_sy = ?') !== false; $why154 = 'heal=' . mb_substr($st154, 0, 12);
+if (strpos($st154, 'done') === 0) {
+    $bad154 = [];
+    foreach ($map154 as $eid => $net) {
+        $e = $db->query("SELECT salary_input_mode m, base_salary_usd u FROM employees WHERE id = $eid AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+        if (!$e) continue;
+        $rows = $db->query("SELECT month, base_salary_lbp b, net_salary_lbp n, exchange_rate r FROM monthly_salaries WHERE employee_id = $eid AND school_year = '2026-2027'")->fetchAll(PDO::FETCH_ASSOC);
+        if ($e['m'] !== 'direct_usd' || (float)$e['u'] < $net || count($rows) < 12) { $bad154[] = "#$eid m={$e['m']} u={$e['u']} rows=" . count($rows); continue; }
+        foreach ($rows as $r) {
+            $nu = (int)floor((int)$r['n'] / (float)$r['r']);
+            if ($nu !== $net || (int)$r['n'] % 1000 !== 0 || abs((int)$r['b'] - (int)floor((float)$e['u'] * (float)$r['r'])) > 1) { $bad154[] = "#$eid m{$r['month']} net={$r['n']}⇒{$nu}$≠{$net} b={$r['b']}"; break; }
+        }
+    }
+    // 📅 أساس الدولار يسري من 2026-2027: كل الـ16 مؤرَّخون + حساب حيّ (بلا حفظ) لتشرين الأول 2025 لفيوليت = راتبها القديم بالليرة 2,225,000 لا الدولار
+    $fs154 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE id IN (" . implode(',', array_keys($map154)) . ") AND is_deleted = 0 AND usd_base_from_sy = '2026-2027'")->fetchColumn();
+    $n154 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE id IN (" . implode(',', array_keys($map154)) . ") AND is_deleted = 0")->fetchColumn();
+    if ($fs154 !== $n154) $bad154[] = "from_sy $fs154/$n154";
+    try { $v154 = (new PayrollCalculator(141, 10, 2025))->calculate(); if ((int)$v154['base_salary_lbp'] !== 2225000) $bad154[] = 'فيوليت ت1 2025 أساس=' . (int)$v154['base_salary_lbp']; } catch (Throwable $e) { $bad154[] = 'calc141: ' . $e->getMessage(); }
+    $bk154 = (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '_bk_abra_cw_net_20260921_emp'")->fetchColumn();
+    if (!$bk154) $bad154[] = 'no backup';
+    $ok154 = $ok154 && !$bad154; $why154 .= $bad154 ? ' bad=' . implode(' · ', $bad154) : ' 16 ok (12 شهراً كلّ واحد)';
+}
+check('💵 متعاقدو عبرا: إكسله = الصافي بعد المحسومات ⇒ الأساس بالدولار محسوب بالمحرّك + 📅 «يسري من 2026-2027» (عمود ذاتي + خانة بالملف + الإكسل يؤرّخ) فتبقى 2025-2026 بالليرة (كود + بعد الشفاء: كل أشهر 2026-2027 صافي = المبلغ تماماً + فيوليت ت1 2025 حيّاً = 2,225,000)', $ok154, $why154);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

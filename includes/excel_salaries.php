@@ -332,7 +332,13 @@ function excelSalariesApply(PDO $db, int $schoolId, string $sy, array $changes):
         $ops = $ch['ops'] ?? [];
         if ($ety === 'enseignant_titulaire') unset($ops['salary']); // 🛡️ الملاك: الراتب بالسلسلة دائماً
         if (!empty($ops['salary'])) {
-            if ($ops['salary']['mode'] === 'direct_usd') $db->prepare("UPDATE employees SET salary_input_mode = 'direct_usd', base_salary_usd = ? WHERE id = ?")->execute([(float)$ops['salary']['usd'], $id]);
+            if ($ops['salary']['mode'] === 'direct_usd') {
+                // 💵📅 (2026-09-21) الانتقال من الليرة إلى الدولار يُؤرَّخ بسنة الإكسل: الأشهر قبلها تبقى على راتبه بالليرة (كشوفه القديمة لا تُخرَّب)
+                ensureUsdBaseFromSyColumn();
+                $pm = (string)$db->query("SELECT salary_input_mode FROM employees WHERE id = $id")->fetchColumn();
+                if ($pm !== 'direct_usd') $db->prepare("UPDATE employees SET salary_input_mode = 'direct_usd', base_salary_usd = ?, usd_base_from_sy = ? WHERE id = ?")->execute([(float)$ops['salary']['usd'], $sy, $id]);
+                else $db->prepare("UPDATE employees SET salary_input_mode = 'direct_usd', base_salary_usd = ? WHERE id = ?")->execute([(float)$ops['salary']['usd'], $id]);
+            }
             else $db->prepare("UPDATE employees SET salary_input_mode = 'direct_lbp', contract_salary_lbp = ? WHERE id = ?")->execute([(int)round((float)$ops['salary']['lbp']), $id]);
         }
         if (array_key_exists('prime', $ops)) {

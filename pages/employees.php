@@ -433,6 +433,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'salary_input_mode' => $modeP,
         'salary_labor_law' => $laborLawP, // ⚖️ موظف على قانون العمل (2026-09-18)
         'base_salary_usd' => (float)str_replace(',', '', $_POST['base_salary_usd'] ?? 0),
+        'usd_base_from_sy' => (preg_match('/^\d{4}-\d{4}$/', (string)($_POST['usd_base_from_sy'] ?? '')) ? (string)$_POST['usd_base_from_sy'] : null), // 💵📅 أساس الدولار يسري من سنة (2026-09-21)
         'base_salary_lbp_percent' => (float)($_POST['base_salary_lbp_percent'] ?? 0),
         'contract_salary_lbp' => (int)str_replace(',', '', $_POST['contract_salary_lbp'] ?? 0),
         'payment_months_per_year' => (int)($_POST['payment_months_per_year'] ?? 12), // 📆 السنة الدراسية ت1 ← أيلول للجميع تلقائياً (2026-09-20)
@@ -503,7 +504,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     try {
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) unset($data['job_title']);
         if (!$db->query("SHOW COLUMNS FROM employees LIKE 'salary_labor_law'")->fetch()) unset($data['salary_labor_law']);
-    } catch (Exception $e) { unset($data['job_title'], $data['salary_labor_law']); }
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'usd_base_from_sy'")->fetch()) unset($data['usd_base_from_sy']);
+    } catch (Exception $e) { unset($data['job_title'], $data['salary_labor_law'], $data['usd_base_from_sy']); }
     // أعمدة الخيارات (التنزيل العائلي + احتساب تعويض الزوجة/الأولاد): ركّبها ذاتياً،
     // وإن تعذّر أزِلها من الحفظ لتفادي الكسر
     ensureEmployeeChildren20260823();
@@ -1843,6 +1845,19 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     <div class="form-group salmode-field" data-mode="direct_usd">
                         <label class="form-label">Salaire en USD ($) / الراتب بالدولار</label>
                         <input type="number" name="base_salary_usd" class="form-control" value="<?= e($employee['base_salary_usd']) ?>" step="0.01" min="0">
+                        <?php // 💵📅 (2026-09-21) أساس الدولار «يسري من السنة الدراسية» — قبلها يُعتمد الراتب المتفق عليه بالليرة (كشوف عبرا القديمة)
+                        $usdFromSy = (string)($employee['usd_base_from_sy'] ?? '');
+                        $usdSyOpts = [currentSchoolYear()];
+                        if (preg_match('/^(\d{4})-(\d{4})$/', $usdSyOpts[0], $usdM)) { $usdSyOpts[] = ($usdM[1] - 1) . '-' . ($usdM[2] - 1); $usdSyOpts[] = ($usdM[1] + 1) . '-' . ($usdM[2] + 1); }
+                        try { foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)($employee['id'] ?? 0) . " AND school_year REGEXP '^[0-9]{4}-[0-9]{4}$'")->fetchAll(PDO::FETCH_COLUMN) as $usdSy) $usdSyOpts[] = (string)$usdSy; } catch (Exception $e) {}
+                        if ($usdFromSy !== '') $usdSyOpts[] = $usdFromSy;
+                        $usdSyOpts = array_unique($usdSyOpts); rsort($usdSyOpts); ?>
+                        <label class="form-label mt-2">S'applique à partir de l'année scolaire / يسري من السنة الدراسية</label>
+                        <select name="usd_base_from_sy" class="form-control">
+                            <option value="">— كل السنوات / Toutes les années —</option>
+                            <?php foreach ($usdSyOpts as $usdSy): ?><option value="<?= e($usdSy) ?>" <?= $usdSy === $usdFromSy ? 'selected' : '' ?>><?= e($usdSy) ?></option><?php endforeach; ?>
+                        </select>
+                        <small class="text-muted d-block">الأشهر قبل هذه السنة تبقى على «الراتب المتفق عليه (ل.ل)» — فلا تتغيّر الكشوف القديمة عند إعادة الحساب.</small>
                     </div>
                     <div class="form-group salmode-field" data-mode="percent_of_lbp">
                         <label class="form-label">أساس الراتب حسب السلسلة (ل.ل) / Échelle</label>

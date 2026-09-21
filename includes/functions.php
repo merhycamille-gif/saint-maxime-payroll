@@ -779,6 +779,26 @@ function ensureSalaryLaborLawColumn(): void {
         }
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
+/** 💵📅 (2026-09-21) تركيب ذاتي: عمود «أساس الدولار يسري من السنة الدراسية» — قبلها يُعتمد الراتب المتفق عليه بالليرة (contract_salary_lbp).
+ *  السبب: متعاقدو عبرا صاروا بأساس دولار من 2026-2027، وأي إعادة حساب لـ2025-2026 (كشفهم القديم المدقَّق) كانت تخرّبها بالأساس الجديد. */
+function ensureUsdBaseFromSyColumn(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'usd_base_from_sy'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN usd_base_from_sy VARCHAR(9) NULL DEFAULT NULL COMMENT 'أساس الدولار يسري من السنة الدراسية (قبلها: الراتب بالليرة)' AFTER base_salary_usd");
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+/** هل أساس الدولار (direct_usd) ساري على هذا الشهر؟ فارغ = كل السنوات؛ وإلا من تلك السنة الدراسية فصاعداً. */
+function usdBaseAppliesForMonth(array $emp, int $month, int $year): bool {
+    if (($emp['salary_input_mode'] ?? '') !== 'direct_usd') return false;
+    $from = trim((string)($emp['usd_base_from_sy'] ?? ''));
+    if ($from === '' || !preg_match('/^\d{4}-\d{4}$/', $from)) return true;
+    return schoolYearOfMonth($year, $month) >= $from;
+}
 /** هل هذا الموظف على «قانون العمل» (أساسه الحد الأدنى الساري)؟ — للموظف الإداري فقط */
 function isLaborLawSalary(array $emp): bool {
     return (($emp['employee_type'] ?? '') === 'employe') && !empty($emp['salary_labor_law']);
@@ -6167,6 +6187,76 @@ function healAbraContractUsd2_20260920() {
         logAudit('heal_abra_cw_usd2_20260920', 'employees', 0, null, ['done' => $done, 'skip' => $skip]);
     } catch (Throwable $e) {
         try { setSetting('heal_abra_cw_usd2_20260920', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
+    }
+}
+/**
+ * 💵 (2026-09-21 «شوف على الدسك توب متعاقد عبرا — هودي الرواتب بدي ياهن رواتب صافية بعد المحسومات، يعني انت لازم تشوف قديش قيمة
+ * أساس الراتب وتحطو تيطلع معك بعد المحسومات»): إكسل الدسك توب «متعاقد عبرا.xlsx» (16 اسماً: 400/400/498/702/750/667/400/400/812/857/
+ * 462/400/698/600×3) = **الصافي المطلوب بالدولار بعد الضمان والضريبة** لا الأساس. الأساس بالدولار (بالسنت) = أصغر أساس يعطي بمحرّك
+ * الحساب نفسه (ضمان 3٪ بحدوده + ضريبة الدخل بالتنزيل العائلي + الصافي داون للألف + الدولار داون) صافياً = المبلغ بكل أشهر 2026-2027.
+ * غير الخاضع (بلا ضمان ولا ضريبة) يبقى أساسه = صافيه. البحث ثنائي على تشرين الأول ثم تحقّق على كل الأشهر. مرّة واحدة، بنسخة احتياطية.
+ */
+function healAbraContractNet20260921() {
+    try {
+        if (strpos((string)getSetting('heal_abra_cw_net_20260921', ''), 'done') === 0) return;
+        $db = getDB();
+        require_once __DIR__ . '/payroll_calculator.php';
+        $map = [1815 => [400, 'عيد'], 1821 => [400, 'متى'], 1397 => [498, 'غدار'], 1816 => [702, 'حرب'], 1847 => [750, 'بولس'], 1106 => [667, 'دمج'],
+                1817 => [400, 'روفايل'], 1822 => [400, 'غزال'], 175 => [812, 'منصور'], 141 => [857, 'الحمصي'], 1819 => [462, 'بركات'],
+                1820 => [400, 'متى'], 1560 => [698, 'انطون'], 1000016 => [600, 'جبور'], 1000017 => [600, 'عون'], 1000018 => [600, 'ايوب']];
+        ensureUsdBaseFromSyColumn(); // قبل النسخة الاحتياطية كي تحمل العمود الجديد
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_abra_cw_net_20260921_emp LIKE employees");
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_abra_cw_net_20260921_ms LIKE monthly_salaries");
+        // الأعمدة المشتركة فقط (لو أُنشئت النسخة قبل عمود جديد)
+        $bkCols = implode(',', array_map(fn($c) => "`$c`", array_intersect($db->query("SHOW COLUMNS FROM _bk_abra_cw_net_20260921_emp")->fetchAll(PDO::FETCH_COLUMN), $db->query("SHOW COLUMNS FROM employees")->fetchAll(PDO::FETCH_COLUMN))));
+        $norm = function ($s) { $s = preg_replace('/[\x{064B}-\x{0652}\x{0640}]/u', '', (string)$s); return str_replace(['أ','إ','آ','ة','ى','ئ'], ['ا','ا','ا','ه','ي','ي'], $s); };
+        ensureUsdBaseFromSyColumn();
+        // 📅 أساس الدولار يسري من 2026-2027 فقط — سنة 2025-2026 (كشفهم القديم المدقَّق) تبقى على راتبهم بالليرة إن أُعيد حسابها
+        $setBase = $db->prepare("UPDATE employees SET salary_input_mode = 'direct_usd', base_salary_usd = ?, usd_base_from_sy = '2026-2027' WHERE id = ?");
+        // الصافي بالدولار (داون) لشهر معيّن بأساس معيّن — بالمحرّك نفسه بلا حفظ
+        $netUsd = function (int $eid, int $m, int $y, float $usd) use ($setBase): int {
+            $setBase->execute([$usd, $eid]);
+            $r = (new PayrollCalculator($eid, $m, $y))->calculate();
+            return (int)lbpToUsd((int)$r['net_salary_lbp'], (float)$r['exchange_rate']);
+        };
+        $done = []; $skip = [];
+        foreach ($map as $eid => [$target, $last]) {
+            $e = $db->query("SELECT * FROM employees WHERE id = $eid AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+            if (!$e || (int)$e['school_id'] !== 4 || $e['employee_type'] !== 'enseignant_contractuel' || mb_strpos($norm($e['last_name_ar']), $norm($last)) === false) { $skip[] = "#$eid"; continue; }
+            $db->exec("INSERT IGNORE INTO _bk_abra_cw_net_20260921_emp ($bkCols) SELECT $bkCols FROM employees WHERE id = $eid");
+            $db->exec("INSERT IGNORE INTO _bk_abra_cw_net_20260921_ms SELECT * FROM monthly_salaries WHERE employee_id = $eid AND school_year >= '2026-2027'");
+            $old = (float)$e['base_salary_usd'];
+            // أشهر 2026-2027 المخزّنة (وإلا 12 شهراً ت1 ← أيلول)
+            $months = [];
+            foreach ($db->query("SELECT month, year FROM monthly_salaries WHERE employee_id = $eid AND school_year = '2026-2027' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC) as $r) $months[] = [(int)$r['month'], (int)$r['year']];
+            if (!$months) { foreach ([10, 11, 12] as $m) $months[] = [$m, 2026]; foreach (range(1, 9) as $m) $months[] = [$m, 2027]; }
+            [$m0, $y0] = $months[0];
+            // بحث ثنائي على السنت: أصغر أساس يعطي صافي الشهر الأول ≥ الهدف (الصافي لا يتناقص مع الأساس)
+            $lo = $target * 100; $hi = (int)ceil($target * 1.3) * 100; $tries = 0;
+            while ($netUsd($eid, $m0, $y0, $hi / 100) < $target && $tries++ < 5) $hi = (int)($hi * 1.5);
+            if ($netUsd($eid, $m0, $y0, $lo / 100) >= $target) $hi = $lo;
+            while ($lo < $hi) { $mid = intdiv($lo + $hi, 2); if ($netUsd($eid, $m0, $y0, $mid / 100) >= $target) $hi = $mid; else $lo = $mid + 1; }
+            // تحقّق على كل الأشهر: أي شهر أقلّ من الهدف ⇒ سنت زيادة (محدود)
+            $usd = $hi / 100; $guard = 0;
+            do {
+                $minNet = PHP_INT_MAX;
+                foreach ($months as [$m, $y]) $minNet = min($minNet, $netUsd($eid, $m, $y, $usd));
+                if ($minNet >= $target) break;
+                $usd = round($usd + 0.01, 2);
+            } while ($guard++ < 200);
+            $setBase->execute([$usd, $eid]);
+            $n = 0;
+            foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = $eid AND school_year >= '2026-2027'")->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                try { $n += (int)recalcEmployeeYear($eid, (string)$sy); } catch (Throwable $ex) {}
+            }
+            if ($n === 0) { try { $n = (int)recalcEmployeeYear($eid, '2026-2027'); } catch (Throwable $ex) {} }
+            $net = $db->query("SELECT FLOOR(net_salary_lbp/NULLIF(exchange_rate,0)) FROM monthly_salaries WHERE employee_id = $eid AND school_year = '2026-2027' AND month = $m0")->fetchColumn();
+            $done[] = trim($e['first_name_ar'] . ' ' . $e['last_name_ar']) . " #$eid صافي {$target}$ ⇐ أساس {$old}$ → {$usd}$ (صافي " . (int)$net . "\$، $n شهراً)";
+        }
+        setSetting('heal_abra_cw_net_20260921', 'done: ' . count($done) . ' [' . implode('؛ ', $done) . ']' . ($skip ? ' skip=' . implode(',', $skip) : '') . ' @' . date('Y-m-d H:i'));
+        logAudit('heal_abra_cw_net_20260921', 'employees', 0, null, ['done' => $done, 'skip' => $skip]);
+    } catch (Throwable $e) {
+        try { setSetting('heal_abra_cw_net_20260921', 'err: ' . mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {}
     }
 }
 function healPercentLawOwn20260903() {

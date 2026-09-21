@@ -15,6 +15,7 @@ class PayrollCalculator {
     
     public function __construct($employeeId, $month, $year) {
         ensureFamilyAllowanceDateColumns(); // 👨‍👩‍👧 مدّة التعويض العائلي «من ← إلى» تتركّب ذاتياً (2026-09-20)
+        ensureUsdBaseFromSyColumn(); // 💵📅 «أساس الدولار يسري من سنة» يتركّب ذاتياً (2026-09-21)
         $stmt = getDB()->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0");
         $stmt->execute([$employeeId]);
         $this->employee = $stmt->fetch();
@@ -204,7 +205,7 @@ class PayrollCalculator {
 
         if ($emp['employee_type'] === 'enseignant_titulaire') {
             // اتفاق خاص بالدولار يتجاوز السلسلة (دولار←ليرة بلا فراطات: تدوير لتحت)
-            if ($emp['salary_input_mode'] === 'direct_usd' && (float)$emp['base_salary_usd'] > 0) {
+            if ($emp['salary_input_mode'] === 'direct_usd' && (float)$emp['base_salary_usd'] > 0 && usdBaseAppliesForMonth($emp, (int)$this->month, (int)$this->year)) { // 📅 قبل سنة سريانه ⇒ السلسلة
                 return [usdToLbp($emp['base_salary_usd'], $this->exchangeRate), 0.0, (float)$emp['current_grade']];
             }
             // اتفاق خاص بالليرة يتجاوز السلسلة
@@ -272,7 +273,8 @@ class PayrollCalculator {
         if (isLaborLawSalary($emp)) {
             return [(float)laborLawMinWage((int)$this->month, (int)$this->year), 0.0, (float)$emp['current_grade']];
         }
-        if ($emp['salary_input_mode'] === 'direct_usd') {
+        // 💵📅 (2026-09-21) أساس الدولار «يسري من سنة دراسية»: الأشهر قبلها = الراتب المتفق عليه بالليرة (كشوف عبرا القديمة لا تُخرَّب بإعادة الحساب)
+        if (usdBaseAppliesForMonth($emp, (int)$this->month, (int)$this->year)) {
             return [usdToLbp($emp['base_salary_usd'], $this->exchangeRate), 0.0, (float)$emp['current_grade']];
         }
         // أي وضع آخر (direct_lbp أو ضبط خاطئ على «السلسلة») = الراتب المتفق عليه بالليرة مباشرةً.
