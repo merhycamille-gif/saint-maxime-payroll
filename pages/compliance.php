@@ -25,7 +25,12 @@ include __DIR__ . '/../includes/header.php';
 
 <?php renderCompliancePending($rep, false); ?>
 
-<?php if (!$rep['pending'] && !$rep['auto']): ?>
+<?php if (!empty($rep['before_law'])): ?>
+<div class="card" style="border:2px solid #6d28d9;margin-bottom:16px">
+    <div class="card-header" style="background:#f5f3ff"><h3 style="color:#4c1d95"><i class="fas fa-scale-balanced"></i> Rapport de conformité / تقرير المخالفات — سنة <?= e($rep['sy']) ?></h3></div>
+    <div class="card-body"><div class="alert alert-info" style="margin:0"><i class="fas fa-calendar-check"></i> بقرارك: القانون يُطبَّق على كل البرنامج ابتداءً من <b>1 تشرين الأول <?= e(substr($rep['law_from'], 0, 4)) ?></b> (سنة <?= e($rep['law_from']) ?>). سنة <?= e($rep['sy']) ?> تاريخ مدفوع يُترك كما هو — لا تُفحص ولا تظهر لها مخالفات. لتغيير البداية استعمل الخانة أسفل الصفحة.</div></div>
+</div>
+<?php elseif (!$rep['pending'] && !$rep['auto']): ?>
 <div class="card" style="border:2px solid #16a34a;margin-bottom:16px">
     <div class="card-header" style="background:#f0fdf4"><h3 style="color:#166534"><i class="fas fa-scale-balanced"></i> Rapport de conformité / تقرير المخالفات — سنة <?= e($rep['sy']) ?></h3></div>
     <div class="card-body"><div class="alert alert-success" style="margin:0"><i class="fas fa-check-circle"></i> لا مخالفات معلّقة بالنطاق المختار — كل الأساتذة والموظفين مطابقون للقانون ولبنود ملفاتهم.</div></div>
@@ -91,4 +96,17 @@ include __DIR__ . '/../includes/header.php';
     </ul></div>
 </div>
 
+<?php if (canEdit()): $lawYears = []; try { foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE school_year REGEXP '^[0-9]{4}-[0-9]{4}$' ORDER BY school_year DESC")->fetchAll(PDO::FETCH_COLUMN) as $ly) $lawYears[] = (string)$ly; } catch (Exception $e) {} if (!in_array($rep['law_from'], $lawYears, true)) $lawYears[] = $rep['law_from']; rsort($lawYears); ?>
+<div class="card no-print" style="border:1px solid #c4b5fd;margin-top:16px">
+    <div class="card-header" style="background:#f5f3ff"><h3 style="color:#4c1d95"><i class="fas fa-calendar-check"></i> Application de la loi à partir de / تطبيق القانون ابتداءً من</h3></div>
+    <div class="card-body">
+        <form method="post" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap" onsubmit="return confirm('تطبيق القانون على كل البرنامج ابتداءً من هذه السنة؟ ما قبلها يُترك كما دُفع.')"><?= csrfField() ?><input type="hidden" name="action" value="comp_law_from">
+            <label class="form-label" style="margin:0">السنة الدراسية / Année scolaire</label>
+            <select name="law_from" class="form-control" style="width:auto"><?php foreach ($lawYears as $ly): ?><option value="<?= e($ly) ?>" <?= $ly === $rep['law_from'] ? 'selected' : '' ?>><?= e($ly) ?> (من 1 تشرين الأول <?= e(substr($ly, 0, 4)) ?>)</option><?php endforeach; ?></select>
+            <button class="btn btn-primary"><i class="fas fa-check"></i> اعتماد</button>
+            <small class="text-muted">الفحص الشامل وتقرير المخالفات يعملان من هذه السنة فصاعداً؛ السنوات الأقدم تاريخ مدفوع لا يُمسّ.</small>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -551,11 +551,13 @@ function compliancePendingCount(): int {
 
 function complianceBuild(PDO $db): array {
     $sy = complianceYear();
-    $items = complianceItems($db, $sy);
+    // ⚖️📅 (2026-09-21) بقراره: القانون يُطبَّق من سنة lawEnforceFromSy فصاعداً — سنة أقدم = تاريخ مدفوع بلا بنود
+    $lawFrom = lawEnforceFromSy(); $beforeLaw = $sy < $lawFrom;
+    $items = $beforeLaw ? [] : complianceItems($db, $sy);
     $dec = complianceDecisions($db);
     [$pending, $rejected, $auto, $applied] = complianceSplit($items, $dec);
     try { setSetting('compliance_pending_' . complianceScopeKey(), (string)count($pending)); } catch (Throwable $e) {}
-    return ['sy' => $sy, 'items' => $items, 'pending' => $pending, 'rejected' => $rejected, 'auto' => $auto, 'applied' => $applied];
+    return ['sy' => $sy, 'items' => $items, 'pending' => $pending, 'rejected' => $rejected, 'auto' => $auto, 'applied' => $applied, 'law_from' => $lawFrom, 'before_law' => $beforeLaw];
 }
 
 /** تسجيل تصحيح تلقائي بالتقرير (يستدعيه الشفاء الذاتي) */
@@ -655,11 +657,17 @@ function complianceApply(PDO $db, array $it): string {
 
 /** معالج القرارات (موافق/لا/إعادة فتح) — يُستدعى من لوحة القيادة وصفحة التقرير */
 function handleCompliancePost(PDO $db, string $redirectTo): void {
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !in_array($_POST['action'] ?? '', ['comp_approve', 'comp_reject', 'comp_reopen', 'comp_approve_rule'], true)) return;
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !in_array($_POST['action'] ?? '', ['comp_approve', 'comp_reject', 'comp_reopen', 'comp_approve_rule', 'comp_law_from'], true)) return;
     requireCsrf();
     if (!canEdit()) { $_SESSION['flash_error'] = 'غير مسموح — حساب قراءة فقط.'; header('Location: ' . $redirectTo); exit; }
     complianceEnsureTable($db);
     $act = $_POST['action'];
+    if ($act === 'comp_law_from') { // ⚖️📅 بداية تطبيق القانون (2026-09-21)
+        $v = trim((string)($_POST['law_from'] ?? ''));
+        if (preg_match('/^\d{4}-\d{4}$/', $v)) { $old = lawEnforceFromSy(); setSetting('law_enforce_from_sy', $v); logAudit('law_enforce_from_sy', 'settings', 0, ['from' => $old], ['from' => $v]); $_SESSION['flash_success'] = 'القانون يُطبَّق على كل البرنامج ابتداءً من سنة ' . $v . ' (1 تشرين الأول ' . substr($v, 0, 4) . ')'; }
+        else $_SESSION['flash_error'] = 'سنة غير صالحة';
+        header('Location: ' . $redirectTo); exit;
+    }
     $who = (string)($_SESSION['username'] ?? '');
     if ($act === 'comp_reopen') {
         $db->prepare("DELETE FROM compliance_decisions WHERE item_key = ? AND decision = 'rejected'")->execute([(string)($_POST['key'] ?? '')]);

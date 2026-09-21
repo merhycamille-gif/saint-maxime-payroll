@@ -1083,11 +1083,18 @@ function monthStaleCompare(array $e, string $sy, ?PDO $db = null): ?array {
     if (!$months) return null;
     return ['months' => $months, 'rows' => count($rows), 'fields' => $bad, 'sample' => $sample];
 }
-/** السنوات المفحوصة: السابقة + الجارية */
+/** ⚖️📅 (2026-09-21 «طبّق القانون على كل البرنامج ابتداءً من 1-10-2026»): القانون وفحوص المخالفات تُطبَّق من هذه السنة الدراسية فصاعداً؛
+ *  ما قبلها تاريخ مدفوع يُترك كما هو (لا بنود ولا فحص شامل). الإعداد law_enforce_from_sy (يغيّره من صفحة تقرير المخالفات)، الافتراضي بقراره 2026-2027. */
+function lawEnforceFromSy(): string {
+    $v = trim((string)getSetting('law_enforce_from_sy', ''));
+    return preg_match('/^\d{4}-\d{4}$/', $v) ? $v : '2026-2027';
+}
+/** السنوات المفحوصة: السابقة + الجارية — ابتداءً من سنة تطبيق القانون */
 function monthStaleYears(): array {
     $cur = currentSchoolYear();
     if (!preg_match('/^(\d{4})-(\d{4})$/', $cur, $m)) return [$cur];
-    return [($m[1] - 1) . '-' . ($m[2] - 1), $cur];
+    $from = lawEnforceFromSy();
+    return array_values(array_filter([($m[1] - 1) . '-' . ($m[2] - 1), $cur], fn($y) => $y >= $from)) ?: [$cur];
 }
 /** دفعة من الفحص الشامل (تُنادى من الترويسة مع كل صفحة): ~$budget صفّ راتب ثم تتوقّف؛ جولة كاملة كل $hours ساعات */
 function monthStaleScanStep(int $budget = 120, int $hours = 3): void {

@@ -301,7 +301,7 @@ check('⚖️ تقرير المخالفات: الوحدة + الجدول الذ�
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
-      && strpos($cpSrc, "in_array(\$_POST['action'] ?? '', ['comp_approve', 'comp_reject', 'comp_reopen', 'comp_approve_rule'], true)") !== false
+      && strpos($cpSrc, "in_array(\$_POST['action'] ?? '', ['comp_approve', 'comp_reject', 'comp_reopen', 'comp_approve_rule', 'comp_law_from'], true)") !== false
       && strpos($cpSrc, 'requireCsrf();') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../index.php'), 'handleCompliancePost($db, BASE_URL . \'index.php\');') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../index.php'), 'renderCompliancePending($homeComp, true);') !== false
@@ -7307,6 +7307,24 @@ try {
     }
 } catch (Throwable $e) { $ok155 = false; $why155 .= ' err=' . $e->getMessage(); }
 check('🔎 الفحص الشامل الدوري «شهر مخزّن ≠ المحرّك الحيّ» (كود + ترويسة + قاعدة month_stale بلا تصحيح جماعي + تجربة فعلية: تحريف ضمان شهر يُكشَف ويُسترجَع)', $ok155, $why155);
+
+/**
+ * 156) ⚖️📅 «طبّق القانون على كل البرنامج ابتداءً من 1-10-2026» (2026-09-21): إعداد مؤرَّخ law_enforce_from_sy (افتراضياً 2026-2027) —
+ *      الفحص الشامل يبدأ منه (monthStaleYears) وتقرير المخالفات لسنة أقدم = لافتة «تاريخ مدفوع» بلا بنود + خانة تغييره بالصفحة (comp_law_from).
+ */
+$cp156 = (string)file_get_contents($PROJ . '/includes/compliance.php'); $pg156 = (string)file_get_contents($PROJ . '/pages/compliance.php');
+$ok156 = function_exists('lawEnforceFromSy') && lawEnforceFromSy() >= '2026-2027' && !in_array('2025-2026', monthStaleYears(), true)
+      && strpos($cp156, "\$items = \$beforeLaw ? [] : complianceItems(\$db, \$sy);") !== false && strpos($cp156, "'comp_law_from'") !== false
+      && strpos($pg156, "if (!empty(\$rep['before_law'])):") !== false && strpos($pg156, 'name="law_from"') !== false;
+$why156 = 'from=' . lawEnforceFromSy() . ' years=' . implode(',', monthStaleYears());
+try {
+    $sv156 = $_SESSION['active_school_year'] ?? null; $_SESSION['active_school_year'] = '2025-2026';
+    $rep156 = complianceBuild($db);
+    $_SESSION['active_school_year'] = $sv156;
+    $ok156 = $ok156 && !empty($rep156['before_law']) && $rep156['items'] === [] && $rep156['pending'] === [];
+    $why156 .= ' 2025-2026: before_law=' . (int)!empty($rep156['before_law']) . ' items=' . count($rep156['items']);
+} catch (Throwable $e) { $ok156 = false; $why156 .= ' err=' . $e->getMessage(); }
+check('⚖️📅 تطبيق القانون ابتداءً من 2026-2027 (إعداد مؤرَّخ + الفحص الشامل من تلك السنة + تقرير 2025-2026 = تاريخ مدفوع بلا بنود + خانة التغيير)', $ok156, $why156);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
