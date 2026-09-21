@@ -66,6 +66,7 @@ function complianceRules(): array {
         'pct_nontit'     => ['% hors titulaire',           'نسبة مئوية عند متعاقد أو موظف (للملاك فقط)',          '#b45309'],
         'bonus_nosy'     => ['Prime sans année',           'بند علاوة بلا سنة دراسية (ينطبق على كل السنين)',      '#b45309'],
         'net_math'       => ['Net incohérent',             'صافي أو مستحق لا يساوي مكوّناته',                    '#b91c1c'],
+        'month_stale'    => ['Mois ≠ moteur',              'شهر مخزّن لا يطابق إعادة حسابه بالمحرّك الحيّ اليوم (ملفه أو بنوده أو القانون تغيّر بعد الاحتساب، أو أرقام منقولة من كشف قديم) — الفحص الشامل الدوري', '#b91c1c'],
         'tax_stale'      => ['Impôt ≠ loi',                'ضريبة الدخل المخزّنة لا تطابق القانون الحيّ (ملفه أو القانون تغيّر بعد الاحتساب)', '#b91c1c'],
         'row_rate0'      => ['Taux = 0',                   'صف راتب بسعر صرف صفر أو فارغ',                        '#b45309'],
         'left_rows'      => ['Salaires après départ',      'تارك عنده رواتب بعد تركه',                            '#7c3aed'],
@@ -322,6 +323,27 @@ function complianceItems(PDO $db, string $sy): array {
             'إعادة حساب سنة ' . $sy . ' بالقانون الحيّ', true, ['months' => count($bad), 'stored' => $stored, 'law' => $law]);
     }
 
+    // ── 11ج) 🔎 الفحص الشامل الدوري (2026-09-21 «ما عندك طريقة تكتشف الأخطاء دفعة واحدة؟»): كل شهر مخزّن ≠ إعادة حسابه بالمحرّك الحيّ
+    //  (monthStaleScanStep بالترويسة على دفعات — النتائج بجدول month_stale_findings). بند واحد للموظف بالسنة بانتظار قراره؛ لا تصحيح جماعي.
+    try {
+        ensureMonthStaleTable();
+        $msLbl = monthStaleFields();
+        $msSt = json_decode((string)getSetting('month_stale_scan', ''), true) ?: [];
+        $msWhen = !empty($msSt['done_at']) ? date('Y-m-d H:i', (int)$msSt['done_at']) : 'لم تكتمل جولة بعد';
+        foreach ($q("SELECT e.*, f.months ms_months, f.fields ms_fields, f.sample ms_sample, f.found_at ms_found
+            FROM month_stale_findings f JOIN employees e ON e.id = f.employee_id
+            WHERE f.school_year = ? AND e.is_deleted = 0" . $sc . " ORDER BY e.school_id, e.id", [$sy]) as $r) {
+            $flds = json_decode((string)$r['ms_fields'], true) ?: []; $smp = json_decode((string)$r['ms_sample'], true) ?: [];
+            $core = array_values(array_filter(array_keys($flds), fn($f) => !in_array($f, ['total_retenues_lbp', 'net_salary_lbp', 'total_due_lbp'], true)));
+            $names = array_map(fn($f) => $msLbl[$f] ?? $f, $core ?: array_keys($flds));
+            $ex = $smp ? (' — مثلاً ' . ($msLbl[$smp['f']] ?? $smp['f']) . ' ' . complianceMonthLabel((int)$smp['m'], (int)$smp['y']) . ': مخزّن ' . complianceFmt($smp['stored']) . ' / المحرّك اليوم ' . complianceFmt($smp['live'])) : '';
+            $add('month_stale', $r,
+                (int)$r['ms_months'] . ' شهراً مخزّناً لا يطابق المحرّك الحيّ (' . implode('، ', array_slice($names, 0, 5)) . (count($names) > 5 ? '…' : '') . ')' . $ex . ' — آخر جولة فحص: ' . $msWhen,
+                'إعادة حساب سنة ' . $sy . ' بالمحرّك الحيّ (إذا كانت الأرقام القديمة مقصودة اضغط «لا — اتركه»)', true,
+                ['months' => (int)$r['ms_months'], 'fields' => $flds, 'sample' => $smp]);
+        }
+    } catch (Throwable $ex) {}
+
     // ── 12) صف بسعر صرف صفر (لغير التاركين) ──
     foreach ($q("SELECT e.*, ms.month, ms.year FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0 AND ms.school_year = ? AND COALESCE(ms.exchange_rate,0) <= 0" . $sc . "
@@ -559,6 +581,10 @@ function complianceApply(PDO $db, array $it): string {
             $n = $recalcYear();
             logAudit('compliance_grade_law', 'employees', $eid, ['current_grade' => $old], ['current_grade' => (float)$d['law'], 'sy' => $sy]);
             return 'الدرجة ' . rtrim(rtrim(number_format($old, 1), '0'), '.') . ' → ' . rtrim(rtrim(number_format((float)$d['law'], 1), '0'), '.') . ' وأُعيد حساب ' . $n . ' شهراً';
+        case 'month_stale':
+            $n = $recalcYear();
+            try { ensureMonthStaleTable(); $db->prepare("DELETE FROM month_stale_findings WHERE employee_id = ? AND school_year = ?")->execute([$eid, $sy]); } catch (Throwable $e) {}
+            return 'أُعيد حساب ' . $n . ' شهراً بسنة ' . $sy . ' بالمحرّك الحيّ';
         case 'base_scale': case 'pct_law': case 'add_stale': case 'ghost_add': case 'missing_add': case 'row_rate0': case 'active_nomonths': case 'tax_stale': case 'family_allow_stale':
             $n = $recalcYear();
             return 'أُعيد حساب ' . $n . ' شهراً بسنة ' . $sy;
@@ -647,7 +673,7 @@ function handleCompliancePost(PDO $db, string $redirectTo): void {
     if ($act === 'comp_approve_rule') {
         $rule = (string)($_POST['rule'] ?? '');
         // family_ded_off: قرار شخص بشخص (الأستاذة المتزوجة عادةً زوجها يأخذ التنزيل) — لا تضوية جماعية
-        foreach ($items as $it) if ($it['rule'] === $rule && $it['auto'] && $rule !== 'left_rows' && $rule !== 'net_math' && $rule !== 'family_ded_off' && $rule !== 'eoc_base_only' && $rule !== 'carried_stale') $keys[] = $it['key'];
+        foreach ($items as $it) if ($it['rule'] === $rule && $it['auto'] && $rule !== 'left_rows' && $rule !== 'net_math' && $rule !== 'family_ded_off' && $rule !== 'eoc_base_only' && $rule !== 'carried_stale' && $rule !== 'month_stale') $keys[] = $it['key'];
         $act = 'comp_approve';
     } else {
         $keys = [(string)($_POST['key'] ?? '')];
@@ -707,7 +733,7 @@ function renderComplianceTable(array $items, string $formAction = '', bool $coll
         if (empty($byRule[$rk])) continue;
         $rows = $byRule[$rk];
         $n = count($rows);
-        $canBulk = canEdit() && $rk !== 'left_rows' && $rk !== 'net_math' && $rk !== 'family_ded_off' && $rk !== 'eoc_base_only' && $rk !== 'carried_stale' && count(array_filter($rows, fn($r) => $r['auto'])) > 1;
+        $canBulk = canEdit() && $rk !== 'left_rows' && $rk !== 'net_math' && $rk !== 'family_ded_off' && $rk !== 'eoc_base_only' && $rk !== 'carried_stale' && $rk !== 'month_stale' && count(array_filter($rows, fn($r) => $r['auto'])) > 1;
         $tag = $collapsed ? 'details' : 'div';
         echo '<' . $tag . ' class="comp-rule" style="margin-bottom:10px;border:1px solid var(--gray-200);border-radius:8px;padding:6px 10px"' . ($collapsed && $n <= 3 ? ' open' : '') . '>';
         echo ($collapsed ? '<summary style="cursor:pointer;padding:4px 0">' : '<div style="padding:4px 0">')

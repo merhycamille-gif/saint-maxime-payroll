@@ -296,8 +296,8 @@ $cpItems = complianceItems($db, currentSchoolYear());
 $cpRules = complianceRules();
 $cpBadRule = array_filter($cpItems, fn($i) => !isset($cpRules[$i['rule']]) || !isset($i['key'], $i['violation'], $i['fix'], $i['auto']));
 $cpSrc = (string)file_get_contents(__DIR__ . '/../includes/compliance.php');
-check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 26 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة/تعويض عائلي ≠ ملفه…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
-      count($cpRules) === 26 /* 👨‍👩‍👧 2026-09-20 + family_allow_stale */
+check('⚖️ تقرير المخالفات: الوحدة + الجدول الذاتي + 27 قاعدة (درجة/سلسلة/قانون النسبة/مكرّر/إضافي/تارك/صافي/تنزيل عائلي مطفأ/ضريبة ≠ قانون/صندوق على الأساس/نقل بنسبة/تعويض عائلي ≠ ملفه…) + الرئيسية تبنيه وتعرضه عند كل فتح وتعالج «موافق/لا» + الصفحة الدائمة + شارة بالقائمة + المكرّر التلقائي يُسجَّل فيه',
+      count($cpRules) === 27 /* 👨‍👩‍👧 2026-09-20 + family_allow_stale · 🔎 2026-09-21 + month_stale */
       && (int)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'compliance_decisions'")->fetchColumn() === 1
       && is_array($cpItems) && count($cpBadRule) === 0
       && strpos($cpSrc, "case 'left_rows':") !== false && strpos($cpSrc, "case 'grade_law':") !== false && strpos($cpSrc, "case 'net_math':") !== false
@@ -5175,8 +5175,8 @@ check('تقرير المخالفات: قاعدة family_ded_off معرَّفة (
       isset(complianceRules()['family_ded_off'])
       && strpos($cmp103, "\$add('family_ded_off', \$r,") !== false && substr_count($cmp103, 'familyDeductionAnnual($r[\'social_status\'], $r[\'spouse_works\'] ?? 0, 1, $fdAsOf,') === 2
       && strpos($cmp103, "case 'family_ded_off':") !== false && strpos($cmp103, "if (!empty(\$d['spouse'])) \$set[] = 'grant_spouse_addition = 1';") !== false
-      && strpos($cmp103, "&& \$rule !== 'family_ded_off' && \$rule !== 'eoc_base_only' && \$rule !== 'carried_stale') \$keys[] = \$it['key'];") !== false
-      && strpos($cmp103, "&& \$rk !== 'family_ded_off' && \$rk !== 'eoc_base_only' && \$rk !== 'carried_stale' && count(array_filter(") !== false
+      && strpos($cmp103, "&& \$rule !== 'family_ded_off' && \$rule !== 'eoc_base_only' && \$rule !== 'carried_stale' && \$rule !== 'month_stale') \$keys[] = \$it['key'];") !== false
+      && strpos($cmp103, "&& \$rk !== 'family_ded_off' && \$rk !== 'eoc_base_only' && \$rk !== 'carried_stale' && \$rk !== 'month_stale' && count(array_filter(") !== false
       && strpos($src103, '· تنزيل الأولاد: <b>') !== false);
 
 /* ===================================================================
@@ -7274,6 +7274,39 @@ if (strpos($st154, 'done') === 0) {
     $ok154 = $ok154 && !$bad154; $why154 .= $bad154 ? ' bad=' . implode(' · ', $bad154) : ' 16 ok (12 شهراً كلّ واحد)';
 }
 check('💵 متعاقدو عبرا: إكسله = الصافي بعد المحسومات ⇒ الأساس بالدولار محسوب بالمحرّك + 📅 «يسري من 2026-2027» (عمود ذاتي + خانة بالملف + الإكسل يؤرّخ) فتبقى 2025-2026 بالليرة (كود + بعد الشفاء: كل أشهر 2026-2027 صافي = المبلغ تماماً + فيوليت ت1 2025 حيّاً = 2,225,000)', $ok154, $why154);
+
+/**
+ * 155) 🔎 «ما عندك طريقة تكتشف الأخطاء دفعة واحدة بها البرنامج بدل ما كل يوم نكتشف خطأ جديد… ما إلنا حق نلخبط برواتب الناس» (2026-09-21):
+ *      الفحص الشامل الدوري — كل شهر مخزّن يُعاد حسابه بالمحرّك الحيّ ويُقارَن رقماً رقماً ⇒ بند month_stale بتقرير المخالفات (بلا تصحيح
+ *      جماعي/تلقائي). كود: الدوال + الترويسة + القاعدة + التصحيح. تشغيل فعلي: صفّ مطابق لا يُبلَّغ، وتحريف ضمانه +7,777 يُبلَّغ ثم يُسترجَع.
+ */
+$fn155 = (string)file_get_contents($PROJ . '/includes/functions.php'); $cp155 = (string)file_get_contents($PROJ . '/includes/compliance.php'); $hd155 = (string)file_get_contents($PROJ . '/includes/header.php');
+$ok155 = function_exists('monthStaleCompare') && function_exists('monthStaleScanStep') && function_exists('ensureMonthStaleTable')
+      && strpos($hd155, 'monthStaleScanStep();') !== false && strpos($cp155, "'month_stale'    => ['Mois ≠ moteur'") !== false
+      && strpos($cp155, "FROM month_stale_findings f JOIN employees e") !== false && strpos($cp155, "case 'month_stale':") !== false
+      && strpos($cp155, "&& \$rule !== 'month_stale') \$keys[] = \$it['key'];") !== false && strpos($cp155, "&& \$rk !== 'month_stale'") !== false;
+$why155 = 'code=' . ($ok155 ? 'ok' : 'missing');
+try {
+    ensureMonthStaleTable();
+    // موظف يسمح له المحرّك وله أشهر 2026-2027 مطابقة (نأخذ أوّل واحد ليس ببند month_stale محلياً)
+    $cand155 = $db->query("SELECT e.* FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2026-2027' AND ms.net_salary_lbp > 0
+        LEFT JOIN month_stale_findings f ON f.employee_id = e.id AND f.school_year = '2026-2027'
+        WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_contractuel' AND e.contract_salary_lbp > 0 AND f.employee_id IS NULL AND COALESCE(e.left_date_all,'9999-12-31') = '9999-12-31' AND COALESCE(e.cadre_from_sy,'') = ''
+        GROUP BY e.id ORDER BY e.id LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
+    $pick = null; $r0 = null;
+    foreach ($cand155 as $c) { $r = monthStaleCompare($c, '2026-2027', $db); if ($r === null) { $pick = $c; break; } }
+    if (!$pick) { $ok155 = false; $why155 .= ' no clean candidate'; }
+    else {
+        $row = $db->query("SELECT month, year, cnss_amount_lbp FROM monthly_salaries WHERE employee_id = " . (int)$pick['id'] . " AND school_year = '2026-2027' AND net_salary_lbp > 0 ORDER BY year, month LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        $db->exec("UPDATE monthly_salaries SET cnss_amount_lbp = cnss_amount_lbp + 7777 WHERE employee_id = " . (int)$pick['id'] . " AND school_year = '2026-2027' AND month = " . (int)$row['month'] . " AND year = " . (int)$row['year']);
+        $r1 = monthStaleCompare($pick, '2026-2027', $db);
+        $db->exec("UPDATE monthly_salaries SET cnss_amount_lbp = " . (int)$row['cnss_amount_lbp'] . " WHERE employee_id = " . (int)$pick['id'] . " AND school_year = '2026-2027' AND month = " . (int)$row['month'] . " AND year = " . (int)$row['year']);
+        $r2 = monthStaleCompare($pick, '2026-2027', $db);
+        $ok155 = $ok155 && $r1 !== null && (int)$r1['months'] === 1 && isset($r1['fields']['cnss_amount_lbp']) && $r2 === null;
+        $why155 .= ' #' . $pick['id'] . ' tamper=' . ($r1 ? $r1['months'] . 'm ' . implode(',', array_keys($r1['fields'])) : 'null') . ' restored=' . ($r2 === null ? 'clean' : 'dirty');
+    }
+} catch (Throwable $e) { $ok155 = false; $why155 .= ' err=' . $e->getMessage(); }
+check('🔎 الفحص الشامل الدوري «شهر مخزّن ≠ المحرّك الحيّ» (كود + ترويسة + قاعدة month_stale بلا تصحيح جماعي + تجربة فعلية: تحريف ضمان شهر يُكشَف ويُسترجَع)', $ok155, $why155);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

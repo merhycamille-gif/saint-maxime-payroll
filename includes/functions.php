@@ -1021,6 +1021,124 @@ function pctFmt($v): string {
     return rtrim(rtrim(number_format($f, 4, '.', ''), '0'), '.');
 }
 
+/* =====================================================================
+ * 🔎 الفحص الشامل الدوري «شهر مخزّن ≠ المحرّك الحيّ» (2026-09-21 «ما عندك طريقة تكتشف الأخطاء دفعة واحدة بدل ما كل يوم
+ *    نكتشف خطأ جديد… ما إلنا حق نلخبط برواتب الناس»): كل شهر مخزّن (السنة الجارية والسابقة) يُعاد حسابه بالمحرّك الحيّ
+ *    بلا حفظ ويُقارَن بالمخزّن رقماً رقماً (الأساس/الدرجة/الإضافي/المكافأة/الضمان/الصندوق/الضريبة/الصافي/العائلي/النقل/المستحق).
+ *    أي فرق = بند «month_stale» بتقرير المخالفات بانتظار قراره (لا تصحيح تلقائي — الكشوف القديمة المدقَّقة قد تكون مقصودة).
+ *    يمشي على دفعات صغيرة مع كل فتح صفحة (~120 صفاً ≈ ثانية) فلا يبطّئ الموقع، ويعيد الجولة كل 3 ساعات.
+ *    الاستثناءات: المنقول بأساس مخزّن (المحرّك ممنوع عليه)، السنة المقفولة، سنوات المرسَّم قبل ترسيمه (cadre_from_sy)،
+ *    سنة بعد الترك (قاعدة left_rows)، وفرق سعر صرف أقلّ من ليرة (صفوف مشتقّة من كشف قديم).
+ * =================================================================== */
+function ensureMonthStaleTable(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        getDB()->exec("CREATE TABLE IF NOT EXISTS month_stale_findings (
+            employee_id INT NOT NULL, school_year VARCHAR(9) NOT NULL, months SMALLINT NOT NULL DEFAULT 0,
+            fields VARCHAR(255) NULL, sample TEXT NULL, found_at DATETIME NULL, PRIMARY KEY (employee_id, school_year)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Throwable $e) {}
+}
+function monthStaleFields(): array {
+    return ['base_salary_lbp' => 'الأساس', 'echelon_value_lbp' => 'الدرجة', 'extra_lbp' => 'الإضافي', 'prime_fixe_lbp' => 'الأجر الإضافي', 'aide_complementaire_lbp' => 'المكافأة',
+            'cnss_amount_lbp' => 'الضمان', 'caisse_amount_lbp' => 'الصندوق', 'eoc_grade_lbp' => 'صندوق الدرجة', 'income_tax_lbp' => 'الضريبة', 'total_retenues_lbp' => 'المحسومات',
+            'net_salary_lbp' => 'الصافي', 'family_allowance_lbp' => 'التعويض العائلي', 'transport_lbp' => 'النقل', 'total_due_lbp' => 'المستحق', 'exchange_rate' => 'سعر الصرف'];
+}
+/** مقارنة أشهر موظف بسنة: null = لا ينطبق أو مطابق؛ وإلا [months, fields(اسم⇒عدد), sample] — بلا أي حفظ */
+function monthStaleCompare(array $e, string $sy, ?PDO $db = null): ?array {
+    $db = $db ?: getDB();
+    require_once __DIR__ . '/payroll_calculator.php';
+    if (!preg_match('/^(\d{4})-\d{4}$/', $sy, $m)) return null;
+    if (!salaryEngineAllowed($e, $db)) return null;
+    if (isSchoolYearLocked((int)($e['school_id'] ?? 0), $sy)) return null;
+    $cfs = (string)($e['cadre_from_sy'] ?? '');
+    if (preg_match('/^(\d{4})-\d{4}$/', $cfs, $cm) && (int)$m[1] < (int)$cm[1]) return null; // سنة كان فيها متعاقداً
+    $ld = function_exists('leftDateOf') ? leftDateOf($e) : null;
+    if ($ld !== null) { $depRank = ((int)substr($ld, 5, 2) >= 10) ? (int)substr($ld, 0, 4) : (int)substr($ld, 0, 4) - 1; if ((int)$m[1] > $depRank) return null; }
+    $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0) ORDER BY year, month");
+    $q->execute([(int)$e['id'], $sy]);
+    $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+    if (!$rows) return null;
+    $fields = monthStaleFields(); $bad = []; $months = 0; $sample = null;
+    foreach ($rows as $r) {
+        try { $c = (new PayrollCalculator((int)$e['id'], (int)$r['month'], (int)$r['year']))->calculate(); }
+        catch (Throwable $ex) { continue; }
+        $d = [];
+        foreach ($fields as $f => $lbl) {
+            $a = (float)($r[$f] ?? 0); $b = (float)($c[$f] ?? 0);
+            if (abs($a - $b) > 1) $d[$f] = [$a, $b];
+        }
+        if (!$d) continue;
+        $months++;
+        foreach ($d as $f => $v) { $bad[$f] = ($bad[$f] ?? 0) + 1; }
+        if ($sample === null) {
+            // أوّل حقل جوهري (لا المجاميع المشتقّة) كمثال
+            foreach (['base_salary_lbp','echelon_value_lbp','extra_lbp','prime_fixe_lbp','aide_complementaire_lbp','cnss_amount_lbp','caisse_amount_lbp','income_tax_lbp','family_allowance_lbp','transport_lbp','net_salary_lbp','total_due_lbp','exchange_rate'] as $f) {
+                if (isset($d[$f])) { $sample = ['m' => (int)$r['month'], 'y' => (int)$r['year'], 'f' => $f, 'stored' => $d[$f][0], 'live' => $d[$f][1]]; break; }
+            }
+        }
+    }
+    if (!$months) return null;
+    return ['months' => $months, 'rows' => count($rows), 'fields' => $bad, 'sample' => $sample];
+}
+/** السنوات المفحوصة: السابقة + الجارية */
+function monthStaleYears(): array {
+    $cur = currentSchoolYear();
+    if (!preg_match('/^(\d{4})-(\d{4})$/', $cur, $m)) return [$cur];
+    return [($m[1] - 1) . '-' . ($m[2] - 1), $cur];
+}
+/** دفعة من الفحص الشامل (تُنادى من الترويسة مع كل صفحة): ~$budget صفّ راتب ثم تتوقّف؛ جولة كاملة كل $hours ساعات */
+function monthStaleScanStep(int $budget = 120, int $hours = 3): void {
+    static $ran = false;
+    if ($ran) return;
+    $ran = true;
+    try {
+        $st = json_decode((string)getSetting('month_stale_scan', ''), true) ?: [];
+        $now = time();
+        if (empty($st['sy']) && !empty($st['done_at']) && ($now - (int)$st['done_at']) < $hours * 3600) return; // الجولة الأخيرة حديثة
+        if (!empty($st['running_at']) && ($now - (int)$st['running_at']) < 120) return; // دفعة أخرى تعمل الآن
+        monthStaleScanBatch($budget);
+    } catch (Throwable $e) { try { setSetting('month_stale_scan_err', mb_substr($e->getMessage(), 0, 200)); } catch (Throwable $e2) {} }
+}
+/** دفعة واحدة: تكمل من حيث توقّفت (الحالة بـsettings.month_stale_scan) — تُستعمل من الترويسة ومن الجولة الكاملة */
+function monthStaleScanBatch(int $budget): void {
+    ensureMonthStaleTable();
+    $db = getDB();
+    $years = monthStaleYears(); $now = time();
+    $st = json_decode((string)getSetting('month_stale_scan', ''), true) ?: [];
+    if (empty($st['sy']) || !in_array($st['sy'], $years, true)) $st = ['sy' => $years[0], 'after_id' => 0, 'started_at' => $now, 'done_at' => $st['done_at'] ?? null];
+    $st['running_at'] = $now; setSetting('month_stale_scan', json_encode($st));
+    $sy = (string)$st['sy']; $after = (int)($st['after_id'] ?? 0); $used = 0; $exhausted = true;
+    $emps = $db->prepare("SELECT * FROM employees WHERE is_deleted = 0 AND id > ? ORDER BY id"); $emps->execute([$after]);
+    $up = $db->prepare("INSERT INTO month_stale_findings (employee_id, school_year, months, fields, sample, found_at) VALUES (?,?,?,?,?,NOW())
+                        ON DUPLICATE KEY UPDATE months = VALUES(months), fields = VALUES(fields), sample = VALUES(sample), found_at = NOW()");
+    $del = $db->prepare("DELETE FROM month_stale_findings WHERE employee_id = ? AND school_year = ?");
+    $cntQ = $db->prepare("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = ? AND school_year = ?");
+    while ($e = $emps->fetch(PDO::FETCH_ASSOC)) {
+        $cntQ->execute([(int)$e['id'], $sy]); $cnt = (int)$cntQ->fetchColumn();
+        $res = $cnt ? monthStaleCompare($e, $sy, $db) : null;
+        if ($res) $up->execute([(int)$e['id'], $sy, (int)$res['months'], json_encode($res['fields']), json_encode($res['sample'])]);
+        else $del->execute([(int)$e['id'], $sy]);
+        $after = (int)$e['id']; $used += max(1, $cnt);
+        if ($used >= $budget) { $exhausted = ($emps->fetch(PDO::FETCH_ASSOC) === false); break; }
+    }
+    if ($exhausted) {
+        $i = array_search($sy, $years, true);
+        if ($i !== false && isset($years[$i + 1])) { $st['sy'] = $years[$i + 1]; $st['after_id'] = 0; }
+        else $st = ['sy' => '', 'after_id' => 0, 'done_at' => $now, 'started_at' => $st['started_at'] ?? $now, 'last_pass_secs' => $now - (int)($st['started_at'] ?? $now)];
+    } else { $st['after_id'] = $after; }
+    unset($st['running_at']);
+    setSetting('month_stale_scan', json_encode($st));
+}
+/** جولة كاملة فوراً (أدوات/فحص) — تتجاهل البوّابة الزمنية */
+function monthStaleRunFull(): array {
+    setSetting('month_stale_scan', json_encode(['sy' => '', 'after_id' => 0, 'done_at' => 0]));
+    $guard = 0;
+    do { monthStaleScanBatch(1000000); $st = json_decode((string)getSetting('month_stale_scan', ''), true) ?: []; } while (!empty($st['sy']) && $guard++ < 20);
+    return $st;
+}
 function healGateOpen(string $key, int $hours = 3): bool {
     static $ran = [];
     if (!empty($ran[$key]) || !empty($_SESSION[$key . '_done'])) return false;
