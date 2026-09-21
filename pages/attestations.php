@@ -252,7 +252,7 @@ if ($emp && !empty($_GET['dossier'])):
             $w .= $row2('استمرار العمل بعد ٦٤', $yn($emp['keep_working_past_64']??0));
 
             // أرقام رسمية وتواريخ الترك
-            $o  = $row2('رقم الضمان (CNSS)', $emp['nssf_number']??'');
+            $o  = $row2('رقم الضمان (CNSS)', cnssWithBirthYear($emp['nssf_number']??'', $emp['birth_date']??'', ''));
             $o .= $row2('الرقم المالي (MOF)', $emp['finance_ministry_number']??'');
             $o .= $row2('رقم الصندوق (Caisse)', $emp['caisse_number']??'');
             $o .= $row2('تاريخ الترك من الكل', !empty($emp['left_date_all']) ? formatDate($emp['left_date_all']) : '');
@@ -1126,7 +1126,7 @@ if (!$emp):
               <h2 style="text-align:center;margin:18px 0 26px;text-decoration:underline"><?= $FR ? 'Attestation — À qui de droit' : 'Attestation — To whom it may concern' ?></h2><?= $rateLine ?>
               <p><?= $FR ? 'L\'institution' : 'The institution' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
               <p><?= $FR ? 'immatriculée à la Caisse Nationale de Sécurité Sociale sous le n°' : 'registered with the National Social Security Fund under No.' ?> <strong><?= e($employerNssf) ?></strong></p>
-              <p><?= $FR ? 'atteste que l\'assuré(e)' : 'certifies that the insured' ?> <strong><?= e($nomFr) ?></strong>, <?= $FR ? 'n°' : 'No.' ?> <strong><?= e($emp['nssf_number']) ?></strong>, <?= $FR ? 'a commencé à travailler chez nous à plein temps' : 'started working with us on a full-time basis' ?></p>
+              <p><?= $FR ? 'atteste que l\'assuré(e)' : 'certifies that the insured' ?> <strong><?= e($nomFr) ?></strong>, <?= $FR ? 'n°' : 'No.' ?> <strong><?= e(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) ?></strong>, <?= $FR ? 'a commencé à travailler chez nous à plein temps' : 'started working with us on a full-time basis' ?></p>
               <p><?= $FR ? 'à compter du' : 'as of' ?> <strong><?= $hireFmt ?></strong> <?= $FR ? 'en qualité de' : 'in the capacity of' ?> (<strong><?= e($FR ? $fnFr['fr'] : $fnFr['en']) ?></strong>)</p>
               <p><?= $FR ? 'et perçoit un salaire mensuel :' : 'and receives a monthly salary of:' ?></p>
               <p style="margin-left:34px">- <?= $FR ? 'Salaire de base conformément à la loi' : 'Basic salary in accordance with the law' ?> : <strong><?= $moneyLat($attBase) ?></strong></p>
@@ -1156,7 +1156,7 @@ if (!$emp):
             <h2 style="text-align:center;margin:18px 0 26px;text-decoration:underline">إفـــادة لمن يهمه الأمر</h2><?= $rateLine ?>
             <p>تفيد مؤسسة : <strong><?= e($schoolNameAr) ?></strong></p>
             <p>المسجَّلة في الصندوق الوطني للضمان الاجتماعي تحت الرقم <strong><?= e($employerNssf) ?></strong></p>
-            <p>أنّ المضمون <strong><?= e($nomAr) ?></strong> رقمه <strong><?= e($emp['nssf_number']) ?></strong> قد بدأ العمل لدينا بدوام كامل</p>
+            <p>أنّ المضمون <strong><?= e($nomAr) ?></strong> رقمه <strong><?= e(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) ?></strong> قد بدأ العمل لدينا بدوام كامل</p>
             <p>اعتباراً من تاريخ <strong><?= $hireFmt ?></strong> بصفة (<strong><?= e($fnFr['ar']) ?></strong>)</p>
             <p>ويتقاضى راتباً شهرياً :</p>
             <p style="margin-right:34px;text-align:right">- أساس راتب عملاً بالقانون : <strong><?= $moneyAr($attBase) ?></strong></p>

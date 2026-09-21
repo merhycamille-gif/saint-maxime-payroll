@@ -646,7 +646,7 @@ function reportDocThumb($path) {
             'aide'    => ['مكافأة ومساعدة / Prime & aide', fn($r) => isset($bonusMap[(int)$r['id']]) ? money(aideCompLbp($bonusMap[(int)$r['id']]), rowRate($bonusMap[(int)$r['id']])) : money(0)],
             'transport' => ['تعويض النقل / Transport', fn($r) => isset($bonusMap[(int)$r['id']]) ? money((float)$bonusMap[(int)$r['id']]['transport_lbp'], rowRate($bonusMap[(int)$r['id']])) : money(0)],
             'composed' => ['الراتب المركّب / Salaire composé', fn($r) => isset($bonusMap[(int)$r['id']]) ? dualFromUsd(composedSalaryLbp($bonusMap[(int)$r['id']]), composedSalaryUsd($bonusMap[(int)$r['id']])) : money(0)],
-            'nssf'    => ['ضمان / N° CNSS', fn($r) => e($r['nssf_number'])],
+            'nssf'    => ['ضمان / N° CNSS', fn($r) => e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', ''))],
             'mof'     => ['مالية / N° MOF', fn($r) => e($r['finance_ministry_number'])],
             'caisse'  => ['صندوق / N° Caisse', fn($r) => e($r['caisse_number'])],
             'phone'   => ['هاتف / Tél.', fn($r) => e(implode(' / ', array_filter([trim($r['phone1']), trim($r['phone2'])])))],

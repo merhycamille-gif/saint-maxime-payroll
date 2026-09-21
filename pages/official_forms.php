@@ -446,8 +446,8 @@ if (in_array($form, $imageForms)) {
             'address'     => $school['address'] ?? '',
             'emp_nbox'    => $school['nssf_employer_number'] ?? '',
             'school_finance' => $school['finance_number'] ?? '',
-            'emp_reg'     => $emp['nssf_number'] ?? '',
-            'nssf'        => $emp['nssf_number'] ?? '',
+            'emp_reg'     => cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', ''), // 🪪 سنة الولادة-رقم الضمان بكل المطبوعات (2026-09-21)
+            'nssf'        => cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', ''),
             'name'        => $emp['first_name_ar'] ?: $emp['first_name_fr'],
             'lastname'    => $emp['last_name_ar'] ?: $emp['last_name_fr'],
             'fullname'    => empFullNameAr($emp),
@@ -576,7 +576,7 @@ if (in_array($form, $imageForms)) {
             $nm = trim(($r['first_name_ar'].' '.$r['father_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr']);
             $extra[] = ['x'=>72,'y'=>$y,'val'=>$nm,'s'=>2.1];
             $extra[] = ['x'=>54,'y'=>$y,'val'=>$r['finance_ministry_number'],'s'=>2.0];
-            $extra[] = ['x'=>40,'y'=>$y,'val'=>$r['nssf_number'],'s'=>2.0];
+            $extra[] = ['x'=>40,'y'=>$y,'val'=>cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', ''),'s'=>2.0];
             $extra[] = ['x'=>26,'y'=>$y,'val'=>formatDate($r['hire_date']),'s'=>2.0];
             $extra[] = ['x'=>12,'y'=>$y,'val'=>formatDate($left),'s'=>2.0];
         }
@@ -1016,12 +1016,12 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     <div class="doc-p">يصرّح بأن الأجير المبيّنة هويته فيما يلي:</div>
     <?php $hasReg = !empty(trim((string)$emp['nssf_number'])); ?>
     <div class="fline">
-        <?= fopt('الأجير مسجّل سابقاً في الصندوق تحت الرقم', '', $hasReg) ?> <?= $hasReg ? digitBoxes($emp['nssf_number'],8) : '<span class="val g">&nbsp;</span>' ?>
+        <?= fopt('الأجير مسجّل سابقاً في الصندوق تحت الرقم', '', $hasReg) ?> <?= $hasReg ? nssfBoxesWithYear($emp['nssf_number'], $emp['birth_date'] ?? '', 8) : '<span class="val g">&nbsp;</span>' ?>
     </div>
     <div class="fline"><?= fopt('الأجير غير مسجّل سابقاً في الصندوق', '', !$hasReg) ?></div>
 
     <div class="fline"><span class="lbl">الجنس :</span> <?= fopt('ذكر',1) ?> <?= fopt('أنثى',2) ?></div>
-    <div class="fline"><span class="lbl">اسم الأجير</span> <?= fval($emp['first_name_ar'] ?: $emp['first_name_fr']) ?> <span class="lbl">الشهرة</span> <?= fval($emp['last_name_ar'] ?: $emp['last_name_fr']) ?> <span class="lbl">رقمه في الصندوق</span> <?= fval($emp['nssf_number'],'g') ?></div>
+    <div class="fline"><span class="lbl">اسم الأجير</span> <?= fval($emp['first_name_ar'] ?: $emp['first_name_fr']) ?> <span class="lbl">الشهرة</span> <?= fval($emp['last_name_ar'] ?: $emp['last_name_fr']) ?> <span class="lbl">رقمه في الصندوق</span> <?= fval(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', ''),'g') ?></div>
     <div class="fline"><span class="lbl">اسم الأب</span> <?= fval($emp['father_name_ar']) ?> <span class="lbl">اسم الأم وشهرتها</span> <?= fval(trim($emp['mother_first_name'].' '.$emp['mother_last_name'])) ?></div>
     <div class="fline"><span class="lbl">تاريخ ومحل الولادة</span> <?= fval(formatDate($emp['birth_date']).' - '.$emp['birth_place']) ?> <span class="lbl">رقم السجل</span> <?= fval($emp['civil_registry_number'],'g') ?></div>
     <div class="fline"><span class="lbl">الجنسية</span> <?= fval($emp['nationality']==='lebanese'?'لبنانية':$emp['nationality'],'g') ?></div>
@@ -1059,7 +1059,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     <p style="line-height:2.2;margin-top:24px">
         تفيد مؤسسة <?= fillVal($school['name_ar']) ?> المسجّلة في الصندوق الوطني للضمان الاجتماعي
         تحت رقم <?= fillVal($school['nssf_employer_number']) ?>، أن المضمون
-        <?= fillVal(empFullNameAr($emp)) ?> رقمه <?= fillVal($emp['nssf_number']) ?>
+        <?= fillVal(empFullNameAr($emp)) ?> رقمه <?= fillVal(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) ?>
         قد بدأ العمل لدينا بدوام كامل اعتباراً من تاريخ <?= fillVal(formatDate($emp['hire_date'])) ?>،
         ويتقاضى راتباً شهرياً قدره <?= fillVal($salary?formatLBP($salary):'') ?>،
         وهو مستمر في عمله حتى تاريخه.
@@ -1081,7 +1081,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     <div class="cnss-title"><u>تصريح عن الزوجة</u></div>
 
     <div class="doc-section">معلومات عن المضمون</div>
-    <div class="fline"><span class="lbl">أنا المضمون الموقّع أدناه المسجّل في الصندوق تحت الرقم :</span> <?= digitBoxes($emp['nssf_number'],8) ?></div>
+    <div class="fline"><span class="lbl">أنا المضمون الموقّع أدناه المسجّل في الصندوق تحت الرقم :</span> <?= nssfBoxesWithYear($emp['nssf_number'], $emp['birth_date'] ?? '', 8) ?></div>
     <div class="fline"><span class="lbl">الاسم والشهرة</span> <?= fval(empFullNameAr($emp)) ?> <span class="lbl">اسم الأم وشهرتها</span> <?= fval(trim($emp['mother_first_name'].' '.$emp['mother_last_name'])) ?></div>
     <div class="fline"><span class="lbl">اسم الأب</span> <?= fval($emp['father_name_ar']) ?> <span class="lbl">رقم السجل</span> <?= fval($emp['civil_registry_number'],'g') ?></div>
     <div class="fline"><span class="lbl">العامل في مؤسسة</span> <?= fval($school['name_ar']) ?> <span class="lbl">رقمها</span> <?= digitBoxes($school['nssf_employer_number'],8) ?></div>
@@ -1205,7 +1205,7 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">المرحلة:</span> <?= fillVal($emp['niveau_scolaire']) ?></div>
         <div><span class="k">مادة التدريس:</span> <?= fillVal($emp['subjects_taught']) ?></div>
         <div><span class="k">عدد الساعات الأسبوعية:</span> <?= fillVal(rtrim(rtrim((string)$emp['hours_per_week'],'0'),'.')) ?></div>
-        <div><span class="k">رقمه في الضمان:</span> <?= fillVal($emp['nssf_number']) ?></div>
+        <div><span class="k">رقمه في الضمان:</span> <?= fillVal(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) ?></div>
         <div><span class="k">رقمه المالي:</span> <?= fillVal($emp['finance_ministry_number']) ?></div>
         <?php if (salaryCompHas('extra')): ?><div><span class="k">الأجر الإضافي:</span> <strong><?= ($sal ? extraWageMoney($sal) : money(0)) ?></strong></div><?php endif; ?>
         <?php if (salaryCompHas('aide')): ?><div><span class="k">مكافأة ومساعدة:</span> <strong><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null) ?></strong></div><?php endif; ?>
@@ -2009,7 +2009,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
                 <tr><td><?= $i+1 ?></td>
                     <td><?= e(trim(($r['first_name_ar'].' '.$r['father_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                     <td><?= e($r['finance_ministry_number']) ?></td>
-                    <td><?= e($r['nssf_number']) ?></td>
+                    <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '')) ?></td>
                     <td><?= formatDate($r['hire_date']) ?></td>
                     <td><?= formatDate($left) ?></td></tr>
             <?php endforeach; ?>
@@ -2294,7 +2294,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         <div class="doc-p">حضرة المدير العام للصندوق الوطني للضمان الاجتماعي المحترم،</div>
         <div class="doc-p">أنا المضمون (1) / صاحب الحق / الوكيل الموقّع أدناه،</div>
         <div class="fline"><span class="lbl">أرجو الموافقة على تصفية (1):</span> <?= cbox('تعويضي', true, 'X') ?> <?= cbox('تعويض المضمون :') ?> <?= fval(empFullNameAr($emp)) ?></div>
-        <div class="fline"><span class="lbl">علماً أنني (1) / أنه منتسب (2):</span> <?= cbox('إلزامياً', true, 'X') ?> <?= cbox('اختيارياً') ?> <span class="lbl">إلى نظام تعويض نهاية الخدمة ومسجَّل في الصندوق تحت رقم:</span> <?= digitBoxes($emp['nssf_number'], 8) ?></div>
+        <div class="fline"><span class="lbl">علماً أنني (1) / أنه منتسب (2):</span> <?= cbox('إلزامياً', true, 'X') ?> <?= cbox('اختيارياً') ?> <span class="lbl">إلى نظام تعويض نهاية الخدمة ومسجَّل في الصندوق تحت رقم:</span> <?= nssfBoxesWithYear($emp['nssf_number'], $emp['birth_date'] ?? '', 8) ?></div>
         <div class="fline"><span class="lbl">وأعمل (1) / وكان يعمل في مؤسسة:</span> <?= fval($school['name_ar']) ?> <span class="lbl">رقمها</span> <?= fval($school['nssf_employer_number'], 'g') ?></div>
         <div class="fline"><span class="lbl">وعنوانها:</span> <?= fval($school['address'], 'lg') ?><?php if ($years > 0): ?> <span class="lbl">(مدة الخدمة: <?= $years ?> سنة)</span><?php endif; ?></div>
         <div class="fline"><span class="lbl">وذلك بسبب (2):</span> <?= cbox('بلوغ السن') ?> <?= cbox('العجز') ?> <?= cbox('الوفاة') ?> <?= cbox('ترك العمل المأجور نهائياً', true, 'X') ?> <?= cbox('الزواج') ?></div>
@@ -2334,7 +2334,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     <div class="cnss-title"><u>إفـــادة <?= $isWage?'بالأجر أو الكسب الأخير':'المؤسسة بالأجور والاشتراكات' ?></u></div>
     <p style="line-height:2.2;margin-top:18px">
         تفيد مؤسسة <?= fillVal($school['name_ar']) ?> رقمها <?= fillVal($school['nssf_employer_number']) ?>،
-        أن المضمون <?= fillVal(empFullNameAr($emp)) ?> رقمه <?= fillVal($emp['nssf_number']) ?>
+        أن المضمون <?= fillVal(empFullNameAr($emp)) ?> رقمه <?= fillVal(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) ?>
         عمل لحسابها من تاريخ <?= fillVal(formatDate($emp['hire_date'])) ?>
         لغاية <?= fillVal(formatDate(leftDateOfFor($emp, 'cnss'))) ?>.
     </p>
@@ -2384,7 +2384,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         <div class="full"><span class="k">عنوان المؤسسة (مكان عمل الأجير):</span> <?= fillVal($school['address']) ?></div>
     </div>
     <div class="doc-section">ب – معلومات خاصة بالأجير</div>
-    <div class="fline"><span class="lbl">٣. الجنس :</span> <?= fopt('ذكر',1) ?> <?= fopt('أنثى',2) ?> <span class="lbl">رقمه في الصندوق</span> <?= fval($emp['nssf_number'],'g') ?></div>
+    <div class="fline"><span class="lbl">٣. الجنس :</span> <?= fopt('ذكر',1) ?> <?= fopt('أنثى',2) ?> <span class="lbl">رقمه في الصندوق</span> <?= fval(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', ''),'g') ?></div>
     <div class="fline"><span class="lbl">٤. اسم الأجير</span> <?= fval($emp['first_name_ar'] ?: $emp['first_name_fr']) ?> <span class="lbl">الشهرة</span> <?= fval($emp['last_name_ar'] ?: $emp['last_name_fr']) ?></div>
     <div class="fline"><span class="lbl">٥. اسم الأب</span> <?= fval($emp['father_name_ar']) ?> <span class="lbl">اسم الأم وشهرتها</span> <?= fval(trim($emp['mother_first_name'].' '.$emp['mother_last_name'])) ?></div>
     <div class="fline"><span class="lbl">٦. تاريخ ومحل الولادة</span> <?= fval(formatDate($emp['birth_date']).' - '.$emp['birth_place']) ?> <span class="lbl">رقم السجل</span> <?= fval($emp['civil_registry_number'],'g') ?></div>
@@ -2429,7 +2429,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     <div class="cnss-title"><u>إفـــادة عمل</u></div>
     <p>إن رب العمل الموقّع أدناه المسؤول عن مؤسسة <?= fillVal($school['name_ar']) ?>
        رقمها في الصندوق <?= fillVal($school['nssf_employer_number']) ?>، يفيد أن الأجير
-       <?= fillVal(empFullNameAr($emp)) ?> رقمه في الصندوق <?= fillVal($emp['nssf_number']) ?>
+       <?= fillVal(empFullNameAr($emp)) ?> رقمه في الصندوق <?= fillVal(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) ?>
        عمل خلال الستة أشهر السابقة للمرض، وفقاً للتوزيع التالي:</p>
     <table class="doc-table" style="max-width:680px;margin:6px auto">
         <thead><tr><th>الشهر</th><th>عدد أيام/أسابيع العمل الفعلي</th><th>الأجر الإضافي</th><th>مكافأة ومساعدة</th><th>الأجر المدفوع (ل.ل)</th></tr></thead>
@@ -2457,7 +2457,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     <div class="cnss-title"><u>طلب إجراء تحقيق اجتماعي</u><br><span style="font-size:12pt">للاستفادة عن الوالد</span></div>
     <div class="info-grid">
         <div><span class="k">اسم المضمون:</span> <?= fillVal(empFullNameAr($emp)) ?></div>
-        <div><span class="k">رقمه في الضمان:</span> <?= fillVal($emp['nssf_number']) ?></div>
+        <div><span class="k">رقمه في الضمان:</span> <?= fillVal(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) ?></div>
         <div><span class="k">المؤسسة ورقمها:</span> <?= fillVal($school['name_ar'].' - '.$school['nssf_employer_number']) ?></div>
         <div><span class="k">الأجر الشهري:</span> <?= fillVal($salary?formatLBP($salary):'') ?></div>
         <div><span class="k">اسم الوالد وتاريخ ولادته:</span> <span class="fill dotted" style="min-width:180px">&nbsp;</span></div>
@@ -2477,7 +2477,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
 elseif ($form === 'payment_list'):
     // كشف الدفع: لائحة الرواتب الصافية للموظفين (لشهر) — للدفع/التحويل المصرفي + توقيع
     $stmt = $db->prepare("SELECT e.employee_type, e.employee_code, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
-                                 e.nssf_number, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.exchange_rate, ms.net_salary_lbp, ms.total_due_lbp, ms.family_allowance_lbp, ms.transport_lbp,
+                                 e.nssf_number, e.birth_date, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.exchange_rate, ms.net_salary_lbp, ms.total_due_lbp, ms.family_allowance_lbp, ms.transport_lbp,
                                  ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
@@ -2530,7 +2530,7 @@ elseif ($form === 'payment_list'):
                 <td><?= ++$nn ?></td>
                 <td><?= e($r['employee_code']) ?></td>
                 <td style="text-align:right"><?= ofStateNameCell($r) ?></td>
-                <td><?= e($r['nssf_number']) ?></td>
+                <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '')) ?></td>
                 <td class="num"><?= moneyLaw($r['base_salary_lbp'], ['withCur'=>false]) ?></td>
                 <?= extraAideCells($r) ?>
                 <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r), false) ?></strong></td>
@@ -2804,7 +2804,7 @@ elseif ($form === 'payment_list'):
                 <td><?= $age ?></td>
                 <td><?= formatDate($r['hire_date']) ?></td>
                 <td><?= $left?formatDate($left):'—' ?></td>
-                <td><?= e($r['nssf_number']) ?></td>
+                <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '')) ?></td>
                 <td><?= e($r['finance_ministry_number']) ?></td>
                 <td class="num"><?= money($rsal, $giRate, ['withCur'=>false]) ?></td>
             </tr>

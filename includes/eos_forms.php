@@ -239,7 +239,7 @@ function eosRenderDoc(array $emp, array $d): string {
             <div class="fline"><span class="lbl">تفيد مؤسسة :</span> <?= ofe('inst_name', $s['name_ar'] ?? '', 'lg') ?> <span class="lbl">رقمها في الصندوق :</span> <?= ofe('inst_no', $s['nssf_employer_number'] ?? '', 'g') ?></div>
             <div class="fline"><span class="lbl">العنوان :</span> <?= ofe('inst_addr', $s['address'] ?? '', 'lg') ?></div>
             <div class="fline"><span class="lbl">هاتف :</span> <?= ofe('inst_phone', $s['phone'] ?? '', 'g') ?> <span class="lbl">بريد إلكتروني :</span> <?= ofe('inst_email', $s['email'] ?? '', 'lg') ?></div>
-            <div class="fline"><span class="lbl">إن المضمون :</span> <?= ofe('emp_name', empFullNameAr($emp), 'lg') ?> <span class="lbl">رقمه في الصندوق :</span> <?= ofe('emp_no', $emp['nssf_number'] ?? '', 'g') ?></div>
+            <div class="fline"><span class="lbl">إن المضمون :</span> <?= ofe('emp_name', empFullNameAr($emp), 'lg') ?> <span class="lbl">رقمه في الصندوق :</span> <?= ofe('emp_no', cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', ''), 'g') ?></div>
             <div class="fline"><span class="lbl">عدّ لحسابها من تاريخ :</span> <?= ofe('from', eosDmy($d['from']), 'g') ?> <span class="lbl">ولغاية :</span> <?= ofe('to', eosDmy($d['to']), 'g') ?> <span class="lbl">وكان أجره محدداً على أساس :</span></div>
             <div class="fline"><?= ofeBox('b_month', '', true) ?> <span class="lbl">شهري وبلغ مقدار أجره عن الشهر الأخير مع جميع لواحقه</span> <?= ofe('m_wage', eosNum($d['last_wage']), 'g') ?> <span class="lbl">ل.ل.</span></div>
             <div class="fline"><span class="lbl">فقط :</span> <?= ofe('m_words', $d['last_wage'] > 0 ? numToArabicWords((int)$d['last_wage']) . ' ليرة لبنانية' : '', 'lg') ?></div>
@@ -291,7 +291,7 @@ function eosRender2y(array $emp, array $d): string {
     <div class="official-doc cnss-form rtl eos-doc" id="ppExportArea">
         <?= eosHead() ?>
         <div class="fline" style="margin-top:12px"><span class="lbl">تفيد مؤسسة :</span> <?= ofe('inst_name', $s['name_ar'] ?? '', 'lg') ?> <span class="lbl">رقمها في الصندوق :</span> <?= ofe('inst_no', $s['nssf_employer_number'] ?? '', 'g') ?></div>
-        <div class="fline"><span class="lbl">بأن الأجير :</span> <?= ofe('emp_name', empFullNameAr($emp), 'lg') ?> <span class="lbl">رقمه في الصندوق :</span> <?= ofe('emp_no', $emp['nssf_number'] ?? '', 'g') ?></div>
+        <div class="fline"><span class="lbl">بأن الأجير :</span> <?= ofe('emp_name', empFullNameAr($emp), 'lg') ?> <span class="lbl">رقمه في الصندوق :</span> <?= ofe('emp_no', cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', ''), 'g') ?></div>
         <div class="eos-p">قد تقاضى أجوره خلال السنتين الأخيرتين وفقاً لما هو مبين أدناه :</div>
         <?= $block('y1', (int)$d['y1']) ?>
         <?= $block('y2', (int)$d['y2']) ?>
@@ -310,7 +310,7 @@ function eosRenderAnnual(array $emp, array $d): string {
     <div class="official-doc cnss-form rtl eos-doc" id="ppExportArea">
         <div class="eos-title" style="font-size:14pt">جدول بالأجور السنوية</div>
         <div class="fline" style="margin-top:14px"><span class="lbl">تفيد مؤسسة</span> <?= ofe('inst_name', $s['name_ar'] ?? '', 'lg') ?> <span class="lbl">رقمها في الضمان</span> <?= ofe('inst_no', $s['nssf_employer_number'] ?? '', 'g') ?></div>
-        <div class="fline"><span class="lbl">أن المضمون</span> <?= ofe('emp_name', empFullNameAr($emp), 'lg') ?> <span class="lbl">رقمه في الضمان</span> <?= ofe('emp_no', $emp['nssf_number'] ?? '', 'g') ?></div>
+        <div class="fline"><span class="lbl">أن المضمون</span> <?= ofe('emp_name', empFullNameAr($emp), 'lg') ?> <span class="lbl">رقمه في الضمان</span> <?= ofe('emp_no', cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', ''), 'g') ?></div>
         <div class="fline"><span class="lbl">عمل لديها من تاريخ</span> <?= ofe('from', eosDmy($d['from']), 'g') ?> <span class="lbl">لتاريخ</span> <?= ofe('to', eosDmy($d['to']), 'g') ?></div>
         <div class="eos-p">وقد تقاضى أجوره السنوية على النحو الآتي:</div>
         <table class="eos-table"><thead><tr><th style="width:14%">السنة</th><th style="width:26%">الأجور</th><th style="width:34%">أجور إضافية بموجب تقرير تفتيش<br>أو ملحق التصريح السنوي</th><th>ملاحظات</th></tr></thead><tbody>

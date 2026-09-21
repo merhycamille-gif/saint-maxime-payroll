@@ -509,7 +509,7 @@ if ($form === 'mof_r3') {
     $X(['single' => 78.4, 'married' => 70.2, 'widow' => 65.0, 'divorced' => 54.75][$marKey], 31.58);
     $put((string)(int)($emp['number_of_children'] ?? 0), 21.5, 31.2);
     $put($hD, 76.0, 34.2, 'c'); $put($hM, 66.0, 34.2, 'c'); $put($hY, 57.5, 34.2, 'c');
-    $put($emp['nssf_number'] ?? '', 17.7, 33.3); // مزاح قليلاً عن كلمة «الإجتماعي»
+    $put(cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', ''), 17.7, 33.3); // مزاح قليلاً عن كلمة «الإجتماعي»
     $X(['m' => 22.5, 'd' => 15.2, 'h' => 8.1][$wage], 35.83);
     // الزوج/الزوجة: كل معلوماته من ملف الموظف (تُعبَّأ بشاشة نموذج ر3 — «وين معلومات
     // الزوج/الزوجة» + «ناقصة كتير معلومات» 2026-08-21) + المستفيدون من التنزيل + هل يعمل
@@ -1062,7 +1062,7 @@ JS
         $r7c += [
             'A' . $R => $nm3,
             'B' . $R => preg_replace('/\D/', '', (string)($le2['finance_ministry_number'] ?? '')),
-            'C' . $R => trim((string)($le2['nssf_number'] ?? '')),
+            'C' . $R => cnssWithBirthYear($le2['nssf_number'] ?? '', $le2['birth_date'] ?? '', ''),
             'D' . $R => ($le2['hire_date'] ?? '') ? $serial567($le2['hire_date']) : '',
             'E' . $R => date('d/m/Y', strtotime($left2)),
         ];

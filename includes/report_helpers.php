@@ -250,6 +250,14 @@ function fillVal($value, string $minWidth = '120px'): string {
 /**
  * مربعات أرقام التسجيل (متل النماذج الرسمية): خانة لكل رقم.
  */
+/** 🪪 (2026-09-21 «بس بدك تحط رقم الضمان لازم يكون بجانبو دغري على الشمال سنة تاريخ الولادة مثلاً 1968-1242983»): مربّعات رقم الضمان
+ *  للأجير مسبوقة بسنة ولادته على اليسار (LTR) — بكل النماذج الرسمية؛ رقم المؤسسة يبقى بلا سنة. */
+function nssfBoxesWithYear($nssf, $birthDate, int $count = 8): string {
+    $by = $birthDate ? date('Y', strtotime($birthDate)) : '';
+    $boxes = digitBoxes($nssf, $count);
+    if ($by === '' || trim((string)$nssf) === '') return $boxes;
+    return '<span dir="ltr" style="display:inline-block;white-space:nowrap"><b style="font-family:Arial;letter-spacing:.5px">' . e($by) . '-</b>' . $boxes . '</span>';
+}
 function digitBoxes($value, int $count = 8): string {
     $value = preg_replace('/\D/', '', (string)$value);
     $out = '<span class="digit-boxes">';

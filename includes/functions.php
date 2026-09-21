@@ -3090,7 +3090,7 @@ function cnssTaswiyaData($db, int $fy, array $schoolIds): array {
         $key = strlen($nssfDigits) >= 3 ? 'n' . $nssfDigits
              : 'x' . caisseNameNorm($r['first_name_ar'] . ' ' . $r['father_name_ar'] . ' ' . $r['last_name_ar']);
         if (!isset($persons[$key])) {
-            $persons[$key] = ['nssf' => $nssfDigits, 'name' => trim($r['first_name_ar'] . ' ' . $r['father_name_ar'] . ' ' . $r['last_name_ar']),
+            $persons[$key] = ['nssf' => cnssWithBirthYear($nssfDigits, $r['birth_date'] ?? '', ''), 'name' => trim($r['first_name_ar'] . ' ' . $r['father_name_ar'] . ' ' . $r['last_name_ar']),
                 'birth' => ($r['birth_date'] ? (int)substr($r['birth_date'], 0, 4) : ''),
                 'worker' => 0, 'hire' => $r['hire_date'], 'left' => null, 'monthsSet' => [],
                 'N' => 0, 'O' => 0, 'Q' => 0];

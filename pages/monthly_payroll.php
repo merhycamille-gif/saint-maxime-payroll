@@ -63,7 +63,7 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                 </tr>
                 <tr>
                     <td>N° dossier / رقم الملف</td><td><strong><?= (int)$emp['id'] ?></strong></td>
-                    <td>N° CNSS / رقم الضمان</td><td><strong><?= e(trim((string)($emp['nssf_number'] ?? '')) !== '' ? $emp['nssf_number'] : '—') ?></strong></td>
+                    <td>N° CNSS / رقم الضمان</td><td><strong><?= e(cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '')) ?></strong></td>
                 </tr>
                 <tr>
                     <?php if ($isAdminEmp): ?>
@@ -377,7 +377,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                 </tr>
                 <tr>
                     <td>N° dossier / رقم الملف</td><td><strong><?= (int)$emp['id'] ?></strong></td>
-                    <td>N° CNSS / رقم الضمان</td><td><strong><?= e(trim((string)($emp['nssf_number'] ?? '')) !== '' ? $emp['nssf_number'] : '—') ?></strong></td>
+                    <td>N° CNSS / رقم الضمان</td><td><strong><?= e(cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '')) ?></strong></td>
                 </tr>
             </table>
             <?php if (!$salary): ?>

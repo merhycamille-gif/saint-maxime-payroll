@@ -285,7 +285,7 @@ if ($report === 'monthly_summary') {
         'aide' => ['مكافأة ومساعدة', fn($r) => isset($bonusMap[(int)$r['id']]) ? aideCompLbp($bonusMap[(int)$r['id']]) : 0],
         'transport' => ['تعويض النقل', fn($r) => isset($bonusMap[(int)$r['id']]) ? (int)$bonusMap[(int)$r['id']]['transport_lbp'] : 0],
         'composed' => ['الراتب المركّب', fn($r) => isset($bonusMap[(int)$r['id']]) ? composedSalaryLbp($bonusMap[(int)$r['id']]) : 0],
-        'nssf' => ['رقم الضمان', fn($r) => $r['nssf_number']],
+        'nssf' => ['رقم الضمان', fn($r) => cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '')],
         'mof' => ['رقم المالية', fn($r) => $r['finance_ministry_number']],
         'caisse' => ['رقم الصندوق', fn($r) => $r['caisse_number']],
         'phone' => ['هاتف', fn($r) => implode(' / ', array_filter([trim($r['phone1']), trim($r['phone2'])]))],

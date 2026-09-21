@@ -7326,6 +7326,29 @@ try {
 } catch (Throwable $e) { $ok156 = false; $why156 .= ' err=' . $e->getMessage(); }
 check('⚖️📅 تطبيق القانون ابتداءً من 2026-2027 (إعداد مؤرَّخ + الفحص الشامل من تلك السنة + تقرير 2025-2026 = تاريخ مدفوع بلا بنود + خانة التغيير)', $ok156, $why156);
 
+/**
+ * 157) 🪪 «دايماً بكل التقارير والإفادات بس بدك تحط رقم الضمان لازم يكون بجانبو دغري على الشمال سنة تاريخ الولادة مثلاً 1968-1242983» (2026-09-21 p1
+ *      مستند تصفية نهاية الخدمة): cnssWithBirthYear بكل مواضع العرض (إفادات، كشف الراتب الشهري، النماذج الرسمية والتصفية ونهاية الخدمة، التقارير،
+ *      التصدير) + مربّعات الرقم بالنماذج مسبوقة بالسنة (nssfBoxesWithYear). لا عرض خامّ متبقٍّ.
+ */
+$src157 = ['pages/attestations.php', 'pages/monthly_payroll.php', 'pages/official_forms.php', 'includes/eos_forms.php', 'pages/reports.php', 'pages/reports_export.php', 'pages/official_export.php'];
+$raw157 = [];
+foreach ($src157 as $f) {
+    foreach (explode("\n", (string)file_get_contents($PROJ . '/' . $f)) as $ln => $line) {
+        if (strpos($line, 'nssf_number') === false) continue;
+        if (preg_match('/cnssWithBirthYear|nssfBoxesWithYear|e\.nssf_number|SELECT|\$_POST|name="nssf_number"|hasReg = |\'R6\'|\'O6\'|K11|K13|N13|12\.8, 32\.4|nssfDigits/', $line)) continue;
+        $raw157[] = $f . ':' . ($ln + 1);
+    }
+}
+$ok157 = function_exists('cnssWithBirthYear') && function_exists('nssfBoxesWithYear')
+      && cnssWithBirthYear('1242983', '1968-05-02') === '1968-1242983' && cnssWithBirthYear('1242983', '') === '1242983' && cnssWithBirthYear('', '', '') === ''
+      && strpos(nssfBoxesWithYear('1242983', '1968-05-02', 8), '1968-</b>') !== false && strpos(nssfBoxesWithYear('1242983', '1968-05-02', 8), 'dir="ltr"') !== false
+      && substr_count((string)file_get_contents($PROJ . '/pages/official_forms.php'), 'nssfBoxesWithYear(') === 3
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "'nssf' => cnssWithBirthYear(\$nssfDigits, \$r['birth_date'] ?? '', '')") !== false
+      && substr_count((string)file_get_contents($PROJ . '/includes/eos_forms.php'), "ofe('emp_no', cnssWithBirthYear(") === 3
+      && !$raw157;
+check('🪪 رقم الضمان مسبوقاً بسنة الولادة (1968-1242983) بكل الإفادات والكشوف والنماذج الرسمية والتقارير والتصدير + مربّعات النماذج + لا عرض خامّ متبقٍّ', $ok157, $raw157 ? 'raw=' . implode(',', $raw157) : 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
