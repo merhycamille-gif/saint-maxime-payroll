@@ -1249,6 +1249,7 @@ foreach ($usdSweep as $usLbl => [$usRel, $usGet]) {
     $usArea = $hOfU;
     if (preg_match_all('/<table[^>]*class="[^"]*doc-table[^"]*".*?<\/table>/su', $hOfU, $mT) && $mT[0]) $usArea = implode('', $mT[0]);
     $usArea = preg_replace('/rgba?\([^)]*\)/', '', $usArea);
+    $usArea = preg_replace('/<span class="law-lbp">.*?<\/span>/su', '', $usArea); // 📄 الأساس/الدرجة بالليرة دائماً كالبطاقة (2026-09-21)
     $usPat = in_array($usLbl, $usAnnual, true) ? '/\d{1,3}(?:,\d{3}){3}/' : '/\d{1,3},\d{3},\d{3}/';
     $mil = preg_match_all($usPat, $usArea);
     check("توحيد العملتين: $usLbl بوضع «دولار فقط» بلا أي خلية ليرة متروكة", strlen($hOfU) > 5000 && $mil === 0, "خلايا ليرة=$mil");
@@ -1299,7 +1300,7 @@ $repSrc3 = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
 check('الكشف الشهري: كل أعمدة المجاميع بالعملة المختارة (لا formatLBP ثابتة)',
       strpos($repSrc3, "\$dualTot(\$t['total'], \$t['total_usd'])") !== false
       && strpos($repSrc3, "\$dualTot(\$t['net'], \$t['net_usd'])") !== false
-      && strpos($repSrc3, "\$dualTot(\$t['base'], \$t['base_usd'])") !== false);
+      && strpos($repSrc3, "dualLaw(\$t['base'], \$t['base_usd'], true)") !== false);
 check('تدقيق سلامة الأرقام المخزَّنة موجود بصفحة فحص القانون',
       strpos((string)file_get_contents(__DIR__ . '/../pages/law_check.php'), 'تدقيق سلامة الأرقام المخزَّنة') !== false);
 // سلامة البيانات: الثوابت التي يجب أن تبقى صفراً دائماً
@@ -6088,12 +6089,12 @@ check('دولار القانون للأساس (كود): lawUsd/lawUsdSql/moneyLa
       && strpos($of125, "money(\$r['base_salary_lbp'], \$rRate") === false && strpos($of125, "money(\$r['echelon_value_lbp'], \$rRate") === false && strpos($of125, "money(\$r['base_plus_echelon_lbp'], \$rRate") === false
       && strpos($of125, "lbpToUsd(composedSalaryLbp(") === false && substr_count($of125, "base_plus_echelon_lbp/NULLIF(") === 3 && substr_count($of125, "AS bpe_usd_mkt,") === 1 && substr_count($of125, ") bpe_usd_mkt,") === 2 && strpos($of125, "base_salary_lbp/NULLIF") === false
       && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "function composedSalaryUsd(array \$row): float { return lbpToUsd(composedSalaryLbp(\$row), rowRate(\$row)); }") !== false
-      && strpos($of125, "foreach (['base','ech','bpe'] as \$uk) \$add[\$uk.'_usd'] = lawUsd(\$add[\$uk]);") !== false
+      && strpos($of125, "foreach (['base','ech','bpe'] as \$uk) \$add[\$uk.'_usd'] = lawUsdRow(\$r, \$uk, \$add[\$uk]);") !== false
       && strpos($of125, "\$fmtL = fn(\$v) => (int)\$v ? moneyLaw((int)\$v, ['withCur'=>false]) : '0';") !== false
       && strpos($rp125, "money(\$r['base_salary_lbp'], \$r") === false && strpos($rp125, "lbpToUsd((int)\$r['base_salary_lbp']") === false && strpos($rp125, "lbpToUsd(composedSalaryLbp(") === false
       && substr_count($rp125, "dualFromUsd(composedSalaryLbp(\$r), composedSalaryUsd(\$r))") === 4 && strpos($rp125, "money(composedSalaryLbp(") === false && strpos($of125, "money(composedSalaryLbp(") === false
-      && strpos($mp125, "money(\$salary['base_salary_lbp']") === false && substr_count($mp125, "moneyLaw(\$salary['base_plus_echelon_lbp'])") === 2
-      && strpos($rh125, "'usd' => 'SUM(' . lawUsdSql('ms.base_plus_echelon_lbp') . ')'") !== false && strpos($rh125, "\$u('ms.base_salary_lbp')") === false && strpos($rh125, "\$r['composed_usd'] = (float)\$r['bpe_usd_mkt'] + (\$hasE") !== false
+      && strpos($mp125, "money(\$salary['base_salary_lbp']") === false && substr_count($mp125, "moneyLaw(\$salary['base_plus_echelon_lbp'], [], \$salary, 'bpe')") === 2
+      && strpos($rh125, "THEN ' . lawUsdSql('ms.base_plus_echelon_lbp') . ' ELSE 0 END)'") !== false && strpos($rh125, "\$u('ms.base_salary_lbp')") === false && strpos($rh125, "\$r['composed_usd'] = (float)\$r['bpe_usd_mkt'] + (\$hasE") !== false
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'cur_sal_old_usd' => (int)floor(\$curSal / officialUsdRate())") !== false);
 $ok125 = false; $why125 = '';
 try {
@@ -6109,7 +6110,9 @@ try {
         $seg = ''; $i = false; // الاسم بالعربي (تقارير المركز) أو بالفرنسي (لوائح الدولة)
         foreach ([trim($r125['first_name_ar'] . ' ' . $r125['last_name_ar']), trim($r125['first_name_fr'] . ' ' . $r125['last_name_fr'])] as $nm) { if ($nm !== '' && ($i = strpos($o, $nm)) !== false) break; }
         if ($i !== false) $seg = substr($o, $i, 1500);
-        if ($seg === '' || strpos($seg, '$' . $lawB) === false || ($mktB !== $lawB && strpos($seg, '$' . $mktB . '<') !== false)) $bad125[] = ($g['form'] ?? $g['report']);
+        // 📄 (2026-09-21 كالبطاقة) الأساس بالليرة فقط؛ صاحب النسبة وحده يظهر ÷1500 تحت «بعد التدرّج»
+        $isP125 = isPctLawRow($r125); $bpeL125 = number_format(lawUsd($r125['base_plus_echelon_lbp']));
+        if ($seg === '' || strpos($seg, number_format((int)$r125['base_salary_lbp'])) === false || (!$isP125 && strpos($seg, '$' . $lawB . '<') !== false) || ($isP125 && strpos($seg, '$' . $bpeL125) === false)) $bad125[] = ($g['form'] ?? $g['report']);
         if (stripos($o, 'Fatal error') !== false) $bad125[] = ($g['form'] ?? $g['report']) . '(fatal)';
     }
     unset($_SESSION['display_currency']);
@@ -6125,9 +6128,9 @@ check('دولار القانون للأساس (تشغيل فعلي): أساس أ
 $of126 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp126 = (string)file_get_contents($PROJ . '/pages/reports.php'); $rh126 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 check('سعر الصرف بالعناوين (كود): rateHead مصدر واحد + 15 law (أساس/درجة/بعد التدرّج) و13 mkt (المركّب/الإجمالي/الصافي/المستحق) بالنماذج + 6/5 بالمركز + CSS .rate-head + الفروقات والتقرير العام السنويان بلا سعر شهر تحت المركّب',
       function_exists('rateHead') && strpos($rh126, '.doc-table th .rate-head{display:block;') !== false
-      && substr_count($of126, "<?= rateHead('law') ?></th>") === 15 && substr_count($of126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 10 && substr_count($of126, ". rateHead('mkt', \$month, \$year)) ?>") === 6 /* رؤوس المستحق عبر dueHead (2026-09-19) + الصافي+العائلي عبر netFamHead (2026-09-20) */
+      && substr_count($of126, "<?= rateHead('law') ?></th>") === 4 /* 📄 2026-09-21: «بعد التدرّج» فقط كالبطاقة */ && substr_count($of126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 10 && substr_count($of126, ". rateHead('mkt', \$month, \$year)) ?>") === 6 /* رؤوس المستحق عبر dueHead (2026-09-19) + الصافي+العائلي عبر netFamHead (2026-09-20) */
       && substr_count($of126, "</small><?= rateHead('mkt', \$month, \$year) ?></th>") === 5 && substr_count($of126, "</small><?= rateHead('law') ?></th>") === 0 && strpos($of126, "<th>الأجر الإجمالي<?= rateHead('mkt', \$month, \$year) ?></th>") !== false
-      && substr_count($rp126, "<?= rateHead('law') ?></th>") === 6 && substr_count($rp126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 5 && substr_count($rp126, "</small><?= rateHead('mkt', \$month, \$year) ?></th>") === 4
+      && substr_count($rp126, "<?= rateHead('law') ?></th>") === 1 && substr_count($rp126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 5 && substr_count($rp126, "</small><?= rateHead('mkt', \$month, \$year) ?></th>") === 4
       && strpos($of126, "<th><?= \$grBi('Salaire après échelon', 'الراتب بعد التدرّج') ?><?= rateHead('law') ?></th>") !== false
       && rateHead('law') === '<br><small class="rate-head" dir="ltr">1 $ = ' . number_format(officialUsdRate(), 0, '.', ',') . '</small>');
 $ok126 = false; $why126 = '';
@@ -6135,11 +6138,11 @@ try {
     $bad126 = [];
     $o = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], [], [], 'both');
     $mk = number_format((float)getExchangeRate(10, 2025), 0, '.', ',');
-    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 3 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 4) $bad126[] = 'salary_all(both)'; // 4 = المركّب/الصافي/الصافي+العائلي (2026-09-20)/المدفوعات
+    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 1 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 4) $bad126[] = 'salary_all(both)'; // 4 = المركّب/الصافي/الصافي+العائلي (2026-09-20)/المدفوعات
     $o = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], [], [], 'lbp');
     if (strpos($o, 'class="rate-head"') !== false) $bad126[] = 'salary_all(lbp يعرض)'; // (نصّ CSS يحوي rate-head — نفحص الصنف بالخلية)
     $o = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], [], [], 'both');
-    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 3 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 3) $bad126[] = 'monthly_summary'; // 3 = المركّب/الصافي/الصافي+العائلي (2026-09-20)
+    if (substr_count($o, 'rate-head" dir="ltr">1 $ = 1,500') !== 1 || substr_count($o, 'rate-head" dir="ltr">1 $ = ' . $mk) !== 3) $bad126[] = 'monthly_summary'; // 3 = المركّب/الصافي/الصافي+العائلي (2026-09-20)
     $ok126 = !$bad126; $why126 = "mkt=$mk bad=" . implode(',', $bad126);
 } catch (Throwable $e) { $why126 = $e->getMessage(); }
 check('سعر الصرف بالعناوين (تشغيل فعلي): كشف كل الموظفين 3×1,500 (أساس/درجة/بعد التدرّج) + 3×سعر الشهر (المركّب/الصافي/المدفوعات)، يختفي بوضع الليرة، Résumé mensuel 3 + 2', $ok126, $why126);
@@ -6883,7 +6886,7 @@ foreach ($docs145 as [$pg, $get, $law, $scope145, $sy145]) {
     $hb = renderPage($pg, $get, ['extra', 'aide', 'transport'], $scope145, 'both', $sy145);
     $hl = renderPage($pg, $get, ['extra', 'aide', 'transport'], $scope145, 'lbp', $sy145);
     $hasB = preg_match('/سعر الصرف المعتمد: (سعر كل شهر — آخر سعر )?1 \$ = [0-9,]+ ل\.ل\./u', $hb) === 1;
-    $lawB = strpos($hb, 'الأساس والدرجة بالسعر الرسمي 1 $ = 1,500') !== false;
+    $lawB = strpos($hb, 'الراتب بعد التدرّج لأصحاب النسبة بالسعر الرسمي 1 $ = 1,500') !== false;
     $hasL = strpos($hl, 'سعر الصرف المعتمد') !== false;
     $fat = strpos($hb, 'FATAL') !== false || strpos($hl, 'FATAL') !== false;
     if (!$hasB || $lawB !== $law || $hasL || $fat) { $ok145 = false; $why145[] = basename($pg) . ':' . json_encode($get) . " both=" . (int)$hasB . " law=" . (int)$lawB . " lbp=" . (int)$hasL . " fatal=" . (int)$fat; }
@@ -7348,6 +7351,29 @@ $ok157 = function_exists('cnssWithBirthYear') && function_exists('nssfBoxesWithY
       && substr_count((string)file_get_contents($PROJ . '/includes/eos_forms.php'), "ofe('emp_no', cnssWithBirthYear(") === 3
       && !$raw157;
 check('🪪 رقم الضمان مسبوقاً بسنة الولادة (1968-1242983) بكل الإفادات والكشوف والنماذج الرسمية والتقارير والتصدير + مربّعات النماذج + لا عرض خامّ متبقٍّ', $ok157, $raw157 ? 'raw=' . implode(',', $raw157) : 'ok');
+
+/**
+ * 158) 📄 «p1 شوف يا أستاذ كل التقارير لازم تكون مطابقة لبطاقة الراتب السنوية» (2026-09-21): قاعدة البطاقة لدولار أعمدة الراتب صارت المصدر
+ *      الواحد بكل الكشوف — الأساس والدرجة بالليرة فقط، «بعد التدرّج» ÷1500 لأصحاب النسبة فقط (كانت الكشوف تقسم ÷1500 للجميع: ايف عيد 24,605$).
+ *      كود: الدوال + لا lawUsd/lawUsdSql خامّ للأساس/الدرجة + رؤوس «1$=1,500» على «بعد التدرّج» فقط. تجربة: متعاقد بالدولار بلا دولار قانون، وصاحب نسبة ÷1500.
+ */
+$of158 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp158 = (string)file_get_contents($PROJ . '/pages/reports.php'); $rh158 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$ok158 = function_exists('pctLawHolderIds') && function_exists('isPctLawRow') && function_exists('lawUsdRow') && function_exists('dualLaw')
+      && preg_match_all('/lawUsd\(\(int\)\$r\[' . "'" . 'base_salary_lbp' . "'" . '\]\)|lawUsd\(\(int\)\$r\[' . "'" . 'echelon_value_lbp' . "'" . '\]\)|lawUsdSql\(' . "'" . '(ms\.)?base_salary_lbp' . "'" . '\)/', $of158 . $rp158 . $rh158) === 0
+      && substr_count($of158, "rateHead('law')") === 4 && substr_count($rp158, "rateHead('law')") === 1
+      && strpos($of158, "أساس الراتب<?= rateHead('law') ?>") === false && strpos($rp158, "أساس الراتب<?= rateHead('law') ?>") === false
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "الراتب بعد التدرّج لأصحاب النسبة بالسعر الرسمي") !== false;
+$why158 = 'code=' . ($ok158 ? 'ok' : 'bad');
+try {
+    $cur158 = $_SESSION['display_currency'] ?? null; $_SESSION['display_currency'] = 'both';
+    $c158 = $db->query("SELECT ms.* FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_contractuel' AND e.salary_input_mode = 'direct_usd' AND e.base_salary_usd > 0 AND ms.school_year = '2026-2027' AND ms.month = 10 AND ms.base_salary_lbp > 0 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $p158 = $db->query("SELECT ms.* FROM monthly_salaries ms JOIN employee_bonuses b ON b.employee_id = ms.employee_id AND b.bonus_type = 'prime_fixe' AND b.is_active = 1 AND b.value_type = 'percent' AND (b.school_year IS NULL OR b.school_year = '2026-2027') WHERE ms.school_year = '2026-2027' AND ms.month = 10 AND ms.base_plus_echelon_lbp > 0 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $t1 = $c158 ? (lawUsdRow($c158, 'base') == 0 && lawUsdRow($c158, 'bpe') == 0 && !isPctLawRow($c158) && strpos(moneyLaw($c158['base_salary_lbp'], ['withCur' => false], $c158, 'bpe'), '$') === false) : false;
+    $t2 = $p158 ? (isPctLawRow($p158) && lawUsdRow($p158, 'bpe') == floor($p158['base_plus_echelon_lbp'] / officialUsdRate()) && lawUsdRow($p158, 'base') == 0 && strpos(moneyLaw($p158['base_plus_echelon_lbp'], ['withCur' => false], $p158, 'bpe'), 'money-usd') !== false) : false;
+    $ok158 = $ok158 && $t1 && $t2; if ($cur158 === null) unset($_SESSION['display_currency']); else $_SESSION['display_currency'] = $cur158;
+    $why158 .= ' contract#' . ($c158['employee_id'] ?? '-') . '=' . ($t1 ? 'lbp-only' : 'BAD') . ' pct#' . ($p158['employee_id'] ?? '-') . '=' . ($t2 ? '÷1500' : 'BAD');
+} catch (Throwable $e) { $ok158 = false; $why158 .= ' err=' . $e->getMessage(); }
+check('📄 الكشوف مطابقة للبطاقة السنوية: الأساس والدرجة بالليرة فقط، «بعد التدرّج» ÷1500 لأصحاب النسبة فقط (كود + رؤوس + تجربة على متعاقد بالدولار وصاحب نسبة)', $ok158, $why158);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

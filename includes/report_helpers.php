@@ -817,12 +817,12 @@ CSS;
 function annualTotalItems(): array {
     $u = fn(string $c) => "SUM(FLOOR(($c)/NULLIF(ms.exchange_rate,0)))";
     return [
-        'base_sal'   => ['g' => 'salaires',  'ar' => 'أساس الراتب',                    'fr' => 'Salaire de base',        'lbp' => 'SUM(ms.base_salary_lbp)',                  'usd' => 'SUM(' . lawUsdSql('ms.base_salary_lbp') . ')'],
+        'base_sal'   => ['g' => 'salaires',  'ar' => 'أساس الراتب',                    'fr' => 'Salaire de base',        'lbp' => 'SUM(ms.base_salary_lbp)',                  'usd' => '0'], // 📄 كما بالبطاقة: الأساس بالليرة فقط
         // 🏆 (p1 2026-09-17 «بدي بهيدا التقرير الدرجات العادية والدرجات الاستثنائية والراتب بعد التدرّج»): قيمة درجات السنة مقسومة
         //    بنوعها (annualGradeSplit) — أساس الراتب + العادية + الاستثنائية = الراتب بعد التدرّج (الأرقام تركب).
         'grade_ord'  => ['g' => 'salaires',  'ar' => 'الدرجات العادية',                'fr' => 'Échelons ordinaires',    'calc' => true],
         'grade_exc'  => ['g' => 'salaires',  'ar' => 'الدرجات الاستثنائية',            'fr' => 'Échelons exceptionnels', 'calc' => true],
-        'bpe'        => ['g' => 'salaires',  'ar' => 'الراتب بعد التدرّج',              'fr' => 'Base + échelons',        'lbp' => 'SUM(ms.base_plus_echelon_lbp)',            'usd' => 'SUM(' . lawUsdSql('ms.base_plus_echelon_lbp') . ')'],
+        'bpe'        => ['g' => 'salaires',  'ar' => 'الراتب بعد التدرّج',              'fr' => 'Base + échelons',        'lbp' => 'SUM(ms.base_plus_echelon_lbp)',            'usd' => 'SUM(CASE WHEN ' . pctLawHolderInSql((string)(activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear())) . ' THEN ' . lawUsdSql('ms.base_plus_echelon_lbp') . ' ELSE 0 END)'], // 📄 بعد التدرّج ÷1500 لأصحاب النسبة فقط
         'extra_wage' => ['g' => 'additions', 'ar' => 'الأجر الإضافي',                  'fr' => 'Supplément',             'lbp' => 'SUM(ms.extra_lbp + ms.prime_fixe_lbp)',    'usd' => 'SUM(' . extraWageUsdSql('ms.') . ')'],
         'aide'       => ['g' => 'additions', 'ar' => 'مكافأة ومساعدة',                 'fr' => 'Prime & aide',           'lbp' => 'SUM(ms.aide_complementaire_lbp)',          'usd' => $u('ms.aide_complementaire_lbp')],
         'transport'  => ['g' => 'transport', 'ar' => 'تعويض النقل',                    'fr' => 'Transport',              'lbp' => 'SUM(ms.transport_lbp)',                    'usd' => $u('ms.transport_lbp')],
@@ -912,7 +912,7 @@ function annualGradeSplit(PDO $db, string $schoolYear, string $empFilter, array 
         $sid = $m['sid'];
         if (!isset($out[$sid])) $out[$sid] = ['ord' => 0, 'exc' => 0, 'ord_usd' => 0.0, 'exc_usd' => 0.0];
         $out[$sid]['ord'] += $ord; $out[$sid]['exc'] += $exc;
-        $out[$sid]['ord_usd'] += lawUsd($ord); $out[$sid]['exc_usd'] += lawUsd($exc);
+        $out[$sid]['ord_usd'] += 0; $out[$sid]['exc_usd'] += 0; // 📄 الدرجات بالليرة فقط كما بالبطاقة
     }
     return $out;
 }

@@ -4806,7 +4806,7 @@ function rateTitleText($month = null, $year = null, bool $annual = false, ?float
     $txt = $annual
         ? 'سعر الصرف المعتمد: سعر كل شهر — آخر سعر 1 $ = ' . number_format($r, 0, '.', ',') . ' ل.ل.'
         : 'سعر الصرف المعتمد: 1 $ = ' . number_format($r, 0, '.', ',') . ' ل.ل.';
-    if ($law) $txt .= ' · الأساس والدرجة بالسعر الرسمي 1 $ = ' . number_format(officialUsdRate(), 0, '.', ',') . ' ل.ل.';
+    if ($law) $txt .= ' · الراتب بعد التدرّج لأصحاب النسبة بالسعر الرسمي 1 $ = ' . number_format(officialUsdRate(), 0, '.', ',') . ' ل.ل.'; // 📄 كما بالبطاقة (2026-09-21)
     return $txt;
 }
 function rateSubtitle($month = null, $year = null, bool $annual = false, ?float $rate = null, bool $law = true): string {
@@ -4821,7 +4821,47 @@ function rateHead(string $which, $month = null, $year = null): string {
 }
 function lawUsd($lbp): float { return floor((float)$lbp / officialUsdRate()); }
 function lawUsdSql(string $expr): string { return 'FLOOR((' . $expr . ')/' . officialUsdRate() . ')'; }
-function moneyLaw($lbp, array $opts = []): string { return money($lbp, officialUsdRate(), $opts); }
+/* 📄 (2026-09-21 p1 «كل التقارير لازم تكون مطابقة لبطاقة الراتب السنوية»): قاعدة البطاقة لدولار أعمدة الراتب — المصدر الواحد لكل الكشوف:
+ *   الأساس والدرجة بالليرة فقط (بلا دولار)، و«الراتب بعد التدرّج» بدولار القانون ÷1500 لأصحاب نسبة الإضافي بالسنة فقط، وإلا بالليرة فقط.
+ *   (كانت الكشوف تقسم الأساس ÷1500 للجميع فطلع أساس ايف عيد 36,908,010 = 24,605$ بينما البطاقة تعرضه بالليرة وحدها.) */
+function pctLawHolderIds(string $sy): array {
+    static $c = [];
+    if (isset($c[$sy])) return $c[$sy];
+    try {
+        $st = getDB()->prepare("SELECT DISTINCT employee_id FROM employee_bonuses WHERE bonus_type = 'prime_fixe' AND is_active = 1 AND value_type = 'percent' AND (school_year IS NULL OR school_year = ?)");
+        $st->execute([$sy]); $c[$sy] = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+    } catch (Throwable $e) { $c[$sy] = []; }
+    return $c[$sy];
+}
+/** شرط SQL «صاحب نسبة بالسنة» (للمجاميع المحسوبة بالاستعلام) */
+function pctLawHolderInSql(string $sy, string $col = 'ms.employee_id'): string {
+    $ids = pctLawHolderIds($sy);
+    return $ids ? "$col IN (" . implode(',', $ids) . ")" : '0=1';
+}
+function rowSchoolYear(array $row): string {
+    if (!empty($row['school_year']) && preg_match('/^\d{4}-\d{4}$/', (string)$row['school_year'])) return (string)$row['school_year'];
+    if (!empty($row['year']) && !empty($row['month'])) return schoolYearOfMonth((int)$row['year'], (int)$row['month']);
+    $sy = activeSchoolYear();
+    return $sy === 'all' ? currentSchoolYear() : $sy;
+}
+function isPctLawRow(array $row): bool {
+    $eid = (int)($row['employee_id'] ?? $row['id'] ?? 0);
+    return $eid > 0 && in_array($eid, pctLawHolderIds(rowSchoolYear($row)), true);
+}
+/** دولار القانون لعمود ('base'|'ech'|'bpe') كما بالبطاقة: bpe لصاحب النسبة فقط، وإلا 0 (= لا يُعرض) */
+function lawUsdRow(array $row, string $col, $lbp = null): float {
+    if ($col !== 'bpe' || !isPctLawRow($row)) return 0.0;
+    return lawUsd($lbp ?? (float)($row['base_plus_echelon_lbp'] ?? 0));
+}
+/** خلية الأساس/الدرجة/بعد التدرّج كما بالبطاقة (الصفّ والعمود يحدّدان إن كان يُعرض دولار القانون) */
+function moneyLaw($lbp, array $opts = [], ?array $row = null, string $col = 'base'): string {
+    if ($col === 'bpe' && $row && isPctLawRow($row)) return money($lbp, officialUsdRate(), $opts);
+    return '<span class="law-lbp">' . formatLBP($lbp, false) . '</span>'; // ليرة بلا وحدة كالبطاقة (حتى بوضع الدولار — خلية num-lbp بالبطاقة)
+}
+/** خلية مجموع بقاعدة البطاقة: دولار فقط إن وُجد (مجموع أصحاب النسبة)، وإلا ليرة فقط */
+function dualLaw($lbp, $usd, bool $withCur = false): string {
+    return (float)$usd > 0 ? dualFromUsd($lbp, $usd, $withCur) : '<span class="law-lbp">' . formatLBP($lbp, false) . '</span>';
+}
 /** دولار «الراتب المركّب» = بسعر الشهر (🔴 تصحيحه 2026-09-14: «1500 بس على أساس الراتب والراتب بعد التدرّج — من بعد الإضافي وكل شي
  *  بسعر صرف اليوم 89,500») — المركّب والأجر الإجمالي والصافي والمحسومات كلها بسعر الشهر؛ دولار القانون للأساس/الدرجة/بعد التدرّج فقط. */
 function composedSalaryUsd(array $row): float { return lbpToUsd(composedSalaryLbp($row), rowRate($row)); }

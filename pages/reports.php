@@ -308,7 +308,7 @@ function reportDocThumb($path) {
                         <th>#</th>
                         <?php if ($multi): ?><th>المدرسة</th><?php endif; ?>
                         <th>الاسم</th><th>الفئة</th><th>الدرجة</th>
-                        <th>أساس الراتب<?= rateHead('law') ?></th><th>قيمة الدرجة<?= rateHead('law') ?></th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
+                        <th>أساس الراتب</th><th>قيمة الدرجة</th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
                         <?= extraAideHeads('', $data, $month, $year) ?>
                         <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
                         <th>الضمان (٣٪)</th><th>الصندوق (٦٪)</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى الصندوق</small></th><?= familyDedHeads() ?><th>الضريبة</th>
@@ -333,7 +333,7 @@ function reportDocThumb($path) {
                             ob_start(); ?>
                             <tr class="<?= $isGrand ? 'total-row' : 'subtotal-row' ?>" style="<?= $bg ?>font-weight:700">
                                 <td colspan="<?= $colspanLbl ?>" style="text-align:right"><?= $label ?></td>
-                                <td><?= $dualTot($t['base'], $t['base_usd']) ?></td><td><?= $dualTot($t['ech'], $t['ech_usd']) ?></td><td><?= $dualTot($t['bpe'], $t['bpe_usd']) ?></td>
+                                <td><?= dualLaw($t['base'], $t['base_usd'], true) ?></td><td><?= dualLaw($t['ech'], $t['ech_usd'], true) ?></td><td><?= dualLaw($t['bpe'], $t['bpe_usd'], true) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= $dualTot($t['extra'], $t['extra_usd']) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= $dualTot($t['aide'], $t['aide_usd']) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= $dualTot($t['composed'], $t['composed_usd']) ?></strong></td>
                                 <td><?= $dualTot($t['cnss'], $t['cnss_usd']) ?></td><td><?= $dualTot($t['caisse'], $t['caisse_usd']) ?></td><td><?= $dualTot($t['eocg'] ?? 0, $t['eocg_usd'] ?? 0) ?></td>
@@ -356,8 +356,8 @@ function reportDocThumb($path) {
                                   'trans'=>$rTrans,'total'=>dueShownLbp($r),
                                   'extra_usd'=>extraWageUsd($r),'aide_usd'=>lbpToUsd(aideCompLbp($r),$rRate),'trans_usd'=>lbpToUsd($rTrans,$rRate),
                                   'composed'=>composedSalaryLbp($r),'composed_usd'=>composedSalaryUsd($r),
-                                  'base_usd'=>lawUsd((int)$r['base_salary_lbp']),'ech_usd'=>lawUsd((int)$r['echelon_value_lbp']),
-                                  'bpe_usd'=>lawUsd((int)$r['base_plus_echelon_lbp']),'cnss_usd'=>lbpToUsd((int)$r['cnss_amount_lbp'],$rRate),
+                                  'base_usd'=>0.0,'ech_usd'=>0.0, // 📄 كما بالبطاقة: الأساس والدرجة بالليرة فقط
+                                  'bpe_usd'=>lawUsdRow($r, 'bpe'),'cnss_usd'=>lbpToUsd((int)$r['cnss_amount_lbp'],$rRate),
                                   'caisse_usd'=>lbpToUsd((int)$r['caisse_amount_lbp'],$rRate),'eocg_usd'=>lbpToUsd((int)$r['eoc_grade_lbp'],$rRate),'tax_usd'=>lbpToUsd((int)$r['income_tax_lbp'],$rRate),
                                   'net_usd'=>lbpToUsd((int)$r['net_salary_lbp'],$rRate),'family_usd'=>lbpToUsd((int)$r['family_allowance_lbp'],$rRate),
                                   'total_usd'=>lbpToUsd(dueShownLbp($r),$rRate)];
@@ -373,7 +373,7 @@ function reportDocThumb($path) {
                                 <td><?= e(gradeDisplay($r['employee_type'], $r['grade_at_month'])) ?></td>
                                 <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
                                 <td><?= moneyLaw($r['echelon_value_lbp']) ?></td>
-                                <td><?= moneyLaw($r['base_plus_echelon_lbp']) ?></td>
+                                <td><?= moneyLaw($r['base_plus_echelon_lbp'], [], $r, 'bpe') ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $rRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r)) ?></strong></td>
@@ -419,7 +419,7 @@ function reportDocThumb($path) {
         <?php /* 🏛️ ترويسة كشف الضمان باسم صاحب العمل لدى الصندوق (25-82-043 ⇒ الجمعية) */ ?>
         <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year, 'school' => cnssEmployerSchool(currentSchool())]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
                     <tbody>
                         <?php
                         $zC = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'composed_usd'=>0,'cnss'=>0,'school'=>0]; $G = $zC; $csL = $multi?4:3;
@@ -487,7 +487,7 @@ function reportDocThumb($path) {
         </form>
         <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>الضريبة</th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>الضريبة</th></tr></thead>
                     <tbody>
                         <?php
                         $zX = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'composed_usd'=>0,'txb'=>0,'fded'=>0,'tax'=>0]; $G = $zX; $csL = $multi?4:3;
@@ -550,7 +550,7 @@ function reportDocThumb($path) {
         </form>
         <?= docSheetStart('Caisse EOC — retenues mensuelles', 'كشف صندوق التعليم الخاص الشهري', [monthName($month) . ' ' . $year], ['month' => $month, 'year' => $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب<?= rateHead('law') ?></th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
                     <tbody>
                         <?php $rn=0; foreach ($data as $r): $te += $r['caisse_amount_lbp']; $ts += $r['school_eoc_6_lbp']; $teg += $r['eoc_grade_lbp']; $teEx += extraWageLbp($r); $teExU += extraWageUsd($r); $teAi += aideCompLbp($r); $teBaseE += (int)$r['base_salary_lbp']; $teComposed += composedSalaryLbp($r); $teComposedU += composedSalaryUsd($r); ?>
                             <tr>
