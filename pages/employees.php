@@ -875,9 +875,12 @@ if ($action === 'list') {
     if ($typeFilter) { $sql .= " AND employee_type = ?"; $params[] = $typeFilter; }
     if ($statusFilter) { $sql .= " AND status = ?"; $params[] = $statusFilter; }
     if ($search) {
-        $sql .= " AND (first_name_fr LIKE ? OR last_name_fr LIKE ? OR first_name_ar LIKE ? OR last_name_ar LIKE ? OR employee_code LIKE ?)";
+        // 📞 (2026-09-21) البحث يشمل رقم الهاتف (بالأرقام فقط: 08-506827 = 08506827 = 506827)
+        $sDigits = preg_replace('/\D/', '', $search); $sDlike = $sDigits !== '' ? "%$sDigits%" : "\0";
+        $sql .= " AND (first_name_fr LIKE ? OR last_name_fr LIKE ? OR first_name_ar LIKE ? OR last_name_ar LIKE ? OR employee_code LIKE ?
+                       OR REPLACE(REPLACE(REPLACE(COALESCE(phone1,''),'-',''),' ',''),'/','') LIKE ? OR REPLACE(REPLACE(REPLACE(COALESCE(phone2,''),'-',''),' ',''),'/','') LIKE ?)";
         $like = "%$search%";
-        array_push($params, $like, $like, $like, $like, $like);
+        array_push($params, $like, $like, $like, $like, $like, $sDlike, $sDlike);
     }
     // فلترة حسب السنة الدراسية المختارة من الأعلى:
     //  «كل السنين» = الكل؛ سنة محددة = مَن إلهم رواتب فعلية بتلك السنة، **بالإضافة إلى الأساتذة الجدد
@@ -929,7 +932,51 @@ if ($action === 'list') {
         <div class="card-body">
             <form method="GET" class="form-row cols-4 mb-4">
                 <div class="form-group mb-0">
-                    <input type="text" name="q" class="form-control" placeholder="🔍 Rechercher..." value="<?= e($search) ?>">
+                    <div id="empSearchBox" style="position:relative">
+                        <input type="text" name="q" id="empSearchInput" class="form-control" placeholder="🔍 Nom ou téléphone / اكتب أوّل حرف من الاسم أو رقم الهاتف..." value="<?= e($search) ?>" autocomplete="off">
+                        <div id="empSearchPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--gray-200,#e2e8f0);border-radius:10px;box-shadow:0 10px 30px rgba(15,23,42,.12);max-height:380px;overflow:auto;z-index:60;text-align:right"></div>
+                    </div>
+                    <script>
+                    // 🔍📞 (2026-09-21 «بس حط أوّل حرف تبيّن أسماء اللي بأوّل هيدا الحرف وأنا بختار أو بكمّل كتابة الاسم أو تفتيش برقم التلفون»)
+                    (function () {
+                        var inp = document.getElementById('empSearchInput'), panel = document.getElementById('empSearchPanel'), box = document.getElementById('empSearchBox');
+                        if (!inp) return;
+                        var timer = null, items = [], sel = -1;
+                        function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+                        function close() { panel.style.display = 'none'; sel = -1; }
+                        function paint() { panel.querySelectorAll('.gs-item').forEach(function (a, i) { a.style.background = i === sel ? 'var(--gray-100,#f1f5f9)' : ''; }); }
+                        function render(emps) {
+                            items = emps; sel = -1;
+                            var h = '';
+                            if (emps.length) {
+                                h += '<div class="gs-sec"><i class="fas fa-users"></i> Enseignants & employés / الأساتذة والموظفون — اختر أو كمّل الكتابة</div>';
+                                emps.forEach(function (r, i) {
+                                    h += '<a class="gs-item" data-i="' + i + '" href="<?= BASE_URL ?>pages/employees.php?action=edit&id=' + r.id + '">'
+                                       + '<i class="fas fa-user"></i><span>' + esc(r.ar || r.fr) + (r.fr && r.ar ? ' / ' + esc(r.fr) : '')
+                                       + '<small>' + esc((r.code ? r.code + ' — ' : '') + (r.phone ? '📞 ' + r.phone + ' — ' : '') + (r.school || '')) + '</small></span></a>';
+                                });
+                            } else h = '<div class="gs-empty">Aucun résultat / لا نتائج</div>';
+                            panel.innerHTML = h; panel.style.display = 'block';
+                        }
+                        inp.addEventListener('input', function () {
+                            var q = inp.value.trim(); clearTimeout(timer);
+                            if (q.length < 1) { close(); return; }
+                            timer = setTimeout(function () {
+                                fetch('<?= BASE_URL ?>ajax_search.php?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+                                    .then(function (r) { return r.json(); }).then(render).catch(function () { render([]); });
+                            }, 120);
+                        });
+                        inp.addEventListener('focus', function () { if (inp.value.trim().length >= 1) inp.dispatchEvent(new Event('input')); });
+                        inp.addEventListener('keydown', function (e) {
+                            if (panel.style.display === 'none') return;
+                            if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(items.length - 1, sel + 1); paint(); }
+                            else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(-1, sel - 1); paint(); }
+                            else if (e.key === 'Enter' && sel >= 0 && items[sel]) { e.preventDefault(); window.location = '<?= BASE_URL ?>pages/employees.php?action=edit&id=' + items[sel].id; }
+                            else if (e.key === 'Escape') close();
+                        });
+                        document.addEventListener('click', function (e) { if (!box.contains(e.target)) close(); });
+                    })();
+                    </script>
                 </div>
                 <div class="form-group mb-0">
                     <select name="type" class="form-select">

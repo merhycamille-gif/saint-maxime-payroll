@@ -7375,6 +7375,52 @@ try {
 } catch (Throwable $e) { $ok158 = false; $why158 .= ' err=' . $e->getMessage(); }
 check('📄 الكشوف مطابقة للبطاقة السنوية: الأساس والدرجة بالليرة فقط، «بعد التدرّج» ÷1500 لأصحاب النسبة فقط (كود + رؤوس + تجربة على متعاقد بالدولار وصاحب نسبة)', $ok158, $why158);
 
+/**
+ * 159) 💱 «عم شوف سعر دولار 89,501 أو 89,509 ليش نحنا حاطينو 89,500» (2026-09-21): الصفوف المنقولة بسعر مشتقّ بكسور تُعاد إلى سعر الشهر
+ *      الرسمي (±100) مع مرايا الدولار — healDerivedExchangeRates مستمرّ بالترويسة. تشغيل فعلي: صفّ يُحرَّف إلى 89,501.09 يرجع 89,500، وسعر صحيح 90,000 لا يُمسّ.
+ */
+$ok159 = function_exists('healDerivedExchangeRates') && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healDerivedExchangeRates();') !== false;
+$why159 = 'code=' . ($ok159 ? 'ok' : 'bad');
+try {
+    $row159 = $db->query("SELECT employee_id, year, month, exchange_rate, net_salary_lbp FROM monthly_salaries WHERE school_year = '2026-2027' AND month = 10 AND net_salary_lbp > 0 AND exchange_rate = ROUND(exchange_rate) LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$row159) throw new RuntimeException('لا صفّ');
+    $w159 = "employee_id = " . (int)$row159['employee_id'] . " AND year = " . (int)$row159['year'] . " AND month = " . (int)$row159['month'];
+    $db->exec("UPDATE monthly_salaries SET exchange_rate = 89501.09 WHERE $w159");
+    healDerivedExchangeRates(true);
+    $after = $db->query("SELECT exchange_rate, net_salary_usd FROM monthly_salaries WHERE $w159")->fetch(PDO::FETCH_ASSOC);
+    $off159 = (float)getExchangeRate((int)$row159['month'], (int)$row159['year']);
+    $t1 = abs((float)$after['exchange_rate'] - $off159) < 0.01 && abs((float)$after['net_salary_usd'] - round((int)$row159['net_salary_lbp'] / $off159, 2)) < 0.011;
+    $db->exec("UPDATE monthly_salaries SET exchange_rate = 90000 WHERE $w159");
+    healDerivedExchangeRates(true);
+    $t2 = (float)$db->query("SELECT exchange_rate FROM monthly_salaries WHERE $w159")->fetchColumn() == 90000.0;
+    $db->prepare("UPDATE monthly_salaries SET exchange_rate = ?, net_salary_usd = ROUND(net_salary_lbp / ?, 2) WHERE $w159")->execute([(float)$row159['exchange_rate'], (float)$row159['exchange_rate']]);
+    $left159 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE exchange_rate > 0 AND exchange_rate <> ROUND(exchange_rate) AND school_year >= '2025-2026'")->fetchColumn();
+    $ok159 = $ok159 && $t1 && $t2 && $left159 === 0;
+    $why159 .= " tamper=" . ($t1 ? 'healed' : 'NOT') . " whole=" . ($t2 ? 'kept' : 'TOUCHED') . " leftover=$left159";
+} catch (Throwable $e) { $ok159 = false; $why159 .= ' err=' . $e->getMessage(); }
+check('💱 سعر الصرف المشتقّ بكسور يرجع سعر الشهر الرسمي (89,500) مع مرايا الدولار — مستمرّ بالترويسة + لا صفّ متبقٍّ + الأسعار الصحيحة لا تُمسّ', $ok159, $why159);
+
+/**
+ * 160) 🔍📞 «بصفحة الموظفين والأساتذة بس بدي فتّش على أستاذ لازم دغري بس حطّ أوّل حرف تبيّن أسماء اللي بأوّل هيدا الحرف وأنا بختار
+ *      أو بكمّل كتابة الاسم أو تفتيش برقم التلفون» (2026-09-21): خانة البحث بلوحة اقتراحات فورية (ajax_search) من أوّل حرف + الهاتف
+ *      بالأرقام فقط بالاقتراحات وبفلتر اللائحة. تجربة: أستاذ بهاتف يُعثر عليه بآخر 6 أرقام بلا شرطة.
+ */
+$ax160 = (string)file_get_contents($PROJ . '/ajax_search.php'); $ep160 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$ok160 = strpos($ax160, "REPLACE(REPLACE(REPLACE(COALESCE(phone1,''),'-',''),' ',''),'/','') LIKE ?") !== false && strpos($ax160, "'phone'  =>") !== false
+      && strpos($ep160, 'id="empSearchPanel"') !== false && strpos($ep160, "ajax_search.php?q=") !== false && strpos($ep160, "REPLACE(REPLACE(REPLACE(COALESCE(phone1,''),'-',''),' ',''),'/','') LIKE ?") !== false
+      && strpos($ep160, "action=edit&id=' + r.id") !== false;
+$why160 = 'code=' . ($ok160 ? 'ok' : 'bad');
+try {
+    $ph = $db->query("SELECT id, phone1 FROM employees WHERE is_deleted = 0 AND phone1 REGEXP '^[0-9]{2}-[0-9]{6}$' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$ph) throw new RuntimeException('لا هاتف');
+    $d = substr(preg_replace('/\D/', '', $ph['phone1']), -6);
+    $st = $db->prepare("SELECT id FROM employees WHERE is_deleted = 0 AND (REPLACE(REPLACE(REPLACE(COALESCE(phone1,''),'-',''),' ',''),'/','') LIKE ? OR REPLACE(REPLACE(REPLACE(COALESCE(phone2,''),'-',''),' ',''),'/','') LIKE ?)");
+    $st->execute(['%' . $d . '%', '%' . $d . '%']); $ids = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+    $ok160 = $ok160 && in_array((int)$ph['id'], $ids, true);
+    $why160 .= " phone={$ph['phone1']} tail=$d found=" . (in_array((int)$ph['id'], $ids, true) ? 'yes' : 'NO');
+} catch (Throwable $e) { $ok160 = false; $why160 .= ' err=' . $e->getMessage(); }
+check('🔍📞 بحث الموظفين: اقتراحات فورية من أوّل حرف (اختيار أو تكملة) + البحث برقم الهاتف بالأرقام فقط (اقتراحات + فلتر اللائحة)', $ok160, $why160);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

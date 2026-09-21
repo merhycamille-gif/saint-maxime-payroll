@@ -1223,6 +1223,27 @@ function healNullExchangeRates(): int {
     } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
     return $n;
 }
+/** 💱 (2026-09-21 «عم شوف سعر دولار 89,501 أو 89,509 ليش نحنا حاطينو 89,500؟»): صفوف منقولة من البرنامج القديم/الكشوف حُفظ سعرها
+ *  مشتقّاً (الصافي ÷ دولار قديم = 89,498.94 / 89,509.14…) لا سعر الشهر المضبوط بالإعدادات. أي سعر **بكسور** يبعد أقلّ من 100 ليرة عن
+ *  سعر الشهر الرسمي يُعاد إليه مع مرايا الدولار (ROUND ÷ السعر) — الأسعار الصحيحة التي يضبطها المستخدم لا تُمسّ. مستمرّ كل 3 ساعات. */
+function healDerivedExchangeRates(bool $force = false): int {
+    if (!$force && !healGateOpen('heal_derived_rate')) return 0;
+    $n = 0;
+    try {
+        $db = getDB();
+        $ym = $db->query("SELECT DISTINCT year, month FROM monthly_salaries WHERE exchange_rate > 0 AND exchange_rate <> ROUND(exchange_rate)")->fetchAll(PDO::FETCH_ASSOC);
+        $up = $db->prepare("UPDATE monthly_salaries SET exchange_rate = ?, net_salary_usd = ROUND(net_salary_lbp / ?, 2), total_due_usd = ROUND(total_due_lbp / ?, 2)
+                            WHERE year = ? AND month = ? AND exchange_rate > 0 AND exchange_rate <> ROUND(exchange_rate) AND ABS(exchange_rate - ?) < 100");
+        foreach ($ym as $r) {
+            $rate = (float)getExchangeRate((int)$r['month'], (int)$r['year']);
+            if ($rate <= 0) continue;
+            $up->execute([$rate, $rate, $rate, (int)$r['year'], (int)$r['month'], $rate]);
+            $n += $up->rowCount();
+        }
+        if ($n) logAudit('heal_derived_exchange_rate', 'monthly_salaries', 0, null, ['rows' => $n]);
+    } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
+    return $n;
+}
 function healNetMathRows(): int {
     if (!healGateOpen('heal_net_math')) return 0;
     $n = 0;
