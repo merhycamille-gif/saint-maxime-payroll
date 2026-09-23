@@ -182,10 +182,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             header('Location: ' . BASE_URL . 'pages/info_collect.php#newteachers'); exit;
         }
         $data = json_decode($sub['data'] ?: '{}', true) ?: [];
-        // سنة الدخول: يجب أن تكون لاحقة للسنة الجارية (الجديد لا يدخل على السنة الجارية أو ما قبلها)
-        $entryYear = (isset($data['entry_school_year']) && preg_match('/^\d{4}-\d{4}$/', $data['entry_school_year']) && $data['entry_school_year'] > currentSchoolYear())
-            ? $data['entry_school_year']
-            : ((int)substr(currentSchoolYear(),0,4) + 1) . '-' . ((int)substr(currentSchoolYear(),0,4) + 2);
+        // سنة الدخول: سنة البرنامج الحالية فأكثر (🔴 2026-09-23: بعد فتح 2026-2027 صارت هي الحالية، فكان الجديد يُدفَع إلى 2027-2028 —
+        //    شربل عرب/بيرلا ضومط/عبد القادر الحجار). الطلبات المُرسَلة قبل هذا التصحيح لم يُعرض عليها إلا السنة التالية ⇒ تُعامَل كالحالية.
+        $curSyIC = currentSchoolYear();
+        $nextSyIC = ((int)substr($curSyIC, 0, 4) + 1) . '-' . ((int)substr($curSyIC, 0, 4) + 2);
+        $entryYear = (isset($data['entry_school_year']) && preg_match('/^\d{4}-\d{4}$/', $data['entry_school_year']) && strcmp($data['entry_school_year'], $curSyIC) >= 0)
+            ? $data['entry_school_year'] : $curSyIC;
+        if ($entryYear === $nextSyIC && (string)($sub['submitted_at'] ?? '') !== '' && $sub['submitted_at'] < '2026-09-24 00:00:00') $entryYear = $curSyIC;
         $entryStartYear = (int)substr($entryYear, 0, 4);
         // ابنِ صفّ الموظف من الحقول المُرسَلة. الفئة يختارها الأستاذ بالفورم (متعاقد/ملاك/موظف)؛
         // إن غابت أو كانت غير صالحة → متعاقد افتراضياً. يُكمّل المدير الإعداد المالي/التدرّج لاحقاً.
@@ -197,6 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             'status' => 'actif',
             'school_id' => (int)$sub['school_id'],
             'hire_date' => $entryStartYear . '-10-01',
+            'payment_months_per_year' => 12, // 📆 12 شهراً للجميع (2026-09-20) — كان يأخذ الافتراضي 10 من الجدول
         ];
         $strFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','mother_first_name','mother_last_name',
             'birth_place','nationality','gouvernorat','district','ville','quartier','rue','immeuble','etage',

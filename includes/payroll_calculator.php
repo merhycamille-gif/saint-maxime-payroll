@@ -680,6 +680,18 @@ function salaryYearPayable(int $employeeId, string $schoolYear, ?PDO $db = null)
     return (int)$q->fetchColumn() > 0;
 }
 
+/**
+ * 🔒 (2026-09-23 — ايف عيد #1815 عبرا: حفظ ملفه أعاد حساب 9 أشهر **مدفوعة** من 2025-2026 فصار صافيه 970,000 بدل 69,060,000)
+ * الأشهر المدفوعة (is_paid=1) لسنة دراسية **سابقة** لسنة البرنامج لا تُعاد بأي إعادة حساب ضمنية (حفظ ملف، درجات، شفاءات…).
+ * تُعاد فقط بفعل صريح من المستخدم: صفحات «احسب السنة» (البطاقة/الكشف الشهري)، تقرير المخالفات (زرّ التصحيح)، الإكسل، العلاوات الجماعية،
+ * الإعدادات — تلك الصفحات ترفع العلم $GLOBALS['msa_recalc_paid_ok']. ما تخطّاه المحرّك يُسجَّل بالتدقيق (recalc_skipped_paid).
+ */
+function recalcPaidAllowed(): bool { return !empty($GLOBALS['msa_recalc_paid_ok']); }
+function protectPaidMonths(string $schoolYear): bool {
+    if (recalcPaidAllowed()) return false;
+    if (!preg_match('/^\d{4}-\d{4}$/', $schoolYear)) return false;
+    return strcmp($schoolYear, currentSchoolYear()) < 0;
+}
 function recalcEmployeeYear($employeeId, $schoolYear = null) {
     $db = getDB();
     ensureSalaryLaborLawColumn();
@@ -751,9 +763,13 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
         ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
         : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
     $n = 0;
+    $protect = protectPaidMonths($sy); $skipped = [];
+    $paidSt = $protect ? $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND month = ? AND year = ? AND COALESCE(is_paid,0) = 1 LIMIT 1") : null;
     foreach ($months as [$m, $y]) {
+        if ($protect) { $paidSt->execute([$employeeId, $m, $y]); if ($paidSt->fetchColumn()) { $skipped[] = "$y-$m"; continue; } } // 🔒 شهر مدفوع بسنة سابقة
         try { (new PayrollCalculator($employeeId, $m, $y))->calculateAndSave(); $n++; } catch (Exception $ex) {}
     }
+    if ($skipped) { try { logAudit('recalc_skipped_paid', 'monthly_salaries', (int)$employeeId, null, ['sy' => $sy, 'skipped' => $skipped]); } catch (Throwable $ex) {} }
     return $n;
 }
 
@@ -813,7 +829,9 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
             net_salary_lbp = ?, total_due_lbp = ?, net_salary_usd = ?, total_due_usd = ?, prime_fixe_usd_law = ?, family_allowance_lbp = ?
         WHERE id = ?");
     $n = 0;
+    $protectOv = protectPaidMonths((string)$schoolYear);
     foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        if ($protectOv && (int)($r['is_paid'] ?? 0) === 1) continue; // 🔒 شهر مدفوع بسنة سابقة — لا يُمسّ إلا بفعل صريح
         try { $calc = new PayrollCalculator($employeeId, (int)$r['month'], (int)$r['year']); }
         catch (Exception $ex) { continue; }
         [$primeFixe, $aideComp, $transportComp] = $calc->bonusComponents((float)$r['base_plus_echelon_lbp']);

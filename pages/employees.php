@@ -623,6 +623,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Modifications enregistrées / تم حفظ التعديلات'];
             }
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
+            // 🎓🛡️ (2026-09-23 تريزيا مارون) حفظ ثانٍ من نموذج قديم أعاد بند الإضافي الثابت 35,000,000 من أيام تعاقدها بدل نسبة الملاك 50 %
+            //    التي طبّقها البرنامج قبل ثوانٍ (saveEmployeeBonuses يعيد كتابة البنود كما بالنموذج). قراره: «دايماً بس نحطّ ملاك بيطبّق عليه كل شي»
+            //    ⇒ ملاك صار ملاكاً بسنة البرنامج ومدرسته بنسبة: إن كان إضافيه الفعّال مبلغاً لا نسبة تُعاد نسبة المدرسة والنقل كملاك (idempotent)
+            if ($data['employee_type'] === 'enseignant_titulaire' && function_exists('cadreDueApplyPercent')) {
+                try {
+                    $cgSy = currentSchoolYear();
+                    $cgTit = (string)($data['titularization_date'] ?? '');
+                    if ($cgTit !== '' && strcmp(schoolYearOfDate($cgTit), $cgSy) >= 0) {
+                        $cgSyApply = schoolYearOfDate($cgTit);
+                        $cgHasPct = (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = " . (int)$id . " AND school_year = " . $db->quote($cgSyApply) . " AND bonus_type = 'prime_fixe' AND value_type = 'percent' AND is_active = 1")->fetchColumn();
+                        if (!$cgHasPct && schoolCadrePercent($db, currentSchoolId(), $cgSyApply)) {
+                            $cgP = cadreDueApplyPercent($db, (int)$id, currentSchoolId(), $cgSyApply);
+                            $cgT = cadreDueApplyTransport($db, (int)$id, currentSchoolId(), $cgSyApply);
+                            if ($cgP !== null || $cgT !== null) {
+                                $_SESSION['flash'] = ['type' => 'success', 'msg' => '🎓 ملاك المدرسة: أُعيدت له نسبة الإضافي ' . ($cgP !== null ? pctFmt($cgP) . ' %' : '') . ($cgT ? ' + ' . $cgT : '') . ' بدل البند الثابت — ' . ($_SESSION['flash']['msg'] ?? '')];
+                                logAudit('cadre_pct_guard', 'employees', (int)$id, null, ['sy' => $cgSyApply, 'pct' => $cgP, 'transport' => $cgT]);
+                            }
+                        }
+                    }
+                } catch (Throwable $t) {}
+            }
             applyFamilyAllowanceDates($db, $id, $data); // 👨‍👩‍👧 مدّة التعويض العائلي (بداية افتراضية إن غابت)
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
             // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات

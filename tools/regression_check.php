@@ -26,6 +26,7 @@ $_SESSION += ['user_id' => 1, 'username' => 'admin', 'full_name' => 'RegCheck', 
 require_once $PROJ . '/config/database.php';
 require_once $PROJ . '/includes/functions.php';
 $db = getDB();
+$GLOBALS['msa_recalc_paid_ok'] = true; // 🔒 أداة فحص = فعل صريح: التجارب الحيّة تعيد حساب أشهر مدفوعة بسنين سابقة (القسم 164 يختبر الحماية بإطفاء العلم مؤقتاً)
 
 // ---------- عارض صفحات داخلي (كل صفحة بعملية فرعية لتفادي إعادة تعريف الدوال) ----------
 // $outFile: للمخرجات الثنائية (xlsx...) — أنبوب shell_exec بويندوز وضع نصي يقصّ عند أول
@@ -5622,7 +5623,7 @@ check('الترسيم الحكمي: الوحدة (مرشَّحون/ترسيم/ق
       && strpos($oy115, 'handleCadreDuePost($db, BASE_URL . \'pages/open_year.php\')') !== false && strpos($oy115, 'renderCadreDuePending($cdPend, $cdSy, false') !== false
       && strpos($ix115, 'handleCadreDuePost($db, BASE_URL . \'index.php\')') !== false && strpos($ix115, 'renderCadreDuePending($homeCd, $homeCdSy, true') !== false
       && strpos($pc115, "\$cfs = (string)(\$this->employee['cadre_from_sy'] ?? '')") !== false && strpos($pc115, 'SELECT cadre_from_sy FROM employees WHERE id = ') !== false
-      && strpos($hd115, 'cadreDueEnsureColumns(); healJanaRestore20260913(); healCadreNew20260913();') !== false && function_exists('healJanaRestore20260913') && function_exists('healCadreNew20260913') && is_file($PROJ . '/tools/data/rows_1785_pre2627_20260913.json') && strpos($em115, 'UPDATE employees SET cadre_from_sy = ? WHERE id = ?') !== false && strpos($em115, 'cadreDueTemplate($db, currentSchoolId())') !== false && strpos($cd115, 'heal_cadre_new_20260913b') !== false && strpos($cd115, '$tplF = cadreDueTemplate($db, (int)$emp[\'school_id\'])') !== false && isset(complianceRules()['cadre_due']) && function_exists('schoolCadreTransportTemplate') && function_exists('cadreDueApplyTransport') && strpos($cd115, "cadreDueApplyTransport(\$db, \$empId, (int)\$emp['school_id'], \$sy)") !== false
+      && strpos($hd115, 'cadreDueEnsureColumns(); healJanaRestore20260913(); healCadreNew20260913();') !== false && function_exists('healJanaRestore20260913') && function_exists('healCadreNew20260913') && is_file($PROJ . '/tools/data/rows_1785_pre2627_20260913.json') && strpos($em115, 'UPDATE employees SET cadre_from_sy = ? WHERE id = ?') !== false && strpos($em115, 'cadreDueTemplate($db, currentSchoolId())') !== false && strpos($cd115, 'heal_cadre_new_20260923c') !== false && strpos($cd115, '$tplF = cadreDueTemplate($db, (int)$emp[\'school_id\'])') !== false && isset(complianceRules()['cadre_due']) && function_exists('schoolCadreTransportTemplate') && function_exists('cadreDueApplyTransport') && strpos($cd115, "cadreDueApplyTransport(\$db, \$empId, (int)\$emp['school_id'], \$sy)") !== false
       && strpos($em115, '$becameCadre = (') !== false && strpos($cd115, "isSchoolYearLocked((int)\$emp['school_id'], \$sy)") !== false
       && strpos($cd115, "buildLegalGradeHistory(\$empId, sprintf('%04d-09-30', \$y2), false, true)") !== false && strpos($cd115, 'recalcEmployeeYear($empId, $sy)') !== false);
 // تجربة حيّة تُرجَع بالكامل (لقطة + استرجاع): مرشَّح حقيقي لسنة 2026-2027 ← ترسيم ← ملاك من 1/10 + السلسلة + الدرجات (دخول + فورية لغير التعليمية بتشرين + 4 بكانون)
@@ -6844,7 +6845,9 @@ check('🚪🔴 تاريخ ترك وهمي = لا تاريخ + التقليم ل
       && strpos($hd143, 'healBogusLeftDates20260919();') !== false
       && is_file($PROJ . '/tools/data/rows_1438_20260919.json')
       && $ok143 && $bogus143 === 0
-      && ((string)($r143['last_name_ar'] ?? '') !== 'عون' || ((int)$r143['rows_'] === 45 /* 43 + آب/أيلول 2027 بعد قاعدة 12 شهراً للجميع (2026-09-20) */ && (int)$r143['bon'] === 2 && $r143['left_date_all'] === null && $r143['left_date_eoc'] === null)),
+      && ((string)($r143['last_name_ar'] ?? '') !== 'عون' || ((int)$r143['bon'] === 2 && $r143['left_date_eoc'] === null
+          && (($r143['left_date_all'] === null && (int)$r143['rows_'] === 45 /* 43 + آب/أيلول 2027 بعد قاعدة 12 شهراً للجميع (2026-09-20) */)
+              || ($r143['left_date_all'] === '2026-09-30' && (int)$r143['rows_'] >= 33 /* 🚪 قراره أونلاين 2026-09-21: ترك 30/9/2026 ⇒ أشهر 2026-2027 غير المدفوعة قُلِّمت */)))),
       $why143 . ' · bogus=' . $bogus143 . ' · 1438=' . json_encode($r143, JSON_UNESCAPED_UNICODE));
 
 /**
@@ -7530,7 +7533,8 @@ try {
     $cdSrc163 = (string)file_get_contents($PROJ . '/includes/cadre_due.php');
     $healOk163 = strpos($cdSrc163, "heal_cadre_new_20260923c") !== false && strpos($cdSrc163, "logAudit('cadre_heal_fail'") !== false && strpos($cdSrc163, '} } catch (Throwable $eg) {') !== false
               && strpos($cdSrc163, "SET salary_input_mode = 'percent_of_lbp', base_salary_lbp_percent = IF(base_salary_lbp_percent > 0, base_salary_lbp_percent, 100), contract_salary_lbp = 0, base_salary_usd = 0 WHERE id = ?\")->execute([\$id]);") !== false
-              && strpos($ep163, "cadreManualConversionComplete(\$db, (int)\$id, (string)(\$_SESSION['username'] ?? ''), 'new')") !== false;
+              && strpos($ep163, "cadreManualConversionComplete(\$db, (int)\$id, (string)(\$_SESSION['username'] ?? ''), 'new')") !== false
+              && strpos($ep163, "logAudit('cadre_pct_guard'") !== false && strpos($ep163, 'saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي') < strpos($ep163, "logAudit('cadre_pct_guard'"); // 🛡️ الحارس بعد إعادة كتابة البنود
     $ok163 = $code163 && $healOk163 && strpos($rateLbp163, '89,500') !== false && $res163 && $e163['cadre_from_sy'] === '2026-2027' && $e163['salary_input_mode'] === 'percent_of_lbp' && (float)$e163['contract_salary_lbp'] == 0
           && (int)$e163['eoc_subject'] === 1 && $dec163 && $dec163['decision'] === 'approved' && strpos($dec163['result'], 'حُوِّل بيده') !== false
           && (!$pct163 || (count($bon163) === 1 && $bon163[0]['value_type'] === 'percent' && abs((float)$bon163[0]['amount'] - (float)$pct163['pct']) < 0.01))
@@ -7544,6 +7548,44 @@ finally {
     $db->exec("DELETE FROM audit_log WHERE record_id = $rid163 AND table_name = 'employees'"); $db->exec("DELETE FROM employees WHERE id = $rid163");
 }
 check('🎓✍️🏷️ تريزيا مارون: التحويل اليدوي إلى ملاك = قانون الملاك كاملاً فوراً (السلسلة + المحسومات + النسبة + النقل + صمام السنين + قرار approved + تدقيق) + فشل «موافق» يُقال ويُسجَّل + سطر سعر الصرف بالبطاقة بكل أوضاع العملة وبالتصدير', $ok163, $why163);
+
+/**
+ * 164) 🔒📆 (2026-09-23) ايف عيد #1815: حفظ ملفه أعاد حساب 9 أشهر مدفوعة من 2025-2026 (69,060,000 ⇒ 970,000) ⇒ الأشهر المدفوعة لسنة سابقة
+ *      لا تُعاد بإعادة حساب ضمنية (recalcEmployeeYear/overlay) إلا بعلم الفعل الصريح msa_recalc_paid_ok (صفحات احسب السنة/المخالفات/الإكسل/العلاوات/الإعدادات).
+ *      + الأساتذة الجدد من الرابط: سنة الدخول = سنة البرنامج الحالية (الفورم + الموافقة + 12 شهراً) + شفاء الثلاثة المدفوعين إلى 2027-2028.
+ *      تجربة حيّة: متعاقد __REG164 بعقد 2,000,000 وشهر تشرين 2025 مدفوع بصافي 1 ⇒ إعادة الحساب الضمنية تتركه 1، وبالعلم تصحّحه.
+ */
+$ok164 = true; $why164 = '';
+$pc164 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php'); $ic164 = (string)file_get_contents($PROJ . '/pages/info_collect.php');
+$tf164 = (string)file_get_contents($PROJ . '/pages/teacher_form.php'); $hd164 = (string)file_get_contents($PROJ . '/includes/header.php');
+$code164 = strpos($pc164, 'function protectPaidMonths(') !== false && strpos($pc164, "logAudit('recalc_skipped_paid'") !== false && strpos($pc164, '$protectOv && (int)($r[\'is_paid\'] ?? 0) === 1) continue;') !== false
+        && strpos($ic164, "'payment_months_per_year' => 12,") !== false && strpos($ic164, "strcmp(\$data['entry_school_year'], \$curSyIC) >= 0") !== false
+        && strpos($tf164, 'for ($yy = $curStart; $yy <= $curStart + 2; $yy++)') !== false && strpos($hd164, 'healLinkEntryYear20260923();') !== false;
+foreach (['annual_slip', 'monthly_payroll', 'compliance', 'excel_salaries', 'bulk_allowances', 'settings'] as $pg164) $code164 = $code164 && strpos((string)file_get_contents($PROJ . "/pages/$pg164.php"), "\$GLOBALS['msa_recalc_paid_ok'] = true;") !== false;
+$prevFlag164 = $GLOBALS['msa_recalc_paid_ok'] ?? null; unset($GLOBALS['msa_recalc_paid_ok']);
+$db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, status, salary_input_mode, base_salary_usd, contract_salary_lbp, payment_months_per_year, days_per_week, transport_weeks, tax_subject, tax_includes_extra, cnss_subject, cnss_includes_extra, eoc_subject, is_deleted)
+    VALUES (2, '__REG164', 'enseignant_contractuel', 'فحص', 'مدفوع164', 'Reg', 'Paid164', '2024-10-01', 'actif', 'direct_lbp', 0, 2000000, 12, 5, 4, 1, 1, 1, 1, 0, 0)");
+$rid164 = (int)$db->lastInsertId();
+try {
+    $db->exec("INSERT INTO monthly_salaries (employee_id, school_id, month, year, school_year, base_salary_lbp, base_plus_echelon_lbp, net_salary_lbp, total_due_lbp, exchange_rate, is_calculated, is_paid) VALUES ($rid164, 2, 10, 2025, '2025-2026', 1, 1, 1, 1, 89500, 1, 1)");
+    $db->exec("INSERT INTO monthly_salaries (employee_id, school_id, month, year, school_year, base_salary_lbp, base_plus_echelon_lbp, net_salary_lbp, total_due_lbp, exchange_rate, is_calculated, is_paid) VALUES ($rid164, 2, 11, 2025, '2025-2026', 1, 1, 1, 1, 89500, 1, 0)");
+    recalcEmployeeYear($rid164, '2025-2026');
+    $octA = (int)$db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id = $rid164 AND month = 10 AND year = 2025")->fetchColumn();
+    $novA = (int)$db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id = $rid164 AND month = 11 AND year = 2025")->fetchColumn();
+    $sk = (int)$db->query("SELECT COUNT(*) FROM audit_log WHERE action = 'recalc_skipped_paid' AND record_id = $rid164")->fetchColumn();
+    $GLOBALS['msa_recalc_paid_ok'] = true;
+    recalcEmployeeYear($rid164, '2025-2026');
+    $octB = (int)$db->query("SELECT net_salary_lbp FROM monthly_salaries WHERE employee_id = $rid164 AND month = 10 AND year = 2025")->fetchColumn();
+    $ok164 = $code164 && $octA === 1 && $novA > 1000 && $sk === 1 && $octB > 1000 && protectPaidMonths('2025-2026') === false;
+    unset($GLOBALS['msa_recalc_paid_ok']);
+    $ok164 = $ok164 && protectPaidMonths('2025-2026') === true && protectPaidMonths(currentSchoolYear()) === false;
+    $why164 = 'code=' . ($code164 ? 'ok' : 'bad') . " octProtected=$octA novRecalc=$novA skippedLog=$sk octForced=$octB";
+} catch (Throwable $e) { $ok164 = false; $why164 .= ' err=' . $e->getMessage(); }
+finally {
+    if ($prevFlag164 !== null) $GLOBALS['msa_recalc_paid_ok'] = $prevFlag164; else unset($GLOBALS['msa_recalc_paid_ok']);
+    $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid164"); $db->exec("DELETE FROM audit_log WHERE record_id = $rid164 AND action = 'recalc_skipped_paid'"); $db->exec("DELETE FROM employees WHERE id = $rid164");
+}
+check('🔒📆 الأشهر المدفوعة لسنة سابقة لا تُعاد بإعادة حساب ضمنية (حفظ ملف/درجات/شفاء) وتُعاد بالفعل الصريح فقط + تسجيل التخطّي + الجديد من الرابط على سنة البرنامج الحالية بـ12 شهراً + شفاء المدفوعين إلى 2027-2028', $ok164, $why164);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

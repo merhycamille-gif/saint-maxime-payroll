@@ -1088,6 +1088,45 @@ function newTeachersReportCols(): array {
 }
 
 /**
+ * 🩹 شفاء مرّة واحدة (2026-09-23): الأساتذة الجدد الذين وُوفق عليهم من الرابط بعد فتح 2026-2027 دُفعوا إلى 2027-2028 (القاعدة القديمة
+ * «الجديد لا يدخل على السنة الجارية» والفورم لم يعرض إلا السنة التالية) — شربل عرب #1000021، بيرلا ضومط #1000022، عبد القادر الحجار #1000023.
+ * الشرط: أُنشئ من الرابط بين فتح السنة و2026-09-24، سنة الفورم = سنة البرنامج+1، hire_date = 1/10 من تلك السنة، لا شهر مدفوع.
+ * الأثر: hire_date ← 1/10 سنة البرنامج، بنوده ← سنة البرنامج، أشهره غير المدفوعة بالسنة التالية تُحذف، ويُحسب على سنة البرنامج. يُسجَّل بالمخالفات والتدقيق.
+ */
+function healLinkEntryYear20260923(): void {
+    $flag = 'heal_link_entry_year_20260923';
+    try {
+        if (strpos((string)getSetting($flag, ''), 'done') === 0) return;
+        $db = getDB();
+        if ($db->inTransaction()) return;
+        require_once __DIR__ . '/payroll_calculator.php';
+        $cur = currentSchoolYear(); if (!preg_match('/^(\d{4})-\d{4}$/', $cur, $m)) return;
+        $next = ((int)$m[1] + 1) . '-' . ((int)$m[1] + 2);
+        $st = $db->prepare("SELECT e.id, e.school_id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, s.applied_at
+                            FROM employees e JOIN info_submissions s ON s.employee_id = e.id AND s.is_new_teacher = 1 AND s.status = 'applied'
+                            WHERE e.is_deleted = 0 AND e.hire_date = ? AND s.applied_at >= '2026-09-12' AND s.applied_at < '2026-09-24'
+                              AND JSON_UNQUOTE(JSON_EXTRACT(s.data, '$.entry_school_year')) = ?
+                              AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND COALESCE(ms.is_paid,0) = 1)");
+        $st->execute([substr($next, 0, 4) . '-10-01', $next]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $n = 0; $names = [];
+        foreach ($rows as $e) {
+            $id = (int)$e['id'];
+            if (isSchoolYearLocked((int)$e['school_id'], $cur)) continue;
+            $db->prepare("UPDATE employees SET hire_date = ?, payment_months_per_year = 12 WHERE id = ?")->execute([substr($cur, 0, 4) . '-10-01', $id]);
+            $db->prepare("UPDATE employee_bonuses SET school_year = ? WHERE employee_id = ? AND school_year = ?")->execute([$cur, $id, $next]);
+            $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_paid,0) = 0")->execute([$id, $next]);
+            $months = 0; try { $months = (int)recalcEmployeeYear($id, $cur); } catch (Throwable $t) {}
+            $nm = trim($e['first_name_ar'] . ' ' . $e['last_name_ar']) ?: trim($e['first_name_fr'] . ' ' . $e['last_name_fr']);
+            $names[] = $nm; $n++;
+            try { complianceLogAuto($db, 'ghost_add', $id, $cur, $nm, 'وُوفق عليه من الرابط بعد فتح ' . $cur . ' فدُفع خطأً إلى ' . $next . ' (الفورم لم يعرض السنة الحالية)', 'دخوله 1/10 من ' . $cur . ' وبنوده وحسابه عليها', 'صُحِّح تلقائياً — حُسب ' . $months . ' شهراً على ' . $cur . ' (شفاء 2026-09-23)'); } catch (Throwable $t) {}
+            try { logAudit('heal_link_entry_year', 'employees', $id, ['hire_date' => substr($next, 0, 4) . '-10-01'], ['hire_date' => substr($cur, 0, 4) . '-10-01', 'sy' => $cur, 'months' => $months]); } catch (Throwable $t) {}
+        }
+        setSetting($flag, 'done ' . date('Y-m-d H:i') . " ($n: " . implode('، ', $names) . ')');
+    } catch (Throwable $e) { try { setSetting($flag, 'err: ' . mb_substr($e->getMessage(), 0, 150)); } catch (Throwable $t) {} }
+}
+
+/**
  * 🆕 صفوف الملفات الناقصة (2026-09-23) للإلحاق بالتقارير/اللوحة: موظفو السنة بلا راتب محسوب، مرتّبون كالكشوف
  * (المدرسة ← الفئة ← الاسم). $schoolSql/$extraSql بـ alias e (مثل $schoolSqlEmp و$empTypeSql).
  */

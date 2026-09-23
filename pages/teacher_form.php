@@ -170,9 +170,10 @@ $showCaisse = ($selCategory === 'enseignant_titulaire');
 
 // سنوات الدخول للأستاذ الجديد: السنة الدراسية **القادمة فأكثر** فقط (لا يجوز للجديد الدخول على
 // السنة الجارية أو ما قبلها). الافتراضي = السنة القادمة (مثلاً 2026-2027 المفتوحة).
-$curStart = (int)substr(currentSchoolYear(), 0, 4);   // 2025 إذا الحالية 2025-2026
+$curStart = (int)substr(currentSchoolYear(), 0, 4);   // 2026 إذا الحالية 2026-2027
+// 🔴 (2026-09-23) سنة البرنامج الحالية هي الافتراضية (بعد فتح السنة الجديدة تصير هي الحالية) ثم السنتان بعدها
 $entryYearOptions = [];
-for ($yy = $curStart + 1; $yy <= $curStart + 3; $yy++) { $entryYearOptions[] = $yy . '-' . ($yy + 1); }
+for ($yy = $curStart; $yy <= $curStart + 2; $yy++) { $entryYearOptions[] = $yy . '-' . ($yy + 1); }
 $defaultEntryYear = $entryYearOptions[0];
 
 // الحقول النصية القابلة للتحديث
