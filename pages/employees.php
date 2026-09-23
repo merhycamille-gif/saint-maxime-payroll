@@ -543,6 +543,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             
             logAudit('create', 'employees', $id, null, $data);
             $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Employé créé avec succès / تم إنشاء الموظف بنجاح'];
+            // 🎓 (2026-09-23 «دايماً بس نحطّ ملاك بيطبّق عليه كل شي») الجديد المُنشأ ملاكاً: محسومات الملاك + السلسلة + نسبة/نقل مدرسته + حساب السنة
+            if ($data['employee_type'] === 'enseignant_titulaire' && function_exists('cadreManualConversionComplete')) {
+                try { $cmNew = cadreManualConversionComplete($db, (int)$id, (string)($_SESSION['username'] ?? ''), 'new'); if ($cmNew) $_SESSION['flash']['msg'] .= ' — 🎓 ' . $cmNew; } catch (Throwable $t) {}
+            }
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
             applyFamilyAllowanceDates($db, $id, $data); // 👨‍👩‍👧 مدّة التعويض العائلي (بداية افتراضية إن غابت)
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات

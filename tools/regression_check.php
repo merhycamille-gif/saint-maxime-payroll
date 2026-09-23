@@ -7526,11 +7526,16 @@ try {
     $n163 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $rid163 AND school_year = '2026-2027' AND base_plus_echelon_lbp > 0")->fetchColumn();
     $oldKept = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $rid163 AND school_year < '2026-2027' AND base_plus_echelon_lbp = 1325000")->fetchColumn();
     $au163 = (int)$db->query("SELECT COUNT(*) FROM audit_log WHERE action = 'cadre_manual' AND record_id = $rid163")->fetchColumn();
-    $ok163 = $code163 && strpos($rateLbp163, '89,500') !== false && $res163 && $e163['cadre_from_sy'] === '2026-2027' && $e163['salary_input_mode'] === 'percent_of_lbp' && (float)$e163['contract_salary_lbp'] == 0
+    // 🔁 الشفاء الدوري لا يتخطّى بصمت: أستاذ ملاك جديد بسنة البرنامج بلا شهادة (الدرجات تفشل) يأخذ رغم ذلك النسبة/السلسلة/المحسومات ولا يُعلَّم منجزاً إن تعذّر شيء
+    $cdSrc163 = (string)file_get_contents($PROJ . '/includes/cadre_due.php');
+    $healOk163 = strpos($cdSrc163, "heal_cadre_new_20260923c") !== false && strpos($cdSrc163, "logAudit('cadre_heal_fail'") !== false && strpos($cdSrc163, '} } catch (Throwable $eg) {') !== false
+              && strpos($cdSrc163, "SET salary_input_mode = 'percent_of_lbp', base_salary_lbp_percent = IF(base_salary_lbp_percent > 0, base_salary_lbp_percent, 100), contract_salary_lbp = 0, base_salary_usd = 0 WHERE id = ?\")->execute([\$id]);") !== false
+              && strpos($ep163, "cadreManualConversionComplete(\$db, (int)\$id, (string)(\$_SESSION['username'] ?? ''), 'new')") !== false;
+    $ok163 = $code163 && $healOk163 && strpos($rateLbp163, '89,500') !== false && $res163 && $e163['cadre_from_sy'] === '2026-2027' && $e163['salary_input_mode'] === 'percent_of_lbp' && (float)$e163['contract_salary_lbp'] == 0
           && (int)$e163['eoc_subject'] === 1 && $dec163 && $dec163['decision'] === 'approved' && strpos($dec163['result'], 'حُوِّل بيده') !== false
           && (!$pct163 || (count($bon163) === 1 && $bon163[0]['value_type'] === 'percent' && abs((float)$bon163[0]['amount'] - (float)$pct163['pct']) < 0.01))
           && $n163 >= 10 && $oldKept === 4 && $au163 === 1;
-    $why163 = 'code=' . ($code163 ? 'ok' : 'bad') . ' rateLbp=' . (strpos($rateLbp163, '89,500') !== false ? 'ok' : 'NO') . ' cfs=' . ($e163['cadre_from_sy'] ?? '-') . ' mode=' . ($e163['salary_input_mode'] ?? '-') . ' eoc=' . (int)($e163['eoc_subject'] ?? -1)
+    $why163 = 'code=' . ($code163 ? 'ok' : 'bad') . ' heal=' . ($healOk163 ? 'ok' : 'bad') . ' rateLbp=' . (strpos($rateLbp163, '89,500') !== false ? 'ok' : 'NO') . ' cfs=' . ($e163['cadre_from_sy'] ?? '-') . ' mode=' . ($e163['salary_input_mode'] ?? '-') . ' eoc=' . (int)($e163['eoc_subject'] ?? -1)
             . ' dec=' . ($dec163['decision'] ?? '-') . ' pct=' . json_encode($bon163) . ' months27=' . $n163 . ' oldKept=' . $oldKept . ' audit=' . $au163;
 } catch (Throwable $e) { $ok163 = false; $why163 .= ' err=' . $e->getMessage(); }
 finally {

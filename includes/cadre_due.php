@@ -380,15 +380,17 @@ function titularizeContractTeacher(PDO $db, int $empId, string $sy, string $who 
  * + قرار «approved» بسجلّ الترسيم (يظهر عنده بلائحة «رُسِّموا هذه السنة») + سجلّ تدقيق cadre_manual. المصدر الواحد نفسه المستعمل بزرّ «موافق».
  * الدرجات تُبنى بمسار الحفظ نفسه (buildLegalGradeHistory عند تغيّر الشهادة/التواريخ أو «صار ملاكاً بلا سجلّ»). idempotent: تكراره لا يضاعف شيئاً.
  */
-function cadreManualConversionComplete(PDO $db, int $empId, string $who = ''): ?string {
+function cadreManualConversionComplete(PDO $db, int $empId, string $who = '', string $mode = 'converted'): ?string {
     require_once __DIR__ . '/payroll_calculator.php';
     cadreDueEnsureColumns($db);
     $st = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0");
     $st->execute([$empId]);
     $emp = $st->fetch(PDO::FETCH_ASSOC);
-    if (!$emp || $emp['employee_type'] !== 'enseignant_titulaire' || empty($emp['titularization_date']) || $emp['titularization_date'] === '0000-00-00') return null;
-    $sy = schoolYearOfDate($emp['titularization_date']);
-    if (!preg_match('/^\d{4}-\d{4}$/', (string)$sy)) return null;
+    if (!$emp || $emp['employee_type'] !== 'enseignant_titulaire') return null;
+    // 🔴 قراره 2026-09-23 «دايماً بس نحطّ ملاك بيطبّق عليه كل شي»: سنة التطبيق = سنة الترسيم أو سنة البرنامج الحالية أيّهما أحدث
+    //    (لا نعيد كتابة سنين ماضية)، وبلا تاريخ ترسيم ⇒ سنة البرنامج
+    $sy = (!empty($emp['titularization_date']) && $emp['titularization_date'] !== '0000-00-00') ? schoolYearOfDate($emp['titularization_date']) : currentSchoolYear();
+    if (!preg_match('/^\d{4}-\d{4}$/', (string)$sy) || strcmp((string)$sy, currentSchoolYear()) < 0) $sy = currentSchoolYear();
     if (isSchoolYearLocked((int)$emp['school_id'], $sy)) return null;
     $log = [];
     $prev = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND school_year < ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) LIMIT 1");
@@ -404,7 +406,7 @@ function cadreManualConversionComplete(PDO $db, int $empId, string $who = ''): ?
     }
     // الملاك على السلسلة دائماً: لا راتب متفق عليه يبقى بملفه
     if ((float)$emp['contract_salary_lbp'] > 0 || (float)$emp['base_salary_usd'] > 0 || $emp['salary_input_mode'] !== 'percent_of_lbp') {
-        $db->prepare("UPDATE employees SET salary_input_mode = 'percent_of_lbp', base_salary_lbp_percent = 100, contract_salary_lbp = 0, base_salary_usd = 0 WHERE id = ?")->execute([$empId]);
+        $db->prepare("UPDATE employees SET salary_input_mode = 'percent_of_lbp', base_salary_lbp_percent = IF(base_salary_lbp_percent > 0, base_salary_lbp_percent, 100), contract_salary_lbp = 0, base_salary_usd = 0 WHERE id = ?")->execute([$empId]);
         $log[] = 'السلسلة بدل الراتب المتفق عليه (' . ((float)$emp['base_salary_usd'] > 0 ? '$' . (float)$emp['base_salary_usd'] : number_format((float)$emp['contract_salary_lbp']) . ' ل.ل.') . ')';
     }
     $p = cadreDueApplyPercent($db, $empId, (int)$emp['school_id'], $sy);
@@ -413,10 +415,13 @@ function cadreManualConversionComplete(PDO $db, int $empId, string $who = ''): ?
     if ($t !== null) $log[] = $t;
     $months = (int)recalcEmployeeYear($empId, $sy);
     $name = cadreDueEmpName($emp);
-    $res = 'حُوِّل بيده من ملفه إلى ملاك من ' . $emp['titularization_date'] . ($log ? ' — استُكمل له قانون الملاك: ' . implode(' · ', $log) : ' — كان مكتملاً') . ' — حُسب ' . $months . ' شهراً';
-    $years = 0; try { $years = (int)date_diff(date_create((string)$emp['hire_date']), date_create(substr($sy, 0, 4) . '-10-01'))->y; } catch (Throwable $e) {}
-    cadreDueRecordDecision($db, ['id' => $empId, 'school_id' => (int)$emp['school_id'], 'name' => $name, 'hire_date' => $emp['hire_date'], 'years' => $years, 'tit' => $emp['titularization_date']], $sy, 'approved', $res, $who ?: 'المستخدم (من الملف)');
-    logAudit('cadre_manual', 'employees', $empId, ['employee_type' => 'enseignant_contractuel'], ['employee_type' => 'enseignant_titulaire', 'titularization_date' => $emp['titularization_date'], 'sy' => $sy, 'log' => $log, 'months' => $months]);
+    $tit = (string)($emp['titularization_date'] ?: (substr($sy, 0, 4) . '-10-01'));
+    $res = ($mode === 'new' ? 'أُنشئ ملاكاً من ' : 'حُوِّل بيده من ملفه إلى ملاك من ') . $tit . ($log ? ' — طُبِّق له قانون الملاك: ' . implode(' · ', $log) : ' — كان مكتملاً') . ' — حُسب ' . $months . ' شهراً';
+    if ($mode !== 'new') {
+        $years = 0; try { $years = (int)date_diff(date_create((string)$emp['hire_date']), date_create(substr($sy, 0, 4) . '-10-01'))->y; } catch (Throwable $e) {}
+        cadreDueRecordDecision($db, ['id' => $empId, 'school_id' => (int)$emp['school_id'], 'name' => $name, 'hire_date' => $emp['hire_date'], 'years' => $years, 'tit' => $tit], $sy, 'approved', $res, $who ?: 'المستخدم (من الملف)');
+    }
+    logAudit($mode === 'new' ? 'cadre_new_full' : 'cadre_manual', 'employees', $empId, null, ['employee_type' => 'enseignant_titulaire', 'titularization_date' => $tit, 'sy' => $sy, 'log' => $log, 'months' => $months]);
     return $res;
 }
 
@@ -619,7 +624,7 @@ function healJanaRestore20260913(): void {
  * الإضافي كملاك مدرسته، ثم إعادة حساب السنة. يحترم قفل السنة. يُسجَّل بتقرير المخالفات «صُحِّح تلقائياً». مرّة لكل أستاذ/سنة.
  */
 function healCadreNew20260913(): void {
-    $flag = 'heal_cadre_new_20260913b'; // b = بعد إضافة محسومات الملاك (يعيد فحص الجميع مرّة)
+    $flag = 'heal_cadre_new_20260923c'; // c = (2026-09-23 تريزيا مارون) الخطوة المالية مستقلّة عن الدرجات + السلسلة بدل العقد + لا تخطّي صامتاً — يعيد فحص الجميع مرّة
     try {
         $db = getDB();
         if ($db->inTransaction()) return;
@@ -639,10 +644,11 @@ function healCadreNew20260913(): void {
             if (in_array($key, $done, true)) continue;
             if ($n >= 15) break; // دفعات خفيفة عند كل فتح
             if (isSchoolYearLocked((int)$emp['school_id'], $sy)) continue;
-            $log = [];
+            $log = []; $errs = [];
             try {
                 // (1) درجات سنة الترسيم كاملة — فقط إن لم يلمسها المستخدم وكان الناقص واضحاً (القانون يعطي أكثر مما بالسجلّ)
-                if (!gradesUserAdjusted($id) && !empty($emp['diploma'])) {
+                //     🔴 (2026-09-23) خطأ الدرجات لا يمنع الخطوة المالية بعده (كان استثناءٌ هنا يُسقط النسبة والنقل ويُعلّم الأستاذ «منجزاً» بصمت)
+                try { if (!gradesUserAdjusted($id) && !empty($emp['diploma'])) {
                     $dry = buildLegalGradeHistory($id, sprintf('%04d-09-30', $y2), true);
                     $maxStored = (float)$db->query("SELECT COALESCE(MAX(grade_after),0) FROM employee_grade_history WHERE employee_id = $id")->fetchColumn();
                     if ((float)$dry['final_grade'] - $maxStored > 0.01) {
@@ -653,12 +659,18 @@ function healCadreNew20260913(): void {
                         $db->prepare("UPDATE employees SET current_grade = ? WHERE id = ?")->execute([$gNow, $id]);
                         $log[] = 'درجات سنة الترسيم بالقانون (' . rtrim(rtrim(number_format($maxStored, 1), '0'), '.') . ' ← ' . rtrim(rtrim(number_format((float)$dry['final_grade'], 1), '0'), '.') . ')';
                     }
-                }
-                // (2) المُحوَّل من تعاقد (له رواتب قبل سنة الترسيم): نقل + نسبة كملاك مدرسته + صمام السنين السابقة
+                } } catch (Throwable $eg) { $errs[] = 'الدرجات: ' . $eg->getMessage(); }
+                // (2) 🔴 قراره 2026-09-23 «دايماً بس نحطّ ملاك بيطبّق عليه كل شي»: كل ملاك صار ملاكاً هذه السنة (مُحوَّل أو جديد) يأخذ
+                //     محسومات الملاك + السلسلة بدل أي عقد + نسبة الإضافي والنقل كملاك مدرسته؛ والمُحوَّل (له رواتب سابقة) صمام السنين السابقة
                 $prev = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND school_year < ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) LIMIT 1");
                 $prev->execute([$id, $sy]);
-                if ($prev->fetchColumn()) {
-                    if (empty($emp['cadre_from_sy'])) $db->prepare("UPDATE employees SET cadre_from_sy = ? WHERE id = ?")->execute([$sy, $id]);
+                $wasConverted = (bool)$prev->fetchColumn();
+                if ($wasConverted && empty($emp['cadre_from_sy'])) { $db->prepare("UPDATE employees SET cadre_from_sy = ? WHERE id = ?")->execute([$sy, $id]); $log[] = 'ملاك من سنة ' . $sy; }
+                if ((float)$emp['contract_salary_lbp'] > 0 || (float)$emp['base_salary_usd'] > 0 || $emp['salary_input_mode'] !== 'percent_of_lbp') {
+                    $db->prepare("UPDATE employees SET salary_input_mode = 'percent_of_lbp', base_salary_lbp_percent = IF(base_salary_lbp_percent > 0, base_salary_lbp_percent, 100), contract_salary_lbp = 0, base_salary_usd = 0 WHERE id = ?")->execute([$id]);
+                    $log[] = 'السلسلة بدل الراتب المتفق عليه';
+                }
+                if (true) {
                     // 🏦 محسومات الملاك كرفاقه (صندوق التعويضات ٦٪ + نصف راتب الترسيم + الضمان/الضريبة على الأساس والدرجة والإضافي، 12 شهراً)
                     //    — ملاحظته 2026-09-13 «ما عملتهن حسم لصندوق التعويضات… هودي أرزاق الناس»: المُحوَّل بيده من ملفه كان يبقى بمفاتيح المتعاقد
                     $tplF = cadreDueTemplate($db, (int)$emp['school_id']);
@@ -677,10 +689,15 @@ function healCadreNew20260913(): void {
                 if ($log) {
                     $months = (int)recalcEmployeeYear($id, $sy);
                     complianceLogAuto($db, 'cadre_due', $id, $sy, cadreDueEmpName($emp), 'صار ملاكاً بسنة ' . $sy . ' وينقصه من قانون الملاك: ' . implode(' · ', $log),
-                                      'استكمال قانون الملاك كرفاقه بالمدرسة وإعادة حساب السنة', implode(' · ', $log) . ' — حُسب ' . $months . ' شهراً (شفاء ذاتي 2026-09-13)');
-                    logAudit('cadre_heal_new', 'employees', $id, null, ['sy' => $sy, 'log' => $log]);
+                                      'استكمال قانون الملاك كرفاقه بالمدرسة وإعادة حساب السنة', implode(' · ', $log) . ' — حُسب ' . $months . ' شهراً (شفاء ذاتي)');
+                    logAudit('cadre_heal_new', 'employees', $id, null, ['sy' => $sy, 'log' => $log, 'errs' => $errs]);
                 }
-            } catch (Throwable $e) { /* أستاذ واحد لا يوقف الباقي */ }
+            } catch (Throwable $e) { $errs[] = $e->getMessage(); }
+            if ($errs) { // 🔴 لا صمت: ما تعذّر يظهر بتقرير المخالفات وبالتدقيق (ويُعاد فحصه عند الفتح التالي)
+                try { complianceLogAuto($db, 'cadre_due', $id, $sy, cadreDueEmpName($emp), 'تعذّر استكمال قانون الملاك له: ' . implode(' · ', $errs), 'راجع ملفه (الشهادة/التواريخ) ثم احفظه — يُعاد فحصه تلقائياً', 'لم يُنجَز — ' . implode(' · ', $errs)); } catch (Throwable $t) {}
+                try { logAudit('cadre_heal_fail', 'employees', $id, null, ['sy' => $sy, 'errs' => $errs]); } catch (Throwable $t) {}
+                $n++; continue; // لا يُعلَّم منجزاً
+            }
             $done[] = $key; $n++;
         }
         if ($n) setSetting($flag, json_encode(array_slice($done, -400)));
