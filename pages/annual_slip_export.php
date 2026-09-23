@@ -142,9 +142,11 @@ $m = $slip['meta'];
 $rep = new ReportTable('كشف الراتب السنوي ' . $schoolYear, true);
 $rep->schoolHeader($slip['school']);
 $isAdminEmp = ($emp['employee_type'] === 'employe');
+$slipRateTxt = rateTitleText(null, null, true, (float)($m['rate'] ?? 0) > 0 ? (float)$m['rate'] : null, ($m['extra_pct'] ?? '') !== ''); // 🏷️ سعر الصرف بالتصدير أيضاً (2026-09-23)
 $rep->period($m['name'] . '  —  ' . ($isAdminEmp ? 'الوظيفة' : 'الشهادة') . ': ' . $m['diploma'] . ' · الفئة: ' . $m['type']
     . ($isAdminEmp ? '' : ' · الدرجة: ' . $m['grade'])
-    . ' · ر.الضمان: ' . $m['cnss'] . ' · ر.الصندوق: ' . $m['caisse_no'] . ' · ر.المالية: ' . $m['finance_no']);
+    . ' · ر.الضمان: ' . $m['cnss'] . ' · ر.الصندوق: ' . $m['caisse_no'] . ' · ر.المالية: ' . $m['finance_no']
+    . ($slipRateTxt !== '' ? "\n" . $slipRateTxt : ''));
 // الموظف الإداري: احذف أعمدة الدرجة/التدرّج/الصندوق من الرأس والعرض والصفوف (لا سلسلة رتب له).
 $rep->head(annualDropCols($head, $isAdminEmp));
 $rep->widths(annualDropCols($widths, $isAdminEmp));

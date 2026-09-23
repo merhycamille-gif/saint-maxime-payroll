@@ -6867,7 +6867,8 @@ check('📐 الصافي دغري بعد المحسومات: كشف الروات
 /**
  * 145) 🏷️ «اتفقنا بكل عناوين التقارير والإفادات والبرنامج: بس نحطّ الراتب بالدولار لازم يكون بالعنوان سعر الدولار اللي حاسبها» (2026-09-19):
  *      rateTitleText/rateSubtitle (functions.php) = المصدر الواحد؛ docSheetStart يضيفه تلقائياً (opts month/year/annual/law)؛ عناوين official_forms
- *      الـ13 + القسيمة + كل الإفادات التي تطبع مبلغاً ($rateLine بعد كل <h2>) + ملف الأستاذ. يظهر فقط حين تُعرض الدولارات.
+ *      الـ13 + القسيمة + كل الإفادات التي تطبع مبلغاً ($rateLine بعد كل <h2>) + ملف الأستاذ.
+ *      ⚠️ 2026-09-23 (تريزيا مارون «البطاقة ما بيّنت قيمة الدولار بالعناوين»): السطر يظهر بكل أوضاع العملة بما فيها «ليرة فقط» (كان يُخفى فيه).
  */
 $fn145 = (string)file_get_contents($PROJ . '/includes/functions.php'); $rh145 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 $of145 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $at145 = (string)file_get_contents($PROJ . '/pages/attestations.php');
@@ -6889,18 +6890,18 @@ foreach ($docs145 as [$pg, $get, $law, $scope145, $sy145]) {
     $lawB = strpos($hb, 'الراتب بعد التدرّج لأصحاب النسبة بالسعر الرسمي 1 $ = 1,500') !== false;
     $hasL = strpos($hl, 'سعر الصرف المعتمد') !== false;
     $fat = strpos($hb, 'FATAL') !== false || strpos($hl, 'FATAL') !== false;
-    if (!$hasB || $lawB !== $law || $hasL || $fat) { $ok145 = false; $why145[] = basename($pg) . ':' . json_encode($get) . " both=" . (int)$hasB . " law=" . (int)$lawB . " lbp=" . (int)$hasL . " fatal=" . (int)$fat; }
+    if (!$hasB || $lawB !== $law || !$hasL || $fat) { $ok145 = false; $why145[] = basename($pg) . ':' . json_encode($get) . " both=" . (int)$hasB . " law=" . (int)$lawB . " lbp=" . (int)$hasL . " fatal=" . (int)$fat; }
 }
 $hTad = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'tadris'], [], [$sch145], 'both', '2025-2026'); // إفادة بلا مبلغ ⇒ بلا سطر سعر
-// 🏷️ «مش موجود ببطاقة المتعاقد» (2026-09-19): البطاقة السنوية — سطر واحد (.slip-rate) لكل الفئات؛ 1,500 لأصحاب النسبة فقط؛ لا يظهر بوضع الليرة (التصميم المجمّد لم يُمسّ)
+// 🏷️ «مش موجود ببطاقة المتعاقد» (2026-09-19): البطاقة السنوية — سطر واحد (.slip-rate) لكل الفئات؛ 1,500 لأصحاب النسبة فقط؛ يظهر بوضع الليرة أيضاً منذ 2026-09-23 (التصميم المجمّد لم يُمسّ)
 $con145 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0
                            WHERE e.employee_type = 'enseignant_contractuel' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
 $slipB = $con145 ? renderPage('pages/annual_slip.php', ['employee_id' => $con145, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026') : '';
 $slipL = $con145 ? renderPage('pages/annual_slip.php', ['employee_id' => $con145, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'lbp', '2025-2026') : '';
 $slipOk = $con145 && preg_match('/<div class="slip-rate" dir="rtl">سعر الصرف المعتمد: سعر كل شهر — آخر سعر 1 \$ = [0-9,]+ ل\.ل\.<\/div>/u', $slipB) === 1
-          && strpos($slipL, 'slip-rate"') === false && strpos($slipB, 'FATAL') === false;
+          && strpos($slipL, 'slip-rate"') !== false && strpos($slipB, 'FATAL') === false;
 if (!$slipOk) $why145[] = 'annual_slip contract=' . $con145;
-check('🏷️ سعر الصرف المعتمد بعنوان كل مستند فيه دولار (كشف/تقرير/إفادة/قسيمة/بطاقة): يظهر بوضع الدولار ولا يظهر بوضع الليرة، والسعر الرسمي 1,500 فقط حيث أعمدة الأساس، وإفادة بلا مبلغ بلا سطر',
+check('🏷️ سعر الصرف المعتمد بعنوان كل مستند فيه دولار (كشف/تقرير/إفادة/قسيمة/بطاقة): يظهر بكل أوضاع العملة (الليرة أيضاً منذ 2026-09-23)، والسعر الرسمي 1,500 فقط حيث أعمدة الأساس، وإفادة بلا مبلغ بلا سطر',
       function_exists('rateTitleText') && function_exists('rateSubtitle') && strpos($rh145, "rateTitleText(\$opts['month'] ?? null") !== false
       && substr_count($of145, 'rateSubtitle(') === 13 && substr_count($at145, '<?= $rateLine ?>') === substr_count($at145, '</h2>')
       && $ok145 && $slipOk && strpos($hTad, 'سعر الصرف المعتمد') === false,
@@ -7491,6 +7492,53 @@ try {
 } catch (Throwable $e) { $ok162 = false; $why162 .= ' err=' . $e->getMessage(); }
 finally { $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid162"); $db->exec("DELETE FROM employees WHERE id = $rid162"); }
 check('🆕 تقرير «الأساتذة الجدد»: من دخل ضمن السنة + كامل معلومات الملف (≥28 عموداً) + ملاحظة الملف المالي (✅ راتب محسوب / ❌ لا راتب + النواقص) + المصدر + الشاشة والتصدير والقائمة', $ok162, $why162);
+
+/**
+ * 163) 🎓✍️🏷️ تريزيا مارون (2026-09-23): «حطّيت موافق لدخول بالملاك ما أخذها، رجعت فتت على ملفها وحطّيتلها ملاك — هيدي بدّك تنتبهلها»
+ *      + «طلّعت البطاقة السنوية ما ظهر بالعناوين قدّيش قيمة الدولار»:
+ *      (أ) التحويل اليدوي من الملف = قانون الملاك كاملاً فوراً (cadreManualConversionComplete من مسار الحفظ) + قرار approved بسجلّ الترسيم.
+ *      (ب) فشل «موافق» لا يصمت: اسم + سبب + سجلّ تدقيق cadre_approve_fail (حتى لو لم يعد مرشَّحاً) + الزرّ المطفأ يشرح.
+ *      (ج) سطر سعر الصرف بعنوان البطاقة يظهر بكل أوضاع العملة (كان يختفي بوضع «ليرة فقط») + بتصدير البطاقة.
+ *      تجربة حيّة: متعاقد __REG163 بسنتَي رواتب بمدرسة 2 يُحوَّل بيده إلى ملاك ⇒ السلسلة + نسبة/نقل الملاك + cadre_from_sy + قرار approved.
+ */
+$ok163 = true; $why163 = '';
+$cd163 = (string)file_get_contents($PROJ . '/includes/cadre_due.php'); $ep163 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$fn163 = (string)file_get_contents($PROJ . '/includes/functions.php'); $ax163 = (string)file_get_contents($PROJ . '/pages/annual_slip_export.php');
+$code163 = strpos($cd163, 'function cadreManualConversionComplete(') !== false && strpos($cd163, "logAudit('cadre_approve_fail'") !== false && strpos($cd163, 'راجع الملاحظة الصفراء بسطره') !== false
+        && strpos($ep163, 'cadreManualConversionComplete($db, (int)$id') !== false && strpos($fn163, "if (displayCurrency() === 'lbp') return '';\n    \$r = \$rate") === false
+        && strpos($ax163, '$slipRateTxt = rateTitleText(') !== false;
+$prevCur163 = $_SESSION['display_currency'] ?? null; $_SESSION['display_currency'] = 'lbp';
+$rateLbp163 = rateTitleText(null, null, true, 89500.0, false);
+if ($prevCur163 === null) unset($_SESSION['display_currency']); else $_SESSION['display_currency'] = $prevCur163;
+$db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, titularization_date, status, salary_input_mode, base_salary_usd, contract_salary_lbp, starting_grade, current_grade, diploma, payment_months_per_year, days_per_week, transport_weeks, tax_subject, tax_includes_extra, cnss_subject, cnss_includes_extra, eoc_subject, is_deleted)
+    VALUES (2, '__REG163', 'enseignant_contractuel', 'فحص', 'تريزيا163', 'Reg', 'Manual163', '2024-10-01', '2026-10-01', 'actif', 'direct_lbp', 0, 1325000, 1, 1, 'licence', 10, 5, 4, 1, 1, 1, 1, 0, 0)");
+$rid163 = (int)$db->lastInsertId();
+try {
+    $ins = $db->prepare("INSERT INTO monthly_salaries (employee_id, school_id, month, year, school_year, base_salary_lbp, base_plus_echelon_lbp, net_salary_lbp, total_due_lbp, exchange_rate, is_calculated) VALUES (?,2,?,?,?,1325000,1325000,1200000,1200000,89500,1)");
+    foreach (['2024-2025' => 2024, '2025-2026' => 2025] as $sy0 => $y0) { $ins->execute([$rid163, 10, $y0, $sy0]); $ins->execute([$rid163, 11, $y0, $sy0]); }
+    // التحويل اليدوي كما يفعله مسار الحفظ: النوع ملاك ثم الاستكمال
+    $db->exec("UPDATE employees SET employee_type = 'enseignant_titulaire' WHERE id = $rid163");
+    $res163 = cadreManualConversionComplete($db, $rid163, 'reg');
+    $e163 = $db->query("SELECT * FROM employees WHERE id = $rid163")->fetch(PDO::FETCH_ASSOC);
+    $dec163 = $db->query("SELECT decision, result FROM compliance_decisions WHERE item_key = 'cadre_due|$rid163|2026-2027'")->fetch(PDO::FETCH_ASSOC);
+    $pct163 = schoolCadrePercent($db, 2, '2026-2027');
+    $bon163 = $db->query("SELECT value_type, amount FROM employee_bonuses WHERE employee_id = $rid163 AND school_year = '2026-2027' AND bonus_type = 'prime_fixe' AND is_active = 1")->fetchAll(PDO::FETCH_ASSOC);
+    $n163 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $rid163 AND school_year = '2026-2027' AND base_plus_echelon_lbp > 0")->fetchColumn();
+    $oldKept = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $rid163 AND school_year < '2026-2027' AND base_plus_echelon_lbp = 1325000")->fetchColumn();
+    $au163 = (int)$db->query("SELECT COUNT(*) FROM audit_log WHERE action = 'cadre_manual' AND record_id = $rid163")->fetchColumn();
+    $ok163 = $code163 && strpos($rateLbp163, '89,500') !== false && $res163 && $e163['cadre_from_sy'] === '2026-2027' && $e163['salary_input_mode'] === 'percent_of_lbp' && (float)$e163['contract_salary_lbp'] == 0
+          && (int)$e163['eoc_subject'] === 1 && $dec163 && $dec163['decision'] === 'approved' && strpos($dec163['result'], 'حُوِّل بيده') !== false
+          && (!$pct163 || (count($bon163) === 1 && $bon163[0]['value_type'] === 'percent' && abs((float)$bon163[0]['amount'] - (float)$pct163['pct']) < 0.01))
+          && $n163 >= 10 && $oldKept === 4 && $au163 === 1;
+    $why163 = 'code=' . ($code163 ? 'ok' : 'bad') . ' rateLbp=' . (strpos($rateLbp163, '89,500') !== false ? 'ok' : 'NO') . ' cfs=' . ($e163['cadre_from_sy'] ?? '-') . ' mode=' . ($e163['salary_input_mode'] ?? '-') . ' eoc=' . (int)($e163['eoc_subject'] ?? -1)
+            . ' dec=' . ($dec163['decision'] ?? '-') . ' pct=' . json_encode($bon163) . ' months27=' . $n163 . ' oldKept=' . $oldKept . ' audit=' . $au163;
+} catch (Throwable $e) { $ok163 = false; $why163 .= ' err=' . $e->getMessage(); }
+finally {
+    $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid163"); $db->exec("DELETE FROM employee_bonuses WHERE employee_id = $rid163");
+    $db->exec("DELETE FROM employee_grade_history WHERE employee_id = $rid163"); $db->exec("DELETE FROM compliance_decisions WHERE employee_id = $rid163");
+    $db->exec("DELETE FROM audit_log WHERE record_id = $rid163 AND table_name = 'employees'"); $db->exec("DELETE FROM employees WHERE id = $rid163");
+}
+check('🎓✍️🏷️ تريزيا مارون: التحويل اليدوي إلى ملاك = قانون الملاك كاملاً فوراً (السلسلة + المحسومات + النسبة + النقل + صمام السنين + قرار approved + تدقيق) + فشل «موافق» يُقال ويُسجَّل + سطر سعر الصرف بالبطاقة بكل أوضاع العملة وبالتصدير', $ok163, $why163);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

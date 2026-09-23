@@ -374,6 +374,53 @@ function titularizeContractTeacher(PDO $db, int $empId, string $sy, string $who 
 }
 
 /**
+ * 🎓✍️ (2026-09-23 — تريزيا مارون: «حطّيت موافق ما أخذها، رجعت فتت على ملفها وحطّيتلها ملاك — هيدي بدّك تنتبهلها»)
+ * الأستاذ الذي يحوّله المستخدم **بيده من ملفه** إلى ملاك يأخذ قانون الملاك كاملاً فوراً كأنه كبس «موافق» بصفحة الترسيم:
+ * صمام السنين السابقة (cadre_from_sy) + محسومات الملاك كرفاقه + نسبة الملاك بالمدرسة + تعويض النقل كملاك + إعادة حساب سنة الترسيم
+ * + قرار «approved» بسجلّ الترسيم (يظهر عنده بلائحة «رُسِّموا هذه السنة») + سجلّ تدقيق cadre_manual. المصدر الواحد نفسه المستعمل بزرّ «موافق».
+ * الدرجات تُبنى بمسار الحفظ نفسه (buildLegalGradeHistory عند تغيّر الشهادة/التواريخ أو «صار ملاكاً بلا سجلّ»). idempotent: تكراره لا يضاعف شيئاً.
+ */
+function cadreManualConversionComplete(PDO $db, int $empId, string $who = ''): ?string {
+    require_once __DIR__ . '/payroll_calculator.php';
+    cadreDueEnsureColumns($db);
+    $st = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0");
+    $st->execute([$empId]);
+    $emp = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$emp || $emp['employee_type'] !== 'enseignant_titulaire' || empty($emp['titularization_date']) || $emp['titularization_date'] === '0000-00-00') return null;
+    $sy = schoolYearOfDate($emp['titularization_date']);
+    if (!preg_match('/^\d{4}-\d{4}$/', (string)$sy)) return null;
+    if (isSchoolYearLocked((int)$emp['school_id'], $sy)) return null;
+    $log = [];
+    $prev = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND school_year < ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) LIMIT 1");
+    $prev->execute([$empId, $sy]);
+    if ($prev->fetchColumn() && empty($emp['cadre_from_sy'])) { $db->prepare("UPDATE employees SET cadre_from_sy = ? WHERE id = ?")->execute([$sy, $empId]); $log[] = 'ملاك من سنة ' . $sy . ' (سنواته السابقة كمتعاقد لا تُمسّ)'; }
+    $tpl = cadreDueTemplate($db, (int)$emp['school_id']);
+    $diff = [];
+    foreach ($tpl as $f => $v) if ((int)($emp[$f] ?? 0) !== (int)$v) $diff[$f] = (int)$v;
+    if ($diff) {
+        $set = implode(', ', array_map(fn($f) => "`$f` = ?", array_keys($diff)));
+        $db->prepare("UPDATE employees SET $set WHERE id = ?")->execute(array_merge(array_values($diff), [$empId]));
+        $log[] = 'محسومات الملاك كرفاقه (' . implode('، ', array_keys($diff)) . ')';
+    }
+    // الملاك على السلسلة دائماً: لا راتب متفق عليه يبقى بملفه
+    if ((float)$emp['contract_salary_lbp'] > 0 || (float)$emp['base_salary_usd'] > 0 || $emp['salary_input_mode'] !== 'percent_of_lbp') {
+        $db->prepare("UPDATE employees SET salary_input_mode = 'percent_of_lbp', base_salary_lbp_percent = 100, contract_salary_lbp = 0, base_salary_usd = 0 WHERE id = ?")->execute([$empId]);
+        $log[] = 'السلسلة بدل الراتب المتفق عليه (' . ((float)$emp['base_salary_usd'] > 0 ? '$' . (float)$emp['base_salary_usd'] : number_format((float)$emp['contract_salary_lbp']) . ' ل.ل.') . ')';
+    }
+    $p = cadreDueApplyPercent($db, $empId, (int)$emp['school_id'], $sy);
+    if ($p !== null) $log[] = 'إضافي ' . pctFmt($p) . ' % كملاك المدرسة';
+    $t = cadreDueApplyTransport($db, $empId, (int)$emp['school_id'], $sy);
+    if ($t !== null) $log[] = $t;
+    $months = (int)recalcEmployeeYear($empId, $sy);
+    $name = cadreDueEmpName($emp);
+    $res = 'حُوِّل بيده من ملفه إلى ملاك من ' . $emp['titularization_date'] . ($log ? ' — استُكمل له قانون الملاك: ' . implode(' · ', $log) : ' — كان مكتملاً') . ' — حُسب ' . $months . ' شهراً';
+    $years = 0; try { $years = (int)date_diff(date_create((string)$emp['hire_date']), date_create(substr($sy, 0, 4) . '-10-01'))->y; } catch (Throwable $e) {}
+    cadreDueRecordDecision($db, ['id' => $empId, 'school_id' => (int)$emp['school_id'], 'name' => $name, 'hire_date' => $emp['hire_date'], 'years' => $years, 'tit' => $emp['titularization_date']], $sy, 'approved', $res, $who ?: 'المستخدم (من الملف)');
+    logAudit('cadre_manual', 'employees', $empId, ['employee_type' => 'enseignant_contractuel'], ['employee_type' => 'enseignant_titulaire', 'titularization_date' => $emp['titularization_date'], 'sy' => $sy, 'log' => $log, 'months' => $months]);
+    return $res;
+}
+
+/**
  * معالج القرارات (POST) من لوحة القيادة/صفحة فتح السنة: cd_approve (emp_id أو emp_ids[]) يرسّم، cd_reject يترك متعاقداً هذه السنة،
  * cd_reopen يلغي الرفض. محميّ بـCSRF + canEdit + نطاق المدرسة + السنة ≥ سنة البرنامج (لا ترسيم بأثر رجعي على سنة منتهية).
  */
@@ -399,12 +446,22 @@ function handleCadreDuePost(PDO $db, string $redirectTo): void {
     $done = 0; $msgs = []; $errs = []; $locked = 0;
     foreach ($ids as $eid) {
         $c = $cands[$eid] ?? null;
-        if (!$c) continue;
+        if (!$c) {
+            // 🔎 (2026-09-23 تريزيا مارون «حطّيت موافق ما أخذها») لا صمت بعد اليوم: يُقال مَن ولماذا ويُسجَّل بالتدقيق
+            $nm = ''; try { $x = $db->query("SELECT * FROM employees WHERE id = " . (int)$eid)->fetch(PDO::FETCH_ASSOC); $nm = $x ? cadreDueEmpName($x) : ('#' . $eid); } catch (Throwable $t) { $nm = '#' . $eid; }
+            $why = 'لم يعد مرشَّحاً للترسيم بسنة ' . $sy . ' (ليس متعاقداً فاعلاً بسنتين مدفوعتين بهذه المدرسة، أو قُرِّر له سابقاً، أو خارج مدرستك المختارة)';
+            $errs[] = $nm . ': ' . $why;
+            try { logAudit('cadre_approve_fail', 'employees', (int)$eid, null, ['sy' => $sy, 'act' => $act, 'why' => $why, 'by' => $who]); } catch (Throwable $t) {}
+            continue;
+        }
         if (isSchoolYearLocked((int)$c['school_id'], $sy)) { $locked++; continue; }
         if ($act === 'cd_approve') {
-            if (!$c['can']) { $errs[] = $c['name'] . ': ' . $c['why']; continue; }
+            if (!$c['can']) { $errs[] = $c['name'] . ': ' . $c['why']; try { logAudit('cadre_approve_fail', 'employees', $eid, null, ['sy' => $sy, 'why' => $c['why'], 'by' => $who]); } catch (Throwable $t) {} continue; }
             try { $r = titularizeContractTeacher($db, $eid, $sy, $who); $msgs[] = $r['name'] . ' (' . $r['msg'] . ')'; $done++; }
-            catch (Throwable $e) { $errs[] = $c['name'] . ': ' . $e->getMessage(); }
+            catch (Throwable $e) {
+                $errs[] = $c['name'] . ': ' . $e->getMessage();
+                try { logAudit('cadre_approve_fail', 'employees', $eid, null, ['sy' => $sy, 'why' => $e->getMessage(), 'by' => $who]); } catch (Throwable $t) {}
+            }
         } else {
             cadreDueRecordDecision($db, $c, $sy, 'rejected', 'بقراره: يبقى متعاقداً بسنة ' . $sy, $who);
             $msgs[] = $c['name']; $done++;
@@ -679,7 +736,7 @@ function renderCadreDuePending(array $cands, string $sy, bool $collapsed = false
                 </form>
             </<?= $collapsed ? 'details' : 'div' ?>>
             <?php endforeach; ?>
-            <script>function msaCdOne(btn, act){ var f=btn.form||btn.closest('form'); var tr=btn.closest('tr'); f.querySelectorAll('input[name="emp_ids[]"]').forEach(function(c){c.checked=false;}); var me=tr.querySelector('input[name="emp_ids[]"]'); if(!me||me.disabled) return; me.checked=true; f.querySelector('input[name=action]').value=act; f.querySelector('input[name=cd_act]').value=act; if (typeof f.requestSubmit==='function') f.requestSubmit(); else f.submit(); }</script>
+            <script>function msaCdOne(btn, act){ var f=btn.form||btn.closest('form'); var tr=btn.closest('tr'); f.querySelectorAll('input[name="emp_ids[]"]').forEach(function(c){c.checked=false;}); var me=tr.querySelector('input[name="emp_ids[]"]'); if(!me||me.disabled){ alert('لا يمكن ترسيمه الآن — راجع الملاحظة الصفراء بسطره (الشهادة ناقصة أو السنة مقفولة)'); return; } me.checked=true; f.querySelector('input[name=action]').value=act; f.querySelector('input[name=cd_act]').value=act; if (typeof f.requestSubmit==='function') f.requestSubmit(); else f.submit(); }</script>
             <?php if ($rejected): ?>
             <details style="margin-top:8px"><summary style="cursor:pointer;color:#6b7280;font-weight:700"><i class="fas fa-user-clock"></i> تركتهم متعاقدين بسنة <?= e($sy) ?> بقرارك — <?= count($rejected) ?> <small style="font-weight:600">(اكبس لإعادة فتح قرار)</small></summary>
                 <div class="table-wrapper" style="margin-top:6px"><table class="table" style="margin:0"><thead><tr><th>الأستاذ</th><th>المدرسة</th><th>بالمدرسة منذ</th><th>القرار</th><th></th></tr></thead><tbody>

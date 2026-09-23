@@ -629,6 +629,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 }
             }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
+            // 🎓✍️ (2026-09-23 تريزيا مارون) حُوِّل بيده من متعاقد/موظف إلى ملاك ⇒ قانون الملاك كاملاً فوراً (نسبة/نقل/محسومات/السلسلة/صمام
+            //    السنين السابقة/قرار الترسيم) — نفس ما يعمله زرّ «موافق» بصفحة الترسيم، بلا انتظار الشفاء الدوري
+            $becameCadreAny = ($oldDates && ($oldDates['employee_type'] ?? '') !== 'enseignant_titulaire' && $data['employee_type'] === 'enseignant_titulaire');
+            if ($becameCadreAny && function_exists('cadreManualConversionComplete')) {
+                try {
+                    $cmRes = cadreManualConversionComplete($db, (int)$id, (string)($_SESSION['username'] ?? ''));
+                    if ($cmRes) $_SESSION['flash'] = ['type' => 'success', 'msg' => '🎓 ' . $cmRes . ' — ' . ($_SESSION['flash']['msg'] ?? '')];
+                } catch (Throwable $t) { $_SESSION['flash'] = ['type' => 'warning', 'msg' => '⚠️ حُفظ الملف لكن تعذّر استكمال قانون الملاك: ' . $t->getMessage()]; }
+            }
             handleEmployeeUploads($db, $id); // رفع/تحديث الصورة والوثائق
             $tabQ = ($t = preg_replace('/[^a-z]/', '', $_POST['active_tab'] ?? '')) ? '&tab=' . $t : '';
             header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id . $tabQ);

@@ -4988,7 +4988,8 @@ function compColsCount(bool $withTransport = true): int {
 //    سطر واحد تحت عنوان كل مستند فيه دولار = سعر الصرف المعتمد بالحساب (سعر الشهر؛ للمستندات السنوية: سعر كل شهر + آخر سعر)
 //    + السعر الرسمي 1,500 لأعمدة الأساس/الدرجة حين تكون موجودة ($law). لا يظهر بوضع «ليرة فقط». المصدر الواحد لكل البرنامج.
 function rateTitleText($month = null, $year = null, bool $annual = false, ?float $rate = null, bool $law = true): string {
-    if (displayCurrency() === 'lbp') return '';
+    // 🏷️ (2026-09-23 «طلّعت البطاقة السنوية ما ظهر بالعناوين قدّيش قيمة الدولار») السطر يظهر بكل أوضاع العملة — حتى بوضع «ليرة فقط»
+    //    (كان يُخفى فيه) لأنه معلومة عن السعر المعتمد لا مبلغاً بالدولار.
     $r = $rate !== null ? (float)$rate : (float)getExchangeRate($month, $year);
     if ($r <= 0) return '';
     $txt = $annual

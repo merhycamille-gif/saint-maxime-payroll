@@ -403,7 +403,7 @@ function docSheetStart(string $titleFr, string $titleAr, array $chips = [], arra
     $cur = displayCurrency();
     if ($cur !== 'both') $auto[] = 'العملة: ' . ($cur === 'usd' ? 'دولار فقط' : 'ليرة فقط');
     // 🏷️ (2026-09-19) سعر الصرف المعتمد بعنوان كل تقرير فيه دولار — opts: month/year (شهري) · annual (سنوي) · law (أعمدة الأساس بـ1,500)
-    if ($cur !== 'lbp' && ($opts['comp'] ?? true) && function_exists('rateTitleText')) {
+    if (($opts['comp'] ?? true) && function_exists('rateTitleText')) { // 🏷️ 2026-09-23: بكل أوضاع العملة (كان يُخفى بوضع الليرة)
         $rt = rateTitleText($opts['month'] ?? null, $opts['year'] ?? null, !empty($opts['annual']), null, $opts['law'] ?? true);
         if ($rt !== '') $auto[] = $rt;
     }

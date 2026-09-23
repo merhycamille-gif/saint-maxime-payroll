@@ -864,7 +864,7 @@ if (!$emp):
     $hasCurrency   = true;
     $printsSalary  = in_array($type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'salaire', 'embassy', 'aqd_taalim'], true);
     // 🏷️ (2026-09-19) سعر الصرف المعتمد تحت عنوان الإفادة حين يظهر المبلغ بالدولار (نفس $fxRate الذي حُسبت به المبالغ — بلا سعر 1,500 لأن الإفادة ÷ سعر الشهر)
-    $rateLine = ($printsSalary && $cur !== 'lbp' && $fxRate > 0) ? '<div class="rate-subtitle" dir="rtl" style="text-align:center;font-weight:700;color:#1e40af;margin:-14px 0 16px">' . e(rateTitleText(null, null, false, (float)$fxRate, false)) . '</div>' : '';
+    $rateLine = ($printsSalary && $fxRate > 0) ? '<div class="rate-subtitle" dir="rtl" style="text-align:center;font-weight:700;color:#1e40af;margin:-14px 0 16px">' . e(rateTitleText(null, null, false, (float)$fxRate, false)) . '</div>' : '';
     $isNotice      = in_array($type, ['notice_school', 'notice_mail'], true);
     $defaultLogo   = in_array($type, ['anhaa_khedme', 'anhaa_mail', 'aqd_taalim', 'cnss', 'notice_school', 'notice_mail', 'salaire', 'tadris', 'embassy', 'riaaya'], true); // الصادرة عن المدرسة: الشعار افتراضياً
     $showLogo      = isset($_GET['logo']) ? ($_GET['logo'] === '1') : $defaultLogo;
