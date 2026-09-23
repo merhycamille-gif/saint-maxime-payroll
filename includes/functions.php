@@ -997,6 +997,97 @@ function incompleteFileText($e, $db, $schoolYear) {
 }
 
 /**
+ * 🆕 تقرير «الأساتذة الجدد / Nouveaux enseignants» (2026-09-23 — «بدي تقرير اسمه الأساتذة الجداد وفيه ملاحظة مين مكمّل ملفه المالي
+ * ومين لا، وأكيد يكون فيه كامل المعلومات عن ملفه»):
+ * كل من دخل المدرسة ضمن السنة الدراسية (hire_date بين 1/10 و30/9) بنطاق المدارس/الفئة المختارة، ولكل واحد:
+ *   via_link/submitted_at = وصل عبر رابط الأستاذ الجديد (info_submissions is_new_teacher) أم أُدخل يدوياً،
+ *   fin_ok = له راتب محسوب فعلاً بالسنة (الملف المالي مكتمل) — وإلا fin_note بالنواقص (employeeFileGaps)،
+ *   last_salary = آخر شهر محسوب بالسنة (أساس/إضافي/نقل للمكتمل).
+ * المصدر الواحد للشاشة والتصدير.
+ */
+function newTeachersReportRows($db, $schoolYear, $schoolSql = '', $extraSql = '') {
+    if (!preg_match('/^(\d{4})-(\d{4})$/', (string)$schoolYear, $m)) return [];
+    $from = $m[1] . '-10-01'; $to = $m[2] . '-09-30';
+    $st = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.hire_date BETWEEN ? AND ?" . $schoolSql . $extraSql . "
+        ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), e.hire_date,
+                 COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+    $st->execute([$from, $to]);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    if (!$rows) return [];
+    $ids = array_map(fn($r) => (int)$r['id'], $rows); $in = implode(',', $ids);
+    $noSal = noSalaryYearEmployeeIds($db, $schoolYear, $schoolSql, $extraSql);
+    $sub = [];
+    try { foreach ($db->query("SELECT employee_id, MAX(submitted_at) s FROM info_submissions WHERE is_new_teacher = 1 AND employee_id IN ($in) GROUP BY employee_id") as $x) $sub[(int)$x['employee_id']] = $x['s']; } catch (Exception $e) {}
+    $base = [];
+    try {
+        foreach ($db->query("SELECT ms.* FROM monthly_salaries ms
+            JOIN (SELECT employee_id, MAX(year*12+month) ym FROM monthly_salaries WHERE school_year = " . $db->quote($schoolYear) . " AND employee_id IN ($in) AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0) GROUP BY employee_id) lt
+              ON lt.employee_id = ms.employee_id AND ms.year*12+ms.month = lt.ym") as $b) $base[(int)$b['employee_id']] = $b;
+    } catch (Exception $e) {}
+    foreach ($rows as &$r) {
+        $id = (int)$r['id'];
+        $r['via_link'] = isset($sub[$id]); $r['submitted_at'] = $sub[$id] ?? null;
+        $r['fin_ok'] = !isset($noSal[$id]);
+        $r['gaps'] = $r['fin_ok'] ? [] : employeeFileGaps($r, $db, $schoolYear);
+        $r['fin_note'] = $r['fin_ok'] ? '✅ الملف المالي مكتمل — الراتب محسوب / Dossier financier complet'
+                                      : '❌ الملف المالي غير مكتمل — لا راتب محسوب / Dossier financier incomplet' . (count($r['gaps']) > 1 ? ' — ناقص أيضاً: ' . implode(' · ', array_slice($r['gaps'], 1)) : '');
+        $r['last_salary'] = $base[$id] ?? null;
+    }
+    unset($r);
+    return $rows;
+}
+
+/**
+ * 🆕 أعمدة تقرير الأساتذة الجدد — «كامل المعلومات عن ملفه» (نصّ خالص للشاشة والتصدير معاً).
+ * كل عمود: [المفتاح => [العنوان عربي / فرنسي, دالة النصّ, عرض التصدير]].
+ */
+function newTeachersReportCols(): array {
+    $t = fn($v) => trim((string)$v);
+    $d = fn($v) => ($v && $v !== '0000-00-00') ? formatDate($v) : '';
+    $lbp = fn($v) => ((float)$v) != 0 ? number_format((float)$v) : '';
+    return [
+        'code'     => ['الرقم / Code', fn($r) => $t($r['employee_code'] ?? ''), 9],
+        'name_fr'  => ['الاسم / Nom', fn($r) => $t(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? '')), 22],
+        'name_ar'  => ['الاسم بالعربي / Nom (ar)', fn($r) => $t(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? '')), 20],
+        'type'     => ['الفئة / Catégorie', fn($r) => employeeTypeLabel($r['employee_type']) . (($r['employee_type'] ?? '') === 'employe' && $t($r['job_title'] ?? '') !== '' ? ' — ' . jobTitleLabel($r['job_title'], 'ar') : ''), 16],
+        'hire'     => ['دخول المدرسة / Embauche', fn($r) => $d($r['hire_date'] ?? ''), 12],
+        'titul'    => ['دخول الملاك / Titularisation', fn($r) => $d($r['titularization_date'] ?? ''), 12],
+        'source'   => ['المصدر / Source', fn($r) => !empty($r['via_link']) ? ('عبر الرابط / Via le lien' . (!empty($r['submitted_at']) ? ' ' . $d(substr($r['submitted_at'], 0, 10)) : '')) : 'إدخال يدوي / Saisie manuelle', 16],
+        'mother'   => ['اسم الأم / Mère', fn($r) => $t(($r['mother_first_name'] ?? '') . ' ' . ($r['mother_last_name'] ?? '')), 14],
+        'birth'    => ['الولادة / Naissance', fn($r) => $t($d($r['birth_date'] ?? '') . ' ' . ($r['birth_place'] ?? '')), 16],
+        'nat'      => ['الجنسية / Nationalité', fn($r) => $t($r['nationality'] ?? ''), 10],
+        'social'   => ['الوضع العائلي / Famille', fn($r) => $t($r['social_status'] ?? '') !== '' ? socialStatusLabel($r['social_status'], 'ar') . ' — الأولاد: ' . (int)($r['number_of_children'] ?? 0) : '', 18],
+        'address'  => ['السكن / Adresse', fn($r) => $t(implode(' ', array_filter([$r['gouvernorat'] ?? '', $r['district'] ?? '', $r['ville'] ?? '', $r['quartier'] ?? '', $r['rue'] ?? '', $r['immeuble'] ?? '', $r['etage'] ?? '']))), 24],
+        'phone'    => ['الهاتف / Tél.', fn($r) => implode(' / ', array_filter([$t($r['phone1'] ?? ''), $t($r['phone2'] ?? '')])), 16],
+        'email'    => ['Email', fn($r) => $t($r['email'] ?? ''), 20],
+        'diploma'  => ['الشهادة / Diplôme', fn($r) => $t($r['diploma'] ?? '') !== '' ? strip_tags((string)diplomaLabel($r['diploma'], 'ar')) : '', 18],
+        'subjects' => ['المواد / Matières', fn($r) => $t($r['subjects_taught'] ?? ''), 18],
+        'classes'  => ['الصفوف / Classes', fn($r) => $t($r['classes_taught'] ?? '') !== '' ? $t(strip_tags((string)classLevelNames($r['classes_taught']))) : '', 18],
+        'niveau'   => ['المرحلة / Niveau', fn($r) => $t($r['niveau_scolaire'] ?? ''), 12],
+        'hours'    => ['ساعات/أيام بالأسبوع / Heures-jours', fn($r) => $t(rtrim(rtrim(number_format((float)($r['hours_per_week'] ?? 0), 1), '0'), '.') . ' س / ' . (int)($r['days_per_week'] ?? 0) . ' ي'), 12],
+        'grade'    => ['الدرجة / Échelon', fn($r) => $t(gradeDisplay($r)), 8],
+        'nssf'     => ['رقم الضمان / N° CNSS', fn($r) => ((int)($r['cnss_subject'] ?? 1)) === 1 ? ($t($r['nssf_number'] ?? '') !== '' ? cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '') : '⚠️ ناقص') : 'لا يخضع', 16],
+        'mof'      => ['رقم المالية / N° MOF', fn($r) => ((int)($r['tax_subject'] ?? 1)) === 1 ? ($t($r['finance_ministry_number'] ?? '') !== '' ? $t($r['finance_ministry_number']) : '⚠️ ناقص') : 'لا يخضع', 14],
+        'caisse'   => ['رقم الصندوق / N° Caisse', fn($r) => ((int)($r['eoc_subject'] ?? 0)) === 1 ? ($t($r['caisse_number'] ?? '') !== '' ? $t($r['caisse_number']) : '⚠️ ناقص') : 'لا يخضع', 12],
+        'setup'    => ['الإعداد المالي بالملف / Paramétrage', function ($r) use ($t, $lbp) {
+            $mode = $t($r['salary_input_mode'] ?? '');
+            if (($r['employee_type'] ?? '') === 'enseignant_titulaire') return 'ملاك — السلسلة حسب الدرجة';
+            // المبلغ الفعلي أولاً (وضع الإدخال وحده لا يكفي: «دولار» بصفر = لا أساس)
+            if ((float)($r['base_salary_usd'] ?? 0) > 0) return 'أساس بالدولار: ' . number_format((float)$r['base_salary_usd'], 2) . ' $';
+            if ((float)($r['contract_salary_lbp'] ?? 0) > 0) return 'أساس بالليرة: ' . $lbp($r['contract_salary_lbp']) . ' ل.ل';
+            if ((float)($r['base_salary_lbp_percent'] ?? 0) > 0) return 'نسبة من السلسلة: ' . rtrim(rtrim(number_format((float)$r['base_salary_lbp_percent'], 2), '0'), '.') . '٪';
+            if (!empty($r['fin_ok'])) return 'راتب مخزّن بالأشهر (منقول — بلا أساس بالملف)'; // منقول بالمليم: الأساس بالأشهر لا بالإعداد
+            return '⚠️ لا أساس بالملف';
+        }, 20],
+        'base'     => ['أساس آخر شهر محسوب / Base', fn($r) => !empty($r['last_salary']) ? $lbp($r['last_salary']['base_plus_echelon_lbp'] ?? 0) : '', 14],
+        'extra'    => ['الأجر الإضافي / Supplément', fn($r) => !empty($r['last_salary']) ? $lbp(extraWageLbp($r['last_salary'])) : '', 14],
+        'transport'=> ['تعويض النقل / Transport', fn($r) => !empty($r['last_salary']) ? $lbp($r['last_salary']['transport_lbp'] ?? 0) : '', 12],
+        'net'      => ['الصافي آخر شهر / Net', fn($r) => !empty($r['last_salary']) ? $lbp($r['last_salary']['net_salary_lbp'] ?? 0) : '', 14],
+        'note'     => ['ملاحظة — الملف المالي / Note — dossier financier', fn($r) => $r['fin_note'] ?? '', 60],
+    ];
+}
+
+/**
  * 🆕 صفوف الملفات الناقصة (2026-09-23) للإلحاق بالتقارير/اللوحة: موظفو السنة بلا راتب محسوب، مرتّبون كالكشوف
  * (المدرسة ← الفئة ← الاسم). $schoolSql/$extraSql بـ alias e (مثل $schoolSqlEmp و$empTypeSql).
  */

@@ -370,6 +370,25 @@ if ($report === 'monthly_summary') {
         $rep->totalRow(array_merge(['', 'المجموع', (int)$atTot['cnt']], array_map(fn($k) => (int)$atTot[$k], $atSel)));
     }
 
+} elseif ($report === 'new_teachers') {
+    // 🆕 (2026-09-23) الأساتذة الجدد — نفس مصدر الشاشة (newTeachersReportRows + newTeachersReportCols) + ملاحظة الملف المالي
+    $data = newTeachersReportRows($db, $schoolYear, $schoolSqlEmp, $empTypeSql);
+    $ntCols = newTeachersReportCols();
+    $ntOk = count(array_filter($data, fn($r) => $r['fin_ok']));
+    $rep = new ReportTable('الأساتذة الجدد — الداخلون خلال السنة الدراسية ' . $schoolYear . $empTypeTitle . ' (العدد: ' . count($data) . ' — مكتمل: ' . $ntOk . ' — غير مكتمل: ' . (count($data) - $ntOk) . ')', true);
+    $rep->schoolHeader($school);
+    $head = ['#']; $w = [5]; if ($schCol) { $head[] = 'المدرسة'; $w[] = 18; }
+    foreach ($ntCols as $c) { $head[] = $c[0]; $w[] = $c[2]; }
+    $rep->head($head); $rep->widths($w);
+    $rn = 0; $cur = null;
+    foreach ($data as $r) {
+        if ($schCol && (int)$r['school_id'] !== $cur) { $cur = (int)$r['school_id']; $rep->sectionRow(schoolNameById($cur)); }
+        $rn++; $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
+        foreach ($ntCols as $c) $row[] = (string)($c[1])($r);
+        $rep->row($row);
+    }
+    if ($data) { $pad = $schCol ? 2 : 1; $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'العدد الإجمالي: ' . count($data) . ' — مكتمل: ' . $ntOk . ' — غير مكتمل: ' . (count($data) - $ntOk); $rep->totalRow($row); }
+
 } else {
     http_response_code(400);
     die('نوع تقرير غير معروف للتصدير: ' . htmlspecialchars($report));

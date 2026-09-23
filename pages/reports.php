@@ -50,7 +50,7 @@ $selectedNames = (function() {
 })();
 
 // تصدير Excel/Word حقيقي منسّق عبر الخادم (reports_export.php) لهذه التقارير
-$exportableReports = ['monthly_summary','cnss_summary','tax_summary','eoc_summary','employee_list','annual_totals'];
+$exportableReports = ['monthly_summary','cnss_summary','tax_summary','eoc_summary','employee_list','annual_totals','new_teachers'];
 if ($report && in_array($report, $exportableReports, true)) {
     $qs = http_build_query(array_filter([
         'report' => $report, 'month' => $month, 'year' => $year,
@@ -195,6 +195,7 @@ function reportDocThumb($path) {
             ['url'=>'?report=employee_list', 'icon'=>'fa-users', 'color'=>'var(--success)', 'fr'=>'Liste du personnel', 'ar'=>'لائحة الموظفين'],
             ['url'=>$OF.'teacher_card', 'icon'=>'fa-address-card', 'color'=>'var(--primary)', 'fr'=>'Carte enseignant', 'ar'=>'بطاقة الأستاذ'],
             ['url'=>$OF.'teaching_staff', 'icon'=>'fa-chalkboard-user', 'color'=>'var(--info)', 'fr'=>'Corps enseignant', 'ar'=>'لائحة الهيئة التعليمية'],
+            ['url'=>'?report=new_teachers', 'icon'=>'fa-user-plus', 'color'=>'var(--warning)', 'fr'=>'Nouveaux enseignants', 'ar'=>'الأساتذة الجدد — كامل الملف + مين مكمّل ملفه المالي'], // 🆕 2026-09-23
             ['url'=>'?report=titularized&tmode=hire', 'icon'=>'fa-door-open', 'color'=>'var(--success)', 'fr'=>"Entrés à l'école (par date)", 'ar'=>'الداخلون إلى المدرسة بتاريخ'],
             ['url'=>'?report=titularized', 'icon'=>'fa-user-check', 'color'=>'var(--primary)', 'fr'=>'Entrés au cadre (par date)', 'ar'=>'الداخلون في الملاك بتاريخ'],
             ['url'=>$PG.'employee_history.php', 'icon'=>'fa-user-clock', 'color'=>'var(--warning)', 'fr'=>'Dossier enseignant', 'ar'=>'سيرة الأستاذ'],
@@ -929,6 +930,68 @@ function reportDocThumb($path) {
                         <?php if ($multi && $curSch !== null) echo $schSum($curSch, $schN); ?>
                         <?php if (!$data): ?><tr><td colspan="<?= $colsN ?>" class="text-center text-muted"><?= $tmode === 'hire' ? 'لا يوجد من دخل المدرسة بهذا التاريخ / Aucune entrée à l\'école à cette date' : 'لا يوجد أساتذة دخلوا الملاك بهذا التاريخ / Aucun enseignant titularisé à cette date' ?></td></tr><?php endif; ?>
                         <?php if ($data): ?><tr class="total-row"><td colspan="<?= $colsN ?>">العدد الإجمالي / Total: <?= $rn ?></td></tr><?php endif; ?>
+                    </tbody>
+                </table></div>
+        <?= docSheetEnd() ?>
+    <?php elseif ($report === 'new_teachers'):
+        // 🆕 (2026-09-23) «بدي تقرير اسمه الأساتذة الجداد وفيه ملاحظة مين مكمّل ملفه المالي ومين لا — وأكيد فيه كامل المعلومات عن ملفه»:
+        //    كل من دخل المدرسة ضمن السنة الدراسية المختارة (المصدر الواحد newTeachersReportRows) + كل أعمدة الملف (newTeachersReportCols)
+        //    + ملاحظة الملف المالي (✅ راتب محسوب / ❌ لا راتب + النواقص) + المصدر (رابط/يدوي) + زرّ «أكمل الملف».
+        $data = newTeachersReportRows($db, $schoolYear, $schoolSqlEmp, $empTypeSql);
+        $ntCols = newTeachersReportCols();
+        $ntOk = count(array_filter($data, fn($r) => $r['fin_ok'])); $ntNo = count($data) - $ntOk;
+        $cyN = (int)date('Y'); $startN = ((int)date('n') >= 10) ? $cyN : $cyN - 1;
+        [$ntY1, $ntY2] = schoolYearToYears($schoolYear);
+    ?>
+        <form method="GET" class="card no-print">
+            <input type="hidden" name="report" value="new_teachers">
+            <div class="card-body form-row cols-3">
+                <div class="form-group mb-0">
+                    <label class="form-label"><i class="fas fa-calendar-alt"></i> Année scolaire / السنة الدراسية</label>
+                    <select name="school_year" class="form-select">
+                        <?php for ($yn = $startN + 1; $yn >= 2006; $yn--): $syN = $yn . '-' . ($yn + 1); ?>
+                            <option value="<?= $syN ?>" <?= $syN === $schoolYear ? 'selected' : '' ?>><?= $syN ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <?php empTypePicker(); ?>
+                <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
+                <?php reportSchoolPicker(); ?>
+            </div>
+        </form>
+        <?= docSheetStart('Nouveaux enseignants — ' . $schoolYear, 'الأساتذة الجدد — الداخلون خلال السنة الدراسية ' . $schoolYear . ' (' . formatDate($ntY1 . '-10-01') . ' → ' . formatDate($ntY2 . '-09-30') . ')' . $empTypeTitle,
+                ['العدد: ' . count($data) . ' — ✅ الملف المالي مكتمل: ' . $ntOk . ' — ❌ غير مكتمل: ' . $ntNo], ['comp' => false]) ?>
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl" style="font-size:11px">
+                    <thead><tr>
+                        <th>#</th>
+                        <?php if ($multi): ?><th>المدرسة / École</th><?php endif; ?>
+                        <?php foreach ($ntCols as $k => $c): ?><th<?= $k === 'note' ? ' style="min-width:260px"' : '' ?>><?= e($c[0]) ?></th><?php endforeach; ?>
+                        <th class="no-print"></th>
+                    </tr></thead>
+                    <tbody>
+                        <?php
+                        $colsN = count($ntCols) + 2 + ($multi ? 1 : 0);
+                        $rn = 0; $curSch = null; $schN = 0; $schOk = 0;
+                        $schSum = function($sid, $n, $ok) use ($colsN) {
+                            return '<tr class="subtotal-row" style="background:#e0e7ff;font-weight:700"><td colspan="' . $colsN . '" style="text-align:right">عدد الجدد — ' . e(schoolNameById($sid)) . ': ' . $n . ' (✅ مكتمل: ' . $ok . ' — ❌ غير مكتمل: ' . ($n - $ok) . ')</td></tr>';
+                        };
+                        foreach ($data as $r):
+                            if ($multi && $curSch !== null && (int)$r['school_id'] !== $curSch) { echo $schSum($curSch, $schN, $schOk); $schN = 0; $schOk = 0; }
+                            if ($multi && (int)$r['school_id'] !== $curSch): $curSch = (int)$r['school_id']; ?>
+                                <tr class="cat-row"><td colspan="<?= $colsN ?>" style="text-align:right;font-weight:700;background:#dbeafe"><i class="fas fa-school"></i> <?= e(schoolNameById($curSch)) ?></td></tr>
+                            <?php endif; $schN++; if ($r['fin_ok']) $schOk++; ?>
+                            <tr style="<?= $r['fin_ok'] ? '' : 'background:#fffbeb' ?>">
+                                <td><?= ++$rn ?></td>
+                                <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
+                                <?php foreach ($ntCols as $k => $c): $txt = (string)($c[1])($r); ?>
+                                    <td<?= $k === 'note' ? ' style="text-align:right;' . ($r['fin_ok'] ? 'color:#166534' : 'color:#92400e;font-weight:700') . '"' : ($k === 'phone' || $k === 'email' ? ' dir="ltr"' : '') ?>><?= $k === 'name_fr' ? '<strong>' . e($txt) . '</strong>' : (strpos($txt, '⚠️') !== false ? '<span style="color:#b45309;font-weight:700">' . e($txt) . '</span>' : e($txt)) ?></td>
+                                <?php endforeach; ?>
+                                <td class="no-print"><a class="btn btn-sm <?= $r['fin_ok'] ? 'btn-secondary' : 'btn-warning' ?>" href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$r['id'] ?>"><i class="fas fa-pen"></i> <?= $r['fin_ok'] ? 'الملف' : 'أكمل الملف' ?></a></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if ($multi && $curSch !== null) echo $schSum($curSch, $schN, $schOk); ?>
+                        <?php if (!$data): ?><tr><td colspan="<?= $colsN ?>" class="text-center text-muted">لا أساتذة جدداً بهذه السنة / Aucun nouvel enseignant cette année</td></tr><?php endif; ?>
+                        <?php if ($data): ?><tr class="total-row"><td colspan="<?= $colsN ?>">العدد الإجمالي / Total: <?= $rn ?> — ✅ الملف المالي مكتمل: <?= $ntOk ?> — ❌ غير مكتمل: <?= $ntNo ?></td></tr><?php endif; ?>
                     </tbody>
                 </table></div>
         <?= docSheetEnd() ?>

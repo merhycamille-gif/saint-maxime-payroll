@@ -7463,6 +7463,35 @@ try {
 finally { $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid161"); $db->exec("DELETE FROM employees WHERE id = $rid161"); }
 check('🆕 الأستاذ الجديد الموافَق عليه بلا راتب يظهر بتقارير سنة دخوله بشارة «ملف ناقص» (فلتر السنة = راتب أو دخول ضمنها) + الكشف الشهري/التصدير/لائحة الموظفين/كشف الرواتب/اللوحة/فحص الصحة + الملف المكتمل بلا شارة', $ok161, $why161);
 
+/**
+ * 162) 🆕 «بدي تقرير كمان اسمه الأساتذة الجداد وفيه ملاحظة كمان مين مكمّل ملفه المالي ومين لا — وأكيد يكون فيه كامل المعلومات عن ملفه» (2026-09-23):
+ *      ?report=new_teachers = كل من دخل ضمن السنة (hire_date) + كل أعمدة الملف (newTeachersReportCols ≥ 28 عموداً) + ملاحظة ✅/❌ الملف المالي
+ *      + المصدر (رابط/يدوي) + تصدير بنفس الأعمدة. تجربة حيّة: __REG162 دخول 2026-10-01 بلا راتب ⇒ بالتقرير 2026-2027 «غير مكتمل»
+ *      وليس بـ2025-2026؛ موظف براتب 2025-2026 ⇒ «مكتمل» مع أساسه.
+ */
+$ok162 = true; $why162 = '';
+$db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, status, salary_input_mode, base_salary_usd, contract_salary_lbp, payment_months_per_year, days_per_week, transport_weeks, tax_subject, tax_includes_extra, cnss_subject, cnss_includes_extra, eoc_subject, is_deleted, phone1, diploma)
+    VALUES (2, '__REG162', 'enseignant_contractuel', 'فحص', 'جديد162', 'Reg', 'Nouveau162', '2026-10-01', 'actif', 'percent_of_lbp', 0, 0, 12, 5, 4, 1, 1, 1, 1, 0, 0, '03-162162', 'licence')");
+$rid162 = (int)$db->lastInsertId();
+try {
+    $r27 = newTeachersReportRows($db, '2026-2027', '', " AND e.id = $rid162");
+    $r26 = newTeachersReportRows($db, '2025-2026', '', " AND e.id = $rid162");
+    $paid = $db->query("SELECT e.id FROM employees e WHERE e.is_deleted = 0 AND e.hire_date BETWEEN '2025-10-01' AND '2026-09-30' AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = '2025-2026' AND base_plus_echelon_lbp > 0) LIMIT 1")->fetchColumn();
+    $rp = $paid ? newTeachersReportRows($db, '2025-2026', '', " AND e.id = " . (int)$paid) : [];
+    $cols = newTeachersReportCols();
+    $txt = $r27 ? array_map(fn($c) => (string)($c[1])($r27[0]), $cols) : [];
+    $html = renderPage('pages/reports.php', ['report' => 'new_teachers', 'school_year' => '2026-2027'], ['extra','aide','transport']);
+    $src = (string)file_get_contents($PROJ . '/pages/reports.php'); $srx = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+    $ok162 = count($r27) === 1 && $r27[0]['fin_ok'] === false && strpos($r27[0]['fin_note'], 'غير مكتمل') !== false && $r27[0]['via_link'] === false
+          && count($r26) === 0 && (!$paid || (count($rp) === 1 && $rp[0]['fin_ok'] === true && strpos($rp[0]['fin_note'], 'مكتمل') !== false && $rp[0]['last_salary']))
+          && count($cols) >= 28 && ($txt['phone'] ?? '') === '03-162162' && ($txt['nssf'] ?? '') === '⚠️ ناقص' && ($txt['setup'] ?? '') === '⚠️ لا أساس بالملف' && ($txt['hire'] ?? '') === formatDate('2026-10-01')
+          && strpos($html, 'Nouveau162') !== false && strpos($html, 'الملف المالي غير مكتمل') !== false && strpos($html, 'الأساتذة الجدد') !== false && strpos($html, 'رقم الضمان / N° CNSS') !== false
+          && strpos($src, "'?report=new_teachers'") !== false && strpos($src, "'new_teachers']") !== false && strpos($srx, "\$report === 'new_teachers'") !== false && strpos($srx, 'newTeachersReportCols()') !== false;
+    $why162 = 'r27=' . count($r27) . ' r26=' . count($r26) . ' paid=' . (int)$paid . ' paidOk=' . (($rp[0]['fin_ok'] ?? null) ? 'yes' : 'no') . ' cols=' . count($cols) . ' phone=' . ($txt['phone'] ?? '-') . ' nssf=' . ($txt['nssf'] ?? '-') . ' html=' . (strpos($html, 'Nouveau162') !== false ? 'ok' : 'NO') . ' len=' . strlen($html);
+} catch (Throwable $e) { $ok162 = false; $why162 .= ' err=' . $e->getMessage(); }
+finally { $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid162"); $db->exec("DELETE FROM employees WHERE id = $rid162"); }
+check('🆕 تقرير «الأساتذة الجدد»: من دخل ضمن السنة + كامل معلومات الملف (≥28 عموداً) + ملاحظة الملف المالي (✅ راتب محسوب / ❌ لا راتب + النواقص) + المصدر + الشاشة والتصدير والقائمة', $ok162, $why162);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
