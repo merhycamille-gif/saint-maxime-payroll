@@ -1074,7 +1074,7 @@ if ($action === 'list') {
                                         <?php if ($emp['first_name_ar']): ?>
                                             <br><small style="color:var(--gray-500)"><?= e($emp['first_name_ar'] . ' ' . $emp['last_name_ar']) ?></small>
                                         <?php endif; ?>
-                                        <?php $incB = incompleteFileBadge($emp, $db, activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()); if ($incB): ?><div style="margin-top:3px"><?= $incB ?></div><?php endif; // 🆕 ملف ناقص (2026-09-23) ?>
+                                        <?php $incB = empBadges($emp, $db, activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()); if (trim($incB) !== ''): ?><div style="margin-top:3px"><?= $incB ?></div><?php endif; // 🆕 ملف ناقص (2026-09-23) ?>
                                     </td>
                                     <td>
                                         <span class="badge badge-<?= $emp['employee_type'] === 'enseignant_titulaire' ? 'gold' : ($emp['employee_type'] === 'enseignant_contractuel' ? 'info' : 'secondary') ?>">

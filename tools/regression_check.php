@@ -7447,6 +7447,8 @@ try {
     $gaps161 = employeeFileGaps($e161, $db, '2026-2027');
     $rows161 = incompleteEmployeesRows($db, '2026-2027', '', " AND e.id = $rid161");
     $badge161 = incompleteFileBadge($e161, $db, '2026-2027', false);
+    $both161 = empBadges($e161, $db, '2026-2027', false); $txt161 = empBadgesText($e161, $db, '2026-2027'); // 🆕 «جديد» + «ملف ناقص» معاً (2026-09-23)
+    $msRow161 = ['employee_id' => $rid161]; $bothMs161 = empBadges($msRow161, $db, '2026-2027', false); // صفّ راتب شهري (بلا بيانات الموظف) يكمّل من الكاش
     // موظف له راتب فعلي بالسنة ⇒ لا شارة (الملفات المكتملة لا تُوسَم)
     $paid161 = $db->query("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = '2025-2026' AND base_plus_echelon_lbp > 0) LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     $paidGaps = $paid161 ? employeeFileGaps($paid161, $db, '2025-2026') : [];
@@ -7455,12 +7457,14 @@ try {
     $mp = (string)file_get_contents($PROJ . '/pages/monthly_payroll.php'); $ep = (string)file_get_contents($PROJ . '/pages/employees.php');
     $ix = (string)file_get_contents($PROJ . '/index.php'); $hc = (string)file_get_contents($PROJ . '/pages/health_check.php');
     $code161 = strpos($rp, "incompleteEmployeesRows(\$db, \$periodSchoolYear, \$schoolSqlEmp, \$empTypeSql)") !== false && strpos($rp, "'gaps'    => ['ملف ناقص / Dossier incomplet'") !== false
-            && strpos($rp, "incompleteFileBadge(\$r, \$db, \$bonusSy)") !== false
+            && strpos($rp, "empBadges(\$r, \$db, \$bonusSy)") !== false
             && strpos($rx, "incompleteEmployeesRows(\$db, \$periodSchoolYear, \$schoolSqlEmp, \$empTypeSql)") !== false && strpos($rx, "'gaps' => ['ملف ناقص'") !== false
-            && strpos($mp, "incompleteFileBadge(\$r, \$db, \$msSchoolYear)") !== false && strpos($ep, "incompleteFileBadge(\$emp, \$db,") !== false
+            && strpos($mp, "empBadges(\$r, \$db, \$msSchoolYear)") !== false && strpos($ep, "empBadges(\$emp, \$db,") !== false
             && strpos($ix, "incompleteEmployeesRows(\$db, \$homeIncSy") !== false && strpos($hc, "incompleteEmployeesRows(\$db, \$hcYear") !== false;
     $ok161 = $in27 === 1 && $in26 === 0 && isset($ids161[$rid161]) && $gaps161 && $gaps161[0] === 'الراتب غير محسوب (الإعداد المالي)' && in_array('رقم الضمان', $gaps161, true)
-          && count($rows161) === 1 && (int)$rows161[0]['id'] === $rid161 && strpos($badge161, 'ملف ناقص') !== false && $paidGaps === [] && $code161;
+          && count($rows161) === 1 && (int)$rows161[0]['id'] === $rid161 && strpos($badge161, 'ملف ناقص') !== false && $paidGaps === [] && $code161
+          && strpos($both161, 'جديد') !== false && strpos($both161, 'ملف ناقص') !== false && $txt161 === ' (جديد) (ملف ناقص)' && strpos($bothMs161, 'جديد') !== false
+          && substr_count($rp, 'empBadges($r, $db, $periodSchoolYear)') === 4 && strpos($rx, 'empBadgesText($r, $db, $periodSchoolYear)') !== false && strpos($mp, 'empBadges($r, $db, $msSchoolYear)') !== false;
     $why161 = "in2026-2027=$in27 in2025-2026=$in26 noSal=" . (isset($ids161[$rid161]) ? 'yes' : 'NO') . ' gaps=' . implode('|', $gaps161) . ' rows=' . count($rows161)
             . ' badge=' . (strpos($badge161, 'ملف ناقص') !== false ? 'ok' : 'NO') . ' paidGaps=' . count($paidGaps) . ' code=' . ($code161 ? 'ok' : 'bad');
 } catch (Throwable $e) { $ok161 = false; $why161 .= ' err=' . $e->getMessage(); }

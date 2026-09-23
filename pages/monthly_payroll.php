@@ -539,7 +539,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                             <tr>
                                 <td><strong><?= e($r['employee_code']) ?></strong></td>
                                 <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
-                                <td><?= e($r['first_name_fr'].' '.$r['last_name_fr']) ?> <?= incompleteFileBadge($r, $db, $msSchoolYear) ?></td><?php /* 🆕 ملف ناقص (2026-09-23) */ ?>
+                                <td><?= e($r['first_name_fr'].' '.$r['last_name_fr']) ?> <?= empBadges($r, $db, $msSchoolYear) ?></td><?php /* 🆕 جديد + ملف ناقص (2026-09-23) */ ?>
                                 <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
                                 <td><?= e(gradeDisplay($r)) ?></td>
                                 <td><?= $r['is_calculated'] ? money($r['net_salary_lbp'], rowRate($r)) : '—' ?></td>

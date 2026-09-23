@@ -990,6 +990,43 @@ function incompleteFileBadge($e, $db, $schoolYear, $withLink = true) {
     return $html;
 }
 
+/**
+ * 🆕 (2026-09-23 «حدّ اسمهم بتحطّ مش كامل الملف، وجديد إذا جديد») شارات الاسم الموحّدة بكل التقارير واللوائح:
+ * «🆕 Nouveau / جديد» لمن دخل المدرسة ضمن السنة الدراسية المعروضة (hire_date بين 1/10 و30/9) + «⚠️ ملف ناقص» لمن لا راتب له بها.
+ * يقبل صفّ موظف (id) أو صفّ راتب شهري (employee_id) — يكمّل بيانات الموظف من كاش عند الحاجة.
+ */
+function employeeRowCached($db, int $id): ?array {
+    static $c = [];
+    if (!array_key_exists($id, $c)) { try { $c[$id] = $db->query("SELECT * FROM employees WHERE id = " . $id)->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Exception $e) { $c[$id] = null; } }
+    return $c[$id];
+}
+function isNewHireInYear($e, $schoolYear): bool {
+    if (!preg_match('/^(\d{4})-(\d{4})$/', (string)$schoolYear, $m)) return false;
+    $h = (string)($e['hire_date'] ?? '');
+    return $h !== '' && $h !== '0000-00-00' && $h >= $m[1] . '-10-01' && $h <= $m[2] . '-09-30';
+}
+function empBadges($r, $db, $schoolYear, $withLink = true): string {
+    $id = (int)($r['id'] ?? ($r['employee_id'] ?? 0));
+    if (!$id) return '';
+    $e = (isset($r['hire_date']) && isset($r['employee_type']) && isset($r['id'])) ? $r : employeeRowCached($db, $id);
+    if (!$e) return '';
+    $h = '';
+    if (isNewHireInYear($e, $schoolYear)) $h .= ' <span class="badge badge-info new-badge" title="دخل المدرسة ' . htmlspecialchars(formatDate($e['hire_date']), ENT_QUOTES, 'UTF-8') . '" style="white-space:nowrap">🆕 Nouveau / جديد</span>';
+    $inc = incompleteFileBadge($e, $db, $schoolYear, $withLink);
+    if ($inc !== '') $h .= ' ' . $inc;
+    return $h;
+}
+function empBadgesText($r, $db, $schoolYear): string {
+    $id = (int)($r['id'] ?? ($r['employee_id'] ?? 0));
+    if (!$id) return '';
+    $e = (isset($r['hire_date']) && isset($r['employee_type']) && isset($r['id'])) ? $r : employeeRowCached($db, $id);
+    if (!$e) return '';
+    $t = '';
+    if (isNewHireInYear($e, $schoolYear)) $t .= ' (جديد)';
+    if (employeeFileGaps($e, $db, $schoolYear)) $t .= ' (ملف ناقص)';
+    return $t;
+}
+
 /** 🆕 نصّ النواقص للتصدير (Excel/Word) والطباعة: «ملف ناقص: الراتب · رقم الضمان» أو فارغ. */
 function incompleteFileText($e, $db, $schoolYear) {
     $gaps = employeeFileGaps($e, $db, $schoolYear);

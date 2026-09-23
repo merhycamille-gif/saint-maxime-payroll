@@ -369,7 +369,7 @@ function reportDocThumb($path) {
                             <tr>
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
-                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
                                 <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
                                 <td><?= e(gradeDisplay($r['employee_type'], $r['grade_at_month'])) ?></td>
                                 <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
@@ -405,7 +405,7 @@ function reportDocThumb($path) {
                             <tr class="incomplete-row" style="background:#fffbeb">
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($ie['school_id'])) ?></small></td><?php endif; ?>
-                                <td><?= e(trim($ie['first_name_ar'].' '.$ie['last_name_ar']) ?: trim($ie['first_name_fr'].' '.$ie['last_name_fr'])) ?> <?= incompleteFileBadge($ie, $db, $periodSchoolYear) ?></td>
+                                <td><?= e(trim($ie['first_name_ar'].' '.$ie['last_name_ar']) ?: trim($ie['first_name_fr'].' '.$ie['last_name_fr'])) ?><?= empBadges($ie, $db, $periodSchoolYear) ?></td>
                                 <td><small><?= employeeTypeLabel($ie['employee_type']) ?></small></td>
                                 <td><?= e(gradeDisplay($ie)) ?></td>
                                 <td colspan="<?= $incSpan - ($multi?5:4) ?>" style="text-align:right;color:#92400e"><?= e(incompleteFileText($ie, $db, $periodSchoolYear)) ?></td>
@@ -463,7 +463,7 @@ function reportDocThumb($path) {
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'])) ?></td>
-                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
                                 <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
@@ -533,7 +533,7 @@ function reportDocThumb($path) {
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e($r['finance_ministry_number']) ?></td>
-                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
                                 <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
@@ -576,7 +576,7 @@ function reportDocThumb($path) {
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e($r['caisse_number']) ?></td>
-                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
                                 <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
@@ -648,7 +648,7 @@ function reportDocThumb($path) {
         // الأعمدة المتاحة: key => [label, دالة العرض]
         $availCols = [
             'code'    => ['Code', fn($r) => '<strong>'.e($r['employee_code']).'</strong>'],
-            'name'    => ['الاسم / Nom', fn($r) => e(trim($r['first_name_fr'].' '.$r['last_name_fr']) ?: trim($r['first_name_ar'].' '.$r['last_name_ar'])) . ' ' . incompleteFileBadge($r, $db, $bonusSy)], // 🆕 شارة «ملف ناقص» (2026-09-23)
+            'name'    => ['الاسم / Nom', fn($r) => e(trim($r['first_name_fr'].' '.$r['last_name_fr']) ?: trim($r['first_name_ar'].' '.$r['last_name_ar'])) . empBadges($r, $db, $bonusSy)], // 🆕 شارتا «جديد» و«ملف ناقص» (2026-09-23)
             'name_ar' => ['الاسم بالعربي / Nom (arabe)', fn($r) => e(trim($r['first_name_ar'].' '.$r['last_name_ar']))],
             'type'    => ['الفئة / Type', fn($r) => employeeTypeLabel($r['employee_type'])],
             // الموظف الإداري: تُعرَض وظيفته بدل الشهادة (مطابق للتصدير — كانا مختلفَين)
@@ -919,7 +919,7 @@ function reportDocThumb($path) {
                             <tr>
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
-                                <td><strong><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></strong></td>
+                                <td><strong><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></strong><?= empBadges($r, $db, activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()) ?></td>
                                 <td><?= diplomaLabel($r['diploma']) ?></td>
                                 <td><?= e(gradeDisplay($r)) ?></td>
                                 <td><?= formatDate($r['hire_date']) ?></td>

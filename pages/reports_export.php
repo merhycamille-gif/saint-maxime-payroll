@@ -94,7 +94,7 @@ if ($report === 'monthly_summary') {
         foreach ($v as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [$nm($r), employeeTypeLabel($r['employee_type']), gradeDisplay($r['employee_type'], $r['grade_at_month']), $v['base'], $v['ech'], $v['bpe']]);
+        $row = array_merge($row, [$nm($r) . empBadgesText($r, $db, $periodSchoolYear), employeeTypeLabel($r['employee_type']), gradeDisplay($r['employee_type'], $r['grade_at_month']), $v['base'], $v['ech'], $v['bpe']]);
         if (salaryCompHas('extra')) $row[] = $v['extra'];
         if (salaryCompHas('aide'))  $row[] = $v['aide'];
         $row[] = $v['composed'];
@@ -111,7 +111,7 @@ if ($report === 'monthly_summary') {
         $rep->sectionRow('⚠️ ملفات ناقصة — بلا راتب محسوب (العدد: ' . count($incRows) . ') — أكمل الملف ثم احسب الراتب');
         foreach ($incRows as $ie) {
             $rn++; $row = [$rn]; if ($schCol) $row[] = schoolNameById($ie['school_id']);
-            $row = array_merge($row, [$nm($ie), employeeTypeLabel($ie['employee_type']), gradeDisplay($ie), incompleteFileText($ie, $db, $periodSchoolYear)]);
+            $row = array_merge($row, [$nm($ie) . empBadgesText($ie, $db, $periodSchoolYear), employeeTypeLabel($ie['employee_type']), gradeDisplay($ie), incompleteFileText($ie, $db, $periodSchoolYear)]);
             $rep->row($row);
         }
     }
@@ -150,7 +150,7 @@ if ($report === 'monthly_summary') {
         foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'cnss' => $cnss, 'school' => $sch] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [cnssWithBirthYear($r['nssf_number'], $r['birth_date']), $nm($r), $base]);
+        $row = array_merge($row, [cnssWithBirthYear($r['nssf_number'], $r['birth_date']), $nm($r) . empBadgesText($r, $db, $periodSchoolYear), $base]);
         if (salaryCompHas('extra')) $row[] = $ex;
         if (salaryCompHas('aide'))  $row[] = $ai;
         $row = array_merge($row, [$comp, ($cnss ? (int)round($cnss / 0.03) : 0), $cnss, $sch]);
@@ -196,7 +196,7 @@ if ($report === 'monthly_summary') {
         foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'fded' => $fded, 'txb' => $txb, 'tax' => $tax] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [$r['finance_ministry_number'], $nm($r), $base]);
+        $row = array_merge($row, [$r['finance_ministry_number'], $nm($r) . empBadgesText($r, $db, $periodSchoolYear), $base]);
         if (salaryCompHas('extra')) $row[] = $ex;
         if (salaryCompHas('aide'))  $row[] = $ai;
         $row = array_merge($row, [$comp, $fded, $txb, $tax]);
@@ -225,7 +225,7 @@ if ($report === 'monthly_summary') {
         $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r); $ca = (int)$r['caisse_amount_lbp']; $gr = (int)$r['eoc_grade_lbp']; $sc = (int)$r['school_eoc_6_lbp'];
         $T['base'] += $base; $T['extra'] += $ex; $T['aide'] += $ai; $T['composed'] += $comp; $T['caisse'] += $ca; $T['grade'] += $gr; $T['school'] += $sc; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [$r['caisse_number'], $nm($r), $base]);
+        $row = array_merge($row, [$r['caisse_number'], $nm($r) . empBadgesText($r, $db, $periodSchoolYear), $base]);
         if (salaryCompHas('extra')) $row[] = $ex;
         if (salaryCompHas('aide'))  $row[] = $ai;
         $row = array_merge($row, [$comp, $ca, ($gr > 0 ? $gr : '—'), $sc]);
@@ -280,7 +280,7 @@ if ($report === 'monthly_summary') {
     // 🔴 نفس أعمدة الشاشة (reports.php) تماماً — أي عمود يختاره المستخدم يجب أن يصل للملف
     $cols = [
         'code' => ['Code', fn($r) => $r['employee_code']],
-        'name' => ['الاسم', fn($r) => (trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) ?: trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])) . (employeeFileGaps($r, $db, $bonusSy) ? ' ⚠️ ملف ناقص' : '')], // 🆕 (2026-09-23)
+        'name' => ['الاسم', fn($r) => (trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) ?: trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])) . empBadgesText($r, $db, $bonusSy)], // 🆕 (2026-09-23) (جديد) (ملف ناقص)
         'name_ar' => ['الاسم بالعربي', fn($r) => trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])],
         'type' => ['الفئة', fn($r) => employeeTypeLabel($r['employee_type'])],
         'diploma' => ['الشهادة', fn($r) => $r['employee_type'] === 'employe' ? jobTitleLabel($r['job_title'] ?? '') : diplomaLabel($r['diploma'])],

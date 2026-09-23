@@ -221,7 +221,7 @@ if ($homeInc): ?>
                 <tr>
                     <td><?= $i + 1 ?></td>
                     <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($ie['school_id'])) ?></small></td><?php endif; ?>
-                    <td><strong><?= e(trim($ie['first_name_fr'] . ' ' . $ie['last_name_fr'])) ?></strong><?php if ($ie['first_name_ar']): ?><br><small style="color:var(--gray-500)"><?= e($ie['first_name_ar'] . ' ' . $ie['last_name_ar']) ?></small><?php endif; ?></td>
+                    <td><strong><?= e(trim($ie['first_name_fr'] . ' ' . $ie['last_name_fr'])) ?></strong><?= empBadges($ie, $db, $homeIncSy, false) ?><?php if ($ie['first_name_ar']): ?><br><small style="color:var(--gray-500)"><?= e($ie['first_name_ar'] . ' ' . $ie['last_name_ar']) ?></small><?php endif; ?></td>
                     <td><small><?= e(employeeTypeLabel($ie['employee_type'])) ?></small></td>
                     <td><?= formatDate($ie['hire_date']) ?></td>
                     <td style="color:#92400e"><?= e(implode(' · ', employeeFileGaps($ie, $db, $homeIncSy))) ?></td>
