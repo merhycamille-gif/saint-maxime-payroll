@@ -7421,6 +7421,48 @@ try {
 } catch (Throwable $e) { $ok160 = false; $why160 .= ' err=' . $e->getMessage(); }
 check('🔍📞 بحث الموظفين: اقتراحات فورية من أوّل حرف (اختيار أو تكملة) + البحث برقم الهاتف بالأرقام فقط (اقتراحات + فلتر اللائحة)', $ok160, $why160);
 
+/**
+ * 161) 🆕 «الأساتذة الجداد اللي بيكونوا باعتين عاللينك وكبست موافق وما كمّلت الملف: إذا بدّي أطبع تقرير متعاقد أو موظف
+ *      وأطلب الكل لازم يبيّنوا أسماؤهم حتى لو ما كمّلتهن الملف، وهيك بعرف أي ملف ناقص» (2026-09-23):
+ *      yearEmploymentFilter = راتب فعلي بالسنة **أو** دخول ضمن السنة (hire_date بين تشرين الأول وأيلول) + المصدر الواحد
+ *      noSalaryYearEmployeeIds/employeeFileGaps/incompleteFileBadge/incompleteEmployeesRows بكل اللوائح والكشوف والتصدير واللوحة.
+ *      تجربة حيّة: متعاقد جديد __REG161 دخول 2026-10-01 بلا أي راتب ⇒ ظاهر بفلتر 2026-2027، «ملف ناقص»، غير ظاهر بـ2025-2026.
+ */
+$ok161 = true; $why161 = '';
+$db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, status, salary_input_mode, base_salary_usd, contract_salary_lbp, payment_months_per_year, days_per_week, transport_weeks, tax_subject, tax_includes_extra, cnss_subject, cnss_includes_extra, eoc_subject, is_deleted)
+    VALUES (2, '__REG161', 'enseignant_contractuel', 'فحص', 'جديد161', 'Reg', 'Nouveau161', '2026-10-01', 'actif', 'percent_of_lbp', 0, 0, 12, 5, 4, 1, 1, 1, 1, 0, 0)");
+$rid161 = (int)$db->lastInsertId();
+try {
+    [$f161, $p161] = yearEmploymentFilter('2026-2027', 'e.');
+    $q = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.id = $rid161" . $f161); $q->execute($p161); $in27 = (int)$q->fetchColumn();
+    [$f161b, $p161b] = yearEmploymentFilter('2025-2026', 'e.');
+    $q = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.id = $rid161" . $f161b); $q->execute($p161b); $in26 = (int)$q->fetchColumn();
+    // المصدر الواحد (بلا كاش قديم: المفتاح يتضمّن شرطاً فريداً)
+    $ids161 = noSalaryYearEmployeeIds($db, '2026-2027', '', " AND e.id = $rid161");
+    $e161 = $db->query("SELECT * FROM employees WHERE id = $rid161")->fetch(PDO::FETCH_ASSOC);
+    $gaps161 = employeeFileGaps($e161, $db, '2026-2027');
+    $rows161 = incompleteEmployeesRows($db, '2026-2027', '', " AND e.id = $rid161");
+    $badge161 = incompleteFileBadge($e161, $db, '2026-2027', false);
+    // موظف له راتب فعلي بالسنة ⇒ لا شارة (الملفات المكتملة لا تُوسَم)
+    $paid161 = $db->query("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = '2025-2026' AND base_plus_echelon_lbp > 0) LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $paidGaps = $paid161 ? employeeFileGaps($paid161, $db, '2025-2026') : [];
+    // الكود: الصفوف الملحقة بالكشف الشهري (شاشة + تصدير) + عمود «ملف ناقص» بلائحة الموظفين + الشارة بكشف الرواتب ولائحة الموظفين + اللوحة + فحص الصحة
+    $rp = (string)file_get_contents($PROJ . '/pages/reports.php'); $rx = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+    $mp = (string)file_get_contents($PROJ . '/pages/monthly_payroll.php'); $ep = (string)file_get_contents($PROJ . '/pages/employees.php');
+    $ix = (string)file_get_contents($PROJ . '/index.php'); $hc = (string)file_get_contents($PROJ . '/pages/health_check.php');
+    $code161 = strpos($rp, "incompleteEmployeesRows(\$db, \$periodSchoolYear, \$schoolSqlEmp, \$empTypeSql)") !== false && strpos($rp, "'gaps'    => ['ملف ناقص / Dossier incomplet'") !== false
+            && strpos($rp, "incompleteFileBadge(\$r, \$db, \$bonusSy)") !== false
+            && strpos($rx, "incompleteEmployeesRows(\$db, \$periodSchoolYear, \$schoolSqlEmp, \$empTypeSql)") !== false && strpos($rx, "'gaps' => ['ملف ناقص'") !== false
+            && strpos($mp, "incompleteFileBadge(\$r, \$db, \$msSchoolYear)") !== false && strpos($ep, "incompleteFileBadge(\$emp, \$db,") !== false
+            && strpos($ix, "incompleteEmployeesRows(\$db, \$homeIncSy") !== false && strpos($hc, "incompleteEmployeesRows(\$db, \$hcYear") !== false;
+    $ok161 = $in27 === 1 && $in26 === 0 && isset($ids161[$rid161]) && $gaps161 && $gaps161[0] === 'الراتب غير محسوب (الإعداد المالي)' && in_array('رقم الضمان', $gaps161, true)
+          && count($rows161) === 1 && (int)$rows161[0]['id'] === $rid161 && strpos($badge161, 'ملف ناقص') !== false && $paidGaps === [] && $code161;
+    $why161 = "in2026-2027=$in27 in2025-2026=$in26 noSal=" . (isset($ids161[$rid161]) ? 'yes' : 'NO') . ' gaps=' . implode('|', $gaps161) . ' rows=' . count($rows161)
+            . ' badge=' . (strpos($badge161, 'ملف ناقص') !== false ? 'ok' : 'NO') . ' paidGaps=' . count($paidGaps) . ' code=' . ($code161 ? 'ok' : 'bad');
+} catch (Throwable $e) { $ok161 = false; $why161 .= ' err=' . $e->getMessage(); }
+finally { $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid161"); $db->exec("DELETE FROM employees WHERE id = $rid161"); }
+check('🆕 الأستاذ الجديد الموافَق عليه بلا راتب يظهر بتقارير سنة دخوله بشارة «ملف ناقص» (فلتر السنة = راتب أو دخول ضمنها) + الكشف الشهري/التصدير/لائحة الموظفين/كشف الرواتب/اللوحة/فحص الصحة + الملف المكتمل بلا شارة', $ok161, $why161);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

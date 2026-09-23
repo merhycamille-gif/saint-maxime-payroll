@@ -928,11 +928,87 @@ function yearEmploymentFilter($schoolYear, $prefix = '') {
     // التي تبدأ 1-10-2026). ولرؤية كل السابقين يُستعمل «كل السنين» (بلا فلترة).
     // شرط القيمة>0 يستبعد الصفوف الصفرية (الأشباح).
     $yearStart = $m[1] . '-10-01'; // بداية السنة الدراسية (تشرين الأول)
+    $yearEnd   = $m[2] . '-09-30'; // نهايتها (أيلول)
     $leftDate = leftDateSql($prefix); // 🚪 «الترك من الكل» وحده يُخرج الاسم (2026-09-18)
-    $sql = " AND {$prefix}id IN (SELECT employee_id FROM monthly_salaries"
+    // 🆕 (2026-09-23) «الأساتذة الجداد اللي بعتوا عاللينك وكبست موافق وما كمّلت الملف لازم يبيّنوا بالتقرير حتى بعرف مين ناقص»:
+    //    مَن دخل المدرسة **ضمن هذه السنة الدراسية** (hire_date بين تشرين الأول وأيلول) هو من موظفيها ولو لم يُحسب له راتب بعد —
+    //    فيظهر بكل اللوائح/التقارير/الكشوف مع شارة «ملف ناقص» (employeeFileGaps) بدل أن يختفي حتى يُكمَل ملفه.
+    $sql = " AND ({$prefix}id IN (SELECT employee_id FROM monthly_salaries"
          . " WHERE school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))"
+         . " OR ({$prefix}hire_date BETWEEN ? AND ?))"
          . " AND {$leftDate} >= ?";
-    return [$sql, [$schoolYear, $yearStart]];
+    return [$sql, [$schoolYear, $yearStart, $yearEnd, $yearStart]];
+}
+
+/**
+ * 🆕 «ملف ناقص» (2026-09-23): موظفو السنة الدراسية الذين **لا راتب فعلياً لهم** بها (دخلوا عبر رابط الأستاذ الجديد
+ * وكُبس «موافق» ولم يُكمَل إعدادهم المالي بعد). المصدر الواحد لكل الشارات والصفوف الملحقة بالتقارير.
+ * يرجع مصفوفة id ⇒ true. مقيَّدة بنطاق المدرسة/المدارس المختارة عند الطلب ($schoolSql بـ alias e).
+ */
+function noSalaryYearEmployeeIds($db, $schoolYear, $schoolSql = '', $extraSql = '') {
+    static $cache = [];
+    if ($schoolYear === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$schoolYear)) return [];
+    $key = $schoolYear . '|' . $schoolSql . '|' . $extraSql;
+    if (isset($cache[$key])) return $cache[$key];
+    [$yf, $yp] = yearEmploymentFilter($schoolYear, 'e.');
+    $out = [];
+    try {
+        $st = $db->prepare("SELECT e.id FROM employees e WHERE e.is_deleted = 0" . $yf . $schoolSql . $extraSql
+            . " AND e.id NOT IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0))");
+        $st->execute(array_merge($yp, [$schoolYear]));
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) $out[(int)$id] = true;
+    } catch (Exception $e) { /* لا نُعطّل التقرير */ }
+    return $cache[$key] = $out;
+}
+
+/**
+ * 🆕 نواقص ملف الموظف (2026-09-23): تُرجع لائحة بالمعلومات الأساسية الناقصة **فقط لمن لا راتب له بالسنة** (الملف غير مكتمل)،
+ * وإلا مصفوفة فارغة — فلا تظهر شارات على الملفات المكتملة. أوّل بند دائماً «الراتب/الإعداد المالي».
+ */
+function employeeFileGaps($e, $db, $schoolYear) {
+    $noSal = noSalaryYearEmployeeIds($db, $schoolYear);
+    if (!isset($noSal[(int)($e['id'] ?? 0)])) return [];
+    $gaps = ['الراتب غير محسوب (الإعداد المالي)'];
+    if (empty($e['birth_date']) || $e['birth_date'] === '0000-00-00') $gaps[] = 'تاريخ الولادة';
+    if (((int)($e['cnss_subject'] ?? 1)) === 1 && trim((string)($e['nssf_number'] ?? '')) === '') $gaps[] = 'رقم الضمان';
+    if (((int)($e['tax_subject'] ?? 1)) === 1 && trim((string)($e['finance_ministry_number'] ?? '')) === '') $gaps[] = 'رقم المالية';
+    if (($e['employee_type'] ?? '') !== 'employe' && trim((string)($e['diploma'] ?? '')) === '') $gaps[] = 'الشهادة';
+    if (trim((string)($e['social_status'] ?? '')) === '') $gaps[] = 'الوضع العائلي';
+    if (trim((string)($e['phone1'] ?? '')) === '' && trim((string)($e['phone2'] ?? '')) === '') $gaps[] = 'الهاتف';
+    return $gaps;
+}
+
+/** 🆕 شارة «ملف ناقص / Dossier incomplet» بجانب الاسم (بكل اللوائح والكشوف) — فارغة إن كان الملف مكتملاً. */
+function incompleteFileBadge($e, $db, $schoolYear, $withLink = true) {
+    $gaps = employeeFileGaps($e, $db, $schoolYear);
+    if (!$gaps) return '';
+    $title = 'ناقص: ' . implode(' · ', $gaps);
+    $html = '<span class="badge badge-warning incomplete-badge" title="' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '" style="white-space:nowrap">⚠️ Dossier incomplet / ملف ناقص</span>';
+    if ($withLink && function_exists('canEdit') && canEdit()) { // كبسة على الشارة = فتح الملف لإكماله
+        $html = '<a href="' . BASE_URL . 'pages/employees.php?action=edit&id=' . (int)$e['id'] . '" style="text-decoration:none" title="' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '">' . $html . '</a>';
+    }
+    return $html;
+}
+
+/** 🆕 نصّ النواقص للتصدير (Excel/Word) والطباعة: «ملف ناقص: الراتب · رقم الضمان» أو فارغ. */
+function incompleteFileText($e, $db, $schoolYear) {
+    $gaps = employeeFileGaps($e, $db, $schoolYear);
+    return $gaps ? ('ملف ناقص: ' . implode(' · ', $gaps)) : '';
+}
+
+/**
+ * 🆕 صفوف الملفات الناقصة (2026-09-23) للإلحاق بالتقارير/اللوحة: موظفو السنة بلا راتب محسوب، مرتّبون كالكشوف
+ * (المدرسة ← الفئة ← الاسم). $schoolSql/$extraSql بـ alias e (مثل $schoolSqlEmp و$empTypeSql).
+ */
+function incompleteEmployeesRows($db, $schoolYear, $schoolSql = '', $extraSql = '') {
+    $ids = noSalaryYearEmployeeIds($db, $schoolYear, $schoolSql, $extraSql);
+    if (!$ids) return [];
+    $in = implode(',', array_map('intval', array_keys($ids)));
+    try {
+        return $db->query("SELECT e.* FROM employees e WHERE e.id IN ($in)
+            ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
+                     COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { return []; }
 }
 
 // 🩹 شفاء ذاتي: احذف أيّ راتب شهري يقع في سنة دراسية **بعد** سنة ترك الأستاذ.

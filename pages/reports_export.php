@@ -105,6 +105,16 @@ if ($report === 'monthly_summary') {
         $rep->row($row);
     }
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('الإجمالي العام', $G, $rn); }
+    // 🆕 (2026-09-23) ملفات ناقصة (موظفو السنة بلا راتب محسوب) — أسماء فقط تحت المجاميع، لا تدخل بأي مجموع
+    $incRows = incompleteEmployeesRows($db, $periodSchoolYear, $schoolSqlEmp, $empTypeSql);
+    if ($incRows) {
+        $rep->sectionRow('⚠️ ملفات ناقصة — بلا راتب محسوب (العدد: ' . count($incRows) . ') — أكمل الملف ثم احسب الراتب');
+        foreach ($incRows as $ie) {
+            $rn++; $row = [$rn]; if ($schCol) $row[] = schoolNameById($ie['school_id']);
+            $row = array_merge($row, [$nm($ie), employeeTypeLabel($ie['employee_type']), gradeDisplay($ie), incompleteFileText($ie, $db, $periodSchoolYear)]);
+            $rep->row($row);
+        }
+    }
 
 } elseif ($report === 'cnss_summary') {
     $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.nssf_number,e.birth_date,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.cnss_amount_lbp,ms.school_cnss_8_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.prime_fixe_usd_law,ms.aide_complementaire_lbp
@@ -270,7 +280,7 @@ if ($report === 'monthly_summary') {
     // 🔴 نفس أعمدة الشاشة (reports.php) تماماً — أي عمود يختاره المستخدم يجب أن يصل للملف
     $cols = [
         'code' => ['Code', fn($r) => $r['employee_code']],
-        'name' => ['الاسم', fn($r) => trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) ?: trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])],
+        'name' => ['الاسم', fn($r) => (trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) ?: trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])) . (employeeFileGaps($r, $db, $bonusSy) ? ' ⚠️ ملف ناقص' : '')], // 🆕 (2026-09-23)
         'name_ar' => ['الاسم بالعربي', fn($r) => trim($r['first_name_ar'] . ' ' . $r['last_name_ar'])],
         'type' => ['الفئة', fn($r) => employeeTypeLabel($r['employee_type'])],
         'diploma' => ['الشهادة', fn($r) => $r['employee_type'] === 'employe' ? jobTitleLabel($r['job_title'] ?? '') : diplomaLabel($r['diploma'])],
@@ -298,6 +308,7 @@ if ($report === 'monthly_summary') {
         'hours' => ['ساعات/أسبوع', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'], 1), '0'), '.')],
         'days' => ['أيام/أسبوع', fn($r) => (int)$r['days_per_week']],
         'status' => ['الحالة', fn($r) => employeeStatusLabel($r['status'])['label']],
+        'gaps' => ['ملف ناقص', fn($r) => incompleteFileText($r, $db, $bonusSy)], // 🆕 (2026-09-23) نفس عمود الشاشة
     ];
     $defaultCols = ['code', 'name', 'type', 'grade', 'status'];
     $sel = $_GET['cols'] ?? $defaultCols;

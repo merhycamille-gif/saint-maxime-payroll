@@ -393,6 +393,24 @@ function reportDocThumb($path) {
                         <?php if ($data) echo $sumRow('مجموع '.empCategoryTitle($curCat).' — العدد: '.$catN, $catTot, false); ?>
                         <?php if (!$data): ?><tr><td colspan="<?= ($multi?17:16) + compColsCount() + dueColsCount() + netFamColsCount() ?>" class="text-center text-muted">لا توجد بيانات — احسب رواتب هذا الشهر أولاً</td></tr><?php endif; ?>
                         <?php if ($data) echo $sumRow('الإجمالي العام — مجموع كل الفئات (العدد: '.$rn.')', $totals, true); ?>
+                        <?php
+                        // 🆕 (2026-09-23) «الأساتذة الجداد اللي بعتوا عاللينك وكبست موافق وما كمّلت الملف لازم يبيّنوا بالتقرير»:
+                        //    موظفو السنة بلا أي راتب محسوب (ملف ناقص) يُلحَقون بأسمائهم تحت المجاميع — لا يدخلون بأي مجموع.
+                        $incRows = incompleteEmployeesRows($db, $periodSchoolYear, $schoolSqlEmp, $empTypeSql);
+                        $incSpan = ($multi?17:16) + compColsCount() + dueColsCount() + netFamColsCount();
+                        if ($incRows): ?>
+                            <tr class="subtotal-row" style="background:#fef3c7;font-weight:700"><td colspan="<?= $incSpan ?>" style="text-align:right">⚠️ Dossiers incomplets — sans salaire calculé / ملفات ناقصة — بلا راتب محسوب (العدد: <?= count($incRows) ?>) — أكمل الملف ثم احسب الراتب</td></tr>
+                            <?php foreach ($incRows as $ie): ?>
+                            <tr class="incomplete-row" style="background:#fffbeb">
+                                <td><?= ++$rn ?></td>
+                                <?php if ($multi): ?><td><small><?= e(schoolNameById($ie['school_id'])) ?></small></td><?php endif; ?>
+                                <td><?= e(trim($ie['first_name_ar'].' '.$ie['last_name_ar']) ?: trim($ie['first_name_fr'].' '.$ie['last_name_fr'])) ?> <?= incompleteFileBadge($ie, $db, $periodSchoolYear) ?></td>
+                                <td><small><?= employeeTypeLabel($ie['employee_type']) ?></small></td>
+                                <td><?= e(gradeDisplay($ie)) ?></td>
+                                <td colspan="<?= $incSpan - ($multi?5:4) ?>" style="text-align:right;color:#92400e"><?= e(incompleteFileText($ie, $db, $periodSchoolYear)) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table></div>
         <?= docSheetEnd() ?>
@@ -629,7 +647,7 @@ function reportDocThumb($path) {
         // الأعمدة المتاحة: key => [label, دالة العرض]
         $availCols = [
             'code'    => ['Code', fn($r) => '<strong>'.e($r['employee_code']).'</strong>'],
-            'name'    => ['الاسم / Nom', fn($r) => e(trim($r['first_name_fr'].' '.$r['last_name_fr']) ?: trim($r['first_name_ar'].' '.$r['last_name_ar']))],
+            'name'    => ['الاسم / Nom', fn($r) => e(trim($r['first_name_fr'].' '.$r['last_name_fr']) ?: trim($r['first_name_ar'].' '.$r['last_name_ar'])) . ' ' . incompleteFileBadge($r, $db, $bonusSy)], // 🆕 شارة «ملف ناقص» (2026-09-23)
             'name_ar' => ['الاسم بالعربي / Nom (arabe)', fn($r) => e(trim($r['first_name_ar'].' '.$r['last_name_ar']))],
             'type'    => ['الفئة / Type', fn($r) => employeeTypeLabel($r['employee_type'])],
             // الموظف الإداري: تُعرَض وظيفته بدل الشهادة (مطابق للتصدير — كانا مختلفَين)
@@ -659,6 +677,7 @@ function reportDocThumb($path) {
             'hours'   => ['ساعات/أسبوع / Heures/sem.', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'],1),'0'),'.')],
             'days'    => ['أيام/أسبوع / Jours/sem.', fn($r) => (int)$r['days_per_week']],
             'status'  => ['الحالة / Statut', fn($r) => '<span class="badge badge-'.employeeStatusLabel($r['status'])['badge'].'">'.e(employeeStatusLabel($r['status'])['label']).'</span>'],
+            'gaps'    => ['ملف ناقص / Dossier incomplet', fn($r) => e(incompleteFileText($r, $db, $bonusSy))], // 🆕 (2026-09-23) النواقص بالتفصيل — فارغ للملف المكتمل
         ];
         $defaultCols = ['code','name','type','grade','status'];
         $selectedCols = $_GET['cols'] ?? $defaultCols;

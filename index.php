@@ -202,6 +202,38 @@ $dashSections = [
 
 <?php renderHoursReductionPending($homeHrPending, $homeHrSy, true); ?>
 
+<?php
+// 🆕 (2026-09-23) ملفات ناقصة: موظفو السنة المعروضة بلا أي راتب محسوب (دخلوا عبر الرابط وكُبس «موافق» ولم يُكمَل ملفهم)
+$homeIncSy = activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear();
+$homeInc = canEdit() ? incompleteEmployeesRows($db, $homeIncSy, schoolScopeSql('e.school_id')) : [];
+if ($homeInc): ?>
+<details class="reg-details no-print" open>
+    <summary>
+        <span class="rd-ic" style="background:rgba(217,119,6,.16);color:#d97706"><i class="fas fa-user-edit"></i></span>
+        <span dir="ltr">Dossiers incomplets</span> <span style="opacity:.85">/ ملفات ناقصة — بلا راتب محسوب (<?= count($homeInc) ?>)</span>
+        <i class="fas fa-chevron-down rd-chev"></i>
+    </summary>
+    <div class="rd-body">
+        <div class="table-wrap"><table class="table" style="font-size:13px">
+            <thead><tr><th>#</th><?php if (isAllSchools()): ?><th>المدرسة</th><?php endif; ?><th>الاسم</th><th>الفئة</th><th>الدخول</th><th>الناقص</th><th></th></tr></thead>
+            <tbody>
+            <?php foreach ($homeInc as $i => $ie): ?>
+                <tr>
+                    <td><?= $i + 1 ?></td>
+                    <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($ie['school_id'])) ?></small></td><?php endif; ?>
+                    <td><strong><?= e(trim($ie['first_name_fr'] . ' ' . $ie['last_name_fr'])) ?></strong><?php if ($ie['first_name_ar']): ?><br><small style="color:var(--gray-500)"><?= e($ie['first_name_ar'] . ' ' . $ie['last_name_ar']) ?></small><?php endif; ?></td>
+                    <td><small><?= e(employeeTypeLabel($ie['employee_type'])) ?></small></td>
+                    <td><?= formatDate($ie['hire_date']) ?></td>
+                    <td style="color:#92400e"><?= e(implode(' · ', employeeFileGaps($ie, $db, $homeIncSy))) ?></td>
+                    <td><a class="btn btn-sm btn-warning" href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$ie['id'] ?>"><i class="fas fa-pen"></i> أكمل الملف</a></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table></div>
+    </div>
+</details>
+<?php endif; ?>
+
 <?php if ($home64): ?>
 <details class="reg-details no-print">
     <summary>

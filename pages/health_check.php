@@ -183,6 +183,14 @@ try {
 $G2 = 'أرقام تحتاج مراجعتك / Montants à revoir';
 $hcYear = activeSchoolYear();
 $hcYear = ($hcYear === 'all') ? currentSchoolYear() : $hcYear;
+// 🆕 (2026-09-23) ملفات ناقصة: موظفو السنة بلا أي راتب محسوب — يظهرون بكل التقارير بشارة «ملف ناقص» بدل أن يختفوا
+try {
+    $incHc = incompleteEmployeesRows($db, $hcYear, schoolScopeSql('e.school_id'));
+    $incNames = array_map(fn($x) => trim($x['first_name_ar'] . ' ' . $x['last_name_ar']) ?: trim($x['first_name_fr'] . ' ' . $x['last_name_fr']), array_slice($incHc, 0, 8));
+    hc($groups, $G2, empty($incHc), 'لا ملفات ناقصة (موظفو السنة كلّهم لهم راتب محسوب)',
+       empty($incHc) ? 'صفر' : count($incHc) . ' ملفاً: ' . implode('، ', $incNames) . (count($incHc) > 8 ? ' …' : ''),
+       'لو فشل: أستاذ/موظف دخل عبر الرابط وكُبس «موافق» ولم يُكمَل إعداده المالي — اسمه يظهر بالتقارير بشارة «ملف ناقص» ولا يدخل بأي مجموع حتى تُكمل ملفه وتحسب راتبه (اللوحة الرئيسية فيها لائحته بزرّ «أكمل الملف»).', 'review');
+} catch (Throwable $e) { hc($groups, $G2, true, 'فحص الملفات الناقصة غير متاح', 'تخطٍّ', $e->getMessage(), 'review'); }
 try {
     $st = $db->prepare("SELECT COUNT(DISTINCT ms.employee_id) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0 AND ms.school_year = ?" . schoolScopeSql('e.school_id') . "
