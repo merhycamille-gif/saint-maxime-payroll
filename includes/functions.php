@@ -1164,6 +1164,35 @@ function healLinkEntryYear20260923(): void {
 }
 
 /**
+ * 🩹 شفاء مرّة واحدة (2026-09-23 «ليش حطّيتهن بالكوفان؟ هودي بالمدرسة»): بيرلا ضومط #1000022 وعبد القادر الحجار #1000023 دخلا من رابط
+ * «دير سيدة البشارة – جون» (9) بينما هما أستاذان بـ«مدرسة سيدة البشارة» (5) ⇒ نقل ملفيهما وأشهرهما وطلبيهما إلى المدرسة 5 (إن كانا بـ9 ولا شهر مدفوع).
+ * + (قراره «أكيد بالمدرسة حطّهن») ايليو زعرور #1000014 وأحمد بصبوص #1000015 من رابط الدير نفسه (تموز) ⇒ إلى المدرسة 5 أيضاً.
+ */
+function healJounSchoolMove20260923(): void {
+    $flag = 'heal_joun_school_move_20260923b'; // b = «أكيد بالمدرسة حطّهن»: ايليو زعرور وأحمد بصبوص أيضاً
+    try {
+        if (strpos((string)getSetting($flag, ''), 'done') === 0) return;
+        $db = getDB();
+        if ($db->inTransaction()) return;
+        $ok5 = (int)$db->query("SELECT COUNT(*) FROM schools WHERE id = 5 AND is_deleted = 0 AND name_ar LIKE 'مدرسة سيدة البشارة%'")->fetchColumn();
+        if (!$ok5) { setSetting($flag, 'done ' . date('Y-m-d H:i') . ' (المدرسة 5 ليست مدرسة سيدة البشارة — لا شيء)'); return; }
+        $n = 0; $names = [];
+        foreach ([1000022, 1000023, 1000014, 1000015] as $id) {
+            $e = $db->query("SELECT id, school_id, first_name_ar, last_name_ar FROM employees WHERE id = $id AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+            if (!$e || (int)$e['school_id'] !== 9) continue;
+            if ((int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $id AND COALESCE(is_paid,0) = 1")->fetchColumn() > 0) continue;
+            $db->exec("UPDATE employees SET school_id = 5 WHERE id = $id");
+            $db->exec("UPDATE monthly_salaries SET school_id = 5 WHERE employee_id = $id");
+            try { $db->exec("UPDATE info_submissions SET school_id = 5 WHERE employee_id = $id"); } catch (Throwable $t) {}
+            $nm = trim($e['first_name_ar'] . ' ' . $e['last_name_ar']); $names[] = $nm; $n++;
+            try { logAudit('heal_school_move', 'employees', $id, ['school_id' => 9], ['school_id' => 5, 'why' => 'دخل من رابط الدير وهو أستاذ بالمدرسة (قراره 2026-09-23)']); } catch (Throwable $t) {}
+            try { complianceLogAuto($db, 'ghost_add', $id, currentSchoolYear(), $nm, 'أُنشئ ملفه بدير سيدة البشارة – جون (رابط الدير) وهو أستاذ بمدرسة سيدة البشارة', 'نقل الملف والأشهر إلى مدرسة سيدة البشارة', 'صُحِّح تلقائياً — نُقل إلى مدرسة سيدة البشارة (شفاء 2026-09-23)'); } catch (Throwable $t) {}
+        }
+        setSetting($flag, 'done ' . date('Y-m-d H:i') . " ($n: " . implode('، ', $names) . ')');
+    } catch (Throwable $e) { try { setSetting($flag, 'err: ' . mb_substr($e->getMessage(), 0, 150)); } catch (Throwable $t) {} }
+}
+
+/**
  * 🆕 صفوف الملفات الناقصة (2026-09-23) للإلحاق بالتقارير/اللوحة: موظفو السنة بلا راتب محسوب، مرتّبون كالكشوف
  * (المدرسة ← الفئة ← الاسم). $schoolSql/$extraSql بـ alias e (مثل $schoolSqlEmp و$empTypeSql).
  */

@@ -195,6 +195,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         // hire_date = 1 تشرين الأول لسنة الدخول → فيُحسب راتبه على تلك السنة لا الجارية.
         $validTypes = ['enseignant_contractuel', 'enseignant_titulaire', 'employe'];
         $empType = (isset($data['employee_type']) && in_array($data['employee_type'], $validTypes, true)) ? $data['employee_type'] : 'enseignant_contractuel';
+        // 🏫 (2026-09-23 «ليش حطّيتهن بالكوفان؟ هودي بالمدرسة — في فرق كبير») المدرسة تُختار وتُؤكَّد عند الموافقة: الرابط قد يحمل
+        //    مدرسة أخرى (دير جون ≠ مدرسة البشارة). المختارة من النموذج تسبق مدرسة الطلب، ضمن نطاق المدير فقط.
+        $pickSid = (int)($_POST['target_school_id'] ?? 0);
+        $allowedSids = array_map('intval', activeSchoolIds() ?: []);
+        if ($pickSid > 0 && (isAllSchools() || in_array($pickSid, $allowedSids, true) || $pickSid === currentSchoolId())) {
+            $okSid = (int)$db->query("SELECT COUNT(*) FROM schools WHERE id = $pickSid AND is_deleted = 0")->fetchColumn();
+            if ($okSid) { $sub['school_id'] = $pickSid; $db->prepare("UPDATE info_submissions SET school_id = ? WHERE id = ?")->execute([$pickSid, $sub['id']]); }
+        }
         $emp = [
             'employee_type' => $empType,
             'status' => 'actif',
@@ -507,8 +515,15 @@ $newSubs = $newSubs->fetchAll();
             <?php if (!empty($s['school_name'])): ?><span class="badge" style="background:#0a6b5e;color:#fff"><i class="fas fa-school"></i> <?= e($s['school_name']) ?></span><?php endif; ?>
             <span class="badge badge-info"><?= e($s['submitted_at']) ?></span></div>
           <div style="display:flex;gap:8px">
-            <form method="post" onsubmit="return confirm('إنشاء ملف أستاذ جديد بهذه المعلومات؟ تُكمل الإعداد المالي والتدرّج من ملف الأستاذ.')" style="margin:0">
+            <form method="post" onsubmit="var sel=this.querySelector('select[name=target_school_id]'); return confirm('إنشاء ملف أستاذ جديد بهذه المعلومات في: ' + (sel ? sel.options[sel.selectedIndex].text : '') + ' ؟ تُكمل الإعداد المالي والتدرّج من ملف الأستاذ.')" style="margin:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <?= csrfField() ?><input type="hidden" name="action" value="create_new"><input type="hidden" name="submission_id" value="<?= $s['id'] ?>">
+              <?php // 🏫 اختيار المدرسة عند الموافقة (2026-09-23): الرابط قد يكون لدير/مركز آخر — تأكّد قبل الإنشاء
+                    $schOpts = []; try { foreach (allSchools() as $so) if (isAllSchools() || in_array((int)$so['id'], array_map('intval', activeSchoolIds() ?: []), true) || (int)$so['id'] === currentSchoolId()) $schOpts[] = $so; } catch (Throwable $t) {} ?>
+              <?php if ($schOpts): ?>
+              <select name="target_school_id" class="form-select" style="max-width:320px;font-size:12.5px" title="المدرسة التي يُنشأ فيها ملفه / École du dossier">
+                <?php foreach ($schOpts as $so): ?><option value="<?= (int)$so['id'] ?>" <?= (int)$so['id'] === (int)$s['school_id'] ? 'selected' : '' ?>><?= e($so['name_fr'] ?: $so['name_ar']) ?> — <?= e($so['name_ar']) ?></option><?php endforeach; ?>
+              </select>
+              <?php endif; ?>
               <button class="btn btn-sm btn-success"><i class="fas fa-user-plus"></i> Créer le dossier / إنشاء ملف الأستاذ</button>
             </form>
             <form method="post" onsubmit="return confirm('تجاهل هذا الطلب؟')" style="margin:0">

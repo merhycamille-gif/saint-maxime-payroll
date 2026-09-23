@@ -7564,7 +7564,9 @@ $pc164 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php'); 
 $tf164 = (string)file_get_contents($PROJ . '/pages/teacher_form.php'); $hd164 = (string)file_get_contents($PROJ . '/includes/header.php');
 $code164 = strpos($pc164, 'function protectPaidMonths(') !== false && strpos($pc164, "logAudit('recalc_skipped_paid'") !== false && strpos($pc164, '$protectOv && (int)($r[\'is_paid\'] ?? 0) === 1) continue;') !== false
         && strpos($ic164, "'payment_months_per_year' => 12,") !== false && strpos($ic164, "strcmp(\$data['entry_school_year'], \$curSyIC) >= 0") !== false
-        && strpos($tf164, 'for ($yy = $curStart; $yy <= $curStart + 2; $yy++)') !== false && strpos($hd164, 'healLinkEntryYear20260923();') !== false;
+        && strpos($tf164, 'for ($yy = $curStart; $yy <= $curStart + 2; $yy++)') !== false && strpos($hd164, 'healLinkEntryYear20260923();') !== false
+        && strpos($hd164, 'healJounSchoolMove20260923();') !== false && function_exists('healJounSchoolMove20260923')
+        && strpos($ic164, "name=\"target_school_id\"") !== false && strpos($ic164, "\$pickSid = (int)(\$_POST['target_school_id'] ?? 0);") !== false; // 🏫 المدرسة تُختار عند الموافقة (2026-09-23)
 foreach (['annual_slip', 'monthly_payroll', 'compliance', 'excel_salaries', 'bulk_allowances', 'settings'] as $pg164) $code164 = $code164 && strpos((string)file_get_contents($PROJ . "/pages/$pg164.php"), "\$GLOBALS['msa_recalc_paid_ok'] = true;") !== false;
 $prevFlag164 = $GLOBALS['msa_recalc_paid_ok'] ?? null; unset($GLOBALS['msa_recalc_paid_ok']);
 $db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, status, salary_input_mode, base_salary_usd, contract_salary_lbp, payment_months_per_year, days_per_week, transport_weeks, tax_subject, tax_includes_extra, cnss_subject, cnss_includes_extra, eoc_subject, is_deleted)
