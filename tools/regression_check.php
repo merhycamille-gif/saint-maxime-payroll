@@ -2445,10 +2445,10 @@ check('قاعدة التارك: صفر رواتب وهمية (غير مدفوع�
 $pcSrc38 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
 $fnSrc38 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $hdSrc38 = (string)file_get_contents($PROJ . '/includes/header.php');
-check('الكشف يطابق الملف: recalcEmployeeYear بلا سنة = السنة المعروضة + التقويمية + المفتوحة اللاحقة',
+check('الكشف يطابق الملف: recalcEmployeeYear بلا سنة = السنة المعروضة فقط (📅 قراره 2026-09-23: التغيير يمسّ السنة التي يُغيَّر فيها وحدها)',
       strpos($pcSrc38, '$sy = $schoolYear ?: writeSchoolYear();') !== false
       && strpos($pcSrc38, '$schoolYear ?: currentSchoolYear()') === false
-      && strpos($pcSrc38, 'foreach (array_keys($others) as $oSy)') !== false);
+      && strpos($pcSrc38, 'foreach (array_keys($others) as $oSy)') === false);
 check('الكشف يطابق الملف: الشفاء healStaleYearMirror20260806 موجود ومربوط بالهيدر',
       function_exists('healStaleYearMirror20260806')
       && strpos($hdSrc38, 'healStaleYearMirror20260806();') !== false
@@ -2476,9 +2476,13 @@ if ($cand38) {
     $y138 = (int)substr($sy38, 0, 4);
     $prm38 = $db->prepare("SELECT prime_fixe_lbp FROM monthly_salaries WHERE employee_id = ? AND month = 10 AND year = ?");
     $oldSess38 = $_SESSION['active_school_year'] ?? null;
-    $_SESSION['active_school_year'] = $cur38; // المستخدم واقف على السنة التقويمية (سيناريو الباگ)
+    $prm38->execute([$eid38, $y138]); $before38 = (int)$prm38->fetchColumn();
+    $_SESSION['active_school_year'] = $cur38; // واقف على سنة أخرى ⇒ (📅 2026-09-23) لا تُمسّ سنة البند
     $db->prepare("UPDATE employee_bonuses SET amount = ? WHERE id = ?")->execute([$test38, (int)$cand38['bid']]);
-    recalcEmployeeYear($eid38); // ⬅ بلا سنة — قبل الإصلاح ما كان يلمس $sy38
+    recalcEmployeeYear($eid38);
+    $prm38->execute([$eid38, $y138]); $untouched38 = (int)$prm38->fetchColumn();
+    $_SESSION['active_school_year'] = $sy38; // واقف على سنة البند نفسها ⇒ تُحدَّث
+    recalcEmployeeYear($eid38);
     $prm38->execute([$eid38, $y138]);
     $got38 = (int)$prm38->fetchColumn();
     // ترجيع كامل ثم تثبّت أن القيمة رجعت
@@ -2487,8 +2491,8 @@ if ($cand38) {
     $prm38->execute([$eid38, $y138]);
     $back38 = (int)$prm38->fetchColumn();
     if ($oldSess38 === null) unset($_SESSION['active_school_year']); else $_SESSION['active_school_year'] = $oldSess38;
-    check('الكشف يطابق الملف (تجربة فعلية): تعديل علاوة سنة مفتوحة + إعادة حساب بلا سنة حدّث أشهرها',
-          $got38 === (int)$test38, "موظف $eid38 سنة $sy38 — مخزّن 10/$y138 = " . number_format($got38) . " (المتوقّع " . number_format($test38) . ")");
+    check('الكشف يطابق الملف (تجربة فعلية): تعديل علاوة سنة + إعادة حساب بلا سنة وأنا على سنتها حدّث أشهرها، وعلى سنة أخرى لم يمسّها (📅 2026-09-23)',
+          $got38 === (int)$test38 && $untouched38 === $before38, "موظف $eid38 سنة $sy38 — مخزّن 10/$y138 = " . number_format($got38) . " (المتوقّع " . number_format($test38) . ") · على سنة أخرى: " . number_format($untouched38) . " (كان " . number_format($before38) . ")");
     check('الكشف يطابق الملف (تجربة فعلية): الترجيع أعاد المخزّن كما كان',
           $back38 === (int)$orig38, number_format($back38));
 } else {
@@ -7592,6 +7596,43 @@ finally {
     $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid164"); $db->exec("DELETE FROM audit_log WHERE record_id = $rid164 AND action = 'recalc_skipped_paid'"); $db->exec("DELETE FROM employees WHERE id = $rid164");
 }
 check('🔒📆 الأشهر المدفوعة لسنة سابقة لا تُعاد بإعادة حساب ضمنية (حفظ ملف/درجات/شفاء) وتُعاد بالفعل الصريح فقط + تسجيل التخطّي + الجديد من الرابط على سنة البرنامج الحالية بـ12 شهراً + شفاء المدفوعين إلى 2027-2028', $ok164, $why164);
+
+/**
+ * 165) 🧹 أحمد بصبوص #1000015 (2026-09-23): «حطّيت أساس 400 $ وحفظت، رجعت صفّرته وحطّيت 400 $ بالإضافي — البطاقة بقيت على الأساس القديم»:
+ *      صمام المنقولين (أساس 0 بالملف + أشهر بأساس > 0 ⇒ overlay فقط) كان يمنع تصفير الأساس. صار المحرّك سيّده لمن دخل بسنة البرنامج
+ *      (لا أشهر منقولة) ولمن صفّر المستخدم أساسه بيده (base_cleared_by_user، عمود ذاتي يُرفع بمسار الحفظ) + شفاء healNewHireZeroBase.
+ *      تجربة حيّة: متعاقد __REG165 دخول 2026-10-01 بأساس 400 $ ⇒ أشهر بأساس > 0؛ ثم أساس 0 + إضافي 400 $ ⇒ إعادة الحساب تصفّر الأساس والإضافي = 400 $.
+ */
+$ok165 = true; $why165 = '';
+$pc165 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php'); $ep165 = (string)file_get_contents($PROJ . '/pages/employees.php'); $hd165 = (string)file_get_contents($PROJ . '/includes/header.php');
+$code165 = strpos($pc165, "if ((int)(\$emp['base_cleared_by_user'] ?? 0) === 1) return true;") !== false && strpos($ep165, "logAudit('base_cleared_by_user'") !== false
+        && strpos($hd165, 'healNewHireZeroBase20260923();') !== false && function_exists('ensureBaseClearedColumn') && function_exists('healNewHireZeroBase20260923');
+ensureBaseClearedColumn();
+$db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, status, salary_input_mode, base_salary_usd, contract_salary_lbp, payment_months_per_year, days_per_week, transport_weeks, tax_subject, tax_includes_extra, cnss_subject, cnss_includes_extra, eoc_subject, is_deleted)
+    VALUES (2, '__REG165', 'enseignant_contractuel', 'فحص', 'بصبوص165', 'Reg', 'Zero165', '2026-10-01', 'actif', 'direct_usd', 400, 0, 12, 5, 4, 1, 1, 1, 1, 0, 0)");
+$rid165 = (int)$db->lastInsertId();
+try {
+    $n1 = (int)recalcEmployeeYear($rid165, '2026-2027');
+    $b1 = (float)$db->query("SELECT base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = $rid165 AND month = 10 AND year = 2026")->fetchColumn();
+    // كما يفعل الملف المالي: الأساس 0 + إضافي 400 $
+    $db->exec("UPDATE employees SET base_salary_usd = 0 WHERE id = $rid165");
+    $db->exec("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES ($rid165, 'prime_fixe', 1, '2026-2027', 400, 'amount', 'USD', NULL, NULL, 1)");
+    $e165 = $db->query("SELECT * FROM employees WHERE id = $rid165")->fetch(PDO::FETCH_ASSOC);
+    $allowed165 = salaryEngineAllowed($e165, $db); // دخل بسنة البرنامج ⇒ المحرّك سيّده رغم أساس 0 وأشهر بأساس > 0
+    $n2 = (int)recalcEmployeeYear($rid165, '2026-2027');
+    $r2 = $db->query("SELECT base_plus_echelon_lbp b, prime_fixe_lbp p, exchange_rate x FROM monthly_salaries WHERE employee_id = $rid165 AND month = 10 AND year = 2026")->fetch(PDO::FETCH_ASSOC);
+    $expP = usdToLbp(400, (float)$r2['x']);
+    // وقديم الدخول: بلا علم ⇒ ما زال «منقولاً» محميّاً؛ بالعلم ⇒ المحرّك سيّده
+    $db->exec("UPDATE monthly_salaries SET base_salary_lbp = 5000000, base_plus_echelon_lbp = 5000000 WHERE employee_id = $rid165 AND month = 10 AND year = 2026"); // أساس «منقول» مخزّن
+    $db->exec("UPDATE employees SET hire_date = '2020-10-01', base_cleared_by_user = 0 WHERE id = $rid165");
+    $eOld = $db->query("SELECT * FROM employees WHERE id = $rid165")->fetch(PDO::FETCH_ASSOC); $oldProtected = !salaryEngineAllowed($eOld, $db);
+    $db->exec("UPDATE employees SET base_cleared_by_user = 1 WHERE id = $rid165");
+    $eFlag = $db->query("SELECT * FROM employees WHERE id = $rid165")->fetch(PDO::FETCH_ASSOC); $flagAllowed = salaryEngineAllowed($eFlag, $db);
+    $ok165 = $code165 && $n1 === 12 && $b1 > 0 && $allowed165 && $n2 === 12 && (float)$r2['b'] === 0.0 && abs((float)$r2['p'] - $expP) < 1 && $oldProtected && $flagAllowed;
+    $why165 = 'code=' . ($code165 ? 'ok' : 'bad') . " n1=$n1 b1=$b1 allowed=" . (int)$allowed165 . " n2=$n2 b2={$r2['b']} p2={$r2['p']} exp=$expP oldProtected=" . (int)$oldProtected . ' flagAllowed=' . (int)$flagAllowed;
+} catch (Throwable $e) { $ok165 = false; $why165 .= ' err=' . $e->getMessage(); }
+finally { $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid165"); $db->exec("DELETE FROM employee_bonuses WHERE employee_id = $rid165"); $db->exec("DELETE FROM employees WHERE id = $rid165"); }
+check('🧹 تصفير الأساس من الملف المالي يصل إلى البطاقة وكل الكشوف: داخل سنة البرنامج ليس «منقولاً» + علم base_cleared_by_user + المنقول القديم يبقى محميّاً + شفاء أحمد بصبوص', $ok165, $why165);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

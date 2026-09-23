@@ -768,6 +768,18 @@ function monthSubjectTo(array $emp, string $kind, int $year, int $month): bool {
  * عمود salary_labor_law (1 = أساس راتبه = الحد الأدنى للأجور الساري بتاريخ الشهر من «النِّسَب حسب التاريخ»، يتغيّر
  * تلقائياً مع القانون). 0 = راتب محدّد بيده (ليرة/دولار) كما كان. يتركّب ذاتياً. الموظفون القدامى لا يتغيّرون (0).
  */
+/** 🧹 (2026-09-23 أحمد بصبوص) عمود ذاتي: المستخدم صفّر الأساس بيده من الملف المالي ⇒ المحرّك سيّده (لا «منقول») */
+function ensureBaseClearedColumn(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'base_cleared_by_user'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN base_cleared_by_user TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'صفّر المستخدم الأساس بيده من الملف المالي (2026-09-23) ⇒ يُحسب بأساس 0 لا يُعامَل كمنقول' AFTER contract_salary_lbp");
+        }
+    } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
 function ensureSalaryLaborLawColumn(): void {
     static $done = false;
     if ($done) return;
@@ -1187,6 +1199,36 @@ function healJounSchoolMove20260923(): void {
             $nm = trim($e['first_name_ar'] . ' ' . $e['last_name_ar']); $names[] = $nm; $n++;
             try { logAudit('heal_school_move', 'employees', $id, ['school_id' => 9], ['school_id' => 5, 'why' => 'دخل من رابط الدير وهو أستاذ بالمدرسة (قراره 2026-09-23)']); } catch (Throwable $t) {}
             try { complianceLogAuto($db, 'ghost_add', $id, currentSchoolYear(), $nm, 'أُنشئ ملفه بدير سيدة البشارة – جون (رابط الدير) وهو أستاذ بمدرسة سيدة البشارة', 'نقل الملف والأشهر إلى مدرسة سيدة البشارة', 'صُحِّح تلقائياً — نُقل إلى مدرسة سيدة البشارة (شفاء 2026-09-23)'); } catch (Throwable $t) {}
+        }
+        setSetting($flag, 'done ' . date('Y-m-d H:i') . " ($n: " . implode('، ', $names) . ')');
+    } catch (Throwable $e) { try { setSetting($flag, 'err: ' . mb_substr($e->getMessage(), 0, 150)); } catch (Throwable $t) {} }
+}
+
+/**
+ * 🩹 شفاء مرّة واحدة (2026-09-23 أحمد بصبوص #1000015 بجون: «حطّيت أساس 400 $ وحفظت ثم صفّرته وحطّيت 400 $ إضافياً — البطاقة بقيت على الأساس القديم»):
+ * الداخلون بسنة البرنامج الحالية (لا أشهر منقولة لهم) بلا أساس بالملف لكن أشهر السنة الحالية بأساس > 0 ⇒ يُعاد حسابهم (الأساس 0 + علاواتهم).
+ */
+function healNewHireZeroBase20260923(): void {
+    $flag = 'heal_newhire_zero_base_20260923';
+    try {
+        if (strpos((string)getSetting($flag, ''), 'done') === 0) return;
+        $db = getDB();
+        if ($db->inTransaction()) return;
+        require_once __DIR__ . '/payroll_calculator.php';
+        ensureSalaryLaborLawColumn();
+        $sy = currentSchoolYear(); if (!preg_match('/^(\d{4})-\d{4}$/', $sy, $m)) return;
+        $st = $db->prepare("SELECT e.id, e.school_id, e.first_name_ar, e.last_name_ar FROM employees e
+                            WHERE e.is_deleted = 0 AND e.employee_type <> 'enseignant_titulaire' AND e.hire_date >= ?
+                              AND COALESCE(e.base_salary_usd,0) = 0 AND COALESCE(e.contract_salary_lbp,0) = 0 AND COALESCE(e.salary_labor_law,0) = 0
+                              AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.base_plus_echelon_lbp > 0 AND COALESCE(ms.is_paid,0) = 0)");
+        $st->execute([$m[1] . '-10-01', $sy]);
+        $n = 0; $names = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $e) {
+            if (isSchoolYearLocked((int)$e['school_id'], $sy)) continue;
+            $months = 0; try { $months = (int)recalcEmployeeYear((int)$e['id'], $sy); } catch (Throwable $t) {}
+            $nm = trim($e['first_name_ar'] . ' ' . $e['last_name_ar']); $names[] = $nm; $n++;
+            try { logAudit('heal_newhire_zero_base', 'employees', (int)$e['id'], null, ['sy' => $sy, 'months' => $months]); } catch (Throwable $t) {}
+            try { complianceLogAuto($db, 'ghost_add', (int)$e['id'], $sy, $nm, 'صُفِّر أساسه من ملفه لكن أشهره بقيت على الأساس القديم (صمام المنقولين)', 'إعادة حساب السنة بأساس 0 + علاواته', 'صُحِّح تلقائياً — حُسب ' . $months . ' شهراً (شفاء 2026-09-23)'); } catch (Throwable $t) {}
         }
         setSetting($flag, 'done ' . date('Y-m-d H:i') . " ($n: " . implode('، ', $names) . ')');
     } catch (Throwable $e) { try { setSetting($flag, 'err: ' . mb_substr($e->getMessage(), 0, 150)); } catch (Throwable $t) {} }

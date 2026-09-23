@@ -484,7 +484,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     // الشهادة القديمة (لكشف تغييرها عند التعديل وإعادة ضبط التدرّج)
     $oldDiploma = null; $oldDates = null;
     if ($action === 'edit' && $id) {
-        $stOld = $db->prepare("SELECT diploma, hire_date, titularization_date, tenure_confirmation_date, employee_type FROM employees WHERE id = ? AND school_id = ?");
+        $stOld = $db->prepare("SELECT diploma, hire_date, titularization_date, tenure_confirmation_date, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND school_id = ?");
         $stOld->execute([$id, currentSchoolId()]);
         $oldRow = $stOld->fetch(PDO::FETCH_ASSOC) ?: [];
         $oldDiploma = $oldRow['diploma'] ?? null;
@@ -553,7 +553,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
             // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
             if (!empty($data['keep_working_past_64'])) {
-                foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$id)->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                foreach (array_filter([activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()]) as $sy) { // 📅 (2026-09-23 قراره «بس تغيّر شغلة لازم تتغيّر بس بالسنة اللي بتغيّر فيها») السنة المعروضة فقط
                     if ($sy) recalcEmployeeYear($id, $sy);
                 }
             }
@@ -570,6 +570,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             // school_id في WHERE يمنع تعديل موظف من مدرسة أخرى
             $db->prepare("UPDATE employees SET $set WHERE id = :id AND school_id = :where_school_id")->execute($data);
             logAudit('update', 'employees', $id, null, $data);
+            // 🧹 (2026-09-23 أحمد بصبوص) صفّر الأساس بيده (كان > 0 وصار 0) ⇒ علم base_cleared_by_user فلا يُعامَل كمنقول ويُحسب بأساس 0؛ أساس > 0 يمسحه
+            try {
+                ensureBaseClearedColumn();
+                $oldBase = (float)($oldDates['base_salary_usd'] ?? 0) + (float)($oldDates['contract_salary_lbp'] ?? 0);
+                $newBase = (float)($data['base_salary_usd'] ?? 0) + (float)($data['contract_salary_lbp'] ?? 0);
+                if ($data['employee_type'] !== 'enseignant_titulaire' && empty($data['salary_labor_law'])) {
+                    if ($oldBase > 0 && $newBase <= 0) { $db->prepare("UPDATE employees SET base_cleared_by_user = 1 WHERE id = ?")->execute([$id]); logAudit('base_cleared_by_user', 'employees', $id, ['base' => $oldBase], ['base' => 0]); }
+                    elseif ($newBase > 0) { $db->prepare("UPDATE employees SET base_cleared_by_user = 0 WHERE id = ?")->execute([$id]); }
+                }
+            } catch (Throwable $t) {}
 
             // أستاذ ملاك: إذا تغيّرت الشهادة أو تاريخ دخول الملاك/الترسيم → أعِد بناء الدرجات حسب القانون تلقائياً
             // 🔴 (2026-08-29، قصة شيرا العاقوري) كان الشرط `$oldDiploma !== null` يُسقِط حالة «الشهادة كانت فاضية
@@ -615,7 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 }
                 // المحرّك يبني: دخول + فورية + تدرّج + استثنائية تلقائية (244/102/223/2017 أو 4+4+2). قانون 344 يدوي محفوظ.
                 try { buildLegalGradeHistory($id); } catch (Exception $ex) {}
-                foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$id)->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                foreach (array_filter([activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()]) as $sy) { // 📅 (2026-09-23 قراره «بس تغيّر شغلة لازم تتغيّر بس بالسنة اللي بتغيّر فيها») السنة المعروضة فقط
                     recalcEmployeeYear($id, $sy);
                 }
                 $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'تم تحديث الشهادة/تاريخ دخول الملاك: أُعيد بناء الدرجات والراتب حسب القانون تلقائياً (الاستثنائية آلية عدا 344 اليدوي). راجِع صفحة الدرجات للتصليح الفردي إذا لزم. / Recalculé selon la loi.'];
@@ -649,7 +659,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
             // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
             if (!empty($data['keep_working_past_64'])) {
-                foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$id)->fetchAll(PDO::FETCH_COLUMN) as $sy) {
+                foreach (array_filter([activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()]) as $sy) { // 📅 (2026-09-23 قراره «بس تغيّر شغلة لازم تتغيّر بس بالسنة اللي بتغيّر فيها») السنة المعروضة فقط
                     if ($sy) recalcEmployeeYear($id, $sy);
                 }
             }

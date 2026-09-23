@@ -665,6 +665,14 @@ function salaryEngineAllowed(array $emp, ?PDO $db = null): bool {
     $id = (int)($emp['id'] ?? 0);
     if ($id <= 0) return false;
     $db = $db ?: getDB();
+    // 🔴 (2026-09-23 أحمد بصبوص) «منقول» = له أشهر من البرنامج القديم فقط. من دخل بسنة البرنامج الحالية لا أشهر منقولة له،
+    //    ومن صفّر المستخدم أساسه بيده من ملفه (base_cleared_by_user) قرّر «بلا أساس» ⇒ المحرّك سيّده بأساس 0 + علاواته.
+    ensureBaseClearedColumn();
+    if (!array_key_exists('hire_date', $emp) || !array_key_exists('base_cleared_by_user', $emp)) {
+        try { $x = $db->query("SELECT hire_date, base_cleared_by_user FROM employees WHERE id = $id")->fetch(PDO::FETCH_ASSOC); if ($x) $emp = array_merge($emp, $x); } catch (Throwable $t) {}
+    }
+    if ((int)($emp['base_cleared_by_user'] ?? 0) === 1) return true;
+    if (preg_match('/^(\d{4})-\d{4}$/', currentSchoolYear(), $cm) && (string)($emp['hire_date'] ?? '') >= $cm[1] . '-10-01') return true;
     $q = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND base_plus_echelon_lbp > 0 LIMIT 1");
     $q->execute([$id]);
     return $q->fetchColumn() === false; // لا أساس منقول → المحرّك سيّده
@@ -727,24 +735,9 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
     try { $cfsR = (string)$db->query("SELECT cadre_from_sy FROM employees WHERE id = " . (int)$employeeId)->fetchColumn(); } catch (Throwable $ex) { $cfsR = ''; }
     if (preg_match('/^(\d{4})-\d{4}$/', $cfsR, $cfm) && (int)$mm[1] < (int)$cfm[1]) return 0;
 
-    if (!$schoolYear) {
-        $others = [];
-        $cur = currentSchoolYear();
-        // السنة التقويمية أيضاً (تعديل الإعداد يمسّها) — إلا الأستاذ المعيَّن لسنة لاحقة
-        // (دخوله بعد السنة الجارية): لا تُحسب له السنة الجارية فلا يظهر فيها.
-        $hireSyG = !empty($e['hire_date']) ? schoolYearOfDate($e['hire_date']) : null;
-        if ($cur !== $sy && (!$hireSyG || $hireSyG <= $cur)) $others[$cur] = 1;
-        try {
-            $fq = $db->prepare("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = ? AND school_year > ?");
-            $fq->execute([$employeeId, $cur]);
-            foreach ($fq->fetchAll(PDO::FETCH_COLUMN) as $fSy) {
-                if ($fSy !== $sy && preg_match('/^\d{4}-\d{4}$/', (string)$fSy)) $others[$fSy] = 1;
-            }
-        } catch (Exception $ex) {}
-        foreach (array_keys($others) as $oSy) {
-            try { recalcEmployeeYear($employeeId, $oSy); } catch (Exception $ex) {}
-        }
-    }
+    // 📅 (2026-09-23 قراره «بس تغيّر شغلة لازم تتغيّر بس بالسنة اللي بتغيّر فيها») النداء بلا سنة = السنة المعروضة فقط
+    //    (كان منذ 2026-08-06 يعيد أيضاً السنة التقويمية وكل السنين المفتوحة اللاحقة). البنود تُحفَظ على السنة المعروضة (writeSchoolYear)
+    //    فالحساب عليها وحدها يكفي؛ السنين الأخرى لا تُمسّ إلا بفعل صريح أو بحسابها وهي معروضة.
 
     // المنقول بصفوف مخزّنة (متعاقد/موظف بأساس صفر): بدل تجاهُله كلياً — ركِّب علاواته
     // المسجّلة على أشهره المخزّنة، فيظهر الأجر الإضافي الذي يدخله المستخدم في ملفه
