@@ -855,7 +855,91 @@ function ensureFamilyAllowanceDateColumns(): void {
                        family_allowance_children_from = family_allowance_from, family_allowance_children_to = family_allowance_to
                        WHERE family_allowance_from IS NOT NULL AND family_allowance_spouse_from IS NULL AND family_allowance_children_from IS NULL");
         }
+        // 📅💱 (2026-09-24 «أوقات خلال السنة بتتغيّر قيمة التعويض من شهر لشهر») جدول التغييرات الشهرية — يتركّب ذاتياً
+        $db->exec("CREATE TABLE IF NOT EXISTS family_allowance_changes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            kind ENUM('spouse','children') NOT NULL DEFAULT 'children',
+            from_month DATE NOT NULL COMMENT 'أوّل الشهر الذي يسري منه المبلغ الجديد',
+            amount_lbp BIGINT NOT NULL DEFAULT 0 COMMENT 'المبلغ الجديد (0 = يوقف من هذا الشهر)',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_emp (employee_id, kind, from_month)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+/**
+ * 📅💱 التغييرات الشهرية للتعويض العائلي (2026-09-24 «لازم التعويض يكون شهري: بختار أي شهر وبحطّ القيمة اللي بتتغيّر،
+ * وإذا ما غيّرتها بأي شهر بتضلّ هي ذاتها خلال السنة حتى غيّرها بأي شهر»): لكل موظف لائحة [kind ⇒ [[مفتاح الشهر, المبلغ], ...] مرتّبة].
+ * المبلغ بملفه هو البداية، وكل تغيير يسري من شهره حتى التغيير التالي (0 = يوقف). كاش ثابت لكل موظف (يُصفَّر بعد الحفظ).
+ */
+function familyAllowanceChanges(int $empId): array {
+    static $cache = [];
+    if ($empId <= 0) return ['spouse' => [], 'children' => []];
+    if (!empty($GLOBALS['__fa_chg_reset'][$empId])) { unset($cache[$empId], $GLOBALS['__fa_chg_reset'][$empId]); }
+    if (isset($cache[$empId])) return $cache[$empId];
+    $out = ['spouse' => [], 'children' => []];
+    try {
+        ensureFamilyAllowanceDateColumns();
+        $st = getDB()->prepare("SELECT kind, from_month, amount_lbp FROM family_allowance_changes WHERE employee_id = ? ORDER BY from_month, id");
+        $st->execute([$empId]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $k = familyAllowanceDateKey($r['from_month']); if ($k === null) continue;
+            $out[$r['kind'] === 'spouse' ? 'spouse' : 'children'][$k] = max(0, (int)$r['amount_lbp']); // الأحدث لنفس الشهر يغلب
+        }
+        foreach ($out as &$l) ksort($l); unset($l);
+    } catch (Throwable $e) {}
+    return $cache[$empId] = $out;
+}
+function familyAllowanceChangesReset(int $empId): void { $GLOBALS['__fa_chg_reset'][$empId] = true; }
+/** هل له أي تعويض مسجّل (مبلغ بملفه أو تغيير شهري)؟ — تستعمله مسارات المنقولين والمخالفات بدل «المبلغ > 0» فقط */
+function familyAllowanceHasAny(array $emp): bool {
+    if ((float)($emp['family_allowance_spouse_lbp'] ?? 0) > 0 || (float)($emp['family_allowance_children_lbp'] ?? 0) > 0) return true;
+    $c = familyAllowanceChanges((int)($emp['id'] ?? 0));
+    return (bool)($c['spouse'] || $c['children']);
+}
+/** المبلغ الساري لنوع بشهر معيّن: مبلغ الملف ثم آخر تغيير شهره ≤ هذا الشهر (المصدر الواحد لتطبيق التغييرات) */
+function familyAllowanceKindAmount(array $emp, int $month, int $year, string $kind): float {
+    $kind = $kind === 'spouse' ? 'spouse' : 'children';
+    $amt = max(0.0, (float)($emp["family_allowance_{$kind}_lbp"] ?? 0));
+    $k = $year * 12 + $month;
+    foreach (familyAllowanceChanges((int)($emp['id'] ?? 0))[$kind] as $ck => $cAmt) { if ($ck <= $k) $amt = (float)$cAmt; else break; }
+    return $amt;
+}
+/**
+ * حفظ لائحة التغييرات الشهرية لموظف (المصدر الواحد لملف الموظف والملف الجماعي): $rows = [[kind, from (YYYY-MM), amt], ...]
+ * تُستبدَل اللائحة كاملة؛ الصفوف الفارغة/غير الصالحة تُهمَل. يرجع true إن تغيّر شيء فعلاً (للمقارنة قبل إعادة الحساب).
+ */
+function saveFamilyAllowanceChanges(PDO $db, int $empId, array $rows): bool {
+    ensureFamilyAllowanceDateColumns();
+    $new = [];
+    foreach ($rows as $r) {
+        if (!is_array($r)) continue;
+        $kind = (($r['kind'] ?? '') === 'spouse') ? 'spouse' : 'children';
+        if (!preg_match('/^(\d{4})-(\d{2})$/', trim((string)($r['from'] ?? '')), $m)) continue;
+        $amt = max(0, (int)round((float)str_replace([',', ' '], '', (string)($r['amt'] ?? ''))));
+        if (trim((string)($r['amt'] ?? '')) === '') continue; // بلا مبلغ = صفّ فارغ
+        $new[$kind . '|' . $m[1] . '-' . $m[2] . '-01'] = [$kind, $m[1] . '-' . $m[2] . '-01', $amt];
+    }
+    ksort($new);
+    $cur = [];
+    try {
+        $st = $db->prepare("SELECT kind, from_month, amount_lbp FROM family_allowance_changes WHERE employee_id = ? ORDER BY from_month, id"); $st->execute([$empId]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $cur[$r['kind'] . '|' . substr((string)$r['from_month'], 0, 10)] = [$r['kind'], substr((string)$r['from_month'], 0, 10), (int)$r['amount_lbp']];
+    } catch (Throwable $e) {}
+    ksort($cur);
+    if ($cur === $new) return false;
+    $db->prepare("DELETE FROM family_allowance_changes WHERE employee_id = ?")->execute([$empId]);
+    $ins = $db->prepare("INSERT INTO family_allowance_changes (employee_id, kind, from_month, amount_lbp) VALUES (?, ?, ?, ?)");
+    foreach ($new as $r) $ins->execute([$empId, $r[0], $r[1], $r[2]]);
+    familyAllowanceChangesReset($empId);
+    return true;
+}
+/** لائحة التغييرات لموظف بصيغة الفورم [[kind, from YYYY-MM, amt], ...] (للعرض بملفه وبالملف الجماعي) */
+function familyAllowanceChangesRows(int $empId): array {
+    $o = [];
+    foreach (familyAllowanceChanges($empId) as $kind => $l) foreach ($l as $k => $amt) $o[] = ['kind' => $kind, 'from' => sprintf('%04d-%02d', intdiv($k - 1, 12), (($k - 1) % 12) + 1), 'amt' => $amt];
+    usort($o, fn($a, $b) => [$a['from'], $a['kind']] <=> [$b['from'], $b['kind']]);
+    return $o;
 }
 /** هل يستحقّ هذا الموظف تعويضاً عائلياً بحسب فئته؟ — المتعاقد (قانون المعلمين) لا: لا من المدرسة ولا من الضمان */
 function familyAllowanceEligible(array $emp): bool {
@@ -880,9 +964,15 @@ function familyAllowanceMonthInWindow(array $emp, int $month, int $year, string 
 /** أبكر «من شهر» بين المدّتين (للمنقول: ما قبله يبقى مخزّناً كما هو) — null إن كانت إحدى المدّتين بلا بداية وصاحبها له مبلغ */
 function familyAllowanceFromKeyMin(array $emp): ?int {
     $keys = [];
+    $chg = familyAllowanceChanges((int)($emp['id'] ?? 0)); // 📅💱 تغييرات شهرية بلا مبلغ بالملف = تبدأ من أوّل تغيير
     foreach (['spouse', 'children'] as $kind) {
-        if ((float)($emp["family_allowance_{$kind}_lbp"] ?? 0) <= 0) continue;
         $f = familyAllowanceDateKey($emp["family_allowance_{$kind}_from"] ?? '');
+        if ((float)($emp["family_allowance_{$kind}_lbp"] ?? 0) <= 0) {
+            if (!$chg[$kind]) continue;
+            $k0 = min(array_keys($chg[$kind]));
+            $keys[] = ($f !== null) ? max($f, $k0) : $k0;
+            continue;
+        }
         if ($f === null) return null;
         $keys[] = $f;
     }
@@ -896,8 +986,9 @@ function familyAllowanceFromKeyMin(array $emp): ?int {
 function familyAllowanceForMonth(array $emp, int $month, int $year): int {
     if (!familyAllowanceEligible($emp)) return 0;
     // 👫 مدّة الزوجة ومدّة الأولاد مستقلّتان (2026-09-20 مساءً)
-    $sp = familyAllowanceMonthInWindow($emp, $month, $year, 'spouse')   ? max(0.0, (float)($emp['family_allowance_spouse_lbp'] ?? 0))   : 0.0;
-    $ch = familyAllowanceMonthInWindow($emp, $month, $year, 'children') ? max(0.0, (float)($emp['family_allowance_children_lbp'] ?? 0)) : 0.0;
+    // 📅💱 (2026-09-24) المبلغ = مبلغ الملف ثم آخر تغيير شهري ≤ هذا الشهر (familyAllowanceKindAmount) — إن لم يتغيّر بشهر يبقى نفسه
+    $sp = familyAllowanceMonthInWindow($emp, $month, $year, 'spouse')   ? familyAllowanceKindAmount($emp, $month, $year, 'spouse')   : 0.0;
+    $ch = familyAllowanceMonthInWindow($emp, $month, $year, 'children') ? familyAllowanceKindAmount($emp, $month, $year, 'children') : 0.0;
     if ((int)($emp['count_spouse_allowance'] ?? 1) !== 1) $sp = 0;
     if ((int)($emp['count_children_allowance'] ?? 1) !== 1) $ch = 0;
     if (!empty($emp['spouse_works'])) $sp = 0;
@@ -980,7 +1071,10 @@ function familyAllowanceBulkApply(PDO $db, array $rows, string $schoolYear, stri
                 && $new[str_replace('_from', '_lbp', $k)] === $old[str_replace('_from', '_lbp', $k)]) { $new[$k] = $old[$k]; continue; } // أبقى «من» المخزّن
             $same = false;
         }
-        if ($same) continue;
+        // 📅💱 التغييرات الشهرية (إن أُرسلت لائحتها مع الصفّ) — تُقارَن وتُحفَظ بالمصدر الواحد saveFamilyAllowanceChanges
+        $chgChanged = false;
+        if (!empty($r['chg_set']) || (isset($r['chg']) && is_array($r['chg']))) $chgChanged = saveFamilyAllowanceChanges($db, $id, is_array($r['chg'] ?? null) ? array_values($r['chg']) : []);
+        if ($same && !$chgChanged) continue;
         $upd->execute([$new['family_allowance_spouse_lbp'], $new['family_allowance_children_lbp'], $id]);
         applyFamilyAllowanceDates($db, $id, $new);
         try { logAudit('family_allowance_bulk', 'employees', $id, array_intersect_key($emp, $new), $new + ['sy' => $schoolYear, 'by' => $who]); } catch (Throwable $t) {}

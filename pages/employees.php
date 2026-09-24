@@ -532,6 +532,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             }
             saveEmployeeBonuses($db, $id); // حفظ الأجر الإضافي/المكافآت من المحرّر المباشر
             applyFamilyAllowanceDates($db, $id, $data); // 👨‍👩‍👧 مدّة التعويض العائلي (بداية افتراضية إن غابت)
+            if (isset($_POST['fa_chg_set'])) saveFamilyAllowanceChanges($db, (int)$id, is_array($_POST['fa_chg'] ?? null) ? array_values($_POST['fa_chg']) : []); // 📅💱 التغييرات الشهرية (2026-09-24)
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
             // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
             // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
@@ -638,6 +639,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 } catch (Throwable $t) {}
             }
             applyFamilyAllowanceDates($db, $id, $data); // 👨‍👩‍👧 مدّة التعويض العائلي (بداية افتراضية إن غابت)
+            if (isset($_POST['fa_chg_set'])) saveFamilyAllowanceChanges($db, (int)$id, is_array($_POST['fa_chg'] ?? null) ? array_values($_POST['fa_chg']) : []); // 📅💱 التغييرات الشهرية (2026-09-24)
             recalcEmployeeYear($id); // إعادة حساب راتب السنة الحالية تلقائياً حسب القانون والمعطيات
             // بلوغ الـ64: للمُبقَى بعد 64 أعِد حساب كل سنواته المخزّنة حتى يُطبَّق وقف محسومات
             // التقاعد على الأشهر من بلوغه 64 في السنوات السابقة أيضاً (لا السنة الحالية فقط).
@@ -2091,6 +2093,42 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     function upd(){ var v=(parseInt(sp.value,10)||0)+(parseInt(ch.value,10)||0); out.textContent=v.toLocaleString('en-US'); }
                     sp.addEventListener('input',upd); ch.addEventListener('input',upd);
                 })();
+                </script>
+
+                <?php /* 📅💱 (2026-09-24 «أوقات خلال السنة بتتغيّر قيمة التعويض من شهر لشهر — بختار أي شهر وبحطّ القيمة، وإذا ما غيّرتها بتضلّ هي ذاتها»)
+                         تغييرات شهرية: كل سطر = النوع + من شهر + المبلغ الجديد؛ يسري من شهره حتى التغيير التالي (0 = يوقف). المصدر الواحد familyAllowanceKindAmount */
+                      $faChgRows = ($id > 0) ? familyAllowanceChangesRows((int)$id) : []; ?>
+                <div id="faChgBox" style="margin-top:14px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px">
+                    <input type="hidden" name="fa_chg_set" value="1">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+                        <strong><i class="fas fa-calendar-days"></i> Changements en cours d'année / تغييرات المبلغ خلال السنة</strong>
+                        <button type="button" class="btn btn-sm btn-light" onclick="faChgAdd()"><i class="fas fa-plus"></i> تغيير جديد / Nouveau</button>
+                    </div>
+                    <small style="display:block;color:var(--gray-600);margin:4px 0 8px">المبلغ فوق هو البداية. من الشهر الذي تختاره يسري المبلغ الجديد ويبقى هو نفسه بكل الأشهر بعده حتى تغيّره بشهر آخر · 0 = يوقف من ذلك الشهر · «إلى شهر» فوق يوقف الكل.</small>
+                    <table class="table" style="margin:0;font-size:13px" id="faChgTable">
+                        <thead><tr><th>Type / النوع</th><th>Dès le mois / من شهر</th><th>Nouveau montant (L.L) / المبلغ الجديد</th><th style="width:60px"></th></tr></thead>
+                        <tbody>
+                        <?php foreach ($faChgRows as $i => $cr): ?>
+                            <tr>
+                                <td><select name="fa_chg[<?= $i ?>][kind]" class="form-select form-select-sm"><option value="children" <?= $cr['kind'] === 'children' ? 'selected' : '' ?>>الأولاد / Enfants</option><option value="spouse" <?= $cr['kind'] === 'spouse' ? 'selected' : '' ?>>الزوجة / Épouse</option></select></td>
+                                <td><input type="month" name="fa_chg[<?= $i ?>][from]" class="form-control" value="<?= e($cr['from']) ?>" required></td>
+                                <td><input type="number" name="fa_chg[<?= $i ?>][amt]" class="form-control" value="<?= (int)$cr['amt'] ?>" min="0"></td>
+                                <td><button type="button" class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()" title="حذف"><i class="fas fa-trash"></i></button></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <?php if (!$faChgRows): ?><div id="faChgEmpty" style="color:var(--gray-500);font-size:12.5px;padding:6px 0">لا تغييرات — المبلغ نفسه كل الأشهر ضمن المدّة.</div><?php endif; ?>
+                </div>
+                <script>
+                function faChgAdd(){
+                    var tb=document.querySelector('#faChgTable tbody'), n=Date.now(), tr=document.createElement('tr'), em=document.getElementById('faChgEmpty'); if(em) em.remove();
+                    tr.innerHTML='<td><select name="fa_chg['+n+'][kind]" class="form-select form-select-sm"><option value="children">الأولاد / Enfants</option><option value="spouse">الزوجة / Épouse</option></select></td>'
+                      +'<td><input type="month" name="fa_chg['+n+'][from]" class="form-control" required></td>'
+                      +'<td><input type="number" name="fa_chg['+n+'][amt]" class="form-control" min="0" placeholder="المبلغ الجديد"></td>'
+                      +'<td><button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\'tr\').remove()"><i class="fas fa-trash"></i></button></td>';
+                    tb.appendChild(tr); tr.querySelector('input[type=month]').focus();
+                }
                 </script>
 
                 <?php /* «الحفظ دغري بس قدّام يلي غيّرتو»: زرّ حفظ بنفس التبويب — يحفظ ملف الأستاذ كاملاً */ ?>

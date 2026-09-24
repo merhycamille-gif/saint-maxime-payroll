@@ -7817,6 +7817,11 @@ $stW = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND
 $stW->execute($yp167);
 $c167('render-filter-titulaire-with', $noFatal($h2) && substr_count($h2, '<tr class="na" data-id=') === 0 && strpos($h2, 'fa-badge fa-e') === false && strpos($h2, 'fa-badge fa-c') === false
     && substr_count($h2, '<tr class="" data-id=') === (int)$stW->fetchColumn());
+// ☑️ «الفئة المشيّكة بس هي تبيّن، وبلا ولا تشك مارك ما يبيّن حدا» (2026-09-24 مساءً): cat_set بلا cat = صفر صفوف + رسالة؛ الموظفون وحدهم = لا ملاك ولا متعاقد
+$h2b = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat_set' => 1], []);
+$c167('no-category-no-rows', $noFatal($h2b) && substr_count($h2b, ' data-id=') === 0 && strpos($h2b, 'ما في ولا فئة مشيّكة') !== false && strpos($h2b, 'name="cat_set"') !== false);
+$h2c = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat_set' => 1, 'cat' => ['employe']], []);
+$c167('employe-only', $noFatal($h2c) && strpos($h2c, 'fa-badge fa-t') === false && strpos($h2c, 'fa-badge fa-c') === false && strpos($h2c, 'fa-badge fa-e') !== false);
 $sch167 = (int)$db->query("SELECT school_id FROM employees WHERE is_deleted = 0 AND employee_type = 'enseignant_titulaire' LIMIT 1")->fetchColumn();
 $h3 = renderPage('pages/family_allowances.php', ['sch' => $sch167, 'sy' => $sy167, 'q' => 'ا'], []);
 $c167('render-school-search', $noFatal($h3) && strpos($h3, 'École / المدرسة</th>') === false && strpos($h3, 'id="faForm"') !== false);
@@ -7859,6 +7864,71 @@ if ($t167) {
     $c167('restored', $after === $before);
 } else { $why167[] = 'no test employee (skipped live test)'; }
 check('👨‍👩‍👧📋 ملف التعويض العائلي الجماعي (2026-09-24): صفحة family_allowances.php (مدرسة/كل المدارس + الفئة + عندهم/بلا + بحث) + المتعاقد مقفول + «طبّق» = حفظ ملف الموظف نفسه (المبلغان + المدّتان + إعادة حساب السنة) — تجربة فعلية مع ترجيع + idempotent + الإيقاف بـ«إلى شهر» + الملاحة', $ok167, implode(' · ', $why167) ?: 'ok');
+
+/* =====================================================================
+ * 168) 📅💱 التعويض العائلي الشهري (2026-09-24 «أوقات خلال السنة بتتغيّر قيمة التعويض من شهر لشهر — بختار أي شهر وبحطّ القيمة،
+ *      وإذا ما غيّرتها بأي شهر بتضلّ هي ذاتها خلال السنة حتى غيّرها بأي شهر» — بملف الموظف وبالملف الجماعي معاً):
+ *      جدول family_allowance_changes يتركّب ذاتياً + المصدر الواحد familyAllowanceKindAmount داخل familyAllowanceForMonth + المنقول/المخالفات
+ *      يعتبران التغيير تسجيلاً (familyAllowanceHasAny) + الفورم (قسم التغييرات) + الملف الجماعي (سطر «شهري») — تجربة فعلية مع ترجيع كامل
+ * =================================================================== */
+$ok168 = true; $why168 = [];
+$c168 = function (string $n, bool $ok) use (&$ok168, &$why168) { if (!$ok) { $ok168 = false; $why168[] = $n; } };
+ensureFamilyAllowanceDateColumns();
+$c168('table', (bool)$db->query("SHOW TABLES LIKE 'family_allowance_changes'")->fetch() && function_exists('familyAllowanceKindAmount') && function_exists('saveFamilyAllowanceChanges') && function_exists('familyAllowanceHasAny'));
+$fn168 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$c168('single-source', strpos($fn168, "familyAllowanceMonthInWindow(\$emp, \$month, \$year, 'spouse')   ? familyAllowanceKindAmount(\$emp, \$month, \$year, 'spouse')") !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), '$doFam = $empRow && !$famZeroAll && familyAllowanceHasAny($empRow);') !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/compliance.php'), '$hasAmt = familyAllowanceHasAny($r);') !== false);
+$em168 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$c168('form-code', strpos($em168, 'id="faChgBox"') !== false && substr_count($em168, "if (isset(\$_POST['fa_chg_set'])) saveFamilyAllowanceChanges(") === 2 && strpos($em168, 'name="fa_chg[<?= $i ?>][from]"') !== false);
+$fa168 = (string)file_get_contents($PROJ . '/pages/family_allowances.php');
+$c168('totals-row', strpos($fa168, 'class="fa-total-row"') !== false && strpos($fa168, 'id="faTotSp"') !== false && strpos($fa168, 'id="faTotCh"') !== false && strpos($fa168, 'id="faTotCur"') !== false); // 🧮 «ديماً مجموع للكل»
+$c168('bulk-code', strpos($fa168, 'class="fa-chg-row"') !== false && strpos($fa168, '[chg_set]') !== false && strpos($fa168, 'fa-chg-btn') !== false && strpos($fn168, "if (!empty(\$r['chg_set']) || (isset(\$r['chg']) && is_array(\$r['chg'])))") !== false);
+// تجربة فعلية على ملاك بأشهر غير مدفوعة بلا تعويض: أولاد 2,000,000 من تشرين الأول ⇒ 2,500,000 من كانون الثاني ⇒ 0 من أيار ⇒ إزالة التغييرات ⇒ تغيير بلا مبلغ أساس ⇒ ترجيع
+$sy168 = currentSchoolYear(); [$y168] = schoolYearToYears($sy168);
+$t168 = $db->query("SELECT e.id, e.school_id FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND COALESCE(e.family_allowance_children_lbp,0) = 0 AND COALESCE(e.family_allowance_spouse_lbp,0) = 0
+    AND e.id NOT IN (SELECT employee_id FROM family_allowance_changes)
+    AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = '$sy168' AND is_paid = 0 AND base_plus_echelon_lbp > 0 AND month = 12) LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($t168) {
+    $tid168 = (int)$t168['id'];
+    $snap168 = $db->query("SELECT family_allowance_spouse_lbp sp, family_allowance_children_lbp ch, family_allowance_spouse_from sf, family_allowance_spouse_to st, family_allowance_children_from cf, family_allowance_children_to ct, family_allowance_from f0, family_allowance_to t0 FROM employees WHERE id = $tid168")->fetch(PDO::FETCH_ASSOC);
+    $before168 = $db->query("SELECT * FROM monthly_salaries WHERE employee_id = $tid168 AND school_year = '$sy168' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC);
+    $db->exec("DROP TEMPORARY TABLE IF EXISTS _ms_bak168"); $db->exec("CREATE TEMPORARY TABLE _ms_bak168 AS SELECT * FROM monthly_salaries WHERE employee_id = $tid168 AND school_year = '$sy168'");
+    try {
+        $famF = function () use ($db, $tid168, $sy168) { $o = []; foreach ($db->query("SELECT month, family_allowance_lbp f, total_due_lbp d FROM monthly_salaries WHERE employee_id = $tid168 AND school_year = '$sy168'")->fetchAll(PDO::FETCH_ASSOC) as $r) $o[(int)$r['month']] = [(int)$r['f'], (int)$r['d']]; return $o; };
+        $b168 = []; foreach ($before168 as $r) $b168[(int)$r['month']] = [(int)$r['family_allowance_lbp'], (int)$r['total_due_lbp']];
+        $y2 = $y168 + 1;
+        $r1 = familyAllowanceBulkApply($db, [$tid168 => ['sp' => '0', 'ch' => '2,000,000', 'chf' => "$y168-10", 'chg_set' => 1, 'chg' => [
+            ['kind' => 'children', 'from' => "$y2-01", 'amt' => '2,500,000'], ['kind' => 'children', 'from' => "$y2-05", 'amt' => '0'], ['kind' => 'spouse', 'from' => '', 'amt' => '5']]]], $sy168, '', [], 'regcheck');
+        $a = $famF();
+        $c168('apply', $r1['changed'] === 1 && $r1['recalc'] === 1 && $a[10][0] === 2000000 && $a[12][0] === 2000000 && $a[1][0] === 2500000 && $a[4][0] === 2500000 && $a[5][0] === 0 && $a[9][0] === 0
+            && $a[1][1] === $b168[1][1] + 2500000 && $a[5][1] === $b168[5][1] && count(familyAllowanceChangesRows($tid168)) === 2); // الصفّ غير الصالح أُهمل
+        $emp168 = $db->query("SELECT * FROM employees WHERE id = $tid168")->fetch(PDO::FETCH_ASSOC);
+        $c168('forMonth', familyAllowanceForMonth($emp168, 10, $y168) === 2000000 && familyAllowanceForMonth($emp168, 1, $y2) === 2500000 && familyAllowanceForMonth($emp168, 4, $y2) === 2500000 && familyAllowanceForMonth($emp168, 5, $y2) === 0 && familyAllowanceHasAny($emp168));
+        $r2 = familyAllowanceBulkApply($db, [$tid168 => ['sp' => '0', 'ch' => '2000000', 'chf' => "$y168-10", 'chg_set' => 1, 'chg' => [['kind' => 'children', 'from' => "$y2-01", 'amt' => '2500000'], ['kind' => 'children', 'from' => "$y2-05", 'amt' => '0']]]], $sy168, '', [], 'regcheck');
+        $c168('idempotent', $r2['changed'] === 0);
+        $r3 = familyAllowanceBulkApply($db, [$tid168 => ['sp' => '0', 'ch' => '2000000', 'chf' => "$y168-10", 'chg_set' => 1]], $sy168, '', [], 'regcheck');
+        $a3 = $famF();
+        $c168('remove-changes', $r3['changed'] === 1 && $a3[1][0] === 2000000 && $a3[5][0] === 2000000 && count(familyAllowanceChangesRows($tid168)) === 0);
+        $r4 = familyAllowanceBulkApply($db, [$tid168 => ['sp' => '0', 'ch' => '0', 'chf' => '', 'chg_set' => 1, 'chg' => [['kind' => 'children', 'from' => "$y2-02", 'amt' => '1,000,000']]]], $sy168, '', [], 'regcheck');
+        $emp168 = $db->query("SELECT * FROM employees WHERE id = $tid168")->fetch(PDO::FETCH_ASSOC); $a4 = $famF();
+        $c168('change-without-base', $r4['changed'] === 1 && familyAllowanceFromKeyMin($emp168) === $y2 * 12 + 2 && $a4[1][0] === 0 && $a4[2][0] === 1000000 && $a4[9][0] === 1000000 && familyAllowanceHasAny($emp168));
+        // الفورم يعرض القسم مع سطر التغيير، والملف الجماعي يعرض سطر «شهري» بالقيمة
+        $hf = renderPage('pages/employees.php', ['action' => 'edit', 'id' => $tid168, 'tab' => 'finance'], []);
+        $c168('form-render', $noFatal($hf) && strpos($hf, 'id="faChgBox"') !== false && preg_match('/name="fa_chg\[0\]\[from\]"[^>]*value="' . $y2 . '-02"/', $hf) === 1 && preg_match('/name="fa_chg\[0\]\[amt\]"[^>]*value="1000000"/', $hf) === 1);
+        $hb = renderPage('pages/family_allowances.php', ['sch' => (int)$t168['school_id'], 'sy' => $sy168], []);
+        $c168('bulk-render', $noFatal($hb) && preg_match('/<tr class="fa-chg-row" data-for="' . $tid168 . '"/', $hb) === 1 && preg_match('/name="fa\[' . $tid168 . '\]\[chg\]\[0\]\[amt\]" value="1,000,000"/', $hb) === 1 && preg_match('/fa-chg-btn" data-id="' . $tid168 . '"[^>]*>.*?1<\/button>/s', $hb) === 1);
+    } catch (Throwable $e) { $c168('exception:' . $e->getMessage(), false); }
+    $db->prepare("DELETE FROM family_allowance_changes WHERE employee_id = ?")->execute([$tid168]);
+    $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = ?, family_allowance_children_lbp = ?, family_allowance_spouse_from = ?, family_allowance_spouse_to = ?, family_allowance_children_from = ?, family_allowance_children_to = ?, family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")
+       ->execute([$snap168['sp'], $snap168['ch'], $snap168['sf'], $snap168['st'], $snap168['cf'], $snap168['ct'], $snap168['f0'], $snap168['t0'], $tid168]);
+    $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $tid168 AND school_year = '$sy168'");
+    $db->exec("INSERT INTO monthly_salaries SELECT * FROM _ms_bak168"); $db->exec("DROP TEMPORARY TABLE _ms_bak168");
+    try { $db->exec("DELETE FROM audit_log WHERE action = 'family_allowance_bulk' AND record_id = $tid168"); } catch (Throwable $e) {}
+    $after168 = $db->query("SELECT * FROM monthly_salaries WHERE employee_id = $tid168 AND school_year = '$sy168' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC);
+    $c168('restored', $after168 === $before168);
+} else { $why168[] = 'no test employee (skipped live test)'; }
+check('📅💱 التعويض العائلي الشهري (2026-09-24): تغييرات المبلغ خلال السنة (النوع + من شهر + المبلغ الجديد، يبقى حتى التغيير التالي، 0 = يوقف) بملف الموظف وبالملف الجماعي — جدول ذاتي + المصدر الواحد + المنقول/المخالفات — تجربة فعلية مع ترجيع', $ok168, implode(' · ', $why168) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -419,10 +419,11 @@ function complianceItems(PDO $db, string $sy): array {
         $faRows = $db->prepare("SELECT month, year, family_allowance_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month,0) = 0 ORDER BY year, month");
         foreach ($q("SELECT DISTINCT e.* FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
             WHERE e.is_deleted = 0" . $sc . "
-              AND (COALESCE(e.family_allowance_spouse_lbp,0) > 0 OR COALESCE(e.family_allowance_children_lbp,0) > 0 OR ms.family_allowance_lbp > 0)
+              AND (COALESCE(e.family_allowance_spouse_lbp,0) > 0 OR COALESCE(e.family_allowance_children_lbp,0) > 0 OR ms.family_allowance_lbp > 0
+                   OR e.id IN (SELECT employee_id FROM family_allowance_changes))
             ORDER BY e.school_id, e.id", [$sy]) as $r) {
             $engine = salaryEngineAllowed($r, $db);
-            $hasAmt = (float)$r['family_allowance_spouse_lbp'] > 0 || (float)$r['family_allowance_children_lbp'] > 0;
+            $hasAmt = familyAllowanceHasAny($r); // 📅💱 مبلغ بملفه أو تغيير شهري (2026-09-24)
             $eligible = familyAllowanceEligible($r);
             if (!$engine && !$hasAmt && $eligible) continue; // منقول بلا مبلغ بملفه: مخزّنه القديم ليس خطأ
             $fromKey = familyAllowanceFromKeyMin($r); // 👫 أبكر «من شهر» بين المدّتين

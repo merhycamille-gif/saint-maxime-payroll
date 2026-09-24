@@ -29,7 +29,10 @@ $validCats = ['titulaire' => 'enseignant_titulaire', 'contractuel' => 'enseignan
 $catLbl = ['titulaire' => 'الملاك', 'contractuel' => 'المتعاقدين', 'employe' => 'الموظفين'];
 $rawCats = $_POST['cat'] ?? $_GET['cat'] ?? null;
 $categories = array_values(array_intersect(is_array($rawCats) ? $rawCats : ($rawCats !== null ? [$rawCats] : []), array_keys($validCats)));
-if (!$categories) $categories = array_keys($validCats);
+// ✅ (2026-09-24 «الفئة اللي حاطط عليها تشك مارك بس هي تبيّن، وإذا ما حطّيت على أي فئة ما لازم يبيّنوا موظفينها»):
+//    أوّل فتحة (بلا اختيار بعد) = الكل مشيّك؛ بعد ما يلمس الفلتر (cat_set) الفئات المشيّكة فقط — ولا واحدة = لا أحد
+$catSet = isset($_GET['cat_set']) || isset($_POST['cat_set']);
+if (!$categories && !$catSet) $categories = array_keys($validCats);
 $schoolYear = (string)($_GET['sy'] ?? $_POST['sy'] ?? (activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()));
 if (!preg_match('/^\d{4}-\d{4}$/', $schoolYear)) $schoolYear = currentSchoolYear();
 $q = trim((string)($_GET['q'] ?? $_POST['q'] ?? ''));
@@ -38,11 +41,12 @@ $show = in_array($_GET['show'] ?? $_POST['show'] ?? 'all', ['all', 'with', 'with
 // قيد النطاق بصيغة SQL (alias e) — المصدر الواحد للعرض والحفظ معاً
 $scopeSql = ''; $scopeParams = [];
 if (!$scopeAll) { $scopeSql .= ' AND e.school_id = ?'; $scopeParams[] = $schoolId; }
-if (count($categories) < 3) $scopeSql .= " AND e.employee_type IN (" . implode(',', array_map(fn($c) => "'" . $validCats[$c] . "'", $categories)) . ")";
+if (!$categories) $scopeSql .= " AND 1=0"; // لا فئة مشيّكة = لا أحد
+elseif (count($categories) < 3) $scopeSql .= " AND e.employee_type IN (" . implode(',', array_map(fn($c) => "'" . $validCats[$c] . "'", $categories)) . ")";
 [$yf, $yp] = yearEmploymentFilter($schoolYear, 'e.'); // موظفو السنة (راتب أو دخول ضمنها؛ التارك من الكل قبلها لا يظهر)
 $scopeSql .= $yf; $scopeParams = array_merge($scopeParams, $yp);
 
-$backQ = 'sch=' . ($scopeAll ? 'all' : $schoolId) . '&sy=' . urlencode($schoolYear) . '&show=' . $show . ($q !== '' ? '&q=' . urlencode($q) : '');
+$backQ = 'sch=' . ($scopeAll ? 'all' : $schoolId) . '&sy=' . urlencode($schoolYear) . '&show=' . $show . '&cat_set=1' . ($q !== '' ? '&q=' . urlencode($q) : '');
 foreach ($categories as $c) $backQ .= '&cat[]=' . urlencode($c);
 
 // ===== طبّق: المتغيّر فقط يُحفَظ كما يحفظه ملف الموظف =====
@@ -88,8 +92,8 @@ $refM = (int)date('n'); $refY = (int)date('Y');
 if (schoolYearOfDate(date('Y-m-01')) !== $schoolYear) { $refM = 10; $refY = (int)$syY1; }
 $typeLbl = ['enseignant_titulaire' => 'ملاك', 'enseignant_contractuel' => 'متعاقد', 'employe' => 'موظف'];
 $typeCls = ['enseignant_titulaire' => 'fa-t', 'enseignant_contractuel' => 'fa-c', 'employe' => 'fa-e'];
-$nWith = 0; $totSp = 0; $totCh = 0;
-foreach ($rows as $r) { $v = familyAllowanceForMonth($r, $refM, $refY); if ($v > 0) $nWith++; if (familyAllowanceEligible($r)) { $totSp += (int)$r['family_allowance_spouse_lbp']; $totCh += (int)$r['family_allowance_children_lbp']; } }
+$nWith = 0; $totSp = 0; $totCh = 0; $totCur = 0;
+foreach ($rows as $r) { $v = familyAllowanceForMonth($r, $refM, $refY); if ($v > 0) $nWith++; $totCur += $v; if (familyAllowanceEligible($r)) { $totSp += (int)$r['family_allowance_spouse_lbp']; $totCh += (int)$r['family_allowance_children_lbp']; } }
 $mo = fn($d) => ($d && (string)$d !== '0000-00-00') ? substr((string)$d, 0, 7) : '';
 ?>
 <style>
@@ -110,7 +114,10 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
 .fa-table tr.changed td { background:#fef9c3 !important; }
 .fa-table tr.changed td.nm::before { content:'✏️ '; }
 .fa-table tr.na td { background:#f8fafc; color:#94a3b8; }
+.fa-table tfoot th { font-size:13.5px; font-weight:800; position:sticky; bottom:0; }
 .fa-table tr.na input { background:#f1f5f9; color:#94a3b8; }
+.fa-chg-tbl td { border:none; padding:3px 4px; }
+.fa-chg-tbl input.amt { width:130px; } .fa-chg-tbl input.mon { width:140px; }
 .fa-badge { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:700; }
 .fa-t { background:#dcfce7; color:#166534; } .fa-c { background:#fee2e2; color:#991b1b; } .fa-e { background:#e0e7ff; color:#3730a3; }
 .fa-tot { font-weight:800; color:#1F4E5F; }
@@ -137,7 +144,8 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
             <div dir="ltr" style="text-align:left"><strong>Allocations familiales</strong> (épouse / enfants, du mois → au mois) — enregistrées dans le dossier de chaque employé exactement comme depuis sa fiche.</div>
             <div dir="rtl">اكتب قدّام كل موظف <strong>تعويض الزوجة</strong> و<strong>تعويض الأولاد</strong> بالليرة ومدّة كل واحد «من شهر ← إلى شهر»، ثم اكبس <strong>طبّق</strong>:
             يروح كل شي على ملف كل موظف (نفس حفظ ملفه) ويُعاد حساب رواتب السنة المختارة. «من» فارغ مع مبلغ = من أوّل شهر غير مدفوع · «إلى» فارغ = مستمرّ · لإيقافه حطّ «إلى شهر» لا تصفّر المبلغ.
-            <strong>الملاك</strong> من المدرسة · <strong>الموظف</strong> خاضع لقانون العمل من الضمان · <strong>المتعاقد</strong> لا يستحقّ (قانون المعلمين) فخاناته مقفولة · لا يُقسَّم بين الزوجين.</div>
+            <strong>الملاك</strong> من المدرسة · <strong>الموظف</strong> خاضع لقانون العمل من الضمان · <strong>المتعاقد</strong> لا يستحقّ (قانون المعلمين) فخاناته مقفولة · لا يُقسَّم بين الزوجين.
+            <br>📅 <strong>تغيّر المبلغ خلال السنة:</strong> زرّ «شهري» قدّام الموظف يفتح سطوراً: النوع + من شهر + المبلغ الجديد — يسري من ذلك الشهر ويبقى نفسه بكل الأشهر بعده حتى تغيّره بشهر آخر (0 = يوقف).</div>
         </div>
 
         <form method="GET" class="fa-filters no-print" id="faFilter">
@@ -159,6 +167,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
             </div>
             <div class="form-group fa-cats">
                 <label class="form-label">Catégorie / الفئة</label>
+                <input type="hidden" name="cat_set" value="1">
                 <div style="padding:6px 0">
                 <?php foreach ($catLbl as $k => $l): ?>
                     <label><input type="checkbox" name="cat[]" value="<?= $k ?>" <?= in_array($k, $categories, true) ? 'checked' : '' ?> onchange="document.getElementById('faFilter').submit()"> <?= $l ?></label>
@@ -184,6 +193,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
         <div class="fa-kpis">
             <div class="fa-kpi"><span><div class="v"><?= count($rows) ?></div><div class="l">موظف ظاهر / Employés</div></span></div>
             <div class="fa-kpi"><span><div class="v"><?= $nWith ?></div><div class="l">عندهم تعويض ساري (<?= monthName($refM, 'ar') . ' ' . $refY ?>)</div></span></div>
+            <div class="fa-kpi"><span><div class="v"><?= number_format($totCur) ?></div><div class="l">مجموع الساري <?= monthName($refM, 'ar') . ' ' . $refY ?> (ل.ل)</div></span></div>
             <div class="fa-kpi"><span><div class="v"><?= number_format($totSp) ?></div><div class="l">مجموع تعويض الزوجة بالملفات (ل.ل)</div></span></div>
             <div class="fa-kpi"><span><div class="v"><?= number_format($totCh) ?></div><div class="l">مجموع تعويض الأولاد بالملفات (ل.ل)</div></span></div>
         </div>
@@ -192,7 +202,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
             <?= csrfField() ?>
             <input type="hidden" name="action" value="apply">
             <input type="hidden" name="sch" value="<?= $scopeAll ? 'all' : (int)$schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
-            <input type="hidden" name="show" value="<?= e($show) ?>"><input type="hidden" name="q" value="<?= e($q) ?>">
+            <input type="hidden" name="show" value="<?= e($show) ?>"><input type="hidden" name="q" value="<?= e($q) ?>"><input type="hidden" name="cat_set" value="1">
             <?php foreach ($categories as $c): ?><input type="hidden" name="cat[]" value="<?= e($c) ?>"><?php endforeach; ?>
             <div class="fa-wrap">
             <table class="fa-table">
@@ -205,6 +215,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                         <th colspan="3" class="sp">Épouse / تعويض الزوجة</th>
                         <th colspan="3" class="ch">Enfants / تعويض الأولاد</th>
                         <th rowspan="2" style="min-width:120px">الساري<br><small><?= monthName($refM, 'ar') . ' ' . $refY ?></small></th>
+                        <th rowspan="2">Mensuel / شهري</th>
                         <th rowspan="2">Remarque / ملاحظة</th>
                     </tr>
                     <tr class="sub">
@@ -214,7 +225,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 </thead>
                 <tbody>
                 <?php if (!$rows): ?>
-                    <tr><td colspan="12" style="padding:24px;color:#64748b">لا موظفين ضمن هذا النطاق / Aucun employé</td></tr>
+                    <tr><td colspan="13" style="padding:24px;color:#64748b"><?= !$categories ? '☐ ما في ولا فئة مشيّكة — أشّر الملاك أو المتعاقدين أو الموظفين فوق / Cochez une catégorie' : 'لا موظفين ضمن هذا النطاق / Aucun employé' ?></td></tr>
                 <?php endif; ?>
                 <?php $i = 0; foreach ($rows as $r): $i++; $id = (int)$r['id']; $elig = familyAllowanceEligible($r);
                     $name = trim(($r['first_name_ar'] ?: $r['first_name_fr']) . ' ' . ($r['last_name_ar'] ?: $r['last_name_fr']));
@@ -240,16 +251,52 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                         <td class="ch"><input type="month" class="mon" name="fa[<?= $id ?>][chf]" value="<?= e($mo($r['family_allowance_children_from'])) ?>" data-orig="<?= e($mo($r['family_allowance_children_from'])) ?>"<?= $dis ?>></td>
                         <td class="ch"><input type="month" class="mon" name="fa[<?= $id ?>][cht]" value="<?= e($mo($r['family_allowance_children_to'])) ?>" data-orig="<?= e($mo($r['family_allowance_children_to'])) ?>"<?= $dis ?>></td>
                         <td class="fa-tot"><?= $cur > 0 ? number_format($cur) : '—' ?></td>
+                        <?php $chgRows = $elig ? familyAllowanceChangesRows($id) : []; ?>
+                        <td><?php if ($elig): ?><button type="button" class="btn btn-sm <?= $chgRows ? 'btn-warning' : 'btn-light' ?> fa-chg-btn" data-id="<?= $id ?>" title="تغييرات المبلغ خلال السنة"><i class="fas fa-calendar-days"></i> <?= $chgRows ? count($chgRows) : '' ?></button><?php else: ?>—<?php endif; ?></td>
                         <td class="fa-note"><?= e(implode(' · ', $notes)) ?></td>
                     </tr>
+                    <?php if ($elig): /* 📅💱 سطر التغييرات الشهرية (مخفيّ حتى يُكبس «شهري») — نفس صيغة ملف الموظف: النوع + من شهر + المبلغ الجديد */ ?>
+                    <tr class="fa-chg-row" data-for="<?= $id ?>" style="display:none">
+                        <td colspan="<?= $scopeAll ? 13 : 12 ?>" style="text-align:right;background:#fffbeb;padding:8px 14px">
+                            <input type="hidden" name="fa[<?= $id ?>][chg_set]" value="1" data-orig="1">
+                            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+                                <strong style="font-size:12.5px"><i class="fas fa-calendar-days"></i> <?= e($name) ?> — تغييرات المبلغ خلال السنة / Changements en cours d'année</strong>
+                                <button type="button" class="btn btn-sm btn-light fa-chg-add" data-id="<?= $id ?>"><i class="fas fa-plus"></i> تغيير جديد</button>
+                                <small style="color:#78350f">يسري من الشهر المختار ويبقى نفسه حتى التغيير التالي · 0 = يوقف</small>
+                            </div>
+                            <table class="fa-chg-tbl" style="border-collapse:collapse;font-size:12.5px">
+                                <?php foreach ($chgRows as $ci => $cr): ?>
+                                <tr>
+                                    <td><select name="fa[<?= $id ?>][chg][<?= $ci ?>][kind]" class="form-select" style="padding:3px 6px" data-orig="<?= e($cr['kind']) ?>"><option value="children" <?= $cr['kind'] === 'children' ? 'selected' : '' ?>>الأولاد</option><option value="spouse" <?= $cr['kind'] === 'spouse' ? 'selected' : '' ?>>الزوجة</option></select></td>
+                                    <td><input type="month" class="mon" name="fa[<?= $id ?>][chg][<?= $ci ?>][from]" value="<?= e($cr['from']) ?>" data-orig="<?= e($cr['from']) ?>"></td>
+                                    <td><input type="text" inputmode="numeric" class="amt" name="fa[<?= $id ?>][chg][<?= $ci ?>][amt]" value="<?= number_format((int)$cr['amt']) ?>" data-orig="<?= number_format((int)$cr['amt']) ?>"></td>
+                                    <td><button type="button" class="btn btn-sm btn-danger fa-chg-del" title="حذف">✕</button></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </table>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
                 <?php endforeach; ?>
                 </tbody>
+                <?php /* 🧮 «ما تنسى ديماً يكون في مجموع للكل» (2026-09-24): صفّ المجموع لكل الظاهرين — يتحدّث فوراً بالـJS وأنت تكتب */ ?>
+                <tfoot>
+                    <tr class="fa-total-row">
+                        <th colspan="<?= $scopeAll ? 4 : 3 ?>" style="text-align:right;background:#1F4E5F;color:#fff">Total / المجموع (<?= count($rows) ?> موظف)</th>
+                        <th class="sp" style="background:#9d174d;color:#fff" id="faTotSp"><?= number_format($totSp) ?></th>
+                        <th class="sp" colspan="2" style="background:#9d174d;color:#fff;font-weight:400;font-size:11.5px">ل.ل / L.L</th>
+                        <th class="ch" style="background:#1d4ed8;color:#fff" id="faTotCh"><?= number_format($totCh) ?></th>
+                        <th class="ch" colspan="2" style="background:#1d4ed8;color:#fff;font-weight:400;font-size:11.5px">ل.ل / L.L</th>
+                        <th style="background:#1F4E5F;color:#fff" id="faTotCur"><?= number_format($totCur) ?></th>
+                        <th colspan="2" style="background:#1F4E5F;color:#fff;font-weight:400;font-size:11.5px">الساري <?= monthName($refM, 'ar') . ' ' . $refY ?></th>
+                    </tr>
+                </tfoot>
             </table>
             </div>
             <div class="fa-bar">
                 <button type="submit" class="btn btn-primary" id="faApply" disabled><i class="fas fa-check-double"></i> Appliquer / طبّق على ملفات الموظفين</button>
                 <span>المعدَّلون: <span class="cnt" id="faCnt">0</span> — يُحفَظ المتغيّر فقط، ويُعاد حساب رواتب <?= e($schoolYear) ?> للمعنيين.</span>
-                <span style="color:#64748b;font-size:12px">النطاق: <?= $scopeAll ? 'كل المدارس' : e(schoolNameById($schoolId, 'ar')) ?> · <?= count($categories) >= 3 ? 'كل الفئات' : e(implode(' + ', array_map(fn($c) => $catLbl[$c], $categories))) ?> · <?= e($schoolYear) ?></span>
+                <span style="color:#64748b;font-size:12px">النطاق: <?= $scopeAll ? 'كل المدارس' : e(schoolNameById($schoolId, 'ar')) ?> · <?= count($categories) >= 3 ? 'كل الفئات' : ($categories ? e(implode(' + ', array_map(fn($c) => $catLbl[$c], $categories))) : 'لا فئة') ?> · <?= e($schoolYear) ?></span>
             </div>
         </form>
 <?php else: ?>
@@ -263,20 +310,54 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
     var form = document.getElementById('faForm'); if (!form) return;
     var btn = document.getElementById('faApply'), cnt = document.getElementById('faCnt');
     function fmt(v) { v = String(v || '').replace(/[^\d]/g, ''); return v ? Number(v).toLocaleString('en-US') : ''; }
+    function subRow(tr) { var n = tr.nextElementSibling; return (n && n.classList.contains('fa-chg-row')) ? n : null; }
     function rowChanged(tr) {
-        var ch = false;
-        tr.querySelectorAll('input[data-orig]').forEach(function (inp) {
-            var cur = inp.classList.contains('amt') ? fmt(inp.value) : inp.value;
-            var org = inp.classList.contains('amt') ? fmt(inp.dataset.orig) : inp.dataset.orig;
-            if (cur !== org) ch = true;
-        });
+        var ch = false, sub = subRow(tr);
+        var scan = function (el) {
+            el.querySelectorAll('input,select').forEach(function (inp) {
+                if (inp.type === 'hidden') return;
+                if (inp.dataset.orig === undefined) { ch = true; return; } // سطر تغيير جديد
+                var cur = inp.classList.contains('amt') ? fmt(inp.value) : inp.value;
+                var org = inp.classList.contains('amt') ? fmt(inp.dataset.orig) : inp.dataset.orig;
+                if (cur !== org) ch = true;
+            });
+        };
+        scan(tr);
+        if (sub) { scan(sub); if (sub.dataset.dirty === '1') ch = true; }
         tr.classList.toggle('changed', ch);
         return ch;
     }
+    // 📅💱 فتح/إغلاق سطر التغييرات الشهرية + إضافة/حذف سطر
+    form.addEventListener('click', function (ev) {
+        var b = ev.target.closest('.fa-chg-btn, .fa-chg-add, .fa-chg-del'); if (!b) return;
+        if (b.classList.contains('fa-chg-btn')) {
+            var sub = form.querySelector('tr.fa-chg-row[data-for="' + b.dataset.id + '"]'); if (!sub) return;
+            sub.style.display = sub.style.display === 'none' ? '' : 'none';
+            if (sub.style.display === '' && !sub.querySelector('.fa-chg-tbl tr')) addChg(b.dataset.id);
+        } else if (b.classList.contains('fa-chg-add')) { addChg(b.dataset.id); }
+        else { var tr = b.closest('tr'), sub2 = b.closest('tr.fa-chg-row'); tr.remove(); if (sub2) sub2.dataset.dirty = '1'; refresh(); }
+    });
+    function addChg(id) {
+        var sub = form.querySelector('tr.fa-chg-row[data-for="' + id + '"]'); if (!sub) return;
+        var tb = sub.querySelector('.fa-chg-tbl'), n = 'n' + Date.now(), tr = document.createElement('tr');
+        tr.innerHTML = '<td><select name="fa[' + id + '][chg][' + n + '][kind]" class="form-select" style="padding:3px 6px"><option value="children">الأولاد</option><option value="spouse">الزوجة</option></select></td>'
+            + '<td><input type="month" class="mon" name="fa[' + id + '][chg][' + n + '][from]"></td>'
+            + '<td><input type="text" inputmode="numeric" class="amt" name="fa[' + id + '][chg][' + n + '][amt]" placeholder="المبلغ الجديد"></td>'
+            + '<td><button type="button" class="btn btn-sm btn-danger fa-chg-del" title="حذف">✕</button></td>';
+        tb.appendChild(tr); tr.querySelector('input[type=month]').focus(); refresh();
+    }
     function refresh() {
-        var n = 0;
-        form.querySelectorAll('tbody tr[data-id]').forEach(function (tr) { if (rowChanged(tr)) n++; });
+        var n = 0, tSp = 0, tCh = 0;
+        form.querySelectorAll('tbody tr[data-id]').forEach(function (tr) {
+            if (rowChanged(tr)) n++;
+            var a = tr.querySelector('input.amt[name$="[sp]"]'), b = tr.querySelector('input.amt[name$="[ch]"]');
+            if (a && !a.disabled) tSp += parseInt(fmt(a.value).replace(/,/g, ''), 10) || 0;
+            if (b && !b.disabled) tCh += parseInt(fmt(b.value).replace(/,/g, ''), 10) || 0;
+        });
         cnt.textContent = n; btn.disabled = n === 0;
+        var eSp = document.getElementById('faTotSp'), eCh = document.getElementById('faTotCh');
+        if (eSp) eSp.textContent = tSp.toLocaleString('en-US');
+        if (eCh) eCh.textContent = tCh.toLocaleString('en-US');
     }
     form.addEventListener('input', refresh);
     form.addEventListener('change', refresh);
@@ -295,7 +376,10 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
         if (n === 0) { ev.preventDefault(); return; }
         if (!confirm('طبّق التعويض العائلي على ملفات ' + n + ' موظف وأعِد حساب رواتبهم؟\nAppliquer sur ' + n + ' dossier(s) ?')) ev.preventDefault();
         // الصفوف غير المتغيّرة لا تُرسَل أصلاً (أخفّ وأسرع؛ الخادم يقارن أيضاً)
-        else form.querySelectorAll('tbody tr[data-id]:not(.changed) input').forEach(function (i) { i.disabled = true; });
+        else form.querySelectorAll('tbody tr[data-id]:not(.changed)').forEach(function (tr) {
+            tr.querySelectorAll('input').forEach(function (i) { i.disabled = true; });
+            var sub = subRow(tr); if (sub) sub.querySelectorAll('input,select').forEach(function (i) { i.disabled = true; });
+        });
     });
     refresh();
 })();
