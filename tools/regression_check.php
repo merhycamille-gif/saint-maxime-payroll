@@ -66,6 +66,7 @@ if ($__f) {
     }
 }
 $_SERVER['REQUEST_URI'] = '/x';
+$GLOBALS['msa_att_prefs_off'] = true; // 🧠 خيارات الإفادة المحفوظة مطفأة بالفحوص إلا بـprefs_test=1 (2026-09-24)
 $_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET'; // CLI بلا REQUEST_METHOD — تحذيره كان يتصدّر مخرجات القياس
 chdir(dirname($PROJ . '/' . $argv[1]));
 ob_start();
@@ -7679,6 +7680,27 @@ if ($eid166) {
     $aF = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'anhaa_khedme', 'lang_doc' => 'fr', 'sig_t' => 'moudir'], []));
     $c166('head-choice-fr', preg_match('/Le Directeur de l(&#039;|\')école/u', $aF) === 1 && strpos($aF, 'Directrice') === false);
     $c166('head-choice-contract', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'aqd_taalim', 'sig_t' => 'raisa'], [])), 'من قبل رئيسة المدرسة') !== false);
+    // 🧠 «الملاحظات اللي أنا مختارها لإلو تبقى» (2026-09-24): حفظ بتفاعل واحد ثم فتح إفادة أخرى بلا خيارات ⇒ نفس الخيارات (والموقّع لكل مدرسة) + ↩️ زرّ الرجوع لملف إفاداته
+    $sch166 = (int)$db->query("SELECT school_id FROM employees WHERE id = $eid166")->fetchColumn();
+    attestationPrefsClear($eid166, $sch166);
+    try {
+        renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'prefs_test' => 1, 'opts_set' => 1, 'inc_extra' => 1, 'cur' => 'usd', 'rate_show' => 1, 'sig_t' => 'raisa', 'sig_name' => 'الأخت فحص محفوظة', 'subj_ovr' => 'رياضيات', 'id_mof' => 1, 'lang_doc' => 'fr'], []);
+        $hP = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris', 'prefs_test' => 1], []);
+        $aP = $area166($hP);
+        $c166('prefs-recalled', strpos($hP, 'name="sig_t" value="raisa" checked') !== false && strpos($aP, 'الأخت فحص محفوظة') === false /* fr: مترجَم */ && strpos($hP, 'value="الأخت فحص محفوظة"') !== false
+              && strpos($hP, 'name="rate_show" value="1" checked') !== false && strpos($hP, 'name="cur" value="usd" checked') !== false && strpos($hP, 'name="id_mof" value="1" checked') !== false
+              && strpos($hP, 'value="رياضيات"') !== false && strpos($aP, 'La Supérieure de l') !== false && strpos($aP, 'Mathématiques') !== false);
+        $hO = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire'], []); // بلا prefs_test ⇒ الفحوص لا تتأثر
+        $c166('prefs-off-in-tests', strpos($hO, 'name="sig_t" value="moudir" checked') !== false);
+        $c166('back-to-dossier', strpos($hO, "attestations.php?employee_id=$eid166&amp;dossier=1'") !== false); // e() تحوّل & إلى &amp;
+    } finally { attestationPrefsClear($eid166, $sch166); }
+    // «ببداية الإفادة: تفيد رئيسة / تفيد إدارة / يفيد مدير» (2026-09-24) — افتتاحية الراتب/العمل/الرعاية بحسب الإمضاء (ar/fr/en)
+    foreach (['raisa' => ['تفيد رئيسة <strong>', 'La Supérieure de l', 'The Mother Superior of <strong>'], 'idara' => ['تفيد إدارة <strong>', 'L&#039;administration de l', 'The administration of <strong>'], 'moudir' => ['يفيد مدير <strong>', 'Le Directeur de l', 'The Director of <strong>']] as $st166 => $w166) {
+        $oa = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'sig_t' => $st166], []));
+        $of = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris', 'lang_doc' => 'fr', 'sig_t' => $st166], []));
+        $oe = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'riaaya', 'lang_doc' => 'en', 'sig_t' => $st166], []));
+        $c166("opening-$st166", strpos($oa, $w166[0]) !== false && strpos($of, $w166[1]) !== false && strpos($oe, $w166[2]) !== false && ($st166 === 'idara' || (strpos($oa, 'تفيد إدارة') === false && strpos($of, 'administration de l') === false)));
+    }
     $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire'], []);
     $c166('rate-default-on', strpos($area166($h), 'سعر الصرف المعتمد') !== false && strpos($h, 'name="rate_show" value="1" checked') !== false);
     $c166('rate-off', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1], [])), 'سعر الصرف المعتمد') === false);

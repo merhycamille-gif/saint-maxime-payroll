@@ -141,6 +141,9 @@ $sigPhone  = $sig['phone'] ?? '';
 // 🔴 لا doc-view هنا: الإفادات وملف الأستاذ يبقيان بشكلهما المعهود (شكوى المستخدم p1 بتاريخ 2026-08-01).
 // صفحة اختيار الأستاذ (بلا موظف): لا شيء يُصدَّر — شريط التصدير زائد يعجّق الواجهة (2026-08-19)
 if (!$emp) $hideExportToolbar = true;
+// ↩️ «وقت بكون بصفحة إفادة الأستاذ لازم يكون في محل أرجع ملف الإفادة فوراً» (2026-09-24): زرّ الرجوع بالترويسة يرجّع مباشرة
+//    لملف إفادات هذا الأستاذ (dossier) بدل history.back() الذي كان يرجع خطوة واحدة عن كل تغيير خيار
+if ($emp && $type !== '' && empty($_GET['dossier'])) $backHref = BASE_URL . 'pages/attestations.php?employee_id=' . (int)$employeeId . '&dossier=1';
 include __DIR__ . '/../includes/header.php';
 
 // ====== ملف الأستاذ الكامل / Dossier: كل شي عن الأستاذ بمكان واحد ======
@@ -689,6 +692,32 @@ if (!$emp):
         return;
     endif;
     if (!isset($ATT_TYPES[$type])) $type = 'cnss';
+    // 🧠 «تكون الملاحظات اللي أنا مختارها لإلو بعدها، ما ضلّ أكتبها دائماً» (2026-09-24): خيارات الشريط تُحفَظ بكل تفاعل (opts_set)
+    //    وتُسترجَع عند فتح أي إفادة لهذا الأستاذ بلا خيارات: العامة لكل موظف، والموقّع لكل مدرسة ولكل مجموعة (إفادات/كتب).
+    //    تاريخ الإفادة والجنس لا يُحفَظان. المربّع الغائب عند الحفظ = مطفأ. (أداة الفحص تطفئها إلا بـprefs_test=1)
+    $PREF_COMMON  = ['lang_doc','cur','inc_extra','inc_aide','inc_trans','logo','rate_show','amt','amt_cur','hire_dt','end_dt','end_none','subj_ovr','id_nssf','id_mof','id_eoc'];
+    $PREF_SIGNER  = ['sig','sig_t','sig_name','sig_noname'];
+    $PREF_BY_TYPE = ['isqat_haq' => ['eos','isq'], 'embassy' => ['emb_amt','emb_cur','emb_per'], 'iqrar' => ['grant'], 'aqd_taalim' => ['aqd_lbp','aqd_usd'],
+                     'afade_madrasiya' => ['lv_sel','lv_txt'], 'notice_school' => ['subj_txt'], 'notice_mail' => ['subj_txt'], 'riaaya' => ['assoc_txt']];
+    $prefTypeKeys = $PREF_BY_TYPE[$type] ?? [];
+    $prefSchoolScope = in_array($type, ['anhaa_khedme','anhaa_mail','notice_school','notice_mail','talab_istiqala'], true) ? 'school_letters' : 'school_certs';
+    $prefSchoolId = (int)($emp['school_id'] ?? 0);
+    $prefsOn = empty($GLOBALS['msa_att_prefs_off']) || !empty($_GET['prefs_test']);
+    if ($prefsOn && !empty($_GET['opts_set'])) {
+        $pv = []; foreach (array_merge($PREF_COMMON, $prefTypeKeys) as $pk) $pv[$pk] = isset($_GET[$pk]) ? (string)$_GET[$pk] : '';
+        attestationPrefsSave('employee', $employeeId, $pv);
+        $ps = []; foreach ($PREF_SIGNER as $pk) $ps[$pk] = isset($_GET[$pk]) ? (string)$_GET[$pk] : '';
+        attestationPrefsSave($prefSchoolScope, $prefSchoolId, $ps);
+    } elseif ($prefsOn) {
+        $pref = array_merge(attestationPrefsGet($prefSchoolScope, $prefSchoolId), attestationPrefsGet('employee', $employeeId));
+        if ($pref) {
+            $allowed = array_merge($PREF_COMMON, $PREF_SIGNER, $prefTypeKeys);
+            foreach ($pref as $pk => $pvv) if ((string)$pvv !== '' && !isset($_GET[$pk]) && in_array($pk, $allowed, true)) $_GET[$pk] = (string)$pvv;
+            $_GET['opts_set'] = '1'; // حتى تُحترَم حالة المربّعات المحفوظة (الغائب = مطفأ)
+            $docLang = $_GET['lang_doc'] ?? ($_SESSION['lang'] ?? 'ar');
+            if (!isset($DOC_LANGS[$docLang])) $docLang = 'ar';
+        }
+    }
     // 📅 «تاريخ الدخول في المدرسة من – إلى ببعض الإفادات: خيار غيّر التاريخ» (2026-09-24): خانتان بالشريط —
     //    «من» تحلّ محلّ تاريخ الدخول بملف الموظف بنصّ هذه الإفادة فقط (والملف لا يُمسّ)، و«إلى» = تاريخ الترك/الانقطاع
     //    (الافتراضي تاريخ الإفادة). سنوات الخدمة تُحسب بينهما.
@@ -932,6 +961,12 @@ if (!$emp):
                  'idara'  => ['ar' => 'حضرة إدارة مدرسة', 'fr' => 'À la Direction de l\'école',       'en' => 'To the Administration of'],
                  'moudir' => ['ar' => 'حضرة مدير مدرسة',  'fr' => 'Monsieur le Directeur de l\'école', 'en' => 'To the Director of']];
     $sigSchool = $SIG_SCHOOL[$sigTitle]; $sigAddr = $SIG_ADDR[$sigTitle];
+    // «وقت بحطّ الإمضاء ببداية الإفادة: الرئيسة ⇒ تفيد رئيسة، الإدارة ⇒ تفيد إدارة، المدير ⇒ يفيد مدير» (2026-09-24):
+    //    افتتاحية إفادات الراتب/العمل/الرعاية تتبع الصفة المختارة نفسها (عربي/فرنسي/إنكليزي)
+    $SIG_OPEN = ['raisa'  => ['ar' => 'تفيد رئيسة', 'fr' => 'La Supérieure de l\'école', 'en' => 'The Mother Superior of'],
+                 'idara'  => ['ar' => 'تفيد إدارة', 'fr' => 'L\'administration de l\'école', 'en' => 'The administration of'],
+                 'moudir' => ['ar' => 'يفيد مدير',  'fr' => 'Le Directeur de l\'école',     'en' => 'The Director of']];
+    $sigOpen = $SIG_OPEN[$sigTitle];
     $hasSigTitle = true; // خيار صفة الموقّع بكل الإفادات (2026-09-24)
     // اسم الموقّع: فاضي = من ملف المدرسة (المسؤول المختار)؛ مكتوب = يحلّ محلّه (العربي يُترجم تلقائياً للنسخ اللاتينية)؛
     // «بلا اسم» = الصفة والتوقيع فقط. يمسّ كل مواضع اسم المدير بالإفادة (التوقيع، «أنا الموقّعة أدناه»، «الممثَّلة بشخص»).
@@ -1476,7 +1511,7 @@ if (!$emp):
         <?php /* متل مثال p1.png: اسم المدينة قبل التاريخ («Mansourieh, le ...» / «Mansourieh: ...») */ ?>
         <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : 'Date : ' ?><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation de salaire' : 'Salary Certificate' ?></h2><?= $rateLine ?>
-        <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $vWork ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $vTeach ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $fromW ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?= $toPart ?>, <?= $endActive ? ($FR ? 'et percevait un salaire mensuel' : 'and received a monthly salary') : ($FR ? 'toujours en fonction à ce jour, et perçoit un salaire mensuel' : 'is still in service to date, and receives a monthly salary') ?><?= $salParts ? ($FR ? ' détaillé comme suit :' : ' detailed as follows:') : ($FR ? ' de <strong>' . $moneyLat($salShown) . '</strong>.' : ' of <strong>' . $moneyLat($salShown) . '</strong>.') ?></p>
+        <p><?= e($FR ? $sigOpen['fr'] : $sigOpen['en']) ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $vWork ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $vTeach ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $fromW ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?= $toPart ?>, <?= $endActive ? ($FR ? 'et percevait un salaire mensuel' : 'and received a monthly salary') : ($FR ? 'toujours en fonction à ce jour, et perçoit un salaire mensuel' : 'is still in service to date, and receives a monthly salary') ?><?= $salParts ? ($FR ? ' détaillé comme suit :' : ' detailed as follows:') : ($FR ? ' de <strong>' . $moneyLat($salShown) . '</strong>.' : ' of <strong>' . $moneyLat($salShown) . '</strong>.') ?></p>
         <?php if ($salParts): ?>
         <p style="margin-left:34px">- <?= $FR ? 'Salaire de base' . ($isEmploye ? '' : ' (après échelons)') : 'Basic salary' . ($isEmploye ? '' : ' (after increments)') ?> : <strong><?= $moneyLat((int)$basePlusEch) ?></strong></p>
         <?php foreach ($salParts as $sp): ?>
@@ -1494,14 +1529,14 @@ if (!$emp):
         <?php /* متل مثال p1.png: اسم المدينة قبل التاريخ («Mansourieh, le ...» / «Mansourieh: ...») */ ?>
         <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : 'Date : ' ?><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? ($FR ? 'Attestation de travail' : 'Work Certificate') : ($FR ? 'Attestation de travail et d\'enseignement' : 'Work and Teaching Certificate') ?></h2><?= $rateLine ?>
-        <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $vWork ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $vTeach ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $fromW ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?= $toPart ?><?= $endActive ? '. ' . ($FR ? $heShe . ' a fait preuve de bonne conduite et d\'assiduité dans l\'accomplissement de son travail.' : $heShe . ' showed good conduct and commitment in the performance of ' . $g('his', 'her', 'his/her') . ' duties.') : ($FR ? ', toujours en fonction à ce jour. ' . $heShe . ' fait preuve de bonne conduite et d\'assiduité dans l\'accomplissement de son travail.' : ', and is still in service to date. ' . $heShe . ' has shown good conduct and commitment in the performance of ' . $g('his', 'her', 'his/her') . ' duties.') ?></p>
+        <p><?= e($FR ? $sigOpen['fr'] : $sigOpen['en']) ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $vWork ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $vTeach ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $fromW ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?= $toPart ?><?= $endActive ? '. ' . ($FR ? $heShe . ' a fait preuve de bonne conduite et d\'assiduité dans l\'accomplissement de son travail.' : $heShe . ' showed good conduct and commitment in the performance of ' . $g('his', 'her', 'his/her') . ' duties.') : ($FR ? ', toujours en fonction à ce jour. ' . $heShe . ' fait preuve de bonne conduite et d\'assiduité dans l\'accomplissement de son travail.' : ', and is still in service to date. ' . $heShe . ' has shown good conduct and commitment in the performance of ' . $g('his', 'her', 'his/her') . ' duties.') ?></p>
         <p><?= $reqLine ?></p>
         <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleLat) ?> — <?= $FR ? 'Signature et cachet' : 'Signature & stamp' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
 
         <?php elseif ($type === 'riaaya'): ?>
         <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : '' ?><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'À qui de droit' : 'To whom it may concern' ?></h2><?= $rateLine ?>
-        <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= strpos($assocTxt, 'التابعة لجمعية') === 0 ? ($FR ? 'relevant de l\'Association des Religieuses Salvatoriennes de Notre-Dame de l\'Annonciation, enregistrée auprès de vos services sous le n° (.....)' : 'affiliated to the Association of the Salvatorian Sisters of Our Lady of the Annunciation, registered with you under No. (.....)') : e($assocTxt) ?>,</p>
+        <p><?= e($FR ? $sigOpen['fr'] : $sigOpen['en']) ?> <strong><?= e($schoolNameFr) ?></strong> <?= strpos($assocTxt, 'التابعة لجمعية') === 0 ? ($FR ? 'relevant de l\'Association des Religieuses Salvatoriennes de Notre-Dame de l\'Annonciation, enregistrée auprès de vos services sous le n° (.....)' : 'affiliated to the Association of the Salvatorian Sisters of Our Lady of the Annunciation, registered with you under No. (.....)') : e($assocTxt) ?>,</p>
         <p><?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille en qualité de' : 'works as' ?> <strong><?= e($funcLat) ?></strong> <?= $FR ? 'dans notre école' : 'at our school' ?><?php else: ?><?= $FR ? 'est enseignant(e) de la matière' : 'is a teacher of' ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?> <?= $FR ? 'dans notre école' : 'at our school' ?><?php endif; ?>.</p>
         <p><?= $FR ? 'La présente attestation est délivrée à cet effet.' : 'This attestation is issued accordingly.' ?></p>
         <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleLat) ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
@@ -1781,7 +1816,7 @@ if (!$emp):
                dir=rtl على السطر حتى تبقى كلمة «التاريخ» قبل الرقم (يمينه) بالشاشة والوورد سواء */ ?>
         <div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : <?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفادة راتب</h2><?= $rateLine ?>
-        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $endActive ? 'ولغاية تاريخ <strong>' . $endFmt . '</strong> ، ' . $g('وكان يتقاضى', 'وكانت تتقاضى', 'وكان(ت) يتقاضى') : $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') . ' حتى تاريخه ، ' . $g('ويتقاضى', 'وتتقاضى', 'ويتقاضى') ?> راتباً شهرياً<?= $salParts ? ' وفق التفصيل الآتي :' : ' قدره <strong>' . $moneyAr($salShown) . '</strong> .' ?></p>
+        <p><?= e($sigOpen['ar']) ?> <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $endActive ? 'ولغاية تاريخ <strong>' . $endFmt . '</strong> ، ' . $g('وكان يتقاضى', 'وكانت تتقاضى', 'وكان(ت) يتقاضى') : $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') . ' حتى تاريخه ، ' . $g('ويتقاضى', 'وتتقاضى', 'ويتقاضى') ?> راتباً شهرياً<?= $salParts ? ' وفق التفصيل الآتي :' : ' قدره <strong>' . $moneyAr($salShown) . '</strong> .' ?></p>
         <?php if ($salParts): ?>
         <?php /* كل مكوّن مختار سطر مستقل واضح (الإضافي/المكافأة/النقل) — لا يُدمج بسطر «بدلات» عام */ ?>
         <p style="margin-right:34px;text-align:right">- الراتب الأساسي<?= $isEmploye ? '' : ' (بعد التدرّج)' ?> : <strong><?= $moneyAr((int)$basePlusEch) ?></strong></p>
@@ -1802,7 +1837,7 @@ if (!$emp):
                dir=rtl على السطر حتى تبقى كلمة «التاريخ» قبل الرقم (يمينه) بالشاشة والوورد سواء */ ?>
         <div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : <?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? 'إفادة عمل' : 'إفادة عمل وتدريس' ?></h2><?= $rateLine ?>
-        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $endActive ? 'ولغاية تاريخ <strong>' . $endFmt . '</strong> ، ' . $g('وكان', 'وكانت', 'وكان(ت)') : $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') . ' حتى تاريخه ، ' . $g('وهو', 'وهي', 'وهو(هي)') ?> على حسن سلوك والتزام في أداء <?= $g('عمله', 'عملها', 'عمله(ا)') ?> .</p>
+        <p><?= e($sigOpen['ar']) ?> <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $endActive ? 'ولغاية تاريخ <strong>' . $endFmt . '</strong> ، ' . $g('وكان', 'وكانت', 'وكان(ت)') : $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') . ' حتى تاريخه ، ' . $g('وهو', 'وهي', 'وهو(هي)') ?> على حسن سلوك والتزام في أداء <?= $g('عمله', 'عملها', 'عمله(ا)') ?> .</p>
         <?php /* صيغة «لمن يلزم» وجملة عدم المسؤولية شِيلتا من كل الإفادات (بطلبه 2026-08-20) */ ?>
         <p>وقد أُعطيت هذه الإفادة بناءً على <?= $g('طلبه', 'طلبها', 'طلبه(ا)') ?> .</p>
         <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
@@ -1812,7 +1847,7 @@ if (!$emp):
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
         <div style="text-align:left;margin-bottom:10px"><?= $today ?></div>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إلى من يهمه الأمر</h2><?= $rateLine ?>
-        <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> <?= e($assocTxt) ?> ،</p>
+        <p><?= e($sigOpen['ar']) ?> <strong><?= e($schoolNameAr) ?></strong> <?= e($assocTxt) ?> ،</p>
         <p>أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا<?php else: ?><?= $g('هو معلّم', 'هي معلّمة', 'هو(هي) معلّم(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا<?php endif; ?> .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
         <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?></strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>

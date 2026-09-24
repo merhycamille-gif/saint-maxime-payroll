@@ -440,7 +440,7 @@ document.addEventListener('submit', function (e) {
                 <?php
                 // بوضع «عرض المستند» (تقرير/نموذج/إفادة): الرجوع يعيد **لنفس الصفحة اللي
                 // كان فيها** المستخدم (docBackUrl) لا لحالة الفلاتر السابقة بالتاريخ.
-                $docBackHref = !empty($docFocus) ? docBackUrl() : '';
+                $docBackHref = !empty($docFocus) ? docBackUrl() : (!empty($backHref) ? (string)$backHref : ''); // $backHref: الصفحة تحدّد وجهة الرجوع (إفادة الأستاذ ⇒ ملف إفاداته، 2026-09-24)
                 ?>
                 <button type="button" class="btn btn-light no-print" title="رجوع / Retour"
                         onclick="<?= $docBackHref !== '' ? "location.href='" . e($docBackHref) . "'" : "if(document.referrer&&history.length>1){history.back()}else{location.href='" . BASE_URL . "index.php'}" ?>"

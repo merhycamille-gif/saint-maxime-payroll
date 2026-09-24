@@ -2045,6 +2045,42 @@ function genderSexOf($g): string {
 /** القيم المقبولة بخانة الجنس (ملف الموظف + شاشات الإفادات). */
 function genderValues(): array { return ['m', 'f', 'd']; }
 
+/** 🧠 «وقت بمون بصفحة إفادة الأستاذ … تكون الملاحظات اللي أنا مختارها لإلو بعدها، ما ضلّ أكتبها دائماً» (2026-09-24):
+ *  خيارات شريط الإفادة تُحفَظ ذاتياً — العامة لكل موظف (scope=employee)، والموقّع (الصفة/الاسم/المسؤول) لكل مدرسة
+ *  ولكل مجموعة (school_certs للإفادات، school_letters لكتب الإنهاء/الإنذار/الاستقالة). جدول ذاتي التركيب، بلا migrate. */
+function ensureAttestationPrefsTable20260924(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        getDB()->exec("CREATE TABLE IF NOT EXISTS attestation_prefs (
+            scope VARCHAR(20) NOT NULL, scope_id INT NOT NULL, opts TEXT NOT NULL, updated_at DATETIME NOT NULL,
+            PRIMARY KEY (scope, scope_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Throwable $e) {}
+}
+function attestationPrefsGet(string $scope, int $id): array {
+    ensureAttestationPrefsTable20260924();
+    try {
+        $q = getDB()->prepare("SELECT opts FROM attestation_prefs WHERE scope = ? AND scope_id = ?");
+        $q->execute([$scope, $id]);
+        $o = json_decode((string)$q->fetchColumn(), true);
+        return is_array($o) ? $o : [];
+    } catch (Throwable $e) { return []; }
+}
+function attestationPrefsSave(string $scope, int $id, array $opts): void {
+    ensureAttestationPrefsTable20260924();
+    try {
+        $merged = array_merge(attestationPrefsGet($scope, $id), $opts); // المفاتيح غير المرسَلة (أنواع أخرى) تبقى كما هي
+        getDB()->prepare("INSERT INTO attestation_prefs (scope, scope_id, opts, updated_at) VALUES (?, ?, ?, NOW())
+                          ON DUPLICATE KEY UPDATE opts = VALUES(opts), updated_at = NOW()")
+               ->execute([$scope, $id, json_encode($merged, JSON_UNESCAPED_UNICODE)]);
+    } catch (Throwable $e) {}
+}
+function attestationPrefsClear(int $employeeId, int $schoolId): void {
+    ensureAttestationPrefsTable20260924();
+    try { getDB()->prepare("DELETE FROM attestation_prefs WHERE (scope = 'employee' AND scope_id = ?) OR (scope IN ('school_certs','school_letters') AND scope_id = ?)")->execute([$employeeId, $schoolId]); } catch (Throwable $e) {}
+}
+
 function ensureGenderColumn20260822() {
     static $done = false;
     if ($done) return;
