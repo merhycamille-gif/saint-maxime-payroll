@@ -2040,7 +2040,7 @@ check('الإفادات: لا رقم هاتف تحت توقيع المدير/ا�
       strpos($atSrc32, 'e($sigPhone)') === false);
 check('الإفادات: «على رأس عمله» استُبدلت بـ«حتى تاريخه» (راتب/عمل/ملاك)',
       strpos($atSrc32, 'على رأس عمله') === false
-      && substr_count($atSrc32, "\$g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') ?> حتى تاريخه") === 2 // (2026-09-15) الصيغة حسب الجنس
+      && substr_count($atSrc32, "\$g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') . ' حتى تاريخه ، '") === 2 // (2026-09-15) الصيغة حسب الجنس — (2026-09-24) صارت الفرع «غير التارك» بجانب «ولغاية تاريخ …» للتارك
       && strpos($atSrc32, 'ولا يزال حتى تاريخه') !== false);
 check('الإفادة المدرسية: لا «راجع ظهر الصفحة» بأسفلها',
       strpos($atSrc32, 'راجع ظهر الصفحة') === false);
@@ -7688,14 +7688,48 @@ if ($eid166) {
     $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris', 'lang_doc' => 'fr', 'opts_set' => 1, 'inc_extra' => 1, 'id_nssf' => 1], []));
     $c166('ids-fr', strpos($a, 'N° CNSS : <strong>') !== false && strpos($a, 'N° fiscal') === false);
     $c166('ids-embassy-en', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'embassy', 'opts_set' => 1, 'inc_extra' => 1, 'id_mof' => 1], [])), 'Tax No. (Ministry of Finance) : <strong>') !== false);
+    // «الأرقام ما بيكونو بأوّل الصفحة»: سطر الأرقام بعد العنوان وقبل آخر كتلة توقيع، مرّة واحدة (راتب/ضمان/مدرسية/عقد)
+    foreach (['salaire' => 'التوقيع والختم', 'cnss' => 'الخاتم والتوقيع', 'afade_madrasiya' => 'خاتم المدرسة', 'aqd_taalim' => 'الفريق الأول'] as $ty166 => $sg166) {
+        $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => $ty166, 'opts_set' => 1, 'inc_extra' => 1, 'id_nssf' => 1], []));
+        $pi = strpos($a, 'class="id-line"'); $ph = strpos($a, '</h2>'); $ps = strrpos($a, $sg166);
+        $c166("ids-bottom-$ty166", $pi !== false && $ph !== false && $pi > $ph && $ps !== false && $pi < $ps && substr_count($a, 'class="id-line"') === 1);
+    }
+    // 🚪 «إذا عندو ترك لازم نحطّو + غيّره أو شيله» + 📚 «المادة أكتب أو غيّر»
+    $left166 = (int)$db->query("SELECT e.id FROM employees e WHERE e.is_deleted=0 AND e.left_date_all IS NOT NULL AND e.left_date_all > '2020-01-01' AND e.employee_type<>'employe' ORDER BY (SELECT COUNT(*) FROM monthly_salaries ms WHERE ms.employee_id=e.id AND ms.net_salary_lbp>0) DESC LIMIT 1")->fetchColumn();
+    if ($left166) {
+        $ld166 = (string)$db->query("SELECT left_date_all FROM employees WHERE id=$left166")->fetchColumn(); $lf166 = date('d/m/Y', strtotime($ld166));
+        $h = renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'salaire'], []);
+        $c166('left-default-ar', strpos($area166($h), 'ولغاية تاريخ <strong>' . $lf166 . '</strong>') !== false && strpos($area166($h), 'حتى تاريخه') === false && strpos($h, 'name="end_dt" value="' . $ld166 . '"') !== false && strpos($h, '&end_dt=' . $ld166) !== false);
+        $c166('left-default-fr', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'tadris', 'lang_doc' => 'fr'], [])), "jusqu'au <strong>$lf166</strong>. Il/Elle a fait preuve") !== false);
+        $c166('left-changed', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1, 'end_dt' => '2025-06-30'], [])), 'ولغاية تاريخ <strong>30/06/2025</strong>') !== false);
+        $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1, 'end_none' => 1], []));
+        $c166('left-removed', strpos($a, 'حتى تاريخه') !== false && strpos($a, 'ولغاية تاريخ') === false);
+        $c166('left-removed-afade-dotted', preg_match('/عن العمل بتاريخ <strong><span style="display:inline-block;min-width:110px;border-bottom:1px dotted/u', $area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'afade_madrasiya', 'opts_set' => 1, 'inc_extra' => 1, 'end_none' => 1], []))) === 1);
+    } else { $why166[] = 'no-left-teacher(skipped)'; }
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire'], []));
+    $c166('no-left-unchanged', strpos($a, 'حتى تاريخه') !== false && strpos($a, 'ولغاية') === false);
+    // 📚 «ببطاقة الراتب السنوية حطّ المواد محلّ الدرجة» (2026-09-24): خانة المواد بالسطر الأوّل مكان الدرجة، والدرجة بالسطر الثالث مكانها — تبديل فقط
+    $as166 = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
+    $pS166 = strpos($as166, '<span class="lbl">Matières / المواد</span>'); $pG166 = strpos($as166, '<span class="lbl">Échelon / الدرجة</span>'); $pT166 = strpos($as166, '<span class="lbl">Type / الفئة</span>'); $pC166 = strpos($as166, '<span class="lbl">Code / الرمز</span>');
+    $c166('slip-subjects-in-grade-cell', $pS166 !== false && $pG166 !== false && $pT166 < $pS166 && $pS166 < $pC166 && $pG166 > $pC166 && substr_count($as166, 'Matières / المواد') === 1 && substr_count($as166, 'Échelon / الدرجة') === 1);
+    // 📚 «شيّك بالإفادات إذا عم تذكر المواد»: الإفادات القانونية تذكر المادة مع الصفة (الضمان/الإسقاط/الإبراء/الإقرار/المدرسية) بالعربي والفرنسي
+    $sj166 = (string)$db->query("SELECT subjects_taught FROM employees WHERE id = $eid166")->fetchColumn();
+    foreach (['cnss' => 'بصفة (<strong>', 'isqat_haq' => 'بصفة : <strong>', 'baraa_zimma' => 'بصفة <strong>', 'iqrar' => 'بصفة <strong>'] as $ty166 => $pre166) {
+        $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => $ty166, 'opts_set' => 1, 'inc_extra' => 1, 'subj_ovr' => 'رياضيات'], []));
+        $c166("subject-in-$ty166", preg_match('/' . preg_quote($pre166, '/') . '[^<]*— مادة الرياضيات/u', $a) === 1);
+    }
+    $c166('subject-in-afade', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'afade_madrasiya', 'opts_set' => 1, 'inc_extra' => 1, 'subj_ovr' => 'رياضيات'], [])), 'التدريس في مدرستنا لمادة <strong>الرياضيات</strong> بتاريخ') !== false);
+    $c166('subject-in-isqat-fr', preg_match('/en qualité de : <strong>[^<]*— matière : Mathématiques/u', $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'isqat_haq', 'lang_doc' => 'fr', 'opts_set' => 1, 'inc_extra' => 1, 'subj_ovr' => 'رياضيات'], []))) === 1);
+    $c166('subject-free', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris', 'opts_set' => 1, 'inc_extra' => 1, 'subj_ovr' => 'مادة حرّة خاصة'], [])), 'لمادة <strong>مادة حرّة خاصة</strong>') !== false);
+    $c166('subject-translated', preg_match('/la matière <strong>Math/u', $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'lang_doc' => 'fr', 'opts_set' => 1, 'inc_extra' => 1, 'subj_ovr' => 'رياضيات'], []))) === 1);
     foreach (['salaire','tadris','embassy','riaaya','anhaa_khedme','afade_madrasiya','isqat_haq','iqrar','aqd_taalim','notice_mail','cnss'] as $ty166) {
         foreach (['ar','fr','en'] as $lg166) {
-            $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => $ty166, 'lang_doc' => $lg166, 'opts_set' => 1, 'inc_extra' => 1, 'rate_show' => 1, 'amt' => 777, 'amt_cur' => 'usd', 'cur' => 'both', 'sig_t' => 'raisa', 'sig_name' => 'Sr Test', 'date' => '2026-02-02', 'hire_dt' => '2011-10-03', 'end_dt' => '2026-06-30', 'id_nssf' => 1, 'id_mof' => 1, 'id_eoc' => 1], []);
-            $c166("no-error $ty166/$lg166", strpos($h, 'FATAL') === false && strpos($h, 'Warning:') === false && strpos($h, 'id="ppExportArea"') !== false && strpos($h, 'name="sig_t"') !== false && strpos($h, 'name="amt"') !== false);
+            $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => $ty166, 'lang_doc' => $lg166, 'opts_set' => 1, 'inc_extra' => 1, 'rate_show' => 1, 'amt' => 777, 'amt_cur' => 'usd', 'cur' => 'both', 'sig_t' => 'raisa', 'sig_name' => 'Sr Test', 'date' => '2026-02-02', 'hire_dt' => '2011-10-03', 'end_dt' => '2026-06-30', 'id_nssf' => 1, 'id_mof' => 1, 'id_eoc' => 1, 'subj_ovr' => 'رياضيات'], []);
+            $c166("no-error $ty166/$lg166", strpos($h, 'FATAL') === false && strpos($h, 'Warning:') === false && strpos($h, 'id="ppExportArea"') !== false && strpos($h, 'name="sig_t"') !== false && strpos($h, 'name="amt"') !== false && substr_count($h, 'class="id-line"') === 1);
         }
     }
 } else { $ok166 = false; $why166[] = 'no employee'; }
-check('✍️📅💱🪪 خيارات الإفادات (2026-09-24): سعر الدولار حطّ/شيل + صفة واسم الموقّع بكل الإفادات + التاريخ المطبوع + المبلغ اليدوي + تاريخ الدخول من – إلى + أرقام الضمان/المالية/صندوق التعويضات — بكل الأنواع واللغات بلا أخطاء', $ok166, implode(' · ', $why166) ?: 'ok');
+check('✍️📅💱🪪 خيارات الإفادات (2026-09-24): سعر الدولار حطّ/شيل + صفة واسم الموقّع بكل الإفادات + التاريخ المطبوع + المبلغ اليدوي + تاريخ الدخول من – إلى + أرقام الضمان/المالية/صندوق التعويضات (آخر الإفادة قبل التوقيع) + تاريخ الترك من الملف (غيّره/شيله) + المادة تُكتب أو تُغيَّر — بكل الأنواع واللغات بلا أخطاء', $ok166, implode(' · ', $why166) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

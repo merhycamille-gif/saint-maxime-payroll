@@ -192,7 +192,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
             <tr>
                 <td><span class="lbl"><?= ($emp['employee_type'] === 'employe') ? 'Fonction / الوظيفة' : 'Diplôme / الشهادة العلمية' ?></span><span class="val"><?= e($meta['diploma']) ?></span></td>
                 <td><span class="lbl">Type / الفئة</span><span class="val"><?= e($meta['type']) ?></span></td>
-                <td><span class="lbl">Échelon / الدرجة</span><span class="val"><?= e($meta['grade']) ?></span></td>
+                <?php /* 📚 «حطّ المواد محلّ الدرجة» (طلبه المباشر 2026-09-24): تبديل الخانتين فقط — المواد بالسطر الأوّل والدرجة بالثالث؛ التخطيط المجمّد لم يُمسّ */ ?>
+                <td><span class="lbl">Matières / المواد</span><span class="val"><?= e($meta['subjects']) ?></span></td>
                 <td><span class="lbl">Code / الرمز</span><span class="val"><?= e($meta['code']) ?></span></td>
             </tr>
             <tr>
@@ -206,7 +207,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 <td><span class="lbl">Classes / الصفوف</span><span class="val"><?= e($meta['classes']) ?></span></td>
             </tr>
             <tr>
-                <td><span class="lbl">Matières / المواد</span><span class="val"><?= e($meta['subjects']) ?></span></td>
+                <td><span class="lbl">Échelon / الدرجة</span><span class="val"><?= e($meta['grade']) ?></span></td>
                 <td><span class="lbl">N° CNSS / رقم الضمان</span><span class="val"><?= e($meta['cnss']) ?></span></td>
                 <td><span class="lbl">N° Caisse / رقم صندوق التعويضات</span><span class="val"><?= e($meta['caisse_no']) ?></span></td>
                 <td><span class="lbl">N° Fin. / الرقم المالي</span><span class="val"><?= e($meta['finance_no']) ?></span></td>
