@@ -924,6 +924,73 @@ function defaultFamilyAllowanceFrom(int $empId, ?PDO $db = null): string {
     } catch (Throwable $e) {}
     return max($cands);
 }
+/**
+ * 👨‍👩‍👧 (2026-09-20) مدّة التعويض العائلي بعد الحفظ: مبلغ بلا «من شهر» يأخذ البداية الافتراضية (أوّل شهر غير مدفوع —
+ * لا يُعدَّل شهر مدفوع أبداً، والمستخدم يراها بملفه ويغيّرها)، و«إلى» قبل «من» تُلغى. تُستدعى قبل recalcEmployeeYear.
+ */
+function applyFamilyAllowanceDates($db, int $id, array $data): void {
+    // 👫 مدّتان مستقلّتان: الزوجة لحالها والأولاد لحالهم (2026-09-20 مساءً «تاريخ الزوجة لحال وتاريخ الأولاد لحال»)
+    $dflt = null; $set = [];
+    foreach (['spouse', 'children'] as $kind) {
+        $from = $data["family_allowance_{$kind}_from"] ?? null;
+        $to   = $data["family_allowance_{$kind}_to"] ?? null;
+        if ((int)($data["family_allowance_{$kind}_lbp"] ?? 0) > 0 && empty($from)) { $dflt = $dflt ?: defaultFamilyAllowanceFrom($id, $db); $from = $dflt; }
+        if ($from && $to && $to < $from) $to = null;
+        $set[$kind] = [$from ?: null, $to ?: null];
+    }
+    try { $db->prepare("UPDATE employees SET family_allowance_spouse_from = ?, family_allowance_spouse_to = ?, family_allowance_children_from = ?, family_allowance_children_to = ?,
+                        family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")
+             ->execute([$set['spouse'][0], $set['spouse'][1], $set['children'][0], $set['children'][1], $set['children'][0] ?: $set['spouse'][0], $set['children'][1] ?: $set['spouse'][1], $id]); } catch (Throwable $e) {}
+}
+
+/**
+ * 👨‍👩‍👧📋 (2026-09-24 «ملف تعويض عائلي: كل الموظفين وقدام كل واحد الزوجة/الأولاد من–إلى، وبس أحطّهم وأكبس طبّق يروح على ملف كل موظف»)
+ * المصدر الواحد لتطبيق التعويض العائلي جماعياً: لكل صفّ مُرسَل (id ⇒ sp/spf/spt/ch/chf/cht) يُقارَن بملفه، ومَن تغيّر شيء عنده فقط
+ * يُحفَظ بالضبط كما يحفظه ملف الموظف نفسه (المبلغان + applyFamilyAllowanceDates + recalcEmployeeYear على السنة المختارة) — لا مسار حساب جديد.
+ * المتعاقد (لا يستحقّ بقانون المعلمين) يُتخطّى. $idSql = قيد النطاق (مدرسة/فئة/سنة) بـalias e — الصفّ خارج النطاق يُتجاهل.
+ * يرجع ['changed'=>عدد المحفوظين, 'recalc'=>عدد المُعاد حسابهم, 'skipped'=>المتخطَّون, 'names'=>[...]].
+ */
+function familyAllowanceBulkApply(PDO $db, array $rows, string $schoolYear, string $idSql = '', array $idParams = [], string $who = ''): array {
+    ensureFamilyAllowanceDateColumns();
+    $out = ['changed' => 0, 'recalc' => 0, 'skipped' => 0, 'names' => []];
+    $mon = function ($v): ?string { return preg_match('/^(\d{4})-(\d{2})$/', trim((string)$v), $m) ? $m[1] . '-' . $m[2] . '-01' : null; };
+    $amt = function ($v): int { return max(0, (int)round((float)str_replace([',', ' '], '', (string)$v))); };
+    $sel = $db->prepare("SELECT e.* FROM employees e WHERE e.id = ? AND e.is_deleted = 0" . $idSql);
+    $upd = $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = ?, family_allowance_children_lbp = ? WHERE id = ?");
+    foreach ($rows as $id => $r) {
+        $id = (int)$id; if ($id <= 0 || !is_array($r)) continue;
+        $sel->execute(array_merge([$id], $idParams));
+        $emp = $sel->fetch(PDO::FETCH_ASSOC);
+        if (!$emp) { $out['skipped']++; continue; }
+        if (!familyAllowanceEligible($emp)) { $out['skipped']++; continue; }
+        $new = ['family_allowance_spouse_lbp' => $amt($r['sp'] ?? 0), 'family_allowance_children_lbp' => $amt($r['ch'] ?? 0),
+                'family_allowance_spouse_from' => $mon($r['spf'] ?? ''), 'family_allowance_spouse_to' => $mon($r['spt'] ?? ''),
+                'family_allowance_children_from' => $mon($r['chf'] ?? ''), 'family_allowance_children_to' => $mon($r['cht'] ?? '')];
+        $old = ['family_allowance_spouse_lbp' => (int)($emp['family_allowance_spouse_lbp'] ?? 0), 'family_allowance_children_lbp' => (int)($emp['family_allowance_children_lbp'] ?? 0)];
+        foreach (['family_allowance_spouse_from', 'family_allowance_spouse_to', 'family_allowance_children_from', 'family_allowance_children_to'] as $k) {
+            $v = (string)($emp[$k] ?? ''); $old[$k] = ($v === '' || $v === '0000-00-00') ? null : substr($v, 0, 7) . '-01';
+        }
+        // «إلى» قبل «من» تُلغى (نفس قاعدة applyFamilyAllowanceDates) قبل المقارنة حتى لا يُعَدّ تغييراً وهمياً
+        foreach (['spouse', 'children'] as $kd) if ($new["family_allowance_{$kd}_from"] && $new["family_allowance_{$kd}_to"] && $new["family_allowance_{$kd}_to"] < $new["family_allowance_{$kd}_from"]) $new["family_allowance_{$kd}_to"] = null;
+        // مبلغ بلا «من» يأخذ البداية الافتراضية عند الحفظ — فلا يُعَدّ تغييراً إن كان المخزّن أصلاً كذلك (مبلغ نفسه + «من» موجود)
+        $same = true;
+        foreach ($new as $k => $v) {
+            if ($v === $old[$k]) continue;
+            if (in_array($k, ['family_allowance_spouse_from', 'family_allowance_children_from'], true) && $v === null && $old[$k] !== null
+                && $new[str_replace('_from', '_lbp', $k)] === $old[str_replace('_from', '_lbp', $k)]) { $new[$k] = $old[$k]; continue; } // أبقى «من» المخزّن
+            $same = false;
+        }
+        if ($same) continue;
+        $upd->execute([$new['family_allowance_spouse_lbp'], $new['family_allowance_children_lbp'], $id]);
+        applyFamilyAllowanceDates($db, $id, $new);
+        try { logAudit('family_allowance_bulk', 'employees', $id, array_intersect_key($emp, $new), $new + ['sy' => $schoolYear, 'by' => $who]); } catch (Throwable $t) {}
+        $out['changed']++;
+        try { if (recalcEmployeeYear($id, $schoolYear) > 0) $out['recalc']++; } catch (Throwable $t) {}
+        $out['names'][] = trim(($emp['first_name_ar'] ?: $emp['first_name_fr']) . ' ' . ($emp['last_name_ar'] ?: $emp['last_name_fr']));
+    }
+    return $out;
+}
+
 /** شرط SQL «له إعداد راتب» (المصدر الواحد): ملاك أو أساس محدّد أو قانون العمل */
 function salaryConfigSql(string $prefix = 'e.'): string {
     ensureSalaryLaborLawColumn();

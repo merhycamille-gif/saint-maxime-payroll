@@ -18,24 +18,7 @@ requireCsrf();
 ensureGenderColumn20260822(); // 🧑 خانة الجنس بملف الموظف — تركيب ذاتي + تعبئة تلقائية من الاسم (2026-08-22)
 ensureFamilyAllowanceDateColumns(); // 👨‍👩‍👧 مدّة التعويض العائلي «من شهر ← إلى شهر» — تركيب ذاتي (2026-09-20)
 
-/**
- * 👨‍👩‍👧 (2026-09-20) مدّة التعويض العائلي بعد الحفظ: مبلغ بلا «من شهر» يأخذ البداية الافتراضية (أوّل شهر غير مدفوع —
- * لا يُعدَّل شهر مدفوع أبداً، والمستخدم يراها بملفه ويغيّرها)، و«إلى» قبل «من» تُلغى. تُستدعى قبل recalcEmployeeYear.
- */
-function applyFamilyAllowanceDates($db, int $id, array $data): void {
-    // 👫 مدّتان مستقلّتان: الزوجة لحالها والأولاد لحالهم (2026-09-20 مساءً «تاريخ الزوجة لحال وتاريخ الأولاد لحال»)
-    $dflt = null; $set = [];
-    foreach (['spouse', 'children'] as $kind) {
-        $from = $data["family_allowance_{$kind}_from"] ?? null;
-        $to   = $data["family_allowance_{$kind}_to"] ?? null;
-        if ((int)($data["family_allowance_{$kind}_lbp"] ?? 0) > 0 && empty($from)) { $dflt = $dflt ?: defaultFamilyAllowanceFrom($id, $db); $from = $dflt; }
-        if ($from && $to && $to < $from) $to = null;
-        $set[$kind] = [$from ?: null, $to ?: null];
-    }
-    try { $db->prepare("UPDATE employees SET family_allowance_spouse_from = ?, family_allowance_spouse_to = ?, family_allowance_children_from = ?, family_allowance_children_to = ?,
-                        family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")
-             ->execute([$set['spouse'][0], $set['spouse'][1], $set['children'][0], $set['children'][1], $set['children'][0] ?: $set['spouse'][0], $set['children'][1] ?: $set['spouse'][1], $id]); } catch (Throwable $e) {}
-}
+// 👨‍👩‍👧 applyFamilyAllowanceDates صارت مشتركة بـincludes/functions.php (2026-09-24) — تستعملها أيضاً صفحة «التعويض العائلي» الجماعية family_allowances.php
 
 /**
  * رفع ملفات الأستاذ: صورة، إخراج قيد/تذكرة، إخراج قيد عائلي.

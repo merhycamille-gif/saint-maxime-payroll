@@ -7032,7 +7032,7 @@ check('👨‍👩‍👧 التعويض العائلي المؤرَّخ (كود
       && strpos($pc149, '$newDue = max(0, $newNet + $newFam + $newTr);') !== false
       && strpos($em149, 'name="family_allowance_spouse_from"') !== false && strpos($em149, 'name="family_allowance_spouse_to"') !== false
       && strpos($em149, 'name="family_allowance_children_from"') !== false && strpos($em149, 'name="family_allowance_children_to"') !== false && strpos($em149, 'name="family_allowance_from"') === false
-      && substr_count($em149, 'applyFamilyAllowanceDates($db, $id, $data);') === 2 && strpos($em149, '$dflt = $dflt ?: defaultFamilyAllowanceFrom($id, $db); $from = $dflt;') !== false
+      && substr_count($em149, 'applyFamilyAllowanceDates($db, $id, $data);') === 2 && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), '$dflt = $dflt ?: defaultFamilyAllowanceFrom($id, $db); $from = $dflt;') !== false /* 👨‍👩‍👧📋 الدالة صارت مشتركة بـfunctions.php (2026-09-24) */
       && strpos($pc149, '$famFromKey = familyAllowanceFromKeyMin($empRow);') !== false && strpos($cp149, '$fromKey = familyAllowanceFromKeyMin($r);') !== false
       && strpos($em149, 'id="famAllowTotal"') !== false && strpos($em149, "\$famTotNow = isset(\$employee['id']) ? familyAllowanceForMonth(\$employee, (int)date('n'), (int)date('Y')) : 0;") !== false /* 🧮 مجموع التعويضات بالملف (2026-09-20) */
       && strpos($hd149, 'ensureFamilyAllowanceDateColumns();') !== false && strpos($hd149, 'healFamilyAllowanceFrom20260920();') !== false
@@ -7793,6 +7793,72 @@ if ($eid166) {
     }
 } else { $ok166 = false; $why166[] = 'no employee'; }
 check('✍️📅💱🪪 خيارات الإفادات (2026-09-24): سعر الدولار حطّ/شيل + صفة واسم الموقّع بكل الإفادات + التاريخ المطبوع + المبلغ اليدوي + تاريخ الدخول من – إلى + أرقام الضمان/المالية/صندوق التعويضات (آخر الإفادة قبل التوقيع) + تاريخ الترك من الملف (غيّره/شيله) + المادة تُكتب أو تُغيَّر — بكل الأنواع واللغات بلا أخطاء', $ok166, implode(' · ', $why166) ?: 'ok');
+
+/* =====================================================================
+ * 167) 👨‍👩‍👧📋 ملف التعويض العائلي الجماعي (2026-09-24 «بدل ما فوت على كل موظف… ملف فيه كل الموظفين وقدام كل واحد الزوجة/الأولاد من–إلى،
+ *      أحدّد الفئة والمدرسة، وبس أحطّهم وأكبس طبّق يروح على ملف كل موظف»): الصفحة ترندر (كل المدارس + مدرسة + فلتر الفئة/العرض/البحث)،
+ *      المتعاقد مقفول، والتطبيق الجماعي = حفظ ملف الموظف نفسه (المبلغان + المدّتان + إعادة حساب السنة) — تجربة فعلية مع ترجيع + idempotent + الإيقاف بـ«إلى شهر»
+ * =================================================================== */
+$ok167 = true; $why167 = [];
+$c167 = function (string $n, bool $ok) use (&$ok167, &$why167) { if (!$ok) { $ok167 = false; $why167[] = $n; } };
+$c167('applyFamilyAllowanceDates-shared', function_exists('applyFamilyAllowanceDates') && function_exists('familyAllowanceBulkApply')
+    && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'function applyFamilyAllowanceDates') === false);
+$hdr167 = (string)file_get_contents($PROJ . '/includes/header.php');
+$c167('nav+dashboard', strpos($hdr167, 'pages/family_allowances.php') !== false && strpos($hdr167, "'family_allowances'=>'personnel'") !== false
+    && strpos($hdr167, "'family_allowances.php'") !== false && strpos((string)file_get_contents($PROJ . '/index.php'), 'pages/family_allowances.php') !== false);
+$sy167 = currentSchoolYear();
+$h = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167], []);
+$nElig = substr_count($h, '<tr class="" data-id='); $nNa = substr_count($h, '<tr class="na" data-id=');
+$c167('render-all', $noFatal($h) && strpos($h, 'id="faForm"') !== false && strpos($h, 'name="fa[') !== false && $nElig > 0 && strpos($h, 'type="month"') !== false && stripos($h, 'Warning:') === false);
+$c167('contractuel-locked', $nNa === 0 || (substr_count($h, 'متعاقد: لا يستحقّ') === $nNa && preg_match('/<tr class="na" data-id="\d+">.*?<input[^>]*name="fa\[\d+\]\[sp\]"[^>]* disabled>/s', $h) === 1));
+[$yf167, $yp167] = yearEmploymentFilter($sy167, 'e.');
+$h2 = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat' => ['titulaire'], 'show' => 'with'], []);
+$stW = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND (COALESCE(e.family_allowance_spouse_lbp,0) > 0 OR COALESCE(e.family_allowance_children_lbp,0) > 0)" . $yf167);
+$stW->execute($yp167);
+$c167('render-filter-titulaire-with', $noFatal($h2) && substr_count($h2, '<tr class="na" data-id=') === 0 && strpos($h2, 'fa-badge fa-e') === false && strpos($h2, 'fa-badge fa-c') === false
+    && substr_count($h2, '<tr class="" data-id=') === (int)$stW->fetchColumn());
+$sch167 = (int)$db->query("SELECT school_id FROM employees WHERE is_deleted = 0 AND employee_type = 'enseignant_titulaire' LIMIT 1")->fetchColumn();
+$h3 = renderPage('pages/family_allowances.php', ['sch' => $sch167, 'sy' => $sy167, 'q' => 'ا'], []);
+$c167('render-school-search', $noFatal($h3) && strpos($h3, 'École / المدرسة</th>') === false && strpos($h3, 'id="faForm"') !== false);
+// تجربة فعلية: ملاك بسنة جارية بأشهر غير مدفوعة وبلا تعويض ⇒ تطبيق زوجة+أولاد من كانون الأول، الأولاد حتى آذار ⇒ الأشهر تتبع + idempotent + الإيقاف ⇒ ترجيع كامل
+[$y167] = schoolYearToYears($sy167);
+$t167 = $db->query("SELECT e.id, e.school_id FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND COALESCE(e.family_allowance_children_lbp,0) = 0 AND COALESCE(e.family_allowance_spouse_lbp,0) = 0
+    AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = '$sy167' AND is_paid = 0 AND base_plus_echelon_lbp > 0 AND month = 12) LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($t167) {
+    $tid = (int)$t167['id'];
+    $snap = $db->query("SELECT family_allowance_spouse_lbp sp, family_allowance_children_lbp ch, family_allowance_spouse_from sf, family_allowance_spouse_to st, family_allowance_children_from cf, family_allowance_children_to ct, family_allowance_from f0, family_allowance_to t0 FROM employees WHERE id = $tid")->fetch(PDO::FETCH_ASSOC);
+    $before = $db->query("SELECT * FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$sy167' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC);
+    $db->exec("DROP TEMPORARY TABLE IF EXISTS _ms_bak167"); $db->exec("CREATE TEMPORARY TABLE _ms_bak167 AS SELECT * FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$sy167'");
+    try {
+        $m1 = sprintf('%04d-12', $y167); $m2 = sprintf('%04d-03', $y167 + 1);
+        $r1 = familyAllowanceBulkApply($db, [$tid => ['sp' => '500,000', 'spf' => $m1, 'spt' => '', 'ch' => '2,310,000', 'chf' => $m1, 'cht' => $m2], 999999999 => ['sp' => 1]], $sy167, ' AND e.school_id = ?', [(int)$t167['school_id']], 'regcheck');
+        $fam = function () use ($db, $tid, $sy167) { $o = []; foreach ($db->query("SELECT month, family_allowance_lbp f, total_due_lbp d FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$sy167'")->fetchAll(PDO::FETCH_ASSOC) as $r) $o[(int)$r['month']] = [(int)$r['f'], (int)$r['d']]; return $o; };
+        $b = []; foreach ($before as $r) $b[(int)$r['month']] = [(int)$r['family_allowance_lbp'], (int)$r['total_due_lbp']];
+        $a = $fam();
+        $c167('apply-changed-1', $r1['changed'] === 1 && $r1['recalc'] === 1 && $r1['skipped'] === 1);
+        $emp = $db->query("SELECT * FROM employees WHERE id = $tid")->fetch(PDO::FETCH_ASSOC);
+        $c167('apply-file', (int)$emp['family_allowance_spouse_lbp'] === 500000 && (int)$emp['family_allowance_children_lbp'] === 2310000 && $emp['family_allowance_spouse_from'] === $m1 . '-01' && $emp['family_allowance_spouse_to'] === null && $emp['family_allowance_children_from'] === $m1 . '-01' && $emp['family_allowance_children_to'] === $m2 . '-01');
+        $c167('apply-months', isset($a[11], $a[12], $a[3], $a[4]) && $a[11][0] === 0 && $a[12][0] === 2810000 && $a[3][0] === 2810000 && $a[4][0] === 500000
+            && $a[12][1] === $b[12][1] + 2810000 && $a[4][1] === $b[4][1] + 500000 && $a[11][1] === $b[11][1]); // المستحق يركب بالضبط
+        $r2 = familyAllowanceBulkApply($db, [$tid => ['sp' => '500000', 'spf' => $m1, 'spt' => '', 'ch' => '2310000', 'chf' => $m1, 'cht' => $m2]], $sy167, '', [], 'regcheck');
+        $c167('idempotent', $r2['changed'] === 0);
+        $r2b = familyAllowanceBulkApply($db, [$tid => ['sp' => '500000', 'spf' => '', 'spt' => '', 'ch' => '2310000', 'chf' => '', 'cht' => $m2]], $sy167, '', [], 'regcheck');
+        $c167('idempotent-empty-from-keeps-stored', $r2b['changed'] === 0); // «من» فارغ مع نفس المبلغ = يبقى المخزّن، لا تغيير وهمي
+        $r3 = familyAllowanceBulkApply($db, [$tid => ['sp' => '500000', 'spf' => $m1, 'spt' => $m2, 'ch' => '2310000', 'chf' => $m1, 'cht' => $m2]], $sy167, '', [], 'regcheck');
+        $a3 = $fam();
+        $c167('stop-by-to-month', $r3['changed'] === 1 && $a3[4][0] === 0 && $a3[3][0] === 2810000 && $a3[4][1] === $b[4][1]);
+        $ct = $db->query("SELECT id FROM employees WHERE is_deleted = 0 AND employee_type = 'enseignant_contractuel' LIMIT 1")->fetchColumn();
+        if ($ct) { $r4 = familyAllowanceBulkApply($db, [(int)$ct => ['sp' => '900000', 'ch' => '900000']], $sy167, '', [], 'regcheck'); $c167('contractuel-skipped', $r4['changed'] === 0 && $r4['skipped'] === 1 && (int)$db->query("SELECT COALESCE(family_allowance_children_lbp,0) FROM employees WHERE id = $ct")->fetchColumn() !== 900000); }
+    } catch (Throwable $e) { $c167('exception:' . $e->getMessage(), false); }
+    $db->prepare("UPDATE employees SET family_allowance_spouse_lbp = ?, family_allowance_children_lbp = ?, family_allowance_spouse_from = ?, family_allowance_spouse_to = ?, family_allowance_children_from = ?, family_allowance_children_to = ?, family_allowance_from = ?, family_allowance_to = ? WHERE id = ?")
+       ->execute([$snap['sp'], $snap['ch'], $snap['sf'], $snap['st'], $snap['cf'], $snap['ct'], $snap['f0'], $snap['t0'], $tid]);
+    $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$sy167'");
+    $db->exec("INSERT INTO monthly_salaries SELECT * FROM _ms_bak167"); $db->exec("DROP TEMPORARY TABLE _ms_bak167");
+    try { $db->exec("DELETE FROM audit_log WHERE action = 'family_allowance_bulk' AND record_id = $tid"); } catch (Throwable $e) {}
+    $after = $db->query("SELECT * FROM monthly_salaries WHERE employee_id = $tid AND school_year = '$sy167' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC);
+    $c167('restored', $after === $before);
+} else { $why167[] = 'no test employee (skipped live test)'; }
+check('👨‍👩‍👧📋 ملف التعويض العائلي الجماعي (2026-09-24): صفحة family_allowances.php (مدرسة/كل المدارس + الفئة + عندهم/بلا + بحث) + المتعاقد مقفول + «طبّق» = حفظ ملف الموظف نفسه (المبلغان + المدّتان + إعادة حساب السنة) — تجربة فعلية مع ترجيع + idempotent + الإيقاف بـ«إلى شهر» + الملاحة', $ok167, implode(' · ', $why167) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
