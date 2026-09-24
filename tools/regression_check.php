@@ -7659,7 +7659,26 @@ if ($eid166) {
     $c166('sig-noname', strpos($a, 'الأخت فحص الموقّعة') === false && preg_match('/المدير — التوقيع والختم<\/strong><\/div>/u', $a) === 1);
     $c166('sig-riaaya-default', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'riaaya'], [])), '<strong>الإدارة</strong>') !== false);
     $c166('sig-embassy-en', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'embassy', 'sig_t' => 'raisa'], [])), '<strong>The Mother Superior</strong>') !== false);
-    $c166('sig-afade-name', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'afade_madrasiya', 'sig_name' => 'الأخت فحص الموقّعة'], [])), 'أنا الموقّعة أدناه : <strong>الأخت فحص الموقّعة</strong>') !== false);
+    // 🏫 «يا مدير لحالو أو رئيسة المدرسة لحالها» (p1 2026-09-24): الإفادة المدرسية تتبع خيار الإمضاء — لا «رئيسة أو مديرة» ولا «رئيس أو مدير»
+    $aAf = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'afade_madrasiya', 'sig_t' => 'raisa', 'sig_name' => 'الأخت فحص الموقّعة'], []));
+    $c166('sig-afade-name', strpos($aAf, 'أنا الموقّعة أدناه : <strong>الأخت فحص الموقّعة</strong>') !== false && strpos($aAf, 'رئيسة مدرسة : <strong>') !== false && strpos($aAf, '<strong>توقيع رئيسة المدرسة</strong>') !== false && strpos($aAf, 'رئيسة أو مديرة') === false);
+    $aAf = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'afade_madrasiya'], []));
+    $c166('sig-afade-director-default', strpos($aAf, 'أنا الموقّع أدناه : ') !== false && strpos($aAf, 'مدير مدرسة : <strong>') !== false && strpos($aAf, '<strong>توقيع مدير المدرسة</strong>') !== false && strpos($aAf, 'رئيس أو مدير') === false);
+    $aAf = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'afade_madrasiya', 'lang_doc' => 'fr', 'sig_t' => 'raisa'], []));
+    $c166('sig-afade-fr', strpos($aAf, 'Je soussignée : ') !== false && preg_match('/Supérieure de l(&#039;|\x27)école : <strong>/u', $aAf) === 1 && strpos($aAf, 'Signature de la Supérieure') !== false); // e() تحوّل ' إلى &#039;
+    $aAf = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'afade_madrasiya', 'lang_doc' => 'en'], []));
+    $c166('sig-afade-en', strpos($aAf, 'Director of : <strong>') !== false && strpos($aAf, 'Signature of the Director') !== false);
+    // «كل الإفادات لازم» (2026-09-24): لا «رئيسة المدرسة» ثابتة ولا «Directrice/Principal» — الصفة المختارة بكل الإفادات (إنهاء الخدمات/الإنذاران/الاستقالة/العقد)
+    $at166 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+    $c166('no-fixed-head-in-code', strpos($at166, '<strong>رئيسة المدرسة</strong>') === false && strpos($at166, 'La Directrice de l') === false && strpos($at166, 'School Principal') === false && strpos($at166, 'رئيسة أو مديرة') === false && strpos($at166, 'رئيس أو مدير') === false && strpos($at166, 'حضرة مديرة مدرسة') === false && strpos($at166, 'من قبل رئيس المدرسة') === false);
+    foreach (['anhaa_khedme' => ['رئيسة المدرسة', 'مدير المدرسة'], 'notice_mail' => ['رئيسة المدرسة', 'مدير المدرسة'], 'talab_istiqala' => ['حضرة رئيسة مدرسة :', 'حضرة مدير مدرسة :']] as $ty166 => $w166) {
+        $aR = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => $ty166], []));
+        $aM = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => $ty166, 'sig_t' => 'moudir'], []));
+        $c166("head-choice-$ty166", strpos($aR, $w166[0]) !== false && strpos($aR, $w166[1]) === false && strpos($aM, $w166[1]) !== false && strpos($aM, 'رئيسة') === false);
+    }
+    $aF = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'anhaa_khedme', 'lang_doc' => 'fr', 'sig_t' => 'moudir'], []));
+    $c166('head-choice-fr', preg_match('/Le Directeur de l(&#039;|\')école/u', $aF) === 1 && strpos($aF, 'Directrice') === false);
+    $c166('head-choice-contract', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'aqd_taalim', 'sig_t' => 'raisa'], [])), 'من قبل رئيسة المدرسة') !== false);
     $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire'], []);
     $c166('rate-default-on', strpos($area166($h), 'سعر الصرف المعتمد') !== false && strpos($h, 'name="rate_show" value="1" checked') !== false);
     $c166('rate-off', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1], [])), 'سعر الصرف المعتمد') === false);

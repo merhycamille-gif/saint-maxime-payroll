@@ -901,6 +901,8 @@ if (!$emp):
     // ✍️ «بكل إفادة أقدر غيّر أو أكتب اسم المدير أو الرئيسة» (2026-09-24): خيار الصفة صار بكل الإفادات (كان بإفادة الراتب
     //    فقط) — الافتراضي يحافظ على ما كانت تطبعه كل إفادة (الإدارة لإفادة الرعاية والقسم العام، والمدير للباقي).
     $sigDefault = ($type === 'riaaya' || !in_array($type, ['salaire','tadris','embassy','anhaa_khedme','anhaa_mail','talab_istiqala','afade_madrasiya','isqat_haq','baraa_zimma','iqrar','aqd_taalim','notice_school','notice_mail','cnss'], true)) ? 'idara' : 'moudir';
+    // «كل الإفادات لازم» (2026-09-24): كتب إنهاء الخدمات والإنذاران وطلب الاستقالة كانت بـ«رئيسة المدرسة» ثابتة ⇒ افتراضيها الرئيسة، ويختار غيرها
+    if (in_array($type, ['anhaa_khedme', 'anhaa_mail', 'notice_school', 'notice_mail', 'talab_istiqala'], true)) $sigDefault = 'raisa';
     $sigTitle = $_GET['sig_t'] ?? $sigDefault;
     if (!in_array($sigTitle, ['raisa', 'idara', 'moudir'], true)) $sigTitle = $sigDefault;
     $SIG_TITLES = ['raisa' => ['ar' => 'الرئيسة', 'fr' => 'La Supérieure'],
@@ -910,6 +912,26 @@ if (!$emp):
     $sigTitleAr = $SIG_TITLES[$sigTitle]['ar'];
     $sigTitleFr = $SIG_TITLES[$sigTitle]['fr'];
     $sigTitleEn = $SIG_EN[$sigTitle];
+    // 🏫 «يا مدير لحالو أو رئيسة المدرسة لحالها — لازم اختار» (p1 2026-09-24، الإفادة المدرسية لصندوق التعويضات):
+    //    كانت صيغة «الرئيسة/المديرة» المزدوجة ثابتة بالسطر الأوّل وبالتوقيع ⇒ صارت تتبع خيار الإمضاء نفسه (الرئيسة/الإدارة/المدير)
+    $AF_HEAD = ['raisa'  => ['i' => 'أنا الموقّعة أدناه',  'ar' => 'رئيسة مدرسة',   'sig' => 'توقيع رئيسة المدرسة',
+                            'jf' => 'Je soussignée',       'fr' => 'Supérieure de l\'école', 'sf' => 'Signature de la Supérieure',
+                            'je' => 'I, the undersigned', 'en' => 'Mother Superior of',   'se' => 'Signature of the Mother Superior'],
+                'idara'  => ['i' => 'الموقّع أدناه عن الإدارة', 'ar' => 'إدارة مدرسة',   'sig' => 'توقيع إدارة المدرسة',
+                            'jf' => 'Je soussigné(e)',     'fr' => 'Direction de l\'école',  'sf' => 'Signature de la Direction',
+                            'je' => 'I, the undersigned', 'en' => 'Administration of',    'se' => 'Signature of the Administration'],
+                'moudir' => ['i' => 'أنا الموقّع أدناه',   'ar' => 'مدير مدرسة',    'sig' => 'توقيع مدير المدرسة',
+                            'jf' => 'Je soussigné',        'fr' => 'Directeur de l\'école',  'sf' => 'Signature du Directeur',
+                            'je' => 'I, the undersigned', 'en' => 'Director of',          'se' => 'Signature of the Director']];
+    $afHead = $AF_HEAD[$sigTitle];
+    // «كل الإفادات لازم» (2026-09-24): صفة الموقّع الواحدة بكل الإفادات — «رئيسة المدرسة/مدير المدرسة/إدارة المدرسة» بالتوقيع وبالمخاطبة وبالنصّ
+    $SIG_SCHOOL = ['raisa'  => ['ar' => 'رئيسة المدرسة', 'fr' => 'La Supérieure de l\'école', 'en' => 'The Mother Superior', 'frfrom' => 'de la Supérieure de l\'école', 'enfrom' => 'from the Mother Superior', 'frby' => 'la Supérieure', 'enby' => 'the Mother Superior'],
+                   'idara'  => ['ar' => 'إدارة المدرسة', 'fr' => 'La Direction de l\'école',  'en' => 'The School Administration', 'frfrom' => 'de la Direction de l\'école', 'enfrom' => 'from the School Administration', 'frby' => 'la Direction', 'enby' => 'the administration'],
+                   'moudir' => ['ar' => 'مدير المدرسة',  'fr' => 'Le Directeur de l\'école',  'en' => 'The School Director', 'frfrom' => 'du Directeur de l\'école', 'enfrom' => 'from the School Director', 'frby' => 'le Directeur', 'enby' => 'the Director']];
+    $SIG_ADDR = ['raisa'  => ['ar' => 'حضرة رئيسة مدرسة', 'fr' => 'Madame la Supérieure de l\'école', 'en' => 'To the Mother Superior of'],
+                 'idara'  => ['ar' => 'حضرة إدارة مدرسة', 'fr' => 'À la Direction de l\'école',       'en' => 'To the Administration of'],
+                 'moudir' => ['ar' => 'حضرة مدير مدرسة',  'fr' => 'Monsieur le Directeur de l\'école', 'en' => 'To the Director of']];
+    $sigSchool = $SIG_SCHOOL[$sigTitle]; $sigAddr = $SIG_ADDR[$sigTitle];
     $hasSigTitle = true; // خيار صفة الموقّع بكل الإفادات (2026-09-24)
     // اسم الموقّع: فاضي = من ملف المدرسة (المسؤول المختار)؛ مكتوب = يحلّ محلّه (العربي يُترجم تلقائياً للنسخ اللاتينية)؛
     // «بلا اسم» = الصفة والتوقيع فقط. يمسّ كل مواضع اسم المدير بالإفادة (التوقيع، «أنا الموقّعة أدناه»، «الممثَّلة بشخص»).
@@ -1509,13 +1531,13 @@ if (!$emp):
         <p><?= $FR ? 'Tout en regrettant de vous notifier sa décision, l\'administration de l\'école vous remercie de votre coopération dévouée et vous souhaite plein succès, avec l\'expression de son profond respect.' : 'While regretting to notify you of its decision, the school administration thanks you for your devoted cooperation and wishes you every success, with its highest consideration.' ?></p>
         <div style="display:flex;justify-content:space-between;margin-top:32px">
           <div><?= $FR ? 'Le' : 'On' ?> : <?= $effFmt ?></div>
-          <div style="text-align:center"><strong><?= $FR ? 'La Directrice de l\'école' : 'The School Principal' ?></strong><div style="margin-top:36px;border-top:1px solid #333;width:200px"></div></div>
+          <div style="text-align:center"><strong><?= e($FR ? $sigSchool['fr'] : $sigSchool['en']) ?></strong><div style="margin-top:36px;border-top:1px solid #333;width:200px"></div></div>
         </div>
         <p style="margin-top:12px<?= $type === 'anhaa_mail' ? ';text-align:center' : '' ?>"><?= $FR ? 'Sous toutes réserves' : 'With all reservations' ?></p>
         <?php if ($type === 'anhaa_khedme'): ?>
         <div style="margin-top:24px;border-top:1px dashed #999;padding-top:12px">
           <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= e($nomFr) ?></strong></p>
-          <p><?= $FR ? 'reconnais avoir reçu de la Directrice de l\'école la lettre de fin de mes services.' : 'acknowledge having received from the School Principal the letter terminating my services.' ?></p>
+          <p><?= $FR ? 'reconnais avoir reçu ' . e($sigSchool['frfrom']) . ' la lettre de fin de mes services.' : 'acknowledge having received ' . e($sigSchool['enfrom']) . ' the letter terminating my services.' ?></p>
           <div style="display:flex;justify-content:space-between;margin-top:24px">
             <div><?= $FR ? 'Le' : 'On' ?> : <?= $blank(90) ?></div>
             <div style="text-align:center"><strong><?= $FR ? 'Nom et signature' : 'Name and signature' ?></strong><div style="margin-top:32px;border-top:1px solid #333;width:200px"></div></div>
@@ -1525,7 +1547,7 @@ if (!$emp):
 
         <?php elseif ($type === 'talab_istiqala'): ?>
         <h2 style="text-align:center;margin:6px 0 24px;text-decoration:underline"><?= $FR ? 'Demande de démission' : 'Resignation Request' ?></h2><?= $rateLine ?>
-        <p><?= $FR ? 'Madame la Directrice de l\'école' : 'To the Principal of' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
+        <p><?= e($FR ? $sigAddr['fr'] : $sigAddr['en']) ?> : <strong><?= e($schoolNameFr) ?></strong></p>
         <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= e($nomFr) ?></strong></p>
         <p><?= $FR ? 'vous informe de ma démission de mes fonctions à l\'école' : 'hereby inform you of my resignation from my duties at' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'à compter de la prochaine année scolaire' : 'as of the coming academic year' ?> <strong><?= $nextSY ?></strong>, <?= $FR ? 'et ce pour des raisons personnelles.' : 'for personal reasons.' ?></p>
         <p><?= $FR ? 'Veuillez agréer l\'expression de mon profond respect.' : 'Please accept my highest consideration.' ?></p>
@@ -1536,8 +1558,8 @@ if (!$emp):
 
         <?php elseif ($type === 'afade_madrasiya'): ?>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $FR ? 'Attestation scolaire' : 'School Attestation' ?></h2><?= $rateLine ?>
-        <p><?= $FR ? 'Je soussigné(e)' : 'I, the undersigned' ?> : <strong><?= $directorFr ? e($directorFr) : $blank(180) ?></strong></p>
-        <p><?= $FR ? 'Chef d\'établissement de l\'école' : 'Head of' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
+        <p><?= $FR ? e($afHead['jf']) : e($afHead['je']) ?> : <strong><?= $directorFr ? e($directorFr) : $blank(180) ?></strong></p>
+        <p><?= $FR ? e($afHead['fr']) : e($afHead['en']) ?> : <strong><?= e($schoolNameFr) ?></strong></p>
         <p><?= $FR ? 'certifie que' : 'certify that' ?> <?= $mrsLat ?> : <strong><?= e($nomFr) ?></strong> &nbsp; <?= $FR ? 'titulaire de la carte d\'identité n°' : 'holder of ID card No.' ?> <?= $blank(150) ?></p>
         <p><?= $FR ? 'a commencé à enseigner dans notre école' : 'started teaching at our school' ?><?= (!$isEmploye && $subj !== '') ? ($FR ? ' la matière' : '') . ' <strong>' . e($subjL) . '</strong>' : '' ?> <?= $FR ? 'le' : 'on' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(120) ?></strong></p>
         <p><?= $FR ? 'et a cessé son travail le' : 'and ceased work on' ?> <strong><?= $endFmt ?></strong></p>
@@ -1561,7 +1583,7 @@ if (!$emp):
         <p><?= $FR ? 'La présente attestation est établie conformément aux faits et sur la base des registres de l\'école.' : 'This attestation is issued in accordance with the facts and based on the school records.' ?></p>
         <div style="display:flex;justify-content:space-between;margin-top:38px">
           <div><?= $FR ? 'Fait le' : 'Issued on' ?> <?= $effFmt ?></div>
-          <div style="text-align:center"><strong><?= $FR ? 'Signature du chef d\'établissement' : 'Signature of the head of school' ?></strong><div style="margin-top:10px"><?= $FR ? 'Cachet de l\'école' : 'School stamp' ?></div>
+          <div style="text-align:center"><strong><?= $FR ? e($afHead['sf']) : e($afHead['se']) ?></strong><div style="margin-top:10px"><?= $FR ? 'Cachet de l\'école' : 'School stamp' ?></div>
             <div style="margin-top:28px;border-top:1px solid #333;width:220px"></div></div>
         </div>
         <p style="margin-top:22px;font-size:12pt;color:#444"><?= $FR ? 'Note : la présente attestation est à adresser à la direction de la Caisse d\'indemnités des membres du corps enseignant des écoles privées.' : 'Note: this attestation is to be sent to the administration of the Compensation Fund for Private-School Teaching Staff.' ?></p>
@@ -1643,7 +1665,7 @@ if (!$emp):
         <p><?= $FR ? 'Merci.' : 'Thank you.' ?></p>
         <div style="display:flex;justify-content:space-between;margin-top:34px">
           <div><?= $FR ? 'Le' : 'On' ?> : <?= $effFmt ?></div>
-          <div style="text-align:center"><strong><?= $FR ? 'La Directrice de l\'école' : 'The School Principal' ?></strong><div style="margin-top:38px;border-top:1px solid #333;width:200px"></div></div>
+          <div style="text-align:center"><strong><?= e($FR ? $sigSchool['fr'] : $sigSchool['en']) ?></strong><div style="margin-top:38px;border-top:1px solid #333;width:200px"></div></div>
         </div>
         <?php if ($type === 'notice_school'): ?>
         <div style="margin-top:30px;border-top:1px dashed #999;padding-top:10px">
@@ -1733,7 +1755,7 @@ if (!$emp):
         <p><strong>9 ـ</strong> <?= $FR ? 'La seconde partie ne peut quitter le travail à l\'école avant la fin de l\'année scolaire sans l\'accord de la première partie, sous peine des dommages-intérêts visés à l\'article 30 de la loi du 15-6-1956.' : 'The second party may not leave work at the school before the end of the school year without the first party\'s consent, under penalty of the damages referred to in Article 30 of the Law of 15-6-1956.' ?></p>
         <p><strong>10 ـ</strong> <?= $FR ? 'La première partie peut imposer à la seconde partie, sans contrepartie, des heures supplémentaires pour achever le programme que cette dernière a établi et déposé auprès de l\'administration en début d\'année.' : 'The first party may impose on the second party, without consideration, additional hours to complete the curriculum which the latter established and filed with the administration at the beginning of the year.' ?></p>
         <p><strong>11 ـ</strong> <?= $FR ? 'La seconde partie s\'engage à respecter les échéances relatives à la répartition annuelle des cours et à leur préparation, à la remise des questions des devoirs hebdomadaires et des examens, à leur correction et à leur restitution sans délai aux responsables, aux dates fixées par l\'administration.' : 'The second party undertakes to respect the deadlines relating to the annual distribution of lessons and their preparation, the submission of weekly assignment and examination questions, their correction and their return without delay to those in charge, on the dates set by the administration.' ?></p>
-        <p><strong>12 ـ</strong> <?= $FR ? 'La seconde partie reste liée à l\'administration de l\'école pendant un mois des vacances d\'été, fixé par le chef d\'établissement avant la fin de l\'année scolaire ; elle doit répondre à toute convocation durant ce mois dans les limites de ses devoirs professionnels, à l\'exception de l\'enseignement, et dans le délai fixé par l\'administration (article 22 de la loi du 15-6-1956).' : 'The second party remains bound to the school administration for one month of the summer vacation, to be determined by the head of school before the end of the school year; he/she must respond to any summons during this month within the limits of his/her professional duties, excluding teaching, and within the period set by the administration (Article 22 of the Law of 15-6-1956).' ?></p>
+        <p><strong>12 ـ</strong> <?= $FR ? 'La seconde partie reste liée à l\'administration de l\'école pendant un mois des vacances d\'été, fixé par ' . e($sigSchool['frby']) . ' avant la fin de l\'année scolaire ; elle doit répondre à toute convocation durant ce mois dans les limites de ses devoirs professionnels, à l\'exception de l\'enseignement, et dans le délai fixé par l\'administration (article 22 de la loi du 15-6-1956).' : 'The second party remains bound to the school administration for one month of the summer vacation, to be determined by ' . e($sigSchool['enby']) . ' before the end of the school year; he/she must respond to any summons during this month within the limits of his/her professional duties, excluding teaching, and within the period set by the administration (Article 22 of the Law of 15-6-1956).' ?></p>
         <p><strong>13 ـ</strong> <?= $FR ? 'Le présent contrat est réputé suspendu si son exécution devient impossible pour toute cause indépendante de la volonté des deux parties et que cette impossibilité persiste trois mois à compter de la suspension ; dans ce cas, la seconde partie a droit au salaire entier du premier mois et à la moitié du salaire des deux mois suivants. L\'impossibilité comprend, à titre d\'exemple non limitatif, les troubles, les guerres et les mesures de l\'État ; aucun droit d\'aucune sorte ne naît pour l\'une des parties à l\'égard de l\'autre à compter de la suspension de l\'exécution du présent contrat.' : 'This contract is deemed suspended if its performance becomes impossible for any cause beyond the control of both parties and such impossibility persists for three months from the suspension; in this case, the second party is entitled to the full salary of the first month and half the salary of the following two months. Impossibility includes, by way of non-limiting example, unrest, wars and State measures; no rights of any kind arise for either party towards the other as from the suspension of the performance of this contract.' ?></p>
         <p><strong>14 ـ</strong> <?= $FR ? 'Pour toutes les matières non mentionnées aux articles précédents, les dispositions des lois en vigueur s\'appliquent, notamment la loi du 15-6-1956 et les lois relatives à l\'organisation du budget scolaire.' : 'In all matters not mentioned in the preceding articles, the provisions of the laws in force shall apply, in particular the Law of 15-6-1956 and the laws relating to the organization of the school budget.' ?></p>
         <p><strong>15 ـ</strong> <?= $FR ? 'Le présent contrat s\'applique du' : 'This contract applies from' ?> <?= $blank(90) ?> <?= $FR ? 'au' : 'to' ?> <?= $blank(90) ?>, <?= $FR ? 'et se renouvelle automatiquement sous réserve des dispositions des articles 29 nouveau et 30 de la loi du 15-6-1956.' : 'and is automatically renewed subject to the provisions of the new Article 29 and Article 30 of the Law of 15-6-1956.' ?></p>
@@ -1831,12 +1853,12 @@ if (!$emp):
         <p>وإذ تأسف إدارة المدرسة لإبلاغكم قرارها تشكر لكم تعاونكم المخلص معها داعيةً لكم بالتوفيق راجيةً قبول احترامها .</p>
         <div style="display:flex;justify-content:space-between;margin-top:32px">
           <div>في : <?= $effFmt ?></div>
-          <div style="text-align:center"><strong>رئيسة المدرسة</strong><div style="margin-top:36px;border-top:1px solid #333;width:200px"></div></div>
+          <div style="text-align:center"><strong><?= e($sigSchool['ar']) ?></strong><div style="margin-top:36px;border-top:1px solid #333;width:200px"></div></div>
         </div>
         <p style="margin-top:12px">مع جميع التحفظات</p>
         <div style="margin-top:24px;border-top:1px dashed #999;padding-top:12px">
           <p>أنا <?= $g('الموقّع', 'الموقّعة', 'الموقّع(ة)') ?> أدناه : <strong><?= e($nomAr) ?></strong></p>
-          <p>لقد استلمت من رئيسة المدرسة كتاب إنهاء خدماتي .</p>
+          <p>لقد استلمت من <?= e($sigSchool['ar']) ?> كتاب إنهاء خدماتي .</p>
           <div style="display:flex;justify-content:space-between;margin-top:24px">
             <div>في : <?= $blank(90) ?></div>
             <div style="text-align:center"><strong>الاسم والتوقيع</strong><div style="margin-top:32px;border-top:1px solid #333;width:200px"></div></div>
@@ -1866,14 +1888,14 @@ if (!$emp):
         <p>وإذ تأسف إدارة المدرسة لإبلاغكم قرارها تشكر لكم تعاونكم المخلص معها داعيةً لكم بالتوفيق راجيةً قبول احترامها .</p>
         <div style="display:flex;justify-content:space-between;margin-top:32px">
           <div>في : <?= $effFmt ?></div>
-          <div style="text-align:center"><strong>رئيسة المدرسة</strong><div style="margin-top:36px;border-top:1px solid #333;width:200px"></div></div>
+          <div style="text-align:center"><strong><?= e($sigSchool['ar']) ?></strong><div style="margin-top:36px;border-top:1px solid #333;width:200px"></div></div>
         </div>
         <p style="margin-top:12px;text-align:center">مع جميع التحفظات</p>
 
       <?php elseif ($type === 'talab_istiqala'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
         <h2 style="text-align:center;margin:6px 0 24px;text-decoration:underline">طلب استقالة</h2><?= $rateLine ?>
-        <p>حضرة مديرة مدرسة : <strong><?= e($schoolNameAr) ?></strong></p>
+        <p><?= e($sigAddr['ar']) ?> : <strong><?= e($schoolNameAr) ?></strong></p>
         <p>أنا الموقّع أدناه : <strong><?= e($nomAr) ?></strong></p>
         <p>أُبلغكم استقالتي من الخدمة في مدرسة <strong><?= e($schoolNameAr) ?></strong> اعتباراً من السنة المدرسية المقبلة <strong><?= $nextSY ?></strong> ، وذلك لأسبابٍ شخصية .</p>
         <p>وتفضّلوا بقبول الاحترام .</p>
@@ -1885,8 +1907,8 @@ if (!$emp):
       <?php elseif ($type === 'afade_madrasiya'): ?>
         <?php if ($showRecHead): ?><?= $schoolHead ?><?php endif; ?>
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">إفـادة مدرسية</h2><?= $rateLine ?>
-        <p>أنا الموقّعة أدناه : <strong><?= $director ? e($director) : $blank(180) ?></strong></p>
-        <p>رئيسة أو مديرة مدرسة : <strong><?= e($schoolNameAr) ?></strong></p>
+        <p><?= e($afHead['i']) ?> : <strong><?= $director ? e($director) : $blank(180) ?></strong></p>
+        <p><?= e($afHead['ar']) ?> : <strong><?= e($schoolNameAr) ?></strong></p>
         <p>أُثبت أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> : <strong><?= e($nomAr) ?></strong> &nbsp; <?= $g('حامل', 'حاملة', 'حامل') ?> بطاقة الهوية رقم <?= $blank(150) ?></p>
         <p>قد <?= $g('باشر', 'باشرت', 'باشر') ?> التدريس في مدرستنا<?= (!$isEmploye && $subj !== '') ? ' لمادة <strong>' . e($subjAr) . '</strong>' : '' ?> بتاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(120) ?></strong></p>
         <p><?= $g('وانقطع', 'وانقطعت', 'وانقطع') ?> عن العمل بتاريخ <strong><?= $endFmt ?></strong></p>
@@ -1915,7 +1937,7 @@ if (!$emp):
         <p>وبياناً للواقع ، وبالاستناد إلى قيود سجلات المدرسة ، أُعطيت هذه الإفادة .</p>
         <div style="display:flex;justify-content:space-between;margin-top:38px">
           <div>تحريراً في <?= $effFmt ?></div>
-          <div style="text-align:center"><strong>توقيع رئيس أو مدير المدرسة</strong><div style="margin-top:10px">خاتم المدرسة</div>
+          <div style="text-align:center"><strong><?= e($afHead['sig']) ?></strong><div style="margin-top:10px">خاتم المدرسة</div>
             <div style="margin-top:28px;border-top:1px solid #333;width:220px"></div></div>
         </div>
         <p style="margin-top:22px;font-size:12pt;color:#444">ملاحظة : تُرسل هذه الإفادة إلى إدارة صندوق تعويضات أفراد الهيئة التعليمية في المدارس الخاصة .</p>
@@ -2056,7 +2078,7 @@ if (!$emp):
         <p><strong>9 ـ</strong> لا يحق للفريق الثاني أن يترك العمل في المدرسة قبل نهاية السنة الدراسية بدون رضى الفريق الأول وإلا ترتّب عليه العطل والضرر المنوّه عنهما في المادة 30 من قانون 15 ـ 6 ـ 1956 .</p>
         <p><strong>10 ـ</strong> يحق للفريق الأول أن يفرض على الفريق الثاني ودون مقابل ساعات إضافية لإتمام المنهج الذي يكون قد وضعه هذا الأخير وأودعه الإدارة في بداية السنة .</p>
         <p><strong>11 ـ</strong> يلتزم الفريق الثاني احترام المواعيد المتعلقة بالتوزيع السنوي للدروس وتحضيرها وتقديم أسئلة الفروض الأسبوعية وأسئلة الامتحانات وتصحيحها وإعادتها دون إبطاء إلى المسؤولين في المواعيد التي تحدّدها الإدارة .</p>
-        <p><strong>12 ـ</strong> يبقى الفريق الثاني مرتبطاً بإدارة المدرسة مدة شهر من أشهر العطلة الصيفية على أن يحدَّد هذا الشهر من قبل رئيس المدرسة قبل نهاية السنة الدراسيّة ، وعلى الفريق الثاني أن يلبّي كل دعوة توجَّه إليه خلال هذا الشهر في حدود واجباته المهنية باستثناء التدريس وضمن المهلة التي تحددها له الإدارة ( المادة 22 من قانون 15 ـ 6 ـ 1956 ) .</p>
+        <p><strong>12 ـ</strong> يبقى الفريق الثاني مرتبطاً بإدارة المدرسة مدة شهر من أشهر العطلة الصيفية على أن يحدَّد هذا الشهر من قبل <?= e($sigSchool['ar']) ?> قبل نهاية السنة الدراسيّة ، وعلى الفريق الثاني أن يلبّي كل دعوة توجَّه إليه خلال هذا الشهر في حدود واجباته المهنية باستثناء التدريس وضمن المهلة التي تحددها له الإدارة ( المادة 22 من قانون 15 ـ 6 ـ 1956 ) .</p>
         <p><strong>13 ـ</strong> يعتبر هذا العقد معلّقاً إذا تعذّر تنفيذه لأي سبب خارج عن إرادة الفريقين واستمر هذا التعذّر مدة ثلاثة أشهر من تاريخ وقف تنفيذه ، وفي هذه الحال يترتّب للفريق الثاني راتب الشهر الأول كاملاً ونصف راتب الشهرين التاليين . ويشمل التعذّر على سبيل المثال لا الحصر الاضطرابات والحروب وتدابير الدولة ، ولا يترتب لأيٍّ من الفريقين أيّ حقوق على الفريق الآخر من أي نوع كان اعتباراً من وقف تنفيذ هذا العقد .</p>
         <p><strong>14 ـ</strong> في جميع الشؤون التي لم يرد ذكرها في المواد السابقة تطبّق أحكام القوانين المرعية الإجراء ، لا سيّما قانون 15 ـ 6 ـ 1956 والقوانين المتعلّقة بتنظيم الموازنة المدرسية .</p>
         <p><strong>15 ـ</strong> يُعمل بهذا العقد من <?= $blank(90) ?> لغاية <?= $blank(90) ?> ، ويتجدد تلقائياً مع مراعاة أحكام المادتين 29 الجديدة و 30 من قانون 15 ـ 6 ـ 1956 .</p>
@@ -2079,7 +2101,7 @@ if (!$emp):
         <p>وشكراً .</p>
         <div style="display:flex;justify-content:space-between;margin-top:34px">
           <div>في : <?= $effFmt ?></div>
-          <div style="text-align:center"><strong>رئيسة المدرسة</strong><div style="margin-top:38px;border-top:1px solid #333;width:200px"></div></div>
+          <div style="text-align:center"><strong><?= e($sigSchool['ar']) ?></strong><div style="margin-top:38px;border-top:1px solid #333;width:200px"></div></div>
         </div>
         <div style="margin-top:30px;border-top:1px dashed #999;padding-top:10px">
           <p>تبلّغت الكتاب الوارد مضمونه أعلاه ،</p>
@@ -2113,7 +2135,7 @@ if (!$emp):
         <p>وشكراً .</p>
         <div style="display:flex;justify-content:space-between;margin-top:34px">
           <div>في : <?= $effFmt ?></div>
-          <div style="text-align:center"><strong>رئيسة المدرسة</strong><div style="margin-top:38px;border-top:1px solid #333;width:200px"></div></div>
+          <div style="text-align:center"><strong><?= e($sigSchool['ar']) ?></strong><div style="margin-top:38px;border-top:1px solid #333;width:200px"></div></div>
         </div>
       <?php endif; ?>
 
