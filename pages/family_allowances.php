@@ -29,10 +29,8 @@ $validCats = ['titulaire' => 'enseignant_titulaire', 'contractuel' => 'enseignan
 $catLbl = ['titulaire' => 'الملاك', 'contractuel' => 'المتعاقدين', 'employe' => 'الموظفين'];
 $rawCats = $_POST['cat'] ?? $_GET['cat'] ?? null;
 $categories = array_values(array_intersect(is_array($rawCats) ? $rawCats : ($rawCats !== null ? [$rawCats] : []), array_keys($validCats)));
-// ✅ (2026-09-24 «الفئة اللي حاطط عليها تشك مارك بس هي تبيّن، وإذا ما حطّيت على أي فئة ما لازم يبيّنوا موظفينها»):
-//    أوّل فتحة (بلا اختيار بعد) = الكل مشيّك؛ بعد ما يلمس الفلتر (cat_set) الفئات المشيّكة فقط — ولا واحدة = لا أحد
-$catSet = isset($_GET['cat_set']) || isset($_POST['cat_set']);
-if (!$categories && !$catSet) $categories = array_keys($validCats);
+// ✅ (2026-09-24 «الفئة اللي حاطط عليها تشك مارك بس هي تبيّن، وإذا ما حطّيت على أي فئة ما لازم يبيّنوا موظفينها» ثم «اتفقنا نغيّر تشك مارك»):
+//    حتى أوّل فتحة بلا أي تشك مارك — لا أحد يبيّن حتى يشيّك فئة (أو أكثر)؛ المشيّكة فقط تبيّن
 $schoolYear = (string)($_GET['sy'] ?? $_POST['sy'] ?? (activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()));
 if (!preg_match('/^\d{4}-\d{4}$/', $schoolYear)) $schoolYear = currentSchoolYear();
 $q = trim((string)($_GET['q'] ?? $_POST['q'] ?? ''));

@@ -7807,7 +7807,9 @@ $hdr167 = (string)file_get_contents($PROJ . '/includes/header.php');
 $c167('nav+dashboard', strpos($hdr167, 'pages/family_allowances.php') !== false && strpos($hdr167, "'family_allowances'=>'personnel'") !== false
     && strpos($hdr167, "'family_allowances.php'") !== false && strpos((string)file_get_contents($PROJ . '/index.php'), 'pages/family_allowances.php') !== false);
 $sy167 = currentSchoolYear();
-$h = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167], []);
+$h0 = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167], []);
+$c167('first-open-nobody', $noFatal($h0) && substr_count($h0, ' data-id=') === 0 && strpos($h0, 'ما في ولا فئة مشيّكة') !== false && strpos($h0, 'value="titulaire" ') !== false && strpos($h0, 'value="titulaire" checked') === false); // ☐ «اتفقنا نغيّر تشك مارك»: أوّل فتحة بلا تشك مارك ولا أحد
+$h = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat' => ['titulaire', 'contractuel', 'employe']], []);
 $nElig = substr_count($h, '<tr class="" data-id='); $nNa = substr_count($h, '<tr class="na" data-id=');
 $c167('render-all', $noFatal($h) && strpos($h, 'id="faForm"') !== false && strpos($h, 'name="fa[') !== false && $nElig > 0 && strpos($h, 'type="month"') !== false && stripos($h, 'Warning:') === false);
 $c167('contractuel-locked', $nNa === 0 || (substr_count($h, 'متعاقد: لا يستحقّ') === $nNa && preg_match('/<tr class="na" data-id="\d+">.*?<input[^>]*name="fa\[\d+\]\[sp\]"[^>]* disabled>/s', $h) === 1));
@@ -7823,7 +7825,7 @@ $c167('no-category-no-rows', $noFatal($h2b) && substr_count($h2b, ' data-id=') =
 $h2c = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat_set' => 1, 'cat' => ['employe']], []);
 $c167('employe-only', $noFatal($h2c) && strpos($h2c, 'fa-badge fa-t') === false && strpos($h2c, 'fa-badge fa-c') === false && strpos($h2c, 'fa-badge fa-e') !== false);
 $sch167 = (int)$db->query("SELECT school_id FROM employees WHERE is_deleted = 0 AND employee_type = 'enseignant_titulaire' LIMIT 1")->fetchColumn();
-$h3 = renderPage('pages/family_allowances.php', ['sch' => $sch167, 'sy' => $sy167, 'q' => 'ا'], []);
+$h3 = renderPage('pages/family_allowances.php', ['sch' => $sch167, 'sy' => $sy167, 'q' => 'ا', 'cat' => ['titulaire', 'contractuel', 'employe']], []);
 $c167('render-school-search', $noFatal($h3) && strpos($h3, 'École / المدرسة</th>') === false && strpos($h3, 'id="faForm"') !== false);
 // تجربة فعلية: ملاك بسنة جارية بأشهر غير مدفوعة وبلا تعويض ⇒ تطبيق زوجة+أولاد من كانون الأول، الأولاد حتى آذار ⇒ الأشهر تتبع + idempotent + الإيقاف ⇒ ترجيع كامل
 [$y167] = schoolYearToYears($sy167);
@@ -7916,7 +7918,7 @@ if ($t168) {
         // الفورم يعرض القسم مع سطر التغيير، والملف الجماعي يعرض سطر «شهري» بالقيمة
         $hf = renderPage('pages/employees.php', ['action' => 'edit', 'id' => $tid168, 'tab' => 'finance'], []);
         $c168('form-render', $noFatal($hf) && strpos($hf, 'id="faChgBox"') !== false && preg_match('/name="fa_chg\[0\]\[from\]"[^>]*value="' . $y2 . '-02"/', $hf) === 1 && preg_match('/name="fa_chg\[0\]\[amt\]"[^>]*value="1000000"/', $hf) === 1);
-        $hb = renderPage('pages/family_allowances.php', ['sch' => (int)$t168['school_id'], 'sy' => $sy168], []);
+        $hb = renderPage('pages/family_allowances.php', ['sch' => (int)$t168['school_id'], 'sy' => $sy168, 'cat' => ['titulaire']], []);
         $c168('bulk-render', $noFatal($hb) && preg_match('/<tr class="fa-chg-row" data-for="' . $tid168 . '"/', $hb) === 1 && preg_match('/name="fa\[' . $tid168 . '\]\[chg\]\[0\]\[amt\]" value="1,000,000"/', $hb) === 1 && preg_match('/fa-chg-btn" data-id="' . $tid168 . '"[^>]*>.*?1<\/button>/s', $hb) === 1);
     } catch (Throwable $e) { $c168('exception:' . $e->getMessage(), false); }
     $db->prepare("DELETE FROM family_allowance_changes WHERE employee_id = ?")->execute([$tid168]);
