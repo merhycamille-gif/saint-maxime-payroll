@@ -7714,6 +7714,15 @@ if ($eid166) {
     } else { $why166[] = 'no-left-teacher(skipped)'; }
     $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire'], []));
     $c166('no-left-unchanged', strpos($a, 'حتى تاريخه') !== false && strpos($a, 'ولغاية') === false);
+    // 🏫 «بالإفادات ما تخلّي اسم المدرسة يتكرّر مرتين حدّ بعض» (2026-09-24): مدرسة اسمها يبدأ بـ«مدرسة» وفرنسيها بـ«Ecole» ⇒ لا «مدرسة : مدرسة …» ولا «l'école Ecole …» ولا «school Ecole …»
+    $dup166 = (int)$db->query("SELECT e.id FROM employees e JOIN schools s ON s.id = e.school_id WHERE e.is_deleted = 0 AND e.employee_type <> 'employe' AND e.hire_date IS NOT NULL AND s.name_ar LIKE 'مدرسة %' AND (s.name_fr LIKE 'Ecole %' OR s.name_fr LIKE 'École %') ORDER BY e.id LIMIT 1")->fetchColumn();
+    if ($dup166) {
+        foreach (['afade_madrasiya', 'aqd_taalim', 'isqat_haq', 'anhaa_khedme'] as $ty166) foreach (['ar', 'fr', 'en'] as $lg166) {
+            $txt = preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($area166(renderPage('pages/attestations.php', ['employee_id' => $dup166, 'type' => $ty166, 'lang_doc' => $lg166], [])))));
+            $c166("no-dup-school-$ty166/$lg166", $txt !== '' && preg_match('/(مدرسة|مؤسسة|دير|مركز|دار|مستوصف|ثانوية) ?:? ?\1 /u', $txt) === 0 && preg_match('/(l[\x27’]?[EeÉé]cole|[EeÉé]cole|school) ?:? ?[EeÉé]cole /u', $txt) === 0);
+        }
+        $c166('no-dup-school-afade-sample', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $dup166, 'type' => 'afade_madrasiya'], [])), 'مديرة مدرسة : <strong>مدرسة ') === false);
+    } else { $why166[] = 'no-dup-school-sample(skipped)'; }
     $m166 = (int)$db->query("SELECT id FROM employees WHERE is_deleted=0 AND gender='m' AND employee_type<>'employe' AND left_date_all IS NULL LIMIT 1")->fetchColumn();
     if ($m166) {
         $aM = $area166(renderPage('pages/attestations.php', ['employee_id' => $m166, 'type' => 'tadris', 'lang_doc' => 'fr'], []));
