@@ -6288,9 +6288,10 @@ check('جنس الإفادات (كود): $g(مذكّر, مؤنّث, مزدوج) 
 $ok129 = true; $why129 = [];
 try {
     $db129 = getDB();
-    $m129 = (int)$db129->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id WHERE e.is_deleted=0 AND e.gender='m' AND e.employee_type<>'employe' AND e.hire_date IS NOT NULL ORDER BY (e.id=1387) DESC, e.id LIMIT 1")->fetchColumn();
-    $f129 = (int)$db129->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id WHERE e.is_deleted=0 AND e.gender='f' AND e.employee_type<>'employe' AND e.hire_date IS NOT NULL ORDER BY e.id LIMIT 1")->fetchColumn();
-    $u129 = (int)$db129->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id WHERE e.is_deleted=0 AND e.gender IS NULL AND e.employee_type<>'employe' AND e.hire_date IS NOT NULL ORDER BY e.id LIMIT 1")->fetchColumn();
+    $m129 = (int)$db129->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id WHERE e.is_deleted=0 AND e.gender='m' AND e.employee_type<>'employe' AND e.hire_date IS NOT NULL AND e.left_date_all IS NULL AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL ORDER BY (e.id=1387) DESC, e.id LIMIT 1")->fetchColumn();
+    $f129 = (int)$db129->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id WHERE e.is_deleted=0 AND e.gender='f' AND e.employee_type<>'employe' AND e.hire_date IS NOT NULL AND e.left_date_all IS NULL AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL ORDER BY e.id LIMIT 1")->fetchColumn();
+    // (2026-09-24) غير تارك: التارك صار بصيغة الماضي «عمل(ت) لديها» لا «يعمل(تعمل)» (إفادة عمل وتدريس مظبوطة لغوياً)
+    $u129 = (int)$db129->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id WHERE e.is_deleted=0 AND e.gender IS NULL AND e.employee_type<>'employe' AND e.hire_date IS NOT NULL AND e.left_date_all IS NULL AND e.left_date_cnss IS NULL AND e.left_date_finance IS NULL AND e.left_date_eoc IS NULL ORDER BY e.id LIMIT 1")->fetchColumn();
     $txt129 = function (int $eid, string $type, string $lang) {
         $h = renderPage('pages/attestations.php', ['employee_id' => $eid, 'type' => $type, 'lang_doc' => $lang, 'date' => '2026-09-15'], ['extra'], [], '', 'all');
         $p = mb_strpos($h, 'id="ppExportArea"');
@@ -7700,7 +7701,12 @@ if ($eid166) {
         $ld166 = (string)$db->query("SELECT left_date_all FROM employees WHERE id=$left166")->fetchColumn(); $lf166 = date('d/m/Y', strtotime($ld166));
         $h = renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'salaire'], []);
         $c166('left-default-ar', strpos($area166($h), 'ولغاية تاريخ <strong>' . $lf166 . '</strong>') !== false && strpos($area166($h), 'حتى تاريخه') === false && strpos($h, 'name="end_dt" value="' . $ld166 . '"') !== false && strpos($h, '&end_dt=' . $ld166) !== false);
-        $c166('left-default-fr', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'tadris', 'lang_doc' => 'fr'], [])), "jusqu'au <strong>$lf166</strong>. Il/Elle a fait preuve") !== false);
+        // (2026-09-24 «إفادة عمل وتدريس مظبوطة لغوياً») التارك بالماضي: a enseigné/a travaillé … du X au Y + الضمير بحسب الجنس (لا Il/Elle حين معروف)
+        $aF = $area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'tadris', 'lang_doc' => 'fr'], []));
+        $c166('left-default-fr', preg_match('/a (enseigné|travaillé) au sein de son établissement[^.]* du <strong>[0-9\/]+<\/strong> au <strong>' . preg_quote($lf166, '/') . '<\/strong>\. (Il|Elle|Il\/Elle) a fait preuve/u', $aF) === 1 && strpos($aF, 'jusqu') === false);
+        $aE = $area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'tadris', 'lang_doc' => 'en'], []));
+        $c166('left-default-en', preg_match('/(taught|worked there as)[^.]* from <strong>[0-9\/]+<\/strong> to <strong>' . preg_quote($lf166, '/') . '<\/strong>\. (He|She|He\/She) showed good conduct/u', $aE) === 1);
+        $c166('left-default-ar-past', preg_match('/(عمل|عملت|عمل\(ت\)) لديها بوظيفة/u', $area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'tadris'], []))) === 1);
         $c166('left-changed', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1, 'end_dt' => '2025-06-30'], [])), 'ولغاية تاريخ <strong>30/06/2025</strong>') !== false);
         $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $left166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1, 'end_none' => 1], []));
         $c166('left-removed', strpos($a, 'حتى تاريخه') !== false && strpos($a, 'ولغاية تاريخ') === false);
@@ -7708,6 +7714,13 @@ if ($eid166) {
     } else { $why166[] = 'no-left-teacher(skipped)'; }
     $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire'], []));
     $c166('no-left-unchanged', strpos($a, 'حتى تاريخه') !== false && strpos($a, 'ولغاية') === false);
+    $m166 = (int)$db->query("SELECT id FROM employees WHERE is_deleted=0 AND gender='m' AND employee_type<>'employe' AND left_date_all IS NULL LIMIT 1")->fetchColumn();
+    if ($m166) {
+        $aM = $area166(renderPage('pages/attestations.php', ['employee_id' => $m166, 'type' => 'tadris', 'lang_doc' => 'fr'], []));
+        $c166('pronoun-fr-male', strpos($aM, 'Il fait preuve de bonne conduite') !== false && strpos($aM, 'Il/Elle') === false);
+        $aM = $area166(renderPage('pages/attestations.php', ['employee_id' => $m166, 'type' => 'tadris', 'lang_doc' => 'en'], []));
+        $c166('pronoun-en-male', strpos($aM, 'He has shown good conduct and commitment in the performance of his duties.') !== false && strpos($aM, 'He/She') === false);
+    }
     // 📚 «ببطاقة الراتب السنوية حطّ المواد محلّ الدرجة» (2026-09-24): خانة المواد بالسطر الأوّل مكان الدرجة، والدرجة بالسطر الثالث مكانها — تبديل فقط
     $as166 = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
     $pS166 = strpos($as166, '<span class="lbl">Matières / المواد</span>'); $pG166 = strpos($as166, '<span class="lbl">Échelon / الدرجة</span>'); $pT166 = strpos($as166, '<span class="lbl">Type / الفئة</span>'); $pC166 = strpos($as166, '<span class="lbl">Code / الرمز</span>');
