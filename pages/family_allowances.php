@@ -109,6 +109,11 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
 .fa-table input.mon { width:128px; direction:ltr; font-size:12px; }
 .fa-table input { padding:4px 6px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; }
 .fa-table input:focus { outline:2px solid #3b82f6; border-color:#3b82f6; }
+.fa-table input[readonly] { border-color:transparent; background:transparent; cursor:default; }
+.fa-table input[readonly]::-webkit-calendar-picker-indicator { display:none; }
+.fa-table tr.editing td { background:#fefce8 !important; }
+.fa-table tr.editing input:not([disabled]) { border-color:#f59e0b; background:#fff; }
+.fa-act .btn { padding:3px 8px; font-size:12px; }
 .fa-table tr.changed td { background:#fef9c3 !important; }
 .fa-table tr.changed td.nm::before { content:'✏️ '; }
 .fa-table tr.na td { background:#f8fafc; color:#94a3b8; }
@@ -207,6 +212,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 <thead>
                     <tr>
                         <th rowspan="2">#</th>
+                        <th rowspan="2">Modifier / تعديل</th>
                         <th rowspan="2">Nom / الاسم</th>
                         <th rowspan="2">Catégorie / الفئة</th>
                         <?php if ($scopeAll): ?><th rowspan="2">École / المدرسة</th><?php endif; ?>
@@ -223,7 +229,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 </thead>
                 <tbody>
                 <?php if (!$rows): ?>
-                    <tr><td colspan="13" style="padding:24px;color:#64748b"><?= !$categories ? '☐ ما في ولا فئة مشيّكة — أشّر الملاك أو المتعاقدين أو الموظفين فوق / Cochez une catégorie' : 'لا موظفين ضمن هذا النطاق / Aucun employé' ?></td></tr>
+                    <tr><td colspan="14" style="padding:24px;color:#64748b"><?= !$categories ? '☐ ما في ولا فئة مشيّكة — أشّر الملاك أو المتعاقدين أو الموظفين فوق / Cochez une catégorie' : 'لا موظفين ضمن هذا النطاق / Aucun employé' ?></td></tr>
                 <?php endif; ?>
                 <?php $i = 0; foreach ($rows as $r): $i++; $id = (int)$r['id']; $elig = familyAllowanceEligible($r);
                     $name = trim(($r['first_name_ar'] ?: $r['first_name_fr']) . ' ' . ($r['last_name_ar'] ?: $r['last_name_fr']));
@@ -236,18 +242,25 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                         if (isset($r['count_spouse_allowance']) && (int)$r['count_spouse_allowance'] !== 1) $notes[] = 'احتساب الزوجة مطفأ بملفه';
                         if (isset($r['count_children_allowance']) && (int)$r['count_children_allowance'] !== 1) $notes[] = 'احتساب الأولاد مطفأ بملفه';
                     }
-                    $dis = $elig ? '' : ' disabled'; ?>
+                    $dis = $elig ? '' : ' disabled'; $ro = $elig ? ' readonly' : ''; // ✏️ الصفّ مقفول للقراءة حتى يُكبس «تعديل» (2026-09-24 «لازم يكون قدام الموظف في إديت») ?>
                     <tr class="<?= $elig ? '' : 'na' ?>" data-id="<?= $id ?>">
                         <td><?= $i ?></td>
+                        <td class="fa-act" style="white-space:nowrap">
+                            <?php if ($elig): ?>
+                            <button type="button" class="btn btn-sm btn-primary fa-edit-btn" title="تعديل هذا الصفّ / Modifier"><i class="fas fa-pen"></i> تعديل</button>
+                            <button type="button" class="btn btn-sm btn-success fa-save-btn" style="display:none" title="حفظ هذا الموظف وحده / Enregistrer"><i class="fas fa-save"></i> حفظ</button>
+                            <?php endif; ?>
+                            <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $id ?>&tab=finance" target="_blank" class="btn btn-sm btn-light" title="فتح ملفه / Ouvrir la fiche"><i class="fas fa-folder-open"></i></a>
+                        </td>
                         <td class="nm"><a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $id ?>&tab=finance" target="_blank" title="فتح الملف / Ouvrir la fiche"><?= e($name) ?></a><?php if ($nameFr && $nameFr !== $name): ?><small dir="ltr" style="text-align:left"><?= e($nameFr) ?></small><?php endif; ?></td>
                         <td><span class="fa-badge <?= $typeCls[$r['employee_type']] ?? '' ?>"><?= $typeLbl[$r['employee_type']] ?? e($r['employee_type']) ?></span></td>
                         <?php if ($scopeAll): ?><td style="white-space:normal;font-size:12px"><?= e($r['school_ar'] ?: $r['school_fr']) ?></td><?php endif; ?>
-                        <td class="sp"><input type="text" inputmode="numeric" class="amt" name="fa[<?= $id ?>][sp]" value="<?= $elig ? number_format((int)$r['family_allowance_spouse_lbp']) : '' ?>" data-orig="<?= $elig ? number_format((int)$r['family_allowance_spouse_lbp']) : '' ?>"<?= $dis ?>></td>
-                        <td class="sp"><input type="month" class="mon" name="fa[<?= $id ?>][spf]" value="<?= e($mo($r['family_allowance_spouse_from'])) ?>" data-orig="<?= e($mo($r['family_allowance_spouse_from'])) ?>"<?= $dis ?>></td>
-                        <td class="sp"><input type="month" class="mon" name="fa[<?= $id ?>][spt]" value="<?= e($mo($r['family_allowance_spouse_to'])) ?>" data-orig="<?= e($mo($r['family_allowance_spouse_to'])) ?>"<?= $dis ?>></td>
-                        <td class="ch"><input type="text" inputmode="numeric" class="amt" name="fa[<?= $id ?>][ch]" value="<?= $elig ? number_format((int)$r['family_allowance_children_lbp']) : '' ?>" data-orig="<?= $elig ? number_format((int)$r['family_allowance_children_lbp']) : '' ?>"<?= $dis ?>></td>
-                        <td class="ch"><input type="month" class="mon" name="fa[<?= $id ?>][chf]" value="<?= e($mo($r['family_allowance_children_from'])) ?>" data-orig="<?= e($mo($r['family_allowance_children_from'])) ?>"<?= $dis ?>></td>
-                        <td class="ch"><input type="month" class="mon" name="fa[<?= $id ?>][cht]" value="<?= e($mo($r['family_allowance_children_to'])) ?>" data-orig="<?= e($mo($r['family_allowance_children_to'])) ?>"<?= $dis ?>></td>
+                        <td class="sp"><input type="text" inputmode="numeric" class="amt" name="fa[<?= $id ?>][sp]" value="<?= $elig ? number_format((int)$r['family_allowance_spouse_lbp']) : '' ?>" data-orig="<?= $elig ? number_format((int)$r['family_allowance_spouse_lbp']) : '' ?>"<?= $dis . $ro ?>></td>
+                        <td class="sp"><input type="month" class="mon" name="fa[<?= $id ?>][spf]" value="<?= e($mo($r['family_allowance_spouse_from'])) ?>" data-orig="<?= e($mo($r['family_allowance_spouse_from'])) ?>"<?= $dis . $ro ?>></td>
+                        <td class="sp"><input type="month" class="mon" name="fa[<?= $id ?>][spt]" value="<?= e($mo($r['family_allowance_spouse_to'])) ?>" data-orig="<?= e($mo($r['family_allowance_spouse_to'])) ?>"<?= $dis . $ro ?>></td>
+                        <td class="ch"><input type="text" inputmode="numeric" class="amt" name="fa[<?= $id ?>][ch]" value="<?= $elig ? number_format((int)$r['family_allowance_children_lbp']) : '' ?>" data-orig="<?= $elig ? number_format((int)$r['family_allowance_children_lbp']) : '' ?>"<?= $dis . $ro ?>></td>
+                        <td class="ch"><input type="month" class="mon" name="fa[<?= $id ?>][chf]" value="<?= e($mo($r['family_allowance_children_from'])) ?>" data-orig="<?= e($mo($r['family_allowance_children_from'])) ?>"<?= $dis . $ro ?>></td>
+                        <td class="ch"><input type="month" class="mon" name="fa[<?= $id ?>][cht]" value="<?= e($mo($r['family_allowance_children_to'])) ?>" data-orig="<?= e($mo($r['family_allowance_children_to'])) ?>"<?= $dis . $ro ?>></td>
                         <td class="fa-tot"><?= $cur > 0 ? number_format($cur) : '—' ?></td>
                         <?php $chgRows = $elig ? familyAllowanceChangesRows($id) : []; ?>
                         <td><?php if ($elig): ?><button type="button" class="btn btn-sm <?= $chgRows ? 'btn-warning' : 'btn-light' ?> fa-chg-btn" data-id="<?= $id ?>" title="تغييرات المبلغ خلال السنة"><i class="fas fa-calendar-days"></i> <?= $chgRows ? count($chgRows) : '' ?></button><?php else: ?>—<?php endif; ?></td>
@@ -255,7 +268,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                     </tr>
                     <?php if ($elig): /* 📅💱 سطر التغييرات الشهرية (مخفيّ حتى يُكبس «شهري») — نفس صيغة ملف الموظف: النوع + من شهر + المبلغ الجديد */ ?>
                     <tr class="fa-chg-row" data-for="<?= $id ?>" style="display:none">
-                        <td colspan="<?= $scopeAll ? 13 : 12 ?>" style="text-align:right;background:#fffbeb;padding:8px 14px">
+                        <td colspan="<?= $scopeAll ? 14 : 13 ?>" style="text-align:right;background:#fffbeb;padding:8px 14px">
                             <input type="hidden" name="fa[<?= $id ?>][chg_set]" value="1" data-orig="1">
                             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
                                 <strong style="font-size:12.5px"><i class="fas fa-calendar-days"></i> <?= e($name) ?> — تغييرات المبلغ خلال السنة / Changements en cours d'année</strong>
@@ -280,7 +293,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 <?php /* 🧮 «ما تنسى ديماً يكون في مجموع للكل» (2026-09-24): صفّ المجموع لكل الظاهرين — يتحدّث فوراً بالـJS وأنت تكتب */ ?>
                 <tfoot>
                     <tr class="fa-total-row">
-                        <th colspan="<?= $scopeAll ? 4 : 3 ?>" style="text-align:right;background:#1F4E5F;color:#fff">Total / المجموع (<?= count($rows) ?> موظف)</th>
+                        <th colspan="<?= $scopeAll ? 5 : 4 ?>" style="text-align:right;background:#1F4E5F;color:#fff">Total / المجموع (<?= count($rows) ?> موظف)</th>
                         <th class="sp" style="background:#9d174d;color:#fff" id="faTotSp"><?= number_format($totSp) ?></th>
                         <th class="sp" colspan="2" style="background:#9d174d;color:#fff;font-weight:400;font-size:11.5px">ل.ل / L.L</th>
                         <th class="ch" style="background:#1d4ed8;color:#fff" id="faTotCh"><?= number_format($totCh) ?></th>
@@ -325,10 +338,34 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
         tr.classList.toggle('changed', ch);
         return ch;
     }
+    // ✏️ «لازم يكون قدام الموظف في إديت» (2026-09-24): الصفّ مقفول للقراءة؛ «تعديل» يفتحه (وسطر «شهري» معه)، و«حفظ» يرسل هذا الموظف وحده
+    function unlockRow(tr) {
+        if (!tr || tr.classList.contains('editing')) return;
+        tr.classList.add('editing');
+        tr.querySelectorAll('input[readonly]').forEach(function (i) { i.removeAttribute('readonly'); });
+        var eb = tr.querySelector('.fa-edit-btn'), sb = tr.querySelector('.fa-save-btn');
+        if (eb) eb.style.display = 'none'; if (sb) sb.style.display = '';
+    }
+    form.addEventListener('click', function (ev) {
+        var eb = ev.target.closest('.fa-edit-btn'), sb = ev.target.closest('.fa-save-btn');
+        if (eb) { var tr = eb.closest('tr'); unlockRow(tr); var f = tr.querySelector('input.amt'); if (f) { f.focus(); f.select && f.select(); } return; }
+        if (sb) {
+            var tr2 = sb.closest('tr');
+            if (!rowChanged(tr2)) { alert('ما في تغيير بهذا الصفّ / Aucun changement'); return; }
+            if (!confirm('حفظ التعويض العائلي لهذا الموظف وحده وإعادة حساب رواتبه؟\nEnregistrer ce dossier ?')) return;
+            form.querySelectorAll('tbody tr[data-id]').forEach(function (o) {
+                if (o === tr2) return;
+                o.querySelectorAll('input').forEach(function (i) { i.disabled = true; });
+                var so = subRow(o); if (so) so.querySelectorAll('input,select').forEach(function (i) { i.disabled = true; });
+            });
+            form.dataset.rowSubmit = '1'; form.submit(); return;
+        }
+    });
     // 📅💱 فتح/إغلاق سطر التغييرات الشهرية + إضافة/حذف سطر
     form.addEventListener('click', function (ev) {
         var b = ev.target.closest('.fa-chg-btn, .fa-chg-add, .fa-chg-del'); if (!b) return;
         if (b.classList.contains('fa-chg-btn')) {
+            unlockRow(b.closest('tr'));
             var sub = form.querySelector('tr.fa-chg-row[data-for="' + b.dataset.id + '"]'); if (!sub) return;
             sub.style.display = sub.style.display === 'none' ? '' : 'none';
             if (sub.style.display === '' && !sub.querySelector('.fa-chg-tbl tr')) addChg(b.dataset.id);
@@ -370,6 +407,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
         });
     });
     form.addEventListener('submit', function (ev) {
+        if (form.dataset.rowSubmit === '1') return; // «حفظ» صفّ واحد — مؤكَّد ومجهَّز
         var n = parseInt(cnt.textContent, 10) || 0;
         if (n === 0) { ev.preventDefault(); return; }
         if (!confirm('طبّق التعويض العائلي على ملفات ' + n + ' موظف وأعِد حساب رواتبهم؟\nAppliquer sur ' + n + ' dossier(s) ?')) ev.preventDefault();
