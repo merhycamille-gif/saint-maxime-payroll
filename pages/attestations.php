@@ -43,6 +43,8 @@ $type    = $_GET['type'] ?? '';
 $docLang = $_GET['lang_doc'] ?? ($_SESSION['lang'] ?? 'ar');
 if (!isset($DOC_LANGS[$docLang])) $docLang = 'ar';
 $effDate = $_GET['date'] ?? date('Y-m-d');
+// 📅 «أقدر غيّر التاريخ إذا بدّي» (2026-09-24): التاريخ المختار بشريط الإفادة هو التاريخ المطبوع عليها (الافتراضي اليوم)
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$effDate) || !strtotime((string)$effDate)) $effDate = date('Y-m-d');
 $emp = null;
 
 // وضع «كل المدارس»: عند اختيار أستاذ، بدّل المدرسة الفعّالة لمدرسته تلقائياً — حتى يفتّش عن الأستاذ
@@ -687,6 +689,14 @@ if (!$emp):
         return;
     endif;
     if (!isset($ATT_TYPES[$type])) $type = 'cnss';
+    // 📅 «تاريخ الدخول في المدرسة من – إلى ببعض الإفادات: خيار غيّر التاريخ» (2026-09-24): خانتان بالشريط —
+    //    «من» تحلّ محلّ تاريخ الدخول بملف الموظف بنصّ هذه الإفادة فقط (والملف لا يُمسّ)، و«إلى» = تاريخ الترك/الانقطاع
+    //    (الافتراضي تاريخ الإفادة). سنوات الخدمة تُحسب بينهما.
+    $hireOvr = (string)($_GET['hire_dt'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hireOvr) || !strtotime($hireOvr)) $hireOvr = '';
+    if ($hireOvr !== '') $emp['hire_date'] = $hireOvr;
+    $endDate = (string)($_GET['end_dt'] ?? '');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate) || !strtotime($endDate)) $endDate = $effDate;
     $sessLang = $_SESSION['lang'] ?? 'fr';
     $nomFr = trim($emp['first_name_fr'].' '.($emp['father_name_fr'] ? $emp['father_name_fr'].' ' : '').$emp['last_name_fr']);
     $nomAr = trim($emp['first_name_ar'].' '.($emp['father_name_ar'] ? $emp['father_name_ar'].' ' : '').$emp['last_name_ar']);
@@ -713,10 +723,12 @@ if (!$emp):
     $fnFr = ['fr'=> ($isEmploye && $jobT !== '') ? jobTitleLabel($emp['job_title'],'fr') : employeeTypeLabel($emp['employee_type'],'fr'),
              'ar'=> ($isEmploye && $jobT !== '') ? jobTitleLabel($emp['job_title'],'ar') : employeeTypeLabel($emp['employee_type'],'ar'),
              'en'=> ($isEmploye && $jobT !== '') ? jobTitleLabel($emp['job_title'],'fr') : (['enseignant_titulaire'=>'Tenured teacher','enseignant_contractuel'=>'Contract teacher','employe'=>'Administrative employee'][$emp['employee_type']] ?? $emp['employee_type'])];
-    $today = date('d/m/Y');
+    // 📅 (2026-09-24) التاريخ المطبوع على الإفادة = التاريخ المختار بالشريط (كان اليوم دائماً ولو غيّره المستخدم)
+    $today = formatDate($effDate);
     $hireFmt = formatDate($emp['hire_date']);
     $titFmt  = formatDate($emp['titularization_date']);
     $effFmt  = formatDate($effDate);
+    $endFmt  = formatDate($endDate); // تاريخ الترك/الانقطاع «إلى» (2026-09-24) — كان = تاريخ الإفادة دائماً
     $clsNm = classLevelNames($emp['classes_taught'] ?? ''); if ($clsNm === '—') $clsNm = '';
     $classesAr = $clsNm;
     $classesLat = $clsNm;
@@ -773,7 +785,7 @@ if (!$emp):
     }
     $yAr=$yFr=$yEn='';
     if ($emp['hire_date']) {
-        $diff=(new DateTime($emp['hire_date']))->diff(new DateTime($effDate));
+        $diff=(new DateTime($emp['hire_date']))->diff(new DateTime($endDate)); // من الدخول إلى الترك (2026-09-24)
         $yAr=$diff->y.' سنة'.($diff->m?" و{$diff->m} شهر":'');
         $yFr=$diff->y.' an(s)'.($diff->m?" et {$diff->m} mois":'');
         $yEn=$diff->y.' year(s)'.($diff->m?" and {$diff->m} month(s)":'');
@@ -796,11 +808,26 @@ if (!$emp):
     $cur = $_GET['cur'] ?? displayCurrency();
     if (!in_array($cur, ['lbp', 'usd', 'both'], true)) $cur = 'lbp';
     $fxRate = $sal ? getExchangeRate((int)$sal['month'], (int)$sal['year']) : getExchangeRate();
+    // ✍️ «أقدر غيّر رقم المبلغ إذا بدّي» (2026-09-24): مبلغ يدوي بالليرة أو بالدولار يحلّ محلّ الراتب كلّه بنصّ
+    //    الإفادة (سطر واحد بلا تفصيل مكوّنات — الأساس/الإضافي/المكافأة/النقل تصفَّر). بالدولار: الليرة = المبلغ × سعر
+    //    الشهر (usdToLbp بلا فراطات) والدولار المعروض هو الرقم المكتوب نفسه لا ناتج قسمة. الفاضي = المحسوب كالمعتاد.
+    $amtMan = (int)preg_replace('/[^0-9]/', '', (string)($_GET['amt'] ?? ''));
+    $amtCur = (($_GET['amt_cur'] ?? 'lbp') === 'usd') ? 'usd' : 'lbp';
+    $manualLbp = 0; $manualUsd = 0.0;
+    $extraW0 = $extraW; $aideW0 = $aideW; $transW0 = $transW; // القيم المحسوبة كما هي لعرضها بجانب مربّعات الشريط
+    if ($amtMan > 0) {
+        if ($amtCur === 'usd') { $manualUsd = (float)$amtMan; $manualLbp = $fxRate > 0 ? (int)usdToLbp($amtMan, $fxRate) : $amtMan; }
+        else { $manualLbp = $amtMan; $manualUsd = $fxRate > 0 ? $amtMan / $fxRate : 0.0; }
+        $basePlusEch = (float)$manualLbp; $net = (float)$manualLbp; $netUsd = $manualUsd;
+        $extraW = 0; $aideW = 0; $transW = 0;
+        $salShown = $manualLbp;
+    }
     // 🧮 (2026-09-03 «صحّح النسبة بكل التقارير والإفادات») لأصحاب النسبة: دولار الإضافي = دولار القانون (844 $ لا 837)،
     // والمبالغ المركّبة (الراتب المعروض / الملحقات) = جمع دولارات مكوّناتها (الأرقام تركب). غيرهم: الليرة ÷ السعر كالمعتاد.
     $extraWUsd = ($sal && (int)($sal['prime_fixe_usd_law'] ?? 0) > 0) ? extraWageUsd($sal) : null;
     // المجاميع (الراتب المعتمد/الملحقات) تبقى ÷ السعر كباقي التقارير (الإجمالي 863 $ بكل مكان) — الإضافي وحده 844 $
-    $usdOf   = function ($lbp) use ($fxRate, $extraWUsd, $extraW) {
+    $usdOf   = function ($lbp) use ($fxRate, $extraWUsd, $extraW, $manualLbp, $manualUsd) {
+        if ($manualLbp > 0 && (int)$lbp === (int)$manualLbp) return $manualUsd; // المبلغ اليدوي بالدولار = الرقم المكتوب نفسه
         if ($extraWUsd !== null && $extraW > 0 && (int)$lbp === (int)$extraW) return $extraWUsd;
         return $fxRate > 0 ? $lbp / $fxRate : 0;
     };
@@ -846,13 +873,26 @@ if (!$emp):
     $isqMode = in_array(($_GET['isq'] ?? ''), ['istiqala', 'sarf'], true) ? $_GET['isq'] : ''; // إسقاط الحق: استقالة أو صرف
     $grant   = (int)preg_replace('/[^0-9]/', '', (string)($_GET['grant'] ?? '')); // قيمة المنحة بالدولار (إقرار) — تظهر بالأرقام والحروف
     // صفة الموقّع أسفل الإفادة: الرئيسة / الإدارة / المدير — يختارها المستخدم لكل إفادة
-    $sigTitle = $_GET['sig_t'] ?? 'moudir';
-    if (!in_array($sigTitle, ['raisa', 'idara', 'moudir'], true)) $sigTitle = 'moudir';
+    // ✍️ «بكل إفادة أقدر غيّر أو أكتب اسم المدير أو الرئيسة» (2026-09-24): خيار الصفة صار بكل الإفادات (كان بإفادة الراتب
+    //    فقط) — الافتراضي يحافظ على ما كانت تطبعه كل إفادة (الإدارة لإفادة الرعاية والقسم العام، والمدير للباقي).
+    $sigDefault = ($type === 'riaaya' || !in_array($type, ['salaire','tadris','embassy','anhaa_khedme','anhaa_mail','talab_istiqala','afade_madrasiya','isqat_haq','baraa_zimma','iqrar','aqd_taalim','notice_school','notice_mail','cnss'], true)) ? 'idara' : 'moudir';
+    $sigTitle = $_GET['sig_t'] ?? $sigDefault;
+    if (!in_array($sigTitle, ['raisa', 'idara', 'moudir'], true)) $sigTitle = $sigDefault;
     $SIG_TITLES = ['raisa' => ['ar' => 'الرئيسة', 'fr' => 'La Supérieure'],
                    'idara' => ['ar' => 'الإدارة', 'fr' => 'La Direction'],
                    'moudir'=> ['ar' => 'المدير',  'fr' => 'Le Directeur']];
+    $SIG_EN = ['raisa' => 'The Mother Superior', 'idara' => 'The Administration', 'moudir' => 'The Director'];
     $sigTitleAr = $SIG_TITLES[$sigTitle]['ar'];
-    $hasSigTitle = ($type === 'salaire'); // الإفادات التي فيها خيار صفة الموقّع
+    $sigTitleFr = $SIG_TITLES[$sigTitle]['fr'];
+    $sigTitleEn = $SIG_EN[$sigTitle];
+    $hasSigTitle = true; // خيار صفة الموقّع بكل الإفادات (2026-09-24)
+    // اسم الموقّع: فاضي = من ملف المدرسة (المسؤول المختار)؛ مكتوب = يحلّ محلّه (العربي يُترجم تلقائياً للنسخ اللاتينية)؛
+    // «بلا اسم» = الصفة والتوقيع فقط. يمسّ كل مواضع اسم المدير بالإفادة (التوقيع، «أنا الموقّعة أدناه»، «الممثَّلة بشخص»).
+    $sigName   = trim((string)($_GET['sig_name'] ?? ''));
+    $sigNoName = !empty($_GET['sig_noname']);
+    $sigNameDefault = $director; // للعرض بخانة الشريط
+    if ($sigNoName) { $director = ''; $sigNameFr = ''; }
+    elseif ($sigName !== '') { $director = $sigName; $sigNameFr = preg_match('/\p{Arabic}/u', $sigName) ? '' : $sigName; }
     // شعار المدرسة للترويسة (خاص بالمدرسة أو الموحّد)
     $logoUrl = schoolLogoUrl($school);
     $logoImg = $logoUrl ? '<img src="' . htmlspecialchars($logoUrl, ENT_QUOTES) . '" alt="" style="max-height:88px;max-width:150px;object-fit:contain">' : '';
@@ -864,7 +904,27 @@ if (!$emp):
     $hasCurrency   = true;
     $printsSalary  = in_array($type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'salaire', 'embassy', 'aqd_taalim'], true);
     // 🏷️ (2026-09-19) سعر الصرف المعتمد تحت عنوان الإفادة حين يظهر المبلغ بالدولار (نفس $fxRate الذي حُسبت به المبالغ — بلا سعر 1,500 لأن الإفادة ÷ سعر الشهر)
-    $rateLine = ($printsSalary && $fxRate > 0) ? '<div class="rate-subtitle" dir="rtl" style="text-align:center;font-weight:700;color:#1e40af;margin:-14px 0 16px">' . e(rateTitleText(null, null, false, (float)$fxRate, false)) . '</div>' : '';
+    // 💱 «بكل إفادة خيار حطّ أو شيل قيمة الدولار» (2026-09-24): مربّع بالشريط — افتراضياً محطوط بالإفادات التي تطبع مبلغاً
+    //    ومشيول بغيرها، وبعد أي تفاعل (opts_set) تُحترَم حالة المربّع كما هي (يقدر يحطّه حتى بإفادة بلا مبلغ).
+    $showRate = $optsSet ? !empty($_GET['rate_show']) : $printsSalary;
+    $rateLine = ($showRate && $fxRate > 0) ? '<div class="rate-subtitle" dir="rtl" style="text-align:center;font-weight:700;color:#1e40af;margin:-14px 0 16px">' . e(rateTitleText(null, null, false, (float)$fxRate, false)) . '</div>' : '';
+    // 🪪 «خيار حطّ رقم ضمانه ورقم المالية ورقم صندوق التعويضات بالإفادة» (2026-09-24): ثلاثة مربّعات بالشريط (مشيولة افتراضياً)
+    //    ⇒ سطر تحت عنوان الإفادة بلغتها، بالأرقام من ملف الموظف (الضمان بصيغة سنة الولادة-الرقم كباقي المستندات)، والناقص خطّ منقّط.
+    $idNssf = !empty($_GET['id_nssf']); $idMof = !empty($_GET['id_mof']); $idEoc = !empty($_GET['id_eoc']);
+    $idVals = ['nssf' => cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', ''),
+               'mof'  => trim((string)($emp['finance_ministry_number'] ?? '')),
+               'eoc'  => trim((string)($emp['caisse_number'] ?? ''))];
+    $ID_LBL = ['nssf' => ['ar' => 'رقم الضمان الاجتماعي', 'fr' => 'N° CNSS', 'en' => 'Social Security No.'],
+               'mof'  => ['ar' => 'الرقم المالي (وزارة المالية)', 'fr' => 'N° fiscal (Ministère des Finances)', 'en' => 'Tax No. (Ministry of Finance)'],
+               'eoc'  => ['ar' => 'رقم صندوق التعويضات', 'fr' => 'N° Caisse des indemnités', 'en' => 'Compensation Fund No.']];
+    $idLang = ($type === 'embassy' && $docLang === 'ar') ? 'en' : $docLang; // السفارة إنكليزية ولو كانت لغة الجلسة عربية
+    $idParts = [];
+    foreach (['nssf' => $idNssf, 'mof' => $idMof, 'eoc' => $idEoc] as $ik => $ion) {
+        if (!$ion) continue;
+        $idParts[] = e($ID_LBL[$ik][$idLang]) . ' : <strong>' . ($idVals[$ik] !== '' ? '<span dir="ltr">' . e($idVals[$ik]) . '</span>' : '<span style="display:inline-block;min-width:90px;border-bottom:1px dotted #555">&nbsp;</span>') . '</strong>';
+    }
+    $idLine = $idParts ? '<div class="id-line" dir="' . ($idLang === 'ar' ? 'rtl' : 'ltr') . '" style="text-align:center;margin:-6px 0 14px">' . implode(' &nbsp;·&nbsp; ', $idParts) . '</div>' : '';
+    $rateLine .= $idLine; // يُطبع بعد كل عنوان مع سطر سعر الصرف (نفس الموضع بكل الإفادات)
     $isNotice      = in_array($type, ['notice_school', 'notice_mail'], true);
     $defaultLogo   = in_array($type, ['anhaa_khedme', 'anhaa_mail', 'aqd_taalim', 'cnss', 'notice_school', 'notice_mail', 'salaire', 'tadris', 'embassy', 'riaaya'], true); // الصادرة عن المدرسة: الشعار افتراضياً
     $showLogo      = isset($_GET['logo']) ? ($_GET['logo'] === '1') : $defaultLogo;
@@ -949,7 +1009,11 @@ if (!$emp):
     $L=$money($salShown); $N=$money($net); $U='';
     $nssf=cnssWithBirthYear($emp['nssf_number'], $emp['birth_date']);
     $rtl = ($docLang === 'ar');
-    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($embCur!=='usd'?'&emb_cur='.$embCur:'').($embPer!=='month'?'&emb_per='.$embPer:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'').($hasSigTitle?'&sig_t='.$sigTitle:'').($lvSel!==''?'&lv_sel='.urlencode($lvSel):'').($lvTxt!==''?'&lv_txt='.urlencode($lvTxt):'');
+    $qs = 'employee_id='.$employeeId.'&type='.urlencode($type).'&date='.urlencode($effDate).'&opts_set=1'.($incExtra?'&inc_extra=1':'').($incAide?'&inc_aide=1':'').($incTrans?'&inc_trans=1':'').'&cur='.$cur.($eos>0?'&eos='.$eos:'').($isqMode?'&isq='.$isqMode:'').'&logo='.($showLogo?'1':'0').($isNotice?'&subj_txt='.urlencode($subjectTxt):'').($type==='riaaya'?'&assoc_txt='.urlencode($assocTxt):'').($embAmt>0?'&emb_amt='.$embAmt:'').($embCur!=='usd'?'&emb_cur='.$embCur:'').($embPer!=='month'?'&emb_per='.$embPer:'').($grant>0?'&grant='.$grant:'').($aqdLbp>0?'&aqd_lbp='.$aqdLbp:'').($aqdUsd>0?'&aqd_usd='.$aqdUsd:'').($sigIdx>0?'&sig='.$sigIdx:'').($hasSigTitle?'&sig_t='.$sigTitle:'').($lvSel!==''?'&lv_sel='.urlencode($lvSel):'').($lvTxt!==''?'&lv_txt='.urlencode($lvTxt):'')
+        // (2026-09-24) سعر الدولار / اسم الموقّع / المبلغ اليدوي — تبقى بالطباعة والتصدير والإرسال
+        .($showRate?'&rate_show=1':'').($sigName!==''?'&sig_name='.urlencode($sigName):'').($sigNoName?'&sig_noname=1':'').($amtMan>0?'&amt='.$amtMan.'&amt_cur='.$amtCur:'')
+        .($hireOvr!==''?'&hire_dt='.$hireOvr:'').($endDate!==$effDate?'&end_dt='.$endDate:'')
+        .($idNssf?'&id_nssf=1':'').($idMof?'&id_mof=1':'').($idEoc?'&id_eoc=1':'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
         <div class="btn-group" role="group">
@@ -971,9 +1035,19 @@ if (!$emp):
         <input type="hidden" name="employee_id" value="<?= (int)$employeeId ?>">
         <input type="hidden" name="type" value="<?= e($type) ?>">
         <input type="hidden" name="lang_doc" value="<?= e($docLang) ?>">
-        <input type="hidden" name="date" value="<?= e($effDate) ?>">
         <input type="hidden" name="opts_set" value="1">
         <div class="card-body" style="padding:10px 14px">
+            <?php /* 📅 (2026-09-24) التاريخ المطبوع على الإفادة — خانة ظاهرة بدل المخفية */ ?>
+            <div style="margin-bottom:6px">
+            <strong>Date / التاريخ على الإفادة:</strong>
+            <input type="date" name="date" value="<?= e($effDate) ?>" onchange="this.form.submit()" style="padding:3px 6px;margin:0 6px">
+            <span style="margin:0 12px;color:#cbd5e1">|</span>
+            <?php /* 📅 (2026-09-24) تاريخ الدخول «من» (يحلّ محلّ الملف بهذه الإفادة فقط) والترك «إلى» */ ?>
+            <strong>Entrée à l'école (du) / تاريخ الدخول (من):</strong>
+            <input type="date" name="hire_dt" value="<?= e($hireOvr !== '' ? $hireOvr : (string)($emp['hire_date'] ?? '')) ?>" onchange="this.form.submit()" style="padding:3px 6px;margin:0 6px<?= $hireOvr !== '' ? ';border:2px solid #b45309' : '' ?>" title="فاضي/كما هو = من ملف الموظف — تغييره يمسّ هذه الإفادة فقط لا الملف">
+            <strong>Cessation (au) / الترك (إلى):</strong>
+            <input type="date" name="end_dt" value="<?= e($endDate) ?>" onchange="this.form.submit()" style="padding:3px 6px;margin:0 6px<?= $endDate !== $effDate ? ';border:2px solid #b45309' : '' ?>" title="تاريخ الانقطاع/الترك بإفادات الترك والاستقالة والإسقاط — الافتراضي تاريخ الإفادة">
+            </div>
             <strong>En-tête de l'école / رأس المدرسة:</strong>
             <input type="hidden" name="logo" value="0">
             <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="logo" value="1" <?= $showLogo?'checked':'' ?> onchange="this.form.submit()"> Mettre le logo de l'école / ضع شعار المدرسة على الإفادة</label>
@@ -996,18 +1070,24 @@ if (!$emp):
             </select>
             <?php else: ?><input type="hidden" name="sig" value="0"><?php endif; ?>
             <?php if ($hasSigTitle): ?>
-            <span style="margin:0 16px;color:#cbd5e1">|</span>
+            <?php /* ✍️ (2026-09-24) صفة الموقّع بكل الإفادات + اسمه يُكتب أو يُخفى */ ?>
+            <div style="margin-top:6px">
             <strong>Signature / الإمضاء:</strong>
             <?php foreach ($SIG_TITLES as $stk => $stl): ?>
             <label style="margin:0 10px;cursor:pointer"><input type="radio" name="sig_t" value="<?= $stk ?>" <?= $sigTitle===$stk?'checked':'' ?> onchange="this.form.submit()"> <?= e($stl['fr']) ?> / <?= e($stl['ar']) ?></label>
             <?php endforeach; ?>
+            <span style="margin:0 12px;color:#cbd5e1">|</span>
+            <strong>Nom du signataire / اسم الموقّع:</strong>
+            <input type="text" name="sig_name" value="<?= e($sigName) ?>" placeholder="<?= e($sigNameDefault !== '' ? 'فاضي = ' . $sigNameDefault : 'اكتب اسم المدير/الرئيسة') ?>" style="width:220px;padding:3px 6px" onchange="this.form.submit()" title="فاضي = الاسم من ملف المدرسة — المكتوب يحلّ محلّه بكل مواضع الإفادة. للنسخة الفرنسية/الإنكليزية اكتبه بالحروف اللاتينية (العربي يُترجم تلقائياً)">
+            <label style="margin:0 8px;cursor:pointer"><input type="checkbox" name="sig_noname" value="1" <?= $sigNoName?'checked':'' ?> onchange="this.form.submit()"> Sans nom / بلا اسم (الصفة والتوقيع فقط)</label>
+            </div>
             <?php endif; ?>
-            <?php if ($hasComponents || $hasCurrency || $type==='isqat_haq' || $isNotice): ?><span style="margin:0 16px;color:#cbd5e1">|</span><?php endif; ?>
+            <?php if ($hasComponents || $hasCurrency || $type==='isqat_haq' || $isNotice): ?><div style="margin-top:6px"><?php endif; ?>
             <?php if ($hasComponents): ?>
             <strong>Composantes du salaire / مكوّنات الراتب:</strong>
-            <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_extra" value="1" <?= $incExtra?'checked':'' ?> onchange="this.form.submit()"> + Rémunération suppl. / + الأجر الإضافي (<?= formatLBP($extraW,false) ?>)</label>
-            <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_aide" value="1" <?= $incAide?'checked':'' ?> onchange="this.form.submit()"> + Prime et aide / + مكافأة ومساعدة (<?= formatLBP($aideW,false) ?>)</label>
-            <label style="cursor:pointer"><input type="checkbox" name="inc_trans" value="1" <?= $incTrans?'checked':'' ?> onchange="this.form.submit()"> + Transport / + تعويض النقل (<?= formatLBP($transW,false) ?>)</label>
+            <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_extra" value="1" <?= $incExtra?'checked':'' ?> onchange="this.form.submit()"> + Rémunération suppl. / + الأجر الإضافي (<?= formatLBP($extraW0,false) ?>)</label>
+            <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_aide" value="1" <?= $incAide?'checked':'' ?> onchange="this.form.submit()"> + Prime et aide / + مكافأة ومساعدة (<?= formatLBP($aideW0,false) ?>)</label>
+            <label style="cursor:pointer"><input type="checkbox" name="inc_trans" value="1" <?= $incTrans?'checked':'' ?> onchange="this.form.submit()"> + Transport / + تعويض النقل (<?= formatLBP($transW0,false) ?>)</label>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
             <?php endif; ?>
             <?php if ($hasCurrency): ?>
@@ -1016,6 +1096,25 @@ if (!$emp):
             <label style="margin:0 10px;cursor:pointer"><input type="radio" name="cur" value="usd" <?= $cur==='usd'?'checked':'' ?> onchange="this.form.submit()"> Dollar / دولار ($)</label>
             <label style="cursor:pointer"><input type="radio" name="cur" value="both" <?= $cur==='both'?'checked':'' ?> onchange="this.form.submit()"> Les deux / الاثنين (ل.ل + $)</label>
             <?php endif; ?>
+            <?php if ($hasComponents || $hasCurrency || $type==='isqat_haq' || $isNotice): ?></div><?php endif; ?>
+            <?php /* 💱 + ✍️ (2026-09-24) سعر الدولار على الإفادة (حطّ/شيل) + المبلغ اليدوي — بكل الإفادات */ ?>
+            <div style="margin-top:6px">
+                <strong>Taux du dollar / سعر الدولار على الإفادة:</strong>
+                <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="rate_show" value="1" <?= $showRate?'checked':'' ?> onchange="this.form.submit()"> Écrire le taux / اكتب سعر الصرف على الإفادة<?= $fxRate > 0 ? ' (1 $ = ' . formatLBP((int)$fxRate, false) . ' ل.ل)' : '' ?></label>
+                <span style="margin:0 12px;color:#cbd5e1">|</span>
+                <strong>Montant manuel / المبلغ يدوياً:</strong>
+                <input type="text" name="amt" value="<?= $amtMan>0 ? (int)$amtMan : '' ?>" placeholder="فاضي = المحسوب" style="width:150px;padding:3px 6px" onchange="this.form.submit()" title="مبلغ تكتبه بإيدك يحلّ محلّ الراتب المحسوب بنصّ الإفادة">
+                <label style="margin:0 6px;cursor:pointer"><input type="radio" name="amt_cur" value="lbp" <?= $amtCur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> ل.ل</label>
+                <label style="cursor:pointer"><input type="radio" name="amt_cur" value="usd" <?= $amtCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> $</label>
+                <?php if ($amtMan > 0): ?><span style="color:#b45309;font-weight:700;margin-right:8px"><i class="fas fa-pen"></i> المبلغ اليدوي معتمد بالإفادة بدل المحسوب — فرّغ الخانة للرجوع للمحسوب</span><?php endif; ?>
+            </div>
+            <?php /* 🪪 (2026-09-24) أرقام الموظف على الإفادة: الضمان / المالية / صندوق التعويضات */ ?>
+            <div style="margin-top:6px">
+                <strong>Numéros sur l'attestation / الأرقام على الإفادة:</strong>
+                <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="id_nssf" value="1" <?= $idNssf?'checked':'' ?> onchange="this.form.submit()"> N° CNSS / رقم الضمان (<?= $idVals['nssf'] !== '' ? e($idVals['nssf']) : '⚠ فاضي بالملف' ?>)</label>
+                <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="id_mof" value="1" <?= $idMof?'checked':'' ?> onchange="this.form.submit()"> N° fiscal / رقم المالية (<?= $idVals['mof'] !== '' ? e($idVals['mof']) : '⚠ فاضي بالملف' ?>)</label>
+                <label style="cursor:pointer"><input type="checkbox" name="id_eoc" value="1" <?= $idEoc?'checked':'' ?> onchange="this.form.submit()"> N° Caisse / رقم صندوق التعويضات (<?= $idVals['eoc'] !== '' ? e($idVals['eoc']) : '⚠ فاضي بالملف' ?>)</label>
+            </div>
             <?php if ($type === 'isqat_haq'): ?>
             <span style="margin:0 16px;color:#cbd5e1">|</span>
             <strong>Montant de l'indemnité calculée / مبلغ تعويض الصرف المحسوب:</strong>
@@ -1065,7 +1164,7 @@ if (!$emp):
             <?php if ($grant>0): ?><div style="margin-top:6px;color:#1e40af"><?= number_format($grant) ?> دولار أميركي — بالحروف: <strong><?= e(numToArabicWords($grant)) ?> دولار أميركي</strong></div><?php endif; ?>
             <?php endif; ?>
             <?php if ($hasComponents): ?>
-            <div style="margin-top:6px;color:#1e40af"><?= $printsSalary ? 'الراتب المعتمد بالإفادة' : 'الراتب المعتمد (هذه الإفادة بلا مبلغ بنصّها — للعلم)' ?>: <strong><?= $moneyAr($salShown) ?></strong> (<?= $isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج' ?> <?= $moneyAr((int)$basePlusEch) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?><?= $incTrans?' + النقل':'' ?>)<?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
+            <div style="margin-top:6px;color:#1e40af"><?= $printsSalary ? 'الراتب المعتمد بالإفادة' : 'الراتب المعتمد (هذه الإفادة بلا مبلغ بنصّها — للعلم)' ?>: <strong><?= $moneyAr($salShown) ?></strong> <?= $amtMan > 0 ? '(مبلغ يدوي)' : '(' . ($isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج') . ' ' . $moneyAr((int)$basePlusEch) . ($incExtra?' + الإضافي':'') . ($incAide?' + المكافأة':'') . ($incTrans?' + النقل':'') . ')' ?><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php elseif ($type === 'aqd_taalim'): ?>
             <div style="margin-top:6px;color:#1e40af">أساس الراتب بالعقد: <strong><?= $moneyAr((int)$basePlusEch) ?></strong><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php endif; ?>
@@ -1233,7 +1332,7 @@ if (!$emp):
         $nivMapFr = ['maternelle'=>'Maternelle','primaire'=>'Primaire','intermediaire'=>'Complémentaire','secondaire'=>'Secondaire'];
         $nivFr = array_values(array_filter(array_map(function ($k) use ($nivMapFr) { return $nivMapFr[$k] ?? ''; }, $nivKeys)));
         $levelsFr = count($nivFr) >= 2 ? ('aux niveaux ' . implode(' et ', $nivFr)) : (count($nivFr) == 1 ? ('au niveau ' . $nivFr[0]) : '');
-        $usdSal = $fxRate > 0 ? (int)round($salShown / $fxRate) : 0;
+        $usdSal = $manualLbp > 0 ? (int)round($manualUsd) : ($fxRate > 0 ? (int)round($salShown / $fxRate) : 0); // المبلغ اليدوي بالدولار كما كُتب (2026-09-24)
         // سعر إفادة السفارة: المبلغ اليدوي بالعملة المختارة، وإلا المحسوب بالدولار
         // «خيار أنا حط قيمة الراتب بالدولار + شهري أو سنوي» (2026-08-20): المبلغ اليدوي بعملة
         // خانته (دولار افتراضياً)، وإلا المحسوب بالدولار (×12 حين تكون الفترة سنوية)
@@ -1287,8 +1386,7 @@ if (!$emp):
         // (بطلبه 2026-08-20): النسخ الفرنسية والإنكليزية لكل الإفادات — نفس نصوص العربي
         // بالمعنى حرفياً، وبيانات كل مدرسة تُسحب من ملفها (الاسم الفرنسي/المدينة/الترويسة)
         $FR = ($docLang === 'fr');
-        $SIG_EN = ['raisa' => 'The Mother Superior', 'idara' => 'The Administration', 'moudir' => 'The Director'];
-        $sigTitleLat = $FR ? $SIG_TITLES[$sigTitle]['fr'] : $SIG_EN[$sigTitle];
+        $sigTitleLat = $FR ? $sigTitleFr : $sigTitleEn; // صفة الموقّع المختارة بالشريط (بكل الإفادات منذ 2026-09-24)
         $funcLat  = $FR ? $fnFr['fr'] : $fnFr['en'];
         $subjL    = $FR ? $subjFr : $subjEn; // المادة بلغة الوثيقة
         $wordsLat = $FR ? $moneyWordsFr : $moneyWordsEn;
@@ -1337,7 +1435,7 @@ if (!$emp):
         <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline"><?= $isEmploye ? ($FR ? 'Attestation de travail' : 'Work Certificate') : ($FR ? 'Attestation de travail et d\'enseignement' : 'Work and Teaching Certificate') ?></h2><?= $rateLine ?>
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille au sein de son établissement en qualité de' : 'has been working there as' ?> <strong><?= e($funcLat) ?></strong><?php else: ?><?= $FR ? 'enseigne au sein de son établissement la matière' : 'has been teaching' ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?><?php endif; ?> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'toujours en fonction à ce jour. Il/Elle fait preuve de bonne conduite et d\'assiduité dans l\'accomplissement de son travail.' : 'and is still in service to date. He/She has shown good conduct and commitment in the performance of his/her duties.' ?></p>
         <p><?= $reqLine ?></p>
-        <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= $FR ? 'Le Directeur — Signature et cachet' : 'The Director — Signature & stamp' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
+        <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleLat) ?> — <?= $FR ? 'Signature et cachet' : 'Signature & stamp' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
 
         <?php elseif ($type === 'riaaya'): ?>
         <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? ($FR ? e($cityFr) . ', le ' : e($cityFr) . ': ') : '' ?><?= $today ?></div>
@@ -1345,7 +1443,7 @@ if (!$emp):
         <p><?= $FR ? 'L\'administration de l\'école' : 'The administration of' ?> <strong><?= e($schoolNameFr) ?></strong> <?= strpos($assocTxt, 'التابعة لجمعية') === 0 ? ($FR ? 'relevant de l\'Association des Religieuses Salvatoriennes de Notre-Dame de l\'Annonciation, enregistrée auprès de vos services sous le n° (.....)' : 'affiliated to the Association of the Salvatorian Sisters of Our Lady of the Annunciation, registered with you under No. (.....)') : e($assocTxt) ?>,</p>
         <p><?= $FR ? 'atteste que' : 'certifies that' ?> <?= $mrsLat ?> <strong><?= e($nomFr) ?></strong> <?php if ($isEmploye): ?><?= $FR ? 'travaille en qualité de' : 'works as' ?> <strong><?= e($funcLat) ?></strong> <?= $FR ? 'dans notre école' : 'at our school' ?><?php else: ?><?= $FR ? 'est enseignant(e) de la matière' : 'is a teacher of' ?> <strong><?= $subj !== '' ? e($subjL) : $blank(140) ?></strong> <?= $levelsLat ?> <?= $FR ? 'dans notre école' : 'at our school' ?><?php endif; ?>.</p>
         <p><?= $FR ? 'La présente attestation est délivrée à cet effet.' : 'This attestation is issued accordingly.' ?></p>
-        <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= $FR ? 'L\'Administration' : 'The Administration' ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
+        <div style="width:280px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleLat) ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
 
         <?php elseif ($type === 'anhaa_khedme' || $type === 'anhaa_mail'): ?>
         <?php if ($type === 'anhaa_mail'): ?>
@@ -1403,7 +1501,7 @@ if (!$emp):
         <p><?= $FR ? 'Chef d\'établissement de l\'école' : 'Head of' ?> : <strong><?= e($schoolNameFr) ?></strong></p>
         <p><?= $FR ? 'certifie que' : 'certify that' ?> <?= $mrsLat ?> : <strong><?= e($nomFr) ?></strong> &nbsp; <?= $FR ? 'titulaire de la carte d\'identité n°' : 'holder of ID card No.' ?> <?= $blank(150) ?></p>
         <p><?= $FR ? 'a commencé à enseigner dans notre école le' : 'started teaching at our school on' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(120) ?></strong></p>
-        <p><?= $FR ? 'et a cessé son travail le' : 'and ceased work on' ?> <strong><?= $effFmt ?></strong></p>
+        <p><?= $FR ? 'et a cessé son travail le' : 'and ceased work on' ?> <strong><?= $endFmt ?></strong></p>
         <p><?= $FR ? 'pour les motifs suivants' : 'for the following reasons' ?> : <?= $lvLat !== '' ? '<strong>' . e($lvLat) . '</strong>' : $blank(380) ?></p>
         <?php $attParts = [];
         if ($incExtra && $extraW > 0) $attParts[] = [$FR ? 'Rémunération supplémentaire' : 'Additional remuneration', $extraW];
@@ -1436,7 +1534,7 @@ if (!$emp):
         <p><?= $FR ? 'selon ma carte d\'identité, registre n°' : 'as per my identity card, registry No.' ?> <?= $blank(150) ?> &nbsp; <?= $FR ? 'déclare ce qui suit :' : 'declare the following:' ?></p>
         <p><strong>1)</strong> <?= $FR ? 'J\'ai travaillé à l\'école' : 'I worked at' ?> : <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'en qualité de' : 'as' ?> : <strong><?= e($funcLat) ?></strong> <?= $FR ? 'depuis le' : 'since' ?> <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong>, <?= $FR ? 'mon salaire à la date de la présente renonciation s\'élevant (en chiffres) à' : 'my salary as of the date of this waiver amounting (in figures) to' ?> <strong><?= $moneyLat($salShown) ?></strong>, <?= $FR ? 'soit (en lettres)' : 'in words' ?> <strong><?= e($wordsLat($salShown)) ?> <?= $uniq ?>.</strong></p>
         <p><strong>2)</strong> <?= $FR ? 'J\'ai perçu de l\'école' : 'I received from' ?> : <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'l\'intégralité de mes salaires et de leurs accessoires pendant toute la durée de mon travail, ainsi que tous les droits que la loi me confère pour ladite période, y compris les heures supplémentaires et les congés annuels, etc.' : 'all my salaries and their accessories throughout my period of work, as well as all the rights conferred upon me by law for the said period, including overtime and annual leave, etc.' ?></p>
-        <p><strong>3)</strong> <?= $FR ? 'En date du' : 'On' ?> <strong><?= $effFmt ?></strong> &nbsp; <?= $box($isqMode==='istiqala') ?> <?= $FR ? 'j\'ai présenté ma démission' : 'I submitted my resignation' ?> &nbsp;&nbsp; <?= $box($isqMode==='sarf') ?> <?= $FR ? 'j\'ai été licencié(e)' : 'I was dismissed from service' ?>.</p>
+        <p><strong>3)</strong> <?= $FR ? 'En date du' : 'On' ?> <strong><?= $endFmt ?></strong> &nbsp; <?= $box($isqMode==='istiqala') ?> <?= $FR ? 'j\'ai présenté ma démission' : 'I submitted my resignation' ?> &nbsp;&nbsp; <?= $box($isqMode==='sarf') ?> <?= $FR ? 'j\'ai été licencié(e)' : 'I was dismissed from service' ?>.</p>
         <p><?= $FR ? 'En conséquence et après règlement des comptes, j\'ai perçu de l\'école' : 'Consequently, and after settlement of accounts, I received from' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'la somme (en chiffres) de' : 'the amount (in figures) of' ?> <strong><?= $eos>0 ? $freeNum($eos) : $blank(140) ?></strong> &nbsp; (<?= $FR ? 'en lettres' : 'in words' ?>) <strong><?= $eos>0 ? e(($FR ? numToFrenchWords($eos) : numToEnglishWords($eos)) . ' ' . ($cur === 'usd' ? ($FR ? 'dollars américains' : 'US Dollars') : ($FR ? 'livres libanaises' : 'Lebanese Pounds')) . ' ' . $uniq) : $blank(240) ?></strong></p>
         <p><?= $FR ? 'Cette somme constitue mon indemnité de licenciement.' : 'This amount constitutes my end-of-service indemnity.' ?></p>
         <p><?= $FR ? 'En conséquence, je reconnais que l\'école' : 'Accordingly, I acknowledge that' ?> <strong><?= e($schoolNameFr) ?></strong> <?= $FR ? 'm\'a versé toutes les sommes qui m\'étaient dues en ma qualité d\'employé(e), notamment l\'indemnité de licenciement et l\'indemnité de préavis ; je renonce à l\'égard de ladite école à tout droit, action ou réclamation m\'appartenant en vertu du Code du travail et de ses amendements et de toutes les lois et réglementations en vigueur, et je décharge entièrement l\'école à cet égard, décharge totale couvrant l\'ensemble de la relation de travail qui existait entre nous.' : 'has paid me all amounts due to me in my capacity as its employee, in particular the end-of-service indemnity and the notice indemnity; I waive towards the said school any right, action or claim belonging to me under the Labor Law and its amendments and all applicable laws and regulations, and I fully release the school in this respect, a complete release covering the entire employment relationship that existed between us.' ?></p>
@@ -1519,7 +1617,7 @@ if (!$emp):
         <?php elseif ($type === 'aqd_taalim'):
         $cExtra  = $incExtra ? $extraW : 0;
         $cAide   = $incAide  ? $aideW  : 0;
-        $cTrans  = ($incTrans && $sal) ? (int)$sal['transport_lbp'] : 0; // يتبع خيار «+ تعويض النقل» بالشريط (2026-09-15)
+        $cTrans  = $incTrans ? (int)$transW : 0; // يتبع خيار «+ تعويض النقل» بالشريط (2026-09-15) — و$transW يصفَّر مع المبلغ اليدوي (2026-09-24)
         $cFamily = $sal ? (int)$sal['family_allowance_lbp'] : 0;
         $cTotal  = (int)round($basePlusEch) + $cExtra + $cAide + $cTrans + $cFamily;
         $cDailyTrans = (float)($emp['transport_daily_amount'] ?? 0);
@@ -1646,7 +1744,7 @@ if (!$emp):
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') ?> حتى تاريخه ، <?= $g('وهو', 'وهي', 'وهو(هي)') ?> على حسن سلوك والتزام في أداء <?= $g('عمله', 'عملها', 'عمله(ا)') ?> .</p>
         <?php /* صيغة «لمن يلزم» وجملة عدم المسؤولية شِيلتا من كل الإفادات (بطلبه 2026-08-20) */ ?>
         <p>وقد أُعطيت هذه الإفادة بناءً على <?= $g('طلبه', 'طلبها', 'طلبه(ا)') ?> .</p>
-        <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong>المدير — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'riaaya'): ?>
@@ -1656,31 +1754,31 @@ if (!$emp):
         <p>تفيد إدارة <strong><?= e($schoolNameAr) ?></strong> <?= e($assocTxt) ?> ،</p>
         <p>أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا<?php else: ?><?= $g('هو معلّم', 'هي معلّمة', 'هو(هي) معلّم(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا<?php endif; ?> .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
-        <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong>الإدارة</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?></strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'embassy' && $docLang === 'fr'): ?>
         <?php /* «بدي نفس الإفادة باللغة الفرنسية» (2026-08-20) — تُختار من أزرار اللغة فوق */ ?>
         <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
         <div dir="ltr" style="text-align:justify">
-          <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? e($cityFr) . ', le ' : '' ?><?= date('d/m/Y') ?></div>
+          <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? e($cityFr) . ', le ' : '' ?><?= $today ?></div>
           <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">Attestation</h2><?= $rateLine ?>
           <p>À qui de droit,</p>
           <p>Nous certifions par la présente que <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>est employé(e) en qualité de <strong><?= e($fnFr['fr']) ?></strong> à <strong><?= e($schoolNameFr) ?></strong>, à raison de <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> par <?= $embPerWordFr ?></strong><?= $embRate !== '' ? ' (' . e($embWordsFr) . ')' : '' ?><?php else: ?>est enseignant(e) à <strong><?= e($schoolNameFr) ?></strong>. Il/Elle enseigne <strong><?= $subj !== '' ? e($subjFr) : $blank(140) ?></strong> <?= $levelsFr ?>, à raison de <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> par <?= $embPerWordFr ?></strong><?= $embRate !== '' ? ' (' . e($embWordsFr) . ')' : '' ?><?php endif; ?>. Nous confirmons également qu'il/elle est engagé(e) dans notre établissement pour l'année scolaire <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">Cette attestation lui est délivrée à sa demande.</p>
-          <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong>Le Directeur</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
+          <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleFr) ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
         </div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'embassy'): ?>
         <?php if ($showRecHead): ?><?= $schoolHeadFr ?><?php endif; ?>
         <div dir="ltr" style="text-align:justify">
-          <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? e($cityFr) . ': ' : '' ?><?= date('d/m/Y') ?></div>
+          <div style="text-align:right;margin-bottom:10px"><?= $cityFr !== '' ? e($cityFr) . ': ' : '' ?><?= $today ?></div>
           <h2 style="text-align:center;margin:6px 0 22px;text-decoration:underline">Attestation</h2><?= $rateLine ?>
           <p>To whom it may concern,</p>
           <p>This is to certify that <strong><?= e(trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['father_name_fr'] ? $emp['father_name_fr'] . ' ' : '') . ($emp['last_name_fr'] ?? ''))) ?></strong> <?php if ($isEmploye): ?>has been employed as <strong><?= e($fnFr['en']) ?></strong> at <strong><?= e($schoolNameFr) ?></strong>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?= $embRate !== '' ? ' (' . e($embWords) . ')' : '' ?><?php else: ?>has been a teacher at <strong><?= e($schoolNameFr) ?></strong>. He/She has been, and continues to be, teaching <strong><?= $subj !== '' ? e($subjEn) : $blank(140) ?></strong> <?= $levelsEn ?>, at a rate of <strong><?= $embRate !== '' ? e($embRate) : $blank(90) ?> per <?= $embPerWord ?></strong><?= $embRate !== '' ? ' (' . e($embWords) . ')' : '' ?><?php endif; ?>. We also confirm that he/she is currently engaged at our school for the academic year <strong><?= $nextSY ?></strong>.</p>
           <p style="text-align:center">This certificate is issued upon his/her request.</p>
-          <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong>The Director</strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
+          <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleEn) ?></strong><?php if ($directorFr): ?><br><?= e($directorFr) ?><?php endif; ?></div>
         </div>
         <?= $footerHtml ?>
 
@@ -1752,7 +1850,7 @@ if (!$emp):
         <p>رئيسة أو مديرة مدرسة : <strong><?= e($schoolNameAr) ?></strong></p>
         <p>أُثبت أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> : <strong><?= e($nomAr) ?></strong> &nbsp; <?= $g('حامل', 'حاملة', 'حامل') ?> بطاقة الهوية رقم <?= $blank(150) ?></p>
         <p>قد <?= $g('باشر', 'باشرت', 'باشر') ?> التدريس في مدرستنا بتاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(120) ?></strong></p>
-        <p><?= $g('وانقطع', 'وانقطعت', 'وانقطع') ?> عن العمل بتاريخ <strong><?= $effFmt ?></strong></p>
+        <p><?= $g('وانقطع', 'وانقطعت', 'وانقطع') ?> عن العمل بتاريخ <strong><?= $endFmt ?></strong></p>
         <?php /* سبب الترك من الخيار/النص الحرّ (2026-08-20) — والفاضي = خط منقّط يُعبّأ باليد */ ?>
         <p>للأسباب الآتية : <?= $lvFinal !== '' ? '<strong>' . e($lvFinal) . '</strong>' : $blank(380) ?></p>
         <?php /* 🧾 تفصيل الراتب بالإفادة المدرسية (بطلب المستخدم 2026-08-19): أساس الراتب لحاله
@@ -1790,7 +1888,7 @@ if (!$emp):
         <p>حسب تذكرة هويتي ، رقم السجل <?= $blank(150) ?> &nbsp; أُصرّح بما يلي :</p>
         <p><strong>1)</strong> عملت لدى مدرسة : <strong><?= e($schoolNameAr) ?></strong> بصفة : <strong><?= e($fnFr['ar']) ?></strong> منذ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong> ، وأصبح راتبي بتاريخ هذا الإسقاط بالغاً ( بالأرقام ) <strong><?= $salFig ?></strong> ، بالحروف <strong><?= e($salWrd) ?> لا غير .</strong></p>
         <p><strong>2)</strong> قبضت من مدرسة : <strong><?= e($schoolNameAr) ?></strong> رواتبي كاملةً مع لواحقها طيلة مدة عملي لديها ، كما تناولت جميع الحقوق التي يخوّلني إياها القانون طيلة المدة المذكورة بما في ذلك بدل الساعات الإضافية والفرص السنوية إلخ .....</p>
-        <p><strong>3)</strong> بتاريخ <strong><?= $effFmt ?></strong> &nbsp; <?= $box($isqMode==='istiqala') ?> قدّمت استقالتي &nbsp;&nbsp; <?= $box($isqMode==='sarf') ?> صار صرفي من الخدمة .</p>
+        <p><strong>3)</strong> بتاريخ <strong><?= $endFmt ?></strong> &nbsp; <?= $box($isqMode==='istiqala') ?> قدّمت استقالتي &nbsp;&nbsp; <?= $box($isqMode==='sarf') ?> صار صرفي من الخدمة .</p>
         <p>وبنتيجة ذلك وبعد المحاسبة قبضت من مدرسة <strong><?= e($schoolNameAr) ?></strong> مبلغ ( بالأرقام ) <strong><?= $eos>0 ? $freeNum($eos) : $blank(140) ?></strong> &nbsp; (بالحروف) <strong><?= $eos>0 ? 'فقط '.e($freeWords($eos)).' لا غير' : $blank(240) ?></strong></p>
         <p>وهذا المبلغ يشكّل تعويض صرفي من الخدمة .</p>
         <p>بناءً عليه ، أُقرّ وأعترف بأنّ مدرسة <strong><?= e($schoolNameAr) ?></strong> دفعت لي جميع المبالغ المترتبة لي بصفتي مستخدَماً لديها ولا سيّما تعويض الصرف من الخدمة وبدل مدة الإنذار ، وأنني أُسقط عن المدرسة المذكورة كل حقٍّ أو دعوى أو مطلب يعود لي بموجب قانون العمل وتعديلاته وسائر القوانين والأنظمة المعمول بها ، وأُبرئ ذمة المدرسة من هذا القبيل إبراءً تاماً شاملاً مجمل علاقة الاستخدام التي كانت قائمةً فيما بيننا .</p>
@@ -1840,7 +1938,7 @@ if (!$emp):
         // الأجر الإضافي والمكافأة يظهران حسب خيار «مكوّنات الراتب» أعلى الصفحة ($incExtra/$incAide).
         $cExtra  = $incExtra ? $extraW : 0;
         $cAide   = $incAide  ? $aideW  : 0;
-        $cTrans  = ($incTrans && $sal) ? (int)$sal['transport_lbp'] : 0; // يتبع خيار «+ تعويض النقل» بالشريط (2026-09-15)
+        $cTrans  = $incTrans ? (int)$transW : 0; // يتبع خيار «+ تعويض النقل» بالشريط (2026-09-15) — و$transW يصفَّر مع المبلغ اليدوي (2026-09-24)
         $cFamily = $sal ? (int)$sal['family_allowance_lbp'] : 0;
         $cTotal  = (int)round($basePlusEch) + $cExtra + $cAide + $cTrans + $cFamily;
         // قيمة تعويض النقل اليومي من ملف الأستاذ (بعملته الخاصة كما أُدخِلت)
@@ -2012,9 +2110,9 @@ if (!$emp):
                 <?php endif; ?>
                 <?php if ($type==='salaire'): ?><p>ويبلغ راتبه الشهري<?= $isEmploye ? '' : ' (الأساس + الدرجات)' ?> <strong><?= $L ?></strong>، وصافي راتبه <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> عن <?= e($salPeriodAr) ?><?php endif; ?>.</p>
                 <?php elseif ($type==='cnss'): ?><p>وهو مسجَّل في الصندوق الوطني للضمان الاجتماعي تحت الرقم <strong><?= e($nssf) ?></strong>، على راتب شهري خاضع قدره <strong><?= $L ?></strong> (حصة الأجير 3%: <?= formatLBP($cnssAmt) ?>؛ حصة المدرسة 8%: <?= formatLBP($schoolCnss) ?>).</p>
-                <?php elseif ($type==='resignation'): ?><p>وقد تقدّم <strong><?= e($nomAr) ?></strong> باستقالته من عمله في مدرستنا<?php if ($emp['hire_date']): ?> (المباشرة منذ <strong><?= $hireFmt ?></strong>)<?php endif; ?>، وقد قُبلت اعتباراً من <strong><?= $effFmt ?></strong>.</p>
-                <?php elseif ($type==='fin_de_service'): ?><p>وقد انتهت خدمة <strong><?= e($nomAr) ?></strong> في مدرستنا<?php if ($emp['hire_date']): ?>، بعد خدمة من <strong><?= $hireFmt ?></strong> حتى <strong><?= $effFmt ?></strong><?= $yAr?' ('.e($yAr).')':'' ?><?php endif; ?>، اعتباراً من <strong><?= $effFmt ?></strong>.</p>
-                <?php elseif ($type==='decharge'): ?><p>يُقرّ <strong><?= e($nomAr) ?></strong> بأنه قبض من مدرستنا كامل حقوقه ورواتبه ومستحقاته (بما فيها التعويضات وتعويض نهاية الخدمة) لغاية تاريخ <strong><?= $effFmt ?></strong>، وأنه لا يطالب المدرسة بأي حقّ أو مستحق بعد هذا التاريخ (براءة ذمة تامة).</p>
+                <?php elseif ($type==='resignation'): ?><p>وقد تقدّم <strong><?= e($nomAr) ?></strong> باستقالته من عمله في مدرستنا<?php if ($emp['hire_date']): ?> (المباشرة منذ <strong><?= $hireFmt ?></strong>)<?php endif; ?>، وقد قُبلت اعتباراً من <strong><?= $endFmt ?></strong>.</p>
+                <?php elseif ($type==='fin_de_service'): ?><p>وقد انتهت خدمة <strong><?= e($nomAr) ?></strong> في مدرستنا<?php if ($emp['hire_date']): ?>، بعد خدمة من <strong><?= $hireFmt ?></strong> حتى <strong><?= $endFmt ?></strong><?= $yAr?' ('.e($yAr).')':'' ?><?php endif; ?>، اعتباراً من <strong><?= $endFmt ?></strong>.</p>
+                <?php elseif ($type==='decharge'): ?><p>يُقرّ <strong><?= e($nomAr) ?></strong> بأنه قبض من مدرستنا كامل حقوقه ورواتبه ومستحقاته (بما فيها التعويضات وتعويض نهاية الخدمة) لغاية تاريخ <strong><?= $endFmt ?></strong>، وأنه لا يطالب المدرسة بأي حقّ أو مستحق بعد هذا التاريخ (براءة ذمة تامة).</p>
                 <?php endif; ?>
                 <p>أُعطيت هذه الإفادة بناءً على طلبه.</p>
 
@@ -2026,9 +2124,9 @@ if (!$emp):
                 <?php endif; ?>
                 <?php if ($type==='salaire'): ?><p>Son salaire mensuel<?= $isEmploye ? '' : ' (base + échelon)' ?> s'élève à <strong><?= $L ?></strong>, salaire net <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> au titre de <?= e($salPeriodLat) ?><?php endif; ?>.</p>
                 <?php elseif ($type==='cnss'): ?><p>Immatriculé(e) à la CNSS sous le n° <strong><?= e($nssf) ?></strong>, sur un salaire mensuel soumis de <strong><?= $L ?></strong> (part employé 3% : <?= formatLBP($cnssAmt) ?> ; part employeur 8% : <?= formatLBP($schoolCnss) ?>).</p>
-                <?php elseif ($type==='resignation'): ?><p><strong><?= e($nomFr) ?></strong> a présenté sa démission, acceptée à compter du <strong><?= $effFmt ?></strong>.</p>
-                <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> a cessé ses fonctions à compter du <strong><?= $effFmt ?></strong><?php if ($emp['hire_date']): ?>, après une période de service du <?= $hireFmt ?> au <?= $effFmt ?><?= $yFr?' ('.e($yFr).')':'' ?><?php endif; ?>.</p>
-                <?php elseif ($type==='decharge'): ?><p><strong><?= e($nomFr) ?></strong> reconnaît avoir perçu de notre établissement l'intégralité de ses droits et salaires (y compris indemnités et fin de service) à la date du <strong><?= $effFmt ?></strong>, et déclare n'avoir aucune réclamation envers l'établissement (reçu pour solde de tout compte).</p>
+                <?php elseif ($type==='resignation'): ?><p><strong><?= e($nomFr) ?></strong> a présenté sa démission, acceptée à compter du <strong><?= $endFmt ?></strong>.</p>
+                <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> a cessé ses fonctions à compter du <strong><?= $endFmt ?></strong><?php if ($emp['hire_date']): ?>, après une période de service du <?= $hireFmt ?> au <?= $endFmt ?><?= $yFr?' ('.e($yFr).')':'' ?><?php endif; ?>.</p>
+                <?php elseif ($type==='decharge'): ?><p><strong><?= e($nomFr) ?></strong> reconnaît avoir perçu de notre établissement l'intégralité de ses droits et salaires (y compris indemnités et fin de service) à la date du <strong><?= $endFmt ?></strong>, et déclare n'avoir aucune réclamation envers l'établissement (reçu pour solde de tout compte).</p>
                 <?php endif; ?>
                 <p>La présente attestation est délivrée à sa demande.</p>
 
@@ -2040,9 +2138,9 @@ if (!$emp):
                 <?php endif; ?>
                 <?php if ($type==='salaire'): ?><p>His/her monthly salary<?= $isEmploye ? '' : ' (base + increment)' ?> is <strong><?= $L ?></strong>, net salary <strong><?= $N ?></strong><?= $U ?><?php if ($sal): ?> for <?= e($salPeriodLat) ?><?php endif; ?>.</p>
                 <?php elseif ($type==='cnss'): ?><p>Registered with the National Social Security Fund under no. <strong><?= e($nssf) ?></strong>, on a monthly contributory salary of <strong><?= $L ?></strong> (employee share 3%: <?= formatLBP($cnssAmt) ?>; employer share 8%: <?= formatLBP($schoolCnss) ?>).</p>
-                <?php elseif ($type==='resignation'): ?><p><strong><?= e($nomFr) ?></strong> has submitted his/her resignation, accepted effective <strong><?= $effFmt ?></strong>.</p>
-                <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> ended his/her duties effective <strong><?= $effFmt ?></strong><?php if ($emp['hire_date']): ?>, after a service period from <?= $hireFmt ?> to <?= $effFmt ?><?= $yEn?' ('.e($yEn).')':'' ?><?php endif; ?>.</p>
-                <?php elseif ($type==='decharge'): ?><p><strong><?= e($nomFr) ?></strong> acknowledges having received from our establishment all of his/her dues and salaries (including allowances and end-of-service) as of <strong><?= $effFmt ?></strong>, and declares having no claim whatsoever against the establishment (final discharge / receipt in full).</p>
+                <?php elseif ($type==='resignation'): ?><p><strong><?= e($nomFr) ?></strong> has submitted his/her resignation, accepted effective <strong><?= $endFmt ?></strong>.</p>
+                <?php elseif ($type==='fin_de_service'): ?><p><strong><?= e($nomFr) ?></strong> ended his/her duties effective <strong><?= $endFmt ?></strong><?php if ($emp['hire_date']): ?>, after a service period from <?= $hireFmt ?> to <?= $endFmt ?><?= $yEn?' ('.e($yEn).')':'' ?><?php endif; ?>.</p>
+                <?php elseif ($type==='decharge'): ?><p><strong><?= e($nomFr) ?></strong> acknowledges having received from our establishment all of his/her dues and salaries (including allowances and end-of-service) as of <strong><?= $endFmt ?></strong>, and declares having no claim whatsoever against the establishment (final discharge / receipt in full).</p>
                 <?php endif; ?>
                 <p>This certificate is issued upon his/her request.</p>
             <?php endif; ?>
@@ -2059,7 +2157,7 @@ if (!$emp):
                         <strong><?= $docLang==='ar'?'الموظف':($docLang==='fr'?"L'employé(e)":'The employee') ?></strong>
                         <div style="margin-top:46px;border-top:1px solid #333;width:200px"><?= $docLang==='ar'?'التوقيع':'Signature' ?></div>
                     <?php else: ?>
-                        <strong><?= $docLang==='ar'?'الإدارة':($docLang==='fr'?'La Direction':'The Administration') ?></strong><br>
+                        <strong><?= $docLang==='ar' ? e($sigTitleAr) : ($docLang==='fr' ? e($sigTitleFr) : e($sigTitleEn)) ?></strong><br>
                         <?php if ($director): ?><span><?= e($director) ?></span><br><?php endif; ?>
                         <div style="margin-top:46px;border-top:1px solid #333;width:210px"><?= $docLang==='ar'?'التوقيع والخاتم':($docLang==='fr'?'Signature & cachet':'Signature & stamp') ?></div>
                     <?php endif; ?>

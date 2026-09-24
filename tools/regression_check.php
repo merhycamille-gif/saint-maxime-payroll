@@ -6371,7 +6371,7 @@ check('خيارات الإفادات موحّدة (تشغيل فعلي): 15 نو
 $at132 = (string)file_get_contents($PROJ . '/pages/attestations.php');
 check('خيارات المكوّنات تُحترَم (كود): إفادة الضمان سطر لكل مكوّن مختار + عقد التعليم النقل يتبع مربّعه',
       substr_count($at132, "foreach (\$cnssParts as \$cp)") === 2
-      && substr_count($at132, "\$cTrans  = (\$incTrans && \$sal) ? (int)\$sal['transport_lbp'] : 0;") === 2
+      && substr_count($at132, "\$cTrans  = \$incTrans ? (int)\$transW : 0;") === 2 // (2026-09-24) \$transW لا \$sal مباشرة — يصفَّر مع المبلغ اليدوي
       && strpos($at132, "\$attSupp = (\$incExtra ? \$extraW : 0) + (\$incAide ? \$aideW : 0);") !== false);
 $ok132 = false; $why132 = '';
 try {
@@ -7633,6 +7633,69 @@ try {
 } catch (Throwable $e) { $ok165 = false; $why165 .= ' err=' . $e->getMessage(); }
 finally { $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $rid165"); $db->exec("DELETE FROM employee_bonuses WHERE employee_id = $rid165"); $db->exec("DELETE FROM employees WHERE id = $rid165"); }
 check('🧹 تصفير الأساس من الملف المالي يصل إلى البطاقة وكل الكشوف: داخل سنة البرنامج ليس «منقولاً» + علم base_cleared_by_user + المنقول القديم يبقى محميّاً + شفاء أحمد بصبوص', $ok165, $why165);
+
+
+/* =====================================================================
+ * 166) ✍️📅💱 خيارات الإفادات الجديدة (2026-09-24): «بكل إفادة خيار حطّ أو شيل قيمة الدولار + أقدر غيّر أو أكتب اسم المدير
+ *      أو الرئيسة + أغيّر التاريخ + رقم المبلغ + تاريخ الدخول من – إلى» — بشريط الخيارات بكل الإفادات الـ15 ولغاتها الثلاث:
+ *      rate_show (افتراضي = الإفادات التي تطبع مبلغاً) · sig_t بكل الإفادات (الافتراضي يحفظ صيغة كل إفادة) + sig_name/sig_noname ·
+ *      date = التاريخ المطبوع · amt/amt_cur يحلّ محلّ الراتب كلّه بلا تفصيل · hire_dt/end_dt للدخول والترك (سنوات الخدمة بينهما).
+ */
+$ok166 = true; $why166 = [];
+$eid166 = (int)$db->query("SELECT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE ms.month = 6 AND ms.year = 2026 AND ms.net_salary_lbp > 0 AND e.is_deleted = 0 LIMIT 1")->fetchColumn();
+$area166 = function (string $h): string { $p = strpos($h, 'id="ppExportArea"'); return $p === false ? '' : substr($h, $p); };
+$c166 = function (string $k, bool $v) use (&$ok166, &$why166) { if (!$v) { $ok166 = false; $why166[] = $k; } };
+if ($eid166) {
+    $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'date' => '2026-01-15'], []);
+    $c166('date', strpos($area166($h), 'التاريخ : 15/01/2026') !== false && strpos($h, 'type="date" name="date" value="2026-01-15"') !== false);
+    $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'embassy', 'date' => '2026-01-15'], []);
+    $c166('date-embassy', strpos($area166($h), '15/01/2026') !== false);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris', 'sig_t' => 'raisa', 'sig_name' => 'الأخت فحص الموقّعة'], []));
+    $c166('sig-tadris', strpos($a, 'الرئيسة — التوقيع والختم') !== false && strpos($a, 'الأخت فحص الموقّعة') !== false);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris', 'lang_doc' => 'fr', 'sig_t' => 'raisa', 'sig_name' => 'الأخت فحص الموقّعة'], []));
+    $c166('sig-fr', strpos($a, 'La Supérieure — Signature et cachet') !== false && preg_match('/<br>[A-Za-z]/', $a) === 1);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'sig_noname' => 1, 'sig_name' => 'الأخت فحص الموقّعة'], []));
+    $c166('sig-noname', strpos($a, 'الأخت فحص الموقّعة') === false && preg_match('/المدير — التوقيع والختم<\/strong><\/div>/u', $a) === 1);
+    $c166('sig-riaaya-default', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'riaaya'], [])), '<strong>الإدارة</strong>') !== false);
+    $c166('sig-embassy-en', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'embassy', 'sig_t' => 'raisa'], [])), '<strong>The Mother Superior</strong>') !== false);
+    $c166('sig-afade-name', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'afade_madrasiya', 'sig_name' => 'الأخت فحص الموقّعة'], [])), 'أنا الموقّعة أدناه : <strong>الأخت فحص الموقّعة</strong>') !== false);
+    $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire'], []);
+    $c166('rate-default-on', strpos($area166($h), 'سعر الصرف المعتمد') !== false && strpos($h, 'name="rate_show" value="1" checked') !== false);
+    $c166('rate-off', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1], [])), 'سعر الصرف المعتمد') === false);
+    $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris'], []);
+    $c166('rate-default-off-tadris', strpos($area166($h), 'سعر الصرف المعتمد') === false && strpos($h, 'name="rate_show" value="1" checked') === false);
+    $c166('rate-on-tadris', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris', 'opts_set' => 1, 'inc_extra' => 1, 'rate_show' => 1], [])), 'سعر الصرف المعتمد') !== false);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1, 'amt' => 12345678, 'amt_cur' => 'lbp', 'cur' => 'lbp'], []));
+    $c166('amt-lbp', strpos($a, 'قدره <strong>12,345,678 ل.ل</strong>') !== false && strpos($a, 'وفق التفصيل') === false && strpos($a, 'اثنا عشر مليون') !== false);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1, 'amt' => 500, 'amt_cur' => 'usd', 'cur' => 'usd'], []));
+    $c166('amt-usd', strpos($a, 'قدره <strong>$500</strong>') !== false && strpos($a, 'خمسمئة دولار') !== false);
+    $c166('amt-both', preg_match('/قدره <strong>[0-9,]+ ل\.ل \(\$500\)<\/strong>/u', $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1, 'amt' => 500, 'amt_cur' => 'usd', 'cur' => 'both'], []))) === 1);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'cnss', 'opts_set' => 1, 'inc_extra' => 1, 'amt' => 12345678, 'cur' => 'lbp'], []));
+    $c166('amt-cnss', strpos($a, 'أساس راتب عملاً بالقانون : <strong>12,345,678 ل.ل</strong>') !== false && strpos($a, 'المجموع : <strong>12,345,678 ل.ل</strong>') !== false && strpos($a, 'الأجر الإضافي') === false);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'lang_doc' => 'en', 'opts_set' => 1, 'inc_extra' => 1, 'amt' => 500, 'amt_cur' => 'usd', 'cur' => 'usd'], []));
+    $c166('amt-en', strpos($a, 'of <strong>$500</strong>') !== false && strpos($a, 'Five Hundred US Dollars') !== false);
+    $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'hire_dt' => '2011-10-03'], []);
+    $c166('hire-override', strpos($area166($h), 'منذ تاريخ <strong>03/10/2011</strong>') !== false && strpos($h, 'name="hire_dt" value="2011-10-03"') !== false);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'afade_madrasiya', 'hire_dt' => '2011-10-03', 'end_dt' => '2026-06-30', 'date' => '2026-07-10'], []));
+    $c166('afade-from-to', strpos($a, 'بتاريخ <strong>03/10/2011</strong>') !== false && strpos($a, 'عن العمل بتاريخ <strong>30/06/2026</strong>') !== false && strpos($a, 'تحريراً في 10/07/2026') !== false);
+    $c166('isqat-end', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'isqat_haq', 'end_dt' => '2026-06-30', 'date' => '2026-07-10'], [])), 'بتاريخ <strong>30/06/2026</strong>') !== false);
+    $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire'], []);
+    $c166('hire-default-file', preg_match('/name="hire_dt" value="\d{4}-\d{2}-\d{2}"/', $h) === 1 && strpos($h, '&hire_dt=') === false);
+    // 🪪 أرقام الموظف (الضمان/المالية/صندوق التعويضات) — مشيولة افتراضياً، وسطر بلغة الإفادة عند تأشيرها
+    $c166('ids-default-off', strpos($area166($h), 'id-line') === false && strpos($h, 'name="id_nssf"') !== false && strpos($h, 'name="id_mof"') !== false && strpos($h, 'name="id_eoc"') !== false);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'opts_set' => 1, 'inc_extra' => 1, 'id_nssf' => 1, 'id_mof' => 1, 'id_eoc' => 1], []));
+    $c166('ids-ar', strpos($a, 'رقم الضمان الاجتماعي : <strong>') !== false && strpos($a, 'الرقم المالي (وزارة المالية) : <strong>') !== false && strpos($a, 'رقم صندوق التعويضات : <strong>') !== false);
+    $a = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris', 'lang_doc' => 'fr', 'opts_set' => 1, 'inc_extra' => 1, 'id_nssf' => 1], []));
+    $c166('ids-fr', strpos($a, 'N° CNSS : <strong>') !== false && strpos($a, 'N° fiscal') === false);
+    $c166('ids-embassy-en', strpos($area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'embassy', 'opts_set' => 1, 'inc_extra' => 1, 'id_mof' => 1], [])), 'Tax No. (Ministry of Finance) : <strong>') !== false);
+    foreach (['salaire','tadris','embassy','riaaya','anhaa_khedme','afade_madrasiya','isqat_haq','iqrar','aqd_taalim','notice_mail','cnss'] as $ty166) {
+        foreach (['ar','fr','en'] as $lg166) {
+            $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => $ty166, 'lang_doc' => $lg166, 'opts_set' => 1, 'inc_extra' => 1, 'rate_show' => 1, 'amt' => 777, 'amt_cur' => 'usd', 'cur' => 'both', 'sig_t' => 'raisa', 'sig_name' => 'Sr Test', 'date' => '2026-02-02', 'hire_dt' => '2011-10-03', 'end_dt' => '2026-06-30', 'id_nssf' => 1, 'id_mof' => 1, 'id_eoc' => 1], []);
+            $c166("no-error $ty166/$lg166", strpos($h, 'FATAL') === false && strpos($h, 'Warning:') === false && strpos($h, 'id="ppExportArea"') !== false && strpos($h, 'name="sig_t"') !== false && strpos($h, 'name="amt"') !== false);
+        }
+    }
+} else { $ok166 = false; $why166[] = 'no employee'; }
+check('✍️📅💱🪪 خيارات الإفادات (2026-09-24): سعر الدولار حطّ/شيل + صفة واسم الموقّع بكل الإفادات + التاريخ المطبوع + المبلغ اليدوي + تاريخ الدخول من – إلى + أرقام الضمان/المالية/صندوق التعويضات — بكل الأنواع واللغات بلا أخطاء', $ok166, implode(' · ', $why166) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
