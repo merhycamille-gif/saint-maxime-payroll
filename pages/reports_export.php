@@ -28,12 +28,13 @@ $periodSchoolYear = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) 
 
 // 🧑‍🏫 فلترا الفئة والضريبة الموحّدان (مطابقان لـreports.php): الملاك/المتعاقدون/الموظفون/الكل
 // + خاضع للضريبة/لا يخضع/الكل — يسريان على استعلام كل تقرير مصدَّر وعنوانه (الملف = الشاشة).
-$empTypesAllowed = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
-$empTypeSel = in_array($_GET['emp_type'] ?? '', $empTypesAllowed, true) ? $_GET['emp_type'] : '';
+// ☑️ (2026-09-25) الفئة = خانات تشييك (المصدر الواحد empTypeSelection) — الملف = الشاشة
+$empTypeState = empTypeSelection();
+$empTypeSel = (!$empTypeState['all'] && count($empTypeState['sel']) === 1) ? $empTypeState['sel'][0] : '';
 $taxSubSel = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
-$empTypeSql = ($empTypeSel ? " AND e.employee_type = " . $db->quote($empTypeSel) : '')
+$empTypeSql = empTypeSqlFrom($db, $empTypeState)
             . ($taxSubSel !== '' ? " AND e.tax_subject = " . (int)$taxSubSel : '');
-$empTypeTitle = ($empTypeSel ? (' — ' . empCategoryTitle($empTypeSel)) : '')
+$empTypeTitle = (empTypeTitleFrom($empTypeState) !== '' ? (' — ' . empTypeTitleFrom($empTypeState)) : '')
               . ($taxSubSel !== '' ? ($taxSubSel === '1' ? ' — الخاضعون للضريبة' : ' — غير الخاضعين للضريبة') : '');
 
 $nm = function ($r) { return trim(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? '')) ?: trim(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? '')); };

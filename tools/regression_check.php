@@ -2241,7 +2241,7 @@ $expSrc34 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 check('فلتر الفئة والضريبة: منتقٍ موحّد empTypePicker بكل تقارير reports.php والاستعلامات تحمل الفلترين',
       substr_count($repSrc34, 'empTypePicker();') >= 5
       && substr_count($repSrc34, '$empTypeSql') >= 6
-      && strpos($repSrc34, 'الكل مع بعض') !== false
+      && strpos($repSrc34, 'empTypeCheckboxes($empTypeState)') !== false // ☑️ (2026-09-25) خانات تشييك بدل «الكل مع بعض»
       && strpos($repSrc34, "name=\"tax_sub\"") !== false
       && strpos($repSrc34, 'e.tax_subject = ') !== false);
 check('فلتر الفئة والضريبة: التصدير Excel/Word يحترم الفلترين نفسيهما وبعنوان الملف',
@@ -7933,6 +7933,60 @@ if ($t168) {
     $c168('restored', $after168 === $before168);
 } else { $why168[] = 'no test employee (skipped live test)'; }
 check('📅💱 التعويض العائلي الشهري (2026-09-24): تغييرات المبلغ خلال السنة (النوع + من شهر + المبلغ الجديد، يبقى حتى التغيير التالي، 0 = يوقف) بملف الموظف وبالملف الجماعي — جدول ذاتي + المصدر الواحد + المنقول/المخالفات — تجربة فعلية مع ترجيع', $ok168, implode(' · ', $why168) ?: 'ok');
+
+/* =====================================================================
+ * 169) ☑️ منتقي الفئة بخانات تشييك (2026-09-25 «بدي بس حط تشاك مارك لأي فئة من الموظفين تبيّن أسماء هيدي الفئة بس،
+ *      وإذا مش حاطط تشاك مارك ما يبيّنوا»): المصدر الواحد empTypeSelection/empTypeSqlFrom/empTypeTitleFrom/empTypeCheckboxes
+ *      بكل التقارير + النماذج الرسمية + التصدير + الرواتب الشهرية + البطاقة السنوية (اللائحة) + لائحة الموظفين.
+ *      المشيّكة فقط تبيّن؛ ولا واحدة مشيّكة ⇒ لا أحد؛ أوّل فتحة بلا اختيار = الكل؛ الرابط القديم emp_type=x ما زال يعمل.
+ * =================================================================== */
+$ok169 = true; $why169 = [];
+$c169 = function (string $what, bool $ok) use (&$ok169, &$why169) { if (!$ok) { $ok169 = false; $why169[] = $what; } };
+// (أ) الدوال المركزية
+$stA = empTypeSelection([]);                                   $c169('default=all', $stA['all'] && !$stA['none'] && count($stA['sel']) === 3);
+$stN = empTypeSelection(['emp_type_set' => '1']);              $c169('set-none', $stN['none'] && !$stN['all'] && $stN['sel'] === []);
+$stT = empTypeSelection(['emp_type' => ['employe', 'enseignant_titulaire']]);
+$c169('two-canonical-order', !$stT['all'] && !$stT['none'] && $stT['sel'] === ['enseignant_titulaire', 'employe']);
+$stL = empTypeSelection(['emp_type' => 'enseignant_contractuel']); $c169('legacy-single', $stL['sel'] === ['enseignant_contractuel'] && !$stL['all']);
+$stP = empTypeSelection(['type' => ['employe'], 'type_set' => '1'], 'type'); $c169('param-type', $stP['sel'] === ['employe']);
+$c169('sql-none', empTypeSqlFrom($db, $stN) === ' AND 1=0');
+$c169('sql-all', empTypeSqlFrom($db, $stA) === '');
+$c169('sql-two', empTypeSqlFrom($db, $stT, 'e.') === " AND e.employee_type IN ('enseignant_titulaire','employe')");
+$c169('title', empTypeTitleFrom($stT) === 'الملاك + الموظفين' && empTypeTitleFrom($stN) === 'بلا فئة مشيّكة' && empTypeTitleFrom($stA) === '');
+$c169('query', empTypeQueryFrom($stA) === '' && empTypeQueryFrom($stN) === '&emp_type_set=1'
+      && empTypeQueryFrom($stT, 'type') === '&type_set=1&type[]=enseignant_titulaire&type[]=employe');
+$cb169 = empTypeCheckboxes($stT, true, 'type');
+$c169('checkboxes-html', substr_count($cb169, 'type="checkbox"') === 3 && substr_count($cb169, ' checked') === 2
+      && strpos($cb169, 'name="type_set" value="1"') !== false && strpos($cb169, 'onchange="this.form.submit()"') !== false);
+// (ب) المصدر: كل الصفحات على المصدر الواحد — لا قائمة منسدلة للفئة بقيت
+foreach (['pages/reports.php', 'pages/reports_export.php', 'pages/official_forms.php', 'pages/monthly_payroll.php', 'pages/annual_slip.php', 'pages/annual_slip_export.php', 'pages/employees.php'] as $pf169) {
+    $src169 = (string)file_get_contents($PROJ . '/' . $pf169);
+    $c169("src:$pf169", strpos($src169, 'empTypeSelection(') !== false && strpos($src169, 'empTypeSqlFrom(') !== false
+        && preg_match('/<select name="(emp_type|type)"/', $src169) === 0 && strpos($src169, '&type=<?=') === false && strpos($src169, "'&type=' . urlencode") === false); // روابط الفئة القديمة فقط (لا نوع الإفادة/translit)
+}
+$c169('src:mof', strpos((string)file_get_contents($PROJ . '/includes/functions.php'), 'return empTypeSqlFrom($db, empTypeSelection())') !== false);
+// (ج) تجربة فعلية: كشف حزيران 2026 — ولا فئة مشيّكة = لا بيانات وعنوان «بلا فئة مشيّكة»؛ فئتان = مجموع الفئتين بالقاعدة
+$hN = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026, 'emp_type_set' => '1'], []);
+$c169('live-none', $noFatal($hN) && strpos($hN, 'لا توجد بيانات') !== false && strpos($hN, '— بلا فئة مشيّكة') !== false);
+$hT = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 6, 'year' => 2026, 'emp_type_set' => '1', 'emp_type' => ['enseignant_titulaire', 'employe']], []);
+preg_match('/مجموع كل الفئات \(العدد: (\d+)\)/u', $hT, $mT);
+$expT = $q34(" AND e.employee_type IN ('enseignant_titulaire','employe')");
+$c169('live-two=' . ($mT[1] ?? '?') . '/' . $expT, $noFatal($hT) && isset($mT[1]) && (int)$mT[1] === $expT && $expT > 0 && strpos($hT, '— الملاك + الموظفين') !== false
+      && preg_match('/name="emp_type\[\]" value="enseignant_titulaire" checked/', $hT) === 1 && preg_match('/name="emp_type\[\]" value="enseignant_contractuel"(?! checked)/', $hT) === 1);
+// النماذج الرسمية: كشف رواتب كل الموظفين (مدرسة 3) — فئتان = مجموع كلٍّ لحاله، وولا واحدة = 0
+$n169two = $n34(['emp_type_set' => '1', 'emp_type' => ['enseignant_titulaire', 'enseignant_contractuel']]);
+$n169sum = $n34(['emp_type' => 'enseignant_titulaire']) + $n34(['emp_type' => 'enseignant_contractuel']);
+$c169("of-two=$n169two/$n169sum", $n169two > 0 && $n169two === $n169sum);
+$hON = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026, 'emp_type_set' => '1'], [], [3]);
+$c169('of-none', $noFatal($hON) && strpos($hON, 'بلا فئة مشيّكة') !== false && (preg_match('/المجموع العام \((\d+)\)/u', $hON, $mON) === 0 || (int)$mON[1] === 0));
+// الرواتب الشهرية + لائحة الموظفين + البطاقة السنوية: خانات التشييك ظاهرة، وولا فئة = لا صفوف
+$hM = renderPage('pages/monthly_payroll.php', ['month' => 6, 'year' => 2026, 'type_set' => '1'], []);
+$c169('monthly-none', $noFatal($hM) && substr_count($hM, 'name="type[]"') === 3 && !preg_match('/name="type\[\]" value="[a-z_]+" checked/', $hM));
+$hE = renderPage('pages/employees.php', ['type_set' => '1', 'type' => ['employe']], []);
+$c169('employees-one', $noFatal($hE) && preg_match('/name="type\[\]" value="employe" checked/', $hE) === 1 && strpos($hE, 'أستاذ في الملاك</') === false);
+$hA = renderPage('pages/annual_slip.php', ['school_year' => '2025-2026', 'type_set' => '1', 'type' => ['enseignant_contractuel']], []);
+$c169('annual-list', $noFatal($hA) && preg_match('/name="type\[\]" value="enseignant_contractuel" checked/', $hA) === 1 && strpos($hA, '&type_set=1&type[]=enseignant_contractuel') !== false);
+check('☑️ منتقي الفئة بخانات تشييك (2026-09-25): المشيّكة فقط تبيّن وولا واحدة = لا أحد — مصدر واحد بكل التقارير/النماذج/التصدير/الرواتب الشهرية/البطاقة/لائحة الموظفين — تجارب فعلية', $ok169, implode(' · ', $why169) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

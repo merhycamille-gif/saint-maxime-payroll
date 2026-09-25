@@ -895,13 +895,15 @@ if ($action === 'list') {
     $pageTitle = 'Employés & Enseignants / الموظفون والأساتذة';
     include __DIR__ . '/../includes/header.php';
     
-    $typeFilter = $_GET['type'] ?? '';
+    // ☑️ (2026-09-25) خانات تشييك: المشيّكة فقط تبيّن، ولا واحدة ⇒ لا أحد (المصدر الواحد empTypeSelection)
+    $typeState = empTypeSelection($_GET, 'type');
+    $typeFilter = (!$typeState['all'] && count($typeState['sel']) === 1) ? $typeState['sel'][0] : '';
     $statusFilter = $_GET['status'] ?? 'actif';
     $search = $_GET['q'] ?? '';
     
     $sql = "SELECT * FROM employees WHERE is_deleted = 0" . schoolScopeSql();
     $params = [];
-    if ($typeFilter) { $sql .= " AND employee_type = ?"; $params[] = $typeFilter; }
+    $sql .= empTypeSqlFrom($db, $typeState, ''); // ☑️ الفئات المشيّكة
     if ($statusFilter) { $sql .= " AND status = ?"; $params[] = $statusFilter; }
     if ($search) {
         // 📞 (2026-09-21) البحث يشمل رقم الهاتف (بالأرقام فقط: 08-506827 = 08506827 = 506827)
@@ -1007,14 +1009,7 @@ if ($action === 'list') {
                     })();
                     </script>
                 </div>
-                <div class="form-group mb-0">
-                    <select name="type" class="form-select">
-                        <option value="">Tous les types / كل الأنواع</option>
-                        <option value="enseignant_titulaire" <?= $typeFilter === 'enseignant_titulaire' ? 'selected' : '' ?>>Enseignant titulaire / أستاذ في الملاك</option>
-                        <option value="enseignant_contractuel" <?= $typeFilter === 'enseignant_contractuel' ? 'selected' : '' ?>>Enseignant contractuel / أستاذ متعاقد</option>
-                        <option value="employe" <?= $typeFilter === 'employe' ? 'selected' : '' ?>>Employé administratif / موظف إداري</option>
-                    </select>
-                </div>
+                <?= empTypeCheckboxes($typeState, false, 'type') /* ☑️ (2026-09-25) خانات تشييك: المشيّكة فقط تبيّن */ ?>
                 <div class="form-group mb-0">
                     <select name="status" class="form-select">
                         <option value="">Tous statuts / كل الحالات</option>

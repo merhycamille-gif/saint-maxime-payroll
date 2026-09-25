@@ -19,8 +19,9 @@ $employeeId = (int)($_GET['employee_id'] ?? 0);
 $all = !empty($_GET['all']);
 
 $allowedTypes = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
-$typeFilter = $_GET['type'] ?? '';
-if (!in_array($typeFilter, $allowedTypes, true)) $typeFilter = '';
+// ☑️ (2026-09-25) خانات تشييك (type[]=…&type_set=1) — الملف = الشاشة (المصدر الواحد empTypeSelection)
+$typeState = empTypeSelection($_GET, 'type');
+$typeFilter = (!$typeState['all'] && count($typeState['sel']) === 1) ? $typeState['sel'][0] : '';
 
 // رؤوس الأعمدة (LBP الرسمي) — 17 عموداً تتأقلم على A4 أفقي — الفرنسي قبل العربي (بطلب المستخدم)
 $head = [
@@ -110,14 +111,14 @@ if ($all) {
     [$yf, $yp] = yearEmploymentFilter($schoolYear, 'e.');
     $sql = "SELECT e.* FROM employees e WHERE e.is_deleted = 0" . schoolScopeSql('e.school_id') . $yf;
     $params = $yp;
-    if ($typeFilter) { $sql .= " AND e.employee_type = ?"; $params[] = $typeFilter; }
+    $sql .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
     $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $emps = $stmt->fetchAll();
     if (!$emps) { http_response_code(404); die('لا يوجد موظفون مطابقون.'); }
 
-    $typeLbl = $typeFilter ? employeeTypeLabel($typeFilter) : 'الكل';
+    $typeLbl = $typeFilter ? employeeTypeLabel($typeFilter) : ($typeState['all'] ? 'الكل' : empTypeTitleFrom($typeState));
     $rep = new ReportTable('كشوف الرواتب السنوية ' . $schoolYear . ' — ' . $typeLbl, true);
     $rep->schoolHeader(currentSchool());
     $rep->period('السنة الدراسية ' . $schoolYear . ' — ' . $typeLbl . ' (' . count($emps) . ' موظف)');

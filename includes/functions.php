@@ -3781,9 +3781,8 @@ function mofCumTax($db, array $e, int $y, int $mTo): array {
  * ici pour que le verificateur du fichier ministere (r567_check.php) utilise la meme source unique. */
 /** فلترا الفئة/الضريبة من الرابط (نفس فلتري official_forms) */
 function mofEmpFilterSql($db) {
-    $t = in_array($_GET['emp_type'] ?? '', ['enseignant_titulaire', 'enseignant_contractuel', 'employe'], true) ? $_GET['emp_type'] : '';
     $x = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
-    return ($t ? " AND e.employee_type = " . $db->quote($t) : '')
+    return empTypeSqlFrom($db, empTypeSelection()) // ☑️ خانات التشييك (2026-09-25)
          . ($x !== '' ? " AND e.tax_subject = " . (int)$x : '');
 }
 
@@ -5561,6 +5560,61 @@ function gradeDisplay($empOrType, $grade = null) {
  */
 function empCategoryTitle($type) {
     return ['enseignant_titulaire'=>'الملاك','enseignant_contractuel'=>'المتعاقدين','employe'=>'الموظفين'][$type] ?? $type;
+}
+
+/* ☑️ (2026-09-25 «بدي بس حط تشاك مارك لأي فئة من الموظفين تبيّن أسماء هيدي الفئة بس، وإذا مش حاطط تشاك مارك ما يبيّنوا»):
+ *  منتقي الفئة الموحّد بكل التقارير والنماذج الرسمية والتصدير = ثلاث خانات تشييك (الملاك / المتعاقدين / الموظفين)
+ *  بدل القائمة المنسدلة. المشيّكة فقط تبيّن؛ ولا واحدة مشيّكة ⇒ لا أحد (AND 1=0 + «بلا فئة مشيّكة» بالعنوان).
+ *  أوّل فتحة بلا أي اختيار = الثلاث مشيّكة (كل الفئات) كي تبقى كل الروابط والتصدير كما هي.
+ *  الرابط: emp_type[]=… + emp_type_set=1 (علامة أنّ الفورم أُرسل)؛ القيمة المفردة القديمة emp_type=x ما زالت مفهومة.
+ *  🔴 المصدر الواحد: أي صفحة فيها فلتر فئة تستعمل هذه الدوال (empTypeSelection/empTypeSqlFrom/empTypeTitleFrom/empTypeQueryFrom/empTypeCheckboxes). */
+function empTypesAll(): array { return ['enseignant_titulaire', 'enseignant_contractuel', 'employe']; }
+/** حالة المنتقي من الرابط: ['sel'=>الفئات المشيّكة بترتيبها الثابت, 'all'=>الثلاث, 'none'=>أُرسل بلا ولا واحدة] */
+function empTypeSelection(?array $src = null, string $param = 'emp_type'): array {
+    $src = $src ?? $_GET;
+    $raw = $src[$param] ?? null;
+    $list = is_array($raw) ? $raw : (($raw !== null && $raw !== '') ? [$raw] : []);
+    $sel = array_values(array_intersect(empTypesAll(), array_map('strval', $list)));
+    $set = !empty($src[$param . '_set']) || $sel;
+    if (!$set) $sel = empTypesAll(); // أوّل فتحة = الكل
+    return ['sel' => $sel, 'all' => count($sel) === count(empTypesAll()), 'none' => (bool)$set && !$sel];
+}
+/** شرط SQL (يبدأ بـ AND) — $alias مثل 'e.' أو '' */
+function empTypeSqlFrom(PDO $db, array $st, string $alias = 'e.'): string {
+    if ($st['none']) return ' AND 1=0';
+    if ($st['all']) return '';
+    return ' AND ' . $alias . 'employee_type IN (' . implode(',', array_map(fn($t) => $db->quote($t), $st['sel'])) . ')';
+}
+/** نصّ الفئات المشيّكة للعنوان المطبوع (فارغ = الكل) */
+function empTypeTitleFrom(array $st): string {
+    if ($st['none']) return 'بلا فئة مشيّكة';
+    if ($st['all']) return '';
+    return implode(' + ', array_map('empCategoryTitle', $st['sel']));
+}
+/** لاحقة الرابط (تبدأ بـ&) لنقل الاختيار للتصدير والروابط الفرعية */
+function empTypeQueryFrom(array $st, string $param = 'emp_type'): string {
+    if ($st['all'] && !$st['none']) return '';
+    $q = '&' . $param . '_set=1';
+    foreach ($st['sel'] as $t) $q .= '&' . $param . '[]=' . urlencode($t);
+    return $q;
+}
+/** حقول مخفيّة تنقل الاختيار داخل فورم آخر بالصفحة نفسها */
+function empTypeHiddenFrom(array $st, string $param = 'emp_type'): string {
+    if ($st['all'] && !$st['none']) return '';
+    $h = '<input type="hidden" name="' . $param . '_set" value="1">';
+    foreach ($st['sel'] as $t) $h .= '<input type="hidden" name="' . $param . '[]" value="' . e($t) . '">';
+    return $h;
+}
+/** المنتقي نفسه (form-group) — خانات تشييك؛ $submitOnChange = إرسال الفورم فور التشييك */
+function empTypeCheckboxes(array $st, bool $submitOnChange = false, string $param = 'emp_type'): string {
+    $lbl = ['enseignant_titulaire' => 'Titulaires / الملاك', 'enseignant_contractuel' => 'Contractuels / المتعاقدين', 'employe' => 'Employés / الموظفين'];
+    $oc = $submitOnChange ? ' onchange="this.form.submit()"' : '';
+    $h = '<div class="form-group mb-0 emp-type-picker"><label class="form-label"><i class="fas fa-users"></i> Catégorie / الفئة <small class="text-muted">(المشيّكة فقط تبيّن)</small></label>'
+       . '<input type="hidden" name="' . $param . '_set" value="1"><div class="school-checks emp-type-checks">';
+    foreach ($lbl as $k => $l) {
+        $h .= '<label class="chk"><input type="checkbox" name="' . $param . '[]" value="' . $k . '"' . (in_array($k, $st['sel'], true) ? ' checked' : '') . $oc . '> ' . $l . '</label>';
+    }
+    return $h . '</div></div>';
 }
 
 /**

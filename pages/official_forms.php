@@ -132,10 +132,11 @@ $ofMonthSchoolYear = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1)
 
 // 🧑‍🏫 فلترا الفئة والخضوع للضريبة الموحّدان («بدي بكل التقارير» 2026-08-04) — نفس فلترَي
 // صفحة التقارير: يدخلان استعلام كل نموذج/كشف جماعي، ويظهر المختار على رأس المستند المطبوع.
-$empTypesAllowed = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
-$empTypeSel = in_array($_GET['emp_type'] ?? '', $empTypesAllowed, true) ? $_GET['emp_type'] : '';
+// ☑️ (2026-09-25) الفئة = خانات تشييك: المشيّكة فقط تبيّن، ولا واحدة ⇒ لا أحد (المصدر الواحد empTypeSelection)
+$empTypeState = empTypeSelection();
+$empTypeSel = (!$empTypeState['all'] && count($empTypeState['sel']) === 1) ? $empTypeState['sel'][0] : '';
 $taxSubSel = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
-$ofEmpFilter = ($empTypeSel ? " AND e.employee_type = " . $db->quote($empTypeSel) : '')
+$ofEmpFilter = empTypeSqlFrom($db, $empTypeState)
              . ($taxSubSel !== '' ? " AND e.tax_subject = " . (int)$taxSubSel : '');
 // 🏫 منتقي المدارس بالتقرير العام: «الكل» (بلا schools[]) = تصفير الاختيار المحفوظ بالجلسة — قبل رسم المنتقي والاستعلام
 if (isset($_GET['schools_set']) && !isset($_GET['schools'])) $_SESSION['report_schools'] = [];
@@ -159,8 +160,8 @@ $ofEmpFilterPlain = str_replace(' e.', ' ', $ofEmpFilter);
 $ofEmpFilterMs = $ofEmpFilter !== ''
     ? " AND ms.employee_id IN (SELECT id FROM employees WHERE 1=1" . $ofEmpFilterPlain . ")"
     : '';
-$ofFilterTitle = ($empTypeSel ? (empCategoryTitle($empTypeSel)) : '')
-               . ($taxSubSel !== '' ? (($empTypeSel ? ' — ' : '') . ($taxSubSel === '1' ? 'الخاضعون للضريبة' : 'غير الخاضعين للضريبة')) : '');
+$ofFilterTitle = empTypeTitleFrom($empTypeState)
+               . ($taxSubSel !== '' ? ((empTypeTitleFrom($empTypeState) !== '' ? ' — ' : '') . ($taxSubSel === '1' ? 'الخاضعون للضريبة' : 'غير الخاضعين للضريبة')) : '');
 
 // النماذج التي تحتاج موظفاً محدّداً (تُعبَّأ لكل أستاذ)
 $perEmployee = ['cnss_employ','cnss_terminate','cnss_work','cnss_wife',
@@ -314,18 +315,10 @@ if ($form !== '' && in_array($form, $ofFilterableForms, true)):
 ?>
 <form method="get" class="card no-print">
     <div class="card-body form-row cols-3">
-        <?php foreach ($_GET as $gk => $gv): if (in_array($gk, ['emp_type', 'tax_sub', 'schools_set'], true) || is_array($gv)) continue; ?>
+        <?php foreach ($_GET as $gk => $gv): if (in_array($gk, ['emp_type', 'emp_type_set', 'tax_sub', 'schools_set'], true) || is_array($gv)) continue; ?>
             <input type="hidden" name="<?= e($gk) ?>" value="<?= e((string)$gv) ?>">
         <?php endforeach; ?>
-        <div class="form-group mb-0">
-            <label class="form-label"><i class="fas fa-users"></i> Catégorie / الفئة</label>
-            <select name="emp_type" class="form-select">
-                <option value="">Tous ensemble / الكل مع بعض</option>
-                <option value="enseignant_titulaire" <?= $empTypeSel === 'enseignant_titulaire' ? 'selected' : '' ?>>Titulaires / أساتذة الملاك</option>
-                <option value="enseignant_contractuel" <?= $empTypeSel === 'enseignant_contractuel' ? 'selected' : '' ?>>Contractuels / أساتذة متعاقدون</option>
-                <option value="employe" <?= $empTypeSel === 'employe' ? 'selected' : '' ?>>Employés / موظفون إداريون</option>
-            </select>
-        </div>
+        <?= empTypeCheckboxes($empTypeState) /* ☑️ (2026-09-25) خانات تشييك: المشيّكة فقط تبيّن */ ?>
         <div class="form-group mb-0">
             <label class="form-label"><i class="fas fa-file-invoice-dollar"></i> Impôt / الضريبة</label>
             <select name="tax_sub" class="form-select">
@@ -758,7 +751,7 @@ elseif ($form === 'tax_r6t'):
     } else { $rqyDef = (int)date('Y'); }
     if ($rqy < 2000 || $rqy > 2100) $rqy = $rqyDef;
     $rqMonthsMap = [1 => [1,2,3], 2 => [4,5,6], 3 => [7,8,9], 4 => [10,11,12]];
-    $fltQ = ($empTypeSel !== '' ? '&emp_type=' . urlencode($empTypeSel) : '') . ($taxSubSel !== '' ? '&tax_sub=' . $taxSubSel : '');
+    $fltQ = empTypeQueryFrom($empTypeState) . ($taxSubSel !== '' ? '&tax_sub=' . $taxSubSel : '');
     $exp10 = BASE_URL . 'pages/official_export.php?form=mof_r10&rq=' . $rq . '&rqy=' . $rqy . $fltQ;
 ?>
     <div class="card no-print" style="max-width:860px;margin:0 auto">
@@ -769,7 +762,7 @@ elseif ($form === 'tax_r6t'):
         <div class="card-body">
             <form method="get" class="form-row cols-3" style="align-items:end;margin-bottom:14px">
                 <input type="hidden" name="form" value="tax_r10">
-                <?php if ($empTypeSel !== ''): ?><input type="hidden" name="emp_type" value="<?= e($empTypeSel) ?>"><?php endif; ?>
+                <?= empTypeHiddenFrom($empTypeState) ?>
                 <?php if ($taxSubSel !== ''): ?><input type="hidden" name="tax_sub" value="<?= e($taxSubSel) ?>"><?php endif; ?>
                 <div class="form-group mb-0"><label class="form-label">Trimestre / عن الفترة (الفصل)</label>
                     <select name="rq" class="form-select" onchange="this.form.submit()">
@@ -796,7 +789,7 @@ elseif ($form === 'tax_r5'):
     // فالسنوي «يركب» على الفصول بالمليم) — شاشة خيارات ثم الطباعة/الإكسل على قالبه نفسه.
     $fy = (int)($_GET['fy'] ?? 0);
     if ($fy < 2000 || $fy > 2100) $fy = (int)date('Y') - 1;
-    $fltQ = ($empTypeSel !== '' ? '&emp_type=' . urlencode($empTypeSel) : '') . ($taxSubSel !== '' ? '&tax_sub=' . $taxSubSel : '');
+    $fltQ = empTypeQueryFrom($empTypeState) . ($taxSubSel !== '' ? '&tax_sub=' . $taxSubSel : '');
     $exp5 = BASE_URL . 'pages/official_export.php?form=mof_r5&fy=' . $fy . $fltQ;
 ?>
     <div class="card no-print" style="max-width:860px;margin:0 auto">
@@ -807,7 +800,7 @@ elseif ($form === 'tax_r5'):
         <div class="card-body">
             <form method="get" class="form-row cols-3" style="align-items:end;margin-bottom:14px">
                 <input type="hidden" name="form" value="tax_r5">
-                <?php if ($empTypeSel !== ''): ?><input type="hidden" name="emp_type" value="<?= e($empTypeSel) ?>"><?php endif; ?>
+                <?= empTypeHiddenFrom($empTypeState) ?>
                 <?php if ($taxSubSel !== ''): ?><input type="hidden" name="tax_sub" value="<?= e($taxSubSel) ?>"><?php endif; ?>
                 <div class="form-group mb-0"><label class="form-label">Année fiscale (civile) / السنة المالية (ميلادية)</label>
                     <input type="number" name="fy" class="form-control" value="<?= $fy ?>" min="2000" max="2100" onchange="this.form.submit()"></div>
@@ -896,7 +889,7 @@ elseif ($form === 'tax_emp_report'):
 ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="tax_emp_report">
-        <?php if ($empTypeSel !== ''): ?><input type="hidden" name="emp_type" value="<?= e($empTypeSel) ?>"><?php endif; ?>
+        <?= empTypeHiddenFrom($empTypeState) ?>
         <?php if ($taxSubSel !== ''): ?><input type="hidden" name="tax_sub" value="<?= e($taxSubSel) ?>"><?php endif; ?>
         <div class="card-body form-row cols-3">
             <div class="form-group mb-0"><label class="form-label">Du (mois) / الفترة من شهر</label>

@@ -16,9 +16,10 @@ $employeeId = (int)($_GET['employee_id'] ?? 0);
 $month = (int)($_GET['month'] ?? date('n'));
 $year = (int)($_GET['year'] ?? date('Y'));
 // فلتر النوع: '' = الكل، أو نوع محدّد (ملاك/متعاقد/موظف)
-$allowedTypes = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
-$typeFilter = $_GET['type'] ?? '';
-if (!in_array($typeFilter, $allowedTypes, true)) $typeFilter = '';
+// ☑️ (2026-09-25) خانات تشييك: المشيّكة فقط تبيّن، ولا واحدة ⇒ لا أحد (المصدر الواحد empTypeSelection — الرابط type[]=…&type_set=1)
+$typeState = empTypeSelection($_GET, 'type');
+$typeFilter = (!$typeState['all'] && count($typeState['sel']) === 1) ? $typeState['sel'][0] : ''; // فئة واحدة مشيّكة (للتسميات المفردة)
+$typeQ = empTypeQueryFrom($typeState, 'type'); // لاحقة الروابط (تبدأ بـ&)
 // السنة الدراسية التي يقع فيها الشهر المختار (تشرين الأول→أيلول) — لفلترة موظفي تلك السنة فقط
 $msSchoolYear = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) . '-' . $year);
 
@@ -167,7 +168,7 @@ if ($action === 'calc_all') {
           . " AND " . leftDateSql() . " >= ?"
           . " AND " . salaryConfigSql('') . schoolScopeSql();
     $paramsC = [$syStartC];
-    if ($typeFilter) { $sqlC .= " AND employee_type = ?"; $paramsC[] = $typeFilter; }
+    $sqlC .= empTypeSqlFrom($db, $typeState, ''); // ☑️ الفئات المشيّكة
     $stmtC = $db->prepare($sqlC);
     $stmtC->execute($paramsC);
     $employees = $stmtC->fetchAll();
@@ -183,7 +184,7 @@ if ($action === 'calc_all') {
         } catch (Exception $ex) {}
     }
     $_SESSION['flash'] = ['type' => $lockedN && !$count ? 'danger' : 'success', 'msg' => "$count salaires calculés pour " . monthName($month) . " $year" . ($lockedN ? " — 🔒 $lockedN تُركوا كما هم لأن سنتهم مقفولة لمدرستهم" : '')];
-    header('Location: ' . BASE_URL . 'pages/monthly_payroll.php?month=' . $month . '&year=' . $year . '&type=' . urlencode($typeFilter));
+    header('Location: ' . BASE_URL . 'pages/monthly_payroll.php?month=' . $month . '&year=' . $year . $typeQ);
     exit;
 }
 
@@ -235,15 +236,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                 <label class="form-label">Année / السنة</label>
                 <input type="number" name="year" class="form-control" value="<?= $year ?>" min="2020" max="2030">
             </div>
-            <div class="form-group mb-0">
-                <label class="form-label">الفئة / Type</label>
-                <select name="type" class="form-select" onchange="this.form.submit()">
-                    <option value="" <?= $typeFilter === '' ? 'selected' : '' ?>>الكل / Tous</option>
-                    <option value="enseignant_titulaire" <?= $typeFilter === 'enseignant_titulaire' ? 'selected' : '' ?>>أساتذة ملاك / Titulaires</option>
-                    <option value="enseignant_contractuel" <?= $typeFilter === 'enseignant_contractuel' ? 'selected' : '' ?>>متعاقدون / Contractuels</option>
-                    <option value="employe" <?= $typeFilter === 'employe' ? 'selected' : '' ?>>موظفون / Employés</option>
-                </select>
-            </div>
+            <?= empTypeCheckboxes($typeState, true, 'type') /* ☑️ (2026-09-25) خانات تشييك: المشيّكة فقط تبيّن */ ?>
             <div class="form-group mb-0">
                 <label class="form-label">Taux de change / سعر الصرف</label>
                 <input type="text" class="form-control" value="<?= formatLBP(getExchangeRate($month, $year)) ?> / $1" disabled>
@@ -261,13 +254,13 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     [$pyf, $pyp] = yearEmploymentFilter($msSchoolYear, 'e.');
     $sqlP = "SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif'" . schoolScopeSql('e.school_id') . $pyf;
     $paramsP = $pyp;
-    if ($typeFilter) { $sqlP .= " AND e.employee_type = ?"; $paramsP[] = $typeFilter; }
+    $sqlP .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
     $sqlP .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)";
     $stmtP = $db->prepare($sqlP);
     $stmtP->execute($paramsP);
     $empsP = $stmtP->fetchAll();
     $salStmt = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND month = ? AND year = ?");
-    $typeLbl = $typeFilter ? employeeTypeLabel($typeFilter) : 'الكل / Tous';
+    $typeLbl = $typeFilter ? employeeTypeLabel($typeFilter) : ($typeState['all'] ? 'الكل / Tous' : empTypeTitleFrom($typeState));
 ?>
     <style>
     @media print {
@@ -280,7 +273,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     }
     </style>
     <div class="d-flex justify-between align-center mb-3 no-print">
-        <a href="<?= BASE_URL ?>pages/monthly_payroll.php?month=<?= $month ?>&year=<?= $year ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-light">
+        <a href="<?= BASE_URL ?>pages/monthly_payroll.php?month=<?= $month ?>&year=<?= $year ?><?= $typeQ ?>" class="btn btn-light">
             <i class="fas fa-arrow-left"></i> Retour à la liste / رجوع
         </a>
         <div>
@@ -465,7 +458,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     [$lyf, $lyp] = yearEmploymentFilter($msSchoolYear, 'e.');
     $sql .= $lyf;
     $listParams = array_merge([$month, $year], $lyp);
-    if ($typeFilter) { $sql .= " AND e.employee_type = ?"; $listParams[] = $typeFilter; }
+    $sql .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
     $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)";
     $stmt = $db->prepare($sql);
     $stmt->execute($listParams);
@@ -504,11 +497,11 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
             </h3>
             <div class="d-flex gap-2 no-print">
                 <?php /* 🧹 زرّ «طباعة الجدول» أُزيل — مكرّر مع «طباعة» بشريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
-                <a href="?action=print_all&month=<?= $month ?>&year=<?= $year ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-primary" title="Afficher/imprimer le bulletin de chaque employé / عرض/طباعة قسيمة كل موظف">
+                <a href="?action=print_all&month=<?= $month ?>&year=<?= $year ?><?= $typeQ ?>" class="btn btn-primary" title="Afficher/imprimer le bulletin de chaque employé / عرض/طباعة قسيمة كل موظف">
                     <i class="fas fa-file-invoice"></i> Imprimer les bulletins / طباعة القسائم
                 </a>
                 <?php if (!isAllSchools()): ?>
-                <a href="?action=calc_all&month=<?= $month ?>&year=<?= $year ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-gold" data-confirm="احتساب رواتب كل الموظفين المعروضين لهذا الشهر؟">
+                <a href="?action=calc_all&month=<?= $month ?>&year=<?= $year ?><?= $typeQ ?>" class="btn btn-gold" data-confirm="احتساب رواتب كل الموظفين المعروضين لهذا الشهر؟">
                     <i class="fas fa-bolt"></i> Calculer tout / احتساب الكل
                 </a>
                 <?php endif; ?>

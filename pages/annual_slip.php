@@ -16,9 +16,10 @@ $schoolYear = $_GET['school_year'] ?? activeSchoolYear();
 if ($schoolYear === 'all') $schoolYear = currentSchoolYear(); // الكشف يحتاج سنة محددة
 
 // فلتر النوع: '' = الكل، أو نوع محدّد
-$allowedTypes = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
-$typeFilter = $_GET['type'] ?? '';
-if (!in_array($typeFilter, $allowedTypes, true)) $typeFilter = '';
+// ☑️ (2026-09-25) خانات تشييك بلائحة الأساتذة (البطاقة نفسها مجمّدة ولا تُمَسّ): المشيّكة فقط تبيّن، ولا واحدة ⇒ لا أحد
+$typeState = empTypeSelection($_GET, 'type');
+$typeFilter = (!$typeState['all'] && count($typeState['sel']) === 1) ? $typeState['sel'][0] : '';
+$typeQ = empTypeQueryFrom($typeState, 'type'); // لاحقة الروابط (تبدأ بـ&)
 
 // School year months: October -> September (or per employee)
 [$y1, $y2] = schoolYearToYears($schoolYear);
@@ -33,7 +34,8 @@ function getYearEmployees($db, $schoolYear, $typeFilter = '') {
     [$yf, $yp] = yearEmploymentFilter($schoolYear, 'e.');
     $sql = "SELECT DISTINCT e.* FROM employees e WHERE e.is_deleted = 0" . schoolScopeSql('e.school_id') . $yf;
     $params = $yp;
-    if ($typeFilter) { $sql .= " AND e.employee_type = ?"; $params[] = $typeFilter; }
+    if (is_array($typeFilter)) $sql .= empTypeSqlFrom($db, $typeFilter, 'e.'); // ☑️ حالة خانات التشييك
+    elseif ($typeFilter) { $sql .= " AND e.employee_type = ?"; $params[] = $typeFilter; }
     $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
@@ -52,7 +54,8 @@ function getYearCalcRoster($db, $typeFilter = '') {
          . " AND " . salaryConfigSql('e.')
          . schoolScopeSql('e.school_id');
     $params = [];
-    if ($typeFilter) { $sql .= " AND e.employee_type = ?"; $params[] = $typeFilter; }
+    if (is_array($typeFilter)) $sql .= empTypeSqlFrom($db, $typeFilter, 'e.'); // ☑️ حالة خانات التشييك
+    elseif ($typeFilter) { $sql .= " AND e.employee_type = ?"; $params[] = $typeFilter; }
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();
@@ -119,7 +122,7 @@ if ($action === 'calc_range' && $employeeId > 0) {
 if ($action === 'calc_all_year') {
     requireWriteAction();
     requireSchoolSelected();
-    $emps = getYearCalcRoster($db, $typeFilter); // الاحتساب على الفاعلين (يشمل غير المحتسَبين بعد)
+    $emps = getYearCalcRoster($db, $typeState); // الاحتساب على الفاعلين (يشمل غير المحتسَبين بعد)
     $nEmp = 0; $nMonths = 0;
     foreach ($emps as $e) {
         $months = schoolYearMonthsFor($e['payment_months_per_year'], $y1, $y2);
@@ -130,7 +133,7 @@ if ($action === 'calc_all_year') {
         if ($did) $nEmp++;
     }
     $_SESSION['flash_success'] = "تم احتساب رواتب السنة $schoolYear لـ $nEmp موظف ($nMonths شهر) / $nEmp employés";
-    header('Location: ' . BASE_URL . 'pages/annual_slip.php?school_year=' . urlencode($schoolYear) . '&type=' . urlencode($typeFilter));
+    header('Location: ' . BASE_URL . 'pages/annual_slip.php?school_year=' . urlencode($schoolYear) . $typeQ);
     exit;
 }
 
@@ -504,7 +507,7 @@ include __DIR__ . '/../includes/header.php';
                 <select name="employee_id" class="form-select">
                     <option value="">-- (laisser vide pour impression groupée / اتركه فارغاً للطباعة الجماعية) --</option>
                     <?php
-                    $emps = getYearEmployees($db, $schoolYear, $typeFilter);
+                    $emps = getYearEmployees($db, $schoolYear, $typeState);
                     foreach ($emps as $e):
                         $nm = trim($e['first_name_fr'] . ' ' . $e['last_name_fr']);
                         if ($nm === '') $nm = trim($e['first_name_ar'] . ' ' . $e['last_name_ar']);
@@ -515,15 +518,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="form-group mb-0">
-                <label class="form-label">الفئة / Type</label>
-                <select name="type" class="form-select" onchange="this.form.submit()">
-                    <option value="" <?= $typeFilter === '' ? 'selected' : '' ?>>الكل / Tous</option>
-                    <option value="enseignant_titulaire" <?= $typeFilter === 'enseignant_titulaire' ? 'selected' : '' ?>>أساتذة ملاك / Titulaires</option>
-                    <option value="enseignant_contractuel" <?= $typeFilter === 'enseignant_contractuel' ? 'selected' : '' ?>>أساتذة متعاقدون / Contractuels</option>
-                    <option value="employe" <?= $typeFilter === 'employe' ? 'selected' : '' ?>>موظفون / Employés</option>
-                </select>
-            </div>
+            <?= empTypeCheckboxes($typeState, true, 'type') /* ☑️ (2026-09-25) خانات تشييك: المشيّكة فقط تبيّن */ ?>
             <div class="form-group mb-0">
                 <label class="form-label">Année scolaire / السنة الدراسية</label>
                 <select name="school_year" class="form-select" onchange="this.form.submit()">
@@ -545,12 +540,12 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- أزرار الكل: احتساب وطباعة جماعية للسنة المختارة حسب الفلتر -->
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px;border-top:1px solid var(--gray-200);padding-top:14px">
-            <span style="font-weight:600;color:var(--gray-700)"><i class="fas fa-users"></i> Toute l'école / كل المدرسة (<?= e($typeFilter ? employeeTypeLabel($typeFilter) : 'Tous / الكل') ?>) année / للسنة <?= e($schoolYear) ?>:</span>
-            <a href="?action=calc_all_year&school_year=<?= e($schoolYear) ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-gold"
+            <span style="font-weight:600;color:var(--gray-700)"><i class="fas fa-users"></i> Toute l'école / كل المدرسة (<?= e($typeFilter ? employeeTypeLabel($typeFilter) : ($typeState['all'] ? 'Tous / الكل' : empTypeTitleFrom($typeState))) ?>) année / للسنة <?= e($schoolYear) ?>:</span>
+            <a href="?action=calc_all_year&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-gold"
                onclick="return confirm('احتساب رواتب كل الموظفين المعروضين لكامل السنة الدراسية <?= e($schoolYear) ?>؟ قد تأخذ وقتاً.')">
                 <i class="fas fa-calculator"></i> Calculer toute l'année / احتساب الكل للسنة
             </a>
-            <a href="?action=print_all&school_year=<?= e($schoolYear) ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-primary">
+            <a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-primary">
                 <i class="fas fa-print"></i> Afficher/imprimer tous les relevés / عرض/طباعة كل الكشوف
             </a>
         </div>
@@ -564,19 +559,19 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
 
 <?php if ($action === 'print_all'):
     // طباعة/عرض جماعي: كشف كل موظف للسنة المختارة (حسب الفلتر)
-    $empsP = getYearEmployees($db, $schoolYear, $typeFilter);
-    $typeLbl = $typeFilter ? employeeTypeLabel($typeFilter) : 'الكل / Tous';
+    $empsP = getYearEmployees($db, $schoolYear, $typeState);
+    $typeLbl = $typeFilter ? employeeTypeLabel($typeFilter) : ($typeState['all'] ? 'الكل / Tous' : empTypeTitleFrom($typeState));
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print">
-        <a href="<?= BASE_URL ?>pages/annual_slip.php?school_year=<?= e($schoolYear) ?>&type=<?= urlencode($typeFilter) ?>" class="btn btn-light">
+        <a href="<?= BASE_URL ?>pages/annual_slip.php?school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-light">
             <i class="fas fa-arrow-left"></i> رجوع / Retour
         </a>
         <div>
             <span class="badge badge-info"><?= count($empsP) ?> — <?= e($typeLbl) ?> — <?= e($schoolYear) ?></span>
             <?php
-                $expAllQ = 'all=1&type=' . urlencode($typeFilter) . '&school_year=' . urlencode($schoolYear);
+                $expAllQ = 'all=1' . $typeQ . '&school_year=' . urlencode($schoolYear);
                 // «PDF رسمي (الكل)» = طبق الأصل عبر Chrome (صفحة لكل أستاذ، نفس تصميم الشاشة)
-                $allTarget = rawurlencode('pages/annual_slip.php?action=print_all&type=' . $typeFilter . '&school_year=' . $schoolYear);
+                $allTarget = rawurlencode('pages/annual_slip.php?action=print_all' . $typeQ . '&school_year=' . $schoolYear); // ☑️ الفئات المشيّكة
             ?>
             <?php /* 📏 بلا fit=1: المسار العادي صار يملأ الورقة كاملة (وضع fit القديم كان يطبع أصغر — ملاحظة المستخدم p1) */ ?>
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel (tous) / PDF رسمي (الكل)</a>

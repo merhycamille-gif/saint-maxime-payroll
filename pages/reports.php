@@ -22,13 +22,14 @@ if ($schoolYear === 'all') $schoolYear = currentSchoolYear(); // تقارير ا
 // 🧑‍🏫 فلتر الفئة الموحّد بكل التقارير (طلب المستخدم 2026-08-04): «الملاك لحالون أو
 // المتعاقدين أو الموظفين أو مع بعض» + «خاضع للضرائب أو لا يخضع» —
 // يُطبَّق على الاستعلام والعنوان والتصدير معاً.
-$empTypesAllowed = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
-$empTypeSel = in_array($_GET['emp_type'] ?? '', $empTypesAllowed, true) ? $_GET['emp_type'] : '';
+// ☑️ (2026-09-25) الفئة = خانات تشييك: المشيّكة فقط تبيّن، ولا واحدة ⇒ لا أحد (المصدر الواحد empTypeSelection بـfunctions.php)
+$empTypeState = empTypeSelection();
+$empTypeSel = (!$empTypeState['all'] && count($empTypeState['sel']) === 1) ? $empTypeState['sel'][0] : ''; // فئة واحدة مشيّكة (للعناوين المفردة)
 $taxSubSel = in_array($_GET['tax_sub'] ?? '', ['1', '0'], true) ? $_GET['tax_sub'] : '';
-$empTypeSql = ($empTypeSel ? " AND e.employee_type = " . $db->quote($empTypeSel) : '')
+$empTypeSql = empTypeSqlFrom($db, $empTypeState)
             . ($taxSubSel !== '' ? " AND e.tax_subject = " . (int)$taxSubSel : '');
-// لاحقة العنوان: تظهر الفئة/الخضوع المختاران على رأس التقرير المطبوع
-$empTypeTitle = ($empTypeSel ? (' — ' . empCategoryTitle($empTypeSel)) : '')
+// لاحقة العنوان: تظهر الفئات المشيّكة/الخضوع على رأس التقرير المطبوع
+$empTypeTitle = (empTypeTitleFrom($empTypeState) !== '' ? (' — ' . empTypeTitleFrom($empTypeState)) : '')
               . ($taxSubSel !== '' ? ($taxSubSel === '1' ? ' — الخاضعون للضريبة' : ' — غير الخاضعين للضريبة') : '');
 
 // فلتر المدارس (آمن — أرقام)
@@ -54,9 +55,9 @@ $exportableReports = ['monthly_summary','cnss_summary','tax_summary','eoc_summar
 if ($report && in_array($report, $exportableReports, true)) {
     $qs = http_build_query(array_filter([
         'report' => $report, 'month' => $month, 'year' => $year,
-        'school_year' => $schoolYear, 'emp_type' => $_GET['emp_type'] ?? null,
+        'school_year' => $schoolYear,
         'tax_sub' => $_GET['tax_sub'] ?? null,
-    ], fn($v) => $v !== null && $v !== ''));
+    ], fn($v) => $v !== null && $v !== '')) . empTypeQueryFrom($empTypeState); // ☑️ الفئات المشيّكة تصل للتصدير
     $colsQ = '';
     if (!empty($_GET['cols']) && is_array($_GET['cols'])) foreach ($_GET['cols'] as $c) $colsQ .= '&cols[]=' . urlencode($c);
     if (!empty($_GET['items']) && is_array($_GET['items'])) foreach ($_GET['items'] as $c) $colsQ .= '&items[]=' . urlencode($c); // بنود المجاميع السنوية المختارة
@@ -99,16 +100,9 @@ function reportSchoolPicker() {
  * (٢) الضريبة: خاضع للضريبة / غير خاضع / الكل
  */
 function empTypePicker() {
-    global $empTypeSel, $taxSubSel; ?>
-    <div class="form-group mb-0">
-        <label class="form-label"><i class="fas fa-users"></i> Catégorie / الفئة</label>
-        <select name="emp_type" class="form-select">
-            <option value="">Tous ensemble / الكل مع بعض</option>
-            <option value="enseignant_titulaire" <?= $empTypeSel === 'enseignant_titulaire' ? 'selected' : '' ?>>Titulaires / أساتذة الملاك</option>
-            <option value="enseignant_contractuel" <?= $empTypeSel === 'enseignant_contractuel' ? 'selected' : '' ?>>Contractuels / أساتذة متعاقدون</option>
-            <option value="employe" <?= $empTypeSel === 'employe' ? 'selected' : '' ?>>Employés / موظفون إداريون</option>
-        </select>
-    </div>
+    global $empTypeState, $taxSubSel;
+    // ☑️ (2026-09-25) خانات تشييك بدل «الكل مع بعض»: المشيّكة فقط تبيّن — المصدر الواحد empTypeCheckboxes
+    echo empTypeCheckboxes($empTypeState); ?>
     <div class="form-group mb-0">
         <label class="form-label"><i class="fas fa-file-invoice-dollar"></i> Impôt / الضريبة</label>
         <select name="tax_sub" class="form-select">
@@ -607,7 +601,8 @@ function reportDocThumb($path) {
             'enseignant_contractuel' => 'أساتذة متعاقدون / Contractuels',
             'employe'                => 'موظفون / Employés',
         ];
-        $listTitle = ($empType && isset($typeLabels[$empType])) ? $typeLabels[$empType] : 'كل الموظفين / Tout le personnel';
+        $listTitle = ($empType && isset($typeLabels[$empType])) ? $typeLabels[$empType]
+                   : ($empTypeState['all'] ? 'كل الموظفين / Tout le personnel' : empTypeTitleFrom($empTypeState)); // ☑️ أكثر من فئة مشيّكة
     ?>
         <?php
         // سلسلة 2017: الراتب حسب الدرجة (لعمود الراتب)
