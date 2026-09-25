@@ -7988,6 +7988,46 @@ $hA = renderPage('pages/annual_slip.php', ['school_year' => '2025-2026', 'type_s
 $c169('annual-list', $noFatal($hA) && preg_match('/name="type\[\]" value="enseignant_contractuel" checked/', $hA) === 1 && strpos($hA, '&type_set=1&type[]=enseignant_contractuel') !== false);
 check('☑️ منتقي الفئة بخانات تشييك (2026-09-25): المشيّكة فقط تبيّن وولا واحدة = لا أحد — مصدر واحد بكل التقارير/النماذج/التصدير/الرواتب الشهرية/البطاقة/لائحة الموظفين — تجارب فعلية', $ok169, implode(' · ', $why169) ?: 'ok');
 
+/* =====================================================================
+ * 170) 🏥👨‍👩‍👧 التعويضات العائلية بتصاريح الضمان (2026-09-25 «التعويضات العائلية للموظفين الخاضعين لقانون العمل لازم تنحطّ
+ *      بتصاريح الضمان الشهرية والفصلية — وتعويضات الأساتذة الخاضعين لقانون المعلمين بتبيّن بكل التقارير ما عدا تصاريح وتقارير الضمان»):
+ *      «التعويضات العائلية المدفوعة» بتصريح الضمان الشهري/الفصلي (شاشة + إكسل) وبالكشف الاسمي الشهري = موظفو قانون العمل
+ *      (employe) فقط — المصدر الواحد cnssFamilyPaidTypeSql / cnssFamilyPaidLbp. باقي التقارير تعرض تعويض الجميع كما هي.
+ * =================================================================== */
+$ok170 = true; $why170 = [];
+$c170 = function (string $what, bool $ok) use (&$ok170, &$why170) { if (!$ok) { $ok170 = false; $why170[] = $what; } };
+$c170('fn-sql', cnssFamilyPaidTypeSql('e.') === " AND e.employee_type = 'employe'" && strpos(cnssFamilyPaidExpr(), "WHEN e.employee_type = 'employe' THEN ms.family_allowance_lbp ELSE 0") !== false);
+$c170('fn-row', cnssFamilyPaidLbp(['employee_type' => 'employe', 'family_allowance_lbp' => 2310000]) === 2310000
+    && cnssFamilyPaidLbp(['employee_type' => 'enseignant_titulaire', 'family_allowance_lbp' => 2310000]) === 0
+    && cnssFamilyPaidLbp(['employee_type' => 'enseignant_contractuel', 'family_allowance_lbp' => 500]) === 0);
+$of170 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+$ox170 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+// التصريح الشهري/الفصلي (شاشة + إكسل رسمي): استعلام المدفوع يحمل حصر الموظفين — والكشف الاسمي صفّه عبر الدالة
+$c170('src-forms', preg_match('/SUM\(ms\.family_allowance_lbp\),0\) f FROM monthly_salaries ms JOIN employees e ON e\.id=ms\.employee_id\s+WHERE e\.is_deleted=0" \. cnssFamilyPaidTypeSql\(\'e\.\'\)/', $of170) === 1
+    && strpos($of170, '$fpaid = cnssFamilyPaidLbp($r);') !== false);
+$c170('src-export', preg_match('/SUM\(ms\.family_allowance_lbp\),0\) f FROM monthly_salaries ms JOIN employees e ON e\.id=ms\.employee_id\s+WHERE e\.is_deleted=0" \. cnssFamilyPaidTypeSql\(\'e\.\'\)/', $ox170) === 1);
+// باقي التقارير لم تُحصَر: كشف الرواتب الشهري بمركز التقارير ما زال يعرض التعويض للجميع
+$rp170 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$c170('others-untouched', strpos($rp170, "money(\$r['family_allowance_lbp'], \$rRate)") !== false && strpos($rp170, 'cnssFamilyPaid') === false);
+// تجربة فعلية بالقاعدة: أحدث شهر فيه تعويض مخزّن لأستاذ ملاك — استعلام التصريح (بالحصر) لا يضمّه، وبلا حصر يضمّه
+$r170 = $db->query("SELECT ms.school_id, ms.year, ms.month FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+    WHERE e.is_deleted=0 AND e.employee_type='enseignant_titulaire' AND ms.family_allowance_lbp>0 ORDER BY ms.year DESC, ms.month DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($r170) {
+    $sid170 = (int)$r170['school_id']; $y170 = (int)$r170['year']; $m170 = (int)$r170['month'];
+    $qAll170 = (int)$db->query("SELECT COALESCE(SUM(ms.family_allowance_lbp),0) FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+        WHERE e.is_deleted=0 AND ms.school_id=$sid170 AND ms.year=$y170 AND ms.month=$m170")->fetchColumn();
+    $qEmp170 = (int)$db->query("SELECT COALESCE(SUM(ms.family_allowance_lbp),0) FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+        WHERE e.is_deleted=0" . cnssFamilyPaidTypeSql('e.') . " AND ms.school_id=$sid170 AND ms.year=$y170 AND ms.month=$m170")->fetchColumn();
+    $qTit170 = (int)$db->query("SELECT COALESCE(SUM(ms.family_allowance_lbp),0) FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+        WHERE e.is_deleted=0 AND e.employee_type='enseignant_titulaire' AND ms.school_id=$sid170 AND ms.year=$y170 AND ms.month=$m170")->fetchColumn();
+    $c170("db:$sid170/$m170-$y170 emp=$qEmp170 all=$qAll170", $qTit170 > 0 && $qEmp170 < $qAll170 && $qEmp170 + $qTit170 <= $qAll170);
+    $hC170 = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => $m170, 'year' => $y170], [], [$sid170]);
+    $c170('render-contrib', $noFatal($hC170) && strpos($hC170, formatLBP($qEmp170, false)) !== false);
+    $hN170 = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => $m170, 'year' => $y170], [], [$sid170]);
+    $c170('render-nominative', $noFatal($hN170) && strpos($hN170, 'المتوجب للصندوق') !== false);
+} else { $why170[] = 'no titulaire with stored family allowance (db part skipped)'; }
+check('🏥👨‍👩‍👧 تصاريح الضمان (2026-09-25): «التعويضات العائلية المدفوعة» = موظفو قانون العمل فقط (الشهري/الفصلي شاشة + إكسل + الكشف الاسمي) — تعويض أستاذ الملاك يبقى بكل التقارير الأخرى — مصدر واحد + تجربة بالقاعدة', $ok170, implode(' · ', $why170) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

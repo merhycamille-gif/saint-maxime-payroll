@@ -2196,8 +2196,9 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
     $q2b->execute($params); $fam = $q2b->fetch();
+    // 👨‍👩‍👧 التعويضات العائلية المدفوعة = موظفو قانون العمل فقط (تعويض أستاذ الملاك من المدرسة لا يدخل الضمان — 2026-09-25)
     $q3 = $db->prepare("SELECT COALESCE(SUM(ms.family_allowance_lbp),0) f FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.is_deleted=0" . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
+        WHERE e.is_deleted=0" . cnssFamilyPaidTypeSql('e.') . $yf . $ofEmpFilter . " AND ms.year=? AND ms.month IN ($ph) AND " . schoolScopeWhere('ms.school_id'));
     $q3->execute($params); $fpaid = (int)$q3->fetchColumn();
     // الاشتراك المخزّن لكل فرع، والأجور = الاشتراك ÷ المعدل (الأساس الفعلي بعد الحد الأقصى)
     $c1=(int)$a['c']; $n1=(int)$a['n']; $w1=$c1 ? (int)round($c1/cnssTotalFrac($month, $year)) : 0;
@@ -2903,7 +2904,7 @@ elseif ($form === 'payment_list'):
             $eos   = (int)$r['school_end_of_service_8_5_lbp'];
             $fam6  = (int)$r['school_family_comp_6_lbp'];
             $due   = $mtot + $eos + $fam6;
-            $fpaid = (int)$r['family_allowance_lbp'];
+            $fpaid = cnssFamilyPaidLbp($r);                            // 👨‍👩‍👧 تعويض الموظف (قانون العمل) فقط — الأستاذ 0 (2026-09-25)
             $rest  = $due - $fpaid;
             $T['baseSal']+=(int)$r['base_salary_lbp'];
             $T['teach']+=$teach; $T['cola']+=$cola; $T['bonus']+=$bonus; $T['trans']+=$trans; $T['work']+=$work;

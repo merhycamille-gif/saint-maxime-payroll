@@ -5303,6 +5303,22 @@ function netFamColShown(): bool { return netFamColMode() !== 'none'; }
 function netFamColsCount(): int { return netFamColShown() ? 1 : 0; }
 /** الصافي + التعويض العائلي لصفّ راتب مخزّن (المصدر الواحد) */
 function netFamLbp(array $r): int { return (int)($r['net_salary_lbp'] ?? 0) + (int)($r['family_allowance_lbp'] ?? 0); }
+
+/* 🏥👨‍👩‍👧 (2026-09-25 «التعويضات العائلية للموظفين الخاضعين لقانون العمل لازم تنحطّ بتصاريح الضمان الشهرية والفصلية —
+ *  وتعويضات الأساتذة الخاضعين لقانون المعلمين بتبيّن بكل التقارير ما عدا تصاريح وتقارير الضمان»):
+ *  بكل مستند/تصريح للضمان، «التعويضات العائلية المدفوعة» (التي تُحسم من المتوجّب للصندوق) = تعويضات الموظفين
+ *  (employee_type = employe، قانون العمل — مصدرها الضمان) فقط؛ تعويض أستاذ الملاك (من المدرسة) لا يدخل الضمان أبداً.
+ *  🔴 المصدر الواحد: أي كشف ضمان جديد يستعمل هاتين الدالتين. باقي التقارير تعرض تعويض الجميع كما هي. */
+/** شرط SQL (يبدأ بـ AND) يحصر التعويض العائلي المدفوع بموظفي قانون العمل */
+function cnssFamilyPaidTypeSql(string $alias = 'e.'): string { return " AND {$alias}employee_type = 'employe'"; }
+/** تعبير SQL لمبلغ التعويض المدفوع الداخل بالضمان لصفّ راتب (0 للأساتذة) */
+function cnssFamilyPaidExpr(string $msAlias = 'ms.', string $eAlias = 'e.'): string {
+    return "CASE WHEN {$eAlias}employee_type = 'employe' THEN {$msAlias}family_allowance_lbp ELSE 0 END";
+}
+/** التعويض المدفوع الداخل بالضمان لصفّ (يحتاج employee_type بالصفّ) */
+function cnssFamilyPaidLbp(array $r): int {
+    return (($r['employee_type'] ?? '') === 'employe') ? (int)($r['family_allowance_lbp'] ?? 0) : 0;
+}
 /** خلية عمود «الصافي + العائلي» لصف جسم/مجموع: '' إن كان غير موجود، فارغة (بعرض للكتابة) بوضع «بلا مبلغ»، وإلا $html. */
 function netFamTd(string $html, string $attrs = ' class="num"'): string {
     $m = netFamColMode();

@@ -344,8 +344,9 @@ if ($form === 'cnss_contrib_monthly') {
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE e.employee_type='employe' AND e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month=? AND " . schoolScopeWhere('ms.school_id'));
     $q2b->execute($params); $fam = $q2b->fetch();
+    // 👨‍👩‍👧 التعويضات العائلية المدفوعة = موظفو قانون العمل فقط (المصدر الواحد cnssFamilyPaidTypeSql — 2026-09-25)
     $q3 = $db->prepare("SELECT COALESCE(SUM(ms.family_allowance_lbp),0) f FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
-        WHERE e.is_deleted=0" . $yf . " AND ms.year=? AND ms.month=? AND " . schoolScopeWhere('ms.school_id'));
+        WHERE e.is_deleted=0" . cnssFamilyPaidTypeSql('e.') . $yf . " AND ms.year=? AND ms.month=? AND " . schoolScopeWhere('ms.school_id'));
     $q3->execute($params); $fpaid = (int)$q3->fetchColumn();
 
     $c1 = (int)$a['c']; $n1 = (int)$a['n']; $w1 = $c1 ? (int)round($c1 / cnssTotalFrac($month, $year)) : 0;
