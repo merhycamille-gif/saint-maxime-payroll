@@ -314,7 +314,7 @@ if ($form === 'cnss_taswiya') {
 }
 
 $school = currentSchool();
-if (!$school) $school = institutionSchoolPick(); // 🏫 (2026-09-25) مدرسة مختارة من منتقي الصفحة (&school_id=)
+if (!$school) $school = institutionSchoolPick() ?: institutionGroupSchool(); // 🏫 (2026-09-25) مدرسة بالرابط أو مجموعة المدارس المختارة معاً
 // 🔒 نموذج الضمان 190A يُصدَر لمؤسسة واحدة برقم صاحب عمل واحد — في وضع «كل المدارس»
 // كان يُبَثّ ملفٌ بترويسة فارغة يجمع أرقام كل المدارس. اطلب اختيار مدرسة.
 if (!$school) {
@@ -761,10 +761,10 @@ if ($form === 'mof_r567') {
     if ($fy < 2000 || $fy > 2100) $fy = (int)date('Y') - 1;
     $empFilter = mofEmpFilterSql($db);
     $serial567 = function ($dateStr) { return (int)round((strtotime($dateStr) - strtotime('1899-12-30')) / 86400); };
-    $s0 = currentSchool();
+    $s0 = currentSchool() ?: institutionSchoolPick() ?: institutionGroupSchool(); // 🏫 مدرسة واحدة أو مجموعة (2026-09-25)
     $ss = $db->prepare("SELECT * FROM schools WHERE id=?");
     $ss->execute([(int)($s0['id'] ?? 0)]);
-    $sch = $ss->fetch() ?: $s0;
+    $sch = (!empty($s0['_group_ids'])) ? $s0 : ($ss->fetch() ?: $s0);
     $prof = mofProfile($sch);
     $finNum = preg_replace('/\D/', '', (string)($sch['finance_number'] ?? ''));
 
@@ -1198,10 +1198,10 @@ if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
 
     // ===== ر5 (سنوي) / ر10 (فصلي) — مستوى المؤسسة =====
     // مدرسة المالية = المدرسة المختارة نفسها برقمها المالي (لا قاعدة «صاحب العمل بالضمان»)
-    $s0 = currentSchool();
+    $s0 = currentSchool() ?: institutionSchoolPick() ?: institutionGroupSchool(); // 🏫 مدرسة واحدة أو مجموعة (2026-09-25)
     $ss = $db->prepare("SELECT * FROM schools WHERE id=?");
     $ss->execute([(int)($s0['id'] ?? 0)]);
-    $sch = $ss->fetch() ?: $s0;
+    $sch = (!empty($s0['_group_ids'])) ? $s0 : ($ss->fetch() ?: $s0);
     $prof = mofProfile($sch);
     $finNum = preg_replace('/\D/', '', (string)($sch['finance_number'] ?? ''));
 

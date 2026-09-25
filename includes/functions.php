@@ -293,24 +293,51 @@ function institutionSchoolPick(): ?array {
     $GLOBALS['msa_school_override'] = [$sid];
     return currentSchool();
 }
-/** لائحة المدارس المتاحة للاختيار (المختارة من الأعلى، أو كل الفاعلة بوضع «الكل») */
+/** المدارس ضمن النطاق الحالي (المختارة من الأعلى، أو كل الفاعلة بوضع «الكل») */
 function institutionSchoolChoices(): array {
     $ids = activeSchoolIds() ?: allActiveSchoolIdsCached();
     $out = [];
     foreach (allSchools() as $s) if (in_array((int)$s['id'], $ids, true)) $out[] = $s;
     return $out;
 }
-/** صندوق اختيار المدرسة للتصريح المؤسّسي (يحمل كل معاملات الرابط الحالية + school_id) */
-function institutionSchoolChooserHtml(string $title): string {
-    $base = $_GET; unset($base['school_id']);
-    $h = '<div class="card" style="max-width:820px;margin:0 auto"><div class="card-header"><h3><i class="fas fa-school"></i> ' . e($title) . '</h3></div><div class="card-body">'
-       . '<p style="font-weight:700;margin-bottom:12px">هذا التصريح يُصدَر لمدرسة واحدة (رقم صاحب عمل واحد) — اختر المدرسة / Cette déclaration se fait pour une seule école — choisissez :</p>'
-       . '<div style="display:flex;flex-wrap:wrap;gap:10px">';
-    foreach (institutionSchoolChoices() as $s) {
-        $q = http_build_query($base + ['school_id' => (int)$s['id']]);
-        $h .= '<a class="btn btn-primary btn-lg" href="?' . e($q) . '"><i class="fas fa-file-signature"></i> ' . e($s['name_ar'] ?: $s['name_fr']) . '<br><small dir="ltr">' . e($s['name_fr']) . '</small></a>';
+/**
+ * 🏫 (2026-09-25 «وقت بدي اختار أي تصريح ممكن اختار مدرسة لحالها وممكن اختار عدة مدارس — بملفات الضمان ما عم تخلّيني
+ * اختار عدة مدارس مع بعضها، بدي اختار أو وحدة لحالها أو مجموعة»): مع عدة مدارس مختارة التصريح المؤسّسي يُصدَر
+ * **للمجموعة معاً** (الاستعلامات تجمعها عبر schoolScopeWhere)، وصاحب العمل = صفّ «مدرسة مجموعة»:
+ * الأساس = أوّل مدرسة مختارة (id/العنوان/mof_profile)، والاسم = اسم صاحب العمل الموحّد إن تشاركت المدارس رقم الضمان
+ * نفسه (معظمها 25-82-043 = الراهبات المخلصيات)، وإلا أسماؤها متسلسلة + علم _group_mixed للتنبيه.
+ * يعيد null بمدرسة واحدة (currentSchool تكفي) أو بلا مدارس.
+ */
+function institutionGroupSchool(): ?array {
+    $rows = institutionSchoolChoices();
+    if (count($rows) <= 1) return $rows ? $rows[0] : null;
+    $base = $rows[0];
+    $keys = array_unique(array_map(fn($s) => cnssEmployerNumberKey($s['nssf_employer_number'] ?? ''), $rows));
+    $same = count($keys) === 1 && $keys[0] !== '';
+    $g = $base;
+    $g['_group_ids'] = array_map(fn($s) => (int)$s['id'], $rows);
+    $g['_group_names'] = array_map(fn($s) => (string)($s['name_ar'] ?: $s['name_fr']), $rows);
+    $g['_group_mixed'] = !$same;
+    if ($same) {
+        $e = cnssEmployerSchool($base); // اسم صاحب العمل الموحّد حسب رقمه (إن كان معروفاً) وإلا اسم الأولى
+        $g['name_ar'] = $e['name_ar']; $g['name_fr'] = $e['name_fr'];
+        if ($e['name_ar'] === $base['name_ar']) { // رقم غير معروف بلائحة أصحاب العمل ⇒ الأسماء متسلسلة
+            $g['name_ar'] = implode(' + ', $g['_group_names']);
+            $g['name_fr'] = implode(' + ', array_map(fn($s) => (string)($s['name_fr'] ?: $s['name_ar']), $rows));
+        }
+    } else {
+        $g['name_ar'] = implode(' + ', $g['_group_names']);
+        $g['name_fr'] = implode(' + ', array_map(fn($s) => (string)($s['name_fr'] ?: $s['name_ar']), $rows));
     }
-    return $h . '</div></div></div>';
+    return $g;
+}
+/** شارة فوق التصريح: «التصريح لمجموعة المدارس: …» (+ تنبيه إن اختلفت أرقام الضمان) */
+function institutionGroupBadgeHtml(array $g): string {
+    $h = '<div class="no-print" style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-weight:700">'
+       . '<i class="fas fa-school"></i> التصريح لمجموعة المدارس معاً / Déclaration groupée : ' . e(implode(' + ', $g['_group_names'] ?? []))
+       . ' <span style="font-weight:400;color:#475569">— رقم صاحب العمل: ' . e((string)($g['nssf_employer_number'] ?? '')) . '</span>';
+    if (!empty($g['_group_mixed'])) $h .= '<div style="color:#b91c1c;font-weight:700;margin-top:6px">⚠️ المدارس المختارة بأرقام ضمان مختلفة — التصريح يجمعها تحت رقم المدرسة الأولى. اختر مدارس بنفس رقم صاحب العمل إن أردت تصريحاً رسمياً واحداً.</div>';
+    return $h . '</div>';
 }
 /** شارة فوق التصريح: «لمدرسة: X — اختر مدرسة أخرى» عندما اختيرت من المنتقي */
 function institutionSchoolBadgeHtml(array $school): string {

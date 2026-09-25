@@ -42,15 +42,13 @@ if (!$school && $employeeId > 0) {
 // في وضع «كل المدارس» كان $school = null فتُطبَع الترويسة فارغة وتُدمَج أرقام كل المدارس
 // في تصريح واحد بلا رقم صاحب عمل. الآن نطلب اختيار مدرسة بوضوح.
 $institutionForms = ['tax_r5','tax_r10','tax_r7','tax_emp_report','cnss_annual','cnss_contrib_monthly','cnss_contrib_annual','cnss_nominative_monthly'];
-$ofSchoolPicked = false; // 🏫 (2026-09-25) اختيرت المدرسة من منتقي الصفحة (عدة مدارس مختارة فوق)
+$ofSchoolPicked = false; // 🏫 مدرسة واحدة اختيرت بالرابط (&school_id=) من ضمن المختارة
+$ofSchoolGroup = false;  // 🏫 (2026-09-25 «بدي اختار أو وحدة لحالها أو مجموعة») عدة مدارس مختارة ⇒ التصريح للمجموعة معاً
 if (in_array($form, $institutionForms, true) && !$school) {
     $school = institutionSchoolPick();
     if ($school) { $ofSchoolPicked = true; }
-    else {
-        // «اخترت مدرستين وكبست تصريح الضمان الشهري عم بينطّ على صفحة التصاريح الرسمية» ⇒ لا طرد:
-        // نبقى بالصفحة ونعرض المدارس المختارة ليختار واحدة (الاختيار العام فوق لا يتغيّر).
-        $docFocus = true; $hideExportToolbar = true; $ofChooseSchool = true; // يُعرض بعد تحديد $pageTitle (أسفل)
-    }
+    else { $school = institutionGroupSchool(); $ofSchoolGroup = $school && !empty($school['_group_ids']); }
+    if (!$school) { $_SESSION['flash_error'] = 'لا مدارس فاعلة / Aucune école active.'; header('Location: ' . BASE_URL . 'pages/tax_declarations.php'); exit; }
 }
 $lang = $_SESSION['lang'] ?? 'fr';
 
@@ -309,11 +307,7 @@ if ($form !== '') $docFocus = true;
 // صفحة القائمة (بلا نموذج مختار): لا شيء يُصدَّر — شريط التصدير زائد (2026-08-19)
 if ($form === '') $hideExportToolbar = true;
 include __DIR__ . '/../includes/header.php';
-if (!empty($ofChooseSchool)) { // 🏫 (2026-09-25) عدة مدارس مختارة + تصريح مؤسّسي ⇒ منتقي المدرسة بنفس الصفحة (لا طرد)
-    echo institutionSchoolChooserHtml($pageTitle);
-    include __DIR__ . '/../includes/footer.php';
-    exit;
-}
+
 echo officialFormStyles();
 
 /* ===== شريط الفلترة الموحّد (الفئة + الخضوع للضريبة) — فوق كل نموذج/كشف جماعي ===== */
@@ -321,7 +315,8 @@ $ofFilterableForms = ['salary_all', 'payment_list', 'full_register', 'general_re
     'employer_cost', 'general_info', 'salary_detail', 'teaching_staff', 'eoc_staff', 'eoc_quarterly',
     'cnss_nominative_monthly', 'cnss_annual', 'cnss_contrib_monthly', 'cnss_contrib_annual',
     'tax_r5', 'tax_r10', 'tax_r7', 'tax_emp_report', 'staff_stats'];
-if ($ofSchoolPicked && $school) echo institutionSchoolBadgeHtml($school); // 🏫 لمدرسة مختارة من المنتقي
+if ($ofSchoolPicked && $school) echo institutionSchoolBadgeHtml($school); // 🏫 لمدرسة واحدة مختارة بالرابط
+if ($ofSchoolGroup && $school) echo institutionGroupBadgeHtml($school);   // 🏫 لمجموعة المدارس المختارة معاً
 if ($form !== '' && in_array($form, $ofFilterableForms, true)):
 ?>
 <form method="get" class="card no-print">

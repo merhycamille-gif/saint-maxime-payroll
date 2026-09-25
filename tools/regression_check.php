@@ -8029,38 +8029,44 @@ if ($r170) {
 check('🏥👨‍👩‍👧 تصاريح الضمان (2026-09-25): «التعويضات العائلية المدفوعة» = موظفو قانون العمل فقط (الشهري/الفصلي شاشة + إكسل + الكشف الاسمي) — تعويض أستاذ الملاك يبقى بكل التقارير الأخرى — مصدر واحد + تجربة بالقاعدة', $ok170, implode(' · ', $why170) ?: 'ok');
 
 /* =====================================================================
- * 171) 🏫 التصاريح المؤسّسية مع عدة مدارس مختارة (2026-09-25 «اخترت مدرستين ورحت على التقارير وكبست تصريح الضمان
- *      الشهري عم بينطّ على صفحة التصاريح الرسمية»): لا طرد — منتقي المدرسة بنفس الصفحة (زرّ لكل مدرسة مختارة، &school_id=)،
- *      وباختيارها يُحصَر هذا الطلب بها (msa_school_override) والاختيار العام لا يتغيّر؛ روابط الإكسل الرسمي تحمل school_id.
+ * 171) 🏫 التصاريح المؤسّسية مع عدة مدارس مختارة (2026-09-25 «اخترت مدرستين وكبست تصريح الضمان الشهري عم بينطّ على صفحة
+ *      التصاريح الرسمية» ثم «بدي اختار أو وحدة لحالها أو مجموعة»): لا طرد — عدة مدارس = التصريح **للمجموعة معاً**
+ *      (institutionGroupSchool: الاسم = صاحب العمل الموحّد إن تشاركت رقم الضمان، وإلا الأسماء + تنبيه)، والعدد/المجاميع
+ *      = مجموع المدارس؛ &school_id= يحصر الطلب بمدرسة واحدة من ضمن المختارة (msa_school_override) والاختيار العام لا يتغيّر.
  * =================================================================== */
 $ok171 = true; $why171 = [];
 $c171 = function (string $what, bool $ok) use (&$ok171, &$why171) { if (!$ok) { $ok171 = false; $why171[] = $what; } };
 $fn171 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $c171('src-fn', strpos($fn171, "if (!empty(\$GLOBALS['msa_school_override'])) return") !== false && strpos($fn171, 'function institutionSchoolPick(): ?array') !== false
-    && strpos($fn171, 'function institutionSchoolChooserHtml(') !== false);
+    && strpos($fn171, 'function institutionGroupSchool(): ?array') !== false && strpos($fn171, 'function institutionGroupBadgeHtml(') !== false);
 $of171 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
-$c171('src-forms', strpos($of171, '$school = institutionSchoolPick();') !== false && strpos($of171, 'echo institutionSchoolChooserHtml($pageTitle);') !== false
-    && strpos($of171, "header('Location: ' . BASE_URL . 'pages/tax_declarations.php');") === false
+$c171('src-forms', strpos($of171, '$school = institutionSchoolPick();') !== false && strpos($of171, '$school = institutionGroupSchool();') !== false
+    && strpos($of171, 'institutionSchoolChooserHtml') === false && strpos($of171, 'اختر المدرسة من الأعلى أولاً') === false
     && substr_count($of171, "(\$ofSchoolPicked ? '&school_id=' . (int)\$school['id'] : '')") >= 3);
-$c171('src-export', strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), 'if (!$school) $school = institutionSchoolPick();') !== false);
-// تجربة فعلية: مدرستان مختارتان (3 و5) — بلا school_id = منتقٍ بزرّين؛ school_id=5 = التصريح لمدرسة 5 مع الشارة؛ school_id خارج المختار = المنتقي
-$sc171 = array_slice(array_map('intval', array_column(allSchools(), 'id')), 0, 2);
-if (count($sc171) === 2) {
-    $hA = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2026], [], $sc171);
-    $c171('chooser-two', $noFatal($hA) && strpos($hA, 'اختر المدرسة / Cette') !== false && substr_count($hA, 'school_id=') === 2 && strpos($hA, 'ppExportArea') === false);
-    $hB = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2026, 'school_id' => $sc171[1]], [], $sc171);
-    $sB = $db->query("SELECT name_ar FROM schools WHERE id = " . $sc171[1])->fetchColumn();
-    $c171('picked', $noFatal($hB) && strpos($hB, 'التصريح لمدرسة') !== false && strpos($hB, e($sB)) !== false && strpos($hB, 'official_export.php?form=cnss_contrib_monthly&month=10&year=2026&school_id=' . $sc171[1]) !== false
-        && strpos($hB, 'اختر المدرسة / Cette') === false);
-    $other = 0; foreach (allSchools() as $s171) if (!in_array((int)$s171['id'], $sc171, true)) { $other = (int)$s171['id']; break; }
-    if ($other) {
-        $hC = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2026, 'school_id' => $other], [], $sc171);
-        $c171('out-of-scope', $noFatal($hC) && strpos($hC, 'اختر المدرسة / Cette') !== false);
-    }
-    $hD = renderPage('pages/official_forms.php', ['form' => 'tax_r10', 'school_id' => $sc171[0]], [], $sc171);
-    $c171('r10-picked', $noFatal($hD) && strpos($hD, 'التصريح لمدرسة') !== false && strpos($hD, 'school_id=' . $sc171[0]) !== false); // الرابط بـe() ⇒ &amp;
-} else { $why171[] = 'less than 2 schools (live part skipped)'; }
-check('🏫 التصاريح المؤسّسية مع عدة مدارس (2026-09-25): لا طرد — منتقي المدرسة بنفس الصفحة + الحصر لطلب واحد (school_id) + روابط الإكسل الرسمي — تجربة فعلية', $ok171, implode(' · ', $why171) ?: 'ok');
+$ox171 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+$c171('src-export', strpos($ox171, 'institutionSchoolPick() ?: institutionGroupSchool()') !== false && substr_count($ox171, "(!empty(\$s0['_group_ids'])) ? \$s0") === 2);
+// تجربة فعلية: مدرستان بنفس رقم الضمان (3 و5): الكشف الاسمي للمجموعة = مجموع عدد مضموني كلٍّ لحالها + اسم صاحب العمل الموحّد
+$cnt171 = function (array $ids) use (&$noFatal) {
+    $h = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => 10, 'year' => 2025], [], $ids);
+    return preg_match('/عدد المضمونين: (\d+)/u', $h, $m) ? [(int)$m[1], $h] : [-1, $h];
+};
+[$n3, ] = $cnt171([3]); [$n5, ] = $cnt171([5]); [$n35, $h35] = $cnt171([3, 5]);
+$c171("group-nominative=$n35/" . ($n3 + $n5), $n3 > 0 && $n5 > 0 && $n35 === $n3 + $n5 && strpos($h35, 'التصريح لمجموعة المدارس') !== false
+    && strpos($h35, 'الراهبات المخلصيات لسيدة البشارة') !== false && strpos($h35, '⚠️ المدارس المختارة بأرقام ضمان مختلفة') === false);
+$hM = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2025], [], [3, 5]);
+$c171('group-contrib', $noFatal($hM) && strpos($hM, 'التصريح لمجموعة المدارس') !== false && strpos($hM, 'ppExportArea') !== false);
+// أرقام ضمان مختلفة (2 مكسيموس 22-82-745 + 3): التصريح يطلع مع تنبيه
+$hX = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2025], [], [2, 3]);
+$c171('group-mixed-warning', $noFatal($hX) && strpos($hX, '⚠️ المدارس المختارة بأرقام ضمان مختلفة') !== false);
+// &school_id= يحصر بمدرسة واحدة من ضمن المختارة (شارة + رابط الإكسل)، وخارج النطاق = المجموعة
+$hB = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2025, 'school_id' => 5], [], [3, 5]);
+$c171('picked-one', $noFatal($hB) && strpos($hB, 'التصريح لمدرسة') !== false && strpos($hB, 'التصريح لمجموعة') === false && strpos($hB, 'official_export.php?form=cnss_contrib_monthly&month=10&year=2025&school_id=5') !== false);
+$hC = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2025, 'school_id' => 7], [], [3, 5]);
+$c171('out-of-scope=group', $noFatal($hC) && strpos($hC, 'التصريح لمجموعة المدارس') !== false);
+$hD = renderPage('pages/official_forms.php', ['form' => 'tax_r10'], [], [3, 5]);
+$c171('r10-group', $noFatal($hD) && strpos($hD, 'التصريح لمجموعة المدارس') !== false);
+check('🏫 التصاريح المؤسّسية مع عدة مدارس (2026-09-25): وحدة لحالها أو مجموعة معاً — المجموعة = مجموع المدارس + صاحب العمل الموحّد + تنبيه عند اختلاف الأرقام + school_id يحصر — تجربة فعلية', $ok171, implode(' · ', $why171) ?: 'ok');
+
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
