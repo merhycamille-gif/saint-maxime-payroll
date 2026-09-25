@@ -252,6 +252,9 @@ function isSuperAdmin() {
  * يدعم اختيار عدة مدارس معاً (واحدة/تنتين/تلاتة/الكل).
  */
 function activeSchoolIds() {
+    // 🏫 (2026-09-25) تجاوز لطلب واحد: تصريح مؤسّسي (ضمان/ضريبة) اختير له مدرسة من ضمن المختارة
+    //    (institutionSchoolPick) — لا يغيّر اختيار المستخدم العام بالجلسة.
+    if (!empty($GLOBALS['msa_school_override'])) return array_values(array_map('intval', (array)$GLOBALS['msa_school_override']));
     // حساب مدرسة (قراءة فقط): نطاقه = المدارس المسموحة له.
     // إن كان يملك عدة مدارس (أو الكل) يستطيع تصفيتها من المبدّل الأعلى (ضمن المسموح فقط).
     if (isViewer()) {
@@ -273,6 +276,48 @@ function activeSchoolIds() {
     $ids = $_SESSION['active_schools'] ?? [];
     if (!is_array($ids)) $ids = [];
     return array_values(array_unique(array_filter(array_map('intval', $ids), fn($x) => $x > 0)));
+}
+
+/**
+ * 🏫 (2026-09-25 «اخترت مدرستين وكبست تصريح الضمان الشهري عم بينطّ على صفحة التصاريح الرسمية»):
+ * التصاريح المؤسّسية (ضمان/ضريبة) تُصدَر لمدرسة واحدة برقم صاحب عمل واحد. مع عدة مدارس مختارة
+ * لا نطرد المستخدم: نعرض له المدارس المختارة ليختار واحدة (زرّ لكل مدرسة برابط &school_id=)،
+ * وعند وصول school_id ضمن نطاقه نحصر هذا الطلب فقط بها (msa_school_override) — الاختيار العام لا يتغيّر.
+ * تعيد: صفّ المدرسة المختارة، أو null (اعرض المنتقي) — المصدر الواحد لـofficial_forms/official_export.
+ */
+function institutionSchoolPick(): ?array {
+    $sid = (int)($_GET['school_id'] ?? 0);
+    if ($sid <= 0) return null;
+    $scope = activeSchoolIds() ?: allActiveSchoolIdsCached();
+    if (!in_array($sid, array_map('intval', $scope), true)) return null;
+    $GLOBALS['msa_school_override'] = [$sid];
+    return currentSchool();
+}
+/** لائحة المدارس المتاحة للاختيار (المختارة من الأعلى، أو كل الفاعلة بوضع «الكل») */
+function institutionSchoolChoices(): array {
+    $ids = activeSchoolIds() ?: allActiveSchoolIdsCached();
+    $out = [];
+    foreach (allSchools() as $s) if (in_array((int)$s['id'], $ids, true)) $out[] = $s;
+    return $out;
+}
+/** صندوق اختيار المدرسة للتصريح المؤسّسي (يحمل كل معاملات الرابط الحالية + school_id) */
+function institutionSchoolChooserHtml(string $title): string {
+    $base = $_GET; unset($base['school_id']);
+    $h = '<div class="card" style="max-width:820px;margin:0 auto"><div class="card-header"><h3><i class="fas fa-school"></i> ' . e($title) . '</h3></div><div class="card-body">'
+       . '<p style="font-weight:700;margin-bottom:12px">هذا التصريح يُصدَر لمدرسة واحدة (رقم صاحب عمل واحد) — اختر المدرسة / Cette déclaration se fait pour une seule école — choisissez :</p>'
+       . '<div style="display:flex;flex-wrap:wrap;gap:10px">';
+    foreach (institutionSchoolChoices() as $s) {
+        $q = http_build_query($base + ['school_id' => (int)$s['id']]);
+        $h .= '<a class="btn btn-primary btn-lg" href="?' . e($q) . '"><i class="fas fa-file-signature"></i> ' . e($s['name_ar'] ?: $s['name_fr']) . '<br><small dir="ltr">' . e($s['name_fr']) . '</small></a>';
+    }
+    return $h . '</div></div></div>';
+}
+/** شارة فوق التصريح: «لمدرسة: X — اختر مدرسة أخرى» عندما اختيرت من المنتقي */
+function institutionSchoolBadgeHtml(array $school): string {
+    $base = $_GET; unset($base['school_id']);
+    return '<div class="no-print" style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-weight:700">'
+         . '<i class="fas fa-school"></i> التصريح لمدرسة / École : ' . e($school['name_ar'] ?: $school['name_fr'])
+         . ' &nbsp;—&nbsp; <a href="?' . e(http_build_query($base)) . '">اختر مدرسة أخرى / autre école</a></div>';
 }
 
 // المدرسة الحالية المفردة (لعمليات الإدخال/النماذج): الرقم إذا مختارة وحدة فقط، وإلا 0

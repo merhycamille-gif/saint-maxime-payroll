@@ -42,10 +42,15 @@ if (!$school && $employeeId > 0) {
 // في وضع «كل المدارس» كان $school = null فتُطبَع الترويسة فارغة وتُدمَج أرقام كل المدارس
 // في تصريح واحد بلا رقم صاحب عمل. الآن نطلب اختيار مدرسة بوضوح.
 $institutionForms = ['tax_r5','tax_r10','tax_r7','tax_emp_report','cnss_annual','cnss_contrib_monthly','cnss_contrib_annual','cnss_nominative_monthly'];
+$ofSchoolPicked = false; // 🏫 (2026-09-25) اختيرت المدرسة من منتقي الصفحة (عدة مدارس مختارة فوق)
 if (in_array($form, $institutionForms, true) && !$school) {
-    $_SESSION['flash_error'] = 'هذا التصريح يُصدَر لمدرسة واحدة — اختر المدرسة من الأعلى أولاً. / Choisissez une seule école.';
-    header('Location: ' . BASE_URL . 'pages/tax_declarations.php');
-    exit;
+    $school = institutionSchoolPick();
+    if ($school) { $ofSchoolPicked = true; }
+    else {
+        // «اخترت مدرستين وكبست تصريح الضمان الشهري عم بينطّ على صفحة التصاريح الرسمية» ⇒ لا طرد:
+        // نبقى بالصفحة ونعرض المدارس المختارة ليختار واحدة (الاختيار العام فوق لا يتغيّر).
+        $docFocus = true; $hideExportToolbar = true; $ofChooseSchool = true; // يُعرض بعد تحديد $pageTitle (أسفل)
+    }
 }
 $lang = $_SESSION['lang'] ?? 'fr';
 
@@ -304,6 +309,11 @@ if ($form !== '') $docFocus = true;
 // صفحة القائمة (بلا نموذج مختار): لا شيء يُصدَّر — شريط التصدير زائد (2026-08-19)
 if ($form === '') $hideExportToolbar = true;
 include __DIR__ . '/../includes/header.php';
+if (!empty($ofChooseSchool)) { // 🏫 (2026-09-25) عدة مدارس مختارة + تصريح مؤسّسي ⇒ منتقي المدرسة بنفس الصفحة (لا طرد)
+    echo institutionSchoolChooserHtml($pageTitle);
+    include __DIR__ . '/../includes/footer.php';
+    exit;
+}
 echo officialFormStyles();
 
 /* ===== شريط الفلترة الموحّد (الفئة + الخضوع للضريبة) — فوق كل نموذج/كشف جماعي ===== */
@@ -311,6 +321,7 @@ $ofFilterableForms = ['salary_all', 'payment_list', 'full_register', 'general_re
     'employer_cost', 'general_info', 'salary_detail', 'teaching_staff', 'eoc_staff', 'eoc_quarterly',
     'cnss_nominative_monthly', 'cnss_annual', 'cnss_contrib_monthly', 'cnss_contrib_annual',
     'tax_r5', 'tax_r10', 'tax_r7', 'tax_emp_report', 'staff_stats'];
+if ($ofSchoolPicked && $school) echo institutionSchoolBadgeHtml($school); // 🏫 لمدرسة مختارة من المنتقي
 if ($form !== '' && in_array($form, $ofFilterableForms, true)):
 ?>
 <form method="get" class="card no-print">
@@ -751,7 +762,7 @@ elseif ($form === 'tax_r6t'):
     } else { $rqyDef = (int)date('Y'); }
     if ($rqy < 2000 || $rqy > 2100) $rqy = $rqyDef;
     $rqMonthsMap = [1 => [1,2,3], 2 => [4,5,6], 3 => [7,8,9], 4 => [10,11,12]];
-    $fltQ = empTypeQueryFrom($empTypeState) . ($taxSubSel !== '' ? '&tax_sub=' . $taxSubSel : '');
+    $fltQ = empTypeQueryFrom($empTypeState) . ($taxSubSel !== '' ? '&tax_sub=' . $taxSubSel : '') . ($ofSchoolPicked ? '&school_id=' . (int)$school['id'] : '');
     $exp10 = BASE_URL . 'pages/official_export.php?form=mof_r10&rq=' . $rq . '&rqy=' . $rqy . $fltQ;
 ?>
     <div class="card no-print" style="max-width:860px;margin:0 auto">
@@ -789,7 +800,7 @@ elseif ($form === 'tax_r5'):
     // فالسنوي «يركب» على الفصول بالمليم) — شاشة خيارات ثم الطباعة/الإكسل على قالبه نفسه.
     $fy = (int)($_GET['fy'] ?? 0);
     if ($fy < 2000 || $fy > 2100) $fy = (int)date('Y') - 1;
-    $fltQ = empTypeQueryFrom($empTypeState) . ($taxSubSel !== '' ? '&tax_sub=' . $taxSubSel : '');
+    $fltQ = empTypeQueryFrom($empTypeState) . ($taxSubSel !== '' ? '&tax_sub=' . $taxSubSel : '') . ($ofSchoolPicked ? '&school_id=' . (int)$school['id'] : '');
     $exp5 = BASE_URL . 'pages/official_export.php?form=mof_r5&fy=' . $fy . $fltQ;
 ?>
     <div class="card no-print" style="max-width:860px;margin:0 auto">
@@ -2215,7 +2226,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         'n3'=>$n3, 'w3'=>formatLBP($w3,false), 'c3'=>formatLBP($c3,false),
         'total'=>formatLBP($total,false), 'fpaid'=>formatLBP($fpaid,false), 'net'=>formatLBP($net,false),
     ];
-    $ofExp = BASE_URL . 'pages/official_export.php?form=' . e($form) . '&month=' . (int)$month . '&year=' . (int)$year;
+    $ofExp = BASE_URL . 'pages/official_export.php?form=' . e($form) . '&month=' . (int)$month . '&year=' . (int)$year . ($ofSchoolPicked ? '&school_id=' . (int)$school['id'] : '');
 ?>
     <?php if (!$isQuarter): ?>
     <div class="no-print" style="background:#e9f9ee;border:2px solid #1a7f37;border-radius:10px;padding:14px;margin-bottom:14px;text-align:center">

@@ -8028,6 +8028,40 @@ if ($r170) {
 } else { $why170[] = 'no titulaire with stored family allowance (db part skipped)'; }
 check('🏥👨‍👩‍👧 تصاريح الضمان (2026-09-25): «التعويضات العائلية المدفوعة» = موظفو قانون العمل فقط (الشهري/الفصلي شاشة + إكسل + الكشف الاسمي) — تعويض أستاذ الملاك يبقى بكل التقارير الأخرى — مصدر واحد + تجربة بالقاعدة', $ok170, implode(' · ', $why170) ?: 'ok');
 
+/* =====================================================================
+ * 171) 🏫 التصاريح المؤسّسية مع عدة مدارس مختارة (2026-09-25 «اخترت مدرستين ورحت على التقارير وكبست تصريح الضمان
+ *      الشهري عم بينطّ على صفحة التصاريح الرسمية»): لا طرد — منتقي المدرسة بنفس الصفحة (زرّ لكل مدرسة مختارة، &school_id=)،
+ *      وباختيارها يُحصَر هذا الطلب بها (msa_school_override) والاختيار العام لا يتغيّر؛ روابط الإكسل الرسمي تحمل school_id.
+ * =================================================================== */
+$ok171 = true; $why171 = [];
+$c171 = function (string $what, bool $ok) use (&$ok171, &$why171) { if (!$ok) { $ok171 = false; $why171[] = $what; } };
+$fn171 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$c171('src-fn', strpos($fn171, "if (!empty(\$GLOBALS['msa_school_override'])) return") !== false && strpos($fn171, 'function institutionSchoolPick(): ?array') !== false
+    && strpos($fn171, 'function institutionSchoolChooserHtml(') !== false);
+$of171 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+$c171('src-forms', strpos($of171, '$school = institutionSchoolPick();') !== false && strpos($of171, 'echo institutionSchoolChooserHtml($pageTitle);') !== false
+    && strpos($of171, "header('Location: ' . BASE_URL . 'pages/tax_declarations.php');") === false
+    && substr_count($of171, "(\$ofSchoolPicked ? '&school_id=' . (int)\$school['id'] : '')") >= 3);
+$c171('src-export', strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), 'if (!$school) $school = institutionSchoolPick();') !== false);
+// تجربة فعلية: مدرستان مختارتان (3 و5) — بلا school_id = منتقٍ بزرّين؛ school_id=5 = التصريح لمدرسة 5 مع الشارة؛ school_id خارج المختار = المنتقي
+$sc171 = array_slice(array_map('intval', array_column(allSchools(), 'id')), 0, 2);
+if (count($sc171) === 2) {
+    $hA = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2026], [], $sc171);
+    $c171('chooser-two', $noFatal($hA) && strpos($hA, 'اختر المدرسة / Cette') !== false && substr_count($hA, 'school_id=') === 2 && strpos($hA, 'ppExportArea') === false);
+    $hB = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2026, 'school_id' => $sc171[1]], [], $sc171);
+    $sB = $db->query("SELECT name_ar FROM schools WHERE id = " . $sc171[1])->fetchColumn();
+    $c171('picked', $noFatal($hB) && strpos($hB, 'التصريح لمدرسة') !== false && strpos($hB, e($sB)) !== false && strpos($hB, 'official_export.php?form=cnss_contrib_monthly&month=10&year=2026&school_id=' . $sc171[1]) !== false
+        && strpos($hB, 'اختر المدرسة / Cette') === false);
+    $other = 0; foreach (allSchools() as $s171) if (!in_array((int)$s171['id'], $sc171, true)) { $other = (int)$s171['id']; break; }
+    if ($other) {
+        $hC = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2026, 'school_id' => $other], [], $sc171);
+        $c171('out-of-scope', $noFatal($hC) && strpos($hC, 'اختر المدرسة / Cette') !== false);
+    }
+    $hD = renderPage('pages/official_forms.php', ['form' => 'tax_r10', 'school_id' => $sc171[0]], [], $sc171);
+    $c171('r10-picked', $noFatal($hD) && strpos($hD, 'التصريح لمدرسة') !== false && strpos($hD, 'school_id=' . $sc171[0]) !== false); // الرابط بـe() ⇒ &amp;
+} else { $why171[] = 'less than 2 schools (live part skipped)'; }
+check('🏫 التصاريح المؤسّسية مع عدة مدارس (2026-09-25): لا طرد — منتقي المدرسة بنفس الصفحة + الحصر لطلب واحد (school_id) + روابط الإكسل الرسمي — تجربة فعلية', $ok171, implode(' · ', $why171) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
