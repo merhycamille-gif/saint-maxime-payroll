@@ -1854,6 +1854,40 @@ function healDerivedExchangeRates(bool $force = false): int {
     } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
     return $n;
 }
+/**
+ * ⚖️🩹 (2026-09-26 «الموظف الخاضع لقانون العمل وصار عمره 64 وبعده يشتغل ما بيخضع لتعويض نهاية الخدمة»):
+ * أشهر مخزّنة لموظف (employe) بلغ 64 بنهاية الشهر ولا تزال تحمل حصّة نهاية الخدمة ٨.٥٪ ⇒ إعادة حساب سنته
+ * بالمسار الآمن recalcEmployeeYear (المدفوع بسنة سابقة محميّ ويبقى ظاهراً بالفحص الشامل month_stale). كل 3 ساعات.
+ */
+/** ⚖️ المصدر الواحد: موظف قانون العمل (employe) بلغ 64 بنهاية الشهر ⇒ معفى من فرع نهاية الخدمة ٨.٥٪ تلقائياً (بلا مفتاح) */
+function employeExemptEos64(array $emp, int $month, int $year): bool {
+    if (($emp['employee_type'] ?? '') !== 'employe') return false;
+    $age = ageOnDate($emp['birth_date'] ?? '', date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $year, $month))));
+    return $age !== null && $age >= 64;
+}
+function healEmploye64EndOfService(bool $force = false): int {
+    if (!$force && !healGateOpen('heal_employe64_eos')) return 0;
+    $n = 0;
+    try {
+        $db = getDB();
+        $rows = $db->query("SELECT DISTINCT ms.employee_id, ms.school_year FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+            WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND e.birth_date IS NOT NULL AND e.birth_date > '1900-01-01'
+              AND ms.school_end_of_service_8_5_lbp > 0
+              AND TIMESTAMPDIFF(YEAR, e.birth_date, LAST_DAY(CONCAT(ms.year, '-', LPAD(ms.month, 2, '0'), '-01'))) >= 64
+              AND NOT (ms.is_paid = 1 AND ms.school_year < " . $db->quote(currentSchoolYear()) . ")")->fetchAll(PDO::FETCH_ASSOC); // 🔒 المدفوع بسنة سابقة محميّ (يبقى للفحص الشامل)
+        foreach ($rows as $r) { if (recalcEmployeeYear((int)$r['employee_id'], (string)$r['school_year']) > 0) $n++; }
+        // المنقول بلا محرّك (أساسه صفر بالملف): recalc لا يمسّ حصصه ⇒ تصفير مباشر لعمود ٨.٥٪ وحده (لا يدخل بصافي الموظف ولا مستحقّه)
+        $up = $db->prepare("UPDATE monthly_salaries ms JOIN employees e ON e.id = ms.employee_id SET ms.school_end_of_service_8_5_lbp = 0
+            WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND e.birth_date IS NOT NULL AND e.birth_date > '1900-01-01'
+              AND ms.school_end_of_service_8_5_lbp > 0
+              AND TIMESTAMPDIFF(YEAR, e.birth_date, LAST_DAY(CONCAT(ms.year, '-', LPAD(ms.month, 2, '0'), '-01'))) >= 64
+              AND NOT (ms.is_paid = 1 AND ms.school_year < ?)");
+        $up->execute([currentSchoolYear()]); $z = $up->rowCount();
+        if ($n || $z) logAudit('heal_employe64_eos', 'monthly_salaries', 0, null, ['employee_years' => $n, 'rows_zeroed' => $z]);
+        $n += $z;
+    } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
+    return $n;
+}
 function healNetMathRows(): int {
     if (!healGateOpen('heal_net_math')) return 0;
     $n = 0;
@@ -3799,7 +3833,7 @@ function cnssTaswiyaData($db, int $fy, array $schoolIds): array {
     $tot = ['count' => count($persons), 'workers' => 0, 'N' => 0, 'O' => 0, 'P' => 0, 'Q' => 0, 'R' => 0,
             'aFin' => 0, 'aFam' => 0, 'aMal' => 0];
     foreach ($persons as $p) {
-        $tot['workers'] += $p['worker'];
+        $tot['workers'] += ($p['worker'] && $p['O'] > 0) ? 1 : 0; // ⚖️ (2026-09-26) يُعدّ خاضعاً لنهاية الخدمة من له أجور تحت الفرع فقط — موظف بلغ 64 وأُعفي كامل السنة لا يُعدّ
         foreach (['N', 'O', 'P', 'Q', 'R'] as $k) $tot[$k] += $p[$k];
     }
     foreach ($monthly as $mm) { $tot['aFin'] += $mm['fin']; $tot['aFam'] += $mm['fam']; $tot['aMal'] += $mm['mal']; }

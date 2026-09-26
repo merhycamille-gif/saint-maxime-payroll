@@ -2088,7 +2088,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
             <div style="text-align:left">
                 <div style="font-weight:700"><?= e($tsName ?: (count($tsSelSchools) . ' مدارس مختارة')) ?></div>
                 <div>رقم المؤسسة: <span dir="ltr"><?= e($tsSelSchools[0]['nssf_employer_number'] ?? '') ?></span> — عن سنة <?= $tsFy ?></div>
-                <div>عدد الأجراء: <?= (int)$T['count'] ?> (منهم <?= (int)$T['workers'] ?> عامل/إداري)</div>
+                <div>عدد الأجراء: <?= (int)$T['count'] ?> (منهم <?= (int)$T['workers'] ?> خاضع لنهاية الخدمة — الموظف بعد 64 لا يُعدّ)</div>
             </div>
         </div>
         <div class="doc-title" style="margin:6px 0">الجدول الملحق — الرواتب والأجور (<?= (int)$T['count'] ?> أجيراً، بكتل 19 سطراً طبق الأصل)</div><?= rateSubtitle(null, null, true, null, false) ?>
@@ -2115,7 +2115,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
             <?php if (!$tsData['persons']): ?><tr><td colspan="13" class="text-center">لا أجراء خاضعين للضمان بهذه السنة للمدارس المختارة</td></tr><?php endif; ?>
             </tbody>
             <?php if ($tsData['persons']): ?><tfoot><tr class="total-row">
-                <td colspan="3">المجموع — العدد: <?= (int)$T['count'] ?></td><td><?= (int)$T['workers'] ?> عامل</td><td></td><td></td><td></td><td></td>
+                <td colspan="3">المجموع — العدد: <?= (int)$T['count'] ?></td><td><?= (int)$T['workers'] ?> خاضع لنهاية الخدمة</td><td></td><td></td><td></td><td></td>
                 <td class="num"><?= formatLBP($T['N'], false) ?></td>
                 <td class="num"><?= formatLBP($T['O'], false) ?></td>
                 <td class="num"><?= formatLBP($T['P'], false) ?></td>

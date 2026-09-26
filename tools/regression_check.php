@@ -8116,6 +8116,50 @@ $c172('live-filter', strpos($fa172, 'window.faApplyLiveFilter = function ()') !=
     && preg_match('/data-cat="employe" data-school="\d+" data-cur="\d+" style="display:none">/', $hA) === 1 && strpos($fa172, 'e.employee_type IN (') === false && strpos($fa172, 'id="faCatHidden"') !== false); // ☑️⚡ كل الفئات محمَّلة، غير المشيّكة مخفيّة، التبديل محلّي بلا إرسال
 check('🏫 الصفحات الجماعية بعدة مدارس (2026-09-26): التعويض العائلي + المكافآت/النقل = مدرسة واحدة أو مجموعة معاً أو الكل بخانات تشييك (pageSchoolScope) — المجموعة = مجموع المدارس + عمود المدرسة + بلا طرد', $ok172, implode(' · ', $why172) ?: 'ok');
 
+/* =====================================================================
+ * 173) ⚖️ موظف قانون العمل بعد 64 لا يخضع لتعويض نهاية الخدمة (2026-09-26 «صار عمره 64 وبعده يشتغل ما بيخضع…
+ *      وبتصريح الضمان أو مطرح ما في عدد الموظفين الخاضعين لنهاية الخدمة اللي مش خاضع ما لازم تعدّه»):
+ *      المحرّك تلقائي (بلا مفتاح) للموظف فقط · الملاك يبقى بقرار الإبقاء · الشفاء يعيد حساب المخزّن · العدّ بالتسوية = من له أجور تحت الفرع
+ * =================================================================== */
+$ok173 = true; $why173 = [];
+$c173 = function (string $n, bool $ok) use (&$ok173, &$why173) { if (!$ok) { $ok173 = false; $why173[] = $n; } };
+$pc173 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$c173('engine-code', strpos($pc173, "if (\$emp['employee_type'] === 'employe') \$past64Employe = true;") !== false
+    && strpos($pc173, "elseif (\$emp['employee_type'] === 'enseignant_titulaire' && !empty(\$emp['keep_working_past_64'])) \$past64Titulaire = true;") !== false
+    && strpos($pc173, "if (!empty(\$emp['keep_working_past_64'])) {\n            \$endOfMonth") === false && strpos($pc173, "if (!empty(\$emp['keep_working_past_64'])) {\r\n            \$endOfMonth") === false);
+$c173('heal+count-code', function_exists('healEmploye64EndOfService') && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healEmploye64EndOfService();') !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), "\$ag['D'] += ((\$p['worker'] && \$p['O'] > 0) ? 1 : 0);") !== false
+    && strpos($fnAll173 = (string)file_get_contents($PROJ . '/includes/functions.php'), "\$tot['workers'] += (\$p['worker'] && \$p['O'] > 0) ? 1 : 0;") !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/official_forms.php'), 'خاضع لنهاية الخدمة — الموظف بعد 64 لا يُعدّ') !== false);
+// المحرّك: موظف بلغ 64 بنهاية الشهر ⇒ ٨.٥٪ = 0 بلا مفتاح؛ وشهر قبل بلوغه (إن وُجد بالقاعدة) ⇒ > 0
+$e173 = $db->query("SELECT e.id, e.birth_date FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+    WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND e.cnss_subject = 1 AND COALESCE(e.keep_working_past_64, 0) = 0
+      AND e.birth_date > '1900-01-01' AND ms.base_plus_echelon_lbp > 0
+      AND TIMESTAMPDIFF(YEAR, e.birth_date, LAST_DAY(CONCAT(ms.year, '-', LPAD(ms.month, 2, '0'), '-01'))) >= 64
+    ORDER BY ms.year DESC, ms.month DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($e173) {
+    [$by173, $bm173] = array_map('intval', explode('-', substr($e173['birth_date'], 0, 7)));
+    $after = (new PayrollCalculator((int)$e173['id'], $bm173, $by173 + 64))->calculate();   // شهر بلوغه 64
+    $before = (new PayrollCalculator((int)$e173['id'], $bm173, $by173 + 63))->calculate();  // قبله بسنة
+    $c173('engine-64=0', (int)$after['school_end_of_service_8_5_lbp'] === 0 && (int)$after['school_family_comp_6_lbp'] > 0);
+    $c173('engine-63>0', (int)$before['school_end_of_service_8_5_lbp'] > 0);
+    // بعد الشفاء: لا شهر مخزّن (غير محميّ) لموظف بلغ 64 يحمل ٨.٥٪
+    healEmploye64EndOfService(true);
+    $left173 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND e.birth_date > '1900-01-01' AND ms.school_end_of_service_8_5_lbp > 0
+          AND TIMESTAMPDIFF(YEAR, e.birth_date, LAST_DAY(CONCAT(ms.year, '-', LPAD(ms.month, 2, '0'), '-01'))) >= 64
+          AND NOT (ms.is_paid = 1 AND ms.school_year < " . $db->quote(currentSchoolYear()) . ")")->fetchColumn();
+    $c173('heal-cleared', $left173 === 0);
+} else $c173('no-employe-64-data', false);
+// الملاك بلا قرار إبقاء: صندوق التعويضات يبقى (لا يتأثّر بالقاعدة الجديدة)
+$t173 = $db->query("SELECT e.id, e.birth_date FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+    WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.eoc_subject = 1 AND COALESCE(e.keep_working_past_64, 0) = 0
+      AND e.birth_date > '1900-01-01' AND ms.base_plus_echelon_lbp > 0 AND ms.caisse_amount_lbp > 0
+      AND TIMESTAMPDIFF(YEAR, e.birth_date, LAST_DAY(CONCAT(ms.year, '-', LPAD(ms.month, 2, '0'), '-01'))) >= 64
+    ORDER BY ms.year DESC, ms.month DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($t173) { [$ty173, $tm173] = array_map('intval', explode('-', substr($t173['birth_date'], 0, 7))); $tr = (new PayrollCalculator((int)$t173['id'], $tm173, $ty173 + 64))->calculate(); $c173('titulaire-unchanged', (int)$tr['caisse_amount_lbp'] > 0); }
+check('⚖️ موظف قانون العمل بعد 64 لا يخضع لنهاية الخدمة (2026-09-26): المحرّك تلقائي بلا مفتاح (٨.٥٪ = 0 من شهر بلوغه، والعائلي ٦٪ يبقى) + الملاك بقرار الإبقاء كما كان + الشفاء يصفّر المخزّن غير المحميّ + العدّ بالتسوية = الخاضعون فعلاً', $ok173, implode(' · ', $why173) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

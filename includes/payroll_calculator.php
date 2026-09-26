@@ -408,15 +408,14 @@ class PayrollCalculator {
         //   • الموظف (employe): تُوقَف حصّة نهاية الخدمة ٨.٥٪ (المدرسة).
         //   • الأستاذ الملاك: يُوقَف صندوق التعويضات ٦٪ عنه وعن المدرسة (+ حسم الدرجة/نصف الراتب).
         // الإعفاء مشروط ببلوغ 64 في ذلك الشهر تحديداً، فالأشهر السابقة (قبل 64) تبقى محسوماتها كاملة.
+        // ⚖️ (2026-09-26 «الموظف الخاضع لقانون العمل وصار عمره 64 وبعده يشتغل ما بيخضع لتعويض نهاية الخدمة»):
+        //    للموظف (employe) الإعفاء من ٨.٥٪ **تلقائي بالقانون** من شهر بلوغه 64 بلا أي قرار/مفتاح — فلا يُعدّ ولا يُصرَّح عنه
+        //    بفرع نهاية الخدمة بالضمان (الشهري/الفصلي/التسوية/الاسمي تقرأ الاشتراك المخزّن = 0). الأستاذ الملاك يبقى بقرار الإبقاء (keep_working_past_64).
         $past64Titulaire = false; $past64Employe = false;
-        if (!empty($emp['keep_working_past_64'])) {
-            $endOfMonth = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $this->year, $this->month)));
-            $ageEnd = ageOnDate($emp['birth_date'] ?? '', $endOfMonth);
-            if ($ageEnd !== null && $ageEnd >= 64) {
-                if ($emp['employee_type'] === 'enseignant_titulaire') $past64Titulaire = true;
-                elseif ($emp['employee_type'] === 'employe') $past64Employe = true;
-            }
-        }
+        $endOfMonth = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $this->year, $this->month)));
+        $ageEnd = ageOnDate($emp['birth_date'] ?? '', $endOfMonth);
+        $past64Employe = employeExemptEos64($emp, (int)$this->month, (int)$this->year); // المصدر الواحد
+        if ($ageEnd !== null && $ageEnd >= 64 && $emp['employee_type'] === 'enseignant_titulaire' && !empty($emp['keep_working_past_64'])) $past64Titulaire = true;
 
         // === 5. Calculate deductions ===
         // تطبيق الحد الأدنى/الأقصى للأجر الخاضع لكل فرع (جدول cnss_brackets، حسب تاريخ الشهر).
@@ -978,7 +977,7 @@ function backfillEmployerCharges($db, $fromDate = null, $toDate = null) {
     @ignore_user_abort(true);
     $fromKey = $fromDate ? ((int)date('Y', strtotime($fromDate)) * 12 + ((int)date('n', strtotime($fromDate)) - 1)) : 0;
     $toKey   = $toDate   ? ((int)date('Y', strtotime($toDate))   * 12 + ((int)date('n', strtotime($toDate))   - 1)) : PHP_INT_MAX;
-    $rows = $db->query("SELECT ms.id, ms.month, ms.year, ms.cnss_amount_lbp, e.employee_type
+    $rows = $db->query("SELECT ms.id, ms.month, ms.year, ms.cnss_amount_lbp, e.employee_type, e.birth_date
         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0 AND ms.cnss_amount_lbp > 0")->fetchAll(PDO::FETCH_ASSOC);
     $upd = $db->prepare("UPDATE monthly_salaries SET
@@ -997,7 +996,7 @@ function backfillEmployerCharges($db, $fromDate = null, $toDate = null) {
         $isEmploye = ($r['employee_type'] === 'employe');
         $c8  = clampCnssBase($subjBase, 'maladie_maternite', $m, $y) * (getRateAsOf('cnss_employer_rate', $m, $y, 8) / 100);
         $fam = $isEmploye ? clampCnssBase($subjBase, 'allocations_familiales', $m, $y) * (getRateAsOf('family_compensation_rate', $m, $y, 6) / 100) : 0;
-        $eos = $isEmploye ? clampCnssBase($subjBase, 'fin_de_service', $m, $y) * (getRateAsOf('end_of_service_rate', $m, $y, 8.5) / 100) : 0;
+        $eos = ($isEmploye && !employeExemptEos64($r, $m, $y)) ? clampCnssBase($subjBase, 'fin_de_service', $m, $y) * (getRateAsOf('end_of_service_rate', $m, $y, 8.5) / 100) : 0; // ⚖️ بعد 64 معفى (2026-09-26)
         $upd->execute([':c8' => floor($c8), ':fam' => floor($fam), ':eos' => floor($eos), ':id' => $r['id']]);
         $n++;
     }
