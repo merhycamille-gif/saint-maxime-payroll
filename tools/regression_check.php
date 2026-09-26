@@ -7807,8 +7807,9 @@ $hdr167 = (string)file_get_contents($PROJ . '/includes/header.php');
 $c167('nav+dashboard', strpos($hdr167, 'pages/family_allowances.php') !== false && strpos($hdr167, "'family_allowances'=>'personnel'") !== false
     && strpos($hdr167, "'family_allowances.php'") !== false && strpos((string)file_get_contents($PROJ . '/index.php'), 'pages/family_allowances.php') !== false);
 $sy167 = currentSchoolYear();
+$vis167 = fn(string $h, string $cls = '(?:na)?', string $cat = '[a-z]+') => preg_match_all('/<tr class="' . $cls . '" data-id="\d+" data-cat="' . $cat . '" data-school="\d+" data-cur="\d+">/', $h); // ⚡ الصفوف الظاهرة (غير المشيّكة تصل بـstyle=display:none)
 $h0 = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167], []);
-$c167('first-open-nobody', $noFatal($h0) && substr_count($h0, ' data-id=') === 0 && strpos($h0, 'ما في ولا فئة مشيّكة') !== false && strpos($h0, 'value="titulaire" ') !== false && strpos($h0, 'value="titulaire" checked') === false); // ☐ «اتفقنا نغيّر تشك مارك»: أوّل فتحة بلا تشك مارك ولا أحد
+$c167('first-open-nobody', $noFatal($h0) && $vis167($h0) === 0 && strpos($h0, 'ما في ولا فئة مشيّكة') !== false && strpos($h0, 'value="titulaire" ') !== false && strpos($h0, 'value="titulaire" checked') === false); // ☐ «اتفقنا نغيّر تشك مارك»: أوّل فتحة بلا تشك مارك ولا أحد
 $h = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat' => ['titulaire', 'contractuel', 'employe']], []);
 $nElig = substr_count($h, '<tr class="" data-id='); $nNa = substr_count($h, '<tr class="na" data-id=');
 $c167('render-all', $noFatal($h) && strpos($h, 'id="faForm"') !== false && strpos($h, 'name="fa[') !== false && $nElig > 0 && strpos($h, 'type="month"') !== false && stripos($h, 'Warning:') === false);
@@ -7819,13 +7820,13 @@ $c167('contractuel-locked', $nNa === 0 || (substr_count($h, 'متعاقد: لا 
 $h2 = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat' => ['titulaire'], 'show' => 'with'], []);
 $stW = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND (COALESCE(e.family_allowance_spouse_lbp,0) > 0 OR COALESCE(e.family_allowance_children_lbp,0) > 0)" . $yf167);
 $stW->execute($yp167);
-$c167('render-filter-titulaire-with', $noFatal($h2) && substr_count($h2, '<tr class="na" data-id=') === 0 && strpos($h2, 'fa-badge fa-e') === false && strpos($h2, 'fa-badge fa-c') === false
-    && substr_count($h2, '<tr class="" data-id=') === (int)$stW->fetchColumn());
+$c167('render-filter-titulaire-with', $noFatal($h2) && $vis167($h2, 'na') === 0 && $vis167($h2, '', 'employe') === 0 && $vis167($h2, '', 'contractuel') === 0
+    && $vis167($h2, '', 'titulaire') === (int)$stW->fetchColumn());
 // ☑️ «الفئة المشيّكة بس هي تبيّن، وبلا ولا تشك مارك ما يبيّن حدا» (2026-09-24 مساءً): cat_set بلا cat = صفر صفوف + رسالة؛ الموظفون وحدهم = لا ملاك ولا متعاقد
 $h2b = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat_set' => 1], []);
-$c167('no-category-no-rows', $noFatal($h2b) && substr_count($h2b, ' data-id=') === 0 && strpos($h2b, 'ما في ولا فئة مشيّكة') !== false && strpos($h2b, 'name="cat_set"') !== false);
+$c167('no-category-no-rows', $noFatal($h2b) && $vis167($h2b) === 0 && strpos($h2b, 'ما في ولا فئة مشيّكة') !== false && strpos($h2b, 'name="cat_set"') !== false);
 $h2c = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat_set' => 1, 'cat' => ['employe']], []);
-$c167('employe-only', $noFatal($h2c) && strpos($h2c, 'fa-badge fa-t') === false && strpos($h2c, 'fa-badge fa-c') === false && strpos($h2c, 'fa-badge fa-e') !== false);
+$c167('employe-only', $noFatal($h2c) && $vis167($h2c, '(?:na)?', 'titulaire') === 0 && $vis167($h2c, '(?:na)?', 'contractuel') === 0 && $vis167($h2c, '(?:na)?', 'employe') > 0 && strpos($h2c, 'data-cat="titulaire" data-school="') !== false); // الملاك موجودون مخفيّين
 $sch167 = (int)$db->query("SELECT school_id FROM employees WHERE is_deleted = 0 AND employee_type = 'enseignant_titulaire' LIMIT 1")->fetchColumn();
 $h3 = renderPage('pages/family_allowances.php', ['sch' => $sch167, 'sy' => $sy167, 'q' => 'ا', 'cat' => ['titulaire', 'contractuel', 'employe']], []);
 $c167('render-school-search', $noFatal($h3) && strpos($h3, 'École / المدرسة</th>') === false && strpos($h3, 'id="faForm"') !== false);
@@ -8106,12 +8107,13 @@ $c172('debounced-submit', strpos($js172, 'window.msaSubmitSoon = function (form,
     && strpos($fa172, 'onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"') !== false && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "\$sub = '(window.msaSubmitSoon||function(f){f.submit()})(this.form)';") !== false
     && strpos($fa172, "getElementById('faFilter').submit()") === false); // ☑️⏳ «مشيّك على الموظفين ولسا مبيّن الملاك»: الكبسات المتتالية تُجمَع بإرسال واحد
 $c172('sync-forms', strpos($js172, 'window.msaSyncForms = function ()') !== false && strpos($js172, "addEventListener('pageshow', function () { setTimeout(window.msaSyncForms, 50); })") !== false
-    && strpos($fa172, 'data-msa-sync-name="cat[]" data-msa-sync-values="<?= e(implode(\',\', $categories)) ?>"') !== false && strpos($fa172, 'id="faFilter" autocomplete="off"') !== false
+    && strpos($fa172, 'data-msa-sync-name="cat[]"') === false && strpos($fa172, 'id="faFilter" autocomplete="off"') !== false // ⚡ الفئة محلّية بلا مزامنة سيرفر
     && strpos($hAB, 'data-msa-sync-name="sch[]" data-msa-sync-values="' . $sa172 . ',' . $sb172 . '"') !== false && strpos($hAll, 'data-msa-sync-name="sch_all" data-msa-sync-values="1"') !== false
-    && strpos($hA, 'data-msa-sync-name="cat[]" data-msa-sync-values="titulaire"') !== false && strpos($hA, '<input type="checkbox" autocomplete="off" name="cat[]"') !== false
+    && strpos($hA, 'onchange="window.faApplyLiveFilter&&faApplyLiveFilter()"') !== false && strpos($hA, '<input type="checkbox" autocomplete="off" name="cat[]"') !== false
     && strpos(empTypeCheckboxes(empTypeSelection(['type' => ['employe'], 'type_set' => 1], 'type'), true, 'type'), 'data-msa-sync-name="type[]" data-msa-sync-values="employe"') !== false); // 🔁 الخانات المعروضة = الصفحة المحسوبة وإلا إعادة تحميل
 $c172('live-filter', strpos($fa172, 'window.faApplyLiveFilter = function ()') !== false && strpos($fa172, "addEventListener('pageshow', window.faApplyLiveFilter)") !== false
-    && preg_match('/<tr class="" data-id="\d+" data-cat="titulaire" data-school="' . $sa172 . '">/', $hA) === 1 && strpos($hA, 'id="faShown"') !== false); // ☑️⚡ الجدول يتبع التشك مارك فوراً بالمتصفّح
+    && preg_match('/<tr class="" data-id="\d+" data-cat="titulaire" data-school="' . $sa172 . '" data-cur="\d+">/', $hA) === 1 && strpos($hA, 'id="faShown"') !== false
+    && preg_match('/data-cat="employe" data-school="\d+" data-cur="\d+" style="display:none">/', $hA) === 1 && strpos($fa172, 'e.employee_type IN (') === false && strpos($fa172, 'id="faCatHidden"') !== false); // ☑️⚡ كل الفئات محمَّلة، غير المشيّكة مخفيّة، التبديل محلّي بلا إرسال
 check('🏫 الصفحات الجماعية بعدة مدارس (2026-09-26): التعويض العائلي + المكافآت/النقل = مدرسة واحدة أو مجموعة معاً أو الكل بخانات تشييك (pageSchoolScope) — المجموعة = مجموع المدارس + عمود المدرسة + بلا طرد', $ok172, implode(' · ', $why172) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */

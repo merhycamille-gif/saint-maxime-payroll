@@ -37,8 +37,9 @@ $show = in_array($_GET['show'] ?? $_POST['show'] ?? 'all', ['all', 'with', 'with
 // قيد النطاق بصيغة SQL (alias e) — المصدر الواحد للعرض والحفظ معاً
 $scopeSql = ''; $scopeParams = [];
 $scopeSql .= pageSchoolScopeSql($schScope, 'e.school_id'); // مدرسة أو مجموعة أو كل الفاعلة
-if (!$categories) $scopeSql .= " AND 1=0"; // لا فئة مشيّكة = لا أحد
-elseif (count($categories) < 3) $scopeSql .= " AND e.employee_type IN (" . implode(',', array_map(fn($c) => "'" . $validCats[$c] . "'", $categories)) . ")";
+// ☑️⚡ (2026-09-26 «بس حدّد الفئة هي اللي لازم تبيّن مش العكس» — ثالث مرّة): الفئة **لا تُرسَل للسيرفر**: كل فئات النطاق تُحمَّل مرّة واحدة
+//    وكل صفّ يحمل data-cat، والتشك مارك يخفي/يبيّن الصفوف فوراً بالمتصفّح (faApplyLiveFilter) بلا أي إعادة تحميل ولا انتظار —
+//    الصفوف غير المشيّكة تصل مخفيّة (style=display:none) فتبقى الصفحة صحيحة حتى بلا جافاسكريبت. المجاميع تُحسب من الصفوف الظاهرة.
 [$yf, $yp] = yearEmploymentFilter($schoolYear, 'e.'); // موظفو السنة (راتب أو دخول ضمنها؛ التارك من الكل قبلها لا يظهر)
 $scopeSql .= $yf; $scopeParams = array_merge($scopeParams, $yp);
 
@@ -159,9 +160,8 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 <label class="form-label">Catégorie / الفئة</label>
                 <input type="hidden" name="cat_set" value="1">
                 <div style="padding:6px 0">
-                <span hidden data-msa-sync-name="cat[]" data-msa-sync-values="<?= e(implode(',', $categories)) ?>"></span><?php /* 🔁 القيم التي حُسب عليها الجدول (msaSyncForms) */ ?>
                 <?php foreach ($catLbl as $k => $l): ?>
-                    <label><input type="checkbox" autocomplete="off" name="cat[]" value="<?= $k ?>" <?= in_array($k, $categories, true) ? 'checked' : '' ?> onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> <?= $l ?></label>
+                    <label><input type="checkbox" autocomplete="off" name="cat[]" value="<?= $k ?>" <?= in_array($k, $categories, true) ? 'checked' : '' ?> onchange="window.faApplyLiveFilter&&faApplyLiveFilter()"> <?= $l ?></label>
                 <?php endforeach; ?>
                 </div>
             </div>
@@ -183,10 +183,10 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
 <?php if ($hasScope): ?>
         <div class="fa-kpis">
             <div class="fa-kpi"><span><div class="v" id="faShown"><?= count($rows) ?></div><div class="l">موظف ظاهر / Employés</div></span></div>
-            <div class="fa-kpi"><span><div class="v"><?= $nWith ?></div><div class="l">عندهم تعويض ساري (<?= monthName($refM, 'ar') . ' ' . $refY ?>)</div></span></div>
-            <div class="fa-kpi"><span><div class="v"><?= number_format($totCur) ?></div><div class="l">مجموع الساري <?= monthName($refM, 'ar') . ' ' . $refY ?> (ل.ل)</div></span></div>
-            <div class="fa-kpi"><span><div class="v"><?= number_format($totSp) ?></div><div class="l">مجموع تعويض الزوجة بالملفات (ل.ل)</div></span></div>
-            <div class="fa-kpi"><span><div class="v"><?= number_format($totCh) ?></div><div class="l">مجموع تعويض الأولاد بالملفات (ل.ل)</div></span></div>
+            <div class="fa-kpi"><span><div class="v" id="faNWith"><?= $nWith ?></div><div class="l">عندهم تعويض ساري (<?= monthName($refM, 'ar') . ' ' . $refY ?>)</div></span></div>
+            <div class="fa-kpi"><span><div class="v" id="faTotCurK"><?= number_format($totCur) ?></div><div class="l">مجموع الساري <?= monthName($refM, 'ar') . ' ' . $refY ?> (ل.ل)</div></span></div>
+            <div class="fa-kpi"><span><div class="v" id="faTotSpK"><?= number_format($totSp) ?></div><div class="l">مجموع تعويض الزوجة بالملفات (ل.ل)</div></span></div>
+            <div class="fa-kpi"><span><div class="v" id="faTotChK"><?= number_format($totCh) ?></div><div class="l">مجموع تعويض الأولاد بالملفات (ل.ل)</div></span></div>
         </div>
 
         <form method="POST" id="faForm">
@@ -194,7 +194,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
             <input type="hidden" name="action" value="apply">
             <?= $schScope['hidden'] ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
             <input type="hidden" name="show" value="<?= e($show) ?>"><input type="hidden" name="q" value="<?= e($q) ?>"><input type="hidden" name="cat_set" value="1">
-            <?php foreach ($categories as $c): ?><input type="hidden" name="cat[]" value="<?= e($c) ?>"><?php endforeach; ?>
+            <span id="faCatHidden"><?php foreach ($categories as $c): ?><input type="hidden" name="cat[]" value="<?= e($c) ?>"><?php endforeach; ?></span>
             <div class="fa-wrap">
             <table class="fa-table">
                 <thead>
@@ -216,9 +216,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                     </tr>
                 </thead>
                 <tbody>
-                <?php if (!$rows): ?>
-                    <tr><td colspan="14" style="padding:24px;color:#64748b"><?= !$categories ? '☐ ما في ولا فئة مشيّكة — أشّر الملاك أو المتعاقدين أو الموظفين فوق / Cochez une catégorie' : 'لا موظفين ضمن هذا النطاق / Aucun employé' ?></td></tr>
-                <?php endif; ?>
+                <tr id="faNoRows"<?= ($rows && $categories) ? ' style="display:none"' : '' ?>><td colspan="14" style="padding:24px;color:#64748b"><?= !$categories ? '☐ ما في ولا فئة مشيّكة — أشّر الملاك أو المتعاقدين أو الموظفين فوق / Cochez une catégorie' : 'لا موظفين ضمن هذا النطاق / Aucun employé' ?></td></tr>
                 <?php $i = 0; foreach ($rows as $r): $i++; $id = (int)$r['id']; $elig = familyAllowanceEligible($r);
                     $name = trim(($r['first_name_ar'] ?: $r['first_name_fr']) . ' ' . ($r['last_name_ar'] ?: $r['last_name_fr']));
                     $nameFr = trim(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? ''));
@@ -231,7 +229,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                         if (isset($r['count_children_allowance']) && (int)$r['count_children_allowance'] !== 1) $notes[] = 'احتساب الأولاد مطفأ بملفه';
                     }
                     $dis = $elig ? '' : ' disabled'; $ro = $elig ? ' readonly' : ''; // ✏️ الصفّ مقفول للقراءة حتى يُكبس «تعديل» (2026-09-24 «لازم يكون قدام الموظف في إديت») ?>
-                    <tr class="<?= $elig ? '' : 'na' ?>" data-id="<?= $id ?>" data-cat="<?= e(array_search($r['employee_type'], $validCats, true) ?: '') ?>" data-school="<?= (int)$r['school_id'] ?>">
+                    <?php $cat = array_search($r['employee_type'], $validCats, true) ?: ''; ?><tr class="<?= $elig ? '' : 'na' ?>" data-id="<?= $id ?>" data-cat="<?= e($cat) ?>" data-school="<?= (int)$r['school_id'] ?>" data-cur="<?= (int)$cur ?>"<?= in_array($cat, $categories, true) ? '' : ' style="display:none"' ?>>
                         <td><?= $i ?></td>
                         <td class="fa-act" style="white-space:nowrap">
                             <?php if ($elig): ?>
@@ -281,7 +279,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 <?php /* 🧮 «ما تنسى ديماً يكون في مجموع للكل» (2026-09-24): صفّ المجموع لكل الظاهرين — يتحدّث فوراً بالـJS وأنت تكتب */ ?>
                 <tfoot>
                     <tr class="fa-total-row">
-                        <th colspan="<?= $scopeMulti ? 5 : 4 ?>" style="text-align:right;background:#1F4E5F;color:#fff">Total / المجموع (<?= count($rows) ?> موظف)</th>
+                        <th colspan="<?= $scopeMulti ? 5 : 4 ?>" style="text-align:right;background:#1F4E5F;color:#fff">Total / المجموع (<span id="faTotN"><?= count($rows) ?></span> موظف)</th>
                         <th class="sp" style="background:#9d174d;color:#fff" id="faTotSp"><?= number_format($totSp) ?></th>
                         <th class="sp" colspan="2" style="background:#9d174d;color:#fff;font-weight:400;font-size:11.5px">ل.ل / L.L</th>
                         <th class="ch" style="background:#1d4ed8;color:#fff" id="faTotCh"><?= number_format($totCh) ?></th>
@@ -313,18 +311,29 @@ window.faApplyLiveFilter = function () {
     var cats = [].slice.call(f.querySelectorAll('input[name="cat[]"]:checked')).map(function (c) { return c.value; });
     var schBoxes = f.querySelectorAll('input[name="sch[]"]'); var allBox = f.querySelector('input[name="sch_all"]');
     var schools = (schBoxes.length && !(allBox && allBox.checked)) ? [].slice.call(schBoxes).filter(function (c) { return c.checked; }).map(function (c) { return c.value; }) : null;
-    var shown = 0;
+    var num = function (v) { return parseInt(String(v == null ? '' : v).replace(/[^0-9]/g, ''), 10) || 0; };
+    var shown = 0, nWith = 0, totCur = 0, totSp = 0, totCh = 0;
     document.querySelectorAll('tr[data-id][data-cat]').forEach(function (tr) {
         var ok = cats.indexOf(tr.getAttribute('data-cat')) !== -1 && (schools === null || schools.indexOf(tr.getAttribute('data-school')) !== -1);
-        tr.style.display = ok ? '' : 'none'; if (ok) shown++;
+        tr.style.display = ok ? '' : 'none';
         var chg = tr.nextElementSibling; if (!ok && chg && chg.classList.contains('fa-chg-row')) chg.style.display = 'none';
+        if (!ok) return;
+        shown++; var cur = num(tr.getAttribute('data-cur')); if (cur > 0) nWith++; totCur += cur;
+        var a = tr.querySelector('input.amt[name$="[sp]"]'), b = tr.querySelector('input.amt[name$="[ch]"]');
+        if (a && !a.disabled) totSp += num(a.value); if (b && !b.disabled) totCh += num(b.value);
     });
-    var k = document.getElementById('faShown'); if (k) k.textContent = shown;
+    var set = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = typeof v === 'number' ? v.toLocaleString('en-US') : v; };
+    set('faShown', shown); set('faTotN', shown); set('faNWith', nWith); set('faTotCurK', totCur); set('faTotSpK', totSp); set('faTotChK', totCh); set('faTotSp', totSp); set('faTotCh', totCh); set('faTotCur', totCur);
+    var nr = document.getElementById('faNoRows');
+    if (nr) { nr.style.display = shown ? 'none' : ''; var td = nr.querySelector('td'); if (td) td.textContent = cats.length ? 'لا موظفين ضمن هذا النطاق / Aucun employé' : '☐ ما في ولا فئة مشيّكة — أشّر الملاك أو المتعاقدين أو الموظفين فوق / Cochez une catégorie'; }
+    var hid = document.getElementById('faCatHidden'); if (hid) hid.innerHTML = cats.map(function (c) { return '<input type="hidden" name="cat[]" value="' + c + '">'; }).join('');
+    try { var u = new URL(location.href); u.searchParams.delete('cat[]'); cats.forEach(function (c) { u.searchParams.append('cat[]', c); }); u.searchParams.set('cat_set', '1'); history.replaceState(null, '', u.toString()); } catch (e) {}
 };
 (function () {
     var f = document.getElementById('faFilter');
     if (f) f.addEventListener('change', function (e) { if (e.target && (e.target.name === 'cat[]' || e.target.name === 'sch[]' || e.target.name === 'sch_all')) window.faApplyLiveFilter(); });
     window.addEventListener('pageshow', window.faApplyLiveFilter);
+    window.faApplyLiveFilter();
 })();
 (function () {
     var form = document.getElementById('faForm'); if (!form) return;
@@ -394,6 +403,7 @@ window.faApplyLiveFilter = function () {
         var n = 0, tSp = 0, tCh = 0;
         form.querySelectorAll('tbody tr[data-id]').forEach(function (tr) {
             if (rowChanged(tr)) n++;
+            if (tr.style.display === 'none') return; // ⚡ المجاميع من الصفوف الظاهرة فقط
             var a = tr.querySelector('input.amt[name$="[sp]"]'), b = tr.querySelector('input.amt[name$="[ch]"]');
             if (a && !a.disabled) tSp += parseInt(fmt(a.value).replace(/,/g, ''), 10) || 0;
             if (b && !b.disabled) tCh += parseInt(fmt(b.value).replace(/,/g, ''), 10) || 0;
