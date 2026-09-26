@@ -695,7 +695,7 @@ function pageSchoolScopeSql(array $scope, string $column = 'e.school_id'): strin
 /** منتقي المدارس بخانات تشييك (الكل + مدرسة مدرسة) — يرسل الفورم عند أي تغيير؛ غير المدير العام: حقول مخفية */
 function pageSchoolPickerHtml(array $scope, string $formId = ''): string {
     if (!isSuperAdmin()) return $scope['hidden'];
-    $sub = $formId !== '' ? "document.getElementById('" . e($formId) . "').submit()" : 'this.form.submit()';
+    $sub = '(window.msaSubmitSoon||function(f){f.submit()})(this.form)'; // ⏳ إرسال مؤجَّل يجمع عدّة مدارس بإرسال واحد (app.js)
     $h = '<div class="form-group mb-0" style="grid-column:1 / -1;flex:1 1 100%"><label class="form-label"><i class="fas fa-school"></i> Écoles / المدارس'
        . ' <small style="font-weight:400;color:#64748b">— وحدة لحالها أو مجموعة معاً أو الكل / une, plusieurs ou toutes</small></label>'
        . '<div class="school-checks msa-school-pick"><input type="hidden" name="sch_set" value="1">'
@@ -5757,7 +5757,7 @@ function empTypeHiddenFrom(array $st, string $param = 'emp_type'): string {
 /** المنتقي نفسه (form-group) — خانات تشييك؛ $submitOnChange = إرسال الفورم فور التشييك */
 function empTypeCheckboxes(array $st, bool $submitOnChange = false, string $param = 'emp_type'): string {
     $lbl = ['enseignant_titulaire' => 'Titulaires / الملاك', 'enseignant_contractuel' => 'Contractuels / المتعاقدين', 'employe' => 'Employés / الموظفين'];
-    $oc = $submitOnChange ? ' onchange="this.form.submit()"' : '';
+    $oc = $submitOnChange ? ' onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"' : ''; // ⏳ إرسال مؤجَّل يجمع الكبسات (msaSubmitSoon، app.js)
     $h = '<div class="form-group mb-0 emp-type-picker"><label class="form-label"><i class="fas fa-users"></i> Catégorie / الفئة <small class="text-muted">(المشيّكة فقط تبيّن)</small></label>'
        . '<input type="hidden" name="' . $param . '_set" value="1"><div class="school-checks emp-type-checks">';
     foreach ($lbl as $k => $l) {

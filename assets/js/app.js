@@ -470,3 +470,24 @@ function showAlert(msg, type = 'info') {
     if ('scrollRestoration' in history) { try { history.scrollRestoration = 'manual'; } catch (e) {} }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', restore); else restore();
 })();
+
+// ☑️⏳ msaSubmitSoon (2026-09-26 «مشيّك على الموظفين ولسا مبيّن الملاك»): خانات الفئة/المدارس كانت ترسل الفورم فوراً
+// عند كل كبسة، فلمّا يشيل فئة ويحطّ أخرى بسرعة تضيع الكبسة الثانية والسيرفر البطيء يعرض صفحة قديمة.
+// الحلّ: تأخير قصير يجمع الكبسات المتتالية بإرسال واحد، مع طبقة «جارٍ التحديث» حتى تصل الصفحة الجديدة.
+window.msaSubmitSoon = function (form, ms) {
+    if (!form) return;
+    if (form._msaTimer) clearTimeout(form._msaTimer);
+    form._msaTimer = setTimeout(function () {
+        form._msaTimer = null;
+        var ov = document.getElementById('msaBusyOverlay');
+        if (!ov) {
+            ov = document.createElement('div'); ov.id = 'msaBusyOverlay';
+            ov.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font:700 18px Arial,sans-serif;color:#1F4E5F;direction:rtl');
+            ov.innerHTML = '<div style="background:#fff;border:2px solid #1F4E5F;border-radius:12px;padding:16px 28px;box-shadow:0 8px 30px rgba(0,0,0,.15)">⏳ جارٍ التحديث… / Mise à jour…</div>';
+            document.body.appendChild(ov);
+        }
+        ov.style.display = 'flex';
+        if (typeof form.requestSubmit === 'function') form.requestSubmit(); else form.submit();
+    }, ms == null ? 700 : ms);
+};
+window.addEventListener('pageshow', function () { var ov = document.getElementById('msaBusyOverlay'); if (ov) ov.style.display = 'none'; });

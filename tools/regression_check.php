@@ -7957,7 +7957,7 @@ $c169('query', empTypeQueryFrom($stA) === '' && empTypeQueryFrom($stN) === '&emp
       && empTypeQueryFrom($stT, 'type') === '&type_set=1&type[]=enseignant_titulaire&type[]=employe');
 $cb169 = empTypeCheckboxes($stT, true, 'type');
 $c169('checkboxes-html', substr_count($cb169, 'type="checkbox"') === 3 && substr_count($cb169, ' checked') === 2
-      && strpos($cb169, 'name="type_set" value="1"') !== false && strpos($cb169, 'onchange="this.form.submit()"') !== false);
+      && strpos($cb169, 'name="type_set" value="1"') !== false && strpos($cb169, 'onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"') !== false); // ⏳ مؤجَّل (2026-09-26)
 // (ب) المصدر: كل الصفحات على المصدر الواحد — لا قائمة منسدلة للفئة بقيت
 foreach (['pages/reports.php', 'pages/reports_export.php', 'pages/official_forms.php', 'pages/monthly_payroll.php', 'pages/annual_slip.php', 'pages/annual_slip_export.php', 'pages/employees.php'] as $pf169) {
     $src169 = (string)file_get_contents($PROJ . '/' . $pf169);
@@ -8101,6 +8101,10 @@ if (count($two172) === 2) {
         && preg_match('/name="sch\[\]" value="' . $sb172 . '" checked/', $hB2) === 1 && strpos($hB2, '<input type="hidden" name="sch[]" value="' . $sa172 . '"><input type="hidden" name="sch[]" value="' . $sb172 . '">') !== false
         && preg_match('/لكل فئة رقمها[^<]*—[^<]* \+ [^<]* — /u', $hB2) === 1);
 } else $c172('need-two-schools-data', false);
+$js172 = (string)file_get_contents($PROJ . '/assets/js/app.js');
+$c172('debounced-submit', strpos($js172, 'window.msaSubmitSoon = function (form, ms)') !== false && strpos($js172, 'msaBusyOverlay') !== false
+    && strpos($fa172, 'onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"') !== false && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "\$sub = '(window.msaSubmitSoon||function(f){f.submit()})(this.form)';") !== false
+    && strpos($fa172, "getElementById('faFilter').submit()") === false); // ☑️⏳ «مشيّك على الموظفين ولسا مبيّن الملاك»: الكبسات المتتالية تُجمَع بإرسال واحد
 check('🏫 الصفحات الجماعية بعدة مدارس (2026-09-26): التعويض العائلي + المكافآت/النقل = مدرسة واحدة أو مجموعة معاً أو الكل بخانات تشييك (pageSchoolScope) — المجموعة = مجموع المدارس + عمود المدرسة + بلا طرد', $ok172, implode(' · ', $why172) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */

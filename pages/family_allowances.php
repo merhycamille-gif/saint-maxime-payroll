@@ -160,7 +160,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 <input type="hidden" name="cat_set" value="1">
                 <div style="padding:6px 0">
                 <?php foreach ($catLbl as $k => $l): ?>
-                    <label><input type="checkbox" name="cat[]" value="<?= $k ?>" <?= in_array($k, $categories, true) ? 'checked' : '' ?> onchange="document.getElementById('faFilter').submit()"> <?= $l ?></label>
+                    <label><input type="checkbox" name="cat[]" value="<?= $k ?>" <?= in_array($k, $categories, true) ? 'checked' : '' ?> onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> <?= $l ?></label>
                 <?php endforeach; ?>
                 </div>
             </div>
