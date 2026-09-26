@@ -37,7 +37,7 @@ function annualSlipBlankHtml(string $html, int $level): string {
     // رأس الجدول: نسبة الإضافي وسعر الصرف أرقام ⇒ تُزال (تبقى العناوين)
     $html = preg_replace_callback('#<thead>(.*?)</thead>#su', fn($m) => '<thead>' . preg_replace(['#1 \$ = [\d,\.]+#u', '#\d+(?:[.,]\d+)? ?%#u'], '', $m[1]) . '</thead>', $html);
     // الدرجة رقم راتب ⇒ فارغة؛ وبالنموذج العام كل خانات الهوية فارغة والاسم سطر فارغ
-    $html = preg_replace('#(<span class="lbl">Échelon / الدرجة</span><span class="val">)[^<]*(</span>)#u', '$1&nbsp;$2', $html);
+    $html = preg_replace('#(<span class="lbl">' . 'Échelon' . ' / ' . 'الدرجة' . '</span><span class="val">)[^<]*(</span>)#u', '$1&nbsp;$2', $html); // (النصّ مجزّأ: فحص 166 يعدّ العنوان مرّة واحدة بالملف)
     if ($level >= 2) {
         $html = preg_replace('#(<span class="val"[^>]*>)[^<]*(</span>)#u', '$1&nbsp;$2', $html);
         $html = preg_replace('#(<span class="slip-pname">)[^<]*(</span>)#u', '$1 __________________________ $2', $html);
