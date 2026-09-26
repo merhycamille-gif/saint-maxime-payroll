@@ -106,7 +106,7 @@ $sectionColors = [
 $sectionIcons = ['dashboard'=>'fa-gauge-high','personnel'=>'fa-users','paie'=>'fa-money-check-dollar','rapports'=>'fa-chart-column','systeme'=>'fa-gear'];
 $pageSection = [
     'dashboard'=>'dashboard',
-    'employees'=>'personnel','cadre_due'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','family_allowances'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel',
+    'employees'=>'personnel','cadre_due'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','family_allowances'=>'personnel','employee_full_history'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel',
     'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie','hours_reduction'=>'paie',
     'reports'=>'rapports','tax'=>'rapports',
     'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
@@ -255,6 +255,11 @@ document.addEventListener('submit', function (e) {
             <a href="<?= BASE_URL ?>pages/family_allowances.php" class="<?= $currentPage === 'family_allowances' ? 'active' : '' ?>">
                 <i class="fas fa-people-roof"></i>
                 <span>Allocations familiales / التعويض العائلي</span>
+            </a>
+
+            <a href="<?= BASE_URL ?>pages/employee_full_history.php" class="<?= $currentPage === 'employee_full_history' ? 'active' : '' ?>">
+                <i class="fas fa-clock-rotate-left"></i>
+                <span>Historique complet / التاريخ الكامل للأستاذ</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/excel_salaries.php" class="<?= $currentPage === 'excel_salaries' ? 'active' : '' ?>">

@@ -8271,6 +8271,30 @@ if ($lv177) {
 } else $c177('no-leaver-sample', false);
 check('🔍🚪 البحث العلوي: التارك من الكل يختفي بالسنة التي تبدأ بعد تركه ويظهر بشارة «ترك» بـ«كل السنين» (2026-09-26 كرستيان عون)', $ok177, implode(' · ', $why177) ?: 'ok');
 
+/* =====================================================================
+ * 178) 🗂️ صفحة «التاريخ الكامل للأستاذ» (2026-09-26): بحث بكل الموظفين (تارك أو لا، بالاسم/الهاتف/الولادة) ⇒ التعريف والأرقام الرسمية
+ *      + الخطّ الزمني + كل سنوات الرواتب شهراً شهراً بحصص الموظف والمؤسّسة + البنود — مستقلّة عن سنة الشريط
+ * =================================================================== */
+$ok178 = true; $why178 = [];
+$c178 = function (string $n, bool $ok) use (&$ok178, &$why178) { if (!$ok) { $ok178 = false; $why178[] = $n; } };
+$hdr178 = (string)file_get_contents($PROJ . '/includes/header.php');
+$c178('nav+dashboard', is_file($PROJ . '/pages/employee_full_history.php') && is_file($PROJ . '/pages/employee_history.php') /* سيرة الأستاذ القديمة باقية */
+    && strpos($hdr178, "'employee_full_history'=>'personnel'") !== false && strpos($hdr178, 'pages/employee_full_history.php') !== false && strpos((string)file_get_contents($PROJ . '/index.php'), 'pages/employee_full_history.php') !== false);
+$lv178 = $db->query("SELECT e.id, e.first_name_ar, e.birth_date, e.phone1, " . leftDateSql('e.') . " l, (SELECT COUNT(DISTINCT school_year) FROM monthly_salaries m WHERE m.employee_id = e.id AND m.net_salary_lbp > 0) ny
+    FROM employees e WHERE e.is_deleted = 0 AND " . leftDateSql('e.') . " BETWEEN '2000-01-01' AND '2026-09-30' AND e.first_name_ar <> '' AND e.birth_date > '1900-01-01' HAVING ny >= 2 ORDER BY ny DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($lv178) {
+    $hid = renderPage('pages/employee_full_history.php', ['id' => (int)$lv178['id']], [], [], '', '2026-2027'); // السنة بالشريط لا تخفيه
+    $c178('leaver-page', $noFatal($hid) && substr_count($hid, '<div class="eh-ytitle">') === (int)$lv178['ny'] && strpos($hid, 'ترك ' . date('d/m/Y', strtotime($lv178['l']))) !== false
+        && strpos($hid, 'رقم الضمان / N° CNSS') !== false && strpos($hid, 'المدرسة: ضمان 8%') !== false && strpos($hid, 'class="eh-tl"') !== false && stripos($hid, 'Warning:') === false);
+    $hs = renderPage('pages/employee_full_history.php', ['q' => mb_substr($lv178['first_name_ar'], 0, 2)], [], [], '', '2026-2027');
+    $c178('search-includes-leaver', $noFatal($hs) && (strpos($hs, 'employee_full_history.php?id=' . (int)$lv178['id']) !== false || strpos($hs, 'Location') !== false));
+    $hb = renderPage('pages/employee_full_history.php', ['q' => date('d/m/Y', strtotime($lv178['birth_date']))], [], [], '', '2026-2027');
+    $c178('search-by-birth-date', strlen($hb) < 5000 /* نتيجة واحدة ⇒ تحويل */ || strpos($hb, 'employee_full_history.php?id=' . (int)$lv178['id']) !== false);
+    $hy = renderPage('pages/employee_full_history.php', ['q' => substr($lv178['birth_date'], 0, 4)], [], [], '', '2026-2027');
+    $c178('search-by-birth-year', strlen($hy) < 5000 || strpos($hy, 'employee_full_history.php?id=' . (int)$lv178['id']) !== false);
+} else $c178('no-leaver-sample', false);
+check('🗂️ صفحة «التاريخ الكامل للأستاذ» (2026-09-26): بحث بكل الموظفين (تارك أو لا، بالاسم/الهاتف/الولادة) ⇒ التعريف والأرقام + الخطّ الزمني + كل سنوات الرواتب بحصص الموظف والمؤسّسة — مستقلّة عن سنة الشريط', $ok178, implode(' · ', $why178) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

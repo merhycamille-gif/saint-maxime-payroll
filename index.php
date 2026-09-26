@@ -147,6 +147,7 @@ $dashSections = [
         canEdit() ? ['pages/exceptional_laws.php','fas fa-scroll','Lois exceptionnelles','القوانين الاستثنائية'] : null,
         canEdit() ? ['pages/bulk_allowances.php','fas fa-gift','Primes & transport','المكافآت والنقل'] : null,
         canEdit() ? ['pages/family_allowances.php','fas fa-people-roof','Allocations familiales','التعويض العائلي'] : null,
+        ['pages/employee_full_history.php','fas fa-clock-rotate-left','Historique complet','التاريخ الكامل للأستاذ'],
         canEdit() ? ['pages/law_check.php','fas fa-balance-scale','Conformité légale','فحص مطابقة القانون'] : null,
     ])],
     ['Paie', 'الرواتب', 'fa-money-check-dollar', '#16a34a', 'rgba(22,163,74,.10)', array_filter([
