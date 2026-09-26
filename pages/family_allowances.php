@@ -132,7 +132,12 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
 .fa-law { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; font-size:12.5px; color:#475569; line-height:1.8; margin-bottom:10px; }
 .fa-filters { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px; }
 .fa-filters .form-group { margin:0; min-width:150px; }
-.fa-cats label { font-weight:normal; cursor:pointer; white-space:nowrap; margin-inline-end:10px; }
+/* ☑️ (2026-09-26 «حاطط تشك مارك قدّام المتعاقدين مش الموظفين»): بالعربي الصندوق يقع يمين كلمته فيبدو كأنّه للكلمة التالية —
+   كل فئة بإطار مستقلّ (الصندوق + الكلمة معاً) بفراغ واضح بينها، كخانات المدارس */
+.fa-cats .school-checks { gap:8px 18px; padding:6px 10px; }
+.fa-cats .school-checks .chk { border:1px solid #cbd5e1; background:#fff; padding:4px 10px; font-weight:600; direction:rtl; }
+.fa-cats .school-checks .chk input { margin:0 0 0 6px; width:16px; height:16px; }
+.fa-cats .school-checks .chk:has(input:checked) { background:#dbeafe; border-color:#1d4ed8; color:#1e3a8a; }
 @media print { .fa-bar, .fa-filters, .no-print { display:none !important; } .fa-table input { border:none; background:transparent; } }
 </style>
 
@@ -159,9 +164,9 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
             <div class="form-group fa-cats">
                 <label class="form-label">Catégorie / الفئة</label>
                 <input type="hidden" name="cat_set" value="1">
-                <div style="padding:6px 0">
+                <div class="school-checks">
                 <?php foreach ($catLbl as $k => $l): ?>
-                    <label><input type="checkbox" autocomplete="off" name="cat[]" value="<?= $k ?>" <?= in_array($k, $categories, true) ? 'checked' : '' ?> onchange="window.faApplyLiveFilter&&faApplyLiveFilter()"> <?= $l ?></label>
+                    <label class="chk"><input type="checkbox" autocomplete="off" name="cat[]" value="<?= $k ?>" <?= in_array($k, $categories, true) ? 'checked' : '' ?> onchange="window.faApplyLiveFilter&&faApplyLiveFilter()"> <?= $l ?></label>
                 <?php endforeach; ?>
                 </div>
             </div>
