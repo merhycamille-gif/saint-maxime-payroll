@@ -19,12 +19,10 @@ $pageTitle = 'Allocations familiales / التعويض العائلي';
 $db = getDB();
 @set_time_limit(0);
 
-// ===== النطاق: المدرسة (المدير العام: مدرسة أو كل المدارس) + الفئات + السنة + بحث + عرض =====
-$schParam = (string)($_GET['sch'] ?? $_POST['sch'] ?? '');
-$scopeAll = isSuperAdmin() && ($schParam === 'all');
-$schoolId = $scopeAll ? 0 : ($schParam !== '' ? (int)$schParam : (int)currentSchoolId());
-if (!isSuperAdmin()) { $scopeAll = false; $schoolId = (int)currentSchoolId(); }
-$hasScope = $scopeAll || $schoolId > 0;
+// ===== النطاق: المدارس (🏫 2026-09-26 «بدي اقدر اختار كمان عدة مدارس»: وحدة لحالها أو مجموعة معاً أو الكل — pageSchoolScope) + الفئات + السنة + بحث + عرض =====
+$schScope = pageSchoolScope();
+$scopeAll = $schScope['all']; $scopeIds = $schScope['ids']; $scopeMulti = $schScope['multi'];
+$hasScope = count($scopeIds) > 0;
 $validCats = ['titulaire' => 'enseignant_titulaire', 'contractuel' => 'enseignant_contractuel', 'employe' => 'employe'];
 $catLbl = ['titulaire' => 'الملاك', 'contractuel' => 'المتعاقدين', 'employe' => 'الموظفين'];
 $rawCats = $_POST['cat'] ?? $_GET['cat'] ?? null;
@@ -38,19 +36,19 @@ $show = in_array($_GET['show'] ?? $_POST['show'] ?? 'all', ['all', 'with', 'with
 
 // قيد النطاق بصيغة SQL (alias e) — المصدر الواحد للعرض والحفظ معاً
 $scopeSql = ''; $scopeParams = [];
-if (!$scopeAll) { $scopeSql .= ' AND e.school_id = ?'; $scopeParams[] = $schoolId; }
+$scopeSql .= pageSchoolScopeSql($schScope, 'e.school_id'); // مدرسة أو مجموعة أو كل الفاعلة
 if (!$categories) $scopeSql .= " AND 1=0"; // لا فئة مشيّكة = لا أحد
 elseif (count($categories) < 3) $scopeSql .= " AND e.employee_type IN (" . implode(',', array_map(fn($c) => "'" . $validCats[$c] . "'", $categories)) . ")";
 [$yf, $yp] = yearEmploymentFilter($schoolYear, 'e.'); // موظفو السنة (راتب أو دخول ضمنها؛ التارك من الكل قبلها لا يظهر)
 $scopeSql .= $yf; $scopeParams = array_merge($scopeParams, $yp);
 
-$backQ = 'sch=' . ($scopeAll ? 'all' : $schoolId) . '&sy=' . urlencode($schoolYear) . '&show=' . $show . '&cat_set=1' . ($q !== '' ? '&q=' . urlencode($q) : '');
+$backQ = $schScope['query'] . '&sy=' . urlencode($schoolYear) . '&show=' . $show . '&cat_set=1' . ($q !== '' ? '&q=' . urlencode($q) : '');
 foreach ($categories as $c) $backQ .= '&cat[]=' . urlencode($c);
 
 // ===== طبّق: المتغيّر فقط يُحفَظ كما يحفظه ملف الموظف =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope && ($_POST['action'] ?? '') === 'apply') {
-    if (!$scopeAll && $schoolId > 0 && isAllSchools()) { $_SESSION['active_schools'] = [$schoolId]; unset($_SESSION['report_schools']); }
-    $lkSchools = $scopeAll ? array_map(fn($sc) => (int)$sc['id'], allSchools()) : [(int)$schoolId];
+    if (!$scopeAll && isSuperAdmin()) { $_SESSION['active_schools'] = $scopeIds; unset($_SESSION['report_schools']); } // المدارس المختارة بالصفحة = القصد الصريح (المبدّل الأعلى يتبعها)
+    $lkSchools = $scopeIds;
     $lkHit = array_values(array_filter($lkSchools, fn($sid) => isSchoolYearLocked($sid, $schoolYear)));
     if ($lkHit) { $_SESSION['flash_error'] = yearLockedMsg($lkHit[0], $schoolYear); }
     else {
@@ -152,18 +150,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
         </div>
 
         <form method="GET" class="fa-filters no-print" id="faFilter">
-            <?php if (isSuperAdmin()): ?>
-            <div class="form-group">
-                <label class="form-label">École / المدرسة</label>
-                <select name="sch" class="form-select" onchange="this.form.submit()">
-                    <option value="">— Choisir / اختر —</option>
-                    <option value="all" <?= $scopeAll ? 'selected' : '' ?>>🌐 كل المدارس / Toutes les écoles</option>
-                    <?php foreach (allSchools() as $s): ?>
-                        <option value="<?= (int)$s['id'] ?>" <?= (!$scopeAll && $schoolId === (int)$s['id']) ? 'selected' : '' ?>><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <?php else: ?><input type="hidden" name="sch" value="<?= $schoolId ?>"><?php endif; ?>
+            <?= pageSchoolPickerHtml($schScope, 'faFilter') ?>
             <div class="form-group">
                 <label class="form-label">Année scolaire / السنة الدراسية</label>
                 <input type="text" name="sy" class="form-control" value="<?= e($schoolYear) ?>" onchange="this.form.submit()" style="width:120px">
@@ -204,7 +191,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
         <form method="POST" id="faForm">
             <?= csrfField() ?>
             <input type="hidden" name="action" value="apply">
-            <input type="hidden" name="sch" value="<?= $scopeAll ? 'all' : (int)$schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+            <?= $schScope['hidden'] ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
             <input type="hidden" name="show" value="<?= e($show) ?>"><input type="hidden" name="q" value="<?= e($q) ?>"><input type="hidden" name="cat_set" value="1">
             <?php foreach ($categories as $c): ?><input type="hidden" name="cat[]" value="<?= e($c) ?>"><?php endforeach; ?>
             <div class="fa-wrap">
@@ -215,7 +202,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                         <th rowspan="2">Modifier / تعديل</th>
                         <th rowspan="2">Nom / الاسم</th>
                         <th rowspan="2">Catégorie / الفئة</th>
-                        <?php if ($scopeAll): ?><th rowspan="2">École / المدرسة</th><?php endif; ?>
+                        <?php if ($scopeMulti): ?><th rowspan="2">École / المدرسة</th><?php endif; ?>
                         <th colspan="3" class="sp">Épouse / تعويض الزوجة</th>
                         <th colspan="3" class="ch">Enfants / تعويض الأولاد</th>
                         <th rowspan="2" style="min-width:120px">الساري<br><small><?= monthName($refM, 'ar') . ' ' . $refY ?></small></th>
@@ -254,7 +241,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                         </td>
                         <td class="nm"><a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $id ?>&tab=finance" target="_blank" title="فتح الملف / Ouvrir la fiche"><?= e($name) ?></a><?php if ($nameFr && $nameFr !== $name): ?><small dir="ltr" style="text-align:left"><?= e($nameFr) ?></small><?php endif; ?></td>
                         <td><span class="fa-badge <?= $typeCls[$r['employee_type']] ?? '' ?>"><?= $typeLbl[$r['employee_type']] ?? e($r['employee_type']) ?></span></td>
-                        <?php if ($scopeAll): ?><td style="white-space:normal;font-size:12px"><?= e($r['school_ar'] ?: $r['school_fr']) ?></td><?php endif; ?>
+                        <?php if ($scopeMulti): ?><td style="white-space:normal;font-size:12px"><?= e($r['school_ar'] ?: $r['school_fr']) ?></td><?php endif; ?>
                         <td class="sp"><input type="text" inputmode="numeric" class="amt" name="fa[<?= $id ?>][sp]" value="<?= $elig ? number_format((int)$r['family_allowance_spouse_lbp']) : '' ?>" data-orig="<?= $elig ? number_format((int)$r['family_allowance_spouse_lbp']) : '' ?>"<?= $dis . $ro ?>></td>
                         <td class="sp"><input type="month" class="mon" name="fa[<?= $id ?>][spf]" value="<?= e($mo($r['family_allowance_spouse_from'])) ?>" data-orig="<?= e($mo($r['family_allowance_spouse_from'])) ?>"<?= $dis . $ro ?>></td>
                         <td class="sp"><input type="month" class="mon" name="fa[<?= $id ?>][spt]" value="<?= e($mo($r['family_allowance_spouse_to'])) ?>" data-orig="<?= e($mo($r['family_allowance_spouse_to'])) ?>"<?= $dis . $ro ?>></td>
@@ -268,7 +255,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                     </tr>
                     <?php if ($elig): /* 📅💱 سطر التغييرات الشهرية (مخفيّ حتى يُكبس «شهري») — نفس صيغة ملف الموظف: النوع + من شهر + المبلغ الجديد */ ?>
                     <tr class="fa-chg-row" data-for="<?= $id ?>" style="display:none">
-                        <td colspan="<?= $scopeAll ? 14 : 13 ?>" style="text-align:right;background:#fffbeb;padding:8px 14px">
+                        <td colspan="<?= $scopeMulti ? 14 : 13 ?>" style="text-align:right;background:#fffbeb;padding:8px 14px">
                             <input type="hidden" name="fa[<?= $id ?>][chg_set]" value="1" data-orig="1">
                             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
                                 <strong style="font-size:12.5px"><i class="fas fa-calendar-days"></i> <?= e($name) ?> — تغييرات المبلغ خلال السنة / Changements en cours d'année</strong>
@@ -293,7 +280,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 <?php /* 🧮 «ما تنسى ديماً يكون في مجموع للكل» (2026-09-24): صفّ المجموع لكل الظاهرين — يتحدّث فوراً بالـJS وأنت تكتب */ ?>
                 <tfoot>
                     <tr class="fa-total-row">
-                        <th colspan="<?= $scopeAll ? 5 : 4 ?>" style="text-align:right;background:#1F4E5F;color:#fff">Total / المجموع (<?= count($rows) ?> موظف)</th>
+                        <th colspan="<?= $scopeMulti ? 5 : 4 ?>" style="text-align:right;background:#1F4E5F;color:#fff">Total / المجموع (<?= count($rows) ?> موظف)</th>
                         <th class="sp" style="background:#9d174d;color:#fff" id="faTotSp"><?= number_format($totSp) ?></th>
                         <th class="sp" colspan="2" style="background:#9d174d;color:#fff;font-weight:400;font-size:11.5px">ل.ل / L.L</th>
                         <th class="ch" style="background:#1d4ed8;color:#fff" id="faTotCh"><?= number_format($totCh) ?></th>
@@ -307,11 +294,11 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
             <div class="fa-bar">
                 <button type="submit" class="btn btn-primary" id="faApply" disabled><i class="fas fa-check-double"></i> Appliquer / طبّق على ملفات الموظفين</button>
                 <span>المعدَّلون: <span class="cnt" id="faCnt">0</span> — يُحفَظ المتغيّر فقط، ويُعاد حساب رواتب <?= e($schoolYear) ?> للمعنيين.</span>
-                <span style="color:#64748b;font-size:12px">النطاق: <?= $scopeAll ? 'كل المدارس' : e(schoolNameById($schoolId, 'ar')) ?> · <?= count($categories) >= 3 ? 'كل الفئات' : ($categories ? e(implode(' + ', array_map(fn($c) => $catLbl[$c], $categories))) : 'لا فئة') ?> · <?= e($schoolYear) ?></span>
+                <span style="color:#64748b;font-size:12px">النطاق: <?= e($schScope['label']) ?> · <?= count($categories) >= 3 ? 'كل الفئات' : ($categories ? e(implode(' + ', array_map(fn($c) => $catLbl[$c], $categories))) : 'لا فئة') ?> · <?= e($schoolYear) ?></span>
             </div>
         </form>
 <?php else: ?>
-        <div class="alert alert-info">اختر مدرسة من الأعلى / Choisissez une école.</div>
+        <div class="alert alert-info">اختر مدرسة أو أكثر من الأعلى / Choisissez une ou plusieurs écoles.</div>
 <?php endif; ?>
     </div>
 </div>

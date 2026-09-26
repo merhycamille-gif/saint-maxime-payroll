@@ -649,6 +649,67 @@ function classLevelNames($csv, bool $frOnly = false) {
     return implode($frOnly ? ', ' : '، ', $names);
 }
 
+/**
+ * 🏫 نطاق المدارس للصفحات الجماعية (2026-09-26 «بدي بصفحة التعويضات اقدر اختار كمان عدة مدارس»):
+ * التعويض العائلي والمكافآت/النقل الجماعي كانا يقبلان مدرسة واحدة أو «كل المدارس» فقط — القاعدة الملزمة
+ * [feedback-one-school-or-group]: أي صفحة = مدرسة واحدة أو مجموعة مختارة معاً أو الكل، بلا طرد لمدرسة واحدة.
+ * يقرأ (GET ثم POST): sch_all=1 (الكل) أو sch[]=id (مجموعة) — والقديم sch=all / sch=id يبقى مفهوماً.
+ * الافتراضي (بلا أي وسيط): المدارس المختارة بالمبدّل الأعلى (فارغة = الكل). sch_set بلا شيء مشيّك = الكل.
+ * غير المدير العام: مدارسه المسموحة فقط مهما أرسل. «الكل» = المدارس الفاعلة فقط (المعطّلة لا تُدمَج).
+ * يعيد: all (bool) · ids (المدارس المعنيّة فعلياً، حتى بوضع الكل) · multi (أكثر من مدرسة) · label · query (للروابط) · hidden (للفورمات).
+ */
+function pageSchoolScope(): array {
+    $active = allActiveSchoolIdsCached();
+    $ids = []; $all = false;
+    if (!isSuperAdmin()) {
+        $ids = activeSchoolIds();
+    } else {
+        $rawArr = $_GET['sch'] ?? $_POST['sch'] ?? null;
+        if (isset($_GET['sch_all']) || isset($_POST['sch_all'])) $all = true;
+        elseif (is_array($rawArr)) $ids = array_map('intval', $rawArr);
+        elseif ($rawArr !== null && (string)$rawArr !== '') { if ((string)$rawArr === 'all') $all = true; else $ids = [(int)$rawArr]; }
+        elseif (isset($_GET['sch_set']) || isset($_POST['sch_set'])) $all = true;
+        else $ids = activeSchoolIds();
+        $ids = array_values(array_unique(array_filter($ids, fn($x) => in_array((int)$x, $active, true))));
+        if (!$all && !$ids && !is_array($rawArr) && ($rawArr === null || (string)$rawArr === '')) $all = true; // بلا اختيار صالح = الكل
+        if ($all) $ids = $active;
+    }
+    $names = [];
+    if (!$all) foreach (allSchools() as $s) if (in_array((int)$s['id'], $ids, true)) $names[] = (string)($s['name_ar'] ?: $s['name_fr']);
+    $q = $all ? 'sch_all=1' : implode('&', array_map(fn($i) => 'sch%5B%5D=' . (int)$i, $ids));
+    $hidden = $all ? '<input type="hidden" name="sch_all" value="1">' : implode('', array_map(fn($i) => '<input type="hidden" name="sch[]" value="' . (int)$i . '">', $ids));
+    return [
+        'all'    => $all,
+        'ids'    => $ids,
+        'multi'  => $all || count($ids) > 1,
+        'label'  => $all ? 'كل المدارس' : ($names ? implode(' + ', $names) : '—'),
+        'query'  => $q,
+        'hidden' => $hidden . '<input type="hidden" name="sch_set" value="1">',
+    ];
+}
+/** شرط SQL للنطاق (يبدأ بـ AND) — أرقام آمنة؛ بلا مدارس = لا أحد */
+function pageSchoolScopeSql(array $scope, string $column = 'e.school_id'): string {
+    if (!$scope['ids']) return ' AND 1=0';
+    return ' AND ' . $column . ' IN (' . implode(',', array_map('intval', $scope['ids'])) . ')';
+}
+/** منتقي المدارس بخانات تشييك (الكل + مدرسة مدرسة) — يرسل الفورم عند أي تغيير؛ غير المدير العام: حقول مخفية */
+function pageSchoolPickerHtml(array $scope, string $formId = ''): string {
+    if (!isSuperAdmin()) return $scope['hidden'];
+    $sub = $formId !== '' ? "document.getElementById('" . e($formId) . "').submit()" : 'this.form.submit()';
+    $h = '<div class="form-group mb-0" style="grid-column:1 / -1;flex:1 1 100%"><label class="form-label"><i class="fas fa-school"></i> Écoles / المدارس'
+       . ' <small style="font-weight:400;color:#64748b">— وحدة لحالها أو مجموعة معاً أو الكل / une, plusieurs ou toutes</small></label>'
+       . '<div class="school-checks msa-school-pick"><input type="hidden" name="sch_set" value="1">'
+       . '<label class="chk all"><input type="checkbox" name="sch_all" value="1"' . ($scope['all'] ? ' checked' : '') . ' onclick="msaSchoolPickAll(this);' . $sub . '"> <strong>Toutes / الكل</strong></label>';
+    foreach (allSchools() as $s) {
+        $sid = (int)$s['id'];
+        $h .= '<label class="chk"><input type="checkbox" name="sch[]" value="' . $sid . '"' . ((!$scope['all'] && in_array($sid, $scope['ids'], true)) ? ' checked' : '') . ' onclick="msaSchoolPickOne(this);' . $sub . '"> ' . e($s['name_ar'] ?: $s['name_fr']) . '</label>';
+    }
+    $h .= '</div></div>'
+        . '<script>function msaSchoolPickAll(b){var w=b.closest(".msa-school-pick");if(b.checked){w.querySelectorAll(\'input[name="sch[]"]\').forEach(function(c){c.checked=false;});}else if(!Array.from(w.querySelectorAll(\'input[name="sch[]"]\')).some(function(c){return c.checked;})){b.checked=true;}}'
+        . 'function msaSchoolPickOne(b){var w=b.closest(".msa-school-pick");var any=Array.from(w.querySelectorAll(\'input[name="sch[]"]\')).some(function(c){return c.checked;});var a=w.querySelector(\'input[name="sch_all"]\');if(a)a.checked=!any;}</script>';
+    return $h;
+}
+
 // قائمة كل المدارس الفعّالة
 function allSchools($activeOnly = true) {
     $sql = "SELECT * FROM schools WHERE is_deleted = 0";

@@ -4543,7 +4543,7 @@ check('المكافآت الجماعية 2026-09-11/12: بطاقة «طبّق ع
       && strpos($ba0911, "baMonthSel('ind_from', 10") !== false && strpos($ba0911, "\$perSql = \$iFull ? \$fullYearSql : \"(start_month = \$iFrom AND end_month = \$iTo)\"") !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(pct/100))') !== false
       && strpos($ba0911, 'var usd=Math.floor((base/OFFICIAL)*(b.pct/100))') !== false
-      && strpos($ba0911, "isAllSchools()) { \$_SESSION['active_schools'] = [\$schoolId];") !== false
+      && strpos($ba0911, "isSuperAdmin()) { \$_SESSION['active_schools'] = \$scopeIds;") !== false
       && strpos($ba0911, '"✅ طُبّق: $desc') !== false
       && strpos($emp0911, 'bulk_allowances.php?sch=') !== false && strpos($emp0911, '#baOnePct') !== false);
 $tf0911 = (string)file_get_contents($PROJ . '/pages/teacher_form.php'); $ic0911 = (string)file_get_contents($PROJ . '/pages/info_collect.php');
@@ -8067,6 +8067,41 @@ $hD = renderPage('pages/official_forms.php', ['form' => 'tax_r10'], [], [3, 5]);
 $c171('r10-group', $noFatal($hD) && strpos($hD, 'التصريح لمجموعة المدارس') !== false);
 check('🏫 التصاريح المؤسّسية مع عدة مدارس (2026-09-25): وحدة لحالها أو مجموعة معاً — المجموعة = مجموع المدارس + صاحب العمل الموحّد + تنبيه عند اختلاف الأرقام + school_id يحصر — تجربة فعلية', $ok171, implode(' · ', $why171) ?: 'ok');
 
+
+/* =====================================================================
+ * 172) 🏫 الصفحات الجماعية بعدة مدارس (2026-09-26 «بدي بصفحة التعويضات اقدر اختار كمان عدة مدارس»):
+ *      التعويض العائلي + المكافآت/النقل = مدرسة واحدة أو مجموعة معاً أو الكل بخانات تشييك — مصدر واحد pageSchoolScope
+ *      (sch_all / sch[] + القديم sch=all/sch=id) — بلا طرد لمدرسة واحدة (requireSchoolSelected أُزيل من الجماعي)
+ * =================================================================== */
+$ok172 = true; $why172 = [];
+$c172 = function (string $n, bool $ok) use (&$ok172, &$why172) { if (!$ok) { $ok172 = false; $why172[] = $n; } };
+$fa172 = (string)file_get_contents($PROJ . '/pages/family_allowances.php'); $ba172 = (string)file_get_contents($PROJ . '/pages/bulk_allowances.php');
+$c172('single-source', function_exists('pageSchoolScope') && function_exists('pageSchoolScopeSql') && function_exists('pageSchoolPickerHtml')
+    && strpos($fa172, 'pageSchoolPickerHtml(') !== false && strpos($ba172, 'pageSchoolPickerHtml(') !== false
+    && strpos($fa172, '<select name="sch"') === false && strpos($ba172, '<select name="sch"') === false && strpos($ba172, 'requireSchoolSelected') === false);
+$sy172 = currentSchoolYear(); [$yf172, $yp172] = yearEmploymentFilter($sy172, 'e.');
+$two172 = $db->prepare("SELECT e.school_id, COUNT(*) n FROM employees e JOIN schools s ON s.id = e.school_id AND s.is_active = 1 WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire'" . $yf172 . " GROUP BY e.school_id HAVING n > 0 ORDER BY n DESC LIMIT 2");
+$two172->execute($yp172); $two172 = $two172->fetchAll(PDO::FETCH_KEY_PAIR);
+if (count($two172) === 2) {
+    [$sa172, $sb172] = array_keys($two172);
+    $rowsOf = fn(string $h) => substr_count($h, '<tr class="" data-id=') + substr_count($h, '<tr class="na" data-id=');
+    $hA = renderPage('pages/family_allowances.php', ['sch' => [$sa172], 'sy' => $sy172, 'cat' => ['titulaire']], []);
+    $hAB = renderPage('pages/family_allowances.php', ['sch' => [$sa172, $sb172], 'sy' => $sy172, 'cat' => ['titulaire']], []);
+    $hAll = renderPage('pages/family_allowances.php', ['sch_all' => 1, 'sy' => $sy172, 'cat' => ['titulaire']], []);
+    $c172('fa-one-school', $noFatal($hA) && $rowsOf($hA) === (int)$two172[$sa172] && strpos($hA, 'École / المدرسة</th>') === false
+        && preg_match('/name="sch\[\]" value="' . $sa172 . '" checked/', $hA) === 1 && strpos($hA, 'name="sch_all" value="1" checked') === false);
+    $c172('fa-two-schools=sum', $noFatal($hAB) && $rowsOf($hAB) === (int)$two172[$sa172] + (int)$two172[$sb172] && strpos($hAB, 'École / المدرسة</th>') !== false
+        && substr_count($hAB, '<input type="hidden" name="sch[]" value="') === 2 && preg_match('/النطاق: [^·]+ \+ [^·]+ ·/u', $hAB) === 1);
+    $c172('fa-all', $noFatal($hAll) && strpos($hAll, 'name="sch_all" value="1" checked') !== false && strpos($hAll, 'النطاق: كل المدارس') !== false && $rowsOf($hAll) >= $rowsOf($hAB));
+    $hB1 = renderPage('pages/bulk_allowances.php', ['sch' => [$sa172], 'sy' => $sy172], []);
+    $hB2 = renderPage('pages/bulk_allowances.php', ['sch' => [$sa172, $sb172], 'sy' => $sy172], []);
+    $c172('ba-one-school', $noFatal($hB1) && strpos($hB1, 'excel_salaries.php?sch=' . $sa172) !== false && strpos($hB1, 'id="baOnePct"') !== false
+        && preg_match('/name="sch\[\]" value="' . $sa172 . '" checked/', $hB1) === 1);
+    $c172('ba-two-schools', $noFatal($hB2) && strpos($hB2, 'excel_salaries.php?sch=') === false && strpos($hB2, 'id="baOnePct"') !== false
+        && preg_match('/name="sch\[\]" value="' . $sb172 . '" checked/', $hB2) === 1 && strpos($hB2, '<input type="hidden" name="sch[]" value="' . $sa172 . '"><input type="hidden" name="sch[]" value="' . $sb172 . '">') !== false
+        && preg_match('/لكل فئة رقمها[^<]*—[^<]* \+ [^<]* — /u', $hB2) === 1);
+} else $c172('need-two-schools-data', false);
+check('🏫 الصفحات الجماعية بعدة مدارس (2026-09-26): التعويض العائلي + المكافآت/النقل = مدرسة واحدة أو مجموعة معاً أو الكل بخانات تشييك (pageSchoolScope) — المجموعة = مجموع المدارس + عمود المدرسة + بلا طرد', $ok172, implode(' · ', $why172) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

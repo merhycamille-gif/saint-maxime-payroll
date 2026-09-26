@@ -17,11 +17,10 @@ $pageTitle = 'Primes & Transport groupés / المكافآت والنقل الج
 $db = getDB();
 @set_time_limit(0);
 
-// نطاق المدرسة: المدير العام يختار مدرسة أو **كل المدارس** (sch=all)؛ غيره مدرسته فقط.
-$schParam = (string)($_GET['sch'] ?? $_POST['sch'] ?? '');
-$scopeAll = isSuperAdmin() && ($schParam === 'all');
-$schoolId = $scopeAll ? 0 : ($schParam !== '' ? (int)$schParam : (int)currentSchoolId());
-if (!isSuperAdmin()) { $scopeAll = false; $schoolId = (int)currentSchoolId(); }
+// نطاق المدارس (🏫 2026-09-26 «بدي اقدر اختار كمان عدة مدارس»): مدرسة واحدة أو مجموعة معاً أو الكل — pageSchoolScope (sch_all / sch[] والقديم sch=all/sch=id)؛ غير المدير العام مدارسه فقط.
+$schScope = pageSchoolScope();
+$scopeAll = $schScope['all']; $scopeIds = $schScope['ids']; $scopeMulti = $schScope['multi'];
+$schoolId = $scopeIds; // مصفوفة المدارس المعنيّة (schoolWhere/scopeLabel تقبلان المصفوفة)
 // الفئات المختارة (شيك-ماركس — يمكن اختيار أكثر من فئة معاً). فارغة = كل الفئات.
 $validCats = ['titulaire','contractuel','employe'];
 $rawCats = $_POST['cat'] ?? $_GET['cat'] ?? null;
@@ -29,7 +28,7 @@ $categories = array_values(array_intersect(is_array($rawCats) ? $rawCats : ($raw
 if (!$categories) $categories = $validCats;
 $schoolYear = $_GET['sy'] ?? $_POST['sy'] ?? currentSchoolYear();
 if (!preg_match('/^\d{4}-\d{4}$/', (string)$schoolYear)) $schoolYear = currentSchoolYear();
-$hasScope = $scopeAll || $schoolId > 0;
+$hasScope = count($scopeIds) > 0;
 
 // شرط الفئة + شرط المدرسة بصيغة SQL
 function catTypeMap() { return ['titulaire'=>'enseignant_titulaire','contractuel'=>'enseignant_contractuel','employe'=>'employe']; }
@@ -62,11 +61,13 @@ function baMonthSel($name, $sel, $attrs = '') {
     foreach ([10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9] as $m) $h .= '<option value="' . $m . '"' . ((int)$sel === $m ? ' selected' : '') . '>' . monthName($m, 'ar') . '</option>';
     return $h . '</select>';
 }
-function schoolWhere($scopeAll, $schoolId) {
-    return $scopeAll ? '' : (' AND school_id = ' . (int)$schoolId);
+function schoolWhere($scopeAll, $schoolId) { // مدرسة أو مجموعة أو كل الفاعلة — أرقام آمنة (المعطّلة لا تُدمَج)
+    $ids = array_values(array_filter(array_map('intval', (array)$schoolId), fn($x) => $x > 0));
+    return $ids ? ' AND school_id IN (' . implode(',', $ids) . ')' : ' AND 1=0';
 }
 function scopeLabel($scopeAll, $schoolId) {
-    return $scopeAll ? 'كل المدارس' : schoolNameById($schoolId, 'ar');
+    if ($scopeAll) return 'كل المدارس';
+    return implode(' + ', array_map(fn($i) => schoolNameById((int)$i, 'ar'), (array)$schoolId)) ?: '—';
 }
 
 // قيد «موجود فعلاً بالسنة الدراسية المختارة»: له راتب غير صفري بتلك السنة وغير تارك.
@@ -94,11 +95,10 @@ function recalcScope($db, $scopeAll, $schoolId, $cat, $sy) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
     // (2026-09-11) المدرسة المختارة بالصفحة هي القصد الصريح: لو الجلسة على «كل المدارس» نبدّلها لهذه المدرسة تلقائياً
     // (متل autoSwitchToEmployeeSchool) بدل رفض الحفظ برسالة «اختر مدرسة من الأعلى» — كانت تربك المستخدم.
-    if (!$scopeAll && $schoolId > 0 && isAllSchools()) { $_SESSION['active_schools'] = [$schoolId]; unset($_SESSION['report_schools']); }
-    if (!$scopeAll) requireSchoolSelected();   // نطاق مدرسة واحدة يتطلّب اختيارها؛ «كل المدارس» للمدير العام فقط
+    if (!$scopeAll && isSuperAdmin()) { $_SESSION['active_schools'] = $scopeIds; unset($_SESSION['report_schools']); } // مدرسة أو مجموعة — بلا طرد لمدرسة واحدة (2026-09-26)
     $action = $_POST['action'] ?? '';
     // 🔒 قفل السنة (2026-09-12): مدرسة مقفولة على هذه السنة = لا تعديل جماعي (ولا على «كل المدارس» إن كان بينها مقفولة)
-    $lkSchools = $scopeAll ? array_map(fn($sc) => (int)$sc['id'], allSchools()) : [(int)$schoolId];
+    $lkSchools = $scopeIds;
     $lkHit = array_values(array_filter($lkSchools, fn($sid) => isSchoolYearLocked($sid, (string)$schoolYear)));
     if ($lkHit) { $_SESSION['flash_error'] = yearLockedMsg($lkHit[0], (string)$schoolYear) . ($scopeAll ? ' — اختر المدارس غير المقفولة واحدة واحدة.' : ''); header('Location: ' . $_SERVER['REQUEST_URI']); exit; }
 
@@ -323,7 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
         $_SESSION['flash_success'] = "أُزيل النقل اليومي عن " . count($ids) . " (" . catLabel($categories) . " — " . scopeLabel($scopeAll,$schoolId) . ") — أُعيد حساب $done.";
     }
 
-    header('Location: ' . BASE_URL . "pages/bulk_allowances.php?sch=" . ($scopeAll ? 'all' : $schoolId) . catQuery($categories) . "&sy=" . urlencode($schoolYear));
+    header('Location: ' . BASE_URL . "pages/bulk_allowances.php?" . $schScope['query'] . catQuery($categories) . "&sy=" . urlencode($schoolYear));
     exit;
 }
 
@@ -454,24 +454,13 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     </h3></div>
     <div class="card-body">
         <form method="GET" class="form-row cols-2 no-print" style="margin-bottom:12px">
-            <?php if (isSuperAdmin()): ?>
-            <div class="form-group mb-0">
-                <label class="form-label">École / المدرسة</label>
-                <select name="sch" class="form-select" onchange="this.form.submit()">
-                    <option value="">— Choisir / اختر —</option>
-                    <option value="all" <?= $scopeAll?'selected':'' ?>>🌐 كل المدارس / Toutes les écoles</option>
-                    <?php foreach (allSchools() as $s): ?>
-                        <option value="<?= (int)$s['id'] ?>" <?= (!$scopeAll && $schoolId===(int)$s['id'])?'selected':'' ?>><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <?php else: ?><input type="hidden" name="sch" value="<?= $schoolId ?>"><?php endif; ?>
+            <?= pageSchoolPickerHtml($schScope) ?>
             <div class="form-group mb-0">
                 <label class="form-label">Année scolaire / السنة الدراسية</label>
                 <input type="text" name="sy" class="form-control" value="<?= e($schoolYear) ?>" onchange="this.form.submit()">
             </div>
         </form>
-<?php if ($hasScope): $scopeIn = ($scopeAll ? 'all' : $schoolId); ?>
+<?php if ($hasScope): $scopeIn = $schScope['hidden']; ?>
         <div class="ba-kpis">
             <div class="ba-kpi"><span class="ic" style="background:#e0e7ff;color:#3730a3"><i class="fas fa-users"></i></span>
                 <span><div class="v"><?= count($preview) ?></div><div class="l">موظف مشمول / Employés</div></span></div>
@@ -557,7 +546,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <form method="POST" id="baOnePctForm">
                     <?= csrfField() ?>
                     <input type="hidden" name="action" value="apply_percats">
-                    <input type="hidden" name="sch" value="<?= (int)$schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+                    <?= $schScope['hidden'] ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
                     <div class="ba-step"><span class="ba-num">١</span><div>
                         <strong>شو؟</strong>
                         <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px" id="opTypes">
@@ -707,7 +696,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <button type="button" class="btn btn-success" onclick="baOpen('baModalIndiv')"><i class="fas fa-user-pen"></i> مبالغ فردية (لكل واحد)</button>
                 <button type="button" class="btn btn-light" onclick="baOpen('baModalDaily')"><i class="fas fa-bus"></i> نقل يومي</button>
                 <button type="button" class="btn btn-light" style="color:#b91c1c" onclick="baOpen('baModalRemove')"><i class="fas fa-trash"></i> إزالة</button>
-                <?php if (!$scopeAll): ?><a class="btn btn-light" style="color:#166534" href="<?= BASE_URL ?>pages/excel_salaries.php?sch=<?= (int)$schoolId ?>&sy=<?= urlencode($schoolYear) ?>" title="إكسل بأسماء المتعاقدين والموظفين: الراتب والأجر الإضافي وعدد الأيام — تعبّيه وترفعه"><i class="fas fa-file-excel"></i> إكسل (متعاقدين/موظفين)</a><?php endif; ?>
+                <?php if (!$scopeMulti): ?><a class="btn btn-light" style="color:#166534" href="<?= BASE_URL ?>pages/excel_salaries.php?sch=<?= (int)($scopeIds[0] ?? 0) ?>&sy=<?= urlencode($schoolYear) ?>" title="إكسل بأسماء المتعاقدين والموظفين: الراتب والأجر الإضافي وعدد الأيام — تعبّيه وترفعه"><i class="fas fa-file-excel"></i> إكسل (متعاقدين/موظفين)</a><?php endif; ?>
             </div>
         </div>
 
@@ -740,7 +729,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                         <button type="button" class="btn btn-sm btn-light" title="تعديل / Modifier" onclick='baEditRow(<?= $rowJson ?>)'><i class="fas fa-pen" style="color:#1d4ed8"></i></button>
                         <form method="POST" style="display:inline" onsubmit="return confirm('حذف هذا السطر عن <?= (int)$al['n'] ?> موظف (<?= e($catLbl2[$al['employee_type']] ?? '') ?>)؟')">
                             <?= csrfField() ?>
-                            <input type="hidden" name="action" value="row_delete"><input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><?= catHidden($validCats) ?>
+                            <input type="hidden" name="action" value="row_delete"><?= $scopeIn ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><?= catHidden($validCats) ?>
                             <input type="hidden" name="old_type" value="<?= e($al['bonus_type']) ?>"><input type="hidden" name="old_vtype" value="<?= e($al['value_type']) ?>">
                             <input type="hidden" name="old_amount" value="<?= e((string)$al['amount']) ?>"><input type="hidden" name="old_currency" value="<?= e($al['currency']) ?>">
                             <input type="hidden" name="old_from" value="<?= $al['start_month'] === null ? '' : (int)$al['start_month'] ?>"><input type="hidden" name="old_to" value="<?= $al['end_month'] === null ? '' : (int)$al['end_month'] ?>">
@@ -770,7 +759,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     <form method="POST" id="periodsForm">
         <?= csrfField() ?>
         <input type="hidden" name="action" value="apply_periods">
-        <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+        <?= $scopeIn ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
         <div class="ba-modal-body">
             <div class="ba-step"><span class="ba-num">١</span><div>
                 <strong>على مين؟</strong> <span class="ba-hint">اختر الفئة — البند بينطبق على كل موظفي هالفئة بالمدرسة. (لأستاذ واحد بس: من ملفه ← تبويب «المالي».)</span>
@@ -820,7 +809,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     <form method="POST" id="indivForm">
         <?= csrfField() ?>
         <input type="hidden" name="action" value="apply_individual">
-        <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><?= catHidden($validCats) ?>
+        <?= $scopeIn ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><?= catHidden($validCats) ?>
         <div class="ba-modal-body">
             <div class="ba-hint" style="margin-bottom:6px">قدّام كل اسم ولكل نوع ثلاث خانات: <b>نسبة ٪</b> (من أساس الراتب بعد التدرّج) <b>+ مبلغ بالليرة + مبلغ بالدولار</b> — عبّي وحدة أو الاتنين أو التلاتة، والبرنامج بيجمعهم (مثلاً متعاقد: 100 $ + 5,000,000 ل.ل بالشهر). القيم <b>شهرية</b>. <b>فاضي</b> = ما بيتغيّر · <b>0</b> = شيله. الخانات تعرض قيم «كل السنة»؛ لتفاصيل فترات شخص: من ملفه ← تبويب «المكافآت».</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px">
@@ -888,7 +877,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     <form method="POST" id="tPeriodsForm">
         <?= csrfField() ?>
         <input type="hidden" name="action" value="apply_transport_periods">
-        <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+        <?= $scopeIn ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
         <div class="ba-modal-body">
             <div style="font-size:12.5px;color:#64748b;margin-bottom:8px">القيمة <strong>يومية</strong> — الشهري = اليومي × أيام حضور كل أستاذ (من ملفه) × 4 أسابيع.</div>
             <div class="ba-cats"><strong>على مين؟</strong>
@@ -919,7 +908,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     <form method="POST" id="beForm">
         <?= csrfField() ?>
         <input type="hidden" name="action" value="row_update">
-        <input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><?= catHidden($validCats) ?>
+        <?= $scopeIn ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><?= catHidden($validCats) ?>
         <input type="hidden" name="old_type" id="beOldType"><input type="hidden" name="old_vtype" id="beOldVt">
         <input type="hidden" name="old_amount" id="beOldAmount"><input type="hidden" name="old_currency" id="beOldCur">
         <input type="hidden" name="old_from" id="beOldFrom"><input type="hidden" name="old_to" id="beOldTo">
@@ -953,7 +942,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     <div class="ba-modal-head"><h4 style="color:#b91c1c"><i class="fas fa-trash"></i> إزالة نوع كامل عن فئة</h4><button type="button" class="ba-x" onclick="baClose('baModalRemove')">✕</button></div>
     <form method="POST" onsubmit="return confirm('إزالة هذا النوع عن الفئات المشيّكة كلها؟')">
         <?= csrfField() ?>
-        <input type="hidden" name="action" value="remove_bonus"><input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+        <input type="hidden" name="action" value="remove_bonus"><?= $scopeIn ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
         <div class="ba-modal-body">
             <div class="ba-cats"><strong>عن مين؟</strong>
                 <?php foreach (['titulaire'=>'الملاك','contractuel'=>'المتعاقدين','employe'=>'الموظفين'] as $k=>$l): ?>
@@ -973,7 +962,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
     </form>
     <form method="POST" onsubmit="return confirm('إزالة كل النقل اليومي عن كل الفئات؟')" style="padding:0 20px 16px">
         <?= csrfField() ?>
-        <input type="hidden" name="action" value="remove_transport_periods"><input type="hidden" name="sch" value="<?= e($scopeIn) ?>"><?= catHidden($validCats) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
+        <input type="hidden" name="action" value="remove_transport_periods"><?= $scopeIn ?><?= catHidden($validCats) ?><input type="hidden" name="sy" value="<?= e($schoolYear) ?>">
         <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-bus"></i> إزالة كل النقل اليومي (كل الفئات)</button>
     </form>
   </div>
