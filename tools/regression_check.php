@@ -8213,10 +8213,10 @@ $cd175 = (string)file_get_contents($PROJ . '/includes/cadre_due.php');
 $ok175 = strpos($cd175, "OR e.id IN (SELECT employee_id FROM employee_bonuses WHERE school_year = ? AND bonus_type IN ('prime_fixe','transport_complement','transport_daily'))") !== false
     && strpos($cd175, "\$p = [\$cut, \$yearStart, \$syA, \$syA, \$syB];") !== false;
 // باميلا (1802): رُسِّمت بـ2026-2027 (قرار approved) وملاكها كرفاقها: صندوق يشمل الإضافي، إضافي 60٪، ت1 2026 = 6٪ × (الأساس + الإضافي)
-$pam175 = $db->query("SELECT e.employee_type, e.titularization_date, e.eoc_includes_extra, (SELECT decision FROM compliance_decisions d WHERE d.rule_key = 'cadre_due' AND d.employee_id = 1802 AND d.school_year = '2026-2027' ORDER BY d.id DESC LIMIT 1) dec,
+$pam175 = $db->query("SELECT e.employee_type, e.titularization_date, e.eoc_includes_extra, (SELECT decision FROM compliance_decisions d WHERE d.rule_key = 'cadre_due' AND d.employee_id = 1802 AND d.school_year = '2026-2027' ORDER BY d.id DESC LIMIT 1) cd_dec,
     (SELECT caisse_amount_lbp FROM monthly_salaries WHERE employee_id = 1802 AND year = 2026 AND month = 10) caisse, (SELECT base_plus_echelon_lbp + prime_fixe_lbp FROM monthly_salaries WHERE employee_id = 1802 AND year = 2026 AND month = 10) gross
     FROM employees e WHERE e.id = 1802 AND e.is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
-if ($pam175) $ok175 = $ok175 && $pam175['employee_type'] === 'enseignant_titulaire' && $pam175['titularization_date'] === '2026-10-01' && (int)$pam175['eoc_includes_extra'] === 1 && $pam175['dec'] === 'approved'
+if ($pam175) $ok175 = $ok175 && $pam175['employee_type'] === 'enseignant_titulaire' && $pam175['titularization_date'] === '2026-10-01' && (int)$pam175['eoc_includes_extra'] === 1 && $pam175['cd_dec'] === 'approved'
     && (int)$pam175['caisse'] === (int)round((int)$pam175['gross'] * 0.06) && (int)$pam175['gross'] > 50000000;
 check('🎓 المرشّح للملاك بعد سنتين يظهر للقرار ولو رواتب سنته الأولى غير مخزّنة (بند لها يكفي) + باميلا نضّور رُسِّمت 1/10/2026 كرفاقها (2026-09-26)', $ok175, $pam175 ? json_encode($pam175) : 'no-pamela');
 
