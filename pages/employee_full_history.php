@@ -10,6 +10,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/payroll_calculator.php';
 requireLogin();
+define('ANNUAL_SLIP_LIB', true); require_once __DIR__ . '/annual_slip.php'; // 🗂️ دوال البطاقة السنوية وتنسيقها حرفياً (وضع مكتبة)
 
 $currentPage = 'employee_full_history';
 $pageTitle = 'Historique employé / تاريخ الأستاذ الكامل';
@@ -96,6 +97,13 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
 .eh-year td.paid { color:#166534; font-weight:700; } .eh-year td.unpaid { color:#b45309; }
 .eh-ytitle { display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:8px 12px; border-radius:8px; margin:14px 0 6px; font-weight:800; }
 .card.eh-card { overflow:visible; }
+.eh-first { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:8px; margin:12px 0 4px; }
+.eh-first > div { background:#1F4E5F; color:#fff; border-radius:10px; padding:8px 12px; }
+.eh-first .k { color:#cbd5e1; font-size:11.5px; } .eh-first .v { font-weight:900; font-size:16px; direction:ltr; text-align:left; }
+.eh-slip-title { display:flex; justify-content:space-between; align-items:center; background:#1F4E5F; color:#fff; padding:8px 14px; border-radius:8px; margin:22px 0 8px; font-weight:800; font-size:15px; }
+.eh-slip-title small { font-weight:600; opacity:.9; }
+.eh-shares { font-size:12.5px; color:#334155; background:#f1f5f9; border-radius:8px; padding:6px 12px; margin:4px 0 6px; }
+@media print { .eh-slip-title { break-before: page; } .eh-first > div { background:#e2e8f0 !important; color:#111 !important; } .eh-first .k { color:#334155 !important; } }
 @media print { .no-print { display:none !important; } .eh-year thead th { position:static; } .card { box-shadow:none; border:none; } }
 </style>
 
@@ -174,6 +182,16 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
             </div>
         </div>
 
+        <?php /* 🥇 «يظهر أوّل شي: تاريخ الدخول، تاريخ الملاك، أرقام صندوق التعويضات والضمان والمالية، تاريخ الميلاد» */ ?>
+        <div class="eh-first">
+            <div><div class="k">تاريخ الدخول / Embauche</div><div class="v eh-num"><?= $d($emp['hire_date']) ?></div></div>
+            <div><div class="k">تاريخ الملاك / Titularisation</div><div class="v eh-num"><?= $emp['employee_type'] === 'enseignant_titulaire' ? $d($emp['titularization_date']) : '—' ?></div></div>
+            <div><div class="k">رقم صندوق التعويضات / N° Caisse</div><div class="v eh-num"><?= e($emp['caisse_number'] ?: '—') ?></div></div>
+            <div><div class="k">رقم الضمان / N° CNSS</div><div class="v eh-num"><?= e(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'])) ?></div></div>
+            <div><div class="k">الرقم المالي / N° Finances</div><div class="v eh-num"><?= e($emp['finance_ministry_number'] ?: '—') ?></div></div>
+            <div><div class="k">تاريخ الميلاد / Naissance</div><div class="v eh-num"><?= $d($emp['birth_date']) ?><?= $age !== null ? ' (' . $age . ')' : '' ?></div></div>
+        </div>
+
         <h4 style="margin:16px 0 8px;color:#1F4E5F"><i class="fas fa-id-card"></i> Identité & numéros officiels / التعريف والأرقام الرسمية</h4>
         <div class="eh-id">
             <div><div class="k">الرقم بالبرنامج / Code</div><div class="v eh-num"><?= e($emp['employee_code'] ?: $id) ?></div></div>
@@ -226,54 +244,17 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
         <ul class="eh-tl"><?php foreach ($famChanges as $fc): ?><li class="d"><span class="dt"><?= $d($fc['from_month'] ?? '') ?></span> <?= ($fc['kind'] ?? '') === 'spouse' ? 'الزوجة' : 'الأولاد' ?>: <?= $fmt($fc['amount_lbp'] ?? 0) ?> ل.ل من هذا الشهر</li><?php endforeach; ?></ul>
         <?php endif; ?>
 
-        <h4 style="margin:18px 0 4px;color:#1F4E5F"><i class="fas fa-money-check-dollar"></i> Salaires — toutes les années / الرواتب كل السنين شهراً شهراً</h4>
+        <h4 style="margin:18px 0 4px;color:#1F4E5F"><i class="fas fa-money-check-dollar"></i> Relevés annuels — toutes les années / البطاقة السنوية لكل سنة ورا بعضها</h4>
+        <?= annualSlipStyleHtml() ?>
         <?php if (!$years): ?><div style="color:#64748b">لا رواتب مخزّنة لهذا الموظف.</div><?php endif; ?>
         <?php foreach ($years as $sy => $rows):
-            $t = ['bpe' => 0, 'pf' => 0, 'aide' => 0, 'tr' => 0, 'fam' => 0, 'caisse' => 0, 'eocg' => 0, 'cnss' => 0, 'tax' => 0, 'ret' => 0, 'net' => 0, 'due' => 0, 'c8' => 0, 'e6' => 0, 'f6' => 0, 'eos' => 0, 'paid' => 0];
-            foreach ($rows as $r) { $t['bpe'] += $r['base_plus_echelon_lbp']; $t['pf'] += $r['prime_fixe_lbp'] + $r['extra_lbp']; $t['aide'] += $r['aide_complementaire_lbp']; $t['tr'] += $r['transport_lbp']; $t['fam'] += $r['family_allowance_lbp']; $t['caisse'] += $r['caisse_amount_lbp']; $t['eocg'] += $r['eoc_grade_lbp']; $t['cnss'] += $r['cnss_amount_lbp']; $t['tax'] += $r['income_tax_lbp']; $t['ret'] += $r['total_retenues_lbp']; $t['net'] += $r['net_salary_lbp']; $t['due'] += $r['total_due_lbp']; $t['c8'] += $r['school_cnss_8_lbp']; $t['e6'] += $r['school_eoc_6_lbp']; $t['f6'] += $r['school_family_comp_6_lbp']; $t['eos'] += $r['school_end_of_service_8_5_lbp']; $t['paid'] += (int)$r['is_paid']; }
-            $grand['net'] += $t['net']; $grand['due'] += $t['due']; $grand['caisse'] += $t['caisse'] + $t['eocg']; $grand['cnss'] += $t['cnss']; $grand['tax'] += $t['tax']; $grand['fam'] += $t['fam']; $grand['n'] += count($rows); $grand['paid'] += $t['paid'];
+            $t = ['net' => 0, 'due' => 0, 'caisse' => 0, 'cnss' => 0, 'tax' => 0, 'fam' => 0, 'c8' => 0, 'e6' => 0, 'f6' => 0, 'eos' => 0, 'paid' => 0];
+            foreach ($rows as $r) { $t['net'] += $r['net_salary_lbp']; $t['due'] += $r['total_due_lbp']; $t['caisse'] += $r['caisse_amount_lbp'] + $r['eoc_grade_lbp']; $t['cnss'] += $r['cnss_amount_lbp']; $t['tax'] += $r['income_tax_lbp']; $t['fam'] += $r['family_allowance_lbp']; $t['c8'] += $r['school_cnss_8_lbp']; $t['e6'] += $r['school_eoc_6_lbp']; $t['f6'] += $r['school_family_comp_6_lbp']; $t['eos'] += $r['school_end_of_service_8_5_lbp']; $t['paid'] += (int)$r['is_paid']; }
+            $grand['net'] += $t['net']; $grand['due'] += $t['due']; $grand['caisse'] += $t['caisse']; $grand['cnss'] += $t['cnss']; $grand['tax'] += $t['tax']; $grand['fam'] += $t['fam']; $grand['n'] += count($rows); $grand['paid'] += $t['paid'];
         ?>
-        <div class="eh-ytitle"><span>📅 <?= e($sy) ?> — <?= count($rows) ?> شهر (مدفوع <?= $t['paid'] ?>)</span><span>الصافي <?= $fmt($t['net']) ?> · المستحق <?= $fmt($t['due']) ?> ل.ل</span></div>
-        <div class="eh-wrap"><table class="eh-year">
-            <thead><tr>
-                <th>الشهر</th><th>الدرجة</th><th>الأساس + الدرجة</th><th>الأجر الإضافي</th><th>مكافأة</th><th>النقل</th><th>تعويض عائلي</th>
-                <th>الصندوق 6%</th><th>حسم درجة/½</th><th>الضمان 3%</th><th>الضريبة</th><th>مجموع الحسومات</th><th>الصافي</th><th>المستحق</th><th>سعر $</th>
-                <th class="sch">المدرسة: ضمان 8%</th><th class="sch">صندوق 6%</th><th class="sch">عائلي 6%</th><th class="sch">نهاية خدمة 8.5%</th><th>الدفع</th>
-            </tr></thead>
-            <tbody>
-            <?php foreach ($rows as $r): ?>
-                <tr>
-                    <td><?= monthName((int)$r['month'], 'ar') ?> <?= (int)$r['year'] ?></td>
-                    <td><?= $emp['employee_type'] === 'employe' ? '—' : rtrim(rtrim(number_format((float)$r['grade_at_month'], 1), '0'), '.') ?></td>
-                    <td class="num"><?= $fmt($r['base_plus_echelon_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['prime_fixe_lbp'] + $r['extra_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['aide_complementaire_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['transport_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['family_allowance_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['caisse_amount_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['eoc_grade_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['cnss_amount_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['income_tax_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['total_retenues_lbp']) ?></td>
-                    <td class="num" style="font-weight:700"><?= $fmt($r['net_salary_lbp']) ?></td>
-                    <td class="num" style="font-weight:700"><?= $fmt($r['total_due_lbp']) ?></td>
-                    <td class="num"><?= (float)$r['exchange_rate'] > 0 ? number_format((float)$r['exchange_rate']) : '—' ?></td>
-                    <td class="num"><?= $fmt($r['school_cnss_8_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['school_eoc_6_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['school_family_comp_6_lbp']) ?></td>
-                    <td class="num"><?= $fmt($r['school_end_of_service_8_5_lbp']) ?></td>
-                    <td class="<?= (int)$r['is_paid'] ? 'paid' : 'unpaid' ?>"><?= (int)$r['is_paid'] ? 'مدفوع' . ($r['paid_date'] ? ' ' . $d($r['paid_date']) : '') : 'غير مدفوع' ?></td>
-                </tr>
-            <?php endforeach; ?>
-                <tr class="tot">
-                    <td colspan="2">المجموع</td>
-                    <td class="num"><?= $fmt($t['bpe']) ?></td><td class="num"><?= $fmt($t['pf']) ?></td><td class="num"><?= $fmt($t['aide']) ?></td><td class="num"><?= $fmt($t['tr']) ?></td><td class="num"><?= $fmt($t['fam']) ?></td>
-                    <td class="num"><?= $fmt($t['caisse']) ?></td><td class="num"><?= $fmt($t['eocg']) ?></td><td class="num"><?= $fmt($t['cnss']) ?></td><td class="num"><?= $fmt($t['tax']) ?></td><td class="num"><?= $fmt($t['ret']) ?></td>
-                    <td class="num"><?= $fmt($t['net']) ?></td><td class="num"><?= $fmt($t['due']) ?></td><td></td>
-                    <td class="num"><?= $fmt($t['c8']) ?></td><td class="num"><?= $fmt($t['e6']) ?></td><td class="num"><?= $fmt($t['f6']) ?></td><td class="num"><?= $fmt($t['eos']) ?></td><td></td>
-                </tr>
-            </tbody>
-        </table></div>
+        <div class="eh-slip-title"><span>📅 Relevé annuel <?= e($sy) ?> / البطاقة السنوية <?= e($sy) ?></span><small><?= count($rows) ?> شهر (مدفوع <?= $t['paid'] ?>) · الصافي <?= $fmt($t['net']) ?> · المستحق <?= $fmt($t['due']) ?> ل.ل</small></div>
+        <?php try { echo annualSlipHtml($db, $emp, $sy); } catch (Throwable $e) { echo '<div class="alert alert-warning">تعذّر عرض بطاقة ' . e($sy) . ': ' . e($e->getMessage()) . '</div>'; } ?>
+        <div class="eh-shares">🏫 حصص المدرسة لسنة <?= e($sy) ?>: ضمان 8% <b><?= $fmt($t['c8']) ?></b> · صندوق التعويضات 6% <b><?= $fmt($t['e6']) ?></b> · تعويضات عائلية 6% <b><?= $fmt($t['f6']) ?></b> · نهاية الخدمة 8.5% <b><?= $fmt($t['eos']) ?></b> — من الموظف: الصندوق <b><?= $fmt($t['caisse']) ?></b> · الضمان 3% <b><?= $fmt($t['cnss']) ?></b> · الضريبة <b><?= $fmt($t['tax']) ?></b> · التعويض العائلي <b><?= $fmt($t['fam']) ?></b></div>
         <?php endforeach; ?>
 
         <?php if ($years): ?>

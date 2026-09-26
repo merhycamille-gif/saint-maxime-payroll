@@ -8284,8 +8284,12 @@ $lv178 = $db->query("SELECT e.id, e.first_name_ar, e.birth_date, e.phone1, " . l
     FROM employees e WHERE e.is_deleted = 0 AND " . leftDateSql('e.') . " BETWEEN '2000-01-01' AND '2026-09-30' AND e.first_name_ar <> '' AND e.birth_date > '1900-01-01' HAVING ny >= 2 ORDER BY ny DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 if ($lv178) {
     $hid = renderPage('pages/employee_full_history.php', ['id' => (int)$lv178['id']], [], [], '', '2026-2027'); // السنة بالشريط لا تخفيه
-    $c178('leaver-page', $noFatal($hid) && substr_count($hid, '<div class="eh-ytitle">') === (int)$lv178['ny'] && strpos($hid, 'ترك ' . date('d/m/Y', strtotime($lv178['l']))) !== false
-        && strpos($hid, 'رقم الضمان / N° CNSS') !== false && strpos($hid, 'المدرسة: ضمان 8%') !== false && strpos($hid, 'class="eh-tl"') !== false && stripos($hid, 'Warning:') === false);
+    $c178('leaver-page', $noFatal($hid) && substr_count($hid, '<div class="salary-slip">') === (int)$lv178['ny'] && substr_count($hid, '<div class="eh-slip-title">') === (int)$lv178['ny'] && strpos($hid, 'ترك ' . date('d/m/Y', strtotime($lv178['l']))) !== false
+        && strpos($hid, 'class="eh-first"') !== false && substr_count($hid, 'annualSlipStyleHtml') === 0 && strpos($hid, '.salary-slip-table th') !== false /* CSS البطاقة موجود */
+        && strpos($hid, 'رقم الضمان / N° CNSS') !== false && strpos($hid, 'حصص المدرسة لسنة') !== false && strpos($hid, 'class="eh-tl"') !== false && stripos($hid, 'Warning:') === false);
+    // البطاقة السنوية العادية لم تتغيّر بوضع المكتبة: صفحتها تعرض CSS مرّة واحدة والبطاقة كما هي
+    $hslip178 = renderPage('pages/annual_slip.php', ['employee_id' => (int)$lv178['id'], 'school_year' => '2025-2026'], []);
+    $c178('slip-page-unchanged', $noFatal($hslip178) && substr_count($hslip178, '/* ترويسة المدرسة: بلا خط أفقي ثقيل، مرتّبة */') === 1 && substr_count($hslip178, '<div class="salary-slip">') === 1);
     $hs = renderPage('pages/employee_full_history.php', ['q' => mb_substr($lv178['first_name_ar'], 0, 2)], [], [], '', '2026-2027');
     $c178('search-includes-leaver', $noFatal($hs) && (strpos($hs, 'employee_full_history.php?id=' . (int)$lv178['id']) !== false || strpos($hs, 'Location') !== false));
     $hb = renderPage('pages/employee_full_history.php', ['q' => date('d/m/Y', strtotime($lv178['birth_date']))], [], [], '', '2026-2027');

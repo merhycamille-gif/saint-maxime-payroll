@@ -20,6 +20,9 @@ if ($schoolYear === 'all') $schoolYear = currentSchoolYear(); // الكشف يح
 $slipBlank = max(0, min(2, (int)($_GET['blank'] ?? 0)));
 $GLOBALS['slip_blank'] = $slipBlank;
 $blankQ = $slipBlank ? '&blank=' . $slipBlank : '';
+// 🗂️ (2026-09-26 «كل سنة تبيّن البطاقة السنوية ورا بعضهن» بصفحة التاريخ الكامل): وضع مكتبة — الصفحة الأخرى تعرّف ANNUAL_SLIP_LIB
+//    ثم تُدرج هذا الملف فتأخذ دوال البطاقة (annualSlipHtml) وتنسيقها (annualSlipStyleHtml) حرفياً بلا أي إخراج — البطاقة نفسها لم تُمَسّ.
+if (defined('ANNUAL_SLIP_LIB')) return;
 function annualSlipBlankHtml(string $html, int $level): string {
     // سطر سعر الصرف: رقم ⇒ يُزال
     $html = preg_replace('#<div class="slip-rate"[^>]*>.*?</div>#su', '', $html);
@@ -373,6 +376,7 @@ $hideExportToolbar = true;
 include __DIR__ . '/../includes/header.php';
 ?>
 
+<?php function annualSlipStyleHtml(): string { ob_start(); ?>
 <style>
 /* ترويسة المدرسة: بلا خط أفقي ثقيل، مرتّبة */
 .salary-slip-header { border-bottom: none !important; align-items: flex-start; padding-bottom: 6px; margin-bottom: 14px; }
@@ -511,6 +515,7 @@ include __DIR__ . '/../includes/header.php';
 }
 .salary-slip + .salary-slip { margin-top: 24px; border-top: 3px dashed var(--gray-300); padding-top: 24px; }
 </style>
+<?php return ob_get_clean(); } echo annualSlipStyleHtml(); /* 🗂️ CSS البطاقة كدالة تُشاركها صفحة التاريخ الكامل */ ?>
 <?php if (!empty($_GET['_fit'])): /* وضع ملء الصفحة: كل الأعمدة + الدولار. الترويسة/المعلومات مكبّرة (لا تؤثّر على عرض الجدول) */ ?>
 <style>
 @media print {
