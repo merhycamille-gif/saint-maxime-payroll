@@ -204,10 +204,19 @@ function cadreDueTemplate(PDO $db, int $schoolId): array {
               'payment_months_per_year' => 12];
     try {
         $rows = $db->query("SELECT " . implode(',', array_keys($flags)) . " FROM employees WHERE school_id = " . (int)$schoolId . " AND is_deleted = 0 AND status = 'actif' AND employee_type = 'enseignant_titulaire'")->fetchAll(PDO::FETCH_ASSOC);
+        // 🔴 (2026-09-26 ريتا طنوس/النجاة «6٪ بصندوق التعويضات على الأساس بس»): مفاتيح «يشمل الأجر الإضافي/المكافأة» كانت تُؤخذ
+        //    من أكثرية كل الملاك — وبالنجاة 30 ملاكاً بلا إضافي (المفتاح عندهم مطفأ ولا أثر له) مقابل 24 يتقاضون إضافياً وكلهم «يشمل» ⇒
+        //    المرسَّم الجديد ورث «مطفأ» فحُسم 6٪ من أساسه وحده. الصحّ: هذه المفاتيح تُقرأ ممّن يتقاضون إضافياً فعلاً (بند إضافي فعّال).
+        $withExtra = [];
+        try {
+            $withExtra = $db->query("SELECT " . implode(',', array_keys($flags)) . " FROM employees e WHERE e.school_id = " . (int)$schoolId . " AND e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire'
+                AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id AND b.bonus_type = 'prime_fixe' AND b.is_active = 1 AND b.school_year >= " . $db->quote(currentSchoolYear()) . ")")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { $withExtra = []; }
         if ($rows) {
             foreach (array_keys($flags) as $f) {
+                $src = (preg_match('/includes_(extra|prime_aide)$/', $f) && $withExtra) ? $withExtra : $rows;
                 $freq = [];
-                foreach ($rows as $r) { $v = (string)(int)$r[$f]; $freq[$v] = ($freq[$v] ?? 0) + 1; }
+                foreach ($src as $r) { $v = (string)(int)$r[$f]; $freq[$v] = ($freq[$v] ?? 0) + 1; }
                 arsort($freq);
                 $flags[$f] = (int)array_key_first($freq);
             }

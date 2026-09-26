@@ -8177,6 +8177,35 @@ check('🖨️ PDF/إرسال: هدف فيه type[]=… مقبول (2026-09-26)'
     && strpos((string)file_get_contents($PROJ . '/pages/send_attestation.php'), "[A-Za-z0-9_./?&=%\-+:\[\]]+") !== false
     && preg_match('#^[A-Za-z0-9_./?&=%\-+:\[\]]+$#', 'pages/annual_slip.php?action=print_all&type_set=1&type[]=enseignant_titulaire&school_year=2026-2027') === 1, 'ok');
 
+/* =====================================================================
+ * 174) 🏦 الداخل للملاك يرث «الصندوق يشمل الأجر الإضافي» كرفاقه المتقاضين إضافياً (2026-09-26 ريتا طنوس/النجاة: 6٪ على الأساس بس)
+ *      + شفاء تلقائي للملاك الحاليين بإضافي ومفتاح مطفأ خلافاً لرفاقهم
+ * =================================================================== */
+$ok174 = true; $why174 = [];
+$c174 = function (string $n, bool $ok) use (&$ok174, &$why174) { if (!$ok) { $ok174 = false; $why174[] = $n; } };
+require_once $PROJ . '/includes/cadre_due.php';
+$c174('code', function_exists('healCadreEocIncludesExtra') && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healCadreEocIncludesExtra();') !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/cadre_due.php'), "preg_match('/includes_(extra|prime_aide)\$/', \$f) && \$withExtra") !== false);
+// القالب: بكل مدرسة فيها ملاك يتقاضون إضافياً وأكثريتهم «يشمل» ⇒ القالب «يشمل» حتى لو أكثرية كل الملاك (بلا إضافي) مطفأة
+$schools174 = $db->query("SELECT e.school_id, SUM(e.eoc_includes_extra = 1) yes, COUNT(*) n FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire'
+    AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id AND b.bonus_type = 'prime_fixe' AND b.is_active = 1 AND b.school_year >= " . $db->quote(currentSchoolYear()) . ") GROUP BY e.school_id HAVING yes * 2 > n")->fetchAll(PDO::FETCH_ASSOC);
+$tplOk174 = count($schools174) > 0;
+foreach ($schools174 as $sr) { $t = cadreDueTemplate($db, (int)$sr['school_id']); if ((int)$t['eoc_includes_extra'] !== 1) { $tplOk174 = false; $why174[] = 'tpl-school-' . $sr['school_id']; } }
+$c174('template-includes-extra', $tplOk174);
+// الشفاء: بعده لا ملاك فاعل بإضافي مخزّن بسنة حالية/مفتوحة ومفتاح مطفأ في مدرسة أكثريتها «يشمل» (ريتا طنوس 1776 محلياً: 6٪ × 55,525,000)
+healCadreEocIncludesExtra(true);
+$left174 = 0;
+foreach ($db->query("SELECT DISTINCT e.id, e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+    WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND COALESCE(e.eoc_subject, 1) = 1 AND COALESCE(e.eoc_includes_extra, 0) = 0
+      AND ms.school_year >= " . $db->quote(currentSchoolYear()) . " AND ms.prime_fixe_lbp > 0 AND ms.caisse_amount_lbp > 0 AND " . leftDateSql('e.') . " = '9999-12-31'")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    if (in_array((int)$r['school_id'], array_map('intval', array_column($schools174, 'school_id')), true)) $left174++;
+}
+$c174('heal-cleared', $left174 === 0);
+$rita174 = $db->query("SELECT eoc_includes_extra ex, (SELECT caisse_amount_lbp FROM monthly_salaries WHERE employee_id = 1776 AND year = 2026 AND month = 10) c FROM employees WHERE id = 1776 AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+if ($rita174) $c174('rita-oct-2026', (int)$rita174['ex'] === 1 && (int)$rita174['c'] === (int)round(55525000 * 0.06));
+$c174('idempotent', healCadreEocIncludesExtra(true) === 0);
+check('🏦 الداخل للملاك يرث «الصندوق يشمل الأجر الإضافي» كرفاقه المتقاضين إضافياً + شفاء الملاك الحاليين (2026-09-26 ريتا طنوس: 6٪ على الأساس + الإضافي)', $ok174, implode(' · ', $why174) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

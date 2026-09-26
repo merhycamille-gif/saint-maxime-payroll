@@ -1888,6 +1888,39 @@ function healEmploye64EndOfService(bool $force = false): int {
     } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
     return $n;
 }
+/**
+ * 🩹⚖️ (2026-09-26 ريتا طنوس «6٪ بصندوق التعويضات على الأساس بس» — «بس يدخل ملاك لازم يطبّق عليه متل كل الداخلين تلقائياً»):
+ * ملاك خاضع للصندوق له أجر إضافي مخزّن بسنة حالية/مفتوحة ومفتاح «الصندوق يشمل الأجر الإضافي» مطفأ، بينما ملاك مدرسته
+ * المتقاضون إضافياً (بند فعّال) أكثريتهم «يشمل» ⇒ تُضوّى الخانة ويُعاد حساب تلك السنوات (المدفوع بسنة سابقة لا يُمسّ). كل 3 ساعات.
+ */
+function healCadreEocIncludesExtra(bool $force = false): int {
+    if (!$force && !healGateOpen('heal_cadre_eoc_extra')) return 0;
+    $n = 0;
+    try {
+        $db = getDB(); $cur = currentSchoolYear();
+        $rows = $db->query("SELECT DISTINCT e.id, e.school_id, ms.school_year FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+            WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND COALESCE(e.eoc_subject, 1) = 1 AND COALESCE(e.eoc_includes_extra, 0) = 0
+              AND ms.school_year >= " . $db->quote($cur) . " AND ms.prime_fixe_lbp > 0 AND ms.caisse_amount_lbp > 0
+              AND " . leftDateSql('e.') . " = '9999-12-31'
+            ORDER BY e.school_id, e.id, ms.school_year")->fetchAll(PDO::FETCH_ASSOC);
+        $norm = [];
+        foreach ($rows as $r) {
+            $sid = (int)$r['school_id'];
+            if (!isset($norm[$sid])) {
+                $st = $db->query("SELECT SUM(e.eoc_includes_extra = 1) yes, COUNT(*) n FROM employees e WHERE e.school_id = $sid AND e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire' AND e.id <> " . (int)$r['id'] . "
+                    AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id AND b.bonus_type = 'prime_fixe' AND b.is_active = 1 AND b.school_year >= " . $db->quote($cur) . ")")->fetch(PDO::FETCH_ASSOC);
+                $norm[$sid] = ((int)$st['n'] > 0 && (int)$st['yes'] * 2 > (int)$st['n']); // الأكثرية «يشمل»
+            }
+            if (!$norm[$sid]) continue;
+            if (isSchoolYearLocked($sid, (string)$r['school_year'])) continue;
+            $db->exec("UPDATE employees SET eoc_includes_extra = 1 WHERE id = " . (int)$r['id']);
+            $m = (int)recalcEmployeeYear((int)$r['id'], (string)$r['school_year']);
+            logAudit('heal_cadre_eoc_includes_extra', 'employees', (int)$r['id'], null, ['sy' => $r['school_year'], 'months' => $m]);
+            $n++;
+        }
+    } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
+    return $n;
+}
 function healNetMathRows(): int {
     if (!healGateOpen('heal_net_math')) return 0;
     $n = 0;
