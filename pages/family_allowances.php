@@ -182,7 +182,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
 
 <?php if ($hasScope): ?>
         <div class="fa-kpis">
-            <div class="fa-kpi"><span><div class="v"><?= count($rows) ?></div><div class="l">موظف ظاهر / Employés</div></span></div>
+            <div class="fa-kpi"><span><div class="v" id="faShown"><?= count($rows) ?></div><div class="l">موظف ظاهر / Employés</div></span></div>
             <div class="fa-kpi"><span><div class="v"><?= $nWith ?></div><div class="l">عندهم تعويض ساري (<?= monthName($refM, 'ar') . ' ' . $refY ?>)</div></span></div>
             <div class="fa-kpi"><span><div class="v"><?= number_format($totCur) ?></div><div class="l">مجموع الساري <?= monthName($refM, 'ar') . ' ' . $refY ?> (ل.ل)</div></span></div>
             <div class="fa-kpi"><span><div class="v"><?= number_format($totSp) ?></div><div class="l">مجموع تعويض الزوجة بالملفات (ل.ل)</div></span></div>
@@ -231,7 +231,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                         if (isset($r['count_children_allowance']) && (int)$r['count_children_allowance'] !== 1) $notes[] = 'احتساب الأولاد مطفأ بملفه';
                     }
                     $dis = $elig ? '' : ' disabled'; $ro = $elig ? ' readonly' : ''; // ✏️ الصفّ مقفول للقراءة حتى يُكبس «تعديل» (2026-09-24 «لازم يكون قدام الموظف في إديت») ?>
-                    <tr class="<?= $elig ? '' : 'na' ?>" data-id="<?= $id ?>">
+                    <tr class="<?= $elig ? '' : 'na' ?>" data-id="<?= $id ?>" data-cat="<?= e(array_search($r['employee_type'], $validCats, true) ?: '') ?>" data-school="<?= (int)$r['school_id'] ?>">
                         <td><?= $i ?></td>
                         <td class="fa-act" style="white-space:nowrap">
                             <?php if ($elig): ?>
@@ -305,6 +305,27 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
 </div>
 
 <script>
+// ☑️⚡ (2026-09-26 «بس حدّد الفئة هي اللي لازم تبيّن مش العكس»): الجدول يتبع التشك مارك فوراً بالمتصفّح — لا انتظار للسيرفر ولا لأي إعادة تحميل.
+//    كل صفّ يحمل data-cat/data-school؛ عند أي تغيير (أو عند عرض الصفحة) تُخفى الصفوف غير المشيّكة ويُحدَّث عدّاد «موظف ظاهر»،
+//    ثم يُعاد الحساب من السيرفر (msaSubmitSoon) لتصحيح المجاميع — لكن ما يراه المستخدم صحيح من اللحظة الأولى.
+window.faApplyLiveFilter = function () {
+    var f = document.getElementById('faFilter'); if (!f) return;
+    var cats = [].slice.call(f.querySelectorAll('input[name="cat[]"]:checked')).map(function (c) { return c.value; });
+    var schBoxes = f.querySelectorAll('input[name="sch[]"]'); var allBox = f.querySelector('input[name="sch_all"]');
+    var schools = (schBoxes.length && !(allBox && allBox.checked)) ? [].slice.call(schBoxes).filter(function (c) { return c.checked; }).map(function (c) { return c.value; }) : null;
+    var shown = 0;
+    document.querySelectorAll('tr[data-id][data-cat]').forEach(function (tr) {
+        var ok = cats.indexOf(tr.getAttribute('data-cat')) !== -1 && (schools === null || schools.indexOf(tr.getAttribute('data-school')) !== -1);
+        tr.style.display = ok ? '' : 'none'; if (ok) shown++;
+        var chg = tr.nextElementSibling; if (!ok && chg && chg.classList.contains('fa-chg-row')) chg.style.display = 'none';
+    });
+    var k = document.getElementById('faShown'); if (k) k.textContent = shown;
+};
+(function () {
+    var f = document.getElementById('faFilter');
+    if (f) f.addEventListener('change', function (e) { if (e.target && (e.target.name === 'cat[]' || e.target.name === 'sch[]' || e.target.name === 'sch_all')) window.faApplyLiveFilter(); });
+    window.addEventListener('pageshow', window.faApplyLiveFilter);
+})();
 (function () {
     var form = document.getElementById('faForm'); if (!form) return;
     var btn = document.getElementById('faApply'), cnt = document.getElementById('faCnt');
