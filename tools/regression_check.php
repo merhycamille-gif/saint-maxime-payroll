@@ -8124,25 +8124,37 @@ check('🏫 الصفحات الجماعية بعدة مدارس (2026-09-26): ا
 $ok173 = true; $why173 = [];
 $c173 = function (string $n, bool $ok) use (&$ok173, &$why173) { if (!$ok) { $ok173 = false; $why173[] = $n; } };
 $pc173 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
-$c173('engine-code', strpos($pc173, "if (\$emp['employee_type'] === 'employe') \$past64Employe = true;") !== false
-    && strpos($pc173, "elseif (\$emp['employee_type'] === 'enseignant_titulaire' && !empty(\$emp['keep_working_past_64'])) \$past64Titulaire = true;") !== false
-    && strpos($pc173, "if (!empty(\$emp['keep_working_past_64'])) {\n            \$endOfMonth") === false && strpos($pc173, "if (!empty(\$emp['keep_working_past_64'])) {\r\n            \$endOfMonth") === false);
+$c173('engine-code', function_exists('employeExemptEos64') && strpos($pc173, "\$past64Employe = employeExemptEos64(\$emp, (int)\$this->month, (int)\$this->year);") !== false
+    && strpos($pc173, "\$emp['employee_type'] === 'enseignant_titulaire' && !empty(\$emp['keep_working_past_64'])) \$past64Titulaire = true;") !== false
+    && strpos($pc173, "(\$isEmploye && !employeExemptEos64(\$r, \$m, \$y))") !== false
+    && employeExemptEos64(['employee_type' => 'employe', 'birth_date' => '1962-06-15'], 6, 2026) && !employeExemptEos64(['employee_type' => 'employe', 'birth_date' => '1962-06-15'], 5, 2026)
+    && !employeExemptEos64(['employee_type' => 'enseignant_titulaire', 'birth_date' => '1950-01-01'], 6, 2026));
 $c173('heal+count-code', function_exists('healEmploye64EndOfService') && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healEmploye64EndOfService();') !== false
     && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), "\$ag['D'] += ((\$p['worker'] && \$p['O'] > 0) ? 1 : 0);") !== false
     && strpos($fnAll173 = (string)file_get_contents($PROJ . '/includes/functions.php'), "\$tot['workers'] += (\$p['worker'] && \$p['O'] > 0) ? 1 : 0;") !== false
     && strpos((string)file_get_contents($PROJ . '/pages/official_forms.php'), 'خاضع لنهاية الخدمة — الموظف بعد 64 لا يُعدّ') !== false);
 // المحرّك: موظف بلغ 64 بنهاية الشهر ⇒ ٨.٥٪ = 0 بلا مفتاح؛ وشهر قبل بلوغه (إن وُجد بالقاعدة) ⇒ > 0
-$e173 = $db->query("SELECT e.id, e.birth_date FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+// تجربة فعلية مع ترجيع: موظف بمحرّك حيّ (آخر شهر مخزّن له عائلي > 0) — نبدّل تاريخ ولادته مؤقّتاً ليبلغ 64 بذلك الشهر ⇒ ٨.٥٪ = 0
+//    وبـ63 ⇒ > 0، ثم نعيد تاريخه حرفياً (المحرّك يقرأ الملف عند الإنشاء)
+$e173 = null; $after = $before = null;
+$cand173 = $db->query("SELECT e.id, e.birth_date, ms.month, ms.year FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
     WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND e.cnss_subject = 1 AND COALESCE(e.keep_working_past_64, 0) = 0
-      AND e.birth_date > '1900-01-01' AND ms.base_plus_echelon_lbp > 0
-      AND TIMESTAMPDIFF(YEAR, e.birth_date, LAST_DAY(CONCAT(ms.year, '-', LPAD(ms.month, 2, '0'), '-01'))) >= 64
+      AND ms.school_family_comp_6_lbp > 0 AND ms.school_end_of_service_8_5_lbp > 0 AND ms.is_paid = 0
+      AND (e.base_salary_usd > 0 OR e.contract_salary_lbp > 0)
     ORDER BY ms.year DESC, ms.month DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-if ($e173) {
-    [$by173, $bm173] = array_map('intval', explode('-', substr($e173['birth_date'], 0, 7)));
-    $after = (new PayrollCalculator((int)$e173['id'], $bm173, $by173 + 64))->calculate();   // شهر بلوغه 64
-    $before = (new PayrollCalculator((int)$e173['id'], $bm173, $by173 + 63))->calculate();  // قبله بسنة
-    $c173('engine-64=0', (int)$after['school_end_of_service_8_5_lbp'] === 0 && (int)$after['school_family_comp_6_lbp'] > 0);
-    $c173('engine-63>0', (int)$before['school_end_of_service_8_5_lbp'] > 0);
+if ($cand173) {
+    $id173 = (int)$cand173['id']; $m173 = (int)$cand173['month']; $y173 = (int)$cand173['year']; $orig173 = $cand173['birth_date'];
+    $setBd = $db->prepare("UPDATE employees SET birth_date = ? WHERE id = ?");
+    try {
+        $setBd->execute([sprintf('%04d-%02d-01', $y173 - 64, $m173), $id173]);
+        $after = (new PayrollCalculator($id173, $m173, $y173))->calculate();   // بلغ 64 هذا الشهر
+        $setBd->execute([sprintf('%04d-%02d-01', $y173 - 63, $m173), $id173]);
+        $before = (new PayrollCalculator($id173, $m173, $y173))->calculate();  // 63 فقط
+    } finally { $setBd->execute([$orig173, $id173]); }
+    $e173 = $cand173;
+    $c173('engine-64=0', $after && (int)$after['school_end_of_service_8_5_lbp'] === 0 && (int)$after['school_family_comp_6_lbp'] > 0 && (int)$after['cnss_amount_lbp'] > 0);
+    $c173('engine-63>0', $before && (int)$before['school_end_of_service_8_5_lbp'] > 0);
+    $c173('birth-restored', $db->query("SELECT birth_date FROM employees WHERE id = $id173")->fetchColumn() === $orig173);
     // بعد الشفاء: لا شهر مخزّن (غير محميّ) لموظف بلغ 64 يحمل ٨.٥٪
     healEmploye64EndOfService(true);
     $left173 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
