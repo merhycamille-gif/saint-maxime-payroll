@@ -609,7 +609,7 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel (tous) / PDF رسمي (الكل)</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expAllQ ?>&format=xlsx" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
-            <?php if ($slipBlank): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> بالمبالغ / avec montants</a>
+            <?php if ($slipBlank): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> بالمبالغ / avec montants</a><?php endif; ?>
             <?php if ($slipBlank !== 1): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=1" class="btn btn-warning" title="كل البطاقات بالأسماء بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierges (montants) / فاضية من المبالغ</a><?php endif; ?>
             <?php if ($slipBlank !== 2): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=2" class="btn btn-warning" title="نماذج فارغة بلا اسم ولا مبالغ — نسخة لكل أستاذ مختار"><i class="fas fa-file"></i> Formulaires vierges / نماذج فارغة بلا اسم</a><?php endif; ?>
         </div>
