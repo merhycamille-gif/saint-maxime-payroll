@@ -94,11 +94,15 @@ foreach ($rows as $r) { $v = familyAllowanceForMonth($r, $refM, $refY); if ($v >
 $mo = fn($d) => ($d && (string)$d !== '0000-00-00') ? substr((string)$d, 0, 7) : '';
 ?>
 <style>
-.fa-wrap { overflow:auto; }
+/* 📌 (2026-09-26 «بس انزل بالصفحة لازم عناوين الصفحة يضلّوا مبيّنين»): بلا حاوية تمرير حول الجدول حتى يلتصق رأس الجدول
+   بأعلى الشاشة (تحت الشريط العلوي الملتصق) أثناء تمرير الصفحة؛ العرض الزائد يمرَّر أفقياً على مستوى الصفحة بلا قصّ */
+.fa-wrap { overflow:visible; }
+.card.fa-card { overflow:visible; }
+:root { --msa-top: 0px; }
 table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
 .fa-table th, .fa-table td { border:1px solid #e2e8f0; padding:5px 6px; text-align:center; vertical-align:middle; white-space:nowrap; }
-.fa-table thead th { background:#1F4E5F; color:#fff; font-weight:700; position:sticky; top:0; z-index:2; }
-.fa-table thead tr.sub th { background:#2b6478; font-weight:600; font-size:12px; top:33px; }
+.fa-table thead th { background:#1F4E5F; color:#fff; font-weight:700; position:sticky; top:var(--msa-top); z-index:2; }
+.fa-table thead tr.sub th { background:#2b6478; font-weight:600; font-size:12px; top:calc(var(--msa-top) + 33px); }
 .fa-table th.sp, .fa-table td.sp { background:#fdf2f8; } .fa-table thead th.sp { background:#9d174d; } .fa-table thead tr.sub th.sp { background:#be185d; }
 .fa-table th.ch, .fa-table td.ch { background:#eff6ff; } .fa-table thead th.ch { background:#1d4ed8; } .fa-table thead tr.sub th.ch { background:#2563eb; }
 .fa-table td.nm { text-align:right; font-weight:700; white-space:normal; min-width:180px; }
@@ -141,7 +145,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
 @media print { .fa-bar, .fa-filters, .no-print { display:none !important; } .fa-table input { border:none; background:transparent; } }
 </style>
 
-<div class="card">
+<div class="card fa-card"><?php /* 📌 fa-card: بلا قصّ (overflow) حتى يلتصق رأس الجدول أثناء التمرير */ ?>
     <div class="card-header"><h3>
         <span dir="ltr"><i class="fas fa-people-roof"></i> Allocations familiales — fichier groupé</span>
         <div style="font-size:0.85em;font-weight:600;opacity:0.9">التعويض العائلي — ملف جماعي لكل الموظفين</div>
@@ -311,6 +315,13 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
 // ☑️⚡ (2026-09-26 «بس حدّد الفئة هي اللي لازم تبيّن مش العكس»): الجدول يتبع التشك مارك فوراً بالمتصفّح — لا انتظار للسيرفر ولا لأي إعادة تحميل.
 //    كل صفّ يحمل data-cat/data-school؛ عند أي تغيير (أو عند عرض الصفحة) تُخفى الصفوف غير المشيّكة ويُحدَّث عدّاد «موظف ظاهر»،
 //    ثم يُعاد الحساب من السيرفر (msaSubmitSoon) لتصحيح المجاميع — لكن ما يراه المستخدم صحيح من اللحظة الأولى.
+// 📌 رأس الجدول يلتصق تحت الشريط العلوي: نقيس ارتفاعه (يتغيّر مع عرض الشاشة) ونمرّره كمتغيّر CSS
+(function () {
+    var tb = document.querySelector('.topbar');
+    var set = function () { document.documentElement.style.setProperty('--msa-top', (tb && getComputedStyle(tb).position === 'sticky' ? Math.round(tb.getBoundingClientRect().height) : 0) + 'px'); };
+    set(); window.addEventListener('resize', set); window.addEventListener('load', set);
+    if (window.ResizeObserver && tb) new ResizeObserver(set).observe(tb);
+})();
 window.faApplyLiveFilter = function () {
     var f = document.getElementById('faFilter'); if (!f) return;
     var cats = [].slice.call(f.querySelectorAll('input[name="cat[]"]:checked')).map(function (c) { return c.value; });
