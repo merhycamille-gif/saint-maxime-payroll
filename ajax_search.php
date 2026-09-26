@@ -22,7 +22,8 @@ $digits = preg_replace('/\D/', '', $q); $dlike = $digits !== '' ? '%' . $digits 
 //    مع شارة «ترك يوم/شهر/سنة» حتى لا يُفتَح ملفه على أنّه موظف حالي.
 $sySearch = activeSchoolYear();
 $leftFilter = ''; $leftParams = [];
-if (preg_match('/^(\d{4})-\d{4}$/', (string)$sySearch, $ym)) { $leftFilter = " AND " . leftDateSql() . " >= ?"; $leftParams[] = $ym[1] . '-10-01'; }
+// 🗂️ scope=all (صفحة التاريخ الكامل): كل الموظفين تاركين أو لا بأي سنة — الشارة «ترك» تبقى
+if (($_GET['scope'] ?? '') !== 'all' && preg_match('/^(\d{4})-\d{4}$/', (string)$sySearch, $ym)) { $leftFilter = " AND " . leftDateSql() . " >= ?"; $leftParams[] = $ym[1] . '-10-01'; }
 $st = getDB()->prepare(
     "SELECT id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar, school_id, phone1, phone2, " . leftDateSql() . " AS left_on,
             CASE WHEN COALESCE(first_name_ar,'') LIKE ? OR COALESCE(first_name_fr,'') LIKE ? THEN 0

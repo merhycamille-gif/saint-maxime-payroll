@@ -8296,6 +8296,11 @@ if ($lv178) {
     $c178('search-by-birth-date', strlen($hb) < 5000 /* نتيجة واحدة ⇒ تحويل */ || strpos($hb, 'employee_full_history.php?id=' . (int)$lv178['id']) !== false);
     $hy = renderPage('pages/employee_full_history.php', ['q' => substr($lv178['birth_date'], 0, 4)], [], [], '', '2026-2027');
     $c178('search-by-birth-year', strlen($hy) < 5000 || strpos($hy, 'employee_full_history.php?id=' . (int)$lv178['id']) !== false);
+    // 🔍 الأسانسور: الصفحة فيها الاقتراحات، ونقطة البحث بـscope=all تعيد التارك مع الشارة حتى على سنة بعد تركه
+    $jS = json_decode(renderPage('ajax_search.php', ['q' => mb_substr($lv178['first_name_ar'], 0, 1), 'scope' => 'all'], [], [], '', '2026-2027'), true) ?: [];
+    $hitS = null; foreach ($jS as $r) if ((int)$r['id'] === (int)$lv178['id']) $hitS = $r;
+    $c178('suggestions', strpos((string)file_get_contents($PROJ . '/pages/employee_full_history.php'), "ajax_search.php?scope=all&q=") !== false && strpos((string)file_get_contents($PROJ . '/pages/employee_full_history.php'), 'id="ehSugg"') !== false
+        && (count($jS) >= 30 || $hitS !== null) && strpos((string)file_get_contents($PROJ . '/ajax_search.php'), "(\$_GET['scope'] ?? '') !== 'all'") !== false);
 } else $c178('no-leaver-sample', false);
 check('🗂️ صفحة «التاريخ الكامل للأستاذ» (2026-09-26): بحث بكل الموظفين (تارك أو لا، بالاسم/الهاتف/الولادة) ⇒ التعريف والأرقام + الخطّ الزمني + كل سنوات الرواتب بحصص الموظف والمؤسّسة — مستقلّة عن سنة الشريط', $ok178, implode(' · ', $why178) ?: 'ok');
 

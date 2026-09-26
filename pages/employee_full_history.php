@@ -97,6 +97,14 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
 .eh-year td.paid { color:#166534; font-weight:700; } .eh-year td.unpaid { color:#b45309; }
 .eh-ytitle { display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:8px 12px; border-radius:8px; margin:14px 0 6px; font-weight:800; }
 .card.eh-card { overflow:visible; }
+/* 🔍 «بس تحطّ أوّل حرف لازم يعطيك أسانسور لأسماء نفس الحرف» — اقتراحات فورية من ajax_search.php?scope=all (تارك أو لا) */
+.eh-sugg-wrap { position:relative; }
+.eh-sugg { position:absolute; top:100%; right:0; left:0; z-index:60; background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.14); max-height:380px; overflow:auto; display:none; margin-top:4px; }
+.eh-sugg.open { display:block; }
+.eh-sugg a { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 12px; text-decoration:none; color:#0f172a; border-bottom:1px solid #f1f5f9; font-size:14px; }
+.eh-sugg a:hover, .eh-sugg a.act { background:#eff6ff; }
+.eh-sugg a small { color:#64748b; font-size:11.5px; }
+.eh-sugg .eh-left { margin-inline-start:6px; }
 .eh-first { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:8px; margin:12px 0 4px; }
 .eh-first > div { background:#1F4E5F; color:#fff; border-radius:10px; padding:8px 12px; }
 .eh-first .k { color:#cbd5e1; font-size:11.5px; } .eh-first .v { font-weight:900; font-size:16px; direction:ltr; text-align:left; }
@@ -116,7 +124,10 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
         <form method="GET" class="eh-search no-print" autocomplete="off">
             <div class="form-group" style="margin:0">
                 <label class="form-label">Rechercher / فتّش بالاسم أو الهاتف أو تاريخ الولادة (15/08/1975 أو 1975) أو رقم الضمان/المالية</label>
-                <input type="text" name="q" class="form-control" value="<?= e($q) ?>" placeholder="اسم… أو 03-123456 أو 15/08/1975" autofocus>
+                <div class="eh-sugg-wrap">
+                    <input type="text" name="q" id="ehQ" class="form-control" value="<?= e($q) ?>" placeholder="اسم… أو 03-123456 أو 15/08/1975" autofocus autocomplete="off">
+                    <div class="eh-sugg" id="ehSugg"></div>
+                </div>
             </div>
             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Chercher / فتّش</button>
             <?php if ($emp): ?><a class="btn btn-secondary" href="<?= BASE_URL ?>pages/employee_full_history.php"><i class="fas fa-rotate-left"></i> بحث جديد</a>
@@ -266,4 +277,41 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
 <?php endif; ?>
     </div>
 </div>
+<script>
+(function () {
+    var inp = document.getElementById('ehQ'), box = document.getElementById('ehSugg'); if (!inp || !box) return;
+    var timer = null, idx = -1, items = [];
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function close() { box.classList.remove('open'); box.innerHTML = ''; idx = -1; items = []; }
+    function render(rows) {
+        items = rows; idx = -1;
+        if (!rows.length) { box.innerHTML = '<div style="padding:8px 12px;color:#64748b">لا نتائج / Aucun résultat</div>'; box.classList.add('open'); return; }
+        box.innerHTML = rows.map(function (r) {
+            return '<a href="<?= BASE_URL ?>pages/employee_full_history.php?id=' + r.id + '"><span><b>' + esc(r.ar) + '</b> <small dir="ltr">' + esc(r.fr) + '</small>'
+                 + (r.left ? '<span class="eh-left">🚪 ترك ' + esc(r.left) + '</span>' : '') + '</span><small>' + esc(r.code + (r.school ? ' — ' + r.school : '')) + '</small></a>';
+        }).join('');
+        box.classList.add('open');
+    }
+    inp.addEventListener('input', function () {
+        var q = inp.value.trim(); clearTimeout(timer);
+        if (q.length < 1) { close(); return; }
+        timer = setTimeout(function () {
+            fetch('<?= BASE_URL ?>ajax_search.php?scope=all&q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); }).then(render).catch(function () { close(); });
+        }, 120);
+    });
+    inp.addEventListener('keydown', function (e) {
+        var links = box.querySelectorAll('a'); if (!links.length) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(links.length - 1, idx + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(0, idx - 1); }
+        else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); location.href = links[idx].href; return; }
+        else if (e.key === 'Escape') { close(); return; }
+        else return;
+        links.forEach(function (a, i) { a.classList.toggle('act', i === idx); });
+        if (idx >= 0) links[idx].scrollIntoView({ block: 'nearest' });
+    });
+    inp.addEventListener('focus', function () { if (inp.value.trim().length >= 1 && !items.length) inp.dispatchEvent(new Event('input')); });
+    document.addEventListener('click', function (e) { if (!box.contains(e.target) && e.target !== inp) close(); });
+})();
+</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
