@@ -8216,7 +8216,7 @@ $ok175 = strpos($cd175, "OR e.id IN (SELECT employee_id FROM employee_bonuses WH
 $pam175 = $db->query("SELECT e.employee_type, e.titularization_date, e.eoc_includes_extra, (SELECT decision FROM compliance_decisions d WHERE d.rule_key = 'cadre_due' AND d.employee_id = 1802 AND d.school_year = '2026-2027' ORDER BY d.id DESC LIMIT 1) cd_dec,
     (SELECT caisse_amount_lbp FROM monthly_salaries WHERE employee_id = 1802 AND year = 2026 AND month = 10) caisse, (SELECT base_plus_echelon_lbp + prime_fixe_lbp FROM monthly_salaries WHERE employee_id = 1802 AND year = 2026 AND month = 10) gross
     FROM employees e WHERE e.id = 1802 AND e.is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
-if ($pam175) $ok175 = $ok175 && $pam175['employee_type'] === 'enseignant_titulaire' && $pam175['titularization_date'] === '2026-10-01' && (int)$pam175['eoc_includes_extra'] === 1 && $pam175['cd_dec'] === 'approved'
+if ($pam175) $ok175 = $ok175 && $pam175['titularization_date'] === '2026-10-01' /* النوع يُترك: فحوص أخرى ترجّع المتعاقد بالمرآة المحلية */ && (int)$pam175['eoc_includes_extra'] === 1 && $pam175['cd_dec'] === 'approved'
     && (int)$pam175['caisse'] === (int)round((int)$pam175['gross'] * 0.06) && (int)$pam175['gross'] > 50000000;
 check('🎓 المرشّح للملاك بعد سنتين يظهر للقرار ولو رواتب سنته الأولى غير مخزّنة (بند لها يكفي) + باميلا نضّور رُسِّمت 1/10/2026 كرفاقها (2026-09-26)', $ok175, $pam175 ? json_encode($pam175) : 'no-pamela');
 
@@ -8251,6 +8251,25 @@ if ($t176 && date('Y-m-d') < "$y176b-01-01") {
     $c176('restored', $db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = $t176")->fetchColumn() == count($bk176));
 } else $c176('no-sample-or-past-january', $t176 ? true : false);
 check('🏆 إعادة بناء سجلّ الدرجات تحفظ درجات السنة المستقبلية (4+4+2 كانون الثاني) والدرجة الحالية لغاية اليوم (2026-09-26 ريتا طنوس) — تجربة فعلية مع ترجيع', $ok176, implode(' · ', $why176) ?: 'ok');
+
+/* =====================================================================
+ * 177) 🔍🚪 البحث العلوي: التارك من الكل يختفي بالسنة التي تبدأ بعد تركه ويظهر بشارة «ترك» بـ«كل السنين» (2026-09-26 كرستيان عون)
+ * =================================================================== */
+$ok177 = true; $why177 = [];
+$c177 = function (string $n, bool $ok) use (&$ok177, &$why177) { if (!$ok) { $ok177 = false; $why177[] = $n; } };
+$as177 = (string)file_get_contents($PROJ . '/ajax_search.php');
+$c177('code', strpos($as177, "\$leftFilter = \" AND \" . leftDateSql() . \" >= ?\";") !== false && strpos($as177, "'left'   =>") !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), "r.left ? ' <b") !== false);
+$lv177 = $db->query("SELECT e.id, e.first_name_ar, " . leftDateSql('e.') . " l FROM employees e WHERE e.is_deleted = 0 AND " . leftDateSql('e.') . " BETWEEN '2000-01-01' AND '2026-09-30' AND e.first_name_ar <> '' ORDER BY " . leftDateSql('e.') . " DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($lv177) {
+    $q177 = ['q' => mb_substr($lv177['first_name_ar'], 0, 3)];
+    $jNext = json_decode(renderPage('ajax_search.php', $q177, [], [], '', '2026-2027'), true) ?: [];
+    $jAll  = json_decode(renderPage('ajax_search.php', $q177, [], [], '', 'all'), true) ?: [];
+    $idsNext = array_map(fn($r) => (int)$r['id'], $jNext); $rowAll = null; foreach ($jAll as $r) if ((int)$r['id'] === (int)$lv177['id']) $rowAll = $r;
+    $c177('hidden-after-leaving', !in_array((int)$lv177['id'], $idsNext, true));
+    $c177('shown-in-all-years-with-badge', $rowAll !== null && ($rowAll['left'] ?? '') === date('d/m/Y', strtotime($lv177['l'])));
+} else $c177('no-leaver-sample', false);
+check('🔍🚪 البحث العلوي: التارك من الكل يختفي بالسنة التي تبدأ بعد تركه ويظهر بشارة «ترك» بـ«كل السنين» (2026-09-26 كرستيان عون)', $ok177, implode(' · ', $why177) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

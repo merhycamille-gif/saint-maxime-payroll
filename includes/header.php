@@ -634,6 +634,7 @@ document.addEventListener('submit', function (e) {
                     emps.forEach(function (r) {
                         h += '<a class="gs-item" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=' + r.id + '">'
                            + '<i class="fas fa-user"></i><span>' + esc(r.fr) + ' / ' + esc(r.ar)
+                           + (r.left ? ' <b style="color:#b91c1c;font-size:11px;background:#fee2e2;border-radius:6px;padding:1px 6px">🚪 ترك ' + esc(r.left) + '</b>' : '')
                            + '<small>' + esc(r.code + (r.school ? ' — ' + r.school : '')) + '</small></span></a>';
                     });
                 }
