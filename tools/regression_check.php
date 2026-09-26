@@ -7814,7 +7814,7 @@ $nElig = substr_count($h, '<tr class="" data-id='); $nNa = substr_count($h, '<tr
 $c167('render-all', $noFatal($h) && strpos($h, 'id="faForm"') !== false && strpos($h, 'name="fa[') !== false && $nElig > 0 && strpos($h, 'type="month"') !== false && stripos($h, 'Warning:') === false);
 $c167('edit-save-per-row', preg_match('/<td class="fa-act"[^>]*>\s*<button type="button" class="btn btn-sm btn-primary fa-edit-btn"/', $h) === 1 && strpos($h, 'fa-save-btn') !== false
     && preg_match('/name="fa\[\d+\]\[sp\]"[^>]* readonly>/', $h) === 1 && strpos($h, 'Modifier / تعديل</th>') !== false && strpos($h, 'function unlockRow(tr)') !== false); // ✏️ «لازم يكون قدام الموظف في إديت»
-$c167('contractuel-locked', $nNa === 0 || (substr_count($h, 'متعاقد: لا يستحقّ') === $nNa && preg_match('/<tr class="na" data-id="\d+">.*?<input[^>]*name="fa\[\d+\]\[sp\]"[^>]* disabled>/s', $h) === 1));
+$c167('contractuel-locked', $nNa === 0 || (substr_count($h, 'متعاقد: لا يستحقّ') === $nNa && preg_match('/<tr class="na" data-id="\d+"[^>]*>.*?<input[^>]*name="fa\[\d+\]\[sp\]"[^>]* disabled>/s', $h) === 1)); // ⚡ الصفّ يحمل data-cat/data-school (2026-09-26)
 [$yf167, $yp167] = yearEmploymentFilter($sy167, 'e.');
 $h2 = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167, 'cat' => ['titulaire'], 'show' => 'with'], []);
 $stW = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND (COALESCE(e.family_allowance_spouse_lbp,0) > 0 OR COALESCE(e.family_allowance_children_lbp,0) > 0)" . $yf167);
