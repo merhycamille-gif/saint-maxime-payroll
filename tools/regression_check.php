@@ -8085,7 +8085,7 @@ $two172 = $db->prepare("SELECT e.school_id, COUNT(*) n FROM employees e JOIN sch
 $two172->execute($yp172); $two172 = $two172->fetchAll(PDO::FETCH_KEY_PAIR);
 if (count($two172) === 2) {
     [$sa172, $sb172] = array_keys($two172);
-    $rowsOf = fn(string $h) => substr_count($h, '<tr class="" data-id=') + substr_count($h, '<tr class="na" data-id=');
+    $rowsOf = fn(string $h) => preg_match_all('/<tr class="(?:na)?" data-id="\d+" data-cat="[a-z]+" data-school="\d+" data-cur="\d+">/', $h); // ⚡ الصفوف الظاهرة فقط (كل الفئات محمَّلة، غير المشيّكة مخفيّة)
     $hA = renderPage('pages/family_allowances.php', ['sch' => [$sa172], 'sy' => $sy172, 'cat' => ['titulaire']], []);
     $hAB = renderPage('pages/family_allowances.php', ['sch' => [$sa172, $sb172], 'sy' => $sy172, 'cat' => ['titulaire']], []);
     $hAll = renderPage('pages/family_allowances.php', ['sch_all' => 1, 'sy' => $sy172, 'cat' => ['titulaire']], []);
@@ -8104,7 +8104,7 @@ if (count($two172) === 2) {
 } else $c172('need-two-schools-data', false);
 $js172 = (string)file_get_contents($PROJ . '/assets/js/app.js');
 $c172('debounced-submit', strpos($js172, 'window.msaSubmitSoon = function (form, ms)') !== false && strpos($js172, 'msaBusyOverlay') !== false
-    && strpos($fa172, 'onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"') !== false && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "\$sub = '(window.msaSubmitSoon||function(f){f.submit()})(this.form)';") !== false
+    && strpos($fa172, 'onchange="window.faApplyLiveFilter&&faApplyLiveFilter()"') !== false && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "\$sub = '(window.msaSubmitSoon||function(f){f.submit()})(this.form)';") !== false // ⚡ الفئة محلّية؛ المدارس بالإرسال المؤجَّل
     && strpos($fa172, "getElementById('faFilter').submit()") === false); // ☑️⏳ «مشيّك على الموظفين ولسا مبيّن الملاك»: الكبسات المتتالية تُجمَع بإرسال واحد
 $c172('sync-forms', strpos($js172, 'window.msaSyncForms = function ()') !== false && strpos($js172, "addEventListener('pageshow', function () { setTimeout(window.msaSyncForms, 50); })") !== false
     && strpos($fa172, 'data-msa-sync-name="cat[]"') === false && strpos($fa172, 'id="faFilter" autocomplete="off"') !== false // ⚡ الفئة محلّية بلا مزامنة سيرفر
