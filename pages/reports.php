@@ -668,8 +668,8 @@ function reportDocThumb($path) {
             'address' => ['السكن / Adresse', fn($r) => e(trim(implode(' ', array_filter([$r['gouvernorat'],$r['district'],$r['ville'],$r['rue'],$r['immeuble']]))))],
             'birth'   => ['الولادة / Naissance', fn($r) => trim(formatDate($r['birth_date']).' '.e($r['birth_place']))],
             'social'  => ['عائلي / Famille', fn($r) => e($r['social_status']).' ('.(int)$r['number_of_children'].')'],
-            'hire'    => ['الدخول / Embauche', fn($r) => formatDate($r['hire_date'])],
-            'titul'   => ['الملاك / Titularisation', fn($r) => formatDate($r['titularization_date'])],
+            'hire'    => ['الدخول / Embauche', fn($r) => formatDate(shownHireDate($r))],
+            'titul'   => ['الملاك / Titularisation', fn($r) => formatDate(shownTitularizationDate($r))],
             'hours'   => ['ساعات/أسبوع / Heures/sem.', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'],1),'0'),'.')],
             'days'    => ['أيام/أسبوع / Jours/sem.', fn($r) => (int)$r['days_per_week']],
             'status'  => ['الحالة / Statut', fn($r) => '<span class="badge badge-'.employeeStatusLabel($r['status'])['badge'].'">'.e(employeeStatusLabel($r['status'])['label']).'</span>'],
@@ -917,8 +917,8 @@ function reportDocThumb($path) {
                                 <td><strong><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></strong><?= empBadges($r, $db, activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()) ?></td>
                                 <td><?= diplomaLabel($r['diploma']) ?></td>
                                 <td><?= e(gradeDisplay($r)) ?></td>
-                                <td><?= formatDate($r['hire_date']) ?></td>
-                                <td><?= formatDate($r['titularization_date']) ?></td>
+                                <td><?= formatDate(shownHireDate($r)) ?></td>
+                                <td><?= formatDate(shownTitularizationDate($r)) ?></td>
                                 <td><span class="badge badge-<?= employeeStatusLabel($r['status'])['badge'] ?>"><?= e(employeeStatusLabel($r['status'])['label']) ?></span></td>
                             </tr>
                         <?php endforeach; ?>

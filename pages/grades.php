@@ -353,7 +353,7 @@ include __DIR__ . '/../includes/header.php';
                                 <td><strong><?= e($e['first_name_fr'] . ' ' . $e['last_name_fr']) ?></strong></td>
                                 <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($e['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e(diplomaLabel($e['diploma'])) ?></td>
-                                <td><?= formatDate($e['titularization_date']) ?></td>
+                                <td><?= formatDate(shownTitularizationDate($e)) ?></td>
                                 <td><?= $e['starting_grade'] ?></td>
                                 <td><span class="badge badge-gold" style="font-size:14px"><?= $e['current_grade'] ?></span></td>
                                 <td><?= formatLBP($e['new_salary_2017']) ?></td>
@@ -405,7 +405,7 @@ include __DIR__ . '/../includes/header.php';
                 <table class="table">
                     <tr><td><strong>Type / النوع</strong></td><td><?= employeeTypeLabel($emp['employee_type']) ?></td></tr>
                     <tr><td><strong>Diplôme / الشهادة</strong></td><td><?= diplomaLabel($emp['diploma']) ?></td></tr>
-                    <tr><td><strong>Entrée (école) / دخول المدرسة</strong></td><td><?= formatDate($emp['hire_date']) ?></td></tr>
+                    <tr><td><strong>Entrée (école) / دخول المدرسة</strong></td><td><?= formatDate(shownHireDate($emp)) ?></td></tr>
                     <tr><td><strong>Date titularisation / تاريخ التثبيت</strong></td><td><?= formatDate(tenureReferenceDate($emp)) ?> <small class="text-muted">(منه الاستثنائية — تلقائي دخول+سنتين)</small></td></tr>
                     <tr><td><strong>Échelon initial / الدرجة الأولية</strong></td><td><?= $emp['starting_grade'] ?></td></tr>
                     <tr><td><strong>Échelon actuel / الدرجة الحالية</strong></td><td><span class="badge badge-gold" style="font-size:16px"><?= $emp['current_grade'] ?></span></td></tr>

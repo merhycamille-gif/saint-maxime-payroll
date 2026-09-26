@@ -8343,6 +8343,41 @@ if ($e180) {
 } else $c180('no-sample', false);
 check('👤 البطاقة السنوية: الاسم الثلاثي مع اسم الأب + تاريخ الولادة بخانة الرمز بلا أي تغيير بالتخطيط (2026-09-26)', $ok180, implode(' · ', $why180) ?: 'ok');
 
+/* =====================================================================
+ * 181) 🗓️👁️ تاريخ الدخول المعروض (صوري) بملف الأستاذ: يظهر بدل الحقيقي بالبطاقة/التقارير/الإفادات + تاريخ ملاك معروض = +سنتان — بلا أثر محاسبي
+ *      (2026-09-26) — تجربة فعلية مع ترجيع
+ * =================================================================== */
+$ok181 = true; $why181 = [];
+$c181 = function (string $n, bool $ok) use (&$ok181, &$why181) { if (!$ok) { $ok181 = false; $why181[] = $n; } };
+ensureDisplayHireDateColumn();
+$c181('column+helpers', (bool)$db->query("SHOW COLUMNS FROM employees LIKE 'display_hire_date'")->fetch() && function_exists('shownHireDate') && function_exists('shownTitularizationDate')
+    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'ensureDisplayHireDateColumn();') !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'name="display_hire_date"') !== false && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "'display_hire_date' => (\$_POST['display_hire_date'] ?? '') ?: null") !== false);
+$c181('helpers-logic', shownHireDate(['hire_date' => '2020-10-01', 'display_hire_date' => '2015-10-01']) === '2015-10-01' && shownTitularizationDate(['hire_date' => '2020-10-01', 'display_hire_date' => '2015-10-01', 'titularization_date' => '2022-10-01', 'employee_type' => 'enseignant_titulaire']) === '2017-10-01'
+    && shownHireDate(['hire_date' => '2020-10-01', 'display_hire_date' => null]) === '2020-10-01' && shownTitularizationDate(['titularization_date' => '2022-10-01', 'display_hire_date' => '']) === '2022-10-01'
+    && shownTitularizationDate(['display_hire_date' => '2015-10-01', 'employee_type' => 'employe']) === '');
+// لا أثر على الحساب: الدوال الحسابية لا تقرأ العمود
+$c181('no-calc-effect', strpos((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), 'display_hire_date') === false && strpos((string)file_get_contents($PROJ . '/includes/cadre_due.php'), 'display_hire_date') === false);
+$e181 = $db->query("SELECT e.id, e.hire_date, e.titularization_date FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.hire_date > '1900-01-01' AND m.school_year = '2025-2026' AND m.net_salary_lbp > 0 AND (e.display_hire_date IS NULL) ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($e181) {
+    $id181 = (int)$e181['id'];
+    try {
+        $db->exec("UPDATE employees SET display_hire_date = '2001-10-01' WHERE id = $id181");
+        $hS = renderPage('pages/annual_slip.php', ['employee_id' => $id181, 'school_year' => '2025-2026'], []);
+        $c181('slip-shows-display', preg_match('#<span class="lbl">Embauche / تاريخ الدخول</span><span class="val">01/10/2001</span>#u', $hS) === 1 && preg_match('#<span class="lbl">Titularisation / تاريخ الملاك</span><span class="val">01/10/2003</span>#u', $hS) === 1);
+        $hL = renderPage('pages/employees.php', [], [], [], '', '2025-2026');
+        $hR = renderPage('pages/reports.php', ['report' => 'titularized', 'mode' => 'hire'], [], [], '', '2025-2026');
+        $c181('list-shows-display', strpos($hL, '01/10/2001') !== false || strpos($hR, '01/10/2001') !== false);
+        $calc = (new PayrollCalculator($id181, 6, 2026))->calculate();
+        $db->exec("UPDATE employees SET display_hire_date = NULL WHERE id = $id181");
+        $calc0 = (new PayrollCalculator($id181, 6, 2026))->calculate();
+        $c181('no-salary-change', (int)$calc['net_salary_lbp'] === (int)$calc0['net_salary_lbp'] && (int)$calc['caisse_amount_lbp'] === (int)$calc0['caisse_amount_lbp']);
+        $hS0 = renderPage('pages/annual_slip.php', ['employee_id' => $id181, 'school_year' => '2025-2026'], []);
+        $c181('unset-shows-real', preg_match('#<span class="lbl">Embauche / تاريخ الدخول</span><span class="val">' . preg_quote(formatDate($e181['hire_date']), '#') . '</span>#u', $hS0) === 1);
+    } finally { $db->exec("UPDATE employees SET display_hire_date = NULL WHERE id = $id181"); }
+} else $c181('no-sample', false);
+check('🗓️👁️ تاريخ الدخول المعروض (صوري) بملف الأستاذ (2026-09-26): يظهر بدل الحقيقي بالبطاقة/اللوائح/التقارير + تاريخ ملاك معروض = +سنتان + لا أثر على الراتب — تجربة فعلية مع ترجيع', $ok181, implode(' · ', $why181) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

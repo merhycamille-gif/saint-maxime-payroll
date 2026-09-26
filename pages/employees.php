@@ -396,6 +396,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
             ? (($_POST['job_title'] ?? '') === '__other__' ? trim($_POST['job_title_other'] ?? '') : trim($_POST['job_title'] ?? ''))
             : null,
         'hire_date' => $_POST['hire_date'] ?: null,
+        'display_hire_date' => ($_POST['display_hire_date'] ?? '') ?: null, // 🗓️👁️ صوري للعرض فقط (2026-09-26)
         // دخول الملاك = دخول المدرسة + سنتين تلقائياً إن تُرك فاضياً (القاعدة)؛ يمكن إدخاله يدوياً للتجاوز.
         'titularization_date' => (($_POST['titularization_date'] ?? '') ?: (!empty($_POST['hire_date']) ? date('Y-m-d', strtotime($_POST['hire_date'] . ' +2 years')) : null)),
         'tenure_confirmation_date' => ($_POST['tenure_confirmation_date'] ?? '') ?: null,
@@ -1075,7 +1076,7 @@ if ($action === 'list') {
                                         <?php endif; ?>
                                     </td>
                                     <td><strong><?= e(gradeDisplay($emp)) ?></strong></td>
-                                    <td><?= formatDate($emp['hire_date']) ?></td>
+                                    <td><?= formatDate(shownHireDate($emp)) ?></td>
                                     <td><?= e($emp['phone1']) ?></td>
                                     <td><span class="badge badge-<?= $statusInfo['badge'] ?>"><?= e($statusInfo['label']) ?></span></td>
                                     <td class="no-print">
@@ -1118,7 +1119,7 @@ $employee = [
     'gouvernorat' => '', 'district' => '', 'ville' => '', 'quartier' => '', 'rue' => '',
     'immeuble' => '', 'etage' => '', 'phone1' => '', 'phone2' => '', 'email' => '',
     'diploma' => 'ijaza_jamiya', 'specialization' => '', 'subjects_taught' => '', 'niveau_scolaire' => '', 'classes_taught' => '', 'job_title' => '',
-    'hire_date' => '', 'titularization_date' => '', 'tenure_confirmation_date' => '', 'starting_grade' => 1, 'current_grade' => 1,
+    'hire_date' => '', 'display_hire_date' => '', 'titularization_date' => '', 'tenure_confirmation_date' => '', 'starting_grade' => 1, 'current_grade' => 1,
     'days_per_week' => 5, 'hours_per_week' => 18, 'status' => 'actif',
     'nssf_number' => '', 'finance_ministry_number' => '', 'caisse_number' => '',
     'salary_input_mode' => 'percent_of_lbp', 'salary_labor_law' => 0, 'base_salary_usd' => 0, 'base_salary_lbp_percent' => 100, 'contract_salary_lbp' => 0,
@@ -1696,6 +1697,11 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
                     <div class="form-group">
                         <label class="form-label">Date d'embauche / تاريخ الدخول <span class="req">*</span> <small>(دخول المدرسة)</small></label>
                         <input type="date" id="hireDate" name="hire_date" class="form-control" value="<?= e($employee['hire_date']) ?>" required>
+                    </div>
+                    <div class="form-group" title="للعرض فقط بالبطاقة والتقارير والإفادات — لا يؤثّر بأي حساب أو درجة أو ترسيم؛ ومعه يُعرض تاريخ ملاك صوري = هذا التاريخ + سنتان">
+                        <label class="form-label">Date d'entrée affichée / تاريخ الدخول المعروض <small>(صوري — للعرض فقط)</small></label>
+                        <input type="date" name="display_hire_date" class="form-control" value="<?= e($employee['display_hire_date'] ?? '') ?>" style="border-color:#d97706">
+                        <small style="color:#92400e">إن وُضع: يظهر بدل تاريخ الدخول بالبطاقة والتقارير، وتاريخ الملاك المعروض = هذا التاريخ + سنتان. الحساب على التاريخ الحقيقي دائماً.</small>
                     </div>
                     <div class="form-group emp-teacher-only">
                         <label class="form-label">Titularisation / دخول الملاك <small>(تلقائي = دخول المدرسة + سنتين، يمكن تعديله)</small></label>

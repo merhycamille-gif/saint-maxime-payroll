@@ -459,7 +459,7 @@ if (in_array($form, $imageForms)) {
             'registry_place' => $emp['civil_registry_place'] ?? '',
             'nationality' => $natAr,
             'finance'     => $emp['finance_ministry_number'] ?? '',
-            'hire'        => formatDate($emp['hire_date']),
+            'hire'        => formatDate(shownHireDate($emp)),
             'leftdate'    => formatDate(leftDateOf($emp) ?: ($emp['left_date_cnss'] ?: ($emp['left_date_finance'] ?: $emp['left_date_eoc']))),
             'children'    => (string)($emp['number_of_children'] ?? ''),
             'salary'      => $salary ? formatLBP($salary, false) : '',
@@ -576,7 +576,7 @@ if (in_array($form, $imageForms)) {
             $extra[] = ['x'=>72,'y'=>$y,'val'=>$nm,'s'=>2.1];
             $extra[] = ['x'=>54,'y'=>$y,'val'=>$r['finance_ministry_number'],'s'=>2.0];
             $extra[] = ['x'=>40,'y'=>$y,'val'=>cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', ''),'s'=>2.0];
-            $extra[] = ['x'=>26,'y'=>$y,'val'=>formatDate($r['hire_date']),'s'=>2.0];
+            $extra[] = ['x'=>26,'y'=>$y,'val'=>formatDate(shownHireDate($r)),'s'=>2.0];
             $extra[] = ['x'=>12,'y'=>$y,'val'=>formatDate($left),'s'=>2.0];
         }
     }
@@ -1027,14 +1027,14 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     <div class="fline"><span class="lbl">الوضع العائلي :</span> <?= fopt('أعزب',1,!$isMarried) ?> <?= fopt('متأهل',2,$isMarried) ?> <?= fopt('أرمل',3) ?> <?= fopt('مطلق',4) ?> <?= fopt('هاجر',5) ?></div>
 
     <?php if (!$isTerm): ?>
-    <div class="fline"><span class="lbl">استُخدم فيها منذ</span> <?= fval(formatDate($emp['hire_date'])) ?> <span class="lbl">عدد ساعات العمل في الشهر</span> <?= fval('','g') ?></div>
+    <div class="fline"><span class="lbl">استُخدم فيها منذ</span> <?= fval(formatDate(shownHireDate($emp))) ?> <span class="lbl">عدد ساعات العمل في الشهر</span> <?= fval('','g') ?></div>
     <div class="fline"><span class="lbl">الدوام :</span> <?= fopt('كامل',1,true) ?> <?= fopt('جزئي',2) ?></div>
     <div class="fline"><span class="lbl">عمل الأجير الحالي</span> <?= fval(cnssOccupationAr($emp)) ?> <span class="lbl">إن الراتب الحالي</span> <?= fval($salary?formatLBP($salary,false):'','g') ?> <span class="lbl">ل.ل</span></div>
     <div class="fline"><span class="lbl">منها الأجر الإضافي</span> <?= fval($exW?formatLBP($exW,false):'—','g') ?> <span class="lbl">ل.ل — ومكافأة ومساعدة</span> <?= fval($aid?formatLBP($aid,false):'—','g') ?> <span class="lbl">ل.ل</span></div>
     <div class="fline"><span class="lbl">طريقة دفع الأجر :</span> <?= fopt('شهري',1,true) ?> <?= fopt('اسبوعي',2) ?> <?= fopt('يومي',3) ?> <?= fopt('لقاء عمولة',4) ?> <?= fopt('على الإنتاج',5) ?></div>
     <div class="fline"><span class="lbl">هل يعمل حسب معرفتك لدى صاحب عمل آخر :</span> <?= fopt('نعم',1) ?> <?= fopt('كلا',2) ?></div>
     <?php else: ?>
-    <div class="fline"><span class="lbl">استُخدم فيها منذ</span> <?= fval(formatDate($emp['hire_date'])) ?></div>
+    <div class="fline"><span class="lbl">استُخدم فيها منذ</span> <?= fval(formatDate(shownHireDate($emp))) ?></div>
     <div class="fline"><span class="lbl">ترك العمل بها منذ</span> <?= fval(formatDate(leftDateOfFor($emp, 'cnss'))) ?></div>
     <div class="fline"><span class="lbl">سبب ترك العمل :</span> <?= fopt('استقالة',1) ?> <?= fopt('بلوغ السن',2) ?> <?= fopt('عجز',3) ?> <?= fopt('زواج',4) ?> <?= fopt('وفاة',5) ?> <?= fopt('هجرة',6) ?> <?= fopt('عمل آخر',7) ?></div>
     <div class="fline"><span class="lbl">إن راتب الأجير بتاريخ ترك العمل هو</span> <?= fval($salary?formatLBP($salary,false):'') ?> <span class="lbl">ل.ل</span></div>
@@ -1059,7 +1059,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
         تفيد مؤسسة <?= fillVal($school['name_ar']) ?> المسجّلة في الصندوق الوطني للضمان الاجتماعي
         تحت رقم <?= fillVal($school['nssf_employer_number']) ?>، أن المضمون
         <?= fillVal(empFullNameAr($emp)) ?> رقمه <?= fillVal(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) ?>
-        قد بدأ العمل لدينا بدوام كامل اعتباراً من تاريخ <?= fillVal(formatDate($emp['hire_date'])) ?>،
+        قد بدأ العمل لدينا بدوام كامل اعتباراً من تاريخ <?= fillVal(formatDate(shownHireDate($emp))) ?>،
         ويتقاضى راتباً شهرياً قدره <?= fillVal($salary?formatLBP($salary):'') ?>،
         وهو مستمر في عمله حتى تاريخه.
     </p>
@@ -1198,8 +1198,8 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">الوظيفة/الفئة:</span> <?= fillVal(employeeTypeLabel($emp['employee_type'],'ar')) ?></div>
         <div><span class="k">أعلى شهادة رسمية:</span> <?= fillVal(diplomaLabel($emp['diploma'],'ar')) ?></div>
         <div><span class="k">الاختصاص:</span> <?= fillVal($emp['specialization']) ?></div>
-        <div><span class="k">تاريخ المباشرة:</span> <?= fillVal(formatDate($emp['hire_date'])) ?></div>
-        <div><span class="k">تاريخ الدخول في الملاك:</span> <?= fillVal(formatDate($emp['titularization_date'])) ?></div>
+        <div><span class="k">تاريخ المباشرة:</span> <?= fillVal(formatDate(shownHireDate($emp))) ?></div>
+        <div><span class="k">تاريخ الدخول في الملاك:</span> <?= fillVal(formatDate(shownTitularizationDate($emp))) ?></div>
         <div><span class="k">الدرجة الحالية:</span> <?= fillVal(rtrim(rtrim((string)$emp['current_grade'],'0'),'.')) ?></div>
         <div><span class="k">المرحلة:</span> <?= fillVal($emp['niveau_scolaire']) ?></div>
         <div><span class="k">مادة التدريس:</span> <?= fillVal($emp['subjects_taught']) ?></div>
@@ -1287,7 +1287,7 @@ elseif ($form === 'teacher_card'):
                 <td><?= $i+1 ?></td>
                 <td style="text-align:right"><?= e(trim(($r['first_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                 <td><?= e(diplomaLabel($r['diploma'],'ar')) ?></td>
-                <td><?= formatDate($r['hire_date']) ?></td>
+                <td><?= formatDate(shownHireDate($r)) ?></td>
                 <td><?php // الفئة: معلّم للابتدائي/الحضانة، مدرّس للمتوسط/الثانوي
                     $isMod = (strpos($nv,'secondaire')!==false || strpos($nv,'intermediaire')!==false);
                     echo $isMod ? 'مدرّس' : ((strpos($nv,'primaire')!==false || strpos($nv,'maternelle')!==false) ? 'معلّم' : 'مدرّس'); ?></td>
@@ -1409,7 +1409,7 @@ elseif ($form === 'teacher_card'):
                 <td><?= e($isMlk ? ($r['caisse_number'] ?? '') : $r['finance_ministry_number']) ?></td>
                 <td style="text-align:right"><?= e(trim(($r['first_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                 <td><?= e(diplomaLabel($r['diploma'],'ar')) ?></td>
-                <td><?= formatDate($isMlk ? ($r['titularization_date'] ?: $r['hire_date']) : $r['hire_date']) ?></td>
+                <td><?= formatDate($isMlk ? (shownTitularizationDate($r) ?: shownHireDate($r)) : shownHireDate($r)) ?></td>
                 <td><?= $catCol==='mat'?$X:'' ?></td>
                 <td><?= $catCol==='prim'?$X:'' ?></td>
                 <td><?= $catCol==='int'?$X:'' ?></td>
@@ -1459,7 +1459,7 @@ elseif ($form === 'teacher_card'):
         <div><span class="k">المدرسة:</span> <?= fillVal($school['name_ar']) ?></div>
         <div><span class="k">رقم الملاك:</span> <?= fillVal($emp['caisse_number']) ?></div>
         <div><span class="k">أعلى شهادة:</span> <?= fillVal(diplomaLabel($emp['diploma'],'ar')) ?></div>
-        <div><span class="k">تاريخ الدخول في الملاك:</span> <?= fillVal(formatDate($emp['titularization_date'])) ?></div>
+        <div><span class="k">تاريخ الدخول في الملاك:</span> <?= fillVal(formatDate(shownTitularizationDate($emp))) ?></div>
         <div><span class="k">الدرجة الحالية:</span> <?= fillVal(rtrim(rtrim((string)$emp['current_grade'],'0'),'.')) ?></div>
         <div><span class="k">عدد ساعات التعليم:</span> <?= fillVal(rtrim(rtrim((string)$emp['hours_per_week'],'0'),'.')) ?></div>
         <div><span class="k">الراتب الأساسي (سلسلة):</span> <strong><?= money($sal ? (int)$sal['base_plus_echelon_lbp'] : (int)$base, $sal ? rowRate($sal) : null) ?></strong></div>
@@ -2009,7 +2009,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
                     <td><?= e(trim(($r['first_name_ar'].' '.$r['father_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                     <td><?= e($r['finance_ministry_number']) ?></td>
                     <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '')) ?></td>
-                    <td><?= formatDate($r['hire_date']) ?></td>
+                    <td><?= formatDate(shownHireDate($r)) ?></td>
                     <td><?= formatDate($left) ?></td></tr>
             <?php endforeach; ?>
             <?php if(!$rows): ?><tr><td colspan="6" class="text-center">لا أحد ترك العمل خلال هذه السنة</td></tr><?php endif; ?>
@@ -2335,7 +2335,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     <p style="line-height:2.2;margin-top:18px">
         تفيد مؤسسة <?= fillVal($school['name_ar']) ?> رقمها <?= fillVal($school['nssf_employer_number']) ?>،
         أن المضمون <?= fillVal(empFullNameAr($emp)) ?> رقمه <?= fillVal(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) ?>
-        عمل لحسابها من تاريخ <?= fillVal(formatDate($emp['hire_date'])) ?>
+        عمل لحسابها من تاريخ <?= fillVal(formatDate(shownHireDate($emp))) ?>
         لغاية <?= fillVal(formatDate(leftDateOfFor($emp, 'cnss'))) ?>.
     </p>
     <?php if ($isWage): ?>
@@ -2389,7 +2389,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     <div class="fline"><span class="lbl">٥. اسم الأب</span> <?= fval($emp['father_name_ar']) ?> <span class="lbl">اسم الأم وشهرتها</span> <?= fval(trim($emp['mother_first_name'].' '.$emp['mother_last_name'])) ?></div>
     <div class="fline"><span class="lbl">٦. تاريخ ومحل الولادة</span> <?= fval(formatDate($emp['birth_date']).' - '.$emp['birth_place']) ?> <span class="lbl">رقم السجل</span> <?= fval($emp['civil_registry_number'],'g') ?></div>
     <div class="fline"><span class="lbl">٧. الوضع العائلي :</span> <?= fopt('أعزب',1,!$isMarried) ?> <?= fopt('متأهل',2,$isMarried) ?> <?= fopt('أرمل',3) ?> <?= fopt('مطلق',4) ?></div>
-    <div class="fline"><span class="lbl">٨. محل الإقامة</span> <?= fval($emp['ville']) ?> <span class="lbl">١٠. تاريخ دخول العمل</span> <?= fval(formatDate($emp['hire_date']),'g') ?></div>
+    <div class="fline"><span class="lbl">٨. محل الإقامة</span> <?= fval($emp['ville']) ?> <span class="lbl">١٠. تاريخ دخول العمل</span> <?= fval(formatDate(shownHireDate($emp)),'g') ?></div>
     <div class="fline"><span class="lbl">دوام العمل :</span> <?= fopt('كامل',1,true) ?> <?= fopt('جزئي',2) ?></div>
     <div class="fline"><span class="lbl">١١. عمل الأجير الحالي</span> <?= fval(cnssOccupationAr($emp)) ?> <span class="lbl">الراتب</span> <?= fval($salary?formatLBP($salary,false):'','g') ?> <span class="lbl">ل.ل</span></div>
     <div class="fline"><span class="lbl">منها الأجر الإضافي</span> <?= fval($exW?formatLBP($exW,false):'—','g') ?> <span class="lbl">ل.ل — ومكافأة ومساعدة</span> <?= fval($aid?formatLBP($aid,false):'—','g') ?> <span class="lbl">ل.ل</span></div>
@@ -2802,7 +2802,7 @@ elseif ($form === 'payment_list'):
                 <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
                 <td><?= $r['birth_date']?formatDate($r['birth_date']):'' ?></td>
                 <td><?= $age ?></td>
-                <td><?= formatDate($r['hire_date']) ?></td>
+                <td><?= formatDate(shownHireDate($r)) ?></td>
                 <td><?= $left?formatDate($left):'—' ?></td>
                 <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '')) ?></td>
                 <td><?= e($r['finance_ministry_number']) ?></td>
@@ -2933,7 +2933,7 @@ elseif ($form === 'payment_list'):
                 <td class="num"><?= $fmt($capped) ?></td>
                 <td><?= $isTeacher?1:0 ?></td>
                 <td><?= $isTeacher?0:1 ?></td>
-                <td><?= $r['hire_date']?formatDate($r['hire_date']):'' ?></td>
+                <td><?= shownHireDate($r)?formatDate(shownHireDate($r)):'' ?></td>
                 <td class="num"><?= $fmt($m3) ?></td>
                 <td class="num"><?= $fmt($m8) ?></td>
                 <td class="num"><?= $fmt($mtot) ?></td>

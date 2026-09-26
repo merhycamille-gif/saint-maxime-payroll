@@ -1395,8 +1395,8 @@ function newTeachersReportCols(): array {
         'name_fr'  => ['الاسم / Nom', fn($r) => $t(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? '')), 22],
         'name_ar'  => ['الاسم بالعربي / Nom (ar)', fn($r) => $t(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? '')), 20],
         'type'     => ['الفئة / Catégorie', fn($r) => employeeTypeLabel($r['employee_type']) . (($r['employee_type'] ?? '') === 'employe' && $t($r['job_title'] ?? '') !== '' ? ' — ' . jobTitleLabel($r['job_title'], 'ar') : ''), 16],
-        'hire'     => ['دخول المدرسة / Embauche', fn($r) => $d($r['hire_date'] ?? ''), 12],
-        'titul'    => ['دخول الملاك / Titularisation', fn($r) => $d($r['titularization_date'] ?? ''), 12],
+        'hire'     => ['دخول المدرسة / Embauche', fn($r) => $d(shownHireDate($r)), 12], // 👁️ المعروض
+        'titul'    => ['دخول الملاك / Titularisation', fn($r) => $d(shownTitularizationDate($r)), 12],
         'source'   => ['المصدر / Source', fn($r) => !empty($r['via_link']) ? ('عبر الرابط / Via le lien' . (!empty($r['submitted_at']) ? ' ' . $d(substr($r['submitted_at'], 0, 10)) : '')) : 'إدخال يدوي / Saisie manuelle', 16],
         'mother'   => ['اسم الأم / Mère', fn($r) => $t(($r['mother_first_name'] ?? '') . ' ' . ($r['mother_last_name'] ?? '')), 14],
         'birth'    => ['الولادة / Naissance', fn($r) => $t($d($r['birth_date'] ?? '') . ' ' . ($r['birth_place'] ?? '')), 16],
@@ -3826,12 +3826,12 @@ function cnssTaswiyaData($db, int $fy, array $schoolIds): array {
         if (!isset($persons[$key])) {
             $persons[$key] = ['nssf' => cnssWithBirthYear($nssfDigits, $r['birth_date'] ?? '', ''), 'name' => trim($r['first_name_ar'] . ' ' . $r['father_name_ar'] . ' ' . $r['last_name_ar']),
                 'birth' => ($r['birth_date'] ? (int)substr($r['birth_date'], 0, 4) : ''),
-                'worker' => 0, 'hire' => $r['hire_date'], 'left' => null, 'monthsSet' => [],
+                'worker' => 0, 'hire' => shownHireDate($r) ?: null, 'left' => null, 'monthsSet' => [], // 👁️ تاريخ الدخول المعروض
                 'N' => 0, 'O' => 0, 'Q' => 0];
         }
         $p = &$persons[$key];
         if ($r['employee_type'] === 'employe') $p['worker'] = 1;
-        if ($r['hire_date'] && (!$p['hire'] || $r['hire_date'] < $p['hire'])) $p['hire'] = $r['hire_date'];
+        if (shownHireDate($r) && (!$p['hire'] || shownHireDate($r) < $p['hire'])) $p['hire'] = shownHireDate($r);
         // 🚪 تاريخ ترك الضمان الفعلي = الأبكر بين «ترك الضمان» و«الترك من الكل» (2026-09-18)
         if (($l = $r['left_cnss'] ?? null) && $l !== '9999-12-31' && substr($l, 0, 4) === (string)$fy && (!$p['left'] || $l > $p['left'])) $p['left'] = $l;
         if ($bmal + $bfam + $bfin > 0) $p['monthsSet'][$m] = 1;
@@ -8430,6 +8430,41 @@ function ensureGradeUserEditedColumn(): void {
     if (getDB()->inTransaction()) return; // DDL داخل معاملة = COMMIT ضمني
     $done = true;
     try { $db = getDB(); if (!$db->query("SHOW COLUMNS FROM employee_grade_history LIKE 'user_edited'")->fetch()) $db->exec("ALTER TABLE employee_grade_history ADD COLUMN user_edited TINYINT(1) NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
+}
+/**
+ * 🗓️👁️ تاريخ الدخول المعروض (صوري) — 2026-09-26 «حدّ تاريخ الدخول تحطّلي تاريخ أقدر أنا أكتبه، صوري ما بدّي ياه يأثّر ولا محل،
+ * بس إذا حطّيته بدّي بالبطاقة والتقارير يبيّن هو، ومعه بعد سنتين تاريخ الملاك الصوري»:
+ * عمود employees.display_hire_date (يتركّب ذاتياً). للعرض فقط: كل مكان **يعرض** تاريخ الدخول/الملاك يمرّ بـshownHireDate/shownTitularizationDate؛
+ * الحساب (الرواتب/الدرجات/الترسيم/الأقدمية/الضمان) يبقى على hire_date/titularization_date الحقيقيين.
+ */
+function ensureDisplayHireDateColumn(): void {
+    static $done = false; if ($done) return;
+    if (getDB()->inTransaction()) return;
+    $done = true;
+    try { $db = getDB(); if (!$db->query("SHOW COLUMNS FROM employees LIKE 'display_hire_date'")->fetch()) $db->exec("ALTER TABLE employees ADD COLUMN display_hire_date DATE NULL DEFAULT NULL AFTER hire_date"); } catch (Throwable $e) {}
+}
+/** خريطة id ⇒ التاريخ الصوري (للصفوف التي لا تحمل العمود، كالتقارير ذات الأعمدة المحدّدة) */
+function displayHireDateMap(): array {
+    static $m = null;
+    if ($m === null) { $m = []; try { foreach (getDB()->query("SELECT id, display_hire_date FROM employees WHERE display_hire_date IS NOT NULL AND display_hire_date >= '1900-01-01'") as $r) $m[(int)$r['id']] = (string)$r['display_hire_date']; } catch (Throwable $e) {} }
+    return $m;
+}
+function displayHireDateOf($e): string {
+    $e = (array)$e;
+    if (array_key_exists('display_hire_date', $e)) { $d = (string)($e['display_hire_date'] ?? ''); return ($d !== '' && $d >= '1900-01-01') ? substr($d, 0, 10) : ''; }
+    $id = (int)($e['id'] ?? $e['employee_id'] ?? 0);
+    return $id > 0 ? (displayHireDateMap()[$id] ?? '') : '';
+}
+/** تاريخ الدخول كما يُعرض: الصوري إن وُجد وإلا الحقيقي ('' إن لا شيء) */
+function shownHireDate($e): string {
+    $d = displayHireDateOf($e); if ($d !== '') return $d;
+    $h = (string)(((array)$e)['hire_date'] ?? ''); return ($h !== '' && $h !== '0000-00-00' && $h >= '1900-01-01') ? substr($h, 0, 10) : '';
+}
+/** تاريخ الملاك كما يُعرض: مع الصوري = الصوري + سنتان (للأساتذة)، وإلا الحقيقي */
+function shownTitularizationDate($e): string {
+    $a = (array)$e; $d = displayHireDateOf($a);
+    if ($d !== '') return (($a['employee_type'] ?? '') === 'employe') ? '' : date('Y-m-d', strtotime($d . ' +2 years'));
+    $t = (string)($a['titularization_date'] ?? ''); return ($t !== '' && $t !== '0000-00-00' && $t >= '1900-01-01') ? substr($t, 0, 10) : '';
 }
 function gradesUserAdjusted(int $empId): bool {
     try {

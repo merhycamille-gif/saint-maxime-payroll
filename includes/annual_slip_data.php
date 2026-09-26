@@ -214,8 +214,8 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'new_rates'   => implode(' / ', array_unique(array_map(fn($x) => number_format($x, 0), array_values(array_filter(array_map(fn($r) => (float)($r['rate'] ?? 0), $rows)))))),
         'code'        => $emp['employee_code'] ?: '—',
         'birth'       => (!empty($emp['birth_date']) && $emp['birth_date'] >= '1900-01-01') ? date('d/m/Y', strtotime($emp['birth_date'])) : '', // 👤 تاريخ الولادة (يُعرض بخانة الرمز)
-        'hire'        => formatDate($emp['hire_date']),
-        'titul'       => formatDate($emp['titularization_date']),
+        'hire'        => formatDate(shownHireDate($emp)),
+        'titul'       => formatDate(shownTitularizationDate($emp)),
         'hours'       => rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.'),
         // 🕐 ساعات التناقص + حضور التناقص (×1.5) — للملاك ذي التناقص المسجّل فقط، وإلا ''
         'hours_red'   => (float)($emp['hours_reduction'] ?? 0) > 0 ? hoursFmt($emp['hours_reduction']) : '',

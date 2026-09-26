@@ -61,7 +61,7 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                 </tr>
                 <tr>
                     <td>Année scolaire / السنة الدراسية</td><td><strong><?= e($schoolYearLbl) ?></strong></td>
-                    <td>Date d'embauche / تاريخ المباشرة</td><td><strong><?= formatDate($emp['hire_date']) ?></strong></td>
+                    <td>Date d'embauche / تاريخ المباشرة</td><td><strong><?= formatDate(shownHireDate($emp)) ?></strong></td>
                 </tr>
                 <tr>
                     <td>N° dossier / رقم الملف</td><td><strong><?= (int)$emp['id'] ?></strong></td>
@@ -354,8 +354,8 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                     <td style="width:25%">Année scolaire / السنة الدراسية</td><td style="width:25%"><strong><?= e($schoolYearLbl) ?></strong></td>
                 </tr>
                 <tr>
-                    <td>Date d'embauche / تاريخ الدخول</td><td><strong><?= formatDate($emp['hire_date']) ?></strong></td>
-                    <td>Date titularisation / تاريخ الملاك</td><td><strong><?= $isAdminEmp ? '—' : formatDate($emp['titularization_date']) ?></strong></td>
+                    <td>Date d'embauche / تاريخ الدخول</td><td><strong><?= formatDate(shownHireDate($emp)) ?></strong></td>
+                    <td>Date titularisation / تاريخ الملاك</td><td><strong><?= $isAdminEmp ? '—' : formatDate(shownTitularizationDate($emp)) ?></strong></td>
                 </tr>
                 <tr>
                     <?php if ($isAdminEmp): ?>

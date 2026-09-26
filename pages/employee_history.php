@@ -116,8 +116,8 @@ if (!$emp):
                     </table>
                     <table class="table">
                         <tr><th colspan="2" style="background:var(--primary);color:#fff">Carrière / المسار الوظيفي</th></tr>
-                        <tr><td>Date d'embauche / المباشرة</td><td><strong><?= formatDate($emp['hire_date']) ?></strong></td></tr>
-                        <tr><td>Titularisation / الترسيم</td><td><?= $isAdminEmp ? '—' : formatDate($emp['titularization_date']) ?></td></tr>
+                        <tr><td>Date d'embauche / المباشرة</td><td><strong><?= formatDate(shownHireDate($emp)) ?></strong></td></tr>
+                        <tr><td>Titularisation / الترسيم</td><td><?= $isAdminEmp ? '—' : formatDate(shownTitularizationDate($emp)) ?></td></tr>
                         <tr><td>Ancienneté / الأقدمية</td><td><?= e($anc ?: '—') ?></td></tr>
                         <?php if (!$isAdminEmp): ?><tr><td>Échelon départ → actuel / الدرجة</td><td><strong><?= gradeDisplay($emp['employee_type'], $emp['starting_grade']) ?> → <?= gradeDisplay($emp) ?></strong></td></tr><?php endif; ?>
                         <tr><td>Statut / الحالة</td><td><?php $s=employeeStatusLabel($emp['status'],$lang); ?><span class="badge badge-<?= $s['badge'] ?>"><?= e($s['label']) ?></span></td></tr>

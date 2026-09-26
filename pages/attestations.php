@@ -250,8 +250,8 @@ if ($emp && !empty($_GET['dossier'])):
             $w .= $row2('الدرجة الابتدائية', rtrim(rtrim(number_format((float)($emp['starting_grade']??0),1),'0'),'.'));
             $w .= $row2('ساعات/أسبوع', rtrim(rtrim(number_format((float)($emp['hours_per_week']??0),1),'0'),'.'));
             $w .= $row2('أيام/أسبوع', (int)($emp['days_per_week']??0));
-            $w .= $row2('تاريخ الدخول', $emp['hire_date'] ? formatDate($emp['hire_date']) : '');
-            $w .= $row2('تاريخ الملاك', $emp['titularization_date'] ? formatDate($emp['titularization_date']) : '');
+            $w .= $row2('تاريخ الدخول', shownHireDate($emp) ? formatDate(shownHireDate($emp)) : '');
+            $w .= $row2('تاريخ الملاك', shownTitularizationDate($emp) ? formatDate(shownTitularizationDate($emp)) : '');
             $w .= $row2('تاريخ تثبيت الملاك', $emp['tenure_confirmation_date'] ? formatDate($emp['tenure_confirmation_date']) : '');
             $w .= $row2('الحالة', employeeStatusLabel($emp['status'])['label']);
             $w .= $row2('استمرار العمل بعد ٦٤', $yn($emp['keep_working_past_64']??0));
@@ -778,8 +778,8 @@ if (!$emp):
     }
     // 📅 (2026-09-24) التاريخ المطبوع على الإفادة = التاريخ المختار بالشريط (كان اليوم دائماً ولو غيّره المستخدم)
     $today = formatDate($effDate);
-    $hireFmt = formatDate($emp['hire_date']);
-    $titFmt  = formatDate($emp['titularization_date']);
+    $hireFmt = formatDate(shownHireDate($emp));
+    $titFmt  = formatDate(shownTitularizationDate($emp));
     $effFmt  = formatDate($effDate);
     // تاريخ الترك/الانقطاع «إلى» (2026-09-24): من الملف أو اليدوي؛ «شيله» = خطّ منقّط؛ ولا شيء = تاريخ الإفادة (كما كان)
     $endFmt  = $endActive ? formatDate($endDate) : ($endNone ? '<span style="display:inline-block;min-width:110px;border-bottom:1px dotted #555">&nbsp;</span>' : formatDate($effDate));

@@ -152,7 +152,7 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
                         <td class="eh-num"><?= e($r['phone1'] ?: '—') ?></td>
                         <td><?= e($typeLbl[$r['employee_type']] ?? $r['employee_type']) ?></td>
                         <td><?= e(schoolNameById((int)$r['school_id'], 'ar')) ?></td>
-                        <td class="eh-num"><?= $d($r['hire_date']) ?></td>
+                        <td class="eh-num"><?= $d(shownHireDate($r)) ?></td>
                         <td><?= $left ? '<span class="eh-left">🚪 ترك ' . $d($ln) . '</span>' : '<span class="eh-now">مستمرّ</span>' ?></td>
                     </tr>
                 <?php endforeach; ?>
@@ -171,8 +171,8 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
         $age = ageOnDate($emp['birth_date'] ?? '');
         // الخطّ الزمني
         $tl = [];
-        if (!empty($emp['hire_date']) && $emp['hire_date'] >= '1900-01-01') $tl[] = ['d' => $emp['hire_date'], 'c' => '', 't' => 'دخول المدرسة / Embauche'];
-        if (!empty($emp['titularization_date']) && $emp['titularization_date'] >= '1900-01-01' && $emp['employee_type'] === 'enseignant_titulaire') $tl[] = ['d' => $emp['titularization_date'], 'c' => 'g', 't' => 'دخول الملاك / Titularisation' . (!empty($emp['cadre_from_sy']) ? ' (سنة ' . $emp['cadre_from_sy'] . ')' : '')];
+        if (shownHireDate($emp) !== '') $tl[] = ['d' => shownHireDate($emp), 'c' => '', 't' => 'دخول المدرسة / Embauche'];
+        if (shownTitularizationDate($emp) !== '' && $emp['employee_type'] === 'enseignant_titulaire') $tl[] = ['d' => shownTitularizationDate($emp), 'c' => 'g', 't' => 'دخول الملاك / Titularisation' . (!empty($emp['cadre_from_sy']) ? ' (سنة ' . $emp['cadre_from_sy'] . ')' : '')];
         foreach ($grades as $g) { if ((float)$g['grade_before'] == 0 && $g['reason'] === 'titularization') continue; $tl[] = ['d' => $g['change_date'], 'c' => 'g', 't' => 'درجة: ' . rtrim(rtrim(number_format((float)$g['grade_before'], 1), '0'), '.') . ' ← ' . rtrim(rtrim(number_format((float)$g['grade_after'], 1), '0'), '.') . ' — ' . e($g['notes'] ?: $g['reason']) . ((int)($g['counted'] ?? 1) === 0 ? ' (غير محتسبة)' : '') . (!empty($g['user_edited']) ? ' ✍️' : '')]; }
         foreach ($decisions as $dc) { $tl[] = ['d' => substr((string)$dc['decided_at'], 0, 10), 'c' => 'd', 't' => e(($dc['decision'] === 'auto' ? 'تلقائياً: ' : ($dc['decision'] === 'approved' ? 'موافقة: ' : 'رفض: ')) . mb_substr((string)$dc['violation'], 0, 140))]; }
         foreach (['left_date_all' => 'ترك من الكل (نهائي)', 'left_date_cnss' => 'ترك الضمان', 'left_date_finance' => 'ترك المالية', 'left_date_eoc' => 'ترك صندوق التعويضات'] as $k => $l) if (!empty($emp[$k]) && $emp[$k] >= '1900-01-01') $tl[] = ['d' => $emp[$k], 'c' => 'x', 't' => $l];
@@ -195,8 +195,8 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
 
         <?php /* 🥇 «يظهر أوّل شي: تاريخ الدخول، تاريخ الملاك، أرقام صندوق التعويضات والضمان والمالية، تاريخ الميلاد» */ ?>
         <div class="eh-first">
-            <div><div class="k">تاريخ الدخول / Embauche</div><div class="v eh-num"><?= $d($emp['hire_date']) ?></div></div>
-            <div><div class="k">تاريخ الملاك / Titularisation</div><div class="v eh-num"><?= $emp['employee_type'] === 'enseignant_titulaire' ? $d($emp['titularization_date']) : '—' ?></div></div>
+            <div><div class="k">تاريخ الدخول / Embauche</div><div class="v eh-num"><?= $d(shownHireDate($emp)) ?></div></div>
+            <div><div class="k">تاريخ الملاك / Titularisation</div><div class="v eh-num"><?= $emp['employee_type'] === 'enseignant_titulaire' ? $d(shownTitularizationDate($emp)) : '—' ?></div></div>
             <div><div class="k">رقم صندوق التعويضات / N° Caisse</div><div class="v eh-num"><?= e($emp['caisse_number'] ?: '—') ?></div></div>
             <div><div class="k">رقم الضمان / N° CNSS</div><div class="v eh-num"><?= e(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'])) ?></div></div>
             <div><div class="k">الرقم المالي / N° Finances</div><div class="v eh-num"><?= e($emp['finance_ministry_number'] ?: '—') ?></div></div>
@@ -210,8 +210,8 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
             <div><div class="k">المدرسة / École</div><div class="v"><?= e($emp['school_ar'] ?: $emp['school_fr']) ?></div></div>
             <div><div class="k">الشهادة / Diplôme</div><div class="v"><?= e($dipLbl[$emp['diploma'] ?? ''] ?? ($emp['diploma'] ?: '—')) ?></div></div>
             <div><div class="k">تاريخ الولادة / Naissance</div><div class="v eh-num"><?= $d($emp['birth_date']) ?><?= $age !== null ? ' (' . $age . ' سنة)' : '' ?></div></div>
-            <div><div class="k">دخول المدرسة / Embauche</div><div class="v eh-num"><?= $d($emp['hire_date']) ?></div></div>
-            <div><div class="k">دخول الملاك / Titularisation</div><div class="v eh-num"><?= $emp['employee_type'] === 'enseignant_titulaire' ? $d($emp['titularization_date']) : '—' ?></div></div>
+            <div><div class="k">دخول المدرسة / Embauche</div><div class="v eh-num"><?= $d(shownHireDate($emp)) ?></div></div>
+            <div><div class="k">دخول الملاك / Titularisation</div><div class="v eh-num"><?= $emp['employee_type'] === 'enseignant_titulaire' ? $d(shownTitularizationDate($emp)) : '—' ?></div></div>
             <div><div class="k">مدّة الخدمة / Ancienneté</div><div class="v"><?= e($svc ?: '—') ?><?= $isLeft ? ' (حتى تركه)' : '' ?></div></div>
             <div><div class="k">الدرجة الحالية / Échelon</div><div class="v eh-num"><?= $emp['employee_type'] === 'employe' ? '—' : rtrim(rtrim(number_format((float)$emp['current_grade'], 1), '0'), '.') ?></div></div>
             <div><div class="k">رقم الضمان / N° CNSS</div><div class="v eh-num"><?= e(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'])) ?></div></div>
