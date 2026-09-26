@@ -230,7 +230,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 <td><span class="lbl">Type / الفئة</span><span class="val"><?= e($meta['type']) ?></span></td>
                 <?php /* 📚 «حطّ المواد محلّ الدرجة» (طلبه المباشر 2026-09-24): تبديل الخانتين فقط — المواد بالسطر الأوّل والدرجة بالثالث؛ التخطيط المجمّد لم يُمسّ */ ?>
                 <td><span class="lbl">Matières / المواد</span><span class="val"><?= e($meta['subjects']) ?></span></td>
-                <td><span class="lbl">Code / الرمز</span><span class="val"><?= e($meta['code']) ?></span></td>
+                <td><span class="lbl">Code / الرمز</span><span class="val"><?= e($meta['code']) ?><?= ($meta['birth'] ?? '') !== '' ? ' · ولادة ' . e($meta['birth']) : '' ?></span></td><?php /* 👤 تاريخ الولادة بنفس الخانة — لا صفّ ولا خانة جديدة (البطاقة كما هي) */ ?>
             </tr>
             <tr>
                 <td><span class="lbl">Embauche / تاريخ الدخول</span><span class="val"><?= e($meta['hire']) ?></span></td>

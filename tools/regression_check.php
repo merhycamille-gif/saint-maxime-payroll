@@ -8325,6 +8325,24 @@ if ($e179) {
 } else $c179('no-sample', false);
 check('📝 بطاقة سنوية فاضية للتعبئة باليد (2026-09-26): بلا مبالغ (الهوية والأشهر تبقى) · نموذج فارغ لأي أستاذ · الجماعية · العادية كما هي', $ok179, implode(' · ', $why179) ?: 'ok');
 
+/* =====================================================================
+ * 180) 👤 البطاقة السنوية: الاسم الثلاثي (مع اسم الأب) + تاريخ الولادة بخانة الرمز — بلا صفّ ولا خانة جديدة (2026-09-26)
+ * =================================================================== */
+$ok180 = true; $why180 = [];
+$c180 = function (string $n, bool $ok) use (&$ok180, &$why180) { if (!$ok) { $ok180 = false; $why180[] = $n; } };
+$e180 = $db->query("SELECT e.id, e.first_name_ar, e.father_name_ar, e.last_name_ar, e.birth_date FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id
+    WHERE e.is_deleted = 0 AND e.father_name_ar <> '' AND e.birth_date > '1900-01-01' AND m.school_year = '2025-2026' AND m.net_salary_lbp > 0 ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($e180) {
+    $h180 = renderPage('pages/annual_slip.php', ['employee_id' => (int)$e180['id'], 'school_year' => '2025-2026'], []);
+    $triple = trim(preg_replace('/\s+/', ' ', $e180['first_name_ar'] . ' ' . $e180['father_name_ar'] . ' ' . $e180['last_name_ar']));
+    $c180('triple-name', $noFatal($h180) && preg_match('#<span class="slip-pname">' . preg_quote(e($triple), '#') . '#u', $h180) === 1);
+    $c180('birth-in-code-cell', preg_match('#<span class="lbl">Code / الرمز</span><span class="val">[^<]*· ولادة ' . preg_quote(date('d/m/Y', strtotime($e180['birth_date'])), '#') . '</span>#u', $h180) === 1);
+    $c180('layout-same', substr_count($h180, '<table class="slip-info">') === 1 && preg_match_all('#<table class="slip-info">.*?</table>#su', $h180, $mm) === 1 && substr_count($mm[0][0], '<tr>') === 3 && substr_count($mm[0][0], '<td>') === 12);
+    $hb180 = renderPage('pages/annual_slip.php', ['employee_id' => (int)$e180['id'], 'school_year' => '2025-2026', 'blank' => 2], []);
+    $c180('blank2-hides-birth', strpos($hb180, '· ولادة') === false);
+} else $c180('no-sample', false);
+check('👤 البطاقة السنوية: الاسم الثلاثي مع اسم الأب + تاريخ الولادة بخانة الرمز بلا أي تغيير بالتخطيط (2026-09-26)', $ok180, implode(' · ', $why180) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

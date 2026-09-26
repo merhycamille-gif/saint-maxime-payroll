@@ -190,8 +190,9 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         $tot['total_due_usd'] += floor((float)$s['total_due_usd']);
     }
 
-    $empNameAr = trim($emp['first_name_ar'].' '.$emp['last_name_ar']);
-    $empNameFr = trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
+    // 👤 (2026-09-26 «ببطاقة الأستاذ يكون الاسم الثلاثي مع اسم الأب + تاريخ الولادة بلا ما تخرب البطاقة بولا ملم»): الاسم ثلاثي عربي/فرنسي
+    $empNameAr = trim(preg_replace('/\s+/', ' ', $emp['first_name_ar'].' '.($emp['father_name_ar'] ?? '').' '.$emp['last_name_ar']));
+    $empNameFr = trim(preg_replace('/\s+/', ' ', $emp['first_name_fr'].' '.($emp['father_name_fr'] ?? '').' '.$emp['last_name_fr']));
     if ($empNameAr !== '' && $empNameFr !== '') $empNameDisp = $empNameAr.' — '.$empNameFr;
     else $empNameDisp = $empNameAr !== '' ? $empNameAr : $empNameFr;
 
@@ -212,6 +213,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'old_rate'    => officialUsdRateLbl(),
         'new_rates'   => implode(' / ', array_unique(array_map(fn($x) => number_format($x, 0), array_values(array_filter(array_map(fn($r) => (float)($r['rate'] ?? 0), $rows)))))),
         'code'        => $emp['employee_code'] ?: '—',
+        'birth'       => (!empty($emp['birth_date']) && $emp['birth_date'] >= '1900-01-01') ? date('d/m/Y', strtotime($emp['birth_date'])) : '', // 👤 تاريخ الولادة (يُعرض بخانة الرمز)
         'hire'        => formatDate($emp['hire_date']),
         'titul'       => formatDate($emp['titularization_date']),
         'hours'       => rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.'),
