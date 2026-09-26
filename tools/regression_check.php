@@ -8206,6 +8206,52 @@ if ($rita174) $c174('rita-oct-2026', (int)$rita174['ex'] === 1 && (int)$rita174[
 $c174('idempotent', healCadreEocIncludesExtra(true) === 0);
 check('🏦 الداخل للملاك يرث «الصندوق يشمل الأجر الإضافي» كرفاقه المتقاضين إضافياً + شفاء الملاك الحاليين (2026-09-26 ريتا طنوس: 6٪ على الأساس + الإضافي)', $ok174, implode(' · ', $why174) ?: 'ok');
 
+/* =====================================================================
+ * 175) 🎓 المرشّح للملاك بعد سنتين يظهر للقرار حتى لو رواتب سنته الأولى غير مخزّنة (بند إضافي/نقل لها يكفي) — باميلا نضّور (2026-09-26)
+ * =================================================================== */
+$cd175 = (string)file_get_contents($PROJ . '/includes/cadre_due.php');
+$ok175 = strpos($cd175, "OR e.id IN (SELECT employee_id FROM employee_bonuses WHERE school_year = ? AND bonus_type IN ('prime_fixe','transport_complement','transport_daily'))") !== false
+    && strpos($cd175, "\$p = [\$cut, \$yearStart, \$syA, \$syA, \$syB];") !== false;
+// باميلا (1802): رُسِّمت بـ2026-2027 (قرار approved) وملاكها كرفاقها: صندوق يشمل الإضافي، إضافي 60٪، ت1 2026 = 6٪ × (الأساس + الإضافي)
+$pam175 = $db->query("SELECT e.employee_type, e.titularization_date, e.eoc_includes_extra, (SELECT decision FROM compliance_decisions d WHERE d.rule_key = 'cadre_due' AND d.employee_id = 1802 AND d.school_year = '2026-2027' ORDER BY d.id DESC LIMIT 1) dec,
+    (SELECT caisse_amount_lbp FROM monthly_salaries WHERE employee_id = 1802 AND year = 2026 AND month = 10) caisse, (SELECT base_plus_echelon_lbp + prime_fixe_lbp FROM monthly_salaries WHERE employee_id = 1802 AND year = 2026 AND month = 10) gross
+    FROM employees e WHERE e.id = 1802 AND e.is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+if ($pam175) $ok175 = $ok175 && $pam175['employee_type'] === 'enseignant_titulaire' && $pam175['titularization_date'] === '2026-10-01' && (int)$pam175['eoc_includes_extra'] === 1 && $pam175['dec'] === 'approved'
+    && (int)$pam175['caisse'] === (int)round((int)$pam175['gross'] * 0.06) && (int)$pam175['gross'] > 50000000;
+check('🎓 المرشّح للملاك بعد سنتين يظهر للقرار ولو رواتب سنته الأولى غير مخزّنة (بند لها يكفي) + باميلا نضّور رُسِّمت 1/10/2026 كرفاقها (2026-09-26)', $ok175, $pam175 ? json_encode($pam175) : 'no-pamela');
+
+/* =====================================================================
+ * 176) 🏆 إعادة بناء سجلّ الدرجات بلا تاريخ صريح تحفظ درجات السنة الدراسية المستقبلية (4+4+2 بكانون الثاني) والدرجة الحالية لغاية اليوم
+ *      (2026-09-26 ريتا طنوس: كانون الثاني 2027 صار 15 بدل 19 بعد إعادة البناء) — تجربة فعلية مع ترجيع
+ * =================================================================== */
+$ok176 = true; $why176 = [];
+$c176 = function (string $n, bool $ok) use (&$ok176, &$why176) { if (!$ok) { $ok176 = false; $why176[] = $n; } };
+$pc176 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$c176('code', strpos($pc176, "if (\$eoy > \$todayTs) { \$todayTs = \$eoy; \$horizonExtended = true; }") !== false && strpos($pc176, "if (\$horizonExtended) {") !== false);
+[$y176a, $y176b] = array_map('intval', explode('-', currentSchoolYear()));
+$t176 = $db->query("SELECT e.id FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.diploma = 'ijaza_taalimiya' AND e.titularization_date = '$y176a-10-01'
+    AND EXISTS (SELECT 1 FROM employee_grade_history h WHERE h.employee_id = e.id AND h.change_date = '$y176b-01-01' AND h.notes LIKE '%4+4+2%')
+    AND NOT EXISTS (SELECT 1 FROM employee_grade_history h WHERE h.employee_id = e.id AND h.user_edited = 1) ORDER BY e.id LIMIT 1")->fetchColumn();
+if ($t176 && date('Y-m-d') < "$y176b-01-01") {
+    $t176 = (int)$t176;
+    $bk176 = $db->query("SELECT * FROM employee_grade_history WHERE employee_id = $t176 ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+    $cg176 = (float)$db->query("SELECT current_grade FROM employees WHERE id = $t176")->fetchColumn();
+    try {
+        buildLegalGradeHistory($t176);  // بلا تاريخ ⇒ الأفق نهاية السنة الدراسية
+        $after176 = $db->query("SELECT MAX(grade_after) mx, SUM(change_date = '$y176b-01-01') jan, (SELECT current_grade FROM employees WHERE id = $t176) cg FROM employee_grade_history WHERE employee_id = $t176")->fetch(PDO::FETCH_ASSOC);
+        $c176('future-rows-kept', (int)$after176['jan'] === 4 && (float)$after176['mx'] === (float)($bk176 ? max(array_column($bk176, 'grade_after')) : 0));
+        $c176('current-grade-as-of-today', abs((float)$after176['cg'] - $cg176) < 0.01);
+        $eng176 = (new PayrollCalculator($t176, 1, $y176b))->calculate();
+        $c176('engine-jan-uses-future-grade', (float)$eng176['grade_at_month'] === (float)$after176['mx'] && (int)$eng176['echelon_value_lbp'] > 0);
+    } catch (Throwable $e) { $c176('exception:' . $e->getMessage(), false); }
+    // ترجيع حرفي
+    $db->exec("DELETE FROM employee_grade_history WHERE employee_id = $t176");
+    if ($bk176) { $cols = array_keys($bk176[0]); $ins = $db->prepare("INSERT INTO employee_grade_history (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")"); foreach ($bk176 as $r) $ins->execute(array_values($r)); }
+    $db->prepare("UPDATE employees SET current_grade = ? WHERE id = ?")->execute([$cg176, $t176]);
+    $c176('restored', $db->query("SELECT COUNT(*) FROM employee_grade_history WHERE employee_id = $t176")->fetchColumn() == count($bk176));
+} else $c176('no-sample-or-past-january', $t176 ? true : false);
+check('🏆 إعادة بناء سجلّ الدرجات تحفظ درجات السنة المستقبلية (4+4+2 كانون الثاني) والدرجة الحالية لغاية اليوم (2026-09-26 ريتا طنوس) — تجربة فعلية مع ترجيع', $ok176, implode(' · ', $why176) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

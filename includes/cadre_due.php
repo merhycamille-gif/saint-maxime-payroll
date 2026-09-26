@@ -244,9 +244,13 @@ function cadreDueCandidates(PDO $db, string $sy, ?array $schoolIds = null, bool 
             WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_contractuel'
               AND e.hire_date IS NOT NULL AND e.hire_date <> '0000-00-00' AND e.hire_date <= ?
               AND " . leftDateSql('e.') . " >= ?
-              AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND school_id = e.school_id AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0))
+              AND (e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND school_id = e.school_id AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0))
+                   OR e.id IN (SELECT employee_id FROM employee_bonuses WHERE school_year = ? AND bonus_type IN ('prime_fixe','transport_complement','transport_daily')))
               AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = ? AND school_id = e.school_id AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0))";
-    $p = [$cut, $yearStart, $syA, $syB];
+    // 🎓 (2026-09-26 باميلا نضّور/النجاة: دخلت 1/10/2024 مع ريتا طنوس بنفس الشهادة، لكن رواتب 2024-2025 غير مخزّنة — لها بند إضافي لتلك
+    //    السنة فقط — فلم يقترحها البرنامج للملاك بـ2026-2027 وأجّلها لـ2027-2028). «اتفقنا بس يصير عندو سنتين، تالت سنة لازم تعطيني خبر»:
+    //    السنة الأولى تُعتبر مكتملة برواتب مخزّنة **أو** ببند إضافي/نقل مسجّل لها بملفه؛ السنة الثانية (السابقة مباشرة) تبقى برواتب فعلية.
+    $p = [$cut, $yearStart, $syA, $syA, $syB];
     if (is_array($schoolIds)) {
         $ids = array_values(array_filter(array_map('intval', $schoolIds)));
         if (!$ids) return [];

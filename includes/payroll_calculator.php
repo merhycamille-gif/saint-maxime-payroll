@@ -1162,6 +1162,15 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, 
     $tenureDate = tenureReferenceDate($emp);                   // التثبيت = دخول + سنتان (أو override)
     $tenureYear = (int)date('Y', strtotime($tenureDate));
     $todayTs = $todayOverride ? strtotime($todayOverride) : time();
+    // 🏆 (2026-09-26 ريتا طنوس: إعادة بناء سجلّها بتاريخ اليوم أسقطت درجاتها الأربع المؤرّخة 1/1/2027 فصار كانون الثاني 15 بدل 19):
+    //    الكتابة الفعلية (لا التقدير) بلا تاريخ صريح تمتدّ حتى نهاية السنة الدراسية الحالية (30/9) — كما يكتب الترسيم (grade_end) —
+    //    فتبقى الدرجات المستحقّة خلال السنة بالسجلّ والمحرّك يحسب أشهرها؛ أمّا «الدرجة الحالية» بالملف فتبقى لغاية اليوم (أدناه).
+    $realTodayStr = date('Y-m-d');
+    $horizonExtended = false;
+    if (!$dryRun && !$todayOverride && function_exists('currentSchoolYear') && preg_match('/^\d{4}-(\d{4})$/', (string)currentSchoolYear(), $hm)) {
+        $eoy = strtotime($hm[1] . '-09-30');
+        if ($eoy > $todayTs) { $todayTs = $eoy; $horizonExtended = true; }
+    }
 
     // ===== منطق التدرّج العادي منقول حرفياً من برنامج المستخدم المرجعي «ف7» (calcEchelonFromTable) =====
     // درجة عادية فورية عند دخول الملاك لكل الشهادات إلا الإجازة التعليمية (gets_immediate_grade=0 → noT).
@@ -1367,6 +1376,13 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, 
                 $insM->execute([$empId, (float)$mr['d'], (float)$mr['d'], (int)$mr['counted'], $mr['change_date'], ($mr['notes'] !== null && $mr['notes'] !== '') ? $mr['notes'] : 'درجة يدوية (بقرار المدرسة)']);
             }
             $g = rechainGradeHistory($empId);   // يعيد الحساب شاملاً اليدوية (يحترم التاريخ/الاحتساب)
+        }
+        if ($horizonExtended) { // الدرجة الحالية بالملف = آخر درجة مؤرّخة لغاية اليوم (المستقبلية بالسجلّ فقط)
+            $gq = $db->prepare("SELECT grade_after FROM employee_grade_history WHERE employee_id = ? AND grade_after >= 1 AND change_date <= ? ORDER BY change_date DESC, id DESC LIMIT 1");
+            $gq->execute([$empId, $realTodayStr]);
+            $gNow = $gq->fetchColumn();
+            if ($gNow === false) $gNow = $start; // دخول الملاك نفسه لاحق لليوم (مرسَّم من تشرين القادم) ⇒ درجة الدخول
+            $db->prepare("UPDATE employees SET current_grade = ? WHERE id = ?")->execute([(float)$gNow, $empId]); $g = (float)$gNow;
         }
         $db->commit();
     } catch (Exception $e) { $db->rollBack(); throw $e; }
