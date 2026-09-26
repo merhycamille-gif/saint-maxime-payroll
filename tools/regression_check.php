@@ -7981,7 +7981,7 @@ $hON = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' =
 $c169('of-none', $noFatal($hON) && strpos($hON, 'بلا فئة مشيّكة') !== false && (preg_match('/المجموع العام \((\d+)\)/u', $hON, $mON) === 0 || (int)$mON[1] === 0));
 // الرواتب الشهرية + لائحة الموظفين + البطاقة السنوية: خانات التشييك ظاهرة، وولا فئة = لا صفوف
 $hM = renderPage('pages/monthly_payroll.php', ['month' => 6, 'year' => 2026, 'type_set' => '1'], []);
-$c169('monthly-none', $noFatal($hM) && substr_count($hM, 'name="type[]"') === 3 && !preg_match('/name="type\[\]" value="[a-z_]+" checked/', $hM));
+$c169('monthly-none', $noFatal($hM) && substr_count($hM, 'name="type[]" value=') === 3 /* 🔁 2026-09-26: علامة data-msa-sync-name="type[]" تُضاف فلا تُعدّ */ && !preg_match('/name="type\[\]" value="[a-z_]+" checked/', $hM));
 $hE = renderPage('pages/employees.php', ['type_set' => '1', 'type' => ['employe']], []);
 $c169('employees-one', $noFatal($hE) && preg_match('/name="type\[\]" value="employe" checked/', $hE) === 1 && strpos($hE, 'أستاذ في الملاك</') === false);
 $hA = renderPage('pages/annual_slip.php', ['school_year' => '2025-2026', 'type_set' => '1', 'type' => ['enseignant_contractuel']], []);
