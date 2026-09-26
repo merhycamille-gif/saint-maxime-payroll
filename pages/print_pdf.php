@@ -29,7 +29,7 @@ $target = $_GET['target'] ?? '';
 // أمان: مسار داخلي فقط (يبدأ بـ pages/ أو الجذر) بلا مضيف/سكيم خارجي
 $target = ltrim($target, '/');
 if ($target === '' || preg_match('#^[a-z]+://#i', $target) || strpos($target, '..') !== false
-    || !preg_match('#^[A-Za-z0-9_./?&=%\-+:]+$#', $target)) {
+    || !preg_match('#^[A-Za-z0-9_./?&=%\-+:\[\]]+$#', $target)) { // ☑️ (2026-09-26 «طلب غير صالح» بطباعة البطاقات السنوية PDF) الفئة بخانات type[]=… تحمل [ ] منذ 2026-09-25
     http_response_code(400); die('طلب غير صالح');
 }
 

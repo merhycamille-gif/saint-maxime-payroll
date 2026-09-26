@@ -28,7 +28,7 @@ $name = preg_replace('/[^a-z0-9_]+/i', '_', (string)($_GET['name'] ?? 'attestati
 $back = BASE_URL . ($target ?: 'pages/attestations.php');
 
 if ($target === '' || preg_match('#^[a-z]+://#i', $target) || strpos($target, '..') !== false
-    || !preg_match('#^[A-Za-z0-9_./?&=%\-+:]+$#', $target)) {
+    || !preg_match('#^[A-Za-z0-9_./?&=%\-+:\[\]]+$#', $target)) { // ☑️ (2026-09-26) روابط الفئة بخانات type[]=… تحمل [ ]
     sendResult(false, 'طلب غير صالح', BASE_URL . 'pages/attestations.php');
 }
 if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {

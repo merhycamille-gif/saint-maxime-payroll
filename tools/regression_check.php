@@ -8160,6 +8160,11 @@ $t173 = $db->query("SELECT e.id, e.birth_date FROM employees e JOIN monthly_sala
 if ($t173) { [$ty173, $tm173] = array_map('intval', explode('-', substr($t173['birth_date'], 0, 7))); $tr = (new PayrollCalculator((int)$t173['id'], $tm173, $ty173 + 64))->calculate(); $c173('titulaire-unchanged', (int)$tr['caisse_amount_lbp'] > 0); }
 check('⚖️ موظف قانون العمل بعد 64 لا يخضع لنهاية الخدمة (2026-09-26): المحرّك تلقائي بلا مفتاح (٨.٥٪ = 0 من شهر بلوغه، والعائلي ٦٪ يبقى) + الملاك بقرار الإبقاء كما كان + الشفاء يصفّر المخزّن غير المحميّ + العدّ بالتسوية = الخاضعون فعلاً', $ok173, implode(' · ', $why173) ?: 'ok');
 
+// 🖨️ (2026-09-26 «عم حاول أطبع البطاقات السنوية PDF عم بيقلي طلب غير صالح»): الفئة بخانات type[]= تحمل [ ] ⇒ القائمة البيضاء لهدف الطباعة/الإرسال تقبلهما
+check('🖨️ PDF/إرسال: هدف فيه type[]=… مقبول (2026-09-26)', strpos((string)file_get_contents($PROJ . '/pages/print_pdf.php'), "[A-Za-z0-9_./?&=%\-+:\[\]]+") !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/send_attestation.php'), "[A-Za-z0-9_./?&=%\-+:\[\]]+") !== false
+    && preg_match('#^[A-Za-z0-9_./?&=%\-+:\[\]]+$#', 'pages/annual_slip.php?action=print_all&type_set=1&type[]=enseignant_titulaire&school_year=2026-2027') === 1, 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
