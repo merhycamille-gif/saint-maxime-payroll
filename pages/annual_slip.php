@@ -14,6 +14,36 @@ $action = $_GET['action'] ?? '';
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 $schoolYear = $_GET['school_year'] ?? activeSchoolYear();
 if ($schoolYear === 'all') $schoolYear = currentSchoolYear(); // الكشف يحتاج سنة محددة
+// 📝 (2026-09-26 «بدي أقدر أطبع بطاقة سنوية فيها المبالغ فاضية حتى إذا بدي عبّي أنا أي أستاذ باليد»):
+//    blank=1 = بطاقة هذا الأستاذ بلا أي مبلغ أو رقم راتب (الأشهر والهوية تبقى) · blank=2 = نموذج فارغ لأي أستاذ (الهوية فارغة أيضاً، المدرسة والسنة تبقيان)
+//    التصميم نفسه حرفياً (البطاقة مجمّدة) — التفريغ يُطبَّق على الـHTML الجاهز بعد الحساب، فلا يمسّ الحساب ولا العرض العادي.
+$slipBlank = max(0, min(2, (int)($_GET['blank'] ?? 0)));
+$GLOBALS['slip_blank'] = $slipBlank;
+$blankQ = $slipBlank ? '&blank=' . $slipBlank : '';
+function annualSlipBlankHtml(string $html, int $level): string {
+    // سطر سعر الصرف: رقم ⇒ يُزال
+    $html = preg_replace('#<div class="slip-rate"[^>]*>.*?</div>#su', '', $html);
+    // جدول الرواتب: كل الخلايا فارغة ما عدا خانة الشهر وخانة «TOTAL» وخانة التوقيع
+    $html = preg_replace_callback('#(<table class="salary-slip-table[^"]*">)(.*?)(</table>)#su', function ($m) {
+        $body = preg_replace_callback('#<(tbody|tfoot)>(.*?)</\1>#su', function ($sec) {
+            $inner = preg_replace_callback('#<td([^>]*)>(.*?)</td>#su', function ($td) {
+                if (preg_match('/row-month|sig-cell/', $td[1]) || stripos($td[2], 'TOTAL') !== false) return $td[0];
+                return '<td' . $td[1] . '>&nbsp;</td>';
+            }, $sec[2]);
+            return '<' . $sec[1] . '>' . $inner . '</' . $sec[1] . '>';
+        }, $m[2]);
+        return $m[1] . $body . $m[3];
+    }, $html);
+    // رأس الجدول: نسبة الإضافي وسعر الصرف أرقام ⇒ تُزال (تبقى العناوين)
+    $html = preg_replace_callback('#<thead>(.*?)</thead>#su', fn($m) => '<thead>' . preg_replace(['#1 \$ = [\d,\.]+#u', '#\d+(?:[.,]\d+)? ?%#u'], '', $m[1]) . '</thead>', $html);
+    // الدرجة رقم راتب ⇒ فارغة؛ وبالنموذج العام كل خانات الهوية فارغة والاسم سطر فارغ
+    $html = preg_replace('#(<span class="lbl">Échelon / الدرجة</span><span class="val">)[^<]*(</span>)#u', '$1&nbsp;$2', $html);
+    if ($level >= 2) {
+        $html = preg_replace('#(<span class="val"[^>]*>)[^<]*(</span>)#u', '$1&nbsp;$2', $html);
+        $html = preg_replace('#(<span class="slip-pname">)[^<]*(</span>)#u', '$1 __________________________ $2', $html);
+    }
+    return $html;
+}
 
 // فلتر النوع: '' = الكل، أو نوع محدّد
 // ☑️ (2026-09-25) خانات تشييك بلائحة الأساتذة (البطاقة نفسها مجمّدة ولا تُمَسّ): المشيّكة فقط تبيّن، ولا واحدة ⇒ لا أحد
@@ -330,7 +360,9 @@ function annualSlipHtml($db, $emp, $schoolYear) {
         </table>
     </div>
     <?php
-    return ob_get_clean();
+    $slipOut = ob_get_clean();
+    if (!empty($GLOBALS['slip_blank'])) $slipOut = annualSlipBlankHtml($slipOut, (int)$GLOBALS['slip_blank']); // 📝 بطاقة فاضية
+    return $slipOut;
 }
 
 // 🔴 لا doc-view هنا: بطاقة الراتب السنوية لها تصميمها الخاص وكانت تصير صغيرة ضايعة
@@ -571,14 +603,17 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <?php
                 $expAllQ = 'all=1' . $typeQ . '&school_year=' . urlencode($schoolYear);
                 // «PDF رسمي (الكل)» = طبق الأصل عبر Chrome (صفحة لكل أستاذ، نفس تصميم الشاشة)
-                $allTarget = rawurlencode('pages/annual_slip.php?action=print_all' . $typeQ . '&school_year=' . $schoolYear); // ☑️ الفئات المشيّكة
+                $allTarget = rawurlencode('pages/annual_slip.php?action=print_all' . $typeQ . '&school_year=' . $schoolYear . $blankQ); // ☑️ الفئات المشيّكة (+ فاضية)
             ?>
             <?php /* 📏 بلا fit=1: المسار العادي صار يملأ الورقة كاملة (وضع fit القديم كان يطبع أصغر — ملاحظة المستخدم p1) */ ?>
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel (tous) / PDF رسمي (الكل)</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expAllQ ?>&format=xlsx" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
+            <?php if ($slipBlank): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> بالمبالغ / avec montants</a>
+            <?php else: ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=1" class="btn btn-warning" title="كل البطاقات بالأسماء بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierges (montants) / فاضية من المبالغ</a><?php endif; ?>
         </div>
     </div>
+    <?php if ($slipBlank): ?><div class="alert alert-warning no-print" style="margin-bottom:12px">📝 بطاقات <?= $slipBlank === 2 ? 'نموذج فارغ' : 'بلا مبالغ' ?> — للتعبئة باليد. الحساب لم يُمَسّ.</div><?php endif; ?>
     <div class="alert alert-info no-print" style="margin-bottom:16px">
         <i class="fas fa-info-circle"></i> راجِع كشوف كل الموظفين تحت، وعند التأكد اضغط «طباعة الكل». كل كشف يُطبع بصفحة مستقلة.
         <strong>ملاحظة:</strong> تظهر الأرقام فقط للأشهر المُحتسَبة — إن كانت فارغة استعمل «احتساب الكل للسنة» أولاً.
@@ -620,14 +655,20 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <?php
                 $expQ = 'employee_id=' . $employeeId . '&school_year=' . urlencode($schoolYear);
                 // «PDF رسمي» = طبق الأصل عن الشاشة عبر Chrome (نفس تصميم الكشف بالضبط، بلا قصّ)
-                $slipTarget = rawurlencode('pages/annual_slip.php?employee_id=' . $employeeId . '&school_year=' . $schoolYear);
+                $slipTarget = rawurlencode('pages/annual_slip.php?employee_id=' . $employeeId . '&school_year=' . $schoolYear . $blankQ);
             ?>
             <?php /* 📏 بلا fit=1: المسار العادي صار يملأ الورقة كاملة (وضع fit القديم كان يطبع أصغر — ملاحظة المستخدم p1) */ ?>
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $slipTarget ?>&name=releve_<?= $employeeId ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel / PDF رسمي</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expQ ?>&format=xlsx" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
+            <?php if ($slipBlank): ?><a href="?<?= $expQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> بالمبالغ / avec montants</a>
+            <?php else: ?>
+            <a href="?<?= $expQ ?>&blank=1" class="btn btn-warning" title="بطاقة هذا الأستاذ بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierge (montants) / فاضية من المبالغ</a>
+            <a href="?<?= $expQ ?>&blank=2" class="btn btn-warning" title="نموذج فارغ بلا اسم ولا مبالغ — لأي أستاذ"><i class="fas fa-file"></i> Formulaire vierge / نموذج فارغ لأي أستاذ</a>
+            <?php endif; ?>
         </div>
     </div>
+    <?php if ($slipBlank): ?><div class="alert alert-warning no-print" style="margin-bottom:12px">📝 <?= $slipBlank === 2 ? 'نموذج فارغ لأي أستاذ (بلا اسم ولا مبالغ)' : 'بطاقة هذا الأستاذ بلا مبالغ' ?> — للتعبئة باليد. الحساب والبطاقة العادية لم يُمَسّا.</div><?php endif; ?>
 
     <?php echo annualSlipHtml($db, $emp, $schoolYear); ?>
 

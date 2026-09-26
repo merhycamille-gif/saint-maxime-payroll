@@ -8295,6 +8295,27 @@ if ($lv178) {
 } else $c178('no-leaver-sample', false);
 check('🗂️ صفحة «التاريخ الكامل للأستاذ» (2026-09-26): بحث بكل الموظفين (تارك أو لا، بالاسم/الهاتف/الولادة) ⇒ التعريف والأرقام + الخطّ الزمني + كل سنوات الرواتب بحصص الموظف والمؤسّسة — مستقلّة عن سنة الشريط', $ok178, implode(' · ', $why178) ?: 'ok');
 
+/* =====================================================================
+ * 179) 📝 بطاقة سنوية فاضية للتعبئة باليد (2026-09-26): blank=1 بلا مبالغ (الأشهر والهوية تبقى) · blank=2 نموذج فارغ (الهوية فارغة) · العادية لم تتغيّر
+ * =================================================================== */
+$ok179 = true; $why179 = [];
+$c179 = function (string $n, bool $ok) use (&$ok179, &$why179) { if (!$ok) { $ok179 = false; $why179[] = $n; } };
+$e179 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND m.school_year = '2025-2026' AND m.net_salary_lbp > 1000000 ORDER BY e.id LIMIT 1")->fetchColumn();
+if ($e179) {
+    $hN = renderPage('pages/annual_slip.php', ['employee_id' => $e179, 'school_year' => '2025-2026'], []);
+    $hB = renderPage('pages/annual_slip.php', ['employee_id' => $e179, 'school_year' => '2025-2026', 'blank' => 1], []);
+    $hF = renderPage('pages/annual_slip.php', ['employee_id' => $e179, 'school_year' => '2025-2026', 'blank' => 2], []);
+    $tbl = fn(string $h) => preg_match('#<table class="salary-slip-table[^"]*">(.*?)</table>#su', $h, $m) ? $m[1] : '';
+    $bodyDigits = fn(string $t) => preg_match('#<tbody>(.*?)</tbody>#su', $t, $m) ? preg_match_all('/\d{1,3}(?:,\d{3})+/', strip_tags(preg_replace('#<td class="row-month">.*?</td>#su', '', $m[1]))) : -1;
+    $c179('normal-has-amounts', $noFatal($hN) && $bodyDigits($tbl($hN)) > 10 && strpos($hN, 'blank=1') !== false && strpos($hN, 'blank=2') !== false);
+    $c179('blank1-no-amounts', $noFatal($hB) && $bodyDigits($tbl($hB)) === 0 && strpos($hB, 'class="row-month"') !== false && strpos($hB, 'TOTAL') !== false && strpos($hB, 'class="slip-rate"') === false
+        && preg_match('#<span class="lbl">N° CNSS / رقم الضمان</span><span class="val">[^<&]+</span>#u', $hB) === 1 /* الهوية تبقى */ && strpos($hB, 'بالمبالغ / avec montants') !== false);
+    $c179('blank2-no-identity', $noFatal($hF) && $bodyDigits($tbl($hF)) === 0 && preg_match('#<span class="slip-pname"> _+ </span>#u', $hF) === 1 && preg_match('#<span class="val"[^>]*>[^<&]+</span>#u', $hF) === 0);
+    $hPA = renderPage('pages/annual_slip.php', ['action' => 'print_all', 'school_year' => '2025-2026', 'type_set' => 1, 'type' => ['enseignant_titulaire'], 'blank' => 1], [], [(int)$db->query("SELECT school_id FROM employees WHERE id = $e179")->fetchColumn()]);
+    $c179('print-all-blank', $noFatal($hPA) && $bodyDigits($tbl($hPA)) === 0 && strpos($hPA, 'blank%3D1') !== false);
+} else $c179('no-sample', false);
+check('📝 بطاقة سنوية فاضية للتعبئة باليد (2026-09-26): بلا مبالغ (الهوية والأشهر تبقى) · نموذج فارغ لأي أستاذ · الجماعية · العادية كما هي', $ok179, implode(' · ', $why179) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
