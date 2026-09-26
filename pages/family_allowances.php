@@ -149,7 +149,7 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
             <br>📅 <strong>تغيّر المبلغ خلال السنة:</strong> زرّ «شهري» قدّام الموظف يفتح سطوراً: النوع + من شهر + المبلغ الجديد — يسري من ذلك الشهر ويبقى نفسه بكل الأشهر بعده حتى تغيّره بشهر آخر (0 = يوقف).</div>
         </div>
 
-        <form method="GET" class="fa-filters no-print" id="faFilter">
+        <form method="GET" class="fa-filters no-print" id="faFilter" autocomplete="off">
             <?= pageSchoolPickerHtml($schScope, 'faFilter') ?>
             <div class="form-group">
                 <label class="form-label">Année scolaire / السنة الدراسية</label>
@@ -159,8 +159,9 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 <label class="form-label">Catégorie / الفئة</label>
                 <input type="hidden" name="cat_set" value="1">
                 <div style="padding:6px 0">
+                <span hidden data-msa-sync-name="cat[]" data-msa-sync-values="<?= e(implode(',', $categories)) ?>"></span><?php /* 🔁 القيم التي حُسب عليها الجدول (msaSyncForms) */ ?>
                 <?php foreach ($catLbl as $k => $l): ?>
-                    <label><input type="checkbox" name="cat[]" value="<?= $k ?>" <?= in_array($k, $categories, true) ? 'checked' : '' ?> onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> <?= $l ?></label>
+                    <label><input type="checkbox" autocomplete="off" name="cat[]" value="<?= $k ?>" <?= in_array($k, $categories, true) ? 'checked' : '' ?> onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> <?= $l ?></label>
                 <?php endforeach; ?>
                 </div>
             </div>

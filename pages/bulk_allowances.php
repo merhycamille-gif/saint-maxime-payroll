@@ -453,7 +453,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
         <div style="font-size:0.85em;font-weight:600;opacity:0.9">المكافآت والأجر الإضافي والنقل</div>
     </h3></div>
     <div class="card-body">
-        <form method="GET" class="form-row cols-2 no-print" style="margin-bottom:12px">
+        <form method="GET" class="form-row cols-2 no-print" style="margin-bottom:12px" autocomplete="off">
             <?= pageSchoolPickerHtml($schScope) ?>
             <div class="form-group mb-0">
                 <label class="form-label">Année scolaire / السنة الدراسية</label>

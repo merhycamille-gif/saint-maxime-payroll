@@ -491,3 +491,27 @@ window.msaSubmitSoon = function (form, ms) {
     }, ms == null ? 700 : ms);
 };
 window.addEventListener('pageshow', function () { var ov = document.getElementById('msaBusyOverlay'); if (ov) ov.style.display = 'none'; });
+
+// ☑️🔁 msaSyncForms (2026-09-26 «مشيّك على الموظفين والجدول ملاك»): كروم يرجّع حالة الخانات كما كانت (رجوع/تحديث/bfcache)
+// بينما الجدول محسوب على اختيار آخر. كل مجموعة خانات تحمل علامة <span data-msa-sync-name data-msa-sync-values> بالقيم
+// التي حُسبت عليها الصفحة فعلاً؛ عند كل عرض نقارن — اختلاف ⇒ إعادة تحميل واحدة (حارس 8 ثوانٍ ضدّ التكرار).
+window.msaSyncForms = function () {
+    var marks = document.querySelectorAll('span[data-msa-sync-name]');
+    if (!marks.length) return false;
+    var bad = null;
+    marks.forEach(function (m) {
+        var form = m.closest('form'); if (!form || bad) return;
+        var name = m.getAttribute('data-msa-sync-name');
+        var boxes = form.querySelectorAll('input[type=checkbox][name="' + name + '"]');
+        if (!boxes.length) return; // حقول مخفية (غير المدير العام) — لا شيء يقارَن
+        var cur = [].slice.call(boxes).filter(function (c) { return c.checked; }).map(function (c) { return c.value; }).sort().join(',');
+        var exp = (m.getAttribute('data-msa-sync-values') || '').split(',').filter(Boolean).sort().join(',');
+        if (cur !== exp) bad = form;
+    });
+    if (!bad) return false;
+    var key = 'msaSync:' + location.pathname, now = Date.now();
+    try { var last = parseInt(sessionStorage.getItem(key) || '0', 10); if (now - last < 8000) return false; sessionStorage.setItem(key, String(now)); } catch (e) {}
+    window.msaSubmitSoon(bad, 0);
+    return true;
+};
+window.addEventListener('pageshow', function () { setTimeout(window.msaSyncForms, 50); });

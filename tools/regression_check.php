@@ -8105,6 +8105,11 @@ $js172 = (string)file_get_contents($PROJ . '/assets/js/app.js');
 $c172('debounced-submit', strpos($js172, 'window.msaSubmitSoon = function (form, ms)') !== false && strpos($js172, 'msaBusyOverlay') !== false
     && strpos($fa172, 'onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"') !== false && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "\$sub = '(window.msaSubmitSoon||function(f){f.submit()})(this.form)';") !== false
     && strpos($fa172, "getElementById('faFilter').submit()") === false); // ☑️⏳ «مشيّك على الموظفين ولسا مبيّن الملاك»: الكبسات المتتالية تُجمَع بإرسال واحد
+$c172('sync-forms', strpos($js172, 'window.msaSyncForms = function ()') !== false && strpos($js172, "addEventListener('pageshow', function () { setTimeout(window.msaSyncForms, 50); })") !== false
+    && strpos($fa172, 'data-msa-sync-name="cat[]" data-msa-sync-values="<?= e(implode(\',\', $categories)) ?>"') !== false && strpos($fa172, 'id="faFilter" autocomplete="off"') !== false
+    && strpos($hAB, 'data-msa-sync-name="sch[]" data-msa-sync-values="' . $sa172 . ',' . $sb172 . '"') !== false && strpos($hAll, 'data-msa-sync-name="sch_all" data-msa-sync-values="1"') !== false
+    && strpos($hA, 'data-msa-sync-name="cat[]" data-msa-sync-values="titulaire"') !== false && strpos($hA, '<input type="checkbox" autocomplete="off" name="cat[]"') !== false
+    && strpos(empTypeCheckboxes(empTypeSelection(['type' => ['employe'], 'type_set' => 1], 'type'), true, 'type'), 'data-msa-sync-name="type[]" data-msa-sync-values="employe"') !== false); // 🔁 الخانات المعروضة = الصفحة المحسوبة وإلا إعادة تحميل
 check('🏫 الصفحات الجماعية بعدة مدارس (2026-09-26): التعويض العائلي + المكافآت/النقل = مدرسة واحدة أو مجموعة معاً أو الكل بخانات تشييك (pageSchoolScope) — المجموعة = مجموع المدارس + عمود المدرسة + بلا طرد', $ok172, implode(' · ', $why172) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */

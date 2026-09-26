@@ -699,10 +699,12 @@ function pageSchoolPickerHtml(array $scope, string $formId = ''): string {
     $h = '<div class="form-group mb-0" style="grid-column:1 / -1;flex:1 1 100%"><label class="form-label"><i class="fas fa-school"></i> Écoles / المدارس'
        . ' <small style="font-weight:400;color:#64748b">— وحدة لحالها أو مجموعة معاً أو الكل / une, plusieurs ou toutes</small></label>'
        . '<div class="school-checks msa-school-pick"><input type="hidden" name="sch_set" value="1">'
-       . '<label class="chk all"><input type="checkbox" name="sch_all" value="1"' . ($scope['all'] ? ' checked' : '') . ' onclick="msaSchoolPickAll(this);' . $sub . '"> <strong>Toutes / الكل</strong></label>';
+       . '<span hidden data-msa-sync-name="sch_all" data-msa-sync-values="' . ($scope['all'] ? '1' : '') . '"></span>' // 🔁 msaSyncForms
+       . '<span hidden data-msa-sync-name="sch[]" data-msa-sync-values="' . ($scope['all'] ? '' : implode(',', $scope['ids'])) . '"></span>'
+       . '<label class="chk all"><input type="checkbox" autocomplete="off" name="sch_all" value="1"' . ($scope['all'] ? ' checked' : '') . ' onclick="msaSchoolPickAll(this);' . $sub . '"> <strong>Toutes / الكل</strong></label>';
     foreach (allSchools() as $s) {
         $sid = (int)$s['id'];
-        $h .= '<label class="chk"><input type="checkbox" name="sch[]" value="' . $sid . '"' . ((!$scope['all'] && in_array($sid, $scope['ids'], true)) ? ' checked' : '') . ' onclick="msaSchoolPickOne(this);' . $sub . '"> ' . e($s['name_ar'] ?: $s['name_fr']) . '</label>';
+        $h .= '<label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="' . $sid . '"' . ((!$scope['all'] && in_array($sid, $scope['ids'], true)) ? ' checked' : '') . ' onclick="msaSchoolPickOne(this);' . $sub . '"> ' . e($s['name_ar'] ?: $s['name_fr']) . '</label>';
     }
     $h .= '</div></div>'
         . '<script>function msaSchoolPickAll(b){var w=b.closest(".msa-school-pick");if(b.checked){w.querySelectorAll(\'input[name="sch[]"]\').forEach(function(c){c.checked=false;});}else if(!Array.from(w.querySelectorAll(\'input[name="sch[]"]\')).some(function(c){return c.checked;})){b.checked=true;}}'
@@ -5759,9 +5761,10 @@ function empTypeCheckboxes(array $st, bool $submitOnChange = false, string $para
     $lbl = ['enseignant_titulaire' => 'Titulaires / الملاك', 'enseignant_contractuel' => 'Contractuels / المتعاقدين', 'employe' => 'Employés / الموظفين'];
     $oc = $submitOnChange ? ' onchange="(window.msaSubmitSoon||function(f){f.submit()})(this.form)"' : ''; // ⏳ إرسال مؤجَّل يجمع الكبسات (msaSubmitSoon، app.js)
     $h = '<div class="form-group mb-0 emp-type-picker"><label class="form-label"><i class="fas fa-users"></i> Catégorie / الفئة <small class="text-muted">(المشيّكة فقط تبيّن)</small></label>'
-       . '<input type="hidden" name="' . $param . '_set" value="1"><div class="school-checks emp-type-checks">';
+       . '<input type="hidden" name="' . $param . '_set" value="1"><div class="school-checks emp-type-checks">'
+       . '<span hidden data-msa-sync-name="' . $param . '[]" data-msa-sync-values="' . e(implode(',', $st['sel'])) . '"></span>'; // 🔁 القيم التي حُسبت عليها الصفحة (msaSyncForms)
     foreach ($lbl as $k => $l) {
-        $h .= '<label class="chk"><input type="checkbox" name="' . $param . '[]" value="' . $k . '"' . (in_array($k, $st['sel'], true) ? ' checked' : '') . $oc . '> ' . $l . '</label>';
+        $h .= '<label class="chk"><input type="checkbox" autocomplete="off" name="' . $param . '[]" value="' . $k . '"' . (in_array($k, $st['sel'], true) ? ' checked' : '') . $oc . '> ' . $l . '</label>';
     }
     return $h . '</div></div>';
 }
