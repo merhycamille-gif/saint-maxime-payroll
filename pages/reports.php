@@ -818,7 +818,7 @@ function reportDocThumb($path) {
         <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند'], ['dir' => 'ltr', 'annual' => true, 'law' => false]) ?>
                 <div class="report-table-wrap" dir="ltr"><table class="doc-table" dir="ltr">
                     <thead><tr>
-                        <th>#</th><th>المدرسة / École</th><th>عدد الكشوف</th>
+                        <th>#</th><th>المدرسة / École</th><th>عدد الأشخاص<br><small style="font-weight:400;opacity:.8">Effectif</small></th><th>الأشهر المدفوعة<br><small style="font-weight:400;opacity:.8">Mois payés</small></th><?php /* 👥📅 (2026-09-27) رقمان بدل «عدد الكشوف» الغامض */ ?>
                         <?php foreach ($atSel as $k): ?><th><?= e(annualTotalLabel($k, 'ar')) ?><?= annualTotalRateHead($k, $schoolYear) ?><br><small style="font-weight:400;opacity:.8"><?= e(annualTotalLabel($k, 'fr')) ?></small></th><?php endforeach; ?>
                     </tr></thead>
                     <tbody>
@@ -826,15 +826,15 @@ function reportDocThumb($path) {
                         <tr>
                             <td><?= ++$rn ?></td>
                             <td style="white-space:nowrap;text-align:right"><strong><?= e(schoolNameById($r['school_id'])) ?></strong></td>
-                            <td><?= (int)$r['cnt'] ?></td>
+                            <td><?= (int)$r['persons'] ?></td><td><?= (int)$r['cnt'] ?></td>
                             <?php foreach ($atSel as $k): ?><td style="white-space:nowrap"><?= $atCell($r[$k], $r[$k . '_usd']) ?></td><?php endforeach; ?>
                         </tr>
                         <?php endforeach; ?>
-                        <?php if (!$atRows): ?><tr><td colspan="<?= 3 + count($atSel) ?>" class="text-center">لا كشوف محسوبة بهذا النطاق / Aucune fiche</td></tr><?php endif; ?>
+                        <?php if (!$atRows): ?><tr><td colspan="<?= 4 + count($atSel) ?>" class="text-center">لا كشوف محسوبة بهذا النطاق / Aucune fiche</td></tr><?php endif; ?>
                         <?php if (count($atRows) > 1): ?>
                         <tr class="total-row" style="background:var(--gold-light);font-weight:800">
                             <td colspan="2">المجموع / Total — <?= count($atRows) ?> مدارس</td>
-                            <td><?= (int)$atTot['cnt'] ?></td>
+                            <td><?= (int)$atTot['persons'] ?></td><td><?= (int)$atTot['cnt'] ?></td>
                             <?php foreach ($atSel as $k): ?><td style="white-space:nowrap"><?= $atCell($atTot[$k], $atTot[$k . '_usd']) ?></td><?php endforeach; ?>
                         </tr>
                         <?php endif; ?>
@@ -842,7 +842,7 @@ function reportDocThumb($path) {
                 </table></div>
                 <?php if ($atRows): ?>
                 <p class="text-muted" style="margin:10px 0 0;font-size:12px"><i class="fas fa-circle-info"></i>
-                    كل خانة = مجموع الشهور المحسوبة للسنة الدراسية <?= e($schoolYear) ?> بالمدرسة. الدولار يُجمع شهراً بشهر بسعر صرف كل شهر (بلا فراطات).
+                    «عدد الأشخاص» = من تقاضى راتباً بالمدرسة خلال السنة (بالمجموع: الشخص المنقول بين مدرستين يُعدّ مرّة). «الأشهر المدفوعة» = مجموع الشهور المحسوبة لكل الأشخاص (شخص × شهر). كل خانة = مجموع الشهور المحسوبة للسنة الدراسية <?= e($schoolYear) ?> بالمدرسة. الدولار يُجمع شهراً بشهر بسعر صرف كل شهر (بلا فراطات).
                     <?php if (in_array('total', $atSel, true) && !salaryCompHas('transport')): ?>النقل غير مشمول بالمتوجب لأن زرّ «الراتب يشمل» لا يتضمّنه.<?php endif; ?>
                 </p>
                 <?php endif; ?>

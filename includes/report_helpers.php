@@ -927,16 +927,18 @@ function annualTotalRows(PDO $db, string $schoolYear, string $empFilter, array $
         $sel[] = $it['usd'] . ' `' . $k . '_usd`';
     }
     $sel[] = 'SUM(FLOOR(ms.base_plus_echelon_lbp/NULLIF(ms.exchange_rate,0))) `bpe_usd_mkt`'; // للمركّب بسعر الشهر (bpe_usd = دولار القانون للعرض)
-    $st = $db->prepare("SELECT ms.school_id, COUNT(*) cnt, " . implode(', ', $sel) . "
-                        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    // 👥📅 (2026-09-27 «شو المقصود عدد الكشوف؟» ⇒ بالمنطق المحاسبي رقمان): cnt = الأشهر المدفوعة (شخص × شهر) · persons = عدد الأشخاص (بلا تكرار)
+    $where = " FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                         WHERE e.is_deleted = 0" . $empFilter . $empTypeSql . " AND ms.school_year = ?
-                          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . "
-                        GROUP BY ms.school_id ORDER BY ms.school_id");
+                          AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql;
+    $st = $db->prepare("SELECT ms.school_id, COUNT(*) cnt, COUNT(DISTINCT ms.employee_id) persons, " . implode(', ', $sel) . $where . " GROUP BY ms.school_id ORDER BY ms.school_id");
     $st->execute(array_merge($empParams, [$schoolYear]));
     $rows = $st->fetchAll();
+    $stP = $db->prepare("SELECT COUNT(DISTINCT ms.employee_id)" . $where); $stP->execute(array_merge($empParams, [$schoolYear]));
+    $personsAll = (int)$stP->fetchColumn(); // المجموع الحقيقي: الشخص المنقول بين مدرستين يُعدّ مرّة واحدة
     $gs = annualGradeSplit($db, $schoolYear, $empFilter, $empParams, $empTypeSql, $schoolSql);
     $hasT = salaryCompHas('transport'); $hasE = salaryCompHas('extra'); $hasA = salaryCompHas('aide');
-    $tot = ['school_id' => 0, 'cnt' => 0];
+    $tot = ['school_id' => 0, 'cnt' => 0, 'persons' => $personsAll];
     foreach ($items as $k => $_) { $tot[$k] = 0; $tot[$k . '_usd'] = 0; }
     foreach ($rows as &$r) {
         $g = $gs[(int)$r['school_id']] ?? ['ord' => 0, 'exc' => 0, 'ord_usd' => 0.0, 'exc_usd' => 0.0];

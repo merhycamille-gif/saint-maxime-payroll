@@ -361,14 +361,14 @@ if ($report === 'monthly_summary') {
     [$atRows, $atTot] = annualTotalRows($db, $schoolYear, $annualEmpFilter, $annualEmpParams, $empTypeSql, $schoolSql);
     $rep = new ReportTable('المجاميع السنوية — لكل مدرسة ولكل بند — ' . $schoolYear . $empTypeTitle, true);
     $rep->schoolHeader($school);
-    $rep->head(array_merge(['#', 'المدرسة', 'عدد الكشوف'], array_map(fn($k) => annualTotalLabel($k, 'ar', $schoolYear) . ' (ل.ل)', $atSel)));
-    $rep->widths(array_merge([5, 30, 10], array_fill(0, count($atSel), 18)));
+    $rep->head(array_merge(['#', 'المدرسة', 'عدد الأشخاص (Effectif)', 'الأشهر المدفوعة (Mois payés)'], array_map(fn($k) => annualTotalLabel($k, 'ar', $schoolYear) . ' (ل.ل)', $atSel)));
+    $rep->widths(array_merge([5, 30, 12, 14], array_fill(0, count($atSel), 18)));
     $rn = 0;
     foreach ($atRows as $r) {
-        $rep->row(array_merge([++$rn, schoolNameById($r['school_id']), (int)$r['cnt']], array_map(fn($k) => (int)$r[$k], $atSel)));
+        $rep->row(array_merge([++$rn, schoolNameById($r['school_id']), (int)$r['persons'], (int)$r['cnt']], array_map(fn($k) => (int)$r[$k], $atSel)));
     }
     if (count($atRows) > 1) {
-        $rep->totalRow(array_merge(['', 'المجموع', (int)$atTot['cnt']], array_map(fn($k) => (int)$atTot[$k], $atSel)));
+        $rep->totalRow(array_merge(['', 'المجموع', (int)$atTot['persons'], (int)$atTot['cnt']], array_map(fn($k) => (int)$atTot[$k], $atSel)));
     }
 
 } elseif ($report === 'new_teachers') {

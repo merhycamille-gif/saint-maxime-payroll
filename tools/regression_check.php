@@ -8584,6 +8584,25 @@ check('↩️ سهم «Revenir / لمحل ما كنت» بعد الرجوع (202
       && $sim186,
       $node186 ? ('node: ' . ($out186 ?? '')) : 'node غير متوفّر — فحص المصدر فقط');
 
+/* =====================================================================
+ * 187) 👥📅 المجاميع السنوية: «عدد الكشوف» ⇒ عمودان «عدد الأشخاص / Effectif» + «الأشهر المدفوعة / Mois payés» (2026-09-27 «شو المقصود عدد
+ *      الكشوف؟» ⇒ المنطق المحاسبي: رقمان) — persons = COUNT(DISTINCT employee) لكل مدرسة، والمجموع بلا تكرار (المنقول بين مدرستين مرّة)،
+ *      cnt = الأشهر المدفوعة. الشاشة + الإكسل. الأشخاص ≤ الأشهر دائماً، ومجموع الأشخاص ≤ مجموع أشخاص المدارس.
+ * =================================================================== */
+[$rows187, $tot187] = annualTotalRows($db, '2025-2026', '', [], '', '');
+$ok187 = count($rows187) > 0 && isset($tot187['persons']) && (int)$tot187['persons'] > 0 && (int)$tot187['persons'] <= (int)$tot187['cnt']
+      && (int)$tot187['persons'] <= array_sum(array_map(fn($r) => (int)$r['persons'], $rows187));
+foreach ($rows187 as $r187) { if ((int)$r187['persons'] <= 0 || (int)$r187['persons'] > (int)$r187['cnt']) $ok187 = false; }
+$hT187 = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026'], [], [], 'lbp', '2025-2026');
+$xT187 = renderPage('pages/reports_export.php', ['report' => 'annual_totals', 'school_year' => '2025-2026', 'format' => 'xlsx'], [], [], 'lbp', '2025-2026', $PROJ . '/tools/_r187.xlsx');
+$tmp187 = tempnam(sys_get_temp_dir(), 'r187'); file_put_contents($tmp187, $xT187); $z187 = new ZipArchive(); $sx187 = ''; if ($z187->open($tmp187) === true) { $sx187 = html_entity_decode((string)$z187->getFromName('xl/worksheets/sheet1.xml'), ENT_QUOTES | ENT_XML1, 'UTF-8'); $z187->close(); } @unlink($tmp187);
+check('👥📅 المجاميع السنوية: «عدد الأشخاص / Effectif» + «الأشهر المدفوعة / Mois payés» بدل «عدد الكشوف» (2026-09-27) — الشاشة + الإكسل + الأشخاص ≤ الأشهر + المجموع بلا تكرار',
+      $ok187 && $noFatal($hT187) && strpos($hT187, '<th>عدد الأشخاص<br>') !== false && strpos($hT187, '<th>الأشهر المدفوعة<br>') !== false && strpos($hT187, '<th>عدد الكشوف</th>') === false
+      && strpos($hT187, '<td>' . (int)$tot187['persons'] . '</td><td>' . (int)$tot187['cnt'] . '</td>') !== false
+      && $sx187 !== '' && strpos($sx187, 'عدد الأشخاص (Effectif)') !== false && strpos($sx187, 'الأشهر المدفوعة (Mois payés)') !== false && strpos($sx187, 'عدد الكشوف') === false
+      && strpos((string)file_get_contents($PROJ . '/includes/report_helpers.php'), 'COUNT(DISTINCT ms.employee_id) persons') !== false,
+      'persons=' . ($tot187['persons'] ?? '?') . ' months=' . ($tot187['cnt'] ?? '?') . ' schools=' . count($rows187));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
