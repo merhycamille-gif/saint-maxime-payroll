@@ -5622,6 +5622,63 @@ function contribLbl(string $label, string $key, $month = null, $year = null, ?st
     $p = contribPct($key, $month, $year, $sy);
     return $p === '' ? $label : $label . ' ' . $p . ' %';
 }
+/* 🏫 نوع المؤسّسة بنصّ الإفادات — «إذا اسمها مدرسة كذا منحطّ مدرسة، وإذا ثانوية كذا منحطّ ثانوية؛ كلمة وحدة، ما منرجع منحطّ مدرسة»
+ *  (2026-09-27): الكلمة تُستنتَج من اسم المؤسّسة نفسه (عربي للنصّ العربي، فرنسي للفرنسي/الإنكليزي) وتُطبَّق على المخرجات النهائية
+ *  لكل الإفادات (attestationSchoolNounFilter): الاسم كما كُتب بصفحة المدارس (اكتبه «ثانوية السيدة…» فتصير الكلمة ثانوية)، «رئيسة مدرسة» ⇒ «رئيسة ثانوية»،
+ *  «المدرسة» ⇒ «الثانوية»، وبالفرنسي «de l'école» ⇒ «du collège»… لا يُمسّ شيء إن كان الاسم يبدأ بـ«مدرسة» أو بلا كلمة معروفة. */
+/** «بدي متل ما مكتوب الاسم بنظام المدارس يطلع الاسم بالإفادات والتقارير» (2026-09-27): الاسم كما كُتب بصفحة المدارس — لا تحوير */
+function schoolNameArDisplay(string $nameAr): string { return trim($nameAr); }
+function schoolNounAr(string $nameAr): string {
+    $n = schoolNameArDisplay($nameAr);
+    return preg_match('~^(مدرسة|ثانوية|دار|دير|مركز|مستوصف|كلية|معهد|روضة|حضانة|جامعة|شركة|جمعية|مؤسسة)\b~u', $n, $m) ? $m[1] : '';
+}
+/** الكلمة الفرنسية من الاسم الفرنسي: ['n' => "le collège", 'de' => "du collège", 'a' => "au collège", 'en' => 'college'] — '' إن لا كلمة معروفة */
+function schoolNounFr(string $nameFr): array {
+    $w = mb_strtolower(preg_replace('~^\s*(\S+).*$~us', '$1', trim($nameFr)), 'UTF-8');
+    $w = strtr($w, ['é' => 'e', 'è' => 'e', 'ê' => 'e']);
+    $map = [
+        'college'  => ['n' => 'le collège',  'de' => 'du collège',       'a' => 'au collège',       'en' => 'college',     'key' => 'collège'],
+        'lycee'    => ['n' => 'le lycée',    'de' => 'du lycée',         'a' => 'au lycée',         'en' => 'high school', 'key' => 'lycée'],
+        'ecole'    => ['n' => "l'école",     'de' => "de l'école",       'a' => "à l'école",        'en' => 'school',      'key' => 'école'],
+        'centre'   => ['n' => 'le centre',   'de' => 'du centre',        'a' => 'au centre',        'en' => 'center',      'key' => 'centre'],
+        'couvent'  => ['n' => 'le couvent',  'de' => 'du couvent',       'a' => 'au couvent',       'en' => 'convent',     'key' => 'couvent'],
+        'covent'   => ['n' => 'le couvent',  'de' => 'du couvent',       'a' => 'au couvent',       'en' => 'convent',     'key' => 'couvent'],
+        'clinique' => ['n' => 'la clinique', 'de' => 'de la clinique',   'a' => 'à la clinique',    'en' => 'clinic',      'key' => 'clinique'],
+        'institut' => ['n' => "l'institut",  'de' => "de l'institut",    'a' => "à l'institut",     'en' => 'institute',   'key' => 'institut'],
+    ];
+    return $map[$w] ?? [];
+}
+/** يطبَّق على HTML الإفادة النهائي (كل اللغات) — الكلمة تتبع اسم المؤسّسة، وبلا تكرار الكلمة داخل الاسم */
+function attestationSchoolNounFilter(string $html, string $nameAr, string $nameFr): string {
+    // عربي: الاسم كما كُتب بصفحة المدارس (لا تحوير) — والكلمة العامّة بالنصّ تتبع أوّل كلمة منه
+    $nounAr = schoolNounAr($nameAr);
+    if ($nounAr !== '' && $nounAr !== 'مدرسة') {
+        // «رئيسة مدرسة / إدارة مدرسة / مدير مدرسة / في مدرسة / لدى مدرسة / بأنّ مدرسة» قبل الاسم ⇒ كلمة المؤسّسة
+        $html = preg_replace('~مدرسة(\s*:?\s*<strong>)~u', $nounAr . '$1', $html);
+        $html = preg_replace('~(رئيسة|إدارة|مدير|مديرة)\s+مدرسة\b~u', '$1 ' . $nounAr, $html);
+        $html = str_replace('المدرسة', 'ال' . $nounAr, $html);
+    }
+    // فرنسي/إنكليزي: الكلمة من الاسم الفرنسي
+    $fr = schoolNounFr($nameFr);
+    if ($fr && $fr['key'] !== 'école') {
+        // الفاصلة العليا قد تكون مستقيمة أو مقوّسة أو مهرَّبة بالـHTML (e() تعطي &#039;)
+        $apos = ["'", "\u{2019}", '&#039;', '&apos;', '&#8217;', '&rsquo;'];
+        $Nn = mb_convert_case(mb_substr($fr['n'], 0, 1), MB_CASE_UPPER) . mb_substr($fr['n'], 1);
+        foreach ($apos as $a) {
+            $html = str_replace(["de l{$a}école", "à l{$a}école", "l{$a}école", "L{$a}école", "de l{$a}\u{00E9}cole"], [$fr['de'], $fr['a'], $fr['n'], $Nn, $fr['de']], $html);
+        }
+        $en = $fr['en']; $En = ucwords($en);
+        $html = str_replace(['the school', 'The school', 'School Administration', 'School Director', 'the School'], ['the ' . $en, 'The ' . $en, $En . ' Administration', $En . ' Director', 'the ' . $En], $html);
+    }
+    // لا تكرار كلمة المؤسّسة داخل الاسم بعد كلمة النصّ: «ثانوية : <strong>ثانوية السيدة» ⇒ «ثانوية : <strong>السيدة»
+    $html = preg_replace('~(مدرسة|مؤسسة|دير|مركز|دار|مستوصف|ثانوية|كلية|معهد)(\s*:?\s*)<strong>\1\s+~u', '$1$2<strong>', $html);
+    // التكرار يُحذف فقط حين تكون الكلمة نفسها (collège ← Collège، school ← Ecole…) — لا حذف كلمة مختلفة
+    foreach ([['coll[èe]ge', 'Coll[èe]ge'], ['lyc[ée]e', 'Lyc[ée]e'], ['centre', 'Centre'], ['couvent', 'Cou?vent'], ['clinique', 'Clinique'], ['institut', 'Institut'],
+              ['college', 'Coll[èe]ge'], ['high school', 'Lyc[ée]e'], ['school', '[EeÉé]cole'], ['center', 'Centre'], ['convent', 'Cou?vent'], ['clinic', 'Clinique'], ['institute', 'Institut']] as [$w, $n]) {
+        $html = preg_replace('~(' . $w . ')(\s*:?\s*)<strong>(?:' . $n . ')\s+~ui', '$1$2<strong>', $html);
+    }
+    return $html;
+}
 function lawUsd($lbp): float { return floor((float)$lbp / officialUsdRate()); }
 function lawUsdSql(string $expr): string { return 'FLOOR((' . $expr . ')/' . officialUsdRate() . ')'; }
 /* 📄 (2026-09-21 p1 «كل التقارير لازم تكون مطابقة لبطاقة الراتب السنوية»): قاعدة البطاقة لدولار أعمدة الراتب — المصدر الواحد لكل الكشوف:

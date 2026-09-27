@@ -1009,7 +1009,8 @@ if (!$emp):
         $idParts[] = e($ID_LBL[$ik][$idLang]) . ' : <strong>' . ($idVals[$ik] !== '' ? '<span dir="ltr">' . e($idVals[$ik]) . '</span>' : '<span style="display:inline-block;min-width:90px;border-bottom:1px dotted #555">&nbsp;</span>') . '</strong>';
     }
     // «ما بيكونو بأوّل الصفحة» (2026-09-24): السطر يُحقن آخر الإفادة قبل كتلة التوقيع الأخيرة (لا تحت العنوان) — انظر ob_start أدناه
-    $idLine = $idParts ? '<div class="id-line" dir="' . ($idLang === 'ar' ? 'rtl' : 'ltr') . '" style="text-align:start;margin:8px 0 6px">' . implode(' &nbsp;·&nbsp; ', $idParts) . '</div>' : '';
+    // 🪪 «الأرقام يكونوا مرتّبين تحت بعض مش على نفس السطر» (2026-09-27): كل رقم بسطره — الضمان ثم المالية ثم الصندوق
+    $idLine = $idParts ? '<div class="id-line" dir="' . ($idLang === 'ar' ? 'rtl' : 'ltr') . '" style="text-align:start;margin:8px 0 6px;line-height:1.7"><div>' . implode('</div><div>', $idParts) . '</div></div>' : '';
     $isNotice      = in_array($type, ['notice_school', 'notice_mail'], true);
     $defaultLogo   = in_array($type, ['anhaa_khedme', 'anhaa_mail', 'aqd_taalim', 'cnss', 'notice_school', 'notice_mail', 'salaire', 'tadris', 'embassy', 'riaaya'], true); // الصادرة عن المدرسة: الشعار افتراضياً
     $showLogo      = isset($_GET['logo']) ? ($_GET['logo'] === '1') : $defaultLogo;
@@ -2297,6 +2298,8 @@ if (!$emp):
     // 🪪 «الأرقام ما بيكونو بأوّل الصفحة» (2026-09-24): سطر أرقام الضمان/المالية/الصندوق يدخل قبل آخر كتلة توقيع
     //    (صندوق «المدير — التوقيع والختم» أو صفّ التاريخ/التوقيع) بأي إفادة كانت؛ وإن لم تُعرف الكتلة فقبل إغلاق منطقة التصدير.
     $__doc = ob_get_clean();
+    // 🏫 «إذا اسمها مدرسة كذا منحطّ مدرسة وإذا ثانوية كذا منحطّ ثانوية — كلمة وحدة» (2026-09-27): الكلمة تتبع اسم المؤسّسة بكل اللغات (المصدر الواحد)
+    $__doc = attestationSchoolNounFilter($__doc, (string)$schoolNameAr, (string)$schoolNameFr);
     // 🏫 «بالإفادات ما تخلّي اسم المدرسة يتكرّر مرتين حدّ بعض» (2026-09-24): «مدرسة : <strong>مدرسة سيدة النجاة…»
     //    و«l'école <strong>Ecole St.Georges…» ⇒ الكلمة المكرّرة داخل الاسم تُحذف (تبقى كلمة النصّ والاسم بعدها) — بكل الإفادات
     //    ولغاتها، على المخرجات النهائية (الشاشة/الطباعة/وورد/الإيميل سواء).

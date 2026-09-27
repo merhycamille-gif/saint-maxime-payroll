@@ -7649,7 +7649,9 @@ check('🧹 تصفير الأساس من الملف المالي يصل إلى �
  */
 $ok166 = true; $why166 = [];
 $eid166 = (int)$db->query("SELECT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE ms.month = 6 AND ms.year = 2026 AND ms.net_salary_lbp > 0 AND e.is_deleted = 0 LIMIT 1")->fetchColumn();
-$area166 = function (string $h): string { $p = strpos($h, 'id="ppExportArea"'); return $p === false ? '' : substr($h, $p); };
+$area166 = function (string $h): string { $p = strpos($h, 'id="ppExportArea"'); if ($p === false) return '';
+    // 🏫 (2026-09-27) الكلمة الفرنسية صارت تتبع اسم المؤسّسة (Collège ⇒ «du collège») — تُعاد هنا لصيغة «de l'école» ليبقى فحص 2026-09-24 كما كُتب (فحص 191 يغطّي القاعدة الجديدة)
+    return str_replace(['du collège', 'au collège', 'Le collège', 'le collège'], ["de l'école", "à l'école", "L'école", "l'école"], substr($h, $p)); };
 $c166 = function (string $k, bool $v) use (&$ok166, &$why166) { if (!$v) { $ok166 = false; $why166[] = $k; } };
 if ($eid166) {
     $h = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'date' => '2026-01-15'], []);
@@ -8663,6 +8665,57 @@ check('🎨 لائحة الإفادات بملف الأستاذ أقساماً �
       && strpos($hD190, 'class="btn btn-sm btn-light" style="border:1px solid #cbd5e1"') === false
       && strpos($css190, '.att-groups .att-gb{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));') !== false && strpos($css190, '.att-groups .att-g1{background:#ecfdf5;') !== false && strpos($css190, '.att-groups .att-g3{background:#eef2ff;') !== false,
       'groups=' . substr_count($hD190, 'class="att-group att-g') . ' links=' . preg_match_all('#pages/attestations\.php\?employee_id=' . (int)$tit184 . '&type=#', $hD190));
+
+/* =====================================================================
+ * 191) 🏫 كلمة المؤسّسة بالإفادات تتبع اسمها كما كُتب بصفحة المدارس — «إذا اسمها مدرسة كذا منحطّ مدرسة، وإذا ثانوية كذا منحطّ ثانوية —
+ *      كلمة وحدة» + «بدي متل ما مكتوب الاسم بنظام المدارس يطلع الاسم بالإفادات والتقارير» (2026-09-27): attestationSchoolNounFilter على
+ *      المخرجات النهائية لكل الإفادات ولغاتها: الاسم لا يُحوَّر؛ «مدير مدرسة» ⇒ «مدير ثانوية»، «المدرسة» ⇒ «الثانوية»، وبالفرنسي «de l'école» ⇒
+ *      «du collège» حسب الاسم الفرنسي؛ التكرار داخل الاسم يُحذف عند نفس الكلمة فقط. مدرسة سيدة النجاة بلا تغيير.
+ * =================================================================== */
+$ok191 = function_exists('attestationSchoolNounFilter') && schoolNameArDisplay(' مدرسة ثانوية السيدة ') === 'مدرسة ثانوية السيدة' /* لا تحوير */
+      && schoolNounAr('ثانوية السيدة للراهبات') === 'ثانوية' && schoolNounAr('مدرسة ثانوية السيدة') === 'مدرسة' && schoolNounAr('مدرسة سيدة النجاة') === 'مدرسة' && schoolNounAr('دار السعادة') === 'دار' && schoolNounAr('الراهبات المخلصيات') === ''
+      && (schoolNounFr('Collège N.D des SRS')['de'] ?? '') === 'du collège' && (schoolNounFr('Ecole St.Georges')['key'] ?? '') === 'école' && schoolNounFr('Dar al Saadeh') === []
+      && attestationSchoolNounFilter('يفيد مدير مدرسة <strong>ثانوية السيدة</strong> بأنّ … إدارة المدرسة والسنة المدرسية', 'ثانوية السيدة', 'Collège X') === 'يفيد مدير ثانوية <strong>السيدة</strong> بأنّ … إدارة الثانوية والسنة المدرسية'
+      && attestationSchoolNounFilter('يفيد مدير مدرسة <strong>مدرسة ثانوية السيدة</strong> إدارة المدرسة', 'مدرسة ثانوية السيدة', 'Collège X') === 'يفيد مدير مدرسة <strong>ثانوية السيدة</strong> إدارة المدرسة' /* كما كُتب: أوّل كلمة مدرسة ⇒ لا تغيير */
+      && attestationSchoolNounFilter("registres de l&#039;école. Supérieure de l'école <strong>Collège X</strong>", 'ثانوية السيدة', 'Collège X') === "registres du collège. Supérieure du collège <strong>X</strong>"
+      && attestationSchoolNounFilter("Directeur de l'école <strong>Collège X</strong>", 'مدرسة كذا', 'Ecole Y') === "Directeur de l'école <strong>Collège X</strong>" /* école ≠ Collège ⇒ لا حذف */
+      && attestationSchoolNounFilter('رئيسة مدرسة : <strong>مدرسة سيدة النجاة</strong> إدارة المدرسة', 'مدرسة سيدة النجاة', 'Collège Y') === 'رئيسة مدرسة : <strong>سيدة النجاة</strong> إدارة المدرسة'
+      && attestationSchoolNounFilter('the school records. School Administration', 'ثانوية', 'Collège X') === 'the college records. College Administration'
+      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), '$__doc = attestationSchoolNounFilter($__doc, (string)$schoolNameAr, (string)$schoolNameFr);') !== false;
+$why191 = '';
+$doc191 = function (string $h) { return preg_match('#<div id="ppExportArea".*#su', $h, $m) ? html_entity_decode(preg_replace('/\s+/', ' ', strip_tags(str_replace(['<br>', '</p>'], [' ', ' '], $m[0]))), ENT_QUOTES, 'UTF-8') : ''; };
+// حيّ: مؤسّسة أوّل كلمتها ليست «مدرسة» (ثانوية/دار/دير/مركز…) ولها موظف براتب ⇒ كلمتها بالنصّ ولا «المدرسة»؛ وإلا يُكتفى بالوحدات
+$r191 = $db->query("SELECT e.id, e.school_id, s.name_ar, s.name_fr FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 JOIN schools s ON s.id = e.school_id
+                    WHERE e.is_deleted = 0 AND s.name_ar NOT LIKE 'مدرسة%' AND s.name_ar REGEXP '^(ثانوية|دار|دير|مركز|مستوصف|كلية|معهد)' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($r191) {
+    $noun = schoolNounAr($r191['name_ar']);
+    $hK = $doc191(renderPage('pages/attestations.php', ['employee_id' => (int)$r191['id'], 'type' => 'anhaa_khedme', 'lang_doc' => 'ar'], [], [(int)$r191['school_id']], 'both', '2025-2026'));
+    $hQ = $doc191(renderPage('pages/attestations.php', ['employee_id' => (int)$r191['id'], 'type' => 'talab_istiqala', 'lang_doc' => 'ar'], [], [(int)$r191['school_id']], 'both', '2025-2026'));
+    if ($hK === '' || mb_strpos($hK, 'المدرسة') !== false || mb_strpos($hK, 'إدارة ال' . $noun) === false) { $ok191 = false; $why191 .= ' live-anhaa(' . $noun . ')'; }
+    if ($hQ === '' || mb_strpos($hQ, 'في مدرسة') !== false || mb_strpos($hQ, 'في ' . $noun . ' ') === false || mb_strpos($hQ, 'المدرسة') !== false) { $ok191 = false; $why191 .= ' live-istiqala(' . $noun . ')'; }
+    $why191 .= ' live=' . $noun;
+} else $why191 .= ' live=none';
+$e191b = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
+if ($e191b) {
+    $hB = $doc191(renderPage('pages/attestations.php', ['employee_id' => $e191b, 'type' => 'salaire', 'lang_doc' => 'ar'], [], [3], 'both', '2025-2026'));
+    $hBf = $doc191(renderPage('pages/attestations.php', ['employee_id' => $e191b, 'type' => 'afade_madrasiya', 'lang_doc' => 'fr'], [], [3], 'both', '2025-2026'));
+    if ($hB === '' || mb_strpos($hB, 'مدرسة سيدة النجاة') === false || mb_strpos($hB, 'ثانوية') !== false) { $ok191 = false; $why191 .= ' najat-unchanged'; }
+    if ($hBf === '' || mb_strpos($hBf, "l'école") !== false || mb_strpos($hBf, 'du collège') === false || mb_strpos($hBf, 'N.D de la Délivrance') === false) { $ok191 = false; $why191 .= ' najat-fr'; }
+}
+check('🏫 كلمة المؤسّسة بالإفادات تتبع اسمها كما كُتب (2026-09-27): مدير/رئيسة/إدارة + الكلمة، «ال»+الكلمة بدل «المدرسة»، الفرنسي حسب الاسم الفرنسي (du collège)، لا تحوير للاسم، لا حذف كلمة مختلفة — وحدات + حيّ', $ok191, trim($why191) ?: 'ok');
+
+/* =====================================================================
+ * 192) 🪪 «بس اختار أرقام المالية والضمان وصندوق التعويضات بالإفادات يكونوا مرتّبين تحت بعض مش على نفس السطر» (2026-09-27):
+ *      سطر الأرقام آخر الإفادة = كل رقم بسطره (div لكل رقم) بدل الفاصل «·» على سطر واحد — الترتيب: الضمان، المالية، الصندوق.
+ * =================================================================== */
+$e192 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
+$h192 = $e192 ? renderPage('pages/attestations.php', ['employee_id' => $e192, 'type' => 'salaire', 'lang_doc' => 'ar', 'opts_set' => 1, 'id_nssf' => 1, 'id_mof' => 1, 'id_eoc' => 1], [], [3], 'both', '2025-2026') : '';
+$ok192 = $e192 > 0 && preg_match('#<div class="id-line"[^>]*><div>(.*?)</div></div>#su', $h192, $m192) === 1;
+$inner192 = $ok192 ? $m192[1] : '';
+$ok192 = $ok192 && substr_count($inner192, '</div><div>') === 2 && strpos($inner192, '&nbsp;·&nbsp;') === false
+      && preg_match('#رقم الضمان.*</div><div>.*الرقم المالي.*</div><div>.*رقم صندوق التعويضات#su', $inner192) === 1
+      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), "<div>' . implode('</div><div>', \$idParts) . '</div></div>'") !== false;
+check('🪪 أرقام الضمان/المالية/الصندوق بالإفادة تحت بعض (سطر لكل رقم) لا على سطر واحد (2026-09-27)', $ok192, 'emp=' . $e192 . ' divs=' . ($inner192 !== '' ? substr_count($inner192, '</div><div>') + 1 : 0));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
