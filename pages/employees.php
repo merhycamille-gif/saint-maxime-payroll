@@ -1222,12 +1222,12 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
     </div>
 <?php endif; ?>
 
-<div class="d-flex justify-between align-center mb-3">
+<div class="d-flex justify-between align-center mb-3" style="flex-wrap:wrap;gap:8px"><?php /* ☑️📐 (2026-09-27) الأزرار تلتفّ بدل أن تُقصّ من طرف الشاشة */ ?>
     <a href="<?= BASE_URL ?>pages/employees.php" class="btn btn-light">
         <i class="fas fa-arrow-left"></i> Retour à la liste / العودة إلى اللائحة
     </a>
     <?php if ($id > 0): ?>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2" style="flex-wrap:wrap">
             <?php /* 🧹 زرّا «تعديل/حذف» العلويان أُزيلا — مكرّران مع صفّ الأزرار الموجود بكل
                      تبويب تحتهما مباشرة («ها العجقة كلها لشو» — 2026-08-01) */ ?>
             <a href="?action=copy_year&id=<?= $id ?>" class="btn btn-light" title="نسخ ملفه كامل لسنة تانية (مثلاً أستاذ ترك ورجع)">

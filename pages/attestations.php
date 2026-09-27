@@ -1125,6 +1125,7 @@ if (!$emp):
             <?php /* ☑️📐 (2026-09-27 p1 «هون كمان بدهن ترتيب»): خيارات الإفادة صفوفاً مرصوفة — كل خيار بسطره: تسمية بعرض ثابت ثم خاناته بخانات متساوية،
                      بعمودين على الشاشة الواسعة (الصفوف الطويلة تأخذ العرض كله). كل الخانات وأسماؤها وسلوكها كما كانت — الترتيب فقط. */ ?>
             <?php /* 📅 (2026-09-24) التاريخ المطبوع على الإفادة — خانة ظاهرة بدل المخفية */ ?>
+            <div class="att-sec g1"><div class="att-st"><i class="fas fa-calendar-days"></i> Dates et matière / التواريخ والمادة</div><?php /* 🎨 أقسام ملوّنة (p1 2026-09-27) */ ?>
             <div class="att-row">
             <strong class="att-k">Date / التاريخ على الإفادة:</strong>
             <input type="date" name="date" value="<?= e($effDate) ?>" onchange="this.form.submit()" style="padding:3px 6px;margin:0 6px">
@@ -1145,6 +1146,8 @@ if (!$emp):
             <label style="margin:0 6px;cursor:pointer" title="يشيل تاريخ الترك من هذه الإفادة (خطّ منقّط حيث يلزم، و«ولا يزال حتى تاريخه» بإفادتَي الراتب والعمل)"><input type="checkbox" name="end_none" value="1" <?= $endNone?'checked':'' ?> onchange="this.form.submit()"> Sans / شيل تاريخ الترك</label>
             <?php if ($leftFile !== '' && !$endNone): ?><span style="color:#b45309;font-weight:700"><i class="fas fa-door-open"></i> تارك من الملف <?= e(formatDate($leftFile)) ?></span><?php endif; ?>
             </div>
+            </div>
+            <div class="att-sec g2"><div class="att-st"><i class="fas fa-pen-nib"></i> Présentation et signature / الشكل والتوقيع</div>
             <div class="att-row">
             <strong class="att-k">En-tête de l'école / رأس المدرسة:</strong>
             <input type="hidden" name="logo" value="0">
@@ -1184,6 +1187,8 @@ if (!$emp):
             <label style="margin:0 8px;cursor:pointer"><input type="checkbox" name="sig_noname" value="1" <?= $sigNoName?'checked':'' ?> onchange="this.form.submit()"> Sans nom / بلا اسم (الصفة والتوقيع فقط)</label>
             </div>
             <?php endif; ?>
+            </div>
+            <div class="att-sec g3"><div class="att-st"><i class="fas fa-coins"></i> Montants / المبالغ</div>
             <?php if ($hasComponents): ?>
             <div class="att-row wide">
             <strong class="att-k">Composantes du salaire / مكوّنات الراتب:</strong>
@@ -1212,6 +1217,8 @@ if (!$emp):
                 <label class="att-sm" style="cursor:pointer"><input type="radio" name="amt_cur" value="usd" <?= $amtCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> $</label>
                 <?php if ($amtMan > 0): ?><span style="color:#b45309;font-weight:700;margin-right:8px"><i class="fas fa-pen"></i> المبلغ اليدوي معتمد بالإفادة بدل المحسوب — فرّغ الخانة للرجوع للمحسوب</span><?php endif; ?>
             </div>
+            </div>
+            <div class="att-sec g4"><div class="att-st"><i class="fas fa-id-card"></i> Numéros et options du modèle / الأرقام وخيارات النموذج</div>
             <?php /* 🪪 (2026-09-24) أرقام الموظف على الإفادة: الضمان / المالية / صندوق التعويضات */ ?>
             <div class="att-row wide">
                 <strong class="att-k">Numéros sur l'attestation / الأرقام على الإفادة:</strong>
@@ -1281,6 +1288,7 @@ if (!$emp):
                 <span class="att-hint">(عبّي عملة وحدها أو الاثنتين معاً — الفاضية ما بتظهر بالعقد)</span>
             </div>
             <?php endif; ?>
+            </div>
             <?php if ($hasComponents): ?>
             <div class="att-note"><?= $printsSalary ? 'الراتب المعتمد بالإفادة' : 'الراتب المعتمد (هذه الإفادة بلا مبلغ بنصّها — للعلم)' ?>: <strong><?= $moneyAr($salShown) ?></strong> <?= $amtMan > 0 ? '(مبلغ يدوي)' : '(' . ($isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج') . ' ' . $moneyAr((int)$basePlusEch) . ($incExtra?' + الإضافي':'') . ($incAide?' + المكافأة':'') . ($incTrans?' + النقل':'') . ')' ?><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php elseif ($type === 'aqd_taalim'): ?>

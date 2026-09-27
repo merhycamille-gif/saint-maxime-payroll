@@ -1532,7 +1532,7 @@ body.print-landscape .doc-table{--pz-target:1062 !important;}
 
 /* ☑️📐 (2026-09-27 «هون كمان بدهن ترتيب — رتّب كل البرنامج») صفوف الخيارات المرتّبة: كل خيار بسطره — تسمية بعرض ثابت (.att-k)
    ثم خاناته بخانات متساوية؛ بعمودين على الشاشة الواسعة والصفوف الطويلة (.wide) تأخذ العرض كله. المصدر الواحد لكل شرائط الخيارات. */
-.att-opts{display:grid;grid-template-columns:1fr 1fr;gap:2px 22px;align-items:start}
+.att-opts{display:grid;grid-template-columns:1fr;gap:2px 22px;align-items:start} /* عمود واحد: كل خيار بسطره تحت اللي قبله (p1 2026-09-27: الخلط عمود/عمودين كان يبعثر العين) */
 .att-opts .att-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:5px 6px;border-bottom:1px dashed #cfe0f5;min-height:36px}
 .att-opts .att-row.wide{grid-column:1 / -1}
 .att-opts .att-k{flex:0 0 240px;color:#1e3a8a;font-size:13px;line-height:1.25}
@@ -1542,7 +1542,6 @@ body.print-landscape .doc-table{--pz-target:1062 !important;}
 .att-opts .att-row input[type=text],.att-opts .att-row input[type=date],.att-opts .att-row input[type=number],.att-opts .att-row select{margin:0 !important}
 .att-opts .att-note{grid-column:1 / -1;color:#1e40af;padding:6px 6px 0;font-weight:600}
 .att-opts .att-hint{color:#64748b;font-size:12px}
-@media (max-width:1100px){.att-opts{grid-template-columns:1fr}}
 @media print{.att-opts{display:none}}
 /* ☑️📐 (2026-09-27) شريط «الراتب المركّب يشمل» صفوفاً مرتّبة بألوانه */
 .salcomp-bar.att-opts{display:grid;gap:0 22px}
@@ -1563,3 +1562,13 @@ body.print-landscape .doc-table{--pz-target:1062 !important;}
 .att-groups .att-g2{background:#fffbeb;border-color:#fde68a}.att-groups .att-g2 .att-gt{color:#92400e}.att-groups .att-g2 a.btn{border-color:#fde68a;color:#78350f}
 .att-groups .att-g3{background:#eef2ff;border-color:#c7d2fe}.att-groups .att-g3 .att-gt{color:#3730a3}.att-groups .att-g3 a.btn{border-color:#c7d2fe;color:#312e81}
 .att-groups .att-g4{background:#f8fafc;border-color:#e2e8f0}.att-groups .att-g4 .att-gt{color:#334155}.att-groups .att-g4 a.btn{border-color:#e2e8f0;color:#1e293b}
+/* 🎨 (2026-09-27 p1) أقسام ملوّنة هادئة داخل شريط الخيارات: عنوان صغير + صفوفه — للتمييز بلمحة */
+.att-opts .att-sec{border:1px solid;border-radius:10px;padding:4px 10px 2px;margin:3px 0}
+.att-opts .att-sec .att-st{font-weight:700;font-size:12.5px;padding:2px 4px 4px;display:flex;align-items:center;gap:6px}
+.att-opts .att-sec .att-row{border-bottom-color:rgba(15,23,42,.08)}
+.att-opts .att-sec .att-row:last-child{border-bottom:none}
+.att-opts .att-sec.g1{background:#ecfdf5;border-color:#a7f3d0}.att-opts .att-sec.g1 .att-st,.att-opts .att-sec.g1 .att-k{color:#065f46}
+.att-opts .att-sec.g2{background:#eef2ff;border-color:#c7d2fe}.att-opts .att-sec.g2 .att-st,.att-opts .att-sec.g2 .att-k{color:#3730a3}
+.att-opts .att-sec.g3{background:#fffbeb;border-color:#fde68a}.att-opts .att-sec.g3 .att-st,.att-opts .att-sec.g3 .att-k{color:#92400e}
+.att-opts .att-sec.g4{background:#f8fafc;border-color:#e2e8f0}.att-opts .att-sec.g4 .att-st,.att-opts .att-sec.g4 .att-k{color:#334155}
+.att-opts .att-sec .att-row label:hover{background:rgba(255,255,255,.7)}

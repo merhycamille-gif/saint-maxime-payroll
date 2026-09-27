@@ -8610,7 +8610,7 @@ check('👥📅 المجاميع السنوية: «عدد الأشخاص / Effec
  * =================================================================== */
 $css188 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $at188 = (string)file_get_contents($PROJ . '/pages/attestations.php');
 $emp188 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
-$ok188 = strpos($css188, '.att-opts{display:grid;grid-template-columns:1fr 1fr;') !== false && strpos($css188, '.att-opts .att-k{flex:0 0 240px;') !== false
+$ok188 = strpos($css188, '.att-opts{display:grid;grid-template-columns:1fr;') !== false /* عمود واحد (p1 لاحقاً) */ && strpos($css188, '.att-opts .att-k{flex:0 0 240px;') !== false
       && strpos($at188, 'color:#cbd5e1">|</span>') === false && strpos($at188, '<div class="card-body att-opts"') !== false && strpos($at188, '<div class="form-group att-opts" style="grid-column:1 / -1">') !== false
       && substr_count($at188, 'onchange="this.form.submit()"') === 52 && $emp188 > 0;
 $why188 = 'emp=' . $emp188;
@@ -8618,9 +8618,15 @@ $bal188 = function (string $h) { return preg_match('#<form method="get"[^>]*>.*?
 foreach (['salaire' => 10, 'embassy' => 12, 'isqat_haq' => 12, 'aqd_taalim' => 11, 'cnss_leave' => 2] as $t188 => $min188) {
     if (!$emp188) break;
     $h = renderPage('pages/attestations.php', ['employee_id' => $emp188, 'type' => $t188], [], [3], 'both', '2025-2026');
-    $rows = substr_count($h, 'class="att-row'); $bal = $bal188($h);
-    if (!$noFatal($h) || $rows < $min188 || $bal !== 0) { $ok188 = false; $why188 .= " $t188:rows=$rows bal=$bal fatal=" . (int)!$noFatal($h); }
+    $rows = substr_count($h, 'class="att-row'); $bal = $bal188($h); $secs = substr_count($h, 'class="att-sec g');
+    // 🎨 (p1 لاحقاً) أربعة أقسام ملوّنة (g1..g4) بشريط الإفادة العام؛ شريط التصريح (cnss_leave) بلا أقسام
+    $wantSecs = $t188 === 'cnss_leave' ? 0 : 4;
+    if (!$noFatal($h) || $rows < $min188 || $bal !== 0 || $secs !== $wantSecs) { $ok188 = false; $why188 .= " $t188:rows=$rows bal=$bal secs=$secs fatal=" . (int)!$noFatal($h); }
 }
+// عمود واحد ثابت (p1: الخلط عمود/عمودين كان يبعثر العين) + أقسام ملوّنة + شبكة أزرار المدارس بفحص القانون
+$ok188 = $ok188 && strpos($css188, '.att-opts{display:grid;grid-template-columns:1fr;') !== false && strpos($css188, '.att-opts .att-sec.g1{background:#ecfdf5;') !== false
+       && strpos($at188, '<div class="att-sec g1"><div class="att-st">') !== false && strpos($at188, '<div class="att-sec g4"><div class="att-st">') !== false
+       && strpos((string)file_get_contents($PROJ . '/pages/law_check.php'), 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:6px') !== false;
 check('☑️📐 شريط خيارات الإفادة صفوفاً مرتّبة (2026-09-27): .att-opts عام + لا فواصل «|» + 52 خانة بسلوكها + صفوف ≥ الحدّ بكل نوع (salaire/embassy/isqat/aqd/cnss_leave) + div متوازنة', $ok188, $why188);
 
 /* =====================================================================

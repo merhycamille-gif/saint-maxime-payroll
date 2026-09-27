@@ -58,7 +58,7 @@ include __DIR__ . '/../includes/header.php';
       </p>
 
       <!-- أزرار اختيار النطاق -->
-      <div class="no-print" style="margin:12px 0;display:flex;flex-wrap:wrap;gap:6px">
+      <div class="no-print" style="margin:12px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:6px"><?php /* ☑️📐 (2026-09-27) أزرار المدارس بشبكة متساوية بدل الرصّ الحرّ */ ?>
         <?php if (isSuperAdmin()): ?>
           <a href="?" class="btn btn-sm <?= $reqSchool===0 ? 'btn-primary' : 'btn-light' ?>">
             <i class="fas fa-globe"></i> Toutes les écoles / كل المدارس
