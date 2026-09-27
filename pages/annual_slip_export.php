@@ -27,7 +27,7 @@ $typeFilter = (!$typeState['all'] && count($typeState['sel']) === 1) ? $typeStat
 $head = [
     'Mois / الشهر', 'Salaire / أساس الراتب', 'Valeur échelon / قيمة الدرجة', 'Après échelon / الراتب بعد التدرّج',
     'Supplément / الأجر الإضافي', 'Prime & aide / مكافأة ومساعدة',
-    'Brut / الإجمالي', 'Caisse / الصندوق', 'Échelon-½ / درجة-نصف راتب', 'CNSS / الضمان', 'Impôt / الضريبة',
+    'Brut / الإجمالي', contribLbl('Caisse', 'eoc_employee_rate', null, null, $schoolYear) . ' / الصندوق', 'Échelon-½ / درجة-نصف راتب', contribLbl('CNSS', 'cnss_employee_rate', null, null, $schoolYear) . ' / الضمان', 'Impôt / الضريبة', // 📊 النِّسَب مؤرَّخة (2026-09-27)
     'Total ret. / مجموع الحسومات', 'Net / الصافي',
     'Alloc. fam. / عائلي', 'Net + alloc. / الصافي + عائلي', 'Transport / النقل', 'Total dû / المستحق', 'Signature / التوقيع',
 ];

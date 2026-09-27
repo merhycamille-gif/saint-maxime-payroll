@@ -63,7 +63,7 @@ if ($report === 'monthly_summary') {
     if (salaryCompHas('aide'))  { $head[] = 'مكافأة ومساعدة'; $w[] = 14; }
     $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')'; $w[] = 18;
     // 👨‍👩‍👧 التنزيل العائلي (حصّة الشهر) ثم الخاضع بعد حسمه قبل الضريبة — كالشاشة (2026-09-15)
-    $head = array_merge($head, ['الضمان ٣٪', 'الصندوق ٦٪', 'درجة / نصف راتب (إلى الصندوق)', 'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)', 'الضريبة', 'الصافي', 'تعويض عائلي']);
+    $head = array_merge($head, [contribLbl('الضمان', 'cnss_employee_rate', $month, $year), contribLbl('الصندوق', 'eoc_employee_rate', $month, $year), 'درجة / نصف راتب (إلى الصندوق)', 'التنزيل العائلي (حصّة الشهر)', 'الراتب الخاضع (بعد حسم التنزيل)', 'الضريبة', 'الصافي', 'تعويض عائلي']);
     $w = array_merge($w, [14, 14, 14, 14, 16, 12, 16, 14]);
     if (netFamColShown()) { $head[] = 'الصافي + التعويض العائلي'; $w[] = 18; } // 👨‍👩‍👧➕ موجود (بالمبلغ أو فارغاً) / غير موجود (2026-09-20)
     if (transportColShown()) { $head[] = 'تعويض النقل'; $w[] = 14; } // 🚌 موجود (بالمبلغ أو فارغاً) / غير موجود
@@ -132,7 +132,7 @@ if ($report === 'monthly_summary') {
     if (salaryCompHas('extra')) $head[] = 'الأجر الإضافي';
     if (salaryCompHas('aide'))  $head[] = 'مكافأة ومساعدة';
     $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')';
-    $head = array_merge($head, ['وعاء الضمان', 'الأجير ٣٪', 'المدرسة ٨٪']);
+    $head = array_merge($head, ['وعاء الضمان', contribLbl('الأجير', 'cnss_employee_rate', $month, $year), contribLbl('المدرسة', 'cnss_employer_rate', $month, $year)]);
     $rep->head($head);
     $z = ['base' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'cnss' => 0, 'school' => 0]; $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
     $pad = $schCol ? 4 : 3;
@@ -219,7 +219,7 @@ if ($report === 'monthly_summary') {
     if (salaryCompHas('extra')) $head[] = 'الأجر الإضافي';
     if (salaryCompHas('aide'))  $head[] = 'مكافأة ومساعدة';
     $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')';
-    $head = array_merge($head, ['الأجير ٦٪', 'درجة/نصف راتب', 'المدرسة ٦٪']);
+    $head = array_merge($head, [contribLbl('الأجير', 'eoc_employee_rate', $month, $year), 'درجة/نصف راتب', contribLbl('المدرسة', 'eoc_employer_rate', $month, $year)]);
     $rep->head($head);
     $T = ['base' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'caisse' => 0, 'grade' => 0, 'school' => 0]; $rn = 0;
     foreach ($data as $r) {
@@ -361,7 +361,7 @@ if ($report === 'monthly_summary') {
     [$atRows, $atTot] = annualTotalRows($db, $schoolYear, $annualEmpFilter, $annualEmpParams, $empTypeSql, $schoolSql);
     $rep = new ReportTable('المجاميع السنوية — لكل مدرسة ولكل بند — ' . $schoolYear . $empTypeTitle, true);
     $rep->schoolHeader($school);
-    $rep->head(array_merge(['#', 'المدرسة', 'عدد الكشوف'], array_map(fn($k) => annualTotalLabel($k, 'ar') . ' (ل.ل)', $atSel)));
+    $rep->head(array_merge(['#', 'المدرسة', 'عدد الكشوف'], array_map(fn($k) => annualTotalLabel($k, 'ar', $schoolYear) . ' (ل.ل)', $atSel)));
     $rep->widths(array_merge([5, 30, 10], array_fill(0, count($atSel), 18)));
     $rn = 0;
     foreach ($atRows as $r) {

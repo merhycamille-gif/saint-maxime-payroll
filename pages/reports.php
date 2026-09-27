@@ -306,7 +306,7 @@ function reportDocThumb($path) {
                         <th>أساس الراتب</th><th>قيمة الدرجة</th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
                         <?= extraAideHeads('', $data, $month, $year) ?>
                         <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
-                        <th>الضمان (٣٪)</th><th>الصندوق (٦٪)</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى الصندوق</small></th><?= familyDedHeads() ?><th>الضريبة</th>
+                        <th>الضمان<?= contribHead('cnss_employee_rate', $month, $year) ?></th><th>الصندوق<?= contribHead('eoc_employee_rate', $month, $year) ?></th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى الصندوق</small></th><?= familyDedHeads() ?><th>الضريبة</th>
                         <th>الصافي<?= rateHead('mkt', $month, $year) ?></th><th>التعويضات العائلية</th><?= netFamHead('', 'الصافي + التعويض العائلي' . rateHead('mkt', $month, $year)) ?><?= transportHead() ?><?= dueHead() ?>
                     </tr></thead>
                     <tbody>
@@ -432,7 +432,7 @@ function reportDocThumb($path) {
         <?php /* 🏛️ ترويسة كشف الضمان باسم صاحب العمل لدى الصندوق (25-82-043 ⇒ الجمعية) */ ?>
         <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year, 'school' => cnssEmployerSchool(currentSchool())]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>وعاء الضمان</th><th>الأجير ٣٪</th><th>المدرسة ٨٪</th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>وعاء الضمان</th><th>الأجير<?= contribHead('cnss_employee_rate', $month, $year) ?></th><th>المدرسة<?= contribHead('cnss_employer_rate', $month, $year) ?></th></tr></thead>
                     <tbody>
                         <?php
                         $zC = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'composed_usd'=>0,'cnss'=>0,'school'=>0]; $G = $zC; $csL = $multi?4:3;
@@ -563,7 +563,7 @@ function reportDocThumb($path) {
         </form>
         <?= docSheetStart('Caisse EOC — retenues mensuelles', 'كشف صندوق التعليم الخاص الشهري', [monthName($month) . ' ' . $year], ['month' => $month, 'year' => $year]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>الأجير ٦٪</th><th>درجة/نصف راتب</th><th>المدرسة ٦٪</th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>الأجير<?= contribHead('eoc_employee_rate', $month, $year) ?></th><th>درجة/نصف راتب</th><th>المدرسة<?= contribHead('eoc_employer_rate', $month, $year) ?></th></tr></thead>
                     <tbody>
                         <?php $rn=0; foreach ($data as $r): $te += $r['caisse_amount_lbp']; $ts += $r['school_eoc_6_lbp']; $teg += $r['eoc_grade_lbp']; $teEx += extraWageLbp($r); $teExU += extraWageUsd($r); $teAi += aideCompLbp($r); $teBaseE += (int)$r['base_salary_lbp']; $teComposed += composedSalaryLbp($r); $teComposedU += composedSalaryUsd($r); ?>
                             <tr>
@@ -805,7 +805,7 @@ function reportDocThumb($path) {
                 <div class="report-table-wrap" dir="ltr"><table class="doc-table" dir="ltr">
                     <thead><tr>
                         <th>#</th><th>المدرسة / École</th><th>عدد الكشوف</th>
-                        <?php foreach ($atSel as $k): ?><th><?= e(annualTotalLabel($k, 'ar')) ?><br><small style="font-weight:400;opacity:.8"><?= e(annualTotalLabel($k, 'fr')) ?></small></th><?php endforeach; ?>
+                        <?php foreach ($atSel as $k): ?><th><?= e(annualTotalLabel($k, 'ar')) ?><?= annualTotalRateHead($k, $schoolYear) ?><br><small style="font-weight:400;opacity:.8"><?= e(annualTotalLabel($k, 'fr')) ?></small></th><?php endforeach; ?>
                     </tr></thead>
                     <tbody>
                         <?php $rn = 0; foreach ($atRows as $r): ?>

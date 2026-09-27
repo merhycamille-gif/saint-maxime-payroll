@@ -896,7 +896,7 @@ check('المجاميع السنوية: ترتيب الأعمدة — الأجر
       && strpos($hAtOn, '<th>تعويض النقل') < strpos($hAtOn, '<th>الراتب المركّب')
       && strpos($hAtOn, '<th>الراتب بعد التدرّج') < strpos($hAtOn, '<th>الأجر الإضافي'));
 check('المجاميع السنوية: اختيار بنود الضمان فقط يخفي باقي الأعمدة (أساس الراتب/الضريبة) ويُبقي الضمان',
-      strpos($hAtSel, '<th>الضمان — الأجير ٣٪') !== false && strpos($hAtSel, '<th>الضمان — المدرسة ٨٪') !== false
+      strpos($hAtSel, '<th>الضمان — الأجير<br><small class="rate-head contrib-head" dir="ltr">') !== false && strpos($hAtSel, '<th>الضمان — المدرسة<br><small class="rate-head contrib-head" dir="ltr">') !== false /* 📊 2026-09-27: النسبة تحت العنوان من الجدول */
       && strpos($hAtSel, '<th>أساس الراتب') === false && strpos($hAtSel, '<th>ضريبة الدخل') === false
       && strpos($hAtSel, 'FATAL') === false);
 $xAtSel = renderPage('pages/reports_export.php', ['report' => 'annual_totals', 'format' => 'xlsx', 'school_year' => '2025-2026', 'items' => ['cnss']], ['extra', 'aide', 'transport']);
@@ -8473,6 +8473,70 @@ if ($tit183) { $hT = renderPage('pages/annual_slip.php', ['employee_id' => $tit1
 $emp183 = $db->query("SELECT e.id, e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'employe' AND e.is_deleted = 0 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 if ($emp183) { $hE = renderPage('pages/annual_slip.php', ['employee_id' => (int)$emp183['id'], 'school_year' => '2025-2026'], ['extra', 'aide'], [(int)$emp183['school_id']], 'both', '2025-2026', '', [], '', '', 'show'); $c183('employe-never', $noFatal($hE) && strpos($hE, 'Valeur échelon') === false && strpos($hE, 'Régime / النظام') !== false); } else $c183('no-employe', false);
 check('🎓 أعمدة الدرجة/التدرّج للمتعاقد (2026-09-27): مخفية افتراضياً (+ خانة الدرجة «—») وتظهر بخيار «أعمدة الدرجة والتدرّج للمتعاقد» — الملاك كما هو، الموظف بلا درجة دائماً، إكسل المفرد يتبع الخيار — تجربة حيّة', $ok183, implode(' · ', $why183) ?: 'ok');
+
+/* =====================================================================
+ * 184) 📊 نِسَب الاشتراكات تحت عناوين الأعمدة — «دايماً أي عنوان مكتوب وعنده محسومات لازم نكتب تحته قيمة هالمحسومات بالبطاقة السنوية وبكل
+ *      التقارير: الأجير 3٪ · المدرسة مرض وأمومة · نهاية الخدمة 8.5٪ · تعويضات عائلية 6٪ · صندوق التعويضات 6٪» (2026-09-27). الضريبة ودرجة/نصف راتب
+ *      بلا نسبة بقراره («هودي تركهن»). المصدر الواحد contribPct/contribHead/contribLbl يقرأ جدول النِّسَب المؤرَّخ (نفس مفاتيح المحرّك) — لا رقم ثابت.
+ *      مطبَّق: البطاقة السنوية (+ إكسلها) · الكشف الشهري · كشفا الضمان والصندوق · المجاميع السنوية (+ إكسلاتها) · salary_all · التقرير العام · السجلّ الكامل · تفصيل الراتب.
+ *      النماذج الرسمية طبق الأصل (190A، التسوية، الاسمي، الفصلي، 386، الموازنة) لم تُمسّ.
+ * =================================================================== */
+$ok184 = true; $why184 = [];
+$c184 = function (string $n, bool $ok) use (&$ok184, &$why184) { if (!$ok) { $ok184 = false; $why184[] = $n; } };
+$c184('helpers', function_exists('contribPct') && function_exists('contribHead') && function_exists('contribLbl') && function_exists('syRateMonth') && function_exists('annualTotalRateHead')
+    && contribPct('cnss_employee_rate', 10, 2025) === '3' && contribPct('cnss_employer_rate', 10, 2025) === '8' && contribPct('end_of_service_rate', 10, 2025) === '8.5'
+    && contribPct('family_compensation_rate', 10, 2025) === '6' && contribPct('eoc_employee_rate', 10, 2025) === '6' && contribPct('eoc_employer_rate', 10, 2025) === '6' && contribPct('income_tax', 10, 2025) === ''
+    && contribHead('cnss_employee_rate', 10, 2025) === '<br><small class="rate-head contrib-head" dir="ltr">3 %</small>' && contribHead('cnss_employee_rate', 10, 2025, null, 'span') === '<br><span class="contrib-head" dir="ltr">3 %</span>'
+    && contribLbl('الضمان', 'cnss_employee_rate', 10, 2025) === 'الضمان 3 %' && syRateMonth('2024-2025') === [9, 2025] && syRateMonth('2099-2100') === [10, 2099]);
+// مؤرَّخة فعلاً: صفّ مؤقّت بالجدول بنسبة 4٪ من 2090 ⇒ العنوان يقرأه لذلك التاريخ ولا يمسّ 2025 — ثم يُحذف
+try {
+    $db->exec("INSERT INTO rate_history (param_key, value, effective_from, effective_to, notes) VALUES ('cnss_employee_rate', 4, '2090-01-01', NULL, 'regcheck-184')");
+    $c184('dated', contribPct('cnss_employee_rate', 3, 2090) === '4' && contribPct('cnss_employee_rate', 10, 2025) === '3' && contribLbl('الضمان', 'cnss_employee_rate', null, null, '2090-2091') === 'الضمان 4 %');
+} finally { $db->exec("DELETE FROM rate_history WHERE notes = 'regcheck-184'"); }
+$c184('dated-cleanup', (int)$db->query("SELECT COUNT(*) FROM rate_history WHERE notes = 'regcheck-184'")->fetchColumn() === 0);
+// لا رقم ثابت باقٍ بالعناوين الداخلية
+$src184 = fn(string $f) => (string)file_get_contents($PROJ . '/' . $f);
+$c184('no-hardcoded', strpos($src184('pages/reports.php'), 'الضمان (٣٪)') === false && strpos($src184('pages/reports.php'), '<th>الأجير ٣٪</th>') === false && strpos($src184('pages/reports.php'), '<th>الأجير ٦٪</th>') === false
+    && strpos($src184('pages/reports_export.php'), "'الضمان ٣٪'") === false && strpos($src184('pages/reports_export.php'), "'المدرسة ٨٪'") === false && strpos($src184('pages/reports_export.php'), "'المدرسة ٦٪'") === false
+    && strpos($src184('includes/report_helpers.php'), 'CNSS salarié 3%') === false && strpos($src184('includes/report_helpers.php'), "'rk' => 'cnss_employer_rate'") !== false
+    && strpos($src184('pages/official_forms.php'), '<th>مساهمة الضمان ٨٪</th>') === false && strpos($src184('pages/official_forms.php'), "salarié 3% + école 8%") === false && strpos($src184('pages/official_forms.php'), 'المرض الأمومة 3%') === false
+    && strpos($src184('pages/annual_slip.php'), '<th class="deduction-header">CNSS</th>') === false && strpos($src184('pages/annual_slip.php'), "contribHead('eoc_employee_rate', \$slipRM[0], \$slipRM[1], null, 'span')") !== false
+    && strpos($src184('pages/annual_slip_export.php'), "contribLbl('CNSS', 'cnss_employee_rate', null, null, \$schoolYear) . ' / الضمان'") !== false);
+// النماذج الرسمية طبق الأصل كما هي
+$c184('official-untouched', strpos($src184('pages/official_forms.php'), '<th>الأجير 3%</th>') !== false || strpos($src184('pages/official_forms.php'), 'الأجير 3%') !== false);
+// تشغيل حيّ
+$thTxt184 = function (string $h) { preg_match_all('#<th[^>]*>(.*?)</th>#su', $h, $m); return array_map(fn($t) => trim(preg_replace('/\s+/', ' ', strip_tags(str_replace('<br>', ' ⏎ ', $t)))), $m[1]); };
+$has184 = fn(array $ths, string $needle) => count(array_filter($ths, fn($t) => strpos($t, $needle) !== false)) > 0;
+$tit184 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
+if ($tit184) {
+    $hS = renderPage('pages/annual_slip.php', ['employee_id' => $tit184, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026'); $t = $thTxt184($hS);
+    $c184('slip', $noFatal($hS) && $has184($t, 'Caisse ⏎ 6 %') && $has184($t, 'CNSS ⏎ 3 %') && substr_count($hS, 'contrib-head') === 2);
+    $hB = renderPage('pages/annual_slip.php', ['employee_id' => $tit184, 'school_year' => '2025-2026', 'blank' => 1], ['extra', 'aide'], [3], 'both', '2025-2026');
+    $c184('slip-blank-strips', $noFatal($hB) && preg_match('#<thead>.*?</thead>#su', $hB, $mb) === 1 && strpos($mb[0], ' %') === false);
+} else $c184('no-titulaire', false);
+$hM = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], ['extra', 'aide'], [3], 'lbp', '2025-2026'); $t = $thTxt184($hM);
+$c184('monthly', $noFatal($hM) && $has184($t, 'الضمان ⏎ 3 %') && $has184($t, 'الصندوق ⏎ 6 %') && !$has184($t, 'الضريبة ⏎') );
+$hC = renderPage('pages/reports.php', ['report' => 'cnss_summary', 'month' => 10, 'year' => 2025], ['extra', 'aide'], [3], 'lbp', '2025-2026'); $t = $thTxt184($hC);
+$c184('cnss', $noFatal($hC) && $has184($t, 'الأجير ⏎ 3 %') && $has184($t, 'المدرسة ⏎ 8 %'));
+$hE = renderPage('pages/reports.php', ['report' => 'eoc_summary', 'month' => 10, 'year' => 2025], ['extra', 'aide'], [3], 'lbp', '2025-2026'); $t = $thTxt184($hE);
+$c184('eoc', $noFatal($hE) && $has184($t, 'الأجير ⏎ 6 %') && $has184($t, 'المدرسة ⏎ 6 %') && $has184($t, 'درجة/نصف راتب') && !$has184($t, 'درجة/نصف راتب ⏎'));
+$hR = renderPage('pages/official_forms.php', ['form' => 'full_register', 'month' => 10, 'year' => 2025], ['extra', 'aide'], [3], 'lbp', '2025-2026'); $t = $thTxt184($hR);
+$c184('register', $noFatal($hR) && $has184($t, 'مساهمة الضمان ⏎ 8 %') && $has184($t, 'نهاية الخدمة ⏎ 8.5 %') && $has184($t, 'تعويضات عائلية ⏎ 6 %') && $has184($t, 'صندوق التعويضات ⏎ 6 %'));
+$hD = renderPage('pages/official_forms.php', ['form' => 'salary_detail', 'month' => 10, 'year' => 2025], ['extra', 'aide'], [3], 'lbp', '2025-2026'); $t = $thTxt184($hD);
+$c184('detail', $noFatal($hD) && $has184($t, 'المرض والأمومة ⏎ 3 %') && $has184($t, 'صندوق التعويضات ⏎ 6 %'));
+$hA = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], ['extra', 'aide'], [3], 'lbp', '2025-2026'); $t = $thTxt184($hA);
+$c184('salary-all', $noFatal($hA) && $has184($t, 'الضمان الاجتماعي ⏎ 3 %') && $has184($t, 'صندوق التعويضات ⏎ 6 %') && !$has184($t, 'ضريبة الدخل ⏎'));
+$hG = renderPage('pages/official_forms.php', ['form' => 'general_report', 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'lbp', '2025-2026');
+$c184('general', $noFatal($hG) && strpos($hG, 'salarié 3 % + école 8 %') !== false && strpos($hG, 'الأجير 6 % + درجة/نصف راتب + المدرسة 6 %') !== false);
+$hT = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'lbp', '2025-2026'); $t = $thTxt184($hT);
+$c184('annual-totals', $noFatal($hT) && $has184($t, 'الضمان — الأجير ⏎ 3 % ⏎ CNSS salarié') && $has184($t, 'صندوق التعويضات — المدرسة ⏎ 6 % ⏎ Fonds école') && $has184($t, 'درجة / نصف راتب إلى الصندوق ⏎ Échelon'));
+// الإكسل: العنوان النصّي يحمل النسبة
+$sheet184 = function (string $bin) { $tmp = tempnam(sys_get_temp_dir(), 'r184'); file_put_contents($tmp, $bin); $z = new ZipArchive(); $x = ''; if ($z->open($tmp) === true) { $x = (string)$z->getFromName('xl/worksheets/sheet1.xml'); $z->close(); } @unlink($tmp); return html_entity_decode($x, ENT_QUOTES | ENT_XML1, 'UTF-8'); };
+$xM = $sheet184(renderPage('pages/reports_export.php', ['report' => 'cnss_summary', 'month' => 10, 'year' => 2025, 'format' => 'xlsx'], ['extra', 'aide'], [3], 'lbp', '2025-2026', $PROJ . '/tools/_r184.xlsx'));
+$xA = $sheet184(renderPage('pages/reports_export.php', ['report' => 'annual_totals', 'school_year' => '2025-2026', 'format' => 'xlsx'], ['extra', 'aide'], [3], 'lbp', '2025-2026', $PROJ . '/tools/_r184b.xlsx'));
+$xS = $tit184 ? $sheet184(renderPage('pages/annual_slip_export.php', ['employee_id' => $tit184, 'school_year' => '2025-2026', 'format' => 'xlsx'], ['extra', 'aide'], [3], 'both', '2025-2026', $PROJ . '/tools/_r184c.xlsx')) : '';
+$c184('excel', strpos($xM, 'الأجير 3 %') !== false && strpos($xM, 'المدرسة 8 %') !== false && strpos($xA, 'الضمان — الأجير 3 % (ل.ل)') !== false && strpos($xS, 'Caisse 6 % / الصندوق') !== false && strpos($xS, 'CNSS 3 % / الضمان') !== false);
+check('📊 نِسَب الاشتراكات تحت عناوين الأعمدة من الجدول المؤرَّخ (2026-09-27): البطاقة (+إكسل) · الشهري · الضمان · الصندوق · المجاميع السنوية (+إكسل) · salary_all · التقرير العام · السجلّ · التفصيل — الضريبة ودرجة/نصف راتب بلا نسبة — مؤرَّخة (صفّ مؤقّت 2090) — النماذج الرسمية كما هي', $ok184, implode(' · ', $why184) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

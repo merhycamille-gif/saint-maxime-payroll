@@ -187,6 +187,8 @@ function annualSlipHtml($db, $emp, $schoolYear) {
     // 🎓 «المتعاقد ما عنده درجة ولا راتب بعد التدرّج — موافق بس بشرط إذا بدي ياها يكون عندي خيار حطّها» (2026-09-27): عمودا قيمة الدرجة/بعد التدرّج
     //    وخانة الدرجة مخفية للمتعاقد افتراضياً (كالموظف) ويظهرها خيار «أعمدة الدرجة والتدرّج للمتعاقد» بقائمة «الراتب يشمل» — الملاك كما هو. المصدر الواحد slipHidesGradeCols.
     $noGrade = slipHidesGradeCols($emp);
+    // 📊 نِسَب الاشتراكات تحت رأسَي الصندوق والضمان (2026-09-27) — من جدول النِّسَب المؤرَّخ بآخر شهر بالسنة، بنفس خطّ الرأس (سطر ثانٍ كباقي الرؤوس)
+    $slipRM = syRateMonth((string)$schoolYear);
     // عدد أعمدة الجدول (تُطرح 4 أعمدة الأستاذ للموظف الإداري) — أعمدة الإضافي/المكافأة/النقل تتبع زرّ «الراتب يشمل»
     // (بطلب المستخدم: النقل خيار بإيده). ولما يكون النقل مخفياً، يُعرض «المستحق» بلا النقل لتبقى الأرقام راكبة.
     // 🚌 خيار ثلاثي (2026-09-17): $showTrans = العمود ظاهر (بالمبلغ أو فارغاً)؛ $transAmt = فيه مبلغ (ويُجمع بالمستحق).
@@ -282,10 +284,10 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 </tr>
                 <tr>
                     <?php if (!$noCaisse): ?>
-                    <th class="deduction-header">Caisse</th>
+                    <th class="deduction-header">Caisse<?= contribHead('eoc_employee_rate', $slipRM[0], $slipRM[1], null, 'span') ?></th>
                     <th class="deduction-header">Échelon / ½ sal.<br>درجة / نصف راتب</th>
                     <?php endif; ?>
-                    <th class="deduction-header">CNSS</th>
+                    <th class="deduction-header">CNSS<?= contribHead('cnss_employee_rate', $slipRM[0], $slipRM[1], null, 'span') ?></th>
                     <th class="deduction-header">Impôt</th>
                     <th class="deduction-header">Total ret.</th>
                 </tr>

@@ -5585,6 +5585,43 @@ function rateHead(string $which, $month = null, $year = null): string {
     if ($rate <= 0) return '';
     return '<br><small class="rate-head" dir="ltr">1 $ = ' . number_format($rate, 0, '.', ',') . '</small>';
 }
+/* 📊 نِسَب الاشتراكات تحت عناوين الأعمدة — المصدر الواحد (2026-09-27 «دايماً أي عنوان مكتوب وعنده محسومات لازم نكتب تحته قيمة هالمحسومات
+ *  بالبطاقة السنوية وبكل التقارير: الضمان على الأجير 3٪، على المدرسة 7٪ مرض وأمومة، نهاية الخدمة 8.5٪، تعويضات عائلية 6٪، صندوق التعويضات 6٪»):
+ *  النسبة لا تُكتب رقماً ثابتاً بالكود بل تُقرأ من جدول «النِّسَب حسب التاريخ» (rate_history) بتاريخ شهر التقرير أو آخر شهر بالسنة الدراسية —
+ *  نفس المفاتيح التي يحسب بها المحرّك، فالعنوان والحساب لا يفترقان. الضريبة (شطور) ودرجة/نصف راتب (ليست نسبة) بلا نسبة بقراره. */
+function contribRateDefaults(): array {
+    return ['cnss_employee_rate' => 3, 'cnss_employer_rate' => 8, 'end_of_service_rate' => 8.5, 'family_compensation_rate' => 6, 'eoc_employee_rate' => 6, 'eoc_employer_rate' => 6];
+}
+/** شهر قراءة النِّسَب لسنة دراسية: آخر شهر منها (أيلول y2) أو الشهر الحالي إن كانت جارية (ولا يسبق تشرين الأول y1) */
+function syRateMonth(?string $sy): array {
+    if (!$sy || !preg_match('/^\d{4}-\d{4}$/', $sy)) return [(int)date('n'), (int)date('Y')];
+    [$y1, $y2] = schoolYearToYears($sy);
+    $end = $y2 * 12 + 9; $now = (int)date('Y') * 12 + (int)date('n'); $start = $y1 * 12 + 10;
+    $k = max($start, min($end, $now));
+    return [(($k - 1) % 12) + 1, intdiv($k - 1, 12)];
+}
+/** نسبة الاشتراك نصّاً («3»، «8.5») بتاريخ الشهر أو السنة الدراسية — '' إن لا مفتاح */
+function contribPct(string $key, $month = null, $year = null, ?string $sy = null): string {
+    $def = contribRateDefaults();
+    if (!isset($def[$key])) return '';
+    if ($sy !== null && $sy !== '' && ($month === null || $year === null)) [$month, $year] = syRateMonth($sy);
+    $v = (float)getRateAsOf($key, $month ? (int)$month : null, $year ? (int)$year : null, $def[$key]);
+    if ($v <= 0) return '';
+    return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+}
+/** السطر الثاني تحت عنوان العمود: <br><small class="rate-head">3 %</small> — بالتقارير؛ $tag='span' للبطاقة السنوية (بنفس خطّها) */
+function contribHead(string $key, $month = null, $year = null, ?string $sy = null, string $tag = 'small'): string {
+    $p = contribPct($key, $month, $year, $sy);
+    if ($p === '') return '';
+    return $tag === 'span'
+        ? '<br><span class="contrib-head" dir="ltr">' . $p . ' %</span>'
+        : '<br><small class="rate-head contrib-head" dir="ltr">' . $p . ' %</small>';
+}
+/** عنوان نصّي (إكسل/PDF حيث الرأس نصّ واحد): «الضمان 3 %» */
+function contribLbl(string $label, string $key, $month = null, $year = null, ?string $sy = null): string {
+    $p = contribPct($key, $month, $year, $sy);
+    return $p === '' ? $label : $label . ' ' . $p . ' %';
+}
 function lawUsd($lbp): float { return floor((float)$lbp / officialUsdRate()); }
 function lawUsdSql(string $expr): string { return 'FLOOR((' . $expr . ')/' . officialUsdRate() . ')'; }
 /* 📄 (2026-09-21 p1 «كل التقارير لازم تكون مطابقة لبطاقة الراتب السنوية»): قاعدة البطاقة لدولار أعمدة الراتب — المصدر الواحد لكل الكشوف:

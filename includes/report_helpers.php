@@ -828,13 +828,13 @@ function annualTotalItems(): array {
         'transport'  => ['g' => 'transport', 'ar' => 'تعويض النقل',                    'fr' => 'Transport',              'lbp' => 'SUM(ms.transport_lbp)',                    'usd' => $u('ms.transport_lbp')],
         'composed'   => ['g' => 'salaires',  'ar' => 'الراتب المركّب',                 'fr' => 'Salaire composé',        'calc' => true],
         'fam'        => ['g' => 'indemn',    'ar' => 'التعويضات العائلية',             'fr' => 'Allocations familiales', 'lbp' => 'SUM(ms.family_allowance_lbp)',             'usd' => $u('ms.family_allowance_lbp')],
-        'cnss'       => ['g' => 'cnss',      'ar' => 'الضمان — الأجير ٣٪',             'fr' => 'CNSS salarié 3%',        'lbp' => 'SUM(ms.cnss_amount_lbp)',                  'usd' => $u('ms.cnss_amount_lbp')],
-        'scnss'      => ['g' => 'cnss',      'ar' => 'الضمان — المدرسة ٨٪',            'fr' => 'CNSS école 8%',          'lbp' => 'SUM(ms.school_cnss_8_lbp)',                'usd' => $u('ms.school_cnss_8_lbp')],
-        'caisse'     => ['g' => 'eoc',       'ar' => 'صندوق التعويضات — الأجير ٦٪',    'fr' => 'Fonds salarié 6%',       'lbp' => 'SUM(ms.caisse_amount_lbp)',                'usd' => $u('ms.caisse_amount_lbp')],
+        'cnss'       => ['g' => 'cnss',      'ar' => 'الضمان — الأجير',                'fr' => 'CNSS salarié',     'rk' => 'cnss_employee_rate',        'lbp' => 'SUM(ms.cnss_amount_lbp)',                  'usd' => $u('ms.cnss_amount_lbp')],
+        'scnss'      => ['g' => 'cnss',      'ar' => 'الضمان — المدرسة',               'fr' => 'CNSS école',       'rk' => 'cnss_employer_rate',          'lbp' => 'SUM(ms.school_cnss_8_lbp)',                'usd' => $u('ms.school_cnss_8_lbp')],
+        'caisse'     => ['g' => 'eoc',       'ar' => 'صندوق التعويضات — الأجير',       'fr' => 'Fonds salarié',    'rk' => 'eoc_employee_rate',       'lbp' => 'SUM(ms.caisse_amount_lbp)',                'usd' => $u('ms.caisse_amount_lbp')],
         // 🧾 (2026-09-17 «p1,p2 قارن لازم يكون نفس النتيجة»): درجة/نصف راتب إلى الصندوق بند مستقل — كي يساوي مجموع بنود الصندوق الثلاثة
         //    عمود «صندوق التعويضات» بالتقرير العام (الأجير ٦٪ + الدرجة/نصف الراتب + المدرسة ٦٪).
         'eocg'       => ['g' => 'eoc',       'ar' => 'درجة / نصف راتب إلى الصندوق',    'fr' => 'Échelon / ½ salaire au fonds', 'lbp' => 'SUM(ms.eoc_grade_lbp)',              'usd' => $u('ms.eoc_grade_lbp')],
-        'seoc'       => ['g' => 'eoc',       'ar' => 'صندوق التعويضات — المدرسة ٦٪',   'fr' => 'Fonds école 6%',         'lbp' => 'SUM(ms.school_eoc_6_lbp)',                 'usd' => $u('ms.school_eoc_6_lbp')],
+        'seoc'       => ['g' => 'eoc',       'ar' => 'صندوق التعويضات — المدرسة',      'fr' => 'Fonds école',      'rk' => 'eoc_employer_rate',         'lbp' => 'SUM(ms.school_eoc_6_lbp)',                 'usd' => $u('ms.school_eoc_6_lbp')],
         'tax'        => ['g' => 'impot',     'ar' => 'ضريبة الدخل',                    'fr' => 'Impôt sur le revenu',    'lbp' => 'SUM(ms.income_tax_lbp)',                   'usd' => $u('ms.income_tax_lbp')],
         'net'        => ['g' => 'paye',      'ar' => 'إجمالي المدفوع (الصافي)',        'fr' => 'Net payé',               'lbp' => 'SUM(ms.net_salary_lbp)',                   'usd' => $u('ms.net_salary_lbp')],
         'total'      => ['g' => 'paye',      'ar' => 'الإجمالي المتوجب',               'fr' => 'Total dû',               'lbp' => 'SUM(ms.total_due_lbp)',                    'usd' => $u('ms.total_due_lbp')],
@@ -853,9 +853,11 @@ function annualTotalGroups(): array {
     ];
 }
 /** تسمية البند للعرض — «الإجمالي المتوجب» توضح مكوّناته حسب زرّ «الراتب يشمل» (النقل يُضاف عند تفعيله فقط) */
-function annualTotalLabel(string $key, string $lang = 'ar'): string {
+/** 📊 (2026-09-27) $sy: يُلحق نسبة الاشتراك من الجدول المؤرَّخ بالعنوان النصّي (الإكسل) — «الضمان — الأجير 3 %» */
+function annualTotalLabel(string $key, string $lang = 'ar', ?string $sy = null): string {
     $it = annualTotalItems()[$key] ?? null;
     if (!$it) return $key;
+    if ($sy !== null && !empty($it['rk'])) return contribLbl((string)($it[$lang] ?? $it['ar']), $it['rk'], null, null, $sy);
     if ($key === 'total') {
         return $lang === 'ar'
             ? 'الإجمالي المتوجب (الصافي + التعويضات' . (salaryCompHas('transport') ? ' + النقل' : '') . ')'
@@ -947,4 +949,10 @@ function annualTotalRows(PDO $db, string $schoolYear, string $empFilter, array $
     }
     unset($r);
     return [$rows, $tot];
+}
+
+/** 📊 السطر الثاني (النسبة) تحت رأس بند مجاميع سنوية له مفتاح نسبة (rk) — من الجدول المؤرَّخ بآخر شهر بالسنة الدراسية */
+function annualTotalRateHead(string $key, ?string $sy): string {
+    $rk = annualTotalItems()[$key]['rk'] ?? '';
+    return $rk === '' ? '' : contribHead($rk, null, null, $sy);
 }

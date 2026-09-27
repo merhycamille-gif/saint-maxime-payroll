@@ -1655,7 +1655,7 @@ elseif ($form === 'teacher_card'):
             <th>#</th><th>الاسم</th><th>أساس الراتب</th><th>درجة عادية واستثنائية</th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
             <?= extraAideHeads('', $rows, $month, $year) ?>
             <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
-            <th>صندوق التعويضات ٦٪</th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى صندوق التعويضات</small></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>ضريبة الدخل</th><th>الضمان الاجتماعي</th>
+            <th>صندوق التعويضات<?= contribHead('eoc_employee_rate', $month, $year) ?></th><th>درجة / نصف راتب<br><small style="font-weight:400">إلى صندوق التعويضات</small></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>ضريبة الدخل</th><th>الضمان الاجتماعي<?= contribHead('cnss_employee_rate', $month, $year) ?></th>
             <?php // 📐 (2026-09-19 p1) «عمود الصافي دغري بعد عمود المحسومات بكل البرنامج»: محسومات ← صافي ← عائلي ← نقل ← مجموع المدفوعات ?>
             <th>مجموع المحسومات</th><th>الصافي<?= rateHead('mkt', $month, $year) ?></th><th>تعويض عائلي</th><?= netFamHead('', 'الصافي + التعويض العائلي' . rateHead('mkt', $month, $year)) ?><?= transportHead('', 'تعويض نقل') ?><?= dueHead('', 'مجموع المدفوعات' . rateHead('mkt', $month, $year)) ?>
             <th>توقيع الموظف</th>
@@ -1877,7 +1877,7 @@ elseif ($form === 'teacher_card'):
             <?php if (transportColShown()): ?><th><?= $grBi('Transport', 'تعويض النقل') ?></th><?php endif; ?>
             <th style="background:#4338ca"><?= $grBi('Total', 'المجموع') ?><?= $grSub('salaire après échelon' . ($grCompFr !== '' ? ' + ' . $grCompFr : ''), 'الراتب بعد التدرّج' . ($grCompAr !== '' ? ' + ' . $grCompAr : '')) ?></th>
             <th><?= $grBi('Salaires nets', 'الرواتب الصافية') ?><?= $grTransAmt ? $grSub('avec transport', 'مع تعويض النقل') : '' ?></th>
-            <th><?= $grBi('CNSS', 'الضمان الاجتماعي') ?><?= $grSub('salarié 3% + école 8%', 'الأجير ٣٪ + المدرسة ٨٪') ?></th><th><?= $grBi('Caisse des indemnités', 'صندوق التعويضات') ?><?= $grSub('salarié 6% + échelon/½ salaire + école 6%', 'الأجير ٦٪ + درجة/نصف راتب + المدرسة ٦٪') ?></th><th><?= $grBi('Impôt sur le revenu', 'ضريبة الدخل') ?></th>
+            <th><?= $grBi('CNSS', 'الضمان الاجتماعي') ?><?php $pcE = contribPct('cnss_employee_rate', null, null, $schoolYear); $pcS = contribPct('cnss_employer_rate', null, null, $schoolYear); $pfE = contribPct('eoc_employee_rate', null, null, $schoolYear); $pfS = contribPct('eoc_employer_rate', null, null, $schoolYear); /* 📊 النِّسَب مؤرَّخة (2026-09-27) */ ?><?= $grSub("salarié $pcE % + école $pcS %", "الأجير $pcE % + المدرسة $pcS %") ?></th><th><?= $grBi('Caisse des indemnités', 'صندوق التعويضات') ?><?= $grSub("salarié $pfE % + échelon/½ salaire + école $pfS %", "الأجير $pfE % + درجة/نصف راتب + المدرسة $pfS %") ?></th><th><?= $grBi('Impôt sur le revenu', 'ضريبة الدخل') ?></th>
             <th><?= $grBi('Total', 'المجموع') ?><?= $grSub('net + CNSS + caisse + impôt', 'الصافي + الضمان + الصندوق + الضريبة') ?></th>
         </tr></thead>
         <tbody>
@@ -2580,7 +2580,7 @@ elseif ($form === 'payment_list'):
             <th>اسم الأستاذ</th><th>عدد الساعات</th><th>أساس الراتب</th><th>درجة وتدرّج</th><th>الراتب بعد التدرّج<?= rateHead('law') ?></th>
             <?= extraAideHeads('', $rows, $month, $year) ?>
             <th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
-            <th>مساهمة الضمان ٨٪</th><th>صندوق التعويضات ٦٪</th><th>نهاية الخدمة ٨.٥٪</th><th>تعويضات عائلية ٦٪</th>
+            <th>مساهمة الضمان<?= contribHead('cnss_employer_rate', $month, $year) ?></th><th>صندوق التعويضات<?= contribHead('eoc_employer_rate', $month, $year) ?></th><th>نهاية الخدمة<?= contribHead('end_of_service_rate', $month, $year) ?></th><th>تعويضات عائلية<?= contribHead('family_compensation_rate', $month, $year) ?></th>
             <th>التعويضات العائلية</th><?= transportHead() ?><?= familyDedHeads() ?><th>ضريبة الدخل</th><th>الكلفة على المؤسسة<?= rateHead('mkt', $month, $year) ?></th>
         </tr></thead>
         <tbody>
@@ -3059,11 +3059,11 @@ elseif ($form === 'payment_list'):
             </tr>
             <tr>
                 <th>نصف راتب،درجة</th>
-                <th>صندوق التعويضات 6%</th>
+                <th>صندوق التعويضات<?= contribHead('eoc_employee_rate', $month, $year) ?></th>
                 <th>الأجر الإجمالي<?= rateHead('mkt', $month, $year) ?></th>
                 <?= familyDedHeads() ?>
                 <th>ضريبة الدخل</th>
-                <th>الضمان الاجتماعي<br>المرض الأمومة 3%</th>
+                <th>الضمان الاجتماعي<br>المرض والأمومة<?= contribHead('cnss_employee_rate', $month, $year) ?></th>
                 <th>مجموع المحسومات</th>
             </tr>
             <tr style="display:none"></tr>
