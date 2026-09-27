@@ -184,6 +184,9 @@ function annualSlipHtml($db, $emp, $schoolYear) {
     // 🏦 «ببطاقة المتعاقد ما لازم يكون فيه عمود لصندوق التعويضات — أوعى تخرب البطاقة» (2026-09-19): الصندوق للملاك فقط (المحرّك: enseignant_titulaire)
     //    ⇒ عمودا الصندوق ودرجة/نصف راتب يُخفَيان للمتعاقد كما للموظف الإداري؛ أعمدة الدرجة/التدرّج تبقى له. لا تغيير آخر بالتصميم.
     $noCaisse = $isEmp || $emp['employee_type'] === 'enseignant_contractuel';
+    // 🎓 «المتعاقد ما عنده درجة ولا راتب بعد التدرّج — موافق بس بشرط إذا بدي ياها يكون عندي خيار حطّها» (2026-09-27): عمودا قيمة الدرجة/بعد التدرّج
+    //    وخانة الدرجة مخفية للمتعاقد افتراضياً (كالموظف) ويظهرها خيار «أعمدة الدرجة والتدرّج للمتعاقد» بقائمة «الراتب يشمل» — الملاك كما هو. المصدر الواحد slipHidesGradeCols.
+    $noGrade = slipHidesGradeCols($emp);
     // عدد أعمدة الجدول (تُطرح 4 أعمدة الأستاذ للموظف الإداري) — أعمدة الإضافي/المكافأة/النقل تتبع زرّ «الراتب يشمل»
     // (بطلب المستخدم: النقل خيار بإيده). ولما يكون النقل مخفياً، يُعرض «المستحق» بلا النقل لتبقى الأرقام راكبة.
     // 🚌 خيار ثلاثي (2026-09-17): $showTrans = العمود ظاهر (بالمبلغ أو فارغاً)؛ $transAmt = فيه مبلغ (ويُجمع بالمستحق).
@@ -209,7 +212,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
         return (salaryCompHas('extra') ? 0.0 : (float)($t['extra_wage_usd'] ?? 0))
              + (salaryCompHas('aide')  ? 0.0 : (float)($t['aide_usd'] ?? 0));
     };
-    $slipCols = ($isEmp ? 9 : ($noCaisse ? 11 : 13)) + compColsCount() + ($showDue ? 1 : 0) + ($showNetFam ? 1 : 0);
+    $slipCols = ($noGrade ? 9 : ($noCaisse ? 11 : 13)) + compColsCount() + ($showDue ? 1 : 0) + ($showNetFam ? 1 : 0);
 
     ob_start();
     ?>
@@ -249,7 +252,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
             </tr>
             <tr>
                 <?php if ($isEmp): ?><td><span class="lbl">Fin de service / نهاية الخدمة</span><span class="val"><?= e($meta['eos']) ?></span></td>
-                <?php else: ?><td><span class="lbl">Échelon / الدرجة</span><span class="val"><?= e($meta['grade']) ?></span></td><?php endif; ?>
+                <?php else: ?><td><span class="lbl">Échelon / الدرجة</span><span class="val"><?= $noGrade ? '—' : e($meta['grade']) ?></span></td><?php endif; ?>
                 <td><span class="lbl">N° CNSS / رقم الضمان</span><span class="val"><?= e($meta['cnss']) ?></span></td>
                 <?php if ($isEmp): ?><td><span class="lbl">Départ / تاريخ الترك</span><span class="val"><?= e($meta['left']) ?></span></td>
                 <?php else: ?><td><span class="lbl">N° Caisse / رقم صندوق التعويضات</span><span class="val"><?= e($meta['caisse_no']) ?></span></td><?php endif; ?>
@@ -262,7 +265,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 <tr>
                     <th rowspan="2">Mois<br>الشهر</th>
                     <th rowspan="2">Salaire<br>أساس الراتب</th>
-                    <?php if (!$isEmp): ?>
+                    <?php if (!$noGrade): ?>
                     <th rowspan="2">Valeur échelon<br>قيمة الدرجة (ل.ل)</th>
                     <th rowspan="2">Après échelon<br>الراتب بعد التدرج<?= ($meta['extra_pct'] ?? '') !== '' ? '<br><span dir="ltr">1 $ = ' . e($meta['old_rate']) . '</span>' : '' /* 🧮 السعر الرسمي القديم (قانون النسبة) */ ?></th>
                     <?php endif; ?>
@@ -309,7 +312,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                             <?php /* 🔠 «أحجام المبالغ بالليرة متل بعضها» (طلب المستخدم 2026-08-01):
                                      num-lbp = نفس حجم كل مبالغ الليرة بالجدول (14 عريض) */ ?>
                             <td class="num-lbp"><strong><?= formatLBP($r['base_shown'], false) ?></strong></td>
-                            <?php if (!$isEmp): ?>
+                            <?php if (!$noGrade): ?>
                             <td class="num-lbp"><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '—' ?></td>
                             <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): // 🧮 تحته قيمته بالدولار القديم (÷1500 داون) — أساس قانون النسبة ?><span class="sub-lbp"><strong><?= formatLBP($r['cur_sal'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$r['cur_sal_old_usd'], 0) ?> $</span><?php else: ?><strong><?= formatLBP($r['cur_sal'], false) ?></strong><?php endif; ?></td>
                             <?php endif; ?>
@@ -345,7 +348,7 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 <tr class="total-row">
                     <td><strong>TOTAL</strong></td>
                     <td class="num-lbp"><strong><?= formatLBP($tot['base_shown'], false) ?></strong></td>
-                    <?php if (!$isEmp): ?>
+                    <?php if (!$noGrade): ?>
                     <td class="num-lbp"><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
                     <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): ?><span class="sub-lbp"><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$tot['bpe_old_usd'], 0) ?> $</span><?php else: ?><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong><?php endif; ?></td>
                     <?php endif; ?>

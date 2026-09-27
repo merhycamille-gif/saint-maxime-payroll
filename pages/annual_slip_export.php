@@ -49,8 +49,9 @@ function annualCompDropIdx(): array {
     if (!dueColShown())              $d[] = 16; // 💰 عمود المستحق: «غير موجود» يُحذف، «بلا مبلغ» يبقى فارغاً
     return $d;
 }
-function annualDropCols(array $row, bool $dropTeacher): array {
-    $drop = array_merge($dropTeacher ? ANNUAL_TEACHER_COLS : [], annualCompDropIdx());
+function annualDropCols(array $row, bool $dropTeacher, bool $dropGradeOnly = false): array {
+    // 🎓 (2026-09-27) $dropGradeOnly: المتعاقد وأعمدة الدرجة مخفية ⇒ يُحذف عمودا الدرجة/التدرّج فقط (2، 3)
+    $drop = array_merge($dropTeacher ? ANNUAL_TEACHER_COLS : ($dropGradeOnly ? [2, 3] : []), annualCompDropIdx());
     foreach ($drop as $i) unset($row[$i]);
     return array_values($row);
 }
@@ -63,10 +64,10 @@ function annualDropTeacherCols(array $row) {
  * $withIdentity: سطر هوية مدموج قبل الأشهر — للطباعة الجماعية فقط (للموظف الواحد الهوية في period).
  * $dropCols: يحذف أعمدة الدرجة/الصندوق (للموظف الإداري في تصدير الموظف الواحد فقط).
  */
-function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $dropCols = false) {
+function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $dropCols = false, $dropGradeOnly = false) {
     $m = $slip['meta'];
-    $emit = function (array $row, $isTotal = false) use ($rep, $dropCols) {
-        $row = annualDropCols($row, $dropCols);
+    $emit = function (array $row, $isTotal = false) use ($rep, $dropCols, $dropGradeOnly) {
+        $row = annualDropCols($row, $dropCols, $dropGradeOnly);
         $isTotal ? $rep->totalRow($row) : $rep->row($row);
     };
     if ($withIdentity) {
@@ -148,14 +149,15 @@ $m = $slip['meta'];
 $rep = new ReportTable('كشف الراتب السنوي ' . $schoolYear, true);
 $rep->schoolHeader($slip['school']);
 $isAdminEmp = ($emp['employee_type'] === 'employe');
+$dropGrade = !$isAdminEmp && slipHidesGradeCols($emp); // 🎓 متعاقد وأعمدة الدرجة مخفية (2026-09-27)
 $slipRateTxt = rateTitleText(null, null, true, (float)($m['rate'] ?? 0) > 0 ? (float)$m['rate'] : null, ($m['extra_pct'] ?? '') !== ''); // 🏷️ سعر الصرف بالتصدير أيضاً (2026-09-23)
 // 🧑‍💼 (2026-09-27) الموظف (قانون العمل): النظام/الأقدمية/الوضع العائلي/نهاية الخدمة/الترك بدل الدرجة والصندوق — كالبطاقة (المصدر الواحد employeSlipInfo)
 $rep->period($m['name'] . '  —  ' . ($isAdminEmp ? 'الوظيفة' : 'الشهادة') . ': ' . $m['diploma'] . ' · الفئة: ' . $m['type']
-    . ($isAdminEmp ? ' · النظام: ' . $m['regime'] . ' · الأقدمية: ' . $m['seniority'] . ' · الوضع العائلي: ' . $m['family'] . ' · نهاية الخدمة: ' . $m['eos'] : ' · الدرجة: ' . $m['grade'])
+    . ($isAdminEmp ? ' · النظام: ' . $m['regime'] . ' · الأقدمية: ' . $m['seniority'] . ' · الوضع العائلي: ' . $m['family'] . ' · نهاية الخدمة: ' . $m['eos'] : ($dropGrade ? '' : ' · الدرجة: ' . $m['grade']))
     . ' · ر.الضمان: ' . $m['cnss'] . ($isAdminEmp ? '' : ' · ر.الصندوق: ' . $m['caisse_no']) . ' · ر.المالية: ' . $m['finance_no'] . ($isAdminEmp ? ' · الترك: ' . $m['left'] : '')
     . ($slipRateTxt !== '' ? "\n" . $slipRateTxt : ''));
 // الموظف الإداري: احذف أعمدة الدرجة/التدرّج/الصندوق من الرأس والعرض والصفوف (لا سلسلة رتب له).
-$rep->head(annualDropCols($head, $isAdminEmp));
-$rep->widths(annualDropCols($widths, $isAdminEmp));
-addEmployeeBlock($rep, $slip, false, $isAdminEmp); // الهوية معروضة في period — لا تكرّرها
+$rep->head(annualDropCols($head, $isAdminEmp, $dropGrade));
+$rep->widths(annualDropCols($widths, $isAdminEmp, $dropGrade));
+addEmployeeBlock($rep, $slip, false, $isAdminEmp, $dropGrade); // الهوية معروضة في period — لا تكرّرها
 $rep->export($format);

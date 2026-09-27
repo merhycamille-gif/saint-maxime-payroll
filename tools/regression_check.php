@@ -31,8 +31,9 @@ $GLOBALS['msa_recalc_paid_ok'] = true; // 🔒 أداة فحص = فعل صريح
 // ---------- عارض صفحات داخلي (كل صفحة بعملية فرعية لتفادي إعادة تعريف الدوال) ----------
 // $outFile: للمخرجات الثنائية (xlsx...) — أنبوب shell_exec بويندوز وضع نصي يقصّ عند أول
 // محرف 0x1A، فالثنائي يُكتب لملف عبر إعادة توجيه cmd ويُقرأ من القرص (2026-08-22)
-function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = '', string $schoolYear = '', string $outFile = '', array $files = [], string $dueMode = '', string $netFamMode = ''): string {
+function renderPage(string $rel, array $get, array $comp, array $schoolIds = [], string $currency = '', string $schoolYear = '', string $outFile = '', array $files = [], string $dueMode = '', string $netFamMode = '', string $contractGrade = ''): string {
     global $PROJ;
+    if ($contractGrade !== '') { if ($dueMode === '') $dueMode = 'amount'; if ($netFamMode === '') $netFamMode = 'amount'; } // 🎓 يحفظ ترتيب الوسائط (argv[10])
     if ($netFamMode !== '' && $dueMode === '') $dueMode = 'amount'; // 👨‍👩‍👧➕ يحفظ ترتيب الوسائط (argv[8] المستحق، argv[9] الصافي+العائلي)
     $runner = __DIR__ . '/_render_one.php';
     // الوسائط تمرَّر base64 (اقتباسات JSON تتخربط بسطر أوامر ويندوز)
@@ -56,6 +57,8 @@ $__dm = $argv[8] ?? '';
 if ($__dm !== '') $_SESSION['due_col_mode'] = $__dm; // 💰 حالة عمود المستحق (2026-09-19)
 $__nfm = $argv[9] ?? '';
 if ($__nfm !== '') $_SESSION['netfam_col_mode'] = $__nfm; // 👨‍👩‍👧➕ حالة عمود الصافي + التعويض العائلي (2026-09-20)
+$__cg = $argv[10] ?? '';
+if ($__cg !== '') $_SESSION['contract_grade_mode'] = $__cg; // 🎓 أعمدة الدرجة/التدرّج للمتعاقد hide/show (2026-09-27)
 $__f = json_decode(base64_decode($argv[7] ?? ''), true) ?: [];
 if ($__f) {
     $_SERVER['REQUEST_METHOD'] = 'POST';
@@ -76,7 +79,7 @@ PHP);
     $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner) . ' '
          . escapeshellarg($rel) . ' ' . base64_encode(json_encode($get)) . ' ' . base64_encode(json_encode($comp))
          . ' ' . base64_encode(json_encode($schoolIds)) . ' ' . escapeshellarg($currency) . ' ' . escapeshellarg($schoolYear)
-         . ' ' . base64_encode(json_encode($files)) . ($dueMode !== '' ? ' ' . escapeshellarg($dueMode) : '') . ($netFamMode !== '' ? ' ' . escapeshellarg($netFamMode) : '');
+         . ' ' . base64_encode(json_encode($files)) . ($dueMode !== '' ? ' ' . escapeshellarg($dueMode) : '') . ($netFamMode !== '' ? ' ' . escapeshellarg($netFamMode) : '') . ($contractGrade !== '' ? ' ' . escapeshellarg($contractGrade) : '');
     if ($outFile !== '') {
         @unlink($outFile);
         shell_exec($cmd . ' 2>NUL > ' . escapeshellarg($outFile));
@@ -4821,7 +4824,7 @@ check('ساعات التناقص خانة بملف الأستاذ (للداخل�
       // 🧮 نسبة الإضافي المعطاة له بالبطاقة (طلبه 2026-09-03) بخانة الدرجة نفسها: «38 · 45 %» — الدالة employeeExtraPercentForYear
       && function_exists('employeeExtraPercentForYear') && employeeExtraPercentForYear($db, -1, '2025-2026') === '' && employeeExtraPercentForYear($db, 1, 'all') === ''
       && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "الأجر الإضافي<?= (\$meta['extra_pct'] ?? '') !== '' ? '<br><span dir=\"ltr\">' . e(\$meta['extra_pct']) . ' %</span>' . ((\$meta['new_rates'] ?? '') !== ''") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "<td><span class=\"lbl\">Échelon / الدرجة</span><span class=\"val\"><?= e(\$meta['grade']) ?></span></td>") !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), "<td><span class=\"lbl\">Échelon / الدرجة</span><span class=\"val\"><?= \$noGrade ? '—' : e(\$meta['grade']) ?></span></td>") !== false /* 🎓 2026-09-27: «—» للمتعاقد المخفي (183) */
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'extra_pct'   => employeeExtraPercentForYear(\$db, \$emp['id'], \$schoolYear)") !== false
       // 🧮 (طلبه بعدها) قانون النسبة ظاهر بالبطاقة: تحت «الراتب بعد التدرج» قيمته بالدولار القديم (÷1500 داون) + السعر القديم بترويسته، والسعر الجديد (سعر الشهر) تحت النسبة — لأصحاب النسبة فقط
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'cur_sal_old_usd' => (int)floor(\$curSal / officialUsdRate())") !== false
@@ -6918,17 +6921,18 @@ check('🏷️ سعر الصرف المعتمد بعنوان كل مستند ف�
 
 /**
  * 146) 🏦 «ببطاقة المتعاقد ما لازم يكون فيه عمود لصندوق التعويضات — بس انتبه أوعى تخرب البطاقة» (2026-09-19): $noCaisse = موظف أو متعاقد ⇒
- *      عمودا Caisse ودرجة/نصف راتب مخفيان (المحسومات colspan 3) — الملاك كما هو (5 + Caisse). أعمدة الدرجة/التدرّج تبقى للمتعاقد. لا تغيير آخر.
+ *      عمودا Caisse ودرجة/نصف راتب مخفيان (المحسومات colspan 3) — الملاك كما هو (5 + Caisse). لا تغيير آخر.
+ *      🎓 تحديث 2026-09-27: أعمدة الدرجة/التدرّج للمتعاقد صارت مخفية افتراضياً وتظهر بخيار (راجع 183) — هنا تُرندر بوضع «ظاهرة» لتبقى بقية الفحص كما هي.
  */
 $as146 = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
 $tit146 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0
                            WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
-$sC = $con145 ? renderPage('pages/annual_slip.php', ['employee_id' => $con145, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026') : '';
+$sC = $con145 ? renderPage('pages/annual_slip.php', ['employee_id' => $con145, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026', '', [], '', '', 'show') : '';
 $sT = $tit146 ? renderPage('pages/annual_slip.php', ['employee_id' => $tit146, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026') : '';
 check('🏦 البطاقة السنوية للمتعاقد بلا عمود صندوق التعويضات (المحسومات = ضمان/ضريبة/مجموع، colspan 3، أعمدة الدرجة باقية) — الملاك كما هو (Caisse + colspan 5) — بلا Fatal',
       strpos($as146, "\$noCaisse = \$isEmp || \$emp['employee_type'] === 'enseignant_contractuel';") !== false
       && strpos($as146, '<th colspan="<?= $noCaisse ? 3 : 5 ?>" class="deduction-header">') !== false
-      && substr_count($as146, '<?php if (!$noCaisse): ?>') === 3 && strpos($as146, "(\$isEmp ? 9 : (\$noCaisse ? 11 : 13)) + compColsCount() + (\$showDue ? 1 : 0)") !== false
+      && substr_count($as146, '<?php if (!$noCaisse): ?>') === 3 && strpos($as146, "(\$noGrade ? 9 : (\$noCaisse ? 11 : 13)) + compColsCount() + (\$showDue ? 1 : 0)") !== false
       && $con145 && $tit146 && strpos($sC, 'FATAL') === false && strpos($sT, 'FATAL') === false
       && strpos($sC, 'deduction-header">Caisse') === false && strpos($sC, 'colspan="3" class="deduction-header"') !== false && strpos($sC, 'Valeur échelon<br>قيمة الدرجة') !== false
       && strpos($sT, 'deduction-header">Caisse') !== false && strpos($sT, 'colspan="5" class="deduction-header"') !== false,
@@ -7008,7 +7012,7 @@ check('💰 عمود المستحق بثلاث حالات (كود + تشغيل �
       && substr_count($of148, 'dueHead(') === 3 && substr_count($of148, 'dueCell(') === 2 && substr_count($of148, 'dueTotalCell(') === 2 && substr_count($of148, 'dueTd(') === 2
       && strpos($of148, 'colspan="<?= 16 + compColsCount() + dueColsCount() + netFamColsCount() ?>"') !== false && strpos($of148, 'colspan="<?= 8 + compColsCount() + dueColsCount() + netFamColsCount() ?>"') !== false && strpos($of148, '$sdCols = 16 + compColsCount() + dueColsCount() + netFamColsCount();') !== false
       && strpos($rp148, '<?= transportHead() ?><?= dueHead() ?>') !== false && substr_count($rp148, 'dueTd(') === 2 && strpos($rp148, '($multi?17:16) + compColsCount() + dueColsCount()') !== false
-      && strpos($as148, "\$showDue = dueColShown(); \$dueAmt = (dueColMode() === 'amount');") !== false && strpos($as148, '.salary-slip-table .due-blank { min-width: 130px; }') !== false && substr_count($as148, '<?php if ($showDue): ?>') === 3 && strpos($as148, "(\$isEmp ? 9 : (\$noCaisse ? 11 : 13)) + compColsCount() + (\$showDue ? 1 : 0)") !== false
+      && strpos($as148, "\$showDue = dueColShown(); \$dueAmt = (dueColMode() === 'amount');") !== false && strpos($as148, '.salary-slip-table .due-blank { min-width: 130px; }') !== false && substr_count($as148, '<?php if ($showDue): ?>') === 3 && strpos($as148, "(\$noGrade ? 9 : (\$noCaisse ? 11 : 13)) + compColsCount() + (\$showDue ? 1 : 0)") !== false
       && strpos($ax148, "if (!dueColShown())              \$d[] = 16;") !== false /* 👨‍👩‍👧➕ 2026-09-20: العمود 14 صار الصافي+العائلي */ && substr_count($ax148, "dueColMode() === 'amount' ?") === 2
       && strpos($rx148, "if (dueColShown()) { \$head[] = 'الإجمالي المتوجب'; \$w[] = 18; }") !== false && substr_count($rx148, "if (dueColShown()) \$row[] = dueColMode() === 'amount' ?") === 2,
       $why148 ?: 'ok ths=' . json_encode($ths148 ?? []));
@@ -8422,6 +8426,53 @@ if ($t182) {
         && strpos($tT, 'Classes / الصفوف') !== false && strpos($tT, 'Échelon / الدرجة') !== false && strpos($tT, 'N° Caisse / رقم صندوق التعويضات') !== false && strpos($tT, 'Régime /') === false && strpos($tT, 'Ancienneté') === false);
 } else $c182('no-teacher-sample', false);
 check('🧑‍💼 بطاقة الموظف (قانون العمل) (2026-09-27): لا تاريخ ملاك/مواد/صفوف/درجة/صندوق — النظام/الأقدمية/الوضع العائلي/نهاية الخدمة/الترك بنفس الـ12 خانة + منطق المصدر الواحد (64/الترك/الحد الأدنى) + بطاقة الأستاذ كما هي', $ok182, implode(' · ', $why182) ?: 'ok');
+
+/* =====================================================================
+ * 183) 🎓 أعمدة الدرجة/التدرّج للمتعاقد — «المتعاقد عندو درجة وراتب بعد التدرّج؟ برأيك» ⇒ لا (السلسلة للملاك) — «موافق بس بشرط إذا بدي ياها
+ *      يكون عندي خيار حطّها» (2026-09-27): مخفية افتراضياً (عمودا قيمة الدرجة/بعد التدرّج + خانة الدرجة «—») وخيار «أعمدة الدرجة والتدرّج للمتعاقد»
+ *      بقائمة «الراتب يشمل» (contract_grade_mode بالجلسة) يظهرها — الملاك كما هو، الموظف بلا درجة دائماً. إكسل المفرد يتبع الخيار (الجماعي رأس واحد كما هو).
+ * =================================================================== */
+$ok183 = true; $why183 = [];
+$c183 = function (string $n, bool $ok) use (&$ok183, &$why183) { if (!$ok) { $ok183 = false; $why183[] = $n; } };
+$as183 = (string)file_get_contents($PROJ . '/pages/annual_slip.php'); $ex183 = (string)file_get_contents($PROJ . '/pages/annual_slip_export.php');
+$c183('source', function_exists('slipHidesGradeCols') && function_exists('contractGradeColsMode')
+    && strpos($as183, "\$noGrade = slipHidesGradeCols(\$emp);") !== false && substr_count($as183, '<?php if (!$noGrade): ?>') === 3 && strpos($as183, '<?php if (!$isEmp): ?>') === false
+    && strpos($as183, "<?= \$noGrade ? '—' : e(\$meta['grade']) ?>") !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'name="contract_grade_mode"') !== false
+    && strpos((string)file_get_contents($PROJ . '/switch_salarycomp.php'), "\$_SESSION['contract_grade_mode'] = (string)\$_GET['contract_grade_mode']") !== false
+    && strpos($ex183, "\$dropGrade = !\$isAdminEmp && slipHidesGradeCols(\$emp);") !== false && strpos($ex183, "addEmployeeBlock(\$rep, \$slip, false, \$isAdminEmp, \$dropGrade);") !== false);
+unset($_SESSION['contract_grade_mode']);
+$c183('logic', slipHidesGradeCols(['employee_type' => 'employe']) && slipHidesGradeCols(['employee_type' => 'enseignant_contractuel']) && !slipHidesGradeCols(['employee_type' => 'enseignant_titulaire']) && contractGradeColsMode() === 'hide');
+$_SESSION['contract_grade_mode'] = 'show';
+$c183('logic-show', slipHidesGradeCols(['employee_type' => 'employe']) && !slipHidesGradeCols(['employee_type' => 'enseignant_contractuel']) && !slipHidesGradeCols(['employee_type' => 'enseignant_titulaire']));
+unset($_SESSION['contract_grade_mode']);
+$con183 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0
+                           WHERE e.employee_type = 'enseignant_contractuel' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
+$slipInfo183 = function (string $h) { return preg_match('#<table class="slip-info">.*?</table>#su', $h, $mm) === 1 ? $mm[0] : ''; };
+if ($con183) {
+    $hH = renderPage('pages/annual_slip.php', ['employee_id' => $con183, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026');
+    $hS = renderPage('pages/annual_slip.php', ['employee_id' => $con183, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026', '', [], '', '', 'show');
+    $tH = $slipInfo183($hH); $tS = $slipInfo183($hS);
+    $c183('contract-hidden-default', $noFatal($hH) && strpos($hH, 'Valeur échelon') === false && strpos($hH, 'Après échelon') === false && strpos($hH, 'deduction-header">Caisse') === false
+        && $tH !== '' && substr_count($tH, '<td>') === 12 && preg_match('#Échelon / الدرجة</span><span class="val">—</span>#u', $tH) === 1);
+    $c183('contract-shown-by-option', $noFatal($hS) && strpos($hS, 'Valeur échelon') !== false && strpos($hS, 'Après échelon') !== false && strpos($hS, 'deduction-header">Caisse') === false
+        && $tS !== '' && substr_count($tS, '<td>') === 12 && preg_match('#Échelon / الدرجة</span><span class="val">—</span>#u', $tS) === 0);
+    // عدد أعمدة صفّ المجموع = عدد رؤوس الجدول (الأرقام راكبة)
+    $cnt = function (string $h) { preg_match('#<tr class="total-row">.*?</tr>#su', $h, $tr); return substr_count($tr[0] ?? '', '<td'); };
+    $c183('contract-cols-consistent', $cnt($hS) === $cnt($hH) + 2);
+    // الإكسل المفرد يتبع الخيار
+    $xH = renderPage('pages/annual_slip_export.php', ['employee_id' => $con183, 'school_year' => '2025-2026', 'format' => 'xlsx'], ['extra', 'aide'], [3], 'both', '2025-2026', $PROJ . '/tools/_r183.xlsx');
+    $xS = renderPage('pages/annual_slip_export.php', ['employee_id' => $con183, 'school_year' => '2025-2026', 'format' => 'xlsx'], ['extra', 'aide'], [3], 'both', '2025-2026', $PROJ . '/tools/_r183b.xlsx', [], '', '', 'show');
+    $sheet = function (string $bin) { $tmp = tempnam(sys_get_temp_dir(), 'r183'); file_put_contents($tmp, $bin); $z = new ZipArchive(); $x = ''; if ($z->open($tmp) === true) { $x = (string)$z->getFromName('xl/worksheets/sheet1.xml'); $z->close(); } @unlink($tmp); return html_entity_decode($x, ENT_QUOTES | ENT_XML1, 'UTF-8'); };
+    $shH = $sheet($xH); $shS = $sheet($xS);
+    $c183('excel-follows-option', $shH !== '' && strpos($shH, 'قيمة الدرجة') === false && strpos($shH, '· الدرجة:') === false && $shS !== '' && strpos($shS, 'قيمة الدرجة') !== false && strpos($shS, '· الدرجة:') !== false);
+} else $c183('no-contract-sample', false);
+// الملاك كما هو + الموظف بلا درجة حتى بوضع «ظاهرة»
+$tit183 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
+if ($tit183) { $hT = renderPage('pages/annual_slip.php', ['employee_id' => $tit183, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026'); $c183('titulaire-unchanged', $noFatal($hT) && strpos($hT, 'Valeur échelon') !== false && strpos($hT, 'deduction-header">Caisse') !== false && preg_match('#Échelon / الدرجة</span><span class="val">[0-9.]+</span>#u', $hT) === 1); } else $c183('no-titulaire', false);
+$emp183 = $db->query("SELECT e.id, e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'employe' AND e.is_deleted = 0 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($emp183) { $hE = renderPage('pages/annual_slip.php', ['employee_id' => (int)$emp183['id'], 'school_year' => '2025-2026'], ['extra', 'aide'], [(int)$emp183['school_id']], 'both', '2025-2026', '', [], '', '', 'show'); $c183('employe-never', $noFatal($hE) && strpos($hE, 'Valeur échelon') === false && strpos($hE, 'Régime / النظام') !== false); } else $c183('no-employe', false);
+check('🎓 أعمدة الدرجة/التدرّج للمتعاقد (2026-09-27): مخفية افتراضياً (+ خانة الدرجة «—») وتظهر بخيار «أعمدة الدرجة والتدرّج للمتعاقد» — الملاك كما هو، الموظف بلا درجة دائماً، إكسل المفرد يتبع الخيار — تجربة حيّة', $ok183, implode(' · ', $why183) ?: 'ok');
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

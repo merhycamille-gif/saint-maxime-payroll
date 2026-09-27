@@ -15,6 +15,8 @@ if (isset($_GET['transport_mode'])) {
 if (isset($_GET['due_mode']) && in_array((string)$_GET['due_mode'], ['none', 'blank', 'amount'], true)) $_SESSION['due_col_mode'] = (string)$_GET['due_mode'];
 // 👨‍👩‍👧➕ عمود «الصافي + التعويض العائلي» بثلاث حالات (2026-09-20): none / blank / amount — عرض فقط
 if (isset($_GET['netfam_mode']) && in_array((string)$_GET['netfam_mode'], ['none', 'blank', 'amount'], true)) $_SESSION['netfam_col_mode'] = (string)$_GET['netfam_mode'];
+// 🎓 أعمدة الدرجة/التدرّج للمتعاقد (2026-09-27): hide (الافتراضي) / show — عرض فقط
+if (isset($_GET['contract_grade_mode']) && in_array((string)$_GET['contract_grade_mode'], ['hide', 'show'], true)) $_SESSION['contract_grade_mode'] = (string)$_GET['contract_grade_mode'];
 $_SESSION['salary_comp'] = $comp;
 header('Location: ' . safeBackUrl());
 exit;

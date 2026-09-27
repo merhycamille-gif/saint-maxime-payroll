@@ -587,6 +587,13 @@ document.addEventListener('submit', function (e) {
                                     <option value="amount" <?= $nfmH==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
                                 </select>
                             </label>
+                            <?php $cgH = contractGradeColsMode(); // 🎓 أعمدة الدرجة/التدرّج للمتعاقد (2026-09-27): مخفية افتراضياً + خيار إظهارها ?>
+                            <label style="display:block;font-size:12px;color:#4c1d95;padding:4px 4px 2px"><i class="fas fa-graduation-cap"></i> <?= $lang==='ar'?'أعمدة الدرجة والتدرّج للمتعاقد':'Colonnes échelon (contractuel)' ?>
+                                <select name="contract_grade_mode" class="form-control form-control-sm" style="margin-top:3px">
+                                    <option value="hide" <?= $cgH==='hide'?'selected':'' ?>><?= $lang==='ar'?'مخفية (المتعاقد بلا درجة)':'Masquées (pas d’échelon)' ?></option>
+                                    <option value="show" <?= $cgH==='show'?'selected':'' ?>><?= $lang==='ar'?'ظاهرة':'Affichées' ?></option>
+                                </select>
+                            </label>
                             <div style="font-size:11px;color:#64748b;padding:2px 4px 6px"><?= $lang==='ar'?'الأساس + الدرجة يبقى دائماً':'Base + échelon toujours inclus' ?></div>
                             <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> Appliquer / تطبيق</button>
                         </form>

@@ -5506,6 +5506,22 @@ function netFamColsCount(): int { return netFamColShown() ? 1 : 0; }
 /** الصافي + التعويض العائلي لصفّ راتب مخزّن (المصدر الواحد) */
 function netFamLbp(array $r): int { return (int)($r['net_salary_lbp'] ?? 0) + (int)($r['family_allowance_lbp'] ?? 0); }
 
+/** 🎓 أعمدة «قيمة الدرجة» و«الراتب بعد التدرّج» ببطاقة **المتعاقد** — (2026-09-27 «المتعاقد عندو درجة وراتب بعد التدرّج؟» ⇒ لا: الدرجة
+ *  والتدرّج من سلسلة الرتب للملاك فقط، والمتعاقد راتبه عقده — «موافق بس بشرط إذا بدي ياها يكون عندي خيار حطّها»):
+ *  'hide' = مخفية (الافتراضي) · 'show' = ظاهرة. عرض فقط بالبطاقة السنوية وإكسلها — لا يمسّ أي حساب ولا الملاك ولا الموظف. */
+function contractGradeColsMode(): string {
+    $m = (string)($_SESSION['contract_grade_mode'] ?? 'hide');
+    return $m === 'show' ? 'show' : 'hide';
+}
+function contractGradeColsShown(): bool { return contractGradeColsMode() === 'show'; }
+/** هل تُخفى أعمدة الدرجة/التدرّج لهذا الشخص بالبطاقة؟ الموظف دائماً؛ المتعاقد إلا إذا اختار المستخدم إظهارها؛ الملاك أبداً. */
+function slipHidesGradeCols(array $emp): bool {
+    $t = (string)($emp['employee_type'] ?? '');
+    if ($t === 'employe') return true;
+    if ($t === 'enseignant_contractuel') return !contractGradeColsShown();
+    return false;
+}
+
 /* 🏥👨‍👩‍👧 (2026-09-25 «التعويضات العائلية للموظفين الخاضعين لقانون العمل لازم تنحطّ بتصاريح الضمان الشهرية والفصلية —
  *  وتعويضات الأساتذة الخاضعين لقانون المعلمين بتبيّن بكل التقارير ما عدا تصاريح وتقارير الضمان»):
  *  بكل مستند/تصريح للضمان، «التعويضات العائلية المدفوعة» (التي تُحسم من المتوجّب للصندوق) = تعويضات الموظفين
