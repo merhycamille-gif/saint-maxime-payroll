@@ -689,9 +689,23 @@ function reportDocThumb($path) {
                     <?php reportSchoolPicker(); ?>
                 </div>
                 <label class="form-label" style="margin-top:14px;display:block">📋 المعلومات اللي بدّك ياها بالتقرير / Colonnes à afficher:</label>
-                <div class="school-checks" style="display:flex;flex-wrap:wrap;gap:8px 18px">
-                    <?php foreach ($availCols as $k => $c): ?>
+                <?php /* ☑️ (2026-09-27 p1) مجموعات مُعنونة بشبكة مرصوفة بدل الرصّ الحرّ — كل معلومة بخانتها */
+                $colGroups = [
+                    ['Identité / الهوية',                 ['code', 'name', 'name_ar', 'type', 'birth', 'social']],
+                    ['Poste & salaire / الوظيفة والراتب',  ['diploma', 'grade', 'salary', 'extra_wage', 'aide', 'transport', 'composed', 'hours', 'days']],
+                    ['Numéros officiels / الأرقام الرسمية', ['nssf', 'mof', 'caisse']],
+                    ['Dates / التواريخ',                    ['hire', 'titul']],
+                    ['Contact / الاتصال',                   ['phone', 'email', 'address']],
+                    ['Dossier & statut / الملف والحالة',    ['status', 'gaps', 'submit_status', 'diploma_img', 'civil_img']],
+                ];
+                $grouped = array_merge(...array_map(fn($g) => $g[1], $colGroups)); $rest = array_diff(array_keys($availCols), $grouped); if ($rest) $colGroups[] = ['Autres / أخرى', array_values($rest)]; ?>
+                <div class="school-checks">
+                    <?php foreach ($colGroups as [$gTitle, $gKeys]): ?>
+                    <div class="chk-group"><div class="chk-group-title"><?= e($gTitle) ?></div>
+                        <?php foreach ($gKeys as $k): if (!isset($availCols[$k])) continue; $c = $availCols[$k]; ?>
                         <label class="chk"><input type="checkbox" name="cols[]" value="<?= $k ?>" <?= in_array($k, $selectedCols, true) ? 'checked' : '' ?>> <?= e($c[0]) ?></label>
+                        <?php endforeach; ?>
+                    </div>
                     <?php endforeach; ?>
                 </div>
                 <button class="btn btn-primary" style="margin-top:14px"><i class="fas fa-filter"></i> عرض التقرير / Afficher</button>
@@ -779,15 +793,15 @@ function reportDocThumb($path) {
                 <?php empTypePicker(); ?>
                 <div class="form-group mb-0" style="grid-column:1 / -1">
                     <label class="form-label"><i class="fas fa-list-check"></i> Rubriques du rapport / بنود التقرير — <small class="text-muted">اختر ما تريده بالتقرير (الكل افتراضياً)</small></label>
-                    <div class="school-checks at-items" style="flex-wrap:wrap;gap:6px 14px">
+                    <div class="school-checks at-items">
                         <label class="chk all"><input type="checkbox" onclick="atToggleAll(this)" <?= count($atSel) === count($atItems) ? 'checked' : '' ?>> <strong>Toutes / الكل</strong></label>
                         <?php foreach ($atGroups as $gk => $gl): ?>
-                            <span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 8px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0">
-                                <strong style="color:#1F4E5F;font-size:12px"><?= e($gl[0]) ?> / <?= e($gl[1]) ?>:</strong>
+                            <div class="chk-group"><?php /* ☑️ (2026-09-27 p1) مجموعة مُعنونة بالشبكة المرصوفة */ ?>
+                                <div class="chk-group-title"><?= e($gl[0]) ?> / <?= e($gl[1]) ?></div>
                                 <?php foreach ($atItems as $k => $it): if ($it['g'] !== $gk) continue; ?>
                                     <label class="chk" style="margin:0"><input type="checkbox" name="items[]" value="<?= e($k) ?>" onclick="atOnCheck()" <?= in_array($k, $atSel, true) ? 'checked' : '' ?>> <?= e($it['ar']) ?></label>
                                 <?php endforeach; ?>
-                            </span>
+                            </div>
                         <?php endforeach; ?>
                     </div>
                 </div>

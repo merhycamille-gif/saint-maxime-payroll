@@ -8538,6 +8538,25 @@ $xS = $tit184 ? $sheet184(renderPage('pages/annual_slip_export.php', ['employee_
 $c184('excel', strpos($xM, 'الأجير 3 %') !== false && strpos($xM, 'المدرسة 8 %') !== false && strpos($xA, 'الضمان — الأجير 3 % (ل.ل)') !== false && strpos($xS, 'Caisse 6 % / الصندوق') !== false && strpos($xS, 'CNSS 3 % / الضمان') !== false);
 check('📊 نِسَب الاشتراكات تحت عناوين الأعمدة من الجدول المؤرَّخ (2026-09-27): البطاقة (+إكسل) · الشهري · الضمان · الصندوق · المجاميع السنوية (+إكسل) · salary_all · التقرير العام · السجلّ · التفصيل — الضريبة ودرجة/نصف راتب بلا نسبة — مؤرَّخة (صفّ مؤقّت 2090) — النماذج الرسمية كما هي', $ok184, implode(' · ', $why184) ?: 'ok');
 
+/* =====================================================================
+ * 185) ☑️ ترتيب مجموعات التشييك (p1 2026-09-27 «عم ضيع بأي محل بدي حطّ تشاك مارك — رتّب كل شي هيك موجود بالبرنامج»): الصنف الواحد
+ *      .school-checks شبكة أعمدة مرصوفة (auto-fill 230px، المدارس 330px)، «الكل» سطر كامل، والمجموعات المُعنونة (.chk-group) بنفس الأعمدة —
+ *      معلومات تقرير الموظفين بـ6 مجموعات، بنود المجاميع السنوية بمجموعاتها، ولا رصّ حرّ (inline flex) باقٍ.
+ * =================================================================== */
+$css185 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $rp185 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$hEl185 = renderPage('pages/reports.php', ['report' => 'employee_list'], [], [], 'lbp', '2025-2026');
+$hAt185 = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026'], [], [3], 'lbp', '2025-2026');
+check('☑️ مجموعات التشييك شبكة مرصوفة بكل البرنامج (2026-09-27 p1): .school-checks grid + «الكل» سطر كامل + مجموعات مُعنونة (تقرير الموظفين 6 مجموعات، بنود المجاميع) — بلا رصّ حرّ',
+      (strpos($css185, ".school-checks {\n    display: grid;") !== false || strpos($css185, ".school-checks {\r\n    display: grid;") !== false)
+      && strpos($css185, 'grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));') !== false && strpos($css185, '.school-checks .chk.all { grid-column: 1 / -1;') !== false
+      && strpos($css185, '.school-checks .chk-group { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid;') !== false
+      && strpos($css185, 'input[name="schools[]"]) { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }') !== false
+      && strpos($rp185, 'class="school-checks" style="display:flex') === false && strpos($rp185, 'class="school-checks at-items" style=') === false
+      && strpos($rp185, "['Identité / الهوية',") !== false && strpos($rp185, "['Numéros officiels / الأرقام الرسمية', ['nssf', 'mof', 'caisse']],") !== false
+      && $noFatal($hEl185) && substr_count($hEl185, 'class="chk-group-title"') === 6 && substr_count($hEl185, 'name="cols[]"') === 28
+      && $noFatal($hAt185) && substr_count($hAt185, 'class="chk-group-title"') >= 6 && strpos($hAt185, '<span style="display:inline-flex') === false,
+      'cols=' . substr_count($hEl185, 'name="cols[]"') . ' groups=' . substr_count($hEl185, 'class="chk-group-title"') . ' at-groups=' . substr_count($hAt185, 'class="chk-group-title"'));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

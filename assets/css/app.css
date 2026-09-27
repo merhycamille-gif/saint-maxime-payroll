@@ -947,15 +947,27 @@ input:checked + .slider:before { transform: translateX(20px); }
 .school-switcher select:focus { outline: none; box-shadow: none; border: none !important; }
 
 /* Report school picker (checkboxes) */
+/* ☑️ (2026-09-27 p1 «عم ضيع بأي محل بدي حطّ تشاك مارك — رتّب كل شي هيك موجود بالبرنامج»): كل مجموعات التشييك بالبرنامج
+   (المدارس، الفئة، معلومات التقرير، بنود المجاميع، فئات التعويض…) شبكة أعمدة مرصوفة بعرض ثابت بدل الرصّ الحرّ —
+   كل خيار بخانته تحت اللي فوقه، و«الكل» بسطر لحاله فوق الشبكة. المصدر الواحد: هذا الصنف. */
 .school-checks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 4px 10px;
+    align-items: center;
     padding: 10px 12px;
     border: 1px solid var(--gray-200, #e2e8f0);
     border-radius: var(--radius, 8px);
     background: var(--gray-50, #f8fafc);
 }
+/* أسماء المدارس طويلة ⇒ خانات أعرض */
+.school-checks.msa-school-pick, .school-checks:has(input[name="schools[]"]) { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+/* «الكل» سطر كامل فوق الشبكة بفاصل */
+.school-checks .chk.all { grid-column: 1 / -1; border-right: none; padding-right: 8px; border-bottom: 1px solid var(--gray-300, #cbd5e1); border-radius: 0; margin-bottom: 4px; padding-bottom: 6px; }
+/* مجموعة مُعنونة داخل الشبكة (بنود المجاميع السنوية، معلومات تقرير الموظفين): عنوانها سطر كامل وخياراتها بنفس الأعمدة */
+.school-checks .chk-group { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; gap: inherit; padding: 6px 8px 8px; border: 1px solid var(--gray-200, #e2e8f0); border-radius: 8px; background: #fff; }
+.school-checks .chk-group > .chk-group-title { grid-column: 1 / -1; color: #1F4E5F; font-size: 12px; font-weight: 700; padding: 0 4px 2px; border-bottom: 1px dashed var(--gray-200, #e2e8f0); }
+@supports not (grid-template-columns: subgrid) { .school-checks .chk-group { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); } }
 .school-checks .chk {
     display: inline-flex;
     align-items: center;
@@ -966,7 +978,6 @@ input:checked + .slider:before { transform: translateX(20px); }
     border-radius: 6px;
 }
 .school-checks .chk:hover { background: var(--gray-100, #f1f5f9); }
-.school-checks .chk.all { border-right: 1px solid var(--gray-300, #cbd5e1); padding-right: 14px; }
 
 /* Selected-schools banner (shows on print) */
 .report-scope {
