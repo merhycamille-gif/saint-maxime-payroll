@@ -647,12 +647,12 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
     if (!$emp) { echo "<div class='alert alert-danger'>Employé introuvable dans cette école</div>"; include __DIR__ . '/../includes/footer.php'; exit; }
 ?>
     <div class="card no-print" style="margin-bottom:14px">
-        <div class="card-body" style="display:flex;flex-wrap:wrap;gap:10px;align-items:end">
+        <div class="card-body att-opts" style="padding:8px 14px"><?php /* ☑️📐 (2026-09-27 «رتّب كل البرنامج») سطران مرتّبان: الاحتساب ثم التصدير والطباعة — الأزرار نفسها */ ?>
+            <div class="att-row wide"><strong class="att-k"><i class="fas fa-calculator"></i> Calcul / احتساب:</strong>
             <a href="?action=calc_year&employee_id=<?= $employeeId ?>&school_year=<?= e($schoolYear) ?>" class="btn btn-gold"
                onclick="return confirm('احسب رواتب كل أشهر السنة لهذا الأستاذ؟')">
                 <i class="fas fa-calculator"></i> احسب كل الأشهر / Toute l'année
             </a>
-            <span style="color:var(--gray-400)">|</span>
             <form method="GET" style="display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin:0">
                 <input type="hidden" name="action" value="calc_range">
                 <input type="hidden" name="employee_id" value="<?= $employeeId ?>">
@@ -669,7 +669,8 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
                     <input type="number" name="to_y" class="form-control" value="<?= $y2 ?>" style="width:90px"></div>
                 <button class="btn btn-secondary"><i class="fas fa-calculator"></i> احسب الفترة / Période</button>
             </form>
-            <span style="flex:1"></span>
+            </div>
+            <div class="att-row wide"><strong class="att-k"><i class="fas fa-print"></i> Export / تصدير وطباعة:</strong>
             <?php
                 $expQ = 'employee_id=' . $employeeId . '&school_year=' . urlencode($schoolYear);
                 // «PDF رسمي» = طبق الأصل عن الشاشة عبر Chrome (نفس تصميم الكشف بالضبط، بلا قصّ)
@@ -685,6 +686,7 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <a href="?<?= $expQ ?>&blank=1" class="btn btn-warning" title="بطاقة هذا الأستاذ بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierge (montants) / فاضية من المبالغ</a>
             <a href="?<?= $expQ ?>&blank=2" class="btn btn-warning" title="نموذج فارغ بلا اسم ولا مبالغ — لأي أستاذ"><i class="fas fa-file"></i> Formulaire vierge / نموذج فارغ لأي أستاذ</a>
             <?php endif; ?>
+            </div>
         </div>
     </div>
     <?php if ($slipBlank): ?><div class="alert alert-warning no-print" style="margin-bottom:12px">📝 <?= $slipBlank === 2 ? 'نموذج فارغ لأي أستاذ (بلا اسم ولا مبالغ)' : 'بطاقة هذا الأستاذ بلا مبالغ' ?> — للتعبئة باليد. الحساب والبطاقة العادية لم يُمَسّا.</div><?php endif; ?>

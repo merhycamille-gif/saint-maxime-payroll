@@ -177,8 +177,9 @@ include __DIR__ . '/../includes/header.php';
       <div><span class="badge" style="background:#0a7a37;color:#fff;font-size:14px"><i class="fas fa-user-plus"></i> Nouveaux / جدد</span> <strong style="font-size:20px"><?= $gNew ?></strong></div>
       <?php /* 🧹 زرّ «طباعة» أُزيل — مكرّر مع شريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
     </div>
-    <div style="margin-top:12px;border-top:1px solid var(--gray-200);padding-top:12px;display:flex;gap:8px 16px;flex-wrap:wrap;align-items:center">
-      <span style="font-weight:700;color:var(--gray-600)"><i class="fas fa-calendar-days"></i> Année de mise à jour / سنة التحديث:</span>
+    <div class="att-opts" style="margin-top:12px;border-top:1px solid var(--gray-200);padding-top:8px"><?php /* ☑️📐 (2026-09-27) صفوف مرتّبة */ ?>
+    <div class="att-row wide">
+      <strong class="att-k"><i class="fas fa-calendar-days"></i> Année de mise à jour / سنة التحديث:</strong>
       <form method="GET" style="display:inline-flex;align-items:center;gap:6px;margin:0">
         <input type="hidden" name="show" value="<?= e($show) ?>">
         <select name="sy" class="form-select" style="width:auto;min-width:170px" onchange="this.form.submit()">
@@ -192,8 +193,8 @@ include __DIR__ . '/../includes/header.php';
         <small style="color:var(--gray-500)">التحديث محسوب من 1/7/<?= (int)$sy1 ?> حتى 30/6/<?= (int)$sy2 ?> (إرسال الصيف يُحسب للسنة الجاية)</small>
       <?php endif; ?>
     </div>
-    <div style="margin-top:12px;border-top:1px solid var(--gray-200);padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <span style="font-weight:700;color:var(--gray-600)"><i class="fas fa-filter"></i> Afficher / imprimer — اعرض / اطبع:</span>
+    <div class="att-row wide">
+      <strong class="att-k"><i class="fas fa-filter"></i> Afficher / imprimer — اعرض / اطبع:</strong>
       <?php foreach ($showLabels as $key => $lbl):
         $on = ($show === $key);
         $icon = ['all'=>'fa-list','sent'=>'fa-check','notsent'=>'fa-hourglass-half','new'=>'fa-user-plus'][$key];
@@ -201,6 +202,7 @@ include __DIR__ . '/../includes/header.php';
         <a href="<?= BASE_URL ?>pages/info_status.php?show=<?= $key ?>&sy=<?= e($selYear) ?>"
            class="btn btn-sm <?= $on ? 'btn-success' : 'btn-light' ?>"><i class="fas <?= $icon ?>"></i> <?= e($lbl) ?></a>
       <?php endforeach; ?>
+    </div>
     </div>
   </div>
 </div>

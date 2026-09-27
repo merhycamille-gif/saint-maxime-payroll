@@ -964,6 +964,7 @@ if ($action === 'list') {
         <div class="card-body">
             <form method="GET" class="form-row cols-4 mb-4">
                 <div class="form-group mb-0">
+                    <label class="form-label"><i class="fas fa-magnifying-glass"></i> Recherche / بحث</label><?php /* ☑️📐 (2026-09-27) تسمية كباقي الخانات — الصفّ مرصوف */ ?>
                     <div id="empSearchBox" style="position:relative">
                         <input type="text" name="q" id="empSearchInput" class="form-control" placeholder="🔍 Nom ou téléphone / اكتب أوّل حرف من الاسم أو رقم الهاتف..." value="<?= e($search) ?>" autocomplete="off">
                         <div id="empSearchPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--gray-200,#e2e8f0);border-radius:10px;box-shadow:0 10px 30px rgba(15,23,42,.12);max-height:380px;overflow:auto;z-index:60;text-align:right"></div>
@@ -1012,6 +1013,7 @@ if ($action === 'list') {
                 </div>
                 <?= empTypeCheckboxes($typeState, false, 'type') /* ☑️ (2026-09-25) خانات تشييك: المشيّكة فقط تبيّن */ ?>
                 <div class="form-group mb-0">
+                    <label class="form-label"><i class="fas fa-toggle-on"></i> Statut / الحالة</label>
                     <select name="status" class="form-select">
                         <option value="">Tous statuts / كل الحالات</option>
                         <option value="actif" <?= $statusFilter === 'actif' ? 'selected' : '' ?>>Actif / نشط</option>

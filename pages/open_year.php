@@ -375,6 +375,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
         <div style="font-size:13px;line-height:1.8;margin-bottom:8px">كل التقارير والإفادات والقسائم ولوحة القيادة تفتح افتراضياً على هذه السنة. تتبدّل <b>تلقائياً</b> بمجرّد فتح السنة الجديدة من الأسفل، وفيك تبدّلها هون يدوياً إذا احتجت.</div>
         <form method="POST" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <?= csrfField() ?><input type="hidden" name="action" value="set_program_year">
+            <label class="form-label" style="margin:0;font-weight:700">Année du programme / سنة البرنامج</label><?php /* ☑️📐 (2026-09-27) تسمية */ ?>
             <select name="program_year" class="form-select" style="max-width:220px">
                 <option value="auto" <?= $pyForced === '' ? 'selected' : '' ?>>حسب التقويم (<?= e(calendarSchoolYear()) ?>)</option>
                 <?php for ($yy = $startN + 2; $yy >= $startN; $yy--): $sy = $yy . '-' . ($yy + 1); ?>

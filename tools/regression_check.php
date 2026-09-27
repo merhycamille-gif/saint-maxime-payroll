@@ -6472,7 +6472,7 @@ check('عمود النقل الثلاثي (كود): الدوال المركزي�
       strpos($fn135, 'function transportColMode(): string {') !== false
       && strpos($fn135, 'function transportColShown(): bool { return transportColMode() !== \'none\'; }') !== false
       && strpos($fn135, 'function transportTd(string $html, string $attrs = \' class="num"\'): string {') !== false
-      && strpos($fn135, '<select name="transport_mode" onchange="this.form.submit()">') !== false
+      && strpos($fn135, '<select name="transport_mode" onchange="this.form.submit()" class="scb-sel">') /* ☑️📐 2026-09-27 صفوف مرتّبة */ !== false
       && strpos($fn135, "if (\$withTransport) \$n += transportColShown() ? 1 : 0;") !== false
       && strpos($rh135, "return transportColShown() ? '<th' . \$attrs . '>' . \$label . '</th>' : '';") !== false
       && strpos($rh135, "return transportTd(money((int)(\$r['transport_lbp'] ?? 0), rowRate(\$r), ['withCur' => false]), \$num ? ' class=\"num\"' : '');") !== false
@@ -7007,7 +7007,7 @@ foreach (['amount', 'blank', 'none'] as $dm) {
 if (!isset($ths148['amount'], $ths148['none']) || $ths148['amount'] - $ths148['none'] !== 1 || $ths148['blank'] !== $ths148['amount']) { $ok148 = false; $why148 .= ' ths=' . json_encode($ths148 ?? []); }
 check('💰 عمود المستحق بثلاث حالات (كود + تشغيل فعلي بالكشف الشهري وsalary_all والبطاقة السنوية للمتعاقد: بالمبلغ/فارغ/غير موجود، عمود واحد يزيد أو ينقص فقط، بلا Fatal)',
       $ok148 && function_exists('dueColMode') && function_exists('dueTd') && function_exists('dueHead') && function_exists('dueCell') && function_exists('dueTotalCell')
-      && strpos($fn148, '<select name="due_mode" onchange="this.form.submit()">') !== false && strpos($hd148, '<select name="due_mode" class="form-control form-control-sm"') !== false
+      && strpos($fn148, '<select name="due_mode" onchange="this.form.submit()" class="scb-sel">') !== false && strpos($hd148, '<select name="due_mode" class="form-control form-control-sm"') !== false
       && strpos((string)file_get_contents($PROJ . '/switch_salarycomp.php'), "\$_SESSION['due_col_mode'] = (string)\$_GET['due_mode'];") !== false
       && substr_count($of148, 'dueHead(') === 3 && substr_count($of148, 'dueCell(') === 2 && substr_count($of148, 'dueTotalCell(') === 2 && substr_count($of148, 'dueTd(') === 2
       && strpos($of148, 'colspan="<?= 16 + compColsCount() + dueColsCount() + netFamColsCount() ?>"') !== false && strpos($of148, 'colspan="<?= 8 + compColsCount() + dueColsCount() + netFamColsCount() ?>"') !== false && strpos($of148, '$sdCols = 16 + compColsCount() + dueColsCount() + netFamColsCount();') !== false
@@ -7149,7 +7149,7 @@ foreach ([0, 1, 2, 3, 4] as $i) {
 }
 check('👨‍👩‍👧➕ عمود «الصافي + التعويض العائلي» بثلاث حالات (كود + تشغيل فعلي: الكشف الشهري وsalary_all وpayment_list وجميع الأساتذة والبطاقة السنوية — بالمبلغ/فارغ/غير موجود، عمود واحد يزيد أو ينقص فقط، بلا Fatal)',
       $ok150 && function_exists('netFamColMode') && function_exists('netFamTd') && function_exists('netFamLbp') && function_exists('netFamHead') && function_exists('netFamCell') && function_exists('netFamTotalCell')
-      && strpos($fn150, '<select name="netfam_mode" onchange="this.form.submit()">') !== false && strpos($hd150, '<select name="netfam_mode" class="form-control form-control-sm"') !== false
+      && strpos($fn150, '<select name="netfam_mode" onchange="this.form.submit()" class="scb-sel">') !== false && strpos($hd150, '<select name="netfam_mode" class="form-control form-control-sm"') !== false
       && strpos((string)file_get_contents($PROJ . '/switch_salarycomp.php'), "\$_SESSION['netfam_col_mode'] = (string)\$_GET['netfam_mode'];") !== false
       && substr_count($of150, 'netFamHead(') === 3 && substr_count($of150, 'netFamCell(') === 2 && substr_count($of150, 'netFamTotalCell(') === 2 && substr_count($of150, 'netFamTd(') === 2
       && strpos($rp150, "<?= netFamHead('', 'الصافي + التعويض العائلي' . rateHead('mkt', \$month, \$year)) ?><?= transportHead() ?><?= dueHead() ?>") !== false && substr_count($rp150, 'netFamTd(') === 2
@@ -8602,6 +8602,61 @@ check('👥📅 المجاميع السنوية: «عدد الأشخاص / Effec
       && $sx187 !== '' && strpos($sx187, 'عدد الأشخاص (Effectif)') !== false && strpos($sx187, 'الأشهر المدفوعة (Mois payés)') !== false && strpos($sx187, 'عدد الكشوف') === false
       && strpos((string)file_get_contents($PROJ . '/includes/report_helpers.php'), 'COUNT(DISTINCT ms.employee_id) persons') !== false,
       'persons=' . ($tot187['persons'] ?? '?') . ' months=' . ($tot187['cnt'] ?? '?') . ' schools=' . count($rows187));
+
+/* =====================================================================
+ * 188) ☑️📐 شريط خيارات الإفادة صفوفاً مرتّبة (p1 2026-09-27 «هون كمان بدهن ترتيب» + «رتّب كل البرنامج ما تنطرني»): .att-opts/.att-row/.att-k
+ *      بـapp.css (عام) — كل خيار بسطره (تسمية 240px + خاناته)، لا فواصل «|» ولا رصّ حرّ؛ كل الخانات (name=) وسلوكها (onchange) كما كانت.
+ *      + شريط تصريح الضمان (cnss_leave: المكوّنات سطر، العملة سطر). الـdiv متوازنة بكل نوع.
+ * =================================================================== */
+$css188 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $at188 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$emp188 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
+$ok188 = strpos($css188, '.att-opts{display:grid;grid-template-columns:1fr 1fr;') !== false && strpos($css188, '.att-opts .att-k{flex:0 0 240px;') !== false
+      && strpos($at188, 'color:#cbd5e1">|</span>') === false && strpos($at188, '<div class="card-body att-opts"') !== false && strpos($at188, '<div class="form-group att-opts" style="grid-column:1 / -1">') !== false
+      && substr_count($at188, 'onchange="this.form.submit()"') === 52 && $emp188 > 0;
+$why188 = 'emp=' . $emp188;
+$bal188 = function (string $h) { return preg_match('#<form method="get"[^>]*>.*?</form>#su', $h, $m) ? substr_count($m[0], '<div') - substr_count($m[0], '</div>') : 999; };
+foreach (['salaire' => 10, 'embassy' => 12, 'isqat_haq' => 12, 'aqd_taalim' => 11, 'cnss_leave' => 2] as $t188 => $min188) {
+    if (!$emp188) break;
+    $h = renderPage('pages/attestations.php', ['employee_id' => $emp188, 'type' => $t188], [], [3], 'both', '2025-2026');
+    $rows = substr_count($h, 'class="att-row'); $bal = $bal188($h);
+    if (!$noFatal($h) || $rows < $min188 || $bal !== 0) { $ok188 = false; $why188 .= " $t188:rows=$rows bal=$bal fatal=" . (int)!$noFatal($h); }
+}
+check('☑️📐 شريط خيارات الإفادة صفوفاً مرتّبة (2026-09-27): .att-opts عام + لا فواصل «|» + 52 خانة بسلوكها + صفوف ≥ الحدّ بكل نوع (salaire/embassy/isqat/aqd/cnss_leave) + div متوازنة', $ok188, $why188);
+
+/* =====================================================================
+ * 189) ☑️📐 «رتّب كل البرنامج ما تنطرني» (2026-09-27): باقي الشرائط صفوفاً مرتّبة (.att-opts/.att-row) — شريط «الراتب المركّب يشمل» (5 صفوف:
+ *      المكوّنات، النقل، المستحق، الصافي+العائلي، أعمدة الدرجة للمتعاقد) · بطاقة الراتب (احتساب / تصدير) · حالة التحديث (السنة / اعرض) ·
+ *      الفئة (3 خانات) أفقية · المكافآت الجماعية: خانات الفئات بعرض ثابت + تسمية لبند الحذف · فتح السنة: تسمية سنة البرنامج · لائحة الموظفين: تسميتا البحث والحالة.
+ * =================================================================== */
+$fn189 = (string)file_get_contents($PROJ . '/includes/functions.php'); $css189 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$hR189 = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => 10, 'year' => 2025], ['extra', 'aide'], [3], 'lbp', '2025-2026');
+$hS189 = $tit184 ? renderPage('pages/annual_slip.php', ['employee_id' => $tit184, 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'both', '2025-2026') : '';
+$hI189 = renderPage('pages/info_status.php', [], [], [3], 'lbp', '2025-2026');
+$hE189 = renderPage('pages/employees.php', [], [], [3], 'lbp', '2025-2026');
+$tb189 = preg_match('#<form method="get" action="[^"]*switch_salarycomp\.php" class="salcomp-bar att-opts[^"]*">(.*?)</form>#su', $hR189, $m189) ? $m189[1] : '';
+check('☑️📐 باقي الشرائط صفوفاً مرتّبة (2026-09-27): «الراتب المركّب يشمل» 5 صفوف بخاناته + أعمدة الدرجة للمتعاقد · البطاقة (احتساب/تصدير) · حالة التحديث · الفئة أفقية · المكافآت الجماعية · فتح السنة · لائحة الموظفين — بلا رصّ حرّ',
+      strpos($fn189, 'class="salcomp-bar att-opts no-print no-export"') !== false && strpos($fn189, '<select name="contract_grade_mode" onchange="this.form.submit()" class="scb-sel">') !== false
+      && $tb189 !== '' && substr_count($tb189, 'class="att-row') === 5 && strpos($tb189, 'name="comp[]" value="extra"') !== false && strpos($tb189, 'name="transport_mode"') !== false && strpos($tb189, 'name="due_mode"') !== false && strpos($tb189, 'name="netfam_mode"') !== false && strpos($tb189, 'name="contract_grade_mode"') !== false
+      && strpos($css189, '.school-checks.emp-type-checks,.fa-cats .school-checks{display:flex;flex-wrap:wrap;gap:4px 14px}') !== false && strpos($css189, '.salcomp-bar.att-opts{display:grid;gap:0 22px}') !== false
+      && $noFatal($hS189) && substr_count($hS189, 'Calcul / احتساب:') === 1 && substr_count($hS189, 'Export / تصدير وطباعة:') === 1 && strpos($hS189, '<span style="color:var(--gray-400)">|</span>') === false && strpos($hS189, 'name="from_m"') !== false && strpos($hS189, 'blank=2') !== false
+      && $noFatal($hI189) && substr_count($hI189, 'class="att-row wide"') === 2 && strpos($hI189, '<strong class="att-k"><i class="fas fa-calendar-days"></i> Année de mise à jour') !== false && strpos($hI189, 'name="sy"') !== false
+      && $noFatal($hE189) && strpos($hE189, 'Recherche / بحث</label>') !== false && strpos($hE189, 'Statut / الحالة</label>') !== false && strpos($hE189, 'name="status"') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/bulk_allowances.php'), '<div class="ba-cats"><strong>أي بند؟</strong>') !== false && strpos((string)file_get_contents($PROJ . '/pages/bulk_allowances.php'), '.ba-cats label { font-weight:600; cursor:pointer; white-space:nowrap; min-width:150px;') !== false
+      && strpos((string)file_get_contents($PROJ . '/pages/open_year.php'), 'Année du programme / سنة البرنامج</label>') !== false,
+      'toolbar-rows=' . substr_count($tb189, 'class="att-row'));
+
+/* =====================================================================
+ * 190) 🎨 لائحة الإفادات بملف الأستاذ (dossier=1) — p1 2026-09-27 «يكون مرتبين وفيهن شوي ألوان راكزة لنميّز من بعض»: كل قسم لوحة بلون هادئ
+ *      (att-g1 أخضر راتب/ضمان · att-g2 كهرماني نهاية الخدمة · att-g3 نيلي عقود · att-g4 رمادي أخرى) وأزراره بشبكة متساوية — الروابط والأنواع نفسها.
+ * =================================================================== */
+$hD190 = $tit184 ? renderPage('pages/attestations.php', ['employee_id' => $tit184, 'dossier' => 1], [], [3], 'both', '2025-2026') : '';
+$css190 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+check('🎨 لائحة الإفادات بملف الأستاذ أقساماً ملوّنة بشبكة متساوية (2026-09-27 p1): 3 لوحات (att-g1/2/3) + كل نوع إفادة له زرّ + CSS الألوان + لا ستايل حدود inline',
+      $noFatal($hD190) && substr_count($hD190, 'class="att-group att-g') === 3 && strpos($hD190, 'class="att-group att-g1"') !== false && strpos($hD190, 'class="att-group att-g3"') !== false
+      && substr_count($hD190, 'class="att-gb"') === 3 && preg_match_all('#pages/attestations\.php\?employee_id=' . (int)$tit184 . '&type=[a-z_0-9]+&lang_doc=#', $hD190) === 20
+      && strpos($hD190, 'class="btn btn-sm btn-light" style="border:1px solid #cbd5e1"') === false
+      && strpos($css190, '.att-groups .att-gb{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));') !== false && strpos($css190, '.att-groups .att-g1{background:#ecfdf5;') !== false && strpos($css190, '.att-groups .att-g3{background:#eef2ff;') !== false,
+      'groups=' . substr_count($hD190, 'class="att-group att-g') . ' links=' . preg_match_all('#pages/attestations\.php\?employee_id=' . (int)$tit184 . '&type=#', $hD190));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

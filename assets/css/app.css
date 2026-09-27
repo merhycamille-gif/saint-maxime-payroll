@@ -1529,3 +1529,37 @@ body.doc-view .page-content { max-width: 1600px; margin: 0 auto; }   /* أوسع
 }
 body.print-portrait .doc-table{--pz-target:718 !important;}
 body.print-landscape .doc-table{--pz-target:1062 !important;}
+
+/* ☑️📐 (2026-09-27 «هون كمان بدهن ترتيب — رتّب كل البرنامج») صفوف الخيارات المرتّبة: كل خيار بسطره — تسمية بعرض ثابت (.att-k)
+   ثم خاناته بخانات متساوية؛ بعمودين على الشاشة الواسعة والصفوف الطويلة (.wide) تأخذ العرض كله. المصدر الواحد لكل شرائط الخيارات. */
+.att-opts{display:grid;grid-template-columns:1fr 1fr;gap:2px 22px;align-items:start}
+.att-opts .att-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:5px 6px;border-bottom:1px dashed #cfe0f5;min-height:36px}
+.att-opts .att-row.wide{grid-column:1 / -1}
+.att-opts .att-k{flex:0 0 240px;color:#1e3a8a;font-size:13px;line-height:1.25}
+.att-opts .att-row label{display:inline-flex;align-items:center;gap:5px;margin:0 !important;cursor:pointer;min-width:250px;padding:2px 6px;border-radius:6px}
+.att-opts .att-row label.att-sm,.att-opts .att-row:not(.wide) label{min-width:auto}
+.att-opts .att-row label:hover{background:#dbeafe}
+.att-opts .att-row input[type=text],.att-opts .att-row input[type=date],.att-opts .att-row input[type=number],.att-opts .att-row select{margin:0 !important}
+.att-opts .att-note{grid-column:1 / -1;color:#1e40af;padding:6px 6px 0;font-weight:600}
+.att-opts .att-hint{color:#64748b;font-size:12px}
+@media (max-width:1100px){.att-opts{grid-template-columns:1fr}}
+@media print{.att-opts{display:none}}
+/* ☑️📐 (2026-09-27) شريط «الراتب المركّب يشمل» صفوفاً مرتّبة بألوانه */
+.salcomp-bar.att-opts{display:grid;gap:0 22px}
+.salcomp-bar.att-opts .att-row{border-bottom-color:#e9d5ff;min-height:32px;padding:3px 6px}
+.salcomp-bar.att-opts .att-k{color:#5b21b6;font-weight:700}
+.salcomp-bar.att-opts .scb-opt{min-width:230px}
+.salcomp-bar.att-opts select.scb-sel{cursor:pointer;border:1px solid #c4b5fd;border-radius:6px;padding:2px 6px;background:#fff;color:#4c1d95;font-weight:600}
+/* الفئة (3 خانات) وفئات التعويض العائلي: أفقية بسطر واحد — قليلة فلا تحتاج شبكة عمودية */
+.school-checks.emp-type-checks,.fa-cats .school-checks{display:flex;flex-wrap:wrap;gap:4px 14px}
+.school-checks.emp-type-checks .chk{min-width:0}
+/* 🎨 (2026-09-27 p1) لائحة الإفادات بملف الأستاذ: أقسام ملوّنة هادئة + أزرار بشبكة متساوية */
+.att-groups .att-group{border:1px solid;border-radius:10px;padding:8px 10px 10px;margin-bottom:10px}
+.att-groups .att-gt{font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.att-groups .att-gb{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:6px 8px}
+.att-groups .att-gb a.btn{justify-content:flex-start;text-align:start;white-space:normal;border:1px solid;background:#fff;font-weight:600}
+.att-groups .att-gb a.btn:hover{filter:brightness(.97)}
+.att-groups .att-g1{background:#ecfdf5;border-color:#a7f3d0}.att-groups .att-g1 .att-gt{color:#065f46}.att-groups .att-g1 a.btn{border-color:#a7f3d0;color:#064e3b}
+.att-groups .att-g2{background:#fffbeb;border-color:#fde68a}.att-groups .att-g2 .att-gt{color:#92400e}.att-groups .att-g2 a.btn{border-color:#fde68a;color:#78350f}
+.att-groups .att-g3{background:#eef2ff;border-color:#c7d2fe}.att-groups .att-g3 .att-gt{color:#3730a3}.att-groups .att-g3 a.btn{border-color:#c7d2fe;color:#312e81}
+.att-groups .att-g4{background:#f8fafc;border-color:#e2e8f0}.att-groups .att-g4 .att-gt{color:#334155}.att-groups .att-g4 a.btn{border-color:#e2e8f0;color:#1e293b}

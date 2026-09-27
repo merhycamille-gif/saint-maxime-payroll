@@ -423,7 +423,8 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
 .ba-x { background:none; border:none; font-size:18px; cursor:pointer; color:#64748b; }
 .ba-cats { display:flex; gap:16px; flex-wrap:wrap; align-items:center; padding:8px 12px;
            background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; margin:8px 0; }
-.ba-cats strong { color:#9a3412; } .ba-cats label { font-weight:600; cursor:pointer; white-space:nowrap; }
+.ba-cats strong { color:#9a3412; min-width:90px; } .ba-cats label { font-weight:600; cursor:pointer; white-space:nowrap; min-width:150px; display:inline-flex; align-items:center; gap:5px; } /* ☑️📐 (2026-09-27) خانات بعرض ثابت مرصوفة */
+#opTypes label { min-width:190px; display:inline-flex; align-items:center; gap:5px; }
 .ba-live { background:#f0fdf4; border:1px dashed #86efac; border-radius:10px; padding:10px 14px; font-size:13px; margin-top:10px; }
 .ba-live strong { color:#166534; }
 .ba-editor td { vertical-align:middle; }
@@ -949,11 +950,13 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <label><input type="checkbox" name="cat[]" value="<?= $k ?>"> <?= $l ?></label>
                 <?php endforeach; ?>
             </div>
-            <select name="bonus_type" class="form-select" style="margin-top:8px">
+            <div class="ba-cats"><strong>أي بند؟</strong><?php /* ☑️📐 (2026-09-27) تسمية للبند بدل قائمة بلا عنوان */ ?>
+            <select name="bonus_type" class="form-select" style="max-width:280px">
                 <option value="prime_fixe">➕ الأجر الإضافي</option>
                 <option value="aide_complementaire">💰 مكافأة ومساعدة</option>
                 <option value="transport_complement">🚌 تعويض نقل (شهري)</option>
             </select>
+            </div>
         </div>
         <div class="ba-modal-foot">
             <button type="button" class="btn btn-light" onclick="baClose('baModalRemove')">إلغاء</button>

@@ -335,13 +335,15 @@ if ($emp && !empty($_GET['dossier'])):
             $others = array_values(array_diff(array_keys($ATT_TYPES), $grouped));
             if ($others) $attGroups['Autres / أخرى'] = $others;
             ?>
-            <div class="no-print">
-                <?php foreach ($attGroups as $gTitle => $keys): ?>
-                <div style="margin-bottom:12px">
-                    <div style="font-weight:700;color:#334155;font-size:13px;margin-bottom:6px"><i class="fas fa-angle-left" style="color:var(--primary)"></i> <?= e($gTitle) ?></div>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <?php /* 🎨 (2026-09-27 p1 «يكون مرتبين وفيهن شوي ألوان راكزة لنميّز من بعض»): كل قسم لوحة بلون هادئ خاصّ به (أخضر: راتب وعمل وضمان · كهرماني: نهاية الخدمة · نيلي: عقود وإنذارات · رمادي: أخرى)
+                     والأزرار بشبكة خانات متساوية — الروابط نفسها */ ?>
+            <div class="no-print att-groups">
+                <?php $gi = 0; foreach ($attGroups as $gTitle => $keys): $gi++; $gIcon = ['fa-money-check-dollar', 'fa-door-open', 'fa-file-contract', 'fa-folder-open'][min($gi, 4) - 1]; ?>
+                <div class="att-group att-g<?= min($gi, 4) ?>">
+                    <div class="att-gt"><i class="fas <?= $gIcon ?>"></i> <?= e($gTitle) ?></div>
+                    <div class="att-gb">
                         <?php foreach ($keys as $k): if (!isset($ATT_TYPES[$k])) continue; ?>
-                        <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= (int)$employeeId ?>&type=<?= e($k) ?>&lang_doc=<?= e($docLang) ?>" class="btn btn-sm btn-light" style="border:1px solid #cbd5e1"><i class="fas fa-file-lines" style="color:var(--primary);opacity:.6"></i> <?= e($ATT_TYPES[$k]['fr'].' / '.$ATT_TYPES[$k]['ar']) ?></a>
+                        <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= (int)$employeeId ?>&type=<?= e($k) ?>&lang_doc=<?= e($docLang) ?>" class="btn btn-sm btn-light"><i class="fas fa-file-lines" style="color:var(--primary);opacity:.6"></i> <?= e($ATT_TYPES[$k]['fr'].' / '.$ATT_TYPES[$k]['ar']) ?></a>
                         <?php endforeach; ?>
                     </div>
                 </div>
@@ -664,17 +666,18 @@ if (!$emp):
                 </div>
                 <?php endif; ?>
                 <input type="hidden" name="opts_set" value="1">
-                <div class="form-group" style="grid-column:1 / -1">
-                    <label class="form-label">Composantes du salaire / مكوّنات الراتب بالتصريح:</label>
+                <div class="form-group att-opts" style="grid-column:1 / -1"><?php /* ☑️📐 (2026-09-27) صفوف مرتّبة: المكوّنات سطر، العملة سطر */ ?>
+                    <div class="att-row wide"><strong class="att-k">Composantes du salaire / مكوّنات الراتب بالتصريح:</strong>
                     <label style="margin:0 12px 0 0;cursor:pointer"><input type="checkbox" name="inc_extra" value="1" <?= $incExtra?'checked':'' ?> onchange="this.form.submit()"> + Rémunération suppl. / + الأجر الإضافي (<?= formatLBP($decExtra,false) ?>)</label>
                     <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_aide" value="1" <?= $incAide?'checked':'' ?> onchange="this.form.submit()"> + Prime et aide / + مكافأة ومساعدة (<?= formatLBP($decAide,false) ?>)</label>
                     <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_trans" value="1" <?= $incTrans?'checked':'' ?> onchange="this.form.submit()"> + Transport / + تعويض النقل (<?= formatLBP($decTrans,false) ?>)</label>
-                    <span style="margin:0 12px;color:#cbd5e1">|</span>
-                    <strong>Devise / العملة:</strong>
+                    </div>
+                    <div class="att-row wide"><strong class="att-k">Devise / العملة:</strong>
                     <label style="margin:0 8px;cursor:pointer"><input type="radio" name="cur" value="lbp" <?= $decCur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> ليرة (ل.ل)</label>
                     <label style="margin:0 8px;cursor:pointer"><input type="radio" name="cur" value="usd" <?= $decCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> دولار ($)</label>
                     <label style="margin:0 8px;cursor:pointer"><input type="radio" name="cur" value="both" <?= $decCur==='both'?'checked':'' ?> onchange="this.form.submit()"> الاثنين</label>
-                    <div style="margin-top:6px;color:#1e40af">الراتب المعتمد بالتصريح: <strong><?= $decCur==='usd' ? ('$' . number_format((int)$decWageUsd)) : (formatLBP($decWage,false) . ' ل.ل' . ($decCur==='both' ? ' ($' . number_format((int)$decWageUsd) . ')' : '')) ?></strong>
+                    </div>
+                    <div class="att-note">الراتب المعتمد بالتصريح: <strong><?= $decCur==='usd' ? ('$' . number_format((int)$decWageUsd)) : (formatLBP($decWage,false) . ' ل.ل' . ($decCur==='both' ? ' ($' . number_format((int)$decWageUsd) . ')' : '')) ?></strong>
                         (الأساس <?= formatLBP($decBase,false) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?><?= $incTrans?' + النقل':'' ?><?= $decSal ? ' — شهر ' . monthName((int)$decSal['month'],'ar') . ' ' . $decSal['year'] : ' — لا راتب محسوب' ?>)</div>
                 </div>
             </form>
@@ -1118,150 +1121,170 @@ if (!$emp):
         <input type="hidden" name="type" value="<?= e($type) ?>">
         <input type="hidden" name="lang_doc" value="<?= e($docLang) ?>">
         <input type="hidden" name="opts_set" value="1">
-        <div class="card-body" style="padding:10px 14px">
+        <div class="card-body att-opts" style="padding:8px 14px">
+            <?php /* ☑️📐 (2026-09-27 p1 «هون كمان بدهن ترتيب»): خيارات الإفادة صفوفاً مرصوفة — كل خيار بسطره: تسمية بعرض ثابت ثم خاناته بخانات متساوية،
+                     بعمودين على الشاشة الواسعة (الصفوف الطويلة تأخذ العرض كله). كل الخانات وأسماؤها وسلوكها كما كانت — الترتيب فقط. */ ?>
             <?php /* 📅 (2026-09-24) التاريخ المطبوع على الإفادة — خانة ظاهرة بدل المخفية */ ?>
-            <div style="margin-bottom:6px">
-            <strong>Date / التاريخ على الإفادة:</strong>
+            <div class="att-row">
+            <strong class="att-k">Date / التاريخ على الإفادة:</strong>
             <input type="date" name="date" value="<?= e($effDate) ?>" onchange="this.form.submit()" style="padding:3px 6px;margin:0 6px">
-            <span style="margin:0 12px;color:#cbd5e1">|</span>
+            </div>
+            <?php /* 📅 (2026-09-24) المادة (تحلّ محلّ الملف بهذه الإفادة فقط) */ ?>
+            <div class="att-row">
+            <strong class="att-k">Matière(s) / المادة (المواد):</strong>
+            <input type="text" name="subj_ovr" value="<?= e($subjOvr) ?>" placeholder="<?= e(($subjOvr === '' && trim((string)($emp['subjects_taught'] ?? '')) !== '') ? 'فاضي = ' . trim((string)$emp['subjects_taught']) : 'اكتب المادة/المواد') ?>" style="width:220px;padding:3px 6px" onchange="this.form.submit()" title="فاضي = من ملف الأستاذ — المكتوب يحلّ محلّه بهذه الإفادة فقط (المواد المعروفة تُترجم بالنسخ الفرنسية/الإنكليزية)">
+            </div>
             <?php /* 📅 (2026-09-24) تاريخ الدخول «من» (يحلّ محلّ الملف بهذه الإفادة فقط) والترك «إلى» */ ?>
-            <strong>Entrée à l'école (du) / تاريخ الدخول (من):</strong>
+            <div class="att-row wide">
+            <strong class="att-k">Entrée à l'école (du) / تاريخ الدخول (من):</strong>
             <input type="date" name="hire_dt" value="<?= e($hireOvr !== '' ? $hireOvr : (string)($emp['hire_date'] ?? '')) ?>" onchange="this.form.submit()" style="padding:3px 6px;margin:0 6px<?= $hireOvr !== '' ? ';border:2px solid #b45309' : '' ?>" title="فاضي/كما هو = من ملف الموظف — تغييره يمسّ هذه الإفادة فقط لا الملف">
-            <strong>Cessation (au) / الترك (إلى):</strong>
+            </div>
+            <div class="att-row wide">
+            <strong class="att-k">Cessation (au) / الترك (إلى):</strong>
             <input type="date" name="end_dt" value="<?= e($endDate) ?>" onchange="this.form.submit()" style="padding:3px 6px;margin:0 6px<?= ($endActive && $endDate !== $leftFile) ? ';border:2px solid #b45309' : '' ?>" title="<?= $leftFile !== '' ? 'من ملف الموظف (تاريخ الترك ' . e(formatDate($leftFile)) . ') — تغييره يمسّ هذه الإفادة فقط' : 'لا تاريخ ترك بالملف — فاضي = تاريخ الإفادة بإفادات الترك/الاستقالة/الإسقاط' ?>">
             <label style="margin:0 6px;cursor:pointer" title="يشيل تاريخ الترك من هذه الإفادة (خطّ منقّط حيث يلزم، و«ولا يزال حتى تاريخه» بإفادتَي الراتب والعمل)"><input type="checkbox" name="end_none" value="1" <?= $endNone?'checked':'' ?> onchange="this.form.submit()"> Sans / شيل تاريخ الترك</label>
             <?php if ($leftFile !== '' && !$endNone): ?><span style="color:#b45309;font-weight:700"><i class="fas fa-door-open"></i> تارك من الملف <?= e(formatDate($leftFile)) ?></span><?php endif; ?>
-            <span style="margin:0 12px;color:#cbd5e1">|</span>
-            <strong>Matière(s) / المادة (المواد):</strong>
-            <input type="text" name="subj_ovr" value="<?= e($subjOvr) ?>" placeholder="<?= e(($subjOvr === '' && trim((string)($emp['subjects_taught'] ?? '')) !== '') ? 'فاضي = ' . trim((string)$emp['subjects_taught']) : 'اكتب المادة/المواد') ?>" style="width:220px;padding:3px 6px" onchange="this.form.submit()" title="فاضي = من ملف الأستاذ — المكتوب يحلّ محلّه بهذه الإفادة فقط (المواد المعروفة تُترجم بالنسخ الفرنسية/الإنكليزية)">
             </div>
-            <strong>En-tête de l'école / رأس المدرسة:</strong>
+            <div class="att-row">
+            <strong class="att-k">En-tête de l'école / رأس المدرسة:</strong>
             <input type="hidden" name="logo" value="0">
             <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="logo" value="1" <?= $showLogo?'checked':'' ?> onchange="this.form.submit()"> Mettre le logo de l'école / ضع شعار المدرسة على الإفادة</label>
-            <span style="margin:0 16px;color:#cbd5e1">|</span>
+            </div>
             <?php /* 🧑 الجنس: يحدّد صيغة المذكّر/المؤنّث بنصّ الإفادة — تلقائي من ملف الموظف، وتغييره يُحفَظ بالملف (2026-09-15) */ ?>
-            <strong>Sexe / الجنس:</strong>
+            <div class="att-row">
+            <strong class="att-k">Sexe / الجنس:</strong>
             <select name="sex" onchange="this.form.submit()" style="padding:3px 6px;margin-right:6px<?= $attGender==='' ? ';border:2px solid #dc2626;background:#fef2f2' : '' ?>" title="تلقائي من ملف الموظف — تغييره يُحفَظ بالملف">
                 <?php if ($attGender === ''): ?><option value="" selected>⚠ حدّد الجنس — بلا تحديد تطلع الصيغة المزدوجة (ة)</option><?php endif; ?>
                 <option value="m" <?= $attGender==='m'?'selected':'' ?>>Homme / ذكر</option>
                 <option value="f" <?= $attGender==='f'?'selected':'' ?>>Femme / أنثى (السيّدة)</option>
                 <option value="d" <?= $attGender==='d'?'selected':'' ?>>Mlle / الآنسة</option>
             </select>
+            </div>
             <?php if (count($signatories) > 1): ?>
-            <span style="margin:0 16px;color:#cbd5e1">|</span>
-            <strong>Signataire responsable / الموقّع المسؤول:</strong>
+            <div class="att-row">
+            <strong class="att-k">Signataire responsable / الموقّع المسؤول:</strong>
             <select name="sig" onchange="this.form.submit()" style="padding:3px 6px;margin-right:6px">
                 <?php foreach ($signatories as $si => $sgo): ?>
                 <option value="<?= $si ?>" <?= $si===$sigIdx?'selected':'' ?>><?= e($sgo['name'] . ($sgo['title']?' — '.$sgo['title']:'') . ($sgo['phone']?' ('.$sgo['phone'].')':'')) ?></option>
                 <?php endforeach; ?>
             </select>
+            </div>
             <?php else: ?><input type="hidden" name="sig" value="0"><?php endif; ?>
             <?php if ($hasSigTitle): ?>
             <?php /* ✍️ (2026-09-24) صفة الموقّع بكل الإفادات + اسمه يُكتب أو يُخفى */ ?>
-            <div style="margin-top:6px">
-            <strong>Signature / الإمضاء:</strong>
+            <div class="att-row wide">
+            <strong class="att-k">Signature / الإمضاء:</strong>
             <?php foreach ($SIG_TITLES as $stk => $stl): ?>
             <label style="margin:0 10px;cursor:pointer"><input type="radio" name="sig_t" value="<?= $stk ?>" <?= $sigTitle===$stk?'checked':'' ?> onchange="this.form.submit()"> <?= e($stl['fr']) ?> / <?= e($stl['ar']) ?></label>
             <?php endforeach; ?>
-            <span style="margin:0 12px;color:#cbd5e1">|</span>
-            <strong>Nom du signataire / اسم الموقّع:</strong>
+            </div>
+            <div class="att-row wide">
+            <strong class="att-k">Nom du signataire / اسم الموقّع:</strong>
             <input type="text" name="sig_name" value="<?= e($sigName) ?>" placeholder="<?= e($sigNameDefault !== '' ? 'فاضي = ' . $sigNameDefault : 'اكتب اسم المدير/الرئيسة') ?>" style="width:220px;padding:3px 6px" onchange="this.form.submit()" title="فاضي = الاسم من ملف المدرسة — المكتوب يحلّ محلّه بكل مواضع الإفادة. للنسخة الفرنسية/الإنكليزية اكتبه بالحروف اللاتينية (العربي يُترجم تلقائياً)">
             <label style="margin:0 8px;cursor:pointer"><input type="checkbox" name="sig_noname" value="1" <?= $sigNoName?'checked':'' ?> onchange="this.form.submit()"> Sans nom / بلا اسم (الصفة والتوقيع فقط)</label>
             </div>
             <?php endif; ?>
-            <?php if ($hasComponents || $hasCurrency || $type==='isqat_haq' || $isNotice): ?><div style="margin-top:6px"><?php endif; ?>
             <?php if ($hasComponents): ?>
-            <strong>Composantes du salaire / مكوّنات الراتب:</strong>
+            <div class="att-row wide">
+            <strong class="att-k">Composantes du salaire / مكوّنات الراتب:</strong>
             <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_extra" value="1" <?= $incExtra?'checked':'' ?> onchange="this.form.submit()"> + Rémunération suppl. / + الأجر الإضافي (<?= formatLBP($extraW0,false) ?>)</label>
             <label style="margin:0 12px;cursor:pointer"><input type="checkbox" name="inc_aide" value="1" <?= $incAide?'checked':'' ?> onchange="this.form.submit()"> + Prime et aide / + مكافأة ومساعدة (<?= formatLBP($aideW0,false) ?>)</label>
             <label style="cursor:pointer"><input type="checkbox" name="inc_trans" value="1" <?= $incTrans?'checked':'' ?> onchange="this.form.submit()"> + Transport / + تعويض النقل (<?= formatLBP($transW0,false) ?>)</label>
-            <span style="margin:0 16px;color:#cbd5e1">|</span>
+            </div>
             <?php endif; ?>
             <?php if ($hasCurrency): ?>
-            <strong>Devise / العملة:</strong>
+            <div class="att-row wide">
+            <strong class="att-k">Devise / العملة:</strong>
             <label style="margin:0 10px;cursor:pointer"><input type="radio" name="cur" value="lbp" <?= $cur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> Livre (LBP) / ليرة (ل.ل)</label>
             <label style="margin:0 10px;cursor:pointer"><input type="radio" name="cur" value="usd" <?= $cur==='usd'?'checked':'' ?> onchange="this.form.submit()"> Dollar / دولار ($)</label>
             <label style="cursor:pointer"><input type="radio" name="cur" value="both" <?= $cur==='both'?'checked':'' ?> onchange="this.form.submit()"> Les deux / الاثنين (ل.ل + $)</label>
+            </div>
             <?php endif; ?>
-            <?php if ($hasComponents || $hasCurrency || $type==='isqat_haq' || $isNotice): ?></div><?php endif; ?>
             <?php /* 💱 + ✍️ (2026-09-24) سعر الدولار على الإفادة (حطّ/شيل) + المبلغ اليدوي — بكل الإفادات */ ?>
-            <div style="margin-top:6px">
-                <strong>Taux du dollar / سعر الدولار على الإفادة:</strong>
+            <div class="att-row">
+                <strong class="att-k">Taux du dollar / سعر الدولار على الإفادة:</strong>
                 <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="rate_show" value="1" <?= $showRate?'checked':'' ?> onchange="this.form.submit()"> Écrire le taux / اكتب سعر الصرف على الإفادة<?= $fxRate > 0 ? ' (1 $ = ' . formatLBP((int)$fxRate, false) . ' ل.ل)' : '' ?></label>
-                <span style="margin:0 12px;color:#cbd5e1">|</span>
-                <strong>Montant manuel / المبلغ يدوياً:</strong>
+            </div>
+            <div class="att-row">
+                <strong class="att-k">Montant manuel / المبلغ يدوياً:</strong>
                 <input type="text" name="amt" value="<?= $amtMan>0 ? (int)$amtMan : '' ?>" placeholder="فاضي = المحسوب" style="width:150px;padding:3px 6px" onchange="this.form.submit()" title="مبلغ تكتبه بإيدك يحلّ محلّ الراتب المحسوب بنصّ الإفادة">
-                <label style="margin:0 6px;cursor:pointer"><input type="radio" name="amt_cur" value="lbp" <?= $amtCur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> ل.ل</label>
-                <label style="cursor:pointer"><input type="radio" name="amt_cur" value="usd" <?= $amtCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> $</label>
+                <label class="att-sm" style="margin:0 6px;cursor:pointer"><input type="radio" name="amt_cur" value="lbp" <?= $amtCur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> ل.ل</label>
+                <label class="att-sm" style="cursor:pointer"><input type="radio" name="amt_cur" value="usd" <?= $amtCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> $</label>
                 <?php if ($amtMan > 0): ?><span style="color:#b45309;font-weight:700;margin-right:8px"><i class="fas fa-pen"></i> المبلغ اليدوي معتمد بالإفادة بدل المحسوب — فرّغ الخانة للرجوع للمحسوب</span><?php endif; ?>
             </div>
             <?php /* 🪪 (2026-09-24) أرقام الموظف على الإفادة: الضمان / المالية / صندوق التعويضات */ ?>
-            <div style="margin-top:6px">
-                <strong>Numéros sur l'attestation / الأرقام على الإفادة:</strong>
+            <div class="att-row wide">
+                <strong class="att-k">Numéros sur l'attestation / الأرقام على الإفادة:</strong>
                 <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="id_nssf" value="1" <?= $idNssf?'checked':'' ?> onchange="this.form.submit()"> N° CNSS / رقم الضمان (<?= $idVals['nssf'] !== '' ? e($idVals['nssf']) : '⚠ فاضي بالملف' ?>)</label>
                 <label style="margin:0 10px;cursor:pointer"><input type="checkbox" name="id_mof" value="1" <?= $idMof?'checked':'' ?> onchange="this.form.submit()"> N° fiscal / رقم المالية (<?= $idVals['mof'] !== '' ? e($idVals['mof']) : '⚠ فاضي بالملف' ?>)</label>
                 <label style="cursor:pointer"><input type="checkbox" name="id_eoc" value="1" <?= $idEoc?'checked':'' ?> onchange="this.form.submit()"> N° Caisse / رقم صندوق التعويضات (<?= $idVals['eoc'] !== '' ? e($idVals['eoc']) : '⚠ فاضي بالملف' ?>)</label>
             </div>
             <?php if ($type === 'isqat_haq'): ?>
-            <span style="margin:0 16px;color:#cbd5e1">|</span>
-            <strong>Montant de l'indemnité calculée / مبلغ تعويض الصرف المحسوب:</strong>
+            <div class="att-row wide">
+            <strong class="att-k">Montant de l'indemnité calculée / مبلغ تعويض الصرف المحسوب:</strong>
             <input type="text" name="eos" value="<?= $eos>0 ? (int)$eos : '' ?>" placeholder="اكتب المبلغ" style="width:150px;padding:3px 6px" onchange="this.form.submit()">
-            <div style="margin-top:6px">
-                <strong>Situation / الحالة:</strong>
+            </div>
+            <div class="att-row wide">
+                <strong class="att-k">Situation / الحالة:</strong>
                 <label style="margin:0 10px;cursor:pointer"><input type="radio" name="isq" value="istiqala" <?= $isqMode==='istiqala'?'checked':'' ?> onchange="this.form.submit()"> J'ai présenté ma démission / قدّمت استقالتي</label>
                 <label style="cursor:pointer"><input type="radio" name="isq" value="sarf" <?= $isqMode==='sarf'?'checked':'' ?> onchange="this.form.submit()"> J'ai été licencié(e) / صار صرفي من الخدمة</label>
             </div>
             <?php endif; ?>
             <?php if ($isNotice): ?>
-            <div style="margin-top:6px"><strong>Objet / motif de l'avertissement / الموضوع / سبب الإنذار:</strong>
+            <div class="att-row wide"><strong class="att-k">Objet / motif de l'avertissement / الموضوع / سبب الإنذار:</strong>
             <input type="text" name="subj_txt" value="<?= e($subjectTxt) ?>" style="width:60%;min-width:300px;padding:3px 6px" onchange="this.form.submit()"></div>
             <?php endif; ?>
             <?php if ($type === 'afade_madrasiya'): ?>
-            <div style="margin-top:6px">
-                <strong>Motif de cessation / سبب ترك العمل:</strong>
+            <div class="att-row wide">
+                <strong class="att-k">Motif de cessation / سبب ترك العمل:</strong>
                 <select name="lv_sel" onchange="this.form.submit()" style="padding:3px 8px">
                     <option value="">— فراغ منقّط (تعبئة باليد) —</option>
                     <?php foreach ($LV_REASONS as $r): ?><option value="<?= e($r) ?>" <?= $lvSel===$r?'selected':'' ?>><?= e($r) ?></option><?php endforeach; ?>
                 </select>
-                &nbsp; <strong>أو اكتب سبباً:</strong>
+            </div>
+            <div class="att-row wide">
+                <strong class="att-k">أو اكتب سبباً / ou saisir un motif:</strong>
                 <input type="text" name="lv_txt" value="<?= e($lvTxt) ?>" placeholder="سبب آخر تكتبه بإيدك" style="width:240px;padding:3px 6px" onchange="this.form.submit()">
-                <span style="color:#64748b">(المكتوب يغلب المختار)</span>
+                <span class="att-hint">(المكتوب يغلب المختار)</span>
             </div>
             <?php endif; ?>
             <?php if ($type === 'riaaya'): ?>
-            <div style="margin-top:6px"><strong>Organisme et n° d'enregistrement / الجهة ورقم التسجيل:</strong>
+            <div class="att-row wide"><strong class="att-k">Organisme et n° d'enregistrement / الجهة ورقم التسجيل:</strong>
             <input type="text" name="assoc_txt" value="<?= e($assocTxt) ?>" style="width:70%;min-width:340px;padding:3px 6px" onchange="this.form.submit()"></div>
             <?php endif; ?>
             <?php if ($type === 'embassy'): ?>
-            <span style="margin:0 16px;color:#cbd5e1">|</span>
-            <strong>Montant (à saisir) / قيمة الراتب (اكتبها):</strong>
+            <div class="att-row wide">
+            <strong class="att-k">Montant (à saisir) / قيمة الراتب (اكتبها):</strong>
             <input type="text" name="emb_amt" value="<?= $embAmt>0 ? (int)$embAmt : '' ?>" placeholder="المبلغ" style="width:140px;padding:3px 6px" onchange="this.form.submit()">
-            <label style="margin:0 8px;cursor:pointer"><input type="radio" name="emb_cur" value="usd" <?= $embCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> $ دولار</label>
-            <label style="cursor:pointer"><input type="radio" name="emb_cur" value="lbp" <?= $embCur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> ل.ل ليرة</label>
-            <span style="margin:0 12px;color:#cbd5e1">|</span>
-            <strong>Période / الفترة:</strong>
+            <label class="att-sm" style="margin:0 8px;cursor:pointer"><input type="radio" name="emb_cur" value="usd" <?= $embCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> $ دولار</label>
+            <label class="att-sm" style="cursor:pointer"><input type="radio" name="emb_cur" value="lbp" <?= $embCur==='lbp'?'checked':'' ?> onchange="this.form.submit()"> ل.ل ليرة</label>
+            <span class="att-hint">(الفاضي = الراتب المحسوب بالدولار تلقائياً)</span>
+            </div>
+            <div class="att-row wide">
+            <strong class="att-k">Période / الفترة:</strong>
             <label style="margin:0 8px;cursor:pointer"><input type="radio" name="emb_per" value="month" <?= $embPer==='month'?'checked':'' ?> onchange="this.form.submit()"> Mensuel / شهري</label>
             <label style="cursor:pointer"><input type="radio" name="emb_per" value="year" <?= $embPer==='year'?'checked':'' ?> onchange="this.form.submit()"> Annuel / سنوي</label>
-            <span style="color:#64748b">(الفاضي = الراتب المحسوب بالدولار تلقائياً)</span>
+            </div>
             <?php endif; ?>
             <?php if ($type === 'iqrar'): ?>
-            <span style="margin:0 16px;color:#cbd5e1">|</span>
-            <strong>Valeur de la subvention (USD) / قيمة المنحة (دولار أميركي):</strong>
+            <div class="att-row wide">
+            <strong class="att-k">Valeur de la subvention (USD) / قيمة المنحة (دولار أميركي):</strong>
             <input type="text" name="grant" value="<?= $grant>0 ? (int)$grant : '' ?>" placeholder="اكتب المبلغ" style="width:150px;padding:3px 6px" onchange="this.form.submit()">
-            <?php if ($grant>0): ?><div style="margin-top:6px;color:#1e40af"><?= number_format($grant) ?> دولار أميركي — بالحروف: <strong><?= e(numToArabicWords($grant)) ?> دولار أميركي</strong></div><?php endif; ?>
-            <?php endif; ?>
-            <?php if ($hasComponents): ?>
-            <div style="margin-top:6px;color:#1e40af"><?= $printsSalary ? 'الراتب المعتمد بالإفادة' : 'الراتب المعتمد (هذه الإفادة بلا مبلغ بنصّها — للعلم)' ?>: <strong><?= $moneyAr($salShown) ?></strong> <?= $amtMan > 0 ? '(مبلغ يدوي)' : '(' . ($isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج') . ' ' . $moneyAr((int)$basePlusEch) . ($incExtra?' + الإضافي':'') . ($incAide?' + المكافأة':'') . ($incTrans?' + النقل':'') . ')' ?><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
-            <?php elseif ($type === 'aqd_taalim'): ?>
-            <div style="margin-top:6px;color:#1e40af">أساس الراتب بالعقد: <strong><?= $moneyAr((int)$basePlusEch) ?></strong><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
+            <?php if ($grant>0): ?><span style="color:#1e40af"><?= number_format($grant) ?> دولار أميركي — بالحروف: <strong><?= e(numToArabicWords($grant)) ?> دولار أميركي</strong></span><?php endif; ?>
+            </div>
             <?php endif; ?>
             <?php if ($type === 'aqd_taalim'): ?>
-            <div style="margin-top:6px">
-                <strong>Montant convenu / المبلغ المتفق عليه:</strong>
+            <div class="att-row wide">
+                <strong class="att-k">Montant convenu / المبلغ المتفق عليه:</strong>
                 L.L <input type="text" name="aqd_lbp" value="<?= $aqdLbp>0 ? (int)$aqdLbp : '' ?>" placeholder="بالليرة" style="width:140px;padding:3px 6px" onchange="this.form.submit()">
                 &nbsp; $ <input type="text" name="aqd_usd" value="<?= $aqdUsd>0 ? (int)$aqdUsd : '' ?>" placeholder="بالدولار" style="width:110px;padding:3px 6px" onchange="this.form.submit()">
-                <span style="color:#64748b">(عبّي عملة وحدها أو الاثنتين معاً — الفاضية ما بتظهر بالعقد)</span>
+                <span class="att-hint">(عبّي عملة وحدها أو الاثنتين معاً — الفاضية ما بتظهر بالعقد)</span>
             </div>
+            <?php endif; ?>
+            <?php if ($hasComponents): ?>
+            <div class="att-note"><?= $printsSalary ? 'الراتب المعتمد بالإفادة' : 'الراتب المعتمد (هذه الإفادة بلا مبلغ بنصّها — للعلم)' ?>: <strong><?= $moneyAr($salShown) ?></strong> <?= $amtMan > 0 ? '(مبلغ يدوي)' : '(' . ($isEmploye ? 'الراتب الأساسي' : 'الأساس بعد التدرّج') . ' ' . $moneyAr((int)$basePlusEch) . ($incExtra?' + الإضافي':'') . ($incAide?' + المكافأة':'') . ($incTrans?' + النقل':'') . ')' ?><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
+            <?php elseif ($type === 'aqd_taalim'): ?>
+            <div class="att-note">أساس الراتب بالعقد: <strong><?= $moneyAr((int)$basePlusEch) ?></strong><?php if ($cur==='usd'): ?> — سعر الصرف <?= formatLBP((int)$fxRate,false) ?><?php endif; ?></div>
             <?php endif; ?>
         </div>
     </form>
