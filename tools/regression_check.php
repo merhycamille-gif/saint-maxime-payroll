@@ -8378,6 +8378,51 @@ if ($e181) {
 } else $c181('no-sample', false);
 check('🗓️👁️ تاريخ الدخول المعروض (صوري) بملف الأستاذ (2026-09-26): يظهر بدل الحقيقي بالبطاقة/اللوائح/التقارير + تاريخ ملاك معروض = +سنتان + لا أثر على الراتب — تجربة فعلية مع ترجيع', $ok181, implode(' · ', $why181) ?: 'ok');
 
+/* =====================================================================
+ * 182) 🧑‍💼 بطاقة الموظف (قانون العمل) — «بالبطاقة السنوية للموظف في معلومات لازم تكون صح» (2026-09-27):
+ *      الموظف ليس أستاذاً — لا «تاريخ الملاك» (كان يظهر 01/10/2020 لعاملة تنظيفات) ولا مواد/صفوف/درجة/صندوق؛
+ *      مكانها: النظام · الأقدمية · الوضع العائلي · نهاية الخدمة (خاضع/معفى 64) · الترك — بنفس الـ3 صفوف/12 خانة.
+ *      بطاقة الأستاذ كما هي. المصدر الواحد employeSlipInfo يصل للتصدير أيضاً.
+ * =================================================================== */
+$ok182 = true; $why182 = [];
+$c182 = function (string $n, bool $ok) use (&$ok182, &$why182) { if (!$ok) { $ok182 = false; $why182[] = $n; } };
+require_once $PROJ . '/includes/annual_slip_data.php'; // الدالة تعيش بملف البطاقة
+$c182('source', function_exists('employeSlipInfo')
+    && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "if ((\$emp['employee_type'] ?? '') === 'employe') { \$meta['titul'] = ''; \$meta += employeSlipInfo(\$emp, \$schoolYear); }") !== false
+    && substr_count((string)file_get_contents($PROJ . '/pages/annual_slip_export.php'), "\$m['regime']") === 3); // isset + الهوية الجماعية + المفردة
+$slipInfo182 = function (string $h) { return preg_match('#<table class="slip-info">.*?</table>#su', $h, $mm) === 1 ? $mm[0] : ''; };
+// موظف له راتب بالسنة وتاريخ ملاك مسرَّب بملفه (الأخطر) — وإلا أي موظف براتب
+$e182 = $db->query("SELECT e.* FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND m.school_year = '2025-2026' AND m.net_salary_lbp > 0 ORDER BY (e.titularization_date IS NOT NULL AND e.titularization_date > '1900-01-01') DESC, e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($e182) {
+    $hE = renderPage('pages/annual_slip.php', ['employee_id' => (int)$e182['id'], 'school_year' => '2025-2026'], []);
+    $tE = $slipInfo182($hE);
+    $c182('emp-layout-3x12', $tE !== '' && substr_count($tE, '<tr>') === 3 && substr_count($tE, '<td>') === 12);
+    $c182('emp-no-teacher-cells', $tE !== '' && strpos($tE, 'Titularisation') === false && strpos($tE, 'Matières') === false && strpos($tE, 'Classes /') === false && strpos($tE, 'Échelon /') === false && strpos($tE, 'N° Caisse') === false);
+    $c182('emp-cells', $tE !== '' && strpos($tE, 'Fonction / الوظيفة') !== false && strpos($tE, 'Régime / النظام') !== false && strpos($tE, 'Ancienneté / الأقدمية') !== false
+        && strpos($tE, 'Situation familiale / الوضع العائلي') !== false && strpos($tE, 'Fin de service / نهاية الخدمة') !== false && strpos($tE, 'Départ / تاريخ الترك') !== false
+        && strpos($tE, 'N° CNSS / رقم الضمان') !== false && strpos($tE, 'N° Fin. / الرقم المالي') !== false && strpos($tE, 'Embauche / تاريخ الدخول') !== false);
+    $info = employeSlipInfo($e182, '2025-2026');
+    $c182('emp-values-shown', $tE !== '' && strpos($tE, e($info['regime'])) !== false && strpos($tE, e($info['seniority'])) !== false && strpos($tE, e($info['family'])) !== false && strpos($tE, e($info['eos'])) !== false && strpos($tE, e($info['left'])) !== false);
+    // منطق المصدر الواحد: 64 ⇒ معفى، 40 ⇒ خاضع، الترك يظهر، الحد الأدنى بالنظام، الأقدمية 7 سنة 11 شهر (1/10/2018 ← 30/9/2026)
+    $base = $e182; unset($base['display_hire_date']);
+    $i64 = employeSlipInfo($base + [], '2025-2026'); // كما هو
+    $iOld = employeSlipInfo(array_merge($base, ['birth_date' => '1950-01-01', 'left_date_all' => '2026-03-31', 'salary_labor_law' => 1, 'hire_date' => '2018-10-01', 'display_hire_date' => null, 'social_status' => 'marie_2_enfants']), '2025-2026');
+    $iYoung = employeSlipInfo(array_merge($base, ['birth_date' => '1986-01-01', 'left_date_all' => null, 'salary_labor_law' => 0, 'base_salary_usd' => 0, 'contract_salary_lbp' => 0]), '2025-2026');
+    $c182('logic', strpos($iOld['eos'], 'Exempté — 64 ans') === 0 && $iOld['left'] === '31/03/2026' && $iOld['regime'] === 'قانون العمل — الحد الأدنى للأجور' && $iOld['family'] === 'متزوج وله ولدين' && $iOld['seniority'] === '7 سنة 6 شهر / 7 ans 6 mois'
+        && strpos($iYoung['eos'], 'Assujetti') === 0 && $iYoung['left'] === 'En service / بالخدمة' && $iYoung['regime'] === 'قانون العمل' && is_array($i64));
+    // بلوغ 64 داخل السنة ⇒ «معفى من MM/YYYY»
+    $iMid = employeSlipInfo(array_merge($base, ['birth_date' => '1962-03-15']), '2025-2026');
+    $c182('logic-mid-year', $iMid['eos'] === 'Exempté dès 03/2026 / معفى من 03/2026');
+} else $c182('no-emp-sample', false);
+// بطاقة الأستاذ كما هي (خاناته الخمس باقية)
+$t182 = $db->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND m.school_year = '2025-2026' AND m.net_salary_lbp > 0 ORDER BY e.id LIMIT 1")->fetchColumn();
+if ($t182) {
+    $tT = $slipInfo182(renderPage('pages/annual_slip.php', ['employee_id' => (int)$t182, 'school_year' => '2025-2026'], []));
+    $c182('teacher-unchanged', $tT !== '' && substr_count($tT, '<tr>') === 3 && substr_count($tT, '<td>') === 12 && strpos($tT, 'Titularisation / تاريخ الملاك') !== false && strpos($tT, 'Matières / المواد') !== false
+        && strpos($tT, 'Classes / الصفوف') !== false && strpos($tT, 'Échelon / الدرجة') !== false && strpos($tT, 'N° Caisse / رقم صندوق التعويضات') !== false && strpos($tT, 'Régime /') === false && strpos($tT, 'Ancienneté') === false);
+} else $c182('no-teacher-sample', false);
+check('🧑‍💼 بطاقة الموظف (قانون العمل) (2026-09-27): لا تاريخ ملاك/مواد/صفوف/درجة/صندوق — النظام/الأقدمية/الوضع العائلي/نهاية الخدمة/الترك بنفس الـ12 خانة + منطق المصدر الواحد (64/الترك/الحد الأدنى) + بطاقة الأستاذ كما هي', $ok182, implode(' · ', $why182) ?: 'ok');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

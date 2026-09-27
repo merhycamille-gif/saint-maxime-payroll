@@ -229,6 +229,51 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         'rate'        => $slipRate,
         'school_year' => $schoolYear,
     ];
+    // 🧑‍💼 «بالبطاقة السنوية للموظف في معلومات لازم تكون صح» (2026-09-27): الموظف (قانون العمل) ليس أستاذاً — لا ملاك ولا درجة ولا مواد
+    //    ولا صفوف ولا صندوق تعويضات؛ خاناته الخمس تلك تُبدَّل بمعلوماته الحقيقية (بنفس الـ12 خانة، التصميم المجمّد لم يُمسّ).
+    if (($emp['employee_type'] ?? '') === 'employe') { $meta['titul'] = ''; $meta += employeSlipInfo($emp, $schoolYear); }
 
     return ['meta' => $meta, 'rows' => $rows, 'tot' => $tot, 'school' => $empSchool];
+}
+
+/**
+ * 🧑‍💼 معلومات الموظف (قانون العمل) لبطاقته السنوية — المصدر الواحد (البطاقة + التصدير + الطباعة الجماعية).
+ * «وقت اللي بقول موظف غير ما بقول أستاذ» (2026-09-27): الموظف لا ملاك ولا درجة ولا مواد ولا صفوف ولا صندوق —
+ * فمكانها: النظام (قانون العمل — الحد الأدنى/أساس محدّد) · الأقدمية · الوضع العائلي · نهاية الخدمة (خاضع/معفى 64) · الترك.
+ */
+function employeSlipInfo(array $emp, string $schoolYear): array {
+    [$y1, $y2] = schoolYearToYears($schoolYear);
+    // النظام
+    if (isLaborLawSalary($emp)) $regime = 'قانون العمل — الحد الأدنى للأجور';
+    elseif ((float)($emp['base_salary_usd'] ?? 0) > 0 && ($emp['salary_input_mode'] ?? '') === 'direct_usd') $regime = 'قانون العمل — أساس محدّد ($)';
+    elseif ((float)($emp['contract_salary_lbp'] ?? 0) > 0) $regime = 'قانون العمل — أساس محدّد (ل.ل)';
+    else $regime = 'قانون العمل';
+    // الأقدمية: من تاريخ الدخول المعروض حتى الترك أو نهاية السنة الدراسية (30/9) أو اليوم — الأسبق
+    $hire = shownHireDate($emp);
+    $leftAll = (string)($emp['left_date_all'] ?? '');
+    $leftAll = ($leftAll !== '' && $leftAll !== '0000-00-00' && $leftAll >= '1900-01-01') ? substr($leftAll, 0, 10) : '';
+    $end = min(date('Y-m-d'), sprintf('%04d-09-30', $y2));
+    if ($leftAll !== '' && $leftAll < $end) $end = $leftAll;
+    $seniority = '—';
+    if ($hire !== '' && $hire <= $end) {
+        $d = date_diff(date_create($hire), date_create($end)->modify('+1 day')); // آخر يوم خدمة محسوب (1/10 ← 30/9 = سنة كاملة)
+        $seniority = $d->y . ' سنة ' . $d->m . ' شهر / ' . $d->y . ' ans ' . $d->m . ' mois'; // العربي أوّلاً (الخانة RTL — الترتيب المعكوس كان يخربط الأرقام)
+    }
+    // الوضع العائلي
+    $ss = trim((string)($emp['social_status'] ?? ''));
+    $family = $ss !== '' ? socialStatusLabel($ss, 'ar') : '—';
+    // نهاية الخدمة (فرع الضمان ٨.٥٪ على المؤسّسة): معفى تلقائياً ببلوغ 64 — أوّل شهر معفى ضمن السنة
+    $eos = 'Assujetti / خاضع (CNSS 8,5 %)';
+    $months = schoolYearMonthsFor(12, $y1, $y2);
+    $first = null;
+    foreach ($months as [$m, $y]) { if (employeExemptEos64($emp, (int)$m, (int)$y)) { $first = [(int)$m, (int)$y]; break; } }
+    if ($first !== null) {
+        [$fm, $fy] = $first;
+        $eos = ($fm === (int)$months[0][0] && $fy === (int)$months[0][1])
+            ? 'Exempté — 64 ans / معفى (64 سنة)'
+            : sprintf('Exempté dès %02d/%04d / معفى من %02d/%04d', $fm, $fy, $fm, $fy);
+    }
+    // الترك
+    $left = $leftAll !== '' ? formatDate($leftAll) : 'En service / بالخدمة';
+    return ['regime' => $regime, 'seniority' => $seniority, 'family' => $family, 'eos' => $eos, 'left' => $left];
 }

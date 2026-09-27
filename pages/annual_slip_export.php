@@ -70,9 +70,14 @@ function addEmployeeBlock(ReportTable $rep, array $slip, $withIdentity = true, $
         $isTotal ? $rep->totalRow($row) : $rep->row($row);
     };
     if ($withIdentity) {
-        $rep->sectionRow($m['name'] . '  —  الشهادة: ' . $m['diploma'] . ' · الفئة: ' . $m['type']
-            . ' · الدرجة: ' . $m['grade'] . ' · ر.الضمان: ' . $m['cnss']
-            . ' · ر.الصندوق: ' . $m['caisse_no'] . ' · ر.المالية: ' . $m['finance_no']);
+        // 🧑‍💼 (2026-09-27) الموظف (قانون العمل): وظيفته ونظامه ووضعه العائلي ونهاية خدمته — لا شهادة ولا درجة ولا صندوق (كالبطاقة)
+        $rep->sectionRow(isset($m['regime'])
+            ? $m['name'] . '  —  الوظيفة: ' . $m['diploma'] . ' · الفئة: ' . $m['type'] . ' · النظام: ' . $m['regime']
+                . ' · الأقدمية: ' . $m['seniority'] . ' · الوضع العائلي: ' . $m['family'] . ' · نهاية الخدمة: ' . $m['eos']
+                . ' · ر.الضمان: ' . $m['cnss'] . ' · ر.المالية: ' . $m['finance_no'] . ' · الترك: ' . $m['left']
+            : $m['name'] . '  —  الشهادة: ' . $m['diploma'] . ' · الفئة: ' . $m['type']
+                . ' · الدرجة: ' . $m['grade'] . ' · ر.الضمان: ' . $m['cnss']
+                . ' · ر.الصندوق: ' . $m['caisse_no'] . ' · ر.المالية: ' . $m['finance_no']);
     }
 
     foreach ($slip['rows'] as $r) {
@@ -144,9 +149,10 @@ $rep = new ReportTable('كشف الراتب السنوي ' . $schoolYear, true);
 $rep->schoolHeader($slip['school']);
 $isAdminEmp = ($emp['employee_type'] === 'employe');
 $slipRateTxt = rateTitleText(null, null, true, (float)($m['rate'] ?? 0) > 0 ? (float)$m['rate'] : null, ($m['extra_pct'] ?? '') !== ''); // 🏷️ سعر الصرف بالتصدير أيضاً (2026-09-23)
+// 🧑‍💼 (2026-09-27) الموظف (قانون العمل): النظام/الأقدمية/الوضع العائلي/نهاية الخدمة/الترك بدل الدرجة والصندوق — كالبطاقة (المصدر الواحد employeSlipInfo)
 $rep->period($m['name'] . '  —  ' . ($isAdminEmp ? 'الوظيفة' : 'الشهادة') . ': ' . $m['diploma'] . ' · الفئة: ' . $m['type']
-    . ($isAdminEmp ? '' : ' · الدرجة: ' . $m['grade'])
-    . ' · ر.الضمان: ' . $m['cnss'] . ' · ر.الصندوق: ' . $m['caisse_no'] . ' · ر.المالية: ' . $m['finance_no']
+    . ($isAdminEmp ? ' · النظام: ' . $m['regime'] . ' · الأقدمية: ' . $m['seniority'] . ' · الوضع العائلي: ' . $m['family'] . ' · نهاية الخدمة: ' . $m['eos'] : ' · الدرجة: ' . $m['grade'])
+    . ' · ر.الضمان: ' . $m['cnss'] . ($isAdminEmp ? '' : ' · ر.الصندوق: ' . $m['caisse_no']) . ' · ر.المالية: ' . $m['finance_no'] . ($isAdminEmp ? ' · الترك: ' . $m['left'] : '')
     . ($slipRateTxt !== '' ? "\n" . $slipRateTxt : ''));
 // الموظف الإداري: احذف أعمدة الدرجة/التدرّج/الصندوق من الرأس والعرض والصفوف (لا سلسلة رتب له).
 $rep->head(annualDropCols($head, $isAdminEmp));

@@ -229,23 +229,30 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 <td><span class="lbl"><?= ($emp['employee_type'] === 'employe') ? 'Fonction / الوظيفة' : 'Diplôme / الشهادة العلمية' ?></span><span class="val"><?= e($meta['diploma']) ?></span></td>
                 <td><span class="lbl">Type / الفئة</span><span class="val"><?= e($meta['type']) ?></span></td>
                 <?php /* 📚 «حطّ المواد محلّ الدرجة» (طلبه المباشر 2026-09-24): تبديل الخانتين فقط — المواد بالسطر الأوّل والدرجة بالثالث؛ التخطيط المجمّد لم يُمسّ */ ?>
-                <td><span class="lbl">Matières / المواد</span><span class="val"><?= e($meta['subjects']) ?></span></td>
+                <?php /* 🧑‍💼 «بالبطاقة السنوية للموظف في معلومات لازم تكون صح» (2026-09-27): الموظف (قانون العمل) ليس أستاذاً — خاناته الخمس (المواد/الملاك/الصفوف/الدرجة/الصندوق)
+                         تُبدَّل بمعلوماته (النظام/الأقدمية/الوضع العائلي/نهاية الخدمة/الترك) من المصدر الواحد employeSlipInfo — نفس الـ12 خانة، لا ستايل ولا أبعاد مُسّت */ ?>
+                <?php if ($isEmp): ?><td><span class="lbl">Régime / النظام</span><span class="val"><?= e($meta['regime']) ?></span></td>
+                <?php else: ?><td><span class="lbl">Matières / المواد</span><span class="val"><?= e($meta['subjects']) ?></span></td><?php endif; ?>
                 <td><span class="lbl">Code / الرمز</span><span class="val"><?= e($meta['code']) ?><?= ($meta['birth'] ?? '') !== '' ? ' · ولادة ' . e($meta['birth']) : '' ?></span></td><?php /* 👤 تاريخ الولادة بنفس الخانة — لا صفّ ولا خانة جديدة (البطاقة كما هي) */ ?>
             </tr>
             <tr>
                 <td><span class="lbl">Embauche / تاريخ الدخول</span><span class="val"><?= e($meta['hire']) ?></span></td>
-                <td><span class="lbl">Titularisation / تاريخ الملاك</span><span class="val"><?= e($meta['titul']) ?></span></td>
+                <?php if ($isEmp): ?><td><span class="lbl">Ancienneté / الأقدمية</span><span class="val"><?= e($meta['seniority']) ?></span></td>
+                <?php else: ?><td><span class="lbl">Titularisation / تاريخ الملاك</span><span class="val"><?= e($meta['titul']) ?></span></td><?php endif; ?>
                 <?php if (($meta['hours_red'] ?? '') !== ''): // 🕐 التناقص وحضوره بنفس الخانة (بلا خانة/صف جديد — ارتفاع الصفوف والصفحة كما هما، مفحوص) ?>
                 <td><span class="lbl">Heures / jours par semaine — الساعات / الأيام أسبوعياً</span><span class="val" dir="ltr" style="white-space:nowrap;unicode-bidi:isolate"><?= e($meta['hours']) ?> h / <?= e($meta['days']) ?> j · Réduction <?= e($meta['hours_red']) ?> h = Présence <?= e($meta['hours_pres']) ?> h</span></td>
                 <?php else: ?>
                 <td><span class="lbl">Heures / jours par semaine — الساعات / الأيام أسبوعياً</span><span class="val"><?= e($meta['hours']) ?> h / <?= e($meta['days']) ?> j</span></td>
                 <?php endif; ?>
-                <td><span class="lbl">Classes / الصفوف</span><span class="val"><?= e($meta['classes']) ?></span></td>
+                <?php if ($isEmp): ?><td><span class="lbl">Situation familiale / الوضع العائلي</span><span class="val"><?= e($meta['family']) ?></span></td>
+                <?php else: ?><td><span class="lbl">Classes / الصفوف</span><span class="val"><?= e($meta['classes']) ?></span></td><?php endif; ?>
             </tr>
             <tr>
-                <td><span class="lbl">Échelon / الدرجة</span><span class="val"><?= e($meta['grade']) ?></span></td>
+                <?php if ($isEmp): ?><td><span class="lbl">Fin de service / نهاية الخدمة</span><span class="val"><?= e($meta['eos']) ?></span></td>
+                <?php else: ?><td><span class="lbl">Échelon / الدرجة</span><span class="val"><?= e($meta['grade']) ?></span></td><?php endif; ?>
                 <td><span class="lbl">N° CNSS / رقم الضمان</span><span class="val"><?= e($meta['cnss']) ?></span></td>
-                <td><span class="lbl">N° Caisse / رقم صندوق التعويضات</span><span class="val"><?= e($meta['caisse_no']) ?></span></td>
+                <?php if ($isEmp): ?><td><span class="lbl">Départ / تاريخ الترك</span><span class="val"><?= e($meta['left']) ?></span></td>
+                <?php else: ?><td><span class="lbl">N° Caisse / رقم صندوق التعويضات</span><span class="val"><?= e($meta['caisse_no']) ?></span></td><?php endif; ?>
                 <td><span class="lbl">N° Fin. / الرقم المالي</span><span class="val"><?= e($meta['finance_no']) ?></span></td>
             </tr>
         </table>
