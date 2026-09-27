@@ -8557,6 +8557,33 @@ check('☑️ مجموعات التشييك شبكة مرصوفة بكل الب�
       && $noFatal($hAt185) && substr_count($hAt185, 'class="chk-group-title"') >= 6 && strpos($hAt185, '<span style="display:inline-flex') === false,
       'cols=' . substr_count($hEl185, 'name="cols[]"') . ' groups=' . substr_count($hEl185, 'class="chk-group-title"') . ' at-groups=' . substr_count($hAt185, 'class="chk-group-title"'));
 
+/* =====================================================================
+ * 186) ↩️ سهم «Revenir / لمحل ما كنت» (2026-09-27 «بدي إذا كنت بشي صفحة وأرجع للي قبلها يكون في كمان سهم حتى أرجع محل ما كنت»):
+ *      كبسة «رجوع» تتذكّر الصفحة المتروكة (رابط + تمرير + عنوان، 30 دقيقة بالجلسة) ⇒ بالصفحة السابقة (وباللوحة أيضاً) يظهر #msaFwdBtn
+ *      يعيده لذاك الرابط ويرجّع التمرير — msaRememberFwd/msaGoFwd بـapp.js. مخفي إن لا محلّ. اختبار المنطق بمحاكاة Node إن توفّر.
+ * =================================================================== */
+$hd186 = (string)file_get_contents($PROJ . '/includes/header.php'); $js186 = (string)file_get_contents($PROJ . '/assets/js/app.js');
+$hR186 = renderPage('pages/reports.php', ['report' => 'employee_list'], [], [], 'lbp', '2025-2026'); $hD186 = renderPage('index.php', [], [], [], 'lbp', '2025-2026');
+$node186 = trim((string)@shell_exec('node -v 2>NUL')) !== '';
+$sim186 = true;
+if ($node186) {
+    $t186 = $PROJ . '/tools/_fwd186.js';
+    file_put_contents($t186, "const fs=require('fs');const src=fs.readFileSync(process.argv[2],'utf8');const st=src.indexOf(\"var K = 'msa_fwd'\");const iife=src.slice(src.lastIndexOf('(function () {',st),src.indexOf('})();',st)+5);"
+        . "const store={};const ss={getItem:k=>(k in store?store[k]:null),setItem:(k,v)=>{store[k]=String(v);},removeItem:k=>{delete store[k];}};let sc=[],nav=null,btn={hidden:true,title:''};"
+        . "function env(p,s,y,t){const w={pageYOffset:y,scrollTo:(x,yy)=>sc.push(yy)};const l={pathname:p,search:s,set href(v){nav=v;}};const d={title:t,readyState:'complete',documentElement:{scrollTop:y},getElementById:id=>id==='msaFwdBtn'?btn:null,addEventListener:()=>{}};return new Function('window','location','document','sessionStorage','setTimeout','Date',iife+'; return window;')(w,l,d,ss,cb=>cb(),Date);}"
+        . "let w=env('/a.php','?x=1',900,'A');const h0=btn.hidden;w.msaRememberFwd();btn={hidden:true,title:''};w=env('/b.php','',0,'B');const v1=!btn.hidden&&btn.title.indexOf('A')>0;w.msaGoFwd();const n1=nav==='/a.php?x=1'&&!('msa_fwd' in store);btn={hidden:true};sc=[];w=env('/a.php','?x=1',0,'A');const s1=sc[0]===900&&btn.hidden&&!('msa_fwd_restore' in store);"
+        . "process.stdout.write((h0&&v1&&n1&&s1)?'OK':'FAIL '+[h0,v1,n1,s1].join(','));");
+    $out186 = trim((string)shell_exec('node ' . escapeshellarg($t186) . ' ' . escapeshellarg($PROJ . '/assets/js/app.js') . ' 2>&1')); @unlink($t186);
+    $sim186 = ($out186 === 'OK');
+}
+check('↩️ سهم «Revenir / لمحل ما كنت» بعد الرجوع (2026-09-27): زرّ الرجوع يتذكّر الصفحة (msaRememberFwd) + #msaFwdBtn بكل الصفحات واللوحة (مخفي افتراضياً) + msaGoFwd يعيد الرابط والتمرير + انتهاء 30 دقيقة — محاكاة Node',
+      strpos($hd186, 'onclick="if(window.msaRememberFwd)msaRememberFwd();') !== false && strpos($hd186, 'id="msaFwdBtn" hidden') !== false && strpos($hd186, 'onclick="if(window.msaGoFwd)msaGoFwd()"') !== false
+      && strpos($js186, "var K = 'msa_fwd', KR = 'msa_fwd_restore', TTL = 30 * 60 * 1000;") !== false && strpos($js186, 'window.msaRememberFwd = function () {') !== false && strpos($js186, 'window.msaGoFwd = function () {') !== false
+      && $noFatal($hR186) && substr_count($hR186, 'id="msaFwdBtn" hidden') === 1 && strpos($hR186, 'msaRememberFwd();') !== false
+      && $noFatal($hD186) && substr_count($hD186, 'id="msaFwdBtn" hidden') === 1
+      && $sim186,
+      $node186 ? ('node: ' . ($out186 ?? '')) : 'node غير متوفّر — فحص المصدر فقط');
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

@@ -456,11 +456,16 @@ document.addEventListener('submit', function (e) {
                 $docBackHref = !empty($docFocus) ? docBackUrl() : (!empty($backHref) ? (string)$backHref : ''); // $backHref: الصفحة تحدّد وجهة الرجوع (إفادة الأستاذ ⇒ ملف إفاداته، 2026-09-24)
                 ?>
                 <button type="button" class="btn btn-light no-print" title="رجوع / Retour"
-                        onclick="<?= $docBackHref !== '' ? "location.href='" . e($docBackHref) . "'" : "if(document.referrer&&history.length>1){history.back()}else{location.href='" . BASE_URL . "index.php'}" ?>"
+                        onclick="if(window.msaRememberFwd)msaRememberFwd();<?= $docBackHref !== '' ? "location.href='" . e($docBackHref) . "'" : "if(document.referrer&&history.length>1){history.back()}else{location.href='" . BASE_URL . "index.php'}" ?>"
                         style="white-space:nowrap">
                     <i class="fas fa-arrow-right" style="color:#16a34a"></i> Retour / رجوع
                 </button>
                 <?php endif; ?>
+                <?php /* ↩️ «إذا كنت بشي صفحة ورجعت للي قبلها يكون في كمان سهم حتى أرجع محل ما كنت» (2026-09-27): بعد كبسة «رجوع» يظهر هنا سهم يعيده
+                         للصفحة اللي تركها **وبنفس موضع التمرير** (msaRememberFwd/msaFwdInit بـapp.js — يُخزَّن بالجلسة 30 دقيقة). مخفي ما لم يوجد محلّ للرجوع إليه. */ ?>
+                <button type="button" class="btn btn-light no-print" id="msaFwdBtn" hidden title="Revenir où j'étais / ارجع لمحل ما كنت" style="white-space:nowrap" onclick="if(window.msaGoFwd)msaGoFwd()">
+                    <i class="fas fa-arrow-left" style="color:#2563eb"></i> Revenir / لمحل ما كنت
+                </button>
                 <?php
                 // عنوان الصفحة ثنائي اللغة: الفرنسي فوق والعربي تحت (يُكتشفان تلقائياً من $pageTitle
                 // مهما كان ترتيبه — أي جزء فيه حروف عربية = السطر العربي، والباقي = الفرنسي).

@@ -515,3 +515,46 @@ window.msaSyncForms = function () {
     return true;
 };
 window.addEventListener('pageshow', function () { setTimeout(window.msaSyncForms, 50); });
+
+// ↩️ «بدي إذا كنت بشي صفحة وأرجع للي قبلها يكون في كمان سهم حتى أرجع محل ما كنت» (طلبه 2026-09-27):
+// عند كبس «رجوع» نتذكّر الصفحة اللي تركها (الرابط + موضع التمرير + عنوانها) بالجلسة 30 دقيقة، وبالصفحة السابقة يظهر
+// زرّ «Revenir / لمحل ما كنت» (#msaFwdBtn بالهيدر) يعيده لذاك الرابط ويرجّع التمرير لنفس السطر. عام لكل البرنامج.
+(function () {
+    var K = 'msa_fwd', KR = 'msa_fwd_restore', TTL = 30 * 60 * 1000;
+    function here() { return location.pathname + location.search; }
+    window.msaRememberFwd = function () {
+        try { sessionStorage.setItem(K, JSON.stringify({ u: here(), y: window.pageYOffset || document.documentElement.scrollTop || 0, t: Date.now(), n: (document.title || '').replace(/\s+/g, ' ').trim() })); } catch (e) {}
+    };
+    function read() {
+        var raw = null; try { raw = sessionStorage.getItem(K); } catch (e) { return null; }
+        if (!raw) return null;
+        var s = null; try { s = JSON.parse(raw); } catch (e) { return null; }
+        if (!s || !s.u || (Date.now() - (s.t || 0)) > TTL) { try { sessionStorage.removeItem(K); } catch (e) {} return null; }
+        return s;
+    }
+    window.msaGoFwd = function () {
+        var s = read(); if (!s) return;
+        try { sessionStorage.setItem(KR, JSON.stringify({ u: s.u, y: s.y || 0, t: Date.now() })); sessionStorage.removeItem(K); } catch (e) {}
+        location.href = s.u;
+    };
+    function init() {
+        // 1) رجعنا «لمحل ما كنّا» ⇒ رجّع التمرير
+        try {
+            var r = sessionStorage.getItem(KR);
+            if (r) {
+                sessionStorage.removeItem(KR);
+                var st = JSON.parse(r);
+                if (st && st.u === here() && (Date.now() - (st.t || 0)) < 120000) {
+                    var y = parseInt(st.y, 10) || 0;
+                    window.scrollTo(0, y); setTimeout(function () { window.scrollTo(0, y); }, 60); setTimeout(function () { window.scrollTo(0, y); }, 300);
+                }
+            }
+        } catch (e) {}
+        // 2) في محلّ محفوظ غير هذه الصفحة ⇒ أظهر السهم
+        var s = read(); var b = document.getElementById('msaFwdBtn');
+        if (!b) return;
+        if (s && s.u !== here()) { b.hidden = false; if (s.n) b.title = 'Revenir / ارجع إلى: ' + s.n; }
+        else b.hidden = true;
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
