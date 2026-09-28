@@ -8876,6 +8876,25 @@ $ok197 = in_array('pay_from_month', $cols197, true) && in_array('pay_to_month', 
 check('📆 الفترة المدفوعة من شهر ← إلى شهر بملف الموظف (2026-09-28): أعمدة ذاتية + paidMonthsFor (12/10/8/1/مقلوبة/بلا أعمدة) + لا ثلاثية ===10 بالمحرّك وفتح السنة والنسخ والبطاقة + الفورم بلا أسانسور العدد', $ok197,
       'cols=' . implode(',', $cols197) . ' fn=' . (int)$fnOk197 . ' src=' . (int)$srcOk197 . ' form=' . (int)$formOk197);
 
+/* =====================================================================
+ * 198) 🔁 إعادة إرسال نماذج POST تلقائياً عند انقطاع الاتصال + منع التكرار (2026-09-28 بيرلا:
+ *      «عملت حفظ صار يفتل وعطاني can't reach this page» ثم «ما رح أعمل تجارب — البرنامج كلو صح»):
+ *      header.php يرسل كل POST بـfetch مع محاولات وreq_id؛ database.php يتجاهل req_id المكرّر (303 للصفحة نفسها).
+ * =================================================================== */
+$hd198 = (string)file_get_contents($PROJ . '/includes/header.php'); $cf198 = (string)file_get_contents($PROJ . '/config/database.php');
+$_SESSION['msa_done_req'] = [];
+$rid198 = 'rtest' . substr(md5((string)microtime(true)), 0, 12);
+$dup198 = function_exists('msaPostIsDuplicate') && msaPostIsDuplicate($rid198) === false && msaPostIsDuplicate($rid198) === true
+    && msaPostIsDuplicate('') === false && msaPostIsDuplicate('x') === false && msaPostIsDuplicate('bad id!') === false;
+for ($i = 0; $i < 70; $i++) msaPostIsDuplicate('rfill' . str_pad((string)$i, 8, '0', STR_PAD_LEFT)); // معرّفات صالحة (≥ 8 أحرف)
+$cap198 = count($_SESSION['msa_done_req']) <= 60 && msaPostIsDuplicate($rid198) === false; // الأقدم يُنسى (سقف 60)
+unset($_SESSION['msa_done_req']);
+$ok198 = $dup198 && $cap198
+    && strpos($hd198, 'window.msaPostRetry = { max: 6, delay: 2500 };') !== false && strpos($hd198, "fd.append('req_id', rid);") !== false
+    && strpos($hd198, "e.submitter") !== false && strpos($hd198, "f.hasAttribute('data-no-retry')") !== false && strpos($hd198, "credentials: 'same-origin', redirect: 'follow'") !== false
+    && strpos($cf198, "isset(\$_POST['req_id']) && PHP_SAPI !== 'cli' && msaPostIsDuplicate((string)\$_POST['req_id'])") !== false && strpos($cf198, "true, 303);") !== false;
+check('🔁 نماذج POST تُعاد تلقائياً عند انقطاع الاتصال (fetch + محاولات + req_id) والخادم يتجاهل التكرار (سقف 60) — 2026-09-28', $ok198, 'dup=' . (int)$dup198 . ' cap=' . (int)$cap198);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

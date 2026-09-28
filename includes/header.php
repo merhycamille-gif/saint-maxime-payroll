@@ -147,6 +147,55 @@ document.addEventListener('submit', function (e) {
         f.appendChild(i);
     }
 }, true);
+// 🔁 (2026-09-28 p1 «رحت على ملف بيرلا وحطّيت الإضافي… عملت حفظ صار يفتل وعطاني can't reach this page» + «ما رح أعمل تجارب — البرنامج كلو صح»):
+//    الاستضافة تُسقط اتصالات متقطّعة (ERR_CONNECTION_TIMED_OUT حتى للملفات الثابتة). كل نموذج POST يُرسَل بـfetch مع إعادة محاولة تلقائية
+//    (حتى 6 مرّات) عند فشل الاتصال، مع req_id فريد لكل إرسال (الخادم يتجاهل التكرار — database.php). لا يمسّ النماذج التي تفتح نافذة/تبويباً
+//    (target) ولا data-no-retry. الردّ: إعادة توجيه ⇒ ننتقل إليها، وإلا نعرض الصفحة المرجَعة كما هي.
+window.msaPostRetry = { max: 6, delay: 2500 };
+document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f || e.defaultPrevented || !window.fetch || !window.FormData) return;
+    if (!f.method || f.method.toLowerCase() !== 'post') return;
+    if ((f.getAttribute('target') || '') !== '' || f.hasAttribute('data-no-retry') || f._msaRetrySubmitting) return;
+    e.preventDefault();
+    var fd = new FormData(f);
+    var sub = e.submitter;
+    if (sub && sub.name) fd.append(sub.name, sub.value || '');
+    if (!fd.has('csrf')) fd.append('csrf', '<?= csrfToken() ?>');
+    var rid = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    fd.append('req_id', rid);
+    var url = f.getAttribute('action') || window.location.href;
+    var ov = document.getElementById('msaBusyOverlay');
+    if (!ov) {
+        ov = document.createElement('div'); ov.id = 'msaBusyOverlay';
+        ov.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font:700 18px Arial,sans-serif;color:#1F4E5F');
+        document.body.appendChild(ov);
+    }
+    var box = function (t) { ov.innerHTML = '<div style="background:#fff;border:2px solid #1F4E5F;border-radius:12px;padding:16px 28px;box-shadow:0 8px 30px rgba(0,0,0,.15)">' + t + '</div>'; ov.style.display = 'flex'; };
+    box('⏳ جارٍ الحفظ… / Enregistrement…');
+    f._msaRetrySubmitting = true;
+    var attempt = 0;
+    var go = function () {
+        attempt++;
+        fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', redirect: 'follow', cache: 'no-store' }).then(function (r) {
+            return r.text().then(function (html) {
+                f._msaRetrySubmitting = false;
+                if (r.redirected) { window.location.href = r.url; return; }
+                try { window.history.replaceState(null, '', r.url || url); } catch (x) {}
+                document.open(); document.write(html); document.close();
+            });
+        }).catch(function () {
+            if (attempt < window.msaPostRetry.max) {
+                box('📡 انقطع الاتصال بالخادم — إعادة المحاولة تلقائياً (' + (attempt + 1) + '/' + window.msaPostRetry.max + ')… لا تغلق الصفحة<br><span style="font-size:13px;font-weight:400">Connexion perdue — nouvelle tentative automatique</span>');
+                setTimeout(go, window.msaPostRetry.delay);
+            } else {
+                f._msaRetrySubmitting = false;
+                box('⚠️ تعذّر الوصول للخادم بعد ' + attempt + ' محاولات — ما انحفظ شي. <a href="#" onclick="location.reload();return false" style="color:#1F4E5F">أعد المحاولة</a>');
+            }
+        });
+    };
+    go();
+}, false);
 // 📌 «بدي ما تنطّ الصفحة على مكان آخر وأنا عم اشتغل فيها — إذا صلّحت شي لازم تضلّ بنفس الصفحة، بكل البرنامج» (أمره 2026-09-13):
 // عند إرسال أي نموذج POST نحفظ موضع التمرير والأقسام المفتوحة (details) لهذه الصفحة، وبعد الرجوع (إعادة التوجيه) نرجّعها كما كانت.
 (function () {
