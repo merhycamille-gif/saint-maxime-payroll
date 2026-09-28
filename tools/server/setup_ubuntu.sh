@@ -116,6 +116,25 @@ function getDB() {
     }
     return \$pdo;
 }
+// كاش الإعدادات + getSetting/setSetting (يستعملهما البرنامج منذ التحميل — لازم يكونا هنا)
+function &settingsCache() {
+    static \$settings = null;
+    if (\$settings === null) {
+        try {
+            \$stmt = getDB()->query("SELECT \`key\`, \`value\` FROM settings");
+            \$settings = [];
+            while (\$row = \$stmt->fetch()) { \$settings[\$row['key']] = \$row['value']; }
+        } catch (Exception \$e) { \$settings = []; }
+    }
+    return \$settings;
+}
+function getSetting(\$key, \$default = '') { \$settings = &settingsCache(); return \$settings[\$key] ?? \$default; }
+function setSetting(\$key, \$value) {
+    \$stmt = getDB()->prepare("INSERT INTO settings (\`key\`, \`value\`) VALUES (?, ?) ON DUPLICATE KEY UPDATE \`value\` = ?");
+    \$ok = \$stmt->execute([\$key, \$value, \$value]);
+    if (\$ok) { \$settings = &settingsCache(); \$settings[\$key] = \$value; }
+    return \$ok;
+}
 EOF
 fi
 chown -R www-data:www-data "$APP_DIR"
