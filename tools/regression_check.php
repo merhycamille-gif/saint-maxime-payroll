@@ -8896,6 +8896,40 @@ $ok198 = $dup198 && $cap198
     && strpos((string)file_get_contents($PROJ . '/config/database.php'), 'msaPostIsDuplicate') === false && strpos((string)file_get_contents($PROJ . '/.gitignore'), 'config/database.php') !== false;
 check('🔁 نماذج POST تُعاد تلقائياً عند انقطاع الاتصال (fetch + محاولات + req_id) والخادم يتجاهل التكرار (سقف 60) — 2026-09-28', $ok198, 'dup=' . (int)$dup198 . ' cap=' . (int)$cap198);
 
+/* =====================================================================
+ * 199) 🗂️ نقل مستندات الأساتذة بلا cPanel (2026-09-28 — الانتقال لسيرفر خاصّ): pages/backup.php?action=files
+ *      يبثّ uploads/ كاملاً بـtar قياسي (ustar) كتلةً كتلة بلا ذاكرة ولا ملف مؤقّت + action=files_info (العدد والحجم)
+ *      — للمدير فقط كباقي النسخ. تجربة حيّة: العدد بالـtar = العدد بالمجلد، وترويسة ustar صحيحة.
+ * =================================================================== */
+$bk199 = (string)file_get_contents($PROJ . '/pages/backup.php');
+$info199 = json_decode(trim((string)renderPage('pages/backup.php', ['action' => 'files_info'], [])), true) ?: [];
+// المخرجات ثنائية (فيها \0) ⇒ إلى ملف (أنبوب shell_exec بويندوز يقصّها) ونقرأ الترويسات بالقفز لا بتحميل الملف بالذاكرة
+$tarFile199 = $PROJ . '/tools/_r199.tar';
+// renderPage تحذف ملف المخرجات بعد قراءته كاملاً بالذاكرة (294MB) ⇒ نشغّل المشغّل نفسه مباشرة إلى الملف
+@unlink($tarFile199);
+shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/_render_one.php') . ' ' . escapeshellarg('pages/backup.php') . ' ' . base64_encode(json_encode(['action' => 'files'])) . ' ' . base64_encode('[]') . ' ' . base64_encode('[]') . ' "" "" 2>NUL > ' . escapeshellarg($tarFile199));
+$nHdr199 = 0; $okUstar = false; $len = (int)@filesize($tarFile199); $endOk199 = false;
+if ($len >= 1024 && ($fh199 = @fopen($tarFile199, 'rb'))) {
+    $okUstar = true; $off = 0;
+    while ($off + 512 <= $len) {
+        fseek($fh199, $off); $h = (string)fread($fh199, 512);
+        if (trim($h, "\0") === '') break;
+        if (substr($h, 257, 5) !== 'ustar') { $okUstar = false; break; }
+        $type = $h[156]; $size = octdec(trim(substr($h, 124, 12)));
+        if ($type === '0') $nHdr199++;
+        $off += 512 + ($type === '0' ? (int)(ceil($size / 512) * 512) : 0);
+    }
+    fseek($fh199, $len - 1024); $endOk199 = (string)fread($fh199, 1024) === str_repeat("\0", 1024);
+    fclose($fh199);
+}
+@unlink($tarFile199);
+$ok199 = strpos($bk199, "if (\$action === 'files') {") !== false && strpos($bk199, "if (\$action === 'files_info') {") !== false
+    && strpos($bk199, 'RecursiveIteratorIterator') !== false && strpos($bk199, 'application/x-tar') !== false
+    && isset($info199['files']) && (int)$info199['files'] === $nHdr199 && $okUstar && $endOk199
+    && strpos($bk199, "if (!isAdmin()) {") !== false;
+check('🗂️ مستندات الأساتذة تُنزَّل كاملة بـtar قياسي من backup.php?action=files (+ files_info) — عدد الملفات بالأرشيف = المجلد، ترويسات ustar، نهاية صحيحة، للمدير فقط (2026-09-28)', $ok199,
+      'files=' . ($info199['files'] ?? '?') . ' tarEntries=' . $nHdr199 . ' ustar=' . (int)$okUstar . ' bytes=' . $len);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

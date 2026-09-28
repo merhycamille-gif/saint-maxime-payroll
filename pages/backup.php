@@ -35,6 +35,50 @@ function dumpConn() {
     );
 }
 
+// ===== 0) 🗂️ مستندات الأساتذة كاملة (uploads/) بملف tar واحد يُبثّ مباشرة — للنقل بين الخوادم بلا cPanel (2026-09-28) =====
+//     tar بلا ضغط (الصور/PDF مضغوطة أصلاً) يُكتب كتلةً كتلة فلا يستهلك ذاكرة ولا ملفاً مؤقتاً مهما كبر المجلد.
+if ($action === 'files') {
+    @set_time_limit(0);
+    while (ob_get_level()) { ob_end_flush(); }
+    $base = realpath(__DIR__ . '/../uploads');
+    header('Content-Type: application/x-tar');
+    header('Content-Disposition: attachment; filename="payroll_uploads_' . $stamp . '.tar"');
+    $tarHeader = function (string $name, int $size, int $mtime, string $type, int $mode): string {
+        $prefix = '';
+        if (strlen($name) > 100) { $cut = strrpos(substr($name, 0, 155), '/'); if ($cut !== false) { $prefix = substr($name, 0, $cut); $name = substr($name, $cut + 1); } }
+        $h = str_pad(substr($name, 0, 100), 100, "\0") . sprintf("%07o\0", $mode) . sprintf("%07o\0", 0) . sprintf("%07o\0", 0)
+           . sprintf("%011o\0", $size) . sprintf("%011o\0", $mtime) . '        ' . $type . str_repeat("\0", 100) . "ustar\0" . '00'
+           . str_pad('www-data', 32, "\0") . str_pad('www-data', 32, "\0") . sprintf("%07o\0", 0) . sprintf("%07o\0", 0) . str_pad(substr($prefix, 0, 155), 155, "\0");
+        $h = str_pad($h, 512, "\0");
+        $sum = 0; for ($i = 0; $i < 512; $i++) $sum += ord($h[$i]);
+        return substr($h, 0, 148) . sprintf("%06o\0 ", $sum) . substr($h, 156);
+    };
+    $n = 0;
+    if ($base && is_dir($base)) {
+        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST);
+        foreach ($it as $f) {
+            $rel = 'uploads/' . str_replace(DIRECTORY_SEPARATOR, '/', substr($f->getPathname(), strlen($base) + 1));
+            if ($f->isDir()) { echo $tarHeader($rel . '/', 0, $f->getMTime(), '5', 0755); continue; }
+            if (!$f->isFile()) continue;
+            $size = $f->getSize();
+            echo $tarHeader($rel, $size, $f->getMTime(), '0', 0644);
+            $fh = fopen($f->getPathname(), 'rb');
+            if ($fh) { while (!feof($fh)) { echo fread($fh, 1 << 20); } fclose($fh); }
+            if ($size % 512) echo str_repeat("\0", 512 - ($size % 512));
+            $n++; if ($n % 20 === 0) flush();
+        }
+    }
+    echo str_repeat("\0", 1024); // نهاية الأرشيف
+    flush();
+    exit;
+}
+// عدد الملفات وحجمها (للتحقّق قبل/بعد النقل)
+if ($action === 'files_info') {
+    $base = realpath(__DIR__ . '/../uploads'); $n = 0; $sz = 0;
+    if ($base && is_dir($base)) foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS)) as $f) if ($f->isFile()) { $n++; $sz += $f->getSize(); }
+    header('Content-Type: application/json'); echo json_encode(['files' => $n, 'bytes' => $sz]); exit;
+}
+
 // ===== 1) نسخة SQL كاملة (ملف لكل الداتا، قابل للاستعادة) =====
 if ($action === 'sql') {
     @set_time_limit(0);

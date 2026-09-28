@@ -197,14 +197,14 @@ chmod +x /usr/local/bin/msa-backup.sh
 # استيراد الداتا (من دمب البرنامج pages/backup.php?action=sql أو phpMyAdmin) + المستندات
 cat > /usr/local/bin/msa-import.sh <<EOF
 #!/usr/bin/env bash
-# الاستعمال: msa-import.sh /root/dump.sql [/root/uploads.tar.gz]
+# الاستعمال: msa-import.sh /root/dump.sql [/root/uploads.tar أو .tar.gz]
 set -e
 SQL="\$1"; UP="\${2:-}"
 [ -f "\$SQL" ] || { echo "لا يوجد \$SQL"; exit 1; }
 /usr/local/bin/msa-backup.sh || true   # نسخة قبل الاستيراد
 case "\$SQL" in *.gz) zcat "\$SQL" | mysql --default-character-set=utf8mb4 ${DB_NAME};; *) mysql --default-character-set=utf8mb4 ${DB_NAME} < "\$SQL";; esac
 echo "✅ استُوردت قاعدة البيانات: \$(mysql -N -e "SELECT COUNT(*) FROM employees" ${DB_NAME}) موظفاً، \$(mysql -N -e "SELECT COUNT(*) FROM monthly_salaries" ${DB_NAME}) صفّ راتب"
-if [ -n "\$UP" ] && [ -f "\$UP" ]; then tar -xzf "\$UP" -C ${APP_DIR}; chown -R www-data:www-data ${APP_DIR}/uploads; echo "✅ المستندات: \$(find ${APP_DIR}/uploads -type f | wc -l) ملفاً"; fi
+if [ -n "\$UP" ] && [ -f "\$UP" ]; then tar -xf "\$UP" -C ${APP_DIR}; chown -R www-data:www-data ${APP_DIR}/uploads; echo "✅ المستندات: \$(find ${APP_DIR}/uploads -type f | wc -l) ملفاً"; fi
 EOF
 chmod +x /usr/local/bin/msa-import.sh
 # شهادة https بعد تحويل الدومين
