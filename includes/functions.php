@@ -783,7 +783,56 @@ function openYearCarrySql(PDO $db, int $schoolId, int $y1): string {
  * الثلاثة لكل الموجودين (لا يتغيّر أي سلوك قائم) — والقاعدة الجديدة تسري على ما يُدخَل بعدها.
  * العمود يتركّب ذاتياً (منهج DB self-install) — لا خطوة يدوية.
  */
+/**
+ * 📆 (2026-09-28 p1 «أنت بس محدّدلي هيدي الفترة غلط — لازم أنا حدّد الفترة اللي بدّي ياها»): الفترة المدفوعة بالسنة الدراسية
+ * تُحدَّد بملف الموظف من شهر ← إلى شهر (بترتيب السنة الدراسية ت1 ← أيلول) بدل عدد ثابت يبدأ من ت1 دائماً.
+ * الأعمدة pay_from_month / pay_to_month تتركّب ذاتياً؛ payment_months_per_year يبقى = عدد الأشهر (للتوافق مع كل ما يقرأه).
+ */
+function ensurePayPeriodColumns(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $db = getDB();
+        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'pay_from_month'")->fetch()) {
+            $db->exec("ALTER TABLE employees ADD COLUMN pay_from_month TINYINT NOT NULL DEFAULT 10 COMMENT 'أوّل شهر مدفوع بالسنة الدراسية' AFTER payment_months_per_year");
+            $db->exec("ALTER TABLE employees ADD COLUMN pay_to_month TINYINT NOT NULL DEFAULT 9 COMMENT 'آخر شهر مدفوع بالسنة الدراسية' AFTER pay_from_month");
+            // الموجودون: كانت الفترة تبدأ من ت1 دائماً وعدد أشهرها 12/11/10 ⇒ إلى أيلول/آب/تموز
+            $db->exec("UPDATE employees SET pay_from_month = 10, pay_to_month = CASE COALESCE(payment_months_per_year,12) WHEN 10 THEN 7 WHEN 11 THEN 8 ELSE 9 END");
+        }
+    } catch (Throwable $e) { /* صلاحيات — paidMonthsFor يعود لعدد الأشهر */ }
+}
+/** أشهر السنة الدراسية بالترتيب: ت1(y1) … أيلول(y2) */
+function schoolYearMonthList(int $y1, int $y2): array {
+    return [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
+}
+/** ترتيب الشهر داخل السنة الدراسية: ت1=0 … أيلول=11 */
+function schoolYearMonthIndex(int $m): int { return ($m + 2) % 12; }
+/** الفترة المدفوعة للموظف بسنة دراسية: [[m,y],…] من pay_from_month إلى pay_to_month (وإلا من عدد الأشهر القديم) */
+function paidMonthsFor(array $emp, int $y1, int $y2): array {
+    $from = (int)($emp['pay_from_month'] ?? 0); $to = (int)($emp['pay_to_month'] ?? 0);
+    $n = (int)($emp['payment_months_per_year'] ?? 12);
+    // بلا أعمدة، أو صفّ كُتب بالعدد القديم فقط (10/11) وبقيت أعمدته على الافتراضي ت1 ← أيلول ⇒ العدد هو المرجع
+    if ($from < 1 || $from > 12 || $to < 1 || $to > 12 || ($from === 10 && $to === 9 && ($n === 10 || $n === 11))) {
+        $from = 10; $to = ($n === 10) ? 7 : (($n === 11) ? 8 : 9);
+    }
+    $a = schoolYearMonthIndex($from); $b = schoolYearMonthIndex($to);
+    if ($b < $a) $b = $a; // فترة مقلوبة = شهر واحد (لا يُسمح بها من الفورم)
+    $out = [];
+    foreach (schoolYearMonthList($y1, $y2) as $i => $my) if ($i >= $a && $i <= $b) $out[] = $my;
+    return $out;
+}
+/** نصّ الفترة المدفوعة لملف الموظف/الإفادات: «من تشرين الأول إلى أيلول (12 شهراً)» */
+function paidPeriodLabel(array $emp, string $lang = 'ar'): string {
+    $ms = paidMonthsFor($emp, 2000, 2001);
+    if (!$ms) return '';
+    $f = $ms[0][0]; $t = $ms[count($ms) - 1][0]; $n = count($ms);
+    return $lang === 'ar' ? ('من ' . monthName($f, 'ar') . ' إلى ' . monthName($t, 'ar') . ' (' . $n . ' ' . ($n >= 3 && $n <= 10 ? 'أشهر' : 'شهراً') . ')')
+                          : (monthName($f, 'fr', true) . ' → ' . monthName($t, 'fr', true) . ' (' . $n . ' mois)');
+}
+
 function ensureLeftDateAllColumn(): void {
+    ensurePayPeriodColumns(); // 📆 يركّب أعمدة الفترة المدفوعة معه (كل صفحة تمرّ من هنا)
     static $done = false;
     if ($done) return;
     $done = true;
@@ -2115,9 +2164,7 @@ function healYearAdditions2627() {
                               VALUES (?,?,?,?,?,?,?,?,?,1)")
                    ->execute([$id, $b['bonus_type'], $b['period_number'], $newSY, $b['amount'], $b['value_type'], $b['currency'], $b['start_month'], $b['end_month']]);
             }
-            $months = ((int)$emp['payment_months_per_year'] === 10)
-                ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
-                : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
+            $months = paidMonthsFor($emp, $y1, $y2); // 📆 (2026-09-28) الفترة المدفوعة من ملفه (من شهر ← إلى شهر)
             foreach ($months as [$m, $y]) {
                 try { (new PayrollCalculator($id, $m, $y))->calculateAndSave(); } catch (Exception $e) {}
             }
@@ -5710,12 +5757,36 @@ function isPctLawRow(array $row): bool {
 }
 /** دولار القانون لعمود ('base'|'ech'|'bpe') كما بالبطاقة: bpe لصاحب النسبة فقط، وإلا 0 (= لا يُعرض) */
 function lawUsdRow(array $row, string $col, $lbp = null): float {
+    if (($col === 'base' || $col === 'bpe') && !isPctLawRow($row) && directUsdBaseForRow($row) !== null) { // 💵 راتب بالدولار (2026-09-28)
+        $v = $lbp ?? (float)($col === 'base' ? ($row['base_salary_lbp'] ?? 0) : ($row['base_plus_echelon_lbp'] ?? 0));
+        return (float)lbpToUsd($v, rowRate($row));
+    }
     if ($col !== 'bpe' || !isPctLawRow($row)) return 0.0;
     return lawUsd($lbp ?? (float)($row['base_plus_echelon_lbp'] ?? 0));
+}
+/**
+ * 💵 (2026-09-28 أحمد السيد: «حطّيت الراتب بالدولار ليش هوي حاطو باللبناني») الراتب المتّفق عليه بالدولار (salary_input_mode=direct_usd
+ * والدولار ساري لهذا الشهر usd_base_from_sy) ⇒ خلية الأساس/بعد التدرّج تُظهر الدولار المتّفق عليه مع الليرة (كباقي الأعمدة بسعر الشهر).
+ * ليس دولار القانون ÷1500 (ذاك لأصحاب النسبة فقط). يرجع الدولار الأساس للصفّ أو null. المصدر الواحد للبطاقة وكل التقارير.
+ */
+function directUsdBaseForRow(array $row): ?float {
+    static $emps = [];
+    $eid = (int)($row['employee_id'] ?? $row['id'] ?? 0);
+    if ($eid <= 0) return null;
+    if (!array_key_exists($eid, $emps)) {
+        try { $emps[$eid] = getDB()->query("SELECT salary_input_mode, base_salary_usd, usd_base_from_sy FROM employees WHERE id = " . $eid)->fetch(PDO::FETCH_ASSOC) ?: null; }
+        catch (Throwable $e) { $emps[$eid] = null; }
+    }
+    $e = $emps[$eid];
+    if (!$e || (float)($e['base_salary_usd'] ?? 0) <= 0) return null;
+    $m = (int)($row['month'] ?? 0); $y = (int)($row['year'] ?? 0);
+    if ($m < 1 || $y < 2000) return ($e['salary_input_mode'] ?? '') === 'direct_usd' ? (float)$e['base_salary_usd'] : null;
+    return usdBaseAppliesForMonth($e, $m, $y) ? (float)$e['base_salary_usd'] : null;
 }
 /** خلية الأساس/الدرجة/بعد التدرّج كما بالبطاقة (الصفّ والعمود يحدّدان إن كان يُعرض دولار القانون) */
 function moneyLaw($lbp, array $opts = [], ?array $row = null, string $col = 'base'): string {
     if ($col === 'bpe' && $row && isPctLawRow($row)) return money($lbp, officialUsdRate(), $opts);
+    if (($col === 'base' || $col === 'bpe') && $row && directUsdBaseForRow($row) !== null) return money($lbp, rowRate($row), $opts); // 💵 راتب بالدولار: ليرة + دولار الشهر
     return '<span class="law-lbp">' . formatLBP($lbp, false) . '</span>'; // ليرة بلا وحدة كالبطاقة (حتى بوضع الدولار — خلية num-lbp بالبطاقة)
 }
 /** خلية مجموع بقاعدة البطاقة: دولار فقط إن وُجد (مجموع أصحاب النسبة)، وإلا ليرة فقط */
@@ -5749,7 +5820,7 @@ function salaryCompModeOptions(string $lang): array {
         'amount' => $lang==='ar' ? 'موجود مع المبلغ' : 'Présente avec montant',
     ];
     return [
-        'transport_mode'      => $tri,
+        'transport_mode'      => ['none' => $tri['none'], 'blank' => $tri['blank'], 'amount' => ($lang==='ar' ? 'موجود مع المبلغ (يُجمع بالمستحق)' : 'Présente avec montant (dans le dû)')],
         'due_mode'            => $tri,
         'netfam_mode'         => $tri,
         'contract_grade_mode' => ['hide' => ($lang==='ar' ? 'مخفية (المتعاقد بلا درجة)' : 'Masquées (pas d’échelon)'), 'show' => ($lang==='ar' ? 'ظاهرة' : 'Affichées')],

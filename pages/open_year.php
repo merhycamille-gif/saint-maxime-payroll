@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         // السنة المفتوحة (1/10) لا يُنقَل إليها؛ ومَن ترك خلالها أو بعدها يُشمَل (يبقى بسنة
         // عمله حتى 30-9) — فيصحّ أيضاً فتح سنين قديمة كان يعمل فيها تارك لاحق.
         $openOne = function (int $schoolId) use ($db, $y1, $y2, $prevSY, $newYear, $addMode, $transMode, $addPct, $transPct, $addFactor, $transFactor) {
-        $emps = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp FROM employees
+        $emps = $db->prepare("SELECT id, payment_months_per_year, pay_from_month, pay_to_month, employee_type, base_salary_usd, contract_salary_lbp FROM employees
                               WHERE school_id = ? AND is_deleted = 0 AND status = 'actif'
                                 AND " . leftDateSql() . " >= ?" . openYearCarrySql($db, $schoolId, $y1));
         $emps->execute([$schoolId, $y1 . '-10-01']);
@@ -89,9 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
                                  AND (year < ? OR (year = ? AND month < 10)) ORDER BY year DESC, month DESC LIMIT 1");
         $n = 0; $carried = 0; $promoted = 0;
         foreach ($emps->fetchAll() as $emp) {
-            $months = ((int)$emp['payment_months_per_year'] === 10)
-                ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
-                : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
+            $months = paidMonthsFor($emp, $y1, $y2); // 📆 (2026-09-28) الفترة المدفوعة من ملفه (من شهر ← إلى شهر)
             // الموظف المُعَدّ (ملاك أو أساس>0) يُحسب بالقانون الساري؛ المنقول بلا إعداد يُنقل راتبه كما هو
             $hasConfig = salaryEngineAllowed($emp, $db); // المصدر الواحد (الجديد بلا أساس منقول يُحسب من ملفه)
             if ($hasConfig) {
@@ -285,7 +283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
         $addTypes = ['prime_fixe', 'aide_complementaire'];
         $trTypes  = ['transport_complement', 'transport_daily'];
         // نفس قاعدة التارك (§١٠) المطبَّقة عند فتح السنة: مَن ترك قبل بداية السنة لا يُشمَل
-        $emps = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp
+        $emps = $db->prepare("SELECT id, payment_months_per_year, pay_from_month, pay_to_month, employee_type, base_salary_usd, contract_salary_lbp
             FROM employees WHERE school_id = ? AND is_deleted = 0 AND status = 'actif'
               AND " . leftDateSql() . " >= ?" . openYearCarrySql($db, $schoolId, $y1));
         $emps->execute([$schoolId, $y1 . '-10-01']);
@@ -299,9 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
             else $db->prepare("DELETE FROM employee_bonuses WHERE employee_id=? AND school_year=? AND bonus_type IN ('transport_complement','transport_daily')")->execute([$id, $yr]);
 
             $hasConfig = salaryEngineAllowed($emp, $db); // المصدر الواحد
-            $months = ((int)$emp['payment_months_per_year'] === 10)
-                ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
-                : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
+            $months = paidMonthsFor($emp, $y1, $y2); // 📆 (2026-09-28) الفترة المدفوعة من ملفه (من شهر ← إلى شهر)
             if ($hasConfig) {
                 // الملاك/المُعَدّ: أعِد حساب أشهر السنة فقط (المحرّك يقرأ حالة العلاوات الجديدة) — لا يمسّ الدرجات
                 foreach ($months as [$m, $y]) { try { (new PayrollCalculator($id, $m, $y))->calculateAndSave(); } catch (Exception $e) {} }

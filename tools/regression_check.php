@@ -7214,7 +7214,7 @@ check('📅 المنقول الذي صار «12 شهراً»: آب/أيلول ي
 $em152 = (string)file_get_contents($PROJ . '/pages/employees.php'); $fn152 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $hd152 = (string)file_get_contents($PROJ . '/includes/header.php'); $ad152 = (string)file_get_contents($PROJ . '/includes/annual_slip_data.php');
 $hNew152 = renderPage('pages/employees.php', ['action' => 'new'], [], [3]);
-$sel152 = preg_match('/<option value="12" selected>12 mois — Oct\. → Sept\./u', $hNew152) === 1;
+$sel152 = preg_match('/<select name="pay_from_month"[^>]*>\s*<option value="10" selected>/u', $hNew152) === 1 && preg_match('/<select name="pay_to_month"[^>]*>(?:(?!<\/select>).)*<option value="9" selected>/su', $hNew152) === 1; // 📆 2026-09-28 الفترة من ملفه: الافتراضي ت1 ← أيلول
 $pmBad152 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND COALESCE(payment_months_per_year,10) <> 12")->fetchColumn();
 $healSt152 = (string)getSetting('heal_pm12_20260920', '');
 // بطاقة سنة ماضية بـ10 أشهر مخزّنة: لا صفوف «—» لآب/أيلول
@@ -7227,8 +7227,8 @@ if ($past152 && strcmp('2025-2026', currentSchoolYear()) < 0) {
     $okPast152 = $dash152 === 0 && strpos($hp152, 'FATAL') === false && strpos($hp152, 'Juil. 2026') !== false && strpos($hp152, 'Août 2026') === false;
 }
 check('📆 السنة الدراسية ت1 ← أيلول للجميع: الافتراضي 12 بالفورم والحفظ + التسميات بالمدى + الشفاء التدريجي مربوط + لا فاعل على غير 12 بعد الخطوة ١ + بطاقة السنة الماضية بلا «—» بعد آخر شهر',
-      $sel152 && strpos($em152, "'payment_months_per_year' => (int)(\$_POST['payment_months_per_year'] ?? 12)") !== false
-      && strpos($em152, '12 mois — Oct. → Sept. / 12 شهراً (ت1 ← أيلول) — للجميع تلقائياً') !== false
+      $sel152 && strpos($em152, "'payment_months_per_year' => count(paidMonthsFor(['pay_from_month' => \$payFromP, 'pay_to_month' => \$payToP], 2000, 2001))") !== false
+      && strpos($em152, 'الافتراضي ت1 ← أيلول (12 شهراً)') !== false
       && function_exists('healPaymentMonths12_20260920') && strpos($hd152, 'healPaymentMonths12_20260920();') !== false
       && strpos($fn152, "UPDATE employees SET payment_months_per_year = 12 WHERE is_deleted = 0 AND COALESCE(payment_months_per_year, 10) <> 12") !== false
       && strpos($ad152, "if (strcmp((string)\$schoolYear, (string)currentSchoolYear()) < 0 && \$salaries) {") !== false
@@ -7385,7 +7385,9 @@ try {
     $cur158 = $_SESSION['display_currency'] ?? null; $_SESSION['display_currency'] = 'both';
     $c158 = $db->query("SELECT ms.* FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_contractuel' AND e.salary_input_mode = 'direct_usd' AND e.base_salary_usd > 0 AND ms.school_year = '2026-2027' AND ms.month = 10 AND ms.base_salary_lbp > 0 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     $p158 = $db->query("SELECT ms.* FROM monthly_salaries ms JOIN employee_bonuses b ON b.employee_id = ms.employee_id AND b.bonus_type = 'prime_fixe' AND b.is_active = 1 AND b.value_type = 'percent' AND (b.school_year IS NULL OR b.school_year = '2026-2027') WHERE ms.school_year = '2026-2027' AND ms.month = 10 AND ms.base_plus_echelon_lbp > 0 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-    $t1 = $c158 ? (lawUsdRow($c158, 'base') == 0 && lawUsdRow($c158, 'bpe') == 0 && !isPctLawRow($c158) && strpos(moneyLaw($c158['base_salary_lbp'], ['withCur' => false], $c158, 'bpe'), '$') === false) : false;
+    // 💵 (2026-09-28 أحمد السيد) المتعاقد بالدولار: دولاره المتّفق عليه (÷ سعر الشهر) لا ÷1500 — وبلا صفّ = ليرة فقط
+    $t1 = $c158 ? (!isPctLawRow($c158) && lawUsdRow($c158, 'base') == floor($c158['base_salary_lbp'] / $c158['exchange_rate']) && lawUsdRow($c158, 'base') != floor($c158['base_salary_lbp'] / officialUsdRate())
+                   && strpos(moneyLaw($c158['base_salary_lbp'], ['withCur' => false], $c158, 'bpe'), '$') !== false && strpos(moneyLaw($c158['base_salary_lbp']), '$') === false) : false;
     $t2 = $p158 ? (isPctLawRow($p158) && lawUsdRow($p158, 'bpe') == floor($p158['base_plus_echelon_lbp'] / officialUsdRate()) && lawUsdRow($p158, 'base') == 0 && strpos(moneyLaw($p158['base_plus_echelon_lbp'], ['withCur' => false], $p158, 'bpe'), 'money-usd') !== false) : false;
     $ok158 = $ok158 && $t1 && $t2; if ($cur158 === null) unset($_SESSION['display_currency']); else $_SESSION['display_currency'] = $cur158;
     $why158 .= ' contract#' . ($c158['employee_id'] ?? '-') . '=' . ($t1 ? 'lbp-only' : 'BAD') . ' pct#' . ($p158['employee_id'] ?? '-') . '=' . ($t2 ? '÷1500' : 'BAD');
@@ -8443,7 +8445,7 @@ $as183 = (string)file_get_contents($PROJ . '/pages/annual_slip.php'); $ex183 = (
 $c183('source', function_exists('slipHidesGradeCols') && function_exists('contractGradeColsMode')
     && strpos($as183, "\$noGrade = slipHidesGradeCols(\$emp);") !== false && substr_count($as183, '<?php if (!$noGrade): ?>') === 3 && strpos($as183, '<?php if (!$isEmp): ?>') === false
     && strpos($as183, "<?= \$noGrade ? '—' : e(\$meta['grade']) ?>") !== false
-    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'name="contract_grade_mode"') !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), "salaryCompModeTiles('contract_grade_mode'") /* ☑️ 2026-09-28 خانات حدّ بعض */ !== false
     && strpos((string)file_get_contents($PROJ . '/switch_salarycomp.php'), "\$_SESSION['contract_grade_mode'] = (string)\$_GET['contract_grade_mode']") !== false
     && strpos($ex183, "\$dropGrade = !\$isAdminEmp && slipHidesGradeCols(\$emp);") !== false && strpos($ex183, "addEmployeeBlock(\$rep, \$slip, false, \$isAdminEmp, \$dropGrade);") !== false);
 unset($_SESSION['contract_grade_mode']);
@@ -8815,6 +8817,64 @@ $ok195 = function_exists('salaryCompModeTiles') && function_exists('salaryCompMo
     && strpos($pop195, '<select') === false && preg_match('/<input type="radio" name="due_mode" value="(none|blank|amount)" checked/', $pop195) === 1;
 check('☑️ خيارات أعمدة الراتب خانات حدّ بعض لا أسانسور (2026-09-28 p1): الشريط 3+3+3+2 radio ترسل فوراً + قائمة الهيدر نفسها بلا select (أعرض) + CSS', $ok195,
       'toolbar=' . strlen($tb195) . ' pop=' . strlen($pop195));
+
+/* =====================================================================
+ * 196) 💵 الراتب المتّفق عليه بالدولار يظهر بالدولار (2026-09-28 أحمد السيد «حطّيت الراتب
+ *      بالدولار ليش هوي حاطو باللبناني»): salary_input_mode=direct_usd ⇒ خلية الأساس (وبعد
+ *      التدرّج) بالبطاقة السنوية = الليرة + الدولار المتّفق عليه (لا ÷1500) + المجموع؛ وبالتقارير
+ *      عبر moneyLaw/lawUsdRow (directUsdBaseForRow) — الملاك وأصحاب النسبة كما هم.
+ * =================================================================== */
+$e196 = $db->query("SELECT e.id, e.school_id, e.base_salary_usd, ms.school_year FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.net_salary_lbp > 0 AND ms.exchange_rate > 0
+                    WHERE e.is_deleted = 0 AND e.salary_input_mode = 'direct_usd' AND e.base_salary_usd > 0 AND (e.usd_base_from_sy IS NULL OR e.usd_base_from_sy = '' OR ms.school_year >= e.usd_base_from_sy)
+                    ORDER BY ms.school_year DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$ok196 = function_exists('directUsdBaseForRow') && $e196 !== false;
+$why196 = $e196 ? ('emp=' . $e196['id'] . ' sy=' . $e196['school_year'] . ' usd=' . $e196['base_salary_usd']) : 'no direct_usd sample';
+if ($e196) {
+    $h196 = renderPage('pages/annual_slip.php', ['employee_id' => (int)$e196['id'], 'school_year' => $e196['school_year']], ['extra', 'aide'], [(int)$e196['school_id']], 'both', $e196['school_year']);
+    $usd196 = number_format((int)floor((float)$e196['base_salary_usd']), 0) . ' $';
+    // خلية الأساس بالصفّ الشهري: ليرة ثم الدولار المتّفق عليه؛ وسطر المجموع فيه دولار
+    $rowOk196 = preg_match('#<td class="num-lbp"><span class="sub-lbp"><strong>[\d,]+</strong></span><span class="cur-usd">' . preg_quote($usd196, '#') . '</span></td>#u', $h196) === 1;
+    $totOk196 = preg_match('#<tr class="total-row">\s*<td><strong>TOTAL</strong></td>\s*<td class="num-lbp"><span class="sub-lbp"><strong>[\d,]+</strong></span><span class="cur-usd">[\d,]+ \$</span></td>#su', $h196) === 1;
+    // moneyLaw/lawUsdRow على صفّ حقيقي لهذا الموظف
+    $row196 = $db->query("SELECT * FROM monthly_salaries WHERE employee_id = " . (int)$e196['id'] . " AND school_year = " . $db->quote($e196['school_year']) . " AND net_salary_lbp > 0 ORDER BY year, month LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $fnOk196 = $row196 && directUsdBaseForRow($row196) == (float)$e196['base_salary_usd'] && lawUsdRow($row196, 'base') > 0
+        && strpos(moneyLaw($row196['base_salary_lbp'], [], $row196, 'base'), '$') !== false && strpos(moneyLaw($row196['base_salary_lbp']), '$') === false;
+    // متعاقد بالليرة (direct_lbp) لا يتغيّر: بلا دولار بخلية الأساس
+    $l196 = $db->query("SELECT e.id, e.school_id, ms.school_year FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.net_salary_lbp > 0 WHERE e.is_deleted = 0 AND e.salary_input_mode = 'direct_lbp' AND e.contract_salary_lbp > 0 AND e.employee_type = 'enseignant_contractuel' ORDER BY ms.school_year DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $lbpOk196 = true;
+    if ($l196) { $hl196 = renderPage('pages/annual_slip.php', ['employee_id' => (int)$l196['id'], 'school_year' => $l196['school_year']], ['extra', 'aide'], [(int)$l196['school_id']], 'both', $l196['school_year']);
+        $lbpOk196 = $noFatal($hl196) && preg_match('#<tr class="total-row">\s*<td><strong>TOTAL</strong></td>\s*<td class="num-lbp"><strong>[\d,]+</strong></td>#su', $hl196) === 1; }
+    $ok196 = $ok196 && $noFatal($h196) && $rowOk196 && $totOk196 && $fnOk196 && $lbpOk196;
+    $why196 .= ' row=' . (int)$rowOk196 . ' tot=' . (int)$totOk196 . ' fn=' . (int)$fnOk196 . ' lbp=' . (int)$lbpOk196;
+}
+check('💵 الراتب المتّفق عليه بالدولار يظهر بالدولار تحت الأساس بالبطاقة السنوية (+ المجموع) وبالتقارير عبر moneyLaw/lawUsdRow — والمتعاقد بالليرة كما هو (2026-09-28)', $ok196, $why196);
+
+/* =====================================================================
+ * 197) 📆 الفترة المدفوعة يحدّدها هو (2026-09-28 p1 «أنت بس محدّدلي هيدي الفترة غلط — لازم أنا
+ *      حدّد الفترة اللي بدّي ياها»): بملف الموظف «من شهر ← إلى شهر» بترتيب السنة الدراسية بدل
+ *      عدد ثابت من ت1؛ الأعمدة ذاتية التركيب؛ paidMonthsFor المصدر الواحد بالمحرّك وفتح السنة
+ *      والاحتساب الجماعي والبطاقة ونسخ السنة؛ العدد القديم يُشتقّ؛ 11 شهراً لم يعد يُعامَل كـ12.
+ * =================================================================== */
+$cols197 = $db->query("SHOW COLUMNS FROM employees LIKE 'pay_%'")->fetchAll(PDO::FETCH_COLUMN);
+$pm = fn($f, $t) => array_map(fn($x) => $x[0], paidMonthsFor(['pay_from_month' => $f, 'pay_to_month' => $t], 2026, 2027));
+$fnOk197 = function_exists('paidMonthsFor') && function_exists('ensurePayPeriodColumns') && function_exists('paidPeriodLabel')
+    && $pm(10, 9) === [10,11,12,1,2,3,4,5,6,7,8,9] && $pm(10, 7) === [10,11,12,1,2,3,4,5,6,7] && $pm(11, 6) === [11,12,1,2,3,4,5,6] && $pm(2, 2) === [2]
+    && $pm(9, 10) === [9] /* مقلوبة = شهر واحد */
+    && array_map(fn($x) => $x[0], paidMonthsFor(['pay_from_month' => 10, 'pay_to_month' => 9, 'payment_months_per_year' => 10], 2026, 2027)) === [10,11,12,1,2,3,4,5,6,7] /* كُتب بالعدد القديم فقط */
+    && count(paidMonthsFor(['pay_from_month' => 10, 'pay_to_month' => 6, 'payment_months_per_year' => 10], 2026, 2027)) === 9 /* الأعمدة المضبوطة هي المرجع */
+    && array_map(fn($x) => $x[0], paidMonthsFor(['payment_months_per_year' => 11], 2026, 2027)) === [10,11,12,1,2,3,4,5,6,7,8] /* بلا أعمدة: من العدد (11 = حتى آب) */
+    && paidMonthsFor(['pay_from_month' => 10, 'pay_to_month' => 7], 2026, 2027)[9] === [7, 2027];
+$src197 = '';
+foreach (['includes/payroll_calculator.php', 'pages/open_year.php', 'includes/functions.php', 'pages/employees.php', 'pages/annual_slip.php', 'includes/annual_slip_data.php'] as $f) $src197 .= (string)file_get_contents($PROJ . '/' . $f);
+$srcOk197 = !preg_match("/\\\$months = \\(\\(int\\)\\\$\\w+\\['payment_months_per_year'\\] === 10\\)/", $src197)
+    && substr_count($src197, 'paidMonthsFor($') >= 8 && strpos($src197, "schoolYearMonthsFor(\$emp['payment_months_per_year']") === false
+    && preg_match('/SELECT id, employee_type, base_salary_usd, contract_salary_lbp, salary_labor_law, payment_months_per_year, pay_from_month, pay_to_month, hire_date/', $src197) === 1;
+$hF197 = renderPage('pages/employees.php', ['action' => 'new'], [], [3]);
+$formOk197 = strpos($hF197, 'name="pay_from_month"') !== false && strpos($hF197, 'name="pay_to_month"') !== false && strpos($hF197, '<select name="payment_months_per_year"') === false
+    && substr_count($hF197, 'Oct. / تشرين الأول') === 2;
+$ok197 = in_array('pay_from_month', $cols197, true) && in_array('pay_to_month', $cols197, true) && $fnOk197 && $srcOk197 && $formOk197;
+check('📆 الفترة المدفوعة من شهر ← إلى شهر بملف الموظف (2026-09-28): أعمدة ذاتية + paidMonthsFor (12/10/8/1/مقلوبة/بلا أعمدة) + لا ثلاثية ===10 بالمحرّك وفتح السنة والنسخ والبطاقة + الفورم بلا أسانسور العدد', $ok197,
+      'cols=' . implode(',', $cols197) . ' fn=' . (int)$fnOk197 . ' src=' . (int)$srcOk197 . ' form=' . (int)$formOk197);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

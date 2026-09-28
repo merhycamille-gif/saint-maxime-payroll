@@ -702,7 +702,7 @@ function protectPaidMonths(string $schoolYear): bool {
 function recalcEmployeeYear($employeeId, $schoolYear = null) {
     $db = getDB();
     ensureSalaryLaborLawColumn();
-    $e = $db->prepare("SELECT id, employee_type, base_salary_usd, contract_salary_lbp, salary_labor_law, payment_months_per_year, hire_date, is_deleted FROM employees WHERE id = ?");
+    $e = $db->prepare("SELECT id, employee_type, base_salary_usd, contract_salary_lbp, salary_labor_law, payment_months_per_year, pay_from_month, pay_to_month, hire_date, is_deleted FROM employees WHERE id = ?");
     $e->execute([$employeeId]);
     $e = $e->fetch();
     if (!$e || (int)$e['is_deleted'] === 1) return 0;
@@ -751,9 +751,7 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
     }
 
     $y1 = (int)$mm[1]; $y2 = (int)$mm[2];
-    $months = ((int)$e['payment_months_per_year'] === 10)
-        ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
-        : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
+    $months = paidMonthsFor($e, $y1, $y2); // 📆 (2026-09-28) الفترة المدفوعة من ملفه (من شهر ← إلى شهر)
     $n = 0;
     $protect = protectPaidMonths($sy); $skipped = [];
     $paidSt = $protect ? $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND month = ? AND year = ? AND COALESCE(is_paid,0) = 1 LIMIT 1") : null;
@@ -899,9 +897,7 @@ function fillCarriedMissingMonths(int $employeeId, string $schoolYear): int {
     $e = $db->query("SELECT * FROM employees WHERE id = $employeeId AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
     if (!$e) return 0;
     $y1 = (int)$mm[1]; $y2 = (int)$mm[2];
-    $months = ((int)$e['payment_months_per_year'] === 10)
-        ? [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2]]
-        : [[10,$y1],[11,$y1],[12,$y1],[1,$y2],[2,$y2],[3,$y2],[4,$y2],[5,$y2],[6,$y2],[7,$y2],[8,$y2],[9,$y2]];
+    $months = paidMonthsFor($e, $y1, $y2); // 📆 (2026-09-28) الفترة المدفوعة من ملفه (من شهر ← إلى شهر)
     $rows = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month,0) = 0 ORDER BY year, month");
     $rows->execute([$employeeId, $schoolYear]);
     $have = []; $last = null;

@@ -82,7 +82,7 @@ function getYearEmployees($db, $schoolYear, $typeFilter = '') {
 function getYearCalcRoster($db, $typeFilter = '') {
     // 🔴 حماية المنقولين يدوياً: الاحتساب الجماعي يشمل فقط ذوي الإعداد الفعلي (ملاك أو أساس>0)؛
     // المتعاقد/الموظف ذو الراتب المنقول (بلا إعداد) لا يُعاد حسابه لئلا يُصفَّر راتبه المخزّن.
-    $sql = "SELECT e.id, e.payment_months_per_year FROM employees e WHERE e.is_deleted = 0"
+    $sql = "SELECT e.id, e.payment_months_per_year, e.pay_from_month, e.pay_to_month FROM employees e WHERE e.is_deleted = 0"
          . " AND e.status = 'actif' AND " . leftDateSql('e.') . " = '9999-12-31'"
          . " AND " . salaryConfigSql('e.')
          . schoolScopeSql('e.school_id');
@@ -99,7 +99,7 @@ if ($action === 'calc_year' && $employeeId > 0) {
     requireWriteAction(); // 🔒 قراءة-فقط ممنوع + مصدر داخلي فقط
     autoSwitchToEmployeeSchool($employeeId);
     requireSchoolSelected();
-    $eC = $db->prepare("SELECT id, payment_months_per_year, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
+    $eC = $db->prepare("SELECT id, payment_months_per_year, pay_from_month, pay_to_month, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());
     $eC->execute([$employeeId]);
     $eC = $eC->fetch();
     $hasConfig = $eC && salaryEngineAllowed($eC, $db); // المصدر الواحد (الجديد بلا أساس منقول يُحسب من ملفه)
@@ -110,7 +110,7 @@ if ($action === 'calc_year' && $employeeId > 0) {
             ? "راتبه الأساسي منقول (لا يُعاد حسابه) — ورُكِّبت علاواته المسجّلة على $nOv شهر."
             : 'راتب هذا الموظف مُدخَل يدوياً (منقول) — أساسه لا يُعاد حسابه، وعلاواته مطابقة أصلاً.';
     } elseif ($eC) {
-        $months = schoolYearMonthsFor($eC['payment_months_per_year'], $y1, $y2);
+        $months = paidMonthsFor($eC, $y1, $y2); // 📆 (2026-09-28) الفترة من ملفه
         $n = 0;
         foreach ($months as [$m, $y]) {
             try { (new PayrollCalculator($employeeId, $m, $y))->calculateAndSave(); $n++; } catch (Exception $e) {}
@@ -158,7 +158,7 @@ if ($action === 'calc_all_year') {
     $emps = getYearCalcRoster($db, $typeState); // الاحتساب على الفاعلين (يشمل غير المحتسَبين بعد)
     $nEmp = 0; $nMonths = 0;
     foreach ($emps as $e) {
-        $months = schoolYearMonthsFor($e['payment_months_per_year'], $y1, $y2);
+        $months = paidMonthsFor($e, $y1, $y2); // 📆 (2026-09-28) الفترة من ملفه
         $did = false;
         foreach ($months as [$m, $y]) {
             try { (new PayrollCalculator($e['id'], $m, $y))->calculateAndSave(); $nMonths++; $did = true; } catch (Exception $ex) {}
@@ -313,10 +313,11 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                         ?>
                             <?php /* 🔠 «أحجام المبالغ بالليرة متل بعضها» (طلب المستخدم 2026-08-01):
                                      num-lbp = نفس حجم كل مبالغ الليرة بالجدول (14 عريض) */ ?>
-                            <td class="num-lbp"><strong><?= formatLBP($r['base_shown'], false) ?></strong></td>
+                            <?php /* 💵 (2026-09-28 أحمد السيد «حطّيت الراتب بالدولار ليش هوي حاطو باللبناني»): الراتب المتّفق عليه بالدولار ⇒ الدولار المتّفق عليه تحت الليرة */ ?>
+                            <td class="num-lbp"><?php if (($r['base_usd'] ?? null) !== null): ?><span class="sub-lbp"><strong><?= formatLBP($r['base_shown'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)floor($r['base_usd']), 0) ?> $</span><?php else: ?><strong><?= formatLBP($r['base_shown'], false) ?></strong><?php endif; ?></td>
                             <?php if (!$noGrade): ?>
                             <td class="num-lbp"><?= $r['grade_inc'] > 0 ? formatLBP($r['grade_inc'], false) : '—' ?></td>
-                            <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): // 🧮 تحته قيمته بالدولار القديم (÷1500 داون) — أساس قانون النسبة ?><span class="sub-lbp"><strong><?= formatLBP($r['cur_sal'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$r['cur_sal_old_usd'], 0) ?> $</span><?php else: ?><strong><?= formatLBP($r['cur_sal'], false) ?></strong><?php endif; ?></td>
+                            <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): // 🧮 تحته قيمته بالدولار القديم (÷1500 داون) — أساس قانون النسبة ?><span class="sub-lbp"><strong><?= formatLBP($r['cur_sal'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$r['cur_sal_old_usd'], 0) ?> $</span><?php elseif (($r['bpe_usd'] ?? null) !== null): ?><span class="sub-lbp"><strong><?= formatLBP($r['cur_sal'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)floor($r['bpe_usd']), 0) ?> $</span><?php else: ?><strong><?= formatLBP($r['cur_sal'], false) ?></strong><?php endif; ?></td>
                             <?php endif; ?>
                             <?php if (salaryCompHas('extra')): ?><td><?php if ($r['extra_wage'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['extra_wage'], false) ?></span><span class="cur-usd"><?= number_format($r['extra_law_usd'] !== null ? (int)$r['extra_law_usd'] : $usd($r['extra_wage']), 0) /* 🧮 لأصحاب النسبة: دولار القانون (844 $) */ ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                             <?php if (salaryCompHas('aide')): ?><td><?php if ($r['aide'] > 0): ?><span class="sub-lbp"><?= formatLBP($r['aide'], false) ?></span><span class="cur-usd"><?= number_format($usd($r['aide']), 0) ?> $</span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
@@ -349,10 +350,10 @@ function annualSlipHtml($db, $emp, $schoolYear) {
                 }; ?>
                 <tr class="total-row">
                     <td><strong>TOTAL</strong></td>
-                    <td class="num-lbp"><strong><?= formatLBP($tot['base_shown'], false) ?></strong></td>
+                    <td class="num-lbp"><?php if (($tot['base_usd'] ?? null) !== null): ?><span class="sub-lbp"><strong><?= formatLBP($tot['base_shown'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)floor($tot['base_usd']), 0) ?> $</span><?php else: ?><strong><?= formatLBP($tot['base_shown'], false) ?></strong><?php endif; ?></td>
                     <?php if (!$noGrade): ?>
                     <td class="num-lbp"><strong><?= formatLBP($tot['grade_inc'], false) ?></strong></td>
-                    <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): ?><span class="sub-lbp"><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$tot['bpe_old_usd'], 0) ?> $</span><?php else: ?><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong><?php endif; ?></td>
+                    <td class="num-lbp"><?php if (($meta['extra_pct'] ?? '') !== ''): ?><span class="sub-lbp"><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)$tot['bpe_old_usd'], 0) ?> $</span><?php elseif (($tot['bpe_usd'] ?? null) !== null): ?><span class="sub-lbp"><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong></span><span class="cur-usd"><?= number_format((int)floor($tot['bpe_usd']), 0) ?> $</span><?php else: ?><strong><?= formatLBP($tot['base_plus_echelon'], false) ?></strong><?php endif; ?></td>
                     <?php endif; ?>
                     <?php if (salaryCompHas('extra')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['extra_wage'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor(!empty($meta['has_pct']) ? $tot['extra_law_usd'] : $tot['extra_wage_usd']), 0) ?> $</span></td><?php endif; ?>
                     <?php if (salaryCompHas('aide')): ?><td><span class="sub-lbp"><strong><?= formatLBP($tot['aide'], false) ?></strong></span><span class="cur-usd"><?= number_format(floor($tot['aide_usd']), 0) ?> $</span></td><?php endif; ?>

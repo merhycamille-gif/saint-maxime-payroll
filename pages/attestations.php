@@ -278,7 +278,7 @@ if ($emp && !empty($_GET['dossier'])):
             if (($emp['salary_input_mode']??'')==='direct_usd') $s .= $row2('أساس الراتب بالدولار', (float)($emp['base_salary_usd']??0) ? ('$'.number_format((float)$emp['base_salary_usd'],2)) : '');
             if (($emp['salary_input_mode']??'')==='percent_of_lbp') $s .= $row2('النسبة من راتب الليرة', (float)($emp['base_salary_lbp_percent']??0) ? (rtrim(rtrim(number_format((float)$emp['base_salary_lbp_percent'],2),'0'),'.').'%') : '');
             if (($emp['salary_input_mode']??'')==='direct_lbp') $s .= $row2('راتب العقد (ل.ل)', (float)($emp['contract_salary_lbp']??0) ? formatLBP($emp['contract_salary_lbp']) : '');
-            $s .= $row2('أشهر الدفع بالسنة', (int)($emp['payment_months_per_year']??0) ?: '');
+            $s .= $row2('الفترة المدفوعة بالسنة', paidPeriodLabel($emp, 'ar')); // 📆 (2026-09-28) من شهر ← إلى شهر
             $s .= $row2('الشهر الثالث عشر', $m13);
             $s .= $row2('تعويض عائلي (زوج)', (float)($emp['family_allowance_spouse_lbp']??0) ? formatLBP($emp['family_allowance_spouse_lbp']) : '');
             $s .= $row2('تعويض عائلي (أولاد)', (float)($emp['family_allowance_children_lbp']??0) ? formatLBP($emp['family_allowance_children_lbp']) : '');

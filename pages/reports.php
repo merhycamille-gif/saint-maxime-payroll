@@ -366,7 +366,7 @@ function reportDocThumb($path) {
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
                                 <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
                                 <td><?= e(gradeDisplay($r['employee_type'], $r['grade_at_month'])) ?></td>
-                                <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
+                                <td><?= moneyLaw($r['base_salary_lbp'], [], $r, 'base') ?></td>
                                 <td><?= moneyLaw($r['echelon_value_lbp']) ?></td>
                                 <td><?= moneyLaw($r['base_plus_echelon_lbp'], [], $r, 'bpe') ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
@@ -458,7 +458,7 @@ function reportDocThumb($path) {
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'])) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
-                                <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
+                                <td><?= moneyLaw($r['base_salary_lbp'], [], $r, 'base') ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r)) ?></strong></td>
@@ -528,7 +528,7 @@ function reportDocThumb($path) {
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e($r['finance_ministry_number']) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
-                                <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
+                                <td><?= moneyLaw($r['base_salary_lbp'], [], $r, 'base') ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r)) ?></strong></td>
@@ -571,7 +571,7 @@ function reportDocThumb($path) {
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e($r['caisse_number']) ?></td>
                                 <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
-                                <td><?= moneyLaw($r['base_salary_lbp']) ?></td>
+                                <td><?= moneyLaw($r['base_salary_lbp'], [], $r, 'base') ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= dualFromUsd(composedSalaryLbp($r), composedSalaryUsd($r)) ?></strong></td>

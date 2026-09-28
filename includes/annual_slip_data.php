@@ -45,7 +45,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
     $stmt->execute([$emp['id'], $schoolYear]);
     $salaries = $stmt->fetchAll();
 
-    $expectedMonths = schoolYearMonthsFor($emp['payment_months_per_year'], $y1, $y2);
+    $expectedMonths = paidMonthsFor($emp, $y1, $y2); // 📆 (2026-09-28) الفترة المدفوعة من ملفه (من شهر ← إلى شهر)
     // 📆 (2026-09-20) صار الجميع 12 شهراً؛ السنة **الماضية** المدفوعة بـ10 أشهر لا تُعرض بصفوف «—» لآب/أيلول بعد آخر شهر مخزّن
     //    (ليست خطأ ولا تُستكمل) — الفجوات بين أشهر موجودة تبقى ظاهرة، والسنة الجارية/اللاحقة تعرض أشهرها كلّها (تُستكمل تلقائياً)
     if (strcmp((string)$schoolYear, (string)currentSchoolYear()) < 0 && $salaries) {
@@ -110,7 +110,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
     }
 
     $tot = [
-        'base_shown'=>0,'grade_inc'=>0,'base_plus_echelon'=>0,'bpe_old_usd'=>0,'extra_wage'=>0,'aide'=>0,'brut'=>0,
+        'base_shown'=>0,'grade_inc'=>0,'base_plus_echelon'=>0,'bpe_old_usd'=>0,'base_usd'=>null,'bpe_usd'=>null,'extra_wage'=>0,'aide'=>0,'brut'=>0,
         'caisse'=>0,'eoc_grade'=>0,'cnss'=>0,'income_tax'=>0,'total_retenues'=>0,'net'=>0,
         'family'=>0,'transport'=>0,'total_due'=>0,
         // نُسخ بالدولار للعرض على الشاشة فقط
@@ -146,12 +146,18 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
 
         $eocGrade = (int)($s['eoc_grade_lbp'] ?? 0);
         $brut = $curSal + (int)$s['extra_lbp'] + $primeAide;
+        // 💵 (2026-09-28 أحمد السيد) الراتب المتّفق عليه بالدولار: يظهر تحت الأساس (وبعد التدرّج) بالدولار المتّفق عليه — null لغيره
+        $baseUsdDirect = (!empty($s['month']) && !empty($s['year']) && usdBaseAppliesForMonth($emp, (int)$s['month'], (int)$s['year']) && (float)($emp['base_salary_usd'] ?? 0) > 0)
+            ? (float)$emp['base_salary_usd'] : null;
+        $bpeUsdDirect = $baseUsdDirect !== null ? $baseUsdDirect + ($gradeInc > 0 ? $usd($gradeInc) : 0) : null;
 
         $row = [
             'label'        => $dr['label'],
             's'            => $s,
             'rate'         => $rate,
             'base_shown'   => $baseShown,
+            'base_usd'     => $baseUsdDirect,
+            'bpe_usd'      => $bpeUsdDirect,
             'grade_inc'    => $gradeInc,
             'cur_sal'      => $curSal,
             // 🧮 قيمة «الراتب بعد التدرج» بالدولار القديم (÷ السعر الرسمي 1500، داون) — أساس قانون نسبة الإضافي (طلبه 2026-09-03)
@@ -175,6 +181,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
 
         // مجاميع
         $tot['base_shown'] += $baseShown; $tot['grade_inc'] += $gradeInc;
+        if ($baseUsdDirect !== null) { $tot['base_usd'] = (float)($tot['base_usd'] ?? 0) + floor($baseUsdDirect); $tot['bpe_usd'] = (float)($tot['bpe_usd'] ?? 0) + floor($bpeUsdDirect); } // مجموع الأشهر المعروضة (داون) فالأرقام تركب
         $tot['base_plus_echelon'] += $curSal; $tot['bpe_old_usd'] += (int)floor($curSal / officialUsdRate()); $tot['extra_wage'] += $extraWageSlip; $tot['aide'] += $aideSlip;
         $tot['brut'] += $brut; $tot['caisse'] += $row['caisse']; $tot['eoc_grade'] += $eocGrade;
         $tot['cnss'] += $row['cnss']; $tot['income_tax'] += $row['income_tax'];
