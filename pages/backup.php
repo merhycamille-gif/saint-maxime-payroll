@@ -78,6 +78,26 @@ if ($action === 'files_info') {
     if ($base && is_dir($base)) foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS)) as $f) if ($f->isFile()) { $n++; $sz += $f->getSize(); }
     header('Content-Type: application/json'); echo json_encode(['files' => $n, 'bytes' => $sz]); exit;
 }
+// 🗂️ قائمة كل ملفات uploads/ بمساراتها النسبية وأحجامها (للنقل ملفاً ملفاً عند ضعف الاتصال) — للمدير فقط
+if ($action === 'filelist') {
+    $base = realpath(__DIR__ . '/../uploads'); $list = [];
+    if ($base && is_dir($base)) foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS)) as $f)
+        if ($f->isFile()) $list[] = ['p' => str_replace('\\', '/', substr($f->getPathname(), strlen($base) + 1)), 's' => $f->getSize()];
+    header('Content-Type: application/json'); echo json_encode($list); exit;
+}
+// 🗂️ ملف واحد من uploads/ (مسار نسبي آمن داخل المجلد فقط) — للنقل ملفاً ملفاً
+if ($action === 'file') {
+    $base = realpath(__DIR__ . '/../uploads');
+    $rel = str_replace('\\', '/', (string)($_GET['p'] ?? ''));
+    $full = realpath($base . '/' . $rel);
+    if (!$base || !$full || strncmp($full, $base . DIRECTORY_SEPARATOR, strlen($base) + 1) !== 0 || !is_file($full)) { http_response_code(404); echo 'not found'; exit; }
+    while (ob_get_level()) { ob_end_flush(); }
+    header('Content-Type: application/octet-stream');
+    header('Content-Length: ' . filesize($full));
+    header('Content-Disposition: attachment; filename="' . basename($full) . '"');
+    $fh = fopen($full, 'rb'); if ($fh) { while (!feof($fh)) { echo fread($fh, 1 << 20); } fclose($fh); }
+    exit;
+}
 
 // ===== 1) نسخة SQL كاملة (ملف لكل الداتا، قابل للاستعادة) =====
 if ($action === 'sql') {
