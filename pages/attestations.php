@@ -37,6 +37,14 @@ $ATT_TYPES = [
     'notice_mail'    => ['fr' => 'Avertissement (par courrier)',  'en' => 'Warning (by mail)',           'ar' => 'إنذار (بالبريد المضمون)'],
 ];
 $DOC_LANGS = ['ar' => 'العربية', 'fr' => 'Français', 'en' => 'English'];
+// كل أنواع الإفادات مقسّمة لأقسام واضحة (تُغطّى كل الأنواع + قسم «أخرى» احتياطاً لأي نوع جديد) — المصدر الواحد لملف الأستاذ ولصفحة الاختيار
+$ATT_GROUPS = [
+    'Salaire, travail et CNSS / راتب وعمل وضمان' => ['salaire','tadris','cnss','cnss_travail','cnss_hire_new','cnss_hire_reg','cnss_leave','mof_r3','afade_madrasiya','embassy','riaaya'],
+    'Fin de service, démission et décharge / نهاية الخدمة والاستقالة وإبراء الذمّة' => ['anhaa_khedme','anhaa_mail','talab_istiqala','isqat_haq','baraa_zimma'],
+    'Contrats, déclarations et avertissements / عقود وإقرارات وإنذارات' => ['aqd_taalim','iqrar','notice_school','notice_mail'],
+];
+$ATT_GROUPS_OTHERS = array_values(array_diff(array_keys($ATT_TYPES), array_merge(...array_values($ATT_GROUPS))));
+if ($ATT_GROUPS_OTHERS) $ATT_GROUPS['Autres / أخرى'] = $ATT_GROUPS_OTHERS;
 
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 $type    = $_GET['type'] ?? '';
@@ -326,14 +334,7 @@ if ($emp && !empty($_GET['dossier'])):
             </h4>
             <?php
             // كل أنواع الإفادات مقسّمة لأقسام واضحة (تُغطّى كل الأنواع + قسم «أخرى» احتياطاً لأي نوع جديد)
-            $attGroups = [
-                'Salaire, travail et CNSS / راتب وعمل وضمان' => ['salaire','tadris','cnss','cnss_travail','cnss_hire_new','cnss_hire_reg','cnss_leave','mof_r3','afade_madrasiya','embassy','riaaya'],
-                'Fin de service, démission et décharge / نهاية الخدمة والاستقالة وإبراء الذمّة' => ['anhaa_khedme','anhaa_mail','talab_istiqala','isqat_haq','baraa_zimma'],
-                'Contrats, déclarations et avertissements / عقود وإقرارات وإنذارات' => ['aqd_taalim','iqrar','notice_school','notice_mail'],
-            ];
-            $grouped = array_merge(...array_values($attGroups));
-            $others = array_values(array_diff(array_keys($ATT_TYPES), $grouped));
-            if ($others) $attGroups['Autres / أخرى'] = $others;
+            $attGroups = $ATT_GROUPS;
             ?>
             <?php /* 🎨 (2026-09-27 p1 «يكون مرتبين وفيهن شوي ألوان راكزة لنميّز من بعض»): كل قسم لوحة بلون هادئ خاصّ به (أخضر: راتب وعمل وضمان · كهرماني: نهاية الخدمة · نيلي: عقود وإنذارات · رمادي: أخرى)
                      والأزرار بشبكة خانات متساوية — الروابط نفسها */ ?>
@@ -398,21 +399,31 @@ if (!$emp):
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Type / نوع الإفادة</label>
-                    <select name="type" class="form-select">
-                        <?php foreach ($ATT_TYPES as $k => $lbl): ?>
-                        <option value="<?= $k ?>"><?= e($lbl['fr']) ?> / <?= e($lbl['ar']) ?></option>
+                <?php /* ☑️ (2026-09-28 p1 «بدي هودي اللي بالأسانسور يكونو ظاهرين مرتّبين وحدهن تشاك مارك»): أنواع الإفادات كانت مخبّأة
+                         بقائمة منسدلة (20 نوعاً) ⇒ صارت ظاهرة كلّها بخانات تشييك مرصوفة، بنفس الأقسام الملوّنة الهادئة الأربعة التي بملف الأستاذ
+                         (راتب وعمل وضمان · نهاية الخدمة · عقود وإنذارات · أخرى). تشاك مارك واحد فقط (radio بشكل خانة) — اللغة كذلك 3 خانات. */ ?>
+                <div class="form-group" style="grid-column:1/-1">
+                    <label class="form-label">Type / نوع الإفادة <span class="text-muted" style="font-weight:400;font-size:12px">— حطّ تشاك مارك على وحدة</span></label>
+                    <div class="att-type-pick att-groups">
+                        <?php $gi = 0; foreach ($ATT_GROUPS as $gTitle => $keys): $gi++; $gIcon = ['fa-money-check-dollar', 'fa-door-open', 'fa-file-contract', 'fa-folder-open'][min($gi, 4) - 1]; ?>
+                        <div class="att-group att-g<?= min($gi, 4) ?>">
+                            <div class="att-gt"><i class="fas <?= $gIcon ?>"></i> <?= e($gTitle) ?></div>
+                            <div class="school-checks att-type-checks">
+                                <?php foreach ($keys as $k): if (!isset($ATT_TYPES[$k])) continue; ?>
+                                <label class="chk"><input type="radio" name="type" value="<?= e($k) ?>" required autocomplete="off"> <span><?= e($ATT_TYPES[$k]['fr']) ?> / <?= e($ATT_TYPES[$k]['ar']) ?></span></label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
                         <?php endforeach; ?>
-                    </select>
+                    </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="grid-column:1/-1">
                     <label class="form-label">Langue / اللغة</label>
-                    <select name="lang_doc" class="form-select">
+                    <div class="school-checks att-lang-checks">
                         <?php foreach ($DOC_LANGS as $k => $lbl): ?>
-                        <option value="<?= $k ?>" <?= $k===$docLang?'selected':'' ?>><?= e($lbl) ?></option>
+                        <label class="chk"><input type="radio" name="lang_doc" value="<?= e($k) ?>" <?= $k===$docLang?'checked':'' ?> autocomplete="off"> <span><?= e($lbl) ?></span></label>
                         <?php endforeach; ?>
-                    </select>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Date (استقالة/صرف/براءة)</label>
@@ -420,7 +431,7 @@ if (!$emp):
                 </div>
                 <div class="form-group" style="grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap">
                     <button class="btn btn-primary"><i class="fas fa-file-export"></i> Générer l'attestation / إصدار الإفادة</button>
-                    <button name="dossier" value="1" class="btn btn-info"><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل</button>
+                    <button name="dossier" value="1" class="btn btn-info" formnovalidate><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل</button>
                 </div>
             </form>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> كل إفادة تصدر بلغة واحدة مستقلة ومرتّبة. تقدر تبدّل اللغة من الوثيقة وتطبع/تصدّر كل لغة لحالها. حقل التاريخ للاستقالة والصرف وبراءة الذمة.</p>

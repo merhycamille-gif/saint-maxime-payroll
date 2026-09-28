@@ -1562,6 +1562,23 @@ body.print-landscape .doc-table{--pz-target:1062 !important;}
 .att-groups .att-g2{background:#fffbeb;border-color:#fde68a}.att-groups .att-g2 .att-gt{color:#92400e}.att-groups .att-g2 a.btn{border-color:#fde68a;color:#78350f}
 .att-groups .att-g3{background:#eef2ff;border-color:#c7d2fe}.att-groups .att-g3 .att-gt{color:#3730a3}.att-groups .att-g3 a.btn{border-color:#c7d2fe;color:#312e81}
 .att-groups .att-g4{background:#f8fafc;border-color:#e2e8f0}.att-groups .att-g4 .att-gt{color:#334155}.att-groups .att-g4 a.btn{border-color:#e2e8f0;color:#1e293b}
+/* ☑️ (2026-09-28 p1 «بدي هودي اللي بالأسانسور يكونو ظاهرين مرتّبين وحدهن تشاك مارك»): صفحة اختيار الإفادة —
+   الأنواع الـ20 ظاهرة كلّها بخانات مرصوفة داخل الأقسام الملوّنة نفسها، والاختيار واحد (radio بشكل تشاك مارك مربّع) + اللغة 3 خانات */
+.att-type-pick .att-group{margin-bottom:8px}
+.att-type-pick .school-checks.att-type-checks{background:transparent;border:none;padding:2px 0 0;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.school-checks.att-type-checks .chk,.school-checks.att-lang-checks .chk{background:#fff;border:1px solid var(--gray-200,#e2e8f0);align-items:flex-start;font-weight:600;line-height:1.35}
+.school-checks.att-type-checks .chk span,.school-checks.att-lang-checks .chk span{white-space:normal}
+.att-groups .att-g1 .school-checks .chk{border-color:#a7f3d0;color:#064e3b}
+.att-groups .att-g2 .school-checks .chk{border-color:#fde68a;color:#78350f}
+.att-groups .att-g3 .school-checks .chk{border-color:#c7d2fe;color:#312e81}
+.att-groups .att-g4 .school-checks .chk{border-color:#e2e8f0;color:#1e293b}
+.school-checks.att-lang-checks{display:flex;flex-wrap:wrap;gap:4px 14px}
+.school-checks.att-lang-checks .chk{min-width:150px}
+/* radio بشكل خانة تشييك: مربّع + علامة ✓ عند الاختيار — والخانة المختارة تتلوّن */
+.school-checks.att-type-checks input[type=radio],.school-checks.att-lang-checks input[type=radio]{appearance:none;-webkit-appearance:none;width:16px;height:16px;min-width:16px;margin:2px 0 0;border:1.5px solid #64748b;border-radius:4px;background:#fff;position:relative;cursor:pointer;flex:0 0 16px}
+.school-checks.att-type-checks input[type=radio]:checked,.school-checks.att-lang-checks input[type=radio]:checked{background:#1F4E5F;border-color:#1F4E5F}
+.school-checks.att-type-checks input[type=radio]:checked::after,.school-checks.att-lang-checks input[type=radio]:checked::after{content:"";position:absolute;left:4.5px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.school-checks.att-type-checks .chk:has(input:checked),.school-checks.att-lang-checks .chk:has(input:checked){background:#dbeafe !important;border-color:#1d4ed8 !important;color:#1e3a8a !important;box-shadow:0 0 0 1px #1d4ed8 inset}
 /* 🎨 (2026-09-27 p1) أقسام ملوّنة هادئة داخل شريط الخيارات: عنوان صغير + صفوفه — للتمييز بلمحة */
 .att-opts .att-sec{border:1px solid;border-radius:10px;padding:4px 10px 2px;margin:3px 0}
 .att-opts .att-sec .att-st{font-weight:700;font-size:12.5px;padding:2px 4px 4px;display:flex;align-items:center;gap:6px}

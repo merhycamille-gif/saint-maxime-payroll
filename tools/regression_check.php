@@ -8717,6 +8717,30 @@ $ok192 = $ok192 && substr_count($inner192, '</div><div>') === 2 && strpos($inner
       && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), "<div>' . implode('</div><div>', \$idParts) . '</div></div>'") !== false;
 check('🪪 أرقام الضمان/المالية/الصندوق بالإفادة تحت بعض (سطر لكل رقم) لا على سطر واحد (2026-09-27)', $ok192, 'emp=' . $e192 . ' divs=' . ($inner192 !== '' ? substr_count($inner192, '</div><div>') + 1 : 0));
 
+/* =====================================================================
+ * 193) ☑️ صفحة اختيار الإفادة (2026-09-28 p1 «بدي هودي اللي بالأسانسور يكونو ظاهرين
+ *      مرتّبين وحدهن تشاك مارك»): أنواع الإفادات لا تُخبَّأ بقائمة منسدلة بل ظاهرة كلّها
+ *      بخانات مرصوفة (radio بشكل تشاك مارك) داخل الأقسام الملوّنة الأربعة نفسها التي بملف
+ *      الأستاذ، واللغة 3 خانات؛ زرّ «الملف الكامل» لا يتعطّل بشرط الاختيار (formnovalidate).
+ * =================================================================== */
+$h193 = renderPage('pages/attestations.php', ['dossier' => 1], [], [2], '', '2025-2026');
+$src193 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$css193 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$nTypes193 = preg_match_all("/^    '([a-z0-9_]+)'\s*=>\s*\['fr'/m", substr($src193, strpos($src193, '$ATT_TYPES = ['), strpos($src193, '$DOC_LANGS') - strpos($src193, '$ATT_TYPES = [')), $mt193);
+$radios193 = preg_match_all('/<input type="radio" name="type" value="([a-z0-9_]+)"/', $h193, $mr193);
+$ok193 = $nTypes193 >= 20 && $radios193 === $nTypes193
+      && !array_diff($mt193[1], $mr193[1]) && !array_diff($mr193[1], $mt193[1])
+      && strpos($h193, '<select name="type"') === false && strpos($h193, '<select name="lang_doc"') === false
+      && preg_match_all('/<input type="radio" name="lang_doc" value="(ar|fr|en)"/', $h193) === 3
+      && substr_count($h193, 'class="school-checks att-type-checks"') === 3
+      && preg_match('/<div class="att-type-pick att-groups">.*?<div class="att-group att-g1">.*?<div class="att-group att-g2">.*?<div class="att-group att-g3">/su', $h193) === 1
+      && preg_match('/<button name="dossier" value="1"[^>]*formnovalidate/', $h193) === 1
+      && strpos($h193, 'required autocomplete="off"') !== false
+      && strpos($css193, '.school-checks.att-type-checks input[type=radio]:checked::after') !== false
+      && strpos($css193, '.school-checks.att-type-checks .chk:has(input:checked)') !== false
+      && strpos($src193, '$attGroups = $ATT_GROUPS;') !== false; // ملف الأستاذ يستعمل الأقسام نفسها (مصدر واحد)
+check('☑️ صفحة اختيار الإفادة: كل الأنواع ظاهرة بخانات تشاك مارك مرصوفة بالأقسام الملوّنة (بلا قائمة منسدلة) + اللغة 3 خانات + الملف الكامل بلا شرط (2026-09-28)', $ok193, 'types=' . $nTypes193 . ' radios=' . $radios193);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
