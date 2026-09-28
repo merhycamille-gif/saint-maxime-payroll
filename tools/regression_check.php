@@ -696,7 +696,10 @@ if ($regEid) {
           && strpos($hTit27, 'name="tdate"') !== false);
     // 🏫 (2026-09-04) «مين داخل على المدرسة بتاريخ/بسنة لكل مدرسة»: وضع الدخول إلى المدرسة (hire_date، كل الفئات) + مدى «كل السنة الدراسية»
     $hHire04 = renderPage('pages/reports.php', ['report' => 'titularized', 'tmode' => 'hire', 'tspan' => 'year', 'tdate' => '2023-10-01'], []);
-    $nHire04 = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND hire_date BETWEEN '2023-10-01' AND '2024-09-30'")->fetchColumn();
+    // 🚪 (2026-09-28) الداخلون بتاريخ = من أساتذة السنة المعروضة فقط (بلا جلسة = سنة البرنامج الحالية) — التارك لا يظهر
+    [$yfH04, $ypH04] = yearEmploymentFilter(currentSchoolYear(), 'e.');
+    $stH04 = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND e.hire_date BETWEEN '2023-10-01' AND '2024-09-30'" . $yfH04); $stH04->execute($ypH04);
+    $nHire04 = (int)$stH04->fetchColumn();
     check('تقرير الداخلين إلى المدرسة: بطاقة بالمركز + وضع hire (كل الفئات) + مدى السنة الدراسية 1/10→30/9 + العدد = استعلام مباشر',
           strpos($repSrc25, "'fr'=>\"Entrés à l'école (par date)\"") !== false
           && strpos($hHire04, 'الداخلون إلى المدرسة خلال السنة الدراسية 2023-2024') !== false
@@ -8740,6 +8743,53 @@ $ok193 = $nTypes193 >= 20 && $radios193 === $nTypes193
       && strpos($css193, '.school-checks.att-type-checks .chk:has(input:checked)') !== false
       && strpos($src193, '$attGroups = $ATT_GROUPS;') !== false; // ملف الأستاذ يستعمل الأقسام نفسها (مصدر واحد)
 check('☑️ صفحة اختيار الإفادة: كل الأنواع ظاهرة بخانات تشاك مارك مرصوفة بالأقسام الملوّنة (بلا قائمة منسدلة) + اللغة 3 خانات + الملف الكامل بلا شرط (2026-09-28)', $ok193, 'types=' . $nTypes193 . ' radios=' . $radios193);
+
+/* =====================================================================
+ * 194) 🚪 التارك لا يعود يظهر بسنين بعد تركه ولا بأي محل (2026-09-28 «بدي بس الأساتذة
+ *      الموجودين 2025-2026 وما بعدها… كل أستاذ تارك ما لازم يرجع يبين بعدين — بكل تقارير
+ *      وصفحات البرنامج»): أساتذة السنة = yearEmploymentFilter الموحّد بكل لائحة —
+ *      بلوغ الـ64 (age64List) · مخالفات الإضافي/البند/التعويض العائلي · المنقول الصفري
+ *      (carried_zero) مطويّ بلا أسماء على لوحة القيادة · موازنة الوزارة · حالة التحديث
+ *      («بعتوا» ∩ أساتذة السنة + السنين من 2025-2026) · المرسَّمون بقرار · الداخلون بتاريخ.
+ * =================================================================== */
+$src194a = (string)file_get_contents($PROJ . '/includes/age64.php');
+$src194c = (string)file_get_contents($PROJ . '/includes/compliance.php');
+$src194m = (string)file_get_contents($PROJ . '/pages/mehe_budget.php');
+$src194i = (string)file_get_contents($PROJ . '/pages/info_status.php');
+$src194d = (string)file_get_contents($PROJ . '/includes/cadre_due.php');
+$src194r = (string)file_get_contents($PROJ . '/pages/reports.php');
+$okSrc194 = strpos($src194a, 'yearEmploymentFilter($mSy64') !== false && strpos($src194a, '$st->execute($yp64)') !== false
+    && substr_count($src194c, '. $yf') >= 6 && strpos($src194c, "=== 'carried_zero'") !== false && strpos($src194c, 'class="comp-ghosts"') !== false
+    && strpos($src194m, 'ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) WHERE e.school_id IN') !== false
+    && strpos($src194i, "INFO_STATUS_FIRST_SY = '2025-2026'") !== false && strpos($src194i, 'if (!isset($memberIds[$eid])) continue;') !== false
+    && strpos($src194d, "AND (e.id IS NULL OR (e.is_deleted = 0 AND \" . leftDateSql('e.') . \" >= ?))") !== false
+    && strpos($src194r, '$schoolSqlEmp . $tMember') !== false && strpos($src194r, 'array_merge($tParams, $tMP)') !== false;
+// تجربة فعلية: بلوغ الـ64 وحالة التحديث ولوحة القيادة بسنة 2026-2027 لا تحمل أي id خارج أساتذة السنة
+$sy194 = '2026-2027';
+[$yf194, $yp194] = yearEmploymentFilter($sy194, 'e.');
+$st194 = $db->prepare("SELECT e.id FROM employees e WHERE e.is_deleted = 0" . $yf194); $st194->execute($yp194);
+$ok194ids = array_fill_keys(array_map('intval', $st194->fetchAll(PDO::FETCH_COLUMN)), 1);
+$leak194 = function (string $h) use ($ok194ids, $db): array {
+    $ids = [];
+    if (preg_match_all('/[?&](?:employee_id|emp|eid|id|edit)=(\d+)/', $h, $m)) foreach ($m[1] as $i) $ids[(int)$i] = 1;
+    if (preg_match_all('/data-(?:id|emp|employee)="(\d+)"/', $h, $m)) foreach ($m[1] as $i) $ids[(int)$i] = 1;
+    $bad = array_keys(array_diff_key($ids, $ok194ids));
+    if (!$bad) return [];
+    $in = implode(',', array_map('intval', $bad));
+    return $db->query("SELECT id FROM employees WHERE id IN ($in) AND is_deleted = 0")->fetchAll(PDO::FETCH_COLUMN);
+};
+$h194r = renderPage('pages/retirement_64.php', [], [], [], '', $sy194);
+$h194s = renderPage('pages/info_status.php', ['sy' => $sy194], [], [], '', $sy194);
+$h194sa = renderPage('pages/info_status.php', ['sy' => 'all'], [], [], '', $sy194);
+$h194x = renderPage('index.php', [], [], [], '', $sy194);
+$ghostTable194 = preg_match('/<details class="comp-ghosts".*?<\/details>/su', $h194x, $mg194) === 1 ? $mg194[0] : '';
+$ok194 = $okSrc194 && strpos($h194r, 'FATAL') === false && strpos($h194s, 'FATAL') === false && strpos($h194x, 'FATAL') === false
+    && !$leak194($h194r) && !$leak194($h194s) && !$leak194($h194sa)
+    && ($ghostTable194 === '' || strpos($ghostTable194, '<table') === false) // لوحة القيادة: سطر مجمَّع بلا جدول أسماء
+    && preg_match('/<select name="sy"[^>]*>(.*?)<\/select>/su', $h194s, $mSel194) === 1
+    && !preg_match('/<option value="20(0\d|1\d|2[0-4])-/', $mSel194[1]); // منتقي سنة التحديث (name=sy لا مبدّل السنة العلوي) بلا سنين قبل 2025-2026
+check('🚪 التارك لا يظهر بسنين بعد تركه ولا بأي محل (2026-09-28): بلوغ الـ64 / حالة التحديث (بعتوا ∩ أساتذة السنة، السنين من 2025-2026) / لوحة القيادة (المنقول الصفري مطويّ بلا أسماء) / المخالفات / الموازنة / المرسَّمون / الداخلون بتاريخ — مصدر + حيّ',
+      $ok194, 'src=' . (int)$okSrc194 . ' leaks r64=' . count($leak194($h194r)) . ' status=' . count($leak194($h194s)) . ' all=' . count($leak194($h194sa)));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

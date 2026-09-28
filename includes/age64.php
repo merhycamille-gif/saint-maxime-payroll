@@ -80,6 +80,11 @@ function age64List($db, $activeYearOnly = false) {
     $selYear = $activeYearOnly ? activeSchoolYear() : 'all';
     $specificYear = ($selYear !== 'all' && preg_match('/^\d{4}-\d{4}$/', (string)$selYear));
     $ageCond = $specificYear ? '' : ' AND TIMESTAMPDIFF(YEAR, e.birth_date, CURDATE()) >= 64';
+    // 🚪 (2026-09-28 «اللي ترك خلص ما عاد لازم يبين بسنين بعد الترك ولا بمحل بالبرنامج»): بلوغ الـ64 لأساتذة السنة المعروضة فقط
+    //    (yearEmploymentFilter الموحّد) — لا للتارك بلا تاريخ ترك ولا لمن لا راتب فعلياً له بالسنة. «كل السنين» = سنة البرنامج الحالية.
+    $aSy64 = activeSchoolYear();
+    $mSy64 = ($specificYear && $selYear !== 'all') ? $selYear : (preg_match('/^\d{4}-\d{4}$/', (string)$aSy64) ? $aSy64 : currentSchoolYear());
+    [$yf64, $yp64] = yearEmploymentFilter($mSy64, 'e.');
 
     $rows = [];
     try {
@@ -90,10 +95,10 @@ function age64List($db, $activeYearOnly = false) {
             WHERE e.is_deleted = 0 AND e.status = 'actif'
               AND " . leftDateSql('e.') . " = '9999-12-31'
               AND e.birth_date IS NOT NULL AND e.birth_date NOT IN ('0000-00-00','1900-01-01')"
-              . $ageCond . schoolScopeSql('e.school_id')
+              . $ageCond . schoolScopeSql('e.school_id') . $yf64
             . " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
                 COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr)");
-        $st->execute();
+        $st->execute($yp64);
         $rows = $st->fetchAll();
     } catch (Exception $e) { $rows = []; }
 

@@ -873,10 +873,14 @@ function reportDocThumb($path) {
             $tLblFr = ($tmode === 'hire' ? "Entrés à l'école le " : 'Entrés au cadre le ') . formatDate($tdate);
             $tLblAr = ($tmode === 'hire' ? 'الداخلون إلى المدرسة بتاريخ ' : 'الداخلون في الملاك بتاريخ ') . formatDate($tdate);
         }
+        // 🚪 (2026-09-28 «التارك ما لازم يبين بسنين بعد تركه ولا بمحل»): الداخلون بتاريخ كذا = من أساتذة السنة المعروضة فقط
+        //    (yearEmploymentFilter الموحّد)؛ «كل السنين» = بلا فلتر (التاريخ القديم كما هو).
+        $tMember = ''; $tMP = [];
+        if (preg_match('/^\d{4}-\d{4}$/', (string)activeSchoolYear())) [$tMember, $tMP] = yearEmploymentFilter(activeSchoolYear(), 'e.');
         $stmtT = $db->prepare("SELECT e.* FROM employees e
-                               WHERE e.is_deleted = 0" . $tTypeSql . $tWhere . $schoolSqlEmp . "
+                               WHERE e.is_deleted = 0" . $tTypeSql . $tWhere . $schoolSqlEmp . $tMember . "
                                ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), $tcol, COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
-        $stmtT->execute($tParams);
+        $stmtT->execute(array_merge($tParams, $tMP));
         $data = $stmtT->fetchAll();
     ?>
         <form method="GET" class="card no-print">

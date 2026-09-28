@@ -116,7 +116,7 @@ $fmt0 = fn($v) => number_format((float)$v, 0);
 $fmt2 = fn($v) => number_format((float)$v, 2);
 $allEmps = array_merge($p['tit'], $p['con'], array_filter($p['adm'], fn($a) => empty($a['manual'])));
 // كل موظفي السنة (لخيار الاستثناء) — بمن فيهم المستثنون حالياً
-$empList = $db->prepare("SELECT DISTINCT e.id, e.school_id, CONCAT(e.first_name_ar,' ',e.last_name_ar) nm, e.employee_type FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ? WHERE e.school_id IN (" . implode(',', $ids) . ") AND e.is_deleted = 0 ORDER BY e.school_id, e.employee_type, nm");
+$empList = $db->prepare("SELECT DISTINCT e.id, e.school_id, CONCAT(e.first_name_ar,' ',e.last_name_ar) nm, e.employee_type FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) WHERE e.school_id IN (" . implode(',', $ids) . ") AND e.is_deleted = 0 ORDER BY e.school_id, e.employee_type, nm"); // 🚪 (2026-09-28) أساتذة السنة فقط: صفوف صفرية منقولة لا تُدخل التارك
 $empList->execute([$sy]);
 $empList = $empList->fetchAll();
 ?>

@@ -230,8 +230,8 @@ function complianceItems(PDO $db, string $sy): array {
         JOIN (SELECT employee_id, SUM(amount) s FROM employee_bonuses WHERE is_active = 1 AND bonus_type = 'prime_fixe' AND school_year = ? AND value_type = 'amount' AND currency = 'LBP' AND start_month IS NULL GROUP BY employee_id) t ON t.employee_id = e.id
         WHERE e.is_deleted = 0" . $sc . "
           AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id AND b.is_active = 1 AND b.bonus_type = 'prime_fixe' AND (b.school_year IS NULL OR b.school_year = ?) AND (b.value_type = 'percent' OR b.currency = 'USD' OR b.start_month IS NOT NULL))
-          AND ms.prime_fixe_lbp <> t.s
-        GROUP BY e.id ORDER BY ms.year, ms.month", [$sy, $sy, $sy]) as $r) {
+          AND ms.prime_fixe_lbp <> t.s" . $yf . "
+        GROUP BY e.id ORDER BY ms.year, ms.month", array_merge([$sy, $sy, $sy], $yp)) as $r) {
         $add('add_stale', $r, 'بشهر ' . complianceMonthLabel((int)$r['month'], (int)$r['year']) . ' الإضافي المخزّن ' . complianceFmt($r['stored']) . ' ل.ل وبند ملفه ' . complianceFmt($r['expected']) . ' ل.ل',
             'إعادة حساب رواتب سنة ' . $sy . ' من بنود ملفه', true);
     }
@@ -247,9 +247,9 @@ function complianceItems(PDO $db, string $sy): array {
 
     // ── 7) بند إضافي فاعل لكن أشهره بصفر ──
     foreach ($q("SELECT e.* FROM employees e
-        WHERE e.is_deleted = 0" . $sc . " AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND b.school_year = ? AND b.start_month IS NULL)
+        WHERE e.is_deleted = 0" . $sc . $yf . " AND EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = e.id AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type IN ('prime_fixe','aide_complementaire') AND b.school_year = ? AND b.start_month IS NULL)
           AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ?)
-          AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND (ms.prime_fixe_lbp > 0 OR ms.aide_complementaire_lbp > 0))", [$sy, $sy, $sy]) as $r) {
+          AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND (ms.prime_fixe_lbp > 0 OR ms.aide_complementaire_lbp > 0))", array_merge($yp, [$sy, $sy, $sy])) as $r) {
         $add('missing_add', $r, 'بملفه بند إضافي/مكافأة فاعل لسنة ' . $sy . ' لكن كل أشهره المخزّنة بصفر (لم يُطبَّق)', 'إعادة حساب سنة ' . $sy . ' من ملفه', true);
     }
 
@@ -418,10 +418,10 @@ function complianceItems(PDO $db, string $sy): array {
         ensureFamilyAllowanceDateColumns();
         $faRows = $db->prepare("SELECT month, year, family_allowance_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month,0) = 0 ORDER BY year, month");
         foreach ($q("SELECT DISTINCT e.* FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
-            WHERE e.is_deleted = 0" . $sc . "
+            WHERE e.is_deleted = 0" . $sc . $yf . "
               AND (COALESCE(e.family_allowance_spouse_lbp,0) > 0 OR COALESCE(e.family_allowance_children_lbp,0) > 0 OR ms.family_allowance_lbp > 0
                    OR e.id IN (SELECT employee_id FROM family_allowance_changes))
-            ORDER BY e.school_id, e.id", [$sy]) as $r) {
+            ORDER BY e.school_id, e.id", array_merge([$sy], $yp)) as $r) {
             $engine = salaryEngineAllowed($r, $db);
             $hasAmt = familyAllowanceHasAny($r); // 📅💱 مبلغ بملفه أو تغيير شهري (2026-09-24)
             $eligible = familyAllowanceEligible($r);
@@ -772,6 +772,10 @@ function renderCompliancePending(array $rep, bool $compact = true): void {
     $sy = $rep['sy'];
     $autoN = count($rep['auto']);
     if (!$pending && !$autoN) return;
+    // 🚪 (2026-09-28 «كل أستاذ تارك ما لازم يرجع يبين بعدين»): المنقول بأشهر صفرية بلا أي راتب سابق (carried_zero) ليس من أساتذة
+    //    السنة — أسماؤهم لا تُعرض بالجدول مع المخالفات، بل تُطوى بسطر واحد مجمَّع (يُفتح عند الحاجة للحذف بالجملة).
+    $ghosts = array_values(array_filter($pending, fn($it) => ($it['rule'] ?? '') === 'carried_zero'));
+    $pending = array_values(array_filter($pending, fn($it) => ($it['rule'] ?? '') !== 'carried_zero'));
     $n = count($pending);
     ?>
     <div class="card no-print" id="compPending" style="border:2px solid <?= $n ? '#b91c1c' : '#16a34a' ?>;margin-bottom:16px">
@@ -782,6 +786,15 @@ function renderCompliancePending(array $rep, bool $compact = true): void {
                 <strong style="color:#166534">موافق — صحّح</strong> ينفّذ التصحيح فوراً، و<strong>لا — اتركه</strong> يسجّل قرارك ولا يعود يظهر. لا يُصحَّح شيء بلا موافقتك.
                 <a href="<?= BASE_URL ?>pages/compliance.php"><i class="fas fa-file-lines"></i> التقرير الكامل (المعلّق + ما تركته + ما صُحِّح)</a></p>
             <?php if ($pending): renderComplianceTable($pending, BASE_URL . 'index.php', $compact, $compact ? 5 : 0); endif; ?>
+            <?php if ($ghosts): ?>
+            <details class="comp-ghosts" style="margin-top:8px"><summary style="cursor:pointer;color:#6b7280;font-weight:700"><i class="fas fa-ghost"></i>
+                <?= count($ghosts) ?> ملفاً قديماً نُقل لسنة <?= e($sy) ?> بأشهر صفرية بلا أي راتب سابق — ليسوا من أساتذة السنة ولا يظهرون بأي مكان بالبرنامج (افتح للحذف بالجملة)
+                <span dir="ltr" style="font-weight:400;color:#9ca3af">/ anciens dossiers reportés à zéro — masqués partout</span></summary>
+                <?php if ($compact): ?>
+                <p style="margin:6px 0 0;color:#6b7280">الأسماء لا تُعرض على لوحة القيادة — <a href="<?= BASE_URL ?>pages/compliance.php#compPending">افتح التقرير الكامل</a> لحذف أشهرهم الصفرية بالجملة.</p>
+                <?php else: renderComplianceTable($ghosts, BASE_URL . 'index.php', false, 0); endif; ?>
+            </details>
+            <?php endif; ?>
             <?php if ($autoN): ?>
             <details style="margin-top:8px"><summary style="cursor:pointer;color:#166534;font-weight:700"><i class="fas fa-wand-magic-sparkles"></i> صُحِّح تلقائياً (مكرّر حرفي لا يحتاج قراراً) — <?= $autoN ?></summary>
                 <ul style="margin:6px 0 0;padding-inline-start:18px">

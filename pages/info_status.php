@@ -34,8 +34,9 @@ function updateYearOfToday() {
     $m = (int)date('n'); $y = (int)date('Y');
     return ($m >= 7) ? ($y . '-' . ($y + 1)) : (($y - 1) . '-' . $y);
 }
+const INFO_STATUS_FIRST_SY = '2025-2026'; // أوّل سنة تحديث معلومات (2026-09-28)
 $selYear = $_GET['sy'] ?? updateYearOfToday();
-if ($selYear !== 'all' && !preg_match('/^\d{4}-\d{4}$/', $selYear)) $selYear = updateYearOfToday();
+if ($selYear !== 'all' && (!preg_match('/^\d{4}-\d{4}$/', $selYear) || strcmp($selYear, INFO_STATUS_FIRST_SY) < 0)) $selYear = updateYearOfToday();
 $syCond = ''; $syParams = [];
 if ($selYear !== 'all') {
     [$sy1, $sy2] = schoolYearToYears($selYear);
@@ -46,6 +47,9 @@ if ($selYear !== 'all') {
 $yearOptions = $db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE school_year REGEXP '^[0-9]{4}-[0-9]{4}$' ORDER BY school_year DESC")->fetchAll(PDO::FETCH_COLUMN);
 foreach ([updateYearOfToday(), $selYear === 'all' ? null : $selYear] as $extraY)
     if ($extraY && !in_array($extraY, $yearOptions, true)) { $yearOptions[] = $extraY; rsort($yearOptions); }
+// 📅 (2026-09-28 «بملف تحديث المعلومات بدي بس الأساتذة الموجودين 2025-2026 وما بعدها مش قبلها»): حملات التحديث بدأت 2025-2026 —
+//    السنين الأقدم لا تُعرض بالمنتقي (التارك قبلها خلص).
+$yearOptions = array_values(array_filter($yearOptions, fn($y) => strcmp($y, INFO_STATUS_FIRST_SY) >= 0));
 $selYearLabel = ($selYear === 'all') ? 'Toutes les années / كل السنين' : $selYear;
 
 // 1) أساتذة/موظفو السنة المختارة في المدارس الفعّالة ضمن النطاق (غير محذوفين، موجودون فعلاً بهذه السنة، غير تاركين)
@@ -61,6 +65,8 @@ $activeSql = "SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.l
 $st = $db->prepare($activeSql);
 $st->execute($yp);
 $active = $st->fetchAll();
+// 🚪 (2026-09-28) أساتذة السنة هم المرجع الوحيد: مَن بعت طلباً وهو ليس من أساتذة السنة المختارة (ترك قبلها) لا يظهر لا بـ«بعتوا» ولا بـ«ما بعتوا»
+$memberIds = array_fill_keys(array_map(fn($r) => (int)$r['id'], $active), true);
 
 // 2) كل من بعت طلباً (موجود، applied أو pending) **ضمن سنة التحديث المختارة** في المدارس
 //    الفعّالة ضمن النطاق — نقودها من جدول الطلبات مباشرةً حتى يظهر **كل** من بعت بهذه السنة.
@@ -78,6 +84,7 @@ $sq = $db->prepare("SELECT s.status, s.submitted_at, e.id, e.first_name_ar, e.la
 $sq->execute($syParams);
 foreach ($sq->fetchAll() as $r) {
     $eid = (int)$r['id'];
+    if (!isset($memberIds[$eid])) continue; // 🚪 ليس من أساتذة السنة (تارك قبلها)
     $cur = $sentByEmp[$eid] ?? null;
     $better = !$cur
         || ($rank[$r['status']] ?? 0) > ($rank[$cur['status']] ?? 0)

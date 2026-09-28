@@ -524,11 +524,14 @@ function cadreDuePendingCount(?PDO $db = null, ?string $sy = null): int {
 function cadreDueApprovedList(PDO $db, string $sy): array {
     complianceEnsureTable($db);
     try {
+        [$cy1] = schoolYearToYears($sy);
+        // 🚪 (2026-09-28) التارك قبل بداية السنة لا يظهر بلائحة المرسَّمين ولو بقي قراره بالسجلّ
         $st = $db->prepare("SELECT d.*, e.hire_date, e.titularization_date, e.current_grade, s.name_ar school_name_ar, s.name_fr school_name_fr
                             FROM compliance_decisions d LEFT JOIN employees e ON e.id = d.employee_id LEFT JOIN schools s ON s.id = d.school_id
                             WHERE d.rule_key = 'cadre_due' AND d.school_year = ? AND d.decision = 'approved' AND d.employee_id IS NOT NULL" . schoolScopeSql('d.school_id') . "
+                              AND (e.id IS NULL OR (e.is_deleted = 0 AND " . leftDateSql('e.') . " >= ?))
                             ORDER BY s.name_ar, d.decided_at DESC");
-        $st->execute([$sy]);
+        $st->execute([$sy, $cy1 . '-10-01']);
         return $st->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) { return []; }
 }
