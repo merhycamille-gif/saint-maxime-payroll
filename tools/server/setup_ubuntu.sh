@@ -56,7 +56,7 @@ systemctl enable --now mariadb
 if [ -f "$CRED" ] && grep -q '^DB_PASS=' "$CRED"; then
   DB_PASS="$(grep '^DB_PASS=' "$CRED" | cut -d= -f2-)"
 else
-  DB_PASS="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 28)"
+  DB_PASS="$(openssl rand -hex 18)"  # 36 hex chars — بلا أنبوب /dev/urandom (يتفادى SIGPIPE مع pipefail)
   { echo "DB_NAME=${DB_NAME}"; echo "DB_USER=${DB_USER}"; echo "DB_PASS=${DB_PASS}"; echo "CREATED=$(date -Is)"; } > "$CRED"; chmod 600 "$CRED"
 fi
 mysql -e "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
