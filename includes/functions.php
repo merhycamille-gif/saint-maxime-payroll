@@ -5,6 +5,25 @@
 
 require_once __DIR__ . '/../config/database.php';
 
+// 🔁 (2026-09-28 «صار يفتل وعطاني ERR_CONNECTION_TIMED_OUT» + «ما رح أعمل تجارب — البرنامج كلو صح»): المتصفّح يعيد إرسال نماذج POST
+//    تلقائياً عند انقطاع الاتصال (header.php: msaPostRetry) ويرفق req_id فريداً لكل إرسال — إن كان الإرسال الأوّل وصل وعولج وضاع ردّه،
+//    الإعادة لا تُعالَج مرّة ثانية (لا تكرار حفظ/إنشاء) بل تُعاد للصفحة نفسها حيث يظهر أثر الحفظ الأوّل.
+//    (هنا لا بـconfig/database.php: ذاك ملف خاصّ بكل خادم وغير منشور — هذا الملف يصل لكل الخوادم بالنشر.)
+if (!function_exists('msaPostIsDuplicate')) {
+    function msaPostIsDuplicate(string $rid): bool {
+        if ($rid === '' || !preg_match('/^[A-Za-z0-9_-]{8,64}$/', $rid)) return false;
+        $done = $_SESSION['msa_done_req'] ?? [];
+        if (in_array($rid, $done, true)) return true;
+        $done[] = $rid; if (count($done) > 60) $done = array_slice($done, -60);
+        $_SESSION['msa_done_req'] = $done;
+        return false;
+    }
+}
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['req_id']) && PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_ACTIVE && msaPostIsDuplicate((string)$_POST['req_id'])) {
+    header('Location: ' . (string)($_SERVER['REQUEST_URI'] ?? '/'), true, 303);
+    exit;
+}
+
 // =====================================================
 // Authentication
 // =====================================================

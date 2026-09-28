@@ -8881,7 +8881,7 @@ check('📆 الفترة المدفوعة من شهر ← إلى شهر بملف
  *      «عملت حفظ صار يفتل وعطاني can't reach this page» ثم «ما رح أعمل تجارب — البرنامج كلو صح»):
  *      header.php يرسل كل POST بـfetch مع محاولات وreq_id؛ database.php يتجاهل req_id المكرّر (303 للصفحة نفسها).
  * =================================================================== */
-$hd198 = (string)file_get_contents($PROJ . '/includes/header.php'); $cf198 = (string)file_get_contents($PROJ . '/config/database.php');
+$hd198 = (string)file_get_contents($PROJ . '/includes/header.php'); $cf198 = (string)file_get_contents($PROJ . '/includes/functions.php'); // الحارس بملف منشور (config/database.php خاصّ بكل خادم)
 $_SESSION['msa_done_req'] = [];
 $rid198 = 'rtest' . substr(md5((string)microtime(true)), 0, 12);
 $dup198 = function_exists('msaPostIsDuplicate') && msaPostIsDuplicate($rid198) === false && msaPostIsDuplicate($rid198) === true
@@ -8892,7 +8892,8 @@ unset($_SESSION['msa_done_req']);
 $ok198 = $dup198 && $cap198
     && strpos($hd198, 'window.msaPostRetry = { max: 6, delay: 2500 };') !== false && strpos($hd198, "fd.append('req_id', rid);") !== false
     && strpos($hd198, "e.submitter") !== false && strpos($hd198, "f.hasAttribute('data-no-retry')") !== false && strpos($hd198, "credentials: 'same-origin', redirect: 'follow'") !== false
-    && strpos($cf198, "isset(\$_POST['req_id']) && PHP_SAPI !== 'cli' && msaPostIsDuplicate((string)\$_POST['req_id'])") !== false && strpos($cf198, "true, 303);") !== false;
+    && strpos($cf198, "isset(\$_POST['req_id']) && PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_ACTIVE && msaPostIsDuplicate((string)\$_POST['req_id'])") !== false && strpos($cf198, "true, 303);") !== false
+    && strpos((string)file_get_contents($PROJ . '/config/database.php'), 'msaPostIsDuplicate') === false && strpos((string)file_get_contents($PROJ . '/.gitignore'), 'config/database.php') !== false;
 check('🔁 نماذج POST تُعاد تلقائياً عند انقطاع الاتصال (fetch + محاولات + req_id) والخادم يتجاهل التكرار (سقف 60) — 2026-09-28', $ok198, 'dup=' . (int)$dup198 . ' cap=' . (int)$cap198);
 
 /* ---------- الخلاصة ---------- */
