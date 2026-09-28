@@ -6475,7 +6475,7 @@ check('عمود النقل الثلاثي (كود): الدوال المركزي�
       strpos($fn135, 'function transportColMode(): string {') !== false
       && strpos($fn135, 'function transportColShown(): bool { return transportColMode() !== \'none\'; }') !== false
       && strpos($fn135, 'function transportTd(string $html, string $attrs = \' class="num"\'): string {') !== false
-      && strpos($fn135, '<select name="transport_mode" onchange="this.form.submit()" class="scb-sel">') /* ☑️📐 2026-09-27 صفوف مرتّبة */ !== false
+      && strpos($fn135, "salaryCompModeTiles('transport_mode', \$tm, true)") /* ☑️ 2026-09-28 خانات حدّ بعض بدل الأسانسور */ !== false
       && strpos($fn135, "if (\$withTransport) \$n += transportColShown() ? 1 : 0;") !== false
       && strpos($rh135, "return transportColShown() ? '<th' . \$attrs . '>' . \$label . '</th>' : '';") !== false
       && strpos($rh135, "return transportTd(money((int)(\$r['transport_lbp'] ?? 0), rowRate(\$r), ['withCur' => false]), \$num ? ' class=\"num\"' : '');") !== false
@@ -7010,7 +7010,7 @@ foreach (['amount', 'blank', 'none'] as $dm) {
 if (!isset($ths148['amount'], $ths148['none']) || $ths148['amount'] - $ths148['none'] !== 1 || $ths148['blank'] !== $ths148['amount']) { $ok148 = false; $why148 .= ' ths=' . json_encode($ths148 ?? []); }
 check('💰 عمود المستحق بثلاث حالات (كود + تشغيل فعلي بالكشف الشهري وsalary_all والبطاقة السنوية للمتعاقد: بالمبلغ/فارغ/غير موجود، عمود واحد يزيد أو ينقص فقط، بلا Fatal)',
       $ok148 && function_exists('dueColMode') && function_exists('dueTd') && function_exists('dueHead') && function_exists('dueCell') && function_exists('dueTotalCell')
-      && strpos($fn148, '<select name="due_mode" onchange="this.form.submit()" class="scb-sel">') !== false && strpos($hd148, '<select name="due_mode" class="form-control form-control-sm"') !== false
+      && strpos($fn148, "salaryCompModeTiles('due_mode', \$dm, true)") !== false && strpos($hd148, "salaryCompModeTiles('due_mode', \$dmH, false)") !== false
       && strpos((string)file_get_contents($PROJ . '/switch_salarycomp.php'), "\$_SESSION['due_col_mode'] = (string)\$_GET['due_mode'];") !== false
       && substr_count($of148, 'dueHead(') === 3 && substr_count($of148, 'dueCell(') === 2 && substr_count($of148, 'dueTotalCell(') === 2 && substr_count($of148, 'dueTd(') === 2
       && strpos($of148, 'colspan="<?= 16 + compColsCount() + dueColsCount() + netFamColsCount() ?>"') !== false && strpos($of148, 'colspan="<?= 8 + compColsCount() + dueColsCount() + netFamColsCount() ?>"') !== false && strpos($of148, '$sdCols = 16 + compColsCount() + dueColsCount() + netFamColsCount();') !== false
@@ -7152,7 +7152,7 @@ foreach ([0, 1, 2, 3, 4] as $i) {
 }
 check('👨‍👩‍👧➕ عمود «الصافي + التعويض العائلي» بثلاث حالات (كود + تشغيل فعلي: الكشف الشهري وsalary_all وpayment_list وجميع الأساتذة والبطاقة السنوية — بالمبلغ/فارغ/غير موجود، عمود واحد يزيد أو ينقص فقط، بلا Fatal)',
       $ok150 && function_exists('netFamColMode') && function_exists('netFamTd') && function_exists('netFamLbp') && function_exists('netFamHead') && function_exists('netFamCell') && function_exists('netFamTotalCell')
-      && strpos($fn150, '<select name="netfam_mode" onchange="this.form.submit()" class="scb-sel">') !== false && strpos($hd150, '<select name="netfam_mode" class="form-control form-control-sm"') !== false
+      && strpos($fn150, "salaryCompModeTiles('netfam_mode', \$nfm, true)") !== false && strpos($hd150, "salaryCompModeTiles('netfam_mode', \$nfmH, false)") !== false
       && strpos((string)file_get_contents($PROJ . '/switch_salarycomp.php'), "\$_SESSION['netfam_col_mode'] = (string)\$_GET['netfam_mode'];") !== false
       && substr_count($of150, 'netFamHead(') === 3 && substr_count($of150, 'netFamCell(') === 2 && substr_count($of150, 'netFamTotalCell(') === 2 && substr_count($of150, 'netFamTd(') === 2
       && strpos($rp150, "<?= netFamHead('', 'الصافي + التعويض العائلي' . rateHead('mkt', \$month, \$year)) ?><?= transportHead() ?><?= dueHead() ?>") !== false && substr_count($rp150, 'netFamTd(') === 2
@@ -8646,7 +8646,7 @@ $hI189 = renderPage('pages/info_status.php', [], [], [3], 'lbp', '2025-2026');
 $hE189 = renderPage('pages/employees.php', [], [], [3], 'lbp', '2025-2026');
 $tb189 = preg_match('#<form method="get" action="[^"]*switch_salarycomp\.php" class="salcomp-bar att-opts[^"]*">(.*?)</form>#su', $hR189, $m189) ? $m189[1] : '';
 check('☑️📐 باقي الشرائط صفوفاً مرتّبة (2026-09-27): «الراتب المركّب يشمل» 5 صفوف بخاناته + أعمدة الدرجة للمتعاقد · البطاقة (احتساب/تصدير) · حالة التحديث · الفئة أفقية · المكافآت الجماعية · فتح السنة · لائحة الموظفين — بلا رصّ حرّ',
-      strpos($fn189, 'class="salcomp-bar att-opts no-print no-export"') !== false && strpos($fn189, '<select name="contract_grade_mode" onchange="this.form.submit()" class="scb-sel">') !== false
+      strpos($fn189, 'class="salcomp-bar att-opts no-print no-export"') !== false && strpos($fn189, "salaryCompModeTiles('contract_grade_mode', \$cgm, true)") !== false
       && $tb189 !== '' && substr_count($tb189, 'class="att-row') === 5 && strpos($tb189, 'name="comp[]" value="extra"') !== false && strpos($tb189, 'name="transport_mode"') !== false && strpos($tb189, 'name="due_mode"') !== false && strpos($tb189, 'name="netfam_mode"') !== false && strpos($tb189, 'name="contract_grade_mode"') !== false
       && strpos($css189, '.school-checks.emp-type-checks,.fa-cats .school-checks{display:flex;flex-wrap:wrap;gap:4px 14px}') !== false && strpos($css189, '.salcomp-bar.att-opts{display:grid;gap:0 22px}') !== false
       && $noFatal($hS189) && substr_count($hS189, 'Calcul / احتساب:') === 1 && substr_count($hS189, 'Export / تصدير وطباعة:') === 1 && strpos($hS189, '<span style="color:var(--gray-400)">|</span>') === false && strpos($hS189, 'name="from_m"') !== false && strpos($hS189, 'blank=2') !== false
@@ -8790,6 +8790,31 @@ $ok194 = $okSrc194 && strpos($h194r, 'FATAL') === false && strpos($h194s, 'FATAL
     && !preg_match('/<option value="20(0\d|1\d|2[0-4])-/', $mSel194[1]); // منتقي سنة التحديث (name=sy لا مبدّل السنة العلوي) بلا سنين قبل 2025-2026
 check('🚪 التارك لا يظهر بسنين بعد تركه ولا بأي محل (2026-09-28): بلوغ الـ64 / حالة التحديث (بعتوا ∩ أساتذة السنة، السنين من 2025-2026) / لوحة القيادة (المنقول الصفري مطويّ بلا أسماء) / المخالفات / الموازنة / المرسَّمون / الداخلون بتاريخ — مصدر + حيّ',
       $ok194, 'src=' . (int)$okSrc194 . ' leaks r64=' . count($leak194($h194r)) . ' status=' . count($leak194($h194s)) . ' all=' . count($leak194($h194sa)));
+
+/* =====================================================================
+ * 195) ☑️ خيارات أعمدة الراتب خانات حدّ بعض لا أسانسور (2026-09-28 p1 «ما بدي أسانسور
+ *      بدي ياهن يبيّنوا حدّ بعض رتّبهن منيح»): النقل/المستحق/الصافي+العائلي/أعمدة الدرجة
+ *      = radio بشكل تشاك مارك (salaryCompModeTiles) بشريط «الراتب المركّب يشمل» (يرسل فوراً)
+ *      وبقائمة «الراتب يشمل» بالهيدر (تنتظر «تطبيق»، والقائمة أعرض) — لا <select> لهذه الأسماء.
+ * =================================================================== */
+$fn195 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$hd195 = (string)file_get_contents($PROJ . '/includes/header.php');
+$css195 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$hR195 = renderPage('pages/reports.php', ['report' => 'salary_all'], ['extra'], [3], 'both', '2025-2026');
+$tb195 = preg_match('#<form method="get" action="[^"]*switch_salarycomp\.php" class="salcomp-bar att-opts[^"]*">(.*?)</form>#su', $hR195, $m195) ? $m195[1] : '';
+$pop195 = preg_match('#<div class="school-menu scb-menu" id="salCompMenu">(.*?)</form>#su', $hR195, $m195b) ? $m195b[1] : '';
+$cnt195 = function (string $h, string $name): int { return preg_match_all('/<input type="radio" name="' . $name . '" value="[a-z]+"/', $h); };
+$ok195 = function_exists('salaryCompModeTiles') && function_exists('salaryCompModeOptions')
+    && !preg_match('/<select name="(transport_mode|due_mode|netfam_mode|contract_grade_mode)"/', $fn195)
+    && !preg_match('/<select name="(transport_mode|due_mode|netfam_mode|contract_grade_mode)"/', $hd195)
+    && substr_count($hd195, 'class="scb-block"') === 4 && strpos($hd195, 'class="school-menu scb-menu" id="salCompMenu"') !== false
+    && strpos($css195, '.school-multi .school-menu.scb-menu{min-width:560px') !== false && strpos($css195, '.school-checks.scb-tiles .chk:has(input:checked)') !== false
+    && $tb195 !== '' && $cnt195($tb195, 'transport_mode') === 3 && $cnt195($tb195, 'due_mode') === 3 && $cnt195($tb195, 'netfam_mode') === 3 && $cnt195($tb195, 'contract_grade_mode') === 2
+    && substr_count($tb195, 'onchange="this.form.submit()"') >= 13 && substr_count($tb195, 'class="school-checks att-lang-checks scb-tiles"') === 4
+    && $pop195 !== '' && $cnt195($pop195, 'transport_mode') === 3 && $cnt195($pop195, 'due_mode') === 3 && $cnt195($pop195, 'netfam_mode') === 3 && $cnt195($pop195, 'contract_grade_mode') === 2
+    && strpos($pop195, '<select') === false && preg_match('/<input type="radio" name="due_mode" value="(none|blank|amount)" checked/', $pop195) === 1;
+check('☑️ خيارات أعمدة الراتب خانات حدّ بعض لا أسانسور (2026-09-28 p1): الشريط 3+3+3+2 radio ترسل فوراً + قائمة الهيدر نفسها بلا select (أعرض) + CSS', $ok195,
+      'toolbar=' . strlen($tb195) . ' pop=' . strlen($pop195));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

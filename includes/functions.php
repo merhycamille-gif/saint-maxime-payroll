@@ -5737,6 +5737,35 @@ function composedSalaryLbp(array $row): int {
  * شريط خانات اختيار ظاهر (متل شريط الإفادة) — يُعرَض فوق التقارير والملفات ليتحكّم المستخدم
  * بمكوّنات «الراتب المركّب» مباشرةً (يتغيّر فوراً عند الكبس). لا يظهر بالطباعة/التصدير.
  */
+/**
+ * ☑️ (2026-09-28 p1 «ما بدي أسانسور — بدي ياهن يبيّنوا حدّ بعض، رتّبهن منيح»): خيارات أعمدة الراتب (النقل/المستحق/الصافي+العائلي/
+ * أعمدة الدرجة للمتعاقد) كانت قوائم منسدلة ⇒ صارت خانات ظاهرة حدّ بعض (radio بشكل تشاك مارك مربّع) — المصدر الواحد لشريط
+ * «الراتب المركّب يشمل» ولقائمة «الراتب يشمل» بالهيدر. $submitOnChange: الشريط يرسل فوراً، والقائمة تنتظر «تطبيق».
+ */
+function salaryCompModeOptions(string $lang): array {
+    $tri = [
+        'none'   => $lang==='ar' ? 'غير موجود' : 'Absente',
+        'blank'  => $lang==='ar' ? 'موجود بلا مبلغ' : 'Présente sans montant',
+        'amount' => $lang==='ar' ? 'موجود مع المبلغ' : 'Présente avec montant',
+    ];
+    return [
+        'transport_mode'      => $tri,
+        'due_mode'            => $tri,
+        'netfam_mode'         => $tri,
+        'contract_grade_mode' => ['hide' => ($lang==='ar' ? 'مخفية (المتعاقد بلا درجة)' : 'Masquées (pas d’échelon)'), 'show' => ($lang==='ar' ? 'ظاهرة' : 'Affichées')],
+    ];
+}
+function salaryCompModeTiles(string $name, string $current, bool $submitOnChange): string {
+    $lang = $_SESSION['lang'] ?? 'fr';
+    $opts = salaryCompModeOptions($lang)[$name] ?? [];
+    $h = '<div class="school-checks att-lang-checks scb-tiles" data-scb="' . e($name) . '">';
+    foreach ($opts as $v => $lbl) {
+        $h .= '<label class="chk"><input type="radio" name="' . e($name) . '" value="' . e($v) . '"' . ($current === $v ? ' checked' : '')
+            . ($submitOnChange ? ' onchange="this.form.submit()"' : '') . ' autocomplete="off"> <span>' . e($lbl) . '</span></label>';
+    }
+    return $h . '</div>';
+}
+
 function salaryCompToolbar(): string {
     $sel  = salaryComp();
     $lang = $_SESSION['lang'] ?? 'fr';
@@ -5750,34 +5779,19 @@ function salaryCompToolbar(): string {
         </div>
         <?php $tm = transportColMode(); ?>
         <div class="att-row"><strong class="att-k"><i class="fas fa-bus"></i> <?= $lang==='ar'?'عمود تعويض النقل:':'Colonne transport :' ?></strong>
-            <select name="transport_mode" onchange="this.form.submit()" class="scb-sel">
-                <option value="none"   <?= $tm==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
-                <option value="blank"  <?= $tm==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
-                <option value="amount" <?= $tm==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ (يُجمع بالمستحق)':'Présente avec montant (dans le dû)' ?></option>
-            </select>
+            <?= salaryCompModeTiles('transport_mode', $tm, true) ?>
         </div>
         <?php $dm = dueColMode(); // 💰 عمود المستحق بثلاث حالات (2026-09-19) ?>
         <div class="att-row"><strong class="att-k"><i class="fas fa-sack-dollar"></i> <?= $lang==='ar'?'عمود المستحق (المجموع):':'Colonne total dû :' ?></strong>
-            <select name="due_mode" onchange="this.form.submit()" class="scb-sel">
-                <option value="none"   <?= $dm==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
-                <option value="blank"  <?= $dm==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
-                <option value="amount" <?= $dm==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
-            </select>
+            <?= salaryCompModeTiles('due_mode', $dm, true) ?>
         </div>
         <?php $nfm = netFamColMode(); // 👨‍👩‍👧➕ عمود «الصافي + التعويض العائلي» بثلاث حالات (2026-09-20) ?>
         <div class="att-row"><strong class="att-k"><i class="fas fa-people-roof"></i> <?= $lang==='ar'?'عمود الصافي + التعويض العائلي:':'Colonne net + alloc. fam. :' ?></strong>
-            <select name="netfam_mode" onchange="this.form.submit()" class="scb-sel">
-                <option value="none"   <?= $nfm==='none'  ?'selected':'' ?>><?= $lang==='ar'?'غير موجود':'Absente' ?></option>
-                <option value="blank"  <?= $nfm==='blank' ?'selected':'' ?>><?= $lang==='ar'?'موجود بلا مبلغ':'Présente sans montant' ?></option>
-                <option value="amount" <?= $nfm==='amount'?'selected':'' ?>><?= $lang==='ar'?'موجود مع المبلغ':'Présente avec montant' ?></option>
-            </select>
+            <?= salaryCompModeTiles('netfam_mode', $nfm, true) ?>
         </div>
         <?php $cgm = contractGradeColsMode(); // 🎓 أعمدة الدرجة/التدرّج للمتعاقد (2026-09-27) — نفس الخيار الموجود بقائمة الهيدر ?>
         <div class="att-row"><strong class="att-k"><i class="fas fa-graduation-cap"></i> <?= $lang==='ar'?'أعمدة الدرجة والتدرّج للمتعاقد:':'Colonnes échelon (contractuel) :' ?></strong>
-            <select name="contract_grade_mode" onchange="this.form.submit()" class="scb-sel">
-                <option value="hide" <?= $cgm==='hide'?'selected':'' ?>><?= $lang==='ar'?'مخفية (المتعاقد بلا درجة)':'Masquées (pas d’échelon)' ?></option>
-                <option value="show" <?= $cgm==='show'?'selected':'' ?>><?= $lang==='ar'?'ظاهرة':'Affichées' ?></option>
-            </select>
+            <?= salaryCompModeTiles('contract_grade_mode', $cgm, true) ?>
         </div>
     </form>
     <?php return ob_get_clean();
