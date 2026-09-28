@@ -79,7 +79,7 @@ if [ ! -d "$APP_DIR/.git" ]; then
 else
   git -C "$APP_DIR" pull -q --ff-only || true
 fi
-mkdir -p "$APP_DIR/uploads" "$APP_DIR/tmp"
+mkdir -p "$APP_DIR/uploads" "$APP_DIR/tmp" "$APP_DIR/config"  # config/ فارغ بعد الاستنساخ (database.php متجاهَل بـgit)
 # ملف الإعداد الخاصّ بهذا الخادم (غير منشور بـgit — راجع .gitignore)
 if [ ! -f "$APP_DIR/config/database.php" ]; then
 cat > "$APP_DIR/config/database.php" <<EOF
