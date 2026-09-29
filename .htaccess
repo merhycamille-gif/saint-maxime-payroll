@@ -13,6 +13,18 @@ php_value memory_limit 512M
 # الملف الصحيح من الجذر. محميّ بشرط المضيف → لا يمسّ maximos-rawatib.com إطلاقاً.
 <IfModule mod_rewrite.c>
 RewriteEngine On
+# ─────────────────────────────────────────────────────────────────────
+# 🖥️ (2026-09-29 «القديم خلص شغّلني دايماً على الجديد»): البرنامج انتقل إلى السيرفر الجديد msapayroll.com.
+# أي فتح على العنوان القديم maximos-rawatib.com (الأيقونات والروابط القديمة وروابط الأساتذة المبعوتة)
+# يتحوّل تلقائياً إلى نفس الصفحة على الجديد — فلا يُدخَل شيء على قاعدة السيرفر القديم بعد اليوم.
+# GET/HEAD = 302، وغيرها (POST) = 307 ليبقى المحتوى المُرسَل. «msa_old=1» = باب صيانة للمدير فقط.
+RewriteCond %{HTTP_HOST} ^(www\.)?maximos-rawatib\.com$ [NC]
+RewriteCond %{QUERY_STRING} !(^|&)msa_old=1(&|$)
+RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+RewriteRule ^(.*)$ https://msapayroll.com/$1 [R=302,L]
+RewriteCond %{HTTP_HOST} ^(www\.)?maximos-rawatib\.com$ [NC]
+RewriteCond %{QUERY_STRING} !(^|&)msa_old=1(&|$)
+RewriteRule ^(.*)$ https://msapayroll.com/$1 [R=307,L]
 RewriteCond %{HTTP_HOST} ^(www\.)?msapayroll\.com$ [NC]
 RewriteRule ^saint-maxime-payroll/(.*)$ $1 [L]
 RewriteCond %{HTTP_HOST} ^(www\.)?msapayroll\.com$ [NC]

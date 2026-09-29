@@ -430,7 +430,7 @@ function reportDocThumb($path) {
             </div>
         </form>
         <?php /* 🏛️ ترويسة كشف الضمان باسم صاحب العمل لدى الصندوق (25-82-043 ⇒ الجمعية) */ ?>
-        <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year, 'school' => cnssEmployerSchool(currentSchool())]) ?>
+        <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year, 'school' => cnssEmployerSchool(reportHeaderSchool())]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>وعاء الضمان</th><th>الأجير<?= contribHead('cnss_employee_rate', $month, $year) ?></th><th>المدرسة<?= contribHead('cnss_employer_rate', $month, $year) ?></th></tr></thead>
                     <tbody>
@@ -888,10 +888,11 @@ function reportDocThumb($path) {
             <div class="card-body form-row cols-3">
                 <div class="form-group mb-0">
                     <label class="form-label"><i class="fas fa-door-open"></i> Type d'entrée / نوع الدخول</label>
-                    <select name="tmode" class="form-control">
-                        <option value="hire" <?= $tmode === 'hire' ? 'selected' : '' ?>>Entrée à l'école (toutes catégories) / الدخول إلى المدرسة (كل الفئات)</option>
-                        <option value="titular" <?= $tmode === 'titular' ? 'selected' : '' ?>>Entrée au cadre (titulaires) / الدخول في الملاك (الملاك فقط)</option>
-                    </select>
+                    <?php /* ☑️ (2026-09-29) خانات ظاهرة بدل القائمة المنسدلة (قاعدته: أي اختيار قصير = خانات) */ ?>
+                    <div class="school-checks">
+                        <label class="chk"><input type="radio" name="tmode" value="hire" <?= $tmode === 'hire' ? 'checked' : '' ?> autocomplete="off"> <span>Entrée à l'école (toutes catégories) / الدخول إلى المدرسة (كل الفئات)</span></label>
+                        <label class="chk"><input type="radio" name="tmode" value="titular" <?= $tmode === 'titular' ? 'checked' : '' ?> autocomplete="off"> <span>Entrée au cadre (titulaires) / الدخول في الملاك (الملاك فقط)</span></label>
+                    </div>
                 </div>
                 <div class="form-group mb-0">
                     <label class="form-label"><i class="fas fa-calendar-check"></i> Date / التاريخ</label>
@@ -899,10 +900,10 @@ function reportDocThumb($path) {
                 </div>
                 <div class="form-group mb-0">
                     <label class="form-label"><i class="fas fa-calendar-days"></i> Période / المدى</label>
-                    <select name="tspan" class="form-control">
-                        <option value="day" <?= $tspan === 'day' ? 'selected' : '' ?>>À cette date exacte / بهذا التاريخ بالضبط</option>
-                        <option value="year" <?= $tspan === 'year' ? 'selected' : '' ?>>Toute l'année scolaire de cette date / كل السنة الدراسية لهذا التاريخ</option>
-                    </select>
+                    <div class="school-checks">
+                        <label class="chk"><input type="radio" name="tspan" value="day" <?= $tspan === 'day' ? 'checked' : '' ?> autocomplete="off"> <span>À cette date exacte / بهذا التاريخ بالضبط</span></label>
+                        <label class="chk"><input type="radio" name="tspan" value="year" <?= $tspan === 'year' ? 'checked' : '' ?> autocomplete="off"> <span>Toute l'année scolaire de cette date / كل السنة الدراسية لهذا التاريخ</span></label>
+                    </div>
                 </div>
                 <div class="form-group mb-0"><label class="form-label">&nbsp;</label><button class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button></div>
                 <?php reportSchoolPicker(); ?>

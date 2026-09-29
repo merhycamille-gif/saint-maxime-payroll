@@ -295,6 +295,12 @@ hc($groups, $G4, abs(rateFrac('cnss_employee_rate', null, null, 3) - 0.03) < 1e-
 hc($groups, $G4, strpos($fn, 'function dueShownLbp') !== false || strpos(@file_get_contents($PROJ . '/includes/report_helpers.php') ?: '', 'function dueShownLbp') !== false,
    'قاعدة «الأرقام تركب» مركزية بالتقارير', 'موجودة ✓',
    'لو فشل: مستحق يشمل مبالغ بلا عمود يفسّرها.');
+hc($groups, $G4, strpos($fn, 'function reportHeaderSchool') !== false && strpos(@file_get_contents($PROJ . '/includes/report_helpers.php') ?: '', 'reportHeaderSchool()') !== false,
+   'ترويسة التقرير = المدرسة المشيّكة بالتقرير', 'مطابقة ✓',
+   'لو فشل: تقرير مدرسة يُطبَع بترويسة وأرقام مدرسة أخرى (مدرسة المبدّل الأعلى).');
+hc($groups, $G3, strpos(@file_get_contents($PROJ . '/.htaccess') ?: '', 'https://msapayroll.com/$1 [R=302,L]') !== false,
+   'العنوان القديم يتحوّل للسيرفر الجديد', 'يتحوّل ✓',
+   'لو فشل: من يفتح maximos-rawatib.com يُدخِل بياناته على قاعدة السيرفر القديم فلا تظهر على الجديد.');
 hc($groups, $G4, strpos($fn, 'function sanitizeAmountCurrency') !== false,
    'حارس خطأ العملة (دولار/ليرة)', 'يعمل ✓',
    'لو فشل: مبلغ ليرة بعملة دولار يضخّم الراتب آلاف المرّات.');

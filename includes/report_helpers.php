@@ -395,10 +395,16 @@ function officialFormToolbar(string $back = ''): string {
  *
  * $chips: معلومات التقرير (مثل الشهر/السنة أو العدد). $opts:
  *   - school: ترويسة مدرسة محدّدة بدل الحالية · no_letterhead: بلا ترويسة
+ *   - scope: 'report' (الافتراضي، منتقي التقرير) | 'active' (مبدّل المدارس الأعلى)
  *   - comp: false = بلا شارة «الراتب يشمل» (لتقارير لا تعرض رواتب)
  */
 function docSheetStart(string $titleFr, string $titleAr, array $chips = [], array $opts = []): string {
-    $multi = (function_exists('reportIsMultiSchool') && reportIsMultiSchool()) || isAllSchools();
+    // 🏫 (2026-09-29) الترويسة تتبع نطاق الصفحة نفسه: 'report' (الافتراضي) = المدارس المشيّكة بمنتقي التقرير،
+    //    'active' = مبدّل المدارس الأعلى (صفحات لا تمرّ بمنتقي التقارير) — كانت تأخذ مدرسة المبدّل دائماً فتخالف الجدول.
+    $scopeActive = (($opts['scope'] ?? 'report') === 'active') || !function_exists('reportHeaderSchool');
+    $hdrSchool = $scopeActive ? currentSchool() : reportHeaderSchool();
+    $hdrIds = $scopeActive ? activeSchoolIds() : selectedReportSchoolIds();
+    $multi = ($hdrSchool === null);
     $auto = [];
     $cur = displayCurrency();
     if ($cur !== 'both') $auto[] = 'العملة: ' . ($cur === 'usd' ? 'دولار فقط' : 'ليرة فقط');
@@ -414,10 +420,10 @@ function docSheetStart(string $titleFr, string $titleAr, array $chips = [], arra
     <div class="doc-sheet<?= $ltr ? ' doc-ltr' : '' ?>"<?= $ltr ? ' dir="ltr"' : '' ?>>
         <?php if (empty($opts['no_letterhead'])): ?>
             <?php if (!$multi || !empty($opts['school'])): ?>
-                <?= schoolLetterhead($opts['school'] ?? currentSchool()) ?>
+                <?= schoolLetterhead($opts['school'] ?? $hdrSchool) ?>
             <?php else: ?>
                 <div class="report-scope"><i class="fas fa-school"></i> <strong>المدارس / Écoles:</strong>
-                    <?= e(implode(' + ', array_map('schoolNameById', selectedReportSchoolIds())) ?: 'Toutes les écoles / كل المدارس') ?></div>
+                    <?= e(implode(' + ', array_map('schoolNameById', $hdrIds)) ?: 'Toutes les écoles / كل المدارس') ?></div>
             <?php endif; ?>
         <?php endif; ?>
         <div class="doc-head">

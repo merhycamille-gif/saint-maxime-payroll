@@ -914,7 +914,7 @@ elseif ($form === 'tax_emp_report'):
     <?= docSheetStart('Impôt sur le revenu — enseignant/employé (état nominatif détaillé)',
                       'تقرير ضريبة الدخل - الأستاذ/الموظف',
                       ['الفترة من ' . monthName($fm, 'ar') . ' ' . $fyr . ' إلى ' . monthName($tm, 'ar') . ' ' . $tyr,
-                       'عدد الموظفين: ' . count($EMPR)], ['comp' => false]) ?>
+                       'عدد الموظفين: ' . count($EMPR)], ['comp' => false, 'scope' => 'active']) ?>
         <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
             <thead><tr>
                 <th>الرقم</th>

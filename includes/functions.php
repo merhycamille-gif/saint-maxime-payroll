@@ -4824,6 +4824,27 @@ function reportIsMultiSchool() {
     return count($ids) > 1;
 }
 
+/**
+ * 🏫 (2026-09-29 «شيّكت ثانوية السيدة وطلعت الترويسة باسم مكسيموس»): مدرسة ترويسة التقرير = المدرسة
+ * المشيّكة بمنتقي التقرير نفسه (selectedReportSchoolIds) لا مدرسة المبدّل الأعلى (currentSchool).
+ * مدرسة واحدة مشيّكة (أو «الكل» والفاعلة واحدة) ⇒ صفّها من schools؛ عدّة مدارس ⇒ null (بانر المدارس).
+ * المصدر الواحد لكل ما يمرّ بمنتقي التقارير: الورقة (docSheetStart) والتصدير (reports_export) وكشف الضمان.
+ */
+function reportHeaderSchool(): ?array {
+    static $cache = [];
+    $ids = selectedReportSchoolIds();
+    if (empty($ids)) $ids = allActiveSchoolIdsCached(); // «الكل» = الفاعلة فقط
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)$ids), fn($x) => $x > 0)));
+    if (count($ids) !== 1) return null;
+    $sid = $ids[0];
+    if (!array_key_exists($sid, $cache)) {
+        $st = getDB()->prepare("SELECT * FROM schools WHERE id = ? AND is_deleted = 0");
+        $st->execute([$sid]);
+        $cache[$sid] = $st->fetch() ?: null;
+    }
+    return $cache[$sid];
+}
+
 // اسم مدرسة معيّنة بالـ id
 function schoolNameById($id, $lang = null) {
     $lang = $lang ?: ($_SESSION['lang'] ?? 'fr');

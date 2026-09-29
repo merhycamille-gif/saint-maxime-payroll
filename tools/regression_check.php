@@ -8954,6 +8954,76 @@ $okLangAr = $e200 > 0 && strpos($h200, 'FATAL') === false && (strpos($h200, 'dir
 $ok200 = $okSrc200 && $okLangAr;
 check('🔙🇱🇧 زرّ الرجوع للصفحة السابقة الحقيقية (msaPrevPage بكل صفحة) + الإفادات عربي افتراضياً بلا حفظ lang_doc (2026-09-29)', $ok200, 'src=' . (int)$okSrc200 . ' langAr=' . (int)$okLangAr . ' emp=' . $e200);
 
+/* =====================================================================
+ * 201) 🏫 (2026-09-29 «شيّكت ثانوية السيدة وطلعت ترويسة التقرير باسم مكسيموس»): ترويسة أي تقرير يمرّ بمنتقي
+ *      التقارير = المدرسة المشيّكة فيه (reportHeaderSchool المصدر الواحد) لا مدرسة المبدّل الأعلى —
+ *      بالورقة (docSheetStart) وبالتصدير (reports_export) وبكشف الضمان. عدّة مدارس ⇒ بانر المدارس المشيّكة.
+ *      الصفحات التي نطاقها المبدّل الأعلى تمرّر scope=active.
+ * =================================================================== */
+$fn201 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$rh201 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$rp201 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rx201 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+$of201 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+$okSrc201 = strpos($fn201, 'function reportHeaderSchool(): ?array {') !== false
+    && strpos($rh201, '$hdrSchool = $scopeActive ? currentSchool() : reportHeaderSchool();') !== false
+    && strpos($rh201, "schoolLetterhead(\$opts['school'] ?? \$hdrSchool)") !== false
+    && strpos($rh201, "schoolLetterhead(\$opts['school'] ?? currentSchool())") === false
+    && strpos($rp201, 'cnssEmployerSchool(reportHeaderSchool())') !== false && strpos($rp201, 'cnssEmployerSchool(currentSchool())') === false
+    && strpos($rx201, '$school = reportHeaderSchool();') !== false && strpos($rx201, '$school = currentSchool();') === false
+    && strpos($of201, "['comp' => false, 'scope' => 'active']") !== false;
+// تجربة فعلية: مدرستان فاعلتان لهما أساتذة — المبدّل الأعلى على الأولى والتقرير مشيّك على الثانية
+$sc201 = $db->query("SELECT s.id, s.name_ar FROM schools s WHERE s.is_deleted = 0 AND s.is_active = 1 AND COALESCE(s.name_ar,'') <> ''
+    AND EXISTS (SELECT 1 FROM employees e WHERE e.school_id = s.id AND e.is_deleted = 0) ORDER BY s.id LIMIT 2")->fetchAll();
+$okLive201 = false; $d201 = 'schools<2';
+if (count($sc201) === 2 && $sc201[0]['name_ar'] !== $sc201[1]['name_ar']) {
+    [$top201, $pick201] = $sc201;
+    $lh201 = function (string $h): string { return preg_match('/class="lh-name-ar">([^<]*)</u', $h, $m) ? html_entity_decode(trim($m[1]), ENT_QUOTES, 'UTF-8') : ''; };
+    $hA = renderPage('pages/reports.php', ['report' => 'employee_list', 'schools' => [(int)$pick201['id']]], [], [(int)$top201['id']]);
+    $hB = renderPage('pages/reports.php', ['report' => 'titularized', 'tmode' => 'hire', 'tspan' => 'year', 'tdate' => '2025-10-01', 'schools' => [(int)$pick201['id']]], [], [(int)$top201['id']]);
+    $hC = renderPage('pages/reports.php', ['report' => 'employee_list', 'schools' => [(int)$top201['id'], (int)$pick201['id']]], [], [(int)$top201['id']]);
+    $okA = $lh201($hA) === trim($pick201['name_ar']);
+    $okB = $lh201($hB) === trim($pick201['name_ar']);
+    $okC = $lh201($hC) === '' && strpos($hC, 'class="report-scope"') !== false; // مجموعة ⇒ بانر لا ترويسة مدرسة واحدة
+    $okLive201 = $okA && $okB && $okC && strpos($hA . $hB . $hC, 'FATAL') === false;
+    $d201 = 'top=' . $top201['id'] . ' pick=' . $pick201['id'] . ' A=' . (int)$okA . ' B=' . (int)$okB . ' C=' . (int)$okC;
+}
+check('🏫 ترويسة التقرير = المدرسة المشيّكة بمنتقي التقرير لا مبدّل الأعلى (reportHeaderSchool بالورقة/التصدير/الضمان) + المجموعة ببانر (2026-09-29)', $okSrc201 && $okLive201, 'src=' . (int)$okSrc201 . ' ' . $d201);
+
+/* =====================================================================
+ * 202) 🖥️ (2026-09-29 «القديم خلص شغّلني دايماً على الجديد»): العنوان القديم maximos-rawatib.com يتحوّل
+ *      تلقائياً إلى نفس الصفحة على msapayroll.com (.htaccess: GET/HEAD=302، غيرها=307، باب صيانة msa_old=1)
+ *      — قبل قواعد msapayroll الداخلية، ولا يمسّ localhost ولا الدومين الجديد. تجربة حيّة على الخادم المحلي إن كان شغّالاً.
+ * =================================================================== */
+$ht202 = (string)file_get_contents($PROJ . '/.htaccess');
+$pOld202 = strpos($ht202, 'RewriteRule ^(.*)$ https://msapayroll.com/$1 [R=302,L]');
+$okSrc202 = $pOld202 !== false && strpos($ht202, 'RewriteRule ^(.*)$ https://msapayroll.com/$1 [R=307,L]') !== false
+    && substr_count($ht202, 'RewriteCond %{HTTP_HOST} ^(www\.)?maximos-rawatib\.com$ [NC]') === 2
+    && substr_count($ht202, 'RewriteCond %{QUERY_STRING} !(^|&)msa_old=1(&|$)') === 2
+    && strpos($ht202, 'RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$') !== false
+    && $pOld202 < strpos($ht202, 'RewriteRule ^saint-maxime-payroll/(.*)$ $1 [L]');
+$live202 = 'skip';
+if (function_exists('curl_init')) {
+    $rq202 = function (string $host, string $path, bool $post = false): array {
+        $c = curl_init('http://localhost/saint-maxime-payroll/' . $path);
+        curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_NOBODY => !$post, CURLOPT_HTTPHEADER => ['Host: ' . $host], CURLOPT_TIMEOUT => 15, CURLOPT_FOLLOWLOCATION => false]);
+        if ($post) curl_setopt_array($c, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => 'a=1']);
+        curl_exec($c); $r = [(int)curl_getinfo($c, CURLINFO_HTTP_CODE), (string)curl_getinfo($c, CURLINFO_REDIRECT_URL)]; curl_close($c);
+        return $r;
+    };
+    $n202 = $rq202('localhost', 'login.php');
+    if ($n202[0] === 200) { // الخادم المحلي شغّال ⇒ تجربة فعلية
+        $a202 = $rq202('maximos-rawatib.com', 'pages/reports.php?report=titularized&schools%5B%5D=4');
+        $b202 = $rq202('www.maximos-rawatib.com', 'login.php', true);
+        $c202 = $rq202('maximos-rawatib.com', 'login.php?msa_old=1');
+        $d202 = $rq202('msapayroll.com', 'login.php');
+        $live202 = ($a202[0] === 302 && $a202[1] === 'https://msapayroll.com/pages/reports.php?report=titularized&schools%5B%5D=4'
+            && $b202[0] === 307 && $b202[1] === 'https://msapayroll.com/login.php'
+            && $c202[0] === 200 && $d202[0] === 200) ? 'ok' : ('bad ' . json_encode([$a202, $b202, $c202, $d202]));
+    }
+}
+check('🖥️ العنوان القديم maximos-rawatib.com يتحوّل تلقائياً لنفس الصفحة على msapayroll.com (302/307 + باب صيانة) بلا مسّ الجديد والمحلي (2026-09-29)', $okSrc202 && in_array($live202, ['ok', 'skip'], true), 'src=' . (int)$okSrc202 . ' live=' . $live202);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

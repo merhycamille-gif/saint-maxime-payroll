@@ -21,7 +21,7 @@ if ($schoolYear === 'all') $schoolYear = currentSchoolYear();
 $schoolSql = reportSchoolSql('ms.school_id');
 $schoolSqlEmp = reportSchoolSql('e.school_id');
 $multi = reportIsMultiSchool();
-$school = currentSchool(); // null في وضع عدة مدارس
+$school = reportHeaderSchool(); // 🏫 المدرسة المشيّكة بمنتقي التقرير (لا مبدّل الأعلى) — null عند عدّة مدارس
 $periodSchoolYear = ($month >= 10) ? ($year . '-' . ($year + 1)) : (($year - 1) . '-' . $year);
 [$empYearFilter, $empYearParams] = yearEmploymentFilter($periodSchoolYear, 'e.');
 [$annualEmpFilter, $annualEmpParams] = yearEmploymentFilter($schoolYear, 'e.');
