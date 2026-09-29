@@ -7698,9 +7698,12 @@ if ($eid166) {
         renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire', 'prefs_test' => 1, 'opts_set' => 1, 'inc_extra' => 1, 'cur' => 'usd', 'rate_show' => 1, 'sig_t' => 'raisa', 'sig_name' => 'الأخت فحص محفوظة', 'subj_ovr' => 'رياضيات', 'id_mof' => 1, 'lang_doc' => 'fr'], []);
         $hP = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'tadris', 'prefs_test' => 1], []);
         $aP = $area166($hP);
-        $c166('prefs-recalled', strpos($hP, 'name="sig_t" value="raisa" checked') !== false && strpos($aP, 'الأخت فحص محفوظة') === false /* fr: مترجَم */ && strpos($hP, 'value="الأخت فحص محفوظة"') !== false
+        // 🇱🇧 (2026-09-29 «الإفادات تطلع تلقائياً بالعربي»): اللغة لا تُحفَظ بالخيارات ⇒ الاستدعاء عربي (لا فرنسي)، وباقي الخيارات (الموقّع/المادة/العملة/الأرقام) تُستدعى
+        $c166('prefs-recalled', strpos($hP, 'name="sig_t" value="raisa" checked') !== false && strpos($hP, 'value="الأخت فحص محفوظة"') !== false
               && strpos($hP, 'name="rate_show" value="1" checked') !== false && strpos($hP, 'name="cur" value="usd" checked') !== false && strpos($hP, 'name="id_mof" value="1" checked') !== false
-              && strpos($hP, 'value="رياضيات"') !== false && strpos($aP, 'La Supérieure de l') !== false && strpos($aP, 'Mathématiques') !== false);
+              && strpos($hP, 'value="رياضيات"') !== false
+              && strpos($aP, 'رياضيات') !== false && (strpos($aP, 'الرئيسة') !== false || strpos($aP, 'تفيد رئيسة') !== false) && strpos($aP, 'الأخت فحص محفوظة') !== false
+              && strpos($aP, 'La Supérieure de l') === false && strpos($aP, 'Mathématiques') === false);
         $hO = renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'salaire'], []); // بلا prefs_test ⇒ الفحوص لا تتأثر
         $c166('prefs-off-in-tests', strpos($hO, 'name="sig_t" value="moudir" checked') !== false);
         $c166('back-to-dossier', strpos($hO, "attestations.php?employee_id=$eid166&amp;dossier=1'") !== false); // e() تحوّل & إلى &amp;
@@ -8929,6 +8932,27 @@ $ok199 = strpos($bk199, "if (\$action === 'files') {") !== false && strpos($bk19
     && strpos($bk199, "if (!isAdmin()) {") !== false;
 check('🗂️ مستندات الأساتذة تُنزَّل كاملة بـtar قياسي من backup.php?action=files (+ files_info) — عدد الملفات بالأرشيف = المجلد، ترويسات ustar، نهاية صحيحة، للمدير فقط (2026-09-28)', $ok199,
       'files=' . ($info199['files'] ?? '?') . ' tarEntries=' . $nHdr199 . ' ustar=' . (int)$okUstar . ' bytes=' . $len);
+
+/* =====================================================================
+ * 200) 🔙🇱🇧 (2026-09-29): (أ) زرّ «رجوع» بكل صفحة يرجّع للصفحة الحقيقية السابقة عبر مكدّس
+ *      صفحات مميّزة (msaPrevPage/msa_nav) يتجاهل تبديل الخيارات — الهيدر يستدعيه أولاً ثم البديل.
+ *      (ب) الإفادات تطلع بالعربي افتراضياً مهما كانت لغة الواجهة، ولا تُحفظ lang_doc (التبديل لكل وثيقة).
+ * =================================================================== */
+$js200 = (string)file_get_contents($PROJ . '/assets/js/app.js');
+$hd200 = (string)file_get_contents($PROJ . '/includes/header.php');
+$at200 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$okSrc200 = strpos($js200, 'window.msaPrevPage = function () {') !== false && strpos($js200, "var NK = 'msa_nav'") !== false
+    && strpos($js200, "window.msaHasPrev = function ()") !== false && strpos($js200, "function restoreY(y)") !== false && strpos($js200, "window.addEventListener('pagehide', saveY)") !== false
+    && strpos($hd200, 'if(!(window.msaPrevPage&&msaPrevPage())){') !== false
+    && strpos($at200, "\$docLang = \$_GET['lang_doc'] ?? 'ar';") !== false && substr_count($at200, "\$docLang = \$_GET['lang_doc'] ?? 'ar';") === 2
+    && strpos($at200, "\$_SESSION['lang'] ?? 'ar'") === false
+    && strpos($at200, "\$PREF_COMMON  = ['cur',") !== false && strpos($at200, "'lang_doc','cur'") === false;
+// تجربة فعلية: إفادة بلا lang_doc ⇒ عربي (rtl / dir="rtl") حتى لو لغة الجلسة fr
+$e200 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.is_deleted = 0 LIMIT 1")->fetchColumn();
+$h200 = $e200 ? renderPage('pages/attestations.php', ['employee_id' => $e200, 'type' => 'tadris'], [], [], '', '2025-2026') : '';
+$okLangAr = $e200 > 0 && strpos($h200, 'FATAL') === false && (strpos($h200, 'dir="rtl"') !== false || strpos($h200, 'lang="ar"') !== false || strpos($h200, 'إفادة') !== false);
+$ok200 = $okSrc200 && $okLangAr;
+check('🔙🇱🇧 زرّ الرجوع للصفحة السابقة الحقيقية (msaPrevPage بكل صفحة) + الإفادات عربي افتراضياً بلا حفظ lang_doc (2026-09-29)', $ok200, 'src=' . (int)$okSrc200 . ' langAr=' . (int)$okLangAr . ' emp=' . $e200);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -516,6 +516,48 @@ window.msaSyncForms = function () {
 };
 window.addEventListener('pageshow', function () { setTimeout(window.msaSyncForms, 50); });
 
+// 🔙 «بدي دايماً أي صفحة بكون فيها كبسة ترجعني للصفحة اللي كنت قبلها» (طلبه 2026-09-29): زرّ «رجوع» بكل صفحة
+// يرجّع للصفحة **الحقيقية** السابقة عبر مكدّس صفحات مميّزة بالجلسة — يتجاهل تبديل الخيارات وإعادة تحميل نفس
+// الصفحة (نفس التوقيع)، فلا يعلق «رجوع» على حالة سابقة كما كان history.back(). عامّ لكل البرنامج، بلا خادم.
+(function () {
+    var NK = 'msa_nav', MAX = 30;
+    // بارامترات تحدّد «هوية الصفحة» (النوع/التقرير/الموظف…) — تبديل خيار شكلي لا يغيّرها فيُعدّ نفس الصفحة
+    var IDP = ['report', 'form', 'type', 'dossier', 'action', 'employee_id', 'emp', 'eid', 'id', 'edit', 'q', 'sy', 'school_year', 'month', 'year', 'tab', 'report_type'];
+    function here() { return location.pathname + location.search; }
+    function sig() {
+        try {
+            var u = new URL(location.href), parts = [u.pathname];
+            IDP.forEach(function (k) { if (u.searchParams.has(k)) parts.push(k + '=' + u.searchParams.get(k)); });
+            return parts.join('|');
+        } catch (e) { return location.pathname; }
+    }
+    function readNav() { try { return JSON.parse(sessionStorage.getItem(NK)) || []; } catch (e) { return []; } }
+    function writeNav(a) { try { sessionStorage.setItem(NK, JSON.stringify(a.slice(-MAX))); } catch (e) {} }
+    function curY() { return window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0; }
+    function restoreY(y) { y = parseInt(y, 10) || 0; if (!y) return; window.scrollTo(0, y); setTimeout(function () { window.scrollTo(0, y); }, 60); setTimeout(function () { window.scrollTo(0, y); }, 250); setTimeout(function () { window.scrollTo(0, y); }, 600); }
+    function record() {
+        var a = readNav(), s = sig(), e = { u: here(), n: (document.title || '').replace(/\s+/g, ' ').trim(), s: s, y: 0 };
+        if (a.length && a[a.length - 1].s === s) { e.y = a[a.length - 1].y || 0; a[a.length - 1] = e; }   // نفس الصفحة (تبديل خيار/حفظ) ⇒ استبدال مع إبقاء موضعها
+        else if (a.length >= 2 && a[a.length - 2].s === s) { a.pop(); restoreY(a[a.length - 1].y); }        // 🎯 رجعنا للسابقة ⇒ اقفز عنها وارجع لنفس محلّ التمرير («محل ما كنت»)
+        else a.push(e);                                                                                     // صفحة جديدة ⇒ أضِف
+        writeNav(a);
+    }
+    // احفظ موضع التمرير الحالي بمدخل هذه الصفحة عند مغادرتها، حتى نرجع لنفس المحل لمّا نضغط «رجوع» إليها لاحقاً
+    function saveY() { var a = readNav(); if (a.length && a[a.length - 1].s === sig()) { a[a.length - 1].y = curY(); writeNav(a); } }
+    window.addEventListener('pagehide', saveY);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') saveY(); });
+    // عند أي كبسة على رابط/زرّ داخل الصفحة نحدّث الموضع أيضاً (يغطّي الانتقالات التي لا تُطلق pagehead بموثوقية)
+    document.addEventListener('click', function (ev) { var t = ev.target && ev.target.closest ? ev.target.closest('a[href],button') : null; if (t) saveY(); }, true);
+    window.msaPrevPage = function () {
+        var a = readNav(), cur = sig();
+        saveY();
+        for (var i = a.length - 2; i >= 0; i--) if (a[i].s !== cur) { location.href = a[i].u; return true; }
+        return false; // لا صفحة سابقة ⇒ يترك المستدعي يقرّر البديل (docBackUrl / اللوحة)
+    };
+    window.msaHasPrev = function () { var a = readNav(), cur = sig(); for (var i = a.length - 2; i >= 0; i--) if (a[i].s !== cur) return true; return false; };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', record); else record();
+})();
+
 // ↩️ «بدي إذا كنت بشي صفحة وأرجع للي قبلها يكون في كمان سهم حتى أرجع محل ما كنت» (طلبه 2026-09-27):
 // عند كبس «رجوع» نتذكّر الصفحة اللي تركها (الرابط + موضع التمرير + عنوانها) بالجلسة 30 دقيقة، وبالصفحة السابقة يظهر
 // زرّ «Revenir / لمحل ما كنت» (#msaFwdBtn بالهيدر) يعيده لذاك الرابط ويرجّع التمرير لنفس السطر. عام لكل البرنامج.

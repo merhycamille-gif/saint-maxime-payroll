@@ -48,7 +48,7 @@ if ($ATT_GROUPS_OTHERS) $ATT_GROUPS['Autres / أخرى'] = $ATT_GROUPS_OTHERS;
 
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 $type    = $_GET['type'] ?? '';
-$docLang = $_GET['lang_doc'] ?? ($_SESSION['lang'] ?? 'ar');
+$docLang = $_GET['lang_doc'] ?? 'ar'; // 🇱🇧 (2026-09-29 «الإفادات تطلع تلقائياً بالعربي، وإذا بدّي غيّر بغيّر») العربي افتراضياً مهما كانت لغة الواجهة — التبديل الصريح يبقى محترَماً
 if (!isset($DOC_LANGS[$docLang])) $docLang = 'ar';
 $effDate = $_GET['date'] ?? date('Y-m-d');
 // 📅 «أقدر غيّر التاريخ إذا بدّي» (2026-09-24): التاريخ المختار بشريط الإفادة هو التاريخ المطبوع عليها (الافتراضي اليوم)
@@ -709,7 +709,7 @@ if (!$emp):
     // 🧠 «تكون الملاحظات اللي أنا مختارها لإلو بعدها، ما ضلّ أكتبها دائماً» (2026-09-24): خيارات الشريط تُحفَظ بكل تفاعل (opts_set)
     //    وتُسترجَع عند فتح أي إفادة لهذا الأستاذ بلا خيارات: العامة لكل موظف، والموقّع لكل مدرسة ولكل مجموعة (إفادات/كتب).
     //    تاريخ الإفادة والجنس لا يُحفَظان. المربّع الغائب عند الحفظ = مطفأ. (أداة الفحص تطفئها إلا بـprefs_test=1)
-    $PREF_COMMON  = ['lang_doc','cur','inc_extra','inc_aide','inc_trans','logo','rate_show','amt','amt_cur','hire_dt','end_dt','end_none','subj_ovr','id_nssf','id_mof','id_eoc'];
+    $PREF_COMMON  = ['cur','inc_extra','inc_aide','inc_trans','logo','rate_show','amt','amt_cur','hire_dt','end_dt','end_none','subj_ovr','id_nssf','id_mof','id_eoc'];
     $PREF_SIGNER  = ['sig','sig_t','sig_name','sig_noname'];
     $PREF_BY_TYPE = ['isqat_haq' => ['eos','isq'], 'embassy' => ['emb_amt','emb_cur','emb_per'], 'iqrar' => ['grant'], 'aqd_taalim' => ['aqd_lbp','aqd_usd'],
                      'afade_madrasiya' => ['lv_sel','lv_txt'], 'notice_school' => ['subj_txt'], 'notice_mail' => ['subj_txt'], 'riaaya' => ['assoc_txt']];
@@ -728,7 +728,7 @@ if (!$emp):
             $allowed = array_merge($PREF_COMMON, $PREF_SIGNER, $prefTypeKeys);
             foreach ($pref as $pk => $pvv) if ((string)$pvv !== '' && !isset($_GET[$pk]) && in_array($pk, $allowed, true)) $_GET[$pk] = (string)$pvv;
             $_GET['opts_set'] = '1'; // حتى تُحترَم حالة المربّعات المحفوظة (الغائب = مطفأ)
-            $docLang = $_GET['lang_doc'] ?? ($_SESSION['lang'] ?? 'ar');
+            $docLang = $_GET['lang_doc'] ?? 'ar'; // 🇱🇧 (2026-09-29 «الإفادات تطلع تلقائياً بالعربي، وإذا بدّي غيّر بغيّر») العربي افتراضياً مهما كانت لغة الواجهة — التبديل الصريح يبقى محترَماً
             if (!isset($DOC_LANGS[$docLang])) $docLang = 'ar';
         }
     }
