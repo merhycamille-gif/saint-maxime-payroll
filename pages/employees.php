@@ -658,16 +658,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 }
             }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
-            // 📆🧹 (2026-09-30 مايكل متى «حطّيت 9 أشهر والبطاقة طلعت 12 — بس غيّر شي بملف الموظف لازم تلقائياً يتغيّر بكل المحلات»):
-            //    الفترة المدفوعة إعداد واحد بالملف لكل السنين ⇒ إذا تغيّرت تسري فوراً على سنة البرنامج وكل سنة مفتوحة بعدها أيضاً
-            //    (لا السنة المعروضة وحدها): الأشهر غير المدفوعة خارجها تُشال والتي دخلتها تُحسب — والرسالة تقول ما الذي شيل.
+            // 📆🧹 (2026-09-30 مايكل متى «حطّيت 9 أشهر والبطاقة طلعت 12» ثم «كل اللي بدّي ياه: بس غيّر، بنفس السنة يتغيّر»):
+            //    غيّر الفترة المدفوعة ⇒ السنة **المعروضة وحدها** تتبع الملف فوراً (recalcEmployeeYear أعلاه حسب أشهر الفترة وشال ما صار
+            //    خارجها)؛ وإن كانت المعروضة سنة سابقة فهذا فعل صريح منه عليها ⇒ أشهرها غير المدفوعة خارج الفترة تُشال أيضاً. لا سنة أخرى تُمسّ.
             if ($oldPayPeriod && ((int)$oldPayPeriod['pay_from_month'] !== (int)$payFromP || (int)$oldPayPeriod['pay_to_month'] !== (int)$payToP)) {
-                try {
-                    $ppShown = (string)writeSchoolYear();
-                    foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$id . " AND school_year >= " . $db->quote(currentSchoolYear()))->fetchAll(PDO::FETCH_COLUMN) as $ppSy) {
-                        if ((string)$ppSy !== $ppShown) recalcEmployeeYear($id, (string)$ppSy);
-                    }
-                } catch (Throwable $t) {}
+                try { prunePaidPeriodRows((int)$id, (string)writeSchoolYear(), true); } catch (Throwable $t) {}
             }
             $ppGone = array_values(array_unique($GLOBALS['msa_pay_period_pruned'][(int)$id] ?? []));
             if ($ppGone && !empty($_SESSION['flash']['msg'])) {

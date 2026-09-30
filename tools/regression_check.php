@@ -4662,7 +4662,7 @@ check('تجربة حيّة (موظفة بلا إعداد): إضافة سطر إ�
  * =================================================================== */
 require_once $PROJ . '/includes/data_audit.php';
 $aud90 = dataAuditRules($db, '2025-2026');
-$info90 = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'orphan_rows', 'row_rate0'];
+$info90 = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'orphan_rows', 'row_rate0', 'pay_period_rows'];
 $bad90 = []; foreach ($aud90 as $a) if ($a['n'] > 0 && !in_array($a['key'], $info90, true)) $bad90[] = $a['key'] . '=' . $a['n'];
 check('الفحص الرسمي (21 قاعدة، منها tax_stale الضريبة ≠ القانون الحيّ منذ 2026-09-10) على النسخة المحلية 2025-2026: صفر أخطاء حساب (المعلوماتية للمراجعة مستثناة)', !$bad90, implode(' ', $bad90));
 check('شفاء تكميل العلاوات لا يستدعي المحرّك الكامل مباشرةً (سبب تصفير الأساس أونلاين) + شفاء الاسترجاع موصول + اللقطة + بطاقة الفحص',
@@ -9028,18 +9028,22 @@ check('🖥️ العنوان القديم maximos-rawatib.com يتحوّل تل
  * 203) 📆🧹 (2026-09-30 مايكل متى #1820 عبرا: «أنا حطّيت 9 أشهر والبطاقة طلعت 12 شهر — بس غيّر شي بملف الموظف لازم تلقائياً
  *      يتغيّر بكل المحلات بالبرنامج، هيدا خطأ برمجي»): تقصير الفترة المدفوعة يشيل الأشهر غير المدفوعة التي صارت خارجها
  *      (prunePaidPeriodRows المصدر الواحد: recalcEmployeeYear + تركيب المنقول + المحرّك calculateAndSave + احتساب البطاقة + فتح السنة
- *      + حفظ الملف لكل السنين المفتوحة + شفاء دوري بالهيدر + قاعدة الفحص الرسمي pay_period_rows). المدفوع لا يُمسّ أبداً.
+ *      + قاعدة «للمراجعة» بالفحص الرسمي pay_period_rows). المدفوع لا يُمسّ أبداً.
+ *      ثم توضيحه «كل اللي بدّي ياه: بس غيّر، بنفس السنة يتغيّر» ⇒ الشيل دائماً لسنة واحدة (المعروضة/المُعاد حسابها): لا شفاء دوري،
+ *      لا سنة أخرى تُمسّ، وبوّابة المحرّك لسنة البرنامج وما بعدها فقط.
  * =================================================================== */
 $pc203 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php'); $fn203 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $em203 = (string)file_get_contents($PROJ . '/pages/employees.php'); $as203 = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
-$okSrc203 = function_exists('prunePaidPeriodRows') && function_exists('monthInPaidPeriod') && function_exists('healPaidPeriodOrphans')
+$okSrc203 = function_exists('prunePaidPeriodRows') && function_exists('monthInPaidPeriod') && !function_exists('healPaidPeriodOrphans') /* لا شفاء عابر للسنين */
     && substr_count($pc203, 'prunePaidPeriodRows((int)$employeeId, (string)$sy);') === 1 && substr_count($pc203, 'prunePaidPeriodRows((int)$employeeId, (string)$schoolYear);') === 1
-    && strpos($pc203, "if (!monthInPaidPeriod(\$this->employee, (int)\$this->month)) {") !== false
+    && strpos($pc203, "if (strcmp(\$syRow, (string)currentSchoolYear()) >= 0 && !monthInPaidPeriod(\$this->employee, (int)\$this->month)) {") !== false /* البوّابة لسنة البرنامج وما بعدها */
     && preg_match('/function prunePaidPeriodRows\(.*?\n\}/s', $fn203, $fb203) === 1 && strpos($fb203[0], 'COALESCE(is_paid, 0) = 0 AND COALESCE(is_indemnity_month, 0) = 0') !== false
-    && strpos($fb203[0], 'isSchoolYearLocked(') !== false && strpos($fb203[0], "logAudit('prune_paid_period'") !== false && strpos($fb203[0], 'if (strcmp($sy, $cur) < 0 && !$zero) continue;') !== false
-    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healPaidPeriodOrphans();') !== false
+    && strpos($fb203[0], 'function prunePaidPeriodRows(int $employeeId, string $schoolYear, bool $explicit = false): int {') !== false && strpos($fb203[0], 'AND school_year = ?') !== false /* سنة واحدة محدّدة دائماً */
+    && strpos($fb203[0], 'isSchoolYearLocked(') !== false && strpos($fb203[0], "logAudit('prune_paid_period'") !== false && strpos($fb203[0], 'if ($past && !$zero) continue;') !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healPaidPeriodOrphans') === false
     && substr_count($as203, 'prunePaidPeriodRows(') === 2 && strpos((string)file_get_contents($PROJ . '/pages/open_year.php'), 'prunePaidPeriodRows($id, (string)$yr);') !== false
     && strpos($em203, "\$GLOBALS['msa_pay_period_pruned'][(int)\$id]") !== false && strpos($em203, "(int)\$oldPayPeriod['pay_to_month'] !== (int)\$payToP") !== false
+    && strpos($em203, 'prunePaidPeriodRows((int)$id, (string)writeSchoolYear(), true);') !== false && strpos($em203, 'school_year >= " . $db->quote(currentSchoolYear())') === false /* السنة المعروضة وحدها */
     && strpos((string)file_get_contents($PROJ . '/includes/data_audit.php'), "\$add('pay_period_rows'") !== false
     && monthInPaidPeriod(['pay_from_month' => 10, 'pay_to_month' => 6], 6) && !monthInPaidPeriod(['pay_from_month' => 10, 'pay_to_month' => 6], 7)
     && monthInPaidPeriod(['pay_from_month' => 10, 'pay_to_month' => 9], 9) && !monthInPaidPeriod(['pay_from_month' => 10, 'pay_to_month' => 9, 'payment_months_per_year' => 10], 8);
@@ -9057,6 +9061,9 @@ $okLive203 = true;
 if ($t203) {
     $tid = (int)$t203['id'];
     $orig203 = $db->query("SELECT * FROM monthly_salaries WHERE employee_id = $tid AND school_year = " . $db->quote($cur203))->fetchAll(PDO::FETCH_ASSOC);
+    // «بنفس السنة يتغيّر»: بصمة كل سنواته الأخرى قبل التجربة — يجب ألّا يتغيّر فيها صفّ واحد
+    $oth203 = fn() => (string)$db->query("SELECT CONCAT(COUNT(*), ':', COALESCE(SUM(net_salary_lbp),0), ':', COALESCE(SUM(total_due_lbp),0), ':', COALESCE(MAX(calculated_at),'')) FROM monthly_salaries WHERE employee_id = $tid AND school_year <> " . $db->quote($cur203))->fetchColumn();
+    $othBefore203 = $oth203();
     $restore203 = function () use ($db, $tid, $cur203, $orig203) {
         $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $tid AND school_year = " . $db->quote($cur203));
         foreach ($orig203 as $r) { $c = array_keys($r); $db->prepare("INSERT INTO monthly_salaries (`" . implode('`,`', $c) . "`) VALUES (" . implode(',', array_fill(0, count($c), '?')) . ")")->execute(array_values($r)); }
@@ -9079,18 +9086,39 @@ if ($t203) {
         $db->exec("UPDATE employees SET pay_to_month = 9, payment_months_per_year = 12 WHERE id = $tid");
         recalcEmployeeYear($tid, $cur203);
         $n12_203 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $tid AND school_year = " . $db->quote($cur203))->fetchColumn();
-        $okLive203 = $okRows203 && $okEng203 && $okSlip203 && $again203 === 0 && $n12_203 === 12;
-        $why203 .= " #$tid rows=" . (int)$okRows203 . ' [' . implode(',', $left203) . "] eng=" . (int)$okEng203 . ' slip=' . (int)$okSlip203 . " audit=$aud203 again=$again203 back12=$n12_203 rec=$nRec";
+        $okOther203 = $oth203() === $othBefore203; // ولا صفّ بسنة أخرى تغيّر
+        $okLive203 = $okRows203 && $okEng203 && $okSlip203 && $again203 === 0 && $n12_203 === 12 && $okOther203;
+        $why203 .= " #$tid rows=" . (int)$okRows203 . ' [' . implode(',', $left203) . "] eng=" . (int)$okEng203 . ' slip=' . (int)$okSlip203 . " audit=$aud203 again=$again203 back12=$n12_203 rec=$nRec other=" . (int)$okOther203;
     } finally { $restore203(); }
     $same203 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(net_salary_lbp),0) s, COALESCE(SUM(is_paid),0) p FROM monthly_salaries WHERE employee_id = $tid AND school_year = " . $db->quote($cur203))->fetch(PDO::FETCH_ASSOC);
     $okLive203 = $okLive203 && (int)$same203['n'] === 12 && (int)$same203['p'] === 0 && (float)$same203['s'] === (float)array_sum(array_column($orig203, 'net_salary_lbp'));
     $why203 .= ' restored=' . (int)$same203['n'];
 } else { $why203 .= ' · لا عيّنة (skipped)'; }
-// القاعدة الحيّة: لا شهر غير مدفوع خارج الفترة بسنة البرنامج (بعد الشفاء)
-healPaidPeriodOrphans(true);
-$bad203 = 0; foreach (dataAuditRules($db, $cur203) as $a) if ($a['key'] === 'pay_period_rows') $bad203 = (int)$a['n'];
-check('📆🧹 تقصير الفترة المدفوعة بملف الموظف يشيل الأشهر غير المدفوعة خارجها من كل المسارات (حفظ الملف/المحرّك/البطاقة/فتح السنة/الشفاء) — المدفوع يبقى، الرجوع لـ12 يعيدها، وقاعدة الفحص الرسمي صفر (2026-09-30)',
-      $okSrc203 && $okLive203 && $bad203 === 0, $why203 . ' stale=' . $bad203);
+// محرّك سنة سابقة: شهر خارج فترة ملف اليوم يبقى يُحسب ويُحفَظ (البوّابة لسنة البرنامج وما بعدها فقط) — تجربة بمعاملة تُرجَع
+$okPast203 = true; $pastWhy203 = 'لا عيّنة';
+$p203 = $db->query("SELECT e.id, ms.year, ms.month, ms.net_salary_lbp net FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+    WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.pay_from_month = 10 AND e.pay_to_month = 9 AND COALESCE(e.payment_months_per_year,12) = 12
+      AND ms.school_year < " . $db->quote($cur203) . " AND ms.month = 7 AND ms.net_salary_lbp > 0 AND COALESCE(ms.is_indemnity_month,0) = 0 AND " . leftDateSql('e.') . " = '9999-12-31'
+    ORDER BY ms.year DESC, e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($p203 && !isSchoolYearLocked((int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$p203['id'])->fetchColumn(), schoolYearOfMonth((int)$p203['year'], 7))) {
+    $pid = (int)$p203['id']; $py = (int)$p203['year'];
+    $prow203 = $db->query("SELECT * FROM monthly_salaries WHERE employee_id = $pid AND year = $py AND month = 7")->fetch(PDO::FETCH_ASSOC);
+    try {
+        $db->exec("UPDATE employees SET pay_to_month = 6, payment_months_per_year = 9 WHERE id = $pid");
+        (new PayrollCalculator($pid, 7, $py))->calculateAndSave();
+        $kept = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $pid AND year = $py AND month = 7")->fetchColumn();
+        $impl = prunePaidPeriodRows($pid, schoolYearOfMonth($py, 7));         // ضمني بسنة سابقة: الصفّ غير الصفري يبقى
+        $okPast203 = $kept === 1 && $impl === 0;
+        $pastWhy203 = "#$pid 7/$py kept=$kept implicit=$impl";
+    } finally {
+        $db->exec("UPDATE employees SET pay_to_month = 9, payment_months_per_year = 12 WHERE id = $pid");
+        $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $pid AND year = $py AND month = 7");
+        $c = array_keys($prow203); $db->prepare("INSERT INTO monthly_salaries (`" . implode('`,`', $c) . "`) VALUES (" . implode(',', array_fill(0, count($c), '?')) . ")")->execute(array_values($prow203));
+    }
+}
+$bad203 = 0; foreach (dataAuditRules($db, $cur203) as $a) if ($a['key'] === 'pay_period_rows') $bad203 = (int)$a['n']; // «للمراجعة» فقط (معلوماتية)
+check('📆🧹 تقصير الفترة المدفوعة بملف الموظف يشيل الأشهر غير المدفوعة خارجها **بنفس السنة فقط** (حفظ الملف/المحرّك/البطاقة/فتح السنة) — المدفوع يبقى، الرجوع لـ12 يعيدها، ولا صفّ بسنة أخرى يتغيّر، وسنة سابقة لا تُمسّ ضمنياً (2026-09-30)',
+      $okSrc203 && $okLive203 && $okPast203, $why203 . ' past[' . $pastWhy203 . '] review=' . $bad203);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

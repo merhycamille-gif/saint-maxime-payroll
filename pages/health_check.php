@@ -512,7 +512,7 @@ include __DIR__ . '/../includes/header.php';
   require_once __DIR__ . '/../includes/data_audit.php';
   $auditSy = activeSchoolYear(); if ($auditSy === 'all') $auditSy = currentSchoolYear();
   $auditRows = dataAuditRules(getDB(), $auditSy);
-  $auditInfo = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'row_rate0'];   // للمراجعة (قرارات/إدخال — ليست أخطاء حساب)
+  $auditInfo = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'row_rate0', 'pay_period_rows'];   // للمراجعة (قرارات/إدخال — ليست أخطاء حساب)
   $auditErrors = 0; $auditReview = 0;
   foreach ($auditRows as $ar) { if ($ar['n'] <= 0) continue; if (in_array($ar['key'], $auditInfo, true)) $auditReview += $ar['n']; else $auditErrors += $ar['n']; }
   ?>

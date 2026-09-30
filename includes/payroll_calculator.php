@@ -581,9 +581,11 @@ class PayrollCalculator {
         // 🔒 قفل السنة (2026-09-12): سنة مقفولة لمدرسة الموظف = الحسابات ما بتتغيّر من أي مسار (احتساب/فتح/شفاء/مكافآت) — بلا حفظ
         if (isSchoolYearLocked((int)($this->employee['school_id'] ?? 0), schoolYearOfMonth((int)$this->year, (int)$this->month))) return $this->calculate();
         // 📆 الفترة المدفوعة (2026-09-30 مايكل متى «حطّيت 9 أشهر والبطاقة طلعت 12»): شهر خارج «من شهر ← إلى شهر» بملفه لا يُحفَظ له
-        // راتب من أي مسار (احتساب شهري/جماعي/مدى/شفاء)، وصفّه غير المدفوع العالق يُشال — الملف هو المرجع بكل البرنامج.
-        if (!monthInPaidPeriod($this->employee, (int)$this->month)) {
-            prunePaidPeriodRows((int)$this->employee['id'], schoolYearOfMonth((int)$this->year, (int)$this->month));
+        // راتب من أي مسار (احتساب شهري/جماعي/مدى/شفاء)، وصفّه غير المدفوع العالق يُشال. «بنفس السنة يتغيّر»: سنة البرنامج وما بعدها
+        // فقط — أشهر سنة سابقة (كانت فترته فيها غير فترة ملفه اليوم) تبقى تُحسب وتُحفَظ كما كانت.
+        $syRow = schoolYearOfMonth((int)$this->year, (int)$this->month);
+        if (strcmp($syRow, (string)currentSchoolYear()) >= 0 && !monthInPaidPeriod($this->employee, (int)$this->month)) {
+            prunePaidPeriodRows((int)$this->employee['id'], $syRow);
             return $this->calculate(); // بلا أي حفظ
         }
         $data = $this->calculate();

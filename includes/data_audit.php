@@ -170,7 +170,8 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
         GROUP BY b.employee_id, b.school_year HAVING COUNT(*)>1"));
 
     // 23) شهر غير مدفوع مخزّن خارج الفترة المدفوعة بملف الموظف «من شهر ← إلى شهر» (2026-09-30 مايكل متى/عبرا: «حطّيت 9 أشهر والبطاقة
-    //     طلعت 12») — نفس قاعدة prunePaidPeriodRows: سنة البرنامج وما بعدها كل صفّ، سنة سابقة الصفّ الصفري فقط. SQL مضمّن (دمب الأونلاين).
+    //     طلعت 12») — «للمراجعة»: سنة لم يُعَد حسابها بعد تغيير الفترة وهو على سنة أخرى («بنفس السنة يتغيّر» — لا شفاء عابر للسنين)؛
+    //     تُصحَّح بـ«احسب السنة» من بطاقته. سنة البرنامج وما بعدها كل صفّ، سنة سابقة الصفّ الصفري فقط. SQL مضمّن (دمب الأونلاين).
     try {
         $pastZero = (function_exists('currentSchoolYear') && strcmp($sy, (string)currentSchoolYear()) < 0)
             ? " AND ms.net_salary_lbp = 0 AND ms.total_due_lbp = 0 AND ms.base_plus_echelon_lbp = 0 AND (ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) = 0" : '';
