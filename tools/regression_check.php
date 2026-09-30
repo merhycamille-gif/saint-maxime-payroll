@@ -8475,7 +8475,7 @@ if ($con183) {
     $xS = renderPage('pages/annual_slip_export.php', ['employee_id' => $con183, 'school_year' => '2025-2026', 'format' => 'xlsx'], ['extra', 'aide'], [3], 'both', '2025-2026', $PROJ . '/tools/_r183b.xlsx', [], '', '', 'show');
     $sheet = function (string $bin) { $tmp = tempnam(sys_get_temp_dir(), 'r183'); file_put_contents($tmp, $bin); $z = new ZipArchive(); $x = ''; if ($z->open($tmp) === true) { $x = (string)$z->getFromName('xl/worksheets/sheet1.xml'); $z->close(); } @unlink($tmp); return html_entity_decode($x, ENT_QUOTES | ENT_XML1, 'UTF-8'); };
     $shH = $sheet($xH); $shS = $sheet($xS);
-    $c183('excel-follows-option', $shH !== '' && strpos($shH, 'قيمة الدرجة') === false && strpos($shH, '· الدرجة:') === false && $shS !== '' && strpos($shS, 'قيمة الدرجة') !== false && strpos($shS, '· الدرجة:') !== false);
+    $c183('excel-follows-option', $shH !== '' && strpos($shH, 'قيمة الدرجة') === false && $shS !== '' && strpos($shS, 'قيمة الدرجة') !== false); // 📗 (2026-09-30) الإكسل صار البطاقة نفسها: عمود «قيمة الدرجة» يتبع الخيار
 } else $c183('no-contract-sample', false);
 // الملاك كما هو + الموظف بلا درجة حتى بوضع «ظاهرة»
 $tit183 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
@@ -8545,7 +8545,7 @@ $sheet184 = function (string $bin) { $tmp = tempnam(sys_get_temp_dir(), 'r184');
 $xM = $sheet184(renderPage('pages/reports_export.php', ['report' => 'cnss_summary', 'month' => 10, 'year' => 2025, 'format' => 'xlsx'], ['extra', 'aide'], [3], 'lbp', '2025-2026', $PROJ . '/tools/_r184.xlsx'));
 $xA = $sheet184(renderPage('pages/reports_export.php', ['report' => 'annual_totals', 'school_year' => '2025-2026', 'format' => 'xlsx'], ['extra', 'aide'], [3], 'lbp', '2025-2026', $PROJ . '/tools/_r184b.xlsx'));
 $xS = $tit184 ? $sheet184(renderPage('pages/annual_slip_export.php', ['employee_id' => $tit184, 'school_year' => '2025-2026', 'format' => 'xlsx'], ['extra', 'aide'], [3], 'both', '2025-2026', $PROJ . '/tools/_r184c.xlsx')) : '';
-$c184('excel', strpos($xM, 'الأجير 3 %') !== false && strpos($xM, 'المدرسة 8 %') !== false && strpos($xA, 'الضمان — الأجير 3 % (ل.ل)') !== false && strpos($xS, 'Caisse 6 % / الصندوق') !== false && strpos($xS, 'CNSS 3 % / الضمان') !== false);
+$c184('excel', strpos($xM, 'الأجير 3 %') !== false && strpos($xM, 'المدرسة 8 %') !== false && strpos($xA, 'الضمان — الأجير 3 % (ل.ل)') !== false && preg_match('/Caisse\s*6 %/u', strip_tags($xS)) === 1 && preg_match('/CNSS\s*3 %/u', strip_tags($xS)) === 1); // 📗 (2026-09-30) إكسل البطاقة = رؤوس البطاقة (النسبة تحت العنوان)
 check('📊 نِسَب الاشتراكات تحت عناوين الأعمدة من الجدول المؤرَّخ (2026-09-27): البطاقة (+إكسل) · الشهري · الضمان · الصندوق · المجاميع السنوية (+إكسل) · salary_all · التقرير العام · السجلّ · التفصيل — الضريبة ودرجة/نصف راتب بلا نسبة — مؤرَّخة (صفّ مؤقّت 2090) — النماذج الرسمية كما هي', $ok184, implode(' · ', $why184) ?: 'ok');
 
 /* =====================================================================
@@ -9138,6 +9138,50 @@ foreach (['enseignant' => "employee_type <> 'employe'", 'employe' => "employee_t
     $ok204 = $ok204 && $okOne; $why204[] = "$k204 #{$e204['id']}=" . (int)$okOne . " (n=$n204)";
 }
 check('👤 البطاقة السنوية المفردة: زرّ واحد «ملف الأستاذ / ملف الموظف» يفتح ملفه (تبويب المالي) بشريط الأزرار غير المطبوع — البطاقة لم تُمَسّ (2026-09-30)', $ok204, implode(' · ', $why204));
+
+/* =====================================================================
+ * 205) 📗 (2026-09-30 «عم اطبع البطاقة السنوية إكسل وفاضية من المبالغ — شوف كيف طلعت، بدّي ياها تطلع بالضبط متل ما بتطلع PDF»):
+ *      إكسل البطاقة السنوية = البطاقة نفسها (annualSlipHtml ⇒ includes/annual_slip_xlsx.php): شريط الاسم، جدول المعلومات، رأسان
+ *      (المحسومات فوق أعمدتها)، الأشهر، TOTAL — A4 أفقي بصفحة، ويتبع «فاضية من المبالغ» (blank=1) و«نموذج فارغ» (blank=2).
+ *      الجماعي: بطاقة لكل ورقة بفواصل صفحات ونسبة طباعة محسوبة. زرّا Excel يحملان blank.
+ * =================================================================== */
+$as205 = (string)file_get_contents($PROJ . '/pages/annual_slip.php'); $ex205 = (string)file_get_contents($PROJ . '/pages/annual_slip_export.php');
+$okSrc205 = is_file($PROJ . '/includes/annual_slip_xlsx.php')
+    && strpos($ex205, "require_once __DIR__ . '/../includes/annual_slip_xlsx.php';") !== false && strpos($ex205, "define('ANNUAL_SLIP_LIB', 1);") !== false
+    && substr_count($ex205, 'annualSlipSendXlsx(') === 3 && substr_count($ex205, 'annualSlipHtml($db, $emp, $schoolYear)') === 2
+    && strpos($as205, 'annual_slip_export.php?<?= $expQ ?>&format=xlsx<?= $blankQ ?>"') !== false
+    && strpos($as205, 'annual_slip_export.php?<?= $expAllQ ?>&format=xlsx<?= $blankQ ?>"') !== false;
+$sheet205 = function (string $bin): string { $tmp = tempnam(sys_get_temp_dir(), 'r205'); file_put_contents($tmp, $bin); $z = new ZipArchive(); $x = ''; if ($z->open($tmp) === true) { $x = (string)$z->getFromName('xl/worksheets/sheet1.xml'); $z->close(); } @unlink($tmp); return $x; };
+$text205 = fn(string $x): string => html_entity_decode(strip_tags(str_replace('</r>', ' ', $x)), ENT_QUOTES | ENT_XML1, 'UTF-8');
+$why205 = ['src=' . (int)$okSrc205]; $okLive205 = true;
+$e205 = $db->query("SELECT e.id, e.school_id, ms.school_year sy, e.first_name_ar fn FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.net_salary_lbp > 0
+    WHERE e.is_deleted = 0 AND e.employee_type = 'employe' AND COALESCE(e.first_name_ar,'') <> '' ORDER BY ms.school_year DESC, e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if ($e205) {
+    $g205 = ['employee_id' => (int)$e205['id'], 'school_year' => $e205['sy'], 'format' => 'xlsx'];
+    $rp205 = fn(array $extra, string $cur = 'both') => $sheet205(renderPage('pages/annual_slip_export.php', $g205 + $extra, ['extra', 'aide'], [(int)$e205['school_id']], $cur, $e205['sy'], $PROJ . '/tools/_r205.xlsx'));
+    $xF = $rp205([]); $xB1 = $rp205(['blank' => 1]); $xB2 = $rp205(['blank' => 2]); $xL = $rp205([], 'lbp');
+    $tF = $text205($xF); $tB1 = $text205($xB1); $tB2 = $text205($xB2);
+    // صافي مجموع البطاقة (HTML) يجب أن يظهر بالإكسل نفسه
+    $hC = renderPage('pages/annual_slip.php', ['employee_id' => (int)$e205['id'], 'school_year' => $e205['sy']], ['extra', 'aide'], [(int)$e205['school_id']], 'both', $e205['sy']);
+    preg_match('#<tr class="total-row">.*?</tr>#su', $hC, $trC); preg_match_all('#<span class="sub-lbp"><strong>([\d,]+)</strong>#u', $trC[0] ?? '', $mC);
+    $totNet = $mC[1] ? max(array_map(fn($v) => (int)str_replace(',', '', $v), $mC[1])) : 0; // أكبر رقم بصفّ المجموع (الإجمالي) — موجود حتماً
+    $amt = '/\d{1,3},\d{3},\d{3}/';
+    $okFull = $xF !== '' && strpos($xF, 'orientation="landscape"') !== false && strpos($xF, 'fitToPage="1"') !== false && strpos($xF, '<mergeCells') !== false
+        && strpos($tF, $e205['fn']) !== false && strpos($tF, 'Retenues / المحسومات') !== false && strpos($tF, 'Oct. ') !== false && strpos($tF, 'TOTAL') !== false
+        && strpos($tF, 'Fonction / الوظيفة') !== false && $totNet > 0 && strpos($tF, number_format($totNet)) !== false && strpos($tF, ' $') !== false;
+    $okB1 = $xB1 !== '' && strpos($tB1, $e205['fn']) !== false && strpos($tB1, 'Oct. ') !== false && strpos($tB1, 'TOTAL') !== false
+        && preg_match($amt, $tB1) === 0 && strpos($xB1, '<v>') === false && strpos($tB1, ' $') === false; // فاضية من المبالغ: لا مبلغ ولا دولار
+    $okB2 = $xB2 !== '' && strpos($tB2, $e205['fn']) === false && strpos($tB2, '______') !== false && strpos($tB2, 'Fonction / الوظيفة') !== false && preg_match($amt, $tB2) === 0;
+    $okLbp = $xL !== '' && preg_match('/\d \$(?! =)/u', $text205($xL)) === 0 /* لا مبلغ دولار (سطر سعر الصرف «1 $ = …» مستثنى) */ && strpos($xL, '<v>' . $totNet . '</v>') !== false; // ليرة فقط: أرقام حقيقية قابلة للجمع
+    // الجماعي (موظفو مدرسته): بطاقة لكل ورقة — فواصل = البطاقات − 1، ونسبة طباعة لا ملاءمة
+    $xAll = $sheet205(renderPage('pages/annual_slip_export.php', ['all' => 1, 'school_year' => $e205['sy'], 'format' => 'xlsx', 'type' => ['employe', 'enseignant_contractuel'], 'type_set' => 1], ['extra', 'aide'], [(int)$e205['school_id']], 'both', $e205['sy'], $PROJ . '/tools/_r205.xlsx'));
+    $nCards = substr_count($xAll, 'Retenues / '); $nBrk = substr_count($xAll, '<brk ');
+    $okAll = $xAll !== '' && $nCards >= 1 && $nBrk === $nCards - 1 && ($nCards === 1 || (strpos($xAll, 'fitToPage="0"') !== false && preg_match('/ scale="\d+"/', $xAll) === 1));
+    $okLive205 = $okFull && $okB1 && $okB2 && $okLbp && $okAll;
+    $why205[] = "#{$e205['id']} full=" . (int)$okFull . ' blank1=' . (int)$okB1 . ' blank2=' . (int)$okB2 . ' lbp=' . (int)$okLbp . " all=" . (int)$okAll . " (cards=$nCards brk=$nBrk)";
+} else $why205[] = 'لا عيّنة (skipped)';
+check('📗 إكسل البطاقة السنوية طبق الأصل عن البطاقة/الـPDF (شريط الاسم + المعلومات + رأسان + الأشهر + TOTAL، A4 أفقي) ويتبع «فاضية من المبالغ» و«نموذج فارغ» ووضع العملة — والجماعي بطاقة لكل ورقة (2026-09-30)',
+      $okSrc205 && $okLive205, implode(' · ', $why205));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -18,6 +18,29 @@ if ($schoolYear === 'all') $schoolYear = currentSchoolYear();
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 $all = !empty($_GET['all']);
 
+// 📗 (2026-09-30 «عم اطبع البطاقة السنوية إكسل وفاضية من المبالغ — بدّي ياها تطلع بالضبط متل ما بتطلع PDF»): الإكسل = البطاقة نفسها
+//    (annualSlipHtml بكل خياراتها: العملة، الأعمدة، blank=1/2) محوَّلة لورقة بنفس الشكل — لا الجدول العام القديم الذي كان يتجاهل «فاضية».
+//    PDF/Word من هذا الملف يبقيان على ReportTable كما كانا.
+if ($format === 'xlsx') {
+    if (!defined('ANNUAL_SLIP_LIB')) define('ANNUAL_SLIP_LIB', 1);
+    require_once __DIR__ . '/annual_slip.php'; // دوال البطاقة فقط (بلا إخراج) + $GLOBALS['slip_blank'] من ?blank=
+    require_once __DIR__ . '/../includes/annual_slip_xlsx.php';
+}
+/** يبثّ ملف إكسل البطاقات (HTML بطاقة أو أكثر) وينهي الطلب. */
+function annualSlipSendXlsx(string $html, string $title): void {
+    $cards = annualSlipXlsxParseAll($html);
+    if (!$cards) { http_response_code(500); die('تعذّر توليد الإكسل.'); }
+    $data = annualSlipXlsxBuild($cards, 'Relevé annuel');
+    $fn = mb_substr(preg_replace('/[\\\\\/:*?"<>|]+/', '_', $title), 0, 60, 'UTF-8') . '_' . date('Y-m-d') . '.xlsx';
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $fn . '"');
+    header('Content-Length: ' . strlen($data));
+    header('Cache-Control: no-cache');
+    echo $data;
+    exit;
+}
+
 $allowedTypes = ['enseignant_titulaire', 'enseignant_contractuel', 'employe'];
 // ☑️ (2026-09-25) خانات تشييك (type[]=…&type_set=1) — الملف = الشاشة (المصدر الواحد empTypeSelection)
 $typeState = empTypeSelection($_GET, 'type');
@@ -125,6 +148,12 @@ if ($all) {
     if (!$emps) { http_response_code(404); die('لا يوجد موظفون مطابقون.'); }
 
     $typeLbl = $typeFilter ? employeeTypeLabel($typeFilter) : ($typeState['all'] ? 'الكل' : empTypeTitleFrom($typeState));
+    if ($format === 'xlsx') { // 📗 بطاقة لكل ورقة، طبق الأصل عن الـPDF الجماعي
+        @set_time_limit(300);
+        $htmlAll = '';
+        foreach ($emps as $emp) $htmlAll .= annualSlipHtml($db, $emp, $schoolYear);
+        annualSlipSendXlsx($htmlAll, 'كشوف الرواتب السنوية ' . $schoolYear . ' — ' . $typeLbl);
+    }
     $rep = new ReportTable('كشوف الرواتب السنوية ' . $schoolYear . ' — ' . $typeLbl, true);
     $rep->schoolHeader(currentSchool());
     $rep->period('السنة الدراسية ' . $schoolYear . ' — ' . $typeLbl . ' (' . count($emps) . ' موظف)');
@@ -143,6 +172,7 @@ $stmt = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0" .
 $stmt->execute([$employeeId]);
 $emp = $stmt->fetch();
 if (!$emp) { http_response_code(404); die('الموظف غير موجود في هذه المدرسة.'); }
+if ($format === 'xlsx') annualSlipSendXlsx(annualSlipHtml($db, $emp, $schoolYear), 'كشف الراتب السنوي ' . $schoolYear); // 📗 طبق الأصل عن الـPDF
 
 $slip = computeAnnualSlip($db, $emp, $schoolYear);
 $m = $slip['meta'];
