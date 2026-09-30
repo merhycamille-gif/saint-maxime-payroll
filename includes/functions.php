@@ -849,6 +849,76 @@ function paidPeriodLabel(array $emp, string $lang = 'ar'): string {
     return $lang === 'ar' ? ('من ' . monthName($f, 'ar') . ' إلى ' . monthName($t, 'ar') . ' (' . $n . ' ' . ($n >= 3 && $n <= 10 ? 'أشهر' : 'شهراً') . ')')
                           : (monthName($f, 'fr', true) . ' → ' . monthName($t, 'fr', true) . ' (' . $n . ' mois)');
 }
+/** هل الشهر ضمن الفترة المدفوعة بملف الموظف؟ (الفترة نفسها لكل سنة دراسية — مصدرها paidMonthsFor) */
+function monthInPaidPeriod(array $emp, int $month): bool {
+    foreach (paidMonthsFor($emp, 2000, 2001) as $my) if ((int)$my[0] === $month) return true;
+    return false;
+}
+/**
+ * 📆🧹 (2026-09-30 مايكل متى #1820 عبرا: «أنا حطّيت 9 أشهر والبطاقة طلعت 12 شهر — بس غيّر شي بملف الموظف لازم تلقائياً يتغيّر
+ * بكل المحلات بالبرنامج، هيدا خطأ برمجي»): تقصير الفترة المدفوعة كان يعيد حساب أشهر الفترة الجديدة فقط ويترك الأشهر التي صارت
+ * خارجها مخزّنة براتب كامل ⇒ تبقى بالبطاقة وبكل الكشوف. المصدر الواحد لشيلها — يُستدعى من كل مسار حساب (recalcEmployeeYear،
+ * تركيب المنقول، المحرّك calculateAndSave، احتساب البطاقة، فتح السنة) ومن الشفاء الدوري healPaidPeriodOrphans:
+ *  - يُشال فقط الصفّ **غير المدفوع** (is_paid=0) وغير شهر التعويض، خارج «من شهر ← إلى شهر» بملفه؛ المدفوع لا يُمسّ أبداً.
+ *  - سنة البرنامج الحالية وما بعدها: كل صفّ خارج الفترة. سنة سابقة: الصفّ الصفري فقط (لا نمحو تاريخ رواتب سنة منتهية).
+ *  - السنة المقفولة لمدرسته لا تُمسّ. كل محي يُسجَّل بالتدقيق مع الصفوف كاملة (قابلة للاسترجاع).
+ * $schoolYear = null ⇒ كل سنواته. يعيد عدد الصفوف المشالة (وأسماء أشهرها بـ$GLOBALS['msa_pay_period_pruned'][id] لرسالة الحفظ).
+ */
+function prunePaidPeriodRows(int $employeeId, ?string $schoolYear = null): int {
+    if ($employeeId <= 0) return 0;
+    $n = 0;
+    try {
+        $db = getDB();
+        ensurePayPeriodColumns();
+        $e = $db->query("SELECT id, school_id, payment_months_per_year, pay_from_month, pay_to_month FROM employees WHERE id = $employeeId AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+        if (!$e) return 0;
+        $in = array_map(fn($my) => (int)$my[0], paidMonthsFor($e, 2000, 2001));
+        if (!$in || count($in) >= 12) return 0; // الفترة كاملة (ت1 ← أيلول) — لا شهر خارجها
+        $sql = "SELECT * FROM monthly_salaries WHERE employee_id = ? AND COALESCE(is_paid, 0) = 0 AND COALESCE(is_indemnity_month, 0) = 0
+                AND month NOT IN (" . implode(',', $in) . ")";
+        $p = [$employeeId];
+        if ($schoolYear !== null) { $sql .= " AND school_year = ?"; $p[] = $schoolYear; }
+        $st = $db->prepare($sql . " ORDER BY year, month");
+        $st->execute($p);
+        $cur = currentSchoolYear();
+        $ids = []; $gone = []; $labels = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $sy = (string)($r['school_year'] ?: schoolYearOfMonth((int)$r['year'], (int)$r['month']));
+            if (isSchoolYearLocked((int)$e['school_id'], $sy)) continue; // 🔒 سنة مقفولة
+            $zero = (int)$r['net_salary_lbp'] === 0 && (int)$r['total_due_lbp'] === 0 && (int)$r['base_plus_echelon_lbp'] === 0
+                 && ((int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp'] + (int)$r['aide_complementaire_lbp']) === 0;
+            if (strcmp($sy, $cur) < 0 && !$zero) continue; // سنة سابقة: الصفري فقط
+            $ids[] = (int)$r['id'];
+            $gone[] = array_filter($r, fn($v) => $v !== null && $v !== '' && $v !== '0' && $v !== '0.00');
+            $labels[] = monthName((int)$r['month'], 'ar') . ' ' . (int)$r['year'];
+        }
+        if (!$ids) return 0;
+        $n = (int)$db->exec("DELETE FROM monthly_salaries WHERE id IN (" . implode(',', $ids) . ") AND COALESCE(is_paid, 0) = 0");
+        if ($n > 0) {
+            $GLOBALS['msa_pay_period_pruned'][$employeeId] = array_merge($GLOBALS['msa_pay_period_pruned'][$employeeId] ?? [], $labels);
+            try { logAudit('prune_paid_period', 'monthly_salaries', $employeeId, $gone, ['period' => paidPeriodLabel($e), 'deleted' => $n, 'months' => $labels]); } catch (Throwable $t) {}
+        }
+    } catch (Throwable $t) { /* لا نُعطّل الحفظ/الصفحة */ }
+    return $n;
+}
+/**
+ * 🩹📆 شفاء ذاتي مستمرّ (كل 3 ساعات — 2026-09-30): أي موظف فترته المدفوعة أقصر من السنة وله أشهر غير مدفوعة مخزّنة خارجها
+ * (قصّر فترته قبل هذا الإصلاح، أو من مسار قديم) ⇒ تُشال بالمصدر الواحد prunePaidPeriodRows. خفيف: أصحاب الفترة غير الكاملة فقط.
+ */
+function healPaidPeriodOrphans(bool $force = false): int {
+    if (!$force && !healGateOpen('heal_pay_period_rows')) return 0;
+    $n = 0;
+    try {
+        $db = getDB();
+        ensurePayPeriodColumns();
+        $ids = $db->query("SELECT id FROM employees WHERE is_deleted = 0
+            AND NOT (pay_from_month = 10 AND pay_to_month = 9 AND COALESCE(payment_months_per_year, 12) NOT IN (10, 11))")->fetchAll(PDO::FETCH_COLUMN);
+        $emps = 0;
+        foreach ($ids as $id) { $k = prunePaidPeriodRows((int)$id); if ($k) { $n += $k; $emps++; } }
+        if ($n) logAudit('heal_pay_period_rows', 'monthly_salaries', 0, null, ['employees' => $emps, 'rows' => $n]);
+    } catch (Throwable $e) { /* لا نُعطّل الصفحة */ }
+    return $n;
+}
 
 function ensureLeftDateAllColumn(): void {
     ensurePayPeriodColumns(); // 📆 يركّب أعمدة الفترة المدفوعة معه (كل صفحة تمرّ من هنا)

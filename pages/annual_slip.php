@@ -111,6 +111,7 @@ if ($action === 'calc_year' && $employeeId > 0) {
             : 'راتب هذا الموظف مُدخَل يدوياً (منقول) — أساسه لا يُعاد حسابه، وعلاواته مطابقة أصلاً.';
     } elseif ($eC) {
         $months = paidMonthsFor($eC, $y1, $y2); // 📆 (2026-09-28) الفترة من ملفه
+        prunePaidPeriodRows((int)$employeeId, (string)$schoolYear); // 📆🧹 (2026-09-30) أشهر غير مدفوعة خارج فترته تُشال
         $n = 0;
         foreach ($months as [$m, $y]) {
             try { (new PayrollCalculator($employeeId, $m, $y))->calculateAndSave(); $n++; } catch (Exception $e) {}
@@ -159,6 +160,7 @@ if ($action === 'calc_all_year') {
     $nEmp = 0; $nMonths = 0;
     foreach ($emps as $e) {
         $months = paidMonthsFor($e, $y1, $y2); // 📆 (2026-09-28) الفترة من ملفه
+        prunePaidPeriodRows((int)$e['id'], (string)$schoolYear); // 📆🧹 (2026-09-30) أشهر غير مدفوعة خارج فترته تُشال
         $did = false;
         foreach ($months as [$m, $y]) {
             try { (new PayrollCalculator($e['id'], $m, $y))->calculateAndSave(); $nMonths++; $did = true; } catch (Exception $ex) {}

@@ -298,6 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_a
 
             $hasConfig = salaryEngineAllowed($emp, $db); // المصدر الواحد
             $months = paidMonthsFor($emp, $y1, $y2); // 📆 (2026-09-28) الفترة المدفوعة من ملفه (من شهر ← إلى شهر)
+            prunePaidPeriodRows($id, (string)$yr); // 📆🧹 (2026-09-30) أشهر غير مدفوعة خارج فترته تُشال
             if ($hasConfig) {
                 // الملاك/المُعَدّ: أعِد حساب أشهر السنة فقط (المحرّك يقرأ حالة العلاوات الجديدة) — لا يمسّ الدرجات
                 foreach ($months as [$m, $y]) { try { (new PayrollCalculator($id, $m, $y))->calculateAndSave(); } catch (Exception $e) {} }

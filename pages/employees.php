@@ -472,13 +472,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     if ($data['father_name_fr'] === '' && $data['father_name_ar'] !== '') $data['father_name_fr'] = arNameToFr($data['father_name_ar'], 'first');
 
     // الشهادة القديمة (لكشف تغييرها عند التعديل وإعادة ضبط التدرّج)
-    $oldDiploma = null; $oldDates = null;
+    $oldDiploma = null; $oldDates = null; $oldPayPeriod = null;
     if ($action === 'edit' && $id) {
         $stOld = $db->prepare("SELECT diploma, hire_date, titularization_date, tenure_confirmation_date, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND school_id = ?");
         $stOld->execute([$id, currentSchoolId()]);
         $oldRow = $stOld->fetch(PDO::FETCH_ASSOC) ?: [];
         $oldDiploma = $oldRow['diploma'] ?? null;
         $oldDates = $oldRow;
+        // 📆 الفترة المدفوعة قبل الحفظ (لمعرفة إن تغيّرت — 2026-09-30)
+        try { ensurePayPeriodColumns(); $oldPayPeriod = $db->query("SELECT pay_from_month, pay_to_month FROM employees WHERE id = " . (int)$id)->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Throwable $t) { $oldPayPeriod = null; }
     }
 
     // عمود classes_taught قد لا يكون موجوداً في قاعدة لم تُطبَّق عليها migration 015 بعد (مثلاً الأونلاين قبل التحديث)
@@ -656,6 +658,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 }
             }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
+            // 📆🧹 (2026-09-30 مايكل متى «حطّيت 9 أشهر والبطاقة طلعت 12 — بس غيّر شي بملف الموظف لازم تلقائياً يتغيّر بكل المحلات»):
+            //    الفترة المدفوعة إعداد واحد بالملف لكل السنين ⇒ إذا تغيّرت تسري فوراً على سنة البرنامج وكل سنة مفتوحة بعدها أيضاً
+            //    (لا السنة المعروضة وحدها): الأشهر غير المدفوعة خارجها تُشال والتي دخلتها تُحسب — والرسالة تقول ما الذي شيل.
+            if ($oldPayPeriod && ((int)$oldPayPeriod['pay_from_month'] !== (int)$payFromP || (int)$oldPayPeriod['pay_to_month'] !== (int)$payToP)) {
+                try {
+                    $ppShown = (string)writeSchoolYear();
+                    foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE employee_id = " . (int)$id . " AND school_year >= " . $db->quote(currentSchoolYear()))->fetchAll(PDO::FETCH_COLUMN) as $ppSy) {
+                        if ((string)$ppSy !== $ppShown) recalcEmployeeYear($id, (string)$ppSy);
+                    }
+                } catch (Throwable $t) {}
+            }
+            $ppGone = array_values(array_unique($GLOBALS['msa_pay_period_pruned'][(int)$id] ?? []));
+            if ($ppGone && !empty($_SESSION['flash']['msg'])) {
+                $_SESSION['flash']['msg'] .= ' — 📆 الفترة المدفوعة ' . paidPeriodLabel(['pay_from_month' => $payFromP, 'pay_to_month' => $payToP]) . ': شيلت من الرواتب الأشهر غير المدفوعة خارجها (' . implode('، ', $ppGone) . ')';
+            }
             // 🎓✍️ (2026-09-23 تريزيا مارون) حُوِّل بيده من متعاقد/موظف إلى ملاك ⇒ قانون الملاك كاملاً فوراً (نسبة/نقل/محسومات/السلسلة/صمام
             //    السنين السابقة/قرار الترسيم) — نفس ما يعمله زرّ «موافق» بصفحة الترسيم، بلا انتظار الشفاء الدوري
             $becameCadreAny = ($oldDates && ($oldDates['employee_type'] ?? '') !== 'enseignant_titulaire' && $data['employee_type'] === 'enseignant_titulaire');

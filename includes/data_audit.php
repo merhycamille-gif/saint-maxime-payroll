@@ -169,5 +169,21 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
         WHERE e.is_deleted=0 AND b.is_active=1 AND b.value_type='percent' AND b.bonus_type='prime_fixe' AND b.start_month IS NULL AND b.school_year IS NOT NULL
         GROUP BY b.employee_id, b.school_year HAVING COUNT(*)>1"));
 
+    // 23) شهر غير مدفوع مخزّن خارج الفترة المدفوعة بملف الموظف «من شهر ← إلى شهر» (2026-09-30 مايكل متى/عبرا: «حطّيت 9 أشهر والبطاقة
+    //     طلعت 12») — نفس قاعدة prunePaidPeriodRows: سنة البرنامج وما بعدها كل صفّ، سنة سابقة الصفّ الصفري فقط. SQL مضمّن (دمب الأونلاين).
+    try {
+        $pastZero = (function_exists('currentSchoolYear') && strcmp($sy, (string)currentSchoolYear()) < 0)
+            ? " AND ms.net_salary_lbp = 0 AND ms.total_due_lbp = 0 AND ms.base_plus_echelon_lbp = 0 AND (ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) = 0" : '';
+        $add('pay_period_rows', 'شهر غير مدفوع مخزّن خارج الفترة المدفوعة بملف الموظف (من شهر ← إلى شهر)', $q("
+            SELECT CONCAT($nm,' (',GROUP_CONCAT(CONCAT(ms.month,'/',ms.year) ORDER BY ms.year, ms.month),')') nm
+            FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
+            WHERE e.is_deleted=0 AND ms.school_year=? AND COALESCE(ms.is_paid,0)=0 AND COALESCE(ms.is_indemnity_month,0)=0
+              AND NOT (((ms.month+2)%12) BETWEEN ((e.pay_from_month+2)%12) AND
+                   (CASE WHEN e.pay_from_month=10 AND e.pay_to_month=9 AND e.payment_months_per_year=10 THEN 9
+                         WHEN e.pay_from_month=10 AND e.pay_to_month=9 AND e.payment_months_per_year=11 THEN 10
+                         ELSE GREATEST((e.pay_to_month+2)%12, (e.pay_from_month+2)%12) END))$pastZero
+            GROUP BY ms.employee_id", [$sy]));
+    } catch (Throwable $t) { $add('pay_period_rows', 'شهر غير مدفوع مخزّن خارج الفترة المدفوعة بملف الموظف (من شهر ← إلى شهر)', []); /* دمب قديم بلا أعمدة الفترة */ }
+
     return $out;
 }

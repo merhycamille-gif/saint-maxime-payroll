@@ -580,6 +580,12 @@ class PayrollCalculator {
         }
         // 🔒 قفل السنة (2026-09-12): سنة مقفولة لمدرسة الموظف = الحسابات ما بتتغيّر من أي مسار (احتساب/فتح/شفاء/مكافآت) — بلا حفظ
         if (isSchoolYearLocked((int)($this->employee['school_id'] ?? 0), schoolYearOfMonth((int)$this->year, (int)$this->month))) return $this->calculate();
+        // 📆 الفترة المدفوعة (2026-09-30 مايكل متى «حطّيت 9 أشهر والبطاقة طلعت 12»): شهر خارج «من شهر ← إلى شهر» بملفه لا يُحفَظ له
+        // راتب من أي مسار (احتساب شهري/جماعي/مدى/شفاء)، وصفّه غير المدفوع العالق يُشال — الملف هو المرجع بكل البرنامج.
+        if (!monthInPaidPeriod($this->employee, (int)$this->month)) {
+            prunePaidPeriodRows((int)$this->employee['id'], schoolYearOfMonth((int)$this->year, (int)$this->month));
+            return $this->calculate(); // بلا أي حفظ
+        }
         $data = $this->calculate();
         
         ensurePrimeUsdLawColumn();
@@ -742,6 +748,8 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
     // المسجّلة على أشهره المخزّنة، فيظهر الأجر الإضافي الذي يدخله المستخدم في ملفه
     // على البطاقة السنوية وكل الكشوف (حالة ديانا شرو 2026-08-04).
     if (!$hasConfig) return overlayStoredYearBonuses($employeeId, $sy);
+    // 📆🧹 (2026-09-30 مايكل متى) الفترة المدفوعة قُصِّرت بملفه ⇒ أشهر السنة غير المدفوعة التي صارت خارجها تُشال (كانت تبقى براتب كامل بالبطاقة والكشوف)
+    prunePaidPeriodRows((int)$employeeId, (string)$sy);
     // بلا أساس بالإعداد (يُحسب من علاواته فقط): إن لم يكن له ما يُدفَع هذه السنة فلا تولّد أشهراً كلّها أصفار
     if (!$hasBaseCfg && !salaryYearPayable((int)$employeeId, $sy, $db)) {
         $hasRows = $db->prepare("SELECT 1 FROM monthly_salaries WHERE employee_id = ? AND school_year = ? LIMIT 1");
@@ -784,7 +792,10 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
     if (isSchoolYearLocked($lkSid, (string)$schoolYear)) return 0;
     // 📅 (2026-09-20 طانيوس طنّوس «شوف آب وأيلول» — p1) المنقول الذي صار «12 شهراً» بملفه بعدما انفتحت سنته بـ10 أشهر:
     //    كانت بطاقته تعرض آب/أيلول «—» لأنّ لا صفّ لهما ولا أحد يخلقه (المحرّك ممنوع عليه). تُستكمَل أشهره الناقصة **بعد آخر شهر
-    //    مخزّن** نسخةً عنه (نفس منطق فتح السنة للمنقول)، غير مدفوعة، ثم يُركَّب عليها ما بملفه أدناه. لا حذف أبداً (10 أشهر بصفوف 12 تبقى).
+    //    مخزّن** نسخةً عنه (نفس منطق فتح السنة للمنقول)، غير مدفوعة، ثم يُركَّب عليها ما بملفه أدناه.
+    // 📆🧹 (2026-09-30 مايكل متى «بس غيّر شي بملف الموظف لازم تلقائياً يتغيّر بكل المحلات») والعكس: الفترة قُصِّرت بملفه ⇒ أشهره
+    //    غير المدفوعة التي صارت خارجها تُشال (سنة البرنامج وما بعدها؛ المدفوع والسنين السابقة لا تُمسّ) — prunePaidPeriodRows المصدر الواحد.
+    prunePaidPeriodRows((int)$employeeId, (string)$schoolYear);
     fillCarriedMissingMonths((int)$employeeId, (string)$schoolYear);
 
     // أي عائلات علاوات مسجّلة له هذه السنة؟ (تشمل غير الفعّالة كي يُصفَّر المطفأ)
