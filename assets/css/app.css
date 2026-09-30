@@ -672,34 +672,57 @@ body.rtl .table th { text-align: right; }
     background: var(--gray-100);
     border: 1px solid var(--gray-200);
     border-radius: 12px;
-    padding: 5px;
+    padding: 8px 8px 10px;
     margin-bottom: 20px;
-    overflow-x: auto;
+    flex-wrap: wrap; /* كل التبويبات ظاهرة دائماً (لا تمرير يخفي آخرها) */
 }
 
+/* 🎨 (2026-09-30 p1 «بدّي يكونو أوضح، إذا فيهن ألوان راكزة»): لكل تبويب لونه الهادئ الثابت (--tc) — غير المفتوح بخلفية فاتحة من لونه
+   وكتابة بلونه الغامق وشريط ملوّن تحته، والمفتوح بلونه الكامل وكتابة بيضاء. بلا --tc يرجع للون القسم (--accent). */
 .tab {
-    padding: 9px 16px;
+    --tc: var(--accent, var(--primary));
+    flex: 1 1 auto; /* تملأ السطر بالتساوي — وإذا ضاقت الشاشة تنزل لسطر ثانٍ مرتّب */
+    text-align: center;
+    padding: 9px 10px;
     cursor: pointer;
-    border: 1px solid var(--gray-200);
+    border: 1.5px solid color-mix(in srgb, var(--tc) 38%, #fff);
+    border-bottom: 4px solid var(--tc);
     border-radius: 9px;
-    background: #fff;
-    color: var(--gray-700);
+    background: color-mix(in srgb, var(--tc) 9%, #fff);
+    /* 🔘 «وخلّيهن يكونو نافرين» (2026-09-30): زرّ بارز — تدرّج من فوق لتحت + لمعة علوية + ظلّ تحته + حافّة سفلية بلونه */
+    background-image: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--tc) 17%, #fff) 100%);
+    box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(15, 23, 42, .18), 0 1px 2px rgba(15, 23, 42, .12);
+    color: color-mix(in srgb, var(--tc) 88%, #000);
     font-size: 13.5px;
     font-weight: 700;
     transition: all 0.15s;
     white-space: nowrap;
 }
+.tab[data-tab="personal"]   { --tc: #1f4e79; } /* كحلي */
+.tab[data-tab="address"]    { --tc: #0f6b66; } /* أخضر مائي غامق */
+.tab[data-tab="employment"] { --tc: #574b90; } /* بنفسجي هادئ */
+.tab[data-tab="finance"]    { --tc: #2f6b4f; } /* أخضر غامق */
+.tab[data-tab="bonuses"]    { --tc: #8a5a16; } /* برونزي */
+.tab[data-tab="deductions"] { --tc: #8f3a3a; } /* قرميدي */
+.tab[data-tab="grades"]     { --tc: #6d3f6b; } /* خمري */
 
 .tab:hover {
-    border-color: var(--accent, var(--primary));
-    color: var(--accent, var(--primary));
+    background: color-mix(in srgb, var(--tc) 18%, #fff);
+    background-image: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--tc) 28%, #fff) 100%);
+    border-color: var(--tc);
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 #fff, 0 5px 10px rgba(15, 23, 42, .22), 0 1px 2px rgba(15, 23, 42, .12);
 }
 
 .tab.active {
-    background: var(--accent, var(--primary));
-    border-color: var(--accent, var(--primary));
+    background: var(--tc);
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--tc) 78%, #fff) 0%, var(--tc) 45%, color-mix(in srgb, var(--tc) 86%, #000) 100%);
+    border-color: var(--tc);
+    border-bottom-color: color-mix(in srgb, var(--tc) 62%, #000);
     color: #fff;
-    box-shadow: 0 2px 7px rgba(0,0,0,.20);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .30);
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .40), 0 6px 12px color-mix(in srgb, var(--tc) 50%, transparent), 0 2px 3px rgba(15, 23, 42, .25);
 }
 
 .tab-content { display: none; }

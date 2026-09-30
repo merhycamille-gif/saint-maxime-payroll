@@ -9183,6 +9183,26 @@ if ($e205) {
 check('📗 إكسل البطاقة السنوية طبق الأصل عن البطاقة/الـPDF (شريط الاسم + المعلومات + رأسان + الأشهر + TOTAL، A4 أفقي) ويتبع «فاضية من المبالغ» و«نموذج فارغ» ووضع العملة — والجماعي بطاقة لكل ورقة (2026-09-30)',
       $okSrc205 && $okLive205, implode(' · ', $why205));
 
+/* =====================================================================
+ * 206) 🎨 (2026-09-30 p1 = شريط تبويبات ملف الموظف «بدّي يكونو أوضح، إذا فيهن ألوان راكزة»): لكل تبويب لونه الهادئ الثابت (--tc)
+ *      — غير المفتوح بخلفية فاتحة من لونه وشريط ملوّن تحته، والمفتوح بلونه الكامل وكتابة بيضاء — وكلها ظاهرة دائماً (wrap لا تمرير).
+ * =================================================================== */
+$css206 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $em206 = (string)file_get_contents($PROJ . '/pages/employees.php');
+$tabs206 = ['personal', 'address', 'employment', 'finance', 'bonuses', 'deductions', 'grades'];
+$ok206 = preg_match('/\.tabs \{[^}]*flex-wrap: wrap;[^}]*\}/s', $css206) === 1 && preg_match('/\.tabs \{[^}]*overflow-x: auto;[^}]*\}/s', $css206) === 0
+    && strpos($css206, 'border-bottom: 4px solid var(--tc);') !== false && strpos($css206, 'background: color-mix(in srgb, var(--tc) 9%, #fff);') !== false
+    && preg_match('/\.tab\.active \{[^}]*background: var\(--tc\);[^}]*color: #fff;[^}]*\}/s', $css206) === 1
+    // 🔘 «وخلّيهن يكونو نافرين»: تدرّج + لمعة علوية + ظلّ (زرّ بارز)، والمفتوح بتدرّج لونه وظلّه
+    && strpos($css206, 'background-image: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--tc) 17%, #fff) 100%);') !== false
+    && strpos($css206, 'box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(15, 23, 42, .18), 0 1px 2px rgba(15, 23, 42, .12);') !== false
+    && preg_match('/\.tab\.active \{[^}]*background-image: linear-gradient\([^}]*box-shadow: inset[^}]*\}/s', $css206) === 1;
+$cols206 = [];
+foreach ($tabs206 as $t206) {
+    $ok206 = $ok206 && preg_match('/\.tab\[data-tab="' . $t206 . '"\]\s*\{ --tc: (#[0-9a-f]{6}); \}/', $css206, $m206) === 1 && strpos($em206, 'class="tab' . ($t206 === 'personal' ? ' active' : '') . '" data-tab="' . $t206 . '"') !== false;
+    if (!empty($m206[1])) $cols206[$m206[1]] = true;
+}
+check('🎨 تبويبات ملف الموظف أوضح بألوان هادئة ونافرة: لون ثابت لكل تبويب (7 ألوان مختلفة)، زرّ بارز بتدرّج وظلّ، المفتوح بلونه الكامل، وكلها ظاهرة بلا تمرير (2026-09-30)', $ok206 && count($cols206) === 7, 'colors=' . count($cols206));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
