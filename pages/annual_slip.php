@@ -689,6 +689,8 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <a href="?<?= $expQ ?>&blank=1" class="btn btn-warning" title="بطاقة هذا الأستاذ بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierge (montants) / فاضية من المبالغ</a>
             <a href="?<?= $expQ ?>&blank=2" class="btn btn-warning" title="نموذج فارغ بلا اسم ولا مبالغ — لأي أستاذ"><i class="fas fa-file"></i> Formulaire vierge / نموذج فارغ لأي أستاذ</a>
             <?php endif; ?>
+            <?php /* 👤 (2026-09-30 «وقت اللي بكون بصفحة اطبع البطاقة السنوية ما في كبسة ترجعني على ملفو للأستاذ — بدي ياها»): زرّ واحد يفتح ملفه (تبويب المالي) — بشريط الأزرار غير المطبوع، البطاقة نفسها لم تُمَسّ */ ?>
+            <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $employeeId ?>&tab=finance" class="btn btn-primary slip-to-file"><i class="fas fa-user-pen"></i> <?= $emp['employee_type'] === 'employe' ? "Dossier de l'employé / ملف الموظف" : "Dossier de l'enseignant / ملف الأستاذ" ?></a>
             </div>
         </div>
     </div>

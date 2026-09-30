@@ -9120,6 +9120,25 @@ $bad203 = 0; foreach (dataAuditRules($db, $cur203) as $a) if ($a['key'] === 'pay
 check('📆🧹 تقصير الفترة المدفوعة بملف الموظف يشيل الأشهر غير المدفوعة خارجها **بنفس السنة فقط** (حفظ الملف/المحرّك/البطاقة/فتح السنة) — المدفوع يبقى، الرجوع لـ12 يعيدها، ولا صفّ بسنة أخرى يتغيّر، وسنة سابقة لا تُمسّ ضمنياً (2026-09-30)',
       $okSrc203 && $okLive203 && $okPast203, $why203 . ' past[' . $pastWhy203 . '] review=' . $bad203);
 
+/* =====================================================================
+ * 204) 👤 (2026-09-30 «وقت اللي بكون بصفحة اطبع البطاقة السنوية ما في كبسة ترجعني على ملفو للأستاذ — بدي ياها»):
+ *      بشريط أزرار البطاقة المفردة (غير المطبوع) زرّ واحد يفتح ملفه على تبويب المالي — «ملف الأستاذ» للمعلّم و«ملف الموظف»
+ *      لموظف قانون العمل. البطاقة نفسها (المجمّدة) لم تُمَسّ: الزرّ خارج .salary-slip.
+ * =================================================================== */
+$ok204 = true; $why204 = [];
+foreach (['enseignant' => "employee_type <> 'employe'", 'employe' => "employee_type = 'employe'"] as $k204 => $w204) {
+    $e204 = $db->query("SELECT e.id, e.school_id, ms.school_year sy FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.net_salary_lbp > 0
+        WHERE e.is_deleted = 0 AND e.$w204 ORDER BY ms.school_year DESC, e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$e204) { $why204[] = "$k204: لا عيّنة"; continue; }
+    $h204 = renderPage('pages/annual_slip.php', ['employee_id' => (int)$e204['id'], 'school_year' => $e204['sy']], ['extra', 'aide'], [(int)$e204['school_id']], 'lbp', $e204['sy']);
+    $lbl204 = $k204 === 'employe' ? "Dossier de l'employé / ملف الموظف" : "Dossier de l'enseignant / ملف الأستاذ";
+    $n204 = preg_match_all('#<a href="[^"]*pages/employees\.php\?action=edit&id=' . (int)$e204['id'] . '&tab=finance" class="btn btn-primary slip-to-file"><i class="fas fa-user-pen"></i> ' . preg_quote($lbl204, '#') . '</a>#u', $h204);
+    $pBtn = strpos($h204, 'slip-to-file'); $pSlip = strpos($h204, '<div class="salary-slip');
+    $okOne = $n204 === 1 && strpos($h204, 'FATAL') === false && $pBtn !== false && $pSlip !== false && $pBtn < $pSlip; // زرّ واحد، قبل البطاقة (بالشريط غير المطبوع)
+    $ok204 = $ok204 && $okOne; $why204[] = "$k204 #{$e204['id']}=" . (int)$okOne . " (n=$n204)";
+}
+check('👤 البطاقة السنوية المفردة: زرّ واحد «ملف الأستاذ / ملف الموظف» يفتح ملفه (تبويب المالي) بشريط الأزرار غير المطبوع — البطاقة لم تُمَسّ (2026-09-30)', $ok204, implode(' · ', $why204));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
