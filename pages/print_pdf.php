@@ -90,7 +90,7 @@ if (!empty($_GET['view'])) {
     header('Content-Type: text/html; charset=utf-8');
     echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>' . htmlspecialchars($name) . '</title>'
         . '<style>body{margin:0;font-family:Tahoma,Arial}.bar{position:fixed;top:0;left:0;right:0;height:52px;background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:center;gap:12px;z-index:9}'
-        . '.bar button,.bar a{background:#16a34a;color:#fff;border:0;border-radius:8px;padding:9px 22px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;font-family:inherit}'
+        . '.bar button,.bar a{background:#16a34a;color:#fff;border:0;border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(0,0,0,.10));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 6px rgba(15,23,42,.28);border-radius:8px;padding:9px 22px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;font-family:inherit}'
         . '.bar a.dl{background:#2563eb}iframe{position:fixed;top:52px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 52px);border:0}</style></head><body>'
         . '<div class="bar"><button type="button" onclick="pr()">🖨️ Imprimer / اطبع</button><a class="dl" href="' . htmlspecialchars($dl, ENT_QUOTES) . '">⬇️ تنزيل الملف</a></div>'
         . '<iframe id="pf" src="' . htmlspecialchars($src, ENT_QUOTES) . '"></iframe>'

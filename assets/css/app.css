@@ -501,34 +501,43 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
     white-space: nowrap;
 }
 
-.btn-primary {
-    background: linear-gradient(180deg, var(--primary-light), var(--primary));
-    color: white;
-    border-color: var(--primary);
-    box-shadow: 0 2px 6px rgba(23,63,111,.25);
+/* 🔘 «يا ريت كل الكبسات نافرين 3D — كل الكبسات اللي بالبرنامج» (2026-09-30): كل زرّ .btn مجسَّم — تدرّج من فوق لتحت + لمعة علوية
+   + حافّة سفلية أغمق + ظلّ تحته؛ يرتفع عند المرور وينكبس (لتحت + ظلّ داخلي) عند الكبس. لون الزرّ بالمتغيّر --bc لكل نوع. */
+.btn {
+    --bc: #64748b;
+    border-bottom-width: 3px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 3px 6px rgba(15, 23, 42, .18), 0 1px 2px rgba(15, 23, 42, .14);
 }
-.btn-primary:hover { background: var(--primary-light); }
-
-.btn-gold {
-    background: linear-gradient(180deg, var(--gold-light), var(--gold));
-    color: var(--primary-dark);
-    border-color: var(--gold);
+.btn-primary, .btn-gold, .btn-success, .btn-warning, .btn-danger, .btn-info, .btn-secondary {
+    background: var(--bc);
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--bc) 76%, #fff) 0%, var(--bc) 50%, color-mix(in srgb, var(--bc) 86%, #000) 100%);
+    border-color: color-mix(in srgb, var(--bc) 82%, #000);
+    border-bottom-color: color-mix(in srgb, var(--bc) 60%, #000);
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .28);
 }
-.btn-gold:hover { background: var(--gold-light); }
-
-.btn-success { background: var(--success); color: white; }
-.btn-warning { background: var(--warning); color: white; }
-.btn-danger { background: var(--danger); color: white; }
-.btn-info { background: var(--info); color: white; }
+.btn-primary   { --bc: #1f5a9e; }
+.btn-gold      { --bc: #c9a961; color: var(--primary-dark); text-shadow: 0 1px 0 rgba(255, 255, 255, .45); }
+.btn-success   { --bc: #10b981; }
+.btn-warning   { --bc: #f59e0b; }
+.btn-danger    { --bc: #ef4444; }
+.btn-info      { --bc: #3b82f6; }
+.btn-secondary { --bc: #64748b; }
 
 .btn-light {
-    background: white;
+    background: #fff;
+    background-image: linear-gradient(180deg, #fff 0%, #f8fafc 45%, #e6ebf2 100%);
     color: var(--gray-700);
     border-color: var(--gray-300);
+    border-bottom-color: var(--gray-400);
+    box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(15, 23, 42, .14), 0 1px 2px rgba(15, 23, 42, .10);
 }
-.btn-light:hover { background: var(--gray-50); border-color: var(--gray-400); }
 
-.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn:hover { filter: brightness(1.06); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 6px 12px rgba(15, 23, 42, .24), 0 2px 3px rgba(15, 23, 42, .14); }
+.btn:active { filter: brightness(.96); transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(15, 23, 42, .30); }
+.btn:disabled, .btn[disabled] { filter: grayscale(.35); opacity: .6; transform: none; box-shadow: none; cursor: not-allowed; }
+
+.btn-sm { padding: 6px 12px; font-size: 12px; border-bottom-width: 2px; }
 .btn-lg { padding: 12px 24px; font-size: 15px; }
 
 /* 🗑️ أزرار الحذف زغيرة وهادية حتى ما تنكبس بالغلط (طلب المستخدم 2026-08-02):
@@ -547,6 +556,11 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
     border: 1px solid #fca5a5;
     align-self: center;
     opacity: .85;
+    /* تبقى زغيرة (حتى ما تنكبس بالغلط) لكن نافرة كباقي الكبسات — «كل شي في كبسة بدّي ياها نافرة» (2026-09-30) */
+    background-image: linear-gradient(180deg, #fff 0%, #fff5f5 45%, #fee2e2 100%);
+    text-shadow: none;
+    border-bottom: 2px solid #f87171;
+    box-shadow: inset 0 1px 0 #fff, 0 2px 4px rgba(15, 23, 42, .18), 0 1px 1px rgba(15, 23, 42, .10);
 }
 .btn-danger:has(.fa-trash, .fa-trash-alt):not(.btn-lg) i,
 .btn-danger[onclick*=".remove()"] i { font-size: 10px; }
@@ -558,6 +572,7 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
 .btn-danger:has(.fa-trash, .fa-trash-alt):not(.btn-lg):hover,
 .btn-danger[onclick*=".remove()"]:hover {
     background: #dc2626;
+    background-image: none;
     color: #fff;
     border-color: #dc2626;
     opacity: 1;
@@ -1189,9 +1204,7 @@ h1, h2, h3, h4, h5, h6,
 /* مرور أنعم على صفوف الجدول */
 .table tbody tr:hover { background: #f4f8fc; }
 
-/* الأزرار: رفعة خفيفة وظلّ عند المرور */
-.btn:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-.btn:active { transform: translateY(0); box-shadow: var(--shadow-sm); }
+/* الأزرار: الرفعة والكبسة المجسَّمة معرّفتان بقسم Buttons (3D — 2026-09-30) */
 
 /* الحقول: تحديد واضح ورسمي عند التركيز (كحلي) */
 input:focus, select:focus, textarea:focus {
@@ -1625,3 +1638,52 @@ html[dir=rtl] .school-multi .school-menu.scb-menu{left:0;right:auto}
 .att-opts .att-sec.g3{background:#fffbeb;border-color:#fde68a}.att-opts .att-sec.g3 .att-st,.att-opts .att-sec.g3 .att-k{color:#92400e}
 .att-opts .att-sec.g4{background:#f8fafc;border-color:#e2e8f0}.att-opts .att-sec.g4 .att-st,.att-opts .att-sec.g4 .att-k{color:#334155}
 .att-opts .att-sec .att-row label:hover{background:rgba(255,255,255,.7)}
+
+/* 🔘 3D للشريط العلوي أيضاً («كل الكبسات اللي بالبرنامج» — 2026-09-30): حبوب المدرسة/السنة/العملة/«الراتب يشمل» وزرّ «ملف الأستاذ الكامل»
+   مجسَّمة كباقي الأزرار (تدرّج + لمعة + حافّة سفلية + ظلّ، ترتفع عند المرور). */
+.school-switcher {
+    background-image: linear-gradient(180deg, #fff 0%, #f8fafc 45%, #e6ebf2 100%);
+    border-bottom: 3px solid var(--gray-400);
+    box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(15, 23, 42, .14), 0 1px 2px rgba(15, 23, 42, .10);
+}
+.school-switcher:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 #fff, 0 6px 12px rgba(15, 23, 42, .20), 0 2px 3px rgba(15, 23, 42, .12); }
+.topbar-dossier {
+    background-image: linear-gradient(180deg, #fff 0%, #eef2ff 45%, #dbe3ff 100%);
+    border-bottom: 3px solid #818cf8;
+    box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(55, 48, 163, .18), 0 1px 2px rgba(15, 23, 42, .10);
+}
+.topbar-dossier:hover { background-image: linear-gradient(180deg, #fff 0%, #e0e7ff 45%, #c7d2fe 100%); box-shadow: inset 0 1px 0 #fff, 0 6px 12px rgba(79, 70, 229, .24), 0 2px 3px rgba(15, 23, 42, .12); }
+
+/* 🔘 «كل شي في كبسة بدّي ياها نافرة بكل كبسات البرنامج» (2026-09-30): كل ما يُكبَس غير .btn مجسَّم أيضاً —
+   القائمة الجانبية، بلاطات لوحة القيادة ومركز التقارير، حبوب الخيارات (الراتب يشمل/أعمدة النقل والمستحق…)، زرّ القائمة والإغلاق. */
+.sidebar-nav a {
+    margin: 4px 0;
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-bottom: 3px solid rgba(0, 0, 0, .50);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, .11) 0%, rgba(255, 255, 255, .02) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 2px 5px rgba(0, 0, 0, .40);
+}
+.sidebar-nav a:hover { background-image: linear-gradient(180deg, rgba(255, 255, 255, .20) 0%, rgba(255, 255, 255, .07) 100%); transform: translateY(-1px); }
+.sidebar-nav a:active { transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(0, 0, 0, .55); }
+.sidebar-nav a.active {
+    background-image: linear-gradient(180deg, #ecd9a6 0%, var(--gold) 55%, #b8944a 100%);
+    border-color: #b8944a;
+    border-bottom-color: #8a6f33;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 4px 12px rgba(201, 169, 97, .38), 0 2px 3px rgba(0, 0, 0, .35);
+}
+.dash-link, .report-card {
+    background-image: linear-gradient(180deg, #fff 0%, #f8fafc 45%, #e9eef5 100%);
+    border: 1px solid var(--gray-300);
+    border-bottom: 3px solid var(--gray-400);
+    box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(15, 23, 42, .13), 0 1px 2px rgba(15, 23, 42, .09);
+}
+.dash-link:hover, .report-card:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 #fff, 0 7px 14px rgba(15, 23, 42, .20), 0 2px 3px rgba(15, 23, 42, .12); }
+.dash-link:active, .report-card:active { transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(15, 23, 42, .25); }
+.salcomp-bar .scb-opt, .school-checks.scb-tiles .chk, .school-checks.att-type-checks .chk, .school-checks.att-lang-checks .chk {
+    background-image: linear-gradient(180deg, #fff 0%, #faf8ff 45%, #ece7fb 100%);
+    border-bottom-width: 3px;
+    box-shadow: inset 0 1px 0 #fff, 0 2px 5px rgba(15, 23, 42, .14), 0 1px 2px rgba(15, 23, 42, .09);
+}
+.salcomp-bar .scb-opt:hover, .school-checks.scb-tiles .chk:hover, .school-checks.att-type-checks .chk:hover, .school-checks.att-lang-checks .chk:hover { transform: translateY(-1px); }
+.school-checks.scb-tiles .chk:has(input:checked), .school-checks.att-type-checks .chk:has(input:checked), .school-checks.att-lang-checks .chk:has(input:checked) { background-image: none; transform: translateY(1px); }
+.menu-toggle, .ba-x, .toast-x { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 2px 5px rgba(15, 23, 42, .22); border-bottom: 2px solid rgba(0, 0, 0, .28); }

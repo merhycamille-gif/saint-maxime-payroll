@@ -9203,6 +9203,42 @@ foreach ($tabs206 as $t206) {
 }
 check('🎨 تبويبات ملف الموظف أوضح بألوان هادئة ونافرة: لون ثابت لكل تبويب (7 ألوان مختلفة)، زرّ بارز بتدرّج وظلّ، المفتوح بلونه الكامل، وكلها ظاهرة بلا تمرير (2026-09-30)', $ok206 && count($cols206) === 7, 'colors=' . count($cols206));
 
+/* =====================================================================
+ * 207) 🔘 (2026-09-30 «يا ريت كل الكبسات بعملهن نافرين ثري دي — كل الكبسات اللي بالبرنامج»): كل أزرار البرنامج مجسَّمة —
+ *      .btn (تدرّج + لمعة علوية + حافّة سفلية أغمق + ظلّ، ترتفع عند المرور وتنكبس عند الكبس) بكل أنواعها عبر --bc،
+ *      حبوب الشريط العلوي، والأزرار ذات الستايل المضمَّن (صفحات الطباعة/شريط الـPDF). زرّ الحذف يبقى زغيراً هادئاً.
+ * =================================================================== */
+$css207 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$ok207 = strpos($css207, 'box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 3px 6px rgba(15, 23, 42, .18), 0 1px 2px rgba(15, 23, 42, .14);') !== false
+    && strpos($css207, '.btn-primary, .btn-gold, .btn-success, .btn-warning, .btn-danger, .btn-info, .btn-secondary {') !== false
+    && strpos($css207, 'background-image: linear-gradient(180deg, color-mix(in srgb, var(--bc) 76%, #fff) 0%, var(--bc) 50%, color-mix(in srgb, var(--bc) 86%, #000) 100%);') !== false
+    && preg_match('/\.btn \{\s*--bc: #64748b;\s*border-bottom-width: 3px;/', $css207) === 1
+    && strpos($css207, '.btn:active { filter: brightness(.96); transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(15, 23, 42, .30); }') !== false
+    && strpos($css207, '.btn:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }') === false /* القاعدة المسطّحة القديمة أُزيلت */
+    && preg_match('/\.btn-light \{[^}]*background-image: linear-gradient\(180deg, #fff 0%, #f8fafc 45%, #e6ebf2 100%\);[^}]*\}/s', $css207) === 1
+    && preg_match('/\.school-switcher \{\s*background-image: linear-gradient[^}]*border-bottom: 3px solid var\(--gray-400\);[^}]*\}/s', $css207) === 1
+    && preg_match('/\.topbar-dossier \{\s*background-image: linear-gradient[^}]*border-bottom: 3px solid #818cf8;[^}]*\}/s', $css207) === 1
+    && preg_match('/opacity: \.85;\s*\/\*[^*]*\*\/\s*background-image: linear-gradient\(180deg, #fff 0%, #fff5f5 45%, #fee2e2 100%\);[^}]*border-bottom: 2px solid #f87171;[^}]*box-shadow: inset/s', $css207) === 1 // زرّ الحذف يبقى زغيراً لكن نافراً
+    && strpos($css207, 'padding: 1px 7px;') !== false
+    // «كل شي في كبسة بدّي ياها نافرة»: القائمة الجانبية + بلاطات لوحة القيادة ومركز التقارير + حبوب الخيارات
+    && preg_match('/\.sidebar-nav a \{\s*margin: 4px 0;[^}]*border-bottom: 3px solid rgba\(0, 0, 0, \.50\);[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
+    && preg_match('/\.dash-link, \.report-card \{[^}]*border-bottom: 3px solid var\(--gray-400\);[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
+    && preg_match('/\.salcomp-bar \.scb-opt, \.school-checks\.scb-tiles \.chk,[^{]*\{[^}]*border-bottom-width: 3px;[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1;
+$n207 = 0; // كل نوع مستعمَل بالصفحات له لون --bc أو تعريف (لا زرّ مسطّح بلا ستايل)
+foreach (['primary', 'gold', 'success', 'warning', 'danger', 'info', 'secondary'] as $v207) if (preg_match('/\.btn-' . $v207 . '\s*\{ --bc: #[0-9a-f]{6};/', $css207) === 1) $n207++;
+$inl207 = substr_count((string)file_get_contents($PROJ . '/pages/official_export.php'), 'border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient') === 6
+    && substr_count((string)file_get_contents($PROJ . '/includes/footer.php'), 'border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient') === 2
+    && strpos((string)file_get_contents($PROJ . '/pages/print_pdf.php'), '.bar button,.bar a{background:#16a34a;color:#fff;border:0;border-bottom:3px solid rgba(0,0,0,.32);') !== false;
+// لا <button> بلا ستايل بالصفحات: إمّا class (btn/tab/…) أو ستايل مضمَّن مجسَّم — يمنع رجوع زرّ مسطّح
+$flat207 = [];
+foreach (array_merge(glob($PROJ . '/pages/*.php'), [$PROJ . '/includes/footer.php', $PROJ . '/includes/header.php']) as $f207) {
+    if (preg_match_all('/<button(?![^>]*class=)([^>]*)>/u', (string)file_get_contents($f207), $mm207)) {
+        foreach ($mm207[1] as $attr207) if (strpos($attr207, 'box-shadow') === false && strpos($attr207, 'onclick="pr()"') === false && strpos($attr207, 'type="submit"') === false) $flat207[] = basename($f207);
+    }
+}
+check('🔘 كل ما يُكبَس بالبرنامج مجسَّم 3D: .btn بكل أنواعها (تدرّج + لمعة + حافّة سفلية + ظلّ + كبسة) + الشريط العلوي + القائمة الجانبية + بلاطات اللوحة والتقارير + حبوب الخيارات + أزرار الطباعة المضمَّنة؛ زرّ الحذف زغير ونافر (2026-09-30)',
+      $ok207 && $n207 === 7 && $inl207 && !$flat207, 'css=' . (int)$ok207 . " variants=$n207 inline=" . (int)$inl207 . ' flat=' . implode(',', array_unique($flat207)));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

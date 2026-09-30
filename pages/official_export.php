@@ -418,7 +418,7 @@ if ($form === 'cnss_contrib_monthly') {
                /* «بدي ياها تكون قد A4» (2026-08-21): هامش صفحة 0 وبلا أي تصغير — النموذج بحجمه الكامل */
                . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:297mm;height:210mm;overflow:hidden;margin:0}.page{transform:none}}'
                . '</style></head><body>'
-               . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
+               . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer;border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(0,0,0,.10));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 6px rgba(15,23,42,.28)">🖨️ اطبع / احفظ PDF</button>'
                . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — النموذج طبق الأصل الرسمي (اتجاه الورقة: أفقي/Paysage)</div></div>'
                . '<div class="sheet"><div class="page"><img class="pbg" src="' . BASE_URL . 'assets/templates/cnss_monthly.png" alt=""> ' . $F . '</div></div>'
                . '</body></html>';
@@ -642,7 +642,7 @@ if ($form === 'mof_r3') {
        . '.bar{text-align:center;margin:10px 0}'
        . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:210mm;height:297mm;overflow:hidden;margin:0}}'
        . '</style></head><body>'
-       . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
+       . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer;border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(0,0,0,.10));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 6px rgba(15,23,42,.28)">🖨️ اطبع / احفظ PDF</button>'
        . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — نموذج ر3 طبق الأصل الرسمي (Margins = None)</div></div>'
        . '<div class="sheet"><div class="page"><img class="pbg" src="' . BASE_URL . 'assets/templates/mof_r3.png" alt=""> ' . $F . '</div></div>'
        . '</body></html>';
@@ -699,7 +699,7 @@ function mofOverlayServe($tplKey, $titleAr, array $vals, array $widths = []) {
        . '.bar{text-align:center;margin:10px 0}'
        . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:210mm;height:297mm;overflow:hidden;margin:0}}'
        . '</style></head><body>'
-       . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
+       . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer;border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(0,0,0,.10));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 6px rgba(15,23,42,.28)">🖨️ اطبع / احفظ PDF</button>'
        . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — ' . $E($titleAr) . ' طبق الأصل الرسمي (Margins = None)</div></div>'
        . '<div class="sheet"><div class="page"><img class="pbg" src="' . BASE_URL . 'assets/templates/' . $tplKey . '.png" alt=""> ' . $F . '</div></div>'
        . '</body></html>';
@@ -1407,11 +1407,11 @@ if ($form === 'cnss_work_attestation') {
         if ($bar === 'download') {
             $barHtml = '<div class="bar">'
                 . '<a href="' . $E($saveUrl) . '" style="display:inline-block;padding:11px 26px;font-size:16px;font-weight:bold;background:#16a34a;color:#fff;border-radius:6px;text-decoration:none;margin-left:10px">💾 احفظ PDF على الكمبيوتر</a>'
-                . '<button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع</button>'
+                . '<button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer;border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(0,0,0,.10));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 6px rgba(15,23,42,.28)">🖨️ اطبع</button>'
                 . '<div style="color:#475569;font-size:13px;margin-top:6px">«احفظ PDF» بينزّل نسخة عالكمبيوتر مباشرةً — و«اطبع» بيفتح الطابعة</div></div>';
         } elseif ($bar === 'print') {
             $barHtml = '<div class="bar">'
-                . '<button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
+                . '<button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer;border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(0,0,0,.10));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 6px rgba(15,23,42,.28)">🖨️ اطبع / احفظ PDF</button>'
                 . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF»</div></div>';
         }
         return '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>إفادة عمل للضمان</title>'
@@ -1707,7 +1707,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
            . '.bar{text-align:center;margin:10px 0}'
            . '@media print{.bar{display:none}body{background:#fff;margin:0}.sheet{width:194mm;height:276mm;overflow:hidden;margin:0}.page{transform:scale(0.923)}}'
            . '</style></head><body>'
-           . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer">🖨️ اطبع / احفظ PDF</button>'
+           . '<div class="bar"><button onclick="window.print()" style="padding:11px 26px;font-size:16px;font-weight:bold;background:#dc2626;color:#fff;border:0;border-radius:6px;cursor:pointer;border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(0,0,0,.10));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 6px rgba(15,23,42,.28)">🖨️ اطبع / احفظ PDF</button>'
            . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — النموذج طبق الأصل الرسمي</div></div>'
            . '<div class="sheet"><div class="page"><img class="pbg" src="' . BASE_URL . 'assets/templates/' . $form . '.png" alt=""> ' . $F . '</div></div>'
            . '</body></html>';
