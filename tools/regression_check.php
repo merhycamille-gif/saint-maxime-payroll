@@ -9223,7 +9223,12 @@ $ok207 = strpos($css207, 'box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 
     // «كل شي في كبسة بدّي ياها نافرة»: القائمة الجانبية + بلاطات لوحة القيادة ومركز التقارير + حبوب الخيارات
     && preg_match('/\.sidebar-nav a \{\s*margin: 4px 0;[^}]*border-bottom: 3px solid rgba\(0, 0, 0, \.50\);[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
     && preg_match('/\.dash-link, \.report-card \{[^}]*border-bottom: 3px solid var\(--gray-400\);[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
-    && preg_match('/\.salcomp-bar \.scb-opt, \.school-checks\.scb-tiles \.chk,[^{]*\{[^}]*border-bottom-width: 3px;[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1;
+    && preg_match('/\.salcomp-bar \.scb-opt, \.school-checks\.scb-tiles \.chk,[^{]*\{[^}]*border-bottom-width: 3px;[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
+    // «كل شي»: خانات التشييك/الاختيار + القوائم المنسدلة + العناوين المطوية نافرة، والمختار مكبوس
+    && preg_match('/\.school-checks \.chk, \.school-checks \.chk\.all, \.att-opts \.att-row label \{[^}]*border-bottom: 3px solid var\(--gray-400, #94a3b8\);[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
+    && preg_match('/\.school-checks \.chk:has\(input:checked\), \.att-opts \.att-row label:has\(input:checked\) \{[^}]*box-shadow: inset 0 2px 4px[^}]*transform: translateY\(1px\);[^}]*\}/s', $css207) === 1
+    && preg_match('/select\.form-select, select\.form-control,[^{]*\{[^}]*border-bottom-width: 3px;[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
+    && preg_match('/details > summary, \.reg-details > summary \{[^}]*border-bottom: 3px solid[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1;
 $n207 = 0; // كل نوع مستعمَل بالصفحات له لون --bc أو تعريف (لا زرّ مسطّح بلا ستايل)
 foreach (['primary', 'gold', 'success', 'warning', 'danger', 'info', 'secondary'] as $v207) if (preg_match('/\.btn-' . $v207 . '\s*\{ --bc: #[0-9a-f]{6};/', $css207) === 1) $n207++;
 $inl207 = substr_count((string)file_get_contents($PROJ . '/pages/official_export.php'), 'border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient') === 6
