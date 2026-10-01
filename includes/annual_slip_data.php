@@ -76,7 +76,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         foreach ($displayRows as $dr0) { if (!empty($dr0['s']) && (int)$dr0['s']['is_indemnity_month']) { $already13 = true; break; } }
         if (!$already13 && !empty($salaries)) {
             // شهر 13 = الراتب الأساسي + (اختيارياً الأجر الإضافي و/أو المكافأة حسب خيار ملف الأستاذ)
-            // الحسومات متناسبة مع نسبة إجمالي شهر 13 إلى إجمالي الشهر المرجعي (بلا نقل/عائلي).
+            // بلا محسومات ولا نقل/عائلي.
             $ref = end($salaries);
             $incExtra = !empty($emp['m13_include_extra']);
             $incAide  = !empty($emp['m13_include_aide']);
@@ -89,12 +89,11 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
             $s13['aide_complementaire_lbp'] = $aide13;
             $salary13 = (int)$ref['base_plus_echelon_lbp'];
             $brut13 = $salary13 + $extra13 + $aide13;
-            $brutRef = (int)$ref['base_plus_echelon_lbp'] + (int)$ref['extra_lbp'] + (int)$ref['prime_fixe_lbp'] + (int)$ref['aide_complementaire_lbp'];
-            $ratio = $brutRef > 0 ? $brut13 / $brutRef : 1;
             $s13['eoc_grade_lbp'] = 0; // لا حسم درجة/نصف راتب في شهر 13
-            $s13['caisse_amount_lbp'] = (int)round((int)$ref['caisse_amount_lbp'] * $ratio);
-            $s13['cnss_amount_lbp']   = (int)round((int)$ref['cnss_amount_lbp'] * $ratio);
-            // 🚫💰 (2026-10-01 «شهر التعويض يعني شهر 13 ما بيكون عليه ضرائب»): لا ضريبة دخل ولا أساس خاضع على شهر التعويض
+            // 🚫💰 (2026-10-01 «شهر التعويض يعني شهر 13 ما بيكون عليه ضرائب» ثم «أنا بس قول ضرائب يعني كل شي محسومات»):
+            //    شهر التعويض بلا أي محسومات — لا صندوق ولا ضمان ولا ضريبة ولا أساس خاضع؛ الصافي = الإجمالي
+            $s13['caisse_amount_lbp'] = 0;
+            $s13['cnss_amount_lbp']   = 0;
             $s13['income_tax_lbp']    = 0;
             $s13['taxable_base_lbp']  = 0;
             $s13['total_retenues_lbp'] = $s13['caisse_amount_lbp'] + $s13['cnss_amount_lbp'] + $s13['income_tax_lbp'];

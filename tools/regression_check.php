@@ -9282,17 +9282,17 @@ check('🟦 خلفية البرنامج زرقاء على الشاشة فقط و
 require_once $PROJ . '/includes/annual_slip_data.php';
 $src210 = (string)file_get_contents($PROJ . '/includes/annual_slip_data.php');
 $ok210 = strpos($src210, "\$s13['income_tax_lbp']    = 0;") !== false && strpos($src210, "\$s13['taxable_base_lbp']  = 0;") !== false
-      && strpos($src210, "\$ref['income_tax_lbp'] * \$ratio") === false;
+      && strpos($src210, "\$s13['cnss_amount_lbp']   = 0;") !== false && strpos($src210, "\$s13['caisse_amount_lbp'] = 0;") !== false && strpos($src210, '* $ratio') === false; // «ضرائب» عنده = كل المحسومات
 $n210 = 0; $bad210 = [];
 foreach ($db->query("SELECT * FROM employees WHERE is_deleted = 0 AND has_13th_month = 1 LIMIT 20")->fetchAll(PDO::FETCH_ASSOC) as $e210) {
     $d210 = computeAnnualSlip($db, $e210, currentSchoolYear());
     foreach (($d210['rows'] ?? []) as $r210) {
         if (strpos((string)($r210['label'] ?? ''), '(13)') === false) continue;
         $n210++;
-        if ((int)$r210['income_tax'] !== 0 || (int)$r210['net'] !== (int)$r210['brut'] - (int)$r210['total_retenues'] || (int)$r210['total_retenues'] !== (int)$r210['cnss'] + (int)$r210['caisse']) $bad210[] = (int)$e210['id'];
+        if ((int)$r210['income_tax'] !== 0 || (int)$r210['cnss'] !== 0 || (int)$r210['caisse'] !== 0 || (int)$r210['total_retenues'] !== 0 || (int)$r210['net'] !== (int)$r210['brut'] || (int)$r210['brut'] <= 0) $bad210[] = (int)$e210['id'];
     }
 }
-check('🚫💰 شهر التعويض (13) بلا ضريبة دخل: المصدر + كل من عنده شهر 13 حيّاً (ضريبة 0، المحسومات = ضمان + صندوق، الصافي = الإجمالي − المحسومات) (2026-10-01)', $ok210 && !$bad210, 'src=' . (int)$ok210 . " rows13=$n210 bad=" . implode(',', $bad210));
+check('🚫💰 شهر التعويض (13) بلا أي محسومات: المصدر + كل من عنده شهر 13 حيّاً (ضريبة/ضمان/صندوق 0، الصافي = الإجمالي) (2026-10-01)', $ok210 && !$bad210, 'src=' . (int)$ok210 . " rows13=$n210 bad=" . implode(',', $bad210));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
