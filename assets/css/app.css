@@ -1851,3 +1851,10 @@ form[method="GET" i] .form-row:has(> .form-group > .btn), form[method="GET" i].f
 .table td:last-child:has(> .btn + .btn) { white-space: nowrap; }
 form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-sizing: border-box; }
 .school-checks .chk:has(input:disabled) { opacity: .75; cursor: default; }
+
+/* =====================================================================
+ * 214) 📌 (2026-10-01 «عناوين الصفحة يضلّوا مبيّنين كيف ما حرّكت الصفحة — بكل البرنامج»): السطر الثاني من عنوان الشريط العلوي
+ *      يعرض عنوان القسم/التقرير الذي أنت داخله أثناء النزول (app.js) — سطر واحد لا يغيّر ارتفاع الشريط. شاشة فقط.
+ * =================================================================== */
+.topbar h1 .sec-now { max-width: min(44vw, 640px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar h1 .sec-now.is-sec { color: var(--primary); opacity: 1 !important; font-weight: 800 !important; direction: ltr; unicode-bidi: plaintext; }

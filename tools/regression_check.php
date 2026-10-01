@@ -9351,6 +9351,19 @@ if (getSetting('names_fr_healed_20261001', '') !== '') {
 check('🔤 أسماء الأساتذة بالفرنسي: القاموس المكمَّل (16 عيّنة) + تمييز المولَّد آلياً عن المكتوب باليد + الشفاء موصول ومحفوظ القديم + لا اسم بلا أحرف علّة بين أساتذة السنة (2026-10-01)',
       $ok213 && count($nv213) <= 6, 'bad=' . implode(',', $bad213) . ' novowel=' . implode(',', array_keys($nv213)));
 
+/* =====================================================================
+ * 214) 📌 (2026-10-01 «بأي صفحة كنت وعم انزل، لازم عناوين الصفحة يضلّوا مبيّنين كيف ما حرّكت الصفحة — بكل البرنامج»):
+ *      الشريط العلوي ثابت + رؤوس أعمدة الجداول ثابتة (القديم) + السطر الثاني من عنوان الشريط يعرض 📌 عنوان القسم/التقرير الحالي.
+ * =================================================================== */
+$js214 = (string)file_get_contents($PROJ . '/assets/js/app.js'); $css214 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$ok214 = strpos($js214, "var SEL = '.main-content .card > .card-header h3, .main-content .doc-head, .main-content .salary-slip .slip-pname, .main-content [data-sec-title]';") !== false
+    && strpos($js214, "line.textContent = '📌 ' + t; line.classList.add('is-sec');") !== false
+    && strpos($js214, "window.addEventListener('scroll', req, { passive: true });") !== false
+    && strpos($css214, '.topbar h1 .sec-now { max-width: min(44vw, 640px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }') !== false
+    && preg_match('/\.topbar \{[^}]*position: sticky;\s*top: 0;/s', $css214) === 1
+    && preg_match('/\.table thead th, \.doc-table thead th, \.salary-slip-table thead th \{\s*position: sticky;/', $css214) === 1;
+check('📌 عناوين الصفحة تبقى ظاهرة مع النزول: الشريط العلوي ثابت + رؤوس الأعمدة ثابتة + عنوان القسم/التقرير الحالي بالشريط (2026-10-01)', $ok214);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

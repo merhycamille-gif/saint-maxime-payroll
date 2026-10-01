@@ -600,3 +600,47 @@ window.addEventListener('pageshow', function () { setTimeout(window.msaSyncForms
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
+
+// 📌 (2026-10-01 «بأي صفحة كنت بالبرنامج وعم انزل، لازم عناوين الصفحة يضلّوا مبيّنين كيف ما حرّكت الصفحة — بكل البرنامج»):
+// عناوين الأعمدة ثابتة أصلاً (أعلاه) والشريط العلوي ثابت بعنوان الصفحة؛ الناقص كان عنوان **القسم/التقرير** الذي يختفي مع النزول
+// (عنوان البطاقة «لائحة الموظفين…»، عنوان التقرير «كشف رواتب شهري — تشرين»، اسم الأستاذ بالبطاقات الجماعية). الحلّ: السطر الثاني من
+// عنوان الشريط العلوي يعرض 📌 عنوان القسم الذي أنت داخله الآن، ويرجع لاسم الصفحة العربي عند الصعود — بلا تغيير ارتفاع الشريط.
+(function () {
+    function init() {
+        var tb = document.querySelector('.topbar'), h1 = tb && tb.querySelector('h1');
+        if (!h1 || getComputedStyle(tb).position !== 'sticky') return;
+        var line = h1.querySelector('span[style*="display:block"]');
+        if (!line) { line = document.createElement('span'); line.style.cssText = 'display:block;font-size:0.62em;font-weight:600;opacity:0.92'; line.innerHTML = '&nbsp;'; h1.appendChild(line); }
+        line.classList.add('sec-now');
+        var orig = line.innerHTML, shown = '';
+        var SEL = '.main-content .card > .card-header h3, .main-content .doc-head, .main-content .salary-slip .slip-pname, .main-content [data-sec-title]';
+        function titleOf(el) {
+            if (el.hasAttribute('data-sec-title')) return el.getAttribute('data-sec-title');
+            if (el.classList.contains('doc-head')) { var a = el.querySelector('.dh-fr'), b = el.querySelector('.dh-ar'), c = el.querySelector('.dh-chip'); return [a && a.innerText, b && b.innerText, c && c.innerText].filter(Boolean).join(' · '); }
+            return el.innerText;
+        }
+        function boxOf(el) { return el.closest('.card, .doc-sheet, .salary-slip, [data-sec-box]') || el.parentElement; }
+        var ticking = false;
+        function update() {
+            ticking = false;
+            var top = tb.getBoundingClientRect().bottom, els = document.querySelectorAll(SEL), cur = null;
+            for (var i = 0; i < els.length; i++) {
+                var el = els[i]; if (!el.offsetParent) continue;
+                var r = el.getBoundingClientRect(); if (r.bottom > top + 2) continue;      // عنوانه ما زال ظاهراً (أو تحت)
+                var b = boxOf(el).getBoundingClientRect(); if (b.bottom < top + 60) continue; // خرجنا من قسمه
+                cur = el;
+            }
+            var t = cur ? String(titleOf(cur) || '').replace(/\s*\n+\s*/g, ' · ').replace(/\s+/g, ' ').trim() : '';
+            if (t === shown) return;
+            shown = t;
+            if (t) { line.textContent = '📌 ' + t; line.classList.add('is-sec'); line.title = t; }
+            else { line.innerHTML = orig; line.classList.remove('is-sec'); line.removeAttribute('title'); }
+        }
+        function req() { if (!ticking) { ticking = true; (window.requestAnimationFrame || setTimeout)(update); } }
+        window.addEventListener('scroll', req, { passive: true });
+        window.addEventListener('resize', req);
+        window.addEventListener('beforeprint', function () { line.innerHTML = orig; line.classList.remove('is-sec'); shown = ''; });
+        update();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
