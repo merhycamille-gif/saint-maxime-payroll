@@ -812,7 +812,7 @@ elseif ($form === 'tax_r5'):
                     <input type="number" name="fy" class="form-control" value="<?= $fy ?>" min="2000" max="2100" onchange="this.form.submit()"></div>
             </form>
             <?= mofProfileBox($school) ?>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <div class="btn-grid"><?php /* 📐 (2026-10-01 «رتّب الكبسات بكل البرنامج»): شبكة أزرار متساوية بدل رصّ على 3 أسطر */ ?>
                 <a class="btn btn-danger btn-lg" href="<?= e($exp5) ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي ر5 (طباعة / PDF) / Formulaire officiel R5</a>
                 <a class="btn btn-success btn-lg" href="<?= e($exp5) ?>&format=xlsx"><i class="fas fa-file-excel"></i> Excel رسمي (معبّى) / Excel officiel rempli</a>
                 <a class="btn btn-lg" style="background:#7c3aed;color:#fff" href="<?= e(BASE_URL . 'pages/official_export.php?form=mof_r567&fy=' . $fy . $fltQ) ?>"><i class="fas fa-file-export"></i> 📤 ملف الوزارة R567 (ر5+ر6+ر7) / Fichier ministère R567</a>

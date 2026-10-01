@@ -553,8 +553,9 @@ include __DIR__ . '/../includes/header.php';
         </h3>
     </div>
     <div class="card-body">
-        <form method="GET" class="form-row cols-4">
-            <div class="form-group mb-0">
+        <?php /* 📐 (2026-10-01 p1 «كلو بدو ترتيب»): شبكة مرتّبة — الموظف + السنة + عرض بسطر واحد، والفئة تحتها بعرض السطر */ ?>
+        <form method="GET" class="slip-sel">
+            <div class="form-group mb-0 slip-sel-emp">
                 <label class="form-label">Employé / موظف واحد</label>
                 <select name="employee_id" class="form-select">
                     <option value="">-- (laisser vide pour impression groupée / اتركه فارغاً للطباعة الجماعية) --</option>
@@ -570,8 +571,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php endforeach; ?>
                 </select>
             </div>
-            <?= empTypeCheckboxes($typeState, true, 'type') /* ☑️ (2026-09-25) خانات تشييك: المشيّكة فقط تبيّن */ ?>
-            <div class="form-group mb-0">
+            <div class="form-group mb-0 slip-sel-year">
                 <label class="form-label">Année scolaire / السنة الدراسية</label>
                 <select name="school_year" class="form-select" onchange="this.form.submit()">
                     <?php
@@ -584,15 +584,16 @@ include __DIR__ . '/../includes/header.php';
                     <?php endfor; ?>
                 </select>
             </div>
-            <div class="form-group mb-0">
-                <label class="form-label">&nbsp;</label>
+            <div class="form-group mb-0 slip-sel-go">
                 <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Afficher / عرض</button>
             </div>
+            <div class="slip-sel-cat"><?= empTypeCheckboxes($typeState, true, 'type') /* ☑️ (2026-09-25) خانات تشييك: المشيّكة فقط تبيّن */ ?></div>
         </form>
 
         <!-- أزرار الكل: احتساب وطباعة جماعية للسنة المختارة حسب الفلتر -->
-        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px;border-top:1px solid var(--gray-200);padding-top:14px">
-            <span style="font-weight:600;color:var(--gray-700)"><i class="fas fa-users"></i> Toute l'école / كل المدرسة (<?= e($typeFilter ? employeeTypeLabel($typeFilter) : ($typeState['all'] ? 'Tous / الكل' : empTypeTitleFrom($typeState))) ?>) année / للسنة <?= e($schoolYear) ?>:</span>
+        <div class="slip-rows slip-rows-all">
+            <strong class="slip-k"><i class="fas fa-users"></i> Toute l'école / كل المدرسة<small><?= e($typeFilter ? employeeTypeLabel($typeFilter) : ($typeState['all'] ? 'Tous / الكل' : empTypeTitleFrom($typeState))) ?> — <span dir="ltr"><?= e($schoolYear) ?></span></small></strong>
+            <div class="slip-v">
             <a href="?action=calc_all_year&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-gold"
                onclick="return confirm('احتساب رواتب كل الموظفين المعروضين لكامل السنة الدراسية <?= e($schoolYear) ?>؟ قد تأخذ وقتاً.')">
                 <i class="fas fa-calculator"></i> Calculer toute l'année / احتساب الكل للسنة
@@ -600,6 +601,7 @@ include __DIR__ . '/../includes/header.php';
             <a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-primary">
                 <i class="fas fa-print"></i> Afficher/imprimer tous les relevés / عرض/طباعة كل الكشوف
             </a>
+            </div>
         </div>
     </div>
 </div>
@@ -614,12 +616,12 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
     $empsP = getYearEmployees($db, $schoolYear, $typeState);
     $typeLbl = $typeFilter ? employeeTypeLabel($typeFilter) : ($typeState['all'] ? 'الكل / Tous' : empTypeTitleFrom($typeState));
 ?>
-    <div class="d-flex justify-between align-center mb-3 no-print">
+    <div class="btn-bar mb-3 no-print"><?php /* 📐 (2026-10-01 «رتّب الكبسات بكل البرنامج»): شريط واحد بفراغات متساوية */ ?>
         <a href="<?= BASE_URL ?>pages/annual_slip.php?school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-light">
-            <i class="fas fa-arrow-left"></i> رجوع / Retour
+            <i class="fas fa-arrow-left"></i> Retour / رجوع
         </a>
-        <div>
-            <span class="badge badge-info"><?= count($empsP) ?> — <?= e($typeLbl) ?> — <?= e($schoolYear) ?></span>
+        <span class="badge badge-info"><?= count($empsP) ?> — <?= e($typeLbl) ?> — <span dir="ltr"><?= e($schoolYear) ?></span></span>
+        <div class="btn-bar btn-bar-end">
             <?php
                 $expAllQ = 'all=1' . $typeQ . '&school_year=' . urlencode($schoolYear);
                 // «PDF رسمي (الكل)» = طبق الأصل عبر Chrome (صفحة لكل أستاذ، نفس تصميم الشاشة)
@@ -629,7 +631,7 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel (tous) / PDF رسمي (الكل)</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expAllQ ?>&format=xlsx<?= $blankQ ?>" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
-            <?php if ($slipBlank): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> بالمبالغ / avec montants</a><?php endif; ?>
+            <?php if ($slipBlank): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> Avec montants / بالمبالغ</a><?php endif; ?>
             <?php if ($slipBlank !== 1): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=1" class="btn btn-warning" title="كل البطاقات بالأسماء بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierges (montants) / فاضية من المبالغ</a><?php endif; ?>
             <?php if ($slipBlank !== 2): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=2" class="btn btn-warning" title="نماذج فارغة بلا اسم ولا مبالغ — نسخة لكل أستاذ مختار"><i class="fas fa-file"></i> Formulaires vierges / نماذج فارغة بلا اسم</a><?php endif; ?>
         </div>
@@ -650,30 +652,29 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
     if (!$emp) { echo "<div class='alert alert-danger'>Employé introuvable dans cette école</div>"; include __DIR__ . '/../includes/footer.php'; exit; }
 ?>
     <div class="card no-print" style="margin-bottom:14px">
-        <div class="card-body att-opts" style="padding:8px 14px"><?php /* ☑️📐 (2026-09-27 «رتّب كل البرنامج») سطران مرتّبان: الاحتساب ثم التصدير والطباعة — الأزرار نفسها */ ?>
-            <div class="att-row wide"><strong class="att-k"><i class="fas fa-calculator"></i> Calcul / احتساب:</strong>
+        <div class="card-body slip-rows"><?php /* 📐 (2026-10-01 p1 «كلو بدو ترتيب»): أسطر بعمود عناوين واحد محاذى — احتساب السنة · احتساب فترة · تصدير وطباعة · فاضية · الملف — الأزرار نفسها */ ?>
+            <strong class="slip-k"><i class="fas fa-calculator"></i> Calcul / احتساب</strong>
+            <div class="slip-v">
             <a href="?action=calc_year&employee_id=<?= $employeeId ?>&school_year=<?= e($schoolYear) ?>" class="btn btn-gold"
                onclick="return confirm('احسب رواتب كل أشهر السنة لهذا الأستاذ؟')">
                 <i class="fas fa-calculator"></i> احسب كل الأشهر / Toute l'année
             </a>
-            <form method="GET" style="display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin:0">
+            </div>
+            <strong class="slip-k"><i class="fas fa-calendar-days"></i> Période / فترة</strong>
+            <form method="GET" class="slip-v slip-range">
                 <input type="hidden" name="action" value="calc_range">
                 <input type="hidden" name="employee_id" value="<?= $employeeId ?>">
                 <input type="hidden" name="school_year" value="<?= e($schoolYear) ?>">
-                <div class="form-group mb-0"><label class="form-label" style="font-size:12px">من شهر / De</label>
-                    <select name="from_m" class="form-select"><?php for($i=1;$i<=12;$i++) echo "<option value='$i'>".monthName($i,'fr',true)."</option>"; ?></select>
-                </div>
-                <div class="form-group mb-0"><label class="form-label" style="font-size:12px">Année / سنة</label>
-                    <input type="number" name="from_y" class="form-control" value="<?= $y1 ?>" style="width:90px"></div>
-                <div class="form-group mb-0"><label class="form-label" style="font-size:12px">إلى شهر / À</label>
-                    <select name="to_m" class="form-select"><?php for($i=1;$i<=12;$i++) echo "<option value='$i'>".monthName($i,'fr',true)."</option>"; ?></select>
-                </div>
-                <div class="form-group mb-0"><label class="form-label" style="font-size:12px">Année / سنة</label>
-                    <input type="number" name="to_y" class="form-control" value="<?= $y2 ?>" style="width:90px"></div>
-                <button class="btn btn-secondary"><i class="fas fa-calculator"></i> احسب الفترة / Période</button>
+                <span class="slip-lbl">De / من</span>
+                <select name="from_m" class="form-select" aria-label="De / من شهر"><?php for($i=1;$i<=12;$i++) echo "<option value='$i'" . ($i === 10 ? ' selected' : '') . ">".monthName($i,'fr',true)."</option>"; ?></select>
+                <input type="number" name="from_y" class="form-control" value="<?= $y1 ?>" aria-label="Année / سنة">
+                <span class="slip-lbl">À / إلى</span>
+                <select name="to_m" class="form-select" aria-label="À / إلى شهر"><?php for($i=1;$i<=12;$i++) echo "<option value='$i'" . ($i === 9 ? ' selected' : '') . ">".monthName($i,'fr',true)."</option>"; ?></select>
+                <input type="number" name="to_y" class="form-control" value="<?= $y2 ?>" aria-label="Année / سنة">
+                <button class="btn btn-secondary"><i class="fas fa-calculator"></i> Calculer la période / احسب الفترة</button>
             </form>
-            </div>
-            <div class="att-row wide"><strong class="att-k"><i class="fas fa-print"></i> Export / تصدير وطباعة:</strong>
+            <strong class="slip-k"><i class="fas fa-print"></i> Export / تصدير وطباعة</strong>
+            <div class="slip-v">
             <?php
                 $expQ = 'employee_id=' . $employeeId . '&school_year=' . urlencode($schoolYear);
                 // «PDF رسمي» = طبق الأصل عن الشاشة عبر Chrome (نفس تصميم الكشف بالضبط، بلا قصّ)
@@ -683,12 +684,18 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $slipTarget ?>&name=releve_<?= $employeeId ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel / PDF رسمي</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expQ ?>&format=xlsx<?= $blankQ ?>" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
-            <?php if ($slipBlank): ?><a href="?<?= $expQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> بالمبالغ / avec montants</a>
+            </div>
+            <strong class="slip-k"><i class="fas fa-file-lines"></i> Vierge / فاضية</strong>
+            <div class="slip-v">
+            <?php if ($slipBlank): ?><a href="?<?= $expQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> Avec montants / بالمبالغ</a>
             <?php if ($slipBlank === 1): ?><a href="?<?= $expQ ?>&blank=2" class="btn btn-warning" title="نموذج فارغ بلا اسم ولا مبالغ — لأي أستاذ"><i class="fas fa-file"></i> Formulaire vierge / نموذج فارغ بلا اسم</a><?php else: ?><a href="?<?= $expQ ?>&blank=1" class="btn btn-warning"><i class="fas fa-file-lines"></i> Vierge (montants) / فاضية من المبالغ</a><?php endif; ?>
             <?php else: ?>
             <a href="?<?= $expQ ?>&blank=1" class="btn btn-warning" title="بطاقة هذا الأستاذ بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierge (montants) / فاضية من المبالغ</a>
             <a href="?<?= $expQ ?>&blank=2" class="btn btn-warning" title="نموذج فارغ بلا اسم ولا مبالغ — لأي أستاذ"><i class="fas fa-file"></i> Formulaire vierge / نموذج فارغ لأي أستاذ</a>
             <?php endif; ?>
+            </div>
+            <strong class="slip-k"><i class="fas fa-folder-open"></i> Dossier / الملف</strong>
+            <div class="slip-v">
             <?php /* 👤 (2026-09-30 «وقت اللي بكون بصفحة اطبع البطاقة السنوية ما في كبسة ترجعني على ملفو للأستاذ — بدي ياها»): زرّ واحد يفتح ملفه (تبويب المالي) — بشريط الأزرار غير المطبوع، البطاقة نفسها لم تُمَسّ */ ?>
             <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $employeeId ?>&tab=finance" class="btn btn-primary slip-to-file"><i class="fas fa-user-pen"></i> <?= $emp['employee_type'] === 'employe' ? "Dossier de l'employé / ملف الموظف" : "Dossier de l'enseignant / ملف الأستاذ" ?></a>
             </div>

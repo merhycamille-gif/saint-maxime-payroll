@@ -8332,7 +8332,7 @@ if ($e179) {
     $bodyDigits = fn(string $t) => preg_match('#<tbody>(.*?)</tbody>#su', $t, $m) ? preg_match_all('/\d{1,3}(?:,\d{3})+/', strip_tags(preg_replace('#<td class="row-month">.*?</td>#su', '', $m[1]))) : -1;
     $c179('normal-has-amounts', $noFatal($hN) && $bodyDigits($tbl($hN)) > 10 && strpos($hN, 'blank=1') !== false && strpos($hN, 'blank=2') !== false);
     $c179('blank1-no-amounts', $noFatal($hB) && $bodyDigits($tbl($hB)) === 0 && strpos($hB, 'class="row-month"') !== false && strpos($hB, 'TOTAL') !== false && strpos($hB, 'class="slip-rate"') === false
-        && preg_match('#<span class="lbl">N° CNSS / رقم الضمان</span><span class="val">[^<&]+</span>#u', $hB) === 1 /* الهوية تبقى */ && strpos($hB, 'بالمبالغ / avec montants') !== false);
+        && preg_match('#<span class="lbl">N° CNSS / رقم الضمان</span><span class="val">[^<&]+</span>#u', $hB) === 1 /* الهوية تبقى */ && strpos($hB, 'Avec montants / بالمبالغ') !== false);
     $c179('blank2-no-identity', $noFatal($hF) && $bodyDigits($tbl($hF)) === 0 && preg_match('#<span class="slip-pname"> _+ </span>#u', $hF) === 1 && preg_match('#<span class="val"[^>]*>[^<&]+</span>#u', $hF) === 0);
     $hPA = renderPage('pages/annual_slip.php', ['action' => 'print_all', 'school_year' => '2025-2026', 'type_set' => 1, 'type' => ['enseignant_titulaire'], 'blank' => 1], [], [(int)$db->query("SELECT school_id FROM employees WHERE id = $e179")->fetchColumn()]);
     $c179('print-all-blank', $noFatal($hPA) && $bodyDigits($tbl($hPA)) === 0 && strpos($hPA, 'blank%3D1') !== false);
@@ -8654,7 +8654,7 @@ check('☑️📐 باقي الشرائط صفوفاً مرتّبة (2026-09-27)
       strpos($fn189, 'class="salcomp-bar att-opts no-print no-export"') !== false && strpos($fn189, "salaryCompModeTiles('contract_grade_mode', \$cgm, true)") !== false
       && $tb189 !== '' && substr_count($tb189, 'class="att-row') === 5 && strpos($tb189, 'name="comp[]" value="extra"') !== false && strpos($tb189, 'name="transport_mode"') !== false && strpos($tb189, 'name="due_mode"') !== false && strpos($tb189, 'name="netfam_mode"') !== false && strpos($tb189, 'name="contract_grade_mode"') !== false
       && strpos($css189, '.school-checks.emp-type-checks,.fa-cats .school-checks{display:flex;flex-wrap:wrap;gap:4px 14px}') !== false && strpos($css189, '.salcomp-bar.att-opts{display:grid;gap:0 22px}') !== false
-      && $noFatal($hS189) && substr_count($hS189, 'Calcul / احتساب:') === 1 && substr_count($hS189, 'Export / تصدير وطباعة:') === 1 && strpos($hS189, '<span style="color:var(--gray-400)">|</span>') === false && strpos($hS189, 'name="from_m"') !== false && strpos($hS189, 'blank=2') !== false
+      && $noFatal($hS189) && substr_count($hS189, 'Calcul / احتساب</strong>') === 1 && substr_count($hS189, 'Export / تصدير وطباعة</strong>') === 1 /* 211: أسطر slip-rows */ && strpos($hS189, '<span style="color:var(--gray-400)">|</span>') === false && strpos($hS189, 'name="from_m"') !== false && strpos($hS189, 'blank=2') !== false
       && $noFatal($hI189) && substr_count($hI189, 'class="att-row wide"') === 2 && strpos($hI189, '<strong class="att-k"><i class="fas fa-calendar-days"></i> Année de mise à jour') !== false && strpos($hI189, 'name="sy"') !== false
       && $noFatal($hE189) && strpos($hE189, 'Recherche / بحث</label>') !== false && strpos($hE189, 'Statut / الحالة</label>') !== false && strpos($hE189, 'name="status"') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/bulk_allowances.php'), '<div class="ba-cats"><strong>أي بند؟</strong>') !== false && strpos((string)file_get_contents($PROJ . '/pages/bulk_allowances.php'), '.ba-cats label { font-weight:600; cursor:pointer; white-space:nowrap; min-width:150px;') !== false
@@ -9293,6 +9293,36 @@ foreach ($db->query("SELECT * FROM employees WHERE is_deleted = 0 AND has_13th_m
     }
 }
 check('🚫💰 شهر التعويض (13) بلا أي محسومات: المصدر + كل من عنده شهر 13 حيّاً (ضريبة/ضمان/صندوق 0، الصافي = الإجمالي) (2026-10-01)', $ok210 && !$bad210, 'src=' . (int)$ok210 . " rows13=$n210 bad=" . implode(',', $bad210));
+
+/* =====================================================================
+ * 211) 📐 (2026-10-01 p1 «شوف كلو بدو ترتيب» — صفحة البطاقة السنوية): شريط الاختيار شبكة مرتّبة (الموظف + السنة + عرض بسطر،
+ *      الفئة تحتها) وأسطر الأزرار بعمود عناوين واحد محاذى (احتساب · فترة · تصدير · فاضية · الملف)؛ الفترة الافتراضية ت1 ← أيلول.
+ * =================================================================== */
+$src211 = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
+$css211 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$h211 = '';
+$e211 = $db->query("SELECT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE e.is_deleted = 0 AND ms.school_year = " . $db->quote(currentSchoolYear()) . " AND ms.net_salary_lbp > 0 LIMIT 1")->fetchColumn();
+if ($e211) $h211 = (string)shell_exec('"' . PHP_BINARY . '" ' . escapeshellarg($PROJ . '/tools/_render_one.php') . ' ' . escapeshellarg('pages/annual_slip.php') . ' ' . base64_encode(json_encode(['employee_id' => (int)$e211, 'school_year' => currentSchoolYear()])) . ' "" ' . base64_encode(json_encode([])) . ' "" ' . escapeshellarg(currentSchoolYear()));
+$ok211 = strpos($src211, '<form method="GET" class="slip-sel">') !== false && strpos($src211, 'class="form-row cols-4"') === false
+    && strpos($css211, '.slip-sel { display: grid;') !== false && strpos($css211, '.slip-rows { display: grid; grid-template-columns: max-content minmax(0, 1fr);') !== false
+    && substr_count($h211, '<strong class="slip-k">') === 6 && substr_count($h211, 'class="slip-v') === 6
+    && strpos($h211, "<option value='10' selected>") !== false && strpos($h211, "<option value='9' selected>") !== false
+    && strpos($h211, 'slip-to-file') !== false && strpos($h211, 'att-row wide') === false;
+check('📐 صفحة البطاقة السنوية مرتّبة: شريط الاختيار شبكة + 6 أسطر أزرار بعمود عناوين محاذى + الفترة الافتراضية ت1 ← أيلول (2026-10-01)', $ok211, 'k=' . substr_count($h211, '<strong class="slip-k">') . ' v=' . substr_count($h211, 'class="slip-v') . ' len=' . strlen($h211));
+
+/* =====================================================================
+ * 212) 📐 (2026-10-01 «رتّب الكبسات بكل البرنامج مش بس بالبطاقة السنوية»): قواعد ترتيب عامّة بـapp.css — (أ) خانات الفئة تنزل لسطرها
+ *      بعرض صفّ التصفية، (ب) صفّ التصفية بزرّه يتوزّع بسطر واحد (لا زرّ نازل لحاله)، (ج) .btn-bar/.btn-grid — مطبّقة على
+ *      الطباعة الجماعية للبطاقات وأزرار ر5. الجرد الآلي: scratchpad/audit_btn.js (55 صفحة).
+ * =================================================================== */
+$css212 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$ok212 = strpos($css212, '.form-row > .emp-type-picker { grid-column: 1 / -1; order: 99; }') !== false
+    && strpos($css212, 'form[method="GET" i] .form-row:has(> .form-group > .btn), form[method="GET" i].form-row:has(> .form-group > .btn) { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: end; }') !== false
+    && strpos($css212, '.btn-bar { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }') !== false
+    && strpos($css212, '.btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));') !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/official_forms.php'), '<div class="btn-grid">') !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), '<div class="btn-bar mb-3 no-print">') !== false;
+check('📐 ترتيب الكبسات بكل البرنامج: الفئة بسطرها + صفّ التصفية بزرّه بسطر واحد + شريط/شبكة أزرار عامّان (الطباعة الجماعية، ر5) (2026-10-01)', $ok212);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -1808,3 +1808,41 @@ details[open] > summary { transform: translateY(1px); box-shadow: inset 0 2px 4p
         background-color: var(--page-bg);
     }
 }
+
+/* =====================================================================
+ * 211) 📐 (2026-10-01 p1 «شوف كلو بدو ترتيب» — صفحة البطاقة السنوية): شريط الاختيار شبكة (الموظف + السنة + عرض بسطر،
+ *      الفئة تحتها)، وأسطر الأزرار بعمود عناوين واحد محاذى (احتساب · فترة · تصدير · فاضية · الملف). شاشة فقط — البطاقة لم تُمَسّ.
+ * =================================================================== */
+.slip-sel { display: grid; grid-template-columns: minmax(260px, 2fr) minmax(170px, 1fr) minmax(170px, 1fr); gap: 12px 14px; align-items: end; margin: 0; }
+.slip-sel .slip-sel-cat { grid-column: 1 / -1; }
+.slip-sel .slip-sel-cat .form-group { margin-bottom: 0; }
+.slip-sel .slip-sel-go .btn { min-height: 38px; }
+.slip-rows { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 16px; align-items: center; padding: 6px 16px; }
+.slip-rows > .slip-k, .slip-rows > .slip-v { padding: 9px 0; border-top: 1px dashed var(--gray-200); margin: 0; }
+.slip-rows > .slip-k:first-of-type, .slip-rows > .slip-k:first-of-type + .slip-v { border-top: 0; }
+.slip-rows > .slip-k { color: var(--primary); white-space: nowrap; align-self: stretch; display: flex; flex-wrap: wrap; align-items: center; align-content: center; gap: 2px 7px; }
+.slip-rows > .slip-k small { flex-basis: 100%; color: var(--gray-500); font-weight: 600; }
+.slip-rows > .slip-v { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.slip-rows.slip-rows-all { margin-top: 14px; padding: 4px 0 0; border-top: 1px solid var(--gray-200); }
+.slip-range .slip-lbl { color: var(--gray-600); white-space: nowrap; }
+.slip-range .form-select { width: 120px; }
+.slip-range .form-control { width: 86px; }
+@media (max-width: 900px) {
+    .slip-sel { grid-template-columns: 1fr; }
+    .slip-rows { grid-template-columns: 1fr; }
+    .slip-rows > .slip-v { border-top: 0; padding-top: 0; }
+}
+
+/* =====================================================================
+ * 212) 📐 (2026-10-01 «رتّب الكبسات بكل البرنامج مش بس بالبطاقة السنوية»): قواعد ترتيب عامّة — شاشة فقط.
+ *      (أ) أي صفّ تصفية (form-row) فيه خانات الفئة: الفئة تنزل لسطرها بعرض الصفّ وخاناتها أفقية، وباقي الخانات والزرّ محاذية من تحت.
+ * =================================================================== */
+.form-row:has(> .emp-type-picker) { align-items: end; }
+.form-row > .emp-type-picker { grid-column: 1 / -1; order: 99; }
+/*      (ب) صفّ تصفية (فورم GET) فيه زرّ «عرض/تصفية»: الخانات والزرّ بسطر واحد يتوزّع تلقائياً — لا زرّ نازل لحاله بسطر. */
+form[method="GET" i] .form-row:has(> .form-group > .btn), form[method="GET" i].form-row:has(> .form-group > .btn) { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: end; }
+/*      (ج) شريط أزرار عامّ (.btn-bar: سطر بفراغات متساوية، .btn-bar-end يدفع المجموعة للطرف) وشبكة أزرار متساوية (.btn-grid). */
+.btn-bar { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.btn-bar > .btn-bar-end { display: contents; }
+.btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px 12px; }
+.btn-grid > .btn { display: flex; align-items: center; justify-content: center; text-align: center; white-space: normal; margin: 0; }
