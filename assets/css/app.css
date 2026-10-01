@@ -1801,7 +1801,7 @@ details[open] > summary { transform: translateY(1px); box-shadow: inset 0 2px 4p
  * 209) 🟦 (2026-10-01 «بدي الباكروند يعني الخلفية للبرنامج تكون لون أزرق»): خلفية البرنامج زرقاء هادئة (شاشة فقط —
  *      الطباعة و PDF تبقى بيضاء). البطاقات والجداول تبقى بيضاء فوقها لتبقى القراءة واضحة.
  * =================================================================== */
-:root { --page-bg: #c3d8ef; --page-bg2: #a9c6e6; }
+:root { --page-bg: #86acd9; --page-bg2: #6592c8; }
 @media screen {
     body {
         background: linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg2) 100%) fixed;
