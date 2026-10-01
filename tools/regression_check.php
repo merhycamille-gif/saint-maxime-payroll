@@ -9215,7 +9215,7 @@ $ok207 = strpos($css207, 'box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 
     && preg_match('/\.btn \{\s*--bc: #64748b;\s*border-bottom-width: 3px;/', $css207) === 1
     && strpos($css207, '.btn:active { filter: brightness(.96); transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(15, 23, 42, .30); }') !== false
     && strpos($css207, '.btn:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }') === false /* القاعدة المسطّحة القديمة أُزيلت */
-    && preg_match('/\.btn-light \{[^}]*background-image: linear-gradient\(180deg, #fff 0%, #f8fafc 45%, #e6ebf2 100%\);[^}]*\}/s', $css207) === 1
+    && preg_match('/\.btn-light \{[^}]*background-image: linear-gradient\(180deg, #eef5fc 0%, #d6e4f4 50%, #b9cfe8 100%\);[^}]*\}/s', $css207) === 1 /* الأزرار المحايدة أزرق فاتح لا أبيض (208) */
     && preg_match('/\.school-switcher \{\s*background-image: linear-gradient[^}]*border-bottom: 3px solid var\(--gray-400\);[^}]*\}/s', $css207) === 1
     && preg_match('/\.topbar-dossier \{\s*background-image: linear-gradient[^}]*border-bottom: 3px solid #818cf8;[^}]*\}/s', $css207) === 1
     && preg_match('/opacity: \.85;\s*\/\*[^*]*\*\/\s*background-image: linear-gradient\(180deg, #fff 0%, #fff5f5 45%, #fee2e2 100%\);[^}]*border-bottom: 2px solid #f87171;[^}]*box-shadow: inset/s', $css207) === 1 // زرّ الحذف يبقى زغيراً لكن نافراً
@@ -9225,7 +9225,7 @@ $ok207 = strpos($css207, 'box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 
     && preg_match('/\.dash-link, \.report-card \{[^}]*border-bottom: 3px solid var\(--gray-400\);[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
     && preg_match('/\.salcomp-bar \.scb-opt, \.school-checks\.scb-tiles \.chk,[^{]*\{[^}]*border-bottom-width: 3px;[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
     // «كل شي»: خانات التشييك/الاختيار + القوائم المنسدلة + العناوين المطوية نافرة، والمختار مكبوس
-    && preg_match('/\.school-checks \.chk, \.school-checks \.chk\.all, \.att-opts \.att-row label \{[^}]*border-bottom: 3px solid var\(--gray-400, #94a3b8\);[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
+    && preg_match('/\.school-checks \.chk, \.school-checks \.chk\.all, \.att-opts \.att-row label:has\(input\) \{[^}]*border-bottom: 3px solid var\(--gray-400, #94a3b8\);[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
     && preg_match('/\.school-checks \.chk:has\(input:checked\), \.att-opts \.att-row label:has\(input:checked\) \{[^}]*box-shadow: inset 0 2px 4px[^}]*transform: translateY\(1px\);[^}]*\}/s', $css207) === 1
     && preg_match('/select\.form-select, select\.form-control,[^{]*\{[^}]*border-bottom-width: 3px;[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1
     && preg_match('/details > summary, \.reg-details > summary \{[^}]*border-bottom: 3px solid[^}]*box-shadow: inset[^}]*\}/s', $css207) === 1;
@@ -9243,6 +9243,37 @@ foreach (array_merge(glob($PROJ . '/pages/*.php'), [$PROJ . '/includes/footer.ph
 }
 check('🔘 كل ما يُكبَس بالبرنامج مجسَّم 3D: .btn بكل أنواعها (تدرّج + لمعة + حافّة سفلية + ظلّ + كبسة) + الشريط العلوي + القائمة الجانبية + بلاطات اللوحة والتقارير + حبوب الخيارات + أزرار الطباعة المضمَّنة؛ زرّ الحذف زغير ونافر (2026-09-30)',
       $ok207 && $n207 === 7 && $inl207 && !$flat207, 'css=' . (int)$ok207 . " variants=$n207 inline=" . (int)$inl207 . ' flat=' . implode(',', array_unique($flat207)));
+
+/* =====================================================================
+ * 208) 🎨 (2026-09-30 «بدّي يكونو الكبسات ملوّنين ألوان متناسقة كلهن»): لوحة ألوان واحدة هادئة لكل أزرار البرنامج (عائلة ألوان
+ *      التبويبات) — لا زرّ أبيض: المحايدة أزرق فاتح؛ الأزرار ذات اللون المضمَّن بالصفحة (واتساب…) تُردّ للّوحة وتتجسّم؛ بلاطات اللوحة
+ *      والتقارير بلون قسمها؛ حبوب الخيارات أزرق فاتح والمختارة كحلي كامل بكل البرنامج.
+ * =================================================================== */
+$css208 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$pal208 = ['primary' => '#1f4e79', 'gold' => '#b8944a', 'success' => '#2f7a55', 'warning' => '#a06a1c', 'danger' => '#a23b3b', 'info' => '#2b6f9e', 'secondary' => '#574b90'];
+$okPal208 = true;
+foreach ($pal208 as $v208 => $c208) $okPal208 = $okPal208 && preg_match('/\.btn-' . $v208 . '\s*\{ --bc: ' . $c208 . ';/', $css208) === 1;
+$ok208 = $okPal208
+    && preg_match('/\.btn-light \{\s*background: #d6e4f4;[^}]*color: #1b3f63;[^}]*\}/s', $css208) === 1
+    && strpos($css208, '.btn[style*="background"] {') !== false && strpos($css208, 'rgba(0, 0, 0, .14) 100%) !important;') !== false
+    && strpos($css208, '.btn[style*="#25D366"], .btn[style*="#25d366"]') !== false
+    && preg_match('/\.dash-link \{\s*background-image: linear-gradient\(180deg, #fff 0%, color-mix\(in srgb, var\(--sec-c, #64748b\) 9%, #fff\)/', $css208) === 1
+    && preg_match('/\.report-card \{\s*background-image: linear-gradient\(180deg, #fff 0%, color-mix\(in srgb, var\(--rc, #64748b\) 12%, #fff\)/', $css208) === 1
+    && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "<div class=\"report-cat\" style=\"--rc:<?= \$cat['color'] ?>\">") !== false
+    && preg_match('/\.school-checks \.chk:has\(input:checked\), \.att-opts \.att-row label:has\(input:checked\) \{\s*background-color: #1f4e79;/', $css208) === 1
+    && preg_match('/\.salcomp-bar \.scb-opt:has\(input:checked\), \.school-checks\.scb-tiles \.chk:has\(input:checked\),[^{]*\{\s*background-color: #1f4e79 !important;/', $css208) === 1
+    && strpos($css208, '.att-opts .att-row label:has(input) {') !== false; // الحبّة فقط لخيار فيه خانة — لا عناوين الحقول
+check('🎨 كل الأزرار ملوّنة بلوحة واحدة متناسقة (7 ألوان هادئة + المحايد أزرق فاتح لا أبيض) + الألوان المضمَّنة تُردّ للّوحة + البلاطات بلون قسمها + المختار كحلي بكل البرنامج (2026-09-30)', $ok208, 'palette=' . (int)$okPal208);
+
+/* =====================================================================
+ * 209) 🟦 (2026-10-01 «بدي الباكروند يعني الخلفية للبرنامج تكون لون أزرق»): خلفية البرنامج زرقاء هادئة على الشاشة فقط —
+ *      الطباعة و PDF تبقى بيضاء.
+ * =================================================================== */
+$css209 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$ok209 = strpos($css209, ':root { --page-bg: #c3d8ef; --page-bg2: #a9c6e6; }') !== false
+    && preg_match('/@media screen \{\s*body \{\s*background: linear-gradient\(180deg, var\(--page-bg\) 0%, var\(--page-bg2\) 100%\) fixed;/', $css209) === 1
+    && preg_match('/@media print \{[^@]*?body \{ background: white; \}/s', $css209) === 1;
+check('🟦 خلفية البرنامج زرقاء على الشاشة فقط والطباعة بيضاء (2026-10-01)', $ok209);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

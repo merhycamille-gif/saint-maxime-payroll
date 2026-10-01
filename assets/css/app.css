@@ -516,21 +516,24 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
     color: #fff;
     text-shadow: 0 1px 1px rgba(0, 0, 0, .28);
 }
-.btn-primary   { --bc: #1f5a9e; }
-.btn-gold      { --bc: #c9a961; color: var(--primary-dark); text-shadow: 0 1px 0 rgba(255, 255, 255, .45); }
-.btn-success   { --bc: #10b981; }
-.btn-warning   { --bc: #f59e0b; }
-.btn-danger    { --bc: #ef4444; }
-.btn-info      { --bc: #3b82f6; }
-.btn-secondary { --bc: #64748b; }
+/* 🎨 «بدّي يكونو الكبسات ملوّنين ألوان متناسقة كلهن» (2026-09-30): لوحة واحدة هادئة لكل أزرار البرنامج (نفس عائلة ألوان التبويبات،
+   بإشباع وإضاءة متقاربَين) — اللون للمعنى: كحلي = الفعل الأساسي، أزرق فولاذي = معلومات/Word، أخضر = حفظ/Excel، برونزي = تنبيه،
+   قرميدي = PDF/حذف، ذهبي = احتساب، بنفسجي = ثانوي، وأزرق فاتح = الأزرار المحايدة (رجوع/طباعة المتصفّح…) بدل الأبيض. */
+.btn-primary   { --bc: #1f4e79; }
+.btn-gold      { --bc: #b8944a; color: #2b2208; text-shadow: 0 1px 0 rgba(255, 255, 255, .45); }
+.btn-success   { --bc: #2f7a55; }
+.btn-warning   { --bc: #a06a1c; }
+.btn-danger    { --bc: #a23b3b; }
+.btn-info      { --bc: #2b6f9e; }
+.btn-secondary { --bc: #574b90; }
 
 .btn-light {
-    background: #fff;
-    background-image: linear-gradient(180deg, #fff 0%, #f8fafc 45%, #e6ebf2 100%);
-    color: var(--gray-700);
-    border-color: var(--gray-300);
-    border-bottom-color: var(--gray-400);
-    box-shadow: inset 0 1px 0 #fff, 0 3px 6px rgba(15, 23, 42, .14), 0 1px 2px rgba(15, 23, 42, .10);
+    background: #d6e4f4;
+    background-image: linear-gradient(180deg, #eef5fc 0%, #d6e4f4 50%, #b9cfe8 100%);
+    color: #1b3f63;
+    border-color: #9db7d6;
+    border-bottom-color: #6f90b8;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), 0 3px 6px rgba(15, 23, 42, .14), 0 1px 2px rgba(15, 23, 42, .10);
 }
 
 .btn:hover { filter: brightness(1.06); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 6px 12px rgba(15, 23, 42, .24), 0 2px 3px rgba(15, 23, 42, .14); }
@@ -1690,7 +1693,7 @@ html[dir=rtl] .school-multi .school-menu.scb-menu{left:0;right:auto}
 
 /* 🔘 «كل شي» (2026-09-30 — جوابه على «خانات التشييك العادية تركتها»): كل ما يُكبَس نافر — خانات التشييك/الاختيار (كل .chk وخيارات الإفادات)،
    القوائم المنسدلة، العناوين المطوية (summary)، نتائج البحث، ومفاتيح التشغيل. المختار/المفتوح يبيّن مكبوساً بلونه. */
-.school-checks .chk, .school-checks .chk.all, .att-opts .att-row label {
+.school-checks .chk, .school-checks .chk.all, .att-opts .att-row label:has(input) {
     border: 1px solid var(--gray-300, #cbd5e1);
     border-bottom: 3px solid var(--gray-400, #94a3b8);
     border-radius: 7px;
@@ -1700,8 +1703,8 @@ html[dir=rtl] .school-multi .school-menu.scb-menu{left:0;right:auto}
     transition: transform .12s ease, box-shadow .15s ease;
 }
 .school-checks .chk.all { justify-self: start; grid-column: 1 / -1; margin-bottom: 6px; padding: 3px 12px; }
-.school-checks .chk:hover, .att-opts .att-row label:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 #fff, 0 5px 10px rgba(15, 23, 42, .18), 0 1px 2px rgba(15, 23, 42, .10); }
-.school-checks .chk:active, .att-opts .att-row label:active { transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(15, 23, 42, .25); }
+.school-checks .chk:hover, .att-opts .att-row label:has(input):hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 #fff, 0 5px 10px rgba(15, 23, 42, .18), 0 1px 2px rgba(15, 23, 42, .10); }
+.school-checks .chk:active, .att-opts .att-row label:has(input):active { transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(15, 23, 42, .25); }
 .school-checks .chk:has(input:checked), .att-opts .att-row label:has(input:checked) {
     background-color: #e3edfb;
     background-image: linear-gradient(180deg, #d5e3f8 0%, #e9f1fd 100%);
@@ -1729,3 +1732,79 @@ details > summary:hover { transform: translateY(-1px); }
 details[open] > summary { transform: translateY(1px); box-shadow: inset 0 2px 4px rgba(15, 23, 42, .18); }
 .gs-item { border: 1px solid var(--gray-200); border-bottom: 2px solid var(--gray-300); box-shadow: 0 1px 3px rgba(15, 23, 42, .10); margin-bottom: 3px; }
 .switch .slider, .switch span { box-shadow: inset 0 1px 3px rgba(15, 23, 42, .30), 0 1px 0 #fff; }
+
+/* 🎨 ألوان متناسقة لكل ما يُكبَس (2026-09-30): الأزرار ذات اللون المضمَّن بالصفحة (واتساب وغيره) تدخل اللوحة نفسها + تجسيمها،
+   والبلاطات والحبوب تأخذ لوناً فاتحاً من لون قسمها بدل الأبيض. */
+.btn[style*="background"] {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, .26) 0%, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, .14) 100%) !important;
+    border-color: rgba(0, 0, 0, .22);
+    border-bottom-color: rgba(0, 0, 0, .38);
+    color: #fff;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .28);
+}
+.btn[style*="#25D366"], .btn[style*="#25d366"], .btn[style*="#128c7e"], .btn[style*="#0a7a37"], .btn[style*="#166534"] { background-color: #1f8a63 !important; } /* واتساب/أخضر */
+.btn[style*="#0a6b5e"], .btn[style*="#0e7490"], .btn[style*="#0ea5e9"] { background-color: #0f6b66 !important; } /* أخضر مائي */
+.btn[style*="#b45309"] { background-color: #a06a1c !important; } /* برونزي */
+.btn[style*="#991b1b"], .btn[style*="#e11d48"] { background-color: #a23b3b !important; } /* قرميدي */
+.btn[style*="#6d28d9"], .btn[style*="#7c3aed"] { background-color: #574b90 !important; } /* بنفسجي */
+.dash-link {
+    background-image: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--sec-c, #64748b) 9%, #fff) 50%, color-mix(in srgb, var(--sec-c, #64748b) 20%, #fff) 100%);
+    border-color: color-mix(in srgb, var(--sec-c, #64748b) 35%, #fff);
+    border-bottom-color: color-mix(in srgb, var(--sec-c, #64748b) 75%, #fff);
+}
+.dash-link:hover { background-image: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--sec-c, #64748b) 16%, #fff) 50%, color-mix(in srgb, var(--sec-c, #64748b) 30%, #fff) 100%); }
+.report-card {
+    background-image: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--rc, #64748b) 12%, #fff) 50%, color-mix(in srgb, var(--rc, #64748b) 26%, #fff) 100%);
+    border-color: color-mix(in srgb, var(--rc, #64748b) 32%, #fff);
+    border-bottom-color: color-mix(in srgb, var(--rc, #64748b) 70%, #fff);
+}
+.school-checks .chk, .school-checks .chk.all, .att-opts .att-row label:has(input), details > summary, .reg-details > summary {
+    background-color: #e6eef8;
+    background-image: linear-gradient(180deg, #f6f9fd 0%, #e6eef8 50%, #d0deef 100%);
+    border-color: #a9bfd9;
+    border-bottom-color: #7f9cc0;
+    color: #1b3f63;
+}
+.school-checks .chk:has(input:checked), .att-opts .att-row label:has(input:checked) {
+    background-color: #1f4e79;
+    background-image: linear-gradient(180deg, #2f659a 0%, #1f4e79 55%, #173c5e 100%);
+    border-color: #173c5e;
+    border-bottom-color: #0f2a44;
+    color: #fff;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, .30);
+}
+.school-checks .chk:has(input:checked) input, .att-opts .att-row label:has(input:checked) input { accent-color: #e0c889; }
+.school-switcher {
+    background-image: linear-gradient(180deg, #f6f9fd 0%, #e6eef8 50%, #cfdded 100%);
+    border-color: #a9bfd9;
+    border-bottom-color: #7f9cc0;
+}
+/* حبوب الخيارات («الراتب يشمل»، أعمدة النقل/المستحق، نوع ولغة الإفادة): نفس الأزرق الفاتح، والمختارة كحلي كامل بكتابة بيضاء — لون واحد للمختار بكل البرنامج */
+.salcomp-bar .scb-opt, .school-checks.scb-tiles .chk, .school-checks.att-type-checks .chk, .school-checks.att-lang-checks .chk {
+    background-color: #e6eef8;
+    background-image: linear-gradient(180deg, #f6f9fd 0%, #e6eef8 50%, #d0deef 100%);
+    border-color: #a9bfd9;
+    border-bottom-color: #7f9cc0;
+    color: #1b3f63;
+}
+.salcomp-bar .scb-opt:has(input:checked), .school-checks.scb-tiles .chk:has(input:checked), .school-checks.att-type-checks .chk:has(input:checked), .school-checks.att-lang-checks .chk:has(input:checked) {
+    background-color: #1f4e79 !important;
+    background-image: linear-gradient(180deg, #2f659a 0%, #1f4e79 55%, #173c5e 100%) !important;
+    border-color: #173c5e !important;
+    border-bottom-color: #0f2a44 !important;
+    color: #fff !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, .30) !important;
+}
+.salcomp-bar .scb-opt:has(input:checked) input, .school-checks.scb-tiles .chk:has(input:checked) input { accent-color: #e0c889; }
+
+/* =====================================================================
+ * 209) 🟦 (2026-10-01 «بدي الباكروند يعني الخلفية للبرنامج تكون لون أزرق»): خلفية البرنامج زرقاء هادئة (شاشة فقط —
+ *      الطباعة و PDF تبقى بيضاء). البطاقات والجداول تبقى بيضاء فوقها لتبقى القراءة واضحة.
+ * =================================================================== */
+:root { --page-bg: #c3d8ef; --page-bg2: #a9c6e6; }
+@media screen {
+    body {
+        background: linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg2) 100%) fixed;
+        background-color: var(--page-bg);
+    }
+}

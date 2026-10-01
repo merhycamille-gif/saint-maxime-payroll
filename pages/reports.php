@@ -218,7 +218,7 @@ function reportDocThumb($path) {
             </div>
             <?php endif; ?>
             <?php foreach ($categories as $cat): ?>
-            <div class="report-cat">
+            <div class="report-cat" style="--rc:<?= $cat['color'] ?>">
                 <?php $ctParts = explode(' / ', $cat['title'], 2); ?>
                 <h4 class="report-cat-title" style="--rc:<?= $cat['color'] ?>">
                     <span dir="ltr"><i class="fas <?= $cat['icon'] ?>"></i> <?= e($ctParts[1] ?? $cat['title']) ?></span>
