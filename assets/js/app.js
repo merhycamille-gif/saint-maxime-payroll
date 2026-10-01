@@ -116,6 +116,8 @@ window.msaFitScreenTables = function () {
         topOffG = 0;
         var tb = document.querySelector('.topbar');
         if (tb) { var tbs = getComputedStyle(tb); if (tbs.position === 'sticky' && tbs.display !== 'none') topOffG = Math.ceil(tb.getBoundingClientRect().height); }
+        // 📌 (2026-10-01) شريط تبويبات ملف الموظف ثابت تحت الشريط العلوي ⇒ رؤوس الجداول تلتصق تحته لا خلفه
+        try { document.documentElement.style.setProperty('--msa-topbar-h', topOffG + 'px'); var tabsEl = document.querySelector('.main-content .tabs'); if (tabsEl && tabsEl.offsetParent && getComputedStyle(tabsEl).position === 'sticky') topOffG += Math.ceil(tabsEl.getBoundingClientRect().height); } catch (e) {}
         var tables = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table');
         for (var k = 0; k < tables.length; k++) {
             var t = tables[k];

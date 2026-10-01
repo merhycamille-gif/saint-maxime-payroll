@@ -9364,6 +9364,18 @@ $ok214 = strpos($js214, "var SEL = '.main-content .card > .card-header h3, .main
     && preg_match('/\.table thead th, \.doc-table thead th, \.salary-slip-table thead th \{\s*position: sticky;/', $css214) === 1;
 check('📌 عناوين الصفحة تبقى ظاهرة مع النزول: الشريط العلوي ثابت + رؤوس الأعمدة ثابتة + عنوان القسم/التقرير الحالي بالشريط (2026-10-01)', $ok214);
 
+/* =====================================================================
+ * 215) 📌 (2026-10-01 «بصفحات ملف الموظف محلّ العناوين التوظيف/المالي/محسومات… بس تحرّك الصفحة طلوع نزول بيتحرّكوا معها»):
+ *      شريط تبويبات ملف الموظف ثابت تحت الشريط العلوي على طول الصفحة (حتى بتبويب الدرجات الذي خارج الفورم) ورؤوس الجداول تحته.
+ * =================================================================== */
+$css215 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $js215 = (string)file_get_contents($PROJ . '/assets/js/app.js');
+$ok215 = strpos($css215, '.main-content .tabs { position: sticky; top: var(--msa-topbar-h, 0px); z-index: 30;') !== false
+    && strpos($css215, '#empForm { display: contents; }') !== false
+    && strpos($js215, "document.documentElement.style.setProperty('--msa-topbar-h', topOffG + 'px');") !== false
+    && strpos($js215, "if (tabsEl && tabsEl.offsetParent && getComputedStyle(tabsEl).position === 'sticky') topOffG += Math.ceil(tabsEl.getBoundingClientRect().height);") !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), '<form method="POST" enctype="multipart/form-data" id="empForm"') !== false;
+check('📌 شريط تبويبات ملف الموظف ثابت مع النزول (كل التبويبات، والدرجات) ورؤوس الجداول تلتصق تحته (2026-10-01)', $ok215);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

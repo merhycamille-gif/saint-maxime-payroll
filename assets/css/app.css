@@ -1858,3 +1858,14 @@ form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-siz
  * =================================================================== */
 .topbar h1 .sec-now { max-width: min(44vw, 640px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar h1 .sec-now.is-sec { color: var(--primary); opacity: 1 !important; font-weight: 800 !important; direction: ltr; unicode-bidi: plaintext; }
+
+/* =====================================================================
+ * 215) 📌 (2026-10-01 «بصفحات ملف الموظف محلّ العناوين التوظيف/المالي/محسومات… بس تحرّك الصفحة طلوع نزول بيتحرّكوا معها»):
+ *      شريط التبويبات (شخصي · العنوان · التوظيف · مالي · المكافآت · محسومات · الدرجات) ثابت تحت الشريط العلوي أثناء النزول.
+ *      --msa-topbar-h يضبطه app.js (ارتفاع الشريط العلوي). شاشة فقط.
+ * =================================================================== */
+@media screen {
+    .main-content .tabs { position: sticky; top: var(--msa-topbar-h, 0px); z-index: 30; box-shadow: 0 6px 14px -8px rgba(15, 23, 42, .35); }
+    /* لائحة الدرجات خارج الفورم: الفورم بلا صندوق خاصّ فيبقى الشريط ثابتاً على طول الصفحة كلها (لا ينتهي التثبيت عند آخر الفورم) */
+    #empForm { display: contents; }
+}
