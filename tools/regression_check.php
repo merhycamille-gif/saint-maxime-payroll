@@ -9324,6 +9324,32 @@ $ok212 = strpos($css212, '.form-row > .emp-type-picker { grid-column: 1 / -1; or
     && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), '<div class="btn-bar mb-3 no-print">') !== false;
 check('📐 ترتيب الكبسات بكل البرنامج: الفئة بسطرها + صفّ التصفية بزرّه بسطر واحد + شريط/شبكة أزرار عامّان (الطباعة الجماعية، ر5) (2026-10-01)', $ok212);
 
+/* =====================================================================
+ * 213) 🔤 (2026-10-01 «الترجمة من العربي إلى الفرنسي تكون مظبوطة ما تضحك الأساتذة علينا — وخاصة أسماء الأساتذة باللغة الأجنبية»):
+ *      القاموس مكمَّل بكل أسماء/شهرات البرنامج (arFrNamesExtra) + القاموس الآخر احتياطاً قبل نقل الحروف + شفاء مرّة واحدة
+ *      healNamesFr20261001 (المولَّد آلياً فقط؛ المكتوب باليد لا يُمسّ؛ القديم بـ_names_fr_bk20261001).
+ * =================================================================== */
+require_once $PROJ . '/includes/translit_ar_fr.php';
+$t213 = [['حسن','first','Hassan'],['جميل','first','Jamil'],['برنار','first','Bernard'],['برلا','first','Perla'],['محمد','first','Mohammad'],['كرم','first','Karam'],
+         ['شربل','last','Charbel'],['نمور','last','Nammour'],['القزي','last','Azzi'],['السيقلي','last','Saikali'],['ابو ضاهر','last','Abou Daher'],['زغيب','last','Zgheib'],
+         ['الاخت تراز','first','Sœur Thérèse'],['سليم','first','Salim'],['سليم','last','Slim'],['جان','last','Jean']];
+$bad213 = [];
+foreach ($t213 as [$a213, $ty213, $ex213]) if (arNameToFr($a213, $ty213) !== $ex213) $bad213[] = $a213 . '=' . arNameToFr($a213, $ty213);
+$c213 = arFrAutoCandidates('حسن', 'first');
+$src213 = (string)file_get_contents($PROJ . '/includes/translit_ar_fr.php');
+$ok213 = !$bad213 && in_array('hsn', $c213, true) && !in_array('hassane', $c213, true)
+    && strpos($src213, "if (\$cur !== '' && !in_array(mb_strtolower(preg_replace('/\s+/', ' ', \$cur), 'UTF-8'), arFrAutoCandidates(\$ar, \$t), true)) continue; // مكتوب بيده") !== false
+    && strpos($src213, 'CREATE TABLE IF NOT EXISTS _names_fr_bk20261001') !== false; // ⏳ الشفاء غير موصول بالهيدر بعد — بانتظار موافقة المستخدم على تصحيح الأسماء المخزّنة أونلاين
+// حيّاً: لا اسم فرنسي بلا أي حرف علّة (≥3 أحرف) بين أساتذة السنة بعد الشفاء
+$nv213 = [];
+if (getSetting('names_fr_healed_20261001', '') !== '') {
+    foreach ($db->query("SELECT first_name_fr f, father_name_fr p, last_name_fr l, first_name_ar fa FROM employees e WHERE e.is_deleted = 0 AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = " . $db->quote(currentSchoolYear()) . ")")->fetchAll(PDO::FETCH_ASSOC) as $r213)
+        foreach (['f', 'l'] as $k213) foreach (preg_split('/[\s\-]+/', (string)$r213[$k213]) as $w213)
+            if (mb_strlen($w213) >= 3 && preg_match('/^\p{Latin}+$/u', $w213) && !preg_match('/[aeiouyéèëêïîôâœ]/iu', $w213) && preg_match('/\p{Arabic}{2,}/u', (string)$r213['fa'])) $nv213[$w213] = 1;
+}
+check('🔤 أسماء الأساتذة بالفرنسي: القاموس المكمَّل (16 عيّنة) + تمييز المولَّد آلياً عن المكتوب باليد + الشفاء موصول ومحفوظ القديم + لا اسم بلا أحرف علّة بين أساتذة السنة (2026-10-01)',
+      $ok213 && count($nv213) <= 6, 'bad=' . implode(',', $bad213) . ' novowel=' . implode(',', array_keys($nv213)));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

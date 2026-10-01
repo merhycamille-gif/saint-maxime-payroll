@@ -74,7 +74,7 @@ function arFrFirstDict() {
         'سيمون'=>'Simon','بيتر'=>'Peter','اندريه'=>'André','اندره'=>'André','رهام'=>'Reham','عبير'=>'Abir',
         'رالف'=>'Ralph','جاكي'=>'Jacky','نتالي'=>'Nathalie','جيلبير'=>'Gilbert','اغناطيوس'=>'Ignace',
     ];
-    $nd = []; foreach ($d as $k => $v) { $nd[arFrNormalize($k)] = $v; }
+    $nd = []; foreach (array_merge($d, arFrNamesExtra('first')) as $k => $v) { $nd[arFrNormalize($k)] = $v; }
     $d = $nd;
     return $d;
 }
@@ -135,9 +135,93 @@ function arFrLastDict() {
         'شبوع'=>'Chabbouh','الديك'=>'Deek','فياض'=>'Fayyad','الصهيوني'=>'Sahyouni','صعيبي'=>'Soueid',
         'طربيه'=>'Tarabay','طربيه'=>'Tarabay','عطيه'=>'Attieh','عطية'=>'Attieh','الزغبي'=>'Zoghbi',
     ];
-    $nd = []; foreach ($d as $k => $v) { $nd[arFrNormalize($k)] = $v; }
+    $nd = []; foreach (array_merge($d, arFrNamesExtra('last')) as $k => $v) { $nd[arFrNormalize($k)] = $v; }
     $d = $nd;
     return $d;
+}
+
+/**
+ * 🔤 (2026-10-01 «الترجمة من العربي إلى الفرنسي تكون مظبوطة ما تضحك الأساتذة علينا — وخاصة أسماء الأساتذة باللغة الأجنبية»):
+ * تكملة القاموسين بكل اسم/شهرة موجودة فعلاً بالبرنامج وكان النقل الاحتياطي يطلّعها بلا أحرف علّة (Hsn, Jmil, Brnar, Nmour…).
+ * لها الأولوية على القاموس القديم (تصحّح أيضاً مدخلاته الغلط: السيقلي/القزي/صعيبي). التهجئة لبنانية متعارف عليها،
+ * وحيث كتب المستخدم بيده تهجئة لاسم (Imane, Mirvate, Valessa…) اعتُمدت تهجئته.
+ */
+function arFrNamesExtra(string $type): array {
+    if ($type === 'first') return [
+        'ريمون'=>'Raymond','رمون'=>'Raymond','طانوس'=>'Tannous','سعيد'=>'Said','حسن'=>'Hassan','فواد'=>'Fouad','فؤاد'=>'Fouad',
+        'جميل'=>'Jamil','نبيه'=>'Nabih','نجيب'=>'Najib','احمد'=>'Ahmad','عساف'=>'Assaf','توفيق'=>'Toufic','دنيا'=>'Dounia',
+        'علاء'=>'Alaa','اديب'=>'Adib','لبيب'=>'Labib','جريس'=>'Jreis','وديع'=>'Wadih','جانيت'=>'Jeannette','رجا'=>'Raja',
+        'رجاء'=>'Rajaa','جاك'=>'Jacques','مطانيوس'=>'Mtanios','رشيد'=>'Rachid','جنات'=>'Jannat','مرتا'=>'Martha',
+        'روجيه'=>'Roger','شنتال'=>'Chantal','السي'=>'Elsy','وفيق'=>'Wafic','نجمة'=>'Najmeh','نجمه'=>'Najmeh','تراز'=>'Thérèse',
+        'جومانا'=>'Joumana','جومانه'=>'Joumana','دياب'=>'Diab','ايلان'=>'Hélène','خالد'=>'Khaled',
+        'موريس'=>'Maurice','ادمون'=>'Edmond','ميرال'=>'Miral','قيصر'=>'Kaissar','مصطفى'=>'Moustafa','هبه'=>'Hiba','هبة'=>'Hiba',
+        'عايده'=>'Aida','عايدة'=>'Aida','فوزي'=>'Fawzi','ناديا'=>'Nadia','برلا'=>'Perla','بيرلا'=>'Perla','منوال'=>'Manuel',
+        'كريستين'=>'Christine','ربى'=>'Rouba','ويلده'=>'Wilda','انجي'=>'Angie','يولا'=>'Yola','تغريد'=>'Taghrid',
+        'اميره'=>'Amira','اميرة'=>'Amira','قزحيا'=>'Kozhaya','نورما'=>'Norma','جنى'=>'Jana','مروان'=>'Marwan','كريس'=>'Chris',
+        'اسبر'=>'Esper','شبل'=>'Chebel','جورجيو'=>'Georgio','دوللي'=>'Dolly','دولي'=>'Dolly','اوجين'=>'Eugène','مارينا'=>'Marina',
+        'باسمة'=>'Bassima','باسمه'=>'Bassima','برنادات'=>'Bernadette','كريم'=>'Karim','جيزيل'=>'Gisèle','جيزال'=>'Gisèle',
+        'عاطف'=>'Atef','لبنى'=>'Loubna','فرنسوا'=>'François','قاسم'=>'Kassem','نهاية'=>'Nihaya','حمود'=>'Hammoud',
+        'الماس'=>'Almaz','فرج'=>'Faraj','فاهمة'=>'Fahima','فاهمه'=>'Fahima','نوها'=>'Nouha','نهى'=>'Nouha','صبا'=>'Saba',
+        'بياره'=>'Pierra','منجد'=>'Mounjed','سولا'=>'Sola','ليليان'=>'Liliane','شفيق'=>'Chafic','سعدى'=>'Saada',
+        'صموييل'=>'Samuel','صموئيل'=>'Samuel','سميح'=>'Samih','جورجينا'=>'Georgina','صولنج'=>'Solange','ميريللا'=>'Mirella',
+        'ميريلا'=>'Mirella','عادل'=>'Adel','مالده'=>'Malda','مالدة'=>'Malda','نيفين'=>'Nivine','اميلي'=>'Émilie',
+        'اليانور'=>'Éléonore','شكرالله'=>'Chukrallah','جهان'=>'Jihane','روبيكا'=>'Rebecca','ربيكا'=>'Rebecca','ايليز'=>'Élise',
+        'غيتا'=>'Ghita','نظله'=>'Nazly','كارن'=>'Karen','جلنار'=>'Joulnar','مرفت'=>'Mirvate','ميرفت'=>'Mirvate','عثمان'=>'Osman',
+        'رحيله'=>'Rahil','كريستيا'=>'Christia','نجيبة'=>'Najibeh','نجيبه'=>'Najibeh','شوقي'=>'Chawki','حسام'=>'Houssam',
+        'تامارا'=>'Tamara','سلافا'=>'Sulafa','تمام'=>'Tamam','كريتا'=>'Greta','اسمهان'=>'Asmahane','شيرا'=>'Chira',
+        'سيدة'=>'Sayde','سيمونا'=>'Simona','ريفا'=>'Riva','لوري'=>'Laury','شاديا'=>'Chadia','صفيناز'=>'Safinaz','اماني'=>'Amani',
+        'ماريانا'=>'Mariana','رينيه'=>'René','نديم'=>'Nadim','لميس'=>'Lamisse','لويزا'=>'Louisa','هنري'=>'Henri','نهلا'=>'Nahla',
+        'نهله'=>'Nahla','جوزاف'=>'Joseph','مريام'=>'Myriam','فهد'=>'Fahd','احلام'=>'Ahlam','حياة'=>'Hayate','حياه'=>'Hayate',
+        'بلال'=>'Bilal','علي'=>'Ali','سلمى'=>'Salma','كريستل'=>'Christelle','عناية'=>'Inaya','عنايه'=>'Inaya','عمر'=>'Omar',
+        'بسكال'=>'Pascale','ميلو'=>'Milo','فاليسا'=>'Valessa','ديالا'=>'Diala','لوريس'=>'Loris','غانا'=>'Ghana','ليندا'=>'Linda',
+        'مادو'=>'Mado','سميره'=>'Samira','سميرة'=>'Samira','خطار'=>'Khattar','جورجيت'=>'Georgette','ادوار'=>'Édouard',
+        'كرستيان'=>'Christian','مخيبر'=>'Mkhayber','فتون'=>'Fatoun','فريال'=>'Férial','رونزا'=>'Ronza','ثريا'=>'Souraya',
+        'جاندرك'=>"Jeanne d'Arc",'جندارك'=>"Jeanne d'Arc",'صلاح'=>'Salah','رويده'=>'Rouwayda','رويدة'=>'Rouwayda','جونا'=>'Jona',
+        'تيا'=>'Tia','ماريان'=>'Marianne','ايمي'=>'Aimy','انجيلا'=>'Angela','روزالة'=>'Rozala','نيكول'=>'Nicole','بهية'=>'Bahia',
+        'بهيه'=>'Bahia','ادكار'=>'Edgard','ميليسا'=>'Melissa','روان'=>'Rawan','اناليسا'=>'Annalisa','اتيان'=>'Étienne',
+        'ايليو'=>'Elio','اليو'=>'Elio','جيمي'=>'Jimmy','اندي'=>'Andy','مارسيلا'=>'Marcella','رولى'=>'Roula','ايمان'=>'Imane',
+        'انطوني'=>'Anthony','جهاد'=>'Jihad','ميلي'=>'Mily','غاييل'=>'Gaëlle','نيكولا'=>'Nicolas','امين'=>'Amine',
+        'جنيفر'=>'Jennifer','ادي'=>'Eddy','زهير'=>'Zouher','اوهيلا'=>'Ohayla','هدية'=>'Hadiya','هديه'=>'Hadiya','رفيق'=>'Rafic',
+        'ريمي'=>'Rémie','نعمة'=>'Nehmé','نعمه'=>'Nehmé','رفيقة'=>'Rafica','رفيقه'=>'Rafica','فريد'=>'Farid','سالم'=>'Salem',
+        'طلعت'=>'Talaat','ميرلا'=>'Mirla','مارتين'=>'Martine','ايلسيا'=>'Elsia','باميلا'=>'Paméla','سيلفا'=>'Silva',
+        'شكيب'=>'Chakib','كلاديس'=>'Gladys','فرادي'=>'Freddy','دورلين'=>'Dorline','لويس'=>'Louis','باتريسيا'=>'Patricia',
+        'مفيد'=>'Moufid','ليزا'=>'Lisa','زويا'=>'Zoya','روزالي'=>'Rosalie','بيا'=>'Pia','نسيب'=>'Nassib','كريستوف'=>'Christophe',
+        'رندلا'=>'Rindala','كلاريتا'=>'Clarita','تينا'=>'Tina','برنار'=>'Bernard','ليا'=>'Léa','غوا'=>'Ghiwa','ران'=>'Reine',
+        'اوغستان'=>'Augustin','اوديل'=>'Odile','اغابي'=>'Agapé','اسبرانس'=>'Espérance','الاخت'=>'Sœur','لاخت'=>'Sœur',
+        'الام'=>'Mère','الاب'=>'Père','رزق الله'=>'Rizkallah','رز الله'=>'Rizkallah','سعد الدين'=>'Saadeddine',
+        'عبد القادر'=>'Abdel Kader','عبد الله'=>'Abdallah','عبدالله'=>'Abdallah','شربل'=>'Charbel',
+        'بطرس'=>'Boutros','نخلي'=>'Nakhlé','نخله'=>'Nakhlé','نخلة'=>'Nakhlé','عبدو'=>'Abdo','غرامي'=>'Gharami','جمال'=>'Jamal',
+        'فارس'=>'Fares','سليم'=>'Salim','علاء الدين'=>'Alaeddine','خير'=>'Kheir','ماهر'=>'Maher','سيد'=>'Sayed',
+    ];
+    return [
+        'وازن'=>'Wazen','روفايل'=>'Roufael','بصيبص'=>'Bsaibes','اسماعيل'=>'Ismail','قزحيا'=>'Kozhaya','ابوضاهر'=>'Abou Daher',
+        'ابو ضاهر'=>'Abou Daher','غدار'=>'Ghaddar','غطاس'=>'Ghattas','شهدان'=>'Chahdan','السيد'=>'El Sayed','الاترم'=>'Atram',
+        'الاثرم'=>'Atram','بدر'=>'Bader','ابورجيلي'=>'Abou Rjeily','قرعه'=>'Karaa','بو نافع'=>'Bou Nafeh','كامل'=>'Kamel',
+        'القارح'=>'El Kareh','غنيمه'=>'Ghanimeh','غنيمة'=>'Ghanimeh','ريشا'=>'Richa','عطاالله'=>'Atallah','عطا الله'=>'Atallah',
+        'ابوعزيز'=>'Abou Aziz','رزق الله'=>'Rizkallah','القطار'=>'Kattar','الحريري'=>'Hariri','مفرج'=>'Mfarrej',
+        'حبقوق'=>'Habakouk','عبد اللطيف'=>'Abdel Latif','الكبش'=>'El Kabsh','شمس الدين'=>'Chamseddine','خالد'=>'Khaled',
+        'العجيل'=>'Oujeil','سفر'=>'Safar','الشكر'=>'El Chakar','ربابي'=>'Rababy','ابوزغيب'=>'Abou Zgheib','فزع'=>'Fazaa',
+        'ابوزيدان'=>'Abou Zeidan','رحال'=>'Rahhal','الجوني'=>'Jouni','عاقوري'=>'Aakoury','بوسابا'=>'Bou Saba',
+        'علي'=>'Ali','العلم'=>'El Alam','نبها'=>'Nabha','مرقباوي'=>'Markabawi','سلامه'=>'Salameh','سلامة'=>'Salameh',
+        'شيخو'=>'Chikho','معمو'=>'Maamo','فلفلي'=>'Flefly','الشامية'=>'Chamieh','بوسمعان'=>'Bou Semaan','مزهر'=>'Mezher',
+        'عبيد'=>'Obeid','بدرا'=>'Badra','زعزع'=>'Zaazaa','اسطفان'=>'Estephan','ابونادر'=>'Abou Nader','ابو نادر'=>'Abou Nader',
+        'حلمي'=>'Helmi','غيث'=>'Ghaith','جزاع'=>'Jazaa','برهاني'=>'Berhani','قيقانو'=>'Kikano','المندلق'=>'Mondalek',
+        'شليطا'=>'Chlita','قسطة'=>'Kosta','قسطه'=>'Kosta','بعقليني'=>'Baaklini','الدردغاني'=>'Dardaghani','دمج'=>'Damaj',
+        'الزين'=>'El Zein','الشختورة'=>'Chakhtoura','الشختوره'=>'Chakhtoura','مارتينوس'=>'Martinos','المغربي'=>'Maghrabi',
+        'كنهوش'=>'Kanhouch','حليم'=>'Halim','المصري'=>'Masri','جمعه'=>'Jomaa','جمعة'=>'Jomaa',
+        'القنواتي'=>'Kanawati','بوطايع'=>'Bou Tayeh','سماك'=>'Sammak','نمور'=>'Nammour','طانوس'=>'Tannous','عمار'=>'Ammar',
+        'دايخ'=>'Dayekh','ويس'=>'Wais','فرج'=>'Faraj','العرجا'=>'Arja','فريجي'=>'Freiji','حماده'=>'Hamadeh','حمادة'=>'Hamadeh',
+        'سباهيه'=>'Sbahieh','القصير'=>'Kassir','سعد الدين'=>'Saadeddine','ظهران'=>'Zahran','بونصار'=>'Bou Nassar',
+        'ابوخاطر'=>'Abou Khater','عساف'=>'Assaf','زياده'=>'Ziadeh','زيادة'=>'Ziadeh','خطار'=>'Khattar','الصغبيني'=>'Saghbini',
+        'قبلان'=>'Kabalan','راجحه'=>'Rajha','بوراشد'=>'Bou Rached','جانبين'=>'Janbein','حسونه'=>'Hassouneh','حسّونه'=>'Hassouneh',
+        'الهبر'=>'Habr','غريب'=>'Gharib','غريّب'=>'Gharib','الرشيد'=>'Rachid','ابوشعيا'=>'Abou Chaaya','اسبر'=>'Esper',
+        'الحلاق'=>'Hallak','شلحاوي'=>'Chalhawi','المدور'=>'Mdawar','اسطنبولي'=>'Istambouly','بجاني'=>'Bejjani',
+        'ابويونس'=>'Abou Younes','حدشيتي'=>'Hadchiti','لبوس'=>'Labbous','محفوظ'=>'Mahfouz','فريحة'=>'Freiha','فريحه'=>'Freiha',
+        'باصيلا'=>'Bassila','نضور'=>'Naddour','العبد'=>'El Abd','مومجيان'=>'Momjian','حوشان'=>'Hawchan','الغزال'=>'Ghazal',
+        'شرو'=>'Charro','تحومي'=>'Tahoumi','باصيل'=>'Bassil','زيتو'=>'Zito','مشعلاني'=>'Machaalani','زغيب'=>'Zgheib',
+        'بصبوص'=>'Basbous','ضومط'=>'Doumit','السيقلي'=>'Saikali','القزي'=>'Azzi','صعيبي'=>'Saaiby','داموري'=>'Damouri',
+        'المشنتف'=>'Mechantaf','عربيد'=>'Arbid','عتيق'=>'Atik','انطون'=>'Antoun','سميا'=>'Smaya','السعدي'=>'Saadi','سعدي'=>'Saadi',
+    ];
 }
 
 /** خريطة الحروف للنقل الاحتياطي (تهجئة فرنسية تقريبية). */
@@ -181,6 +265,8 @@ function arNameToFr($ar, $type = 'last') {
     $norm = arFrNormalize($ar);
     if ($norm === '' || $norm === '.') return '';
     $dict = ($type === 'first') ? arFrFirstDict() : arFrLastDict();
+    // 🔤 (2026-10-01) القاموس الآخر احتياطاً قبل نقل الحروف: شهرة هي اسم علم (شربل، جان) أو اسم أب هو اسم عائلة (كرم، نجم، ملحم)
+    $other = ($type === 'first') ? arFrLastDict() : arFrFirstDict();
 
     // 1) مطابقة الاسم الكامل بالقاموس
     if (isset($dict[$norm])) return $dict[$norm];
@@ -208,9 +294,112 @@ function arNameToFr($ar, $type = 'last') {
         }
         if (isset($dict[$lookup])) { $parts[] = $dict[$lookup]; continue; }
         if (isset($dict[$w])) { $parts[] = $dict[$w]; continue; }
+        if (isset($other[$lookup])) { $parts[] = $other[$lookup]; continue; }
+        if (isset($other[$w])) { $parts[] = $other[$w]; continue; }
         $parts[] = arFrTranslitWord($lookup);
     }
     return trim(implode(' ', array_filter($parts)));
+}
+
+/** كل الصيغ التي كان النقل الآلي القديم يعطيها لاسم (بأحرف صغيرة) — لتمييز «مولَّد آلياً» عن «مكتوب بيد المستخدم». */
+function arFrAutoCandidates($ar, $type): array {
+    $norm = arFrNormalize($ar);
+    if ($norm === '' || $norm === '.') return [];
+    $dict = ($type === 'first') ? arFrFirstDict() : arFrLastDict();
+    $oldWrong = ['السيقلي' => 'Sayegh', 'سيقلي' => 'Sayegh', 'القزي' => 'Kozhaya', 'قزي' => 'Kozhaya', 'صعيبي' => 'Soueid'];
+    $sets = [];
+    foreach (explode(' ', $norm) as $w) {
+        if ($w === '') continue;
+        $fix = ['بو' => 'Bou', 'ابو' => 'Abou', 'ابي' => 'Abi', 'عبد' => 'Abdel'];
+        if (isset($fix[$w])) { $sets[] = [$fix[$w]]; continue; }
+        $lookup = ($type === 'last' && mb_substr($w, 0, 2, 'UTF-8') === 'ال' && mb_strlen($w, 'UTF-8') > 3) ? mb_substr($w, 2, null, 'UTF-8') : $w;
+        $o = [arFrTranslitWord($lookup), arFrTranslitWord($w)];
+        foreach ([$lookup, $w] as $k) { if (isset($dict[$k])) $o[] = $dict[$k]; if (isset($oldWrong[$k])) $o[] = $oldWrong[$k]; }
+        $sets[] = array_values(array_unique(array_filter($o)));
+    }
+    $out = [''];
+    foreach ($sets as $o) { $n = []; foreach ($out as $p) foreach ($o as $x) { $n[] = trim($p . ' ' . $x); if (count($n) > 128) break 2; } $out = $n; }
+    return array_values(array_unique(array_map(fn($x) => mb_strtolower($x, 'UTF-8'), $out)));
+}
+
+/**
+ * 🩹🔤 شفاء مرّة واحدة (2026-10-01): الأسماء الفرنسية التي **ولّدها البرنامج آلياً** بالنقل القديم (Hsn, Jmil, Brnar, Nmour…) تُستبدل
+ * بتهجئة القاموس الصحيحة. ما كتبه المستخدم بيده (أي صيغة لا تطابق مخرجات النقل الآلي) لا يُمسّ أبداً. الخانة الفارغة تُعبّأ.
+ * القيم القديمة محفوظة بجدول _names_fr_bk20261001 للاسترجاع.
+ */
+function healNamesFr20261001(): void {
+    $flag = 'names_fr_healed_20261001';
+    if (getSetting($flag, '') !== '') return;
+    try {
+        $db = getDB();
+        $db->exec("CREATE TABLE IF NOT EXISTS _names_fr_bk20261001 (id INT AUTO_INCREMENT PRIMARY KEY, employee_id INT NOT NULL, field VARCHAR(30) NOT NULL, old_value VARCHAR(190) NULL, new_value VARCHAR(190) NULL, changed_at DATETIME NOT NULL) DEFAULT CHARSET=utf8mb4");
+        $rows = $db->query("SELECT id, first_name_ar, first_name_fr, father_name_ar, father_name_fr, last_name_ar, last_name_fr FROM employees WHERE is_deleted = 0")->fetchAll(PDO::FETCH_ASSOC);
+        $ins = $db->prepare("INSERT INTO _names_fr_bk20261001 (employee_id, field, old_value, new_value, changed_at) VALUES (?,?,?,?,NOW())");
+        $n = 0; $emps = 0;
+        $db->beginTransaction();
+        foreach ($rows as $r) {
+            $set = [];
+            foreach ([['first_name_ar', 'first_name_fr', 'first'], ['father_name_ar', 'father_name_fr', 'first'], ['last_name_ar', 'last_name_fr', 'last']] as [$a, $f, $t]) {
+                $ar = trim((string)$r[$a]); $cur = trim((string)$r[$f]);
+                if (preg_match('/^[.\-\s]*$/', $cur)) $cur = ''; // «.» = خانة فارغة
+                if ($ar === '' || preg_match('/[A-Za-z]/', $ar) || !preg_match('/\p{Arabic}{2,}/u', $ar)) continue;
+                $new = arNameToFr($ar, $t);
+                if ($new === '' || mb_strtolower($new, 'UTF-8') === mb_strtolower($cur, 'UTF-8')) continue;
+                if ($cur !== '' && !in_array(mb_strtolower(preg_replace('/\s+/', ' ', $cur), 'UTF-8'), arFrAutoCandidates($ar, $t), true)) continue; // مكتوب بيده
+                $set[$f] = $new; $ins->execute([(int)$r['id'], $f, $cur, $new]); $n++;
+            }
+            if ($set) {
+                $db->prepare("UPDATE employees SET " . implode(', ', array_map(fn($k) => "$k = ?", array_keys($set))) . " WHERE id = ?")->execute(array_merge(array_values($set), [(int)$r['id']]));
+                $emps++;
+            }
+        }
+        $db->commit();
+        if ($n) logAudit('heal_names_fr', 'employees', 0, null, ['fields' => $n, 'employees' => $emps, 'backup' => '_names_fr_bk20261001']);
+        setSetting($flag, date('Y-m-d H:i') . " ($n خانة — $emps ملفاً)");
+    } catch (Throwable $e) {
+        try { if (isset($db) && $db->inTransaction()) $db->rollBack(); } catch (Throwable $e2) {}
+    }
+}
+
+/**
+ * 🗺️🔤 (2026-10-01 «الترجمة من العربي إلى الفرنسي تكون مظبوطة ما تضحك الأساتذة علينا»): تكملة قاموس الأماكن بكل محلّات
+ * الولادة/البلدات الموجودة فعلاً بملفات أساتذة السنة وكان النقل الاحتياطي يطلّعها بلا أحرف علّة (Dmchk, Tnourin, Kbiat…).
+ */
+function arPlaceDictExtra(): array {
+    return [
+        'مار موسى'=>'Mar Moussa','تنورين'=>'Tannourine','سرعين'=>'Saraïne','الليلكة'=>'Laylaké','الليلكي'=>'Laylaké','الليكي'=>'Laylaké',
+        'حارة حريك'=>'Haret Hreik','وادي بنحليه'=>'Wadi Bnahlé','المختارة'=>'Moukhtara','التل'=>'El Tall','تل'=>'Tall','الكويت'=>'Koweït',
+        'جوار النخل'=>'Jouar El Nakhl','حوش بردى'=>'Hoch Barada','جنينة ارسلان'=>'Jnaynet Arslan','العيشية'=>'Aïchiyeh',
+        'عين الرمانة'=>'Aïn El Remmaneh','عبن الرمانة'=>'Aïn El Remmaneh','شمسطار'=>'Chmestar','ميدان اكيس'=>'Midan Ekbes',
+        'دكار سينغال'=>'Dakar - Sénégal','دكار'=>'Dakar','سينغال'=>'Sénégal','البوار'=>'Bouar','القاهرة'=>'Le Caire','فيليبين'=>'Philippines',
+        'عين الريحانة'=>'Aïn El Rihaneh','عين الريحاني'=>'Aïn El Rihaneh','دمنيه شرقيه'=>'Doumaniyeh Charkiyeh','دمنية شرقية'=>'Doumaniyeh Charkiyeh',
+        'دمشق'=>'Damas','عمان'=>'Amman','غزة'=>'Gaza','بقسطا'=>'Bqosta','بقسطه'=>'Bqosta','عين القبو'=>'Aïn El Qabou',
+        'القرداحة'=>'Qardaha','تحويطة الغدير'=>'Tahwitet El Ghadir','تحويطة النهر'=>'Tahwitet El Nahr','رعيت'=>'Raït',
+        'عين دارة'=>'Aïn Dara','تل عباس'=>'Tall Abbas','بنغازي ليبيا'=>'Benghazi - Libye','بنغازي'=>'Benghazi','ليبيا'=>'Libye',
+        'كفرنيس'=>'Kfarniss','كفرقطرة'=>'Kfarqatra','بسوس'=>'Bsous','وجه الحجر'=>'Wajh El Hajar','معلولا'=>'Maaloula',
+        'الرجمة'=>'Rajmeh','تمنين'=>'Temnine','تمنين الفوقا'=>'Temnine El Faouqa','عجلتون'=>'Ajaltoun','دير دوريت'=>'Deir Dourit',
+        'خربة قنافار'=>'Kherbet Qanafar','رحبة'=>'Rahbeh','القبيات'=>'Qoubaiyat','دبين'=>'Debbine','حارة صخر'=>'Haret Sakhr',
+        'صفد الدوارة'=>'Safad El Dawara','القدام'=>'Qaddam','الهلالية'=>'Hlaliyeh','القبة'=>'Qobbeh','طرابلس'=>'Tripoli',
+        'بكيفا'=>'Bkifa','المية و مية'=>'Miyé ou Miyé','المية ومية'=>'Miyé ou Miyé','ميه وميه'=>'Miyé ou Miyé','مية ومية'=>'Miyé ou Miyé',
+        'سد البوشرية'=>'Sed El Bauchrieh','شدرا'=>'Chadra','القنطرة'=>'Qantara','شياح'=>'Chiyah','الشياح'=>'Chiyah',
+        'البوشرية'=>'Bauchrieh','البوسريه'=>'Bauchrieh','عندقت'=>'Andaqet','ضبية'=>'Dbayeh','جونية'=>'Jounieh','كفر جره'=>'Kfarjarra',
+        'كفرجره'=>'Kfarjarra','ديك المحدي'=>'Dik El Mehdi','المحاربية'=>'Mharbiyeh','روضة'=>'Rawda','الروضة'=>'Rawda',
+        'عدوسية'=>'Aadousiyeh','خزيز'=>'Khzaiz','خزير'=>'Khzaiz','الحدت'=>'Hadath','الجدث'=>'Hadath','الوسطاني'=>'Wastani',
+        'جسر الباشا'=>'Jisr El Bacha','كفر فالوس'=>'Kfarfalous','كفرفالوس'=>'Kfarfalous','بلونة'=>'Ballouneh','الجمهور'=>'Jamhour',
+        'شتورة'=>'Chtaura','منصورية'=>'Mansourieh','المنصورية'=>'Mansourieh','عين المرج'=>'Aïn El Marj','المرج'=>'El Marj',
+        'سعدنايل'=>'Saadnayel','خربة بسري'=>'Kherbet Bisri','عاريا'=>'Araya','بطشاية'=>'Btechay','بكاسين'=>'Bkassine',
+        'سيدة البشارة'=>"Notre-Dame de l'Annonciation",'سيدة النجاة'=>'Notre-Dame de la Délivrance','داريا'=>'Daraya','العبادية'=>'Abadiyeh',
+        'جدايل'=>'Jeddayel','جبيل'=>'Jbeil','قبلي'=>'Qebli','القناية'=>'Qennayeh','كرخا'=>'Karkha','حي'=>'Hay','الجورة'=>'Joura',
+        'المنارة'=>'Manara','صور'=>'Tyr','الكشك'=>'Kechek','دلبتا'=>'Dlebta','حوش الزراعنة'=>'Hoch El Zaraaneh','حوش الزراعة'=>'Hoch El Zaraaneh',
+        'معاصر الشوف'=>'Maasser El Chouf','العاقورة'=>'Aqoura','الغابات'=>'Ghabat','سرجبال'=>'Sirjbal','صفاريه'=>'Sfaray','صفاري'=>'Sfaray',
+        'الفرزل'=>'Ferzol','الفزل'=>'Ferzol','مار انطونيوس'=>'Mar Antonios','مار نقولا'=>'Mar Nicolas','يبرود'=>'Yabroud',
+        'تل جيلو'=>'Tall Jilo','بشري'=>'Bcharré','المجيدل'=>'Mjeidel','قتالة'=>'Qtaleh','قيمرية'=>'Qaymariyeh','اللبوة'=>'Laboueh',
+        'اللبوه'=>'Laboueh','المشارفة'=>'Mcharfeh','جوسيه'=>'Joussieh','الحمصية'=>'Homsiyeh','بمهريه'=>'Bmahray','راشانا'=>'Rachana',
+        'برج البراجنة'=>'Bourj El Barajneh','برج الراجنة'=>'Bourj El Barajneh','بحمدون'=>'Bhamdoun','زحلتا'=>'Zahalta','الصويري'=>'Souairi',
+        'بيت لهيا'=>'Beit Lahia','نيحا'=>'Niha','المحفارة'=>'Mahfara','حومال'=>'Houmal','عجبل'=>'Ajbel','عشاش'=>'Aachach',
+        'وادي شحرور العليا'=>'Wadi Chahrour El Olya','العليا'=>'El Olya','ضهور'=>'Dhour','القرداحه'=>'Qardaha',
+        'جون'=>'Joun','عين'=>'Aïn','وادي'=>'Wadi','حوش'=>'Hoch','خربة'=>'Kherbet','برج'=>'Bourj','كفر'=>'Kfar','بيت'=>'Beit','دير'=>'Deir',
+    ];
 }
 
 /**
@@ -279,6 +468,7 @@ function arPlaceDict() {
         'حي'=>'Hay','حارة'=>'Haret','شارع'=>'Rue','طريق'=>'Route','طابق'=>'Étage','بناية'=>'Imm.',
         'عمارة'=>'Imm.','التحتا'=>'El Tahta','الفوقا'=>'El Faouqa','التحتاني'=>'El Tahtani','الفوقاني'=>'El Faouqani',
     ];
+    $raw += arPlaceDictExtra(); // 🗺️🔤 (2026-10-01) تكملة: محلّات ولادة/بلدات أساتذة السنة (القديم له الأولوية)
     $d = [];
     foreach ($raw as $k => $v) { $d[str_replace('ة', 'ه', arFrNormalize($k))] = $v; }
     return $d;

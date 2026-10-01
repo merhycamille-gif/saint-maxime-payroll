@@ -416,18 +416,16 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
             <input type="hidden" name="action" value="open">
             <div class="form-row cols-2">
                 <?php if (isSuperAdmin()): ?>
-                <div class="form-group mb-0">
+                <div class="form-group mb-0" style="grid-column:1/-1">
                     <label class="form-label">المدارس / Écoles — أشّر الكل أو اختر</label>
-                    <div style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;background:#fff">
-                        <label style="display:block;cursor:pointer;margin:2px 0;font-weight:700;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px">
+                    <div class="school-checks"><?php /* 📐 (2026-10-01 «رتّب الكبسات بكل البرنامج»): نفس حبوب اختيار المدارس بباقي البرنامج بدل خانات عادية */ ?>
+                        <label class="chk all">
                             <input type="checkbox" id="oy_all" name="all_schools" value="1" checked onchange="document.querySelectorAll('#openYearForm input[name=&quot;school_ids[]&quot;]').forEach(function(c){c.checked=this.checked;c.disabled=this.checked;}.bind(this))" title="مؤشَّر = كل المدارس؛ شيل الصحّ واختر"> 🌐 كل المدارس دفعة وحدة / Toutes les écoles
                         </label>
-                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:2px 14px">
-                        <?php foreach (allSchools() as $s): ?>
-                            <label style="display:block;cursor:pointer;margin:2px 0"><input type="checkbox" name="school_ids[]" value="<?= (int)$s['id'] ?>" checked disabled> <?= e($s['name_ar'] ?: $s['name_fr']) ?></label>
+                                                <?php foreach (allSchools() as $s): ?>
+                            <label class="chk"><input type="checkbox" name="school_ids[]" value="<?= (int)$s['id'] ?>" checked disabled> <?= e($s['name_ar'] ?: $s['name_fr']) ?></label>
                         <?php endforeach; ?>
-                        </div>
-                        <small style="color:#64748b;display:block;margin-top:6px">شيل صحّ «كل المدارس» لتختار مدرسة أو أكثر.</small>
+                        <small style="color:#64748b;display:block;grid-column:1/-1">شيل صحّ «كل المدارس» لتختار مدرسة أو أكثر.</small>
                     </div>
                 </div>
                 <?php else: ?>

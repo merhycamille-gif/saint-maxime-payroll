@@ -1846,3 +1846,8 @@ form[method="GET" i] .form-row:has(> .form-group > .btn), form[method="GET" i].f
 .btn-bar > .btn-bar-end { display: contents; }
 .btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px 12px; }
 .btn-grid > .btn { display: flex; align-items: center; justify-content: center; text-align: center; white-space: normal; margin: 0; }
+/*      (د) خانة الإجراءات بالجداول: أزرارها بسطر واحد لا مكدّسة فوق بعضها · شريط القفل «مقفَّل/تعديل» يأخذ سطره كاملاً داخل أي فورم
+ *          flex/grid · لائحة مدارس فتح السنة بنفس حبوب باقي البرنامج. */
+.table td:last-child:has(> .btn + .btn) { white-space: nowrap; }
+form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-sizing: border-box; }
+.school-checks .chk:has(input:disabled) { opacity: .75; cursor: default; }
