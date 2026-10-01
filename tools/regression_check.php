@@ -9339,7 +9339,8 @@ $c213 = arFrAutoCandidates('حسن', 'first');
 $src213 = (string)file_get_contents($PROJ . '/includes/translit_ar_fr.php');
 $ok213 = !$bad213 && in_array('hsn', $c213, true) && !in_array('hassane', $c213, true)
     && strpos($src213, "if (\$cur !== '' && !in_array(mb_strtolower(preg_replace('/\s+/', ' ', \$cur), 'UTF-8'), arFrAutoCandidates(\$ar, \$t), true)) continue; // مكتوب بيده") !== false
-    && strpos($src213, 'CREATE TABLE IF NOT EXISTS _names_fr_bk20261001') !== false; // ⏳ الشفاء غير موصول بالهيدر بعد — بانتظار موافقة المستخدم على تصحيح الأسماء المخزّنة أونلاين
+    && strpos($src213, 'CREATE TABLE IF NOT EXISTS _names_fr_bk20261001') !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healNamesFr20261001();') !== false; // موصول بموافقته («صحّح الأسماء»)
 // حيّاً: لا اسم فرنسي بلا أي حرف علّة (≥3 أحرف) بين أساتذة السنة بعد الشفاء
 $nv213 = [];
 if (getSetting('names_fr_healed_20261001', '') !== '') {
