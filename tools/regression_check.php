@@ -9389,6 +9389,18 @@ $ok215 = strpos($css215, '.main-content .tabs { position: sticky; top: var(--msa
     && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), '<form method="POST" enctype="multipart/form-data" id="empForm"') !== false;
 check('📌 شريط تبويبات ملف الموظف ثابت مع النزول (كل التبويبات، والدرجات) ورؤوس الجداول تلتصق تحته (2026-10-01)', $ok215);
 
+/* =====================================================================
+ * 218) 🎨 (2026-10-02 p1 «شوف الألوان للأيقونات كيف منسّقة، عمول البرنامج متلها»): أيقونات البرنامج مربّعات بلون كامل
+ *      وأيقونة بيضاء، من لوحة واحدة متناسقة (--ic1 … --ic6) تتوالى على البلاطات — شاشة فقط.
+ * =================================================================== */
+$css218 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$ok218 = strpos($css218, ':root { --ic1: #e06666; --ic2: #4a7abf; --ic3: #eebf2c; --ic4: #8e44ad; --ic5: #2bab99; --ic6: #4a86b8; }') !== false
+    && strpos($css218, '.dash-link .dl-ic, .report-card-icon, .dash-kpi .dk-ic, .dash-meta .dm-ic, .dash-sec-head .ds-ic, .reg-details .rd-ic, .stat-icon, .card-header h3 i, .sidebar-nav a > i:first-child {') !== false
+    && preg_match('/\.sidebar-nav a > i:first-child \{\s*background-color: var\(--ic, [^;]*\) !important;[^}]*color: #fff !important;/s', $css218) === 1
+    && substr_count($css218, '.dash-links > .dash-link:nth-child(6n+') === 6
+    && strpos($css218, 'border-bottom-color: var(--ic);') !== false;
+check('🎨 أيقونات البرنامج بألوان متناسقة (لوحة p1: مربّع بلون كامل + أيقونة بيضاء، ستّة ألوان تتوالى) (2026-10-02)', $ok218);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

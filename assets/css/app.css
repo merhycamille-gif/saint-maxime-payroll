@@ -1905,3 +1905,45 @@ form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-siz
     body.doc-view { background: #fff; --surface: #fff; --surface2: #f8fafc; --surface3: #f1f5f9; --surface-line: #e2e8f0; }
     .salcomp-bar .school-checks { background-color: transparent !important; }
 }
+
+/* =====================================================================
+ * 218) 🎨 (2026-10-02 p1 «شوف الألوان للأيقونات كيف منسّقة، عمول البرنامج متلها» — بلاطات موقع وزارة المالية):
+ *      كل أيقونة بالبرنامج مربّع بلون كامل وأيقونة بيضاء، والألوان لوحة واحدة متناسقة من ستّة تتوالى على البلاطات
+ *      (مرجاني · أزرق · أصفر · بنفسجي · أخضر مائي · أزرق فولاذي). لتغيير أي لون: عدّل --ic1 … --ic6 فقط. شاشة فقط.
+ * =================================================================== */
+:root { --ic1: #e06666; --ic2: #4a7abf; --ic3: #eebf2c; --ic4: #8e44ad; --ic5: #2bab99; --ic6: #4a86b8; }
+@media screen {
+    /* توالي الألوان على البلاطات/الروابط المتجاورة */
+    .dash-links > .dash-link:nth-child(6n+1), .report-grid > .report-card:nth-child(6n+1), .dash-kpis > .dash-kpi:nth-child(6n+1), .dash-meta > .dm-item:nth-child(6n+1), .sidebar-nav a:nth-of-type(6n+1), .stat-icon.gold { --ic: var(--ic1); }
+    .dash-links > .dash-link:nth-child(6n+2), .report-grid > .report-card:nth-child(6n+2), .dash-kpis > .dash-kpi:nth-child(6n+2), .dash-meta > .dm-item:nth-child(6n+2), .sidebar-nav a:nth-of-type(6n+2), .stat-icon.primary { --ic: var(--ic2); }
+    .dash-links > .dash-link:nth-child(6n+3), .report-grid > .report-card:nth-child(6n+3), .dash-kpis > .dash-kpi:nth-child(6n+3), .dash-meta > .dm-item:nth-child(6n+3), .sidebar-nav a:nth-of-type(6n+3), .stat-icon.warning { --ic: var(--ic3); }
+    .dash-links > .dash-link:nth-child(6n+4), .report-grid > .report-card:nth-child(6n+4), .dash-kpis > .dash-kpi:nth-child(6n+4), .dash-meta > .dm-item:nth-child(6n+4), .sidebar-nav a:nth-of-type(6n+4) { --ic: var(--ic4); }
+    .dash-links > .dash-link:nth-child(6n+5), .report-grid > .report-card:nth-child(6n+5), .dash-kpis > .dash-kpi:nth-child(6n+5), .dash-meta > .dm-item:nth-child(6n+5), .sidebar-nav a:nth-of-type(6n+5), .stat-icon.success { --ic: var(--ic5); }
+    .dash-links > .dash-link:nth-child(6n+6), .report-grid > .report-card:nth-child(6n+6), .dash-kpis > .dash-kpi:nth-child(6n+6), .dash-meta > .dm-item:nth-child(6n+6), .sidebar-nav a:nth-of-type(6n+6), .stat-icon.info { --ic: var(--ic6); }
+    /* المربّع الملوَّن: لون كامل + أيقونة بيضاء + تجسيم خفيف (نافر كباقي البرنامج) */
+    .dash-link .dl-ic, .report-card-icon, .dash-kpi .dk-ic, .dash-meta .dm-ic, .dash-sec-head .ds-ic, .reg-details .rd-ic, .stat-icon, .card-header h3 i, .sidebar-nav a > i:first-child {
+        background-color: var(--ic, var(--sec-c, var(--accent, var(--ic2)))) !important;
+        background-image: linear-gradient(180deg, rgba(255, 255, 255, .22) 0%, rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, .10) 100%) !important;
+        color: #fff !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 2px 4px rgba(15, 23, 42, .22);
+        text-shadow: 0 1px 1px rgba(0, 0, 0, .22);
+    }
+    .reg-details .rd-ic { --ic: var(--ic1); }
+    .reg-details:nth-of-type(2n) .rd-ic { --ic: var(--ic4); }
+    .reg-details:nth-of-type(3n) .rd-ic { --ic: var(--ic5); }
+    .dash-link .dl-ic { width: 38px; height: 38px; min-width: 38px; border-radius: 9px; font-size: 16px; }
+    .report-card-icon { width: 46px; height: 46px; border-radius: 10px; font-size: 20px; }
+    .dash-kpi .dk-ic { font-size: 21px; }
+    .dash-meta .dm-ic { font-size: 15px; }
+    .sidebar-nav a > i:first-child { width: 24px; height: 24px; min-width: 24px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; opacity: 1; margin-inline: -3px -2px; }
+    /* البلاطة نفسها بلمسة من لون أيقونتها وحافّتها السفلية بلونها */
+    .dash-links > .dash-link, .report-grid > .report-card {
+        background-image: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--ic) 8%, #fff) 50%, color-mix(in srgb, var(--ic) 20%, #fff) 100%);
+        border-color: color-mix(in srgb, var(--ic) 38%, #fff);
+        border-bottom-color: var(--ic);
+    }
+    .dash-links > .dash-link:hover, .report-grid > .report-card:hover {
+        background-image: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--ic) 16%, #fff) 50%, color-mix(in srgb, var(--ic) 32%, #fff) 100%);
+        border-color: var(--ic);
+    }
+}
