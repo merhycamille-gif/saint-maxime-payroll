@@ -9611,6 +9611,25 @@ $ok232 = preg_match('/^\s*monthStaleScanStep\(/m', $hd232) === 0
     && $sgA232 === $sgB232 && $sgA232 !== 'none' && is_bool(monthStaleScanDue());
 check('🚀 الفحص الشامل الدوري بنبض خلفي لا داخل الصفحة + البصمة على محتوى نتائجه (الكاش يصيب أثناء الجولة) (2026-10-02)', $ok232, 'sig=' . $sgA232);
 
+/* =====================================================================
+ * 233) 📅🎓 (2026-10-02 «كامل متكامل ما في ولا خطأ» — الفحص الرسمي أونلاين: 220 ملاكاً درجتهم الحالية ≠ آخر درجة بسجلّهم بعد 1/10):
+ *      healCurrentGradeAsOfToday يومياً يرفع «الدرجة الحالية» لآخر درجة سارية اليوم بالسجلّ (لا يُنزّل، لا يلمس السجلّ/الرواتب،
+ *      نسخة احتياطية بـ_bk_current_grade_sync). تجربة حيّة: بعده لا ملاك فاعل درجته الحالية **أدنى** من آخر درجة سارية بسجلّه.
+ * =================================================================== */
+$fn233 = (string)file_get_contents($PROJ . '/includes/functions.php');
+setSetting('grade_asof_synced_on', ''); healCurrentGradeAsOfToday();
+$low233 = (int)$db->query("SELECT COUNT(*) FROM (SELECT e.id, e.current_grade cg,
+        (SELECT h.grade_after FROM employee_grade_history h WHERE h.employee_id = e.id AND (h.counted = 1 OR h.reason = 'titularization') AND h.change_date <= CURDATE() ORDER BY h.change_date DESC, h.id DESC LIMIT 1) g1,
+        (SELECT h.grade_after FROM employee_grade_history h WHERE h.employee_id = e.id AND h.grade_after >= 1 AND h.change_date <= CURDATE() ORDER BY h.change_date DESC, h.id DESC LIMIT 1) g2
+    FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.status = 'actif'
+    HAVING g1 IS NOT NULL AND g2 IS NOT NULL AND ABS(g1 - g2) < 0.01 AND g1 - cg > 0.01) x")->fetchColumn();
+$ok233 = strpos($fn233, 'function healCurrentGradeAsOfToday(): void {') !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healCurrentGradeAsOfToday();') !== false
+    && strpos($fn233, 'AND ABS(g1 - g2) < 0.01 AND g1 - cg > 0.01') !== false          // لا تنزيل، والتعريفان متّفقان
+    && strpos($fn233, 'INSERT INTO _bk_current_grade_sync (employee_id, old_grade, new_grade, synced_at)') !== false
+    && (string)getSetting('grade_asof_synced_on', '') === date('Y-m-d') && $low233 === 0;
+check('📅🎓 «الدرجة الحالية» بملف الملاك تلحق يومياً آخر درجة سارية بسجلّه (1/10 و1/1) — بلا تنزيل وبلا مسّ السجلّ/الرواتب (2026-10-02)', $ok233, 'below=' . $low233);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

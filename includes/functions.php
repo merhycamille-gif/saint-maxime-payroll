@@ -1828,6 +1828,46 @@ function monthStaleYears(): array {
     $from = lawEnforceFromSy();
     return array_values(array_filter([($m[1] - 1) . '-' . ($m[2] - 1), $cur], fn($y) => $y >= $from)) ?: [$cur];
 }
+/**
+ * 📅🎓 شفاء ذاتي **يومي** (2026-10-02 — «البرنامج بدو يكون كامل متكامل ما في ولا خطأ»، كُشف بالفحص الرسمي أونلاين: 220 أستاذ ملاك
+ * «الدرجة الحالية ≠ آخر درجة بسجلّ درجاته»): صفوف الدرجات المؤرّخة مسبقاً (تدرّج 1/10 واستثنائية 1/1 من «فتح السنة») تبدأ بتاريخها،
+ * والرواتب تُحسب منها صحيحة — لكن خانة «الدرجة الحالية» بملف الأستاذ (employees.current_grade) لم يكن شيء يحدّثها حين يحلّ التاريخ،
+ * فبقيت على درجة السنة الماضية (تظهر بلائحة الموظفين والبطاقات، وأي إعادة بناء للدرجات كانت ستخسّره نصف درجة).
+ * الآن، مرّة كل يوم: لكل أستاذ ملاك فاعل، إن كانت آخر درجة سارية اليوم بسجلّه **أعلى** من الدرجة الحالية بملفه ⇒ تُرفَع إليها.
+ *  - لا يلمس سجلّ الدرجات ولا أي راتب (الرواتب أصلاً على درجة السجلّ)؛ لا يُنزّل درجة أبداً (درجة بالملف أعلى من السجلّ = قرار المستخدم).
+ *  - التعريفان المستعملان بالبرنامج لـ«آخر درجة سارية» (الفحص الرسمي + المحرّك) يجب أن يتّفقا للأستاذ وإلا يُترك للمراجعة.
+ *  - القيم القديمة تُحفظ بجدول _bk_current_grade_sync (للرجوع) + سطر بسجلّ التدقيق.
+ */
+function healCurrentGradeAsOfToday(): void {
+    static $ran = false;
+    if ($ran) return;
+    $ran = true;
+    try {
+        $today = date('Y-m-d');
+        if ((string)getSetting('grade_asof_synced_on', '') === $today) return;
+        $db = getDB();
+        $rows = $db->query("SELECT e.id, e.current_grade cg,
+                (SELECT h.grade_after FROM employee_grade_history h WHERE h.employee_id = e.id AND (h.counted = 1 OR h.reason = 'titularization') AND h.change_date <= CURDATE() ORDER BY h.change_date DESC, h.id DESC LIMIT 1) g1,
+                (SELECT h.grade_after FROM employee_grade_history h WHERE h.employee_id = e.id AND h.grade_after >= 1 AND h.change_date <= CURDATE() ORDER BY h.change_date DESC, h.id DESC LIMIT 1) g2
+            FROM employees e WHERE e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND e.status = 'actif'
+            HAVING g1 IS NOT NULL AND g2 IS NOT NULL AND ABS(g1 - g2) < 0.01 AND g1 - cg > 0.01")->fetchAll(PDO::FETCH_ASSOC);
+        if ($rows) {
+            $db->exec("CREATE TABLE IF NOT EXISTS _bk_current_grade_sync (id INT AUTO_INCREMENT PRIMARY KEY, employee_id INT NOT NULL, old_grade DECIMAL(5,1) NULL, new_grade DECIMAL(5,1) NULL, synced_at DATETIME NOT NULL, KEY (employee_id)) DEFAULT CHARSET=utf8mb4");
+            $bk = $db->prepare("INSERT INTO _bk_current_grade_sync (employee_id, old_grade, new_grade, synced_at) VALUES (?, ?, ?, NOW())");
+            $up = $db->prepare("UPDATE employees SET current_grade = ? WHERE id = ? AND ABS(current_grade - ?) < 0.01");
+            $n = 0;
+            foreach ($rows as $r) {
+                $bk->execute([(int)$r['id'], (float)$r['cg'], (float)$r['g1']]);
+                $up->execute([(float)$r['g1'], (int)$r['id'], (float)$r['cg']]);
+                $n += $up->rowCount();
+            }
+            if ($n && function_exists('logAudit')) logAudit('grade_asof_sync', 'employees', 0, null, ['count' => $n, 'date' => $today]);
+            setSetting('grade_asof_sync_last', $today . ': ' . $n);
+        }
+        setSetting('grade_asof_synced_on', $today);
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد بالفتحة التالية */ }
+}
+
 /** هل للفحص الشامل الدوري دفعة مستحقّة الآن؟ (نفس بوّابة monthStaleScanStep — تُستعمل بالتذييل ليقرّر تشغيل النبض الخلفي) */
 function monthStaleScanDue(int $hours = 3): bool {
     try {
