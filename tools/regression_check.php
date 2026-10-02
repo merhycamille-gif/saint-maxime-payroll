@@ -9480,6 +9480,18 @@ $ok223 = strpos($fn223, "if (\$on === null) \$on = PHP_SAPI !== 'cli' && ((\$_SE
     && msaLookupOn() === false && $v223a === $v223b && $v223a > 0;   // الفحص الشامل نفسه (CLI) بلا ذاكرة
 check('🚀 ذاكرة القراءة للطلب الواحد: جداول القانون/أسعار الصرف/أولاد الموظف — GET فقط، تُفرَّغ عند الكتابة، والـCLI طازج (2026-10-02)', $ok223);
 
+/* =====================================================================
+ * 224) 🚀 (2026-10-02 «سرعة صاروخ»): قياس الطباعة (fitPrintZoom) لا يشتغل عند فتح كل صفحة — فقط قبل الطباعة وقبل تصوير الـPDF
+ *      (pdf-save ينادي msaFitPrintZoom)، وأدوات الطباعة الآلية (webdriver/Headless) تقيس عند الفتح كما كان.
+ * =================================================================== */
+$js224 = (string)file_get_contents($PROJ . '/assets/js/app.js'); $ps224 = (string)file_get_contents($PROJ . '/assets/js/pdf-save.js');
+$ok224 = strpos($js224, 'window.msaFitPrintZoom = fitPrintZoom;') !== false
+    && strpos($js224, "if (navigator.webdriver || /HeadlessChrome/.test(navigator.userAgent || '')) {") !== false
+    && strpos($js224, "window.addEventListener('resize', fitPrintZoom);") === false
+    && strpos($js224, "window.addEventListener('beforeprint', fitPrintZoom);") !== false
+    && substr_count($ps224, 'if (window.msaFitPrintZoom) window.msaFitPrintZoom();') === 2;
+check('🚀 قياس الطباعة عند الحاجة فقط (قبل الطباعة/تصوير PDF) لا عند فتح كل صفحة (2026-10-02)', $ok224);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

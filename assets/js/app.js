@@ -180,10 +180,21 @@ window.msaFitScreenTables = function () {
             }
         }
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initStickyHeads);
-    else initStickyHeads();
-    window.addEventListener('load', initStickyHeads);   // بعد الخطوط/الصور وملاءمة fitDocTables
-    window.addEventListener('resize', initStickyHeads);
+    // 🚀 (2026-10-02 «سرعة صاروخ»): الجولة الثانية عند load (بعد الخطوط/الصور وملاءمة fitDocTables) تُعاد فقط إن تغيّر مقاس
+    // جدول أو حاويته منذ الجولة الأولى — كانت تُعاد دائماً فتضاعف وقت الجداول الكبيرة. وتغيير المقاس يُجمَّع (150ms).
+    var stkSig = '';
+    function stkSignature() {
+        var ts = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, table.xlsf'), a = [window.innerWidth];
+        for (var i = 0; i < ts.length; i++) { var h = ts[i].parentElement; a.push(ts[i].scrollWidth + '/' + (h ? h.clientWidth : 0) + '/' + (ts[i].tHead ? ts[i].tHead.offsetHeight : 0)); }
+        return a.join(',');
+    }
+    function stkRun() { initStickyHeads(); stkSig = stkSignature(); }
+    function stkRunIfChanged() { if (stkSignature() !== stkSig) stkRun(); }
+    var stkTimer = 0;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', stkRun);
+    else stkRun();
+    window.addEventListener('load', stkRunIfChanged);
+    window.addEventListener('resize', function () { clearTimeout(stkTimer); stkTimer = setTimeout(stkRun, 150); });
     window.addEventListener('scroll', stickXHeads, { passive: true });
 })();
 
@@ -369,11 +380,17 @@ window.msaFitScreenTables = function () {
             }
         }
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitPrintZoom);
-    else fitPrintZoom();
-    window.addEventListener('load', fitPrintZoom);
-    window.addEventListener('resize', fitPrintZoom);
+    // 🚀 (2026-10-02 «بدي سرعة البرنامج صاروخ»): قياس الطباعة كان يشتغل عند فتح كل صفحة (مرّتين + عند كل تغيير مقاس) ويجمّد
+    // المتصفّح ~ثانية بالجداول الكبيرة مع أنّ أحداً لا يطبع. الآن يشتغل فقط حين يلزم: قبل الطباعة (beforeprint)، وقبل تصوير
+    // «PDF عالكمبيوتر» (pdf-save.js ينادي msaFitPrintZoom). أدوات الطباعة الآلية (PDF رسمي عبر Chrome/الفحوص) تقيس عند الفتح كما كان.
+    window.msaFitPrintZoom = fitPrintZoom;
+    if (navigator.webdriver || /HeadlessChrome/.test(navigator.userAgent || '')) {
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitPrintZoom);
+        else fitPrintZoom();
+        window.addEventListener('load', fitPrintZoom);
+    }
     window.addEventListener('beforeprint', fitPrintZoom);
+    if (window.matchMedia) { try { window.matchMedia('print').addListener(function (m) { if (m.matches) fitPrintZoom(); }); } catch (e) {} }
 })();
 
 // 🏷️ عنوان التقرير على كل ورقة مطبوعة (طلب المستخدم 2026-08-04):
