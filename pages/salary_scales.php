@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$from) throw new Exception('تاريخ البداية مطلوب');
 
             $db->beginTransaction();
-            $db->prepare("INSERT INTO salary_scale_versions (name_ar, name_fr, effective_from, effective_to, notes) VALUES (?,?,?,?,?)")
+            msaLookupFlush(); $db->prepare("INSERT INTO salary_scale_versions (name_ar, name_fr, effective_from, effective_to, notes) VALUES (?,?,?,?,?)")
                ->execute([$nameAr, $nameFr, $from, $to, $notes]);
             $newId = (int)$db->lastInsertId();
             // نسخ صفوف السلسلة من إصدار مصدر (لتعديلها بعدها)
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // إقفال الإصدار السابق المفتوح تلقائياً في اليوم السابق لبداية الجديد (اختياري وآمن)
             $prevDay = date('Y-m-d', strtotime($from . ' -1 day'));
-            $db->prepare("UPDATE salary_scale_versions SET effective_to = ? WHERE id <> ? AND effective_to IS NULL AND effective_from < ?")
+            msaLookupFlush(); $db->prepare("UPDATE salary_scale_versions SET effective_to = ? WHERE id <> ? AND effective_to IS NULL AND effective_from < ?")
                ->execute([$prevDay, $newId, $from]);
             $db->commit();
             $nRec = recalcSalariesInRange($db, $from, $to); // إعادة حساب مدى الإصدار الجديد
@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'save_meta') {
             $id = (int)$_POST['id'];
-            $db->prepare("UPDATE salary_scale_versions SET name_ar=?, name_fr=?, effective_from=?, effective_to=?, notes=?, is_active=? WHERE id=?")
+            msaLookupFlush(); $db->prepare("UPDATE salary_scale_versions SET name_ar=?, name_fr=?, effective_from=?, effective_to=?, notes=?, is_active=? WHERE id=?")
                ->execute([
                    trim($_POST['name_ar']), trim($_POST['name_fr']),
                    $_POST['effective_from'] ?: null, $_POST['effective_to'] ?: null,
@@ -103,7 +103,7 @@ if (isset($_GET['delete_version'])) {
         $vr = $db->prepare("SELECT effective_from, effective_to FROM salary_scale_versions WHERE id = ?");
         $vr->execute([$id]); $vrr = $vr->fetch();
         $db->prepare("DELETE FROM salary_scale_2017 WHERE version_id = ?")->execute([$id]);
-        $db->prepare("DELETE FROM salary_scale_versions WHERE id = ?")->execute([$id]);
+        msaLookupFlush(); $db->prepare("DELETE FROM salary_scale_versions WHERE id = ?")->execute([$id]);
         $nRec = $vrr ? recalcSalariesInRange($db, $vrr['effective_from'], $vrr['effective_to']) : 0;
         $_SESSION['flash_success'] = "تم حذف الإصدار، وأُعيد حساب $nRec راتب تلقائياً / Version supprimée";
     }

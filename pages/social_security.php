@@ -44,10 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $db->prepare("UPDATE cnss_brackets SET branch=?, max_salary_lbp=?, min_salary_lbp=?, effective_from=?, effective_to=?, notes=? WHERE id=?")
+                msaLookupFlush(); $db->prepare("UPDATE cnss_brackets SET branch=?, max_salary_lbp=?, min_salary_lbp=?, effective_from=?, effective_to=?, notes=? WHERE id=?")
                    ->execute([$branch, $max, $min, $from, $to, $notes, $id]);
             } else {
-                $db->prepare("INSERT INTO cnss_brackets (branch, max_salary_lbp, min_salary_lbp, effective_from, effective_to, notes) VALUES (?,?,?,?,?,?)")
+                msaLookupFlush(); $db->prepare("INSERT INTO cnss_brackets (branch, max_salary_lbp, min_salary_lbp, effective_from, effective_to, notes) VALUES (?,?,?,?,?,?)")
                    ->execute([$branch, $max, $min, $from, $to, $notes]);
             }
             $nRec = recalcSalariesInRange($db, $from, $to); // إعادة حساب تلقائية للمدى المتأثّر
@@ -64,7 +64,7 @@ if (isset($_GET['delete'])) {
     requireWriteAction(); // 🔒 قراءة-فقط ممنوع + مصدر داخلي فقط
     $r = $db->prepare("SELECT effective_from, effective_to FROM cnss_brackets WHERE id = ?");
     $r->execute([(int)$_GET['delete']]); $rr = $r->fetch();
-    $db->prepare("DELETE FROM cnss_brackets WHERE id = ?")->execute([(int)$_GET['delete']]);
+    msaLookupFlush(); $db->prepare("DELETE FROM cnss_brackets WHERE id = ?")->execute([(int)$_GET['delete']]);
     $nRec = $rr ? recalcSalariesInRange($db, $rr['effective_from'], $rr['effective_to']) : 0;
     $_SESSION['flash_success'] = "تم الحذف، وأُعيد حساب $nRec راتب تلقائياً / Supprimé";
     header('Location: ' . BASE_URL . 'pages/social_security.php');

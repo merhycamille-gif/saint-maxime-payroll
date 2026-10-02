@@ -9492,6 +9492,24 @@ $ok224 = strpos($js224, 'window.msaFitPrintZoom = fitPrintZoom;') !== false
     && substr_count($ps224, 'if (window.msaFitPrintZoom) window.msaFitPrintZoom();') === 2;
 check('🚀 قياس الطباعة عند الحاجة فقط (قبل الطباعة/تصوير PDF) لا عند فتح كل صفحة (2026-10-02)', $ok224);
 
+/* =====================================================================
+ * 225) 🚀 (2026-10-02 «عمول كل شي صح»): ذاكرة الطلب تشمل النِّسَب المؤرّخة وحدود الضمان وإصدار السلسلة وقوانين الدرجات،
+ *      وزرع جدول الاقتراحات مرّة واحدة لا عند كل صفحة. نفس النتائج (الدوال الخام __raw لم تتغيّر).
+ * =================================================================== */
+$fn225 = (string)file_get_contents($PROJ . '/includes/functions.php'); $pc225 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$m225 = (int)date('n'); $y225 = (int)date('Y');
+$ok225 = strpos($fn225, 'function getRateAsOf__raw($key, $month = null, $year = null, $default = null) {') !== false
+    && strpos($fn225, 'function getCnssBracket__raw($branch, $month = null, $year = null) {') !== false
+    && strpos($fn225, 'function scaleVersionIdAsOf__raw($asOfDate = null) {') !== false
+    && strpos($pc225, "\$giM['autolaws'] = \$autoLawRows;") !== false
+    && strpos($fn225, "if (getSetting('tax_suggestions_seeded_20260823', '') !== '') return;") !== false
+    && getRateAsOf('cnss_employee_rate', $m225, $y225) === getRateAsOf__raw('cnss_employee_rate', $m225, $y225)
+    && getCnssBracket('maladie_maternite', $m225, $y225) == getCnssBracket__raw('maladie_maternite', $m225, $y225)
+    && scaleVersionIdAsOf() === scaleVersionIdAsOf__raw()
+    && strpos((string)file_get_contents($PROJ . '/pages/rates_history.php'), 'msaLookupFlush(); $db->prepare("UPDATE rate_history SET') !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/social_security.php'), 'msaLookupFlush(); $db->prepare("UPDATE cnss_brackets SET') !== false;
+check('🚀 ذاكرة الطلب للنِّسَب المؤرّخة/حدود الضمان/السلسلة/قوانين الدرجات + زرع الاقتراحات مرّة واحدة (2026-10-02)', $ok225);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

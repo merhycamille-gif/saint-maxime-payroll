@@ -37,10 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $db->prepare("UPDATE rate_history SET param_key=?, value=?, effective_from=?, effective_to=?, notes=? WHERE id=?")
+                msaLookupFlush(); $db->prepare("UPDATE rate_history SET param_key=?, value=?, effective_from=?, effective_to=?, notes=? WHERE id=?")
                    ->execute([$key, $value, $from, $to, $notes, $id]);
             } else {
-                $db->prepare("INSERT INTO rate_history (param_key, value, effective_from, effective_to, notes) VALUES (?,?,?,?,?)")
+                msaLookupFlush(); $db->prepare("INSERT INTO rate_history (param_key, value, effective_from, effective_to, notes) VALUES (?,?,?,?,?)")
                    ->execute([$key, $value, $from, $to, $notes]);
             }
             syncCurrentRatesToSettings(); // حدّث القيم الحالية المعروضة باللوحة
@@ -58,7 +58,7 @@ if (isset($_GET['delete'])) {
     requireWriteAction(); // 🔒 قراءة-فقط ممنوع + مصدر داخلي فقط
     $r = $db->prepare("SELECT effective_from, effective_to FROM rate_history WHERE id = ?");
     $r->execute([(int)$_GET['delete']]); $rr = $r->fetch();
-    $db->prepare("DELETE FROM rate_history WHERE id = ?")->execute([(int)$_GET['delete']]);
+    msaLookupFlush(); $db->prepare("DELETE FROM rate_history WHERE id = ?")->execute([(int)$_GET['delete']]);
     syncCurrentRatesToSettings();
     $nRec = $rr ? recalcSalariesInRange($db, $rr['effective_from'], $rr['effective_to']) : 0;
     $_SESSION['flash_success'] = "تم الحذف، وأُعيد حساب $nRec راتب تلقائياً / Supprimé";

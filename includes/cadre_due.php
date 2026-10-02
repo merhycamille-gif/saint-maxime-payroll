@@ -91,12 +91,16 @@ function schoolCadrePercent(PDO $db, int $schoolId, string $sy): ?array {
 
 /** خطوط النقل الفاعلة (نقل يومي/تعويض نقل) لأستاذ بسنة — قائمة موحَّدة الشكل للمقارنة والنسخ */
 function cadreDueTransportLines(PDO $db, int $empId, string $sy): array {
+    // 🚀 ذاكرة الطلب (GET فقط): قالب نقل المدرسة يمرّ على ملاكها لكل مرشَّح — كان السؤال نفسه يتكرّر مئات المرّات
+    $tlOn = function_exists('msaLookupOn') && msaLookupOn(); $tlK = 'tl|' . $empId . '|' . $sy;
+    if ($tlOn) { $tlM = &msaLookupMemo(); if (isset($tlM[$tlK])) return $tlM[$tlK]; }
     $st = $db->prepare("SELECT bonus_type, amount, value_type, currency, COALESCE(start_month,0) sm, COALESCE(end_month,0) em FROM employee_bonuses
                         WHERE employee_id = ? AND school_year = ? AND is_active = 1 AND amount > 0 AND bonus_type IN ('transport_daily','transport_complement')
                         ORDER BY bonus_type, amount, sm, em");
     $st->execute([$empId, $sy]);
     $out = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $out[] = ['type' => $r['bonus_type'], 'amount' => round((float)$r['amount'], 2), 'vt' => $r['value_type'], 'cur' => $r['currency'], 'sm' => (int)$r['sm'], 'em' => (int)$r['em']];
+    if ($tlOn) $tlM[$tlK] = $out;
     return $out;
 }
 
@@ -168,7 +172,7 @@ function cadreDueApplyTransport(PDO $db, int $empId, int $schoolId, string $sy):
     $sameFields = $e && (float)$e['transport_daily_amount'] == (float)$t['fields']['transport_daily_amount'] && (int)$e['transport_days_per_week'] == (int)$t['fields']['transport_days_per_week'] && (float)$e['transport_weeks'] == (float)$t['fields']['transport_weeks'];
     if ($sameLines && $sameFields) return null;
     if (!$sameLines) {
-        $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type IN ('transport_daily','transport_complement')")->execute([$empId, $sy]);
+        if (function_exists('msaLookupFlush')) msaLookupFlush(); $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type IN ('transport_daily','transport_complement')")->execute([$empId, $sy]);
         $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?,?,?,?,?,?,?,?,?,1)");
         $pn = 0;
         foreach ($t['lines'] as $l) { $pn++; $ins->execute([$empId, $l['type'], $pn, $sy, $l['amount'], $l['vt'], $l['cur'], $l['sm'] ?: null, $l['em'] ?: null]); }
@@ -186,7 +190,7 @@ function cadreDueApplyPercent(PDO $db, int $empId, int $schoolId, string $sy): ?
     $has->execute([$empId, $sy]);
     $rows = $has->fetchAll(PDO::FETCH_COLUMN);
     if (count($rows) === 1 && abs((float)$rows[0] - (float)$pct['pct']) < 0.01) return null; // عليها أصلاً
-    $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type = 'prime_fixe'")->execute([$empId, $sy]);
+    if (function_exists('msaLookupFlush')) msaLookupFlush(); $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type = 'prime_fixe'")->execute([$empId, $sy]);
     $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active)
                   VALUES (?, 'prime_fixe', 1, ?, ?, 'percent', 'LBP', ?, ?, 1)")
        ->execute([$empId, $sy, $pct['pct'], $pct['start_month'], $pct['end_month']]);

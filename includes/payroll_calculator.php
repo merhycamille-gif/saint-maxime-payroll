@@ -1183,9 +1183,15 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, 
 
     // ===== منطق التدرّج العادي منقول حرفياً من برنامج المستخدم المرجعي «ف7» (calcEchelonFromTable) =====
     // درجة عادية فورية عند دخول الملاك لكل الشهادات إلا الإجازة التعليمية (gets_immediate_grade=0 → noT).
-    $gi = $db->prepare("SELECT gets_immediate_grade FROM diploma_starting_grades WHERE diploma_code = ?");
-    $gi->execute([$emp['diploma']]);
-    $getsImmediate = $gi->fetchColumn();
+    $giOn = function_exists('msaLookupOn') && msaLookupOn(); $giK = 'gi|' . (string)$emp['diploma'];
+    if ($giOn) $giM = &msaLookupMemo();
+    if ($giOn && array_key_exists($giK, $giM)) $getsImmediate = $giM[$giK];   // 🚀 ذاكرة الطلب (GET فقط)
+    else {
+        $gi = $db->prepare("SELECT gets_immediate_grade FROM diploma_starting_grades WHERE diploma_code = ?");
+        $gi->execute([$emp['diploma']]);
+        $getsImmediate = $gi->fetchColumn();
+        if ($giOn) $giM[$giK] = $getsImmediate;
+    }
     $getsImmediate = ($getsImmediate === false) ? 1 : (int)$getsImmediate;
     $noT = ($getsImmediate === 0); // الإجازة التعليمية: لا درجة فورية، أوّل عادية بعد سنتين
 
@@ -1198,7 +1204,9 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, 
 
     // ===== الدرجات الاستثنائية تُطبَّق تلقائياً حسب القوانين (auto_apply=1). قانون 344 يدوي دائماً ولا يُبنى آلياً. =====
     $autoLaws = [];
-    foreach ($db->query("SELECT * FROM exceptional_grades_laws WHERE is_active=1 AND auto_apply=1") as $L) {
+    if ($giOn && isset($giM['autolaws'])) $autoLawRows = $giM['autolaws'];     // 🚀 ذاكرة الطلب (GET فقط)
+    else { $autoLawRows = $db->query("SELECT * FROM exceptional_grades_laws WHERE is_active=1 AND auto_apply=1")->fetchAll(); if ($giOn) $giM['autolaws'] = $autoLawRows; }
+    foreach ($autoLawRows as $L) {
         $autoLaws[(string)$L['law_number']] = $L;
     }
     // جداول المنح التاريخية الثابتة (سنة كانون 1/1 → عدد الدرجات). نصف 223 = آلية تقديم التدرّج (مطبّقة في $adv).

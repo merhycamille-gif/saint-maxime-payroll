@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $db->prepare("UPDATE exceptional_grades_laws SET law_number=?, law_date=?, grades_count=?, description_ar=?, description_fr=?, effective_date=?, effective_from=?, effective_to=?, applies_to=?, is_active=?, auto_apply=? WHERE id=?")
+                msaLookupFlush(); $db->prepare("UPDATE exceptional_grades_laws SET law_number=?, law_date=?, grades_count=?, description_ar=?, description_fr=?, effective_date=?, effective_from=?, effective_to=?, applies_to=?, is_active=?, auto_apply=? WHERE id=?")
                    ->execute([$lawNumber, $lawDate, $grades, $descAr, $descFr, $effDate, $effFrom, $effTo, $applies, $active, $autoApply, $id]);
                 $_SESSION['flash_success'] = "تم تعديل القانون $lawNumber / Loi modifiée";
             } else {
@@ -45,14 +45,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $chk = $db->prepare("SELECT COUNT(*) FROM exceptional_grades_laws WHERE law_number=?");
                 $chk->execute([$lawNumber]);
                 if ((int)$chk->fetchColumn() > 0) throw new Exception("القانون رقم $lawNumber موجود مسبقاً");
-                $db->prepare("INSERT INTO exceptional_grades_laws (law_number, law_date, grades_count, description_ar, description_fr, effective_date, effective_from, effective_to, applies_to, is_active, auto_apply) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+                msaLookupFlush(); $db->prepare("INSERT INTO exceptional_grades_laws (law_number, law_date, grades_count, description_ar, description_fr, effective_date, effective_from, effective_to, applies_to, is_active, auto_apply) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
                    ->execute([$lawNumber, $lawDate, $grades, $descAr, $descFr, $effDate, $effFrom, $effTo, $applies, $active, $autoApply]);
                 $msg = $autoApply ? 'يُطبّق تلقائياً' : 'يدوي — طبّقه من ملف كل أستاذ';
                 $_SESSION['flash_success'] = "تمت إضافة القانون $lawNumber ($msg) / Loi ajoutée";
             }
         } elseif ($action === 'toggle') {
             $id = (int)($_POST['id'] ?? 0);
-            $db->prepare("UPDATE exceptional_grades_laws SET is_active = 1 - is_active WHERE id=?")->execute([$id]);
+            msaLookupFlush(); $db->prepare("UPDATE exceptional_grades_laws SET is_active = 1 - is_active WHERE id=?")->execute([$id]);
             $_SESSION['flash_success'] = 'تم تغيير حالة القانون / Statut modifié';
         }
     } catch (Exception $e) {
@@ -74,7 +74,7 @@ if (isset($_GET['delete'])) {
         if ($applied > 0) {
             $_SESSION['flash_error'] = "لا يمكن حذف القانون $ln لأنّه مطبّق على $applied أستاذ. عطّله بدلاً من حذفه (زرّ تعطيل).";
         } else {
-            $db->prepare("DELETE FROM exceptional_grades_laws WHERE id=?")->execute([$id]);
+            msaLookupFlush(); $db->prepare("DELETE FROM exceptional_grades_laws WHERE id=?")->execute([$id]);
             $_SESSION['flash_success'] = "تم حذف القانون $ln / Loi supprimée";
         }
     }

@@ -4002,7 +4002,7 @@ function healCnssFamilyCeilings20260826() {
         $n = (int)$db->query("SELECT COUNT(*) FROM cnss_brackets WHERE branch='allocations_familiales'
             AND effective_from <= '2025-12-31' AND (effective_to IS NULL OR effective_to >= '2025-01-01')")->fetchColumn();
         if ($n === 0) {
-            $ins = $db->prepare("INSERT INTO cnss_brackets (branch, max_salary_lbp, effective_from, effective_to, notes)
+            msaLookupFlush(); $ins = $db->prepare("INSERT INTO cnss_brackets (branch, max_salary_lbp, effective_from, effective_to, notes)
                 VALUES ('allocations_familiales', ?, ?, ?, ?)");
             $ins->execute([12000000, '2025-01-01', '2025-06-30', 'السقف التاريخي — من تسوية الضمان الرسمية 2025 (زُرع تلقائياً 2026-08-26)']);
             $ins->execute([18000000, '2025-07-01', '2026-04-30', 'السقف التاريخي — من تسوية الضمان الرسمية 2025 (زُرع تلقائياً 2026-08-26)']);
@@ -4379,6 +4379,8 @@ function ensureTaxSuggestions20260823() {
     static $done = false;
     if ($done) return;
     $done = true;
+    // 🚀 (2026-10-02 «سرعة صاروخ»): التركيب والزرع مرّة واحدة — كانا يُعادان عند فتح **كل** صفحة (CREATE + 16 INSERT IGNORE)
+    if (getSetting('tax_suggestions_seeded_20260823', '') !== '') return;
     try {
         $db = getDB();
         $db->exec("CREATE TABLE IF NOT EXISTS tax_suggestions (
@@ -4416,6 +4418,7 @@ function ensureTaxSuggestions20260823() {
             ['maxim_38', 38, 2, 'دنيا القزي', '⚠️ الملف المرفوع بخانة إخراج القيد جواز سفر', 'دنيا القزي (القديس مكسيموس) رفعت جواز سفر بدل إخراج القيد — يُطلب رفع الصحيح.', null, 'pending', null],
         ];
         foreach ($rows as $r) $ins->execute($r);
+        setSetting('tax_suggestions_seeded_20260823', date('Y-m-d H:i'));
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 
@@ -6267,7 +6270,14 @@ function cnssBranchLabel($branch, $lang = 'fr') {
  * يعيد صف الحدود (min/max) الساري لفرع معيّن بتاريخ شهر/سنة، أو null إن لا يوجد.
  * يختار أحدث صف effective_from ≤ التاريخ وضمن نطاق effective_to (أو مفتوح).
  */
+/** 🚀 ذاكرة الطلب (GET فقط — msaLookupOn): حدود الضمان المؤرّخة */
 function getCnssBracket($branch, $month = null, $year = null) {
+    if (!msaLookupOn()) return getCnssBracket__raw($branch, $month, $year);
+    $m = &msaLookupMemo(); $k = 'cb|' . $branch . '|' . ($month === null ? date('n') : (int)$month) . '|' . ($year === null ? date('Y') : (int)$year);
+    if (!array_key_exists($k, $m)) $m[$k] = getCnssBracket__raw($branch, $month, $year);
+    return $m[$k];
+}
+function getCnssBracket__raw($branch, $month = null, $year = null) {
     if ($month === null) $month = (int)date('n');
     if ($year === null)  $year  = (int)date('Y');
     $asOf = sprintf('%04d-%02d-01', $year, $month);
@@ -6325,7 +6335,14 @@ function ratedParamLabel($key, $lang = 'fr') {
  * يعيد قيمة معامل سارية بتاريخ شهر/سنة من rate_history.
  * إن لم يوجد صف مؤرّخ → يرجع إلى قيمة settings (getSetting) ثم $default.
  */
+/** 🚀 ذاكرة الطلب (GET فقط — msaLookupOn): النِّسَب المؤرّخة كانت تُسأل آلاف المرّات بالصفحة */
 function getRateAsOf($key, $month = null, $year = null, $default = null) {
+    if (!msaLookupOn()) return getRateAsOf__raw($key, $month, $year, $default);
+    $m = &msaLookupMemo(); $k = 'ra|' . $key . '|' . ($month === null ? date('n') : (int)$month) . '|' . ($year === null ? date('Y') : (int)$year) . '|' . var_export($default, true);
+    if (!array_key_exists($k, $m)) $m[$k] = getRateAsOf__raw($key, $month, $year, $default);
+    return $m[$k];
+}
+function getRateAsOf__raw($key, $month = null, $year = null, $default = null) {
     if ($month === null) $month = (int)date('n');
     if ($year === null)  $year  = (int)date('Y');
     $asOf = sprintf('%04d-%02d-01', $year, $month);
@@ -6512,7 +6529,14 @@ function schoolYearToYears($schoolYear) {
  * معرّف إصدار السلسلة الساري بتاريخ معيّن (الافتراضي: اليوم).
  * يدعم سلاسل جديدة «من تاريخ إلى تاريخ»؛ الافتراضي الإصدار 1 (سلسلة 2017).
  */
+/** 🚀 ذاكرة الطلب (GET فقط — msaLookupOn): إصدار السلسلة الساري بتاريخ */
 function scaleVersionIdAsOf($asOfDate = null) {
+    if (!msaLookupOn()) return scaleVersionIdAsOf__raw($asOfDate);
+    $m = &msaLookupMemo(); $k = 'sv|' . ($asOfDate === null ? date('Y-m-d') : (string)$asOfDate);
+    if (!array_key_exists($k, $m)) $m[$k] = scaleVersionIdAsOf__raw($asOfDate);
+    return $m[$k];
+}
+function scaleVersionIdAsOf__raw($asOfDate = null) {
     if ($asOfDate === null) $asOfDate = date('Y-m-d');
     $stmt = getDB()->prepare(
         "SELECT id FROM salary_scale_versions
@@ -6622,7 +6646,7 @@ function healLaw2017Description() {
     try {
         $ar = 'سلسلة 2017: 6 درجات لمن دخل الملاك قبل 1/1/2010 (كل الشهادات) أو قسم ثاني (2010→30/9/2017)؛ درجتان لإجازة جامعية/جاردينير ب.ت/ت.س (2010→30/9/2017).';
         $fr = 'Loi 2017: 6 échelons (titularisé avant 2010, ou Qsm2 2010-2017) / 2 échelons (Licence/Jardinière 2010-2017).';
-        $st = getDB()->prepare("UPDATE exceptional_grades_laws SET description_ar=?, description_fr=?
+        msaLookupFlush(); $st = getDB()->prepare("UPDATE exceptional_grades_laws SET description_ar=?, description_fr=?
                                 WHERE law_number='2017' AND description_ar LIKE '%?%'");
         $st->execute([$ar, $fr]);
     } catch (Throwable $e) { /* تجاهل آمن */ }
