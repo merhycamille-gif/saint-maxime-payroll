@@ -9574,6 +9574,15 @@ $ok229 = strpos($js229, "var KEY = 'msaZ:' + location.pathname + location.search
     && strpos($js229, "t2.parentElement.style.overflowX = 'auto';") !== false;
 check('⚡ ملاءمة الجداول وتثبيت الرؤوس على دفعات + ذاكرة التصغير بالجلسة (الجداول الكبيرة تفتح أسرع) (2026-10-02)', $ok229);
 
+/* =====================================================================
+ * 230) ⚡ (2026-10-02 «ما بدي استثناء»): صفحة اقتراحات إخراج القيد — محتوى كل «▾» (فورمات الأولاد/تاريخ عمل الزوج) بقالب
+ *      <template> يُركَّب عند الفتح (tsOpen) فلا تُرسم مئات خانات التاريخ المطوية عند كل فتحة (2ث → ~1ث).
+ * =================================================================== */
+$ts230 = (string)file_get_contents($PROJ . '/pages/tax_suggestions.php');
+$ok230 = substr_count($ts230, 'ontoggle="tsOpen(this)"') === 2 && substr_count($ts230, '<template><div style="padding:4px 0 2px">') === 1 && substr_count($ts230, '<template><form method="POST"') === 1 && substr_count($ts230, '</template></details>') === 2
+    && strpos($ts230, "function tsOpen(d) { if (!d.open) return; var t = d.querySelector(':scope > template'); if (t) t.replaceWith(t.content.cloneNode(true)); }") !== false;
+check('⚡ اقتراحات إخراج القيد: المطويّ يُركَّب عند فتحه فقط (template) — الصفحة تفتح أسرع (2026-10-02)', $ok230);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

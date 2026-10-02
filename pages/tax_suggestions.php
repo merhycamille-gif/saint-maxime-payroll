@@ -161,6 +161,11 @@ $dash = '<span style="color:#94a3b8">—</span>';
             <strong>الزوج يعمل = نعم</strong> ⇒ تنزيل الزوج يسقط حكماً (ومن «تاريخ بدء عمله» إن حدّدته).
         </p>
         <style>.ts-dec td,.ts-dec th{padding:7px 8px !important}</style>
+        <script>
+        // 🚀 (2026-10-02 «كل البرنامج متل البرق»): محتوى كل «▾» (فورمات الأولاد وتاريخ عمل الزوج) محفوظ بقالب <template> ويُركَّب
+        // لحظة فتحه فقط — الصفحة كانت ترسم مئات الفورمات وخانات التاريخ المطوية عند كل فتحة (ثانيتان).
+        function tsOpen(d) { if (!d.open) return; var t = d.querySelector(':scope > template'); if (t) t.replaceWith(t.content.cloneNode(true)); }
+        </script>
         <div class="report-table-wrap" dir="rtl"><table class="table ts-dec" dir="rtl" style="font-size:12px">
             <thead><tr>
                 <th>الموظف</th>
@@ -214,8 +219,8 @@ $dash = '<span style="color:#94a3b8">—</span>';
                                 <?= $eligibleKids ?> <?= $eligibleKids === 1 ? 'ولد مستحقّ' : 'أولاد مستحقّون' ?>
                                 <?php if (!$kids && $fixedKids): ?><small style="font-weight:600;color:#94a3b8">(من وضعه العائلي — بلا تواريخ)</small><?php endif; ?>
                             </div>
-                            <details style="margin-top:3px"><summary style="cursor:pointer;color:#1F4E5F;font-weight:700"><small><?= $kids ? 'الأولاد بالتواريخ (' . count($kids) . ') ▾' : '+ سجّل الأولاد بتواريخهم ▾' ?></small></summary>
-                            <div style="padding:4px 0 2px">
+                            <details style="margin-top:3px" ontoggle="tsOpen(this)"><summary style="cursor:pointer;color:#1F4E5F;font-weight:700"><small><?= $kids ? 'الأولاد بالتواريخ (' . count($kids) . ') ▾' : '+ سجّل الأولاد بتواريخهم ▾' ?></small></summary>
+                            <template><div style="padding:4px 0 2px">
                             <?php foreach ($kids as $k):
                                 $b18 = date('Y-m-d', strtotime($k['birth_date'] . ' +18 years'));
                                 $stillMinor = $b18 > $today; ?>
@@ -238,7 +243,7 @@ $dash = '<span style="color:#94a3b8">—</span>';
                                 <button class="btn btn-primary" style="padding:2px 8px">+ ولد</button>
                             </form>
                             <?php endif; ?>
-                            </div></details>
+                            </div></template></details>
                         <?php endif; ?>
                     </td>
 
@@ -251,12 +256,12 @@ $dash = '<span style="color:#94a3b8">—</span>';
                                 if ($sws) echo 'يعمل من <strong>' . e(formatDate($sws)) . '</strong>' . ($today >= $sws ? '' : ' (لاحقاً)');
                             ?></small></div>
                             <?php if ($canE): ?>
-                            <details style="margin-top:3px"><summary style="cursor:pointer;color:#1F4E5F;font-weight:700"><small>تاريخ بدء عمله ▾</small></summary>
-                            <form method="POST" style="display:flex;gap:4px;margin-top:4px;justify-content:center"><?= csrfField() ?>
+                            <details style="margin-top:3px" ontoggle="tsOpen(this)"><summary style="cursor:pointer;color:#1F4E5F;font-weight:700"><small>تاريخ بدء عمله ▾</small></summary>
+                            <template><form method="POST" style="display:flex;gap:4px;margin-top:4px;justify-content:center"><?= csrfField() ?>
                                 <input type="hidden" name="act" value="spouse_start"><input type="hidden" name="emp" value="<?= $id2 ?>">
                                 <input type="date" name="spouse_work_start_date" class="form-control" style="max-width:125px;padding:2px 6px;font-size:12px" value="<?= e($sws ?? '') ?>" title="تاريخ بدء عمل الزوج">
                                 <button class="btn btn-primary" style="padding:2px 8px" title="حفظ تاريخ بدء عمل الزوج">📅</button>
-                            </form></details>
+                            </form></template></details>
                             <?php endif; ?>
                         <?php endif; ?>
                     </td>
