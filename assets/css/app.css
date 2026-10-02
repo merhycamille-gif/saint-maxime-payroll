@@ -1869,3 +1869,33 @@ form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-siz
     /* لائحة الدرجات خارج الفورم: الفورم بلا صندوق خاصّ فيبقى الشريط ثابتاً على طول الصفحة كلها (لا ينتهي التثبيت عند آخر الفورم) */
     #empForm { display: contents; }
 }
+
+/* =====================================================================
+ * 216) 🟦 (2026-10-02 «الجداول والبطاقات ما تخليها بيضاء»): البطاقات والجداول وأوراق التقارير أزرق فاتح هادئ بدل الأبيض
+ *      (شاشة فقط — الطباعة و PDF تبقى بيضاء). خانات الكتابة تبقى بيضاء لتبان أنها للتعبئة.
+ *      لتغيير الدرجة: عدّل --surface (السطح) و --surface2 (الرؤوس/الصفّ الزوجي) و --surface3 (رأس الجدول/المرور).
+ * =================================================================== */
+:root { --surface: #dbe7f6; --surface2: #cfdff2; --surface3: #bfd3ec; --surface-line: #a9c1e0; }
+/* (min-width: 1px) = علامة: pdf-save.js يطفئ هذا القسم أثناء تصوير الـPDF ليبقى المحفوظ أبيض كالورق */
+@media screen and (min-width: 1px) {
+    .card, .stat-card, .table-wrapper, .dash-kpi, .dash-meta, .dash-sec, .reg-details, .doc-sheet, .salary-slip,
+    .school-checks .chk-group, .school-multi .school-menu, .global-search .gs-panel {
+        background-color: var(--surface);
+        border-color: var(--surface-line);
+    }
+    .card-header { background: var(--surface2); border-bottom-color: var(--surface-line); }
+    .table th { background: var(--surface3); border-bottom-color: var(--surface-line); }
+    .table td { border-color: var(--surface-line); }
+    .table tbody tr:nth-child(even) { background: var(--surface2); }
+    .table tbody tr:hover, .table-hover tbody tr:hover { background: var(--surface3); }
+    .dash-meta .dm-item { border-inline-start-color: var(--surface-line); }
+    /* الحاويات الفاتحة داخل البطاقات (شرائط خانات التشييك، بطاقات الصفحات الخاصّة) وصفوف جداول التقارير */
+    .school-checks, .school-checks .chk-group, .fa-kpi, .fa-law, .fa-bar, .ba-kpi, .ba-help, .ba-fold, .mehe-form details,
+    .main-content div[style*="background:#fff;"]:not(.official-doc, .official-doc *), .main-content div[style$="background:#fff"]:not(.official-doc, .official-doc *), .main-content form[style*="background:#fff;"],
+    .main-content div[style*="background:#f8fafc"], .main-content div[style*="background:#f9fafb"] { background-color: var(--surface2) !important; border-color: var(--surface-line) !important; }
+    /* شعار المدرسة خلفيته بيضاء: يندمج مع السطح الملوَّن بدل مربّع أبيض */
+    .main-content img[src*="assets/logos/"], .main-content img[src*="assets/letterheads/"], .main-content img.lh-logo { mix-blend-mode: multiply; }
+    .doc-table tbody tr { background-color: var(--surface) !important; }
+    .doc-table tbody tr:nth-child(even) { background-color: var(--surface2) !important; }
+    .doc-table tfoot td, .doc-table .total-row td, .doc-table .subtotal-row td, .doc-table tr.cat-row td { background-color: var(--surface3) !important; }
+}

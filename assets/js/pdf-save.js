@@ -35,6 +35,11 @@
                     flipped.push([rule, rule.media.mediaText]);
                     rule.media.mediaText = 'all';
                 }
+                // تلوين الشاشة (بطاقات/جداول زرقاء فاتحة — app.css قسم 216) يُطفأ أثناء التصوير: المحفوظ أبيض كالورق
+                else if (rule.media && /min-width:\s*1px/.test(rule.media.mediaText)) {
+                    flipped.push([rule, rule.media.mediaText]);
+                    rule.media.mediaText = 'not all';
+                }
             }
         }
         return function () {

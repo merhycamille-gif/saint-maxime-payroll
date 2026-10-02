@@ -9276,6 +9276,17 @@ $ok209 = strpos($css209, ':root { --page-bg: #5b88c2; --page-bg2: #3a68a8; }') !
 check('🟦 خلفية البرنامج زرقاء على الشاشة فقط والطباعة بيضاء (2026-10-01)', $ok209);
 
 /* =====================================================================
+ * 216) 🟦 (2026-10-02 «الجداول والبطاقات ما تخليها بيضاء»): البطاقات والجداول وأوراق التقارير أزرق فاتح على الشاشة فقط —
+ *      الطباعة و PDF تبقى بيضاء (القاعدة داخل @media screen حصراً).
+ * =================================================================== */
+$ok216 = strpos($css209, ':root { --surface: #dbe7f6; --surface2: #cfdff2; --surface3: #bfd3ec; --surface-line: #a9c1e0; }') !== false
+    && preg_match('/@media screen and \(min-width: 1px\) \{\s*\.card, \.stat-card, \.table-wrapper, \.dash-kpi, \.dash-meta, \.dash-sec, \.reg-details, \.doc-sheet, \.salary-slip,[^{]*\{\s*background-color: var\(--surface\);/', $css209) === 1
+    && strpos($css209, '.doc-table tbody tr { background-color: var(--surface) !important; }') !== false
+    && strpos((string)file_get_contents($PROJ . '/assets/js/pdf-save.js'), "rule.media.mediaText = 'not all';") !== false // الـPDF المحفوظ يبقى أبيض
+    && preg_match('/@media print \{[^@]*?body \{ background: white; \}/s', $css209) === 1;
+check('🟦 البطاقات والجداول ليست بيضاء على الشاشة (أزرق فاتح) والطباعة بيضاء (2026-10-02)', $ok216);
+
+/* =====================================================================
  * 210) 🚫💰 (2026-10-01 «شهر التعويض يعني شهر 13 ما بيكون عليه ضرائب»): شهر التعويض (13) بلا ضريبة دخل ولا أساس خاضع —
  *      الضمان/الصندوق يبقيان بنسبتهما، والصافي = الإجمالي − المحسومات الباقية.
  * =================================================================== */
