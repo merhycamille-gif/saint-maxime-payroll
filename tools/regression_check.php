@@ -9397,9 +9397,18 @@ $css218 = (string)file_get_contents($PROJ . '/assets/css/app.css');
 $ok218 = strpos($css218, ':root { --ic1: #e06666; --ic2: #4a7abf; --ic3: #eebf2c; --ic4: #8e44ad; --ic5: #2bab99; --ic6: #4a86b8; }') !== false
     && strpos($css218, '.dash-link .dl-ic, .report-card-icon, .dash-kpi .dk-ic, .dash-meta .dm-ic, .dash-sec-head .ds-ic, .reg-details .rd-ic, .stat-icon, .card-header h3 i, .sidebar-nav a > i:first-child {') !== false
     && preg_match('/\.sidebar-nav a > i:first-child \{\s*background-color: var\(--ic, [^;]*\) !important;[^}]*color: #fff !important;/s', $css218) === 1
-    && substr_count($css218, '.dash-links > .dash-link:nth-child(6n+') === 6
+    && substr_count($css218, '.dash-links > .dash-link:nth-child(6n+') === 7 /* 6 ألوان + سطر الأصفر الأغمق (219) */
     && strpos($css218, 'border-bottom-color: var(--ic);') !== false;
 check('🎨 أيقونات البرنامج بألوان متناسقة (لوحة p1: مربّع بلون كامل + أيقونة بيضاء، ستّة ألوان تتوالى) (2026-10-02)', $ok218);
+
+/* =====================================================================
+ * 219) 🎨 (2026-10-02 «نعم» — البلاطة كلها بلون كامل مثل الصورة): بلاطات لوحة القيادة ومركز التقارير بلون كامل وكتابة بيضاء.
+ * =================================================================== */
+$css219 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$ok219 = strpos($css219, '--tile: color-mix(in srgb, var(--ic) 90%, #000);') !== false
+    && strpos($css219, '.dash-link .dl-fr, .dash-link .dl-ar, .report-card-text .rc-fr, .report-card-text .rc-ar { color: #fff;') !== false
+    && strpos($css219, 'border-bottom-color: color-mix(in srgb, var(--ic) 58%, #000);') !== false;
+check('🎨 بلاطات لوحة القيادة ومركز التقارير بلون كامل وكتابة بيضاء (مثل صورة p1) ونافرة (2026-10-02)', $ok219);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
