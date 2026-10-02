@@ -30,3 +30,8 @@ RewriteRule ^saint-maxime-payroll/(.*)$ $1 [L]
 RewriteCond %{HTTP_HOST} ^(www\.)?msapayroll\.com$ [NC]
 RewriteRule ^msa-payroll/(.*)$ $1 [L]
 </IfModule>
+
+# ⚡ (2026-10-02 «في بطء كتير بالبرنامج»): صفحات البرنامج (HTML/JSON) تُرسَل مضغوطة — صفحة الموظفين ~1MB تصير ~100KB.
+<IfModule mod_deflate.c>
+AddOutputFilterByType DEFLATE text/html text/plain application/json text/xml
+</IfModule>

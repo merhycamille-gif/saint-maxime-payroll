@@ -566,6 +566,7 @@ function officialFormStyles(): string {
 .report-table-wrap{overflow-x:auto;}
 /* صفّ عنوان التقرير المتكرّر بالطباعة — مخفيّ على الشاشة (يُظهره بلوك الطباعة أدناه) */
 .pr-title-row{display:none;}
+.pr-mask{display:none;}
 .doc-table th .rate-head{display:block;font-weight:400;font-size:10px;opacity:.9;white-space:nowrap;}
 /* شريط تمرير بارز وواضح ليعرف المستخدم أن في أعمدة إضافية */
 .report-table-wrap::-webkit-scrollbar,.card-body::-webkit-scrollbar{height:12px;}
@@ -659,17 +660,14 @@ function officialFormStyles(): string {
     border:none !important;padding:2px 2px 4px;}
   .doc-table thead .pr-title-row .pr-title-text{width:0;min-width:100%;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis;font-size:10pt;font-weight:800;text-align:center;}
-  /* 📐 (2026-10-02 «هيدي العناوين بكل التقارير بدها ترتيب»): ثلاثة أسطر مرتّبة بكل ورقة — العنوان، ثم السنة/الفلتر، ثم سعر
-     الصرف — بقياس ثابت مهما تصغّر الجدول (القسمة على --pz تعوّض تصغيره)، وعنوان الورقة نفسه يُخفى فلا يتكرّر بالورقة الأولى */
-  .doc-table thead .pr-title-row th{padding:0 2px 5px !important;line-height:1.45;}
-  .doc-table thead .pr-title-row .pr-title-text{font-size:calc(13pt / var(--pz,1));font-weight:700;color:#000;}
-  .doc-table thead .pr-title-row .pr-title-text.pr-t2{font-size:calc(10.5pt / var(--pz,1));font-weight:700;color:#222;}
-  .doc-table thead .pr-title-row .pr-title-text.pr-t3{font-size:calc(9.5pt / var(--pz,1));font-weight:400;color:#333;}
-  body:not(.pr-capture) .has-pr-title > .doc-head,
-  body:not(.pr-capture) .has-pr-title .doc-title,
-  body:not(.pr-capture) .has-pr-title .doc-subtitle,
-  body:not(.pr-capture) .has-pr-title .doc-year,
-  body:not(.pr-capture) .has-pr-title .pr-in-title{display:none !important;}
+  /* 📐 (2026-10-02 «هيدي العناوين بكل التقارير بدها ترتيب» ثم «أكيد، بس نضلّ نقراها»): العناوين الكاملة بالورقة الأولى فقط،
+     وباقي الأوراق سطر واحد مقروء (11pt مهما تصغّر الجدول — القسمة على --pz تعوّض تصغيره) بارتفاع ثابت 20px.
+     بالورقة الأولى: الجدول يُسحب 20px فوق غطاء أبيض (pr-mask، يحقنه app.js قبل الجدول) فيختفي السطر تحته ولا يتكرّر العنوان.
+     تصوير «PDF عالكمبيوتر» (body.pr-capture) يخفي السطر بنفسه فلا غطاء ولا سحب. */
+  .doc-table thead .pr-title-row th{padding:0 2px !important;line-height:calc(20px / var(--pz,1));height:calc(20px / var(--pz,1));}
+  .doc-table thead .pr-title-row .pr-title-text{font-size:calc(11pt / var(--pz,1));font-weight:700;color:#000;line-height:inherit;}
+  body:not(.pr-capture) .pr-mask{display:block;height:20px;background:#fff;position:relative;z-index:5;margin:0;}
+  body:not(.pr-capture) .doc-table.pr-masked{margin-top:calc(-20px / var(--pz,1)) !important;}
   .doc-table tr{page-break-inside:avoid;break-inside:avoid;}
   .doc-table th,.doc-table td{border:1px solid #555 !important;}
   /* الترويسة وعنوان التقرير لا ينفصلان عن بداية الجدول */

@@ -1980,3 +1980,46 @@ form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-siz
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -1px 0 rgba(0, 0, 0, .10);
     }
 }
+
+/* =====================================================================
+ * 222) 🎨 (2026-10-02 p1+p2 «خلّي كل باب نفس اللون — لون الأبواب مش بقلب الباب — واسم الأبواب الرئيسية أوضح، والكبسات أصغر
+ *      أنعم مش دبشين»): كل باب (قسم بلوحة القيادة / خانة بمركز التقارير) لون واحد لكل كبساته، واللون يتبدّل من باب لباب؛
+ *      عنوان الباب أكبر وأوضح بلون بابه؛ والكبسات أصغر وأنعم. شاشة فقط.
+ * =================================================================== */
+@media screen {
+    /* لون الباب (من اللوحة --ic1 … --ic6) */
+    .dash-sec:nth-of-type(6n+1), .report-cat:nth-of-type(6n+1) { --ic: var(--ic2); }
+    .dash-sec:nth-of-type(6n+2), .report-cat:nth-of-type(6n+2) { --ic: var(--ic5); }
+    .dash-sec:nth-of-type(6n+3), .report-cat:nth-of-type(6n+3) { --ic: var(--ic4); }
+    .dash-sec:nth-of-type(6n+4), .report-cat:nth-of-type(6n+4) { --ic: var(--ic1); }
+    .dash-sec:nth-of-type(6n+5), .report-cat:nth-of-type(6n+5) { --ic: var(--ic6); }
+    .dash-sec:nth-of-type(6n+6), .report-cat:nth-of-type(6n+6) { --ic: var(--ic3); }
+    /* كل كبسات الباب بلون بابه (يلغي توالي الألوان داخل الباب) */
+    .dash-sec .dash-links > .dash-link:nth-child(n), .report-cat .report-grid > .report-card:nth-child(n) { --ic: inherit; --tile: color-mix(in srgb, var(--ic) 90%, #000); }
+    .dash-sec:nth-of-type(6n+6) .dash-links > .dash-link:nth-child(n), .report-cat:nth-of-type(6n+6) .report-grid > .report-card:nth-child(n) { --tile: color-mix(in srgb, var(--ic) 80%, #5a3d00); }
+    /* اسم الباب أوضح: أكبر وأسمك وبلون بابه */
+    .dash-sec-head { padding: 8px 14px; gap: 10px; background: color-mix(in srgb, var(--ic) 13%, #fff); border-inline-start: 5px solid var(--ic); border-bottom: 1px solid color-mix(in srgb, var(--ic) 30%, #fff); }
+    .dash-sec-head .ds-ic { width: 28px; height: 28px; min-width: 28px; border-radius: 7px; font-size: 14px; }
+    .dash-sec-head .ds-fr { font-size: 16px !important; font-weight: 800 !important; letter-spacing: 0; color: color-mix(in srgb, var(--ic) 62%, #000); }
+    .dash-sec-head .ds-ar { font-size: 15px !important; font-weight: 800 !important; color: color-mix(in srgb, var(--ic) 62%, #000); }
+    .report-cat .report-cat-title { font-size: 16px !important; font-weight: 800 !important; padding: 8px 14px; margin-bottom: 9px; color: color-mix(in srgb, var(--ic) 62%, #000) !important;
+        background: color-mix(in srgb, var(--ic) 13%, #fff) !important; border-inline-start: 5px solid var(--ic) !important; display: flex; align-items: baseline; gap: 10px; }
+    .report-cat .report-cat-title i { color: var(--ic) !important; }
+    .report-cat .report-cat-title span, .report-cat .report-cat-title > div { font-size: 16px !important; color: inherit !important; }
+    .report-cat .report-cat-title > div { font-size: 15px !important; font-weight: 800 !important; opacity: 1 !important; }
+    /* الكبسات أصغر وأنعم */
+    .dash-links { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 7px; padding: 10px 12px; }
+    .dash-links > .dash-link { padding: 4px 8px; gap: 8px; border-radius: 8px; border-bottom-width: 2px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .30), 0 1px 3px rgba(15, 23, 42, .22); }
+    .dash-links > .dash-link .dl-ic { width: 26px; height: 26px; min-width: 26px; border-radius: 7px; font-size: 12px; }
+    .dash-link .dl-fr { font-size: 12px; line-height: 1.2; }
+    .dash-link .dl-ar { font-size: 10.5px; line-height: 1.2; }
+    .report-grid { grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 8px; }
+    .report-grid > .report-card { padding: 6px 10px; gap: 9px; border-radius: 9px; border-bottom-width: 2px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .30), 0 1px 3px rgba(15, 23, 42, .22); }
+    .report-grid > .report-card .report-card-icon { width: 30px; height: 30px; border-radius: 8px; font-size: 14px; }
+    .report-card-text { line-height: 1.25; }
+    .report-card-text .rc-fr { font-size: 12.5px; }
+    .report-card-text .rc-ar { font-size: 11px; }
+    .dash-links > .dash-link:hover, .report-grid > .report-card:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .40), 0 4px 9px rgba(15, 23, 42, .28); }
+}

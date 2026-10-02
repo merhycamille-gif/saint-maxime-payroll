@@ -9411,24 +9411,58 @@ $ok219 = strpos($css219, '--tile: color-mix(in srgb, var(--ic) 90%, #000);') !==
 check('🎨 بلاطات لوحة القيادة ومركز التقارير بلون كامل وكتابة بيضاء (مثل صورة p1) ونافرة (2026-10-02)', $ok219);
 
 /* =====================================================================
- * 220) 📐 (2026-10-02 p1 «يا أستاذ هيدي العناوين بكل التقارير بدها ترتيب»): عناوين التقرير المطبوع ثلاثة أسطر مرتّبة فوق رأس
- *      الجدول بكل ورقة (العنوان · السنة/الفلتر · سعر الصرف) بقياس ثابت (÷ --pz)، وعنوان الورقة يُخفى بالطباعة فلا يتكرّر
- *      بالورقة الأولى؛ تصوير «PDF عالكمبيوتر» يبقي عنوان الورقة (pr-capture)؛ السنة مباشرة تحت العنوان.
+ * 220) 📐 (2026-10-02 p1 «يا أستاذ هيدي العناوين بكل التقارير بدها ترتيب» ثم «أكيد، بس نضلّ نقراها»): العناوين الكاملة
+ *      بالورقة الأولى فقط (العنوان · السنة · الفلتر · سعر الصرف مرتّبة)، وباقي الأوراق سطر واحد مقروء 11pt (÷ --pz) فوق رأس
+ *      الجدول؛ بالورقة الأولى يغطّيه pr-mask فلا يتكرّر العنوان؛ تصوير «PDF عالكمبيوتر» بلا غطاء (pr-capture).
  * =================================================================== */
 $js220 = (string)file_get_contents($PROJ . '/assets/js/app.js'); $rh220 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 $of220 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $ps220 = (string)file_get_contents($PROJ . '/assets/js/pdf-save.js');
-$ok220 = strpos($js220, "[[l1, ''], [l2.join(' · '), ' pr-t2'], [l3.join(' · '), ' pr-t3']].forEach(function (ln) {") !== false
-    && strpos($js220, "if (extra) root.classList.add('has-pr-title');") !== false
-    && strpos($js220, "(x.indexOf('سعر الصرف') === 0 ? l3 : l2).push(x);") !== false
-    && strpos($js220, "(c.classList.contains('rate-subtitle') ? l3 : l2).push(x);") !== false
-    && strpos($rh220, '.doc-table thead .pr-title-row .pr-title-text{font-size:calc(13pt / var(--pz,1));font-weight:700;color:#000;}') !== false
-    && strpos($rh220, 'body:not(.pr-capture) .has-pr-title > .doc-head,') !== false
-    && strpos($rh220, 'body:not(.pr-capture) .has-pr-title .pr-in-title{display:none !important;}') !== false
+$ok220 = strpos($js220, "mask.className = 'pr-mask';") !== false
+    && strpos($js220, "table.parentNode.insertBefore(mask, table);") !== false
+    && strpos($js220, "table.classList.add('pr-masked');") !== false
+    && strpos($js220, "root.querySelectorAll('.doc-subtitle:not(.rate-subtitle)')") !== false
+    && strpos($rh220, '.pr-mask{display:none;}') !== false
+    && strpos($rh220, '.doc-table thead .pr-title-row .pr-title-text{font-size:calc(11pt / var(--pz,1));font-weight:700;color:#000;line-height:inherit;}') !== false
+    && strpos($rh220, 'body:not(.pr-capture) .pr-mask{display:block;height:20px;background:#fff;position:relative;z-index:5;margin:0;}') !== false
+    && strpos($rh220, 'body:not(.pr-capture) .doc-table.pr-masked{margin-top:calc(-20px / var(--pz,1)) !important;}') !== false
+    && strpos($rh220, 'has-pr-title') === false
     && strpos($rh220, '.official-doc .doc-title ~ :is(.doc-subtitle,.doc-year):not(:has(+ .doc-subtitle,+ .doc-year)){margin-bottom:12px !important;}') !== false
     && substr_count($of220, '<div class="doc-year">عن السنة المدرسية <?= e($sy) ?></div><?= rateSubtitle(null, null, true) ?>') === 2
     && strpos($ps220, "document.body.classList.add('pr-capture');") !== false
     && strpos($ps220, "document.body.classList.remove('pr-capture');") !== false;
-check('📐 عناوين التقارير المطبوعة مرتّبة: ثلاثة أسطر فوق رأس الجدول بكل ورقة بلا تكرار العنوان بالورقة الأولى + السنة تحت العنوان (2026-10-02)', $ok220);
+check('📐 عناوين التقارير المطبوعة مرتّبة: كاملة بالورقة الأولى بلا تكرار (pr-mask) + سطر واحد مقروء بباقي الأوراق + السنة تحت العنوان (2026-10-02)', $ok220);
+
+/* =====================================================================
+ * 221) ⚡ (2026-10-02 «في بطء كتير بالبرنامج، الانتقال من صفحة لصفحة عم ياخد وقت»): لوحة القيادة لا تعيد بناء تقرير المخالفات
+ *      (10–15 ثانية) عند كل فتحة — complianceBuildCached ببصمة الداتا (أي تعديل يعيد البناء) + صفحات HTML مضغوطة.
+ * =================================================================== */
+require_once $PROJ . '/includes/compliance.php';
+$ix221 = (string)file_get_contents($PROJ . '/index.php'); $ht221 = (string)file_get_contents($PROJ . '/.htaccess');
+$fpA221 = complianceFingerprint($db); $fpB221 = complianceFingerprint($db);
+$t221 = microtime(true); $repA221 = complianceBuildCached($db); $repB221 = complianceBuildCached($db); $t221b = microtime(true); $repC221 = complianceBuildCached($db); $hit221 = microtime(true) - $t221b;
+$ax221 = (string)@file_get_contents($PROJ . '/ajax_compliance.php');
+$ok221 = strpos($ix221, '$homeCompState = canEdit() ? complianceDashState($db) : null;') !== false
+    && strpos($ix221, "fetch(<?= json_encode(BASE_URL . 'ajax_compliance.php') ?>") !== false
+    && strpos($ax221, 'session_write_close();') !== false && strpos($ax221, '$rep = complianceBuildCached(getDB());') !== false && strpos($ax221, 'if (!canEdit()) exit;') !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/compliance.php'), '$rep = complianceBuild($db);') !== false // صفحة التقرير طازجة دائماً
+    && strpos($ht221, 'AddOutputFilterByType DEFLATE text/html text/plain application/json text/xml') !== false
+    && $fpA221 !== '' && $fpA221 === $fpB221                                   // البصمة ثابتة ما دامت الداتا لم تتغيّر
+    && count($repB221['pending']) === count($repC221['pending']) && $repC221['sy'] === $repA221['sy']
+    && $hit221 < 1.0;                                                          // الفتحة من الكاش فورية
+check('⚡ لوحة القيادة سريعة: تقرير المخالفات من الكاش ببصمة الداتا (لا إعادة بناء عند كل فتحة) + ضغط صفحات HTML (2026-10-02)', $ok221, 'fp=' . $fpA221 . ' hit=' . round($hit221, 3) . 's');
+
+/* =====================================================================
+ * 222) 🎨 (2026-10-02 p1+p2 «خلّي كل باب نفس اللون… اسم الأبواب الرئيسية أوضح… الكبسات أصغر أنعم مش دبشين»):
+ *      كل باب لون واحد لكل كبساته (يتبدّل من باب لباب) + عنوان الباب 16px/800 بلون بابه + كبسات أصغر.
+ * =================================================================== */
+$css222 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$ok222 = strpos($css222, '.dash-sec .dash-links > .dash-link:nth-child(n), .report-cat .report-grid > .report-card:nth-child(n) { --ic: inherit;') !== false
+    && substr_count($css222, '.dash-sec:nth-of-type(6n+') >= 7
+    && strpos($css222, '.dash-sec-head .ds-fr { font-size: 16px !important; font-weight: 800 !important;') !== false
+    && strpos($css222, '.report-cat .report-cat-title { font-size: 16px !important; font-weight: 800 !important;') !== false
+    && strpos($css222, '.dash-links > .dash-link { padding: 4px 8px;') !== false
+    && strpos($css222, '.report-grid > .report-card { padding: 6px 10px;') !== false;
+check('🎨 كل باب بلون واحد لكبساته + اسم الباب أوضح (16px/800) + كبسات أصغر وأنعم (2026-10-02)', $ok222);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

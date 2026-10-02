@@ -561,6 +561,63 @@ function complianceBuild(PDO $db): array {
     return ['sy' => $sy, 'items' => $items, 'pending' => $pending, 'rejected' => $rejected, 'auto' => $auto, 'applied' => $applied, 'law_from' => $lawFrom, 'before_law' => $beforeLaw];
 }
 
+/**
+ * ⚡ (2026-10-02 «في بطء كتير بالبرنامج، الانتقال من صفحة لصفحة عم ياخد وقت»): لوحة القيادة كانت تعيد بناء التقرير كلّه
+ * (إعادة احتساب كل رواتب السنة ≈ 10–15 ثانية) عند **كل** فتحة. الآن تأخذ آخر تقرير مبنيّ ما دامت الداتا لم تتغيّر:
+ * البصمة = آخر تعديل على جداول البرنامج (information_schema) + الإعدادات الفعلية + اليوم؛ أي حفظ/تعديل/قرار يغيّرها
+ * فيُعاد البناء فوراً، وإلا يُعاد حكماً كل 15 دقيقة. صفحة التقرير نفسها (pages/compliance.php) تبني طازجاً دائماً.
+ */
+function complianceFingerprint(PDO $db): string {
+    try {
+        try { $db->exec("SET SESSION information_schema_stats_expiry = 0"); } catch (Throwable $e) {} // MySQL 8: بلا كاش إحصاءات (MariaDB لا يعرفه)
+        $t = $db->query("SELECT CONCAT(COALESCE(MAX(UPDATE_TIME), 'x'), '|', COUNT(UPDATE_TIME), '|', SUM(TABLE_ROWS IS NOT NULL))
+            FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name NOT LIKE '\\_%'
+              AND table_name NOT IN ('settings', 'audit_log', 'users', 'attestation_prefs', 'official_form_edits', 'info_submissions')")->fetchColumn();
+        $cnt = $db->query("SELECT CONCAT((SELECT COUNT(*) FROM employees), '|', (SELECT COUNT(*) FROM monthly_salaries), '|', (SELECT COUNT(*) FROM compliance_decisions))")->fetchColumn();
+        $db->exec("SET SESSION group_concat_max_len = 1000000");
+        $st = $db->query("SELECT MD5(GROUP_CONCAT(CONCAT(`key`, '=', COALESCE(`value`, '')) ORDER BY `key` SEPARATOR '\n')) FROM settings
+            WHERE `key` NOT LIKE 'compliance\\_pending\\_%' AND `key` NOT LIKE 'heal\\_%' AND `key` NOT LIKE '%\\_at'")->fetchColumn();
+        if (!$t || strpos((string)$t, 'x|') === 0) return ''; // لا تاريخ تعديل متاح ⇒ لا كاش (بناء طازج)
+        return md5($t . '#' . $cnt . '#' . $st . '#' . date('Y-m-d'));
+    } catch (Throwable $e) { return ''; }
+}
+function complianceCacheFile(): string {
+    $dir = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'msa_cache_' . substr(md5(__DIR__), 0, 10);
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    $who = (string)($_SESSION['user_id'] ?? '0');
+    return $dir . DIRECTORY_SEPARATOR . 'compliance_' . md5($who . '|' . complianceScopeKey() . '|' . complianceYear() . '|' . lawEnforceFromSy()) . '.ser';
+}
+function complianceBuildCached(PDO $db, int $ttl = 900): array {
+    $fp = complianceFingerprint($db);
+    $file = $fp !== '' ? complianceCacheFile() : '';
+    if ($file !== '' && is_file($file) && (time() - (int)@filemtime($file)) < $ttl) {
+        $c = @unserialize((string)@file_get_contents($file), ['allowed_classes' => false]);
+        if (is_array($c) && ($c['fp'] ?? '') === $fp && isset($c['rep']['pending'])) return $c['rep'];
+    }
+    $rep = complianceBuild($db);
+    if ($file !== '') {
+        // البناء نفسه قد يكتب (عدّاد الشارة بالإعدادات مستثنى من البصمة) — البصمة تُؤخذ بعده لتطابق الفتحة التالية
+        $fp2 = complianceFingerprint($db);
+        if ($fp2 !== '') { $tmp = $file . '.' . getmypid() . '.tmp'; if (@file_put_contents($tmp, serialize(['fp' => $fp2, 'rep' => $rep])) !== false) @rename($tmp, $file); }
+    }
+    return $rep;
+}
+
+/**
+ * 🚀 («بدي سرعة البرنامج صاروخ ما فيي انطر»): لوحة القيادة لا تبني التقرير أبداً أثناء فتحها — تعرض آخر تقرير محفوظ فوراً،
+ * وإن لم يكن مطابقاً للداتا الحالية (fresh=false) تطلب الصفحة تحديثه بالخلفية (ajax_compliance.php) وتبدّل الخانة حين يجهز.
+ * بالـCLI (الفحص الشامل) يُبنى مباشرة كما كان.
+ */
+function complianceDashState(PDO $db, int $ttl = 900): array {
+    if (PHP_SAPI === 'cli') return ['rep' => complianceBuild($db), 'fresh' => true];
+    $fp = complianceFingerprint($db);
+    if ($fp === '') return ['rep' => null, 'fresh' => false];
+    $file = complianceCacheFile();
+    $c = is_file($file) ? @unserialize((string)@file_get_contents($file), ['allowed_classes' => false]) : null;
+    if (!is_array($c) || !isset($c['rep']['pending'])) return ['rep' => null, 'fresh' => false];
+    return ['rep' => $c['rep'], 'fresh' => (($c['fp'] ?? '') === $fp && (time() - (int)@filemtime($file)) < $ttl)];
+}
+
 /** تسجيل تصحيح تلقائي بالتقرير (يستدعيه الشفاء الذاتي) */
 function complianceLogAuto(PDO $db, string $rule, int $empId, string $sy, string $empName, string $violation, string $fix, string $result): void {
     complianceEnsureTable($db);

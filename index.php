@@ -21,7 +21,9 @@ handleHoursReductionPost($db, BASE_URL . 'index.php');
 handleCompliancePost($db, BASE_URL . 'index.php');
 // 🎓 قرارات الترسيم الحكمي بالملاك (وافق — رسّمه / لا — يبقى متعاقداً) — تُعالَج وتعيد التوجيه للرئيسية
 handleCadreDuePost($db, BASE_URL . 'index.php'); // بلا مرساة — الصفحة ترجع لمكانها نفسه (msa_stay بالهيدر)
-$homeComp = canEdit() ? complianceBuild($db) : null; // التقرير يُبنى عند كل فتح للوحة القيادة
+// 🚀 التقرير لا يُبنى أثناء فتح اللوحة (كان 10–15 ثانية عند كل فتحة): آخر تقرير محفوظ يُعرض فوراً، وإن تغيّرت الداتا يتحدّث بالخلفية
+$homeCompState = canEdit() ? complianceDashState($db) : null;
+$homeComp = $homeCompState['rep'] ?? null;
 // 🎓 المتعاقدون الذين أكملوا سنتين بالسنة الحالية للبرنامج (أو المختارة إن كانت أحدث) — بانتظار قراره
 $homeCdSy = activeSchoolYear(); if ($homeCdSy === 'all' || strcmp($homeCdSy, currentSchoolYear()) < 0) $homeCdSy = currentSchoolYear();
 $homeCd = canEdit() ? cadreDueCandidates($db, $homeCdSy, null, false, true) : [];
@@ -198,7 +200,20 @@ $dashSections = [
 </section>
 <?php endforeach; ?>
 
-<?php if ($homeComp) renderCompliancePending($homeComp, true); ?>
+<div id="homeCompBox"><?php if ($homeComp): renderCompliancePending($homeComp, true); elseif ($homeCompState): ?>
+    <div class="card no-print" style="margin-bottom:16px"><div class="card-body" style="color:var(--gray-600)"><i class="fas fa-spinner fa-spin"></i> <span dir="ltr">Vérification de conformité…</span> / عم نفحص المخالفات…</div></div>
+<?php endif; ?></div>
+<?php if ($homeCompState && !$homeCompState['fresh']): ?>
+<script>
+// 🚀 تحديث تقرير المخالفات بالخلفية بعد ظهور الصفحة — لا ينتظره المستخدم؛ الخانة تتبدّل حين يجهز (إلا إن كان يكبس داخلها)
+window.addEventListener('load', function () {
+    fetch(<?= json_encode(BASE_URL . 'ajax_compliance.php') ?>, { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.text() : Promise.reject(); })
+        .then(function (h) { var b = document.getElementById('homeCompBox'); if (b && !b.contains(document.activeElement) && !b.querySelector('details[open] form:hover')) b.innerHTML = h; })
+        .catch(function () {});
+});
+</script>
+<?php endif; ?>
 
 <?php renderCadreDuePending($homeCd, $homeCdSy, true, BASE_URL . 'index.php'); ?>
 
