@@ -9286,7 +9286,7 @@ $ok216 = strpos($css209, ':root { --surface: #ffffff; --surface2: #f8fafc; --sur
     && strpos($css209, 'body.doc-view { background: #fff; --surface: #fff;') !== false
     && strpos((string)file_get_contents($PROJ . '/assets/js/pdf-save.js'), "rule.media.mediaText = 'not all';") !== false // الـPDF المحفوظ يبقى أبيض
     && preg_match('/@media print \{[^@]*?body \{ background: white; \}/s', $css209) === 1;
-check('🟦 البطاقات والجداول ليست بيضاء على الشاشة (أزرق فاتح) — والتقرير/المستند المعروض ورقة بيضاء وصفحته بيضاء، والطباعة بيضاء (2026-10-02)', $ok216);
+check('🟦 سطوح البطاقات والجداول بمتغيّرات --surface (رجعت بيضاء بطلبه 2026-10-02 «الأزرق الفاتح يرجع أبيض») — والتقرير/المستند المعروض ورقة بيضاء وصفحته بيضاء، والطباعة بيضاء (2026-10-02)', $ok216);
 
 /* =====================================================================
  * 210) 🚫💰 (2026-10-01 «شهر التعويض يعني شهر 13 ما بيكون عليه ضرائب»): شهر التعويض (13) بلا ضريبة دخل ولا أساس خاضع —
@@ -9409,6 +9409,26 @@ $ok219 = strpos($css219, '--tile: color-mix(in srgb, var(--ic) 90%, #000);') !==
     && strpos($css219, '.dash-link .dl-fr, .dash-link .dl-ar, .report-card-text .rc-fr, .report-card-text .rc-ar { color: #fff;') !== false
     && strpos($css219, 'border-bottom-color: color-mix(in srgb, var(--ic) 58%, #000);') !== false;
 check('🎨 بلاطات لوحة القيادة ومركز التقارير بلون كامل وكتابة بيضاء (مثل صورة p1) ونافرة (2026-10-02)', $ok219);
+
+/* =====================================================================
+ * 220) 📐 (2026-10-02 p1 «يا أستاذ هيدي العناوين بكل التقارير بدها ترتيب»): عناوين التقرير المطبوع ثلاثة أسطر مرتّبة فوق رأس
+ *      الجدول بكل ورقة (العنوان · السنة/الفلتر · سعر الصرف) بقياس ثابت (÷ --pz)، وعنوان الورقة يُخفى بالطباعة فلا يتكرّر
+ *      بالورقة الأولى؛ تصوير «PDF عالكمبيوتر» يبقي عنوان الورقة (pr-capture)؛ السنة مباشرة تحت العنوان.
+ * =================================================================== */
+$js220 = (string)file_get_contents($PROJ . '/assets/js/app.js'); $rh220 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$of220 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $ps220 = (string)file_get_contents($PROJ . '/assets/js/pdf-save.js');
+$ok220 = strpos($js220, "[[l1, ''], [l2.join(' · '), ' pr-t2'], [l3.join(' · '), ' pr-t3']].forEach(function (ln) {") !== false
+    && strpos($js220, "if (extra) root.classList.add('has-pr-title');") !== false
+    && strpos($js220, "(x.indexOf('سعر الصرف') === 0 ? l3 : l2).push(x);") !== false
+    && strpos($js220, "(c.classList.contains('rate-subtitle') ? l3 : l2).push(x);") !== false
+    && strpos($rh220, '.doc-table thead .pr-title-row .pr-title-text{font-size:calc(13pt / var(--pz,1));font-weight:700;color:#000;}') !== false
+    && strpos($rh220, 'body:not(.pr-capture) .has-pr-title > .doc-head,') !== false
+    && strpos($rh220, 'body:not(.pr-capture) .has-pr-title .pr-in-title{display:none !important;}') !== false
+    && strpos($rh220, '.official-doc .doc-title ~ :is(.doc-subtitle,.doc-year):not(:has(+ .doc-subtitle,+ .doc-year)){margin-bottom:12px !important;}') !== false
+    && substr_count($of220, '<div class="doc-year">عن السنة المدرسية <?= e($sy) ?></div><?= rateSubtitle(null, null, true) ?>') === 2
+    && strpos($ps220, "document.body.classList.add('pr-capture');") !== false
+    && strpos($ps220, "document.body.classList.remove('pr-capture');") !== false;
+check('📐 عناوين التقارير المطبوعة مرتّبة: ثلاثة أسطر فوق رأس الجدول بكل ورقة بلا تكرار العنوان بالورقة الأولى + السنة تحت العنوان (2026-10-02)', $ok220);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

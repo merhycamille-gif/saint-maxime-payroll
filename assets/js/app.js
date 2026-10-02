@@ -381,19 +381,50 @@ window.msaFitScreenTables = function () {
 // الجدول أعلى كل صفحة بالطباعة (thead = table-header-group). مخفيّ على الشاشة.
 // setTimeout(0): يعمل بعد سكربتات الصفحة (مثل حقن «الفلتر: …» بالنماذج) فيلتقطها بالعنوان.
 (function () {
+    // 📐 (2026-10-02 p1 «هيدي العناوين بكل التقارير بدها ترتيب»): عناوين التقرير المطبوع مرتّبة بثلاثة أسطر ثابتة فوق رأس الجدول
+    // بكل ورقة — (١) العنوان (٢) السنة/الفترة · الفلتر · العملة (٣) سعر الصرف — وحين لا يفصل بين عنوان الورقة والجدول إلا
+    // سطور العنوان نفسها يُخفى عنوان الورقة بالطباعة (has-pr-title) فلا يطلع العنوان مرّتين بالورقة الأولى.
+    function prClean(el) { return el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : ''; }
+    function prLeads(n, table) { // الجدول أوّل ما في الحاوية (لا محتوى قبله)
+        while (n && n !== table) { n = n.firstElementChild; }
+        return n === table;
+    }
+    // ما بين العنوان والجدول: سطور العنوان المعروفة، أو سطر معلومة قصير (مثل «عدد الموظفين المشمولين: 398») يُضمّ للسطر الثاني
+    // (extra) — أي شيء آخر (جدول/شبكة معلومات/فقرة طويلة) يُبقي عنوان الورقة كما هو. يرجع لائحة السطور المضمومة أو null.
+    function prOnlyHeadings(t, table) {
+        var n = t.nextElementSibling, extra = [];
+        while (n) {
+            if (n === table || (n.contains(table) && prLeads(n, table))) return extra;
+            if (!n.matches('.doc-subtitle, .doc-year, script, style')) {
+                var x = prClean(n);
+                if (n.querySelector('table, input, select, img, .info-grid, .fline') || x.length > 90 || n.children.length > 3) return null;
+                if (x) extra.push(n);
+            }
+            n = n.nextElementSibling;
+        }
+        return null;
+    }
     function injectPrintTitles() {
         document.querySelectorAll('.doc-sheet, .official-doc').forEach(function (root) {
-            var t = root.querySelector('.doc-head .dh-ar, .doc-title');
+            var head = root.querySelector('.doc-head'), t = root.querySelector('.doc-head .dh-ar, .doc-title');
             if (!t) return;
-            var txt = (t.textContent || '').trim();
-            var fr = root.querySelector('.doc-head .dh-fr');
-            if (fr && fr.textContent.trim()) txt += ' — ' + fr.textContent.trim();
-            // أول chip (الفترة + الفلتر) بالورقة الموحّدة، أو السطر الفرعي بالنماذج الرسمية
-            var sub = root.querySelector('.dh-meta .dh-chip, .doc-subtitle');
-            if (sub && sub.textContent.trim()) txt += ' — ' + sub.textContent.trim();
-            if (!txt) return;
             var table = root.querySelector('table.doc-table');
             if (!table || table.querySelector('.pr-title-row')) return;
+            var l1 = prClean(t), l2 = [], l3 = [];
+            if (head) {
+                // الورقة الموحّدة: الفرنسي أوّلاً ثم العربي، والشارات (الفترة · العملة · الراتب يشمل · صدر بتاريخ) بسطر، وسعر الصرف بسطره
+                var fr = prClean(head.querySelector('.dh-fr'));
+                if (fr) l1 = fr + ' — ' + l1;
+                head.querySelectorAll('.dh-meta .dh-chip').forEach(function (c) { var x = prClean(c); if (x) (x.indexOf('سعر الصرف') === 0 ? l3 : l2).push(x); });
+            } else {
+                // النماذج والكشوف: السنة أوّلاً ثم الفلتر/العملة، وسعر الصرف بسطره
+                root.querySelectorAll('.doc-year').forEach(function (c) { var x = prClean(c); if (x) l2.push(x); });
+                root.querySelectorAll('.doc-subtitle').forEach(function (c) { var x = prClean(c); if (x) (c.classList.contains('rate-subtitle') ? l3 : l2).push(x); });
+            }
+            if (!l1) return;
+            // عنوان واحد فقط + لا شيء بينه وبين الجدول غير سطوره ⇒ عنوان الورقة يُخفى بالطباعة (الصفّ المحقون يحمله بكل ورقة)
+            var extra = (root.querySelectorAll('.doc-head, .doc-title').length === 1) ? prOnlyHeadings(head || t, table) : null;
+            if (extra) extra.forEach(function (n) { l2.push(prClean(n)); n.classList.add('pr-in-title'); });
             var thead = table.tHead || table.createTHead();
             var row = thead.insertRow(0);
             row.className = 'pr-title-row';
@@ -404,13 +435,18 @@ window.msaFitScreenTables = function () {
             var nCols = 0;
             if (ref) for (var ci = 0; ci < ref.children.length; ci++) nCols += (ref.children[ci].colSpan || 1);
             th.colSpan = Math.max(1, nCols);
-            // العنوان بdiv داخلية (width:0/min-width:100%): سطر واحد دائماً بقصّ أنيق،
+            // كل سطر بdiv داخلية (width:0/min-width:100%): سطر واحد دائماً بقصّ أنيق،
             // بلا ما يلتفّ (يطوّل الرأس المكرر ويخرّب التقطيع) وبلا ما يمدّد أعمدة الجدول
-            var tt = document.createElement('div');
-            tt.className = 'pr-title-text';
-            tt.textContent = txt;
-            th.appendChild(tt);
+            [[l1, ''], [l2.join(' · '), ' pr-t2'], [l3.join(' · '), ' pr-t3']].forEach(function (ln) {
+                if (!ln[0]) return;
+                var tt = document.createElement('div');
+                tt.className = 'pr-title-text' + ln[1];
+                tt.setAttribute('dir', /[\u0600-\u06FF]/.test(ln[0]) ? 'rtl' : 'ltr'); // سطر فيه عربي = من اليمين (لا ينقلب ترتيب «الفترة · صدر بتاريخ»)
+                tt.textContent = ln[0];
+                th.appendChild(tt);
+            });
             row.appendChild(th);
+            if (extra) root.classList.add('has-pr-title');
         });
     }
     if (document.readyState === 'loading') {

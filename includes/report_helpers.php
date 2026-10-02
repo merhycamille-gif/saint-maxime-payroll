@@ -545,6 +545,12 @@ function officialFormStyles(): string {
 .doc-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 16px;
   color:var(--primary-dark,#1e3a8a);}
 .doc-subtitle{text-align:center;font-size:12pt;color:#475569;margin-top:-10px;margin-bottom:14px;}
+/* 📐 (2026-10-02 «هيدي العناوين بكل التقارير بدها ترتيب»): سطور ما تحت عنوان الكشف (السنة · الفلتر · العملة · سعر الصرف)
+   متراصّة بمسافات متساوية تحت العنوان مباشرة، وآخر سطر يبعد عن الجدول مسافة واحدة ثابتة */
+.official-doc .doc-year{text-align:center;font-size:12pt;font-weight:700;color:#0f172a;}
+.official-doc .doc-title:has(+ .doc-subtitle,+ .doc-year){margin-bottom:3px !important;}
+.official-doc .doc-title ~ .doc-subtitle,.official-doc .doc-title ~ .doc-year{margin:0 0 3px !important;}
+.official-doc .doc-title ~ :is(.doc-subtitle,.doc-year):not(:has(+ .doc-subtitle,+ .doc-year)){margin-bottom:12px !important;}
 
 /* خطوط التعبئة */
 .fill{font-weight:600;color:#0f172a;display:inline-block;padding:0 4px;}
@@ -653,6 +659,17 @@ function officialFormStyles(): string {
     border:none !important;padding:2px 2px 4px;}
   .doc-table thead .pr-title-row .pr-title-text{width:0;min-width:100%;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis;font-size:10pt;font-weight:800;text-align:center;}
+  /* 📐 (2026-10-02 «هيدي العناوين بكل التقارير بدها ترتيب»): ثلاثة أسطر مرتّبة بكل ورقة — العنوان، ثم السنة/الفلتر، ثم سعر
+     الصرف — بقياس ثابت مهما تصغّر الجدول (القسمة على --pz تعوّض تصغيره)، وعنوان الورقة نفسه يُخفى فلا يتكرّر بالورقة الأولى */
+  .doc-table thead .pr-title-row th{padding:0 2px 5px !important;line-height:1.45;}
+  .doc-table thead .pr-title-row .pr-title-text{font-size:calc(13pt / var(--pz,1));font-weight:700;color:#000;}
+  .doc-table thead .pr-title-row .pr-title-text.pr-t2{font-size:calc(10.5pt / var(--pz,1));font-weight:700;color:#222;}
+  .doc-table thead .pr-title-row .pr-title-text.pr-t3{font-size:calc(9.5pt / var(--pz,1));font-weight:400;color:#333;}
+  body:not(.pr-capture) .has-pr-title > .doc-head,
+  body:not(.pr-capture) .has-pr-title .doc-title,
+  body:not(.pr-capture) .has-pr-title .doc-subtitle,
+  body:not(.pr-capture) .has-pr-title .doc-year,
+  body:not(.pr-capture) .has-pr-title .pr-in-title{display:none !important;}
   .doc-table tr{page-break-inside:avoid;break-inside:avoid;}
   .doc-table th,.doc-table td{border:1px solid #555 !important;}
   /* الترويسة وعنوان التقرير لا ينفصلان عن بداية الجدول */

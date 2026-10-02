@@ -359,6 +359,7 @@ if ($form !== '' && in_array($form, $ofFilterableForms, true)):
 document.addEventListener('DOMContentLoaded', function () {
     var d = document.getElementById('ppExportArea'); if (!d) return;
     var t = d.querySelector('.doc-title') || d.firstElementChild;
+    var y = t && t.nextElementSibling; if (y && y.classList.contains('doc-year')) t = y; // السنة تبقى مباشرة تحت العنوان، والفلتر بعدها
     var n = document.createElement('div');
     n.className = 'doc-subtitle'; n.style.fontWeight = '700';
     n.textContent = <?= json_encode('الفلتر: ' . $ofFilterTitle, JSON_UNESCAPED_UNICODE) ?>;
@@ -1250,8 +1251,8 @@ elseif ($form === 'teacher_card'):
             <div><?= e($school['address'] ?? '') ?><?= !empty($school['phone'])?' — هاتف: '.e($school['phone']):'' ?></div>
         </div>
     </div>
-    <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div><?= rateSubtitle(null, null, true) ?>
-    <div style="text-align:center;font-size:12pt;margin-bottom:8px">عن السنة المدرسية <?= e($sy) ?></div>
+    <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div>
+    <div class="doc-year">عن السنة المدرسية <?= e($sy) ?></div><?= rateSubtitle(null, null, true) ?>
     <table class="doc-table">
         <thead>
             <tr>
@@ -1356,8 +1357,8 @@ elseif ($form === 'teacher_card'):
             <div>الرقم المالي: <?= e($school['finance_number'] ?? '') ?></div>
         </div>
     </div>
-    <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div><?= rateSubtitle(null, null, true) ?>
-    <div style="text-align:center;font-size:12pt;margin-bottom:8px">عن السنة المدرسية <?= e($sy) ?></div>
+    <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div>
+    <div class="doc-year">عن السنة المدرسية <?= e($sy) ?></div><?= rateSubtitle(null, null, true) ?>
     <table class="doc-table">
         <thead>
             <tr>

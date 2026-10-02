@@ -103,6 +103,7 @@
     }
     function buildGenericPdf(area) {
         var cur = curtain('⏳ عم نجهّز ملف الـPDF... لحظة');
+        document.body.classList.add('pr-capture'); // عنوان الورقة يبقى ظاهراً بالتصوير (الصفّ المحقون للطباعة الورقية يُخفى هنا)
         var restore = flipPrintRules();
         var landscape = window.msaOrientForced ? (window.msaOrientForced === 'landscape') : genericWide(area); // 🔄 زرّ الاتجاه أولاً
         var designW = landscape ? 1040 : 720;                 // عرض ورقة A4 داخل الهوامش (px)
@@ -120,7 +121,7 @@
         if (need > designW) area.style.width = need + 'px';
         var sw = area.scrollWidth; if (sw > need + 2) area.style.width = sw + 'px';
         var ratio = 2; var hPx = area.scrollHeight; if (hPx * ratio > 28000) ratio = Math.max(1, 28000 / hPx);
-        function undo() { area.style.width = prevW; area.style.maxWidth = prevMax; area.style.margin = prevMg; wraps.forEach(function (x) { x[0].style.overflow = x[1]; x[0].style.overflowX = x[2]; }); prRows.forEach(function (x) { x[0].style.display = x[1]; }); if (stStyle.parentNode) stStyle.parentNode.removeChild(stStyle); restore(); cur.done(); }
+        function undo() { area.style.width = prevW; area.style.maxWidth = prevMax; area.style.margin = prevMg; wraps.forEach(function (x) { x[0].style.overflow = x[1]; x[0].style.overflowX = x[2]; }); prRows.forEach(function (x) { x[0].style.display = x[1]; }); if (stStyle.parentNode) stStyle.parentNode.removeChild(stStyle); restore(); document.body.classList.remove('pr-capture'); cur.done(); }
         // مواضع القطع الآمنة = بدايات صفوف الجداول والفقرات (بالبكسل بعد التصوير) — الصفحة تنتهي عند حدّ صفّ لا وسطه
         // 🔴 المواضع تُقاس بالـCSS px ثم تُحوَّل بعد التصوير بالنسبة الفعلية (canvas.height ÷ ارتفاع المنطقة): المتصفّح يسقف
         //    اللوحة عند 16384px فيصغّرها كلها — الضرب بـratio وحده كان يخطئ بالتقارير الطويلة (عناوين مكرّرة/صفوف مقطوعة)
