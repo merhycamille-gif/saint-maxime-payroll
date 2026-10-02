@@ -1746,7 +1746,8 @@ check('وضع عرض المستند: مفعَّل بمركز التقارير و
       && strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), '$docFocus = true') === false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/annual_slip.php'), '$docFocus = true') === false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/employee_history.php'), '$docFocus = true') === false
-      && strpos((string)file_get_contents(__DIR__ . '/../assets/css/app.css'), 'body.doc-view { background') === false);
+      // الخلفية الرمادية الغامقة ممنوعة (شكوى «مغبّر»)؛ المسموح الوحيد = الأبيض بطلبه 2026-10-02 «صفحة التقارير بس تطلع بدها تكون الباكروند أبيض»
+      && preg_match('/body\.doc-view \{ background(?!: #fff;)/', (string)file_get_contents(__DIR__ . '/../assets/css/app.css')) === 0);
 check('وضع عرض المستند: الهيدر يضيف صف doc-view للـbody وزرّ الرجوع يستعمل docBackUrl',
       strpos($hdSrc27, "!empty(\$docFocus) ? ' doc-view'") !== false
       && strpos($hdSrc27, 'docBackUrl()') !== false);
@@ -9280,11 +9281,12 @@ check('🟦 خلفية البرنامج زرقاء على الشاشة فقط و
  *      الطباعة و PDF تبقى بيضاء (القاعدة داخل @media screen حصراً).
  * =================================================================== */
 $ok216 = strpos($css209, ':root { --surface: #dbe7f6; --surface2: #cfdff2; --surface3: #bfd3ec; --surface-line: #a9c1e0; }') !== false
-    && preg_match('/@media screen and \(min-width: 1px\) \{\s*\.card, \.stat-card, \.table-wrapper, \.dash-kpi, \.dash-meta, \.dash-sec, \.reg-details, \.doc-sheet, \.salary-slip,[^{]*\{\s*background-color: var\(--surface\);/', $css209) === 1
-    && strpos($css209, '.doc-table tbody tr { background-color: var(--surface) !important; }') !== false
+    && preg_match('/@media screen and \(min-width: 1px\) \{\s*\.card, \.stat-card, \.table-wrapper, \.dash-kpi, \.dash-meta, \.dash-sec, \.reg-details,[^{]*\{\s*background-color: var\(--surface\);/', $css209) === 1
+    && strpos($css209, '.doc-sheet, .salary-slip, #ppExportArea, #ppExportArea .card, #ppExportArea .table-wrapper, .official-doc { background-color: #fff !important; }') !== false // 217: المستند المعروض ورقة بيضاء
+    && strpos($css209, 'body.doc-view { background: #fff; --surface: #fff;') !== false
     && strpos((string)file_get_contents($PROJ . '/assets/js/pdf-save.js'), "rule.media.mediaText = 'not all';") !== false // الـPDF المحفوظ يبقى أبيض
     && preg_match('/@media print \{[^@]*?body \{ background: white; \}/s', $css209) === 1;
-check('🟦 البطاقات والجداول ليست بيضاء على الشاشة (أزرق فاتح) والطباعة بيضاء (2026-10-02)', $ok216);
+check('🟦 البطاقات والجداول ليست بيضاء على الشاشة (أزرق فاتح) — والتقرير/المستند المعروض ورقة بيضاء وصفحته بيضاء، والطباعة بيضاء (2026-10-02)', $ok216);
 
 /* =====================================================================
  * 210) 🚫💰 (2026-10-01 «شهر التعويض يعني شهر 13 ما بيكون عليه ضرائب»): شهر التعويض (13) بلا ضريبة دخل ولا أساس خاضع —

@@ -1878,7 +1878,7 @@ form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-siz
 :root { --surface: #dbe7f6; --surface2: #cfdff2; --surface3: #bfd3ec; --surface-line: #a9c1e0; }
 /* (min-width: 1px) = علامة: pdf-save.js يطفئ هذا القسم أثناء تصوير الـPDF ليبقى المحفوظ أبيض كالورق */
 @media screen and (min-width: 1px) {
-    .card, .stat-card, .table-wrapper, .dash-kpi, .dash-meta, .dash-sec, .reg-details, .doc-sheet, .salary-slip,
+    .card, .stat-card, .table-wrapper, .dash-kpi, .dash-meta, .dash-sec, .reg-details,
     .school-checks .chk-group, .school-multi .school-menu, .global-search .gs-panel {
         background-color: var(--surface);
         border-color: var(--surface-line);
@@ -1895,7 +1895,13 @@ form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-siz
     .main-content div[style*="background:#f8fafc"], .main-content div[style*="background:#f9fafb"] { background-color: var(--surface2) !important; border-color: var(--surface-line) !important; }
     /* شعار المدرسة خلفيته بيضاء: يندمج مع السطح الملوَّن بدل مربّع أبيض */
     .main-content img[src*="assets/logos/"], .main-content img[src*="assets/letterheads/"], .main-content img.lh-logo { mix-blend-mode: multiply; }
-    .doc-table tbody tr { background-color: var(--surface) !important; }
-    .doc-table tbody tr:nth-child(even) { background-color: var(--surface2) !important; }
-    .doc-table tfoot td, .doc-table .total-row td, .doc-table .subtotal-row td, .doc-table tr.cat-row td { background-color: var(--surface3) !important; }
+    /* 217) 📄 (2026-10-02 «صفحة التقارير بس تطلع أكيد بدها تكون الباكروند أبيض»): المستند المعروض (تقرير/كشف/بطاقة/إفادة/نموذج)
+     *      ورقة بيضاء كما تُطبع — وصفحة عرض التقرير (doc-view) خلفيتها بيضاء كلها. التلوين للبطاقات وجداول البرنامج فقط. */
+    .doc-sheet, .salary-slip, #ppExportArea, #ppExportArea .card, #ppExportArea .table-wrapper, .official-doc { background-color: #fff !important; }
+    .doc-sheet .table th, #ppExportArea .table th { background: var(--gray-50); }
+    .doc-sheet .table tbody tr:nth-child(even), #ppExportArea .table tbody tr:nth-child(even) { background: #fafcfe; }
+    .doc-sheet .table tbody tr:hover, #ppExportArea .table tbody tr:hover { background: #eef5fb; }
+    .doc-sheet div[style*="background:#fff;"], .doc-sheet div[style$="background:#fff"], #ppExportArea div[style*="background:#fff;"], #ppExportArea div[style$="background:#fff"] { background-color: #fff !important; }
+    body.doc-view { background: #fff; --surface: #fff; --surface2: #f8fafc; --surface3: #f1f5f9; --surface-line: #e2e8f0; }
+    .salcomp-bar .school-checks { background-color: transparent !important; }
 }
