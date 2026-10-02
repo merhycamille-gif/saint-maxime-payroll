@@ -9464,6 +9464,22 @@ $ok222 = strpos($css222, '.dash-sec .dash-links > .dash-link:nth-child(n), .repo
     && strpos($css222, '.report-grid > .report-card { padding: 6px 10px;') !== false;
 check('🎨 كل باب بلون واحد لكبساته + اسم الباب أوضح (16px/800) + كبسات أصغر وأنعم (2026-10-02)', $ok222);
 
+/* =====================================================================
+ * 223) 🚀 (2026-10-02 «بدي سرعة البرنامج صاروخ ما فيي انطر»): ذاكرة قراءة للطلب الواحد (GET بالمتصفّح فقط) لجداول القانون
+ *      وأسعار الصرف وأولاد الموظف — نفس الأرقام بلا آلاف الأسئلة المكرّرة؛ الحفظ (POST) والـCLI يقرآن طازجاً، والكتابة تفرّغها.
+ * =================================================================== */
+$fn223 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$v223a = familyDeductionRow($db, 'celibataire', date('Y-m-d')); $GLOBALS['msa_lookup_off'] = 1; $v223b = familyDeductionRow($db, 'celibataire', date('Y-m-d')); unset($GLOBALS['msa_lookup_off']);
+$ok223 = strpos($fn223, "if (\$on === null) \$on = PHP_SAPI !== 'cli' && ((\$_SERVER['REQUEST_METHOD'] ?? '') === 'GET');") !== false
+    && strpos($fn223, 'function msaLookupFlush(): void { $m = &msaLookupMemo(); $m = []; }') !== false
+    && substr_count($fn223, 'familyDeductionRow($db, ') >= 5
+    && strpos($fn223, "\$xrK = 'xr|' . (int)\$year . '|' . (int)\$month;") !== false
+    && strpos($fn223, "\$tbK = 'tb|' . (string)\$asOf;") !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/exchange_rates.php'), 'msaLookupFlush(); $db->prepare("INSERT INTO exchange_rates') !== false
+    && strpos((string)file_get_contents($PROJ . '/pages/tax_brackets.php'), 'msaLookupFlush(); $db->prepare("UPDATE family_tax_deductions SET') !== false
+    && msaLookupOn() === false && $v223a === $v223b && $v223a > 0;   // الفحص الشامل نفسه (CLI) بلا ذاكرة
+check('🚀 ذاكرة القراءة للطلب الواحد: جداول القانون/أسعار الصرف/أولاد الموظف — GET فقط، تُفرَّغ عند الكتابة، والـCLI طازج (2026-10-02)', $ok223);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

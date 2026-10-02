@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $rate = (float)str_replace(',', '', $_POST['rate']);
             $source = trim($_POST['source'] ?? '');
             
-            $db->prepare("INSERT INTO exchange_rates (month, year, rate, source) VALUES (?,?,?,?)
+            msaLookupFlush(); $db->prepare("INSERT INTO exchange_rates (month, year, rate, source) VALUES (?,?,?,?)
                           ON DUPLICATE KEY UPDATE rate = ?, source = ?")
                ->execute([$month, $year, $rate, $source, $rate, $source]);
             // إعادة حساب تلقائية لكل الرواتب المخزّنة (السعر له fallback لـ«الأحدث» فقد يؤثّر على عدة شهور)
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if (isset($_GET['delete'])) {
     requireWriteAction();
-    $db->prepare("DELETE FROM exchange_rates WHERE id = ?")->execute([(int)$_GET['delete']]);
+    msaLookupFlush(); $db->prepare("DELETE FROM exchange_rates WHERE id = ?")->execute([(int)$_GET['delete']]);
     // إعادة حساب تلقائية بعد الحذف (الشهور التي كانت تعتمد هذا السعر تنتقل لـ«الأحدث»)
     $nRec = recalcSalariesInRange($db, '2017-08-01', null);
     $_SESSION['flash'] = ['type' => 'success', 'msg' => "تم الحذف وإعادة حساب الرواتب المتأثّرة تلقائياً ($nRec). / Supprimé, salaires recalculés."];

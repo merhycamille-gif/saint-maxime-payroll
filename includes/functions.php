@@ -4511,7 +4511,7 @@ function ensureEmployeeChildren20260823() {
             [65, 'بندليون العشي', '2004-04-20'], [65, 'أيوب العشي', '2007-02-19'], [65, 'لبيب العشي', '2008-08-01'],
             [53, 'نقولا صليبا', '2003-03-11'], [53, 'شربل صليبا', '2005-07-25'],
         ];
-        $ins = $db->prepare("INSERT IGNORE INTO employee_children (employee_id, child_name, birth_date, source) VALUES (?,?,?, 'family_doc')");
+        msaLookupFlush(); $ins = $db->prepare("INSERT IGNORE INTO employee_children (employee_id, child_name, birth_date, source) VALUES (?,?,?, 'family_doc')");
         foreach ($rows as $r) {
             // لا تزرع إلا إذا الموظف موجود (قاعدة أونلاين/محلي متطابقة الأرقام)
             $ok = $db->query("SELECT id FROM employees WHERE id = " . (int)$r[0])->fetch();
@@ -4637,6 +4637,31 @@ function composeSocialStatus($kind, $children): string {
  *     المرأة لا تأخذها عن زوج قادر على العمل — القرار النهائي بيد المستخدم عبر الزرّ.)
  * $asOf: تاريخ السريان (أحدث قيم effective_from ≤ التاريخ).
  */
+/**
+ * 🚀 (2026-10-02 «بدي سرعة البرنامج صاروخ»): ذاكرة قراءة للطلب الواحد — جداول القانون (التنزيل العائلي، الشطور، أسعار الصرف)
+ * وأولاد الموظف كانت تُسأل قاعدة البيانات عنها آلاف المرّات بالصفحة الواحدة (الرواتب الشهرية: +30 ألف سؤال، أغلبها مكرّر حرفياً).
+ * تعمل فقط بطلبات العرض (GET) بالمتصفّح — أي حفظ (POST) والفحص الشامل (CLI) يقرآن طازجاً دائماً؛ و msaLookupFlush() تفرّغها
+ * عند أي كتابة على هذه الجداول داخل الطلب نفسه.
+ */
+function &msaLookupMemo(): array { static $m = []; return $m; }
+function msaLookupOn(): bool {
+    static $on = null;
+    if ($on === null) $on = PHP_SAPI !== 'cli' && (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET');
+    return $on && empty($GLOBALS['msa_lookup_off']);
+}
+function msaLookupFlush(): void { $m = &msaLookupMemo(); $m = []; }
+/** التنزيل العائلي السنوي لفئة بتاريخ (جدول القانون) — بذاكرة الطلب */
+function familyDeductionRow(PDO $db, string $status, string $asOf): float {
+    $on = msaLookupOn(); $k = 'fd|' . $status . '|' . $asOf;
+    if ($on) { $m = &msaLookupMemo(); if (isset($m[$k])) return $m[$k]; }
+    $q = $db->prepare("SELECT annual_deduction FROM family_tax_deductions
+                           WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
+    $q->execute([$status, $asOf]);
+    $v = (float)($q->fetchColumn() ?: 0);
+    if ($on) $m[$k] = $v;
+    return $v;
+}
+
 function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $grantSpouseAdd = 0, $grantChildrenAdd = 0, $employeeId = 0) {
     if ((int)($applyFlag ?? 1) !== 1) return 0;
     try {
@@ -4651,7 +4676,9 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
         if ((int)$employeeId > 0) {
             $eid = (int)$employeeId;
             $fdKids = []; $fdSws = null;
-            try {
+            $fdOn = msaLookupOn(); $fdK = 'kids|' . $eid; $fdM = &msaLookupMemo();
+            if ($fdOn && isset($fdM[$fdK])) { [$fdKids, $fdSws] = $fdM[$fdK]; }
+            else try {
                 ensureEmployeeChildren20260823();
                 $kq = $db->prepare("SELECT birth_date FROM employee_children WHERE employee_id = ?");
                 $kq->execute([$eid]);
@@ -4661,6 +4688,7 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
                 $sw = $sq->fetchColumn();
                 // تاريخ وهمي (0000-00-00 / 0001-01-01 — جورج العموري 119 بالأونلاين 2026-09-10) = لا تاريخ، وإلا يُسقط زيادة الزوج بالغلط
                 $fdSws = ($sw && (string)$sw >= '1900-01-01') ? $sw : null;
+                if ($fdOn) $fdM[$fdK] = [$fdKids, $fdSws];
             } catch (Throwable $e) {}
             if ($fdKids && preg_match('/^(marie|veuf|divorce)/', $socialStatus, $mPre)) {
                 $n = 0;
@@ -4682,22 +4710,17 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
             $spouseWorks = 1; // يُسقط زيادة الزوج حكماً
             $spouseActuallyWorks = false; // لا زوج ⇒ حصة الأولاد كاملة، لا تُقسَم
         }
-        $q = $db->prepare("SELECT annual_deduction FROM family_tax_deductions
-                           WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
-        $q->execute([(string)$socialStatus, $asOf]);
-        $ded = (float)($q->fetchColumn() ?: 0);
+        $asOf = (string)$asOf;
+        $ded = familyDeductionRow($db, (string)$socialStatus, $asOf);
         // 🔴 «تنزيل الأولاد: لا يُعطى» (2026-08-23): تُحذف حصة الأولاد كاملة (فرق وضعه عن
         // «متزوج بلا أولاد») حتى لو وضعه العائلي فيه أولاد — يبقى الشخصي (+ زيادة الزوج إن حقّت)
         if ((int)($grantChildrenAdd ?? 1) !== 1 && strpos((string)$socialStatus, 'marie') === 0) {
-            $q->execute(['marie_sans_enfants', $asOf]);
-            $married0k = (float)($q->fetchColumn() ?: 0);
+            $married0k = familyDeductionRow($db, 'marie_sans_enfants', $asOf);
             $ded = min($ded, $married0k > 0 ? $married0k : $ded);
         }
         if ((!empty($spouseWorks) || (int)($grantSpouseAdd ?? 1) !== 1) && strpos((string)$socialStatus, 'marie') === 0) {
-            $q->execute(['marie_sans_enfants', $asOf]);
-            $married0 = (float)($q->fetchColumn() ?: 0);
-            $q->execute(['celibataire', $asOf]);
-            $single = (float)($q->fetchColumn() ?: 0);
+            $married0 = familyDeductionRow($db, 'marie_sans_enfants', $asOf);
+            $single = familyDeductionRow($db, 'celibataire', $asOf);
             $ded = max($single, $ded - max(0, $married0 - $single));
             // ⚖️ القانون (تنبيهه 2026-09-10 «إذا الزوجة تعمل تنزيل الأولاد بينقسم على اثنين بين الزوج والزوجة»):
             // الزوجان العاملان يتقاسمان حصة الأولاد مناصفة — نصفها هنا (الأرمل/المطلق لا زوج فحصته كاملة).
@@ -4733,10 +4756,16 @@ function familyDeductionBreakdown(array $emp, string $asOf): array {
 function lawIncomeTaxAnnual($db, $annualAfterDeduction, $asOf) {
     $rem = (float)$annualAfterDeduction;
     if ($rem <= 0) return 0.0;
-    $st = $db->prepare("SELECT * FROM tax_brackets WHERE effective_from = (SELECT MAX(effective_from) FROM tax_brackets WHERE effective_from <= ?) ORDER BY bracket_number ASC");
-    $st->execute([(string)$asOf]);
+    $tbOn = msaLookupOn(); $tbK = 'tb|' . (string)$asOf; $tbM = &msaLookupMemo();
+    if ($tbOn && isset($tbM[$tbK])) $tbRows = $tbM[$tbK];
+    else {
+        $st = $db->prepare("SELECT * FROM tax_brackets WHERE effective_from = (SELECT MAX(effective_from) FROM tax_brackets WHERE effective_from <= ?) ORDER BY bracket_number ASC");
+        $st->execute([(string)$asOf]);
+        $tbRows = $st->fetchAll();
+        if ($tbOn) $tbM[$tbK] = $tbRows;
+    }
     $tax = 0.0;
-    foreach ($st->fetchAll() as $b) {
+    foreach ($tbRows as $b) {
         $size = $b['annual_to'] ? ($b['annual_to'] - $b['annual_from']) : PHP_INT_MAX;
         $in = min($rem, $size);
         if ($in <= 0) break;
@@ -4768,9 +4797,7 @@ function expectedMonthlyTax(array $emp, $taxableBaseMonthly, int $m, int $y, $db
 function annualLawTaxAsOf($db, $annualTaxable, $socialStatus, $m, $y) {
     if ($annualTaxable <= 0) return 0;
     $asOf = sprintf('%04d-%02d-01', $y, $m);
-    $st = $db->prepare("SELECT annual_deduction FROM family_tax_deductions WHERE social_status = ? AND effective_from <= ? ORDER BY effective_from DESC LIMIT 1");
-    $st->execute([$socialStatus, $asOf]);
-    return lawIncomeTaxAnnual($db, max(0, $annualTaxable - (float)($st->fetchColumn() ?: 0)), $asOf);
+    return lawIncomeTaxAnnual($db, max(0, $annualTaxable - familyDeductionRow($db, (string)$socialStatus, $asOf)), $asOf);
 }
 
 /**
@@ -6200,6 +6227,8 @@ function employeeStatusLabel($status, $lang = 'fr') {
 function getExchangeRate($month = null, $year = null) {
     if ($month === null) $month = (int)date('n');
     if ($year === null) $year = (int)date('Y');
+    $xrOn = msaLookupOn(); $xrK = 'xr|' . (int)$year . '|' . (int)$month; $xrM = &msaLookupMemo();
+    if ($xrOn && isset($xrM[$xrK])) return $xrM[$xrK]; // 🚀 ذاكرة الطلب (كان يُسأل آلاف المرّات بالصفحة)
     
     $stmt = getDB()->prepare("SELECT rate FROM exchange_rates WHERE year = ? AND month = ?");
     $stmt->execute([$year, $month]);
@@ -6211,7 +6240,9 @@ function getExchangeRate($month = null, $year = null) {
         $rate = $stmt->fetchColumn();
     }
     
-    return $rate ? (float)$rate : (float)getSetting('current_exchange_rate', 89500);
+    $rate = $rate ? (float)$rate : (float)getSetting('current_exchange_rate', 89500);
+    if ($xrOn) $xrM[$xrK] = $rate;
+    return $rate;
 }
 
 // =====================================================

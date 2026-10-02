@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit()) {
     } elseif ($act === 'spouse_start' && $empOk) {
         $d = $_POST['spouse_work_start_date'] ?? '';
         $d = preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) ? $d : null;
-        $db->prepare("UPDATE employees SET spouse_work_start_date = ? WHERE id = ?")->execute([$d, $empId]);
+        msaLookupFlush(); $db->prepare("UPDATE employees SET spouse_work_start_date = ? WHERE id = ?")->execute([$d, $empId]);
         $recalcFrom($empId);
         $_SESSION['flash_success'] = $d
             ? 'انحفظ تاريخ بدء عمل الزوج — الزيادة تنشال تلقائياً من ' . formatDate($d) . ' / Date enregistrée.'
@@ -75,13 +75,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit()) {
         $nm = trim((string)($_POST['child_name'] ?? ''));
         $bd = $_POST['child_birth'] ?? '';
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $bd)) {
-            $db->prepare("INSERT IGNORE INTO employee_children (employee_id, child_name, birth_date, source) VALUES (?,?,?, 'manual')")
+            msaLookupFlush(); $db->prepare("INSERT IGNORE INTO employee_children (employee_id, child_name, birth_date, source) VALUES (?,?,?, 'manual')")
                ->execute([$empId, ($nm !== '' ? $nm : null), $bd]);
             $recalcFrom($empId);
             $_SESSION['flash_success'] = 'انضاف الولد — تنزيله يسقط تلقائياً من بلوغه 18 (' . formatDate(date('Y-m-d', strtotime($bd . ' +18 years'))) . ') / Enfant ajouté.';
         }
     } elseif ($act === 'del_child' && $empOk) {
-        $db->prepare("DELETE FROM employee_children WHERE id = ? AND employee_id = ?")->execute([(int)($_POST['child_id'] ?? 0), $empId]);
+        msaLookupFlush(); $db->prepare("DELETE FROM employee_children WHERE id = ? AND employee_id = ?")->execute([(int)($_POST['child_id'] ?? 0), $empId]);
         $recalcFrom($empId);
         $_SESSION['flash_success'] = 'انشال الولد وأُعيد الاحتساب / Enfant retiré.';
     } elseif ($act === 'apply' || $act === 'dismiss') {

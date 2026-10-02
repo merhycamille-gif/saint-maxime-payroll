@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $db->beginTransaction();
             $delDate = $origFrom ?: $from;
-            $db->prepare("DELETE FROM tax_brackets WHERE effective_from = ?")->execute([$delDate]);
+            msaLookupFlush(); $db->prepare("DELETE FROM tax_brackets WHERE effective_from = ?")->execute([$delDate]);
 
             $ins = $db->prepare("INSERT INTO tax_brackets
                 (bracket_number, bracket_name, rate_percent, annual_from, annual_to, monthly_from, monthly_to, effective_from, effective_to)
@@ -90,10 +90,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$from) throw new Exception('تاريخ السريان مطلوب');
             $id = (int)($_POST['ded_id'] ?? 0);
             if ($id > 0) {
-                $db->prepare("UPDATE family_tax_deductions SET social_status=?, social_status_ar=?, social_status_fr=?, annual_deduction=?, effective_from=? WHERE id=?")
+                msaLookupFlush(); $db->prepare("UPDATE family_tax_deductions SET social_status=?, social_status_ar=?, social_status_fr=?, annual_deduction=?, effective_from=? WHERE id=?")
                    ->execute([$st, socialStatusLabel($st,'ar'), socialStatusLabel($st,'fr'), $amt, $from, $id]);
             } else {
-                $db->prepare("INSERT INTO family_tax_deductions (social_status, social_status_ar, social_status_fr, annual_deduction, effective_from) VALUES (?,?,?,?,?)")
+                msaLookupFlush(); $db->prepare("INSERT INTO family_tax_deductions (social_status, social_status_ar, social_status_fr, annual_deduction, effective_from) VALUES (?,?,?,?,?)")
                    ->execute([$st, socialStatusLabel($st,'ar'), socialStatusLabel($st,'fr'), $amt, $from]);
             }
             // إعادة حساب تلقائية من تاريخ سريان التنزيل وطالع
@@ -113,7 +113,7 @@ if (isset($_GET['delete_set'])) {
     $d = $_GET['delete_set'];
     $et = $db->prepare("SELECT effective_to FROM tax_brackets WHERE effective_from = ? LIMIT 1");
     $et->execute([$d]); $etVal = $et->fetchColumn() ?: null;
-    $db->prepare("DELETE FROM tax_brackets WHERE effective_from = ?")->execute([$d]);
+    msaLookupFlush(); $db->prepare("DELETE FROM tax_brackets WHERE effective_from = ?")->execute([$d]);
     $nRec = tbRecalcRange($db, $d, $etVal); // إعادة حساب المدى المتأثّر بالشطور المتبقّية
     $_SESSION['flash_success'] = "تم حذف مجموعة الشطور، وأُعيد حساب $nRec راتب تلقائياً / Supprimé";
     header('Location: ' . BASE_URL . 'pages/tax_brackets.php');
@@ -123,7 +123,7 @@ if (isset($_GET['delete_ded'])) {
     requireWriteAction(); // 🔒 قراءة-فقط ممنوع + مصدر داخلي فقط
     $df = $db->prepare("SELECT effective_from FROM family_tax_deductions WHERE id = ?");
     $df->execute([(int)$_GET['delete_ded']]); $dfVal = $df->fetchColumn();
-    $db->prepare("DELETE FROM family_tax_deductions WHERE id = ?")->execute([(int)$_GET['delete_ded']]);
+    msaLookupFlush(); $db->prepare("DELETE FROM family_tax_deductions WHERE id = ?")->execute([(int)$_GET['delete_ded']]);
     $nRec = $dfVal ? tbRecalcRange($db, $dfVal, null) : 0;
     $_SESSION['flash_success'] = "تم حذف التنزيل، وأُعيد حساب $nRec راتب تلقائياً / Supprimé";
     header('Location: ' . BASE_URL . 'pages/tax_brackets.php');
