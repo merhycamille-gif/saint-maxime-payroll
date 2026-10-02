@@ -1059,7 +1059,7 @@ function applyBiennialPromotion($employeeId, $manual = false, $effectiveYear = n
 
         $note = ($manual ? 'Manual application' : 'Auto biennial promotion')
               . ($deferred ? ' — مؤجَّل: درجة استثنائية في نفس السنة' : '');
-        getDB()->prepare("INSERT INTO employee_grade_history (employee_id, grade_before, grade_after, change_date, reason, notes) VALUES (?, ?, ?, ?, 'biennial_promotion', ?)")
+        if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); getDB()->prepare("INSERT INTO employee_grade_history (employee_id, grade_before, grade_after, change_date, reason, notes) VALUES (?, ?, ?, ?, 'biennial_promotion', ?)")
                ->execute([$employeeId, (float)$emp['current_grade'], $newGrade, $changeDate, $note]);
 
         getDB()->commit();
@@ -1313,17 +1313,37 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, 
     }
 
     // ----- الحفاظ على قانون 344 المطبّق يدوياً (لا يُمَسّ من البناء التلقائي) -----
-    $man = $db->prepare("SELECT change_date, (grade_after - grade_before) d FROM employee_grade_history WHERE employee_id=? AND law_reference='344'");
-    $man->execute([$empId]);
+    // 🚀 تحميل جماعي مرّة واحدة بالطلب (GET): صفوف 344 واليدوية لكل الموظفين بسؤال واحد بدل سؤالين **لكل موظف**
+    $ghBulk = null;
+    if ($giOn) {
+        if (!isset($giM['gh_bulk'])) {
+            $giM['gh_bulk'] = ['344' => [], 'manual' => []];
+            try {
+                foreach ($db->query("SELECT employee_id, change_date, grade_after, grade_before, delta, counted, notes, law_reference, reason
+                                     FROM employee_grade_history WHERE law_reference='344' OR reason='manual' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC) as $gr) {
+                    $gid = (int)$gr['employee_id'];
+                    if ((string)$gr['law_reference'] === '344') $giM['gh_bulk']['344'][$gid][] = ['change_date' => $gr['change_date'], 'd' => (float)$gr['grade_after'] - (float)$gr['grade_before']];
+                    if ((string)$gr['reason'] === 'manual') $giM['gh_bulk']['manual'][$gid][] = ['change_date' => $gr['change_date'], 'd' => ($gr['delta'] !== null ? $gr['delta'] : (float)$gr['grade_after'] - (float)$gr['grade_before']), 'counted' => $gr['counted'], 'notes' => $gr['notes']];
+                }
+            } catch (Throwable $eGh) { $giM['gh_bulk'] = false; }
+        }
+        if (is_array($giM['gh_bulk'])) $ghBulk = $giM['gh_bulk'];
+    }
+    if ($ghBulk !== null) $man = $ghBulk['344'][(int)$empId] ?? [];
+    else { $man = $db->prepare("SELECT change_date, (grade_after - grade_before) d FROM employee_grade_history WHERE employee_id=? AND law_reference='344'");
+    $man->execute([$empId]); }
     foreach ($man as $m) {
         $events[] = ['date' => $m['change_date'], 'type' => 'exceptional', 'delta' => (float)$m['d'], 'law' => '344'];
     }
 
     // ----- الحفاظ على الدرجات اليدوية (reason='manual'، بقرار المستخدم خارج القانون) — تُعاد كما هي بعد البناء -----
+    if ($ghBulk !== null) $manualRows = $ghBulk['manual'][(int)$empId] ?? [];
+    else {
     $manualRows = $db->prepare("SELECT change_date, COALESCE(delta, grade_after-grade_before) d, counted, notes
                                 FROM employee_grade_history WHERE employee_id=? AND reason='manual'");
     $manualRows->execute([$empId]);
     $manualRows = $manualRows->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     usort($events, fn($a,$b) => strcmp($a['date'], $b['date']));
 
@@ -1362,9 +1382,9 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, 
 
     $db->beginTransaction();
     try {
-        $db->prepare("DELETE FROM employee_grade_history WHERE employee_id=?")->execute([$empId]);
+        if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $db->prepare("DELETE FROM employee_grade_history WHERE employee_id=?")->execute([$empId]);
         // إعادة البناء تلقائياً = كل الدرجات محسوبة (counted=1)؛ المستخدم يشيل ما لا يريده لاحقاً بملف الدرجات.
-        $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes) VALUES (?,0,?,?,1,?,'titularization','دخول الملاك')")
+        if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes) VALUES (?,0,?,?,1,?,'titularization','دخول الملاك')")
            ->execute([$empId, $start, $start, $entryDate]);
         $g = $start; $nExc = 0; $nOrd = 0;
         foreach ($events as $ev) {
@@ -1374,13 +1394,13 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, 
             if ($ev['type'] === 'ordinary') {
                 $nOrd += ($after - $before);
                 $note = !empty($ev['comp']) ? 'تقديم التدرّج (تشرين)' : 'تدرّج عادي (تشرين)';
-                $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes) VALUES (?,?,?,?,1,?,'biennial_promotion',?)")
+                if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes) VALUES (?,?,?,?,1,?,'biennial_promotion',?)")
                    ->execute([$empId, $before, $after, $delta, $ev['date'], $note]);
             } else {
                 $nExc += ($after - $before);
                 $lawRef = !empty($ev['law']) ? $ev['law'] : null;
                 $note = $lawRef ? ('قانون ' . $lawRef) : 'درجات استثنائية (4+4+2)';
-                $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,?,?,?,1,?,'exceptional',?,?)")
+                if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,?,?,?,1,?,'exceptional',?,?)")
                    ->execute([$empId, $before, $after, $delta, $ev['date'], $lawRef, $note]);
             }
             $g = $after;
@@ -1388,7 +1408,7 @@ function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, 
         $db->prepare("UPDATE employees SET current_grade=? WHERE id=?")->execute([$g, $empId]);
         // أعِد إدراج الدرجات اليدوية المحفوظة (بقيمها وتواريخها وحالة احتسابها)، ثم أعِد الربط لتشمل الدرجة الحالية.
         if (!empty($manualRows)) {
-            $insM = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,0,?,?,?,?,'manual',NULL,?)");
+            if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $insM = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,0,?,?,?,?,'manual',NULL,?)");
             foreach ($manualRows as $mr) {
                 $insM->execute([$empId, (float)$mr['d'], (float)$mr['d'], (int)$mr['counted'], $mr['change_date'], ($mr['notes'] !== null && $mr['notes'] !== '') ? $mr['notes'] : 'درجة يدوية (بقرار المدرسة)']);
             }
@@ -1483,8 +1503,8 @@ function splitExceptionalUnitsForEmployee($empId) {
     $ownTx = !$db->inTransaction();
     if ($ownTx) $db->beginTransaction();
     try {
-        $ins = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,?,?,?,?,?,?,?,?)");
-        $del = $db->prepare("DELETE FROM employee_grade_history WHERE id=?");
+        if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $ins = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,law_reference,notes) VALUES (?,?,?,?,?,?,?,?,?)");
+        if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $del = $db->prepare("DELETE FROM employee_grade_history WHERE id=?");
         foreach ($lumped as $r) {
             $eff = round((float)($r['delta'] !== null ? $r['delta'] : ($r['grade_after'] - $r['grade_before'])), 1);
             $sign = $eff < 0 ? -1 : 1;
@@ -1522,7 +1542,7 @@ function rechainGradeHistory($empId) {
         $running = 0.0;
         $today = date('Y-m-d');
         $asOfToday = 0.0;   // الدرجة الحالية = القيمة لغاية اليوم (الأسطر المستقبلية «فتح السنة» تُسلسَل لكن لا تدخل current_grade)
-        $upd = $db->prepare("UPDATE employee_grade_history SET grade_before=?, grade_after=? WHERE id=?");
+        if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $upd = $db->prepare("UPDATE employee_grade_history SET grade_before=?, grade_after=? WHERE id=?");
         foreach ($rows as $r) {
             $isTitul = ($r['reason'] === 'titularization');
             $delta = ($r['delta'] === null) ? ((float)$r['grade_after'] - (float)$r['grade_before']) : (float)$r['delta'];
@@ -1609,12 +1629,12 @@ function applyLegalGradesForNewYear($db, $empId, $y1, $y2) {
             if ($r['change_date'] !== $want[$i][0] || abs((float)$r['grade_before'] - $want[$i][1]) >= 0.01 || abs((float)$r['grade_after'] - $want[$i][2]) >= 0.01) { $same = false; break; }
         }
         if ($same) return 0;
-        $del = $db->prepare("DELETE FROM employee_grade_history WHERE id=?");
+        if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $del = $db->prepare("DELETE FROM employee_grade_history WHERE id=?");
         foreach ($existing as $r) $del->execute([(int)$r['id']]);
     }
     if (!$want) return 0;
 
-    $ins = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes) VALUES (?,?,?,?,1,?,?,?)");
+    if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $ins = $db->prepare("INSERT INTO employee_grade_history (employee_id,grade_before,grade_after,delta,counted,change_date,reason,notes) VALUES (?,?,?,?,1,?,?,?)");
     foreach ($want as [$d, $b, $a, $reason, $note]) { $dl = round($a - $b, 1); $ins->execute([$empId, $b, $a, $dl, $d, $reason, $note . ' [+' . $dl . ']']); }
     // زيادة يدوية بنفس التاريخين، أو صفوف لاحقة (درجة يدوية بتاريخ أبعد) بعد استبدال: أعِد ربط السلسلة من الـdelta
     // (فقط لسجلّ مرتكز على صفّ الترسيم — وإلا لا يُلمَس حتى لا تُصفَّر current_grade)
@@ -1725,7 +1745,7 @@ function applyExceptionalLaw($employeeId, $lawNumber, $dateOverride = null) {
             : exceptionalLawEffectiveDate($law, tenureReferenceDate($emp));
         // 🔵 نكتب كل درجة **مفردة** (+1، والكسر الأخير ½) صفّاً مستقلاً بـcounted=1 وdelta ثابت —
         //    ليطابق نموذج «كل درجة لحالها». المجموع = gradesToAdd. (المستخدم يعدّل التواريخ فردياً لاحقاً.)
-        $ins = getDB()->prepare("INSERT INTO employee_grade_history (employee_id, grade_before, grade_after, delta, counted, change_date, reason, law_reference, notes) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)");
+        if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $ins = getDB()->prepare("INSERT INTO employee_grade_history (employee_id, grade_before, grade_after, delta, counted, change_date, reason, law_reference, notes) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)");
         $run = (float)$emp['current_grade'];
         foreach (splitGradeUnits($gradesToAdd) as $u) {
             $b = $run; $a = min(52, round($run + $u, 1));
@@ -1768,7 +1788,7 @@ function removeExceptionalLaw($employeeId, $lawNumber) {
 
     $db->beginTransaction();
     try {
-        $db->prepare("DELETE FROM employee_grade_history WHERE employee_id = ? AND law_reference = ?")->execute([$employeeId, $lawNumber]);
+        if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); $db->prepare("DELETE FROM employee_grade_history WHERE employee_id = ? AND law_reference = ?")->execute([$employeeId, $lawNumber]);
         $db->prepare("UPDATE employees SET current_grade = ? WHERE id = ?")->execute([$newGrade, $employeeId]);
         $db->commit();
         return ['old_grade' => $cur, 'new_grade' => $newGrade, 'grades_removed' => $delta];

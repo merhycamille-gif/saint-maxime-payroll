@@ -9526,6 +9526,21 @@ $ok226 = strpos($rh226, 'function setupDocTables() {') !== false && strpos($rh22
     && preg_match('/<script type="speculationrules">\s*(\{.*?\})\s*<\/script>/s', $ft226, $m226) === 1 && is_array(json_decode($m226[1], true));
 check('🚀 التقارير تقيس الطباعة عند الحاجة فقط + التحضير المسبق للصفحات عند الوقوف على روابط التنقّل (2026-10-02)', $ok226);
 
+/* =====================================================================
+ * 227) 🚀 (2026-10-02 «بدي البرنامج يشتغل متل البرق وبدون أخطاء»): تحميل جماعي مرّة واحدة بالطلب (GET) بدل سؤال لكل موظف —
+ *      أولاد الموظفين/تاريخ عمل الأزواج، أساس الدولار المباشر، خاضع السنة التراكمي (mofCumTax)، وصفوف الدرجات 344/اليدوية؛
+ *      وأي كتابة على سجلّ الدرجات تُسقط التحميل (msaGhBulkDrop). المسار الأصلي (سؤال لكل موظف) باقٍ للـPOST والـCLI.
+ * =================================================================== */
+$fn227 = (string)file_get_contents($PROJ . '/includes/functions.php'); $pc227 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$ok227 = strpos($fn227, "\$fdM['kids_all'] = [\$kAll, \$sAll];") !== false
+    && strpos($fn227, "\$mcK = 'mofcum|' . \$y;") !== false
+    && strpos($fn227, 'function msaGhBulkDrop(): void {') !== false
+    && strpos($fn227, 'SELECT SUM(taxable_base_lbp) tb, COUNT(DISTINCT month) mcnt FROM monthly_salaries') !== false   // المسار الأصلي باقٍ
+    && strpos($pc227, "\$giM['gh_bulk'] = ['344' => [], 'manual' => []];") !== false
+    && substr_count($pc227, "if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); ") >= 10
+    && strpos($pc227, "FROM employee_grade_history WHERE employee_id=? AND law_reference='344'") !== false;
+check('🚀 تحميل جماعي بالطلب (أولاد/أزواج/أساس الدولار/خاضع السنة/درجات 344 واليدوية) بدل سؤال لكل موظف — GET فقط (2026-10-02)', $ok227);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

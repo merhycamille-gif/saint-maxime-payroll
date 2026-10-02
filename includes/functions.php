@@ -4080,11 +4080,24 @@ function healFrenchDigits20260826() {
 function mofCumTax($db, array $e, int $y, int $mTo): array {
     $z = ['tb' => 0, 'fd' => 0, 'net' => 0];
     if ($mTo < 1) return $z;
+    if (msaLookupOn()) { // 🚀 تحميل جماعي لخاضع السنة مرّة واحدة بالطلب (GET) — كان سؤالاً لكل موظف ولكل فصل
+        $mcM = &msaLookupMemo(); $mcK = 'mofcum|' . $y;
+        if (!isset($mcM[$mcK])) {
+            $mcM[$mcK] = [];
+            $qa = $db->prepare("SELECT employee_id, month, SUM(taxable_base_lbp) tb FROM monthly_salaries
+                WHERE year=? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0) GROUP BY employee_id, month");
+            $qa->execute([$y]);
+            foreach ($qa->fetchAll(PDO::FETCH_ASSOC) as $ra) $mcM[$mcK][(int)$ra['employee_id']][(int)$ra['month']] = (float)$ra['tb'];
+        }
+        $r = ['tb' => 0, 'mcnt' => 0];
+        foreach (($mcM[$mcK][(int)$e['id']] ?? []) as $mm => $tbm) { if ($mm <= $mTo) { $r['tb'] += $tbm; $r['mcnt']++; } }
+    } else {
     $q = $db->prepare("SELECT SUM(taxable_base_lbp) tb, COUNT(DISTINCT month) mcnt FROM monthly_salaries
         WHERE employee_id=? AND year=? AND month<=?
           AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
     $q->execute([(int)$e['id'], $y, $mTo]);
     $r = $q->fetch() ?: [];
+    }
     if (!(int)($r['mcnt'] ?? 0)) return $z;
     $fda = familyDeductionAnnual($e['social_status'] ?? '', $e['spouse_works'] ?? 0,
         $e['apply_family_deduction'] ?? ($e['afd'] ?? 1), $y . '-01-01',
@@ -4653,6 +4666,8 @@ function msaLookupOn(): bool {
     return $on && empty($GLOBALS['msa_lookup_off']);
 }
 function msaLookupFlush(): void { $m = &msaLookupMemo(); $m = []; }
+/** يُسقط التحميل الجماعي لسجلّ الدرجات (344/اليدوية) عند أي كتابة على employee_grade_history داخل الطلب نفسه */
+function msaGhBulkDrop(): void { $m = &msaLookupMemo(); unset($m['gh_bulk']); }
 /** التنزيل العائلي السنوي لفئة بتاريخ (جدول القانون) — بذاكرة الطلب */
 function familyDeductionRow(PDO $db, string $status, string $asOf): float {
     $on = msaLookupOn(); $k = 'fd|' . $status . '|' . $asOf;
@@ -4680,7 +4695,21 @@ function familyDeductionAnnual($socialStatus, $spouseWorks, $applyFlag, $asOf, $
             $eid = (int)$employeeId;
             $fdKids = []; $fdSws = null;
             $fdOn = msaLookupOn(); $fdK = 'kids|' . $eid; $fdM = &msaLookupMemo();
-            if ($fdOn && isset($fdM[$fdK])) { [$fdKids, $fdSws] = $fdM[$fdK]; }
+            // 🚀 تحميل جماعي مرّة واحدة بالطلب (GET): أولاد كل الموظفين + تواريخ بدء عمل الأزواج بسؤالين بدل سؤالين **لكل موظف**
+            if ($fdOn && !isset($fdM['kids_all'])) {
+                try {
+                    ensureEmployeeChildren20260823();
+                    $kAll = []; foreach ($db->query("SELECT employee_id, birth_date FROM employee_children ORDER BY id")->fetchAll(PDO::FETCH_ASSOC) as $kr) $kAll[(int)$kr['employee_id']][] = $kr['birth_date'];
+                    $sAll = []; foreach ($db->query("SELECT id, spouse_work_start_date FROM employees WHERE spouse_work_start_date IS NOT NULL")->fetchAll(PDO::FETCH_ASSOC) as $sr) $sAll[(int)$sr['id']] = $sr['spouse_work_start_date'];
+                    $fdM['kids_all'] = [$kAll, $sAll];
+                } catch (Throwable $e) { $fdM['kids_all'] = false; }
+            }
+            if ($fdOn && is_array($fdM['kids_all'] ?? null)) {
+                $fdKids = $fdM['kids_all'][0][$eid] ?? [];
+                $sw = $fdM['kids_all'][1][$eid] ?? null;
+                $fdSws = ($sw && (string)$sw >= '1900-01-01') ? $sw : null;
+            }
+            elseif ($fdOn && isset($fdM[$fdK])) { [$fdKids, $fdSws] = $fdM[$fdK]; }
             else try {
                 ensureEmployeeChildren20260823();
                 $kq = $db->prepare("SELECT birth_date FROM employee_children WHERE employee_id = ?");
@@ -5892,6 +5921,11 @@ function directUsdBaseForRow(array $row): ?float {
     static $emps = [];
     $eid = (int)($row['employee_id'] ?? $row['id'] ?? 0);
     if ($eid <= 0) return null;
+    static $bulk = false;
+    if (!$bulk && !array_key_exists($eid, $emps) && msaLookupOn()) { // 🚀 تحميل جماعي مرّة واحدة بالطلب (GET) بدل سؤال لكل موظف
+        $bulk = true;
+        try { foreach (getDB()->query("SELECT id, salary_input_mode, base_salary_usd, usd_base_from_sy FROM employees")->fetchAll(PDO::FETCH_ASSOC) as $br) { $bid = (int)$br['id']; unset($br['id']); if (!array_key_exists($bid, $emps)) $emps[$bid] = $br; } } catch (Throwable $e) {}
+    }
     if (!array_key_exists($eid, $emps)) {
         try { $emps[$eid] = getDB()->query("SELECT salary_input_mode, base_salary_usd, usd_base_from_sy FROM employees WHERE id = " . $eid)->fetch(PDO::FETCH_ASSOC) ?: null; }
         catch (Throwable $e) { $emps[$eid] = null; }
