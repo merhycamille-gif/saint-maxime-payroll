@@ -83,18 +83,33 @@ document.addEventListener('change', function(e) {
 // يغلب هذا التصغير (!important بقواعد @media print)، ووورد/إكسل يمسحانه (cleanHtml).
 // 🔒 البطاقة السنوية (.salary-slip) والقسيمة الشهرية والإفادات مستثناة تماماً — لا تُلمَس.
 window.msaFitScreenTables = function () {
-    var tables = document.querySelectorAll('table.table, table.doc-table, table.xlsf');
-    for (var i = 0; i < tables.length; i++) {
-        var t = tables[i], host = t.parentElement;
-        if (!host) continue;
+    // 🚀 (2026-10-02 «كل البرنامج متل البرق»): على دفعات — تصفير الكل، ثم قياس الكل (تخطيط واحد)، ثم تصغير الكل (تخطيط واحد)،
+    // بدل «صفّر/قِس/صغّر» لكل جدول على حدة (تخطيطان **لكل جدول** — صفحات فيها عشرات الجداول كانت تتجمّد نصف ثانية).
+    var tables = document.querySelectorAll('table.table, table.doc-table, table.xlsf'), list = [], i;
+    for (i = 0; i < tables.length; i++) {
+        var t = tables[i];
+        if (!t.parentElement) continue;
         if (t.closest('.salary-slip, .payslip-card, [data-fit1], .no-print, .ba-overlay, .modal, [role="dialog"]')) continue;
-        t.style.zoom = '';                                   // القياس بالحجم الطبيعي (خط 12)
-        var hs = getComputedStyle(host);   // عرض المحتوى الحقيقي للحاوية (بلا حشوتها) — وإلا فاض الطرف بقدر الحشوة
-        var avail = host.clientWidth - (parseFloat(hs.paddingLeft) || 0) - (parseFloat(hs.paddingRight) || 0);
-        var natW = t.scrollWidth;
+        list.push(t);
+    }
+    for (i = 0; i < list.length; i++) if (list[i].style.zoom) list[i].style.zoom = '';   // القياس بالحجم الطبيعي (خط 12)
+    function availOf(t) {
+        var host = t.parentElement, hs = getComputedStyle(host);   // عرض المحتوى الحقيقي للحاوية (بلا حشوتها) — وإلا فاض الطرف بقدر الحشوة
+        return host.clientWidth - (parseFloat(hs.paddingLeft) || 0) - (parseFloat(hs.paddingRight) || 0);
+    }
+    var m = [];
+    for (i = 0; i < list.length; i++) m.push([availOf(list[i]), list[i].scrollWidth]);
+    var zoomed = [];
+    for (i = 0; i < list.length; i++) {
+        var avail = m[i][0], natW = m[i][1];
         if (!natW || avail <= 0) continue;
         // تسامح 4px (حدود الجدول): الجدول الذي يسع حاويته يبقى بحجمه 12 تماماً — الأعرض وحده يتصغّر
-        if (natW > avail + 4) t.style.zoom = Math.max((avail - 2) / natW, 0.5).toFixed(3);
+        if (natW > avail + 4) { list[i].style.zoom = Math.max((avail - 2) / natW, 0.5).toFixed(3); zoomed.push(i); }
+    }
+    // تحقّق: جدول عريض قد يكون وسّع حاوية مشتركة وقت القياس — إن تغيّر عرض حاوية جدول بعد التصغير يُعاد حسابه وحده
+    for (var k = 0; k < zoomed.length; k++) {
+        var j = zoomed[k], av2 = availOf(list[j]);
+        if (av2 > 0 && Math.abs(av2 - m[j][0]) > 2) list[j].style.zoom = Math.max((av2 - 2) / m[j][1], 0.5).toFixed(3);
     }
 };
 
