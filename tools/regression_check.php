@@ -1380,7 +1380,7 @@ check('رؤوس ثابتة براس الشاشة: أسانسور واحد للص
       && strpos($jsSrc, 'translateY') !== false
       && strpos($jsSrc, 'table-wrapper') !== false
       && strpos($jsSrc, "addEventListener('scroll', stickXHeads") !== false
-      && strpos($jsSrc, 'top += rows[i].offsetHeight') !== false
+      && strpos($jsSrc, 'top += w2.h[i];') !== false // 2026-10-02: ارتفاعات الصفوف تُقرأ دفعة واحدة (w.h) ثم تُكتب المواضع
       && strpos($jsSrc, "classList.add('tbl-scroll')") === false);
 check('رؤوس ثابتة: تكرار رأس الجدول بالطباعة باقٍ (thead: table-header-group)',
       strpos((string)file_get_contents(__DIR__ . '/../includes/report_helpers.php'), 'display:table-header-group') !== false);
@@ -9559,6 +9559,20 @@ $ok228 = strpos($fn228, 'function msaFpCacheGet(string $name, int $ttl = 900) {'
     && strpos($hc228, "msaFpCacheGet('health_g1', 900)") !== false && strpos($hc228, "pages/health_check.php?fresh=1") !== false
     && strpos($fn228, 'foreach ($db->query("SELECT * FROM employees")->fetchAll(PDO::FETCH_ASSOC) as $br)') !== false;
 check('⚡ كاش ببصمة الداتا لاقتراحات الملاك وفحص الصحّة + تقرير المخالفات فوري بتحديث خلفي + تحميل جماعي لصفوف الموظفين (2026-10-02)', $ok228);
+
+/* =====================================================================
+ * 229) ⚡ (2026-10-02 «أكيد وما تنطرني، عمول كل شي» — الصفحات ذات الجداول الكبيرة تحت الثانية): ملاءمة الشاشة وتثبيت الرؤوس
+ *      على دفعات (قراءات ثم كتابات — تخطيط واحد لا تخطيط لكل جدول) + ذاكرة التصغير بالجلسة (sessionStorage نصف ساعة، تتحقّق
+ *      من عدد الصفوف وعرض الحاوية والفيضان). النتيجة البصرية مطابقة (zooms.js: 196 حالة).
+ * =================================================================== */
+$js229 = (string)file_get_contents($PROJ . '/assets/js/app.js');
+$ok229 = strpos($js229, "var KEY = 'msaZ:' + location.pathname + location.search + '|' + window.innerWidth") !== false
+    && strpos($js229, 'if (cache && (Date.now() - cache.at > 1800000 || !cache.t || cache.t.length !== list.length)) cache = null;') !== false
+    && strpos($js229, "var over = c2.z !== '0.500' && h.scrollWidth > h.clientWidth + 4;") !== false
+    && strpos($js229, '// (ج) قراءة: تصغير كل جدول، هل هو أعرض من حاويته، ارتفاعات صفوف رأسه') !== false
+    && strpos($js229, 'for (i = 0; i < rows.length; i++) w.h.push(rows[i].offsetHeight);') !== false
+    && strpos($js229, "t2.parentElement.style.overflowX = 'auto';") !== false;
+check('⚡ ملاءمة الجداول وتثبيت الرؤوس على دفعات + ذاكرة التصغير بالجلسة (الجداول الكبيرة تفتح أسرع) (2026-10-02)', $ok229);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

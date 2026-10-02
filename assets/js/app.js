@@ -85,6 +85,9 @@ document.addEventListener('change', function(e) {
 window.msaFitScreenTables = function () {
     // 🚀 (2026-10-02 «كل البرنامج متل البرق»): على دفعات — تصفير الكل، ثم قياس الكل (تخطيط واحد)، ثم تصغير الكل (تخطيط واحد)،
     // بدل «صفّر/قِس/صغّر» لكل جدول على حدة (تخطيطان **لكل جدول** — صفحات فيها عشرات الجداول كانت تتجمّد نصف ثانية).
+    // ⚡ + ذاكرة التصغير (sessionStorage، نصف ساعة): بالزيارة التالية لنفس الصفحة بنفس مقاس الشاشة يُطبَّق التصغير المحفوظ
+    //   مباشرة قبل أي تخطيط (تخطيط واحد بدل اثنين للجداول الكبيرة)، ويُتحقَّق منه: جدول تغيّر عدد صفوفه/عرض حاويته أو فاض
+    //   عن حاويته يُعاد قياسه بالطريقة الكاملة.
     var tables = document.querySelectorAll('table.table, table.doc-table, table.xlsf'), list = [], i;
     for (i = 0; i < tables.length; i++) {
         var t = tables[i];
@@ -92,25 +95,46 @@ window.msaFitScreenTables = function () {
         if (t.closest('.salary-slip, .payslip-card, [data-fit1], .no-print, .ba-overlay, .modal, [role="dialog"]')) continue;
         list.push(t);
     }
-    for (i = 0; i < list.length; i++) if (list[i].style.zoom) list[i].style.zoom = '';   // القياس بالحجم الطبيعي (خط 12)
     function availOf(t) {
         var host = t.parentElement, hs = getComputedStyle(host);   // عرض المحتوى الحقيقي للحاوية (بلا حشوتها) — وإلا فاض الطرف بقدر الحشوة
         return host.clientWidth - (parseFloat(hs.paddingLeft) || 0) - (parseFloat(hs.paddingRight) || 0);
     }
-    var m = [];
-    for (i = 0; i < list.length; i++) m.push([availOf(list[i]), list[i].scrollWidth]);
-    var zoomed = [];
-    for (i = 0; i < list.length; i++) {
-        var avail = m[i][0], natW = m[i][1];
-        if (!natW || avail <= 0) continue;
-        // تسامح 4px (حدود الجدول): الجدول الذي يسع حاويته يبقى بحجمه 12 تماماً — الأعرض وحده يتصغّر
-        if (natW > avail + 4) { list[i].style.zoom = Math.max((avail - 2) / natW, 0.5).toFixed(3); zoomed.push(i); }
+    function sigOf(t) { var r0 = t.rows[0]; return t.rows.length + 'x' + (r0 ? r0.cells.length : 0); }
+    var KEY = 'msaZ:' + location.pathname + location.search + '|' + window.innerWidth, cache = null, slow = [], keep = {};
+    try { cache = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { cache = null; }
+    if (cache && (Date.now() - cache.at > 1800000 || !cache.t || cache.t.length !== list.length)) cache = null;
+    if (cache) {
+        // المسار السريع: التصغير المحفوظ أوّلاً (كتابة)، ثم قراءة واحدة للتحقّق
+        for (i = 0; i < list.length; i++) { var c = cache.t[i]; if (c.sig === sigOf(list[i])) { if (list[i].style.zoom !== (c.z === '1' ? '' : c.z)) list[i].style.zoom = (c.z === '1' ? '' : c.z); keep[i] = true; } }
+        for (i = 0; i < list.length; i++) {
+            if (!keep[i]) { slow.push(i); continue; }
+            var h = list[i].parentElement, av = availOf(list[i]), c2 = cache.t[i];
+            var over = c2.z !== '0.500' && h.scrollWidth > h.clientWidth + 4;   // الحدّ الأدنى 0.5 يفيض أصلاً (له أسانسور أفقي)
+            if (Math.abs(av - c2.av) > 2 || over || (c2.z === '1' && list[i].scrollWidth > av + 4)) { slow.push(i); delete keep[i]; }
+        }
+    } else { for (i = 0; i < list.length; i++) slow.push(i); }
+    var m = {};
+    if (slow.length) {
+        for (i = 0; i < slow.length; i++) if (list[slow[i]].style.zoom) list[slow[i]].style.zoom = '';   // القياس بالحجم الطبيعي (خط 12)
+        for (i = 0; i < slow.length; i++) m[slow[i]] = [availOf(list[slow[i]]), list[slow[i]].scrollWidth];
+        var zoomed = [];
+        for (i = 0; i < slow.length; i++) {
+            var si = slow[i], avail = m[si][0], natW = m[si][1];
+            if (!natW || avail <= 0) continue;
+            // تسامح 4px (حدود الجدول): الجدول الذي يسع حاويته يبقى بحجمه 12 تماماً — الأعرض وحده يتصغّر
+            if (natW > avail + 4) { list[si].style.zoom = Math.max((avail - 2) / natW, 0.5).toFixed(3); zoomed.push(si); }
+        }
+        // تحقّق: جدول عريض قد يكون وسّع حاوية مشتركة وقت القياس — إن تغيّر عرض حاوية جدول بعد التصغير يُعاد حسابه وحده
+        for (var k = 0; k < zoomed.length; k++) {
+            var j = zoomed[k], av2 = availOf(list[j]);
+            if (av2 > 0 && Math.abs(av2 - m[j][0]) > 2) { list[j].style.zoom = Math.max((av2 - 2) / m[j][1], 0.5).toFixed(3); m[j][0] = av2; }
+        }
     }
-    // تحقّق: جدول عريض قد يكون وسّع حاوية مشتركة وقت القياس — إن تغيّر عرض حاوية جدول بعد التصغير يُعاد حسابه وحده
-    for (var k = 0; k < zoomed.length; k++) {
-        var j = zoomed[k], av2 = availOf(list[j]);
-        if (av2 > 0 && Math.abs(av2 - m[j][0]) > 2) list[j].style.zoom = Math.max((av2 - 2) / m[j][1], 0.5).toFixed(3);
-    }
+    try {
+        var out = [];
+        for (i = 0; i < list.length; i++) out.push({ sig: sigOf(list[i]), z: list[i].style.zoom || '1', av: keep[i] ? cache.t[i].av : (m[i] ? m[i][0] : 0) });
+        sessionStorage.setItem(KEY, JSON.stringify({ at: (cache && !slow.length) ? cache.at : Date.now(), t: out }));
+    } catch (e) {}
 };
 
 // 📌 تثبيت رؤوس الجداول أثناء التمرير (على كل البرنامج):
@@ -133,48 +157,62 @@ window.msaFitScreenTables = function () {
         if (tb) { var tbs = getComputedStyle(tb); if (tbs.position === 'sticky' && tbs.display !== 'none') topOffG = Math.ceil(tb.getBoundingClientRect().height); }
         // 📌 (2026-10-01) شريط تبويبات ملف الموظف ثابت تحت الشريط العلوي ⇒ رؤوس الجداول تلتصق تحته لا خلفه
         try { document.documentElement.style.setProperty('--msa-topbar-h', topOffG + 'px'); var tabsEl = document.querySelector('.main-content .tabs'); if (tabsEl && tabsEl.offsetParent && getComputedStyle(tabsEl).position === 'sticky') topOffG += Math.ceil(tabsEl.getBoundingClientRect().height); } catch (e) {}
-        var tables = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table');
-        for (var k = 0; k < tables.length; k++) {
+        // 🚀 (2026-10-02 «كل البرنامج متل البرق»): على دفعات — كل القراءات معاً ثم كل الكتابات معاً. كان كل جدول يكتب ثم يقرأ
+        // (فتح حاوياته ← قياسه ← كتابة top ← قراءة ارتفاع الصف…) فيعيد المتصفّح التخطيط لكل جدول ولكل صفّ رأس — صفحة فيها
+        // عشرات الجداول كانت تعيد التخطيط ~180 مرّة.
+        var tables = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table'), work = [], k, i, j;
+        var openRe = /(^|\s)(card|card-body|report-table-wrap|table-wrapper|tbl-scroll|official-doc|doc-sheet|xls-sheet|mof-form)(\s|$)/, toOpen = [];
+        // (أ) قراءة: الحاويات المقصوصة/المتمرّرة على سلسلة كل جدول
+        for (k = 0; k < tables.length; k++) {
             var t = tables[k];
             if (!t.tHead || t.tHead.rows.length === 0) continue;
             // الجداول داخل النوافذ المنبثقة (مودال) لا تُثبَّت رؤوسها: الرأس اللاصق كان يغطي خانات
             // الإدخال بنافذة «بند جديد» فتبدو النافذة فاضية (قصة صفحة المكافآت 2026-08-29)
             if (t.closest('.ba-overlay, .modal, [role="dialog"]')) continue;
+            work.push({ t: t });
             // فتح كل حاويات الجداول المقصوصة/المتمرّرة على السلسلة: الصفحة نفسها هي
             // الأسانسور الوحيد عمودياً — لا صناديق تمرير داخلية بعد اليوم
             var p = t.parentElement;
             while (p && p !== document.body) {
-                var st = getComputedStyle(p);
-                if ((st.overflow !== 'visible' || st.overflowX !== 'visible' || st.overflowY !== 'visible')
-                    && /(^|\s)(card|card-body|report-table-wrap|table-wrapper|tbl-scroll|official-doc|doc-sheet|xls-sheet|mof-form)(\s|$)/.test(p.className || '')) {
-                    p.classList.remove('tbl-scroll');
-                    p.style.overflow = 'visible';
-                    p.setAttribute('data-stkvis', '1');
+                if (!p.__stkSeen) {
+                    p.__stkSeen = true;
+                    var st = getComputedStyle(p);
+                    if ((st.overflow !== 'visible' || st.overflowX !== 'visible' || st.overflowY !== 'visible') && openRe.test(p.className || '')) toOpen.push(p);
                 }
                 p = p.parentElement;
             }
-            var z = parseFloat(getComputedStyle(t).zoom) || 1;
-            var host = t.parentElement;
-            var needX = t.scrollWidth > host.clientWidth + 2;   // أعرض من حاويته = بدو أسانسور أفقي
-            var top = 0;
-            if (needX) {
+        }
+        // (ب) كتابة: فتحها كلها
+        for (k = 0; k < toOpen.length; k++) { toOpen[k].classList.remove('tbl-scroll'); toOpen[k].style.overflow = 'visible'; toOpen[k].setAttribute('data-stkvis', '1'); }
+        for (k = 0; k < tables.length; k++) { var q = tables[k].parentElement; while (q && q !== document.body) { if (q.__stkSeen) q.__stkSeen = false; q = q.parentElement; } }
+        // (ج) قراءة: تصغير كل جدول، هل هو أعرض من حاويته، ارتفاعات صفوف رأسه، وموضعه (للتثبيت اليدوي)
+        for (k = 0; k < work.length; k++) {
+            var w = work[k], tt = w.t, host = tt.parentElement;
+            w.z = parseFloat(getComputedStyle(tt).zoom) || 1;
+            w.needX = tt.scrollWidth > host.clientWidth + 2;   // أعرض من حاويته = بدو أسانسور أفقي
+            w.h = []; var rows = tt.tHead.rows;
+            for (i = 0; i < rows.length; i++) w.h.push(rows[i].offsetHeight);
+        }
+        // (د) كتابة: الأسانسور الأفقي ومواضع التصاق الرؤوس
+        for (k = 0; k < work.length; k++) {
+            var w2 = work[k], t2 = w2.t, top = 0;
+            if (w2.needX) {
                 // أسانسور أفقي فقط على الحاوية (بلا حبس عمودي)، والرأس يُثبَّت يدوياً
                 // بالتمرير (translateY) لأن sticky لا يخترق حاوية متمرّرة
-                host.style.overflowX = 'auto';
-                host.setAttribute('data-stkvis', '1');
-                xTables.push({ t: t, z: z });
+                t2.parentElement.style.overflowX = 'auto';
+                t2.parentElement.setAttribute('data-stkvis', '1');
+                xTables.push({ t: t2, z: w2.z });
             } else {
                 // الرأس يلتصق بأعلى الشاشة تحت الشريط (sticky عادي — الإحداثيات داخل
                 // الجدول المصغَّر بالـzoom مقسومة على تصغيره)
-                top = Math.ceil(topOffG / z);
+                top = Math.ceil(topOffG / w2.z);
             }
             // صفوف الرأس المتعدّدة: top تراكمي حتى لا يغطي الصف الأول الثاني
-            var rows = t.tHead.rows;
-            for (var i = 0; i < rows.length; i++) {
-                for (var j = 0; j < rows[i].cells.length; j++) {
-                    rows[i].cells[j].style.top = top + 'px';
-                }
-                top += rows[i].offsetHeight;
+            var rows2 = t2.tHead.rows;
+            for (i = 0; i < rows2.length; i++) {
+                var tp = top + 'px';
+                for (j = 0; j < rows2[i].cells.length; j++) { if (rows2[i].cells[j].style.top !== tp) rows2[i].cells[j].style.top = tp; }
+                top += w2.h[i];
             }
         }
         stickXHeads();
