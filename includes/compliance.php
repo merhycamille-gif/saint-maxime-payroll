@@ -572,13 +572,13 @@ function complianceFingerprint(PDO $db): string {
         try { $db->exec("SET SESSION information_schema_stats_expiry = 0"); } catch (Throwable $e) {} // MySQL 8: بلا كاش إحصاءات (MariaDB لا يعرفه)
         $t = $db->query("SELECT CONCAT(COALESCE(MAX(UPDATE_TIME), 'x'), '|', COUNT(UPDATE_TIME), '|', SUM(TABLE_ROWS IS NOT NULL))
             FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name NOT LIKE '\\_%'
-              AND table_name NOT IN ('settings', 'audit_log', 'users', 'attestation_prefs', 'official_form_edits', 'info_submissions')")->fetchColumn();
+              AND table_name NOT IN ('settings', 'audit_log', 'users', 'attestation_prefs', 'official_form_edits', 'info_submissions', 'month_stale_findings')")->fetchColumn();
         $cnt = $db->query("SELECT CONCAT((SELECT COUNT(*) FROM employees), '|', (SELECT COUNT(*) FROM monthly_salaries), '|', (SELECT COUNT(*) FROM compliance_decisions))")->fetchColumn();
         $db->exec("SET SESSION group_concat_max_len = 1000000");
         $st = $db->query("SELECT MD5(GROUP_CONCAT(CONCAT(`key`, '=', COALESCE(`value`, '')) ORDER BY `key` SEPARATOR '\n')) FROM settings
-            WHERE `key` NOT LIKE 'compliance\\_pending\\_%' AND `key` NOT LIKE 'heal\\_%' AND `key` NOT LIKE '%\\_at'")->fetchColumn();
+            WHERE `key` NOT LIKE 'compliance\\_pending\\_%' AND `key` NOT LIKE 'heal\\_%' AND `key` NOT LIKE '%\\_at' AND `key` NOT LIKE 'month\\_stale\\_scan%'")->fetchColumn();
         if (!$t || strpos((string)$t, 'x|') === 0) return ''; // لا تاريخ تعديل متاح ⇒ لا كاش (بناء طازج)
-        return md5($t . '#' . $cnt . '#' . $st . '#' . date('Y-m-d'));
+        return md5($t . '#' . $cnt . '#' . $st . '#' . (function_exists('msaStaleFindingsSig') ? msaStaleFindingsSig($db) : '') . '#' . date('Y-m-d'));
     } catch (Throwable $e) { return ''; }
 }
 function complianceCacheFile(): string {

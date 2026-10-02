@@ -7303,7 +7303,7 @@ check('💵 متعاقدو عبرا: إكسله = الصافي بعد المحس
  */
 $fn155 = (string)file_get_contents($PROJ . '/includes/functions.php'); $cp155 = (string)file_get_contents($PROJ . '/includes/compliance.php'); $hd155 = (string)file_get_contents($PROJ . '/includes/header.php');
 $ok155 = function_exists('monthStaleCompare') && function_exists('monthStaleScanStep') && function_exists('ensureMonthStaleTable')
-      && strpos($hd155, 'monthStaleScanStep();') !== false && strpos($cp155, "'month_stale'    => ['Mois ≠ moteur'") !== false
+      && strpos((string)@file_get_contents($PROJ . '/ajax_tick.php'), 'monthStaleScanStep(400);') !== false /* 2026-10-02: نبض خلفي بدل الترويسة */ && strpos($cp155, "'month_stale'    => ['Mois ≠ moteur'") !== false
       && strpos($cp155, "FROM month_stale_findings f JOIN employees e") !== false && strpos($cp155, "case 'month_stale':") !== false
       && strpos($cp155, "&& \$rule !== 'month_stale') \$keys[] = \$it['key'];") !== false && strpos($cp155, "&& \$rk !== 'month_stale'") !== false;
 $why155 = 'code=' . ($ok155 ? 'ok' : 'missing');
@@ -9594,6 +9594,22 @@ $ok231 = strpos($fn231, 'function msaFpTtl(int $short = 900, int $long = 21600):
     && substr_count($cp231, "if (function_exists('msaFpTtl')) \$ttl = msaFpTtl(\$ttl);") === 2
     && in_array($ttl231, [900, 21600], true);
 check('⚡ عمر الكاش يطول (6 س) فقط حين يثبت أنّ البصمة تلتقط كل تعديل، وإلا 15 دقيقة (2026-10-02)', $ok231, 'ttl=' . $ttl231);
+
+/* =====================================================================
+ * 232) 🚀 (2026-10-02 «كل البرنامج متل البرق»): الفحص الشامل الدوري لا يشتغل داخل الصفحة (كان يعيد احتساب ~120 صفّاً قبل عرض
+ *      **كل** صفحة ويغيّر بصمة الداتا مع كل فتحة فلا يصيب الكاش) — نبض خلفي بعد ظهور الصفحة (ajax_tick.php، الجلسة مقفلة للقراءة)
+ *      + البصمة تعتمد **محتوى** نتائجه لا وقت كتابتها.
+ * =================================================================== */
+$hd232 = (string)file_get_contents($PROJ . '/includes/header.php'); $ft232 = (string)file_get_contents($PROJ . '/includes/footer.php');
+$ax232 = (string)@file_get_contents($PROJ . '/ajax_tick.php'); $fn232 = (string)file_get_contents($PROJ . '/includes/functions.php'); $cp232 = (string)file_get_contents($PROJ . '/includes/compliance.php');
+$sgA232 = msaStaleFindingsSig($db); $sgB232 = msaStaleFindingsSig($db);
+$ok232 = preg_match('/^\s*monthStaleScanStep\(/m', $hd232) === 0
+    && strpos($ft232, "fetch(window.BASE_URL + 'ajax_tick.php'") !== false && strpos($ft232, "if (function_exists('monthStaleScanDue') && monthStaleScanDue()): ?>") !== false
+    && strpos($ax232, 'session_write_close();') !== false && strpos($ax232, 'requireLogin();') !== false
+    && substr_count($fn232, "'info_submissions', 'month_stale_findings')") === 1 && substr_count($cp232, "'info_submissions', 'month_stale_findings')") === 1
+    && strpos($fn232, "AND `key` NOT LIKE 'month\\\\_stale\\\\_scan%'") !== false && strpos($cp232, "AND `key` NOT LIKE 'month\\\\_stale\\\\_scan%'") !== false
+    && $sgA232 === $sgB232 && $sgA232 !== 'none' && is_bool(monthStaleScanDue());
+check('🚀 الفحص الشامل الدوري بنبض خلفي لا داخل الصفحة + البصمة على محتوى نتائجه (الكاش يصيب أثناء الجولة) (2026-10-02)', $ok232, 'sig=' . $sgA232);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

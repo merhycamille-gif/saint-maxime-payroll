@@ -10,6 +10,19 @@
 <?php /* 🚀 (2026-10-02 «بدي يفتح بجزء من الثانية — كل شي بالبرنامج»): التحضير المسبق — حين يقف الماوس على رابط تنقّل (القائمة الجانبية،
          بلاطات لوحة القيادة ومركز التقارير) يحضّر المتصفّح الصفحة بالخلفية، وعند الكبس تُفتح فوراً (Chrome/Edge؛ غيرهما يتجاهله).
          روابط عرض فقط — لا روابط إجراء/حذف/تصدير؛ والصفحات الثقيلة عمداً (تقرير المخالفات/فحص الصحّة/النسخ الاحتياطي) مستثناة. */ ?>
+<?php if (function_exists('monthStaleScanDue') && monthStaleScanDue()): ?>
+<script>
+// 🔎🚀 الفحص الشامل الدوري بنبض خلفي: بعد ظهور الصفحة بثانيتين، ثم كل 5 ثوانٍ ما دامت الجولة لم تكتمل والصفحة مفتوحة ومرئية
+(function () {
+  function tick() {
+    if (document.hidden || document.prerendering) { setTimeout(tick, 5000); return; }
+    fetch(window.BASE_URL + 'ajax_tick.php', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (s) { if (s && s.due) setTimeout(tick, 5000); }).catch(function () {});
+  }
+  window.addEventListener('load', function () { setTimeout(tick, 2000); });
+})();
+</script>
+<?php endif; ?>
 <script type="speculationrules">
 {"prerender":[{"where":{"selector_matches":".sidebar-nav a:not([href*='logout']):not([href*='backup']):not([href*='compliance']):not([href*='health_check']):not([target='_blank']), .dash-link:not([href*='backup']):not([target='_blank']), .report-card:not([target='_blank'])"},"eagerness":"moderate"}]}
 </script>

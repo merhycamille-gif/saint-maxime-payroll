@@ -1828,7 +1828,18 @@ function monthStaleYears(): array {
     $from = lawEnforceFromSy();
     return array_values(array_filter([($m[1] - 1) . '-' . ($m[2] - 1), $cur], fn($y) => $y >= $from)) ?: [$cur];
 }
-/** دفعة من الفحص الشامل (تُنادى من الترويسة مع كل صفحة): ~$budget صفّ راتب ثم تتوقّف؛ جولة كاملة كل $hours ساعات */
+/** هل للفحص الشامل الدوري دفعة مستحقّة الآن؟ (نفس بوّابة monthStaleScanStep — تُستعمل بالتذييل ليقرّر تشغيل النبض الخلفي) */
+function monthStaleScanDue(int $hours = 3): bool {
+    try {
+        $st = json_decode((string)getSetting('month_stale_scan', ''), true) ?: [];
+        $now = time();
+        if (empty($st['sy']) && !empty($st['done_at']) && ($now - (int)$st['done_at']) < $hours * 3600) return false; // الجولة الأخيرة حديثة
+        return true;
+    } catch (Throwable $e) { return false; }
+}
+/** دفعة من الفحص الشامل: ~$budget صفّ راتب ثم تتوقّف؛ جولة كاملة كل $hours ساعات.
+ *  🚀 (2026-10-02 «كل البرنامج متل البرق»): كانت تُنادى من الترويسة **داخل كل صفحة** (إعادة احتساب ~120 صفّاً قبل عرض الصفحة،
+ *  وجولة كاملة = ~550 فتحة صفحة) — صارت تشتغل بنبض خلفي بعد ظهور الصفحة (ajax_tick.php من footer.php) فلا ينتظرها المستخدم. */
 function monthStaleScanStep(int $budget = 120, int $hours = 3): void {
     static $ran = false;
     if ($ran) return;
@@ -4684,13 +4695,13 @@ function msaDataFingerprint(bool $refresh = false): string {
         try { $db->exec("SET SESSION information_schema_stats_expiry = 0"); } catch (Throwable $e) {}
         $t = $db->query("SELECT CONCAT(COALESCE(MAX(UPDATE_TIME), 'x'), '|', COUNT(UPDATE_TIME), '|', SUM(TABLE_ROWS IS NOT NULL))
             FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name NOT LIKE '\\_%'
-              AND table_name NOT IN ('settings', 'audit_log', 'users', 'attestation_prefs', 'official_form_edits', 'info_submissions')")->fetchColumn();
+              AND table_name NOT IN ('settings', 'audit_log', 'users', 'attestation_prefs', 'official_form_edits', 'info_submissions', 'month_stale_findings')")->fetchColumn();
         $cnt = $db->query("SELECT CONCAT((SELECT COUNT(*) FROM employees), '|', (SELECT COUNT(*) FROM monthly_salaries), '|', (SELECT COUNT(*) FROM employee_bonuses), '|', (SELECT COUNT(*) FROM employee_grade_history))")->fetchColumn();
         $db->exec("SET SESSION group_concat_max_len = 1000000");
         $st = $db->query("SELECT MD5(GROUP_CONCAT(CONCAT(`key`, '=', COALESCE(`value`, '')) ORDER BY `key` SEPARATOR '\n')) FROM settings
-            WHERE `key` NOT LIKE 'compliance\\_pending\\_%' AND `key` NOT LIKE 'heal\\_%' AND `key` NOT LIKE '%\\_at'")->fetchColumn();
+            WHERE `key` NOT LIKE 'compliance\\_pending\\_%' AND `key` NOT LIKE 'heal\\_%' AND `key` NOT LIKE '%\\_at' AND `key` NOT LIKE 'month\\_stale\\_scan%'")->fetchColumn();
         if (!$t || strpos((string)$t, 'x|') === 0) return $fp = '';
-        return $fp = md5($t . '#' . $cnt . '#' . $st . '#' . date('Y-m-d'));
+        return $fp = md5($t . '#' . $cnt . '#' . $st . '#' . msaStaleFindingsSig($db) . '#' . date('Y-m-d'));
     } catch (Throwable $e) { return $fp = ''; }
 }
 /**
@@ -4710,6 +4721,12 @@ function msaFpTtl(int $short = 900, int $long = 21600): int {
         } catch (Throwable $e) { $ok = false; }
     }
     return $ok ? max($short, $long) : $short;
+}
+/** بصمة **محتوى** نتائج الفحص الدوري (لا وقت كتابتها): النبض الخلفي يعيد كتابة نفس النتائج ويحدّث حالته مع كل دفعة —
+ *  لو دخل وقتُها بالبصمة لَما أصاب الكاش أبداً أثناء الجولة. تتغيّر فقط حين تتغيّر نتيجة فعلاً. */
+function msaStaleFindingsSig(PDO $db): string {
+    try { return (string)$db->query("SELECT CONCAT(COUNT(*), ':', COALESCE(MD5(GROUP_CONCAT(CONCAT(employee_id, '|', school_year, '|', months, '|', COALESCE(fields, '')) ORDER BY employee_id, school_year SEPARATOR ';')), '')) FROM month_stale_findings")->fetchColumn(); }
+    catch (Throwable $e) { return 'none'; }
 }
 function msaFpCacheFile(string $name): string {
     $dir = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'msa_cache_' . substr(md5(__DIR__), 0, 10);
