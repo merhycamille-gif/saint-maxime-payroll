@@ -1875,7 +1875,7 @@ form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-siz
  *      (شاشة فقط — الطباعة و PDF تبقى بيضاء). خانات الكتابة تبقى بيضاء لتبان أنها للتعبئة.
  *      لتغيير الدرجة: عدّل --surface (السطح) و --surface2 (الرؤوس/الصفّ الزوجي) و --surface3 (رأس الجدول/المرور).
  * =================================================================== */
-:root { --surface: #dbe7f6; --surface2: #cfdff2; --surface3: #bfd3ec; --surface-line: #a9c1e0; }
+:root { --surface: #ffffff; --surface2: #f8fafc; --surface3: #eef2f7; --surface-line: #dbe3ee; } /* 2026-10-02 «بدي اللون الأزرق الفاتح مش الغامق يرجع أبيض»: السطوح رجعت بيضاء، الخلفية الزرقاء الغامقة باقية */
 /* (min-width: 1px) = علامة: pdf-save.js يطفئ هذا القسم أثناء تصوير الـPDF ليبقى المحفوظ أبيض كالورق */
 @media screen and (min-width: 1px) {
     .card, .stat-card, .table-wrapper, .dash-kpi, .dash-meta, .dash-sec, .reg-details,

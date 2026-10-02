@@ -9280,7 +9280,7 @@ check('🟦 خلفية البرنامج زرقاء على الشاشة فقط و
  * 216) 🟦 (2026-10-02 «الجداول والبطاقات ما تخليها بيضاء»): البطاقات والجداول وأوراق التقارير أزرق فاتح على الشاشة فقط —
  *      الطباعة و PDF تبقى بيضاء (القاعدة داخل @media screen حصراً).
  * =================================================================== */
-$ok216 = strpos($css209, ':root { --surface: #dbe7f6; --surface2: #cfdff2; --surface3: #bfd3ec; --surface-line: #a9c1e0; }') !== false
+$ok216 = strpos($css209, ':root { --surface: #ffffff; --surface2: #f8fafc; --surface3: #eef2f7; --surface-line: #dbe3ee; }') !== false
     && preg_match('/@media screen and \(min-width: 1px\) \{\s*\.card, \.stat-card, \.table-wrapper, \.dash-kpi, \.dash-meta, \.dash-sec, \.reg-details,[^{]*\{\s*background-color: var\(--surface\);/', $css209) === 1
     && strpos($css209, '.doc-sheet, .salary-slip, #ppExportArea, #ppExportArea .card, #ppExportArea .table-wrapper, .official-doc { background-color: #fff !important; }') !== false // 217: المستند المعروض ورقة بيضاء
     && strpos($css209, 'body.doc-view { background: #fff; --surface: #fff;') !== false
