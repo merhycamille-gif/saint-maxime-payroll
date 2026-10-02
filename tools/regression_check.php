@@ -9270,7 +9270,7 @@ check('🎨 كل الأزرار ملوّنة بلوحة واحدة متناسق�
  *      الطباعة و PDF تبقى بيضاء.
  * =================================================================== */
 $css209 = (string)file_get_contents($PROJ . '/assets/css/app.css');
-$ok209 = strpos($css209, ':root { --page-bg: #86acd9; --page-bg2: #6592c8; }') !== false
+$ok209 = strpos($css209, ':root { --page-bg: #5b88c2; --page-bg2: #3a68a8; }') !== false
     && preg_match('/@media screen \{\s*body \{\s*background: linear-gradient\(180deg, var\(--page-bg\) 0%, var\(--page-bg2\) 100%\) fixed;/', $css209) === 1
     && preg_match('/@media print \{[^@]*?body \{ background: white; \}/s', $css209) === 1;
 check('🟦 خلفية البرنامج زرقاء على الشاشة فقط والطباعة بيضاء (2026-10-01)', $ok209);
