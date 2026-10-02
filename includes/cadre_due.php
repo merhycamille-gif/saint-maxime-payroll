@@ -237,7 +237,18 @@ function cadreDueTemplate(PDO $db, int $schoolId): array {
  * كل صفّ: id, name, school_id, school_name, hire_date, years, diploma, diploma_label, grade_start, immediate,
  *          pay (راتبه الآن كمتعاقد), tit (تاريخ الملاك المقترح), pct (نسبة ملاك المدرسة أو null), can (يمكن ترسيمه), why, decision, has_grades
  */
+/** 🚀 المرشَّحون من كاش ببصمة الداتا (GET فقط — msaFpCacheGet): الحساب يمرّ على كل متعاقد ورواتبه ودرجاته (~ثانية) وكان يُعاد عند
+ *  كل فتحة للوحة القيادة وصفحة الاقتراحات وفتح السنة. أي تعديل بالداتا يعيد الحساب؛ القرارات (POST) تحسب طازجاً دائماً. */
 function cadreDueCandidates(PDO $db, string $sy, ?array $schoolIds = null, bool $includeDecided = false, bool $scoped = true): array {
+    if (!function_exists('msaFpCacheGet')) return cadreDueCandidates__raw($db, $sy, $schoolIds, $includeDecided, $scoped);
+    $k = 'cadre_due|' . md5(json_encode([$sy, $schoolIds, $includeDecided, $scoped]));
+    $c = msaFpCacheGet($k, 900);
+    if (is_array($c)) return $c;
+    $r = cadreDueCandidates__raw($db, $sy, $schoolIds, $includeDecided, $scoped);
+    msaFpCachePut($k, $r);
+    return $r;
+}
+function cadreDueCandidates__raw(PDO $db, string $sy, ?array $schoolIds = null, bool $includeDecided = false, bool $scoped = true): array {
     if (!preg_match('/^(\d{4})-(\d{4})$/', $sy, $m)) return [];
     $y1 = (int)$m[1];
     $cut = cadreDueHireCutoff($y1);
@@ -261,7 +272,7 @@ function cadreDueCandidates(PDO $db, string $sy, ?array $schoolIds = null, bool 
         $sql .= " AND e.school_id IN (" . implode(',', $ids) . ")";
     }
     if ($scoped) $sql .= schoolScopeSql('e.school_id');
-    $sql .= " ORDER BY s.name_ar, e.hire_date DESC, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr)";
+    $sql .= " ORDER BY s.name_ar, e.hire_date DESC, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr), e.id";
     $st = $db->prepare($sql);
     $st->execute($p);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);

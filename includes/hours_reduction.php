@@ -90,7 +90,7 @@ function hoursReductionList($db, $sy) {
     [$yf, $yp] = yearEmploymentFilter($sy, 'e.');
     $st = $db->prepare("SELECT e.*, s.name_ar school_name FROM employees e JOIN schools s ON s.id = e.school_id
         WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire'" . schoolScopeSql('e.school_id') . $yf . "
-        ORDER BY s.name_ar, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr)");
+        ORDER BY s.name_ar, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr), e.id");
     $st->execute($yp);
     $out = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $e) {
@@ -142,7 +142,7 @@ function hoursReductionPending($db, $sy) {
         [$yf, $yp] = yearEmploymentFilter($sy, 'e.');
         $st = $db->prepare("SELECT e.*, s.name_ar school_name FROM employees e JOIN schools s ON s.id = e.school_id
             WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire'" . schoolScopeSql('e.school_id') . $yf . "
-            ORDER BY s.name_ar, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr)");
+            ORDER BY s.name_ar, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr), e.id");
         $st->execute($yp);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $e) {
             $hr = hoursReductionFor($e, $sy, $e['school_name']);

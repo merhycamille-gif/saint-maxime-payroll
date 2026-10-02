@@ -55,6 +55,13 @@ function hc(&$groups, $group, $ok, $name, $proof = '', $meaning = '', $type = 'c
 /* =============================================================================
  * (١) سلامة البيانات المخزَّنة — استعلامات فعلية على كل رواتب الموظفين الحاليين
  * ========================================================================== */
+// 🚀 («ما بدي استثناء — كل البرنامج متل البرق»): فحوص الأرقام المخزَّنة (استعلامات على كل الرواتب ~5 ثوانٍ) تُعاد فقط إن تغيّرت
+// الداتا منذ آخر فحص (بصمة الداتا) أو كُبس «أعد الفحص الآن» — وإلا تُعرض نتيجة آخر فحص فوراً مع وقته.
+$hcAt = '';
+$hcC = (empty($_GET['fresh']) && function_exists('msaFpCacheGet')) ? msaFpCacheGet('health_g1', 900) : null;
+if (is_array($hcC) && isset($hcC['groups'])) {
+    $groups = $hcC['groups']; $okAll = (int)$hcC['ok']; $failAll = (int)$hcC['fail']; $reviewAll = (int)$hcC['review']; $totalRows = (int)$hcC['total']; $hcAt = (string)$hcC['at'];
+} else {
 $G1 = 'سلامة الأرقام المخزَّنة / Cohérence des montants';
 $BASE = 'FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE e.is_deleted = 0';
 $cnt = function (string $where) use ($db, $BASE) {
@@ -251,6 +258,8 @@ try {
        . 'إن كان الأستاذ رجع فعلاً: زرّ «نسخ الملف لسنة» بملفه يرجّعه فاعلاً؛ وإلا صحّح تاريخ تركه أو احذفها من كشف الشهر.',
        'review');
 } catch (Exception $e) {}
+if (function_exists('msaFpCachePut')) msaFpCachePut('health_g1', ['groups' => $groups, 'ok' => $okAll, 'fail' => $failAll, 'review' => $reviewAll, 'total' => $totalRows, 'at' => date('H:i')]);
+}
 
 /* =============================================================================
  * (٢) حرّاس الحماية والقواعد موجودون بالكود
@@ -378,6 +387,10 @@ if ($logFile === '') {
 include __DIR__ . '/../includes/header.php';
 ?>
 <div id="pageContent">
+<?php if ($hcAt !== ''): ?>
+<div class="alert alert-info no-print" style="margin-bottom:12px"><i class="fas fa-bolt"></i> فحص الأرقام المخزَّنة من آخر فحص (<?= e($hcAt) ?>) — الداتا لم تتغيّر منذه.
+    <a class="btn btn-sm btn-primary" style="margin-inline-start:8px" href="<?= BASE_URL ?>pages/health_check.php?fresh=1"><i class="fas fa-rotate"></i> Revérifier / أعد الفحص الآن</a></div>
+<?php endif; ?>
 
   <?php $allGood = ($failAll === 0); ?>
   <div class="card">
@@ -511,7 +524,9 @@ include __DIR__ . '/../includes/header.php';
   // 🔎 الفحص الرسمي النهائي للبيانات (2026-08-29): 20 قاعدة على السنة المعروضة — صفر = سليم
   require_once __DIR__ . '/../includes/data_audit.php';
   $auditSy = activeSchoolYear(); if ($auditSy === 'all') $auditSy = currentSchoolYear();
-  $auditRows = dataAuditRules(getDB(), $auditSy);
+  // 🚀 الفحص الرسمي (21 قاعدة على كل رواتب السنة ~3 ثوانٍ) من آخر فحص ما دامت الداتا لم تتغيّر — «أعد الفحص الآن» يعيده
+  $auditRows = (empty($_GET['fresh']) && function_exists('msaFpCacheGet')) ? msaFpCacheGet('health_audit|' . $auditSy, 900) : null;
+  if (!is_array($auditRows)) { $auditRows = dataAuditRules(getDB(), $auditSy); if (function_exists('msaFpCachePut')) msaFpCachePut('health_audit|' . $auditSy, $auditRows); if ($hcAt === '' && !empty($hcC)) $hcAt = date('H:i'); }
   $auditInfo = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'row_rate0', 'pay_period_rows'];   // للمراجعة (قرارات/إدخال — ليست أخطاء حساب)
   $auditErrors = 0; $auditReview = 0;
   foreach ($auditRows as $ar) { if ($ar['n'] <= 0) continue; if (in_array($ar['key'], $auditInfo, true)) $auditReview += $ar['n']; else $auditErrors += $ar['n']; }

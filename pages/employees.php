@@ -952,7 +952,7 @@ if ($action === 'list') {
         $params[] = $syStart;
         $params[] = substr($activeSY, 0, 4) . '-10-01'; // بداية السنة الدراسية (تشرين الأول)
     }
-    $sql .= " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)";
+    $sql .= " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id";
 
     $stmt = $db->prepare($sql);
     $stmt->execute($params);

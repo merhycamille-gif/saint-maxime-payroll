@@ -17,13 +17,32 @@ $db = getDB();
 
 handleCompliancePost($db, BASE_URL . 'pages/compliance.php');
 
-$rep = complianceBuild($db);
+// 🚀 («ما بدي استثناء — كل البرنامج متل البرق»): الصفحة تعرض آخر تقرير محفوظ فوراً؛ إن تغيّرت الداتا منذ بنائه يُعاد بناؤه
+// بالخلفية (ajax_compliance.php) ثم تُحدَّث الصفحة لوحدها — أو يظهر زرّ «حدّث» إن كان المستخدم بدأ يشتغل فيها. بلا تقرير محفوظ: بناء مباشر.
+$repState = complianceDashState($db);
+$repStale = false;
+if ($repState['rep'] === null) $rep = complianceBuildStore($db);
+else { $rep = $repState['rep']; $repStale = !$repState['fresh']; }
 $rules = complianceRules();
 $hideExportToolbar = true;
 
 include __DIR__ . '/../includes/header.php';
 ?>
 
+<?php if ($repStale): ?>
+<div id="compRefresh" class="alert alert-info no-print" style="margin-bottom:12px"><i class="fas fa-spinner fa-spin"></i> <span dir="ltr">Mise à jour du rapport…</span> / عم نحدّث التقرير على آخر تعديلات…</div>
+<script>
+(function () {
+    var touched = false;
+    ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, function () { touched = true; }, { passive: true, once: true }); });
+    fetch(<?= json_encode(BASE_URL . 'ajax_compliance.php') ?>, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.text() : Promise.reject(); }).then(function () {
+        if (!touched) { location.reload(); return; }
+        var b = document.getElementById('compRefresh');
+        if (b) b.innerHTML = '<i class="fas fa-rotate"></i> <span dir="ltr">Rapport mis à jour</span> / التقرير تحدّث — <a href="" class="btn btn-sm btn-primary" style="margin-inline-start:8px">Actualiser / حدّث الصفحة</a>';
+    }).catch(function () { var b = document.getElementById('compRefresh'); if (b) b.style.display = 'none'; });
+})();
+</script>
+<?php endif; ?>
 <?php renderCompliancePending($rep, false); ?>
 
 <?php if (!empty($rep['before_law'])): ?>

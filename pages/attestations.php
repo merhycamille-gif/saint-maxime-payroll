@@ -374,7 +374,7 @@ endif;
 if (!$emp):
     [$ayf, $ayp] = yearEmploymentFilter(activeSchoolYear()); // فلترة حسب السنة الدراسية المختارة
     $aStmt = $db->prepare("SELECT id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar, school_id, phone1, phone2
-                             FROM employees WHERE is_deleted = 0" . schoolScopeSql() . $ayf . " ORDER BY school_id, FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
+                             FROM employees WHERE is_deleted = 0" . schoolScopeSql() . $ayf . " ORDER BY school_id, FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
     $aStmt->execute($ayp);
     $employees = $aStmt->fetchAll();
     $attShowSch = isAllSchools(); // في وضع «كل المدارس» نعرض اسم المدرسة جنب كل أستاذ

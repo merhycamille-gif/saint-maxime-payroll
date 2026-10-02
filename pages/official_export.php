@@ -1142,7 +1142,7 @@ if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
         if ($allIds) {
             $in = implode(',', array_map('intval', $allIds));
             $ord = $db->query("SELECT id FROM employees WHERE id IN ($in)
-                ORDER BY COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)")->fetchAll(PDO::FETCH_COLUMN);
+                ORDER BY COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id")->fetchAll(PDO::FETCH_COLUMN);
             $ix = array_search($empId, array_map('intval', $ord), true);
             if ($ix !== false) $seq = $ix + 1;
         }

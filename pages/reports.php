@@ -266,7 +266,7 @@ function reportDocThumb($path) {
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . $empYearFilter . $empTypeSql . "
-                              ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+                              ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
         // 👨‍👩‍👧 عمودا التنزيل العائلي (حصّة الشهر) والخاضع بعد حسمه قبل الضريبة (الثلاثية الملزمة — 2026-09-15)
@@ -414,7 +414,7 @@ function reportDocThumb($path) {
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.cnss_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
-                              ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+                              ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
         $te=0;$ts=0;$teExtra=0;$teAide=0;$teBase=0;
@@ -478,7 +478,7 @@ function reportDocThumb($path) {
         $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.finance_ministry_number, e.school_id, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, e.id eid, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.tax_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
-                              ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+                              ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
         $t=0;$txExtra=0;$txAide=0;$txBase=0;
@@ -547,7 +547,7 @@ function reportDocThumb($path) {
         $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.caisse_number, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.caisse_amount_lbp, ms.eoc_grade_lbp, ms.school_eoc_6_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.employee_type = 'enseignant_titulaire'" . $schoolSql . $empYearFilter . "
-                              ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+                              ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
         $stmt->execute(array_merge([$year, $month], $empYearParams));
         $data = $stmt->fetchAll();
         $te=0;$ts=0;$teg=0;$teEx=0;$teExU=0;$teAi=0;$teBaseE=0;$teComposed=0;$teComposedU=0;
@@ -593,7 +593,7 @@ function reportDocThumb($path) {
         $typeSql = $empTypeSql;
         // فلترة حسب السنة الدراسية المختارة (سنة محددة = موظفو تلك السنة؛ كل السنين = الكل)
         [$yf, $yp] = yearEmploymentFilter(activeSchoolYear(), 'e.');
-        $stmtEL = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted = 0" . $schoolSqlEmp . $typeSql . $yf . " ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+        $stmtEL = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted = 0" . $schoolSqlEmp . $typeSql . $yf . " ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
         $stmtEL->execute($yp);
         $data = $stmtEL->fetchAll();
         $typeLabels = [
@@ -879,7 +879,7 @@ function reportDocThumb($path) {
         if (preg_match('/^\d{4}-\d{4}$/', (string)activeSchoolYear())) [$tMember, $tMP] = yearEmploymentFilter(activeSchoolYear(), 'e.');
         $stmtT = $db->prepare("SELECT e.* FROM employees e
                                WHERE e.is_deleted = 0" . $tTypeSql . $tWhere . $schoolSqlEmp . $tMember . "
-                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), $tcol, COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), $tcol, COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
         $stmtT->execute(array_merge($tParams, $tMP));
         $data = $stmtT->fetchAll();
     ?>

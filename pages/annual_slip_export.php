@@ -141,7 +141,7 @@ if ($all) {
     $sql = "SELECT e.* FROM employees e WHERE e.is_deleted = 0" . schoolScopeSql('e.school_id') . $yf;
     $params = $yp;
     $sql .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
-    $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)";
+    $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $emps = $stmt->fetchAll();

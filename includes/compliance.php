@@ -594,12 +594,14 @@ function complianceBuildCached(PDO $db, int $ttl = 900): array {
         $c = @unserialize((string)@file_get_contents($file), ['allowed_classes' => false]);
         if (is_array($c) && ($c['fp'] ?? '') === $fp && isset($c['rep']['pending'])) return $c['rep'];
     }
+    return complianceBuildStore($db);
+}
+/** يبني التقرير طازجاً ويحفظه للفتحات التالية (لوحة القيادة وصفحة التقرير تعرضانه فوراً) — يُستعمل بعد كل قرار/تصحيح */
+function complianceBuildStore(PDO $db): array {
     $rep = complianceBuild($db);
-    if ($file !== '') {
-        // البناء نفسه قد يكتب (عدّاد الشارة بالإعدادات مستثنى من البصمة) — البصمة تُؤخذ بعده لتطابق الفتحة التالية
-        $fp2 = complianceFingerprint($db);
-        if ($fp2 !== '') { $tmp = $file . '.' . getmypid() . '.tmp'; if (@file_put_contents($tmp, serialize(['fp' => $fp2, 'rep' => $rep])) !== false) @rename($tmp, $file); }
-    }
+    // البناء نفسه قد يكتب (عدّاد الشارة بالإعدادات مستثنى من البصمة) — البصمة تُؤخذ بعده لتطابق الفتحة التالية
+    $fp2 = complianceFingerprint($db);
+    if ($fp2 !== '') { $file = complianceCacheFile(); $tmp = $file . '.' . getmypid() . '.tmp'; if (@file_put_contents($tmp, serialize(['fp' => $fp2, 'rep' => $rep])) !== false) @rename($tmp, $file); }
     return $rep;
 }
 
@@ -764,8 +766,8 @@ function handleCompliancePost(PDO $db, string $redirectTo): void {
         }
         $done++;
     }
-    // تحديث عداد الشارة
-    try { complianceBuild($db); } catch (Throwable $e) {}
+    // تحديث عداد الشارة + حفظ التقرير الجديد (الصفحة التالية تعرضه فوراً بلا إعادة بناء)
+    try { complianceBuildStore($db); } catch (Throwable $e) {}
     if ($done) $_SESSION['flash_success'] = ($act === 'comp_approve' ? '✅ صُحِّح ' : '⏸️ تُرك ') . $done . ' — ' . implode(' · ', array_slice($msgs, 0, 8)) . (count($msgs) > 8 ? '…' : '');
     else $_SESSION['flash_error'] = 'لم يُنفَّذ شيء — المخالفة لم تعد موجودة أو لا تصحيح آلياً لها.';
     if ($lockedSkipped) $_SESSION['flash_error'] = '🔒 ' . $lockedSkipped . ' بند تُرك كما هو لأن سنته مقفولة لمدرسته (افتح القفل من «فتح سنة دراسية» إذا بدّك تصحّحه).' . (!empty($_SESSION['flash_error']) && $done ? '' : '');

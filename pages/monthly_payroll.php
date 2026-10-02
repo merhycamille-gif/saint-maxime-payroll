@@ -255,7 +255,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     $sqlP = "SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif'" . schoolScopeSql('e.school_id') . $pyf;
     $paramsP = $pyp;
     $sqlP .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
-    $sqlP .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)";
+    $sqlP .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id";
     $stmtP = $db->prepare($sqlP);
     $stmtP->execute($paramsP);
     $empsP = $stmtP->fetchAll();
@@ -459,7 +459,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     $sql .= $lyf;
     $listParams = array_merge([$month, $year], $lyp);
     $sql .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
-    $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)";
+    $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id";
     $stmt = $db->prepare($sql);
     $stmt->execute($listParams);
     $list = $stmt->fetchAll();

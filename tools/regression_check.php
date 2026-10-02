@@ -310,7 +310,7 @@ check('⚖️ تقرير المخالفات: الوحدة + الجدول الذ�
       && strpos($cpSrc, 'requireCsrf();') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../index.php'), 'handleCompliancePost($db, BASE_URL . \'index.php\');') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../index.php'), 'renderCompliancePending($homeComp, true);') !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/compliance.php'), 'complianceBuild($db)') !== false
+      && strpos((string)file_get_contents(__DIR__ . '/../pages/compliance.php'), 'complianceDashState($db)') !== false // 2026-10-02: المحفوظ فوراً + تحديث خلفي (CLI طازج)
       && strpos((string)file_get_contents(__DIR__ . '/../includes/header.php'), 'pages/compliance.php') !== false
       && strpos($fnSrcDup, "complianceLogAuto(\$db, 'dup_percent'") !== false,
       'items=' . count($cpItems) . ' rules=' . implode(',', array_unique(array_column($cpItems, 'rule'))));
@@ -9444,7 +9444,7 @@ $ax221 = (string)@file_get_contents($PROJ . '/ajax_compliance.php');
 $ok221 = strpos($ix221, '$homeCompState = canEdit() ? complianceDashState($db) : null;') !== false
     && strpos($ix221, "fetch(<?= json_encode(BASE_URL . 'ajax_compliance.php') ?>") !== false
     && strpos($ax221, 'session_write_close();') !== false && strpos($ax221, '$rep = complianceBuildCached(getDB());') !== false && strpos($ax221, 'if (!canEdit()) exit;') !== false
-    && strpos((string)file_get_contents($PROJ . '/pages/compliance.php'), '$rep = complianceBuild($db);') !== false // صفحة التقرير طازجة دائماً
+    && strpos((string)file_get_contents($PROJ . '/pages/compliance.php'), '$repState = complianceDashState($db);') !== false // صفحة التقرير: المحفوظ فوراً + تحديث بالخلفية (بالـCLI طازج)
     && strpos($ht221, 'AddOutputFilterByType DEFLATE text/html text/plain application/json text/xml') !== false
     && $fpA221 !== '' && $fpA221 === $fpB221                                   // البصمة ثابتة ما دامت الداتا لم تتغيّر
     && count($repB221['pending']) === count($repC221['pending']) && $repC221['sy'] === $repA221['sy']
@@ -9540,6 +9540,25 @@ $ok227 = strpos($fn227, "\$fdM['kids_all'] = [\$kAll, \$sAll];") !== false
     && substr_count($pc227, "if (function_exists('msaGhBulkDrop')) msaGhBulkDrop(); ") >= 10
     && strpos($pc227, "FROM employee_grade_history WHERE employee_id=? AND law_reference='344'") !== false;
 check('🚀 تحميل جماعي بالطلب (أولاد/أزواج/أساس الدولار/خاضع السنة/درجات 344 واليدوية) بدل سؤال لكل موظف — GET فقط (2026-10-02)', $ok227);
+
+/* =====================================================================
+ * 228) ⚡ (2026-10-02 «ما بدي استثناء — كل البرنامج متل البرق»): كاش ببصمة الداتا (msaFpCacheGet/Put — GET فقط) لاقتراحات الملاك
+ *      وفحوص صحّة الأرقام؛ صفحة تقرير المخالفات تعرض المحفوظ فوراً وتتحدّث بالخلفية؛ القرارات تخزّن التقرير الجديد؛
+ *      صفوف الموظفين تُحمَّل جماعياً. بالـCLI كل شيء طازج (النتائج نفسها).
+ * =================================================================== */
+require_once $PROJ . '/includes/cadre_due.php';
+$fn228 = (string)file_get_contents($PROJ . '/includes/functions.php'); $cd228 = (string)file_get_contents($PROJ . '/includes/cadre_due.php');
+$cp228 = (string)file_get_contents($PROJ . '/includes/compliance.php'); $hc228 = (string)file_get_contents($PROJ . '/pages/health_check.php');
+$sy228 = currentSchoolYear();
+$ok228 = strpos($fn228, 'function msaFpCacheGet(string $name, int $ttl = 900) {') !== false && strpos($fn228, 'if (!msaLookupOn()) return null;') !== false
+    && msaFpCacheGet('x228') === null                                                    // CLI: لا كاش
+    && strpos($cd228, 'function cadreDueCandidates__raw(PDO $db, string $sy, ?array $schoolIds = null, bool $includeDecided = false, bool $scoped = true): array {') !== false
+    && cadreDueCandidates($db, $sy228, null, false, false) == cadreDueCandidates__raw($db, $sy228, null, false, false)
+    && strpos($cp228, 'function complianceBuildStore(PDO $db): array {') !== false
+    && strpos($cp228, 'try { complianceBuildStore($db); } catch (Throwable $e) {}') !== false
+    && strpos($hc228, "msaFpCacheGet('health_g1', 900)") !== false && strpos($hc228, "pages/health_check.php?fresh=1") !== false
+    && strpos($fn228, 'foreach ($db->query("SELECT * FROM employees")->fetchAll(PDO::FETCH_ASSOC) as $br)') !== false;
+check('⚡ كاش ببصمة الداتا لاقتراحات الملاك وفحص الصحّة + تقرير المخالفات فوري بتحديث خلفي + تحميل جماعي لصفوف الموظفين (2026-10-02)', $ok228);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

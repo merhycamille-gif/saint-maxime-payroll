@@ -1422,6 +1422,11 @@ function incompleteFileBadge($e, $db, $schoolYear, $withLink = true) {
  */
 function employeeRowCached($db, int $id): ?array {
     static $c = [];
+    static $bulk = false;
+    if (!$bulk && !array_key_exists($id, $c) && msaLookupOn()) { // 🚀 تحميل جماعي مرّة واحدة بالطلب (GET) — كان سؤالاً لكل صفّ بالجدول (399 بالرواتب الشهرية)
+        $bulk = true;
+        try { foreach ($db->query("SELECT * FROM employees")->fetchAll(PDO::FETCH_ASSOC) as $br) { $bid = (int)$br['id']; if (!array_key_exists($bid, $c)) $c[$bid] = $br; } } catch (Throwable $e) {}
+    }
     if (!array_key_exists($id, $c)) { try { $c[$id] = $db->query("SELECT * FROM employees WHERE id = " . $id)->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Exception $e) { $c[$id] = null; } }
     return $c[$id];
 }
@@ -4666,6 +4671,52 @@ function msaLookupOn(): bool {
     return $on && empty($GLOBALS['msa_lookup_off']);
 }
 function msaLookupFlush(): void { $m = &msaLookupMemo(); $m = []; }
+/**
+ * 🚀⚡ («كل البرنامج متل البرق — ما بدي استثناء» 2026-10-02): كاش ملفّي ببصمة الداتا للحسابات الثقيلة التي لا تتغيّر نتيجتها
+ * ما دامت الداتا لم تتغيّر (اقتراحات الملاك، فحص الصحّة…). البصمة = آخر تعديل على جداول البرنامج + أعداد + الإعدادات الفعلية
+ * + اليوم؛ أي حفظ/تعديل يغيّرها فيُعاد الحساب، وإلا يُعاد حكماً بعد $ttl. GET بالمتصفّح فقط — POST والـCLI يحسبان طازجاً.
+ */
+function msaDataFingerprint(bool $refresh = false): string {
+    static $fp = null;
+    if ($fp !== null && !$refresh) return $fp;
+    try {
+        $db = getDB();
+        try { $db->exec("SET SESSION information_schema_stats_expiry = 0"); } catch (Throwable $e) {}
+        $t = $db->query("SELECT CONCAT(COALESCE(MAX(UPDATE_TIME), 'x'), '|', COUNT(UPDATE_TIME), '|', SUM(TABLE_ROWS IS NOT NULL))
+            FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name NOT LIKE '\\_%'
+              AND table_name NOT IN ('settings', 'audit_log', 'users', 'attestation_prefs', 'official_form_edits', 'info_submissions')")->fetchColumn();
+        $cnt = $db->query("SELECT CONCAT((SELECT COUNT(*) FROM employees), '|', (SELECT COUNT(*) FROM monthly_salaries), '|', (SELECT COUNT(*) FROM employee_bonuses), '|', (SELECT COUNT(*) FROM employee_grade_history))")->fetchColumn();
+        $db->exec("SET SESSION group_concat_max_len = 1000000");
+        $st = $db->query("SELECT MD5(GROUP_CONCAT(CONCAT(`key`, '=', COALESCE(`value`, '')) ORDER BY `key` SEPARATOR '\n')) FROM settings
+            WHERE `key` NOT LIKE 'compliance\\_pending\\_%' AND `key` NOT LIKE 'heal\\_%' AND `key` NOT LIKE '%\\_at'")->fetchColumn();
+        if (!$t || strpos((string)$t, 'x|') === 0) return $fp = '';
+        return $fp = md5($t . '#' . $cnt . '#' . $st . '#' . date('Y-m-d'));
+    } catch (Throwable $e) { return $fp = ''; }
+}
+function msaFpCacheFile(string $name): string {
+    $dir = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'msa_cache_' . substr(md5(__DIR__), 0, 10);
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    $ids = function_exists('activeSchoolIds') ? implode(',', array_map('intval', activeSchoolIds() ?: [])) : '';
+    return $dir . DIRECTORY_SEPARATOR . 'fp_' . md5($name . '|' . ($_SESSION['user_id'] ?? '0') . '|' . $ids . '|' . activeSchoolYear() . '|' . ($_SESSION['lang'] ?? '')) . '.ser';
+}
+/** يرجع القيمة المحفوظة إن كانت بصمتها = بصمة الداتا الحالية وعمرها < $ttl، وإلا null */
+function msaFpCacheGet(string $name, int $ttl = 900) {
+    if (!msaLookupOn()) return null;
+    $fp = msaDataFingerprint();
+    if ($fp === '') return null;
+    $file = msaFpCacheFile($name);
+    if (!is_file($file) || (time() - (int)@filemtime($file)) >= $ttl) return null;
+    $c = @unserialize((string)@file_get_contents($file), ['allowed_classes' => false]);
+    return (is_array($c) && ($c['fp'] ?? '') === $fp && array_key_exists('v', $c)) ? $c['v'] : null;
+}
+function msaFpCachePut(string $name, $value): void {
+    if (!msaLookupOn()) return;
+    $fp = msaDataFingerprint(true); // بعد الحساب: لو كتب الحساب شيئاً تتغيّر البصمة فتطابق الفتحة التالية
+    if ($fp === '') return;
+    $file = msaFpCacheFile($name); $tmp = $file . '.' . getmypid() . '.tmp';
+    if (@file_put_contents($tmp, serialize(['fp' => $fp, 'v' => $value])) !== false) @rename($tmp, $file);
+}
+
 /** يُسقط التحميل الجماعي لسجلّ الدرجات (344/اليدوية) عند أي كتابة على employee_grade_history داخل الطلب نفسه */
 function msaGhBulkDrop(): void { $m = &msaLookupMemo(); unset($m['gh_bulk']); }
 /** التنزيل العائلي السنوي لفئة بتاريخ (جدول القانون) — بذاكرة الطلب */

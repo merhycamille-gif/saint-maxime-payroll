@@ -85,7 +85,7 @@ if (viewerCanSeePage('attestations.php')) {
     [$ayf, $ayp] = yearEmploymentFilter(activeSchoolYear());
     $stHE = $db->prepare("SELECT id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar, school_id
         FROM employees WHERE is_deleted = 0" . schoolScopeSql() . $ayf . "
-        ORDER BY school_id, FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr)");
+        ORDER BY school_id, FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
     $stHE->execute($ayp);
     $homeEmps = $stHE->fetchAll();
 }

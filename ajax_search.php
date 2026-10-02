@@ -35,7 +35,7 @@ $st = getDB()->prepare(
              OR CONCAT(COALESCE(first_name_ar,''),' ',COALESCE(father_name_ar,''),' ',COALESCE(last_name_ar,'')) LIKE ?
              OR CONCAT(COALESCE(first_name_ar,''),' ',COALESCE(last_name_ar,'')) LIKE ?
              OR REPLACE(REPLACE(REPLACE(COALESCE(phone1,''),'-',''),' ',''),'/','') LIKE ? OR REPLACE(REPLACE(REPLACE(COALESCE(phone2,''),'-',''),' ',''),'/','') LIKE ?)
-      ORDER BY rk, COALESCE(NULLIF(first_name_ar,''), first_name_fr), COALESCE(NULLIF(last_name_ar,''), last_name_fr)
+      ORDER BY rk, COALESCE(NULLIF(first_name_ar,''), first_name_fr), COALESCE(NULLIF(last_name_ar,''), last_name_fr), id
       LIMIT 30"
 );
 $st->execute(array_merge([$start, $start, $start, $start], $leftParams, [$like, $like, $like, $like, $dlike, $dlike]));

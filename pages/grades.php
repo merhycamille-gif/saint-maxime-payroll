@@ -313,7 +313,7 @@ include __DIR__ . '/../includes/header.php';
                               FROM employees e
                               LEFT JOIN salary_scale_2017 sc ON FLOOR(e.current_grade) = sc.grade AND sc.version_id = " . (int)$curScaleVid . "
                               WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_titulaire'" . schoolScopeSql('e.school_id') . $gyf . "
-                              ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)");
+                              ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
     $gStmt->execute($gyp);
     $employees = $gStmt->fetchAll();
 ?>
