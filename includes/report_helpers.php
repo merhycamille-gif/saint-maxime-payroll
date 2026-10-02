@@ -781,7 +781,11 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
 // تبقى لازقة براس الشاشة عبر آلية التثبيت في app.js). يبقى هنا حساب --pz للطباعة
 // وحدها فلا يُقصّ عمود على الورق. تعمل في مركز التقارير والنماذج الرسمية معاً.
 (function () {
-    function fitDocTables() {
+    // 🚀 (2026-10-02 «بدي البرنامج صاروخ»): قياس الطباعة (--pz) كان يشتغل عند فتح كل تقرير (مرّتين + عند كل تغيير مقاس) ويعيد
+    // تخطيط الجدول كلّه بعرض الورقة — ثانية كاملة بالكشوف الكبيرة مع أنّ أحداً لا يطبع. الآن: عند الفتح تجهيز الشاشة فقط (خفيف)،
+    // والقياس عند الحاجة فقط: قبل الطباعة (beforeprint) وقبل تصوير «PDF عالكمبيوتر» (msaFitDocTables من pdf-save.js).
+    // أدوات الطباعة الآلية (PDF رسمي عبر Chrome/الفحوص) تقيس عند الفتح كما كان.
+    function setupDocTables() {
         var tables = document.querySelectorAll('table.doc-table');
         for (var i = 0; i < tables.length; i++) {
             var t = tables[i], w = t.parentElement;
@@ -790,7 +794,14 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             if (t.getAttribute('dir') === 'rtl') w.style.direction = 'rtl'; // البداية من اليمين (الاسم أولاً)
             var row = t.querySelector('tr');                  // أعمدة كثيرة → خط أصغر بالطباعة
             if (row && row.children.length >= 14) t.classList.add('cols-many');
-            t.style.zoom = '';   // تنظيف أي تصغير شاشة قديم — الخط على الشاشة 12 دائماً
+        }
+        // 🖥️ ملاءمة الشاشة (الجدول الأعرض من شاشته يصغّر نفسه) تتولّاها app.js (initStickyHeads ← msaFitScreenTables) مرّة واحدة
+    }
+    function measureDocTables() {
+        var tables = document.querySelectorAll('table.doc-table');
+        for (var i = 0; i < tables.length; i++) {
+            var t = tables[i];
+            if (!t.parentElement) continue;
             // تصغير الطباعة (--pz): عرض الورقة المستهدف ÷ عرض الجدول الطبيعي — يضمن أن
             // كل الأعمدة تدخل بالورقة مهما اتّسع الجدول (يقرأه CSS الطباعة أعلاه)
             var target = parseFloat(getComputedStyle(t).getPropertyValue('--pz-target')) || 745;
@@ -798,10 +809,11 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             // فيلفّ النص عند الفراغات كما على الورق، ولا يتجاوز الجدولُ الورقةَ إلا بقدر
             // ما لا يلتفّ (الأرقام الكاملة) — هذا التجاوز وحده يُصغَّر له (--pz)
             t.classList.add('pz-measure');
-            var prevW = t.style.width;
+            var prevW = t.style.width, prevZ = t.style.zoom;
+            t.style.zoom = '';                                // تصغير الشاشة لا يدخل بالقياس (يُرجَع بعده)
             t.style.setProperty('width', target + 'px', 'important');
             var natW = Math.max(t.scrollWidth, Math.ceil(t.getBoundingClientRect().width), 1);
-            t.style.width = prevW;
+            t.style.width = prevW; t.style.zoom = prevZ;
             t.classList.remove('pz-measure');
             // ×0.98 هامش أمان: قياس المحاكاة يختلف عن تدفّق الطباعة الحقيقي ~1.5% فكان طرف
             // الجدول المصغَّر يُقصّ صمتاً (عمود «الباقي للصندوق» بالاسمي الشهري — جردة 2026-08-20)
@@ -811,14 +823,16 @@ table.xlsf .xv{font-size:13px;font-weight:800;white-space:nowrap;color:#0a2240;}
             // والجدول الأعرض من الورقة وحده يتصغّر بالمحسوب حتى لا يُقصّ عمود (كما كان)
             t.style.setProperty('--pz', pz < 1 ? Math.max(pz, 0.4).toFixed(3) : 1);
         }
-        // 🖥️ الشاشة: الجدول الأعرض من شاشته يصغّر نفسه ليظهر كاملاً (msaFitScreenTables في app.js —
-        // «ما بتطلع كلها قبل الطبع» 2026-09-15). الطباعة تبقى على --pz أعلاه (!important)
-        if (window.msaFitScreenTables) window.msaFitScreenTables();
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitDocTables);
-    else fitDocTables();
-    window.addEventListener('resize', fitDocTables);
-    window.addEventListener('load', fitDocTables); // بعد تحميل الصور/الخطوط (تغيّر عرض الأعمدة)
+    window.msaFitDocTables = measureDocTables;
+    var eager = navigator.webdriver || /HeadlessChrome/.test(navigator.userAgent || '');
+    function onReady() { setupDocTables(); if (eager) measureDocTables(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady);
+    else onReady();
+    if (eager) window.addEventListener('load', measureDocTables); // بعد تحميل الصور/الخطوط (تغيّر عرض الأعمدة)
+    window.addEventListener('beforeprint', measureDocTables);
+    // 🔴 لا قياس داخل وضع الطباعة نفسه (matchMedia/resize): القياس هناك يعطي قيمة مختلفة (0.514 بدل 0.518) فتطلع ورقة أخيرة بيضاء —
+    //    beforeprint يسبق تحوّل الوضع فيقيس بشروط الشاشة + pz-measure كما كان دائماً.
 })();
 </script>
 CSS;

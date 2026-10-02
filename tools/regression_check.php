@@ -6177,7 +6177,7 @@ check('الجدول العريض على الشاشة (كود): msaFitScreenTable
       && strpos($js127, "t.closest('.salary-slip, .payslip-card, [data-fit1], .no-print, .ba-overlay, .modal, [role=\"dialog\"]')") !== false
       && strpos($js127, 'Math.max((avail - 2) / natW, 0.5).toFixed(3)') !== false
       && strpos($js127, 'window.msaFitScreenTables();   // 🖥️') !== false
-      && strpos($rh127, 'if (window.msaFitScreenTables) window.msaFitScreenTables();') !== false
+      && strpos($rh127, 'window.msaFitDocTables = measureDocTables;') !== false // 🚀 2026-10-02: قياس الطباعة عند الحاجة؛ ملاءمة الشاشة من initStickyHeads وحده
       && strpos($css127, 'body.doc-view .page-content { max-width: 1600px; margin: 0 auto; }') !== false);
 check('الجدول العريض على الشاشة: الطباعة وPDF لا يرثان تصغير الشاشة (--pz !important للجداول العادية وdoc-table، xlsf zoom:1) + وورد/إكسل يمسحان zoom',
       strpos($css127, '.table { zoom: var(--pz, 1) !important; }') !== false
@@ -9487,9 +9487,10 @@ check('🚀 ذاكرة القراءة للطلب الواحد: جداول الق
 $js224 = (string)file_get_contents($PROJ . '/assets/js/app.js'); $ps224 = (string)file_get_contents($PROJ . '/assets/js/pdf-save.js');
 $ok224 = strpos($js224, 'window.msaFitPrintZoom = fitPrintZoom;') !== false
     && strpos($js224, "if (navigator.webdriver || /HeadlessChrome/.test(navigator.userAgent || '')) {") !== false
-    && strpos($js224, "window.addEventListener('resize', fitPrintZoom);") === false
+    && strpos($js224, "matchMedia('print').addListener") === false // لا قياس داخل وضع الطباعة (يغيّر --pz ويولّد ورقة بيضاء)
     && strpos($js224, "window.addEventListener('beforeprint', fitPrintZoom);") !== false
-    && substr_count($ps224, 'if (window.msaFitPrintZoom) window.msaFitPrintZoom();') === 2;
+    && substr_count($ps224, 'if (window.msaFitPrintZoom) window.msaFitPrintZoom(); if (window.msaFitDocTables) window.msaFitDocTables();') === 2
+    && strpos((string)file_get_contents($PROJ . '/includes/report_helpers.php'), "window.addEventListener('beforeprint', measureDocTables);") !== false;
 check('🚀 قياس الطباعة عند الحاجة فقط (قبل الطباعة/تصوير PDF) لا عند فتح كل صفحة (2026-10-02)', $ok224);
 
 /* =====================================================================
@@ -9509,6 +9510,21 @@ $ok225 = strpos($fn225, 'function getRateAsOf__raw($key, $month = null, $year = 
     && strpos((string)file_get_contents($PROJ . '/pages/rates_history.php'), 'msaLookupFlush(); $db->prepare("UPDATE rate_history SET') !== false
     && strpos((string)file_get_contents($PROJ . '/pages/social_security.php'), 'msaLookupFlush(); $db->prepare("UPDATE cnss_brackets SET') !== false;
 check('🚀 ذاكرة الطلب للنِّسَب المؤرّخة/حدود الضمان/السلسلة/قوانين الدرجات + زرع الاقتراحات مرّة واحدة (2026-10-02)', $ok225);
+
+/* =====================================================================
+ * 226) 🚀 (2026-10-02 «بدي يفتح بجزء من الثانية — كل شي بالبرنامج»): (أ) التقارير: قياس الطباعة عند الحاجة فقط (measureDocTables
+ *      عند beforeprint/PDF) وتجهيز الشاشة خفيف عند الفتح؛ (ب) التحضير المسبق للصفحة عند الوقوف على روابط التنقّل (speculation
+ *      rules: القائمة/لوحة القيادة/مركز التقارير — بلا روابط خروج/نسخ احتياطي/تقارير ثقيلة).
+ * =================================================================== */
+$rh226 = (string)file_get_contents($PROJ . '/includes/report_helpers.php'); $ft226 = (string)file_get_contents($PROJ . '/includes/footer.php');
+$ok226 = strpos($rh226, 'function setupDocTables() {') !== false && strpos($rh226, 'function measureDocTables() {') !== false
+    && strpos($rh226, "if (eager) window.addEventListener('load', measureDocTables);") !== false
+    && strpos($rh226, "window.addEventListener('resize', measureDocTables);") === false && strpos($rh226, "matchMedia('print').addListener") === false
+    && strpos($ft226, '<script type="speculationrules">') !== false
+    && strpos($ft226, '"eagerness":"moderate"') !== false
+    && strpos($ft226, ".sidebar-nav a:not([href*='logout']):not([href*='backup']):not([href*='compliance']):not([href*='health_check'])") !== false
+    && preg_match('/<script type="speculationrules">\s*(\{.*?\})\s*<\/script>/s', $ft226, $m226) === 1 && is_array(json_decode($m226[1], true));
+check('🚀 التقارير تقيس الطباعة عند الحاجة فقط + التحضير المسبق للصفحات عند الوقوف على روابط التنقّل (2026-10-02)', $ok226);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

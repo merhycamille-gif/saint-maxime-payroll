@@ -194,7 +194,8 @@ window.msaFitScreenTables = function () {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', stkRun);
     else stkRun();
     window.addEventListener('load', stkRunIfChanged);
-    window.addEventListener('resize', function () { clearTimeout(stkTimer); stkTimer = setTimeout(stkRun, 150); });
+    window.addEventListener('resize', stkRun);   // فوري: الطباعة/PDF تغيّر المقاس وتحتاج الحالة الصحيحة قبل التخطيط (التأجيل ولّد ورقة أخيرة بيضاء)
+    window.addEventListener('beforeprint', stkRun);
     window.addEventListener('scroll', stickXHeads, { passive: true });
 })();
 
@@ -390,7 +391,7 @@ window.msaFitScreenTables = function () {
         window.addEventListener('load', fitPrintZoom);
     }
     window.addEventListener('beforeprint', fitPrintZoom);
-    if (window.matchMedia) { try { window.matchMedia('print').addListener(function (m) { if (m.matches) fitPrintZoom(); }); } catch (e) {} }
+
 })();
 
 // 🏷️ عنوان التقرير على كل ورقة مطبوعة (طلب المستخدم 2026-08-04):

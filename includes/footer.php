@@ -7,6 +7,12 @@
 <script src="<?= BASE_URL ?>assets/js/form-lock.js?v=<?= @filemtime(__DIR__ . '/../assets/js/form-lock.js') ?: '1' ?>"></script>
 <script src="<?= BASE_URL ?>assets/js/select-search.js?v=<?= @filemtime(__DIR__ . '/../assets/js/select-search.js') ?: '1' ?>"></script>
 <script>window.BASE_URL = <?= json_encode(BASE_URL) ?>; window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;</script>
+<?php /* 🚀 (2026-10-02 «بدي يفتح بجزء من الثانية — كل شي بالبرنامج»): التحضير المسبق — حين يقف الماوس على رابط تنقّل (القائمة الجانبية،
+         بلاطات لوحة القيادة ومركز التقارير) يحضّر المتصفّح الصفحة بالخلفية، وعند الكبس تُفتح فوراً (Chrome/Edge؛ غيرهما يتجاهله).
+         روابط عرض فقط — لا روابط إجراء/حذف/تصدير؛ والصفحات الثقيلة عمداً (تقرير المخالفات/فحص الصحّة/النسخ الاحتياطي) مستثناة. */ ?>
+<script type="speculationrules">
+{"prerender":[{"where":{"selector_matches":".sidebar-nav a:not([href*='logout']):not([href*='backup']):not([href*='compliance']):not([href*='health_check']):not([target='_blank']), .dash-link:not([href*='backup']):not([target='_blank']), .report-card:not([target='_blank'])"},"eagerness":"moderate"}]}
+</script>
 <?php if (function_exists('openYearHealPending20260912') && openYearHealPending20260912()): ?>
 <script>
 // 📅 تجهيز 2026-2027 التلقائي (2026-09-12): نبض خلفي كل 4 ثوانٍ يشغّل دفعة من الشفاء حتى يكتمل — شريط صغير يُظهر التقدّم ثم يختفي

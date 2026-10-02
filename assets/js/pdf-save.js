@@ -104,7 +104,7 @@
     function buildGenericPdf(area) {
         var cur = curtain('⏳ عم نجهّز ملف الـPDF... لحظة');
         document.body.classList.add('pr-capture'); // عنوان الورقة يبقى ظاهراً بالتصوير (الصفّ المحقون للطباعة الورقية يُخفى هنا)
-        try { if (window.msaFitPrintZoom) window.msaFitPrintZoom(); } catch (eFit) {} var restore = flipPrintRules();
+        try { if (window.msaFitPrintZoom) window.msaFitPrintZoom(); if (window.msaFitDocTables) window.msaFitDocTables(); } catch (eFit) {} var restore = flipPrintRules();
         var landscape = window.msaOrientForced ? (window.msaOrientForced === 'landscape') : genericWide(area); // 🔄 زرّ الاتجاه أولاً
         var designW = landscape ? 1040 : 720;                 // عرض ورقة A4 داخل الهوامش (px)
         var prevW = area.style.width, prevMax = area.style.maxWidth, prevMg = area.style.margin;
@@ -226,7 +226,7 @@
     };
     function buildPdf(cards, landscape) {
         var cur = curtain('⏳ عم نجهّز ملف الـPDF... لحظة');
-        try { if (window.msaFitPrintZoom) window.msaFitPrintZoom(); } catch (eFit) {} var restore = flipPrintRules();
+        try { if (window.msaFitPrintZoom) window.msaFitPrintZoom(); if (window.msaFitDocTables) window.msaFitDocTables(); } catch (eFit) {} var restore = flipPrintRules();
         var designW = landscape ? 1085 : 745;                 // عرض ورقة A4 داخل هوامش 4mm
         var ratio = cards.length > 10 ? 1.6 : 2.5;            // دقة أعلى للفردي، أخف للجماعي
         var prev = [];
