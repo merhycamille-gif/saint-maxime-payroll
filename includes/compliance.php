@@ -588,6 +588,7 @@ function complianceCacheFile(): string {
     return $dir . DIRECTORY_SEPARATOR . 'compliance_' . md5($who . '|' . complianceScopeKey() . '|' . complianceYear() . '|' . lawEnforceFromSy()) . '.ser';
 }
 function complianceBuildCached(PDO $db, int $ttl = 900): array {
+    if (function_exists('msaFpTtl')) $ttl = msaFpTtl($ttl); // عمر طويل فقط حين يثبت أنّ البصمة تلتقط كل تعديل
     $fp = complianceFingerprint($db);
     $file = $fp !== '' ? complianceCacheFile() : '';
     if ($file !== '' && is_file($file) && (time() - (int)@filemtime($file)) < $ttl) {
@@ -611,6 +612,7 @@ function complianceBuildStore(PDO $db): array {
  * بالـCLI (الفحص الشامل) يُبنى مباشرة كما كان.
  */
 function complianceDashState(PDO $db, int $ttl = 900): array {
+    if (function_exists('msaFpTtl')) $ttl = msaFpTtl($ttl); // عمر طويل فقط حين يثبت أنّ البصمة تلتقط كل تعديل
     if (PHP_SAPI === 'cli') return ['rep' => complianceBuild($db), 'fresh' => true];
     $fp = complianceFingerprint($db);
     if ($fp === '') return ['rep' => null, 'fresh' => false];

@@ -4693,6 +4693,24 @@ function msaDataFingerprint(bool $refresh = false): string {
         return $fp = md5($t . '#' . $cnt . '#' . $st . '#' . date('Y-m-d'));
     } catch (Throwable $e) { return $fp = ''; }
 }
+/**
+ * عمر الكاش ببصمة الداتا: طويل (6 ساعات) **فقط** حين يثبت أنّ السيرفر يسجّل «آخر تعديل» الجداول فعلاً — نقارن آخر سطر بسجلّ
+ * التدقيق (audit_log.created_at) مع UPDATE_TIME لجدوله: إن تطابقا (±دقيقتين) فالبصمة تلتقط أي تعديل فوراً ولا حاجة لإعادة
+ * الحساب كل ربع ساعة؛ وإلا يبقى العمر القصير (حماية: أقصى تأخّر 15 دقيقة). البصمة تتغيّر بتغيّر اليوم بكل الأحوال.
+ */
+function msaFpTtl(int $short = 900, int $long = 21600): int {
+    static $ok = null;
+    if ($ok === null) {
+        $ok = false;
+        try {
+            $db = getDB();
+            try { $db->exec("SET SESSION information_schema_stats_expiry = 0"); } catch (Throwable $e) {}
+            $r = $db->query("SELECT (SELECT MAX(created_at) FROM audit_log) a, (SELECT UPDATE_TIME FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'audit_log') u")->fetch(PDO::FETCH_ASSOC);
+            if ($r && $r['a'] && $r['u']) $ok = abs(strtotime((string)$r['a']) - strtotime((string)$r['u'])) <= 120;
+        } catch (Throwable $e) { $ok = false; }
+    }
+    return $ok ? max($short, $long) : $short;
+}
 function msaFpCacheFile(string $name): string {
     $dir = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'msa_cache_' . substr(md5(__DIR__), 0, 10);
     if (!is_dir($dir)) @mkdir($dir, 0700, true);
@@ -4705,7 +4723,7 @@ function msaFpCacheGet(string $name, int $ttl = 900) {
     $fp = msaDataFingerprint();
     if ($fp === '') return null;
     $file = msaFpCacheFile($name);
-    if (!is_file($file) || (time() - (int)@filemtime($file)) >= $ttl) return null;
+    if (!is_file($file) || (time() - (int)@filemtime($file)) >= msaFpTtl($ttl)) return null;
     $c = @unserialize((string)@file_get_contents($file), ['allowed_classes' => false]);
     return (is_array($c) && ($c['fp'] ?? '') === $fp && array_key_exists('v', $c)) ? $c['v'] : null;
 }

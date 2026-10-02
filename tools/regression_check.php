@@ -9583,6 +9583,18 @@ $ok230 = substr_count($ts230, 'ontoggle="tsOpen(this)"') === 2 && substr_count($
     && strpos($ts230, "function tsOpen(d) { if (!d.open) return; var t = d.querySelector(':scope > template'); if (t) t.replaceWith(t.content.cloneNode(true)); }") !== false;
 check('⚡ اقتراحات إخراج القيد: المطويّ يُركَّب عند فتحه فقط (template) — الصفحة تفتح أسرع (2026-10-02)', $ok230);
 
+/* =====================================================================
+ * 231) ⚡ عمر الكاش ببصمة الداتا: 6 ساعات فقط حين يثبت أنّ السيرفر يسجّل آخر تعديل الجداول (audit_log.created_at ≈ UPDATE_TIME)،
+ *      وإلا 15 دقيقة — فلا تعيد صفحات فحص الصحّة/اقتراحات الملاك/المخالفات حسابها كل ربع ساعة بلا سبب.
+ * =================================================================== */
+$fn231 = (string)file_get_contents($PROJ . '/includes/functions.php'); $cp231 = (string)file_get_contents($PROJ . '/includes/compliance.php');
+$ttl231 = msaFpTtl(900, 21600);
+$ok231 = strpos($fn231, 'function msaFpTtl(int $short = 900, int $long = 21600): int {') !== false
+    && strpos($fn231, '(time() - (int)@filemtime($file)) >= msaFpTtl($ttl)) return null;') !== false
+    && substr_count($cp231, "if (function_exists('msaFpTtl')) \$ttl = msaFpTtl(\$ttl);") === 2
+    && in_array($ttl231, [900, 21600], true);
+check('⚡ عمر الكاش يطول (6 س) فقط حين يثبت أنّ البصمة تلتقط كل تعديل، وإلا 15 دقيقة (2026-10-02)', $ok231, 'ttl=' . $ttl231);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
