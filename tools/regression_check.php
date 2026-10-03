@@ -9796,6 +9796,15 @@ check('📲 كبسة واتساب تبعت الـPDF دغري (مشاركة ال
       && strpos($ex243, 'if (!canSharePdf()) { fallback(); return; }') !== false && strpos($ex243, 'function () { ppWhatsAppManual(title, phone); }') !== false
       && strpos($ex243, '}, offWaManual);') !== false);
 
+/* =====================================================================
+ * 244) 📲✉️ (2026-10-03 «ماف واتس اب ولا ايميل هون ليش» — p11 البطاقة السنوية): سطر التصدير بالبطاقة (المفردة والجماعية)
+ *      فيه كبستا واتساب وإيميل نفسهما (الـPDF يتجهّز وينبعت دغري)؛ حساب المدرسة بلا إيميل. البطاقة نفسها لم تُمسّ.
+ * =================================================================== */
+$as244 = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
+check('📲✉️ البطاقة السنوية: كبستا واتساب وإيميل بسطر التصدير (المفردة + الكل)',
+      substr_count($as244, 'onclick="ppWhatsApp(') === 2 && substr_count($as244, 'onclick="ppEmail(') === 2
+      && substr_count($as244, '<?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail(') === 2);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

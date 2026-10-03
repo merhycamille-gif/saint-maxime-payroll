@@ -631,6 +631,9 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel (tous) / PDF رسمي (الكل)</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expAllQ ?>&format=xlsx<?= $blankQ ?>" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <button type="button" onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
+            <?php $slipShareAllT = jsAttr('Relevés annuels ' . $schoolYear . ' - ' . $typeLbl); ?>
+            <button type="button" class="btn" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $slipShareAllT ?>','')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+            <?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail('<?= $slipShareAllT ?>','')"><i class="fas fa-envelope"></i> Email</button><?php endif; ?>
             <?php if ($slipBlank): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> Avec montants / بالمبالغ</a><?php endif; ?>
             <?php if ($slipBlank !== 1): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=1" class="btn btn-warning" title="كل البطاقات بالأسماء بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierges (montants) / فاضية من المبالغ</a><?php endif; ?>
             <?php if ($slipBlank !== 2): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=2" class="btn btn-warning" title="نماذج فارغة بلا اسم ولا مبالغ — نسخة لكل أستاذ مختار"><i class="fas fa-file"></i> Formulaires vierges / نماذج فارغة بلا اسم</a><?php endif; ?>
@@ -684,6 +687,10 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $slipTarget ?>&name=releve_<?= $employeeId ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel / PDF رسمي</a>
             <a href="<?= BASE_URL ?>pages/annual_slip_export.php?<?= $expQ ?>&format=xlsx<?= $blankQ ?>" class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <button onclick="window.print()" class="btn btn-light"><i class="fas fa-print"></i> Imprimer (navigateur) / طباعة المتصفّح</button>
+            <?php /* 📲 «ما في واتساب ولا إيميل هون ليش» (2026-10-03): نفس كبستَي التقارير — الـPDF يتجهّز وينبعت دغري (حساب المدرسة: واتساب فقط) */ ?>
+            <?php $slipShareT = jsAttr('Relevé annuel ' . $schoolYear . ' - ' . trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? '')) ?: 'Relevé annuel'); ?>
+            <button type="button" class="btn" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $slipShareT ?>','<?= jsAttr(preg_replace('/[^0-9]/', '', (string)($emp['phone1'] ?? ''))) ?>')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+            <?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail('<?= $slipShareT ?>','<?= jsAttr((string)($emp['email'] ?? '')) ?>')"><i class="fas fa-envelope"></i> Email</button><?php endif; ?>
             </div>
             <strong class="slip-k"><i class="fas fa-file-lines"></i> Vierge / فاضية</strong>
             <div class="slip-v">
