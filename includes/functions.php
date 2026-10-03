@@ -5383,10 +5383,17 @@ function requireWriteAction($redirect = null) {
  * $title: اسم الملف/العنوان. $opts: ['phone'=>..., 'email'=>..., 'wa'=>true, 'email_btn'=>true]
  * يعمل عبر assets/js/export.js على المنطقة #ppExportArea أو #pageContent.
  */
+/** نصّ آمن ليوضع بين فاصلتين عُليَين داخل JavaScript مكتوب بخاصيّة HTML (onclick="f('…')") — يرمّز ' و " و \ والأسطر و < > & */
+function jsAttr($s): string {
+    $j = json_encode((string)$s, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP);
+    return $j === false ? '' : substr($j, 1, -1);
+}
 function exportToolbar($title = 'document', $opts = []) {
-    $t  = htmlspecialchars($title, ENT_QUOTES);
-    $ph = isset($opts['phone']) ? htmlspecialchars(preg_replace('/[^0-9]/', '', (string)$opts['phone']), ENT_QUOTES) : '';
-    $em = isset($opts['email']) ? htmlspecialchars($opts['email'], ENT_QUOTES) : '';
+    // 🩹 (2026-10-03 «الكبسات ما عم يشتغلو» — تقرير صندوق التعويضات): العنوان يدخل نصّاً داخل JavaScript بالكبسة (onclick)، والفاصلة العليا
+    // بعنوان مثل «Caisse d'indemnités» كانت تقطع النصّ فتتعطّل كبسات إكسل/وورد/واتساب/إيميل. jsAttr = ترميز آمن لنصّ JS داخل خاصيّة HTML.
+    $t  = jsAttr($title);
+    $ph = isset($opts['phone']) ? jsAttr(preg_replace('/[^0-9]/', '', (string)$opts['phone'])) : '';
+    $em = isset($opts['email']) ? jsAttr($opts['email']) : '';
     $showWa    = $opts['wa']        ?? true;
     $showEmail = $opts['email_btn'] ?? true;
     // مستخدم «قراءة فقط» (حساب مدرسة): يُسمح له بالتصدير كـ PDF و WhatsApp فقط — لا طباعة مباشرة/Excel/Word/Email
@@ -5435,7 +5442,7 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php endif; ?>
         <?php if ($showWa): ?>
             <?php if ($viewerOnly): ?>
-            <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsAppPdf('<?= $t ?>','<?= $ph ?>','<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>')" title="يفتح ملف الـPDF لترفقه + محادثة واتساب"><i class="fab fa-whatsapp"></i> WhatsApp PDF</button>
+            <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsAppPdf('<?= $t ?>','<?= $ph ?>','<?= jsAttr($officialPdf) ?>')" title="يفتح ملف الـPDF لترفقه + محادثة واتساب"><i class="fab fa-whatsapp"></i> WhatsApp PDF</button>
             <?php else: ?>
             <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $t ?>','<?= $ph ?>')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
             <?php endif; ?>
