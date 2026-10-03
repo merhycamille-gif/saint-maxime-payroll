@@ -9745,6 +9745,25 @@ $ok240 = strpos($css240, '[hidden] { display: none !important; }') !== false
     && strpos($hd240, 'id="msaFwdBtn" hidden ') !== false && strpos($hd240, 'onclick="if(window.msaGoFwd)msaGoFwd()"') !== false;
 check('↩️ سهم «لمحل ما كنت» مخفي فعلاً إلى أن يُكبَس «رجوع» ([hidden] يغلب تنسيق الأزرار) (2026-10-03)', $ok240);
 
+/* =====================================================================
+ * 242) 🏫 (2026-10-03 «بس اختار كل المدارس يصير في تشاك مارك لكل مدرسة… وبكل التقارير والإفادات انقل من مدرسة لمدرسة دغري»):
+ *      (أ) قائمة المدارس: «كل المدارس» تشيّك كل مدرسة (يشيل التي لا يريدها ثم تطبيق؛ الكل مشيّك = الكل)؛
+ *      (ب) شريط مدارس داخل عرض المستند ينقل دغري لنفس التقرير بمدرسة أخرى (switch_school?school=ID&back=نفس التقرير)، لا يُطبَع.
+ * =================================================================== */
+$hd242 = (string)file_get_contents($PROJ . '/includes/header.php'); $sw242 = (string)file_get_contents($PROJ . '/switch_school.php'); $css242 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$r242 = renderPage('pages/official_forms.php', ['form' => 'salary_all'], []);
+$e242 = renderPage('pages/employees.php', [], []);
+$ok242 = strpos($hd242, "<?= (\$isAllSel || in_array((int)\$navS['id'],\$activeIds,true))?'checked':'' ?>") !== false
+    && strpos($hd242, "onclick=\"var v=this.checked;document.querySelectorAll('#schoolMenu input[name=\\'schools[]\\']').forEach(function(c){c.checked=v;})\"") !== false
+    && strpos($hd242, "if(on===bs.length||on===0){bs.forEach(function(c){c.disabled=true;});}") !== false
+    && strpos($hd242, '<div class="school-strip no-print" id="schoolStrip">') !== false
+    && strpos($sw242, "if (\$bk !== '' && \$bk[0] === '/' && strpos(\$bk, '//') === false") !== false && strpos($sw242, "strpos(\$bk, BASE_URL) === 0) \$back = \$bk;") !== false
+    && strpos($css242, '@media print { .school-strip { display: none !important; } }') !== false
+    && substr_count($r242, 'class="ss-chip') >= 3 && strpos($r242, 'switch_school.php?school=0&amp;back=') !== false   // الشريط داخل التقرير
+    && strpos($e242, 'id="schoolStrip"') === false                                                                    // لا شريط خارج عرض المستند
+    && strpos($r242, 'FATAL') === false;
+check('🏫 «كل المدارس» تشيّك كل مدرسة + شريط مدارس داخل التقارير ينقل دغري من مدرسة لمدرسة (2026-10-03)', $ok242, 'chips=' . substr_count($r242, 'class="ss-chip'));
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
