@@ -9736,6 +9736,15 @@ $ok239 = strpos($is239, 'pages/info_collect.php#received" class="btn btn-sm btn-
     && strpos($is239, "msaKeepScroll:") !== false && strpos($ic239, "msaKeepScroll:") !== false;
 check('↩️✅ حالة تحديث المعلومات: «اعتمِد» يبقى بنفس الصفحة والموضع + كبسة «اعتماد الكل وتحديث الملفات» (2026-10-03)', $ok239);
 
+/* =====================================================================
+ * 240) ↩️ (2026-10-03 «كبسة لمحل ما كنت ما عم تشتغل»): تنسيق الأزرار (display) كان يغلب خاصيّة hidden فيظهر السهم دائماً حتى بلا
+ *      محلّ محفوظ (تُكبَس ولا يصير شي). قاعدة عامّة: [hidden] مخفي فعلاً — فيظهر السهم فقط بعد «رجوع» ويعيد لنفس الصفحة والموضع.
+ * =================================================================== */
+$css240 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $hd240 = (string)file_get_contents($PROJ . '/includes/header.php');
+$ok240 = strpos($css240, '[hidden] { display: none !important; }') !== false
+    && strpos($hd240, 'id="msaFwdBtn" hidden ') !== false && strpos($hd240, 'onclick="if(window.msaGoFwd)msaGoFwd()"') !== false;
+check('↩️ سهم «لمحل ما كنت» مخفي فعلاً إلى أن يُكبَس «رجوع» ([hidden] يغلب تنسيق الأزرار) (2026-10-03)', $ok240);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
