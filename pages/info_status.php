@@ -72,7 +72,7 @@ $memberIds = array_fill_keys(array_map(fn($r) => (int)$r['id'], $active), true);
 //    الفعّالة ضمن النطاق — نقودها من جدول الطلبات مباشرةً حتى يظهر **كل** من بعت بهذه السنة.
 $rank = ['applied' => 2, 'pending' => 1];
 $sentByEmp = []; // employee_id => أفضل صفّ طلب (مع اسم الأستاذ ومدرسته)
-$sq = $db->prepare("SELECT s.status, s.submitted_at, e.id, e.first_name_ar, e.last_name_ar,
+$sq = $db->prepare("SELECT s.id AS sub_id, s.data AS sub_data, s.status, s.submitted_at, e.id, e.first_name_ar, e.last_name_ar,
         e.first_name_fr, e.last_name_fr, e.employee_type,
         COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
     FROM info_submissions s
@@ -132,10 +132,10 @@ foreach (array_keys($newBySchool) as $k) if (!in_array($k, $schoolKeys, true)) $
 sort($schoolKeys);
 
 // إجماليات عامة
-$gSent = 0; $gNot = 0; $gPending = 0; $gNew = 0;
+$gSent = 0; $gNot = 0; $gPending = 0; $gNew = 0; $pendingIds = [];
 foreach ($bySchool as $b) {
     $gNot += count($b['notsent']);
-    foreach ($b['sent'] as $e) { $gSent++; if (($e['status'] ?? '') === 'pending') $gPending++; }
+    foreach ($b['sent'] as $e) { $gSent++; if (($e['status'] ?? '') === 'pending') { $gPending++; $pendingIds[] = (int)$e['sub_id']; } }
 }
 foreach ($newBySchool as $list) $gNew += count($list);
 
@@ -180,6 +180,13 @@ include __DIR__ . '/../includes/header.php';
     <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center">
       <div><span class="badge badge-success" style="font-size:14px"><i class="fas fa-check"></i> Ont mis à jour / بعتوا وحدّثوا</span> <strong style="font-size:20px"><?= $gSent ?></strong>
         <?php if ($gPending): ?><span style="color:#b45309">(منهم <?= $gPending ?> بانتظار اعتمادك / en attente)</span><?php endif; ?></div>
+      <?php if ($gPending && canEdit()): /* ✅ (2026-10-03 «كبسة اقدر حدّث كل الملفات المرسلة») */ ?>
+      <form method="post" action="<?= BASE_URL ?>pages/info_collect.php" style="margin:0" onsubmit="return confirm('اعتماد وتحديث ملفات كل الـ<?= $gPending ?> المرسَلة دفعةً واحدة؟')">
+        <?= csrfField() ?><input type="hidden" name="action" value="apply_all"><input type="hidden" name="ids" value="<?= e(implode(',', $pendingIds)) ?>">
+        <input type="hidden" name="back" value="info_status"><input type="hidden" name="back_show" value="<?= e($show) ?>"><input type="hidden" name="back_sy" value="<?= e($selYear) ?>">
+        <button class="btn btn-success"><i class="fas fa-check-double"></i> Tout approuver et mettre à jour / اعتماد الكل وتحديث الملفات (<?= $gPending ?>)</button>
+      </form>
+      <?php endif; ?>
       <div><span class="badge badge-warning" style="font-size:14px"><i class="fas fa-hourglass-half"></i> N'ont pas envoyé / ما بعتوا</span> <strong style="font-size:20px"><?= $gNot ?></strong></div>
       <div><span class="badge" style="background:#0a7a37;color:#fff;font-size:14px"><i class="fas fa-user-plus"></i> Nouveaux / جدد</span> <strong style="font-size:20px"><?= $gNew ?></strong></div>
       <?php /* 🧹 زرّ «طباعة» أُزيل — مكرّر مع شريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
@@ -276,7 +283,13 @@ include __DIR__ . '/../includes/header.php';
             <td class="no-print">
               <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$emp['id'] ?>" class="btn btn-sm btn-light" title="Ouvrir le dossier / فتح الملف"><i class="fas fa-folder-open"></i></a>
               <?php if (!$isApplied): ?>
-                <a href="<?= BASE_URL ?>pages/info_collect.php#received" class="btn btn-sm btn-success" title="Approuver la demande / اعتماد الطلب"><i class="fas fa-check"></i> Approuver / اعتمِد</a>
+                <?php if (canEdit()): $sd = json_decode((string)($emp['sub_data'] ?? '') ?: '{}', true) ?: []; /* ↩️ (2026-10-03) الاعتماد من هنا ويبقى هنا */ ?>
+                <form method="post" action="<?= BASE_URL ?>pages/info_collect.php" style="display:inline;margin:0" onsubmit="return confirm('<?= !empty($sd['leave_date']) ? 'تنبيه: هذا الأستاذ طلب ترك العمل — سيُسجَّل تاريخ الترك ويخرج من السنة الجارية. متابعة؟' : 'اعتماد الطلب وتحديث ملف الأستاذ؟' ?>')">
+                  <?= csrfField() ?><input type="hidden" name="action" value="apply"><input type="hidden" name="submission_id" value="<?= (int)$emp['sub_id'] ?>">
+                  <input type="hidden" name="back" value="info_status"><input type="hidden" name="back_show" value="<?= e($show) ?>"><input type="hidden" name="back_sy" value="<?= e($selYear) ?>">
+                  <button class="btn btn-sm btn-success" title="Approuver la demande / اعتماد الطلب"><i class="fas fa-check"></i> Approuver et mettre à jour / اعتمِد وحدّث الملف</button>
+                </form>
+                <?php endif; ?>
               <?php endif; ?>
             </td>
           </tr>
@@ -368,5 +381,13 @@ include __DIR__ . '/../includes/header.php';
   </div>
 </div>
 <?php endforeach; endif; ?>
+
+<script>
+/* ↩️ (2026-10-03): بعد «اعتمِد» ترجع الصفحة لنفس الموضع الذي كنت فيه — لا تنطّ لأعلى اللائحة */
+(function(){ var K='msaKeepScroll:'+location.pathname;
+  document.addEventListener('submit', function(ev){ var f=ev.target; if(f && (f.method||'').toLowerCase()==='post'){ try{ sessionStorage.setItem(K, String(window.scrollY)); }catch(e){} } }, true);
+  try{ var y=sessionStorage.getItem(K); if(y!==null){ sessionStorage.removeItem(K); window.addEventListener('load', function(){ setTimeout(function(){ window.scrollTo(0, parseInt(y,10)||0); }, 0); }); } }catch(e){}
+})();
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

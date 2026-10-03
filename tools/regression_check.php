@@ -9698,6 +9698,44 @@ $ok237 = count($ids237) === 40 && count(array_unique($ids237)) === 40
     && (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND id IN (" . implode(',', $ids237 ?: [0]) . ")")->fetchColumn() === 40; // الملفّات باقية
 check('🚪🩹 الأربعون المنقولون بلا راتب 2025-2026: أشهر 2026-2027 فقط انشالت (لائحة مقفلة + صمّامات + نسخة _ms_bk_carried20261003) وملفّاتهم باقية (2026-10-03)', $ok237, 'left=' . $left237);
 
+/* =====================================================================
+ * 238) 🩹 (2026-10-03 «الكبسات ما عم يشتغلو… صحّح كل الكبسات بكل البرنامج»): عنوان تقرير فيه فاصلة عليا («Caisse d'indemnités»)
+ *      كان يقطع نصّ JavaScript بكبسات إكسل/وورد/واتساب/إيميل فتتعطّل كلها. jsAttr = ترميز آمن لنصّ JS داخل onclick.
+ *      الفحص: لا فاصلة عليا خام ولا &#039; داخل أي onclick="pp…('…')" بكشوف الصندوق (العنوان الذي كشف العلّة) وبتقرير عادي.
+ * =================================================================== */
+$fn238 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$bad238 = 0; $seen238 = 0;
+foreach ([['pages/official_forms.php', ['form' => 'eoc_staff', 'cat' => 'titulaire']], ['pages/official_forms.php', ['form' => 'eoc_staff', 'cat' => 'contractuel']], ['pages/reports.php', ['report' => 'employee_list']]] as $pg238) {
+    $h238 = renderPage($pg238[0], $pg238[1], []);
+    if (preg_match_all('/onclick="(pp(?:Excel|Word|WhatsApp|WhatsAppPdf|Email)\((.*?)\))"/s', $h238, $mm238)) {
+        foreach ($mm238[2] as $args238) { $seen238++;
+            $dec238 = html_entity_decode($args238, ENT_QUOTES);
+            // بعد فكّ ترميز HTML يجب أن تبقى الوسائط نصوصاً بين فواصل عليا متوازنة: 'a' أو 'a','b' أو 'a','b','c'
+            if (!preg_match("/^'[^']*'(,'[^']*'){0,2}$/", $dec238)) $bad238++;
+        }
+    }
+}
+$ok238 = strpos($fn238, 'function jsAttr($s): string {') !== false && strpos($fn238, '$t  = jsAttr($title);') !== false
+    && strpos($fn238, 'htmlspecialchars($title, ENT_QUOTES)') === false && jsAttr("d'x\"<&") === 'd\u0027x\u0022\u003C\u0026'
+    && $seen238 >= 9 && $bad238 === 0;
+check('🩹 كبسات إكسل/وورد/واتساب/إيميل تشتغل حتى لو بعنوان التقرير فاصلة عليا (jsAttr) — كشوف صندوق التعويضات (2026-10-03)', $ok238, "seen=$seen238 bad=$bad238");
+
+/* =====================================================================
+ * 239) ↩️✅ (2026-10-03 «بملف تحديث معلومات الأستاذ يكون في كمان كبسة اقدر حدّث كل الملفات المرسلة… وبس حدّث ملف أستاذ لحالو لازم
+ *      يضلّ بملف تحديث المعلومات مش ينطّ لمكان تاني»): صفحة حالة التحديث فيها «اعتمِد وحدّث الملف» لكل طلب (POST يرجع لنفس الصفحة
+ *      ونفس الموضع) + «اعتماد الكل وتحديث الملفات» للطلبات المعروضة فقط.
+ * =================================================================== */
+$is239 = (string)file_get_contents($PROJ . '/pages/info_status.php'); $ic239 = (string)file_get_contents($PROJ . '/pages/info_collect.php');
+$ok239 = strpos($is239, 'pages/info_collect.php#received" class="btn btn-sm btn-success"') === false
+    && strpos($is239, '<input type="hidden" name="action" value="apply"><input type="hidden" name="submission_id" value="<?= (int)$emp[\'sub_id\'] ?>">') !== false
+    && strpos($is239, '<input type="hidden" name="action" value="apply_all"><input type="hidden" name="ids" value="<?= e(implode(\',\', $pendingIds)) ?>">') !== false
+    && substr_count($is239, '<input type="hidden" name="back" value="info_status">') === 2
+    && strpos($ic239, "return BASE_URL . 'pages/info_status.php?show=' . \$bShow . (\$bSy !== '' ? '&sy=' . \$bSy : '');") !== false
+    && substr_count($ic239, "header('Location: ' . \$icBack()); exit;") === 2
+    && strpos($ic239, "' AND s.id IN (' . implode(',', \$idsAll) . ')'") !== false
+    && strpos($is239, "msaKeepScroll:") !== false && strpos($ic239, "msaKeepScroll:") !== false;
+check('↩️✅ حالة تحديث المعلومات: «اعتمِد» يبقى بنفس الصفحة والموضع + كبسة «اعتماد الكل وتحديث الملفات» (2026-10-03)', $ok239);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

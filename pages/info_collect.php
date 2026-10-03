@@ -136,6 +136,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     header('Location: ' . BASE_URL . 'pages/info_collect.php'); exit;
 }
 
+// ↩️ (2026-10-03 «بس حدّث ملف أستاذ لحالو لازم يضلّ بملف تحديث المعلومات مش ينطّ لمكان تاني»): الاعتماد من صفحة «حالة تحديث
+// المعلومات» يرجع إليها نفسها (نفس السنة ونفس العرض)، ومن هذه الصفحة يرجع إليها — لا قفزة لصفحة أخرى.
+$icBack = function (): string {
+    if (($_POST['back'] ?? '') === 'info_status') {
+        $bShow = in_array($_POST['back_show'] ?? '', ['all', 'sent', 'notsent', 'new'], true) ? $_POST['back_show'] : 'all';
+        $bSy = preg_match('/^(\d{4}-\d{4}|all)$/', (string)($_POST['back_sy'] ?? '')) ? $_POST['back_sy'] : '';
+        return BASE_URL . 'pages/info_status.php?show=' . $bShow . ($bSy !== '' ? '&sy=' . $bSy : '');
+    }
+    return BASE_URL . 'pages/info_collect.php#received';
+};
 // اعتماد طلب واحد: تحديث ملف الأستاذ بالقيم المُرسَلة + ربط السكانات
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'apply') {
     requireCsrf();
@@ -153,18 +163,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'apply
             $_SESSION['flash_error'] = 'الأستاذ ليس ضمن المدرسة المختارة.';
         }
     }
-    header('Location: ' . BASE_URL . 'pages/info_collect.php#received'); exit;
+    header('Location: ' . $icBack()); exit;
 }
 // اعتماد كل الطلبات الواردة دفعةً واحدة (للمدرسة الحالية فقط)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'apply_all') {
     requireCsrf();
     $rows = $db->prepare("SELECT s.* FROM info_submissions s JOIN employees e ON e.id = s.employee_id
-        WHERE s.status = 'pending' AND e.is_deleted = 0" . schoolScopeSql('e.school_id'));
+        WHERE s.status = 'pending' AND e.is_deleted = 0" . schoolScopeSql('e.school_id')
+        // من صفحة «حالة تحديث المعلومات»: فقط الطلبات المعروضة هناك (سنة التحديث المختارة) — أرقامها تُرسَل مع الكبسة
+        . (($idsAll = array_filter(array_map('intval', explode(',', (string)($_POST['ids'] ?? ''))))) ? ' AND s.id IN (' . implode(',', $idsAll) . ')' : ''));
     $rows->execute();
     $n = 0; $warns = 0;
     foreach ($rows->fetchAll() as $sub) { if (applyOneSubmission($db, $sub, $textFields, $uploadCols)) $warns++; $n++; }
     $_SESSION['flash_success'] = "تم اعتماد وتحديث $n ملف أستاذ دفعةً واحدة." . ($warns ? " ⚠️ $warns منهم طلبوا تغيير الشهادة العلمية — عدّلها يدوياً من ملف الأستاذ (ملاك) ليُعاد بناء الدرجات." : '');
-    header('Location: ' . BASE_URL . 'pages/info_collect.php#received'); exit;
+    header('Location: ' . $icBack()); exit;
 }
 // إنشاء ملف أستاذ جديد من طلب وارد (is_new_teacher)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_new') {
@@ -614,5 +626,13 @@ $newSubs = $newSubs->fetchAll();
     <?php endforeach; endif; ?>
   </div>
 </div>
+
+<script>
+/* ↩️ (2026-10-03): بعد «اعتمِد» ترجع الصفحة لنفس الموضع الذي كنت فيه — لا تنطّ لأعلى اللائحة */
+(function(){ var K='msaKeepScroll:'+location.pathname;
+  document.addEventListener('submit', function(ev){ var f=ev.target; if(f && (f.method||'').toLowerCase()==='post'){ try{ sessionStorage.setItem(K, String(window.scrollY)); }catch(e){} } }, true);
+  try{ var y=sessionStorage.getItem(K); if(y!==null){ sessionStorage.removeItem(K); window.addEventListener('load', function(){ setTimeout(function(){ window.scrollTo(0, parseInt(y,10)||0); }, 0); }); } }catch(e){}
+})();
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
