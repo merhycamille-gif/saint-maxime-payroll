@@ -798,6 +798,11 @@ document.addEventListener('submit', function (e) {
         $noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','excel_salaries.php']; // 📤 (2026-10-03 «بكل البرنامج لازم يكون في كل شي من كل شي»): الشريط الكامل بكل صفحة فيها لائحة/جدول — تبقى بلاه صفحات الإدارة البحتة فقط
         if (empty($hideExportToolbar) && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), $noToolbarPages, true)) {
             $msaTopBars .= exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);
+        } elseif (empty($ownExportRow)) {
+            // 🖨️ (2026-10-03 «لازم بأي صفحة بكون فاتحها يكون عندي كل خيارات الطبع»): الصفحات التي كانت بلا شريط (إدارة/تعديل/قوائم)
+            // تأخذ كبسة وحدة «خيارات الطبع» تفتح الشريط الكامل نفسه — كل الخيارات بكل صفحة بلا عجقة. $ownExportRow = للصفحة سطر تصدير خاصّ كامل.
+            $msaTopBars .= '<details class="export-compact no-print"><summary class="btn btn-sm btn-light"><i class="fas fa-print"></i> Impression &amp; export / خيارات الطبع</summary>'
+                         . exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []) . '</details>';
         }
         if ($msaTopBars !== '') {
             ob_start(function ($buf, $phase) use ($msaTopBars) {

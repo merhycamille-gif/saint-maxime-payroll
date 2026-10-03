@@ -2054,6 +2054,11 @@ form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-siz
  * 242) 🏫⇄ (2026-10-03 «بكل التقارير والإفادات انقل من مدرسة لمدرسة دغري»): شريط المدارس داخل عرض المستند — حبوب نافرة بيضاء،
  *      المدرسة المعروضة كحلية. لا يُطبَع (no-print).
  * =================================================================== */
+/* 🖨️ «خيارات الطبع» بكل صفحة: كبسة وحدة تفتح الشريط الكامل (الصفحات التي ليست مستنداً) */
+.export-compact { margin: 0 0 10px; }
+.export-compact > summary { list-style: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.export-compact > summary::-webkit-details-marker { display: none; }
+.export-compact[open] > summary { margin-bottom: 8px; }
 /* 🧹 p12 (2026-10-03): صفحة فيها خانات المدارس نفسها ⇒ شريط المدارس لا يتكرّر فوقها */
 body:has(#pageContent input[name="schools[]"], #pageContent .msa-school-pick) #schoolStrip { display: none; }
 /* 📐 p12: داخل بطاقة الاختيار — المدارس أوّلاً، ثم باقي الفلاتر، والفئة آخراً (order:99 أدناه) */

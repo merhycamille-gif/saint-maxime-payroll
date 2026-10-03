@@ -448,4 +448,13 @@
         setTimeout(function () { try { document.body.removeChild(frame); } catch (e) {} }, 120000);
     };
 
+    // 🖨️ (2026-10-03 «كل خيارات الطبع بأي صفحة»): النماذج الرسمية أخذت Excel/Word أيضاً — حيث للصفحة إكسل رسمي معبّى
+    // (رابط format=xlsx خارج الشريط) يُزال الإكسل العامّ حتى لا يتكرّر الشيء نفسه.
+    function dropGenericXls() {
+        var g = document.querySelector('.export-toolbar [data-generic-xls]'); if (!g) return;
+        var off = Array.prototype.some.call(document.querySelectorAll('#pageContent a[href*="format=xlsx"]'), function (a) { return !a.closest('.export-toolbar') || a !== g; });
+        if (off) g.remove();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', dropGenericXls); else dropGenericXls();
+
 })();

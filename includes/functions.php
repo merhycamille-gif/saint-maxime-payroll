@@ -5529,8 +5529,8 @@ function exportToolbar($title = 'document', $opts = []) {
             <?php if ($server): ?>
             <a class="btn btn-sm btn-success" href="<?= $sv . $sep ?>format=xlsx"><i class="fas fa-file-excel"></i> Excel</a>
             <a class="btn btn-sm btn-info" href="<?= $sv . $sep ?>format=docx"><i class="fas fa-file-word"></i> Word</a>
-            <?php elseif (!$noOffice): ?>
-            <button type="button" class="btn btn-sm btn-success" onclick="ppExcel('<?= $t ?>')"><i class="fas fa-file-excel"></i> Excel</button>
+            <?php else: /* 🖨️ 2026-10-03 «كل خيارات الطبع بأي صفحة»: النماذج الرسمية أيضاً — الإكسل العامّ يُزال بالمتصفّح حيث للصفحة إكسل رسمي (data-generic-xls) */ ?>
+            <button type="button" class="btn btn-sm btn-success"<?= $noOffice ? ' data-generic-xls="1"' : '' ?> onclick="ppExcel('<?= $t ?>')"><i class="fas fa-file-excel"></i> Excel</button>
             <button type="button" class="btn btn-sm btn-info" onclick="ppWord('<?= $t ?>')"><i class="fas fa-file-word"></i> Word</button>
             <?php endif; ?>
         <?php endif; ?>

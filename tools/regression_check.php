@@ -6083,11 +6083,11 @@ try {
     }
     foreach (['tax_r6t', 'cnss_annual'] as $f) {
         $o = renderPage('pages/official_forms.php', ['form' => $f, 'month' => 10, 'year' => 2025], []);
-        if (strpos($o, 'onclick="ppExcel(') !== false || strpos($o, 'onclick="ppWord(') !== false) $bad124[] = $f . '(office!)';
+        if (substr_count($o, 'onclick="ppWord(') !== 1 || substr_count($o, 'data-generic-xls="1" onclick="ppExcel(') !== 1) $bad124[] = $f . '(office!)'; // 🖨️ 2026-10-03 «كل خيارات الطبع بأي صفحة»: صارت حاضرة (الإكسل العامّ يُزال حيث يوجد رسمي)
     }
     $ok124 = !$bad124; $why124 = 'bad=' . implode(',', $bad124);
 } catch (Throwable $e) { $why124 = $e->getMessage(); }
-check('إكسل/وورد للكشوف (تشغيل فعلي): زرّا Excel/Word مرّة واحدة بالكشوف الجدولية، وغائبان بالنماذج الرسمية الثابتة', $ok124, $why124);
+check('إكسل/وورد للكشوف (تشغيل فعلي): زرّا Excel/Word مرّة واحدة بالكشوف الجدولية وبالنماذج الرسمية الثابتة (2026-10-03)', $ok124, $why124);
 
 /* ===================================================================
  * 125) 💵 «p1 لازم يكون أساس الراتب والراتب بعد التدرّج على أساس دولار 1500 — انتبه» (2026-09-14): دولار الأساس/الدرجة/بعد التدرّج
@@ -9823,6 +9823,24 @@ check('📐🧹 الترتيب بكل البرنامج (اختيار ← خيا�
       && strpos($css245, 'body:has(#pageContent input[name="schools[]"], #pageContent .msa-school-pick) #schoolStrip { display: none; }') !== false
       && strpos($css245, '.form-row > .form-group:has(input[name="schools[]"], .msa-school-pick) { order: -1; }') !== false
       && substr_count((string)file_get_contents($PROJ . '/pages/mehe_budget.php'), 'onclick="ppWhatsApp(') === 1);
+
+/* =====================================================================
+ * 246) 🖨️ (2026-10-03 «لازم بأي صفحة بكون فاتحها يكون عندي كل خيارات الطبع»): الصفحات التي كانت بلا شريط تأخذ كبسة وحدة
+ *      «خيارات الطبع» تفتح الشريط الكامل؛ الصفحات ذات السطر الخاصّ الكامل ($ownExportRow) كما هي؛ البطاقة السنوية + Word/PDF.
+ * =================================================================== */
+$hd246 = (string)file_get_contents($PROJ . '/includes/header.php'); $as246 = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
+$ok246 = false; $why246 = '';
+try {
+    $bad246 = [];
+    foreach (['pages/tax_declarations.php', 'pages/reports.php', 'index.php', 'pages/annual_slip.php'] as $f246) {
+        $o246 = renderPage($f246, [], []);
+        if (substr_count($o246, '<details class="export-compact no-print">') !== 1 || substr_count($o246, 'onclick="ppWhatsApp(') !== 1 || substr_count($o246, 'onclick="ppEmail(') !== 1 || substr_count($o246, 'onclick="ppWord(') !== 1) $bad246[] = $f246;
+    }
+    $ok246 = !$bad246; $why246 = 'bad=' . implode(',', $bad246);
+} catch (Throwable $e) { $why246 = $e->getMessage(); }
+check('🖨️ كل خيارات الطبع بأي صفحة: كبسة «خيارات الطبع» (الشريط الكامل) بصفحات الإدارة/القوائم/اللوحة + البطاقة السنوية بسطرها الكامل', $ok246
+      && strpos($hd246, '} elseif (empty($ownExportRow)) {') !== false && substr_count($as246, 'onclick="ppWord(') === 2 && substr_count($as246, 'onclick="msaSavePdfStart(this)"') === 2
+      && strpos((string)file_get_contents($PROJ . '/assets/js/export.js'), 'function dropGenericXls()') !== false, $why246);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

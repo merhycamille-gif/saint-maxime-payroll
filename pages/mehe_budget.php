@@ -21,7 +21,7 @@ requireLogin();
 $db = getDB();
 $currentPage = 'mehe_budget';
 $pageTitle = 'Budget MEHE / موازنة وزارة التربية';
-$hideExportToolbar = true;
+$hideExportToolbar = true; $ownExportRow = true;
 $sy = activeSchoolYear();
 if ($sy === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$sy)) $sy = currentSchoolYear();
 // 🏫 النطاق: مدرسة واحدة أو مجموعة أو الكل (من مبدّل المدارس بالأعلى) — «ليش ما فيّي اختار مجموعة
