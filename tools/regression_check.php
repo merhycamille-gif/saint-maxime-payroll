@@ -4105,8 +4105,8 @@ check('النجاة: علاء شمعون وكلود كامل وكميل مرعي
       "كميل tax=$camTax74");
 $hanan74 = $who74('حنان', 'تحومي');
 $hanNet74 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(net_salary_lbp),0) s FROM monthly_salaries WHERE employee_id=" . (int)$hanan74['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetch();
-check('النجاة: حنان تحومي مكمَّلة كل السنة بقراره (12 شهراً × 27,160,000 = 325,920,000 — كانت أيار-أيلول نقلاً بلا راتب)',
-      (int)$hanNet74['n'] === 12 && (float)$hanNet74['s'] === 325920000.0, "n={$hanNet74['n']} s={$hanNet74['s']}");
+check('النجاة: حنان تحومي حتى أيار 2026 (8 أشهر × 27,160,000 = 217,280,000) — كانت مكمَّلة 12 شهراً ثم بقراره 2026-10-03 «شيل حنان تحومي كمان» انشالت حزيران-أيلول (تركت 30/4/2026)',
+      (int)$hanNet74['n'] === 8 && (float)$hanNet74['s'] === 217280000.0, "n={$hanNet74['n']} s={$hanNet74['s']}");
 $aline74 = $who74('الين', 'قاصوف'); $jes74 = $who74('جيسيكا', 'كنعان');
 $jesOct74 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=" . (int)$jes74['id'] . " AND year=2025 AND month=10")->fetchColumn();
 check('النجاة «طابق نفس الاسماء»: غير الخاضعين الزائدين بلا أشهر 2025-2026 (الين قاصوف نموذجاً) + جيسيكا كنعان باقية 11 شهراً من دخولها 1/11/2025 بلا صف تشرين وهمي + نسخة الاسترجاع _ms_bk_najat20260827 موجودة',
@@ -9774,14 +9774,17 @@ preg_match_all("/(\d+) => '(\d{4}-\d{2}-\d{2})'/", (string)($m241[1] ?? ''), $mm
 $left241 = 0;
 foreach ($mm241 as $x241) $left241 += (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE e.id = " . (int)$x241[1] . " AND e.is_deleted = 0 AND DATE(e.left_date_all) = '" . $x241[2] . "'
     AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > DATE_ADD('" . $x241[2] . "', INTERVAL 1 MONTH)")->fetchColumn();
-$ok241 = count($mm241) === 19 /* حنان تحومي مستثناة: سنتها مكمَّلة بقراره السابق */
+$han241 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = 1827 AND STR_TO_DATE(CONCAT(year,'-',month,'-01'),'%Y-%m-%d') > DATE_ADD('2026-04-30', INTERVAL 1 MONTH)")->fetchColumn();
+$ok241 = count($mm241) === 19 /* + حنان تحومي بشفائها الخاصّ healHananAfterLeave20261003 («شيل حنان تحومي كمان») */
+    && strpos($fn241, "if (getSetting('heal_hanan_after_leave_20261003', '') !== '') return;") !== false && $han241 === 0
+    && strpos($fn241, "['حنان','تحومي',\$E,28000000,0,28000000, 0, 840000, 840000,27160000,9000000,36160000,202510,202605,1]") !== false
     && strpos($fn241, "if (getSetting('heal_rows_after_leave_20261003', '') !== '') return;") !== false
     && strpos($fn241, 'CREATE TABLE IF NOT EXISTS _ms_bk_afterleft20261003 LIKE monthly_salaries') !== false
     && strpos($fn241, "if (\$cur !== \$ld) { \$skipped[\$id] = 'left_date_changed'; continue; }") !== false
     && strpos($fn241, 'INSERT IGNORE INTO _ms_bk_afterleft20261003 SELECT * FROM monthly_salaries WHERE $cond') !== false
     && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healRowsAfterLeave20261003();') !== false
     && (string)getSetting('heal_rows_after_leave_20261003', '') !== '' && $left241 === 0;
-check('🚪🩹 التاركون الـ19 (بلا حنان تحومي المكمَّلة بقراره): لا شهر مخزّناً بعد تاريخ الترك (لائحة مقفلة + نسخة _ms_bk_afterleft20261003) وما قبل الترك باقٍ (2026-10-03)', $ok241, 'left=' . $left241);
+check('🚪🩹 التاركون العشرون (الـ19 + حنان تحومي بقراره «شيل حنان تحومي كمان»): لا شهر مخزّناً بعد تاريخ الترك (لائحة مقفلة + نسخة _ms_bk_afterleft20261003) وما قبل الترك باقٍ (2026-10-03)', $ok241, 'left=' . $left241);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

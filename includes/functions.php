@@ -3092,7 +3092,7 @@ function najatSheet20260827Spec() {
         ['كميل','مرعي',$C, 2000000,69000000,71000000,2240000,2130000,4370000,66630000,9000000,75630000,202510,202609,0],
         ['هيلاني','يعقوب',$C, 2000000,74000000,76000000, 940000,2280000,3220000,72780000,9000000,81780000,202510,202609,1],
         ['الياس','ابويونس',$E,30160000,0,30160000, 0, 904800, 904800,29255200,9000000,38255200,202510,202609,1],
-        ['حنان','تحومي',$E,28000000,0,28000000, 0, 840000, 840000,27160000,9000000,36160000,202510,202609,1],
+        ['حنان','تحومي',$E,28000000,0,28000000, 0, 840000, 840000,27160000,9000000,36160000,202510,202605,1], // 2026-10-03 «شيل حنان تحومي كمان»: تركت 30/4/2026 ⇒ لا راتب بعد أيار
         ['رفيقة','حدشيتي',$E,28000000,0,28000000, 0, 840000, 840000,27160000,9000000,36160000,202510,202609,1],
         ['شيرين','بعقليني',$E,30000000,0,30000000, 0, 900000, 900000,29100000,9000000,38100000,202510,202609,1],
         ['كرستيان','عون',$E,28000000,0,28000000, 0, 840000, 840000,27160000,9000000,36160000,202510,202609,1],
@@ -3109,7 +3109,8 @@ function najatSheet20260827Spec() {
  *    + مرايا الدولار بسعر صرف الصف نفسه).
  *  - علاء شمعون وكلود كامل وكميل مرعي كانوا مصنَّفين «ملاك» هنا والكشف يصنّفهم متعاقدين
  *    (صندوق تعويضات = 0) ⇒ تُحوَّل فئتهم لمتعاقد، وكميل بلا تنزيل عائلي (ضريبته 2,240,000).
- *  - حنان تحومي: أشهر أيار-أيلول كانت «نقل بلا راتب» — بقرار المستخدم تُكمَّل كل السنة.
+ *  - حنان تحومي: أشهر أيار-أيلول كانت «نقل بلا راتب» — بقرار المستخدم كُمِّلت كل السنة (2026-08-27)، ثم بقراره 2026-10-03
+ *    «شيل حنان تحومي كمان» (تركت 30/4/2026 — لا راتب بعد تاريخ الترك) صار كشفها حتى أيار 2026 وحُذفت حزيران-أيلول.
  *  - كريستوف شلهوب: 9 أشهر عمل (سلفته م10-6) + صف تموز «نقل فقط» غير مدفوع = يُحذف.
  *  - جيسيكا كنعان دخلت 1/11/2025 (تبقى بقرار المستخدم) وصف تشرين «نقل بلا راتب» يُحذف.
  *  - «طابق نفس الأسماء»: غير الخاضعين (ضمان وضريبة صفر بكل السنة) الذين ليسوا على الكشفين
@@ -4761,7 +4762,7 @@ function healCarriedNoPay20261003(): void {
  * 🚪🩹 (2026-10-03 بكلماته بعد عرض اللائحة بالأسماء وملفّ الإكسل: «وكل شي بعد تاريخ الترك ما لازم يكون في الو راتب»): شفاء مرّة
  * واحدة يشيل الأشهر المخزّنة **بعد تاريخ الترك** (نفس تعريف الفحص الرسمي: شهر يبدأ بعد الترك بأكثر من شهر) للعشرين الذين
  * عُرضوا عليه — مدفوعة كانت أو لا. اللائحة مقفلة بالأرقام **وبتاريخ الترك الذي رآه**: إن تغيّر تاريخ ترك أحدهم يُتخطّى.
- * 🔴 حنان تحومي (1827) مستثناة: سنتها مكمَّلة 12 شهراً **بقراره السابق** (كشف النجاة) والبرنامج يعيد أشهرها — تبقى كما هي.
+ * حنان تحومي (1827) كانت مستثناة هنا (سنتها مكمَّلة بقراره السابق) ثم قال «شيل حنان تحومي كمان» ⇒ healHananAfterLeave20261003 أدناه.
  * ما قبل الترك وملفّاتهم لا يُمسّ. سنة مقفلة لمدرسته ⇒ يُتخطّى. نسخة كاملة قبل الحذف بـ_ms_bk_afterleft20261003 + audit.
  */
 function healRowsAfterLeave20261003(): void {
@@ -4789,6 +4790,38 @@ function healRowsAfterLeave20261003(): void {
             if ($n > 0) { $done[$id] = (int)$n; logAudit('heal_rows_after_leave_delete', 'monthly_salaries', $id, null, ['left' => $ld, 'deleted' => (int)$n, 'backup' => '_ms_bk_afterleft20261003']); }
         }
         setSetting('heal_rows_after_leave_20261003', json_encode(['at' => date('Y-m-d H:i:s'), 'employees' => count($done), 'rows' => array_sum($done), 'skipped' => $skipped]));
+        if (function_exists('msaLookupFlush')) msaLookupFlush();
+    } catch (Throwable $e) { /* يُعاد عند الفتحة التالية */ }
+}
+
+/**
+ * 🚪🩹 (2026-10-03 بكلماته «شيل حنان تحومي كمان» — بعدما أخبرتُه أنّ سنتها مكمَّلة بقراره السابق): شفاء مرّة واحدة يشيل أشهرها
+ * المخزّنة بعد تاريخ تركها 30/4/2026 (حزيران ← أيلول 2026؛ أيار يبقى — نفس تعريف «بعد الترك» بالفحص الرسمي). إن تغيّر تاريخ
+ * تركها أو قُفلت السنة يُتخطّى. نسخة قبل الحذف بـ_ms_bk_afterleft20261003 + audit.
+ */
+function healHananAfterLeave20261003(): void {
+    if (getSetting('heal_hanan_after_leave_20261003', '') !== '') return;
+    $id = 1827; $ld = '2026-04-30'; $res = 'skipped';
+    try {
+        $db = getDB();
+        $e = $db->query("SELECT first_name_ar, last_name_ar, left_date_all FROM employees WHERE id = $id AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+        if ($e && trim((string)$e['first_name_ar']) === 'حنان' && trim((string)$e['last_name_ar']) === 'تحومي' && substr((string)$e['left_date_all'], 0, 10) === $ld) {
+            $cond = "employee_id = $id AND STR_TO_DATE(CONCAT(year,'-',month,'-01'),'%Y-%m-%d') > DATE_ADD(" . $db->quote($ld) . ", INTERVAL 1 MONTH)";
+            $locked = false;
+            foreach ($db->query("SELECT DISTINCT school_id, school_year FROM monthly_salaries WHERE $cond")->fetchAll(PDO::FETCH_ASSOC) as $lk) if (function_exists('isSchoolYearLocked') && isSchoolYearLocked((int)$lk['school_id'], (string)$lk['school_year'])) $locked = true;
+            if (!$locked) {
+                $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_afterleft20261003 LIKE monthly_salaries");
+                $db->beginTransaction();
+                try {
+                    $db->exec("INSERT IGNORE INTO _ms_bk_afterleft20261003 SELECT * FROM monthly_salaries WHERE $cond");
+                    $nDel = (int)$db->exec("DELETE FROM monthly_salaries WHERE $cond");
+                    $db->commit();
+                    $res = 'deleted=' . $nDel;
+                    if ($nDel > 0) logAudit('heal_rows_after_leave_delete', 'monthly_salaries', $id, null, ['left' => $ld, 'deleted' => $nDel, 'backup' => '_ms_bk_afterleft20261003']);
+                } catch (Throwable $ex) { $db->rollBack(); $res = 'error'; }
+            } else $res = 'locked';
+        }
+        setSetting('heal_hanan_after_leave_20261003', date('Y-m-d H:i:s') . ' ' . $res);
         if (function_exists('msaLookupFlush')) msaLookupFlush();
     } catch (Throwable $e) { /* يُعاد عند الفتحة التالية */ }
 }
