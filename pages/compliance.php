@@ -24,7 +24,7 @@ $repStale = false;
 if ($repState['rep'] === null) $rep = complianceBuildStore($db);
 else { $rep = $repState['rep']; $repStale = !$repState['fresh']; }
 $rules = complianceRules();
-$hideExportToolbar = true;
+// 📤 (2026-10-03) الشريط الكامل ظاهر هنا أيضاً («بكل البرنامج لازم يكون في كل شي من كل شي»)
 
 include __DIR__ . '/../includes/header.php';
 ?>

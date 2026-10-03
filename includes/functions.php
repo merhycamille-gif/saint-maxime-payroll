@@ -731,6 +731,31 @@ function pageSchoolPickerHtml(array $scope, string $formId = ''): string {
     return $h;
 }
 
+/**
+ * 📐 p12 (2026-10-03 «الترتيب»): يضع شريطَي الخيارات والتصدير بعد فورم الاختيار (GET بطاقة no-print) إن بدأت به الصفحة،
+ * فيصير الترتيب: الاختيار ← الخيارات ← الكبسات ← المستند. إن لم تبدأ الصفحة بفورم اختيار: الشريطان أوّلاً كما كان.
+ */
+function msaOrderTopBars(string $bars, string $body): string {
+    if (preg_match('/<form\b[^>]*>/i', $body, $m, PREG_OFFSET_CAPTURE)) {
+        $tag = $m[0][0]; $at = (int)$m[0][1];
+        // ما قبل الفورم: ستايل/سكربت الصفحة لا يُحسبان؛ شارة صغيرة مقبولة، أمّا جدول أو نصّ طويل فمعناه أنّ الفورم ليس رأس الصفحة
+        $pre = $at < 300000 ? (string)preg_replace('#<(style|script)\b.*?</\1>#is', '', substr($body, 0, $at)) : '<table';
+        if (mb_strlen(trim(strip_tags($pre))) < 3000 && stripos($tag, 'method="get"') !== false && preg_match('/class="[^"]*\bcard\b[^"]*"/', $tag) && strpos($tag, 'no-print') !== false
+            && stripos($pre, '<table') === false && strpos($pre, 'doc-sheet') === false) {
+            $end = stripos($body, '</form>', $at);
+            if ($end !== false) {
+                $end += 7;
+                // فورمات اختيار متتالية (فلترة ثم شهر/سنة…) تبقى كلها فوق الشريطين
+                while (preg_match('/\G(?:\s+|<(style|script)\b.*?<\/\1>|<!--.*?-->)*(<form\b[^>]*>)/is', $body, $n, PREG_OFFSET_CAPTURE, $end)
+                    && stripos($n[2][0], 'method="get"') !== false && preg_match('/class="[^"]*\bcard\b[^"]*"/', $n[2][0]) && strpos($n[2][0], 'no-print') !== false
+                    && ($e2 = stripos($body, '</form>', (int)$n[2][1])) !== false) { $end = $e2 + 7; }
+                return substr($body, 0, $end) . $bars . substr($body, $end);
+            }
+        }
+    }
+    return $bars . $body;
+}
+
 // قائمة كل المدارس الفعّالة
 function allSchools($activeOnly = true) {
     $sql = "SELECT * FROM schools WHERE is_deleted = 0";

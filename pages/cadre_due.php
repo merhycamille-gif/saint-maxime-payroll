@@ -16,7 +16,7 @@ requireLogin();
 $currentPage = 'cadre_due';
 $pageTitle = 'Propositions de titularisation / اقتراحات الدخول بالملاك';
 $db = getDB();
-$hideExportToolbar = true;
+// 📤 (2026-10-03) الشريط الكامل ظاهر هنا أيضاً («بكل البرنامج لازم يكون في كل شي من كل شي»)
 
 handleCadreDuePost($db, BASE_URL . 'pages/cadre_due.php');
 

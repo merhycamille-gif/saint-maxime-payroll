@@ -1,3 +1,4 @@
+<?php if (!empty($msaTopBars) && ob_get_level() > 0) ob_end_flush(); // 📐 يطبع الصفحة بالترتيب (msaOrderTopBars) ?>
         </div><!-- /page-content -->
     </main>
 </div><!-- /app-layout -->

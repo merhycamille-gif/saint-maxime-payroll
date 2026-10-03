@@ -183,6 +183,11 @@ $empList = $empList->fetchAll();
     <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <a class="btn btn-success" href="?export=xlsx"><i class="fas fa-file-excel"></i> Excel (صيغ حيّة)</a>
         <button type="button" class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Imprimer / PDF</button>
+        <?php /* 📤 (2026-10-03 «كل شي من كل شي»): نفس كبسات باقي التقارير */ $mbT = jsAttr('Budget MEHE ' . $sy); ?>
+        <button type="button" class="btn btn-danger" onclick="msaSavePdfStart(this)"><i class="fas fa-file-pdf"></i> PDF</button>
+        <?php if (!isViewer()): ?><button type="button" class="btn btn-info" onclick="ppWord('<?= $mbT ?>')"><i class="fas fa-file-word"></i> Word</button><?php endif; ?>
+        <button type="button" class="btn" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $mbT ?>','')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+        <?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail('<?= $mbT ?>','')"><i class="fas fa-envelope"></i> Email</button><?php endif; ?>
         <span class="text-muted" style="font-size:12.5px">جداول الأساتذة والموظفين والملخّص (أ، ب) تُقرأ من رواتب <?= e($sy) ?> تلقائياً — المدرسة (أو مجموعة مدارس أو الكل) والسنة من الأعلى<?= $multi ? '؛ الآن موازنة مجمّعة لـ' . count($schools) . ' مدارس' : '' ?>. كل سطر بالأوراق تحت قدّامه «✏️ تعديل» ثم «💾 حفظ» ويبقى محفوظاً لهذه المدرسة والسنة؛ أسطر الموظفين المعدَّلة يدوياً لها «↺ تلقائي» للرجوع إلى الرواتب.</span>
     </div>
 </div>

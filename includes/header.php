@@ -613,7 +613,8 @@ document.addEventListener('submit', function (e) {
                 </form>
 
                 <?php $salSel = salaryComp(); ?>
-                <div class="school-switcher school-multi" id="salCompPicker" title="<?= $lang === 'ar' ? 'مكوّنات الراتب المعروض' : 'Composantes du salaire affiché' ?>">
+                <?php /* 🧹 p12 (2026-10-03 «عدم التكرار لنفس الشي بنفس الصفحة»): حيث شريط «الراتب يشمل» الظاهر موجود بالصفحة، القائمة العليا نفسها تختفي */ ?>
+                <div class="school-switcher school-multi" id="salCompPicker"<?= in_array($currentPage ?? '', ['reports', 'employee_history', 'monthly'], true) ? ' hidden' : '' ?> title="<?= $lang === 'ar' ? 'مكوّنات الراتب المعروض' : 'Composantes du salaire affiché' ?>">
                     <i class="fas fa-layer-group" style="color:#fff;background:#7c3aed;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
                     <button type="button" class="sm-btn" onclick="document.getElementById('salCompMenu').classList.toggle('open')">
                         <?= $lang === 'ar' ? 'الراتب يشمل' : 'Salaire inclut' ?> <i class="fas fa-caret-down"></i>
@@ -783,19 +784,27 @@ document.addEventListener('submit', function (e) {
         </script>
         <?php endif; ?>
         <?php
+        // 📐 p12 (2026-10-03 «الترتيب»): ترتيب واحد بكل صفحة — الاختيار (مدارس/فئة/فلترة) أوّلاً ← خيارات العرض ← كبسات
+        // الطباعة والتصدير فوق المستند مباشرةً. الشريطان يُجمَعان هنا ويُطبعان بعد فورم الاختيار إن بدأت الصفحة به (msaOrderTopBars).
+        $msaTopBars = '';
         // شريط «الراتب المركّب يشمل» الظاهر (خانات اختيار متل شريط الإفادة) — على صفحات الرواتب فقط
         if (in_array($currentPage ?? '', ['reports', 'employee_history', 'monthly'], true)) {
-            echo salaryCompToolbar();
+            $msaTopBars .= salaryCompToolbar();
         }
         ?>
         <?php
         // شريط الطباعة والتصدير — يظهر تلقائياً بكل صفحة (طباعة/PDF/Excel/Word/واتساب/إيميل)
         // (2026-08-29، «ما تخلّي شي ما إلو معنى») صفحات الإعدادات/الإدارة ليست مطبوعات: بلا شريط طباعة/تصدير
-        $noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','exchange_rates.php','rates_history.php',
-                           'tax_brackets.php','social_security.php','salary_scales.php','schools.php','classes.php','exceptional_laws.php',
-                           'health_check.php','info_collect.php','bonuses.php','bulk_allowances.php','family_allowances.php','excel_salaries.php','tax_declarations.php','tax_suggestions.php','cadre_due.php',
-                           'r567_check.php'];
+        $noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','excel_salaries.php']; // 📤 (2026-10-03 «بكل البرنامج لازم يكون في كل شي من كل شي»): الشريط الكامل بكل صفحة فيها لائحة/جدول — تبقى بلاه صفحات الإدارة البحتة فقط
         if (empty($hideExportToolbar) && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), $noToolbarPages, true)) {
-            echo exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);
+            $msaTopBars .= exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);
+        }
+        if ($msaTopBars !== '') {
+            ob_start(function ($buf, $phase) use ($msaTopBars) {
+                static $done = false;
+                if ($done) return $buf;      // دفعات لاحقة (صفحة تبثّ على مراحل) تمرّ كما هي
+                $done = true;
+                return msaOrderTopBars($msaTopBars, $buf);
+            });
         }
         ?>

@@ -6792,7 +6792,7 @@ check('🎓 صفحة اقتراحات الدخول بالملاك (كود + رن
       file_exists($PROJ . '/pages/cadre_due.php')
       && function_exists('cadreDuePendingCount') && function_exists('cadreDueApprovedList')
       && strpos($hd142, 'pages/cadre_due.php') !== false && strpos($hd142, '$cdNavPend = cadreDuePendingCount();') !== false
-      && strpos($hd142, "'cadre_due'=>'personnel'") !== false && strpos($hd142, "'cadre_due.php'") !== false
+      && strpos($hd142, "'cadre_due'=>'personnel'") !== false /* 📤 2026-10-03: الشريط الكامل صار ظاهراً هنا بطلبه (245) */
       && strpos($pg142, "handleCadreDuePost(\$db, BASE_URL . 'pages/cadre_due.php');") !== false
       && strpos($pg142, "renderCadreDuePending(\$cdPend, \$cdSy, false, BASE_URL . 'pages/cadre_due.php', \$cdRej);") !== false
       && strpos($pg142, 'cadreDueApprovedList($db, $cdSy)') !== false
@@ -7820,7 +7820,7 @@ $c167('applyFamilyAllowanceDates-shared', function_exists('applyFamilyAllowanceD
     && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), 'function applyFamilyAllowanceDates') === false);
 $hdr167 = (string)file_get_contents($PROJ . '/includes/header.php');
 $c167('nav+dashboard', strpos($hdr167, 'pages/family_allowances.php') !== false && strpos($hdr167, "'family_allowances'=>'personnel'") !== false
-    && strpos($hdr167, "'family_allowances.php'") !== false && strpos((string)file_get_contents($PROJ . '/index.php'), 'pages/family_allowances.php') !== false);
+    /* 📤 2026-10-03: الشريط الكامل صار ظاهراً هنا بطلبه (245) */ && strpos((string)file_get_contents($PROJ . '/index.php'), 'pages/family_allowances.php') !== false);
 $sy167 = currentSchoolYear();
 $vis167 = fn(string $h, string $cls = '(?:na)?', string $cat = '[a-z]+') => preg_match_all('/<tr class="' . $cls . '" data-id="\d+" data-cat="' . $cat . '" data-school="\d+" data-cur="\d+">/', $h); // ⚡ الصفوف الظاهرة (غير المشيّكة تصل بـstyle=display:none)
 $h0 = renderPage('pages/family_allowances.php', ['sch' => 'all', 'sy' => $sy167], []);
@@ -9804,6 +9804,25 @@ $as244 = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
 check('📲✉️ البطاقة السنوية: كبستا واتساب وإيميل بسطر التصدير (المفردة + الكل)',
       substr_count($as244, 'onclick="ppWhatsApp(') === 2 && substr_count($as244, 'onclick="ppEmail(') === 2
       && substr_count($as244, '<?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail(') === 2);
+
+/* =====================================================================
+ * 245) 📐🧹 (2026-10-03 p12 «الترتيب وعدم التكرار لنفس الشي بنفس الصفحة» + «رتّب كل البرنامج» + «بكل البرنامج لازم يكون في كل شي من كل شي»):
+ *      ترتيب واحد بكل صفحة: فورم الاختيار ← خيارات العرض ← كبسات التصدير ← المستند (msaOrderTopBars)؛ شريط المدارس والقائمة
+ *      «الراتب يشمل» لا يتكرّران حيث الشيء نفسه ظاهر بالصفحة؛ الشريط الكامل بكل صفحة عدا الإدارة البحتة.
+ * =================================================================== */
+$hd245 = (string)file_get_contents($PROJ . '/includes/header.php'); $css245 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$o245a = msaOrderTopBars('[BARS]', '<style>.x{}</style><form method="get" class="card no-print"><b>f</b></form><table></table>');
+$o245b = msaOrderTopBars('[BARS]', '<table></table><form method="get" class="card no-print"></form>');
+$o245c = msaOrderTopBars('[BARS]', '<form method="post" class="card no-print"></form>');
+check('📐🧹 الترتيب بكل البرنامج (اختيار ← خيارات ← كبسات ← مستند) + لا تكرار لشريط المدارس/«الراتب يشمل» + الشريط الكامل بكل صفحة عدا الإدارة',
+      $o245a === '<style>.x{}</style><form method="get" class="card no-print"><b>f</b></form>[BARS]<table></table>'
+      && strpos($o245b, '[BARS]') === 0 && strpos($o245c, '[BARS]') === 0
+      && strpos($hd245, 'return msaOrderTopBars($msaTopBars, $buf);') !== false
+      && strpos($hd245, "\$noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','excel_salaries.php'];") !== false
+      && strpos($hd245, 'id="salCompPicker"<?= in_array($currentPage ?? ' . "''" . ', [' . "'reports', 'employee_history', 'monthly'" . '], true) ? ' . "' hidden'" . ' : ' . "''" . ' ?>') !== false
+      && strpos($css245, 'body:has(#pageContent input[name="schools[]"], #pageContent .msa-school-pick) #schoolStrip { display: none; }') !== false
+      && strpos($css245, '.form-row > .form-group:has(input[name="schools[]"], .msa-school-pick) { order: -1; }') !== false
+      && substr_count((string)file_get_contents($PROJ . '/pages/mehe_budget.php'), 'onclick="ppWhatsApp(') === 1);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

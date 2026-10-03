@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit()) {
 
 $pageTitle = 'Décisions & suggestions (état civil) / قرارات التنزيل واقتراحات إخراج القيد';
 $currentPage = 'tax_suggestions';
-$hideExportToolbar = true;
+// 📤 (2026-10-03) الشريط الكامل ظاهر هنا أيضاً («بكل البرنامج لازم يكون في كل شي من كل شي»)
 include __DIR__ . '/../includes/header.php';
 
 /* ===== ١) قرارات التنزيل لكل أستاذ — الجدول المفهوم (طلبه 2026-09-06):
