@@ -5511,7 +5511,7 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php endif; ?>
         <?php if ($showWa): ?>
             <?php if ($viewerOnly): ?>
-            <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsAppPdf('<?= $t ?>','<?= $ph ?>','<?= jsAttr($officialPdf) ?>')" title="يفتح ملف الـPDF لترفقه + محادثة واتساب"><i class="fab fa-whatsapp"></i> WhatsApp PDF</button>
+            <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsAppPdf('<?= $t ?>','<?= $ph ?>','<?= jsAttr($officialPdf) ?>')" title="يجهّز ملف الـPDF ويبعته دغري عالواتساب"><i class="fab fa-whatsapp"></i> WhatsApp PDF</button>
             <?php else: ?>
             <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $t ?>','<?= $ph ?>')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
             <?php endif; ?>

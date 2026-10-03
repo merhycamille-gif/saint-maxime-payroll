@@ -9786,6 +9786,16 @@ $ok241 = count($mm241) === 19 /* + حنان تحومي بشفائها الخاص
     && (string)getSetting('heal_rows_after_leave_20261003', '') !== '' && $left241 === 0;
 check('🚪🩹 التاركون العشرون (الـ19 + حنان تحومي بقراره «شيل حنان تحومي كمان»): لا شهر مخزّناً بعد تاريخ الترك (لائحة مقفلة + نسخة _ms_bk_afterleft20261003) وما قبل الترك باقٍ (2026-10-03)', $ok241, 'left=' . $left241);
 
+/* =====================================================================
+ * 243) 📲 (2026-10-03 «بدي دغري بس اكبس واتس اب تنبعت ب د ف»): كبسة الواتساب تجهّز الـPDF وتسلّمه مباشرةً لواتساب
+ *      عبر مشاركة النظام (navigator.share بالملف) — بلا تنزيل عالدسك توب؛ النافذة القديمة احتياط فقط.
+ * =================================================================== */
+$ex243 = (string)file_get_contents($PROJ . '/assets/js/export.js');
+check('📲 كبسة واتساب تبعت الـPDF دغري (مشاركة الملف مباشرةً — النافذة القديمة احتياط للمتصفّح الذي لا يشارك ملفات)',
+      strpos($ex243, 'function waSendPdf(title, getPdf, fallback)') !== false && strpos($ex243, 'navigator.share({ files: [file], title: title })') !== false
+      && strpos($ex243, 'if (!canSharePdf()) { fallback(); return; }') !== false && strpos($ex243, 'function () { ppWhatsAppManual(title, phone); }') !== false
+      && strpos($ex243, '}, offWaManual);') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

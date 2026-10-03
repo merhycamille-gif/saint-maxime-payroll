@@ -265,8 +265,54 @@
         }).catch(function (e) { btn.innerHTML = old; btn.disabled = false; try { console.error(e); } catch (_) {} window.print(); });
     }
 
+    // 📲 «بدي دغري بس اكبس واتس اب تنبعت ب د ف» (2026-10-03): الكبسة تجهّز الـPDF وتسلّمه مباشرةً لواتساب عبر
+    // مشاركة النظام (navigator.share بالملف) — بلا تنزيل عالدسك توب وبلا إرفاق يدوي. المتصفّح الذي لا يشارك ملفات
+    // (أو تعذّر تجهيز الملف) يرجع للنافذة القديمة (تنزيل + فتح المحادثة).
+    function canSharePdf() {
+        try {
+            return !!(navigator.share && navigator.canShare && window.File
+                && navigator.canShare({ files: [new File([new Blob(['%PDF-'], { type: 'application/pdf' })], 'a.pdf', { type: 'application/pdf' })] }));
+        } catch (e) { return false; }
+    }
+    function waSendPdf(title, getPdf, fallback) {
+        if (!canSharePdf()) { fallback(); return; }
+        var m = shareModal(
+            '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:10px"><i class="fab fa-whatsapp"></i> إرسال عبر واتساب / Envoyer par WhatsApp</div>'
+            + '<div id="ppWaMsg" style="font-size:14.5px;color:#334155;line-height:1.8;margin-bottom:10px">⏳ عم نجهّز ملف الـPDF...</div>'
+            + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+            + '<button type="button" id="ppWaGo" class="btn" style="display:none;background:#25D366;color:#fff;font-weight:700;font-size:15px"><i class="fab fa-whatsapp"></i> ابعت الملف عالواتساب</button>'
+            + '<button type="button" id="ppWaDl" class="btn btn-light" style="display:none">💾 نزّل الملف</button>'
+            + '</div>');
+        var msg = m.el.querySelector('#ppWaMsg'), go = m.el.querySelector('#ppWaGo'), dl = m.el.querySelector('#ppWaDl');
+        getPdf().then(function (r) {
+            var file = new File([r.blob], r.name, { type: 'application/pdf' });
+            function ready(txt) { msg.textContent = txt; go.style.display = ''; dl.style.display = ''; }
+            function send() {
+                navigator.share({ files: [file], title: title }).then(function () {
+                    msg.innerHTML = '<span style="color:#166534;font-weight:700">✅ تسلّم الملف لواتساب</span>';
+                    setTimeout(m.close, 1500);
+                }, function (e) {
+                    // NotAllowedError = تجهيز الملف طوّل فانتهت صلاحية الكبسة ⇒ كبسة وحدة تكفي؛ AbortError = سكّر نافذة المشاركة
+                    ready(e && e.name === 'AbortError' ? 'ما انبعت الملف — اكبس لتبعته:' : '✅ الملف جاهز: ' + r.name + ' — اكبس واختار واتساب:');
+                });
+            }
+            go.addEventListener('click', send);
+            dl.addEventListener('click', function () {
+                var url = URL.createObjectURL(r.blob); var a = document.createElement('a'); a.href = url; a.download = r.name; document.body.appendChild(a); a.click();
+                setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1500);
+            });
+            send();
+        }).catch(function (e) { try { console.error(e); } catch (_) {} m.close(); fallback(); });
+    }
+
     // ===== WhatsApp =====
     window.ppWhatsApp = function (title, phone) {
+        waSendPdf(docTitle(title), function () {
+            return window.msaPdfBlob ? window.msaPdfBlob() : Promise.reject(new Error('no pdf builder'));
+        }, function () { ppWhatsAppManual(title, phone); });
+    };
+    // النافذة القديمة (تنزيل الملف ثم فتح المحادثة) — احتياط للمتصفّح الذي لا يشارك ملفات
+    function ppWhatsAppManual(title, phone) {
         var t = docTitle(title);
         var text = t + '\n\n' + shortDoc();
         var m = shareModal(
@@ -287,7 +333,7 @@
         }
         num.addEventListener('input', upd); upd(); num.focus();
         m.el.querySelector('#ppWaPdf').addEventListener('click', function () { pdfBtnHandler(this); });
-    };
+    }
 
     // ===== WhatsApp + PDF (لحسابات المدارس) — نفس النافذة =====
     window.ppWhatsAppPdf = function (title, phone) { ppWhatsApp(title, phone); };
@@ -304,7 +350,16 @@
             + '<button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" id="msaOffWa"><i class="fab fa-whatsapp"></i> WhatsApp</button>'
             + '<button type="button" class="btn btn-sm btn-light" id="msaOffMail"><i class="fas fa-envelope"></i> Email</button>';
         tb.querySelector('#msaOffWa').addEventListener('click', function () {
-            var text = (o.title || '') + '\n' + location.origin + o.base + o.target;
+            // النموذج الرسمي PDF من الخادم (حيث الأداة متوفّرة) يُسلَّم مباشرةً لواتساب؛ وإلا النافذة القديمة
+            waSendPdf(o.title || 'formulaire', function () {
+                return fetch(o.pdf, { credentials: 'same-origin' }).then(function (x) { return x.blob(); }).then(function (bl) {
+                    if (!/pdf/i.test(bl.type)) throw new Error('not a pdf');
+                    return { blob: bl, name: safeName(o.title || 'formulaire') + '.pdf' };
+                });
+            }, offWaManual);
+        });
+        function offWaManual() {
+            var text =(o.title || '') + '\n' + location.origin + o.base + o.target;
             var m = shareModal(
                 '<div style="font-size:18px;font-weight:800;color:#128C7E;margin-bottom:6px"><i class="fab fa-whatsapp"></i> إرسال عبر واتساب / Envoyer par WhatsApp</div>'
                 + '<div style="font-size:13.5px;color:#475569;line-height:1.8;margin-bottom:10px">واتساب ما بيقبل إرفاق ملف من الرابط. الطريقة: <b>١</b> افتح النموذج واحفظه PDF، <b>٢</b> افتح المحادثة وارفق الملف من 📎.</div>'
@@ -321,7 +376,7 @@
                 hint.textContent = n ? ('بيفتح محادثة الرقم +' + n + ' — وبعدين ارفق الملف من 📎') : 'بلا رقم: بيفتح واتساب لتختار المحادثة';
             }
             num.addEventListener('input', upd); upd(); num.focus();
-        });
+        }
         tb.querySelector('#msaOffMail').addEventListener('click', function () {
             var to = window.prompt('إرسال النموذج (PDF مرفق) إلى بريد:', o.email || '');
             if (to === null || !to.trim()) return;
