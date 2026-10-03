@@ -140,11 +140,12 @@ $canE = canEdit();
 /* زوج أزرار نعم/كلا (راديو يحفظ فوراً) */
 $yesNo = function (string $act, int $empId, bool $on) use ($canE): string {
     if (!$canE) return '<div style="font-weight:800;color:' . ($on ? '#166534' : '#991b1b') . '">' . ($on ? 'نعم ✓' : 'كلا ✗') . '</div>';
-    $h  = '<form method="POST" style="display:inline-flex;gap:4px">' . csrfField() . '<input type="hidden" name="act" value="' . e($act) . '"><input type="hidden" name="emp" value="' . $empId . '">';
+    // 🚀 (2026-10-03): الخانات المخفية (csrf/act/emp) تُضاف للفورم لحظة الكبس (tsYn) — كانت 3 خانات × ~1000 فورم تُرسم بكل فتحة
+    $h  = '<form method="POST" class="ts-yn" data-act="' . e($act) . '" data-emp="' . $empId . '" style="display:inline-flex;gap:4px">';
     $h .= '<label style="display:inline-flex;align-items:center;gap:5px;background:' . ($on ? '#dcfce7' : '#f8fafc') . ';border:2px solid ' . ($on ? '#16a34a' : '#e2e8f0') . ';border-radius:8px;padding:2px 8px;font-weight:800;color:#166534;cursor:pointer">'
-        . '<input type="radio" name="val" value="1"' . ($on ? ' checked' : '') . ' onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#16a34a"> نعم</label>';
+        . '<input type="radio" name="val" value="1"' . ($on ? ' checked' : '') . ' onchange="tsYn(this)" style="width:17px;height:17px;accent-color:#16a34a"> نعم</label>';
     $h .= '<label style="display:inline-flex;align-items:center;gap:5px;background:' . ($on ? '#f8fafc' : '#fee2e2') . ';border:2px solid ' . ($on ? '#e2e8f0' : '#dc2626') . ';border-radius:8px;padding:2px 8px;font-weight:800;color:#991b1b;cursor:pointer">'
-        . '<input type="radio" name="val" value="0"' . ($on ? '' : ' checked') . ' onchange="this.form.submit()" style="width:17px;height:17px;accent-color:#dc2626"> كلا</label>';
+        . '<input type="radio" name="val" value="0"' . ($on ? '' : ' checked') . ' onchange="tsYn(this)" style="width:17px;height:17px;accent-color:#dc2626"> كلا</label>';
     return $h . '</form>';
 };
 $dash = '<span style="color:#94a3b8">—</span>';
@@ -165,6 +166,11 @@ $dash = '<span style="color:#94a3b8">—</span>';
         // 🚀 (2026-10-02 «كل البرنامج متل البرق»): محتوى كل «▾» (فورمات الأولاد وتاريخ عمل الزوج) محفوظ بقالب <template> ويُركَّب
         // لحظة فتحه فقط — الصفحة كانت ترسم مئات الفورمات وخانات التاريخ المطوية عند كل فتحة (ثانيتان).
         function tsOpen(d) { if (!d.open) return; var t = d.querySelector(':scope > template'); if (t) t.replaceWith(t.content.cloneNode(true)); }
+        // 🚀 (2026-10-03): نعم/كلا يحفظ فوراً — خانات الفورم المخفية (رمز الأمان + القرار + الموظف) تُضاف لحظة الكبس
+        var TS_CSRF = <?= json_encode(csrfToken()) ?>;
+        function tsYn(r) { var f = r.form, add = function (n, v) { var i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); };
+            if (!f.querySelector('input[name=csrf]')) { add('csrf', TS_CSRF); add('act', f.dataset.act); add('emp', f.dataset.emp); }
+            f.submit(); }
         </script>
         <div class="report-table-wrap" dir="rtl"><table class="table ts-dec" dir="rtl" style="font-size:12px">
             <thead><tr>

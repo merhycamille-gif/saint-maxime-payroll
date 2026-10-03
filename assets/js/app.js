@@ -249,6 +249,9 @@ window.msaFitScreenTables = function () {
     window.addEventListener('load', stkRunIfChanged);
     window.addEventListener('resize', stkRun);   // فوري: الطباعة/PDF تغيّر المقاس وتحتاج الحالة الصحيحة قبل التخطيط (التأجيل ولّد ورقة أخيرة بيضاء)
     window.addEventListener('beforeprint', stkRun);
+    // 🚀 (2026-10-03): جدول داخل قسم مطويّ (details) يُحسب تثبيت رأسه/أسانسوره لحظة فتح القسم — كان يعتمد على «resize» وهمية
+    // يطلقها export.js مرّتين عند كل فتحة لكل صفحة (أُزيلت للسرعة).
+    document.addEventListener('toggle', function (ev) { var d = ev.target; if (d && d.open && d.querySelector && d.querySelector('table.table, table.doc-table, table.salary-slip-table')) stkRun(); }, true);
     window.addEventListener('scroll', stickXHeads, { passive: true });
 })();
 

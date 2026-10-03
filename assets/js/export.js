@@ -67,7 +67,7 @@
         return 'portrait';
     }
     window.msaPrintOrient = function () { return window.msaOrientForced || msaDefaultOrient(); };
-    function msaOrientApply() {
+    function msaOrientApply(fire) {
         var o = window.msaPrintOrient();
         document.body.classList.toggle('print-portrait', !!window.msaOrientForced && o === 'portrait');
         document.body.classList.toggle('print-landscape', !!window.msaOrientForced && o === 'landscape');
@@ -78,11 +78,13 @@
             b.classList.toggle('btn-warning', !!window.msaOrientForced);
             b.classList.toggle('btn-light', !window.msaOrientForced);
         }
-        window.dispatchEvent(new Event('resize')); // fitDocTables يعيد --pz على عرض الورقة الجديد
+        // 🚀 (2026-10-03): إشارة تغيير المقاس فقط حين يقلب المستخدم الاتجاه فعلاً — كانت تُطلق مرّتين عند كل فتحة (DOMContentLoaded + load)
+        // فتعيد تثبيت رؤوس كل الجداول وتخطيطها مرّتين بلا أي تغيير (~0.2ث بالصفحات الكبيرة).
+        if (fire === true) window.dispatchEvent(new Event('resize'));
     }
     window.msaToggleOrient = function () {
         window.msaOrientForced = (window.msaPrintOrient() === 'landscape') ? 'portrait' : 'landscape';
-        msaOrientApply();
+        msaOrientApply(true);
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', msaOrientApply); else msaOrientApply();
     window.addEventListener('load', msaOrientApply);

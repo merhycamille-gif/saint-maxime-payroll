@@ -3543,12 +3543,12 @@ check('صفحة القرارات: الجدول المفهوم — متزوج؟ �
       strpos($dec66, 'قرارات التنزيل العائلي') !== false
       && !in_array(false, $ord66, true) && $ord66 === array_values(array_unique($ord66)) && $ord66 == array_values((function ($a) { sort($a); return $a; })($ord66))
       && strpos($dec66, '→ 18: <strong>') !== false
-      && strpos($dec66, 'name="act" value="set_married"') !== false
-      && strpos($dec66, 'name="act" value="set_spouse_works"') !== false
-      && strpos($dec66, 'name="act" value="set_gca"') !== false
-      && strpos($dec66, 'name="act" value="set_gsa"') !== false
+      && strpos($dec66, 'data-act="set_married"') !== false // (2026-10-03: خانات الفورم المخفية تُضاف لحظة الكبس — tsYn)
+      && strpos($dec66, 'data-act="set_spouse_works"') !== false // (2026-10-03: خانات الفورم المخفية تُضاف لحظة الكبس — tsYn)
+      && strpos($dec66, 'data-act="set_gca"') !== false // (2026-10-03: خانات الفورم المخفية تُضاف لحظة الكبس — tsYn)
+      && strpos($dec66, 'data-act="set_gsa"') !== false // (2026-10-03: خانات الفورم المخفية تُضاف لحظة الكبس — tsYn)
       && strpos($dec66, 'type="radio" name="val"') !== false
-      && strpos($dec66, 'onchange="this.form.submit()"') !== false
+      && strpos($dec66, 'onchange="tsYn(this)"') !== false && strpos($dec66, 'f.submit(); }') !== false
       && strpos($dec66, 'name="act" value="add_child"') !== false
       && strpos($dec66, 'name="act" value="spouse_start"') !== false
       && strpos($dec66, 'FATAL') === false);
@@ -9629,6 +9629,38 @@ $ok233 = strpos($fn233, 'function healCurrentGradeAsOfToday(): void {') !== fals
     && strpos($fn233, 'INSERT INTO _bk_current_grade_sync (employee_id, old_grade, new_grade, synced_at)') !== false
     && (string)getSetting('grade_asof_synced_on', '') === date('Y-m-d') && $low233 === 0;
 check('📅🎓 «الدرجة الحالية» بملف الملاك تلحق يومياً آخر درجة سارية بسجلّه (1/10 و1/1) — بلا تنزيل وبلا مسّ السجلّ/الرواتب (2026-10-02)', $ok233, 'below=' . $low233);
+
+/* =====================================================================
+ * 234) ⬜ (2026-10-03 جوابه «بدي 4» — تتمّة «بدي اللون الأزرق الفاتح مش الغامق يرجع أبيض»): حبوب الخيارات وخانات التشييك
+ *      والعناوين المطوية وحبّة المدرسة بيضاء نافرة بدل الأزرق الفاتح (متغيّرات --chip)، والمختارة تبقى كحلية بكتابة بيضاء.
+ * =================================================================== */
+$css234 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+$p234 = strpos($css234, ':root { --chip: #ffffff; --chip2: #eef2f7; --chip-line: #cbd5e1; --chip-edge: #94a3b8; }');
+$ok234 = $p234 !== false && $p234 > strrpos($css234, 'background-color: #e6eef8;')                       // القاعدة البيضاء بعد آخر أزرق فاتح فتغلبه
+    && strpos($css234, 'background-image: linear-gradient(180deg, var(--chip) 0%, var(--chip) 55%, var(--chip2) 100%);', $p234) !== false
+    && strpos($css234, '.salcomp-bar .scb-opt, .school-checks.scb-tiles .chk, .school-checks.att-type-checks .chk, .school-checks.att-lang-checks .chk, .school-switcher {', $p234) !== false
+    && strpos($css234, 'background-image: linear-gradient(180deg, #2f659a 0%, #1f4e79 55%, #173c5e 100%);', $p234) !== false; // المختارة كحلية
+check('⬜ حبوب الخيارات/خانات التشييك/العناوين المطوية بيضاء نافرة بدل الأزرق الفاتح — والمختارة كحلية (2026-10-03)', $ok234);
+
+/* =====================================================================
+ * 235) 🚀 (2026-10-03 جوابه «بدي 5» — آخر صفحتين فوق الثانية: موازنة الوزارة واقتراحات الضريبة):
+ *      (أ) export.js لا يطلق «resize» وهمية عند كل فتحة (كانت مرّتين بكل صفحة ⇒ إعادة تثبيت/تخطيط كل الجداول) — فقط عند قلب الاتجاه؛
+ *      (ب) موازنة الوزارة: «حفظ/إلغاء» يُخلقان عند أوّل «تعديل» + مستمع واحد للصفحة + جداول الرواتب من كاش ببصمة الداتا؛
+ *      (ج) اقتراحات الضريبة: خانات فورم «نعم/كلا» المخفية تُضاف لحظة الكبس.
+ * =================================================================== */
+$ex235 = (string)file_get_contents($PROJ . '/assets/js/export.js'); $mb235 = (string)file_get_contents($PROJ . '/pages/mehe_budget.php'); $ts235 = (string)file_get_contents($PROJ . '/pages/tax_suggestions.php');
+$mbR235 = renderPage('pages/mehe_budget.php', [], [], [2], '', '2025-2026'); $tsR235 = renderPage('pages/tax_suggestions.php', [], [], [3]);
+$ok235 = substr_count($ex235, "window.dispatchEvent(new Event('resize'))") === 1 && strpos($ex235, "if (fire === true) window.dispatchEvent(new Event('resize'));") !== false
+    && strpos($ex235, 'msaOrientApply(true);') !== false && strpos((string)file_get_contents($PROJ . '/assets/js/app.js'), "document.addEventListener('toggle', function (ev) { var d = ev.target; if (d && d.open && d.querySelector && d.querySelector('table.table, table.doc-table, table.salary-slip-table')) stkRun(); }, true);") !== false
+    && strpos($mb235, "\$p = msaFpCacheGet(\$pKey);") !== false && strpos($mb235, "if (!is_array(\$p)) { \$p = mehePayroll(\$db, \$ids, \$sy, \$data); msaFpCachePut(\$pKey, \$p); }") !== false
+    && strpos($mb235, "\$pKey = 'mehe_p|' . md5(json_encode([\$ids, \$sy, \$data]));") !== false
+    && strpos($mb235, "document.querySelectorAll('[data-mrow]').forEach(wire)") === false && strpos($mb235, "function full(ctl){ if(ctl.querySelector('.sv')) return;") !== false
+    && substr_count($mbR235, 'class="rowctl no-print"') > 150 && substr_count($mbR235, '<button type="button" class="sv"') <= 1 && substr_count($mbR235, '<button type="button" class="ed"') > 150
+    && strpos($ts235, "if (!f.querySelector('input[name=csrf]')) { add('csrf', TS_CSRF); add('act', f.dataset.act); add('emp', f.dataset.emp); }") !== false
+    && substr_count($tsR235, '<form method="POST" class="ts-yn" data-act="') > 20 && strpos($tsR235, 'name="act" value="set_gca"') === false
+    && strpos($mbR235, 'FATAL') === false && strpos($tsR235, 'FATAL') === false;
+check('🚀 موازنة الوزارة واقتراحات الضريبة أخفّ (كبسات/خانات تُخلق عند الكبس + كاش) وexport.js بلا «resize» وهمية عند كل فتحة (2026-10-03)', $ok235,
+      'sv=' . substr_count($mbR235, '<button type="button" class="sv"') . ' yn=' . substr_count($tsR235, 'class="ts-yn"'));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

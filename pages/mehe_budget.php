@@ -94,7 +94,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit() && isset($_POST['mehe_sav
     exit;
 }
 
-$p = mehePayroll($db, $ids, $sy, $data);
+// 🚀 (2026-10-03): جداول الرواتب للموازنة من كاش ببصمة الداتا (GET) — أي تعديل على الرواتب/الموظفين/بيانات الموازنة يغيّر البصمة أو المفتاح
+$pKey = 'mehe_p|' . md5(json_encode([$ids, $sy, $data]));
+$p = msaFpCacheGet($pKey);
+if (!is_array($p)) { $p = mehePayroll($db, $ids, $sy, $data); msaFpCachePut($pKey, $p); }
 $s = meheSummary($data, $p);
 [$y1, $y2] = schoolYearToYears($sy);
 
@@ -379,7 +382,8 @@ $E = canEdit(); // ✏️ أزرار التعديل تظهر للمحرّرين 
 /* خلية أزرار قدّام السطر (تُخفى بالطباعة). $rs = سطر له قيم يدوية ⇒ زرّ «↺ تلقائي» */
 $ctl = function (bool $rs = false, string $tag = 'td') use ($E): string {
     if (!$E) return '';
-    return "<$tag class=\"rowctl no-print\"><button type=\"button\" class=\"ed\" title=\"تعديل / Modifier\">✏️ تعديل</button><button type=\"button\" class=\"sv\" title=\"حفظ / Enregistrer\">💾 حفظ</button><button type=\"button\" class=\"cx\" title=\"إلغاء\">✖</button>" . ($rs ? "<button type=\"button\" class=\"rs\" title=\"رجوع القيمة التلقائية من الرواتب\">↺ تلقائي</button>" : '') . "</$tag>";
+    // 🚀 (2026-10-03): «💾 حفظ» و«✖» يُخلقان بالمتصفّح عند أوّل «تعديل» (كانا ~1000 كبسة مخفية تُحسب بتخطيط كل فتحة)
+    return "<$tag class=\"rowctl no-print\"><button type=\"button\" class=\"ed\" title=\"تعديل / Modifier\">✏️ تعديل</button>" . ($rs ? "<button type=\"button\" class=\"rs\" title=\"رجوع القيمة التلقائية من الرواتب\">↺ تلقائي</button>" : '') . "</$tag>";
 };
 $ctlTh = fn() => $E ? '<th class="rowctl no-print"></th>' : '';
 /* خلية قابلة للتعديل: data-f اسم الحقل · data-t النوع (s نص، n رقم، ta نص طويل، sel اختيار) · data-v القيمة الخام */
@@ -640,19 +644,31 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
                                else { alert((j && j.msg) || 'تعذّر الحفظ'); row.querySelectorAll('.rowctl button').forEach(function(b){ b.disabled=false; }); } })
             .catch(function(){ alert('تعذّر الحفظ — تحقّق من الاتصال'); row.querySelectorAll('.rowctl button').forEach(function(b){ b.disabled=false; }); });
     }
-    function wire(row){ var ctl=row.querySelector('.rowctl'); if(!ctl||ctl.dataset.w) return; ctl.dataset.w='1';
-        var q=function(c){ return ctl.querySelector(c); };
-        q('.ed').onclick=function(){ open(row); ctl.classList.add('editing'); };
-        q('.cx').onclick=function(){ if(row.dataset.new){ row.remove(); return; } close(row); ctl.classList.remove('editing'); };
-        q('.sv').onclick=function(){ save(row,false); };
-        var rs=q('.rs'); if(rs) rs.onclick=function(){ if(confirm('رجوع القيم التلقائية من الرواتب لهذا السطر؟')) save(row,true); };
-        row.addEventListener('keydown', function(ev){ if(ev.target.classList && ev.target.classList.contains('mi')){ if(ev.key==='Enter' && ev.target.tagName!=='TEXTAREA'){ ev.preventDefault(); save(row,false); } if(ev.key==='Escape'){ q('.cx').click(); } } });
-    }
-    document.querySelectorAll('[data-mrow]').forEach(wire);
+    // 🚀 (2026-10-03): مستمع واحد للصفحة كلها (بدل 4 مستمعات لكل سطر عند كل فتحة)، و«حفظ/إلغاء» يُخلقان للسطر عند أوّل «تعديل»
+    function full(ctl){ if(ctl.querySelector('.sv')) return;
+        var sv=document.createElement('button'); sv.type='button'; sv.className='sv'; sv.title='حفظ / Enregistrer'; sv.textContent='💾 حفظ';
+        var cx=document.createElement('button'); cx.type='button'; cx.className='cx'; cx.title='إلغاء'; cx.textContent='✖';
+        var ed=ctl.querySelector('.ed'); ctl.insertBefore(cx, ed.nextSibling); ctl.insertBefore(sv, cx); }
+    function cancel(row, ctl){ if(row.dataset.new){ row.remove(); return; } close(row); ctl.classList.remove('editing'); }
+    var doc=document;
+    doc.addEventListener('click', function(ev){
+        var b=ev.target.closest ? ev.target.closest('.rowctl button') : null; if(!b) return;
+        var row=b.closest('[data-mrow]'), ctl=b.closest('.rowctl'); if(!row||!ctl) return;
+        if(b.classList.contains('ed')){ full(ctl); open(row); ctl.classList.add('editing'); }
+        else if(b.classList.contains('cx')){ cancel(row, ctl); }
+        else if(b.classList.contains('sv')){ save(row,false); }
+        else if(b.classList.contains('rs')){ if(confirm('رجوع القيم التلقائية من الرواتب لهذا السطر؟')) save(row,true); }
+    });
+    doc.addEventListener('keydown', function(ev){
+        if(!(ev.target.classList && ev.target.classList.contains('mi'))) return;
+        var row=ev.target.closest('[data-mrow]'); if(!row) return;
+        if(ev.key==='Enter' && ev.target.tagName!=='TEXTAREA'){ ev.preventDefault(); save(row,false); }
+        if(ev.key==='Escape'){ cancel(row, row.querySelector('.rowctl')); }
+    });
     window.meheAddSheetRow=function(btn){ var tbl=btn.parentNode.previousElementSibling.querySelector('table'); var tpl=tbl.querySelector('tr.mtpl'); if(!tpl) return;
-        var tr=tpl.cloneNode(true); tr.classList.remove('mtpl'); tr.dataset.new='1'; delete tr.querySelector('.rowctl').dataset.w;
+        var tr=tpl.cloneNode(true); tr.classList.remove('mtpl'); tr.dataset.new='1';
         tbl.querySelectorAll('tbody tr:not([data-mrow]):not(.tot):not(.mtpl)').forEach(function(ph){ ph.style.display='none'; }); // صفّ «لا صفوف»
-        tpl.parentNode.insertBefore(tr, tpl); wire(tr); tr.querySelector('.rowctl .ed').click(); };
+        tpl.parentNode.insertBefore(tr, tpl); tr.querySelector('.rowctl .ed').click(); };
     try{ var sc=sessionStorage.getItem('meheScroll'); if(sc!==null){ sessionStorage.removeItem('meheScroll'); window.scrollTo(0, parseInt(sc,10)||0); } }catch(e){}
 })();
 </script>
