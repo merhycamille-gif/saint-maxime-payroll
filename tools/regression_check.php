@@ -9679,6 +9679,25 @@ $ok236 = strpos($fn236, 'function msaHasCol(PDO $db, string $table, string $col)
     && substr_count($of236, 'COALESCE(NULLIF(e.last_name_ar,\'\'), e.last_name_fr), e.id";') === 2;
 check('🚀 استعلامات مكرّرة أُزيلت: أعمدة الجداول بسؤال واحد (msaHasCol) + آخر راتب/تغييرات التعويض العائلي/صفّ الموظف بتحميل جماعي + ترتيب ثابت بكشف الضمان الاسمي (2026-10-03)', $ok236, 'left=' . $left236);
 
+/* =====================================================================
+ * 237) 🚪🩹 (2026-10-03 بكلماته «شيلهم كلهن… من 2026-2027 بس» بعد عرض اللائحة بالأسماء): شفاء مرّة واحدة لأشهر 2026-2027 للأربعين
+ *      المنقولين بلا راتب 2025-2026 — لائحة مقفلة بالأرقام، صمّامات (لا راتب سابق/لا مدفوع/غير مقفل)، نسخة قبل الحذف، علم يمنع التكرار.
+ * =================================================================== */
+$fn237 = (string)file_get_contents($PROJ . '/includes/functions.php');
+preg_match('/function healCarriedNoPay20261003\(\): void \{.*?\$ids = \[(.*?)\];/s', $fn237, $m237);
+$ids237 = array_filter(array_map('intval', preg_split('/[\s,]+/', (string)($m237[1] ?? ''))));
+$left237 = $ids237 ? (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE school_year = '2026-2027' AND employee_id IN (" . implode(',', $ids237) . ")")->fetchColumn() : -1;
+$ok237 = count($ids237) === 40 && count(array_unique($ids237)) === 40
+    && strpos($fn237, "if (getSetting('heal_carried_nopay_20261003', '') !== '') return;") !== false
+    && strpos($fn237, 'CREATE TABLE IF NOT EXISTS _ms_bk_carried20261003 LIKE monthly_salaries') !== false
+    && strpos($fn237, "if (\$paidPrev > 0 || \$paidNow > 0 || \$locked) {") !== false
+    && strpos($fn237, 'INSERT IGNORE INTO _ms_bk_carried20261003 SELECT * FROM monthly_salaries WHERE employee_id = $id AND school_year = ') !== false
+    && substr_count($fn237, "\$sy = '2026-2027'; \$prev = '2025-2026';") === 1
+    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healCarriedNoPay20261003();') !== false
+    && (string)getSetting('heal_carried_nopay_20261003', '') !== '' && $left237 === 0
+    && (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND id IN (" . implode(',', $ids237 ?: [0]) . ")")->fetchColumn() === 40; // الملفّات باقية
+check('🚪🩹 الأربعون المنقولون بلا راتب 2025-2026: أشهر 2026-2027 فقط انشالت (لائحة مقفلة + صمّامات + نسخة _ms_bk_carried20261003) وملفّاتهم باقية (2026-10-03)', $ok237, 'left=' . $left237);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

@@ -4723,6 +4723,41 @@ function composeSocialStatus($kind, $children): string {
  */
 function &msaLookupMemo(): array { static $m = []; return $m; }
 /**
+ * 🚪🩹 (2026-10-03 بكلماته «شيلهم كلهن» ثم «من 2026-2027 بس» — بعدما رأى اللائحة بالأسماء): شفاء مرّة واحدة يشيل أشهر سنة
+ * 2026-2027 **فقط** للأربعين المنقولين إليها براتب محسوب من ملفهم مع أنّه لم يُدفَع لهم شيء بسنة 2025-2026 (فتح السنة القديم).
+ * اللائحة مقفلة بالأرقام التي عُرضت عليه — لا يلمس أحداً غيرهم. ملفّاتهم ودرجاتهم وكل السنين السابقة تبقى كما هي.
+ * صمّامات لكل موظف (يُتخطّى إن اختلّ أحدها): لا راتب فعلي له بـ2025-2026 · لا شهر مدفوع له بـ2026-2027 · سنة مدرسته غير مقفلة.
+ * نسخة كاملة عن الأشهر قبل الحذف بجدول _ms_bk_carried20261003 (للاسترجاع: INSERT … SELECT منه) + سجلّ audit لكل موظف.
+ */
+function healCarriedNoPay20261003(): void {
+    if (getSetting('heal_carried_nopay_20261003', '') !== '') return;
+    $ids = [1797, 1534, 1657, 1794, 1759, 1659, 1760, 1341, 1749, 889, 1460, 1536, 1793, 1807, 1763, 1796, 1658, 1757, 1758,
+            1109, 1784, 1712, 948, 538, 1576, 1762, 949, 300, 1735, 1074, 265, 717, 1540, 1622, 1745, 1623, 1621, 1804, 1412, 1637];
+    $sy = '2026-2027'; $prev = '2025-2026'; $done = []; $skipped = [];
+    try {
+        $db = getDB();
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_carried20261003 LIKE monthly_salaries");
+        $nz = "(base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)";
+        foreach ($ids as $id) {
+            $paidPrev = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $id AND school_year = " . $db->quote($prev) . " AND $nz")->fetchColumn();
+            $paidNow = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $id AND school_year = " . $db->quote($sy) . " AND is_paid = 1")->fetchColumn();
+            $locked = false;
+            foreach ($db->query("SELECT DISTINCT school_id FROM monthly_salaries WHERE employee_id = $id AND school_year = " . $db->quote($sy))->fetchAll(PDO::FETCH_COLUMN) as $sid) if (function_exists('isSchoolYearLocked') && isSchoolYearLocked((int)$sid, $sy)) $locked = true;
+            if ($paidPrev > 0 || $paidNow > 0 || $locked) { $skipped[$id] = $paidPrev > 0 ? 'paid_prev' : ($paidNow > 0 ? 'paid_now' : 'locked'); continue; }
+            $db->beginTransaction();
+            try {
+                $db->exec("INSERT IGNORE INTO _ms_bk_carried20261003 SELECT * FROM monthly_salaries WHERE employee_id = $id AND school_year = " . $db->quote($sy));
+                $n = $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $id AND school_year = " . $db->quote($sy));
+                $db->commit();
+            } catch (Throwable $e) { $db->rollBack(); $skipped[$id] = 'error'; continue; }
+            if ($n > 0) { $done[$id] = (int)$n; logAudit('heal_carried_nopay_delete', 'monthly_salaries', $id, null, ['sy' => $sy, 'deleted' => (int)$n, 'backup' => '_ms_bk_carried20261003']); }
+        }
+        setSetting('heal_carried_nopay_20261003', json_encode(['at' => date('Y-m-d H:i:s'), 'employees' => count($done), 'rows' => array_sum($done), 'skipped' => $skipped]));
+        if (function_exists('msaLookupFlush')) msaLookupFlush();
+    } catch (Throwable $e) { /* يُعاد عند الفتحة التالية */ }
+}
+
+/**
  * 🚀 (2026-10-03 «بدي البرنامج كلو سريع»): هل العمود موجود بالجدول؟ دوال التركيب الذاتي (ensure*) كانت تسأل
  * «SHOW COLUMNS … LIKE» لكل عمود على حدة عند **كل** فتحة لكل صفحة (~30 سؤالاً — 0.35ث على الكمبيوتر). الآن سؤال واحد
  * بالطلب يحمّل أعمدة كل الجداول؛ والعمود غير الموجود بالخريطة يُتحقَّق منه مباشرة (قد يكون أُضيف للتوّ بنفس الطلب)
