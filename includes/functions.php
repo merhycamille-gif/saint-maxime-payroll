@@ -4758,6 +4758,42 @@ function healCarriedNoPay20261003(): void {
 }
 
 /**
+ * 🚪🩹 (2026-10-03 بكلماته بعد عرض اللائحة بالأسماء وملفّ الإكسل: «وكل شي بعد تاريخ الترك ما لازم يكون في الو راتب»): شفاء مرّة
+ * واحدة يشيل الأشهر المخزّنة **بعد تاريخ الترك** (نفس تعريف الفحص الرسمي: شهر يبدأ بعد الترك بأكثر من شهر) للعشرين الذين
+ * عُرضوا عليه — مدفوعة كانت أو لا. اللائحة مقفلة بالأرقام **وبتاريخ الترك الذي رآه**: إن تغيّر تاريخ ترك أحدهم يُتخطّى.
+ * 🔴 حنان تحومي (1827) مستثناة: سنتها مكمَّلة 12 شهراً **بقراره السابق** (كشف النجاة) والبرنامج يعيد أشهرها — تبقى كما هي.
+ * ما قبل الترك وملفّاتهم لا يُمسّ. سنة مقفلة لمدرسته ⇒ يُتخطّى. نسخة كاملة قبل الحذف بـ_ms_bk_afterleft20261003 + audit.
+ */
+function healRowsAfterLeave20261003(): void {
+    if (getSetting('heal_rows_after_leave_20261003', '') !== '') return;
+    $list = [1806 => '2026-03-31', 1349 => '2024-04-30', 1297 => '2024-04-30', 13 => '2020-06-30', 1367 => '2019-06-30', 31 => '2024-12-31', 1286 => '2020-06-30',
+             105 => '2020-06-30', 1024 => '2024-12-31', 1755 => '2025-06-30', 1731 => '2024-12-31', 1655 => '2025-01-31', 946 => '2023-12-31', 1522 => '2026-01-31',
+             1660 => '2024-06-30', 48 => '2021-01-31', 50 => '2019-07-31', 76 => '2024-02-29', 325 => '2026-03-31'];
+    $done = []; $skipped = [];
+    try {
+        $db = getDB();
+        $db->exec("CREATE TABLE IF NOT EXISTS _ms_bk_afterleft20261003 LIKE monthly_salaries");
+        foreach ($list as $id => $ld) {
+            $cur = substr((string)$db->query("SELECT left_date_all FROM employees WHERE id = $id AND is_deleted = 0")->fetchColumn(), 0, 10);
+            if ($cur !== $ld) { $skipped[$id] = 'left_date_changed'; continue; }
+            $cond = "employee_id = $id AND STR_TO_DATE(CONCAT(year,'-',month,'-01'),'%Y-%m-%d') > DATE_ADD(" . $db->quote($ld) . ", INTERVAL 1 MONTH)";
+            $locked = false;
+            foreach ($db->query("SELECT DISTINCT school_id, school_year FROM monthly_salaries WHERE $cond")->fetchAll(PDO::FETCH_ASSOC) as $lk) if (function_exists('isSchoolYearLocked') && isSchoolYearLocked((int)$lk['school_id'], (string)$lk['school_year'])) $locked = true;
+            if ($locked) { $skipped[$id] = 'locked'; continue; }
+            $db->beginTransaction();
+            try {
+                $db->exec("INSERT IGNORE INTO _ms_bk_afterleft20261003 SELECT * FROM monthly_salaries WHERE $cond");
+                $n = $db->exec("DELETE FROM monthly_salaries WHERE $cond");
+                $db->commit();
+            } catch (Throwable $e) { $db->rollBack(); $skipped[$id] = 'error'; continue; }
+            if ($n > 0) { $done[$id] = (int)$n; logAudit('heal_rows_after_leave_delete', 'monthly_salaries', $id, null, ['left' => $ld, 'deleted' => (int)$n, 'backup' => '_ms_bk_afterleft20261003']); }
+        }
+        setSetting('heal_rows_after_leave_20261003', json_encode(['at' => date('Y-m-d H:i:s'), 'employees' => count($done), 'rows' => array_sum($done), 'skipped' => $skipped]));
+        if (function_exists('msaLookupFlush')) msaLookupFlush();
+    } catch (Throwable $e) { /* يُعاد عند الفتحة التالية */ }
+}
+
+/**
  * 🚀 (2026-10-03 «بدي البرنامج كلو سريع»): هل العمود موجود بالجدول؟ دوال التركيب الذاتي (ensure*) كانت تسأل
  * «SHOW COLUMNS … LIKE» لكل عمود على حدة عند **كل** فتحة لكل صفحة (~30 سؤالاً — 0.35ث على الكمبيوتر). الآن سؤال واحد
  * بالطلب يحمّل أعمدة كل الجداول؛ والعمود غير الموجود بالخريطة يُتحقَّق منه مباشرة (قد يكون أُضيف للتوّ بنفس الطلب)

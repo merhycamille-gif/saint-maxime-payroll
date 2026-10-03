@@ -9764,6 +9764,25 @@ $ok242 = strpos($hd242, "<?= (\$isAllSel || in_array((int)\$navS['id'],\$activeI
     && strpos($r242, 'FATAL') === false;
 check('🏫 «كل المدارس» تشيّك كل مدرسة + شريط مدارس داخل التقارير ينقل دغري من مدرسة لمدرسة (2026-10-03)', $ok242, 'chips=' . substr_count($r242, 'class="ss-chip'));
 
+/* =====================================================================
+ * 241) 🚪🩹 (2026-10-03 بكلماته «وكل شي بعد تاريخ الترك ما لازم يكون في الو راتب» بعد عرض العشرين بالأسماء): شفاء مرّة واحدة —
+ *      لائحة مقفلة بالأرقام وبتاريخ الترك، نسخة قبل الحذف، علم يمنع التكرار. بعده لا أحد منهم له شهر مخزّن بعد تركه.
+ * =================================================================== */
+$fn241 = (string)file_get_contents($PROJ . '/includes/functions.php');
+preg_match('/function healRowsAfterLeave20261003\(\): void \{.*?\$list = \[(.*?)\];/s', $fn241, $m241);
+preg_match_all("/(\d+) => '(\d{4}-\d{2}-\d{2})'/", (string)($m241[1] ?? ''), $mm241, PREG_SET_ORDER);
+$left241 = 0;
+foreach ($mm241 as $x241) $left241 += (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id WHERE e.id = " . (int)$x241[1] . " AND e.is_deleted = 0 AND DATE(e.left_date_all) = '" . $x241[2] . "'
+    AND STR_TO_DATE(CONCAT(ms.year,'-',ms.month,'-01'),'%Y-%m-%d') > DATE_ADD('" . $x241[2] . "', INTERVAL 1 MONTH)")->fetchColumn();
+$ok241 = count($mm241) === 19 /* حنان تحومي مستثناة: سنتها مكمَّلة بقراره السابق */
+    && strpos($fn241, "if (getSetting('heal_rows_after_leave_20261003', '') !== '') return;") !== false
+    && strpos($fn241, 'CREATE TABLE IF NOT EXISTS _ms_bk_afterleft20261003 LIKE monthly_salaries') !== false
+    && strpos($fn241, "if (\$cur !== \$ld) { \$skipped[\$id] = 'left_date_changed'; continue; }") !== false
+    && strpos($fn241, 'INSERT IGNORE INTO _ms_bk_afterleft20261003 SELECT * FROM monthly_salaries WHERE $cond') !== false
+    && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healRowsAfterLeave20261003();') !== false
+    && (string)getSetting('heal_rows_after_leave_20261003', '') !== '' && $left241 === 0;
+check('🚪🩹 التاركون الـ19 (بلا حنان تحومي المكمَّلة بقراره): لا شهر مخزّناً بعد تاريخ الترك (لائحة مقفلة + نسخة _ms_bk_afterleft20261003) وما قبل الترك باقٍ (2026-10-03)', $ok241, 'left=' . $left241);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
