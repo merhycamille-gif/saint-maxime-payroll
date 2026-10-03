@@ -108,11 +108,11 @@ function hoursReductionList($db, $sy) {
 function hoursReductionEnsureColumns($db) {
     static $done = false; if ($done) return; $done = true;
     try {
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'hours_reduction'")->fetch())
+        if (!msaHasCol($db, 'employees', 'hours_reduction'))
             $db->exec("ALTER TABLE employees ADD COLUMN hours_reduction DECIMAL(4,1) NOT NULL DEFAULT 0");
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'hours_reduction_sy'")->fetch())
+        if (!msaHasCol($db, 'employees', 'hours_reduction_sy'))
             $db->exec("ALTER TABLE employees ADD COLUMN hours_reduction_sy VARCHAR(9) NULL");
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'hours_reduction_later_sy'")->fetch())
+        if (!msaHasCol($db, 'employees', 'hours_reduction_later_sy'))
             $db->exec("ALTER TABLE employees ADD COLUMN hours_reduction_later_sy VARCHAR(9) NULL");
     } catch (Exception $e) { /* صلاحيات → الصفحات محصّنة بـ ?? */ }
 }

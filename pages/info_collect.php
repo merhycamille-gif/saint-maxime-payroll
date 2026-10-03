@@ -16,7 +16,7 @@ $db = getDB();
 // تركيب ذاتي لعمود وظيفة الموظف الإداري (job_title) إن كان ناقصاً — حتى لا يفشل اعتماد طلب موظف إداري
 // إن لم تُفتح صفحة الموظفين بعد (migration 018). محصّن: لا يكسر الصفحة إن تعذّرت الصلاحية.
 try {
-    if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) {
+    if (!msaHasCol($db, 'employees', 'job_title')) {
         $db->exec("ALTER TABLE employees ADD COLUMN job_title VARCHAR(80) NULL");
     }
 } catch (Exception $e) { /* صلاحيات → applyOneSubmission يتجاوز job_title إن بقي ناقصاً */ }

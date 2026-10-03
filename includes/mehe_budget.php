@@ -30,7 +30,7 @@ function ensureMeheBudget20260906(): void {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // 🏫 «ليش ما فيّي اختار مجموعة مدارس مع بعضها» (2026-09-06): النطاق = مدرسة أو مجموعة أو الكل —
         // عمود scope ("2" أو "2,3,4") هو مفتاح الحفظ؛ يُركَّب ذاتياً ويُعبّأ من school_id للصفوف القديمة
-        if (!$db->query("SHOW COLUMNS FROM mehe_budget LIKE 'scope'")->fetch()) {
+        if (!msaHasCol($db, 'mehe_budget', 'scope')) {
             $db->exec("ALTER TABLE mehe_budget ADD COLUMN scope VARCHAR(120) NULL AFTER school_id");
             $db->exec("UPDATE mehe_budget SET scope = CAST(school_id AS CHAR) WHERE scope IS NULL");
             try { $db->exec("ALTER TABLE mehe_budget DROP INDEX uq_mehe"); } catch (Throwable $e) {}

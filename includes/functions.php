@@ -164,10 +164,10 @@ function ensureUsersPermsColumn() {
     $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM users LIKE 'allowed_pages'")->fetch()) {
+        if (!msaHasCol($db, 'users', 'allowed_pages')) {
             $db->exec("ALTER TABLE users ADD COLUMN allowed_pages TEXT NULL");   // التقارير المسموحة
         }
-        if (!$db->query("SHOW COLUMNS FROM users LIKE 'allowed_schools'")->fetch()) {
+        if (!msaHasCol($db, 'users', 'allowed_schools')) {
             $db->exec("ALTER TABLE users ADD COLUMN allowed_schools TEXT NULL");  // المدارس المسموحة ('all' أو قائمة ids)
         }
     } catch (Exception $e) { /* تجاهل الفشل الصامت */ }
@@ -813,7 +813,7 @@ function ensurePayPeriodColumns(): void {
     $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'pay_from_month'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'pay_from_month')) {
             $db->exec("ALTER TABLE employees ADD COLUMN pay_from_month TINYINT NOT NULL DEFAULT 10 COMMENT 'أوّل شهر مدفوع بالسنة الدراسية' AFTER payment_months_per_year");
             $db->exec("ALTER TABLE employees ADD COLUMN pay_to_month TINYINT NOT NULL DEFAULT 9 COMMENT 'آخر شهر مدفوع بالسنة الدراسية' AFTER pay_from_month");
             // الموجودون: كانت الفترة تبدأ من ت1 دائماً وعدد أشهرها 12/11/10 ⇒ إلى أيلول/آب/تموز
@@ -907,7 +907,7 @@ function ensureLeftDateAllColumn(): void {
     try {
         $db = getDB();
         $fresh = false;
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'left_date_all'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'left_date_all')) {
             $db->exec("ALTER TABLE employees ADD COLUMN left_date_all DATE NULL COMMENT 'ترك من الكل (نهائي) — وحده يُخرج الاسم والرواتب' AFTER left_date_eoc");
             $fresh = true;
         }
@@ -1027,7 +1027,7 @@ function ensureBaseClearedColumn(): void {
     $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'base_cleared_by_user'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'base_cleared_by_user')) {
             $db->exec("ALTER TABLE employees ADD COLUMN base_cleared_by_user TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'صفّر المستخدم الأساس بيده من الملف المالي (2026-09-23) ⇒ يُحسب بأساس 0 لا يُعامَل كمنقول' AFTER contract_salary_lbp");
         }
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
@@ -1038,7 +1038,7 @@ function ensureSalaryLaborLawColumn(): void {
     $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'salary_labor_law'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'salary_labor_law')) {
             $db->exec("ALTER TABLE employees ADD COLUMN salary_labor_law TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'موظف إداري: الأساس = الحد الأدنى للأجور الساري (قانون العمل)' AFTER contract_salary_lbp");
         }
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
@@ -1051,7 +1051,7 @@ function ensureUsdBaseFromSyColumn(): void {
     $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'usd_base_from_sy'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'usd_base_from_sy')) {
             $db->exec("ALTER TABLE employees ADD COLUMN usd_base_from_sy VARCHAR(9) NULL DEFAULT NULL COMMENT 'أساس الدولار يسري من السنة الدراسية (قبلها: الراتب بالليرة)' AFTER base_salary_usd");
         }
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
@@ -1087,17 +1087,17 @@ function ensureFamilyAllowanceDateColumns(): void {
     $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_from'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'family_allowance_from')) {
             $db->exec("ALTER TABLE employees ADD COLUMN family_allowance_from DATE NULL DEFAULT NULL COMMENT 'التعويض العائلي: من شهر (أول الشهر)' AFTER family_allowance_children_lbp");
         }
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'family_allowance_to'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'family_allowance_to')) {
             $db->exec("ALTER TABLE employees ADD COLUMN family_allowance_to DATE NULL DEFAULT NULL COMMENT 'التعويض العائلي: إلى شهر (فارغ = مستمرّ)' AFTER family_allowance_from");
         }
         // 👫 مدّتان مستقلّتان (الزوجة / الأولاد) — تتركّبان ذاتياً وتُعبَّآن مرّة من المدّة القديمة المشتركة
         $fresh = false;
         foreach (['family_allowance_spouse_from' => 'تعويض الزوجة: من شهر', 'family_allowance_spouse_to' => 'تعويض الزوجة: إلى شهر',
                   'family_allowance_children_from' => 'تعويض الأولاد: من شهر', 'family_allowance_children_to' => 'تعويض الأولاد: إلى شهر'] as $col => $cmt) {
-            if (!$db->query("SHOW COLUMNS FROM employees LIKE '$col'")->fetch()) {
+            if (!msaHasCol($db, 'employees', $col)) {
                 $db->exec("ALTER TABLE employees ADD COLUMN $col DATE NULL DEFAULT NULL COMMENT '$cmt' AFTER family_allowance_to");
                 $fresh = true;
             }
@@ -1132,9 +1132,15 @@ function familyAllowanceChanges(int $empId): array {
     $out = ['spouse' => [], 'children' => []];
     try {
         ensureFamilyAllowanceDateColumns();
-        $st = getDB()->prepare("SELECT kind, from_month, amount_lbp FROM family_allowance_changes WHERE employee_id = ? ORDER BY from_month, id");
-        $st->execute([$empId]);
-        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        // 🚀 (2026-10-03): على صفحات العرض (GET) تُحمَّل تغييرات كل الموظفين مرّة واحدة — كان استعلاماً لكل موظف (329 بصفحة التعويضات العائلية)
+        static $bulk = null;
+        if ($bulk === null && function_exists('msaLookupOn') && msaLookupOn()) {
+            $bulk = [];
+            foreach (getDB()->query("SELECT employee_id, kind, from_month, amount_lbp FROM family_allowance_changes ORDER BY from_month, id")->fetchAll(PDO::FETCH_ASSOC) as $br) $bulk[(int)$br['employee_id']][] = $br;
+        }
+        if ($bulk !== null && empty($GLOBALS['__fa_chg_bulk_off'])) { $rows = $bulk[$empId] ?? []; }
+        else { $st = getDB()->prepare("SELECT kind, from_month, amount_lbp FROM family_allowance_changes WHERE employee_id = ? ORDER BY from_month, id"); $st->execute([$empId]); $rows = $st->fetchAll(PDO::FETCH_ASSOC); }
+        foreach ($rows as $r) {
             $k = familyAllowanceDateKey($r['from_month']); if ($k === null) continue;
             $out[$r['kind'] === 'spouse' ? 'spouse' : 'children'][$k] = max(0, (int)$r['amount_lbp']); // الأحدث لنفس الشهر يغلب
         }
@@ -1142,7 +1148,7 @@ function familyAllowanceChanges(int $empId): array {
     } catch (Throwable $e) {}
     return $cache[$empId] = $out;
 }
-function familyAllowanceChangesReset(int $empId): void { $GLOBALS['__fa_chg_reset'][$empId] = true; }
+function familyAllowanceChangesReset(int $empId): void { $GLOBALS['__fa_chg_reset'][$empId] = true; $GLOBALS['__fa_chg_bulk_off'] = true; }
 /** هل له أي تعويض مسجّل (مبلغ بملفه أو تغيير شهري)؟ — تستعمله مسارات المنقولين والمخالفات بدل «المبلغ > 0» فقط */
 function familyAllowanceHasAny(array $emp): bool {
     if ((float)($emp['family_allowance_spouse_lbp'] ?? 0) > 0 || (float)($emp['family_allowance_children_lbp'] ?? 0) > 0) return true;
@@ -2556,7 +2562,7 @@ function ensureSpouseColumns20260821() {
             'spouse_employer_mof' => 'VARCHAR(30) NULL', 'spouse_employer_public' => 'TINYINT(1) NOT NULL DEFAULT 0',
         ];
         foreach ($cols as $c => $def) {
-            if (!$db->query("SHOW COLUMNS FROM employees LIKE '$c'")->fetch()) {
+            if (!msaHasCol($db, 'employees', $c)) {
                 $db->exec("ALTER TABLE employees ADD COLUMN `$c` $def");
             }
         }
@@ -2621,7 +2627,7 @@ function ensureGenderColumn20260822() {
     $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'gender'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'gender')) {
             $db->exec("ALTER TABLE employees ADD COLUMN gender VARCHAR(1) NULL");
         }
         // ١) ألقاب دينية/اجتماعية ببداية الاسم — الأوثق
@@ -2658,7 +2664,7 @@ function ensureMofProfile20260823() {
     $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM schools LIKE 'mof_profile'")->fetch()) {
+        if (!msaHasCol($db, 'schools', 'mof_profile')) {
             $db->exec("ALTER TABLE schools ADD COLUMN mof_profile TEXT NULL");
         }
         // زرع سان مكسيم (رقمها المالي 2459823) بقيم ملفات المستخدم — مرة واحدة على الفارغ فقط
@@ -4335,26 +4341,26 @@ function ensureEmployeeFlagColumns() {
     $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'apply_family_deduction'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'apply_family_deduction')) {
             $db->exec("ALTER TABLE employees ADD COLUMN apply_family_deduction TINYINT(1) NOT NULL DEFAULT 1");
         }
         // خيارا التعويض العائلي (2026-08-06): احتساب تعويض الزوج/الزوجة والأولاد أو لا
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'count_spouse_allowance'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'count_spouse_allowance')) {
             $db->exec("ALTER TABLE employees ADD COLUMN count_spouse_allowance TINYINT(1) NOT NULL DEFAULT 1");
         }
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'count_children_allowance'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'count_children_allowance')) {
             $db->exec("ALTER TABLE employees ADD COLUMN count_children_allowance TINYINT(1) NOT NULL DEFAULT 1");
         }
         // خيار «زيادة الزوج بالتنزيل العائلي: تُعطى/لا تُعطى» (2026-08-06 بطلب المستخدم —
         // قانوناً الزيادة عن «الزوجة التي لا تعمل»، والمرأة لا تأخذها عن زوج قادر على العمل)
         // 🔴 «طفي زيادة الزوج» (2026-08-23): الافتراضي مطفأ — تُضوّى بقرار المستخدم لكل موظف
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'grant_spouse_addition'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'grant_spouse_addition')) {
             $db->exec("ALTER TABLE employees ADD COLUMN grant_spouse_addition TINYINT(1) NOT NULL DEFAULT 0");
         }
         // خيار «تنزيل الأولاد بالضريبة: يُعطى/لا» («لو عندها اولاد او الزوج لا يعمل اذا انا
         // مطفي التنزيل عليهن ما لازم يحسب — بس تنزيل الاستاذ لوحدو» — 2026-08-23)
         // 🔴 «هيدا الزر يكون مطفي تلقائيا حتى انا اذا بدي ضوي»: الافتراضي مطفأ — يُضوّى يدوياً لكل موظف
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'grant_children_addition'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'grant_children_addition')) {
             $db->exec("ALTER TABLE employees ADD COLUMN grant_children_addition TINYINT(1) NOT NULL DEFAULT 0");
         }
     } catch (Exception $e) { /* لا نكسر الصفحة — يُعاد بالفتحة التالية */ }
@@ -4564,7 +4570,7 @@ function ensureEmployeeChildren20260823() {
             source VARCHAR(40) NULL,
             UNIQUE KEY uq_child (employee_id, child_name, birth_date)
         ) DEFAULT CHARSET=utf8mb4");
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'spouse_work_start_date'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'spouse_work_start_date')) {
             $db->exec("ALTER TABLE employees ADD COLUMN spouse_work_start_date DATE NULL");
         }
         if (getSetting('children_seed_najat_2026_08_23', '') !== '') return;
@@ -4716,6 +4722,24 @@ function composeSocialStatus($kind, $children): string {
  * عند أي كتابة على هذه الجداول داخل الطلب نفسه.
  */
 function &msaLookupMemo(): array { static $m = []; return $m; }
+/**
+ * 🚀 (2026-10-03 «بدي البرنامج كلو سريع»): هل العمود موجود بالجدول؟ دوال التركيب الذاتي (ensure*) كانت تسأل
+ * «SHOW COLUMNS … LIKE» لكل عمود على حدة عند **كل** فتحة لكل صفحة (~30 سؤالاً — 0.35ث على الكمبيوتر). الآن سؤال واحد
+ * بالطلب يحمّل أعمدة كل الجداول؛ والعمود غير الموجود بالخريطة يُتحقَّق منه مباشرة (قد يكون أُضيف للتوّ بنفس الطلب)
+ * فيبقى التركيب الذاتي للأعمدة الجديدة يعمل كما هو.
+ */
+function msaHasCol(PDO $db, string $table, string $col): bool {
+    static $map = null;
+    if ($map === null) {
+        $map = [];
+        try { foreach ($db->query("SELECT TABLE_NAME t, COLUMN_NAME c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()")->fetchAll(PDO::FETCH_ASSOC) as $r) $map[strtolower((string)$r['t'])][strtolower((string)$r['c'])] = true; } catch (Throwable $e) {}
+    }
+    $t = strtolower($table); $c = strtolower($col);
+    if (isset($map[$t][$c])) return true;
+    try { $ok = (bool)$db->query("SHOW COLUMNS FROM `" . str_replace('`', '', $table) . "` LIKE " . $db->quote($col))->fetch(); } catch (Throwable $e) { $ok = false; }
+    if ($ok) $map[$t][$c] = true;
+    return $ok;
+}
 function msaLookupOn(): bool {
     static $on = null;
     if ($on === null) $on = PHP_SAPI !== 'cli' && (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET');
@@ -5588,7 +5612,7 @@ function ensurePrimeUsdLawColumn() {
     static $done = false; if ($done) return; $done = true;
     try {
         $db = getDB();
-        if (!$db->query("SHOW COLUMNS FROM monthly_salaries LIKE 'prime_fixe_usd_law'")->fetch())
+        if (!msaHasCol($db, 'monthly_salaries', 'prime_fixe_usd_law'))
             $db->exec("ALTER TABLE monthly_salaries ADD COLUMN prime_fixe_usd_law INT NOT NULL DEFAULT 0");
         // 🔴 النسخ الاحتياطية/المرايا المصنوعة سابقاً بـ CREATE TABLE ... LIKE monthly_salaries (‏_ms_bk_*…) لا تحمل العمود
         // فتكسر أي شفاء يعمل INSERT ... SELECT * منها/إليها (عدد الأعمدة لا يتطابق) — نضيفه لكلّ جدول بشكل الرواتب (مرّة واحدة)
@@ -8937,7 +8961,7 @@ function ensureGradeUserEditedColumn(): void {
     static $done = false; if ($done) return;
     if (getDB()->inTransaction()) return; // DDL داخل معاملة = COMMIT ضمني
     $done = true;
-    try { $db = getDB(); if (!$db->query("SHOW COLUMNS FROM employee_grade_history LIKE 'user_edited'")->fetch()) $db->exec("ALTER TABLE employee_grade_history ADD COLUMN user_edited TINYINT(1) NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
+    try { $db = getDB(); if (!msaHasCol($db, 'employee_grade_history', 'user_edited')) $db->exec("ALTER TABLE employee_grade_history ADD COLUMN user_edited TINYINT(1) NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
 }
 /**
  * 🗓️👁️ تاريخ الدخول المعروض (صوري) — 2026-09-26 «حدّ تاريخ الدخول تحطّلي تاريخ أقدر أنا أكتبه، صوري ما بدّي ياه يأثّر ولا محل،
@@ -8949,7 +8973,7 @@ function ensureDisplayHireDateColumn(): void {
     static $done = false; if ($done) return;
     if (getDB()->inTransaction()) return;
     $done = true;
-    try { $db = getDB(); if (!$db->query("SHOW COLUMNS FROM employees LIKE 'display_hire_date'")->fetch()) $db->exec("ALTER TABLE employees ADD COLUMN display_hire_date DATE NULL DEFAULT NULL AFTER hire_date"); } catch (Throwable $e) {}
+    try { $db = getDB(); if (!msaHasCol($db, 'employees', 'display_hire_date')) $db->exec("ALTER TABLE employees ADD COLUMN display_hire_date DATE NULL DEFAULT NULL AFTER hire_date"); } catch (Throwable $e) {}
 }
 /** خريطة id ⇒ التاريخ الصوري (للصفوف التي لا تحمل العمود، كالتقارير ذات الأعمدة المحدّدة) */
 function displayHireDateMap(): array {

@@ -1153,8 +1153,9 @@ function tenureReferenceDate($emp) {
  */
 function buildLegalGradeHistory($empId, $todayOverride = null, $dryRun = false, $force = false) {
     $db = getDB();
-    $st = $db->prepare("SELECT * FROM employees WHERE id=?");
-    $st->execute([$empId]); $emp = $st->fetch(PDO::FETCH_ASSOC);
+    // 🚀 (2026-10-03): الحساب التقديري (dryRun) على صفحات العرض يقرأ صفّ الموظف من التحميل الجماعي — كان استعلاماً لكل ملاك (235 بفحص القانون)
+    $emp = ($dryRun && function_exists('msaLookupOn') && msaLookupOn() && function_exists('employeeRowCached')) ? employeeRowCached($db, (int)$empId) : null;
+    if (!$emp) { $st = $db->prepare("SELECT * FROM employees WHERE id=?"); $st->execute([$empId]); $emp = $st->fetch(PDO::FETCH_ASSOC); }
     if (!$emp) throw new Exception("الموظف غير موجود");
     if ($emp['employee_type'] !== 'enseignant_titulaire') throw new Exception("ليس أستاذاً ملاكاً — لا تُبنى له درجات");
     // 🏆 (2026-09-12 «أي درجة بزيدها تثبت ما تتغيّر أبداً إلا إذا أنا بدي غيّر»): أستاذ لمس المستخدم درجاته لا يُعاد بناؤها آلياً

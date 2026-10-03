@@ -25,7 +25,7 @@ function cadreDueEnsureColumns(?PDO $db = null): void {
     if ($db->inTransaction()) return; // DDL داخل معاملة = commit ضمني — نعيدها بالفتح التالي
     $done = true;
     try {
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'cadre_from_sy'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'cadre_from_sy')) {
             $db->exec("ALTER TABLE employees ADD COLUMN cadre_from_sy VARCHAR(9) NULL DEFAULT NULL COMMENT 'رُسِّم بالملاك من متعاقد ابتداءً من هذه السنة الدراسية'");
         }
     } catch (Throwable $e) { $done = false; }

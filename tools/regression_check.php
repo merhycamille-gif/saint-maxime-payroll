@@ -9662,6 +9662,23 @@ $ok235 = substr_count($ex235, "window.dispatchEvent(new Event('resize'))") === 1
 check('🚀 موازنة الوزارة واقتراحات الضريبة أخفّ (كبسات/خانات تُخلق عند الكبس + كاش) وexport.js بلا «resize» وهمية عند كل فتحة (2026-10-03)', $ok235,
       'sv=' . substr_count($mbR235, '<button type="button" class="sv"') . ' yn=' . substr_count($tsR235, 'class="ts-yn"'));
 
+/* =====================================================================
+ * 236) 🚀 (2026-10-03 «ما تسألني، بدي البرنامج كلو سريع ومن هونيك ورايح بيصير شغلك»): استعلامات مكرّرة بكل صفحة/لكل موظف:
+ *      (أ) msaHasCol — أعمدة كل الجداول بسؤال واحد بالطلب بدل ~30 «SHOW COLUMNS … LIKE» بكل فتحة (والتركيب الذاتي يبقى: غير الموجود يُتحقَّق منه مباشرة)؛
+ *      (ب) ofLatestSalary تحميل جماعي من النداء الرابع؛ (ج) familyAllowanceChanges تحميل جماعي (GET)؛ (د) buildLegalGradeHistory التقديري من employeeRowCached؛
+ *      (هـ) كشف الضمان الاسمي: ترتيب ثابت لأصحاب الاسم نفسه (e.id).
+ * =================================================================== */
+$fn236 = (string)file_get_contents($PROJ . '/includes/functions.php'); $of236 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $pc236 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
+$left236 = 0; foreach (array_merge(glob($PROJ . '/includes/*.php'), glob($PROJ . '/pages/*.php'), glob($PROJ . '/*.php')) as $f236) $left236 += preg_match_all('/->query\("SHOW COLUMNS FROM [a-z_]+ LIKE \'/', (string)file_get_contents($f236));
+$ok236 = strpos($fn236, 'function msaHasCol(PDO $db, string $table, string $col): bool {') !== false && $left236 === 0
+    && msaHasCol($db, 'employees', 'left_date_all') === true && msaHasCol($db, 'employees', 'no_such_col_236') === false && msaHasCol($db, 'no_such_table_236x', 'id') === false
+    && strpos($of236, 'if (++$calls > 3 && function_exists(\'msaLookupOn\') && msaLookupOn()) {') !== false
+    && strpos($fn236, 'if ($bulk !== null && empty($GLOBALS[\'__fa_chg_bulk_off\'])) { $rows = $bulk[$empId] ?? []; }') !== false
+    && strpos($fn236, "\$GLOBALS['__fa_chg_reset'][\$empId] = true; \$GLOBALS['__fa_chg_bulk_off'] = true; }") !== false
+    && strpos($pc236, '$emp = ($dryRun && function_exists(\'msaLookupOn\') && msaLookupOn() && function_exists(\'employeeRowCached\')) ? employeeRowCached($db, (int)$empId) : null;') !== false
+    && substr_count($of236, 'COALESCE(NULLIF(e.last_name_ar,\'\'), e.last_name_fr), e.id";') === 2;
+check('🚀 استعلامات مكرّرة أُزيلت: أعمدة الجداول بسؤال واحد (msaHasCol) + آخر راتب/تغييرات التعويض العائلي/صفّ الموظف بتحميل جماعي + ترتيب ثابت بكشف الضمان الاسمي (2026-10-03)', $ok236, 'left=' . $left236);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

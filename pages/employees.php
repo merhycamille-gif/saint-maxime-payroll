@@ -173,7 +173,7 @@ $messageType = 'success';
 
 // تركيب ذاتي لعمود وظيفة الموظف الإداري (job_title) إن كان ناقصاً — يُغني عن أي خطوة يدوية أونلاين (migration 018).
 try {
-    if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) {
+    if (!msaHasCol($db, 'employees', 'job_title')) {
         $db->exec("ALTER TABLE employees ADD COLUMN job_title VARCHAR(80) NULL");
     }
 } catch (Exception $e) { /* صلاحيات → الإزالة عند الحفظ تمنع الكسر */ }
@@ -486,17 +486,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     // عمود classes_taught قد لا يكون موجوداً في قاعدة لم تُطبَّق عليها migration 015 بعد (مثلاً الأونلاين قبل التحديث)
     // → أزِله من الحفظ لتفادي كسر حفظ الموظف. (محلياً موجود فيُحفَظ عادي.)
     try {
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'classes_taught'")->fetch()) unset($data['classes_taught']);
+        if (!msaHasCol($db, 'employees', 'classes_taught')) unset($data['classes_taught']);
     } catch (Exception $e) { unset($data['classes_taught']); }
     // عمود keep_working_past_64 قد لا يكون موجوداً قبل migration 017 أونلاين → أزِله من الحفظ لتفادي الكسر
     try {
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'keep_working_past_64'")->fetch()) unset($data['keep_working_past_64']);
+        if (!msaHasCol($db, 'employees', 'keep_working_past_64')) unset($data['keep_working_past_64']);
     } catch (Exception $e) { unset($data['keep_working_past_64']); }
     // عمود job_title قد لا يكون موجوداً قبل migration 018 أونلاين → أزِله من الحفظ لتفادي الكسر
     try {
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'job_title'")->fetch()) unset($data['job_title']);
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'salary_labor_law'")->fetch()) unset($data['salary_labor_law']);
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'usd_base_from_sy'")->fetch()) unset($data['usd_base_from_sy']);
+        if (!msaHasCol($db, 'employees', 'job_title')) unset($data['job_title']);
+        if (!msaHasCol($db, 'employees', 'salary_labor_law')) unset($data['salary_labor_law']);
+        if (!msaHasCol($db, 'employees', 'usd_base_from_sy')) unset($data['usd_base_from_sy']);
     } catch (Exception $e) { unset($data['job_title'], $data['salary_labor_law'], $data['usd_base_from_sy']); }
     // أعمدة الخيارات (التنزيل العائلي + احتساب تعويض الزوجة/الأولاد): ركّبها ذاتياً،
     // وإن تعذّر أزِلها من الحفظ لتفادي الكسر
@@ -504,7 +504,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     foreach (['apply_family_deduction', 'count_spouse_allowance', 'count_children_allowance', 'grant_spouse_addition', 'grant_children_addition', 'spouse_work_start_date'] as $flagCol) {
         try {
             ensureEmployeeFlagColumns();
-            if (!$db->query("SHOW COLUMNS FROM employees LIKE '$flagCol'")->fetch()) unset($data[$flagCol]);
+            if (!msaHasCol($db, 'employees', $flagCol)) unset($data[$flagCol]);
         } catch (Exception $e) { unset($data[$flagCol]); }
     }
 

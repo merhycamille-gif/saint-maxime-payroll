@@ -69,7 +69,7 @@ function age64Date($birthDate) {
 function age64List($db, $activeYearOnly = false) {
     // تركيب ذاتي للعمود إن كان ناقصاً (يُغني عن أي خطوة يدوية أونلاين)
     try {
-        if (!$db->query("SHOW COLUMNS FROM employees LIKE 'keep_working_past_64'")->fetch()) {
+        if (!msaHasCol($db, 'employees', 'keep_working_past_64')) {
             $db->exec("ALTER TABLE employees ADD COLUMN keep_working_past_64 TINYINT(1) NOT NULL DEFAULT 0");
         }
     } catch (Exception $e) { /* صلاحيات → التحصين أدناه يمنع الكسر */ }

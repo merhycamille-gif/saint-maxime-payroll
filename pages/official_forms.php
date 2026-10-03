@@ -239,10 +239,24 @@ function ofLatestSalary($db, $empId, $year = null) {
         // بالمطلق» كان يُظهر أصفاراً مع أن رواتب السنة المعروضة فيها القيم الصحيحة.
         $sy = activeSchoolYear();
         if ($sy === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$sy)) $sy = currentSchoolYear();
+        // 🚀 (2026-10-03 «بدي البرنامج كلو سريع»): الكشوف تنادي هذه الدالّة لكل موظف (300+ استعلام بالصفحة) — من النداء الرابع
+        // تُحمَّل آخر رواتب السنة لكل الموظفين باستعلام واحد (GET فقط؛ نفس الصفّ: الأحدث سنة/شهراً ضمن السنة الدراسية).
+        static $calls = 0, $bulk = [];
+        if (++$calls > 3 && function_exists('msaLookupOn') && msaLookupOn()) {
+            if (!isset($bulk[$sy])) {
+                $bulk[$sy] = [];
+                $bq = $db->prepare("SELECT ms.* FROM monthly_salaries ms JOIN (SELECT employee_id, MAX(year * 100 + month) ym FROM monthly_salaries WHERE is_calculated = 1 AND school_year = ? GROUP BY employee_id) x
+                    ON x.employee_id = ms.employee_id AND ms.year * 100 + ms.month = x.ym WHERE ms.is_calculated = 1 AND ms.school_year = ? ORDER BY ms.id");
+                $bq->execute([$sy, $sy]);
+                foreach ($bq->fetchAll() as $br) { $be = (int)$br['employee_id']; if (!isset($bulk[$sy][$be])) $bulk[$sy][$be] = $br; }
+            }
+            if (isset($bulk[$sy][(int)$empId])) return $bulk[$sy][(int)$empId];
+        } else {
         $stmt = $db->prepare($sql . " AND school_year = ? ORDER BY year DESC, month DESC LIMIT 1");
         $stmt->execute(array_merge($params, [$sy]));
         $row = $stmt->fetch();
         if ($row) return $row;
+        }
         // لا رواتب بالسنة النشطة → آخر راتب بالمطلق (متل السابق)
     }
     $sql .= " ORDER BY year DESC, month DESC LIMIT 1";
@@ -2837,7 +2851,7 @@ elseif ($form === 'payment_list'):
               AND ms.year = ? AND ms.month = ? AND " . schoolScopeWhere('ms.school_id') . "
               AND (ms.taxable_base_lbp > 0 OR ms.cnss_amount_lbp > 0 OR ms.base_plus_echelon_lbp > 0)
             ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
-                     COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr)";
+                     COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr), e.id";
     $st = $db->prepare($sql);
     $st->execute(array_merge($ofMonthParams, [$year, $month]));
     $rows = $st->fetchAll();
@@ -2986,7 +3000,7 @@ elseif ($form === 'payment_list'):
               AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $ofMonthFilter . $ofEmpFilter . "
               AND " . schoolScopeWhere('e.school_id') . "
             ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
-                     COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr)";
+                     COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr), e.id";
     $st = $db->prepare($sql);
     $st->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $st->fetchAll();
