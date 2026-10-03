@@ -28,5 +28,8 @@ if (isSuperAdmin() || (isViewer() && count(viewerAllowedSchoolIds()) > 1)) {
 }
 
 $back = safeBackUrl();
+// 🏫⇄ (2026-10-03) شريط المدارس داخل التقارير يرسل «back» = نفس التقرير بلا وسائط المدارس القديمة — مسار داخلي فقط (يبدأ بـ/ واحدة، بلا //)
+$bk = (string)($_GET['back'] ?? '');
+if ($bk !== '' && $bk[0] === '/' && strpos($bk, '//') === false && strpos($bk, '\\') === false && !preg_match('/[\r\n]/', $bk) && strpos($bk, BASE_URL) === 0) $back = $bk;
 header('Location: ' . $back);
 exit;

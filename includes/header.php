@@ -568,11 +568,13 @@ document.addEventListener('submit', function (e) {
                         <?= e($selLabel) ?> <i class="fas fa-caret-down"></i>
                     </button>
                     <div class="school-menu" id="schoolMenu">
-                        <form method="get" action="<?= BASE_URL ?>switch_school.php">
-                            <label class="sm-all"><input type="checkbox" id="smAll" <?= $isAllSel?'checked':'' ?> onclick="document.querySelectorAll('#schoolMenu input[name=\'schools[]\']').forEach(c=>c.checked=false)"> <strong>🏫 Toutes les écoles / كل المدارس</strong></label>
+                        <?php /* ☑️ (2026-10-03 «بس اختار كل المدارس يصير في تشاك مارك لكل مدرسة — بختار الكل وبرجع بكبس على المدرسة اللي بديش ياها»):
+                                 «كل المدارس» تشيّك كل المدارس واحدة واحدة، فيشيل التشييك عن التي لا يريدها ثم «تطبيق». الكل مشيّك = كل المدارس. */ ?>
+                        <form method="get" action="<?= BASE_URL ?>switch_school.php" onsubmit="var bs=this.querySelectorAll('input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});if(on===bs.length||on===0){bs.forEach(function(c){c.disabled=true;});}">
+                            <label class="sm-all"><input type="checkbox" id="smAll" <?= $isAllSel?'checked':'' ?> onclick="var v=this.checked;document.querySelectorAll('#schoolMenu input[name=\'schools[]\']').forEach(function(c){c.checked=v;})"> <strong>🏫 Toutes les écoles / كل المدارس</strong></label>
                             <div class="sm-list">
                             <?php foreach ($navSchools as $navS): ?>
-                                <label><input type="checkbox" name="schools[]" value="<?= (int)$navS['id'] ?>" <?= in_array((int)$navS['id'],$activeIds,true)?'checked':'' ?> onclick="document.getElementById('smAll').checked=false"> <?= e($lang==='ar'?$navS['name_ar']:$navS['name_fr']) ?></label>
+                                <label><input type="checkbox" name="schools[]" value="<?= (int)$navS['id'] ?>" <?= ($isAllSel || in_array((int)$navS['id'],$activeIds,true))?'checked':'' ?> onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> <?= e($lang==='ar'?$navS['name_ar']:$navS['name_fr']) ?></label>
                             <?php endforeach; ?>
                             </div>
                             <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> Appliquer / تطبيق</button>
@@ -721,6 +723,30 @@ document.addEventListener('submit', function (e) {
         })();
         </script>
 
+        <?php
+        /* 🏫⇄ (2026-10-03 «بكل التقارير والإفادات يكون عندي خيار انقل من مدرسة لمدرسة دغري ينقل بدل ما ارجع للأول واختار»):
+           داخل عرض المستند (تقرير/كشف/نموذج/إفادة) مبدّل المدارس الأعلى مخفي — هذا شريط مدارس: كبسة لكل مدرسة تنقل دغري لنفس
+           التقرير بتلك المدرسة (وكبسة «الكل»)، بلا رجوع لصفحة الاختيار. لا يُطبَع. */
+        if (!empty($docFocus) && (isSuperAdmin() || (isViewer() && count(viewerAllowedSchoolIds()) > 1))):
+            $stripSchools = isSuperAdmin() ? allSchools()
+                : array_values(array_filter(allSchools(false), fn($s) => in_array((int)$s['id'], viewerAllowedSchoolIds(), true)));
+            if (count($stripSchools) > 1):
+                $stripActive = array_map('intval', activeSchoolIds());
+                if (function_exists('pageSchoolScope') && isSuperAdmin() && (isset($_GET['sch']) || isset($_GET['sch_all']))) { $stripSc = pageSchoolScope(); $stripActive = $stripSc['all'] ? [] : array_map('intval', $stripSc['ids']); }
+                elseif (isSuperAdmin() && isset($_GET['schools'])) $stripActive = array_values(array_filter(array_map('intval', (array)$_GET['schools'])));
+                $stripAll = isSuperAdmin() ? empty($stripActive) : (count($stripActive) === count($stripSchools));
+                // الرجوع لنفس الصفحة بلا وسائط المدارس القديمة ولا الموظف (الموظف تابع لمدرسته)
+                $stripQ = $_GET; foreach (['sch', 'sch_all', 'sch_set', 'schools', 'school', 'employee_id', 'emp', 'emp_id'] as $sk) unset($stripQ[$sk]);
+                $stripBack = strtok((string)($_SERVER['REQUEST_URI'] ?? ''), '?') . ($stripQ ? '?' . http_build_query($stripQ) : '');
+        ?>
+        <div class="school-strip no-print" id="schoolStrip">
+            <span class="ss-k"><i class="fas fa-school"></i> École / المدرسة:</span>
+            <a class="ss-chip<?= $stripAll ? ' on' : '' ?>" href="<?= BASE_URL ?>switch_school.php?school=0&amp;back=<?= e(rawurlencode($stripBack)) ?>">Toutes / الكل</a>
+            <?php foreach ($stripSchools as $ssS): $ssOn = !$stripAll && in_array((int)$ssS['id'], $stripActive, true); ?>
+            <a class="ss-chip<?= $ssOn ? ' on' : '' ?>" href="<?= BASE_URL ?>switch_school.php?school=<?= (int)$ssS['id'] ?>&amp;back=<?= e(rawurlencode($stripBack)) ?>"><?= e($lang === 'ar' ? ($ssS['name_ar'] ?: $ssS['name_fr']) : ($ssS['name_fr'] ?: $ssS['name_ar'])) ?></a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; endif; ?>
         <div class="page-content" id="pageContent" style="--accent: <?= $accentColor ?>; --accent-bg: <?= $accentBg ?>;">
         <?php
         // رسائل التنبيه (flash) — تنبيهات عائمة عصرية تختفي لحالها (الأخطاء تبقى ليكبس ×)
