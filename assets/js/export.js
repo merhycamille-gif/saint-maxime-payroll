@@ -210,6 +210,23 @@
         });
     };
 
+    // ===== ✏️ تعديل / كتابة قبل الطباعة (2026-10-08 «دايماً عمول هيك بكل الإفادات») =====
+    // المستند المعروض (ppExportArea / official-doc / doc-sheet / القسائم) يصير قابلاً للكتابة بالمكان؛ كبسة ثانية تقفله. للطباعة فقط.
+    function ppEditTargets() {
+        var a = document.querySelectorAll('#ppExportArea, .official-doc, .doc-sheet, .xls-sheet, .salary-slip, .payslip-card');
+        return Array.prototype.filter.call(a, function (n) { return !n.closest('.no-print') && n.offsetParent; });
+    }
+    window.ppEditToggle = function (btn) {
+        var on = !document.body.classList.contains('pp-editing');
+        document.body.classList.toggle('pp-editing', on);
+        ppEditTargets().forEach(function (n) { n.contentEditable = on ? 'true' : 'false'; n.style.outline = on ? '2px dashed #1b7a3d' : ''; n.style.outlineOffset = on ? '4px' : ''; });
+        btn = btn || document.getElementById('msaEditBtn');
+        if (btn) { btn.classList.toggle('btn-success', on); btn.classList.toggle('btn-gold', !on); var sp = btn.querySelector('span'); if (sp) sp.textContent = on ? 'Terminé / خلص التعديل' : 'Modifier / تعديل / كتابة'; }
+    };
+    function ppEditInit() { var b = document.getElementById('msaEditBtn'); if (b) b.style.display = ppEditTargets().length ? '' : 'none'; }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ppEditInit); else ppEditInit();
+    window.addEventListener('load', ppEditInit);
+
     // ===== 📤 Excel/Word حقيقيان (2026-10-08 «بس نضغط إكسل وبدنا نحفظها عالدسك توب دغري عم يحفظها ويب») =====
     // HTML المنطقة المعروضة يُبعَث للخادم (pages/html_export.php) فيرجع ملف .xlsx/.docx حقيقياً يُنزَّل دغري
     // باسمه وامتداده — أوفيس يحفظه إكسل/وورد لا «صفحة ويب». الاتجاه يتبع المستند (عربي = من اليمين، فرنسي = من الشمال).

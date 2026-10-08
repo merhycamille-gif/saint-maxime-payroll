@@ -365,6 +365,41 @@ class ReportTable
         $n = mb_substr($n, 0, 28, 'UTF-8');
         return $n !== '' ? $n : 'Sheet1';
     }
+    /** عرض نصّ بوحدة «حرف إكسل» تقريباً: العربي والعريض 1.25، اللاتيني 1.0، الأرقام والفواصل 0.95 */
+    public static function textW(string $t): float {
+        $w = 0.0;
+        if (preg_match_all('/./us', $t, $m)) {
+            foreach ($m[0] as $ch) {
+                $o = mb_ord($ch, 'UTF-8');
+                if ($o >= 0x0600 && $o <= 0x06FF) $w += 1.25;
+                elseif ($o >= 0x0640 && $o <= 0x065F) $w += 0;      // تشكيل
+                elseif (ctype_digit($ch) || $ch === ',' || $ch === '.') $w += 0.95;
+                elseif ($o > 0x2000) $w += 1.3;
+                else $w += 1.0;
+            }
+        }
+        return $w;
+    }
+    /** عرض كل عمود على قدّ أطول محتوى (الرأس يُلفّ على سطرين فلا يفرض عرضه كلّه) — بين 8 و60 */
+    private function autoWidths(int $cols): array {
+        $w = array_fill(0, $cols, 0.0);
+        for ($c = 0; $c < $cols; $c++) {
+            $h = (string)($this->headers[$c] ?? '');
+            $hw = 0.0; foreach (preg_split('/\r\n|\n/', $h) as $ln) $hw = max($hw, self::textW($ln));
+            $w[$c] = max($w[$c], min($hw, 26.0) * 0.75 + 2);
+        }
+        foreach ($this->rows as $r) {
+            if ($r['type'] === 'section') continue;
+            for ($c = 0; $c < $cols; $c++) {
+                $v = (string)($r['cells'][$c] ?? '');
+                if ($v === '') continue;
+                $len = $this->isNum($v) ? strlen(number_format($this->numVal($v), 2)) * 0.95 : self::textW($v);
+                $w[$c] = max($w[$c], min($len, 58.0) + 2);
+            }
+        }
+        for ($c = 0; $c < $cols; $c++) $w[$c] = round(max(8.0, min(60.0, $w[$c])), 1);
+        return $w;
+    }
     private function fileBase()
     {
         $t = preg_replace('/[\\\\\/:*?"<>|]+/', '_', $this->title);
@@ -381,10 +416,26 @@ class ReportTable
             return $s;
         };
 
+        // 📐 (2026-10-08 «بدّي ياها تطلع مرتّبة ودغري مظبوطة بدل ما أرجع أظبّط بالإكسل عواميد وأسطر»):
+        //    عرض كل عمود على قدّ أطول محتوى فيه (رأس/بيانات/مجاميع، العربي أعرض)، وارتفاع كل سطر على قدّ أسطره الملفوفة،
+        //    رأس الأعمدة مثبّت + فلتر تلقائي + يتكرّر على كل ورقة مطبوعة + الورقة تتّسع عرضاً على صفحة واحدة.
+        $autoW = $this->autoWidths($cols);
         $rowsXml = ''; $rIdx = 0;
-        $addRow = function ($cells, $styleText, $styleNum, $mergeAll = false) use (&$rowsXml, &$rIdx, $cols, $colLetter) {
+        $lineH = 17;   // ارتفاع السطر بخط 12 (نقاط)
+        $linesOf = function ($v, $w) {
+            $t = (string)$v; if ($t === '') return 1;
+            $n = 0;
+            foreach (preg_split('/\r\n|\n/', $t) as $ln) { $n += max(1, (int)ceil(self::textW($ln) / max(1.0, $w - 1.5))); }
+            return $n;
+        };
+        $addRow = function ($cells, $styleText, $styleNum, $mergeAll = false) use (&$rowsXml, &$rIdx, $cols, $colLetter, $autoW, $lineH, $linesOf) {
             $rIdx++;
-            $rowsXml .= '<row r="' . $rIdx . '">';
+            // ارتفاع السطر = أكثر خلية أسطراً (الخلية المدموجة على عرض الورقة كلّه)
+            $maxL = 1;
+            if ($mergeAll) { $maxL = $linesOf($cells[0] ?? '', array_sum($autoW)); }
+            else { for ($c = 0; $c < $cols; $c++) { $v = $cells[$c] ?? ''; if ($v !== '' && !$this->isNum($v)) $maxL = max($maxL, $linesOf($v, $autoW[$c] ?? 16)); } }
+            $ht = $maxL > 1 ? ' ht="' . ($maxL * $lineH + 4) . '" customHeight="1"' : ($styleText === 3 ? ' ht="' . ($lineH + 6) . '" customHeight="1"' : '');
+            $rowsXml .= '<row r="' . $rIdx . '"' . $ht . '>';
             if ($mergeAll) {
                 $rowsXml .= '<c r="A' . $rIdx . '" s="' . $styleText . '" t="inlineStr"><is><t xml:space="preserve">' . self::xa($cells[0]) . '</t></is></c>';
                 for ($c = 1; $c < $cols; $c++) $rowsXml .= '<c r="' . $colLetter($c) . $rIdx . '" s="' . $styleText . '"/>';
@@ -437,7 +488,7 @@ class ReportTable
         // أعمدة
         $colsXml = '<cols>';
         for ($c = 0; $c < $cols; $c++) {
-            $w = $this->colWidths[$c] ?? ($c === 1 ? 32 : 16);
+            $w = isset($this->colWidths[$c]) ? max((float)$this->colWidths[$c], (float)($autoW[$c] ?? 0)) : ($autoW[$c] ?? 16);   // العرض المحدّد يدوياً لا يقلّ عن قدّ المحتوى
             $colsXml .= '<col min="' . ($c + 1) . '" max="' . ($c + 1) . '" width="' . $w . '" customWidth="1"/>';
         }
         $colsXml .= '</cols>';
@@ -452,6 +503,7 @@ class ReportTable
             . '<sheetFormatPr defaultRowHeight="16"/>'
             . $colsXml
             . '<sheetData>' . $rowsXml . '</sheetData>'
+            . ($this->headers && $rIdx > $headerRow ? '<autoFilter ref="A' . $headerRow . ':' . $colLetter($cols - 1) . $rIdx . '"/>' : '')
             . $mergesXml
             . '<pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/>'
             . '<pageSetup paperSize="9" orientation="' . $orient . '" fitToWidth="1" fitToHeight="0"/>'
@@ -473,7 +525,9 @@ class ReportTable
         $wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
             . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            . '<sheets><sheet name="' . self::xa($this->sheetName()) . '" sheetId="1" r:id="rId1"/></sheets></workbook>';
+            . '<sheets><sheet name="' . self::xa($this->sheetName()) . '" sheetId="1" r:id="rId1"/></sheets>'
+            . ($this->headers ? '<definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">\'' . str_replace("'", "''", self::xa($this->sheetName())) . '\'!$' . $headerRow . ':$' . $headerRow . '</definedName></definedNames>' : '')
+            . '</workbook>';
         $wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
             . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
@@ -522,11 +576,11 @@ class ReportTable
             . '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 1 title
             . '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 2 subheader
             . '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' // 3 col header
-            . '<xf numFmtId="0" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center"/></xf>' // 4 data text
+            . '<xf numFmtId="0" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center" wrapText="1"/></xf>' // 4 data text
             . '<xf numFmtId="164" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' // 5 data num
-            . '<xf numFmtId="0" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center"/></xf>' // 6 total text
+            . '<xf numFmtId="0" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center" wrapText="1"/></xf>' // 6 total text
             . '<xf numFmtId="164" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' // 7 total num
-            . '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center"/></xf>' // 8 section
+            . '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center" wrapText="1"/></xf>' // 8 section
             . '</cellXfs>'
             . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             . '</styleSheet>';
@@ -772,8 +826,11 @@ class ReportTable
     public function export($format)
     {
         if ($format === 'pdf') { if ($this->pdf()) return; $format = 'xlsx'; } // fallback لو LibreOffice غير منصَّب
+        // 📐 (2026-10-08) الإكسل دائماً من المولّد المدمج (أعمدة على قدّ المحتوى + ارتفاع الأسطر + فلتر + رأس يتكرّر بالطباعة + الاتجاه) —
+        //    مولّد بايثون كان يتجاهلها ولا وجود له أونلاين. الوورد يبقى عبر بايثون حيث يتوفّر وإلا المدمج.
+        if ($format === 'xlsx') { $this->xlsx(); return; }
         if ($this->pyExport($format)) return;
-        if ($format === 'docx') $this->docx(); else $this->xlsx();
+        $this->docx();
     }
 
     /* ============================== ZIP بناء/إرسال ============================== */
