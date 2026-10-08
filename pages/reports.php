@@ -544,7 +544,7 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'eoc_summary'):
-        $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.caisse_number, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.caisse_amount_lbp, ms.eoc_grade_lbp, ms.school_eoc_6_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
+        $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.caisse_number, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.caisse_amount_lbp, ms.eoc_grade_lbp, ms.school_eoc_6_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.employee_type = 'enseignant_titulaire'" . $schoolSql . $empYearFilter . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
@@ -570,7 +570,7 @@ function reportDocThumb($path) {
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e($r['caisse_number']) ?></td>
-                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
+                                <td><?= e(empFullNameAr($r)) /* 👨 الاسم الثلاثي بلوائح الصندوق (2026-10-08) */ ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
                                 <td><?= moneyLaw($r['base_salary_lbp'], [], $r, 'base') ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>

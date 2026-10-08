@@ -206,7 +206,7 @@ if ($report === 'monthly_summary') {
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('المجموع العام', $G, $rn); }
 
 } elseif ($report === 'eoc_summary') {
-    $st = $db->prepare("SELECT e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.caisse_number,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.caisse_amount_lbp,ms.eoc_grade_lbp,ms.school_eoc_6_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.prime_fixe_usd_law,ms.aide_complementaire_lbp
+    $st = $db->prepare("SELECT e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.father_name_ar,e.father_name_fr,e.caisse_number,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.caisse_amount_lbp,ms.eoc_grade_lbp,ms.school_eoc_6_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.prime_fixe_usd_law,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.employee_type='enseignant_titulaire'" . $schoolSql . $empYearFilter . "
         ORDER BY e.school_id, COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
@@ -226,7 +226,7 @@ if ($report === 'monthly_summary') {
         $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r); $ca = (int)$r['caisse_amount_lbp']; $gr = (int)$r['eoc_grade_lbp']; $sc = (int)$r['school_eoc_6_lbp'];
         $T['base'] += $base; $T['extra'] += $ex; $T['aide'] += $ai; $T['composed'] += $comp; $T['caisse'] += $ca; $T['grade'] += $gr; $T['school'] += $sc; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
-        $row = array_merge($row, [$r['caisse_number'], $nm($r) . empBadgesText($r, $db, $periodSchoolYear), $base]);
+        $row = array_merge($row, [$r['caisse_number'], empFullNameAr($r) . empBadgesText($r, $db, $periodSchoolYear), $base]); // 👨 الاسم الثلاثي بلوائح الصندوق (2026-10-08)
         if (salaryCompHas('extra')) $row[] = $ex;
         if (salaryCompHas('aide'))  $row[] = $ai;
         $row = array_merge($row, [$comp, $ca, ($gr > 0 ? $gr : '—'), $sc]);

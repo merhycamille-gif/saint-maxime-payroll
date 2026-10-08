@@ -1300,7 +1300,8 @@ elseif ($form === 'teacher_card'):
         ?>
             <tr>
                 <td><?= $i+1 ?></td>
-                <td style="text-align:right"><?= e(trim(($r['first_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                <?php /* 👨 (2026-10-08 «بلوائح صندوق التعويضات بدنا نحطّ اسم الأستاذ كامل مع اسم الأب»): الاسم الثلاثي */ ?>
+                <td style="text-align:right"><?= e(empFullNameAr($r)) ?></td>
                 <td><?= e(diplomaLabel($r['diploma'],'ar')) ?></td>
                 <td><?= formatDate(shownHireDate($r)) ?></td>
                 <td><?php // الفئة: معلّم للابتدائي/الحضانة، مدرّس للمتوسط/الثانوي
@@ -1422,7 +1423,8 @@ elseif ($form === 'teacher_card'):
                 <?php /* بيان صندوق التعويضات: «الرقم المالي» للملاك = رقمه لدى الصندوق (بيانه الرسمي 2025-02-10)
                          لا رقم وزارة المالية؛ المتعاقد ليس منتسباً للصندوق فيبقى رقم المالية */ ?>
                 <td><?= e($isMlk ? ($r['caisse_number'] ?? '') : $r['finance_ministry_number']) ?></td>
-                <td style="text-align:right"><?= e(trim(($r['first_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                <?php /* 👨 (2026-10-08 «بلوائح صندوق التعويضات بدنا نحطّ اسم الأستاذ كامل مع اسم الأب»): الاسم الثلاثي */ ?>
+                <td style="text-align:right"><?= e(empFullNameAr($r)) ?></td>
                 <td><?= e(diplomaLabel($r['diploma'],'ar')) ?></td>
                 <td><?= formatDate($isMlk ? (shownTitularizationDate($r) ?: shownHireDate($r)) : shownHireDate($r)) ?></td>
                 <td><?= $catCol==='mat'?$X:'' ?></td>
