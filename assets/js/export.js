@@ -105,7 +105,7 @@
     }
 
     // ===== Excel — صفحة A4 بالاتجاه الصحيح + ملاءمة العرض لصفحة واحدة + بلا خطوط شبكة =====
-    window.ppExcel = function (title) {
+    window.ppExcelLegacy = function (title) {
         var wide = isWide();
         var xml = '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
             + '<x:Name>' + safeName(title).slice(0, 28) + '</x:Name><x:WorksheetOptions>'
@@ -149,7 +149,7 @@
             });
         });
     }
-    window.ppWord = function (title) {
+    window.ppWordLegacy = function (title) {
         var wide = isWide();
         // A4: عمودي 595.3×841.9pt، أفقي 841.9×595.3pt
         var size = wide ? '841.9pt 595.3pt' : '595.3pt 841.9pt';
@@ -209,6 +209,50 @@
             rawDownload(safeName(title) + '_' + stamp() + '.doc', mht, 'application/msword');
         });
     };
+
+    // ===== 📤 Excel/Word حقيقيان (2026-10-08 «بس نضغط إكسل وبدنا نحفظها عالدسك توب دغري عم يحفظها ويب») =====
+    // HTML المنطقة المعروضة يُبعَث للخادم (pages/html_export.php) فيرجع ملف .xlsx/.docx حقيقياً يُنزَّل دغري
+    // باسمه وامتداده — أوفيس يحفظه إكسل/وورد لا «صفحة ويب». الاتجاه يتبع المستند (عربي = من اليمين، فرنسي = من الشمال).
+    // إن تعذّر الخادم يرجع للتصدير القديم (ملف HTML) حتى لا يُترك المستخدم بلا شيء.
+    function officeExport(format, title) {
+        var a = area(), btn = document.activeElement && document.activeElement.tagName === 'BUTTON' ? document.activeElement : null;
+        // اتجاه المستند نفسه لا الواجهة: أوّل ورقة/جدول داخل المنطقة (doc-sheet/official-doc/table) — وإلا نصّه (عربي ⇒ rtl)
+        var dir = 'rtl';
+        try {
+            // اتجاه المستند نفسه لا الواجهة: أوّل جدول محتوى (أو ورقة المستند) وما فوقه حتى المنطقة — أوّل dir صريح
+            // (الجداول العربية dir=rtl، لوائح الدولة الخمس dir=ltr بقراره)، وإلا نصّه: عربي أكثر من اللاتيني ⇒ من اليمين
+            var start = null, tbs = a.querySelectorAll('table');
+            for (var ti = 0; ti < tbs.length; ti++) if (tbs[ti].rows.length > 1 && !tbs[ti].closest('.no-print, .export-toolbar, form')) { start = tbs[ti]; break; }
+            if (!start) { var cands = a.querySelectorAll('.official-doc, .doc-sheet, .xls-sheet, .land-report'); for (var pi = 0; pi < cands.length; pi++) if (!cands[pi].closest('.no-print, .export-toolbar, form')) { start = cands[pi]; break; } }
+            var ex = '', n = start;
+            while (n && n !== a.parentElement) { var dA = n.getAttribute ? n.getAttribute('dir') : ''; if (dA === 'ltr' || dA === 'rtl') { ex = dA; break; } if (/(^|\s)(doc-ltr)(\s|$)/.test(n.className || '')) { ex = 'ltr'; break; } n = n.parentElement; }
+            if (ex) dir = ex;
+            else { var tx = ((start || a).textContent || '').slice(0, 6000), ar = (tx.match(/[\u0600-\u06FF]/g) || []).length, la = (tx.match(/[A-Za-z]/g) || []).length; dir = ar >= la ? 'rtl' : 'ltr'; }
+        } catch (e) {}
+        var fd = new FormData();
+        fd.append('format', format); fd.append('title', title || document.title || 'document');
+        fd.append('dir', dir); fd.append('landscape', isWide() ? '1' : '0'); fd.append('html', cleanHtml());
+        var old = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ عم نجهّز الملف...'; }
+        var done = function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } };
+        return fetch((window.BASE_URL || '') + 'pages/html_export.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) {
+                if (!r.ok) throw new Error('http ' + r.status);
+                var cd = r.headers.get('Content-Disposition') || '', m = /filename\*=UTF-8''([^;]+)/i.exec(cd), name = '';
+                try { name = m ? decodeURIComponent(m[1]) : ''; } catch (e) { name = ''; }
+                if (!name) name = safeName(title) + '_' + stamp() + (format === 'docx' ? '.docx' : '.xlsx');
+                return r.blob().then(function (b) {
+                    if (b.size < 200) throw new Error('empty');
+                    var url = URL.createObjectURL(b), l = document.createElement('a');
+                    l.href = url; l.download = name; document.body.appendChild(l); l.click();
+                    setTimeout(function () { URL.revokeObjectURL(url); l.remove(); }, 1500);
+                    done();
+                });
+            })
+            .catch(function (e) { try { console.error(e); } catch (_) {} done(); if (format === 'docx') window.ppWordLegacy(title); else window.ppExcelLegacy(title); });
+    }
+    window.ppExcel = function (title) { return officeExport('xlsx', title); };
+    window.ppWord = function (title) { return officeExport('docx', title); };
 
     // ===== WhatsApp =====
     // ملاحظة: واتساب عبر الرابط يرسل نصاً فقط (لا ملفات). للمستندات: نزّل PDF/Excel ثم أرفقه.

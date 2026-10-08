@@ -111,7 +111,7 @@ include __DIR__ . '/../includes/header.php';
    * =================================================================== */
   $auditYear = ($lcYear === 'all') ? currentSchoolYear() : $lcYear;
   $scAud = schoolScopeSql('e.school_id');
-  $audSt = $db->prepare("SELECT ms.employee_id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+  $audSt = $db->prepare("SELECT ms.employee_id, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
              e.employee_type, e.school_id, COUNT(*) n,
              MAX(ABS(ms.total_retenues_lbp - (ms.cnss_amount_lbp + ms.caisse_amount_lbp + ms.income_tax_lbp + ms.eoc_grade_lbp))) gapDed,
              MAX(ABS(ms.net_salary_lbp - ((ms.base_plus_echelon_lbp + ms.extra_lbp + ms.prime_fixe_lbp + ms.aide_complementaire_lbp) - ms.total_retenues_lbp))) gapNet
@@ -154,7 +154,7 @@ include __DIR__ . '/../includes/header.php';
           <tbody>
           <?php foreach ($audRows as $ar): ?>
             <tr>
-              <td><strong><?= e(trim($ar['first_name_ar'] . ' ' . $ar['last_name_ar']) ?: trim($ar['first_name_fr'] . ' ' . $ar['last_name_fr'])) ?></strong></td>
+              <td><strong><?= e(empFullNameAr($ar)) ?></strong></td>
               <td><small><?= e(employeeTypeLabel($ar['employee_type'])) ?></small></td>
               <td><small><?= e(schoolNameById((int)$ar['school_id'], 'ar')) ?></small></td>
               <td style="text-align:center"><?= (int)$ar['n'] ?></td>

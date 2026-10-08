@@ -262,7 +262,7 @@ function reportDocThumb($path) {
 <?php /* الملاءمة التلقائية للجداول الواسعة صارت مشتركة في officialFormStyles() — تعمل هنا وفي النماذج الرسمية */ ?>
     <?php /* الترويسة (مدرسة واحدة/بانر المدارس) صارت داخل الورقة الموحّدة docSheetStart */ ?>
     <?php if ($report === 'monthly_summary'):
-        $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.employee_type, e.school_id, " . familyDedSelectCols('e') . ", ms.*
+        $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.employee_type, e.school_id, " . familyDedSelectCols('e') . ", ms.*
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . $empYearFilter . $empTypeSql . "
@@ -363,7 +363,7 @@ function reportDocThumb($path) {
                             <tr>
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
-                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
+                                <td><?= e(empFullNameAr($r)) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
                                 <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
                                 <td><?= e(gradeDisplay($r['employee_type'], $r['grade_at_month'])) ?></td>
                                 <td><?= moneyLaw($r['base_salary_lbp'], [], $r, 'base') ?></td>
@@ -399,7 +399,7 @@ function reportDocThumb($path) {
                             <tr class="incomplete-row" style="background:#fffbeb">
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($ie['school_id'])) ?></small></td><?php endif; ?>
-                                <td><?= e(trim($ie['first_name_ar'].' '.$ie['last_name_ar']) ?: trim($ie['first_name_fr'].' '.$ie['last_name_fr'])) ?><?= empBadges($ie, $db, $periodSchoolYear) ?></td>
+                                <td><?= e(empFullNameAr($ie)) ?><?= empBadges($ie, $db, $periodSchoolYear) ?></td>
                                 <td><small><?= employeeTypeLabel($ie['employee_type']) ?></small></td>
                                 <td><?= e(gradeDisplay($ie)) ?></td>
                                 <td colspan="<?= $incSpan - ($multi?5:4) ?>" style="text-align:right;color:#92400e"><?= e(incompleteFileText($ie, $db, $periodSchoolYear)) ?></td>
@@ -410,7 +410,7 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'cnss_summary'):
-        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.nssf_number, e.birth_date, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.cnss_amount_lbp, ms.school_cnss_8_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
+        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.nssf_number, e.birth_date, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.cnss_amount_lbp, ms.school_cnss_8_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.cnss_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
@@ -457,7 +457,7 @@ function reportDocThumb($path) {
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'])) ?></td>
-                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
+                                <td><?= e(empFullNameAr($r)) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
                                 <td><?= moneyLaw($r['base_salary_lbp'], [], $r, 'base') ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
@@ -475,7 +475,7 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'tax_summary'):
-        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.finance_ministry_number, e.school_id, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, e.id eid, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
+        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.finance_ministry_number, e.school_id, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, e.id eid, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.tax_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
@@ -527,7 +527,7 @@ function reportDocThumb($path) {
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e($r['finance_ministry_number']) ?></td>
-                                <td><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
+                                <td><?= e(empFullNameAr($r)) ?><?= empBadges($r, $db, $periodSchoolYear) ?></td>
                                 <td><?= moneyLaw($r['base_salary_lbp'], [], $r, 'base') ?></td>
                                 <?php if (salaryCompHas('extra')): ?><td><?= extraWageMoney($r) ?></td><?php endif; ?>
                                 <?php if (salaryCompHas('aide')): ?><td><?= money(aideCompLbp($r), $repRate) ?></td><?php endif; ?>
@@ -643,8 +643,8 @@ function reportDocThumb($path) {
         // الأعمدة المتاحة: key => [label, دالة العرض]
         $availCols = [
             'code'    => ['Code', fn($r) => '<strong>'.e($r['employee_code']).'</strong>'],
-            'name'    => ['الاسم / Nom', fn($r) => e(trim($r['first_name_fr'].' '.$r['last_name_fr']) ?: trim($r['first_name_ar'].' '.$r['last_name_ar'])) . empBadges($r, $db, $bonusSy)], // 🆕 شارتا «جديد» و«ملف ناقص» (2026-09-23)
-            'name_ar' => ['الاسم بالعربي / Nom (arabe)', fn($r) => e(trim($r['first_name_ar'].' '.$r['last_name_ar']))],
+            'name'    => ['الاسم / Nom', fn($r) => e(empFullNameFr($r)) . empBadges($r, $db, $bonusSy)], // 🆕 شارتا «جديد» و«ملف ناقص» (2026-09-23)
+            'name_ar' => ['الاسم بالعربي / Nom (arabe)', fn($r) => e(empFullNameAr($r))],
             'type'    => ['الفئة / Type', fn($r) => employeeTypeLabel($r['employee_type'])],
             // الموظف الإداري: تُعرَض وظيفته بدل الشهادة (مطابق للتصدير — كانا مختلفَين)
             'diploma' => ['الشهادة / Diplôme', fn($r) => $r['employee_type'] === 'employe' ? jobTitleLabel($r['job_title'] ?? '') : diplomaLabel($r['diploma'])],
@@ -933,7 +933,7 @@ function reportDocThumb($path) {
                             <tr>
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
-                                <td><strong><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr'])) ?></strong><?= empBadges($r, $db, activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()) ?></td>
+                                <td><strong><?= e(empFullNameAr($r)) ?></strong><?= empBadges($r, $db, activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()) ?></td>
                                 <td><?= diplomaLabel($r['diploma']) ?></td>
                                 <td><?= e(gradeDisplay($r)) ?></td>
                                 <td><?= formatDate(shownHireDate($r)) ?></td>

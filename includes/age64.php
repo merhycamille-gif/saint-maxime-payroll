@@ -88,7 +88,7 @@ function age64List($db, $activeYearOnly = false) {
 
     $rows = [];
     try {
-        $st = $db->prepare("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+        $st = $db->prepare("SELECT e.id, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                 e.employee_type, e.birth_date, e.keep_working_past_64,
                 COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
             FROM employees e LEFT JOIN schools sc ON sc.id = e.school_id
@@ -130,7 +130,7 @@ function renderAge64Cards($rows, $emptyHtml = '') {
                 <thead><tr><th>الاسم</th><th>الفئة</th><th>العمر</th><th>تاريخ بلوغ 64</th><th>المدرسة</th><th>القرار</th></tr></thead>
                 <tbody>
                 <?php foreach ($need as $r):
-                    $nm = trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr']);
+                    $nm = empFullNameAr($r);
                     $age = ageOnDate($r['birth_date']); $d64 = age64Date($r['birth_date']); ?>
                 <tr>
                     <td><strong><?= e($nm) ?></strong></td>
@@ -165,7 +165,7 @@ function renderAge64Cards($rows, $emptyHtml = '') {
             <thead><tr><th>الاسم</th><th>الفئة</th><th>العمر</th><th>تاريخ بلوغ 64</th><th>المدرسة</th><th></th></tr></thead>
             <tbody>
             <?php foreach ($kept as $r):
-                $nm = trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr']);
+                $nm = empFullNameAr($r);
                 $age = ageOnDate($r['birth_date']); $d64 = age64Date($r['birth_date']); ?>
             <tr>
                 <td><strong><?= e($nm) ?></strong></td>

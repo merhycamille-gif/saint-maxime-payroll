@@ -45,8 +45,8 @@ function payslipCardHtml($emp, $salary, $month, $year) {
     <div class="card payslip-card" style="page-break-inside:avoid">
         <div class="card-header">
             <h3>
-                <span dir="ltr"><i class="fas fa-user"></i> <?= e(trim($emp['first_name_fr'].' '.$emp['last_name_fr']) ?: trim($emp['first_name_ar'].' '.$emp['last_name_ar'])) ?> — <?= monthName($month) ?> <?= $year ?></span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e(trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: 'قسيمة الراتب') ?></div>
+                <span dir="ltr"><i class="fas fa-user"></i> <?= e(empFullNameFr($emp)) ?> — <?= monthName($month) ?> <?= $year ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e(empFullNameAr($emp) ?: 'قسيمة الراتب') ?></div>
             </h3>
             <div style="font-size:13px;color:var(--gray-600)"><?= e(currentSchoolName()) ?></div>
         </div>
@@ -56,7 +56,7 @@ function payslipCardHtml($emp, $salary, $month, $year) {
             <table class="table" style="margin-bottom:16px">
                 <tr><th colspan="4" style="background:#eef3fb;color:#000"><i class="fas fa-id-badge"></i> Informations / المعلومات</th></tr>
                 <tr>
-                    <td style="width:25%">Nom / الاسم</td><td style="width:25%"><strong><?= e($emp['first_name_fr'].' '.$emp['last_name_fr']) ?></strong><br><small class="text-rtl"><?= e(trim($emp['first_name_ar'].' '.$emp['last_name_ar'])) ?></small></td>
+                    <td style="width:25%">Nom / الاسم</td><td style="width:25%"><strong><?= e(empFullNameFr($emp)) ?></strong><br><small class="text-rtl"><?= e(empFullNameAr($emp)) ?></small></td>
                     <td style="width:25%">Type / النوع</td><td style="width:25%"><strong><?= employeeTypeLabel($emp['employee_type']) ?></strong></td>
                 </tr>
                 <tr>
@@ -326,8 +326,8 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     <div class="card payslip-card" id="ppExportArea">
         <div class="card-header">
             <h3>
-                <span dir="ltr"><i class="fas fa-user"></i> <?= e($emp['first_name_fr'].' '.$emp['last_name_fr']) ?> — <?= monthName($month) ?> <?= $year ?></span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e(trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: 'قسيمة الراتب') ?></div>
+                <span dir="ltr"><i class="fas fa-user"></i> <?= e(empFullNameFr($emp)) ?> — <?= monthName($month) ?> <?= $year ?></span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e(empFullNameAr($emp) ?: 'قسيمة الراتب') ?></div>
             </h3>
             <div style="font-size:13px;color:var(--gray-600)"><?= e(currentSchoolName()) ?></div>
         </div>
@@ -350,7 +350,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
             <table class="table" style="margin-bottom:16px">
                 <tr><th colspan="4" style="background:#eef3fb;color:#000"><i class="fas fa-id-badge"></i> Informations de l'enseignant / معلومات الأستاذ</th></tr>
                 <tr>
-                    <td style="width:25%">Nom / اسم الأستاذ</td><td style="width:25%"><strong><?= e($emp['first_name_fr'].' '.$emp['last_name_fr']) ?></strong><br><small class="text-rtl"><?= e(trim($emp['first_name_ar'].' '.$emp['last_name_ar'])) ?></small></td>
+                    <td style="width:25%">Nom / اسم الأستاذ</td><td style="width:25%"><strong><?= e(empFullNameFr($emp)) ?></strong><br><small class="text-rtl"><?= e(empFullNameAr($emp)) ?></small></td>
                     <td style="width:25%">Année scolaire / السنة الدراسية</td><td style="width:25%"><strong><?= e($schoolYearLbl) ?></strong></td>
                 </tr>
                 <tr>
@@ -532,7 +532,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                             <tr>
                                 <td><strong><?= e($r['employee_code']) ?></strong></td>
                                 <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
-                                <td><?= e($r['first_name_fr'].' '.$r['last_name_fr']) ?> <?= empBadges($r, $db, $msSchoolYear) ?></td><?php /* 🆕 جديد + ملف ناقص (2026-09-23) */ ?>
+                                <td><?= e(empFullNameFr($r)) ?> <?= empBadges($r, $db, $msSchoolYear) ?></td><?php /* 🆕 جديد + ملف ناقص (2026-09-23) */ ?>
                                 <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
                                 <td><?= e(gradeDisplay($r)) ?></td>
                                 <td><?= $r['is_calculated'] ? money($r['net_salary_lbp'], rowRate($r)) : '—' ?></td>

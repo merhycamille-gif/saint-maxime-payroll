@@ -611,7 +611,7 @@ if ($form === 'mof_r3') {
             }
         }
         if (!$okR3) { @unlink($tmpR3); http_response_code(500); die('تعذّر توليد ملف الإكسل — القالب mof_r3_excel.xlsx غير متوفر'); }
-        $fnR3 = 'R3_' . preg_replace('/[^\p{L}\p{N}_-]+/u', '_', trim(($emp['first_name_ar'] ?: $emp['first_name_fr']) . '_' . ($emp['last_name_ar'] ?: $emp['last_name_fr']))) . '.xlsx';
+        $fnR3 = 'R3_' . preg_replace('/[^\p{L}\p{N}_-]+/u', '_', empFullNameAr($emp)) . '.xlsx';
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="' . rawurlencode($fnR3) . '"; filename*=UTF-8\'\'' . rawurlencode($fnR3));
         header('Content-Length: ' . filesize($tmpR3));
@@ -813,7 +813,7 @@ if ($form === 'mof_r567') {
                     if ($gErr === '' && $sets4) {
                         $vals4[] = $eid4;
                         $db->prepare('UPDATE employees SET ' . implode(',', $sets4) . ' WHERE id=?')->execute($vals4);
-                        $gMsg = trim((($tgt4['first_name_ar'] ?? '') ?: ($tgt4['first_name_fr'] ?? '')) . ' ' . (($tgt4['last_name_ar'] ?? '') ?: ($tgt4['last_name_fr'] ?? '')));
+                        $gMsg = empFullNameAr($tgt4);
                     } elseif ($gErr === '') $gErr = 'ما في شي مختار للحفظ';
                 }
             }
@@ -850,7 +850,7 @@ if ($form === 'mof_r567') {
         $fixRows = []; $fixSeen = []; // صفوف التصحيح المباشر: موظف واحد بصفّ واحد مهما تعدّدت خاناته
         foreach ($empRows as $r2) {
             $e2 = $r2['e'];
-            $nm2 = trim(($e2['first_name_ar'] ?: $e2['first_name_fr']) . ' ' . ($e2['last_name_ar'] ?: $e2['last_name_fr']));
+            $nm2 = empFullNameAr($e2);
             $pc0 = count($probs);
             // 🔴 رقم المالية إلزامي: ماكرو الوزارة يقف عند أول صف بلا رقم فيسقط هو ومن بعده
             if (preg_replace('/\D/', '', (string)($e2['finance_ministry_number'] ?? '')) === '') {
@@ -891,7 +891,7 @@ if ($form === 'mof_r567') {
         }
         foreach ($leavers as $le2) {
             if (preg_replace('/\D/', '', (string)($le2['finance_ministry_number'] ?? '')) === '') {
-                $nm3 = trim((($le2['first_name_ar'] ?? '') ?: ($le2['first_name_fr'] ?? '')) . ' ' . (($le2['last_name_ar'] ?? '') ?: ($le2['last_name_fr'] ?? '')));
+                $nm3 = empFullNameAr($le2);
                 $probs[] = [$nm3, 'رقم المالية — تارك (ر7)', '(فارغ)'];
                 if (!isset($fixSeen[(int)$le2['id']])) {
                     $fixSeen[(int)$le2['id']] = 1;
@@ -1060,7 +1060,7 @@ JS
         $R = 13 + $j;
         $left2 = leftDateOfFor($le2, 'finance') ?: ($fy . '-12-31'); // 🚪 ترك المالية (أو من الكل)
         $nm3 = preg_replace('/\s+/', ' ', trim(($le2['first_name_ar'] ?? '') . ' ' . ($le2['father_name_ar'] ?? '') . ' ' . ($le2['last_name_ar'] ?? '')));
-        if ($nm3 === '') $nm3 = trim(($le2['first_name_fr'] ?? '') . ' ' . ($le2['last_name_fr'] ?? ''));
+        if ($nm3 === '') $nm3 = empFullNameFr($le2);
         $r7c += [
             'A' . $R => $nm3,
             'B' . $R => preg_replace('/\D/', '', (string)($le2['finance_ministry_number'] ?? '')),
@@ -1179,7 +1179,7 @@ if (in_array($form, ['mof_r5', 'mof_r10', 'mof_r6'], true)) {
             'F44' => $fd ?: '', 'F45' => $other ?: '',
             'I48' => $net350, 'I49' => $tax,
         ];
-        $nm = trim(($emp['first_name_ar'] ?: $emp['first_name_fr']) . '_' . ($emp['last_name_ar'] ?: $emp['last_name_fr']));
+        $nm = empFullNameAr($emp);
         if ($isXlsx) {
             $cells = $common;
             $cells['C13'] = $from ? $serial($from) : '';
@@ -1334,7 +1334,7 @@ if ($form === 'cnss_work_attestation') {
     // الاسم الثلاثي بالعربي (الاسم + اسم الأب + الشهرة)، fallback للفرنسي
     $name = trim(($emp['first_name_ar'] ?? '') . ' ' . ($emp['father_name_ar'] ?? '') . ' ' . ($emp['last_name_ar'] ?? ''));
     $name = preg_replace('/\s+/', ' ', $name);
-    if ($name === '') $name = trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? ''));
+    if ($name === '') $name = empFullNameFr($emp);
 
     $cells = [
         'B4' => $esch['name_ar'] ?? '',
@@ -1508,7 +1508,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
 
     // الاسم والأهل والولادة والسجل
     $name = preg_replace('/\s+/', ' ', trim(($emp['first_name_ar'] ?? '') . ' ' . ($emp['father_name_ar'] ?? '') . ' ' . ($emp['last_name_ar'] ?? '')));
-    if ($name === '') $name = trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? ''));
+    if ($name === '') $name = empFullNameFr($emp);
     $first  = trim((string)($emp['first_name_ar'] ?? '')) ?: trim((string)($emp['first_name_fr'] ?? ''));
     $last   = trim((string)($emp['last_name_ar'] ?? ''))  ?: trim((string)($emp['last_name_fr'] ?? ''));
     $father = trim((string)($emp['father_name_ar'] ?? ''));

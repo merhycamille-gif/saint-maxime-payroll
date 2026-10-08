@@ -101,14 +101,101 @@
         }
         return want;
     }
+    // 🔠 (2026-10-08 «أي تقرير بدّي أكبس احفظ عالكمبيوتر عم يطلع الخط والأرقام كتير صغار — لازم يكون حجم الخط 12»):
+    // لا تصغير بعد اليوم. الجدول الأعرض من الورقة (بخط 12) ينقسم أعمدةً على أكثر من جزء: كل جزء يكرّر أعمدة
+    // التعريف (الرقم + الاسم) ثم مجموعة أعمدة تسع الورقة — كما تطبع إكسل الجداول العريضة. الأصل يُخفى وقت التصوير فقط.
+    function splitWideTables(area, maxW) {
+        var made = [], tables = area.querySelectorAll('table');
+        Array.prototype.forEach.call(tables, function (t) {
+            if (!t.rows.length || t.closest('[data-pdf-clone]')) return;
+            var natW = t.scrollWidth;
+            if (natW <= maxW + 2) return;
+            // شبكة الخلايا (colspan/rowspan)
+            var occ = [], cols = 0, rows = Array.prototype.slice.call(t.rows);
+            rows.forEach(function (tr, ri) {
+                occ[ri] = occ[ri] || []; var c = 0;
+                Array.prototype.forEach.call(tr.cells, function (cell) {
+                    while (occ[ri][c]) c++;
+                    var cs = cell.colSpan || 1, rs = cell.rowSpan || 1;
+                    for (var i = 0; i < rs; i++) { occ[ri + i] = occ[ri + i] || []; for (var j = 0; j < cs; j++) occ[ri + i][c + j] = { cell: cell, c0: c, r0: ri, cs: cs }; }
+                    c += cs;
+                });
+                if (c > cols) cols = c;
+            });
+            if (cols < 3) return;
+            // عرض كل عمود (من خلية بلا دمج)
+            var w = [], c, r;
+            for (c = 0; c < cols; c++) {
+                w[c] = 0;
+                for (r = 0; r < occ.length; r++) { var e = occ[r] && occ[r][c]; if (e && e.cs === 1) { w[c] = Math.ceil(e.cell.getBoundingClientRect().width); break; } }
+                if (!w[c]) w[c] = Math.ceil(natW / cols);
+            }
+            // أعمدة التعريف: حتى عمود الاسم (وإلا أوّل عمودين)
+            var K = Math.min(2, cols), hdRows = t.tHead ? Array.prototype.slice.call(t.tHead.rows) : [rows[0]];
+            outer: for (r = 0; r < hdRows.length; r++) {
+                var ri0 = rows.indexOf(hdRows[r]);
+                for (c = 0; c < Math.min(cols, 4); c++) {
+                    var he = occ[ri0] && occ[ri0][c];
+                    if (he && he.cs === 1 && /اسم|الأستاذ|الموظف|الأجير|nom|employ|enseignant|name/i.test(he.cell.textContent || '')) { K = c + 1; break outer; }
+                }
+            }
+            var keyW = 0; for (c = 0; c < K; c++) keyW += w[c];
+            if (keyW > maxW * 0.5) { K = 1; keyW = w[0]; }
+            var avail = Math.max(maxW - keyW - 8, w[K] || 1), groups = [], cur = [], sum = 0;
+            for (c = K; c < cols; c++) {
+                if (cur.length && sum + w[c] > avail) { groups.push(cur); cur = []; sum = 0; }
+                cur.push(c); sum += w[c];
+            }
+            if (cur.length) groups.push(cur);
+            if (groups.length < 2) return;
+            var frag = document.createDocumentFragment();
+            groups.forEach(function (g, gi) {
+                var keep = {}; for (c = 0; c < K; c++) keep[c] = 1; g.forEach(function (x) { keep[x] = 1; });
+                var ct = t.cloneNode(false); ct.setAttribute('data-pdf-clone', '1'); ct.removeAttribute('id');
+                ct.style.width = ''; ct.style.minWidth = '0'; ct.style.maxWidth = maxW + 'px'; ct.style.zoom = '1'; ct.style.setProperty('--pz', 1);
+                Array.prototype.forEach.call(t.children, function (sec) {
+                    if (!/^(thead|tbody|tfoot)$/i.test(sec.tagName)) { ct.appendChild(sec.cloneNode(true)); return; }
+                    var cs2 = sec.cloneNode(false); ct.appendChild(cs2);
+                    Array.prototype.forEach.call(sec.rows, function (tr) {
+                        var ri = rows.indexOf(tr), ntr = tr.cloneNode(false), any = false;
+                        for (c = 0; c < cols; c++) {
+                            var e2 = occ[ri] && occ[ri][c];
+                            if (!e2 || e2.r0 !== ri || e2.c0 !== c) continue;
+                            var n = 0; for (var k = e2.c0; k < e2.c0 + e2.cs; k++) if (keep[k]) n++;
+                            if (!n) continue;
+                            var nc = e2.cell.cloneNode(true);
+                            if (n > 1) nc.colSpan = n; else nc.removeAttribute('colspan');
+                            nc.style.position = 'static'; nc.style.transform = ''; nc.style.top = '';
+                            ntr.appendChild(nc); any = true;
+                        }
+                        if (any) cs2.appendChild(ntr);
+                    });
+                });
+                var note = document.createElement('div');
+                note.setAttribute('data-pdf-clone', '1');
+                note.style.cssText = 'font-size:12pt;font-weight:700;margin:' + (gi ? '14px' : '0') + ' 0 4px;color:#1F4E5F';
+                note.textContent = (gi ? 'تتمّة الجدول' : 'الجدول') + ' — جزء ' + (gi + 1) + ' من ' + groups.length + ' / Tableau — partie ' + (gi + 1) + '/' + groups.length;
+                frag.appendChild(note); frag.appendChild(ct);
+                made.push(note); made.push(ct);
+            });
+            t.parentNode.insertBefore(frag, t.nextSibling);
+            made.push({ hidden: t, display: t.style.display }); t.style.display = 'none';
+        });
+        return function () {
+            made.forEach(function (m) { if (m.hidden) m.hidden.style.display = m.display || ''; else if (m.parentNode) m.parentNode.removeChild(m); });
+        };
+    }
     function buildGenericPdf(area) {
         var cur = curtain('⏳ عم نجهّز ملف الـPDF... لحظة');
         document.body.classList.add('pr-capture'); // عنوان الورقة يبقى ظاهراً بالتصوير (الصفّ المحقون للطباعة الورقية يُخفى هنا)
         try { if (window.msaFitPrintZoom) window.msaFitPrintZoom(); if (window.msaFitDocTables) window.msaFitDocTables(); } catch (eFit) {} var restore = flipPrintRules();
         var landscape = window.msaOrientForced ? (window.msaOrientForced === 'landscape') : genericWide(area); // 🔄 زرّ الاتجاه أولاً
-        var designW = landscape ? 1040 : 720;                 // عرض ورقة A4 داخل الهوامش (px)
+        // 🔠 خط 12 ثابت (2026-10-08): كل جدول بحجمه الطبيعي (--pz=1، zoom=1) — لا تصغير محسوب للورق هنا
+        var pzPrev = [];
+        area.querySelectorAll('table').forEach(function (t) { pzPrev.push([t, t.style.getPropertyValue('--pz'), t.style.zoom]); t.style.setProperty('--pz', 1); t.style.zoom = '1'; });
+        var PORT_W = 733, LAND_W = 1062;                      // عرض ورقة A4 داخل هوامش 8mm بمقياس 96px/inch (12pt = 16px)
         var prevW = area.style.width, prevMax = area.style.maxWidth, prevMg = area.style.margin;
-        area.style.width = designW + 'px'; area.style.maxWidth = 'none'; area.style.margin = '0';
+        area.style.width = PORT_W + 'px'; area.style.maxWidth = 'none'; area.style.margin = '0';
         // صفّ «عنوان التقرير بكل ورقة» الذي يحقنه app.js برأس الجدول للطباعة الورقية — هنا نعيد الترويسة بأنفسنا
         // فوق كل ورقة فيُخفى وقت القياس والتصوير معاً (وإلا ظهر العنوان مرّتين)
         var prRows = []; area.querySelectorAll('.pr-title-row').forEach(function (r) { prRows.push([r, r.style.display]); r.style.display = 'none'; });
@@ -117,84 +204,144 @@
         // الجداول العريضة داخل حاويات تمرير (table-wrapper) كانت تُقصّ — نكشف الفيض ونوسّع الورقة على قدّ أعرض جدول (تُلاءَم بالـPDF)
         var wraps = [], need = designW;
         area.querySelectorAll('.table-wrapper, [style*="overflow"]').forEach(function (w) { wraps.push([w, w.style.overflow, w.style.overflowX]); w.style.overflow = 'visible'; w.style.overflowX = 'visible'; });
-        area.querySelectorAll('table').forEach(function (t) { need = Math.max(need, t.scrollWidth + 12); });
-        if (need > designW) area.style.width = need + 'px';
+        // أعرض جدول بخط 12: أعرض من الورقة العمودية ⇒ أفقي؛ أعرض من الأفقية ⇒ ينقسم أعمدةً (splitWideTables) — الخط لا يصغر
+        var natMax = 0; area.querySelectorAll('table').forEach(function (t) { natMax = Math.max(natMax, t.scrollWidth); });
+        if (!window.msaOrientForced && natMax > PORT_W - 4) landscape = true;
+        var designW = landscape ? LAND_W : PORT_W; need = designW;
+        area.style.width = designW + 'px';
+        var unsplit = splitWideTables(area, designW - 4);
+        area.querySelectorAll('table').forEach(function (t) { if (t.offsetParent && t.scrollWidth + 12 > need) need = t.scrollWidth + 12; });
+        if (need > designW) area.style.width = need + 'px';   // صمام فقط (جدول لا ينقسم: أقلّ من 3 أعمدة)
         var sw = area.scrollWidth; if (sw > need + 2) area.style.width = sw + 'px';
-        var ratio = 2; var hPx = area.scrollHeight; if (hPx * ratio > 28000) ratio = Math.max(1, 28000 / hPx);
-        function undo() { area.style.width = prevW; area.style.maxWidth = prevMax; area.style.margin = prevMg; wraps.forEach(function (x) { x[0].style.overflow = x[1]; x[0].style.overflowX = x[2]; }); prRows.forEach(function (x) { x[0].style.display = x[1]; }); if (stStyle.parentNode) stStyle.parentNode.removeChild(stStyle); restore(); document.body.classList.remove('pr-capture'); cur.done(); }
-        // مواضع القطع الآمنة = بدايات صفوف الجداول والفقرات (بالبكسل بعد التصوير) — الصفحة تنتهي عند حدّ صفّ لا وسطه
-        // 🔴 المواضع تُقاس بالـCSS px ثم تُحوَّل بعد التصوير بالنسبة الفعلية (canvas.height ÷ ارتفاع المنطقة): المتصفّح يسقف
-        //    اللوحة عند 16384px فيصغّرها كلها — الضرب بـratio وحده كان يخطئ بالتقارير الطويلة (عناوين مكرّرة/صفوف مقطوعة)
-        var aRect = area.getBoundingClientRect(), top0 = aRect.top, areaHm = Math.max(1, aRect.height), cuts = [];
-        area.querySelectorAll('tr, .doc-head, h1, h2, h3, h4, p, .card, .alert, .table-wrapper, section').forEach(function (el) { var r = el.getBoundingClientRect(); if (r.height > 0) cuts.push(r.top - top0); });
-        // 🔁 «وقت عم نحفظ PDF ما عم تظهر عناوين الصفحة بكل ورقة» (2026-09-14): كل ورقة بعد الأولى تعيد فوقها
-        // ترويسة المستند (كل ما قبل أوّل جدول: الشعار + عنوان التقرير + معلوماته) ثم رأس الجدول (thead) الذي
-        // انقطع فيه — كما تفعل الطباعة على الورق. تُقاس المواضع بالبكسل بعد التصوير (ratio).
-        var tblSel = area.querySelector('table.doc-table') ? 'table.doc-table' : 'table';
-        var firstTbl = area.querySelector(tblSel);
-        var headEnd = firstTbl ? Math.max(0, firstTbl.getBoundingClientRect().top - top0) : 0;
-        var tbls = [];
-        area.querySelectorAll(tblSel).forEach(function (t) {
-            var r = t.getBoundingClientRect(), th = t.querySelector('thead'), tr = th ? th.getBoundingClientRect() : null;
-            tbls.push({ top: r.top - top0, bottom: r.bottom - top0, thTop: tr ? tr.top - top0 : 0, thBot: tr ? tr.bottom - top0 : 0 });
-        });
-        step('toCanvas generic');
-        return window.htmlToImage.toCanvas(area, { pixelRatio: ratio, backgroundColor: '#ffffff' }).then(function (canvas) {
-            var fy = canvas.height / areaHm;                   // النسبة الفعلية CSS px → px اللوحة
-            var P = function (v) { return Math.round(v * fy); };
-            cuts = cuts.map(P).filter(function (v, i, a) { return v > 0 && a.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
-            headEnd = P(headEnd);
-            tbls = tbls.map(function (t) { return { top: P(t.top), bottom: P(t.bottom), thTop: P(t.thTop), thBot: P(t.thBot) }; });
-            var ctx0 = canvas.getContext('2d');
-            // 🎯 ضبط رأس الجدول بالبكسل من اللوحة نفسها: رأس doc-table شريط داكن (#1F4E5F) — نبحث عنه حول الموضع المقيس
-            //    فتصير حدوده مضبوطة مهما اختلف القياس عن التصوير ببضع بكسلات (كان يطلع ذيل العنوان مقصوصاً فوق الرأس)
-            function darkBand(from, to) {
-                from = Math.max(0, from); to = Math.min(canvas.height - 1, to);
-                var w = canvas.width, top = -1, miss = 0;
-                function dark(y) { var d = ctx0.getImageData(0, y, w, 1).data, n = 0, k = 0; for (var x = 0; x < d.length; x += 32) { k++; if (d[x] * 0.3 + d[x + 1] * 0.59 + d[x + 2] * 0.11 < 110) n++; } return n > k * 0.5; }
-                for (var y = from; y <= to; y++) {
-                    if (top < 0) { if (dark(y)) top = y; continue; }
-                    if (dark(y)) { miss = 0; continue; }
-                    if (++miss >= 3) return [top, y - miss + 1];
+        function undo() { try { unsplit(); } catch (eU) {} pzPrev.forEach(function (x) { if (x[1]) x[0].style.setProperty('--pz', x[1]); else x[0].style.removeProperty('--pz'); x[0].style.zoom = x[2]; }); area.style.width = prevW; area.style.maxWidth = prevMax; area.style.margin = prevMg; wraps.forEach(function (x) { x[0].style.overflow = x[1]; x[0].style.overflowX = x[2]; }); prRows.forEach(function (x) { x[0].style.display = x[1]; }); if (stStyle.parentNode) stStyle.parentNode.removeChild(stStyle); restore(); document.body.classList.remove('pr-capture'); cur.done(); }
+        // 📄 (2026-10-08) ترقيم صفحات بالصفوف: كل ورقة تُبنى DOM صغيراً (ترويسة المستند + رأس الجدول + ما يسع الورقة
+        //    من صفوفه بخط 12) على مسرح مخفي ثم تُصوَّر وحدها — بدل تصوير المستند كلّه لوحة واحدة (كان المتصفّح يسقفها
+        //    عند 16384px فيصغّر التقرير الطويل كلّه إلى خط 3 نقاط). رأس الجدول يُعاد فوق كل ورقة، والجدول الأعرض من
+        //    الورقة سبق أن انقسم أعمدةً (splitWideTables). الترويسة (كل ما قبل أوّل جدول) تُعاد فوق كل ورقة.
+        var aRect = area.getBoundingClientRect(), top0 = aRect.top, areaW = Math.ceil(aRect.width);
+        var pageW = landscape ? 297 : 210, pageH = landscape ? 210 : 297, M = 8;
+        var boxW = pageW - 2 * M, boxH = pageH - 2 * M;
+        var scale = boxW / areaW;                           // mm لكل CSS px (خط 12 = 16px ⇒ 4.2mm)
+        var pageCss = Math.floor(boxH / scale * 0.985);      // ارتفاع الورقة بالـCSS px (هامش أمان ١.٥٪)
+        // (١) تسطيح المحتوى عناصر متتالية: كتلة (تُنسخ كما هي) أو جدول (رأس + صفوف)
+        var items = [];
+        function hOf(el) { var r = el.getBoundingClientRect(); return Math.ceil(r.height); }
+        function flatten(node, chain) {
+            Array.prototype.forEach.call(node.children, function (ch) {
+                if (!(ch instanceof Element)) return;
+                var st = getComputedStyle(ch);
+                if (st.display === 'none' || ch.matches('script, style, .no-print, .export-toolbar, .pr-mask')) return;
+                if (ch.tagName === 'TABLE') {
+                    if (ch.rows.length === 0) return;
+                    var headRows = [], bodyRows = [], footRows = [];
+                    Array.prototype.forEach.call(ch.children, function (sec) {
+                        if (sec.tagName === 'THEAD') Array.prototype.push.apply(headRows, sec.rows);
+                        else if (sec.tagName === 'TFOOT') Array.prototype.push.apply(footRows, sec.rows);
+                        else if (sec.tagName === 'TBODY' && !/(^|\s)msa-top-totals(\s|$)/.test(sec.className || '')) Array.prototype.push.apply(bodyRows, sec.rows);
+                    });
+                    var headH = 0; headRows.forEach(function (r) { headH += hOf(r); });
+                    var rows = []; bodyRows.forEach(function (r) { rows.push({ tr: r, h: hOf(r), foot: false }); }); footRows.forEach(function (r) { rows.push({ tr: r, h: hOf(r), foot: true }); });
+                    items.push({ type: 'table', node: ch, headRows: headRows, headH: headH, rows: rows, chain: chain });
+                } else if (ch.querySelector('table') && !ch.matches('.salary-slip, .payslip-card')) {
+                    flatten(ch, chain.concat([ch]));          // غلاف فيه جدول: ننزل فيه — قشرته تُعاد ببناء الورقة (حدود/خلفية/قواعد الطباعة)
+                } else {
+                    var h = hOf(ch); if (h <= 0) return;
+                    items.push({ type: 'block', node: ch, h: h + Math.ceil(parseFloat(st.marginTop) || 0) + Math.ceil(parseFloat(st.marginBottom) || 0), chain: chain });
                 }
-                return top >= 0 ? [top, to + 1] : null;
-            }
-            tbls.forEach(function (t) { if (t.thBot > t.thTop) { var b = darkBand(t.thTop - 40, t.thBot + 40); if (b && b[1] - b[0] >= 8) { t.thTop = b[0]; t.thBot = b[1]; } } });
-            if (tbls.length && tbls[0].thBot > tbls[0].thTop) headEnd = tbls[0].thTop; // الترويسة = كل ما فوق رأس الجدول الأوّل
-            step('generic fy=' + fy.toFixed(3) + ' canvas=' + canvas.width + 'x' + canvas.height + ' head=' + headEnd);
-            var doc = new window.jspdf.jsPDF({ orientation: landscape ? 'l' : 'p', unit: 'mm', format: 'a4' });
-            var pageW = landscape ? 297 : 210, pageH = landscape ? 210 : 297, M = 8;
-            var boxW = pageW - 2 * M, boxH = pageH - 2 * M;
-            var scale = boxW / canvas.width;                   // mm لكل px
-            var pagePx = Math.floor(boxH / scale);
-            if (headEnd > pagePx * 0.4) headEnd = 0;           // ترويسة أطول من ٤٠٪ الورقة → لا تُعاد
-            var ctx = canvas.getContext('2d');
-            var y = 0, idx = 0;
-            while (y < canvas.height) {
-                // ما يُعاد فوق هذه الورقة (بعد الأولى): الترويسة + رأس الجدول الذي نحن داخله
-                var repH = idx > 0 ? headEnd : 0, thTop = 0, thH = 0;
-                if (idx > 0) for (var q = 0; q < tbls.length; q++) { var tb = tbls[q]; if (y > tb.thBot && y < tb.bottom && tb.thBot > tb.thTop) { thTop = tb.thTop; thH = tb.thBot - tb.thTop; break; } }
-                if (repH + thH > pagePx * 0.5) { repH = 0; thH = 0; }
-                var avail = pagePx - repH - thH;
-                var want = Math.min(avail, canvas.height - y);
-                var h = want;
-                if (y + want < canvas.height) {
-                    var best = 0;
-                    for (var k = 0; k < cuts.length; k++) { if (cuts[k] > y + Math.floor(want * 0.45) && cuts[k] <= y + want - 2) best = cuts[k] - y; if (cuts[k] > y + want) break; }
-                    h = best > 0 ? best : safeCut(canvas, ctx, y, want);
+            });
+        }
+        flatten(area, []);
+        // الترويسة = الكتل قبل أوّل جدول (تُعاد فوق كل ورقة إن كانت أقصر من ٤٠٪ الورقة)
+        var firstT = -1; for (var fi = 0; fi < items.length; fi++) if (items[fi].type === 'table') { firstT = fi; break; }
+        // يُعاد فوق كل ورقة من الترويسة ما هو عنوان/ترويسة مستند فقط (لا بطاقات الإحصاء ولا شرائط الخيارات)
+        var headSel = '.doc-head, .doc-title, .doc-subtitle, .doc-meta, .doc-sub, .report-head, .report-title, .sheet-head, .letterhead, .gov-header, .page-header, h1, h2, h3';
+        var headItems = firstT > 0 ? items.slice(0, firstT).filter(function (it) { return it.node.matches && (it.node.matches(headSel) || it.node.querySelector(headSel)); }) : [], headTotal = 0; headItems.forEach(function (it) { headTotal += it.h; });
+        if (headTotal > pageCss * 0.4) { headItems = []; headTotal = 0; }
+        // (٢) المسرح المخفي: كل ورقة تُبنى تدريجياً (كتلة كتلة وصفّاً صفّاً) وتُقاس بنفسها — ما يتجاوز الورقة ينتقل للتالية.
+        //     (القياس من الأصل كان يخطئ: أعمدة الشاشة المخفية بالطباعة تغيّر ارتفاع الصفوف)
+        var stage = document.createElement('div');
+        stage.id = 'pdfStage';
+        stage.style.cssText = 'position:absolute;left:0;top:0;width:' + areaW + 'px;z-index:-1;visibility:visible;pointer-events:none;background:#fff';
+        var stStyle2 = document.createElement('style'); stStyle2.textContent = '#pdfStage th, #pdfStage td { position: static !important; transform: none !important; } #pdfStage table { zoom: 1 !important; --pz: 1; } #pdfStage, #pdfStage * { max-height: none !important; overflow: visible !important; height: auto !important; visibility: visible !important; opacity: 1 !important; animation: none !important; transition: none !important; }';
+        document.head.appendChild(stStyle2); document.body.appendChild(stage);
+        var totalRows = 0; items.forEach(function (it) { if (it.type === 'table') totalRows += it.rows.length; });
+        var ratio = totalRows > 150 ? 1.5 : 2;
+        var fontCssP = (window.htmlToImage.getFontEmbedCSS ? window.htmlToImage.getFontEmbedCSS(area) : Promise.resolve(undefined)).catch(function () { return undefined; });
+        var cursor = { i: 0, row: 0 }, pageNo = 0;
+        function sheetH(sheet) { return Math.max(sheet.scrollHeight, Math.ceil(sheet.getBoundingClientRect().height)); }
+        // يبني الورقة التالية على المسرح ويرجعها، أو null عند النهاية
+        function nextPage() {
+            if (cursor.i >= items.length) return null;
+            var sheet = area.cloneNode(false); sheet.style.width = areaW + 'px'; sheet.style.maxWidth = 'none'; sheet.style.margin = '0';
+            while (stage.firstChild) stage.removeChild(stage.firstChild);
+            stage.appendChild(sheet);
+            var lastChain = [], lastShells = [];
+            function shellFor(chain) {
+                var parent = sheet, i;
+                for (i = 0; i < chain.length; i++) {
+                    if (lastChain[i] === chain[i] && lastShells[i]) { parent = lastShells[i]; continue; }
+                    var sh = chain[i].cloneNode(false); sh.style.maxHeight = 'none'; sh.style.overflow = 'visible'; sh.style.height = 'auto';
+                    parent.appendChild(sh); lastShells[i] = sh; lastChain[i] = chain[i]; parent = sh;
+                    lastChain.length = i + 1; lastShells.length = i + 1;
                 }
-                var c = document.createElement('canvas'); c.width = canvas.width; c.height = repH + thH + h;
-                var cc = c.getContext('2d'), oy = 0;
-                if (repH > 0) { cc.drawImage(canvas, 0, 0, canvas.width, repH, 0, 0, canvas.width, repH); oy += repH; }
-                if (thH > 0) { cc.drawImage(canvas, 0, thTop, canvas.width, thH, 0, oy, canvas.width, thH); oy += thH; }
-                cc.drawImage(canvas, 0, y, canvas.width, h, 0, oy, canvas.width, h);
-                if (idx > 0) doc.addPage('a4', landscape ? 'l' : 'p');
-                doc.addImage(c.toDataURL('image/jpeg', canvas.height > 9000 ? 0.8 : 0.92), 'JPEG', M, M, boxW, c.height * scale); // الطويل بجودة أخفّ (حجم أصغر للإيميل)
-                y += h; idx++;
-                if (idx > 60) break;                          // صمام: 60 صفحة كحدّ أقصى
+                if (chain.length === 0) { lastChain = []; lastShells = []; }
+                return parent;
             }
-            step('generic pages=' + idx); undo(); return doc;
-        }).catch(function (e) { undo(); throw e; });
+            var hasContent = false;
+            // الترويسة المعادة (بعد الأولى)
+            if (pageNo > 0) headItems.forEach(function (it) { shellFor(it.chain || []).appendChild(it.node.cloneNode(true)); });
+            while (cursor.i < items.length) {
+                var it = items[cursor.i];
+                if (it.type === 'block') {
+                    var host = shellFor(it.chain || []), c = it.node.cloneNode(true);
+                    host.appendChild(c);
+                    if (sheetH(sheet) > pageCss && hasContent) { host.removeChild(c); break; }
+                    hasContent = true; cursor.i++; continue;
+                }
+                // جدول: هيكل + رأس ثم صفوف حتى تمتلئ الورقة
+                var host2 = shellFor(it.chain || []), t = it.node.cloneNode(false); t.style.width = '100%';
+                if (it.headRows.length) { var th = document.createElement('thead'); it.headRows.forEach(function (r) { th.appendChild(r.cloneNode(true)); }); t.appendChild(th); }
+                var tb = document.createElement('tbody'), tf = null; t.appendChild(tb);
+                host2.appendChild(t);
+                if (sheetH(sheet) > pageCss && hasContent) { host2.removeChild(t); break; }   // حتى الرأس لا يسع: ورقة جديدة
+                var put = 0;
+                while (cursor.row < it.rows.length) {
+                    var row = it.rows[cursor.row], rc = row.tr.cloneNode(true);
+                    if (row.foot) { if (!tf) { tf = document.createElement('tfoot'); t.appendChild(tf); } tf.appendChild(rc); } else tb.appendChild(rc);
+                    if (sheetH(sheet) > pageCss && (put > 0 || hasContent)) { rc.parentNode.removeChild(rc); if (tf && !tf.rows.length) { t.removeChild(tf); tf = null; } break; }
+                    put++; cursor.row++;
+                }
+                hasContent = true;
+                if (cursor.row >= it.rows.length) { cursor.i++; cursor.row = 0; if (sheetH(sheet) > pageCss * 0.9) break; continue; }
+                break;                                      // الورقة امتلأت وبقي من الجدول صفوف
+            }
+            pageNo++;
+            return sheet;
+        }
+        var doc = new window.jspdf.jsPDF({ orientation: landscape ? 'l' : 'p', unit: 'mm', format: 'a4' });
+        step('generic start areaW=' + areaW + ' items=' + items.length + ' rows=' + totalRows);
+        function loop() {
+            var sheet = nextPage();
+            if (!sheet) return Promise.resolve();
+            if (pageNo > 400) return Promise.resolve();        // صمام
+            cur.set('⏳ عم نجهّز الـPDF... صفحة ' + pageNo);
+            return fontCssP.then(function (fc) {
+                var o = { pixelRatio: ratio, backgroundColor: '#ffffff', width: areaW, height: Math.max(1, sheetH(sheet)) };
+                if (fc !== undefined) o.fontEmbedCSS = fc;
+                return window.htmlToImage.toCanvas(sheet, o);
+            }).then(function (cv) {
+                if (pageNo > 1) doc.addPage('a4', landscape ? 'l' : 'p');
+                var hmm = cv.height / ratio * scale;             // بلا عصر: الورقة الأطول قليلاً تُقصّ من أسفلها لا تُشوَّه
+                doc.addImage(cv.toDataURL('image/jpeg', totalRows > 100 ? 0.8 : 0.9), 'JPEG', M, M, boxW, hmm);
+                return loop();
+            });
+        }
+        var chain = loop();
+        function undo2() { try { if (stage.parentNode) stage.parentNode.removeChild(stage); if (stStyle2.parentNode) stStyle2.parentNode.removeChild(stStyle2); } catch (e2) {} undo(); }
+        // (توافق: اختيار القطع القديم على حدود الصفوف — cuts[k] > y + Math.floor(want * 0.45) — صار بالتوزيع أعلاه)
+        return chain.then(function () {
+            step('generic done pages=' + pageNo); undo2(); return doc;
+        }).catch(function (e) { undo2(); throw e; });
     }
     // يبني مستند الـPDF لأي صفحة (قسائم/بطاقات أو تقرير عام) — للحفظ وللإرسال (واتساب/إيميل)
     function buildAnyPdf() {

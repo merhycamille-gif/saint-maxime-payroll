@@ -246,7 +246,7 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
         if (in_array((int)$r['id'], $excluded, true)) continue;
         $row = [
             'id' => (int)$r['id'], 'key' => 'e' . (int)$r['id'], 'school' => (string)($r['school_name'] ?? ''),
-            'name' => trim((string)$r['first_name_ar'] . ' ' . (string)$r['father_name_ar'] . ' ' . (string)$r['last_name_ar']) ?: trim($r['first_name_fr'] . ' ' . $r['last_name_fr']),
+            'name' => trim((string)$r['first_name_ar'] . ' ' . (string)$r['father_name_ar'] . ' ' . (string)$r['last_name_ar']) ?: empFullNameFr($r),
             'role' => meheRoleText($r), 'qual' => meheQualText($r['diploma'] ?? ''), 'level' => meheLevelText($r),
             'cadre_date' => ($tD = shownTitularizationDate($r)) ? formatDate($tD, 'j/n/Y') : '',
             'start_date' => ($hD = shownHireDate($r)) ? formatDate($hD, 'j/n/Y') : '',

@@ -227,8 +227,8 @@ table.fa-table { width:100%; border-collapse:collapse; font-size:13px; }
                 <tbody>
                 <tr id="faNoRows"<?= ($rows && $categories) ? ' style="display:none"' : '' ?>><td colspan="14" style="padding:24px;color:#64748b"><?= !$categories ? '☐ ما في ولا فئة مشيّكة — أشّر الملاك أو المتعاقدين أو الموظفين فوق / Cochez une catégorie' : 'لا موظفين ضمن هذا النطاق / Aucun employé' ?></td></tr>
                 <?php $i = 0; foreach ($rows as $r): $i++; $id = (int)$r['id']; $elig = familyAllowanceEligible($r);
-                    $name = trim(($r['first_name_ar'] ?: $r['first_name_fr']) . ' ' . ($r['last_name_ar'] ?: $r['last_name_fr']));
-                    $nameFr = trim(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? ''));
+                    $name = empFullNameAr($r);
+                    $nameFr = empFullNameFr($r);
                     $cur = familyAllowanceForMonth($r, $refM, $refY);
                     $notes = [];
                     if (!$elig) $notes[] = 'متعاقد: لا يستحقّ';

@@ -332,7 +332,7 @@ include __DIR__ . '/../includes/header.php';
 // موظفو النطاق للمعاينة
 $preview = [];
 if ($hasScope) {
-    $q = $db->prepare("SELECT e.id, e.school_id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.employee_type,
+    $q = $db->prepare("SELECT e.id, e.school_id, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr, e.employee_type,
                               e.days_per_week, e.transport_daily_amount, e.transport_daily_currency,
                               (SELECT GROUP_CONCAT(CONCAT(b.bonus_type,':',b.amount,IF(b.value_type='percent','%',''),b.currency) SEPARATOR ' | ')
                                FROM employee_bonuses b WHERE b.employee_id = e.id AND b.school_year = ? AND b.is_active = 1) AS bonuses
@@ -518,7 +518,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 foreach ($op['stats'] as $ck => &$byT) foreach ($byT as $tk => &$S) { arsort($S['pct']); arsort($S['amt']); }
                 unset($byT, $S);
                 // أدنى وأعلى أساس (بعد التدرّج) لكل فئة — من آخر راتب مخزّن بالسنة — للمثال الحيّ بالنسبة
-                $bq = $db->query("SELECT e.id, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr) fn, COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr) ln,
+                $bq = $db->query("SELECT e.id, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr) fn, COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr) ln, e.father_name_ar, e.father_name_fr,
                                          (SELECT ms.base_plus_echelon_lbp FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = " . $db->quote($schoolYear) . "
                                             AND ms.base_plus_echelon_lbp > 0 ORDER BY ms.year DESC, ms.month DESC LIMIT 1) b
                                   FROM employees e WHERE e.id IN ($in)")->fetchAll(PDO::FETCH_ASSOC);
@@ -830,7 +830,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
             <table class="table ba-editor" id="indivTable" style="font-size:13px;min-width:1240px">
                 <thead><tr><th>#</th><th>الاسم</th><th>➕ الأجر الإضافي <small>(٪ + ل.ل + $)</small></th><th>💰 مكافأة ومساعدة <small>(٪ + ل.ل + $)</small></th><th>🚌 نقل شهري <small>(٪ + ل.ل + $)</small></th></tr></thead>
                 <tbody>
-                <?php $ri = 0; $lastEty = null; foreach ($preview as $pr): $ri++; $eid = (int)$pr['id']; $nm = trim(($pr['first_name_ar'] ?: $pr['first_name_fr']) . ' ' . ($pr['last_name_ar'] ?: $pr['last_name_fr']));
+                <?php $ri = 0; $lastEty = null; foreach ($preview as $pr): $ri++; $eid = (int)$pr['id']; $nm = empFullNameAr($pr);
                       if ($pr['employee_type'] !== $lastEty): $lastEty = $pr['employee_type']; ?>
                 <tr data-ety="<?= e($lastEty) ?>" class="ind-cat-row"><td colspan="5" style="background:#f1f5f9;font-weight:800;color:#1F4E5F"><?= e($catLblI[$lastEty] ?? $lastEty) ?></td></tr>
                 <?php endif; ?>
@@ -1121,7 +1121,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
             <thead><tr><th>#</th><?php if ($scopeAll): ?><th>École / المدرسة</th><?php endif; ?><th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>Jours/sem. / أيام/أسبوع</th><th>Transport journalier / نقل يومي</th><th>Transport mensuel (calculé) / نقل شهري (محسوب)</th><th>Primes actuelles / المكافآت الحالية</th></tr></thead>
             <tbody>
             <?php $i=1; $baTot=0.0; foreach ($preview as $p):
-                $nm = trim(($p['first_name_ar'] ?: $p['first_name_fr']).' '.($p['last_name_ar'] ?: $p['last_name_fr']));
+                $nm = empFullNameAr($p);
                 $td = (float)$p['transport_daily_amount']; $days = (float)$p['days_per_week'];
                 $monthly = $td * $days * 4; if (($p['transport_daily_currency'] ?? 'LBP')==='USD') $monthly = usdToLbp($monthly, $exchangeRate);
                 $baTot += $monthly;

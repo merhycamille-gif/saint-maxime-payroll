@@ -325,6 +325,7 @@ class ReportTable
     private $colWidths = [];
     private $school = null;
     private $period = '';
+    private $dir = 'rtl';   // ↔️ (2026-10-08) اتجاه الورقة/المستند: عربي rtl (من اليمين) · فرنسي/لوائح الدولة ltr (من الشمال)
 
     public function __construct($title, $landscape = true)
     {
@@ -335,9 +336,12 @@ class ReportTable
     public function schoolHeader($school) { $this->school = $school; return $this; }
     public function period($p) { $this->period = $p; return $this; }
     public function widths($w) { $this->colWidths = $w; return $this; }
+    public function dir($d) { $this->dir = ($d === 'ltr') ? 'ltr' : 'rtl'; return $this; }
+    public function isRtl() { return $this->dir === 'rtl'; }
 
     public function head($cells) { $this->headers = array_values($cells); return $this; }
     public function row($cells) { $this->rows[] = ['type' => 'data', 'cells' => array_values($cells)]; return $this; }
+    public function headRow($cells) { $this->rows[] = ['type' => 'head', 'cells' => array_values($cells)]; return $this; } // رأس جدول ثانٍ بنفس الورقة (تصدير صفحة فيها عدّة جداول)
     public function totalRow($cells) { $this->rows[] = ['type' => 'total', 'cells' => array_values($cells)]; return $this; }
     public function sectionRow($label) { $this->rows[] = ['type' => 'section', 'cells' => [$label]]; return $this; }
 
@@ -353,6 +357,14 @@ class ReportTable
 
     private static function xa($s) { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_XML1, 'UTF-8'); }
 
+    /** اسم الورقة: إكسل يرفض [ ] : * ? / \ ويحدّه بـ31 حرفاً (كان «Rapports / التقارير» يفتح بإصلاح) */
+    private function sheetName()
+    {
+        $n = preg_replace('/[\[\]:*?\/\]+/u', '-', (string)$this->title);
+        $n = trim(preg_replace('/\s+/u', ' ', $n), " -'");
+        $n = mb_substr($n, 0, 28, 'UTF-8');
+        return $n !== '' ? $n : 'Sheet1';
+    }
     private function fileBase()
     {
         $t = preg_replace('/[\\\\\/:*?"<>|]+/', '_', $this->title);
@@ -409,6 +421,7 @@ class ReportTable
         // بيانات
         foreach ($this->rows as $r) {
             if ($r['type'] === 'section') $addRow($r['cells'], 8, 8, true);
+            elseif ($r['type'] === 'head') $addRow($r['cells'], 3, 3);
             elseif ($r['type'] === 'total') $addRow($r['cells'], 6, 7);
             else $addRow($r['cells'], 4, 5);
         }
@@ -433,7 +446,7 @@ class ReportTable
         $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             . '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'
-            . '<sheetViews><sheetView rightToLeft="1" workbookViewId="0" tabSelected="1">'
+            . '<sheetViews><sheetView rightToLeft="' . ($this->isRtl() ? '1' : '0') . '" workbookViewId="0" tabSelected="1">'
             . '<pane ySplit="' . $headerRow . '" topLeftCell="A' . ($headerRow + 1) . '" activePane="bottomLeft" state="frozen"/>'
             . '</sheetView></sheetViews>'
             . '<sheetFormatPr defaultRowHeight="16"/>'
@@ -460,7 +473,7 @@ class ReportTable
         $wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
             . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            . '<sheets><sheet name="' . self::xa(mb_substr($this->title, 0, 28, 'UTF-8')) . '" sheetId="1" r:id="rId1"/></sheets></workbook>';
+            . '<sheets><sheet name="' . self::xa($this->sheetName()) . '" sheetId="1" r:id="rId1"/></sheets></workbook>';
         $wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
             . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
@@ -485,11 +498,11 @@ class ReportTable
             . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             . '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.##"/></numFmts>'
             . '<fonts count="5">'
-            . '<font><sz val="11"/><name val="Arial"/></font>'                                  // 0 default
+            . '<font><sz val="12"/><name val="Arial"/></font>'                                  // 0 default — 🔠 خط 12 بكل المطبوعات
             . '<font><b/><sz val="15"/><color rgb="FF1E3A8A"/><name val="Arial"/></font>'        // 1 title
-            . '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>'        // 2 header white
-            . '<font><sz val="11"/><name val="Arial"/></font>'                                   // 3 data
-            . '<font><b/><sz val="11"/><name val="Arial"/></font>'                               // 4 bold
+            . '<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>'        // 2 header white
+            . '<font><sz val="12"/><name val="Arial"/></font>'                                   // 3 data
+            . '<font><b/><sz val="12"/><name val="Arial"/></font>'                               // 4 bold
             . '</fonts>'
             . '<fills count="5">'
             . '<fill><patternFill patternType="none"/></fill>'                                   // 0
@@ -509,11 +522,11 @@ class ReportTable
             . '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 1 title
             . '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 2 subheader
             . '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' // 3 col header
-            . '<xf numFmtId="0" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' // 4 data text
+            . '<xf numFmtId="0" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center"/></xf>' // 4 data text
             . '<xf numFmtId="164" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' // 5 data num
-            . '<xf numFmtId="0" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' // 6 total text
+            . '<xf numFmtId="0" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center"/></xf>' // 6 total text
             . '<xf numFmtId="164" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' // 7 total num
-            . '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' // 8 section
+            . '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center"/></xf>' // 8 section
             . '</cellXfs>'
             . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             . '</styleSheet>';
@@ -546,12 +559,13 @@ class ReportTable
         if ($this->headers) $tblRows .= $this->docxTr($this->headers, $cols, 'header');
         foreach ($this->rows as $r) {
             if ($r['type'] === 'section') $tblRows .= $this->docxTr([$r['cells'][0]], $cols, 'section', true);
+            elseif ($r['type'] === 'head') $tblRows .= $this->docxTr($r['cells'], $cols, 'header');
             elseif ($r['type'] === 'total') $tblRows .= $this->docxTr($r['cells'], $cols, 'total');
             else $tblRows .= $this->docxTr($r['cells'], $cols, 'data');
         }
 
         $tbl = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="' . $twDoc . '" w:type="dxa"/>'
-            . '<w:bidiVisual/>'
+            . ($this->isRtl() ? '<w:bidiVisual/>' : '')
             . '<w:tblBorders>'
             . '<w:top w:val="single" w:sz="4" w:color="777777"/><w:left w:val="single" w:sz="4" w:color="777777"/>'
             . '<w:bottom w:val="single" w:sz="4" w:color="777777"/><w:right w:val="single" w:sz="4" w:color="777777"/>'
@@ -560,8 +574,8 @@ class ReportTable
 
         // إعداد الصفحة A4 + اتجاه
         $sect = $this->landscape
-            ? '<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="567" w:right="567" w:bottom="567" w:left="567"/><w:bidi/></w:sectPr>'
-            : '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/><w:bidi/></w:sectPr>';
+            ? '<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="567" w:right="567" w:bottom="567" w:left="567"/>' . ($this->isRtl() ? '<w:bidi/>' : '') . '</w:sectPr>'
+            : '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/>' . ($this->isRtl() ? '<w:bidi/>' : '') . '</w:sectPr>';
 
         $doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
@@ -592,8 +606,8 @@ class ReportTable
         if (!empty($o['b'])) $rpr .= '<w:b/>';
         if (!empty($o['sz'])) $rpr .= '<w:sz w:val="' . (int)$o['sz'] . '"/>';
         if (!empty($o['color'])) $rpr .= '<w:color w:val="' . $o['color'] . '"/>';
-        $rpr .= '<w:rtl/></w:rPr>';
-        $ppr = '<w:pPr><w:bidi/>';
+        $rpr .= ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr>';
+        $ppr = '<w:pPr>' . ($this->isRtl() ? '<w:bidi/>' : '');
         if (!empty($o['align'])) $ppr .= '<w:jc w:val="' . $o['align'] . '"/>';
         if (!empty($o['fill'])) $ppr .= '<w:shd w:val="clear" w:fill="' . $o['fill'] . '"/>';
         $ppr .= '</w:pPr>';
@@ -610,11 +624,11 @@ class ReportTable
             $tc = '<w:tcPr><w:tcW w:w="0" w:type="auto"/><w:gridSpan w:val="' . $cols . '"/>';
             $tc .= $fill ? '<w:shd w:val="clear" w:fill="' . $fill . '"/>' : '';
             $tc .= '<w:vAlign w:val="center"/></w:tcPr>';
-            $tr .= '<w:tc>' . $tc . $this->docxCellPara($cells[0], $bold, $white, 'right') . '</w:tc>';
+            $tr .= '<w:tc>' . $tc . $this->docxCellPara($cells[0], $bold, $white, $this->isRtl() ? 'right' : 'left') . '</w:tc>';
         } else {
             for ($c = 0; $c < $cols; $c++) {
                 $v = $cells[$c] ?? '';
-                $align = ($this->isNum($v) && $v !== '') ? 'center' : ($kind === 'header' ? 'center' : 'right');
+                $align = ($this->isNum($v) && $v !== '') ? 'center' : ($kind === 'header' ? 'center' : ($this->isRtl() ? 'right' : 'left'));
                 if ($this->isNum($v) && $v !== '') {
                     $nv = $this->numVal($v);
                     $disp = ($nv == floor($nv)) ? number_format($nv) : rtrim(rtrim(number_format($nv, 2), '0'), '.');
@@ -633,8 +647,8 @@ class ReportTable
         $rpr = '<w:rPr>';
         if ($bold) $rpr .= '<w:b/>';
         if ($white) $rpr .= '<w:color w:val="FFFFFF"/>';
-        $rpr .= '<w:sz w:val="' . ($this->landscape ? 18 : 20) . '"/><w:rtl/></w:rPr>';
-        return '<w:p><w:pPr><w:bidi/><w:jc w:val="' . $align . '"/></w:pPr>'
+        $rpr .= '<w:sz w:val="24"/>' . ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr>';   // 🔠 12pt بكل المطبوعات
+        return '<w:p><w:pPr>' . ($this->isRtl() ? '<w:bidi/>' : '') . '<w:jc w:val="' . $align . '"/></w:pPr>'
             . '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($text) . '</w:t></w:r></w:p>';
     }
 
@@ -781,7 +795,7 @@ class ReportTable
         if ($this->savePath) { file_put_contents($this->savePath, $data); return; } // وضع الحفظ (تست/خادم)
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: ' . $mime);
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Disposition: attachment; filename="' . rawurlencode($filename) . '"; filename*=UTF-8\'\'' . rawurlencode($filename));
         header('Content-Length: ' . strlen($data));
         header('Cache-Control: no-cache');
         echo $data;

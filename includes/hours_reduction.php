@@ -177,7 +177,7 @@ function handleHoursReductionPost($db, $redirectTo) {
         $st->execute([$eid]);
         $emp = $st->fetch(PDO::FETCH_ASSOC);
         if (!$emp) continue;
-        $nm = trim((($emp['first_name_ar'] ?: $emp['first_name_fr']) . ' ' . ($emp['last_name_ar'] ?: $emp['last_name_fr'])));
+        $nm = empFullNameAr($emp);
         if ($_POST['action'] === 'hr_later') {
             $db->prepare("UPDATE employees SET hours_reduction_later_sy = ? WHERE id = ?")->execute([$sy, $eid]);
             logAudit('hours_reduction_later', 'employees', $eid, null, ['sy' => $sy]);

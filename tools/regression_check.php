@@ -2974,8 +2974,9 @@ check('شيل ملف بلا أب (البيانات): الخمسة الوهمية
       $gone50 === 5 && $kept50 === 5 && $jean50 === 2, "مشال $gone50/5 · باقٍ $kept50/5 · جان عاد $jean50/2");
 // وبالكشوف: المشال ما عاد يظهر (مريم ريشا صارت مرة واحدة بكشف النجاة)
 $h50 = renderPage('pages/official_forms.php', ['form' => 'salary_all', 'month' => 6, 'year' => 2026], [], [3]);
+$nm50 = empFullNameAr($db->query("SELECT * FROM employees WHERE first_name_ar='مريم' AND last_name_ar='ريشا' AND is_deleted=0 ORDER BY id LIMIT 1")->fetch() ?: ['first_name_ar' => 'مريم', 'last_name_ar' => 'ريشا']); // 👨 الاسم الثلاثي (2026-10-08)
 check('شيل ملف بلا أب (تجربة فعلية): مريم ريشا صارت مرّة واحدة فقط بكشف رواتب النجاة',
-      substr_count($h50, 'مريم ريشا') === 1, substr_count($h50, 'مريم ريشا') . ' مرّة');
+      substr_count($h50, $nm50) === 1, substr_count($h50, $nm50) . ' مرّة [' . $nm50 . ']');
 
 /* =====================================================================
  * 51) 🔴 القاعدة الرسمية: تجزئة التنزيل العائلي وشطور الضريبة بمدة العمل
@@ -3007,7 +3008,8 @@ check('التنزيل بحدّ الخاضع: السقف min() مطبَّق با�
       && strpos($rp51, "min(\$fdOf(\$r), (int)\$r['taxable_base_lbp'])") === false
       && strpos($of51, "min(\$sfdOf(\$r), (int)\$r['taxable_base_lbp'])") === false);
 $h51 = renderPage('pages/reports.php', ['report' => 'tax_summary', 'month' => 6, 'year' => 2026], [], [2]);
-$p51 = mb_strpos($h51, 'طانوس القزي');
+$nm51 = empFullNameAr($db->query("SELECT * FROM employees WHERE first_name_ar='طانوس' AND last_name_ar='القزي' AND is_deleted=0 ORDER BY id LIMIT 1")->fetch() ?: ['first_name_ar' => 'طانوس', 'last_name_ar' => 'القزي']); // 👨 الاسم الثلاثي
+$p51 = mb_strpos($h51, $nm51);
 $row51 = $p51 !== false ? mb_substr($h51, $p51, 1200) : '';
 $e51 = mb_strpos($row51, '</tr>');
 if ($e51 !== false) $row51 = mb_substr($row51, 0, $e51); // صفّه فقط (لا الصف التالي)
@@ -5934,10 +5936,10 @@ check('أسماء لوائح الدولة بالفرنسي (كود): ofStateName
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), 'nm-fr') === false && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), 'ofStateNameCell') === false);
 $ok120 = false; $why120 = '';
 try {
-    $e120 = $db->query("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, ms.month, ms.year FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
+    $e120 = $db->query("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.father_name_ar, e.father_name_fr, ms.month, ms.year FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
                         WHERE e.is_deleted = 0 AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 AND TRIM(e.first_name_ar) <> '' AND TRIM(e.first_name_fr) <> '' AND TRIM(e.last_name_fr) <> '' ORDER BY ms.year, ms.month LIMIT 1")->fetch();
     if (!$e120) throw new RuntimeException('لا أستاذ باسم عربي وفرنسي معاً');
-    $ar = trim($e120['first_name_ar'] . ' ' . $e120['last_name_ar']); $fr = trim($e120['first_name_fr'] . ' ' . $e120['last_name_fr']);
+    $ar = empFullNameAr($e120); $fr = empFullNameFr($e120); // 👨 الاسم الثلاثي بكل التقارير (2026-10-08)
     $bad120 = [];
     foreach (['salary_all', 'payment_list', 'full_register', 'salary_detail'] as $f) {
         $o = renderPage('pages/official_forms.php', ['form' => $f, 'month' => (int)$e120['month'], 'year' => (int)$e120['year']], [], [], '', '', '', []);
@@ -6067,11 +6069,12 @@ check('زرّ اتجاه الورقة (تشغيل فعلي): يظهر مرّة �
  * =================================================================== */
 $ps124 = (string)file_get_contents($PROJ . '/assets/js/pdf-save.js'); $of124 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('PDF بعناوين بكل ورقة + إكسل/وورد للكشوف (كود): headEnd/thead بالتقطيع + ofOfficeForms مصدر واحد لـno_office',
-      strpos($ps124, "var headEnd = firstTbl ? Math.max(0, firstTbl.getBoundingClientRect().top - top0) : 0;") !== false && strpos($ps124, "var fy = canvas.height / areaHm;") !== false && strpos($ps124, "cuts = cuts.map(P).filter(") !== false
-      && strpos($ps124, "var repH = idx > 0 ? headEnd : 0, thTop = 0, thH = 0;") !== false
-      && strpos($ps124, "if (repH > 0) { cc.drawImage(canvas, 0, 0, canvas.width, repH, 0, 0, canvas.width, repH); oy += repH; }") !== false
-      && strpos($ps124, "if (thH > 0) { cc.drawImage(canvas, 0, thTop, canvas.width, thH, 0, oy, canvas.width, thH); oy += thH; }") !== false
-      && strpos($ps124, "doc.addImage(c.toDataURL('image/jpeg', canvas.height > 9000 ? 0.8 : 0.92), 'JPEG', M, M, boxW, c.height * scale);") !== false
+      // 🔠 (2026-10-08 «الخط 12 بالـPDF»): ترقيم بالصفوف على مسرح مخفي + ترويسة/رأس يُعادان + تقسيم الجدول العريض أعمدةً + خطوط مرّة واحدة
+      strpos($ps124, "function splitWideTables(area, maxW)") !== false && strpos($ps124, "function nextPage()") !== false && strpos($ps124, "stage.id = 'pdfStage';") !== false
+      && strpos($ps124, "if (pageNo > 0) headItems.forEach(function (it) { shellFor(it.chain || []).appendChild(it.node.cloneNode(true)); });") !== false
+      && strpos($ps124, "it.headRows.forEach(function (r) { th.appendChild(r.cloneNode(true)); });") !== false
+      && strpos($ps124, "getFontEmbedCSS(area)") !== false && strpos($ps124, "t.style.setProperty('--pz', 1); t.style.zoom = '1';") !== false
+      && strpos($ps124, "var PORT_W = 733, LAND_W = 1062;") !== false
       && strpos($of124, "function ofOfficeForms(): array { return ['salary_all', 'salary_detail', 'payment_list', 'employer_cost', 'full_register', 'teaching_staff', 'eoc_staff', 'eoc_quarterly', 'differences', 'general_report', 'staff_stats', 'general_info']; }") !== false
       && strpos($of124, "\$exportOpts['no_office'] = !in_array(\$form, ofOfficeForms(), true);") !== false);
 $ok124 = false; $why124 = '';
@@ -6111,7 +6114,7 @@ check('دولار القانون للأساس (كود): lawUsd/lawUsdSql/moneyLa
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), "'cur_sal_old_usd' => (int)floor(\$curSal / officialUsdRate())") !== false);
 $ok125 = false; $why125 = '';
 try {
-    $r125 = $db->query("SELECT ms.*, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+    $r125 = $db->query("SELECT ms.*, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE ms.school_year = '2025-2026' AND ms.base_salary_lbp > 0 AND ms.exchange_rate > 2000 AND e.is_deleted = 0 ORDER BY ms.year, ms.month, e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     if (!$r125) throw new RuntimeException('لا صفّ');
     $lawB = number_format(lawUsd($r125['base_salary_lbp'])); $mktB = number_format(lbpToUsd($r125['base_salary_lbp'], $r125['exchange_rate']));
@@ -6121,7 +6124,7 @@ try {
               ['pages/official_forms.php', ['form' => 'full_register']], ['pages/reports.php', ['report' => 'monthly_summary']], ['pages/reports.php', ['report' => 'cnss_summary']]] as [$pg, $g]) {
         $o = renderPage($pg, $g + ['month' => (int)$r125['month'], 'year' => (int)$r125['year']], [], [], 'both');
         $seg = ''; $i = false; // الاسم بالعربي (تقارير المركز) أو بالفرنسي (لوائح الدولة)
-        foreach ([trim($r125['first_name_ar'] . ' ' . $r125['last_name_ar']), trim($r125['first_name_fr'] . ' ' . $r125['last_name_fr'])] as $nm) { if ($nm !== '' && ($i = strpos($o, $nm)) !== false) break; }
+        foreach ([empFullNameAr($r125), empFullNameFr($r125)] as $nm) { if ($nm !== '' && ($i = strpos($o, $nm)) !== false) break; } // 👨 الاسم الثلاثي
         if ($i !== false) $seg = substr($o, $i, 1500);
         // 📄 (2026-09-21 كالبطاقة) الأساس بالليرة فقط؛ صاحب النسبة وحده يظهر ÷1500 تحت «بعد التدرّج»
         $isP125 = isPctLawRow($r125); $bpeL125 = number_format(lawUsd($r125['base_plus_echelon_lbp']));

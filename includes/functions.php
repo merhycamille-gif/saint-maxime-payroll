@@ -31,6 +31,26 @@ function isLoggedIn() {
     return isset($_SESSION['user_id']);
 }
 
+// 👨 (2026-10-08 «لازم بكل التقارير يطلع الاسم كامل: الاسم مع الأب مع العيلة»): الاسم الثلاثي = المصدر الواحد للأسماء
+//    بكل التقارير/اللوائح/النماذج/الإكسل. عربي: الأوّل + الأب + الشهرة (وإلا الفرنسي)؛ فرنسي: الأوّل + الأب + الشهرة.
+if (!function_exists('empFullNameAr')) {
+    function empFullNameAr(array $e): string {
+        $parts = array_filter([trim((string)($e['first_name_ar'] ?? '')), trim((string)($e['father_name_ar'] ?? '')), trim((string)($e['last_name_ar'] ?? ''))], 'strlen');
+        $name = trim(implode(' ', $parts));
+        if ($name !== '') return $name;
+        return empFullNameFr($e);
+    }
+}
+if (!function_exists('empFullNameFr')) {
+    function empFullNameFr(array $e): string {
+        $parts = array_filter([trim((string)($e['first_name_fr'] ?? '')), trim((string)($e['father_name_fr'] ?? '')), trim((string)($e['last_name_fr'] ?? ''))], 'strlen');
+        $name = trim(implode(' ', $parts));
+        if ($name !== '') return $name;
+        $ar = array_filter([trim((string)($e['first_name_ar'] ?? '')), trim((string)($e['father_name_ar'] ?? '')), trim((string)($e['last_name_ar'] ?? ''))], 'strlen');
+        return trim(implode(' ', $ar));
+    }
+}
+
 function requireLogin() {
     ensurePrimeUsdLawColumn(); // 🧮 عمود دولار القانون للإضافي — يتركّب ذاتياً قبل أي استعلام
     // منع المتصفّح من تخبئة الصفحات: حتى تنعكس تبديلات العملة/«الراتب يشمل» فوراً بلا Ctrl+F5،

@@ -11,17 +11,7 @@ require_once __DIR__ . '/functions.php';
 /**
  * الاسم الكامل للموظف (عربي مع fallback فرنسي والعكس).
  */
-function empFullNameAr(array $e): string {
-    $parts = array_filter([$e['first_name_ar'] ?? '', $e['father_name_ar'] ?? '', $e['last_name_ar'] ?? '']);
-    $name = trim(implode(' ', $parts));
-    if ($name !== '') return $name;
-    return trim(($e['first_name_fr'] ?? '') . ' ' . ($e['last_name_fr'] ?? ''));
-}
-function empFullNameFr(array $e): string {
-    $name = trim(($e['first_name_fr'] ?? '') . ' ' . ($e['last_name_fr'] ?? ''));
-    if ($name !== '') return $name;
-    return empFullNameAr($e);
-}
+// 👨 empFullNameAr/empFullNameFr صارا بـfunctions.php (الاسم الثلاثي بكل مكان — 2026-10-08)
 function empFullName(array $e): string {
     $lang = $_SESSION['lang'] ?? 'fr';
     return $lang === 'ar' ? empFullNameAr($e) : empFullNameFr($e);

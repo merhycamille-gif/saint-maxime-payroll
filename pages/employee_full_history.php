@@ -145,8 +145,8 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
                 <?php foreach ($results as $i => $r): $ln = $r['left_on'] ?? ''; $left = ($ln && $ln !== '9999-12-31'); ?>
                     <tr>
                         <td><?= $i + 1 ?></td>
-                        <td><a href="<?= BASE_URL ?>pages/employee_full_history.php?id=<?= (int)$r['id'] ?>" style="font-weight:700"><?= e(trim(($r['first_name_ar'] ?: $r['first_name_fr']) . ' ' . ($r['last_name_ar'] ?: $r['last_name_fr']))) ?></a>
-                            <small dir="ltr" style="color:#64748b"> <?= e(trim($r['first_name_fr'] . ' ' . $r['last_name_fr'])) ?></small></td>
+                        <td><a href="<?= BASE_URL ?>pages/employee_full_history.php?id=<?= (int)$r['id'] ?>" style="font-weight:700"><?= e(empFullNameAr($r)) ?></a>
+                            <small dir="ltr" style="color:#64748b"> <?= e(empFullNameFr($r)) ?></small></td>
                         <td class="eh-num"><?= e($r['employee_code']) ?></td>
                         <td class="eh-num"><?= $d($r['birth_date']) ?></td>
                         <td class="eh-num"><?= e($r['phone1'] ?: '—') ?></td>
@@ -162,7 +162,7 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
         </div>
 <?php elseif ($emp):
         $name = trim(($emp['first_name_ar'] ?: $emp['first_name_fr']) . ' ' . ($emp['father_name_ar'] ? $emp['father_name_ar'] . ' ' : '') . ($emp['last_name_ar'] ?: $emp['last_name_fr']));
-        $nameFr = trim($emp['first_name_fr'] . ' ' . $emp['last_name_fr']);
+        $nameFr = empFullNameFr($emp);
         $leftOn = leftDateOf($emp);
         $isLeft = ($leftOn && $leftOn !== '9999-12-31');
         $endRef = $isLeft ? $leftOn : date('Y-m-d');

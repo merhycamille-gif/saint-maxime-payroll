@@ -176,7 +176,7 @@ function r567Analyze($db, SimpleXMLElement $x): array {
     foreach ($yd['rows'] as $r) {
         $finN = preg_replace('/\D/', '', (string)($r['e']['finance_ministry_number'] ?? ''));
         if ($finN !== '') $finToId[$finN] = (int)$r['e']['id'];
-        $nm = trim((($r['e']['first_name_ar'] ?? '') ?: ($r['e']['first_name_fr'] ?? '')) . ' ' . (($r['e']['last_name_ar'] ?? '') ?: ($r['e']['last_name_fr'] ?? '')));
+        $nm = empFullNameAr($r['e']);
         if ($finN === '' || !isset($byFin[$finN])) { $missing[] = $nm . ($finN === '' ? ' (بلا رقم مالية)' : ''); continue; }
         $f6 = $byFin[$finN]['fc'];
         if (!$eq($f6['66'] ?? 0, $r['d']['tot1']) || !$eq($f6['89'] ?? 0, $r['d']['tax'])) {

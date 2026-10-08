@@ -616,7 +616,7 @@ function healJanaRestore20260913(): void {
         if ($db->inTransaction()) return;
         $file = __DIR__ . '/../tools/data/rows_1785_pre2627_20260913.json';
         if (!is_file($file)) return;
-        $e = $db->query("SELECT id, first_name_ar, last_name_ar, school_id, employee_type FROM employees WHERE id = 1785 AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+        $e = $db->query("SELECT id, first_name_ar, last_name_ar, father_name_ar, father_name_fr, school_id, employee_type FROM employees WHERE id = 1785 AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
         if (!$e || mb_strpos((string)$e['first_name_ar'], 'جنى') === false || mb_strpos((string)$e['last_name_ar'], 'لبوس') === false) { setSetting($flag, 'done ' . date('Y-m-d H:i') . ' (ليست جنى لبوس — لا شيء)'); return; }
         if (isSchoolYearLocked((int)$e['school_id'], '2025-2026') || isSchoolYearLocked((int)$e['school_id'], '2024-2025')) return; // يُعاد عند فتح القفل
         $rows = json_decode((string)file_get_contents($file), true);

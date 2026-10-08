@@ -70,7 +70,7 @@ if ($allRows) {
         $depRank = ($lm >= 10) ? $ly : $ly - 1;
         $mr = $maxRank[(int)$r['id']] ?? null;
         if ($mr !== null && $mr > $depRank) {
-            $nm = trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr']);
+            $nm = empFullNameAr($r);
             $anomalies[] = ['id' => (int)$r['id'], 'name' => $nm, 'school' => $r['school_name'], 'left' => date('d/m/Y', $r['_primary_ts']), 'until' => $mr];
         }
     }
@@ -157,7 +157,7 @@ include __DIR__ . '/../includes/header.php';
         </tr></thead>
         <tbody>
         <?php $i = 0; foreach ($list as $emp): $i++;
-          $nm = trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
+          $nm = empFullNameAr($emp);
           $primary = $emp['_primary_ts']; // الأبكر بين تواريخ الترك (محسوب مسبقاً)
         ?>
           <tr>

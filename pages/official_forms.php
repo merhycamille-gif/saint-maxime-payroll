@@ -150,8 +150,8 @@ function ofStateLtrForms(): array { return ['salary_all', 'salary_detail', 'paym
 // 🔤 (2026-09-14 «أسماء الأساتذة باللوائح اللي من الشمال لليمين يكونوا باللغة الأجنبية كمان»): خانة الاسم بلوائح الدولة الأربع
 //    (salary_all/payment_list/full_register/salary_detail) = الاسم العربي + الاسم الفرنسي تحته بسطر ثانٍ (المصدر الواحد). employer_cost بلا أسماء.
 function ofStateNameCell(array $r): string {
-    $ar = trim(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? ''));
-    $fr = trim(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? ''));
+    $ar = empFullNameAr($r);
+    $fr = empFullNameFr($r);
     if ($ar === '') return '<span class="nm-fr" dir="ltr">' . e($fr) . '</span>';
     if ($fr === '') return e($ar);
     return e($ar) . '<br><span class="nm-fr" dir="ltr">' . e($fr) . '</span>';
@@ -392,7 +392,7 @@ if (in_array($form, $perEmployee) && !$emp):
              : (in_array($form, $laborLawOnly) ? " AND employee_type IN ('employe','enseignant_contractuel')"
              : (in_array($form, $titulaireOnly) ? " AND employee_type='enseignant_titulaire'"
              : (in_array($form, $teacherOnly) ? " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')" : '')));
-    $list = $db->prepare("SELECT id, first_name_fr, last_name_fr, first_name_ar, last_name_ar, employee_code, phone1, phone2
+    $list = $db->prepare("SELECT id, first_name_fr, last_name_fr, first_name_ar, last_name_ar, father_name_ar, father_name_fr, employee_code, phone1, phone2
                           FROM employees WHERE is_deleted = 0 AND " . schoolScopeWhere('school_id') . $onlyEmp . $yearWhere . "
                           ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
     $list->execute($yearParams);
@@ -415,8 +415,8 @@ if (in_array($form, $perEmployee) && !$emp):
                     <select name="employee_id" class="form-select" required>
                         <option value="">— Choisir / اختر —</option>
                         <?php foreach ($emps as $x): ?>
-                        <option value="<?= (int)$x['id'] ?>" data-phone="<?= e(trim(($x['phone1'] ?? '').' '.($x['phone2'] ?? ''))) ?>" data-search="<?= e(trim($x['first_name_ar'].' '.$x['last_name_ar'])) ?>">
-                            <?= e(trim(($x['first_name_fr'].' '.$x['last_name_fr'])) ?: ($x['first_name_ar'].' '.$x['last_name_ar'])) ?>
+                        <option value="<?= (int)$x['id'] ?>" data-phone="<?= e(trim(($x['phone1'] ?? '').' '.($x['phone2'] ?? ''))) ?>" data-search="<?= e(empFullNameAr($x)) ?>">
+                            <?= e(empFullNameFr($x) ?: empFullNameAr($x)) ?>
                             <?= $x['employee_code'] ? ' ('.e($x['employee_code']).')' : '' ?>
                         </option>
                         <?php endforeach; ?>
@@ -587,7 +587,7 @@ if (in_array($form, $imageForms)) {
             if ($i > 15) break;
             $y = $ys + $i*$dy;
             $left = leftDateOfFor($r, 'finance'); // 🚪 ترك المالية (أو من الكل)
-            $nm = trim(($r['first_name_ar'].' '.$r['father_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr']);
+            $nm = trim(($r['first_name_ar'].' '.$r['father_name_ar'].' '.$r['last_name_ar'])) ?: empFullNameFr($r);
             $extra[] = ['x'=>72,'y'=>$y,'val'=>$nm,'s'=>2.1];
             $extra[] = ['x'=>54,'y'=>$y,'val'=>$r['finance_ministry_number'],'s'=>2.0];
             $extra[] = ['x'=>40,'y'=>$y,'val'=>cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', ''),'s'=>2.0];
@@ -649,7 +649,7 @@ if ($form === 'tax_r6'):
     // (السنة الميلادية) ثم زرّا الطباعة/الإكسل على قالب المستخدم نفسه (mof_r6).
     $fy = (int)($_GET['fy'] ?? 0);
     if ($fy < 2000 || $fy > 2100) $fy = (int)date('Y') - 1;
-    $nm6 = trim((($emp['first_name_ar'] ?: $emp['first_name_fr']) . ' ' . ($emp['last_name_ar'] ?: $emp['last_name_fr'])));
+    $nm6 = empFullNameAr($emp);
     $exp6 = BASE_URL . 'pages/official_export.php?form=mof_r6&emp=' . (int)$emp['id'] . '&fy=' . $fy;
 ?>
     <div class="card no-print" style="max-width:760px;margin:0 auto">
@@ -870,7 +870,7 @@ elseif ($form === 'tax_emp_report'):
             [$yfq, $ypq] = yearEmploymentFilter($syQ, 'e.');
             $inQ = implode(',', $months);
             $st = $db->prepare("SELECT e.id, e.school_id, e.employee_type,
-                    e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+                    e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                     e.social_status, e.spouse_works, COALESCE(e.apply_family_deduction,1) afd, COALESCE(e.grant_spouse_addition,0) gsa, COALESCE(e.grant_children_addition,0) gca,
                     SUM(ms.base_plus_echelon_lbp) base, SUM(ms.extra_lbp+ms.prime_fixe_lbp) extraw,
                     SUM(ms.aide_complementaire_lbp) aide, SUM(ms.transport_lbp) trans,
@@ -890,7 +890,7 @@ elseif ($form === 'tax_emp_report'):
                 $id = (int)$r['id'];
                 if (!isset($EMPR[$id])) {
                     $EMPR[$id] = ['type' => $r['employee_type'], 'school_id' => (int)$r['school_id'],
-                        'name' => (trim($r['first_name_ar'] . ' ' . $r['last_name_ar']) ?: trim($r['first_name_fr'] . ' ' . $r['last_name_fr'])),
+                        'name' => (empFullNameAr($r)),
                         'base' => 0, 'extraw' => 0, 'aide' => 0, 'trans' => 0, 'other' => 0, 'tb' => 0, 'tax' => 0, 'fd' => 0, 'net' => 0, 'months' => 0];
                 }
                 foreach (['base', 'extraw', 'aide', 'trans', 'tb', 'tax'] as $k) $EMPR[$id][$k] += (int)$r[$k];
@@ -1576,7 +1576,7 @@ elseif ($form === 'teacher_card'):
             <tr>
                 <?php if ($multiS): ?><td><small><?= e(schoolNameById($r['school_id'],'ar')) ?></small></td><?php endif; ?>
                 <td><?= e($r['caisse_number']) ?></td>
-                <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                <td style="text-align:right"><?= e(empFullNameAr($r)) ?></td>
                 <td><?= e(trim((string)$r['father_name_ar']) ?: (string)$r['father_name_fr']) ?></td>
                 <td class="num"><?= formatLBP($r['prevSal'],false) ?></td>
                 <td class="num"><?= formatLBP($r['currSal'],false) ?></td>
@@ -1638,7 +1638,7 @@ elseif ($form === 'teacher_card'):
 </div>
 
 <?php elseif ($form === 'salary_all'):
-    $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, ms.*
+    $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
                           ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
@@ -1757,7 +1757,7 @@ elseif ($form === 'teacher_card'):
 <?php elseif ($form === 'differences'):
     [$cy1] = schoolYearToYears($schoolYear);
     $prevSY = ($cy1-1).'-'.$cy1;
-    $q = $db->prepare("SELECT e.id, e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+    $q = $db->prepare("SELECT e.id, e.employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                    SUM(CASE WHEN ms.school_year=? THEN ms.net_salary_lbp ELSE 0 END) AS cur,
                    SUM(CASE WHEN ms.school_year=? THEN ms.net_salary_lbp ELSE 0 END) AS prev,
                    SUM(CASE WHEN ms.school_year=? THEN ms.extra_lbp+ms.prime_fixe_lbp ELSE 0 END) AS extra_wage,
@@ -1812,7 +1812,7 @@ elseif ($form === 'teacher_card'):
             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; }
             $diff=$r['cur']-$r['prev']; $diffU=(float)$r['cur_usd']-(float)$r['prev_usd']; ?>
             <tr><td><?= ++$nn ?></td>
-                <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                <td style="text-align:right"><?= e(empFullNameAr($r)) ?></td>
                 <td class="num"><?= dualLaw((int)$r['base_salary'],(float)$r['base_salary_usd'],false) ?></td>
                 <?php if (salaryCompHas('extra')): ?><td class="num"><?= dualFromUsd((int)$r['extra_wage'],(float)$r['extra_wage_usd'],false) ?></td><?php endif; ?>
                 <?php if (salaryCompHas('aide')): ?><td class="num"><?= dualFromUsd((int)$r['aide'],(float)$r['aide_usd'],false) ?></td><?php endif; ?>
@@ -2023,7 +2023,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
             <?php foreach ($rows as $i=>$r):
                 $left = leftDateOfFor($r, 'finance'); ?>
                 <tr><td><?= $i+1 ?></td>
-                    <td><?= e(trim(($r['first_name_ar'].' '.$r['father_name_ar'].' '.$r['last_name_ar'])) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                    <td><?= e(trim(($r['first_name_ar'].' '.$r['father_name_ar'].' '.$r['last_name_ar'])) ?: empFullNameFr($r)) ?></td>
                     <td><?= e($r['finance_ministry_number']) ?></td>
                     <td><?= e(cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '')) ?></td>
                     <td><?= formatDate(shownHireDate($r)) ?></td>
@@ -2493,7 +2493,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
  * ====================================================================== */
 elseif ($form === 'payment_list'):
     // كشف الدفع: لائحة الرواتب الصافية للموظفين (لشهر) — للدفع/التحويل المصرفي + توقيع
-    $stmt = $db->prepare("SELECT e.employee_type, e.employee_code, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+    $stmt = $db->prepare("SELECT e.employee_type, e.employee_code, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                                  e.nssf_number, e.birth_date, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.exchange_rate, ms.net_salary_lbp, ms.total_due_lbp, ms.family_allowance_lbp, ms.transport_lbp,
                                  ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
@@ -2568,7 +2568,7 @@ elseif ($form === 'payment_list'):
 
 <?php elseif ($form === 'full_register'):
     // جميع الأساتذة — كشف شامل بالكلفة (مطابق p5): لكل أستاذ الراتب + مساهمات المؤسسة + الكلفة
-    $stmt = $db->prepare("SELECT e.school_id, e.employee_type, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+    $stmt = $db->prepare("SELECT e.school_id, e.employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                                  e.hours_per_week, " . familyDedSelectCols('e') . ", ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
@@ -2816,7 +2816,7 @@ elseif ($form === 'payment_list'):
         ?>
             <tr>
                 <td><?= $i+1 ?></td>
-                <td style="text-align:right"><?= e(trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: ($r['first_name_fr'].' '.$r['last_name_fr'])) ?></td>
+                <td style="text-align:right"><?= e(empFullNameAr($r)) ?></td>
                 <td><?= $r['birth_date']?formatDate($r['birth_date']):'' ?></td>
                 <td><?= $age ?></td>
                 <td><?= formatDate(shownHireDate($r)) ?></td>
@@ -2843,7 +2843,7 @@ elseif ($form === 'payment_list'):
     //   العائلية ٦٪ للموظفين فقط (الأستاذ ياخذ نهاية خدمته من صندوق التعويضات لا من الضمان).
     //   الأرقام مأخوذة كما خزّنها محرّك البرنامج لكل شهر (مع سقف الأجر الخاضع لكل فرع).
     // فلتر «موظفي الفترة» الموحّد محسوب بأعلى الملف حسب شهر/سنة الكشف ($ofMonthFilter/$ofMonthParams).
-    $sql = "SELECT e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+    $sql = "SELECT e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
                    e.nssf_number, e.birth_date, e.employee_type, e.hire_date,
                    ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp, ms.transport_lbp, ms.taxable_base_lbp,
                    ms.cnss_amount_lbp, ms.school_cnss_8_lbp,
@@ -2934,7 +2934,7 @@ elseif ($form === 'payment_list'):
             $T['base']+=$capped; $T['nT']+=$isTeacher?1:0; $T['nW']+=$isTeacher?0:1;
             $T['m3']+=$m3; $T['m8']+=$m8; $T['mtot']+=$mtot; $T['eos']+=$eos; $T['fam6']+=$fam6;
             $T['due']+=$due; $T['fpaid']+=$fpaid; $T['rest']+=$rest;
-            $name = trim($r['first_name_ar'].' '.$r['last_name_ar']) ?: trim($r['first_name_fr'].' '.$r['last_name_fr']);
+            $name = empFullNameAr($r);
         ?>
             <tr>
                 <td><?= $i+1 ?></td>
@@ -2996,7 +2996,7 @@ elseif ($form === 'payment_list'):
 <?php elseif ($form === 'salary_detail'):
     // معلومات تفصيلية عن الراتب — جميع الأساتذة/الموظفون (مطابق p3/p4): مجمّع حسب الفئة،
     // صفّ «المجموع» لكل فئة + مجموع عام. الأعمدة من جدول monthly_salaries كما يخزّنها المحرّك.
-    $sql = "SELECT e.first_name_ar,e.last_name_ar,e.first_name_fr,e.last_name_fr,e.employee_type, " . familyDedSelectCols('e') . ", ms.*
+    $sql = "SELECT e.first_name_ar,e.last_name_ar, e.father_name_ar, e.father_name_fr,e.first_name_fr,e.last_name_fr,e.employee_type, " . familyDedSelectCols('e') . ", ms.*
             FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
             WHERE ms.month=? AND ms.year=? AND e.is_deleted=0
               AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $ofMonthFilter . $ofEmpFilter . "

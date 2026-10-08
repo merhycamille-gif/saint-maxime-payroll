@@ -54,7 +54,7 @@ $selYearLabel = ($selYear === 'all') ? 'Toutes les années / كل السنين' 
 
 // 1) أساتذة/موظفو السنة المختارة في المدارس الفعّالة ضمن النطاق (غير محذوفين، موجودون فعلاً بهذه السنة، غير تاركين)
 [$yf, $yp] = yearEmploymentFilter($selYear !== 'all' ? $selYear : activeSchoolYear(), 'e.');
-$activeSql = "SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr,
+$activeSql = "SELECT e.id, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr,
         e.employee_type, e.phone1, e.phone2, e.school_id,
         COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
     FROM employees e JOIN schools sc ON sc.id = e.school_id
@@ -72,7 +72,7 @@ $memberIds = array_fill_keys(array_map(fn($r) => (int)$r['id'], $active), true);
 //    الفعّالة ضمن النطاق — نقودها من جدول الطلبات مباشرةً حتى يظهر **كل** من بعت بهذه السنة.
 $rank = ['applied' => 2, 'pending' => 1];
 $sentByEmp = []; // employee_id => أفضل صفّ طلب (مع اسم الأستاذ ومدرسته)
-$sq = $db->prepare("SELECT s.id AS sub_id, s.data AS sub_data, s.status, s.submitted_at, e.id, e.first_name_ar, e.last_name_ar,
+$sq = $db->prepare("SELECT s.id AS sub_id, s.data AS sub_data, s.status, s.submitted_at, e.id, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr,
         e.first_name_fr, e.last_name_fr, e.employee_type,
         COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name
     FROM info_submissions s
@@ -110,7 +110,7 @@ foreach ($active as $emp) {
 // 3) طلبات الأساتذة الجدد في المدارس الفعّالة ضمن النطاق (نُشئ ملفهم = applied مع employee_id، أو لسا pending)
 $newRows = $db->prepare("SELECT s.id, s.employee_id, s.school_id, s.status, s.submitted_at, s.applied_at, s.data,
         COALESCE(NULLIF(sc.name_ar,''), sc.name_fr) AS school_name,
-        e.first_name_ar e_fna, e.last_name_ar e_lna, e.first_name_fr e_fnf, e.last_name_fr e_lnf,
+        e.first_name_ar e_fna, e.last_name_ar e_lna, e.father_name_ar e_fatha, e.father_name_fr e_fathf, e.first_name_fr e_fnf, e.last_name_fr e_lnf,
         e.hire_date, e.employee_code
     FROM info_submissions s
     JOIN schools sc ON sc.id = s.school_id
@@ -141,11 +141,11 @@ foreach ($newBySchool as $list) $gNew += count($list);
 
 // اسم أستاذ جديد من ملفه إن نُشئ، وإلا من الطلب المرسَل
 function newTeacherName($r) {
-    $nm = trim(($r['e_fna'] ?? '') . ' ' . ($r['e_lna'] ?? '')) ?: trim(($r['e_fnf'] ?? '') . ' ' . ($r['e_lnf'] ?? ''));
+    $nm = empFullNameAr(['first_name_ar' => $r['e_fna'] ?? '', 'father_name_ar' => $r['e_fatha'] ?? '', 'last_name_ar' => $r['e_lna'] ?? '', 'first_name_fr' => $r['e_fnf'] ?? '', 'father_name_fr' => $r['e_fathf'] ?? '', 'last_name_fr' => $r['e_lnf'] ?? '']); // 👨 الاسم الثلاثي
     if ($nm !== '') return $nm;
     $d = json_decode($r['data'] ?: '{}', true) ?: [];
-    return trim(($d['first_name_ar'] ?? '') . ' ' . ($d['last_name_ar'] ?? ''))
-        ?: (trim(($d['first_name_fr'] ?? '') . ' ' . ($d['last_name_fr'] ?? '')) ?: '(بلا اسم)');
+    return empFullNameAr($d)
+        ?: (empFullNameFr($d) ?: '(بلا اسم)');
 }
 
 // فلتر العرض: الكل / بعتوا فقط / ما بعتوا فقط / جدد فقط — ليطبع المدير كل مجموعة لحالها
@@ -265,7 +265,7 @@ include __DIR__ . '/../includes/header.php';
         <thead><tr><th>#</th><th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>Statut / الحالة</th><th>Date d'envoi / تاريخ الإرسال</th><th class="no-print">Dossier / الملف</th></tr></thead>
         <tbody>
         <?php $i = 0; foreach ($sent as $emp): $i++;
-          $nm = trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
+          $nm = empFullNameAr($emp);
           $isApplied = ($emp['status'] ?? '') === 'applied';
         ?>
           <tr>
@@ -314,7 +314,7 @@ include __DIR__ . '/../includes/header.php';
         <thead><tr><th>#</th><th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>Téléphone / الهاتف</th><th class="no-print">Rappel WhatsApp / تذكير واتساب</th><th class="no-print">Dossier / الملف</th></tr></thead>
         <tbody>
         <?php $i = 0; foreach ($notsent as $emp): $i++;
-          $nm = trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr']);
+          $nm = empFullNameAr($emp);
           $wa = waPhone($emp['phone1'] ?: $emp['phone2']);
         ?>
           <tr>

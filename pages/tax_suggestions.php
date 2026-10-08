@@ -125,7 +125,7 @@ include __DIR__ . '/../includes/header.php';
 $empsQ = $db->prepare("SELECT e.id, e.school_id, e.social_status, e.spouse_works, e.spouse_work_start_date,
         COALESCE(e.apply_family_deduction,1) afd,
         COALESCE(e.grant_children_addition,0) gca, COALESCE(e.grant_spouse_addition,0) gsa,
-        COALESCE(NULLIF(TRIM(CONCAT(e.first_name_ar,' ',e.last_name_ar)),''), TRIM(CONCAT(e.first_name_fr,' ',e.last_name_fr))) nm,
+        COALESCE(NULLIF(TRIM(CONCAT_WS(' ', e.first_name_ar, NULLIF(e.father_name_ar,''), e.last_name_ar)),''), TRIM(CONCAT(e.first_name_fr,' ',e.last_name_fr))) nm,
         s.name_ar school_name
     FROM employees e JOIN schools s ON s.id = e.school_id
     WHERE e.is_deleted = 0 AND " . schoolScopeWhere('e.school_id') . $tsYf . "

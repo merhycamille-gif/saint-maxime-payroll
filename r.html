@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Primes &amp; Transport groupés / المكافآت والنقل الجماعي — Collège N.D des SRS Salvatoriennes</title>
+    
+    <!-- Fonts: محلية بالكامل (استقلال البرنامج + توليد PDF بالمتصفح يحتاج خطوطاً بنفس الأصل) -->
+    <link href="/saint-maxime-payroll/assets/fonts/fonts.css?v=1791437009" rel="stylesheet">
+
+    <!-- Icons: Font Awesome محلي -->
+    <link rel="stylesheet" href="/saint-maxime-payroll/assets/vendor/fontawesome/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+
+    <!-- App CSS -->
+    <link rel="stylesheet" href="/saint-maxime-payroll/assets/css/app.css?v=1791437009">
+</head>
+<body class="">
+
+<!-- حماية CSRF: حقن توكن تلقائياً بكل نماذج POST -->
+<script>
+document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (f && f.method && f.method.toLowerCase() === 'post' && !f.querySelector('input[name="csrf"]')) {
+        var i = document.createElement('input');
+        i.type = 'hidden'; i.name = 'csrf'; i.value = '470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8';
+        f.appendChild(i);
+    }
+}, true);
+// 🔁 (2026-09-28 p1 «رحت على ملف بيرلا وحطّيت الإضافي… عملت حفظ صار يفتل وعطاني can't reach this page» + «ما رح أعمل تجارب — البرنامج كلو صح»):
+//    الاستضافة تُسقط اتصالات متقطّعة (ERR_CONNECTION_TIMED_OUT حتى للملفات الثابتة). كل نموذج POST يُرسَل بـfetch مع إعادة محاولة تلقائية
+//    (حتى 6 مرّات) عند فشل الاتصال، مع req_id فريد لكل إرسال (الخادم يتجاهل التكرار — database.php). لا يمسّ النماذج التي تفتح نافذة/تبويباً
+//    (target) ولا data-no-retry. الردّ: إعادة توجيه ⇒ ننتقل إليها، وإلا نعرض الصفحة المرجَعة كما هي.
+window.msaPostRetry = { max: 6, delay: 2500 };
+document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f || e.defaultPrevented || !window.fetch || !window.FormData) return;
+    if (!f.method || f.method.toLowerCase() !== 'post') return;
+    if ((f.getAttribute('target') || '') !== '' || f.hasAttribute('data-no-retry') || f._msaRetrySubmitting) return;
+    e.preventDefault();
+    var fd = new FormData(f);
+    var sub = e.submitter;
+    if (sub && sub.name) fd.append(sub.name, sub.value || '');
+    if (!fd.has('csrf')) fd.append('csrf', '470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8');
+    var rid = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    fd.append('req_id', rid);
+    var url = f.getAttribute('action') || window.location.href;
+    var ov = document.getElementById('msaBusyOverlay');
+    if (!ov) {
+        ov = document.createElement('div'); ov.id = 'msaBusyOverlay';
+        ov.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font:700 18px Arial,sans-serif;color:#1F4E5F');
+        document.body.appendChild(ov);
+    }
+    var box = function (t) { ov.innerHTML = '<div style="background:#fff;border:2px solid #1F4E5F;border-radius:12px;padding:16px 28px;box-shadow:0 8px 30px rgba(0,0,0,.15)">' + t + '</div>'; ov.style.display = 'flex'; };
+    box('⏳ جارٍ الحفظ… / Enregistrement…');
+    f._msaRetrySubmitting = true;
+    var attempt = 0;
+    var go = function () {
+        attempt++;
+        fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', redirect: 'follow', cache: 'no-store' }).then(function (r) {
+            return r.text().then(function (html) {
+                f._msaRetrySubmitting = false;
+                if (r.redirected) { window.location.href = r.url; return; }
+                try { window.history.replaceState(null, '', r.url || url); } catch (x) {}
+                document.open(); document.write(html); document.close();
+            });
+        }).catch(function () {
+            if (attempt < window.msaPostRetry.max) {
+                box('📡 انقطع الاتصال بالخادم — إعادة المحاولة تلقائياً (' + (attempt + 1) + '/' + window.msaPostRetry.max + ')… لا تغلق الصفحة<br><span style="font-size:13px;font-weight:400">Connexion perdue — nouvelle tentative automatique</span>');
+                setTimeout(go, window.msaPostRetry.delay);
+            } else {
+                f._msaRetrySubmitting = false;
+                box('⚠️ تعذّر الوصول للخادم بعد ' + attempt + ' محاولات — ما انحفظ شي. <a href="#" onclick="location.reload();return false" style="color:#1F4E5F">أعد المحاولة</a>');
+            }
+        });
+    };
+    go();
+}, false);
+// 📌 «بدي ما تنطّ الصفحة على مكان آخر وأنا عم اشتغل فيها — إذا صلّحت شي لازم تضلّ بنفس الصفحة، بكل البرنامج» (أمره 2026-09-13):
+// عند إرسال أي نموذج POST نحفظ موضع التمرير والأقسام المفتوحة (details) لهذه الصفحة، وبعد الرجوع (إعادة التوجيه) نرجّعها كما كانت.
+(function () {
+    var key = 'msa_stay:' + location.pathname;
+    document.addEventListener('submit', function (e) {
+        var f = e.target;
+        if (!f || !f.method || f.method.toLowerCase() !== 'post') return;
+        try {
+            var open = []; var ds = document.querySelectorAll('details');
+            for (var i = 0; i < ds.length; i++) if (ds[i].open) open.push(i);
+            sessionStorage.setItem(key, JSON.stringify({ y: window.scrollY || window.pageYOffset || 0, open: open, t: Date.now() }));
+        } catch (err) {}
+    }, true);
+    function restore() {
+        var raw = null;
+        try { raw = sessionStorage.getItem(key); if (raw !== null) sessionStorage.removeItem(key); } catch (err) { return; }
+        if (!raw) return;
+        var s; try { s = JSON.parse(raw); } catch (err) { return; }
+        if (!s || (Date.now() - (s.t || 0)) > 120000) return; // حفظ قديم (تنقّل عادي) — تجاهله
+        var ds = document.querySelectorAll('details');
+        if (s.open) for (var i = 0; i < s.open.length; i++) if (ds[s.open[i]]) ds[s.open[i]].open = true;
+        if (location.hash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (err) {} }
+        var y = parseInt(s.y, 10) || 0;
+        window.scrollTo(0, y);
+        setTimeout(function () { window.scrollTo(0, y); }, 60);
+        setTimeout(function () { window.scrollTo(0, y); }, 300);
+    }
+    if (document.readyState === 'complete') restore(); else window.addEventListener('load', restore);
+})();
+</script>
+
+<div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <span class="brand-logo"><i class="fas fa-graduation-cap"></i></span>
+            <div>
+                <h2>MSA Payroll</h2>
+                <p>Collège N.D des SRS Salvatoriennes</p>
+            </div>
+        </div>
+
+        <!-- بحث سريع بالقائمة (تصفية فورية) -->
+        <div class="sidebar-search no-print">
+            <div class="ss-wrap">
+                <i class="fas fa-magnifying-glass ss-ic"></i>
+                <input type="text" id="navFilter" placeholder="Rechercher / بحث..." autocomplete="off"
+                       oninput="var q=this.value.trim().toLowerCase();document.querySelectorAll('.sidebar-nav a').forEach(function(a){a.style.display=(!q||a.textContent.toLowerCase().indexOf(q)>-1)?'':'none'});document.querySelectorAll('.sidebar-nav .nav-section').forEach(function(s){s.style.display=q?'none':''});">
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="/saint-maxime-payroll/index.php" class="">
+                <i class="fas fa-chart-line"></i>
+                <span>Tableau de bord / لوحة القيادة</span>
+            </a>
+            
+                        <div class="nav-section" style="--ns:#38bdf8">Personnel / الموظفون</div>
+
+            <a href="/saint-maxime-payroll/pages/employees.php" class="">
+                <i class="fas fa-users"></i>
+                <span>Employés & Enseignants / الموظفون والأساتذة</span>
+            </a>
+
+                        <a href="/saint-maxime-payroll/pages/tax_suggestions.php" class="">
+                <i class="fas fa-lightbulb" style="color:#f59e0b"></i>
+                <span>Suggestions état civil / اقتراحات من إخراج القيد</span>
+                <span style="background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite">69</span>            </a>
+
+                        <a href="/saint-maxime-payroll/pages/compliance.php" class="">
+                <i class="fas fa-scale-balanced" style="color:#ef4444"></i>
+                <span>Rapport de conformité / تقرير المخالفات والتصحيحات</span>
+                <span style="background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite">175</span>            </a>
+
+                        <a href="/saint-maxime-payroll/pages/cadre_due.php" class="">
+                <i class="fas fa-graduation-cap" ></i>
+                <span>Propositions de titularisation / اقتراحات الدخول بالملاك</span>
+                            </a>
+
+            <a href="/saint-maxime-payroll/pages/grades.php" class="">
+                <i class="fas fa-layer-group"></i>
+                <span>Échelons & Promotions / الدرجات والترقيات</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/classes.php" class="">
+                <i class="fas fa-chalkboard"></i>
+                <span>Classes / الصفوف</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/exceptional_laws.php" class="">
+                <i class="fas fa-scroll"></i>
+                <span>Lois exceptionnelles / القوانين الاستثنائية</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/bulk_allowances.php" class="active">
+                <i class="fas fa-gift"></i>
+                <span>Primes & transport / المكافآت والنقل</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/family_allowances.php" class="">
+                <i class="fas fa-people-roof"></i>
+                <span>Allocations familiales / التعويض العائلي</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/employee_full_history.php" class="">
+                <i class="fas fa-clock-rotate-left"></i>
+                <span>Historique complet / التاريخ الكامل للأستاذ</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/excel_salaries.php" class="">
+                <i class="fas fa-file-excel"></i>
+                <span>Excel salaires & primes / إكسل الرواتب والإضافي</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/law_check.php" class="">
+                <i class="fas fa-balance-scale"></i>
+                <span>Conformité légale / فحص مطابقة القانون</span>
+            </a>
+            
+            <div class="nav-section" style="--ns:#4ade80">Paie / الرواتب</div>
+
+                        <a href="/saint-maxime-payroll/pages/monthly_payroll.php" class="">
+                <i class="fas fa-money-check-alt"></i>
+                <span>Paie mensuelle / الرواتب الشهرية</span>
+            </a>
+            
+                        <a href="/saint-maxime-payroll/pages/annual_slip.php" class="">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <span>Relevé annuel / الكشف السنوي</span>
+            </a>
+            
+                        <a href="/saint-maxime-payroll/pages/attestations.php" class="">
+                <i class="fas fa-file-signature"></i>
+                <span>Attestations / إفادات</span>
+            </a>
+            
+                        <a href="/saint-maxime-payroll/pages/employee_history.php" class="">
+                <i class="fas fa-user-clock"></i>
+                <span>Dossier enseignant / سيرة الأستاذ</span>
+            </a>
+                                    <a href="/saint-maxime-payroll/pages/info_collect.php" class="">
+                <i class="fab fa-whatsapp"></i>
+                <span>Mise à jour / تحديث معلومات الأساتذة</span>
+            </a>
+            <a href="/saint-maxime-payroll/pages/info_status.php" class="">
+                <i class="fas fa-clipboard-check"></i>
+                <span>État MàJ / حالة التحديث (مين بعت)</span>
+            </a>
+            <a href="/saint-maxime-payroll/pages/left_teachers.php" class="">
+                <i class="fas fa-user-slash"></i>
+                <span>Départs / الأساتذة التاركون</span>
+            </a>
+            <a href="/saint-maxime-payroll/pages/retirement_64.php" class="">
+                <i class="fas fa-hourglass-half"></i>
+                <span>Retraite 64 / بلوغ سنّ الـ64</span>
+            </a>
+            <a href="/saint-maxime-payroll/pages/hours_reduction.php" class="">
+                <i class="fas fa-clock"></i>
+                <span>Réduction d'horaire / تناقص ساعات التدريس</span>
+            </a>
+            
+            <div class="nav-section" style="--ns:#c4b5fd">Rapports / التقارير</div>
+
+                        <a href="/saint-maxime-payroll/pages/reports.php" class="">
+                <i class="fas fa-chart-bar"></i>
+                <span>Rapports / التقارير</span>
+            </a>
+                                    <a href="/saint-maxime-payroll/pages/mehe_budget.php" class="">
+                <i class="fas fa-landmark"></i>
+                <span>Budget MEHE / موازنة وزارة التربية</span>
+            </a>
+            
+                        <a href="/saint-maxime-payroll/pages/tax_declarations.php" class="">
+                <i class="fas fa-file-contract"></i>
+                <span>Déclarations / التصاريح</span>
+            </a>
+            
+            <div class="nav-section" style="--ns:#fbbf24">Système / النظام</div>
+
+                        <a href="/saint-maxime-payroll/pages/schools.php" class="">
+                <i class="fas fa-school"></i>
+                <span>Écoles / المدارس</span>
+            </a>
+            
+                        <a href="/saint-maxime-payroll/pages/users.php" class="">
+                <i class="fas fa-user-shield"></i>
+                <span>Utilisateurs / حسابات المدارس</span>
+            </a>
+            
+                        <a href="/saint-maxime-payroll/pages/open_year.php" class="">
+                <i class="fas fa-folder-plus"></i>
+                <span>Ouvrir année / فتح سنة دراسية</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/exchange_rates.php" class="">
+                <i class="fas fa-coins"></i>
+                <span>Taux de change / أسعار الصرف</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/state_laws.php" class="">
+                <i class="fas fa-scale-balanced"></i>
+                <span>Lois de l'État / قوانين الدولة</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/social_security.php" class="">
+                <i class="fas fa-shield-alt"></i>
+                <span>Plafonds CNSS / حدود الضمان</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/tax_brackets.php" class="">
+                <i class="fas fa-percent"></i>
+                <span>Tranches d'impôt / الشطور الضريبية</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/rates_history.php" class="">
+                <i class="fas fa-percent"></i>
+                <span>Taux datés / النِّسَب حسب التاريخ</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/salary_scales.php" class="">
+                <i class="fas fa-layer-group"></i>
+                <span>Grille / إصدارات السلسلة</span>
+            </a>
+
+            <a href="/saint-maxime-payroll/pages/backup.php" class="">
+                <i class="fas fa-database"></i>
+                <span>Sauvegarde / نسخة احتياطية</span>
+            </a>
+            
+                        <a href="/saint-maxime-payroll/pages/health_check.php" class="">
+                <i class="fas fa-stethoscope"></i>
+                <span>Contrôle de santé / فحص صحّة البرنامج</span>
+            </a>
+            
+            <a href="/saint-maxime-payroll/pages/settings.php" class="">
+                <i class="fas fa-cog"></i>
+                <span>Paramètres / الإعدادات</span>
+            </a>
+                        <a href="/saint-maxime-payroll/pages/email_settings.php" class="">
+                <i class="fas fa-envelope"></i>
+                <span>Paramètres Email / إعدادات البريد</span>
+            </a>
+                    </nav>
+        
+        <div class="sidebar-footer">
+            v2.0.0 • 2026        </div>
+    </aside>
+
+    <!-- غطاء يغلق القائمة على الموبايل + إغلاق القوائم المنسدلة عند الكبس خارجها -->
+    <div class="nav-overlay no-print" onclick="document.body.classList.remove('nav-open')"></div>
+    <script>
+    document.addEventListener('click', function (e) {
+        document.querySelectorAll('.school-menu.open').forEach(function (m) {
+            if (!m.closest('.school-multi').contains(e.target)) m.classList.remove('open');
+        });
+    });
+    </script>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top bar -->
+        <header class="topbar">
+            <div style="display:flex;align-items:center;gap:12px">
+                <button type="button" class="menu-toggle no-print" title="Menu / القائمة"
+                        onclick="document.body.classList.toggle('nav-open')">
+                    <i class="fas fa-bars"></i>
+                </button>
+                                                <button type="button" class="btn btn-light no-print" title="رجوع / Retour"
+                        onclick="if(window.msaRememberFwd)msaRememberFwd(); if(!(window.msaPrevPage&&msaPrevPage())){if(document.referrer&&history.length>1){history.back()}else{location.href='/saint-maxime-payroll/index.php'}}"
+                        style="white-space:nowrap">
+                    <i class="fas fa-arrow-right" style="color:#16a34a"></i> Retour / رجوع
+                </button>
+                                                <button type="button" class="btn btn-light no-print" id="msaFwdBtn" hidden title="Revenir où j'étais / ارجع لمحل ما كنت" style="white-space:nowrap" onclick="if(window.msaGoFwd)msaGoFwd()">
+                    <i class="fas fa-arrow-left" style="color:#2563eb"></i> Revenir / لمحل ما كنت
+                </button>
+                                <div style="display:flex;align-items:center;gap:12px">
+                    <span style="width:44px;height:44px;min-width:44px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:#0284c7;color:#fff"><i class="fas fa-users" style="font-size:20px"></i></span>
+                    <h1 style="line-height:1.15;margin:0">
+                        <span dir="ltr">Primes &amp; Transport groupés</span>                        <span style="display:block;font-size:0.62em;font-weight:600;opacity:0.92">المكافآت والنقل الجماعي</span>                    </h1>
+                </div>
+            </div>
+
+            <!-- 🔍 البحث الشامل (Ctrl+K): أستاذ أو صفحة — من أي مكان بالبرنامج -->
+                        <div class="global-search no-print" id="globalSearch">
+                <i class="fas fa-magnifying-glass gs-ic"></i>
+                <input type="text" id="gsInput" placeholder="Recherche / بحث: اكتب أوّل حرف من اسم الأستاذ..." autocomplete="off">
+                <span class="gs-kbd">Ctrl+K</span>
+                <div class="gs-panel" id="gsPanel"></div>
+            </div>
+
+            <div class="topbar-actions">
+                                <a href="/saint-maxime-payroll/pages/attestations.php?dossier=1" class="topbar-dossier no-print" title="ملف الأستاذ الكامل / Dossier complet de l'enseignant">
+                    <span class="td-ic"><i class="fas fa-folder-open"></i></span>
+                    <span class="td-txt"><span dir="ltr">Dossier</span><span>ملف الأستاذ الكامل</span></span>
+                </a>
+                                                <div class="school-switcher school-multi" id="schoolPicker">
+                    <i class="fas fa-school" style="color:#fff;background:#0891b2;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
+                    <button type="button" class="sm-btn" onclick="document.getElementById('schoolMenu').classList.toggle('open')">
+                        Collège N.D des SRS Salvatoriennes <i class="fas fa-caret-down"></i>
+                    </button>
+                    <div class="school-menu" id="schoolMenu">
+                                                <form method="get" action="/saint-maxime-payroll/switch_school.php" onsubmit="var bs=this.querySelectorAll('input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});if(on===bs.length||on===0){bs.forEach(function(c){c.disabled=true;});}">
+                            <label class="sm-all"><input type="checkbox" id="smAll"  onclick="var v=this.checked;document.querySelectorAll('#schoolMenu input[name=\'schools[]\']').forEach(function(c){c.checked=v;})"> <strong>🏫 Toutes les écoles / كل المدارس</strong></label>
+                            <div class="sm-list">
+                                                            <label><input type="checkbox" name="schools[]" value="13"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> Centre du Patriarche Maximos V Hakim</label>
+                                                            <label><input type="checkbox" name="schools[]" value="18"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> centre physiotherapie</label>
+                                                            <label><input type="checkbox" name="schools[]" value="12"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> Clinique St Georges</label>
+                                                            <label><input type="checkbox" name="schools[]" value="2"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> COLLEGE MAXIMOS</label>
+                                                            <label><input type="checkbox" name="schools[]" value="5"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> Collège N.D de l&#039;annonciation des SRS Salvatoriennes</label>
+                                                            <label><input type="checkbox" name="schools[]" value="7"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> Collège N.D de l&#039;assomption des SRS Salvatoriennes</label>
+                                                            <label><input type="checkbox" name="schools[]" value="3"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> Collège N.D de la Délivrance des SRS Salvatoriennes</label>
+                                                            <label><input type="checkbox" name="schools[]" value="4" checked onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> Collège N.D des SRS Salvatoriennes</label>
+                                                            <label><input type="checkbox" name="schools[]" value="9"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> Couvent SRS Salvatoriennes de l&#039;annonciation</label>
+                                                            <label><input type="checkbox" name="schools[]" value="19"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> covent Jeata</label>
+                                                            <label><input type="checkbox" name="schools[]" value="11"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> Dar al Saadeh</label>
+                                                            <label><input type="checkbox" name="schools[]" value="6"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> Ecole N.D de l&#039;assomption des SRS Salvatoriennes</label>
+                                                            <label><input type="checkbox" name="schools[]" value="20"  onclick="var bs=document.querySelectorAll('#schoolMenu input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});document.getElementById('smAll').checked=(on===bs.length)"> دار سيدة السهل للراهبات اتلمخلصيات</label>
+                                                        </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> Appliquer / تطبيق</button>
+                        </form>
+                    </div>
+                </div>
+                
+                                <form method="get" action="/saint-maxime-payroll/switch_year.php" class="school-switcher" title="Année scolaire">
+                    <i class="fas fa-calendar-alt" style="color:#fff;background:#d97706;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
+                    <select name="school_year" onchange="this.form.submit()" class="form-control form-control-sm">
+                                                <option value="all" >📅 Toutes années / كل السنين</option>
+                                                    <option value="2027-2028" >2027-2028</option>
+                                                    <option value="2026-2027" selected>2026-2027</option>
+                                                    <option value="2025-2026" >2025-2026</option>
+                                                    <option value="2024-2025" >2024-2025</option>
+                                                    <option value="2023-2024" >2023-2024</option>
+                                                    <option value="2022-2023" >2022-2023</option>
+                                                    <option value="2021-2022" >2021-2022</option>
+                                                    <option value="2020-2021" >2020-2021</option>
+                                                    <option value="2019-2020" >2019-2020</option>
+                                                    <option value="2018-2019" >2018-2019</option>
+                                                    <option value="2017-2018" >2017-2018</option>
+                                                    <option value="2016-2017" >2016-2017</option>
+                                                    <option value="2015-2016" >2015-2016</option>
+                                                    <option value="2014-2015" >2014-2015</option>
+                                                    <option value="2013-2014" >2013-2014</option>
+                                                    <option value="2012-2013" >2012-2013</option>
+                                                    <option value="2011-2012" >2011-2012</option>
+                                                    <option value="2010-2011" >2010-2011</option>
+                                                    <option value="2009-2010" >2009-2010</option>
+                                                    <option value="2008-2009" >2008-2009</option>
+                                                    <option value="2007-2008" >2007-2008</option>
+                                                    <option value="2006-2007" >2006-2007</option>
+                                            </select>
+                </form>
+
+                <form method="get" action="/saint-maxime-payroll/switch_currency.php" class="school-switcher" title="Affichage des montants">
+                    <i class="fas fa-money-bill-wave" style="color:#fff;background:#059669;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
+                                        <select name="currency" onchange="this.form.submit()" class="form-control form-control-sm">
+                        <option value="both" selected>💱 L.L + $</option>
+                        <option value="lbp" >🇱🇧 L.L seul</option>
+                        <option value="usd" >💵 $ seul</option>
+                    </select>
+                </form>
+
+                                                <div class="school-switcher school-multi" id="salCompPicker" title="Composantes du salaire affiché">
+                    <i class="fas fa-layer-group" style="color:#fff;background:#7c3aed;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
+                    <button type="button" class="sm-btn" onclick="document.getElementById('salCompMenu').classList.toggle('open')">
+                        Salaire inclut <i class="fas fa-caret-down"></i>
+                    </button>
+                                        <div class="school-menu scb-menu" id="salCompMenu">
+                        <form method="get" action="/saint-maxime-payroll/switch_salarycomp.php">
+                            <div class="sm-list">
+                                <label><input type="checkbox" name="comp[]" value="extra" checked> Supplément</label>
+                                <label><input type="checkbox" name="comp[]" value="aide" checked> Prime & aide</label>
+                            </div>
+                                                        <div class="scb-block"><div class="scb-title"><i class="fas fa-bus"></i> Colonne transport</div>
+                                <div class="school-checks att-lang-checks scb-tiles" data-scb="transport_mode"><label class="chk"><input type="radio" name="transport_mode" value="none" checked autocomplete="off"> <span>Absente</span></label><label class="chk"><input type="radio" name="transport_mode" value="blank" autocomplete="off"> <span>Présente sans montant</span></label><label class="chk"><input type="radio" name="transport_mode" value="amount" autocomplete="off"> <span>Présente avec montant (dans le dû)</span></label></div>                            </div>
+                                                        <div class="scb-block"><div class="scb-title"><i class="fas fa-sack-dollar"></i> Colonne total dû</div>
+                                <div class="school-checks att-lang-checks scb-tiles" data-scb="due_mode"><label class="chk"><input type="radio" name="due_mode" value="none" autocomplete="off"> <span>Absente</span></label><label class="chk"><input type="radio" name="due_mode" value="blank" autocomplete="off"> <span>Présente sans montant</span></label><label class="chk"><input type="radio" name="due_mode" value="amount" checked autocomplete="off"> <span>Présente avec montant</span></label></div>                            </div>
+                                                        <div class="scb-block"><div class="scb-title"><i class="fas fa-people-roof"></i> Colonne net + alloc. fam.</div>
+                                <div class="school-checks att-lang-checks scb-tiles" data-scb="netfam_mode"><label class="chk"><input type="radio" name="netfam_mode" value="none" autocomplete="off"> <span>Absente</span></label><label class="chk"><input type="radio" name="netfam_mode" value="blank" autocomplete="off"> <span>Présente sans montant</span></label><label class="chk"><input type="radio" name="netfam_mode" value="amount" checked autocomplete="off"> <span>Présente avec montant</span></label></div>                            </div>
+                                                        <div class="scb-block"><div class="scb-title"><i class="fas fa-graduation-cap"></i> Colonnes échelon (contractuel)</div>
+                                <div class="school-checks att-lang-checks scb-tiles" data-scb="contract_grade_mode"><label class="chk"><input type="radio" name="contract_grade_mode" value="hide" checked autocomplete="off"> <span>Masquées (pas d’échelon)</span></label><label class="chk"><input type="radio" name="contract_grade_mode" value="show" autocomplete="off"> <span>Affichées</span></label></div>                            </div>
+                            <div style="font-size:11px;color:#64748b;padding:2px 4px 6px">Base + échelon toujours inclus</div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-check"></i> Appliquer / تطبيق</button>
+                        </form>
+                    </div>
+                </div>
+
+                <a href="/saint-maxime-payroll/switch_lang.php?lang=ar" class="btn btn-light btn-sm">
+                    <i class="fas fa-globe" style="color:#fff;background:#0284c7;width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
+                    العربية                </a>
+                
+                <div class="user-menu">
+                    <div class="user-avatar">
+                        A                    </div>
+                    <span>Administrateur Général</span>
+                </div>
+                
+                <a href="/saint-maxime-payroll/logout.php" class="btn btn-light btn-sm" title="Déconnexion / تسجيل الخروج">
+                    <i class="fas fa-sign-out-alt" style="color:#dc2626"></i>
+                </a>
+            </div>
+        </header>
+        <!-- سكربت البحث الشامل -->
+        <script>
+        (function () {
+            var inp = document.getElementById('gsInput'), panel = document.getElementById('gsPanel'), box = document.getElementById('globalSearch');
+            if (!inp) return;
+            var canDossier = true, timer = null;
+            function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+            function close() { panel.classList.remove('open'); }
+            function findPages(q) {
+                var out = [];
+                document.querySelectorAll('.sidebar-nav a').forEach(function (a) {
+                    var txt = a.textContent.trim();
+                    if (txt.toLowerCase().indexOf(q) > -1) {
+                        var ic = a.querySelector('i');
+                        out.push({ t: txt, h: a.href, i: ic ? ic.className : 'fas fa-link' });
+                    }
+                });
+                return out.slice(0, 6);
+            }
+            function render(pg, emps) {
+                var h = '';
+                if (pg.length) {
+                    h += '<div class="gs-sec"><i class="fas fa-window-maximize"></i> Pages / الصفحات</div>';
+                    pg.forEach(function (p) { h += '<a class="gs-item" href="' + esc(p.h) + '"><i class="' + esc(p.i) + '"></i><span>' + esc(p.t) + '</span></a>'; });
+                }
+                if (emps.length) {
+                    h += '<div class="gs-sec"><i class="fas fa-users"></i> Enseignants / الأساتذة</div>';
+                    emps.forEach(function (r) {
+                        h += '<a class="gs-item" href="/saint-maxime-payroll/pages/attestations.php?dossier=1&employee_id=' + r.id + '">'
+                           + '<i class="fas fa-user"></i><span>' + esc(r.fr) + ' / ' + esc(r.ar)
+                           + (r.left ? ' <b style="color:#b91c1c;font-size:11px;background:#fee2e2;border-radius:6px;padding:1px 6px">🚪 ترك ' + esc(r.left) + '</b>' : '')
+                           + '<small>' + esc(r.code + (r.school ? ' — ' + r.school : '')) + '</small></span></a>';
+                    });
+                }
+                if (!h) h = '<div class="gs-empty">Aucun résultat / لا نتائج</div>';
+                panel.innerHTML = h;
+                panel.classList.add('open');
+            }
+            inp.addEventListener('input', function () {
+                var q = inp.value.trim();
+                clearTimeout(timer);
+                if (q.length < 1) { close(); return; } // 🔍 «بس أحطّ أوّل حرف من اسمه لازم دغري يعطيني اللائحة» (2026-09-13)
+                timer = setTimeout(function () {
+                    var pg = findPages(q.toLowerCase());
+                    if (canDossier) {
+                        fetch('/saint-maxime-payroll/ajax_search.php?q=' + encodeURIComponent(q))
+                            .then(function (r) { return r.json(); })
+                            .then(function (emps) { render(pg, emps); })
+                            .catch(function () { render(pg, []); });
+                    } else { render(pg, []); }
+                }, 120);
+            });
+            inp.addEventListener('focus', function () { if (inp.value.trim().length >= 1) inp.dispatchEvent(new Event('input')); });
+            document.addEventListener('keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key && e.key.toLowerCase() === 'k') { e.preventDefault(); inp.focus(); inp.select(); }
+                if (e.key === 'Escape') close();
+            });
+            document.addEventListener('click', function (e) { if (!box.contains(e.target)) close(); });
+        })();
+        </script>
+
+                <div class="page-content" id="pageContent" style="--accent: #0284c7; --accent-bg: rgba(2,132,199,.16);">
+                            <div class="export-toolbar no-print no-export" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+                <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint()"><i class="fas fa-print"></i> Imprimer / طباعة</button>
+                        <button type="button" class="btn btn-sm btn-light" id="msaOrientBtn" onclick="msaToggleOrient()" title="اتجاه الورقة بالطباعة وPDF — اكبس للتبديل"><i class="fas fa-rotate"></i> <span>Orientation / الورقة</span></button>
+                <button type="button" class="btn btn-sm btn-danger" onclick="msaSavePdfStart(this)" title="ينزّل ملف PDF عالكمبيوتر فوراً (بلا شاشة طباعة)"><i class="fas fa-file-pdf"></i> PDF — احفظ عالكمبيوتر</button>
+                <a class="btn btn-sm btn-light" href="/saint-maxime-payroll/pages/print_pdf.php?target=pages%2Fbulk_allowances.php%3Fsch%5B%5D%3D13%26sch%5B%5D%3D14&amp;name=Primes_Transport_group_s_&amp;view=1" target="_blank" title="PDF رسمي طبق الأصل عبر Chrome — يفتح ويطبع"><i class="fas fa-file-pdf"></i> PDF رسمي</a>
+                                        <button type="button" class="btn btn-sm btn-success" onclick="ppExcel('Primes \u0026 Transport groupés \/ المكافآت والنقل الجماعي')"><i class="fas fa-file-excel"></i> Excel</button>
+            <button type="button" class="btn btn-sm btn-info" onclick="ppWord('Primes \u0026 Transport groupés \/ المكافآت والنقل الجماعي')"><i class="fas fa-file-word"></i> Word</button>
+                                                    <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsApp('Primes \u0026 Transport groupés \/ المكافآت والنقل الجماعي','')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+                                    <button type="button" class="btn btn-sm btn-light" onclick="ppEmail('Primes \u0026 Transport groupés \/ المكافآت والنقل الجماعي','')"><i class="fas fa-envelope"></i> Email</button>
+            </div>
+    <style>
+/* ✍️ (2026-08-28 ج، طلبه: «اعمل متل ما عاملين هالبرامج العالمية») — نمط أنظمة الرواتب الاحترافية:
+   مؤشرات + جدول بنود مركزي + نافذة منبثقة للإضافة مع معاينة حساب حيّة */
+.ba-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:14px; }
+.ba-kpi { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 16px; display:flex; gap:12px; align-items:center; }
+.ba-kpi .ic { width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; flex:0 0 38px; }
+.ba-kpi .v { font-weight:800; font-size:17px; color:#0f172a; }
+.ba-kpi .l { font-size:11.5px; color:#64748b; }
+.ba-kpi a { font-size:11px; }
+.ba-toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+.ba-badge-type { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+.bt-prime { background:#e0e7ff; color:#3730a3; } .bt-aide { background:#fef9c3; color:#854d0e; }
+.bt-trans { background:#dcfce7; color:#166534; } .bt-daily { background:#cffafe; color:#155e75; }
+.ba-badge-pct { display:inline-block; padding:3px 10px; border-radius:999px; background:#f3e8ff; color:#6b21a8; font-weight:800; font-size:12.5px; }
+.ba-badge-cat { display:inline-block; padding:2px 9px; border-radius:999px; background:#f1f5f9; color:#334155; font-size:11.5px; font-weight:700; }
+.ba-table th { background:#1F4E5F !important; color:#fff !important; white-space:nowrap; }
+.ba-table tbody tr:hover td { background:#f8fafc; }
+.ba-empty { text-align:center; color:#94a3b8; padding:34px 10px; }
+.ba-empty i { font-size:34px; margin-bottom:8px; display:block; }
+/* المودال */
+.ba-overlay { position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:1000; display:none; align-items:flex-start; justify-content:center; padding:4vh 12px; overflow:auto; }
+.ba-overlay.open { display:flex; }
+.ba-modal { background:#fff; border-radius:14px; width:100%; max-width:760px; box-shadow:0 24px 60px rgba(0,0,0,.25); }
+.ba-modal-head { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid #e2e8f0; }
+.ba-modal-head h4 { margin:0; font-size:15px; color:#1F4E5F; }
+.ba-modal-body { padding:16px 20px; }
+.ba-modal-foot { padding:12px 20px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px; }
+.ba-x { background:none; border:none; font-size:18px; cursor:pointer; color:#64748b; }
+.ba-cats { display:flex; gap:16px; flex-wrap:wrap; align-items:center; padding:8px 12px;
+           background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; margin:8px 0; }
+.ba-cats strong { color:#9a3412; min-width:90px; } .ba-cats label { font-weight:600; cursor:pointer; white-space:nowrap; min-width:150px; display:inline-flex; align-items:center; gap:5px; } /* ☑️📐 (2026-09-27) خانات بعرض ثابت مرصوفة */
+#opTypes label { min-width:190px; display:inline-flex; align-items:center; gap:5px; }
+.ba-live { background:#f0fdf4; border:1px dashed #86efac; border-radius:10px; padding:10px 14px; font-size:13px; margin-top:10px; }
+.ba-live strong { color:#166534; }
+.ba-editor td { vertical-align:middle; }
+.ba-editor select[name$="[type]"] { min-width:170px; }
+.ba-editor select[name$="[vtype]"] { min-width:110px; }
+.ba-editor select[name$="[from]"], .ba-editor select[name$="[to]"] { min-width:100px; }
+.ind-cell { display:inline-flex; align-items:center; gap:4px; }
+.ind-cell .ind-pct { width:58px; padding:4px 6px; text-align:center; }
+.ind-cell .ind-amt { width:118px; padding:4px 8px; text-align:left; }
+.ind-cell .ind-usd { width:84px; }
+.ind-unit { font-size:11.5px; color:#64748b; font-weight:700; }
+.ind-plus { color:#94a3b8; font-weight:800; }
+.ba-step { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px dashed #e2e8f0; }
+.ba-step:last-child { border-bottom:none; }
+.ba-step > div { flex:1; min-width:0; }
+.ba-num { flex:0 0 30px; width:30px; height:30px; border-radius:50%; background:#1F4E5F; color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.ba-hint { color:#64748b; font-size:12.5px; line-height:1.8; }
+.ba-warn { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; font-size:12.5px; line-height:1.8; margin-top:8px; color:#78350f; }
+.ba-help { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin:0 0 12px; font-size:13px; line-height:2; }
+.ba-help summary { cursor:pointer; font-weight:800; color:#1F4E5F; }
+.ba-help ol { margin:6px 18px 0 0; padding:0; }
+</style>
+
+<div class="card">
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-gift"></i> Primes, supplément &amp; transport</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">المكافآت والأجر الإضافي والنقل</div>
+    </h3></div>
+    <div class="card-body">
+        <form method="GET" class="form-row cols-2 no-print" style="margin-bottom:12px" autocomplete="off">
+            <div class="form-group mb-0" style="grid-column:1 / -1;flex:1 1 100%"><label class="form-label"><i class="fas fa-school"></i> Écoles / المدارس <small style="font-weight:400;color:#64748b">— وحدة لحالها أو مجموعة معاً أو الكل / une, plusieurs ou toutes</small></label><div class="school-checks msa-school-pick"><input type="hidden" name="sch_set" value="1"><span hidden data-msa-sync-name="sch_all" data-msa-sync-values=""></span><span hidden data-msa-sync-name="sch[]" data-msa-sync-values="13"></span><label class="chk all"><input type="checkbox" autocomplete="off" name="sch_all" value="1" onclick="msaSchoolPickAll(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> <strong>Toutes / الكل</strong></label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="13" checked onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> مركز البطريرك مكسيموس الخامس حكيم</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="18" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> دار السعادة للعلاج الفيزيائي -مركز السعادة لسيدة البشارة</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="12" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> مستوصف القديس جاورجيوس للراهبات المخلصيات - يارون</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="2" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> مدرسة القديس مكسيموس</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="5" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> مدرسة سيدة البشارة للراهبات المخلصيات</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="7" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> مدرسة سيدة النياح للراهبات المخلصيات</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="3" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> مدرسة سيدة النجاة للراهبات المخلصيات</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="4" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> مدرسة ثانوية السيدة للراهبات المخلصيات</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="9" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> دير سيدة البشارة للراهبات المخلصيات - جون</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="19" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> دير حاملات الطيب للراهبات المخلصيات - جعيتا</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="11" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> دار السعادة للراهبات المخلصيات- كسارة</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="6" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> مدرسة سيدة الانتقال للراهبات المخلصيات</label><label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="20" onclick="msaSchoolPickOne(this);(window.msaSubmitSoon||function(f){f.submit()})(this.form)"> دار سيدة السهل للراهبات المخلصيات - الدامور</label></div></div><script>function msaSchoolPickAll(b){var w=b.closest(".msa-school-pick");if(b.checked){w.querySelectorAll('input[name="sch[]"]').forEach(function(c){c.checked=false;});}else if(!Array.from(w.querySelectorAll('input[name="sch[]"]')).some(function(c){return c.checked;})){b.checked=true;}}function msaSchoolPickOne(b){var w=b.closest(".msa-school-pick");var any=Array.from(w.querySelectorAll('input[name="sch[]"]')).some(function(c){return c.checked;});var a=w.querySelector('input[name="sch_all"]');if(a)a.checked=!any;}</script>            <div class="form-group mb-0">
+                <label class="form-label">Année scolaire / السنة الدراسية</label>
+                <input type="text" name="sy" class="form-control" value="2026-2027" onchange="this.form.submit()">
+            </div>
+        </form>
+        <div class="ba-kpis">
+            <div class="ba-kpi"><span class="ic" style="background:#e0e7ff;color:#3730a3"><i class="fas fa-users"></i></span>
+                <span><div class="v">2</div><div class="l">موظف مشمول / Employés</div></span></div>
+            <div class="ba-kpi"><span class="ic" style="background:#dcfce7;color:#166534"><i class="fas fa-list-check"></i></span>
+                <span><div class="v">0</div><div class="l">بند ساري / Lignes actives</div></span></div>
+            <div class="ba-kpi"><span class="ic" style="background:#fef9c3;color:#854d0e"><i class="fas fa-coins"></i></span>
+                <span><div class="v">1500</div><div class="l">السعر الرسمي القديم (قسمة الأساس) — <a href="/saint-maxime-payroll/pages/settings.php">تعديل</a></div></span></div>
+            <div class="ba-kpi"><span class="ic" style="background:#cffafe;color:#155e75"><i class="fas fa-money-bill-trend-up"></i></span>
+                <span><div class="v">89,500</div><div class="l">السعر الجديد — سعر الشهر (تحويل لليرة) — <a href="/saint-maxime-payroll/pages/exchange_rates.php">تعديل</a></div></span></div>
+        </div>
+
+                <div class="card no-print" id="baOnePct" style="margin:0 0 14px;border:2px solid #1F4E5F;box-shadow:none">
+            <div class="card-header" style="background:#1F4E5F;color:#fff"><h3 style="color:#fff">
+                <span dir="ltr"><i class="fas fa-bolt"></i> Appliquer à tous d'un coup — un taux % ou montant par catégorie</span>
+                <div style="font-size:0.85em;font-weight:600;opacity:0.95">طبّق على الكل دفعة وحدة — لكل فئة رقمها (الملاك / المتعاقدين / الموظفين، نسبة ٪ أو مبلغ) —مركز البطريرك مكسيموس الخامس حكيم — 2026-2027</div>
+            </h3></div>
+            <div class="card-body">
+                                <form method="POST" id="baOnePctForm">
+                    <input type="hidden" name="csrf" value="470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8">                    <input type="hidden" name="action" value="apply_percats">
+                    <input type="hidden" name="sch[]" value="13"><input type="hidden" name="sch_set" value="1"><input type="hidden" name="sy" value="2026-2027">
+                    <div class="ba-step"><span class="ba-num">١</span><div>
+                        <strong>شو؟</strong>
+                        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px" id="opTypes">
+                            <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="ptype" value="prime_fixe" checked> ➕ الأجر الإضافي</label>
+                            <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="ptype" value="aide_complementaire"> 💰 مكافأة ومساعدة</label>
+                            <label style="font-weight:700;cursor:pointer;white-space:nowrap"><input type="radio" name="ptype" value="transport_complement"> 🚌 نقل شهري</label>
+                        </div>
+                    </div></div>
+                    <div class="ba-step"><span class="ba-num">٢</span><div style="min-width:0;flex:1">
+                        <strong>لكل فئة رقمها</strong> <span class="ba-hint">أشّر الفئة واكتب لها نسبتها ٪ أو مبلغها — الملاك شي، المتعاقدون شي، الموظفون شي. الفئة غير المؤشَّرة ما بتتأثّر.</span>
+                        <div class="table-scroll" style="margin-top:6px">
+                        <table class="table" id="opCats" style="margin:0;min-width:760px">
+                            <thead><tr style="background:#f1f5f9">
+                                <th style="width:34px"></th><th>الفئة</th><th>نسبة ٪ أو مبلغ؟</th><th>القيمة</th><th>من شهر ← إلى شهر</th><th>الوضع الحالي</th><th>🧮 مثال حيّ (بالشهر)</th>
+                            </tr></thead>
+                            <tbody>
+                                                        <tr class="opRow" data-cat="titulaire" style="opacity:0.55">
+                                <td style="text-align:center"><input type="checkbox" name="pc[titulaire][on]" value="1" class="opOn"  disabled style="width:20px;height:20px;cursor:pointer"></td>
+                                <td style="font-weight:800;white-space:nowrap">الملاك <small style="color:#64748b;font-weight:400">(0)</small></td>
+                                <td style="white-space:nowrap">
+                                    <label style="font-weight:700;cursor:pointer;display:block"><input type="radio" name="pc[titulaire][vtype]" value="percent" class="opMode" checked> نسبة ٪ من الأساس</label>
+                                    <label style="font-weight:700;cursor:pointer;display:block"><input type="radio" name="pc[titulaire][vtype]" value="amount" class="opMode"> مبلغ ثابت كل شهر</label>
+                                </td>
+                                <td style="white-space:nowrap">
+                                    <div style="display:flex;gap:6px;align-items:center">
+                                        <input type="number" step="0.01" min="0.01" name="pc[titulaire][value]" class="form-control opVal" placeholder="مثلاً 65" style="width:200px;max-width:200px;font-size:16px;font-weight:800;text-align:center" dir="ltr" disabled>
+                                        <span class="opUnit" style="font-weight:800">٪</span>
+                                        <select name="pc[titulaire][currency]" class="form-select opCur" style="max-width:95px;font-weight:700;display:none"><option value="LBP">ل.ل</option><option value="USD">$</option></select>
+                                    </div>
+                                </td>
+                                <td style="white-space:nowrap">
+                                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+                                        <select name="pc[titulaire][from]" class="form-select" style="max-width:118px;font-weight:700"><option value="10" selected>تشرين الأول</option><option value="11">تشرين الثاني</option><option value="12">كانون الأول</option><option value="1">كانون الثاني</option><option value="2">شباط</option><option value="3">آذار</option><option value="4">نيسان</option><option value="5">أيار</option><option value="6">حزيران</option><option value="7">تموز</option><option value="8">آب</option><option value="9">أيلول</option></select>                                        <span>←</span>
+                                        <select name="pc[titulaire][to]" class="form-select" style="max-width:118px;font-weight:700"><option value="10">تشرين الأول</option><option value="11">تشرين الثاني</option><option value="12">كانون الأول</option><option value="1">كانون الثاني</option><option value="2">شباط</option><option value="3">آذار</option><option value="4">نيسان</option><option value="5">أيار</option><option value="6">حزيران</option><option value="7">تموز</option><option value="8">آب</option><option value="9" selected>أيلول</option></select>                                    </div>
+                                    <div class="opPer" style="color:#166534;font-weight:700;font-size:12px;margin-top:2px">(كل السنة)</div>
+                                </td>
+                                <td class="opState" style="font-size:12.5px;line-height:1.7;min-width:170px">—</td>
+                                <td class="opLive" style="font-size:12.5px;line-height:1.7;min-width:220px;background:#f0fdf4">—</td>
+                            </tr>
+                                                        <tr class="opRow" data-cat="contractuel" style="opacity:0.55">
+                                <td style="text-align:center"><input type="checkbox" name="pc[contractuel][on]" value="1" class="opOn"  disabled style="width:20px;height:20px;cursor:pointer"></td>
+                                <td style="font-weight:800;white-space:nowrap">المتعاقدين <small style="color:#64748b;font-weight:400">(0)</small></td>
+                                <td style="white-space:nowrap">
+                                    <label style="font-weight:700;cursor:pointer;display:block"><input type="radio" name="pc[contractuel][vtype]" value="percent" class="opMode" checked> نسبة ٪ من الأساس</label>
+                                    <label style="font-weight:700;cursor:pointer;display:block"><input type="radio" name="pc[contractuel][vtype]" value="amount" class="opMode"> مبلغ ثابت كل شهر</label>
+                                </td>
+                                <td style="white-space:nowrap">
+                                    <div style="display:flex;gap:6px;align-items:center">
+                                        <input type="number" step="0.01" min="0.01" name="pc[contractuel][value]" class="form-control opVal" placeholder="مثلاً 65" style="width:200px;max-width:200px;font-size:16px;font-weight:800;text-align:center" dir="ltr" disabled>
+                                        <span class="opUnit" style="font-weight:800">٪</span>
+                                        <select name="pc[contractuel][currency]" class="form-select opCur" style="max-width:95px;font-weight:700;display:none"><option value="LBP">ل.ل</option><option value="USD">$</option></select>
+                                    </div>
+                                </td>
+                                <td style="white-space:nowrap">
+                                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+                                        <select name="pc[contractuel][from]" class="form-select" style="max-width:118px;font-weight:700"><option value="10" selected>تشرين الأول</option><option value="11">تشرين الثاني</option><option value="12">كانون الأول</option><option value="1">كانون الثاني</option><option value="2">شباط</option><option value="3">آذار</option><option value="4">نيسان</option><option value="5">أيار</option><option value="6">حزيران</option><option value="7">تموز</option><option value="8">آب</option><option value="9">أيلول</option></select>                                        <span>←</span>
+                                        <select name="pc[contractuel][to]" class="form-select" style="max-width:118px;font-weight:700"><option value="10">تشرين الأول</option><option value="11">تشرين الثاني</option><option value="12">كانون الأول</option><option value="1">كانون الثاني</option><option value="2">شباط</option><option value="3">آذار</option><option value="4">نيسان</option><option value="5">أيار</option><option value="6">حزيران</option><option value="7">تموز</option><option value="8">آب</option><option value="9" selected>أيلول</option></select>                                    </div>
+                                    <div class="opPer" style="color:#166534;font-weight:700;font-size:12px;margin-top:2px">(كل السنة)</div>
+                                </td>
+                                <td class="opState" style="font-size:12.5px;line-height:1.7;min-width:170px">—</td>
+                                <td class="opLive" style="font-size:12.5px;line-height:1.7;min-width:220px;background:#f0fdf4">—</td>
+                            </tr>
+                                                        <tr class="opRow" data-cat="employe" style="">
+                                <td style="text-align:center"><input type="checkbox" name="pc[employe][on]" value="1" class="opOn"   style="width:20px;height:20px;cursor:pointer"></td>
+                                <td style="font-weight:800;white-space:nowrap">الموظفين <small style="color:#64748b;font-weight:400">(2)</small></td>
+                                <td style="white-space:nowrap">
+                                    <label style="font-weight:700;cursor:pointer;display:block"><input type="radio" name="pc[employe][vtype]" value="percent" class="opMode" checked> نسبة ٪ من الأساس</label>
+                                    <label style="font-weight:700;cursor:pointer;display:block"><input type="radio" name="pc[employe][vtype]" value="amount" class="opMode"> مبلغ ثابت كل شهر</label>
+                                </td>
+                                <td style="white-space:nowrap">
+                                    <div style="display:flex;gap:6px;align-items:center">
+                                        <input type="number" step="0.01" min="0.01" name="pc[employe][value]" class="form-control opVal" placeholder="مثلاً 65" style="width:200px;max-width:200px;font-size:16px;font-weight:800;text-align:center" dir="ltr" >
+                                        <span class="opUnit" style="font-weight:800">٪</span>
+                                        <select name="pc[employe][currency]" class="form-select opCur" style="max-width:95px;font-weight:700;display:none"><option value="LBP">ل.ل</option><option value="USD">$</option></select>
+                                    </div>
+                                </td>
+                                <td style="white-space:nowrap">
+                                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+                                        <select name="pc[employe][from]" class="form-select" style="max-width:118px;font-weight:700"><option value="10" selected>تشرين الأول</option><option value="11">تشرين الثاني</option><option value="12">كانون الأول</option><option value="1">كانون الثاني</option><option value="2">شباط</option><option value="3">آذار</option><option value="4">نيسان</option><option value="5">أيار</option><option value="6">حزيران</option><option value="7">تموز</option><option value="8">آب</option><option value="9">أيلول</option></select>                                        <span>←</span>
+                                        <select name="pc[employe][to]" class="form-select" style="max-width:118px;font-weight:700"><option value="10">تشرين الأول</option><option value="11">تشرين الثاني</option><option value="12">كانون الأول</option><option value="1">كانون الثاني</option><option value="2">شباط</option><option value="3">آذار</option><option value="4">نيسان</option><option value="5">أيار</option><option value="6">حزيران</option><option value="7">تموز</option><option value="8">آب</option><option value="9" selected>أيلول</option></select>                                    </div>
+                                    <div class="opPer" style="color:#166534;font-weight:700;font-size:12px;margin-top:2px">(كل السنة)</div>
+                                </td>
+                                <td class="opState" style="font-size:12.5px;line-height:1.7;min-width:170px">—</td>
+                                <td class="opLive" style="font-size:12.5px;line-height:1.7;min-width:220px;background:#f0fdf4">—</td>
+                            </tr>
+                                                        </tbody>
+                        </table>
+                        </div>
+                        <div style="font-size:11.5px;color:#64748b;margin-top:4px" id="opRule"></div>
+                    </div></div>
+                    <div class="ba-step"><span class="ba-num">٣</span><div style="min-width:0">
+                        <span class="ba-hint">قيمة بتتغيّر بنص السنة عند فئة = طبّق مرّتين بفترتين مختلفتين. الفترة قدّام كل فئة (افتراضياً كل السنة تشرين ← أيلول).</span>
+                        <div style="margin-top:10px"><button type="submit" class="btn btn-primary" id="opBtn" style="font-weight:800" data-confirm="تطبيق؟"><i class="fas fa-check"></i> <span id="opBtnTxt">طبّق</span> / Appliquer</button></div>
+                    </div></div>
+                    <div class="ba-warn" style="margin-top:6px" id="opWarn">⚠️ الزرّ يستبدل <b id="opWarnType">الأجر الإضافي</b> الحالي عند <b>كل</b> موظفي كل فئة مؤشَّرة (كل فتراته) بسطرها. الفئات غير المؤشَّرة والأنواع التانية ما بتتأثّر. شخص بدّك تخلّيه على شي مختلف؟ بعد التطبيق عدّله من ملفه ← تبويب «المكافآت». <b>كل متعاقد إلو رقمه</b> (مبلغ بالدولار و/أو بالليرة)؟ ما تستعمل هالبطاقة — زرّ <b>«مبالغ فردية (لكل واحد)»</b> تحت، أو <b>إكسل</b>.</div>
+                </form>
+                <script>
+                (function(){
+                    var OFFICIAL=1500, RATE=89500, OFFLBL="1500";
+                    var STATS={"titulaire":{"prime_fixe":{"n":0,"pct":[],"amt":[],"mixed":0,"none":0},"aide_complementaire":{"n":0,"pct":[],"amt":[],"mixed":0,"none":0},"transport_complement":{"n":0,"pct":[],"amt":[],"mixed":0,"none":0}},"contractuel":{"prime_fixe":{"n":0,"pct":[],"amt":[],"mixed":0,"none":0},"aide_complementaire":{"n":0,"pct":[],"amt":[],"mixed":0,"none":0},"transport_complement":{"n":0,"pct":[],"amt":[],"mixed":0,"none":0}},"employe":{"prime_fixe":{"n":2,"pct":[],"amt":[],"mixed":0,"none":2},"aide_complementaire":{"n":2,"pct":[],"amt":[],"mixed":0,"none":2},"transport_complement":{"n":2,"pct":[],"amt":[],"mixed":0,"none":2}}}, LOHI={"titulaire":{"lo":null,"hi":null},"contractuel":{"lo":null,"hi":null},"employe":{"lo":{"name":"مارون طنوس","base":28000000},"hi":{"name":"ريما حليحل","base":30000000}}};
+                    var CATL={titulaire:'الملاك',contractuel:'المتعاقدين',employe:'الموظفين'}, TYPEL={prime_fixe:'الأجر الإضافي',aide_complementaire:'مكافأة ومساعدة',transport_complement:'النقل الشهري'};
+                    var SCHOOL="مركز البطريرك مكسيموس الخامس حكيم — 2026-2027";
+                    var rows=[].slice.call(document.querySelectorAll('#opCats tr.opRow'));
+                    var btn=document.getElementById('opBtn'), btnTxt=document.getElementById('opBtnTxt'), warnType=document.getElementById('opWarnType'), rule=document.getElementById('opRule');
+                    if(!rows.length||!btn) return;
+                    var RULE_PCT='النسبة ٪: الأساس ÷ '+OFFLBL+' × النسبة ← داون بالدولار ← × '+RATE.toLocaleString('en-US')+' (سعر الشهر) ← داون للمليون — بتتحرّك مع الدرجة لحالها.';
+                    var RULE_AMT='المبلغ الثابت: نفس الرقم كل شهر لكل شخص مهما كانت درجته؛ بالدولار يُحوَّل بسعر الشهر ('+RATE.toLocaleString('en-US')+') — داون لليرة.';
+                    function periodTxt(r){ var f=parseInt(r.from.value,10), t=parseInt(r.to.value,10); if(f===10&&t===9) return 'كل السنة';
+                        return r.from.options[r.from.selectedIndex].text+' ← '+r.to.options[r.to.selectedIndex].text; }
+                    function type(){ var r=document.querySelector('#opTypes input:checked'); return r?r.value:'prime_fixe'; }
+                    function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+                    function calc(base,pct){ var usd=Math.floor((base/OFFICIAL)*(pct/100)); var lbp=Math.floor(usd*RATE); return {usd:usd, lbp:Math.floor(lbp/1000000)*1000000}; }
+                    function line(it,pct){ var c=calc(it.base,pct); return '<div>'+it.name+' — أساس '+fmt(it.base)+' ⇒ '+fmt(c.usd)+'$ ⇒ <b style="color:#166534">'+fmt(c.lbp)+' ل.ل</b></div>'; }
+                    function R(tr){ return {tr:tr, cat:tr.getAttribute('data-cat'), on:tr.querySelector('.opOn'), modes:[].slice.call(tr.querySelectorAll('.opMode')), val:tr.querySelector('.opVal'), cur:tr.querySelector('.opCur'), unit:tr.querySelector('.opUnit'), state:tr.querySelector('.opState'), live:tr.querySelector('.opLive'), from:tr.querySelector('select[name$="[from]"]'), to:tr.querySelector('select[name$="[to]"]'), per:tr.querySelector('.opPer')}; }
+                    var RS=rows.map(R);
+                    function mode(r){ var m=r.modes.filter(function(x){return x.checked;})[0]; return m?m.value:'percent'; }
+                    function dominant(S){ // القيمة السائدة بالفئة لهذا النوع (نسبة أو مبلغ) للاقتراح
+                        var best=null; if(!S) return null;
+                        Object.keys(S.pct).forEach(function(k){ if(!best||S.pct[k]>best.n) best={m:'percent',v:k,n:S.pct[k]}; });
+                        Object.keys(S.amt).forEach(function(k){ if(!best||S.amt[k]>best.n){ var p=k.split('|'); best={m:'amount',v:p[0],c:p[1],n:S.amt[k]}; } });
+                        return best;
+                    }
+                    function renderState(r){
+                        var S=(STATS[r.cat]||{})[type()]; if(!S){ r.state.textContent='—'; return; }
+                        var parts=[]; Object.keys(S.pct).sort(function(x,y){return S.pct[y]-S.pct[x];}).forEach(function(k){parts.push('<b>'+S.pct[k]+'</b> على <b>'+k+'٪</b>');});
+                        Object.keys(S.amt).sort(function(x,y){return S.amt[y]-S.amt[x];}).forEach(function(k){var p=k.split('|'); parts.push('<b>'+S.amt[k]+'</b> على مبلغ <b>'+fmt(parseFloat(p[0]))+(p[1]==='USD'?' $':' ل.ل')+'</b>');});
+                        // أكثر من 3 قيم مختلفة (المتعاقدون: كل واحد رقمه) = الأكثر شيوعاً ثم «و N قيمة أخرى» بدل قائمة طويلة
+                        var extra=0; if(parts.length>3){ var rest=parts.slice(3); parts=parts.slice(0,3); rest.forEach(function(h){ var m=h.match(/<b>(\d+)<\/b>/); extra+=m?parseInt(m[1],10):1; }); }
+                        if(extra) parts.push('<b>'+extra+'</b> على قيم فردية أخرى');
+                        if(S.mixed) parts.push('<b>'+S.mixed+'</b> نسبة + مبلغ'); if(S.none) parts.push('<b>'+S.none+'</b> بلا '+TYPEL[type()]);
+                        r.state.innerHTML=parts.length?parts.join('<br>'):'—';
+                    }
+                    // 🚌 النقل مبلغ دائماً: عند اختيار النقل تُقفل خانة النسبة بكل السطور
+                    function guardTransport(){ var t=type(); RS.forEach(function(r){ var pr=r.modes[0], am=r.modes[1];
+                        if(t==='transport_complement'){ pr.disabled=true; pr.parentNode.style.opacity=0.45; if(pr.checked) am.checked=true; } else { pr.disabled=false; pr.parentNode.style.opacity=1; } }); }
+                    function updRow(r){
+                        var m=mode(r), v=parseFloat(r.val.value)||0, on=r.on.checked&&!r.on.disabled;
+                        r.cur.style.display=(m==='amount')?'':'none'; r.unit.style.display=(m==='percent')?'':'none';
+                        r.val.placeholder=(m==='amount')?'مثلاً 54000000':'مثلاً 65';
+                        r.tr.style.background=on?'#fffbeb':''; r.val.required=on; if(r.per) r.per.textContent='('+periodTxt(r)+')';
+                        renderState(r);
+                        if(!on){ r.live.innerHTML='<span style="color:#94a3b8">غير مؤشَّرة — ما بتتأثّر</span>'; return; }
+                        if(!v){ r.live.textContent='—'; return; }
+                        if(m==='amount'){ var c=r.cur.value; r.live.innerHTML='<div>كل شخص = <b style="color:#166534">'+fmt(v)+(c==='USD'?' $':' ل.ل')+'</b>'+(c==='USD'?' ≈ '+fmt(Math.floor(v*RATE))+' ل.ل':'')+'</div>'; return; }
+                        var L=LOHI[r.cat]||{}; if(!L.lo){ r.live.textContent='لا أساس مخزّن لهذه الفئة بهذه السنة'; return; }
+                        var h=line(L.lo,v); if(L.hi&&L.hi.name!==L.lo.name) h+=line(L.hi,v); r.live.innerHTML=h;
+                    }
+                    function upd(){
+                        var t=type(), n=0, who=[], what=[];
+                        RS.forEach(function(r){ updRow(r); if(r.on.checked&&!r.on.disabled){ var S=(STATS[r.cat]||{})[t]; n+=S?S.n:0; who.push(CATL[r.cat]);
+                            var v=parseFloat(r.val.value)||0, m=mode(r); what.push(CATL[r.cat]+' '+(v?(m==='percent'?v+'٪':fmt(v)+(r.cur.value==='USD'?' $':' ل.ل')):'…')+' ('+periodTxt(r)+')'); } });
+                        warnType.textContent=TYPEL[t]; if(rule) rule.textContent=RULE_PCT+' '+RULE_AMT;
+                        btnTxt.textContent='طبّق على '+n+' ('+(who.join(' + ')||'—')+')'; btn.disabled=(n===0);
+                        btn.setAttribute('data-confirm','تطبيق «'+TYPEL[t]+'»: '+(what.join(' · ')||'—')+' — بـ'+SCHOOL+'؟ '+TYPEL[t]+' الحالي عند كل فئة مؤشَّرة (نسب أو مبالغ، كل الفترات) يُستبدل بسطرها، ثم تُعاد الرواتب تلقائياً.');
+                    }
+                    function suggest(){ // عند تغيير النوع: اقترح لكل فئة قيمتها السائدة الحالية — المستخدم يعدّلها كما يشاء
+                        guardTransport();
+                        RS.forEach(function(r){ var d=dominant((STATS[r.cat]||{})[type()]); if(d&&d.m==='percent'&&type()==='transport_complement') d=null;
+                            if(d){ r.modes.forEach(function(x){ x.checked=(x.value===d.m); }); r.val.value=d.v; if(d.m==='amount') r.cur.value=d.c||'LBP'; } else { r.val.value=''; } });
+                        upd();
+                    }
+                    document.querySelectorAll('#opTypes input').forEach(function(el){ el.addEventListener('change',suggest); });
+                    RS.forEach(function(r){ r.on.addEventListener('change',upd); r.modes.forEach(function(x){ x.addEventListener('change',function(){ r.val.value=''; upd(); }); });
+                        r.val.addEventListener('input',upd); r.cur.addEventListener('change',upd); if(r.from) r.from.addEventListener('change',upd); if(r.to) r.to.addEventListener('change',upd); });
+                    suggest();
+                })();
+                </script>
+                            </div>
+        </div>
+        
+        <details class="ba-help no-print">
+            <summary><i class="fas fa-circle-question"></i> كيف بشتغل بهالصفحة؟ (اكبس للشرح)</summary>
+            <ol>
+                <li><b>لكل فئة رقمها دفعة وحدة؟</b> البطاقة الكحلية فوق: شو (أجر إضافي/مكافأة/نقل شهري) ← أشّر الفئات وحطّ لكل واحدة رقمها (الملاك نسبة ٪ مثلاً، المتعاقدون نسبة تانية أو مبلغ، الموظفون مبلغ تالت) ← من شهر إلى شهر ← «طبّق». الفئة غير المؤشَّرة ما بتتأثّر. خلص.</li>
+                <li><b>«+ بند جديد»</b> (لأي نوع/فئة/فترة) ← اختر <b>الفئة</b> (ملاك / متعاقدين / موظفين) ← كل سطر = بند: <b>النوع</b> (أجر إضافي / مكافأة ومساعدة / نقل شهري) + <b>نسبة ٪</b> أو <b>مبلغ ثابت</b> + <b>الفترة</b> ← «طبّق». البرنامج بيعيد حساب رواتب الفئة لحاله.</li>
+                <li><b>النسبة ٪</b> بتنحسب من أساس الراتب بعد التدرّج (÷1500 ← × سعر الشهر) وبتتحرّك مع الدرجة — منطقية للملاك. <b>المبلغ الثابت</b> بالليرة أو بالدولار — للمتعاقدين والموظفين أو لأي زيادة ثابتة.</li>
+                <li><b>نسبة + مبلغ ثابت مع بعض</b> (مثلاً 45٪ + 2,000,000 ثابت): حطّهم <b>سطرين بنفس النافذة</b> وكبس طبّق مرّة وحدة. (لو طبّقتهم بمرّتين منفصلتين، التانية بتشيل الأولى لأنها من نفس النوع.)</li>
+                <li><b>كل واحد إلو رقمه</b> (المتعاقدون، أو أستاذ ملاك بدّك تعطيه شي خاص): زرّ <b>«مبالغ فردية (لكل واحد)»</b> ← جدول بأسماء الفئة، قدّام كل اسم ولكل نوع ثلاث خانات <b>نسبة ٪ + مبلغ بالليرة + مبلغ بالدولار</b> — عبّي وحدة أو أكثر (متعاقد بياخد جزء بالدولار وجزء بالليرة = عبّي الخانتين) واحفظ مرّة وحدة. فاضي = ما بيتغيّر، 0 = شيله.</li>
+                <li>الجدول تحت = <b>البنود السارية</b>: <i class="fas fa-pen" style="color:#1d4ed8"></i> تعديل سطر لحاله · <i class="fas fa-trash" style="color:#b91c1c"></i> حذفه. <b>«نقل يومي»</b> للمتعاقدين حسب أيام الحضور. <b>استثناء لشخص واحد</b>: من ملفه ← تبويب «المالي».</li>
+            </ol>
+        </details>
+
+        <div class="ba-toolbar">
+            <div style="font-weight:800;color:#1F4E5F;font-size:14.5px"><i class="fas fa-table-list"></i> البنود السارية — مركز البطريرك مكسيموس الخامس حكيم — 2026-2027</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="btn btn-primary" onclick="baOpen('baModalAdd')"><i class="fas fa-plus"></i> بند جديد / Ajouter</button>
+                <button type="button" class="btn btn-success" onclick="baOpen('baModalIndiv')"><i class="fas fa-user-pen"></i> مبالغ فردية (لكل واحد)</button>
+                <button type="button" class="btn btn-light" onclick="baOpen('baModalDaily')"><i class="fas fa-bus"></i> نقل يومي</button>
+                <button type="button" class="btn btn-light" style="color:#b91c1c" onclick="baOpen('baModalRemove')"><i class="fas fa-trash"></i> إزالة</button>
+                <a class="btn btn-light" style="color:#166534" href="/saint-maxime-payroll/pages/excel_salaries.php?sch=13&sy=2026-2027" title="إكسل بأسماء المتعاقدين والموظفين: الراتب والأجر الإضافي وعدد الأيام — تعبّيه وترفعه"><i class="fas fa-file-excel"></i> إكسل (متعاقدين/موظفين)</a>            </div>
+        </div>
+
+                <div class="ba-empty"><i class="fas fa-inbox"></i>ما في بنود مطبّقة بعد لهالنطاق — اكبس <strong>«+ بند جديد»</strong> لتبلّش.</div>
+        
+        <details class="ba-fold" style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;margin-top:14px;background:#fff">
+            <summary style="cursor:pointer;font-weight:700;color:#1F4E5F;font-size:13.5px"><i class="fas fa-list"></i> لائحة الموظفين المشمولين (2)</summary>
+            <div id="baPreviewHere"></div>
+        </details>
+    </div>
+</div>
+
+<!-- ═══ مودال: بند جديد ═══ -->
+<div class="ba-overlay" id="baModalAdd">
+  <div class="ba-modal">
+    <div class="ba-modal-head"><h4><i class="fas fa-plus-circle"></i> بند جديد — مكافأة / أجر إضافي / نقل شهري</h4><button type="button" class="ba-x" onclick="baClose('baModalAdd')">✕</button></div>
+    <form method="POST" id="periodsForm">
+        <input type="hidden" name="csrf" value="470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8">        <input type="hidden" name="action" value="apply_periods">
+        <input type="hidden" name="sch[]" value="13"><input type="hidden" name="sch_set" value="1"><input type="hidden" name="sy" value="2026-2027">
+        <div class="ba-modal-body">
+            <div class="ba-step"><span class="ba-num">١</span><div>
+                <strong>على مين؟</strong> <span class="ba-hint">اختر الفئة — البند بينطبق على كل موظفي هالفئة بالمدرسة. (لأستاذ واحد بس: من ملفه ← تبويب «المالي».)</span>
+                <div class="ba-cats" style="margin:6px 0 0">
+                                <label><input type="checkbox" name="cat[]" value="titulaire" checked onchange="baPrefill()"> الملاك</label>
+                                <label><input type="checkbox" name="cat[]" value="contractuel"  onchange="baPrefill()"> المتعاقدين</label>
+                                <label><input type="checkbox" name="cat[]" value="employe"  onchange="baPrefill()"> الموظفين</label>
+                                </div>
+            </div></div>
+
+            <div class="ba-step"><span class="ba-num">٢</span><div style="min-width:0">
+                <strong>شو بدّك تعطي؟</strong> <span class="ba-hint">كل سطر = بند: النوع + نسبة ٪ <u>أو</u> مبلغ ثابت + الفترة. بدّك نسبة <u>و</u>مبلغ ثابت مع بعض؟ حطّهم سطرين هون (بنفس الكبسة).</span>
+                <div style="overflow:auto;margin-top:6px">
+                <table class="table ba-editor" style="font-size:13px;min-width:760px">
+                    <thead><tr><th>النوع</th><th>نسبة أو مبلغ؟</th><th>القيمة</th><th>العملة</th><th>من شهر</th><th>إلى شهر</th><th></th></tr></thead>
+                    <tbody id="linesBody"></tbody>
+                </table>
+                </div>
+                <button type="button" class="btn btn-sm btn-light" onclick="addLine()"><i class="fas fa-plus"></i> أضِف سطراً (بند تاني أو فترة تانية)</button>
+                <div class="ba-hint" style="margin-top:6px">• <b>نسبة ٪</b> = من أساس الراتب <u>بعد التدرّج</u> (للملاك)، وبتتحرّك مع الدرجة لحالها. &nbsp;• <b>مبلغ ثابت</b> = رقم بالليرة أو بالدولار كل شهر. &nbsp;• <b>الفترة</b>: افتراضياً كل السنة (تشرين ← أيلول)؛ قيمة بتتغيّر بنص السنة = سطرين بفترتين.</div>
+            </div></div>
+
+            <div class="ba-step"><span class="ba-num">٣</span><div>
+                <strong>تأكّد وطبّق.</strong>
+                <div class="ba-live" id="baLive" style="margin-top:6px">
+                    🧮 <strong>معاينة حيّة:</strong> جرّب على أساس راتب
+                    <input type="number" id="baSampleBase" value="1755000" style="width:110px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:6px"> ل.ل ←
+                    <span id="baLiveOut" style="font-weight:800;color:#166534">—</span>
+                    <div style="font-size:11.5px;color:#64748b;margin-top:4px">قاعدة النسبة: الأساس ÷ 1500 × النسبة ← داون بالدولار ← × 89,500 ← داون للمليون (النسب المتعدّدة تُجمَع ثم تُدوَّر مرّة وحدة).</div>
+                </div>
+                <div class="ba-warn" id="baIndivNote" style="display:none;background:#fef2f2;border-color:#fecaca;color:#7f1d1d"></div>
+                <div class="ba-warn" id="baReplaceNote">⚠️ عند «طبّق»: الأسطر يلي هون <b>تحلّ محلّ</b> بنود <b>نفس النوع</b> الحالية لهالفئة (مثلاً أجر إضافي جديد بيشيل الأجر الإضافي القديم عند كل الملاك). الأنواع التانية ما بتتأثّر. لهيك النافذة بتفتح <b>معبّاية بالبنود الحالية</b> للفئة — عدّل عليها أو زيد.</div>
+            </div></div>
+        </div>
+        <div class="ba-modal-foot">
+            <button type="button" class="btn btn-light" onclick="baClose('baModalAdd')">إلغاء / Annuler</button>
+            <button type="submit" class="btn btn-primary" data-confirm="تطبيق هذه الأسطر على الفئات المشيّكة — مركز البطريرك مكسيموس الخامس حكيم؟ (تستبدل الأنواع المُدخَلة لكامل السنة)"><i class="fas fa-check"></i> طبّق / Appliquer</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ مودال: مبالغ فردية لكل موظف ═══ -->
+<div class="ba-overlay" id="baModalIndiv">
+  <div class="ba-modal" style="max-width:1340px">
+    <div class="ba-modal-head"><h4><i class="fas fa-user-pen"></i> مبالغ فردية — لكل موظف رقمه</h4><button type="button" class="ba-x" onclick="baClose('baModalIndiv')">✕</button></div>
+    <form method="POST" id="indivForm">
+        <input type="hidden" name="csrf" value="470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8">        <input type="hidden" name="action" value="apply_individual">
+        <input type="hidden" name="sch[]" value="13"><input type="hidden" name="sch_set" value="1"><input type="hidden" name="sy" value="2026-2027"><input type="hidden" name="cat[]" value="titulaire"><input type="hidden" name="cat[]" value="contractuel"><input type="hidden" name="cat[]" value="employe">        <div class="ba-modal-body">
+            <div class="ba-hint" style="margin-bottom:6px">قدّام كل اسم ولكل نوع ثلاث خانات: <b>نسبة ٪</b> (من أساس الراتب بعد التدرّج) <b>+ مبلغ بالليرة + مبلغ بالدولار</b> — عبّي وحدة أو الاتنين أو التلاتة، والبرنامج بيجمعهم (مثلاً متعاقد: 100 $ + 5,000,000 ل.ل بالشهر). القيم <b>شهرية</b>. <b>فاضي</b> = ما بيتغيّر · <b>0</b> = شيله. الخانات تعرض قيم «كل السنة»؛ لتفاصيل فترات شخص: من ملفه ← تبويب «المكافآت».</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px">
+                <strong>📅 الفترة لكل ما تحفظه الآن:</strong> <span>من</span><select name="ind_from" class="form-select" style="max-width:140px"><option value="10" selected>تشرين الأول</option><option value="11">تشرين الثاني</option><option value="12">كانون الأول</option><option value="1">كانون الثاني</option><option value="2">شباط</option><option value="3">آذار</option><option value="4">نيسان</option><option value="5">أيار</option><option value="6">حزيران</option><option value="7">تموز</option><option value="8">آب</option><option value="9">أيلول</option></select> <span>إلى</span><select name="ind_to" class="form-select" style="max-width:140px"><option value="10">تشرين الأول</option><option value="11">تشرين الثاني</option><option value="12">كانون الأول</option><option value="1">كانون الثاني</option><option value="2">شباط</option><option value="3">آذار</option><option value="4">نيسان</option><option value="5">أيار</option><option value="6">حزيران</option><option value="7">تموز</option><option value="8">آب</option><option value="9" selected>أيلول</option></select>                <span class="ba-hint">افتراضياً كل السنة (تشرين ← أيلول). فترة أقصر = يُضاف/يُستبدل بند لهذه الفترة فقط.</span>
+            </div>
+            <div class="ba-cats"><strong>عرض:</strong>
+                                <label><input type="radio" name="indiv_cat_view" value="" checked onchange="baIndivFilter()"> الكل (كل الموظفين والأساتذة)</label>
+                                <label><input type="radio" name="indiv_cat_view" value="employe" onchange="baIndivFilter()"> الموظفين فقط</label>
+                                <span class="ba-hint" id="baIndivCount"></span>
+            </div>
+            <div style="overflow:auto;max-height:60vh">
+            <table class="table ba-editor" id="indivTable" style="font-size:13px;min-width:1240px">
+                <thead><tr><th>#</th><th>الاسم</th><th>➕ الأجر الإضافي <small>(٪ + ل.ل + $)</small></th><th>💰 مكافأة ومساعدة <small>(٪ + ل.ل + $)</small></th><th>🚌 نقل شهري <small>(٪ + ل.ل + $)</small></th></tr></thead>
+                <tbody>
+                                <tr data-ety="employe" class="ind-cat-row"><td colspan="5" style="background:#f1f5f9;font-weight:800;color:#1F4E5F">الموظفين</td></tr>
+                                <tr data-ety="employe">
+                    <td>1</td>
+                    <td style="white-space:nowrap"><strong>ريما قيصر حليحل</strong> <small class="text-muted">الموظفين</small></td>
+                                        <td style="white-space:nowrap">
+                        <span class="ind-cell">
+                            <input type="text" inputmode="decimal" name="ind[419][prime_pct]" value="" placeholder="٪" title="نسبة ٪ من الأساس بعد التدرّج" class="form-control ind-pct" dir="ltr">
+                            <input type="hidden" name="ind[419][prime_pct_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[419][prime_lbp]" value="" placeholder="ل.ل" title="الجزء بالليرة (شهري)" class="form-control ind-amt" dir="ltr"><span class="ind-unit">ل.ل</span>
+                            <input type="hidden" name="ind[419][prime_lbp_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[419][prime_usd]" value="" placeholder="$" title="الجزء بالدولار (شهري)" class="form-control ind-amt ind-usd" dir="ltr"><span class="ind-unit">$</span>
+                            <input type="hidden" name="ind[419][prime_usd_orig]" value="">
+                        </span>
+                                            </td>
+                                        <td style="white-space:nowrap">
+                        <span class="ind-cell">
+                            <input type="text" inputmode="decimal" name="ind[419][aide_pct]" value="" placeholder="٪" title="نسبة ٪ من الأساس بعد التدرّج" class="form-control ind-pct" dir="ltr">
+                            <input type="hidden" name="ind[419][aide_pct_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[419][aide_lbp]" value="" placeholder="ل.ل" title="الجزء بالليرة (شهري)" class="form-control ind-amt" dir="ltr"><span class="ind-unit">ل.ل</span>
+                            <input type="hidden" name="ind[419][aide_lbp_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[419][aide_usd]" value="" placeholder="$" title="الجزء بالدولار (شهري)" class="form-control ind-amt ind-usd" dir="ltr"><span class="ind-unit">$</span>
+                            <input type="hidden" name="ind[419][aide_usd_orig]" value="">
+                        </span>
+                                            </td>
+                                        <td style="white-space:nowrap">
+                        <span class="ind-cell">
+                            <input type="text" inputmode="decimal" name="ind[419][trans_pct]" value="" placeholder="٪" title="نسبة ٪ من الأساس بعد التدرّج" class="form-control ind-pct" dir="ltr">
+                            <input type="hidden" name="ind[419][trans_pct_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[419][trans_lbp]" value="" placeholder="ل.ل" title="الجزء بالليرة (شهري)" class="form-control ind-amt" dir="ltr"><span class="ind-unit">ل.ل</span>
+                            <input type="hidden" name="ind[419][trans_lbp_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[419][trans_usd]" value="" placeholder="$" title="الجزء بالدولار (شهري)" class="form-control ind-amt ind-usd" dir="ltr"><span class="ind-unit">$</span>
+                            <input type="hidden" name="ind[419][trans_usd_orig]" value="">
+                        </span>
+                                            </td>
+                                    </tr>
+                                <tr data-ety="employe">
+                    <td>2</td>
+                    <td style="white-space:nowrap"><strong>مارون طانوس طنوس</strong> <small class="text-muted">الموظفين</small></td>
+                                        <td style="white-space:nowrap">
+                        <span class="ind-cell">
+                            <input type="text" inputmode="decimal" name="ind[417][prime_pct]" value="" placeholder="٪" title="نسبة ٪ من الأساس بعد التدرّج" class="form-control ind-pct" dir="ltr">
+                            <input type="hidden" name="ind[417][prime_pct_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[417][prime_lbp]" value="" placeholder="ل.ل" title="الجزء بالليرة (شهري)" class="form-control ind-amt" dir="ltr"><span class="ind-unit">ل.ل</span>
+                            <input type="hidden" name="ind[417][prime_lbp_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[417][prime_usd]" value="" placeholder="$" title="الجزء بالدولار (شهري)" class="form-control ind-amt ind-usd" dir="ltr"><span class="ind-unit">$</span>
+                            <input type="hidden" name="ind[417][prime_usd_orig]" value="">
+                        </span>
+                                            </td>
+                                        <td style="white-space:nowrap">
+                        <span class="ind-cell">
+                            <input type="text" inputmode="decimal" name="ind[417][aide_pct]" value="" placeholder="٪" title="نسبة ٪ من الأساس بعد التدرّج" class="form-control ind-pct" dir="ltr">
+                            <input type="hidden" name="ind[417][aide_pct_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[417][aide_lbp]" value="" placeholder="ل.ل" title="الجزء بالليرة (شهري)" class="form-control ind-amt" dir="ltr"><span class="ind-unit">ل.ل</span>
+                            <input type="hidden" name="ind[417][aide_lbp_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[417][aide_usd]" value="" placeholder="$" title="الجزء بالدولار (شهري)" class="form-control ind-amt ind-usd" dir="ltr"><span class="ind-unit">$</span>
+                            <input type="hidden" name="ind[417][aide_usd_orig]" value="">
+                        </span>
+                                            </td>
+                                        <td style="white-space:nowrap">
+                        <span class="ind-cell">
+                            <input type="text" inputmode="decimal" name="ind[417][trans_pct]" value="" placeholder="٪" title="نسبة ٪ من الأساس بعد التدرّج" class="form-control ind-pct" dir="ltr">
+                            <input type="hidden" name="ind[417][trans_pct_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[417][trans_lbp]" value="" placeholder="ل.ل" title="الجزء بالليرة (شهري)" class="form-control ind-amt" dir="ltr"><span class="ind-unit">ل.ل</span>
+                            <input type="hidden" name="ind[417][trans_lbp_orig]" value="">
+                            <span class="ind-plus">+</span>
+                            <input type="text" inputmode="decimal" name="ind[417][trans_usd]" value="" placeholder="$" title="الجزء بالدولار (شهري)" class="form-control ind-amt ind-usd" dir="ltr"><span class="ind-unit">$</span>
+                            <input type="hidden" name="ind[417][trans_usd_orig]" value="">
+                        </span>
+                                            </td>
+                                    </tr>
+                                </tbody>
+            </table>
+            </div>
+        </div>
+        <div class="ba-modal-foot">
+            <button type="button" class="btn btn-light" onclick="baClose('baModalIndiv')">إلغاء / Annuler</button>
+            <button type="submit" class="btn btn-primary" data-confirm="حفظ المبالغ الفردية المعدَّلة وإعادة حساب رواتب أصحابها؟"><i class="fas fa-save"></i> احفظ الكل / Enregistrer</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ مودال: نقل يومي ═══ -->
+<div class="ba-overlay" id="baModalDaily">
+  <div class="ba-modal">
+    <div class="ba-modal-head"><h4><i class="fas fa-bus"></i> النقل اليومي — حسب أيام الحضور</h4><button type="button" class="ba-x" onclick="baClose('baModalDaily')">✕</button></div>
+    <form method="POST" id="tPeriodsForm">
+        <input type="hidden" name="csrf" value="470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8">        <input type="hidden" name="action" value="apply_transport_periods">
+        <input type="hidden" name="sch[]" value="13"><input type="hidden" name="sch_set" value="1"><input type="hidden" name="sy" value="2026-2027">
+        <div class="ba-modal-body">
+            <div style="font-size:12.5px;color:#64748b;margin-bottom:8px">القيمة <strong>يومية</strong> — الشهري = اليومي × أيام حضور كل أستاذ (من ملفه) × 4 أسابيع.</div>
+            <div class="ba-cats"><strong>على مين؟</strong>
+                                <label><input type="checkbox" name="cat[]" value="titulaire" checked> الملاك</label>
+                                <label><input type="checkbox" name="cat[]" value="contractuel" checked> المتعاقدين</label>
+                                <label><input type="checkbox" name="cat[]" value="employe" checked> الموظفين</label>
+                            </div>
+            <div style="overflow:auto">
+            <table class="table ba-editor" style="font-size:13px;min-width:440px">
+                <thead><tr><th>القيمة اليومية</th><th>العملة</th><th>من شهر</th><th>إلى شهر</th><th></th></tr></thead>
+                <tbody id="tLinesBody"></tbody>
+            </table>
+            </div>
+            <button type="button" class="btn btn-sm btn-light" onclick="addTLine()"><i class="fas fa-plus"></i> أضِف فترة تانية</button>
+        </div>
+        <div class="ba-modal-foot">
+            <button type="button" class="btn btn-light" onclick="baClose('baModalDaily')">إلغاء</button>
+            <button type="submit" class="btn btn-primary" data-confirm="تطبيق أسطر النقل اليومي على الفئات المشيّكة — مركز البطريرك مكسيموس الخامس حكيم؟"><i class="fas fa-check"></i> طبّق</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ مودال: تعديل سطر ═══ -->
+<div class="ba-overlay" id="baModalEdit">
+  <div class="ba-modal" style="max-width:560px">
+    <div class="ba-modal-head"><h4><i class="fas fa-pen"></i> تعديل السطر — <span id="beTitle"></span></h4><button type="button" class="ba-x" onclick="baClose('baModalEdit')">✕</button></div>
+    <form method="POST" id="beForm">
+        <input type="hidden" name="csrf" value="470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8">        <input type="hidden" name="action" value="row_update">
+        <input type="hidden" name="sch[]" value="13"><input type="hidden" name="sch_set" value="1"><input type="hidden" name="sy" value="2026-2027"><input type="hidden" name="cat[]" value="titulaire"><input type="hidden" name="cat[]" value="contractuel"><input type="hidden" name="cat[]" value="employe">        <input type="hidden" name="old_type" id="beOldType"><input type="hidden" name="old_vtype" id="beOldVt">
+        <input type="hidden" name="old_amount" id="beOldAmount"><input type="hidden" name="old_currency" id="beOldCur">
+        <input type="hidden" name="old_from" id="beOldFrom"><input type="hidden" name="old_to" id="beOldTo">
+        <input type="hidden" name="old_emp_type" id="beOldEty">
+        <div class="ba-modal-body">
+            <div style="font-size:12.5px;color:#64748b;margin-bottom:10px">التعديل بيطال <strong id="beCount"></strong> موظف (<span id="beCat"></span>) وبتنعاد رواتبهم تلقائياً.</div>
+            <div class="form-row cols-2">
+                <div class="form-group"><label class="form-label">مبلغ أو نسبة؟</label>
+                    <select name="vtype" id="beVt" class="form-select" onchange="beVtToggle()"><option value="amount">مبلغ ثابت</option><option value="percent">نسبة ٪</option></select></div>
+                <div class="form-group"><label class="form-label">القيمة</label>
+                    <input type="number" step="0.01" min="0" name="value" id="beVal" class="form-control" required></div>
+            </div>
+            <div class="form-row cols-3">
+                <div class="form-group"><label class="form-label">العملة</label>
+                    <select name="currency" id="beCur" class="form-select"><option value="LBP">ل.ل</option><option value="USD">$</option></select></div>
+                <div class="form-group"><label class="form-label">من شهر</label><select name="from" id="beFrom" class="form-select"></select></div>
+                <div class="form-group"><label class="form-label">إلى شهر</label><select name="to" id="beTo" class="form-select"></select></div>
+            </div>
+        </div>
+        <div class="ba-modal-foot">
+            <button type="button" class="btn btn-light" onclick="baClose('baModalEdit')">إلغاء / Annuler</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ / Enregistrer</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ مودال: إزالة ═══ -->
+<div class="ba-overlay" id="baModalRemove">
+  <div class="ba-modal" style="max-width:560px">
+    <div class="ba-modal-head"><h4 style="color:#b91c1c"><i class="fas fa-trash"></i> إزالة نوع كامل عن فئة</h4><button type="button" class="ba-x" onclick="baClose('baModalRemove')">✕</button></div>
+    <form method="POST" onsubmit="return confirm('إزالة هذا النوع عن الفئات المشيّكة كلها؟')">
+        <input type="hidden" name="csrf" value="470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8">        <input type="hidden" name="action" value="remove_bonus"><input type="hidden" name="sch[]" value="13"><input type="hidden" name="sch_set" value="1"><input type="hidden" name="sy" value="2026-2027">
+        <div class="ba-modal-body">
+            <div class="ba-cats"><strong>عن مين؟</strong>
+                                <label><input type="checkbox" name="cat[]" value="titulaire"> الملاك</label>
+                                <label><input type="checkbox" name="cat[]" value="contractuel"> المتعاقدين</label>
+                                <label><input type="checkbox" name="cat[]" value="employe"> الموظفين</label>
+                            </div>
+            <div class="ba-cats"><strong>أي بند؟</strong>            <select name="bonus_type" class="form-select" style="max-width:280px">
+                <option value="prime_fixe">➕ الأجر الإضافي</option>
+                <option value="aide_complementaire">💰 مكافأة ومساعدة</option>
+                <option value="transport_complement">🚌 تعويض نقل (شهري)</option>
+            </select>
+            </div>
+        </div>
+        <div class="ba-modal-foot">
+            <button type="button" class="btn btn-light" onclick="baClose('baModalRemove')">إلغاء</button>
+            <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> إزالة</button>
+        </div>
+    </form>
+    <form method="POST" onsubmit="return confirm('إزالة كل النقل اليومي عن كل الفئات؟')" style="padding:0 20px 16px">
+        <input type="hidden" name="csrf" value="470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8">        <input type="hidden" name="action" value="remove_transport_periods"><input type="hidden" name="sch[]" value="13"><input type="hidden" name="sch_set" value="1"><input type="hidden" name="cat[]" value="titulaire"><input type="hidden" name="cat[]" value="contractuel"><input type="hidden" name="cat[]" value="employe"><input type="hidden" name="sy" value="2026-2027">
+        <button type="submit" class="btn btn-sm btn-light" style="color:#b91c1c"><i class="fas fa-bus"></i> إزالة كل النقل اليومي (كل الفئات)</button>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+    var MONTHS=['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    var ORDER=[10,11,12,1,2,3,4,5,6,7,8,9]; var li=0; var ti=0;
+    var OFFICIAL=1500, RATE=89500;
+    function mOpts(sel){var o='';ORDER.forEach(function(m){o+='<option value="'+m+'"'+(m==sel?' selected':'')+'>'+MONTHS[m]+'</option>';});return o;}
+    // البنود السارية (للتعبئة المسبقة بنافذة «بند جديد» حسب الفئة المختارة)
+    var BA_LINES=[];
+    // عدد موظفي كل فئة بالنطاق (لتمييز البند العام عن البنود الفردية)
+    var BA_CAT_N={"employe":2};
+    var ETY={titulaire:'enseignant_titulaire',contractuel:'enseignant_contractuel',employe:'employe'};
+    window.baPrefill=function(){
+        var body=document.getElementById('linesBody'); if(!body) return;
+        var cats=[].slice.call(document.querySelectorAll('#baModalAdd input[name="cat[]"]:checked')).map(function(c){return ETY[c.value];});
+        body.innerHTML=''; li=0;
+        var all=BA_LINES.filter(function(r){return r.type!=='transport_daily' && cats.indexOf(r.ety)>=0;});
+        // البند «العام» = مطبّق على كل موظفي فئته → يُعبّأ؛ البند الفردي (على أشخاص معيّنين) لا يُعبّأ بل يُنبَّه عليه
+        // البند العام لكل (فئة+نوع) = الأكثر انتشاراً (على نصف الفئة أو أكثر)؛ ما عداه فردي (استثناءات أشخاص)
+        var best={};
+        all.forEach(function(r){var k=r.ety+'|'+r.type; if(!best[k]||r.n>best[k].n) best[k]=r;});
+        var general=[], indiv=[];
+        all.forEach(function(r){var k=r.ety+'|'+r.type; var cn=BA_CAT_N[r.ety]||0;
+            if(best[k]===r && cn>0 && r.n*2>=cn) general.push(r); else indiv.push(r);});
+        var seen={}; var added=0;
+        general.forEach(function(r){var k=[r.type,r.vt,r.amount,r.cur,r.from,r.to].join('|'); if(seen[k]) return; seen[k]=1;
+            addLine(r.type,r.amount,r.vt,r.cur,r.from===null?10:r.from,r.to===null?9:r.to); added++;});
+        if(!added) addLine();
+        var note=document.getElementById('baReplaceNote'); if(note) note.style.display=(added||indiv.length)?'':'none';
+        var iv=document.getElementById('baIndivNote');
+        if(iv){
+            if(indiv.length){
+                var names={prime_fixe:'أجر إضافي',aide_complementaire:'مكافأة',transport_complement:'نقل شهري'};
+                var who={}; indiv.forEach(function(r){who[r.ety]=(who[r.ety]||0)+r.n;});
+                var lst=indiv.slice(0,6).map(function(r){return names[r.type]+' '+(r.vt==='percent'?r.amount+'٪':r.amount.toLocaleString('en-US'))+' ('+r.n+')';}).join(' · ');
+                iv.innerHTML='🧍 <b>بنود فردية موجودة بهالفئة</b> (لأشخاص معيّنين، ما انعبّت هون): '+lst+(indiv.length>6?' …':'')+'<br>«طبّق» على الفئة <b>بيشيلها</b> عن أصحابها وبيوحّدهم مع الكل — إذا بدّك تخلّيها، عدّل البند العام من زرّ ✏️ بجدول البنود بدل هون، أو رجّع بند الشخص من ملفه بعدين.';
+                iv.style.display='';
+            } else iv.style.display='none';
+        }
+        baLiveCalc();
+    };
+    window.baIndivFilter=function(){
+        var sel=document.querySelector('input[name="indiv_cat_view"]:checked'); var ety=sel?sel.value:'';
+        var n=0; document.querySelectorAll('#indivTable tbody tr').forEach(function(tr){var show=!ety||tr.dataset.ety===ety; tr.style.display=show?'':'none'; if(show&&!tr.classList.contains('ind-cat-row'))n++;});
+        var c=document.getElementById('baIndivCount'); if(c) c.textContent='('+n+' موظف)';
+    };
+    // تنسيق الأرقام بالفواصل أثناء الكتابة بخانات المبالغ الفردية (مثلاً 33,000,000)
+    document.addEventListener('input',function(e){ if(e.target.classList&&e.target.classList.contains('ind-amt')){ var v=e.target.value.replace(/[^\d.]/g,''); var parts=v.split('.'); parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,','); e.target.value=parts.join('.'); } });
+    window.baOpen=function(id){document.getElementById(id).classList.add('open'); if(id==='baModalAdd') baPrefill(); if(id==='baModalIndiv') baIndivFilter();};
+    window.baClose=function(id){document.getElementById(id).classList.remove('open');};
+    document.querySelectorAll('.ba-overlay').forEach(function(ov){ov.addEventListener('click',function(e){if(e.target===ov)ov.classList.remove('open');});});
+    window.baVt=function(sel){
+        var tr=sel.closest('tr'); var cur=tr.querySelector('.baCur');
+        if(sel.value==='percent'){ cur.disabled=true; cur.style.opacity=0.4; } else { cur.disabled=false; cur.style.opacity=1; }
+        baLiveCalc();
+    };
+    window.baLiveCalc=function(){
+        var out=document.getElementById('baLiveOut'); if(!out) return;
+        var base=parseFloat((document.getElementById('baSampleBase')||{}).value)||0;
+        var rows=[].slice.call(document.querySelectorAll('#linesBody tr')); if(!rows.length||!base){out.textContent='—';return;}
+        // متل المحرّك: النسب (لنفس النوع) تُجمَع ثم تُدوَّر مرّة وحدة؛ المبالغ الثابتة تُضاف كما هي
+        var parts=[]; var byType={};
+        rows.forEach(function(row){
+            var type=row.querySelector('select[name$="[type]"]').value, vt=row.querySelector('.baVtSel').value;
+            var val=parseFloat(row.querySelector('input[type=number]').value)||0; if(!val) return;
+            var cur=row.querySelector('.baCur').value;
+            byType[type]=byType[type]||{pct:0,fixed:0};
+            if(vt==='percent') byType[type].pct+=val; else byType[type].fixed+=(cur==='USD'?Math.floor(val*RATE):val);
+        });
+        var names={prime_fixe:'الأجر الإضافي',aide_complementaire:'مكافأة ومساعدة',transport_complement:'نقل شهري'};
+        Object.keys(byType).forEach(function(t){
+            var b=byType[t], txt=[];
+            if(b.pct>0){var usd=Math.floor((base/OFFICIAL)*(b.pct/100)); /* = bonusPercentLbp بالضبط */ var lbp=Math.floor(Math.floor(usd*RATE)/1000000)*1000000; txt.push(b.pct+'٪ = '+usd.toLocaleString('en-US')+'$ = '+lbp.toLocaleString('en-US')+' ل.ل');}
+            if(b.fixed>0) txt.push('ثابت '+b.fixed.toLocaleString('en-US')+' ل.ل');
+            if(txt.length) parts.push(names[t]+': '+txt.join(' + '));
+        });
+        out.textContent=parts.length?parts.join(' · '):'—';
+    };
+    document.addEventListener('input',function(e){ if(e.target.closest('#baModalAdd')||e.target.id==='baSampleBase') baLiveCalc(); });
+    window.addLine=function(type,val,vt,cur,from,to){
+        type=type||'prime_fixe';from=from||10;to=to||9;cur=cur||'LBP';vt=vt||'amount';val=(val===undefined?'':val);
+        var i=li++; var tr=document.createElement('tr');
+        tr.innerHTML='<td><select name="lines['+i+'][type]" class="form-select">'
+          +'<option value="prime_fixe"'+(type=='prime_fixe'?' selected':'')+'>\u2795 الأجر الإضافي</option>'
+          +'<option value="aide_complementaire"'+(type=='aide_complementaire'?' selected':'')+'>\uD83D\uDCB0 مكافأة ومساعدة</option>'
+          +'<option value="transport_complement"'+(type=='transport_complement'?' selected':'')+'>\uD83D\uDE8C تعويض نقل (شهري)</option></select></td>'
+          +'<td><select name="lines['+i+'][vtype]" class="form-select baVtSel" onchange="baVt(this)"><option value="amount"'+(vt=='amount'?' selected':'')+'>مبلغ ثابت</option><option value="percent"'+(vt=='percent'?' selected':'')+'>نسبة \u066A</option></select></td>'
+          +'<td><input type="number" step="0.01" min="0" name="lines['+i+'][value]" class="form-control" value="'+val+'" placeholder="مثلاً 45" style="min-width:100px"></td>'
+          +'<td><select name="lines['+i+'][currency]" class="form-select baCur"><option value="LBP"'+(cur=='LBP'?' selected':'')+'>ل.ل</option><option value="USD"'+(cur=='USD'?' selected':'')+'>$</option></select></td>'
+          +'<td><select name="lines['+i+'][from]" class="form-select">'+mOpts(from)+'</select></td>'
+          +'<td><select name="lines['+i+'][to]" class="form-select">'+mOpts(to)+'</select></td>'
+          +'<td><button type="button" class="btn btn-sm btn-light" style="color:#b91c1c" onclick="this.closest(&quot;tr&quot;).remove()">\u2715</button></td>';
+        document.getElementById('linesBody').appendChild(tr);
+        baVt(tr.querySelector('.baVtSel'));
+    };
+    window.addTLine=function(val,cur,from,to){
+        from=from||10;to=to||9;cur=cur||'LBP';val=(val===undefined?'':val);
+        var i=ti++; var tr=document.createElement('tr');
+        tr.innerHTML='<td><input type="number" step="0.01" min="0" name="tlines['+i+'][value]" class="form-control" value="'+val+'" placeholder="مثلاً 4.5" style="min-width:100px"></td>'
+          +'<td><select name="tlines['+i+'][currency]" class="form-select"><option value="LBP"'+(cur=='LBP'?' selected':'')+'>ل.ل</option><option value="USD"'+(cur=='USD'?' selected':'')+'>$</option></select></td>'
+          +'<td><select name="tlines['+i+'][from]" class="form-select">'+mOpts(from)+'</select></td>'
+          +'<td><select name="tlines['+i+'][to]" class="form-select">'+mOpts(to)+'</select></td>'
+          +'<td><button type="button" class="btn btn-sm btn-light" style="color:#b91c1c" onclick="this.closest(&quot;tr&quot;).remove()">\u2715</button></td>';
+        document.getElementById('tLinesBody').appendChild(tr);
+    };
+    var MONTH_OPTS='';ORDER.forEach(function(m){MONTH_OPTS+='<option value="'+m+'">'+MONTHS[m]+'</option>';});
+    window.beVtToggle=function(){
+        var vt=document.getElementById('beVt').value, cur=document.getElementById('beCur');
+        if(vt==='percent'){cur.disabled=true;cur.style.opacity=0.4;} else {cur.disabled=false;cur.style.opacity=1;}
+    };
+    window.baEditRow=function(r){
+        document.getElementById('beTitle').textContent=r.typeTxt;
+        document.getElementById('beCount').textContent=r.n;
+        document.getElementById('beCat').textContent=r.catTxt;
+        document.getElementById('beOldType').value=r.type; document.getElementById('beOldVt').value=r.vt;
+        document.getElementById('beOldAmount').value=r.amount; document.getElementById('beOldCur').value=r.cur;
+        document.getElementById('beOldFrom').value=(r.from===null?'':r.from); document.getElementById('beOldTo').value=(r.to===null?'':r.to);
+        document.getElementById('beOldEty').value=r.ety;
+        var vtSel=document.getElementById('beVt');
+        vtSel.value=r.vt;
+        // النقل اليومي مبلغ فقط — النسبة غير متاحة له
+        vtSel.querySelector('option[value=percent]').disabled=(r.type==='transport_daily');
+        document.getElementById('beVal').value=parseFloat(r.amount);
+        document.getElementById('beCur').value=r.cur;
+        var f=document.getElementById('beFrom'), t=document.getElementById('beTo');
+        f.innerHTML='<option value="">— كل السنة —</option>'+MONTH_OPTS; t.innerHTML='<option value="">— كل السنة —</option>'+MONTH_OPTS;
+        f.value=(r.from===null?'':r.from); t.value=(r.to===null?'':r.to);
+        beVtToggle();
+        baOpen('baModalEdit');
+    };
+    addLine(); addTLine();
+    // انقل بطاقة المعاينة (لائحة الموظفين) جوّا الطيّة
+    var prev=document.getElementById('baPreviewCard'), slot=document.getElementById('baPreviewHere');
+    if(prev&&slot){ slot.appendChild(prev); prev.style.marginTop='10px'; }
+})();
+</script>
+
+<!-- معاينة النطاق -->
+<div class="card" id="baPreviewCard">
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-list"></i> Aperçu : كل الفئات (2) — مركز البطريرك مكسيموس الخامس حكيم — 2026-2027</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">معاينة: كل الفئات (2) — مركز البطريرك مكسيموس الخامس حكيم — 2026-2027</div>
+    </h3></div>
+    <div class="card-body" style="overflow:auto">
+        <table class="table" style="font-size:13px">
+            <thead><tr><th>#</th><th>Nom / الاسم</th><th>Catégorie / الفئة</th><th>Jours/sem. / أيام/أسبوع</th><th>Transport journalier / نقل يومي</th><th>Transport mensuel (calculé) / نقل شهري (محسوب)</th><th>Primes actuelles / المكافآت الحالية</th></tr></thead>
+            <tbody>
+                            <tr>
+                    <td>1</td>
+                                        <td>ريما قيصر حليحل</td>
+                    <td>الموظفين</td>
+                    <td>5</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td style="font-size:11px">—</td>
+                </tr>
+                            <tr>
+                    <td>2</td>
+                                        <td>مارون طانوس طنوس</td>
+                    <td>الموظفين</td>
+                    <td>5</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td style="font-size:11px">—</td>
+                </tr>
+                        </tbody>
+            <tfoot><tr style="font-weight:700;background:#fdf6e3">
+                <td colspan="5" style="text-align:right">المجموع — العدد: 2 / Total</td>
+                <td>0 L.L</td>
+                <td></td>
+            </tr></tfoot>        </table>
+    </div>
+</div>
+
+        </div><!-- /page-content -->
+    </main>
+</div><!-- /app-layout -->
+
+<script src="/saint-maxime-payroll/assets/js/app.js?v=1791437009"></script>
+<script src="/saint-maxime-payroll/assets/js/export.js?v=1791439153"></script>
+<script src="/saint-maxime-payroll/assets/js/form-lock.js?v=1791437009"></script>
+<script src="/saint-maxime-payroll/assets/js/select-search.js?v=1791437009"></script>
+<script>window.BASE_URL = "\/saint-maxime-payroll\/"; window.CSRF_TOKEN = "470a54aef4da1f55eb93fc66eb95c037a691dcee65903580c390e63aabda6ea8";</script>
+<script>
+// 🔎🚀 الفحص الشامل الدوري بنبض خلفي: بعد ظهور الصفحة بثانيتين، ثم كل 5 ثوانٍ ما دامت الجولة لم تكتمل والصفحة مفتوحة ومرئية
+(function () {
+  function tick() {
+    if (document.hidden || document.prerendering) { setTimeout(tick, 5000); return; }
+    fetch(window.BASE_URL + 'ajax_tick.php', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (s) { if (s && s.due) setTimeout(tick, 5000); }).catch(function () {});
+  }
+  window.addEventListener('load', function () { setTimeout(tick, 2000); });
+})();
+</script>
+<script type="speculationrules">
+{"prerender":[{"where":{"selector_matches":".sidebar-nav a:not([href*='logout']):not([href*='backup']):not([href*='compliance']):not([href*='health_check']):not([target='_blank']), .dash-link:not([href*='backup']):not([target='_blank']), .report-card:not([target='_blank'])"},"eagerness":"moderate"}]}
+</script>
+<script src="/saint-maxime-payroll/assets/js/pdf-save.js?v=1791442246"></script>
+<script>
+// وضع المعاينة قبل الطباعة (_autoprint): عند المجيء من زرّ «PDF رسمي» في بيئة بلا أدوات
+// خادم (الموقع الأونلاين) **لا يفتح حوار الطابعة لحاله** — بطلب المستخدم (2026-08-01):
+// «بدي بس اطبع ما تطلع دغري البرنتر». تظهر الورقة أولاً للمعاينة، ومعها شريط فيه زرّ
+// «اطبع الآن» كبير + إرشاد الهوامش (Margins → None مرّة واحدة والمتصفح يتذكّرها).
+(function () {
+  if (/[?&]_autoprint=1/.test(location.search)) {
+    // 🛡️ صمام الورقة الفاضية («p1 شوف» 2026-08-22): إذا الصفحة كلها شاشة اختيار/قوائم
+    // (كل محتواها no-print — متل شاشة «اختر الموظف» بالنماذج الفردية) ما في شي يُطبع —
+    // فلا نعرض زرّي الطباعة/الحفظ لئلا تطلع ورقة بيضاء، بل رسالة توجّهه لاختيار الموظف.
+    var pc = document.querySelector('.page-content') || document.body;
+    var hasPrintable = Array.prototype.some.call(pc.children, function (el) {
+      if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return false;
+      return !(el.classList && el.classList.contains('no-print'));
+    });
+    if (!hasPrintable) {
+      var w = document.createElement('div');
+      w.className = 'no-print';
+      w.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#fef2f2;border-bottom:2px solid #dc2626;color:#7f1d1d;padding:12px 16px;font-size:15px;text-align:center;font-weight:700';
+      w.textContent = 'ما في مستند معروض للطباعة — اختر الموظف/النموذج أولاً ثم اكبس زرّ الطباعة. / Choisissez d\'abord l\'employé.';
+      window.addEventListener('load', function () { document.body.appendChild(w); });
+      return;
+    }
+    // متل الوورد (طلب المستخدم): الورقة معروضة، وخياران واضحان — «اطبع عالورق» (حوار
+    // المتصفح) أو «احفظها عالكمبيوتر» = تنزيل ملف PDF حقيقي فوراً بلا أي شاشة
+    // (msaSavePdfStart في pdf-save.js — «ما بيّن عندي Save as PDF» 2026-08-01).
+    var b = document.createElement('div');
+    b.className = 'no-print';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#fff8e1;border-bottom:2px solid #f0c419;color:#5b4a00;padding:10px 16px;font-size:15px;text-align:center;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap';
+    b.innerHTML = '<button type="button" onclick="window.print()" style="background:#16a34a;color:#fff;border:0;border-radius:8px;padding:10px 22px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(0,0,0,.10));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 6px rgba(15,23,42,.28)">🖨️ Imprimer / اطبع عالورق</button>' +
+                  '<button type="button" onclick="msaSavePdfStart(this)" style="background:#2563eb;color:#fff;border:0;border-radius:8px;padding:10px 22px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;border-bottom:3px solid rgba(0,0,0,.32);background-image:linear-gradient(180deg,rgba(255,255,255,.24),rgba(0,0,0,.10));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 6px rgba(15,23,42,.28)">💾 احفظها عالكمبيوتر PDF</button>' +
+                  '<span style="font-size:13.5px">للورق: خيار الهوامش <b>Margins</b> خلّيه <b>«None / بلا»</b> لتطلع الورقة كاملة</span>';
+    window.addEventListener('load', function () { document.body.appendChild(b); });
+  }
+})();
+</script>
+</body>
+</html>

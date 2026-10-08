@@ -36,7 +36,7 @@ function complianceEnsureTable(PDO $db): void {
         // يُستدلّ عليه من القاعدة نفسها = بند نسبة مطفأ له توأم فاعل بنفس الموظف/السنة/النوع/النسبة/النافذة وأقدم منه
         if ((int)$db->query("SELECT COUNT(*) FROM compliance_decisions WHERE rule_key = 'dup_percent' AND decision = 'auto'")->fetchColumn() === 0) {
             $seed = $db->query("SELECT b.employee_id, b.school_year, b.amount, GROUP_CONCAT(b.id ORDER BY b.id) off_ids, MIN(a.id) kept,
-                                       (SELECT CONCAT(first_name_ar,' ',last_name_ar) FROM employees e WHERE e.id = b.employee_id) nm
+                                       (SELECT CONCAT_WS(' ', first_name_ar, NULLIF(father_name_ar,''), last_name_ar) FROM employees e WHERE e.id = b.employee_id) nm
                                 FROM employee_bonuses b JOIN employee_bonuses a ON a.employee_id = b.employee_id AND a.school_year = b.school_year AND a.bonus_type = b.bonus_type
                                      AND a.value_type = 'percent' AND a.amount = b.amount AND a.is_active = 1 AND a.id < b.id
                                      AND COALESCE(a.start_month,0) = COALESCE(b.start_month,0) AND COALESCE(a.end_month,0) = COALESCE(b.end_month,0)
@@ -97,7 +97,7 @@ function complianceYear(): string {
 }
 
 function complianceEmpName(array $e): string {
-    $n = trim(($e['first_name_ar'] ?: ($e['first_name_fr'] ?? '')) . ' ' . ($e['last_name_ar'] ?: ($e['last_name_fr'] ?? '')));
+    $n = empFullNameAr($e);
     return $n !== '' ? $n : ('#' . (int)($e['id'] ?? 0));
 }
 
@@ -136,7 +136,7 @@ function complianceItems(PDO $db, string $sy): array {
     $schools = [];
     foreach ($db->query("SELECT id, name_ar, name_fr FROM schools")->fetchAll(PDO::FETCH_ASSOC) as $s) $schools[(int)$s['id']] = $s['name_ar'] ?: $s['name_fr'];
     [$yf, $yp] = yearEmploymentFilter($sy, 'e.');
-    $nm = "CONCAT(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),' ',COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr))";
+    $nm = "CONCAT_WS(' ', COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), NULLIF(e.father_name_ar,''), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr))";
     $add = function (string $rule, array $e, string $violation, string $fix, bool $auto, array $data = [], string $keySuffix = '') use (&$items, $schools, $sy) {
         $eid = (int)($e['id'] ?? 0);
         $items[] = [
