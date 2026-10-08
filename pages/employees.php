@@ -1258,6 +1258,11 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
             <a href="<?= BASE_URL ?>pages/annual_slip.php?employee_id=<?= $id ?>" class="btn btn-primary">
                 <i class="fas fa-file-invoice"></i> Bulletin annuel / الكشف السنوي
             </a>
+            <?php /* 📂 (2026-10-08) «وقت بكون بملف الموظف لازم يكون في كبسة أقدر شوف كامل الملف إذا بدّي أطبعلو إفادة أو استخدام أجير…
+                     أحلى ما أرجع روح على غير محل»: الملف الكامل (مستندات + ر6 + البطاقة السنوية + كل الإفادات والنماذج الرسمية) من هون مباشرة */ ?>
+            <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= $id ?>&dossier=1" class="btn btn-info" title="كل شي عن هذا الموظف بمكان واحد: مستنداته، ر6، البطاقة السنوية، وكل الإفادات والنماذج الرسمية (استخدام أجير، ترك أجير…) للطباعة">
+                <i class="fas fa-folder-open"></i> Dossier complet & attestations / الملف الكامل والإفادات
+            </a>
         </div>
     <?php endif; ?>
 </div>

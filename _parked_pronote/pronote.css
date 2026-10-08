@@ -1,0 +1,75 @@
+/* 🧭 (2026-10-07) تنظيم كالمرجع (Pronote) للشاشة فقط: ترويسة بيضاء، شريط تبويبات رمادي غامق بقوائم منسدلة، شريط صفحة رمادي فاتح، أخضر مزرقّ للعناوين.
+   لا يلمس المطبوعات (كل شيء هنا داخل @media screen) ولا محتوى الصفحات ولا الحسابات. الخط Montserrat محلي (assets/fonts/montserrat-*.woff2). */
+@font-face { font-family: "Montserrat"; font-style: normal; font-weight: 100 900; font-display: swap; src: url(../fonts/montserrat-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Montserrat"; font-style: normal; font-weight: 100 900; font-display: swap; src: url(../fonts/montserrat-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@media screen {
+:root { --pn-nav: #4b4b4b; --pn-nav2: #5f5f5f; --pn-vert: #00584c; --pn-vert2: #004037; --pn-bar: #e8e8e8; }
+body { font-family: "Montserrat", "Inter", "Segoe UI", Tahoma, sans-serif; background: #f0f0f0; }
+body.rtl { font-family: "Montserrat", "Cairo", Tahoma, sans-serif; }
+.app-layout { flex-direction: column; }
+.sidebar { display: none !important; }
+.nav-overlay { display: none !important; }
+.main-content { width: 100%; max-width: none; margin: 0; }
+/* ترويسة */
+.pn-top { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 6px 16px; border-bottom: 3px solid var(--pn-vert); gap: 12px; flex-wrap: wrap; }
+.pn-brand { display: flex; align-items: center; gap: 10px; }
+.pn-logo { width: 40px; height: 40px; border-radius: 10px; background: var(--pn-vert); color: #fff; display: inline-grid; place-items: center; font-size: 20px; }
+.pn-brand b { display: block; color: #222; font-size: 18px; font-weight: 600; }
+.pn-brand span { color: #666; font-size: 13px; }
+.pn-top-r { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.pn-top-r .topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* شريط التبويبات */
+.pn-menu { display: flex; align-items: stretch; background: var(--pn-nav); padding: 0 8px; position: sticky; top: 0; z-index: 60; }
+.pn-burger { display: none; }
+.pn-home { display: grid; place-items: center; padding: 8px 14px; color: #fff; font-size: 18px; text-decoration: none; }
+.pn-home.on { background: #fff; color: var(--pn-vert); border-bottom: 3px solid var(--pn-vert); }
+.pn-dd { position: relative; }
+.pn-dd > button { background: none; border: 0; color: #f6f6f6; font: inherit; font-weight: 600; font-size: 12px; padding: 7px 12px; height: 100%; cursor: pointer; display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.pn-dd > button .pn-ar { font-size: 10.5px; font-weight: 400; opacity: .8; font-family: "Cairo", Tahoma, sans-serif; }
+.pn-dd:hover > button, .pn-dd.open > button { background: var(--pn-nav2); color: #fff; }
+.pn-dd.on > button { background: #fff; color: var(--pn-vert); border-bottom: 3px solid var(--pn-vert); }
+.pn-dd.on > button .pn-ar { opacity: .85; }
+.pn-ddm { display: none; position: absolute; top: 100%; inset-inline-start: 0; min-width: 300px; max-height: 78vh; overflow-y: auto; background: #fff; border: 1px solid #c8c8c8; box-shadow: 0 10px 30px rgba(0,0,0,.18); z-index: 70; padding: 6px 0; }
+.pn-dd:hover .pn-ddm, .pn-dd.open .pn-ddm, .pn-dd:focus-within .pn-ddm { display: block; }
+.pn-dd:nth-last-child(-n+3) .pn-ddm { inset-inline-start: auto; inset-inline-end: 0; }
+.pn-ddm a { display: flex; align-items: center; gap: 10px; padding: 7px 14px; color: #222; text-decoration: none; font-size: 13px; font-weight: 500; }
+.pn-ddm a i { width: 18px; text-align: center; color: #777; font-size: 12px; }
+.pn-ddm a:hover { background: #f1f1f1; color: var(--pn-vert); }
+.pn-ddm a.active { background: #e9f3f1; color: var(--pn-vert); border-inline-start: 3px solid var(--pn-vert); }
+.pn-txt { display: flex; flex-direction: column; line-height: 1.15; }
+.pn-txt .pn-ar { font-size: 11px; color: #666; font-family: "Cairo", Tahoma, sans-serif; }
+.pn-right { margin-inline-start: auto; display: flex; align-items: center; gap: 4px; padding-inline-start: 8px; }
+body.rtl .pn-dd > button .pn-fr, body.rtl .pn-txt .pn-fr { direction: ltr; }
+/* شريط الصفحة (topbar القديم) */
+.topbar { background: var(--pn-bar); border-bottom: 1px solid #d0d0d0; padding: 6px 16px; box-shadow: none; position: static; }
+.topbar h1 { font-size: 14px; color: var(--pn-vert2); font-weight: 600; }
+.topbar h1 span[dir=ltr] { font-size: 14px; }
+.topbar > div:first-child > div > span:first-child { width: 30px !important; height: 30px !important; min-width: 30px !important; font-size: 13px; }
+.page-content { padding-top: 14px; }
+/* عناوين البطاقات والروابط بالأخضر المزرقّ */
+.card .card-header h3, .card-title, h2.section-title { color: var(--pn-vert); }
+a { color: var(--pn-vert); }
+.btn-primary { background: var(--pn-vert) !important; border-color: var(--pn-vert) !important; }
+.btn-primary:hover { background: var(--pn-vert2) !important; border-color: var(--pn-vert2) !important; }
+/* الهاتف: الشريط عمودي بكبسة ☰ */
+@media (max-width: 900px) {
+    .pn-burger { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; background: none; color: #fff; font-size: 20px; cursor: pointer; }
+    .pn-menu { flex-wrap: wrap; position: static; }
+    body:not(.nav-open) .pn-menu > :not(.pn-burger):not(.pn-home):not(.pn-right) { display: none; }
+    .pn-dd { width: 100%; }
+    .pn-dd > button { width: 100%; flex-direction: row; justify-content: flex-start; gap: 8px; padding: 10px 14px; height: auto; }
+    .pn-ddm { position: static; box-shadow: none; border: 0; min-width: 0; max-height: none; display: none; background: #f6f6f6; }
+    .pn-dd:hover .pn-ddm { display: none; } .pn-dd.open .pn-ddm, .pn-dd.on .pn-ddm { display: block; }
+    .pn-top { padding: 6px 10px; }
+    .menu-toggle { display: none !important; }
+}
+}
+@media screen {
+/* مبدّلات الترويسة (مدرسة/سنة/عملة/الراتب يشمل/اللغة/المستخدم) مضغوطة كأيقونات المرجع */
+.pn-top-r .school-switcher, .pn-top-r .btn, .pn-top-r .topbar-dossier, .pn-top-r .user-menu { padding: 2px 8px !important; font-size: 12px !important; border-radius: 8px !important; box-shadow: none !important; min-height: 34px; }
+.pn-top-r .school-switcher i[style], .pn-top-r .btn i[style], .pn-top-r .topbar-dossier .td-ic { width: 24px !important; height: 24px !important; min-width: 24px !important; font-size: 12px !important; border-radius: 6px !important; }
+.pn-top-r .form-control-sm, .pn-top-r select { font-size: 12px !important; padding: 2px 6px !important; height: 28px !important; }
+.pn-top-r .topbar-dossier .td-txt span:first-child { font-size: 12px; } .pn-top-r .topbar-dossier .td-txt span:last-child { font-size: 10.5px; }
+.pn-top-r .user-avatar { width: 26px !important; height: 26px !important; font-size: 12px !important; }
+.pn-top .pn-brand b { font-size: 16px; }
+}
