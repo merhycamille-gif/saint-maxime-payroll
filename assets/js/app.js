@@ -177,7 +177,13 @@ window.msaFitScreenTables = function () {
                 if (!p.__stkSeen) {
                     p.__stkSeen = true;
                     var st = getComputedStyle(p);
-                    if ((st.overflow !== 'visible' || st.overflowX !== 'visible' || st.overflowY !== 'visible') && openRe.test(p.className || '')) toOpen.push(p);
+                    // 📌 (2026-10-08 «دايماً العناوين بأي صفحة… لازم تضلّ مبيّنة»): غلاف تمرير بلا صنف (مثل <div style="overflow:auto">
+                    // بالمكافآت الجماعية) كان يحبس الرأس فلا يلتصق. يُفتح أيضاً كل غلاف تمرير ليس صندوقاً عمودياً مقصوداً
+                    // (بلا max-height/height) — الصندوق العمودي المقصود (مثل max-height:60vh) يبقى كما هو.
+                    if (st.overflow !== 'visible' || st.overflowX !== 'visible' || st.overflowY !== 'visible') {
+                        var plainWrap = st.maxHeight === 'none' && (st.height === 'auto' || !p.style.height) && !/(^|\s)(modal|ba-overlay|sidebar|topbar)(\s|$)/.test(p.className || '');
+                        if (openRe.test(p.className || '') || plainWrap) toOpen.push(p);
+                    }
                 }
                 p = p.parentElement;
             }
@@ -237,7 +243,8 @@ window.msaFitScreenTables = function () {
     // جدول أو حاويته منذ الجولة الأولى — كانت تُعاد دائماً فتضاعف وقت الجداول الكبيرة. وتغيير المقاس يُجمَّع (150ms).
     var stkSig = '';
     function stkSignature() {
-        var ts = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, table.xlsf'), a = [window.innerWidth];
+        var tbS = document.querySelector('.topbar');   // 📌 (2026-10-08) ارتفاع الشريط العلوي جزء من البصمة: يكبر بعد الخطوط/الالتفاف فتبقى الرؤوس خلفه
+        var ts = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, table.xlsf'), a = [window.innerWidth, tbS ? Math.ceil(tbS.getBoundingClientRect().height) : 0];
         for (var i = 0; i < ts.length; i++) { var h = ts[i].parentElement; a.push(ts[i].scrollWidth + '/' + (h ? h.clientWidth : 0) + '/' + (ts[i].tHead ? ts[i].tHead.offsetHeight : 0)); }
         return a.join(',');
     }
@@ -247,6 +254,14 @@ window.msaFitScreenTables = function () {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', stkRun);
     else stkRun();
     window.addEventListener('load', stkRunIfChanged);
+    // 📌 (2026-10-08) الشريط العلوي يتغيّر ارتفاعه (خطوط تُحمَّل، أزرار تلتفّ، شريط مدارس يظهر) ⇒ تُعاد مواضع الرؤوس (مجمَّع 120ms)
+    try {
+        if (window.ResizeObserver) {
+            var stkTb = document.querySelector('.topbar'), stkTbT = 0;
+            if (stkTb) new ResizeObserver(function () { clearTimeout(stkTbT); stkTbT = setTimeout(stkRunIfChanged, 120); }).observe(stkTb);
+        }
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { setTimeout(stkRunIfChanged, 0); });
+    } catch (e) {}
     window.addEventListener('resize', stkRun);   // فوري: الطباعة/PDF تغيّر المقاس وتحتاج الحالة الصحيحة قبل التخطيط (التأجيل ولّد ورقة أخيرة بيضاء)
     window.addEventListener('beforeprint', stkRun);
     // 🚀 (2026-10-03): جدول داخل قسم مطويّ (details) يُحسب تثبيت رأسه/أسانسوره لحظة فتح القسم — كان يعتمد على «resize» وهمية
