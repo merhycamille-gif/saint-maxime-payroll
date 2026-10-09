@@ -134,8 +134,16 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <!-- Icons: Font Awesome محلي -->
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/vendor/fontawesome/css/all.min.css">
     
-    <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+    <!-- Favicon + تطبيق الهاتف (PWA): manifest + أيقونة الشاشة الرئيسية + عامل الخدمة -->
+    <link rel="icon" href="<?= BASE_URL ?>assets/img/icon-192.png">
+    <link rel="manifest" href="<?= BASE_URL ?>manifest.php">
+    <meta name="theme-color" content="#0a2240">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="MSA Payroll">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="<?= BASE_URL ?>assets/img/icon-192.png">
+    <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('<?= BASE_URL ?>sw.js').catch(function () {});</script>
 
     <!-- App CSS -->
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app.css') ?: '1' ?>">
