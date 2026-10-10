@@ -24,6 +24,14 @@ if ($action === 'ack' && $cur) {
     unset($_SESSION['msa_todo_light']);
     echo json_encode(['ok' => true, 'version' => (int)$cur['version'], 'sent_at' => $cur['sent_at']]); exit;
 }
+if ($action === 'undo' && $cur) { // إلغاء التسجيل: يُحذف آخر إصدار؛ إن كان له إصدار سابق يرجع «مبعوتاً»
+    $db->prepare("DELETE FROM legal_filings WHERE id = ?")->execute([$cur['id']]);
+    $prev = $db->prepare("SELECT id FROM legal_filings WHERE dkey = ? AND period = ? AND school_scope = ? ORDER BY version DESC LIMIT 1"); $prev->execute([$key, $period, $scope]); $pid = (int)$prev->fetchColumn();
+    if ($pid) $db->prepare("UPDATE legal_filings SET status = 'sent' WHERE id = ?")->execute([$pid]);
+    logAudit('legal_undo', 'legal_filings', (int)$cur['id'], null, $key . ' ' . $period . ' v' . $cur['version'] . ' cancelled');
+    unset($_SESSION['msa_todo_light']);
+    echo json_encode(['ok' => true, 'prev' => $pid]); exit;
+}
 if ($action === 'send') {
     $v = $cur ? (int)$cur['version'] + 1 : 1;
     if (strlen($json) > 8 * 1024 * 1024) $json = '';

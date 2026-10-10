@@ -10,7 +10,7 @@
 <script>window.BASE_URL = <?= json_encode(BASE_URL) ?>; window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>; window.MSA_PAGE = <?= json_encode((string)($currentPage ?? '')) ?>;</script>
 <script src="<?= BASE_URL ?>assets/js/doclang.js?v=<?= @filemtime(__DIR__ . '/../assets/js/doclang.js') ?: '1' ?>"></script>
 <?php if (!empty($GLOBALS['msaLegalCtx'])): $lc = $GLOBALS['msaLegalCtx']; $lf = $lc['filing'] ? array_intersect_key($lc['filing'], array_flip(['id','version','sent_at','sent_by','snapshot_hash','seen_hash','changed_flag','changed_note'])) : null; ?>
-<script>window.MSA_LEGAL = <?= json_encode(['key' => $lc['key'], 'period' => $lc['period'], 'scope' => $lc['scope'], 'base' => BASE_URL, 'me' => (string)($_SESSION['full_name'] ?? ($_SESSION['username'] ?? '')), 'filing' => $lf], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;</script>
+<script>window.MSA_LEGAL = <?= json_encode(['key' => $lc['key'], 'period' => $lc['period'], 'scope' => $lc['scope'], 'base' => BASE_URL, 'me' => (string)($_SESSION['full_name'] ?? ($_SESSION['username'] ?? '')), 'filing' => $lf, 'auth' => $lc['auth'] ?? null], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;</script>
 <script src="<?= BASE_URL ?>assets/js/legal.js?v=<?= @filemtime(__DIR__ . '/../assets/js/legal.js') ?: '1' ?>"></script>
 <?php endif; ?>
 <?php /* 🚀 (2026-10-02 «بدي يفتح بجزء من الثانية — كل شي بالبرنامج»): التحضير المسبق — حين يقف الماوس على رابط تنقّل (القائمة الجانبية،

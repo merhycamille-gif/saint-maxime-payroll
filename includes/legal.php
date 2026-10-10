@@ -26,6 +26,7 @@ function legalEnsureTables(): void {
             INDEX (dkey, period), INDEX (changed_flag)
         ) DEFAULT CHARSET=utf8mb4");
         try { $db->exec("ALTER TABLE legal_deadlines ADD COLUMN report_key VARCHAR(80) NULL"); } catch (Throwable $e) {}
+        try { $db->exec("ALTER TABLE legal_deadlines MODIFY report_key VARCHAR(255) NULL"); } catch (Throwable $e) {}
         // 📐 lag_months = كم شهراً بعد نهاية الفترة يقع الموعد (0 = خلال الشهر الأخير من الفترة نفسها). أوّل تركيب للعمود ⇒ إعادة البذر بمواعيده هو
         //    (2026-10-10 مساءً بكلماته: الضمان الشهري خلال شهر من نهاية الشهر · الفصلي خلال 3 أشهر من نهاية الفصل · التسوية السنوية نهاية آذار ·
         //     ر10 خلال 15 يوماً من نهاية الفصل · ر5/ر6/ر7 نهاية شباط · الصندوق: المحسومات الفصلية خلال الشهر الثالث من كل فصل والبيان العام (ملاك/متعاقد) خلال كانون الأول)
@@ -33,8 +34,8 @@ function legalEnsureTables(): void {
         try { $db->exec("ALTER TABLE legal_deadlines ADD COLUMN lag_months TINYINT NOT NULL DEFAULT 1"); $reseed = true; } catch (Throwable $e) {}
         if ($reseed) $db->exec("DELETE FROM legal_deadlines");
         // مفتاح التقرير داخل البرنامج (صفحة:نموذج) ⇒ كبسة «انبعت للدولة» بالتقرير تُقفل الموعد نفسه بالرزنامة
-        $rk = ['cnss_monthly' => 'official_forms:cnss_contrib_monthly', 'cnss_quarterly' => 'official_forms:cnss_contrib_annual', 'cnss_annual' => 'official_forms:cnss_taswiya', 'mof_r10' => 'official_forms:tax_r10',
-               'mof_annual' => 'official_forms:tax_r6', 'eoc_quarterly' => 'official_forms:eoc_quarterly', 'eoc_annual_tit' => 'official_forms:eoc_staff:titulaire', 'eoc_annual_con' => 'official_forms:eoc_staff:contractuel'];
+        $rk = ['cnss_monthly' => 'official_forms:cnss_contrib_monthly', 'cnss_quarterly' => 'official_forms:cnss_contrib_annual', 'cnss_annual' => 'official_forms:cnss_taswiya,official_forms:cnss_annual', 'mof_r10' => 'official_forms:tax_r10',
+               'mof_annual' => 'official_forms:tax_r5,official_forms:tax_r6,official_forms:tax_r6t,official_forms:tax_r7', 'eoc_quarterly' => 'official_forms:eoc_quarterly', 'eoc_annual_tit' => 'official_forms:eoc_staff:titulaire', 'eoc_annual_con' => 'official_forms:eoc_staff:contractuel'];
         if ((int)$db->query("SELECT COUNT(*) FROM legal_deadlines")->fetchColumn() === 0) {
             $B = BASE_URL;
             $seed = [
@@ -51,8 +52,8 @@ function legalEnsureTables(): void {
             $ins = $db->prepare("INSERT INTO legal_deadlines (dkey, authority, title_fr, title_ar, kind, due_day, due_months, period_type, report_href, notes, sort_order, lag_months) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
             foreach ($seed as $s) $ins->execute($s);
         }
-        $fix = $db->prepare("UPDATE legal_deadlines SET report_key = ? WHERE dkey = ? AND (report_key IS NULL OR report_key = '')");
-        foreach ($rk as $k => $v) $fix->execute([$v, $k]);
+        $fix = $db->prepare("UPDATE legal_deadlines SET report_key = ? WHERE dkey = ? AND (report_key IS NULL OR report_key <> ?)");
+        foreach ($rk as $k => $v) $fix->execute([$v, $k, $v]);
         $db->exec("UPDATE legal_deadlines SET report_href = REPLACE(report_href, 'form=cnss_contrib_monthly', 'form=cnss_contrib_annual') WHERE dkey = 'cnss_quarterly'");
     } catch (Throwable $e) {}
 }
@@ -85,7 +86,8 @@ function legalOccurrences(int $horizonDays = 120, int $backDays = 400): array {
                     $due = new DateTimeImmutable(sprintf('%04d-%02d-%02d', $y, $m, $day));
                     if ($due < $from || $due > $to) continue;
                     $period = legalPeriodForDue($d, $y, $m);
-                    $f = $filings[$d['dkey'] . '|' . $period] ?? (!empty($d['report_key']) ? ($filings[$d['report_key'] . '|' . $period] ?? null) : null);
+                    $f = $filings[$d['dkey'] . '|' . $period] ?? null;
+                    if (!$f && !empty($d['report_key'])) foreach (explode(',', str_replace(' ', '', $d['report_key'])) as $rk1) { if (isset($filings[$rk1 . '|' . $period])) { $f = $filings[$rk1 . '|' . $period]; break; } }
                     $daysLeft = (int)$today->diff($due)->format('%r%a');
                     $status = $f ? 'sent' : ($daysLeft < 0 ? 'late' : 'pending');
                     if ($status !== 'sent' && $due < $trackFrom) continue; // ما قبل السنة الدراسية الحالية: مُقدَّم سابقاً خارج البرنامج — لا يُعرض متأخّراً
@@ -145,9 +147,17 @@ function legalFilingContext(): ?array {
     if (!empty($g['cat'])) $key .= ':' . preg_replace('/[^a-z]/', '', (string)$g['cat']); // البيان العام: ملاك / متعاقدون
     if (!empty($g['employee_id'])) $key .= ':emp' . (int)$g['employee_id'];
     legalEnsureTables();
-    $f = null;
+    $f = null; $auth = null;
     try { $st = getDB()->prepare("SELECT * FROM legal_filings WHERE dkey = ? AND period = ? AND school_scope = ? ORDER BY version DESC LIMIT 1"); $st->execute([$key, $period, $scope]); $f = $st->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Throwable $e) {}
-    return ['key' => $key, 'period' => $period, 'scope' => $scope, 'filing' => $f];
+    // 🏛️ لأي جهة؟ (سؤاله 2026-10-10 ليلاً «شو هو اللي انبعت للدولة ولوين بالدولة»): التقرير المربوط بموعد ⇒ اسم الجهة؛ غير المربوط ⇒ «مستند عامّ»
+    // (سؤاله 2026-10-10 ليلاً «ليش هيدا الملف بدّو يكون فيه كبسة للدولة؟ بس ر5 اللي بينبعت للدولة») ⇒ الكبسة فقط على مستندات الدولة:
+    //   نماذج المالية (tax_*) والضمان (cnss_*) وصندوق التعويضات (eoc_*) — المربوط منها بموعد يحمل اسم الموعد؛ الكشوف الداخلية (مثل كشف رواتب كل الموظفين) بلا كبسة.
+    $names = ['cnss' => ['CNSS — Caisse nationale de sécurité sociale', 'الصندوق الوطني للضمان الاجتماعي'], 'mof' => ['Ministère des Finances', 'وزارة المالية'], 'eoc' => ['Caisse des indemnités des enseignants', 'صندوق تعويضات أفراد الهيئة التعليمية']];
+    try { $st = getDB()->prepare("SELECT authority, title_fr, title_ar FROM legal_deadlines WHERE FIND_IN_SET(?, REPLACE(report_key, ' ', '')) AND active = 1 ORDER BY sort_order LIMIT 1"); $st->execute([$key]); $d = $st->fetch(PDO::FETCH_ASSOC);
+        if ($d) $auth = ['code' => $d['authority'], 'fr' => $names[$d['authority']][0], 'ar' => $names[$d['authority']][1], 'doc_fr' => $d['title_fr'], 'doc_ar' => $d['title_ar']];
+    } catch (Throwable $e) {}
+    if (!$auth && preg_match('/^official_forms:(tax|cnss|eoc)_/', $key, $mm)) { $code = ['tax' => 'mof', 'cnss' => 'cnss', 'eoc' => 'eoc'][$mm[1]]; $auth = ['code' => $code, 'fr' => $names[$code][0], 'ar' => $names[$code][1], 'doc_fr' => '', 'doc_ar' => 'نموذج رسمي (بلا موعد دوري — يُقدَّم عند الحاجة)']; }
+    return ['key' => $key, 'period' => $period, 'scope' => $scope, 'filing' => $f, 'auth' => $auth];
 }
 
 /** تعديل بيانات يمسّ فترة مبعوتة ⇒ علّم التقارير المبعوتة المعنيّة «تغيّرت» مع السبب (يُستدعى من المحرّك عند تغيّر راتب شهر) */

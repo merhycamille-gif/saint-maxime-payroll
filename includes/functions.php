@@ -5577,9 +5577,9 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php // ⚖️📤 (2026-10-10 «بس اطبع تقرير بدي ابعتو للدولة لازم يكون في محل حطّ انبعت وما بقى يتغيّر شي»): زرّ «انبعت للدولة» بكل مستند رسمي —
               //    يقفل نسخة طبق الأصل (legal.js + pages/legal_mark.php)؛ إذا سبق إرساله يُخفى الزرّ ويظهر شريط الحالة (مطابق / تغيّر ⇒ صحّحه أو خلّيه)
               $legalCtx = (!$viewerOnly && function_exists('legalFilingContext')) ? legalFilingContext() : null;
-              if ($legalCtx) { $GLOBALS['msaLegalCtx'] = $legalCtx + ['title' => (string)$title]; } ?>
-        <?php if ($legalCtx): ?>
-        <button type="button" class="btn btn-sm btn-dark" id="legalSendBtn" title="سجّل أنّ هالتقرير انبعت للدولة — بينحفظ طبق الأصل وما بيتغيّر"<?= $legalCtx['filing'] ? ' style="display:none"' : '' ?>><i class="fas fa-paper-plane"></i> Envoyé à l’État / انبعت للدولة</button>
+              if ($legalCtx && !empty($legalCtx['auth'])) { $GLOBALS['msaLegalCtx'] = $legalCtx + ['title' => (string)$title]; } ?>
+        <?php if ($legalCtx && !empty($legalCtx['auth'])): ?>
+        <button type="button" class="btn btn-sm btn-dark" id="legalSendBtn" title="تسجيل أنّك قدّمت هالتقرير للدولة (البرنامج ما بيبعت شي بنفسه) — بينحفظ طبق الأصل وما بيتغيّر"<?= $legalCtx['filing'] ? ' style="display:none"' : '' ?>><i class="fas fa-paper-plane"></i> Remis à l’État / سجّل: قُدِّم للدولة</button>
         <?php endif; ?>
     </div>
     <?php return ob_get_clean();

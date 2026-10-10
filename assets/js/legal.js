@@ -23,13 +23,18 @@
     function bar(html, cls) { var b = document.getElementById('legalBar'); if (!b) { b = document.createElement('div'); b.id = 'legalBar'; b.className = 'legal-bar no-print no-export'; var tb = document.querySelector('.export-toolbar'); (tb && tb.parentNode ? tb.parentNode : document.querySelector('.page-content')).insertBefore(b, tb && tb.parentNode ? tb.nextSibling : null); } b.className = 'legal-bar no-print no-export ' + (cls || ''); b.innerHTML = html; return b; }
     var btn = document.getElementById('legalSendBtn');
     function fmt(d) { try { var x = new Date(d.replace(' ', 'T')); return x.toLocaleDateString('fr-LB') + ' ' + x.toLocaleTimeString('fr-LB', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return d; } }
+    // 🏛️ لأي جهة: المربوط بموعد ⇒ اسمها؛ وإلا «مستند عامّ — بتقدّمه إنت بالطريقة المعتادة»
+    function authTxt() { return L.auth ? '<span class="lb-auth" dir="rtl">الجهة: <b>' + L.auth.ar + '</b> — ' + L.auth.doc_ar + '</span>' : '<span class="lb-auth" dir="rtl">مستند عامّ غير مربوط بموعد محدّد للدولة — قدّمه بالطريقة المعتادة (ورقي/بوّابة)</span>'; }
     function render(f, same, curHash) {
-        if (!f) { if (btn) { btn.style.display = ''; btn.disabled = false; } return; }
+        if (!f) { if (btn) { btn.style.display = ''; btn.disabled = false; } var ob = document.getElementById('legalBar'); if (ob) ob.remove(); return; }
         if (btn) btn.style.display = 'none';
         var who = f.sent_by ? ' — ' + f.sent_by : '';
         if (same) {
-            bar('<i class="fas fa-lock"></i> <b>Envoyé à l’État</b> le ' + fmt(f.sent_at) + ' (v' + f.version + ')' + who + ' — <span dir="rtl">انبعت للدولة · النسخة مطابقة لما أُرسل</span>'
-                + '<span class="lb-sp"></span><a class="btn btn-sm btn-light" href="' + L.base + 'pages/legal_calendar.php?view=' + f.id + '" target="_blank"><i class="fas fa-eye"></i> النسخة المبعوتة</a>', 'ok');
+            var b0 = bar('<i class="fas fa-lock"></i> <b>Déclaré comme remis à l’État</b> le ' + fmt(f.sent_at) + ' (v' + f.version + ')' + who + ' — <span dir="rtl">مسجَّل «قُدِّم للدولة» · نسخة طبق الأصل محفوظة ومطابقة</span>'
+                + '<div class="lb-note">' + authTxt() + ' <span dir="rtl">· البرنامج لا يرسل شيئاً بنفسه: هذا تسجيل وقفل للنسخة فقط.</span></div>'
+                + '<span class="lb-sp"></span><a class="btn btn-sm btn-light" href="' + L.base + 'pages/legal_calendar.php?view=' + f.id + '" target="_blank"><i class="fas fa-eye"></i> النسخة المحفوظة</a>'
+                + '<button type="button" class="btn btn-sm btn-light" id="lbUndo" title="إلغاء التسجيل (ما انبعت شي فعلياً)"><i class="fas fa-rotate-left"></i> إلغاء التسجيل</button>', 'ok');
+            b0.querySelector('#lbUndo').onclick = function () { var me = this; if (!confirm('إلغاء تسجيل «قُدِّم للدولة» لهذا التقرير؟ (البرنامج ما بعت شي — بس بيشيل التسجيل والنسخة المحفوظة)')) return; me.disabled = true; post({ action: 'undo', hash: curHash || f.snapshot_hash }).then(function (r) { if (r.ok) { L.filing = null; render(null); showAlert('أُلغي التسجيل', 'success'); } else { me.disabled = false; showAlert(r.err || 'خطأ', 'danger'); } }); };
         } else {
             var b = bar('<i class="fas fa-triangle-exclamation"></i> <b>Modifié depuis l’envoi</b> — <span dir="rtl">هالتقرير انبعت للدولة بتاريخ ' + fmt(f.sent_at) + ' (v' + f.version + ') <b>وتغيّر منذ ذلك</b>. شو بدّك؟</span>'
                 + (f.changed_note ? '<div class="lb-note" dir="rtl">' + String(f.changed_note).split('\n').slice(0, 5).map(function (s) { return '• ' + s.replace(/[<>]/g, ''); }).join('<br>') + '</div>' : '')
@@ -45,12 +50,14 @@
         if (el) el.disabled = true;
         sha256(manual ? MANUAL : snap).then(function (h) { if (!h) { showAlert('المتصفّح لا يدعم البصمة (افتح الموقع بـhttps)', 'danger'); if (el) el.disabled = false; return; }
             return post({ action: 'send', hash: h, snapshot: manual ? '' : snap }).then(function (r) {
-                if (r.ok) { L.filing = { id: r.id, version: r.version, sent_at: r.sent_at, sent_by: L.me, snapshot_hash: h, seen_hash: h, changed_flag: 0 }; render(L.filing, true, h); showAlert('📤 انبعت للدولة — التقرير مقفول بنسخة طبق الأصل (v' + r.version + ')', 'success'); }
+                if (r.ok) { L.filing = { id: r.id, version: r.version, sent_at: r.sent_at, sent_by: L.me, snapshot_hash: h, seen_hash: h, changed_flag: 0 }; render(L.filing, true, h); showAlert('📤 سُجّل «قُدِّم للدولة» — نسخة طبق الأصل محفوظة ومقفولة (v' + r.version + ')', 'success'); }
                 else { showAlert(r.err || 'خطأ', 'danger'); if (el) el.disabled = false; }
             });
         });
     }
-    if (btn) btn.addEventListener('click', function () { if (!confirm('تسجيل هالتقرير «انبعت للدولة»؟ بينحفظ طبق الأصل وما بيتغيّر بعدها إلا بنسخة تصحيحية.')) return; send(btn); });
+    if (btn) btn.addEventListener('click', function () {
+        var dest = L.auth ? 'الجهة: ' + L.auth.ar + ' (' + L.auth.doc_ar + ')' : 'هذا مستند عامّ غير مربوط بموعد محدّد للدولة';
+        if (!confirm('تسجيل أنّك قدّمت هذا التقرير للدولة؟\n\n' + dest + '\n\nتنبيه: البرنامج لا يرسل شيئاً بنفسه — إنت بتقدّمه (ورقي أو عبر بوّابة الجهة). الكبسة بتحفظ نسخة طبق الأصل بتاريخ اليوم وبتقفلها، وأي تغيير لاحق بيطلع عليه تنبيه.')) return; send(btn); });
     function check() {
         var f = L.filing; if (!f) { render(null); return; }
         var snap = snapshot(); if (!snap) { render(f, !parseInt(f.changed_flag, 10), f.snapshot_hash); return; }

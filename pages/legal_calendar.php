@@ -34,6 +34,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['do'])) {
         $db->prepare("DELETE FROM legal_filings WHERE id = ? AND snapshot_hash = ?")->execute([$id, str_repeat('0', 64)]); // فقط التسجيلات اليدوية تُلغى
         logAudit('legal_undo', 'legal_filings', $id, null, 'manual done removed');
         $_SESSION['flash'] = ['type' => 'success', 'msg' => 'رجع الموعد معلّقاً'];
+    } elseif ($do === 'cancel') { // إلغاء تسجيل «قُدِّم» (كبسة بالغلط) — البرنامج لا يرسل شيئاً فعلياً
+        $id = (int)($_POST['id'] ?? 0); $st = $db->prepare("SELECT * FROM legal_filings WHERE id = ?"); $st->execute([$id]); $fr = $st->fetch(PDO::FETCH_ASSOC);
+        if ($fr) { $db->prepare("DELETE FROM legal_filings WHERE id = ?")->execute([$id]);
+            $pv = $db->prepare("SELECT id FROM legal_filings WHERE dkey = ? AND period = ? AND school_scope = ? ORDER BY version DESC LIMIT 1"); $pv->execute([$fr['dkey'], $fr['period'], $fr['school_scope']]); $pid = (int)$pv->fetchColumn();
+            if ($pid) $db->prepare("UPDATE legal_filings SET status = 'sent' WHERE id = ?")->execute([$pid]);
+            logAudit('legal_undo', 'legal_filings', $id, null, $fr['dkey'] . ' ' . $fr['period'] . ' v' . $fr['version'] . ' cancelled');
+            $_SESSION['flash'] = ['type' => 'success', 'msg' => 'أُلغي التسجيل: ' . ($fr['title'] ?: $fr['dkey'])]; }
     } elseif ($do === 'save_deadline') {
         $dkey = preg_replace('/[^a-z0-9_]/', '', (string)($_POST['dkey'] ?? ''));
         $months = implode(',', array_filter(array_unique(array_map('intval', explode(',', (string)($_POST['due_months'] ?? '')))), fn($m) => $m >= 1 && $m <= 12));
@@ -140,14 +147,16 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card" id="sent">
-    <div class="card-header"><h3><i class="fas fa-lock"></i> Rapports envoyés à l’État / التقارير المبعوتة للدولة (<?= count($filings) ?>)</h3></div>
+    <div class="card-header"><h3><i class="fas fa-lock"></i> Rapports remis à l’État / التقارير المسجَّلة «قُدِّمت للدولة» (<?= count($filings) ?>)</h3></div>
+    <p class="hint" style="margin:8px 14px 0">البرنامج لا يرسل شيئاً بنفسه: الكبسة بالنموذج الرسمي (المالية / الضمان / الصندوق) تسجّل أنّك قدّمته وتحفظ نسخة طبق الأصل مقفولة. الجهة مكتوبة بكل سطر.</p>
     <div class="card-body">
         <?php if (!$filings): ?><div class="mp-ok">لسّا ما انبعت شي — بكل تقرير رسمي في كبسة «انبعت للدولة» بتقفله طبق الأصل</div><?php else: ?>
         <div class="mp-tool no-print"><input type="search" class="form-control" placeholder="⚡ صفّي: تقرير، فترة، سنة…" data-filter="#sent tbody tr"></div>
-        <div class="table-wrapper"><table class="table mp-table"><thead><tr><th>Rapport / التقرير</th><th>Période / الفترة</th><th>Version</th><th>Envoyé / انبعت</th><th>Par / بواسطة</th><th>Statut / الحالة</th><th class="no-print"></th></tr></thead><tbody>
-        <?php foreach ($filings as $f): ?><tr data-q="<?= e(mb_strtolower(($f['title'] ?: '') . ' ' . $f['dkey'] . ' ' . $f['period'] . ' ' . $f['sent_at'])) ?>"><td><strong><?= e($f['title'] ?: $f['dkey']) ?></strong><br><small><?= e($f['dkey']) ?></small></td><td><?= e(legalPeriodLabel($f['period'])) ?></td><td>v<?= (int)$f['version'] ?></td><td><?= e(date('d/m/Y H:i', strtotime($f['sent_at']))) ?></td><td><?= e((string)$f['sent_by']) ?></td>
+        <div class="table-wrapper"><table class="table mp-table"><thead><tr><th>Rapport / التقرير</th><th>Autorité / الجهة</th><th>Période / الفترة</th><th>Version</th><th>Remis / قُدِّم</th><th>Par / بواسطة</th><th>Statut / الحالة</th><th class="no-print"></th></tr></thead><tbody>
+        <?php foreach ($filings as $f): ?><tr data-q="<?= e(mb_strtolower(($f['title'] ?: '') . ' ' . $f['dkey'] . ' ' . $f['period'] . ' ' . $f['sent_at'])) ?>"><td><strong><?= e($f['title'] ?: $f['dkey']) ?></strong><br><small><?= e($f['dkey']) ?></small></td><td><?php $ac = preg_match('/:(tax|cnss|eoc)_/', $f['dkey'], $am) ? ['tax' => 'mof', 'cnss' => 'cnss', 'eoc' => 'eoc'][$am[1]] : ''; echo $ac ? e($authLbl[$ac][0] . ' / ' . $authLbl[$ac][1]) : '<span class="badge badge-light">مستند داخلي — لا يُرسل للدولة</span>'; ?></td><td><?= e(legalPeriodLabel($f['period'])) ?></td><td>v<?= (int)$f['version'] ?></td><td><?= e(date('d/m/Y H:i', strtotime($f['sent_at']))) ?></td><td><?= e((string)$f['sent_by']) ?></td>
             <td><?= $f['status'] === 'superseded' ? '<span class="badge badge-light">استُبدل بنسخة تصحيحية</span>' : ((int)$f['changed_flag'] ? '<span class="badge badge-danger">تغيّر بعد الإرسال</span>' : '<span class="badge badge-success">مقفول · مطابق</span>') ?></td>
-            <td class="no-print"><a class="btn btn-sm btn-light" href="?view=<?= (int)$f['id'] ?>"><i class="fas fa-eye"></i> المبعوت</a> <?= $f['href'] ? '<a class="btn btn-sm btn-light" href="' . e($f['href']) . '"><i class="fas fa-file-lines"></i> الحالي</a>' : '' ?></td></tr><?php endforeach; ?>
+            <td class="no-print"><a class="btn btn-sm btn-light" href="?view=<?= (int)$f['id'] ?>"><i class="fas fa-eye"></i> المحفوظ</a> <?= $f['href'] ? '<a class="btn btn-sm btn-light" href="' . e($f['href']) . '"><i class="fas fa-file-lines"></i> الحالي</a>' : '' ?>
+                <?php if ($canW): ?><form method="post" style="margin:0;display:inline" onsubmit="return confirm('إلغاء هذا التسجيل؟ (البرنامج ما بعت شي فعلياً — بس بيشيل التسجيل والنسخة المحفوظة)')"><?= csrfField() ?><input type="hidden" name="do" value="cancel"><input type="hidden" name="id" value="<?= (int)$f['id'] ?>"><button class="btn btn-sm btn-light" type="submit" title="إلغاء التسجيل"><i class="fas fa-rotate-left"></i> إلغاء</button></form><?php endif; ?></td></tr><?php endforeach; ?>
         </tbody></table></div><?php endif; ?>
     </div>
 </div>
