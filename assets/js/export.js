@@ -244,7 +244,11 @@
             var ex = '', n = start;
             while (n && n !== a.parentElement) { var dA = n.getAttribute ? n.getAttribute('dir') : ''; if (dA === 'ltr' || dA === 'rtl') { ex = dA; break; } if (/(^|\s)(doc-ltr)(\s|$)/.test(n.className || '')) { ex = 'ltr'; break; } n = n.parentElement; }
             var rlDir = (window.MSA_RL && window.MSA_RL.exportDir) ? window.MSA_RL.exportDir(a) : null; // 🌐 اختياره: عربي = يمين، فرنسي = شمال، الاثنان = جهته
+            // 📊 (2026-10-10 مساءً «إكسل عربي لازم العامود A يكون من اليمين»): الإكسل بلا اختيار صريح = من اليمين متى وُجد عربي بالمستند
+            //    (لم يعد يتبع dir=ltr الذي كان على لوائح الدولة الخمس)؛ الوورد يتبع لغة النصّ.
+            var hasAr = /[؀-ۿ]/.test(((start || a).textContent || '').slice(0, 20000));
             if (rlDir) dir = rlDir;
+            else if (format === 'xlsx') dir = hasAr ? 'rtl' : 'ltr';
             else if (ex) dir = ex;
             else { var tx = ((start || a).textContent || '').slice(0, 6000), ar = (tx.match(/[\u0600-\u06FF]/g) || []).length, la = (tx.match(/[A-Za-z]/g) || []).length; dir = ar >= la ? 'rtl' : 'ltr'; }
         } catch (e) {}

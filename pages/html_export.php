@@ -41,12 +41,12 @@ function hx_text(DOMNode $n): string {
     if ($n->nodeType === XML_TEXT_NODE) return $n->nodeValue;
     if ($n->nodeType !== XML_ELEMENT_NODE) return '';
     $tag = strtolower($n->nodeName);
-    if ($tag === 'br') return ' ';
+    if ($tag === 'br') return "\n"; // 📏 2026-10-10: سطر جديد داخل الخلية (الاسم العربي فوق الفرنسي) بدل مسافة تعرّض العمود
     $s = '';
     foreach ($n->childNodes as $c) $s .= hx_text($c) . ' ';
     return $s;
 }
-function hx_clean(string $s): string { return trim(preg_replace('/\s+/u', ' ', $s)); }
+function hx_clean(string $s): string { $s = preg_replace('/[ \t\r\x{00A0}]+/u', ' ', $s); $s = preg_replace('/ *\n */u', "\n", $s); $s = preg_replace('/\n{2,}/u', "\n", $s); return trim($s); }
 function hx_has_class(DOMNode $n, string $re): bool {
     return $n instanceof DOMElement && preg_match('/' . $re . '/', ' ' . $n->getAttribute('class') . ' ') === 1;
 }

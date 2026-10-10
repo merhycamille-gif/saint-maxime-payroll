@@ -371,7 +371,7 @@ class ReportTable
         if (preg_match_all('/./us', $t, $m)) {
             foreach ($m[0] as $ch) {
                 $o = mb_ord($ch, 'UTF-8');
-                if ($o >= 0x0600 && $o <= 0x06FF) $w += 1.25;
+                if ($o >= 0x0600 && $o <= 0x06FF) $w += 1.1;   // 📏 2026-10-10: كان 1.25 فتطلع الأعمدة العربية أعرض من كلماتها
                 elseif ($o >= 0x0640 && $o <= 0x065F) $w += 0;      // تشكيل
                 elseif (ctype_digit($ch) || $ch === ',' || $ch === '.') $w += 0.95;
                 elseif ($o > 0x2000) $w += 1.3;
@@ -386,18 +386,22 @@ class ReportTable
         for ($c = 0; $c < $cols; $c++) {
             $h = (string)($this->headers[$c] ?? '');
             $hw = 0.0; foreach (preg_split('/\r\n|\n/', $h) as $ln) $hw = max($hw, self::textW($ln));
-            $w[$c] = max($w[$c], min($hw, 26.0) * 0.75 + 2);
+            $w[$c] = max($w[$c], min($hw * 0.6 + 2, 18.0)); // 📏 الرأس يلتفّ على سطرين بدل توسيع العمود
         }
+        // 📏 (2026-10-10 مساءً «وسّع العامود لازم يكون مرتّب قدّ الكلمات اللي فيه مش هالقدّ واسع»): عنوان صفّ المجموع («مجموع الملاك»…)
+        //    لا يوسّع عموده — يمتدّ على الخلايا الفارغة جنبه بالإكسل؛ والعرض = أطول محتوى فعلي + هامش صغير.
         foreach ($this->rows as $r) {
             if ($r['type'] === 'section') continue;
             for ($c = 0; $c < $cols; $c++) {
                 $v = (string)($r['cells'][$c] ?? '');
                 if ($v === '') continue;
-                $len = $this->isNum($v) ? strlen(number_format($this->numVal($v), 2)) * 0.95 : self::textW($v);
-                $w[$c] = max($w[$c], min($len, 58.0) + 2);
+                if ($r['type'] === 'total' && !$this->isNum($v)) continue;
+                if ($this->isNum($v)) $len = strlen(number_format($this->numVal($v), 2)) * 0.95;
+                else { $len = 0.0; foreach (preg_split('/\r\n|\n/', $v) as $ln) $len = max($len, self::textW($ln)); } // أطول سطر لا مجموع الأسطر
+                $w[$c] = max($w[$c], min($len, 58.0) + 1.5);
             }
         }
-        for ($c = 0; $c < $cols; $c++) $w[$c] = round(max(8.0, min(60.0, $w[$c])), 1);
+        for ($c = 0; $c < $cols; $c++) $w[$c] = round(max(5.0, min(60.0, $w[$c])), 1);
         return $w;
     }
     private function fileBase()
