@@ -317,6 +317,7 @@ $exportOpts['no_office'] = !in_array($form, ofOfficeForms(), true);
 
 // وضع «عرض المستند»: عند فتح نموذج/تقرير تختفي القوائم ويصير الرجوع لنفس الصفحة الأصلية
 if ($form !== '') $docFocus = true;
+else { header('Location: ' . BASE_URL . 'pages/reports.php'); exit; } // v2026: بلا نموذج مختار ⇒ مركز التقارير (كانت صفحة فاضية)
 
 // صفحة القائمة (بلا نموذج مختار): لا شيء يُصدَّر — شريط التصدير زائد (2026-08-19)
 if ($form === '') $hideExportToolbar = true;

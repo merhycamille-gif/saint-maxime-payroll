@@ -5567,6 +5567,13 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php if ($showEmail): ?>
         <button type="button" class="btn btn-sm btn-light" onclick="ppEmail('<?= $t ?>','<?= $em ?>')"><i class="fas fa-envelope"></i> Email</button>
         <?php endif; ?>
+        <?php // ⚖️📤 (2026-10-10 «بس اطبع تقرير بدي ابعتو للدولة لازم يكون في محل حطّ انبعت وما بقى يتغيّر شي»): زرّ «انبعت للدولة» بكل مستند رسمي —
+              //    يقفل نسخة طبق الأصل (legal.js + pages/legal_mark.php)؛ إذا سبق إرساله يُخفى الزرّ ويظهر شريط الحالة (مطابق / تغيّر ⇒ صحّحه أو خلّيه)
+              $legalCtx = (!$viewerOnly && function_exists('legalFilingContext')) ? legalFilingContext() : null;
+              if ($legalCtx) { $GLOBALS['msaLegalCtx'] = $legalCtx + ['title' => (string)$title]; } ?>
+        <?php if ($legalCtx): ?>
+        <button type="button" class="btn btn-sm btn-dark" id="legalSendBtn" title="سجّل أنّ هالتقرير انبعت للدولة — بينحفظ طبق الأصل وما بيتغيّر"<?= $legalCtx['filing'] ? ' style="display:none"' : '' ?>><i class="fas fa-paper-plane"></i> Envoyé à l’État / انبعت للدولة</button>
+        <?php endif; ?>
     </div>
     <?php return ob_get_clean();
 }
@@ -9225,4 +9232,16 @@ function unlockSchoolYear(int $schoolId, string $sy, string $who): void {
 /** رسالة موحّدة للرفض. */
 function yearLockedMsg(int $schoolId, string $sy): string {
     return '🔒 سنة ' . $sy . ' مقفولة لمدرسة «' . schoolNameById($schoolId, 'ar') . '» — الحسابات ما بتتغيّر. لتعديلها افتح القفل بكلمة السرّ من صفحة «فتح سنة دراسية».';
+}
+// ⚖️ v2026: الرزنامة القانونية + قفل «انبعت للدولة» — يُحمَّل مع functions.php ليعمل hook المحرّك قبل الهيدر
+require_once __DIR__ . '/legal.php';
+
+/** 🖼️ v2026 «اسم الأستاذ وحدو صورة منيحة» (2026-10-10): صورة الموظف الحقيقية (photo_path — الملفات أونلاين فقط) كدائرة؛
+ *  بلا صورة أو تعذّر تحميلها (المحلي) ⇒ حرفان بلون. تُستعمل بلائحة الموظفين والكشف الشهري والدرج. */
+function empAvatar(array $e, string $color = 'ic2', int $size = 0): string {
+    $ini = mb_strtoupper(mb_substr(trim((string)($e['first_name_fr'] ?? '')), 0, 1) . mb_substr(trim((string)($e['last_name_fr'] ?? '')), 0, 1));
+    $p = trim((string)($e['photo_path'] ?? ''));
+    $img = ($p !== '' && preg_match('/\.(jpe?g|png|gif|webp)$/i', $p)) ? '<img src="' . e(BASE_URL . ltrim($p, '/')) . '" alt="" loading="lazy" onerror="this.remove()">' : '';
+    $st = 'background:var(--' . preg_replace('/[^a-z0-9]/', '', $color) . ')' . ($size ? ';width:' . $size . 'px;height:' . $size . 'px;font-size:' . (int)round($size * 0.36) . 'px' : '');
+    return '<span class="mp-av" style="' . $st . '">' . $img . e($ini) . '</span>';
 }

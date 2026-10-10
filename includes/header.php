@@ -100,6 +100,9 @@ healDedupFill20260902(); // 🧩 تكملة الدمج: خانات الهوية 
 $currentPage = $currentPage ?? '';
 $pageTitle = $pageTitle ?? 'MSA Payroll';
 $lang = $_SESSION['lang'] ?? 'fr';
+require_once __DIR__ . '/todo.php'; require_once __DIR__ . '/legal.php'; // ⚖️ v2026: الرزنامة القانونية + قفل «انبعت للدولة» // 🔔 v2026: الجرس بالشريط العلوي = نفس لائحة «شو لازم تعمل» (كاش جلسة 120 ثانية)
+$msaBell = []; try { if (empty($docFocus)) $msaBell = msaTodoItems(getDB()); } catch (Throwable $e) { $msaBell = []; }
+$msaBellN = 0; foreach ($msaBell as $mb) $msaBellN += (int)$mb[2];
 
 // 🎨 لون + أيقونة مميّزة لكل قسم من البرنامج (تُطبَّق على العنوان وبادجات رؤوس البطاقات)
 $sectionColors = [
@@ -114,7 +117,7 @@ $pageSection = [
     'dashboard'=>'dashboard',
     'employees'=>'personnel','cadre_due'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','family_allowances'=>'personnel','employee_full_history'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel','duplicates'=>'personnel','old_uninsured'=>'personnel','cnss_followup'=>'personnel',
     'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie','hours_reduction'=>'paie',
-    'reports'=>'rapports','tax'=>'rapports',
+    'reports'=>'rapports','tax'=>'rapports','legal_calendar'=>'rapports',
     'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
 ];
 $sec = $pageSection[$currentPage] ?? 'dashboard';
@@ -149,6 +152,7 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app.css') ?: '1' ?>">
 </head>
 <body class="<?= $lang === 'ar' ? 'rtl' : '' ?><?= !empty($docFocus) ? ' doc-view' : '' ?>">
+<script>/* v2026: القائمة الرفيعة — مثبّتة (مفتوحة) إن اختار ذلك بـCtrl+B — قبل الرسم لئلا تقفز */try{if(localStorage.getItem('msa_nav_pinned')==='1')document.body.classList.add('nav-pinned');}catch(e){}</script>
 
 <!-- حماية CSRF: حقن توكن تلقائياً بكل نماذج POST -->
 <script>
@@ -400,6 +404,12 @@ document.addEventListener('submit', function (e) {
                 <span>Rapports / التقارير</span>
             </a>
             <?php endif; ?>
+            <?php if (canEdit()): /* ⚖️ v2026 الرزنامة القانونية: مواعيد الدولة + التقارير المبعوتة */ ?>
+            <a href="<?= BASE_URL ?>pages/legal_calendar.php" class="<?= $currentPage === 'legal_calendar' ? 'active' : '' ?>">
+                <i class="fas fa-landmark"></i>
+                <span>Échéances État / مواعيد الدولة</span>
+            </a>
+            <?php endif; ?>
             <?php if (viewerCanSeePage('mehe_budget.php')): ?>
             <a href="<?= BASE_URL ?>pages/mehe_budget.php" class="<?= $currentPage === 'mehe_budget' ? 'active' : '' ?>">
                 <i class="fas fa-landmark"></i>
@@ -492,7 +502,8 @@ document.addEventListener('submit', function (e) {
         </nav>
         
         <div class="sidebar-footer">
-            v<?= APP_VERSION ?> • <?= date('Y') ?>
+            <button type="button" class="sb-pin no-print" onclick="window.msaNavPin&&msaNavPin()" title="Fixer / ثبّت القائمة (Ctrl+B)"><i class="fas fa-thumbtack"></i><span>Fixer / ثبّت (Ctrl+B)</span></button>
+            <span class="sb-ver">v<?= APP_VERSION ?> • <?= date('Y') ?></span>
         </div>
     </aside>
 
@@ -503,6 +514,7 @@ document.addEventListener('submit', function (e) {
         document.querySelectorAll('.school-menu.open').forEach(function (m) {
             if (!m.closest('.school-multi').contains(e.target)) m.classList.remove('open');
         });
+        var bm = document.getElementById('bellMenu'); if (bm && bm.classList.contains('open') && !bm.closest('.bell-wrap').contains(e.target)) bm.classList.remove('open');
     });
     </script>
 
@@ -665,6 +677,17 @@ document.addEventListener('submit', function (e) {
                     <?= $lang === 'ar' ? 'Français' : 'العربية' ?>
                 </a>
                 
+                <?php if (empty($docFocus)): ?>
+                <div class="bell-wrap no-print" id="bellWrap">
+                    <button type="button" class="bell-btn" onclick="document.getElementById('bellMenu').classList.toggle('open')" title="À faire / شو لازم تعمل"><i class="fas fa-bell"></i><?php if ($msaBellN): ?><span class="bell-n"><?= $msaBellN > 999 ? '999+' : $msaBellN ?></span><?php endif; ?></button>
+                    <div class="bell-menu" id="bellMenu">
+                        <div class="bell-hd"><b>À faire / شو لازم تعمل</b><a href="<?= BASE_URL ?>index.php">Tout voir / الكل →</a></div>
+                        <?php if (!$msaBell): ?><div class="bell-empty"><i class="fas fa-circle-check"></i> Rien en attente / ما في شي معلّق</div><?php else: foreach ($msaBell as [$bIc, $bBg, $bN, $bFr, $bAr, $bHref]): ?>
+                        <a class="bell-item" href="<?= e($bHref) ?>"><span class="bell-ic" style="background:<?= $bBg ?>"><i class="<?= $bIc ?>"></i></span><span class="bell-t"><span dir="ltr"><?= e($bFr) ?></span><small><?= e($bAr) ?></small></span><b><?= (int)$bN ?></b></a>
+                        <?php endforeach; endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <div class="user-menu">
                     <div class="user-avatar">
                         <?= mb_strtoupper(mb_substr($_SESSION['full_name'] ?? 'U', 0, 1)) ?>
@@ -729,10 +752,33 @@ document.addEventListener('submit', function (e) {
                     } else { render(pg, []); }
                 }, 120);
             });
-            inp.addEventListener('focus', function () { if (inp.value.trim().length >= 1) inp.dispatchEvent(new Event('input')); });
+            // 🧭 v2026 (Ctrl+K متل Linear/Raycast): الفاضي يعرض «الأخيرة» + أوامر الصفحة؛ أسهم ↑↓ + Enter للتنقّل؛ ما تختاره يُحفظ بالأخيرة
+            function recents() { try { return JSON.parse(localStorage.getItem('msa_gs_recent') || '[]'); } catch (x) { return []; } }
+            function remember(t, h, i) { try { var r = recents().filter(function (x) { return x.h !== h; }); r.unshift({ t: t, h: h, i: i }); localStorage.setItem('msa_gs_recent', JSON.stringify(r.slice(0, 6))); } catch (x) {} }
+            function actions(q) { var out = []; (window.MSA_ACTIONS || []).forEach(function (a) { if (!q || a.t.toLowerCase().indexOf(q) > -1) out.push(a); }); return out.slice(0, 6); }
+            function renderExtra(q) {
+                var h = '';
+                if (!q) { var r = recents(); if (r.length) { h += '<div class="gs-sec"><i class="fas fa-clock-rotate-left"></i> Récents / الأخيرة</div>'; r.forEach(function (x) { h += '<a class="gs-item" href="' + esc(x.h) + '"><i class="' + esc(x.i || 'fas fa-link') + '"></i><span>' + esc(x.t) + '</span></a>'; }); } }
+                var ac = actions(q); if (ac.length) { h += '<div class="gs-sec"><i class="fas fa-bolt"></i> Actions / أوامر</div>'; ac.forEach(function (a) { h += '<a class="gs-item gs-act" href="' + esc(a.h) + '"' + (a.confirm ? ' data-confirm="' + esc(a.confirm) + '"' : '') + '><i class="fas fa-bolt" style="background:#1d1d1f;color:#fff"></i><span>' + esc(a.t) + '</span><kbd>' + esc(a.k || '') + '</kbd></a>'; }); }
+                return h;
+            }
+            var _render = render;
+            render = function (pg, emps, q) { var extra = renderExtra(q || ''); _render(pg, emps); if (extra) panel.insertAdjacentHTML('afterbegin', extra); if (!panel.textContent.trim() && !extra) panel.innerHTML = '<div class="gs-empty">Aucun résultat / لا نتائج — عدّل البحث</div>'; sel = -1; };
+            var sel = -1;
+            function items() { return panel.querySelectorAll('.gs-item'); }
+            function paint() { items().forEach(function (a, i) { a.classList.toggle('on', i === sel); if (i === sel) a.scrollIntoView({ block: 'nearest' }); }); }
+            inp.addEventListener('focus', function () { if (inp.value.trim().length >= 1) inp.dispatchEvent(new Event('input')); else { var pg = findPages('').slice(0, 5); render(pg, [], ''); } });
+            inp.addEventListener('keydown', function (e) {
+                if (!panel.classList.contains('open')) return;
+                var it = items();
+                if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(it.length - 1, sel + 1); paint(); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(0, sel - 1); paint(); }
+                else if (e.key === 'Enter') { var a = sel >= 0 ? it[sel] : it[0]; if (a) { e.preventDefault(); a.click(); } }
+            });
+            panel.addEventListener('click', function (e) { var a = e.target.closest('.gs-item'); if (!a) return; if (a.dataset.confirm && !confirm(a.dataset.confirm)) { e.preventDefault(); return; } var ic = a.querySelector('i'); remember(a.textContent.trim().replace(/\s+/g, ' ').slice(0, 80), a.getAttribute('href'), ic ? ic.className : ''); });
             document.addEventListener('keydown', function (e) {
                 if ((e.ctrlKey || e.metaKey) && e.key && e.key.toLowerCase() === 'k') { e.preventDefault(); inp.focus(); inp.select(); }
-                if (e.key === 'Escape') close();
+                if (e.key === 'Escape') { close(); inp.blur(); }
             });
             document.addEventListener('click', function (e) { if (!box.contains(e.target)) close(); });
         })();

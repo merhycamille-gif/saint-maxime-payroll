@@ -644,6 +644,8 @@ class PayrollCalculator {
         
         $stmt = getDB()->prepare($sql);
         $stmt->execute($data);
+        // ⚖️ v2026: إذا كان هالشهر ضمن تقرير «انبعت للدولة» ⇒ علّمه «تغيّر منذ الإرسال» (يظهر بالتقرير: صحّحه / خلّيه)
+        if (function_exists('legalTouch')) legalTouch((int)($this->employee['school_id'] ?? 0), (int)$this->year, (int)$this->month, trim(($this->employee['first_name_fr'] ?? '') . ' ' . ($this->employee['last_name_fr'] ?? '')), 'إعادة احتساب الراتب');
         return $data;
     }
 }

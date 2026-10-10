@@ -751,3 +751,81 @@ window.addEventListener('pageshow', function () { setTimeout(window.msaSyncForms
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
+
+// =====================================================================
+// 🧭 v2026 (2026-10-10 «أحدث برنامج بالعالم» — القائمة الرفيعة متل Linear/Arc/shadcn): Ctrl+B يثبّت القائمة مفتوحة أو يرجّعها
+//    رفيعة؛ الحالة محفوظة بالجهاز (localStorage) وتُطبَّق قبل الرسم من الهيدر لئلا تقفز.
+// =====================================================================
+window.msaNavPin = function () {
+    var on = !document.body.classList.contains('nav-pinned');
+    document.body.classList.toggle('nav-pinned', on);
+    try { localStorage.setItem('msa_nav_pinned', on ? '1' : '0'); } catch (e) {}
+    setTimeout(function () { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }, 220);
+};
+document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key && e.key.toLowerCase() === 'b') {
+        var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        e.preventDefault(); window.msaNavPin();
+    }
+});
+
+// ═══ v2026 (2026-10-10) أدوات عامّة للّوائح: اختيار جماعي · حالة «ما في نتيجة» · درج جانبي · شريط «تغييرات غير محفوظة» ═══
+window.msaBulk = function (opts) {
+    var cks = Array.prototype.slice.call(document.querySelectorAll(opts.ck || '.mp-ck')); if (!cks.length) return;
+    var bar = document.createElement('div'); bar.className = 'msa-bulk no-print'; document.body.appendChild(bar);
+    var all = document.getElementById(opts.all || 'mpCkAll');
+    function vis(c) { var tr = c.closest('tr'); return !tr || tr.style.display !== 'none'; }
+    function ids() { return cks.filter(function (c) { return c.checked && vis(c); }).map(function (c) { return c.value; }); }
+    function render() { var n = ids().length; bar.classList.toggle('open', n > 0); cks.forEach(function (c) { var tr = c.closest('tr'); if (tr) tr.classList.toggle('mp-sel', c.checked); }); if (!n) return;
+        var h = '<b>' + n + '</b> <span>' + (opts.label || 'sélectionné(s) / مختار') + '</span>';
+        opts.actions.forEach(function (a, i) { h += '<button type="button" class="btn btn-sm ' + (a.cls || 'btn-light') + '" data-i="' + i + '"><i class="fas ' + (a.icon || 'fa-bolt') + '"></i> ' + a.label + '</button>'; });
+        h += '<button type="button" class="btn btn-sm btn-light msa-bulk-x" title="Annuler / إلغاء التحديد">✕</button>'; bar.innerHTML = h; }
+    function clear() { cks.forEach(function (c) { c.checked = false; }); if (all) all.checked = false; render(); }
+    bar.addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; if (b.classList.contains('msa-bulk-x')) { clear(); return; }
+        var a = opts.actions[+b.getAttribute('data-i')], list = ids(); if (!a || !list.length) return; if (a.confirm && !confirm(a.confirm.replace('{n}', list.length))) return;
+        var h = a.href(list.join(',')); if (a.newTab) window.open(h, '_blank'); else window.location = h; });
+    cks.forEach(function (c) { c.addEventListener('change', render); });
+    if (all) all.addEventListener('change', function () { cks.forEach(function (c) { if (vis(c)) c.checked = all.checked; }); render(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bar.classList.contains('open')) clear(); });
+};
+window.msaFilterEmpty = function (inp, n) {
+    if (!inp) return; var wrap = inp.closest('.mp-tool'), tw = wrap && wrap.nextElementSibling; if (!tw) return;
+    var box = (tw.nextElementSibling && tw.nextElementSibling.classList.contains('mp-empty-filter')) ? tw.nextElementSibling : null;
+    if (n > 0 || !(inp.value || '').trim()) { if (box) box.remove(); return; }
+    if (box) return;
+    box = document.createElement('div'); box.className = 'mp-empty-filter no-print';
+    box.innerHTML = '<i class="fas fa-magnifying-glass"></i><div><b>Aucun résultat pour ce filtre</b><small>ما في نتيجة لهالتصفية — جرّب كلمة تانية أو امسحها</small></div><button type="button" class="btn btn-sm btn-light"><i class="fas fa-xmark"></i> Effacer / امسح التصفية</button>';
+    box.querySelector('button').onclick = function () { inp.value = ''; inp.dispatchEvent(new Event('input')); inp.focus(); };
+    tw.after(box);
+};
+window.msaDrawer = (function () {
+    var dr, ov, body, nameEl, subEl, openEl;
+    function close() { if (!dr) return; dr.classList.remove('open'); ov.classList.remove('open'); dr.setAttribute('aria-hidden', 'true'); }
+    function ensure() { if (dr) return;
+        ov = document.createElement('div'); ov.className = 'mp-ov'; dr = document.createElement('div'); dr.className = 'mp-drawer narrow no-print no-export'; dr.setAttribute('aria-hidden', 'true');
+        dr.innerHTML = '<div class="mp-dr-head"><div><b class="dr-name">—</b><small class="dr-sub">—</small></div><button type="button" class="btn btn-sm btn-light dr-x" title="Fermer / إغلاق">✕</button></div><div class="mp-dr-btns"><a class="btn btn-sm btn-primary dr-open" href="#"><i class="fas fa-up-right-from-square"></i> Page complète / الصفحة الكاملة</a></div><div class="mp-dr-body dr-body"></div>';
+        document.body.appendChild(ov); document.body.appendChild(dr);
+        nameEl = dr.querySelector('.dr-name'); subEl = dr.querySelector('.dr-sub'); openEl = dr.querySelector('.dr-open'); body = dr.querySelector('.dr-body');
+        dr.querySelector('.dr-x').addEventListener('click', close); ov.addEventListener('click', close); document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); }); }
+    function open(o) { ensure(); nameEl.textContent = o.name || ''; subEl.textContent = o.sub || ''; if (o.href) { openEl.href = o.href; openEl.style.display = ''; } else openEl.style.display = 'none';
+        body.innerHTML = '<div class="mp-dr-loading"><i class="fas fa-spinner fa-spin"></i> Chargement… / عم يحمّل…</div>'; dr.classList.add('open'); ov.classList.add('open'); dr.setAttribute('aria-hidden', 'false');
+        if (o.html) { body.innerHTML = o.html; return; }
+        fetch(o.url, { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(function (h) { body.innerHTML = h; }).catch(function () { body.innerHTML = '<div class="alert alert-danger">Erreur de chargement / تعذّر التحميل</div>'; }); }
+    return { open: open, close: close };
+})();
+(function () { // شريط «تغييرات غير محفوظة» لأي form[data-unsaved] (ملف الموظف…) + تحذير قبل مغادرة الصفحة
+    var forms = document.querySelectorAll('form[data-unsaved]'); if (!forms.length) return; var bar = null, dirty = false, submitting = false;
+    function show(f) { if (!bar) { bar = document.createElement('div'); bar.className = 'msa-unsaved no-print';
+            bar.innerHTML = '<i class="fas fa-circle-exclamation"></i> <b>Modifications non enregistrées</b> <span>— تغييرات غير محفوظة</span><span class="sp"></span><button type="button" class="btn btn-sm btn-light" data-a="undo"><i class="fas fa-rotate-left"></i> Annuler / تراجع</button><button type="button" class="btn btn-sm btn-primary" data-a="save"><i class="fas fa-save"></i> Enregistrer / حفظ</button>';
+            document.body.appendChild(bar);
+            bar.addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return;
+                if (b.getAttribute('data-a') === 'undo') { if (confirm('إلغاء كل التغييرات غير المحفوظة والرجوع للمحفوظ؟')) { dirty = false; location.reload(); } }
+                else { submitting = true; dirty = false; if (f.requestSubmit) f.requestSubmit(); else f.submit(); } }); }
+        bar.classList.add('open'); }
+    forms.forEach(function (f) {
+        var mark = function (e) { if (e && e.target && (e.target.type === 'search' || e.target.closest('[data-no-track]'))) return; dirty = true; show(f); };
+        f.addEventListener('input', mark); f.addEventListener('change', mark);
+        f.addEventListener('submit', function () { submitting = true; dirty = false; });
+    });
+    window.addEventListener('beforeunload', function (e) { if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; } });
+})();

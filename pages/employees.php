@@ -908,6 +908,28 @@ if (!empty($_SESSION['flash'])) {
 // =====================================================
 // View routing
 // =====================================================
+if ($action === 'card' && $id > 0) { // 🗂️ v2026 بطاقة الدرج (جزء HTML بلا هيدر): الكبس على سطر اللائحة يفتح درجاً بـ4 أرقام + روابط بدل مغادرة الصفحة
+    $st = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql()); $st->execute([$id]); $c = $st->fetch();
+    if (!$c) { http_response_code(404); echo '<div class="alert alert-warning">—</div>'; exit; }
+    $ls = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND is_calculated = 1 AND (year < ? OR (year = ? AND month <= ?)) ORDER BY year DESC, month DESC LIMIT 1"); $ls->execute([$id, (int)date('Y'), (int)date('Y'), (int)date('n')]); $ls = $ls->fetch(); // آخر شهر محسوب حتى اليوم (السنة تُحسب دفعة واحدة مسبقاً)
+    if (!$ls) { $ls = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND is_calculated = 1 ORDER BY year, month LIMIT 1"); $ls->execute([$id]); $ls = $ls->fetch(); }
+    $stI = employeeStatusLabel($c['status']); $B = BASE_URL;
+    $kv = fn($l, $v) => '<div class="dr-kv"><span>' . $l . '</span><b>' . $v . '</b></div>';
+    echo '<div class="dr-card">';
+    echo '<div class="dr-top">' . empAvatar($c, 'ic2', 56) . '<div><b>' . e(empFullNameFr($c)) . '</b><div class="mp-sub">' . e(empFullNameAr($c)) . '</div><small>' . e($c['employee_code']) . ' · ' . e(schoolNameById($c['school_id'])) . '</small></div></div>';
+    if ($ls) echo '<div class="dr-nums"><div><small>' . e(monthName((int)$ls['month'])) . ' ' . (int)$ls['year'] . ' · Base + échelon</small><b>' . money((int)$ls['base_plus_echelon_lbp'], rowRate($ls)) . '</b></div><div><small>Net / الصافي</small><b>' . money((int)$ls['net_salary_lbp'], rowRate($ls)) . '</b></div><div><small>CNSS / الضمان</small><b>' . money((int)$ls['cnss_amount_lbp'], rowRate($ls)) . '</b></div><div><small>Total dû / المتوجب</small><b>' . money((int)$ls['total_due_lbp'], rowRate($ls)) . '</b></div></div>';
+    else echo '<div class="mp-ok" style="margin:10px 0">Aucun salaire calculé / ما في راتب محسوب بعد</div>';
+    echo '<div class="dr-kvs">' . $kv('Type / النوع', e(employeeTypeLabel($c['employee_type']))) . $kv('Échelon / الدرجة', e(gradeDisplay($c))) . $kv('Embauche / الدخول', e(formatDate(shownHireDate($c)))) . $kv('Statut / الحالة', '<span class="badge badge-' . $stI['badge'] . '">' . e($stI['label']) . '</span>')
+        . $kv('Tél. / الهاتف', e(trim((string)$c['phone1'] . ' ' . (string)$c['phone2']) ?: '—')) . $kv('N° CNSS / الضمان', e(trim((string)$c['nssf_number']) ?: '—')) . $kv('N° Finances / المالية', e(trim((string)$c['finance_ministry_number']) ?: '—')) . '</div>';
+    echo '<div class="dr-links">';
+    if (canEdit()) echo '<a class="btn btn-sm btn-light" href="' . $B . 'pages/employees.php?action=edit&id=' . $id . '"><i class="fas fa-pen"></i> Modifier / تعديل الملف</a>';
+    if (viewerCanSeePage('monthly_payroll.php')) echo '<a class="btn btn-sm btn-light" href="' . $B . 'pages/monthly_payroll.php?employee_id=' . $id . '"><i class="fas fa-money-check"></i> Bulletin / القسيمة</a>';
+    if (viewerCanSeePage('annual_slip.php')) echo '<a class="btn btn-sm btn-light" href="' . $B . 'pages/annual_slip.php?employee_id=' . $id . '"><i class="fas fa-calendar"></i> Fiche annuelle / البطاقة السنوية</a>';
+    if (viewerCanSeePage('attestations.php')) echo '<a class="btn btn-sm btn-light" href="' . $B . 'pages/attestations.php?dossier=1&employee_id=' . $id . '"><i class="fas fa-folder-open"></i> Dossier / الملف والإفادات</a>';
+    echo '<a class="btn btn-sm btn-light" href="' . $B . 'pages/employee_full_history.php?employee_id=' . $id . '"><i class="fas fa-clock-rotate-left"></i> Historique / التاريخ</a></div></div>';
+    exit;
+}
+
 if ($action === 'list') {
     $pageTitle = 'Employés & Enseignants / الموظفون والأساتذة';
     include __DIR__ . '/../includes/header.php';
@@ -1059,6 +1081,7 @@ if ($action === 'list') {
                 <?php /* 🌍 (2026-10-10 «اعمول حسب معرفتك» — نفس ترتيب الرواتب الشهرية): تصفية فورية فوق الجدول + سطر الموظف: دائرة بحرفين، الاسم كبير،
                          وتحته الرمز·المدرسة·الهاتف بسطر واحد + قائمة ⋮ بدل 3 كبسات (تعديل/الراتب/الملف الكامل/التاريخ/حذف). الاستعلام والفلاتر لم تتغيّر. */ ?>
                 <div class="mp-tool no-print" style="margin-top:4px">
+                    <label class="mp-ck-all no-print" title="Tout sélectionner / اختيار الكل"><input type="checkbox" id="mpCkAll"></label>
                     <input type="search" id="empQuick" class="form-control" placeholder="⚡ Filtrer la liste / صفّي اللائحة فوراً: اسم، رمز، مدرسة، هاتف، درجة…" autocomplete="off">
                     <span class="mp-count" id="empQuickCount"></span>
                 </div>
@@ -1084,9 +1107,9 @@ if ($action === 'list') {
                                 $incB = empBadges($emp, $db, $incSy);
                                 $q = mb_strtolower($nFr . ' ' . $nAr . ' ' . $emp['employee_code'] . ' ' . $schN . ' ' . $emp['phone1'] . ' ' . $emp['phone2'] . ' ' . employeeTypeLabel($emp['employee_type']) . ' ' . gradeDisplay($emp) . ' ' . $statusInfo['label'] . ' ' . strip_tags($incB));
                             ?>
-                                <tr class="mp-row" data-q="<?= e($q) ?>" data-url="?action=edit&id=<?= (int)$emp['id'] ?>">
+                                <tr class="mp-row" data-q="<?= e($q) ?>" data-url="?action=edit&id=<?= (int)$emp['id'] ?>" data-id="<?= (int)$emp['id'] ?>" data-name="<?= e($nFr) ?>" data-sub="<?= e($emp['employee_code'] . ' · ' . $schN) ?>">
                                     <td>
-                                        <div class="mp-emp"><span class="mp-av" style="background:var(--<?= $avC[$i % 6] ?>)"><?= e($ini) ?></span>
+                                        <div class="mp-emp"><label class="mp-ck-w no-print" title="Sélectionner / اختيار"><input type="checkbox" class="mp-ck" value="<?= (int)$emp['id'] ?>"></label><?= empAvatar($emp, $avC[$i % 6]) ?>
                                             <span><b><?= e($nFr) ?></b><?php if ($nAr !== ''): ?> <span class="mp-sub" style="display:inline"><?= e($nAr) ?></span><?php endif; ?><?= $incB ?>
                                                 <small><strong><?= e($emp['employee_code']) ?></strong><?= isAllSchools() ? ' · ' . e($schN) : '' ?><?= trim((string)$emp['phone1']) !== '' ? ' · 📞 ' . e($emp['phone1']) : '' ?></small></span></div>
                                     </td>
@@ -1118,13 +1141,20 @@ if ($action === 'list') {
                 (function () {
                     var rows = Array.prototype.slice.call(document.querySelectorAll('tr.mp-row')), inp = document.getElementById('empQuick'), cnt = document.getElementById('empQuickCount');
                     function filter() { var q = (inp.value || '').trim().toLowerCase(), n = 0; rows.forEach(function (tr) { var ok = !q || tr.getAttribute('data-q').indexOf(q) !== -1; tr.style.display = ok ? '' : 'none'; if (ok) n++; }); cnt.textContent = q ? (n + ' / ' + rows.length) : rows.length + ' employés / موظفاً'; }
-                    inp.addEventListener('input', filter); filter();
+                    function filterE() { filter(); var n = rows.filter(function (tr) { return tr.style.display !== 'none'; }).length; if (window.msaFilterEmpty) msaFilterEmpty(inp, n); }
+                    inp.addEventListener('input', filterE); filterE();
+                    document.addEventListener('DOMContentLoaded', function () { if (window.msaBulk) msaBulk({ actions: [
+                        { label: 'Bulletins du mois / قسائم المختارين (<?= e(monthName((int)date('n'))) ?>)', icon: 'fa-print', cls: 'btn-primary', href: function (ids) { return '<?= BASE_URL ?>pages/monthly_payroll.php?action=print_all&month=<?= (int)date('n') ?>&year=<?= (int)date('Y') ?>&ids=' + ids; } }<?php if (!isAllSchools() && canEdit() && viewerCanSeePage('monthly_payroll.php')): ?>,
+                        { label: 'Calculer le mois / احتساب المختارين', icon: 'fa-calculator', cls: 'btn-gold', confirm: 'احتساب رواتب {n} موظف لشهر <?= e(monthName((int)date('n'), 'ar')) ?>؟', href: function (ids) { return '<?= BASE_URL ?>pages/monthly_payroll.php?action=calc_all&month=<?= (int)date('n') ?>&year=<?= (int)date('Y') ?>&ids=' + ids; } }<?php endif; ?>
+                    ] }); });
                     document.addEventListener('click', function (e) {
                         var d = e.target.closest('.mp-dots');
                         document.querySelectorAll('.mp-menu.open').forEach(function (m) { if (!d || m !== d.parentElement) m.classList.remove('open'); });
                         if (d) { e.preventDefault(); e.stopPropagation(); d.parentElement.classList.toggle('open'); }
                     });
-                    rows.forEach(function (tr) { tr.addEventListener('click', function (e) { if (e.target.closest('a, button, input, .mp-menu')) return; window.location = tr.getAttribute('data-url'); }); });
+                    rows.forEach(function (tr) { tr.addEventListener('click', function (e) { if (e.target.closest('a, button, input, label, .mp-menu')) return;
+                        if (window.msaDrawer) msaDrawer.open({ name: tr.getAttribute('data-name'), sub: tr.getAttribute('data-sub'), href: tr.getAttribute('data-url'), url: '?action=card&id=' + tr.getAttribute('data-id') });
+                        else window.location = tr.getAttribute('data-url'); }); });
                 })();
                 </script>
             <?php endif; ?>
@@ -1279,7 +1309,7 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
     <?php endif; ?>
 </div>
 
-<form method="POST" enctype="multipart/form-data" id="empForm"<?= $id > 0 ? ' class="lockedit"' : '' ?>>
+<form method="POST" enctype="multipart/form-data" id="empForm" data-unsaved="1"<?= $id > 0 ? ' class="lockedit"' : '' ?>>
     <input type="hidden" name="active_tab" id="activeTabField" value="<?= e(preg_replace('/[^a-z]/', '', $_GET['tab'] ?? '')) ?>">
     <?php
     // 💾 صفّ أزرار موحّد أعلى كل تبويب من ملف الأستاذ (طلب المستخدم 2026-08-01:

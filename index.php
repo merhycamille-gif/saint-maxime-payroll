@@ -5,6 +5,7 @@ require_once __DIR__ . '/includes/payroll_calculator.php'; // recalcEmployeeYear
 require_once __DIR__ . '/includes/age64.php';               // أدوات تنبيه بلوغ الـ64 (مشتركة)
 require_once __DIR__ . '/includes/hours_reduction.php';     // 🕐 مساج تناقص ساعات التدريس «قرار مطلوب» بكل مدرسة
 require_once __DIR__ . '/includes/compliance.php';          // ⚖️ تقرير المخالفات والتصحيحات «موافق/لا» عند كل فتح (طلبه 2026-09-04)
+require_once __DIR__ . '/includes/todo.php';                // 🔔 «شو لازم تعمل» — المصدر الواحد للوحة والجرس (2026-10-10)
 require_once __DIR__ . '/includes/cadre_due.php';           // 🎓 مساج «متعاقدون أكملوا سنتين — يصيرون بالملاك حكماً» وافق/لا (2026-09-13)
 requireLogin();
 
@@ -126,42 +127,8 @@ $kpiCard = function ($icon, $bg, $fg, $val, $fr, $ar) {
 //    كل بطاقة رابط للمكان نفسه الذي كان يصله من قبل — لا منطق جديد، أعداد من الدوال نفسها.
 $homeIncSy = activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear();
 $homeInc = canEdit() ? incompleteEmployeesRows($db, $homeIncSy, schoolScopeSql('e.school_id')) : [];
-$todo = [];
-if (viewerCanSeePage('monthly_payroll.php')) {
-    $tm = (int)date('n'); $ty = (int)date('Y'); $tsy = ($tm >= 10) ? ($ty . '-' . ($ty + 1)) : (($ty - 1) . '-' . $ty);
-    [$tf, $tp] = yearEmploymentFilter($tsy, 'e.');
-    $stT = $db->prepare("SELECT COUNT(*) FROM employees e LEFT JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.month = ? AND ms.year = ?
-        WHERE e.is_deleted = 0 AND e.status = 'actif'" . schoolScopeSql('e.school_id') . $tf . " AND COALESCE(ms.is_calculated, 0) = 0");
-    $stT->execute(array_merge([$tm, $ty], $tp));
-    if ($nT = (int)$stT->fetchColumn()) $todo[] = ['fas fa-money-check-alt', 'var(--ic5)', $nT, 'Salaires à calculer — ' . monthName($tm), 'رواتب ' . monthName($tm, 'ar') . ' بانتظار الاحتساب', BASE_URL . 'pages/monthly_payroll.php?month=' . $tm . '&year=' . $ty];
-}
-if ($homeComp && !empty($homeComp['pending'])) {
-    $nC = count(array_filter($homeComp['pending'], fn($it) => ($it['rule'] ?? '') !== 'carried_zero'));
-    if ($nC) $todo[] = ['fas fa-balance-scale', 'var(--ic1)', $nC, 'Conformité — décisions en attente', 'مخالفات بانتظار قرارك (موافق / لا)', '#homeCompBox'];
-}
-if ($homeCd)        $todo[] = ['fas fa-graduation-cap', 'var(--ic4)', count($homeCd), 'Titularisations à approuver', 'متعاقدون أكملوا سنتين — بانتظار قرارك', BASE_URL . 'pages/cadre_due.php'];
-if (canEdit()) {
-    // 👥 مكرّرون فاعلون بنفس الاسم (فرنسي) بنفس المدرسة — الحذف من صفحتهم بتأكيد
-    //    يُعدّ فقط الاسم الذي له نسخة بلا أي راتب محسوب (دخل مرّتين وإحداهما فاضية) — نفس شرط صفحة المكرّرين
-    $nDup = (int)$db->query("SELECT COUNT(*) FROM (SELECT school_id, LOWER(TRIM(CONCAT(first_name_fr,' ',last_name_fr))) k, COUNT(*) c,
-            SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.is_calculated = 1) THEN 1 ELSE 0 END) empties
-            FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND TRIM(CONCAT(first_name_fr,' ',last_name_fr)) <> ''" . schoolScopeSql('e.school_id') . " GROUP BY school_id, k HAVING c > 1 AND empties > 0) d")->fetchColumn();
-    if ($nDup) $todo[] = ['fas fa-user-group', 'var(--ic1)', $nDup, 'Doublons à nettoyer', 'أسماء مكرّرة بنفس المدرسة — حذف بتأكيد', BASE_URL . 'pages/duplicates.php'];
-    // 🧹 القدامى غير المضمونين (تركوا قبل السنة الحالية ولم يُحسم عليهم ضمان ولا شهر)
-    $cyT = currentSchoolYear(); $cyStartT = substr($cyT, 0, 4) . '-10-01';
-    $stOU = $db->prepare("SELECT e.status, " . leftDateSql() . " ld, SUM(m.cnss_amount_lbp) cn, (SELECT COUNT(*) FROM monthly_salaries x WHERE x.employee_id = e.id AND x.school_year = ? AND x.is_calculated = 1) scur
-        FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.is_calculated = 1 WHERE e.is_deleted = 0" . schoolScopeSql("e.school_id") . " GROUP BY e.id HAVING cn = 0 AND scur = 0 AND SUM(m.school_year <= ?) > 0");
-    $stOU->execute([$cyT, ((int)substr($cyT, 0, 4) - 1) . "-" . substr($cyT, 0, 4)]); $nOU = 0;
-    $nOU = count($stOU->fetchAll()); // بكلماته: ضمان صفر بكل رواتبه وبلا راتب هالسنة — حتى لو الملف «فاعل» بلا تاريخ ترك
-    if ($nOU) $todo[] = ['fas fa-user-slash', 'var(--ic6)', $nOU, 'Anciens non assurés à retirer', 'قدامى تركوا بلا أي ضمان محسوم — حذف بتأكيد', BASE_URL . 'pages/old_uninsured.php'];
-    // 🛡️ متابعة الضمان: بلا ضمان من 2025-2026 بانتظار قراره + ضمان محسوم بلا رقم
-    $nS1 = (int)$db->query("SELECT COUNT(*) FROM (SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.is_calculated = 1 AND m.school_year >= '2025-2026' WHERE e.is_deleted = 0 AND e.cnss_subject <> 0" . schoolScopeSql('e.school_id') . " GROUP BY e.id HAVING SUM(m.cnss_amount_lbp) = 0) q")->fetchColumn();
-    $nS2 = (int)$db->query("SELECT COUNT(*) FROM (SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.is_calculated = 1 WHERE e.is_deleted = 0 AND (e.nssf_number IS NULL OR TRIM(e.nssf_number) IN ('', '0'))" . schoolScopeSql('e.school_id') . " GROUP BY e.id HAVING SUM(m.cnss_amount_lbp) > 0) q")->fetchColumn();
-    if ($nS1 || $nS2) $todo[] = ['fas fa-user-shield', 'var(--ic4)', $nS1 + $nS2, 'Suivi CNSS — à décider / à compléter', ($nS1 ? $nS1 . ' بلا ضمان بانتظار قرارك' : '') . ($nS1 && $nS2 ? ' · ' : '') . ($nS2 ? $nS2 . ' ناقصهم رقم الضمان' : ''), BASE_URL . 'pages/cnss_followup.php'];
-}
-if ($homeInc)       $todo[] = ['fas fa-user-edit', 'var(--ic3)', count($homeInc), 'Dossiers incomplets', 'ملفات ناقصة بلا راتب محسوب', '#homeIncBox'];
-if ($homeHrPending) $todo[] = ['fas fa-clock', 'var(--ic6)', count($homeHrPending), "Réductions d'heures à confirmer", 'تناقص ساعات بانتظار الإذن', '#'];
-if ($home64)        $todo[] = ['fas fa-hourglass-half', 'var(--ic2)', count($home64), 'Retraite 64 — à traiter', 'بلغوا سنّ الـ64 — قرار', BASE_URL . 'pages/retirement_64.php'];
+// 🔔 المصدر الواحد (includes/todo.php) — نفس اللائحة للجرس بكل الصفحات
+$todo = msaTodoItems($db, ['comp' => $homeComp, 'cd' => $homeCd, 'hr' => $homeHrPending, 'a64' => $home64]);
 ?>
 <div class="card dash-todo no-print" data-sec-title="À faire / شو لازم تعمل">
     <div class="card-header"><h3><span dir="ltr"><i class="fas fa-list-check"></i> À faire aujourd'hui</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">شو لازم تعمل اليوم</div></h3></div>
@@ -170,7 +137,7 @@ if ($home64)        $todo[] = ['fas fa-hourglass-half', 'var(--ic2)', count($hom
             <div class="todo-none"><i class="fas fa-circle-check"></i> Rien en attente / ما في شي معلّق — كل شي تمام</div>
         <?php else: ?>
         <div class="todo-grid">
-            <?php foreach ($todo as [$ic, $bg, $n, $fr, $ar, $href]): ?>
+            <?php foreach ($todo as [$ic, $bg, $n, $fr, $ar, $href]): $href = str_replace(BASE_URL . 'index.php#', '#', $href); ?>
             <a class="todo-item" href="<?= e($href) ?>"><span class="todo-ic" style="background:<?= $bg ?>"><i class="<?= $ic ?>"></i></span><span><b><?= (int)$n ?></b><span class="todo-fr" dir="ltr"><?= e($fr) ?></span><span class="todo-ar"><?= e($ar) ?></span></span><i class="fas fa-chevron-right"></i></a>
             <?php endforeach; ?>
         </div>

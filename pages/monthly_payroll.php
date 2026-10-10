@@ -169,6 +169,8 @@ if ($action === 'calc_all') {
           . " AND " . salaryConfigSql('') . schoolScopeSql();
     $paramsC = [$syStartC];
     $sqlC .= empTypeSqlFrom($db, $typeState, ''); // ☑️ الفئات المشيّكة
+    $idsSel = array_filter(array_map('intval', explode(',', (string)($_GET['ids'] ?? '')))); // ☑️ v2026 اختيار جماعي من اللائحة
+    if ($idsSel) $sqlC .= " AND id IN (" . implode(',', $idsSel) . ")";
     $stmtC = $db->prepare($sqlC);
     $stmtC->execute($paramsC);
     $employees = $stmtC->fetchAll();
@@ -260,6 +262,8 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     $sqlP = "SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif'" . schoolScopeSql('e.school_id') . $pyf;
     $paramsP = $pyp;
     $sqlP .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
+    $idsSelP = array_filter(array_map('intval', explode(',', (string)($_GET['ids'] ?? '')))); // ☑️ v2026 اختيار جماعي من اللائحة
+    if ($idsSelP) $sqlP .= " AND e.id IN (" . implode(',', $idsSelP) . ")";
     $sqlP .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id";
     $stmtP = $db->prepare($sqlP);
     $stmtP->execute($paramsP);
@@ -467,7 +471,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                    ms.base_plus_echelon_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.prime_fixe_usd_law, ms.total_retenues_lbp,
                    ms.family_allowance_lbp, ms.transport_lbp,
                    ms.school_cnss_8_lbp, ms.school_eoc_6_lbp, ms.school_family_comp_6_lbp, ms.school_end_of_service_8_5_lbp,
-                   pm.total_due_lbp AS prev_due_lbp, pm.net_salary_lbp AS prev_net_lbp, pm.is_calculated AS prev_calc
+                   e.photo_path, pm.total_due_lbp AS prev_due_lbp, pm.net_salary_lbp AS prev_net_lbp, pm.is_calculated AS prev_calc
             FROM employees e
             LEFT JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.month = ? AND ms.year = ?
             LEFT JOIN monthly_salaries pm ON pm.employee_id = e.id AND pm.month = ? AND pm.year = ?
@@ -541,7 +545,38 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     $prevLbl = monthName($pmM, 'fr', true);
     $avC = ['ic2','ic4','ic5','ic6','ic1','ic3'];
     $mpBase = BASE_URL . 'pages/monthly_payroll.php?month=' . $month . '&year=' . $year;
+    // 📅 v2026 شريط الأشهر (BambooHR/Deel): 12 شهراً ت1←أيلول + شهر 13 — حالة كل شهر من الداتا: مقفول (سنة مقفولة ومحسوب) / مكتمل / الحالي / متأخّر (مضى وفيه بانتظار) / قادم
+    $syY = (int)substr($msSchoolYear, 0, 4); $moStrip = [];
+    $moIds = array_map('intval', array_column($list, 'id')); $moN = count($moIds);
+    $moCalc = [];
+    if ($moN) { foreach ($db->query("SELECT year, month, COUNT(*) c FROM monthly_salaries WHERE is_calculated = 1 AND school_year = " . $db->quote($msSchoolYear) . " AND employee_id IN (" . implode(',', $moIds) . ") GROUP BY year, month") as $r) $moCalc[$r['year'] . '-' . (int)$r['month']] = (int)$r['c']; }
+    $nowKey = (int)date('Y') * 100 + (int)date('n');
+    foreach (array_merge(range(10, 12), range(1, 9), [13]) as $mm) {
+        $yy = $mm >= 10 && $mm <= 12 ? $syY : $syY + 1; if ($mm === 13) { $yy = $syY + 1; }
+        $c = $moCalc[$yy . '-' . $mm] ?? 0; $isCur = ($mm === $month && $yy === $year);
+        $past = ($mm === 13) ? false : ($yy * 100 + $mm) < $nowKey;
+        $st = $isCur ? 'cur' : ($c >= $moN && $moN > 0 ? ($lockedSy ? 'lock' : 'done') : ($past && $c < $moN ? 'late' : ($c > 0 ? 'ready' : 'next')));
+        $moStrip[] = ['m' => $mm, 'y' => $yy, 'c' => $c, 'st' => $st];
+    }
+    $moLbl = ['lock' => 'Verrouillé / مقفول', 'done' => 'Complet / مكتمل', 'cur' => 'En cours / الحالي', 'late' => 'En retard / متأخّر', 'ready' => 'Calculé d’avance / محسوب مسبقاً', 'next' => 'À venir / قادم'];
 ?>
+    <script>window.MSA_ACTIONS = [
+        <?php if (!isAllSchools()): ?>{ t: 'Calculer tout — <?= monthName($month) ?> <?= $year ?> / احتساب الكل', h: '?action=calc_all&month=<?= $month ?>&year=<?= $year ?><?= e($typeQ) ?>', k: '⚡', confirm: 'احتساب رواتب كل الموظفين المعروضين لهذا الشهر؟' },<?php endif; ?>
+        { t: 'Imprimer les bulletins / طباعة القسائم', h: '?action=print_all&month=<?= $month ?>&year=<?= $year ?><?= e($typeQ) ?>', k: '🖨' },
+        { t: 'Mois précédent / الشهر الماضي — <?= monthName($pmM) ?> <?= $pmY ?>', h: '?month=<?= $pmM ?>&year=<?= $pmY ?><?= e($typeQ) ?>', k: '←' },
+        { t: 'Relevé annuel / الكشف السنوي', h: '<?= BASE_URL ?>pages/annual_slip.php', k: '' }
+    ];</script>
+    <div class="mp-months no-print" aria-label="Mois de l’année / أشهر السنة">
+        <?php foreach ($moStrip as $ms): ?>
+        <a class="mo <?= $ms['st'] ?>" href="?month=<?= $ms['m'] === 13 ? 13 : $ms['m'] ?>&year=<?= $ms['y'] ?><?= e($typeQ) ?>" title="<?= e($moLbl[$ms['st']]) ?> · <?= $ms['c'] ?>/<?= $moN ?>">
+            <b><?= $ms['m'] === 13 ? '13e' : monthName($ms['m'], 'fr', true) ?></b><small><?= $ms['m'] === 13 ? 'شهر 13' : monthName($ms['m'], 'ar') ?></small>
+            <span class="st"><?= $ms['st'] === 'cur' ? 'En cours' : ($ms['st'] === 'lock' ? '🔒' : ($ms['st'] === 'done' ? '✓' : ($ms['st'] === 'late' ? '⚠ ' . ($moN - $ms['c']) : ($ms['st'] === 'ready' ? '✓ ' . $ms['c'] : '·')))) ?></span>
+        </a>
+        <?php endforeach; ?>
+    </div>
+    <?php $mpLegal = null; foreach (($msaBell ?? []) as $mb) if (($mb[6] ?? '') === 'legal' || ($mb[6] ?? '') === 'legal_changed') { $mpLegal = $mb; break; } if ($mpLegal): /* ⚖️ v2026 أقرب موعد للدولة تحت شريط الأشهر */ ?>
+    <a class="mp-legal-line no-print" href="<?= e($mpLegal[5]) ?>" style="--c:<?= e($mpLegal[1]) ?>"><i class="fas fa-landmark"></i> <b><?= e($mpLegal[3]) ?></b> <span><?= e($mpLegal[4]) ?></span> <i class="fas fa-chevron-left"></i></a>
+    <?php endif; ?>
     <div class="mp-steps no-print" data-sec-title="Paie de <?= monthName($month) ?> <?= $year ?>">
         <?php $steps = [
             [1, 'Données', 'البيانات', count($list) . ' employés / موظفاً', true, '#mpTable'],
@@ -585,6 +620,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     <div class="mp-layout">
     <div class="mp-main">
         <div class="mp-tool no-print">
+            <label class="mp-ck-all no-print" title="Tout sélectionner / اختيار الكل"><input type="checkbox" id="mpCkAll"></label>
             <input type="search" id="mpSearch" class="form-control" placeholder="🔍 Nom, code, école… / اسم، رمز، مدرسة — النتيجة فورية" autocomplete="off">
             <span class="mp-count" id="mpCount"></span>
             <button type="button" class="btn btn-sm btn-light mp-tog" id="mpTogDet" data-k="det" title="Afficher base / supplément / primes / retenues"><i class="fas fa-table-columns"></i> Détails / التفاصيل</button>
@@ -633,7 +669,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                             ?>
                                 <tr class="mp-row" data-q="<?= e($q) ?>" data-url="<?= e($viewUrl) ?>" data-name="<?= e($nameFr) ?>" data-sub="<?= e($r['employee_code'] . ' · ' . $schN) ?>">
                                     <td>
-                                        <div class="mp-emp"><span class="mp-av" style="background:var(--<?= $avC[$i % 6] ?>)"><?= e($ini) ?></span>
+                                        <div class="mp-emp"><label class="mp-ck-w no-print" title="Sélectionner / اختيار"><input type="checkbox" class="mp-ck" value="<?= (int)$r['id'] ?>"></label><?= empAvatar($r, $avC[$i % 6]) ?>
                                             <span><b><?= e($nameFr) ?></b><?= empBadges($r, $db, $msSchoolYear) ?><small><?= e($r['employee_code']) ?> · <?= e($schN) ?></small></span></div>
                                     </td>
                                     <td><small><?= employeeTypeLabel($r['employee_type']) ?></small><small class="mp-sub">Échelon <?= e(gradeDisplay($r)) ?></small></td>
@@ -773,7 +809,12 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
             rows.forEach(function (tr) { var ok = !q || tr.getAttribute('data-q').indexOf(q) !== -1; tr.style.display = ok ? '' : 'none'; if (ok) n++; });
             if (cnt) cnt.textContent = q ? (n + ' / ' + rows.length) : rows.length + ' employés / موظفاً';
         }
-        if (inp) { inp.addEventListener('input', filter); filter(); }
+        function filterM() { filter(); var n = rows.filter(function (tr) { return tr.style.display !== 'none'; }).length; if (window.msaFilterEmpty) msaFilterEmpty(inp, n); }
+        if (inp) { inp.addEventListener('input', filterM); filterM(); }
+        document.addEventListener('DOMContentLoaded', function () { if (window.msaBulk) msaBulk({ actions: [
+            { label: 'Imprimer les bulletins / طباعة قسائم المختارين', icon: 'fa-print', cls: 'btn-primary', href: function (ids) { return '?action=print_all&month=<?= $month ?>&year=<?= $year ?><?= e($typeQ) ?>&ids=' + ids; } }<?php if (!isAllSchools() && canEdit()): ?>,
+            { label: 'Calculer / احتساب المختارين', icon: 'fa-calculator', cls: 'btn-gold', confirm: 'احتساب رواتب {n} موظف لهذا الشهر؟', href: function (ids) { return '?action=calc_all&month=<?= $month ?>&year=<?= $year ?><?= e($typeQ) ?>&ids=' + ids; } }<?php endif; ?>
+        ] }); });
         document.querySelectorAll('.mp-filter').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); inp.value = a.getAttribute('data-q'); filter(); document.getElementById('mpTable').scrollIntoView({ behavior: 'smooth' }); }); });
 
         // ⋮ قائمة السطر
@@ -803,7 +844,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
             }).catch(function () { dbody.innerHTML = '<div class="alert alert-danger">Erreur de chargement / تعذّر التحميل</div>'; });
         }
         rows.forEach(function (tr) {
-            tr.addEventListener('click', function (e) { if (e.target.closest('a, button, input, .mp-menu')) return; openDr(tr); });
+            tr.addEventListener('click', function (e) { if (e.target.closest('a, button, input, label, .mp-menu')) return; openDr(tr); });
         });
         document.getElementById('mpDrClose').addEventListener('click', closeDr);
         ov.addEventListener('click', closeDr);
