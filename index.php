@@ -120,6 +120,45 @@ $kpiCard = function ($icon, $bg, $fg, $val, $fr, $ar) {
     ?>
 </div>
 
+<?php
+// ⑨ 🌍 (2026-10-10 «أحدث تنظيم» — متل Gusto «Things to do»): «شو لازم تعمل اليوم» قبل البلاطات — 3 إلى 6 بطاقات مهمّات
+//    بالأعداد الحقيقية (رواتب الشهر بانتظار الاحتساب · مخالفات بانتظار قراره · ترسيم حكمي · ملفات ناقصة · تناقص ساعات · بلوغ الـ64)
+//    كل بطاقة رابط للمكان نفسه الذي كان يصله من قبل — لا منطق جديد، أعداد من الدوال نفسها.
+$homeIncSy = activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear();
+$homeInc = canEdit() ? incompleteEmployeesRows($db, $homeIncSy, schoolScopeSql('e.school_id')) : [];
+$todo = [];
+if (viewerCanSeePage('monthly_payroll.php')) {
+    $tm = (int)date('n'); $ty = (int)date('Y'); $tsy = ($tm >= 10) ? ($ty . '-' . ($ty + 1)) : (($ty - 1) . '-' . $ty);
+    [$tf, $tp] = yearEmploymentFilter($tsy, 'e.');
+    $stT = $db->prepare("SELECT COUNT(*) FROM employees e LEFT JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.month = ? AND ms.year = ?
+        WHERE e.is_deleted = 0 AND e.status = 'actif'" . schoolScopeSql('e.school_id') . $tf . " AND COALESCE(ms.is_calculated, 0) = 0");
+    $stT->execute(array_merge([$tm, $ty], $tp));
+    if ($nT = (int)$stT->fetchColumn()) $todo[] = ['fas fa-money-check-alt', 'var(--ic5)', $nT, 'Salaires à calculer — ' . monthName($tm), 'رواتب ' . monthName($tm, 'ar') . ' بانتظار الاحتساب', BASE_URL . 'pages/monthly_payroll.php?month=' . $tm . '&year=' . $ty];
+}
+if ($homeComp && !empty($homeComp['pending'])) {
+    $nC = count(array_filter($homeComp['pending'], fn($it) => ($it['rule'] ?? '') !== 'carried_zero'));
+    if ($nC) $todo[] = ['fas fa-balance-scale', 'var(--ic1)', $nC, 'Conformité — décisions en attente', 'مخالفات بانتظار قرارك (موافق / لا)', '#homeCompBox'];
+}
+if ($homeCd)        $todo[] = ['fas fa-graduation-cap', 'var(--ic4)', count($homeCd), 'Titularisations à approuver', 'متعاقدون أكملوا سنتين — بانتظار قرارك', BASE_URL . 'pages/cadre_due.php'];
+if ($homeInc)       $todo[] = ['fas fa-user-edit', 'var(--ic3)', count($homeInc), 'Dossiers incomplets', 'ملفات ناقصة بلا راتب محسوب', '#homeIncBox'];
+if ($homeHrPending) $todo[] = ['fas fa-clock', 'var(--ic6)', count($homeHrPending), "Réductions d'heures à confirmer", 'تناقص ساعات بانتظار الإذن', '#'];
+if ($home64)        $todo[] = ['fas fa-hourglass-half', 'var(--ic2)', count($home64), 'Retraite 64 — à traiter', 'بلغوا سنّ الـ64 — قرار', BASE_URL . 'pages/retirement_64.php'];
+?>
+<div class="card dash-todo no-print" data-sec-title="À faire / شو لازم تعمل">
+    <div class="card-header"><h3><span dir="ltr"><i class="fas fa-list-check"></i> À faire aujourd'hui</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">شو لازم تعمل اليوم</div></h3></div>
+    <div class="card-body">
+        <?php if (!$todo): ?>
+            <div class="todo-none"><i class="fas fa-circle-check"></i> Rien en attente / ما في شي معلّق — كل شي تمام</div>
+        <?php else: ?>
+        <div class="todo-grid">
+            <?php foreach ($todo as [$ic, $bg, $n, $fr, $ar, $href]): ?>
+            <a class="todo-item" href="<?= e($href) ?>"><span class="todo-ic" style="background:<?= $bg ?>"><i class="<?= $ic ?>"></i></span><span><b><?= (int)$n ?></b><span class="todo-fr" dir="ltr"><?= e($fr) ?></span><span class="todo-ar"><?= e($ar) ?></span></span><i class="fas fa-chevron-right"></i></a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
 <!-- ℹ️ شريط معلومات النظام (Informations) -->
 <?php
 $metaItem = function ($icon, $bg, $fg, $val, $fr, $ar) {
@@ -221,10 +260,9 @@ window.addEventListener('load', function () {
 
 <?php
 // 🆕 (2026-09-23) ملفات ناقصة: موظفو السنة المعروضة بلا أي راتب محسوب (دخلوا عبر الرابط وكُبس «موافق» ولم يُكمَل ملفهم)
-$homeIncSy = activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear();
-$homeInc = canEdit() ? incompleteEmployeesRows($db, $homeIncSy, schoolScopeSql('e.school_id')) : [];
+// ($homeIncSy / $homeInc محسوبان فوق لبطاقة «شو لازم تعمل»)
 if ($homeInc): ?>
-<details class="reg-details no-print" open>
+<details class="reg-details no-print" open id="homeIncBox">
     <summary>
         <span class="rd-ic" style="background:rgba(217,119,6,.16);color:#d97706"><i class="fas fa-user-edit"></i></span>
         <span dir="ltr">Dossiers incomplets</span> <span style="opacity:.85">/ ملفات ناقصة — بلا راتب محسوب (<?= count($homeInc) ?>)</span>

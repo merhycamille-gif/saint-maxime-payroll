@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (deferred) { deferred.prompt(); deferred.userChoice.then(function () { deferred = null; btn.style.display = 'none'; }); return; }
                     var ios = /iPhone|iPad|iPod/i.test(navigator.userAgent), huawei = /HuaweiBrowser|HarmonyOS|HUAWEI|HONOR/i.test(navigator.userAgent);
                     help.innerHTML = huawei
-                        ? '<b>Huawei (navigateur Huawei) :</b> appuyez sur <b>⋯</b> en bas de l'écran, puis <b>« Ajouter à l'écran d'accueil »</b> puis <b>« Ajouter »</b>.<br>'
+                        ? '<b>Huawei (navigateur Huawei) :</b> appuyez sur <b>⋯</b> en bas de l\'écran, puis <b>« Ajouter à l\'écran d\'accueil »</b> puis <b>« Ajouter »</b>.<br>'
                           + '<span dir="rtl"><b>هواوي (متصفّح هواوي):</b> اكبس <b>⋯</b> بأسفل الشاشة ثم <b>«إضافة إلى الشاشة الرئيسية»</b> ثم <b>«إضافة»</b>. إذا ما ظهرت، اسحب القائمة لليسار لتشوف باقي الخيارات.</span>'
                         : ios
                         ? '<b>iPhone (Safari) :</b> appuyez sur <b>Partager</b> (le carré avec la flèche en bas) puis <b>« Sur l\'écran d\'accueil »</b>.<br>'

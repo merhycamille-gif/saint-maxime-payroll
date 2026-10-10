@@ -2072,3 +2072,172 @@ body:has(#pageContent input[name="schools[]"], #pageContent .msa-school-pick) #s
 .school-strip .ss-chip:active { transform: translateY(2px); box-shadow: inset 0 2px 5px rgba(15, 23, 42, .25); }
 .school-strip .ss-chip.on { color: #fff; background: linear-gradient(180deg, #2f659a 0%, #1f4e79 55%, #173c5e 100%); border-color: #173c5e; border-bottom-color: #0f2a44; box-shadow: inset 0 2px 4px rgba(0, 0, 0, .30); }
 @media print { .school-strip { display: none !important; } }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+ * 🌍 (2026-10-10 «بدي أحدث تنظيم وديزاين») الرواتب الشهرية بالترتيب العالمي (دِمو Rippling/Gusto/Deel وافق عليه):
+ *    خطوات الشهر · بطاقات أرقام برسم 4 أشهر · بحث فوري + الخيارات مطوية · سطر موظف قصير · مقارنة بالشهر الماضي
+ *    · قائمة ⋮ · لوحة يمين ثابتة · درج القسيمة · لوحة القيادة «شو لازم تعمل». شاشة فقط — الطباعة كما كانت.
+ * ═══════════════════════════════════════════════════════════════════════════════════════ */
+@media screen {
+.msa-bars-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin:0 0 12px}
+.msa-bars-row > details.export-compact{margin:0}
+.msa-bars-row > details.export-compact[open]{flex-basis:100%}
+.mp-period .card-header{padding:8px 16px}.mp-period .card-body{padding:10px 16px}
+.mp-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px}
+.mp-step{display:flex;gap:10px;align-items:center;background:var(--surface,#fff);border:1px solid var(--gray-200);border-bottom:3px solid #c7d2e1;border-radius:12px;padding:9px 12px;text-decoration:none;color:var(--gray-800);box-shadow:var(--shadow-sm)}
+.mp-step:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.mp-step .mp-n{width:28px;height:28px;border-radius:50%;background:#e2e8f0;color:#475569;display:grid;place-items:center;font-weight:800;flex:none}
+.mp-step.done .mp-n{background:#1f8a5b;color:#fff}
+.mp-step.cur{border-color:var(--primary);border-bottom-color:var(--primary);background:#eef4fd}
+.mp-step.cur .mp-n{background:var(--primary);color:#fff}
+.mp-step b{display:block;font-size:12px;line-height:1.2}.mp-step small{display:block;font-size:11px;color:var(--gray-500);font-weight:600}
+.mp-kpis .stat-card{padding:14px 16px}
+.mp-d{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:3px 7px;margin-left:auto;text-decoration:none;white-space:nowrap}
+.mp-d.up,.mp-dl.up{background:#dcf5e8;color:#1f8a5b}.mp-d.dn,.mp-dl.dn{background:#fde2e1;color:#c0392b}.mp-d.nt,.mp-dl.eq{background:#eef2f7;color:#475569}.mp-dl.nw{background:#e0ecff;color:#1d4a8c}
+.mp-spark-box{margin-left:auto;display:grid;gap:4px;justify-items:end;flex:none}
+.mp-kpi-money .stat-value{font-size:16px !important}
+.mp-spark{display:flex;gap:3px;align-items:flex-end;height:30px}
+.mp-spark s{display:block;width:9px;background:#9cc3ef;border-radius:3px;text-decoration:none}.mp-spark s:last-child{background:var(--primary)}
+.mp-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:16px;align-items:start}
+.mp-main{min-width:0}
+.mp-tool{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface,#fff);border:1px solid var(--gray-200);border-radius:12px;padding:8px 10px;margin:0 0 12px}
+.mp-tool input.form-control{flex:1;min-width:220px;margin:0}
+.mp-count{font-size:12px;color:var(--gray-500);font-weight:700;white-space:nowrap}
+.mp-tog.on{background:#eef4fd !important;border-color:var(--primary) !important;color:var(--primary) !important}
+.mp-th-sub{display:block;font-size:10px;color:var(--gray-500);font-weight:600}
+.mp-table td{vertical-align:middle}
+.mp-emp{display:flex;gap:9px;align-items:center}
+.mp-av{width:30px;height:30px;border-radius:50%;color:#fff;display:grid;place-items:center;font-weight:800;font-size:11px;flex:none;box-shadow:0 2px 4px rgba(0,0,0,.18)}
+.mp-emp b{display:block;font-size:13px}.mp-emp small{display:block;font-size:11px;color:var(--gray-500)}
+.mp-sub{display:block;color:var(--gray-500);font-size:11px}
+.mp-net{font-weight:800;color:var(--primary)}
+.mp-prev{display:block;font-size:10.5px;color:var(--gray-500);font-weight:600}
+.mp-dl{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 7px;white-space:nowrap}
+body:not(.mp-show-det) .mp-det{display:none !important}
+body:not(.mp-show-cmp) .mp-cmp{display:none !important}
+tr.mp-row{cursor:pointer}tr.mp-row:hover td{background:#eef4fd}
+.mp-menu{position:relative}.mp-dots{font-weight:900;min-width:30px;padding:3px 8px}
+.mp-menu-list{display:none;position:absolute;right:0;top:110%;background:#fff;border:1px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow-md);min-width:270px;z-index:30;padding:6px;text-align:left}
+.mp-menu.open .mp-menu-list{display:block}
+.mp-menu-list a{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;color:var(--gray-800);text-decoration:none;font-weight:700;font-size:12px;white-space:nowrap}
+.mp-menu-list a:hover{background:#f1f5fb}
+.mp-side{position:sticky;top:calc(var(--msa-topbar-h,64px) + 12px);display:grid;gap:12px}
+.mp-side .card{margin:0}
+.mp-ln{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px dashed #e6ebf2;font-size:12px}
+.mp-ln b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.mp-ln-ret{color:#c0392b}.mp-ln-net{font-weight:800}.mp-ln-school{color:var(--gray-500);border:0;margin-top:6px}
+.mp-big{text-align:right;font-size:21px;font-weight:900;color:var(--primary);line-height:1.1;padding:10px 0 4px}
+.mp-big small{display:block;font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:2px}
+.mp-prog{height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin:6px 0 2px}.mp-prog i{display:block;height:100%;background:linear-gradient(90deg,#2bab99,#1e8f80)}
+.mp-prog-lbl{font-size:11px;color:var(--gray-500);text-align:right;font-weight:700}
+.mp-actions{display:grid;gap:8px;margin-top:12px}.mp-actions .btn{justify-content:center}
+.mp-ok{color:#1f8a5b;font-weight:800}
+.mp-alert{display:flex;gap:8px;align-items:flex-start;background:#fff7e0;border:1px solid #f1d98a;border-radius:10px;padding:8px 10px;font-size:12px;margin:0 0 8px;line-height:1.5}
+.mp-alert i{width:8px;height:8px;border-radius:50%;background:#b7791f;margin-top:6px;flex:none}
+.mp-alert.dn{background:#fdecec;border-color:#f3b4b4}.mp-alert.dn i{background:#c0392b}
+.mp-alert a{font-weight:800}
+.mp-ov{position:fixed;inset:0;background:rgba(10,25,50,.45);z-index:2990;display:none}.mp-ov.open{display:block}
+.mp-drawer{position:fixed;top:0;right:-660px;width:640px;max-width:96vw;height:100vh;background:#fff;box-shadow:-10px 0 30px rgba(0,0,0,.25);z-index:2991;transition:right .25s;overflow:auto;padding:16px 18px}
+.mp-drawer.open{right:0}
+.mp-dr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.mp-dr-head b{display:block;font-size:16px;color:var(--primary)}.mp-dr-head small{display:block;font-size:12px;color:var(--gray-500)}
+.mp-dr-btns{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px}
+.mp-dr-loading{color:var(--gray-500);padding:20px;text-align:center}
+.mp-drawer .payslip-card{border:0;box-shadow:none;margin:0}.mp-drawer .payslip-card .card-body{padding:0}
+/* ⑨ لوحة القيادة: «شو لازم تعمل اليوم» */
+.dash-todo{margin-bottom:14px}
+.todo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.todo-item{display:flex;gap:10px;align-items:center;background:var(--surface,#fff);border:1px solid var(--gray-200);border-bottom:3px solid #c7d2e1;border-radius:12px;padding:10px 12px;text-decoration:none;color:var(--gray-800);box-shadow:var(--shadow-sm)}
+.todo-item:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.todo-ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;color:#fff;font-size:17px;flex:none;box-shadow:0 3px 6px rgba(0,0,0,.2)}
+.todo-item b{font-size:20px;color:var(--primary);display:inline-block;margin-right:6px;line-height:1}
+.todo-fr{display:block;font-size:12px;font-weight:800}.todo-ar{display:block;font-size:11px;color:var(--gray-500);font-weight:700}
+.todo-item > .fa-chevron-right{margin-left:auto;color:var(--gray-400)}
+.todo-none{color:#1f8a5b;font-weight:800;font-size:14px}
+body.mp-show-det .mp-layout{grid-template-columns:1fr}body.mp-show-det .mp-side{position:static;grid-template-columns:1fr 1fr}
+@media (max-width:1180px){.mp-layout{grid-template-columns:1fr}.mp-side{position:static}.mp-steps{grid-template-columns:1fr 1fr}}
+}
+@media print{.mp-steps,.mp-tool,.mp-side,.mp-drawer,.mp-ov,.mp-act,.mp-spark-box,.dash-todo{display:none !important}.mp-layout{display:block}}
+
+/* =====================================================================
+ * 250) 🌍 (2026-10-10 «بدي شي تنظيم أفضل أجمل أوضح أتقل — فتّش وعملّي هالبرنامج نموذجي بالعالم»): طبقة تنسيق عالمية على
+ *      كل البرنامج (شاشة فقط — الطباعة/PDF لم تُمسّ): شبكة 8px موحّدة، شريط علوي بسطرين منظّمين (عنوان + بحث + المستخدم /
+ *      سطر السياق: المدرسة · السنة · العملة · الراتب يشمل)، قائمة جانبية أضيق وأهدأ، بطاقات وجداول أكثف وأوضح بأرقام
+ *      متساوية العرض، كبسات متناسقة الحجم. قواعده كلها باقية: 12px عام، بولد، 3D لكل ما يُكبَس، خلفية زرقاء، سطوح بيضاء،
+ *      أيقونات ملوّنة، الفرنسي فوق. لإلغاء الطبقة كلّها: احذف هذا القسم.
+ * =================================================================== */
+@media screen {
+  :root { --radius: 9px; --radius-lg: 12px; }
+  /* الشريط العلوي: سطر 1 = رجوع + عنوان + بحث + (لغة · مستخدم · خروج) · سطر 2 = حبوب السياق */
+  .topbar { padding: 8px 18px 8px; gap: 8px 10px; row-gap: 6px; justify-content: flex-start; }
+  .topbar-actions > .topbar-dossier { margin-inline-end: 4px; }
+  .topbar::after { content: ''; flex-basis: 100%; height: 0; order: 5; }
+  .topbar-actions { display: contents; }
+  .topbar-actions > .topbar-dossier, .topbar-actions > .school-switcher, .topbar-actions > #salCompPicker, .topbar-actions > form.school-switcher { order: 10; }
+  .topbar-actions > .btn.btn-light.btn-sm, .topbar-actions > .user-menu { order: 3; }
+  .topbar-actions > .btn.btn-light.btn-sm:last-child { order: 4; }
+  .global-search { order: 2; flex: 1 1 220px; max-width: 420px; margin-inline-start: auto; }
+  .global-search input { padding-top: 7px; padding-bottom: 7px; border-radius: 10px; }
+  .topbar > div:first-child { gap: 10px; }
+  .topbar > div:first-child > div > span { width: 36px !important; height: 36px !important; min-width: 36px !important; border-radius: 9px !important; }
+  .topbar > div:first-child > div > span i { font-size: 16px !important; }
+  .topbar h1, .topbar h1 span[dir="ltr"] { font-size: 16px !important; letter-spacing: -0.01em; }
+  .topbar h1 > span:not([dir]) { font-size: 11.5px !important; opacity: .75; }
+  .topbar .btn.btn-light { padding: 5px 10px; font-size: 12px; border-radius: 9px; }
+  /* حبوب السياق: أصغر وأهدأ، أيقونة ملوّنة صغيرة بلا مربّع كبير */
+  .school-switcher { padding: 2px 8px 2px 6px; border-radius: 9px; gap: 5px; border-bottom-width: 2px; min-height: 30px; }
+  .school-switcher > i { width: 22px !important; height: 22px !important; border-radius: 6px !important; font-size: 11px !important; }
+  .school-switcher select, .school-switcher .sm-btn { font-size: 12px !important; padding: 2px 4px; }
+  .school-switcher .sm-btn { background: none; border: 0; cursor: pointer; font-weight: 700; color: var(--primary-dark); }
+  .topbar-dossier { padding: 2px 9px 2px 4px; border-radius: 9px; gap: 7px; border-bottom-width: 2px; min-height: 30px; }
+  .topbar-dossier .td-ic { width: 22px; height: 22px; min-width: 22px; border-radius: 6px; font-size: 11px; }
+  .topbar-dossier .td-txt span:first-child { font-size: 12px !important; }
+  .topbar-dossier .td-txt span:last-child { font-size: 10.5px !important; }
+  .topbar-actions > .btn.btn-light.btn-sm i[style] { width: 22px !important; height: 22px !important; font-size: 11px !important; border-radius: 6px !important; }
+  .user-menu { padding: 3px 10px 3px 4px; gap: 7px; border-radius: 999px; }
+  .user-avatar { width: 26px; height: 26px; font-size: 11px; }
+  .topbar-actions > .btn.btn-light.btn-sm:last-child { padding: 5px 8px; }
+  /* القائمة الجانبية: أضيق وأهدأ، سطر واحد لكل بند حيث أمكن */
+  .sidebar { width: 244px; }
+  .sidebar-brand { padding: 14px 14px 12px; gap: 10px; }
+  .sidebar-brand .brand-logo { width: 36px; height: 36px; min-width: 36px; border-radius: 10px; font-size: 16px; }
+  .sidebar-search { padding: 10px 10px 0; }
+  .sidebar-search input { padding-top: 6px; padding-bottom: 6px; border-radius: 8px; }
+  .sidebar-nav { padding: 8px 10px 14px; }
+  .sidebar-nav .nav-section { margin: 12px 2px 5px; padding: 4px 9px; font-size: 10px; }
+  .sidebar-nav a { padding: 6px 9px; margin: 3px 0; gap: 9px; line-height: 1.25; border-radius: 8px; border-bottom-width: 2px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 1px 3px rgba(0,0,0,.35); }
+  .sidebar-nav a > i:first-child { width: 22px !important; height: 22px !important; min-width: 22px !important; border-radius: 6px !important; font-size: 11px !important; }
+  .sidebar-nav a span { font-size: 11.5px !important; }
+  /* المحتوى: شبكة 8px — هوامش أصغر وأثبت */
+  .page-content { padding: 14px 18px 32px; }
+  .card { margin-bottom: 14px; border-radius: 12px; }
+  .card-header { padding: 7px 14px; min-height: 40px; }
+  .card-header h3 i { width: 24px; height: 24px; min-width: 24px; border-radius: 7px; font-size: 12px !important; }
+  .card-body { padding: 14px 16px; }
+  .stats-grid, .dash-kpis { gap: 10px; margin-bottom: 12px; }
+  .stat-card, .dash-kpi { padding: 12px 14px; border-radius: 12px; }
+  .stat-icon, .dash-kpi .dk-ic { width: 42px !important; height: 42px !important; min-width: 42px !important; border-radius: 11px !important; font-size: 17px !important; }
+  .stat-value, .dash-kpi .dk-val { font-size: 20px !important; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .dash-meta { margin-bottom: 12px; }
+  .dash-sec, .report-cat { margin-bottom: 12px; }
+  .dash-links { padding: 8px 10px; gap: 6px; }
+  /* الجداول: أكثف، أرقام متساوية العرض، رؤوس أهدأ */
+  .table th { padding: 8px 10px; font-size: 11px !important; letter-spacing: .03em; }
+  .table td { padding: 7px 10px; font-variant-numeric: tabular-nums; }
+  .table tbody tr:nth-child(even) td { background: #fbfcfe; }
+  .table .badge { padding: 2px 8px; }
+  .table .btn-sm { padding: 4px 8px; }
+  /* الأزرار: حجم موحّد */
+  .btn { padding: 7px 14px; border-radius: 9px; }
+  .btn-sm { padding: 5px 10px; border-radius: 8px; }
+  .export-toolbar { gap: 5px !important; margin-bottom: 10px !important; }
+  .msa-bars-row { margin-bottom: 10px; }
+  /* الفورمات: أخفّ */
+  .form-group { margin-bottom: 12px; }
+  .form-label { margin-bottom: 4px; }
+  .alert { padding: 8px 12px; border-radius: 10px; }
+  .toast-stack .toast { border-radius: 10px; }
+  /* الموبايل: السطر الثاني يلفّ طبيعياً */
+  @media (max-width: 900px) { .topbar::after { display: none; } .global-search { order: 6; max-width: none; margin: 0; } }
+}

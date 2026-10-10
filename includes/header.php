@@ -797,7 +797,13 @@ document.addEventListener('submit', function (e) {
         $msaTopBars = '';
         // شريط «الراتب المركّب يشمل» الظاهر (خانات اختيار متل شريط الإفادة) — على صفحات الرواتب فقط
         if (in_array($currentPage ?? '', ['reports', 'employee_history', 'monthly'], true)) {
-            $msaTopBars .= salaryCompToolbar();
+            $sct = salaryCompToolbar();
+            // 🌍 (2026-10-10 الرواتب الشهرية «أحدث تنظيم»): الصفحة تطلب $compactSalaryComp ⇒ الخيارات الخمسة نفسها مطوية بكبسة واحدة
+            // «Colonnes & options» (مثل كبسة «خيارات الطبع») — لا يتغيّر أي خيار ولا سلوكه، فقط يطلع الجدول لفوق.
+            if (!empty($compactSalaryComp)) {
+                $sct = '<details class="export-compact no-print"><summary class="btn btn-sm btn-light"><i class="fas fa-sliders-h"></i> Colonnes &amp; options / الأعمدة والخيارات</summary>' . $sct . '</details>';
+            }
+            $msaTopBars .= $sct;
         }
         ?>
         <?php
@@ -811,6 +817,9 @@ document.addEventListener('submit', function (e) {
             // تأخذ كبسة وحدة «خيارات الطبع» تفتح الشريط الكامل نفسه — كل الخيارات بكل صفحة بلا عجقة. $ownExportRow = للصفحة سطر تصدير خاصّ كامل.
             $msaTopBars .= '<details class="export-compact no-print"><summary class="btn btn-sm btn-light"><i class="fas fa-print"></i> Impression &amp; export / خيارات الطبع</summary>'
                          . exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []) . '</details>';
+        }
+        if ($msaTopBars !== '' && !empty($compactSalaryComp)) {
+            $msaTopBars = '<div class="msa-bars-row no-print">' . $msaTopBars . '</div>'; // الكبستان بسطر واحد
         }
         if ($msaTopBars !== '') {
             ob_start(function ($buf, $phase) use ($msaTopBars) {

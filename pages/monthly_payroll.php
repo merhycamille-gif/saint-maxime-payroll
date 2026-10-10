@@ -194,6 +194,11 @@ if (!empty($_SESSION['flash'])) {
     unset($_SESSION['flash']);
 }
 
+// 🌍 (2026-10-10 «بدي أحدث تنظيم وديزاين» — دِمو Rippling/Gusto/Deel وافق عليه): لائحة الشهر وحدها تأخذ الترتيب الجديد:
+// شريط الخيارات الخمسة وشريط التصدير يصيران كبستَين قابلتَين للفتح («Colonnes & options» / «Impression & export») فوق الجدول،
+// والقسيمة الفردية والطباعة الجماعية تبقيان بشريطَيهما الكاملَين كما كانتا.
+$mpModern = ($action === 'list' && $employeeId <= 0);
+if ($mpModern) { $hideExportToolbar = true; $compactSalaryComp = true; }
 include __DIR__ . '/../includes/header.php';
 echo officialFormStyles(); // ستايلات الترويسة/التوقيع/العناوين الرسمية على القسيمة
 ?>
@@ -215,7 +220,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
 <?php endif; ?>
 
 <!-- Period selector -->
-<div class="card no-print">
+<div class="card no-print<?= $mpModern ? ' mp-period' : '' ?>">
     <div class="card-header">
         <h3>
             <span dir="ltr"><i class="fas fa-calendar-alt"></i> Période</span>
@@ -449,126 +454,362 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
         </div>
     </div>
 <?php else:
-    // List view
-    $sql = "SELECT e.id, e.school_id, e.employee_code, e.first_name_fr, e.last_name_fr, e.employee_type, e.current_grade,
-                   ms.total_due_lbp, ms.total_due_usd, ms.net_salary_lbp, ms.is_calculated
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🌍 List view — الترتيب العصري (2026-10-10، دِمو Rippling/Gusto/Deel وافق عليه «بدي أحدث تنظيم وديزاين»):
+    //   ② شريط خطوات الشهر · ⑤ بطاقات أرقام مع رسم 4 أشهر وفرق عن الشهر الماضي · ① بحث فوري + الخيارات مطوية
+    //   ⑥ سطر الموظف: الاسم كبير وتحته الرمز·المدرسة · ③ مقارنة بالشهر الماضي (أخضر/أحمر) · ⑦ قائمة ⋮ بآخر السطر
+    //   ④ لوحة يمين ثابتة: ملخّص الشهر برقم كبير + كبسات الشهر + «لازم تشوفهم» · ⑧ الكبس على السطر يفتح القسيمة بدرج
+    //   🔴 لا يتغيّر أي رقم: نفس الاستعلام والدوال (money/rowUsd/dualFromUsd) — أُضيفت أعمدة القسيمة المخزّنة للعرض فقط.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    $pmM = $month === 1 ? 12 : $month - 1; $pmY = $month === 1 ? $year - 1 : $year; // الشهر الماضي (للمقارنة)
+    $sql = "SELECT e.id, e.school_id, e.employee_code, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.employee_type, e.current_grade,
+                   ms.total_due_lbp, ms.total_due_usd, ms.net_salary_lbp, ms.net_salary_usd, ms.is_calculated, ms.exchange_rate, ms.month, ms.year,
+                   ms.base_plus_echelon_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.aide_complementaire_lbp, ms.prime_fixe_usd_law, ms.total_retenues_lbp,
+                   ms.family_allowance_lbp, ms.transport_lbp,
+                   ms.school_cnss_8_lbp, ms.school_eoc_6_lbp, ms.school_family_comp_6_lbp, ms.school_end_of_service_8_5_lbp,
+                   pm.total_due_lbp AS prev_due_lbp, pm.net_salary_lbp AS prev_net_lbp, pm.is_calculated AS prev_calc
             FROM employees e
             LEFT JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.month = ? AND ms.year = ?
+            LEFT JOIN monthly_salaries pm ON pm.employee_id = e.id AND pm.month = ? AND pm.year = ?
             WHERE e.is_deleted = 0 AND e.status = 'actif'" . schoolScopeSql('e.school_id');
     [$lyf, $lyp] = yearEmploymentFilter($msSchoolYear, 'e.');
     $sql .= $lyf;
-    $listParams = array_merge([$month, $year], $lyp);
+    $listParams = array_merge([$month, $year, $pmM, $pmY], $lyp);
     $sql .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
     $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id";
     $stmt = $db->prepare($sql);
     $stmt->execute($listParams);
     $list = $stmt->fetchAll();
-    
+
     $totalDue = 0; $calculatedCount = 0;
     foreach ($list as $r) {
         $totalDue += (float)($r['total_due_lbp'] ?? 0);
         if ($r['is_calculated']) $calculatedCount++;
     }
+    $pendingN = count($list) - $calculatedCount;
+    $curRate  = getExchangeRate($month, $year);
+
+    // ④ ملخّص الشهر (المحتسَبون فقط — نفس الأعمدة المخزّنة بالقسيمة) + ⑤ فرق عن الشهر الماضي + «لازم تشوفهم»
+    $S = ['gross'=>0,'ret'=>0,'net'=>0,'fam'=>0,'tr'=>0,'due'=>0,'due_usd'=>0.0,'net_usd'=>0.0,'school'=>0,'prev_due'=>0,'prev_n'=>0,
+          'base'=>0,'extra'=>0,'aide'=>0];
+    $pendList = []; $anomList = []; $gapList = []; $newN = 0; $gpAll = [];
+    foreach ($list as $r) {
+        if ($r['is_calculated']) {
+            $S['net']  += (int)$r['net_salary_lbp'];   $S['ret'] += (int)$r['total_retenues_lbp'];
+            $S['fam']  += (int)$r['family_allowance_lbp']; $S['tr'] += (int)$r['transport_lbp'];
+            $S['due']  += (int)$r['total_due_lbp'];    $S['due_usd'] += rowUsd($r, 'total_due_usd', 'total_due_lbp'); $S['net_usd'] += rowUsd($r, 'net_salary_usd', 'net_salary_lbp');
+            $S['base'] += (int)$r['base_plus_echelon_lbp']; $S['extra'] += (int)$r['extra_lbp'] + (int)$r['prime_fixe_lbp']; $S['aide'] += (int)$r['aide_complementaire_lbp'];
+            $S['school'] += (int)$r['school_cnss_8_lbp'] + (int)$r['school_eoc_6_lbp'] + (int)$r['school_family_comp_6_lbp'] + (int)$r['school_end_of_service_8_5_lbp'];
+            if ((int)$r['net_salary_lbp'] <= 0) $anomList[] = $r;
+            if ($r['prev_calc'] && (int)$r['prev_due_lbp'] > 0) {
+                $S['prev_due'] += (int)$r['prev_due_lbp']; $S['prev_n']++;
+                $gpAll[] = [$r, ((int)$r['total_due_lbp'] - (int)$r['prev_due_lbp']) / (int)$r['prev_due_lbp']];
+            }
+        } else {
+            $pendList[] = $r;
+        }
+    }
+    // ③ الفرق «غير الاعتيادي»: زيادة عامّة للكل (سنة جديدة/قانون/سعر صرف) ليست خطأ — وسيط **فئته** (ملاك/متعاقد/موظف) هو المرجع،
+    //    ومَن ابتعد عن زملاء فئته أكثر من 15 نقطة يُنبَّه. $gpMed = وسيط الكل (للعنوان).
+    $medOf = function (array $vals): float { sort($vals); $c = count($vals); if (!$c) return 0.0; return $c % 2 ? $vals[intdiv($c, 2)] : ($vals[$c / 2 - 1] + $vals[$c / 2]) / 2; };
+    $gpMed = $medOf(array_map(fn($x) => $x[1], $gpAll));
+    $byType = []; foreach ($gpAll as [$r, $gp]) $byType[$r['employee_type']][] = $gp;
+    $medType = array_map($medOf, $byType);
+    // الشهر الماضي من سنة دراسية أخرى (مثل أيلول قبل تشرين الأول) ⇒ الفروقات طبيعية (سنة جديدة: درجات/قانون/سعر) — لا تنبيهات، العمود يبقى
+    $pmSameSy = (schoolYearOfMonth((int)$pmY, (int)$pmM) === $msSchoolYear);
+    if ($pmSameSy) foreach ($gpAll as [$r, $gp]) { if (abs($gp - ($medType[$r['employee_type']] ?? $gpMed)) > 0.15) $gapList[] = [$r, $gp]; }
+    $S['gross'] = $S['net'] + $S['ret']; // الراتب المركّب (قبل المحسومات) = الصافي + المحسومات (أعمدة القسيمة نفسها)
+    $deltaPct = ($S['prev_n'] > 0 && $S['prev_due'] > 0) ? (($S['due'] - $S['prev_due']) / $S['prev_due'] * 100) : null;
+
+    // ⑤ رسم 4 أشهر (مجموع المتوجب لموظفي اللائحة نفسها)
+    $spark = [];
+    if ($list) {
+        $ids = implode(',', array_map('intval', array_column($list, 'id')));
+        $ym = []; for ($i = 3; $i >= 0; $i--) { $mm = $month - $i; $yy = $year; while ($mm <= 0) { $mm += 12; $yy--; } $ym[] = [$yy, $mm]; }
+        $ymSql = implode(' OR ', array_map(fn($p) => "(year = {$p[0]} AND month = {$p[1]})", $ym));
+        $sp = $db->query("SELECT year, month, COALESCE(SUM(total_due_lbp),0) t FROM monthly_salaries WHERE is_calculated = 1 AND employee_id IN ($ids) AND ($ymSql) GROUP BY year, month")->fetchAll();
+        $spMap = []; foreach ($sp as $row) $spMap[$row['year'] . '-' . $row['month']] = (float)$row['t'];
+        foreach ($ym as $p) $spark[] = ['lbl' => monthName($p[1], 'fr', true) . ' ' . $p[0], 'v' => $spMap[$p[0] . '-' . $p[1]] ?? 0.0];
+    }
+    $spMax = max(1.0, max(array_column($spark ?: [['v'=>1]], 'v')));
+
+    // ② الخطوات: البيانات ✓ ← المراجعة (قيد الانتظار/تنبيهات) ← الإقفال (قفل السنة للمدرسة) ← القسائم
+    $alertsN = count($anomList) + count($gapList);
+    $lockedSy = (!isAllSchools() && currentSchoolId()) ? isSchoolYearLocked((int)currentSchoolId(), $msSchoolYear) : false;
+    $s2done = ($pendingN === 0 && $alertsN === 0 && count($list) > 0);
+    $stepCur = !$s2done ? 2 : (!$lockedSy ? 3 : 4);
+    $prevLbl = monthName($pmM, 'fr', true);
+    $avC = ['ic2','ic4','ic5','ic6','ic1','ic3'];
+    $mpBase = BASE_URL . 'pages/monthly_payroll.php?month=' . $month . '&year=' . $year;
 ?>
-    <div class="stats-grid">
+    <div class="mp-steps no-print" data-sec-title="Paie de <?= monthName($month) ?> <?= $year ?>">
+        <?php $steps = [
+            [1, 'Données', 'البيانات', count($list) . ' employés / موظفاً', true, '#mpTable'],
+            [2, 'Vérification', 'المراجعة', ($pendingN ? $pendingN . ' en attente' : 'tous calculés') . ($alertsN ? ' · ' . $alertsN . ' alertes' : ''), $s2done, '#mpCheck'],
+            [3, 'Clôture', 'الإقفال', $lockedSy ? 'Année verrouillée / السنة مقفولة' : 'Verrouiller l’année / قفل السنة', $lockedSy, (canEdit() ? BASE_URL . 'pages/open_year.php' : '#')],
+            [4, 'Bulletins', 'القسائم', 'PDF · WhatsApp · Email', $stepCur === 4, $mpBase . '&action=print_all' . $typeQ],
+        ];
+        foreach ($steps as [$n, $fr, $ar, $sub, $done, $href]): $cls = $done ? 'done' : ($stepCur === $n ? 'cur' : ''); ?>
+        <a class="mp-step <?= $cls ?>" href="<?= e($href) ?>"><span class="mp-n"><?= $done ? '✓' : $n ?></span><span><b><span dir="ltr"><?= $n ?> · <?= $fr ?></span> / <?= $ar ?></b><small><?= e($sub) ?></small></span></a>
+        <?php endforeach; ?>
+    </div>
+
+    <div class="stats-grid mp-kpis">
         <div class="stat-card">
             <div class="stat-icon primary"><i class="fas fa-users"></i></div>
-            <div><div class="stat-label">Total employés actifs / إجمالي الموظفين الفاعلين</div><div class="stat-value"><?= count($list) ?></div></div>
+            <div><div class="stat-label">Actifs / الموظفون الفاعلون</div><div class="stat-value"><?= count($list) ?></div></div>
+            <?php if ($newN = count(array_filter($list, fn($r) => isNewHireInYear(employeeRowCached($db, (int)$r['id']) ?? [], $msSchoolYear)))): ?><span class="mp-d nt"><?= $newN ?> 🆕</span><?php endif; ?>
         </div>
         <div class="stat-card">
             <div class="stat-icon success"><i class="fas fa-check"></i></div>
             <div><div class="stat-label">Calculés / المحتسَبون</div><div class="stat-value"><?= $calculatedCount ?></div></div>
+            <?php if (count($list)): ?><span class="mp-d <?= $pendingN ? 'nt' : 'up' ?>"><?= round($calculatedCount * 100 / count($list)) ?>%</span><?php endif; ?>
         </div>
         <div class="stat-card">
             <div class="stat-icon warning"><i class="fas fa-clock"></i></div>
-            <div><div class="stat-label">En attente / قيد الانتظار</div><div class="stat-value"><?= count($list) - $calculatedCount ?></div></div>
+            <div><div class="stat-label">En attente / قيد الانتظار</div><div class="stat-value"><?= $pendingN ?></div></div>
+            <?php if ($alertsN): ?><a class="mp-d dn" href="#mpCheck"><?= $alertsN ?> alertes</a><?php endif; ?>
         </div>
-        <div class="stat-card">
+        <div class="stat-card mp-kpi-money">
             <div class="stat-icon gold"><i class="fas fa-money-bill"></i></div>
-            <div><div class="stat-label">Total dû / الإجمالي المتوجب</div><div class="stat-value" style="font-size:18px"><?= money($totalDue, getExchangeRate($month, $year)) ?></div></div>
+            <div><div class="stat-label">Total dû / الإجمالي المتوجب</div><div class="stat-value" style="font-size:18px"><?= money($totalDue, $curRate) ?></div></div>
+            <div class="mp-spark-box">
+                <div class="mp-spark" title="<?= e(implode(' · ', array_map(fn($s) => $s['lbl'] . ': ' . moneyText($s['v'], $curRate, ['withCur' => false]), $spark))) ?>">
+                    <?php foreach ($spark as $s): ?><s style="height:<?= max(3, round($s['v'] / $spMax * 30)) ?>px" title="<?= e($s['lbl']) ?>: <?= e(moneyText($s['v'], $curRate)) ?>"></s><?php endforeach; ?>
+                </div>
+                <?php if ($deltaPct !== null): ?><span class="mp-d <?= $deltaPct > 0.05 ? 'up' : ($deltaPct < -0.05 ? 'dn' : 'nt') ?>" title="vs <?= e($prevLbl) ?> — الفرق عن الشهر الماضي (الإجمالي المتوجب)"><?= ($deltaPct > 0 ? '+' : '') . number_format($deltaPct, 1) ?>%</span><?php endif; ?>
+            </div>
         </div>
     </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h3>
-                <span dir="ltr"><i class="fas fa-money-check-alt"></i> Paie de <?= monthName($month) ?> <?= $year ?> — <?= e(currentSchoolName()) ?></span>
-                <div style="font-size:0.85em;font-weight:600;opacity:0.9">رواتب الشهر</div>
-            </h3>
-            <div class="d-flex gap-2 no-print">
-                <?php /* 🧹 زرّ «طباعة الجدول» أُزيل — مكرّر مع «طباعة» بشريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
-                <a href="?action=print_all&month=<?= $month ?>&year=<?= $year ?><?= $typeQ ?>" class="btn btn-primary" title="Afficher/imprimer le bulletin de chaque employé / عرض/طباعة قسيمة كل موظف">
-                    <i class="fas fa-file-invoice"></i> Imprimer les bulletins / طباعة القسائم
-                </a>
-                <?php if (!isAllSchools()): ?>
-                <a href="?action=calc_all&month=<?= $month ?>&year=<?= $year ?><?= $typeQ ?>" class="btn btn-gold" data-confirm="احتساب رواتب كل الموظفين المعروضين لهذا الشهر؟">
-                    <i class="fas fa-bolt"></i> Calculer tout / احتساب الكل
-                </a>
+
+    <div class="mp-layout">
+    <div class="mp-main">
+        <div class="mp-tool no-print">
+            <input type="search" id="mpSearch" class="form-control" placeholder="🔍 Nom, code, école… / اسم، رمز، مدرسة — النتيجة فورية" autocomplete="off">
+            <span class="mp-count" id="mpCount"></span>
+            <button type="button" class="btn btn-sm btn-light mp-tog" id="mpTogDet" data-k="det" title="Afficher base / supplément / primes / retenues"><i class="fas fa-table-columns"></i> Détails / التفاصيل</button>
+            <button type="button" class="btn btn-sm btn-light mp-tog" id="mpTogCmp" data-k="cmp" title="Comparer au mois précédent"><i class="fas fa-right-left"></i> Comparer à <?= e($prevLbl) ?> / قارن</button>
+        </div>
+
+        <div class="card" id="mpTable">
+            <div class="card-header">
+                <h3>
+                    <span dir="ltr"><i class="fas fa-money-check-alt"></i> Paie de <?= monthName($month) ?> <?= $year ?> — <?= e(currentSchoolName()) ?></span>
+                    <div style="font-size:0.85em;font-weight:600;opacity:0.9">رواتب الشهر</div>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="table-wrapper">
+                    <table class="table mp-table">
+                        <thead>
+                            <tr>
+                                <th>Employé / الموظف<small class="mp-th-sub">Code · École / الرمز · المدرسة</small></th>
+                                <th>Catégorie / الفئة<small class="mp-th-sub">Échelon / الدرجة</small></th>
+                                <th class="mp-det text-end">Base + éch. / الأساس</th>
+                                <th class="mp-det text-end">Supplément / الإضافي</th>
+                                <th class="mp-det text-end">Prime &amp; aide / المكافأة</th>
+                                <th class="mp-det text-end">Retenues / المحسومات</th>
+                                <th class="text-end">Net salaire / الصافي</th>
+                                <th class="text-end">Total dû / الإجمالي المتوجب<small class="mp-th-sub">L.L · $</small></th>
+                                <th class="mp-cmp">vs <?= e($prevLbl) ?> / الفرق</th>
+                                <th>Statut / الحالة</th>
+                                <th class="no-print"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php $mpT = ['net'=>0,'due'=>0,'due_usd'=>0.0,'net_usd'=>0.0,'n'=>0];
+                            foreach ($list as $i => $r):
+                                if ($r['is_calculated']) { $mpT['net'] += (int)$r['net_salary_lbp']; $mpT['due'] += (int)$r['total_due_lbp']; $mpT['due_usd'] += rowUsd($r, 'total_due_usd', 'total_due_lbp'); $mpT['net_usd'] += rowUsd($r, 'net_salary_usd', 'net_salary_lbp'); $mpT['n']++; }
+                                $nameFr = empFullNameFr($r); $nameAr = empFullNameAr($r);
+                                $ini = mb_strtoupper(mb_substr(trim((string)$r['first_name_fr']), 0, 1) . mb_substr(trim((string)$r['last_name_fr']), 0, 1));
+                                $schN = schoolNameById($r['school_id']);
+                                $q = mb_strtolower($nameFr . ' ' . $nameAr . ' ' . $r['employee_code'] . ' ' . $schN . ' ' . employeeTypeLabel($r['employee_type']) . ' ' . ($r['is_calculated'] ? 'calculé محتسب' : 'attente انتظار'));
+                                $gp = null; $gpCls = 'eq'; $gpTxt = '—';
+                                if ($r['is_calculated'] && $r['prev_calc'] && (int)$r['prev_due_lbp'] > 0) {
+                                    $gp = ((int)$r['total_due_lbp'] - (int)$r['prev_due_lbp']) / (int)$r['prev_due_lbp'] * 100;
+                                    $gpCls = $gp > 0.5 ? 'up' : ($gp < -0.5 ? 'dn' : 'eq'); $gpTxt = $gpCls === 'eq' ? '=' : (($gp > 0 ? '+' : '') . number_format($gp, 1) . '%');
+                                } elseif ($r['is_calculated'] && !$r['prev_calc']) { $gpCls = 'nw'; $gpTxt = 'Nouveau'; }
+                                $viewUrl = '?employee_id=' . (int)$r['id'] . '&month=' . $month . '&year=' . $year;
+                            ?>
+                                <tr class="mp-row" data-q="<?= e($q) ?>" data-url="<?= e($viewUrl) ?>" data-name="<?= e($nameFr) ?>" data-sub="<?= e($r['employee_code'] . ' · ' . $schN) ?>">
+                                    <td>
+                                        <div class="mp-emp"><span class="mp-av" style="background:var(--<?= $avC[$i % 6] ?>)"><?= e($ini) ?></span>
+                                            <span><b><?= e($nameFr) ?></b><?= empBadges($r, $db, $msSchoolYear) ?><small><?= e($r['employee_code']) ?> · <?= e($schN) ?></small></span></div>
+                                    </td>
+                                    <td><small><?= employeeTypeLabel($r['employee_type']) ?></small><small class="mp-sub">Échelon <?= e(gradeDisplay($r)) ?></small></td>
+                                    <td class="mp-det text-end"><?= $r['is_calculated'] ? moneyLaw($r['base_plus_echelon_lbp'], [], $r, 'bpe') : '—' ?></td>
+                                    <td class="mp-det text-end"><?= $r['is_calculated'] ? extraWageMoney($r) : '—' ?></td>
+                                    <td class="mp-det text-end"><?= $r['is_calculated'] ? money((int)$r['aide_complementaire_lbp'], rowRate($r)) : '—' ?></td>
+                                    <td class="mp-det text-end text-danger"><?= $r['is_calculated'] ? '−' . money($r['total_retenues_lbp'], rowRate($r)) : '—' ?></td>
+                                    <td class="text-end mp-net"><?= $r['is_calculated'] ? money($r['net_salary_lbp'], rowRate($r)) : '—' ?>
+                                        <?php if ($r['prev_calc']): ?><small class="mp-prev mp-cmp"><?= e($prevLbl) ?> <?= money($r['prev_net_lbp'], $curRate, ['withCur' => false, 'stacked' => false]) ?></small><?php endif; ?></td>
+                                    <td class="text-end"><strong><?= $r['is_calculated'] ? money($r['total_due_lbp'], rowRate($r)) : '—' ?></strong></td>
+                                    <td class="mp-cmp"><?php if ($r['is_calculated']): ?><span class="mp-dl <?= $gpCls ?>"><?= $gpTxt ?></span><?php endif; ?></td>
+                                    <td>
+                                        <?php if ($r['is_calculated']): ?>
+                                            <span class="badge badge-success">✓ Calculé / محتسَب</span>
+                                        <?php else: ?>
+                                            <span class="badge badge-warning">En attente / قيد الانتظار</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="no-print mp-act">
+                                        <div class="mp-menu">
+                                            <button type="button" class="btn btn-sm btn-light mp-dots" title="Actions / إجراءات" aria-label="Actions">⋮</button>
+                                            <div class="mp-menu-list">
+                                                <a href="<?= e($viewUrl) ?>"><i class="fas fa-file-invoice"></i> Voir le bulletin / عرض القسيمة</a>
+                                                <?php if (!isAllSchools()): ?><a href="?action=calc&employee_id=<?= (int)$r['id'] ?>&month=<?= $month ?>&year=<?= $year ?>"><i class="fas fa-calculator"></i> <?= $r['is_calculated'] ? 'Recalculer / إعادة الاحتساب' : 'Calculer / احتساب' ?></a><?php endif; ?>
+                                                <?php if (canEdit()): ?><a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$r['id'] ?>"><i class="fas fa-pen"></i> Modifier le dossier / تعديل الملف</a><?php endif; ?>
+                                                <?php if (viewerCanSeePage('attestations.php')): ?><a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$r['id'] ?>"><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل</a><?php endif; ?>
+                                                <a href="<?= BASE_URL ?>pages/employee_full_history.php?employee_id=<?= (int)$r['id'] ?>"><i class="fas fa-clock-rotate-left"></i> Historique / التاريخ الكامل</a>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <?php if ($mpT['n'] > 0): ?><tfoot><tr class="total-row" style="font-weight:700;background:var(--gold-light,#fdf6e3)">
+                            <td colspan="2" style="text-align:right">المجموع (المحتسَبون: <?= $mpT['n'] ?>) / Total</td>
+                            <td class="mp-det text-end"><?= money($S['base'], $curRate) ?></td>
+                            <td class="mp-det text-end"><?= money($S['extra'], $curRate) ?></td>
+                            <td class="mp-det text-end"><?= money($S['aide'], $curRate) ?></td>
+                            <td class="mp-det text-end text-danger">−<?= money($S['ret'], $curRate) ?></td>
+                            <td class="text-end"><?= dualFromUsd($mpT['net'], $mpT['net_usd']) ?></td>
+                            <td class="text-end"><strong><?= dualFromUsd($mpT['due'], $mpT['due_usd']) ?></strong></td>
+                            <td class="mp-cmp"><?php if ($deltaPct !== null): ?><span class="mp-dl <?= $deltaPct > 0.5 ? 'up' : ($deltaPct < -0.5 ? 'dn' : 'eq') ?>"><?= ($deltaPct > 0 ? '+' : '') . number_format($deltaPct, 1) ?>%</span><?php endif; ?></td>
+                            <td></td><td class="no-print"></td>
+                        </tr></tfoot><?php endif; ?>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <aside class="mp-side no-print no-export">
+        <div class="card mp-sum" data-sec-title="Résumé du mois / ملخّص الشهر">
+            <div class="card-header"><h3><span dir="ltr"><i class="fas fa-calculator"></i> Résumé du mois</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">ملخّص الشهر — <?= monthName($month, 'ar') ?> <?= $year ?></div></h3></div>
+            <div class="card-body">
+                <div class="mp-ln"><span>Base + échelon / الأساس والدرجة</span><b><?= money($S['base'], $curRate, ['withCur' => false, 'stacked' => false]) ?></b></div>
+                <div class="mp-ln"><span>Supplément / الأجر الإضافي</span><b><?= money($S['extra'], $curRate, ['withCur' => false, 'stacked' => false]) ?></b></div>
+                <div class="mp-ln"><span>Prime &amp; aide / المكافأة والمساعدة</span><b><?= money($S['aide'], $curRate, ['withCur' => false, 'stacked' => false]) ?></b></div>
+                <div class="mp-ln mp-ln-ret"><span>Retenues / المحسومات</span><b>− <?= money($S['ret'], $curRate, ['withCur' => false, 'stacked' => false]) ?></b></div>
+                <div class="mp-ln mp-ln-net"><span>Net / الصافي</span><b><?= money($S['net'], $curRate, ['withCur' => false, 'stacked' => false]) ?></b></div>
+                <div class="mp-ln"><span>Alloc. familiales / التعويض العائلي</span><b>+ <?= money($S['fam'], $curRate, ['withCur' => false, 'stacked' => false]) ?></b></div>
+                <div class="mp-ln"><span>Transport / النقل</span><b>+ <?= money($S['tr'], $curRate, ['withCur' => false, 'stacked' => false]) ?></b></div>
+                <div class="mp-big"><small>Total dû / الإجمالي المتوجب</small><?= dualFromUsd($S['due'], $S['due_usd']) ?><span class="money-usd"><?= number_format($curRate) ?> L.L/$</span></div>
+                <div class="mp-prog"><i style="width:<?= count($list) ? round($calculatedCount * 100 / count($list), 1) : 0 ?>%"></i></div>
+                <div class="mp-prog-lbl"><?= $calculatedCount ?> / <?= count($list) ?> calculés / محتسَبون</div>
+                <div class="mp-ln mp-ln-school" title="CNSS 8% + Caisse 6% + Alloc. 6% + Fin de service 8.5% — ما تدفعه المدرسة فوق الرواتب"><span>Charges école / أعباء المدرسة</span><b><?= money($S['school'], $curRate, ['withCur' => false, 'stacked' => false]) ?></b></div>
+                <div class="mp-actions">
+                    <?php if (!isAllSchools()): ?>
+                    <a href="?action=calc_all&month=<?= $month ?>&year=<?= $year ?><?= $typeQ ?>" class="btn btn-gold" data-confirm="احتساب رواتب كل الموظفين المعروضين لهذا الشهر؟"><i class="fas fa-bolt"></i> Calculer tout / احتساب الكل</a>
+                    <?php endif; ?>
+                    <a href="?action=print_all&month=<?= $month ?>&year=<?= $year ?><?= $typeQ ?>" class="btn btn-primary" title="Afficher/imprimer le bulletin de chaque employé / عرض/طباعة قسيمة كل موظف"><i class="fas fa-file-invoice"></i> Imprimer les bulletins / طباعة القسائم</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mp-check" id="mpCheck" data-sec-title="À vérifier / لازم تشوفهم">
+            <div class="card-header"><h3><span dir="ltr"><i class="fas fa-list-check"></i> À vérifier</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">لازم تشوفهم قبل الطباعة</div></h3></div>
+            <div class="card-body">
+                <?php if (!$pendList && !$anomList && !$gapList): ?>
+                    <div class="mp-ok"><i class="fas fa-circle-check"></i> Rien à signaler / ما في شي معلّق</div>
+                <?php endif; ?>
+                <?php if (!$pmSameSy && $S['prev_n'] > 0): ?>
+                <div class="mp-alert" style="background:#eef4fd;border-color:#c7d8f0"><i style="background:var(--primary)"></i><div><b>Nouvelle année scolaire</b> — <?= e($prevLbl) ?> من السنة الماضية، فالفرق عنه (الأغلبية <?= ($gpMed > 0 ? '+' : '') . number_format($gpMed * 100, 0) ?>%) طبيعي: درجات وقانون وسعر جديد. التنبيه على الفروقات غير الاعتيادية بيبلّش من الشهر الجاي.</div></div>
+                <?php endif; ?>
+                <?php if ($pendList): ?>
+                <div class="mp-alert wa"><i></i><div><b><?= count($pendList) ?> en attente / قيد الانتظار</b> — ما انحسب راتبهم بعد: <?= e(implode('، ', array_map(fn($r) => empFullNameFr($r), array_slice($pendList, 0, 5)))) ?><?= count($pendList) > 5 ? '…' : '' ?>
+                    <a href="#" class="mp-filter" data-q="attente">Voir / شوفهم →</a></div></div>
+                <?php endif; ?>
+                <?php foreach (array_slice($anomList, 0, 5) as $r): ?>
+                <div class="mp-alert dn"><i></i><div><b><?= e(empFullNameFr($r)) ?></b> — صافي صفر أو أقل، يرجّح خطأ بالملف. <a href="?employee_id=<?= (int)$r['id'] ?>&month=<?= $month ?>&year=<?= $year ?>">Ouvrir / افتح →</a></div></div>
+                <?php endforeach; ?>
+                <?php if ($gapList): ?>
+                <div class="mp-alert dn"><i></i><div><b><?= count($gapList) ?> écart<?= count($gapList) > 1 ? 's' : '' ?> inhabituel<?= count($gapList) > 1 ? 's' : '' ?> vs <?= e($prevLbl) ?></b> — فرق غير اعتيادي عن الشهر الماضي مقارنةً بزملاء فئته (الأغلبية: <?= ($gpMed > 0 ? '+' : '') . number_format($gpMed * 100, 0) ?>%):
+                    <?php foreach (array_slice($gapList, 0, 5) as [$r, $gp]): ?><a href="?employee_id=<?= (int)$r['id'] ?>&month=<?= $month ?>&year=<?= $year ?>"><?= e(empFullNameFr($r)) ?> (<?= ($gp > 0 ? '+' : '') . number_format($gp * 100, 0) ?>%)</a><?= $r === end($gapList)[0] ? '' : '، ' ?><?php endforeach; ?><?= count($gapList) > 5 ? '…' : '' ?>
+                    <a href="#" class="mp-cmp-on">Comparer / قارن →</a></div></div>
                 <?php endif; ?>
             </div>
         </div>
-        <div class="card-body">
-            <div class="table-wrapper">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Code / الرمز</th>
-                            <?php if (isAllSchools()): ?><th>École / المدرسة</th><?php endif; ?>
-                            <th>Nom / الاسم</th>
-                            <th>Type / الفئة</th>
-                            <th>Échelon / الدرجة</th>
-                            <th>Net salaire / الصافي</th>
-                            <th>Total dû L.L / الإجمالي ل.ل</th>
-                            <th>Total dû $ / الإجمالي بالدولار</th>
-                            <th>Statut / الحالة</th>
-                            <th class="no-print">Action / إجراء</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php $mpT = ['net'=>0,'due'=>0,'due_usd'=>0.0,'n'=>0];
-                        foreach ($list as $r):
-                            if ($r['is_calculated']) { $mpT['net'] += (int)$r['net_salary_lbp']; $mpT['due'] += (int)$r['total_due_lbp']; $mpT['due_usd'] += rowUsd($r, 'total_due_usd', 'total_due_lbp'); $mpT['net_usd'] = ($mpT['net_usd'] ?? 0.0) + rowUsd($r, 'net_salary_usd', 'net_salary_lbp'); $mpT['n']++; }
-                        ?>
-                            <tr>
-                                <td><strong><?= e($r['employee_code']) ?></strong></td>
-                                <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
-                                <td><?= e(empFullNameFr($r)) ?> <?= empBadges($r, $db, $msSchoolYear) ?></td><?php /* 🆕 جديد + ملف ناقص (2026-09-23) */ ?>
-                                <td><small><?= employeeTypeLabel($r['employee_type']) ?></small></td>
-                                <td><?= e(gradeDisplay($r)) ?></td>
-                                <td><?= $r['is_calculated'] ? money($r['net_salary_lbp'], rowRate($r)) : '—' ?></td>
-                                <td><strong><?= $r['is_calculated'] ? money($r['total_due_lbp'], rowRate($r)) : '—' ?></strong></td>
-                                <td><?= $r['is_calculated'] ? formatUSD(rowUsd($r, 'total_due_usd', 'total_due_lbp')) : '—' ?></td>
-                                <td>
-                                    <?php if ($r['is_calculated']): ?>
-                                        <span class="badge badge-success">✓ Calculé / محتسَب</span>
-                                    <?php else: ?>
-                                        <span class="badge badge-warning">En attente / قيد الانتظار</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="no-print">
-                                    <a href="?employee_id=<?= $r['id'] ?>&month=<?= $month ?>&year=<?= $year ?>" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <?php if (!isAllSchools()): ?>
-                                    <a href="?action=calc&employee_id=<?= $r['id'] ?>&month=<?= $month ?>&year=<?= $year ?>" class="btn btn-sm btn-gold" title="Calculer / احتساب">
-                                        <i class="fas fa-calculator"></i>
-                                    </a>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                    <?php if ($mpT['n'] > 0): ?><tfoot><tr class="total-row" style="font-weight:700;background:var(--gold-light,#fdf6e3)">
-                        <td colspan="<?= isAllSchools() ? 5 : 4 ?>" style="text-align:right">المجموع (المحتسَبون: <?= $mpT['n'] ?>) / Total</td>
-                        <td><?= dualFromUsd($mpT['net'], $mpT['net_usd'] ?? 0.0) ?></td>
-                        <td><strong><?= dualFromUsd($mpT['due'], $mpT['due_usd']) ?></strong></td>
-                        <td><?= formatUSD($mpT['due_usd']) ?></td>
-                        <td></td><td class="no-print"></td>
-                    </tr></tfoot><?php endif; ?>
-                </table>
-            </div>
-        </div>
+    </aside>
     </div>
+
+    <?php /* ⑧ درج القسيمة: الكبس على سطر الموظف يجلب قسيمته (نفس صفحة القسيمة الفردية — نفس الأرقام) ويعرضها بالجنب بلا مغادرة اللائحة */ ?>
+    <div class="mp-ov" id="mpOv"></div>
+    <div class="mp-drawer no-print no-export" id="mpDrawer" aria-hidden="true">
+        <div class="mp-dr-head">
+            <div><b id="mpDrName">—</b><small id="mpDrSub">—</small></div>
+            <button type="button" class="btn btn-sm btn-light" id="mpDrClose" title="Fermer / إغلاق">✕</button>
+        </div>
+        <div class="mp-dr-btns">
+            <a class="btn btn-sm btn-primary" id="mpDrOpen" href="#"><i class="fas fa-up-right-from-square"></i> Page complète / الصفحة الكاملة (طباعة · PDF · واتساب)</a>
+            <?php if (!isAllSchools()): ?><a class="btn btn-sm btn-gold" id="mpDrCalc" href="#"><i class="fas fa-calculator"></i> Calculer / احتساب</a><?php endif; ?>
+        </div>
+        <div class="mp-dr-body" id="mpDrBody"><div class="mp-dr-loading"><i class="fas fa-spinner fa-spin"></i> Chargement… / عم يحمّل…</div></div>
+    </div>
+    <script>
+    (function () {
+        var body = document.body;
+        // ① الأعمدة التفصيلية والمقارنة — يتذكّر خياره على هالجهاز
+        function pref(k, d) { try { var v = localStorage.getItem('mp_' + k); return v === null ? d : v === '1'; } catch (e) { return d; } }
+        function setPref(k, v) { try { localStorage.setItem('mp_' + k, v ? '1' : '0'); } catch (e) {} }
+        function apply() {
+            var det = pref('det', false), cmp = pref('cmp', true);
+            body.classList.toggle('mp-show-det', det); body.classList.toggle('mp-show-cmp', cmp);
+            var a = document.getElementById('mpTogDet'), b = document.getElementById('mpTogCmp');
+            if (a) a.classList.toggle('on', det); if (b) b.classList.toggle('on', cmp);
+            if (window.msaRefreshStickyHeads) try { window.msaRefreshStickyHeads(); } catch (e) {}
+        }
+        document.querySelectorAll('.mp-tog').forEach(function (btn) {
+            btn.addEventListener('click', function () { var k = btn.getAttribute('data-k'); setPref(k, !pref(k, k === 'cmp')); apply(); });
+        });
+        document.querySelectorAll('.mp-cmp-on').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); setPref('cmp', true); apply(); document.getElementById('mpTable').scrollIntoView({ behavior: 'smooth' }); }); });
+        apply();
+
+        // 🔍 بحث فوري بالاسم/الرمز/المدرسة/الحالة
+        var rows = Array.prototype.slice.call(document.querySelectorAll('tr.mp-row')), inp = document.getElementById('mpSearch'), cnt = document.getElementById('mpCount');
+        function filter() {
+            var q = (inp.value || '').trim().toLowerCase(), n = 0;
+            rows.forEach(function (tr) { var ok = !q || tr.getAttribute('data-q').indexOf(q) !== -1; tr.style.display = ok ? '' : 'none'; if (ok) n++; });
+            if (cnt) cnt.textContent = q ? (n + ' / ' + rows.length) : rows.length + ' employés / موظفاً';
+        }
+        if (inp) { inp.addEventListener('input', filter); filter(); }
+        document.querySelectorAll('.mp-filter').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); inp.value = a.getAttribute('data-q'); filter(); document.getElementById('mpTable').scrollIntoView({ behavior: 'smooth' }); }); });
+
+        // ⋮ قائمة السطر
+        document.addEventListener('click', function (e) {
+            var d = e.target.closest('.mp-dots');
+            document.querySelectorAll('.mp-menu.open').forEach(function (m) { if (!d || m !== d.parentElement) m.classList.remove('open'); });
+            if (d) { e.preventDefault(); e.stopPropagation(); d.parentElement.classList.toggle('open'); }
+        });
+
+        // ⑧ الدرج: الكبس على السطر (لا على رابط/زر) يجلب القسيمة
+        var dr = document.getElementById('mpDrawer'), ov = document.getElementById('mpOv'), dbody = document.getElementById('mpDrBody');
+        document.body.appendChild(ov); document.body.appendChild(dr); // fixed حقيقي: خارج أي حاوية لها transform/zoom (وإلا تُقصّ النافذة)
+        function closeDr() { dr.classList.remove('open'); ov.classList.remove('open'); dr.setAttribute('aria-hidden', 'true'); }
+        function openDr(tr) {
+            var url = tr.getAttribute('data-url');
+            document.getElementById('mpDrName').textContent = tr.getAttribute('data-name');
+            document.getElementById('mpDrSub').textContent = tr.getAttribute('data-sub');
+            document.getElementById('mpDrOpen').href = url;
+            var c = document.getElementById('mpDrCalc'); if (c) c.href = url.replace('?', '?action=calc&');
+            dbody.innerHTML = '<div class="mp-dr-loading"><i class="fas fa-spinner fa-spin"></i> Chargement… / عم يحمّل…</div>';
+            dr.classList.add('open'); ov.classList.add('open'); dr.setAttribute('aria-hidden', 'false');
+            fetch(url, { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(function (h) {
+                var doc = new DOMParser().parseFromString(h, 'text/html'), slip = doc.getElementById('ppExportArea');
+                if (!slip) { dbody.innerHTML = '<div class="alert alert-warning">—</div>'; return; }
+                slip.querySelectorAll('.card-header, .no-print').forEach(function (x) { x.remove(); });
+                dbody.innerHTML = ''; dbody.appendChild(slip);
+            }).catch(function () { dbody.innerHTML = '<div class="alert alert-danger">Erreur de chargement / تعذّر التحميل</div>'; });
+        }
+        rows.forEach(function (tr) {
+            tr.addEventListener('click', function (e) { if (e.target.closest('a, button, input, .mp-menu')) return; openDr(tr); });
+        });
+        document.getElementById('mpDrClose').addEventListener('click', closeDr);
+        ov.addEventListener('click', closeDr);
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDr(); });
+    })();
+    </script>
 <?php endif; ?>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
