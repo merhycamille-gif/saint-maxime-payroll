@@ -112,7 +112,7 @@ $sectionColors = [
 $sectionIcons = ['dashboard'=>'fa-gauge-high','personnel'=>'fa-users','paie'=>'fa-money-check-dollar','rapports'=>'fa-chart-column','systeme'=>'fa-gear'];
 $pageSection = [
     'dashboard'=>'dashboard',
-    'employees'=>'personnel','cadre_due'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','family_allowances'=>'personnel','employee_full_history'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel','duplicates'=>'personnel',
+    'employees'=>'personnel','cadre_due'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','family_allowances'=>'personnel','employee_full_history'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel','duplicates'=>'personnel','old_uninsured'=>'personnel',
     'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie','hours_reduction'=>'paie',
     'reports'=>'rapports','tax'=>'rapports',
     'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',

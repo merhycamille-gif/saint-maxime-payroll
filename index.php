@@ -147,6 +147,13 @@ if (canEdit()) {
             SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.is_calculated = 1) THEN 1 ELSE 0 END) empties
             FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND TRIM(CONCAT(first_name_fr,' ',last_name_fr)) <> ''" . schoolScopeSql('e.school_id') . " GROUP BY school_id, k HAVING c > 1 AND empties > 0) d")->fetchColumn();
     if ($nDup) $todo[] = ['fas fa-user-group', 'var(--ic1)', $nDup, 'Doublons à nettoyer', 'أسماء مكرّرة بنفس المدرسة — حذف بتأكيد', BASE_URL . 'pages/duplicates.php'];
+    // 🧹 القدامى غير المضمونين (تركوا قبل السنة الحالية ولم يُحسم عليهم ضمان ولا شهر)
+    $cyT = currentSchoolYear(); $cyStartT = substr($cyT, 0, 4) . '-10-01';
+    $stOU = $db->prepare("SELECT e.status, " . leftDateSql() . " ld, SUM(m.cnss_amount_lbp) cn, (SELECT COUNT(*) FROM monthly_salaries x WHERE x.employee_id = e.id AND x.school_year = ? AND x.is_calculated = 1) scur
+        FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.is_calculated = 1 WHERE e.is_deleted = 0" . schoolScopeSql('e.school_id') . " GROUP BY e.id HAVING cn = 0 AND scur = 0");
+    $stOU->execute([$cyT]); $nOU = 0;
+    foreach ($stOU->fetchAll() as $ou) if (!($ou['status'] === 'actif' && $ou['ld'] >= $cyStartT)) $nOU++;
+    if ($nOU) $todo[] = ['fas fa-user-slash', 'var(--ic6)', $nOU, 'Anciens non assurés à retirer', 'قدامى تركوا بلا أي ضمان محسوم — حذف بتأكيد', BASE_URL . 'pages/old_uninsured.php'];
 }
 if ($homeInc)       $todo[] = ['fas fa-user-edit', 'var(--ic3)', count($homeInc), 'Dossiers incomplets', 'ملفات ناقصة بلا راتب محسوب', '#homeIncBox'];
 if ($homeHrPending) $todo[] = ['fas fa-clock', 'var(--ic6)', count($homeHrPending), "Réductions d'heures à confirmer", 'تناقص ساعات بانتظار الإذن', '#'];
