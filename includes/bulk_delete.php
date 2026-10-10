@@ -7,6 +7,9 @@
  */
 function bulkDeleteEnsureBackupTable(PDO $db): void {
     $db->exec("CREATE TABLE IF NOT EXISTS employees_deleted_backup (bk_id INT AUTO_INCREMENT PRIMARY KEY, bk_at DATETIME NOT NULL, bk_by VARCHAR(100) NULL, bk_reason VARCHAR(100) NULL, employee_id INT NOT NULL, row_json LONGTEXT NOT NULL, INDEX (employee_id)) DEFAULT CHARSET=utf8mb4");
+    // 🗄️ (بكلماته 2026-10-10 «شيلو من كل البرنامج والداتا كمان»): رواتب المحذوف تُنقَل إلى جدول احتياطي ثم تُحذف من monthly_salaries
+    //    فلا تبقى بأي كشف أو مجموع — والاسترجاع ممكن (INSERT ... SELECT من الجدول الاحتياطي).
+    $db->exec("CREATE TABLE IF NOT EXISTS monthly_salaries_deleted_backup LIKE monthly_salaries");
 }
 /**
  * @param array $eligible  [id => 'label'] المؤهَّلون للحذف (محسوبون على الخادم)
@@ -24,15 +27,20 @@ function bulkDeleteFlow(PDO $db, array $eligible, string $reason, string $backUr
         $sel = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0");
         $ins = $db->prepare("INSERT INTO employees_deleted_backup (bk_at, bk_by, bk_reason, employee_id, row_json) VALUES (NOW(), ?, ?, ?, ?)");
         $upd = $db->prepare("UPDATE employees SET is_deleted = 1 WHERE id = ? AND is_deleted = 0");
-        $n = 0; $by = (string)($_SESSION['username'] ?? ($_SESSION['full_name'] ?? ''));
+        $mvS = $db->prepare("INSERT IGNORE INTO monthly_salaries_deleted_backup SELECT * FROM monthly_salaries WHERE employee_id = ?");
+        $delS = $db->prepare("DELETE FROM monthly_salaries WHERE employee_id = ?");
+        $n = 0; $ns = 0; $by = (string)($_SESSION['username'] ?? ($_SESSION['full_name'] ?? ''));
         foreach ($ids as $id) {
             $sel->execute([$id]); $row = $sel->fetch(PDO::FETCH_ASSOC);
             if (!$row) continue;
             $ins->execute([$by, $reason, $id, json_encode($row, JSON_UNESCAPED_UNICODE)]);
             $upd->execute([$id]);
-            if ($upd->rowCount()) { $n++; logAudit('delete', 'employees', $id, null, $reason); }
+            if ($upd->rowCount()) {
+                $n++; logAudit('delete', 'employees', $id, null, $reason);
+                $mvS->execute([$id]); $delS->execute([$id]); $ns += $delS->rowCount(); // رواتبه إلى الاحتياطي ثم تُشال من الداتا
+            }
         }
-        $_SESSION['flash'] = ['type' => 'warning', 'msg' => "تم حذف $n موظفاً (حذف ناعم، نسخة محفوظة) / $n supprimé(s)"];
+        $_SESSION['flash'] = ['type' => 'warning', 'msg' => "تم حذف $n موظفاً و$ns صفّ رواتب من الداتا (نسخة محفوظة للاسترجاع) / $n supprimé(s)"];
         header('Location: ' . $backUrl); exit;
     }
     // صفحة التأكيد
@@ -43,7 +51,7 @@ function bulkDeleteFlow(PDO $db, array $eligible, string $reason, string $backUr
         <div class="card-body" style="padding:24px">
             <div style="text-align:center"><div style="font-size:44px;margin-bottom:6px">⚠️</div>
                 <h3 style="margin:0 0 4px"><span dir="ltr"><?= e($titleFr) ?></span> / <?= e($titleAr) ?></h3>
-                <p style="color:#64748b;margin:4px 0 14px">حذف ناعم: بيختفوا من كل البرنامج، ورواتبهم القديمة ونسخة من ملفهم بتضلّ محفوظة بالقاعدة ومنقدر نرجّعهم.</p></div>
+                <p style="color:#64748b;margin:4px 0 14px">بيختفوا من كل البرنامج ومن الداتا: الملف بينشال ورواتبهم بتنشال من كل الكشوف والمجاميع. نسخة منهم بتضلّ محفوظة بجدول احتياطي للاسترجاع عند الحاجة.</p></div>
             <form method="post" action="?action=bulk_delete">
                 <input type="hidden" name="confirmed" value="1">
                 <div class="table-wrapper"><table class="table" style="margin-bottom:14px"><thead><tr><th>#</th><th>Employé / الموظف</th></tr></thead><tbody>

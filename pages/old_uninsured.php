@@ -34,7 +34,7 @@ include __DIR__ . '/../includes/header.php';
 ?>
 <div class="card">
     <div class="card-header"><h3><span dir="ltr"><i class="fas fa-user-slash"></i> Anciens non assurés — jamais de CNSS retenue (<?= count($list) ?>)</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">القدامى غير المضمونين: بطاقتهم بلا أي ضمان محسوم بكل سنينهم، وبلا راتب بـ<?= e($cy) ?> — الحذف بيمرّ بصفحة تأكيد</div></h3>
-        <?php if ($list): ?><form method="get" action="" class="no-print" style="margin:0"><input type="hidden" name="action" value="bulk_delete"><?php foreach ($list as $r): ?><input type="hidden" name="ids[]" value="<?= (int)$r['id'] ?>"><?php endforeach; ?><button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> احذف الكل (<?= count($list) ?>) — بتأكيد</button></form><?php endif; ?></div>
+        <?php if ($eligible): ?><form method="get" action="" class="no-print" style="margin:0"><input type="hidden" name="action" value="bulk_delete"><?php foreach (array_keys($eligible) as $id): ?><input type="hidden" name="ids[]" value="<?= (int)$id ?>"><?php endforeach; ?><button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> احذف الكل (<?= count($eligible) ?>) من البرنامج والداتا — بتأكيد</button></form><?php endif; ?></div>
     <div class="card-body">
         <?php if (!$list): ?>
             <div class="mp-ok"><i class="fas fa-circle-check"></i> Aucun / ما في حدا</div>
