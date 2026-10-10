@@ -38,8 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['do'])) {
         $dkey = preg_replace('/[^a-z0-9_]/', '', (string)($_POST['dkey'] ?? ''));
         $months = implode(',', array_filter(array_unique(array_map('intval', explode(',', (string)($_POST['due_months'] ?? '')))), fn($m) => $m >= 1 && $m <= 12));
         $alerts = implode(',', array_filter(array_unique(array_map('intval', explode(',', (string)($_POST['alert_days'] ?? '')))), fn($m) => $m >= 0 && $m <= 90)) ?: '15,7,3';
-        $db->prepare("UPDATE legal_deadlines SET title_fr = ?, title_ar = ?, due_day = ?, due_months = ?, alert_days = ?, notes = ?, active = ? WHERE dkey = ?")
-           ->execute([mb_substr(trim((string)$_POST['title_fr']), 0, 160), mb_substr(trim((string)$_POST['title_ar']), 0, 160), max(1, min(31, (int)$_POST['due_day'])), $months ?: '1', $alerts, mb_substr(trim((string)($_POST['notes'] ?? '')), 0, 255), empty($_POST['active']) ? 0 : 1, $dkey]);
+        $db->prepare("UPDATE legal_deadlines SET title_fr = ?, title_ar = ?, due_day = ?, due_months = ?, alert_days = ?, notes = ?, active = ?, lag_months = ? WHERE dkey = ?")
+           ->execute([mb_substr(trim((string)$_POST['title_fr']), 0, 160), mb_substr(trim((string)$_POST['title_ar']), 0, 160), max(1, min(31, (int)$_POST['due_day'])), $months ?: '1', $alerts, mb_substr(trim((string)($_POST['notes'] ?? '')), 0, 255), empty($_POST['active']) ? 0 : 1, max(0, min(12, (int)($_POST['lag_months'] ?? 1))), $dkey]);
         logAudit('legal_deadline', 'legal_deadlines', 0, null, $dkey . ' edited');
         $_SESSION['flash'] = ['type' => 'success', 'msg' => 'تم حفظ الموعد'];
     }
@@ -149,14 +149,15 @@ include __DIR__ . '/../includes/header.php';
 <div class="card" id="settings">
     <div class="card-header"><h3><i class="fas fa-sliders"></i> Réglage des échéances / تعديل المواعيد</h3></div>
     <div class="card-body">
-        <p class="hint">المواعيد مسبقة حسب المعمول به بلبنان — تحقّق منها مع المحاسب/الضمان وعدّلها هون: يوم الاستحقاق، أشهره (مثلاً 1,4,7,10 للفصلي)، وأيام التنبيه قبل الموعد (15,7,3).</p>
-        <div class="table-wrapper"><table class="table mp-table legal-set"><thead><tr><th>Clé</th><th>Titre FR</th><th>العنوان</th><th>Jour / اليوم</th><th>Mois / الأشهر</th><th>Alerte / التنبيه (أيام)</th><th>Note</th><th>Actif</th><th></th></tr></thead><tbody>
+        <p class="hint">المواعيد حسب ما حدّدتها: الضمان الشهري خلال شهر من نهاية الشهر · الفصلي خلال 3 أشهر من نهاية الفصل · التسوية السنوية نهاية آذار · ر10 خلال 15 يوماً من نهاية الفصل · ر5/ر6/ر7 نهاية شباط · الصندوق: المحسومات الفصلية خلال الشهر الثالث من كل فصل، والبيان العام (ملاك/متعاقدون) خلال كانون الأول. عدّل هون: يوم الاستحقاق، أشهره، «بعد نهاية الفترة» (كم شهراً)، وأيام التنبيه (15,7,3).</p>
+        <div class="table-wrapper"><table class="table mp-table legal-set"><thead><tr><th>Clé</th><th>Titre FR</th><th>العنوان</th><th>Jour / اليوم</th><th>Mois / الأشهر</th><th title="كم شهراً بعد نهاية الفترة يقع الموعد (0 = خلال الشهر الأخير من الفترة)">Après fin de période (mois) / بعد نهاية الفترة</th><th>Alerte / التنبيه (أيام)</th><th>Note</th><th>Actif</th><th></th></tr></thead><tbody>
         <?php foreach ($deadlines as $d): ?>
         <tr><form method="post"><?= csrfField() ?><input type="hidden" name="do" value="save_deadline"><input type="hidden" name="dkey" value="<?= e($d['dkey']) ?>">
             <td><small><?= e($d['dkey']) ?></small><br><small style="color:var(--gray-500)"><?= e($authLbl[$d['authority']][1] ?? $d['authority']) ?> · <?= e($d['kind']) ?></small></td>
             <td><input class="form-control" name="title_fr" value="<?= e($d['title_fr']) ?>"></td><td><input class="form-control" name="title_ar" dir="rtl" value="<?= e($d['title_ar']) ?>"></td>
             <td><input class="form-control" name="due_day" type="number" min="1" max="31" value="<?= (int)$d['due_day'] ?>" style="width:70px"></td>
             <td><input class="form-control" name="due_months" value="<?= e($d['due_months']) ?>" style="width:110px"></td>
+            <td><input class="form-control" name="lag_months" type="number" min="0" max="12" value="<?= (int)($d['lag_months'] ?? 1) ?>" style="width:70px"></td>
             <td><input class="form-control" name="alert_days" value="<?= e($d['alert_days']) ?>" style="width:90px"></td>
             <td><input class="form-control" name="notes" value="<?= e((string)$d['notes']) ?>"></td>
             <td style="text-align:center"><input type="checkbox" name="active" value="1" <?= $d['active'] ? 'checked' : '' ?>></td>

@@ -26,21 +26,29 @@ function legalEnsureTables(): void {
             INDEX (dkey, period), INDEX (changed_flag)
         ) DEFAULT CHARSET=utf8mb4");
         try { $db->exec("ALTER TABLE legal_deadlines ADD COLUMN report_key VARCHAR(80) NULL"); } catch (Throwable $e) {}
+        // 📐 lag_months = كم شهراً بعد نهاية الفترة يقع الموعد (0 = خلال الشهر الأخير من الفترة نفسها). أوّل تركيب للعمود ⇒ إعادة البذر بمواعيده هو
+        //    (2026-10-10 مساءً بكلماته: الضمان الشهري خلال شهر من نهاية الشهر · الفصلي خلال 3 أشهر من نهاية الفصل · التسوية السنوية نهاية آذار ·
+        //     ر10 خلال 15 يوماً من نهاية الفصل · ر5/ر6/ر7 نهاية شباط · الصندوق: المحسومات الفصلية خلال الشهر الثالث من كل فصل والبيان العام (ملاك/متعاقد) خلال كانون الأول)
+        $reseed = false;
+        try { $db->exec("ALTER TABLE legal_deadlines ADD COLUMN lag_months TINYINT NOT NULL DEFAULT 1"); $reseed = true; } catch (Throwable $e) {}
+        if ($reseed) $db->exec("DELETE FROM legal_deadlines");
         // مفتاح التقرير داخل البرنامج (صفحة:نموذج) ⇒ كبسة «انبعت للدولة» بالتقرير تُقفل الموعد نفسه بالرزنامة
-        $rk = ['cnss_quarterly' => 'official_forms:cnss_contrib_annual', 'cnss_annual' => 'official_forms:cnss_annual', 'mof_r10' => 'official_forms:tax_r10',
-               'mof_annual' => 'official_forms:tax_r6', 'eoc_quarterly' => 'official_forms:eoc_quarterly', 'eoc_annual' => 'official_forms:eoc_staff'];
+        $rk = ['cnss_monthly' => 'official_forms:cnss_contrib_monthly', 'cnss_quarterly' => 'official_forms:cnss_contrib_annual', 'cnss_annual' => 'official_forms:cnss_taswiya', 'mof_r10' => 'official_forms:tax_r10',
+               'mof_annual' => 'official_forms:tax_r6', 'eoc_quarterly' => 'official_forms:eoc_quarterly', 'eoc_annual_tit' => 'official_forms:eoc_staff:titulaire', 'eoc_annual_con' => 'official_forms:eoc_staff:contractuel'];
         if ((int)$db->query("SELECT COUNT(*) FROM legal_deadlines")->fetchColumn() === 0) {
             $B = BASE_URL;
             $seed = [
-                // dkey, authority, fr, ar, kind, day, months, period_type, href, notes, order
-                ['cnss_quarterly', 'cnss', 'CNSS — Déclaration trimestrielle des cotisations + paiement', 'الضمان — التصريح الفصلي عن الاشتراكات + الدفع', 'quarterly', 30, '1,4,7,10', 'quarter', $B . 'pages/official_forms.php?form=cnss_contrib_annual', 'خلال 30 يوماً بعد نهاية كل فصل', 10],
-                ['cnss_annual', 'cnss', 'CNSS — Déclaration nominative annuelle (386)', 'الضمان — التصريح الاسمي السنوي (386)', 'annual', 28, '2', 'year', $B . 'pages/official_forms.php?form=cnss_annual', 'عن السنة المنصرمة — تحقّق من الموعد الرسمي', 20],
-                ['mof_r10', 'mof', 'Finances — R10 déclaration trimestrielle de l’impôt retenu + paiement', 'المالية — R10 التصريح الفصلي عن الضريبة المقتطعة + الدفع', 'quarterly', 15, '1,4,7,10', 'quarter', $B . 'pages/official_forms.php?form=tax_r10', 'خلال 15 يوماً بعد نهاية كل فصل', 30],
-                ['mof_annual', 'mof', 'Finances — R5 / R6 / R7 déclaration annuelle des salaires', 'المالية — R5 / R6 / R7 التصريح السنوي عن الرواتب والأجور', 'annual', 28, '2', 'year', $B . 'pages/official_forms.php?form=tax_r6', 'عن السنة المنصرمة — آخر شباط', 40],
-                ['eoc_quarterly', 'eoc', 'Caisse des indemnités — relevé trimestriel', 'صندوق التعويضات — الكشف الفصلي', 'quarterly', 15, '1,4,7,10', 'quarter', $B . 'pages/official_forms.php?form=eoc_quarterly', 'تحقّق من الموعد مع الصندوق', 50],
-                ['eoc_annual', 'eoc', 'Caisse des indemnités — état général annuel', 'صندوق التعويضات — البيان العام السنوي', 'annual', 31, '10', 'school_year', $B . 'pages/official_forms.php?form=eoc_staff', 'بداية السنة الدراسية — تحقّق من الموعد', 60],
+                // dkey, authority, fr, ar, kind, day, months, period_type, href, notes, order, lag_months
+                ['cnss_monthly',   'cnss', 'CNSS — Déclaration mensuelle des cotisations', 'الضمان — التصريح الشهري عن الاشتراكات', 'monthly', 31, '1,2,3,4,5,6,7,8,9,10,11,12', 'month', $B . 'pages/official_forms.php?form=cnss_contrib_monthly', 'خلال شهر من نهاية الشهر السابق', 10, 1],
+                ['cnss_quarterly', 'cnss', 'CNSS — Déclaration trimestrielle des cotisations', 'الضمان — التصريح الفصلي عن الاشتراكات', 'quarterly', 31, '3,6,9,12', 'quarter', $B . 'pages/official_forms.php?form=cnss_contrib_annual', 'خلال 3 أشهر من نهاية الفصل', 20, 3],
+                ['cnss_annual',    'cnss', 'CNSS — Régularisation annuelle', 'الضمان — التسوية السنوية', 'annual', 31, '3', 'year', $B . 'pages/official_forms.php?form=cnss_taswiya', 'نهاية آذار عن السنة المنصرمة', 30, 3],
+                ['mof_r10',        'mof', 'Finances — R10 déclaration trimestrielle de l’impôt retenu', 'المالية — ر10 التصريح الفصلي عن الضريبة المقتطعة', 'quarterly', 15, '1,4,7,10', 'quarter', $B . 'pages/official_forms.php?form=tax_r10', 'خلال 15 يوماً من نهاية الفصل', 40, 1],
+                ['mof_annual',     'mof', 'Finances — R5 / R6 / R7 régularisation annuelle', 'المالية — ر5 / ر6 / ر7 التسوية السنوية', 'annual', 28, '2', 'year', $B . 'pages/official_forms.php?form=tax_r6', 'نهاية شباط عن السنة المنصرمة', 50, 2],
+                ['eoc_quarterly',  'eoc', 'Caisse des indemnités — retenues trimestrielles', 'صندوق التعويضات — المحسومات الفصلية', 'quarterly', 31, '3,6,9,12', 'quarter', $B . 'pages/official_forms.php?form=eoc_quarterly', 'خلال الشهر الثالث من كل فصل', 60, 0],
+                ['eoc_annual_tit', 'eoc', 'Caisse des indemnités — état général annuel (titulaires)', 'صندوق التعويضات — البيان العام السنوي (الملاك)', 'annual', 31, '12', 'school_year', $B . 'pages/official_forms.php?form=eoc_staff&cat=titulaire', 'خلال كانون الأول', 70, 0],
+                ['eoc_annual_con', 'eoc', 'Caisse des indemnités — état général annuel (contractuels)', 'صندوق التعويضات — البيان العام السنوي (المتعاقدون)', 'annual', 31, '12', 'school_year', $B . 'pages/official_forms.php?form=eoc_staff&cat=contractuel', 'خلال كانون الأول', 80, 0],
             ];
-            $ins = $db->prepare("INSERT INTO legal_deadlines (dkey, authority, title_fr, title_ar, kind, due_day, due_months, period_type, report_href, notes, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+            $ins = $db->prepare("INSERT INTO legal_deadlines (dkey, authority, title_fr, title_ar, kind, due_day, due_months, period_type, report_href, notes, sort_order, lag_months) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
             foreach ($seed as $s) $ins->execute($s);
         }
         $fix = $db->prepare("UPDATE legal_deadlines SET report_key = ? WHERE dkey = ? AND (report_key IS NULL OR report_key = '')");
@@ -51,10 +59,13 @@ function legalEnsureTables(): void {
 
 /** الفترة التي يغطّيها موعد يقع بتاريخ معيّن: فصلي ⇒ الفصل السابق، سنوي ⇒ السنة السابقة، شهري ⇒ الشهر السابق */
 function legalPeriodForDue(array $d, int $dueY, int $dueM): string {
-    if ($d['period_type'] === 'quarter') { $prevQEndM = $dueM - 1; $y = $dueY; if ($prevQEndM <= 0) { $prevQEndM += 12; $y--; } return $y . '-Q' . (int)ceil($prevQEndM / 3); }
-    if ($d['period_type'] === 'month')   { $m = $dueM - 1; $y = $dueY; if ($m <= 0) { $m = 12; $y--; } return $y . '-' . str_pad((string)$m, 2, '0', STR_PAD_LEFT); }
-    if ($d['period_type'] === 'school_year') { $y = $dueM >= 10 ? $dueY - 1 : $dueY - 1; return $y . '-' . ($y + 1); }
-    return (string)($dueY - 1);
+    // الفترة = الشهر الذي يسبق الموعد بـlag_months (0 ⇒ الشهر نفسه): فصلي ⇒ الفصل الذي ينتهي بذلك الشهر، سنوي ⇒ سنته، دراسي ⇒ السنة الدراسية التي تحويه
+    $lag = max(0, min(12, (int)($d['lag_months'] ?? 1)));
+    $m = $dueM - $lag; $y = $dueY; while ($m <= 0) { $m += 12; $y--; }
+    if ($d['period_type'] === 'quarter') return $y . '-Q' . (int)ceil($m / 3);
+    if ($d['period_type'] === 'month')   return $y . '-' . str_pad((string)$m, 2, '0', STR_PAD_LEFT);
+    if ($d['period_type'] === 'school_year') { $sy = $m >= 10 ? $y : $y - 1; return $sy . '-' . ($sy + 1); }
+    return (string)$y;
 }
 
 /** كل الاستحقاقات من اليوم - 400 يوم إلى اليوم + $horizon يوم، مع حالة كل واحد (انبعت/معلّق/متأخّر) */
@@ -65,6 +76,7 @@ function legalOccurrences(int $horizonDays = 120, int $backDays = 400): array {
         $deadlines = $db->query("SELECT * FROM legal_deadlines WHERE active = 1 ORDER BY sort_order, dkey")->fetchAll();
         $filings = []; foreach ($db->query("SELECT * FROM legal_filings WHERE status = 'sent' ORDER BY version") as $f) $filings[$f['dkey'] . '|' . $f['period']] = $f;
         $today = new DateTimeImmutable('today'); $from = $today->modify("-$backDays days"); $to = $today->modify("+$horizonDays days");
+        $trackFrom = new DateTimeImmutable(substr((string)currentSchoolYear(), 0, 4) . '-10-01'); // بداية المتابعة = بداية السنة الدراسية الحالية
         foreach ($deadlines as $d) {
             $months = array_filter(array_map('intval', explode(',', (string)$d['due_months'])));
             for ($y = (int)$from->format('Y'); $y <= (int)$to->format('Y'); $y++) {
@@ -76,7 +88,7 @@ function legalOccurrences(int $horizonDays = 120, int $backDays = 400): array {
                     $f = $filings[$d['dkey'] . '|' . $period] ?? (!empty($d['report_key']) ? ($filings[$d['report_key'] . '|' . $period] ?? null) : null);
                     $daysLeft = (int)$today->diff($due)->format('%r%a');
                     $status = $f ? 'sent' : ($daysLeft < 0 ? 'late' : 'pending');
-                    if ($status !== 'sent' && $daysLeft < -200) continue; // متأخّر قديم جداً: لا يُعرض (قبل البرنامج)
+                    if ($status !== 'sent' && $due < $trackFrom) continue; // ما قبل السنة الدراسية الحالية: مُقدَّم سابقاً خارج البرنامج — لا يُعرض متأخّراً
                     $out[] = ['d' => $d, 'due' => $due->format('Y-m-d'), 'days' => $daysLeft, 'period' => $period, 'status' => $status, 'filing' => $f];
                 }
             }
@@ -125,10 +137,12 @@ function legalFilingContext(): ?array {
     elseif (!empty($g['quarter']) && !empty($g['year'])) $period = (int)$g['year'] . '-Q' . (int)$g['quarter'];
     elseif (!empty($g['month']) && !empty($g['year'])) $period = (int)$g['year'] . '-' . str_pad((string)(int)$g['month'], 2, '0', STR_PAD_LEFT);
     elseif (!empty($g['school_year']) && preg_match('/^\d{4}-\d{4}$/', (string)$g['school_year'])) $period = (string)$g['school_year'];
+    elseif (!empty($g['fy'])) $period = (string)(int)$g['fy']; // تسوية الضمان السنوية (السنة المالية)
     elseif (!empty($g['year'])) $period = (string)(int)$g['year'];
     else $period = activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear();
     $scope = implode(',', array_map('intval', activeSchoolIds())) ?: 'all';
     if (!empty($g['schools']) && is_array($g['schools'])) $scope = implode(',', array_map('intval', $g['schools']));
+    if (!empty($g['cat'])) $key .= ':' . preg_replace('/[^a-z]/', '', (string)$g['cat']); // البيان العام: ملاك / متعاقدون
     if (!empty($g['employee_id'])) $key .= ':emp' . (int)$g['employee_id'];
     legalEnsureTables();
     $f = null;

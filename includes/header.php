@@ -152,7 +152,7 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app.css') ?: '1' ?>">
 </head>
 <body class="<?= $lang === 'ar' ? 'rtl' : '' ?><?= !empty($docFocus) ? ' doc-view' : '' ?>">
-<script>/* v2026: القائمة الرفيعة — مثبّتة (مفتوحة) إن اختار ذلك بـCtrl+B — قبل الرسم لئلا تقفز */try{if(localStorage.getItem('msa_nav_pinned')==='1')document.body.classList.add('nav-pinned');}catch(e){}</script>
+<script>/* v2026: القائمة الجانبية مفتوحة بعناوينها دائماً (طلبه: «العامود اللي عالشمال اللي فيه العناوين يضلّ ظاهر») — Ctrl+B/الدبّوس يطويها لشريط أيقونات */try{if(localStorage.getItem('msa_nav_pinned')!=='0')document.body.classList.add('nav-pinned');}catch(e){}</script>
 
 <!-- حماية CSRF: حقن توكن تلقائياً بكل نماذج POST -->
 <script>
