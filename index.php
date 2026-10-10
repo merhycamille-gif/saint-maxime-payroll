@@ -154,6 +154,10 @@ if (canEdit()) {
     $stOU->execute([$cyT, ((int)substr($cyT, 0, 4) - 1) . "-" . substr($cyT, 0, 4)]); $nOU = 0;
     $nOU = count($stOU->fetchAll()); // بكلماته: ضمان صفر بكل رواتبه وبلا راتب هالسنة — حتى لو الملف «فاعل» بلا تاريخ ترك
     if ($nOU) $todo[] = ['fas fa-user-slash', 'var(--ic6)', $nOU, 'Anciens non assurés à retirer', 'قدامى تركوا بلا أي ضمان محسوم — حذف بتأكيد', BASE_URL . 'pages/old_uninsured.php'];
+    // 🛡️ متابعة الضمان: بلا ضمان من 2025-2026 بانتظار قراره + ضمان محسوم بلا رقم
+    $nS1 = (int)$db->query("SELECT COUNT(*) FROM (SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.is_calculated = 1 AND m.school_year >= '2025-2026' WHERE e.is_deleted = 0 AND e.cnss_subject <> 0" . schoolScopeSql('e.school_id') . " GROUP BY e.id HAVING SUM(m.cnss_amount_lbp) = 0) q")->fetchColumn();
+    $nS2 = (int)$db->query("SELECT COUNT(*) FROM (SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.is_calculated = 1 WHERE e.is_deleted = 0 AND (e.nssf_number IS NULL OR TRIM(e.nssf_number) IN ('', '0'))" . schoolScopeSql('e.school_id') . " GROUP BY e.id HAVING SUM(m.cnss_amount_lbp) > 0) q")->fetchColumn();
+    if ($nS1 || $nS2) $todo[] = ['fas fa-user-shield', 'var(--ic4)', $nS1 + $nS2, 'Suivi CNSS — à décider / à compléter', ($nS1 ? $nS1 . ' بلا ضمان بانتظار قرارك' : '') . ($nS1 && $nS2 ? ' · ' : '') . ($nS2 ? $nS2 . ' ناقصهم رقم الضمان' : ''), BASE_URL . 'pages/cnss_followup.php'];
 }
 if ($homeInc)       $todo[] = ['fas fa-user-edit', 'var(--ic3)', count($homeInc), 'Dossiers incomplets', 'ملفات ناقصة بلا راتب محسوب', '#homeIncBox'];
 if ($homeHrPending) $todo[] = ['fas fa-clock', 'var(--ic6)', count($homeHrPending), "Réductions d'heures à confirmer", 'تناقص ساعات بانتظار الإذن', '#'];
