@@ -150,9 +150,9 @@ if (canEdit()) {
     // 🧹 القدامى غير المضمونين (تركوا قبل السنة الحالية ولم يُحسم عليهم ضمان ولا شهر)
     $cyT = currentSchoolYear(); $cyStartT = substr($cyT, 0, 4) . '-10-01';
     $stOU = $db->prepare("SELECT e.status, " . leftDateSql() . " ld, SUM(m.cnss_amount_lbp) cn, (SELECT COUNT(*) FROM monthly_salaries x WHERE x.employee_id = e.id AND x.school_year = ? AND x.is_calculated = 1) scur
-        FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.is_calculated = 1 WHERE e.is_deleted = 0" . schoolScopeSql('e.school_id') . " GROUP BY e.id HAVING cn = 0 AND scur = 0");
-    $stOU->execute([$cyT]); $nOU = 0;
-    foreach ($stOU->fetchAll() as $ou) if (!($ou['status'] === 'actif' && $ou['ld'] >= $cyStartT)) $nOU++;
+        FROM employees e JOIN monthly_salaries m ON m.employee_id = e.id AND m.is_calculated = 1 WHERE e.is_deleted = 0" . schoolScopeSql("e.school_id") . " GROUP BY e.id HAVING cn = 0 AND scur = 0 AND SUM(m.school_year <= ?) > 0");
+    $stOU->execute([$cyT, ((int)substr($cyT, 0, 4) - 1) . "-" . substr($cyT, 0, 4)]); $nOU = 0;
+    $nOU = count($stOU->fetchAll()); // بكلماته: ضمان صفر بكل رواتبه وبلا راتب هالسنة — حتى لو الملف «فاعل» بلا تاريخ ترك
     if ($nOU) $todo[] = ['fas fa-user-slash', 'var(--ic6)', $nOU, 'Anciens non assurés à retirer', 'قدامى تركوا بلا أي ضمان محسوم — حذف بتأكيد', BASE_URL . 'pages/old_uninsured.php'];
 }
 if ($homeInc)       $todo[] = ['fas fa-user-edit', 'var(--ic3)', count($homeInc), 'Dossiers incomplets', 'ملفات ناقصة بلا راتب محسوب', '#homeIncBox'];
