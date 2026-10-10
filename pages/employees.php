@@ -1056,58 +1056,57 @@ if ($action === 'list') {
                     </a>
                 </div>
             <?php else: ?>
+                <?php /* 🌍 (2026-10-10 «اعمول حسب معرفتك» — نفس ترتيب الرواتب الشهرية): تصفية فورية فوق الجدول + سطر الموظف: دائرة بحرفين، الاسم كبير،
+                         وتحته الرمز·المدرسة·الهاتف بسطر واحد + قائمة ⋮ بدل 3 كبسات (تعديل/الراتب/الملف الكامل/التاريخ/حذف). الاستعلام والفلاتر لم تتغيّر. */ ?>
+                <div class="mp-tool no-print" style="margin-top:4px">
+                    <input type="search" id="empQuick" class="form-control" placeholder="⚡ Filtrer la liste / صفّي اللائحة فوراً: اسم، رمز، مدرسة، هاتف، درجة…" autocomplete="off">
+                    <span class="mp-count" id="empQuickCount"></span>
+                </div>
                 <div class="table-wrapper">
-                    <table class="table">
+                    <table class="table mp-table">
                         <thead>
                             <tr>
-                                <th>Code / الرمز</th>
-                                <?php if (isAllSchools()): ?><th>École / المدرسة</th><?php endif; ?>
-                                <th>Nom complet / الاسم الكامل</th>
-                                <th>Type / النوع</th>
+                                <th>Employé / الموظف<small class="mp-th-sub">Code · École · Tél. / الرمز · المدرسة · الهاتف</small></th>
+                                <th>Type / النوع<small class="mp-th-sub">Fonction / الوظيفة</small></th>
                                 <th>Échelon / الدرجة</th>
-                                <th>Date d'embauche / تاريخ الدخول</th>
-                                <th>Téléphone / الهاتف</th>
+                                <th>Embauche / الدخول</th>
                                 <th>Statut / الحالة</th>
-                                <th class="no-print">Actions / إجراءات</th>
+                                <th class="no-print"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($employees as $emp): 
+                            <?php $avC = ['ic2','ic4','ic5','ic6','ic1','ic3']; $incSy = activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear();
+                            foreach ($employees as $i => $emp):
                                 $statusInfo = employeeStatusLabel($emp['status']);
+                                $nFr = trim($emp['first_name_fr'] . ' ' . $emp['last_name_fr']); $nAr = trim((string)$emp['first_name_ar'] . ' ' . (string)$emp['last_name_ar']);
+                                $ini = mb_strtoupper(mb_substr(trim((string)$emp['first_name_fr']), 0, 1) . mb_substr(trim((string)$emp['last_name_fr']), 0, 1));
+                                $schN = schoolNameById($emp['school_id']);
+                                $incB = empBadges($emp, $db, $incSy);
+                                $q = mb_strtolower($nFr . ' ' . $nAr . ' ' . $emp['employee_code'] . ' ' . $schN . ' ' . $emp['phone1'] . ' ' . $emp['phone2'] . ' ' . employeeTypeLabel($emp['employee_type']) . ' ' . gradeDisplay($emp) . ' ' . $statusInfo['label'] . ' ' . strip_tags($incB));
                             ?>
-                                <tr>
-                                    <td><strong><?= e($emp['employee_code']) ?></strong></td>
-                                    <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($emp['school_id'])) ?></small></td><?php endif; ?>
+                                <tr class="mp-row" data-q="<?= e($q) ?>" data-url="?action=edit&id=<?= (int)$emp['id'] ?>">
                                     <td>
-                                        <strong><?= e(trim($emp['first_name_fr'] . ' ' . $emp['last_name_fr'])) ?></strong>
-                                        <?php if ($emp['first_name_ar']): ?>
-                                            <br><small style="color:var(--gray-500)"><?= e($emp['first_name_ar'] . ' ' . $emp['last_name_ar']) ?></small>
-                                        <?php endif; ?>
-                                        <?php $incB = empBadges($emp, $db, activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()); if (trim($incB) !== ''): ?><div style="margin-top:3px"><?= $incB ?></div><?php endif; // 🆕 ملف ناقص (2026-09-23) ?>
+                                        <div class="mp-emp"><span class="mp-av" style="background:var(--<?= $avC[$i % 6] ?>)"><?= e($ini) ?></span>
+                                            <span><b><?= e($nFr) ?></b><?php if ($nAr !== ''): ?> <span class="mp-sub" style="display:inline"><?= e($nAr) ?></span><?php endif; ?><?= $incB ?>
+                                                <small><strong><?= e($emp['employee_code']) ?></strong><?= isAllSchools() ? ' · ' . e($schN) : '' ?><?= trim((string)$emp['phone1']) !== '' ? ' · 📞 ' . e($emp['phone1']) : '' ?></small></span></div>
                                     </td>
                                     <td>
-                                        <span class="badge badge-<?= $emp['employee_type'] === 'enseignant_titulaire' ? 'gold' : ($emp['employee_type'] === 'enseignant_contractuel' ? 'info' : 'secondary') ?>">
-                                            <?= e(employeeTypeLabel($emp['employee_type'])) ?>
-                                        </span>
-                                        <?php if ($emp['employee_type'] === 'employe' && trim((string)($emp['job_title'] ?? '')) !== ''): ?>
-                                            <div style="font-size:11.5px;color:var(--gray-600);margin-top:3px"><?= e(jobTitleLabel($emp['job_title'], 'ar')) ?></div>
-                                        <?php endif; ?>
+                                        <span class="badge badge-<?= $emp['employee_type'] === 'enseignant_titulaire' ? 'gold' : ($emp['employee_type'] === 'enseignant_contractuel' ? 'info' : 'secondary') ?>"><?= e(employeeTypeLabel($emp['employee_type'])) ?></span>
+                                        <?php if ($emp['employee_type'] === 'employe' && trim((string)($emp['job_title'] ?? '')) !== ''): ?><small class="mp-sub"><?= e(jobTitleLabel($emp['job_title'], 'ar')) ?></small><?php endif; ?>
                                     </td>
                                     <td><strong><?= e(gradeDisplay($emp)) ?></strong></td>
                                     <td><?= formatDate(shownHireDate($emp)) ?></td>
-                                    <td><?= e($emp['phone1']) ?></td>
                                     <td><span class="badge badge-<?= $statusInfo['badge'] ?>"><?= e($statusInfo['label']) ?></span></td>
-                                    <td class="no-print">
-                                        <div style="display:flex;gap:5px;flex-wrap:nowrap;align-items:center">
-                                        <a href="?action=edit&id=<?= $emp['id'] ?>" class="btn btn-sm btn-light" title="Modifier / تعديل">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <a href="<?= BASE_URL ?>pages/monthly_payroll.php?employee_id=<?= $emp['id'] ?>" class="btn btn-sm btn-light" title="Paie / الراتب">
-                                            <i class="fas fa-money-check"></i>
-                                        </a>
-                                        <a href="?action=delete&id=<?= $emp['id'] ?>" class="btn btn-sm btn-danger" data-confirm="<?= e('⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . (trim($emp['first_name_ar'].' '.$emp['last_name_ar']) ?: trim($emp['first_name_fr'].' '.$emp['last_name_fr'])) . '» ؟') ?>" title="Supprimer / حذف">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
+                                    <td class="no-print mp-act">
+                                        <div class="mp-menu">
+                                            <button type="button" class="btn btn-sm btn-light mp-dots" title="Actions / إجراءات" aria-label="Actions">⋮</button>
+                                            <div class="mp-menu-list">
+                                                <a href="?action=edit&id=<?= (int)$emp['id'] ?>"><i class="fas fa-pen"></i> Modifier le dossier / تعديل الملف</a>
+                                                <?php if (viewerCanSeePage('monthly_payroll.php')): ?><a href="<?= BASE_URL ?>pages/monthly_payroll.php?employee_id=<?= (int)$emp['id'] ?>"><i class="fas fa-money-check"></i> Bulletin de paie / قسيمة الراتب</a><?php endif; ?>
+                                                <?php if (viewerCanSeePage('attestations.php')): ?><a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$emp['id'] ?>"><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل والإفادات</a><?php endif; ?>
+                                                <a href="<?= BASE_URL ?>pages/employee_full_history.php?employee_id=<?= (int)$emp['id'] ?>"><i class="fas fa-clock-rotate-left"></i> Historique / التاريخ الكامل</a>
+                                                <?php if (!isAllSchools()): ?><a href="?action=delete&id=<?= (int)$emp['id'] ?>" style="color:#b91c1c"><i class="fas fa-trash"></i> Supprimer / حذف (مع تأكيد)</a><?php endif; ?>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -1115,6 +1114,19 @@ if ($action === 'list') {
                         </tbody>
                     </table>
                 </div>
+                <script>
+                (function () {
+                    var rows = Array.prototype.slice.call(document.querySelectorAll('tr.mp-row')), inp = document.getElementById('empQuick'), cnt = document.getElementById('empQuickCount');
+                    function filter() { var q = (inp.value || '').trim().toLowerCase(), n = 0; rows.forEach(function (tr) { var ok = !q || tr.getAttribute('data-q').indexOf(q) !== -1; tr.style.display = ok ? '' : 'none'; if (ok) n++; }); cnt.textContent = q ? (n + ' / ' + rows.length) : rows.length + ' employés / موظفاً'; }
+                    inp.addEventListener('input', filter); filter();
+                    document.addEventListener('click', function (e) {
+                        var d = e.target.closest('.mp-dots');
+                        document.querySelectorAll('.mp-menu.open').forEach(function (m) { if (!d || m !== d.parentElement) m.classList.remove('open'); });
+                        if (d) { e.preventDefault(); e.stopPropagation(); d.parentElement.classList.toggle('open'); }
+                    });
+                    rows.forEach(function (tr) { tr.addEventListener('click', function (e) { if (e.target.closest('a, button, input, .mp-menu')) return; window.location = tr.getAttribute('data-url'); }); });
+                })();
+                </script>
             <?php endif; ?>
         </div>
     </div>

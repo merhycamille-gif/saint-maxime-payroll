@@ -160,5 +160,25 @@ function localSyncRun(): array {
     // الاحتفاظ بآخر 3 ملفات تحميل فقط
     $files = glob($dl . '/online_dump_*.sql') ?: []; rsort($files);
     foreach (array_slice($files, 3) as $f) @unlink($f);
+    // 🗄️ (2026-10-10 «اعمول حسب معرفتك») نسخة ثانية مضغوطة خارج البرنامج: C:\Users\<user>\payroll_backups\db (+ OneDrive إن كان شغّالاً) — آخر 14 نسخة
+    try {
+        $src = $dump;
+        if (is_file($src)) {
+            $dests = [];
+            $home = getenv('USERPROFILE') ?: (getenv('HOMEDRIVE') . getenv('HOMEPATH'));
+            if ($home) $dests[] = $home . DIRECTORY_SEPARATOR . 'payroll_backups' . DIRECTORY_SEPARATOR . 'db';
+            if ($home && is_dir($home . DIRECTORY_SEPARATOR . 'OneDrive')) $dests[] = $home . DIRECTORY_SEPARATOR . 'OneDrive' . DIRECTORY_SEPARATOR . 'MSA_Payroll_Backups';
+            foreach ($dests as $dir) {
+                if (!is_dir($dir) && !@mkdir($dir, 0777, true)) continue;
+                $gz = $dir . DIRECTORY_SEPARATOR . 'payroll_online_' . date('Ymd_Hi') . '.sql.gz';
+                $in = @fopen($src, 'rb'); $out = @gzopen($gz, 'wb6');
+                if ($in && $out) { while (!feof($in)) gzwrite($out, (string)fread($in, 1048576)); }
+                if ($in) fclose($in); if ($out) gzclose($out);
+                $old = glob($dir . DIRECTORY_SEPARATOR . 'payroll_online_*.sql.gz') ?: []; rsort($old);
+                foreach (array_slice($old, 14) as $f) @unlink($f);
+                localSyncLog('نسخة احتياطية مضغوطة: ' . $gz);
+            }
+        }
+    } catch (Throwable $e) { localSyncLog('تعذّرت النسخة الثانية: ' . $e->getMessage()); }
     return $done(true, "طبق الأصل عن الأونلاين: $final جدولاً، $nemp موظفاً، $nsal صفّ رواتب");
 }

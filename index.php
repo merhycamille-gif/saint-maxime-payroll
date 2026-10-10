@@ -140,6 +140,14 @@ if ($homeComp && !empty($homeComp['pending'])) {
     if ($nC) $todo[] = ['fas fa-balance-scale', 'var(--ic1)', $nC, 'Conformité — décisions en attente', 'مخالفات بانتظار قرارك (موافق / لا)', '#homeCompBox'];
 }
 if ($homeCd)        $todo[] = ['fas fa-graduation-cap', 'var(--ic4)', count($homeCd), 'Titularisations à approuver', 'متعاقدون أكملوا سنتين — بانتظار قرارك', BASE_URL . 'pages/cadre_due.php'];
+if (canEdit()) {
+    // 👥 مكرّرون فاعلون بنفس الاسم (فرنسي) بنفس المدرسة — الحذف من صفحتهم بتأكيد
+    //    يُعدّ فقط الاسم الذي له نسخة بلا أي راتب محسوب (دخل مرّتين وإحداهما فاضية) — نفس شرط صفحة المكرّرين
+    $nDup = (int)$db->query("SELECT COUNT(*) FROM (SELECT school_id, LOWER(TRIM(CONCAT(first_name_fr,' ',last_name_fr))) k, COUNT(*) c,
+            SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.is_calculated = 1) THEN 1 ELSE 0 END) empties
+            FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif' AND TRIM(CONCAT(first_name_fr,' ',last_name_fr)) <> ''" . schoolScopeSql('e.school_id') . " GROUP BY school_id, k HAVING c > 1 AND empties > 0) d")->fetchColumn();
+    if ($nDup) $todo[] = ['fas fa-user-group', 'var(--ic1)', $nDup, 'Doublons à nettoyer', 'أسماء مكرّرة بنفس المدرسة — حذف بتأكيد', BASE_URL . 'pages/duplicates.php'];
+}
 if ($homeInc)       $todo[] = ['fas fa-user-edit', 'var(--ic3)', count($homeInc), 'Dossiers incomplets', 'ملفات ناقصة بلا راتب محسوب', '#homeIncBox'];
 if ($homeHrPending) $todo[] = ['fas fa-clock', 'var(--ic6)', count($homeHrPending), "Réductions d'heures à confirmer", 'تناقص ساعات بانتظار الإذن', '#'];
 if ($home64)        $todo[] = ['fas fa-hourglass-half', 'var(--ic2)', count($home64), 'Retraite 64 — à traiter', 'بلغوا سنّ الـ64 — قرار', BASE_URL . 'pages/retirement_64.php'];

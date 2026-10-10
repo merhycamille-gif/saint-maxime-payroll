@@ -34,11 +34,12 @@ $st = getDB()->prepare(
              OR CONCAT(COALESCE(first_name_fr,''),' ',COALESCE(last_name_fr,'')) LIKE ?
              OR CONCAT(COALESCE(first_name_ar,''),' ',COALESCE(father_name_ar,''),' ',COALESCE(last_name_ar,'')) LIKE ?
              OR CONCAT(COALESCE(first_name_ar,''),' ',COALESCE(last_name_ar,'')) LIKE ?
-             OR REPLACE(REPLACE(REPLACE(COALESCE(phone1,''),'-',''),' ',''),'/','') LIKE ? OR REPLACE(REPLACE(REPLACE(COALESCE(phone2,''),'-',''),' ',''),'/','') LIKE ?)
+             OR REPLACE(REPLACE(REPLACE(COALESCE(phone1,''),'-',''),' ',''),'/','') LIKE ? OR REPLACE(REPLACE(REPLACE(COALESCE(phone2,''),'-',''),' ',''),'/','') LIKE ?
+             OR REPLACE(REPLACE(REPLACE(COALESCE(nssf_number,''),'-',''),' ',''),'/','') LIKE ? OR REPLACE(REPLACE(COALESCE(finance_ministry_number,''),'-',''),' ','') LIKE ? OR REPLACE(REPLACE(COALESCE(caisse_number,''),'-',''),' ','') LIKE ?)
       ORDER BY rk, COALESCE(NULLIF(first_name_ar,''), first_name_fr), COALESCE(NULLIF(last_name_ar,''), last_name_fr), id
       LIMIT 30"
-);
-$st->execute(array_merge([$start, $start, $start, $start], $leftParams, [$like, $like, $like, $like, $dlike, $dlike]));
+); // 🔢 (2026-10-10 «اعمول حسب معرفتك») البحث الشامل يلقط أيضاً رقم الضمان / رقم المالية / رقم الصندوق (بالأرقام فقط)
+$st->execute(array_merge([$start, $start, $start, $start], $leftParams, [$like, $like, $like, $like, $dlike, $dlike, $dlike, $dlike, $dlike]));
 
 $out = [];
 foreach ($st->fetchAll() as $r) {
