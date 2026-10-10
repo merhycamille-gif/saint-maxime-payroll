@@ -67,7 +67,7 @@ $noCnssOnly = array_values(array_filter($noCnss, fn($r) => $hasNum($r['finance_m
 
 // حذف جماعي للائحة ١ (قراره «يُشال») — بصفحة تأكيد
 $eligible = [];
-foreach ($r1 as $r) $eligible[(int)$r['id']] = trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) . ' (' . trim($r['first_name_ar'] . ' ' . $r['last_name_ar']) . ') — ' . schoolNameById((int)$r['school_id']) . ' — ' . $r['employee_code'];
+foreach (array_merge($r1, $noCnss) as $r) $eligible[(int)$r['id']] = trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) . ' (' . trim($r['first_name_ar'] . ' ' . $r['last_name_ar']) . ') — ' . schoolNameById((int)$r['school_id']) . ' — ' . $r['employee_code'];
 if (bulkDeleteFlow($db, $eligible, 'sans_cnss_decision', $self, 'Retirer — sans CNSS', 'حذف نهائي — بلا ضمان بقرارك')) exit;
 
 $canW = canEdit();
@@ -83,25 +83,33 @@ $schoolRow = function ($sid, $cols) { return '<tr><td colspan="' . $cols . '" st
 
 <div class="card" id="t1">
     <div class="card-header"><h3><span dir="ltr"><i class="fas fa-user-shield"></i> 1 · Depuis 2025-2026 sans aucune CNSS retenue (<?= count($r1) ?>)</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">من 2025-2026 وطالع وما انحسم عليهم ضمان ولا شهر — قرّر: «يبقى» (غير خاضع) أو «يُشال»</div></h3>
-        <?php if ($canW && $r1): ?><form method="get" action="" class="no-print" style="margin:0"><input type="hidden" name="action" value="bulk_delete"><?php foreach (array_keys($eligible) as $id): ?><input type="hidden" name="ids[]" value="<?= (int)$id ?>"><?php endforeach; ?><button type="submit" class="btn btn-danger btn-sm" title="حذف نهائي لكل اللائحة — بصفحة تأكيد"><i class="fas fa-trash"></i> شيل الكل (<?= count($r1) ?>) — بتأكيد</button></form><?php endif; ?>
+        <?php if ($canW && $r1): ?><form method="get" action="" class="no-print" style="margin:0"><input type="hidden" name="action" value="bulk_delete"><?php foreach ($r1 as $rr): $id = (int)$rr['id']; ?><input type="hidden" name="ids[]" value="<?= (int)$id ?>"><?php endforeach; ?><button type="submit" class="btn btn-danger btn-sm" title="حذف نهائي لكل اللائحة — بصفحة تأكيد"><i class="fas fa-trash"></i> شيل الكل (<?= count($r1) ?>) — بتأكيد</button></form><?php endif; ?>
     </div>
     <div class="card-body">
         <?php if (!$r1): ?><div class="mp-ok"><i class="fas fa-circle-check"></i> ما في حدا بلا ضمان بانتظار قرارك</div><?php else: ?>
         <div class="mp-tool no-print"><input type="search" class="form-control" placeholder="⚡ صفّي: اسم، مدرسة، فئة…" data-filter="#t1 tbody tr"></div>
         <div class="table-wrapper"><table class="table mp-table">
-            <thead><tr><th>Employé / الموظف</th><th>Type / الفئة</th><th>Embauche / الدخول</th><th>Statut / الحالة</th><th>Salaires sans CNSS / رواتب بلا ضمان</th><th>N° CNSS</th><th>N° Finances / المالية</th><th>Impôt retenu / ضريبة</th><th class="no-print">Décision / قرارك</th></tr></thead>
+            <thead><tr><th>Employé / الموظف</th><th>Type / الفئة</th><th>Embauche / الدخول</th><th>Statut / الحالة</th><th>Salaires sans CNSS / رواتب بلا ضمان</th><th class="no-print" colspan="2">N° CNSS · N° Finances / اكتب الرقمين واحفظ</th><th>Impôt retenu / ضريبة</th><th class="no-print">Décision / قرارك</th></tr></thead>
             <tbody>
             <?php $ps = null; foreach ($r1 as $r): if ($ps !== $r['school_id']) { $ps = $r['school_id']; echo $schoolRow($ps, 9); } $isCur = ($r['status'] === 'actif' && $r['ld'] >= '2026-10-01'); ?>
                 <tr data-q="<?= e(mb_strtolower($r['first_name_fr'] . ' ' . $r['last_name_fr'] . ' ' . $r['first_name_ar'] . ' ' . $r['last_name_ar'] . ' ' . schoolNameById($r['school_id']) . ' ' . employeeTypeLabel($r['employee_type'], 'ar') . ' ' . $r['employee_code'])) ?>">
                     <td><?= $name($r) ?></td><td><small><?= e(employeeTypeLabel($r['employee_type'])) ?></small></td><td><?= formatDate($r['hire_date']) ?></td>
                     <td><?= $isCur ? '<span class="badge badge-success">فاعل 2026-2027</span>' : '<span class="badge badge-warning">ترك ' . formatDate($r['ld']) . '</span>' ?></td>
                     <td><?= (int)$r['k'] ?> شهر <small style="color:var(--gray-500)">[<?= e($r['sys']) ?>]</small></td>
-                    <td><?= $hasNum($r['nssf_number']) ? e($r['nssf_number']) : '—' ?></td><td><?= $hasNum($r['finance_ministry_number']) ? e($r['finance_ministry_number']) : '—' ?></td>
+                    <td class="no-print" colspan="2">
+                        <?php if ($canW): ?>
+                        <form method="post" action="<?= $self ?>" style="display:flex;gap:5px;align-items:center;margin:0"><?= csrfField() ?><input type="hidden" name="do" value="numbers"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="t1">
+                            <input type="text" name="nssf" class="form-control" style="font-size:13px;padding:5px 8px;width:130px" placeholder="رقم الضمان" value="<?= $hasNum($r['nssf_number']) ? e($r['nssf_number']) : '' ?>" dir="ltr">
+                            <input type="text" name="finance" class="form-control" style="font-size:13px;padding:5px 8px;width:110px" placeholder="رقم المالية" value="<?= $hasNum($r['finance_ministry_number']) ? e($r['finance_ministry_number']) : '' ?>" dir="ltr">
+                            <button type="submit" class="btn btn-sm btn-primary" title="يكتب الرقمين بملفه فوراً"><i class="fas fa-save"></i> حفظ</button>
+                        </form>
+                        <?php else: ?><?= $hasNum($r['nssf_number']) ? e($r['nssf_number']) : '—' ?> · <?= $hasNum($r['finance_ministry_number']) ? e($r['finance_ministry_number']) : '—' ?><?php endif; ?>
+                    </td>
                     <td><?= (int)$r['tx'] > 0 ? formatLBP($r['tx'], false) : '0' ?></td>
                     <td class="no-print" style="white-space:nowrap">
                         <?php if ($canW): ?>
                         <form method="post" action="<?= $self ?>" style="display:inline"><?= csrfField() ?><input type="hidden" name="do" value="keep"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="t1"><button type="submit" class="btn btn-sm btn-success" title="يبقى بالبرنامج كغير خاضع للضمان — يختفي من هذه اللائحة"><i class="fas fa-check"></i> يبقى</button></form>
-                        <a class="btn btn-sm btn-danger" href="?action=bulk_delete&ids[]=<?= (int)$r['id'] ?>" title="حذف نهائي بصفحة تأكيد"><i class="fas fa-trash"></i> يُشال</a>
+                        <a class="btn btn-sm btn-danger" href="?action=bulk_delete&ids[]=<?= (int)$r['id'] ?>" title="حذف الملف نهائياً بصفحة تأكيد"><i class="fas fa-trash"></i> احذف الملف</a>
                         <?php endif; ?>
                         <a class="btn btn-sm btn-light" href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$r['id'] ?>" title="فتح الملف"><i class="fas fa-pen"></i></a>
                     </td>
@@ -126,19 +134,19 @@ $schoolRow = function ($sid, $cols) { return '<tr><td colspan="' . $cols . '" st
         <?php if (!$lst): ?><div class="mp-ok"><i class="fas fa-circle-check"></i> ما في حدا — كل الأرقام موجودة</div><?php else: ?>
         <div class="mp-tool no-print"><input type="search" class="form-control" placeholder="⚡ صفّي: اسم، مدرسة…" data-filter="#<?= $tid ?> tbody tr"></div>
         <div class="table-wrapper"><table class="table mp-table">
-            <thead><tr><th>Employé / الموظف</th><th>Type / الفئة</th><th>Embauche / الدخول</th><th>Naissance / الولادة</th><th>CNSS retenue / ضمان محسوم</th><th>Dernier mois / آخر شهر</th><?php if (!$both): ?><th>N° Finances / المالية</th><?php endif; ?><th class="no-print" style="min-width:<?= $both ? 360 : 230 ?>px">Saisie / الكتابة</th></tr></thead>
+            <thead><tr><th>Employé / الموظف</th><th>Type / الفئة</th><th>Embauche / الدخول</th><th>Naissance / الولادة</th><th>CNSS retenue / ضمان محسوم</th><th>Dernier mois / آخر شهر</th><th class="no-print" style="min-width:420px">N° CNSS · N° Finances / اكتب واحفظ — أو احذف الملف</th></tr></thead>
             <tbody>
-            <?php $ps = null; foreach ($lst as $r): if ($ps !== $r['school_id']) { $ps = $r['school_id']; echo $schoolRow($ps, $both ? 7 : 8); } ?>
+            <?php $ps = null; foreach ($lst as $r): if ($ps !== $r['school_id']) { $ps = $r['school_id']; echo $schoolRow($ps, 7); } ?>
                 <tr data-q="<?= e(mb_strtolower($r['first_name_fr'] . ' ' . $r['last_name_fr'] . ' ' . $r['first_name_ar'] . ' ' . $r['last_name_ar'] . ' ' . schoolNameById($r['school_id']) . ' ' . $r['employee_code'])) ?>">
                     <td><?= $name($r) ?></td><td><small><?= e(employeeTypeLabel($r['employee_type'])) ?></small></td><td><?= formatDate($r['hire_date']) ?></td><td><?= formatDate($r['birth_date']) ?></td>
                     <td><?= formatLBP($r['cn'], false) ?> <small style="color:var(--gray-500)">(<?= (int)$r['k'] ?> شهر)</small></td><td><?= e($r['lastm']) ?></td>
-                    <?php if (!$both): ?><td><?= e($r['finance_ministry_number']) ?></td><?php endif; ?>
                     <td class="no-print">
                         <?php if ($canW): ?>
                         <form method="post" action="<?= $self ?>" style="display:flex;gap:5px;align-items:center;margin:0"><?= csrfField() ?><input type="hidden" name="do" value="numbers"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="<?= $tid ?>">
-                            <input type="text" name="nssf" class="form-control" style="font-size:13px;padding:5px 8px;width:140px" placeholder="رقم الضمان" dir="ltr">
-                            <?php if ($both): ?><input type="text" name="finance" class="form-control" style="font-size:13px;padding:5px 8px;width:120px" placeholder="رقم المالية" dir="ltr"><?php endif; ?>
-                            <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-save"></i> حفظ</button>
+                            <input type="text" name="nssf" class="form-control" style="font-size:13px;padding:5px 8px;width:130px" placeholder="رقم الضمان" dir="ltr">
+                            <input type="text" name="finance" class="form-control" style="font-size:13px;padding:5px 8px;width:110px" placeholder="رقم المالية" value="<?= $both ? '' : e($r['finance_ministry_number']) ?>" dir="ltr">
+                            <button type="submit" class="btn btn-sm btn-primary" title="يكتب الرقمين بملفه فوراً"><i class="fas fa-save"></i> حفظ</button>
+                            <a class="btn btn-sm btn-danger" href="?action=bulk_delete&ids[]=<?= (int)$r['id'] ?>" title="حذف الملف نهائياً بصفحة تأكيد"><i class="fas fa-trash"></i> احذف الملف</a>
                             <a class="btn btn-sm btn-light" href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$r['id'] ?>" title="فتح الملف"><i class="fas fa-pen"></i></a>
                         </form>
                         <?php else: ?><a class="btn btn-sm btn-light" href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$r['id'] ?>"><i class="fas fa-pen"></i></a><?php endif; ?>
