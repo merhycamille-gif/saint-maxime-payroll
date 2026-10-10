@@ -2183,6 +2183,7 @@ body.mp-show-det .mp-layout{grid-template-columns:1fr}body.mp-show-det .mp-side{
   .topbar > div:first-child > div > span i { font-size: 16px !important; }
   .topbar h1, .topbar h1 span[dir="ltr"] { font-size: 16px !important; letter-spacing: -0.01em; }
   .topbar h1 > span:not([dir]) { font-size: 11.5px !important; opacity: .75; }
+  .topbar h1 .sec-now { max-width: min(28vw, 420px); }
   .topbar .btn.btn-light { padding: 5px 10px; font-size: 12px; border-radius: 9px; }
   /* حبوب السياق: أصغر وأهدأ، أيقونة ملوّنة صغيرة بلا مربّع كبير */
   .school-switcher { padding: 2px 8px 2px 6px; border-radius: 9px; gap: 5px; border-bottom-width: 2px; min-height: 30px; }
