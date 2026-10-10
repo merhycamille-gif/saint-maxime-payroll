@@ -418,4 +418,28 @@
             throw e;
         });
     }
+    // 🖨️ (2026-10-10 مساءً «خط واضح قبل ما اطبع… رسمي ومنظّم»): الطباعة من المتصفّح كانت تصغّر الجدول العريض (--pz) حتى يدخل بالورقة
+    //    فيطلع الخط صغيراً. الآن: الجدول الأعرض من الورقة ينقسم أعمدةً على أوراق (نفس splitWideTables للـPDF) بخط 12، مع تكرار # والاسم.
+    window.msaSplitWideTables = splitWideTables;
+    (function () {
+        var undo = null, saved = [];
+        function area() { return document.querySelector('#ppExportArea, .doc-sheet, .official-doc'); }
+        window.addEventListener('beforeprint', function () {
+            try {
+                if (window.MSA_PAGE === 'annual' || undo) return; // beforeprint قد يُطلق مرّتين (المتصفّح + الصفحة): لا تقسيم فوق تقسيم
+                var a = area(); if (!a || a.querySelector('.payslip-card, .salary-slip-table') || a.closest('.payslip-card')) return;
+                var land = !!(a.closest('.land-report, .xls-sheet') || a.querySelector('.land-report, .xls-sheet') || a.classList.contains('land-report'));
+                var maxW = land ? 1062 : 718;
+                saved = []; a.querySelectorAll('table').forEach(function (t) { saved.push([t, t.style.zoom, t.style.getPropertyValue('--pz')]); t.style.zoom = ''; t.style.setProperty('--pz', 1); });
+                undo = splitWideTables(a, maxW);
+                if (!undo) { saved.forEach(function (x) { x[0].style.zoom = x[1]; if (x[2]) x[0].style.setProperty('--pz', x[2]); }); saved = []; }
+                else a.querySelectorAll('[data-pdf-clone] table, table[data-pdf-clone]').forEach(function (t) { t.style.setProperty('--pz', 1); t.style.zoom = ''; });
+            } catch (e) { undo = null; }
+        });
+        window.addEventListener('afterprint', function () {
+            try { if (undo) undo(); } catch (e) {}
+            undo = null;
+            saved.forEach(function (x) { x[0].style.zoom = x[1]; if (x[2]) x[0].style.setProperty('--pz', x[2]); else x[0].style.removeProperty('--pz'); }); saved = [];
+        });
+    })();
 })();

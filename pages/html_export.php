@@ -41,7 +41,8 @@ function hx_text(DOMNode $n): string {
     if ($n->nodeType === XML_TEXT_NODE) return $n->nodeValue;
     if ($n->nodeType !== XML_ELEMENT_NODE) return '';
     $tag = strtolower($n->nodeName);
-    if ($tag === 'br') return "\n"; // 📏 2026-10-10: سطر جديد داخل الخلية (الاسم العربي فوق الفرنسي) بدل مسافة تعرّض العمود
+    if ($tag === 'br') return "\n";
+    if (hx_has_class($n, ' money-usd ')) { $s0 = ''; foreach ($n->childNodes as $c0) $s0 .= hx_text($c0); return "\n" . $s0; } // 💵 مرآة الدولار سطر تحت الليرة (كما على الشاشة) لا جنبها // 📏 2026-10-10: سطر جديد داخل الخلية (الاسم العربي فوق الفرنسي) بدل مسافة تعرّض العمود
     $s = '';
     foreach ($n->childNodes as $c) $s .= hx_text($c) . ' ';
     return $s;

@@ -595,15 +595,28 @@ class ReportTable
     public function docx()
     {
         $cols = $this->colCount();
-        // 📐 (2026-10-10 مساءً «طبعت وورد عربي»): الجدول العريض (≥ 9 أعمدة أو محتوى أعرض من الورقة) يطلع أفقياً تلقائياً،
-        //    وعرض كل عمود على قدّ محتواه (نفس حساب الإكسل) بدل أعمدة متساوية تلفّ الأسماء حرفاً حرفاً
-        $autoW = $this->autoWidths($cols); $sumW = max(1.0, array_sum($autoW));
-        if (!$this->landscape && ($cols >= 9 || $sumW > 95)) $this->landscape = true;
+        // 📐 (2026-10-10 مساءً «رتّبلي كل التقارير… رسمي ومنظّم»): مولّد الوورد صار كبرامج التقارير الرسمية —
+        //    • عرض كل عمود = قدّ محتواه الفعلي (رأس/بيانات) بخط 12 (لا أعمدة متساوية تلفّ الكلمات حرفاً حرفاً).
+        //    • الجدول الأعرض من الورقة يُقسَّم **بالعرض** على أجزاء (ورقة لكل جزء) مع تكرار أعمدة المفتاح (# والاسم) بكل جزء،
+        //      وعنوان «الجزء n/N» — كما تفعل أدوات التقارير (Crystal/Jasper) بدل تصغير الخطّ أو لفّ الأرقام.
+        //    • أفقي تلقائياً حين لا يتّسع المحتوى عمودياً، ورأس الجدول يتكرّر بكل ورقة، والسطر داخل الخلية (ل.ل فوق $) سطر حقيقي.
+        $autoW = $this->autoWidths($cols);
+        $nat = []; foreach ($autoW as $c => $w) $nat[$c] = (int)round($w * 118 + 200); // وحدة الإكسل ⇒ twips بخط 12 + حشوة الخلية
+        $sumNat = array_sum($nat);
+        if (!$this->landscape && $sumNat > 10466) $this->landscape = true;
         $twDoc = $this->landscape ? 15700 : 10466; // عرض المحتوى داخل الهوامش (twips)
-        $colWs = []; $acc = 0;
-        for ($c = 0; $c < $cols; $c++) { $colWs[$c] = ($c === $cols - 1) ? ($twDoc - $acc) : (int)round($twDoc * $autoW[$c] / $sumW); $acc += $colWs[$c]; }
-        $this->docxColWs = $colWs;
-        $colW = (int)floor($twDoc / $cols);
+
+        // أعمدة المفتاح: الأوّل (#/الرمز) إن كان ضيّقاً + أوّل عمود نصّي بعده (الاسم) — تتكرّر بكل جزء
+        $isText = []; for ($c = 0; $c < $cols; $c++) { $n = 0; $t = 0; foreach ($this->rows as $r) { if ($r['type'] !== 'data') continue; $v = (string)($r['cells'][$c] ?? ''); if ($v === '') continue; $n++; if (!$this->isNum($v)) $t++; } $isText[$c] = $n > 0 && $t / $n >= 0.5; }
+        $key = [];
+        if ($cols > 3) { if ($nat[0] <= 1400) $key[] = 0; for ($c = 0; $c < min(3, $cols); $c++) { if (!in_array($c, $key, true) && !empty($isText[$c])) { $key[] = $c; break; } } }
+        $keyW = 0; foreach ($key as $c) $keyW += $nat[$c];
+        if ($keyW > $twDoc * 0.4) { $key = $key ? [$key[0]] : []; $keyW = $key ? $nat[$key[0]] : 0; }
+        // تقسيم باقي الأعمدة إلى أجزاء تتّسع بالورقة
+        $parts = []; $cur = []; $curW = $keyW;
+        for ($c = 0; $c < $cols; $c++) { if (in_array($c, $key, true)) continue; if ($cur && $curW + $nat[$c] > $twDoc) { $parts[] = $cur; $cur = []; $curW = $keyW; } $cur[] = $c; $curW += $nat[$c]; }
+        if ($cur) $parts[] = $cur;
+        if (!$parts) $parts = [[]];
 
         $body = '';
         // العنوان
@@ -616,27 +629,33 @@ class ReportTable
         }
         $body .= '<w:p/>';
 
-        // الجدول
-        $grid = '<w:tblGrid>';
-        for ($c = 0; $c < $cols; $c++) $grid .= '<w:gridCol w:w="' . ($this->docxColWs[$c] ?? $colW) . '"/>';
-        $grid .= '</w:tblGrid>';
-
-        $tblRows = '';
-        if ($this->headers) $tblRows .= $this->docxTr($this->headers, $cols, 'header');
-        foreach ($this->rows as $r) {
-            if ($r['type'] === 'section') $tblRows .= $this->docxTr([$r['cells'][0]], $cols, 'section', true);
-            elseif ($r['type'] === 'head') $tblRows .= $this->docxTr($r['cells'], $cols, 'header');
-            elseif ($r['type'] === 'total') $tblRows .= $this->docxTr($r['cells'], $cols, 'total');
-            else $tblRows .= $this->docxTr($r['cells'], $cols, 'data');
+        $tbl = ''; $np = count($parts);
+        foreach ($parts as $pi => $part) {
+            $idx = array_merge($key, $part);
+            // عرض الأعمدة بهذا الجزء: قدّ المحتوى ثم تمديد نسبي ليملأ الورقة (لا فراغ يمين/يسار)
+            $w = []; $sum = 0; foreach ($idx as $c) { $w[$c] = $nat[$c]; $sum += $nat[$c]; }
+            $scale = $sum > 0 ? $twDoc / $sum : 1; $acc = 0; $last = end($idx);
+            foreach ($idx as $c) { $w[$c] = ($c === $last) ? ($twDoc - $acc) : (int)round($nat[$c] * $scale); $acc += $w[$c]; }
+            $this->docxColWs = $w;
+            if ($pi > 0) $tbl .= '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+            if ($np > 1) $tbl .= $this->docxPara(($this->isRtl() ? 'الجزء ' . ($pi + 1) . ' من ' . $np : 'Partie ' . ($pi + 1) . ' / ' . $np) . ' — ' . $this->title, ['b' => true, 'sz' => 22, 'align' => 'center', 'color' => '1E3A8A']);
+            $grid = '<w:tblGrid>'; foreach ($idx as $c) $grid .= '<w:gridCol w:w="' . $w[$c] . '"/>'; $grid .= '</w:tblGrid>';
+            $tblRows = '';
+            if ($this->headers) $tblRows .= $this->docxTr($this->headers, $idx, 'header');
+            foreach ($this->rows as $r) {
+                if ($r['type'] === 'section') $tblRows .= $this->docxTr([$r['cells'][0]], $idx, 'section', true);
+                elseif ($r['type'] === 'head') $tblRows .= $this->docxTr($r['cells'], $idx, 'header');
+                elseif ($r['type'] === 'total') $tblRows .= $this->docxTr($r['cells'], $idx, 'total');
+                else $tblRows .= $this->docxTr($r['cells'], $idx, 'data');
+            }
+            $tbl .= '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="' . $twDoc . '" w:type="dxa"/><w:tblLayout w:type="fixed"/>'
+                . ($this->isRtl() ? '<w:bidiVisual/>' : '')
+                . '<w:tblBorders>'
+                . '<w:top w:val="single" w:sz="4" w:color="777777"/><w:left w:val="single" w:sz="4" w:color="777777"/>'
+                . '<w:bottom w:val="single" w:sz="4" w:color="777777"/><w:right w:val="single" w:sz="4" w:color="777777"/>'
+                . '<w:insideH w:val="single" w:sz="4" w:color="777777"/><w:insideV w:val="single" w:sz="4" w:color="777777"/>'
+                . '</w:tblBorders><w:tblCellMar><w:left w:w="60" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tblCellMar></w:tblPr>' . $grid . $tblRows . '</w:tbl>';
         }
-
-        $tbl = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="' . $twDoc . '" w:type="dxa"/><w:tblLayout w:type="fixed"/>'
-            . ($this->isRtl() ? '<w:bidiVisual/>' : '')
-            . '<w:tblBorders>'
-            . '<w:top w:val="single" w:sz="4" w:color="777777"/><w:left w:val="single" w:sz="4" w:color="777777"/>'
-            . '<w:bottom w:val="single" w:sz="4" w:color="777777"/><w:right w:val="single" w:sz="4" w:color="777777"/>'
-            . '<w:insideH w:val="single" w:sz="4" w:color="777777"/><w:insideV w:val="single" w:sz="4" w:color="777777"/>'
-            . '</w:tblBorders></w:tblPr>' . $grid . $tblRows . '</w:tbl>';
 
         // إعداد الصفحة A4 + اتجاه
         $sect = $this->landscape
@@ -668,9 +687,9 @@ class ReportTable
 
     private function docxPara($text, $o = [])
     {
-        $rpr = '<w:rPr>';
-        if (!empty($o['b'])) $rpr .= '<w:b/>';
-        if (!empty($o['sz'])) $rpr .= '<w:sz w:val="' . (int)$o['sz'] . '"/>';
+        $rpr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>';
+        if (!empty($o['b'])) $rpr .= '<w:b/><w:bCs/>';
+        if (!empty($o['sz'])) $rpr .= '<w:sz w:val="' . (int)$o['sz'] . '"/><w:szCs w:val="' . (int)$o['sz'] . '"/>';
         if (!empty($o['color'])) $rpr .= '<w:color w:val="' . $o['color'] . '"/>';
         $rpr .= ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr>';
         $ppr = '<w:pPr>' . ($this->isRtl() ? '<w:bidi/>' : '');
@@ -680,19 +699,19 @@ class ReportTable
         return '<w:p>' . $ppr . '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($text) . '</w:t></w:r></w:p>';
     }
 
-    private function docxTr($cells, $cols, $kind, $mergeAll = false)
+    private function docxTr($cells, $idx, $kind, $mergeAll = false)
     {
         $fill = ['header' => '1E3A8A', 'total' => 'F3F4F6', 'section' => 'E0E7FF', 'data' => ''][$kind] ?? '';
         $bold = in_array($kind, ['header', 'total', 'section'], true);
         $white = ($kind === 'header');
-        $tr = '<w:tr>' . ($kind === 'header' ? '<w:trPr><w:tblHeader/></w:trPr>' : ''); // رأس الجدول يتكرّر بكل ورقة
+        $tr = '<w:tr>' . ($kind === 'header' ? '<w:trPr><w:cantSplit/><w:tblHeader/></w:trPr>' : '<w:trPr><w:cantSplit/></w:trPr>'); // الرأس يتكرّر بكل ورقة، والسطر لا ينقسم بين ورقتين
         if ($mergeAll) {
-            $tc = '<w:tcPr><w:tcW w:w="0" w:type="auto"/><w:gridSpan w:val="' . $cols . '"/>';
+            $tc = '<w:tcPr><w:tcW w:w="0" w:type="auto"/><w:gridSpan w:val="' . count($idx) . '"/>';
             $tc .= $fill ? '<w:shd w:val="clear" w:fill="' . $fill . '"/>' : '';
             $tc .= '<w:vAlign w:val="center"/></w:tcPr>';
             $tr .= '<w:tc>' . $tc . $this->docxCellPara($cells[0], $bold, $white, $this->isRtl() ? 'right' : 'left') . '</w:tc>';
         } else {
-            for ($c = 0; $c < $cols; $c++) {
+            foreach ($idx as $c) {
                 $v = $cells[$c] ?? '';
                 $align = ($this->isNum($v) && $v !== '') ? 'center' : ($kind === 'header' ? 'center' : ($this->isRtl() ? 'right' : 'left'));
                 if ($this->isNum($v) && $v !== '') {
@@ -710,12 +729,13 @@ class ReportTable
 
     private function docxCellPara($text, $bold, $white, $align)
     {
-        $rpr = '<w:rPr>';
-        if ($bold) $rpr .= '<w:b/>';
+        $rpr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>';
+        if ($bold) $rpr .= '<w:b/><w:bCs/>';
         if ($white) $rpr .= '<w:color w:val="FFFFFF"/>';
-        $rpr .= '<w:sz w:val="24"/>' . ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr>';   // 🔠 12pt بكل المطبوعات
-        return '<w:p><w:pPr>' . ($this->isRtl() ? '<w:bidi/>' : '') . '<w:jc w:val="' . $align . '"/></w:pPr>'
-            . '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($text) . '</w:t></w:r></w:p>';
+        $rpr .= '<w:sz w:val="24"/><w:szCs w:val="24"/>' . ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr>';   // 🔠 12pt بكل المطبوعات
+        $runs = ''; $lines = preg_split('/\r\n|\n/', (string)$text);
+        foreach ($lines as $i => $ln) { if ($i > 0) $runs .= '<w:r>' . $rpr . '<w:br/></w:r>'; $runs .= '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($ln) . '</w:t></w:r>'; }
+        return '<w:p><w:pPr><w:spacing w:before="20" w:after="20"/>' . ($this->isRtl() ? '<w:bidi/>' : '') . '<w:jc w:val="' . $align . '"/></w:pPr>' . $runs . '</w:p>';
     }
 
     private $savePath = null;
