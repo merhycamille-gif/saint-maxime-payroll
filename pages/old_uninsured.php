@@ -39,7 +39,7 @@ include __DIR__ . '/../includes/header.php';
         <?php if (!$list): ?>
             <div class="mp-ok"><i class="fas fa-circle-check"></i> Aucun / ما في حدا</div>
         <?php else: ?>
-        <div class="alert alert-info" style="margin-bottom:12px"><i class="fas fa-info-circle"></i> مَن انحسم عليه ضمان ولو شهراً واحداً كان مضموناً وبيبقى (ما بيظهر هون). الملف «فاعل» بلا تاريخ ترك بس آخر راتبه 2024-2025 أو أقدم = قديم عملياً وبيظهر هون. اكبس «احذف» ثم أكّد بالصفحة التالية؛ الحذف ناعم وبيرجع إذا لزم.</div>
+        <div class="alert alert-info" style="margin-bottom:12px"><i class="fas fa-info-circle"></i> مَن انحسم عليه ضمان ولو شهراً واحداً كان مضموناً وبيبقى (ما بيظهر هون). الملف «فاعل» بلا تاريخ ترك بس آخر راتبه 2024-2025 أو أقدم = قديم عملياً وبيظهر هون. اكبس «احذف» ثم أكّد بالصفحة التالية؛ الحذف نهائي من السيرفر (النسخة الوحيدة على الكمبيوتر).</div>
         <div class="table-wrapper"><table class="table">
             <thead><tr><th>Employé / الموظف</th><th>École / المدرسة</th><th>Type / الفئة</th><th>Embauche → départ / الدخول ← الترك</th><th>Salaires / الرواتب</th><th>N° CNSS</th><th class="no-print"></th></tr></thead>
             <tbody>
