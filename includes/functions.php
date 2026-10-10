@@ -9241,7 +9241,7 @@ require_once __DIR__ . '/legal.php';
 function empAvatar(array $e, string $color = 'ic2', int $size = 0): string {
     $ini = mb_strtoupper(mb_substr(trim((string)($e['first_name_fr'] ?? '')), 0, 1) . mb_substr(trim((string)($e['last_name_fr'] ?? '')), 0, 1));
     $p = trim((string)($e['photo_path'] ?? ''));
-    $img = ($p !== '' && preg_match('/\.(jpe?g|png|gif|webp)$/i', $p)) ? '<img src="' . e(BASE_URL . ltrim($p, '/')) . '" alt="" loading="lazy" onerror="this.remove()">' : '';
+    $img = ($p !== '' && preg_match('/\.(jpe?g|png|gif|webp)$/i', $p)) ? '<img src="' . e(BASE_URL . 'pages/photo_thumb.php?p=' . rawurlencode(ltrim($p, '/'))) . '" alt="" loading="lazy" onerror="this.remove()">' /* ⚡ مصغّر 96px مخزّن بدل الأصل (حتى 1MB) */ : '';
     $st = 'background:var(--' . preg_replace('/[^a-z0-9]/', '', $color) . ')' . ($size ? ';width:' . $size . 'px;height:' . $size . 'px;font-size:' . (int)round($size * 0.36) . 'px' : '');
     return '<span class="mp-av" style="' . $st . '">' . $img . e($ini) . '</span>';
 }
