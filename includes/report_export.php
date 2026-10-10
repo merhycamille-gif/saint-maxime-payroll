@@ -325,6 +325,7 @@ class ReportTable
     private $colWidths = [];
     private $school = null;
     private $period = '';
+    private $docxColWs = []; // عرض أعمدة الوورد (twips) من autoWidths
     private $dir = 'rtl';   // ↔️ (2026-10-08) اتجاه الورقة/المستند: عربي rtl (من اليمين) · فرنسي/لوائح الدولة ltr (من الشمال)
 
     public function __construct($title, $landscape = true)
@@ -594,7 +595,14 @@ class ReportTable
     public function docx()
     {
         $cols = $this->colCount();
-        $twDoc = $this->landscape ? 15840 : 11900; // عرض المحتوى تقريباً (twips) داخل الهوامش
+        // 📐 (2026-10-10 مساءً «طبعت وورد عربي»): الجدول العريض (≥ 9 أعمدة أو محتوى أعرض من الورقة) يطلع أفقياً تلقائياً،
+        //    وعرض كل عمود على قدّ محتواه (نفس حساب الإكسل) بدل أعمدة متساوية تلفّ الأسماء حرفاً حرفاً
+        $autoW = $this->autoWidths($cols); $sumW = max(1.0, array_sum($autoW));
+        if (!$this->landscape && ($cols >= 9 || $sumW > 95)) $this->landscape = true;
+        $twDoc = $this->landscape ? 15700 : 10466; // عرض المحتوى داخل الهوامش (twips)
+        $colWs = []; $acc = 0;
+        for ($c = 0; $c < $cols; $c++) { $colWs[$c] = ($c === $cols - 1) ? ($twDoc - $acc) : (int)round($twDoc * $autoW[$c] / $sumW); $acc += $colWs[$c]; }
+        $this->docxColWs = $colWs;
         $colW = (int)floor($twDoc / $cols);
 
         $body = '';
@@ -610,7 +618,7 @@ class ReportTable
 
         // الجدول
         $grid = '<w:tblGrid>';
-        for ($c = 0; $c < $cols; $c++) $grid .= '<w:gridCol w:w="' . $colW . '"/>';
+        for ($c = 0; $c < $cols; $c++) $grid .= '<w:gridCol w:w="' . ($this->docxColWs[$c] ?? $colW) . '"/>';
         $grid .= '</w:tblGrid>';
 
         $tblRows = '';
@@ -622,7 +630,7 @@ class ReportTable
             else $tblRows .= $this->docxTr($r['cells'], $cols, 'data');
         }
 
-        $tbl = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="' . $twDoc . '" w:type="dxa"/>'
+        $tbl = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="' . $twDoc . '" w:type="dxa"/><w:tblLayout w:type="fixed"/>'
             . ($this->isRtl() ? '<w:bidiVisual/>' : '')
             . '<w:tblBorders>'
             . '<w:top w:val="single" w:sz="4" w:color="777777"/><w:left w:val="single" w:sz="4" w:color="777777"/>'
@@ -677,7 +685,7 @@ class ReportTable
         $fill = ['header' => '1E3A8A', 'total' => 'F3F4F6', 'section' => 'E0E7FF', 'data' => ''][$kind] ?? '';
         $bold = in_array($kind, ['header', 'total', 'section'], true);
         $white = ($kind === 'header');
-        $tr = '<w:tr>';
+        $tr = '<w:tr>' . ($kind === 'header' ? '<w:trPr><w:tblHeader/></w:trPr>' : ''); // رأس الجدول يتكرّر بكل ورقة
         if ($mergeAll) {
             $tc = '<w:tcPr><w:tcW w:w="0" w:type="auto"/><w:gridSpan w:val="' . $cols . '"/>';
             $tc .= $fill ? '<w:shd w:val="clear" w:fill="' . $fill . '"/>' : '';
@@ -691,7 +699,7 @@ class ReportTable
                     $nv = $this->numVal($v);
                     $disp = ($nv == floor($nv)) ? number_format($nv) : rtrim(rtrim(number_format($nv, 2), '0'), '.');
                 } else { $disp = $v; }
-                $tc = '<w:tcPr><w:tcW w:w="0" w:type="auto"/>';
+                $tc = '<w:tcPr><w:tcW w:w="' . (int)($this->docxColWs[$c] ?? 0) . '" w:type="' . (isset($this->docxColWs[$c]) ? 'dxa' : 'auto') . '"/>';
                 $tc .= $fill ? '<w:shd w:val="clear" w:fill="' . $fill . '"/>' : '';
                 $tc .= '<w:vAlign w:val="center"/></w:tcPr>';
                 $tr .= '<w:tc>' . $tc . $this->docxCellPara($disp, $bold, $white, $align) . '</w:tc>';

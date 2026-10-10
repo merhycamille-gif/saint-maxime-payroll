@@ -248,9 +248,7 @@
             //    (لم يعد يتبع dir=ltr الذي كان على لوائح الدولة الخمس)؛ الوورد يتبع لغة النصّ.
             var hasAr = /[؀-ۿ]/.test(((start || a).textContent || '').slice(0, 20000));
             if (rlDir) dir = rlDir;
-            else if (format === 'xlsx') dir = hasAr ? 'rtl' : 'ltr';
-            else if (ex) dir = ex;
-            else { var tx = ((start || a).textContent || '').slice(0, 6000), ar = (tx.match(/[\u0600-\u06FF]/g) || []).length, la = (tx.match(/[A-Za-z]/g) || []).length; dir = ar >= la ? 'rtl' : 'ltr'; }
+            else dir = hasAr ? 'rtl' : 'ltr'; // الإكسل والوورد معاً: عربي ⇒ من اليمين («طبعت وورد عربي» 2026-10-10 مساءً)
         } catch (e) {}
         var fd = new FormData();
         fd.append('format', format); fd.append('title', title || document.title || 'document');
