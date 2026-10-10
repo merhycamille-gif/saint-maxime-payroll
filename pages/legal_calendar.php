@@ -84,11 +84,16 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card" id="cal">
-    <div class="card-header"><h3><i class="fas fa-landmark"></i> Calendrier légal / الرزنامة القانونية <small style="font-weight:500;opacity:.8">— الضمان · المالية · صندوق التعويضات</small></h3>
+    <div class="card-header"><h3><i class="fas fa-landmark"></i> Calendrier légal / الرزنامة القانونية <small style="font-weight:500;opacity:.8">— كل جهة لحالها (طلبه: «خلّي الضمان مع الضمان، المالية مع المالية»)</small></h3>
         <a class="btn btn-sm btn-light no-print" href="#settings"><i class="fas fa-sliders"></i> عدّل المواعيد</a></div>
     <div class="card-body">
-        <div class="legal-grid">
-        <?php $shown = 0; foreach ($occ as $o): if ($o['status'] === 'sent' && $o['days'] < -120) continue; if ($o['status'] !== 'sent' && $o['days'] > 400) continue; $shown++;
+        <?php $grp = []; foreach ($occ as $o) { if ($o['status'] === 'sent' && $o['days'] < -120) continue; if ($o['status'] !== 'sent' && $o['days'] > 400) continue; $grp[$o['d']['authority']][] = $o; }
+        $authOrder = array_merge(array_keys($authLbl), array_diff(array_keys($grp), array_keys($authLbl))); $shown = 0;
+        foreach ($authOrder as $ak): if (empty($grp[$ak])) continue; $shown++; $al = $authLbl[$ak] ?? [$ak, '', 'var(--ic6)']; $lateN = count(array_filter($grp[$ak], fn($o) => $o['status'] === 'late')); ?>
+        <div class="legal-auth" id="auth-<?= e($ak) ?>" style="--a:<?= $al[2] ?>">
+            <h4 class="legal-auth-h"><span class="la-dot"></span><?= e($al[0]) ?> <span class="la-ar">/ <?= e($al[1]) ?></span><small><?= count($grp[$ak]) ?> موعد<?= $lateN ? ' · <b style="color:#b91c1c">' . $lateN . ' متأخّر</b>' : '' ?></small></h4>
+            <div class="legal-grid">
+        <?php foreach ($grp[$ak] as $o):
             $d = $o['d']; $a = $authLbl[$d['authority']] ?? [$d['authority'], '', 'var(--ic6)']; $s = $stLbl[$o['status']]; $f = $o['filing']; ?>
             <div class="legal-item <?= $s[2] ?>" id="due-<?= e($d['dkey']) ?>-<?= e($o['period']) ?>">
                 <div class="li-date"><b><?= date('d', strtotime($o['due'])) ?></b><span><?= monthName((int)date('n', strtotime($o['due'])), 'fr', true) ?> <?= date('Y', strtotime($o['due'])) ?></span></div>
@@ -114,8 +119,10 @@ include __DIR__ . '/../includes/header.php';
                     <?php elseif ($f): ?><a class="btn btn-sm btn-light" href="?view=<?= (int)$f['id'] ?>"><i class="fas fa-eye"></i> النسخة المبعوتة</a><?php endif; ?>
                 </div>
             </div>
-        <?php endforeach; if (!$shown): ?><div class="mp-ok">ما في مواعيد مفعّلة — فعّلها من «عدّل المواعيد»</div><?php endif; ?>
+            <?php endforeach; ?>
+            </div>
         </div>
+        <?php endforeach; if (!$shown): ?><div class="mp-ok">ما في مواعيد مفعّلة — فعّلها من «عدّل المواعيد»</div><?php endif; ?>
     </div>
 </div>
 

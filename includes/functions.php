@@ -5544,6 +5544,13 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php // ✏️ (2026-10-08 «دايماً عمول هيك بكل الإفادات»): كبسة «تعديل / كتابة» بكل مستند — تخلّي الإفادة/النموذج قابلاً للكتابة قبل الطباعة
               //    (ppEditToggle بـexport.js؛ تُخفى تلقائياً حيث لا مستند بالصفحة). بلا حفظ بالقاعدة. ?>
         <button type="button" class="btn btn-sm btn-gold" id="msaEditBtn" onclick="ppEditToggle(this)" title="عدّل أي سطر أو خانة بالمستند قبل الطباعة (للطباعة فقط)" style="display:none"><i class="fas fa-pen"></i> <span>Modifier / تعديل / كتابة</span></button>
+        <?php // 🌐 (2026-10-10 مساءً) لغة التقرير: عربي / فرنسي / الاثنان + جهة الأعمدة للإكسل (doclang.js) — ليس بالبطاقة السنوية
+              if ((($GLOBALS['currentPage'] ?? '') !== 'annual')): /* تُخفى بالـJS حيث لا مستند بالصفحة */ ?>
+        <span class="rl-chips" title="لغة التقرير والإكسل / Langue du rapport et de l’Excel">
+            <button type="button" class="rl-chip" data-rl="ar">عربي</button><button type="button" class="rl-chip" data-rl="fr">Français</button><button type="button" class="rl-chip" data-rl="both">عربي + Français</button>
+            <span class="rl-sides"><button type="button" class="rl-side" data-rs="rtl" title="الأعمدة من اليمين / Colonnes depuis la droite">⇤ من اليمين</button><button type="button" class="rl-side" data-rs="ltr" title="Colonnes depuis la gauche / الأعمدة من الشمال">De gauche ⇥</button></span>
+        </span>
+        <?php endif; ?>
         <button type="button" class="btn btn-sm btn-danger" onclick="msaSavePdfStart(this)" title="ينزّل ملف PDF عالكمبيوتر فوراً (بلا شاشة طباعة)"><i class="fas fa-file-pdf"></i> PDF — احفظ عالكمبيوتر</button>
         <?php if ($officialPdf && $hasPup): ?>
         <a class="btn btn-sm btn-light" href="<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>" target="_blank" title="PDF رسمي طبق الأصل عبر Chrome — يفتح ويطبع"><i class="fas fa-file-pdf"></i> PDF رسمي</a>

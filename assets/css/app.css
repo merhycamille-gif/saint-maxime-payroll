@@ -2548,3 +2548,19 @@ tr.mp-row.mp-sel > td { background: #eef4ff !important; }
 .mp-legal-line span { color: var(--gray-600, #4b5563); }
 .mp-legal-line > i:last-child { margin-inline-start: auto; opacity: .5; }
 .mp-legal-line:hover { background: var(--gray-50, #f9fafb); }
+
+/* الرزنامة: كل جهة بقسم لحالها */
+.legal-auth { margin-bottom: 18px; padding: 12px 14px; border-radius: 14px; background: var(--gray-50, #f9fafb); border: 1px solid var(--gray-200, #e5e7eb); }
+.legal-auth-h { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 1.05rem; color: var(--a); }
+.legal-auth-h .la-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--a); }
+.legal-auth-h .la-ar { color: var(--gray-700, #374151); font-weight: 600; }
+.legal-auth-h small { margin-inline-start: auto; color: var(--gray-500, #6b7280); font-weight: 500; }
+
+/* ═══ 290 🌐 لغة التقرير (عربي / فرنسي / الاثنان) + جهة الإكسل (2026-10-10) ═══ */
+.rl-chips { display: inline-flex; align-items: center; gap: 2px; margin: 0 4px; padding: 2px; border-radius: 10px; background: var(--gray-100, #f3f4f6); }
+.rl-chip, .rl-side { border: 0; background: transparent; padding: 4px 10px; border-radius: 8px; font: inherit; font-size: .85rem; font-weight: 600; color: var(--gray-700, #374151); cursor: pointer; }
+.rl-chip.on, .rl-side.on { background: #fff; color: var(--primary, #1e3a8a); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.rl-sides { display: inline-flex; gap: 2px; margin-inline-start: 6px; padding-inline-start: 6px; border-inline-start: 1px solid var(--gray-300, #d1d5db); }
+.rl-pair.rl-th .rl-ar { font-weight: 600; opacity: .85; }
+.rl-pair.rl-th .rl-fr { direction: ltr; }
+@media print { .rl-chips { display: none !important; } }

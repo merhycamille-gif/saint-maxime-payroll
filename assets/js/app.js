@@ -160,7 +160,14 @@ window.msaFitScreenTables = function () {
         // 🚀 (2026-10-02 «كل البرنامج متل البرق»): على دفعات — كل القراءات معاً ثم كل الكتابات معاً. كان كل جدول يكتب ثم يقرأ
         // (فتح حاوياته ← قياسه ← كتابة top ← قراءة ارتفاع الصف…) فيعيد المتصفّح التخطيط لكل جدول ولكل صفّ رأس — صفحة فيها
         // عشرات الجداول كانت تعيد التخطيط ~180 مرّة.
-        var tables = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table'), work = [], k, i, j;
+        // 📌 (2026-10-10 «وقت بدي اطلع وانزل بالصفحة العناوين تضلّ مبيّنة»): جداول المستندات بلا <thead> (صفّ أوّل كلّه th) تأخذ رأساً حقيقياً فتلتصق أيضاً
+        document.querySelectorAll('.doc-sheet table, .official-doc table, #ppExportArea table, .land-report table').forEach(function (t) {
+            if (t.tHead || t.rows.length < 6 || t.closest('.salary-slip-table, .annual-slip, .payslip-card')) return;
+            var r0 = t.rows[0]; if (!r0 || !r0.cells.length) return;
+            for (var c = 0; c < r0.cells.length; c++) if (r0.cells[c].tagName !== 'TH') return;
+            var th = t.createTHead(); th.appendChild(r0);
+        });
+        var tables = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, .doc-sheet table, .official-doc table, #ppExportArea table'), work = [], k, i, j;
         var openRe = /(^|\s)(card|card-body|report-table-wrap|table-wrapper|tbl-scroll|official-doc|doc-sheet|xls-sheet|mof-form)(\s|$)/, toOpen = [];
         // (أ) قراءة: الحاويات المقصوصة/المتمرّرة على سلسلة كل جدول
         for (k = 0; k < tables.length; k++) {
@@ -473,7 +480,8 @@ window.msaFitScreenTables = function () {
     // 📐 (2026-10-02 p1 «هيدي العناوين بكل التقارير بدها ترتيب» ثم «أكيد، بس نضلّ نقراها»): العناوين الكاملة (العنوان · السنة ·
     // الفلتر · سعر الصرف) بالورقة الأولى فقط، وباقي الأوراق سطر واحد مقروء فوق رأس الجدول (العنوان — السنة/الفترة · الفلتر).
     // السطر المحقون بـthead يتكرّر بكل ورقة حكماً؛ بالورقة الأولى يغطّيه «pr-mask» أبيض (الجدول يُسحب فوقه) فلا يتكرّر العنوان.
-    function prClean(el) { return el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : ''; }
+    function prClean(el) { if (!el) return ''; if (el.style && el.style.display === 'none') return ''; var s = (el.innerText != null && el.offsetParent !== null) ? el.innerText : el.textContent; return (s || '').replace(/\s+/g, ' ').trim(); } // innerText: يتبع لغة العرض المختارة
+    window.msaInjectPrintTitles = injectPrintTitles;
     function injectPrintTitles() {
         document.querySelectorAll('.doc-sheet, .official-doc').forEach(function (root) {
             var head = root.querySelector('.doc-head'), t = root.querySelector('.doc-head .dh-ar, .doc-title');
@@ -484,7 +492,7 @@ window.msaFitScreenTables = function () {
             if (head) {
                 // الورقة الموحّدة: الفرنسي أوّلاً ثم العربي + الشارات (الفترة · العملة…) بلا سعر الصرف/الراتب يشمل/تاريخ الإصدار
                 var fr = prClean(head.querySelector('.dh-fr'));
-                if (fr) l1 = fr + ' — ' + l1;
+                l1 = [fr, l1].filter(Boolean).join(' — ');
                 head.querySelectorAll('.dh-meta .dh-chip').forEach(function (c) { var x = prClean(c); if (x && !/^(سعر الصرف|الراتب يشمل|صدر بتاريخ)/.test(x)) l2.push(x); });
             } else {
                 // النماذج والكشوف: السنة أوّلاً ثم الفلتر/العملة (سعر الصرف يبقى بعناوين الورقة الأولى)

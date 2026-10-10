@@ -243,7 +243,9 @@
             if (!start) { var cands = a.querySelectorAll('.official-doc, .doc-sheet, .xls-sheet, .land-report'); for (var pi = 0; pi < cands.length; pi++) if (!cands[pi].closest('.no-print, .export-toolbar, form')) { start = cands[pi]; break; } }
             var ex = '', n = start;
             while (n && n !== a.parentElement) { var dA = n.getAttribute ? n.getAttribute('dir') : ''; if (dA === 'ltr' || dA === 'rtl') { ex = dA; break; } if (/(^|\s)(doc-ltr)(\s|$)/.test(n.className || '')) { ex = 'ltr'; break; } n = n.parentElement; }
-            if (ex) dir = ex;
+            var rlDir = (window.MSA_RL && window.MSA_RL.exportDir) ? window.MSA_RL.exportDir(a) : null; // 🌐 اختياره: عربي = يمين، فرنسي = شمال، الاثنان = جهته
+            if (rlDir) dir = rlDir;
+            else if (ex) dir = ex;
             else { var tx = ((start || a).textContent || '').slice(0, 6000), ar = (tx.match(/[\u0600-\u06FF]/g) || []).length, la = (tx.match(/[A-Za-z]/g) || []).length; dir = ar >= la ? 'rtl' : 'ltr'; }
         } catch (e) {}
         var fd = new FormData();

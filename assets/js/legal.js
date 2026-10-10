@@ -9,7 +9,7 @@
         tables.forEach(function (t) {
             if (t.closest('.no-print, .no-export')) return;
             var rows = [];
-            t.querySelectorAll('tr').forEach(function (tr) { if (tr.closest('.no-print')) return; var cells = []; tr.querySelectorAll('th,td').forEach(function (c) { cells.push(c.innerText.replace(/\s+/g, ' ').trim()); }); if (cells.join('').trim()) rows.push(cells); });
+            t.querySelectorAll('tr').forEach(function (tr) { if (tr.closest('.no-print')) return; var cells = []; tr.querySelectorAll('th,td').forEach(function (c) { cells.push((c.textContent || '').replace(/\s+/g, ' ').trim()); }); if (cells.join('').trim()) rows.push(cells); }); // textContent: لا يتأثّر بلغة العرض المختارة
             if (rows.length) out.tables.push(rows);
         });
         if (!out.tables.length) { var clone = area.cloneNode(true); clone.querySelectorAll('.no-print, .no-export, script, style').forEach(function (n) { n.remove(); }); var txt = (clone.textContent || '').replace(/\s+/g, ' ').trim(); if (!txt) return null; out.text = txt.slice(0, 200000); }
