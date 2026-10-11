@@ -95,6 +95,40 @@ function smtpSendMail(array $cfg, $to, $subject, $bodyText, array $attachments =
 }
 
 /**
+ * 🔑 (2026-10-11 «عم حاول غيّر كلمة السر… بيرجع للقديم») فحص تسجيل الدخول فقط (بلا إرسال): يتّصل، STARTTLS، AUTH LOGIN، ثم QUIT.
+ * @return array [bool ok, string error]
+ */
+function smtpCheckLogin(array $cfg)
+{
+    $host = $cfg['host'] ?? ''; $port = (int)($cfg['port'] ?? 0); $secure = $cfg['secure'] ?? 'tls';
+    $user = $cfg['user'] ?? ''; $pass = $cfg['pass'] ?? '';
+    if ($host === '' || $user === '') return [false, 'إعدادات البريد غير مكتملة'];
+    if (!$port) $port = ($secure === 'ssl') ? 465 : 587;
+    $ctx = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]]);
+    $errno = 0; $errstr = '';
+    $fp = @stream_socket_client((($secure === 'ssl') ? "ssl://$host" : $host) . ":$port", $errno, $errstr, 20, STREAM_CLIENT_CONNECT, $ctx);
+    if (!$fp) return [false, "تعذّر الاتصال بخادم البريد ($host:$port): $errstr"];
+    stream_set_timeout($fp, 20);
+    $read = function () use ($fp) { $d = ''; while (($l = fgets($fp, 515)) !== false) { $d .= $l; if (strlen($l) < 4 || $l[3] === ' ') break; } return $d; };
+    $cmd = function ($c) use ($fp, $read) { fwrite($fp, $c . "\r\n"); return $read(); };
+    $code = function ($r) { return (int)substr(ltrim($r), 0, 3); };
+    $read(); $cmd("EHLO localhost");
+    if ($secure === 'tls') {
+        $r = $cmd("STARTTLS");
+        if ($code($r) !== 220) { fclose($fp); return [false, "STARTTLS رُفض: " . trim($r)]; }
+        if (!@stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT)) { fclose($fp); return [false, 'فشل تفعيل تشفير TLS']; }
+        $cmd("EHLO localhost");
+    }
+    $r = $cmd("AUTH LOGIN");
+    if ($code($r) !== 334) { fclose($fp); return [false, "الخادم لا يدعم AUTH LOGIN: " . trim($r)]; }
+    $cmd(base64_encode($user));
+    $r = $cmd(base64_encode($pass));
+    $ok = $code($r) === 235;
+    $cmd("QUIT"); fclose($fp);
+    return $ok ? [true, ''] : [false, 'الخادم رفض الإيميل أو كلمة السر: ' . trim($r)];
+}
+
+/**
  * يبني إعدادات SMTP من جدول settings مع كشف الخادم تلقائياً حسب نطاق الإيميل.
  * @return array|null
  */

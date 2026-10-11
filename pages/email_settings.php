@@ -16,13 +16,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     if (isset($_POST['save'])) {
         setSetting('smtp_email', trim($_POST['smtp_email'] ?? ''));
-        // لا تَدُس كلمة السر إن تُركت فارغة (حفاظاً على المحفوظة)
-        if (trim($_POST['smtp_pass'] ?? '') !== '') setSetting('smtp_pass', trim($_POST['smtp_pass']));
         setSetting('smtp_host', trim($_POST['smtp_host'] ?? ''));
         setSetting('smtp_port', trim($_POST['smtp_port'] ?? ''));
         setSetting('smtp_secure', trim($_POST['smtp_secure'] ?? ''));
         setSetting('smtp_from_name', trim($_POST['smtp_from_name'] ?? ''));
-        $_SESSION['flash_success'] = 'تم حفظ إعدادات البريد';
+        // 🔑 (2026-10-11 «عم حاول غيّر كلمة السر… بس حطّ حفظ بيرجع للقديم»): كلمة السر الجديدة تُحفَظ فوراً، ويُسجَّل وقت تغييرها،
+        //    ويُفحَص تسجيل الدخول بها على خادم البريد بالحال — فتعرف دغري إنّها انحفظت وإن كان الخادم قبلها. الفارغة = إبقاء المحفوظة.
+        $newPass = (string)($_POST['smtp_pass'] ?? '');
+        // كلمة مرور تطبيق Google تُعرض «xxxx xxxx xxxx xxxx» — الفراغات ليست جزءاً منها
+        if (preg_match('/^\s*([a-z]{4}\s+){3}[a-z]{4}\s*$/i', $newPass)) $newPass = preg_replace('/\s+/', '', $newPass);
+        else $newPass = trim($newPass);
+        if ($newPass !== '') {
+            setSetting('smtp_pass', $newPass);
+            setSetting('smtp_pass_changed_at', date('Y-m-d H:i'));
+            $cfg = smtpConfigFromSettings();
+            [$okL, $errL] = $cfg ? smtpCheckLogin($cfg) : [false, 'إعدادات البريد غير مكتملة'];
+            $hint = 'كلمة السر الجديدة انحفظت (' . mb_strlen($newPass, 'UTF-8') . ' حرفاً، تبدأ بـ«' . mb_substr($newPass, 0, 1, 'UTF-8') . '» وتنتهي بـ«' . mb_substr($newPass, -1, 1, 'UTF-8') . '»)';
+            if ($okL) $_SESSION['flash_success'] = '✅ ' . $hint . ' — وخادم البريد قبلها: الإرسال جاهز.';
+            else $_SESSION['flash_error'] = '⚠️ ' . $hint . ' — لكن خادم البريد رفضها: ' . $errL . ' — تأكّد أنّها «كلمة مرور التطبيق» لا كلمة سرّ الحساب العادية.';
+        } else {
+            $_SESSION['flash_success'] = 'تم حفظ إعدادات البريد (كلمة السر المحفوظة لم تتغيّر لأنّ خانتها تُركت فارغة)';
+        }
         header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
     }
     if (isset($_POST['test'])) {
@@ -38,7 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $email = getSetting('smtp_email', '');
-$hasPass = getSetting('smtp_pass', '') !== '';
+$savedPass = (string)getSetting('smtp_pass', '');
+$hasPass = $savedPass !== '';
+$passChanged = (string)getSetting('smtp_pass_changed_at', '');
 $host = getSetting('smtp_host', '');
 $port = getSetting('smtp_port', '');
 $secure = getSetting('smtp_secure', '');
@@ -63,7 +79,17 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-group">
                 <label class="form-label">Mot de passe / كلمة السر / كلمة مرور التطبيق <?= $hasPass ? '<span style="color:#16a34a">(محفوظة — اتركها فارغة للإبقاء عليها)</span>' : '' ?></label>
-                <input type="password" name="smtp_pass" class="form-control" dir="ltr" placeholder="<?= $hasPass ? '••••••••' : 'كلمة المرور' ?>" autocomplete="new-password">
+                <div style="display:flex;gap:6px;align-items:center">
+                    <input type="password" name="smtp_pass" id="smtpPass" class="form-control" dir="ltr" value="" placeholder="<?= $hasPass ? 'اكتب كلمة سرّ جديدة هون فقط إذا بدّك تغيّرها' : 'كلمة المرور' ?>" autocomplete="new-password" data-lpignore="true" style="flex:1">
+                    <button type="button" class="btn btn-sm btn-light" id="smtpEye" title="إظهار / إخفاء ما كتبته"><i class="fas fa-eye"></i></button>
+                </div>
+                <?php if ($hasPass): ?>
+                <div style="font-size:12.5px;color:#475569;margin-top:4px;line-height:1.7">
+                    🔑 المحفوظة حالياً: <b><?= mb_strlen($savedPass, 'UTF-8') ?></b> حرفاً، تبدأ بـ«<b dir="ltr"><?= e(mb_substr($savedPass, 0, 1, 'UTF-8')) ?></b>» وتنتهي بـ«<b dir="ltr"><?= e(mb_substr($savedPass, -1, 1, 'UTF-8')) ?></b>»<?= $passChanged !== '' ? ' — آخر تغيير: ' . e($passChanged) : '' ?>.
+                    بعد الحفظ بتنفحص فوراً على خادم البريد وبتعرف إذا قبلها.
+                </div>
+                <?php endif; ?>
+                <script>document.getElementById('smtpEye').addEventListener('click', function () { var p = document.getElementById('smtpPass'); p.type = p.type === 'password' ? 'text' : 'password'; this.innerHTML = p.type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>'; });</script>
             </div>
             <div class="form-group">
                 <label class="form-label">Nom de l'expéditeur / اسم المُرسِل (يظهر بالبريد)</label>
