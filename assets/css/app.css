@@ -2564,3 +2564,51 @@ tr.mp-row.mp-sel > td { background: #eef4ff !important; }
 .rl-pair.rl-th .rl-ar { font-weight: 600; opacity: .85; }
 .rl-pair.rl-th .rl-fr { direction: ltr; }
 @media print { .rl-chips { display: none !important; } }
+
+/* ═══ 300 📐🍎 (2026-10-11 «راس الصفحة قدّيش أخذ مساحة… بدّو ترتيب» + «كبسات اطبع بدي شكلهن متل الآيفون وبالألوان») ═══ */
+@media screen {
+/* (أ) رأس الرواتب الشهرية سطراً واحداً: الفترة + الفئة + سعر الصرف + عرض بسطر، والخيارات الخمسة مطوية جنب شريط الطباعة */
+.mp-period .card-body { padding: 8px 14px !important; }
+.mp-period form.form-row.mp-period-row { grid-template-columns: auto 170px 110px minmax(440px, 1fr) 180px 140px !important; align-items: end; gap: 6px 12px; }
+.mp-period .mp-period-row > .emp-type-picker { grid-column: auto !important; order: 0 !important; }
+.mp-period .mp-period-row .form-label { margin-bottom: 4px; font-size: 12.5px; white-space: nowrap; }
+.mp-period .mp-period-title { font-weight: 800; color: #1e3a8a; font-size: 14px; padding: 0 0 10px; white-space: nowrap; }
+@media (max-width: 1180px) {
+  .mp-period form.form-row.mp-period-row { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important; }
+  .mp-period .mp-period-row > .emp-type-picker, .mp-period .mp-period-title { grid-column: 1 / -1 !important; }
+}
+.msa-bars-row > .export-toolbar { margin: 0 !important; flex: 1 1 320px; min-width: 0; } /* الشريط بنفس سطر كبسة «الأعمدة والخيارات» ويلتفّ داخلياً */
+.msa-bars-row > details.export-compact:not([open]) { flex: 0 0 auto; }
+.mp-slips-bar { gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
+.mp-slips-hint { color: #6e6e73; font-size: 12.5px; flex: 1; text-align: center; }
+/* (ب) كبسات الطباعة والتصدير بشكل الآيفون: مدوّرة 12px، ممتلئة بألوان iOS، نصّ أبيض، أيقونة بيضاء */
+.export-toolbar { gap: 6px !important; }
+.export-toolbar .btn, .export-toolbar .btn.btn-sm, .export-toolbar a.btn {
+  border: 0 !important; border-radius: 12px !important; min-height: 34px; padding: 7px 12px !important; font-size: 12.5px !important; font-weight: 600 !important;
+  color: #fff !important; background: #8e8e93 !important; box-shadow: 0 1px 2px rgba(0,0,0,.10) !important; display: inline-flex; align-items: center; gap: 6px; line-height: 1.2;
+  -webkit-font-smoothing: antialiased; transition: filter .12s ease, transform .12s ease;
+}
+.export-toolbar .btn i { color: #fff !important; }
+.export-toolbar .btn:hover { filter: brightness(1.07); }
+.export-toolbar .btn:active { transform: scale(.96); filter: brightness(.95); }
+.export-toolbar .btn.btn-primary { background: #007aff !important; }      /* Imprimer */
+.export-toolbar #msaOrientBtn, .export-toolbar #msaFitBtn { background: #8e8e93 !important; } /* أدوات الورقة: رمادي iOS */
+.export-toolbar .btn.btn-gold { background: #ff9500 !important; }         /* Modifier */
+.export-toolbar .btn.btn-danger { background: #ff3b30 !important; }       /* PDF */
+.export-toolbar .btn.btn-success { background: #34c759 !important; }      /* Excel */
+.export-toolbar .btn.btn-info { background: #5856d6 !important; }         /* Word */
+.export-toolbar .btn[style*="25D366"] { background: #25d366 !important; color: #fff !important; } /* WhatsApp */
+.export-toolbar .btn.btn-light:not(#msaOrientBtn):not(#msaFitBtn) { background: #32ade6 !important; } /* Email */
+.export-toolbar .btn.btn-dark { background: #1c1c1e !important; }         /* Remis à l’État */
+/* حبوب اللغة = segmented control كالآيفون */
+.export-toolbar .rl-chips { background: rgba(120,120,128,.14); border-radius: 11px; padding: 3px; min-height: 34px; margin: 0; }
+.export-toolbar .rl-chip, .export-toolbar .rl-side { border-radius: 9px; padding: 5px 10px; font-size: 12.5px; }
+.export-toolbar .rl-chip.on, .export-toolbar .rl-side.on { background: #fff; color: #1c1c1e; box-shadow: 0 2px 5px rgba(0,0,0,.14); }
+/* كبسات «Colonnes & options» / «Impression & export» (تفتح الشريط): نمط iOS مظلَّل (tinted) */
+.msa-bars-row > details.export-compact > summary, .export-compact > summary.btn {
+  background: rgba(0,122,255,.12) !important; color: #007aff !important; border: 0 !important; border-radius: 12px !important; min-height: 34px; padding: 7px 14px !important; font-size: 13px !important; font-weight: 600 !important;
+}
+.msa-bars-row > details.export-compact > summary i, .export-compact > summary.btn i { color: #007aff !important; }
+.msa-bars-row > details.export-compact[open] > summary { background: #007aff !important; color: #fff !important; }
+.msa-bars-row > details.export-compact[open] > summary i { color: #fff !important; }
+}

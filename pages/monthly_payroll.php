@@ -200,7 +200,10 @@ if (!empty($_SESSION['flash'])) {
 // شريط الخيارات الخمسة وشريط التصدير يصيران كبستَين قابلتَين للفتح («Colonnes & options» / «Impression & export») فوق الجدول،
 // والقسيمة الفردية والطباعة الجماعية تبقيان بشريطَيهما الكاملَين كما كانتا.
 $mpModern = ($action === 'list' && $employeeId <= 0);
-if ($mpModern) { $hideExportToolbar = true; $compactSalaryComp = true; }
+if ($mpModern) { $hideExportToolbar = true; }
+// 📐 (2026-10-11 «شوف راس الصفحة قدّيش أخذ مساحة») بكل أوضاع الصفحة (لائحة/قسيمة/قسائم جماعية): الخيارات الخمسة مطوية بكبسة «Colonnes & options»
+// وشريط الطباعة بسطر واحد جنبها، وبطاقة الفترة سطر واحد — بدل رأس بثلاث طبقات يأخذ نصف الشاشة.
+$compactSalaryComp = true;
 include __DIR__ . '/../includes/header.php';
 echo officialFormStyles(); // ستايلات الترويسة/التوقيع/العناوين الرسمية على القسيمة
 ?>
@@ -222,15 +225,11 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
 <?php endif; ?>
 
 <!-- Period selector -->
-<div class="card no-print<?= $mpModern ? ' mp-period' : '' ?>">
-    <div class="card-header">
-        <h3>
-            <span dir="ltr"><i class="fas fa-calendar-alt"></i> Période</span>
-            <div style="font-size:0.85em;font-weight:600;opacity:0.9">الفترة</div>
-        </h3>
-    </div>
+<div class="card no-print mp-period">
     <div class="card-body">
-        <form method="GET" class="form-row cols-5">
+        <?php /* 📐 (2026-10-11) سطر واحد: العنوان صغير بأوّل السطر ثم الشهر/السنة/الفئة/سعر الصرف/عرض — بلا رأس بطاقة مستقلّ */ ?>
+        <form method="GET" class="form-row mp-period-row">
+            <div class="mp-period-title"><i class="fas fa-calendar-alt"></i> Période / الفترة</div>
             <div class="form-group mb-0">
                 <label class="form-label">Mois / الشهر</label>
                 <select name="month" class="form-select">
@@ -281,17 +280,13 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
         .payslip-card .table th, .payslip-card .table td { border: 1px solid #d0d7de !important; }
     }
     </style>
-    <div class="d-flex justify-between align-center mb-3 no-print">
-        <a href="<?= BASE_URL ?>pages/monthly_payroll.php?month=<?= $month ?>&year=<?= $year ?><?= $typeQ ?>" class="btn btn-light">
+    <?php /* 📐 (2026-10-11) سطر واحد بدل سطرَين + تنبيه: رجوع · تلميح قصير · العدد. (زرّ «طباعة الكل» أُزيل سابقاً — مكرّر مع «طباعة» بالشريط) */ ?>
+    <div class="d-flex justify-between align-center no-print mp-slips-bar">
+        <a href="<?= BASE_URL ?>pages/monthly_payroll.php?month=<?= $month ?>&year=<?= $year ?><?= $typeQ ?>" class="btn btn-light btn-sm">
             <i class="fas fa-arrow-left"></i> Retour à la liste / رجوع
         </a>
-        <div>
-            <?php /* 🧹 زرّ «طباعة الكل» أُزيل — مكرّر مع «طباعة» بشريط التصدير فوق (قاعدة المستخدم: لا أزرار مكرّرة) */ ?>
-            <span class="badge badge-info"><?= count($empsP) ?> — <?= e($typeLbl) ?></span>
-        </div>
-    </div>
-    <div class="alert alert-info no-print" style="margin-bottom:16px">
-        <i class="fas fa-info-circle"></i> راجِع رواتب كل الأساتذة/الموظفين تحت، وعند التأكد اضغط «طباعة الكل». كل قسيمة تُطبع بصفحة مستقلة.
+        <span class="mp-slips-hint" dir="rtl"><i class="fas fa-info-circle"></i> راجِع القسائم تحت ثم اطبعها من «Imprimer / طباعة» فوق — كل قسيمة بصفحة مستقلّة</span>
+        <span class="badge badge-info"><?= count($empsP) ?> — <?= e($typeLbl) ?></span>
     </div>
     <?php if (!$empsP): ?>
         <div class="alert alert-warning">Aucun employé correspondant au filtre / لا يوجد موظفون مطابقون للفلتر.</div>

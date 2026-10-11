@@ -6,6 +6,8 @@
 //  • «عربي + فرنسي» بالرؤوس (th): الفرنسي سطر فوق والعربي سطر تحت (قاعدة الفرنسي أوّلاً) — بالإكسل خلية واحدة «FR / AR».
 //  • الاتجاه: عربي = من اليمين، فرنسي = من الشمال، الاثنان = الجهة التي يختارها (على ورقة التقرير الموحّدة .doc-sheet فقط —
 //    نماذج الدولة الرسمية .official-doc تبقى بنصّها واتجاهها: طبق الأصل).  • البطاقة السنوية (annual) لا تُمسّ.  • الاختيار محفوظ على الجهاز.
+//  • (2026-10-11 «ما عندي خيار العربي أو الفرنسي») القسائم الجماعية (.payslip-card) مستندات، وأي صفحة فيها جدول بلا ورقة مستند
+//    (التعويض العائلي، لائحة الموظفين…) جدولها هو المستند ⇒ الخيار موجود بكل صفحة فيها شريط طباعة.
 (function () {
     var PAGE = window.MSA_PAGE || '';
     if (PAGE === 'annual') return;
@@ -80,7 +82,13 @@
     }
     function lead(t) { var m = /^(\s*)/.exec(t); return m ? m[1] : ''; }
     function trail(t) { var m = /(\s*)$/.exec(t); return m ? m[1] : ''; }
-    var roots = function () { return document.querySelectorAll('#ppExportArea, .doc-sheet, .official-doc, .land-report, .xls-sheet'); };
+    // 2026-10-11 «ما عندي خيار العربي أو الفرنسي» بالقسائم الجماعية: كل قسيمة (.payslip-card) مستند أيضاً، لا القسيمة الفردية (#ppExportArea) وحدها
+    var roots = function () {
+        var r = document.querySelectorAll('#ppExportArea, .payslip-card, .doc-sheet, .official-doc, .land-report, .xls-sheet');
+        if (r.length) return r;
+        // صفحة بلا ورقة مستند لكن فيها جدول (التعويض العائلي، المكافآت…): الجدول نفسه هو المستند ⇒ الخيار موجود بكل صفحة فيها شريط طباعة
+        return Array.prototype.filter.call(document.querySelectorAll('#pageContent table'), function (t) { return !t.closest('.no-print, .no-export, .export-toolbar, .att-opts, table table'); });
+    };
     var SKIP = /^(SCRIPT|STYLE|INPUT|TEXTAREA|SELECT|OPTION|BUTTON)$/;
     function mkPair(tn, pr, inTh) {
         var t = tn.nodeValue;
@@ -151,7 +159,7 @@
             // الاتجاه — ورقة التقرير الموحّدة فقط (نماذج الدولة تبقى)
             var side = effSide();
             var sheets = root.classList.contains('doc-sheet') ? [root] : Array.prototype.slice.call(root.querySelectorAll('.doc-sheet'));
-            if (!root.classList.contains('official-doc') && !root.querySelector('.official-doc') && !sheets.length && root.querySelector('table')) sheets = [root];
+            if (!root.classList.contains('official-doc') && !root.querySelector('.official-doc') && !sheets.length && (root.tagName === 'TABLE' || root.querySelector('table'))) sheets = [root];
             sheets.forEach(function (sh) {
                 if (sh.__rlDir === undefined) sh.__rlDir = { dir: sh.getAttribute('dir'), ltr: sh.classList.contains('doc-ltr') };
                 if (side) { sh.setAttribute('dir', side); sh.classList.toggle('doc-ltr', side === 'ltr'); sh.querySelectorAll('table').forEach(function (t) { if (t.__rlDir === undefined) t.__rlDir = t.getAttribute('dir'); t.setAttribute('dir', side); }); }
