@@ -2614,3 +2614,9 @@ tr.mp-row.mp-sel > td { background: #eef4ff !important; }
 .msa-bars-row > details.export-compact[open] > summary { background: #007aff !important; color: #fff !important; }
 .msa-bars-row > details.export-compact[open] > summary i { color: #fff !important; }
 }
+/* 🔍 (2026-10-11 «كبّر أيقونات اللي بالعامود على الشمال») أيقونات القائمة الجانبية 30px بدل 22px مع رمز 15px */
+@media screen {
+.sidebar .sidebar-nav a > i:first-child { width: 30px !important; height: 30px !important; min-width: 30px !important; font-size: 15px !important; border-radius: 8px !important; }
+.sidebar .sidebar-nav a { gap: 10px; min-height: 38px; }
+.sidebar .sidebar-nav a span { font-size: 13px; }
+}
