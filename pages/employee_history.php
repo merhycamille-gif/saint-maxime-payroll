@@ -30,6 +30,7 @@ if ($employeeId > 0) {
 }
 
 // 🔴 لا doc-view هنا: سيرة الأستاذ صفحة عمل لها شكلها المعهود (شكوى المستخدم p1 بتاريخ 2026-08-01).
+$compactSalaryComp = true; // 📐 (2026-10-11 «راس الصفحة قدّيش أخذ مساحة») الخيارات الخمسة مطوية «Colonnes & options» متل الرواتب الشهرية
 include __DIR__ . '/../includes/header.php';
 
 if (!$emp):

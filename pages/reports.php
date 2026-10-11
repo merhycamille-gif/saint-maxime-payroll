@@ -70,6 +70,7 @@ if ($report !== '') $docFocus = true;
 // صفحة القائمة (بلا تقرير مختار): لا شيء يُصدَّر — شريط التصدير زائد يعجّق الواجهة (2026-08-19)
 if ($report === '') $hideExportToolbar = true;
 
+$compactSalaryComp = true; // 📐 (2026-10-11 «راس الصفحة قدّيش أخذ مساحة») الخيارات الخمسة مطوية «Colonnes & options» متل الرواتب الشهرية
 include __DIR__ . '/../includes/header.php';
 
 /**

@@ -2620,3 +2620,17 @@ tr.mp-row.mp-sel > td { background: #eef4ff !important; }
 .sidebar .sidebar-nav a { gap: 10px; min-height: 38px; }
 .sidebar .sidebar-nav a span { font-size: 13px; }
 }
+/* 🗂️ (2026-10-11 «كل عنوان وتوابعه لازم يكونوا محدّدين عن بعضهم» — مركز التقارير) كل مجموعة (الضمان/الصندوق/الضريبة…) لوحة مستقلّة
+   بلون المجموعة: خلفية فاتحة + إطار + عنوان بارز بأيقونة ملوّنة + خطّ فاصل، ومسافة واضحة بين المجموعات */
+@media screen {
+.report-cat { margin: 0 0 18px !important; padding: 12px 14px 14px; border-radius: 16px;
+  background: color-mix(in srgb, var(--rc, #1e3a8a) 6%, #fff); border: 1px solid color-mix(in srgb, var(--rc, #1e3a8a) 28%, #fff);
+  border-inline-start: 6px solid var(--rc, #1e3a8a); }
+.report-cat .report-cat-title { background: transparent !important; border: 0 !important; border-bottom: 1px solid color-mix(in srgb, var(--rc, #1e3a8a) 25%, #fff) !important;
+  border-radius: 0; margin: 0 0 12px !important; padding: 2px 0 10px !important; font-size: 16px !important; font-weight: 800 !important; color: var(--rc, #1e3a8a) !important; gap: 10px; }
+.report-cat .report-cat-title span, .report-cat .report-cat-title > div { color: var(--rc, #1e3a8a) !important; }
+.report-cat .report-cat-title > div { font-size: 14px !important; font-weight: 700 !important; opacity: .85; }
+.report-cat .report-cat-title i { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--rc, #1e3a8a); color: #fff !important; font-size: 15px; margin-inline-end: 2px; }
+.report-cat .report-grid { gap: 10px; }
+.report-cat .report-grid > .report-card { border-color: color-mix(in srgb, var(--rc, #1e3a8a) 22%, #fff) !important; }
+}
