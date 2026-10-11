@@ -83,7 +83,10 @@ check('📝 الوورد للإفادة/الكتاب (بلا جداول بيان
       && strpos($dx247, 'class MsaDocx') !== false && strpos($dx247, 'MsaPdf::prepare($html, $o)') !== false
       && strpos($dx247, '$dom->saveXML($ch)') !== false && strpos($dx247, 'setBidiVisual(true)') !== false
       && strpos($en247, 'public static function prepare(string $html, array $o = []): array') !== false
-      && strpos($he247, "if (\$format === 'docx' && \$tablesN === 0) {") !== false && strpos($he247, 'MsaDocx::fromHtml($html,') !== false);
+      && strpos($he247, "if (\$format === 'docx' && \$tablesN === 0) {") !== false && strpos($he247, 'MsaDocx::fromHtml($html,') !== false
+      && strpos($ex247, "fd.set('lh_bg', new URL(m[1], document.baseURI).href)") !== false
+      && strpos($en247, "SetWatermarkImage(\$p['lh_file'], 1,") !== false && strpos($en247, "\$w->setAttribute('class', 'word-head-on')") !== false
+      && strpos($dx247, "MsaPdf::prepare(\$html, \$o + ['word_head' => true])") !== false);
 // تشغيل فعلي: جدول عربي بترويسة ومجاميع ⇒ PDF حقيقي بصفحة واحدة، بلا تكرار tfoot
 $ok247 = false; $why247 = '';
 try {
