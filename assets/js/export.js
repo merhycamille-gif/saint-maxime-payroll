@@ -19,7 +19,7 @@
     // نسخة نظيفة من المحتوى بدون أزرار/عناصر لا تُصدَّر (.word-head خاصة بتصدير الوورد فقط)
     function cleanHtml() {
         var node = area().cloneNode(true);
-        node.querySelectorAll('.no-print, .no-export, .export-toolbar, script, button, .btn, form.no-print, .word-head')
+        node.querySelectorAll('.no-print, .no-export, .export-toolbar, script, button, .btn, form.no-print')
             .forEach(function (n) { n.remove(); });
         // أزل تصغير الشاشة (zoom) عن الجداول — التصدير لوورد/إكسل يجب أن يكون بالحجم الكامل
         node.querySelectorAll('[style*="zoom"]').forEach(function (n) { n.style.zoom = ''; });
@@ -264,6 +264,13 @@
         var fd = new FormData();
         fd.append('format', format); fd.append('title', title || document.title || 'document');
         fd.append('dir', docDir(area())); fd.append('landscape', isWide() ? '1' : '0'); fd.append('html', cleanHtml());
+        // 🖼️ (2026-10-11 «حطّينا شعار المدرسة على الإفادة ليش ما عم يطلع بالوورد») الترويسة-الصورة خلفيةٌ على المنطقة نفسها (خارج innerHTML):
+        //    تُبعَث للخادم (الرابط + الحشوة بالبكسل) فيضعها محرّك الـPDF خلفية الورقة، ويستعمل الوورد الترويسة البديلة .word-head
+        try {
+            var cs = getComputedStyle(area()), bg = cs.backgroundImage || '';
+            var m = /url\(["']?([^"')]+)["']?\)/.exec(bg);
+            if (m) { fd.set('lh_bg', new URL(m[1], document.baseURI).href); fd.set('lh_pad', [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(function (v) { return parseFloat(v) || 0; }).join(',')); }
+        } catch (e) {}
         if (extra) Object.keys(extra).forEach(function (k) { fd.set(k, extra[k]); });
         return fd;
     }

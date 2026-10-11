@@ -32,7 +32,7 @@ if ($format === 'pdf') {
         $sch = currentSchool();
         $schoolName = $sch ? (($dir === 'ltr' ? ($sch['name_fr'] ?? '') : ($sch['name_ar'] ?? '')) ?: ($sch['name_ar'] ?? $sch['name_fr'] ?? '')) : '';
         $landOpt = (($_POST['landscape'] ?? 'auto') === 'auto') ? null : $land;
-        $data = MsaPdf::fromHtml($html, ['title' => $title, 'dir' => $dir, 'landscape' => $landOpt, 'school' => $schoolName, 'fit' => !empty($_POST['fit']) && $_POST['fit'] !== '0']);
+        $data = MsaPdf::fromHtml($html, ['title' => $title, 'dir' => $dir, 'landscape' => $landOpt, 'school' => $schoolName, 'fit' => !empty($_POST['fit']) && $_POST['fit'] !== '0', 'lh_bg' => (string)($_POST['lh_bg'] ?? ''), 'lh_pad' => (string)($_POST['lh_pad'] ?? '')]);
     } catch (Throwable $e) {
         http_response_code(500);
         header('Content-Type: text/plain; charset=utf-8');
@@ -209,7 +209,7 @@ if ($tablesN === 0) {
 // 📝 (2026-10-11 «طبعت إفادة وورد شوف كيف طلعت») الإفادة/الكتاب (بلا جداول بيانات) ⇒ وورد حقيقي من المستند نفسه (MsaDocx) لا جدول الكشوف
 if ($format === 'docx' && $tablesN === 0) {
     require_once __DIR__ . '/../includes/docx_engine.php';
-    try { $data = MsaDocx::fromHtml($html, ['title' => $title, 'dir' => $dir, 'landscape' => $land ? true : null, 'letter' => true]); }
+    try { $data = MsaDocx::fromHtml($html, ['title' => $title, 'dir' => $dir, 'landscape' => $land ? true : null, 'letter' => true, 'lh_bg' => (string)($_POST['lh_bg'] ?? '')]); }
     catch (Throwable $e) { $data = ''; }
     if ($data !== '' && strlen($data) > 1000) {
         $fname = preg_replace('/[\\\/:*?"<>|]+/', '_', mb_substr($title, 0, 60, 'UTF-8')) . '_' . date('Y-m-d') . '.docx';

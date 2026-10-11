@@ -94,8 +94,16 @@ class MsaPdf
         $xp = new DOMXPath($dom);
         $body = $dom->getElementsByTagName('body')->item(0);
 
-        // ---- 1) تنظيف: ما لا يُطبع ----
+        // ---- 0) الترويسة البديلة .word-head (شعار + اسم + هاتف، بلا خط): الوورد يكشفها ويشيل ترويسة الشاشة؛ الـPDF يشيلها (display:none) ----
         $cls = function ($c) { return 'contains(concat(" ",normalize-space(@class)," ")," ' . $c . ' ")'; };
+        if (!empty($o['word_head'])) {
+            $wh = $xp->query('//*[' . $cls('word-head') . ']');
+            if ($wh->length) {
+                foreach ($wh as $w) { $w->setAttribute('style', preg_replace('/display\s*:\s*none;?/i', '', (string)$w->getAttribute('style'))); $w->setAttribute('class', 'word-head-on'); } // لا تُمسح بالتنظيف أدناه
+                foreach (iterator_to_array($xp->query('//*[' . $cls('scr-head') . ']')) as $sh) if ($sh->parentNode) $sh->parentNode->removeChild($sh);
+            }
+        }
+        // ---- 1) تنظيف: ما لا يُطبع ----
         $q = '//*[' . implode(' or ', array_map($cls, ['no-print', 'no-export', 'export-toolbar', 'pr-title-row', 'pr-mask', 'word-head', 'scr-head-hidden', 'msa-top-totals', 'att-opts', 'rl-chips', 'legal-bar', 'school-strip']))
             . ' or contains(translate(@style," ",""),"display:none") or self::script or self::style or self::button or self::select or self::input or self::textarea or self::svg or self::iframe or self::canvas'
             . ' or (self::i and contains(@class,"fa"))]';
@@ -321,7 +329,15 @@ class MsaPdf
             $t->parentNode->replaceChild($wrap, $t);
         }
 
-        return ['dom' => $dom, 'body' => $body, 'dir' => $dir, 'rtl' => $rtl, 'landscape' => (bool)$landscape, 'isLetter' => (bool)$isLetter, 'side' => $side, 'title' => $title];
+        // 🖼️ صورة الترويسة (خلفية المنطقة على الشاشة) ⇒ مسار محلي + الهوامش من حشوة المنطقة (px ⇒ mm)
+        $lhFile = ''; $lhPad = null;
+        if (!empty($o['lh_bg'])) {
+            $pb = preg_replace('/[?#].*$/', '', preg_replace('#^https?://[^/]+#i', '', (string)$o['lh_bg']));
+            $relB = ($base !== '/' && strpos($pb, $base) === 0) ? substr($pb, strlen($base)) : ltrim($pb, '/');
+            if (is_file($root . '/' . $relB)) $lhFile = str_replace('\\', '/', $root . '/' . $relB);
+            if (!empty($o['lh_pad']) && preg_match('/^[\d.]+,[\d.]+,[\d.]+,[\d.]+$/', (string)$o['lh_pad'])) $lhPad = array_map(fn($v) => round((float)$v * 25.4 / 96, 1), explode(',', (string)$o['lh_pad']));
+        }
+        return ['dom' => $dom, 'body' => $body, 'dir' => $dir, 'rtl' => $rtl, 'landscape' => (bool)$landscape, 'isLetter' => (bool)$isLetter, 'side' => $side, 'title' => $title, 'lh_file' => $lhFile, 'lh_pad' => $lhPad];
     }
 
     /** يبني PDF من HTML منطقة المستند المعروضة. $o: title · dir (rtl|ltr) · landscape (bool|null) · school (اسم للتذييل) · letter (bool|null) · fit */
@@ -360,6 +376,13 @@ class MsaPdf
             'setAutoTopMargin' => false,
             'setAutoBottomMargin' => false,
         ]);
+        if (!empty($p['lh_file'])) {
+            // 🖼️ الترويسة الرسمية صورةً على كامل الورقة + هوامش الكتابة كما على الشاشة (فوق الترويسة وتحتها)
+            $mpdf->SetWatermarkImage($p['lh_file'], 1, $landscape ? [297, 210] : [210, 297], [0, 0]);   // صورة الترويسة على كامل الورقة (خلف النصّ) بكل صفحة
+            $mpdf->showWatermarkImage = true;
+            $mpdf->watermarkImgBehind = true;
+            if ($p['lh_pad']) { [$pt, $pr, $pb, $pl] = $p['lh_pad']; $mpdf->SetMargins($pl, $pr, $pt); $mpdf->SetAutoPageBreak(true, $pb); }
+        }
         $mpdf->SetDirectionality($dir);
         $mpdf->SetTitle($title);
         $mpdf->SetAuthor((string)($o['school'] ?? ''));

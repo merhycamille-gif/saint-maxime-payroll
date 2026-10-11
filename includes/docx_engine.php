@@ -13,7 +13,7 @@ class MsaDocx
     public static $lastError = '';
     public static function fromHtml(string $html, array $o = []): string
     {
-        $p = MsaPdf::prepare($html, $o);
+        $p = MsaPdf::prepare($html, $o + ['word_head' => true]);
         /** @var DOMDocument $dom */ $dom = $p['dom']; $body = $p['body']; $rtl = $p['rtl']; $isLetter = $p['isLetter']; $landscape = $p['landscape']; $side = $p['side'];
         $xp = new DOMXPath($dom);
 
@@ -79,6 +79,32 @@ class MsaDocx
             $nx = $br->nextSibling; while ($nx && $nx->nodeType === XML_TEXT_NODE && trim($nx->nodeValue) === '') $nx = $nx->nextSibling;
             if (!$nx || ($nx instanceof DOMElement && in_array(strtolower($nx->nodeName), ['div', 'p', 'table', 'ul', 'ol'], true))) $br->parentNode->removeChild($br);
         }
+        // أي حاوية (خليّة/div) فيها سطور متتالية (نصّ/strong/br/img) خارج فقرة ⇒ تُلفّ بفقرة واحدة (وإلا PHPWord يجعل كل جزء فقرة وكل <br> سطراً فارغاً)
+        $inlineTags = ['span', 'strong', 'b', 'i', 'u', 'em', 'br', 'img', 'a', 'small', 'sup', 'sub', 'font', 'mark'];
+        $blockTags = ['div', 'p', 'table', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'td', 'th', 'tbody', 'thead', 'li'];
+        foreach (iterator_to_array($xp->query('//td|//th|//div|//body')) as $cont) {
+            $groups = []; $cur = [];
+            foreach (iterator_to_array($cont->childNodes) as $k) {
+                $isInline = ($k->nodeType === XML_TEXT_NODE) || ($k instanceof DOMElement && in_array(strtolower($k->nodeName), $inlineTags, true));
+                if ($isInline) { $cur[] = $k; continue; }
+                if ($cur) { $groups[] = $cur; $cur = []; }
+            }
+            if ($cur) $groups[] = $cur;
+            $hasBlockKid = false; foreach ($cont->childNodes as $k) if ($k instanceof DOMElement && in_array(strtolower($k->nodeName), $blockTags, true)) { $hasBlockKid = true; break; }
+            if (!$hasBlockKid && strtolower($cont->nodeName) === 'div') continue; // div ورقي يُحوَّل إلى <p> أدناه
+            foreach ($groups as $g) {
+                $txt = ''; $hasImg = false; foreach ($g as $k) { $txt .= $k->textContent; if ($k instanceof DOMElement && ($k->nodeName === 'img' || $xp->query('.//img', $k)->length)) $hasImg = true; }
+                if (trim($txt) === '' && !$hasImg) continue;
+                while ($g && $g[count($g) - 1] instanceof DOMElement && strtolower($g[count($g) - 1]->nodeName) === 'br') { $br = array_pop($g); $br->parentNode->removeChild($br); } // لا سطر فارغ بالنهاية
+                while ($g && $g[0] instanceof DOMElement && strtolower($g[0]->nodeName) === 'br') { $br = array_shift($g); $br->parentNode->removeChild($br); }
+                if (!$g) continue;
+                $pEl = $dom->createElement('p');
+                $al = preg_match('/text-align\s*:\s*(center|right|left)/', (string)$cont->getAttribute('style'), $am) ? $am[1] : ($rtl ? 'right' : 'left');
+                $pEl->setAttribute('style', 'text-align:' . $al . ';');
+                $cont->insertBefore($pEl, $g[0]);
+                foreach ($g as $k) $pEl->appendChild($k);
+            }
+        }
         // PHPWord لا يعرف <div>: نصوصه تصير فقرات متفرّقة. كل div لا يحوي عناصر كتلية يصير <p> (الأعمق أوّلاً)؛ الباقي يبقى حاوية شفّافة.
         $blocks = ['div', 'p', 'table', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'td', 'th', 'li', 'tbody', 'thead'];
         $divs = iterator_to_array($xp->query('//div'));
@@ -101,6 +127,8 @@ class MsaDocx
             if (strpos($st, 'direction') === false) $el->setAttribute('style', 'direction:' . ($rtl ? 'rtl' : 'ltr') . ';' . $el->getAttribute('style'));
         }
 
+        // ما بقي من <div> (حاويات) يُفكّ: PHPWord يعتبر خليّة بلا <p> مباشر «نصّاً» ثم يصطدم بفقرة داخل div متداخل (TextRun in TextRun)
+        foreach (array_reverse(iterator_to_array($xp->query('//div'))) as $dv) { $par = $dv->parentNode; if (!$par) continue; while ($dv->firstChild) $par->insertBefore($dv->firstChild, $dv); $par->removeChild($dv); }
         // PHPWord يقرأ XML (loadXML): نكتب XHTML صالحاً (img/br مغلقة) ونستبدل كيانات HTML التي لا يعرفها XML
         $inner = '';
         foreach ($body->childNodes as $ch) $inner .= $dom->saveXML($ch);
@@ -124,6 +152,7 @@ class MsaDocx
             \PhpOffice\PhpWord\Shared\Html::addHtml($section, $inner, false, false);
         } catch (Throwable $e) {
             self::$lastError = get_class($e) . ': ' . $e->getMessage() . ' @' . basename($e->getFile()) . ':' . $e->getLine();
+            self::$lastError .= ' | ' . preg_replace('/\s+/', ' ', substr($e->getTraceAsString(), 0, 900));
             // احتياط: نصّ المستند فقرات (لا يُترك المستخدم بلا ملف)
             $txt = trim(preg_replace('/\s+/u', ' ', strip_tags(str_replace(['</p>', '<br>', '<br/>', '</div>', '</tr>'], "\n", $inner))));
             foreach (preg_split('/\n+/', $txt) as $ln) { $ln = trim($ln); if ($ln !== '') $section->addText($ln, ['rtl' => $rtl]); }
