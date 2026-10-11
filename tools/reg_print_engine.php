@@ -80,7 +80,7 @@ check('📐 الإكسل/الوورد: ما قبل أوّل جدول = كتلة 
 $dx247 = (string)file_get_contents($P247 . '/includes/docx_engine.php');
 check('📝 الوورد للإفادة/الكتاب (بلا جداول بيانات) = مستند حقيقي عبر PHPWord من HTML المستند (MsaDocx ⇐ MsaPdf::prepare) لا جدول الكشوف',
       is_file($P247 . '/vendor/phpoffice/phpword/src/PhpWord/PhpWord.php')
-      && strpos($dx247, 'class MsaDocx') !== false && strpos($dx247, 'MsaPdf::prepare($html, $o)') !== false
+      && strpos($dx247, 'class MsaDocx') !== false && strpos($dx247, 'MsaPdf::prepare($html, $o') !== false
       && strpos($dx247, '$dom->saveXML($ch)') !== false && strpos($dx247, 'setBidiVisual(true)') !== false
       && strpos($en247, 'public static function prepare(string $html, array $o = []): array') !== false
       && strpos($he247, "if (\$format === 'docx' && \$tablesN === 0) {") !== false && strpos($he247, 'MsaDocx::fromHtml($html,') !== false
