@@ -81,8 +81,8 @@ class MsaPdf
         return max($wrap, min($mx, 42));
     }
 
-    /** يبني PDF من HTML منطقة المستند المعروضة. $o: title · dir (rtl|ltr) · landscape (bool|null) · school (اسم للتذييل) · letter (bool|null) */
-    public static function fromHtml(string $html, array $o = []): string
+    /** تحضير HTML المستند (تنظيف + تحويل التخطيطات + الجداول) — مشترك بين الـPDF (mPDF) والوورد (MsaDocx). يُرجع dom/body/dir/rtl/landscape/isLetter/side/title */
+    public static function prepare(string $html, array $o = []): array
     {
         $dir = (($o['dir'] ?? 'rtl') === 'ltr') ? 'ltr' : 'rtl';
         $rtl = $dir === 'rtl';
@@ -321,6 +321,15 @@ class MsaPdf
             $t->parentNode->replaceChild($wrap, $t);
         }
 
+        return ['dom' => $dom, 'body' => $body, 'dir' => $dir, 'rtl' => $rtl, 'landscape' => (bool)$landscape, 'isLetter' => (bool)$isLetter, 'side' => $side, 'title' => $title];
+    }
+
+    /** يبني PDF من HTML منطقة المستند المعروضة. $o: title · dir (rtl|ltr) · landscape (bool|null) · school (اسم للتذييل) · letter (bool|null) · fit */
+    public static function fromHtml(string $html, array $o = []): string
+    {
+        $p = self::prepare($html, $o);
+        $dom = $p['dom']; $body = $p['body']; $dir = $p['dir']; $rtl = $p['rtl']; $landscape = $p['landscape']; $isLetter = $p['isLetter']; $side = $p['side']; $title = $p['title'];
+        $fitOne = !empty($o['fit']);
         // ---- 5) mPDF ----
         $root = realpath(__DIR__ . '/..');
         $tmp = $root . '/tmp/mpdf'; if (!is_dir($tmp)) @mkdir($tmp, 0777, true);

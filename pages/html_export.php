@@ -206,4 +206,18 @@ if ($tablesN === 0) {
     foreach ($xp->query('//body//*[self::p or self::div or self::li][not(.//p) and not(.//div) and not(.//li)]') as $p) { $tx = hx_clean(hx_text($p)); if ($tx !== '') $rep->sectionRow($tx); }
 } else $flushPending();
 
+// 📝 (2026-10-11 «طبعت إفادة وورد شوف كيف طلعت») الإفادة/الكتاب (بلا جداول بيانات) ⇒ وورد حقيقي من المستند نفسه (MsaDocx) لا جدول الكشوف
+if ($format === 'docx' && $tablesN === 0) {
+    require_once __DIR__ . '/../includes/docx_engine.php';
+    try { $data = MsaDocx::fromHtml($html, ['title' => $title, 'dir' => $dir, 'landscape' => $land ? true : null, 'letter' => true]); }
+    catch (Throwable $e) { $data = ''; }
+    if ($data !== '' && strlen($data) > 1000) {
+        $fname = preg_replace('/[\\\/:*?"<>|]+/', '_', mb_substr($title, 0, 60, 'UTF-8')) . '_' . date('Y-m-d') . '.docx';
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        header('Content-Disposition: attachment; filename="' . rawurlencode($fname) . '"; filename*=UTF-8\'\'' . rawurlencode($fname));
+        header('Content-Length: ' . strlen($data)); header('Cache-Control: no-cache');
+        echo $data; exit;
+    }
+}
 if ($format === 'docx') $rep->docx(); else $rep->xlsx();
