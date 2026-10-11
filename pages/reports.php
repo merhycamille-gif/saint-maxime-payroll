@@ -262,7 +262,7 @@ function reportDocThumb($path) {
 <?php /* الملاءمة التلقائية للجداول الواسعة صارت مشتركة في officialFormStyles() — تعمل هنا وفي النماذج الرسمية */ ?>
     <?php /* الترويسة (مدرسة واحدة/بانر المدارس) صارت داخل الورقة الموحّدة docSheetStart */ ?>
     <?php if ($report === 'monthly_summary'):
-        $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.employee_type, e.school_id, " . familyDedSelectCols('e') . ", ms.*
+        $stmt = $db->prepare("SELECT ms.employee_id, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.employee_type, e.school_id, " . familyDedSelectCols('e') . ", ms.*
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $schoolSql . $empYearFilter . $empTypeSql . "
@@ -297,7 +297,7 @@ function reportDocThumb($path) {
             </div>
         </form>
 
-        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year]) ?>
+        <?= docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year]) . fileVsStoredBanner($data, $month, $year) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>
                         <th>#</th>
@@ -410,7 +410,7 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'cnss_summary'):
-        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.nssf_number, e.birth_date, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.cnss_amount_lbp, ms.school_cnss_8_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
+        $stmt = $db->prepare("SELECT ms.employee_id, e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.nssf_number, e.birth_date, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.cnss_amount_lbp, ms.school_cnss_8_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.cnss_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
@@ -430,7 +430,7 @@ function reportDocThumb($path) {
             </div>
         </form>
         <?php /* 🏛️ ترويسة كشف الضمان باسم صاحب العمل لدى الصندوق (25-82-043 ⇒ الجمعية) */ ?>
-        <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year, 'school' => cnssEmployerSchool(reportHeaderSchool())]) ?>
+        <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year, 'school' => cnssEmployerSchool(reportHeaderSchool())]) . fileVsStoredBanner($data, $month, $year) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>وعاء الضمان</th><th>الأجير<?= contribHead('cnss_employee_rate', $month, $year) ?></th><th>المدرسة<?= contribHead('cnss_employer_rate', $month, $year) ?></th></tr></thead>
                     <tbody>
@@ -475,7 +475,7 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'tax_summary'):
-        $stmt = $db->prepare("SELECT e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.finance_ministry_number, e.school_id, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, e.id eid, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
+        $stmt = $db->prepare("SELECT ms.employee_id, e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.finance_ministry_number, e.school_id, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, e.id eid, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.income_tax_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.tax_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
@@ -498,7 +498,7 @@ function reportDocThumb($path) {
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
-        <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year]) ?>
+        <?= docSheetStart('Impôt sur le revenu', 'كشف ضريبة الدخل الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year]) . fileVsStoredBanner($data, $month, $year) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>الرقم المالي</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>التنزيل العائلي<br><small style="font-weight:400">حصّة الشهر — مطفأ بملفه = 0</small></th><th>الراتب الخاضع للضريبة<br><small style="font-weight:400">بعد حسم التنزيل</small></th><th>الضريبة</th></tr></thead>
                     <tbody>
@@ -544,7 +544,7 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'eoc_summary'):
-        $stmt = $db->prepare("SELECT e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.caisse_number, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.caisse_amount_lbp, ms.eoc_grade_lbp, ms.school_eoc_6_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
+        $stmt = $db->prepare("SELECT ms.employee_id, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.caisse_number, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.caisse_amount_lbp, ms.eoc_grade_lbp, ms.school_eoc_6_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.employee_type = 'enseignant_titulaire'" . $schoolSql . $empYearFilter . "
                               ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
@@ -561,7 +561,7 @@ function reportDocThumb($path) {
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
-        <?= docSheetStart('Caisse EOC — retenues mensuelles', 'كشف صندوق التعليم الخاص الشهري', [monthName($month) . ' ' . $year], ['month' => $month, 'year' => $year]) ?>
+        <?= docSheetStart('Caisse EOC — retenues mensuelles', 'كشف صندوق التعليم الخاص الشهري', [monthName($month) . ' ' . $year], ['month' => $month, 'year' => $year]) . fileVsStoredBanner($data, $month, $year) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الصندوق</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>الأجير<?= contribHead('eoc_employee_rate', $month, $year) ?></th><th>درجة/نصف راتب</th><th>المدرسة<?= contribHead('eoc_employer_rate', $month, $year) ?></th></tr></thead>
                     <tbody>

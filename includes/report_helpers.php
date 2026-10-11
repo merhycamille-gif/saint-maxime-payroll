@@ -426,6 +426,47 @@ function docSheetStart(string $titleFr, string $titleAr, array $chips = [], arra
     <?php
     return ob_get_clean();
 }
+/**
+ * 🚨 (2026-10-11 مارسيلا داود «هودي أرزاق الناس») حارس الأرقام بالكشوف الشهرية: لكل صفّ بالكشف يقارن الإضافي/المكافأة/النقل
+ * **المخزّن** بما يعطيه **ملف الموظف اليوم** لهذا الشهر؛ أي اختلاف = تنبيه أحمر فوق الكشف (لا يُطبع ولا يُصدَّر) باسم الأستاذ
+ * والرقمين وكبسة «صحّح» (السنة السابقة المدفوعة ⇒ صفحة المعاينة والتأكيد؛ غيرها ⇒ إعادة حساب فورية). بكاش ببصمة الداتا.
+ */
+function fileVsStoredBanner(array $rows, int $month, int $year): string {
+    if (!$rows || !function_exists('msaFpCacheGet')) return '';
+    $key = 'fvs|' . $month . '|' . $year;
+    $bad = msaFpCacheGet($key, 900);
+    if ($bad === null) {
+        $bad = [];
+        require_once __DIR__ . '/payroll_calculator.php';
+        $seen = [];
+        foreach ($rows as $r) {
+            $eid = (int)($r['employee_id'] ?? $r['eid'] ?? 0);
+            if ($eid <= 0 || isset($seen[$eid]) || !array_key_exists('prime_fixe_lbp', $r)) continue;
+            $seen[$eid] = 1;
+            try {
+                $calc = new PayrollCalculator($eid, $month, $year);
+                [$pf, $ac, $tc] = $calc->bonusComponents((float)($r['base_plus_echelon_lbp'] ?? 0));
+                $stored = (int)($r['prime_fixe_lbp'] ?? 0) + (int)($r['aide_complementaire_lbp'] ?? 0);
+                $file = (int)floor($pf) + (int)floor($ac);
+                if (abs($stored - $file) > 1) {
+                    $bad[] = ['eid' => $eid, 'name' => function_exists('empFullNameAr') ? empFullNameAr($r) : trim(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? '')), 'stored' => $stored, 'file' => $file];
+                }
+            } catch (Throwable $e) { /* صفّ بلا إعداد — لا يُقارَن */ }
+        }
+        msaFpCachePut($key, $bad);
+    }
+    if (!$bad) return '';
+    $sy = function_exists('schoolYearOfMonth') ? schoolYearOfMonth($year, $month) : '';
+    $back = $_SERVER['REQUEST_URI'] ?? '';
+    $h = '<div class="alert alert-danger no-print no-export" style="border-right:4px solid #b91c1c;line-height:1.9;margin:0 0 10px">'
+       . '<div style="font-weight:800;font-size:15px"><i class="fas fa-triangle-exclamation"></i> انتباه: ' . count($bad) . ' ' . (count($bad) === 1 ? 'صفّ' : 'صفوف') . ' بهذا الكشف أرقامه المخزّنة لا تطابق ملف الموظف اليوم — لا تطبع قبل التصحيح</div><ul style="margin:4px 0 0;padding-right:18px">';
+    foreach (array_slice($bad, 0, 12) as $b) {
+        $h .= '<li>' . e($b['name']) . ': الإضافي المخزّن <b>' . number_format($b['stored']) . '</b> — بملفه <b>' . number_format($b['file']) . '</b> '
+            . '<a class="btn btn-sm btn-danger" style="margin-right:6px" href="' . BASE_URL . 'pages/fix_stale.php?emp=' . $b['eid'] . '&sy=' . rawurlencode($sy) . '&back=' . rawurlencode($back) . '"><i class="fas fa-wrench"></i> صحّح</a></li>';
+    }
+    if (count($bad) > 12) $h .= '<li>… و' . (count($bad) - 12) . ' غيرهم (تقرير المخالفات)</li>';
+    return $h . '</ul></div>';
+}
 function docSheetEnd(): string {
     return '</div>';
 }

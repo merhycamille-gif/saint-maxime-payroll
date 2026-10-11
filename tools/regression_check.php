@@ -9847,6 +9847,7 @@ check('🖨️ كل خيارات الطبع بأي صفحة: كبسة «خيار
       && strpos((string)file_get_contents($PROJ . '/assets/js/export.js'), 'function dropGenericXls()') !== false, $why246);
 
 require __DIR__ . '/reg_print_engine.php';   // 247) 🖨️ محرّك الطباعة الرسمي (2026-10-11)
+require __DIR__ . '/reg_paid_guard.php';     // 248) 🔒❓ حارس الأرقام: الأشهر المدفوعة المحمية + الكشوف ≠ الملف (2026-10-11)
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

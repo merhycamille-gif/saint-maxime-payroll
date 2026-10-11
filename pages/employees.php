@@ -232,10 +232,10 @@ if ($action === 'delete_file' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // الإضافة/التعديل/الحذف تتطلّب مدرسة محددة (ليس وضع "كل المدارس").
 // 🔵 تعديل/حذف موظف معيّن من وضع «كل المدارس»: نبدّل الجلسة لمدرسته تلقائياً ونكمل
 // (بدل تحويل المستخدم للائحة المدارس ليختار بنفسه).
-if (in_array($action, ['edit', 'delete', 'copy_year'], true)) {
+if (in_array($action, ['edit', 'delete', 'copy_year', 'apply_paid', 'dismiss_paid'], true)) {
     autoSwitchToEmployeeSchool((int)($_GET['id'] ?? $_POST['id'] ?? 0));
 }
-if (in_array($action, ['new', 'edit', 'delete', 'copy_year'])) {
+if (in_array($action, ['new', 'edit', 'delete', 'copy_year', 'apply_paid', 'dismiss_paid'])) {
     requireSchoolSelected();
 }
 
@@ -269,6 +269,24 @@ function renderBonusRow($r = null, $type = 'aide_complementaire') {
     <?php return ob_get_clean();
 }
 
+/**
+ * 🔔 (2026-10-11 مارسيلا داود) بعد حفظ الملف: الأشهر المدفوعة لسنة **سابقة** التي حماها المحرّك (لم يُعد حسابها) تُسجَّل بالجلسة
+ * فيُظهر الملف تنبيهاً أصفر دائماً مع كبسة «طبّق على الأشهر المدفوعة» (تأكيد ثم تطبيق صريح) — لا اختلاف صامت بين الملف والكشوف.
+ */
+function msaNotePaidSkipped(int $employeeId): void {
+    $sk = $GLOBALS['msa_recalc_skipped'][$employeeId] ?? [];
+    if (!$sk) return;
+    if (($GLOBALS['msa_paid_decision'] ?? '') === 'no') { // قرّر صراحةً إبقاء الأشهر المدفوعة على القديم
+        $_SESSION['flash_info'] = 'حُفظ الملف. الأشهر المدفوعة لسنة ' . implode('، ', array_keys($sk)) . ' بقيت على أرقامها القديمة بقرارك.';
+        return;
+    }
+    foreach ($sk as $sy => $months) {
+        if (!$months) continue;
+        $_SESSION['msa_paid_pending'][$employeeId][(string)$sy] = array_values(array_unique($months));
+    }
+    $sys = implode('، ', array_keys($sk));
+    $_SESSION['flash_info'] = '⚠️ تنبيه: الأشهر المدفوعة لسنة ' . $sys . ' ما تغيّرت بتعديلك (محمية). شوف التنبيه الأصفر بأعلى الملف لتطبيق التعديل عليها.';
+}
 function saveEmployeeBonuses($db, $employeeId) {
     if (empty($_POST['bonus_editor'])) return; // المحرّر المباشر لم يكن ظاهراً
     $sy = writeSchoolYear(); // المكافآت مربوطة بالسنة المختارة («كل السنين» → السنة الحالية، لا 'all')
@@ -327,6 +345,15 @@ function saveEmployeeBonuses($db, $employeeId) {
 // Handle Save
 // =====================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit'])) {
+    // 🔒❓ (2026-10-11 قراره «إذا عم غيّر بشي محل وكان محمي لازم يلقي: هيدا محمي بدّك تغيّر نعم أم لا، وساعتها أنا بقرّر وبحفظ»):
+    //    الصفحة تسأل قبل الحفظ (مودال بالجافاسكربت) حين تكون السنة المعروضة سابقة وفيها أشهر مدفوعة. «نعم» = تطبيق التعديل على
+    //    الأشهر المدفوعة أيضاً (فعل صريح موقَّع بالتدقيق) · «لا» = الملف يُحفَظ والأشهر المدفوعة تبقى كما هي بقراره (بلا تنبيه ملحّ).
+    $paidDecision = in_array($_POST['paid_decision'] ?? '', ['yes', 'no'], true) ? $_POST['paid_decision'] : '';
+    if ($paidDecision === 'yes') {
+        $GLOBALS['msa_recalc_paid_ok'] = true;
+        try { logAudit('recalc_paid_decision_yes', 'employees', (int)($_GET['id'] ?? $_POST['id'] ?? 0), null, ['sy' => (string)writeSchoolYear(), 'by' => $_SESSION['username'] ?? '']); } catch (Throwable $ex) {}
+    }
+    $GLOBALS['msa_paid_decision'] = $paidDecision;
     // 🛡️ صمام أمان ضد مسح البيانات (حادثة أندره مراد 2026-08-01): إذا وصل الحفظ
     // **بلا اسم** لموظف له اسم محفوظ، فهذا حفظ ناقص (فورم مقفول أُرسل والحقول
     // المعطَّلة لا تُرسَل) — نرفضه كلياً بدل أن يمسح ملف الموظف.
@@ -551,6 +578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 }
             }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
+            msaNotePaidSkipped((int)$id); // 🔔 أشهر مدفوعة بسنة سابقة لم تُمسّ ⇒ تنبيه + كبسة تطبيق صريح بالملف
             handleEmployeeUploads($db, $id); // رفع الصورة والوثائق (يحدّث الرسالة بعدد الملفات)
             $tabQ = ($t = preg_replace('/[^a-z]/', '', $_POST['active_tab'] ?? '')) ? '&tab=' . $t : '';
             header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id . $tabQ);
@@ -658,6 +686,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 }
             }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
+            msaNotePaidSkipped((int)$id); // 🔔 أشهر مدفوعة بسنة سابقة لم تُمسّ ⇒ تنبيه + كبسة تطبيق صريح بالملف
             // 📆🧹 (2026-09-30 مايكل متى «حطّيت 9 أشهر والبطاقة طلعت 12» ثم «كل اللي بدّي ياه: بس غيّر، بنفس السنة يتغيّر»):
             //    غيّر الفترة المدفوعة ⇒ السنة **المعروضة وحدها** تتبع الملف فوراً (recalcEmployeeYear أعلاه حسب أشهر الفترة وشال ما صار
             //    خارجها)؛ وإن كانت المعروضة سنة سابقة فهذا فعل صريح منه عليها ⇒ أشهرها غير المدفوعة خارج الفترة تُشال أيضاً. لا سنة أخرى تُمسّ.
@@ -691,6 +720,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
 // =====================================================
 // Handle Delete
 // =====================================================
+// 🔔 (2026-10-11) تطبيق الملف على الأشهر المدفوعة لسنة سابقة — بتأكيد صريح: معاينة (ما المخزّن ← ما سيصير) ثم كبسة التطبيق
+if ($action === 'dismiss_paid' && $id > 0) {
+    $sy = (string)($_GET['sy'] ?? '');
+    if ($sy !== '') unset($_SESSION['msa_paid_pending'][$id][$sy]); else unset($_SESSION['msa_paid_pending'][$id]);
+    if (empty($_SESSION['msa_paid_pending'][$id])) unset($_SESSION['msa_paid_pending'][$id]);
+    header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id); exit;
+}
+if ($action === 'apply_paid' && $id > 0) {
+    $sy = preg_match('/^\d{4}-\d{4}$/', (string)($_GET['sy'] ?? '')) ? (string)$_GET['sy'] : '';
+    $empP = $db->prepare("SELECT * FROM employees WHERE id = ? AND school_id = ?"); $empP->execute([$id, currentSchoolId()]); $empP = $empP->fetch();
+    if (!$empP || $sy === '') { $_SESSION['flash_error'] = 'الموظف أو السنة غير محدّدين'; header('Location: ' . BASE_URL . 'pages/employees.php'); exit; }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['confirm_apply'])) {
+        $nP = applyPaidMonthsExplicit((int)$id, $sy);
+        unset($_SESSION['msa_paid_pending'][$id][$sy]);
+        if (empty($_SESSION['msa_paid_pending'][$id])) unset($_SESSION['msa_paid_pending'][$id]);
+        $_SESSION['flash_success'] = '✅ طُبِّق الملف على سنة ' . $sy . ': أُعيد حساب ' . $nP . ' شهراً (بقيت مدفوعة) — الكشوف والتقارير صارت مطابقة للملف.';
+        header('Location: ' . BASE_URL . 'pages/employees.php?action=edit&id=' . $id); exit;
+    }
+    $rowsP = paidMonthsDryRun((int)$id, $sy);
+    $pageTitle = 'تطبيق الملف على الأشهر المدفوعة / Appliquer aux mois payés';
+    $hideExportToolbar = true;
+    include __DIR__ . '/../includes/header.php';
+    $fmt = fn($v) => number_format((int)$v);
+    $chg = array_filter($rowsP, fn($r) => $r['changed']);
+    ?>
+    <div class="card" style="max-width:980px">
+        <div class="card-header"><h3><i class="fas fa-lock-open"></i> تطبيق الملف على الأشهر المدفوعة — <?= e(empFullNameAr($empP)) ?> — سنة <?= e($sy) ?></h3></div>
+        <div class="card-body">
+            <div class="alert alert-warning" style="line-height:1.9">
+                هذه الأشهر <strong>مدفوعة</strong> بسنة سابقة، فالبرنامج لا يغيّرها تلقائياً عند تعديل الملف (حماية للرواتب المدفوعة).
+                تحت: ما هو مخزّن بكل شهر وما سيصير لو طُبِّق الملف عليه. <strong><?= count($chg) ?></strong> من <?= count($rowsP) ?> أشهر ستتغيّر.
+                الأشهر تبقى مدفوعة، والتعديل يُسجَّل بسجلّ التدقيق باسمك.
+            </div>
+            <table class="table doc-table" style="font-size:12pt">
+                <thead><tr><th>الشهر</th><th>الأجر الإضافي المخزّن</th><th>الأجر الإضافي بعد التطبيق</th><th>مكافأة ومساعدة</th><th>النقل</th><th>الصافي المخزّن</th><th>الصافي بعد التطبيق</th><th>الحالة</th></tr></thead>
+                <tbody>
+                <?php foreach ($rowsP as $r): ?>
+                    <tr<?= $r['changed'] ? ' style="background:#fef9c3"' : '' ?>>
+                        <td><?= e(monthName($r['month']) . ' ' . $r['year']) ?></td>
+                        <td class="num"><?= $fmt($r['old']['prime']) ?></td>
+                        <td class="num"><strong><?= $r['new'] ? $fmt($r['new']['prime']) : '—' ?></strong></td>
+                        <td class="num"><?= $fmt($r['old']['aide']) ?> → <?= $r['new'] ? $fmt($r['new']['aide']) : '—' ?></td>
+                        <td class="num"><?= $fmt($r['old']['transport']) ?> → <?= $r['new'] ? $fmt($r['new']['transport']) : '—' ?></td>
+                        <td class="num"><?= $fmt($r['old']['net']) ?></td>
+                        <td class="num"><strong><?= $r['new'] ? $fmt($r['new']['net']) : '—' ?></strong></td>
+                        <td><?= $r['error'] !== '' ? '⚠️ ' . e($r['error']) : ($r['changed'] ? '🔁 يتغيّر' : '✓ مطابق') ?></td>
+                    </tr>
+                <?php endforeach; if (!$rowsP): ?><tr><td colspan="8">لا أشهر مدفوعة لهذه السنة.</td></tr><?php endif; ?>
+                </tbody>
+            </table>
+            <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px">
+                <?= csrfField() ?>
+                <input type="hidden" name="confirm_apply" value="1">
+                <button class="btn btn-warning" type="submit"<?= $rowsP ? '' : ' disabled' ?>><i class="fas fa-check"></i> نعم، طبّق الملف على هذه الأشهر المدفوعة (<?= count($rowsP) ?>)</button>
+                <a class="btn btn-light" href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$id ?>"><i class="fas fa-arrow-left"></i> رجوع بلا تغيير</a>
+            </form>
+        </div>
+    </div>
+    <?php include __DIR__ . '/../includes/footer.php'; exit;
+}
 if ($action === 'delete' && $id > 0) {
     requireWriteAction();
     // 🛡️ قاعدة المستخدم (2026-08-01 بعد حادثة أندره مراد): «بس بدي امحي أي شغلة لازم
@@ -1243,6 +1332,17 @@ include __DIR__ . '/../includes/header.php';
 <?php if ($message): ?>
     <div class="alert alert-<?= $messageType ?>"><?= e($message) ?></div>
 <?php endif; ?>
+<?php // 🔔 (2026-10-11 مارسيلا داود) أشهر مدفوعة بسنة سابقة حماها المحرّك عند آخر حفظ ⇒ تنبيه دائم مع كبسة التطبيق الصريح
+foreach (($id > 0 ? ($_SESSION['msa_paid_pending'][$id] ?? []) : []) as $ppSy => $ppMonths): if (!$ppMonths) continue; ?>
+    <div class="alert alert-warning no-print" id="paidPending-<?= e($ppSy) ?>" style="border-right:4px solid #d97706;line-height:1.9">
+        <i class="fas fa-lock"></i> <strong>تعديلك ما انطبق على الأشهر المدفوعة لسنة <?= e($ppSy) ?></strong> (<?= count($ppMonths) ?> أشهر): هذه الأشهر مدفوعة بسنة سابقة فالبرنامج يحميها ولا يغيّرها تلقائياً —
+        لذلك الكشوف والتقارير لهذه السنة لا تزال على الأرقام القديمة. إذا كان التعديل صحيحاً لهذه السنة أيضاً، اكبس للتطبيق بعد معاينة الأرقام:
+        <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+            <a class="btn btn-sm btn-warning" href="<?= BASE_URL ?>pages/employees.php?action=apply_paid&id=<?= (int)$id ?>&sy=<?= e($ppSy) ?>"><i class="fas fa-lock-open"></i> معاينة وتطبيق على الأشهر المدفوعة <?= e($ppSy) ?></a>
+            <a class="btn btn-sm btn-light" href="<?= BASE_URL ?>pages/employees.php?action=dismiss_paid&id=<?= (int)$id ?>&sy=<?= e($ppSy) ?>">خلّيها على القديم (إخفاء التنبيه)</a>
+        </div>
+    </div>
+<?php endforeach; ?>
 
 <?php
 // 🕐 مساج تناقص ساعات التدريس (مرسوم 2601/2018) — يظهر للأستاذ الملاك الذي له تناقص بالسنة المعروضة.
@@ -1309,7 +1409,13 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
     <?php endif; ?>
 </div>
 
-<form method="POST" enctype="multipart/form-data" id="empForm" data-unsaved="1"<?= $id > 0 ? ' class="lockedit"' : '' ?>>
+<?php // 🔒❓ السنة المعروضة سابقة وفيها أشهر مدفوعة لهذا الموظف ⇒ الصفحة تسأل قبل الحفظ (نعم/لا) — app.js لا يعرف، الجافاسكربت أدناه
+$ppSyForm = (string)writeSchoolYear(); $ppPaidN = 0;
+if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyForm)) {
+    try { $ppQ = $db->prepare("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_paid,0) = 1"); $ppQ->execute([$id, $ppSyForm]); $ppPaidN = (int)$ppQ->fetchColumn(); } catch (Throwable $e) { $ppPaidN = 0; }
+} ?>
+<form method="POST" enctype="multipart/form-data" id="empForm" data-unsaved="1"<?= $id > 0 ? ' class="lockedit"' : '' ?><?= $ppPaidN > 0 ? ' data-paid-protected="1" data-paid-sy="' . e($ppSyForm) . '" data-paid-n="' . $ppPaidN . '"' : '' ?>>
+<input type="hidden" name="paid_decision" id="paidDecision" value="">
     <input type="hidden" name="active_tab" id="activeTabField" value="<?= e(preg_replace('/[^a-z]/', '', $_GET['tab'] ?? '')) ?>">
     <?php
     // 💾 صفّ أزرار موحّد أعلى كل تبويب من ملف الأستاذ (طلب المستخدم 2026-08-01:
@@ -2751,4 +2857,33 @@ function refreshGradeSalaries() {
 })();
 </script>
 
+<script>
+// 🔒❓ (2026-10-11) سنة معروضة محمية: عند الحفظ، إذا تغيّر أي حقل يمسّ الراتب يسأل البرنامج «هيدا محمي — بدّك تطبّق التعديل على الأشهر المدفوعة؟ نعم / لا»
+(function () {
+    var f = document.getElementById('empForm'); if (!f || !f.getAttribute('data-paid-protected')) return;
+    var skip = /name|phone|email|address|ville|quartier|rue|immeuble|etage|notes|photo|birth|sex|father|mother|maiden|nationality|iban|bank|register|cin|passport|whatsapp|tel|civil|place|active_tab|csrf|paid_decision|_fr$|_ar$/i;
+    function snap() { var o = {}; Array.prototype.forEach.call(f.querySelectorAll('input,select,textarea'), function (el, i) { if (!el.name || skip.test(el.name) || el.type === 'file' || el.type === 'button' || el.type === 'submit') return; var v = (el.type === 'checkbox' || el.type === 'radio') ? (el.checked ? '1' : '0') : el.value; o[el.name + '#' + i] = v; }); return JSON.stringify(o); }
+    var initial = snap(); var asked = false;
+    f.addEventListener('submit', function (e) {
+        var dec = document.getElementById('paidDecision');
+        if (asked || dec.value) return;
+        if (snap() === initial) return; // ما تغيّر شي يمسّ الراتب
+        e.preventDefault(); e.stopImmediatePropagation();
+        var sy = f.getAttribute('data-paid-sy'), n = f.getAttribute('data-paid-n');
+        var w = document.createElement('div'); w.className = 'no-print';
+        w.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:16px';
+        w.innerHTML = '<div dir="rtl" style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(600px,100%);padding:20px 22px;line-height:1.9">'
+            + '<div style="font-size:18px;font-weight:800;color:#b45309;margin-bottom:8px"><i class="fas fa-lock"></i> هذه السنة محمية — ' + sy + '</div>'
+            + '<div style="font-size:15px;color:#1f2937">سنة <b>' + sy + '</b> فيها <b>' + n + '</b> أشهر <b>مدفوعة</b>. تعديلك يمسّ الراتب. بدّك تطبّقه على هذه الأشهر المدفوعة كمان؟</div>'
+            + '<div style="font-size:13px;color:#64748b;margin-top:4px">نعم = الكشوف والتقارير لهذه السنة تصير على الأرقام الجديدة (يُسجَّل باسمك). لا = الملف يُحفَظ والأشهر المدفوعة تبقى كما هي.</div>'
+            + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">'
+            + '<button type="button" class="btn btn-warning" data-d="yes"><i class="fas fa-check"></i> نعم — طبّق على الأشهر المدفوعة واحفظ</button>'
+            + '<button type="button" class="btn btn-primary" data-d="no"><i class="fas fa-save"></i> لا — احفظ الملف فقط</button>'
+            + '<button type="button" class="btn btn-light" data-d="cancel">إلغاء</button></div></div>';
+        document.body.appendChild(w);
+        w.addEventListener('click', function (ev) { var b = ev.target.closest('button[data-d]'); if (!b) return; var d = b.getAttribute('data-d'); w.remove();
+            if (d === 'cancel') return; dec.value = d; asked = true; if (f.requestSubmit) f.requestSubmit(); else f.submit(); });
+    }, true);
+})();
+</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

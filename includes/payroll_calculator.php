@@ -771,7 +771,52 @@ function recalcEmployeeYear($employeeId, $schoolYear = null) {
         if ($protect) { $paidSt->execute([$employeeId, $m, $y]); if ($paidSt->fetchColumn()) { $skipped[] = "$y-$m"; continue; } } // 🔒 شهر مدفوع بسنة سابقة
         try { (new PayrollCalculator($employeeId, $m, $y))->calculateAndSave(); $n++; } catch (Exception $ex) {}
     }
-    if ($skipped) { try { logAudit('recalc_skipped_paid', 'monthly_salaries', (int)$employeeId, null, ['sy' => $sy, 'skipped' => $skipped]); } catch (Throwable $ex) {} }
+    if ($skipped) {
+        try { logAudit('recalc_skipped_paid', 'monthly_salaries', (int)$employeeId, null, ['sy' => $sy, 'skipped' => $skipped]); } catch (Throwable $ex) {}
+        // 🔔 (2026-10-11 مارسيلا داود «حطّيت 54,000,000 وبقي بالتقارير 54,060,000 — هودي أرزاق الناس») ما تخطّاه المحرّك يُعلَن
+        //    للصفحة الحافظة (ملف الموظف) فتُظهر تنبيهاً وكبسة تطبيق صريح بدل أن يختلف الملف عن الكشوف بصمت.
+        $GLOBALS['msa_recalc_skipped'][(int)$employeeId][$sy] = array_values(array_unique(array_merge($GLOBALS['msa_recalc_skipped'][(int)$employeeId][$sy] ?? [], $skipped)));
+    }
+    return $n;
+}
+
+/**
+ * 🔔 معاينة الأشهر المدفوعة المحمية لسنة سابقة: ما المخزّن وما الذي سيصير لو طُبِّق ملفه عليها (بلا أي حفظ).
+ * يُرجع صفوفاً [month, year, old => [prime, aide, transport, net], new => [...], changed]. للتأكيد قبل التطبيق الصريح.
+ */
+function paidMonthsDryRun(int $employeeId, string $schoolYear): array {
+    $db = getDB();
+    if (!preg_match('/^\d{4}-\d{4}$/', $schoolYear)) return [];
+    $st = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_paid,0) = 1 AND COALESCE(is_indemnity_month,0) = 0 ORDER BY year, month");
+    $st->execute([$employeeId, $schoolYear]);
+    $out = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $row = ['month' => (int)$r['month'], 'year' => (int)$r['year'], 'id' => (int)$r['id'],
+                'old' => ['prime' => (int)$r['prime_fixe_lbp'], 'aide' => (int)$r['aide_complementaire_lbp'], 'transport' => (int)$r['transport_lbp'], 'net' => (int)$r['net_salary_lbp']],
+                'new' => null, 'changed' => false, 'error' => ''];
+        try {
+            $calc = new PayrollCalculator($employeeId, (int)$r['month'], (int)$r['year']);
+            [$pf, $ac, $tc] = $calc->bonusComponents((float)$r['base_plus_echelon_lbp']);
+            $res = $calc->computeFrom((float)$r['base_salary_lbp'], (float)$r['echelon_value_lbp'], $r['grade_at_month'], (float)$pf, (float)$ac, (float)$tc);
+            $row['new'] = ['prime' => (int)$res['prime_fixe_lbp'], 'aide' => (int)$res['aide_complementaire_lbp'], 'transport' => (int)($res['transport_lbp'] ?? $tc), 'net' => (int)$res['net_salary_lbp']];
+            $row['changed'] = $row['new']['prime'] !== $row['old']['prime'] || $row['new']['aide'] !== $row['old']['aide'] || $row['new']['transport'] !== $row['old']['transport'] || $row['new']['net'] !== $row['old']['net'];
+        } catch (Throwable $ex) { $row['error'] = $ex->getMessage(); }
+        $out[] = $row;
+    }
+    return $out;
+}
+
+/**
+ * ✅ تطبيق ملف الموظف على أشهره المدفوعة لسنة سابقة — **بفعل صريح من المستخدم** (كبسة التأكيد بملفه).
+ * يرفع علم msa_recalc_paid_ok للنداء هذا فقط، يعيد حساب السنة كلّها (المدفوع يبقى مدفوعاً — calculateAndSave لا يلمس is_paid)، ويسجّل بالتدقيق.
+ */
+function applyPaidMonthsExplicit(int $employeeId, string $schoolYear): int {
+    if (!preg_match('/^\d{4}-\d{4}$/', $schoolYear)) return 0;
+    $prev = $GLOBALS['msa_recalc_paid_ok'] ?? null;
+    $GLOBALS['msa_recalc_paid_ok'] = true;
+    try { $n = (int)recalcEmployeeYear($employeeId, $schoolYear); }
+    finally { if ($prev === null) unset($GLOBALS['msa_recalc_paid_ok']); else $GLOBALS['msa_recalc_paid_ok'] = $prev; }
+    try { logAudit('recalc_paid_explicit', 'monthly_salaries', $employeeId, null, ['sy' => $schoolYear, 'months' => $n, 'by' => $_SESSION['username'] ?? '']); } catch (Throwable $ex) {}
     return $n;
 }
 
@@ -836,7 +881,7 @@ function overlayStoredYearBonuses($employeeId, $schoolYear) {
     $n = 0;
     $protectOv = protectPaidMonths((string)$schoolYear);
     foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        if ($protectOv && (int)($r['is_paid'] ?? 0) === 1) continue; // 🔒 شهر مدفوع بسنة سابقة — لا يُمسّ إلا بفعل صريح
+        if ($protectOv && (int)($r['is_paid'] ?? 0) === 1) { $GLOBALS['msa_recalc_skipped'][(int)$employeeId][(string)$schoolYear][] = $r['year'] . '-' . $r['month']; continue; } // 🔒 شهر مدفوع بسنة سابقة — لا يُمسّ إلا بفعل صريح (ويُعلَن للملف)
         try { $calc = new PayrollCalculator($employeeId, (int)$r['month'], (int)$r['year']); }
         catch (Exception $ex) { continue; }
         [$primeFixe, $aideComp, $transportComp] = $calc->bonusComponents((float)$r['base_plus_echelon_lbp']);
