@@ -350,10 +350,12 @@
         if (!cards.length) cards = document.querySelectorAll('.payslip-card');
         if (cards.length > 40) return Promise.reject(new Error('too many cards'));
         if (cards.length) return loadLibs().then(function () { step('buildPdf'); return buildPdf(cards, landscape); }).then(function (doc) { return { doc: doc, name: fileName() }; });
+        // 🖨️ (2026-10-11) أي صفحة ليست قسائم ولا نموذجاً طبق الأصل: PDF جاهز من محرّك الطباعة على الخادم (export.js msaServerPdf)
+        if (window.msaServerPdf && !document.querySelector('.ofs, .xls-sheet')) return window.msaServerPdf().then(function (r) { step('server pdf ' + r.name); return { blob: r.blob, name: r.name }; });
         return loadLibs().then(function () { return buildGenericPdf(genericArea()); }).then(function (doc) { return { doc: doc, name: genericName() }; });
     }
     window.msaPdfBlob = function () {
-        return buildAnyPdf().then(function (r) { return { blob: r.doc.output('blob'), name: r.name }; });
+        return buildAnyPdf().then(function (r) { return r.blob ? r : { blob: r.doc.output('blob'), name: r.name }; });
     };
 
     window.msaSavePdfStart = function (btn) {
@@ -364,7 +366,7 @@
         var old = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.textContent = '⏳ عم نجهّز الملف...'; }
         buildAnyPdf()
-            .then(function (r) { r.doc.save(r.name); step('saved ' + r.name); if (btn) { btn.textContent = '✅ نزل الملف عندك'; setTimeout(function () { btn.innerHTML = old; btn.disabled = false; }, 4000); } })
+            .then(function (r) { if (r.blob) { var u = URL.createObjectURL(r.blob), l = document.createElement('a'); l.href = u; l.download = r.name; document.body.appendChild(l); l.click(); setTimeout(function () { URL.revokeObjectURL(u); l.remove(); }, 1500); } else r.doc.save(r.name); step('saved ' + r.name); if (btn) { btn.textContent = '✅ نزل الملف عندك'; setTimeout(function () { btn.innerHTML = old; btn.disabled = false; }, 4000); } })
             .catch(function (e) {
                 step('CATCH: ' + (e && (e.message || e))); if (btn) { btn.innerHTML = old; btn.disabled = false; }
                 try { console.error(e); } catch (_) {}

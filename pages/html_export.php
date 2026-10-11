@@ -14,7 +14,7 @@ require_once __DIR__ . '/../includes/report_helpers.php';
 require_once __DIR__ . '/../includes/report_export.php';
 requireLogin();
 
-$format = (($_POST['format'] ?? 'xlsx') === 'docx') ? 'docx' : 'xlsx';
+$format = in_array($_POST['format'] ?? '', ['docx', 'pdf'], true) ? $_POST['format'] : 'xlsx';
 $title  = trim((string)($_POST['title'] ?? ''));
 if ($title === '') $title = 'document';
 $title  = mb_substr($title, 0, 120, 'UTF-8');
@@ -23,6 +23,31 @@ $land   = !empty($_POST['landscape']) && $_POST['landscape'] !== '0';
 $html   = (string)($_POST['html'] ?? '');
 if (trim($html) === '') { http_response_code(400); die('no html'); }
 
+// 🖨️ (2026-10-11) PDF جاهز للطباعة من محرّك الطباعة الرسمي (includes/pdf_engine.php — mPDF على الخادم):
+//    الطباعة / «احفظ عالكمبيوتر» / واتساب / إيميل كلّها تمرّ من هنا — ورقة A4 مرتّبة بخط 12، لا تصوير شاشة.
+//    landscape=auto ⇒ المحرّك يقرّر بعرض الجدول · disp=inline ⇒ يُعرض بالمتصفّح (للطباعة) وإلا تنزيل.
+if ($format === 'pdf') {
+    require_once __DIR__ . '/../includes/pdf_engine.php';
+    try {
+        $sch = currentSchool();
+        $schoolName = $sch ? (($dir === 'ltr' ? ($sch['name_fr'] ?? '') : ($sch['name_ar'] ?? '')) ?: ($sch['name_ar'] ?? $sch['name_fr'] ?? '')) : '';
+        $landOpt = (($_POST['landscape'] ?? 'auto') === 'auto') ? null : $land;
+        $data = MsaPdf::fromHtml($html, ['title' => $title, 'dir' => $dir, 'landscape' => $landOpt, 'school' => $schoolName]);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=utf-8');
+        die('pdf error: ' . $e->getMessage());
+    }
+    $fname = preg_replace('/[\\\\\/:*?"<>|]+/', '_', mb_substr($title, 0, 60, 'UTF-8')) . '_' . date('Y-m-d') . '.pdf';
+    $inline = (($_POST['disp'] ?? '') === 'inline');
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . rawurlencode($fname) . '"; filename*=UTF-8\'\'' . rawurlencode($fname));
+    header('Content-Length: ' . strlen($data));
+    header('Cache-Control: no-cache');
+    echo $data; exit;
+}
+
 libxml_use_internal_errors(true);
 $dom = new DOMDocument();
 $dom->loadHTML('<?xml encoding="UTF-8"><html><body>' . $html . '</body></html>');
@@ -30,7 +55,7 @@ $xp = new DOMXPath($dom);
 
 // ما لا يُصدَّر: أزرار/شرائط/سطور الطباعة المحقونة/المخفي/سكربت
 $cls = function ($c) { return 'contains(concat(" ",normalize-space(@class)," ")," ' . $c . ' ")'; };
-$drop = $xp->query('//*[' . $cls('no-print') . ' or ' . $cls('no-export') . ' or ' . $cls('export-toolbar') . ' or ' . $cls('pr-title-row') . ' or ' . $cls('pr-mask') . ' or ' . $cls('word-head') . ' or ' . $cls('scr-head-hidden')
+$drop = $xp->query('//*[' . $cls('no-print') . ' or ' . $cls('no-export') . ' or ' . $cls('export-toolbar') . ' or ' . $cls('pr-title-row') . ' or ' . $cls('pr-mask') . ' or ' . $cls('word-head') . ' or ' . $cls('scr-head-hidden') . ' or ' . $cls('badge') . ' or ' . $cls('tag') . ' or ' . $cls('pill') . ' or ' . $cls('msa-flag')
     . ' or contains(translate(@style," ",""),"display:none") or self::script or self::style or self::button or self::select or self::input or self::textarea]');
 $rm = [];
 foreach ($drop as $n) $rm[] = $n;
@@ -78,11 +103,14 @@ function hx_rows_of(DOMElement $sec): array {
 
 $rep = new ReportTable($title, $land);
 $rep->dir($dir);
-$sch = currentSchool();
-if ($sch) $rep->schoolHeader($sch);
 $firstHead = true; $tablesN = 0; $pending = [];
-
-$flushPending = function () use (&$pending, $rep) { foreach ($pending as $p) $rep->sectionRow($p); $pending = []; };
+// 📐 (2026-10-11) ما قبل أوّل جدول (ترويسة المدرسة/عنوان المستند/سطر المعلومات) = كتلة عنوان فوق رأس الجدول — لا «أقساماً» داخله؛
+//    ما بين الجداول وبعدها يبقى أقساماً. $pending عناصره ['t' => نصّ, 'k' => school|title|meta]
+$push = function (string $t, string $k = 'meta') use (&$pending) { $t = hx_clean($t); if ($t !== '' && !in_array($t, array_column($pending, 't'), true)) $pending[] = ['t' => $t, 'k' => $k]; };
+$flushPending = function () use (&$pending, $rep, &$tablesN) {
+    if ($tablesN === 0 && $pending) { $rep->titleLines($pending); $pending = []; return; }
+    foreach ($pending as $p) $rep->sectionRow($p['t']); $pending = [];
+};
 
 $emitTable = function (DOMElement $t) use ($rep, &$firstHead, &$tablesN, &$pending, $flushPending) {
     $theadRows = []; $bodyRows = []; $footRows = [];
@@ -93,7 +121,7 @@ $emitTable = function (DOMElement $t) use ($rep, &$firstHead, &$tablesN, &$pendi
         elseif ($sn === 'tbody') { if (hx_has_class($sec, 'msa-top-totals')) continue; $bodyRows = array_merge($bodyRows, hx_rows_of($sec)); }
         elseif ($sn === 'tfoot') $footRows = array_merge($footRows, hx_rows_of($sec));
         elseif ($sn === 'tr') $bodyRows[] = $sec;
-        elseif ($sn === 'caption') { $c = hx_clean(hx_text($sec)); if ($c !== '') $pending[] = $c; }
+        elseif ($sn === 'caption') { $c = hx_clean(hx_text($sec)); if ($c !== '') $pending[] = ['t' => $c, 'k' => 'title']; }
     }
     // صف أوّل بالجسم كلّه th = رأس
     if (!$theadRows && $bodyRows) {
@@ -144,19 +172,25 @@ $emitTable = function (DOMElement $t) use ($rep, &$firstHead, &$tablesN, &$pendi
 };
 
 // المشي بترتيب المستند: عناوين/ترويسة = صفوف أقسام قبل الجدول التالي، الجداول تُصدَّر، والباقي يُنزَل فيه
-$walk = function (DOMNode $node) use (&$walk, $emitTable, &$pending) {
+$walk = function (DOMNode $node) use (&$walk, $emitTable, &$pending, $xp, $cls, $push) {
     foreach ($node->childNodes as $ch) {
         if (!($ch instanceof DOMElement)) continue;
         $tag = strtolower($ch->nodeName);
         if ($tag === 'table') { $emitTable($ch); continue; }
-        if (in_array($tag, ['h1', 'h2', 'h3', 'h4', 'h5'], true) || hx_has_class($ch, 'doc-title|doc-subtitle|doc-year|doc-period|card-title')) {
-            $tx = hx_clean(hx_text($ch)); if ($tx !== '') $pending[] = $tx; continue;
+        if (in_array($tag, ['h1', 'h2', 'h3', 'h4', 'h5'], true) || hx_has_class($ch, 'doc-title|card-title')) { $push(hx_text($ch), 'title'); continue; }
+        if (hx_has_class($ch, 'doc-subtitle|doc-year|doc-period|report-scope')) { $push(hx_text($ch), hx_has_class($ch, 'report-scope') ? 'school' : 'meta'); continue; }
+        if (hx_has_class($ch, 'doc-head')) {
+            // عنوان المستند: فرنسي ثم عربي (عنوان) + الشرائح سطراً واحداً (معلومات)
+            foreach ($xp->query('.//*[' . $cls('dh-fr') . ' or ' . $cls('dh-ar') . ']', $ch) as $tt) $push(hx_text($tt), 'title');
+            $chips = []; foreach ($xp->query('.//*[' . $cls('dh-chip') . ']', $ch) as $cp) { $c = hx_clean(hx_text($cp)); if ($c !== '') $chips[] = $c; }
+            if ($chips) $push(implode(' · ', $chips), 'meta');
+            continue;
         }
-        if (hx_has_class($ch, 'doc-head|letterhead|gov-header|scr-head')) {
+        if (hx_has_class($ch, 'letterhead|gov-header|scr-head')) {
             // الترويسة: كل عنصر نهائي فيه نصّ = سطر (الشعار يُهمَل)
-            $leaf = function (DOMNode $n) use (&$leaf, &$pending) {
-                $hasEl = false; foreach ($n->childNodes as $k) if ($k instanceof DOMElement && strtolower($k->nodeName) !== 'br' && strtolower($k->nodeName) !== 'img' && strtolower($k->nodeName) !== 'i') { $hasEl = true; break; }
-                if (!$hasEl) { $tx = hx_clean(hx_text($n)); if ($tx !== '' && !in_array($tx, $pending, true)) $pending[] = $tx; return; }
+            $leaf = function (DOMNode $n) use (&$leaf, $push) {
+                $hasEl = false; foreach ($n->childNodes as $k) if ($k instanceof DOMElement && !in_array(strtolower($k->nodeName), ['br', 'img', 'i', 'strong', 'b', 'span', 'small'], true)) { $hasEl = true; break; }
+                if (!$hasEl) { $push(hx_text($n), 'school'); return; }
                 foreach ($n->childNodes as $k) if ($k instanceof DOMElement) $leaf($k);
             };
             $leaf($ch); continue;

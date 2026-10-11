@@ -416,7 +416,8 @@ check('ترتيب p1: اللوغو بزاوية الورقة والكتابة 2 
 $ppdf21 = (string)file_get_contents(__DIR__ . '/../pages/print_pdf.php');
 check('زر PDF رسمي يعرض ويطبع (view=1 + fetch + طباعة تلقائية بالتبويب)',
       strpos((string)file_get_contents(__DIR__ . '/../includes/functions.php'), "'&view=1'") !== false
-      && strpos($fnSrcToolbar21 = (string)file_get_contents(__DIR__ . '/../includes/functions.php'), 'target="_blank" title="PDF رسمي طبق الأصل') !== false
+      /* 🖨️ 2026-10-11: زرّ «PDF رسمي» عبر Chrome أُزيل من الشريط — الـPDF صار من محرّك الطباعة الرسمي على الخادم (القسم 247)؛ print_pdf.php بقي للمسارات الخاصّة */
+      && strpos($fnSrcToolbar21 = (string)file_get_contents(__DIR__ . '/../includes/functions.php'), 'title="PDF رسمي طبق الأصل') === false
       && strpos($ppdf21, "\$_GET['fetch']") !== false
       && strpos($ppdf21, "f.contentWindow.print()") !== false
       && strpos($ppdf21, "addEventListener(\"load\",function(){setTimeout(pr,800);})") !== false
@@ -9844,6 +9845,8 @@ try {
 check('🖨️ كل خيارات الطبع بأي صفحة: كبسة «خيارات الطبع» (الشريط الكامل) بصفحات الإدارة/القوائم/اللوحة + البطاقة السنوية بسطرها الكامل', $ok246
       && strpos($hd246, '} elseif (empty($ownExportRow)) {') !== false && substr_count($as246, 'onclick="ppWord(') === 2 && substr_count($as246, 'onclick="msaSavePdfStart(this)"') === 2
       && strpos((string)file_get_contents($PROJ . '/assets/js/export.js'), 'function dropGenericXls()') !== false, $why246);
+
+require __DIR__ . '/reg_print_engine.php';   // 247) 🖨️ محرّك الطباعة الرسمي (2026-10-11)
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

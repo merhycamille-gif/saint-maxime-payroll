@@ -44,7 +44,21 @@
     }
 
     // ===== طباعة =====
-    window.ppPrint = function () { window.print(); };
+    // 🖨️ (2026-10-11 «بس أرسلها للطبع تكون جاهزة دغري»): الطباعة = ورقة PDF جاهزة من محرّك الطباعة الرسمي على الخادم
+    // (includes/pdf_engine.php) تُفتح بإطار مخفي وتُطبع — نفس الورقة المرتّبة بكل مكان. القسائم/النماذج طبق الأصل تبقى على طباعة المتصفّح.
+    function serverPrintable() {
+        if (document.querySelector('.salary-slip, .payslip-card, .ofs, .xls-sheet')) return false;
+        return !!document.querySelector('#ppExportArea, .doc-sheet, .land-report, .official-doc, #pageContent table');
+    }
+    window.ppPrint = function (btn) {
+        if (!serverPrintable() || !window.msaServerPdf) { window.print(); return; }
+        var b = btn || (document.activeElement && document.activeElement.tagName === 'BUTTON' ? document.activeElement : null);
+        var old = b ? b.innerHTML : ''; if (b) { b.disabled = true; b.textContent = '⏳ عم نجهّز الورقة...'; }
+        window.msaServerPdf({ inline: true }).then(function (r) {
+            window.ppPrintFile(URL.createObjectURL(r.blob), false);
+            if (b) { b.innerHTML = old; b.disabled = false; }
+        }).catch(function (e) { try { console.error(e); } catch (_) {} if (b) { b.innerHTML = old; b.disabled = false; } window.print(); });
+    };
 
     // ===== 🔄 اتجاه الورقة (2026-09-14 «وقت عم اطبع بتضل لاندسكيب ما بيغير على بورتريه بالبرنت») =====
     // الاتجاه مثبّت بالـCSS (@page landscape للعريض) فحوار الطباعة يرفض تغييره. الزرّ يقلبه: يضيف
@@ -231,49 +245,64 @@
     // HTML المنطقة المعروضة يُبعَث للخادم (pages/html_export.php) فيرجع ملف .xlsx/.docx حقيقياً يُنزَّل دغري
     // باسمه وامتداده — أوفيس يحفظه إكسل/وورد لا «صفحة ويب». الاتجاه يتبع المستند (عربي = من اليمين، فرنسي = من الشمال).
     // إن تعذّر الخادم يرجع للتصدير القديم (ملف HTML) حتى لا يُترك المستخدم بلا شيء.
-    function officeExport(format, title) {
-        var a = area(), btn = document.activeElement && document.activeElement.tagName === 'BUTTON' ? document.activeElement : null;
-        // اتجاه المستند نفسه لا الواجهة: أوّل ورقة/جدول داخل المنطقة (doc-sheet/official-doc/table) — وإلا نصّه (عربي ⇒ rtl)
+    // اتجاه المستند نفسه لا الواجهة: أوّل جدول محتوى (أو ورقة المستند) وما فوقه حتى المنطقة — أوّل dir صريح
+    // (الجداول العربية dir=rtl، لوائح الدولة الخمس dir=ltr بقراره)، وإلا نصّه: عربي أكثر من اللاتيني ⇒ من اليمين
+    // 📊 (2026-10-10 مساءً «إكسل عربي لازم العامود A يكون من اليمين»): بلا اختيار صريح = من اليمين متى وُجد عربي بالمستند
+    function docDir(a) {
         var dir = 'rtl';
         try {
-            // اتجاه المستند نفسه لا الواجهة: أوّل جدول محتوى (أو ورقة المستند) وما فوقه حتى المنطقة — أوّل dir صريح
-            // (الجداول العربية dir=rtl، لوائح الدولة الخمس dir=ltr بقراره)، وإلا نصّه: عربي أكثر من اللاتيني ⇒ من اليمين
             var start = null, tbs = a.querySelectorAll('table');
             for (var ti = 0; ti < tbs.length; ti++) if (tbs[ti].rows.length > 1 && !tbs[ti].closest('.no-print, .export-toolbar, form')) { start = tbs[ti]; break; }
             if (!start) { var cands = a.querySelectorAll('.official-doc, .doc-sheet, .xls-sheet, .land-report'); for (var pi = 0; pi < cands.length; pi++) if (!cands[pi].closest('.no-print, .export-toolbar, form')) { start = cands[pi]; break; } }
-            var ex = '', n = start;
-            while (n && n !== a.parentElement) { var dA = n.getAttribute ? n.getAttribute('dir') : ''; if (dA === 'ltr' || dA === 'rtl') { ex = dA; break; } if (/(^|\s)(doc-ltr)(\s|$)/.test(n.className || '')) { ex = 'ltr'; break; } n = n.parentElement; }
             var rlDir = (window.MSA_RL && window.MSA_RL.exportDir) ? window.MSA_RL.exportDir(a) : null; // 🌐 اختياره: عربي = يمين، فرنسي = شمال، الاثنان = جهته
-            // 📊 (2026-10-10 مساءً «إكسل عربي لازم العامود A يكون من اليمين»): الإكسل بلا اختيار صريح = من اليمين متى وُجد عربي بالمستند
-            //    (لم يعد يتبع dir=ltr الذي كان على لوائح الدولة الخمس)؛ الوورد يتبع لغة النصّ.
             var hasAr = /[؀-ۿ]/.test(((start || a).textContent || '').slice(0, 20000));
-            if (rlDir) dir = rlDir;
-            else dir = hasAr ? 'rtl' : 'ltr'; // الإكسل والوورد معاً: عربي ⇒ من اليمين («طبعت وورد عربي» 2026-10-10 مساءً)
+            dir = rlDir ? rlDir : (hasAr ? 'rtl' : 'ltr');
         } catch (e) {}
+        return dir;
+    }
+    function exportForm(format, title, extra) {
         var fd = new FormData();
         fd.append('format', format); fd.append('title', title || document.title || 'document');
-        fd.append('dir', dir); fd.append('landscape', isWide() ? '1' : '0'); fd.append('html', cleanHtml());
+        fd.append('dir', docDir(area())); fd.append('landscape', isWide() ? '1' : '0'); fd.append('html', cleanHtml());
+        if (extra) Object.keys(extra).forEach(function (k) { fd.set(k, extra[k]); });
+        return fd;
+    }
+    // يبعت HTML المنطقة للخادم (pages/html_export.php) ويرجع الملف الحقيقي {blob, name}
+    function fetchFile(fd, fallbackName) {
+        return fetch((window.BASE_URL || '') + 'pages/html_export.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) {
+                if (!r.ok) return r.text().then(function (t) { throw new Error('http ' + r.status + ' ' + String(t || '').slice(0, 300)); });
+                var cd = r.headers.get('Content-Disposition') || '', m = /filename\*=UTF-8''([^;]+)/i.exec(cd), name = '';
+                try { name = m ? decodeURIComponent(m[1]) : ''; } catch (e) { name = ''; }
+                if (!name) name = fallbackName;
+                return r.blob().then(function (b) { if (b.size < 200) throw new Error('empty'); return { blob: b, name: name }; });
+            });
+    }
+    function saveBlob(r) {
+        var url = URL.createObjectURL(r.blob), l = document.createElement('a');
+        l.href = url; l.download = r.name; document.body.appendChild(l); l.click();
+        setTimeout(function () { URL.revokeObjectURL(url); l.remove(); }, 1500);
+    }
+    // 📤 Excel/Word حقيقيان (2026-10-08): الخادم يبني .xlsx/.docx من HTML المنطقة المعروضة؛ إن تعذّر يرجع للتصدير القديم
+    function officeExport(format, title) {
+        var btn = document.activeElement && document.activeElement.tagName === 'BUTTON' ? document.activeElement : null;
         var old = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.textContent = '⏳ عم نجهّز الملف...'; }
         var done = function () { if (btn) { btn.innerHTML = old; btn.disabled = false; } };
-        return fetch((window.BASE_URL || '') + 'pages/html_export.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-            .then(function (r) {
-                if (!r.ok) throw new Error('http ' + r.status);
-                var cd = r.headers.get('Content-Disposition') || '', m = /filename\*=UTF-8''([^;]+)/i.exec(cd), name = '';
-                try { name = m ? decodeURIComponent(m[1]) : ''; } catch (e) { name = ''; }
-                if (!name) name = safeName(title) + '_' + stamp() + (format === 'docx' ? '.docx' : '.xlsx');
-                return r.blob().then(function (b) {
-                    if (b.size < 200) throw new Error('empty');
-                    var url = URL.createObjectURL(b), l = document.createElement('a');
-                    l.href = url; l.download = name; document.body.appendChild(l); l.click();
-                    setTimeout(function () { URL.revokeObjectURL(url); l.remove(); }, 1500);
-                    done();
-                });
-            })
+        return fetchFile(exportForm(format, title), safeName(title) + '_' + stamp() + (format === 'docx' ? '.docx' : '.xlsx'))
+            .then(function (r) { saveBlob(r); done(); })
             .catch(function (e) { try { console.error(e); } catch (_) {} done(); if (format === 'docx') window.ppWordLegacy(title); else window.ppExcelLegacy(title); });
     }
     window.ppExcel = function (title) { return officeExport('xlsx', title); };
     window.ppWord = function (title) { return officeExport('docx', title); };
+    // 🖨️ (2026-10-11) PDF جاهز من محرّك الطباعة الرسمي على الخادم (mPDF) — للطباعة والحفظ والواتساب والإيميل.
+    // pdf-save.js يستعمله لكل صفحة ليست قسائم. opts: {inline, title}. الاتجاه: تلقائي بعرض الجدول إلا إن قلبه المستخدم بزرّ الورقة.
+    window.msaServerPdf = function (opts) {
+        opts = opts || {};
+        var land = window.msaOrientForced ? (window.msaOrientForced === 'landscape' ? '1' : '0') : 'auto';
+        var t = opts.title || docTitle();
+        return fetchFile(exportForm('pdf', t, { landscape: land, disp: opts.inline ? 'inline' : 'attachment' }), safeName(t) + '_' + stamp() + '.pdf');
+    };
 
     // ===== WhatsApp =====
     // ملاحظة: واتساب عبر الرابط يرسل نصاً فقط (لا ملفات). للمستندات: نزّل PDF/Excel ثم أرفقه.

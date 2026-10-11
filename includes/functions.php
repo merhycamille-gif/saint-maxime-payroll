@@ -5533,7 +5533,7 @@ function exportToolbar($title = 'document', $opts = []) {
     ob_start(); ?>
     <div class="export-toolbar no-print no-export" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
         <?php if (!$viewerOnly): ?>
-        <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint()"><i class="fas fa-print"></i> Imprimer / طباعة</button>
+        <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint(this)" title="ورقة جاهزة للطباعة من محرّك الطباعة الرسمي"><i class="fas fa-print"></i> Imprimer / طباعة</button>
         <?php endif; ?>
         <?php // 🔄 (2026-09-14 «وقت عم اطبع بتضل لاندسكيب ما بيغير على بورتريه بالبرنت»): اتجاه الورقة كان مثبّتاً بالـCSS فحوار
               // المتصفّح يرفض تغييره — زرّ واحد بكل البرنامج يقلب أفقي ⇄ عمودي للطباعة ولـPDF معاً (msaToggleOrient بـexport.js) ?>
@@ -5552,9 +5552,7 @@ function exportToolbar($title = 'document', $opts = []) {
         </span>
         <?php endif; ?>
         <button type="button" class="btn btn-sm btn-danger" onclick="msaSavePdfStart(this)" title="ينزّل ملف PDF عالكمبيوتر فوراً (بلا شاشة طباعة)"><i class="fas fa-file-pdf"></i> PDF — احفظ عالكمبيوتر</button>
-        <?php if ($officialPdf && $hasPup): ?>
-        <a class="btn btn-sm btn-light" href="<?= htmlspecialchars($officialPdf, ENT_QUOTES) ?>" target="_blank" title="PDF رسمي طبق الأصل عبر Chrome — يفتح ويطبع"><i class="fas fa-file-pdf"></i> PDF رسمي</a>
-        <?php endif; ?>
+        <?php /* 🖨️ (2026-10-11) زرّ «PDF رسمي» عبر Chrome أُزيل: كبسة PDF صارت من محرّك الطباعة الرسمي على الخادم بكل مكان (لا كبسات مكرّرة) */ ?>
         <?php if (!$viewerOnly): ?>
             <?php if ($server): ?>
             <a class="btn btn-sm btn-success" href="<?= $sv . $sep ?>format=xlsx"><i class="fas fa-file-excel"></i> Excel</a>

@@ -327,6 +327,9 @@ class ReportTable
     private $period = '';
     private $docxColWs = []; // عرض أعمدة الوورد (twips) من autoWidths
     private $dir = 'rtl';   // ↔️ (2026-10-08) اتجاه الورقة/المستند: عربي rtl (من اليمين) · فرنسي/لوائح الدولة ltr (من الشمال)
+    // 📐 (2026-10-11 «ما في تقرير بيطلع مظبوط بالإكسل/الوورد»): كتلة العنوان كما بالورقة المعروضة — ترويسة المدرسة ثم عنوان المستند ثم سطر المعلومات —
+    //    فوق رأس الجدول (كانت سطور الترويسة تنزل «أقساماً» داخل الجدول تحت رأس الأعمدة). [['t' => نصّ, 'k' => 'school'|'title'|'meta'], …]
+    private $titleLines = [];
 
     public function __construct($title, $landscape = true)
     {
@@ -338,6 +341,7 @@ class ReportTable
     public function period($p) { $this->period = $p; return $this; }
     public function widths($w) { $this->colWidths = $w; return $this; }
     public function dir($d) { $this->dir = ($d === 'ltr') ? 'ltr' : 'rtl'; return $this; }
+    public function titleLines(array $lines) { $this->titleLines = array_values(array_filter($lines, fn($l) => trim((string)($l['t'] ?? '')) !== '')); return $this; }
     public function isRtl() { return $this->dir === 'rtl'; }
 
     public function head($cells) { $this->headers = array_values($cells); return $this; }
@@ -399,7 +403,7 @@ class ReportTable
                 if ($r['type'] === 'total' && !$this->isNum($v)) continue;
                 if ($this->isNum($v)) $len = strlen(number_format($this->numVal($v), 2)) * 0.95;
                 else { $len = 0.0; foreach (preg_split('/\r\n|\n/', $v) as $ln) $len = max($len, self::textW($ln)); } // أطول سطر لا مجموع الأسطر
-                $w[$c] = max($w[$c], min($len, 58.0) + 1.5);
+                $w[$c] = max($w[$c], min($len, $this->isNum($v) ? 58.0 : 42.0) + 1.5);   // 📐 النصّ الطويل يلتفّ (42 حرفاً)، الأرقام لا تنكسر
             }
         }
         for ($c = 0; $c < $cols; $c++) $w[$c] = round(max(5.0, min(60.0, $w[$c])), 1);
@@ -458,14 +462,19 @@ class ReportTable
             $rowsXml .= '</row>';
         };
 
-        // أنماط: 1=عنوان, 2=ترويسة مدرسة, 3=رأس عمود, 4=نص بيانات, 5=رقم بيانات, 6=نص مجموع, 7=رقم مجموع, 8=قسم
-        // عنوان كبير
-        $addRow([$this->title], 1, 1, true);
-        if ($this->period) $addRow([$this->period], 2, 2, true);
-        if ($this->school) {
-            $sn = $this->school['name_ar'] ?? ($this->school['name_fr'] ?? '');
-            $extra = trim(($this->school['address'] ?? ''));
-            $addRow([$sn . ($extra ? ' — ' . $extra : '')], 2, 2, true);
+        // أنماط: 1=عنوان, 2=ترويسة مدرسة, 3=رأس عمود, 4=نص بيانات, 5=رقم بيانات, 6=نص مجموع, 7=رقم مجموع, 8=قسم, 9=سطر معلومات
+        if ($this->titleLines) {
+            // كتلة العنوان كما بالورقة: ترويسة (غامق) ← عنوان (كبير) ← معلومات (رمادي)
+            foreach ($this->titleLines as $ln) { $k = $ln['k'] ?? 'meta'; $st = $k === 'title' ? 1 : ($k === 'school' ? 2 : 9); $addRow([$ln['t']], $st, $st, true); }
+        } else {
+            // عنوان كبير
+            $addRow([$this->title], 1, 1, true);
+            if ($this->period) $addRow([$this->period], 2, 2, true);
+            if ($this->school) {
+                $sn = $this->school['name_ar'] ?? ($this->school['name_fr'] ?? '');
+                $extra = trim(($this->school['address'] ?? ''));
+                $addRow([$sn . ($extra ? ' — ' . $extra : '')], 2, 2, true);
+            }
         }
         $addRow([''], 4, 4, true); // سطر فاصل
         $titleRows = $rIdx;
@@ -491,12 +500,19 @@ class ReportTable
         $mergesXml = $merges ? '<mergeCells count="' . substr_count($merges, '<mergeCell') . '">' . $merges . '</mergeCells>' : '';
 
         // أعمدة
-        $colsXml = '<cols>';
+        $colsXml = '<cols>'; $sumW = 0.0;
         for ($c = 0; $c < $cols; $c++) {
             $w = isset($this->colWidths[$c]) ? max((float)$this->colWidths[$c], (float)($autoW[$c] ?? 0)) : ($autoW[$c] ?? 16);   // العرض المحدّد يدوياً لا يقلّ عن قدّ المحتوى
-            $colsXml .= '<col min="' . ($c + 1) . '" max="' . ($c + 1) . '" width="' . $w . '" customWidth="1"/>';
+            $colsXml .= '<col min="' . ($c + 1) . '" max="' . ($c + 1) . '" width="' . $w . '" customWidth="1"/>'; $sumW += $w;
         }
         $colsXml .= '</cols>';
+        // 🖨️ (2026-10-11 «بس أطبع إكسل ما في تقرير بيطلع مظبوط»): الورقة التي تسع عرض الصفحة تُطبع «ملاءمة العرض»؛ الأعرض (كشوف 20 عموداً)
+        //    تُطبع بحجمها الحقيقي 12 على صفحات متجاورة مع تكرار عمودَي # والاسم (Print_Titles أعمدة) — لا تصغير يجعل الخط غير مقروء.
+        $pagesAcross = max(1, (int)ceil($sumW / ($this->landscape ? 150 : 100)));   // عدد الصفحات عرضاً بالحجم الحقيقي
+        $fitW = $pagesAcross === 1;
+        $keyLast = 0;
+        for ($c = 0; $c < min(3, $cols); $c++) { $n = 0; $t = 0; foreach ($this->rows as $r) { if ($r['type'] !== 'data') continue; $v = (string)($r['cells'][$c] ?? ''); if ($v === '') continue; $n++; if (!$this->isNum($v)) $t++; } if ($n > 0 && $t / $n >= 0.5) { $keyLast = $c; break; } }
+        $printCols = $fitW ? '' : ("'" . str_replace("'", "''", self::xa($this->sheetName())) . "'!\$A:\$" . $colLetter($keyLast) . ',');
 
         $orient = $this->landscape ? 'landscape' : 'portrait';
         $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -511,7 +527,7 @@ class ReportTable
             . ($this->headers && $rIdx > $headerRow ? '<autoFilter ref="A' . $headerRow . ':' . $colLetter($cols - 1) . $rIdx . '"/>' : '')
             . $mergesXml
             . '<pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/>'
-            . '<pageSetup paperSize="9" orientation="' . $orient . '" fitToWidth="1" fitToHeight="0"/>'
+            . '<pageSetup paperSize="9" orientation="' . $orient . '" fitToWidth="' . $pagesAcross . '" fitToHeight="0"/>'
             . '</worksheet>';
 
         $styles = $this->xlsxStyles();
@@ -531,7 +547,7 @@ class ReportTable
             . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
             . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
             . '<sheets><sheet name="' . self::xa($this->sheetName()) . '" sheetId="1" r:id="rId1"/></sheets>'
-            . ($this->headers ? '<definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">\'' . str_replace("'", "''", self::xa($this->sheetName())) . '\'!$' . $headerRow . ':$' . $headerRow . '</definedName></definedNames>' : '')
+            . ($this->headers ? '<definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">' . $printCols . '\'' . str_replace("'", "''", self::xa($this->sheetName())) . '\'!$' . $headerRow . ':$' . $headerRow . '</definedName></definedNames>' : '')
             . '</workbook>';
         $wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -556,12 +572,13 @@ class ReportTable
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             . '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.##"/></numFmts>'
-            . '<fonts count="5">'
+            . '<fonts count="6">'
             . '<font><sz val="12"/><name val="Arial"/></font>'                                  // 0 default — 🔠 خط 12 بكل المطبوعات
             . '<font><b/><sz val="15"/><color rgb="FF1E3A8A"/><name val="Arial"/></font>'        // 1 title
             . '<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>'        // 2 header white
             . '<font><sz val="12"/><name val="Arial"/></font>'                                   // 3 data
             . '<font><b/><sz val="12"/><name val="Arial"/></font>'                               // 4 bold
+            . '<font><sz val="11"/><color rgb="FF475569"/><name val="Arial"/></font>'             // 5 meta (سطر المعلومات)
             . '</fonts>'
             . '<fills count="5">'
             . '<fill><patternFill patternType="none"/></fill>'                                   // 0
@@ -576,7 +593,7 @@ class ReportTable
             . '<top style="thin"><color rgb="FF94A3B8"/></top><bottom style="thin"><color rgb="FF94A3B8"/></bottom><diagonal/></border>' // 1 thin grey
             . '</borders>'
             . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            . '<cellXfs count="9">'
+            . '<cellXfs count="10">'
             . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>' // 0 default
             . '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 1 title
             . '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 2 subheader
@@ -586,6 +603,7 @@ class ReportTable
             . '<xf numFmtId="0" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center" wrapText="1"/></xf>' // 6 total text
             . '<xf numFmtId="164" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' // 7 total num
             . '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center" wrapText="1"/></xf>' // 8 section
+            . '<xf numFmtId="0" fontId="5" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' // 9 meta
             . '</cellXfs>'
             . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             . '</styleSheet>';
@@ -619,13 +637,21 @@ class ReportTable
         if (!$parts) $parts = [[]];
 
         $body = '';
-        // العنوان
-        $body .= $this->docxPara($this->title, ['b' => true, 'sz' => 30, 'align' => 'center', 'color' => '1E3A8A']);
-        if ($this->period) $body .= $this->docxPara($this->period, ['b' => true, 'sz' => 22, 'align' => 'center']);
-        if ($this->school) {
-            $sn = $this->school['name_ar'] ?? ($this->school['name_fr'] ?? '');
-            $extra = trim(($this->school['address'] ?? ''));
-            $body .= $this->docxPara($sn . ($extra ? ' — ' . $extra : ''), ['b' => true, 'sz' => 22, 'align' => 'center']);
+        if ($this->titleLines) {
+            // كتلة العنوان كما بالورقة: ترويسة (غامق) ← عنوان (كبير) ← معلومات (رمادي)
+            foreach ($this->titleLines as $ln) {
+                $k = $ln['k'] ?? 'meta';
+                $body .= $this->docxPara($ln['t'], $k === 'title' ? ['b' => true, 'sz' => 30, 'align' => 'center', 'color' => '1E3A8A'] : ($k === 'school' ? ['b' => true, 'sz' => 24, 'align' => 'center'] : ['sz' => 20, 'align' => 'center', 'color' => '475569']));
+            }
+        } else {
+            // العنوان
+            $body .= $this->docxPara($this->title, ['b' => true, 'sz' => 30, 'align' => 'center', 'color' => '1E3A8A']);
+            if ($this->period) $body .= $this->docxPara($this->period, ['b' => true, 'sz' => 22, 'align' => 'center']);
+            if ($this->school) {
+                $sn = $this->school['name_ar'] ?? ($this->school['name_fr'] ?? '');
+                $extra = trim(($this->school['address'] ?? ''));
+                $body .= $this->docxPara($sn . ($extra ? ' — ' . $extra : ''), ['b' => true, 'sz' => 22, 'align' => 'center']);
+            }
         }
         $body .= '<w:p/>';
 
