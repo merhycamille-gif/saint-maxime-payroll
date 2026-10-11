@@ -290,11 +290,18 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     </div>
     <?php if (!$empsP): ?>
         <div class="alert alert-warning">Aucun employé correspondant au filtre / لا يوجد موظفون مطابقون للفلتر.</div>
-    <?php else: foreach ($empsP as $empP):
-        $salStmt->execute([$empP['id'], $month, $year]);
-        $salP = $salStmt->fetch();
-        echo payslipCardHtml($empP, $salP, $month, $year);
-    endforeach; endif; ?>
+    <?php else:
+        // 🚨 (2026-10-11 مارسيلا داود: كشوف الشهر فيها حارس «المخزّن ≠ الملف» والقسائم لا) — نفس الحارس فوق القسائم قبل الطباعة
+        $cardsP = ''; $fvsRows = [];
+        foreach ($empsP as $empP) {
+            $salStmt->execute([$empP['id'], $month, $year]);
+            $salP = $salStmt->fetch();
+            if ($salP) $fvsRows[] = $salP + $empP;
+            $cardsP .= payslipCardHtml($empP, $salP, $month, $year);
+        }
+        echo fileVsStoredBanner($fvsRows, $month, $year, 'slips' . count($fvsRows) . '_' . md5(implode(',', array_column($empsP, 'id'))));
+        echo $cardsP;
+    endif; ?>
     <?php if (($_GET['autoprint'] ?? '') === '1' && $empsP): ?>
     <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 400); });</script>
     <?php endif; ?>
@@ -327,6 +334,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     }
     </style>
 
+    <?= $salary ? fileVsStoredBanner([$salary + $emp], $month, $year, 'e' . $employeeId) : '' /* 🚨 (2026-10-11) حارس «المخزّن ≠ الملف» على القسيمة الفردية أيضاً */ ?>
     <div class="card payslip-card" id="ppExportArea">
         <div class="card-header">
             <h3>

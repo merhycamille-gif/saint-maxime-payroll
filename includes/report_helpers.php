@@ -431,9 +431,10 @@ function docSheetStart(string $titleFr, string $titleAr, array $chips = [], arra
  * **المخزّن** بما يعطيه **ملف الموظف اليوم** لهذا الشهر؛ أي اختلاف = تنبيه أحمر فوق الكشف (لا يُطبع ولا يُصدَّر) باسم الأستاذ
  * والرقمين وكبسة «صحّح» (السنة السابقة المدفوعة ⇒ صفحة المعاينة والتأكيد؛ غيرها ⇒ إعادة حساب فورية). بكاش ببصمة الداتا.
  */
-function fileVsStoredBanner(array $rows, int $month, int $year): string {
+function fileVsStoredBanner(array $rows, int $month, int $year, string $cacheSuffix = ''): string {
     if (!$rows || !function_exists('msaFpCacheGet')) return '';
-    $key = 'fvs|' . $month . '|' . $year;
+    // 🧾 (2026-10-11 مارسيلا داود: القسيمة ما فيها الحارس) القسيمة الفردية/القسائم الجماعية تمرّر لاحقة حتى لا تشارك كاش الكشف الكامل
+    $key = 'fvs|' . $month . '|' . $year . ($cacheSuffix !== '' ? '|' . $cacheSuffix : '');
     $bad = msaFpCacheGet($key, 900);
     if ($bad === null) {
         $bad = [];
