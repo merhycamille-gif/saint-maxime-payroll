@@ -108,6 +108,8 @@
         var made = [], tables = area.querySelectorAll('table');
         Array.prototype.forEach.call(tables, function (t) {
             if (!t.rows.length || t.closest('[data-pdf-clone]')) return;
+            // 🏛️ (2026-10-11 «بتصلح وبتخرب شي تاني» — تصريح الضمان 190A انقسم جزأين بالطباعة): نماذج الدولة الرسمية طبق الأصل — لا تُقسَّم أبداً
+            if (t.closest('.official-doc')) return;
             var natW = t.scrollWidth;
             if (natW <= maxW + 2) return;
             // شبكة الخلايا (colspan/rowspan)
@@ -430,6 +432,7 @@
             try {
                 if (window.MSA_PAGE === 'annual' || undo) return; // beforeprint قد يُطلق مرّتين (المتصفّح + الصفحة): لا تقسيم فوق تقسيم
                 var a = area(); if (!a || a.querySelector('.payslip-card, .salary-slip-table') || a.closest('.payslip-card')) return;
+                if (a.classList.contains('official-doc') || a.closest('.official-doc') || a.querySelector('.official-doc')) return; // 🏛️ النماذج الرسمية لا تُقسَّم ولا يُلمَس تصغيرها
                 var land = !!(a.closest('.land-report, .xls-sheet') || a.querySelector('.land-report, .xls-sheet') || a.classList.contains('land-report'));
                 var maxW = land ? 1062 : 718;
                 saved = []; a.querySelectorAll('table').forEach(function (t) { saved.push([t, t.style.zoom, t.style.getPropertyValue('--pz')]); t.style.zoom = ''; t.style.setProperty('--pz', 1); });

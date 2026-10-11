@@ -316,7 +316,7 @@
     function msaFitInit() {
         var b = document.getElementById('msaFitBtn'); if (!b) return;
         var wide = false;
-        area().querySelectorAll('table').forEach(function (t) { if (t.closest('.no-print, .export-toolbar')) return; for (var i = 0; i < t.rows.length && i < 4; i++) if (t.rows[i].cells.length >= 10) wide = true; });
+        area().querySelectorAll('table').forEach(function (t) { if (t.closest('.no-print, .export-toolbar, .official-doc')) return; /* 🏛️ النماذج الرسمية بلا «أجزاء» */ for (var i = 0; i < t.rows.length && i < 4; i++) if (t.rows[i].cells.length >= 10) wide = true; });
         b.style.display = wide ? '' : 'none';
     }
     window.msaFitToggle = function (btn) {
