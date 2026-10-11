@@ -9849,6 +9849,14 @@ check('🖨️ كل خيارات الطبع بأي صفحة: كبسة «خيار
 require __DIR__ . '/reg_print_engine.php';   // 247) 🖨️ محرّك الطباعة الرسمي (2026-10-11)
 require __DIR__ . '/reg_paid_guard.php';     // 248) 🔒❓ حارس الأرقام: الأشهر المدفوعة المحمية + الكشوف ≠ الملف (2026-10-11)
 
+// ---------- 🏛️ (2026-10-11 «تظبيط طبع التقارير بيصلح وبيخرب شي تاني» — تصريح الضمان 190A انقسم جزأين بالطباعة) ----------
+// نماذج الدولة الرسمية (.official-doc) طبق الأصل: لا تُقسَّم أعمدةً بالطباعة/الـPDF ولا يظهر لها زرّ «أجزاء» — قفل بالكود
+$pdfJs = (string)@file_get_contents($PROJ . '/assets/js/pdf-save.js'); $expJs = (string)@file_get_contents($PROJ . '/assets/js/export.js');
+check('🏛️ النماذج الرسمية لا تُقسَّم بالطباعة ولا بالـPDF (splitWideTables يتجاهل .official-doc + beforeprint يخرج) ولا زرّ «أجزاء» لها',
+    strpos($pdfJs, "if (t.closest('.official-doc')) return;") !== false
+    && strpos($pdfJs, "a.classList.contains('official-doc') || a.closest('.official-doc') || a.querySelector('.official-doc')") !== false
+    && strpos($expJs, "'.no-print, .export-toolbar, .official-doc'") !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
