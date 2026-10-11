@@ -53,8 +53,12 @@ check('🖨️ المحرّك: tfoot ⇒ آخر الجسم (المجاميع م�
       && strpos($en247, "foreach (\$xp->query('//table[not(@dir)]') as \$t) { \$t->setAttribute('dir', \$dir);") !== false
       && strpos($en247, "\$chip->parentNode->insertBefore(\$dom->createTextNode(' · '), \$chip);") !== false
       && strpos($en247, "\$cls('badge') . ' or ' . \$cls('tag') . ' or ' . \$cls('pill')") !== false
-      && strpos($en247, "if (\$sum <= \$usable * 1.15) continue;") !== false
-      && strpos($en247, "'shrink_tables_to_fit' => 1.15") !== false
+      && strpos($en247, "if (\$fitOne || \$sum <= \$usable * 1.15) continue;") !== false
+      && strpos($en247, "'shrink_tables_to_fit' => \$fitOne ? 3 : 1.15,") !== false
+      && strpos($en247, "//form[not(.//table)]") !== false
+      && strpos($ex247, 'window.msaFitToggle = function (btn)') !== false && strpos($ex247, "fit: window.msaFitOne ? '1' : '0'") !== false
+      && strpos($fn247, 'id="msaFitBtn" onclick="msaFitToggle(this)"') !== false
+      && strpos($he247, "'fit' => !empty(\$_POST['fit'])") !== false
       && strpos($en247, "'الجزء ' . (\$pi + 1) . ' من ' . \$np") !== false
       && strpos($en247, 'صفحة {PAGENO} من {nbpg}') !== false
       && strpos($en247, "str_replace('\\\\', '/', \$abs)") !== false

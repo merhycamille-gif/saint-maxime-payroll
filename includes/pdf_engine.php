@@ -103,6 +103,8 @@ class MsaPdf
         foreach ($xp->query($q) as $n) $rm[] = $n;
         foreach ($rm as $n) if ($n->parentNode) $n->parentNode->removeChild($n);
         foreach ($xp->query('//a') as $a) { $a->removeAttribute('href'); }
+        // نماذج الإدخال (إضافة/تعديل) بلا جدول داخلها ليست من المستند
+        foreach (iterator_to_array($xp->query('//form[not(.//table)]')) as $f) if ($f->parentNode) $f->parentNode->removeChild($f);
 
         // ---- 2) الصور: رابط ⇒ مسار محلي ----
         $root = realpath(__DIR__ . '/..');
@@ -192,6 +194,7 @@ class MsaPdf
 
         // ---- 4) الجداول: tfoot ⇒ آخر الجسم (المجاميع مرّة واحدة لا بكل صفحة) + تقسيم العريض أعمدةً ----
         $landscape = $o['landscape'] ?? null;
+        $fitOne = !empty($o['fit']);   // 📄 «ورقة وحدة»: لا تقسيم أعمدةً — الجدول العريض يصغّر خطّه ليسع عرض الورقة
         $isLetter = $o['letter'] ?? null;
         $tables = [];
         foreach ($xp->query('//table') as $t) if (!$xp->query('ancestor::table', $t)->length) $tables[] = $t;
@@ -245,7 +248,7 @@ class MsaPdf
         foreach ($tables as $i => $t) {
             if (!isset($natural[$i])) continue;
             $w = $natural[$i]; $sum = array_sum($w);
-            if ($sum <= $usable * 1.15) continue;
+            if ($fitOne || $sum <= $usable * 1.15) continue;
             $cols = count($w);
             // أعمدة المفتاح: الأوّل إن كان ضيّقاً (#) + أوّل عمود نصّي بعده (الاسم)
             $key = [];
@@ -342,7 +345,7 @@ class MsaPdf
             'languageToFont' => new MsaLangToFont(),
             'useSubstitutions' => true,
             'backupSubsFont' => ['freesans', 'dejavusans'],
-            'shrink_tables_to_fit' => 1.15,
+            'shrink_tables_to_fit' => $fitOne ? 3 : 1.15,
             'use_kwt' => true,
             'img_dpi' => 96,
             'setAutoTopMargin' => false,

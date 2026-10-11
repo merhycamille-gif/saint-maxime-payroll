@@ -301,8 +301,24 @@
         opts = opts || {};
         var land = window.msaOrientForced ? (window.msaOrientForced === 'landscape' ? '1' : '0') : 'auto';
         var t = opts.title || docTitle();
-        return fetchFile(exportForm('pdf', t, { landscape: land, disp: opts.inline ? 'inline' : 'attachment' }), safeName(t) + '_' + stamp() + '.pdf');
+        return fetchFile(exportForm('pdf', t, { landscape: land, disp: opts.inline ? 'inline' : 'attachment', fit: window.msaFitOne ? '1' : '0' }), safeName(t) + '_' + stamp() + '.pdf');
     };
+    // 📄 (2026-10-11) الجدول العريض: «أجزاء» (الافتراضي، خط 12 مع تكرار # والاسم بكل جزء) ⇄ «ورقة وحدة» (كل الأعمدة بصفحة واحدة بخط أصغر).
+    //    الزرّ يظهر فقط حين يكون بالمستند جدول من 10 أعمدة وأكثر. لا يُحفَظ: كل صفحة تبدأ بالأجزاء.
+    window.msaFitOne = false;
+    function msaFitInit() {
+        var b = document.getElementById('msaFitBtn'); if (!b) return;
+        var wide = false;
+        area().querySelectorAll('table').forEach(function (t) { if (t.closest('.no-print, .export-toolbar')) return; for (var i = 0; i < t.rows.length && i < 4; i++) if (t.rows[i].cells.length >= 10) wide = true; });
+        b.style.display = wide ? '' : 'none';
+    }
+    window.msaFitToggle = function (btn) {
+        window.msaFitOne = !window.msaFitOne;
+        var sp = btn.querySelector('span'); if (sp) sp.textContent = window.msaFitOne ? 'Une page / ورقة وحدة ⇄' : 'Parties / أجزاء ⇄';
+        btn.classList.toggle('btn-warning', window.msaFitOne); btn.classList.toggle('btn-light', !window.msaFitOne);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', msaFitInit); else msaFitInit();
+    window.addEventListener('load', msaFitInit);
 
     // ===== WhatsApp =====
     // ملاحظة: واتساب عبر الرابط يرسل نصاً فقط (لا ملفات). للمستندات: نزّل PDF/Excel ثم أرفقه.
