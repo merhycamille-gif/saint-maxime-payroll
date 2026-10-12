@@ -94,7 +94,7 @@ include __DIR__ . '/../includes/header.php';
             <?= csrfField() ?>
             <div class="form-row cols-2">
                 <div class="form-group"><label class="form-label">Nom de l'expéditeur / اسم المُرسِل</label><input type="text" name="program_email_name" class="form-control" value="<?= e(getSetting('program_email_name', '')) ?>" placeholder="MSA Payroll"></div>
-                <div class="form-group"><label class="form-label">Adresse (optionnel) / العنوان (اختياري — الافتراضي noreply@<?= e(programMailDomain()) ?>)</label><input type="email" name="program_email_addr" class="form-control" dir="ltr" value="<?= e(getSetting('program_email_addr', '')) ?>" placeholder="noreply@<?= e(programMailDomain()) ?>"></div>
+                <div class="form-group"><label class="form-label">Adresse (optionnel) / العنوان (اختياري — الافتراضي no-reply@<?= e(programMailDomain()) ?>)</label><input type="email" name="program_email_addr" class="form-control" dir="ltr" value="<?= e(getSetting('program_email_addr', '')) ?>" placeholder="no-reply@<?= e(programMailDomain()) ?>"></div>
             </div>
             <button class="btn btn-primary" name="save_program" value="1"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
         </form>
