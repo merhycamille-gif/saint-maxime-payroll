@@ -237,7 +237,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <?php // 📧 (2026-10-12) الإرسال بالإيميل من إيميل البرنامج أو إيميل المدرسة
                 $emMode = (($editSchool['email_sender_mode'] ?? 'program') === 'school') ? 'school' : 'program';
-                $progAddr = function_exists('programMailAddress') ? programMailAddress() : 'noreply@msapayroll.com';
+                $progAddr = function_exists('programMailAddress') ? programMailAddress() : 'no-reply@msapayroll.com';
                 $progName = function_exists('programMailName') ? programMailName() : 'MSA Payroll'; ?>
             <div class="form-row cols-2">
                 <div class="form-group">

@@ -173,7 +173,7 @@ function programMailDomain(): string {
 function programMailAddress(): string {
     $custom = trim((string)getSetting('program_email_addr', ''));
     if ($custom !== '' && filter_var($custom, FILTER_VALIDATE_EMAIL)) return $custom;
-    return 'noreply@' . programMailDomain();
+    return 'no-reply@' . programMailDomain(); // العنوان الذي ثبت أنّ خادم الموقع يقبله (تجربة 2026-09-13)
 }
 function programMailName(): string {
     $n = trim((string)getSetting('program_email_name', ''));
@@ -225,8 +225,16 @@ function programMailSend($to, $subject, $body, array $attachments = [], $isHtml 
     }
     $m .= "--$boundary--\r\n";
     $tos = is_array($to) ? implode(', ', $to) : (string)$to;
-    $sent = @mail($tos, '=?UTF-8?B?' . base64_encode((string)$subject) . '?=', $m, $h, '-f' . $from);
-    return $sent ? [true, ''] : [false, 'خادم الموقع رفض إرسال البريد'];
+    $subj = '=?UTF-8?B?' . base64_encode((string)$subject) . '?=';
+    // محاولات متدرّجة: بمغلّف المرسِل (-f) ثم بلا مغلّف (بعض الاستضافات ترفض -f لعنوان بلا صندوق) — ويُسجَّل سبب الرفض
+    $lastErr = '';
+    foreach (['-f' . $from, null] as $extra) {
+        error_clear_last();
+        $sent = $extra === null ? @mail($tos, $subj, $m, $h) : @mail($tos, $subj, $m, $h, $extra);
+        if ($sent) return [true, ''];
+        $le = error_get_last(); if ($le) $lastErr = (string)($le['message'] ?? '');
+    }
+    return [false, 'خادم الموقع رفض إرسال البريد' . ($lastErr !== '' ? ' (' . mb_substr(strip_tags($lastErr), 0, 160) . ')' : '')];
 }
 /**
  * 🚪 الباب الواحد لإرسال الإيميل بكل البرنامج: يختار المصدر حسب خيار المدرسة، ويرجع للبديل إذا فشل الأوّل.
