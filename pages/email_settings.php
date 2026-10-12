@@ -104,6 +104,12 @@ include __DIR__ . '/../includes/header.php';
                 <input type="email" name="test_to_program" class="form-control" dir="ltr" value="<?= e($email) ?>" placeholder="جرّب على إيميلك"></div>
             <button class="btn btn-success" name="test_program" value="1"><i class="fas fa-paper-plane"></i> Envoyer un test / إرسال تجربة</button>
         </form>
+        <?php // 🧾 سجلّات DNS المطلوبة للتوقيع (يكتبها سكربت تركيب بريد السيرفر) — للمدير العام
+            $dnsNeeded = @file_get_contents(__DIR__ . '/../tmp/dns_records_needed.txt');
+            if ($dnsNeeded !== false && trim($dnsNeeded) !== ''): ?>
+        <details style="margin-top:10px"><summary style="cursor:pointer;color:#2563eb;font-size:13px">سجلّات DNS للدومين (SPF + DKIM) — تقنية</summary>
+            <pre id="dnsNeeded" dir="ltr" style="font-size:11px;white-space:pre-wrap;word-break:break-all;background:#f8fafc;padding:8px;border-radius:8px"><?= e($dnsNeeded) ?></pre></details>
+        <?php endif; ?>
         <?php if ($progSchools): ?>
         <div style="margin-top:12px;font-size:13px;line-height:1.9">
             <strong>المدارس — الإرسال من</strong> (يتغيّر من صفحة <a href="<?= BASE_URL ?>pages/schools.php">المدارس</a>):
