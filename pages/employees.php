@@ -458,6 +458,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'm13_include_extra' => isset($_POST['m13_include_extra']) ? 1 : 0,
         'm13_include_aide' => isset($_POST['m13_include_aide']) ? 1 : 0,
         'keep_working_past_64' => isset($_POST['keep_working_past_64']) ? 1 : 0,
+        // 🧾 (2026-10-12) نصف الراتب لصندوق التعويضات بت1 من سنة يحدّدها — اختياري: الخانة مطفأة أو السنة فارغة ⇒ NULL
+        'eoc_half_salary_year' => (isset($_POST['eoc_half_salary_on']) && preg_match('/^\d{4}$/', (string)($_POST['eoc_half_salary_year'] ?? ''))) ? (int)$_POST['eoc_half_salary_year'] : null,
         'tax_subject' => isset($_POST['tax_subject']) ? 1 : 0,
         'apply_family_deduction' => isset($_POST['apply_family_deduction']) ? 1 : 0,
         // قائمتا نعم/كلا بالحالة العائلية (2026-09-10 جورج العموري «ما حسبلهن التنزيل») — القيمة لا isset
@@ -504,6 +506,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         $stOld = $db->prepare("SELECT diploma, hire_date, titularization_date, tenure_confirmation_date, employee_type, base_salary_usd, contract_salary_lbp FROM employees WHERE id = ? AND school_id = ?");
         $stOld->execute([$id, currentSchoolId()]);
         $oldRow = $stOld->fetch(PDO::FETCH_ASSOC) ?: [];
+        // 🧾 سنة نصف الراتب القديمة (لإعادة حساب السنة الدراسية المعنيّة إذا تغيّرت — 2026-10-12)
+        try { $oldRow['eoc_half_salary_year'] = msaHasCol($db, 'employees', 'eoc_half_salary_year') ? $db->query("SELECT eoc_half_salary_year FROM employees WHERE id = " . (int)$id)->fetchColumn() : null; } catch (Throwable $t) { $oldRow['eoc_half_salary_year'] = null; }
         $oldDiploma = $oldRow['diploma'] ?? null;
         $oldDates = $oldRow;
         // 📆 الفترة المدفوعة قبل الحفظ (لمعرفة إن تغيّرت — 2026-09-30)
@@ -519,6 +523,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     try {
         if (!msaHasCol($db, 'employees', 'keep_working_past_64')) unset($data['keep_working_past_64']);
     } catch (Exception $e) { unset($data['keep_working_past_64']); }
+    // 🧾 عمود eoc_half_salary_year يتركّب ذاتياً (ensureEmployeeFlagColumns) — حارس إضافي كي لا يكسر الحفظ
+    try {
+        if (!msaHasCol($db, 'employees', 'eoc_half_salary_year')) unset($data['eoc_half_salary_year']);
+    } catch (Exception $e) { unset($data['eoc_half_salary_year']); }
     // عمود job_title قد لا يكون موجوداً قبل migration 018 أونلاين → أزِله من الحفظ لتفادي الكسر
     try {
         if (!msaHasCol($db, 'employees', 'job_title')) unset($data['job_title']);
@@ -686,6 +694,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                 }
             }
             pruneSalariesAfterDeparture($db, $id); // 🩹 احذف أي راتب بعد تاريخ الترك (شفاء ذاتي)
+            // 🧾 (2026-10-12) تغيّرت سنة «نصف الراتب لصندوق التعويضات» ⇒ تشرين الأول المعنيّ وحده يتبع (السنة الدراسية القديمة والجديدة)؛
+            //    الأشهر المدفوعة تبقى محمية بنفس آلية recalcEmployeeYear (سؤال نعم/لا + التنبيه الأصفر)
+            if (array_key_exists('eoc_half_salary_year', $data) && (int)($oldDates['eoc_half_salary_year'] ?? 0) !== (int)($data['eoc_half_salary_year'] ?? 0)) {
+                $ehsDone = [activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()];
+                foreach ([(int)($oldDates['eoc_half_salary_year'] ?? 0), (int)($data['eoc_half_salary_year'] ?? 0)] as $ehsYy) {
+                    if ($ehsYy < 2000) continue;
+                    $ehsSy = schoolYearOfMonth($ehsYy, 10);
+                    if (in_array($ehsSy, $ehsDone, true)) continue;
+                    $ehsDone[] = $ehsSy;
+                    try { recalcEmployeeYear($id, $ehsSy); } catch (Throwable $t) {}
+                }
+            }
             msaNotePaidSkipped((int)$id); // 🔔 أشهر مدفوعة بسنة سابقة لم تُمسّ ⇒ تنبيه + كبسة تطبيق صريح بالملف
             // 📆🧹 (2026-09-30 مايكل متى «حطّيت 9 أشهر والبطاقة طلعت 12» ثم «كل اللي بدّي ياه: بس غيّر، بنفس السنة يتغيّر»):
             //    غيّر الفترة المدفوعة ⇒ السنة **المعروضة وحدها** تتبع الملف فوراً (recalcEmployeeYear أعلاه حسب أشهر الفترة وشال ما صار
@@ -1275,7 +1295,7 @@ $employee = [
     'payment_months_per_year' => 12, 'pay_from_month' => 10, 'pay_to_month' => 9, 'has_13th_month' => 0, 'm13_include_extra' => 0, 'm13_include_aide' => 0, // 📆 12 = ت1 ← أيلول للجميع (2026-09-20)
     'tax_subject' => 1, 'apply_family_deduction' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
-    'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0,
+    'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0, 'eoc_half_salary_year' => null,
     'family_allowance_spouse_lbp' => 0, 'family_allowance_children_lbp' => 0, 'family_allowance_spouse_from' => '', 'family_allowance_spouse_to' => '', 'family_allowance_children_from' => '', 'family_allowance_children_to' => '',
     'count_spouse_allowance' => 1, 'count_children_allowance' => 1, 'grant_spouse_addition' => 0, 'grant_children_addition' => 0,
     'transport_daily_amount' => 0, 'transport_daily_currency' => 'LBP', 'transport_days_per_week' => 0, 'transport_weeks' => 4,
@@ -2644,6 +2664,24 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                             <label><input type="checkbox" name="eoc_includes_echelon" value="1" <?= $employee['eoc_includes_echelon'] ? 'checked' : '' ?>> الدرجة والتدرّج / Échelon</label><br>
                             <label><input type="checkbox" name="eoc_includes_extra" value="1" <?= $employee['eoc_includes_extra'] ? 'checked' : '' ?>> الأجر الإضافي / Supplément</label><br>
                             <label><input type="checkbox" name="eoc_includes_prime_aide" value="1" <?= $employee['eoc_includes_prime_aide'] ? 'checked' : '' ?>> مكافأة ومساعدة / Prime &amp; aide</label>
+                            <?php // 🧾 (2026-10-12) اختياري: نصف الراتب (أساس + درجة، بلا إضافي) لصندوق التعويضات بشهر تشرين الأول من سنة يحدّدها المستخدم
+                                $ehsY = (int)($employee['eoc_half_salary_year'] ?? 0);
+                                $ehsCur = (int)substr((string)(activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()), 0, 4);
+                                $ehsYears = range(max($ehsCur + 2, $ehsY ?: 0), min($ehsCur - 15, $ehsY ?: $ehsCur), -1); ?>
+                            <div class="emp-teacher-only" style="margin-top:12px;padding-top:10px;border-top:1px dashed #fcd34d">
+                                <label class="d-flex justify-between align-center" style="gap:10px">
+                                    <span><strong>حسم نصف الراتب لصندوق التعويضات بشهر تشرين الأول</strong> / Retenue d'un demi-salaire pour la Caisse (octobre)</span>
+                                    <label class="switch"><input type="checkbox" name="eoc_half_salary_on" id="eocHalfOn" value="1" <?= $ehsY ? 'checked' : '' ?>><span class="slider"></span></label>
+                                </label>
+                                <div id="eocHalfYearWrap" style="margin-top:8px;<?= $ehsY ? '' : 'display:none' ?>">
+                                    <label class="form-label" style="margin-bottom:4px">السنة / Année <small>(يُحسم بتشرين الأول من هذه السنة فقط)</small></label>
+                                    <select name="eoc_half_salary_year" class="form-select" style="max-width:160px">
+                                        <?php foreach ($ehsYears as $yy): ?><option value="<?= $yy ?>" <?= ($ehsY ? $yy === $ehsY : $yy === $ehsCur) ? 'selected' : '' ?>><?= $yy ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <p style="font-size:12px;color:var(--gray-600);margin:6px 0 0">اختياري ومطفأ افتراضياً. عند تفعيله: نصف (الأساس + الدرجة) بلا الأجر الإضافي يُحسم مرّة واحدة بتشرين الأول من السنة المختارة ويُقيَّد لصندوق التعويضات (خانة «صندوق الدرجة») ويُنزَّل من وعاء الضريبة — تماماً كحسم الترسيم بالقانون. لا يُحسم مرّتين إذا صادف شهر ترسيم.</p>
+                                <script>(function(){var c=document.getElementById('eocHalfOn'),w=document.getElementById('eocHalfYearWrap');if(c&&w){c.addEventListener('change',function(){w.style.display=c.checked?'':'none';});}})();</script>
+                            </div>
                         </div>
                     </div>
                 </div>

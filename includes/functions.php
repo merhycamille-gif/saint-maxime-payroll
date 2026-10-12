@@ -4409,6 +4409,10 @@ function ensureEmployeeFlagColumns() {
         if (!msaHasCol($db, 'employees', 'grant_children_addition')) {
             $db->exec("ALTER TABLE employees ADD COLUMN grant_children_addition TINYINT(1) NOT NULL DEFAULT 0");
         }
+        // 🧾 (2026-10-12) خيار «حسم نصف الراتب لصندوق التعويضات بشهر ت1 من سنة يحدّدها المستخدم» — NULL = مطفأ (الافتراضي للجميع)
+        if (!msaHasCol($db, 'employees', 'eoc_half_salary_year')) {
+            $db->exec("ALTER TABLE employees ADD COLUMN eoc_half_salary_year SMALLINT NULL DEFAULT NULL");
+        }
     } catch (Exception $e) { /* لا نكسر الصفحة — يُعاد بالفتحة التالية */ }
 }
 

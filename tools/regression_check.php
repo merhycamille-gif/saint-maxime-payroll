@@ -9857,6 +9857,45 @@ check('🏛️ النماذج الرسمية لا تُقسَّم بالطباع�
     && strpos($pdfJs, "a.classList.contains('official-doc') || a.closest('.official-doc') || a.querySelector('.official-doc')") !== false
     && strpos($expJs, "'.no-print, .export-toolbar, .official-doc'") !== false);
 
+/* =====================================================================
+ * 249) 🧾 (2026-10-12 «بملف الأستاذ خيار: إذا داخل بالملاك، أنا بحدّد السنة وبينحسم نصف الراتب بشهر ت1 لصندوق التعويضات متل القانون —
+ *      بس إذا أنا حطّيتها»): عمود eoc_half_salary_year (NULL = مطفأ) يتركّب ذاتياً؛ المحرّك يحسم نصف (الأساس + الدرجة) بلا إضافي
+ *      بتشرين الأول من السنة المحدّدة فقط إلى «صندوق الدرجة» (ويُنزَّل من وعاء الضريبة)؛ لا يُحسم مرّتين مع الترسيم؛ الإطفاء يعيد
+ *      كل الأشهر كما كانت بالمليم. الخانة بالملف داخل بطاقة صندوق التعويضات (ملاك فقط) مع سنة.
+ * =================================================================== */
+$pc249 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php'); $em249 = (string)file_get_contents($PROJ . '/pages/employees.php'); $fn249 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$ok249 = false; $why249 = '';
+try {
+    ensureEmployeeFlagColumns();
+    $e249 = $db->query("SELECT e.id FROM employees e JOIN monthly_salaries m ON m.employee_id=e.id AND m.school_year='2026-2027' AND m.month=10 AND m.base_plus_echelon_lbp>0 AND m.is_paid=0
+                        WHERE e.employee_type='enseignant_titulaire' AND e.eoc_subject=1 AND e.is_deleted=0 AND (e.eoc_half_salary_year IS NULL) AND e.keep_working_past_64=0
+                          AND NOT EXISTS (SELECT 1 FROM employee_grade_history h WHERE h.employee_id=e.id AND h.change_date BETWEEN '2026-10-01' AND '2026-10-31')
+                        ORDER BY e.id LIMIT 1")->fetchColumn();
+    if (!$e249) { $ok249 = true; $why249 = 'لا أستاذ مناسب محلياً — فحص الكود فقط'; }
+    else {
+        $e249 = (int)$e249;
+        $snap249 = function () use ($db, $e249) { return $db->query("SELECT month, year, base_plus_echelon_lbp, caisse_amount_lbp, eoc_grade_lbp, taxable_base_lbp, income_tax_lbp, total_retenues_lbp, net_salary_lbp, total_due_lbp FROM monthly_salaries WHERE employee_id=$e249 AND school_year='2026-2027' ORDER BY year, month")->fetchAll(PDO::FETCH_ASSOC); };
+        $b249 = $snap249();
+        $db->exec("UPDATE employees SET eoc_half_salary_year = 2026 WHERE id = $e249"); recalcEmployeeYear($e249, '2026-2027'); $o249 = $snap249();
+        $db->exec("UPDATE employees SET eoc_half_salary_year = NULL WHERE id = $e249"); recalcEmployeeYear($e249, '2026-2027'); $f249 = $snap249();
+        $bo = null; $oo = null; foreach ($b249 as $i => $r) { if ((int)$r['month'] === 10 && (int)$r['year'] === 2026) { $bo = $r; $oo = $o249[$i] ?? null; } }
+        $half249 = (int)round($bo['base_plus_echelon_lbp'] / 2);
+        $others249 = true; foreach ($b249 as $i => $r) { if ((int)$r['month'] === 10 && (int)$r['year'] === 2026) continue; if (($o249[$i] ?? null) != $r) $others249 = false; }
+        $ok249 = $oo && (int)$oo['eoc_grade_lbp'] - (int)$bo['eoc_grade_lbp'] === $half249
+              && (int)$bo['taxable_base_lbp'] - (int)$oo['taxable_base_lbp'] === $half249
+              && (int)$oo['net_salary_lbp'] % 1000 === 0 && (int)$oo['net_salary_lbp'] < (int)$bo['net_salary_lbp']
+              && $others249 && $f249 == $b249;
+        $why249 = "emp=$e249 half=$half249 eocΔ=" . ((int)($oo['eoc_grade_lbp'] ?? 0) - (int)$bo['eoc_grade_lbp']) . ' others=' . ($others249 ? 'ok' : 'CHANGED') . ' restored=' . ($f249 == $b249 ? 'yes' : 'NO');
+    }
+} catch (Throwable $e) { $why249 = $e->getMessage(); }
+check('🧾 نصف الراتب لصندوق التعويضات بت1 من سنة يحدّدها (اختياري، ملاك): عمود ذاتي + المحرّك + الخانة بالملف + تجربة حيّة تشغيل/إطفاء',
+      $ok249
+      && strpos($fn249, "ADD COLUMN eoc_half_salary_year SMALLINT NULL DEFAULT NULL") !== false
+      && strpos($pc249, "if (!\$hasTit && \$this->month === 10 && !empty(\$emp['eoc_half_salary_year']) && (int)\$emp['eoc_half_salary_year'] === (int)\$this->year) {") !== false
+      && strpos($em249, 'name="eoc_half_salary_on" id="eocHalfOn"') !== false && strpos($em249, 'name="eoc_half_salary_year" class="form-select"') !== false
+      && strpos($em249, "'eoc_half_salary_year' => (isset(\$_POST['eoc_half_salary_on']) && preg_match('/^\\d{4}\$/', (string)(\$_POST['eoc_half_salary_year'] ?? ''))) ? (int)\$_POST['eoc_half_salary_year'] : null,") !== false
+      && strpos($em249, '$ehsSy = schoolYearOfMonth($ehsYy, 10);') !== false, $why249);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
