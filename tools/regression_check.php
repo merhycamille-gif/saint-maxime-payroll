@@ -5738,7 +5738,7 @@ check('أزرار التقارير: PDF حقيقي لأي صفحة (تقطيع �
       && strpos($ps116, "rows[i].children.length >= 9") !== false && strpos($ps116, "w.style.overflow = 'visible'") !== false
       && strpos($ex116, 'function shareModal(html)') !== false && strpos($ex116, "'https://wa.me/' + n + '?text='") !== false && strpos($ex116, "pages/send_report.php") !== false && strpos($ex116, 'window.msaPdfBlob()') !== false
       && strpos($fn116, 'onclick="msaSavePdfStart(this)"') !== false && strpos($ft116, 'window.CSRF_TOKEN') !== false
-      && strpos($sr116, "verifyCsrf(\$_POST['csrf'] ?? '')") !== false && strpos($sr116, '!canEdit()') !== false && strpos($sr116, 'smtpSendMail($cfg, $to, $subject, $text, $att)') !== false && strpos($sr116, '@mail($to') !== false
+      && strpos($sr116, "verifyCsrf(\$_POST['csrf'] ?? '')") !== false && strpos($sr116, '!canEdit()') !== false && strpos($sr116, 'msaSendMail($to, $subject, $text, $att, false, $schoolId,') !== false // 📧 (2026-10-12) SMTP ثم mail صارا داخل الباب الواحد msaSendMail (قسم 250)
       && strpos($sr116, "substr(\$data, 0, 4) !== '%PDF'") !== false);
 // الخادم يرفض بلا ملف/بلا CSRF (تجربة حيّة بلا أثر)
 $why116 = ''; $ok116 = false;
@@ -9895,6 +9895,37 @@ check('🧾 نصف الراتب لصندوق التعويضات بت1 من سن�
       && strpos($em249, 'name="eoc_half_salary_on" id="eocHalfOn"') !== false && strpos($em249, 'name="eoc_half_salary_year" class="form-select"') !== false
       && strpos($em249, "'eoc_half_salary_year' => (isset(\$_POST['eoc_half_salary_on']) && preg_match('/^\\d{4}\$/', (string)(\$_POST['eoc_half_salary_year'] ?? ''))) ? (int)\$_POST['eoc_half_salary_year'] : null,") !== false
       && strpos($em249, '$ehsSy = schoolYearOfMonth($ehsYy, 10);') !== false, $why249);
+
+/* =====================================================================
+ * 250) 📧 (2026-10-12 «يكون في إيميل محدّد للبرنامج أرسل منّو وأنا يكون عندي خيار أي مدارس بدّي أستعمل هالإيميل» + «اشتغل هلق وخلص»):
+ *      إيميل البرنامج MSA Payroll ‹noreply@دومين الموقع› (بريد الخادم بلا كلمة سرّ) + خيار لكل مدرسة بصفحة المدارس
+ *      (schools.email_sender_mode يتركّب ذاتياً، الافتراضي program) + الباب الواحد msaSendMail لكل كبسات الإيميل
+ *      (send_report + send_attestation) مع بديل تلقائي + بطاقة إيميل البرنامج بإعدادات البريد (اسم/عنوان/تجربة).
+ * =================================================================== */
+$ml250 = (string)file_get_contents($PROJ . '/includes/mailer.php'); $sc250 = (string)file_get_contents($PROJ . '/pages/schools.php');
+$sr250 = (string)file_get_contents($PROJ . '/pages/send_report.php'); $sa250 = (string)file_get_contents($PROJ . '/pages/send_attestation.php');
+$es250 = (string)file_get_contents($PROJ . '/pages/email_settings.php'); $fn250 = (string)file_get_contents($PROJ . '/includes/functions.php');
+$ok250 = false; $why250 = '';
+try {
+    require_once $PROJ . '/includes/mailer.php';
+    ensureEmployeeFlagColumns();
+    $sid250 = (int)$db->query("SELECT id FROM schools WHERE is_active = 1 ORDER BY id LIMIT 1")->fetchColumn();
+    $m0 = $db->query("SELECT email_sender_mode FROM schools WHERE id = $sid250")->fetchColumn();
+    $db->exec("UPDATE schools SET email_sender_mode = 'school' WHERE id = $sid250"); $mS = schoolEmailMode($sid250);
+    $db->exec("UPDATE schools SET email_sender_mode = 'program' WHERE id = $sid250"); $mP = schoolEmailMode($sid250);
+    $db->prepare("UPDATE schools SET email_sender_mode = ? WHERE id = ?")->execute([$m0 ?: 'program', $sid250]);
+    $ok250 = $mS === 'school' && $mP === 'program' && programMailName() !== '' && strpos(programMailAddress(), '@') !== false && is_bool(programMailAvailable());
+    $why250 = "school=$sid250 modes=$mS/$mP addr=" . programMailAddress();
+} catch (Throwable $e) { $why250 = $e->getMessage(); }
+check('📧 إيميل البرنامج MSA Payroll + خيار المدرسة (program/school) + الباب الواحد msaSendMail بكل كبسات الإيميل + بطاقة إعدادات البريد',
+      $ok250
+      && strpos($fn250, "ADD COLUMN email_sender_mode VARCHAR(10) NOT NULL DEFAULT 'program'") !== false
+      && strpos($ml250, 'function msaSendMail(') !== false && strpos($ml250, 'function programMailSend(') !== false && strpos($ml250, 'function schoolEmailMode(') !== false
+      && strpos($ml250, "return \$n !== '' ? \$n : 'MSA Payroll';") !== false
+      && strpos($sc250, 'name="email_sender_mode"') !== false && strpos($sc250, 'UPDATE schools SET email_sender_mode = ? WHERE id = ?') !== false
+      && strpos($sr250, '[$ok, $err, $via, $fromAddr] = msaSendMail($to, $subject, $text, $att, false, $schoolId,') !== false && strpos($sr250, 'smtpSendMail(') === false && strpos($sr250, '@mail(') === false
+      && substr_count($sa250, 'msaSendMail(') === 2 && strpos($sa250, 'smtpSendMail(') === false
+      && strpos($es250, 'name="program_email_name"') !== false && strpos($es250, 'name="test_program"') !== false && strpos($es250, 'programMailSend($testTo,') !== false, $why250);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

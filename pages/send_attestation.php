@@ -35,8 +35,9 @@ if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
     sendResult(false, 'البريد الإلكتروني غير صحيح', $back);
 }
 
-$cfg = smtpConfigFromSettings();
-if (!$cfg) {
+// 📧 (2026-10-12) الإرسال عبر الباب الواحد msaSendMail: إيميل البرنامج أو إيميل المدرسة حسب خيار المدرسة — لا حاجة لإعدادات البريد إلا إذا اختارت المدرسة إيميلها
+$attSchoolId = (!isAllSchools() && currentSchool()) ? (int)currentSchool()['id'] : null;
+if (schoolEmailMode($attSchoolId) === 'school' && !smtpConfigFromSettings() && !programMailAvailable()) {
     sendResult(false, 'لم تُضبَط إعدادات البريد بعد. افتح «إعدادات البريد» وأدخل إيميل المدرسة وكلمة المرور.', BASE_URL . 'pages/email_settings.php');
 }
 
@@ -70,7 +71,7 @@ if ($hasPuppeteer) {
     $pdf = file_get_contents($out);
     @unlink($out);
     $body = "السلام عليكم،\n\nمرفق الإفادة المطلوبة بصيغة PDF.\n\n" . $schoolName;
-    [$ok, $err] = smtpSendMail($cfg, $to, $subject, $body, [['name' => $name . '.pdf', 'data' => $pdf, 'mime' => 'application/pdf']]);
+    [$ok, $err] = msaSendMail($to, $subject, $body, [['name' => $name . '.pdf', 'data' => $pdf, 'mime' => 'application/pdf']], false, $attSchoolId, $schoolName);
 } else {
     // ----- أونلاين (بلا puppeteer): نجلب نصّ الإفادة (#ppExportArea) ونرسله كبريد HTML -----
     $url = $baseUrl . BASE_URL . $target;
@@ -92,7 +93,7 @@ if ($hasPuppeteer) {
     if ($content === '') sendResult(false, 'تعذّر جلب نصّ الإفادة لإرسالها', $back);
     $body = '<div dir="rtl" style="font-family:Arial,sans-serif">' . $content
           . '<hr><div style="color:#555;font-size:13px">' . htmlspecialchars($schoolName) . '</div></div>';
-    [$ok, $err] = smtpSendMail($cfg, $to, $subject, $body, [], true);
+    [$ok, $err] = msaSendMail($to, $subject, $body, [], true, $attSchoolId, $schoolName);
 }
 
 if ($ok) sendResult(true, "تم إرسال الإفادة إلى $to بنجاح", $back);

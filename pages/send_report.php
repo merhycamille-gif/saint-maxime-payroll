@@ -34,27 +34,11 @@ $text = ($body !== '' ? $body : 'مرفق المستند المطلوب بصيغ
 $att = [['name' => $name, 'data' => $data, 'mime' => 'application/pdf']];
 $settingsUrl = BASE_URL . 'pages/email_settings.php';
 
-// ١) SMTP من إعدادات البريد
-$cfg = smtpConfigFromSettings();
-$err = '';
-if ($cfg) {
-    if ($schoolName !== '') $cfg['from_name'] = $schoolName; // المرسِل باسم المدرسة المختارة
-    [$ok, $err] = smtpSendMail($cfg, $to, $subject, $text, $att);
-    if ($ok) { logAudit('send_report_email', 'settings', 0, null, ['to' => $to, 'subject' => $subject, 'file' => $name, 'via' => 'smtp']); $out(true, 'أُرسل إلى ' . $to . ' مع الملف ' . $name . ' (عبر ' . $cfg['user'] . ')'); }
+// 📧 (2026-10-12) الباب الواحد: إيميل البرنامج (MSA Payroll ‹noreply@الموقع›) أو إيميل المدرسة حسب خيار المدرسة بصفحة المدارس، مع بديل تلقائي
+$schoolId = (!isAllSchools() && currentSchool()) ? (int)currentSchool()['id'] : null;
+[$ok, $err, $via, $fromAddr] = msaSendMail($to, $subject, $text, $att, false, $schoolId, $schoolName !== '' ? $schoolName : '');
+if ($ok) {
+    logAudit('send_report_email', 'settings', 0, null, ['to' => $to, 'subject' => $subject, 'file' => $name, 'via' => $via, 'from' => $fromAddr]);
+    $out(true, 'أُرسل إلى ' . $to . ' مع الملف ' . $name . ' (من ' . $fromAddr . ($via === 'program' ? ' — إيميل البرنامج؛ إذا ما لقيته افحص Spam' : '') . ')');
 }
-// ٢) بريد الخادم نفسه (mail) — احتياط عندما لا SMTP أو رُفض تسجيل الدخول (هوتميل يمنع كلمة السر العادية)
-$host = preg_replace('/^www\./', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
-if ($host !== 'localhost' && strpos($host, '127.') !== 0 && strpos($host, '192.') !== 0 && function_exists('mail')) {
-    $from = 'no-reply@' . preg_replace('/:\d+$/', '', $host);
-    $fromName = $schoolName ?: 'MSA Payroll';
-    $boundary = '=_pp_' . bin2hex(random_bytes(8));
-    $h  = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>\r\n";
-    if ($cfg && !empty($cfg['user'])) $h .= "Reply-To: <" . $cfg['user'] . ">\r\n";
-    $h .= "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"$boundary\"\r\n";
-    $m  = "--$boundary\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($text)) . "\r\n";
-    $m .= "--$boundary\r\nContent-Type: application/pdf; name=\"$name\"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"$name\"\r\n\r\n" . chunk_split(base64_encode($data)) . "\r\n--$boundary--\r\n";
-    $sent = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $m, $h, '-f' . $from);
-    if ($sent) { logAudit('send_report_email', 'settings', 0, null, ['to' => $to, 'subject' => $subject, 'file' => $name, 'via' => 'mail']); $out(true, 'أُرسل إلى ' . $to . ' مع الملف ' . $name . ' (من بريد الموقع ' . $from . ' — إذا ما لقيته افحص Spam)'); }
-}
-if (!$cfg) $out(false, 'لم تُضبَط إعدادات البريد بعد — افتح «إعدادات البريد» وأدخل إيميل المدرسة وكلمة مرور التطبيق', ['settings' => $settingsUrl]);
 $out(false, 'تعذّر الإرسال: ' . ($err ?: 'خطأ غير معروف'), ['settings' => $settingsUrl]);

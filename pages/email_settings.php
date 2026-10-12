@@ -39,6 +39,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
     }
+    // 📧 (2026-10-12) إيميل البرنامج: اسم المُرسِل + عنوان اختياري (الافتراضي noreply@دومين الموقع)
+    if (isset($_POST['save_program'])) {
+        setSetting('program_email_name', trim((string)($_POST['program_email_name'] ?? '')));
+        $pa = trim((string)($_POST['program_email_addr'] ?? ''));
+        setSetting('program_email_addr', ($pa !== '' && filter_var($pa, FILTER_VALIDATE_EMAIL)) ? $pa : '');
+        $_SESSION['flash_success'] = 'تم حفظ إيميل البرنامج: ' . programMailName() . ' ‹' . programMailAddress() . '›';
+        header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
+    }
+    if (isset($_POST['test_program'])) {
+        $testTo = trim($_POST['test_to_program'] ?? '');
+        if (!filter_var($testTo, FILTER_VALIDATE_EMAIL)) { $_SESSION['flash_error'] = 'اكتب إيميلاً صحيحاً للتجربة'; }
+        else {
+            [$ok, $err] = programMailSend($testTo, 'تجربة إيميل البرنامج - ' . programMailName(), 'هذه رسالة تجربة من إيميل البرنامج ' . programMailAddress() . '. إذا وصلتك فالإرسال من إيميل البرنامج شغّال.', [], false, '', schoolReplyEmail());
+            $_SESSION[$ok ? 'flash_success' : 'flash_error'] = $ok ? "تم إرسال رسالة التجربة من إيميل البرنامج إلى $testTo ✓ (إذا ما لقيتها افحص Spam)" : "فشل الإرسال من إيميل البرنامج: $err";
+        }
+        header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
+    }
     if (isset($_POST['test'])) {
         $cfg = smtpConfigFromSettings();
         $testTo = trim($_POST['test_to'] ?? '') ?: ($cfg['user'] ?? '');
@@ -61,10 +78,46 @@ $secure = getSetting('smtp_secure', '');
 $fromName = getSetting('smtp_from_name', '');
 include __DIR__ . '/../includes/header.php';
 ?>
+<?php // 📧 (2026-10-12) إيميل البرنامج — يبعت منه خادم الموقع بلا كلمة سرّ؛ كل مدرسة تختار بصفحة المدارس: إيميل البرنامج (الافتراضي) أو إيميلها
+    $progSchools = []; try { $progSchools = getDB()->query("SELECT name_ar, name_fr, email, IFNULL(email_sender_mode,'program') m FROM schools WHERE is_active = 1 ORDER BY id")->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $t) {} ?>
+<div class="card" style="max-width:680px;border:1px solid #bfdbfe">
+    <div class="card-header" style="background:#eff6ff"><h3>
+        <span dir="ltr"><i class="fas fa-paper-plane"></i> E-mail du programme</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إيميل البرنامج (الإرسال بلا كلمة سرّ)</div>
+    </h3></div>
+    <div class="card-body">
+        <div class="alert alert-info" style="line-height:1.9">
+            الإيميل الحالي: <strong><?= e(programMailName()) ?></strong> ‹<span dir="ltr"><?= e(programMailAddress()) ?></span>›<br>
+            خادم الموقع يبعت منه لحاله (إفادات، بطاقات، تقارير) والردّ يرجع لإيميل المدرسة المكتوب بصفحة المدارس. يعمل على الموقع (<?= programMailAvailable() ? '✅ متاح هنا' : '⚠️ غير متاح على نسخة الكمبيوتر — على الموقع فقط' ?>).
+        </div>
+        <form method="post" class="lockedit">
+            <?= csrfField() ?>
+            <div class="form-row cols-2">
+                <div class="form-group"><label class="form-label">Nom de l'expéditeur / اسم المُرسِل</label><input type="text" name="program_email_name" class="form-control" value="<?= e(getSetting('program_email_name', '')) ?>" placeholder="MSA Payroll"></div>
+                <div class="form-group"><label class="form-label">Adresse (optionnel) / العنوان (اختياري — الافتراضي noreply@<?= e(programMailDomain()) ?>)</label><input type="email" name="program_email_addr" class="form-control" dir="ltr" value="<?= e(getSetting('program_email_addr', '')) ?>" placeholder="noreply@<?= e(programMailDomain()) ?>"></div>
+            </div>
+            <button class="btn btn-primary" name="save_program" value="1"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
+        </form>
+        <form method="post" class="form-row" style="align-items:end;gap:10px;margin-top:10px">
+            <?= csrfField() ?>
+            <div class="form-group" style="flex:1"><label class="form-label">Test depuis l'e-mail du programme / تجربة من إيميل البرنامج إلى</label>
+                <input type="email" name="test_to_program" class="form-control" dir="ltr" value="<?= e($email) ?>" placeholder="جرّب على إيميلك"></div>
+            <button class="btn btn-success" name="test_program" value="1"><i class="fas fa-paper-plane"></i> Envoyer un test / إرسال تجربة</button>
+        </form>
+        <?php if ($progSchools): ?>
+        <div style="margin-top:12px;font-size:13px;line-height:1.9">
+            <strong>المدارس — الإرسال من</strong> (يتغيّر من صفحة <a href="<?= BASE_URL ?>pages/schools.php">المدارس</a>):
+            <?php foreach ($progSchools as $ps): ?>
+                <span class="badge" style="background:<?= $ps['m'] === 'school' ? '#fef3c7' : '#dcfce7' ?>;color:#1f2937;margin:2px"><?= e($ps['name_ar'] ?: $ps['name_fr']) ?>: <?= $ps['m'] === 'school' ? '🏫 إيميل المدرسة' : '📨 إيميل البرنامج' ?></span>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
 <div class="card" style="max-width:680px">
     <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-envelope"></i> Paramètres de messagerie (envoi automatique)</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إعدادات البريد الإلكتروني (للإرسال التلقائي)</div>
+        <span dir="ltr"><i class="fas fa-envelope"></i> E-mail de l'école (SMTP)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إيميل المدرسة (للمدارس التي اختارت الإرسال من إيميلها)</div>
     </h3></div>
     <div class="card-body">
         <div class="alert alert-info" style="line-height:1.9">

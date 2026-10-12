@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/translit_ar_fr.php';
+require_once __DIR__ . '/../includes/mailer.php'; // 📧 إيميل البرنامج (اسمه وعنوانه بخيار المدرسة)
 requireLogin();
 
 if (!isSuperAdmin()) {
@@ -49,6 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // تركيب ذاتي: عمود رقم المدرسة لدى صندوق التعويضات
     try { $db->query("SELECT caisse_number FROM schools LIMIT 1"); }
     catch (Exception $e) { try { $db->exec("ALTER TABLE schools ADD COLUMN caisse_number VARCHAR(50) NULL COMMENT 'رقم المدرسة لدى صندوق التعويضات'"); } catch (Exception $e2) {} }
+    // 📧 (2026-10-12) الإرسال بالإيميل من: إيميل البرنامج (program) أو إيميل المدرسة (school)
+    $emailModeP = (($_POST['email_sender_mode'] ?? 'program') === 'school') ? 'school' : 'program';
+    ensureEmployeeFlagColumns();
 
     if ($data[1] === '' && $data[2] === '') {
         $_SESSION['flash_error'] = 'الاسم مطلوب / Le nom est requis';
@@ -59,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([...$data, $id]);
         logAudit('update', 'schools', $id, null, $data[2]);
         $savedId = $id;
+        try { $db->prepare("UPDATE schools SET email_sender_mode = ? WHERE id = ?")->execute([$emailModeP, $id]); } catch (Throwable $t) {}
         $_SESSION['flash_success'] = 'تم تحديث المدرسة / École mise à jour';
     } else {
         $sql = "INSERT INTO schools (code, name_ar, name_fr, address, address_fr, phone, email,
@@ -69,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newId = $db->lastInsertId();
         logAudit('create', 'schools', $newId, null, $data[2]);
         $savedId = (int)$newId;
+        try { $db->prepare("UPDATE schools SET email_sender_mode = ? WHERE id = ?")->execute([$emailModeP, (int)$newId]); } catch (Throwable $t) {}
         $_SESSION['flash_success'] = 'تمت إضافة المدرسة / École ajoutée';
     }
     // حفظ المسؤولين الموقّعين (اسم/أجنبي/صفة/هاتف) كـ JSON بجدول الإعدادات لكل مدرسة
@@ -227,6 +233,20 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-group">
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-control" value="<?= e($editSchool['email'] ?? '') ?>">
+                </div>
+            </div>
+            <?php // 📧 (2026-10-12) الإرسال بالإيميل من إيميل البرنامج أو إيميل المدرسة
+                $emMode = (($editSchool['email_sender_mode'] ?? 'program') === 'school') ? 'school' : 'program';
+                $progAddr = function_exists('programMailAddress') ? programMailAddress() : 'noreply@msapayroll.com';
+                $progName = function_exists('programMailName') ? programMailName() : 'MSA Payroll'; ?>
+            <div class="form-row cols-2">
+                <div class="form-group">
+                    <label class="form-label">Envoi des e-mails depuis / الإرسال بالإيميل من</label>
+                    <select name="email_sender_mode" class="form-select">
+                        <option value="program" <?= $emMode === 'program' ? 'selected' : '' ?>>📨 إيميل البرنامج — <?= e($progName) ?> ‹<?= e($progAddr) ?>› (بلا كلمة سرّ، الردّ يرجع لإيميل المدرسة)</option>
+                        <option value="school" <?= $emMode === 'school' ? 'selected' : '' ?>>🏫 إيميل المدرسة المضبوط بـ«إعدادات البريد» (وإن فشل يُرسَل من إيميل البرنامج)</option>
+                    </select>
+                    <small class="text-muted d-block">كل كبسات الإيميل بالبرنامج (إفادات، بطاقات، تقارير) لهذه المدرسة تمشي حسب هذا الخيار.</small>
                 </div>
             </div>
             <div class="form-row cols-3">

@@ -4413,6 +4413,10 @@ function ensureEmployeeFlagColumns() {
         if (!msaHasCol($db, 'employees', 'eoc_half_salary_year')) {
             $db->exec("ALTER TABLE employees ADD COLUMN eoc_half_salary_year SMALLINT NULL DEFAULT NULL");
         }
+        // 📧 (2026-10-12) خيار المدرسة: الإرسال من إيميل البرنامج (program، الافتراضي) أو من إيميل المدرسة (school — SMTP بإعدادات البريد)
+        if (!msaHasCol($db, 'schools', 'email_sender_mode')) {
+            $db->exec("ALTER TABLE schools ADD COLUMN email_sender_mode VARCHAR(10) NOT NULL DEFAULT 'program'");
+        }
     } catch (Exception $e) { /* لا نكسر الصفحة — يُعاد بالفتحة التالية */ }
 }
 
