@@ -1122,9 +1122,12 @@ if (!$emp):
     </div>
     <script>
     function ppSendAtt(target, defEmail, name){
+        // 📧 (2026-10-12) اختيار المستلِم: للمدرسة (الافتراضي) / للأستاذ / إيميل آخر — نافذة مشتركة بـexport.js
+        var go = function (to) { window.location.href = '<?= BASE_URL ?>pages/send_attestation.php?target=' + encodeURIComponent(target) + '&to=' + encodeURIComponent(to) + '&name=' + encodeURIComponent(name); };
+        if (window.msaAskEmail) { window.msaAskEmail('إرسال الإفادة بالإيميل (PDF مرفق)', defEmail || '', go); return; }
         var to = window.prompt('إرسال الإفادة (PDF مرفق) إلى بريد:', defEmail || '');
         if (to === null || !to.trim()) return;
-        window.location.href = '<?= BASE_URL ?>pages/send_attestation.php?target=' + encodeURIComponent(target) + '&to=' + encodeURIComponent(to.trim()) + '&name=' + encodeURIComponent(name);
+        go(to.trim());
     }
     </script>
 

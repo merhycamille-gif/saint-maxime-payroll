@@ -353,6 +353,43 @@
         return { el: w, close: close };
     }
     function escH(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    // 📧 (2026-10-12 «يروح على إيميل المدرسة تلقائياً وإذا بدّي أبعته لأستاذ يكون عندي خيار»): منتقي المستلِم المشترك لكل نوافذ الإيميل
+    //    خيارات: 🏫 المدرسة (الافتراضي إن كان إيميلها مكتوباً بصفحة المدارس) · 👨‍🏫 الأستاذ المعروض (إن كان له إيميل بملفه) · ✍️ إيميل آخر
+    function msaRecipHtml(inputId, to) {
+        var sch = window.MSA_SCHOOL_EMAIL || '', tch = window.MSA_TEACHER_EMAIL || '';
+        var def = sch ? 'school' : (tch ? 'teacher' : 'other');
+        var val = def === 'school' ? sch : (def === 'teacher' ? tch : (to || ''));
+        var h = '<div class="msaRecip" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;font-size:14px">';
+        if (sch) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="school" data-mail="' + escH(sch) + '"' + (def === 'school' ? ' checked' : '') + '> 🏫 <b>للمدرسة</b> ' + escH(window.MSA_SCHOOL_NAME || '') + ' <span dir="ltr" style="color:#64748b">‹' + escH(sch) + '›</span></label>';
+        if (tch) h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="teacher" data-mail="' + escH(tch) + '"' + (def === 'teacher' ? ' checked' : '') + '> 👨‍🏫 <b>للأستاذ</b> ' + escH(window.MSA_TEACHER_NAME || '') + ' <span dir="ltr" style="color:#64748b">‹' + escH(tch) + '›</span></label>';
+        else if (window.MSA_TEACHER_NAME) h += '<div style="color:#92400e;font-size:12.5px">👨‍🏫 الأستاذ ' + escH(window.MSA_TEACHER_NAME) + ' ما إله إيميل بملفه — اكتبه بملفه (تبويب العنوان) ليظهر هون.</div>';
+        h += '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="radio" name="msaRecip" value="other"' + (def === 'other' ? ' checked' : '') + '> ✍️ <b>إيميل آخر</b></label></div>';
+        h += '<input type="email" id="' + inputId + '" class="form-control" dir="ltr" value="' + escH(val) + '" placeholder="name@example.com" style="margin-bottom:8px">';
+        return h;
+    }
+    function msaRecipWire(root, inputId) {
+        var inp = root.querySelector('#' + inputId);
+        Array.prototype.forEach.call(root.querySelectorAll('input[name="msaRecip"]'), function (r) {
+            r.addEventListener('change', function () { if (r.value === 'other') { inp.value = ''; inp.focus(); } else { inp.value = r.getAttribute('data-mail') || ''; } });
+        });
+        inp.addEventListener('input', function () { var o = root.querySelector('input[name="msaRecip"][value="other"]'); var match = false;
+            Array.prototype.forEach.call(root.querySelectorAll('input[name="msaRecip"][data-mail]'), function (r) { if (r.getAttribute('data-mail') === inp.value.trim()) { r.checked = true; match = true; } });
+            if (!match && o) o.checked = true; });
+        return inp;
+    }
+    // نافذة اختيار المستلِم فقط (للإفادات التي يولّد الخادم PDF لها): cb(email)
+    window.msaAskEmail = function (title, defEmail, cb) {
+        var m = shareModal('<div style="font-size:18px;font-weight:800;color:#1e3a5f;margin-bottom:6px"><i class="fas fa-envelope"></i> ' + escH(title || 'إرسال بالإيميل') + '</div>'
+            + '<label style="display:block;font-weight:700;margin-bottom:4px">إلى / À</label>' + msaRecipHtml('msaAskTo', defEmail)
+            + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" id="msaAskGo" class="btn btn-primary" style="font-weight:700"><i class="fas fa-paper-plane"></i> أرسل</button></div>'
+            + '<div id="msaAskMsg" style="font-size:13.5px;margin-top:8px;color:#b91c1c"></div>');
+        var inp = msaRecipWire(m.el, 'msaAskTo');
+        m.el.querySelector('#msaAskGo').addEventListener('click', function () {
+            var to = inp.value.trim();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { m.el.querySelector('#msaAskMsg').textContent = 'اكتب إيميلاً صحيحاً'; inp.focus(); return; }
+            m.close(); cb(to);
+        });
+    };
     function waNumber(v) {
         var num = String(v || '').replace(/[^0-9]/g, '');
         if (num.length === 8 && /^(03|70|71|76|78|79|81)/.test(num)) num = '961' + num.replace(/^0/, '');
@@ -495,9 +532,9 @@
             num.addEventListener('input', upd); upd(); num.focus();
         }
         tb.querySelector('#msaOffMail').addEventListener('click', function () {
-            var to = window.prompt('إرسال النموذج (PDF مرفق) إلى بريد:', o.email || '');
-            if (to === null || !to.trim()) return;
-            window.location.href = o.base + 'pages/send_attestation.php?target=' + encodeURIComponent(o.target) + '&to=' + encodeURIComponent(to.trim()) + '&name=' + encodeURIComponent(o.title || 'formulaire');
+            window.msaAskEmail('إرسال النموذج بالإيميل (PDF مرفق)', o.email || '', function (to) {
+                window.location.href = o.base + 'pages/send_attestation.php?target=' + encodeURIComponent(o.target) + '&to=' + encodeURIComponent(to) + '&name=' + encodeURIComponent(o.title || 'formulaire');
+            });
         });
     };
 
@@ -507,7 +544,7 @@
         var m = shareModal(
             '<div style="font-size:18px;font-weight:800;color:#1e3a5f;margin-bottom:6px"><i class="fas fa-envelope"></i> إرسال بالإيميل مع الملف PDF / Envoyer par e-mail</div>'
             + '<label style="display:block;font-weight:700;margin-bottom:4px">إلى / À</label>'
-            + '<input type="email" id="ppEmTo" class="form-control" dir="ltr" value="' + escH(to || '') + '" placeholder="name@example.com" style="margin-bottom:8px">'
+            + msaRecipHtml('ppEmTo', to)
             + '<label style="display:block;font-weight:700;margin-bottom:4px">الموضوع / Objet</label>'
             + '<input type="text" id="ppEmSub" class="form-control" value="' + escH(t) + '" style="margin-bottom:8px">'
             + '<label style="display:block;font-weight:700;margin-bottom:4px">الرسالة / Message</label>'
@@ -516,8 +553,8 @@
             + '<button type="button" id="ppEmSend" class="btn btn-primary" style="font-weight:700"><i class="fas fa-paper-plane"></i> أرسل مع الملف مرفقاً</button>'
             + '<button type="button" id="ppEmPdf" class="btn btn-light">💾 أو نزّل الملف فقط</button>'
             + '</div><div id="ppEmMsg" style="font-size:13.5px;margin-top:10px;line-height:1.7"></div>');
-        var toEl = m.el.querySelector('#ppEmTo'), msg = m.el.querySelector('#ppEmMsg'), send = m.el.querySelector('#ppEmSend');
-        toEl.focus();
+        var toEl = msaRecipWire(m.el, 'ppEmTo'), msg = m.el.querySelector('#ppEmMsg'), send = m.el.querySelector('#ppEmSend');
+        if (!toEl.value) toEl.focus();
         m.el.querySelector('#ppEmPdf').addEventListener('click', function () { pdfBtnHandler(this); });
         send.addEventListener('click', function () {
             var to = toEl.value.trim();

@@ -9927,6 +9927,28 @@ check('📧 إيميل البرنامج MSA Payroll + خيار المدرسة (p
       && substr_count($sa250, 'msaSendMail(') === 2 && strpos($sa250, 'smtpSendMail(') === false
       && strpos($es250, 'name="program_email_name"') !== false && strpos($es250, 'name="test_program"') !== false && strpos($es250, 'programMailSend($testTo,') !== false, $why250);
 
+/* =====================================================================
+ * 251) 📧 (2026-10-12 «أبعت من ملف الأستاذ أو المدرسة يروح على إيميل المدرسة تلقائياً، وإذا بدّي أبعته لأستاذ يكون عندي خيار»):
+ *      نافذة الإيميل بكل البرنامج فيها منتقي المستلِم: 🏫 للمدرسة (الافتراضي إن كان إيميلها بصفحة المدارس) · 👨‍🏫 للأستاذ المعروض
+ *      (إن كان له إيميل بملفه) · ✍️ إيميل آخر — footer.php يعرّف MSA_SCHOOL_EMAIL/MSA_TEACHER_EMAIL، وexport.js يستعملها
+ *      بـppEmail وmsaAskEmail (الإفادات والنماذج الرسمية بدل window.prompt).
+ * =================================================================== */
+$ft251 = (string)file_get_contents($PROJ . '/includes/footer.php'); $ex251 = (string)file_get_contents($PROJ . '/assets/js/export.js'); $at251 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$ok251 = false; $why251 = '';
+try {
+    $e251 = (int)$db->query("SELECT id FROM employees WHERE is_deleted = 0 AND email LIKE '%@%' ORDER BY id LIMIT 1")->fetchColumn();
+    $o251 = $e251 ? renderPage('pages/attestations.php', ['employee_id' => $e251, 'type' => 'travail'], []) : '';
+    $ok251 = $e251 > 0 && strpos($o251, 'window.MSA_TEACHER_EMAIL = "') !== false && strpos($o251, 'window.MSA_TEACHER_EMAIL = ""') === false && strpos($o251, 'window.MSA_SCHOOL_EMAIL = ') !== false;
+    $why251 = "emp=$e251";
+} catch (Throwable $e) { $why251 = $e->getMessage(); }
+check('📧 نافذة الإيميل: للمدرسة (افتراضي) / للأستاذ / إيميل آخر بكل الكبسات (ppEmail + الإفادات + النماذج الرسمية) + إيميل الأستاذ المعروض يصل للصفحة',
+      $ok251
+      && strpos($ft251, 'window.MSA_SCHOOL_EMAIL = ') !== false && strpos($ft251, 'window.MSA_TEACHER_EMAIL = ') !== false
+      && strpos($ex251, 'function msaRecipHtml(inputId, to)') !== false && strpos($ex251, 'window.msaAskEmail = function (title, defEmail, cb)') !== false
+      && strpos($ex251, "+ msaRecipHtml('ppEmTo', to)") !== false && strpos($ex251, "var toEl = msaRecipWire(m.el, 'ppEmTo')") !== false
+      && strpos($ex251, "window.msaAskEmail('إرسال النموذج بالإيميل (PDF مرفق)'") !== false && strpos($ex251, "var to = window.prompt('إرسال النموذج") === false
+      && strpos($at251, "if (window.msaAskEmail) { window.msaAskEmail('إرسال الإفادة بالإيميل (PDF مرفق)', defEmail || '', go); return; }") !== false, $why251);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

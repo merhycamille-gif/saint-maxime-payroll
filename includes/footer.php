@@ -8,6 +8,16 @@
 <script src="<?= BASE_URL ?>assets/js/form-lock.js?v=<?= @filemtime(__DIR__ . '/../assets/js/form-lock.js') ?: '1' ?>"></script>
 <script src="<?= BASE_URL ?>assets/js/select-search.js?v=<?= @filemtime(__DIR__ . '/../assets/js/select-search.js') ?: '1' ?>"></script>
 <script>window.BASE_URL = <?= json_encode(BASE_URL) ?>; window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>; window.MSA_PAGE = <?= json_encode((string)($currentPage ?? '')) ?>;</script>
+<?php // 📧 (2026-10-12 «أبعت من ملف الأستاذ أو المدرسة يروح على إيميل المدرسة تلقائياً، وإذا بدّي أبعته لأستاذ يكون عندي خيار»):
+      //    إيميل المدرسة المختارة + إيميل الأستاذ المعروض (إن وُجد) لنافذة الإرسال — الاختيار «للمدرسة / للأستاذ / إيميل آخر»
+      $msaMailSch = (!isAllSchools() && function_exists('currentSchool')) ? (currentSchool() ?: []) : [];
+      $msaMailSchEmail = trim((string)($msaMailSch['email'] ?? '')); if (!filter_var($msaMailSchEmail, FILTER_VALIDATE_EMAIL)) $msaMailSchEmail = '';
+      $msaMailTEmail = ''; $msaMailTName = '';
+      $msaMailEid = (int)($_GET['employee_id'] ?? (($currentPage ?? '') === 'employees' ? ($_GET['id'] ?? 0) : 0));
+      if ($msaMailEid > 0) { try { $msaMailRow = getDB()->query("SELECT email, first_name_ar, last_name_ar, first_name_fr, last_name_fr FROM employees WHERE id = $msaMailEid AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+          if ($msaMailRow) { $msaMailTEmail = trim((string)$msaMailRow['email']); if (!filter_var($msaMailTEmail, FILTER_VALIDATE_EMAIL)) $msaMailTEmail = '';
+              $msaMailTName = trim(($msaMailRow['first_name_ar'] ?: $msaMailRow['first_name_fr']) . ' ' . ($msaMailRow['last_name_ar'] ?: $msaMailRow['last_name_fr'])); } } catch (Throwable $t) {} } ?>
+<script>window.MSA_SCHOOL_EMAIL = <?= json_encode($msaMailSchEmail) ?>; window.MSA_SCHOOL_NAME = <?= json_encode((string)(($msaMailSch['name_ar'] ?? '') ?: ($msaMailSch['name_fr'] ?? ''))) ?>; window.MSA_TEACHER_EMAIL = <?= json_encode($msaMailTEmail) ?>; window.MSA_TEACHER_NAME = <?= json_encode($msaMailTName) ?>;</script>
 <script src="<?= BASE_URL ?>assets/js/doclang.js?v=<?= @filemtime(__DIR__ . '/../assets/js/doclang.js') ?: '1' ?>"></script>
 <?php if (!empty($GLOBALS['msaLegalCtx'])): $lc = $GLOBALS['msaLegalCtx']; $lf = $lc['filing'] ? array_intersect_key($lc['filing'], array_flip(['id','version','sent_at','sent_by','snapshot_hash','seen_hash','changed_flag','changed_note'])) : null; ?>
 <script>window.MSA_LEGAL = <?= json_encode(['key' => $lc['key'], 'period' => $lc['period'], 'scope' => $lc['scope'], 'base' => BASE_URL, 'me' => (string)($_SESSION['full_name'] ?? ($_SESSION['username'] ?? '')), 'filing' => $lf, 'auth' => $lc['auth'] ?? null], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;</script>
