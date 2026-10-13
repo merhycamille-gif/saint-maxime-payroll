@@ -9949,6 +9949,26 @@ check('📧 نافذة الإيميل: للمدرسة (افتراضي) / للأ�
       && strpos($ex251, "window.msaAskEmail('إرسال النموذج بالإيميل (PDF مرفق)'") !== false && strpos($ex251, "var to = window.prompt('إرسال النموذج") === false
       && strpos($at251, "if (window.msaAskEmail) { window.msaAskEmail('إرسال الإفادة بالإيميل (PDF مرفق)', defEmail || '', go); return; }") !== false, $why251);
 
+/* =====================================================================
+ * 252) 🩺 (2026-10-13 «لائحة أرقام الضمان لأساتذة الراهبات 25-82-043 — حطّ للي ما عندو وصحّح الغلط»): شفاء مرّة واحدة
+ *      healNssfFromSistersList20261013 من tools/data/nssf_updates_20261013.json (62 بنداً) يعدّل nssf_number فقط بشرط مطابقة
+ *      القيمة القديمة، مع نسخة _bk_nssf_20261013 وaudit. عيّنات: شيرا العاقوري 807 ⇒ 942946، ميرلا الخوري 1788 ⇒ 1446617.
+ * =================================================================== */
+$fn252 = (string)file_get_contents($PROJ . '/includes/functions.php'); $hd252 = (string)file_get_contents($PROJ . '/includes/header.php');
+$ok252 = false; $why252 = '';
+try {
+    $rows252 = json_decode((string)file_get_contents($PROJ . '/tools/data/nssf_updates_20261013.json'), true);
+    $flag252 = (string)getSetting('heal_nssf_sisters_20261013', '');
+    $n807 = preg_replace('/\D/', '', (string)$db->query("SELECT nssf_number FROM employees WHERE id = 807")->fetchColumn());
+    $n1788 = preg_replace('/\D/', '', (string)$db->query("SELECT nssf_number FROM employees WHERE id = 1788")->fetchColumn());
+    $ok252 = is_array($rows252) && count($rows252) === 62 && strpos($flag252, 'done') === 0 && strpos($flag252, 'skipped=0') !== false
+          && $n807 === '942946' && $n1788 === '1446617';
+    $why252 = 'rows=' . (is_array($rows252) ? count($rows252) : 'x') . " flag=" . mb_substr($flag252, 0, 60) . " 807=$n807 1788=$n1788";
+} catch (Throwable $e) { $why252 = $e->getMessage(); }
+check('🩺 أرقام الضمان من لائحة الراهبات: 62 بنداً طُبّقت بلا تخطّي (nssf_number فقط + نسخة احتياطية) + عيّنتان صحيحتان',
+      $ok252 && strpos($fn252, 'function healNssfFromSistersList20261013()') !== false && strpos($fn252, "if (\$norm(\$cur) !== \$norm(\$old)) { \$skip[] = \"\$id:changed[\$cur]\"; continue; }") !== false
+      && strpos($hd252, 'healNssfFromSistersList20261013();') !== false, $why252);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

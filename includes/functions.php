@@ -9260,3 +9260,42 @@ function empAvatar(array $e, string $color = 'ic2', int $size = 0): string {
     $st = 'background:var(--' . preg_replace('/[^a-z0-9]/', '', $color) . ')' . ($size ? ';width:' . $size . 'px;height:' . $size . 'px;font-size:' . (int)round($size * 0.36) . 'px' : '');
     return '<span class="mp-av" style="' . $st . '">' . $img . e($ini) . '</span>';
 }
+
+/**
+ * 🩺 شفاء مرّة واحدة (2026-10-13 «عندي لائحة بأرقام الضمان لأساتذة الراهبات… حطّ للي ما عندو رقم وصحّح الغلط»):
+ * يقرأ tools/data/nssf_updates_20261013.json (62 بنداً: 45 تعبئة + 17 تصحيحاً، مطابقة بالاسم الثلاثي وسنة الميلاد مع لائحة
+ * «ارقام الضمان للاساتذة الراهبات.xlsx» لرقم ربّ العمل 25-82-043) ويعدّل خانة nssf_number فقط، بشرط أن تكون القيمة الحالية
+ * هي المتوقَّعة (القديمة) — وإلا يتخطّى البند ويسجّله. نسخة احتياطية بجدول _bk_nssf_20261013 (id, old, new) + audit.
+ */
+function healNssfFromSistersList20261013() {
+    try {
+        if (strpos((string)getSetting('heal_nssf_sisters_20261013', ''), 'done') === 0) return;
+        $db = getDB();
+        if ($db->inTransaction()) return;
+        $file = dirname(__DIR__) . '/tools/data/nssf_updates_20261013.json';
+        if (!is_file($file)) return;
+        $rows = json_decode((string)file_get_contents($file), true);
+        if (!is_array($rows) || !$rows) { setSetting('heal_nssf_sisters_20261013', 'done: empty file'); return; }
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_nssf_20261013 (employee_id INT PRIMARY KEY, old_value VARCHAR(50) NULL, new_value VARCHAR(50) NULL, applied_at DATETIME NULL)");
+        $sel = $db->prepare("SELECT nssf_number FROM employees WHERE id = ? AND is_deleted = 0");
+        $upd = $db->prepare("UPDATE employees SET nssf_number = ? WHERE id = ?");
+        $bk  = $db->prepare("INSERT IGNORE INTO _bk_nssf_20261013 (employee_id, old_value, new_value, applied_at) VALUES (?, ?, ?, NOW())");
+        $ok = 0; $skip = []; $norm = fn($v) => ltrim(preg_replace('/\D/', '', (string)$v), '0');
+        foreach ($rows as $r) {
+            $id = (int)($r['id'] ?? 0); $new = trim((string)($r['new'] ?? '')); $old = trim((string)($r['old'] ?? ''));
+            if ($id <= 0 || !preg_match('/^\d{5,9}$/', $new)) { $skip[] = "$id:bad"; continue; }
+            $sel->execute([$id]); $cur = $sel->fetchColumn();
+            if ($cur === false) { $skip[] = "$id:missing"; continue; }
+            $cur = trim((string)$cur);
+            if ($norm($cur) === $norm($new)) { $ok++; continue; }                       // صحيح أصلاً (أو طُبّق سابقاً)
+            if ($norm($cur) !== $norm($old)) { $skip[] = "$id:changed[$cur]"; continue; } // تغيّر بيد المستخدم منذ المقارنة — لا نلمسه
+            $bk->execute([$id, $cur, $new]);
+            $upd->execute([$new, $id]);
+            try { logAudit('nssf_from_sisters_list', 'employees', $id, $cur, $new); } catch (Throwable $t) {}
+            $ok++;
+        }
+        setSetting('heal_nssf_sisters_20261013', mb_substr('done ' . date('Y-m-d H:i') . ": applied/ok=$ok skipped=" . count($skip) . ($skip ? ' [' . implode(',', $skip) . ']' : ''), 0, 4000));
+    } catch (Throwable $e) {
+        try { setSetting('heal_nssf_sisters_20261013', 'err: ' . mb_substr($e->getMessage(), 0, 300)); } catch (Throwable $e2) {}
+    }
+}
