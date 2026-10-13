@@ -9270,6 +9270,8 @@ function empAvatar(array $e, string $color = 'ic2', int $size = 0): string {
 function healNssfFromSistersList20261013() { msaApplyNssfUpdatesFile('nssf_updates_20261013.json', 'heal_nssf_sisters_20261013', '_bk_nssf_20261013'); }
 /** 🩺 (2026-10-13) دار السعادة كسارة (ربّ عمل 52-82-286): لائحة «دار السعادة كسارة.xlsx» ⇒ تعبئة رقمين (تراز روكز، ايمان جانبين) */
 function healNssfSaadeh20261013() { msaApplyNssfUpdatesFile('nssf_updates_saadeh_20261013.json', 'heal_nssf_saadeh_20261013', '_bk_nssf_saadeh_20261013'); }
+/** 🩺 (2026-10-13) القديس مكسيموس (ربّ عمل 22-82-745): لائحة «القديس مكسيموس.xlsx» ورقة 3 ⇒ تعبئة مارسيلا داود + طانيوس القزي + اندريه مراد (مركز 15) وتصحيح كريستل الشختوره 157981⇒1579181 */
+function healNssfMaximos20261013() { msaApplyNssfUpdatesFile('nssf_updates_maximos_20261013.json', 'heal_nssf_maximos_20261013', '_bk_nssf_maximos_20261013'); }
 /** المنفّذ المشترك: ملف JSON بـtools/data (id, old, new) ⇒ تعديل nssf_number فقط بشرط مطابقة القديم + نسخة + audit + فلاغ */
 function msaApplyNssfUpdatesFile(string $fileName, string $flagKey, string $bkTable) {
     try {
