@@ -267,6 +267,7 @@ document.addEventListener('submit', function (e) {
             </div>
         </div>
 
+        <?php ob_start(); // 🧭 (2026-10-14 «العربي مكتوب تحت الفرنسي مش على جانبو») كل اسم بالقائمة الجانبية يُقسَم سطرَين: الفرنسي فوق والعربي تحت ?>
         <nav class="sidebar-nav">
             <a href="<?= BASE_URL ?>index.php" class="<?= $currentPage === 'dashboard' ? 'active' : '' ?>">
                 <i class="fas fa-chart-line"></i>
@@ -503,6 +504,12 @@ document.addEventListener('submit', function (e) {
             </a>
             <?php endif; ?>
         </nav>
+        <?php
+        $__nav = ob_get_clean();
+        $__nav = preg_replace('~<span>([^<>]+?) / ([^<>]+?)</span>~u', '<span class="nl2"><span class="nl-fr">$1</span><span class="nl-ar">$2</span></span>', $__nav);
+        $__nav = preg_replace('~(<div class="nav-section"[^>]*>)([^<>]+?) / ([^<>]+?)</div>~u', '$1<span class="nl-fr">$2</span><span class="nl-ar">$3</span></div>', $__nav);
+        echo $__nav;
+        ?>
         
         <div class="sidebar-footer">
             <button type="button" class="sb-pin no-print" onclick="window.msaNavPin&&msaNavPin()" title="Fixer / ثبّت القائمة (Ctrl+B)"><i class="fas fa-thumbtack"></i><span>Fixer / ثبّت (Ctrl+B)</span></button>
