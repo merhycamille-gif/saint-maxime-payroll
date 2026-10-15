@@ -323,6 +323,7 @@ class ReportTable
     private $headers = [];
     private $rows = [];      // كل صف: ['type'=>'data|total|section|head', 'cells'=>[...], 'span'=>n]
     private $colWidths = [];
+    private $docxFontScale = 1.0;   // 📄 تصغير خط الوورد نسبياً حين لا تسع الأعمدة الورقة
     private $school = null;
     private $period = '';
     private $docxColWs = []; // عرض أعمدة الوورد (twips) من autoWidths
@@ -508,8 +509,11 @@ class ReportTable
         $colsXml .= '</cols>';
         // 🖨️ (2026-10-11 «بس أطبع إكسل ما في تقرير بيطلع مظبوط»): الورقة التي تسع عرض الصفحة تُطبع «ملاءمة العرض»؛ الأعرض (كشوف 20 عموداً)
         //    تُطبع بحجمها الحقيقي 12 على صفحات متجاورة مع تكرار عمودَي # والاسم (Print_Titles أعمدة) — لا تصغير يجعل الخط غير مقروء.
-        $pagesAcross = max(1, (int)ceil($sumW / ($this->landscape ? 150 : 100)));   // عدد الصفحات عرضاً بالحجم الحقيقي
-        $fitW = $pagesAcross === 1;
+        // 📄 (2026-10-15 «ب د ف مشي الحال بس اكسل ما مشي الحال» بعد «العواميد كلّها نفس الصفحة»): الإكسل يُطبع دائماً بكل أعمدته على عرض ورقة
+        //    واحدة (fitToWidth=1، الصفوف على صفحات)؛ الجدول الأعرض من الورقة العمودية ⇒ أفقي تلقائياً — كما الـPDF
+        if (!$this->landscape && $sumW > 100) $this->landscape = true;
+        $pagesAcross = 1;
+        $fitW = true;
         $keyLast = 0;
         for ($c = 0; $c < min(3, $cols); $c++) { $n = 0; $t = 0; foreach ($this->rows as $r) { if ($r['type'] !== 'data') continue; $v = (string)($r['cells'][$c] ?? ''); if ($v === '') continue; $n++; if (!$this->isNum($v)) $t++; } if ($n > 0 && $t / $n >= 0.5) { $keyLast = $c; break; } }
         $printCols = $fitW ? '' : ("'" . str_replace("'", "''", self::xa($this->sheetName())) . "'!\$A:\$" . $colLetter($keyLast) . ',');
@@ -630,11 +634,14 @@ class ReportTable
         if ($cols > 3) { if ($nat[0] <= 1400) $key[] = 0; for ($c = 0; $c < min(3, $cols); $c++) { if (!in_array($c, $key, true) && !empty($isText[$c])) { $key[] = $c; break; } } }
         $keyW = 0; foreach ($key as $c) $keyW += $nat[$c];
         if ($keyW > $twDoc * 0.4) { $key = $key ? [$key[0]] : []; $keyW = $key ? $nat[$key[0]] : 0; }
-        // تقسيم باقي الأعمدة إلى أجزاء تتّسع بالورقة
-        $parts = []; $cur = []; $curW = $keyW;
-        for ($c = 0; $c < $cols; $c++) { if (in_array($c, $key, true)) continue; if ($cur && $curW + $nat[$c] > $twDoc) { $parts[] = $cur; $cur = []; $curW = $keyW; } $cur[] = $c; $curW += $nat[$c]; }
-        if ($cur) $parts[] = $cur;
-        if (!$parts) $parts = [[]];
+        // 📄 (2026-10-15 «العواميد كلّها نفس الصفحة… السطور ما في مشكلة صفحات عديدة»): لا تقسيم أعمدةً بالوورد — كل الأعمدة بورقة واحدة
+        //    (أفقية إن لزم) والخط يصغر نسبياً ليسع العرض (حدّ أدنى 7pt)؛ الصفوف تمتدّ على صفحات
+        $key = []; $keyW = 0;
+        $parts = [range(0, $cols - 1)];
+        // التصغير على النصّ وحده (حشوة الخلية 200 twips لا تتصغّر): نسبة = (عرض الورقة − الحشوات) ÷ (عرض النصوص)، حدّ أدنى 6pt
+        $pad = 200 * $cols; $txtNat = max(1, $sumNat - $pad);
+        $this->docxFontScale = ($sumNat > $twDoc) ? max(0.5, ($twDoc - $pad) / $txtNat) : 1.0;
+        if ($sumNat > $twDoc) { foreach ($nat as $c => $v) $nat[$c] = (int)round(($v - 200) * (($twDoc - $pad) / $txtNat) + 200); }
 
         $body = '';
         if ($this->titleLines) {
@@ -758,7 +765,8 @@ class ReportTable
         $rpr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>';
         if ($bold) $rpr .= '<w:b/><w:bCs/>';
         if ($white) $rpr .= '<w:color w:val="FFFFFF"/>';
-        $rpr .= '<w:sz w:val="24"/><w:szCs w:val="24"/>' . ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr>';   // 🔠 12pt بكل المطبوعات
+        $szc = (int)max(14, round(24 * ($this->docxFontScale ?? 1.0)));   // 📄 12pt، ويصغر نسبياً فقط حين لا تسع الأعمدة عرض الورقة
+        $rpr .= '<w:sz w:val="' . $szc . '"/><w:szCs w:val="' . $szc . '"/>' . ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr>';   // 🔠 12pt بكل المطبوعات
         $runs = ''; $lines = preg_split('/\r\n|\n/', (string)$text);
         foreach ($lines as $i => $ln) { if ($i > 0) $runs .= '<w:r>' . $rpr . '<w:br/></w:r>'; $runs .= '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($ln) . '</w:t></w:r>'; }
         return '<w:p><w:pPr><w:spacing w:before="20" w:after="20"/>' . ($this->isRtl() ? '<w:bidi/>' : '') . '<w:jc w:val="' . $align . '"/></w:pPr>' . $runs . '</w:p>';

@@ -67,7 +67,8 @@ check('🖨️ المحرّك: tfoot ⇒ آخر الجسم (المجاميع م�
 check('📐 الإكسل/الوورد: ما قبل أوّل جدول = كتلة عنوان فوق رأس الأعمدة (titleLines) · الشارات لا تُصدَّر · الإكسل يُطبع بالحجم الحقيقي على N صفحات عرضاً مع تكرار عمودَي # والاسم · النصّ يُحدّ بـ42 حرفاً',
       strpos($re247, 'public function titleLines(array $lines)') !== false
       && strpos($re247, "foreach (\$this->titleLines as \$ln) { \$k = \$ln['k'] ?? 'meta'; \$st = \$k === 'title' ? 1 : (\$k === 'school' ? 2 : 9);") !== false
-      && strpos($re247, '$pagesAcross = max(1, (int)ceil($sumW / ($this->landscape ? 150 : 100)));') !== false
+      && strpos($re247, '$pagesAcross = 1;') !== false && strpos($re247, 'if (!$this->landscape && $sumW > 100) $this->landscape = true;') !== false   /* 📄 2026-10-15 «العواميد كلّها نفس الصفحة»: الإكسل كل الأعمدة بعرض ورقة واحدة */
+      && strpos($re247, '$parts = [range(0, $cols - 1)];') !== false   /* الوورد: بلا أجزاء، الخط يصغر نسبياً */
       && strpos($re247, '" fitToWidth="\' . $pagesAcross . \'" fitToHeight="0"/>\'') !== false
       && strpos($re247, "localSheetId=\"0\">' . \$printCols . '\\''") !== false
       && strpos($re247, 'min($len, $this->isNum($v) ? 58.0 : 42.0)') !== false
