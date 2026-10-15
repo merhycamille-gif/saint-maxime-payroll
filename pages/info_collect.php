@@ -179,6 +179,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'apply
     header('Location: ' . $icBack()); exit;
 }
 // إنشاء ملف أستاذ جديد من طلب وارد (is_new_teacher)
+// 🚫👥 (2026-10-15 «أي أستاذ عم يحدّث معلوماته وعند الحفظ كان عم ينعمل ملف جديد تاني… لازم يعطينا إشارة»): قبل إنشاء ملف من طلب
+//    «أستاذ جديد» نفتّش عن ملف فاعل بنفس الاسم بنفس المدرسة (عربي أو فرنسي، بلا حركات ومسافات زائدة) — إن وُجد لا يُنشأ ملف ثانٍ
+//    بل يُربط الطلب بالملف الموجود (ينتقل إلى قائمة «تحديث معلومات») مع تنبيه واضح؛ والقائمة تعرض إشارة «موجود مسبقاً» قبل الكبس.
+function icNormName(string $s): string { return preg_replace('/\s+/u', ' ', mb_strtolower(trim(preg_replace('/[^\p{L}\s]/u', '', $s)))); }
+function icFindExisting(PDO $db, int $schoolId, array $data): ?array
+{
+    $kAr = icNormName(($data['first_name_ar'] ?? '') . ' ' . ($data['last_name_ar'] ?? ''));
+    $kFr = icNormName(($data['first_name_fr'] ?? '') . ' ' . ($data['last_name_fr'] ?? ''));
+    if ($kAr === '' && $kFr === '') return null;
+    $st = $db->prepare("SELECT id, employee_code, first_name_ar, last_name_ar, first_name_fr, last_name_fr, employee_type FROM employees WHERE is_deleted = 0 AND school_id = ? ORDER BY id");
+    $st->execute([$schoolId]);
+    foreach ($st->fetchAll() as $e) {
+        $eAr = icNormName($e['first_name_ar'] . ' ' . $e['last_name_ar']); $eFr = icNormName($e['first_name_fr'] . ' ' . $e['last_name_fr']);
+        if (($kAr !== '' && $eAr === $kAr) || ($kFr !== '' && $eFr === $kFr)) return $e;
+    }
+    return null;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_new') {
     requireCsrf();
     $sid = (int)($_POST['submission_id'] ?? 0);
@@ -214,6 +231,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         if ($pickSid > 0 && (isAllSchools() || in_array($pickSid, $allowedSids, true) || $pickSid === currentSchoolId())) {
             $okSid = (int)$db->query("SELECT COUNT(*) FROM schools WHERE id = $pickSid AND is_deleted = 0")->fetchColumn();
             if ($okSid) { $sub['school_id'] = $pickSid; $db->prepare("UPDATE info_submissions SET school_id = ? WHERE id = ?")->execute([$pickSid, $sub['id']]); }
+        }
+        // 🚫👥 موجود مسبقاً بنفس المدرسة؟ ⇒ لا ملف ثانٍ: يُربط الطلب بملفه (قائمة التحديث) إلا إذا أكّد المدير صراحةً أنه شخص آخر
+        $exist = empty($_POST['force_new']) ? icFindExisting($db, (int)$sub['school_id'], $data) : null;
+        if ($exist) {
+            $db->prepare("UPDATE info_submissions SET employee_id = ?, is_new_teacher = 0 WHERE id = ?")->execute([(int)$exist['id'], $sub['id']]);
+            $exName = trim($exist['first_name_ar'] . ' ' . $exist['last_name_ar']) ?: trim($exist['first_name_fr'] . ' ' . $exist['last_name_fr']);
+            $_SESSION['flash_error'] = '⚠️ لم يُنشأ ملف جديد: «' . $exName . '» موجود مسبقاً بهذه المدرسة (ملف رقم ' . (int)$exist['id'] . '). رُبط طلبه بملفه الموجود وصار تحت «تحديث معلومات» — راجعه هناك واعتمده. إذا كان شخصاً آخر بنفس الاسم علّم «شخص آخر بنفس الاسم» ثم أنشئ الملف.';
+            header('Location: ' . BASE_URL . 'pages/info_collect.php#pending'); exit;
         }
         $emp = [
             'employee_type' => $empType,
@@ -519,16 +544,19 @@ $newSubs = $newSubs->fetchAll();
     <?php else: foreach ($newSubs as $s):
         $data = json_decode($s['data'] ?: '{}', true) ?: [];
         $nm = trim(($data['first_name_ar']??'').' '.($data['last_name_ar']??'')) ?: trim(($data['first_name_fr']??'').' '.($data['last_name_fr']??'')) ?: '(بلا اسم)';
+        $exist = $s['school_id'] ? icFindExisting($db, (int)$s['school_id'], $data) : null;   // 🚫👥 إشارة «موجود مسبقاً» قبل الكبس
     ?>
-      <div style="border:1px solid var(--gray-200);border-radius:8px;padding:14px;margin-bottom:14px">
+      <div style="border:1px solid <?= $exist ? '#f59e0b' : 'var(--gray-200)' ?>;border-radius:8px;padding:14px;margin-bottom:14px;<?= $exist ? 'background:#fffbeb' : '' ?>">
         <div class="d-flex justify-between align-center" style="flex-wrap:wrap;gap:8px">
           <div><strong style="font-size:16px"><?= e($nm) ?></strong>
             <span class="badge badge-success">Nouvel enseignant / أستاذ جديد</span>
+            <?php if ($exist): ?><span class="badge" style="background:#f59e0b;color:#111"><i class="fas fa-exclamation-triangle"></i> موجود مسبقاً — ملف رقم <?= (int)$exist['id'] ?> (<?= e(trim($exist['first_name_fr'] . ' ' . $exist['last_name_fr'])) ?>) · الكبسة تربط الطلب بملفه ولا تنشئ ملفاً ثانياً</span>
+            <label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;margin-inline-start:6px"><input type="checkbox" form="icCreate<?= (int)$s['id'] ?>" name="force_new" value="1"> شخص آخر بنفس الاسم — أنشئ ملفاً جديداً</label><?php endif; ?>
             <?php if (!empty($s['school_name'])): ?><span class="badge" style="background:#0a6b5e;color:#fff"><i class="fas fa-school"></i> <?= e($s['school_name']) ?></span><?php endif; ?>
             <span class="badge badge-info"><?= e($s['submitted_at']) ?></span></div>
           <div style="display:flex;gap:8px">
-            <form method="post" onsubmit="var sel=this.querySelector('select[name=target_school_id]'); return confirm('إنشاء ملف أستاذ جديد بهذه المعلومات في: ' + (sel ? sel.options[sel.selectedIndex].text : '') + ' ؟ تُكمل الإعداد المالي والتدرّج من ملف الأستاذ.')" style="margin:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              <?= csrfField() ?><input type="hidden" name="action" value="create_new"><input type="hidden" name="submission_id" value="<?= $s['id'] ?>">
+            <form method="post" id="icCreate<?= (int)$s['id'] ?>" onsubmit="var sel=this.querySelector('select[name=target_school_id]'); return confirm('إنشاء ملف أستاذ جديد بهذه المعلومات في: ' + (sel ? sel.options[sel.selectedIndex].text : '') + ' ؟ تُكمل الإعداد المالي والتدرّج من ملف الأستاذ.')" style="margin:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <?= csrfField() ?><input type="hidden" name="action" value="create_new"><input type="hidden" name="submission_id" value="<?= $s['id'] ?>"><?php /* 🚫👥 id للفورم ليربط خيار «شخص آخر» */ ?>
               <?php // 🏫 اختيار المدرسة عند الموافقة (2026-09-23): الرابط قد يكون لدير/مركز آخر — تأكّد قبل الإنشاء
                     $schOpts = []; try { foreach (allSchools() as $so) if (isAllSchools() || in_array((int)$so['id'], array_map('intval', activeSchoolIds() ?: []), true) || (int)$so['id'] === currentSchoolId()) $schOpts[] = $so; } catch (Throwable $t) {} ?>
               <?php if ($schOpts): ?>

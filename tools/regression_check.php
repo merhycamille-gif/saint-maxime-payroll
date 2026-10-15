@@ -9846,6 +9846,29 @@ check('🖨️ كل خيارات الطبع بأي صفحة: كبسة «خيار
       && strpos($hd246, '} elseif (empty($ownExportRow)) {') !== false && substr_count($as246, 'onclick="ppWord(') === 2 && substr_count($as246, 'onclick="msaSavePdfStart(this)"') === 2
       && strpos((string)file_get_contents($PROJ . '/assets/js/export.js'), 'function dropGenericXls()') !== false, $why246);
 
+
+/* 🚫👥 (2026-10-15 «أي أستاذ عم يحدّث معلوماته وعند الحفظ كان عم ينعمل ملف جديد تاني… لازم يعطينا إشارة»): طلب «أستاذ جديد» باسم موجود
+ *    بنفس المدرسة لا ينشئ ملفاً ثانياً — يُربط بالملف الموجود (قائمة التحديث) مع تنبيه، والقائمة تعرض «موجود مسبقاً» + خيار «شخص آخر» صريح. */
+$ic250 = (string)@file_get_contents($PROJ . '/pages/info_collect.php');
+check('🚫👥 لا ملف ثانٍ لاسم موجود بنفس المدرسة من فورم المعلومات: فحص icFindExisting قبل الإنشاء + ربط بالملف الموجود + إشارة بالقائمة + force_new صريح',
+    strpos($ic250, 'function icFindExisting(PDO $db, int $schoolId, array $data): ?array') !== false
+    && strpos($ic250, "\$exist = empty(\$_POST['force_new']) ? icFindExisting(\$db, (int)\$sub['school_id'], \$data) : null;") !== false
+    && strpos($ic250, "UPDATE info_submissions SET employee_id = ?, is_new_teacher = 0 WHERE id = ?") !== false
+    && strpos($ic250, 'موجود مسبقاً — ملف رقم') !== false
+    && strpos($ic250, 'name="force_new" value="1"') !== false);
+
+
+/* 🔗 (2026-10-15 «عمول الشغل انت» — المكرّرون اللي عندهم رواتب هالسنة): دمج الزائدة بالملف الأصلي بدل حذفها وضياع رواتبها —
+ *    الأشهر الناقصة عند الأصلي تنتقل، المكرّرة تُحذف، المدفوع يُتخطّى، ثم حذف الزائدة؛ صفحة تأكيد؛ تراجع عند أي خطأ (transaction). */
+$dp250 = (string)@file_get_contents($PROJ . '/pages/duplicates.php');
+check('🔗 دمج المكرّرين: action=merge بتأكيد + نقل أشهر الرواتب الناقصة فقط + حذف المكرّرة + تخطّي المدفوع + transaction + أزرار دمج',
+    strpos($dp250, "if ((\$_GET['action'] ?? '') === 'merge') {") !== false
+    && strpos($dp250, "UPDATE monthly_salaries x LEFT JOIN monthly_salaries k ON k.employee_id = ? AND k.year = x.year AND k.month = x.month SET x.employee_id = ? WHERE x.employee_id = ? AND k.id IS NULL") !== false
+    && strpos($dp250, "SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = \$x AND is_paid = 1") !== false
+    && strpos($dp250, '$db->beginTransaction();') !== false && strpos($dp250, '$db->rollBack();') !== false
+    && strpos($dp250, 'bulkDeleteHard($db, $x);') !== false
+    && strpos($dp250, 'name="action" value="merge"') !== false && strpos($dp250, 'href="?action=merge&ids[]=') !== false);
+
 require __DIR__ . '/reg_print_engine.php';   // 247) 🖨️ محرّك الطباعة الرسمي (2026-10-11)
 require __DIR__ . '/reg_paid_guard.php';     // 248) 🔒❓ حارس الأرقام: الأشهر المدفوعة المحمية + الكشوف ≠ الملف (2026-10-11)
 
