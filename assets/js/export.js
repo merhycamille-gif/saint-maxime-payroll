@@ -324,9 +324,13 @@
     };
     // 📄 (2026-10-11) الجدول العريض: «أجزاء» (الافتراضي، خط 12 مع تكرار # والاسم بكل جزء) ⇄ «ورقة وحدة» (كل الأعمدة بصفحة واحدة بخط أصغر).
     //    الزرّ يظهر فقط حين يكون بالمستند جدول من 10 أعمدة وأكثر. لا يُحفَظ: كل صفحة تبدأ بالأجزاء.
-    window.msaFitOne = false;
+    // 📄 (2026-10-15 «أي تقرير بدي اطبعو بدي العواميد كلّها نفس الصفحة… السطور ما في مشكلة صفحات عديدة») الافتراضي = ورقة وحدة:
+    //    كل الأعمدة على عرض الورقة (أفقية إن لزم، بخط أصغر إن لزم) والسطور تمتدّ على صفحات؛ الزرّ يقلب إلى «أجزاء» لمن يريد.
+    window.msaFitOne = true;
     function msaFitInit() {
         var b = document.getElementById('msaFitBtn'); if (!b) return;
+        var sp0 = b.querySelector('span'); if (sp0) sp0.textContent = window.msaFitOne ? 'Une page / ورقة وحدة ⇄' : 'Parties / أجزاء ⇄';
+        b.classList.toggle('btn-warning', !window.msaFitOne); b.classList.toggle('btn-light', window.msaFitOne);
         var wide = false;
         area().querySelectorAll('table').forEach(function (t) { if (t.closest('.no-print, .export-toolbar, .official-doc')) return; /* 🏛️ النماذج الرسمية بلا «أجزاء» */ for (var i = 0; i < t.rows.length && i < 4; i++) if (t.rows[i].cells.length >= 10) wide = true; });
         b.style.display = wide ? '' : 'none';
@@ -334,7 +338,7 @@
     window.msaFitToggle = function (btn) {
         window.msaFitOne = !window.msaFitOne;
         var sp = btn.querySelector('span'); if (sp) sp.textContent = window.msaFitOne ? 'Une page / ورقة وحدة ⇄' : 'Parties / أجزاء ⇄';
-        btn.classList.toggle('btn-warning', window.msaFitOne); btn.classList.toggle('btn-light', !window.msaFitOne);
+        btn.classList.toggle('btn-warning', !window.msaFitOne); btn.classList.toggle('btn-light', window.msaFitOne);   // الأصفر = الوضع غير الافتراضي (أجزاء)
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', msaFitInit); else msaFitInit();
     window.addEventListener('load', msaFitInit);
