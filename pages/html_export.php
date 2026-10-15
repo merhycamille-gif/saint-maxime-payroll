@@ -33,7 +33,7 @@ if ($format === 'pdf') {
         $sch = currentSchool();
         $schoolName = $sch ? (($dir === 'ltr' ? ($sch['name_fr'] ?? '') : ($sch['name_ar'] ?? '')) ?: ($sch['name_ar'] ?? $sch['name_fr'] ?? '')) : '';
         $landOpt = (($_POST['landscape'] ?? 'auto') === 'auto') ? null : $land;
-        $data = MsaPdf::fromHtml($html, ['title' => $title, 'dir' => $dir, 'landscape' => $landOpt, 'school' => $schoolName, 'fit' => !empty($_POST['fit']) && $_POST['fit'] !== '0', 'lh_bg' => (string)($_POST['lh_bg'] ?? ''), 'lh_pad' => (string)($_POST['lh_pad'] ?? '')]);
+        $data = MsaPdf::fromHtml($html, ['title' => $title, 'dir' => $dir, 'landscape' => $landOpt, 'school' => $schoolName, 'fit' => (($_POST['fit'] ?? '1') !== '0'),   /* 📄 2026-10-15: الافتراضي ورقة وحدة (كل الأعمدة) حتى لمن لا يبعث fit (واتساب/إيميل) */ 'lh_bg' => (string)($_POST['lh_bg'] ?? ''), 'lh_pad' => (string)($_POST['lh_pad'] ?? '')]);
     } catch (Throwable $e) {
         http_response_code(500);
         header('Content-Type: text/plain; charset=utf-8');

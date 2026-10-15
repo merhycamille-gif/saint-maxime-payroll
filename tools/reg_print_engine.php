@@ -58,7 +58,7 @@ check('🖨️ المحرّك: tfoot ⇒ آخر الجسم (المجاميع م�
       && strpos($en247, "//form[not(.//table)]") !== false
       && strpos($ex247, 'window.msaFitToggle = function (btn)') !== false && strpos($ex247, "fit: window.msaFitOne ? '1' : '0'") !== false
       && strpos($fn247, 'id="msaFitBtn" onclick="msaFitToggle(this)"') !== false
-      && strpos($he247, "'fit' => !empty(\$_POST['fit'])") !== false
+      && strpos($he247, "'fit' => ((\$_POST['fit'] ?? '1') !== '0'),") !== false
       && strpos($en247, "'الجزء ' . (\$pi + 1) . ' من ' . \$np") !== false
       && strpos($en247, 'صفحة {PAGENO} من {nbpg}') !== false
       && strpos($en247, "str_replace('\\\\', '/', \$abs)") !== false

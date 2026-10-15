@@ -1351,7 +1351,7 @@ elseif ($form === 'teacher_card'):
     $rows = $q->fetchAll();
     $sy = (activeSchoolYear()==='all') ? $schoolYear : activeSchoolYear();
     $X = '<span style="font-weight:700">X</span>';
-    $nCols = ($isMlk ? 17 : 18) + compColsCount(); // الأعمدة الثابتة + أعمدة المكوّنات الظاهرة (تتبع «الراتب يشمل»)
+    $nCols = 17 + compColsCount();   // 🗑️ (2026-10-15 «لا شي») عمود «تعاقد رسمي» للمتعاقدين انشال بطلبه // الأعمدة الثابتة + أعمدة المكوّنات الظاهرة (تتبع «الراتب يشمل»)
 ?>
     <form method="get" class="card no-print">
         <input type="hidden" name="form" value="eoc_staff">
@@ -1388,7 +1388,6 @@ elseif ($form === 'teacher_card'):
                 <th rowspan="2">أساس الراتب</th>
                 <?= extraAideHeads(' rowspan="2"', $rows, null, null, $sy) ?><?= transportHead(' rowspan="2"') ?>
                 <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
-                <?php if (!$isMlk): ?><th rowspan="2">تعاقد رسمي</th><?php endif; ?>
                 <th rowspan="2">التوقيع</th>
             </tr>
             <tr>
@@ -1442,7 +1441,6 @@ elseif ($form === 'teacher_card'):
                 <?php if (salaryCompHas('aide')): ?><td class="num"><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td><?php endif; ?>
                 <?= transportTd(money($sal ? (int)$sal['transport_lbp'] : 0, $sal ? rowRate($sal) : null, ['withCur'=>false])) ?>
                 <td class="num" style="background:#eef2ff"><strong><?= $sal ? dualFromUsd(composedSalaryLbp($sal), composedSalaryUsd($sal), false) : formatLBP($rsal,false) ?></strong></td>
-                <?php if (!$isMlk): ?><td class="num"><?= $contract>0?formatLBP($contract,false):'' ?></td><?php endif; ?>
                 <td>&nbsp;</td>
             </tr>
         <?php endforeach; ?>
@@ -1454,7 +1452,6 @@ elseif ($form === 'teacher_card'):
             <?= extraAideTotalCells($esG['ex'],$esG['ex_u'],$esG['ai'],$esG['ai_u']) ?>
             <?= transportTotalCell($esG['tr'],$esG['tr_u']) ?>
             <td class="num" style="background:#eef2ff"><strong><?= dualFromUsd($esG['comp'],$esG['comp_u'],false) ?></strong></td>
-            <?php if (!$isMlk): ?><td class="num"><?= formatLBP($esG['contract'],false) ?></td><?php endif; ?>
             <td></td>
         </tr></tfoot><?php endif; ?>
     </table>
