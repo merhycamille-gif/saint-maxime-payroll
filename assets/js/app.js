@@ -306,7 +306,7 @@ window.msaFitScreenTables = function () {
         for (var i = 0; i < tables.length; i++) {
             var t = tables[i];
             if (t.classList.contains('doc-table') || t.closest('.payslip-card, .salary-slip, .no-print')) continue;
-            var target = t.closest('.land-report') ? 1062 : 718;   // عرض A4 الفعلي داخل هوامش @page (كان 1075/745 أعرض من الورقة فيُقصّ الطرف — 2026-08-20)
+            var target = (t.closest('.land-report') || document.body.classList.contains('print-landscape')) ? 1062 : 718;   // 📏 2026-10-15: الاتجاه الأفقي التلقائي (pdf-save beforeprint) يرفع الهدف   // عرض A4 الفعلي داخل هوامش @page (كان 1075/745 أعرض من الورقة فيُقصّ الطرف — 2026-08-20)
             // 🖨️ الجدول داخل بطاقة (card-body) لا يأخذ عرض الورقة كله: حشوة البطاقة وحدودها تُخصم
             // (تُقاس بالقواعد المقلوبة = كما على الورق) — جدول الرواتب الشهرية كان يُقصّ عمود الحالة
             var host1 = t.parentElement, hs1 = host1 ? getComputedStyle(host1) : null;
@@ -469,6 +469,7 @@ window.msaFitScreenTables = function () {
         window.addEventListener('load', fitPrintZoom);
     }
     window.addEventListener('beforeprint', fitPrintZoom);
+    window.msaFitPrintZoom = fitPrintZoom;   // 📏 2026-10-15: يُعاد نداؤه بعد تقرير الاتجاه
 
 })();
 

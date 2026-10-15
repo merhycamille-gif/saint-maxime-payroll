@@ -126,3 +126,26 @@ check('📏 المحرّك: قياس حقيقي بخطوط mPDF (OTL) + عرض �
       && strpos($en247, "if (\$isTh && \$cs === 1 && \$nameCol < 0 && preg_match(") !== false
       && strpos($en247, "\" official-doc \")]', \$t)->length > 0;") !== false
       && strpos($en247, '$pw = []; foreach ($idx as $c) $pw[] = $w[$c];') !== false);
+
+/* 🌐 (2026-10-15 «ما في ولا تقرير ظابط للطبع… فتّش على برنامج ذكاء… حتى لو بدي ادفع» ⇒ «ركّبه») المحرّك الاحترافي: Chromium (Gotenberg 8 بـDocker)
+ *    على سيرفر المدرسة الخاصّ 144.91.110.214 عبر https://collegesaintmaxime.com/pdf/ (Apache proxy + Basic Auth). includes/pdf_chromium.php:
+ *    MsaPdf::fromHtml يحوّل إليه تلقائياً إن وُجد config/pdf_service.php وإلّا (أو عند أي عطل) mPDF كما كان؛ التحضير مشترك (MsaPdf::prepare)،
+ *    العرض الصريح بالملم يُشال والمتصفّح يقيس؛ التقسيم أعمدةً داخل الورقة بسكربت (قياسات حقيقية، توزيع متوازن، # + الاسم بكل جزء)؛
+ *    أفقي إن كان أعرض من العمودي؛ خط Cairo مرفق؛ تذييل المدرسة/الصفحة/التاريخ. النتيجة: الشهري 85 ⇒ 61، الضمان 43 ⇒ 32، الضريبة 42 ⇒ 32. */
+$cr247 = (string)@file_get_contents($PROJ . '/includes/pdf_chromium.php');
+check('🌐 محرّك Chromium: ملف المحرّك + التحويل التلقائي من fromHtml مع رجوع لـmPDF + تحضير مشترك + تقسيم بالمتصفّح (متوازن) + أفقي للعريض + الاسم بكل جزء + الخط مرفق',
+    strpos($cr247, 'class MsaChromePdf') !== false
+    && strpos($en247, "if ((\$o['engine'] ?? '') !== 'mpdf' && class_exists('MsaChromePdf') && MsaChromePdf::available(\$o)) {") !== false
+    && strpos($en247, "catch (\Throwable \$e) { error_log('MsaChromePdf fallback: ' . \$e->getMessage()); }") !== false
+    && strpos($en247, "require_once __DIR__ . '/pdf_chromium.php';") !== false
+    && strpos($cr247, '$p = MsaPdf::prepare($html, $o);') !== false
+    && strpos($cr247, "\$o['variants'] = ['wrap', 'stack'];") !== false && strpos($cr247, "\$o['fit'] = true;") !== false
+    && strpos($cr247, "\$landscape = \$landscape || ((\$p['widest'] ?? 0) > MsaPdf::usableWidth(false, \$side));") !== false
+    && strpos($cr247, "if(cur.length&&(sum+w[c]>cap||(sum>=target&&gs.length<N-1))){ gs.push(cur); cur=[]; sum=0; }") !== false
+    && strpos($cr247, "if(name>=0&&key.indexOf(name)<0) key.push(name);") !== false
+    && strpos($cr247, "'waitForExpression' => 'window.msaFitDone === true',") !== false
+    && strpos($cr247, "foreach (['f1.woff2', 'f2.woff2', 'f3.woff2'] as \$f)") !== false
+    && strpos($cr247, "if (!empty(\$o['lh_bg'])) return false;") !== false
+    && strpos($cr247, "getSetting('pdf_service_pass', '')") !== false && strpos((string)@file_get_contents($PROJ . '/pages/email_settings.php'), "setSetting('pdf_service_pass', ") !== false
+    && strpos((string)@file_get_contents($PROJ . '/.gitignore'), 'config/pdf_service.php') !== false
+    && strpos($en247, "'widest' => (float)(\$widestMm ?? 0)") !== false);

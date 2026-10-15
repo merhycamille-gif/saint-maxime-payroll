@@ -432,18 +432,63 @@
             try {
                 if (window.MSA_PAGE === 'annual' || undo) return; // beforeprint قد يُطلق مرّتين (المتصفّح + الصفحة): لا تقسيم فوق تقسيم
                 var a = area(); if (!a || a.querySelector('.payslip-card, .salary-slip-table') || a.closest('.payslip-card')) return;
-                if (a.classList.contains('official-doc') || a.closest('.official-doc') || a.querySelector('.official-doc')) return; // 🏛️ النماذج الرسمية لا تُقسَّم ولا يُلمَس تصغيرها
-                var land = !!(a.closest('.land-report, .xls-sheet') || a.querySelector('.land-report, .xls-sheet') || a.classList.contains('land-report'));
-                var maxW = land ? 1062 : 718;
-                saved = []; a.querySelectorAll('table').forEach(function (t) { saved.push([t, t.style.zoom, t.style.getPropertyValue('--pz')]); t.style.zoom = ''; t.style.setProperty('--pz', 1); });
-                undo = splitWideTables(a, maxW);
-                if (!undo) { saved.forEach(function (x) { x[0].style.zoom = x[1]; if (x[2]) x[0].style.setProperty('--pz', x[2]); }); saved = []; }
-                else a.querySelectorAll('[data-pdf-clone] table, table[data-pdf-clone]').forEach(function (t) { t.style.setProperty('--pz', 1); t.style.zoom = ''; });
+                if (document.querySelector('.ofs, .xls-sheet, .official-doc')) return; // 📏 النماذج الرسمية/الإكسل/الصور لها @page خاصّة — لا تُمَسّ (بأي مكان بالصفحة: الحاوية المختارة قد تكون غيرها)
+                if (a.classList.contains('official-doc') || a.closest('.official-doc') || a.querySelector('.official-doc')) return; // 🏛️ النماذج الرسمية لا تُقسَّم ولايُلمَس تصغيرها
+                // 📏 (2026-10-15 «الأعمدة أوسع من الكلمات… صفحات كتير»): القياس كان بعرض الشاشة (الجدول ممدود 100٪ على شاشة
+                //    عريضة) فانقسمت لائحة 7 أعمدة ثلاثة أجزاء و62 ورقة. الآن: يُقاس عرض المحتوى الطبيعي (max-content = كل عمود
+                //    قدّ كلماته) ثم: يسع عمودياً ⇒ كما هو · يسع أفقياً ⇒ الورقة أفقية · يسع بتصغير ≤15٪ ⇒ --pz · وإلّا يُقسَّم بأعمدته الطبيعية.
+                //    لا تقسيم بطباعة المتصفّح بعد اليوم (التقسيم الصحيح بأعمدة قدّ محتواها يقوم به محرّك PDF الخادم — كبسة الطباعة وCtrl+P).
+                //    هنا: يُقاس عرض المحتوى الطبيعي بشروط الطباعة الحقيقية (قواعد @media print مقلوبة لحظياً + width:max-content)؛
+                //    أعرض من الورقة العمودية ⇒ الورقة أفقية تلقائياً؛ ثم يُعاد حساب التصغير المحسوب (--pz) على الاتجاه الصحيح.
+                var forced = window.msaOrientForced || '';
+                var fixedLand = !!(a.closest('.land-report, .xls-sheet') || a.querySelector('.land-report, .xls-sheet') || a.classList.contains('land-report'));
+                var land = forced ? forced === 'landscape' : fixedLand;
+                saved = [];
+                // الخلايا القصيرة لا تلتفّ على الورق (سطر واحد = عمود قدّ كلماته)؛ الطويلة (> 38 حرفاً) وحدها تلتفّ — يُعلَّم قبل القياس ليدخل فيه
+                a.querySelectorAll('td').forEach(function (td) { if ((td.textContent || '').trim().length > 38) td.classList.add('pr-wrap'); });
+                document.body.classList.add(land ? 'print-landscape' : 'print-portrait');   // مؤقّتاً للقياس (تُضبَط نهائياً بعده)
+                if (!forced && !fixedLand) {
+                    var flipped = [];
+                    try {
+                        for (var s = 0; s < document.styleSheets.length; s++) {
+                            var rules; try { rules = document.styleSheets[s].cssRules; } catch (e1) { continue; }
+                            if (!rules) continue;
+                            for (var r = 0; r < rules.length; r++) { var rule = rules[r]; if (rule.media && /print/.test(rule.media.mediaText)) { flipped.push([rule, rule.media.mediaText]); rule.media.mediaText = 'all'; } }
+                        }
+                    } catch (e0) {}
+                    var nat = 0;
+                    try {
+                        a.querySelectorAll('table').forEach(function (t) {
+                            if (!t.rows.length || t.closest('.official-doc, .payslip-card, .salary-slip, .no-print') || t.querySelector('table')) return;
+                            var pw = t.style.getPropertyValue('width'), pl = t.style.getPropertyValue('table-layout'), pzv = t.style.getPropertyValue('--pz'), pzo = t.style.zoom;
+                            t.style.zoom = ''; t.style.setProperty('--pz', 1);
+                            t.style.setProperty('width', 'max-content', 'important'); t.style.setProperty('table-layout', 'auto', 'important');
+                            nat = Math.max(nat, t.scrollWidth);
+                            t.style.removeProperty('width'); if (pw) t.style.setProperty('width', pw); t.style.removeProperty('table-layout'); if (pl) t.style.setProperty('table-layout', pl);
+                            t.style.zoom = pzo; if (pzv) t.style.setProperty('--pz', pzv); else t.style.removeProperty('--pz');
+                        });
+                    } finally { for (var f = 0; f < flipped.length; f++) flipped[f][0].media.mediaText = flipped[f][1]; }
+                    if (nat > 718 * 1.02) land = true;   // أعرض من الورقة العمودية (190mm) ⇒ أفقية؛ وما لا يسع الأفقية يصغَّر بالمحسوب
+                }
+                document.body.classList.toggle('print-landscape', land); document.body.classList.toggle('print-portrait', !land);
+                if (window.msaFitDocTables) window.msaFitDocTables();   // إعادة القياس على الاتجاه الصحيح (كانت على العمودي)
+                if (window.msaFitPrintZoom) window.msaFitPrintZoom();
+                // الجدول العريض جداً (21 عموداً): بلا التفاف يصل التصغير حدّه (0.4) ويُقصّ ⇒ نعيد السماح بالالتفاف ونقيس من جديد
+                var atFloor = Array.prototype.some.call(a.querySelectorAll('table'), function (t) { return parseFloat(t.style.getPropertyValue('--pz')) <= 0.41; });
+                if (atFloor) {
+                    document.body.classList.add('pr-wrapall');
+                    if (window.msaFitDocTables) window.msaFitDocTables();
+                    if (window.msaFitPrintZoom) window.msaFitPrintZoom();
+                }
+                undo = function () {};
             } catch (e) { undo = null; }
         });
         window.addEventListener('afterprint', function () {
             try { if (undo) undo(); } catch (e) {}
             undo = null;
+            document.body.classList.remove('print-landscape', 'print-portrait', 'pr-wrapall');
+            document.querySelectorAll('td.pr-wrap').forEach(function (td) { td.classList.remove('pr-wrap'); });
+            if (window.msaOrientForced) document.body.classList.add(window.msaOrientForced === 'landscape' ? 'print-landscape' : 'print-portrait');
             saved.forEach(function (x) { x[0].style.zoom = x[1]; if (x[2]) x[0].style.setProperty('--pz', x[2]); else x[0].style.removeProperty('--pz'); }); saved = [];
         });
     })();

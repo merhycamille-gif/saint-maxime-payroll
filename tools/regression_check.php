@@ -9857,6 +9857,24 @@ check('🏛️ النماذج الرسمية لا تُقسَّم بالطباع�
     && strpos($pdfJs, "a.classList.contains('official-doc') || a.closest('.official-doc') || a.querySelector('.official-doc')") !== false
     && strpos($expJs, "'.no-print, .export-toolbar, .official-doc'") !== false);
 
+/* 📏 (2026-10-15 «ما في ولا تقرير ظابط للطبع… صفحات كتير») طباعة المتصفّح (Ctrl+P / القائمة) كانت تقيس الجدول بعرض الشاشة فتقسّم لائحة 7 أعمدة
+ *    ثلاثة أجزاء (62 ورقة، الضمان 103): لا تقسيم بطباعة المتصفّح بعد اليوم — قياس بشروط الطباعة (max-content + قواعد print مقلوبة) ⇒ أفقي
+ *    تلقائياً إن كان أعرض من العمودي ⇒ إعادة --pz على الاتجاه الصحيح؛ الخلايا القصيرة سطر واحد (pr-wrap للطويلة)؛ صفوف مضغوطة؛
+ *    Ctrl+P = PDF الخادم؛ النماذج الرسمية/xls-sheet/ofs خارج كل ذلك (document-wide). النتيجة: الموظفون 62 ⇒ 20، الضمان 103 ⇒ 20، الشهري 113 ⇒ 12. */
+$css250b = (string)@file_get_contents($PROJ . '/assets/css/app.css'); $appJs250b = (string)@file_get_contents($PROJ . '/assets/js/app.js');
+check('📏 طباعة المتصفّح: بلا تقسيم · قياس بشروط الطباعة · أفقي تلقائي · --pz يُعاد على الاتجاه · نماذج الدولة مستثناة · Ctrl+P = PDF الخادم · سطر واحد للقصير',
+    strpos($pdfJs, "if (document.querySelector('.ofs, .xls-sheet, .official-doc')) return;") !== false
+    && strpos($pdfJs, "t.style.setProperty('width', 'max-content', 'important'); t.style.setProperty('table-layout', 'auto', 'important');") !== false
+    && strpos($pdfJs, "if (nat > 718 * 1.02) land = true;") !== false
+    && strpos($pdfJs, "if (window.msaFitDocTables) window.msaFitDocTables();") !== false && strpos($pdfJs, "if (window.msaFitPrintZoom) window.msaFitPrintZoom();") !== false
+    && strpos($pdfJs, "undo = splitWideTables(a, maxW)") === false
+    && strpos($pdfJs, "td.classList.add('pr-wrap')") !== false
+    && strpos($appJs250b, "window.msaFitPrintZoom = fitPrintZoom;") !== false
+    && strpos($appJs250b, "(t.closest('.land-report') || document.body.classList.contains('print-landscape')) ? 1062 : 718") !== false
+    && strpos($expJs, "e.key.toLowerCase() !== 'p') return;") !== false && strpos($expJs, "if (!serverPrintable() || !window.msaServerPdf) return;") !== false
+    && strpos($css250b, "body.print-landscape td.pr-wrap, body.print-portrait td.pr-wrap { white-space: normal !important; }") !== false
+    && strpos($css250b, ".doc-table td, .doc-table th, .table td, .table th { padding: 2px 4px !important; line-height: 1.25 !important; }") !== false);
+
 /* =====================================================================
  * 249) 🧾 (2026-10-12 «بملف الأستاذ خيار: إذا داخل بالملاك، أنا بحدّد السنة وبينحسم نصف الراتب بشهر ت1 لصندوق التعويضات متل القانون —
  *      بس إذا أنا حطّيتها»): عمود eoc_half_salary_year (NULL = مطفأ) يتركّب ذاتياً؛ المحرّك يحسم نصف (الأساس + الدرجة) بلا إضافي

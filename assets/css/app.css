@@ -2667,3 +2667,19 @@ body.rtl .sidebar .sidebar-nav a > span.nl2, body.rtl .sidebar .sidebar-nav .nav
 .report-cat .report-cat-title i { width: 44px !important; height: 44px !important; border-radius: 13px !important; font-size: 20px !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 5px 12px -5px rgba(0,0,0,.45); }
 }
+/* 📏 (2026-10-15 «بيطلع صفحات كتير») طباعة المتصفّح: صفوف الجداول مضغوطة كورقة الـPDF (كانت الحشوة والسطر يضاعفان الارتفاع) */
+@media print {
+  .doc-table td, .doc-table th, .table td, .table th { padding: 2px 4px !important; line-height: 1.25 !important; }
+  .doc-table thead th, .table thead th { padding: 3px 4px !important; }
+  .doc-table td .badge, .table td .badge { padding: 0 4px !important; line-height: 1.2 !important; }
+}
+@media print {
+  body.print-landscape .doc-table td, body.print-portrait .doc-table td, body.print-landscape .table td, body.print-portrait .table td { white-space: nowrap; }
+  body.print-landscape td.pr-wrap, body.print-portrait td.pr-wrap { white-space: normal !important; }
+}
+/* 📏 حالة القياس (pz-measure) تطابق الورق: الخلايا القصيرة بلا التفاف والطويلة (pr-wrap) تلتفّ — وإلّا يُقاس الجدول أضيق ممّا يُطبع فيُقصّ */
+.doc-table.pz-measure td, .table.pz-measure td { white-space: nowrap; }
+.doc-table.pz-measure td.pr-wrap, .table.pz-measure td.pr-wrap { white-space: normal !important; }
+/* العريض جداً: الالتفاف مسموح بكل الخلايا (pr-wrapall) بدل القصّ — بالقياس وعلى الورق */
+body.pr-wrapall .doc-table.pz-measure td, body.pr-wrapall .table.pz-measure td { white-space: normal !important; }
+@media print { body.pr-wrapall .doc-table td, body.pr-wrapall .table td { white-space: normal !important; } }

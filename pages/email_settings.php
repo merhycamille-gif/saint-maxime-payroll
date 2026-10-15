@@ -47,6 +47,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['flash_success'] = 'تم حفظ إيميل البرنامج: ' . programMailName() . ' ‹' . programMailAddress() . '›';
         header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
     }
+    // 🌐 (2026-10-15 «ركّبه») محرّك الطباعة الاحترافي (Chromium على سيرفر المدرسة): كلمة سرّ الخدمة تُحفَظ هنا لا بالكود
+    if (isset($_POST['save_pdf_engine'])) {
+        $pp = (string)($_POST['pdf_service_pass'] ?? '');
+        if ($pp !== '') setSetting('pdf_service_pass', $pp);
+        setSetting('pdf_service_disabled', !empty($_POST['pdf_service_disabled']) ? '1' : '');
+        $_SESSION['flash_success'] = 'تم حفظ إعدادات محرّك الطباعة';
+        header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
+    }
     if (isset($_POST['test_program'])) {
         $testTo = trim($_POST['test_to_program'] ?? '');
         if (!filter_var($testTo, FILTER_VALIDATE_EMAIL)) { $_SESSION['flash_error'] = 'اكتب إيميلاً صحيحاً للتجربة'; }
@@ -78,6 +86,29 @@ $secure = getSetting('smtp_secure', '');
 $fromName = getSetting('smtp_from_name', '');
 include __DIR__ . '/../includes/header.php';
 ?>
+<?php // 🌐 (2026-10-15) محرّك الطباعة الاحترافي — Chromium على سيرفر المدرسة (collegesaintmaxime.com/pdf)
+    $pdfPassSet = (string)getSetting('pdf_service_pass', '') !== ''; $pdfOff = (string)getSetting('pdf_service_disabled', '') === '1';
+    $pdfHealth = null; try { $chH = curl_init('https://collegesaintmaxime.com/pdf/health'); curl_setopt_array($chH, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 5, CURLOPT_CONNECTTIMEOUT => 4]); curl_exec($chH); $pdfHealth = (int)curl_getinfo($chH, CURLINFO_HTTP_CODE); curl_close($chH); } catch (Throwable $e) {} ?>
+<div class="card" style="max-width:680px;border:1px solid #c7d2fe">
+    <div class="card-header" style="background:#eef2ff"><h3>
+        <span dir="ltr"><i class="fas fa-print"></i> Moteur d'impression professionnel</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">محرّك الطباعة الاحترافي (Chromium على سيرفر المدرسة)</div>
+    </h3></div>
+    <div class="card-body">
+        <div class="alert <?= ($pdfPassSet && !$pdfOff && $pdfHealth === 200) ? 'alert-success' : 'alert-warning' ?>" style="line-height:1.9">
+            الحالة: <strong><?= $pdfOff ? 'معطَّل (الطباعة بالمحرّك الداخلي)' : ($pdfPassSet ? ($pdfHealth === 200 ? 'شغّال ✓' : 'الخدمة لا تردّ (' . (int)$pdfHealth . ') — الطباعة بالمحرّك الداخلي مؤقّتاً') : 'بلا كلمة سرّ — الطباعة بالمحرّك الداخلي') ?></strong><br>
+            كل الطباعة والـPDF والإيميل والواتساب تمرّ من هذا المحرّك حين يكون شغّالاً؛ وإذا تعطّل يرجع البرنامج تلقائياً إلى محرّكه الداخلي.
+        </div>
+        <form method="post" class="lockedit">
+            <?= csrfField() ?>
+            <div class="form-row cols-2">
+                <div class="form-group"><label class="form-label">Mot de passe du service / كلمة سرّ الخدمة <?= $pdfPassSet ? '(محفوظة — اتركها فارغة لتبقى)' : '' ?></label><input type="password" name="pdf_service_pass" class="form-control" dir="ltr" autocomplete="new-password"></div>
+                <div class="form-group"><label class="form-label">&nbsp;</label><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="pdf_service_disabled" value="1" <?= $pdfOff ? 'checked' : '' ?>> Désactiver / تعطيل مؤقّت (ارجع للمحرّك الداخلي)</label></div>
+            </div>
+            <button class="btn btn-primary" name="save_pdf_engine" value="1"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
+        </form>
+    </div>
+</div>
 <?php // 📧 (2026-10-12) إيميل البرنامج — يبعت منه خادم الموقع بلا كلمة سرّ؛ كل مدرسة تختار بصفحة المدارس: إيميل البرنامج (الافتراضي) أو إيميلها
     $progSchools = []; try { $progSchools = getDB()->query("SELECT name_ar, name_fr, email, IFNULL(email_sender_mode,'program') m FROM schools WHERE is_active = 1 ORDER BY id")->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $t) {} ?>
 <div class="card" style="max-width:680px;border:1px solid #bfdbfe">

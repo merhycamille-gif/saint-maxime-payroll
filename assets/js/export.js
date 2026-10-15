@@ -60,6 +60,15 @@
         }).catch(function (e) { try { console.error(e); } catch (_) {} if (b) { b.innerHTML = old; b.disabled = false; } window.print(); });
     };
 
+    // ⌨️ (2026-10-15 «ما في ولا تقرير ظابط للطبع»): Ctrl+P / Cmd+P من لوحة المفاتيح = نفس كبسة الطباعة (PDF الخادم المرتّب)
+    //    لا طباعة المتصفّح الخام — حيث يُطبع المستند من الخادم أصلاً.
+    document.addEventListener('keydown', function (e) {
+        if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || !e.key || e.key.toLowerCase() !== 'p') return;
+        if (!serverPrintable() || !window.msaServerPdf) return;
+        e.preventDefault(); e.stopPropagation();
+        window.ppPrint(null);
+    }, true);
+
     // ===== 🔄 اتجاه الورقة (2026-09-14 «وقت عم اطبع بتضل لاندسكيب ما بيغير على بورتريه بالبرنت») =====
     // الاتجاه مثبّت بالـCSS (@page landscape للعريض) فحوار الطباعة يرفض تغييره. الزرّ يقلبه: يضيف
     // body.print-portrait / .print-landscape (app.css يفرض @page مسمّاة + عرض الورقة --pz-target) ويعيد
@@ -88,7 +97,10 @@
         var b = document.getElementById('msaOrientBtn');
         if (b) {
             var sp = b.querySelector('span');
-            if (sp) sp.textContent = (o === 'landscape' ? 'Paysage / أفقي' : 'Portrait / عمودي') + ' ⇄';
+            // 🔄 (2026-10-15 «ما عم يغير من أفقي إلى عمودي»): الاتجاه التلقائي يقرّره محرّك الطباعة (الخادم) لا CSS الصفحة، فكان الزرّ
+            //    يظنّ الورقة عمودية ويقلبها «أفقية» وهي أفقية أصلاً. الآن ثلاث حالات واضحة: تلقائي ⇒ عمودي ⇒ أفقي ⇒ تلقائي.
+            if (sp) sp.textContent = (!window.msaOrientForced ? 'Auto / تلقائي' : (o === 'landscape' ? 'Paysage / أفقي' : 'Portrait / عمودي')) + ' ⇄';
+            b.title = 'Orientation de la page : automatique → portrait → paysage / اتجاه الورقة: تلقائي ← عمودي ← أفقي';
             b.classList.toggle('btn-warning', !!window.msaOrientForced);
             b.classList.toggle('btn-light', !window.msaOrientForced);
         }
@@ -97,7 +109,7 @@
         if (fire === true) window.dispatchEvent(new Event('resize'));
     }
     window.msaToggleOrient = function () {
-        window.msaOrientForced = (window.msaPrintOrient() === 'landscape') ? 'portrait' : 'landscape';
+        window.msaOrientForced = !window.msaOrientForced ? 'portrait' : (window.msaOrientForced === 'portrait' ? 'landscape' : '');
         msaOrientApply(true);
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', msaOrientApply); else msaOrientApply();

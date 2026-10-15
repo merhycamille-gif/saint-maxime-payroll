@@ -18,3 +18,4 @@ launch.vbs
 make_online_deploy.py
 tools/_render_one.php
 _moved_block.txt
+config/pdf_service.php

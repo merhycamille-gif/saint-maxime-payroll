@@ -27,7 +27,7 @@ class MsaLangToFont implements \Mpdf\Language\LanguageToFontInterface
 class MsaPdf
 {
     /** عرض الورقة القابل للكتابة (mm) */
-    private static function usableWidth(bool $landscape, int $side): float
+    public static function usableWidth(bool $landscape, int $side): float
     {
         return ($landscape ? 297 : 210) - 2 * $side;
     }
@@ -414,6 +414,7 @@ class MsaPdf
                 foreach (iterator_to_array($xp->query('.//*[' . $cls('money-usd') . ']', $tables[$i])) as $mu) $mu->parentNode->insertBefore($dom->createElement('br'), $mu);
             }
             $natural[$i] = $m[$v]; $nameColOf[$i] = $m['nameCol'];
+            $widestMm = max($widestMm ?? 0, array_sum($m[$v]));   // أعرض جدول بعرضه المختار (mm) — يستعمله محرّك Chromium لقرار الاتجاه
         }
 
         // تقسيم الجدول الأعرض من الورقة (حتى بعد سماح تصغير 15٪) على أجزاء بالعرض مع تكرار أعمدة التعريف
@@ -491,12 +492,17 @@ class MsaPdf
             if (is_file($root . '/' . $relB)) $lhFile = str_replace('\\', '/', $root . '/' . $relB);
             if (!empty($o['lh_pad']) && preg_match('/^[\d.]+,[\d.]+,[\d.]+,[\d.]+$/', (string)$o['lh_pad'])) $lhPad = array_map(fn($v) => round((float)$v * 25.4 / 96, 1), explode(',', (string)$o['lh_pad']));
         }
-        return ['dom' => $dom, 'body' => $body, 'dir' => $dir, 'rtl' => $rtl, 'landscape' => (bool)$landscape, 'isLetter' => (bool)$isLetter, 'side' => $side, 'title' => $title, 'lh_file' => $lhFile, 'lh_pad' => $lhPad];
+        return ['dom' => $dom, 'body' => $body, 'dir' => $dir, 'rtl' => $rtl, 'landscape' => (bool)$landscape, 'isLetter' => (bool)$isLetter, 'side' => $side, 'title' => $title, 'lh_file' => $lhFile, 'lh_pad' => $lhPad, 'widest' => (float)($widestMm ?? 0)];
     }
 
     /** يبني PDF من HTML منطقة المستند المعروضة. $o: title · dir (rtl|ltr) · landscape (bool|null) · school (اسم للتذييل) · letter (bool|null) · fit */
     public static function fromHtml(string $html, array $o = []): string
     {
+        // 🌐 (2026-10-15 «ركّبه») المحرّك الاحترافي Chromium على سيرفر المدرسة إن كان مهيّأً ومتاحاً؛ وإلّا (أو عند أي عطل) mPDF كما كان
+        if (($o['engine'] ?? '') !== 'mpdf' && class_exists('MsaChromePdf') && MsaChromePdf::available($o)) {
+            try { return MsaChromePdf::fromHtml($html, $o); }
+            catch (\Throwable $e) { error_log('MsaChromePdf fallback: ' . $e->getMessage()); }
+        }
         $p = self::prepare($html, $o);
         $dom = $p['dom']; $body = $p['body']; $dir = $p['dir']; $rtl = $p['rtl']; $landscape = $p['landscape']; $isLetter = $p['isLetter']; $side = $p['side']; $title = $p['title'];
         $fitOne = !empty($o['fit']);
@@ -560,7 +566,7 @@ class MsaPdf
     }
 
     /** ستايل الورق الموحّد — مجموعة CSS يفهمها mPDF (بلا flex/grid/position) */
-    private static function css(bool $rtl, bool $letter): string
+    public static function css(bool $rtl, bool $letter): string
     {
         $al = $rtl ? 'right' : 'left';
         $op = $rtl ? 'left' : 'right';
@@ -640,3 +646,4 @@ img { max-width: 100%; }
 CSS;
     }
 }
+require_once __DIR__ . '/pdf_chromium.php';   // 🌐 المحرّك الاحترافي (Chromium على سيرفر المدرسة) — يُستعمل تلقائياً من fromHtml إن كان مهيّأً
