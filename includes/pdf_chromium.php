@@ -52,9 +52,19 @@ class MsaChromePdf
         // العرض الصريح بالملم (لmPDF) يُشال: المتصفّح يقيس بنفسه؛ الخلايا القصيرة سطر واحد، الطويلة (> 38 حرفاً) تلتفّ
         foreach ($xp->query('//table[contains(concat(" ",normalize-space(@class)," ")," pdf-t ")]') as $t) {
             $t->setAttribute('style', preg_replace('/width\s*:[^;]*;?/i', '', (string)$t->getAttribute('style')));
+            // صفوف المجاميع (عريضة وقليلة): مرآة الدولار تنزل سطراً ثانياً فلا يوسّع المجموع عمود الأرقام كلّه
+            foreach ($xp->query('.//tr[contains(@class,"total-row") or contains(@class,"grand-row") or contains(@class,"sum-row") or contains(@class,"subtotal-row")]//*[contains(concat(" ",normalize-space(@class)," ")," money-usd ")]', $t) as $mu) {
+                $mu->parentNode->insertBefore($dom->createElement('br'), $mu);
+            }
             foreach ($xp->query('.//th|.//td', $t) as $c) {
                 $st = preg_replace('/(^|;)\s*(width|white-space|min-width|max-width)\s*:[^;]*;?/i', '$1', (string)$c->getAttribute('style'));
                 $c->removeAttribute('nowrap');
+                if (strtolower($c->nodeName) === 'th' && (int)$c->getAttribute('colspan') <= 1 && $c->childNodes->length) {
+                    // الرأس لا يوسّع العمود: يلتفّ على عرض أرقامه (أطول كلمة بالرأس هي الحدّ الأدنى فقط)
+                    $ph = $dom->createElement('div'); $ph->setAttribute('class', 'ph');
+                    while ($c->firstChild) $ph->appendChild($c->firstChild);
+                    $c->appendChild($ph);
+                }
                 if (trim($st) === '') $c->removeAttribute('style'); else $c->setAttribute('style', $st);
                 if (strtolower($c->nodeName) === 'td' && mb_strlen(trim(preg_replace('/\s+/u', ' ', $c->textContent)), 'UTF-8') > 30) {
                     // الخلية الطويلة تلتفّ عند 60mm فعلاً: كتلة داخلية بعرض أقصى (max-width على الخلية لا يعمل بتخطيط الجدول)
@@ -204,8 +214,8 @@ JS;
             . "table.pdf-t{width:auto;border-collapse:collapse;margin:3pt 0 6pt;table-layout:auto;page-break-inside:auto}"
             . "table.pdf-t.pdf-full{width:100%}"
             . "table.pdf-t thead{display:table-header-group}table.pdf-t tr{page-break-inside:avoid;break-inside:avoid}"
-            . "table.pdf-t th{white-space:normal;padding:2.5pt 4pt;line-height:1.25}"
-            . "table.pdf-t td{white-space:nowrap;padding:1pt 4pt;line-height:1.2}table.pdf-t td.pr-wrap{white-space:normal}table.pdf-t td .pw{max-width:60mm;white-space:normal;display:inline-block;vertical-align:middle;text-align:inherit}"
+            . "table.pdf-t th{white-space:normal;padding:2.5pt 4pt;line-height:1.25}table.pdf-t th .ph{display:block;width:min-content;min-width:100%;margin:0 auto;white-space:normal}"
+            . "table.pdf-t td{white-space:nowrap;padding:1pt 4pt;line-height:1.2}table.pdf-t td.pr-wrap{white-space:normal}table.pdf-t td .pw{max-width:58mm;white-space:normal;display:inline-block;vertical-align:middle;text-align:inherit}"
             . "table.pdf-t td .money-usd{display:inline;font-size:9.5pt;white-space:nowrap}"
             . ".pdf-part{break-inside:avoid}.pdf-break{break-before:page;page-break-before:always;height:0}"
             . "table.pdf-lh,table.pdf-gov,table.pdf-info,table.pdf-sign{width:100%}"
