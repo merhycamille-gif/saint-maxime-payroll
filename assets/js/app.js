@@ -470,6 +470,12 @@ window.msaFitScreenTables = function () {
     }
     window.addEventListener('beforeprint', fitPrintZoom);
     window.msaFitPrintZoom = fitPrintZoom;   // 📏 2026-10-15: يُعاد نداؤه بعد تقرير الاتجاه
+    // 📐 (2026-10-15 «بدي العامود تلقائي يطلع قدّ الكلمات اللي جواته») الشاشة: الخلايا الطويلة (> 30 حرفاً) وحدها تلتفّ، الباقي سطر واحد (app.css)
+    function msaMarkWrapCells() {
+        document.querySelectorAll('table.doc-table td').forEach(function (c) { if (!c.classList.contains('pr-wrap') && (c.textContent || '').replace(/\s+/g, ' ').trim().length > 30) c.classList.add('pr-wrap'); });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', msaMarkWrapCells); else msaMarkWrapCells();
+    window.msaMarkWrapCells = msaMarkWrapCells;
 
 })();
 

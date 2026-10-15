@@ -2683,3 +2683,10 @@ body.rtl .sidebar .sidebar-nav a > span.nl2, body.rtl .sidebar .sidebar-nav .nav
 /* العريض جداً: الالتفاف مسموح بكل الخلايا (pr-wrapall) بدل القصّ — بالقياس وعلى الورق */
 body.pr-wrapall .doc-table.pz-measure td, body.pr-wrapall .table.pz-measure td { white-space: normal !important; }
 @media print { body.pr-wrapall .doc-table td, body.pr-wrapall .table td { white-space: normal !important; } }
+/* 📐 (2026-10-15 «بدي العامود تلقائي يطلع قدّ الكلمات اللي جواته») جداول التقارير على الشاشة: كل عمود بعرض محتواه لا ممدوداً على عرض الشاشة؛
+   الخلايا القصيرة سطر واحد والطويلة (> 30 حرفاً، pr-wrap من app.js) تلتفّ. الورق والـPDF لهما قواعدهما (محرّك الطباعة). */
+@media screen {
+  .doc-sheet table.doc-table, #ppExportArea table.doc-table, .land-report table.doc-table { width: auto !important; max-width: 100%; }
+  .doc-sheet table.doc-table td, #ppExportArea table.doc-table td, .land-report table.doc-table td { white-space: nowrap; }
+  .doc-sheet table.doc-table td.pr-wrap, #ppExportArea table.doc-table td.pr-wrap, .land-report table.doc-table td.pr-wrap { white-space: normal; }
+}
