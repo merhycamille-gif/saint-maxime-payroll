@@ -275,7 +275,8 @@
     function exportForm(format, title, extra) {
         var fd = new FormData();
         fd.append('format', format); fd.append('title', title || document.title || 'document');
-        fd.append('dir', docDir(area())); fd.append('landscape', isWide() ? '1' : '0'); fd.append('html', cleanHtml());
+        // 🔄 (2026-10-15 «بملف الإكسل ما عم يغير من أفقي لعمودي») الاتجاه بكل الصيغ من زرّ الاتجاه: تلقائي (الخادم يقرّر) أو مفروض
+        fd.append('dir', docDir(area())); fd.append('landscape', window.msaOrientForced ? (window.msaOrientForced === 'landscape' ? '1' : '0') : 'auto'); fd.append('html', cleanHtml());
         // 🖼️ (2026-10-11 «حطّينا شعار المدرسة على الإفادة ليش ما عم يطلع بالوورد») الترويسة-الصورة خلفيةٌ على المنطقة نفسها (خارج innerHTML):
         //    تُبعَث للخادم (الرابط + الحشوة بالبكسل) فيضعها محرّك الـPDF خلفية الورقة، ويستعمل الوورد الترويسة البديلة .word-head
         try {

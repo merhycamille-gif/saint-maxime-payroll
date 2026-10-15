@@ -323,7 +323,8 @@ class ReportTable
     private $headers = [];
     private $rows = [];      // كل صف: ['type'=>'data|total|section|head', 'cells'=>[...], 'span'=>n]
     private $colWidths = [];
-    private $docxFontScale = 1.0;   // 📄 تصغير خط الوورد نسبياً حين لا تسع الأعمدة الورقة
+    private $docxFontScale = 1.0;
+    public $orientMode = 'auto';   // 🔄 auto | 0 (عمودي مفروض) | 1 (أفقي مفروض) — الأفقي التلقائي للعريض فقط بوضع auto   // 📄 تصغير خط الوورد نسبياً حين لا تسع الأعمدة الورقة
     private $school = null;
     private $period = '';
     private $docxColWs = []; // عرض أعمدة الوورد (twips) من autoWidths
@@ -511,7 +512,7 @@ class ReportTable
         //    تُطبع بحجمها الحقيقي 12 على صفحات متجاورة مع تكرار عمودَي # والاسم (Print_Titles أعمدة) — لا تصغير يجعل الخط غير مقروء.
         // 📄 (2026-10-15 «ب د ف مشي الحال بس اكسل ما مشي الحال» بعد «العواميد كلّها نفس الصفحة»): الإكسل يُطبع دائماً بكل أعمدته على عرض ورقة
         //    واحدة (fitToWidth=1، الصفوف على صفحات)؛ الجدول الأعرض من الورقة العمودية ⇒ أفقي تلقائياً — كما الـPDF
-        if (!$this->landscape && $sumW > 100) $this->landscape = true;
+        if ($this->orientMode === 'auto' && !$this->landscape && $sumW > 100) $this->landscape = true;
         $pagesAcross = 1;
         $fitW = true;
         $keyLast = 0;
@@ -625,7 +626,7 @@ class ReportTable
         $autoW = $this->autoWidths($cols);
         $nat = []; foreach ($autoW as $c => $w) $nat[$c] = (int)round($w * 118 + 200); // وحدة الإكسل ⇒ twips بخط 12 + حشوة الخلية
         $sumNat = array_sum($nat);
-        if (!$this->landscape && $sumNat > 10466) $this->landscape = true;
+        if ($this->orientMode === 'auto' && !$this->landscape && $sumNat > 10466) $this->landscape = true;
         $twDoc = $this->landscape ? 15700 : 10466; // عرض المحتوى داخل الهوامش (twips)
 
         // أعمدة المفتاح: الأوّل (#/الرمز) إن كان ضيّقاً + أوّل عمود نصّي بعده (الاسم) — تتكرّر بكل جزء

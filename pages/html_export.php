@@ -19,7 +19,8 @@ $title  = trim((string)($_POST['title'] ?? ''));
 if ($title === '') $title = 'document';
 $title  = mb_substr($title, 0, 120, 'UTF-8');
 $dir    = (($_POST['dir'] ?? 'rtl') === 'ltr') ? 'ltr' : 'rtl';
-$land   = !empty($_POST['landscape']) && $_POST['landscape'] !== '0';
+$orientMode = in_array($_POST['landscape'] ?? 'auto', ['0', '1'], true) ? $_POST['landscape'] : 'auto';   // 🔄 2026-10-15: auto | 0 عمودي مفروض | 1 أفقي مفروض
+$land   = $orientMode === '1';
 $html   = (string)($_POST['html'] ?? '');
 if (trim($html) === '') { http_response_code(400); die('no html'); }
 
@@ -102,6 +103,7 @@ function hx_rows_of(DOMElement $sec): array {
 }
 
 $rep = new ReportTable($title, $land);
+$rep->orientMode = $orientMode;   // 🔄 (2026-10-15 «بملف الإكسل ما عم يغير من أفقي لعمودي») العمودي المفروض يبقى عمودياً
 $rep->dir($dir);
 $firstHead = true; $tablesN = 0; $pending = [];
 // 📐 (2026-10-11) ما قبل أوّل جدول (ترويسة المدرسة/عنوان المستند/سطر المعلومات) = كتلة عنوان فوق رأس الجدول — لا «أقساماً» داخله؛
