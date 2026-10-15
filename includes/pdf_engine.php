@@ -6,6 +6,9 @@
  *   • ورقة A4 (أفقية تلقائياً للجداول العريضة) بهوامش ثابتة · خط 12pt · عربي Noto Naskh / لاتيني FreeSans (Arial-like)
  *   • رأس الجدول يتكرّر على كل صفحة، السطر لا ينقسم بين صفحتين، المجاميع مرّة واحدة بآخر الجدول
  *   • الجدول الأعرض من الورقة يُقسَّم أعمدةً على أجزاء (مع تكرار عمودَي # والاسم) بدل تصغير الخط
+ *   • 📏 (2026-10-15 «الأعمدة أوسع من الكلمات اللي جوّاتها… صفحات كتير») عرض كل عمود = أعرض محتوى فيه مقيساً بالخطوط الحقيقية
+ *     (Cairo مشكَّلاً / FreeSans عبر mPDF نفسه) ويُكتب صريحاً على الجدول؛ عمودي إلا إذا لم يسع الجدول؛ السطر 12pt بارتفاع 1.15
+ *     (كان صندوق خط Cairo يرفعه إلى 7.3mm)؛ النماذج الرسمية (.official-doc) خارج ذلك كلّه
  *   • ترويسة المدرسة (الشعار بالزاوية حسب اتجاه اللغة) · تذييل: المدرسة · صفحة n/N · تاريخ الإصدار
  * يعمل على أي استضافة (PHP فقط، بلا Chrome/LibreOffice/Python). يستعمله pages/html_export.php (format=pdf).
  */
@@ -29,8 +32,53 @@ class MsaPdf
         return ($landscape ? 297 : 210) - 2 * $side;
     }
 
-    /** تقدير عرض نصّ بخط 12pt بالملم (عربي 1.9 · لاتيني 2.1 · رقم 2.3) */
-    public static function textMm(string $t): float
+    /** 📏 (2026-10-15 «الأعمدة أوسع من الأرقام أو الكلمات اللي جوّاتها») قياس عرض النصّ بالخطوط الحقيقية (Cairo بالتشكيل الكامل / FreeSans)
+     *  عبر محرّك mPDF نفسه بدل التخمين بالملم — نسخة قياس واحدة مخفيّة + ذاكرة لكل نصّ (2000 خلية ≈ 0.3 ث) */
+    private static $meas = null;
+    private static $measCache = [];
+    private static function measurer(): ?array
+    {
+        if (self::$meas !== null) return self::$meas ?: null;
+        try {
+            $root = realpath(__DIR__ . '/..');
+            $tmp = $root . '/tmp/mpdf'; if (!is_dir($tmp)) @mkdir($tmp, 0777, true);
+            $cfg = (new \Mpdf\Config\ConfigVariables())->getDefaults();
+            $fcfg = (new \Mpdf\Config\FontVariables())->getDefaults();
+            $fontdata = $fcfg['fontdata'];
+            $fontdata['cairo'] = ['R' => 'CairoArabic-Regular.ttf', 'B' => 'CairoArabic-Bold.ttf', 'useOTL' => 0xFF];
+            $m = new \Mpdf\Mpdf(['mode' => 'utf-8', 'tempDir' => $tmp, 'fontDir' => array_merge($cfg['fontDir'], [$root . '/assets/fonts/ttf']), 'fontdata' => $fontdata, 'default_font' => 'freesans', 'default_font_size' => 12]);
+            $otl = (function () { return $this->otl; })->call($m);   // خاصّة بالمحرّك: نحتاجها لتشكيل العربي قبل القياس
+            $m->SetFont('cairo', '', 12); $m->SetFont('freesans', '', 12);
+            self::$meas = [$m, $otl];
+        } catch (\Throwable $e) { self::$meas = false; }
+        return self::$meas ?: null;
+    }
+
+    /** عرض النصّ بالملم بالخط الحقيقي (حجم $pt، عريض $bold)؛ عند تعذّر القياس يرجع للتقدير */
+    public static function textMm(string $t, bool $bold = false, float $pt = 12): float
+    {
+        if ($t === '') return 0.0;
+        $k = ($bold ? 'b' : 'r') . $pt . '|' . $t;
+        if (isset(self::$measCache[$k])) return self::$measCache[$k];
+        $w = null;
+        if ($mm = self::measurer()) {
+            try {
+                [$m, $otl] = $mm; $w = 0.0;
+                foreach (preg_split('/([\p{Arabic}\x{060C}\x{061B}\x{061F}\x{0640}\s]+)/u', $t, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) as $run) {
+                    $ar = preg_match('/\p{Arabic}/u', $run) === 1;
+                    $m->SetFont($ar ? 'cairo' : 'freesans', $bold ? 'B' : '', $pt);
+                    if ($ar && !empty($m->CurrentFont['useOTL'])) { $m->OTLtags = []; $sh = $otl->applyOTL($run, $m->CurrentFont['useOTL']); $w += $m->GetStringWidth($sh, true, $otl->OTLdata, 0); }
+                    else $w += $m->GetStringWidth($run);
+                }
+            } catch (\Throwable $e) { $w = null; }
+        }
+        if ($w === null) $w = self::textMmEst($t) * ($pt / 12) * ($bold ? 1.07 : 1);
+        if (count(self::$measCache) > 20000) self::$measCache = [];
+        return self::$measCache[$k] = $w;
+    }
+
+    /** تقدير احتياطي لعرض نصّ بخط 12pt بالملم (عربي 1.9 · لاتيني 2.1 · رقم 2.3) — يُستعمل فقط إن تعذّر القياس الحقيقي */
+    public static function textMmEst(string $t): float
     {
         $w = 0.0;
         if (preg_match_all('/./us', $t, $m)) {
@@ -62,23 +110,41 @@ class MsaPdf
         $s = '';
         foreach ($n->childNodes as $c) $s .= self::text($c);
         // كتلة أو شارة أو سطر ثانٍ (مرآة الدولار / نسبة الإضافي) = سطر مستقلّ بالقياس
-        if (in_array($tag, ['div', 'p', 'small', 'li'], true) || self::hasClass($n, 'money-usd|rate-head|badge|tag|chip|pill|nm-fr')) return "\n" . $s . "\n";
+        if (self::hasClass($n, 'money-usd')) return " \x03" . trim($s) . "\x04";                   // مرآة الدولار: بنفس السطر بعد فراغ، 9.5pt عريض
+        if ($tag === 'small' || self::hasClass($n, 'rate-head|nm-fr')) return "\n\x02" . $s . "\n";   // سطر ثانوي 9.5pt
+        if (in_array($tag, ['div', 'p', 'li'], true) || self::hasClass($n, 'badge|tag|chip|pill')) return "\n" . $s . "\n";
         return $s;
     }
 
     /** عرض الخلية المطلوب (mm): أطول سطر؛ النصّ القابل للّف عند الفراغات يُحدّ بـ42mm (يلتفّ على سطرين)، الأرقام والنصوص بلا فراغ كاملةً */
-    private static function cellMm(DOMElement $cell, bool $isHead = false): float
+    /** عرض الخلية (mm) ⇒ [كامل بلا التفاف, ملتفّ]: الكامل = أطول سطر؛ الملتفّ = النصّ القابل للّف يُحدّ (الاسم 55mm · الجملة ≥5 كلمات 42mm) وأطول كلمة لا تنكسر.
+     *  الرأس يُقاس ملتفّاً دائماً (سطران أو ثلاثة لا يزيدان الصفوف). */
+    private static function cellMm(DOMElement $cell, bool $isHead = false, bool $bold = false): array
     {
         $t = preg_replace('/[ \t\x{00A0}]+/u', ' ', self::text($cell));
-        $mx = 0.0; $wrap = 0.0;
+        $mx = 0.0; $wrap = 0.0; $mxWrap = 0.0; $mxStack = 0.0;
         foreach (preg_split('/\n/', $t) as $ln) {
             $ln = trim($ln); if ($ln === '') continue;
-            $w = self::textMm($ln);
-            $longest = 0.0; foreach (explode(' ', $ln) as $wd) $longest = max($longest, self::textMm($wd)); // أطول كلمة لا تنكسر
+            $pt = $isHead ? 11 : 12; $b = $bold || $isHead;
+            if ($ln[0] === "\x01") { $pt = 10.5; $b = true; $ln = trim(substr($ln, 1)); }
+            elseif ($ln[0] === "\x02") { $pt = 9.5; $b = false; $ln = trim(substr($ln, 1)); }
+            if ($ln === '') continue;
+            // مقاطع السطر: ما بين \x03…\x04 = مرآة الدولار 9.5pt عريض، والباقي بحجم السطر
+            $w = 0.0; $longest = 0.0; $segMax = 0.0;
+            foreach (preg_split('/(\x03[^\x04]*\x04)/u', $ln, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) as $seg) {
+                $usd = ($seg[0] === "\x03"); if ($usd) $seg = trim($seg, "\x03\x04");
+                $sp = $usd ? 9.5 : $pt; $sb = $usd ? true : $b;
+                $sw = self::textMm($seg, $sb, $sp); $w += $sw; $segMax = max($segMax, $sw);
+                foreach (explode(' ', $seg) as $wd) $longest = max($longest, self::textMm($wd, $sb, $sp)); // أطول كلمة لا تنكسر
+            }
             $mx = max($mx, $w); $wrap = max($wrap, $longest);
+            // صفوف المجاميع (عريضة وقليلة): بالنسخة الملتفّة يُسمح لمرآة الدولار أن تنزل سطراً ثانياً فلا يوسّع المجموع العمود كلّه
+            $mxWrap = max($mxWrap, ($bold && !$isHead) ? $segMax : $w);
+            $mxStack = max($mxStack, $segMax);   // النسخة المكدَّسة: مرآة الدولار سطراً ثانياً بكل الصفوف
         }
-        if ($isHead) return max($wrap, min($mx * 0.55 + 3, 30));   // الرأس يلتفّ على سطرين أو ثلاثة
-        return max($wrap, min($mx, 42));
+        if ($isHead) { $h = max($wrap, min($mx * 0.55 + 2, 30)); return [$h, $h, $h]; }
+        $cap = (substr_count(trim($t), ' ') >= 4) ? 42 : 55;
+        return [max($wrap, $mx), max($wrap, min($mxWrap, $cap)), max($wrap, min($mxStack, $cap))];
     }
 
     /** تحضير HTML المستند (تنظيف + تحويل التخطيطات + الجداول) — مشترك بين الـPDF (mPDF) والوورد (MsaDocx). يُرجع dom/body/dir/rtl/landscape/isLetter/side/title */
@@ -189,6 +255,11 @@ class MsaPdf
             $prev = $chip->previousSibling; while ($prev && $prev->nodeType !== XML_ELEMENT_NODE) $prev = $prev->previousSibling;
             if ($prev && self::hasClass($prev, 'dh-chip')) $chip->parentNode->insertBefore($dom->createTextNode(' · '), $chip);
         }
+        // مرآة الدولار بعد الليرة: فراغ قبلها ليكون الكسر ممكناً عندها (mPDF لا يفصلها سطراً مستقلاً داخل الخلية)
+        foreach (iterator_to_array($xp->query('//*[' . $cls('money-usd') . ']')) as $mu) {
+            $pv = $mu->previousSibling;
+            if (!$pv || $pv->nodeType !== XML_TEXT_NODE || !preg_match('/\s$/u', $pv->nodeValue)) $mu->parentNode->insertBefore($dom->createTextNode(' '), $mu);
+        }
         // شارات الشاشة (🆕 جديد / ⚠️ ملف…) ليست من المستند الرسمي
         foreach (iterator_to_array($xp->query('//*[' . $cls('badge') . ' or ' . $cls('tag') . ' or ' . $cls('pill') . ' or ' . $cls('msa-flag') . ']')) as $b) if ($b->parentNode) $b->parentNode->removeChild($b);
         // سمات الشاشة التي تخرّب الورق
@@ -228,42 +299,47 @@ class MsaPdf
         $side = $isLetter ? 20 : 10;
 
         // عرض الأعمدة الطبيعي لكل جدول (لتقرير الاتجاه والتقسيم)
+        // لكل جدول: عرض الأعمدة «الكامل» (بلا التفاف) و«الملتفّ» + عدد الصفوف وعدد الخلايا التي ستلتفّ لو اعتُمد الملتفّ
         $measure = function (DOMElement $t) use ($xp) {
-            $widths = []; $n = 0;
+            $full = []; $wrap = []; $stack = []; $n = 0; $rows = 0; $wrapCells = 0; $wrapRows = 0; $usdRows = 0; $nameCol = -1;
             foreach ($xp->query('.//tr', $t) as $tr) {
-                $c = 0;
+                $c = 0; $hasTd = false; $hasUsd = false; $hasWrap = false;
+                $rowBold = preg_match('/(total|grand|sum|subtotal)-row/', $tr->getAttribute('class')) === 1;
                 foreach ($tr->childNodes as $cell) {
                     if (!($cell instanceof DOMElement) || !in_array(strtolower($cell->nodeName), ['td', 'th'], true)) continue;
+                    $isTh = strtolower($cell->nodeName) === 'th'; if (!$isTh) $hasTd = true;
                     $cs = max(1, (int)$cell->getAttribute('colspan'));
-                    if ($cs === 1) { $w = self::cellMm($cell, strtolower($cell->nodeName) === 'th') + 4.5; $widths[$c] = max($widths[$c] ?? 0, min($w, 70)); }
+                    if ($isTh && $cs === 1 && $nameCol < 0 && preg_match('/الاسم|\bnoms?\b|\bname\b/iu', $cell->textContent)) $nameCol = $c;
+                    if ($cs === 1) {
+                        $bold = $rowBold || $xp->query('.//b|.//strong', $cell)->length > 0 || preg_match('/font-weight\s*:\s*(bold|[6-9]00)/i', (string)$cell->getAttribute('style')) === 1;
+                        [$f, $w, $s] = self::cellMm($cell, $isTh, $bold);
+                        $f = min($f + 3.2, 80); $w = min($w + 3.2, 80); $s = min($s + 3.2, 80);   // حشوة 3pt×2 + حدّ + أمان؛ سقف 80mm
+                        if (!$isTh && $f > $w + 0.5) { $wrapCells++; $hasWrap = true; }
+                        if (!$isTh && $s < $w - 0.5) $hasUsd = true;
+                        $full[$c] = max($full[$c] ?? 0, $f); $wrap[$c] = max($wrap[$c] ?? 0, $w); $stack[$c] = max($stack[$c] ?? 0, $s);
+                    }
                     $c += $cs;
                 }
+                if ($hasTd) $rows++;
+                if ($hasUsd) $usdRows++;
+                if ($hasWrap) $wrapRows++;
                 $n = max($n, $c);
             }
-            for ($i = 0; $i < $n; $i++) $widths[$i] = max($widths[$i] ?? 0, 8);
-            ksort($widths);
-            return $widths;
+            for ($i = 0; $i < $n; $i++) { $full[$i] = max($full[$i] ?? 0, 7); $wrap[$i] = max($wrap[$i] ?? 0, 7); $stack[$i] = max($stack[$i] ?? 0, 7); }
+            ksort($full); ksort($wrap); ksort($stack);
+            return ['full' => $full, 'wrap' => $wrap, 'stack' => $stack, 'rows' => max(1, $rows), 'wrapCells' => $wrapCells, 'wrapRows' => $wrapRows, 'usdRows' => $usdRows, 'nameCol' => $nameCol];
         };
-        $natural = []; $widest = 0;
-        foreach ($tables as $i => $t) {
-            if (!self::hasClass($t, 'pdf-t')) continue;
-            $natural[$i] = $measure($t); $widest = max($widest, array_sum($natural[$i]));
-        }
-        if ($landscape === null) $landscape = $widest > self::usableWidth(false, $side) || $maxCols >= 9;
-        $usable = self::usableWidth($landscape, $side);
-
-        // تقسيم الجدول الأعرض من الورقة (حتى بعد سماح تصغير 15٪) على أجزاء بالعرض مع تكرار أعمدة التعريف
-        foreach ($tables as $i => $t) {
-            if (!isset($natural[$i])) continue;
-            $w = $natural[$i]; $sum = array_sum($w);
-            if ($fitOne || $sum <= $usable * 1.15) continue;
+        // تقسيم أعمدة جدول أعرض من الورقة على أجزاء: أعمدة المفتاح (# + أوّل عمود نصّي) تتكرّر بكل جزء ⇒ [key[], parts[][]]
+        $partition = function (array $w, float $usable, int $nameCol = -1): array {
             $cols = count($w);
-            // أعمدة المفتاح: الأوّل إن كان ضيّقاً (#) + أوّل عمود نصّي بعده (الاسم)
             $key = [];
             if ($w[0] <= 14) $key[] = 0;
-            for ($c = 0; $c < min(3, $cols); $c++) { if (!in_array($c, $key, true)) { $key[] = $c; break; } }
+            // عمود الاسم (من رأسه: الاسم / Nom / Name) يتكرّر بكل جزء — صفّ راتب بلا اسم لا يُقرأ؛ وإلّا أوّل عمود نصّي
+            if ($nameCol >= 0 && $nameCol < $cols && !in_array($nameCol, $key, true)) $key[] = $nameCol;
+            else for ($c = 0; $c < min(3, $cols); $c++) { if (!in_array($c, $key, true)) { $key[] = $c; break; } }
+            sort($key);
             $keyW = 0; foreach ($key as $c) $keyW += $w[$c];
-            if ($keyW > $usable * 0.4) { $key = [$key[0]]; $keyW = $w[$key[0]]; }
+            if ($keyW > $usable * 0.45) { $key = [$key[0]]; $keyW = $w[$key[0]]; }
             $parts = []; $cur = []; $curW = $keyW;
             for ($c = 0; $c < $cols; $c++) {
                 if (in_array($c, $key, true)) continue;
@@ -271,6 +347,82 @@ class MsaPdf
                 $cur[] = $c; $curW += $w[$c];
             }
             if ($cur) $parts[] = $cur;
+            return [$key, $parts];
+        };
+        // تقدير عدد الأوراق لجدول بعرض أعمدة معيّن على ورقة معيّنة: الأجزاء × الصفوف (سطر 6.2mm) ÷ ارتفاع الورقة المتاح
+        $pagesOf = function (array $w, float $usable, bool $land, int $lines, int $nameCol = -1) use ($partition): array {
+            $sum = array_sum($w);
+            $parts = ($sum <= $usable * 1.15) ? 1 : count($partition($w, $usable, $nameCol)[1]);
+            $avail = ($land ? 210 : 297) - 24 - 45;   // الهوامش + الترويسة والعنوان
+            return [$parts * max(1, (int)ceil($lines * 6.2 / $avail)), $parts];
+        };
+        // 📐 الأعمدة بعرض محتواها بالضبط: عرض صريح لكل عمود + عرض الجدول = مجموعها (يُمدّ ليملأ الورقة فقط إن كان قريباً منها ≥ 85٪)
+        $applyWidths = function (DOMElement $t, array $w, float $usable) use ($xp) {
+            $sum = array_sum($w); if ($sum <= 0) return;
+            $scale = ($sum > $usable || $sum < $usable * 0.85) ? 1.0 : $usable / $sum;
+            $n = count($w);
+            foreach ($xp->query('.//tr', $t) as $tr) {
+                $cells = []; $plain = true;
+                foreach ($tr->childNodes as $cell) {
+                    if (!($cell instanceof DOMElement) || !in_array(strtolower($cell->nodeName), ['td', 'th'], true)) continue;
+                    if ((int)$cell->getAttribute('colspan') > 1 || (int)$cell->getAttribute('rowspan') > 1) $plain = false;
+                    $cells[] = $cell;
+                }
+                if (!$plain || count($cells) !== $n) continue;
+                foreach ($cells as $i => $cell) {
+                    $st = preg_replace('/(min-|max-)?width\s*:[^;]*;?/i', '', (string)$cell->getAttribute('style'));
+                    $cell->setAttribute('style', 'width:' . round($w[$i] * $scale, 1) . 'mm;' . $st);
+                    $cell->removeAttribute('width');
+                }
+                break;   // صفّ واحد بلا دمج يكفي لتعريف الأعمدة
+            }
+            $tw = $sum * $scale + 1.0;   // +1mm عمداً: إن ساوى عرض الجدول مجموع أعمدته بالضبط يأخذ mPDF فرع «كل عمود بأقصى محتواه» ويتجاهل العرض الصريح
+            $t->setAttribute('style', preg_replace('/width\s*:[^;]*;?/i', '', (string)$t->getAttribute('style')) . 'width:' . ($tw > $usable ? '100%' : round($tw, 1) . 'mm') . ';');
+            $t->removeAttribute('width');
+        };
+        $natural = [];
+        foreach ($tables as $i => $t) {
+            if (!self::hasClass($t, 'pdf-t')) continue;
+            $natural[$i] = $measure($t);
+        }
+        // 📄 الاختيار بأقلّ عدد أوراق: الاتجاه (عمودي/أفقي) × شكل الأعمدة (كامل بلا التفاف / ملتفّ / مرآة الدولار سطراً ثانياً)
+        //    = أقلّ (أجزاء × صفحات الصفوف)؛ عند التساوي: الكامل ثم الملتفّ ثم المكدَّس، والعمودي قبل الأفقي
+        $variantOf = []; $nameColOf = [];
+        $pick = function (bool $land) use ($natural, $pagesOf, $side): array {
+            $usable = self::usableWidth($land, $side); $total = 0; $choice = [];
+            foreach ($natural as $i => $m) {
+                $best = null;
+                foreach (['full' => $m['rows'], 'wrap' => $m['rows'] + $m['wrapRows'], 'stack' => $m['rows'] + $m['wrapRows'] + $m['usdRows']] as $v => $lines) {
+                    [$pg, $parts] = $pagesOf($m[$v], $usable, $land, $lines, $m['nameCol']);
+                    if ($best === null || $pg < $best[0] || ($pg === $best[0] && $parts < $best[2])) $best = [$pg, $v, $parts];   // التساوي: الأقلّ أجزاءً
+                }
+                $total += $best[0]; $choice[$i] = $best[1];
+            }
+            return [$total, $choice];
+        };
+        if ($landscape === null) {
+            [$pp, $cp] = $pick(false); [$pl, $cl] = $pick(true);
+            $landscape = $pl < $pp; $variantOf = $landscape ? $cl : $cp;
+        } else {
+            $variantOf = $pick((bool)$landscape)[1];
+        }
+        $usable = self::usableWidth($landscape, $side);
+        foreach ($natural as $i => $m) {
+            $v = $variantOf[$i] ?? 'full';
+            if (getenv('MSAPDF_DEBUG')) fwrite(STDERR, sprintf("[pdf] table %d: %s %s full=%.0f wrap=%.0f stack=%.0f usable=%.0f rows=%d wrapCells=%d usdRows=%d\n  %s\n", $i, $landscape ? 'L' : 'P', $v, array_sum($m['full']), array_sum($m['wrap']), array_sum($m['stack']), $usable, $m['rows'], $m['wrapCells'], $m['usdRows'], implode(' ', array_map(fn($x) => round($x), $m[$v]))));
+            if ($v === 'stack') {   // مرآة الدولار سطراً ثانياً فعلاً
+                foreach (iterator_to_array($xp->query('.//*[' . $cls('money-usd') . ']', $tables[$i])) as $mu) $mu->parentNode->insertBefore($dom->createElement('br'), $mu);
+            }
+            $natural[$i] = $m[$v]; $nameColOf[$i] = $m['nameCol'];
+        }
+
+        // تقسيم الجدول الأعرض من الورقة (حتى بعد سماح تصغير 15٪) على أجزاء بالعرض مع تكرار أعمدة التعريف
+        foreach ($tables as $i => $t) {
+            if (!isset($natural[$i])) continue;
+            $w = $natural[$i]; $sum = array_sum($w);
+            $official = $xp->query('ancestor::*[contains(concat(" ",normalize-space(@class)," ")," official-doc ")]', $t)->length > 0;   // النماذج الرسمية طبق الأصل: لا تقسيم ولا عرض صريح
+            if ($fitOne || $official || $sum <= $usable * 1.15) { if (!$fitOne && !$official) $applyWidths($t, $w, $usable); continue; }
+            [$key, $parts] = $partition($w, $usable, $nameColOf[$i] ?? -1);
             if (count($parts) < 2) continue;
             // صفوف الجدول مع شبكة colspan/rowspan — نبني نسخة لكل جزء
             $trs = iterator_to_array($xp->query('.//tr', $t));
@@ -319,6 +471,8 @@ class MsaPdf
                     }
                     if ($sn !== 'tr') $nt->appendChild($nsec);
                 }
+                $pw = []; foreach ($idx as $c) $pw[] = $w[$c];
+                $applyWidths($nt, $pw, $usable);
                 $cap = $dom->createElement('div');
                 $cap->setAttribute('class', 'pdf-part');
                 $cap->appendChild($dom->createTextNode(($rtl ? ('الجزء ' . ($pi + 1) . ' من ' . $np) : ('Partie ' . ($pi + 1) . ' / ' . $np)) . ($pi > 0 ? ($rtl ? ' — تابع الأعمدة' : ' — suite des colonnes') : '')));
@@ -371,6 +525,8 @@ class MsaPdf
             'useSubstitutions' => true,
             'backupSubsFont' => ['freesans', 'dejavusans'],
             'shrink_tables_to_fit' => $fitOne ? 3 : 1.15,
+            'useFixedNormalLineHeight' => true,   // ارتفاع السطر من حجم الخط لا من صندوق خط Cairo الضخم (كان السطر 7.3mm لخط 12pt)
+            'useFixedTextBaseline' => true,
             'use_kwt' => true,
             'img_dpi' => 96,
             'setAutoTopMargin' => false,
@@ -425,7 +581,7 @@ td.pdf-lh-r { width: 38mm; text-align: $op; font-size: 10.5pt; color: #334155; }
 .lh-name-ar { font-size: 16pt; font-weight: bold; color: #1e3a8a; }
 .lh-name-fr { font-size: 11pt; font-weight: bold; color: #475569; }
 .lh-contact { font-size: 10pt; color: #64748b; }
-.report-scope { text-align: center; font-weight: bold; color: #1e3a8a; border-bottom: 1.5pt solid #1e3a8a; padding-bottom: 5pt; margin-bottom: 8pt; }
+.report-scope { text-align: center; font-weight: bold; color: #1e3a8a; border-bottom: 1.5pt solid #1e3a8a; padding-bottom: 2pt; margin-bottom: 4pt; line-height: 1.3; }
 /* ترويسة حكومية */
 table.pdf-gov { width: 100%; border-collapse: collapse; border-bottom: 0.5pt solid #cbd5e1; margin-bottom: 8pt; }
 table.pdf-gov td { border: 0; vertical-align: top; padding: 0 0 4pt 0; }
@@ -434,28 +590,28 @@ td.pdf-gov-c { text-align: center; font-weight: bold; }
 td.pdf-gov-e { width: 22mm; text-align: center; } td.pdf-gov-e img { height: 16mm; }
 .gov-title { color: #1e3a8a; font-size: 13pt; }
 /* عنوان المستند */
-.doc-head { text-align: center; margin: 2pt 0 8pt; }
+.doc-head { text-align: center; margin: 0 0 4pt; line-height: 1.3; }
 .doc-head .dh-fr { font-size: 14pt; font-weight: bold; color: #1e3a8a; }
-.doc-head .dh-ar { font-size: 16pt; font-weight: bold; color: #1e3a8a; }
-.doc-head .dh-meta { font-size: 10pt; color: #475569; margin-top: 3pt; }
+.doc-head .dh-ar { font-size: 15pt; font-weight: bold; color: #1e3a8a; }
+.doc-head .dh-meta { font-size: 10pt; color: #475569; margin-top: 1pt; line-height: 1.3; }
 .doc-head .dh-chip { display: inline; padding: 0 5pt; border-right: 0.5pt solid #cbd5e1; }
-.doc-title { text-align: center; font-size: 16pt; font-weight: bold; color: #1e3a8a; margin: 6pt 0 10pt; }
-.doc-subtitle, .doc-year { text-align: center; color: #475569; margin: -4pt 0 8pt; }
+.doc-title { text-align: center; font-size: 15pt; font-weight: bold; color: #1e3a8a; margin: 2pt 0 4pt; line-height: 1.3; }
+.doc-subtitle, .doc-year { text-align: center; color: #475569; margin: 0 0 4pt; line-height: 1.3; }
 .doc-section { font-weight: bold; color: #1e3a8a; margin: 10pt 0 4pt; border-$al: 2pt solid #d4af37; padding-$al: 6pt; }
 .doc-note { font-size: 10.5pt; color: #64748b; border-top: 0.5pt dashed #cbd5e1; padding-top: 4pt; margin-top: 10pt; }
-.pdf-part { font-weight: bold; color: #1e3a8a; margin: 8pt 0 2pt; }
+.pdf-part { font-weight: bold; color: #1e3a8a; margin: 4pt 0 1pt; font-size: 10.5pt; }
 .pdf-break { page-break-before: always; }
 /* الجداول */
-table.pdf-t { width: 100%; border-collapse: collapse; margin: 6pt 0 8pt; page-break-inside: auto; }
-table.pdf-t thead th, table.pdf-t th { background: #1F4E5F; color: #fff; font-weight: bold; text-align: center; vertical-align: middle; padding: 3.5pt 4pt; border: 0.5pt solid #1F4E5F; font-size: 11pt; }
-table.pdf-t td { border: 0.5pt solid #94a3b8; padding: 3pt 4pt; text-align: center; vertical-align: middle; }
+table.pdf-t { width: 100%; border-collapse: collapse; margin: 3pt 0 6pt; page-break-inside: auto; }
+table.pdf-t thead th, table.pdf-t th { background: #1F4E5F; color: #fff; font-weight: bold; text-align: center; vertical-align: middle; padding: 2pt 3pt; border: 0.5pt solid #1F4E5F; font-size: 11pt; line-height: 1.2; }
+table.pdf-t td { border: 0.5pt solid #94a3b8; padding: 1.2pt 3pt; text-align: center; vertical-align: middle; line-height: 1.15; }
 table.pdf-t td.num, table.pdf-t td.money, table.pdf-t td.n { text-align: $op; }
 table.pdf-t tr { page-break-inside: avoid; }
 table.pdf-t tr.total-row td, table.pdf-t tr.grand-row td, table.pdf-t tr.sum-row td { background: #e2e8f0; font-weight: bold; }
 table.pdf-t tr.subtotal-row td { background: #f1f5f9; font-weight: bold; }
 table.pdf-t tr.section-row td, table.pdf-t td.section { background: #e0e7ff; font-weight: bold; text-align: $al; }
 table.pdf-t th .rate-head, table.pdf-t th small { font-weight: normal; font-size: 9pt; }
-.money-usd { display: block; color: #047857; font-weight: bold; font-size: 10.5pt; }
+.money-usd { display: inline; color: #047857; font-weight: bold; font-size: 9.5pt; white-space: nowrap; }
 .money-usd-inline { color: #047857; font-weight: bold; }
 small { font-size: 9.5pt; }
 /* نماذج وإفادات */

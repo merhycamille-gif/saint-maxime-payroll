@@ -53,7 +53,7 @@ check('🖨️ المحرّك: tfoot ⇒ آخر الجسم (المجاميع م�
       && strpos($en247, "foreach (\$xp->query('//table[not(@dir)]') as \$t) { \$t->setAttribute('dir', \$dir);") !== false
       && strpos($en247, "\$chip->parentNode->insertBefore(\$dom->createTextNode(' · '), \$chip);") !== false
       && strpos($en247, "\$cls('badge') . ' or ' . \$cls('tag') . ' or ' . \$cls('pill')") !== false
-      && strpos($en247, "if (\$fitOne || \$sum <= \$usable * 1.15) continue;") !== false
+      && strpos($en247, "if (\$fitOne || \$official || \$sum <= \$usable * 1.15) { if (!\$fitOne && !\$official) \$applyWidths(\$t, \$w, \$usable); continue; }") !== false
       && strpos($en247, "'shrink_tables_to_fit' => \$fitOne ? 3 : 1.15,") !== false
       && strpos($en247, "//form[not(.//table)]") !== false
       && strpos($ex247, 'window.msaFitToggle = function (btn)') !== false && strpos($ex247, "fit: window.msaFitOne ? '1' : '0'") !== false
@@ -104,3 +104,25 @@ try {
 check('🖨️ المحرّك يولّد PDF فعلياً (ترويسة + جدول عربي 30 صفّاً + مجاميع = صفحة واحدة)', $ok247, $why247);
 
 if (!empty($__regStandalone)) { echo implode("\n", $results) . "\n\n═══ النتيجة: $pass ناجح · $fail فاشل ═══\n"; exit($fail ? 1 : 0); }
+
+/* 📏 (2026-10-15 «الأعمدة أوسع من الأرقام أو الكلمات اللي جوّاتها… لازم تساع على صفحة A4… بيطلع صفحات كتير») عرض كل عمود = محتواه
+ *    الحقيقي مقيساً بخطوط mPDF نفسها (Cairo مشكَّلاً عبر OTL / FreeSans) لا تخميناً بالملم، ويُكتب صريحاً على الجدول (+1mm على عرض الجدول
+ *    لأن المساواة التامة تُسقط mPDF بفرع «كل عمود بأقصى محتواه»)؛ عمودي إلا إذا لم يسع؛ السطر 12pt بارتفاع 1.15 لا صندوق خط Cairo؛
+ *    النماذج الرسمية (.official-doc) بلا تقسيم ولا عرض صريح. النتيجة: كشف الضمان 7 ⇒ 3 ورقات، الشهري 85 ⇒ أقلّ، كل الأعمدة قدّ كلماتها. */
+check('📏 المحرّك: قياس حقيقي بخطوط mPDF (OTL) + عرض صريح لكل عمود (+1mm) + عمودي ما لم يضق + سطر 1.15 + النماذج الرسمية مستثناة',
+      strpos($en247, 'private static function measurer(): ?array') !== false
+      && strpos($en247, '$otl = (function () { return $this->otl; })->call($m);') !== false
+      && strpos($en247, "\$sh = \$otl->applyOTL(\$run, \$m->CurrentFont['useOTL']); \$w += \$m->GetStringWidth(\$sh, true, \$otl->OTLdata, 0);") !== false
+      && strpos($en247, 'public static function textMm(string $t, bool $bold = false, float $pt = 12): float') !== false
+      && strpos($en247, 'public static function textMmEst(string $t): float') !== false
+      && strpos($en247, '$tw = $sum * $scale + 1.0;') !== false
+      && strpos($en247, "\$cell->setAttribute('style', 'width:' . round(\$w[\$i] * \$scale, 1) . 'mm;' . \$st);") !== false
+      && strpos($en247, "'useFixedNormalLineHeight' => true,") !== false
+      && strpos($en247, 'table.pdf-t td { border: 0.5pt solid #94a3b8; padding: 1.2pt 3pt; text-align: center; vertical-align: middle; line-height: 1.15; }') !== false
+      && strpos($en247, "\$cap = (substr_count(trim(\$t), ' ') >= 4) ? 42 : 55;") !== false
+      && strpos($en247, "foreach (['full' => \$m['rows'], 'wrap' => \$m['rows'] + \$m['wrapRows'], 'stack' => \$m['rows'] + \$m['wrapRows'] + \$m['usdRows']] as \$v => \$lines) {") !== false
+      && strpos($en247, '$landscape = $pl < $pp; $variantOf = $landscape ? $cl : $cp;') !== false
+      && strpos($en247, "\$parts = (\$sum <= \$usable * 1.15) ? 1 : count(\$partition(\$w, \$usable, \$nameCol)[1]);") !== false
+      && strpos($en247, "if (\$isTh && \$cs === 1 && \$nameCol < 0 && preg_match(") !== false
+      && strpos($en247, "\" official-doc \")]', \$t)->length > 0;") !== false
+      && strpos($en247, '$pw = []; foreach ($idx as $c) $pw[] = $w[$c];') !== false);
