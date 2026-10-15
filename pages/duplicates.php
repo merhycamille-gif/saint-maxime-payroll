@@ -20,6 +20,7 @@ $rows = $db->query("SELECT e.*, (SELECT COUNT(*) FROM monthly_salaries m WHERE m
         (SELECT COALESCE(SUM(m.cnss_amount_lbp),0) FROM monthly_salaries m WHERE m.employee_id = e.id AND m.is_calculated = 1) cn,
         (SELECT MAX(CONCAT(m.year, '-', LPAD(m.month, 2, '0'))) FROM monthly_salaries m WHERE m.employee_id = e.id AND m.is_calculated = 1) lastm,
         (SELECT MIN(CONCAT(m.year, '-', LPAD(m.month, 2, '0'))) FROM monthly_salaries m WHERE m.employee_id = e.id AND m.is_calculated = 1) firstm,
+        (SELECT GROUP_CONCAT(DISTINCT IF(m.month >= 10, m.year, m.year - 1)) FROM monthly_salaries m WHERE m.employee_id = e.id AND m.is_calculated = 1) sys,
         " . leftDateSql('e.') . " ld
         FROM employees e WHERE e.is_deleted = 0 AND e.status = 'actif'" . schoolScopeSql('e.school_id') . " ORDER BY e.school_id, e.id")->fetchAll();
 $norm = fn($s) => preg_replace('/\s+/u', ' ', mb_strtolower(trim(preg_replace('/[^\p{L}\s]/u', '', (string)$s))));
@@ -44,6 +45,20 @@ foreach ($groups as $g) {
         //    لفترة عمل جديدة — لا حذف ولا دمج (الدمج في ملف تارك يمحو رواتبه فوراً: heal_leaver_phantoms)
         $keepLeft = ($keep['ld'] ?? '9999-12-31') !== '9999-12-31' ? substr($keep['ld'], 0, 7) : null;
         if ($keepLeft && !$noSal && $r['firstm'] && $r['firstm'] > $keepLeft) { $flags[$r['id']] = 'returned'; continue; }
+        // 📏 (2026-10-15 بكلماته «اللي بيهمّني الأسماء المكرّرة بنفس المدرسة بنفس السنة اللي ما عندها ضمان — المكرّرة تنشال»):
+        //    زائدة = النسختان بنفس السنة الدراسية + الزائدة بلا ضمان (لا حسم ولا رقم). الداخل هذه السنة بلا راتب ولا ضمان = «جديد»
+        //    (مكانه لائحة الجدد لا المحذوفين)؛ وغير ذلك «راجعها».
+        $syOf = function ($ym) { if (!$ym) return null; $y = (int)substr($ym, 0, 4); $m = (int)substr($ym, 5, 2); return $m >= 10 ? $y : $y - 1; };
+        $curY = (int)substr(currentSchoolYear(), 0, 4);
+        $keepYears = array_map('intval', array_filter(explode(',', (string)($keep['sys'] ?? ''))));
+        if (!$keepLeft) $keepYears[] = $curY;   // فاعل الآن
+        $xYears = array_map('intval', array_filter(explode(',', (string)($r['sys'] ?? ''))));
+        $xEntry = $syOf($r['firstm'] ?: (!empty($r['hire_date']) ? substr($r['hire_date'], 0, 7) : (!empty($r['created_at']) ? substr($r['created_at'], 0, 7) : null)));
+        if (!$xYears && $xEntry !== null) $xYears = [$xEntry];
+        $sameYear = (bool)array_intersect($xYears, $keepYears);
+        $noCnss = $zeroCn && trim((string)($r['nssf_number'] ?? '')) === '';
+        if ($noSal && $xEntry === $curY && !$sameYear) { $flags[$r['id']] = 'new'; continue; }
+        if (!($sameYear && $noCnss)) { $flags[$r['id']] = ($noSal && $xEntry === $curY) ? 'new' : 'review'; continue; }
         if (($hasInsured && $zeroCn) || $noSal) { $flags[$r['id']] = 'del'; $eligible[(int)$r['id']] = trim($r['first_name_fr'] . ' ' . $r['last_name_fr']) . ' (' . trim($r['first_name_ar'] . ' ' . $r['last_name_ar']) . ') — ' . schoolNameById($r['school_id']) . ' — ' . $r['employee_code'] . ' — ' . employeeTypeLabel($r['employee_type'], 'ar') . ' — رواتب بلا ضمان: ' . (int)$r['nsal'] . ($r['lastm'] ? ' (آخر ' . $r['lastm'] . ')' : '') . ' — تبقى: ' . $keep['employee_code'] . ' ' . employeeTypeLabel($keep['employee_type'], 'ar');
             if ($r['lastm'] && $r['lastm'] >= $cyM) $eligCur[(int)$r['id']] = 1; else $eligSafe[(int)$r['id']] = 1;
             $keepOf[(int)$r['id']] = (int)$keep['id']; }
@@ -140,7 +155,7 @@ include __DIR__ . '/../includes/header.php';
                     <tbody>
                     <?php foreach ($g as $r): $f = $flags[$r['id']]; $gaps = employeeFileGaps($r, $db, $sy); ?>
                         <tr style="<?= $f === 'keep' ? 'background:#ecfdf5' : ($f === 'del' ? 'background:#fff1f2' : '') ?>">
-                            <td><?= $f === 'keep' ? '⭐ تبقى' : ($f === 'del' ? '<b style="color:#b91c1c">زائدة</b>' : ($f === 'returned' ? '<b style="color:#0a6b5e">↩️ عاد بعد ترك — ملف جديد (ليس مكرّراً)</b>' : '<b style="color:#92400e">راجعها</b>')) ?></td>
+                            <td><?= $f === 'keep' ? '⭐ تبقى' : ($f === 'del' ? '<b style="color:#b91c1c">زائدة (نفس السنة، بلا ضمان)</b>' : ($f === 'returned' ? '<b style="color:#0a6b5e">↩️ عاد بعد ترك — ملف جديد (ليس مكرّراً)</b>' : ($f === 'new' ? '<b style="color:#1d4ed8">🆕 جديد هذه السنة — بلائحة الجدد لا المحذوفين</b>' : '<b style="color:#92400e">راجعها</b>'))) ?></td>
                             <td><strong><?= e($r['employee_code']) ?></strong> <small style="color:var(--gray-500)">id <?= (int)$r['id'] ?></small></td>
                             <td><small><?= e(employeeTypeLabel($r['employee_type'])) ?></small></td>
                             <td><?= formatDate($r['hire_date']) ?></td>
