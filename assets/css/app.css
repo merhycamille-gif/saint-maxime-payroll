@@ -2897,3 +2897,18 @@ details > summary.btn:not(.btn-light), .reg-details > summary { background: #e3f
 .user-menu span { color: #fff !important; }
 .user-menu .user-avatar { background: #fff !important; color: var(--ios-navy) !important; }
 }
+
+/* ═══ 320 🟦 (2026-10-16 «بدي خلفية البرنامج غير الشريط… الصفحة كلها بدل ما تكون بيضا تكون أزرق فاتح متل صفحة الأقساط»)
+ *      خلفية الصفحة = نفس تدرّج الأقساط (msa-theme.css: #5b88c2 → #3a68a8 ثابت)، البطاقات تبقى بيضا فوقها. شاشة فقط — الطباعة بيضا. ═══ */
+@media screen {
+:root { --page-bg: #5b88c2; --page-bg2: #3a68a8; }
+body:not(.doc-view) { background: linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg2) 100%) fixed !important; background-color: var(--page-bg) !important; }
+}
+
+/* ═══ 330 🔙 (2026-10-16 «كبسات الرجوع ولمحل ما كنت يكونو ملونين ما عم شوفهن منيح») الرجوع برتقالي قوي و«ارجع لمحل ما كنت» زهري قوي،
+ *      بكل مكان بالبرنامج (كانتا تركواز فاتح على شريط أبيض). شاشة فقط. ═══ */
+@media screen {
+.btn:has(> .fa-arrow-left), .btn:has(> .fa-arrow-right), .topbar .btn.btn-light:has(> .fa-arrow-left), .topbar .btn.btn-light:has(> .fa-arrow-right) { --bg: #ff9500; }
+.topbar #msaFwdBtn, #msaFwdBtn.btn { --bg: #ff2d55; }
+.topbar .btn.btn-light:has(> .fa-arrow-left), .topbar .btn.btn-light:has(> .fa-arrow-right), .topbar #msaFwdBtn { font-weight: 700 !important; box-shadow: 0 2px 6px rgba(0,0,0,.18) !important; }
+}
