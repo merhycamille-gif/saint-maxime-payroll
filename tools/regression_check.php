@@ -8067,11 +8067,11 @@ $fn171 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $c171('src-fn', strpos($fn171, "if (!empty(\$GLOBALS['msa_school_override'])) return") !== false && strpos($fn171, 'function institutionSchoolPick(): ?array') !== false
     && strpos($fn171, 'function institutionGroupSchool(bool $byCnssEmployer = false): ?array') !== false && strpos($fn171, 'function institutionGroupBadgeHtml(') !== false); // 🏛️ 2026-10-16 الضمان: صاحب عمل واحد
 $of171 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
-$c171('src-forms', strpos($of171, '$school = institutionSchoolPick();') !== false && strpos($of171, '$school = institutionGroupSchool(strpos($form, 'cnss_') === 0);') !== false
+$c171('src-forms', strpos($of171, '$school = institutionSchoolPick();') !== false && strpos($of171, "\$school = institutionGroupSchool(strpos(\$form, 'cnss_') === 0);") !== false
     && strpos($of171, 'institutionSchoolChooserHtml') === false && strpos($of171, 'اختر المدرسة من الأعلى أولاً') === false
     && substr_count($of171, "(\$ofSchoolPicked ? '&school_id=' . (int)\$school['id'] : '')") >= 3);
 $ox171 = (string)file_get_contents($PROJ . '/pages/official_export.php');
-$c171('src-export', strpos($ox171, 'institutionSchoolPick() ?: institutionGroupSchool(strpos($form, 'cnss_') === 0)') !== false && substr_count($ox171, "(!empty(\$s0['_group_ids'])) ? \$s0") === 2);
+$c171('src-export', strpos($ox171, "institutionSchoolPick() ?: institutionGroupSchool(strpos(\$form, 'cnss_') === 0)") !== false && substr_count($ox171, "(!empty(\$s0['_group_ids'])) ? \$s0") === 2);
 // تجربة فعلية: مدرستان بنفس رقم الضمان (3 و5): الكشف الاسمي للمجموعة = مجموع عدد مضموني كلٍّ لحالها + اسم صاحب العمل الموحّد
 $cnt171 = function (array $ids) use (&$noFatal) {
     $h = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => 10, 'year' => 2025], [], $ids);
