@@ -156,7 +156,7 @@ function smtpConfigFromSettings()
     return [
         'host' => $host, 'port' => $port, 'secure' => $secure,
         'user' => $email, 'pass' => (string)getSetting('smtp_pass', ''),
-        'from' => $email, 'from_name' => (string)getSetting('smtp_from_name', getSetting('school_name_ar', '')),
+        'from' => $email, 'from_name' => programMailName(), // 📧 (2026-10-16 «لازم يطلع الإيميل المرسل من البرنامج باسم MSA Payroll هيك اتفقنا») لا اسم المدرسة
     ];
 }
 
@@ -283,6 +283,7 @@ function programMailSend($to, $subject, $body, array $attachments = [], $isHtml 
  * @return array [bool ok, string error, string via ('program'|'smtp'), string fromAddress]
  */
 function msaSendMail($to, $subject, $body, array $attachments = [], $isHtml = false, $schoolId = null, $fromName = ''): array {
+    $fromName = programMailName(); // 📧 (2026-10-16 «طالع باسم كلية سان مكسيم ما بدي هيك») اسم المرسِل دائماً «MSA Payroll» مهما مرّرت الصفحة (المدرسة تبقى بعنوان الردّ وبنصّ الرسالة)
     $mode = schoolEmailMode($schoolId);
     $cfg = smtpConfigFromSettings();
     $reply = schoolReplyEmail($schoolId);
