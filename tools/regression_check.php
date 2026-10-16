@@ -92,6 +92,10 @@ PHP);
 $noFatal = fn(string $h) => strpos($h, 'FATAL') !== 0 && stripos($h, 'Fatal error') === false && strlen($h) > 5000;
 
 echo "═══ فحص الانحدار — رواتب Saint-Maxime ═══\n\n";
+// 📚 (2026-10-16) أقسام مركز التقارير انتقلت من pages/reports.php إلى includes/report_center.php (مصدر واحد للصفحة ولأبواب الشريط العلوي)
+//    ⇒ كل فحص يقرأ «مصدر صفحة التقارير» يقرأ الملفين معاً كي تبقى الفحوص النصّية صحيحة (الاختبار 119 كان يسقط fatal على array_merge)
+function regReportsSrc(): string { global $PROJ; return (string)file_get_contents($PROJ . '/pages/reports.php') . "
+" . (string)file_get_contents($PROJ . '/includes/report_center.php'); }
 
 /* =====================================================================
  * 1) كل الصفحات الأساسية ترندر بلا خطأ قاتل (بالحالتين: كل الخيارات/بلاها)
@@ -221,7 +225,7 @@ $xEl = renderPage('pages/reports_export.php', ['report' => 'employee_list', 'for
 check('تصدير لائحة الموظفين ملف سليم', strpos($xEl, 'PK') !== false && strpos($xEl, 'FATAL') !== 0);
 // مقارنة مفاتيح أعمدة الشاشة ($availCols في reports.php) بمفاتيح التصدير ($cols في reports_export.php):
 // أي عمود يظهر على الشاشة ولا نظير له بالتصدير = يختفي من Word/Excel → فشل.
-$srcScreen = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+$srcScreen = (string)regReportsSrc();
 $srcExport = (string)file_get_contents(__DIR__ . '/../pages/reports_export.php');
 preg_match('/\$availCols\s*=\s*\[(.*?)\n\s*\];/s', $srcScreen, $mScr);
 preg_match('/\$cols\s*=\s*\[(.*?)\n\s*\];/s', $srcExport, $mExp);
@@ -622,7 +626,7 @@ check('تصدير وورد: ملف MHT بصور مضمَّنة base64 (multipart
       && strpos($expSrc, 'word-head') !== false
       && strpos($expSrc, 'scr-head') !== false
       && strpos($expSrc, 'rawDownload') !== false);
-$repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+$repSrc = (string)regReportsSrc();
 check('حجم الخط 12pt بطباعة مركز التقارير', strpos($repSrc, 'font-size: 12pt !important') !== false);
 $regEid = (int)$db->query("SELECT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
                            WHERE ms.month = 6 AND ms.year = 2026 AND ms.net_salary_lbp > 0 AND e.is_deleted = 0 LIMIT 1")->fetchColumn();
@@ -672,7 +676,7 @@ if ($regEid) {
     check('الكشف السنوي: الصفوف بالفرنسي فقط', strpos($asdSrc, "classLevelNames(\$emp['classes_taught'] ?? '', true)") !== false);
     // ✍️ (2026-08-25) «في شي مكرر بمركز التقارير»: بطاقة «Résumé mensuel» أُزيلت (مكرّرة —
     // أعمدتها ضمن État des salaires) ولا ترجع؛ التقرير نفسه يبقى شغّالاً بالرابط المباشر
-    $repSrc25 = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+    $repSrc25 = (string)regReportsSrc();
     check('مركز التقارير بلا مكرّر: لا بطاقة «Résumé mensuel» (ضمن كشف رواتب كل الموظفين) والرابط المباشر شغّال',
           strpos($repSrc25, "'fr'=>'Résumé mensuel'") === false
           && strpos($repSrc25, "report === 'monthly_summary'") !== false);
@@ -906,7 +910,7 @@ check('المجاميع السنوية: اختيار بنود الضمان فق�
 $xAtSel = renderPage('pages/reports_export.php', ['report' => 'annual_totals', 'format' => 'xlsx', 'school_year' => '2025-2026', 'items' => ['cnss']], ['extra', 'aide', 'transport']);
 check('المجاميع السنوية: التصدير يحمل البنود المختارة (items[]) وملف Excel سليم',
       strpos($xAtSel, 'PK') !== false && strpos($xAtSel, 'FATAL') !== 0
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/reports.php'), "'&items[]='") !== false
+      && strpos((string)regReportsSrc(), "'&items[]='") !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/reports_export.php'), 'annualTotalSelected()') !== false);
 // صحّة المجاميع: صفّ المجموع = مجموع صفوف المدارس (الضمان 3٪ بالليرة) — من المصدر نفسه
 require_once __DIR__ . '/../includes/report_helpers.php';
@@ -1003,7 +1007,7 @@ $bkSrc = (string)file_get_contents(__DIR__ . '/../pages/backup.php');
 check('النسخ الاحتياطي: تدفّق غير مخزّن (لا انفجار ذاكرة)',
       strpos($bkSrc, 'MYSQL_ATTR_USE_BUFFERED_QUERY => false') !== false
       && strpos($bkSrc, '$db->query("SELECT * FROM `$t`")->fetchAll') === false);
-$repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+$repSrc = (string)regReportsSrc();
 check('الكشف الشهري: مفاتيح مجاميع الدولار/المركّب مهيّأة (لا Undefined)',
       preg_match('/\$totals = \[[^\]]*composed_usd/s', $repSrc) === 1);
 
@@ -1145,7 +1149,7 @@ check('«كل المدارس» = الفاعلة فقط (المعطّلة لا ت
       && preg_match('/function schoolScopeSql.*?allActiveSchoolIdsCached\(\)/s', $fnSrc2) === 1
       && preg_match('/function reportSchoolSql.*?allActiveSchoolIdsCached\(\)/s', $fnSrc2) === 1);
 check('التقارير: منتقي المدارس لا يعرض المعطّلة',
-      strpos((string)file_get_contents(__DIR__ . '/../pages/reports.php'), '$schools = allSchools();') !== false);
+      strpos((string)regReportsSrc(), '$schools = allSchools();') !== false);
 check('حفظ العلاوات: «كل السنين» تُخزَّن بالسنة الحالية لا \'all\'',
       strpos($fnSrc2, 'function writeSchoolYear') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'writeSchoolYear()') !== false);
@@ -1155,7 +1159,7 @@ $reSrc = (string)file_get_contents(__DIR__ . '/../pages/reports_export.php');
 check('التصدير = الشاشة: لائحة الموظفين فيها صفّ مجاميع الأعمدة المالية',
       strpos($reSrc, '$sumCols = [') !== false && strpos($reSrc, "\$row[] = isset(\$sumCols[\$c]) ? formatLBP(\$colTot[\$c]) : '';") !== false);
 check('التصدير = الشاشة: عمود الشهادة يعرض وظيفة الموظف الإداري بالاثنين',
-      strpos($repSrc = (string)file_get_contents(__DIR__ . '/../pages/reports.php'), "\$r['employee_type'] === 'employe' ? jobTitleLabel(\$r['job_title'] ?? '') : diplomaLabel(\$r['diploma'])") !== false);
+      strpos($repSrc = (string)regReportsSrc(), "\$r['employee_type'] === 'employe' ? jobTitleLabel(\$r['job_title'] ?? '') : diplomaLabel(\$r['diploma'])") !== false);
 check('تقرير الصندوق: لا صفّ مجاميع أصفار على شهر بلا بيانات',
       strpos($repSrc, 'لا تطبع صفّ مجاميع أصفار') !== false);
 // (تحديث 2026-08-06: الخاضع المعروض صار **بعد حسم حصّة التنزيل العائلي** بطلب المستخدم)
@@ -1305,7 +1309,7 @@ $attSrcU = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
 check('الإفادات: تفقيط الدولار بالحروف = الرقم المعروض نفسه (floor)',
       strpos($attSrcU, '(int)floor($usdOf($lbp))') !== false
       && strpos($attSrcU, '(int)round($usdOf($lbp))') === false);
-$repSrc3 = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+$repSrc3 = (string)regReportsSrc();
 check('الكشف الشهري: كل أعمدة المجاميع بالعملة المختارة (لا formatLBP ثابتة)',
       strpos($repSrc3, "\$dualTot(\$t['total'], \$t['total_usd'])") !== false
       && strpos($repSrc3, "\$dualTot(\$t['net'], \$t['net_usd'])") !== false
@@ -1731,7 +1735,7 @@ check('الراتب يشمل: عمود «تعويض النقل» بكشف الض
 $fnSrc27  = (string)file_get_contents(__DIR__ . '/../includes/functions.php');
 $rhSrc27  = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php');
 $hdSrc27  = (string)file_get_contents(__DIR__ . '/../includes/header.php');
-$repSrc27 = (string)file_get_contents(__DIR__ . '/../pages/reports.php');
+$repSrc27 = (string)regReportsSrc();
 check('القالب الموحّد: دوال docSheetStart/docSheetEnd و docBackUrl موجودة',
       strpos($rhSrc27, 'function docSheetStart(') !== false
       && strpos($rhSrc27, 'function docSheetEnd(') !== false
@@ -1893,7 +1897,7 @@ check('الخط 12 على الورق: أعمدة الأزرار (no-print) لا 
       strpos($rhSrc34, '.pz-measure .no-print{display:none !important;}') !== false
       && strpos($asSrc34, '.pz-measure .no-print { display: none !important; }') !== false);
 check('الخط 12 على الورق: تقارير reports.php أعمدتها حسب المحتوى (لا fixed يقصّ الأرقام) والتاركون A4 أفقي',
-      strpos((string)file_get_contents(__DIR__ . '/../pages/reports.php'), 'table-layout: fixed') === false
+      strpos((string)regReportsSrc(), 'table-layout: fixed') === false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/left_teachers.php'), 'land-report') !== false);
 // 🎨🔒 التصميم النهائي المجمّد للبطاقة السنوية — اعتمده المستخدم حرفياً بقوله
 // «ما تغير بقى شي بالبطاقة احفظها منيح» (2026-08-01 مساءً). أي كسر لأحد هذه البنود
@@ -2244,7 +2248,7 @@ check('امتصاص الفجوة (تجربة فعلية): الترجيع أعا�
  * 34) فلترا التقارير الموحّدان (طلب 2026-08-04): «الملاك لحالون أو المتعاقدين
  *     أو الموظفين أو مع بعض» + «يخضع للضرائب أو لا يخضع» — بكل التقارير والتصدير
  * =================================================================== */
-$repSrc34 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$repSrc34 = (string)regReportsSrc();
 $expSrc34 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 check('فلتر الفئة والضريبة: منتقٍ موحّد empTypePicker بكل تقارير reports.php والاستعلامات تحمل الفلترين',
       substr_count($repSrc34, 'empTypePicker();') >= 5
@@ -2696,7 +2700,7 @@ if ($cand41) {
  *     بالشاشة والتصدير معاً — السنوي الساري حسب وضعه الاجتماعي، ويتبع زرّ
  *     «تطبيق التنزيل العائلي» بملفه (مطفأ = 0). نفس مصدر المحرّك.
  * =================================================================== */
-$rp42 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rp42 = (string)regReportsSrc();
 $rx42 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 // (تصحيح المستخدم 2026-08-06): الكشف شهري ⇒ التنزيل «حصّة الشهر» (السنوي ÷ أشهر دفعه)،
 // وعموده **قبل** «الخاضع للضريبة» لأنه يُحسم منه، والخاضع المعروض = بعد الحسم
@@ -2839,7 +2843,7 @@ check('المركّب بلا نقل (تجربة فعلية): مركّب مارس
       && strpos($row45, '9,000,000') !== false
       && strpos($row45, '59,786,000') !== false);
 // والكشف الشهري العام أيضاً: النقل قبل «الإجمالي المتوجب» مباشرة (بنية الرأس)
-$rp45 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rp45 = (string)regReportsSrc();
 check('الكشف الشهري: عمود النقل يسبق «الإجمالي المتوجب» مباشرة',
       strpos($rp45, 'transportHead() ?><?= dueHead() ?>') !== false); // (2026-09-19) رأس المستحق صار dueHead
 
@@ -2988,7 +2992,7 @@ check('شيل ملف بلا أب (تجربة فعلية): مريم ريشا صا
 $pc51 = (string)file_get_contents($PROJ . '/includes/payroll_calculator.php');
 $fn51 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $hd51 = (string)file_get_contents($PROJ . '/includes/header.php');
-$rp51 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rp51 = (string)regReportsSrc();
 $of51 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('تجزئة القانون: المحرّك يُسنوِن ×12 ويقسم ÷12 (لا على أشهر الدفع)',
       strpos($pc51, '$annualTaxable = $taxBase * 12;') !== false
@@ -3267,7 +3271,7 @@ check('واجهة أنعم: رؤوس البطاقات شرائط رفيعة فا
       && strpos($css58, 'border-inline-start: 3px solid var(--accent, var(--primary));') !== false
       && strpos($css58, '.dash-sec-head .ds-fr { font-weight:700; font-size:12.5px; color:var(--sec-c);') !== false);
 check('شريط التصدير مخفيّ بصفحات القوائم (تقارير/إفادات/نماذج/تصاريح — لا شيء يُصدَّر منها)',
-      strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "if (\$report === '') \$hideExportToolbar = true;") !== false
+      strpos((string)regReportsSrc(), "if (\$report === '') \$hideExportToolbar = true;") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), "if (!\$emp) \$hideExportToolbar = true;") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/official_forms.php'), "if (\$form === '') \$hideExportToolbar = true;") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/tax_declarations.php'), '$hideExportToolbar = true;') !== false);
@@ -3374,7 +3378,7 @@ $of60 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('تقرير ضريبة الأستاذ-الموظف: ضمن الفلاتر الموحّدة + النماذج المؤسّسية + قائمة التقارير',
       strpos($of60, "'tax_r5', 'tax_r10', 'tax_r7', 'tax_emp_report', 'staff_stats'") !== false
       && strpos($of60, "'tax_emp_report',") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "tax_emp_report") !== false);
+      && strpos((string)regReportsSrc(), "tax_emp_report") !== false);
 
 /* =====================================================================
  * 61) 👶 مفتاح «تنزيل الأولاد بالضريبة: يُعطى/لا» («لو عندها اولاد او الزوج
@@ -3957,7 +3961,7 @@ check('تسوية الضمان: القالب والمحرّك والشاشة و�
       && function_exists('cnssTaswiyaData') && function_exists('cnssSchoolGroups')
       && strpos((string)file_get_contents($PROJ . '/pages/official_export.php'), "form === 'cnss_taswiya'") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/official_forms.php'), "form === 'cnss_taswiya'") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), 'cnss_taswiya') !== false);
+      && strpos((string)regReportsSrc(), 'cnss_taswiya') !== false);
 $ts72 = cnssTaswiyaData($db, 2025, [2]);
 $tt72 = $ts72['totals'];
 $aMal72 = 0; foreach ($ts72['monthly'] as $mm72) $aMal72 += $mm72['mal'];
@@ -4902,7 +4906,7 @@ foreach (['pages/reports.php', 'pages/official_forms.php', 'pages/reports_export
         if (preg_match('/(ms\.)?extra_lbp,\s*(ms\.)?prime_fixe_lbp,\s*(ms\.)?aide_complementaire_lbp/', $line97) && strpos($line97, 'prime_fixe_usd_law') === false) $bad97[] = $f97 . ':' . ($ln97 + 1);
     }
 }
-$repSrc97 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$repSrc97 = (string)regReportsSrc();
 check('كل استعلام عرض يجيب extra_lbp/prime_fixe_lbp صراحةً يجيب prime_fixe_usd_law معه + المجاميع الفرعية بالكشوف تجمع دولارات القانون (لا money($a[extra]) ولا money($teEx)) + الإفادة: الإضافي وحده بدولار القانون والمجاميع ÷ السعر كباقي التقارير',
       !$bad97 && strpos($repSrc97, "money(\$a['extra'], \$repRate)") === false && strpos($repSrc97, "money(\$teEx, \$repRate)") === false
       && strpos($repSrc97, "dualFromUsd(\$a['extra'], \$a['extra_usd'])") !== false && strpos($repSrc97, "dualFromUsd(\$teEx, \$teExU)") !== false
@@ -5887,7 +5891,7 @@ check('إكسل الفئة/الضريبة (تجربة حيّة تُرجَع): ك
  *      خانة «كشوف الرواتب» بمركز التقارير = salary_all/salary_detail/payment_list/employer_cost/full_register (official_forms، المصدر الواحد
  *      ofStateLtrForms) + annual_totals (reports، docSheetStart dir) ⇒ dir=ltr دائماً. غيرها rtl كما كان. البطاقة السنوية والقسيمة لا تُمَسّ.
  * =================================================================== */
-$of119 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp119 = (string)file_get_contents($PROJ . '/pages/reports.php'); $rh119 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$of119 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp119 = (string)regReportsSrc(); $rh119 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 $tiles119 = []; if (preg_match("/'tiles'=>\[(.*?)\]\],/su", preg_replace('~^\s*//.*$~mu', '', substr($rp119, strpos($rp119, "'كشوف الرواتب / Bulletins de salaire'"))), $mt)) preg_match_all("/\\\$OF\.'([a-z_]+)'|\?report=([a-z_]+)|\\\$PG\.'([a-z_]+)\.php'/", $mt[1], $mm);
 $tiles119 = array_values(array_filter(array_merge($mm[1] ?? [], $mm[2] ?? [], $mm[3] ?? [])));
 check('كشوف الرواتب LTR: خانة «كشوف الرواتب» بالمركز = البطاقة السنوية (مستثناة) + 5 نماذج ofStateLtrForms + مجاميع سنوية — كلها dir=ltr بالكود (لا ربط بفلتر الضريبة)، Résumé mensuel rtl، البطاقة السنوية بلا dir=ltr',
@@ -5934,7 +5938,7 @@ check('أسماء لوائح الدولة بالفرنسي (كود): ofStateName
       && substr_count($of120, '<?= $name /* HTML جاهز من ofStateNameCell */ ?>') === 1
       && substr_count($of120, 'ofStateNameCell(') === 5
       && strpos($rh120, '.official-doc .nm-fr{display:block;') !== false
-      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), 'nm-fr') === false && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), 'ofStateNameCell') === false);
+      && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), 'nm-fr') === false && strpos((string)regReportsSrc(), 'ofStateNameCell') === false);
 $ok120 = false; $why120 = '';
 try {
     $e120 = $db->query("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.father_name_ar, e.father_name_fr, ms.month, ms.year FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id
@@ -6098,7 +6102,7 @@ check('إكسل/وورد للكشوف (تشغيل فعلي): زرّا Excel/Word
  *      بكل الكشوف والتقارير = ÷ السعر الرسمي (1500) داون — المصدر الواحد lawUsd/lawUsdSql/moneyLaw/composedSalaryUsd. الصافي والمحسومات
  *      والنقل تبقى بسعر الشهر. البطاقة السنوية كانت أصلاً ÷1500 (cur_sal_old_usd) ولم تُمَسّ.
  * =================================================================== */
-$of125 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp125 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$of125 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp125 = (string)regReportsSrc();
 $mp125 = (string)file_get_contents($PROJ . '/pages/monthly_payroll.php'); $rh125 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 check('دولار القانون للأساس (كود): lawUsd/lawUsdSql/moneyLaw/composedSalaryUsd + لا بقايا تحويل الأساس بسعر الشهر بالكشوف/التقارير/الراتب الشهري/المجاميع السنوية',
       function_exists('lawUsd') && function_exists('lawUsdSql') && function_exists('moneyLaw') && function_exists('composedSalaryUsd')
@@ -6142,7 +6146,7 @@ check('دولار القانون للأساس (تشغيل فعلي): أساس أ
  *      الأجر الإجمالي/المركّب (1 $ = 1,500) وrateHead('mkt',$month,$year) تحت الصافي/المستحق/مجموع المدفوعات/الكلفة (1 $ = سعر الشهر)
  *      بكل الكشوف الجدولية ومركز التقارير؛ يختفي بوضع «ليرة فقط»؛ التقرير العام السنوي بلا سعر شهر.
  * =================================================================== */
-$of126 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp126 = (string)file_get_contents($PROJ . '/pages/reports.php'); $rh126 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$of126 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp126 = (string)regReportsSrc(); $rh126 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 check('سعر الصرف بالعناوين (كود): rateHead مصدر واحد + 15 law (أساس/درجة/بعد التدرّج) و13 mkt (المركّب/الإجمالي/الصافي/المستحق) بالنماذج + 6/5 بالمركز + CSS .rate-head + الفروقات والتقرير العام السنويان بلا سعر شهر تحت المركّب',
       function_exists('rateHead') && strpos($rh126, '.doc-table th .rate-head{display:block;') !== false
       && substr_count($of126, "<?= rateHead('law') ?></th>") === 4 /* 📄 2026-09-21: «بعد التدرّج» فقط كالبطاقة */ && substr_count($of126, "<?= rateHead('mkt', \$month, \$year) ?></th>") === 10 && substr_count($of126, ". rateHead('mkt', \$month, \$year)) ?>") === 6 /* رؤوس المستحق عبر dueHead (2026-09-19) + الصافي+العائلي عبر netFamHead (2026-09-20) */
@@ -6174,7 +6178,7 @@ check('سعر الصرف بالعناوين (تشغيل فعلي): كشف كل �
  *      (extraAideHeads بصفوف/شهر/سنة) — الأكثر شيوعاً أوّلاً لغاية 4 نِسَب ثم «…».
  * =================================================================== */
 $js127 = (string)file_get_contents($PROJ . '/assets/js/app.js'); $css127 = (string)file_get_contents($PROJ . '/assets/css/app.css');
-$rh127 = (string)file_get_contents($PROJ . '/includes/report_helpers.php'); $of127 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp127 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rh127 = (string)file_get_contents($PROJ . '/includes/report_helpers.php'); $of127 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp127 = (string)regReportsSrc();
 check('الجدول العريض على الشاشة (كود): msaFitScreenTables بapp.js (table/doc-table/xlsf، يستثني .salary-slip والقسيمة والإفادات، حدّ 0.5) + تُستدعى من initStickyHeads وfitDocTables + doc-view 1600',
       strpos($js127, 'window.msaFitScreenTables = function ()') !== false
       && strpos($js127, "querySelectorAll('table.table, table.doc-table, table.xlsf')") !== false
@@ -6239,7 +6243,7 @@ check('نسبة الأجر الإضافي تحت العنوان (تشغيل فع
  * =================================================================== */
 $rh128 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 $of128 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
-$rp128 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rp128 = (string)regReportsSrc();
 $rx128 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 check('التنزيل العائلي بكل الكشوف (كود): المصدر الواحد بreport_helpers + الرأسان بالترتيب الملزم',
       function_exists('familyDedSelectCols') && function_exists('familyDedMonthShare') && function_exists('taxableAfterFamilyDed') && function_exists('familyDedHeads')
@@ -6473,7 +6477,7 @@ $fn135 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $rh135 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 $sw135 = (string)file_get_contents($PROJ . '/switch_salarycomp.php');
 $of135 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
-$rp135 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rp135 = (string)regReportsSrc();
 $rx135 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 $ax135 = (string)file_get_contents($PROJ . '/pages/annual_slip_export.php');
 check('عمود النقل الثلاثي (كود): الدوال المركزية + الشريط select + المبدّل + لا خلية نقل مباشرة بـsalaryCompHas بالتقارير + الإكسل يتبع الحالة',
@@ -6953,7 +6957,7 @@ check('🏦 البطاقة السنوية للمتعاقد بلا عمود صن�
  */
 require_once $PROJ . '/includes/eos_forms.php';
 ensureOfficialFormEdits();
-$of147 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp147 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$of147 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp147 = (string)regReportsSrc();
 $e147 = $db->query("SELECT e.id, e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.is_calculated = 1 AND ms.net_salary_lbp > 0
                     WHERE e.employee_type = 'employe' AND e.is_deleted = 0 AND e.nssf_number <> '' GROUP BY e.id HAVING COUNT(*) >= 12 LIMIT 1")->fetch(PDO::FETCH_ASSOC) ?: [];
 $ok147 = (bool)$e147; $why147 = 'emp=' . json_encode($e147);
@@ -6993,7 +6997,7 @@ check('🏦 نماذج نهاية الخدمة p1/p2/p3: تُرندَر بلا �
  *      مطبَّق: كشف الرواتب الشهري (reports + إكسل) + salary_all + payment_list + ofState + البطاقة السنوية (+ إكسلها).
  */
 $fn148 = (string)file_get_contents($PROJ . '/includes/functions.php'); $rh148 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
-$of148 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp148 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$of148 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp148 = (string)regReportsSrc();
 $as148 = (string)file_get_contents($PROJ . '/pages/annual_slip.php'); $ax148 = (string)file_get_contents($PROJ . '/pages/annual_slip_export.php');
 $rx148 = (string)file_get_contents($PROJ . '/pages/reports_export.php'); $hd148 = (string)file_get_contents($PROJ . '/includes/header.php');
 $ok148 = true; $why148 = ''; $ths148 = [];
@@ -7128,7 +7132,7 @@ check('👨‍👩‍👧 لا تعويض عائلي مخزّن لأي متعا�
  *      select netfam_mode بالشريط والترويسة + switch_salarycomp — عرض فقط. مطبَّق: كشف الرواتب الشهري (+إكسل) · salary_all · payment_list · ofState · البطاقة السنوية (+إكسلها).
  */
 $fn150 = (string)file_get_contents($PROJ . '/includes/functions.php'); $rh150 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
-$of150 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp150 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$of150 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp150 = (string)regReportsSrc();
 $as150 = (string)file_get_contents($PROJ . '/pages/annual_slip.php'); $ax150 = (string)file_get_contents($PROJ . '/pages/annual_slip_export.php');
 $rx150 = (string)file_get_contents($PROJ . '/pages/reports_export.php'); $hd150 = (string)file_get_contents($PROJ . '/includes/header.php');
 $ok150 = true; $why150 = ''; $ths150 = [];
@@ -7379,7 +7383,7 @@ check('🪪 رقم الضمان مسبوقاً بسنة الولادة (1968-124
  *      الواحد بكل الكشوف — الأساس والدرجة بالليرة فقط، «بعد التدرّج» ÷1500 لأصحاب النسبة فقط (كانت الكشوف تقسم ÷1500 للجميع: ايف عيد 24,605$).
  *      كود: الدوال + لا lawUsd/lawUsdSql خامّ للأساس/الدرجة + رؤوس «1$=1,500» على «بعد التدرّج» فقط. تجربة: متعاقد بالدولار بلا دولار قانون، وصاحب نسبة ÷1500.
  */
-$of158 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp158 = (string)file_get_contents($PROJ . '/pages/reports.php'); $rh158 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
+$of158 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp158 = (string)regReportsSrc(); $rh158 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 $ok158 = function_exists('pctLawHolderIds') && function_exists('isPctLawRow') && function_exists('lawUsdRow') && function_exists('dualLaw')
       && preg_match_all('/lawUsd\(\(int\)\$r\[' . "'" . 'base_salary_lbp' . "'" . '\]\)|lawUsd\(\(int\)\$r\[' . "'" . 'echelon_value_lbp' . "'" . '\]\)|lawUsdSql\(' . "'" . '(ms\.)?base_salary_lbp' . "'" . '\)/', $of158 . $rp158 . $rh158) === 0
       && substr_count($of158, "rateHead('law')") === 4 && substr_count($rp158, "rateHead('law')") === 1
@@ -7473,7 +7477,7 @@ try {
     $paid161 = $db->query("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.id IN (SELECT employee_id FROM monthly_salaries WHERE school_year = '2025-2026' AND base_plus_echelon_lbp > 0) LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     $paidGaps = $paid161 ? employeeFileGaps($paid161, $db, '2025-2026') : [];
     // الكود: الصفوف الملحقة بالكشف الشهري (شاشة + تصدير) + عمود «ملف ناقص» بلائحة الموظفين + الشارة بكشف الرواتب ولائحة الموظفين + اللوحة + فحص الصحة
-    $rp = (string)file_get_contents($PROJ . '/pages/reports.php'); $rx = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+    $rp = (string)regReportsSrc(); $rx = (string)file_get_contents($PROJ . '/pages/reports_export.php');
     $mp = (string)file_get_contents($PROJ . '/pages/monthly_payroll.php'); $ep = (string)file_get_contents($PROJ . '/pages/employees.php');
     $ix = (string)file_get_contents($PROJ . '/index.php'); $hc = (string)file_get_contents($PROJ . '/pages/health_check.php');
     $code161 = strpos($rp, "incompleteEmployeesRows(\$db, \$periodSchoolYear, \$schoolSqlEmp, \$empTypeSql)") !== false && strpos($rp, "'gaps'    => ['ملف ناقص / Dossier incomplet'") !== false
@@ -7509,7 +7513,7 @@ try {
     $cols = newTeachersReportCols();
     $txt = $r27 ? array_map(fn($c) => (string)($c[1])($r27[0]), $cols) : [];
     $html = renderPage('pages/reports.php', ['report' => 'new_teachers', 'school_year' => '2026-2027'], ['extra','aide','transport']);
-    $src = (string)file_get_contents($PROJ . '/pages/reports.php'); $srx = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+    $src = (string)regReportsSrc(); $srx = (string)file_get_contents($PROJ . '/pages/reports_export.php');
     $ok162 = count($r27) === 1 && $r27[0]['fin_ok'] === false && strpos($r27[0]['fin_note'], 'غير مكتمل') !== false && $r27[0]['via_link'] === false
           && count($r26) === 0 && (!$paid || (count($rp) === 1 && $rp[0]['fin_ok'] === true && strpos($rp[0]['fin_note'], 'مكتمل') !== false && $rp[0]['last_salary']))
           && count($cols) >= 28 && ($txt['phone'] ?? '') === '03-162162' && ($txt['nssf'] ?? '') === '⚠️ ناقص' && ($txt['setup'] ?? '') === '⚠️ لا أساس بالملف' && ($txt['hire'] ?? '') === formatDate('2026-10-01')
@@ -8027,7 +8031,7 @@ $c170('src-forms', preg_match('/SUM\(ms\.family_allowance_lbp\),0\) f FROM month
     && strpos($of170, '$fpaid = cnssFamilyPaidLbp($r);') !== false);
 $c170('src-export', preg_match('/SUM\(ms\.family_allowance_lbp\),0\) f FROM monthly_salaries ms JOIN employees e ON e\.id=ms\.employee_id\s+WHERE e\.is_deleted=0" \. cnssFamilyPaidTypeSql\(\'e\.\'\)/', $ox170) === 1);
 // باقي التقارير لم تُحصَر: كشف الرواتب الشهري بمركز التقارير ما زال يعرض التعويض للجميع
-$rp170 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rp170 = (string)regReportsSrc();
 $c170('others-untouched', strpos($rp170, "money(\$r['family_allowance_lbp'], \$rRate)") !== false && strpos($rp170, 'cnssFamilyPaid') === false);
 // تجربة فعلية بالقاعدة: أحدث شهر فيه تعويض مخزّن لأستاذ ملاك — استعلام التصريح (بالحصر) لا يضمّه، وبلا حصر يضمّه
 $r170 = $db->query("SELECT ms.school_id, ms.year, ms.month FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
@@ -8510,7 +8514,7 @@ try {
 } finally { $db->exec("DELETE FROM rate_history WHERE notes = 'regcheck-184'"); }
 $c184('dated-cleanup', (int)$db->query("SELECT COUNT(*) FROM rate_history WHERE notes = 'regcheck-184'")->fetchColumn() === 0);
 // لا رقم ثابت باقٍ بالعناوين الداخلية
-$src184 = fn(string $f) => (string)file_get_contents($PROJ . '/' . $f);
+$src184 = fn(string $f) => $f === 'pages/reports.php' ? regReportsSrc() : (string)file_get_contents($PROJ . '/' . $f);
 $c184('no-hardcoded', strpos($src184('pages/reports.php'), 'الضمان (٣٪)') === false && strpos($src184('pages/reports.php'), '<th>الأجير ٣٪</th>') === false && strpos($src184('pages/reports.php'), '<th>الأجير ٦٪</th>') === false
     && strpos($src184('pages/reports_export.php'), "'الضمان ٣٪'") === false && strpos($src184('pages/reports_export.php'), "'المدرسة ٨٪'") === false && strpos($src184('pages/reports_export.php'), "'المدرسة ٦٪'") === false
     && strpos($src184('includes/report_helpers.php'), 'CNSS salarié 3%') === false && strpos($src184('includes/report_helpers.php'), "'rk' => 'cnss_employer_rate'") !== false
@@ -8558,7 +8562,7 @@ check('📊 نِسَب الاشتراكات تحت عناوين الأعمدة �
  *      .school-checks شبكة أعمدة مرصوفة (auto-fill 230px، المدارس 330px)، «الكل» سطر كامل، والمجموعات المُعنونة (.chk-group) بنفس الأعمدة —
  *      معلومات تقرير الموظفين بـ6 مجموعات، بنود المجاميع السنوية بمجموعاتها، ولا رصّ حرّ (inline flex) باقٍ.
  * =================================================================== */
-$css185 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $rp185 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$css185 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $rp185 = (string)regReportsSrc();
 $hEl185 = renderPage('pages/reports.php', ['report' => 'employee_list'], [], [], 'lbp', '2025-2026');
 $hAt185 = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026'], [], [3], 'lbp', '2025-2026');
 check('☑️ مجموعات التشييك شبكة مرصوفة بكل البرنامج (2026-09-27 p1): .school-checks grid + «الكل» سطر كامل + مجموعات مُعنونة (تقرير الموظفين 6 مجموعات، بنود المجاميع) — بلا رصّ حرّ',
@@ -8767,7 +8771,7 @@ $src194c = (string)file_get_contents($PROJ . '/includes/compliance.php');
 $src194m = (string)file_get_contents($PROJ . '/pages/mehe_budget.php');
 $src194i = (string)file_get_contents($PROJ . '/pages/info_status.php');
 $src194d = (string)file_get_contents($PROJ . '/includes/cadre_due.php');
-$src194r = (string)file_get_contents($PROJ . '/pages/reports.php');
+$src194r = (string)regReportsSrc();
 $okSrc194 = strpos($src194a, 'yearEmploymentFilter($mSy64') !== false && strpos($src194a, '$st->execute($yp64)') !== false
     && substr_count($src194c, '. $yf') >= 6 && strpos($src194c, "=== 'carried_zero'") !== false && strpos($src194c, 'class="comp-ghosts"') !== false
     && strpos($src194m, 'ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) WHERE e.school_id IN') !== false
@@ -8967,7 +8971,7 @@ check('🔙🇱🇧 زرّ الرجوع للصفحة السابقة الحقيق
  * =================================================================== */
 $fn201 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $rh201 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
-$rp201 = (string)file_get_contents($PROJ . '/pages/reports.php');
+$rp201 = (string)regReportsSrc();
 $rx201 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
 $of201 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 $okSrc201 = strpos($fn201, 'function reportHeaderSchool(): ?array {') !== false
@@ -9264,7 +9268,7 @@ $ok208 = $okPal208
     && strpos($css208, '.btn[style*="#25D366"], .btn[style*="#25d366"]') !== false
     && preg_match('/\.dash-link \{\s*background-image: linear-gradient\(180deg, #fff 0%, color-mix\(in srgb, var\(--sec-c, #64748b\) 9%, #fff\)/', $css208) === 1
     && preg_match('/\.report-card \{\s*background-image: linear-gradient\(180deg, #fff 0%, color-mix\(in srgb, var\(--rc, #64748b\) 12%, #fff\)/', $css208) === 1
-    && strpos((string)file_get_contents($PROJ . '/pages/reports.php'), "<div class=\"report-cat\" style=\"--rc:<?= \$cat['color'] ?>\">") !== false
+    && strpos((string)regReportsSrc(), "<div class=\"report-cat\" style=\"--rc:<?= \$cat['color'] ?>\">") !== false
     && preg_match('/\.school-checks \.chk:has\(input:checked\), \.att-opts \.att-row label:has\(input:checked\) \{\s*background-color: #1f4e79;/', $css208) === 1
     && preg_match('/\.salcomp-bar \.scb-opt:has\(input:checked\), \.school-checks\.scb-tiles \.chk:has\(input:checked\),[^{]*\{\s*background-color: #1f4e79 !important;/', $css208) === 1
     && strpos($css208, '.att-opts .att-row label:has(input) {') !== false; // الحبّة فقط لخيار فيه خانة — لا عناوين الحقول

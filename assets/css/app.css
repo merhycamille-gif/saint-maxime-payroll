@@ -2834,3 +2834,66 @@ body.msa-side .msa-tabs .mt-side { background: var(--mt-gold); border-color: var
 .msa-tabs .mt-drop.mt-wide .mt-links.mt-links-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 10px; }
 @media (max-width: 1300px) { .msa-tabs .mt-att-cols { grid-template-columns: repeat(2, 1fr); } .msa-tabs .mt-drop.mt-wide .mt-links.mt-links-grid { grid-template-columns: repeat(2, 1fr); } }
 }
+
+/* ═══ 310 🍎🎨 (2026-10-16 «أي كبسة لازم تكون ملوّنة حتى أقدر شوفها — ما بدي كبسات بيض») لا كبسة بيضاء بكل البرنامج:
+ *      كل كبسة بيضا/فاتحة تصير ممتلئة بلون الآيفون حسب نوعها أو أيقونتها (طباعة أزرق · تعديل برتقالي · حذف/إغلاق أحمر ·
+ *      إضافة/حفظ أخضر · رجوع تركواز · تراجع بنفسجي · ملف نيلي · خيارات بنفسجي فاتح · افتراضي سماوي)، النصّ والأيقونة بيض.
+ *      حبوب شريط الأعلى (ملف الأستاذ · المدرسة · السنة · العملة · الراتب يشمل · اللغة) ملوّنة بلون أيقونتها. حبوب الخيارات غير المختارة
+ *      سماوية فاتحة بدل البيضا. شاشة فقط — الطباعة لا تتأثّر. نفس أسلوب الأقساط (msa-theme.css «لا كبسة بيضاء»). ═══ */
+@media screen {
+:root { --ios-blue: #007aff; --ios-sky: #32ade6; --ios-teal: #30b0c7; --ios-green: #34c759; --ios-orange: #ff9500; --ios-red: #ff3b30; --ios-purple: #5856d6; --ios-indigo: #4f46e5; --ios-violet: #af52de; --ios-pink: #ff2d55; --ios-navy: #173f6f; --ios-brown: #a2845e; }
+/* (أ) الكبسات الفاتحة: ممتلئة سماوي افتراضياً */
+.btn-light, .btn-light:hover, .export-toolbar .btn, .export-compact > summary.btn, .msa-bars-row .btn, .export-toolbar .btn[style*="25D366"] {
+  --bg: var(--ios-sky); background: var(--bg) !important; border-color: var(--bg) !important; color: #fff !important; font-weight: 600 !important; }
+.btn-light i, .export-toolbar .btn i, .export-compact > summary.btn i, .msa-bars-row .btn i, .btn-light i[style*="color"], .msa-bars-row .btn i[style*="color"] { color: #fff !important; }
+.btn-light:hover, .export-toolbar .btn:hover, .export-compact > summary.btn:hover, .msa-bars-row .btn:hover { filter: brightness(1.08); }
+/* (ب) حسب الأيقونة — أينما كانت الكبسة */
+.btn:has(> .fa-print), .btn:has(> .fa-file-lines), .btn:has(> .fa-eye), .btn:has(> .fa-search), .btn:has(> .fa-magnifying-glass) { --bg: var(--ios-blue); }
+.btn:has(> .fa-edit), .btn:has(> .fa-pen), .btn:has(> .fa-pen-to-square), .btn:has(> .fa-user-pen), .btn:has(> .fa-pencil) { --bg: var(--ios-orange); }
+.btn:has(> .fa-times), .btn:has(> .fa-xmark), .btn:has(> .fa-trash), .btn:has(> .fa-trash-can), .btn:has(> .fa-ban), .btn:has(> .fa-file-pdf) { --bg: var(--ios-red); }
+.btn:has(> .fa-plus), .btn:has(> .fa-save), .btn:has(> .fa-floppy-disk), .btn:has(> .fa-check), .btn:has(> .fa-file-excel) { --bg: var(--ios-green); }
+.btn:has(> .fa-arrow-left), .btn:has(> .fa-arrow-right), .btn:has(> .fa-door-open), .btn:has(> .fa-up-right-from-square), .btn:has(> .fa-right-left) { --bg: var(--ios-teal); }
+.btn:has(> .fa-rotate-left), .btn:has(> .fa-rotate), .btn:has(> .fa-clock-rotate-left), .btn:has(> .fa-undo), .btn:has(> .fa-history), .btn:has(> .fa-file-word) { --bg: var(--ios-purple); }
+.btn:has(> .fa-folder-open), .btn:has(> .fa-folder), .btn:has(> .fa-user), .btn:has(> .fa-id-card), .btn:has(> .fa-money-check) { --bg: var(--ios-indigo); }
+.btn:has(> .fa-sliders), .btn:has(> .fa-sliders-h), .btn:has(> .fa-table-columns), .btn:has(> .fa-filter), .btn:has(> .fa-gear), .btn:has(> .fa-cog) { --bg: var(--ios-violet); }
+.btn:has(> .fa-calendar), .btn:has(> .fa-calendar-days), .btn:has(> .fa-bus), .btn:has(> .fa-broom) { --bg: var(--ios-pink); }
+.btn:has(> .fa-language), .btn:has(> .fa-globe) { --bg: var(--ios-brown); }
+.export-toolbar .btn.btn-primary { --bg: var(--ios-blue); } .export-toolbar .btn.btn-gold { --bg: var(--ios-orange); } .export-toolbar .btn.btn-danger { --bg: var(--ios-red); }
+.export-toolbar .btn.btn-success { --bg: var(--ios-green); } .export-toolbar .btn.btn-info { --bg: var(--ios-purple); } .export-toolbar #msaOrientBtn, .export-toolbar #msaFitBtn { --bg: var(--ios-teal); }
+.export-toolbar .btn, .export-toolbar .btn.btn-primary, .export-toolbar .btn.btn-gold, .export-toolbar .btn.btn-danger, .export-toolbar .btn.btn-success, .export-toolbar .btn.btn-info, .export-toolbar #msaOrientBtn, .export-toolbar #msaFitBtn { background: var(--bg) !important; }
+/* (ج) حبوب شريط الأعلى: ممتلئة بلون أيقونتها، الكتابة والسهم بيض، الأيقونة دائرة بيضا بلون الحبّة */
+.school-switcher, .topbar-dossier, .school-switcher:hover, .topbar-dossier:hover { --pc: var(--ios-navy); background: var(--pc) !important; border-color: var(--pc) !important; color: #fff !important; }
+.school-switcher:hover, .topbar-dossier:hover { filter: brightness(1.08); }
+.topbar-dossier { --pc: var(--ios-indigo); }
+.school-switcher:has(> i[style*="059669"]) { --pc: #059669; }
+.school-switcher:has(> i[style*="7c3aed"]) { --pc: #7c3aed; }
+.school-switcher:has(> i.fa-calendar), .school-switcher:has(> i.fa-calendar-days), .school-switcher:has(> i.fa-calendar-alt) { --pc: var(--ios-orange); }
+.school-switcher:has(> i.fa-school), .school-switcher:has(> i.fa-building), .school-switcher:has(> i.fa-city) { --pc: var(--ios-blue); }
+.school-switcher > i, .topbar-dossier .td-ic { background: #fff !important; color: var(--pc) !important; }
+.school-switcher select, .school-switcher .sm-btn, .school-switcher .sm-btn i, .topbar-dossier .td-txt span, .school-switcher .fa-caret-down { color: #fff !important; background: transparent !important; }
+.school-switcher select option { color: #1d1d1f; background: #fff; }
+.topbar .btn.btn-light { --bg: var(--ios-brown); }  /* اللغة Français/العربية */
+.topbar #msaFwdBtn { --bg: var(--ios-teal); }        /* ارجع لمحل ما كنت */
+/* (د) حبوب الخيارات غير المختارة: سماوية فاتحة بحدّ كحلي (المختارة تبقى كحلي ممتلئ) */
+.school-checks .chk:not(:has(input:checked)), .att-opts .att-row label:has(input):not(:has(input:checked)), .salcomp-bar .scb-opt:not(:has(input:checked)),
+.school-checks.scb-tiles .chk:not(:has(input:checked)), .school-checks.att-type-checks .chk:not(:has(input:checked)), .school-checks.att-lang-checks .chk:not(:has(input:checked)), .school-strip .ss-chip:not(.on):not(.active) {
+  background-color: #e3f2ff !important; border-color: #9cc9ef !important; color: var(--ios-navy) !important; }
+details > summary.btn:not(.btn-light), .reg-details > summary { background: #e3f2ff !important; border-color: #9cc9ef !important; color: var(--ios-navy) !important; }
+}
+/* (هـ) الجرس وحبوب لغة المستند وجهة الإكسل: ملوّنة لا بيضا (تكملة القسم 310) */
+@media screen {
+.bell-btn, .bell-btn:hover { background: var(--ios-orange) !important; border-color: var(--ios-orange) !important; color: #fff !important; }
+.bell-btn:hover { filter: brightness(1.08); }
+.rl-chips, .rl-sides { background: #e3f2ff !important; border-radius: 10px; padding: 2px; border: 1px solid #9cc9ef; }
+.rl-sides { border-inline-start: 0 !important; margin-inline-start: 4px; }
+.rl-chip, .rl-side, .export-toolbar .rl-chip, .export-toolbar .rl-side { background: transparent !important; color: var(--ios-navy) !important; font-weight: 700; }
+.rl-chip.on, .rl-side.on, .export-toolbar .rl-chip.on, .export-toolbar .rl-side.on { background: var(--ios-navy) !important; color: #fff !important; box-shadow: 0 1px 3px rgba(0,0,0,.18) !important; }
+}
+/* (و) تكملة 310: الخروج أحمر، الرجوع بشريط الأعلى تركواز، واسم المستخدم حبّة كحلية */
+@media screen {
+.btn:has(> .fa-sign-out-alt), .btn:has(> .fa-right-from-bracket), .topbar .btn.btn-light:has(> .fa-sign-out-alt) { --bg: var(--ios-red); }
+.topbar .btn.btn-light:has(> .fa-arrow-left), .topbar .btn.btn-light:has(> .fa-arrow-right) { --bg: var(--ios-teal); }
+.user-menu { background: var(--ios-navy) !important; color: #fff !important; border-color: var(--ios-navy) !important; }
+.user-menu span { color: #fff !important; }
+.user-menu .user-avatar { background: #fff !important; color: var(--ios-navy) !important; }
+}
