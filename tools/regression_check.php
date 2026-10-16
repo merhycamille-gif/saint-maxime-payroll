@@ -94,6 +94,9 @@ $noFatal = fn(string $h) => strpos($h, 'FATAL') !== 0 && stripos($h, 'Fatal erro
 echo "═══ فحص الانحدار — رواتب Saint-Maxime ═══\n\n";
 // 📚 (2026-10-16) أقسام مركز التقارير انتقلت من pages/reports.php إلى includes/report_center.php (مصدر واحد للصفحة ولأبواب الشريط العلوي)
 //    ⇒ كل فحص يقرأ «مصدر صفحة التقارير» يقرأ الملفين معاً كي تبقى الفحوص النصّية صحيحة (الاختبار 119 كان يسقط fatal على array_merge)
+// 📜 (2026-10-16) أنواع الإفادات ومجموعاتها انتقلت من pages/attestations.php إلى includes/attestation_types.php (مصدر واحد للصفحة ولباب «الإفادات» بالشريط) ⇒ الأنواع أوّلاً ثم الصفحة
+function regAttSrc(): string { global $PROJ; return (string)file_get_contents($PROJ . '/includes/attestation_types.php') . "
+" . (string)file_get_contents($PROJ . '/pages/attestations.php'); }
 function regReportsSrc(): string { global $PROJ; return (string)file_get_contents($PROJ . '/pages/reports.php') . "
 " . (string)file_get_contents($PROJ . '/includes/report_center.php'); }
 
@@ -264,7 +267,7 @@ check('رؤوس الجداول كحلية #1F4E5F (شاشة + طباعة)', subs
 check('حجم الخط 12pt بالتقارير (doc-table + رؤوس + فقرات النماذج)',
       strpos($hlpSrc, 'font-size:12pt;margin:10px 0') !== false          // .doc-table
       && substr_count($hlpSrc, 'font-size:12pt') >= 6);                   // th/info-grid/fline/doc-p/sign-box
-$attSrc = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
+$attSrc = (string)regAttSrc();
 check('حجم الخط 12pt بالإفادات (أجسام الإفادات الثلاثة)', substr_count($attSrc, 'font-size:12pt') >= 3);
 // (2026-08-20) بطلب المستخدم: خط الإفادات Arial (متل «أبجد هوز» بالوورد) بكل اللغات —
 // القاعدة معرَّفة بمواضع العرض الثلاثة (إفادة الضمان + نمط مكسيموس + القسم العام) وبلا Sakkal بالصفحة
@@ -1135,7 +1138,7 @@ check('الكشف السنوي: الإجمالي/الصافي/المستحق ت�
       strpos($asSrc, '$hidRow') !== false && strpos($asSrc, "\$money(\$r['brut'] - \$hR, true)") !== false
       && strpos($aeSrc, "\$r['brut'] - \$hR") !== false && strpos($aeSrc, "\$t['net'] - \$hT") !== false);
 check('إفادة الضمان: سطر النقل يظهر عند اختياره فيساوي المجموع',
-      strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), '$attTrans = $incTrans') !== false);
+      strpos((string)regAttSrc(), '$attTrans = $incTrans') !== false);
 $elSrc = (string)file_get_contents(__DIR__ . '/../pages/exceptional_laws.php');
 check('القوانين الاستثنائية: العدد = أساتذة فعليون (DISTINCT + غير محذوفين + نطاق المدارس)',
       strpos($elSrc, 'COUNT(DISTINCT gh.employee_id)') !== false && strpos($elSrc, "schoolScopeSql('e.school_id')") !== false);
@@ -1217,7 +1220,7 @@ check('تحويل دولار←ليرة بلا فراطات (usdToLbp تدوير
       && strpos($pcSrcU, '*= $this->exchangeRate') === false
       && preg_match('/base_salary_usd.{0,30}\*\s*\$this->exchangeRate/', $pcSrcU) === 0
       && substr_count($pcSrcU, 'usdToLbp(') >= 5
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), "usdToLbp(\$emp['base_salary_usd']") !== false
+      && strpos((string)regAttSrc(), "usdToLbp(\$emp['base_salary_usd']") !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/bulk_allowances.php'), 'usdToLbp(') !== false);
 // والدولار المعروض من الجافاسكريبت أيضاً بلا فراطات (Math.floor لا سنتات)
 $appJsU = (string)file_get_contents(__DIR__ . '/../assets/js/app.js');
@@ -1305,7 +1308,7 @@ check('السعر الرسمي (÷1500) خيار بالإعدادات: القا�
       && strpos((string)file_get_contents(__DIR__ . '/../pages/bulk_allowances.php'), 'officialUsdRateLbl()') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/employees.php'), 'officialUsdRateLbl()') !== false);
 // التفقيط بالإفادات يتبع نفس الرقم المعروض (floor لا round)
-$attSrcU = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
+$attSrcU = (string)regAttSrc();
 check('الإفادات: تفقيط الدولار بالحروف = الرقم المعروض نفسه (floor)',
       strpos($attSrcU, '(int)floor($usdOf($lbp))') !== false
       && strpos($attSrcU, '(int)round($usdOf($lbp))') === false);
@@ -1748,7 +1751,7 @@ check('القالب الموحّد: التقارير الستة بمركز ال�
 check('وضع عرض المستند: مفعَّل بمركز التقارير والنماذج الرسمية فقط — لا يلمس البطاقة السنوية/الإفادات/السيرة',
       strpos($repSrc27, '$docFocus = true') !== false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/official_forms.php'), '$docFocus = true') !== false
-      && strpos((string)file_get_contents(__DIR__ . '/../pages/attestations.php'), '$docFocus = true') === false
+      && strpos((string)regAttSrc(), '$docFocus = true') === false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/annual_slip.php'), '$docFocus = true') === false
       && strpos((string)file_get_contents(__DIR__ . '/../pages/employee_history.php'), '$docFocus = true') === false
       // الخلفية الرمادية الغامقة ممنوعة (شكوى «مغبّر»)؛ المسموح الوحيد = الأبيض بطلبه 2026-10-02 «صفحة التقارير بس تطلع بدها تكون الباكروند أبيض»
@@ -2048,7 +2051,7 @@ check('أندره مراد مُستعاد بالكامل (اسم + رقم مال
 /* =====================================================================
  * 32) تنظيف الإفادات وعقد التعليم (طلب المستخدم 2026-08-03)
  * =================================================================== */
-$atSrc32 = (string)file_get_contents(__DIR__ . '/../pages/attestations.php');
+$atSrc32 = (string)regAttSrc();
 check('الإفادات: لا رقم هاتف تحت توقيع المدير/الإدارة',
       strpos($atSrc32, 'e($sigPhone)') === false);
 check('الإفادات: «على رأس عمله» استُبدلت بـ«حتى تاريخه» (راتب/عمل/ملاك)',
@@ -2533,7 +2536,7 @@ check('الكشف يطابق الملف: صفر موظف معدّ مخزّنُ �
  *     فتخالف الكشوف المعروضة — صارت تقرأ من السنة الدراسية المعروضة نفسها،
  *     وإفادة عمل الضمان (٦ أشهر) لا تعرض أشهراً مستقبلية أبداً.
  * =================================================================== */
-$atSrc39 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$atSrc39 = (string)regAttSrc();
 $ehSrc39 = (string)file_get_contents($PROJ . '/pages/employee_history.php');
 $ofSrc39 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
 check('مصدر واحد: الإفادات تختار شهر الراتب من السنة المعروضة أولاً (fallback إجمالي)',
@@ -3046,7 +3049,7 @@ check('نماذج الضمان الثلاثة: القوالب الرسمية م�
       is_file($PROJ . '/assets/templates/cnss_hire_new.xlsx')
       && is_file($PROJ . '/assets/templates/cnss_hire_reg.xlsx')
       && is_file($PROJ . '/assets/templates/cnss_leave.xlsx'));
-$at52 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$at52 = (string)regAttSrc();
 $oe52 = (string)file_get_contents($PROJ . '/pages/official_export.php');
 check('نماذج الضمان الثلاثة: الأنواع مضافة بصفحة الإفادات وبمجموعة «راتب وعمل وضمان» بملف الأستاذ',
       strpos($at52, "'cnss_hire_new'") !== false && strpos($at52, "'cnss_hire_reg'") !== false
@@ -3071,7 +3074,7 @@ check('نماذج الضمان الثلاثة: تاريخ الترك من ملف
       && strpos($oe52, "\$_GET['ld']") === false);
 // «بعدك ما عم بتحط تاريخ الترك» (2026-08-18): إن كان ملف الموظف بلا تاريخ ترك، شاشة
 // إعلام الترك تعرض خانة تحفظه **بملف الموظف نفسه** (left_date_cnss عبر POST بحماية CSRF)
-$at52b = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$at52b = (string)regAttSrc();
 check('نماذج الضمان الثلاثة: ملف بلا تاريخ ترك → خانة حفظ التاريخ بملف الموظف (POST + CSRF) موجودة',
       strpos($at52b, "isset(\$_POST['save_leave_date'])") !== false
       && strpos($at52b, 'requireCsrf();') !== false
@@ -3122,7 +3125,7 @@ check('تفتيش الأستاذ: الويدجت موجودة ومربوطة ب�
       && strpos($ssJs53, 'data-phone') !== false && strpos($ssJs53, '[أإآٱ]') !== false
       && strpos((string)file_get_contents($PROJ . '/includes/footer.php'), 'select-search.js') !== false);
 check('تفتيش الأستاذ: رقم الهاتف مزروع data-phone بقوائم الصفحات الأربع',
-      substr_count((string)file_get_contents($PROJ . '/pages/attestations.php'), 'data-phone=') >= 1
+      substr_count((string)regAttSrc(), 'data-phone=') >= 1
       && substr_count((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'data-phone=') >= 1
       && substr_count((string)file_get_contents($PROJ . '/pages/employee_history.php'), 'data-phone=') >= 1
       && substr_count((string)file_get_contents($PROJ . '/pages/official_forms.php'), 'data-phone=') >= 1);
@@ -3272,11 +3275,11 @@ check('واجهة أنعم: رؤوس البطاقات شرائط رفيعة فا
       && strpos($css58, '.dash-sec-head .ds-fr { font-weight:700; font-size:12.5px; color:var(--sec-c);') !== false);
 check('شريط التصدير مخفيّ بصفحات القوائم (تقارير/إفادات/نماذج/تصاريح — لا شيء يُصدَّر منها)',
       strpos((string)regReportsSrc(), "if (\$report === '') \$hideExportToolbar = true;") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), "if (!\$emp) \$hideExportToolbar = true;") !== false
+      && strpos((string)regAttSrc(), "if (!\$emp) \$hideExportToolbar = true;") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/official_forms.php'), "if (\$form === '') \$hideExportToolbar = true;") !== false
       && strpos((string)file_get_contents($PROJ . '/pages/tax_declarations.php'), '$hideExportToolbar = true;') !== false);
 check('لا أزرار «رجوع لملف الأستاذ» مكرَّرة بصفحات الإفادات (الرجوع بالهيدر + زرّ Dossier)',
-      strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), 'رجوع لملف الأستاذ') === false);
+      strpos((string)regAttSrc(), 'رجوع لملف الأستاذ') === false);
 // 🧾 الإفادة المدرسية لصندوق التعويضات: تفصيل الراتب (أساس/إضافي/مكافأة ثم المجموع) حسب
 // خيارات «الراتب يشمل» — تجربة فعلية بموظفة عندها أجر إضافي
 $h58 = renderPage('pages/attestations.php', ['employee_id' => 968, 'type' => 'afade_madrasiya', 'lang_doc' => 'ar',
@@ -4897,7 +4900,7 @@ check('لا بقايا قسمة مباشرة للإضافي على السعر ب
       && strpos($calcSrc97, 'prime_fixe_usd_law = VALUES(prime_fixe_usd_law)') !== false
       && strpos($calcSrc97, 'total_due_usd = ?, prime_fixe_usd_law = ?') !== false
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healPrimeUsdLaw20260903();') !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), '$extraWUsd = ($sal && (int)($sal[\'prime_fixe_usd_law\'] ?? 0) > 0) ? extraWageUsd($sal) : null;') !== false);
+      && strpos((string)regAttSrc(), '$extraWUsd = ($sal && (int)($sal[\'prime_fixe_usd_law\'] ?? 0) > 0) ? extraWageUsd($sal) : null;') !== false);
 // 🔴 («كل شي مطابق ونفس الأرقام بكل التقارير» 2026-09-03) أي SELECT يجيب أعمدة الإضافي صراحةً لعرضها يجب أن يجيب prime_fixe_usd_law معها
 //    (لائحة الدفع كانت 837 $ لأن استعلامها بلا العمود) + المجاميع الفرعية تجمع دولارات القانون لا تقسم الليرة (cnss/tax/eoc summaries)
 $bad97 = [];
@@ -4910,7 +4913,7 @@ $repSrc97 = (string)regReportsSrc();
 check('كل استعلام عرض يجيب extra_lbp/prime_fixe_lbp صراحةً يجيب prime_fixe_usd_law معه + المجاميع الفرعية بالكشوف تجمع دولارات القانون (لا money($a[extra]) ولا money($teEx)) + الإفادة: الإضافي وحده بدولار القانون والمجاميع ÷ السعر كباقي التقارير',
       !$bad97 && strpos($repSrc97, "money(\$a['extra'], \$repRate)") === false && strpos($repSrc97, "money(\$teEx, \$repRate)") === false
       && strpos($repSrc97, "dualFromUsd(\$a['extra'], \$a['extra_usd'])") !== false && strpos($repSrc97, "dualFromUsd(\$teEx, \$teExU)") !== false
-      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), "if (\$extraWUsd !== null && \$extraW > 0 && (int)\$lbp === (int)\$extraW) return \$extraWUsd;") !== false,
+      && strpos((string)regAttSrc(), "if (\$extraWUsd !== null && \$extraW > 0 && (int)\$lbp === (int)\$extraW) return \$extraWUsd;") !== false,
       $bad97 ? implode(', ', $bad97) : 'ok');
 // حيّ: بعد شفاء التعبئة محلياً، كل صف بإضافي نسبةٍ له عمود قانون = floor(floor(bpe/1500)×pct) — عيّنة أصحاب النسبة
 $miss97 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employee_bonuses b ON b.employee_id=ms.employee_id AND b.bonus_type='prime_fixe' AND b.is_active=1 AND b.value_type='percent' AND (b.school_year IS NULL OR b.school_year=ms.school_year) AND b.start_month IS NULL
@@ -6289,7 +6292,7 @@ check('التنزيل العائلي بكل الكشوف (تشغيل فعلي): 
  *     الإفادات من خانة الجنس بملف الموظف — معروف ⇒ «السيّد… يعمل… مدرّس… طلبه» أو «السيّدة… تعمل…
  *     مدرّسة… طلبها» (وM./Mme بالفرنسي)؛ مجهول ⇒ الصيغة المزدوجة (ة) كما كانت + خانة جنس حمراء تُحفَظ بالملف.
  * =================================================================== */
-$at129 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$at129 = (string)regAttSrc();
 check('جنس الإفادات (كود): $g(مذكّر, مؤنّث, مزدوج) مصدر واحد + خانة الجنس بشريط الخيارات تُحفَظ بالملف + لا صيغة مزدوجة خام بالنصوص',
       strpos($at129, "\$g = function (string \$m, string \$f, string \$both, ?string \$miss = null) use (\$attGender): string {") !== false
       && substr_count($at129, "\$g('") >= 30
@@ -6341,7 +6344,7 @@ check('جنس الإفادات (تشغيل فعلي): ذكر ⇒ صيغة الم
  *     2026-2027 كانت تأخذ آخر شهر بالسنة (أيلول 2027 صيفي بلا نقل ⇒ النقل 0 رغم تأشيره). صار الشهر = آخر شهر
  *     لا يتجاوز تاريخ الإفادة، وإن كانت السنة كلها مستقبلية فأوّل شهر فيها (تشرين الأول بنقله 18,000,000).
  * =================================================================== */
-$at130 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$at130 = (string)regAttSrc();
 check('شهر الإفادة (كود): الاختيار مقيَّد بتاريخ الإفادة (≤ attYm أوّلاً، ثم أقرب شهر مستقبلي)',
       strpos($at130, "\$attYm = (int)date('Ym', strtotime(\$effDate) ?: time());") !== false
       && strpos($at130, "(year*100+month <= \$attYm) DESC,") !== false
@@ -6368,7 +6371,7 @@ check('شهر الإفادة (تشغيل فعلي): كميل مرعي 15/9/2026 
  *     البرنامج موحّد وكل الخيارات بكل المحلات» (2026-09-15): شريط المكوّنات + العملة بكل الإفادات العامة (16 نوعاً)
  *     — النماذج الرسمية الثابتة (ضمان/ر3) لها شاشاتها الخاصة.
  * =================================================================== */
-$at131 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$at131 = (string)regAttSrc();
 check('خيارات الإفادات موحّدة (كود): $hasComponents و$hasCurrency = true بلا قوائم أنواع',
       strpos($at131, "\$hasComponents = true;") !== false && strpos($at131, "\$hasCurrency   = true;") !== false
       && strpos($at131, "\$printsSalary  = in_array(\$type, ['cnss', 'afade_madrasiya', 'isqat_haq', 'salaire', 'embassy', 'aqd_taalim'], true);") !== false);
@@ -6385,7 +6388,7 @@ check('خيارات الإفادات موحّدة (تشغيل فعلي): 15 نو
  *     (2026-09-15): إفادة الضمان كانت تطبع سطر «الأجر الإضافي» دائماً (بصفر) والمكافأة مدموجة فيه؛ وعقد التعليم
  *     كان يجمع النقل ولو شِيل خياره. صار كل مكوّن يتبع مربّعه بكل الإفادات: مشيول = لا سطر ولا بالمجموع.
  * =================================================================== */
-$at132 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$at132 = (string)regAttSrc();
 check('خيارات المكوّنات تُحترَم (كود): إفادة الضمان سطر لكل مكوّن مختار + عقد التعليم النقل يتبع مربّعه',
       substr_count($at132, "foreach (\$cnssParts as \$cp)") === 2
       && substr_count($at132, "\$cTrans  = \$incTrans ? (int)\$transW : 0;") === 2 // (2026-09-24) \$transW لا \$sal مباشرة — يصفَّر مع المبلغ اليدوي
@@ -6414,7 +6417,7 @@ check('خيارات المكوّنات تُحترَم (تشغيل فعلي): إ�
  *     — أوّل فتح = زرّا ملف الموظف «الضمان يشمل…» وبلا نقل؛ والشهر = آخر شهر ≤ تاريخ التصريح.
  * =================================================================== */
 $oe133 = (string)file_get_contents($PROJ . '/pages/official_export.php');
-$at133 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$at133 = (string)regAttSrc();
 check('تصريح استخدام أجير (كود): الراتب من مربّعات الشاشة + العملة + الشهر ≤ تاريخ التصريح، والشاشة تمرّرها بالرابط',
       strpos($oe133, "\$incExtra = \$decOpts ? !empty(\$_GET['inc_extra']) : !empty(\$emp['cnss_includes_extra']);") !== false
       && strpos($oe133, "(\$incTrans ? (int)(\$sal['transport_lbp'] ?? 0) : 0)) : 0;") !== false
@@ -6454,7 +6457,7 @@ check('تصريح استخدام أجير (تشغيل فعلي): كميل مرع
  *     تعمل على صفحة الخيارات لا على النموذج الرسمي. صار الشريط نفسه (مجموعة أزرار وحدة — الكبيرة انشالت) يعمل على
  *     النموذج المعبّأ بخيارات الشاشة الحالية عبر msaOfficialToolbar (export.js) — بالضمان الثلاثة ور3.
  * =================================================================== */
-$at134 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$at134 = (string)regAttSrc();
 $js134 = (string)file_get_contents($PROJ . '/assets/js/export.js');
 check('شريط النماذج الرسمية (كود): msaOfficialToolbar بـexport.js + 3 نداءات بالصفحة (ضمان الثلاثة + إفادة عمل الضمان + ر3) بعد DOMContentLoaded + لا أزرار كبيرة مكرّرة',
       strpos($js134, 'window.msaOfficialToolbar = function (o) {') !== false
@@ -6895,7 +6898,7 @@ check('📐 الصافي دغري بعد المحسومات: كشف الروات
  *      ⚠️ 2026-09-23 (تريزيا مارون «البطاقة ما بيّنت قيمة الدولار بالعناوين»): السطر يظهر بكل أوضاع العملة بما فيها «ليرة فقط» (كان يُخفى فيه).
  */
 $fn145 = (string)file_get_contents($PROJ . '/includes/functions.php'); $rh145 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
-$of145 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $at145 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$of145 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $at145 = (string)regAttSrc();
 $sch145 = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$regEid)->fetchColumn() ?: 3; // مستندات الموظف بمدرسته وشهره (6/2026)
 $docs145 = [
     ['pages/official_forms.php', ['form' => 'salary_all', 'month' => 10, 'year' => 2025], true, [3], '2025-2026'],
@@ -7690,7 +7693,7 @@ if ($eid166) {
     $aAf = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => 'afade_madrasiya', 'lang_doc' => 'en'], []));
     $c166('sig-afade-en', strpos($aAf, 'Director of : <strong>') !== false && strpos($aAf, 'Signature of the Director') !== false);
     // «كل الإفادات لازم» (2026-09-24): لا «رئيسة المدرسة» ثابتة ولا «Directrice/Principal» — الصفة المختارة بكل الإفادات (إنهاء الخدمات/الإنذاران/الاستقالة/العقد)
-    $at166 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+    $at166 = (string)regAttSrc();
     $c166('no-fixed-head-in-code', strpos($at166, '<strong>رئيسة المدرسة</strong>') === false && strpos($at166, 'La Directrice de l') === false && strpos($at166, 'School Principal') === false && strpos($at166, 'رئيسة أو مديرة') === false && strpos($at166, 'رئيس أو مدير') === false && strpos($at166, 'حضرة مديرة مدرسة') === false && strpos($at166, 'من قبل رئيس المدرسة') === false);
     foreach (['anhaa_khedme' => ['رئيسة المدرسة', 'مدير المدرسة'], 'notice_mail' => ['رئيسة المدرسة', 'مدير المدرسة'], 'talab_istiqala' => ['حضرة رئيسة مدرسة :', 'حضرة مدير مدرسة :']] as $ty166 => $w166) {
         $aR = $area166(renderPage('pages/attestations.php', ['employee_id' => $eid166, 'type' => $ty166], []));
@@ -8627,7 +8630,7 @@ check('👥📅 المجاميع السنوية: «عدد الأشخاص / Effec
  *      بـapp.css (عام) — كل خيار بسطره (تسمية 240px + خاناته)، لا فواصل «|» ولا رصّ حرّ؛ كل الخانات (name=) وسلوكها (onchange) كما كانت.
  *      + شريط تصريح الضمان (cnss_leave: المكوّنات سطر، العملة سطر). الـdiv متوازنة بكل نوع.
  * =================================================================== */
-$css188 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $at188 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$css188 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $at188 = (string)regAttSrc();
 $emp188 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
 $ok188 = strpos($css188, '.att-opts{display:grid;grid-template-columns:1fr;') !== false /* عمود واحد (p1 لاحقاً) */ && strpos($css188, '.att-opts .att-k{flex:0 0 240px;') !== false
       && strpos($at188, 'color:#cbd5e1">|</span>') === false && strpos($at188, '<div class="card-body att-opts"') !== false && strpos($at188, '<div class="form-group att-opts" style="grid-column:1 / -1">') !== false
@@ -8698,7 +8701,7 @@ $ok191 = function_exists('attestationSchoolNounFilter') && schoolNameArDisplay('
       && attestationSchoolNounFilter("Directeur de l'école <strong>Collège X</strong>", 'مدرسة كذا', 'Ecole Y') === "Directeur de l'école <strong>Collège X</strong>" /* école ≠ Collège ⇒ لا حذف */
       && attestationSchoolNounFilter('رئيسة مدرسة : <strong>مدرسة سيدة النجاة</strong> إدارة المدرسة', 'مدرسة سيدة النجاة', 'Collège Y') === 'رئيسة مدرسة : <strong>سيدة النجاة</strong> إدارة المدرسة'
       && attestationSchoolNounFilter('the school records. School Administration', 'ثانوية', 'Collège X') === 'the college records. College Administration'
-      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), '$__doc = attestationSchoolNounFilter($__doc, (string)$schoolNameAr, (string)$schoolNameFr);') !== false;
+      && strpos((string)regAttSrc(), '$__doc = attestationSchoolNounFilter($__doc, (string)$schoolNameAr, (string)$schoolNameFr);') !== false;
 $why191 = '';
 $doc191 = function (string $h) { return preg_match('#<div id="ppExportArea".*#su', $h, $m) ? html_entity_decode(preg_replace('/\s+/', ' ', strip_tags(str_replace(['<br>', '</p>'], [' ', ' '], $m[0]))), ENT_QUOTES, 'UTF-8') : ''; };
 // حيّ: مؤسّسة أوّل كلمتها ليست «مدرسة» (ثانوية/دار/دير/مركز…) ولها موظف براتب ⇒ كلمتها بالنصّ ولا «المدرسة»؛ وإلا يُكتفى بالوحدات
@@ -8731,7 +8734,7 @@ $ok192 = $e192 > 0 && preg_match('#<div class="id-line"[^>]*><div>(.*?)</div></d
 $inner192 = $ok192 ? $m192[1] : '';
 $ok192 = $ok192 && substr_count($inner192, '</div><div>') === 2 && strpos($inner192, '&nbsp;·&nbsp;') === false
       && preg_match('#رقم الضمان.*</div><div>.*الرقم المالي.*</div><div>.*رقم صندوق التعويضات#su', $inner192) === 1
-      && strpos((string)file_get_contents($PROJ . '/pages/attestations.php'), "<div>' . implode('</div><div>', \$idParts) . '</div></div>'") !== false;
+      && strpos((string)regAttSrc(), "<div>' . implode('</div><div>', \$idParts) . '</div></div>'") !== false;
 check('🪪 أرقام الضمان/المالية/الصندوق بالإفادة تحت بعض (سطر لكل رقم) لا على سطر واحد (2026-09-27)', $ok192, 'emp=' . $e192 . ' divs=' . ($inner192 !== '' ? substr_count($inner192, '</div><div>') + 1 : 0));
 
 /* =====================================================================
@@ -8741,7 +8744,7 @@ check('🪪 أرقام الضمان/المالية/الصندوق بالإفاد
  *      الأستاذ، واللغة 3 خانات؛ زرّ «الملف الكامل» لا يتعطّل بشرط الاختيار (formnovalidate).
  * =================================================================== */
 $h193 = renderPage('pages/attestations.php', ['dossier' => 1], [], [2], '', '2025-2026');
-$src193 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$src193 = (string)regAttSrc();
 $css193 = (string)file_get_contents($PROJ . '/assets/css/app.css');
 $nTypes193 = preg_match_all("/^    '([a-z0-9_]+)'\s*=>\s*\['fr'/m", substr($src193, strpos($src193, '$ATT_TYPES = ['), strpos($src193, '$DOC_LANGS') - strpos($src193, '$ATT_TYPES = [')), $mt193);
 $radios193 = preg_match_all('/<input type="radio" name="type" value="([a-z0-9_]+)"/', $h193, $mr193);
@@ -8949,7 +8952,7 @@ check('🗂️ مستندات الأساتذة تُنزَّل كاملة بـtar
  * =================================================================== */
 $js200 = (string)file_get_contents($PROJ . '/assets/js/app.js');
 $hd200 = (string)file_get_contents($PROJ . '/includes/header.php');
-$at200 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$at200 = (string)regAttSrc();
 $okSrc200 = strpos($js200, 'window.msaPrevPage = function () {') !== false && strpos($js200, "var NK = 'msa_nav'") !== false
     && strpos($js200, "window.msaHasPrev = function ()") !== false && strpos($js200, "function restoreY(y)") !== false && strpos($js200, "window.addEventListener('pagehide', saveY)") !== false
     && strpos($hd200, 'if(!(window.msaPrevPage&&msaPrevPage())){') !== false
@@ -9978,7 +9981,7 @@ check('📧 إيميل البرنامج MSA Payroll + خيار المدرسة (p
  *      (إن كان له إيميل بملفه) · ✍️ إيميل آخر — footer.php يعرّف MSA_SCHOOL_EMAIL/MSA_TEACHER_EMAIL، وexport.js يستعملها
  *      بـppEmail وmsaAskEmail (الإفادات والنماذج الرسمية بدل window.prompt).
  * =================================================================== */
-$ft251 = (string)file_get_contents($PROJ . '/includes/footer.php'); $ex251 = (string)file_get_contents($PROJ . '/assets/js/export.js'); $at251 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+$ft251 = (string)file_get_contents($PROJ . '/includes/footer.php'); $ex251 = (string)file_get_contents($PROJ . '/assets/js/export.js'); $at251 = (string)regAttSrc();
 $ok251 = false; $why251 = '';
 try {
     $e251 = (int)$db->query("SELECT id FROM employees WHERE is_deleted = 0 AND email LIKE '%@%' ORDER BY id LIMIT 1")->fetchColumn();

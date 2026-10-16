@@ -977,7 +977,8 @@ document.addEventListener('submit', function (e) {
             $sct = salaryCompToolbar();
             // 🌍 (2026-10-10 الرواتب الشهرية «أحدث تنظيم»): الصفحة تطلب $compactSalaryComp ⇒ الخيارات الخمسة نفسها مطوية بكبسة واحدة
             // «Colonnes & options» (مثل كبسة «خيارات الطبع») — لا يتغيّر أي خيار ولا سلوكه، فقط يطلع الجدول لفوق.
-            if (!empty($compactSalaryComp)) {
+            // 📐 (2026-10-16 «الخيارات معجّقة وآخدة كل الصفحة — رتّبها بكل صفحات الطبع») الطيّ صار الافتراضي بكل الصفحات؛ الصفحة تضع $compactSalaryComp = false لإظهار الأسطر الخمسة
+            if (!isset($compactSalaryComp) || $compactSalaryComp) {
                 $sct = '<details class="export-compact no-print"><summary class="btn btn-sm btn-light"><i class="fas fa-sliders-h"></i> Colonnes &amp; options / الأعمدة والخيارات</summary>' . $sct . '</details>';
             }
             $msaTopBars .= $sct;
@@ -995,7 +996,7 @@ document.addEventListener('submit', function (e) {
             $msaTopBars .= '<details class="export-compact no-print"><summary class="btn btn-sm btn-light"><i class="fas fa-print"></i> Impression &amp; export / خيارات الطبع</summary>'
                          . exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []) . '</details>';
         }
-        if ($msaTopBars !== '' && !empty($compactSalaryComp)) {
+        if ($msaTopBars !== '' && (!isset($compactSalaryComp) || $compactSalaryComp)) {
             $msaTopBars = '<div class="msa-bars-row no-print">' . $msaTopBars . '</div>'; // الكبستان بسطر واحد
         }
         if ($msaTopBars !== '') {

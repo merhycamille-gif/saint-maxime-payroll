@@ -2912,3 +2912,46 @@ body:not(.doc-view) { background: linear-gradient(180deg, var(--page-bg) 0%, var
 .topbar #msaFwdBtn, #msaFwdBtn.btn { --bg: #ff2d55; }
 .topbar .btn.btn-light:has(> .fa-arrow-left), .topbar .btn.btn-light:has(> .fa-arrow-right), .topbar #msaFwdBtn { font-weight: 700 !important; box-shadow: 0 2px 6px rgba(0,0,0,.18) !important; }
 }
+
+/* ═══ 340 🏫 (2026-10-16 «انتبه فوت وشوف محل بدي شوف المدارس») اللائحة المنسدلة داخل حبّة ملوّنة (المدارس / الراتب يشمل) كانت ترث الخطّ
+ *      الأبيض من الحبّة فتطلع الأسماء بيضا على أبيض ⇒ اللائحة بيضا بخطّ غامق، والمختار كحلي بخطّ أبيض. ═══ */
+@media screen {
+.school-switcher .school-menu, .school-switcher .scb-menu { background: #fff !important; color: #1d1d1f !important; }
+.school-switcher .school-menu *, .school-switcher .scb-menu * { color: #1d1d1f; }
+.school-switcher .school-menu .chk:has(input:checked), .school-switcher .school-menu .chk:has(input:checked) *, .school-switcher .scb-menu .chk:has(input:checked), .school-switcher .scb-menu .chk:has(input:checked) * { color: #fff !important; }
+.school-switcher .school-menu .btn, .school-switcher .school-menu .btn *, .school-switcher .scb-menu .btn, .school-switcher .scb-menu .btn * { color: #fff !important; }
+}
+
+/* ═══ 350 🟡 (2026-10-16 فحص التباين contrast_audit.js) الدائرة الصفرا للأحرف الأولى (--ic3) كانت فاتحة فالحروف البيضا عليها ما تنقرا ⇒ عنبري أغمق. ═══ */
+@media screen { :root { --ic3: #c9900e; } }
+
+/* ═══ 360 📐 (2026-10-16 «الخيارات بدها ترتيب معجّقة وآخدة كل الصفحة تقريباً — رتّبها بكل صفحات الطبع») ما فوق المستند يصير مضغوطاً بكل الصفحات:
+ *      فلتر الاختيار (الفئة/الضريبة/الشهر/السنة/فلترة) بسطر واحد بدل 3 أعمدة وبطاقة عالية · شارة التصريح المجمّع والمدرسة أصغر ·
+ *      صندوق النموذج الرسمي سطر واحد بكبستين عاديّتين · خيارات الراتب الخمسة مطويّة بكبسة «الأعمدة والخيارات» (header.php) بجنب كبسات الطباعة. شاشة فقط. ═══ */
+@media screen {
+.page-content form.card.no-print, .page-content .card.no-print { margin-bottom: 8px !important; }
+.page-content form.card.no-print > .card-body.form-row { display: flex !important; flex-wrap: wrap; align-items: flex-end; gap: 6px 14px; padding: 8px 12px !important; }
+.page-content form.card.no-print > .card-body.form-row > .form-group { margin: 0 !important; min-width: 0; flex: 0 1 auto; }
+.page-content form.card.no-print > .card-body.form-row .form-label { margin-bottom: 3px; font-size: 12px; white-space: nowrap; }
+.page-content form.card.no-print > .card-body.form-row .form-select, .page-content form.card.no-print > .card-body.form-row .form-control { min-width: 170px; height: 34px; padding: 4px 10px; font-size: 13px; }
+.page-content form.card.no-print > .card-body.form-row .btn.w-100 { width: auto !important; min-width: 130px; height: 34px; padding: 4px 16px; }
+.page-content form.card.no-print .school-checks { padding: 3px 6px; gap: 6px; }
+.page-content div.no-print[style*="eef2ff"] { padding: 6px 12px !important; margin-bottom: 8px !important; font-size: 12.5px !important; font-weight: 600 !important; line-height: 1.35; }
+.page-content div.no-print[style*="eef2ff"] > div { margin-top: 3px !important; font-size: 12px; }
+.page-content div.no-print[style*="e9f9ee"] { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 12px; padding: 8px 12px !important; margin-bottom: 8px !important; }
+.page-content div.no-print[style*="e9f9ee"] > div { margin: 0 !important; font-size: 13px !important; flex: 0 1 auto; }
+.page-content div.no-print[style*="e9f9ee"] .btn-lg { padding: 6px 14px !important; font-size: 13px !important; }
+.msa-bars-row { margin-bottom: 8px; }
+.export-compact[open] > summary { margin-bottom: 6px; }
+}
+
+/* ═══ 370 🎛️ (2026-10-16) كبستا «الأعمدة والخيارات» و«خيارات الطبع» المطويّتان كانتا باهتتين (قاعدة قديمة أعلى تخصيصاً بالقسم 300) ⇒ ممتلئتان بلون أيقونتهما (خيارات بنفسجي · طباعة أزرق)، والمفتوحة أغمق قليلاً. ═══ */
+@media screen {
+.msa-bars-row > details.export-compact > summary, .msa-bars-row > details.export-compact > summary.btn, details.export-compact > summary.btn, .page-content details.export-compact > summary.btn {
+  background: var(--bg, var(--ios-violet)) !important; color: #fff !important; border-color: transparent !important; font-weight: 600 !important; }
+.msa-bars-row > details.export-compact > summary i, details.export-compact > summary.btn i, .page-content details.export-compact > summary.btn i { color: #fff !important; }
+.msa-bars-row > details.export-compact[open] > summary, details.export-compact[open] > summary.btn { filter: brightness(.88); }
+}
+
+/* ═══ 380 🔎 (2026-10-16 فحص التباين) السطر العربي تحت عنوان البطاقة (div بشفافية .95) يرث لون العنوان بدل الرمادي — كان رمادياً على رأس غامق بصفحة فتح السنة. ═══ */
+@media screen { .card-header h3 > div[style*="opacity:0.95"], .card-header h3 > div[style*="opacity:0.9"] { color: inherit !important; } }
