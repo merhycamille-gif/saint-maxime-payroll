@@ -2955,3 +2955,14 @@ body:not(.doc-view) { background: linear-gradient(180deg, var(--page-bg) 0%, var
 
 /* ═══ 380 🔎 (2026-10-16 فحص التباين) السطر العربي تحت عنوان البطاقة (div بشفافية .95) يرث لون العنوان بدل الرمادي — كان رمادياً على رأس غامق بصفحة فتح السنة. ═══ */
 @media screen { .card-header h3 > div[style*="opacity:0.95"], .card-header h3 > div[style*="opacity:0.9"] { color: inherit !important; } }
+
+/* ═══ 390 📏 (2026-10-16 «بدي تكون بنفس السطر») كبسات الطباعة + كبسة «الأعمدة والخيارات» بسطر واحد على الشاشات العريضة: حشوة وفراغات أضيق قليلاً وخطّ 12px. ═══ */
+@media screen and (min-width: 1501px) {
+.msa-bars-row { gap: 6px; }
+.msa-bars-row > .export-toolbar { gap: 4px !important; }
+.msa-bars-row > .export-toolbar .btn, .msa-bars-row > .export-toolbar .btn.btn-sm, .msa-bars-row > .export-toolbar a.btn { padding: 6px 9px !important; font-size: 12px !important; gap: 5px; min-height: 36px !important; }
+.msa-bars-row > .export-toolbar .btn i { font-size: 16px !important; width: 18px; }
+.msa-bars-row > .export-toolbar .rl-chips, .msa-bars-row > .export-toolbar .rl-sides { padding: 1px; }
+.msa-bars-row > .export-toolbar .rl-chip, .msa-bars-row > .export-toolbar .rl-side { padding: 5px 8px; font-size: 12px; }
+.msa-bars-row > details.export-compact > summary, .msa-bars-row > details.export-compact > summary.btn { padding: 6px 10px !important; font-size: 12px !important; min-height: 36px !important; }
+}
