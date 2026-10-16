@@ -13,7 +13,16 @@ $sh = function (string $cmd): string {
     $o = @shell_exec($cmd . ' 2>&1'); return $o === null || trim((string)$o) === '' ? '(لا شيء)' : trim((string)$o);
 };
 echo "host: " . programMailDomain() . " | mail() available: " . var_export(programMailAvailable(), true) . " | from: " . programMailAddress() . " | " . date('Y-m-d H:i:s') . "\n\n";
-echo "=== mail queue (mailq)\n" . $sh('mailq | tail -n 40') . "\n\n";
+echo "server addr: " . ($_SERVER['SERVER_ADDR'] ?? '?') . " | php user: " . $sh('id -un') . " | A record: " . implode(',', array_column((array)@dns_get_record('msapayroll.com', DNS_A), 'ip')) . "\n";
+echo "=== postfix settings (postconf -n)\n" . $sh('postconf -n 2>/dev/null | grep -E "^(relayhost|inet_interfaces|inet_protocols|myhostname|mynetworks|smtp_helo_name|smtpd_milters|default_transport|smtp_bind)"') . "\n\n";
+echo "=== postfix running? (ps)\n" . $sh('ps -eo comm,etime | grep -E "^(master|opendkim|qmgr)" ') . "\n\n";
+echo "=== journalctl postfix (آخر 30)\n" . $sh('journalctl --no-pager -n 30 -t postfix/smtp -t postfix/qmgr -t postfix/error -t postfix/bounce') . "\n\n";
+echo "=== outbound port 25 from server (direct to Gmail / Outlook MX)\n";
+foreach (['gmail-smtp-in.l.google.com', 'hotmail-com.olc.protection.outlook.com'] as $h) {
+    $t0 = microtime(true); $f = @fsockopen($h, 25, $en, $es, 6);
+    echo "  $h:25 => " . ($f ? 'OPEN  ' . trim((string)fgets($f, 200)) : "CLOSED ($en $es)") . '  ' . round(microtime(true) - $t0, 1) . "s\n"; if ($f) fclose($f);
+}
+echo "\n=== mail queue (mailq)\n" . $sh('mailq | tail -n 40') . "\n\n";
 echo "=== /var/log/mail.log (آخر 60)\n" . $sh('tail -n 60 /var/log/mail.log') . "\n\n";
 foreach (['msapayroll.com' => DNS_TXT, 'msa._domainkey.msapayroll.com' => DNS_TXT, 'msapayroll.com MX' => DNS_MX] as $k => $t) {
     $name = explode(' ', $k)[0];
