@@ -2700,9 +2700,9 @@ body.pr-wrapall .doc-table.pz-measure td, body.pr-wrapall .table.pz-measure td {
  * =================================================================== */
 @media screen {
 :root { --mt-navy: #1e3a5f; --mt-navy2: #15294a; --mt-gold: #c9a961; --mt-gold2: #e3c98a; --mt-bg: #f5f7fa; --mt-line: #e3e8ef; --mt-text: #1a1f36; --mt-muted: #6b7280; }
-.msa-tabs { position: sticky; top: var(--msa-topbar1-h, 56px); z-index: 39; display: flex; align-items: stretch; gap: 2px; padding: 0 12px; overflow: visible; flex-wrap: nowrap; min-height: 56px; background: #fff; border-bottom: 2px solid var(--mt-line); box-shadow: 0 6px 16px -12px rgba(15,23,42,.25); min-height: 50px; }
+.msa-tabs { position: sticky; top: var(--msa-topbar1-h, 56px); z-index: 39; display: flex; align-items: stretch; gap: 2px; padding: 0 12px; overflow: visible; flex-wrap: nowrap; min-height: 72px; background: #fff; border-bottom: 2px solid var(--mt-line); box-shadow: 0 6px 16px -12px rgba(15,23,42,.25); min-height: 50px; }
 .msa-tabs .mt-brand { display: inline-flex; align-items: center; gap: 9px; padding: 6px 14px 6px 4px; margin-inline-end: 8px; border-inline-end: 1px solid var(--mt-line); text-decoration: none !important; color: var(--mt-navy); align-self: center; }
-.msa-tabs .mt-brand-ic { width: 38px; height: 38px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(180deg, var(--mt-navy) 0%, var(--mt-navy2) 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); font-size: 17px; }
+.msa-tabs .mt-brand-ic { width: 56px; height: 56px; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(180deg, var(--mt-navy) 0%, var(--mt-navy2) 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); font-size: 24px; }
 .msa-tabs .mt-brand-tx { display: flex; flex-direction: column; line-height: 1.15; }
 .msa-tabs .mt-brand-tx b { font-size: 13.5px; letter-spacing: .01em; color: var(--mt-navy2); }
 .msa-tabs .mt-brand-tx small { font-size: 11px; color: var(--mt-gold); font-weight: 700; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2710,10 +2710,10 @@ body.pr-wrapall .doc-table.pz-measure td, body.pr-wrapall .table.pz-measure td {
 .msa-tabs a.mt-tab, .msa-tabs a.mt-tab:hover { text-decoration: none !important; color: var(--mt-navy); }
 .msa-tabs a.mt-tab .nl-fr, .msa-tabs a.mt-tab .nl-ar { text-decoration: none !important; }
 .msa-tabs a.mt-tab, .msa-tabs .mt-btn { display: inline-flex; align-items: center; gap: 9px; padding: 6px 14px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--mt-navy); font: inherit; cursor: pointer; text-decoration: none; line-height: 1.15; white-space: nowrap; transition: background .12s ease, border-color .12s ease; border-radius: 10px 10px 0 0; }
-.msa-tabs a.mt-tab > i:first-child, .msa-tabs .mt-btn > i:first-child { width: 34px; height: 34px; min-width: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; /* 🔎 (2026-10-16 «أيقونات العناوين بدهن تكبير شوي») */ color: #fff; background: var(--tc, var(--mt-navy)); box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
+.msa-tabs a.mt-tab > i:first-child, .msa-tabs .mt-btn > i:first-child { width: 56px; height: 56px; min-width: 56px; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; /* 🔎 (2026-10-16 «هيدا الحجم اللي لازم يكون» = أيقونة «شو لازم تعمل اليوم»/«الموظفون» بالرئيسية: 56px/24px/16px) */ color: #fff; background: var(--tc, var(--mt-navy)); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 6px 14px -6px rgba(0,0,0,.45); }
 .msa-tabs .nl2 { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
-.msa-tabs .nl2 .nl-fr { font-size: 13px; font-weight: 700; letter-spacing: .01em; }
-.msa-tabs .nl2 .nl-ar { font-size: 11.5px; font-weight: 500; color: var(--mt-muted); unicode-bidi: plaintext; }
+.msa-tabs .nl2 .nl-fr { font-size: 14px; font-weight: 700; letter-spacing: .01em; }
+.msa-tabs .nl2 .nl-ar { font-size: 12.5px; font-weight: 500; color: var(--mt-muted); unicode-bidi: plaintext; }
 .msa-tabs .mt-car { font-size: 9px; color: #9aa3b2; margin-inline-start: 2px; transition: transform .15s ease; }
 .msa-tabs a.mt-tab:hover, .msa-tabs .mt-tab:hover .mt-btn, .msa-tabs .mt-tab.open .mt-btn { background: var(--mt-bg); }
 .msa-tabs .mt-tab.open .mt-car { transform: rotate(180deg); }
@@ -2752,8 +2752,47 @@ body.msa-side .msa-tabs .mt-side { background: #fbf7ee; border-color: var(--mt-g
 body.rtl .msa-tabs .nl2 { align-items: flex-end; }
 }
 @media print { .msa-tabs { display: none !important; } }
-@media screen and (max-width: 1500px) { .msa-tabs { flex-wrap: wrap; } .msa-tabs .mt-spacer { display: none; } .msa-tabs a.mt-tab, .msa-tabs .mt-btn { padding: 6px 8px; gap: 6px; } .msa-tabs a.mt-tab > i:first-child, .msa-tabs .mt-btn > i:first-child { width: 30px; height: 30px; min-width: 30px; font-size: 14px; } .msa-tabs .nl2 .nl-fr { font-size: 12.5px; } .msa-tabs .nl2 .nl-ar { font-size: 11px; } .msa-tabs .mt-brand-tx small { display: none; } }
+@media screen and (max-width: 1500px) { .msa-tabs { flex-wrap: wrap; } .msa-tabs .mt-spacer { display: none; } .msa-tabs a.mt-tab, .msa-tabs .mt-btn { padding: 6px 8px; gap: 7px; } .msa-tabs a.mt-tab > i:first-child, .msa-tabs .mt-btn > i:first-child { width: 48px; height: 48px; min-width: 48px; font-size: 21px; border-radius: 14px; } .msa-tabs .mt-brand-ic { width: 48px; height: 48px; font-size: 21px; } .msa-tabs .nl2 .nl-fr { font-size: 12.5px; } .msa-tabs .nl2 .nl-ar { font-size: 11px; } .msa-tabs .mt-brand-tx small { display: none; } }
 @media screen and (max-width: 1280px) { .msa-tabs .mt-brand-tx { display: none; } .msa-tabs .mt-brand { padding-inline-end: 8px; } }
+/* 🟦 (2026-10-16 «خلي باكراوند لشريط هالأبواب كلّو مش أبيض يكون أزرق») الشريط كحلي بألوان الأقساط، الكتابة بيضا، الفعّال بخطّ ذهبي؛ اللائحة المنسدلة تبقى بيضا */
+@media screen {
+.msa-tabs { background: linear-gradient(180deg, var(--mt-navy) 0%, var(--mt-navy2) 100%); border-bottom: 3px solid var(--mt-gold); box-shadow: 0 8px 20px -12px rgba(15,23,42,.6); }
+.msa-tabs .mt-brand { color: #fff; border-inline-end-color: rgba(255,255,255,.18); }
+.msa-tabs .mt-brand-ic { background: linear-gradient(180deg, var(--mt-gold2) 0%, var(--mt-gold) 100%); color: var(--mt-navy2); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 6px 14px -6px rgba(0,0,0,.5); }
+.msa-tabs .mt-brand-tx b { color: #fff; }
+.msa-tabs .mt-brand-tx small { color: var(--mt-gold2); }
+.msa-tabs a.mt-tab, .msa-tabs .mt-btn, .msa-tabs a.mt-tab:hover { color: #fff; }
+.msa-tabs .nl2 .nl-ar { color: rgba(255,255,255,.78); font-weight: 700; } /* 🅱️ (2026-10-16 «ديما خط العناوين يكون بولد») */
+.msa-tabs .mt-drop-hd .mt-hd-ar, .msa-tabs .mt-links a .nl2 .nl-fr { font-weight: 700; }
+.msa-tabs .mt-car { color: rgba(255,255,255,.6); }
+.msa-tabs a.mt-tab > i:first-child, .msa-tabs .mt-btn > i:first-child { outline: 2px solid rgba(255,255,255,.22); outline-offset: -1px; }
+.msa-tabs a.mt-tab:hover, .msa-tabs .mt-tab:hover .mt-btn, .msa-tabs .mt-tab.open .mt-btn { background: rgba(255,255,255,.1); }
+.msa-tabs a.mt-tab.active, .msa-tabs .mt-tab.active .mt-btn { border-bottom-color: var(--mt-gold); background: rgba(255,255,255,.14); }
+.msa-tabs .mt-tab.active .nl-fr { color: #fff; }
+.msa-tabs .mt-tab.active .nl-ar { color: var(--mt-gold2); }
+.msa-tabs .mt-side { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.28); color: #fff; }
+.msa-tabs .mt-side:hover { background: rgba(255,255,255,.18); color: #fff; }
+body.msa-side .msa-tabs .mt-side { background: var(--mt-gold); border-color: var(--mt-gold); color: var(--mt-navy2); }
+.msa-tabs .mt-drop { border-top-color: var(--mt-gold); }
+}
+/* 📏 (2026-10-16 «الشريط مش مكمّل على الآخر») الأبواب تتوزّع على عرض الشاشة كلّه بالتساوي بلا ما يطلع باب برّا؛ الاسم الطويل يلتفّ سطرين */
+@media screen and (min-width: 1501px) {
+.msa-tabs { padding: 0 8px; }
+.msa-tabs .mt-spacer { display: none; }
+.msa-tabs .mt-brand { margin-inline-end: 4px; padding: 6px 10px 6px 2px; }
+.msa-tabs .mt-brand-tx small { display: none; }
+.msa-tabs .mt-tab { flex: 1 1 0; min-width: 0; }
+.msa-tabs a.mt-tab, .msa-tabs .mt-btn { width: 100%; padding: 6px 8px; gap: 8px; white-space: normal; justify-content: flex-start; }
+.msa-tabs .nl2 { min-width: 0; flex: 1; }
+.msa-tabs .nl2 .nl-fr, .msa-tabs .nl2 .nl-ar { white-space: normal; overflow-wrap: normal; word-break: keep-all; hyphens: none; text-align: start; line-height: 1.1; }
+.msa-tabs .nl2 .nl-fr { font-size: 13px; }
+.msa-tabs .nl2 .nl-ar { font-size: 12px; }
+.msa-tabs .mt-tab { position: relative; }
+.msa-tabs .mt-btn { padding-inline-end: 16px; }
+.msa-tabs .mt-car { position: absolute; inset-inline-end: 4px; top: 50%; transform: translateY(-50%); margin: 0; }
+.msa-tabs .mt-tab.open .mt-car { transform: translateY(-50%) rotate(180deg); }
+.msa-tabs .mt-side { margin-inline-start: 4px; }
+}
 
 /* ═══ 290) 🪟 (2026-10-16 p1 «بس اكبس على الأستاذ تطلع هيدي الصفحة البيضا بالنصّ مش على جنب») بطاقة الأستاذ السريعة (الدرج الضيّق)
  *      صارت نافذة بوسط الشاشة فوق خلفية معتمة بدل الدرج الجانبي؛ نفس المحتوى والكبسات. شاشة فقط. ═══ */
