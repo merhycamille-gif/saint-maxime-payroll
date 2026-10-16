@@ -2700,9 +2700,9 @@ body.pr-wrapall .doc-table.pz-measure td, body.pr-wrapall .table.pz-measure td {
  * =================================================================== */
 @media screen {
 :root { --mt-navy: #1e3a5f; --mt-navy2: #15294a; --mt-gold: #c9a961; --mt-gold2: #e3c98a; --mt-bg: #f5f7fa; --mt-line: #e3e8ef; --mt-text: #1a1f36; --mt-muted: #6b7280; }
-.msa-tabs { position: sticky; top: var(--msa-topbar1-h, 56px); z-index: 39; display: flex; align-items: stretch; gap: 2px; padding: 0 12px; overflow: visible; flex-wrap: nowrap; background: #fff; border-bottom: 2px solid var(--mt-line); box-shadow: 0 6px 16px -12px rgba(15,23,42,.25); min-height: 50px; }
+.msa-tabs { position: sticky; top: var(--msa-topbar1-h, 56px); z-index: 39; display: flex; align-items: stretch; gap: 2px; padding: 0 12px; overflow: visible; flex-wrap: nowrap; min-height: 56px; background: #fff; border-bottom: 2px solid var(--mt-line); box-shadow: 0 6px 16px -12px rgba(15,23,42,.25); min-height: 50px; }
 .msa-tabs .mt-brand { display: inline-flex; align-items: center; gap: 9px; padding: 6px 14px 6px 4px; margin-inline-end: 8px; border-inline-end: 1px solid var(--mt-line); text-decoration: none !important; color: var(--mt-navy); align-self: center; }
-.msa-tabs .mt-brand-ic { width: 32px; height: 32px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(180deg, var(--mt-navy) 0%, var(--mt-navy2) 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); font-size: 14px; }
+.msa-tabs .mt-brand-ic { width: 38px; height: 38px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(180deg, var(--mt-navy) 0%, var(--mt-navy2) 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); font-size: 17px; }
 .msa-tabs .mt-brand-tx { display: flex; flex-direction: column; line-height: 1.15; }
 .msa-tabs .mt-brand-tx b { font-size: 13.5px; letter-spacing: .01em; color: var(--mt-navy2); }
 .msa-tabs .mt-brand-tx small { font-size: 11px; color: var(--mt-gold); font-weight: 700; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2710,7 +2710,7 @@ body.pr-wrapall .doc-table.pz-measure td, body.pr-wrapall .table.pz-measure td {
 .msa-tabs a.mt-tab, .msa-tabs a.mt-tab:hover { text-decoration: none !important; color: var(--mt-navy); }
 .msa-tabs a.mt-tab .nl-fr, .msa-tabs a.mt-tab .nl-ar { text-decoration: none !important; }
 .msa-tabs a.mt-tab, .msa-tabs .mt-btn { display: inline-flex; align-items: center; gap: 9px; padding: 6px 14px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--mt-navy); font: inherit; cursor: pointer; text-decoration: none; line-height: 1.15; white-space: nowrap; transition: background .12s ease, border-color .12s ease; border-radius: 10px 10px 0 0; }
-.msa-tabs a.mt-tab > i:first-child, .msa-tabs .mt-btn > i:first-child { width: 26px; height: 26px; min-width: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; background: var(--tc, var(--mt-navy)); box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
+.msa-tabs a.mt-tab > i:first-child, .msa-tabs .mt-btn > i:first-child { width: 34px; height: 34px; min-width: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; /* 🔎 (2026-10-16 «أيقونات العناوين بدهن تكبير شوي») */ color: #fff; background: var(--tc, var(--mt-navy)); box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
 .msa-tabs .nl2 { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
 .msa-tabs .nl2 .nl-fr { font-size: 13px; font-weight: 700; letter-spacing: .01em; }
 .msa-tabs .nl2 .nl-ar { font-size: 11.5px; font-weight: 500; color: var(--mt-muted); unicode-bidi: plaintext; }
@@ -2752,7 +2752,7 @@ body.msa-side .msa-tabs .mt-side { background: #fbf7ee; border-color: var(--mt-g
 body.rtl .msa-tabs .nl2 { align-items: flex-end; }
 }
 @media print { .msa-tabs { display: none !important; } }
-@media screen and (max-width: 1500px) { .msa-tabs a.mt-tab, .msa-tabs .mt-btn { padding: 6px 9px; gap: 7px; } .msa-tabs .nl2 .nl-fr { font-size: 12.5px; } .msa-tabs .nl2 .nl-ar { font-size: 11px; } .msa-tabs .mt-brand-tx small { display: none; } }
+@media screen and (max-width: 1500px) { .msa-tabs { flex-wrap: wrap; } .msa-tabs .mt-spacer { display: none; } .msa-tabs a.mt-tab, .msa-tabs .mt-btn { padding: 6px 8px; gap: 6px; } .msa-tabs a.mt-tab > i:first-child, .msa-tabs .mt-btn > i:first-child { width: 30px; height: 30px; min-width: 30px; font-size: 14px; } .msa-tabs .nl2 .nl-fr { font-size: 12.5px; } .msa-tabs .nl2 .nl-ar { font-size: 11px; } .msa-tabs .mt-brand-tx small { display: none; } }
 @media screen and (max-width: 1280px) { .msa-tabs .mt-brand-tx { display: none; } .msa-tabs .mt-brand { padding-inline-end: 8px; } }
 
 /* ═══ 290) 🪟 (2026-10-16 p1 «بس اكبس على الأستاذ تطلع هيدي الصفحة البيضا بالنصّ مش على جنب») بطاقة الأستاذ السريعة (الدرج الضيّق)
