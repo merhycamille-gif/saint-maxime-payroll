@@ -29,6 +29,27 @@ foreach (['msapayroll.com' => DNS_TXT, 'msa._domainkey.msapayroll.com' => DNS_TX
     echo "=== DNS $k\n";
     foreach ((array)@dns_get_record($name, $t) as $r) echo '  ' . ($r['txt'] ?? ($r['target'] ?? json_encode($r))) . "\n";
 }
+// 🔎 ?probe=email : محادثة SMTP مباشرة من الخادم مع MX المستلِم حتى RCPT TO ثم QUIT (بلا إرسال) — تُظهر ردّ الرفض الحقيقي (مثل 550 5.7.1 S3150 لأوتلوك)
+$probe = trim((string)($_GET['probe'] ?? ''));
+if ($probe !== '' && filter_var($probe, FILTER_VALIDATE_EMAIL)) {
+    $dom = substr(strrchr($probe, '@'), 1);
+    $mx = (array)@dns_get_record($dom, DNS_MX); usort($mx, fn($a, $b) => ($a['pri'] ?? 0) <=> ($b['pri'] ?? 0));
+    $host = $mx[0]['target'] ?? $dom;
+    echo "\n=== SMTP probe to $host (for $probe)\n";
+    $f = @fsockopen($host, 25, $en, $es, 10);
+    if (!$f) echo "  connect failed: $en $es\n";
+    else {
+        stream_set_timeout($f, 15);
+        $rd = function () use ($f) { $o = ''; while (($l = fgets($f, 1024)) !== false) { $o .= $l; if (strlen($l) < 4 || $l[3] !== '-') break; } return trim($o); };
+        $say = function ($c) use ($f, $rd) { fwrite($f, $c . "\r\n"); return $rd(); };
+        echo "  < " . $rd() . "\n";
+        foreach (['EHLO msapayroll.com', 'MAIL FROM:<' . programMailAddress() . '>', 'RCPT TO:<' . $probe . '>', 'QUIT'] as $c) {
+            $r = $say($c); echo "  > $c\n  < " . str_replace("\n", "\n    ", $r) . "\n";
+            if (strpos($c, 'QUIT') === 0) break;
+        }
+        fclose($f);
+    }
+}
 $test = trim((string)($_GET['test'] ?? ''));
 if ($test !== '' && filter_var($test, FILTER_VALIDATE_EMAIL)) {
     echo "\n=== test send to $test\n";
