@@ -8065,13 +8065,13 @@ $ok171 = true; $why171 = [];
 $c171 = function (string $what, bool $ok) use (&$ok171, &$why171) { if (!$ok) { $ok171 = false; $why171[] = $what; } };
 $fn171 = (string)file_get_contents($PROJ . '/includes/functions.php');
 $c171('src-fn', strpos($fn171, "if (!empty(\$GLOBALS['msa_school_override'])) return") !== false && strpos($fn171, 'function institutionSchoolPick(): ?array') !== false
-    && strpos($fn171, 'function institutionGroupSchool(): ?array') !== false && strpos($fn171, 'function institutionGroupBadgeHtml(') !== false);
+    && strpos($fn171, 'function institutionGroupSchool(bool $byCnssEmployer = false): ?array') !== false && strpos($fn171, 'function institutionGroupBadgeHtml(') !== false); // 🏛️ 2026-10-16 الضمان: صاحب عمل واحد
 $of171 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
-$c171('src-forms', strpos($of171, '$school = institutionSchoolPick();') !== false && strpos($of171, '$school = institutionGroupSchool();') !== false
+$c171('src-forms', strpos($of171, '$school = institutionSchoolPick();') !== false && strpos($of171, "$school = institutionGroupSchool(strpos($form, 'cnss_') === 0);") !== false
     && strpos($of171, 'institutionSchoolChooserHtml') === false && strpos($of171, 'اختر المدرسة من الأعلى أولاً') === false
     && substr_count($of171, "(\$ofSchoolPicked ? '&school_id=' . (int)\$school['id'] : '')") >= 3);
 $ox171 = (string)file_get_contents($PROJ . '/pages/official_export.php');
-$c171('src-export', strpos($ox171, 'institutionSchoolPick() ?: institutionGroupSchool()') !== false && substr_count($ox171, "(!empty(\$s0['_group_ids'])) ? \$s0") === 2);
+$c171('src-export', strpos($ox171, "institutionSchoolPick() ?: institutionGroupSchool(strpos($form, 'cnss_') === 0)") !== false && substr_count($ox171, "(!empty(\$s0['_group_ids'])) ? \$s0") === 2);
 // تجربة فعلية: مدرستان بنفس رقم الضمان (3 و5): الكشف الاسمي للمجموعة = مجموع عدد مضموني كلٍّ لحالها + اسم صاحب العمل الموحّد
 $cnt171 = function (array $ids) use (&$noFatal) {
     $h = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => 10, 'year' => 2025], [], $ids);
@@ -8082,9 +8082,16 @@ $c171("group-nominative=$n35/" . ($n3 + $n5), $n3 > 0 && $n5 > 0 && $n35 === $n3
     && strpos($h35, 'الراهبات المخلصيات لسيدة البشارة') !== false && strpos($h35, '⚠️ المدارس المختارة بأرقام ضمان مختلفة') === false);
 $hM = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2025], [], [3, 5]);
 $c171('group-contrib', $noFatal($hM) && strpos($hM, 'التصريح لمجموعة المدارس') !== false && strpos($hM, 'ppExportArea') !== false);
-// أرقام ضمان مختلفة (2 مكسيموس 22-82-745 + 3): التصريح يطلع مع تنبيه
+// 🏛️ (2026-10-16 «تصريح الضمان للمدارس اللي عندن نفس رقم الضمان لازم يكون اسم المؤسسة الراهبات المخلصيات لسيدة البشارة — بس للضمان») أرقام ضمان مختلفة
+//    (2 مكسيموس 22-82-745 + 3 النجاة 25-82-043): تصريح الضمان = صاحب عمل واحد — الافتراضي الراهبات (رقم معروف) + حبّة للرقم الآخر، بلا تحذير؛ &cnss_emp= يبدّل
 $hX = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2025], [], [2, 3]);
-$c171('group-mixed-warning', $noFatal($hX) && strpos($hX, '⚠️ المدارس المختارة بأرقام ضمان مختلفة') !== false);
+$c171('cnss-single-employer', $noFatal($hX) && strpos($hX, '⚠️ المدارس المختارة بأرقام ضمان مختلفة') === false && strpos($hX, 'تصريح الضمان لصاحب العمل') !== false
+    && strpos($hX, 'الراهبات المخلصيات لسيدة البشارة') !== false && strpos($hX, 'cnss_emp=22-82-745') !== false && strpos($hX, 'official_export.php?form=cnss_contrib_monthly&month=10&year=2025&cnss_emp=25-82-43') !== false);
+$hX2 = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2025, 'cnss_emp' => '22-82-745'], [], [2, 3]);
+$c171('cnss-emp-switch', $noFatal($hX2) && strpos($hX2, 'تصريح الضمان لصاحب العمل') !== false && strpos($hX2, 'مدرسة القديس مكسيموس') !== false && strpos($hX2, 'cnss_emp=22-82-745&format=pdf') !== false);
+// المالية لا تتأثّر: نفس المدرستين بنموذج ر10 ⇒ المجموعة كما كانت مع التحذير
+$hX3 = renderPage('pages/official_forms.php', ['form' => 'tax_r10'], [], [2, 3]);
+$c171('mof-mixed-warning-kept', $noFatal($hX3) && strpos($hX3, '⚠️ المدارس المختارة بأرقام ضمان مختلفة') !== false);
 // &school_id= يحصر بمدرسة واحدة من ضمن المختارة (شارة + رابط الإكسل)، وخارج النطاق = المجموعة
 $hB = renderPage('pages/official_forms.php', ['form' => 'cnss_contrib_monthly', 'month' => 10, 'year' => 2025, 'school_id' => 5], [], [3, 5]);
 $c171('picked-one', $noFatal($hB) && strpos($hB, 'التصريح لمدرسة') !== false && strpos($hB, 'التصريح لمجموعة') === false && strpos($hB, 'official_export.php?form=cnss_contrib_monthly&month=10&year=2025&school_id=5') !== false);

@@ -359,7 +359,8 @@ function institutionGroupSchool(bool $byCnssEmployer = false): ?array {
         $groups = [];
         foreach ($rows as $s) { $groups[cnssEmployerNumberKey($s['nssf_employer_number'] ?? '')][] = $s; }
         if (count($groups) > 1) {
-            uasort($groups, fn($a, $b) => count($b) <=> count($a));
+            $known = fn(array $gs) => (int)((cnssEmployerSchool($gs[0])['name_ar'] ?? '') !== ($gs[0]['name_ar'] ?? '')); // رقم معروف بلائحة أصحاب العمل (الراهبات) يتقدّم عند التعادل
+            uasort($groups, fn($a, $b) => [count($b), $known($b)] <=> [count($a), $known($a)]);
             $want = cnssEmployerNumberKey((string)($_GET['cnss_emp'] ?? ''));
             $cnssKey = ($want !== '' && isset($groups[$want])) ? $want : (string)array_key_first($groups);
             $cnssGroups = [];
