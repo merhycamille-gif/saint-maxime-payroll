@@ -2690,3 +2690,108 @@ body.pr-wrapall .doc-table.pz-measure td, body.pr-wrapall .table.pz-measure td {
   .doc-sheet table.doc-table td, #ppExportArea table.doc-table td, .land-report table.doc-table td { white-space: nowrap; }
   .doc-sheet table.doc-table td.pr-wrap, #ppExportArea table.doc-table td.pr-wrap, .land-report table.doc-table td.pr-wrap { white-space: normal; }
 }
+
+/* =====================================================================
+ * 270) 🧭 (2026-10-16 p1 «بدي التبويب والديزاين المعمول بالعناوين (Namecheap) لبرنامج الرواتب: كل باب وجوّاتو ملفاتو»)
+ *      شريط تبويبات علوي ملتصق تحت الشريط العلوي: تبويب لكل باب (الرئيسية · الموظفون · الرواتب · التقارير · النظام)، فرنسي فوق وعربي
+ *      تحت، وبالمرور عليه لائحة بكل صفحاته بأيقوناتها. ألوان برنامج الأقساط («الألوان اللي اعتمدتها بالأقساط حلوة»): كحلي #1e3a5f
+ *      للنصّ والرأس، ذهبي #c9a961 للتبويب الفعّال، سطوح بيضاء بظلّ ناعم. العامود الجانبي مخفي على الشاشات العريضة (يرجع بكبسة ☰
+ *      = body.msa-side)، وعلى الموبايل يبقى الدرج القديم. شاشة فقط، لا طباعة، لا حسابات.
+ * =================================================================== */
+@media screen {
+:root { --mt-navy: #1e3a5f; --mt-navy2: #15294a; --mt-gold: #c9a961; --mt-gold2: #e3c98a; --mt-bg: #f5f7fa; --mt-line: #e3e8ef; --mt-text: #1a1f36; --mt-muted: #6b7280; }
+.msa-tabs { position: sticky; top: var(--msa-topbar1-h, 56px); z-index: 39; display: flex; align-items: stretch; gap: 2px; padding: 0 12px; overflow: visible; flex-wrap: nowrap; background: #fff; border-bottom: 2px solid var(--mt-line); box-shadow: 0 6px 16px -12px rgba(15,23,42,.25); min-height: 50px; }
+.msa-tabs .mt-brand { display: inline-flex; align-items: center; gap: 9px; padding: 6px 14px 6px 4px; margin-inline-end: 8px; border-inline-end: 1px solid var(--mt-line); text-decoration: none !important; color: var(--mt-navy); align-self: center; }
+.msa-tabs .mt-brand-ic { width: 32px; height: 32px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(180deg, var(--mt-navy) 0%, var(--mt-navy2) 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); font-size: 14px; }
+.msa-tabs .mt-brand-tx { display: flex; flex-direction: column; line-height: 1.15; }
+.msa-tabs .mt-brand-tx b { font-size: 13.5px; letter-spacing: .01em; color: var(--mt-navy2); }
+.msa-tabs .mt-brand-tx small { font-size: 11px; color: var(--mt-gold); font-weight: 700; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msa-tabs .mt-tab { position: relative; display: flex; align-items: stretch; }
+.msa-tabs a.mt-tab, .msa-tabs a.mt-tab:hover { text-decoration: none !important; color: var(--mt-navy); }
+.msa-tabs a.mt-tab .nl-fr, .msa-tabs a.mt-tab .nl-ar { text-decoration: none !important; }
+.msa-tabs a.mt-tab, .msa-tabs .mt-btn { display: inline-flex; align-items: center; gap: 9px; padding: 6px 14px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--mt-navy); font: inherit; cursor: pointer; text-decoration: none; line-height: 1.15; white-space: nowrap; transition: background .12s ease, border-color .12s ease; border-radius: 10px 10px 0 0; }
+.msa-tabs a.mt-tab > i:first-child, .msa-tabs .mt-btn > i:first-child { width: 26px; height: 26px; min-width: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; background: var(--tc, var(--mt-navy)); box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
+.msa-tabs .nl2 { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.msa-tabs .nl2 .nl-fr { font-size: 13px; font-weight: 700; letter-spacing: .01em; }
+.msa-tabs .nl2 .nl-ar { font-size: 11.5px; font-weight: 500; color: var(--mt-muted); unicode-bidi: plaintext; }
+.msa-tabs .mt-car { font-size: 9px; color: #9aa3b2; margin-inline-start: 2px; transition: transform .15s ease; }
+.msa-tabs a.mt-tab:hover, .msa-tabs .mt-tab:hover .mt-btn, .msa-tabs .mt-tab.open .mt-btn { background: var(--mt-bg); }
+.msa-tabs .mt-tab.open .mt-car { transform: rotate(180deg); }
+.msa-tabs a.mt-tab.active, .msa-tabs .mt-tab.active .mt-btn { border-bottom-color: var(--mt-gold); background: linear-gradient(180deg, #fff 0%, #fbf7ee 100%); }
+.msa-tabs .mt-tab.active .nl-fr { color: var(--mt-navy2); }
+.msa-tabs .mt-spacer { flex: 1; }
+.msa-tabs .mt-side { align-self: center; width: 34px; height: 30px; border: 1px solid var(--mt-line); border-radius: 9px; background: #fff; color: var(--mt-muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
+.msa-tabs .mt-side:hover { background: var(--mt-bg); color: var(--mt-navy); }
+body.msa-side .msa-tabs .mt-side { background: #fbf7ee; border-color: var(--mt-gold); color: var(--mt-navy); }
+/* اللائحة المنسدلة */
+.msa-tabs .mt-drop { position: absolute; top: 100%; inset-inline-start: 0; min-width: 300px; max-width: min(760px, 92vw); background: #fff; border: 1px solid var(--mt-line); border-top: 3px solid var(--tc, var(--mt-navy)); border-radius: 0 0 14px 14px; box-shadow: 0 24px 60px -24px rgba(15,23,42,.35), 0 8px 24px -16px rgba(15,23,42,.2); padding: 8px; display: none; z-index: 60; }
+.msa-tabs .mt-drop.flip { inset-inline-start: auto; inset-inline-end: 0; }
+.msa-tabs .mt-tab.open .mt-drop { display: block; animation: mtIn .14s ease-out; }
+@keyframes mtIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.msa-tabs .mt-drop-hd { display: flex; align-items: center; gap: 8px; padding: 6px 10px 8px; margin: 0 2px 6px; border-bottom: 1px solid var(--mt-line); color: var(--mt-navy); font-weight: 800; font-size: 13px; }
+.msa-tabs .mt-drop-hd > i { color: var(--tc, var(--mt-navy)); }
+.msa-tabs .mt-drop-hd .mt-hd-ar { color: var(--mt-muted); font-weight: 600; font-size: 12px; margin-inline-start: auto; }
+.msa-tabs .mt-links { display: grid; grid-template-columns: 1fr; gap: 1px; }
+.msa-tabs .mt-drop.mt-cols .mt-links { grid-template-columns: 1fr 1fr; gap: 1px 10px; min-width: 620px; }
+.msa-tabs .mt-links a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; color: var(--mt-text); text-decoration: none; font-size: 13px; line-height: 1.2; white-space: nowrap; transition: background .1s ease; }
+.msa-tabs .mt-links a:hover { background: var(--mt-bg); }
+.msa-tabs .mt-links a.active { background: #fbf7ee; box-shadow: inset 3px 0 0 var(--mt-gold); }
+.msa-tabs .mt-links a > i:first-child { width: 26px; height: 26px; min-width: 26px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: var(--tc, var(--mt-navy)); background: color-mix(in srgb, var(--tc, var(--mt-navy)) 12%, #fff); }
+.msa-tabs .mt-links a > i:first-child[style*="color"] { background: #fff7e6; }
+.msa-tabs .mt-links a .nl2 .nl-fr { font-size: 13px; font-weight: 600; color: var(--mt-text); }
+.msa-tabs .mt-links a .nl2 .nl-ar { font-size: 11.5px; color: var(--mt-muted); }
+.msa-tabs .mt-links a.active .nl2 .nl-fr { color: var(--mt-navy2); font-weight: 700; }
+.msa-tabs .mt-links a > span:not(.nl2) { margin-inline-start: auto; }
+/* العامود الجانبي مخفي على الشاشات العريضة ما دام الشريط العلوي موجوداً؛ body.msa-side يرجّعه (كبسة ☰) */
+@media (min-width: 1081px) {
+  body:not(.doc-view):not(.msa-side) .sidebar { display: none !important; }
+  body:not(.doc-view):not(.msa-side) .main-content, body.nav-pinned:not(.doc-view):not(.msa-side) .main-content { margin-inline-start: 0 !important; }
+}
+/* الموبايل: الدرج القديم يبقى والشريط العلوي يختفي */
+@media (max-width: 1080px) { .msa-tabs { display: none !important; } }
+body.rtl .msa-tabs .nl2 { align-items: flex-end; }
+}
+@media print { .msa-tabs { display: none !important; } }
+@media screen and (max-width: 1500px) { .msa-tabs a.mt-tab, .msa-tabs .mt-btn { padding: 6px 9px; gap: 7px; } .msa-tabs .nl2 .nl-fr { font-size: 12.5px; } .msa-tabs .nl2 .nl-ar { font-size: 11px; } .msa-tabs .mt-brand-tx small { display: none; } }
+@media screen and (max-width: 1280px) { .msa-tabs .mt-brand-tx { display: none; } .msa-tabs .mt-brand { padding-inline-end: 8px; } }
+
+/* ═══ 290) 🪟 (2026-10-16 p1 «بس اكبس على الأستاذ تطلع هيدي الصفحة البيضا بالنصّ مش على جنب») بطاقة الأستاذ السريعة (الدرج الضيّق)
+ *      صارت نافذة بوسط الشاشة فوق خلفية معتمة بدل الدرج الجانبي؛ نفس المحتوى والكبسات. شاشة فقط. ═══ */
+@media screen {
+.mp-drawer.narrow, .mp-drawer.narrow.open { right: auto; inset-inline: 0; margin: 0 auto; top: 50%; left: 0; width: min(720px, 94vw); height: auto; max-height: 88vh; border-radius: 18px; padding: 18px 22px 20px;
+  box-shadow: 0 30px 80px -20px rgba(15,23,42,.45), 0 10px 30px -18px rgba(15,23,42,.3); transform: translateY(-50%) scale(.97); opacity: 0; pointer-events: none; transition: transform .18s ease-out, opacity .18s ease-out; }
+.mp-drawer.narrow.open { transform: translateY(-50%) scale(1); opacity: 1; pointer-events: auto; }
+.mp-drawer.narrow .mp-dr-head { position: sticky; top: 0; background: #fff; padding-bottom: 8px; margin: -4px 0 4px; border-bottom: 1px solid var(--surface-line, #e5e5ea); z-index: 1; }
+.mp-drawer.narrow .mp-dr-head b { font-size: 17px; color: var(--mt-navy, #1e3a5f); }
+.mp-drawer.narrow .dr-x { border-radius: 50%; width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.mp-drawer.narrow .dr-nums { grid-template-columns: repeat(4, 1fr); }
+.mp-drawer.narrow .dr-kvs { grid-template-columns: repeat(3, 1fr); }
+.mp-ov { background: rgba(15, 23, 42, .5); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+@media (max-width: 760px) { .mp-drawer.narrow .dr-nums { grid-template-columns: 1fr 1fr; } .mp-drawer.narrow .dr-kvs { grid-template-columns: 1fr 1fr; } }
+}
+/* 📄 (2026-10-16) باب الإفادات: لائحة عريضة بثلاثة أعمدة + بحث الأستاذ فوقها */
+@media screen {
+.msa-tabs .mt-drop.mt-wide { min-width: min(980px, 94vw); }
+.msa-tabs .mt-drop.mt-wide .mt-links { display: block; }
+.msa-tabs .mt-search { position: relative; display: flex; align-items: center; gap: 8px; margin: 2px 4px 10px; padding: 0 12px; height: 40px; border: 1px solid var(--mt-line); border-radius: 12px; background: var(--mt-bg); }
+.msa-tabs .mt-search > i { color: var(--mt-navy); }
+.msa-tabs .mt-search .mt-sinp { flex: 1; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--mt-text); outline: none; }
+.msa-tabs .mt-search .mt-sinp::placeholder { color: #9aa3b2; }
+.msa-tabs .mt-sres { position: absolute; top: 100%; inset-inline: 0; margin-top: 4px; background: #fff; border: 1px solid var(--mt-line); border-radius: 12px; box-shadow: 0 18px 40px -18px rgba(15,23,42,.35); z-index: 5; max-height: 320px; overflow: auto; }
+.msa-tabs .mt-sres:empty { display: none; }
+.msa-tabs .mt-sres a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-bottom: 1px solid #f1f3f6; color: var(--mt-text); text-decoration: none; }
+.msa-tabs .mt-sres a:last-child { border-bottom: 0; }
+.msa-tabs .mt-sres a:hover { background: var(--mt-bg); }
+.msa-tabs .mt-sres .mt-sav { width: 28px; height: 28px; min-width: 28px; border-radius: 50%; background: var(--mt-navy); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+.msa-tabs .mt-sres .mt-left { color: #b42318; font-weight: 600; }
+.msa-tabs .mt-sload, .msa-tabs .mt-snone { padding: 10px 12px; color: var(--mt-muted); font-size: 13px; }
+.msa-tabs .mt-att-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 14px; align-items: start; }
+.msa-tabs .mt-att-hd { display: flex; flex-direction: column; padding: 4px 10px 6px; margin-bottom: 2px; border-bottom: 2px solid var(--mt-gold2); color: var(--mt-navy); font-weight: 800; font-size: 12.5px; }
+.msa-tabs .mt-att-hd small { color: var(--mt-muted); font-weight: 600; font-size: 11.5px; }
+.msa-tabs .mt-att-col a { white-space: normal; }
+.msa-tabs .mt-att-col a .nl2 .nl-fr { font-size: 12.5px; }
+.msa-tabs .mt-att-foot { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--mt-line); }
+.msa-tabs .mt-att-foot a { background: var(--mt-bg); border-radius: 10px; }
+.msa-tabs .mt-drop.mt-wide .mt-links.mt-links-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 10px; }
+@media (max-width: 1300px) { .msa-tabs .mt-att-cols { grid-template-columns: repeat(2, 1fr); } .msa-tabs .mt-drop.mt-wide .mt-links.mt-links-grid { grid-template-columns: repeat(2, 1fr); } }
+}

@@ -156,6 +156,8 @@ window.msaFitScreenTables = function () {
         var tb = document.querySelector('.topbar');
         if (tb) { var tbs = getComputedStyle(tb); if (tbs.position === 'sticky' && tbs.display !== 'none') topOffG = Math.ceil(tb.getBoundingClientRect().height); }
         // 📌 (2026-10-01) شريط تبويبات ملف الموظف ثابت تحت الشريط العلوي ⇒ رؤوس الجداول تلتصق تحته لا خلفه
+        // 🧭 (2026-10-16) شريط التبويبات العلوي ملتصق تحت الشريط العلوي ⇒ رؤوس الجداول وتبويبات الملف تلتصق تحته
+        try { document.documentElement.style.setProperty('--msa-topbar1-h', topOffG + 'px'); var mtEl = document.getElementById('msaTabs'); if (mtEl && mtEl.offsetParent && getComputedStyle(mtEl).display !== 'none') topOffG += Math.ceil(mtEl.getBoundingClientRect().height); } catch (e) {}
         try { document.documentElement.style.setProperty('--msa-topbar-h', topOffG + 'px'); var tabsEl = document.querySelector('.main-content .tabs'); if (tabsEl && tabsEl.offsetParent && getComputedStyle(tabsEl).position === 'sticky') topOffG += Math.ceil(tabsEl.getBoundingClientRect().height); } catch (e) {}
         // 🚀 (2026-10-02 «كل البرنامج متل البرق»): على دفعات — كل القراءات معاً ثم كل الكتابات معاً. كان كل جدول يكتب ثم يقرأ
         // (فتح حاوياته ← قياسه ← كتابة top ← قراءة ارتفاع الصف…) فيعيد المتصفّح التخطيط لكل جدول ولكل صفّ رأس — صفحة فيها
@@ -843,4 +845,52 @@ window.msaDrawer = (function () {
         f.addEventListener('submit', function () { submitting = true; dirty = false; });
     });
     window.addEventListener('beforeunload', function (e) { if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; } });
+})();
+
+/* ═══ 🧭 (2026-10-16 p1 «التبويب والديزاين متل Namecheap: كل باب وجوّاتو ملفاتو») شريط التبويبات العلوي ═══
+ * المرور بالماوس يفتح لائحة الباب (بتأخير صغير حتى لا ترفّ)، الكبس يثبّتها (للمس)، Esc أو الكبس خارجها يغلقها،
+ * واللائحة تنقلب لليسار إذا خرجت عن الشاشة. كبسة ☰ بآخر الشريط ترجّع العامود الجانبي القديم (محفوظ بالجهاز). */
+(function () {
+    var bar = document.getElementById('msaTabs'); if (!bar) return;
+    var tabs = Array.prototype.slice.call(bar.querySelectorAll('.mt-group')), openT = null, tmr = null;
+    function place(t) { var d = t.querySelector('.mt-drop'); if (!d) return; d.classList.remove('flip'); var r = d.getBoundingClientRect(); if (r.right > window.innerWidth - 8) d.classList.add('flip'); }
+    function open(t) { if (openT && openT !== t) close(openT); t.classList.add('open'); var b = t.querySelector('.mt-btn'); if (b) b.setAttribute('aria-expanded', 'true'); openT = t; place(t); }
+    function close(t) { if (!t) return; t.classList.remove('open', 'pinned'); var b = t.querySelector('.mt-btn'); if (b) b.setAttribute('aria-expanded', 'false'); if (openT === t) openT = null; }
+    tabs.forEach(function (t) {
+        var btn = t.querySelector('.mt-btn');
+        t.addEventListener('mouseenter', function () { clearTimeout(tmr); tmr = setTimeout(function () { open(t); }, 70); });
+        t.addEventListener('mouseleave', function () { clearTimeout(tmr); tmr = setTimeout(function () { if (!t.classList.contains('pinned')) close(t); }, 160); });
+        btn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); if (t.classList.contains('open') && t.classList.contains('pinned')) close(t); else { open(t); t.classList.add('pinned'); } });
+        btn.addEventListener('keydown', function (e) { if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(t); t.classList.add('pinned'); var a = t.querySelector('.mt-links a'); if (a) a.focus(); } });
+    });
+    document.addEventListener('click', function (e) { if (openT && !openT.contains(e.target)) close(openT); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && openT) { var b = openT.querySelector('.mt-btn'); close(openT); if (b) b.focus(); } });
+    window.addEventListener('resize', function () { if (openT) place(openT); });
+    // 📄 بحث الأستاذ داخل باب «الإفادات»: اسم أو شهرة أو رقم تلفون ⇒ لائحة فورية، الكبس يفتح إفاداته
+    bar.querySelectorAll('.mt-search').forEach(function (sw) {
+        var inp = sw.querySelector('.mt-sinp'), res = sw.querySelector('.mt-sres'), base = sw.getAttribute('data-base') || '', t = sw.closest('.mt-group'), timer = null, seq = 0;
+        function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+        inp.addEventListener('focus', function () { if (t) { open(t); t.classList.add('pinned'); } });
+        inp.addEventListener('click', function (e) { e.stopPropagation(); });
+        inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { var a = res.querySelector('a'); if (a) { e.preventDefault(); location.href = a.href; } } if (e.key === 'Escape') { inp.value = ''; res.innerHTML = ''; } e.stopPropagation(); });
+        inp.addEventListener('input', function () {
+            var q = inp.value.trim(); clearTimeout(timer); if (!q) { res.innerHTML = ''; return; }
+            var my = ++seq; res.innerHTML = '<div class="mt-sload"><i class="fas fa-spinner fa-spin"></i></div>';
+            timer = setTimeout(function () {
+                fetch(base + 'ajax_search.php?q=' + encodeURIComponent(q), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (emps) {
+                    if (my !== seq) return;
+                    if (!emps.length) { res.innerHTML = '<div class="mt-snone">ما في أستاذ بهالاسم / Aucun résultat</div>'; return; }
+                    res.innerHTML = emps.slice(0, 8).map(function (e) {
+                        return '<a href="' + base + (sw.getAttribute('data-target') || 'pages/attestations.php?employee_id={id}').replace('{id}', e.id) + '"><span class="mt-sav">' + esc((e.fr || e.ar || '?').trim().charAt(0).toUpperCase()) + '</span><span class="nl2"><span class="nl-fr">' + esc(e.fr || e.ar) + (e.left ? ' <small class="mt-left">· ترك ' + esc(e.left) + '</small>' : '') + '</span><span class="nl-ar">' + esc(e.ar) + (e.phone ? ' · ' + esc(e.phone) : '') + (e.school ? ' · ' + esc(e.school) : '') + '</span></span></a>';
+                    }).join('');
+                }).catch(function () { res.innerHTML = '<div class="mt-snone">تعذّر البحث</div>'; });
+            }, 150);
+        });
+    });
+    window.msaSideToggle = function () {
+        var on = !document.body.classList.contains('msa-side');
+        document.body.classList.toggle('msa-side', on);
+        try { localStorage.setItem('msa_side', on ? '1' : '0'); } catch (e) {}
+        setTimeout(function () { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }, 220);
+    };
 })();

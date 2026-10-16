@@ -155,7 +155,9 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app.css') ?: '1' ?>">
 </head>
 <body class="<?= $lang === 'ar' ? 'rtl' : '' ?><?= !empty($docFocus) ? ' doc-view' : '' ?>">
-<script>/* v2026: القائمة الجانبية مفتوحة بعناوينها دائماً (طلبه: «العامود اللي عالشمال اللي فيه العناوين يضلّ ظاهر») — Ctrl+B/الدبّوس يطويها لشريط أيقونات */try{if(localStorage.getItem('msa_nav_pinned')!=='0')document.body.classList.add('nav-pinned');}catch(e){}</script>
+<script>/* v2026: القائمة الجانبية مفتوحة بعناوينها دائماً (طلبه: «العامود اللي عالشمال اللي فيه العناوين يضلّ ظاهر») — Ctrl+B/الدبّوس يطويها لشريط أيقونات */try{if(localStorage.getItem('msa_nav_pinned')!=='0')document.body.classList.add('nav-pinned');}catch(e){}
+/* 🧭 (2026-10-16 p1 «التبويب والديزاين متل Namecheap»): شريط تبويبات علوي بقوائم منسدلة لكل باب يحلّ محلّ العامود الجانبي؛ msa_side=1 يرجّع العامود (كبسة ☰ بآخر الشريط) */
+try{if(localStorage.getItem('msa_side')==='1')document.body.classList.add('msa-side');}catch(e){}</script>
 
 <!-- حماية CSRF: حقن توكن تلقائياً بكل نماذج POST -->
 <script>
@@ -710,6 +712,121 @@ document.addEventListener('submit', function (e) {
                 </a>
             </div>
         </header>
+        <?php
+        /* 🧭 (2026-10-16 p1 «بدي التبويب والديزاين لبرنامج الرواتب هيك: كل باب وجوّاتو ملفاتو») الشريط العلوي بالتبويبات:
+         * يُبنى من نفس روابط القائمة الجانبية ($__nav: نفس الصلاحيات والشارات) — كل «باب» تبويب، وبالمرور عليه تنزل لائحة بصفحاته.
+         * ألوان برنامج الأقساط (كحلي #1e3a5f، ذهبي #c9a961). واجهة فقط: لا يمسّ أي حساب. العامود الجانبي يبقى مخفيّاً ويرجع بكبسة ☰. */
+        if (empty($docFocus)) {
+            $__tabIcons = ['Personnel' => 'fa-users', 'Paie' => 'fa-money-check-alt', 'Rapports' => 'fa-chart-bar', 'Système' => 'fa-cog'];
+            $__navInner = preg_replace('~^\s*<nav class="sidebar-nav">|</nav>\s*$~u', '', trim($__nav));   // بلا غلاف <nav> القائمة الجانبية (كان </nav> يقفل الشريط قبل آخره)
+            $__parts = preg_split('~(<div class="nav-section"[^>]*>.*?</div>)~su', $__navInner, -1, PREG_SPLIT_DELIM_CAPTURE);
+            $__groups = []; $__gi = -1;
+            foreach ($__parts as $__p) {
+                if (preg_match('~<div class="nav-section"[^>]*style="--ns:(#[0-9a-fA-F]{3,8})"[^>]*>\s*<span class="nl-fr">([^<]*)</span><span class="nl-ar">([^<]*)</span>~u', $__p, $__m)) {
+                    $__gi++; $__groups[$__gi] = ['fr' => trim($__m[2]), 'ar' => trim($__m[3]), 'color' => $__m[1], 'links' => ''];
+                } elseif (preg_match('~<div class="nav-section"~u', $__p)) { continue; }
+                elseif ($__gi >= 0) { $__groups[$__gi]['links'] .= $__p; }
+            }
+            // 🏛️ (2026-10-16 «يهمّني يكون صندوق التعويضات والضمان والمالية كل واحد باب وضمنّن تقاريرن») أبواب من أقسام مركز التقارير نفسها
+            if (viewerCanSeePage('reports.php')) {
+                require_once __DIR__ . '/report_center.php';
+                $__reqUri = (string)($_SERVER['REQUEST_URI'] ?? '');
+                $__tileLink = function (array $t) use ($__reqUri) {
+                    $__u = (string)$t['url']; if ($__u !== '' && $__u[0] === '?') $__u = BASE_URL . 'pages/reports.php' . $__u;
+                    $__q = parse_url($__u, PHP_URL_QUERY) ?: ''; parse_str($__q, $__qa);
+                    $__act = false;
+                    if (!empty($__qa['form']) && preg_match('~[?&]form=' . preg_quote($__qa['form'], '~') . '(&|$)~', $__reqUri)) $__act = empty($__qa['cat']) || strpos($__reqUri, 'cat=' . $__qa['cat']) !== false;
+                    elseif (!empty($__qa['report']) && preg_match('~[?&]report=' . preg_quote($__qa['report'], '~') . '(&|$)~', $__reqUri)) $__act = true;
+                    return '<a href="' . e($__u) . '" class="' . ($__act ? 'active' : '') . '"><i class="fas ' . e($t['icon']) . '"></i><span class="nl2"><span class="nl-fr">' . e($t['fr']) . '</span><span class="nl-ar">' . e($t['ar']) . '</span></span></a>';
+                };
+                $__pageLink = function (string $file, string $icon, string $fr, string $ar, string $pageKey) use ($currentPage) {
+                    return '<a href="' . BASE_URL . 'pages/' . $file . '" class="' . ($currentPage === $pageKey ? 'active' : '') . '"><i class="fas ' . $icon . '"></i><span class="nl2"><span class="nl-fr">' . e($fr) . '</span><span class="nl-ar">' . e($ar) . '</span></span></a>';
+                };
+                $__cats = []; foreach (reportCenterCategories() as $__c) $__cats[$__c['title']] = $__c;
+                $__pick = function (string $needle) use ($__cats) { foreach ($__cats as $__t => $__c) if (strpos($__t, $needle) !== false) return $__c; return null; };
+                $__doors = [
+                    ['fr' => 'CNSS', 'ar' => 'الضمان الاجتماعي', 'icon' => 'fa-hospital', 'color' => '#3b82f6', 'cat' => $__pick('CNSS'),
+                     'pages' => canEdit() ? [['cnss_followup.php', 'fa-user-shield', 'Suivi CNSS', 'متابعة الضمان', 'cnss_followup'], ['social_security.php', 'fa-shield-alt', 'Plafonds CNSS', 'حدود الضمان', 'social_security']] : []],
+                    ['fr' => 'Caisse EOC', 'ar' => 'صندوق التعويضات', 'icon' => 'fa-piggy-bank', 'color' => '#c9a961', 'cat' => $__pick('Caisse EOC'), 'pages' => []],
+                    ['fr' => 'Finances', 'ar' => 'المالية — الضريبة', 'icon' => 'fa-file-invoice-dollar', 'color' => '#ef4444', 'cat' => $__pick('Impôt'),
+                     'pages' => canEdit() ? [['tax_declarations.php', 'fa-file-contract', 'Déclarations', 'التصاريح', 'tax'], ['tax_brackets.php', 'fa-percent', "Tranches d'impôt", 'الشطور الضريبية', 'tax_brackets']] : []],
+                ];
+                $__extra = [];
+                foreach ($__doors as $__d) {
+                    if (!$__d['cat']) continue;
+                    $__links = ''; foreach ($__d['pages'] as $__pg) $__links .= $__pageLink(...$__pg);
+                    foreach ($__d['cat']['tiles'] as $__t) $__links .= $__tileLink($__t);
+                    $__extra[] = ['fr' => $__d['fr'], 'ar' => $__d['ar'], 'color' => $__d['color'], 'links' => $__links, 'icon' => $__d['icon']];
+                }
+                // 📄 (2026-10-16 «لازم يكون باب الإفادات وضمنو الإفادات مع التفتيش عن أستاذ: اسمو أو عيلتو أو رقم تلفونو») باب الإفادات
+                if (viewerCanSeePage('attestations.php')) {
+                    require_once __DIR__ . '/attestation_types.php';
+                    $__attT = attestationTypes(); $__attG = attestationGroups(); $__attUsed = [];
+                    $__attLinks = '<div class="mt-search" data-base="' . BASE_URL . '" data-target="pages/attestations.php?employee_id={id}"><i class="fas fa-magnifying-glass"></i><input type="text" class="mt-sinp" placeholder="اسم الأستاذ أو شهرته أو رقم تلفونه… / Nom, famille ou téléphone" autocomplete="off"><div class="mt-sres"></div></div>';
+                    $__attLinks .= '<div class="mt-att-cols">';
+                    foreach ($__attG as $__gt => $__keys) { $__gp = array_map('trim', explode(' / ', $__gt, 2));
+                        $__attLinks .= '<div class="mt-att-col"><div class="mt-att-hd"><span dir="ltr">' . e($__gp[0]) . '</span><small>' . e($__gp[1] ?? '') . '</small></div>';
+                        foreach ($__keys as $__k) { if (!isset($__attT[$__k])) continue; $__attUsed[$__k] = 1;
+                            $__attLinks .= '<a href="' . BASE_URL . 'pages/attestations.php?type=' . e($__k) . '" class="' . ($currentPage === 'attestations' && (($_GET['type'] ?? '') === $__k) ? 'active' : '') . '"><i class="fas fa-file-lines"></i><span class="nl2"><span class="nl-fr">' . e($__attT[$__k]['fr']) . '</span><span class="nl-ar">' . e($__attT[$__k]['ar']) . '</span></span></a>'; }
+                        $__attLinks .= '</div>'; }
+                    $__others = array_diff(array_keys($__attT), array_keys($__attUsed));
+                    if ($__others) { $__attLinks .= '<div class="mt-att-col"><div class="mt-att-hd"><span dir="ltr">Autres</span><small>أخرى</small></div>'; foreach ($__others as $__k) $__attLinks .= '<a href="' . BASE_URL . 'pages/attestations.php?type=' . e($__k) . '"><i class="fas fa-file-lines"></i><span class="nl2"><span class="nl-fr">' . e($__attT[$__k]['fr']) . '</span><span class="nl-ar">' . e($__attT[$__k]['ar']) . '</span></span></a>'; $__attLinks .= '</div>'; }
+                    $__attLinks .= '</div>';
+                    $__attLinks .= '<div class="mt-att-foot"><a href="' . BASE_URL . 'pages/attestations.php" class="' . ($currentPage === 'attestations' && empty($_GET['type']) ? 'active' : '') . '"><i class="fas fa-file-signature"></i><span class="nl2"><span class="nl-fr">Toutes les attestations</span><span class="nl-ar">صفحة الإفادات كاملة</span></span></a>'
+                                 . '<a href="' . BASE_URL . 'pages/attestations.php?dossier=1"><i class="fas fa-folder-open"></i><span class="nl2"><span class="nl-fr">Dossier complet</span><span class="nl-ar">ملف الأستاذ الكامل</span></span></a></div>';
+                    $__attDoor = ['fr' => 'Attestations', 'ar' => 'الإفادات', 'color' => '#d97706', 'links' => $__attLinks, 'icon' => 'fa-file-signature', 'wide' => true, 'active' => $currentPage === 'attestations'];
+                    $__posA = count($__groups); foreach ($__groups as $__i => $__g) if ($__g['fr'] === 'Paie') { $__posA = $__i + 1; break; }
+                    array_splice($__groups, $__posA, 0, [$__attDoor]);
+                    $__tabIcons['Attestations'] = 'fa-file-signature';
+                    if ($currentPage === 'attestations') $__extraActive = true;
+                }
+                // 👤 (2026-10-16 «لازم يكون باب اسمو ملف الأستاذ وجوّاتو كل شي بيخصّ الأستاذ وأكيد محلّ للتفتيش عنه») أوّل باب بعد الرئيسية
+                if (viewerCanSeePage('attestations.php') || viewerCanSeePage('employee_history.php')) {
+                    $__dL = '<div class="mt-search" data-base="' . BASE_URL . '" data-target="pages/attestations.php?dossier=1&employee_id={id}"><i class="fas fa-magnifying-glass"></i><input type="text" class="mt-sinp" placeholder="فتّش عن الأستاذ: اسمو أو شهرتو أو رقم تلفونو… / Nom, famille ou téléphone" autocomplete="off"><div class="mt-sres"></div></div>';
+                    $__dItems = [];
+                    if (canEdit()) $__dItems[] = ['pages/employees.php', 'fa-users', 'Employés & Enseignants', 'لائحة الموظفين والأساتذة (تعديل الملف)', 'employees'];
+                    if (viewerCanSeePage('attestations.php')) $__dItems[] = ['pages/attestations.php?dossier=1', 'fa-folder-open', 'Dossier complet', 'الملف الكامل والإفادات', '__dossier'];
+                    if (viewerCanSeePage('employee_history.php')) $__dItems[] = ['pages/employee_history.php', 'fa-user-clock', 'Dossier enseignant', 'سيرة الأستاذ', 'employee_history'];
+                    if (canEdit()) $__dItems[] = ['pages/employee_full_history.php', 'fa-clock-rotate-left', 'Historique complet', 'التاريخ الكامل للأستاذ', 'employee_full_history'];
+                    if (viewerCanSeePage('annual_slip.php')) $__dItems[] = ['pages/annual_slip.php', 'fa-file-invoice-dollar', 'Bulletin annuel', 'بطاقة الراتب السنوية', 'annual'];
+                    if (viewerCanSeePage('attestations.php')) $__dItems[] = ['pages/attestations.php', 'fa-file-signature', 'Attestations', 'الإفادات', '__att'];
+                    if (viewerCanSeePage('reports.php')) $__dItems[] = ['pages/official_forms.php?form=teacher_card', 'fa-address-card', 'Carte enseignant', 'بطاقة الأستاذ', '__card'];
+                    if (canEdit()) { $__dItems[] = ['pages/info_collect.php', 'fa-whatsapp', 'Mise à jour', 'تحديث معلومات الأساتذة (واتساب)', 'info_collect']; $__dItems[] = ['pages/info_status.php', 'fa-clipboard-check', 'État MàJ', 'حالة التحديث (مين بعت)', 'info_status'];
+                                    $__dItems[] = ['pages/tax_suggestions.php', 'fa-lightbulb', 'Suggestions état civil', 'اقتراحات من إخراج القيد', 'tax_suggestions']; $__dItems[] = ['pages/left_teachers.php', 'fa-user-slash', 'Départs', 'الأساتذة التاركون', 'left_teachers']; $__dItems[] = ['pages/retirement_64.php', 'fa-hourglass-half', 'Retraite 64', 'بلوغ سنّ الـ64', 'retirement_64']; }
+                    $__dL .= '<div class="mt-links mt-links-grid">';
+                    foreach ($__dItems as $__it) { $__ic = $__it[1] === 'fa-whatsapp' ? 'fab fa-whatsapp' : 'fas ' . $__it[1];
+                        $__isA = ($__it[4] === '__dossier' && $currentPage === 'attestations' && !empty($_GET['dossier'])) || ($__it[4] === '__att' && $currentPage === 'attestations' && empty($_GET['dossier'])) || ($__it[4] === 'employees' && $currentPage === 'employees') || ($__it[4] === $currentPage && strpos($__it[4], '__') !== 0 && $__it[4] !== 'employees');
+                        $__dL .= '<a href="' . BASE_URL . $__it[0] . '" class="' . ($__isA ? 'active' : '') . '"><i class="' . $__ic . '"></i><span class="nl2"><span class="nl-fr">' . e($__it[2]) . '</span><span class="nl-ar">' . e($__it[3]) . '</span></span></a>'; }
+                    $__dL .= '</div>';
+                    $__dossierDoor = ['fr' => 'Dossier enseignant', 'ar' => 'ملف الأستاذ', 'color' => '#1d4ed8', 'links' => $__dL, 'icon' => 'fa-id-badge', 'wide' => true, 'active' => strpos($__dL, 'class="active"') !== false];
+                    array_splice($__groups, 0, 0, [$__dossierDoor]);
+                    $__tabIcons['Dossier enseignant'] = 'fa-id-badge';
+                    if ($__dossierDoor['active']) $__extraActive = true;
+                }
+                // تُدرَج قبل باب «Rapports» (الترتيب: ملف الأستاذ · الموظفون · الرواتب · الإفادات · الضمان · الصندوق · المالية · التقارير · النظام)
+                $__pos = count($__groups); foreach ($__groups as $__i => $__g) if ($__g['fr'] === 'Rapports') { $__pos = $__i; break; }
+                array_splice($__groups, $__pos, 0, $__extra);
+                $__extraActive = false; foreach ($__extra as $__x) if (strpos($__x['links'], 'class="active"') !== false) { $__extraActive = true; break; }
+                $__tabIcons += ['CNSS' => 'fa-hospital', 'Caisse EOC' => 'fa-piggy-bank', 'Finances' => 'fa-file-invoice-dollar'];
+            }
+            echo '<nav class="msa-tabs no-print" id="msaTabs" aria-label="Navigation">';
+            echo '<a class="mt-brand" href="' . BASE_URL . 'index.php" title="' . e(currentSchoolName()) . '"><span class="mt-brand-ic"><i class="fas fa-graduation-cap"></i></span><span class="mt-brand-tx"><b>MSA Payroll</b><small>' . e(currentSchoolName()) . '</small></span></a>';
+            echo '<a class="mt-tab mt-home' . ($currentPage === 'dashboard' ? ' active' : '') . '" href="' . BASE_URL . 'index.php" style="--tc:#1e3a5f"><i class="fas fa-house"></i><span class="nl2"><span class="nl-fr">Accueil</span><span class="nl-ar">الرئيسية</span></span></a>';
+            foreach ($__groups as $__g) {
+                if (trim(strip_tags($__g['links'])) === '' && !preg_match('~<a ~', $__g['links'])) continue;
+                $__isAct = !empty($__g['active']) || strpos($__g['links'], 'class="active"') !== false || preg_match('~class="[^"]*\bactive\b~', $__g['links']);
+                if ($__isAct && !empty($__extraActive) && in_array($__g['fr'], ['Personnel', 'Paie', 'Rapports', 'Système'], true)) $__isAct = false;   // الصفحة تخصّ باباً مخصَّصاً (الضمان/الصندوق/المالية) ⇒ يضيء هو وحده
+                $__n = preg_match_all('~<a ~', $__g['links']);
+                echo '<div class="mt-tab mt-group' . ($__isAct ? ' active' : '') . '" style="--tc:' . e($__g['color']) . '">'
+                   . '<button type="button" class="mt-btn" aria-haspopup="true" aria-expanded="false"><i class="fas ' . ($__tabIcons[$__g['fr']] ?? 'fa-folder') . '"></i><span class="nl2"><span class="nl-fr">' . e($__g['fr']) . '</span><span class="nl-ar">' . e($__g['ar']) . '</span></span><i class="fas fa-chevron-down mt-car"></i></button>'
+                   . '<div class="mt-drop' . (!empty($__g['wide']) ? ' mt-wide' : ($__n > 7 ? ' mt-cols' : '')) . '"><div class="mt-drop-hd"><i class="fas ' . ($__tabIcons[$__g['fr']] ?? 'fa-folder') . '"></i> <span dir="ltr">' . e($__g['fr']) . '</span> <span class="mt-hd-ar">' . e($__g['ar']) . '</span></div><div class="mt-links">' . $__g['links'] . '</div></div>'
+                   . '</div>';
+            }
+            echo '<span class="mt-spacer"></span>';
+            echo '<button type="button" class="mt-side" onclick="window.msaSideToggle&&msaSideToggle()" title="إظهار / إخفاء العامود الجانبي"><i class="fas fa-table-columns"></i></button>';
+            echo '</nav>';
+        }
+        ?>
         <!-- سكربت البحث الشامل -->
         <script>
         (function () {
