@@ -314,7 +314,7 @@ if ($form === 'cnss_taswiya') {
 }
 
 $school = currentSchool();
-if (!$school) $school = institutionSchoolPick() ?: institutionGroupSchool(); // 🏫 (2026-09-25) مدرسة بالرابط أو مجموعة المدارس المختارة معاً
+if (!$school) $school = institutionSchoolPick() ?: institutionGroupSchool(strpos($form, 'cnss_') === 0); // 🏛️ (2026-10-16) الضمان: صاحب عمل واحد لكل تصريح (&cnss_emp=) // 🏫 (2026-09-25) مدرسة بالرابط أو مجموعة المدارس المختارة معاً
 // 🔒 نموذج الضمان 190A يُصدَر لمؤسسة واحدة برقم صاحب عمل واحد — في وضع «كل المدارس»
 // كان يُبَثّ ملفٌ بترويسة فارغة يجمع أرقام كل المدارس. اطلب اختيار مدرسة.
 if (!$school) {

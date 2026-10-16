@@ -347,9 +347,38 @@ function institutionSchoolChoices(): array {
  * نفسه (معظمها 25-82-043 = الراهبات المخلصيات)، وإلا أسماؤها متسلسلة + علم _group_mixed للتنبيه.
  * يعيد null بمدرسة واحدة (currentSchool تكفي) أو بلا مدارس.
  */
-function institutionGroupSchool(): ?array {
+function institutionGroupSchool(bool $byCnssEmployer = false): ?array {
     $rows = institutionSchoolChoices();
     if (count($rows) <= 1) return $rows ? $rows[0] : null;
+    // 🏛️ (2026-10-16 «تصريح الضمان للمدارس اللي عندن نفس رقم الضمان لازم يكون اسم المؤسسة الراهبات المخلصيات لسيدة البشارة — بس للضمان هيك»)
+    //    بنماذج الضمان التصريح الواحد = صاحب عمل واحد (رقم واحد). مدارس مختارة بأرقام مختلفة ⇒ هذا الطلب وحده يُحصر بمجموعة الرقم
+    //    المختار (&cnss_emp=) أو الأكبر عدداً (25-82-043 = الراهبات المخلصيات لسيدة البشارة)، والمجموعات الأخرى حبوب للتبديل بالشارة.
+    //    لا يغيّر اختيار المستخدم بالجلسة (msa_school_override لهذا الطلب فقط). نماذج المالية تبقى كما كانت.
+    $cnssGroups = null; $cnssKey = '';
+    if ($byCnssEmployer) {
+        $groups = [];
+        foreach ($rows as $s) { $groups[cnssEmployerNumberKey($s['nssf_employer_number'] ?? '')][] = $s; }
+        if (count($groups) > 1) {
+            uasort($groups, fn($a, $b) => count($b) <=> count($a));
+            $want = cnssEmployerNumberKey((string)($_GET['cnss_emp'] ?? ''));
+            $cnssKey = ($want !== '' && isset($groups[$want])) ? $want : (string)array_key_first($groups);
+            $cnssGroups = [];
+            foreach ($groups as $k => $gs) {
+                $e = cnssEmployerSchool($gs[0]);
+                $cnssGroups[$k] = ['key' => $k, 'number' => (string)($gs[0]['nssf_employer_number'] ?? ''), 'count' => count($gs),
+                                   'name' => count($gs) === 1 ? (string)($gs[0]['name_ar'] ?: $gs[0]['name_fr']) : (string)($e['name_ar'] ?? ''),
+                                   'ids' => array_map(fn($s) => (int)$s['id'], $gs), 'schools' => array_map(fn($s) => (string)($s['name_ar'] ?: $s['name_fr']), $gs)];
+            }
+            $rows = array_values($groups[$cnssKey]);
+            $GLOBALS['msa_school_override'] = array_map(fn($s) => (int)$s['id'], $rows);
+            if (count($rows) === 1) {
+                $one = $rows[0];
+                $one['_group_ids'] = [(int)$one['id']]; $one['_group_names'] = [(string)($one['name_ar'] ?: $one['name_fr'])]; $one['_group_mixed'] = false;
+                $one['_cnss_groups'] = $cnssGroups; $one['_cnss_key'] = $cnssKey;
+                return $one;
+            }
+        }
+    }
     $base = $rows[0];
     $keys = array_unique(array_map(fn($s) => cnssEmployerNumberKey($s['nssf_employer_number'] ?? ''), $rows));
     $same = count($keys) === 1 && $keys[0] !== '';
@@ -368,10 +397,28 @@ function institutionGroupSchool(): ?array {
         $g['name_ar'] = implode(' + ', $g['_group_names']);
         $g['name_fr'] = implode(' + ', array_map(fn($s) => (string)($s['name_fr'] ?: $s['name_ar']), $rows));
     }
+    if ($cnssGroups !== null) { $g['_cnss_groups'] = $cnssGroups; $g['_cnss_key'] = $cnssKey; }
     return $g;
 }
 /** شارة فوق التصريح: «التصريح لمجموعة المدارس: …» (+ تنبيه إن اختلفت أرقام الضمان) */
 function institutionGroupBadgeHtml(array $g): string {
+    // 🏛️ (2026-10-16) نماذج الضمان: صاحب عمل واحد لكل تصريح + حبوب التبديل بين أرقام الضمان المختارة
+    if (!empty($g['_cnss_groups'])) {
+        $cur = (string)($g['_cnss_key'] ?? '');
+        $h = '<div class="no-print" style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-weight:700">'
+           . '<i class="fas fa-shield-alt"></i> تصريح الضمان لصاحب العمل / Déclaration CNSS de l\'employeur : <b>' . e((string)($g['name_ar'] ?? '')) . '</b>'
+           . ' <span style="font-weight:400;color:#475569">— رقم ' . e((string)($g['nssf_employer_number'] ?? '')) . ' · ' . count($g['_group_ids'] ?? []) . ' مؤسسة'
+           . (count($g['_group_ids'] ?? []) > 1 ? ' (' . e(implode(' + ', $g['_group_names'] ?? [])) . ')' : '') . '</span>';
+        if (count($g['_cnss_groups']) > 1) {
+            $h .= '<div class="cnss-emp-pick" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-weight:600;color:#475569">أرقام ضمان أخرى ضمن اختيارك — تصريح لكل رقم / Autres employeurs :</span>';
+            foreach ($g['_cnss_groups'] as $k => $grp) {
+                $q = $_GET; $q['cnss_emp'] = $k; $url = '?' . http_build_query($q);
+                $h .= '<a class="btn btn-sm ' . ($k === $cur ? 'btn-primary' : 'btn-light') . '" href="' . e($url) . '" title="' . e(implode(' + ', $grp['schools'])) . '"><i class="fas fa-building"></i> ' . e($grp['name']) . ' — ' . e($grp['number']) . ' (' . (int)$grp['count'] . ')</a>';
+            }
+            $h .= '</div>';
+        }
+        return $h . '</div>';
+    }
     $h = '<div class="no-print" style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-weight:700">'
        . '<i class="fas fa-school"></i> التصريح لمجموعة المدارس معاً / Déclaration groupée : ' . e(implode(' + ', $g['_group_names'] ?? []))
        . ' <span style="font-weight:400;color:#475569">— رقم صاحب العمل: ' . e((string)($g['nssf_employer_number'] ?? '')) . '</span>';

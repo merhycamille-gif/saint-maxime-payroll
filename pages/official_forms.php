@@ -47,7 +47,7 @@ $ofSchoolGroup = false;  // 🏫 (2026-09-25 «بدي اختار أو وحدة �
 if (in_array($form, $institutionForms, true) && !$school) {
     $school = institutionSchoolPick();
     if ($school) { $ofSchoolPicked = true; }
-    else { $school = institutionGroupSchool(); $ofSchoolGroup = $school && !empty($school['_group_ids']); }
+    else { $school = institutionGroupSchool(strpos($form, 'cnss_') === 0); $ofSchoolGroup = $school && !empty($school['_group_ids']); } // 🏛️ (2026-10-16) الضمان: صاحب عمل واحد لكل تصريح
     if (!$school) { $_SESSION['flash_error'] = 'لا مدارس فاعلة / Aucune école active.'; header('Location: ' . BASE_URL . 'pages/tax_declarations.php'); exit; }
 }
 $lang = $_SESSION['lang'] ?? 'fr';
@@ -2236,7 +2236,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         'n3'=>$n3, 'w3'=>formatLBP($w3,false), 'c3'=>formatLBP($c3,false),
         'total'=>formatLBP($total,false), 'fpaid'=>formatLBP($fpaid,false), 'net'=>formatLBP($net,false),
     ];
-    $ofExp = BASE_URL . 'pages/official_export.php?form=' . e($form) . '&month=' . (int)$month . '&year=' . (int)$year . ($ofSchoolPicked ? '&school_id=' . (int)$school['id'] : '');
+    $ofExp = BASE_URL . 'pages/official_export.php?form=' . e($form) . '&month=' . (int)$month . '&year=' . (int)$year . ($ofSchoolPicked ? '&school_id=' . (int)$school['id'] : '') . (!empty($school['_cnss_key']) ? '&cnss_emp=' . rawurlencode($school['_cnss_key']) : ''); // 🏛️ (2026-10-16) نفس صاحب العمل بالملف الرسمي
 ?>
     <?php if (!$isQuarter): ?>
     <div class="no-print" style="background:#e9f9ee;border:2px solid #1a7f37;border-radius:10px;padding:14px;margin-bottom:14px;text-align:center">
