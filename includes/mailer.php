@@ -173,7 +173,9 @@ function programMailDomain(): string {
 function programMailAddress(): string {
     $custom = trim((string)getSetting('program_email_addr', ''));
     if ($custom !== '' && filter_var($custom, FILTER_VALIDATE_EMAIL)) return $custom;
-    return 'no-reply@' . programMailDomain(); // العنوان الذي ثبت أنّ خادم الموقع يقبله (تجربة 2026-09-13)
+    $d = programMailDomain();
+    if (!programMailAvailable() && defined('ONLINE_SYNC_URL')) $d = preg_replace('/^www\./', '', (string)parse_url((string)ONLINE_SYNC_URL, PHP_URL_HOST)) ?: $d; // نسخة الكمبيوتر تبعت عبر الموقع ⇒ العنوان بدومين الموقع
+    return 'no-reply@' . $d; // العنوان الذي ثبت أنّ خادم الموقع يقبله (تجربة 2026-09-13)
 }
 function programMailName(): string {
     $n = trim((string)getSetting('program_email_name', ''));
@@ -207,11 +209,51 @@ function schoolReplyEmail($schoolId = null): string {
     return filter_var($e, FILTER_VALIDATE_EMAIL) ? $e : '';
 }
 /**
+ * 🔁 (2026-10-16) نسخة الكمبيوتر بلا بريد ⇒ تبعت الرسالة عبر الموقع: دخول بحساب المزامنة (كما local_sync.php) ثم POST JSON إلى pages/mail_relay.php.
+ * الجلسة تُحفَظ بـtmp/mail_relay_cookies.txt فلا دخول بكل رسالة؛ عند انتهائها (401/302) يعاد الدخول مرّة.
+ */
+function programMailRelay($to, $subject, $body, array $attachments = [], $isHtml = false, $fromName = '', $replyTo = ''): array {
+    if (!defined('ONLINE_SYNC_URL') || !defined('ONLINE_SYNC_USER') || !defined('ONLINE_SYNC_PASS') || !function_exists('curl_init'))
+        return [false, 'الإرسال من إيميل البرنامج يعمل على الموقع (msapayroll.com) لا على نسخة الكمبيوتر'];
+    $site = rtrim((string)ONLINE_SYNC_URL, '/');
+    $dir = dirname(__DIR__) . '/tmp'; if (!is_dir($dir)) @mkdir($dir, 0777, true);
+    $cj = $dir . '/mail_relay_cookies.txt';
+    $ch = function (string $url, array $opt = []) use ($cj) {
+        $c = curl_init($url);
+        curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIEJAR => $cj, CURLOPT_COOKIEFILE => $cj, CURLOPT_FOLLOWLOCATION => false,
+                               CURLOPT_TIMEOUT => 120, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_USERAGENT => 'MSA-Payroll-MailRelay'] + $opt);
+        $out = curl_exec($c); $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE); $err = curl_error($c); curl_close($c);
+        return [$out, $code, $err];
+    };
+    $login = function () use ($ch, $site, $cj): string {
+        @unlink($cj);
+        [$html, $code, $err] = $ch($site . '/login.php');
+        if ($html === false || $code !== 200) return 'لا اتصال بالموقع (' . ($err ?: $code) . ')';
+        preg_match('/name="csrf" value="([^"]+)"/', (string)$html, $m);
+        [, $code] = $ch($site . '/login.php', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query(['username' => ONLINE_SYNC_USER, 'password' => ONLINE_SYNC_PASS, 'csrf' => $m[1] ?? ''])]);
+        return $code === 302 ? '' : 'فشل الدخول إلى الموقع (رمز ' . $code . ')';
+    };
+    $payload = json_encode([
+        'to' => $to, 'subject' => (string)$subject, 'body' => (string)$body, 'isHtml' => (bool)$isHtml, 'fromName' => (string)$fromName, 'replyTo' => (string)$replyTo,
+        'attachments' => array_map(fn($a) => ['name' => (string)($a['name'] ?? 'file'), 'mime' => (string)($a['mime'] ?? 'application/octet-stream'), 'data' => base64_encode((string)($a['data'] ?? ''))], $attachments),
+    ], JSON_UNESCAPED_UNICODE);
+    $post = fn() => $ch($site . '/pages/mail_relay.php', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $payload, CURLOPT_HTTPHEADER => ['Content-Type: application/json']]);
+    [$out, $code, $err] = is_file($cj) ? $post() : [null, 401, ''];
+    if ($code === 401 || $code === 302 || $code === 0) {   // جلسة منتهية أو لا جلسة ⇒ دخول ثم إعادة
+        $le = $login(); if ($le !== '') return [false, 'عبر الموقع: ' . $le];
+        [$out, $code, $err] = $post();
+    }
+    if ($out === false || $code !== 200) return [false, 'عبر الموقع: تعذّر الاتصال (' . ($err ?: $code) . ')'];
+    $r = json_decode((string)$out, true);
+    if (!is_array($r)) return [false, 'عبر الموقع: ردّ غير مفهوم'];
+    return [!empty($r['ok']), !empty($r['ok']) ? '' : 'عبر الموقع: ' . (string)($r['err'] ?? 'تعذّر الإرسال')];
+}
+/**
  * إرسال من إيميل البرنامج عبر بريد الخادم (mail()) — نصّ أو HTML + مرفقات.
  * @return array [bool ok, string error]
  */
 function programMailSend($to, $subject, $body, array $attachments = [], $isHtml = false, $fromName = '', $replyTo = ''): array {
-    if (!programMailAvailable()) return [false, 'الإرسال من إيميل البرنامج يعمل على الموقع (msapayroll.com) لا على نسخة الكمبيوتر'];
+    if (!programMailAvailable()) return programMailRelay($to, $subject, $body, $attachments, $isHtml, $fromName, $replyTo);
     $from = programMailAddress();
     $fromName = $fromName !== '' ? $fromName : programMailName();
     $boundary = '=_pp_' . bin2hex(random_bytes(8));
