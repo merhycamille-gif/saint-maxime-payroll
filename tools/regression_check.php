@@ -8655,7 +8655,8 @@ foreach (['salaire' => 10, 'embassy' => 12, 'isqat_haq' => 12, 'aqd_taalim' => 1
 // عمود واحد ثابت (p1: الخلط عمود/عمودين كان يبعثر العين) + أقسام ملوّنة + شبكة أزرار المدارس بفحص القانون
 $ok188 = $ok188 && strpos($css188, '.att-opts{display:grid;grid-template-columns:1fr;') !== false && strpos($css188, '.att-opts .att-sec.g1{background:#ecfdf5;') !== false
        && strpos($at188, '<div class="att-sec g1"><div class="att-st">') !== false && strpos($at188, '<div class="att-sec g4"><div class="att-st">') !== false
-       && strpos((string)file_get_contents($PROJ . '/pages/law_check.php'), 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:6px') !== false;
+       && strpos((string)file_get_contents($PROJ . '/pages/law_check.php'), 'onchange="location.href=this.value"') !== false   // 🧹 (2026-10-17) أزرار المدارس بفحص القانون صارت قائمة منسدلة واحدة
+       && strpos((string)file_get_contents($PROJ . '/pages/law_check.php'), '<option value="?school=<?= (int)') !== false;
 check('☑️📐 شريط خيارات الإفادة صفوفاً مرتّبة (2026-09-27): .att-opts عام + لا فواصل «|» + 52 خانة بسلوكها + صفوف ≥ الحدّ بكل نوع (salaire/embassy/isqat/aqd/cnss_leave) + div متوازنة', $ok188, $why188);
 
 /* =====================================================================

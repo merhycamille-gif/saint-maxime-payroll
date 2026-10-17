@@ -12,6 +12,9 @@ const key = fs.readFileSync(process.argv[2], 'utf8').trim(); const testTo = proc
   await page.goto('https://msapayroll.com/pages/email_settings.php', { waitUntil: 'networkidle2' });
   const has = await page.$('input[name=program_relay_key]'); console.log('relay field present:', !!has);
   if (!has) { await browser.close(); process.exit(2); }
+  // 🔒 الفورم مقفول (form-lock.js) حتى كبسة «تعديل / Modifier» داخله
+  await page.evaluate(() => { const f = document.querySelector('input[name=program_relay_key]').form; const b = f.querySelector('.lockedit-bar button, button.btn-warning'); if (b) b.click(); });
+  await new Promise(r => setTimeout(r, 400));
   await page.type('input[name=program_relay_key]', key);
   await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.click('button[name=save_program]')]);
   const flash1 = await page.evaluate(() => (document.querySelector('.alert-success, .alert-danger, .flash') || {}).innerText || '');

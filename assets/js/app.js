@@ -894,3 +894,40 @@ window.msaDrawer = (function () {
         setTimeout(function () { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }, 220);
     };
 })();
+
+// 🧹 (2026-10-17 «شوف أنت إذا بعد في صفحات معجّقة بكل البرنامج») — مكانان مشتركان كانا يأكلان الشاشة بكل صفحة:
+// (١) شبكات الاختيار الطويلة (المدارس 13×4 أسطر، بنود التقرير، الأعمدة) ⇒ مطوية بسطر واحد يُظهر المختار + «تغيير»؛ تنفتح عند الحاجة.
+// (٢) الملاحظات التوضيحية الطويلة (alert-info) ⇒ سطر واحد يفتح بالكبس. لا يتغيّر أي خيار ولا أي إرسال فورم.
+(function () {
+    function txt(el) { return (el ? el.textContent : '').replace(/\s+/g, ' ').trim(); }
+    function collapsePicker(box) {
+        if (box.closest('details.msa-pick') || box.closest('.export-toolbar')) return;
+        var chks = box.querySelectorAll('label.chk'); if (chks.length < 7) return;
+        var labelEl = box.previousElementSibling; if (!(labelEl && labelEl.classList.contains('form-label'))) labelEl = null;
+        var det = document.createElement('details'); det.className = 'msa-pick no-print';
+        var sum = document.createElement('summary'); det.appendChild(sum);
+        box.parentNode.insertBefore(det, box); det.appendChild(box);
+        if (labelEl) labelEl.style.display = 'none';
+        var base = labelEl ? txt(labelEl).replace(/\s*[—-]\s*(وحدة لحالها|اختر|une,).*$/u, '') : 'الاختيار / Sélection';
+        function paint() {
+            var all = box.querySelector('label.chk.all input'); var on = [];
+            box.querySelectorAll('label.chk:not(.all) input:checked').forEach(function (i) { on.push(txt(i.parentElement)); });
+            var sel = (all && all.checked) || !on.length ? 'الكل / Toutes' : (on.slice(0, 3).join(' · ') + (on.length > 3 ? ' +' + (on.length - 3) : ''));
+            sum.innerHTML = '<i class="fas fa-list-check"></i> <b>' + base.replace(/</g, '&lt;') + '</b> <span class="mp-sel">' + sel.replace(/</g, '&lt;') + '</span> <span class="mp-edit"><i class="fas fa-pen"></i> تغيير / Modifier</span>';
+        }
+        box.addEventListener('change', paint); paint();
+    }
+    function collapseNote(al) {
+        if (al.classList.contains('toast') || al.closest('.toast-stack, .export-toolbar, .official-doc, .doc-sheet')) return;
+        if (al.querySelector('input, select, textarea, .btn, button, table')) return;
+        if (txt(al).length < 150) return;
+        al.classList.add('msa-note');
+        al.addEventListener('click', function (e) { if (e.target.closest('a')) return; al.classList.toggle('open'); });
+    }
+    function run() {
+        var pc = document.getElementById('pageContent'); if (!pc) return;
+        pc.querySelectorAll('.school-checks:not(.emp-type-checks)').forEach(collapsePicker);
+        pc.querySelectorAll('.alert.alert-info, .alert.alert-warning, .fa-law').forEach(collapseNote);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+})();

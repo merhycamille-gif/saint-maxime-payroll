@@ -58,16 +58,15 @@ include __DIR__ . '/../includes/header.php';
       </p>
 
       <!-- أزرار اختيار النطاق -->
-      <div class="no-print" style="margin:12px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:6px"><?php /* ☑️📐 (2026-09-27) أزرار المدارس بشبكة متساوية بدل الرصّ الحرّ */ ?>
+      <div class="no-print" style="margin:10px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><?php /* 🧹 (2026-10-17) 14 كبسة مدرسة على 4 أسطر ⇒ قائمة منسدلة واحدة بنفس الروابط */ ?>
         <?php if (isSuperAdmin()): ?>
-          <a href="?" class="btn btn-sm <?= $reqSchool===0 ? 'btn-primary' : 'btn-light' ?>">
-            <i class="fas fa-globe"></i> Toutes les écoles / كل المدارس
-          </a>
-          <?php foreach ($schoolsList as $s): ?>
-            <a href="?school=<?= (int)$s['id'] ?>" class="btn btn-sm <?= $reqSchool===(int)$s['id'] ? 'btn-primary' : 'btn-light' ?>">
-              <i class="fas fa-school"></i> <?= e($s['name_ar'] ?: $s['name_fr']) ?>
-            </a>
-          <?php endforeach; ?>
+          <label class="form-label" style="margin:0"><i class="fas fa-school"></i> École / المدرسة</label>
+          <select class="form-select" style="width:auto;min-width:320px" onchange="location.href=this.value">
+            <option value="?"<?= $reqSchool===0 ? ' selected' : '' ?>>Toutes les écoles / كل المدارس</option>
+            <?php foreach ($schoolsList as $s): ?>
+            <option value="?school=<?= (int)$s['id'] ?>"<?= $reqSchool===(int)$s['id'] ? ' selected' : '' ?>><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
+            <?php endforeach; ?>
+          </select>
         <?php endif; ?>
       </div>
 

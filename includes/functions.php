@@ -129,6 +129,7 @@ function viewerBaseScripts() {
         // مبدّلات العرض والبحث (كانت ناقصة فكان حساب المدرسة يُطرد عند تغيير العملة/مكوّنات الراتب
         // ويرجع بحث Ctrl+K فارغاً — كلّها عرض فقط ولا تعدّل بيانات):
         'switch_currency.php', 'switch_salarycomp.php', 'ajax_search.php',
+        'switch_rateline.php', // 💱 (2026-10-17) إظهار/إخفاء سطر سعر الصرف بالعناوين — عرض فقط
     ];
 }
 
@@ -5635,6 +5636,8 @@ function exportToolbar($title = 'document', $opts = []) {
         </span>
         <details class="xt-more no-print"><summary class="btn btn-sm btn-light" title="خيارات إضافية: اتجاه الورقة، أجزاء الجدول، تسجيل التقديم للدولة"><i class="fas fa-ellipsis"></i> Plus / المزيد</summary>
             <div class="xt-menu">
+        <?php // 💱 (2026-10-17) سطر «سعر الصرف المعتمد» بعناوين المستندات: إظهار/إخفاء بكل البرنامج (جلسة، يرجع للصفحة نفسها) ?>
+        <a class="btn btn-sm btn-light" id="msaRateLineBtn" href="<?= BASE_URL ?>switch_rateline.php?show=<?= rateLineHidden() ? '1' : '0' ?>" title="سطر «سعر الصرف المعتمد» تحت عنوان كل تقرير وإفادة وبطاقة"><i class="fas fa-money-bill-transfer"></i> <?= rateLineHidden() ? 'Afficher le taux de change / أظهر سعر الصرف بالعنوان' : 'Masquer le taux de change / شيل سعر الصرف من العنوان' ?></a>
         <?php if ((($GLOBALS['currentPage'] ?? '') !== 'annual')): ?>
             <span class="rl-sides"><button type="button" class="rl-side" data-rs="rtl" title="الأعمدة من اليمين / Colonnes depuis la droite">⇤ من اليمين</button><button type="button" class="rl-side" data-rs="ltr" title="Colonnes depuis la gauche / الأعمدة من الشمال">De gauche ⇥</button></span>
         <?php endif; ?>
@@ -6154,7 +6157,10 @@ function compColsCount(bool $withTransport = true): int {
 // 🏷️ «اتفقنا بكل عناوين التقارير والإفادات والبرنامج: بس نحطّ الراتب بالدولار لازم يكون بالعنوان سعر الدولار اللي حاسبها» (2026-09-19):
 //    سطر واحد تحت عنوان كل مستند فيه دولار = سعر الصرف المعتمد بالحساب (سعر الشهر؛ للمستندات السنوية: سعر كل شهر + آخر سعر)
 //    + السعر الرسمي 1,500 لأعمدة الأساس/الدرجة حين تكون موجودة ($law). لا يظهر بوضع «ليرة فقط». المصدر الواحد لكل البرنامج.
+/** 💱 (2026-10-17 «عم تحطّ براس كل تقرير سعر الصرف المعتمد — لازم يكون عندي خيار إنّو شيلها كمان، وين ما كان») خيار بالجلسة (switch_rateline.php) */
+function rateLineHidden(): bool { return !empty($_SESSION['hide_rate_line']); }
 function rateTitleText($month = null, $year = null, bool $annual = false, ?float $rate = null, bool $law = true): string {
+    if (rateLineHidden()) return '';   // 💱 المستخدم اختار إخفاء السطر بكل المستندات (تقارير/إفادات/بطاقات/PDF/إكسل)
     // 🏷️ (2026-09-23 «طلّعت البطاقة السنوية ما ظهر بالعناوين قدّيش قيمة الدولار») السطر يظهر بكل أوضاع العملة — حتى بوضع «ليرة فقط»
     //    (كان يُخفى فيه) لأنه معلومة عن السعر المعتمد لا مبلغاً بالدولار.
     $r = $rate !== null ? (float)$rate : (float)getExchangeRate($month, $year);
