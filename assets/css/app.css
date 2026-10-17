@@ -3023,3 +3023,28 @@ details.msa-pick[open] > .school-checks { border-top: 0; border-top-left-radius:
 .alert.msa-note.open, .fa-law.msa-note.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .alert.msa-note:not(.open)::after, .fa-law.msa-note:not(.open)::after { content: '… ▾'; position: absolute; inset-inline-end: 10px; top: 6px; font-weight: 800; background: inherit; padding-inline-start: 8px; }
 @media print { details.msa-pick { display: none !important; } .alert.msa-note { display: block; -webkit-line-clamp: unset; } }
+
+/* ═══ 440 — ➕ (2026-10-17 «خيار للمجاميع: كلها أو كل سطر كمان») عمود «المجموع» بآخر كل سطر + سطر مجموع كل فئة (totals.js) ═══ */
+.doc-table th.msa-rowsum { background: #1e3a8a !important; color: #fff !important; }
+.doc-table td.msa-rowsum { background: #eef2ff; font-weight: 800; white-space: nowrap; }
+.doc-table td.msa-rowsum .msa-usd { color: #15803d; font-size: .9em; }
+.doc-table tr.msa-grp-row td { background: #fef3c7 !important; font-weight: 800; border-top: 2px solid #f59e0b; }
+.doc-table tr.msa-grp-row td small { font-weight: 600; color: #92400e; }
+.doc-table tr.subtotal-row.msa-sub-hidden { display: none !important; }
+@media print { .doc-table th.msa-rowsum { background: #e2e8f0 !important; color: #000 !important; } .doc-table tr.msa-grp-row td { background: #f8fafc !important; } }
+
+/* ➕ (2026-10-17 «بدّي مجموع لشي معيّن») كبسة Σ على رؤوس الأعمدة الرقمية + شريط المجموع العائم */
+.doc-table th .msa-colpick { display: inline-block; float: inline-end; margin: 0 0 2px 4px; width: 18px; height: 18px; border: 0; border-radius: 5px; background: rgba(255,255,255,.22); color: #fff; font: 700 12px/18px serif; cursor: pointer; padding: 0; opacity: .55; vertical-align: top; }
+.doc-table th .msa-colpick:hover { opacity: 1; background: #f59e0b; }
+.doc-table th.msa-picked { outline: 3px solid #f59e0b; outline-offset: -3px; }
+.doc-table th.msa-picked .msa-colpick { opacity: 1; background: #f59e0b; color: #000; }
+#msaColBar { position: fixed; bottom: 14px; inset-inline-start: 50%; transform: translateX(-50%); z-index: 90; background: #111827; color: #fff; border-radius: 14px; padding: 10px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); min-width: 320px; max-width: 92vw; font-size: 14px; direction: rtl; }
+#msaColBar .cb-h { display: flex; align-items: center; gap: 8px; font-weight: 800; margin-bottom: 6px; color: #fbbf24; }
+#msaColBar .cb-x { margin-inline-start: auto; background: #374151; color: #fff; border: 0; border-radius: 8px; width: 26px; height: 26px; cursor: pointer; }
+#msaColBar .cb-i { display: flex; align-items: center; gap: 10px; padding: 3px 0; border-top: 1px solid #374151; }
+#msaColBar .cb-n { flex: 1; font-weight: 700; }
+#msaColBar .cb-v { font-weight: 800; white-space: nowrap; }
+#msaColBar .cb-v .msa-usd { color: #86efac; }
+#msaColBar .cb-t { border-top: 2px solid #fbbf24; color: #fbbf24; }
+#msaColBar small { color: #9ca3af; }
+@media print { .doc-table th .msa-colpick, #msaColBar { display: none !important; } .doc-table th.msa-picked { outline: 0; } }

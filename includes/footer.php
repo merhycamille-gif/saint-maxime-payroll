@@ -19,6 +19,7 @@
               $msaMailTName = trim(($msaMailRow['first_name_ar'] ?: $msaMailRow['first_name_fr']) . ' ' . ($msaMailRow['last_name_ar'] ?: $msaMailRow['last_name_fr'])); } } catch (Throwable $t) {} } ?>
 <script>window.MSA_SCHOOL_EMAIL = <?= json_encode($msaMailSchEmail) ?>; window.MSA_SCHOOL_NAME = <?= json_encode((string)(($msaMailSch['name_ar'] ?? '') ?: ($msaMailSch['name_fr'] ?? ''))) ?>; window.MSA_TEACHER_EMAIL = <?= json_encode($msaMailTEmail) ?>; window.MSA_TEACHER_NAME = <?= json_encode($msaMailTName) ?>;</script>
 <script src="<?= BASE_URL ?>assets/js/doclang.js?v=<?= @filemtime(__DIR__ . '/../assets/js/doclang.js') ?: '1' ?>"></script>
+<script src="<?= BASE_URL ?>assets/js/totals.js?v=<?= @filemtime(__DIR__ . '/../assets/js/totals.js') ?: '1' ?>"></script><?php /* ➕ (2026-10-17) عمود مجموع السطر / مجموع كل فئة بكل التقارير */ ?>
 <?php if (!empty($GLOBALS['msaLegalCtx'])): $lc = $GLOBALS['msaLegalCtx']; $lf = $lc['filing'] ? array_intersect_key($lc['filing'], array_flip(['id','version','sent_at','sent_by','snapshot_hash','seen_hash','changed_flag','changed_note'])) : null; ?>
 <script>window.MSA_LEGAL = <?= json_encode(['key' => $lc['key'], 'period' => $lc['period'], 'scope' => $lc['scope'], 'base' => BASE_URL, 'me' => (string)($_SESSION['full_name'] ?? ($_SESSION['username'] ?? '')), 'filing' => $lf, 'auth' => $lc['auth'] ?? null], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;</script>
 <script src="<?= BASE_URL ?>assets/js/legal.js?v=<?= @filemtime(__DIR__ . '/../assets/js/legal.js') ?: '1' ?>"></script>

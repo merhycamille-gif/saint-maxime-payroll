@@ -154,7 +154,7 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <!-- App CSS -->
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app.css') ?: '1' ?>">
 </head>
-<body class="<?= $lang === 'ar' ? 'rtl' : '' ?><?= !empty($docFocus) ? ' doc-view' : '' ?>">
+<body class="<?= $lang === 'ar' ? 'rtl' : '' ?><?= !empty($docFocus) ? ' doc-view' : '' ?>" data-totals-rowsum="<?= function_exists('totalsRowSum') && totalsRowSum() ? '1' : '0' ?>" data-totals-group="<?= function_exists('totalsGroup') && totalsGroup() ? '1' : '0' ?>">
 <script>/* v2026: القائمة الجانبية مفتوحة بعناوينها دائماً (طلبه: «العامود اللي عالشمال اللي فيه العناوين يضلّ ظاهر») — Ctrl+B/الدبّوس يطويها لشريط أيقونات */try{if(localStorage.getItem('msa_nav_pinned')!=='0')document.body.classList.add('nav-pinned');}catch(e){}
 /* 🧭 (2026-10-16 p1 «التبويب والديزاين متل Namecheap»): شريط تبويبات علوي بقوائم منسدلة لكل باب يحلّ محلّ العامود الجانبي؛ msa_side=1 يرجّع العامود (كبسة ☰ بآخر الشريط) */
 try{if(localStorage.getItem('msa_side')==='1')document.body.classList.add('msa-side');}catch(e){}</script>
