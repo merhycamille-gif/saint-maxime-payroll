@@ -9777,10 +9777,10 @@ $ok242 = strpos($hd242, "<?= (\$isAllSel || in_array((int)\$navS['id'],\$activeI
     && strpos($hd242, '<div class="school-strip no-print" id="schoolStrip">') !== false
     && strpos($sw242, "if (\$bk !== '' && \$bk[0] === '/' && strpos(\$bk, '//') === false") !== false && strpos($sw242, "strpos(\$bk, BASE_URL) === 0) \$back = \$bk;") !== false
     && strpos($css242, '@media print { .school-strip { display: none !important; } }') !== false
-    && substr_count($r242, 'class="ss-chip') >= 3 && strpos($r242, 'switch_school.php?school=0&amp;back=') !== false   // الشريط داخل التقرير
+    && strpos($r242, 'class="ss-sel"') !== false && substr_count($r242, 'switch_school.php?school=') >= 3 && substr_count($r242, '<option value="') >= 3 && strpos($r242, 'switch_school.php?school=0&amp;back=') !== false   // 🧹 (2026-10-17) الشريط داخل التقرير = قائمة منسدلة بنفس الروابط
     && strpos($e242, 'id="schoolStrip"') === false                                                                    // لا شريط خارج عرض المستند
     && strpos($r242, 'FATAL') === false;
-check('🏫 «كل المدارس» تشيّك كل مدرسة + شريط مدارس داخل التقارير ينقل دغري من مدرسة لمدرسة (2026-10-03)', $ok242, 'chips=' . substr_count($r242, 'class="ss-chip'));
+check('🏫 «كل المدارس» تشيّك كل مدرسة + شريط مدارس داخل التقارير ينقل دغري من مدرسة لمدرسة (2026-10-03)', $ok242, 'options=' . substr_count($r242, 'switch_school.php?school='));
 
 /* =====================================================================
  * 241) 🚪🩹 (2026-10-03 بكلماته «وكل شي بعد تاريخ الترك ما لازم يكون في الو راتب» بعد عرض العشرين بالأسماء): شفاء مرّة واحدة —

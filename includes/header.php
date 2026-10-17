@@ -927,12 +927,17 @@ document.addEventListener('submit', function (e) {
                 $stripQ = $_GET; foreach (['sch', 'sch_all', 'sch_set', 'schools', 'school', 'employee_id', 'emp', 'emp_id'] as $sk) unset($stripQ[$sk]);
                 $stripBack = strtok((string)($_SERVER['REQUEST_URI'] ?? ''), '?') . ($stripQ ? '?' . http_build_query($stripQ) : '');
         ?>
+        <?php /* 🧹 (2026-10-17 «بكل البرنامج أي صفحة بفتحها بتطلع معجّقة») 14 حبّة مدارس على 3 أسطر ⇒ قائمة منسدلة واحدة بنفس الروابط (switch_school) */
+              $ssMulti = !$stripAll && count($stripActive) > 1; ?>
         <div class="school-strip no-print" id="schoolStrip">
             <span class="ss-k"><i class="fas fa-school"></i> École / المدرسة:</span>
-            <a class="ss-chip<?= $stripAll ? ' on' : '' ?>" href="<?= BASE_URL ?>switch_school.php?school=0&amp;back=<?= e(rawurlencode($stripBack)) ?>">Toutes / الكل</a>
-            <?php foreach ($stripSchools as $ssS): $ssOn = !$stripAll && in_array((int)$ssS['id'], $stripActive, true); ?>
-            <a class="ss-chip<?= $ssOn ? ' on' : '' ?>" href="<?= BASE_URL ?>switch_school.php?school=<?= (int)$ssS['id'] ?>&amp;back=<?= e(rawurlencode($stripBack)) ?>"><?= e($lang === 'ar' ? ($ssS['name_ar'] ?: $ssS['name_fr']) : ($ssS['name_fr'] ?: $ssS['name_ar'])) ?></a>
-            <?php endforeach; ?>
+            <select class="ss-sel" onchange="if (this.value) location.href = this.value" title="انتقل لنفس المستند بمدرسة ثانية دغري">
+                <?php if ($ssMulti): ?><option value="" selected><?= count($stripActive) ?> écoles / مدارس مختارة</option><?php endif; ?>
+                <option value="<?= BASE_URL ?>switch_school.php?school=0&amp;back=<?= e(rawurlencode($stripBack)) ?>"<?= $stripAll ? ' selected' : '' ?>>Toutes / الكل</option>
+                <?php foreach ($stripSchools as $ssS): $ssOn = !$stripAll && !$ssMulti && in_array((int)$ssS['id'], $stripActive, true); ?>
+                <option value="<?= BASE_URL ?>switch_school.php?school=<?= (int)$ssS['id'] ?>&amp;back=<?= e(rawurlencode($stripBack)) ?>"<?= $ssOn ? ' selected' : '' ?>><?= e($lang === 'ar' ? ($ssS['name_ar'] ?: $ssS['name_fr']) : ($ssS['name_fr'] ?: $ssS['name_ar'])) ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
         <?php endif; endif; ?>
         <div class="page-content" id="pageContent" style="--accent: <?= $accentColor ?>; --accent-bg: <?= $accentBg ?>;">

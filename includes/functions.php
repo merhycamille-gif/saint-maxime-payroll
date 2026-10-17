@@ -5588,29 +5588,21 @@ function exportToolbar($title = 'document', $opts = []) {
         : '';
     ob_start(); ?>
     <div class="export-toolbar no-print no-export" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+        <?php /* 🧹 (2026-10-17 «رتّب الكبسات بكل البرنامج… بعد في عجقة») الشريط بمجموعات بسطر واحد: [طباعة · PDF · تعديل] | [Excel · Word] | [واتساب · إيميل] | [اللغة] | «المزيد ▾» (الورقة/الأجزاء/قُدِّم للدولة) */ ?>
+        <span class="xt-g xt-g1">
         <?php if (!$viewerOnly): ?>
         <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint(this)" title="ورقة جاهزة للطباعة من محرّك الطباعة الرسمي"><i class="fas fa-print"></i> Imprimer / طباعة</button>
         <?php endif; ?>
-        <?php // 🔄 (2026-09-14 «وقت عم اطبع بتضل لاندسكيب ما بيغير على بورتريه بالبرنت»): اتجاه الورقة كان مثبّتاً بالـCSS فحوار
-              // المتصفّح يرفض تغييره — زرّ واحد بكل البرنامج يقلب أفقي ⇄ عمودي للطباعة ولـPDF معاً (msaToggleOrient بـexport.js) ?>
-        <button type="button" class="btn btn-sm btn-light" id="msaOrientBtn" onclick="msaToggleOrient()" title="اتجاه الورقة بالطباعة وPDF — اكبس للتبديل"><i class="fas fa-rotate"></i> <span>Orientation / الورقة</span></button>
-        <?php // 📄 (2026-10-11) الجدول العريض بالـPDF: أجزاء بخط 12 (الافتراضي) ⇄ ورقة وحدة بخط أصغر — يظهر فقط حين يكون الجدول 10 أعمدة وأكثر (export.js msaFitInit) ?>
-        <button type="button" class="btn btn-sm btn-light" id="msaFitBtn" onclick="msaFitToggle(this)" title="الجدول العريض: أجزاء بخط 12 مع تكرار الاسم بكل جزء، أو كل الأعمدة بورقة وحدة بخط أصغر" style="display:none"><i class="fas fa-table-columns"></i> <span>Parties / أجزاء ⇄</span></button>
         <?php // 💾 (2026-09-13 «كبسة احفظها على الكمبيوتر عم تطلع متل طباعة على الورق») زرّ PDF = تنزيل ملف حقيقي فوراً بالمتصفّح
               // (pdf-save.js لأي صفحة)؛ «PDF رسمي» عبر Chrome يبقى حيث الأداة متوفّرة (الكمبيوتر) لأن الأونلاين بلا node يرجع لحوار الطباعة
               $hasPup = is_file(__DIR__ . '/../tools/page_to_pdf.js') && is_dir(__DIR__ . '/../tools/node_modules/puppeteer-core') && (@is_file('C:/Program Files/nodejs/node.exe') || stripos(PHP_OS, 'WIN') === 0); ?>
+        <button type="button" class="btn btn-sm btn-danger" onclick="msaSavePdfStart(this)" title="ينزّل ملف PDF عالكمبيوتر فوراً (بلا شاشة طباعة)"><i class="fas fa-file-pdf"></i> PDF — احفظ عالكمبيوتر</button>
+        <?php /* 🖨️ (2026-10-11) زرّ «PDF رسمي» عبر Chrome أُزيل: كبسة PDF صارت من محرّك الطباعة الرسمي على الخادم بكل مكان (لا كبسات مكرّرة) */ ?>
         <?php // ✏️ (2026-10-08 «دايماً عمول هيك بكل الإفادات»): كبسة «تعديل / كتابة» بكل مستند — تخلّي الإفادة/النموذج قابلاً للكتابة قبل الطباعة
               //    (ppEditToggle بـexport.js؛ تُخفى تلقائياً حيث لا مستند بالصفحة). بلا حفظ بالقاعدة. ?>
         <button type="button" class="btn btn-sm btn-gold" id="msaEditBtn" onclick="ppEditToggle(this)" title="عدّل أي سطر أو خانة بالمستند قبل الطباعة (للطباعة فقط)" style="display:none"><i class="fas fa-pen"></i> <span>Modifier / تعديل / كتابة</span></button>
-        <?php // 🌐 (2026-10-10 مساءً) لغة التقرير: عربي / فرنسي / الاثنان + جهة الأعمدة للإكسل (doclang.js) — ليس بالبطاقة السنوية
-              if ((($GLOBALS['currentPage'] ?? '') !== 'annual')): /* تُخفى بالـJS حيث لا مستند بالصفحة */ ?>
-        <span class="rl-chips" title="لغة التقرير والإكسل / Langue du rapport et de l’Excel">
-            <button type="button" class="rl-chip" data-rl="ar">عربي</button><button type="button" class="rl-chip" data-rl="fr">Français</button><button type="button" class="rl-chip" data-rl="both">عربي + Français</button>
-            <span class="rl-sides"><button type="button" class="rl-side" data-rs="rtl" title="الأعمدة من اليمين / Colonnes depuis la droite">⇤ من اليمين</button><button type="button" class="rl-side" data-rs="ltr" title="Colonnes depuis la gauche / الأعمدة من الشمال">De gauche ⇥</button></span>
         </span>
-        <?php endif; ?>
-        <button type="button" class="btn btn-sm btn-danger" onclick="msaSavePdfStart(this)" title="ينزّل ملف PDF عالكمبيوتر فوراً (بلا شاشة طباعة)"><i class="fas fa-file-pdf"></i> PDF — احفظ عالكمبيوتر</button>
-        <?php /* 🖨️ (2026-10-11) زرّ «PDF رسمي» عبر Chrome أُزيل: كبسة PDF صارت من محرّك الطباعة الرسمي على الخادم بكل مكان (لا كبسات مكرّرة) */ ?>
+        <span class="xt-g xt-g2">
         <?php if (!$viewerOnly): ?>
             <?php if ($server): ?>
             <a class="btn btn-sm btn-success" href="<?= $sv . $sep ?>format=xlsx"><i class="fas fa-file-excel"></i> Excel</a>
@@ -5620,6 +5612,8 @@ function exportToolbar($title = 'document', $opts = []) {
             <button type="button" class="btn btn-sm btn-info" onclick="ppWord('<?= $t ?>')"><i class="fas fa-file-word"></i> Word</button>
             <?php endif; ?>
         <?php endif; ?>
+        </span>
+        <span class="xt-g xt-g3">
         <?php if ($showWa): ?>
             <?php if ($viewerOnly): ?>
             <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" onclick="ppWhatsAppPdf('<?= $t ?>','<?= $ph ?>','<?= jsAttr($officialPdf) ?>')" title="يجهّز ملف الـPDF ويبعته دغري عالواتساب"><i class="fab fa-whatsapp"></i> WhatsApp PDF</button>
@@ -5630,6 +5624,25 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php if ($showEmail): ?>
         <button type="button" class="btn btn-sm btn-light" onclick="ppEmail('<?= $t ?>','<?= $em ?>')"><i class="fas fa-envelope"></i> Email</button>
         <?php endif; ?>
+        </span>
+        <span class="xt-g xt-g4">
+        <?php // 🌐 (2026-10-10 مساءً) لغة التقرير: عربي / فرنسي / الاثنان + جهة الأعمدة للإكسل (doclang.js) — ليس بالبطاقة السنوية
+              if ((($GLOBALS['currentPage'] ?? '') !== 'annual')): /* تُخفى بالـJS حيث لا مستند بالصفحة */ ?>
+        <span class="rl-chips" title="لغة التقرير والإكسل / Langue du rapport et de l’Excel">
+            <button type="button" class="rl-chip" data-rl="ar">عربي</button><button type="button" class="rl-chip" data-rl="fr">Français</button><button type="button" class="rl-chip" data-rl="both">عربي + Français</button>
+        </span>
+        <?php endif; ?>
+        </span>
+        <details class="xt-more no-print"><summary class="btn btn-sm btn-light" title="خيارات إضافية: اتجاه الورقة، أجزاء الجدول، تسجيل التقديم للدولة"><i class="fas fa-ellipsis"></i> Plus / المزيد</summary>
+            <div class="xt-menu">
+        <?php if ((($GLOBALS['currentPage'] ?? '') !== 'annual')): ?>
+            <span class="rl-sides"><button type="button" class="rl-side" data-rs="rtl" title="الأعمدة من اليمين / Colonnes depuis la droite">⇤ من اليمين</button><button type="button" class="rl-side" data-rs="ltr" title="Colonnes depuis la gauche / الأعمدة من الشمال">De gauche ⇥</button></span>
+        <?php endif; ?>
+        <?php // 🔄 (2026-09-14 «وقت عم اطبع بتضل لاندسكيب ما بيغير على بورتريه بالبرنت»): اتجاه الورقة كان مثبّتاً بالـCSS فحوار
+              // المتصفّح يرفض تغييره — زرّ واحد بكل البرنامج يقلب أفقي ⇄ عمودي للطباعة ولـPDF معاً (msaToggleOrient بـexport.js) ?>
+        <button type="button" class="btn btn-sm btn-light" id="msaOrientBtn" onclick="msaToggleOrient()" title="اتجاه الورقة بالطباعة وPDF — اكبس للتبديل"><i class="fas fa-rotate"></i> <span>Orientation / الورقة</span></button>
+        <?php // 📄 (2026-10-11) الجدول العريض بالـPDF: أجزاء بخط 12 (الافتراضي) ⇄ ورقة وحدة بخط أصغر — يظهر فقط حين يكون الجدول 10 أعمدة وأكثر (export.js msaFitInit) ?>
+        <button type="button" class="btn btn-sm btn-light" id="msaFitBtn" onclick="msaFitToggle(this)" title="الجدول العريض: أجزاء بخط 12 مع تكرار الاسم بكل جزء، أو كل الأعمدة بورقة وحدة بخط أصغر" style="display:none"><i class="fas fa-table-columns"></i> <span>Parties / أجزاء ⇄</span></button>
         <?php // ⚖️📤 (2026-10-10 «بس اطبع تقرير بدي ابعتو للدولة لازم يكون في محل حطّ انبعت وما بقى يتغيّر شي»): زرّ «انبعت للدولة» بكل مستند رسمي —
               //    يقفل نسخة طبق الأصل (legal.js + pages/legal_mark.php)؛ إذا سبق إرساله يُخفى الزرّ ويظهر شريط الحالة (مطابق / تغيّر ⇒ صحّحه أو خلّيه)
               $legalCtx = (!$viewerOnly && function_exists('legalFilingContext')) ? legalFilingContext() : null;
@@ -5637,6 +5650,9 @@ function exportToolbar($title = 'document', $opts = []) {
         <?php if ($legalCtx && !empty($legalCtx['auth'])): ?>
         <button type="button" class="btn btn-sm btn-dark" id="legalSendBtn" title="تسجيل أنّك قدّمت هالتقرير للدولة (البرنامج ما بيبعت شي بنفسه) — بينحفظ طبق الأصل وما بيتغيّر"<?= $legalCtx['filing'] ? ' style="display:none"' : '' ?>><i class="fas fa-paper-plane"></i> Remis à l’État / سجّل: قُدِّم للدولة</button>
         <?php endif; ?>
+            </div>
+        </details>
+        <script>if(!window.__xtMoreInit){window.__xtMoreInit=1;document.addEventListener("click",function(e){document.querySelectorAll("details.xt-more[open]").forEach(function(d){if(!d.contains(e.target))d.removeAttribute("open");});});}</script>
     </div>
     <?php return ob_get_clean();
 }

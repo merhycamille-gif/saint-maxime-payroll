@@ -44,7 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setSetting('program_email_name', trim((string)($_POST['program_email_name'] ?? '')));
         $pa = trim((string)($_POST['program_email_addr'] ?? ''));
         setSetting('program_email_addr', ($pa !== '' && filter_var($pa, FILTER_VALIDATE_EMAIL)) ? $pa : '');
-        $_SESSION['flash_success'] = 'تم حفظ إيميل البرنامج: ' . programMailName() . ' ‹' . programMailAddress() . '›';
+        // 🚀 (2026-10-17) مفتاح خدمة الإرسال (Resend): فارغ = لا تغيير؛ «-» = إلغاء
+        $rk = trim((string)($_POST['program_relay_key'] ?? ''));
+        if ($rk === '-') setSetting('program_relay_key', ''); elseif ($rk !== '') setSetting('program_relay_key', $rk);
+        $_SESSION['flash_success'] = 'تم حفظ إيميل البرنامج: ' . programMailName() . ' ‹' . programMailAddress() . '›' . (programRelayConfig() ? ' — خدمة الإرسال مفعّلة ✓' : '');
         header('Location: ' . BASE_URL . 'pages/email_settings.php'); exit;
     }
     // 🌐 (2026-10-15 «ركّبه») محرّك الطباعة الاحترافي (Chromium على سيرفر المدرسة): كلمة سرّ الخدمة تُحفَظ هنا لا بالكود
@@ -125,6 +128,7 @@ include __DIR__ . '/../includes/header.php';
             <?= csrfField() ?>
             <div class="form-row cols-2">
                 <div class="form-group"><label class="form-label">Nom de l'expéditeur / اسم المُرسِل</label><input type="text" name="program_email_name" class="form-control" value="<?= e(getSetting('program_email_name', '')) ?>" placeholder="MSA Payroll"></div>
+                <div class="form-group"><label class="form-label">Clé du service d'envoi (Resend) / مفتاح خدمة الإرسال <?= programRelayConfig() ? '<span style="color:#15803d">✓ مفعّلة</span>' : '<span style="color:#b45309">غير مفعّلة — الإرسال من خادم الموقع</span>' ?></label><input type="password" name="program_relay_key" class="form-control" dir="ltr" value="" autocomplete="new-password" placeholder="<?= programRelayConfig() ? 'محفوظ — اتركه فارغاً، أو «-» للإلغاء' : 're_…' ?>"></div>
                 <div class="form-group"><label class="form-label">Adresse (optionnel) / العنوان (اختياري — الافتراضي no-reply@<?= e(programMailDomain()) ?>)</label><input type="email" name="program_email_addr" class="form-control" dir="ltr" value="<?= e(getSetting('program_email_addr', '')) ?>" placeholder="no-reply@<?= e(programMailDomain()) ?>"></div>
             </div>
             <button class="btn btn-primary" name="save_program" value="1"><i class="fas fa-save"></i> Enregistrer / حفظ</button>

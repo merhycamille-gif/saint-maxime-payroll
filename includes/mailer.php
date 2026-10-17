@@ -69,6 +69,7 @@ function smtpSendMail(array $cfg, $to, $subject, $bodyText, array $attachments =
 
     $boundary = '=_pp_' . bin2hex(random_bytes(8));
     $H  = "From: " . ($fromName ? '=?UTF-8?B?' . base64_encode($fromName) . '?= ' : '') . "<$from>\r\n";
+    if (!empty($cfg['reply_to']) && filter_var($cfg['reply_to'], FILTER_VALIDATE_EMAIL)) $H .= "Reply-To: <" . $cfg['reply_to'] . ">\r\n";   // 📧 (2026-10-17) الردّ لإيميل المدرسة
     $H .= "To: " . implode(', ', $to) . "\r\n";
     $H .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
     $H .= "MIME-Version: 1.0\r\n";
@@ -181,6 +182,19 @@ function programMailName(): string {
     $n = trim((string)getSetting('program_email_name', ''));
     return $n !== '' ? $n : 'MSA Payroll';
 }
+/** 🚀 (2026-10-17 «ما انبعت اليوم الإيميل من الرواتب» ⇒ مايكروسوفت تحظر IP السيرفر (S3150) مرّة بعد مرّة)
+ *  خدمة الإرسال المتخصّصة (Resend) لإيميل البرنامج: المفتاح بالإعدادات `program_relay_key` (صفحة إعدادات البريد)، الدومين msapayroll.com موثَّق
+ *  عندها (DKIM + SPF). الإرسال عبر SMTP smtp.resend.com:465 بالمفتاح؛ إن غاب المفتاح أو فشل ⇒ بريد الخادم (mail()) كما قبل. المرسِل يبقى «MSA Payroll». */
+function programRelayConfig(string $fromName = '', string $replyTo = ''): ?array {
+    $key = trim((string)getSetting('program_relay_key', ''));
+    if ($key === '' || !function_exists('stream_socket_client')) return null;
+    $from = programMailAddress();
+    $dom = strtolower(substr((string)strrchr($from, '@'), 1)); $rd = strtolower((string)getSetting('program_relay_domain', 'msapayroll.com'));
+    if ($rd !== '' && $dom !== $rd) $from = 'no-reply@' . $rd;   // الخدمة تبعت فقط من دومينها الموثَّق
+    return ['host' => trim((string)getSetting('program_relay_host', '')) ?: 'smtp.resend.com', 'port' => 465, 'secure' => 'ssl',
+            'user' => trim((string)getSetting('program_relay_user', '')) ?: 'resend', 'pass' => $key,
+            'from' => $from, 'from_name' => $fromName !== '' ? $fromName : programMailName(), 'reply_to' => $replyTo];
+}
 function programMailAvailable(): bool {
     $d = programMailDomain();
     return function_exists('mail') && $d !== 'localhost' && strpos($d, '127.') !== 0 && strpos($d, '192.') !== 0 && strpos($d, '10.') !== 0;
@@ -253,7 +267,14 @@ function programMailRelay($to, $subject, $body, array $attachments = [], $isHtml
  * @return array [bool ok, string error]
  */
 function programMailSend($to, $subject, $body, array $attachments = [], $isHtml = false, $fromName = '', $replyTo = ''): array {
-    if (!programMailAvailable()) return programMailRelay($to, $subject, $body, $attachments, $isHtml, $fromName, $replyTo);
+    // 🚀 (2026-10-17) خدمة الإرسال أوّلاً (تعمل من أي مكان، حتى من نسخة الكمبيوتر) ثم بريد الخادم كبديل
+    $relayErr = '';
+    if ($rc = programRelayConfig((string)$fromName, (string)$replyTo)) {
+        [$ok, $err] = smtpSendMail($rc, $to, $subject, $body, $attachments, $isHtml);
+        if ($ok) return [true, ''];
+        $relayErr = 'خدمة الإرسال: ' . $err;
+    }
+    if (!programMailAvailable()) { $r = programMailRelay($to, $subject, $body, $attachments, $isHtml, $fromName, $replyTo); if (!$r[0] && $relayErr !== '') $r[1] = $relayErr . ' · ' . $r[1]; return $r; }
     $from = programMailAddress();
     $fromName = $fromName !== '' ? $fromName : programMailName();
     $boundary = '=_pp_' . bin2hex(random_bytes(8));
@@ -276,7 +297,7 @@ function programMailSend($to, $subject, $body, array $attachments = [], $isHtml 
         if ($sent) return [true, ''];
         $le = error_get_last(); if ($le) $lastErr = (string)($le['message'] ?? '');
     }
-    return [false, 'خادم الموقع رفض إرسال البريد' . ($lastErr !== '' ? ' (' . mb_substr(strip_tags($lastErr), 0, 160) . ')' : '')];
+    return [false, ($relayErr !== '' ? $relayErr . ' · ' : '') . 'خادم الموقع رفض إرسال البريد' . ($lastErr !== '' ? ' (' . mb_substr(strip_tags($lastErr), 0, 160) . ')' : '')];
 }
 /**
  * 🚪 الباب الواحد لإرسال الإيميل بكل البرنامج: يختار المصدر حسب خيار المدرسة، ويرجع للبديل إذا فشل الأوّل.
