@@ -29,6 +29,17 @@
     function sumRows(rows, cols) { var s = { lbp: 0, usd: 0, n: 0 }; rows.forEach(function (r) { cols.forEach(function (c) { var p = parseCell(r.cells[c]); if (p.ok) { s.lbp += p.lbp; s.usd += p.usd; s.n++; } }); }); return s; }
     function isTotalRow(tr) { return /(^|\s)(total-row|subtotal-row|msa-grp-row)(\s|$)/.test(tr.className) || tr.parentElement.tagName === 'TFOOT'; }
     function isGroupRow(tr) { if (/(^|\s)cat-row(\s|$)/.test(tr.className)) return true; var c = tr.children; return c.length === 1 && c[0].tagName === 'TD' && (parseInt(c[0].getAttribute('colspan') || '1', 10) >= 3); }
+    // شبكة الرأس: لكل عمود الخانة الورقية (آخر صفّ تصل إليه، colspan=1) مع مراعاة rowspan/colspan؛ صفّ عنوان التقرير (خانة واحدة بـcolspan) لا يُحتسب
+    function headerGrid(thead) {
+        var rows = Array.prototype.filter.call(thead.rows, function (r) { return !(r.cells.length === 1 && parseInt(r.cells[0].getAttribute('colspan') || '1', 10) >= 3); });
+        var R = rows.length, occ = [], leaf = [], nCols = 0;
+        for (var r = 0; r < R; r++) { occ[r] = occ[r] || []; var col = 0;
+            Array.prototype.forEach.call(rows[r].cells, function (c) { while (occ[r][col]) col++; var cs = parseInt(c.getAttribute('colspan') || '1', 10), rs = parseInt(c.getAttribute('rowspan') || '1', 10);
+                for (var i = 0; i < rs; i++) { occ[r + i] = occ[r + i] || []; for (var k = 0; k < cs; k++) occ[r + i][col + k] = true; }
+                if (cs === 1 && r + rs >= R) leaf[col] = c; col += cs; });
+            if (col > nCols) nCols = col; }
+        return { nCols: nCols, leaf: leaf, colRows: rows, last: rows[R - 1] || null };
+    }
     function bump(cell) { if (cell) cell.setAttribute('colspan', String(parseInt(cell.getAttribute('colspan') || '1', 10) + 1)); }
     // ── اختيار الأعمدة (محفوظ لكل صفحة/تقرير بالمتصفّح) ──
     var KEY = 'msa_colpick:' + location.pathname + location.search.replace(/[?&](rowsum|group)=\d/g, '');
@@ -39,9 +50,7 @@
         if (tbl.closest('.no-print, .export-toolbar') || tbl.dataset.msaTotals) return;
         var thead = tbl.tHead, bodies = Array.prototype.slice.call(tbl.tBodies); if (!thead || !bodies.length) return;
         // صفّ الأعمدة = آخر صفّ بالرأس فيه ≥3 خانات (صفّ عنوان التقرير بـcolspan لا يُحتسب)؛ عدد الأعمدة = مجموع colspan فيه
-        var hRow = null; for (var hi = thead.rows.length - 1; hi >= 0; hi--) if (thead.rows[hi].cells.length >= 3) { hRow = thead.rows[hi]; break; }
-        if (!hRow) return;
-        var nCols = 0, headOf = []; Array.prototype.forEach.call(hRow.cells, function (c) { var cs = parseInt(c.getAttribute('colspan') || '1', 10); for (var k = 0; k < cs; k++) headOf[nCols + k] = cs === 1 ? c : null; nCols += cs; });
+        var G = headerGrid(thead), nCols = G.nCols, headOf = G.leaf, hRow = G.last; if (!hRow || nCols < 3) return;
         var dataRows = [], oddRows = [];
         bodies.forEach(function (tb) { Array.prototype.forEach.call(tb.rows, function (tr) { if (isTotalRow(tr) || isGroupRow(tr)) return; if (tr.cells.length === nCols) dataRows.push(tr); else oddRows.push(tr); }); });
         if (dataRows.length < 2) return;
@@ -61,8 +70,11 @@
         }
         // (١) عمود مجموع السطر
         if (ROWSUM) {
-            var th = document.createElement('th'); th.className = 'msa-rowsum'; th.innerHTML = 'Total<br>المجموع'; hRow.appendChild(th); ctx.sumTh = th;
-            Array.prototype.forEach.call(thead.rows, function (r) { if (r !== hRow) bump(r.cells[r.cells.length - 1]); });
+            var th = document.createElement('th'); th.className = 'msa-rowsum'; th.innerHTML = 'Total<br>المجموع'; ctx.sumTh = th;
+            // صفوف عنوان التقرير تتّسع بواحد؛ خانة «المجموع» على أوّل صفّ أعمدة بـrowspan يغطّي صفوف الأعمدة كلّها (رؤوس بصفّين)
+            Array.prototype.forEach.call(thead.rows, function (r) { if (G.colRows.indexOf(r) < 0) bump(r.cells[0]); });
+            if (G.colRows.length > 1) th.setAttribute('rowspan', String(G.colRows.length));
+            G.colRows[0].appendChild(th);
             oddRows.forEach(function (r) { bump(r.cells[r.cells.length - 1]); });
             dataRows.forEach(function (r) { var td = document.createElement('td'); td.className = 'msa-rowsum'; r.appendChild(td); ctx.sumTds.push({ row: r, td: td }); });
             bodies.forEach(function (tb) { Array.prototype.forEach.call(tb.rows, function (tr) { if (isTotalRow(tr) || isGroupRow(tr)) { if (tr.cells.length === nCols) { var td = document.createElement('td'); td.className = 'msa-rowsum'; tr.appendChild(td); } else bump(tr.cells[tr.cells.length - 1]); } }); });
@@ -111,6 +123,26 @@
             + (items.length > 1 ? '<div class="cb-i cb-t"><span class="cb-n">المجموع معاً / Ensemble</span> <span class="cb-v">' + cellHtml(tot) + '</span></div>' : '');
         bar.querySelector('.cb-x').addEventListener('click', function () { ctxs.forEach(function (ct) { ct.sel = []; picked[ct.ti] = []; refresh(ct); }); savePick(); });
     }
-    function run() { document.querySelectorAll('#pageContent table.doc-table').forEach(process); }
+    // 💱 (2026-10-17 «تحت الكتابة دغري بعناوين الأعمدة اللي فيها مبالغ نكتب نوع العملة: ل.ل / $ / ل.ل + $») لكل عمود مبالغ سطر العملة تحت رأسه
+    function curHeads(tbl) {
+        var thead = tbl.tHead; if (!thead) return;
+        var G = headerGrid(thead), nCols = G.nCols, headOf = G.leaf, hRow = G.last; if (!hRow || nCols < 3) return;
+        var rows = []; Array.prototype.forEach.call(tbl.tBodies, function (tb) { Array.prototype.forEach.call(tb.rows, function (tr) { if (!isTotalRow(tr) && !isGroupRow(tr) && tr.cells.length === nCols) rows.push(tr); }); });
+        if (!rows.length) return;
+        for (var c = 1; c < nCols; c++) {
+            var th = headOf[c]; if (!th || th.querySelector('.cur-head') || th.classList.contains('msa-rowsum')) continue;
+            var hc = th.cloneNode(true); Array.prototype.forEach.call(hc.querySelectorAll('.rate-head, .msa-colpick, small'), function (x) { x.parentNode.removeChild(x); }); var ht = txt(hc); if (/ل\.ل|L\.L|\$|USD|LBP|ليرة|دولار/.test(ht)) continue;   // الرأس نفسه يذكر العملة أصلاً (لا سطر سعر الصرف الصغير)
+            var lbp = 0, usd = 0, bare = 0, tot = 0;
+            rows.forEach(function (r) { var t = txt(r.cells[c]); if (!t || t === '—' || t === '-') return; tot++; var hasL = /L\.L|ل\.ل/.test(t), hasU = /\$/.test(t); var restT = t.replace(/\$\s*-?[\d,]+(\.\d+)?|-?[\d,]+(\.\d+)?\s*\$/g, ' ').replace(/L\.L|ل\.ل\.?/g, ' ').trim(); if (!hasL && hasU && /^-?\d+(,\d{3})*(\.\d+)?$/.test(restT)) hasL = true;   /* «54,000,000 $603»: ليرة بلا وحدة + دولار = العملتان */ if (hasL) lbp++; if (hasU) usd++; if (!hasL && !hasU && /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) bare++; });
+            if (!tot) continue;
+            var lab = '';
+            if (lbp + usd >= tot * 0.6) lab = (lbp && usd) ? 'ل.ل + $' : (usd ? '$' : 'ل.ل');
+            else if (bare >= tot * 0.6) lab = 'ل.ل';   // رقم بفواصل الآلاف بلا وحدة = ليرة (أساس الراتب…)
+            if (!lab) continue;
+            var sm = document.createElement('small'); sm.className = 'cur-head'; sm.setAttribute('dir', 'ltr'); sm.textContent = lab;
+            var pick = th.querySelector('.msa-colpick'); th.appendChild(sm); if (pick) th.appendChild(pick);
+        }
+    }
+    function run() { document.querySelectorAll('#pageContent table.doc-table').forEach(process); document.querySelectorAll('#pageContent table.doc-table').forEach(curHeads); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
 })();

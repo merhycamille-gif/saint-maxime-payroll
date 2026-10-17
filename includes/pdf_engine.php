@@ -46,9 +46,10 @@ class MsaPdf
             $fcfg = (new \Mpdf\Config\FontVariables())->getDefaults();
             $fontdata = $fcfg['fontdata'];
             $fontdata['cairo'] = ['R' => 'CairoArabic-Regular.ttf', 'B' => 'CairoArabic-Bold.ttf', 'useOTL' => 0xFF];
-            $m = new \Mpdf\Mpdf(['mode' => 'utf-8', 'tempDir' => $tmp, 'fontDir' => array_merge($cfg['fontDir'], [$root . '/assets/fonts/ttf']), 'fontdata' => $fontdata, 'default_font' => 'freesans', 'default_font_size' => 12]);
+            $fontdata['arial'] = ['R' => 'arial.ttf', 'B' => 'arialbd.ttf', 'useOTL' => 0xFF, 'useKashida' => 75];   // 🔤 (2026-10-17) القياس بخطّ الورق الفعلي
+            $m = new \Mpdf\Mpdf(['mode' => 'utf-8', 'tempDir' => $tmp, 'fontDir' => array_merge($cfg['fontDir'], [$root . '/assets/fonts/ttf']), 'fontdata' => $fontdata, 'default_font' => 'arial', 'default_font_size' => 12]);
             $otl = (function () { return $this->otl; })->call($m);   // خاصّة بالمحرّك: نحتاجها لتشكيل العربي قبل القياس
-            $m->SetFont('cairo', '', 12); $m->SetFont('freesans', '', 12);
+            $m->SetFont('arial', '', 12); $m->SetFont('cairo', '', 12); $m->SetFont('freesans', '', 12);
             self::$meas = [$m, $otl];
         } catch (\Throwable $e) { self::$meas = false; }
         return self::$meas ?: null;
@@ -66,7 +67,7 @@ class MsaPdf
                 [$m, $otl] = $mm; $w = 0.0;
                 foreach (preg_split('/([\p{Arabic}\x{060C}\x{061B}\x{061F}\x{0640}\s]+)/u', $t, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) as $run) {
                     $ar = preg_match('/\p{Arabic}/u', $run) === 1;
-                    $m->SetFont($ar ? 'cairo' : 'freesans', $bold ? 'B' : '', $pt);
+                    $m->SetFont('arial', $bold ? 'B' : '', $pt);   // 🔤 (2026-10-17) القياس بـArial كما يُطبع
                     if ($ar && !empty($m->CurrentFont['useOTL'])) { $m->OTLtags = []; $sh = $otl->applyOTL($run, $m->CurrentFont['useOTL']); $w += $m->GetStringWidth($sh, true, $otl->OTLdata, 0); }
                     else $w += $m->GetStringWidth($run);
                 }

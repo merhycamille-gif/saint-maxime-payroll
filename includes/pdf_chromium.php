@@ -88,7 +88,7 @@ class MsaChromePdf
         if (!empty($o['debug_html'])) @file_put_contents($o['debug_html'], $doc);
         $date = date('d/m/Y');
         $pg = $rtl ? ('صفحة <span class="pageNumber"></span> من <span class="totalPages"></span>') : ('Page <span class="pageNumber"></span> / <span class="totalPages"></span>');
-        $footer = '<!DOCTYPE html><html dir="' . $dir . '"><head><meta charset="utf-8"><style>' . self::fontCss() . 'body{margin:0;padding:0 ' . $side . 'mm;font-family:Cairo,sans-serif;font-size:9pt;color:#64748b;-webkit-print-color-adjust:exact}'
+        $footer = '<!DOCTYPE html><html dir="' . $dir . '"><head><meta charset="utf-8"><style>' . self::fontCss() . 'body{margin:0;padding:0 ' . $side . 'mm;font-family:Arial,Cairo,sans-serif;font-size:9pt;color:#64748b;-webkit-print-color-adjust:exact}'
             . 'table{width:100%;border-collapse:collapse;border-top:0.5pt solid #cbd5e1}td{padding:2pt 0 0;border:0;white-space:nowrap}.a{text-align:' . ($rtl ? 'right' : 'left') . '}.b{text-align:' . ($rtl ? 'left' : 'right') . '}.c{text-align:center}</style></head><body>'
             . '<table><tr><td class="a" style="width:40%">' . htmlspecialchars($school, ENT_QUOTES, 'UTF-8') . '</td><td class="c" style="width:20%">' . $pg . '</td><td class="b" style="width:40%">' . ($rtl ? 'صدر بتاريخ ' : 'Émis le ') . $date . '</td></tr></table></body></html>';
         $header = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body></body></html>';
@@ -209,7 +209,7 @@ JS;
         $al = $rtl ? 'right' : 'left';
         return "\n@page{size:A4 " . ($landscape ? 'landscape' : 'portrait') . "}"
             . "html,body{margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}"
-            . "body{font-family:Cairo,'Segoe UI',Arial,sans-serif;font-size:12pt;line-height:" . ($letter ? '1.6' : '1.3') . ";color:#111}"
+            . "body{font-family:Arial,Cairo,'Segoe UI',sans-serif;font-size:12pt;line-height:" . ($letter ? '1.6' : '1.3') . ";color:#111}"
             . ".pdf-doc{direction:" . ($rtl ? 'rtl' : 'ltr') . ";text-align:$al}"
             . "table.pdf-t{width:auto;border-collapse:collapse;margin:3pt 0 6pt;table-layout:auto;page-break-inside:auto}"
             . "table.pdf-t.pdf-full{width:100%}"

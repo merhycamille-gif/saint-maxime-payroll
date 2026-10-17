@@ -3048,3 +3048,22 @@ details.msa-pick[open] > .school-checks { border-top: 0; border-top-left-radius:
 #msaColBar .cb-t { border-top: 2px solid #fbbf24; color: #fbbf24; }
 #msaColBar small { color: #9ca3af; }
 @media print { .doc-table th .msa-colpick, #msaColBar { display: none !important; } .doc-table th.msa-picked { outline: 0; } }
+
+/* ═══ 450 — 🔤 (2026-10-17 «شوف هيدا الخطّ (بيان عام صندوق التعويضات) وقلّي موجود بكل التقارير والإفادات») خطّ المستندات واحد بكل البرنامج = Arial
+   (نفس خطّ النماذج الرسمية؛ كان ناقصاً بصفحة «سيرة الأستاذ» لأن قاعدة report_helpers لا تُحمَّل فيها) ═══ */
+#ppExportArea, .doc-sheet, .official-doc, .doc-table, .payslip-card, .salary-slip, #ppExportArea .card { font-family: Arial, 'Segoe UI', Tahoma, sans-serif; }
+
+/* ═══ 460 — 🔠 (2026-10-17 «هيدا هو الخطّ اللي بدّي ياه (Arial) ويكون حجمه على طول 12») المستندات على الشاشة 12pt حقيقي مثل الورق:
+   قاعدة الشاشة العامة 12px (قسم «كل الكلمات 12px») كانت تصغّر السطر العربي بالعناوين الثنائية (rl-ar) وخانات البطاقة والإفادة إلى 9pt. ═══ */
+@media screen {
+.doc-sheet, #ppExportArea, .payslip-card, .salary-slip, .doc-table { font-size: 12pt; }
+.doc-sheet span, .doc-sheet small, .doc-sheet strong, .doc-sheet b, .doc-sheet a, .doc-sheet li, .doc-sheet label, .doc-sheet td, .doc-sheet th,
+#ppExportArea span, #ppExportArea small, #ppExportArea strong, #ppExportArea b, #ppExportArea a, #ppExportArea li, #ppExportArea label, #ppExportArea td, #ppExportArea th, #ppExportArea p,
+.payslip-card span, .payslip-card small, .payslip-card strong, .payslip-card b, .payslip-card td, .payslip-card th, .payslip-card p,
+.salary-slip span, .salary-slip small, .salary-slip strong, .salary-slip b, .salary-slip td, .salary-slip th, .salary-slip p,
+.doc-table span, .doc-table small, .doc-table strong, .doc-table b, .doc-table td, .doc-table th { font-size: inherit !important; }
+#ppExportArea .table, #ppExportArea .table th, #ppExportArea .table td, .payslip-card .table, .payslip-card .table th, .payslip-card .table td { font-size: 12pt !important; }
+.doc-table th .rate-head { font-size: 10px !important; }   /* سطر سعر الصرف/النسبة الصغير تحت رأس العمود يبقى كما صُمّم */
+.doc-table th .cur-head { font-size: inherit !important; font-weight: 400; display: block; opacity: .95; }
+}
+@media print { .doc-table th .cur-head { font-weight: 400; display: block; } }
