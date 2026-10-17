@@ -2966,3 +2966,8 @@ body:not(.doc-view) { background: linear-gradient(180deg, var(--page-bg) 0%, var
 .msa-bars-row > .export-toolbar .rl-chip, .msa-bars-row > .export-toolbar .rl-side { padding: 5px 8px; font-size: 12px; }
 .msa-bars-row > details.export-compact > summary, .msa-bars-row > details.export-compact > summary.btn { padding: 6px 10px !important; font-size: 12px !important; min-height: 36px !important; }
 }
+
+/* ═══ 400 — 📂 (2026-10-17 «كبسة الملف الكامل خلّيها تكون أكبر شوي حتى نشوفها») كبسة «الملف الكامل والإفادات» أكبر وأوضح من جاراتها ═══ */
+.btn.btn-dossier { padding: 14px 26px !important; font-size: 17px !important; font-weight: 800 !important; border-radius: 14px !important; letter-spacing: .2px; box-shadow: 0 4px 14px rgba(37,99,235,.35) !important; }
+.btn.btn-dossier i { font-size: 1.35em; margin-inline-end: 8px; }
+@media (max-width: 700px) { .btn.btn-dossier { padding: 12px 18px !important; font-size: 16px !important; } }

@@ -406,7 +406,7 @@ if (!$emp):
                 </div>
                 <div class="form-group" style="grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap">
                     <button class="btn btn-primary"><i class="fas fa-file-export"></i> Générer l'attestation / إصدار الإفادة</button>
-                    <button name="dossier" value="1" class="btn btn-info" formnovalidate><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل</button>
+                    <button name="dossier" value="1" class="btn btn-info btn-lg btn-dossier" formnovalidate><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل</button>
                 </div>
             </form>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> كل إفادة تصدر بلغة واحدة مستقلة ومرتّبة. تقدر تبدّل اللغة من الوثيقة وتطبع/تصدّر كل لغة لحالها. حقل التاريخ للاستقالة والصرف وبراءة الذمة.</p>
