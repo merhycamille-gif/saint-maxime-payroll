@@ -19,8 +19,8 @@ class MsaLangToFont implements \Mpdf\Language\LanguageToFontInterface
     public function getLanguageOptions($llcc, $adobeCJK)
     {
         $lang = strtolower(substr((string)$llcc, 0, 2));
-        if (in_array($lang, ['ar', 'fa', 'ur', 'ps'], true)) return ['cairo', false];
-        return ['freesans', false];
+        // 🔤 (2026-10-17) خطّ الورق = خطّ الشاشة (Arial بالعربي والأجنبي) — Cairo/FreeSans احتياط فقط
+        return ['arial', false];
     }
 }
 
@@ -515,6 +515,7 @@ class MsaPdf
         $fontdata = $fcfg['fontdata'];
         $fontdata['naskh'] = ['R' => 'NotoNaskhArabic-Regular.ttf', 'B' => 'NotoNaskhArabic-Bold.ttf', 'useOTL' => 0xFF, 'useKashida' => 75];
         $fontdata['cairo'] = ['R' => 'CairoArabic-Regular.ttf', 'B' => 'CairoArabic-Bold.ttf', 'useOTL' => 0xFF];
+        $fontdata['arial'] = ['R' => 'arial.ttf', 'B' => 'arialbd.ttf', 'useOTL' => 0xFF, 'useKashida' => 75];   // 🔤 (2026-10-17) خطّ الشاشة نفسه
         $mpdf = new \Mpdf\Mpdf([
             'mode' => 'utf-8',
             'format' => $landscape ? 'A4-L' : 'A4',
@@ -524,13 +525,13 @@ class MsaPdf
             'tempDir' => $tmp,
             'fontDir' => array_merge($cfg['fontDir'], [$root . '/assets/fonts/ttf']),
             'fontdata' => $fontdata,
-            'default_font' => $rtl ? 'cairo' : 'freesans',
+            'default_font' => 'arial',   // 🔤 (2026-10-17) Arial على الورق كما على الشاشة
             'default_font_size' => 12,
             'autoScriptToLang' => true,
             'autoLanguageToFont' => true,
             'languageToFont' => new MsaLangToFont(),
             'useSubstitutions' => true,
-            'backupSubsFont' => ['freesans', 'dejavusans'],
+            'backupSubsFont' => ['cairo', 'freesans', 'dejavusans'],
             'shrink_tables_to_fit' => $fitOne ? 3 : 1.15,
             'useFixedNormalLineHeight' => true,   // ارتفاع السطر من حجم الخط لا من صندوق خط Cairo الضخم (كان السطر 7.3mm لخط 12pt)
             'useFixedTextBaseline' => true,

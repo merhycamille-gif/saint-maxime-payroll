@@ -101,6 +101,7 @@ class MsaChromePdf
             file_put_contents("$tmp/footer.html", $isLetter ? $header : $footer); $files['footer.html'] = "$tmp/footer.html";
             file_put_contents("$tmp/header.html", $header); $files['header.html'] = "$tmp/header.html";
             foreach (['f1.woff2', 'f2.woff2', 'f3.woff2'] as $f) if (is_file("$fontDir/$f")) $files[$f] = "$fontDir/$f";
+            foreach (['arial.ttf', 'arialbd.ttf'] as $f) if (is_file("$fontDir/ttf/$f")) $files[$f] = "$fontDir/ttf/$f";   // 🔤 (2026-10-17) خطّ الشاشة نفسه (Arial) على الورق
             $post = [
                 'paperWidth' => ($landscape ? 297 : 210) . 'mm', 'paperHeight' => ($landscape ? 210 : 297) . 'mm',
                 'marginTop' => ($isLetter ? 15 : 10) . 'mm', 'marginBottom' => ($isLetter ? 15 : 14) . 'mm', 'marginLeft' => $side . 'mm', 'marginRight' => $side . 'mm',
@@ -191,14 +192,17 @@ JS;
 
     private static function mime(string $name): string
     {
-        return substr($name, -5) === '.html' ? 'text/html' : (substr($name, -6) === '.woff2' ? 'font/woff2' : 'application/octet-stream');
+        return substr($name, -5) === '.html' ? 'text/html' : (substr($name, -6) === '.woff2' ? 'font/woff2' : (substr($name, -4) === '.ttf' ? 'font/ttf' : 'application/octet-stream'));
     }
 
     /** خطوط Cairo نفسها التي على الشاشة (الملفات مرفقة بالطلب) */
     private static function fontCss(): string
     {
         $ar = 'U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FEFF';
-        return "@font-face{font-family:Cairo;font-style:normal;font-weight:200 900;src:url(f1.woff2) format('woff2');unicode-range:$ar}"
+        // 🔤 (2026-10-17 «بس أكبس أطبع أو أبعت إيميل عم يتغيّر الخطّ عن الشاشة») Arial نفسه (مرفق بالطلب) هو خطّ المستند على الورق كما على الشاشة
+        return "@font-face{font-family:Arial;font-style:normal;font-weight:400;src:url(arial.ttf) format('truetype')}"
+            . "@font-face{font-family:Arial;font-style:normal;font-weight:700;src:url(arialbd.ttf) format('truetype')}"
+            . "@font-face{font-family:Cairo;font-style:normal;font-weight:200 900;src:url(f1.woff2) format('woff2');unicode-range:$ar}"
             . "@font-face{font-family:Cairo;font-style:normal;font-weight:200 900;src:url(f3.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}"
             . "@font-face{font-family:Cairo;font-style:normal;font-weight:200 900;src:url(f2.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}";
     }
