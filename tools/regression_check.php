@@ -261,7 +261,7 @@ check('كشف الرواتب: عمود توقيع الموظف', strpos($hSA, '�
 check('كشف الرواتب: تواقيع إعداد/تدقيق/اعتماد', strpos($hSA, 'إعداد: المحاسب') !== false
       && strpos($hSA, 'تدقيق: مدير الموارد البشرية') !== false && strpos($hSA, 'اعتماد: المدير العام') !== false);
 $hlpSrc = (string)file_get_contents(__DIR__ . '/../includes/report_helpers.php');
-check('رؤوس الجداول كحلية #1F4E5F (شاشة + طباعة)', substr_count($hlpSrc, '#1F4E5F') >= 2);
+check('رؤوس الجداول كحلية #1F4E5F على الشاشة، وعلى الورق رمادي فاتح بخطّ أسود (2026-10-17 «الخطّ الأبيض ما عم يبيّن بالطباعة»)', substr_count($hlpSrc, '#1F4E5F') >= 1 && strpos($hlpSrc, '.doc-table th[style]{background:#e5e7eb !important;color:#000 !important;') !== false);
 // (2026-09-04) فحص Sakkal القديم أُلغي — الخط صار Arial (الفحص الجديد تحت)
 // حجم الخط 12pt (متل «12» بالوورد) بالتقارير والإفادات — بطلب المستخدم 2026-07-29
 check('حجم الخط 12pt بالتقارير (doc-table + رؤوس + فقرات النماذج)',
@@ -3154,8 +3154,14 @@ $emp54a = $db->query("SELECT e.id FROM employees e JOIN schools s ON s.id = e.sc
 $emp54b = $db->query("SELECT e.id FROM employees e JOIN schools s ON s.id = e.school_id
     WHERE e.is_deleted = 0 AND e.school_id = 2 LIMIT 1")->fetchColumn();
 $sid54a = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$emp54a)->fetchColumn();
-$h54a = renderPage('pages/official_forms.php', ['form' => 'cnss_employ', 'employee_id' => (int)$emp54a], [], [$sid54a]);
-$h54b = renderPage('pages/official_forms.php', ['form' => 'cnss_employ', 'employee_id' => (int)$emp54b], [], [2]);
+// 2026-10-17: نموذج 41A الفردي من official_forms يحوّل للرسمي المعبّى (الإفادات ⇒ official_export: cnss_hire_reg لمن عنده رقم / cnss_hire_new)
+//             ⇒ نفحص النموذج الرسمي نفسه (mode=image = صفحة القالب بالقيم، بلا ترويسة البرنامج فلا تتسرّب أسماء المدارس الأخرى)
+$t54 = function (int $id) use ($db): string {
+    $n = (string)$db->query("SELECT nssf_number FROM employees WHERE id = " . $id)->fetchColumn();
+    return trim($n) !== '' ? 'cnss_hire_reg' : 'cnss_hire_new';
+};
+$h54a = renderPage('pages/official_export.php', ['form' => $t54((int)$emp54a), 'emp' => (int)$emp54a, 'mode' => 'image'], [], [$sid54a]);
+$h54b = renderPage('pages/official_export.php', ['form' => $t54((int)$emp54b), 'emp' => (int)$emp54b, 'mode' => 'image'], [], [2]);
 check('صاحب العمل بالضمان (تجربة فعلية): نموذج 41A لمؤسسة 043 باسم الجمعية، ولمكسيموس باسمه',
       strpos($h54a, $CONG54) !== false && strpos($h54b, $CONG54) === false && strpos($h54b, 'مكسيموس') !== false);
 // إفادة الضمان (لمن يهمه الأمر) باسم الجمعية — وإفادة الراتب (غير الضمان) تبقى باسم المدرسة
@@ -8071,7 +8077,7 @@ $c171('src-forms', strpos($of171, '$school = institutionSchoolPick();') !== fals
     && strpos($of171, 'institutionSchoolChooserHtml') === false && strpos($of171, 'اختر المدرسة من الأعلى أولاً') === false
     && substr_count($of171, "(\$ofSchoolPicked ? '&school_id=' . (int)\$school['id'] : '')") >= 3);
 $ox171 = (string)file_get_contents($PROJ . '/pages/official_export.php');
-$c171('src-export', strpos($ox171, "institutionSchoolPick() ?: institutionGroupSchool(strpos(\$form, 'cnss_') === 0)") !== false && substr_count($ox171, "(!empty(\$s0['_group_ids'])) ? \$s0") === 2);
+$c171('src-export', strpos($ox171, "institutionSchoolPick() ?: institutionGroupSchool(strpos(\$form, 'cnss_') === 0 && empty(\$_GET['emp']))") !== false   /* 🩹 2026-10-17: نماذج الأجير الواحد (&emp=) خارج حصر صاحب العمل */ && substr_count($ox171, "(!empty(\$s0['_group_ids'])) ? \$s0") === 2);
 // تجربة فعلية: مدرستان بنفس رقم الضمان (3 و5): الكشف الاسمي للمجموعة = مجموع عدد مضموني كلٍّ لحالها + اسم صاحب العمل الموحّد
 $cnt171 = function (array $ids) use (&$noFatal) {
     $h = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => 10, 'year' => 2025], [], $ids);

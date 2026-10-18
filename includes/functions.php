@@ -5641,6 +5641,7 @@ function exportToolbar($title = 'document', $opts = []) {
         <a class="btn btn-sm btn-light" id="msaRateLineBtn" href="<?= BASE_URL ?>switch_rateline.php?show=<?= rateLineHidden() ? '1' : '0' ?>" title="سطر سعر الدولار تحت عنوان كل تقرير وإفادة وبطاقة: إظهار أو إخفاء بكل البرنامج"><i class="fas fa-money-bill-transfer"></i> <?= rateLineHidden() ? 'Afficher le taux de change / أظهر سعر الصرف بالعنوان' : 'Masquer le taux de change / شيل سعر الصرف من العنوان' ?></a>
         <?php // ➕ (2026-10-17 «خيار للمجاميع: كلها أو كل سطر كمان») عمود مجموع السطر + سطر مجموع كل فئة — بكل جداول التقارير (totals.js) ?>
         <a class="btn btn-sm btn-light" id="msaRowSumBtn" href="<?= BASE_URL ?>switch_totals.php?rowsum=<?= totalsRowSum() ? '0' : '1' ?>" title="خانة بآخر كل سطر فيها مجموع أرقام السطر (الليرة والدولار كلٌّ على حدة)"><i class="fas fa-<?= totalsRowSum() ? 'square-check' : 'square' ?>"></i> Total par ligne / مجموع كل سطر</a>
+        <a class="btn btn-sm btn-light" id="msaColSumBtn" href="<?= BASE_URL ?>switch_totals.php?cols=<?= totalsCols() ? '0' : '1' ?>" title="مجموع كل عمود أرقام بسطور المجاميع (الفئة والعامّ)، ويُضاف سطر مجموع عامّ حيث لا يوجد"><i class="fas fa-<?= totalsCols() ? 'square-check' : 'square' ?>"></i> Totaux par colonne / مجموع كل عمود</a>
         <a class="btn btn-sm btn-light" id="msaGrpSumBtn" href="<?= BASE_URL ?>switch_totals.php?group=<?= totalsGroup() ? '0' : '1' ?>" title="سطر مجموع تحت كل فئة (الملاك/المتعاقدين/الموظفين) قبل المجموع العام"><i class="fas fa-<?= totalsGroup() ? 'square-check' : 'square' ?>"></i> Sous-total par catégorie / مجموع كل فئة</a>
         <?php if ((($GLOBALS['currentPage'] ?? '') !== 'annual')): ?>
             <span class="rl-sides"><button type="button" class="rl-side" data-rs="rtl" title="الأعمدة من اليمين / Colonnes depuis la droite">⇤ من اليمين</button><button type="button" class="rl-side" data-rs="ltr" title="Colonnes depuis la gauche / الأعمدة من الشمال">De gauche ⇥</button></span>
@@ -6165,7 +6166,8 @@ function compColsCount(bool $withTransport = true): int {
 function rateLineHidden(): bool { return !empty($_SESSION['hide_rate_line']); }
 /** ➕ (2026-10-17) خيارا المجاميع بكل التقارير: عمود مجموع السطر / سطر مجموع كل فئة (switch_totals.php + totals.js) */
 function totalsRowSum(): bool { return !empty($_SESSION['totals_rowsum']); }
-function totalsGroup(): bool { return !isset($_SESSION['totals_group']) || !empty($_SESSION['totals_group']); }   // افتراضياً ظاهر (مجاميع الفئات كانت موجودة بالتقارير)
+function totalsGroup(): bool { return !isset($_SESSION['totals_group']) || !empty($_SESSION['totals_group']); }
+function totalsCols(): bool { return !isset($_SESSION['totals_cols']) || !empty($_SESSION['totals_cols']); }   // 🧮 مجاميع كل الأعمدة (افتراضياً ظاهرة)   // افتراضياً ظاهر (مجاميع الفئات كانت موجودة بالتقارير)
 function rateTitleText($month = null, $year = null, bool $annual = false, ?float $rate = null, bool $law = true): string {
     if (rateLineHidden()) return '';   // 💱 المستخدم اختار إخفاء السطر بكل المستندات (تقارير/إفادات/بطاقات/PDF/إكسل)
     // 🏷️ (2026-09-23 «طلّعت البطاقة السنوية ما ظهر بالعناوين قدّيش قيمة الدولار») السطر يظهر بكل أوضاع العملة — حتى بوضع «ليرة فقط»

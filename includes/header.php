@@ -154,7 +154,7 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     <!-- App CSS -->
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/app.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app.css') ?: '1' ?>">
 </head>
-<body class="<?= $lang === 'ar' ? 'rtl' : '' ?><?= !empty($docFocus) ? ' doc-view' : '' ?>" data-totals-rowsum="<?= function_exists('totalsRowSum') && totalsRowSum() ? '1' : '0' ?>" data-totals-group="<?= function_exists('totalsGroup') && totalsGroup() ? '1' : '0' ?>">
+<body class="<?= $lang === 'ar' ? 'rtl' : '' ?><?= !empty($docFocus) ? ' doc-view' : '' ?>" data-totals-rowsum="<?= function_exists('totalsRowSum') && totalsRowSum() ? '1' : '0' ?>" data-totals-group="<?= function_exists('totalsGroup') && totalsGroup() ? '1' : '0' ?>" data-totals-cols="<?= !function_exists('totalsCols') || totalsCols() ? '1' : '0' ?>">
 <script>/* v2026: القائمة الجانبية مفتوحة بعناوينها دائماً (طلبه: «العامود اللي عالشمال اللي فيه العناوين يضلّ ظاهر») — Ctrl+B/الدبّوس يطويها لشريط أيقونات */try{if(localStorage.getItem('msa_nav_pinned')!=='0')document.body.classList.add('nav-pinned');}catch(e){}
 /* 🧭 (2026-10-16 p1 «التبويب والديزاين متل Namecheap»): شريط تبويبات علوي بقوائم منسدلة لكل باب يحلّ محلّ العامود الجانبي؛ msa_side=1 يرجّع العامود (كبسة ☰ بآخر الشريط) */
 try{if(localStorage.getItem('msa_side')==='1')document.body.classList.add('msa-side');}catch(e){}</script>
@@ -745,10 +745,11 @@ document.addEventListener('submit', function (e) {
                 $__cats = []; foreach (reportCenterCategories() as $__c) $__cats[$__c['title']] = $__c;
                 $__pick = function (string $needle) use ($__cats) { foreach ($__cats as $__t => $__c) if (strpos($__t, $needle) !== false) return $__c; return null; };
                 $__doors = [
-                    ['fr' => 'CNSS', 'ar' => 'الضمان الاجتماعي', 'icon' => 'fa-hospital', 'color' => '#3b82f6', 'cat' => $__pick('CNSS'),
+                    // 🏛️🖼️ (2026-10-18 «لوغو الضمان تمون أيقونة الضمان») gov-ic = شعار الجهة الرسمية محلّ الأيقونة (app.css قسم 500)
+                    ['fr' => 'CNSS', 'ar' => 'الضمان الاجتماعي', 'icon' => 'gov-ic gov-cnss', 'color' => '#3b82f6', 'cat' => $__pick('CNSS'),
                      'pages' => canEdit() ? [['cnss_followup.php', 'fa-user-shield', 'Suivi CNSS', 'متابعة الضمان', 'cnss_followup'], ['social_security.php', 'fa-shield-alt', 'Plafonds CNSS', 'حدود الضمان', 'social_security']] : []],
-                    ['fr' => 'Caisse EOC', 'ar' => 'صندوق التعويضات', 'icon' => 'fa-piggy-bank', 'color' => '#c9a961', 'cat' => $__pick('Caisse EOC'), 'pages' => []],
-                    ['fr' => 'Finances', 'ar' => 'المالية — الضريبة', 'icon' => 'fa-file-invoice-dollar', 'color' => '#ef4444', 'cat' => $__pick('Impôt'),
+                    ['fr' => 'Caisse EOC', 'ar' => 'صندوق التعويضات', 'icon' => 'gov-ic gov-eoc', 'color' => '#c9a961', 'cat' => $__pick('Caisse EOC'), 'pages' => []],
+                    ['fr' => 'Finances', 'ar' => 'المالية — الضريبة', 'icon' => 'gov-ic gov-mof', 'color' => '#ef4444', 'cat' => $__pick('Impôt'),
                      'pages' => canEdit() ? [['tax_declarations.php', 'fa-file-contract', 'Déclarations', 'التصاريح', 'tax'], ['tax_brackets.php', 'fa-percent', "Tranches d'impôt", 'الشطور الضريبية', 'tax_brackets']] : []],
                 ];
                 $__extra = [];
@@ -807,7 +808,7 @@ document.addEventListener('submit', function (e) {
                 $__pos = count($__groups); foreach ($__groups as $__i => $__g) if ($__g['fr'] === 'Rapports') { $__pos = $__i; break; }
                 array_splice($__groups, $__pos, 0, $__extra);
                 $__extraActive = false; foreach ($__extra as $__x) if (strpos($__x['links'], 'class="active"') !== false) { $__extraActive = true; break; }
-                $__tabIcons += ['CNSS' => 'fa-hospital', 'Caisse EOC' => 'fa-piggy-bank', 'Finances' => 'fa-file-invoice-dollar'];
+                $__tabIcons += ['CNSS' => 'gov-ic gov-cnss', 'Caisse EOC' => 'gov-ic gov-eoc', 'Finances' => 'gov-ic gov-mof'];
             }
             echo '<nav class="msa-tabs no-print" id="msaTabs" aria-label="Navigation">';
             echo '<a class="mt-brand" href="' . BASE_URL . 'index.php" title="' . e(currentSchoolName()) . '"><span class="mt-brand-ic"><i class="fas fa-graduation-cap"></i></span><span class="mt-brand-tx"><b>MSA Payroll</b><small>' . e(currentSchoolName()) . '</small></span></a>';

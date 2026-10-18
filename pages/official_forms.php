@@ -305,6 +305,16 @@ if ($form === 'tax_register' && $emp) {
     header('Location: ' . BASE_URL . 'pages/attestations.php?employee_id=' . (int)$emp['id'] . '&type=mof_r3');
     exit;
 }
+// 🏛️📄 (2026-10-17 «إعلام استخدام أجير / أجير عنده رقم / ترك أجير / إفادة عمل للضمان كنّا عاملينهم مرتّبين إكسل ووورد وPDF — هلّق غلط»)
+// نماذج الضمان الفردية الأربعة لها نسخة رسمية طبق الأصل معبّأة (صفحة الإفادات + official_export: PDF/Excel على قالب الصندوق نفسه).
+// النسخة HTML القديمة هنا كانت تعطي من الشريط إكسل/وورد عامّين (نسخ الشاشة سطراً سطراً) ⇒ باختيار الموظف ننتقل للنموذج الرسمي
+// كما ر3. (raw=1 = احتياط official_export حين تغيب ملفات القالب ⇒ تبقى النسخة المبنية هنا بلا دوران.)
+if ($emp && empty($_GET['raw'])) {
+    $hasReg = trim((string)($emp['nssf_number'] ?? '')) !== ''; // مسجّل سابقاً بالصندوق ⇒ نموذج «أجير عنده رقم»
+    $offType = ['cnss_employ' => ($hasReg ? 'cnss_hire_reg' : 'cnss_hire_new'),
+                'cnss_employ2' => 'cnss_hire_new', 'cnss_terminate' => 'cnss_leave', 'cnss_work' => 'cnss_travail'][$form] ?? '';
+    if ($offType !== '') { header('Location: ' . BASE_URL . 'pages/attestations.php?employee_id=' . (int)$emp['id'] . '&type=' . $offType); exit; }
+}
 $famStatus = $emp['social_status'] ?? '';
 $isMarried = strpos($famStatus, 'marie') === 0;
 

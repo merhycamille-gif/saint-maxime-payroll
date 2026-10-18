@@ -2605,7 +2605,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                     <div class="card" style="margin:0;">
                         <div class="card-header" style="background:#fef2f2;">
                             <h3 style="color:var(--danger)">
-                                <span dir="ltr"><i class="fas fa-file-invoice-dollar"></i> Impôt sur le revenu</span>
+                                <span dir="ltr"><i class="fas gov-ic gov-mof"></i> Impôt sur le revenu</span>
                                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">ضريبة الدخل</div>
                             </h3>
                         </div>
@@ -2631,7 +2631,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                     <div class="card" style="margin:0;">
                         <div class="card-header" style="background:#eff6ff;">
                             <h3 style="color:var(--info)">
-                                <span dir="ltr"><i class="fas fa-hospital"></i> CNSS (3%)</span>
+                                <span dir="ltr"><i class="fas gov-ic gov-cnss"></i> CNSS (3%)</span>
                                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">الضمان الاجتماعي (٣٪)</div>
                             </h3>
                         </div>
@@ -2651,7 +2651,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                     <div class="card" style="margin:0;">
                         <div class="card-header" style="background:#fffbeb;">
                             <h3 style="color:var(--warning)">
-                                <span dir="ltr"><i class="fas fa-piggy-bank"></i> Caisse EOC (6%)</span>
+                                <span dir="ltr"><i class="fas gov-ic gov-eoc"></i> Caisse EOC (6%)</span>
                                 <div style="font-size:0.85em;font-weight:600;opacity:0.9">صندوق التعويضات (٦٪)</div>
                             </h3>
                         </div>

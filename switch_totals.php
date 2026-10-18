@@ -6,5 +6,6 @@ require_once __DIR__ . '/includes/functions.php';
 requireLogin();
 if (isset($_GET['rowsum'])) $_SESSION['totals_rowsum'] = $_GET['rowsum'] === '1' ? 1 : 0;
 if (isset($_GET['group']))  $_SESSION['totals_group']  = $_GET['group'] === '1' ? 1 : 0;
+if (isset($_GET['cols']))   $_SESSION['totals_cols']   = $_GET['cols'] === '1' ? 1 : 0;   // 🧮 مجاميع الأعمدة
 header('Location: ' . safeBackUrl());
 exit;

@@ -22,12 +22,15 @@ $fn247 = (string)file_get_contents($P247 . '/includes/functions.php');
 $he247 = (string)file_get_contents($P247 . '/pages/html_export.php');
 $re247 = (string)file_get_contents($P247 . '/includes/report_export.php');
 
-check('🖨️ محرّك الطباعة: mPDF ضمن vendor (بلا composer أونلاين) + المحرّك + خطوط Cairo/FreeSans الجاهزة لـmPDF',
+check('🖨️ محرّك الطباعة: mPDF ضمن vendor (بلا composer أونلاين) + المحرّك + خطّ الورق Arial (كالشاشة، 2026-10-17) وCairo/FreeSans احتياطاً',
       is_file($P247 . '/vendor/autoload.php') && is_file($P247 . '/vendor/mpdf/mpdf/src/Mpdf.php')
       && is_file($P247 . '/assets/fonts/ttf/CairoArabic-Regular.ttf') && is_file($P247 . '/assets/fonts/ttf/CairoArabic-Bold.ttf')
       && is_file($P247 . '/vendor/mpdf/mpdf/ttfonts/FreeSans.ttf') && is_file($P247 . '/vendor/mpdf/mpdf/ttfonts/DejaVuSans.ttf')
       && is_file($P247 . '/tools/_make_pdf_fonts.py')
-      && strpos($en247, "return ['cairo', false];") !== false && strpos($en247, "'default_font' => \$rtl ? 'cairo' : 'freesans'") !== false);
+      && is_file($P247 . '/assets/fonts/ttf/arial.ttf') && is_file($P247 . '/assets/fonts/ttf/arialbd.ttf')
+      && strpos($en247, "return ['arial', false];") !== false && strpos($en247, "'default_font' => 'arial'") !== false
+      && strpos($en247, "\$fontdata['arial'] = ['R' => 'arial.ttf', 'B' => 'arialbd.ttf'") !== false
+      && strpos((string)file_get_contents($P247 . '/includes/pdf_chromium.php'), "@font-face{font-family:Arial;font-style:normal;font-weight:400;src:url(arial.ttf)") !== false);
 
 check('🖨️ html_export.php يبني PDF (format=pdf · disp=inline للطباعة · landscape=auto يقرّره المحرّك)',
       strpos($he247, "in_array(\$_POST['format'] ?? '', ['docx', 'pdf'], true)") !== false

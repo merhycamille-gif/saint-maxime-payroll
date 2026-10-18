@@ -66,7 +66,7 @@ include __DIR__ . '/../includes/header.php';
             </a>
             <a href="?form=190a" class="card" style="text-decoration:none;color:inherit">
                 <div class="card-body text-center">
-                    <i class="fas fa-hospital-symbol" style="font-size:36px;color:var(--danger)"></i>
+                    <i class="fas gov-ic gov-cnss" style="font-size:36px"></i>
                     <h4 style="margin:12px 0 4px">
                         <span dir="ltr">190A — CNSS</span>
                         <div style="font-size:0.85em;font-weight:600;opacity:0.9">190A — الضمان الاجتماعي</div>

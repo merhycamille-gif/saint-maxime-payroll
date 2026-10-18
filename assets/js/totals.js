@@ -7,14 +7,14 @@
 // الإكسل/الوورد/الـPDF تأخذ الصفحة كما تُعرض فتحمل الإضافات؛ لا يُمسّ أي رقم أصلي ولا سطور المجاميع الموجودة.
 (function () {
     var b = document.body; if (!b) return;
-    var ROWSUM = b.getAttribute('data-totals-rowsum') === '1', GROUP = b.getAttribute('data-totals-group') !== '0';
+    var ROWSUM = b.getAttribute('data-totals-rowsum') === '1', GROUP = b.getAttribute('data-totals-group') !== '0', COLS = b.getAttribute('data-totals-cols') !== '0';
     var NUM = /^-?[\d,]+(\.\d+)?$/;
     function txt(el) { return (el.textContent || '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim(); }
     function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
     // يقرأ خلية: {lbp, usd, ok} — ok=false إن لم تكن رقمية (نسبة %، تاريخ، رقم مركّب، نصّ)
     function parseCell(td) {
         if (!td) return { ok: false };
-        var t = txt(td); if (t === '' || t === '—' || t === '-') return { lbp: 0, usd: 0, ok: false, empty: true };
+        var t = td.getAttribute('data-msa-raw') !== null ? td.getAttribute('data-msa-raw') : txt(td); if (t === '' || t === '—' || t === '-') return { lbp: 0, usd: 0, ok: false, empty: true };
         if (/%|\/|[A-Za-z]{3,}(?!\.L)|\d-\d/.test(t.replace(/L\.L|ل\.ل/g, ''))) return { ok: false };
         var lbp = 0, usd = 0, found = false, rest = t;
         // الدولار: «$643» أو «643 $» — لا «57,560,000 $643» (الرقم قبل $ يجب ألّا يتبعه رقم آخر بعد الـ$)
@@ -26,6 +26,12 @@
     }
     function fmt(n) { n = Math.round(n * 100) / 100; var s = Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 2 }); return (n < 0 ? '-' : '') + s; }
     function cellHtml(s) { var h = []; if (s.lbp) h.push('<span dir="ltr">' + fmt(s.lbp) + ' L.L</span>'); if (s.usd) h.push('<span dir="ltr" class="msa-usd">$' + fmt(s.usd) + '</span>'); return h.length ? h.join('<br>') : '—'; }
+    // 🧮 (2026-10-17 «المجاميع لكل شي، عواميد وخطوط — بكشف الضمان مجموع وعاء الضمان مش موجود») نمط العمود: both/lbp/usd/bare ليُكتب المجموع بنفس شكل خاناته
+    function colStyle(rows, c) { var l = 0, u = 0, bare = 0, tot = 0; rows.forEach(function (r) { var t = txt(r.cells[c]); if (!t || t === '—' || t === '-') return; tot++; var hL = /L\.L|ل\.ل/.test(t), hU = /\$/.test(t); if (hL) l++; if (hU) u++; if (!hL && !hU) bare++; }); if (!tot) return 'bare'; if (u && (l || bare)) return 'both'; if (u) return 'usd'; if (l) return 'lbp'; return 'bare'; }
+    function fmtCol(style, s) { if (style === 'bare') return '<span dir="ltr">' + fmt(s.lbp) + '</span>'; if (style === 'usd') return '<span dir="ltr" class="msa-usd">$' + fmt(s.usd) + '</span>'; if (style === 'lbp') return '<span dir="ltr">' + fmt(s.lbp) + ' L.L</span>'; return cellHtml(s); }
+    // خانات صفّ (مع colspan) ⇒ رقم العمود لكل خانة
+    function cellsByCol(tr) { var m = {}, col = 0; Array.prototype.forEach.call(tr.cells, function (c) { m[col] = c; col += parseInt(c.getAttribute('colspan') || '1', 10); }); return m; }
+    function isEmptyCell(td) { var t = txt(td); return t === '' || t === '—' || t === '-'; }
     function sumRows(rows, cols) { var s = { lbp: 0, usd: 0, n: 0 }; rows.forEach(function (r) { cols.forEach(function (c) { var p = parseCell(r.cells[c]); if (p.ok) { s.lbp += p.lbp; s.usd += p.usd; s.n++; } }); }); return s; }
     function isTotalRow(tr) { return /(^|\s)(total-row|subtotal-row|msa-grp-row)(\s|$)/.test(tr.className) || tr.parentElement.tagName === 'TFOOT'; }
     function isGroupRow(tr) { if (/(^|\s)cat-row(\s|$)/.test(tr.className)) return true; var c = tr.children; return c.length === 1 && c[0].tagName === 'TD' && (parseInt(c[0].getAttribute('colspan') || '1', 10) >= 3); }
@@ -77,7 +83,7 @@
             G.colRows[0].appendChild(th);
             oddRows.forEach(function (r) { bump(r.cells[r.cells.length - 1]); });
             dataRows.forEach(function (r) { var td = document.createElement('td'); td.className = 'msa-rowsum'; r.appendChild(td); ctx.sumTds.push({ row: r, td: td }); });
-            bodies.forEach(function (tb) { Array.prototype.forEach.call(tb.rows, function (tr) { if (isTotalRow(tr) || isGroupRow(tr)) { if (tr.cells.length === nCols) { var td = document.createElement('td'); td.className = 'msa-rowsum'; tr.appendChild(td); } else bump(tr.cells[tr.cells.length - 1]); } }); });
+            (function () { var seg = []; bodies.forEach(function (tb) { Array.prototype.forEach.call(tb.rows, function (tr) { if (isGroupRow(tr)) { seg = []; bump(tr.cells[tr.cells.length - 1]); return; } if (isTotalRow(tr)) { var td = document.createElement('td'); td.className = 'msa-rowsum'; tr.appendChild(td); var isSub = /(^|\s)subtotal-row(\s|$)/.test(tr.className); ctx.grpTds.push({ rows: isSub ? seg.slice() : dataRows, td: td }); seg = []; return; } if (dataRows.indexOf(tr) >= 0) seg.push(tr); }); }); })();
             if (tbl.tFoot) Array.prototype.forEach.call(tbl.tFoot.rows, function (tr) { if (tr.cells.length === nCols) { var td = document.createElement('td'); td.className = 'msa-rowsum'; tr.appendChild(td); } else bump(tr.cells[tr.cells.length - 1]); });
         }
         // (٢) مجاميع الفئات
@@ -101,14 +107,39 @@
                 });
             });
         }
+        // 🧮 مجاميع الأعمدة: تعبئة الخانات الفارغة بسطور المجاميع الموجودة (مجموع الفئة / المجموع العام / tfoot)، وإضافة سطر مجموع عامّ حيث لا يوجد
+        if (COLS) {
+            var styles = []; for (var c = 1; c < nCols; c++) if (numeric[c]) styles[c] = colStyle(dataRows, c);
+            ctx.styles = styles;
+            var allRows = []; bodies.forEach(function (tb) { Array.prototype.forEach.call(tb.rows, function (tr) { allRows.push(tr); }); });
+            var seg = [];   // صفوف البيانات منذ آخر حدّ (رأس فئة أو سطر مجموع)
+            var fill = function (tr, rows) { var m = cellsByCol(tr); for (var c = 1; c < nCols; c++) { if (!numeric[c] || !m[c] || m[c].classList.contains('msa-rowsum')) continue; if (isEmptyCell(m[c])) { m[c].innerHTML = fmtCol(styles[c], sumRows(rows, [c])); m[c].classList.add('msa-filled'); } } };
+            allRows.forEach(function (tr) {
+                if (isGroupRow(tr)) { seg = []; return; }
+                if (/(^|\s)subtotal-row(\s|$)/.test(tr.className)) { if (seg.length) fill(tr, seg); seg = []; return; }
+                if (/(^|\s)total-row(\s|$)/.test(tr.className)) { fill(tr, dataRows); seg = []; return; }
+                if (dataRows.indexOf(tr) >= 0) seg.push(tr);   // (بعد إضافة خانة مجموع السطر يصير عدد الخانات nCols+1)
+            });
+            if (tbl.tFoot) Array.prototype.forEach.call(tbl.tFoot.rows, function (tr) { fill(tr, dataRows); });
+            var hasGrand = tbl.querySelector('tr.total-row') || (tbl.tFoot && tbl.tFoot.rows.length);
+            if (!hasGrand && dataRows.length >= 2) {
+                var tr = document.createElement('tr'); tr.className = 'total-row msa-total-row';
+                var first = -1; for (var c = 1; c < nCols; c++) if (numeric[c]) { first = c; break; }
+                var lab = document.createElement('td'); lab.setAttribute('colspan', String(first)); lab.innerHTML = 'المجموع العام / Total général <small>(' + dataRows.length + ')</small>'; tr.appendChild(lab);
+                for (var c = first; c < nCols; c++) { var td = document.createElement('td'); if (numeric[c]) td.innerHTML = fmtCol(styles[c], sumRows(dataRows, [c])); tr.appendChild(td); }
+                if (ROWSUM) { var tdr = document.createElement('td'); tdr.className = 'msa-rowsum'; tr.appendChild(tdr); ctx.grpTds.push({ rows: dataRows, td: tdr }); }
+                bodies[bodies.length - 1].appendChild(tr);
+            }
+        }
         refresh(ctx);
     }
     // يعيد حساب عمود مجموع السطر حسب الأعمدة المختارة (أو كل الرقمية إن لم يُختر شيء) ويحدّث الشريط العائم
     function refresh(ctx) {
         var cols = ctx.sel.length ? ctx.sel.slice() : []; if (!cols.length) for (var c = 1; c < ctx.nCols; c++) if (ctx.numeric[c]) cols.push(c);
         for (var c = 1; c < ctx.nCols; c++) if (ctx.headOf[c]) ctx.headOf[c].classList.toggle('msa-picked', ctx.sel.indexOf(c) >= 0);
-        ctx.sumTds.forEach(function (x) { x.td.innerHTML = cellHtml(sumRows([x.row], cols)); });
-        ctx.grpTds.forEach(function (x) { x.td.innerHTML = cellHtml(sumRows(x.rows, cols)); });
+        ctx.sumTds.forEach(function (x) { x.td.innerHTML = cellHtml(sumRows([x.row], cols)); x.td.removeAttribute('data-msa-raw'); });
+        ctx.grpTds.forEach(function (x) { x.td.innerHTML = cellHtml(sumRows(x.rows, cols)); x.td.removeAttribute('data-msa-raw'); });
+        if (ctx.sumTh && ctx.sumTh.querySelector('.cur-head')) ctx.tbl.querySelectorAll('td.msa-rowsum').forEach(stripCur);
         if (ctx.sumTh) ctx.sumTh.innerHTML = ctx.sel.length ? 'Total<br>مجموع المختار' : 'Total<br>المجموع';
         renderBar();
     }
@@ -131,7 +162,7 @@
         if (!rows.length) return;
         for (var c = 1; c < nCols; c++) {
             var th = headOf[c]; if (!th || th.querySelector('.cur-head') || th.classList.contains('msa-rowsum')) continue;
-            var hc = th.cloneNode(true); Array.prototype.forEach.call(hc.querySelectorAll('.rate-head, .msa-colpick, small'), function (x) { x.parentNode.removeChild(x); }); var ht = txt(hc); if (/ل\.ل|L\.L|\$|USD|LBP|ليرة|دولار/.test(ht)) continue;   // الرأس نفسه يذكر العملة أصلاً (لا سطر سعر الصرف الصغير)
+            var hc = th.cloneNode(true); Array.prototype.forEach.call(hc.querySelectorAll('.rate-head, .msa-colpick, small'), function (x) { x.parentNode.removeChild(x); }); var ht = txt(hc); if (/ل\.ل|L\.L|\$|USD|LBP|ليرة|دولار/.test(ht)) { stripColumn(tbl, c); continue; }   // الرأس نفسه يذكر العملة أصلاً ⇒ الخانات أرقام فقط
             var lbp = 0, usd = 0, bare = 0, tot = 0;
             rows.forEach(function (r) { var t = txt(r.cells[c]); if (!t || t === '—' || t === '-') return; tot++; var hasL = /L\.L|ل\.ل/.test(t), hasU = /\$/.test(t); var restT = t.replace(/\$\s*-?[\d,]+(\.\d+)?|-?[\d,]+(\.\d+)?\s*\$/g, ' ').replace(/L\.L|ل\.ل\.?/g, ' ').trim(); if (!hasL && hasU && /^-?\d+(,\d{3})*(\.\d+)?$/.test(restT)) hasL = true;   /* «54,000,000 $603»: ليرة بلا وحدة + دولار = العملتان */ if (hasL) lbp++; if (hasU) usd++; if (!hasL && !hasU && /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) bare++; });
             if (!tot) continue;
@@ -140,9 +171,31 @@
             else if (bare >= tot * 0.6) lab = 'ل.ل';   // رقم بفواصل الآلاف بلا وحدة = ليرة (أساس الراتب…)
             if (!lab) continue;
             var sm = document.createElement('small'); sm.className = 'cur-head'; sm.setAttribute('dir', 'ltr'); sm.textContent = lab;
-            var pick = th.querySelector('.msa-colpick'); th.appendChild(sm); if (pick) th.appendChild(pick);
+            var rh = th.querySelector('.rate-head'); var br = rh && rh.previousSibling && rh.previousSibling.nodeName === 'BR' ? rh.previousSibling : rh; if (br) th.insertBefore(sm, br); else { var pick = th.querySelector('.msa-colpick'); th.appendChild(sm); if (pick) th.appendChild(pick); }   // العملة مباشرة تحت اسم العمود
+            stripColumn(tbl, c);   // الرقم فقط داخل الخانات
         }
     }
-    function run() { document.querySelectorAll('#pageContent table.doc-table').forEach(process); document.querySelectorAll('#pageContent table.doc-table').forEach(curHeads); }
+    // 💱 (2026-10-17 «بس تكون كاتب الرقم بقلب الخانة ما في نحطّ نوع العملة — الرقم بس مادام العنوان محدّد العملة»)
+    function stripCur(td) {
+        if (td.hasAttribute('data-msa-raw')) return;
+        td.setAttribute('data-msa-raw', txt(td));
+        var w = document.createTreeWalker(td, NodeFilter.SHOW_TEXT, null); var n, list = [];
+        while ((n = w.nextNode())) list.push(n);
+        list.forEach(function (tn) { tn.nodeValue = tn.nodeValue.replace(/\s*(L\.L|ل\.ل\.?)\s*/g, ' ').replace(/\$\s*/g, '').replace(/\s{2,}/g, ' '); });
+        td.querySelectorAll('.money-usd').forEach(function (m) { m.classList.add('msa-nocur'); var pv = m.previousSibling; if (!pv || pv.nodeType !== 3 || !/\s$/.test(pv.nodeValue)) m.parentNode.insertBefore(document.createTextNode(' '), m); });   // فاصل حقيقي قبل الدولار (الإكسل/الـPDF يقرآن النصّ)
+    }
+    function stripColumn(tbl, c) {
+        var rows = []; Array.prototype.forEach.call(tbl.tBodies, function (tb) { Array.prototype.forEach.call(tb.rows, function (tr) { rows.push(tr); }); });
+        if (tbl.tFoot) Array.prototype.forEach.call(tbl.tFoot.rows, function (tr) { rows.push(tr); });
+        rows.forEach(function (tr) { if (isGroupRow(tr)) return; var m = cellsByCol(tr); if (m[c]) stripCur(m[c]); });
+    }
+    function run() {
+        // 🏛️ (2026-10-17) نماذج الدولة الرسمية (ضمان cnss-form / مالية mof-form) تبقى طبق الأصل: لا Σ ولا مجاميع ولا تغيير بخاناتها
+        var tables = Array.prototype.filter.call(document.querySelectorAll('#pageContent table.doc-table'), function (t) { return !t.closest('.cnss-form, .mof-form'); });
+        tables.forEach(process);
+        tables.forEach(curHeads);
+        // خانة «مجموع السطر» المضافة: عنوانها يأخذ العملة أيضاً وخاناتها أرقام فقط
+        document.querySelectorAll('#pageContent table.doc-table th.msa-rowsum').forEach(function (th) { if (th.querySelector('.cur-head')) return; var tbl = th.closest('table'); var any = tbl.querySelector('td.msa-rowsum'); var t = any ? txt(any) : ''; var lab = (/L\.L/.test(t) && /\$/.test(t)) ? 'ل.ل + $' : (/\$/.test(t) ? '$' : 'ل.ل'); var sm = document.createElement('small'); sm.className = 'cur-head'; sm.setAttribute('dir', 'ltr'); sm.textContent = lab; th.appendChild(sm); tbl.querySelectorAll('td.msa-rowsum').forEach(stripCur); });
+    }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
 })();

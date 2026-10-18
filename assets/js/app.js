@@ -920,6 +920,7 @@ window.msaDrawer = (function () {
     function collapseNote(al) {
         if (al.classList.contains('toast') || al.closest('.toast-stack, .export-toolbar, .official-doc, .doc-sheet')) return;
         if (al.querySelector('input, select, textarea, .btn, button, table')) return;
+        if (al.querySelector('strong, b') && txt(al).length < 400) return;   // ملاحظة فيها معطيات مميَّزة (أشهر/تواريخ/مبالغ) تبقى كاملة
         if (txt(al).length < 150) return;
         al.classList.add('msa-note');
         al.addEventListener('click', function (e) { if (e.target.closest('a')) return; al.classList.toggle('open'); });
@@ -928,6 +929,57 @@ window.msaDrawer = (function () {
         var pc = document.getElementById('pageContent'); if (!pc) return;
         pc.querySelectorAll('.school-checks:not(.emp-type-checks)').forEach(collapsePicker);
         pc.querySelectorAll('.alert.alert-info, .alert.alert-warning, .fa-law').forEach(collapseNote);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+})();
+
+// 🧹📄 (2026-10-17 «فاتح صفحة إفادة راتب شوف كيف معجّقة فوق — روح فتّش بكل محلّات البرنامج وكل صفحة بتنطبع ورتّبها، كل شي مرتّب ومنظّم ورسمي»)
+// بكل صفحة فيها مستند (إفادة/تقرير/نموذج/بطاقة/قسيمة): بطاقات الخيارات والفلاتر التي فوق المستند تُطوى بسطر واحد يلخّص المختار
+// («Options / الخيارات: إفادة راتب · عربي · الاثنين…» + «تعديل») — المستند يطلع مباشرة تحت شريط الطباعة. الفورم كما هو داخل الطيّ (كل خانة
+// وسلوكها لم يتغيّرا)؛ أي تغيير بالخيارات يُبقيه مفتوحاً لهذه الصفحة حتى يقفله المستخدم بيده. لا يطبع ولا يُصدَّر.
+(function () {
+    function txt(el) { return (el ? el.textContent : '').replace(/\s+/g, ' ').trim(); }
+    function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+    function labelOf(inp) { var l = inp.closest('label') || (inp.id ? document.querySelector('label[for="' + inp.id + '"]') : null); var t = l ? txt(l) : ''; return t.replace(/\s*\(.*?\)\s*$/, '').slice(0, 40); }
+    function summarize(box) {
+        var chips = [];
+        box.querySelectorAll('select').forEach(function (s) { if (s.offsetParent === null || chips.length >= 6) return; var o = s.options[s.selectedIndex]; if (o && txt(o) && !/^(—|-|Tous|الكل|Toutes)/.test(txt(o))) chips.push(txt(o).slice(0, 34)); });
+        box.querySelectorAll('input[type=radio]:checked').forEach(function (r) { if (chips.length >= 6) return; var t = labelOf(r); if (t) chips.push(t); });
+        var cb = Array.prototype.filter.call(box.querySelectorAll('input[type=checkbox]:checked'), function (c) { return c.offsetParent !== null; });
+        if (cb.length && chips.length < 6) chips.push('☑ ' + cb.length);
+        box.querySelectorAll('input[type=date], input[type=text], input[type=search]').forEach(function (i) { if (chips.length >= 6 || i.offsetParent === null || !i.value || i.name === 'csrf') return; chips.push(i.value.slice(0, 24)); });
+        var note = box.querySelector('.att-note'); if (note) chips.push(txt(note).slice(0, 60));
+        return chips;
+    }
+    function run() {
+        var pc = document.getElementById('pageContent'); if (!pc) return;
+        if (pc.querySelector('.salary-slip') || /annual_slip\.php/.test(location.pathname)) return;   // 🔒 البطاقة السنوية مجمّدة بأمره («أوعى تخرب البطاقة السنوية») — لا نلمس صفحتها
+        var doc = pc.querySelector('.official-doc, .doc-sheet, #ppExportArea, .payslip-card'); if (!doc) return;
+        var key = 'msa_opts_open:' + location.pathname + ':' + (new URLSearchParams(location.search).get('type') || new URLSearchParams(location.search).get('report') || new URLSearchParams(location.search).get('form') || '');
+        var wantOpen = false; try { wantOpen = localStorage.getItem(key) === '1'; } catch (e) {}
+        var blocks = [];
+        Array.prototype.forEach.call(pc.children, function (el) {
+            if (!(el.compareDocumentPosition(doc) & Node.DOCUMENT_POSITION_FOLLOWING)) return;   // فوق المستند فقط
+            if (el.contains(doc)) return;
+            if (el.matches('details, .msa-bars-row, .export-toolbar, .export-compact, .toast-stack, .alert, script, style, .school-strip, .legal-bar, #legalBar')) return;
+            if (!el.querySelector('input, select, textarea, button')) return;
+            if (el.getBoundingClientRect().height < 90) return;
+            // بطاقة فيها كبسات الطباعة/التصدير نفسها (صفحات بلا شريط الطباعة المشترك مثل البطاقة السنوية): تبقى ظاهرة حتى لا تختفي الطباعة
+            if (!pc.querySelector('.export-toolbar') && el.querySelector('[onclick*="ppPrint"], [onclick*="msaSavePdfStart"], [onclick*="ppExcel"], [onclick*="ppWord"], [onclick*="ppWhatsApp"], [onclick*="ppEmail"]')) return;
+            blocks.push(el);
+        });
+        if (!blocks.length) return;
+        blocks.forEach(function (el, i) {
+            var det = document.createElement('details'); det.className = 'msa-opts no-print no-export'; if (wantOpen) det.open = true;
+            var sum = document.createElement('summary');
+            var chips = summarize(el);
+            sum.innerHTML = '<span class="mo-t"><i class="fas fa-sliders-h"></i> ' + (blocks.length > 1 ? 'Options ' + (i + 1) : 'Options') + ' / الخيارات</span>'
+                + '<span class="mo-c">' + chips.map(function (c) { return '<span class="mo-chip">' + esc(c) + '</span>'; }).join('') + '</span>'
+                + '<span class="mo-e"><i class="fas fa-pen"></i> Modifier / تعديل</span>';
+            el.parentNode.insertBefore(det, el); det.appendChild(sum); det.appendChild(el);
+            det.addEventListener('toggle', function () { try { localStorage.setItem(key, det.open ? '1' : '0'); } catch (e) {} });
+            el.addEventListener('change', function () { try { localStorage.setItem(key, '1'); } catch (e) {} });
+        });
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
 })();

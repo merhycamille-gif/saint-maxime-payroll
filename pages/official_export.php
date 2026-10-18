@@ -314,7 +314,7 @@ if ($form === 'cnss_taswiya') {
 }
 
 $school = currentSchool();
-if (!$school) $school = institutionSchoolPick() ?: institutionGroupSchool(strpos($form, 'cnss_') === 0); // 🏛️ (2026-10-16) الضمان: صاحب عمل واحد لكل تصريح (&cnss_emp=) // 🏫 (2026-09-25) مدرسة بالرابط أو مجموعة المدارس المختارة معاً
+if (!$school) $school = institutionSchoolPick() ?: institutionGroupSchool(strpos($form, 'cnss_') === 0 && empty($_GET['emp']));   // 🩹 (2026-10-17 «إعلام استخدام/ترك أجير وإفادة عمل للضمان كلّن غلط») نماذج الأجير الواحد (&emp=) لا تُحصَر بمجموعة رقم الضمان الافتراضية (كانت ترجع 404 لموظف مدرسة برقم آخر) — مدرسته هي صاحب العمل // 🏛️ (2026-10-16) الضمان: صاحب عمل واحد لكل تصريح (&cnss_emp=) // 🏫 (2026-09-25) مدرسة بالرابط أو مجموعة المدارس المختارة معاً
 // 🔒 نموذج الضمان 190A يُصدَر لمؤسسة واحدة برقم صاحب عمل واحد — في وضع «كل المدارس»
 // كان يُبَثّ ملفٌ بترويسة فارغة يجمع أرقام كل المدارس. اطلب اختيار مدرسة.
 if (!$school) {
@@ -1715,7 +1715,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     }
     // احتياط أخير (ملفات الصورة/الإحداثيات غير موجودة) → النسخة المبنية بالبرنامج بنفس المعلومات
     $_SESSION['flash_info'] = 'النموذج الرسمي طبق الأصل (PDF) يتولّد على كمبيوتر المدرسة. هون فتحنالك النسخة المبنية بالبرنامج بنفس المعلومات — اطبعها من زرّ الطباعة، أو نزّل Excel الرسمي. / Le PDF officiel n\'est disponible que sur l\'ordinateur de l\'école — version imprimable affichée.';
-    header('Location: ' . BASE_URL . 'pages/official_forms.php?form=' . $fallbackForm . '&employee_id=' . $empId);
+    header('Location: ' . BASE_URL . 'pages/official_forms.php?form=' . $fallbackForm . '&employee_id=' . $empId . '&raw=1');   // raw=1: لا يعود للنموذج الرسمي (2026-10-17)
     exit;
 }
 

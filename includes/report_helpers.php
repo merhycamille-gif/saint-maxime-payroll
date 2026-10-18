@@ -612,6 +612,11 @@ function officialFormStyles(): string {
 .doc-table th{background:#1F4E5F;color:#fff;padding:7px 8px;text-align:center;
   font-weight:600;border:1px solid #1F4E5F;font-size:12pt;}
 .doc-table td{border:1px solid #94a3b8;padding:6px 8px;text-align:center;}
+/* 📏 (2026-10-17 «بالتقارير لمّا الأسماء تحت بعضها: ارتفاع الخانة 25») صفوف الجدول 25px: حشوة صغيرة وسطر واحد — مرآة الدولار بجانب الليرة لا تحتها */
+.doc-table tbody td{padding:3px 6px;height:30px;line-height:22px;}
+@media print{.doc-table tbody td{height:23px;padding:2px 6px;line-height:18px;}}
+.doc-table tbody td .money-usd{display:inline;margin-inline-start:6px;font-size:.9em;line-height:inherit;}
+.doc-table tbody td:has(.money-usd){direction:ltr;unicode-bidi:isolate;white-space:nowrap;}
 .doc-table tfoot td,.doc-table .total-row td{background:#eef1f4;font-weight:700;}
 .doc-table .subtotal-row td{background:#f1f5f9;font-weight:700;}
 .doc-table .num{text-align:left;font-variant-numeric:tabular-nums;}
@@ -662,8 +667,13 @@ function officialFormStyles(): string {
   body:has(.land-report){page:landscapePage;}
   body{background:#fff;}
   .official-doc{border:none !important;border-radius:0;padding:0;max-width:100%;box-shadow:none;page-break-inside:auto;}
-  .doc-table th{background:#1F4E5F !important;color:#fff !important;
+  /* 🖨️ (2026-10-17 «بس عم نطبع على الورق محلّ العناوين اللي لون الخطّ أبيض ما عم يبيّن») على الورق رأس الجدول رمادي فاتح وخطّه أسود —
+     الأزرق الغامق مع خطّ أبيض يختفي حين لا تطبع الطابعة الخلفيات */
+  .doc-table th,.doc-table thead th,.doc-table th[style]{background:#e5e7eb !important;color:#000 !important;border:1px solid #555 !important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .doc-table th *,.doc-table th .rate-head,.doc-table th .cur-head{color:#000 !important;opacity:1 !important;}
+  .doc-table th.msa-rowsum{background:#d1d5db !important;color:#000 !important;}
+  .doc-table .cat-row td{background:#f1f5f9 !important;color:#000 !important;}
   .doc-table tfoot td,.doc-table .total-row td{background:#e2e8f0 !important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .doc-table .subtotal-row td{background:#f1f5f9 !important;

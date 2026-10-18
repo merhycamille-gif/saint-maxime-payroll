@@ -18,7 +18,8 @@ function reportCenterCategories(): array {
             ['url'=>$OF.'employer_cost', 'icon'=>'fa-sack-dollar', 'color'=>'var(--danger)', 'fr'=>'Coût employeur total', 'ar'=>'كلفة المؤسسة الإجمالية'],
             ['url'=>$OF.'full_register', 'icon'=>'fa-table-cells-large', 'color'=>'var(--primary)', 'fr'=>'Registre complet', 'ar'=>'كشف شامل بالكلفة (جميع الأساتذة)'],
         ]],
-        ['title'=>'الضمان الاجتماعي / CNSS', 'icon'=>'fa-hospital', 'color'=>'var(--info)', 'tiles'=>[
+        // 🏛️🖼️ (2026-10-18) gov-ic = شعار الجهة الرسمية محلّ الأيقونة (الضمان/المالية/الصندوق — app.css قسم 500)
+        ['title'=>'الضمان الاجتماعي / CNSS', 'icon'=>'gov-ic gov-cnss', 'color'=>'var(--info)', 'tiles'=>[
             ['url'=>'?report=cnss_summary', 'icon'=>'fa-list', 'color'=>'var(--info)', 'fr'=>'CNSS mensuel', 'ar'=>'كشف ضمان شهري'],
             ['url'=>$OF.'cnss_nominative_monthly', 'icon'=>'fa-table-list', 'color'=>'var(--success)', 'fr'=>'Bordereau nominatif mensuel', 'ar'=>'كشف اشتراكات الضمان الشهري (اسمي)'],
             ['url'=>$OF.'cnss_annual', 'icon'=>'fa-file-contract', 'color'=>'var(--primary)', 'fr'=>'Décl. annuelle nominative', 'ar'=>'التصريح الاسمي السنوي'],
@@ -39,7 +40,7 @@ function reportCenterCategories(): array {
             ['url'=>$OF.'cnss_contrib_annual', 'icon'=>'fa-table-cells', 'color'=>'var(--primary)', 'fr'=>'Déclaration trimestrielle', 'ar'=>'تصريح الضمان الفصلي'],
             ['url'=>$OF.'cnss_taswiya', 'icon'=>'fa-file-shield', 'color'=>'var(--danger)', 'fr'=>'Régularisation annuelle (officielle)', 'ar'=>'تسوية الضمان السنوية — طبق الأصل'],
         ]],
-        ['title'=>'ضريبة الدخل / Impôt sur le revenu', 'icon'=>'fa-file-invoice-dollar', 'color'=>'var(--danger)', 'tiles'=>[
+        ['title'=>'ضريبة الدخل / Impôt sur le revenu', 'icon'=>'gov-ic gov-mof', 'color'=>'var(--danger)', 'tiles'=>[
             ['url'=>'?report=tax_summary', 'icon'=>'fa-list', 'color'=>'var(--danger)', 'fr'=>'Impôt mensuel', 'ar'=>'كشف ضريبة شهري'],
             ['url'=>$OF.'tax_register', 'icon'=>'fa-id-card-clip', 'color'=>'var(--gold)', 'fr'=>'R3 — Enregistrement', 'ar'=>'ر3 تسجيل أجير'],
             ['url'=>$OF.'tax_r4', 'icon'=>'fa-address-book', 'color'=>'var(--info)', 'fr'=>'R4 — Infos + ayants droit', 'ar'=>'ر4 معلومات + العيال'],
@@ -50,7 +51,7 @@ function reportCenterCategories(): array {
             ['url'=>$OF.'tax_r10', 'icon'=>'fa-file-lines', 'color'=>'var(--success)', 'fr'=>'R10 — Décl. périodique', 'ar'=>'ر10 بيان دوري'],
             ['url'=>$OF.'tax_emp_report', 'icon'=>'fa-table-list', 'color'=>'var(--danger)', 'fr'=>'Impôt sur le revenu — détaillé', 'ar'=>'تقرير ضريبة الدخل - الأستاذ/الموظف'],
         ]],
-        ['title'=>'صندوق التعليم الخاص / Caisse EOC', 'icon'=>'fa-piggy-bank', 'color'=>'var(--gold)', 'tiles'=>[
+        ['title'=>'صندوق التعليم الخاص / Caisse EOC', 'icon'=>'gov-ic gov-eoc', 'color'=>'var(--gold)', 'tiles'=>[
             ['url'=>'?report=eoc_summary', 'icon'=>'fa-list', 'color'=>'var(--gold)', 'fr'=>'Caisse mensuelle', 'ar'=>'كشف صندوق شهري'],
             ['url'=>$OF.'eoc_card', 'icon'=>'fa-id-badge', 'color'=>'var(--primary)', 'fr'=>'Carte titulaire', 'ar'=>'بطاقة ملاك'],
             ['url'=>$OF.'eoc_staff&cat=titulaire', 'icon'=>'fa-users', 'color'=>'var(--primary)', 'fr'=>'État général — titulaires', 'ar'=>'بيان عام — الملاك'],

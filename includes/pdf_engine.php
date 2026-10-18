@@ -619,7 +619,9 @@ table.pdf-t tr.total-row td, table.pdf-t tr.grand-row td, table.pdf-t tr.sum-row
 table.pdf-t tr.subtotal-row td { background: #f1f5f9; font-weight: bold; }
 table.pdf-t tr.section-row td, table.pdf-t td.section { background: #e0e7ff; font-weight: bold; text-align: $al; }
 table.pdf-t th .rate-head, table.pdf-t th small { font-weight: normal; font-size: 9pt; }
+table.pdf-t.doc-table thead th, table.pdf-t.doc-table th { background: #e5e7eb; color: #000; }   /* 🖨️ (2026-10-17) رؤوس جداول التقارير على الورق رمادي فاتح بخطّ أسود — النماذج الرسمية كما كانت */
 .money-usd { display: inline; color: #047857; font-weight: bold; font-size: 9.5pt; white-space: nowrap; }
+table.pdf-t.doc-table tbody td { padding: 2pt 4pt; height: 23px; }   /* على الورق 23px (30 صفّاً + ترويسة + مجاميع = صفحة واحدة) — الشاشة 30 */   /* جداول التقارير فقط (لا النماذج الرسمية/الإفادات): 30 رُفعت إلى 28px على الورق ليبقى 30 صفّاً بصفحة */
 .money-usd-inline { color: #047857; font-weight: bold; }
 small { font-size: 9.5pt; }
 /* نماذج وإفادات */
