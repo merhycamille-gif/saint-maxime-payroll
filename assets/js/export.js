@@ -317,11 +317,24 @@
     window.ppWord = function (title) { return officeExport('docx', title); };
     // 🖨️ (2026-10-11) PDF جاهز من محرّك الطباعة الرسمي على الخادم (mPDF) — للطباعة والحفظ والواتساب والإيميل.
     // pdf-save.js يستعمله لكل صفحة ليست قسائم. opts: {inline, title}. الاتجاه: تلقائي بعرض الجدول إلا إن قلبه المستخدم بزرّ الورقة.
+    // ⏳ (2026-10-18 «ليش بس اكبس طباعة بتاخد وقت تتفتح») مؤشّر واضح وسط الشاشة طول ما الخادم عم يحضّر الورقة (طباعة/حفظ/واتساب/إيميل)
+    window.msaPdfWait = function (on, txt) {
+        var w = document.getElementById('msaPdfWait');
+        if (!on) { if (w) w.remove(); return; }
+        if (!w) {
+            w = document.createElement('div'); w.id = 'msaPdfWait'; w.className = 'no-print';
+            w.innerHTML = '<div class="pw-box"><i class="fas fa-spinner fa-spin"></i><b></b><small>أوّل مرّة بتاخد ثواني — بعدها نفس الورقة بتطلع فوراً<br>La première fois prend quelques secondes, ensuite c\'est immédiat</small></div>';
+            document.body.appendChild(w);
+        }
+        w.querySelector('b').textContent = txt || 'عم نحضّر الورقة للطباعة… / Préparation de la page…';
+    };
     window.msaServerPdf = function (opts) {
         opts = opts || {};
         var land = window.msaOrientForced ? (window.msaOrientForced === 'landscape' ? '1' : '0') : 'auto';
         var t = opts.title || docTitle();
-        return fetchFile(exportForm('pdf', t, { landscape: land, disp: opts.inline ? 'inline' : 'attachment', fit: window.msaFitOne ? '1' : '0' }), safeName(t) + '_' + stamp() + '.pdf');
+        window.msaPdfWait(true, opts.inline ? 'عم نحضّر الورقة للطباعة… / Préparation de la page…' : 'عم نحضّر ملف PDF… / Préparation du PDF…');
+        return fetchFile(exportForm('pdf', t, { landscape: land, disp: opts.inline ? 'inline' : 'attachment', fit: window.msaFitOne ? '1' : '0' }), safeName(t) + '_' + stamp() + '.pdf')
+            .then(function (r) { window.msaPdfWait(false); return r; }, function (e) { window.msaPdfWait(false); throw e; });
     };
     // 📄 (2026-10-11) الجدول العريض: «أجزاء» (الافتراضي، خط 12 مع تكرار # والاسم بكل جزء) ⇄ «ورقة وحدة» (كل الأعمدة بصفحة واحدة بخط أصغر).
     //    الزرّ يظهر فقط حين يكون بالمستند جدول من 10 أعمدة وأكثر. لا يُحفَظ: كل صفحة تبدأ بالأجزاء.

@@ -853,7 +853,14 @@ window.msaDrawer = (function () {
 (function () {
     var bar = document.getElementById('msaTabs'); if (!bar) return;
     var tabs = Array.prototype.slice.call(bar.querySelectorAll('.mt-group')), openT = null, tmr = null;
-    function place(t) { var d = t.querySelector('.mt-drop'); if (!d) return; d.classList.remove('flip'); var r = d.getBoundingClientRect(); if (r.right > window.innerWidth - 8) d.classList.add('flip'); }
+    function place(t) {
+        var d = t.querySelector('.mt-drop'); if (!d) return;
+        d.classList.remove('flip'); d.style.left = ''; d.style.right = '';
+        var r = d.getBoundingClientRect();
+        if (r.right > window.innerWidth - 8) { d.classList.add('flip'); r = d.getBoundingClientRect(); }
+        // 📐 (2026-10-18) اللائحة العريضة (الإفادات/ملف الأستاذ) كانت تخرج من يسار الشاشة بعد القلب ⇒ تُزاح لتدخل بالشاشة كاملة
+        if (r.left < 8) { d.style.left = (d.offsetLeft + (8 - r.left)) + 'px'; d.style.right = 'auto'; }
+    }
     function open(t) { if (openT && openT !== t) close(openT); t.classList.add('open'); var b = t.querySelector('.mt-btn'); if (b) b.setAttribute('aria-expanded', 'true'); openT = t; place(t); }
     function close(t) { if (!t) return; t.classList.remove('open', 'pinned'); var b = t.querySelector('.mt-btn'); if (b) b.setAttribute('aria-expanded', 'false'); if (openT === t) openT = null; }
     tabs.forEach(function (t) {
@@ -870,9 +877,32 @@ window.msaDrawer = (function () {
     bar.querySelectorAll('.mt-search').forEach(function (sw) {
         var inp = sw.querySelector('.mt-sinp'), res = sw.querySelector('.mt-sres'), base = sw.getAttribute('data-base') || '', t = sw.closest('.mt-group'), timer = null, seq = 0;
         function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+        // 📄 (2026-10-18 «بباب الإفادات وقت بختار الاسم لازم يعطيني خيار أي إفادة بدي ياها وبس اكبس عليها تطلع دغري»)
+        //    بباب «الإفادات» (فيه لائحة الأنواع .mt-att-cols): اختيار الاسم لا ينتقل لصفحة — يثبّت الأستاذ بحبّة بالخانة، وروابط
+        //    الإفادات الـ20 بالباب تصير لهالأستاذ (employee_id) ⇒ كبسة على أي إفادة تفتحها دغري. ✕ على الحبّة يرجّع الباب عامّاً.
+        var drop = sw.closest('.mt-drop'), attMode = !!(drop && drop.querySelector('.mt-att-cols')), lastEmps = [], ph0 = inp.getAttribute('placeholder') || '';
+        var attLinks = attMode ? Array.prototype.slice.call(drop.querySelectorAll('.mt-att-cols a, .mt-att-foot a')) : [];
+        attLinks.forEach(function (a) { a.setAttribute('data-href0', a.getAttribute('href') || ''); });
+        function unpick() { var c = sw.querySelector('.mt-schip'); if (c) c.remove(); drop.classList.remove('mt-att-picked'); attLinks.forEach(function (a) { a.setAttribute('href', a.getAttribute('data-href0')); }); inp.setAttribute('placeholder', ph0); }
+        function pickEmp(e) {
+            unpick();
+            attLinks.forEach(function (a) {
+                var h = a.getAttribute('data-href0');
+                if (/attestations\.php(\?|$)/.test(h) && !/[?&]type=/.test(h) && !/dossier=1/.test(h)) return;   // «صفحة الإفادات كاملة» تبقى عامّة
+                a.setAttribute('href', h + (h.indexOf('?') > -1 ? '&' : '?') + 'employee_id=' + encodeURIComponent(e.id));
+            });
+            drop.classList.add('mt-att-picked');
+            var chip = document.createElement('span'); chip.className = 'mt-schip';
+            chip.innerHTML = '<i class="fas fa-user"></i> ' + esc(e.ar || e.fr) + ' <b class="mt-schip-x" title="إلغاء / Annuler">✕</b>';
+            chip.querySelector('.mt-schip-x').addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); unpick(); inp.value = ''; inp.focus(); });
+            chip.addEventListener('click', function (ev) { ev.stopPropagation(); });
+            sw.insertBefore(chip, inp);
+            inp.value = ''; res.innerHTML = ''; inp.setAttribute('placeholder', 'اختَر الإفادة من اللائحة تحت ⬇ / Choisissez l’attestation ci-dessous');
+            if (t) { open(t); t.classList.add('pinned'); }
+        }
         inp.addEventListener('focus', function () { if (t) { open(t); t.classList.add('pinned'); } });
         inp.addEventListener('click', function (e) { e.stopPropagation(); });
-        inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { var a = res.querySelector('a'); if (a) { e.preventDefault(); location.href = a.href; } } if (e.key === 'Escape') { inp.value = ''; res.innerHTML = ''; } e.stopPropagation(); });
+        inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { var a = res.querySelector('a'); if (a) { e.preventDefault(); if (attMode && lastEmps[0]) pickEmp(lastEmps[0]); else location.href = a.href; } } if (e.key === 'Escape') { inp.value = ''; res.innerHTML = ''; } e.stopPropagation(); });
         inp.addEventListener('input', function () {
             var q = inp.value.trim(); clearTimeout(timer); if (!q) { res.innerHTML = ''; return; }
             var my = ++seq; res.innerHTML = '<div class="mt-sload"><i class="fas fa-spinner fa-spin"></i></div>';
@@ -880,9 +910,11 @@ window.msaDrawer = (function () {
                 fetch(base + 'ajax_search.php?q=' + encodeURIComponent(q), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (emps) {
                     if (my !== seq) return;
                     if (!emps.length) { res.innerHTML = '<div class="mt-snone">ما في أستاذ بهالاسم / Aucun résultat</div>'; return; }
-                    res.innerHTML = emps.slice(0, 8).map(function (e) {
+                    lastEmps = emps.slice(0, 8);
+                    res.innerHTML = lastEmps.map(function (e) {
                         return '<a href="' + base + (sw.getAttribute('data-target') || 'pages/attestations.php?employee_id={id}').replace('{id}', e.id) + '"><span class="mt-sav">' + esc((e.fr || e.ar || '?').trim().charAt(0).toUpperCase()) + '</span><span class="nl2"><span class="nl-fr">' + esc(e.fr || e.ar) + (e.left ? ' <small class="mt-left">· ترك ' + esc(e.left) + '</small>' : '') + '</span><span class="nl-ar">' + esc(e.ar) + (e.phone ? ' · ' + esc(e.phone) : '') + (e.school ? ' · ' + esc(e.school) : '') + '</span></span></a>';
                     }).join('');
+                    if (attMode) res.querySelectorAll('a').forEach(function (a, i) { a.addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); pickEmp(lastEmps[i]); }); });
                 }).catch(function () { res.innerHTML = '<div class="mt-snone">تعذّر البحث</div>'; });
             }, 150);
         });
@@ -927,8 +959,43 @@ window.msaDrawer = (function () {
     }
     function run() {
         var pc = document.getElementById('pageContent'); if (!pc) return;
-        pc.querySelectorAll('.school-checks:not(.emp-type-checks)').forEach(collapsePicker);
+        // 📄 (2026-10-18 «بملف الإفادات الموضوعة بالشريط ما في إفادة عمل للضمان رسمي») منتقي نوع الإفادة لا يُطوى: الـ11 إفادة بالمجموعة الأولى يجب أن تبقى ظاهرة
+        pc.querySelectorAll('.school-checks:not(.emp-type-checks):not(.att-type-checks)').forEach(collapsePicker);
         pc.querySelectorAll('.alert.alert-info, .alert.alert-warning, .fa-law').forEach(collapseNote);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+})();
+
+// ✅ (2026-10-18 «وقت بكون فاتح تقرير وبدي اختار شي، بس افتح أي أسانسور بالخيارات واكبس خيار دغري بياخد الخيار — لازم يكون بقلبو كبسة موافق»)
+//    بوضع عرض المستند (تقرير/إفادة/نموذج): أي قائمة منسدلة كانت تنفّذ الاختيار فوراً (onchange = submit/انتقال) صارت تنتظر كبسة
+//    «موافق» خضرا تظهر جنبها بعد تغيير الاختيار. القوائم التي لا تنفّذ شيئاً فوراً لا تتغيّر. حبوب الشريط العلوي (السنة/العملة) خارج هذا.
+//    «بلكي بدي اختار أكتر من خيار أنا» ⇒ كبسة «موافق» واحدة لكل فورم: يغيّر ما يشاء من قوائمها وخاناتها ثم كبسة واحدة تطبّق الكل معاً.
+//    يشمل كل صفحات البرنامج (التاركون، الكشوف، التقارير…) — داخل محتوى الصفحة فقط؛ حبوب الشريط العلوي كما هي.
+(function () {
+    function mkBtn() {
+        var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn btn-success btn-sm msa-ok no-print'; btn.hidden = true;
+        btn.innerHTML = '<i class="fas fa-check"></i> موافق / OK'; btn.title = 'تطبيق الاختيار / Appliquer le choix';
+        return btn;
+    }
+    var perForm = new Map();
+    function arm(el) {
+        var oc = el.getAttribute('onchange'); if (!oc || !/submit\(|location/.test(oc)) return;
+        el.removeAttribute('onchange'); el.setAttribute('data-oc', oc);
+        if (el.form && /submit\(/.test(oc)) {
+            // قوائم/خانات الفورم نفسه ⇒ كبسة واحدة مشتركة بعد آخر عنصر منها، تطبّق كل الاختيارات معاً
+            var f = el.form, btn = perForm.get(f);
+            if (!btn) { btn = mkBtn(); btn.classList.add('msa-ok-form'); perForm.set(f, btn); btn.addEventListener('click', function (ev) { ev.preventDefault(); if (f.requestSubmit) f.requestSubmit(); else f.submit(); }); }
+            el.insertAdjacentElement('afterend', btn);   // يتنقّل ليجلس بعد آخر عنصر مسلَّح بالفورم
+            el.addEventListener('change', function () { btn.hidden = false; });
+            return;
+        }
+        var b = mkBtn(); el.insertAdjacentElement('afterend', b);
+        el.addEventListener('change', function () { b.hidden = false; });
+        b.addEventListener('click', function (ev) { ev.preventDefault(); try { (new Function('event', el.getAttribute('data-oc'))).call(el, ev); } catch (e) { if (el.form) el.form.submit(); } });
+    }
+    function run() {
+        if (document.querySelector('#pageContent .salary-slip') || /annual_slip\.php/.test(location.pathname)) return;   // 🔒 البطاقة السنوية مجمّدة بأمره («أوعى تخرب البطاقة») — صفحتها كما هي
+        document.querySelectorAll('#pageContent select[onchange], #pageContent input[onchange], #schoolStrip select[onchange]').forEach(arm);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
 })();

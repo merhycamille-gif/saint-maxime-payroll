@@ -422,17 +422,20 @@ if (!$emp):
         if ($nm === '') $nm = trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? ''));
         $end = $mo - 1; $mlist = [];
         for ($i = 0; $i < 7; $i++) { $idx = $end - (6 - $i); $norm = (($idx - 1) % 12 + 12) % 12 + 1; $mlist[] = monthName($norm, 'ar'); }
-        $expBase = BASE_URL . 'pages/official_export.php?form=cnss_work_attestation&emp=' . (int)$employeeId . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr;
+        // 🏛️ (2026-10-18) detail=1 = «إفادة عمل — مرض (مفصّلة)»: القالب الرسمي نفسه + قسم «تقاضى خلال الثلاثة أشهر الأخيرة» معبّأً من الرواتب
+        $detail = !empty($_GET['detail']);
+        $expBase = BASE_URL . 'pages/official_export.php?form=cnss_work_attestation&emp=' . (int)$employeeId . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr . ($detail ? '&detail=1' : '');
     ?>
     <div class="card no-print" style="max-width:760px;margin:0 auto">
         <div class="card-header"><h3>
-          <span dir="ltr"><i class="fas fa-file-medical"></i> Attestation de travail CNSS (officiel) — <?= e($nm) ?></span>
-          <div style="font-size:0.85em;font-weight:600;opacity:0.9">إفادة عمل للضمان (نموذج رسمي)</div>
+          <span dir="ltr"><i class="fas fa-file-medical"></i> Attestation de travail CNSS (officiel<?= $detail ? ' — maladie, détaillée' : '' ?>) — <?= e($nm) ?></span>
+          <div style="font-size:0.85em;font-weight:600;opacity:0.9">إفادة عمل للضمان (نموذج رسمي<?= $detail ? ' — مرض، مفصّلة بالأجور' : '' ?>)</div>
         </h3></div>
         <div class="card-body">
             <form method="GET" class="form-row cols-3" style="align-items:end;margin-bottom:14px">
                 <input type="hidden" name="employee_id" value="<?= (int)$employeeId ?>">
                 <input type="hidden" name="type" value="cnss_travail">
+                <?php if ($detail): ?><input type="hidden" name="detail" value="1"><?php endif; ?>
                 <div class="form-group">
                     <label class="form-label">Date de l'attestation / تاريخ الإفادة (في:)</label>
                     <input type="date" name="date" class="form-control" value="<?= e($effDate) ?>" onchange="this.form.submit()">
@@ -442,6 +445,7 @@ if (!$emp):
             <div class="alert alert-info">
                 الأشهر السبعة المحتسَبة تلقائياً من التاريخ (من الأقدم للأحدث): <strong><?= e(implode(' ، ', $mlist)) ?></strong> — كلّها «دوام كامل».<br>
                 التاريخ تحت الإفادة: <strong><?= $d . ' / ' . $mo . ' / ' . $yr ?></strong>
+                <?php if ($detail): ?><br>قسم «تقاضى خلال الثلاثة أشهر الأخيرة»: يُعبَّأ تلقائياً من رواتب آخر ثلاثة أشهر محسوبة قبل التاريخ (الأجر الخاضع للضمان)؛ تواريخ الانقطاع ومربّعات المرض تُعبَّأ باليد على الورقة.<?php endif; ?>
             </div>
             <?php /* 🏛️ (2026-09-15) مجموعة أزرار وحدة = الشريط العلوي يعمل على إفادة عمل الضمان الرسمية المعبّأة (لا أزرار مكرّرة) */ ?>
             <div style="margin:4px 0 10px;color:#1e40af;font-weight:700"><i class="fas fa-arrow-up"></i> الطباعة وPDF وExcel والإرسال: من الشريط أعلى الصفحة.</div>

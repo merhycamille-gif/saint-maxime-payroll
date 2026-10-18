@@ -496,6 +496,35 @@ class MsaPdf
         return ['dom' => $dom, 'body' => $body, 'dir' => $dir, 'rtl' => $rtl, 'landscape' => (bool)$landscape, 'isLetter' => (bool)$isLetter, 'side' => $side, 'title' => $title, 'lh_file' => $lhFile, 'lh_pad' => $lhPad, 'widest' => (float)($widestMm ?? 0)];
     }
 
+    // ⚡ (2026-10-18 «ليش بس اكبس طباعة بتاخد وقت تتفتح وبعدين اطبع» ⇒ «اوك بدون ما تخرب») كاش الـPDF ببصمة المحتوى:
+    //    نفس HTML المستند + نفس الخيارات + نفس اليوم (التذييل فيه التاريخ) + نفس نسخة المحرّك (تواريخ ملفاته وتوفّر Chromium)
+    //    ⇒ الملف الجاهز نفسه بلا إعادة بناء (أوّل طباعة تبني، والتالية فورية). لا يمسّ الرسم إطلاقاً: أي تغيير بالأرقام = بصمة جديدة.
+    //    الملفات بـtmp/pdfcache؛ تنظيف ما مضى عليه 14 يوماً (عرضياً).
+    public static function cacheDir(): string { $d = realpath(__DIR__ . '/..') . '/tmp/pdfcache'; if (!is_dir($d)) @mkdir($d, 0777, true); return $d; }
+    public static function cacheKey(string $html, array $o): string
+    {
+        $eng = [];
+        foreach (['pdf_engine.php', 'pdf_chromium.php', 'report_helpers.php'] as $f) $eng[] = (string)@filemtime(__DIR__ . '/' . $f);
+        $eng[] = (class_exists('MsaChromePdf') && MsaChromePdf::available($o)) ? 'chrome' : 'mpdf';
+        $eng[] = date('Y-m-d');
+        return sha1($html . '|' . json_encode($o, JSON_UNESCAPED_UNICODE) . '|' . implode(',', $eng) . '|v1');
+    }
+    public static function cacheGet(string $key): ?string
+    {
+        if (!preg_match('/^[a-f0-9]{40}$/', $key)) return null;
+        $f = self::cacheDir() . '/' . $key . '.pdf';
+        if (!is_file($f) || filesize($f) < 400) return null;
+        @touch($f);
+        return (string)file_get_contents($f);
+    }
+    public static function cachePut(string $key, string $data): void
+    {
+        if (!preg_match('/^[a-f0-9]{40}$/', $key) || strlen($data) < 400 || strpos($data, '%PDF') !== 0) return;
+        $d = self::cacheDir();
+        @file_put_contents($d . '/' . $key . '.pdf', $data, LOCK_EX);
+        if (mt_rand(1, 20) === 1) foreach ((array)glob($d . '/*.pdf') as $old) if (@filemtime($old) < time() - 14 * 86400) @unlink($old);
+    }
+
     /** يبني PDF من HTML منطقة المستند المعروضة. $o: title · dir (rtl|ltr) · landscape (bool|null) · school (اسم للتذييل) · letter (bool|null) · fit */
     public static function fromHtml(string $html, array $o = []): string
     {

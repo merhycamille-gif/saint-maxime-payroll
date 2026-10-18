@@ -1011,6 +1011,27 @@ function annualTotalRows(PDO $db, string $schoolYear, string $empFilter, array $
     $st = $db->prepare("SELECT ms.school_id, COUNT(*) cnt, COUNT(DISTINCT ms.employee_id) persons, " . implode(', ', $sel) . $where . " GROUP BY ms.school_id ORDER BY ms.school_id");
     $st->execute(array_merge($empParams, [$schoolYear]));
     $rows = $st->fetchAll();
+    // 🎁 (2026-10-18 قراره «شهر التعويض بيظهر كمجموع بتقارير المصاريف مع خيار») شهر التعويض (13) كما على البطاقة يُضاف إلى
+    //    بعد التدرّج/الإضافي/المكافأة/الصافي/المتوجّب + شهر مدفوع — بلا ضمان ولا ضريبة ولا صندوق. ضمن نطاق الفلاتر نفسها.
+    if (m13InReports()) {
+        require_once __DIR__ . '/annual_slip_data.php';
+        $m13 = thirteenthMonthByEmployee($db, $schoolYear);
+        if ($m13) {
+            $stE = $db->prepare("SELECT DISTINCT ms.employee_id" . $where); $stE->execute(array_merge($empParams, [$schoolYear]));
+            $inScope = array_flip(array_map('intval', $stE->fetchAll(PDO::FETCH_COLUMN)));
+            foreach ($m13 as $eid => $x) {
+                if (!isset($inScope[$eid])) continue;
+                foreach ($rows as $i0 => $r0) {
+                    if ((int)$r0['school_id'] !== $x['school_id']) continue;
+                    $rows[$i0]['cnt'] = (int)$r0['cnt'] + 1;
+                    // كالبطاقة: شهر 13 بلا قفزة درجة ⇒ أساسه = بعد التدرّج (أساس + عادية + استثنائية = بعد التدرّج يبقى صحيحاً)
+                    foreach (['base_sal' => 'bpe', 'bpe' => 'bpe', 'extra_wage' => 'extra', 'aide' => 'aide', 'net' => 'net', 'total' => 'due'] as $rk => $xk) $rows[$i0][$rk] = (int)$r0[$rk] + $x[$xk];
+                    foreach (['bpe_usd_mkt' => 'bpe_usd', 'extra_wage_usd' => 'extra_usd', 'aide_usd' => 'aide_usd', 'net_usd' => 'net_usd', 'total_usd' => 'due_usd'] as $rk => $xk) $rows[$i0][$rk] = (float)$r0[$rk] + $x[$xk];
+                    break;
+                }
+            }
+        }
+    }
     $stP = $db->prepare("SELECT COUNT(DISTINCT ms.employee_id)" . $where); $stP->execute(array_merge($empParams, [$schoolYear]));
     $personsAll = (int)$stP->fetchColumn(); // المجموع الحقيقي: الشخص المنقول بين مدرستين يُعدّ مرّة واحدة
     $gs = annualGradeSplit($db, $schoolYear, $empFilter, $empParams, $empTypeSql, $schoolSql);

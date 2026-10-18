@@ -91,9 +91,18 @@ function isViewer() {
     return isLoggedIn() && ($_SESSION['role'] ?? '') === 'viewer';
 }
 
-/** هل يملك المستخدم صلاحية التعديل؟ (أي دور ما عدا viewer). */
+/** 🖥️🔒 (2026-10-18 «هيك أنا ما بعود بغيّر شي على الكمبيوتر» + «وإذا بدي غيّر على الكمبيوتر لازم كمان يتغيّر أونلاين») نسخة الكمبيوتر (localhost + مزامنة
+ *  من الأونلاين مهيّأة) مرآة للأونلاين: أي تعديل عليها يُمحى بأوّل مزامنة ⇒ قراءة وطباعة فقط، والتعديل أونلاين (كبسة بالهيدر). إلغاؤه: define('LOCAL_EDITS_ALLOWED', true) بـconfig المحلي. */
+function pcReadOnly(): bool {
+    // 🔁 (2026-10-18 لاحقاً: «لنفترض ما في إنترنت واضطريت اشتغل على الكمبيوتر… يبقى كل شي نفس الشي بالمكانين») المزامنة صارت باتّجاهين
+    //    (localSyncCycle) فالتعديل على الكمبيوتر مسموح ويُرفع تلقائياً — القراءة-فقط تُفعَّل يدوياً فقط بـdefine('LOCAL_READ_ONLY', true).
+    if (php_sapi_name() === 'cli' || !defined('ONLINE_SYNC_URL') || !defined('LOCAL_READ_ONLY') || !LOCAL_READ_ONLY) return false;
+    $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+    return $host !== '' && (strpos($host, 'localhost') !== false || strpos($host, '127.0.0.1') !== false);
+}
+/** هل يملك المستخدم صلاحية التعديل؟ (أي دور ما عدا viewer — وعلى نسخة الكمبيوتر لا أحد: التعديل أونلاين). */
 function canEdit() {
-    return isLoggedIn() && !isViewer();
+    return isLoggedIn() && !isViewer() && !pcReadOnly();
 }
 
 /**
@@ -131,6 +140,7 @@ function viewerBaseScripts() {
         'switch_currency.php', 'switch_salarycomp.php', 'ajax_search.php',
         'switch_rateline.php', // 💱 (2026-10-17) إظهار/إخفاء سطر سعر الصرف بالعناوين — عرض فقط
         'switch_totals.php',   // ➕ (2026-10-17) عمود مجموع السطر / مجموع كل فئة — عرض فقط
+        'switch_m13.php',      // 🎁 (2026-10-18) شهر التعويض بتقارير المصاريف: مشمول/غير مشمول — عرض فقط
     ];
 }
 
@@ -5643,6 +5653,9 @@ function exportToolbar($title = 'document', $opts = []) {
         <a class="btn btn-sm btn-light" id="msaRowSumBtn" href="<?= BASE_URL ?>switch_totals.php?rowsum=<?= totalsRowSum() ? '0' : '1' ?>" title="خانة بآخر كل سطر فيها مجموع أرقام السطر (الليرة والدولار كلٌّ على حدة)"><i class="fas fa-<?= totalsRowSum() ? 'square-check' : 'square' ?>"></i> Total par ligne / مجموع كل سطر</a>
         <a class="btn btn-sm btn-light" id="msaColSumBtn" href="<?= BASE_URL ?>switch_totals.php?cols=<?= totalsCols() ? '0' : '1' ?>" title="مجموع كل عمود أرقام بسطور المجاميع (الفئة والعامّ)، ويُضاف سطر مجموع عامّ حيث لا يوجد"><i class="fas fa-<?= totalsCols() ? 'square-check' : 'square' ?>"></i> Totaux par colonne / مجموع كل عمود</a>
         <a class="btn btn-sm btn-light" id="msaGrpSumBtn" href="<?= BASE_URL ?>switch_totals.php?group=<?= totalsGroup() ? '0' : '1' ?>" title="سطر مجموع تحت كل فئة (الملاك/المتعاقدين/الموظفين) قبل المجموع العام"><i class="fas fa-<?= totalsGroup() ? 'square-check' : 'square' ?>"></i> Sous-total par catégorie / مجموع كل فئة</a>
+        <?php if (!empty($GLOBALS['msa_m13_opt'])): // 🎁 (2026-10-18) تقارير المصاريف السنوية فقط: شهر التعويض (13) مشمول أو لا — بلا ضرائب ولا ضمان ولا صندوق ?>
+        <a class="btn btn-sm <?= m13InReports() ? 'btn-success' : 'btn-light' ?>" id="msaM13Btn" href="<?= BASE_URL ?>switch_m13.php?on=<?= m13InReports() ? '0' : '1' ?>" title="شهر التعويض (13) كما على البطاقة السنوية: يُضاف إلى الرواتب والصافي والمتوجّب كمبلغ بلا محسومات — لا يدخل أبداً بتقارير الضمان والمالية وصندوق التعويضات"><i class="fas fa-<?= m13InReports() ? 'square-check' : 'square' ?>"></i> 13e mois (indemnité) / شهر التعويض (13): <?= m13InReports() ? 'مشمول' : 'غير مشمول' ?></a>
+        <?php endif; ?>
         <?php if ((($GLOBALS['currentPage'] ?? '') !== 'annual')): ?>
             <span class="rl-sides"><button type="button" class="rl-side" data-rs="rtl" title="الأعمدة من اليمين / Colonnes depuis la droite">⇤ من اليمين</button><button type="button" class="rl-side" data-rs="ltr" title="Colonnes depuis la gauche / الأعمدة من الشمال">De gauche ⇥</button></span>
         <?php endif; ?>
@@ -6168,6 +6181,9 @@ function rateLineHidden(): bool { return !empty($_SESSION['hide_rate_line']); }
 function totalsRowSum(): bool { return !empty($_SESSION['totals_rowsum']); }
 function totalsGroup(): bool { return !isset($_SESSION['totals_group']) || !empty($_SESSION['totals_group']); }
 function totalsCols(): bool { return !isset($_SESSION['totals_cols']) || !empty($_SESSION['totals_cols']); }   // 🧮 مجاميع كل الأعمدة (افتراضياً ظاهرة)   // افتراضياً ظاهر (مجاميع الفئات كانت موجودة بالتقارير)
+/** 🎁 (2026-10-18 قراره: «شهر التعويض ما بيدخل بتصاريح الضمان والمالية وصندوق التعويضات أبداً؛ بيضلّ بالبطاقة؛ وبتقارير المصاريف بيظهر كمجموع بلا ضرائب مع خيار»)
+ *  خيار بالجلسة (switch_m13.php، أو m13=0|1 بالرابط) يسري على تقارير المصاريف السنوية فقط: المجاميع السنوية، كلفة المؤسسة، التقرير العام. الافتراضي: مشمول. */
+function m13InReports(): bool { if (isset($_GET['m13'])) return $_GET['m13'] === '1'; return !isset($_SESSION['m13_reports']) || !empty($_SESSION['m13_reports']); }
 function rateTitleText($month = null, $year = null, bool $annual = false, ?float $rate = null, bool $law = true): string {
     if (rateLineHidden()) return '';   // 💱 المستخدم اختار إخفاء السطر بكل المستندات (تقارير/إفادات/بطاقات/PDF/إكسل)
     // 🏷️ (2026-09-23 «طلّعت البطاقة السنوية ما ظهر بالعناوين قدّيش قيمة الدولار») السطر يظهر بكل أوضاع العملة — حتى بوضع «ليرة فقط»

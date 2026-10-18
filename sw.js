@@ -1,7 +1,7 @@
 // عامل الخدمة (PWA): وجوده يجعل البرنامج قابلاً للتركيب كتطبيق على الهاتف.
 // لا يخزّن أي صفحة فيها بيانات — كل الصفحات من السيرفر مباشرة (السرعة والصحّة كما هي).
 // يخزّن ملفات الشكل الثابتة فقط (خطوط/أيقونات/CSS) ويعرض «لا اتصال» عند انقطاع الإنترنت.
-const CACHE = 'msa-payroll-v1';
+const CACHE = 'msa-payroll-v2'; // v2 (2026-10-18): أيقونة التطبيق الجديدة (شعار رواتب الأساتذة)
 const BASE = new URL('./', self.location.href).pathname;
 const OFFLINE = BASE + 'hors-ligne.html';
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll([OFFLINE])).then(() => self.skipWaiting())); });

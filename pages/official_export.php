@@ -1352,12 +1352,29 @@ if ($form === 'cnss_work_attestation') {
         $cells['B' . (10 + $i)] = monthName($norm, 'ar');
         $cells['E' . (10 + $i)] = 'دوام كامل';
     }
+    // 🏛️ (2026-10-18 «إفادة عمل الضمان في نموذج رسمي — حاطط غير شي») detail=1 = النسخة المفصّلة (مرض): قسم
+    //    «وان هذا الاجير قد تقاضى خلال الثلاثة اشهر الاخيرة مبلغا قدره … مفصلا كما يلي: شهر … الاجر المدفوع … ل.ل»
+    //    يُعبَّأ من آخر ثلاثة أشهر محسوبة قبل تاريخ الإفادة بالأجر الخاضع للضمان (cnssSubjectWageLbp — كالنسخة HTML القديمة).
+    //    الخلايا: N18 المجموع، F19..F21 الشهر، M19..M21 الأجر (الصفّ الرابع يبقى فارغاً كالنموذج).
+    $detail = !empty($_GET['detail']); $last3 = [];
+    if ($detail) {
+        $q3 = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND is_calculated = 1 AND (year * 100 + month) < ? ORDER BY year DESC, month DESC LIMIT 3");
+        $q3->execute([$empId, $yr * 100 + $mo]);
+        $last3 = array_reverse($q3->fetchAll());   // الأقدم → الأحدث
+        $sum3 = 0;
+        foreach ($last3 as $i => $p) {
+            $w = (int)cnssSubjectWageLbp($p, $emp); $sum3 += $w;
+            $cells['F' . (19 + $i)] = monthName((int)$p['month'], 'ar') . ' ' . $p['year'];
+            $cells['M' . (19 + $i)] = formatLBP($w, false);
+        }
+        if ($last3) $cells['N18'] = formatLBP($sum3, false);
+    }
 
     // ✅ الأساس: نعبّئ قالب الإكسل الرسمي نفسه ونبثّه (PDF افتراضياً | Excel عند الطلب). هذه أدقّ محاذاة
     //    على الإطلاق لأنّها القالب الأصلي بالضبط، والـPDF ينزّل محفوظاً على الكمبيوتر جاهزاً للطباعة.
     //    يعمل حيث تتوفّر أدوات القالب (كمبيوتر المستخدم: Python+openpyxl + LibreOffice)؛ وإن تعذّرت (أونلاين
     //    بلا هذه الأدوات) يرجع false فنسقط تلقائياً للعرض المصوّر أدناه الذي يعمل في كل مكان.
-    $tplName = 'Ifadat_Damane_' . $empId . '_' . $d . '-' . $mo . '-' . $yr;
+    $tplName = 'Ifadat_Damane_' . ($detail ? 'Marad_' : '') . $empId . '_' . $d . '-' . $mo . '-' . $yr;
     // mode=image يفرض النسخة المصوّرة (للفحص/المقارنة)؛ غير ذلك نجرّب قالب الإكسل أولاً.
     if (($_GET['mode'] ?? '') !== 'image'
         && officialTemplateExport(__DIR__ . '/../assets/templates/cnss_work_attestation.xlsx', $cells, $format, $tplName)) {
@@ -1388,6 +1405,13 @@ if ($form === 'cnss_work_attestation') {
         $F .= $fld('c', 62, $rowY[$i], 15, $cells['E' . (10 + $i)]);
     }
     $F .= $fld('c', 27, 92.8, 6, $d) . $fld('c', 19, 92.8, 6, $mo) . $fld('c', 9, 92.8, 9, $yr); // التاريخ
+    if ($detail && $last3) {   // 🏛️ قسم الأجور الثلاثة الأخيرة (إحداثيات مقيسة على صورة القالب: سطر «قدره» 63.6٪ ثم أسطر 66.0/68.3/70.6٪)
+        $F .= $fld('r', 12, 62.8, 38.5, $cells['N18'] ?? '');
+        $wY = [65.2, 67.5, 69.8];
+        for ($i = 0; $i < count($last3) && $i < 3; $i++) {
+            $F .= $fld('c', 60, $wY[$i], 16, $cells['F' . (19 + $i)] ?? '') . $fld('r', 13.5, $wY[$i], 35, $cells['M' . (19 + $i)] ?? '');
+        }
+    }
     // كشف Chrome/Edge (منصّب على كمبيوتر المستخدم؛ غالباً غير متوفّر على الاستضافة أونلاين) — لتوليد PDF بكبسة.
     $chromeBin = null;
     foreach ([

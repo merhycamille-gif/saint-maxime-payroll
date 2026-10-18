@@ -148,13 +148,14 @@ check('إضافي فقط: عمود الإضافي ظاهر والمكافأة م
  *    ورواتب بسنين لاحقة — لازم النموذج يعرض قيمة سنته لا صفر السنين الجاي.
  * =================================================================== */
 $sy = currentSchoolYear();
-$probe = $db->query("SELECT ms.employee_id, MAX(ms.extra_lbp + ms.prime_fixe_lbp) mx
+// 🏦📅 (2026-10-18) البيان العام صار يعتمد راتب تشرين الأول من السنة المعروضة (ofOctoberSalary) ⇒ القيمة المتوقّعة = إضافي ذلك الشهر
+$y1p = (int)schoolYearToYears($sy)[0];
+$probe = $db->query("SELECT ms.employee_id, (ms.extra_lbp + ms.prime_fixe_lbp) mx
     FROM monthly_salaries ms
     JOIN employees e ON e.id = ms.employee_id AND e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire'
-    WHERE ms.school_year = '$sy' AND ms.is_calculated = 1
-    GROUP BY ms.employee_id
-    HAVING mx > 0
-       AND EXISTS (SELECT 1 FROM monthly_salaries m2 WHERE m2.employee_id = ms.employee_id
+    WHERE ms.school_year = '$sy' AND ms.is_calculated = 1 AND ms.year = $y1p AND ms.month = 10
+      AND (ms.extra_lbp + ms.prime_fixe_lbp) > 0
+      AND EXISTS (SELECT 1 FROM monthly_salaries m2 WHERE m2.employee_id = ms.employee_id
                    AND m2.school_year > '$sy' AND m2.is_calculated = 1 AND (m2.extra_lbp + m2.prime_fixe_lbp) = 0)
     LIMIT 1")->fetch();
 if ($probe) {
@@ -698,8 +699,11 @@ if ($regEid) {
     // 🎓 (2026-08-27) تقرير «الداخلون في الملاك بتاريخ» (طلب المستخدم — الافتراضي 1/10/2023):
     // بطاقته بمركز التقارير + الصفحة تُعرض بالقالب الموحّد مع فلتر التاريخ ومنتقي المدارس
     $hTit27 = renderPage('pages/reports.php', ['report' => 'titularized', 'tdate' => '2023-10-01'], []);
-    check('تقرير الداخلين في الملاك: البطاقة بالمركز + الصفحة تعمل بفلتر التاريخ',
-          strpos($repSrc25, "'fr'=>'Entrés au cadre (par date)'") !== false
+    // 📅 (2026-10-18 «لازم يكون في تقرير الأساتذة والموظفين اللي دخلوا إلى المدرسة 1-10 من نفس السنة») الافتراضي = 1/10 من السنة المعروضة
+    $hTitDef = renderPage('pages/reports.php', ['report' => 'titularized', 'tmode' => 'hire'], [], [], '', '2026-2027');
+    check('تقرير الداخلين في الملاك: البطاقة بالمركز + الصفحة تعمل بفلتر التاريخ + الافتراضي 1/10 من السنة المعروضة (2026-2027 ⇒ 01/10/2026)',
+          strpos($repSrc25, "'fr'=>'Entrés au cadre le 1/10 (année affichée, date modifiable)'") !== false
+          && strpos($hTitDef, 'الداخلون إلى المدرسة بتاريخ 01/10/2026') !== false && strpos($hTitDef, 'value="2026-10-01"') !== false
           && strpos($hTit27, 'الداخلون في الملاك بتاريخ') !== false
           && strpos($hTit27, 'name="tdate"') !== false);
     // 🏫 (2026-09-04) «مين داخل على المدرسة بتاريخ/بسنة لكل مدرسة»: وضع الدخول إلى المدرسة (hire_date، كل الفئات) + مدى «كل السنة الدراسية»
@@ -709,7 +713,7 @@ if ($regEid) {
     $stH04 = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.is_deleted = 0 AND e.hire_date BETWEEN '2023-10-01' AND '2024-09-30'" . $yfH04); $stH04->execute($ypH04);
     $nHire04 = (int)$stH04->fetchColumn();
     check('تقرير الداخلين إلى المدرسة: بطاقة بالمركز + وضع hire (كل الفئات) + مدى السنة الدراسية 1/10→30/9 + العدد = استعلام مباشر',
-          strpos($repSrc25, "'fr'=>\"Entrés à l'école (par date)\"") !== false
+          strpos($repSrc25, "'fr'=>\"Entrés à l'école le 1/10 (année affichée, date modifiable)\"") !== false
           && strpos($hHire04, 'الداخلون إلى المدرسة خلال السنة الدراسية 2023-2024') !== false
           && strpos($hHire04, 'name="tmode"') !== false && strpos($hHire04, 'name="tspan"') !== false
           && strpos($hHire04, 'العدد: ' . $nHire04) !== false,
@@ -2561,9 +2565,13 @@ check('مصدر واحد (تجربة فعلية): نفس الإفادة على �
       strlen($h39b) . ' حرف');
 // تجربة فعلية: إفادة عمل الضمان لمارسيلا — رغم وجود أشهر مخزّنة حتى أيلول 2027،
 // الأشهر المعروضة فعلية ماضية فقط (لا أشهر 2027 المستقبلية؛ منتقي السنة بالفورم خارج الفحص)
-$h39c = renderPage('pages/official_forms.php', ['form' => 'cnss_work_detail', 'employee_id' => 1677], [], [2]);
-check('مصدر واحد (تجربة فعلية): إفادة عمل الضمان بلا أشهر مستقبلية (آب 2026 ظاهر، أشهر 2027 غائبة)',
-      strpos($h39c, 'آب 2026') !== false
+// 🏛️ (2026-10-18) المفصّلة صارت القالب الرسمي نفسه (official_forms ⇒ attestations cnss_travail&detail=1 ⇒ official_export detail=1):
+//    قسم الأجور = آخر 3 أشهر محسوبة قبل تاريخ الإفادة (اليوم) ⇒ «آب 2026» ظاهر وأشهر 2027 غائبة
+$h39c = renderPage('pages/official_export.php', ['form' => 'cnss_work_attestation', 'emp' => 1677, 'detail' => 1, 'mode' => 'image', 'd' => 18, 'mo' => 10, 'yr' => 2026], [], [2]);
+$src39c = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+check('مصدر واحد (تجربة فعلية): إفادة عمل الضمان المفصّلة = القالب الرسمي بلا أشهر مستقبلية (آب 2026 ظاهر، أشهر 2027 غائبة) + التحويل من official_forms',
+      strpos($src39c, "'cnss_work_detail' => 'cnss_travail'") !== false && strpos($h39c, 'cnss_work_attestation.png') !== false
+      && strpos($h39c, 'آب 2026') !== false
       && strpos($h39c, 'أيلول 2027') === false && strpos($h39c, 'أيار 2027') === false
       && strpos($h39c, 'نيسان 2027') === false,
       strlen($h39c) . ' حرف');
@@ -10030,6 +10038,328 @@ try {
 check('🩺 أرقام الضمان من لائحة الراهبات: 62 بنداً طُبّقت بلا تخطّي (nssf_number فقط + نسخة احتياطية) + عيّنتان صحيحتان',
       $ok252 && strpos($fn252, 'function healNssfFromSistersList20261013()') !== false && strpos($fn252, "if (\$norm(\$cur) !== \$norm(\$old)) { \$skip[] = \"\$id:changed[\$cur]\"; continue; }") !== false
       && strpos($hd252, 'healNssfFromSistersList20261013();') !== false, $why252);
+
+/**
+ * 253) 📄 (2026-10-18 «انتبه كل الإفادات الموجودة عند ملف الأستاذ لازم تكون هي ذاتها بملف الإفادات الموجودة دغري بالشريط»)
+ *      مصدر واحد (attestation_types.php) ⇒ أنواع الإفادات بملف الأستاذ الكامل = أنواعها بباب «الإفادات» بالشريط العلوي = خانات صفحة الإفادات، كلّها بلا نقص.
+ *      + منتقي نوع الإفادة لا يُطوى (app.js يستثني .att-type-checks) كي تبقى الـ11 إفادة الأولى ظاهرة («ما في إفادة عمل للضمان رسمي»).
+ */
+$ok253 = false; $why253 = '';
+try {
+    require_once $PROJ . '/includes/attestation_types.php';
+    $keys253 = array_keys(attestationTypes());
+    $grp253 = []; foreach (attestationGroups() as $g) foreach ($g as $k) $grp253[] = $k;
+    $pick253 = function (string $html, string $re): array { preg_match_all($re, $html, $m); return array_values(array_unique($m[1])); };
+    $hDos = renderPage('pages/attestations.php', ['dossier' => 1, 'employee_id' => 1677], [], [2]);
+    $dos253 = $pick253($hDos, '~attestations\.php\?[^"\']*type=([a-z_0-9]+)~');
+    $hPg = renderPage('pages/attestations.php', [], [], [2]);
+    preg_match('~<nav class="msa-tabs[^"]*".*?</nav>~s', $hPg, $mNav); $nav253 = $pick253($mNav[0] ?? '', '~attestations\.php\?type=([a-z_0-9]+)~');
+    preg_match('~<div class="att-type-pick.*?</form>~s', $hPg, $mPick); $page253 = $pick253($mPick[0] ?? '', '~value="([a-z_0-9]+)"~');
+    $same = function (array $a, array $b): bool { $a = array_unique($a); $b = array_unique($b); sort($a); sort($b); return $a === $b; };
+    $ok253 = $keys253 && $same($keys253, $grp253) && $same($keys253, $dos253) && $same($keys253, $nav253) && !array_diff($keys253, $page253)
+          && strpos((string)file_get_contents($PROJ . '/assets/js/app.js'), ".school-checks:not(.emp-type-checks):not(.att-type-checks)") !== false;
+    $why253 = 'types=' . count($keys253) . ' groups=' . count(array_unique($grp253)) . ' dossier=' . count($dos253) . ' door=' . count($nav253) . ' page=' . count(array_intersect($keys253, $page253))
+            . ($same($keys253, $dos253) ? '' : ' dossier≠' . implode(',', array_merge(array_diff($keys253, $dos253), array_diff($dos253, $keys253))))
+            . ($same($keys253, $nav253) ? '' : ' door≠' . implode(',', array_merge(array_diff($keys253, $nav253), array_diff($nav253, $keys253))));
+} catch (Throwable $e) { $why253 = $e->getMessage(); }
+check('📄 الإفادات: ملف الأستاذ الكامل = باب «الإفادات» بالشريط = خانات صفحة الإفادات (مصدر واحد، بلا نقص) + منتقي النوع لا يُطوى', $ok253, $why253);
+
+/**
+ * 254) 🚪📅 (2026-10-18 «وملف اللي تركوا بنفس السنة») التاركون: الافتراضي = السنة الدراسية المعروضة (لا سنة البرنامج الثابتة)
+ *      + بطاقة بمركز التقارير (بطاقات وموظفين) ⇒ تظهر بباب «التقارير» بالشريط.
+ */
+$ok254 = false; $why254 = '';
+try {
+    $hL25 = renderPage('pages/left_teachers.php', [], [], [], '', '2025-2026');
+    $hL26 = renderPage('pages/left_teachers.php', [], [], [], '', '2026-2027');
+    $src254 = (string)file_get_contents($PROJ . '/includes/report_center.php');
+    // 📅 (2026-10-18 «بدي التاركين يبيّنوا تركهن بالسنة الميلادية — أنا بختار») ym=civil ⇒ الافتراضي السنة الميلادية الحالية، والعدد = استعلام مباشر على تاريخ الترك الأساسي
+    $cy254 = date('Y');
+    $hLc = renderPage('pages/left_teachers.php', ['ym' => 'civil'], [], [], '', '2026-2027');
+    $nC254 = 0; $seen254 = [];
+    foreach ($db->query("SELECT id, school_id, first_name_ar, father_name_ar, last_name_ar, left_date_all, left_date_cnss, left_date_finance, left_date_eoc FROM employees WHERE is_deleted = 0 AND (left_date_all IS NOT NULL OR left_date_cnss IS NOT NULL OR left_date_finance IS NOT NULL OR left_date_eoc IS NOT NULL)") as $r254) {
+        $all254 = leftDateOf($r254); $ds254 = array_filter([$r254['left_date_cnss'], $r254['left_date_finance'], $r254['left_date_eoc']], fn($d) => !empty($d) && $d !== '0000-00-00');
+        $ts254 = $all254 !== null ? strtotime($all254) : ($ds254 ? min(array_map('strtotime', $ds254)) : 0);
+        if ($ts254 && date('Y', $ts254) === $cy254) $nC254++;
+    }
+    $ok254 = strpos($hL25, '<option value="2025-2026" selected>') !== false && strpos($hL25, 'التاركون في 2025-2026') !== false
+          && strpos($hL26, '<option value="2026-2027" selected>') !== false && strpos($hL26, 'التاركون في 2026-2027') !== false
+          && strpos($src254, "left_teachers.php', 'icon'=>'fa-user-slash'") !== false
+          && strpos($hLc, 'name="ym" value="civil" checked') !== false && strpos($hLc, '<option value="' . $cy254 . '" selected>') !== false
+          && preg_match('~التاركون في ' . $cy254 . ' \((\d+)\)~u', $hLc, $mC254) === 1 && (int)$mC254[1] <= $nC254 && (int)$mC254[1] >= $nC254 - 5;   // ≤ لأن المكرّر بنفس المدرسة يُخفى
+    $why254 = 'sel25=' . (int)(strpos($hL25, '<option value="2025-2026" selected>') !== false) . ' sel26=' . (int)(strpos($hL26, '<option value="2026-2027" selected>') !== false)
+            . ' civil=' . ($mC254[1] ?? '?') . '/' . $nC254;
+} catch (Throwable $e) { $why254 = $e->getMessage(); }
+check('🚪📅 التاركون: الافتراضي = السنة المعروضة (2025-2026 ⇒ 2025-2026، 2026-2027 ⇒ 2026-2027) + بطاقة «التاركون خلال السنة المعروضة» بمركز التقارير', $ok254, $why254);
+
+/**
+ * 255) 🚪📅 (2026-10-18 «بدي يكون في باب لهالتقرير») باب «الداخلون والتاركون» بالشريط العلوي: 5 روابط (داخلو المدرسة بـ1/10 · الملاك · الجدد · التاركون · بلوغ الـ64)
+ */
+$ok255 = false; $why255 = '';
+try {
+    $hNav255 = renderPage('pages/reports.php', [], [], [2]);
+    preg_match('~<nav class="msa-tabs[^"]*".*?</nav>~s', $hNav255, $mN255); $nav255 = $mN255[0] ?? '';
+    $need255 = ['الداخلون والتاركون', 'report=titularized&amp;tmode=hire', 'report=titularized"', 'report=new_teachers', 'left_teachers.php', 'retirement_64.php'];
+    $miss255 = array_values(array_filter($need255, fn($s) => strpos($nav255, $s) === false));
+    $ok255 = $nav255 !== '' && !$miss255;
+    $why255 = $miss255 ? 'missing=' . implode(',', $miss255) : 'ok';
+} catch (Throwable $e) { $why255 = $e->getMessage(); }
+check('🚪📅 باب «الداخلون والتاركون» بالشريط العلوي: داخلو المدرسة بـ1/10 + الملاك + الجدد + التاركون + بلوغ الـ64', $ok255, $why255);
+
+/**
+ * 256) 📅 (2026-10-18 «أي تقرير أو ملف أو إفادة بفتحو يكون دايماً السنين المدرسية مبيّنة فوق… تضلّ ظاهرة وين ما فتحت بالبرنامج»)
+ *      شريط السنين الدائم (#yearStrip) بالصفحات العادية وبصفحات المستندات (إفادة بموظف = docFocus)، السنة الفعّالة active، الروابط switch_year?school_year=&back=الصفحة نفسها،
+ *      وswitch_year يقبل back داخلياً. لا يُطبَع (no-print).
+ */
+$ok256 = false; $why256 = '';
+try {
+    $hY1 = renderPage('pages/reports.php', ['report' => 'titularized'], [], [2], '', '2025-2026');
+    $hY2 = renderPage('pages/attestations.php', ['employee_id' => 1677, 'type' => 'salaire'], [], [2], '', '2024-2025');
+    // «هي كانت موجودة فوق… بس كانت تحرك… شيل الجديد وظبط اللي كانت واعملها غير لون» ⇒ القائمة القديمة نفسها (form#yearSwitcher بالشريط العلوي):
+    //   موجودة بكل صفحة وبالمستندات (كانت مخفية بـbody.doc-view)، المختارة selected، back=الصفحة نفسها، لون مميّز (year-switcher)، الشريط العلوي sticky
+    $c256 = function (string $h, string $sy): array {
+        preg_match('~<form method="get" action="[^"]*switch_year\.php" class="school-switcher year-switcher" id="yearSwitcher".*?</form>~s', $h, $m); $s = $m[0] ?? '';
+        $beforeTabs = ($p = strpos($h, 'id="yearSwitcher"')) !== false && (($q = strpos($h, 'id="msaTabs"')) === false || $p < $q);
+        return [$s !== '' && strpos($s, 'fa-calendar-alt') !== false && $beforeTabs && strpos($s, 'name="back"') !== false,
+                preg_match('~<option value="' . preg_quote($sy, '~') . '" selected>~', $s) === 1,
+                substr_count($s, '<option value="'), strpos($s, '<option value="all"') !== false];
+    };
+    [$a1, $b1, $n1, $all1] = $c256($hY1, '2025-2026'); [$a2, $b2, $n2, $all2] = $c256($hY2, '2024-2025');
+    $sw256 = (string)file_get_contents($PROJ . '/switch_year.php');
+    $hY3 = renderPage('pages/official_forms.php', ['form' => 'cnss_annual', 'fy' => 2025], [], [2], '', '2025-2026');   // صفحة مستند (docFocus) بلا الشريط العلوي
+    [$a3, $b3, $n3, $all3] = $c256($hY3, '2025-2026');
+    $css256 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+    $ok256 = $a1 && $b1 && $n1 >= 20 && $all1 && $a2 && $b2 && $n2 >= 20 && $all2 && $a3 && $b3 && strpos($hY3, 'doc-view') !== false
+          && strpos($sw256, "\$_GET['back']") !== false
+          && strpos($css256, 'body.doc-view form[action*="switch_year"]') === false            // لم تعد مخفية بالمستندات
+          && strpos($css256, '.topbar { position: sticky !important; top: 0;') !== false         // الشريط العلوي ثابت
+          && strpos($css256, '.school-switcher.year-switcher { background: linear-gradient(180deg, #2b4f7e') !== false   // لون مميّز (كحلي/ذهبي — «غيرلي هالّلون الأحمر»)
+          && strpos($h, 'id="yearStrip"') === false && strpos($css256, '.year-bar {') === false;   // الشريط الجديد انشال
+    $h = '';
+    $why256 = "reports: strip=$a1 active=$b1 chips=$n1 all=$all1 · attestation(doc): strip=$a2 active=$b2 chips=$n2 all=$all2";
+} catch (Throwable $e) { $why256 = $e->getMessage(); }
+check('📅 قائمة السنة القديمة بالشريط العلوي: ظاهرة بكل صفحة وبكل مستند (كانت مخفية بالمستندات) + المختارة selected + back=الصفحة نفسها + لون مميّز + الشريط العلوي ثابت + لا شريط جديد', $ok256, $why256);
+
+/**
+ * 257) 🏫☑️ (2026-10-18 «بكل الصفحات لازم يكون خيار المدارس موجود وحدّها تشاك مارك ممكن أختار عدّة مدارس»)
+ *      منتقي المدارس بالتشييك (#schoolPicker) ظاهر بالمستندات أيضاً (كان مخفياً بـbody.doc-view) + «تطبيق» يحمل back = الصفحة نفسها بلا وسائط المدارس/الموظف.
+ */
+$ok257 = false; $why257 = '';
+try {
+    $hP1 = renderPage('pages/official_forms.php', ['form' => 'cnss_annual', 'fy' => 2025, 'schools' => [2]], [], [2]);
+    $hP2 = renderPage('pages/attestations.php', ['employee_id' => 1677, 'type' => 'salaire'], [], [2]);
+    $css257 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+    $pick = function (string $h): array { preg_match('~<div class="school-switcher school-multi" id="schoolPicker">.*?</form>~s', $h, $m); $s = $m[0] ?? ''; preg_match('~<input type="hidden" name="back" value="([^"]*)">~', $s, $b); return [$s !== '', substr_count($s, 'name="schools[]"'), html_entity_decode($b[1] ?? '')]; };
+    [$p1, $n1, $b1] = $pick($hP1); [$p2, $n2, $b2] = $pick($hP2);
+    $ok257 = $p1 && $n1 >= 3 && strpos($hP1, 'doc-view') !== false && strpos($b1, 'form=cnss_annual') !== false && strpos($b1, 'schools') === false
+          && $p2 && $n2 >= 3 && strpos($b2, 'employee_id') === false && strpos($b2, 'type=salaire') !== false
+          && strpos($css257, 'body.doc-view #schoolPicker { display: inline-flex !important; }') !== false && strpos($css257, "body.doc-view #schoolPicker,\n") === false;
+    $why257 = "doc: picker=$p1 boxes=$n1 back=$b1 · attestation: picker=$p2 boxes=$n2 back=$b2";
+} catch (Throwable $e) { $why257 = $e->getMessage(); }
+check('🏫☑️ منتقي المدارس بالتشييك (عدّة مدارس) ظاهر بكل الصفحات وبالمستندات + «تطبيق» يرجع لنفس المستند بلا وسائط المدارس/الموظف', $ok257, $why257);
+
+/**
+ * 258) ⚡⏳ (2026-10-18 «ليش بس اكبس طباعة بتاخد وقت تتفتح» ⇒ «اوك بدون ما تخرب») كاش الـPDF ببصمة المحتوى + مؤشّر التحضير:
+ *      MsaPdf::cacheKey/cacheGet/cachePut (نفس HTML + الخيارات + اليوم + نسخة المحرّك ⇒ نفس المفتاح؛ أي تغيير = مفتاح آخر؛ لا يقبل غير PDF)
+ *      + html_export.php يمرّ بالكاش قبل البناء ويعلن hit/miss + export.js يعرض msaPdfWait طول التحضير.
+ */
+$ok258 = false; $why258 = '';
+try {
+    require_once $PROJ . '/includes/pdf_engine.php';
+    $o258 = ['title' => 'reg', 'dir' => 'rtl', 'landscape' => null, 'school' => 's', 'fit' => true, 'lh_bg' => '', 'lh_pad' => ''];
+    $k1 = MsaPdf::cacheKey('<table><tr><td>1</td></tr></table>', $o258); $k1b = MsaPdf::cacheKey('<table><tr><td>1</td></tr></table>', $o258);
+    $k2 = MsaPdf::cacheKey('<table><tr><td>2</td></tr></table>', $o258); $k3 = MsaPdf::cacheKey('<table><tr><td>1</td></tr></table>', ['fit' => false] + $o258);
+    $fake = '%PDF-1.4 regression ' . str_repeat('x', 500);
+    MsaPdf::cachePut($k1, $fake); $got = MsaPdf::cacheGet($k1);
+    MsaPdf::cachePut($k2, 'not a pdf ' . str_repeat('y', 500)); $gotBad = MsaPdf::cacheGet($k2);
+    @unlink(MsaPdf::cacheDir() . '/' . $k1 . '.pdf');
+    $he258 = (string)file_get_contents($PROJ . '/pages/html_export.php'); $ex258 = (string)file_get_contents($PROJ . '/assets/js/export.js');
+    $ok258 = $k1 === $k1b && $k1 !== $k2 && $k1 !== $k3 && $got === $fake && $gotBad === null && MsaPdf::cacheGet('zz') === null
+          && strpos($he258, '$ck = MsaPdf::cacheKey($html, $pdfOpts);') !== false && strpos($he258, "if (!\$cacheHit) { \$data = MsaPdf::fromHtml(\$html, \$pdfOpts); MsaPdf::cachePut(\$ck, \$data); }") !== false
+          && strpos($he258, "header('X-Msa-Pdf-Cache: '") !== false
+          && strpos($ex258, 'window.msaPdfWait = function (on, txt)') !== false && strpos($ex258, "window.msaPdfWait(true, opts.inline ?") !== false && strpos($ex258, 'window.msaPdfWait(false); throw e;') !== false
+          && strpos((string)file_get_contents($PROJ . '/assets/css/app.css'), '#msaPdfWait { position: fixed; inset: 0;') !== false;
+    $why258 = 'same=' . (int)($k1 === $k1b) . ' diffData=' . (int)($k1 !== $k2) . ' diffOpt=' . (int)($k1 !== $k3) . ' get=' . (int)($got === $fake) . ' rejectNonPdf=' . (int)($gotBad === null);
+} catch (Throwable $e) { $why258 = $e->getMessage(); }
+check('⚡⏳ كاش الـPDF ببصمة المحتوى (نفس المستند = فوري، أي تغيير = بناء جديد، يرفض غير PDF) + html_export يمرّ به + مؤشّر التحضير msaPdfWait', $ok258, $why258);
+
+/**
+ * 259) ✅ (2026-10-18 «أي أسانسور بالخيارات واكبس خيار دغري بياخد الخيار — لازم يكون بقلبو كبسة موافق» + «بلكي بدي اختار أكتر من خيار»)
+ *      app.js: القوائم/الخانات ذات onchange = submit/انتقال داخل #pageContent (وشريط المدارس) تُنزع منها التنفيذ الفوري وتظهر كبسة «موافق»
+ *      (واحدة لكل فورم تطبّق كل الاختيارات معاً)؛ حبوب الشريط العلوي خارج ذلك. + CSS .msa-ok.
+ */
+$js259 = (string)file_get_contents($PROJ . '/assets/js/app.js'); $css259 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+check('✅ كبسة «موافق» بدل التنفيذ الفوري لقوائم الخيارات (واحدة لكل فورم = عدّة اختيارات معاً) بكل صفحات البرنامج + الشريط العلوي مستثنى',
+      strpos($js259, "document.querySelectorAll('#pageContent select[onchange], #pageContent input[onchange], #schoolStrip select[onchange]').forEach(arm);") !== false
+      && strpos($js259, "if (!oc || !/submit\\(|location/.test(oc)) return;") !== false && strpos($js259, "el.removeAttribute('onchange'); el.setAttribute('data-oc', oc);") !== false
+      && strpos($js259, "if (f.requestSubmit) f.requestSubmit(); else f.submit();") !== false && strpos($js259, "btn.classList.add('msa-ok-form'); perForm.set(f, btn);") !== false
+      && strpos($js259, "if (!document.body.classList.contains('doc-view')) return;\n    function mkBtn()") === false
+      && strpos($js259, "if (document.querySelector('#pageContent .salary-slip') || /annual_slip\\.php/.test(location.pathname)) return;   // 🔒 البطاقة السنوية مجمّدة بأمره («أوعى تخرب البطاقة»)") !== false   // البطاقة السنوية خارج كبسة «موافق»
+      && strpos($css259, '.msa-ok { margin-inline-start: 6px;') !== false);
+
+/**
+ * 260) 🏦📅 (2026-10-18 «ببيان عام صندوق التعويضات ديما حطّ الراتب بعد التدرّج تبع 1-10 لأن منقدّم البيان قبل 31-12 — إنت معتمد راتب كانون الثاني
+ *      وهيدا غلط؛ كمان تاريخ الدخول هوي تاريخ الدخول في المدرسة مش تاريخ الملاك»)
+ *      eoc_staff: الراتب = صفّ تشرين الأول من السنة المعروضة (ofOctoberSalary؛ وإلا أوّل شهر محسوب) + عمود الأساس = base_plus_echelon + تاريخ الدخول = hire_date للملاك أيضاً.
+ */
+$ok260 = false; $why260 = '';
+try {
+    $of260 = (string)file_get_contents($PROJ . '/pages/official_forms.php');
+    $src260 = strpos($of260, 'function ofOctoberSalary($db, $empId, $sy = null)') !== false
+           && strpos($of260, "\$sal = ofOctoberSalary(\$db, \$r['id'], \$sy);") !== false
+           && strpos($of260, '<td><?= formatDate(shownHireDate($r)) ?></td>') !== false
+           && strpos($of260, "<td class=\"num\"><?= formatLBP(\$sal ? (int)\$sal['base_plus_echelon_lbp'] : \$rsal,false) ?></td>") !== false
+           && strpos($of260, "\$isMlk ? (shownTitularizationDate(\$r) ?: shownHireDate(\$r)) : shownHireDate(\$r)") === false;
+    // تجربة فعلية 2025-2026 بمدرسة 2: ملاك عنده تشرين الأول 2025 محسوب وتاريخ ملاك ≠ تاريخ دخول، وراتب كانون الثاني 2026 ≠ تشرين الأول
+    $p260 = $db->query("SELECT e.id, e.hire_date, e.titularization_date, o.base_plus_echelon_lbp oct, j.base_plus_echelon_lbp jan
+        FROM employees e
+        JOIN monthly_salaries o ON o.employee_id = e.id AND o.is_calculated = 1 AND o.year = 2025 AND o.month = 10
+        LEFT JOIN monthly_salaries j ON j.employee_id = e.id AND j.is_calculated = 1 AND j.year = 2026 AND j.month = 1
+        WHERE e.is_deleted = 0 AND e.school_id = 2 AND e.employee_type = 'enseignant_titulaire'
+          AND e.hire_date IS NOT NULL AND e.titularization_date IS NOT NULL AND e.hire_date <> e.titularization_date
+        ORDER BY (j.base_plus_echelon_lbp IS NOT NULL AND j.base_plus_echelon_lbp <> o.base_plus_echelon_lbp) DESC, e.id LIMIT 1")->fetch();
+    $live260 = true; $det = '';
+    if ($p260) {
+        $h260 = renderPage('pages/official_forms.php', ['form' => 'eoc_staff', 'cat' => 'titulaire'], [], [2], '', '2025-2026');
+        // صفّ هذا الموظف: يحوي تاريخ دخوله ولا يحوي تاريخ ملاكه، ويحوي أساس تشرين الأول
+        $rows260 = preg_split('~<tr>~', $h260);
+        $row = ''; foreach ($rows260 as $tr) { if (strpos($tr, formatDate($p260['hire_date'])) !== false && strpos($tr, number_format((int)$p260['oct'])) !== false) { $row = $tr; break; } }
+        $live260 = $row !== '' && strpos($row, formatDate($p260['titularization_date'])) === false
+                 && strpos($h260, 'الرواتب بعد التدرّج كما في 1/10/2025') !== false && strpos($h260, 'أساس الراتب بعد التدرّج') !== false;
+        $det = ' emp=' . $p260['id'] . ' oct=' . number_format((int)$p260['oct']) . ' jan=' . ($p260['jan'] === null ? '-' : number_format((int)$p260['jan'])) . ' hire=' . formatDate($p260['hire_date']) . ' tit=' . formatDate($p260['titularization_date']) . ' rowFound=' . (int)($row !== '');
+    } else $det = ' (لا عيّنة بالداتا — فحص المصدر فقط)';
+    $ok260 = $src260 && $live260; $why260 = 'src=' . (int)$src260 . $det;
+} catch (Throwable $e) { $why260 = $e->getMessage(); }
+check('🏦📅 بيان عام الصندوق: راتب تشرين الأول (1/10) من السنة المعروضة لا كانون الثاني + أساس بعد التدرّج + تاريخ الدخول في المدرسة لا الملاك', $ok260, $why260);
+
+/**
+ * 261) 📘🔴 قانون المستخدم (2026-10-18 «كل مبالغ التقارير الشهرية أو الفصلية أو السنوية لازم تعتمد على أرقام البطاقة السنوية إجباري»):
+ *      مصدر كل تقرير = صفوف monthly_salaries نفسها التي تبني البطاقة (computeAnnualSlip). الفحص: لكل موظف بالسنة الحالية والسابقة،
+ *      مجاميع البطاقة (بعد التدرّج/الإضافي/المكافأة/الإجمالي/الضمان/الضريبة/الصندوق/الصافي/المتوجّب/العائلي/النقل) = مجاميع SQL
+ *      بنفس مرشّح التقارير (bpe>0 أو net>0 أو due>0). الاستثناء الموثَّق الوحيد: شهر التعويض (13) الافتراضي على البطاقة
+ *      (has_13th_month بلا صفّ مخزّن) — بانتظار قراره بإدخاله بالتقارير.
+ */
+$ok261 = true; $why261 = '';
+try {
+    require_once $PROJ . '/includes/annual_slip_data.php';
+    $sum261 = $db->prepare("SELECT SUM(base_plus_echelon_lbp) bpe, SUM(extra_lbp + prime_fixe_lbp) extra, SUM(aide_complementaire_lbp) aide, SUM(base_plus_echelon_lbp + extra_lbp + prime_fixe_lbp + aide_complementaire_lbp) brut,
+        SUM(cnss_amount_lbp) cnss, SUM(income_tax_lbp) tax, SUM(caisse_amount_lbp) caisse, SUM(net_salary_lbp) net, SUM(total_due_lbp) due, SUM(family_allowance_lbp) fam, SUM(transport_lbp) tr
+        FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
+    $keys261 = ['bpe' => 'base_plus_echelon', 'extra' => 'extra_wage', 'aide' => 'aide', 'brut' => 'brut', 'cnss' => 'cnss', 'tax' => 'income_tax', 'caisse' => 'caisse', 'net' => 'net', 'due' => 'total_due', 'fam' => 'family', 'tr' => 'transport'];
+    $bad261 = []; $n261 = 0; $v13 = 0;
+    foreach ([currentSchoolYear(), (string)((int)substr(currentSchoolYear(), 0, 4) - 1) . '-' . substr(currentSchoolYear(), 0, 4)] as $sy261) {
+        foreach ($db->query("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = " . $db->quote($sy261) . ") ORDER BY e.id")->fetchAll() as $e261) {
+            $slip = computeAnnualSlip($db, $e261, $sy261); $n261++;
+            $has13 = false; foreach ($slip['rows'] as $r) if (!empty($r['s']) && (int)($r['s']['is_indemnity_month'] ?? 0)) $has13 = true;
+            if ($has13) { $v13++; continue; }   // الاستثناء الموثَّق: شهر التعويض الافتراضي (قراره معلّق)
+            $sum261->execute([(int)$e261['id'], $sy261]); $s = $sum261->fetch();
+            foreach ($keys261 as $sk => $tk) if ((int)$slip['tot'][$tk] !== (int)$s[$sk]) { $bad261[] = $e261['id'] . '/' . $sy261 . ':' . $sk; break; }
+        }
+    }
+    $ok261 = $n261 > 100 && !$bad261;
+    $why261 = "checked=$n261 13th=$v13" . ($bad261 ? ' bad=' . implode(',', array_slice($bad261, 0, 10)) : '');
+} catch (Throwable $e) { $ok261 = false; $why261 = $e->getMessage(); }
+check('📘 قانون البطاقة السنوية: مجاميع كل موظف بالسنتين الحالية والسابقة من مصدر التقارير = مجاميع البطاقة (11 بنداً) — الاستثناء الوحيد شهر التعويض الافتراضي', $ok261, $why261);
+
+/**
+ * 262) 🎁 (2026-10-18 قراره «شهر التعويض ما بيدخل بالضمان ولا بالمالية ولا بصندوق التعويضات؛ بيضلّ بالبطاقة؛ بتقارير المصاريف بيظهر كمجموع بلا ضرائب مع خيار»)
+ *      thirteenthMonthByEmployee = سطر شهر 13 من البطاقة نفسها؛ خيار m13 (جلسة/رابط) بالمجاميع السنوية وكلفة المؤسسة والتقرير العام فقط:
+ *      الفرق بين «مشمول» و«غير مشمول» = مبالغ البطاقة بالضبط (بعد التدرّج/الإضافي/الصافي/المتوجّب) + لا صفوف تعويض مخزّنة + لا أثر بالضمان/المالية/الصندوق.
+ */
+$ok262 = false; $why262 = '';
+try {
+    require_once $PROJ . '/includes/annual_slip_data.php';
+    $m13t = thirteenthMonthByEmployee($db, '2025-2026');
+    $s2 = array_filter($m13t, fn($x) => $x['school_id'] === 2);
+    $expNet = array_sum(array_column($s2, 'net')); $expBpe = array_sum(array_column($s2, 'bpe')); $expEx = array_sum(array_column($s2, 'extra'));
+    $nums262 = function (string $h, string $needle): array {
+        foreach (preg_split('~<tr~', $h) as $tr) if (strpos($tr, $needle) !== false) { preg_match_all('~<td[^>]*>(.*?)</td>~s', $tr, $m); if (count($m[1]) < 3) continue; return array_map(fn($c) => (int)preg_replace('/\D/', '', strip_tags($c)), $m[1]); }
+        return [];
+    };
+    $diffs = function (array $a, array $b): array { $d = []; foreach ($a as $i => $v) if (isset($b[$i]) && $v !== $b[$i]) $d[] = $v - $b[$i]; return $d; };
+    $hA1 = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026', 'm13' => '1'], [], [2], 'lbp', '2025-2026');
+    $hA0 = renderPage('pages/reports.php', ['report' => 'annual_totals', 'school_year' => '2025-2026', 'm13' => '0'], [], [2], 'lbp', '2025-2026');
+    $dA = $diffs($nums262($hA1, 'مكسيموس'), $nums262($hA0, 'مكسيموس'));
+    $hG1 = renderPage('pages/official_forms.php', ['form' => 'general_report', 'm13' => '1'], [], [2], 'lbp', '2025-2026');
+    $hG0 = renderPage('pages/official_forms.php', ['form' => 'general_report', 'm13' => '0'], [], [2], 'lbp', '2025-2026');
+    $dG = $diffs($nums262($hG1, 'المجموع'), $nums262($hG0, 'المجموع'));
+    $hC1 = renderPage('pages/official_forms.php', ['form' => 'employer_cost', 'm13' => '1'], [], [2], 'lbp', '2025-2026');
+    $hC0 = renderPage('pages/official_forms.php', ['form' => 'employer_cost', 'm13' => '0'], [], [2], 'lbp', '2025-2026');
+    // الضمان/المالية/الصندوق: لا خيار ولا أثر — كشف الضمان الشهري والفصلي للصندوق لا يتغيّران بالخيار
+    $hS1 = renderPage('pages/reports.php', ['report' => 'cnss_summary', 'month' => 9, 'year' => 2026, 'm13' => '1'], [], [2], 'lbp', '2025-2026');
+    $hS0 = renderPage('pages/reports.php', ['report' => 'cnss_summary', 'month' => 9, 'year' => 2026, 'm13' => '0'], [], [2], 'lbp', '2025-2026');
+    $hQ1 = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 3, 'm13' => '1'], [], [2], 'lbp', '2025-2026');
+    $hQ0 = renderPage('pages/official_forms.php', ['form' => 'eoc_quarterly', 'quarter' => 3, 'm13' => '0'], [], [2], 'lbp', '2025-2026');
+    $noStored = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE COALESCE(is_indemnity_month,0) = 1")->fetchColumn() === 0;
+    $src262 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+    $ok262 = count($s2) >= 1 && $expNet > 0
+          && in_array($expBpe, $dA, true) && in_array($expEx, $dA, true) && in_array($expNet, $dA, true) && in_array(1, $dA, true)   // بعد التدرّج/الإضافي/الصافي + شهر مدفوع
+          && in_array($expBpe, $dG, true) && in_array($expNet, $dG, true)
+          && strpos($hC1, 'منها: شهر التعويض (13)') !== false && strpos($hC0, 'منها: شهر التعويض (13)') === false
+          && strpos($hA1, 'id="msaM13Btn"') !== false && strpos($hS1, 'id="msaM13Btn"') === false && strpos($hQ1, 'id="msaM13Btn"') === false
+          && $nums262($hS1, 'المجموع العام') === $nums262($hS0, 'المجموع العام') && strlen($hQ1) === strlen($hQ0)
+          && $noStored && strpos($src262, 'thirteenthMonthByEmployee') === false;
+    $why262 = 'sch2=' . count($s2) . " net=$expNet bpe=$expBpe extra=$expEx dA=" . json_encode($dA) . ' dG=' . json_encode($dG) . ' cost13=' . (int)(strpos($hC1, 'منها: شهر التعويض (13)') !== false) . ' noStored=' . (int)$noStored;
+} catch (Throwable $e) { $why262 = $e->getMessage(); }
+check('🎁 شهر التعويض (13): خيار بتقارير المصاريف فقط (مجاميع سنوية/كلفة المؤسسة/تقرير عام) بمبالغ البطاقة بالضبط + لا أثر ولا خيار بالضمان/المالية/الصندوق + لا صفوف مخزّنة', $ok262, $why262);
+
+/**
+ * 263) 🔁🖥️ (2026-10-18 «بدي تلقائياً إذا غيّرت شي أونلاين يتغيّر على الكمبيوتر» + «وإذا بدي غيّر على الكمبيوتر لازم كمان يتغيّر أونلاين»)
+ *      مزامنة بتغيّر البصمة: sync_version.php أونلاين (مدير فقط) + localSyncCheckDue كل 5 دقائق + localSyncOnlineChanged + حفظ online_fp بعد النجاح
+ *      + الهيدر يطلق الفحص + نسخة الكمبيوتر قراءة فقط (pcReadOnly ⇒ canEdit=false، لا بـCLI/أونلاين) + كبسة «افتح هالصفحة أونلاين».
+ */
+require_once $PROJ . '/includes/local_sync.php';
+$sv263 = renderPage('sync_version.php', [], [], [2]);
+$ls263 = (string)file_get_contents($PROJ . '/includes/local_sync.php'); $sl263 = (string)file_get_contents($PROJ . '/sync_local.php');
+$hd263 = (string)file_get_contents($PROJ . '/includes/header.php');
+$j263 = json_decode(trim($sv263), true);
+check('🔁 مزامنة فورية عند تغيّر الأونلاين (بصمة sync_version كل 5 دقائق) + الدورة باتّجاهين من الهيدر + التعديل على الكمبيوتر مسموح',
+      is_array($j263) && !empty($j263['ok']) && preg_match('/^[a-f0-9]{32}$/', (string)($j263['fp'] ?? '')) === 1
+      && function_exists('localSyncCheckDue') && function_exists('localSyncOnlineChanged') && function_exists('localSyncCycle') && function_exists('localSyncPush') && function_exists('localSyncLocalDiff')
+      && strpos($ls263, "if (\$fpNow !== '') { \$stF = localSyncState(); \$stF['online_fp'] = \$fpNow;") !== false
+      && strpos($sl263, '$res = localSyncCycle($force);') !== false
+      && strpos($hd263, 'if (localSyncDue() || localSyncCheckDue()):') !== false && strpos($hd263, 'localSyncConflicts()') !== false
+      && function_exists('pcReadOnly') && !pcReadOnly() && canEdit(),
+      'fp=' . substr((string)($j263['fp'] ?? ''), 0, 8));
+
+/**
+ * 264) 🔁⇄ (2026-10-18 «لنفترض ما في إنترنت واضطريت اشتغل على الكمبيوتر… يبقى كل شي نفس الشي بالمكانين، وكل شي تلقائي») محرّك الدمج الثلاثي:
+ *      sync_common (بصمات صفوف متطابقة بالمكانين) + sync_api (tables/hashes/apply للمدير العام) + localSyncLocalDiff يكشف تعديل محلي ثم يعود صفراً بعد التراجع
+ *      + apply يأخذ نسخة احتياطية ويطبّق REPLACE ويرفض الحذف الجماعي. (تجربة فعلية على نسخة الكمبيوتر — بلا أونلاين)
+ */
+$ok264 = false; $why264 = '';
+try {
+    require_once $PROJ . '/includes/sync_common.php';
+    require_once $PROJ . '/includes/local_sync.php';
+    $pdo264 = new PDO('mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+    $tabs = syncRealTables($pdo264, DB_NAME);
+    $mEmp = syncTableMeta($pdo264, DB_NAME, 'employees');
+    $tj = json_decode(trim(renderPage('sync_api.php', ['action' => 'tables'], [], [2])), true);
+    $hj = json_decode(trim(renderPage('sync_api.php', ['action' => 'hashes', 'table' => 'employees'], [], [2])), true);
+    $localH = syncRowHashes($pdo264, DB_NAME, 'employees', $mEmp);
+    $apiOk = is_array($tj) && !empty($tj['ok']) && isset($tj['tables']['employees']['pk']) && $tj['tables']['employees']['pk'] === ['id']
+          && is_array($hj) && !empty($hj['ok']) && count($hj['hashes']) === count($localH) && ($hj['hashes']['1677'] ?? '') === ($localH['1677'] ?? '-');
+    // تجربة فعلية: أساس ⇒ لا فرق؛ تعديل هاتف موظف ⇒ فرق صفّ واحد (upd) ⇒ تراجع ⇒ لا فرق
+    localSyncBaseRebuild();
+    $d0 = localSyncLocalDiff();
+    $old = (string)$pdo264->query("SELECT phone1 FROM employees WHERE id = 1677")->fetchColumn();
+    $pdo264->prepare("UPDATE employees SET phone1 = ? WHERE id = 1677")->execute([$old . '9']);
+    $d1 = localSyncLocalDiff();
+    $pdo264->prepare("UPDATE employees SET phone1 = ? WHERE id = 1677")->execute([$old]);
+    $d2 = localSyncLocalDiff();
+    $diffOk = $d0 === [] && isset($d1['employees']) && $d1['employees']['upd'] === ['1677'] && $d1['employees']['ins'] === [] && $d1['employees']['del'] === [] && count($d1) === 1 && $d2 === [];
+    // apply محلياً: نفس الصفّ (بلا تغيير) ⇒ ok + نسخة احتياطية؛ حذف جماعي ⇒ مرفوض
+    $row1677 = syncRowsByPk($pdo264, DB_NAME, 'employees', $mEmp, ['1677']);
+    $ap = syncApplyChanges($pdo264, DB_NAME, 'employees', $mEmp, array_values($row1677), []);
+    $bkOk = !empty($ap['ok']) && (int)$ap['ins'] === 1 && $ap['bk'] !== '' && (int)$pdo264->query("SELECT COUNT(*) FROM `" . $ap['bk'] . "`")->fetchColumn() === 1;
+    $pdo264->exec("DROP TABLE IF EXISTS `" . $ap['bk'] . "`");
+    $same = (string)$pdo264->query("SELECT phone1 FROM employees WHERE id = 1677")->fetchColumn() === $old;
+    $src264 = (string)file_get_contents($PROJ . '/sync_api.php');
+    $ok264 = in_array('employees', $tabs, true) && in_array('monthly_salaries', $tabs, true) && !in_array('_sync_base', $tabs, true) && $apiOk && $diffOk && $bkOk && $same
+          && strpos($src264, "throw new RuntimeException('mass delete refused") !== false && strpos($src264, "if (!isLoggedIn() || !isSuperAdmin())") !== false;
+    $why264 = 'api=' . (int)$apiOk . ' diff=' . (int)$diffOk . ' d1=' . json_encode(array_map(fn($x) => [count($x['ins']), count($x['upd']), count($x['del'])], $d1 ?? [])) . ' bk=' . (int)$bkOk . ' same=' . (int)$same;
+} catch (Throwable $e) { $why264 = $e->getMessage(); }
+check('🔁⇄ الدمج الثلاثي: بصمات متطابقة محلياً/واجهة + كشف تعديل محلي واحد ثم صفر بعد التراجع + apply بنسخة احتياطية + رفض الحذف الجماعي', $ok264, $why264);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

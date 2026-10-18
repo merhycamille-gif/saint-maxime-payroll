@@ -244,6 +244,33 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
 }
 
 /**
+ * 🎁 (2026-10-18 قراره) شهر التعويض (13) كما تحسبه البطاقة السنوية (افتراضي لمن عنده has_13th_month بلا صفّ مخزّن) — لكل موظف بالسنة:
+ *   [emp_id => ['school_id','bpe','extra','aide','brut','net','due', '*_usd' (داون)]] — المصدر الواحد لتقارير المصاريف (المجاميع السنوية/كلفة المؤسسة/التقرير العام).
+ *   لا يُستعمل أبداً بتقارير الضمان أو المالية أو صندوق التعويضات (شهر بلا محسومات).
+ */
+function thirteenthMonthByEmployee($db, string $schoolYear): array {
+    static $cache = [];
+    if (isset($cache[$schoolYear])) return $cache[$schoolYear];
+    $out = [];
+    $emps = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted = 0 AND e.has_13th_month = 1
+                          AND EXISTS (SELECT 1 FROM monthly_salaries m WHERE m.employee_id = e.id AND m.school_year = ?)");
+    $emps->execute([$schoolYear]);
+    foreach ($emps->fetchAll() as $e) {
+        $slip = computeAnnualSlip($db, $e, $schoolYear);
+        foreach ($slip['rows'] as $r) {
+            if (empty($r['s']) || !(int)($r['s']['is_indemnity_month'] ?? 0)) continue;
+            $rate = (float)$r['rate']; $usd = fn($v) => $rate > 0 ? (int)floor($v / $rate) : 0;
+            $out[(int)$e['id']] = ['school_id' => (int)($r['s']['school_id'] ?? $e['school_id']), 'bpe' => (int)$r['cur_sal'], 'extra' => (int)$r['extra_wage'], 'aide' => (int)$r['aide'],
+                'brut' => (int)$r['brut'], 'net' => (int)$r['net'], 'due' => (int)$r['total_due'],
+                'bpe_usd' => $usd((int)$r['cur_sal']), 'extra_usd' => $usd((int)$r['extra_wage']), 'aide_usd' => $usd((int)$r['aide']),
+                'net_usd' => (int)floor((float)($r['s']['net_salary_usd'] ?? 0)), 'due_usd' => (int)floor((float)($r['s']['total_due_usd'] ?? 0))];
+            break;
+        }
+    }
+    return $cache[$schoolYear] = $out;
+}
+
+/**
  * 🧑‍💼 معلومات الموظف (قانون العمل) لبطاقته السنوية — المصدر الواحد (البطاقة + التصدير + الطباعة الجماعية).
  * «وقت اللي بقول موظف غير ما بقول أستاذ» (2026-09-27): الموظف لا ملاك ولا درجة ولا مواد ولا صفوف ولا صندوق —
  * فمكانها: النظام (قانون العمل — الحد الأدنى/أساس محدّد) · الأقدمية · الوضع العائلي · نهاية الخدمة (خاضع/معفى 64) · الترك.

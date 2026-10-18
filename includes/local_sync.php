@@ -46,6 +46,43 @@ function localSyncDue(): bool {
     if (time() - $lastTry < 900) return false;                       // لا نعيد المحاولة أكثر من مرّة كل 15 دقيقة
     return time() - $last >= localSyncHours() * 3600;
 }
+/** 🔁 (2026-10-18 «بدي تلقائياً إذا غيّرت شي أونلاين يتغيّر كمان على الكمبيوتر») فحص خفيف كل 5 دقائق: هل تغيّرت بصمة الأونلاين؟ */
+function localSyncCheckDue(): bool {
+    $st = localSyncState();
+    if (!empty($st['lock']) && time() - (int)$st['lock'] < 1800) return false;
+    return time() - (int)($st['last_check'] ?? 0) >= 300;
+}
+/** الدخول أونلاين + قراءة البصمة (sync_version.php). يعيد البصمة أو '' عند أي عطل. $cj = ملف كوكي موجود (اختياري) */
+function localSyncOnlineVersion(?string $cj = null): string {
+    $site = rtrim((string)ONLINE_SYNC_URL, '/');
+    $own = $cj === null; if ($own) $cj = tempnam(sys_get_temp_dir(), 'syncv');
+    $ch = function (string $url, array $opt = []) use ($cj) {
+        $c = curl_init($url);
+        curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIEJAR => $cj, CURLOPT_COOKIEFILE => $cj, CURLOPT_FOLLOWLOCATION => false,
+                               CURLOPT_TIMEOUT => 25, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_USERAGENT => 'MSA-Payroll-LocalSync'] + $opt);
+        $out = curl_exec($c); $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE); curl_close($c);
+        return [$out, $code];
+    };
+    try {
+        [$html, $code] = $ch($site . '/login.php');
+        if ($html === false || $code !== 200) return '';
+        preg_match('/name="csrf" value="([^"]+)"/', (string)$html, $m);
+        [, $code] = $ch($site . '/login.php', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query(['username' => ONLINE_SYNC_USER, 'password' => ONLINE_SYNC_PASS, 'csrf' => $m[1] ?? ''])]);
+        if ($code !== 302) return '';
+        [$js, $code] = $ch($site . '/sync_version.php');
+        if ($code !== 200) return '';
+        $j = json_decode((string)$js, true);
+        return is_array($j) && !empty($j['ok']) ? (string)$j['fp'] : '';
+    } finally { if ($own) @unlink($cj); }
+}
+/** هل تغيّر الأونلاين عن آخر مزامنة؟ (يسجّل وقت الفحص والبصمة المقروءة) */
+function localSyncOnlineChanged(): bool {
+    $st = localSyncState(); $st['last_check'] = time(); localSyncSaveState($st);
+    $fp = localSyncOnlineVersion();
+    if ($fp === '') return false;                              // لا اتصال/لا نقطة ⇒ نبقى على المزامنة الدورية
+    $st = localSyncState(); $st['online_fp_seen'] = $fp; localSyncSaveState($st);
+    return $fp !== (string)($st['online_fp'] ?? '');
+}
 function localSyncLog(string $msg): void {
     $f = dirname(__DIR__) . '/tmp/local_sync.log';
     if (!is_dir(dirname($f))) @mkdir(dirname($f), 0777, true);
@@ -94,6 +131,9 @@ function localSyncRun(): array {
     preg_match('/name="csrf" value="([^"]+)"/', (string)$html, $m);
     [, $code] = $ch($site . '/login.php', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query(['username' => ONLINE_SYNC_USER, 'password' => ONLINE_SYNC_PASS, 'csrf' => $m[1] ?? ''])]);
     if ($code !== 302) { @unlink($cj); return $done(false, 'فشل الدخول أونلاين (رمز ' . $code . ')'); }
+    // 🔁 بصمة الأونلاين لحظة التحميل — تُحفظ بعد نجاح التبديل فيعرف الكمبيوتر لاحقاً إن تغيّر شيء
+    [$fpJs, $fpCode] = $ch($site . '/sync_version.php');
+    $fpNow = ''; if ($fpCode === 200) { $fpJ = json_decode((string)$fpJs, true); if (is_array($fpJ) && !empty($fpJ['ok'])) $fpNow = (string)$fpJ['fp']; }
     $fh = fopen($dump, 'wb');
     $c = curl_init($site . '/pages/backup.php?action=sql');
     curl_setopt_array($c, [CURLOPT_FILE => $fh, CURLOPT_COOKIEFILE => $cj, CURLOPT_TIMEOUT => 900, CURLOPT_USERAGENT => 'MSA-Payroll-LocalSync']);
@@ -180,5 +220,147 @@ function localSyncRun(): array {
             }
         }
     } catch (Throwable $e) { localSyncLog('تعذّرت النسخة الثانية: ' . $e->getMessage()); }
+    if ($fpNow !== '') { $stF = localSyncState(); $stF['online_fp'] = $fpNow; $stF['last_check'] = time(); localSyncSaveState($stF); }
+    // 🔁 بعد السحب: الأساس الجديد للدمج الثلاثي + ترقيم ذاتي بعيد (لا تصادم مفاتيح بين الكمبيوتر والأونلاين)
+    try { localSyncBaseRebuild(); } catch (Throwable $e) { localSyncLog('تعذّر بناء أساس الدمج: ' . $e->getMessage()); }
     return $done(true, "طبق الأصل عن الأونلاين: $final جدولاً، $nemp موظفاً، $nsal صفّ رواتب");
+}
+
+/* =====================================================================================================================
+ * 🔁 المزامنة باتّجاهين (2026-10-18 «لنفترض ما في إنترنت واضطريت اشتغل على الكمبيوتر — بس ترجع الإنترنت لازم الأونلاين يصير متل الكمبيوتر…
+ *    وين ما بغيّر يبقى كل شي نفس الشي بالمكانين، وكل شي تلقائي»):
+ *    الأساس = بصمات صفوف آخر نسخة مسحوبة (_sync_base). كل 5 دقائق (محلياً): ما تغيّر على الكمبيوتر عن الأساس يُرفع للأونلاين (sync_api)
+ *    — إلا ما تغيّر بالمكانين معاً فيبقى الأونلاين ويُسجَّل تعارضاً (_sync_conflicts) ويظهر بلوحة القيادة — ثم تُسحب النسخة الكاملة فيتطابقان.
+ *    بلا إنترنت: التعديلات تبقى محفوظة على الكمبيوتر وتُرفع أوّل ما يرجع (لا سحب قبل نجاح الرفع ⇒ لا ضياع).
+ * =================================================================================================================== */
+function localSyncPdo(): PDO {
+    return new PDO('mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+}
+/** الأساس: بصمات كل صفوف الجداول الحقيقية الآن (تُبنى بعد كل سحب) + جدول التعارضات + ترقيم ذاتي بعيد */
+function localSyncBaseRebuild(): void {
+    require_once __DIR__ . '/sync_common.php';
+    $pdo = localSyncPdo(); $s = DB_NAME;
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `$s`.`_sync_base` (tbl VARCHAR(64) NOT NULL, pk VARCHAR(191) NOT NULL, h CHAR(32) NOT NULL, PRIMARY KEY (tbl, pk)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `$s`.`_sync_conflicts` (id INT AUTO_INCREMENT PRIMARY KEY, tbl VARCHAR(64) NOT NULL, pk VARCHAR(191) NOT NULL, kind VARCHAR(16) NOT NULL, label VARCHAR(255) NULL, row_json MEDIUMTEXT NULL, created_at DATETIME NOT NULL, seen TINYINT NOT NULL DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("TRUNCATE TABLE `$s`.`_sync_base`");
+    foreach (syncRealTables($pdo, $s) as $t) {
+        $m = syncTableMeta($pdo, $s, $t); if (!$m['pk']) continue;
+        $pdo->exec("INSERT INTO `$s`.`_sync_base` (tbl, pk, h) SELECT " . $pdo->quote($t) . ", " . syncPkSql($m) . ", " . syncHashSql($m) . " FROM `$s`.`$t`");
+        if ($m['auto'] !== '') { // ترقيم ذاتي بعيد عن الأونلاين (+1,000,000) كي لا يتصادم ملف جديد على الكمبيوتر مع ملف جديد أونلاين
+            $mx = (int)$pdo->query("SELECT COALESCE(MAX(`{$m['auto']}`), 0) FROM `$s`.`$t`")->fetchColumn();
+            try { $pdo->exec("ALTER TABLE `$s`.`$t` AUTO_INCREMENT = " . ($mx + 1000000)); } catch (Throwable $e) {}
+        }
+    }
+    $st = localSyncState(); $st['base_built'] = time(); localSyncSaveState($st);
+}
+/** ما تغيّر على الكمبيوتر عن الأساس: [table => ['ins'=>[pk], 'upd'=>[pk], 'del'=>[pk], 'base'=>[pk=>h]]] — null إن لا أساس (أوّل مرّة ⇒ يُبنى) */
+function localSyncLocalDiff(): ?array {
+    require_once __DIR__ . '/sync_common.php';
+    $pdo = localSyncPdo(); $s = DB_NAME;
+    $has = (bool)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = " . $pdo->quote($s) . " AND table_name = '_sync_base'")->fetchColumn();
+    if (!$has) { localSyncBaseRebuild(); return null; }
+    $diff = [];
+    foreach (syncRealTables($pdo, $s) as $t) {
+        $m = syncTableMeta($pdo, $s, $t); if (!$m['pk']) continue;
+        $cur = syncRowHashes($pdo, $s, $t, $m);
+        $st = $pdo->prepare("SELECT pk, h FROM `$s`.`_sync_base` WHERE tbl = ?"); $st->execute([$t]);
+        $base = []; foreach ($st->fetchAll() as $r) $base[$r['pk']] = $r['h'];
+        $ins = []; $upd = []; $del = [];
+        foreach ($cur as $pk => $h) { if ($t === 'settings' && syncSettingsKeyIgnored((string)$pk)) continue; if (!isset($base[$pk])) $ins[] = (string)$pk; elseif ($base[$pk] !== $h) $upd[] = (string)$pk; }
+        foreach ($base as $pk => $h) { if ($t === 'settings' && syncSettingsKeyIgnored((string)$pk)) continue; if (!isset($cur[$pk])) $del[] = (string)$pk; }
+        if ($ins || $upd || $del) $diff[$t] = ['ins' => $ins, 'upd' => $upd, 'del' => $del, 'base' => array_intersect_key($base, array_flip(array_merge($upd, $del)))];
+    }
+    return $diff;
+}
+/** دخول أونلاين بملف كوكي؛ يعيد دالّة طلب أو null */
+function localSyncHttp(string $cj): ?callable {
+    $site = rtrim((string)ONLINE_SYNC_URL, '/');
+    $ch = function (string $url, array $opt = []) use ($cj) {
+        $c = curl_init($url);
+        curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIEJAR => $cj, CURLOPT_COOKIEFILE => $cj, CURLOPT_FOLLOWLOCATION => false,
+                               CURLOPT_TIMEOUT => 120, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_USERAGENT => 'MSA-Payroll-LocalSync'] + $opt);
+        $out = curl_exec($c); $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE); curl_close($c);
+        return [$out, $code];
+    };
+    [$html, $code] = $ch($site . '/login.php');
+    if ($html === false || $code !== 200) return null;
+    preg_match('/name="csrf" value="([^"]+)"/', (string)$html, $m);
+    [, $code] = $ch($site . '/login.php', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query(['username' => ONLINE_SYNC_USER, 'password' => ONLINE_SYNC_PASS, 'csrf' => $m[1] ?? ''])]);
+    return $code === 302 ? $ch : null;
+}
+/** رفع تعديلات الكمبيوتر إلى الأونلاين (دمج ثلاثي). يعيد ['ok','pushed','conflicts','msg'] */
+function localSyncPush(array $diff): array {
+    require_once __DIR__ . '/sync_common.php';
+    $site = rtrim((string)ONLINE_SYNC_URL, '/'); $cj = tempnam(sys_get_temp_dir(), 'syncp');
+    $ch = localSyncHttp($cj);
+    if (!$ch) { @unlink($cj); return ['ok' => false, 'pushed' => 0, 'conflicts' => 0, 'msg' => 'لا اتصال بالأونلاين — التعديلات محفوظة للرفع لاحقاً']; }
+    $pdo = localSyncPdo(); $s = DB_NAME; $pushed = 0; $conf = 0; $msgs = [];
+    try {
+        [$tj, $code] = $ch($site . '/sync_api.php?action=tables'); $tables = json_decode((string)$tj, true);
+        if ($code !== 200 || !is_array($tables) || empty($tables['ok'])) { @unlink($cj); return ['ok' => false, 'pushed' => 0, 'conflicts' => 0, 'msg' => 'واجهة المزامنة أونلاين غير متاحة (رمز ' . $code . ')']; }
+        foreach ($diff as $t => $d) {
+            if (empty($tables['tables'][$t])) { $msgs[] = "$t: غير موجود أونلاين"; continue; }
+            $m = syncTableMeta($pdo, $s, $t);
+            $pks = array_merge($d['ins'], $d['upd'], $d['del']);
+            [$hj, $code] = $ch($site . '/sync_api.php?action=hashes&table=' . rawurlencode($t), [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query(['pks' => $pks])]);
+            $hr = json_decode((string)$hj, true);
+            if ($code !== 200 || !is_array($hr) || empty($hr['ok'])) { $msgs[] = "$t: تعذّرت قراءة بصمات الأونلاين"; continue; }
+            $online = (array)($hr['hashes'] ?? []);
+            $upPks = []; $delPks = [];
+            $conflict = function (string $pk, string $kind) use ($pdo, $s, $t, $m, &$conf) {
+                $label = $t . ' #' . str_replace(chr(31), '/', $pk);
+                if ($t === 'employees') { $r = syncRowsByPk($pdo, $s, $t, $m, [$pk]); $r = reset($r); if ($r) $label = trim(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? '')) ?: $label; }
+                $rows = syncRowsByPk($pdo, $s, $t, $m, [$pk]);
+                $pdo->prepare("INSERT INTO `$s`.`_sync_conflicts` (tbl, pk, kind, label, row_json, created_at) VALUES (?,?,?,?,?,NOW())")->execute([$t, $pk, $kind, $label, json_encode(reset($rows) ?: null, JSON_UNESCAPED_UNICODE), ]);
+                $conf++;
+            };
+            foreach ($d['upd'] as $pk) { if (($online[$pk] ?? null) === ($d['base'][$pk] ?? '')) $upPks[] = $pk; else $conflict($pk, 'upd'); }   // الأونلاين كما كان ⇒ نرفع؛ تغيّر ⇒ تعارض
+            foreach ($d['ins'] as $pk) { if (!isset($online[$pk])) $upPks[] = $pk; else $conflict($pk, 'ins'); }
+            foreach ($d['del'] as $pk) { if (!isset($online[$pk])) continue; if ($online[$pk] === ($d['base'][$pk] ?? '')) $delPks[] = $pk; else $conflict($pk, 'del'); }
+            $rows = $upPks ? syncRowsByPk($pdo, $s, $t, $m, $upPks) : [];
+            $ups = array_values($rows); $dels = array_map(fn($pk) => explode(chr(31), $pk), $delPks);
+            $chunksU = array_chunk($ups, 400); $chunksD = array_chunk($dels, 400);
+            $nb = max(count($chunksU), count($chunksD));
+            for ($i = 0; $i < $nb; $i++) {
+                $body = json_encode(['table' => $t, 'upserts' => $chunksU[$i] ?? [], 'deletes' => $chunksD[$i] ?? []], JSON_UNESCAPED_UNICODE);
+                [$aj, $code] = $ch($site . '/sync_api.php?action=apply', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_HTTPHEADER => ['Content-Type: application/json']]);
+                $ar = json_decode((string)$aj, true);
+                if ($code !== 200 || !is_array($ar) || empty($ar['ok'])) { $msgs[] = "$t: فشل الرفع (" . (is_array($ar) ? ($ar['msg'] ?? $code) : $code) . ')'; @unlink($cj); return ['ok' => false, 'pushed' => $pushed, 'conflicts' => $conf, 'msg' => implode(' · ', $msgs)]; }
+                $pushed += (int)($ar['ins'] ?? 0) + (int)($ar['del'] ?? 0);
+            }
+            $msgs[] = "$t: " . count($upPks) . '↑ ' . count($delPks) . '🗑';
+        }
+    } catch (Throwable $e) { @unlink($cj); return ['ok' => false, 'pushed' => $pushed, 'conflicts' => $conf, 'msg' => 'خطأ بالرفع: ' . mb_substr($e->getMessage(), 0, 200)]; }
+    @unlink($cj);
+    localSyncLog("رُفعت تعديلات الكمبيوتر: $pushed صفّاً، تعارضات $conf — " . implode(' · ', $msgs));
+    return ['ok' => true, 'pushed' => $pushed, 'conflicts' => $conf, 'msg' => "رُفع $pushed صفّاً" . ($conf ? "، تعارضات $conf (بقي الأونلاين)" : '')];
+}
+/** الدورة الكاملة: رفع ما تغيّر على الكمبيوتر (إن وُجد) ثم سحب إن لزم (دوري/تغيّر الأونلاين/بعد الرفع). لا سحب قبل نجاح الرفع. */
+function localSyncCycle(bool $force = false): array {
+    $st = localSyncState();
+    if (!empty($st['lock']) && time() - (int)$st['lock'] < 1800) return ['ok' => false, 'msg' => 'مزامنة جارية'];
+    $st['last_check'] = time(); localSyncSaveState($st);
+    try { $diff = localSyncLocalDiff(); } catch (Throwable $e) { localSyncLog('تعذّر فحص تعديلات الكمبيوتر: ' . $e->getMessage()); $diff = []; }
+    $hasLocal = is_array($diff) && count($diff) > 0;
+    if ($hasLocal) {
+        $p = localSyncPush($diff);
+        $st = localSyncState(); $st['pending_push'] = $p['ok'] ? 0 : 1; $st['last_push_msg'] = $p['msg']; if ($p['ok']) $st['last_push_ok'] = time(); localSyncSaveState($st);
+        if (!$p['ok']) { localSyncLog('⏳ ' . $p['msg']); return ['ok' => false, 'msg' => $p['msg']]; }
+    }
+    if ($force || $hasLocal || localSyncDue() || localSyncOnlineChanged()) {
+        $r = localSyncRun();
+        if ($hasLocal && !empty($r['ok'])) $r['msg'] = ($p['msg'] ?? '') . ' ⇒ ' . $r['msg'];
+        return $r;
+    }
+    return ['ok' => true, 'msg' => 'no change'];
+}
+/** عدد التعارضات غير المقروءة + أحدثها (للوحة القيادة) */
+function localSyncConflicts(int $limit = 10): array {
+    try { $pdo = localSyncPdo(); $s = DB_NAME;
+        $has = (bool)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = " . $pdo->quote($s) . " AND table_name = '_sync_conflicts'")->fetchColumn();
+        if (!$has) return ['n' => 0, 'rows' => []];
+        $n = (int)$pdo->query("SELECT COUNT(*) FROM `$s`.`_sync_conflicts` WHERE seen = 0")->fetchColumn();
+        $rows = $n ? $pdo->query("SELECT id, tbl, pk, kind, label, created_at FROM `$s`.`_sync_conflicts` WHERE seen = 0 ORDER BY id DESC LIMIT $limit")->fetchAll() : [];
+        return ['n' => $n, 'rows' => $rows];
+    } catch (Throwable $e) { return ['n' => 0, 'rows' => []]; }
 }

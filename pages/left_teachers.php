@@ -39,21 +39,52 @@ foreach ($allRows as &$r) {
     $r['_partial'] = ($all === null);
     $r['_primary_ts'] = $all !== null ? strtotime($all) : ($ds ? min(array_map('strtotime', $ds)) : 0);
     $r['_sy'] = $r['_primary_ts'] ? schoolYearOfDate(date('Y-m-d', $r['_primary_ts'])) : null;
+    $r['_cy'] = $r['_primary_ts'] ? date('Y', $r['_primary_ts']) : null;   // 📅 السنة الميلادية للترك (2026-10-18)
 }
 unset($r);
 
-// السنوات الدراسية المتوفّرة في البيانات (تنازلياً) لبناء الفلتر
+// 👥 (2026-10-18 «انتبه إذا في أسماء مكرّرة بدك تشيلها إذا بنفس المدرسة») الاسم نفسه بالمدرسة نفسها يظهر مرّة واحدة:
+//    نُبقي الملف الأكمل (ترك من الكل قبل الجزئي) ثم الأحدث تركاً. العدّ والفحص التلقائي على اللائحة بعد الحذف.
+$ltNameKey = function (array $r): string {
+    $n = trim(($r['first_name_ar'] ?? '') . ' ' . ($r['father_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? ''));
+    if (trim(($r['first_name_ar'] ?? '') . ($r['last_name_ar'] ?? '')) === '') $n = trim(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? ''));
+    $n = preg_replace('/[\x{064B}-\x{0652}\x{0640}]/u', '', $n);                 // بلا تشكيل ولا تطويل
+    $n = str_replace(['أ', 'إ', 'آ', 'ة', 'ى'], ['ا', 'ا', 'ا', 'ه', 'ي'], $n);  // توحيد الهمزات والتاء المربوطة
+    return (int)$r['school_id'] . '|' . mb_strtolower(preg_replace('/\s+/u', ' ', $n), 'UTF-8');
+};
+$ltSeen = []; $dupRemoved = 0;
+foreach ($allRows as $i => $r) {
+    $k = $ltNameKey($r);
+    if (!isset($ltSeen[$k])) { $ltSeen[$k] = $i; continue; }
+    $j = $ltSeen[$k]; $keep = $allRows[$j];
+    $better = ($keep['_partial'] && !$r['_partial']) || ($keep['_partial'] === $r['_partial'] && $r['_primary_ts'] > $keep['_primary_ts']);
+    if ($better) { unset($allRows[$j]); $ltSeen[$k] = $i; } else { unset($allRows[$i]); }
+    $dupRemoved++;
+}
+$allRows = array_values($allRows);
+
+// 📅 (2026-10-18 «بدي التاركين يبيّنوا تركهن بالسنة الميلادية مش المدرسية — أنا بختار») وضعان: ym=school (1/10→30/9) | ym=civil (1/1→31/12)
+$ym = (($_GET['ym'] ?? 'school') === 'civil') ? 'civil' : 'school';
+$ltYearOf = fn(array $r) => $ym === 'civil' ? $r['_cy'] : $r['_sy'];
+$ltYearRe = $ym === 'civil' ? '/^\d{4}$/' : '/^\d{4}-\d{4}$/';
+
+// السنوات المتوفّرة في البيانات (تنازلياً) لبناء الفلتر — مدرسية أو ميلادية حسب الوضع
 $availYears = [];
-foreach ($allRows as $r) { if ($r['_sy']) $availYears[$r['_sy']] = true; }
+foreach ($allRows as $r) { if ($ltYearOf($r)) $availYears[$ltYearOf($r)] = true; }
 $availYears = array_keys($availYears);
 rsort($availYears);
 
-// الفلتر: السنة المختارة (افتراضياً السنة الدراسية الحالية 2025-2026)، أو "all" لكل السنوات
-$selYear = (string)($_GET['sy'] ?? currentSchoolYear());
-if ($selYear !== 'all' && !preg_match('/^\d{4}-\d{4}$/', $selYear)) $selYear = currentSchoolYear();
+// الفلتر: السنة المختارة أو "all" لكل السنوات
+// 📅 (2026-10-18 «وملف اللي تركوا بنفس السنة») الافتراضي = السنة الدراسية المعروضة بالبرنامج (كباقي التقارير)؛ «كل السنين» بالعرض ⇒ سنة البرنامج الحالية
+//    وبالوضع الميلادي: السنة الميلادية الحالية
+$ltDefYear = preg_match('/^\d{4}-\d{4}$/', (string)activeSchoolYear()) ? (string)activeSchoolYear() : currentSchoolYear();
+if ($ym === 'civil') $ltDefYear = date('Y');
+$selYear = (string)($_GET['sy'] ?? $ltDefYear);
+if ($selYear === '') $selYear = $ltDefYear;   // تبديل الوضع يفرّغ السنة ⇒ الافتراضي
+if ($selYear !== 'all' && !preg_match($ltYearRe, $selYear)) $selYear = $ltDefYear;
 
 // طبّق الفلتر
-$rows = ($selYear === 'all') ? $allRows : array_values(array_filter($allRows, fn($r) => $r['_sy'] === $selYear));
+$rows = ($selYear === 'all') ? $allRows : array_values(array_filter($allRows, fn($r) => $ltYearOf($r) === $selYear));
 
 // 🔍 فحص تلقائي: أي تارك عنده راتب في سنة دراسية بعد سنة تركه = تناقض (راتب وهمي).
 // يُحسب لكل التاركين ضمن النطاق (بغضّ النظر عن فلتر السنة) بطلب واحد فعّال.
@@ -88,8 +119,9 @@ $grandTotal = count($allRows);
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="alert alert-info no-print" style="margin-bottom:14px">
-  <i class="fas fa-door-open"></i> لائحة <strong>الأساتذة والموظفين الذين تركوا العمل</strong> (سُجِّل لهم تاريخ ترك عبر ملف الأستاذ أو عبر رابط تحديث المعلومات) — مصنّفة <strong>حسب السنة الدراسية</strong> التي وقع فيها الترك. الافتراضي: السنة الحالية <strong><?= e(currentSchoolYear()) ?></strong>. «ترك من الكل» وحده يُخرج الاسم والرواتب؛ مَن ترك الضمان أو المالية أو الصندوق فقط يظهر «ترك جزئي» ويبقى براتبه.<br>
-  <span dir="ltr">Liste des enseignants / employés ayant quitté, classée par année scolaire du départ. Par défaut : l'année en cours.</span>
+  <i class="fas fa-door-open"></i> لائحة <strong>الأساتذة والموظفين الذين تركوا العمل</strong> (سُجِّل لهم تاريخ ترك عبر ملف الأستاذ أو عبر رابط تحديث المعلومات) — مصنّفة حسب <strong><?= $ym === 'civil' ? 'السنة الميلادية (1/1 → 31/12)' : 'السنة الدراسية (1/10 → 30/9)' ?></strong> التي وقع فيها الترك، وتختار الوضع من الكبستين. الافتراضي: <strong><?= e($ltDefYear) ?></strong>. «ترك من الكل» وحده يُخرج الاسم والرواتب؛ مَن ترك الضمان أو المالية أو الصندوق فقط يظهر «ترك جزئي» ويبقى براتبه.
+  <?php if ($dupRemoved): ?><br><i class="fas fa-user-group"></i> أُخفيت <strong><?= $dupRemoved ?></strong> أسماء مكرّرة بنفس المدرسة (الاسم نفسه مرّتين) — بقي الملف الأكمل والأحدث.<?php endif; ?><br>
+  <span dir="ltr">Liste des enseignants / employés ayant quitté, classée par <?= $ym === 'civil' ? 'année civile' : 'année scolaire' ?> du départ.</span>
 </div>
 
 <?php // 🔍 نتيجة الفحص التلقائي: بانر أخضر إن كل شي سليم، أو تحذير بالتناقضات ?>
@@ -117,14 +149,19 @@ include __DIR__ . '/../includes/header.php';
     <h3><i class="fas fa-user-slash"></i>
       <span dir="ltr">Départs en <?= $selYear === 'all' ? 'toutes les années' : e($selYear) ?> (<?= $total ?>)</span>
       <div style="font-size:0.85em;font-weight:600;opacity:0.9">التاركون في <?= $selYear === 'all' ? 'كل السنوات' : e($selYear) ?> (<?= $total ?>)</div></h3>
-    <form method="get" class="no-print" style="margin:0;display:flex;align-items:center;gap:8px">
-      <label style="margin:0;font-weight:700">السنة الدراسية / Année :</label>
+    <form method="get" class="no-print" style="margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <?php /* 📅 (2026-10-18) الوضع: سنة مدرسية أو ميلادية — كبستان ملوّنتان (قاعدته: الاختيار القصير = خانات) */ ?>
+      <div class="school-checks emp-type-checks" style="margin:0">
+        <label class="chk"><input type="radio" name="ym" value="school" <?= $ym === 'school' ? 'checked' : '' ?> onchange="this.form.sy.value='';this.form.submit()" autocomplete="off"> <span>Année scolaire / سنة مدرسية (1/10 → 30/9)</span></label>
+        <label class="chk"><input type="radio" name="ym" value="civil" <?= $ym === 'civil' ? 'checked' : '' ?> onchange="this.form.sy.value='';this.form.submit()" autocomplete="off"> <span>Année civile / سنة ميلادية (1/1 → 31/12)</span></label>
+      </div>
+      <label style="margin:0;font-weight:700"><?= $ym === 'civil' ? 'السنة الميلادية / Année civile' : 'السنة الدراسية / Année scolaire' ?> :</label>
       <select name="sy" onchange="this.form.submit()" style="padding:8px 11px;border:1px solid #cbd5e1;border-radius:7px;font-size:14px">
         <option value="all" <?= $selYear === 'all' ? 'selected' : '' ?>>كل السنوات / Toutes (<?= $grandTotal ?>)</option>
         <?php
-          // اعرض السنة الحالية دائماً حتى لو ما فيها تاركين بعد
+          // اعرض السنة الافتراضية دائماً حتى لو ما فيها تاركين بعد
           $yearsForMenu = $availYears;
-          if (!in_array(currentSchoolYear(), $yearsForMenu, true)) { $yearsForMenu[] = currentSchoolYear(); rsort($yearsForMenu); }
+          if (!in_array($ltDefYear, $yearsForMenu, true)) { $yearsForMenu[] = $ltDefYear; rsort($yearsForMenu); }
           foreach ($yearsForMenu as $yy): ?>
           <option value="<?= e($yy) ?>" <?= $selYear === $yy ? 'selected' : '' ?>><?= e($yy) ?></option>
         <?php endforeach; ?>

@@ -1516,8 +1516,6 @@ body.doc-view .nav-overlay,
 body.doc-view .menu-toggle,
 body.doc-view .global-search,
 body.doc-view .topbar-dossier,
-body.doc-view #schoolPicker,
-body.doc-view form[action*="switch_year"],
 body.doc-view a[href*="switch_lang"],
 body.doc-view .user-menu { display: none !important; }
 body.doc-view .main-content { margin: 0; }
@@ -3105,7 +3103,7 @@ details.msa-opts[open] > :not(summary) { margin-top: 0 !important; border-top-le
    الاستعمال: <i class="fas gov-ic gov-cnss"></i> — دائرة بيضا وراء الشعار كي يبيّن على الأبواب الكحلية والكبسات الملوّنة. */
 i.gov-ic { display: inline-block; width: 1.35em; height: 1.35em; vertical-align: -.33em; border-radius: 50%; background: #fff var(--gov-img) center / 82% no-repeat; box-shadow: 0 0 0 1px rgba(15,23,42,.12); }
 i.gov-ic::before { content: none !important; }
-i.gov-cnss { --gov-img: url(../img/gov/cnss.png); }
+i.gov-cnss { --gov-img: url(../img/gov/cnss.png); background-size: 96% !important; }   /* الشعار الكلاسيكي (العِيلة الخضرا + النصّ المقوَّس) بعته المستخدم 2026-10-18 — يملأ الدائرة كي تبيّن الرسمة */
 i.gov-mof  { --gov-img: url(../img/gov/mof.png); }
 i.gov-eoc  { --gov-img: url(../img/gov/eoc.svg); }
 .msa-tabs a.mt-tab > i.gov-ic:first-child, .msa-tabs .mt-btn > i.gov-ic:first-child { background: #fff var(--gov-img) center / 74% no-repeat; border-radius: 16px; }
@@ -3113,3 +3111,46 @@ i.gov-eoc  { --gov-img: url(../img/gov/eoc.svg); }
 .report-cat-title i.gov-ic, .card-header h3 i.gov-ic { width: 1.6em; height: 1.6em; vertical-align: -.42em; }
 .card-header h3 i.gov-ic, .sidebar-nav a > i.gov-ic:first-child, .report-cat .report-cat-title i.gov-ic { background-color: #fff !important; background-image: var(--gov-img) !important; background-size: 82% !important; background-position: center !important; background-repeat: no-repeat !important; text-shadow: none; }   /* فوق قاعدة المربّع الملوَّن (قسم الأيقونات بالألوان) */
 @media print { i.gov-ic { box-shadow: none; } }
+
+/* ═══ 510 — 🖼️ (2026-10-18 «حطّه») شعار البرنامج «رواتب الأساتذة» (كتاب + كشف راتب + عملة، كحلي/ذهبي — assets/img/logo_mark.png بلا الكلمة، logo_full.png مع الكلمة) ═══ */
+.msa-tabs .mt-brand-ic, .sidebar-brand .brand-logo { background: #fff !important; padding: 3px; }
+.msa-tabs .mt-brand-ic img, .sidebar-brand .brand-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.login-header .login-logo { width: auto; height: auto; background: #fff; border-radius: 18px; padding: 10px 14px; display: inline-block; }
+.login-header .login-logo img { display: block; width: 190px; max-width: 70vw; height: auto; }
+
+/* ═══ 515 — 📅 (2026-10-18 «السنين المدرسية مبيّنة فوق… تضلّها مبيّنة كيف ما طلعت ونزلت… واعمِلها غير لون تشوفها») قائمة السنة القديمة بالشريط العلوي: لون مميّز + ثابتة ═══ */
+/* 🎨 («وبعدين من السنوات غيرلي هالّلون الأحمر») كحلي البرنامج بخطّ ذهبي — مميّز عن باقي الحبوب (أزرق/أخضر/بنفسجي) ومتل ألوان الشريط العلوي */
+.school-switcher.year-switcher { background: linear-gradient(180deg, #2b4f7e 0%, #1e3a5f 100%) !important; border: 2px solid #c9a961 !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 4px 12px -4px rgba(30,58,95,.7) !important; padding: 3px 8px 3px 4px !important; }
+.school-switcher.year-switcher .ys-ic { color: #1e3a5f; background: linear-gradient(180deg, #e8d5a3 0%, #c9a961 100%); width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+.school-switcher.year-switcher select, .school-switcher.year-switcher select.form-control { background: transparent !important; color: #f3dfa6 !important; border: 0 !important; font-weight: 800 !important; font-size: 16px !important; direction: ltr; text-shadow: 0 1px 1px rgba(0,0,0,.35); cursor: pointer; }
+.school-switcher.year-switcher select option { color: #1e3a5f; background: #fff; font-weight: 700; font-size: 14px; }
+/* 📄 كانت القائمة مخفية بوضع «عرض المستند» (قاعدة doc-view على فورم switch_year — شيلناها) ⇒ صارت ظاهرة بكل التقارير والإفادات والنماذج أيضاً (2026-10-18) */
+/* 🏫☑️ (2026-10-18 «بكل الصفحات لازم يكون خيار المدارس موجود وحدّها تشاك مارك ممكن أختار عدّة مدارس») منتقي المدارس بالتشييك (#schoolPicker) كان مخفياً بالمستندات أيضاً ⇒ ظاهر بكل الصفحات */
+body.doc-view #schoolPicker { display: inline-flex !important; }
+/* القائمة المنسدلة كانت تخرج من يسار الشاشة بالمستندات (الحبّة أوّل السطر) ⇒ تفتح من حافة الحبّة اليسرى للداخل */
+body.doc-view #schoolPicker .school-menu { left: 0 !important; right: auto !important; }
+/* الشريط العلوي (والقائمة فيه) يبقى ثابتاً عند التمرير بكل الصفحات وبصفحات المستندات — لا حاوية تقطع الالتصاق */
+.topbar { position: sticky !important; top: 0; z-index: 45; }
+.main-content, .app-layout, body.doc-view .main-content { overflow: visible !important; }
+@media (max-width: 700px) { .school-switcher.year-switcher select { font-size: 14px !important; } }
+
+/* ═══ 525 — ✅ (2026-10-18 «أي أسانسور بالخيارات… لازم يكون بقلبو كبسة موافق») كبسة «موافق» جنب القائمة بعد تغيير الاختيار (وضع المستند) ═══ */
+.msa-ok { margin-inline-start: 6px; vertical-align: middle; white-space: nowrap; animation: msaOkIn .18s ease; box-shadow: 0 0 0 3px rgba(22,163,74,.22) !important; }
+@keyframes msaOkIn { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+.school-strip .msa-ok { padding: 3px 10px; font-size: 12.5px; }
+
+/* ═══ 530 — ⏳ (2026-10-18 «ليش بس اكبس طباعة بتاخد وقت») مؤشّر تحضير الورقة وسط الشاشة (msaPdfWait بـexport.js) ═══ */
+#msaPdfWait { position: fixed; inset: 0; z-index: 5000; background: rgba(15,23,42,.38); display: flex; align-items: center; justify-content: center; }
+#msaPdfWait .pw-box { background: #fff; border-radius: 16px; padding: 22px 30px; text-align: center; box-shadow: 0 20px 50px -20px rgba(0,0,0,.6); display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 440px; }
+#msaPdfWait .pw-box i { font-size: 36px; color: #d97706; }
+#msaPdfWait .pw-box b { font-size: 17px; color: #1e3a5f; }
+#msaPdfWait .pw-box small { color: #64748b; font-size: 12.5px; line-height: 1.5; }
+@media print { #msaPdfWait { display: none !important; } }
+
+/* ═══ 520 — 📄 (2026-10-18 «بباب الإفادات وقت بختار الاسم لازم يعطيني خيار أي إفادة بدي ياها وبس اكبس عليها تطلع دغري») الأستاذ المختار حبّة بخانة البحث + لائحة الإفادات تصير له ═══ */
+.msa-tabs .mt-search .mt-schip { display: inline-flex; align-items: center; gap: 6px; background: var(--mt-navy); color: #fff; border-radius: 999px; padding: 3px 11px; font-size: 12.5px; font-weight: 700; white-space: nowrap; max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
+.msa-tabs .mt-search .mt-schip-x { cursor: pointer; opacity: .85; margin-inline-start: 4px; font-style: normal; }
+.msa-tabs .mt-search .mt-schip-x:hover { opacity: 1; color: var(--mt-gold2, #e8d5a3); }
+.msa-tabs .mt-drop.mt-att-picked .mt-att-cols a { border-inline-start: 3px solid var(--mt-gold); background: #fffbeb; }
+.msa-tabs .mt-drop.mt-att-picked .mt-att-cols a:hover { background: #fef3c7; }
+.msa-tabs .mt-drop.mt-att-picked .mt-att-hd::after { content: ' — اكبس الإفادة لتطلع دغري'; font-weight: 400; color: #b45309; font-size: 11px; }

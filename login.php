@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="login-page">
     <div class="login-box">
         <div class="login-header">
-            <div class="login-logo"><i class="fas fa-graduation-cap"></i></div>
+            <div class="login-logo"><img src="<?= BASE_URL ?>assets/img/logo_full.png" alt="رواتب الأساتذة" width="190"></div><!-- 🖼️ (2026-10-18 «حطّه») الشعار الكامل بصفحة الدخول -->
             <h1>MSA Payroll</h1>
             <p>Système de gestion de la paie / نظام إدارة الرواتب</p>
         </div>

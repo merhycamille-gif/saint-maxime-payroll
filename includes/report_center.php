@@ -63,8 +63,11 @@ function reportCenterCategories(): array {
             ['url'=>$OF.'teacher_card', 'icon'=>'fa-address-card', 'color'=>'var(--primary)', 'fr'=>'Carte enseignant', 'ar'=>'بطاقة الأستاذ'],
             ['url'=>$OF.'teaching_staff', 'icon'=>'fa-chalkboard-user', 'color'=>'var(--info)', 'fr'=>'Corps enseignant', 'ar'=>'لائحة الهيئة التعليمية'],
             ['url'=>'?report=new_teachers', 'icon'=>'fa-user-plus', 'color'=>'var(--warning)', 'fr'=>'Nouveaux enseignants', 'ar'=>'الأساتذة الجدد — كامل الملف + مين مكمّل ملفه المالي'], // 🆕 2026-09-23
-            ['url'=>'?report=titularized&tmode=hire', 'icon'=>'fa-door-open', 'color'=>'var(--success)', 'fr'=>"Entrés à l'école (par date)", 'ar'=>'الداخلون إلى المدرسة بتاريخ'],
-            ['url'=>'?report=titularized', 'icon'=>'fa-user-check', 'color'=>'var(--primary)', 'fr'=>'Entrés au cadre (par date)', 'ar'=>'الداخلون في الملاك بتاريخ'],
+            // 📅 (2026-10-18) الافتراضي بالتقرير = 1/10 من السنة المعروضة (reports.php) — الأساتذة والموظفون الداخلون إلى المدرسة بهذا التاريخ
+            ['url'=>'?report=titularized&tmode=hire', 'icon'=>'fa-door-open', 'color'=>'var(--success)', 'fr'=>"Entrés à l'école le 1/10 (année affichée, date modifiable)", 'ar'=>'الأساتذة والموظفون الداخلون إلى المدرسة بتاريخ 1/10 من السنة المعروضة (التاريخ قابل للتغيير)'],
+            ['url'=>'?report=titularized', 'icon'=>'fa-user-check', 'color'=>'var(--primary)', 'fr'=>'Entrés au cadre le 1/10 (année affichée, date modifiable)', 'ar'=>'الداخلون في الملاك بتاريخ 1/10 من السنة المعروضة (التاريخ قابل للتغيير)'],
+            // 🚪 (2026-10-18 «وملف اللي تركوا بنفس السنة») التاركون خلال السنة المعروضة (صفحة left_teachers بفلتر السنة)
+            ['url'=>$PG.'left_teachers.php', 'icon'=>'fa-user-slash', 'color'=>'var(--danger)', 'fr'=>"Départs — enseignants et employés partis (année affichée)", 'ar'=>'الأساتذة والموظفون التاركون خلال السنة المعروضة'],
             ['url'=>$PG.'employee_history.php', 'icon'=>'fa-user-clock', 'color'=>'var(--warning)', 'fr'=>'Dossier enseignant', 'ar'=>'سيرة الأستاذ'],
             ['url'=>$PG.'attestations.php', 'icon'=>'fa-file-signature', 'color'=>'var(--gold)', 'fr'=>'Attestations', 'ar'=>'إفادات'],
             ['url'=>$OF.'staff_stats', 'icon'=>'fa-chart-simple', 'color'=>'var(--info)', 'fr'=>'Statistiques du personnel', 'ar'=>'إحصاءات الموظفين'],

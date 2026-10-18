@@ -14,6 +14,7 @@ $pageTitle = 'Rapports / التقارير';
 $db = getDB();
 
 $report = $_GET['report'] ?? '';
+$GLOBALS['msa_m13_opt'] = ($report === 'annual_totals');   // 🎁 (2026-10-18) خيار «شهر التعويض» بقائمة «المزيد» — المجاميع السنوية فقط هنا
 $month = (int)($_GET['month'] ?? date('n'));
 $year = (int)($_GET['year'] ?? date('Y'));
 $repRate = getExchangeRate($month, $year); // سعر صرف الشهر (لعرض البنود بالدولار — التقارير الشهرية بشهر واحد)
@@ -744,7 +745,7 @@ function reportDocThumb($path) {
         </script>
 
         <?php // ↔️ (2026-09-13) «مجاميع سنوية» من خانة كشوف الرواتب (لوائح الدولة) ⇒ من الشمال لليمين — الاتجاه فقط ?>
-        <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند'], ['dir' => 'ltr', 'annual' => true, 'law' => false]) ?>
+        <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند' . (m13InReports() ? ' — مع شهر التعويض (13) لمن عنده' : ' — بلا شهر التعويض (13)')], ['dir' => 'ltr', 'annual' => true, 'law' => false]) ?>
                 <div class="report-table-wrap" dir="ltr"><table class="doc-table" dir="ltr">
                     <thead><tr>
                         <th>#</th><th>المدرسة / École</th><th>عدد الأشخاص<br><small style="font-weight:400;opacity:.8">Effectif</small></th><th>الأشهر المدفوعة<br><small style="font-weight:400;opacity:.8">Mois payés</small></th><?php /* 👥📅 (2026-09-27) رقمان بدل «عدد الكشوف» الغامض */ ?>
@@ -773,6 +774,7 @@ function reportDocThumb($path) {
                 <p class="text-muted" style="margin:10px 0 0;font-size:12px"><i class="fas fa-circle-info"></i>
                     «عدد الأشخاص» = من تقاضى راتباً بالمدرسة خلال السنة (بالمجموع: الشخص المنقول بين مدرستين يُعدّ مرّة). «الأشهر المدفوعة» = مجموع الشهور المحسوبة لكل الأشخاص (شخص × شهر). كل خانة = مجموع الشهور المحسوبة للسنة الدراسية <?= e($schoolYear) ?> بالمدرسة. الدولار يُجمع شهراً بشهر بسعر صرف كل شهر (بلا فراطات).
                     <?php if (in_array('total', $atSel, true) && !salaryCompHas('transport')): ?>النقل غير مشمول بالمتوجب لأن زرّ «الراتب يشمل» لا يتضمّنه.<?php endif; ?>
+                    <?php if (m13InReports()): ?> شهر التعويض (13) لمن عنده بملفه مضاف إلى الرواتب والصافي والمتوجّب كما على بطاقته السنوية (بلا ضمان ولا ضريبة ولا صندوق) — يُشال من قائمة «المزيد».<?php else: ?> شهر التعويض (13) غير مشمول — يُضاف من قائمة «المزيد».<?php endif; ?>
                 </p>
                 <?php endif; ?>
         <?= docSheetEnd() ?>
@@ -785,7 +787,10 @@ function reportDocThumb($path) {
         //    مثلاً 1/10/2023 مين بمدرسة معيّنة داخل على المدرسة»: نفس التقرير صار بوضعين —
         //    tmode=hire (الدخول إلى المدرسة، hire_date، كل الفئات) | tmode=titular (الدخول في الملاك، الملاك فقط)
         //    وبمدى: tspan=day (بهذا التاريخ بالضبط) | tspan=year (كل السنة الدراسية التي يقع فيها التاريخ: 1/10 → 30/9)
-        $tdate = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['tdate'] ?? '')) ? $_GET['tdate'] : '2023-10-01';
+        // 📅 (2026-10-18 «لازم يكون في تقرير الأساتذة والموظفين اللي دخلوا إلى المدرسة 1-10 من نفس السنة») الافتراضي = 1/10 من السنة الدراسية المعروضة
+        //    (كان 1/10/2023 ثابتاً) — «كل السنين» ⇒ 1/10 من السنة الدراسية الحالية.
+        $tDefSy = preg_match('/^\d{4}-\d{4}$/', (string)activeSchoolYear()) ? activeSchoolYear() : schoolYearOfDate(date('Y-m-d'));
+        $tdate = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['tdate'] ?? '')) ? $_GET['tdate'] : (schoolYearToYears($tDefSy)[0] . '-10-01');
         $tmode = (($_GET['tmode'] ?? 'titular') === 'hire') ? 'hire' : 'titular';
         $tspan = (($_GET['tspan'] ?? 'day') === 'year') ? 'year' : 'day';
         $tcol  = $tmode === 'hire' ? 'e.hire_date' : 'e.titularization_date';

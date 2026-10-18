@@ -19,6 +19,7 @@ requireLogin();
 
 $db = getDB();
 $form = preg_replace('/[^a-z0-9_]/', '', $_GET['form'] ?? '');
+$GLOBALS['msa_m13_opt'] = in_array($form, ['employer_cost', 'general_report'], true);   // 🎁 (2026-10-18) خيار «شهر التعويض» — تقارير المصاريف السنوية فقط
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 $year = (int)($_GET['year'] ?? date('Y'));
 $month = (int)($_GET['month'] ?? date('n'));
@@ -229,6 +230,24 @@ function ofGetEmployee($db, $id) {
     $stmt->execute([$id]);
     return $stmt->fetch();
 }
+// 🏦📅 (2026-10-18 «ببيان عام صندوق التعويضات ديما بدك تحطّ الراتب بعد التدرّج تبع 1-10 لأن نحنا منقدّم البيان قبل 31-12 من بداية السنة —
+//    إنت معتمد راتب كانون الثاني وهيدا غلط») راتب تشرين الأول (أوّل السنة الدراسية المعروضة) لكل موظف؛ إن لم يُحسب بعد ⇒ أوّل شهر
+//    محسوب بتلك السنة؛ وإن لا شيء ⇒ آخر راتب (ofLatestSalary). استعلام واحد لكل الموظفين.
+function ofOctoberSalary($db, $empId, $sy = null) {
+    $sy = $sy ?: activeSchoolYear();
+    if ($sy === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$sy)) $sy = currentSchoolYear();
+    static $bulk = [];
+    if (!isset($bulk[$sy])) {
+        $bulk[$sy] = [];
+        [$y1] = schoolYearToYears($sy);
+        $q = $db->prepare("SELECT ms.* FROM monthly_salaries ms WHERE ms.is_calculated = 1 AND ms.school_year = ?
+                           ORDER BY ms.employee_id, (ms.year = ? AND ms.month = 10) DESC, ms.year, ms.month");
+        $q->execute([$sy, (int)$y1]);
+        foreach ($q->fetchAll() as $r) { $e = (int)$r['employee_id']; if (!isset($bulk[$sy][$e])) $bulk[$sy][$e] = $r; }
+    }
+    return $bulk[$sy][(int)$empId] ?? ofLatestSalary($db, $empId);
+}
+
 function ofLatestSalary($db, $empId, $year = null) {
     $sql = "SELECT * FROM monthly_salaries WHERE employee_id = ? AND is_calculated = 1";
     $params = [$empId];
@@ -312,8 +331,9 @@ if ($form === 'tax_register' && $emp) {
 if ($emp && empty($_GET['raw'])) {
     $hasReg = trim((string)($emp['nssf_number'] ?? '')) !== ''; // مسجّل سابقاً بالصندوق ⇒ نموذج «أجير عنده رقم»
     $offType = ['cnss_employ' => ($hasReg ? 'cnss_hire_reg' : 'cnss_hire_new'),
-                'cnss_employ2' => 'cnss_hire_new', 'cnss_terminate' => 'cnss_leave', 'cnss_work' => 'cnss_travail'][$form] ?? '';
-    if ($offType !== '') { header('Location: ' . BASE_URL . 'pages/attestations.php?employee_id=' . (int)$emp['id'] . '&type=' . $offType); exit; }
+                'cnss_employ2' => 'cnss_hire_new', 'cnss_terminate' => 'cnss_leave', 'cnss_work' => 'cnss_travail',
+                'cnss_work_detail' => 'cnss_travail'][$form] ?? '';   // 🏛️ (2026-10-18 «إفادة عمل الضمان في نموذج رسمي — حاطط غير شي») المفصّلة (مرض) = القالب الرسمي نفسه + قسم الأجور الثلاثة الأخيرة (detail=1)
+    if ($offType !== '') { header('Location: ' . BASE_URL . 'pages/attestations.php?employee_id=' . (int)$emp['id'] . '&type=' . $offType . ($form === 'cnss_work_detail' ? '&detail=1' : '')); exit; }
 }
 $famStatus = $emp['social_status'] ?? '';
 $isMarried = strpos($famStatus, 'marie') === 0;
@@ -1385,6 +1405,7 @@ elseif ($form === 'teacher_card'):
     </div>
     <div class="doc-title" style="margin:6px 0">بيان عام بمعلومات عن جميع أفراد الهيئة التعليمية <?= e($catTitle) ?></div>
     <div class="doc-year">عن السنة المدرسية <?= e($sy) ?></div><?= rateSubtitle(null, null, true) ?>
+    <div class="doc-subtitle">الرواتب بعد التدرّج كما في 1/10/<?= (int)schoolYearToYears($sy)[0] ?> (البيان يُقدَّم قبل 31/12)</div><?php /* 🏦📅 (2026-10-18) */ ?>
     <table class="doc-table">
         <thead>
             <tr>
@@ -1395,7 +1416,7 @@ elseif ($form === 'teacher_card'):
                 <th colspan="4">الفئة</th>
                 <th colspan="4">المرحلة</th>
                 <th rowspan="2">عدد ساعات التعليم</th>
-                <th rowspan="2">أساس الراتب</th>
+                <th rowspan="2">أساس الراتب بعد التدرّج<br><small style="font-weight:400">1/10</small></th>
                 <?= extraAideHeads(' rowspan="2"', $rows, null, null, $sy) ?><?= transportHead(' rowspan="2"') ?>
                 <th rowspan="2" style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th>
                 <th rowspan="2">التوقيع</th>
@@ -1413,14 +1434,14 @@ elseif ($form === 'teacher_card'):
             $hasInt = strpos($nv,'intermediaire')!==false; $hasSec = strpos($nv,'secondaire')!==false;
             // الفئة (رتبة واحدة): حاضنة/معلم(ابتدائي)/مدرس(متوسط)/أستاذ ثانوي
             $catCol = $hasSec ? 'sec' : ($hasInt ? 'int' : ($hasPrim ? 'prim' : ($hasMat ? 'mat' : 'int')));
-            $sal = ofLatestSalary($db, $r['id']);
+            $sal = ofOctoberSalary($db, $r['id'], $sy);   // 🏦📅 راتب 1/10 من السنة المعروضة (لا آخر شهر محسوب) — البيان يُقدَّم قبل 31/12
             $rsal = $sal ? (int)$sal['base_plus_echelon_lbp'] : 0;
             if ($rsal <= 0 && $sal) $rsal = (int)$sal['net_salary_lbp'];
             if ($rsal <= 0) $rsal = (int)scaleSalaryLBP($r['current_grade']);
             $contract = (int)($r['contract_salary_lbp'] ?? 0);
-            // مجاميع أسفل الجدول
+            // مجاميع أسفل الجدول — «أساس الراتب» = الأساس بعد التدرّج (base_plus_echelon) كما يطلبه الصندوق
             $esRate = $sal ? rowRate($sal) : null;
-            $esG['base'] += $sal ? (int)$sal['base_salary_lbp'] : 0;
+            $esG['base'] += $sal ? (int)$sal['base_plus_echelon_lbp'] : $rsal;
             $esG['ex']   += $sal ? extraWageLbp($sal) : 0;  $esG['ex_u'] += $sal ? extraWageUsd($sal) : 0;
             $esG['ai']   += $sal ? aideCompLbp($sal) : 0;   $esG['ai_u'] += $sal ? lbpToUsd(aideCompLbp($sal), $esRate) : 0;
             $esG['tr']   += $sal ? (int)$sal['transport_lbp'] : 0; $esG['tr_u'] += $sal ? lbpToUsd((int)$sal['transport_lbp'], $esRate) : 0;
@@ -1436,7 +1457,7 @@ elseif ($form === 'teacher_card'):
                 <?php /* 👨 (2026-10-08 «بلوائح صندوق التعويضات بدنا نحطّ اسم الأستاذ كامل مع اسم الأب»): الاسم الثلاثي */ ?>
                 <td style="text-align:right"><?= e(empFullNameAr($r)) ?></td>
                 <td><?= e(diplomaLabel($r['diploma'],'ar')) ?></td>
-                <td><?= formatDate($isMlk ? (shownTitularizationDate($r) ?: shownHireDate($r)) : shownHireDate($r)) ?></td>
+                <td><?= formatDate(shownHireDate($r)) ?></td><?php /* 📅 (2026-10-18 «تاريخ الدخول هوي تاريخ الدخول في المدرسة مش تاريخ الملاك») للملاك والمتعاقدين سواء */ ?>
                 <td><?= $catCol==='mat'?$X:'' ?></td>
                 <td><?= $catCol==='prim'?$X:'' ?></td>
                 <td><?= $catCol==='int'?$X:'' ?></td>
@@ -1446,7 +1467,7 @@ elseif ($form === 'teacher_card'):
                 <td><?= $hasInt?$X:'' ?></td>
                 <td><?= $hasSec?$X:'' ?></td>
                 <td><?= rtrim(rtrim((string)$r['hours_per_week'],'0'),'.') ?></td>
-                <td class="num"><?= formatLBP($sal ? (int)$sal['base_salary_lbp'] : 0,false) ?></td>
+                <td class="num"><?= formatLBP($sal ? (int)$sal['base_plus_echelon_lbp'] : $rsal,false) ?></td><?php /* الأساس بعد التدرّج (1/10) */ ?>
                 <?php if (salaryCompHas('extra')): ?><td class="num"><?= ($sal ? extraWageMoney($sal, ['withCur'=>false]) : money(0, null, ['withCur'=>false])) ?></td><?php endif; ?>
                 <?php if (salaryCompHas('aide')): ?><td class="num"><?= money($sal ? aideCompLbp($sal) : 0, $sal ? rowRate($sal) : null, ['withCur'=>false]) ?></td><?php endif; ?>
                 <?= transportTd(money($sal ? (int)$sal['transport_lbp'] : 0, $sal ? rowRate($sal) : null, ['withCur'=>false])) ?>
@@ -1867,6 +1888,21 @@ elseif ($form === 'teacher_card'):
         WHERE e.is_deleted=0" . $ofYearFilter . $ofEmpFilter . " AND ms.school_year=?" . reportSchoolSql('ms.school_id') . " GROUP BY ms.school_id ORDER BY ms.school_id");
     $q->execute(array_merge($ofYearParams, [$schoolYear]));
     $sdata = $q->fetchAll();
+    // 🎁 (2026-10-18 قراره) شهر التعويض (13) كما على البطاقة يُضاف لكل مدرسة إلى بعد التدرّج/الإضافي/المكافأة/الصافي — لا ضمان ولا صندوق ولا ضريبة
+    if (m13InReports()) {
+        require_once __DIR__ . '/../includes/annual_slip_data.php';
+        $stG13 = $db->prepare("SELECT DISTINCT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=0" . $ofYearFilter . $ofEmpFilter . " AND ms.school_year=?" . reportSchoolSql('ms.school_id'));
+        $stG13->execute(array_merge($ofYearParams, [$schoolYear])); $inG13 = array_flip(array_map('intval', $stG13->fetchAll(PDO::FETCH_COLUMN)));
+        foreach (thirteenthMonthByEmployee($db, (string)$schoolYear) as $eidG => $xG) {
+            if (!isset($inG13[$eidG])) continue;
+            foreach ($sdata as $iG => $sdG) {
+                if ((int)$sdG['school_id'] !== $xG['school_id']) continue;
+                foreach (['bpe' => 'bpe', 'extra_wage' => 'extra', 'aide' => 'aide', 'net' => 'net'] as $rk => $xk) $sdata[$iG][$rk] = (int)$sdG[$rk] + $xG[$xk];
+                foreach (['bpe_usd_mkt' => 'bpe_usd', 'extra_wage_usd' => 'extra_usd', 'aide_usd' => 'aide_usd', 'net_usd' => 'net_usd'] as $rk => $xk) $sdata[$iG][$rk] = (float)$sdG[$rk] + $xG[$xk];
+                break;
+            }
+        }
+    }
     $T = ['bpe'=>0,'extra'=>0,'aide'=>0,'trans'=>0,'composed'=>0,'netWith'=>0,'cnss'=>0,'eoc'=>0,'tax'=>0,'total'=>0,
           'bpe_usd'=>0.0,'extra_usd'=>0.0,'aide_usd'=>0.0,'trans_usd'=>0.0,'composed_usd'=>0.0,'netWith_usd'=>0.0,'cnss_usd'=>0.0,'eoc_usd'=>0.0,'tax_usd'=>0.0,'total_usd'=>0.0];
     $boxName   = (count($sdata)===1) ? schoolNameById($sdata[0]['school_id'],'ar') : 'المدارس المختارة';
@@ -2700,6 +2736,20 @@ elseif ($form === 'payment_list'):
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE e.is_deleted=0" . $ofYearFilter . $ofEmpFilter . " AND ms.school_year=? AND " . schoolScopeWhere('ms.school_id'));
     $q->execute(array_merge($ofYearParams, [$schoolYear])); $g = $q->fetch();
+    // 🎁 (2026-10-18 قراره) شهر التعويض (13) كما على البطاقة: يُضاف إلى الرواتب (بعد التدرّج/الإضافي/المكافأة) والصافي — بلا أي مساهمة أو محسوم
+    $m13Sum = ['bpe' => 0, 'extra' => 0, 'aide' => 0, 'net' => 0, 'bpe_usd' => 0, 'extra_usd' => 0, 'aide_usd' => 0, 'n' => 0];
+    if (m13InReports()) {
+        require_once __DIR__ . '/../includes/annual_slip_data.php';
+        $stE13 = $db->prepare("SELECT DISTINCT ms.employee_id FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.is_deleted=0" . $ofYearFilter . $ofEmpFilter . " AND ms.school_year=? AND " . schoolScopeWhere('ms.school_id'));
+        $stE13->execute(array_merge($ofYearParams, [$schoolYear])); $in13 = array_flip(array_map('intval', $stE13->fetchAll(PDO::FETCH_COLUMN)));
+        foreach (thirteenthMonthByEmployee($db, (string)$schoolYear) as $eid13 => $x13) {
+            if (!isset($in13[$eid13])) continue;
+            $m13Sum['n']++; foreach (['bpe', 'extra', 'aide', 'net', 'bpe_usd', 'extra_usd', 'aide_usd'] as $k13) $m13Sum[$k13] += $x13[$k13];
+        }
+        $g['baseS'] = (int)($g['baseS'] ?? 0) + $m13Sum['bpe'];   // كالبطاقة: أساس شهر 13 = بعد التدرّج (بلا قفزة درجة)
+        $g['bpe'] = (int)($g['bpe'] ?? 0) + $m13Sum['bpe']; $g['extraWage'] = (int)($g['extraWage'] ?? 0) + $m13Sum['extra']; $g['aideC'] = (int)($g['aideC'] ?? 0) + $m13Sum['aide']; $g['net'] = (int)($g['net'] ?? 0) + $m13Sum['net'];
+        $g['bpe_usd_mkt'] = (float)($g['bpe_usd_mkt'] ?? 0) + $m13Sum['bpe_usd']; $g['extraWage_usd'] = (float)($g['extraWage_usd'] ?? 0) + $m13Sum['extra_usd']; $g['aideC_usd'] = (float)($g['aideC_usd'] ?? 0) + $m13Sum['aide_usd'];
+    }
     $fam=(int)($g['family']??0); $trans=(int)($g['transport']??0);
     $cnss8=(int)($g['cnss8']??0); $eoc6=(int)($g['eoc6']??0); $fam6=(int)($g['fam6']??0); $eos85=(int)($g['eos85']??0);
     $famU=(float)($g['family_usd']??0); $transU=(float)($g['transport_usd']??0);
@@ -2725,6 +2775,7 @@ elseif ($form === 'payment_list'):
     ];
     if (salaryCompHas('extra')) $lines[] = ['— منها: الأجر الإضافي', (int)($g['extraWage']??0), true, (float)($g['extraWage_usd']??0)];
     if (salaryCompHas('aide'))  $lines[] = ['— منها: مكافأة ومساعدة', (int)($g['aideC']??0), true, (float)($g['aideC_usd']??0)];
+    if ($m13Sum['n'] > 0) $lines[] = ['— منها: شهر التعويض (13) لـ' . $m13Sum['n'] . ' — بلا محسومات ولا مساهمات', $m13Sum['bpe'] + (salaryCompHas('extra') ? $m13Sum['extra'] : 0) + (salaryCompHas('aide') ? $m13Sum['aide'] : 0), true, (float)($m13Sum['bpe_usd'] + (salaryCompHas('extra') ? $m13Sum['extra_usd'] : 0) + (salaryCompHas('aide') ? $m13Sum['aide_usd'] : 0))];
     $lines[] = ['التعويضات العائلية', $fam, false, $famU];
     if (salaryCompHas('transport')) $lines[] = ['تعويضات النقل', $trans, false, $transU];
     $lines = array_merge($lines, [

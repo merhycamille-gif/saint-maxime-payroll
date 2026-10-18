@@ -253,7 +253,7 @@ document.addEventListener('submit', function (e) {
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <span class="brand-logo"><i class="fas fa-graduation-cap"></i></span>
+            <span class="brand-logo"><img src="<?= BASE_URL ?>assets/img/logo_mark.png" alt="" width="42" height="42"></span><!-- 🖼️ (2026-10-18 «حطّه») شعار البرنامج: الكتاب وكشف الراتب — logo_mark بلا الكلمة بالأماكن الصغيرة -->
             <div>
                 <h2>MSA Payroll</h2>
                 <p><?= e(currentSchoolName()) ?></p>
@@ -609,6 +609,10 @@ document.addEventListener('submit', function (e) {
                         <?php /* ☑️ (2026-10-03 «بس اختار كل المدارس يصير في تشاك مارك لكل مدرسة — بختار الكل وبرجع بكبس على المدرسة اللي بديش ياها»):
                                  «كل المدارس» تشيّك كل المدارس واحدة واحدة، فيشيل التشييك عن التي لا يريدها ثم «تطبيق». الكل مشيّك = كل المدارس. */ ?>
                         <form method="get" action="<?= BASE_URL ?>switch_school.php" onsubmit="var bs=this.querySelectorAll('input[name=\'schools[]\']'),on=0;bs.forEach(function(c){if(c.checked)on++;});if(on===bs.length||on===0){bs.forEach(function(c){c.disabled=true;});}">
+                            <?php /* 🏫☑️ (2026-10-18 «بكل الصفحات… تشاك مارك… عدّة مدارس») المنتقي صار يظهر بالمستندات أيضاً ⇒ «تطبيق» يرجع لنفس الصفحة/المستند بالمدارس الجديدة (بلا وسائط المدارس والموظف القديمة — الموظف تابع لمدرسته) */
+                                  $spQ = $_GET; foreach (['sch', 'sch_all', 'sch_set', 'schools', 'school', 'employee_id', 'emp', 'emp_id'] as $spk) unset($spQ[$spk]);
+                                  $spBack = strtok((string)($_SERVER['REQUEST_URI'] ?? ''), '?') . ($spQ ? '?' . http_build_query($spQ) : ''); ?>
+                            <input type="hidden" name="back" value="<?= e($spBack) ?>">
                             <label class="sm-all"><input type="checkbox" id="smAll" <?= $isAllSel?'checked':'' ?> onclick="var v=this.checked;document.querySelectorAll('#schoolMenu input[name=\'schools[]\']').forEach(function(c){c.checked=v;})"> <strong>🏫 Toutes les écoles / كل المدارس</strong></label>
                             <div class="sm-list">
                             <?php foreach ($navSchools as $navS): ?>
@@ -624,8 +628,11 @@ document.addEventListener('submit', function (e) {
                 <?php if (function_exists('isSchoolYearLocked') && currentSchoolId() > 0 && isSchoolYearLocked(currentSchoolId(), activeSchoolYear())): ?>
                 <a href="<?= BASE_URL ?>pages/open_year.php#yearLocks" class="school-switcher" title="🔒 هذه السنة مقفولة لهذه المدرسة — الحسابات ما بتتغيّر (افتح القفل من صفحة فتح سنة دراسية)" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-weight:800;text-decoration:none;padding:4px 10px;border-radius:8px">🔒 مقفولة / Verrouillée</a>
                 <?php endif; ?>
-                <form method="get" action="<?= BASE_URL ?>switch_year.php" class="school-switcher" title="<?= $lang === 'ar' ? 'السنة الدراسية' : 'Année scolaire' ?>">
-                    <i class="fas fa-calendar-alt" style="color:#fff;background:#d97706;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
+                <?php /* 📅 (2026-10-18 «السنين المدرسية مبيّنة فوق… تضلّها مبيّنة كيف ما طلعت ونزلت… واعمِلها غير لون تشوفها»): القائمة نفسها القديمة — بلون مميّز (أحمر) وخطّ أكبر،
+                         والشريط العلوي ثابت عند التمرير (sticky بكل الصفحات وبالمستندات — قسم 515 بـapp.css). الاختيار يعيد نفس الصفحة بالسنة المختارة (switch_year يبدّل school_year بالرابط). */ ?>
+                <form method="get" action="<?= BASE_URL ?>switch_year.php" class="school-switcher year-switcher" id="yearSwitcher" title="<?= $lang === 'ar' ? 'السنة الدراسية — اختر السنة والصفحة نفسها تنعاد فيها' : 'Année scolaire — la même page se recharge dans l\'année choisie' ?>">
+                    <input type="hidden" name="back" value="<?= e(strtok((string)($_SERVER['REQUEST_URI'] ?? ''), '?') . ($_GET ? '?' . http_build_query($_GET) : '')) ?>">
+                    <i class="fas fa-calendar-alt ys-ic"></i>
                     <select name="school_year" onchange="this.form.submit()" class="form-control form-control-sm">
                         <?php
                         $aSY = activeSchoolYear();
@@ -759,6 +766,15 @@ document.addEventListener('submit', function (e) {
                     foreach ($__d['cat']['tiles'] as $__t) $__links .= $__tileLink($__t);
                     $__extra[] = ['fr' => $__d['fr'], 'ar' => $__d['ar'], 'color' => $__d['color'], 'links' => $__links, 'icon' => $__d['icon']];
                 }
+                // 🚪📅 (2026-10-18 «لازم يكون في ملف… اللي دخلوا إلى المدرسة 1-10 من نفس السنة» + «وملف اللي تركوا بنفس السنة» + «بدي يكون في باب لهالتقرير»)
+                //    باب «الداخلون والتاركون»: داخلو المدرسة بـ1/10 + الداخلون في الملاك + الأساتذة الجدد + التاركون + بلوغ الـ64 — كلّها بسنة العرض
+                $__edL = $__tileLink(['url' => '?report=titularized&tmode=hire', 'icon' => 'fa-door-open', 'fr' => "Entrés à l'école le 1/10 (année affichée)", 'ar' => 'الأساتذة والموظفون الداخلون إلى المدرسة بـ1/10 من السنة المعروضة'])
+                       . $__tileLink(['url' => '?report=titularized', 'icon' => 'fa-user-check', 'fr' => 'Entrés au cadre le 1/10 (année affichée)', 'ar' => 'الداخلون في الملاك بـ1/10 من السنة المعروضة'])
+                       . $__tileLink(['url' => '?report=new_teachers', 'icon' => 'fa-user-plus', 'fr' => 'Nouveaux enseignants', 'ar' => 'الأساتذة الجدد — كامل الملف']);
+                if (canEdit()) $__edL .= $__pageLink('left_teachers.php', 'fa-user-slash', 'Départs (année affichée)', 'الأساتذة والموظفون التاركون خلال السنة المعروضة', 'left_teachers')
+                                      . $__pageLink('retirement_64.php', 'fa-hourglass-half', 'Retraite 64', 'بلوغ سنّ الـ64', 'retirement_64');
+                $__extra[] = ['fr' => 'Entrées & Départs', 'ar' => 'الداخلون والتاركون', 'color' => '#0d9488', 'links' => $__edL, 'icon' => 'fa-people-arrows'];
+                $__tabIcons['Entrées & Départs'] = 'fa-people-arrows';
                 // 📄 (2026-10-16 «لازم يكون باب الإفادات وضمنو الإفادات مع التفتيش عن أستاذ: اسمو أو عيلتو أو رقم تلفونو») باب الإفادات
                 if (viewerCanSeePage('attestations.php')) {
                     require_once __DIR__ . '/attestation_types.php';
@@ -811,7 +827,7 @@ document.addEventListener('submit', function (e) {
                 $__tabIcons += ['CNSS' => 'gov-ic gov-cnss', 'Caisse EOC' => 'gov-ic gov-eoc', 'Finances' => 'gov-ic gov-mof'];
             }
             echo '<nav class="msa-tabs no-print" id="msaTabs" aria-label="Navigation">';
-            echo '<a class="mt-brand" href="' . BASE_URL . 'index.php" title="' . e(currentSchoolName()) . '"><span class="mt-brand-ic"><i class="fas fa-graduation-cap"></i></span><span class="mt-brand-tx"><b>MSA Payroll</b><small>' . e(currentSchoolName()) . '</small></span></a>';
+            echo '<a class="mt-brand" href="' . BASE_URL . 'index.php" title="' . e(currentSchoolName()) . '"><span class="mt-brand-ic"><img src="' . BASE_URL . 'assets/img/logo_mark.png" alt="" width="56" height="56"></span><span class="mt-brand-tx"><b>MSA Payroll</b><small>' . e(currentSchoolName()) . '</small></span></a>';
             echo '<a class="mt-tab mt-home' . ($currentPage === 'dashboard' ? ' active' : '') . '" href="' . BASE_URL . 'index.php" style="--tc:#1e3a5f"><i class="fas fa-house"></i><span class="nl2"><span class="nl-fr">Accueil</span><span class="nl-ar">الرئيسية</span></span></a>';
             foreach ($__groups as $__g) {
                 if (trim(strip_tags($__g['links'])) === '' && !preg_match('~<a ~', $__g['links'])) continue;
@@ -946,13 +962,32 @@ document.addEventListener('submit', function (e) {
         // رسائل التنبيه (flash) — تنبيهات عائمة عصرية تختفي لحالها (الأخطاء تبقى ليكبس ×)
         // 🔁 نسخة الكمبيوتر: مزامنة بيانات الأونلاين تلقائياً بالخلفية (المدير، كل ONLINE_SYNC_HOURS ساعات) + سطر الحالة بلوحة القيادة
         if (localSyncEnabled() && isAdmin()):
-            if (localSyncDue()): ?>
+            // 🔁 (2026-10-18) إطلاق خلفي أيضاً حين يحين فحص البصمة (كل 5 دقائق) — sync_local يقرّر إن تغيّر الأونلاين
+            if (localSyncDue() || localSyncCheckDue()): ?>
         <script>fetch(<?= json_encode(BASE_URL . 'sync_local.php') ?>, {credentials:'same-origin', keepalive:true}).catch(function(){});</script>
             <?php endif;
-            if (($currentPage ?? '') === 'dashboard'): ?>
-        <div class="alert alert-info no-print" style="margin:0 0 10px;font-size:12.5px;padding:6px 12px"><i class="fas fa-rotate"></i> نسخة الكمبيوتر — بيانات الأونلاين تُسحب تلقائياً كل <?= rtrim(rtrim(number_format(localSyncHours(), 2, '.', ''), '0'), '.') ?> ساعات: <?= e(localSyncStatusText()) ?></div>
-            <?php endif;
+            if (($currentPage ?? '') === 'dashboard'):
+                $lsSt = localSyncState(); $lsConf = localSyncConflicts();
+                if (!empty($_GET['sync_conflicts_seen']) && $lsConf['n']) { try { localSyncPdo()->exec("UPDATE `" . DB_NAME . "`.`_sync_conflicts` SET seen = 1"); } catch (Throwable $e) {} $lsConf = ['n' => 0, 'rows' => []]; } ?>
+        <div class="alert alert-info no-print" style="margin:0 0 10px;font-size:12.5px;padding:6px 12px"><i class="fas fa-rotate"></i> نسخة الكمبيوتر ⇄ الأونلاين تلقائياً (كل 5 دقائق): تعديلاتك هون بتنرفع للأونلاين، وتعديلات الأونلاين بتنزل لهون — وعلى الأقل كل <?= rtrim(rtrim(number_format(localSyncHours(), 2, '.', ''), '0'), '.') ?> ساعات نسخة كاملة: <?= e(localSyncStatusText()) ?>
+            <?php if (!empty($lsSt['pending_push'])): ?><br><strong style="color:#b45309"><i class="fas fa-cloud-arrow-up"></i> في تعديلات على الكمبيوتر بانتظار الإنترنت لترفع:</strong> <?= e((string)($lsSt['last_push_msg'] ?? '')) ?><?php elseif (!empty($lsSt['last_push_ok'])): ?> · آخر رفع للأونلاين <?= date('d/m/Y H:i', (int)$lsSt['last_push_ok']) ?><?php endif; ?>
+        </div>
+                <?php if ($lsConf['n']): ?>
+        <div class="alert alert-danger no-print" style="margin:0 0 10px;font-size:12.5px;padding:6px 12px"><i class="fas fa-triangle-exclamation"></i> <strong>تعارض بالمزامنة (<?= (int)$lsConf['n'] ?>):</strong> هالصفوف تعدّلت على الكمبيوتر وعلى الأونلاين معاً — بقي الأونلاين، راجعها وأعِد تعديلها أونلاين إذا لزم:
+            <?php foreach ($lsConf['rows'] as $cr): ?><span style="display:inline-block;background:#fff;border:1px solid #fecaca;border-radius:8px;padding:1px 8px;margin:2px"><?= e((string)$cr['label']) ?> <small>(<?= e($cr['tbl']) ?> · <?= $cr['kind'] === 'del' ? 'حذف' : ($cr['kind'] === 'ins' ? 'إضافة' : 'تعديل') ?> · <?= e(substr((string)$cr['created_at'], 0, 16)) ?>)</small></span><?php endforeach; ?>
+            <a class="btn btn-sm btn-light" href="?sync_conflicts_seen=1" style="margin-inline-start:8px"><i class="fas fa-check"></i> تمام، شفتها</a>
+        </div>
+                <?php endif;
+            endif;
         endif;
+        // 🖥️🔒 (قراءة فقط يدوياً: LOCAL_READ_ONLY) — افتراضياً مطفأ لأنّ المزامنة صارت باتّجاهين
+        if (function_exists('pcReadOnly') && pcReadOnly()):
+            $pcOnline = rtrim((string)ONLINE_SYNC_URL, '/') . '/' . ltrim(substr((string)($_SERVER['REQUEST_URI'] ?? ''), strlen(rtrim(BASE_URL, '/'))), '/'); ?>
+        <div class="alert alert-warning no-print pc-readonly" style="margin:0 0 10px;font-size:12.5px;padding:6px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><i class="fas fa-lock"></i>
+            <span>نسخة الكمبيوتر للقراءة والطباعة فقط — أي تعديل بيصير <strong>أونلاين</strong> وبيرجع لهون تلقائياً خلال دقائق.</span>
+            <a class="btn btn-sm btn-primary" href="<?= e($pcOnline) ?>" target="_blank" rel="noopener"><i class="fas fa-globe"></i> افتح هالصفحة أونلاين للتعديل / Modifier en ligne</a>
+        </div>
+        <?php endif;
         $hasFlash = !empty($_SESSION['flash_success']) || !empty($_SESSION['flash_error']) || !empty($_SESSION['flash_info']);
         if ($hasFlash): ?>
         <div class="toast-stack no-print" id="toastStack">

@@ -33,7 +33,12 @@ if ($format === 'pdf') {
         $sch = currentSchool();
         $schoolName = $sch ? (($dir === 'ltr' ? ($sch['name_fr'] ?? '') : ($sch['name_ar'] ?? '')) ?: ($sch['name_ar'] ?? $sch['name_fr'] ?? '')) : '';
         $landOpt = (($_POST['landscape'] ?? 'auto') === 'auto') ? null : $land;
-        $data = MsaPdf::fromHtml($html, ['title' => $title, 'dir' => $dir, 'landscape' => $landOpt, 'school' => $schoolName, 'fit' => (($_POST['fit'] ?? '1') !== '0'),   /* 📄 2026-10-15: الافتراضي ورقة وحدة (كل الأعمدة) حتى لمن لا يبعث fit (واتساب/إيميل) */ 'lh_bg' => (string)($_POST['lh_bg'] ?? ''), 'lh_pad' => (string)($_POST['lh_pad'] ?? '')]);
+        $pdfOpts = ['title' => $title, 'dir' => $dir, 'landscape' => $landOpt, 'school' => $schoolName, 'fit' => (($_POST['fit'] ?? '1') !== '0'),   /* 📄 2026-10-15: الافتراضي ورقة وحدة (كل الأعمدة) حتى لمن لا يبعث fit (واتساب/إيميل) */ 'lh_bg' => (string)($_POST['lh_bg'] ?? ''), 'lh_pad' => (string)($_POST['lh_pad'] ?? '')];
+        // ⚡ (2026-10-18 «ليش بس اكبس طباعة بتاخد وقت») كاش ببصمة المحتوى: نفس المستند بنفس الأرقام بنفس اليوم ⇒ الملف الجاهز فوراً (MsaPdf::cache*)
+        $ck = MsaPdf::cacheKey($html, $pdfOpts);
+        $data = MsaPdf::cacheGet($ck);
+        $cacheHit = ($data !== null);
+        if (!$cacheHit) { $data = MsaPdf::fromHtml($html, $pdfOpts); MsaPdf::cachePut($ck, $data); }
     } catch (Throwable $e) {
         http_response_code(500);
         header('Content-Type: text/plain; charset=utf-8');
@@ -46,6 +51,7 @@ if ($format === 'pdf') {
     header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . rawurlencode($fname) . '"; filename*=UTF-8\'\'' . rawurlencode($fname));
     header('Content-Length: ' . strlen($data));
     header('Cache-Control: no-cache');
+    header('X-Msa-Pdf-Cache: ' . ($cacheHit ? 'hit' : 'miss'));
     echo $data; exit;
 }
 
