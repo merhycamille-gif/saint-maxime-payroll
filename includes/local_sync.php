@@ -336,12 +336,16 @@ function localSyncPush(array $diff): array {
     return ['ok' => true, 'pushed' => $pushed, 'conflicts' => $conf, 'msg' => "رُفع $pushed صفّاً" . ($conf ? "، تعارضات $conf (بقي الأونلاين)" : '')];
 }
 /** الدورة الكاملة: رفع ما تغيّر على الكمبيوتر (إن وُجد) ثم سحب إن لزم (دوري/تغيّر الأونلاين/بعد الرفع). لا سحب قبل نجاح الرفع. */
+/** ⏸️ إيقاف مؤقّت للرفع: فحص الانحدار (tools/regression_check.php) يعدّل القاعدة المحلية مؤقّتاً — ممنوع رفع تلك التغييرات للأونلاين؛ الملف يبلى بعد ساعتين */
+function localSyncPaused(): bool { $f = dirname(__DIR__) . '/tmp/local_sync_pause'; return is_file($f) && time() - (int)@filemtime($f) < 7200; }
 function localSyncCycle(bool $force = false): array {
     $st = localSyncState();
     if (!empty($st['lock']) && time() - (int)$st['lock'] < 1800) return ['ok' => false, 'msg' => 'مزامنة جارية'];
+    if (localSyncPaused()) return ['ok' => true, 'msg' => 'paused (regression)'];
     $st['last_check'] = time(); localSyncSaveState($st);
     try { $diff = localSyncLocalDiff(); } catch (Throwable $e) { localSyncLog('تعذّر فحص تعديلات الكمبيوتر: ' . $e->getMessage()); $diff = []; }
     $hasLocal = is_array($diff) && count($diff) > 0;
+    if (!$hasLocal && !empty($st['pending_push'])) { $st = localSyncState(); $st['pending_push'] = 0; localSyncSaveState($st); }   // لا تعديلات معلّقة بعد الآن
     if ($hasLocal) {
         $p = localSyncPush($diff);
         $st = localSyncState(); $st['pending_push'] = $p['ok'] ? 0 : 1; $st['last_push_msg'] = $p['msg']; if ($p['ok']) $st['last_push_ok'] = time(); localSyncSaveState($st);

@@ -13,6 +13,13 @@ if (php_sapi_name() !== 'cli') { http_response_code(403); die('CLI only'); }
 
 $PROJ = dirname(__DIR__);
 $pass = 0; $fail = 0; $results = [];
+// ⏸️ (2026-10-18) الفحص يعدّل القاعدة المحلية مؤقّتاً ⇒ إيقاف رفع المزامنة باتّجاهين طوال الفحص (localSyncPaused) — يُزال بالنهاية
+@mkdir($PROJ . '/tmp', 0777, true); @touch($PROJ . '/tmp/local_sync_pause');
+register_shutdown_function(function () use ($PROJ) {
+    // بعد الفحص: أساس الدمج = حالة القاعدة الآن (الفحوص تعيد ما عدّلته) كي لا تُرفع أي بقايا فحص للأونلاين، ثم رفع الإيقاف
+    try { if (function_exists('localSyncBaseRebuild')) localSyncBaseRebuild(); } catch (Throwable $e) {}
+    @unlink($PROJ . '/tmp/local_sync_pause');
+});
 function check(string $name, bool $ok, string $detail = ''): void {
     global $pass, $fail, $results;
     $ok ? $pass++ : $fail++;
@@ -10360,6 +10367,18 @@ try {
     $why264 = 'api=' . (int)$apiOk . ' diff=' . (int)$diffOk . ' d1=' . json_encode(array_map(fn($x) => [count($x['ins']), count($x['upd']), count($x['del'])], $d1 ?? [])) . ' bk=' . (int)$bkOk . ' same=' . (int)$same;
 } catch (Throwable $e) { $why264 = $e->getMessage(); }
 check('🔁⇄ الدمج الثلاثي: بصمات متطابقة محلياً/واجهة + كشف تعديل محلي واحد ثم صفر بعد التراجع + apply بنسخة احتياطية + رفض الحذف الجماعي', $ok264, $why264);
+
+/**
+ * 265) ⏰ (2026-10-18 «يعني أنا لازم ضلّ فاتح البرنامج على الكمبيوتر حتى يتعدّل؟» ⇒ لا) المزامنة بالخلفية بلا متصفّح: tools/sync_cycle_cli.php (CLI فقط)
+ *      + tools/sync_cycle_hidden.vbs (بلا نافذة) + مهمّة ويندوز «MSA Payroll Sync» كل 5 دقائق على كمبيوتر المدرسة (تُفحص هنا لأنّ الفحص يجري عليه).
+ */
+$cli265 = (string)file_get_contents($PROJ . '/tools/sync_cycle_cli.php'); $vbs265 = (string)@file_get_contents($PROJ . '/tools/sync_cycle_hidden.vbs');
+$task265 = (string)@shell_exec('schtasks /Query /TN "MSA Payroll Sync" /FO LIST 2>&1');
+check('⏰ مزامنة الخلفية بلا متصفّح: سكربت CLI + VBS بلا نافذة + مهمّة ويندوز «MSA Payroll Sync» كل 5 دقائق مسجَّلة على كمبيوتر المدرسة',
+      strpos($cli265, "if (php_sapi_name() !== 'cli')") !== false && strpos($cli265, '$res = localSyncCycle($force);') !== false
+      && strpos($vbs265, 'sync_cycle_cli.php') !== false && strpos($vbs265, ', 0, False') !== false
+      && (stripos($task265, 'MSA Payroll Sync') !== false),
+      stripos($task265, 'MSA Payroll Sync') !== false ? 'task ok' : 'task missing: ' . mb_substr(trim($task265), 0, 80));
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
