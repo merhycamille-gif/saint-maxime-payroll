@@ -1425,6 +1425,10 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
             <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= $id ?>&dossier=1" class="btn btn-info btn-lg btn-dossier" title="كل شي عن هذا الموظف بمكان واحد: مستنداته، ر6، البطاقة السنوية، وكل الإفادات والنماذج الرسمية (استخدام أجير، ترك أجير…) للطباعة">
                 <i class="fas fa-folder-open"></i> Dossier complet & attestations / الملف الكامل والإفادات
             </a>
+            <?php /* 🪪 (2026-10-19) بطاقة الأستاذ على ورقة A4 واحدة — كل معلومات ملفّه للطباعة بلا صور المستندات */ ?>
+            <a href="<?= BASE_URL ?>pages/employee_fiche.php?employee_id=<?= $id ?>" class="btn btn-success" title="كل معلومات الأستاذ (شخصية، وظيفية، أرقام رسمية، راتب) على ورقة A4 واحدة للطباعة">
+                <i class="fas fa-id-card"></i> Fiche A4 / بطاقة الأستاذ A4
+            </a>
         </div>
     <?php endif; ?>
 </div>

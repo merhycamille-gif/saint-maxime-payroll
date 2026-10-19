@@ -124,6 +124,7 @@ function viewerReportExports() {
     return [
         'reports.php'     => ['reports_export.php'],
         'annual_slip.php' => ['annual_slip_export.php'],
+        'attestations.php' => ['employee_fiche.php'],   // 🪪 (2026-10-19) بطاقة الأستاذ A4 تتبع صلاحية الإفادات/الملف الكامل
     ];
 }
 

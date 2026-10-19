@@ -290,6 +290,8 @@ if ($emp && !empty($_GET['dossier'])):
                 <a href="<?= e($r6Url) ?>" class="btn btn-primary"><i class="fas fa-file-lines"></i> R6 — Relevé annuel individuel / ر6 — كشف سنوي إفرادي</a>
                 <a href="<?= e($slipUrl) ?>" class="btn btn-gold"><i class="fas fa-file-invoice-dollar"></i> Fiche de salaire annuelle / بطاقة الراتب السنوية</a>
                 <a href="<?= e($histUrl) ?>" class="btn btn-info"><i class="fas fa-user-clock"></i> Parcours de l'enseignant / سيرة الأستاذ</a>
+                <?php /* 🪪 (2026-10-19 «معلومات الاستاذ على صفحة وحدة A4… واقدر اطبعها») كل معلومات ملفّه على ورقة واحدة بلا صور المستندات — pages/employee_fiche.php */ ?>
+                <a href="<?= BASE_URL ?>pages/employee_fiche.php?employee_id=<?= (int)$employeeId ?>" class="btn btn-success" title="كل معلومات الأستاذ (شخصية، وظيفية، أرقام رسمية، راتب) على ورقة A4 واحدة للطباعة"><i class="fas fa-id-card"></i> Fiche A4 / بطاقة الأستاذ A4</a>
             </div>
 
             <h4 style="color:var(--primary);margin:6px 0 10px">
