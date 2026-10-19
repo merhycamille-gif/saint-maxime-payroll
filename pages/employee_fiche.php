@@ -88,60 +88,63 @@ $famAll = implode(' · ', array_filter([
     (float)($emp['family_allowance_spouse_lbp'] ?? 0) ? ('زوج: ' . formatLBP($emp['family_allowance_spouse_lbp'])) : '',
     (float)($emp['family_allowance_children_lbp'] ?? 0) ? ('أولاد: ' . formatLBP($emp['family_allowance_children_lbp'])) : '',
 ]));
-$subj = fn($on, $ech, $ext, $pa) => (int)$on ? ('نعم — يشمل: ' . $incLbl($ech, $ext, $pa)) : 'لا';
 
 // [التسمية, القيمة, كامل السطر؟] — القيمة الفارغة تُحذف
 $S = [];
-$S['Informations personnelles / معلومات شخصية'] = [
-    ['الاسم الكامل (عربي)', $nameAr, true],
-    ['Nom complet (FR)', $nameFr, true],
-    ['اسم الأم', $mother],
-    ['الجنسية', $emp['nationality'] ?? ''],
-    ['تاريخ ومحل الولادة', $birth],
-    ['رقم السجل / محله', $registry],
-    ['الوضع العائلي', $social],
-    ['عدد الأولاد', (int)($emp['number_of_children'] ?? 0) > 0 ? (string)(int)$emp['number_of_children'] : ''],
+// 🌐 («عملتها باللغتين… فرنسي وتحت الفرنسي دغري عربي» 2026-10-19) عنوان القسم: الفرنسي فوق والعربي تحته؛ تسمية الخانة: «Français / عربي» على السطر نفسه
+//    التسميات قصيرة عمداً كي تسع خانتان بالسطر وتبقى الورقة واحدة
+$incShort = fn($ech, $ext, $pa) => implode('، ', array_filter([(int)$ech ? 'التدرّج' : '', (int)$ext ? 'الإضافي' : '', (int)$pa ? 'المكافأة' : ''])) ?: 'الأساس فقط';
+$subj = fn($on, $ech, $ext, $pa) => (int)$on ? ('نعم: ' . $incShort($ech, $ext, $pa)) : 'لا';
+$S['Informations personnelles|معلومات شخصية'] = [
+    ['Nom complet (AR) / الاسم الكامل', $nameAr, true],
+    ['Nom complet (FR) / الاسم بالفرنسي', $nameFr, true],
+    ['Mère / اسم الأم', $mother],
+    ['Nationalité / الجنسية', $emp['nationality'] ?? ''],
+    ['Naissance / الولادة', $birth],
+    ['Registre / السجل', $registry],
+    ['Situation / الوضع العائلي', $social],
+    ["Enfants / عدد الأولاد", (int)($emp['number_of_children'] ?? 0) > 0 ? (string)(int)$emp['number_of_children'] : ''],
 ];
-$S['Contact et adresse / اتصال وسكن'] = [
-    ['الهاتف', $phones],
-    ['البريد الإلكتروني', $emp['email'] ?? ''],
-    ['العنوان', $addr, true],
+$S['Contact et adresse|اتصال وسكن'] = [
+    ['Tél. / الهاتف', $phones],
+    ['E-mail / الإيميل', $emp['email'] ?? ''],
+    ['Adresse / العنوان', $addr, true],
 ];
-$S['Informations professionnelles / معلومات وظيفية'] = [
-    ['الفئة', employeeTypeLabel($emp['employee_type'])],
-    ['نوع الوظيفة', (!$isTeacher && ($emp['job_title'] ?? '') !== '') ? jobTitleLabel($emp['job_title']) : ''],
-    ['الشهادة', ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma']) : ''],
-    ['الاختصاص', $emp['specialization'] ?? ''],
-    ['المواد التي يعلّمها', $emp['subjects_taught'] ?? ''],
-    ['المرحلة', $emp['niveau_scolaire'] ?? ''],
-    ['الصفوف', classLevelNames($emp['classes_taught'] ?? '')],
-    ['الدرجة', $grade],
-    ['الدوام', $hours],
-    ['تاريخ الدخول', shownHireDate($emp) ? formatDate(shownHireDate($emp)) : ''],
-    ['تاريخ الملاك', shownTitularizationDate($emp) ? formatDate(shownTitularizationDate($emp)) : ''],
-    ['تاريخ تثبيت الملاك', $emp['tenure_confirmation_date'] ? formatDate($emp['tenure_confirmation_date']) : ''],
-    ['الحالة', employeeStatusLabel($emp['status'])['label'] ?? ''],
-    ['استمرار العمل بعد ٦٤', (int)($emp['keep_working_past_64'] ?? 0) === 1 ? 'نعم' : ''],
+$S['Informations professionnelles|معلومات وظيفية'] = [
+    ['Catégorie / الفئة', employeeTypeLabel($emp['employee_type'])],
+    ['Fonction / الوظيفة', (!$isTeacher && ($emp['job_title'] ?? '') !== '') ? jobTitleLabel($emp['job_title']) : ''],
+    ['Diplôme / الشهادة', ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma']) : ''],
+    ['Spécialité / الاختصاص', $emp['specialization'] ?? ''],
+    ['Matières / المواد', $emp['subjects_taught'] ?? ''],
+    ['Cycle / المرحلة', $emp['niveau_scolaire'] ?? ''],
+    ['Classes / الصفوف', classLevelNames($emp['classes_taught'] ?? '')],
+    ['Échelon / الدرجة', $grade],
+    ['Horaire / الدوام', $hours],
+    ["Entrée / الدخول", shownHireDate($emp) ? formatDate(shownHireDate($emp)) : ''],
+    ['Titularisation / الملاك', shownTitularizationDate($emp) ? formatDate(shownTitularizationDate($emp)) : ''],
+    ['Confirmation / تثبيت الملاك', $emp['tenure_confirmation_date'] ? formatDate($emp['tenure_confirmation_date']) : ''],
+    ['Statut / الحالة', employeeStatusLabel($emp['status'])['label'] ?? ''],
+    ['Après 64 ans / بعد ٦٤', (int)($emp['keep_working_past_64'] ?? 0) === 1 ? 'نعم' : ''],
 ];
-$S['Numéros officiels / أرقام رسمية وتواريخ الترك'] = [
-    ['رقم الضمان (CNSS)', cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', '')],
-    ['الرقم المالي (MOF)', $emp['finance_ministry_number'] ?? ''],
-    ['رقم الصندوق (Caisse)', $emp['caisse_number'] ?? ''],
-    ['تاريخ الترك من الكل', !empty($emp['left_date_all']) ? formatDate($emp['left_date_all']) : ''],
-    ['تاريخ ترك الضمان', !empty($emp['left_date_cnss']) ? formatDate($emp['left_date_cnss']) : ''],
-    ['تاريخ ترك المالية', !empty($emp['left_date_finance']) ? formatDate($emp['left_date_finance']) : ''],
-    ['تاريخ ترك الصندوق', !empty($emp['left_date_eoc']) ? formatDate($emp['left_date_eoc']) : ''],
+$S['Numéros officiels et cessations|أرقام رسمية وتواريخ الترك'] = [
+    ['CNSS / الضمان', cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', '')],
+    ['Finances / المالية', $emp['finance_ministry_number'] ?? ''],
+    ['Caisse / الصندوق', $emp['caisse_number'] ?? ''],
+    ['Cessation / الترك من الكل', !empty($emp['left_date_all']) ? formatDate($emp['left_date_all']) : ''],
+    ['Cessation CNSS / ترك الضمان', !empty($emp['left_date_cnss']) ? formatDate($emp['left_date_cnss']) : ''],
+    ['Cessation Finances / ترك المالية', !empty($emp['left_date_finance']) ? formatDate($emp['left_date_finance']) : ''],
+    ['Cessation Caisse / ترك الصندوق', !empty($emp['left_date_eoc']) ? formatDate($emp['left_date_eoc']) : ''],
 ];
-$S['Salaire et retenues / الراتب والمحسومات'] = [
-    ['طريقة الراتب', $modeLbl],
-    ['أساس الراتب', $baseLbl],
-    ['الفترة المدفوعة بالسنة', paidPeriodLabel($emp, 'ar')],
-    ['الشهر الثالث عشر', $m13],
-    ['التعويض العائلي', $famAll],
-    ['تعويض النقل', $transport],
-    ['خاضع للضريبة', $subj($emp['tax_subject'] ?? 0, $emp['tax_includes_echelon'] ?? 0, $emp['tax_includes_extra'] ?? 0, $emp['tax_includes_prime_aide'] ?? 0)],
-    ['خاضع للضمان', $subj($emp['cnss_subject'] ?? 0, $emp['cnss_includes_echelon'] ?? 0, $emp['cnss_includes_extra'] ?? 0, $emp['cnss_includes_prime_aide'] ?? 0)],
-    ['خاضع لصندوق التعويضات', $subj($emp['eoc_subject'] ?? 0, $emp['eoc_includes_echelon'] ?? 0, $emp['eoc_includes_extra'] ?? 0, $emp['eoc_includes_prime_aide'] ?? 0)],
+$S['Salaire et retenues|الراتب والمحسومات'] = [
+    ['Mode / طريقة الراتب', $modeLbl],
+    ['Base / أساس الراتب', $baseLbl],
+    ['Période payée / الفترة المدفوعة', paidPeriodLabel($emp, 'ar')],
+    ['13e mois / الشهر 13', $m13],
+    ['Allocations / التعويض العائلي', $famAll],
+    ['Transport / النقل', $transport],
+    ["Impôt / الضريبة", $subj($emp['tax_subject'] ?? 0, $emp['tax_includes_echelon'] ?? 0, $emp['tax_includes_extra'] ?? 0, $emp['tax_includes_prime_aide'] ?? 0)],
+    ['CNSS / الضمان', $subj($emp['cnss_subject'] ?? 0, $emp['cnss_includes_echelon'] ?? 0, $emp['cnss_includes_extra'] ?? 0, $emp['cnss_includes_prime_aide'] ?? 0)],
+    ['Caisse / الصندوق', $subj($emp['eoc_subject'] ?? 0, $emp['eoc_includes_echelon'] ?? 0, $emp['eoc_includes_extra'] ?? 0, $emp['eoc_includes_prime_aide'] ?? 0)],
 ];
 
 // الصورة الشخصية (إن وُجدت على هذا الجهاز — محرّك الطباعة يقرأها من الملف نفسه)
@@ -165,15 +168,29 @@ echo officialFormStyles();
 .fiche-a4 .doc-subtitle{margin:0 0 4px}
 .fiche-a4 table.pdf-info{width:100%;border-collapse:collapse;margin:2px 0 6px;font-size:12pt}
 .fiche-a4 table.pdf-info td{border:0;border-bottom:1px dotted #94a3b8;vertical-align:top}
-.fiche-a4 .k{color:#334155;white-space:nowrap}
+.fiche-a4 .k{color:#334155}
 .fiche-a4 .fill{font-weight:700;color:#0a3d91;display:inline;padding:0 3px}
 .fiche-a4 .fiche-foot{font-size:10pt;color:#64748b;text-align:center;border-top:1px dashed #cbd5e1;margin-top:12px;padding-top:4px}
 </style>
 <?php
 // خانة = تسمية + قيمة على سطر منقّط؛ القيمة الطويلة (> 36 حرفاً) تأخذ السطر كلّه كي لا تتكسّر على أسطر كثيرة
-$tdStyle = 'padding:1.5pt 4pt 1pt;line-height:1.3;vertical-align:top;border:0;border-bottom:0.5pt dotted #94a3b8';
+$tdStyle = 'padding:1pt 4pt 0.5pt;line-height:1.2;vertical-align:top;border:0;border-bottom:0.5pt dotted #94a3b8';
+$mmEst = function (string $t): float {   // تقدير عرض النصّ بالملم بخط Arial 12pt (نفس تقدير محرّك الطباعة MsaPdf::textMmEst)
+    $w = 0.0;
+    foreach (preg_split('//u', $t, -1, PREG_SPLIT_NO_EMPTY) as $ch) {
+        $o = mb_ord($ch, 'UTF-8');
+        if ($o >= 0x064B && $o <= 0x065F) continue;
+        if ($o >= 0x0600 && $o <= 0x06FF) $w += 1.9;
+        elseif (ctype_digit($ch)) $w += 2.3;
+        elseif ($ch === ' ' || $ch === ',' || $ch === '.' || $ch === ':' || $ch === '/') $w += 1.1;
+        elseif ($o > 0x2000) $w += 2.6;
+        elseif (ctype_upper($ch)) $w += 2.6;
+        else $w += 2.0;
+    }
+    return $w;
+};
 $cell = fn($r, $span) => '<td' . ($span > 1 ? ' colspan="2" style="width:100%;' : ' style="width:50%;') . $tdStyle . '"><span class="k">' . e($r[0]) . ':</span> <span class="fill">' . e($r[1]) . '</span></td>';
-$infoTable = function (array $rows) use ($cell, $tdStyle) {
+$infoTable = function (array $rows) use ($cell, $tdStyle, $mmEst) {
     $out = '<table class="pdf-info" dir="rtl" width="100%" style="width:100%;border-collapse:collapse;margin:2pt 0 5pt">';
     $pair = [];
     $flush = function () use (&$pair, &$out, $cell, $tdStyle) {
@@ -182,7 +199,8 @@ $infoTable = function (array $rows) use ($cell, $tdStyle) {
         $pair = [];
     };
     foreach ($rows as $r) {
-        $full = !empty($r[2]) || mb_strlen((string)$r[1], 'UTF-8') > 30;
+        // الخانة التي لا تسع نصف السطر (≈80mm بخط 12: عربي 1.9mm/حرف، لاتيني 2.0، رقم 2.3) تأخذ السطر كلّه بدل أن تلتفّ
+        $full = !empty($r[2]) || $mmEst($r[0] . ': ' . $r[1]) > 84;
         if ($full) { $flush(); $out .= '<tr>' . $cell($r, 2) . '</tr>'; continue; }
         $pair[] = $r;
         if (count($pair) === 2) $flush();
@@ -200,23 +218,24 @@ $infoTable = function (array $rows) use ($cell, $tdStyle) {
 
 <div id="ppExportArea">
 <div class="official-doc rtl fiche-a4" dir="rtl">
-    <?= schoolLetterhead($school) ?>
+    <div style="line-height:1.25"><?= schoolLetterhead($school) ?></div>
     <table class="fiche-top"><tr>
         <td>
-            <div class="doc-title"><span dir="ltr"><?= e($titleFr) ?></span> / <?= e($titleAr) ?></div>
-            <div class="doc-subtitle"><strong><?= e($nameAr ?: $nameFr) ?></strong><?php if ($nameAr && $nameFr): ?> — <span dir="ltr"><?= e($nameFr) ?></span><?php endif; ?><?php if (!empty($emp['employee_code'])): ?> · <?= e($emp['employee_code']) ?><?php endif; ?></div>
+            <div class="doc-title" style="line-height:1.2;margin:0 0 1pt"><span dir="ltr"><?= e($titleFr) ?></span><div style="font-size:0.85em"><?= e($titleAr) ?></div></div>
+            <div class="doc-subtitle" style="margin:0 0 2pt;line-height:1.2"><strong><?= e($nameAr ?: $nameFr) ?></strong><?php if ($nameAr && $nameFr): ?> — <span dir="ltr"><?= e($nameFr) ?></span><?php endif; ?><?php if (!empty($emp['employee_code'])): ?> · <?= e($emp['employee_code']) ?><?php endif; ?></div>
         </td>
         <?php if ($photoUrl): ?><td class="fiche-photo"><img src="<?= $photoUrl ?>" alt=""></td><?php endif; ?>
     </tr></table>
 
     <?php foreach ($S as $title => $rows): ?>
         <?php $rows = array_values(array_filter($rows, fn($r) => trim((string)$r[1]) !== '')); if (!$rows) continue; ?>
-        <div class="doc-section" style="margin:6pt 0 2pt"><?= e($title) ?></div>
+        <?php [$tFr, $tAr] = array_pad(explode('|', $title, 2), 2, ''); ?>
+        <div class="doc-section" style="margin:5pt 0 1pt;line-height:1.2"><span dir="ltr"><?= e($tFr) ?></span><div style="font-size:0.9em;font-weight:600"><?= e($tAr) ?></div></div>
         <?= $infoTable($rows) ?>
     <?php endforeach; ?>
 
     <?php if ($notes !== ''): ?>
-    <div class="doc-section" style="margin:6pt 0 2pt">Remarques / ملاحظات</div>
+    <div class="doc-section" style="margin:6pt 0 2pt;line-height:1.25"><span dir="ltr">Remarques</span><div style="font-size:0.9em;font-weight:600">ملاحظات</div></div>
     <div style="line-height:1.3"><?= nl2br(e($notes)) ?></div>
     <?php endif; ?>
 
