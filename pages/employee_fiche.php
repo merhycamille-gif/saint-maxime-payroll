@@ -12,6 +12,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/payroll_calculator.php';
 require_once __DIR__ . '/../includes/report_helpers.php';
+require_once __DIR__ . '/../includes/translit_ar_fr.php';   // قواميس الأسماء/الأماكن/الموادّ بالاتجاهين
 requireLogin();
 
 $currentPage = 'employee_fiche';
@@ -174,6 +175,112 @@ $t = fn($k) => $T[$k][$li] ?? $T[$k][1];
 $vl = ($L === 'ar') ? 'ar' : 'fr';   // لغة الدوال المشتركة (عربي/فرنسي) — الإنكليزي يأخذ الفرنسي حيث لا ترجمة
 $rtl = ($L === 'ar');
 
+// 🌐 («بالعربي يعني كل شي فيها بالعربي» 2026-10-19): حتى قيم الملف المكتوبة بلغة ثانية (الجنسية، المرحلة، المواد، الصفوف، العملة)
+//    تُترجَم للغة الورقة — قاموس مصطلحات [عربي, فرنسي, إنكليزي] + مرادفات كما تُكتب بالملفات؛ ما ليس بالقاموس يبقى كما هو.
+$TERMS = [
+    [['لبناني', 'Libanais', 'Lebanese'], ['lebanese', 'libanaise', 'libanais', 'لبنانية', 'لبناني']],
+    [['سوري', 'Syrien', 'Syrian'], ['syrian', 'syrie', 'syrien', 'syrienne', 'سورية', 'سوري']],
+    [['فلسطيني', 'Palestinien', 'Palestinian'], ['palestinian', 'palestinien', 'palestinienne', 'فلسطينية', 'فلسطيني']],
+    [['مصري', 'Égyptien', 'Egyptian'], ['egyptian', 'égyptien', 'egyptien', 'مصرية', 'مصري']],
+    [['أخرى', 'Autre', 'Other'], ['other', 'autre']],
+    [['حضانة', 'Maternelle', 'Kindergarten'], ['maternelle', 'kindergarten', 'روضة']],
+    [['ابتدائي', 'Primaire', 'Primary'], ['primaire', 'primary', 'ابتدائي']],
+    [['متوسط', 'Intermédiaire', 'Intermediate'], ['intermediaire', 'intermédiaire', 'intermediate', 'complémentaire', 'متوسط', 'تكميلي']],
+    [['ثانوي', 'Secondaire', 'Secondary'], ['secondaire', 'secondary', 'ثانوي']],
+    [['لغة فرنسية', 'Langue française', 'French language'], ['langue française', 'langue francaise', 'french language', 'اللغة الفرنسيّة', 'اللغة الفرنسية', 'لغة فرنسية']],
+    [['لغة إنكليزية', 'Langue anglaise', 'English language'], ['english language', 'langue anglaise', 'اللغة الإنكليزية', 'لغة إنكليزية', 'لغة انكليزية']],
+    [['أدب إنكليزي', 'Littérature anglaise', 'English literature'], ['english literature', 'littérature anglaise']],
+    [['لغة عربية', 'Langue arabe', 'Arabic language'], ['langue arabe', 'arabic language', 'اللغة العربية و ادابها', 'اللغة العربية وآدابها', 'اللغة العربية', 'اللّغة العربيّة', 'لغة عربية']],
+    [['كل المواد', 'toutes les matières', 'all subjects'], ['toutes les matières', 'toutes les matieres', 'all subjects', 'كل المواد']],
+    [['فرنسي', 'Français', 'French'], ['français', 'francais', 'french', 'فرنسي']],
+    [['إنكليزي', 'Anglais', 'English'], ['english', 'anglais', 'إنكليزي', 'انكليزي', 'إنجليزي']],
+    [['عربي', 'Arabe', 'Arabic'], ['arabe', 'arabic', 'عربي']],
+    [['رياضيات', 'Maths', 'Maths'], ['mathématiques', 'mathematiques', 'maths', 'math', 'الرياضيات', 'رياضيات']],
+    [['علوم الحياة', 'SVT', 'Life sciences'], ['svt', 'life sciences', 'علوم الحياة']],
+    [['علوم', 'Sciences', 'Sciences'], ['sciences', 'science', 'علوم']],
+    [['كيمياء', 'Chimie', 'Chemistry'], ['chimie', 'chemistry', 'كيمياء']],
+    [['أحياء', 'Biologie', 'Biology'], ['biologie', 'biology', 'أحياء', 'بيولوجيا']],
+    [['فيزياء', 'Physique', 'Physics'], ['physique', 'physics', 'فيزياء']],
+    [['معلوماتية', 'Informatique', 'Computer science'], ['informatique', 'computer science', 'computer', 'معلوماتيه', 'معلوماتية', 'كمبيوتر']],
+    [['رياضة', 'EPS', 'Physical education'], ['eps', 'sport', 'physical education', 'رياضة']],
+    [['تربية وطنية', 'Éducation civique', 'Civics'], ['éducation civique', 'education civique', 'civisme', 'civics', 'التّربية الوطنيّة', 'التربية الوطنية', 'تربية وطنية', 'تربية']],
+    [['تاريخ', 'Histoire', 'History'], ['histoire', 'history', 'تاريخ']],
+    [['جغرافيا', 'Géographie', 'Geography'], ['géographie', 'geographie', 'geography', 'جغرافيا']],
+    [['اجتماعيات', 'Sciences sociales', 'Social studies'], ['sciences sociales', 'social studies', 'اجتماعيات', 'اجتماع']],
+    [['اقتصاد', 'Économie', 'Economics'], ['économie', 'economie', 'economics', 'اقتصاد']],
+    [['فلسفة', 'Philosophie', 'Philosophy'], ['philosophie', 'philosophy', 'فلسفة']],
+    [['حقوق', 'Droit', 'Law'], ['droit', 'law', 'حقوق']],
+    [['تعليم مسيحي', 'Catéchèse', 'Religion'], ['catéchèse', 'catechese', 'religion', 'تعليم مسيحي', 'تعليم دبني', 'تعليم ديني']],
+    [['فنون', 'Arts', 'Arts'], ['arts plastiques', 'arts', 'art', 'فنون', 'رسم']],
+    [['موسيقى', 'Musique', 'Music'], ['musique', 'music', 'موسيقى']],
+    [['محاسبة', 'Comptabilité', 'Accounting'], ['comptabilité', 'comptabilite', 'accounting', 'محاسبة']],
+    [['إدارة', 'Administration', 'Administration'], ['administration', 'ادارة', 'إدارة']],
+    [['ناظر/ة', 'Surveillant(e)', 'Supervisor'], ['surveillante', 'surveillant', 'supervisor', 'ناظرة', 'ناظر', 'نظارة', 'مراقبة الامتحانات']],
+    [['و', 'et', 'and'], [' et ', ' and ', ' و ']],
+];
+$termMap = [];   // مرادف (بأحرف صغيرة) ⇒ [ar, fr, en]
+foreach ($TERMS as [$tr, $aliases]) { foreach (array_merge($aliases, $tr) as $a) $termMap[mb_strtolower(trim($a), 'UTF-8')] = $tr; }
+uksort($termMap, fn($a, $b) => mb_strlen($b, 'UTF-8') <=> mb_strlen($a, 'UTF-8'));   // الأطول أوّلاً كي لا يُقصّ مصطلح داخل آخر
+$trTerms = function (?string $s) use ($termMap, $li): string {
+    $s = trim((string)$s); if ($s === '') return '';
+    $out = ''; $rest = $s;
+    while ($rest !== '') {
+        $hit = null; $hitLen = 0;
+        foreach ($termMap as $alias => $tr) {
+            $len = mb_strlen($alias, 'UTF-8');
+            if (mb_strtolower(mb_substr($rest, 0, $len, 'UTF-8'), 'UTF-8') !== $alias) continue;
+            // حدود كلمة: اللاتيني لا يُقصّ داخل كلمة أطول (math داخل maths يحلّه ترتيب الطول، هنا نمنع «art» داخل «arte»)
+            $next = mb_substr($rest, $len, 1, 'UTF-8'); $prev = mb_substr($out, -1, 1, 'UTF-8');
+            if (preg_match('/[\p{L}]$/u', $alias)) {   // حدود كلمة بكل اللغات: لا يُقصّ مصطلح داخل كلمة أطول (تربية داخل التربية، art داخل arte)
+                if ($next !== '' && preg_match('/^[\p{L}]$/u', $next)) continue;
+                if ($prev !== '' && preg_match('/^[\p{L}]$/u', $prev)) continue;
+            }
+            $hit = $tr; $hitLen = $len; break;
+        }
+        if ($hit) { $pad = ($hit[0] === 'و') ? ' ' : ''; $out .= $pad . $hit[$li] . $pad; $rest = mb_substr($rest, $hitLen, null, 'UTF-8'); }
+        else { $out .= mb_substr($rest, 0, 1, 'UTF-8'); $rest = mb_substr($rest, 1, null, 'UTF-8'); }
+    }
+    return preg_replace('/\s{2,}/u', ' ', trim($out));
+};
+$trList = fn(?string $csv) => implode($rtl ? '، ' : ', ', array_filter(array_map(fn($x) => $trTerms($x), preg_split('/\s*[,،]\s*/u', trim((string)$csv)))));
+// أسماء الأشخاص والأماكن المكتوبة باللغة الأخرى: قاموس الأسماء والأماكن (translit_ar_fr) بالاتجاهين — كلمة مجهولة ⇒ النصّ كما هو
+$deacc = fn(string $s) => strtr(mb_strtolower(trim($s), 'UTF-8'), ['é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e', 'à' => 'a', 'â' => 'a', 'ç' => 'c', 'î' => 'i', 'ï' => 'i', 'ô' => 'o', 'û' => 'u', 'ù' => 'u', 'ü' => 'u', '-' => ' ']);
+$frToAr = null; $frPlaceToAr = null;
+$nameToLang = function (?string $s) use (&$frToAr, $rtl, $deacc): string {
+    $s = trim((string)$s); if ($s === '') return '';
+    $isLatin = !preg_match('/\p{Arabic}/u', $s);
+    if ($rtl && $isLatin) {
+        if ($frToAr === null) { $frToAr = []; foreach ([arFrFirstDict(), arFrLastDict()] as $d) foreach ($d as $ar => $fr) { $k = $deacc($fr); if (!isset($frToAr[$k])) $frToAr[$k] = $ar; } }
+        $out = [];
+        foreach (preg_split('/\s+/u', $s) as $w) { $k = $deacc($w); if (!isset($frToAr[$k])) return $s; $out[] = $frToAr[$k]; }
+        return implode(' ', $out);
+    }
+    if (!$rtl && !$isLatin) {
+        // بالقاموس فقط (لا نقل حروف آلي يعطي «Mrghrit Hkim») — كلمة مجهولة ⇒ الاسم العربي كما هو
+        $first = arFrFirstDict(); $last = arFrLastDict(); $out = [];
+        foreach (preg_split('/\s+/u', $s) as $w) {
+            $n = arFrNormalize($w); $core = (mb_substr($n, 0, 2, 'UTF-8') === 'ال' && mb_strlen($n, 'UTF-8') > 3) ? mb_substr($n, 2, null, 'UTF-8') : $n;
+            $hit = $first[$n] ?? $last[$n] ?? $last[$core] ?? $first[$core] ?? null;
+            if ($hit === null) return $s;
+            $out[] = $hit;
+        }
+        return implode(' ', $out);
+    }
+    return $s;
+};
+$placeToLang = function (?string $s) use (&$frPlaceToAr, $rtl, $deacc): string {
+    $s = trim((string)$s); if ($s === '') return '';
+    $isLatin = !preg_match('/\p{Arabic}/u', $s);
+    if (!$rtl && !$isLatin) return arPlaceToFr($s);
+    if ($rtl && $isLatin) {
+        if ($frPlaceToAr === null) { $frPlaceToAr = []; foreach (arPlaceDict() as $ar => $fr) { $k = $deacc($fr); if (!isset($frPlaceToAr[$k])) $frPlaceToAr[$k] = $ar; } }
+        $segs = preg_split('/\s*[-–\/،,]\s*/u', $s); $out = [];
+        foreach ($segs as $seg) { $k = $deacc($seg); if ($seg === '' ) continue; if (preg_match('/^\d+$/', $seg)) { $out[] = $seg; continue; } if (!isset($frPlaceToAr[$k])) return $s; $out[] = $frPlaceToAr[$k]; }
+        return implode(' - ', $out);
+    }
+    return $s;
+};
+
 $isTeacher = (($emp['employee_type'] ?? '') !== 'employe');
 $nameAr = trim(implode(' ', array_filter([$emp['first_name_ar'] ?? '', $emp['father_name_ar'] ?? '', $emp['last_name_ar'] ?? ''])));
 $nameFr = trim(implode(' ', array_filter([$emp['first_name_fr'] ?? '', $emp['father_name_fr'] ?? '', $emp['last_name_fr'] ?? ''])));
@@ -197,10 +304,16 @@ $addr = implode(' - ', array_values(array_filter(array_map('trim', [
     $emp['ville'] ?? '', $emp['quartier'] ?? '', $emp['rue'] ?? '', $emp['immeuble'] ?? '',
     ($emp['etage'] ?? '') !== '' ? ($t('floor') . ' ' . $emp['etage']) : '', $emp['district'] ?? '', $emp['gouvernorat'] ?? '',
 ]))));
-$registry = trim(($emp['civil_registry_number'] ?? '') . (($emp['civil_registry_place'] ?? '') ? (' / ' . $emp['civil_registry_place']) : ''));
-$mother   = trim(($emp['mother_first_name'] ?? '') . ' ' . ($emp['mother_last_name'] ?? ''));
-$birth    = trim(($emp['birth_date'] ? formatDate($emp['birth_date']) : '') . (($emp['birth_place'] ?? '') ? (' — ' . $emp['birth_place']) : ''));
+$registry = trim(($emp['civil_registry_number'] ?? '') . (($emp['civil_registry_place'] ?? '') ? (' / ' . $placeToLang($emp['civil_registry_place'])) : ''));
+$mother   = $nameToLang(trim(($emp['mother_first_name'] ?? '') . ' ' . ($emp['mother_last_name'] ?? '')));
+$birth    = trim(($emp['birth_date'] ? formatDate($emp['birth_date']) : '') . (($emp['birth_place'] ?? '') ? (' — ' . $placeToLang($emp['birth_place'])) : ''));
+$addr     = $placeToLang($addr);
 $social   = trim((string)socialStatusLabel($emp['social_status'] ?? '', $vl));
+if ($L === 'en' && preg_match('/^(celibataire|(marie|veuf)_(sans_enfants|(\d+)_enfants?))$/', (string)($emp['social_status'] ?? ''), $sm)) {   // الإنكليزي من الرمز
+    $kind = $sm[1] === 'celibataire' ? 'Single' : ($sm[2] === 'marie' ? 'Married' : 'Widowed');
+    $kids = $sm[1] === 'celibataire' ? '' : (($sm[3] === 'sans_enfants') ? ', no children' : (', ' . (int)$sm[4] . ((int)$sm[4] === 1 ? ' child' : ' children')));
+    $social = $kind . $kids;
+}
 if ($social === '' ) $social = trim((string)($emp['social_status'] ?? ''));
 if ($social !== '' && (int)($emp['spouse_works'] ?? 0) === 1) $social .= ' (' . $t('spouse_w') . ')';
 $phones   = implode(' · ', array_filter([trim((string)($emp['phone1'] ?? '')), trim((string)($emp['phone2'] ?? ''))]));
@@ -236,20 +349,29 @@ if ($L === 'en') {
 } else {
     $period = paidPeriodLabel($emp, $L);
 }
+// الصفوف: بالعربي الاسم العربي وحده («روضة ثالثة» بدل «GS / روضة ثالثة»)، وبغيره الرمز الفرنسي
 $classes = classLevelNames($emp['classes_taught'] ?? '', !$rtl);
+if ($rtl) $classes = implode('، ', array_map(fn($c) => trim((string)preg_replace('/^.*?\s\/\s/u', '', $c)), preg_split('/\s*،\s*/u', (string)$classes, -1, PREG_SPLIT_NO_EMPTY)));
+if ($L === 'en') $classes = str_replace('Secondaire', 'Secondary', (string)$classes);
+$natLbl  = $trTerms($emp['nationality'] ?? '');
+$cycleLbl = $trList($emp['niveau_scolaire'] ?? '');
+// قاموس الموادّ المشترك أوّلاً؛ إن بقي شيء بغير لغة الورقة يكمل قاموس البطاقة (EPS، informatique…)
+$subjFix = function (?string $raw) use ($L, $rtl, $trTerms): string {
+    $s = subjectToLang($raw ?? '', $L);
+    $foreign = $rtl ? preg_match('/[A-Za-z]/', $s) : preg_match('/\p{Arabic}/u', $s);
+    return $foreign ? $trTerms($s) : $s;
+};
+$subjLbl = $subjFix($emp['subjects_taught'] ?? '');
+$specLbl = $subjFix($emp['specialization'] ?? '');
+$curFix = fn($v) => $rtl ? str_replace([' L.L', 'LBP', 'USD'], [' ل.ل', 'ل.ل', '$'], (string)$v) : (string)$v;   // العملة بالعربي: ل.ل / $
 
 // [التسمية, القيمة, كامل السطر؟] — القيمة الفارغة تُحذف
 $S = [];
-$S['s_pers'] = $rtl ? [
-    [$t('name_ar'), $nameAr, true],
-    [$t('name_fr'), $nameFr, true],
-] : [
-    [$t('name_fr'), $nameFr, true],
-    [$t('name_ar'), $nameAr, true],
-];
+// الاسم بلغة الورقة وحده (الاسم باللغة الأخرى يظهر بسطر العنوان)
+$S['s_pers'] = $rtl ? [[$t('name_ar'), $nameAr ?: $nameFr, true]] : [[$t('name_fr'), $nameFr ?: $nameAr, true]];
 $S['s_pers'] = array_merge($S['s_pers'], [
     [$t('mother'), $mother],
-    [$t('nat'), $emp['nationality'] ?? ''],
+    [$t('nat'), $natLbl],
     [$t('birth'), $birth],
     [$t('reg'), $registry],
     [$t('social'), $social],
@@ -264,9 +386,9 @@ $S['s_job'] = [
     [$t('cat'), $typeLbl],
     [$t('job'), (!$isTeacher && ($emp['job_title'] ?? '') !== '') ? jobTitleLabel($emp['job_title'], $vl) : ''],
     [$t('dipl'), ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma'], $vl) : ''],
-    [$t('spec'), $emp['specialization'] ?? ''],
-    [$t('subj'), $emp['subjects_taught'] ?? ''],
-    [$t('cycle'), $emp['niveau_scolaire'] ?? ''],
+    [$t('spec'), $specLbl],
+    [$t('subj'), $subjLbl],
+    [$t('cycle'), $cycleLbl],
     [$t('classes'), $classes],
     [$t('grade'), $grade],
     [$t('hours'), $hours],
@@ -287,11 +409,11 @@ $S['s_off'] = [
 ];
 $S['s_sal'] = [
     [$t('mode'), $modeLbl],
-    [$t('base'), $baseLbl],
+    [$t('base'), $curFix($baseLbl)],
     [$t('period'), $period],
     [$t('m13'), $m13],
-    [$t('fam'), $famAll],
-    [$t('transport'), $transport],
+    [$t('fam'), $curFix($famAll)],
+    [$t('transport'), $curFix($transport)],
     [$t('tax'), $subj($emp['tax_subject'] ?? 0, $emp['tax_includes_echelon'] ?? 0, $emp['tax_includes_extra'] ?? 0, $emp['tax_includes_prime_aide'] ?? 0)],
     [$t('cnss_s'), $subj($emp['cnss_subject'] ?? 0, $emp['cnss_includes_echelon'] ?? 0, $emp['cnss_includes_extra'] ?? 0, $emp['cnss_includes_prime_aide'] ?? 0)],
     [$t('eoc_s'), $subj($emp['eoc_subject'] ?? 0, $emp['eoc_includes_echelon'] ?? 0, $emp['eoc_includes_extra'] ?? 0, $emp['eoc_includes_prime_aide'] ?? 0)],
@@ -400,7 +522,7 @@ $langUrl = fn($k) => BASE_URL . 'pages/employee_fiche.php?employee_id=' . $emplo
     <div style="line-height:1.3"><?= nl2br(e($notes)) ?></div>
     <?php endif; ?>
 
-    <div class="fiche-foot"><?= e($rtl ? ($school['name_ar'] ?? '') : ($school['name_fr'] ?? ($school['name_ar'] ?? ''))) ?> · <?= e($titleDoc) ?> · <?= e($t('issued')) ?> <?= date('d/m/Y') ?> · MSA Payroll</div>
+    <div class="fiche-foot"><?= e($rtl ? ($school['name_ar'] ?? '') : ($school['name_fr'] ?? ($school['name_ar'] ?? ''))) ?> · <?= e($titleDoc) ?> · <?= e($t('issued')) ?> <?= date('d/m/Y') ?><?= $rtl ? '' : ' · MSA Payroll' ?></div>
 </div>
 </div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
