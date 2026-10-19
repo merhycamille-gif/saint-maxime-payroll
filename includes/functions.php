@@ -1022,6 +1022,13 @@ function ensureLeftDateAllColumn(): void {
             $n = (int)$db->exec("UPDATE employees SET left_date_all = NULLIF($trio, '9999-12-31') WHERE (left_date_all IS NULL OR left_date_all = '0000-00-00') AND $trio < '9999-12-31'");
             setSetting('left_date_all_migrated_20260918', 'done ' . date('Y-m-d H:i') . ' rows=' . $n);
         }
+        // 🎁 (2026-10-19 «بشهر التعويض لازم يكون عندي خيار الأجر الإضافي والمكافأة والمساعدة… تلقائياً إذا حطيت شهر التعويض لازم تحطهن»):
+        //    مرّة واحدة: كل من عنده شهر التعويض يصير شهره يشمل الأجر الإضافي والمكافأة والمساعدة (الخياران مشغَّلان)؛
+        //    بعدها يطفئ ما لا يريده من ملف الأستاذ. شهر التعويض يبقى دائماً بلا محسومات ولا نقل (annual_slip_data).
+        if (msaHasCol($db, 'employees', 'm13_include_extra') && getSetting('m13_options_default_on_20261019', '') === '') {
+            $n13 = (int)$db->exec("UPDATE employees SET m13_include_extra = 1, m13_include_aide = 1 WHERE has_13th_month = 1 AND is_deleted = 0 AND (m13_include_extra = 0 OR m13_include_aide = 0)");
+            setSetting('m13_options_default_on_20261019', 'done ' . date('Y-m-d H:i') . ' rows=' . $n13);
+        }
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
 }
 /** تعبير SQL لتاريخ «الترك من الكل» (9999-12-31 = لم يترك) — المصدر الواحد لقاعدة التارك بكل البرنامج */

@@ -75,8 +75,8 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
         $already13 = false;
         foreach ($displayRows as $dr0) { if (!empty($dr0['s']) && (int)$dr0['s']['is_indemnity_month']) { $already13 = true; break; } }
         if (!$already13 && !empty($salaries)) {
-            // شهر 13 = الراتب الأساسي + (اختيارياً الأجر الإضافي و/أو المكافأة حسب خيار ملف الأستاذ)
-            // بلا محسومات ولا نقل/عائلي.
+            // شهر 13 = الراتب الأساسي + الأجر الإضافي + المكافأة والمساعدة (الخياران مشغَّلان افتراضياً بملف الأستاذ — 2026-10-19 — ويطفئ ما لا يريده)
+            // دائماً بلا محسومات ولا نقل ولا تعويض عائلي.
             $ref = end($salaries);
             $incExtra = !empty($emp['m13_include_extra']);
             $incAide  = !empty($emp['m13_include_aide']);

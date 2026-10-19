@@ -1293,7 +1293,7 @@ $employee = [
     'days_per_week' => 5, 'hours_per_week' => 18, 'status' => 'actif',
     'nssf_number' => '', 'finance_ministry_number' => '', 'caisse_number' => '',
     'salary_input_mode' => 'percent_of_lbp', 'salary_labor_law' => 0, 'base_salary_usd' => 0, 'base_salary_lbp_percent' => 100, 'contract_salary_lbp' => 0,
-    'payment_months_per_year' => 12, 'pay_from_month' => 10, 'pay_to_month' => 9, 'has_13th_month' => 0, 'm13_include_extra' => 0, 'm13_include_aide' => 0, // 📆 12 = ت1 ← أيلول للجميع (2026-09-20)
+    'payment_months_per_year' => 12, 'pay_from_month' => 10, 'pay_to_month' => 9, 'has_13th_month' => 0, 'm13_include_extra' => 1, 'm13_include_aide' => 1, // 📆 12 = ت1 ← أيلول للجميع (2026-09-20) · 🎁 (2026-10-19) خيارا شهر التعويض مشغَّلان افتراضياً
     'tax_subject' => 1, 'apply_family_deduction' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
     'cnss_subject' => 1, 'cnss_includes_echelon' => 1, 'cnss_includes_extra' => 1, 'cnss_includes_prime_aide' => 1,
     'eoc_subject' => 1, 'eoc_includes_echelon' => 1, 'eoc_includes_extra' => 0, 'eoc_includes_prime_aide' => 0, 'keep_working_past_64' => 0, 'eoc_half_salary_year' => null,
@@ -2222,13 +2222,14 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                     <div class="form-group">
                         <label class="form-label">13ème mois / شهر التعويض</label>
                         <label class="switch">
-                            <input type="checkbox" id="has13" name="has_13th_month" value="1" <?= $employee['has_13th_month'] ? 'checked' : '' ?> onchange="document.getElementById('m13opts').style.display=this.checked?'block':'none'">
+                            <?php // 🎁 (2026-10-19 «إذا حطيت شهر التعويض لازم كمان تحطهن تلقائياً، وإذا ما بدي أعطيه عليهن شيلهن»): تشغيل شهر 13 يشعل الخيارين تلقائياً؛ يبقى بإمكانه إطفاء أيٍّ منهما ?>
+                            <input type="checkbox" id="has13" name="has_13th_month" value="1" <?= $employee['has_13th_month'] ? 'checked' : '' ?> onchange="document.getElementById('m13opts').style.display=this.checked?'block':'none';if(this.checked){document.getElementById('m13ex').checked=true;document.getElementById('m13ai').checked=true;}">
                             <span class="slider"></span>
                         </label>
                         <div id="m13opts" style="display:<?= $employee['has_13th_month'] ? 'block' : 'none' ?>;margin-top:8px;padding:8px 10px;background:#f8fafc;border:1px solid var(--gray-200);border-radius:6px">
-                            <div style="font-size:12px;color:var(--gray-600);margin-bottom:4px">يُحسب شهر 13 على الراتب الأساسي. اختر ما يُضاف معه:</div>
-                            <label style="display:block;font-size:13px;margin-bottom:3px"><input type="checkbox" name="m13_include_extra" value="1" <?= !empty($employee['m13_include_extra']) ? 'checked' : '' ?>> + الأجر الإضافي / Supplément</label>
-                            <label style="display:block;font-size:13px"><input type="checkbox" name="m13_include_aide" value="1" <?= !empty($employee['m13_include_aide']) ? 'checked' : '' ?>> + المكافأة والمساعدة / Prime &amp; aide</label>
+                            <div style="font-size:12px;color:var(--gray-600);margin-bottom:4px">شهر التعويض = الراتب الأساسي + الأجر الإضافي والمكافأة والمساعدة تلقائياً — <strong>دائماً بلا أي محسومات ولا نقل ولا تعويض عائلي</strong>. شِل العلامة عمّا لا تريد إعطاءه معه:</div>
+                            <label style="display:block;font-size:13px;margin-bottom:3px"><input type="checkbox" id="m13ex" name="m13_include_extra" value="1" <?= !empty($employee['m13_include_extra']) ? 'checked' : '' ?>> + الأجر الإضافي / Supplément de salaire</label>
+                            <label style="display:block;font-size:13px"><input type="checkbox" id="m13ai" name="m13_include_aide" value="1" <?= !empty($employee['m13_include_aide']) ? 'checked' : '' ?>> + المكافأة والمساعدة / Prime &amp; aide</label>
                         </div>
                     </div>
                 </div>

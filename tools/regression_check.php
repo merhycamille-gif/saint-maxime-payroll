@@ -10380,6 +10380,19 @@ check('⏰ مزامنة الخلفية بلا متصفّح: سكربت CLI + VBS
       && (stripos($task265, 'MSA Payroll Sync') !== false),
       stripos($task265, 'MSA Payroll Sync') !== false ? 'task ok' : 'task missing: ' . mb_substr(trim($task265), 0, 80));
 
+/**
+ * 266) 🎁 (2026-10-19 «بشهر التعويض لازم يكون عندي خيار الأجر الإضافي والمكافأة والمساعدة؛ إذا ما بدي أعطيه عليهن شيلهن؛ بس تلقائياً إذا حطيت شهر التعويض لازم تحطهن»):
+ *      تشغيل شهر 13 بملف الأستاذ يشعل الخيارين تلقائياً (JS) + الافتراضي للجديد 1/1 + شفاء مرّة واحدة لمن عنده شهر 13 (settings) + شهر 13 بلا محسومات ولا نقل ولا عائلي (المصدر).
+ */
+$em266 = (string)file_get_contents($PROJ . '/pages/employees.php'); $fn266 = (string)file_get_contents($PROJ . '/includes/functions.php'); $as266 = (string)file_get_contents($PROJ . '/includes/annual_slip_data.php');
+$heal266 = (string)getSetting('m13_options_default_on_20261019', '');
+check('🎁 شهر التعويض: خيارا الأجر الإضافي والمكافأة/المساعدة ينشغلان تلقائياً مع تشغيله (يطفئهما إن شاء) + افتراضي الجديد مشغَّل + شفاء الموجودين مرّة + بلا محسومات ولا نقل',
+      strpos($em266, "if(this.checked){document.getElementById('m13ex').checked=true;document.getElementById('m13ai').checked=true;}") !== false
+      && strpos($em266, "'m13_include_extra' => 1, 'm13_include_aide' => 1") !== false
+      && strpos($fn266, "getSetting('m13_options_default_on_20261019', '') === ''") !== false && $heal266 !== ''
+      && strpos($as266, "\$s13['transport_lbp'] = 0;") !== false && strpos($as266, "\$s13['family_allowance_lbp'] = 0;") !== false && strpos($as266, "\$s13['cnss_amount_lbp']   = 0;") !== false,
+      'heal=' . $heal266);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
