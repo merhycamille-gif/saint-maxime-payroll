@@ -55,29 +55,29 @@ function complianceEnsureTable(PDO $db): void {
 /** تعريف القواعد: مفتاح → [عنوان فرنسي، عنوان عربي، لون] */
 function complianceRules(): array {
     return [
-        'grade_law'      => ['Échelon ≠ loi',              'الدرجة لا تطابق القانون',                           '#b91c1c'],
-        'base_scale'     => ['Base ≠ grille',              'أساس الراتب لا يطابق السلسلة عند درجته',             '#b91c1c'],
-        'pct_law'        => ['Supplément ≠ loi du %',      'الإضافي لا يطابق قانون النسبة (÷1500 × سعر الشهر)', '#b91c1c'],
-        'dup_percent'    => ['% en double',                'بند نسبة مكرّر (النسبة تتضاعف)',                     '#b91c1c'],
-        'multi_percent'  => ['Plusieurs %',                'أكثر من نسبة فاعلة بنفس السنة (تُجمع معاً)',          '#b45309'],
-        'add_stale'      => ['Supplément périmé',          'الإضافي بالأشهر لا يطابق بنود ملفه',                  '#b45309'],
-        'ghost_add'      => ['Supplément fantôme',         'إضافي/مكافأة بالأشهر بلا أي بند بملفه',              '#b45309'],
-        'missing_add'    => ['Supplément non appliqué',    'بند إضافي بملفه لكن أشهره بصفر',                     '#b45309'],
-        'pct_nontit'     => ['% hors titulaire',           'نسبة مئوية عند متعاقد أو موظف (للملاك فقط)',          '#b45309'],
-        'bonus_nosy'     => ['Prime sans année',           'بند علاوة بلا سنة دراسية (ينطبق على كل السنين)',      '#b45309'],
-        'net_math'       => ['Net incohérent',             'صافي أو مستحق لا يساوي مكوّناته',                    '#b91c1c'],
-        'month_stale'    => ['Mois ≠ moteur',              'شهر مخزّن لا يطابق إعادة حسابه بالمحرّك الحيّ اليوم (ملفه أو بنوده أو القانون تغيّر بعد الاحتساب، أو أرقام منقولة من كشف قديم) — الفحص الشامل الدوري', '#b91c1c'],
-        'tax_stale'      => ['Impôt ≠ loi',                'ضريبة الدخل المخزّنة لا تطابق القانون الحيّ (ملفه أو القانون تغيّر بعد الاحتساب)', '#b91c1c'],
-        'row_rate0'      => ['Taux = 0',                   'صف راتب بسعر صرف صفر أو فارغ',                        '#b45309'],
+        'grade_law'      => ['Échelon ≠ loi',              'الدرجة لا تطابق القانون',                           '#173f6f'],
+        'base_scale'     => ['Base ≠ grille',              'أساس الراتب لا يطابق السلسلة عند درجته',             '#173f6f'],
+        'pct_law'        => ['Supplément ≠ loi du %',      'الإضافي لا يطابق قانون النسبة (÷1500 × سعر الشهر)', '#173f6f'],
+        'dup_percent'    => ['% en double',                'بند نسبة مكرّر (النسبة تتضاعف)',                     '#173f6f'],
+        'multi_percent'  => ['Plusieurs %',                'أكثر من نسبة فاعلة بنفس السنة (تُجمع معاً)',          '#0e7490'],
+        'add_stale'      => ['Supplément périmé',          'الإضافي بالأشهر لا يطابق بنود ملفه',                  '#0e7490'],
+        'ghost_add'      => ['Supplément fantôme',         'إضافي/مكافأة بالأشهر بلا أي بند بملفه',              '#0e7490'],
+        'missing_add'    => ['Supplément non appliqué',    'بند إضافي بملفه لكن أشهره بصفر',                     '#0e7490'],
+        'pct_nontit'     => ['% hors titulaire',           'نسبة مئوية عند متعاقد أو موظف (للملاك فقط)',          '#0e7490'],
+        'bonus_nosy'     => ['Prime sans année',           'بند علاوة بلا سنة دراسية (ينطبق على كل السنين)',      '#0e7490'],
+        'net_math'       => ['Net incohérent',             'صافي أو مستحق لا يساوي مكوّناته',                    '#173f6f'],
+        'month_stale'    => ['Mois ≠ moteur',              'شهر مخزّن لا يطابق إعادة حسابه بالمحرّك الحيّ اليوم (ملفه أو بنوده أو القانون تغيّر بعد الاحتساب، أو أرقام منقولة من كشف قديم) — الفحص الشامل الدوري', '#173f6f'],
+        'tax_stale'      => ['Impôt ≠ loi',                'ضريبة الدخل المخزّنة لا تطابق القانون الحيّ (ملفه أو القانون تغيّر بعد الاحتساب)', '#173f6f'],
+        'row_rate0'      => ['Taux = 0',                   'صف راتب بسعر صرف صفر أو فارغ',                        '#0e7490'],
         'left_rows'      => ['Salaires après départ',      'تارك عنده رواتب بعد تركه',                            '#7c3aed'],
         'active_nomonths'=> ['Actif sans salaires',        'موظف فاعل بلا رواتب بسنة مفتوحة',                     '#64748b'],
-        'carried_stale'  => ['Reporté avec un ancien salaire', 'منقول للسنة الجديدة براتب مع أنّه لم يُدفَع له شيء بالسنة السابقة (راتب قديم أو من إعداد ملفه)', '#b91c1c'],
+        'carried_stale'  => ['Reporté avec un ancien salaire', 'منقول للسنة الجديدة براتب مع أنّه لم يُدفَع له شيء بالسنة السابقة (راتب قديم أو من إعداد ملفه)', '#173f6f'],
         'carried_zero'   => ['Reporté à zéro',              'منقول للسنة الجديدة بصفوف صفرية ولم يُدفَع له شيء بالسنة السابقة (ملف قديم بلا رواتب)', '#64748b'],
-        'family_ded_off' => ['Abattement familial non accordé', 'متزوج/أرمل بأولاد أو زوج لا يعمل — وتنزيلهم العائلي بالضريبة مطفأ بملفه', '#b45309'],
-        'family_allow_stale' => ['Alloc. familiales ≠ dossier', 'التعويض العائلي المخزّن بالأشهر لا يطابق ملفه (المبلغ / المدّة من←إلى / الفئة: المتعاقد لا يستحقّ)', '#b45309'],
-        'transport_pct'  => ['Transport en %',             'بند تعويض نقل كنسبة ٪ من الأساس (النقل مبلغ لا نسبة) — يضاعف المستحق', '#b91c1c'],
-        'left_impossible'=> ['Date de départ impossible',  'تاريخ ترك مستحيل (= تاريخ الولادة أو قبل دخول المدرسة) — الموظف يختفي من كل الكشوف ولا يُحسب راتبه', '#b91c1c'],
-        'eoc_base_only'  => ['Caisse sur la base seule',   'ملاك يتقاضى أجراً إضافياً وصندوق التعويضات يُحسم من الأساس وحده (مفتاح «يشمل الأجر الإضافي» مطفأ بملفه)', '#b45309'],
+        'family_ded_off' => ['Abattement familial non accordé', 'متزوج/أرمل بأولاد أو زوج لا يعمل — وتنزيلهم العائلي بالضريبة مطفأ بملفه', '#0e7490'],
+        'family_allow_stale' => ['Alloc. familiales ≠ dossier', 'التعويض العائلي المخزّن بالأشهر لا يطابق ملفه (المبلغ / المدّة من←إلى / الفئة: المتعاقد لا يستحقّ)', '#0e7490'],
+        'transport_pct'  => ['Transport en %',             'بند تعويض نقل كنسبة ٪ من الأساس (النقل مبلغ لا نسبة) — يضاعف المستحق', '#173f6f'],
+        'left_impossible'=> ['Date de départ impossible',  'تاريخ ترك مستحيل (= تاريخ الولادة أو قبل دخول المدرسة) — الموظف يختفي من كل الكشوف ولا يُحسب راتبه', '#173f6f'],
+        'eoc_base_only'  => ['Caisse sur la base seule',   'ملاك يتقاضى أجراً إضافياً وصندوق التعويضات يُحسم من الأساس وحده (مفتاح «يشمل الأجر الإضافي» مطفأ بملفه)', '#0e7490'],
         'no_diploma'     => ['Sans diplôme',               'أستاذ ملاك بلا شهادة بملفه (يُفترض قسم ثاني)',        '#64748b'],
         'dupes'          => ['Doublon',                    'موظفان فاعلان بنفس الاسم بنفس المدرسة',               '#64748b'],
         'rate_missing'   => ['Taux manquant',              'شهر بلا سعر صرف مسجّل',                               '#64748b'],
@@ -839,9 +839,10 @@ function renderCompliancePending(array $rep, bool $compact = true): void {
     $pending = array_values(array_filter($pending, fn($it) => ($it['rule'] ?? '') !== 'carried_zero'));
     $n = count($pending);
     ?>
-    <div class="card no-print" id="compPending" style="border:2px solid <?= $n ? '#b91c1c' : '#16a34a' ?>;margin-bottom:16px">
-        <div class="card-header" style="background:<?= $n ? '#fef2f2' : '#f0fdf4' ?>"><h3 style="color:<?= $n ? '#991b1b' : '#166534' ?>"><i class="fas fa-scale-balanced"></i>
-            Rapport de conformité / تقرير المخالفات والتصحيحات — سنة <?= e($sy) ?><?= $n ? ' — <span style="background:#dc2626;color:#fff;border-radius:999px;padding:1px 10px">' . $n . ' قرار مطلوب</span>' : ' — لا مخالفات' ?></h3></div>
+    <?php /* 🎨 2026-10-19 «غيرهن»: الإطار والشارة كانا أحمر ⇒ كحلي */ ?>
+    <div class="card no-print" id="compPending" style="border:2px solid <?= $n ? '#173f6f' : '#16a34a' ?>;margin-bottom:16px">
+        <div class="card-header" style="background:<?= $n ? '#eef4fb' : '#f0fdf4' ?>"><h3 style="color:<?= $n ? '#173f6f' : '#166534' ?>"><i class="fas fa-scale-balanced"></i>
+            Rapport de conformité / تقرير المخالفات والتصحيحات — سنة <?= e($sy) ?><?= $n ? ' — <span style="background:#173f6f;color:#fff;border-radius:999px;padding:1px 10px">' . $n . ' قرار مطلوب</span>' : ' — لا مخالفات' ?></h3></div>
         <div class="card-body">
             <p style="color:var(--gray-600);margin-top:0">البرنامج فحص كل الأساتذة والموظفين بالنطاق المختار على القانون وعلى بنود ملفاتهم. لكل مخالفة: نوعها بالأرقام، والتصحيح المقترح، وقرارك:
                 <strong style="color:#166534">موافق — صحّح</strong> ينفّذ التصحيح فوراً، و<strong>لا — اتركه</strong> يسجّل قرارك ولا يعود يظهر. لا يُصحَّح شيء بلا موافقتك.

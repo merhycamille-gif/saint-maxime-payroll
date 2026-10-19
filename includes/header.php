@@ -286,16 +286,16 @@ document.addEventListener('submit', function (e) {
 
             <?php $tsPend = taxSuggestionsPendingCount(); // 💡 «لازم يضوي بالبرنامج» (2026-08-23): الإشارة تضوي ما دام في اقتراحات معلّقة ?>
             <a href="<?= BASE_URL ?>pages/tax_suggestions.php" class="<?= $currentPage === 'tax_suggestions' ? 'active' : '' ?>">
-                <i class="fas fa-lightbulb" <?= $tsPend ? 'style="color:#f59e0b"' : '' ?>></i>
+                <i class="fas fa-lightbulb" <?= $tsPend ? 'style="color:#0e7490"' : '' ?>></i>
                 <span>Suggestions état civil / اقتراحات من إخراج القيد</span>
-                <?php if ($tsPend): ?><span style="background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite"><?= $tsPend ?></span><?php endif; ?>
+                <?php if ($tsPend): ?><span style="background:#173f6f;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite"><?= $tsPend ?></span><?php endif; ?>
             </a>
 
             <?php require_once __DIR__ . '/compliance.php'; $cpPend = compliancePendingCount(); // ⚖️ (2026-09-04) شارة المخالفات المعلّقة بانتظار قراره ?>
             <a href="<?= BASE_URL ?>pages/compliance.php" class="<?= $currentPage === 'compliance' ? 'active' : '' ?>">
-                <i class="fas fa-scale-balanced" <?= $cpPend ? 'style="color:#ef4444"' : '' ?>></i>
+                <i class="fas fa-scale-balanced" <?= $cpPend ? 'style="color:#173f6f"' : '' ?>></i>
                 <span>Rapport de conformité / تقرير المخالفات والتصحيحات</span>
-                <?php if ($cpPend): ?><span style="background:#dc2626;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite"><?= $cpPend ?></span><?php endif; ?>
+                <?php if ($cpPend): ?><span style="background:#173f6f;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;margin-inline-start:6px;animation:pulse 1.6s infinite"><?= $cpPend ?></span><?php endif; ?>
             </a>
 
             <?php $cdNavPend = cadreDuePendingCount(); // 🎓 (2026-09-19) شارة اقتراحات الدخول بالملاك بعد سنتين — بانتظار موافقته ?>
@@ -626,7 +626,7 @@ document.addEventListener('submit', function (e) {
                 <?php endif; ?>
 
                 <?php if (function_exists('isSchoolYearLocked') && currentSchoolId() > 0 && isSchoolYearLocked(currentSchoolId(), activeSchoolYear())): ?>
-                <a href="<?= BASE_URL ?>pages/open_year.php#yearLocks" class="school-switcher" title="🔒 هذه السنة مقفولة لهذه المدرسة — الحسابات ما بتتغيّر (افتح القفل من صفحة فتح سنة دراسية)" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-weight:800;text-decoration:none;padding:4px 10px;border-radius:8px">🔒 مقفولة / Verrouillée</a>
+                <a href="<?= BASE_URL ?>pages/open_year.php#yearLocks" class="school-switcher" title="🔒 هذه السنة مقفولة لهذه المدرسة — الحسابات ما بتتغيّر (افتح القفل من صفحة فتح سنة دراسية)" style="background:#eef4fb;border:1px solid #b9cde6;color:#173f6f;font-weight:800;text-decoration:none;padding:4px 10px;border-radius:8px">🔒 مقفولة / Verrouillée</a>
                 <?php endif; ?>
                 <?php /* 📅 (2026-10-18 «السنين المدرسية مبيّنة فوق… تضلّها مبيّنة كيف ما طلعت ونزلت… واعمِلها غير لون تشوفها»): القائمة نفسها القديمة — بلون مميّز (أحمر) وخطّ أكبر،
                          والشريط العلوي ثابت عند التمرير (sticky بكل الصفحات وبالمستندات — قسم 515 بـapp.css). الاختيار يعيد نفس الصفحة بالسنة المختارة (switch_year يبدّل school_year بالرابط). */ ?>
@@ -875,7 +875,7 @@ document.addEventListener('submit', function (e) {
                     emps.forEach(function (r) {
                         h += '<a class="gs-item" href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=' + r.id + '">'
                            + '<i class="fas fa-user"></i><span>' + esc(r.fr) + ' / ' + esc(r.ar)
-                           + (r.left ? ' <b style="color:#b91c1c;font-size:11px;background:#fee2e2;border-radius:6px;padding:1px 6px">🚪 ترك ' + esc(r.left) + '</b>' : '')
+                           + (r.left ? ' <b style="color:#173f6f;font-size:11px;background:#e1ebf7;border-radius:6px;padding:1px 6px">🚪 ترك ' + esc(r.left) + '</b>' : '')
                            + '<small>' + esc(r.code + (r.school ? ' — ' + r.school : '')) + '</small></span></a>';
                     });
                 }
@@ -971,7 +971,7 @@ document.addEventListener('submit', function (e) {
                 $lsSt = localSyncState(); $lsConf = localSyncConflicts();
                 if (!empty($_GET['sync_conflicts_seen']) && $lsConf['n']) { try { localSyncPdo()->exec("UPDATE `" . DB_NAME . "`.`_sync_conflicts` SET seen = 1"); } catch (Throwable $e) {} $lsConf = ['n' => 0, 'rows' => []]; } ?>
         <div class="alert alert-info no-print" style="margin:0 0 10px;font-size:12.5px;padding:6px 12px"><i class="fas fa-rotate"></i> نسخة الكمبيوتر ⇄ الأونلاين تلقائياً (كل 5 دقائق): تعديلاتك هون بتنرفع للأونلاين، وتعديلات الأونلاين بتنزل لهون — وعلى الأقل كل <?= rtrim(rtrim(number_format(localSyncHours(), 2, '.', ''), '0'), '.') ?> ساعات نسخة كاملة: <?= e(localSyncStatusText()) ?>
-            <?php if (!empty($lsSt['pending_push'])): ?><br><strong style="color:#b45309"><i class="fas fa-cloud-arrow-up"></i> في تعديلات على الكمبيوتر بانتظار الإنترنت لترفع:</strong> <?= e((string)($lsSt['last_push_msg'] ?? '')) ?><?php elseif (!empty($lsSt['last_push_ok'])): ?> · آخر رفع للأونلاين <?= date('d/m/Y H:i', (int)$lsSt['last_push_ok']) ?><?php endif; ?>
+            <?php if (!empty($lsSt['pending_push'])): ?><br><strong style="color:#0e7490"><i class="fas fa-cloud-arrow-up"></i> في تعديلات على الكمبيوتر بانتظار الإنترنت لترفع:</strong> <?= e((string)($lsSt['last_push_msg'] ?? '')) ?><?php elseif (!empty($lsSt['last_push_ok'])): ?> · آخر رفع للأونلاين <?= date('d/m/Y H:i', (int)$lsSt['last_push_ok']) ?><?php endif; ?>
         </div>
                 <?php if ($lsConf['n']): ?>
         <div class="alert alert-danger no-print" style="margin:0 0 10px;font-size:12.5px;padding:6px 12px"><i class="fas fa-triangle-exclamation"></i> <strong>تعارض بالمزامنة (<?= (int)$lsConf['n'] ?>):</strong> هالصفوف تعدّلت على الكمبيوتر وعلى الأونلاين معاً — بقي الأونلاين، راجعها وأعِد تعديلها أونلاين إذا لزم:

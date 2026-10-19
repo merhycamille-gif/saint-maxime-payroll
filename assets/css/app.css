@@ -3167,3 +3167,26 @@ body.doc-view #schoolPicker .school-menu { left: 0 !important; right: auto !impo
 .btn-gold { background: var(--ios-orange) !important; border-color: var(--ios-orange) !important; color: #fff !important; text-shadow: none !important; }
 .bell-n { background: #fff !important; color: var(--ios-navy) !important; border-color: var(--ios-navy) !important; }   /* عدّاد الجرس أبيض على الجرس الكحلي */
 }
+/* 520-ب 🎨 (2026-10-19 «غيرهن» — تتمّة): التنبيهات والشارات والإطارات الحمراء/البرتقالية على الشاشة أيضاً ⇒ كحلي/تركواز (الخطر كحلي، التنبيه تركواز). الطباعة لا تتأثّر. */
+@media screen {
+:root { --danger: #173f6f; --warning: #0e7490; }
+.alert-danger { background: #eef4fb; color: #173f6f; border-color: #b9cde6; border-inline-start-color: #173f6f; }
+.alert-warning { background: #e6f6f9; color: #0e7490; border-color: #9fd6e3; border-inline-start-color: #0e7490; }
+.badge-danger { background: #e1ebf7 !important; color: #173f6f !important; } .badge-warning, .badge-gold { background: #dff3f8 !important; color: #0e7490 !important; }
+.text-danger { color: #173f6f !important; } .text-warning { color: #0e7490 !important; }
+.legal-bar.warn { background: #e6f6f9; border-color: #9fd6e3; color: #0e7490; }
+.legal-item.late { border-color: #b9cde6; background: #f3f7fc; } .legal-item.late .li-date { background: #e1ebf7; color: #173f6f; }
+.mp-alert.dn { background: #eef4fb; border-color: #b9cde6; } .mp-alert.dn i { background: #173f6f; }
+.mp-d.dn, .mp-dl.dn { background: #e1ebf7; color: #173f6f; } .mp-ln-ret { color: #173f6f; } .mp-months .mo.late .st { background: #e1ebf7; color: #173f6f; }
+.msa-unsaved { background: #e6f6f9; border-color: #9fd6e3; color: #0e7490; }
+.mp-legal-line { border-inline-start-color: var(--c, #0e7490); }
+.doc-table tr.msa-grp-row td { background: #e6f6f9 !important; border-top-color: #0e7490; } .doc-table tr.msa-grp-row td small { color: #0e7490; }
+.doc-table th .msa-colpick:hover, .doc-table th.msa-picked .msa-colpick { background: #0e7490; color: #fff; } .doc-table th.msa-picked { outline-color: #0e7490; }
+#msaColBar .cb-h, #msaColBar .cb-t { color: #5eead4; } #msaColBar .cb-t { border-top-color: #5eead4; }
+#msaPdfWait .pw-box i { color: #0e7490; }
+details.msa-pick > summary .mp-edit, details.msa-opts > summary .mo-e, .msa-tabs .mt-drop.mt-att-picked .mt-att-hd::after { color: #0e7490; }
+.msa-tabs .mt-drop.mt-att-picked .mt-att-cols a { background: #e6f6f9; border-inline-start-color: #0e7490; } .msa-tabs .mt-drop.mt-att-picked .mt-att-cols a:hover { background: #d3eef4; }
+.att-groups .att-g2 { background: #e6f6f9; border-color: #9fd6e3; } .att-groups .att-g2 .att-gt { color: #0e7490; } .att-groups .att-g2 a.btn, .att-groups .att-g2 .school-checks .chk { border-color: #9fd6e3; color: #0e7490; }
+.att-opts .att-sec.g3 { background: #e6f6f9; border-color: #9fd6e3; } .att-opts .att-sec.g3 .att-st, .att-opts .att-sec.g3 .att-k { color: #0e7490; }
+.btn[style*="#b45309"] { background-color: #0e7490 !important; } .btn[style*="#991b1b"], .btn[style*="#e11d48"], .btn[style*="#b91c1c"], .btn[style*="#dc2626"] { background-color: #173f6f !important; }
+}

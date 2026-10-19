@@ -265,7 +265,7 @@ if ($homeInc): ?>
                     <td><strong><?= e(trim($ie['first_name_fr'] . ' ' . $ie['last_name_fr'])) ?></strong><?= empBadges($ie, $db, $homeIncSy, false) ?><?php if ($ie['first_name_ar']): ?><br><small style="color:var(--gray-500)"><?= e($ie['first_name_ar'] . ' ' . $ie['last_name_ar']) ?></small><?php endif; ?></td>
                     <td><small><?= e(employeeTypeLabel($ie['employee_type'])) ?></small></td>
                     <td><?= formatDate($ie['hire_date']) ?></td>
-                    <td style="color:#92400e"><?= e(implode(' · ', employeeFileGaps($ie, $db, $homeIncSy))) ?></td>
+                    <td style="color:#0e7490"><?= e(implode(' · ', employeeFileGaps($ie, $db, $homeIncSy))) ?></td>
                     <td><a class="btn btn-sm btn-warning" href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$ie['id'] ?>"><i class="fas fa-pen"></i> أكمل الملف</a></td>
                 </tr>
             <?php endforeach; ?>
