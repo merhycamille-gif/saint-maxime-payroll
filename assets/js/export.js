@@ -596,7 +596,18 @@
                 fd.append('csrf', window.CSRF_TOKEN || ''); fd.append('to', to);
                 fd.append('subject', m.el.querySelector('#ppEmSub').value); fd.append('body', m.el.querySelector('#ppEmBody').value);
                 fd.append('pdf', r.blob, r.name);
-                return fetch((window.BASE_URL || '') + 'pages/send_report.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (x) { return x.json(); });
+                var mb = r.blob.size / 1048576;
+                // 📦 (2026-10-19) ملف كبير: رفع بتقدّم مرئي (XHR) — الكبير يروح برابط تنزيل من الموقع لا كمرفق
+                return new Promise(function (resolve, reject) {
+                    var x = new XMLHttpRequest();
+                    x.open('POST', (window.BASE_URL || '') + 'pages/send_report.php', true);
+                    x.withCredentials = true; x.timeout = 20 * 60 * 1000;
+                    x.upload.onprogress = function (ev) { if (ev.lengthComputable) { var p = Math.round(ev.loaded * 100 / ev.total); send.textContent = (p < 100 ? '⏳ عم يرفع الملف ' + p + '% (' + mb.toFixed(1) + ' MB)' : '⏳ عم يرسل...'); } };
+                    x.onload = function () { try { resolve(JSON.parse(x.responseText)); } catch (e) { reject(new Error('ردّ غير مفهوم من الخادم')); } };
+                    x.onerror = function () { reject(new Error('انقطع الاتصال أثناء الرفع — حاول مرّة ثانية')); };
+                    x.ontimeout = function () { reject(new Error('الرفع أخذ وقتاً طويلاً — حاول مرّة ثانية')); };
+                    x.send(fd);
+                });
             }).then(function (j) {
                 if (j && j.ok) { msg.innerHTML = '<span style="color:#166534;font-weight:700">✅ ' + escH(j.msg || 'أُرسل') + '</span>' + (j.log ? ' <a href="' + escH(j.log) + '" target="_blank" style="font-weight:700">📬 سجلّ الإيميلات</a>' : ''); send.textContent = '✅ أُرسل'; }
                 else { msg.innerHTML = '<span style="color:#b91c1c;font-weight:700">✕ ' + escH((j && j.msg) || 'تعذّر الإرسال') + '</span>' + (j && j.settings ? ' <a href="' + escH(j.settings) + '">إعدادات البريد</a>' : ''); send.innerHTML = old; send.disabled = false; }

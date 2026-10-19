@@ -226,16 +226,19 @@ function schoolReplyEmail($schoolId = null): string {
  * 🔁 (2026-10-16) نسخة الكمبيوتر بلا بريد ⇒ تبعت الرسالة عبر الموقع: دخول بحساب المزامنة (كما local_sync.php) ثم POST JSON إلى pages/mail_relay.php.
  * الجلسة تُحفَظ بـtmp/mail_relay_cookies.txt فلا دخول بكل رسالة؛ عند انتهائها (401/302) يعاد الدخول مرّة.
  */
-function programMailRelay($to, $subject, $body, array $attachments = [], $isHtml = false, $fromName = '', $replyTo = ''): array {
-    if (!defined('ONLINE_SYNC_URL') || !defined('ONLINE_SYNC_USER') || !defined('ONLINE_SYNC_PASS') || !function_exists('curl_init'))
-        return [false, 'الإرسال من إيميل البرنامج يعمل على الموقع (msapayroll.com) لا على نسخة الكمبيوتر'];
+/**
+ * 🔐 (2026-10-19) جلسة الموقع من نسخة الكمبيوتر — المصدر الواحد: دخول بحساب المزامنة، كوكي محفوظة بـtmp، وإعادة الدخول مرّة عند انتهائها.
+ * @return array [string|false $out, int $code, string $err]  — $code 0 = لا اتصال
+ */
+function msaOnlineRequest(string $path, array $opt = [], int $timeout = 300): array {
+    if (!defined('ONLINE_SYNC_URL') || !defined('ONLINE_SYNC_USER') || !defined('ONLINE_SYNC_PASS') || !function_exists('curl_init')) return [false, 0, 'إعدادات الموقع غير متوفّرة بهذه النسخة'];
     $site = rtrim((string)ONLINE_SYNC_URL, '/');
     $dir = dirname(__DIR__) . '/tmp'; if (!is_dir($dir)) @mkdir($dir, 0777, true);
     $cj = $dir . '/mail_relay_cookies.txt';
-    $ch = function (string $url, array $opt = []) use ($cj) {
+    $ch = function (string $url, array $o = []) use ($cj, $timeout) {
         $c = curl_init($url);
         curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIEJAR => $cj, CURLOPT_COOKIEFILE => $cj, CURLOPT_FOLLOWLOCATION => false,
-                               CURLOPT_TIMEOUT => 120, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_USERAGENT => 'MSA-Payroll-MailRelay'] + $opt);
+                               CURLOPT_TIMEOUT => $timeout, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_USERAGENT => 'MSA-Payroll-MailRelay'] + $o);
         $out = curl_exec($c); $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE); $err = curl_error($c); curl_close($c);
         return [$out, $code, $err];
     };
@@ -247,16 +250,22 @@ function programMailRelay($to, $subject, $body, array $attachments = [], $isHtml
         [, $code] = $ch($site . '/login.php', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query(['username' => ONLINE_SYNC_USER, 'password' => ONLINE_SYNC_PASS, 'csrf' => $m[1] ?? ''])]);
         return $code === 302 ? '' : 'فشل الدخول إلى الموقع (رمز ' . $code . ')';
     };
+    $go = fn() => $ch($site . '/' . ltrim($path, '/'), $opt);
+    [$out, $code, $err] = is_file($cj) ? $go() : [null, 401, ''];
+    if ($code === 401 || $code === 302 || $code === 0) {   // جلسة منتهية أو لا جلسة ⇒ دخول ثم إعادة
+        $le = $login(); if ($le !== '') return [false, 0, $le];
+        [$out, $code, $err] = $go();
+    }
+    return [$out, $code, (string)$err];
+}
+function programMailRelay($to, $subject, $body, array $attachments = [], $isHtml = false, $fromName = '', $replyTo = ''): array {
+    if (!defined('ONLINE_SYNC_URL') || !defined('ONLINE_SYNC_USER') || !defined('ONLINE_SYNC_PASS') || !function_exists('curl_init'))
+        return [false, 'الإرسال من إيميل البرنامج يعمل على الموقع (msapayroll.com) لا على نسخة الكمبيوتر'];
     $payload = json_encode([
         'to' => $to, 'subject' => (string)$subject, 'body' => (string)$body, 'isHtml' => (bool)$isHtml, 'fromName' => (string)$fromName, 'replyTo' => (string)$replyTo,
         'attachments' => array_map(fn($a) => ['name' => (string)($a['name'] ?? 'file'), 'mime' => (string)($a['mime'] ?? 'application/octet-stream'), 'data' => base64_encode((string)($a['data'] ?? ''))], $attachments),
     ], JSON_UNESCAPED_UNICODE);
-    $post = fn() => $ch($site . '/pages/mail_relay.php', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $payload, CURLOPT_HTTPHEADER => ['Content-Type: application/json']]);
-    [$out, $code, $err] = is_file($cj) ? $post() : [null, 401, ''];
-    if ($code === 401 || $code === 302 || $code === 0) {   // جلسة منتهية أو لا جلسة ⇒ دخول ثم إعادة
-        $le = $login(); if ($le !== '') return [false, 'عبر الموقع: ' . $le];
-        [$out, $code, $err] = $post();
-    }
+    [$out, $code, $err] = msaOnlineRequest('pages/mail_relay.php', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $payload, CURLOPT_HTTPHEADER => ['Content-Type: application/json']], 120);
     if ($out === false || $code !== 200) return [false, 'عبر الموقع: تعذّر الاتصال (' . ($err ?: $code) . ')'];
     $r = json_decode((string)$out, true);
     if (!is_array($r)) return [false, 'عبر الموقع: ردّ غير مفهوم'];
@@ -419,8 +428,76 @@ function ensureMailLogTable(): void {
             checked_at DATETIME NULL,
             KEY (created_at), KEY (status), KEY (dup_key)
         ) DEFAULT CHARSET=utf8mb4");
+        $db = getDB();
+        if (!msaHasCol($db, 'mail_log', 'share_token')) $db->exec("ALTER TABLE mail_log ADD COLUMN share_token CHAR(32) NULL AFTER file_name, ADD KEY (share_token)");
+        // 📦 الملفات المشارَكة برابط (الكبيرة) — الملف نفسه على الموقع uploads/share، والصفّ يندمج بالمزامنة (مفتاح نصّي)
+        $db->exec("CREATE TABLE IF NOT EXISTS shared_files (
+            token CHAR(32) NOT NULL PRIMARY KEY,
+            created_at DATETIME NOT NULL,
+            expires_at DATETIME NOT NULL,
+            file_name VARCHAR(255) NOT NULL,
+            mime VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
+            size_bytes BIGINT NOT NULL DEFAULT 0,
+            to_addr VARCHAR(500) NULL,
+            downloads INT NOT NULL DEFAULT 0,
+            last_download_at DATETIME NULL,
+            KEY (created_at)
+        ) DEFAULT CHARSET=utf8mb4");
     } catch (Throwable $e) {}
 }
+/* ═══ 📦 (2026-10-19 «أوقات بدّي أبعت ملف كتير كبير — لازم طريقة بدون أخطاء ويوصل بسرعة») ═══
+ *  الملف يُرفَع على الموقع (uploads/share) ويُبعَث للمستلم رابط تنزيل آمن (dl.php?t=…) — الإيميل يبقى صغيراً فيصل فوراً ولا يرفضه أي بريد.
+ *  ≤ 7MB يُرفَق أيضاً. من نسخة الكمبيوتر يُدفَع الملف إلى الموقع عبر pages/file_share.php (جلسة المزامنة). الرابط صالح 90 يوماً.
+ *  كل تنزيل يُحصى ويظهر بسجلّ الإيميلات (⬇️ نُزِّل). */
+const MSA_SHARE_ATTACH_MAX = 7 * 1024 * 1024;
+const MSA_SHARE_DAYS = 90;
+function msaIsOnlineHost(): bool { return stripos((string)($_SERVER['HTTP_HOST'] ?? ''), 'msapayroll.com') !== false; }
+function msaShareDir(): string { $d = dirname(__DIR__) . '/uploads/share'; if (!is_dir($d)) @mkdir($d, 0775, true); return $d; }
+function msaShareUrl(string $token): string {
+    $base = msaIsOnlineHost() ? ('https://' . preg_replace('/^www\./', '', (string)$_SERVER['HTTP_HOST']) . '/') : (defined('ONLINE_SYNC_URL') ? rtrim((string)ONLINE_SYNC_URL, '/') . '/' : BASE_URL);
+    return $base . 'dl.php?t=' . $token;
+}
+/** تخزين الملف هنا (على هذه النسخة) — يُستعمل على الموقع فقط. @return [ok, token|err] */
+function msaShareStoreLocal(string $name, string $data, string $mime, string $toAddr = ''): array {
+    try {
+        ensureMailLogTable();
+        if ($data === '') return [false, 'الملف فارغ'];
+        $token = bin2hex(random_bytes(16));
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION)) ?: 'bin'; $ext = preg_replace('/[^a-z0-9]/', '', $ext) ?: 'bin';
+        $path = msaShareDir() . '/' . $token . '.' . $ext;
+        if (file_put_contents($path, $data) === false) return [false, 'تعذّر حفظ الملف على الموقع'];
+        getDB()->prepare("INSERT INTO shared_files (token, created_at, expires_at, file_name, mime, size_bytes, to_addr) VALUES (?,?,?,?,?,?,?)")
+            ->execute([$token, date('Y-m-d H:i:s'), date('Y-m-d H:i:s', time() + MSA_SHARE_DAYS * 86400), mb_substr($name, 0, 255), mb_substr($mime, 0, 100), strlen($data), mb_substr($toAddr, 0, 500)]);
+        msaSharePurgeExpired();
+        return [true, $token];
+    } catch (Throwable $e) { return [false, 'تعذّر تسجيل الملف: ' . $e->getMessage()]; }
+}
+/** رفع الملف إلى الموقع من أي نسخة: على الموقع = تخزين مباشر؛ من الكمبيوتر = دفع إلى pages/file_share.php. @return [ok, token|err] */
+function msaShareFile(string $name, string $data, string $mime, string $toAddr = ''): array {
+    if (msaIsOnlineHost()) return msaShareStoreLocal($name, $data, $mime, $toAddr);
+    if (!function_exists('curl_init')) return [false, 'الرفع إلى الموقع يحتاج curl'];
+    $tmpDir = dirname(__DIR__) . '/tmp'; if (!is_dir($tmpDir)) @mkdir($tmpDir, 0777, true);
+    $tmp = $tmpDir . '/share_' . bin2hex(random_bytes(6)) . '.bin';
+    if (file_put_contents($tmp, $data) === false) return [false, 'تعذّر تجهيز الملف للرفع'];
+    $post = ['to' => $toAddr, 'file' => new CURLFile($tmp, $mime, $name)];
+    [$out, $code, $err] = msaOnlineRequest('pages/file_share.php', [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $post], 900);
+    @unlink($tmp);
+    if ($out === false || $code !== 200) return [false, 'تعذّر رفع الملف إلى الموقع (' . ($err ?: $code) . ')'];
+    $r = json_decode((string)$out, true);
+    if (!is_array($r) || empty($r['ok']) || empty($r['token'])) return [false, 'الموقع رفض الملف: ' . (string)($r['err'] ?? mb_substr((string)$out, 0, 120))];
+    return [true, (string)$r['token']];
+}
+function msaSharePurgeExpired(): void {
+    try {
+        $db = getDB();
+        $old = $db->query("SELECT token, file_name FROM shared_files WHERE expires_at < NOW() LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($old as $o) {
+            foreach (glob(msaShareDir() . '/' . $o['token'] . '.*') ?: [] as $f) @unlink($f);
+            $db->prepare("DELETE FROM shared_files WHERE token = ?")->execute([$o['token']]);
+        }
+    } catch (Throwable $e) {}
+}
+function msaHumanSize(int $b): string { return $b >= 1048576 ? round($b / 1048576, 1) . ' MB' : ($b >= 1024 ? round($b / 1024) . ' KB' : $b . ' B'); }
 function msaMailDupKey($to, $subject, array $attachments, $body): string {
     $tos = array_map('strtolower', array_map('trim', (array)$to)); sort($tos);
     $h = implode(',', $tos) . '|' . trim((string)$subject) . '|' . md5((string)$body);

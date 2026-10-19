@@ -10412,6 +10412,29 @@ check('📬 الإيميل: خدمة الإرسال API أوّلاً + لا بر
       && $tbl267 && $dup267 && strpos($pg267, 'msaMailLogRefresh(') !== false && strpos($hd267b, 'pages/mail_log.php') !== false,
       'tbl=' . (int)$tbl267 . ' dup=' . (int)$dup267 . ' via=' . $via267);
 
+/**
+ * 268) 📦 (2026-10-19 «أوقات بدّي أبعت ملف كتير كبير — لازم طريقة بدون أخطاء ويوصل بسرعة»): الملف يُرفَع على الموقع (uploads/share + shared_files)
+ *      ويصل رابط dl.php?t=… صالح 90 يوماً؛ > 7MB بالرابط فقط، ≤ 7MB مرفق + رابط؛ من الكمبيوتر يُدفَع عبر pages/file_share.php؛ التنزيل يُحصى ويظهر بسجلّ الإيميلات.
+ */
+$ml268 = (string)file_get_contents($PROJ . '/includes/mailer.php'); $sr268 = (string)file_get_contents($PROJ . '/pages/send_report.php'); $dl268 = (string)file_get_contents($PROJ . '/dl.php');
+$ok268 = false; $why268 = '';
+try {
+    $hostBak = $_SERVER['HTTP_HOST'] ?? null; $_SERVER['HTTP_HOST'] = 'msapayroll.com';
+    [$sOk, $tok] = msaShareStoreLocal('reg268.pdf', "%PDF-1.4\nreg268\n%%EOF", 'application/pdf', 'x@example.com');
+    if ($hostBak === null) unset($_SERVER['HTTP_HOST']); else $_SERVER['HTTP_HOST'] = $hostBak;
+    $row = $sOk ? $db->query("SELECT * FROM shared_files WHERE token = " . $db->quote($tok))->fetch(PDO::FETCH_ASSOC) : null;
+    $file = $sOk ? (glob($PROJ . '/uploads/share/' . $tok . '.*') ?: []) : [];
+    $ok268 = $sOk && $row && (int)$row['size_bytes'] === strlen("%PDF-1.4\nreg268\n%%EOF") && $row['expires_at'] > date('Y-m-d H:i:s', time() + 89 * 86400) && $file && is_file($file[0]);
+    if ($sOk) { foreach ($file as $f) @unlink($f); $db->exec("DELETE FROM shared_files WHERE token = " . $db->quote($tok)); }
+    $why268 = 'store=' . (int)$sOk . ' row=' . (int)(bool)$row . ' file=' . count($file) . ($sOk ? '' : ' err=' . $tok);
+} catch (Throwable $e) { $why268 = $e->getMessage(); }
+check('📦 الملف الكبير: تخزين على الموقع + صفّ shared_files (90 يوماً) + dl.php يبثّ ويحصي + send_report: > 7MB رابط فقط / ≤ 7MB مرفق + رابط + من الكمبيوتر عبر file_share + عمود share_token بالسجلّ',
+      $ok268 && strpos($ml268, 'const MSA_SHARE_ATTACH_MAX = 7 * 1024 * 1024;') !== false && strpos($ml268, "msaOnlineRequest('pages/file_share.php'") !== false
+      && strpos($sr268, '$att = $big ? [] : [[') !== false && strpos($sr268, "UPDATE mail_log SET share_token = ?") !== false
+      && strpos($dl268, "UPDATE shared_files SET downloads = downloads + 1") !== false && is_file($PROJ . '/pages/file_share.php')
+      && msaHasCol($db, 'mail_log', 'share_token'),
+      $why268);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

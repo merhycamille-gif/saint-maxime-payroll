@@ -19,9 +19,9 @@ if (isset($_GET['refresh'])) { $_SESSION['flash_success'] = 'حُدِّثت حا
 $db = getDB();
 $q = trim((string)($_GET['q'] ?? ''));
 $days = max(1, min(365, (int)($_GET['days'] ?: 30)));
-$where = 'created_at >= ?'; $args = [date('Y-m-d 00:00:00', time() - ($days - 1) * 86400)];
-if ($q !== '') { $where .= ' AND (to_addr LIKE ? OR subject LIKE ? OR file_name LIKE ?)'; $like = '%' . $q . '%'; array_push($args, $like, $like, $like); }
-$st = $db->prepare("SELECT * FROM mail_log WHERE $where ORDER BY created_at DESC LIMIT 400");
+$where = 'm.created_at >= ?'; $args = [date('Y-m-d 00:00:00', time() - ($days - 1) * 86400)];
+if ($q !== '') { $where .= ' AND (m.to_addr LIKE ? OR m.subject LIKE ? OR m.file_name LIKE ?)'; $like = '%' . $q . '%'; array_push($args, $like, $like, $like); }
+$st = $db->prepare("SELECT m.*, s.downloads sh_downloads, s.last_download_at sh_last, s.size_bytes sh_size, s.expires_at sh_exp FROM mail_log m LEFT JOIN shared_files s ON s.token = m.share_token WHERE $where ORDER BY m.created_at DESC LIMIT 400");
 $st->execute($args);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 $schools = [];
@@ -55,7 +55,8 @@ include __DIR__ . '/../includes/header.php';
         <div class="alert alert-info" style="line-height:1.9">
             كل إيميل يخرج من البرنامج يُسجَّل هنا مع حالته الحقيقية عند خدمة الإرسال: <strong>✅ وصل</strong> = استلمه بريد المستلم (إذا ما لقيه بالوارد فهو بمجلّد Junk/Spam عنده) ·
             <strong>✅ وصل وفُتح</strong> = فتح الرسالة · <strong>⛔ ارتدّ</strong> = العنوان غلط أو غير موجود · <strong>⏳ متأخّر</strong> = بريد المستلم بطيء والخدمة تعيد المحاولة لحالها ·
-            <strong>✕ لم يُرسَل</strong> = ما خرج أصلاً (السبب مكتوب). الرسالة نفسها لا تُرسَل مرّتين خلال دقيقتين.
+            <strong>✕ لم يُرسَل</strong> = ما خرج أصلاً (السبب مكتوب). الرسالة نفسها لا تُرسَل مرّتين خلال دقيقتين.<br>
+            📦 <strong>الملفات الكبيرة</strong> (أكثر من 7 MB) تُرفَع على الموقع ويصل المستلم رابط تنزيل صالح 90 يوماً — فيصل الإيميل فوراً ولا يرفضه أي بريد — وتشوف هنا <strong>⬇️ إذا نزّله وكم مرّة</strong>.
         </div>
         <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:12px">
             <div class="form-group" style="margin:0;flex:1;min-width:220px"><label class="form-label">بحث / Recherche (إيميل، موضوع، ملف)</label><input type="text" name="q" class="form-control" value="<?= e($q) ?>"></div>
@@ -89,7 +90,8 @@ include __DIR__ . '/../includes/header.php';
                         <td style="white-space:nowrap" dir="ltr"><?= e(date('d/m/Y H:i', strtotime($r['created_at']))) ?></td>
                         <td dir="ltr" style="white-space:nowrap"><?= e($r['to_addr']) ?></td>
                         <td><?= e($r['subject']) ?></td>
-                        <td dir="ltr" style="font-size:12.5px;color:var(--gray-600)"><?= e($r['file_name'] ?: '—') ?></td>
+                        <td style="font-size:12.5px;color:var(--gray-600)"><span dir="ltr"><?= e($r['file_name'] ?: '—') ?></span>
+                            <?php if ($r['share_token']): ?><div style="white-space:nowrap;margin-top:2px"><?php if ((int)$r['sh_downloads'] > 0): ?><span class="badge" style="background:#dcfce7;color:#166534;font-weight:700">⬇️ نُزِّل <?= (int)$r['sh_downloads'] ?> <?= (int)$r['sh_downloads'] === 1 ? 'مرّة' : 'مرّات' ?></span> <span style="color:var(--gray-500);font-size:11.5px">آخرها <?= e(date('d/m H:i', strtotime($r['sh_last']))) ?></span><?php else: ?><span class="badge" style="background:#f1f5f9;color:#334155">🔗 رابط (<?= e(msaHumanSize((int)$r['sh_size'])) ?>) — لم يُنزَّل بعد</span><?php endif; ?></div><?php endif; ?></td>
                         <td style="white-space:nowrap"><?= e($schools[(int)$r['school_id']] ?? '—') ?></td>
                         <td style="white-space:nowrap;font-size:12.5px"><?= e($viaLabel((string)$r['via'])) ?><?= $r['sent_by'] ? '<br><span style="color:var(--gray-500)">' . e($r['sent_by']) . '</span>' : '' ?></td>
                         <td style="white-space:nowrap">
