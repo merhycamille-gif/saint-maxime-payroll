@@ -505,6 +505,12 @@ document.addEventListener('submit', function (e) {
                 <span>Paramètres Email / إعدادات البريد</span>
             </a>
             <?php endif; ?>
+            <?php if (isAdmin()): // 📬 (2026-10-19) سجلّ الإيميلات: كل رسالة وحالة وصولها الحقيقية ?>
+            <a href="<?= BASE_URL ?>pages/mail_log.php" class="<?= $currentPage === 'mail_log' ? 'active' : '' ?>">
+                <i class="fas fa-envelope-open-text"></i>
+                <span>Suivi des e-mails / سجلّ الإيميلات</span>
+            </a>
+            <?php endif; ?>
         </nav>
         <?php
         $__nav = ob_get_clean();

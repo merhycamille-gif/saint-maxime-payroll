@@ -260,6 +260,7 @@ function programMailRelay($to, $subject, $body, array $attachments = [], $isHtml
     if ($out === false || $code !== 200) return [false, 'عبر الموقع: تعذّر الاتصال (' . ($err ?: $code) . ')'];
     $r = json_decode((string)$out, true);
     if (!is_array($r)) return [false, 'عبر الموقع: ردّ غير مفهوم'];
+    if (!empty($r['ok'])) $GLOBALS['msa_mail_last'] = ['via' => 'relay:' . (string)($r['via'] ?? ''), 'id' => (string)($r['id'] ?? '')];
     return [!empty($r['ok']), !empty($r['ok']) ? '' : 'عبر الموقع: ' . (string)($r['err'] ?? 'تعذّر الإرسال')];
 }
 /**
@@ -268,11 +269,22 @@ function programMailRelay($to, $subject, $body, array $attachments = [], $isHtml
  */
 function programMailSend($to, $subject, $body, array $attachments = [], $isHtml = false, $fromName = '', $replyTo = ''): array {
     // 🚀 (2026-10-17) خدمة الإرسال أوّلاً (تعمل من أي مكان، حتى من نسخة الكمبيوتر) ثم بريد الخادم كبديل
+    // 📬 (2026-10-19 «أوقات بيوصلو أوقات ما بيوصلو — بدّي حلّ جذري»): الخدمة عبر HTTPS (API) أوّلاً — أثبت من منفذ 465 من الكمبيوتر —
+    //    ثم SMTP الخدمة، ثم عبر الموقع من نسخة الكمبيوتر. وما دام مفتاح الخدمة موجوداً **لا نرجع أبداً** لبريد الخادم (mail()) الذي تحظره
+    //    مايكروسوفت ويقول «أُرسل» بلا وصول: الفشل يُقال صراحةً ويُسجَّل. كل محاولة تترك أثرها بـ$GLOBALS['msa_mail_last'] (via/id) لسجلّ الإيميلات.
     $relayErr = '';
+    $GLOBALS['msa_mail_last'] = ['via' => '', 'id' => ''];
     if ($rc = programRelayConfig((string)$fromName, (string)$replyTo)) {
+        if (function_exists('curl_init')) {
+            [$ok, $err, $pid] = resendApiSend($rc, $to, $subject, $body, $attachments, $isHtml);
+            if ($ok) { $GLOBALS['msa_mail_last'] = ['via' => 'resend_api', 'id' => $pid]; return [true, '']; }
+            $relayErr = 'خدمة الإرسال (API): ' . $err;
+        }
         [$ok, $err] = smtpSendMail($rc, $to, $subject, $body, $attachments, $isHtml);
-        if ($ok) return [true, ''];
-        $relayErr = 'خدمة الإرسال: ' . $err;
+        if ($ok) { $GLOBALS['msa_mail_last'] = ['via' => 'resend_smtp', 'id' => '']; return [true, '']; }
+        $relayErr .= ($relayErr !== '' ? ' · ' : '') . 'خدمة الإرسال (SMTP): ' . $err;
+        if (!programMailAvailable()) { $r = programMailRelay($to, $subject, $body, $attachments, $isHtml, $fromName, $replyTo); if (!$r[0]) $r[1] = $relayErr . ' · ' . $r[1]; return $r; }
+        return [false, $relayErr . ' — لم يُرسَل (لا نستعمل بريد الخادم كبديل لأنّه لا يصل إلى Hotmail/Outlook)'];
     }
     if (!programMailAvailable()) { $r = programMailRelay($to, $subject, $body, $attachments, $isHtml, $fromName, $replyTo); if (!$r[0] && $relayErr !== '') $r[1] = $relayErr . ' · ' . $r[1]; return $r; }
     $from = programMailAddress();
@@ -294,7 +306,7 @@ function programMailSend($to, $subject, $body, array $attachments = [], $isHtml 
     foreach (['-f' . $from, null] as $extra) {
         error_clear_last();
         $sent = $extra === null ? @mail($tos, $subj, $m, $h) : @mail($tos, $subj, $m, $h, $extra);
-        if ($sent) return [true, ''];
+        if ($sent) { $GLOBALS['msa_mail_last'] = ['via' => 'server_mail', 'id' => '']; return [true, '']; }
         $le = error_get_last(); if ($le) $lastErr = (string)($le['message'] ?? '');
     }
     return [false, ($relayErr !== '' ? $relayErr . ' · ' : '') . 'خادم الموقع رفض إرسال البريد' . ($lastErr !== '' ? ' (' . mb_substr(strip_tags($lastErr), 0, 160) . ')' : '')];
@@ -304,6 +316,14 @@ function programMailSend($to, $subject, $body, array $attachments = [], $isHtml 
  * @return array [bool ok, string error, string via ('program'|'smtp'), string fromAddress]
  */
 function msaSendMail($to, $subject, $body, array $attachments = [], $isHtml = false, $schoolId = null, $fromName = ''): array {
+    // 📬 (2026-10-19) الرسالة نفسها (المستلِم + الموضوع + الملف) خلال دقيقتين لا تُرسَل مرّتين — تُعاد نتيجة الأولى (via = 'dup')
+    $dupKey = msaMailDupKey($to, $subject, $attachments, $body);
+    if ($prev = msaMailRecentDuplicate($dupKey)) return [true, '', 'dup', (string)$prev['via']];
+    $r = msaSendMailInner($to, $subject, $body, $attachments, $isHtml, $schoolId, $fromName);
+    msaMailLogWrite($to, $subject, $attachments, $schoolId, $r, $dupKey);
+    return $r;
+}
+function msaSendMailInner($to, $subject, $body, array $attachments, $isHtml, $schoolId, $fromName): array {
     $fromName = programMailName(); // 📧 (2026-10-16 «طالع باسم كلية سان مكسيم ما بدي هيك») اسم المرسِل دائماً «MSA Payroll» مهما مرّرت الصفحة (المدرسة تبقى بعنوان الردّ وبنصّ الرسالة)
     $mode = schoolEmailMode($schoolId);
     $cfg = smtpConfigFromSettings();
@@ -321,12 +341,145 @@ function msaSendMail($to, $subject, $body, array $attachments = [], $isHtml = fa
         if (!$ok) $errs[] = 'إيميل البرنامج: ' . $err;
         return [$ok, programMailAddress()];
     };
+    $GLOBALS['msa_mail_last'] = ['via' => '', 'id' => ''];
     if ($mode === 'school') {
-        [$ok, $from] = $trySmtp(); if ($ok) return [true, '', 'smtp', $from];
+        [$ok, $from] = $trySmtp(); if ($ok) { $GLOBALS['msa_mail_last'] = ['via' => 'school_smtp', 'id' => '']; return [true, '', 'smtp', $from]; }
         [$ok, $from] = $tryProgram(); if ($ok) return [true, '', 'program', $from];
     } else {
         [$ok, $from] = $tryProgram(); if ($ok) return [true, '', 'program', $from];
-        [$ok, $from] = $trySmtp(); if ($ok) return [true, '', 'smtp', $from];
+        [$ok, $from] = $trySmtp(); if ($ok) { $GLOBALS['msa_mail_last'] = ['via' => 'school_smtp', 'id' => '']; return [true, '', 'smtp', $from]; }
     }
     return [false, implode(' · ', array_unique($errs)) ?: 'تعذّر الإرسال', '', ''];
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+ * 📬 (2026-10-19 «في شغلة عم بتصير بإرسال الإيميلات: أوقات بيوصلو أوقات ما بيوصلو — بدّي حلّ جذري وعملي بدون أخطاء»)
+ *  1) الإرسال عبر خدمة الإرسال بالـAPI (HTTPS) — يرجع رقم الرسالة عند الخدمة.
+ *  2) سجلّ الإيميلات (mail_log، يتركّب ذاتياً، مفتاحه نصّي كي يندمج بالمزامنة بلا تصادم): كل رسالة ومن أين خرجت وحالتها الحقيقية
+ *     عند الخدمة (وصل / ارتدّ / متأخّر / شكوى) — تُحدَّث بسؤال الخدمة عن الرسائل المعلّقة (pages/mail_log.php).
+ *  3) لا تكرار: الرسالة نفسها خلال دقيقتين لا تخرج مرّتين.
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════════════════ */
+/** إرسال عبر Resend HTTP API. @return [ok, err, id] */
+function resendApiSend(array $rc, $to, $subject, $body, array $attachments = [], $isHtml = false): array {
+    $tos = array_values(array_filter(array_map('trim', (array)$to), fn($t) => filter_var($t, FILTER_VALIDATE_EMAIL)));
+    if (!$tos) return [false, 'عنوان المستلِم غير صالح', ''];
+    $payload = ['from' => ($rc['from_name'] !== '' ? '"' . str_replace('"', '', $rc['from_name']) . '" ' : '') . '<' . $rc['from'] . '>',
+                'to' => $tos, 'subject' => (string)$subject];
+    // نصّ + نسخة HTML دائماً (الحالة «فُتح» عند الخدمة تحتاج HTML)
+    if ($isHtml) { $payload['html'] = (string)$body; $payload['text'] = trim(html_entity_decode(strip_tags(preg_replace('#<br\s*/?>|</p>|</div>|</tr>#i', "
+", (string)$body)), ENT_QUOTES, 'UTF-8')); }
+    else { $payload['text'] = (string)$body; $payload['html'] = '<div dir="auto" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.8;white-space:pre-wrap">' . nl2br(htmlspecialchars((string)$body, ENT_QUOTES, 'UTF-8')) . '</div>'; }
+    if (!empty($rc['reply_to']) && filter_var($rc['reply_to'], FILTER_VALIDATE_EMAIL)) $payload['reply_to'] = [$rc['reply_to']];
+    foreach ($attachments as $a) {
+        $payload['attachments'][] = ['filename' => (string)($a['name'] ?? 'file'), 'content' => base64_encode((string)($a['data'] ?? '')),
+                                     'content_type' => (string)($a['mime'] ?? 'application/octet-stream')];
+    }
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    if ($json === false) return [false, 'تعذّر تجهيز الرسالة', ''];
+    $lastErr = '';
+    for ($try = 1; $try <= 2; $try++) {   // محاولتان على انقطاع الشبكة فقط (لا على رفض الخدمة)
+        $c = curl_init('https://api.resend.com/emails');
+        curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_POSTFIELDS => $json, CURLOPT_TIMEOUT => 90, CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $rc['pass'], 'Content-Type: application/json', 'Idempotency-Key: ' . substr(sha1($json), 0, 40)],
+            CURLOPT_SSL_VERIFYPEER => true, CURLOPT_USERAGENT => 'MSA-Payroll']);
+        $out = curl_exec($c); $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE); $cerr = curl_error($c); curl_close($c);
+        if ($out === false || $code === 0) { $lastErr = 'لا اتصال بخدمة الإرسال (' . $cerr . ')'; usleep(800000); continue; }
+        $r = json_decode((string)$out, true);
+        if ($code >= 200 && $code < 300 && !empty($r['id'])) return [true, '', (string)$r['id']];
+        return [false, 'رفضت الخدمة الرسالة (' . $code . '): ' . (string)($r['message'] ?? mb_substr((string)$out, 0, 160)), ''];
+    }
+    return [false, $lastErr, ''];
+}
+/** حالة رسالة عند الخدمة: delivered / bounced / delivery_delayed / complained / sent / … أو '' إن تعذّر */
+function resendApiStatus(string $id): string {
+    $rc = programRelayConfig(); if (!$rc || $id === '' || !function_exists('curl_init')) return '';
+    $c = curl_init('https://api.resend.com/emails/' . rawurlencode($id));
+    curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $rc['pass']], CURLOPT_SSL_VERIFYPEER => true]);
+    $out = curl_exec($c); $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE); curl_close($c);
+    if ($out === false || $code !== 200) return '';
+    $r = json_decode((string)$out, true);
+    return strtolower(trim((string)($r['last_event'] ?? '')));
+}
+function ensureMailLogTable(): void {
+    static $done = false; if ($done) return; $done = true;
+    try {
+        getDB()->exec("CREATE TABLE IF NOT EXISTS mail_log (
+            id CHAR(24) NOT NULL PRIMARY KEY,
+            created_at DATETIME NOT NULL,
+            sent_by VARCHAR(80) NULL,
+            school_id INT NULL,
+            to_addr VARCHAR(500) NOT NULL,
+            subject VARCHAR(500) NULL,
+            file_name VARCHAR(255) NULL,
+            via VARCHAR(30) NOT NULL DEFAULT '',
+            provider_id VARCHAR(80) NULL,
+            status VARCHAR(24) NOT NULL DEFAULT 'sent',
+            error TEXT NULL,
+            dup_key CHAR(40) NULL,
+            checked_at DATETIME NULL,
+            KEY (created_at), KEY (status), KEY (dup_key)
+        ) DEFAULT CHARSET=utf8mb4");
+    } catch (Throwable $e) {}
+}
+function msaMailDupKey($to, $subject, array $attachments, $body): string {
+    $tos = array_map('strtolower', array_map('trim', (array)$to)); sort($tos);
+    $h = implode(',', $tos) . '|' . trim((string)$subject) . '|' . md5((string)$body);
+    foreach ($attachments as $a) $h .= '|' . (string)($a['name'] ?? '') . ':' . md5((string)($a['data'] ?? ''));
+    return sha1($h);
+}
+/** الرسالة نفسها أُرسلت بنجاح خلال آخر دقيقتين؟ ⇒ صفّها */
+function msaMailRecentDuplicate(string $dupKey): ?array {
+    try {
+        ensureMailLogTable();
+        $st = getDB()->prepare("SELECT * FROM mail_log WHERE dup_key = ? AND status <> 'failed' AND created_at >= ? ORDER BY created_at DESC LIMIT 1");
+        $st->execute([$dupKey, date('Y-m-d H:i:s', time() - 120)]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        return $r ?: null;
+    } catch (Throwable $e) { return null; }
+}
+function msaMailLogWrite($to, $subject, array $attachments, $schoolId, array $r, string $dupKey): void {
+    try {
+        ensureMailLogTable();
+        $last = $GLOBALS['msa_mail_last'] ?? ['via' => '', 'id' => ''];
+        $via = (string)($last['via'] ?? ''); if ($via === '' && !empty($r[0])) $via = (string)($r[2] ?? '');
+        $files = implode(', ', array_map(fn($a) => (string)($a['name'] ?? ''), $attachments));
+        $id = date('ymdHis') . substr(bin2hex(random_bytes(6)), 0, 12);
+        getDB()->prepare("INSERT INTO mail_log (id, created_at, sent_by, school_id, to_addr, subject, file_name, via, provider_id, status, error, dup_key)
+                          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+            ->execute([$id, date('Y-m-d H:i:s'), (string)($_SESSION['username'] ?? (php_sapi_name() === 'cli' ? 'cli' : '')), $schoolId !== null ? (int)$schoolId : null,
+                       mb_substr(implode(', ', (array)$to), 0, 500), mb_substr((string)$subject, 0, 500), mb_substr($files, 0, 255),
+                       $via, (string)($last['id'] ?? '') ?: null, !empty($r[0]) ? 'sent' : 'failed', !empty($r[0]) ? null : (string)($r[1] ?? ''), $dupKey]);
+        $GLOBALS['msa_mail_log_id'] = $id;
+    } catch (Throwable $e) {}
+}
+/** يسأل الخدمة عن الرسائل المعلّقة (آخر 10 أيام، حتى 30 رسالة) ويحدّث حالتها. يرجع عدد المحدَّثة. */
+function msaMailLogRefresh(int $max = 30): int {
+    $n = 0;
+    try {
+        ensureMailLogTable(); $db = getDB();
+        $st = $db->prepare("SELECT id, provider_id, status FROM mail_log WHERE provider_id IS NOT NULL AND provider_id <> '' AND status IN ('sent','delivery_delayed','queued')
+                            AND created_at >= ? ORDER BY created_at DESC LIMIT " . (int)$max);
+        $st->execute([date('Y-m-d H:i:s', time() - 10 * 86400)]);
+        $up = $db->prepare("UPDATE mail_log SET status = ?, checked_at = ? WHERE id = ?");
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $ev = resendApiStatus((string)$row['provider_id']); if ($ev === '') continue;
+            $up->execute([mb_substr($ev, 0, 24), date('Y-m-d H:i:s'), $row['id']]);
+            if ($ev !== $row['status']) $n++;
+        }
+    } catch (Throwable $e) {}
+    return $n;
+}
+/** تسمية الحالة بالعربي/الفرنسي + لون (بلا أحمر ولا برتقالي: كحلي للفشل، تركواز للتأخير) */
+function msaMailStatusLabel(string $st): array {
+    switch ($st) {
+        case 'delivered': return ['✅ وصل / Délivré', '#dcfce7', '#166534'];
+        case 'opened': case 'clicked': return ['✅ وصل وفُتح / Ouvert', '#dcfce7', '#166534'];
+        case 'bounced': return ['⛔ ارتدّ — العنوان غير موجود / Rejeté', '#e0e7ff', '#173f6f'];
+        case 'complained': return ['🚫 المستلم علّمها Spam / Signalé', '#e0e7ff', '#173f6f'];
+        case 'delivery_delayed': return ['⏳ متأخّر — الخدمة تعيد المحاولة / Retardé', '#cffafe', '#0e7490'];
+        case 'failed': return ['✕ لم يُرسَل / Non envoyé', '#e0e7ff', '#173f6f'];
+        case 'canceled': return ['✕ أُلغي / Annulé', '#e0e7ff', '#173f6f'];
+        case 'sent': case 'queued': return ['📤 خرج — بانتظار تأكيد الوصول / Envoyé', '#f1f5f9', '#334155'];
+    }
+    return [$st ?: '—', '#f1f5f9', '#334155'];
 }

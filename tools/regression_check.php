@@ -10393,6 +10393,25 @@ check('🎁 شهر التعويض: خيارا الأجر الإضافي والم
       && strpos($as266, "\$s13['transport_lbp'] = 0;") !== false && strpos($as266, "\$s13['family_allowance_lbp'] = 0;") !== false && strpos($as266, "\$s13['cnss_amount_lbp']   = 0;") !== false,
       'heal=' . $heal266);
 
+/**
+ * 267) 📬 (2026-10-19 «أوقات بيوصلو أوقات ما بيوصلو — بدّي حلّ جذري ورسمي، ما في ضلّ قاعد تلفن إذا وصلون»): الإيميل عبر خدمة الإرسال بالـAPI (HTTPS) أوّلاً،
+ *      لا رجوع لبريد الخادم ما دام المفتاح موجوداً، سجلّ mail_log (مفتاح نصّي للمزامنة) بحالة الوصول من الخدمة، لا تكرار خلال دقيقتين، صفحة mail_log + رابط بالقائمة.
+ */
+$ml267 = (string)file_get_contents($PROJ . '/includes/mailer.php'); $pg267 = (string)file_get_contents($PROJ . '/pages/mail_log.php'); $hd267b = (string)file_get_contents($PROJ . '/includes/header.php');
+$tbl267 = false; try { $tbl267 = (bool)$db->query("SHOW TABLES LIKE 'mail_log'")->fetchColumn(); } catch (Throwable $e) {}
+$dup267 = false; $via267 = '';
+try {
+    $k = msaMailDupKey('x@example.com', 'S', [], 'B'); $db->prepare("INSERT INTO mail_log (id, created_at, sent_by, to_addr, subject, via, status, dup_key) VALUES (?,?,?,?,?,?,?,?)")->execute(['reg267' . substr(bin2hex(random_bytes(9)), 0, 18), date('Y-m-d H:i:s'), 'reg', 'x@example.com', 'S', 'resend_api', 'sent', $k]);
+    $r = msaSendMail('x@example.com', 'S', 'B', [], false, null, ''); $dup267 = !empty($r[0]) && ($r[2] ?? '') === 'dup'; $via267 = (string)($r[2] ?? '');
+    $db->exec("DELETE FROM mail_log WHERE id LIKE 'reg267%'");
+} catch (Throwable $e) { $via267 = $e->getMessage(); }
+check('📬 الإيميل: خدمة الإرسال API أوّلاً + لا بريد خادم مع المفتاح + سجلّ mail_log بحالة الوصول (مفتاح نصّي) + لا تكرار خلال دقيقتين + صفحة السجلّ ورابطها',
+      strpos($ml267, "curl_init('https://api.resend.com/emails')") !== false && strpos($ml267, "resendApiSend(\$rc, \$to, \$subject, \$body, \$attachments, \$isHtml)") !== false
+      && strpos($ml267, 'لا نستعمل بريد الخادم كبديل') !== false && strpos($ml267, 'id CHAR(24) NOT NULL PRIMARY KEY') !== false
+      && strpos($ml267, "return [true, '', 'dup', (string)\$prev['via']];") !== false && function_exists('msaMailLogRefresh') && function_exists('resendApiStatus')
+      && $tbl267 && $dup267 && strpos($pg267, 'msaMailLogRefresh(') !== false && strpos($hd267b, 'pages/mail_log.php') !== false,
+      'tbl=' . (int)$tbl267 . ' dup=' . (int)$dup267 . ' via=' . $via267);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

@@ -122,7 +122,8 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body">
         <div class="alert alert-info" style="line-height:1.9">
             الإيميل الحالي: <strong><?= e(programMailName()) ?></strong> ‹<span dir="ltr"><?= e(programMailAddress()) ?></span>›<br>
-            خادم الموقع يبعت منه لحاله (إفادات، بطاقات، تقارير) والردّ يرجع لإيميل المدرسة المكتوب بصفحة المدارس. يعمل على الموقع (<?= programMailAvailable() ? '✅ متاح هنا' : '⚠️ غير متاح على نسخة الكمبيوتر — على الموقع فقط' ?>).
+            <a class="btn btn-sm btn-primary" href="<?= BASE_URL ?>pages/mail_log.php" style="float:left;margin-inline-start:8px"><i class="fas fa-envelope-open-text"></i> سجلّ الإيميلات / Suivi</a>
+            كل الإيميلات تخرج عبر خدمة الإرسال (HTTPS) وتُسجَّل بسجلّ الإيميلات مع حالة وصولها الحقيقية (وصل / فُتح / ارتدّ). والردّ يرجع لإيميل المدرسة المكتوب بصفحة المدارس. يعمل على الموقع (<?= programMailAvailable() ? '✅ متاح هنا' : '⚠️ غير متاح على نسخة الكمبيوتر — على الموقع فقط' ?>).
         </div>
         <form method="post" class="lockedit">
             <?= csrfField() ?>

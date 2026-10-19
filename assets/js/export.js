@@ -598,7 +598,7 @@
                 fd.append('pdf', r.blob, r.name);
                 return fetch((window.BASE_URL || '') + 'pages/send_report.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (x) { return x.json(); });
             }).then(function (j) {
-                if (j && j.ok) { msg.innerHTML = '<span style="color:#166534;font-weight:700">✅ ' + escH(j.msg || 'أُرسل') + '</span>'; send.textContent = '✅ أُرسل'; }
+                if (j && j.ok) { msg.innerHTML = '<span style="color:#166534;font-weight:700">✅ ' + escH(j.msg || 'أُرسل') + '</span>' + (j.log ? ' <a href="' + escH(j.log) + '" target="_blank" style="font-weight:700">📬 سجلّ الإيميلات</a>' : ''); send.textContent = '✅ أُرسل'; }
                 else { msg.innerHTML = '<span style="color:#b91c1c;font-weight:700">✕ ' + escH((j && j.msg) || 'تعذّر الإرسال') + '</span>' + (j && j.settings ? ' <a href="' + escH(j.settings) + '">إعدادات البريد</a>' : ''); send.innerHTML = old; send.disabled = false; }
             }).catch(function (e) { msg.innerHTML = '<span style="color:#b91c1c">تعذّر الإرسال: ' + escH(e && e.message) + '</span>'; send.innerHTML = old; send.disabled = false; });
         });

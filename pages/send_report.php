@@ -37,8 +37,10 @@ $settingsUrl = BASE_URL . 'pages/email_settings.php';
 // 📧 (2026-10-12) الباب الواحد: إيميل البرنامج (MSA Payroll ‹noreply@الموقع›) أو إيميل المدرسة حسب خيار المدرسة بصفحة المدارس، مع بديل تلقائي
 $schoolId = (!isAllSchools() && currentSchool()) ? (int)currentSchool()['id'] : null;
 [$ok, $err, $via, $fromAddr] = msaSendMail($to, $subject, $text, $att, false, $schoolId, $schoolName !== '' ? $schoolName : '');
+$logUrl = BASE_URL . 'pages/mail_log.php';
+if ($ok && $via === 'dup') $out(true, 'هذه الرسالة نفسها أُرسلت إلى ' . $to . ' قبل أقلّ من دقيقتين — لم تُكرَّر. تابع وصولها بسجلّ الإيميلات.', ['log' => $logUrl, 'dup' => 1]);
 if ($ok) {
     logAudit('send_report_email', 'settings', 0, null, ['to' => $to, 'subject' => $subject, 'file' => $name, 'via' => $via, 'from' => $fromAddr]);
-    $out(true, 'أُرسل إلى ' . $to . ' مع الملف ' . $name . ' (من ' . $fromAddr . ($via === 'program' ? ' — إيميل البرنامج؛ إذا ما لقيته افحص Spam' : '') . ')');
+    $out(true, 'أُرسل إلى ' . $to . ' مع الملف ' . $name . ' (من ' . $fromAddr . ') — حالة الوصول تظهر بسجلّ الإيميلات.', ['log' => $logUrl]);
 }
 $out(false, 'تعذّر الإرسال: ' . ($err ?: 'خطأ غير معروف'), ['settings' => $settingsUrl]);

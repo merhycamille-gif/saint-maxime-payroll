@@ -26,4 +26,4 @@ foreach ((array)($in['attachments'] ?? []) as $a) {
     $att[] = ['name' => (string)($a['name'] ?? 'file'), 'data' => $data, 'mime' => (string)($a['mime'] ?? 'application/octet-stream')];
 }
 [$ok, $err] = programMailSend($tos, (string)($in['subject'] ?? ''), (string)($in['body'] ?? ''), $att, !empty($in['isHtml']), (string)($in['fromName'] ?? ''), (string)($in['replyTo'] ?? ''));
-echo json_encode(['ok' => $ok, 'err' => $err, 'from' => programMailAddress()], JSON_UNESCAPED_UNICODE);
+echo json_encode(['ok' => $ok, 'err' => $err, 'from' => programMailAddress(), 'via' => (string)($GLOBALS['msa_mail_last']['via'] ?? ''), 'id' => (string)($GLOBALS['msa_mail_last']['id'] ?? '')], JSON_UNESCAPED_UNICODE);
