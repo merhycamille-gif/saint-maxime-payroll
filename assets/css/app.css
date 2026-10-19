@@ -721,7 +721,7 @@ body.rtl .table th { text-align: right; }
 .tab[data-tab="employment"] { --tc: #574b90; } /* بنفسجي هادئ */
 .tab[data-tab="finance"]    { --tc: #2f6b4f; } /* أخضر غامق */
 .tab[data-tab="bonuses"]    { --tc: #8a5a16; } /* برونزي */
-.tab[data-tab="deductions"] { --tc: #8f3a3a; } /* قرميدي */
+.tab[data-tab="deductions"] { --tc: #4a5d8a; } /* أزرق رمادي (🎨 2026-10-19 كان قرميدياً — «شيل الأحمر والأورانج») */
 .tab[data-tab="grades"]     { --tc: #6d3f6b; } /* خمري */
 
 .tab:hover {
@@ -1909,7 +1909,7 @@ form > .lockedit-bar { flex: 0 0 100%; grid-column: 1 / -1; width: 100%; box-siz
  *      كل أيقونة بالبرنامج مربّع بلون كامل وأيقونة بيضاء، والألوان لوحة واحدة متناسقة من ستّة تتوالى على البلاطات
  *      (مرجاني · أزرق · أصفر · بنفسجي · أخضر مائي · أزرق فولاذي). لتغيير أي لون: عدّل --ic1 … --ic6 فقط. شاشة فقط.
  * =================================================================== */
-:root { --ic1: #e06666; --ic2: #4a7abf; --ic3: #eebf2c; --ic4: #8e44ad; --ic5: #2bab99; --ic6: #4a86b8; }
+:root { --ic1: #0e7490; /* 🎨 2026-10-19 كان أحمر #e06666 — «شيل الأحمر والأورانج من الأيقونات» */ --ic2: #4a7abf; --ic3: #eebf2c; --ic4: #8e44ad; --ic5: #2bab99; --ic6: #4a86b8; }
 @media screen {
     /* توالي الألوان على البلاطات/الروابط المتجاورة */
     .dash-links > .dash-link:nth-child(6n+1), .report-grid > .report-card:nth-child(6n+1), .dash-kpis > .dash-kpi:nth-child(6n+1), .dash-meta > .dm-item:nth-child(6n+1), .sidebar-nav a:nth-of-type(6n+1), .stat-icon.gold { --ic: var(--ic1); }
@@ -3154,3 +3154,16 @@ body.doc-view #schoolPicker .school-menu { left: 0 !important; right: auto !impo
 .msa-tabs .mt-drop.mt-att-picked .mt-att-cols a { border-inline-start: 3px solid var(--mt-gold); background: #fffbeb; }
 .msa-tabs .mt-drop.mt-att-picked .mt-att-cols a:hover { background: #fef3c7; }
 .msa-tabs .mt-drop.mt-att-picked .mt-att-hd::after { content: ' — اكبس الإفادة لتطلع دغري'; font-weight: 400; color: #b45309; font-size: 11px; }
+
+/* ═══ 520 🎨 (2026-10-19 «باريت بتشيل هاللون الأحمر والأورانج من الأيقونات وحط غير لون») لا أحمر ولا برتقالي بكبسات وحبوب وأبواب الشاشة:
+ *      البرتقالي (تعديل/قلم · الجرس · حبّة السنة · الرجوع · كبسة «تعديل» بشريط الطباعة) ⇒ تركواز غامق #0e7490،
+ *      والأحمر (خروج · حذف/سلّة · إغلاق · PDF · btn-danger) ⇒ كحلي #173f6f. يغلب القسمين 310 و330. شاشة فقط — الطباعة والتنبيهات النصّية لا تتأثّر. ═══ */
+@media screen {
+:root { --ios-orange: #0e7490; --ios-red: #173f6f; }
+.btn:has(> .fa-arrow-left), .btn:has(> .fa-arrow-right), .topbar .btn.btn-light:has(> .fa-arrow-left), .topbar .btn.btn-light:has(> .fa-arrow-right) { --bg: var(--ios-orange); }
+.btn-danger, .btn-danger:hover, .btn-warning, .btn-warning:hover { background: var(--ios-red) !important; border-color: var(--ios-red) !important; color: #fff !important; background-image: none !important; }
+.btn-warning, .btn-warning:hover { background: var(--ios-orange) !important; border-color: var(--ios-orange) !important; }
+.btn-danger:has(.fa-trash, .fa-trash-alt):not(.btn-lg), .btn-danger[onclick*=".remove()"] { color: #fff; border-color: var(--ios-red); border-bottom-color: var(--ios-red); opacity: 1; }
+.btn-gold { background: var(--ios-orange) !important; border-color: var(--ios-orange) !important; color: #fff !important; text-shadow: none !important; }
+.bell-n { background: #fff !important; color: var(--ios-navy) !important; border-color: var(--ios-navy) !important; }   /* عدّاد الجرس أبيض على الجرس الكحلي */
+}

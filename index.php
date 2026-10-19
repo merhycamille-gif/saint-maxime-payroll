@@ -192,7 +192,7 @@ $dashSections = [
         viewerCanSeePage('mehe_budget.php') ? ['pages/mehe_budget.php','fas fa-landmark','Budget MEHE','موازنة وزارة التربية'] : null,
         canEdit() ? ['pages/tax_declarations.php','fas fa-file-contract','Déclarations','التصاريح'] : null,
     ])],
-    ['Système', 'النظام', 'fa-gear', '#d97706', 'rgba(217,119,6,.10)', array_filter([
+    ['Système', 'النظام', 'fa-gear', '#0f766e', 'rgba(15,118,110,.10)', array_filter([   /* 🎨 2026-10-19 كان برتقالياً */
         isSuperAdmin() ? ['pages/schools.php','fas fa-school','Écoles','المدارس'] : null,
         isAdmin() ? ['pages/users.php','fas fa-user-shield','Utilisateurs','حسابات المدارس'] : null,
         canEdit() ? ['pages/open_year.php','fas fa-folder-plus','Ouvrir année','فتح سنة دراسية'] : null,
@@ -250,7 +250,7 @@ window.addEventListener('load', function () {
 if ($homeInc): ?>
 <details class="reg-details no-print" open id="homeIncBox">
     <summary>
-        <span class="rd-ic" style="background:rgba(217,119,6,.16);color:#d97706"><i class="fas fa-user-edit"></i></span>
+        <span class="rd-ic" style="background:rgba(14,116,144,.16);color:#0e7490"><i class="fas fa-user-edit"></i></span>
         <span dir="ltr">Dossiers incomplets</span> <span style="opacity:.85">/ ملفات ناقصة — بلا راتب محسوب (<?= count($homeInc) ?>)</span>
         <i class="fas fa-chevron-down rd-chev"></i>
     </summary>
@@ -278,7 +278,7 @@ if ($homeInc): ?>
 <?php if ($home64): ?>
 <details class="reg-details no-print">
     <summary>
-        <span class="rd-ic" style="background:rgba(217,119,6,.16);color:#d97706"><i class="fas fa-hourglass-half"></i></span>
+        <span class="rd-ic" style="background:rgba(14,116,144,.16);color:#0e7490"><i class="fas fa-hourglass-half"></i></span>
         <span dir="ltr">Retraite 64</span> <span style="opacity:.85">/ بلغوا سنّ الـ64 (<?= count($home64) ?>)</span>
         <i class="fas fa-chevron-down rd-chev"></i>
     </summary>

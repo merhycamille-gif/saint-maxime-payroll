@@ -113,7 +113,7 @@ $sectionColors = [
     'personnel' => ['#0284c7', 'rgba(2,132,199,.16)'],   // الموظفون — أزرق
     'paie'      => ['#16a34a', 'rgba(22,163,74,.16)'],   // الرواتب — أخضر
     'rapports'  => ['#7c3aed', 'rgba(124,58,237,.16)'],  // التقارير — بنفسجي
-    'systeme'   => ['#d97706', 'rgba(217,119,6,.16)'],   // النظام — برتقالي
+    'systeme'   => ['#0f766e', 'rgba(15,118,110,.16)'],   // النظام — تركواز غامق (🎨 2026-10-19 «شيل الأحمر والأورانج من الأيقونات» — كان برتقالياً)
 ];
 $sectionIcons = ['dashboard'=>'fa-gauge-high','personnel'=>'fa-users','paie'=>'fa-money-check-dollar','rapports'=>'fa-chart-column','systeme'=>'fa-gear'];
 $pageSection = [
@@ -430,7 +430,7 @@ document.addEventListener('submit', function (e) {
             </a>
             <?php endif; ?>
 
-            <div class="nav-section" style="--ns:#fbbf24">Système / النظام</div>
+            <div class="nav-section" style="--ns:#2dd4bf">Système / النظام</div><?php /* 🎨 2026-10-19 «شيل الأحمر والأورانج من الأيقونات»: كان أصفر #fbbf24 ⇒ تركواز */ ?>
 
             <?php if (isSuperAdmin()): ?>
             <a href="<?= BASE_URL ?>pages/schools.php" class="<?= $currentPage === 'schools' ? 'active' : '' ?>">
@@ -756,7 +756,7 @@ document.addEventListener('submit', function (e) {
                     ['fr' => 'CNSS', 'ar' => 'الضمان الاجتماعي', 'icon' => 'gov-ic gov-cnss', 'color' => '#3b82f6', 'cat' => $__pick('CNSS'),
                      'pages' => canEdit() ? [['cnss_followup.php', 'fa-user-shield', 'Suivi CNSS', 'متابعة الضمان', 'cnss_followup'], ['social_security.php', 'fa-shield-alt', 'Plafonds CNSS', 'حدود الضمان', 'social_security']] : []],
                     ['fr' => 'Caisse EOC', 'ar' => 'صندوق التعويضات', 'icon' => 'gov-ic gov-eoc', 'color' => '#c9a961', 'cat' => $__pick('Caisse EOC'), 'pages' => []],
-                    ['fr' => 'Finances', 'ar' => 'المالية — الضريبة', 'icon' => 'gov-ic gov-mof', 'color' => '#ef4444', 'cat' => $__pick('Impôt'),
+                    ['fr' => 'Finances', 'ar' => 'المالية — الضريبة', 'icon' => 'gov-ic gov-mof', 'color' => '#be185d', 'cat' => $__pick('Impôt'),   /* 🎨 2026-10-19 كان أحمر */
                      'pages' => canEdit() ? [['tax_declarations.php', 'fa-file-contract', 'Déclarations', 'التصاريح', 'tax'], ['tax_brackets.php', 'fa-percent', "Tranches d'impôt", 'الشطور الضريبية', 'tax_brackets']] : []],
                 ];
                 $__extra = [];
@@ -791,7 +791,7 @@ document.addEventListener('submit', function (e) {
                     $__attLinks .= '</div>';
                     $__attLinks .= '<div class="mt-att-foot"><a href="' . BASE_URL . 'pages/attestations.php" class="' . ($currentPage === 'attestations' && empty($_GET['type']) ? 'active' : '') . '"><i class="fas fa-file-signature"></i><span class="nl2"><span class="nl-fr">Toutes les attestations</span><span class="nl-ar">صفحة الإفادات كاملة</span></span></a>'
                                  . '<a href="' . BASE_URL . 'pages/attestations.php?dossier=1"><i class="fas fa-folder-open"></i><span class="nl2"><span class="nl-fr">Dossier complet</span><span class="nl-ar">ملف الأستاذ الكامل</span></span></a></div>';
-                    $__attDoor = ['fr' => 'Attestations', 'ar' => 'الإفادات', 'color' => '#d97706', 'links' => $__attLinks, 'icon' => 'fa-file-signature', 'wide' => true, 'active' => $currentPage === 'attestations'];
+                    $__attDoor = ['fr' => 'Attestations', 'ar' => 'الإفادات', 'color' => '#0e7490', 'links' => $__attLinks, 'icon' => 'fa-file-signature', 'wide' => true, 'active' => $currentPage === 'attestations'];
                     $__posA = count($__groups); foreach ($__groups as $__i => $__g) if ($__g['fr'] === 'Paie') { $__posA = $__i + 1; break; }
                     array_splice($__groups, $__posA, 0, [$__attDoor]);
                     $__tabIcons['Attestations'] = 'fa-file-signature';
