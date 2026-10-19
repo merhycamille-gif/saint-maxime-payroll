@@ -3105,9 +3105,10 @@ i.gov-ic { display: inline-block; width: 1.35em; height: 1.35em; vertical-align:
 i.gov-ic::before { content: none !important; }
 i.gov-cnss { --gov-img: url(../img/gov/cnss.png); background-size: 96% !important; }   /* الشعار الكلاسيكي (العِيلة الخضرا + النصّ المقوَّس) بعته المستخدم 2026-10-18 — يملأ الدائرة كي تبيّن الرسمة */
 i.gov-mof  { --gov-img: url(../img/gov/mof.png); }
-i.gov-eoc  { --gov-img: url(../img/gov/eoc.svg); }
+i.gov-eoc  { --gov-img: url(../img/gov/eoc.svg?v=2); background-size: 100% !important; }   /* 🏛️ 2026-10-19 «اخترعلهن واحد»: شعار مخترَع للصندوق (قرص كحلي + أرزة + صندوق ذهبي) بدل شعار الجمهورية الأحمر — يملأ الدائرة */
 .msa-tabs a.mt-tab > i.gov-ic:first-child, .msa-tabs .mt-btn > i.gov-ic:first-child { background: #fff var(--gov-img) center / 74% no-repeat; border-radius: 16px; }
 .msa-tabs .mt-drop-hd i.gov-ic { width: 1.5em; height: 1.5em; vertical-align: -.4em; }
+.msa-tabs a.mt-tab > i.gov-eoc:first-child, .msa-tabs .mt-btn > i.gov-eoc:first-child { background-size: 100% !important; }   /* شعار الصندوق المخترَع قرصٌ كامل ⇒ يملأ الدائرة */
 .report-cat-title i.gov-ic, .card-header h3 i.gov-ic { width: 1.6em; height: 1.6em; vertical-align: -.42em; }
 .card-header h3 i.gov-ic, .sidebar-nav a > i.gov-ic:first-child, .report-cat .report-cat-title i.gov-ic { background-color: #fff !important; background-image: var(--gov-img) !important; background-size: 82% !important; background-position: center !important; background-repeat: no-repeat !important; text-shadow: none; }   /* فوق قاعدة المربّع الملوَّن (قسم الأيقونات بالألوان) */
 @media print { i.gov-ic { box-shadow: none; } }
