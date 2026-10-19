@@ -3167,6 +3167,9 @@ body.doc-view #schoolPicker .school-menu { left: 0 !important; right: auto !impo
 .btn-danger:has(.fa-trash, .fa-trash-alt):not(.btn-lg), .btn-danger[onclick*=".remove()"] { color: #fff; border-color: var(--ios-red); border-bottom-color: var(--ios-red); opacity: 1; }
 .btn-gold { background: var(--ios-orange) !important; border-color: var(--ios-orange) !important; color: #fff !important; text-shadow: none !important; }
 .bell-n { background: #fff !important; color: var(--ios-navy) !important; border-color: var(--ios-navy) !important; }   /* عدّاد الجرس أبيض على الجرس الكحلي */
+/* («شوف بعد في لون أحمر بكبسة لمحل ما كنت» 2026-10-19) كبسة «ارجع لمحل ما كنت» كانت زهرية-حمراء #ff2d55 (قسم 330) ⇒ بنفسجي قوي؛ والزهري (--ios-pink: تقويم/باص) ⇒ بنفسجي أيضاً */
+:root { --ios-pink: #9333ea; }
+.topbar #msaFwdBtn, #msaFwdBtn.btn { --bg: #7c3aed; }
 }
 /* 520-ب 🎨 (2026-10-19 «غيرهن» — تتمّة): التنبيهات والشارات والإطارات الحمراء/البرتقالية على الشاشة أيضاً ⇒ كحلي/تركواز (الخطر كحلي، التنبيه تركواز). الطباعة لا تتأثّر. */
 @media screen {
