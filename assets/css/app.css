@@ -3116,7 +3116,7 @@ i.gov-eoc  { --gov-img: url(../img/gov/eoc.svg); }
 .msa-tabs .mt-brand-ic, .sidebar-brand .brand-logo { background: #fff !important; padding: 3px; }
 .msa-tabs .mt-brand-ic img, .sidebar-brand .brand-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .login-header .login-logo { width: auto; height: auto; background: #fff; border-radius: 18px; padding: 10px 14px; display: inline-block; }
-.login-header .login-logo img { display: block; width: 190px; max-width: 70vw; height: auto; }
+.login-header .login-logo img { display: block; width: 130px; max-width: 50vw; height: auto; } /* 🖼️ 2026-10-19 «شيل كلمة رواتب الأساتذة وتزغر شوي» ⇒ logo_mark بلا الكلمة 130px (كان logo_full 190px) */
 
 /* ═══ 515 — 📅 (2026-10-18 «السنين المدرسية مبيّنة فوق… تضلّها مبيّنة كيف ما طلعت ونزلت… واعمِلها غير لون تشوفها») قائمة السنة القديمة بالشريط العلوي: لون مميّز + ثابتة ═══ */
 /* 🎨 («وبعدين من السنوات غيرلي هالّلون الأحمر») كحلي البرنامج بخطّ ذهبي — مميّز عن باقي الحبوب (أزرق/أخضر/بنفسجي) ومتل ألوان الشريط العلوي */
