@@ -290,7 +290,7 @@ function programMailSend($to, $subject, $body, array $attachments = [], $isHtml 
             $relayErr = 'خدمة الإرسال (API): ' . $err;
         }
         [$ok, $err] = smtpSendMail($rc, $to, $subject, $body, $attachments, $isHtml);
-        if ($ok) { $GLOBALS['msa_mail_last'] = ['via' => 'resend_smtp', 'id' => '']; return [true, '']; }
+        if ($ok) { $GLOBALS['msa_mail_last'] = ['via' => 'resend_smtp', 'id' => '', 'note' => $relayErr]; return [true, '']; }
         $relayErr .= ($relayErr !== '' ? ' · ' : '') . 'خدمة الإرسال (SMTP): ' . $err;
         if (!programMailAvailable()) { $r = programMailRelay($to, $subject, $body, $attachments, $isHtml, $fromName, $replyTo); if (!$r[0]) $r[1] = $relayErr . ' · ' . $r[1]; return $r; }
         return [false, $relayErr . ' — لم يُرسَل (لا نستعمل بريد الخادم كبديل لأنّه لا يصل إلى Hotmail/Outlook)'];
@@ -383,8 +383,8 @@ function resendApiSend(array $rc, $to, $subject, $body, array $attachments = [],
         $payload['attachments'][] = ['filename' => (string)($a['name'] ?? 'file'), 'content' => base64_encode((string)($a['data'] ?? '')),
                                      'content_type' => (string)($a['mime'] ?? 'application/octet-stream')];
     }
-    $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
-    if ($json === false) return [false, 'تعذّر تجهيز الرسالة', ''];
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);   // نصّ بترميز معطوب لا يمنع الإرسال
+    if ($json === false) return [false, 'تعذّر تجهيز الرسالة (' . json_last_error_msg() . ')', ''];
     $lastErr = '';
     for ($try = 1; $try <= 2; $try++) {   // محاولتان على انقطاع الشبكة فقط (لا على رفض الخدمة)
         $c = curl_init('https://api.resend.com/emails');
@@ -525,15 +525,41 @@ function msaMailLogWrite($to, $subject, array $attachments, $schoolId, array $r,
                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
             ->execute([$id, date('Y-m-d H:i:s'), (string)($_SESSION['username'] ?? (php_sapi_name() === 'cli' ? 'cli' : '')), $schoolId !== null ? (int)$schoolId : null,
                        mb_substr(implode(', ', (array)$to), 0, 500), mb_substr((string)$subject, 0, 500), mb_substr($files, 0, 255),
-                       $via, (string)($last['id'] ?? '') ?: null, !empty($r[0]) ? 'sent' : 'failed', !empty($r[0]) ? null : (string)($r[1] ?? ''), $dupKey]);
+                       $via, (string)($last['id'] ?? '') ?: null, !empty($r[0]) ? 'sent' : 'failed', !empty($r[0]) ? ((string)($last['note'] ?? '') ?: null) : (string)($r[1] ?? ''), $dupKey]);
         $GLOBALS['msa_mail_log_id'] = $id;
     } catch (Throwable $e) {}
 }
 /** يسأل الخدمة عن الرسائل المعلّقة (آخر 10 أيام، حتى 30 رسالة) ويحدّث حالتها. يرجع عدد المحدَّثة. */
+/** آخر رسائل الخدمة (لمطابقة ما خرج بـSMTP بلا رقم) — [ [id, to[], subject, created_at(UTC), last_event], … ] */
+function resendApiRecent(int $limit = 50): array {
+    $rc = programRelayConfig(); if (!$rc || !function_exists('curl_init')) return [];
+    $c = curl_init('https://api.resend.com/emails?limit=' . (int)$limit);
+    curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $rc['pass']], CURLOPT_SSL_VERIFYPEER => true]);
+    $out = curl_exec($c); $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE); curl_close($c);
+    if ($out === false || $code !== 200) return [];
+    $r = json_decode((string)$out, true);
+    return is_array($r['data'] ?? null) ? $r['data'] : [];
+}
 function msaMailLogRefresh(int $max = 30): int {
     $n = 0;
     try {
         ensureMailLogTable(); $db = getDB();
+        // رسائل خرجت بـSMTP الخدمة (بلا رقم): نطابقها بالمستلم + الموضوع + الوقت (±30 د) مع سجلّ الخدمة لنعرف حالتها
+        $noId = $db->prepare("SELECT id, to_addr, subject, created_at FROM mail_log WHERE (provider_id IS NULL OR provider_id = '') AND via IN ('resend_smtp','relay:resend_smtp') AND status = 'sent' AND created_at >= ? ORDER BY created_at DESC LIMIT 20");
+        $noId->execute([date('Y-m-d H:i:s', time() - 10 * 86400)]);
+        $pending = $noId->fetchAll(PDO::FETCH_ASSOC);
+        if ($pending) {
+            $recent = resendApiRecent(100); $setId = $db->prepare("UPDATE mail_log SET provider_id = ? WHERE id = ?");
+            foreach ($pending as $pr) {
+                $tP = strtotime($pr['created_at']); $tosP = array_map('strtolower', array_map('trim', explode(',', (string)$pr['to_addr'])));
+                foreach ($recent as $e) {
+                    $tE = strtotime(substr((string)($e['created_at'] ?? ''), 0, 19) . ' UTC');
+                    $tosE = array_map('strtolower', (array)($e['to'] ?? []));
+                    $sameSubj = (string)($e['subject'] ?? '') === (string)$pr['subject'];
+                    if (!empty($e['id']) && !array_diff($tosP, $tosE) && (($sameSubj && abs($tE - $tP) <= 1800) || abs($tE - $tP) <= 120)) { $setId->execute([(string)$e['id'], $pr['id']]); break; }
+                }
+            }
+        }
         $st = $db->prepare("SELECT id, provider_id, status FROM mail_log WHERE provider_id IS NOT NULL AND provider_id <> '' AND status IN ('sent','delivery_delayed','queued')
                             AND created_at >= ? ORDER BY created_at DESC LIMIT " . (int)$max);
         $st->execute([date('Y-m-d H:i:s', time() - 10 * 86400)]);

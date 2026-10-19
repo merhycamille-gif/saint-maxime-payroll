@@ -96,7 +96,7 @@ include __DIR__ . '/../includes/header.php';
                         <td style="white-space:nowrap;font-size:12.5px"><?= e($viaLabel((string)$r['via'])) ?><?= $r['sent_by'] ? '<br><span style="color:var(--gray-500)">' . e($r['sent_by']) . '</span>' : '' ?></td>
                         <td style="white-space:nowrap">
                             <span class="badge" style="background:<?= $bg ?>;color:<?= $fg ?>;padding:5px 10px;font-size:13px;font-weight:700"><?= e($lbl) ?></span>
-                            <?php if ($r['status'] === 'failed' && $r['error']): ?><div style="font-size:12px;color:#173f6f;max-width:420px;white-space:normal;margin-top:3px"><?= e($r['error']) ?></div><?php endif; ?>
+                            <?php if ($r['error']): ?><div style="font-size:12px;color:#173f6f;max-width:420px;white-space:normal;margin-top:3px"><?= $r['status'] === 'failed' ? '' : 'ملاحظة: ' ?><?= e($r['error']) ?></div><?php endif; ?>
                             <?php if ($r['checked_at']): ?><div style="font-size:11.5px;color:var(--gray-500)">آخر فحص <?= e(date('d/m H:i', strtotime($r['checked_at']))) ?></div><?php endif; ?>
                         </td>
                     </tr>
