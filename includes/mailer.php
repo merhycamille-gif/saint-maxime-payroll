@@ -552,12 +552,17 @@ function msaMailLogRefresh(int $max = 30): int {
             $recent = resendApiRecent(100); $setId = $db->prepare("UPDATE mail_log SET provider_id = ? WHERE id = ?");
             foreach ($pending as $pr) {
                 $tP = strtotime($pr['created_at']); $tosP = array_map('strtolower', array_map('trim', explode(',', (string)$pr['to_addr'])));
-                foreach ($recent as $e) {
-                    $tE = strtotime(substr((string)($e['created_at'] ?? ''), 0, 19) . ' UTC');
-                    $tosE = array_map('strtolower', (array)($e['to'] ?? []));
-                    $sameSubj = (string)($e['subject'] ?? '') === (string)$pr['subject'];
-                    if (!empty($e['id']) && !array_diff($tosP, $tosE) && (($sameSubj && abs($tE - $tP) <= 1800) || abs($tE - $tP) <= 120)) { $setId->execute([(string)$e['id'], $pr['id']]); break; }
+                $found = '';
+                foreach ([true, false] as $needSubj) {   // أوّلاً بالموضوع نفسه (±30 د)، وإلا الأقرب زمناً (±2 د) لنفس المستلم
+                    foreach ($recent as $e) {
+                        $tE = strtotime(substr((string)($e['created_at'] ?? ''), 0, 19) . ' UTC');
+                        $tosE = array_map('strtolower', (array)($e['to'] ?? []));
+                        $sameSubj = (string)($e['subject'] ?? '') === (string)$pr['subject'];
+                        if (empty($e['id']) || array_diff($tosP, $tosE)) continue;
+                        if (($needSubj && $sameSubj && abs($tE - $tP) <= 1800) || (!$needSubj && abs($tE - $tP) <= 120)) { $found = (string)$e['id']; break 2; }
+                    }
                 }
+                if ($found !== '') $setId->execute([$found, $pr['id']]);
             }
         }
         $st = $db->prepare("SELECT id, provider_id, status FROM mail_log WHERE provider_id IS NOT NULL AND provider_id <> '' AND status IN ('sent','delivery_delayed','queued')
