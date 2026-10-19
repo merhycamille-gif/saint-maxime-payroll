@@ -4,7 +4,9 @@
  * (2026-10-19 «اذا بدي شوف معلومات الاستاذ على صفحة وحدة A4… المعلومات الشخصية وكل شي معلومات لالو بالمدرسة واقدر اطبعها»)
  * كل معلومات ملفّه (شخصية · اتصال · وظيفية · أرقام رسمية · راتب ومحسومات) مرتّبة بخانتَين على كل سطر، بلا صور المستندات،
  * الخانات الفارغة لا تُطبع — فتسع ورقة واحدة. صفحة مستقلّة: لا تمسّ «الملف الكامل» ولا أي صفحة أخرى.
- * الطباعة/PDF/واتساب/إيميل من شريط التصدير الموحّد (محرّك الطباعة الرسمي يحوّل .letterhead و.info-grid إلى جداول الورق).
+ * 🌐 («بطاقة الأستاذ A4 ما عجبتني… بتخليها كلها بالعربي وبتحطلي خيار إذا بدي ياها بغير لغة فرنسي أو إنكليزي أو عربي — هيك بتضلها A4 وواضحة» 2026-10-19):
+ *    لغة واحدة للورقة كلّها (العربي افتراضياً) + حبوب العربية / Français / English فوق الورقة (lang_doc=ar|fr|en).
+ * الطباعة/PDF/واتساب/إيميل من شريط التصدير الموحّد (جداول pdf-info جاهزة ⇒ محرّك الطباعة لا يحوّلها ولا يقسّمها).
  */
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -15,6 +17,9 @@ requireLogin();
 $currentPage = 'employee_fiche';
 $db = getDB();
 $employeeId = (int)($_GET['employee_id'] ?? 0);
+$DOC_LANGS = ['ar' => 'العربية', 'fr' => 'Français', 'en' => 'English'];
+$L = $_GET['lang_doc'] ?? 'ar';
+if (!isset($DOC_LANGS[$L])) $L = 'ar';
 
 // 🪪 («حطلي ياها تبين أيقونة ضمن ملف الأستاذ دغري بدون ما افتح ملفو» 2026-10-19) بلا أستاذ: صفحة اختيار الأستاذ مباشرة ⇒ البطاقة
 if ($employeeId <= 0) {
@@ -48,6 +53,14 @@ if ($employeeId <= 0) {
                     </select>
                 </div>
                 <div class="form-group" style="grid-column:1/-1">
+                    <label class="form-label">Langue / لغة البطاقة</label>
+                    <div class="school-checks att-lang-checks">
+                        <?php foreach ($DOC_LANGS as $k => $lbl): ?>
+                        <label class="chk"><input type="radio" name="lang_doc" value="<?= e($k) ?>" <?= $k === $L ? 'checked' : '' ?> autocomplete="off"> <span><?= e($lbl) ?></span></label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="form-group" style="grid-column:1/-1">
                     <button class="btn btn-success btn-lg"><i class="fas fa-id-card"></i> Afficher la fiche A4 / اعرض بطاقة الأستاذ A4</button>
                 </div>
             </form>
@@ -61,7 +74,7 @@ if ($employeeId <= 0) {
 }
 
 // وضع «كل المدارس»: بدّل المدرسة الفعّالة لمدرسة الأستاذ تلقائياً (كما بالملف الكامل)
-if ($employeeId > 0 && isAllSchools()) {
+if (isAllSchools()) {
     $sidQ = $db->prepare("SELECT school_id FROM employees WHERE id = ? AND is_deleted = 0");
     $sidQ->execute([$employeeId]);
     $sid = (int)$sidQ->fetchColumn();
@@ -78,13 +91,95 @@ if (!$emp) {
     exit;
 }
 
-$isTeacher = (($emp['employee_type'] ?? '') !== 'employe');   // «أستاذ» للمعلّم، «موظف» لقانون العمل
+// ===== القاموس: كل نصّ ثابت بالورقة بثلاث لغات [ar, fr, en] =====
+$T = [
+    'title_t'   => ['بطاقة الأستاذ', "Fiche de l'enseignant", 'Teacher Card'],
+    'title_e'   => ['بطاقة الموظف', "Fiche de l'employé", 'Employee Card'],
+    's_pers'    => ['معلومات شخصية', 'Informations personnelles', 'Personal information'],
+    's_contact' => ['اتصال وسكن', 'Contact et adresse', 'Contact and address'],
+    's_job'     => ['معلومات وظيفية', 'Informations professionnelles', 'Employment information'],
+    's_off'     => ['أرقام رسمية وتواريخ الترك', 'Numéros officiels et cessations', 'Official numbers and leaving dates'],
+    's_sal'     => ['الراتب والمحسومات', 'Salaire et retenues', 'Salary and deductions'],
+    's_notes'   => ['ملاحظات', 'Remarques', 'Notes'],
+    'name_ar'   => ['الاسم الكامل (عربي)', 'Nom complet (arabe)', 'Full name (Arabic)'],
+    'name_fr'   => ['الاسم الكامل (فرنسي)', 'Nom complet', 'Full name'],
+    'mother'    => ['اسم الأم', 'Nom de la mère', "Mother's name"],
+    'nat'       => ['الجنسية', 'Nationalité', 'Nationality'],
+    'birth'     => ['الولادة', 'Naissance', 'Birth'],
+    'reg'       => ['السجل', 'Registre', 'Civil registry'],
+    'social'    => ['الوضع العائلي', 'Situation familiale', 'Marital status'],
+    'kids'      => ['عدد الأولاد', "Nombre d'enfants", 'Children'],
+    'spouse_w'  => ['الزوج/الزوجة يعمل', 'conjoint(e) travaille', 'spouse works'],
+    'tel'       => ['الهاتف', 'Téléphone', 'Phone'],
+    'email'     => ['الإيميل', 'E-mail', 'E-mail'],
+    'addr'      => ['العنوان', 'Adresse', 'Address'],
+    'floor'     => ['طابق', 'étage', 'floor'],
+    'cat'       => ['الفئة', 'Catégorie', 'Category'],
+    'job'       => ['الوظيفة', 'Fonction', 'Position'],
+    'dipl'      => ['الشهادة', 'Diplôme', 'Diploma'],
+    'spec'      => ['الاختصاص', 'Spécialité', 'Specialization'],
+    'subj'      => ['المواد', 'Matières', 'Subjects'],
+    'cycle'     => ['المرحلة', 'Cycle', 'Level'],
+    'classes'   => ['الصفوف', 'Classes', 'Classes'],
+    'grade'     => ['الدرجة', 'Échelon', 'Grade'],
+    'grade0'    => ['الابتدائية', 'initial', 'initial'],
+    'hours'     => ['الدوام', 'Horaire', 'Schedule'],
+    'h_wk'      => ['ساعة/أسبوع', 'h/semaine', 'h/week'],
+    'd_wk'      => ['يوم/أسبوع', 'jours/semaine', 'days/week'],
+    'entry'     => ['تاريخ الدخول', "Date d'entrée", 'Entry date'],
+    'titul'     => ['تاريخ الملاك', 'Titularisation', 'Tenure date'],
+    'confirm'   => ['تثبيت الملاك', 'Confirmation', 'Tenure confirmation'],
+    'status'    => ['الحالة', 'Statut', 'Status'],
+    'after64'   => ['استمرار العمل بعد ٦٤', 'Travail après 64 ans', 'Working after 64'],
+    'cnss'      => ['رقم الضمان', 'N° CNSS', 'NSSF number'],
+    'mof'       => ['الرقم المالي', 'N° Finances', 'Finance number'],
+    'eoc'       => ['رقم الصندوق', 'N° Caisse', 'Fund number'],
+    'left_all'  => ['الترك من الكل', 'Cessation (toutes)', 'Left (all)'],
+    'left_cnss' => ['ترك الضمان', 'Cessation CNSS', 'Left NSSF'],
+    'left_mof'  => ['ترك المالية', 'Cessation Finances', 'Left Finance'],
+    'left_eoc'  => ['ترك الصندوق', 'Cessation Caisse', 'Left Fund'],
+    'mode'      => ['طريقة الراتب', 'Mode de salaire', 'Salary mode'],
+    'base'      => ['أساس الراتب', 'Salaire de base', 'Base salary'],
+    'period'    => ['الفترة المدفوعة', 'Période payée', 'Paid period'],
+    'm13'       => ['الشهر 13', '13e mois', '13th month'],
+    'fam'       => ['التعويض العائلي', 'Allocations familiales', 'Family allowance'],
+    'spouse'    => ['زوج', 'conjoint', 'spouse'],
+    'children'  => ['أولاد', 'enfants', 'children'],
+    'transport' => ['النقل', 'Transport', 'Transport'],
+    'day'       => ['يوم/أسبوع', 'j/sem.', 'd/wk'],
+    'week'      => ['أسبوع', 'sem.', 'wk'],
+    'tax'       => ['الضريبة', 'Impôt', 'Income tax'],
+    'cnss_s'    => ['الضمان', 'CNSS', 'NSSF'],
+    'eoc_s'     => ['الصندوق', 'Caisse', 'Fund'],
+    'yes'       => ['نعم', 'Oui', 'Yes'],
+    'no'        => ['لا', 'Non', 'No'],
+    'incl'      => ['يشمل', 'inclut', 'includes'],
+    'base_only' => ['الأساس فقط', 'base seule', 'base only'],
+    'ech'       => ['التدرّج', 'échelon', 'increments'],
+    'extra'     => ['الإضافي', 'supplément', 'extra pay'],
+    'aide'      => ['المكافأة', 'prime/aide', 'bonus'],
+    'm_law'     => ['قانون العمل (الحد الأدنى للأجور الساري)', 'Code du travail (salaire minimum en vigueur)', 'Labour law (current minimum wage)'],
+    'm_usd'     => ['راتب مباشر بالدولار', 'Salaire direct en dollars', 'Direct salary in USD'],
+    'm_pct'     => ['نسبة من راتب الليرة', 'Pourcentage du salaire en livres', 'Percentage of LBP salary'],
+    'm_lbp'     => ['راتب مباشر بالليرة', 'Salaire direct en livres', 'Direct salary in LBP'],
+    'issued'    => ['صدر بتاريخ', 'Émis le', 'Issued on'],
+    'months'    => ['شهراً', 'mois', 'months'],
+    'type_tit'  => ['أستاذ في الملاك', 'Enseignant titulaire', 'Tenured teacher'],
+    'type_con'  => ['أستاذ متعاقد', 'Enseignant contractuel', 'Contract teacher'],
+    'type_emp'  => ['موظف إداري', 'Employé administratif', 'Administrative employee'],
+    'st_actif'  => ['نشط', 'Actif', 'Active'], 'st_suspendu' => ['متوقف', 'Suspendu', 'Suspended'], 'st_retraite' => ['متقاعد', 'Retraité', 'Retired'], 'st_demissionne' => ['مستقيل', 'Démissionné', 'Resigned'],
+];
+$li = ['ar' => 0, 'fr' => 1, 'en' => 2][$L];
+$t = fn($k) => $T[$k][$li] ?? $T[$k][1];
+$vl = ($L === 'ar') ? 'ar' : 'fr';   // لغة الدوال المشتركة (عربي/فرنسي) — الإنكليزي يأخذ الفرنسي حيث لا ترجمة
+$rtl = ($L === 'ar');
+
+$isTeacher = (($emp['employee_type'] ?? '') !== 'employe');
 $nameAr = trim(implode(' ', array_filter([$emp['first_name_ar'] ?? '', $emp['father_name_ar'] ?? '', $emp['last_name_ar'] ?? ''])));
 $nameFr = trim(implode(' ', array_filter([$emp['first_name_fr'] ?? '', $emp['father_name_fr'] ?? '', $emp['last_name_fr'] ?? ''])));
-$titleFr = $isTeacher ? "Fiche de l'enseignant" : "Fiche de l'employé";
-$titleAr = $isTeacher ? 'بطاقة الأستاذ' : 'بطاقة الموظف';
-$pageTitle = $titleFr . ' / ' . $titleAr;
-$exportTitle = 'Fiche_' . preg_replace('/[^A-Za-z0-9]+/', '_', trim(($emp['first_name_fr'] ?? '') . '_' . ($emp['last_name_fr'] ?? ''))) ?: 'Fiche';
+$titleDoc = $t($isTeacher ? 'title_t' : 'title_e');
+$pageTitle = ($isTeacher ? "Fiche de l'enseignant" : "Fiche de l'employé") . ' / ' . ($isTeacher ? 'بطاقة الأستاذ' : 'بطاقة الموظف');
+$exportTitle = 'Fiche_' . strtoupper($L) . '_' . (preg_replace('/[^A-Za-z0-9]+/', '_', trim(($emp['first_name_fr'] ?? '') . '_' . ($emp['last_name_fr'] ?? ''))) ?: 'Fiche');
 $school = currentSchool();
 $exportOpts = [
     'phone' => (trim((string)($school['phone'] ?? '')) ?: ($emp['phone1'] ?: '')),
@@ -92,99 +187,114 @@ $exportOpts = [
 ];
 $backHref = BASE_URL . 'pages/attestations.php?employee_id=' . $employeeId . '&dossier=1';
 
-// ===== الخانات — نفس مصادر «الملف الكامل»، مدموجة باختصار والفارغ لا يُطبع =====
-$yn   = fn($v) => ((int)$v === 1) ? 'نعم' : 'لا';
+// ===== القيم — نفس مصادر «الملف الكامل»، مترجمة للغة المختارة، والفارغ لا يُطبع =====
 $num  = fn($v) => rtrim(rtrim(number_format((float)$v, 2), '0'), '.');
-$incLbl = fn($ech, $ext, $pa) => implode('، ', array_filter([(int)$ech ? 'التدرّج' : '', (int)$ext ? 'الأجر الإضافي' : '', (int)$pa ? 'المكافأة/المساعدة' : ''])) ?: 'الأساس فقط';
+$typeKey = ['enseignant_titulaire' => 'type_tit', 'enseignant_contractuel' => 'type_con', 'employe' => 'type_emp'][$emp['employee_type'] ?? ''] ?? null;
+$typeLbl = $typeKey ? $t($typeKey) : employeeTypeLabel($emp['employee_type'], $vl);
+$stKey = 'st_' . ($emp['status'] ?? '');
+$statusLbl = isset($T[$stKey]) ? $t($stKey) : (employeeStatusLabel($emp['status'], $vl)['label'] ?? '');
 $addr = implode(' - ', array_values(array_filter(array_map('trim', [
     $emp['ville'] ?? '', $emp['quartier'] ?? '', $emp['rue'] ?? '', $emp['immeuble'] ?? '',
-    ($emp['etage'] ?? '') !== '' ? ('طابق ' . $emp['etage']) : '', $emp['district'] ?? '', $emp['gouvernorat'] ?? '',
+    ($emp['etage'] ?? '') !== '' ? ($t('floor') . ' ' . $emp['etage']) : '', $emp['district'] ?? '', $emp['gouvernorat'] ?? '',
 ]))));
 $registry = trim(($emp['civil_registry_number'] ?? '') . (($emp['civil_registry_place'] ?? '') ? (' / ' . $emp['civil_registry_place']) : ''));
 $mother   = trim(($emp['mother_first_name'] ?? '') . ' ' . ($emp['mother_last_name'] ?? ''));
 $birth    = trim(($emp['birth_date'] ? formatDate($emp['birth_date']) : '') . (($emp['birth_place'] ?? '') ? (' — ' . $emp['birth_place']) : ''));
-$social   = trim((string)($emp['social_status'] ?? ''));
-if ($social !== '' && (int)($emp['spouse_works'] ?? 0) === 1) $social .= ' (الزوج/الزوجة يعمل)';
+$social   = trim((string)socialStatusLabel($emp['social_status'] ?? '', $vl));
+if ($social === '' ) $social = trim((string)($emp['social_status'] ?? ''));
+if ($social !== '' && (int)($emp['spouse_works'] ?? 0) === 1) $social .= ' (' . $t('spouse_w') . ')';
 $phones   = implode(' · ', array_filter([trim((string)($emp['phone1'] ?? '')), trim((string)($emp['phone2'] ?? ''))]));
-$modeLbl  = isLaborLawSalary($emp) ? 'قانون العمل (الحد الأدنى للأجور الساري)'
-          : (['direct_usd' => 'راتب مباشر بالدولار', 'percent_of_lbp' => 'نسبة من راتب الليرة', 'direct_lbp' => 'راتب مباشر بالليرة'][$emp['salary_input_mode'] ?? ''] ?? ($emp['salary_input_mode'] ?? ''));
+$modeLbl  = isLaborLawSalary($emp) ? $t('m_law')
+          : (['direct_usd' => $t('m_usd'), 'percent_of_lbp' => $t('m_pct'), 'direct_lbp' => $t('m_lbp')][$emp['salary_input_mode'] ?? ''] ?? ($emp['salary_input_mode'] ?? ''));
 $baseLbl  = '';
 if (($emp['salary_input_mode'] ?? '') === 'direct_usd' && (float)($emp['base_salary_usd'] ?? 0)) $baseLbl = '$' . number_format((float)$emp['base_salary_usd'], 2);
 if (($emp['salary_input_mode'] ?? '') === 'percent_of_lbp' && (float)($emp['base_salary_lbp_percent'] ?? 0)) $baseLbl = $num($emp['base_salary_lbp_percent']) . '%';
 if (($emp['salary_input_mode'] ?? '') === 'direct_lbp' && (float)($emp['contract_salary_lbp'] ?? 0)) $baseLbl = formatLBP($emp['contract_salary_lbp']);
 $transport = ((float)($emp['transport_daily_amount'] ?? 0) > 0)
-    ? ($num($emp['transport_daily_amount']) . ' ' . ($emp['transport_daily_currency'] ?? 'LBP') . ' × ' . (int)($emp['transport_days_per_week'] ?? 0) . ' يوم/أسبوع × ' . $num($emp['transport_weeks'] ?? 0) . ' أسبوع')
+    ? ($num($emp['transport_daily_amount']) . ' ' . ($emp['transport_daily_currency'] ?? 'LBP') . ' × ' . (int)($emp['transport_days_per_week'] ?? 0) . ' ' . $t('day') . ' × ' . $num($emp['transport_weeks'] ?? 0) . ' ' . $t('week'))
     : '';
+$incShort = fn($ech, $ext, $pa) => implode('، ', array_filter([(int)$ech ? $t('ech') : '', (int)$ext ? $t('extra') : '', (int)$pa ? $t('aide') : ''])) ?: $t('base_only');
+if (!$rtl) $incShort = fn($ech, $ext, $pa) => implode(', ', array_filter([(int)$ech ? $t('ech') : '', (int)$ext ? $t('extra') : '', (int)$pa ? $t('aide') : ''])) ?: $t('base_only');
+$subj = fn($on, $ech, $ext, $pa) => (int)$on ? ($t('yes') . ': ' . $incShort($ech, $ext, $pa)) : $t('no');
 $m13 = (int)($emp['has_13th_month'] ?? 0)
-    ? ('نعم' . ((($emp['m13_include_extra'] ?? 0) || ($emp['m13_include_aide'] ?? 0)) ? ' — يشمل: ' . implode('، ', array_filter([($emp['m13_include_extra'] ?? 0) ? 'الإضافي' : '', ($emp['m13_include_aide'] ?? 0) ? 'المكافأة' : ''])) : ''))
-    : 'لا';
+    ? ($t('yes') . ((($emp['m13_include_extra'] ?? 0) || ($emp['m13_include_aide'] ?? 0)) ? ' — ' . $t('incl') . ': ' . implode($rtl ? '، ' : ', ', array_filter([($emp['m13_include_extra'] ?? 0) ? $t('extra') : '', ($emp['m13_include_aide'] ?? 0) ? $t('aide') : ''])) : ''))
+    : $t('no');
 $grade = trim((string)gradeDisplay($emp));
-if ((float)($emp['starting_grade'] ?? 0) > 0) $grade .= ($grade !== '' ? ' ' : '') . '(الابتدائية ' . $num($emp['starting_grade']) . ')';
+if ((float)($emp['starting_grade'] ?? 0) > 0) $grade .= ($grade !== '' ? ' ' : '') . '(' . $t('grade0') . ' ' . $num($emp['starting_grade']) . ')';
 $hours = implode(' · ', array_filter([
-    (float)($emp['hours_per_week'] ?? 0) > 0 ? ($num($emp['hours_per_week']) . ' ساعة/أسبوع') : '',
-    (int)($emp['days_per_week'] ?? 0) > 0 ? ((int)$emp['days_per_week'] . ' يوم/أسبوع') : '',
+    (float)($emp['hours_per_week'] ?? 0) > 0 ? ($num($emp['hours_per_week']) . ' ' . $t('h_wk')) : '',
+    (int)($emp['days_per_week'] ?? 0) > 0 ? ((int)$emp['days_per_week'] . ' ' . $t('d_wk')) : '',
 ]));
 $famAll = implode(' · ', array_filter([
-    (float)($emp['family_allowance_spouse_lbp'] ?? 0) ? ('زوج: ' . formatLBP($emp['family_allowance_spouse_lbp'])) : '',
-    (float)($emp['family_allowance_children_lbp'] ?? 0) ? ('أولاد: ' . formatLBP($emp['family_allowance_children_lbp'])) : '',
+    (float)($emp['family_allowance_spouse_lbp'] ?? 0) ? ($t('spouse') . ': ' . formatLBP($emp['family_allowance_spouse_lbp'])) : '',
+    (float)($emp['family_allowance_children_lbp'] ?? 0) ? ($t('children') . ': ' . formatLBP($emp['family_allowance_children_lbp'])) : '',
 ]));
+// الفترة المدفوعة: عربي/فرنسي من الدالة المشتركة، والإنكليزي بأسماء الأشهر الإنكليزية
+if ($L === 'en') {
+    $pm = paidMonthsFor($emp, 2000, 2001);
+    $period = $pm ? (date('F', mktime(0, 0, 0, (int)$pm[0][0], 1)) . ' → ' . date('F', mktime(0, 0, 0, (int)$pm[count($pm) - 1][0], 1)) . ' (' . count($pm) . ' ' . $t('months') . ')') : '';
+} else {
+    $period = paidPeriodLabel($emp, $L);
+}
+$classes = classLevelNames($emp['classes_taught'] ?? '', !$rtl);
 
 // [التسمية, القيمة, كامل السطر؟] — القيمة الفارغة تُحذف
 $S = [];
-// 🌐 («عملتها باللغتين… فرنسي وتحت الفرنسي دغري عربي» 2026-10-19) عنوان القسم: الفرنسي فوق والعربي تحته؛ تسمية الخانة: «Français / عربي» على السطر نفسه
-//    التسميات قصيرة عمداً كي تسع خانتان بالسطر وتبقى الورقة واحدة
-$incShort = fn($ech, $ext, $pa) => implode('، ', array_filter([(int)$ech ? 'التدرّج' : '', (int)$ext ? 'الإضافي' : '', (int)$pa ? 'المكافأة' : ''])) ?: 'الأساس فقط';
-$subj = fn($on, $ech, $ext, $pa) => (int)$on ? ('نعم: ' . $incShort($ech, $ext, $pa)) : 'لا';
-$S['Informations personnelles|معلومات شخصية'] = [
-    ['Nom complet (AR) / الاسم الكامل', $nameAr, true],
-    ['Nom complet (FR) / الاسم بالفرنسي', $nameFr, true],
-    ['Mère / اسم الأم', $mother],
-    ['Nationalité / الجنسية', $emp['nationality'] ?? ''],
-    ['Naissance / الولادة', $birth],
-    ['Registre / السجل', $registry],
-    ['Situation / الوضع العائلي', $social],
-    ["Enfants / عدد الأولاد", (int)($emp['number_of_children'] ?? 0) > 0 ? (string)(int)$emp['number_of_children'] : ''],
+$S['s_pers'] = $rtl ? [
+    [$t('name_ar'), $nameAr, true],
+    [$t('name_fr'), $nameFr, true],
+] : [
+    [$t('name_fr'), $nameFr, true],
+    [$t('name_ar'), $nameAr, true],
 ];
-$S['Contact et adresse|اتصال وسكن'] = [
-    ['Tél. / الهاتف', $phones],
-    ['E-mail / الإيميل', $emp['email'] ?? ''],
-    ['Adresse / العنوان', $addr, true],
+$S['s_pers'] = array_merge($S['s_pers'], [
+    [$t('mother'), $mother],
+    [$t('nat'), $emp['nationality'] ?? ''],
+    [$t('birth'), $birth],
+    [$t('reg'), $registry],
+    [$t('social'), $social],
+    [$t('kids'), (int)($emp['number_of_children'] ?? 0) > 0 ? (string)(int)$emp['number_of_children'] : ''],
+]);
+$S['s_contact'] = [
+    [$t('tel'), $phones],
+    [$t('email'), $emp['email'] ?? ''],
+    [$t('addr'), $addr, true],
 ];
-$S['Informations professionnelles|معلومات وظيفية'] = [
-    ['Catégorie / الفئة', employeeTypeLabel($emp['employee_type'])],
-    ['Fonction / الوظيفة', (!$isTeacher && ($emp['job_title'] ?? '') !== '') ? jobTitleLabel($emp['job_title']) : ''],
-    ['Diplôme / الشهادة', ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma']) : ''],
-    ['Spécialité / الاختصاص', $emp['specialization'] ?? ''],
-    ['Matières / المواد', $emp['subjects_taught'] ?? ''],
-    ['Cycle / المرحلة', $emp['niveau_scolaire'] ?? ''],
-    ['Classes / الصفوف', classLevelNames($emp['classes_taught'] ?? '')],
-    ['Échelon / الدرجة', $grade],
-    ['Horaire / الدوام', $hours],
-    ["Entrée / الدخول", shownHireDate($emp) ? formatDate(shownHireDate($emp)) : ''],
-    ['Titularisation / الملاك', shownTitularizationDate($emp) ? formatDate(shownTitularizationDate($emp)) : ''],
-    ['Confirmation / تثبيت الملاك', $emp['tenure_confirmation_date'] ? formatDate($emp['tenure_confirmation_date']) : ''],
-    ['Statut / الحالة', employeeStatusLabel($emp['status'])['label'] ?? ''],
-    ['Après 64 ans / بعد ٦٤', (int)($emp['keep_working_past_64'] ?? 0) === 1 ? 'نعم' : ''],
+$S['s_job'] = [
+    [$t('cat'), $typeLbl],
+    [$t('job'), (!$isTeacher && ($emp['job_title'] ?? '') !== '') ? jobTitleLabel($emp['job_title'], $vl) : ''],
+    [$t('dipl'), ($emp['diploma'] ?? '') ? diplomaLabel($emp['diploma'], $vl) : ''],
+    [$t('spec'), $emp['specialization'] ?? ''],
+    [$t('subj'), $emp['subjects_taught'] ?? ''],
+    [$t('cycle'), $emp['niveau_scolaire'] ?? ''],
+    [$t('classes'), $classes],
+    [$t('grade'), $grade],
+    [$t('hours'), $hours],
+    [$t('entry'), shownHireDate($emp) ? formatDate(shownHireDate($emp)) : ''],
+    [$t('titul'), shownTitularizationDate($emp) ? formatDate(shownTitularizationDate($emp)) : ''],
+    [$t('confirm'), $emp['tenure_confirmation_date'] ? formatDate($emp['tenure_confirmation_date']) : ''],
+    [$t('status'), $statusLbl],
+    [$t('after64'), (int)($emp['keep_working_past_64'] ?? 0) === 1 ? $t('yes') : ''],
 ];
-$S['Numéros officiels et cessations|أرقام رسمية وتواريخ الترك'] = [
-    ['CNSS / الضمان', cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', '')],
-    ['Finances / المالية', $emp['finance_ministry_number'] ?? ''],
-    ['Caisse / الصندوق', $emp['caisse_number'] ?? ''],
-    ['Cessation / الترك من الكل', !empty($emp['left_date_all']) ? formatDate($emp['left_date_all']) : ''],
-    ['Cessation CNSS / ترك الضمان', !empty($emp['left_date_cnss']) ? formatDate($emp['left_date_cnss']) : ''],
-    ['Cessation Finances / ترك المالية', !empty($emp['left_date_finance']) ? formatDate($emp['left_date_finance']) : ''],
-    ['Cessation Caisse / ترك الصندوق', !empty($emp['left_date_eoc']) ? formatDate($emp['left_date_eoc']) : ''],
+$S['s_off'] = [
+    [$t('cnss'), cnssWithBirthYear($emp['nssf_number'] ?? '', $emp['birth_date'] ?? '', '')],
+    [$t('mof'), $emp['finance_ministry_number'] ?? ''],
+    [$t('eoc'), $emp['caisse_number'] ?? ''],
+    [$t('left_all'), !empty($emp['left_date_all']) ? formatDate($emp['left_date_all']) : ''],
+    [$t('left_cnss'), !empty($emp['left_date_cnss']) ? formatDate($emp['left_date_cnss']) : ''],
+    [$t('left_mof'), !empty($emp['left_date_finance']) ? formatDate($emp['left_date_finance']) : ''],
+    [$t('left_eoc'), !empty($emp['left_date_eoc']) ? formatDate($emp['left_date_eoc']) : ''],
 ];
-$S['Salaire et retenues|الراتب والمحسومات'] = [
-    ['Mode / طريقة الراتب', $modeLbl],
-    ['Base / أساس الراتب', $baseLbl],
-    ['Période payée / الفترة المدفوعة', paidPeriodLabel($emp, 'ar')],
-    ['13e mois / الشهر 13', $m13],
-    ['Allocations / التعويض العائلي', $famAll],
-    ['Transport / النقل', $transport],
-    ["Impôt / الضريبة", $subj($emp['tax_subject'] ?? 0, $emp['tax_includes_echelon'] ?? 0, $emp['tax_includes_extra'] ?? 0, $emp['tax_includes_prime_aide'] ?? 0)],
-    ['CNSS / الضمان', $subj($emp['cnss_subject'] ?? 0, $emp['cnss_includes_echelon'] ?? 0, $emp['cnss_includes_extra'] ?? 0, $emp['cnss_includes_prime_aide'] ?? 0)],
-    ['Caisse / الصندوق', $subj($emp['eoc_subject'] ?? 0, $emp['eoc_includes_echelon'] ?? 0, $emp['eoc_includes_extra'] ?? 0, $emp['eoc_includes_prime_aide'] ?? 0)],
+$S['s_sal'] = [
+    [$t('mode'), $modeLbl],
+    [$t('base'), $baseLbl],
+    [$t('period'), $period],
+    [$t('m13'), $m13],
+    [$t('fam'), $famAll],
+    [$t('transport'), $transport],
+    [$t('tax'), $subj($emp['tax_subject'] ?? 0, $emp['tax_includes_echelon'] ?? 0, $emp['tax_includes_extra'] ?? 0, $emp['tax_includes_prime_aide'] ?? 0)],
+    [$t('cnss_s'), $subj($emp['cnss_subject'] ?? 0, $emp['cnss_includes_echelon'] ?? 0, $emp['cnss_includes_extra'] ?? 0, $emp['cnss_includes_prime_aide'] ?? 0)],
+    [$t('eoc_s'), $subj($emp['eoc_subject'] ?? 0, $emp['eoc_includes_echelon'] ?? 0, $emp['eoc_includes_extra'] ?? 0, $emp['eoc_includes_prime_aide'] ?? 0)],
 ];
 
 // الصورة الشخصية (إن وُجدت على هذا الجهاز — محرّك الطباعة يقرأها من الملف نفسه)
@@ -203,6 +313,7 @@ echo officialFormStyles();
 .fiche-a4 .fiche-top{width:100%;border-collapse:collapse;margin:2px 0 6px}
 .fiche-a4 .fiche-top td{border:0;padding:0;vertical-align:middle}
 .fiche-a4 .fiche-photo{width:30mm;text-align:left}
+.fiche-a4.ltr .fiche-photo{text-align:right}
 .fiche-a4 .fiche-photo img{width:26mm;height:32mm;object-fit:cover;border:1px solid #cbd5e1;border-radius:4px}
 .fiche-a4 .doc-title{margin:4px 0 2px;font-size:18pt}
 .fiche-a4 .doc-subtitle{margin:0 0 4px}
@@ -211,13 +322,16 @@ echo officialFormStyles();
 .fiche-a4 .k{color:#334155}
 .fiche-a4 .fill{font-weight:700;color:#0a3d91;display:inline;padding:0 3px}
 .fiche-a4 .fiche-foot{font-size:10pt;color:#64748b;text-align:center;border-top:1px dashed #cbd5e1;margin-top:12px;padding-top:4px}
+.export-toolbar .rl-chips{display:none !important}   /* لغة الورقة من حبوب البطاقة نفسها (العربية / Français / English) لا من قاموس التقارير */
+.fiche-langs{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}
+.fiche-langs .btn.on{outline:3px solid #c9a961;outline-offset:1px}
 </style>
 <?php
-// خانة = تسمية + قيمة على سطر منقّط؛ القيمة الطويلة (> 36 حرفاً) تأخذ السطر كلّه كي لا تتكسّر على أسطر كثيرة
+// خانة = تسمية + قيمة على سطر منقّط؛ الخانة التي لا تسع نصف السطر تأخذ السطر كلّه كي لا تتكسّر
 $tdStyle = 'padding:1pt 4pt 0.5pt;line-height:1.2;vertical-align:top;border:0;border-bottom:0.5pt dotted #94a3b8';
-$mmEst = function (string $t): float {   // تقدير عرض النصّ بالملم بخط Arial 12pt (نفس تقدير محرّك الطباعة MsaPdf::textMmEst)
+$mmEst = function (string $txt): float {   // تقدير عرض النصّ بالملم بخط Arial 12pt (نفس تقدير محرّك الطباعة MsaPdf::textMmEst)
     $w = 0.0;
-    foreach (preg_split('//u', $t, -1, PREG_SPLIT_NO_EMPTY) as $ch) {
+    foreach (preg_split('//u', $txt, -1, PREG_SPLIT_NO_EMPTY) as $ch) {
         $o = mb_ord($ch, 'UTF-8');
         if ($o >= 0x064B && $o <= 0x065F) continue;
         if ($o >= 0x0600 && $o <= 0x06FF) $w += 1.9;
@@ -230,8 +344,9 @@ $mmEst = function (string $t): float {   // تقدير عرض النصّ بال�
     return $w;
 };
 $cell = fn($r, $span) => '<td' . ($span > 1 ? ' colspan="2" style="width:100%;' : ' style="width:50%;') . $tdStyle . '"><span class="k">' . e($r[0]) . ':</span> <span class="fill">' . e($r[1]) . '</span></td>';
-$infoTable = function (array $rows) use ($cell, $tdStyle, $mmEst) {
-    $out = '<table class="pdf-info" dir="rtl" width="100%" style="width:100%;border-collapse:collapse;margin:2pt 0 5pt">';
+$dirAttr = $rtl ? 'rtl' : 'ltr';
+$infoTable = function (array $rows) use ($cell, $tdStyle, $mmEst, $dirAttr) {
+    $out = '<table class="pdf-info" dir="' . $dirAttr . '" width="100%" style="width:100%;border-collapse:collapse;margin:2pt 0 5pt">';
     $pair = [];
     $flush = function () use (&$pair, &$out, $cell, $tdStyle) {
         if (!$pair) return;
@@ -239,7 +354,6 @@ $infoTable = function (array $rows) use ($cell, $tdStyle, $mmEst) {
         $pair = [];
     };
     foreach ($rows as $r) {
-        // الخانة التي لا تسع نصف السطر (≈80mm بخط 12: عربي 1.9mm/حرف، لاتيني 2.0، رقم 2.3) تأخذ السطر كلّه بدل أن تلتفّ
         $full = !empty($r[2]) || $mmEst($r[0] . ': ' . $r[1]) > 84;
         if ($full) { $flush(); $out .= '<tr>' . $cell($r, 2) . '</tr>'; continue; }
         $pair[] = $r;
@@ -248,38 +362,45 @@ $infoTable = function (array $rows) use ($cell, $tdStyle, $mmEst) {
     $flush();
     return $out . '</table>';
 };
+$langUrl = fn($k) => BASE_URL . 'pages/employee_fiche.php?employee_id=' . $employeeId . '&lang_doc=' . $k;
 ?>
 <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
-    <a href="<?= e($backHref) ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> Dossier complet / الملف الكامل</a>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <a href="<?= e($backHref) ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> Dossier complet / الملف الكامل</a>
+        <span class="fiche-langs" title="لغة البطاقة / Langue de la fiche">
+            <?php foreach ($DOC_LANGS as $k => $lbl): ?>
+            <a href="<?= e($langUrl($k)) ?>" class="btn btn-sm btn-light<?= $k === $L ? ' on' : '' ?>"><i class="fas fa-language"></i> <?= e($lbl) ?></a>
+            <?php endforeach; ?>
+        </span>
+    </div>
     <?php if (viewerCanSeePage('employees.php')): ?>
     <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $employeeId ?>" class="btn btn-light"><i class="fas fa-user-pen"></i> Modifier le dossier / تعديل ملف الأستاذ</a>
     <?php endif; ?>
 </div>
 
 <div id="ppExportArea">
-<div class="official-doc rtl fiche-a4" dir="rtl">
+<div class="official-doc <?= $rtl ? 'rtl' : 'ltr' ?> fiche-a4 <?= $rtl ? '' : 'ltr' ?>" dir="<?= $dirAttr ?>">
     <div style="line-height:1.25"><?= schoolLetterhead($school) ?></div>
-    <table class="fiche-top"><tr>
+    <table class="fiche-top" dir="<?= $dirAttr ?>"><tr>
         <td>
-            <div class="doc-title" style="line-height:1.2;margin:0 0 1pt"><span dir="ltr"><?= e($titleFr) ?></span><div style="font-size:0.85em"><?= e($titleAr) ?></div></div>
-            <div class="doc-subtitle" style="margin:0 0 2pt;line-height:1.2"><strong><?= e($nameAr ?: $nameFr) ?></strong><?php if ($nameAr && $nameFr): ?> — <span dir="ltr"><?= e($nameFr) ?></span><?php endif; ?><?php if (!empty($emp['employee_code'])): ?> · <?= e($emp['employee_code']) ?><?php endif; ?></div>
+            <div class="doc-title" style="line-height:1.2;margin:0 0 1pt"><?= e($titleDoc) ?></div>
+            <div class="doc-subtitle" style="margin:0 0 2pt;line-height:1.2"><strong><?= e($rtl ? ($nameAr ?: $nameFr) : ($nameFr ?: $nameAr)) ?></strong><?php if ($nameAr && $nameFr): ?> — <span dir="<?= $rtl ? 'ltr' : 'rtl' ?>"><?= e($rtl ? $nameFr : $nameAr) ?></span><?php endif; ?><?php if (!empty($emp['employee_code'])): ?> · <?= e($emp['employee_code']) ?><?php endif; ?></div>
         </td>
         <?php if ($photoUrl): ?><td class="fiche-photo"><img src="<?= $photoUrl ?>" alt=""></td><?php endif; ?>
     </tr></table>
 
-    <?php foreach ($S as $title => $rows): ?>
+    <?php foreach ($S as $sk => $rows): ?>
         <?php $rows = array_values(array_filter($rows, fn($r) => trim((string)$r[1]) !== '')); if (!$rows) continue; ?>
-        <?php [$tFr, $tAr] = array_pad(explode('|', $title, 2), 2, ''); ?>
-        <div class="doc-section" style="margin:5pt 0 1pt;line-height:1.2"><span dir="ltr"><?= e($tFr) ?></span><div style="font-size:0.9em;font-weight:600"><?= e($tAr) ?></div></div>
+        <div class="doc-section" style="margin:5pt 0 1pt;line-height:1.2"><?= e($t($sk)) ?></div>
         <?= $infoTable($rows) ?>
     <?php endforeach; ?>
 
     <?php if ($notes !== ''): ?>
-    <div class="doc-section" style="margin:6pt 0 2pt;line-height:1.25"><span dir="ltr">Remarques</span><div style="font-size:0.9em;font-weight:600">ملاحظات</div></div>
+    <div class="doc-section" style="margin:5pt 0 1pt;line-height:1.2"><?= e($t('s_notes')) ?></div>
     <div style="line-height:1.3"><?= nl2br(e($notes)) ?></div>
     <?php endif; ?>
 
-    <div class="fiche-foot"><?= e($school['name_ar'] ?? '') ?> · <?= e($titleAr) ?> · صدر بتاريخ <?= date('d/m/Y') ?> · MSA Payroll</div>
+    <div class="fiche-foot"><?= e($rtl ? ($school['name_ar'] ?? '') : ($school['name_fr'] ?? ($school['name_ar'] ?? ''))) ?> · <?= e($titleDoc) ?> · <?= e($t('issued')) ?> <?= date('d/m/Y') ?> · MSA Payroll</div>
 </div>
 </div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

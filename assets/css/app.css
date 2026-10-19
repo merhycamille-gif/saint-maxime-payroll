@@ -3194,3 +3194,16 @@ details.msa-pick > summary .mp-edit, details.msa-opts > summary .mo-e, .msa-tabs
 .att-opts .att-sec.g3 { background: #e6f6f9; border-color: #9fd6e3; } .att-opts .att-sec.g3 .att-st, .att-opts .att-sec.g3 .att-k { color: #0e7490; }
 .btn[style*="#b45309"] { background-color: #0e7490 !important; } .btn[style*="#991b1b"], .btn[style*="#e11d48"], .btn[style*="#b91c1c"], .btn[style*="#dc2626"] { background-color: #173f6f !important; }
 }
+
+/* ═══ 530 🏫🔍 (2026-10-19 «كبسة اختيار المدارس واسماء المدارس ضغار بلكي بتكبرهن شوي حتى اقدر شوفهن») حبّة المدارس بالشريط العلوي أكبر:
+ *      الاسم 15px بعرض حتى 460px (كان 12px/240px فينقصّ)، أيقونة أكبر، ولائحة المدارس المنسدلة 15px بسطور أوسع. شاشة فقط. ═══ */
+@media screen {
+#schoolPicker.school-switcher { min-height: 38px; padding: 2px 12px 2px 6px; }
+#schoolPicker > i { width: 28px !important; height: 28px !important; min-width: 28px !important; font-size: 14px !important; }
+#schoolPicker .sm-btn { font-size: 15px !important; font-weight: 700 !important; max-width: 460px; padding: 3px 4px; }
+#schoolPicker .school-menu { min-width: 380px; max-width: 560px; }
+#schoolPicker .sm-all { font-size: 15px; padding: 8px 10px; }
+#schoolPicker .school-menu label { font-size: 15px; font-weight: 600; padding: 6px 10px; }
+#schoolPicker .school-menu input[type=checkbox] { width: 18px; height: 18px; }
+#schoolPicker .school-menu button[type=submit] { font-size: 14px; padding: 8px; }
+}
