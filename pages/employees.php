@@ -1235,7 +1235,8 @@ if ($action === 'list') {
                                             <div class="mp-menu-list">
                                                 <a href="?action=edit&id=<?= (int)$emp['id'] ?>"><i class="fas fa-pen"></i> Modifier le dossier / تعديل الملف</a>
                                                 <?php if (viewerCanSeePage('monthly_payroll.php')): ?><a href="<?= BASE_URL ?>pages/monthly_payroll.php?employee_id=<?= (int)$emp['id'] ?>"><i class="fas fa-money-check"></i> Bulletin de paie / قسيمة الراتب</a><?php endif; ?>
-                                                <?php if (viewerCanSeePage('attestations.php')): ?><a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$emp['id'] ?>"><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل والإفادات</a><?php endif; ?>
+                                                <?php if (viewerCanSeePage('attestations.php')): ?><a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$emp['id'] ?>"><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل والإفادات</a>
+                                                <a href="<?= BASE_URL ?>pages/employee_fiche.php?employee_id=<?= (int)$emp['id'] ?>"><i class="fas fa-id-card"></i> Fiche A4 / بطاقة الأستاذ A4</a><?php endif; ?>
                                                 <a href="<?= BASE_URL ?>pages/employee_full_history.php?employee_id=<?= (int)$emp['id'] ?>"><i class="fas fa-clock-rotate-left"></i> Historique / التاريخ الكامل</a>
                                                 <?php if (!isAllSchools()): ?><a href="?action=delete&id=<?= (int)$emp['id'] ?>" style="color:#b91c1c"><i class="fas fa-trash"></i> Supprimer / حذف (مع تأكيد)</a><?php endif; ?>
                                             </div>

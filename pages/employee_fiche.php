@@ -12,9 +12,53 @@ require_once __DIR__ . '/../includes/payroll_calculator.php';
 require_once __DIR__ . '/../includes/report_helpers.php';
 requireLogin();
 
-$currentPage = 'attestations';
+$currentPage = 'employee_fiche';
 $db = getDB();
 $employeeId = (int)($_GET['employee_id'] ?? 0);
+
+// 🪪 («حطلي ياها تبين أيقونة ضمن ملف الأستاذ دغري بدون ما افتح ملفو» 2026-10-19) بلا أستاذ: صفحة اختيار الأستاذ مباشرة ⇒ البطاقة
+if ($employeeId <= 0) {
+    $pageTitle = "Fiche A4 / بطاقة الأستاذ A4";
+    $hideExportToolbar = true;
+    [$ayf, $ayp] = yearEmploymentFilter(activeSchoolYear());
+    $aStmt = $db->prepare("SELECT id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar, school_id
+                             FROM employees WHERE is_deleted = 0" . schoolScopeSql() . $ayf . " ORDER BY school_id, FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
+    $aStmt->execute($ayp);
+    $list = $aStmt->fetchAll();
+    $showSch = isAllSchools();
+    include __DIR__ . '/../includes/header.php';
+?>
+    <div class="card">
+        <div class="card-header"><h3>
+          <span dir="ltr"><i class="fas fa-id-card"></i> Fiche A4 de l'enseignant</span>
+          <div style="font-size:0.85em;font-weight:600;opacity:0.9">بطاقة الأستاذ على ورقة A4 واحدة — كل معلومات ملفّه للطباعة</div>
+        </h3></div>
+        <div class="card-body">
+            <?php if (!$list): ?>
+                <div class="alert alert-info">Aucun employé / لا يوجد موظفون.</div>
+            <?php else: ?>
+            <form method="GET" class="form-row cols-4" style="align-items:end">
+                <div class="form-group" style="grid-column:1/-1">
+                    <label class="form-label">Employé / الأستاذ</label>
+                    <select name="employee_id" class="form-select" required onchange="this.form.submit()">
+                        <option value="">— Choisir / اختر —</option>
+                        <?php foreach ($list as $em): $pfx = $showSch ? (schoolNameById($em['school_id']) . ' — ') : ''; ?>
+                        <option value="<?= (int)$em['id'] ?>"><?= e($pfx . $em['employee_code'] . ' — ' . $em['first_name_fr'] . ' ' . $em['last_name_fr']) ?> / <?= e($em['first_name_ar'] . ' ' . $em['last_name_ar']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column:1/-1">
+                    <button class="btn btn-success btn-lg"><i class="fas fa-id-card"></i> Afficher la fiche A4 / اعرض بطاقة الأستاذ A4</button>
+                </div>
+            </form>
+            <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> اختر الأستاذ وبتطلع البطاقة فوراً (بتقدر كمان تفتّش عنه من خانة البحث فوق). بعدها اطبعها أو احفظها PDF أو ابعتها واتساب/إيميل من الشريط.</p>
+            <?php endif; ?>
+        </div>
+    </div>
+<?php
+    include __DIR__ . '/../includes/footer.php';
+    exit;
+}
 
 // وضع «كل المدارس»: بدّل المدرسة الفعّالة لمدرسة الأستاذ تلقائياً (كما بالملف الكامل)
 if ($employeeId > 0 && isAllSchools()) {
@@ -23,10 +67,6 @@ if ($employeeId > 0 && isAllSchools()) {
     $sid = (int)$sidQ->fetchColumn();
     $mayView = isSuperAdmin() || (function_exists('viewerAllowedSchoolIds') && in_array($sid, viewerAllowedSchoolIds(), true));
     if ($sid > 0 && $mayView) { $_SESSION['active_schools'] = [$sid]; unset($_SESSION['report_schools']); }
-}
-if ($employeeId <= 0) {
-    header('Location: ' . BASE_URL . 'pages/attestations.php?dossier=1');
-    exit;
 }
 requireSchoolSelected();
 $stmt = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0" . schoolScopeSql());

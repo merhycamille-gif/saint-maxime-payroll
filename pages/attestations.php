@@ -29,6 +29,11 @@ $effDate = $_GET['date'] ?? date('Y-m-d');
 // 📅 «أقدر غيّر التاريخ إذا بدّي» (2026-09-24): التاريخ المختار بشريط الإفادة هو التاريخ المطبوع عليها (الافتراضي اليوم)
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$effDate) || !strtotime((string)$effDate)) $effDate = date('Y-m-d');
 $emp = null;
+// 🪪 (2026-10-19) كبسة «Fiche A4» بصفحة اختيار الأستاذ ⇒ بطاقة الأستاذ على ورقة واحدة (صفحة مستقلّة)
+if ($employeeId > 0 && !empty($_GET['fiche'])) {
+    header('Location: ' . BASE_URL . 'pages/employee_fiche.php?employee_id=' . $employeeId);
+    exit;
+}
 
 // وضع «كل المدارس»: عند اختيار أستاذ، بدّل المدرسة الفعّالة لمدرسته تلقائياً — حتى يفتّش عن الأستاذ
 // بلا ما يضطرّ يختار مدرسة أولاً (يُقيَّد بالمدارس المسموحة له إن كان حساب مدرسة).
@@ -409,6 +414,8 @@ if (!$emp):
                 <div class="form-group" style="grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap">
                     <button class="btn btn-primary"><i class="fas fa-file-export"></i> Générer l'attestation / إصدار الإفادة</button>
                     <button name="dossier" value="1" class="btn btn-info btn-lg btn-dossier" formnovalidate><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل</button>
+                    <?php /* 🪪 (2026-10-19) بطاقة الأستاذ A4 من هون مباشرة بلا فتح ملفه — fiche=1 يحوّل إلى pages/employee_fiche.php */ ?>
+                    <button name="fiche" value="1" class="btn btn-success btn-lg" formnovalidate><i class="fas fa-id-card"></i> Fiche A4 / بطاقة الأستاذ A4</button>
                 </div>
             </form>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> كل إفادة تصدر بلغة واحدة مستقلة ومرتّبة. تقدر تبدّل اللغة من الوثيقة وتطبع/تصدّر كل لغة لحالها. حقل التاريخ للاستقالة والصرف وبراءة الذمة.</p>

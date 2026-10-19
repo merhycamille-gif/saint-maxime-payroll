@@ -803,6 +803,7 @@ document.addEventListener('submit', function (e) {
                     $__dItems = [];
                     if (canEdit()) $__dItems[] = ['pages/employees.php', 'fa-users', 'Employés & Enseignants', 'لائحة الموظفين والأساتذة (تعديل الملف)', 'employees'];
                     if (viewerCanSeePage('attestations.php')) $__dItems[] = ['pages/attestations.php?dossier=1', 'fa-folder-open', 'Dossier complet', 'الملف الكامل والإفادات', '__dossier'];
+                    if (viewerCanSeePage('attestations.php')) $__dItems[] = ['pages/employee_fiche.php', 'fa-id-card', 'Fiche A4', 'بطاقة الأستاذ A4 (كل معلوماته بورقة)', 'employee_fiche'];   // 🪪 (2026-10-19) «تبين أيقونة ضمن ملف الأستاذ دغري»
                     if (viewerCanSeePage('employee_history.php')) $__dItems[] = ['pages/employee_history.php', 'fa-user-clock', 'Dossier enseignant', 'سيرة الأستاذ', 'employee_history'];
                     if (canEdit()) $__dItems[] = ['pages/employee_full_history.php', 'fa-clock-rotate-left', 'Historique complet', 'التاريخ الكامل للأستاذ', 'employee_full_history'];
                     if (viewerCanSeePage('annual_slip.php')) $__dItems[] = ['pages/annual_slip.php', 'fa-file-invoice-dollar', 'Bulletin annuel', 'بطاقة الراتب السنوية', 'annual'];
