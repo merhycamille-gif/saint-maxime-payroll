@@ -67,15 +67,22 @@ check('🖨️ المحرّك: tfoot ⇒ آخر الجسم (المجاميع م�
       && strpos($en247, "str_replace('\\\\', '/', \$abs)") !== false
       && strpos($en247, '$mpdf->simpleTables = true;') !== false);
 
-check('📐 الإكسل/الوورد: ما قبل أوّل جدول = كتلة عنوان فوق رأس الأعمدة (titleLines) · الشارات لا تُصدَّر · الإكسل يُطبع بالحجم الحقيقي على N صفحات عرضاً مع تكرار عمودَي # والاسم · النصّ يُحدّ بـ42 حرفاً',
+check('📐 الإكسل/الوورد (قواعد 2026-10-21: خطّ 12 لا يصغر · العمود قدّ محتواه · أرقام لاتينية · الاتجاه من اللغة): كتلة عنوان فوق الرأس (titleLines) · الشارات لا تُصدَّر · الإكسل 100٪ على N صفحات عرضاً مع تكرار # والاسم · الوورد أجزاء docxParts بلا تصغير · مجموع مدموج · أعمدة الرمز بلا فواصل · البطاقة السنوية على المسار المجمّد (legacy)',
       strpos($re247, 'public function titleLines(array $lines)') !== false
       && strpos($re247, "foreach (\$this->titleLines as \$ln) { \$k = \$ln['k'] ?? 'meta'; \$st = \$k === 'title' ? 1 : (\$k === 'school' ? 2 : 9);") !== false
-      && strpos($re247, '$pagesAcross = 1;') !== false && strpos($re247, "if (\$this->orientMode === 'auto' && !\$this->landscape && \$sumW > 100) \$this->landscape = true;") !== false   /* 🔄 العمودي المفروض يبقى عمودياً */   /* 📄 2026-10-15 «العواميد كلّها نفس الصفحة»: الإكسل كل الأعمدة بعرض ورقة واحدة */
-      && strpos($re247, '$parts = [range(0, $cols - 1)];') !== false   /* الوورد: بلا أجزاء، الخط يصغر نسبياً */
+      && strpos($re247, '$pagesAcross = 0;') !== false && strpos($re247, '$fitW = false;') !== false && strpos($re247, "if (\$this->orientMode === 'auto' && !\$this->landscape && \$sumW > 100) \$this->landscape = true;") !== false
+      && strpos($re247, '<sheetPr><pageSetUpPr fitToPage="0"/></sheetPr>') !== false && strpos($re247, 'scale="100" orientation=') !== false
+      && strpos($re247, '$parts = $this->docxParts($cols, $w, $twDoc);') !== false && strpos($re247, '$pt = 12.0;') !== false && strpos($re247, '<w:noWrap/>') !== false
+      && strpos($re247, 'private function totalLabelSpan(array $cells): int') !== false && strpos($re247, 'private function isCodeCol(int $c): bool') !== false && strpos($re247, 'private function autoDir(): void') !== false
       && strpos($re247, '" fitToWidth="\' . $pagesAcross . \'" fitToHeight="0"/>\'') !== false
       && strpos($re247, "localSheetId=\"0\">' . \$printCols . '\\''") !== false
+      && strpos($re247, '<headerFooter><oddHeader>') !== false
       && strpos($re247, 'min($len, $this->isNum($v) ? 58.0 : 42.0)') !== false
-      && strpos($re247, '<cellXfs count="10">') !== false && strpos($re247, '<fonts count="6">') !== false
+      && strpos($re247, '<cellXfs count="12">') !== false && strpos($re247, '<fonts count="6">') !== false
+      && strpos($re247, 'public $legacy = false;') !== false && strpos($re247, 'public function docxLegacy()') !== false && strpos($re247, "if (\$this->legacy) { if (\$this->pyExport(\$format)) return; \$this->docxLegacy(); return; }") !== false
+      && strpos((string)file_get_contents($P247 . '/pages/annual_slip_export.php'), '$rep->legacy = true;') !== false
+      && strpos($he247, 'function hx_num(string $s): string') !== false && strpos($he247, "if (hx_has_class(\$n, ' money-usd ')) return '';") !== false
+      && strpos($ex247, 'window.msaFitOne = false;') !== false
       && strpos($he247, 'if ($tablesN === 0 && $pending) { $rep->titleLines($pending); $pending = []; return; }') !== false
       && strpos($he247, "\$cls('badge') . ' or ' . \$cls('tag') . ' or ' . \$cls('pill')") !== false
       && strpos($he247, "\$push(hx_text(\$tt), 'title');") !== false

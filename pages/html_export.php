@@ -74,12 +74,20 @@ function hx_text(DOMNode $n): string {
     if ($n->nodeType !== XML_ELEMENT_NODE) return '';
     $tag = strtolower($n->nodeName);
     if ($tag === 'br') return "\n";
-    if (hx_has_class($n, ' money-usd ')) { $s0 = ''; foreach ($n->childNodes as $c0) $s0 .= hx_text($c0); return "\n" . $s0; } // 💵 مرآة الدولار سطر تحت الليرة (كما على الشاشة) لا جنبها // 📏 2026-10-10: سطر جديد داخل الخلية (الاسم العربي فوق الفرنسي) بدل مسافة تعرّض العمود
+    if (hx_has_class($n, ' money-usd ')) return ''; // 💵 (2026-10-21) مرآة الدولار لا تدخل الإكسل/الوورد: الخلية رقم ليرة صافٍ (سعر الصرف بسطر العنوان) — كانت تجعل كل خلية نصّاً بسطرين
     $s = '';
     foreach ($n->childNodes as $c) $s .= hx_text($c) . ' ';
     return $s;
 }
 function hx_clean(string $s): string { $s = preg_replace('/[ \t\r\x{00A0}]+/u', ' ', $s); $s = preg_replace('/ *\n */u', "\n", $s); $s = preg_replace('/\n{2,}/u', "\n", $s); return trim($s); }
+/** 🔢 (2026-10-21) خلية مبلغ «51,944,000 L.L» / «ل.ل» / «$603» ⇒ رقم صافٍ تفهمه الإكسل (مجاميع/تنسيق)؛ غير ذلك يبقى نصّاً */
+function hx_num(string $s): string {
+    if (preg_match('/^\s*(-?[\d,]+(?:\.\d+)?)\s*(L\.?L\.?|ل\.?ل\.?|LBP|\$|USD)?\s*$/iu', $s, $m) || preg_match('/^\s*(\$|L\.?L\.?|ل\.?ل\.?)\s*(-?[\d,]+(?:\.\d+)?)\s*$/iu', $s, $m2)) {
+        $n = isset($m2) && $m2 ? $m2[2] : $m[1];
+        return str_replace(',', '', $n);
+    }
+    return $s;
+}
 function hx_has_class(DOMNode $n, string $re): bool {
     return $n instanceof DOMElement && preg_match('/' . $re . '/', ' ' . $n->getAttribute('class') . ' ') === 1;
 }
@@ -164,7 +172,7 @@ $emitTable = function (DOMElement $t) use ($rep, &$firstHead, &$tablesN, &$pendi
             for ($c = 0; $c < $cols; $c++) {
                 $e = $occ[$ri][$c] ?? null;
                 if ($e && $e['r0'] === $ri && $e['c0'] === $c) {
-                    $tx = hx_clean(hx_text($e['cell']));
+                    $tx = hx_num(hx_clean(hx_text($e['cell'])));
                     $cells[] = $tx; if ($tx !== '') $nonEmpty++;
                     if ($c === 0) $firstSpan = $e['cs'];
                 } else $cells[] = '';

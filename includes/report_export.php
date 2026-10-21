@@ -324,6 +324,8 @@ class ReportTable
     private $rows = [];      // كل صف: ['type'=>'data|total|section|head', 'cells'=>[...], 'span'=>n]
     private $colWidths = [];
     private $docxFontScale = 1.0;
+    private $docxPt = 12.0;
+    public $legacy = false;      // 🧊 البطاقة السنوية (مجمّدة بأمره): الوورد عبر المسار القديم (بايثون ثم docxLegacy) لا المولّد الجديد      // 📝 حجم خطّ جدول الوورد (يُختار من عدد الأعمدة ثم يصغر حتى تسع الورقة)
     public $orientMode = 'auto';   // 🔄 auto | 0 (عمودي مفروض) | 1 (أفقي مفروض) — الأفقي التلقائي للعريض فقط بوضع auto   // 📄 تصغير خط الوورد نسبياً حين لا تسع الأعمدة الورقة
     private $school = null;
     private $period = '';
@@ -342,7 +344,16 @@ class ReportTable
     public function schoolHeader($school) { $this->school = $school; return $this; }
     public function period($p) { $this->period = $p; return $this; }
     public function widths($w) { $this->colWidths = $w; return $this; }
-    public function dir($d) { $this->dir = ($d === 'ltr') ? 'ltr' : 'rtl'; return $this; }
+    public function dir($d) { $this->dir = ($d === 'ltr') ? 'ltr' : 'rtl'; $this->dirSet = true; return $this; }
+    private $dirSet = false;
+    /** ↔️ (2026-10-21 «إذا بالعربي من اليمين للشمال وإذا بالفرنسي من الشمال لليمين»): الاتجاه تلقائياً من لغة العنوان والرؤوس ما لم يُحدَّد صراحةً */
+    private function autoDir(): void
+    {
+        if ($this->dirSet) return;
+        $t = $this->title . ' ' . implode(' ', $this->headers); foreach ($this->titleLines as $ln) $t .= ' ' . ($ln['t'] ?? '');
+        $ar = preg_match_all('/[\x{0600}-\x{06FF}]/u', $t); $lat = preg_match_all('/[A-Za-zÀ-ÿ]/u', $t);
+        $this->dir = ($ar >= $lat) ? 'rtl' : 'ltr';
+    }
     public function titleLines(array $lines) { $this->titleLines = array_values(array_filter($lines, fn($l) => trim((string)($l['t'] ?? '')) !== '')); return $this; }
     public function isRtl() { return $this->dir === 'rtl'; }
 
@@ -360,6 +371,13 @@ class ReportTable
     }
 
     private function isNum($v) { return is_int($v) || is_float($v) || (is_string($v) && $v !== '' && preg_match('/^-?\d+(\.\d+)?$/', str_replace(',', '', $v))); }
+    /** عمود «رمز/رقم» (#، Code، الرمز، رقم الضمان…): أرقامه معرِّفات تُكتب كما هي بلا فواصل آلاف */
+    private function isCodeCol(int $c): bool
+    {
+        static $cache = [];
+        if (!isset($cache[$c])) { $h = trim((string)($this->headers[$c] ?? '')); $cache[$c] = ($c === 0 && ($h === '#' || $h === '')) || preg_match('/^(#|code|الرمز|رقم|n°|no\.?|id)\b/iu', $h) === 1; }
+        return $cache[$c];
+    }
     private function numVal($v) { return (float)str_replace(',', '', (string)$v); }
 
     private static function xa($s) { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_XML1, 'UTF-8'); }
@@ -381,6 +399,7 @@ class ReportTable
                 if ($o >= 0x0600 && $o <= 0x06FF) $w += 1.1;   // 📏 2026-10-10: كان 1.25 فتطلع الأعمدة العربية أعرض من كلماتها
                 elseif ($o >= 0x0640 && $o <= 0x065F) $w += 0;      // تشكيل
                 elseif (ctype_digit($ch) || $ch === ',' || $ch === '.') $w += 0.95;
+                elseif (ctype_upper($ch)) $w += 1.25;               // الكبيرة اللاتينية أعرض من الصفر (EMP1000024 كان يلتفّ)
                 elseif ($o > 0x2000) $w += 1.3;
                 else $w += 1.0;
             }
@@ -392,8 +411,9 @@ class ReportTable
         $w = array_fill(0, $cols, 0.0);
         for ($c = 0; $c < $cols; $c++) {
             $h = (string)($this->headers[$c] ?? '');
-            $hw = 0.0; foreach (preg_split('/\r\n|\n/', $h) as $ln) $hw = max($hw, self::textW($ln));
-            $w[$c] = max($w[$c], min($hw * 0.6 + 2, 18.0)); // 📏 الرأس يلتفّ على سطرين بدل توسيع العمود
+            // 📏 (2026-10-21 «عرض العامود تلقائياً لازم يكون قدّ عرض الكتابة اللي جوّاتو»): الرأس لا يوسّع العمود أكثر من أطول كلمة فيه — يلتفّ كلمةً كلمة
+            $hw = 0.0; foreach (preg_split('/[\s\x{00A0}]+/u', $h) as $wd) $hw = max($hw, self::textW($wd));
+            $w[$c] = max($w[$c], $hw + 1.0);
         }
         // 📏 (2026-10-10 مساءً «وسّع العامود لازم يكون مرتّب قدّ الكلمات اللي فيه مش هالقدّ واسع»): عنوان صفّ المجموع («مجموع الملاك»…)
         //    لا يوسّع عموده — يمتدّ على الخلايا الفارغة جنبه بالإكسل؛ والعرض = أطول محتوى فعلي + هامش صغير.
@@ -420,6 +440,7 @@ class ReportTable
     /* ============================== XLSX ============================== */
     public function xlsx()
     {
+        $this->autoDir();
         $cols = $this->colCount();
         $colLetter = function ($i) { // 0-based → A,B,...
             $s = ''; $i++;
@@ -436,15 +457,23 @@ class ReportTable
         $linesOf = function ($v, $w) {
             $t = (string)$v; if ($t === '') return 1;
             $n = 0;
-            foreach (preg_split('/\r\n|\n/', $t) as $ln) { $n += max(1, (int)ceil(self::textW($ln) / max(1.0, $w - 1.5))); }
+            foreach (preg_split('/\r\n|\n/', $t) as $ln) { $n += max(1, (int)ceil(self::textW($ln) / max(1.0, $w + 1.0))); } // متسامح قليلاً: كان يرفع ارتفاع سطر اسم يسع فعلاً
             return $n;
         };
-        $addRow = function ($cells, $styleText, $styleNum, $mergeAll = false) use (&$rowsXml, &$rIdx, $cols, $colLetter, $autoW, $lineH, $linesOf) {
+        $extraMerges = [];
+        $addRow = function ($cells, $styleText, $styleNum, $mergeAll = false, $spanTo = -1) use (&$rowsXml, &$rIdx, $cols, $colLetter, $autoW, $lineH, $linesOf, &$extraMerges) {
             $rIdx++;
+            // 📐 (2026-10-21) عنوان صفّ المجموع يمتدّ على الأعمدة النصّية الأولى (# … الدرجة) بدل أن يُحشر بعمود ضيّق ويلتفّ على 4 أسطر
+            if ($spanTo > 0) {
+                $label = ''; for ($c = 0; $c <= $spanTo; $c++) { $v = (string)($cells[$c] ?? ''); if ($v !== '') { $label = $v; break; } }
+                for ($c = 0; $c <= $spanTo; $c++) $cells[$c] = '';
+                $cells[0] = $label;
+                $extraMerges[] = 'A' . $rIdx . ':' . $colLetter($spanTo) . $rIdx;
+            }
             // ارتفاع السطر = أكثر خلية أسطراً (الخلية المدموجة على عرض الورقة كلّه)
             $maxL = 1;
             if ($mergeAll) { $maxL = $linesOf($cells[0] ?? '', array_sum($autoW)); }
-            else { for ($c = 0; $c < $cols; $c++) { $v = $cells[$c] ?? ''; if ($v !== '' && !$this->isNum($v)) $maxL = max($maxL, $linesOf($v, $autoW[$c] ?? 16)); } }
+            else { for ($c = 0; $c < $cols; $c++) { $v = $cells[$c] ?? ''; if ($v !== '' && !$this->isNum($v)) $maxL = max($maxL, $linesOf($v, ($spanTo > 0 && $c === 0) ? array_sum(array_slice($autoW, 0, $spanTo + 1)) : ($autoW[$c] ?? 16))); } }
             $ht = $maxL > 1 ? ' ht="' . ($maxL * $lineH + 4) . '" customHeight="1"' : ($styleText === 3 ? ' ht="' . ($lineH + 6) . '" customHeight="1"' : '');
             $rowsXml .= '<row r="' . $rIdx . '"' . $ht . '>';
             if ($mergeAll) {
@@ -454,8 +483,10 @@ class ReportTable
                 for ($c = 0; $c < $cols; $c++) {
                     $ref = $colLetter($c) . $rIdx;
                     $v = $cells[$c] ?? '';
-                    if ($this->isNum($v) && $v !== '') {
+                    if ($this->isNum($v) && $v !== '' && !$this->isCodeCol($c)) {
                         $rowsXml .= '<c r="' . $ref . '" s="' . $styleNum . '"><v>' . $this->numVal($v) . '</v></c>';
+                    } elseif ($this->isNum($v) && $v !== '') {
+                        $rowsXml .= '<c r="' . $ref . '" s="' . ($styleNum === 7 ? 11 : 10) . '"><v>' . $this->numVal($v) . '</v></c>'; // رمز/رقم: بلا فواصل آلاف
                     } else {
                         $rowsXml .= '<c r="' . $ref . '" s="' . $styleText . '" t="inlineStr"><is><t xml:space="preserve">' . self::xa($v) . '</t></is></c>';
                     }
@@ -489,13 +520,16 @@ class ReportTable
         foreach ($this->rows as $r) {
             if ($r['type'] === 'section') $addRow($r['cells'], 8, 8, true);
             elseif ($r['type'] === 'head') $addRow($r['cells'], 3, 3);
-            elseif ($r['type'] === 'total') $addRow($r['cells'], 6, 7);
+            elseif ($r['type'] === 'total') $addRow($r['cells'], 6, 7, false, $this->totalLabelSpan($r['cells']));
             else $addRow($r['cells'], 4, 5);
         }
 
         // دمج صفوف العنوان/الترويسة عبر كل الأعمدة
         $merges = '';
-        for ($m = 1; $m <= $titleRows; $m++) $merges .= '<mergeCell ref="A' . $m . ':' . $colLetter($cols - 1) . $m . '"/>';
+        foreach ($extraMerges as $em) $merges .= '<mergeCell ref="' . $em . '"/>';
+        // كتلة العنوان تُدمج على أوّل 8 أعمدة فقط (بالطباعة 100٪ الورقة الأولى تعرض أوّل الأعمدة؛ الدمج على 20 عموداً كان يرمي العنوان خارجها)
+        $titleSpan = min($cols, 8);
+        for ($m = 1; $m <= $titleRows; $m++) $merges .= '<mergeCell ref="A' . $m . ':' . $colLetter($titleSpan - 1) . $m . '"/>';
         // دمج صفوف الأقسام والمجاميع غير الرقمية
         $rr = $titleRows + ($this->headers ? 1 : 0);
         foreach ($this->rows as $r) { $rr++; if ($r['type'] === 'section') $merges .= '<mergeCell ref="A' . $rr . ':' . $colLetter($cols - 1) . $rr . '"/>'; }
@@ -513,8 +547,9 @@ class ReportTable
         // 📄 (2026-10-15 «ب د ف مشي الحال بس اكسل ما مشي الحال» بعد «العواميد كلّها نفس الصفحة»): الإكسل يُطبع دائماً بكل أعمدته على عرض ورقة
         //    واحدة (fitToWidth=1، الصفوف على صفحات)؛ الجدول الأعرض من الورقة العمودية ⇒ أفقي تلقائياً — كما الـPDF
         if ($this->orientMode === 'auto' && !$this->landscape && $sumW > 100) $this->landscape = true;
-        $pagesAcross = 1;
-        $fitW = true;
+        // 🔠 (2026-10-21 «الخطّ 12 حتى نقدر نقراه»): لا تصغير بالطباعة (100٪)؛ الأعمدة الزائدة على صفحات متجاورة مع تكرار # والاسم (Print_Titles أعمدة)
+        $pagesAcross = 0;
+        $fitW = false;
         $keyLast = 0;
         for ($c = 0; $c < min(3, $cols); $c++) { $n = 0; $t = 0; foreach ($this->rows as $r) { if ($r['type'] !== 'data') continue; $v = (string)($r['cells'][$c] ?? ''); if ($v === '') continue; $n++; if (!$this->isNum($v)) $t++; } if ($n > 0 && $t / $n >= 0.5) { $keyLast = $c; break; } }
         $printCols = $fitW ? '' : ("'" . str_replace("'", "''", self::xa($this->sheetName())) . "'!\$A:\$" . $colLetter($keyLast) . ',');
@@ -522,7 +557,7 @@ class ReportTable
         $orient = $this->landscape ? 'landscape' : 'portrait';
         $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            . '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'
+            . '<sheetPr><pageSetUpPr fitToPage="0"/></sheetPr>'
             . '<sheetViews><sheetView rightToLeft="' . ($this->isRtl() ? '1' : '0') . '" workbookViewId="0" tabSelected="1">'
             . '<pane ySplit="' . $headerRow . '" topLeftCell="A' . ($headerRow + 1) . '" activePane="bottomLeft" state="frozen"/>'
             . '</sheetView></sheetViews>'
@@ -532,7 +567,10 @@ class ReportTable
             . ($this->headers && $rIdx > $headerRow ? '<autoFilter ref="A' . $headerRow . ':' . $colLetter($cols - 1) . $rIdx . '"/>' : '')
             . $mergesXml
             . '<pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/>'
-            . '<pageSetup paperSize="9" orientation="' . $orient . '" fitToWidth="' . $pagesAcross . '" fitToHeight="0"/>'
+            . '<pageSetup paperSize="9" scale="100" orientation="' . $orient . '" fitToWidth="' . $pagesAcross . '" fitToHeight="0"/>'
+            // 🖨️ (2026-10-21) ترويسة/تذييل الطباعة لا يتصغّران مع ملاءمة العرض: المدرسة + عنوان التقرير فوق كل ورقة، و«صفحة n من N» + التاريخ تحتها
+            . '<headerFooter><oddHeader>' . self::xa($this->xlsxHeaderText()) . '</oddHeader>'
+            . '<oddFooter>' . self::xa('&L&"Arial"&9' . date('d/m/Y') . '&C&"Arial"&9' . ($this->isRtl() ? 'صفحة &P من &N' : 'Page &P / &N') . '&R&"Arial"&9' . str_replace('&', '&&', mb_substr($this->title, 0, 60, 'UTF-8'))) . '</oddFooter></headerFooter>'
             . '</worksheet>';
 
         $styles = $this->xlsxStyles();
@@ -571,6 +609,21 @@ class ReportTable
         ]);
     }
 
+    /** نصّ ترويسة الطباعة بالإكسل: اسم المدرسة (عريض) ثم عنوان التقرير — بصيغة &C/&"خط"/&حجم */
+    private function xlsxHeaderText(): string
+    {
+        $school = ''; $title = $this->title; $meta = '';
+        if ($this->titleLines) {
+            foreach ($this->titleLines as $ln) { $k = $ln['k'] ?? 'meta'; if ($k === 'school' && $school === '') $school = $ln['t']; elseif ($k === 'title') $title = $ln['t']; elseif ($k === 'meta' && $meta === '') $meta = $ln['t']; }
+        } elseif ($this->school) { $school = $this->school['name_ar'] ?? ($this->school['name_fr'] ?? ''); $meta = $this->period; }
+        $esc = fn($s) => str_replace('&', '&&', mb_substr(trim(preg_replace('/\s+/u', ' ', (string)$s)), 0, 90, 'UTF-8'));
+        $h = '&C';
+        if ($school !== '') $h .= '&"Arial,Bold"&11' . $esc($school) . "\n";
+        $h .= '&"Arial,Bold"&12' . $esc($title);
+        if ($meta !== '') $h .= "\n" . '&"Arial,Regular"&9' . $esc($meta);
+        return $h;
+    }
+
     private function xlsxStyles()
     {
         // ألوان: رأس أزرق #1E3A8A نص أبيض، مجموع رمادي فاتح، قسم أزرق فاتح
@@ -580,7 +633,7 @@ class ReportTable
             . '<fonts count="6">'
             . '<font><sz val="12"/><name val="Arial"/></font>'                                  // 0 default — 🔠 خط 12 بكل المطبوعات
             . '<font><b/><sz val="15"/><color rgb="FF1E3A8A"/><name val="Arial"/></font>'        // 1 title
-            . '<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>'        // 2 header white
+            . '<font><b/><sz val="12"/><color rgb="FF111827"/><name val="Arial"/></font>'        // 2 header — 🖨️ أسود على فاتح (قاعدة 2026-10-17: يُطبع على أي طابعة)
             . '<font><sz val="12"/><name val="Arial"/></font>'                                   // 3 data
             . '<font><b/><sz val="12"/><name val="Arial"/></font>'                               // 4 bold
             . '<font><sz val="11"/><color rgb="FF475569"/><name val="Arial"/></font>'             // 5 meta (سطر المعلومات)
@@ -588,7 +641,7 @@ class ReportTable
             . '<fills count="5">'
             . '<fill><patternFill patternType="none"/></fill>'                                   // 0
             . '<fill><patternFill patternType="gray125"/></fill>'                                // 1
-            . '<fill><patternFill patternType="solid"><fgColor rgb="FF1E3A8A"/></patternFill></fill>' // 2 header blue
+            . '<fill><patternFill patternType="solid"><fgColor rgb="FFE5E7EB"/></patternFill></fill>' // 2 header light grey (كان كحلياً بخطّ أبيض)
             . '<fill><patternFill patternType="solid"><fgColor rgb="FFF3F4F6"/></patternFill></fill>' // 3 total grey
             . '<fill><patternFill patternType="solid"><fgColor rgb="FFE0E7FF"/></patternFill></fill>' // 4 section light blue
             . '</fills>'
@@ -598,17 +651,19 @@ class ReportTable
             . '<top style="thin"><color rgb="FF94A3B8"/></top><bottom style="thin"><color rgb="FF94A3B8"/></bottom><diagonal/></border>' // 1 thin grey
             . '</borders>'
             . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            . '<cellXfs count="10">'
+            . '<cellXfs count="12">'
             . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>' // 0 default
             . '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 1 title
             . '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 2 subheader
             . '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' // 3 col header
             . '<xf numFmtId="0" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center" wrapText="1"/></xf>' // 4 data text
-            . '<xf numFmtId="164" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' // 5 data num
+            . '<xf numFmtId="164" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' // 5 data num — الأرقام لليمين كما بكل الكشوف
             . '<xf numFmtId="0" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center" wrapText="1"/></xf>' // 6 total text
-            . '<xf numFmtId="164" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' // 7 total num
+            . '<xf numFmtId="164" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' // 7 total num
             . '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' . ($this->isRtl() ? 'right' : 'left') . '" vertical="center" wrapText="1"/></xf>' // 8 section
             . '<xf numFmtId="0" fontId="5" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' // 9 meta
+            . '<xf numFmtId="1" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 10 code num (بلا فواصل)
+            . '<xf numFmtId="1" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 11 code num total
             . '</cellXfs>'
             . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             . '</styleSheet>';
@@ -617,7 +672,264 @@ class ReportTable
     /* ============================== DOCX ============================== */
     public function docx()
     {
+        $this->autoDir();
         $cols = $this->colCount();
+        // 📝 (2026-10-21 «صرلك شهرين… عم يطلعو مش مرتبين»): مولّد الوورد أُعيد بناؤه كبرامج التقارير الرسمية —
+        //    • حجم الخطّ يُختار من عدد الأعمدة (11pt حتى 7 أعمدة … 7pt لـ19+) ثم يصغر نصف نقطة فنصف نقطة حتى تسع كل الأعمدة الورقة (حدّ 6.5pt).
+        //    • الأرقام **لا تنكسر أبداً** (<w:noWrap/>) وعرض عمود الأرقام = أطول رقم فيه؛ أعمدة النصّ (الاسم/الفئة) تلتفّ عند الحاجة لكن ليس أضيق من أطول كلمة.
+        //    • رأس الأعمدة يلتفّ على كلمات كاملة (لا حرفاً حرفاً)، فاتح بخطّ أسود (يُطبع على أي طابعة)، ويتكرّر بكل ورقة.
+        //    • صفّ المجموع: عنوانه يمتدّ على الأعمدة النصّية الأولى (لا يُحشر بعمود الدرجة الضيّق)، وأفقي تلقائياً فوق 8 أعمدة.
+        $isText = []; for ($c = 0; $c < $cols; $c++) { $n = 0; $t = 0; foreach ($this->rows as $r) { if ($r['type'] !== 'data') continue; $v = (string)($r['cells'][$c] ?? ''); if ($v === '') continue; $n++; if (!$this->isNum($v)) $t++; } $isText[$c] = $n > 0 && $t / $n >= 0.5; }
+        if ($this->orientMode === 'auto' && !$this->landscape && $cols > 8) $this->landscape = true;
+        $twDoc = $this->landscape ? 15704 : 10466; // عرض المحتوى داخل الهوامش (twips)
+        // 🔠 (2026-10-21 «حجم الخطّ جوّات التقرير لازم يكون 12 حتى نقدر نقراه… أنا بختار العواميد»): الخطّ 12 ثابت لا يصغر؛
+        //    الأعمدة التي لا تسعها الورقة تنتقل إلى ورقة تالية («الجزء n من N») مع تكرار عمودَي # والاسم — لا تصغير ولا كسر أرقام.
+        $pt = 12.0;
+        [$w, $sum, $slack] = $this->docxWidths($cols, $pt, $twDoc, $isText, false);
+        if ($this->orientMode === 'auto' && !$this->landscape && $sum > $twDoc && $sum <= 15704) { $this->landscape = true; $twDoc = 15704; } // العمودي لا يسع والأفقي يسع ⇒ أفقي بدل جزأين
+        $this->docxPt = $pt; $this->docxColWs = $w;
+        $parts = $this->docxParts($cols, $w, $twDoc);
+        if (getenv('MSA_DOCX_DEBUG')) @file_put_contents(__DIR__ . '/../tmp/docx_debug.txt', json_encode(['pt' => $pt, 'sum' => $sum, 'doc' => $twDoc, 'w' => $w, 'h' => $this->headers], JSON_UNESCAPED_UNICODE));
+
+        $body = '';
+        if ($this->titleLines) {
+            foreach ($this->titleLines as $ln) {
+                $k = $ln['k'] ?? 'meta';
+                $body .= $this->docxPara($ln['t'], $k === 'title' ? ['b' => true, 'sz' => 30, 'align' => 'center', 'color' => '1E3A8A'] : ($k === 'school' ? ['b' => true, 'sz' => 24, 'align' => 'center'] : ['sz' => 20, 'align' => 'center', 'color' => '475569']));
+            }
+        } else {
+            $body .= $this->docxPara($this->title, ['b' => true, 'sz' => 30, 'align' => 'center', 'color' => '1E3A8A']);
+            if ($this->period) $body .= $this->docxPara($this->period, ['b' => true, 'sz' => 22, 'align' => 'center']);
+            if ($this->school) {
+                $sn = $this->school['name_ar'] ?? ($this->school['name_fr'] ?? '');
+                $extra = trim(($this->school['address'] ?? ''));
+                $body .= $this->docxPara($sn . ($extra ? ' — ' . $extra : ''), ['b' => true, 'sz' => 22, 'align' => 'center']);
+            }
+        }
+        $body .= '<w:p><w:pPr><w:spacing w:before="0" w:after="60"/></w:pPr></w:p>';
+
+        $tbl = ''; $np = count($parts);
+        foreach ($parts as $pi => $idx) {
+            if ($pi > 0) $tbl .= '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+            if ($np > 1) $tbl .= $this->docxPara(($this->isRtl() ? 'الجزء ' . ($pi + 1) . ' من ' . $np : 'Partie ' . ($pi + 1) . ' / ' . $np) . ' — ' . $this->title, ['b' => true, 'sz' => 24, 'align' => 'center', 'color' => '1E3A8A']);
+            $grid = '<w:tblGrid>'; foreach ($idx as $c) $grid .= '<w:gridCol w:w="' . $w[$c] . '"/>'; $grid .= '</w:tblGrid>';
+            $tw = 0; foreach ($idx as $c) $tw += $w[$c];
+            $tblRows = '';
+            if ($this->headers) $tblRows .= $this->docxTr($this->headers, $idx, 'header');
+            foreach ($this->rows as $r) {
+                if ($r['type'] === 'section') $tblRows .= $this->docxTr([$r['cells'][0]], $idx, 'section', true);
+                elseif ($r['type'] === 'head') $tblRows .= $this->docxTr($r['cells'], $idx, 'header');
+                elseif ($r['type'] === 'total') $tblRows .= $this->docxTr($r['cells'], $idx, 'total');
+                else $tblRows .= $this->docxTr($r['cells'], $idx, 'data');
+            }
+            $tbl .= '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="' . $tw . '" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/>'
+                . ($this->isRtl() ? '<w:bidiVisual/>' : '')
+                . '<w:tblBorders>'
+                . '<w:top w:val="single" w:sz="4" w:color="8A8A8A"/><w:left w:val="single" w:sz="4" w:color="8A8A8A"/>'
+                . '<w:bottom w:val="single" w:sz="4" w:color="8A8A8A"/><w:right w:val="single" w:sz="4" w:color="8A8A8A"/>'
+                . '<w:insideH w:val="single" w:sz="4" w:color="8A8A8A"/><w:insideV w:val="single" w:sz="4" w:color="8A8A8A"/>'
+                . '</w:tblBorders><w:tblCellMar><w:top w:w="15" w:type="dxa"/><w:left w:w="40" w:type="dxa"/><w:bottom w:w="15" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar></w:tblPr>' . $grid . $tblRows . '</w:tbl>';
+        }
+
+        // إعداد الصفحة A4 + اتجاه + تذييل «صفحة n من N»
+        $pgSz = $this->landscape ? '<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="567" w:right="567" w:bottom="567" w:left="567" w:header="283" w:footer="283"/>'
+                                 : '<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="283" w:footer="283"/>';
+        $sect = '<w:sectPr><w:footerReference w:type="default" r:id="rIdF"/>' . $pgSz . ($this->isRtl() ? '<w:bidi/>' : '') . '</w:sectPr>';
+        $doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            . '<w:body>' . $body . $tbl . $sect . '</w:body></w:document>';
+        $footTxt = ($this->school ? (($this->school['name_ar'] ?? ($this->school['name_fr'] ?? '')) . '  ·  ') : '') . $this->title;
+        $footer = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            . '<w:p><w:pPr>' . ($this->isRtl() ? '<w:bidi/>' : '') . '<w:jc w:val="center"/></w:pPr>'
+            . '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="16"/><w:szCs w:val="16"/><w:color w:val="475569"/>' . ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr><w:t xml:space="preserve">' . self::xa($footTxt) . '   —   ' . ($this->isRtl() ? 'صفحة ' : 'Page ') . '</w:t></w:r>'
+            . '<w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/><w:color w:val="475569"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/><w:color w:val="475569"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r>'
+            . '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="16"/><w:szCs w:val="16"/><w:color w:val="475569"/>' . ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr><w:t xml:space="preserve"> ' . ($this->isRtl() ? 'من' : '/') . ' </w:t></w:r>'
+            . '<w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/><w:color w:val="475569"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:instrText xml:space="preserve"> NUMPAGES </w:instrText></w:r><w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/><w:color w:val="475569"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r>'
+            . '</w:p></w:ftr>';
+
+        $contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            . '<Default Extension="xml" ContentType="application/xml"/>'
+            . '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            . '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>'
+            . '</Types>';
+        $rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+            . '</Relationships>';
+        $docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            . '<Relationship Id="rIdF" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>'
+            . '</Relationships>';
+
+        $this->sendZip($this->fileBase() . '.docx',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', [
+            '[Content_Types].xml' => $contentTypes,
+            '_rels/.rels' => $rels,
+            'word/document.xml' => $doc,
+            'word/_rels/document.xml.rels' => $docRels,
+            'word/footer1.xml' => $footer,
+        ]);
+    }
+
+    /** عرض نصّ بخطّ Arial بحجم $pt تقريباً — بوحدة twips (1/20 نقطة) */
+    public static function twText(string $s, float $pt): int
+    {
+        $em = 0.0;
+        if (preg_match_all('/./us', $s, $m)) {
+            foreach ($m[0] as $ch) {
+                $o = mb_ord($ch, 'UTF-8');
+                if ($o >= 0x064B && $o <= 0x0652) continue;                // تشكيل
+                if (ctype_digit($ch)) $em += 0.556;
+                elseif ($ch === ',' || $ch === '.' || $ch === ' ' || $ch === ':') $em += 0.28;
+                elseif ($o >= 0x0600 && $o <= 0x06FF) $em += 0.5;
+                elseif (ctype_upper($ch)) $em += 0.68;
+                elseif (ctype_alpha($ch)) $em += 0.52;
+                else $em += 0.6;
+            }
+        }
+        return (int)ceil($em * $pt * 20 * 1.06); // +6٪ أمان (Arial الحقيقي أعرض قليلاً من التقدير — «EMP1000024» كان يلتفّ)
+    }
+
+    /** عرض كل عمود (twips) بحجم خطّ $pt: الأرقام لا تنكسر، النصّ يلتفّ حتى أطول كلمة — يعيد [widths, sum] */
+    private function docxWidths(int $cols, float $pt, int $twDoc, array $isText, bool $compress = true): array
+    {
+        $padC = 60 + 24; // حشوة الخلية يمين+يسار (30+30) + هامش صغير — بـ20 عموداً كل 50 twips زيادة تكلّف الاسم كلمة
+        $noWrap = array_fill(0, $cols, 0); $full = array_fill(0, $cols, 0);
+        $longestWord = function (string $t, float $pt) { $w = 0; foreach (preg_split('/[\s\x{00A0}]+/u', $t) as $wd) $w = max($w, self::twText($wd, $pt)); return $w; };
+        $longestLine = function (string $t, float $pt) { $w = 0; foreach (preg_split('/\r\n|\n/', $t) as $ln) $w = max($w, self::twText($ln, $pt)); return $w; };
+        for ($c = 0; $c < $cols; $c++) {
+            $h = (string)($this->headers[$c] ?? '');
+            $noWrap[$c] = max($noWrap[$c], $longestWord($h, $pt));
+            $full[$c] = max($full[$c], min($longestLine($h, $pt), 2200)); // الرأس يلتفّ فوق ~3.9 سم
+        }
+        foreach ($this->rows as $r) {
+            if ($r['type'] === 'section') continue;
+            $span = $r['type'] === 'total' ? $this->totalLabelSpan($r['cells']) : -1;
+            foreach ($r['cells'] as $c => $v) {
+                $v = (string)$v; if ($v === '' || $c >= $cols) continue;
+                if ($span >= 0 && $c <= $span) continue; // عنوان المجموع ممتدّ على عدّة أعمدة — لا يوسّع عموداً
+                if ($this->isNum($v)) { $nv = $this->numVal($v); $disp = ($nv == floor($nv)) ? number_format($nv) : number_format($nv, 2); $tw = self::twText($disp, $pt) + ($r['type'] === 'total' ? (int)($pt * 2) : 0); $noWrap[$c] = max($noWrap[$c], $tw); $full[$c] = max($full[$c], $tw); }
+                else { $noWrap[$c] = max($noWrap[$c], $longestWord($v, $pt)); $full[$c] = max($full[$c], min($longestLine($v, $pt), 4800)); } // النصّ الطويل جداً (> ~8.5 سم) يلتفّ
+            }
+        }
+        $w = []; for ($c = 0; $c < $cols; $c++) $w[$c] = max($noWrap[$c], $full[$c]) + $padC;
+        $sum = array_sum($w);
+        $slack = []; $tot = 0; for ($c = 0; $c < $cols; $c++) { $s = max(0, $w[$c] - ($noWrap[$c] + $padC)); $slack[$c] = $s; $tot += $s; }
+        if ($compress && $sum > $twDoc) {
+            // ضغط أعمدة النصّ نحو أطول كلمة فيها — الأرقام لا تُمسّ، و**عمود الاسم آخر ما يُضغط** (الفئة والرؤوس تلتفّ قبل أن ينكسر اسم)
+            $need = $sum - $twDoc;
+            $isName = []; for ($c = 0; $c < $cols; $c++) $isName[$c] = preg_match('/الاسم|\bnom\b|\bname\b/iu', (string)($this->headers[$c] ?? '')) === 1;
+            foreach ([false, true] as $pass) { // الجولة الأولى: كل الأعمدة عدا الاسم، الثانية: الاسم إن بقي عجز
+                $t = 0; foreach ($slack as $c => $s) if ($isName[$c] === $pass) $t += $s;
+                if ($need <= 0 || $t <= 0) continue;
+                $f = min(1.0, $need / $t);
+                foreach ($slack as $c => $s) { if ($isName[$c] !== $pass) continue; $d = (int)round($s * $f); $w[$c] -= $d; $need -= $d; }
+            }
+            $sum = array_sum($w);
+        }
+        return [$w, $sum, $tot];
+    }
+
+    /** أعمدة المفتاح (# إن كان ضيّقاً + عمود الاسم) تتكرّر بكل جزء؛ الأجزاء تُملأ بالتتابع حتى عرض الورقة — يعيد قائمة أجزاء كل منها قائمة أعمدة */
+    private function docxParts(int $cols, array $w, int $twDoc): array
+    {
+        if (array_sum($w) <= $twDoc) return [range(0, $cols - 1)];
+        $key = [];
+        if ($cols > 3 && $w[0] <= 900) $key[] = 0;
+        for ($c = 0; $c < min(4, $cols); $c++) { if (in_array($c, $key, true)) continue; if (preg_match('/الاسم|\bnom\b|\bname\b/iu', (string)($this->headers[$c] ?? '')) || (!isset($key[1]) && $c === 1)) { $key[] = $c; break; } }
+        $keyW = 0; foreach ($key as $c) $keyW += $w[$c];
+        if ($keyW > $twDoc * 0.45) { $key = $key ? [$key[0]] : []; $keyW = $key ? $w[$key[0]] : 0; }
+        $parts = []; $cur = []; $curW = $keyW;
+        for ($c = 0; $c < $cols; $c++) {
+            if (in_array($c, $key, true)) continue;
+            if ($cur && $curW + $w[$c] > $twDoc) { $parts[] = array_merge($key, $cur); $cur = []; $curW = $keyW; }
+            $cur[] = $c; $curW += $w[$c];
+        }
+        if ($cur) $parts[] = array_merge($key, $cur);
+        return $parts;
+    }
+
+    /** صفّ المجموع: الخلايا الأولى فارغة ثم عنوان نصّي ⇒ رقم عمود العنوان (ليمتدّ عليها كلّها)، وإلا −1 */
+    private function totalLabelSpan(array $cells): int
+    {
+        $k = -1;
+        foreach ($cells as $c => $v) { $v = (string)$v; if ($v === '') continue; if (!$this->isNum($v)) $k = $c; break; }
+        if ($k < 0) return -1;
+        $end = $k; $n = count($cells);
+        while ($end + 1 < $n && (string)$cells[$end + 1] === '') $end++; // يمتدّ أيضاً على الخلايا الفارغة بعده
+        return $end > 0 ? $end : -1;
+    }
+
+    private function docxPara($text, $o = [])
+    {
+        $rpr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>';
+        if (!empty($o['b'])) $rpr .= '<w:b/><w:bCs/>';
+        if (!empty($o['sz'])) $rpr .= '<w:sz w:val="' . (int)$o['sz'] . '"/><w:szCs w:val="' . (int)$o['sz'] . '"/>';
+        if (!empty($o['color'])) $rpr .= '<w:color w:val="' . $o['color'] . '"/>';
+        $rpr .= ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr>';
+        $ppr = '<w:pPr>' . ($this->isRtl() ? '<w:bidi/>' : '');
+        if (!empty($o['align'])) $ppr .= '<w:jc w:val="' . $o['align'] . '"/>';
+        if (!empty($o['fill'])) $ppr .= '<w:shd w:val="clear" w:fill="' . $o['fill'] . '"/>';
+        $ppr .= '</w:pPr>';
+        return '<w:p>' . $ppr . '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($text) . '</w:t></w:r></w:p>';
+    }
+
+    private function docxTr($cells, $idx, $kind, $mergeAll = false)
+    {
+        // 🖨️ رأس فاتح بخطّ أسود (يُطبع على أي طابعة — قاعدة 2026-10-17)، المجموع رمادي، القسم أزرق فاتح
+        $fill = ['header' => 'E5E7EB', 'total' => 'F3F4F6', 'section' => 'E0E7FF', 'data' => ''][$kind] ?? '';
+        $bold = in_array($kind, ['header', 'total', 'section'], true);
+        $tr = '<w:tr>' . ($kind === 'header' ? '<w:trPr><w:cantSplit/><w:tblHeader/></w:trPr>' : '<w:trPr><w:cantSplit/></w:trPr>');
+        $shd = $fill ? '<w:shd w:val="clear" w:color="auto" w:fill="' . $fill . '"/>' : '';
+        $sumW = function (array $cs) { $s = 0; foreach ($cs as $c) $s += (int)($this->docxColWs[$c] ?? 0); return $s; };
+        if ($mergeAll) {
+            $tr .= '<w:tc><w:tcPr><w:tcW w:w="' . $sumW($idx) . '" w:type="dxa"/><w:gridSpan w:val="' . count($idx) . '"/>' . $shd . '<w:vAlign w:val="center"/></w:tcPr>'
+                 . $this->docxCellPara($cells[0], $bold, $this->isRtl() ? 'right' : 'left', false) . '</w:tc>';
+            return $tr . '</w:tr>';
+        }
+        $span = ($kind === 'total') ? $this->totalLabelSpan($cells) : -1;
+        $c0 = 0;
+        if ($span > 0) {
+            // عنوان المجموع يمتدّ على الأعمدة النصّية الأولى (من # حتى عمود العنوان) — بالجزء الحالي فقط (الأجزاء التالية تحمل # والاسم فقط منها)
+            $label = ''; for ($c = 0; $c <= $span; $c++) { $v = (string)($cells[$c] ?? ''); if ($v !== '') { $label = $v; break; } }
+            $sc = array_values(array_filter($idx, fn($c) => $c <= $span));
+            if ($sc) {
+                $tr .= '<w:tc><w:tcPr><w:tcW w:w="' . $sumW($sc) . '" w:type="dxa"/>' . (count($sc) > 1 ? '<w:gridSpan w:val="' . count($sc) . '"/>' : '') . $shd . '<w:vAlign w:val="center"/></w:tcPr>'
+                     . $this->docxCellPara($label, true, $this->isRtl() ? 'right' : 'left', false) . '</w:tc>';
+            }
+            $c0 = $span + 1;
+        }
+        foreach ($idx as $c) {
+            if ($c < $c0) continue;
+            $v = $cells[$c] ?? '';
+            $num = $this->isNum($v) && $v !== '';
+            if ($num && $this->isCodeCol($c)) $disp = (string)$v;
+            elseif ($num) { $nv = $this->numVal($v); $disp = ($nv == floor($nv)) ? number_format($nv) : rtrim(rtrim(number_format($nv, 2), '0'), '.'); }
+            else $disp = (string)$v;
+            $align = $num ? ($this->isCodeCol($c) ? 'center' : 'right') : (($kind === 'header' || in_array(trim($disp), ['—', '-', '–', '✓', '✗', '×'], true)) ? 'center' : ($this->isRtl() ? 'right' : 'left'));
+            $tr .= '<w:tc><w:tcPr><w:tcW w:w="' . (int)($this->docxColWs[$c] ?? 0) . '" w:type="dxa"/>' . $shd . ($num ? '<w:noWrap/>' : '') . '<w:vAlign w:val="center"/></w:tcPr>'
+                 . $this->docxCellPara($disp, $bold, $align, $num) . '</w:tc>';
+        }
+        return $tr . '</w:tr>';
+    }
+
+    private function docxCellPara($text, $bold, $align, $num = false)
+    {
+        $sz = (int)round(($this->docxPt ?? 12.0) * 2);
+        $rpr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>' . ($bold ? '<w:b/><w:bCs/>' : '')
+             . '<w:sz w:val="' . $sz . '"/><w:szCs w:val="' . $sz . '"/>' . ($this->isRtl() && !$num ? '<w:rtl/>' : '') . '</w:rPr>';
+        $runs = ''; $lines = preg_split('/\r\n|\n/', (string)$text);
+        foreach ($lines as $i => $ln) { if ($i > 0) $runs .= '<w:r>' . $rpr . '<w:br/></w:r>'; $runs .= '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($ln) . '</w:t></w:r>'; }
+        return '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>' . ($this->isRtl() && !$num ? '<w:bidi/>' : '') . '<w:jc w:val="' . $align . '"/></w:pPr>' . $runs . '</w:p>';
+    }
+
+    public function docxLegacy()
+    {
+        $cols = $this->colCount();
+        // 🧊 نسخة مجمّدة (كما كانت قبل 2026-10-21) للبطاقة السنوية فقط — لا تُعدَّل
         // 📐 (2026-10-10 مساءً «رتّبلي كل التقارير… رسمي ومنظّم»): مولّد الوورد صار كبرامج التقارير الرسمية —
         //    • عرض كل عمود = قدّ محتواه الفعلي (رأس/بيانات) بخط 12 (لا أعمدة متساوية تلفّ الكلمات حرفاً حرفاً).
         //    • الجدول الأعرض من الورقة يُقسَّم **بالعرض** على أجزاء (ورقة لكل جزء) مع تكرار أعمدة المفتاح (# والاسم) بكل جزء،
@@ -675,12 +987,12 @@ class ReportTable
             if ($np > 1) $tbl .= $this->docxPara(($this->isRtl() ? 'الجزء ' . ($pi + 1) . ' من ' . $np : 'Partie ' . ($pi + 1) . ' / ' . $np) . ' — ' . $this->title, ['b' => true, 'sz' => 22, 'align' => 'center', 'color' => '1E3A8A']);
             $grid = '<w:tblGrid>'; foreach ($idx as $c) $grid .= '<w:gridCol w:w="' . $w[$c] . '"/>'; $grid .= '</w:tblGrid>';
             $tblRows = '';
-            if ($this->headers) $tblRows .= $this->docxTr($this->headers, $idx, 'header');
+            if ($this->headers) $tblRows .= $this->docxTrLegacy($this->headers, $idx, 'header');
             foreach ($this->rows as $r) {
-                if ($r['type'] === 'section') $tblRows .= $this->docxTr([$r['cells'][0]], $idx, 'section', true);
-                elseif ($r['type'] === 'head') $tblRows .= $this->docxTr($r['cells'], $idx, 'header');
-                elseif ($r['type'] === 'total') $tblRows .= $this->docxTr($r['cells'], $idx, 'total');
-                else $tblRows .= $this->docxTr($r['cells'], $idx, 'data');
+                if ($r['type'] === 'section') $tblRows .= $this->docxTrLegacy([$r['cells'][0]], $idx, 'section', true);
+                elseif ($r['type'] === 'head') $tblRows .= $this->docxTrLegacy($r['cells'], $idx, 'header');
+                elseif ($r['type'] === 'total') $tblRows .= $this->docxTrLegacy($r['cells'], $idx, 'total');
+                else $tblRows .= $this->docxTrLegacy($r['cells'], $idx, 'data');
             }
             $tbl .= '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="' . $twDoc . '" w:type="dxa"/><w:tblLayout w:type="fixed"/>'
                 . ($this->isRtl() ? '<w:bidiVisual/>' : '')
@@ -719,21 +1031,8 @@ class ReportTable
         ]);
     }
 
-    private function docxPara($text, $o = [])
-    {
-        $rpr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>';
-        if (!empty($o['b'])) $rpr .= '<w:b/><w:bCs/>';
-        if (!empty($o['sz'])) $rpr .= '<w:sz w:val="' . (int)$o['sz'] . '"/><w:szCs w:val="' . (int)$o['sz'] . '"/>';
-        if (!empty($o['color'])) $rpr .= '<w:color w:val="' . $o['color'] . '"/>';
-        $rpr .= ($this->isRtl() ? '<w:rtl/>' : '') . '</w:rPr>';
-        $ppr = '<w:pPr>' . ($this->isRtl() ? '<w:bidi/>' : '');
-        if (!empty($o['align'])) $ppr .= '<w:jc w:val="' . $o['align'] . '"/>';
-        if (!empty($o['fill'])) $ppr .= '<w:shd w:val="clear" w:fill="' . $o['fill'] . '"/>';
-        $ppr .= '</w:pPr>';
-        return '<w:p>' . $ppr . '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($text) . '</w:t></w:r></w:p>';
-    }
 
-    private function docxTr($cells, $idx, $kind, $mergeAll = false)
+    private function docxTrLegacy($cells, $idx, $kind, $mergeAll = false)
     {
         $fill = ['header' => '1E3A8A', 'total' => 'F3F4F6', 'section' => 'E0E7FF', 'data' => ''][$kind] ?? '';
         $bold = in_array($kind, ['header', 'total', 'section'], true);
@@ -743,7 +1042,7 @@ class ReportTable
             $tc = '<w:tcPr><w:tcW w:w="0" w:type="auto"/><w:gridSpan w:val="' . count($idx) . '"/>';
             $tc .= $fill ? '<w:shd w:val="clear" w:fill="' . $fill . '"/>' : '';
             $tc .= '<w:vAlign w:val="center"/></w:tcPr>';
-            $tr .= '<w:tc>' . $tc . $this->docxCellPara($cells[0], $bold, $white, $this->isRtl() ? 'right' : 'left') . '</w:tc>';
+            $tr .= '<w:tc>' . $tc . $this->docxCellParaLegacy($cells[0], $bold, $white, $this->isRtl() ? 'right' : 'left') . '</w:tc>';
         } else {
             foreach ($idx as $c) {
                 $v = $cells[$c] ?? '';
@@ -755,13 +1054,13 @@ class ReportTable
                 $tc = '<w:tcPr><w:tcW w:w="' . (int)($this->docxColWs[$c] ?? 0) . '" w:type="' . (isset($this->docxColWs[$c]) ? 'dxa' : 'auto') . '"/>';
                 $tc .= $fill ? '<w:shd w:val="clear" w:fill="' . $fill . '"/>' : '';
                 $tc .= '<w:vAlign w:val="center"/></w:tcPr>';
-                $tr .= '<w:tc>' . $tc . $this->docxCellPara($disp, $bold, $white, $align) . '</w:tc>';
+                $tr .= '<w:tc>' . $tc . $this->docxCellParaLegacy($disp, $bold, $white, $align) . '</w:tc>';
             }
         }
         return $tr . '</w:tr>';
     }
 
-    private function docxCellPara($text, $bold, $white, $align)
+    private function docxCellParaLegacy($text, $bold, $white, $align)
     {
         $rpr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>';
         if ($bold) $rpr .= '<w:b/><w:bCs/>';
@@ -772,6 +1071,7 @@ class ReportTable
         foreach ($lines as $i => $ln) { if ($i > 0) $runs .= '<w:r>' . $rpr . '<w:br/></w:r>'; $runs .= '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($ln) . '</w:t></w:r>'; }
         return '<w:p><w:pPr><w:spacing w:before="20" w:after="20"/>' . ($this->isRtl() ? '<w:bidi/>' : '') . '<w:jc w:val="' . $align . '"/></w:pPr>' . $runs . '</w:p>';
     }
+
 
     private $savePath = null;
     /** للاختبار/التوليد على الخادم: احفظ الملف بدل إرساله للتنزيل. */
@@ -896,7 +1196,8 @@ class ReportTable
         // 📐 (2026-10-08) الإكسل دائماً من المولّد المدمج (أعمدة على قدّ المحتوى + ارتفاع الأسطر + فلتر + رأس يتكرّر بالطباعة + الاتجاه) —
         //    مولّد بايثون كان يتجاهلها ولا وجود له أونلاين. الوورد يبقى عبر بايثون حيث يتوفّر وإلا المدمج.
         if ($format === 'xlsx') { $this->xlsx(); return; }
-        if ($this->pyExport($format)) return;
+        if ($this->legacy) { if ($this->pyExport($format)) return; $this->docxLegacy(); return; } // 🧊 البطاقة السنوية كما كانت
+        // 📝 (2026-10-21) الوورد أيضاً من المولّد المدمج دائماً (أرقام لا تنكسر + خطّ بحسب عدد الأعمدة + تذييل) — مولّد بايثون كان يكسر الأرقام ولا وجود له أونلاين
         $this->docx();
     }
 

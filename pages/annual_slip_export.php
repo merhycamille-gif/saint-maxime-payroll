@@ -154,7 +154,7 @@ if ($all) {
         foreach ($emps as $emp) $htmlAll .= annualSlipHtml($db, $emp, $schoolYear);
         annualSlipSendXlsx($htmlAll, 'كشوف الرواتب السنوية ' . $schoolYear . ' — ' . $typeLbl);
     }
-    $rep = new ReportTable('كشوف الرواتب السنوية ' . $schoolYear . ' — ' . $typeLbl, true);
+    $rep = new ReportTable('كشوف الرواتب السنوية ' . $schoolYear . ' — ' . $typeLbl, true); $rep->legacy = true; // 🧊 مجمّدة
     $rep->schoolHeader(currentSchool());
     $rep->period('السنة الدراسية ' . $schoolYear . ' — ' . $typeLbl . ' (' . count($emps) . ' موظف)');
     $rep->head(annualDropCols($head, false));
@@ -176,7 +176,7 @@ if ($format === 'xlsx') annualSlipSendXlsx(annualSlipHtml($db, $emp, $schoolYear
 
 $slip = computeAnnualSlip($db, $emp, $schoolYear);
 $m = $slip['meta'];
-$rep = new ReportTable('كشف الراتب السنوي ' . $schoolYear, true);
+$rep = new ReportTable('كشف الراتب السنوي ' . $schoolYear, true); $rep->legacy = true; // 🧊 مجمّدة
 $rep->schoolHeader($slip['school']);
 $isAdminEmp = ($emp['employee_type'] === 'employe');
 $dropGrade = !$isAdminEmp && slipHidesGradeCols($emp); // 🎓 متعاقد وأعمدة الدرجة مخفية (2026-09-27)
