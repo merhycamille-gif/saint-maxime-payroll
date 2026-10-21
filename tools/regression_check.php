@@ -10507,7 +10507,7 @@ try {
     $ls270 = (string)file_get_contents($PROJ . '/includes/local_sync.php'); $api270 = (string)file_get_contents($PROJ . '/sync_api.php'); $sc270 = (string)file_get_contents($PROJ . '/includes/sync_common.php');
     $pl270 = localSyncPlan(['1' => 'a', '2' => 'b', '3' => 'c', 'pdf_service_pass' => 'z'], ['1' => 'a', '2' => 'B', '4' => 'd', 'heal_x' => 'q'], 'settings');
     $pl270b = localSyncPlan(['1' => 'a'], ['1' => 'a']);
-    $rj270 = json_decode(trim(renderPage('sync_api.php', ['action' => 'rows', 'table' => 'employees'], ['pks' => ['1677']], [2])), true);
+    $rj270 = json_decode(trim(renderPage('sync_api.php', ['action' => 'rows', 'table' => 'employees', 'pks' => ['1677']], [], [2])), true);
     $ok270 = function_exists('localSyncPullIncremental') && function_exists('localSyncBaseRefreshTable') && function_exists('localSyncBkPrune')
           && $pl270 === ['up' => ['2', '4'], 'del' => ['3']] && $pl270b === ['up' => [], 'del' => []]
           && is_array($rj270) && !empty($rj270['ok']) && (int)($rj270['rows']['1677']['id'] ?? 0) === 1677

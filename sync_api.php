@@ -32,7 +32,7 @@ try {
         $t = preg_replace('/[^a-z0-9_]/i', '', (string)($_GET['table'] ?? ''));
         if ($t === '' || !in_array($t, syncRealTables($db, $schema), true)) throw new RuntimeException('table?');
         $meta = syncTableMeta($db, $schema, $t);
-        $pks = array_values(array_map('strval', (array)($_POST['pks'] ?? [])));
+        $pks = array_values(array_map('strval', (array)($_POST['pks'] ?? $_GET['pks'] ?? [])));
         if (count($pks) > 1000) throw new RuntimeException('batch too large');
         $out = ['ok' => true, 'table' => $t, 'rows' => $pks ? syncRowsByPk($db, $schema, $t, $meta, $pks) : []];
     } elseif ($act === 'apply') {
