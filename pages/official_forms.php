@@ -425,7 +425,7 @@ if (in_array($form, $perEmployee) && !$emp):
              : (in_array($form, $teacherOnly) ? " AND employee_type IN ('enseignant_titulaire','enseignant_contractuel')" : '')));
     $list = $db->prepare("SELECT id, first_name_fr, last_name_fr, first_name_ar, last_name_ar, father_name_ar, father_name_fr, employee_code, phone1, phone2
                           FROM employees WHERE is_deleted = 0 AND " . schoolScopeWhere('school_id') . $onlyEmp . $yearWhere . "
-                          ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
+                          ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $list->execute($yearParams);
     $emps = $list->fetchAll();
 ?>
@@ -610,7 +610,7 @@ if (in_array($form, $imageForms)) {
         $st = "$y1f-10-01"; $en = "$y2f-09-30";
         $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $ofEmpFilterPlain . "
             AND " . leftDateSqlFor('finance') . " BETWEEN ? AND ?
-            ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
+            ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
         $q->execute([$st,$en]);
         $lrows = $q->fetchAll();
         $ys = 26.0; $dy = 3.62;
@@ -1270,7 +1270,7 @@ elseif ($form === 'teacher_card'):
     $catTitle = ['titulaire'=>'الداخلين في الملاك', 'contractuel'=>'المتعاقدين'][$cat] ?? 'المتعاقدين والملاك';
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear());
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $catSql . $yf . $ofEmpFilterPlain . "
-                       ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
+                       ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $q->execute($yp);
     $rows = $q->fetchAll();
     $sy = (activeSchoolYear()==='all') ? $schoolYear : activeSchoolYear();
@@ -1376,7 +1376,7 @@ elseif ($form === 'teacher_card'):
     $catTitle = $isMlk ? 'الداخلين في الملاك' : 'المتعاقدين';
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear());
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . " AND $typeSql" . $yf . $ofEmpFilterPlain . "
-                       ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
+                       ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $q->execute($yp);
     $rows = $q->fetchAll();
     $sy = (activeSchoolYear()==='all') ? $schoolYear : activeSchoolYear();
@@ -1547,7 +1547,7 @@ elseif ($form === 'teacher_card'):
         WHERE e.employee_type='enseignant_titulaire' AND e.is_deleted=0" . $ofYearFilter . "
               AND ms.year=? AND ms.month IN ($ph) AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND " . schoolScopeWhere('e.school_id') . "
         GROUP BY e.id
-        ORDER BY e.school_id, COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
+        ORDER BY e.school_id, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $q->execute(array_merge($ofYearParams, [$qYear], $qm));
     $rows = $q->fetchAll();
     $multiS = (count(activeSchoolIds()) !== 1);
@@ -1670,7 +1670,7 @@ elseif ($form === 'teacher_card'):
     $stmt = $db->prepare("SELECT e.employee_type, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.first_name_fr, e.last_name_fr, e.social_status, e.spouse_works, e.payment_months_per_year, COALESCE(e.apply_family_deduction, 1) afd, COALESCE(e.grant_spouse_addition, 0) gsa, COALESCE(e.grant_children_addition, 0) gca, ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
-                          ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
+                          ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
     $T = ['base'=>0,'ech'=>0,'bpe'=>0,'extra'=>0,'aide'=>0,'caisse'=>0,'fded'=>0,'txb'=>0,'tax'=>0,'cnss'=>0,'ded'=>0,'fam'=>0,'trans'=>0,'due'=>0,'net'=>0];
@@ -1804,7 +1804,7 @@ elseif ($form === 'teacher_card'):
                    SUM(CASE WHEN ms.school_year=? THEN FLOOR(ms.net_salary_lbp/NULLIF(ms.exchange_rate,0)) ELSE 0 END) AS prev_usd
             FROM employees e JOIN monthly_salaries ms ON ms.employee_id=e.id
             WHERE e.is_deleted=0 AND ms.school_year IN (?, ?) AND " . schoolScopeWhere('e.school_id') . "
-            GROUP BY e.id, e.employee_type HAVING (cur>0 OR prev>0) ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
+            GROUP BY e.id, e.employee_type HAVING (cur>0 OR prev>0) ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $q->execute([$schoolYear, $prevSY, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $schoolYear, $prevSY, $schoolYear, $prevSY]);
     $rows = $q->fetchAll();
     $tc=0;$tp=0;$tEx=0;$tAi=0;$tBase=0;
@@ -2046,7 +2046,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
     $start = "$y1-10-01"; $end = "$y2-09-30";
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $ofEmpFilterPlain . "
         AND " . leftDateSqlFor('finance') . " BETWEEN ? AND ?
-        ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
+        ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $q->execute([$start,$end]);
     $rows = $q->fetchAll();
 ?>
@@ -2542,7 +2542,7 @@ elseif ($form === 'payment_list'):
                                  ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
-                          ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
+                          ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
     $tNet=0; $tDue=0; $tEx=0; $tAi=0; $tBase=0; $tTrans=0;
@@ -2616,7 +2616,7 @@ elseif ($form === 'payment_list'):
                                  e.hours_per_week, " . familyDedSelectCols('e') . ", ms.*
                           FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
                           WHERE ms.month=? AND ms.year=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)" . $ofMonthFilter . $ofEmpFilter . " AND" . schoolScopeWhere('e.school_id') . "
-                          ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id");
+                          ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $stmt->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $stmt->fetchAll();
     $multiS = (count(activeSchoolIds()) !== 1);
@@ -2846,7 +2846,7 @@ elseif ($form === 'payment_list'):
     // معلومات عامة عن الموظفين (مطابق Ecole.exe — p13)
     [$yf,$yp] = yearEmploymentFilter(activeSchoolYear());
     $q = $db->prepare("SELECT * FROM employees WHERE is_deleted=0 AND " . schoolScopeWhere('school_id') . $yf . $ofEmpFilterPlain . "
-                       ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id");
+                       ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id");
     $q->execute($yp); $rows = $q->fetchAll();
     $today = new DateTime();
 ?>
@@ -2912,7 +2912,7 @@ elseif ($form === 'payment_list'):
               AND ms.year = ? AND ms.month = ? AND " . schoolScopeWhere('ms.school_id') . "
               AND (ms.taxable_base_lbp > 0 OR ms.cnss_amount_lbp > 0 OR ms.base_plus_echelon_lbp > 0)
             ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
-                     COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr), e.id";
+                     REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $st = $db->prepare($sql);
     $st->execute(array_merge($ofMonthParams, [$year, $month]));
     $rows = $st->fetchAll();
@@ -3061,7 +3061,7 @@ elseif ($form === 'payment_list'):
               AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $ofMonthFilter . $ofEmpFilter . "
               AND " . schoolScopeWhere('e.school_id') . "
             ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'),
-                     COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr), e.id";
+                     REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $st = $db->prepare($sql);
     $st->execute(array_merge([$month, $year], $ofMonthParams));
     $rows = $st->fetchAll();

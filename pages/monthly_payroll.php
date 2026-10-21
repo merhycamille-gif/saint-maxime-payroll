@@ -263,7 +263,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     $sqlP .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
     $idsSelP = array_filter(array_map('intval', explode(',', (string)($_GET['ids'] ?? '')))); // ☑️ v2026 اختيار جماعي من اللائحة
     if ($idsSelP) $sqlP .= " AND e.id IN (" . implode(',', $idsSelP) . ")";
-    $sqlP .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id";
+    $sqlP .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $stmtP = $db->prepare($sqlP);
     $stmtP->execute($paramsP);
     $empsP = $stmtP->fetchAll();
@@ -483,7 +483,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
     $sql .= $lyf;
     $listParams = array_merge([$month, $year, $pmM, $pmY], $lyp);
     $sql .= empTypeSqlFrom($db, $typeState, 'e.'); // ☑️ الفئات المشيّكة
-    $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id";
+    $sql .= " ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $stmt = $db->prepare($sql);
     $stmt->execute($listParams);
     $list = $stmt->fetchAll();

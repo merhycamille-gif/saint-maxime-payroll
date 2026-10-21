@@ -49,7 +49,7 @@ if ($report === 'monthly_summary') {
     $st = $db->prepare("SELECT e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar, e.father_name_ar, e.father_name_fr,e.employee_type,e.school_id," . familyDedSelectCols('e') . ",ms.*
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0)" . $schoolSql . $empYearFilter . $empTypeSql . "
-        ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
+        ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه')");
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
 
@@ -121,7 +121,7 @@ if ($report === 'monthly_summary') {
     $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar, e.father_name_ar, e.father_name_fr,e.nssf_number,e.birth_date,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.cnss_amount_lbp,ms.school_cnss_8_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.prime_fixe_usd_law,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.cnss_subject=1" . $schoolSql . $empYearFilter . $empTypeSql . "
-        ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
+        ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه')");
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
     $rep = new ReportTable('كشف اشتراكات الضمان — ' . monthName($month, 'ar') . ' ' . $year . $empTypeTitle, true);
@@ -163,7 +163,7 @@ if ($report === 'monthly_summary') {
     $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar, e.father_name_ar, e.father_name_fr,e.finance_ministry_number,e.school_id,e.social_status,e.spouse_works,e.payment_months_per_year,COALESCE(e.apply_family_deduction,1) afd,COALESCE(e.grant_spouse_addition,0) gsa,COALESCE(e.grant_children_addition,0) gca,e.id eid,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.income_tax_lbp,ms.taxable_base_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.prime_fixe_usd_law,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.tax_subject=1" . $schoolSql . $empYearFilter . $empTypeSql . "
-        ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
+        ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه')");
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
     // عمود «التنزيل العائلي» (2026-08-06): المصدر الوحيد familyDedMonthShare (report_helpers) — حصّة الشهر
@@ -209,7 +209,7 @@ if ($report === 'monthly_summary') {
     $st = $db->prepare("SELECT e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar,e.father_name_ar,e.father_name_fr,e.caisse_number,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.caisse_amount_lbp,ms.eoc_grade_lbp,ms.school_eoc_6_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.prime_fixe_usd_law,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.employee_type='enseignant_titulaire'" . $schoolSql . $empYearFilter . "
-        ORDER BY e.school_id, COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
+        ORDER BY e.school_id, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه')");
     $st->execute(array_merge([$year, $month], $empYearParams));
     $data = $st->fetchAll();
     $rep = new ReportTable('كشف صندوق التعويضات — ' . monthName($month, 'ar') . ' ' . $year, true);
@@ -245,7 +245,7 @@ if ($report === 'monthly_summary') {
     $empType = $empTypeSel;
     $typeSql = $empTypeSql;
     [$yf, $yp] = yearEmploymentFilter(activeSchoolYear(), 'e.');
-    $st = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted=0" . $schoolSqlEmp . $typeSql . $yf . " ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)");
+    $st = $db->prepare("SELECT e.* FROM employees e WHERE e.is_deleted=0" . $schoolSqlEmp . $typeSql . $yf . " ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه')");
     $st->execute($yp);
     $data = $st->fetchAll();
     $scaleMap = [];

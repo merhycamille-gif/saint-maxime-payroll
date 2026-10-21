@@ -272,7 +272,7 @@ function cadreDueCandidates__raw(PDO $db, string $sy, ?array $schoolIds = null, 
         $sql .= " AND e.school_id IN (" . implode(',', $ids) . ")";
     }
     if ($scoped) $sql .= schoolScopeSql('e.school_id');
-    $sql .= " ORDER BY s.name_ar, e.hire_date DESC, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr), e.id";
+    $sql .= " ORDER BY s.name_ar, e.hire_date DESC, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id";
     $st = $db->prepare($sql);
     $st->execute($p);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);

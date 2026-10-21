@@ -352,7 +352,7 @@ $emps = [];
 if (!isAllSchools()) {
     [$yfE, $ypE] = yearEmploymentFilter(activeSchoolYear(), '');
     $stEmps = $db->prepare("SELECT * FROM employees WHERE is_deleted = 0" . schoolScopeSql('school_id') . $yfE
-        . " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(first_name_ar,''),first_name_fr)");
+        . " ORDER BY FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه')");
     $stEmps->execute($ypE);
     $emps = $stEmps->fetchAll();
 }

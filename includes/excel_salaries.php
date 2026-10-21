@@ -264,7 +264,7 @@ function excelSalariesRows(PDO $db, int $schoolId, string $sy, string $cat = 'al
               AND e.status = 'actif' AND " . leftDateSql('e.') . " = '9999-12-31'
               " . ($tax !== '' ? " AND e.tax_subject = " . (int)$tax : '') . "
               AND " . excelSalariesInYearSql($sy) . "
-            ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id"); // 🔤 (2026-10-21 «مرتّبين أبجدياً طبق الأصل متل بقية التقارير») نفس ترتيب الكشوف: الاسم الأوّل ثم الشهرة
+            ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id"); // 🔤 (2026-10-21 «مرتّبين أبجدياً طبق الأصل متل بقية التقارير») نفس ترتيب الكشوف: الاسم الأوّل ثم الشهرة
     $st->execute(array_merge([$schoolId], excelSalariesInYearParams($sy)));
     $rows = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {

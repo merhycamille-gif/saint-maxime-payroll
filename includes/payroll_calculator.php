@@ -1503,7 +1503,7 @@ function lawConsistencyCheck($schoolIds = null, $schoolYear = null) {
         $in = implode(',', array_map('intval', $schoolIds));
         $sql .= " AND school_id IN ($in)";
     }
-    $sql .= " ORDER BY school_id, COALESCE(NULLIF(first_name_ar,''),first_name_fr), COALESCE(NULLIF(last_name_ar,''),last_name_fr), id";
+    $sql .= " ORDER BY school_id, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(first_name_ar,''),first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(last_name_ar,''),last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), id";
     $st = $db->prepare($sql);
     $st->execute($yp);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);

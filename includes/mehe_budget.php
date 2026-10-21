@@ -239,7 +239,7 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
                         WHERE e.school_id IN ($in) AND e.is_deleted = 0
                           AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)
                         GROUP BY e.id
-                        ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), e.school_id, e.first_name_ar, e.last_name_ar");
+                        ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), e.school_id, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), e.id");
     $st->execute([$sy]);
     $tit = []; $con = []; $adm = [];
     foreach ($st->fetchAll() as $r) {

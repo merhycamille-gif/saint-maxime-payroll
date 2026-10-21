@@ -39,7 +39,7 @@ if ($q !== '' && $id <= 0) {
                OR REPLACE(REPLACE(REPLACE(COALESCE(e.phone1,''),'-',''),' ',''),'/','') LIKE ? OR REPLACE(REPLACE(REPLACE(COALESCE(e.phone2,''),'-',''),' ',''),'/','') LIKE ?
                OR COALESCE(e.nssf_number,'') LIKE ? OR COALESCE(e.finance_ministry_number,'') LIKE ?
                OR e.birth_date = ? OR YEAR(e.birth_date) = ?)
-        ORDER BY rk, COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr) LIMIT 80");
+        ORDER BY rk, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''), e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.last_name_ar,''), e.last_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه') LIMIT 80");
     $st->execute([$start, $start, $start, $start, $like, $like, $like, $like, $dlike, $dlike, $like, $like, $bd, $by]);
     $results = $st->fetchAll(PDO::FETCH_ASSOC);
     if (count($results) === 1) { header('Location: ' . BASE_URL . 'pages/employee_full_history.php?id=' . (int)$results[0]['id']); exit; }
