@@ -32,6 +32,7 @@ function syncHashSql(array $meta): string {
     $parts = [];
     foreach ($meta['cols'] as $col) {
         if ($col === 'updated_at') continue;   // طابع تلقائي (ON UPDATE) — ليس بياناً؛ يُرفع مع الصفّ حين يتغيّر غيره
+        if ($col === 'last_login') continue;   // 🖥️ (2026-10-21) آخر دخول (users): كل دخول على الكمبيوتر/السيرفر أو دخول المزامنة أونلاين كان يصنع «تعارض users» وهمياً وسحباً كاملاً
         $t = $meta['types'][$col] ?? '';
         $expr = in_array($t, ['float', 'double', 'real'], true) ? "ROUND(`$col`, 6)" : "`$col`";
         $parts[] = "IFNULL(CAST($expr AS CHAR), '<NULL>')";

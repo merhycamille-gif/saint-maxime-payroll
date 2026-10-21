@@ -19,8 +19,7 @@ function localSyncMysqlExe(): string {
 /** هل المزامنة ممكنة هنا؟ (كمبيوتر محلي فقط، لا أونلاين ولا CLI) */
 function localSyncEnabled(): bool {
     if (php_sapi_name() === 'cli') return false;
-    $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
-    if ($host === '' || (strpos($host, 'localhost') === false && strpos($host, '127.0.0.1') === false)) return false;
+    if (!msaIsMirrorHost()) return false;   // 🖥️ (2026-10-21) الكمبيوتر أو سيرفر المدرسة (ONLINE_SYNC_LOCAL_HOSTS)
     if (!defined('ONLINE_SYNC_URL') || !defined('ONLINE_SYNC_USER') || !defined('ONLINE_SYNC_PASS')) return false;
     return localSyncMysqlExe() !== '' && function_exists('curl_init');
 }
@@ -41,7 +40,7 @@ function localSyncDue(): bool {
     $st = localSyncState();
     $lock = (int)($st['lock'] ?? 0);
     if ($lock && time() - $lock < 1800) return false;               // مزامنة جارية (القفل يبلى بعد 30 دقيقة)
-    $last = (int)($st['last_ok'] ?? 0);
+    $last = (int)($st['last_full_ok'] ?? $st['last_ok'] ?? 0);   // ⚡ (2026-10-21) الدوري = آخر نسخة كاملة (السحب الجزئي لا يؤجّله)
     $lastTry = (int)($st['last_try'] ?? 0);
     if (time() - $lastTry < 900) return false;                       // لا نعيد المحاولة أكثر من مرّة كل 15 دقيقة
     return time() - $last >= localSyncHours() * 3600;
@@ -105,7 +104,7 @@ function localSyncRun(): array {
     $st['lock'] = time(); $st['last_try'] = time(); localSyncSaveState($st);
     $done = function (bool $ok, string $msg) use (&$st): array {
         $st = localSyncState(); unset($st['lock']);
-        $st['last_msg'] = $msg; if ($ok) $st['last_ok'] = time();
+        $st['last_msg'] = $msg; if ($ok) { $st['last_ok'] = time(); $st['last_full_ok'] = time(); }
         localSyncSaveState($st); localSyncLog(($ok ? '✅ ' : '❌ ') . $msg);
         return ['ok' => $ok, 'msg' => $msg];
     };
@@ -160,7 +159,10 @@ function localSyncRun(): array {
         $pdo = new PDO('mysql:host=' . DB_HOST . ';charset=utf8mb4', DB_USER, DB_PASS, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $pdo->exec("DROP DATABASE IF EXISTS `$tmpdb`"); $pdo->exec("CREATE DATABASE `$tmpdb` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         $args = [$mysql, '-h', DB_HOST, '-u', DB_USER]; if (DB_PASS !== '') $args[] = '-p' . DB_PASS;
+        // ⚡ (2026-10-21 سيرفر المدرسة: كل commit ≈ 90 ms على قرصه فكان التركيب 5 دقائق) كل الملف بمعاملة واحدة (DDL يثبّت ضمنياً) + COMMIT بآخره
+        $args[] = '--init-command=SET autocommit=0, unique_checks=0, foreign_key_checks=0';
         $args[] = '--default-character-set=utf8mb4'; $args[] = $tmpdb;
+        @file_put_contents($dump, "\nCOMMIT;\n", FILE_APPEND);
         $proc = proc_open($args, [0 => ['file', $dump, 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, null, ['bypass_shell' => true]);
         if (!is_resource($proc)) return $done(false, 'تعذّر تشغيل mysql.exe');
         $out = stream_get_contents($pipes[1]); $errOut = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]);
@@ -341,8 +343,15 @@ function localSyncPaused(): bool { $f = dirname(__DIR__) . '/tmp/local_sync_paus
 function localSyncCycle(bool $force = false): array {
     $st = localSyncState();
     if (!empty($st['lock']) && time() - (int)$st['lock'] < 1800) return ['ok' => false, 'msg' => 'مزامنة جارية'];
+    // 🔒 (2026-10-21 سيرفر المدرسة: ثلاث دورات تداخلت لأنّ الفحص/البصمات أبطأ من 5 دقائق) قفل للدورة كلّها، لا للسحب فقط — 30 دقيقة كحدّ
+    if (!empty($st['cycle_lock']) && time() - (int)$st['cycle_lock'] < 1800) return ['ok' => false, 'msg' => 'مزامنة جارية'];
     if (localSyncPaused()) return ['ok' => true, 'msg' => 'paused (regression)'];
-    $st['last_check'] = time(); localSyncSaveState($st);
+    $st['last_check'] = time(); $st['cycle_lock'] = time(); localSyncSaveState($st);
+    try { return localSyncCycleInner($force); }
+    finally { $st = localSyncState(); unset($st['cycle_lock']); localSyncSaveState($st); }
+}
+function localSyncCycleInner(bool $force): array {
+    $st = localSyncState();
     try { $diff = localSyncLocalDiff(); } catch (Throwable $e) { localSyncLog('تعذّر فحص تعديلات الكمبيوتر: ' . $e->getMessage()); $diff = []; }
     $hasLocal = is_array($diff) && count($diff) > 0;
     if (!$hasLocal && !empty($st['pending_push'])) { $st = localSyncState(); $st['pending_push'] = 0; localSyncSaveState($st); }   // لا تعديلات معلّقة بعد الآن
@@ -351,12 +360,99 @@ function localSyncCycle(bool $force = false): array {
         $st = localSyncState(); $st['pending_push'] = $p['ok'] ? 0 : 1; $st['last_push_msg'] = $p['msg']; if ($p['ok']) $st['last_push_ok'] = time(); localSyncSaveState($st);
         if (!$p['ok']) { localSyncLog('⏳ ' . $p['msg']); return ['ok' => false, 'msg' => $p['msg']]; }
     }
-    if ($force || $hasLocal || localSyncDue() || localSyncOnlineChanged()) {
+    if ($force || localSyncDue()) {   // دوري/يدوي ⇒ النسخة الكاملة (شبكة أمان + نسخة مضغوطة)
         $r = localSyncRun();
         if ($hasLocal && !empty($r['ok'])) $r['msg'] = ($p['msg'] ?? '') . ' ⇒ ' . $r['msg'];
         return $r;
     }
+    if ($hasLocal || localSyncOnlineChanged()) {   // ⚡ (2026-10-21) تغيّر ⇒ سحب جزئي (الصفوف المختلفة فقط)، وإن تعذّر ⇒ الكامل
+        $r = localSyncPullIncremental();
+        if (!empty($r['fallback'])) { localSyncLog('⤵ سحب كامل بدل الجزئي: ' . $r['msg']); $r = localSyncRun(); }
+        if ($hasLocal && !empty($r['ok'])) $r['msg'] = ($p['msg'] ?? '') . ' ⇒ ' . $r['msg'];
+        return $r;
+    }
     return ['ok' => true, 'msg' => 'no change'];
+}
+
+/* ⚡ (2026-10-21 «2» — سيرفر المدرسة: قرصه بطيء فالسحب الكامل 47MB يأخذ 5 دقائق ويبطّئ الصفحات) السحب الجزئي:
+ *    بصمات كل صفّ أونلاين (sync_api hashes) مقابل بصماتنا ⇒ نجلب الصفوف المختلفة/الناقصة فقط (sync_api rows) ونطبّقها بنسخة احتياطية
+ *    (syncApplyChanges) ونحذف ما حُذف أونلاين، ونحدّث الأساس للجداول المتأثّرة. أي اختلاف ببنية الجداول أو حذف جماعي أو واجهة
+ *    rows غير منشورة أونلاين ⇒ fallback = السحب الكامل كما كان. السحب الكامل الدوري (ONLINE_SYNC_HOURS) يبقى شبكة أمان + نسخة مضغوطة. */
+/** خطّة جدول واحد (دالّة نقيّة للفحص): ['up' => مفاتيح تُجلب من الأونلاين (ناقصة/مختلفة), 'del' => مفاتيح تُحذف محلياً (غير موجودة أونلاين)] */
+function localSyncPlan(array $local, array $online, string $table = ''): array {
+    $up = []; $del = [];
+    foreach ($online as $pk => $h) { if ($table === 'settings' && syncSettingsKeyIgnored((string)$pk)) continue; if (!isset($local[$pk]) || $local[$pk] !== $h) $up[] = (string)$pk; }
+    foreach ($local as $pk => $h) { if ($table === 'settings' && syncSettingsKeyIgnored((string)$pk)) continue; if (!isset($online[$pk])) $del[] = (string)$pk; }
+    return ['up' => $up, 'del' => $del];
+}
+function localSyncPullIncremental(): array {
+    require_once __DIR__ . '/sync_common.php';
+    $fb = fn(string $why) => ['ok' => false, 'fallback' => true, 'msg' => $why];
+    $site = rtrim((string)ONLINE_SYNC_URL, '/'); $cj = tempnam(sys_get_temp_dir(), 'synci');
+    $ch = localSyncHttp($cj);
+    if (!$ch) { @unlink($cj); return ['ok' => false, 'msg' => 'لا اتصال بالأونلاين']; }
+    $st = localSyncState(); $st['lock'] = time(); $st['last_try'] = time(); localSyncSaveState($st);
+    $end = function (array $r) use ($cj): array { @unlink($cj); $st = localSyncState(); unset($st['lock']); if (!empty($r['ok'])) $st['last_ok'] = time(); $st['last_msg'] = (string)$r['msg']; localSyncSaveState($st); return $r; };
+    @set_time_limit(0); @ignore_user_abort(true);
+    try {
+        $pdo = localSyncPdo(); $s = DB_NAME;
+        [$tj, $code] = $ch($site . '/sync_api.php?action=tables'); $T = json_decode((string)$tj, true);
+        if ($code !== 200 || !is_array($T) || empty($T['ok']) || empty($T['tables'])) return $end($fb('واجهة المزامنة غير متاحة (' . $code . ')'));
+        $fp = (string)($T['fp'] ?? '');
+        $localTabs = syncRealTables($pdo, $s);
+        foreach ($T['tables'] as $t => $info) {
+            if (!in_array($t, $localTabs, true)) return $end($fb("جدول جديد أونلاين: $t"));
+            $m = syncTableMeta($pdo, $s, $t);
+            if ($m['cols'] !== array_values((array)$info['cols']) || $m['pk'] !== array_values((array)$info['pk'])) return $end($fb("بنية مختلفة: $t"));
+        }
+        foreach ($localTabs as $t) if (!isset($T['tables'][$t])) return $end($fb("جدول غير موجود أونلاين: $t"));
+        $nUp = 0; $nDel = 0; $parts = [];
+        foreach ($T['tables'] as $t => $info) {
+            $m = syncTableMeta($pdo, $s, $t); if (!$m['pk']) continue;
+            [$hj, $code] = $ch($site . '/sync_api.php?action=hashes&table=' . rawurlencode($t)); $hr = json_decode((string)$hj, true);
+            if ($code !== 200 || !is_array($hr) || empty($hr['ok'])) return $end(['ok' => false, 'msg' => "$t: تعذّرت قراءة بصمات الأونلاين ($code)"]);
+            $plan = localSyncPlan(syncRowHashes($pdo, $s, $t, $m), (array)($hr['hashes'] ?? []), $t);
+            if (!$plan['up'] && !$plan['del']) continue;
+            $nLoc = (int)$pdo->query("SELECT COUNT(*) FROM `$s`.`$t`")->fetchColumn();
+            if ($plan['del'] && $nLoc > 0 && count($plan['del']) > max(50, (int)($nLoc * 0.2))) return $end($fb("$t: حذف جماعي (" . count($plan['del']) . " من $nLoc)"));
+            $rows = [];
+            foreach (array_chunk($plan['up'], 300) as $chunk) {
+                [$rj, $code] = $ch($site . '/sync_api.php?action=rows&table=' . rawurlencode($t), [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query(['pks' => $chunk])]);
+                $rr = json_decode((string)$rj, true);
+                if (is_array($rr) && ($rr['msg'] ?? '') === 'bad action') return $end($fb('واجهة rows غير منشورة أونلاين بعد'));   // الأونلاين القديم يردّ 200 + bad action
+                if ($code !== 200 || !is_array($rr) || empty($rr['ok'])) return $end(['ok' => false, 'msg' => "$t: تعذّر جلب الصفوف ($code)"]);
+                foreach ((array)$rr['rows'] as $pk => $row) $rows[(string)$pk] = $row;
+            }
+            if (count($rows) !== count($plan['up'])) return $end($fb("$t: صفوف ناقصة من الأونلاين (" . count($rows) . '/' . count($plan['up']) . ')'));
+            $cu = array_chunk(array_values($rows), 500); $cd = array_chunk(array_map(fn($pk) => explode(chr(31), $pk), $plan['del']), 500);
+            for ($i = 0, $nb = max(count($cu), count($cd)); $i < $nb; $i++) {
+                $ar = syncApplyChanges($pdo, $s, $t, $m, $cu[$i] ?? [], $cd[$i] ?? []);
+                if (empty($ar['ok'])) return $end(['ok' => false, 'msg' => "$t: فشل التطبيق — " . ($ar['msg'] ?? '')]);
+            }
+            localSyncBaseRefreshTable($pdo, $s, $t, $m);
+            $nUp += count($plan['up']); $nDel += count($plan['del']); $parts[] = "$t: " . count($plan['up']) . '↓ ' . count($plan['del']) . '🗑';
+        }
+        localSyncBkPrune($pdo, $s);
+        if ($fp !== '') { $st = localSyncState(); $st['online_fp'] = $fp; $st['last_check'] = time(); localSyncSaveState($st); }
+        $msg = ($nUp + $nDel) ? "سحب جزئي: $nUp صفّاً جُدّد و$nDel حُذف — " . implode(' · ', $parts) : 'سحب جزئي: لا فرق';
+        localSyncLog('⚡ ' . $msg);
+        return $end(['ok' => true, 'msg' => $msg, 'up' => $nUp, 'del' => $nDel]);
+    } catch (Throwable $e) { return $end(['ok' => false, 'msg' => 'خطأ بالسحب الجزئي: ' . mb_substr($e->getMessage(), 0, 200)]); }
+}
+/** تحديث أساس الدمج لجدول واحد (بعد سحب جزئي) — إن كان الأساس موجوداً؛ وإلا يُبنى كاملاً بالدورة التالية */
+function localSyncBaseRefreshTable(PDO $pdo, string $s, string $t, array $m): void {
+    $has = (bool)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = " . $pdo->quote($s) . " AND table_name = '_sync_base'")->fetchColumn();
+    if (!$has) return;
+    $pdo->prepare("DELETE FROM `$s`.`_sync_base` WHERE tbl = ?")->execute([$t]);
+    $pdo->exec("INSERT INTO `$s`.`_sync_base` (tbl, pk, h) SELECT " . $pdo->quote($t) . ", " . syncPkSql($m) . ", " . syncHashSql($m) . " FROM `$s`.`$t`");
+}
+/** النسخ الاحتياطية المحلية للصفوف (_sync_bk_…) أقدم من 7 أيام تُحذف حتى لا تتراكم */
+function localSyncBkPrune(PDO $pdo, string $s): void {
+    try {
+        foreach ($pdo->query("SELECT table_name FROM information_schema.tables WHERE table_schema = " . $pdo->quote($s) . " AND table_name LIKE '\\_sync\\_bk\\_%'")->fetchAll(PDO::FETCH_COLUMN) as $bk) {
+            if (preg_match('/_(\d{8})_\d{6}$/', (string)$bk, $mm) && (int)$mm[1] < (int)date('Ymd', time() - 7 * 86400)) $pdo->exec("DROP TABLE IF EXISTS `$s`.`$bk`");
+        }
+    } catch (Throwable $e) {}
 }
 /** عدد التعارضات غير المقروءة + أحدثها (للوحة القيادة) */
 function localSyncConflicts(int $limit = 10): array {

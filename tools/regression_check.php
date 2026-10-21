@@ -5073,7 +5073,9 @@ check('مزامنة الأونلاين→الكمبيوتر: الدوال معر
       && strpos($sl100, '"msg":"disabled"') !== false && strpos($sl100, 'FATAL') === false
       && strpos($ls100, 'SET FOREIGN_KEY_CHECKS=1;') !== false && strpos($ls100, '$got !== $ntab') !== false && strpos($ls100, 'RENAME TABLE') !== false
       && strpos($ls100, 'smp_pc_archive_first') !== false && strpos($ls100, 'local_sync_state.json') !== false
-      && strpos($ls100, "strpos(\$host, 'localhost') === false") !== false,
+      && strpos($ls100, 'msaIsMirrorHost()') !== false && function_exists('msaIsMirrorHost')   // 🖥️ (2026-10-21) المضيف المحلي = localhost أو سيرفر المدرسة (ONLINE_SYNC_LOCAL_HOSTS)
+      && strpos((string)file_get_contents($PROJ . '/includes/functions.php'), "strpos(\$host, 'localhost') !== false") !== false
+      && strpos($ls100, "\$st['cycle_lock']") !== false,   // 🔒 قفل الدورة كلّها (سيرفر المدرسة 2026-10-21)
       $sl100 === '' ? 'no output' : mb_substr($sl100, 0, 80));
 
 /* =====================================================================
@@ -10494,6 +10496,28 @@ check('🗂️ إكسل ملف الموظف كاملاً: 52 عموداً من �
       && strpos($xs269, 'if ($touchSalary && (int)recalcEmployeeYear($id, $sy) > 0) $recalc++;') !== false && strpos($xs269, 'function excelSalariesEnsureNiveau') !== false
       && strpos($xp269, 'عدد الساعات · عدد الأيام بالأسبوع') !== false && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'إكسل ملفات الموظفين والرواتب') !== false,
       $why269);
+
+/**
+ * 270) ⚡ (2026-10-21 «2» — سيرفر المدرسة: السحب الكامل 47MB يأخذ 5 دقائق على قرصه ويبطّئ الصفحات) السحب الجزئي:
+ *      بصمات الأونلاين مقابل المحلي ⇒ الصفوف المختلفة فقط (sync_api rows) + حذف ما حُذف + تحديث الأساس للجدول + fallback للكامل
+ *      عند اختلاف البنية/حذف جماعي/واجهة غير منشورة + الدوري الكامل يبقى (last_full_ok) + cycle_lock + last_login خارج البصمة.
+ */
+try {
+    require_once $PROJ . '/includes/local_sync.php';
+    $ls270 = (string)file_get_contents($PROJ . '/includes/local_sync.php'); $api270 = (string)file_get_contents($PROJ . '/sync_api.php'); $sc270 = (string)file_get_contents($PROJ . '/includes/sync_common.php');
+    $pl270 = localSyncPlan(['1' => 'a', '2' => 'b', '3' => 'c', 'pdf_service_pass' => 'z'], ['1' => 'a', '2' => 'B', '4' => 'd', 'heal_x' => 'q'], 'settings');
+    $pl270b = localSyncPlan(['1' => 'a'], ['1' => 'a']);
+    $rj270 = json_decode(trim(renderPage('sync_api.php', ['action' => 'rows', 'table' => 'employees'], ['pks' => ['1677']], [2])), true);
+    $ok270 = function_exists('localSyncPullIncremental') && function_exists('localSyncBaseRefreshTable') && function_exists('localSyncBkPrune')
+          && $pl270 === ['up' => ['2', '4'], 'del' => ['3']] && $pl270b === ['up' => [], 'del' => []]
+          && is_array($rj270) && !empty($rj270['ok']) && (int)($rj270['rows']['1677']['id'] ?? 0) === 1677
+          && strpos($ls270, '$r = localSyncPullIncremental();') !== false && strpos($ls270, "if (!empty(\$r['fallback'])) { localSyncLog('⤵ سحب كامل بدل الجزئي: '") !== false
+          && strpos($ls270, "\$st['last_full_ok'] ?? \$st['last_ok']") !== false && strpos($ls270, "\$st['cycle_lock']") !== false
+          && strpos($api270, "\$act === 'rows'") !== false && strpos($api270, "throw new RuntimeException('batch too large')") !== false
+          && strpos($sc270, "if (\$col === 'last_login') continue;") !== false;
+    $why270 = 'plan=' . json_encode($pl270) . ' rows=' . (int)(is_array($rj270) && !empty($rj270['ok']));
+} catch (Throwable $e) { $ok270 = false; $why270 = $e->getMessage(); }
+check('⚡ السحب الجزئي من الأونلاين: خطّة الفروق (إعدادات الجهاز مستثناة) + واجهة rows (≤1000) + الدورة تسحب جزئياً وتعود للكامل عند الحاجة + الدوري الكامل بـlast_full_ok + قفل الدورة + last_login خارج البصمة', $ok270, $why270);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

@@ -27,6 +27,14 @@ try {
         $meta = syncTableMeta($db, $schema, $t);
         $pks = isset($_POST['pks']) ? array_values(array_map('strval', (array)$_POST['pks'])) : null;
         $out = ['ok' => true, 'table' => $t, 'hashes' => syncRowHashes($db, $schema, $t, $meta, $pks)];
+    } elseif ($act === 'rows') {
+        // ⚡ (2026-10-21 السحب الجزئي من الكمبيوتر/سيرفر المدرسة) صفوف كاملة بمفاتيح محدّدة — للصفوف المختلفة فقط بدل الملف الكامل 47MB
+        $t = preg_replace('/[^a-z0-9_]/i', '', (string)($_GET['table'] ?? ''));
+        if ($t === '' || !in_array($t, syncRealTables($db, $schema), true)) throw new RuntimeException('table?');
+        $meta = syncTableMeta($db, $schema, $t);
+        $pks = array_values(array_map('strval', (array)($_POST['pks'] ?? [])));
+        if (count($pks) > 1000) throw new RuntimeException('batch too large');
+        $out = ['ok' => true, 'table' => $t, 'rows' => $pks ? syncRowsByPk($db, $schema, $t, $meta, $pks) : []];
     } elseif ($act === 'apply') {
         $body = json_decode((string)file_get_contents('php://input'), true);
         if (!is_array($body)) throw new RuntimeException('json?');

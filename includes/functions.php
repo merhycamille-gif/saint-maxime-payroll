@@ -97,8 +97,18 @@ function pcReadOnly(): bool {
     // 🔁 (2026-10-18 لاحقاً: «لنفترض ما في إنترنت واضطريت اشتغل على الكمبيوتر… يبقى كل شي نفس الشي بالمكانين») المزامنة صارت باتّجاهين
     //    (localSyncCycle) فالتعديل على الكمبيوتر مسموح ويُرفع تلقائياً — القراءة-فقط تُفعَّل يدوياً فقط بـdefine('LOCAL_READ_ONLY', true).
     if (php_sapi_name() === 'cli' || !defined('ONLINE_SYNC_URL') || !defined('LOCAL_READ_ONLY') || !LOCAL_READ_ONLY) return false;
+    return msaIsMirrorHost();
+}
+/** 🖥️ (2026-10-21 «نحطّ برنامج الرواتب على السيرفر متل الأقساط») هل هذا الطلب على نسخة المرآة (الكمبيوتر أو سيرفر المدرسة)؟
+ *  localhost/127.0.0.1 دائماً، أو أي مضيف مذكور بـONLINE_SYNC_LOCAL_HOSTS بـconfig المحلي (مثل '192.168.1.60'، مفصولة بفواصل). الأونلاين لا يعرّفها. */
+function msaIsMirrorHost(): bool {
     $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
-    return $host !== '' && (strpos($host, 'localhost') !== false || strpos($host, '127.0.0.1') !== false);
+    if ($host === '') return false;
+    if (strpos($host, 'localhost') !== false || strpos($host, '127.0.0.1') !== false) return true;
+    if (!defined('ONLINE_SYNC_LOCAL_HOSTS')) return false;
+    $h = preg_replace('/:\d+$/', '', $host);
+    foreach (explode(',', strtolower((string)ONLINE_SYNC_LOCAL_HOSTS)) as $x) if (trim($x) !== '' && trim($x) === $h) return true;
+    return false;
 }
 /** هل يملك المستخدم صلاحية التعديل؟ (أي دور ما عدا viewer — وعلى نسخة الكمبيوتر لا أحد: التعديل أونلاين). */
 function canEdit() {
