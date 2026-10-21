@@ -10489,6 +10489,7 @@ check('🗂️ إكسل ملف الموظف كاملاً: 52 عموداً من �
       $ok269 && count($cols269) >= 50 && isset($cols269['hours'], $cols269['niveau'], $cols269['classes'], $cols269['phone1'], $cols269['birth_date'], $cols269['marital'], $cols269['tax_subject'], $cols269['notes'], $cols269['job_title'])
       && ($f269['hours']['db'] ?? '') === 'hours_per_week' && ($f269['niveau']['db'] ?? '') === 'niveau_scolaire' && excelSalariesColLetter(27) === 'AA'
       && excelSalariesEditable('niveau', 'enseignant_contractuel') && !excelSalariesEditable('niveau', 'employe') && !excelSalariesEditable('sal_usd', 'enseignant_titulaire') && excelSalariesEditable('job_title', 'employe') && !excelSalariesEditable('diploma', 'enseignant_titulaire')
+      && strpos($xs269, "ORDER BY FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr), COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr), e.id") !== false // 🔤 نفس ترتيب الكشوف
       && strpos($xs269, 'function excelSalariesFields()') !== false && strpos($xs269, "ملاك يتمّ من ملف الأستاذ") !== false
       && strpos($xs269, 'if ($touchSalary && (int)recalcEmployeeYear($id, $sy) > 0) $recalc++;') !== false && strpos($xs269, 'function excelSalariesEnsureNiveau') !== false
       && strpos($xp269, 'عدد الساعات · عدد الأيام بالأسبوع') !== false && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'إكسل ملفات الموظفين والرواتب') !== false,
