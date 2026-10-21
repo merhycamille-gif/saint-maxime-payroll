@@ -697,7 +697,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <button type="button" class="btn btn-success" onclick="baOpen('baModalIndiv')"><i class="fas fa-user-pen"></i> مبالغ فردية (لكل واحد)</button>
                 <button type="button" class="btn btn-light" onclick="baOpen('baModalDaily')"><i class="fas fa-bus"></i> نقل يومي</button>
                 <button type="button" class="btn btn-light" style="color:#b91c1c" onclick="baOpen('baModalRemove')"><i class="fas fa-trash"></i> إزالة</button>
-                <?php if (!$scopeMulti): ?><a class="btn btn-light" style="color:#166534" href="<?= BASE_URL ?>pages/excel_salaries.php?sch=<?= (int)($scopeIds[0] ?? 0) ?>&sy=<?= urlencode($schoolYear) ?>" title="إكسل بأسماء المتعاقدين والموظفين: الراتب والأجر الإضافي وعدد الأيام — تعبّيه وترفعه"><i class="fas fa-file-excel"></i> إكسل (متعاقدين/موظفين)</a><?php endif; ?>
+                <?php if (!$scopeMulti): ?><a class="btn btn-light" style="color:#166534" href="<?= BASE_URL ?>pages/excel_salaries.php?sch=<?= (int)($scopeIds[0] ?? 0) ?>&sy=<?= urlencode($schoolYear) ?>" title="إكسل بكل معلومات ملف الموظف + الراتب والأجر الإضافي والساعات والأيام — تعبّيه وترفعه"><i class="fas fa-file-excel"></i> إكسل (ملفات ورواتب)</a><?php endif; ?>
             </div>
         </div>
 

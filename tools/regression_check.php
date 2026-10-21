@@ -10435,6 +10435,65 @@ check('📦 الملف الكبير: تخزين على الموقع + صفّ sha
       && msaHasCol($db, 'mail_log', 'share_token'),
       $why268);
 
+/**
+ * 269) 🗂️ (2026-10-21 «زيد كل شي موجود بملف الموظف على هيدا الإكسل، أحلى ما أبقى فوت على ملف كل موظف وعدّل»): إكسل الرواتب صار ملف الموظف كاملاً —
+ *      المصدر الواحد excelSalariesFields() (أسماء/أم/جنس/ولادة/جنسية/سجلّ/عائلة/أولاد/عنوان/هواتف/إيميل/شهادة/اختصاص/مواد/مرحلة/صفوف/وظيفة/ساعات/أيام/
+ *      ضمان-مالية-صندوق/ضريبة/ضمان/راتب/إضافي/ملاحظات) + الفئة متعاقد ↔ موظف فقط (الملاك محميّ) + «-» = امسح + الرمادي حسب الفئة لا يُقرأ + إعادة الحساب فقط لما يمسّ الراتب.
+ */
+$xs269 = (string)file_get_contents($PROJ . '/includes/excel_salaries.php'); $xp269 = (string)file_get_contents($PROJ . '/pages/excel_salaries.php');
+$cols269 = excelSalariesColumns(); $f269 = excelSalariesFields();
+$ok269 = false; $why269 = '';
+try {
+    $sch269 = (int)$db->query("SELECT e.school_id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026'
+        WHERE e.is_deleted = 0 AND e.status = 'actif' AND e.employee_type = 'enseignant_contractuel' AND " . leftDateSql('e.') . " = '9999-12-31'
+        GROUP BY e.school_id ORDER BY COUNT(DISTINCT e.id) DESC LIMIT 1")->fetchColumn();
+    $sy269 = '2025-2026';
+    if (!$sch269) { $ok269 = true; $why269 = 'لا عيّنة'; }
+    else {
+        $tmp269 = sys_get_temp_dir() . '/reg269_' . uniqid() . '.xlsx';
+        file_put_contents($tmp269, excelSalariesBuild($db, $sch269, $sy269)); $parsed269 = excelSalariesParse($tmp269); @unlink($tmp269);
+        $d0 = excelSalariesDiff($db, $sch269, $sy269, $parsed269); // تنزيل ثم رفع بلا تعديل = صفر فروقات (كل الخانات الجديدة ذهاباً وإياباً)
+        $before = excelSalariesRows($db, $sch269, $sy269);
+        $vict = null; foreach ($before as $r) if ($r['type'] === 'enseignant_contractuel') { $vict = $r; break; }
+        $id269 = (int)$vict['id']; $orig = $db->query("SELECT * FROM employees WHERE id = $id269")->fetch(PDO::FETCH_ASSOC);
+        // تعديل: الفئة ⇒ موظف · الساعات 21.5 · المرحلة متوسط+ثانوي (مرفوضة للموظف الإداري ⇒ تنبيه) · هاتف · الوضع العائلي أرمل + 3 أولاد · الضريبة لا · ملاحظة
+        $mod = ['id' => $id269, 'cat' => 'موظف', 'hours' => '21.5', 'niveau' => 'متوسط، ثانوي', 'phone1' => '03/123456', 'marital' => 'أرمل', 'number_of_children' => '3', 'tax_subject' => 'لا', 'notes' => 'reg269', 'birth_date' => '15/03/1980'];
+        $d1 = excelSalariesDiff($db, $sch269, $sy269, [$mod]);
+        $whats = array_column($d1['changes'][$id269]['fields'] ?? [], 'what');
+        $nivRefused = (bool)array_filter($d1['errors'], fn($e) => strpos($e, 'المرحلة') !== false);
+        $r1 = excelSalariesApply($db, $sch269, $sy269, $d1['changes']);
+        $after = $db->query("SELECT * FROM employees WHERE id = $id269")->fetch(PDO::FETCH_ASSOC);
+        $okApply = $after['employee_type'] === 'employe' && (float)$after['hours_per_week'] === 21.5 && $after['phone1'] === '03/123456' && $after['social_status'] === 'veuf_3_enfants'
+                   && (int)$after['number_of_children'] === 3 && (int)$after['tax_subject'] === 0 && $after['notes'] === 'reg269' && $after['birth_date'] === '1980-03-15'
+                   && (string)$after['niveau_scolaire'] === (string)$orig['niveau_scolaire'];
+        // محاولة ملاك من الإكسل ⇒ مرفوضة بتنبيه ولا تغيير
+        $d2 = excelSalariesDiff($db, $sch269, $sy269, [['id' => $id269, 'cat' => 'ملاك']]);
+        $cadreRefused = !isset($d2['changes'][$id269]) && (bool)array_filter($d2['errors'], fn($e) => strpos($e, 'ملاك') !== false);
+        // إرجاع بالأداة نفسها («-» تمسح ما كان فاضياً)
+        $restore = ['id' => $id269, 'cat' => 'متعاقد', 'hours' => (string)(float)$orig['hours_per_week'], 'phone1' => trim((string)$orig['phone1']) !== '' ? (string)$orig['phone1'] : '-',
+                    'marital' => ['celibataire' => 'أعزب', 'marie' => 'متزوج', 'veuf' => 'أرمل', 'divorce' => 'مطلّق'][excelSalariesMaritalKind((string)$orig['social_status'])],
+                    'number_of_children' => (string)(int)$orig['number_of_children'], 'tax_subject' => (int)$orig['tax_subject'] ? 'نعم' : 'لا',
+                    'notes' => trim((string)$orig['notes']) !== '' ? (string)$orig['notes'] : '-', 'birth_date' => $orig['birth_date'] ? displayDMY($orig['birth_date']) : '-'];
+        $d3 = excelSalariesDiff($db, $sch269, $sy269, [$restore]); excelSalariesApply($db, $sch269, $sy269, $d3['changes']);
+        $db->prepare("UPDATE employees SET employee_type = ?, hours_per_week = ?, phone1 = ?, social_status = ?, number_of_children = ?, tax_subject = ?, notes = ?, birth_date = ?, job_title = ? WHERE id = ?")
+           ->execute([$orig['employee_type'], $orig['hours_per_week'], $orig['phone1'], $orig['social_status'], $orig['number_of_children'], $orig['tax_subject'], $orig['notes'], $orig['birth_date'], $orig['job_title'], $id269]);
+        $final = $db->query("SELECT * FROM employees WHERE id = $id269")->fetch(PDO::FETCH_ASSOC);
+        $keys = ['employee_type', 'hours_per_week', 'phone1', 'social_status', 'number_of_children', 'tax_subject', 'notes', 'birth_date', 'niveau_scolaire'];
+        $restored = array_intersect_key($final, array_flip($keys)) == array_intersect_key($orig, array_flip($keys));
+        $ok269 = count($d0['changes']) === 0 && !$d0['errors'] && count($parsed269) === count($before) && isset($d1['changes'][$id269]) && $nivRefused && $r1['applied'] === 1 && $okApply && $cadreRefused && $restored
+                 && in_array('الفئة', $whats, true) && in_array('الساعات بالأسبوع', $whats, true) && in_array('الوضع العائلي', $whats, true) && in_array('هاتف 1', $whats, true);
+        $why269 = "school=$sch269 rows=" . count($parsed269) . ' roundtrip=' . count($d0['changes']) . '/' . count($d0['errors']) . " emp=$id269 whats=" . implode('|', $whats) . ' nivRefused=' . (int)$nivRefused . ' apply=' . json_encode($r1) . ' okApply=' . (int)$okApply . ' cadreRefused=' . (int)$cadreRefused . ' restored=' . (int)$restored;
+    }
+} catch (Throwable $e) { $why269 = $e->getMessage() . ' @' . $e->getLine(); }
+check('🗂️ إكسل ملف الموظف كاملاً: 52 عموداً من المصدر الواحد (ساعات/مرحلة/صفوف/هواتف/عائلة/ضريبة/ملاحظات…) + الفئة متعاقد↔موظف (ملاك مرفوض) + الرمادي حسب الفئة + «-» يمسح + تنزيل←رفع بلا تعديل = صفر فروقات + تجربة حيّة تُرجَع + إعادة الحساب فقط لما يمسّ الراتب + الشرح بالصفحة والقائمة',
+      $ok269 && count($cols269) >= 50 && isset($cols269['hours'], $cols269['niveau'], $cols269['classes'], $cols269['phone1'], $cols269['birth_date'], $cols269['marital'], $cols269['tax_subject'], $cols269['notes'], $cols269['job_title'])
+      && ($f269['hours']['db'] ?? '') === 'hours_per_week' && ($f269['niveau']['db'] ?? '') === 'niveau_scolaire' && excelSalariesColLetter(27) === 'AA'
+      && excelSalariesEditable('niveau', 'enseignant_contractuel') && !excelSalariesEditable('niveau', 'employe') && !excelSalariesEditable('sal_usd', 'enseignant_titulaire') && excelSalariesEditable('job_title', 'employe') && !excelSalariesEditable('diploma', 'enseignant_titulaire')
+      && strpos($xs269, 'function excelSalariesFields()') !== false && strpos($xs269, "ملاك يتمّ من ملف الأستاذ") !== false
+      && strpos($xs269, 'if ($touchSalary && (int)recalcEmployeeYear($id, $sy) > 0) $recalc++;') !== false && strpos($xs269, 'function excelSalariesEnsureNiveau') !== false
+      && strpos($xp269, 'عدد الساعات · عدد الأيام بالأسبوع') !== false && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'إكسل ملفات الموظفين والرواتب') !== false,
+      $why269);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

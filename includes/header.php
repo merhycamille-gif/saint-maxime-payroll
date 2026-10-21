@@ -337,7 +337,7 @@ document.addEventListener('submit', function (e) {
 
             <a href="<?= BASE_URL ?>pages/excel_salaries.php" class="<?= $currentPage === 'excel_salaries' ? 'active' : '' ?>">
                 <i class="fas fa-file-excel"></i>
-                <span>Excel salaires & primes / إكسل الرواتب والإضافي</span>
+                <span>Excel fiches & salaires / إكسل ملفات الموظفين والرواتب</span>
             </a>
 
             <a href="<?= BASE_URL ?>pages/law_check.php" class="<?= $currentPage === 'law_check' ? 'active' : '' ?>">

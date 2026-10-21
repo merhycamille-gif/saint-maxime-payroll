@@ -15,7 +15,7 @@ requireCsrf();
 if (isViewer()) { $_SESSION['flash_error'] = 'صلاحية قراءة فقط'; header('Location: ' . BASE_URL . 'index.php'); exit; }
 
 $currentPage = 'excel_salaries';
-$pageTitle = 'Excel salaires & primes / إكسل الرواتب والأجر الإضافي';
+$pageTitle = 'Excel fiches & salaires / إكسل ملفات الموظفين والرواتب';
 $db = getDB();
 @set_time_limit(0);
 
@@ -39,7 +39,7 @@ $preview = null; $token = '';
 if ($action === 'download' && $schoolId > 0) {
     $data = excelSalariesBuild($db, $schoolId, $schoolYear, $xsCat, $xsTax);
     $catFile = ['all' => 'الكل', 'titulaire' => 'الملاك', 'contractuel' => 'المتعاقدون', 'employe' => 'الموظفون'][$xsCat] . ($xsTax === '1' ? '-خاضعون' : ($xsTax === '0' ? '-غير-خاضعين' : ''));
-    $name = 'رواتب-واضافي-' . $catFile . '-' . preg_replace('/[\\\\\/:*?"<>|]+/', '_', schoolNameById($schoolId, 'ar')) . '-' . $schoolYear . '.xlsx';
+    $name = 'ملفات-ورواتب-' . $catFile . '-' . preg_replace('/[\\\\\/:*?"<>|]+/', '_', schoolNameById($schoolId, 'ar')) . '-' . $schoolYear . '.xlsx';
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename*=UTF-8\'\'' . rawurlencode($name) . '; filename="salaires_' . $schoolId . '_' . $schoolYear . '.xlsx"');
     header('Content-Length: ' . strlen($data));
@@ -102,8 +102,8 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="card">
     <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-file-excel"></i> Excel — salaires, supplément &amp; jours (titulaires, contractuels, employés)</span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إكسل — الرواتب والأجر الإضافي وعدد الأيام: الملاك لوحدهم أو المتعاقدون أو الموظفون أو الكل، دفعة وحدة</div>
+        <span dir="ltr"><i class="fas fa-file-excel"></i> Excel — fiches du personnel, salaires &amp; supplément (titulaires, contractuels, employés)</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">إكسل — كل معلومات ملف الموظف + الراتب والأجر الإضافي وعدد الساعات والأيام: تعدّل ما تريد بالإكسل وترفعه، بدل ما تفوت على كل ملف</div>
     </h3></div>
     <div class="card-body">
         <form method="GET" class="form-row cols-4 no-print" style="margin-bottom:12px">
@@ -146,17 +146,19 @@ require_once __DIR__ . '/../includes/header.php';
         <?php if (isSchoolYearLocked($schoolId, $schoolYear)): ?>
             <div class="alert alert-warning">🔒 <?= e(yearLockedMsg($schoolId, $schoolYear)) ?> — التنزيل ممكن، التطبيق مرفوض حتى تفتح القفل.</div>
         <?php endif; ?>
-        <div class="xs-hint" style="margin-bottom:6px">هذا خيار زيادة: بدل ما تفوت على كل ملف، تعبّي إكسل واحد للمدرسة كلّها وترفعه. <b><?= e(schoolNameById($schoolId, 'ar')) ?> — <?= e($schoolYear) ?> — <?= e(excelSalariesFilterLabel($xsCat, $xsTax)) ?>:</b> <?= e($xsCounts) ?> فاعلون بالملف. <?= $nT ? '<b>الملاك:</b> راتبهم بالسلسلة والدرجات (خانتا الراتب رمادية لا تُقرآن) — أجرهم الإضافي (٪ / ل.ل / $) وأيامهم من الإكسل نعم.' : '' ?></div>
+        <div class="xs-hint" style="margin-bottom:6px">هذا خيار زيادة: بدل ما تفوت على كل ملف، تعبّي إكسل واحد للمدرسة كلّها وترفعه — فيه كل خانات ملف الموظف (الأسماء، الأم، الولادة، الجنسية، الوضع العائلي والأولاد، العنوان، الهواتف، الشهادة، المواد، المرحلة، الصفوف، الساعات، الأيام، أرقام الضمان/المالية/الصندوق، الضريبة والضمان، الراتب والأجر الإضافي، الملاحظات). <b><?= e(schoolNameById($schoolId, 'ar')) ?> — <?= e($schoolYear) ?> — <?= e(excelSalariesFilterLabel($xsCat, $xsTax)) ?>:</b> <?= e($xsCounts) ?> فاعلون بالملف. <?= $nT ? '<b>الملاك:</b> راتبهم بالسلسلة والدرجات (خانتا الراتب رمادية لا تُقرآن) — أجرهم الإضافي (٪ / ل.ل / $) وأيامهم من الإكسل نعم.' : '' ?></div>
 
         <div class="xs-step"><span class="xs-num">١</span><div>
             <strong>نزّل الملف</strong> <span class="xs-hint">— سطر لكل واحد من الفئة المختارة (<?= e(excelSalariesFilterLabel($xsCat, $xsTax)) ?>)، والخانات الصفراء معبّأة بقيمه الحالية كي تعدّل ما تريد فقط.</span>
             <div style="margin-top:8px"><a class="btn btn-primary" href="<?= $self ?>&action=download" style="font-weight:800"><i class="fas fa-download"></i> Télécharger / نزّل الإكسل (<?= count($rowsNow) ?>)</a></div>
             <div class="xs-cols">
-                <div class="xs-col ro">رقم الملف (لا تغيّره)</div><div class="xs-col ro">الفئة · الاسم</div>
-                <div class="xs-col">الراتب الأساسي $ <u>أو</u> ل.ل <small>(متعاقد/موظف)</small></div><div class="xs-col">الأجر الإضافي ٪</div><div class="xs-col">الأجر الإضافي: جزء ل.ل <u>و/أو</u> جزء $</div>
-                <div class="xs-col">الإضافي من شهر ← إلى شهر</div><div class="xs-col">عدد الأيام بالأسبوع</div>
+                <div class="xs-col ro">رقم الملف (لا تغيّره)</div><div class="xs-col">الفئة <small>(متعاقد ↔ موظف)</small></div><div class="xs-col ro">الاسم الكامل (للعرض)</div>
+                <div class="xs-col">الأسماء عربي/فرنسي · الأم · الجنس</div><div class="xs-col">الولادة · الجنسية · السجلّ</div><div class="xs-col">الوضع العائلي · الأولاد · الزوج يعمل؟</div>
+                <div class="xs-col">العنوان · الهواتف · الإيميل</div><div class="xs-col">الشهادة · الاختصاص · المواد · المرحلة · الصفوف · نوع الوظيفة</div>
+                <div class="xs-col">عدد الساعات · عدد الأيام بالأسبوع</div><div class="xs-col">رقم الضمان · المالية · الصندوق</div><div class="xs-col">خاضع للضريبة؟ · للضمان؟</div>
+                <div class="xs-col">الراتب الأساسي $ <u>أو</u> ل.ل <small>(متعاقد/موظف)</small></div><div class="xs-col">الأجر الإضافي ٪ · جزء ل.ل <u>و/أو</u> جزء $ · من شهر ← إلى شهر</div><div class="xs-col">ملاحظات الملف</div>
             </div>
-            <div class="xs-hint" style="margin-top:6px">فاضي = لا تغيير · <b>0</b> بالأجر الإضافي = شيله · <b>كل أستاذ رقمه</b>: مبلغ بالليرة و/أو مبلغ بالدولار (الاتنين معاً = يُجمعان) · الشهر بالاسم أو بالرقم، فاضي = كل السنة (تشرين الأول ← أيلول) · لا تحذف أعمدة ولا تغيّر ترتيبها.</div>
+            <div class="xs-hint" style="margin-top:6px">فاضي = لا تغيير · <b>«-»</b> (شرطة) = امسح الخانة · الرمادي لا يُقرأ (الملاك: راتبه بالسلسلة وشهادته من ملفه؛ الموظف الإداري: بلا مواد/مرحلة/صفوف) · التواريخ يوم/شهر/سنة · <b>نعم/لا</b> للضريبة والضمان والزوج · المرحلة والصفوف بفاصلة (ابتدائي، متوسط — EB1, EB2) · الفئة من/إلى <b>ملاك</b> تتمّ من ملف الأستاذ · <b>0</b> بالأجر الإضافي = شيله · مبلغ بالليرة و/أو بالدولار (الاتنين معاً = يُجمعان) · الشهر بالاسم أو بالرقم، فاضي = كل السنة · لا تحذف أعمدة ولا تغيّر ترتيبها.</div>
         </div></div>
 
         <div class="xs-step"><span class="xs-num">٢</span><div>
@@ -195,7 +197,7 @@ require_once __DIR__ . '/../includes/header.php';
             <form method="POST" style="margin-top:10px">
                 <?= csrfField() ?><input type="hidden" name="action" value="apply"><input type="hidden" name="sch" value="<?= $schoolId ?>"><input type="hidden" name="sy" value="<?= e($schoolYear) ?>"><input type="hidden" name="cat" value="<?= e($xsCat) ?>"><input type="hidden" name="tax" value="<?= e($xsTax) ?>"><input type="hidden" name="token" value="<?= e($token) ?>">
                 <button type="submit" class="btn btn-primary" style="font-weight:800" data-confirm="توزيع <?= count($preview['changes']) ?> تغييراً على ملفات الأساتذة والموظفين بـ<?= e(schoolNameById($schoolId, 'ar')) ?> — <?= e($schoolYear) ?> وإعادة حساب رواتبهم؟"><i class="fas fa-check"></i> Appliquer / طبّق ووزّع على الملفات (<?= count($preview['changes']) ?>)</button>
-                <span class="xs-hint" style="margin-right:10px">الأجر الإضافي الجديد يستبدل الحالي عند الشخص (كل فتراته) ويُحسب من تشرين الأول. الرواتب تُعاد بالمحرّك فتطلع نفسها بالبطاقة السنوية وكل التقارير.</span>
+                <span class="xs-hint" style="margin-right:10px">تُكتب القيم بملف الموظف مباشرة. الأجر الإضافي الجديد يستبدل الحالي عند الشخص (كل فتراته). ما يمسّ الراتب (راتب/إضافي/أيام/فئة/عائلة/ضريبة/ضمان) يُعاد حسابه بالمحرّك فيطلع نفسه بالبطاقة السنوية وكل التقارير؛ الهاتف والعنوان وأمثالها تُحفظ بلا إعادة حساب.</span>
             </form>
             <?php else: ?>
                 <div class="alert alert-info" style="margin-top:8px">لا فروقات — الملف مطابق للوضع الحالي.</div>
