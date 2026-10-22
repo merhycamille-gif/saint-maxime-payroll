@@ -10545,6 +10545,34 @@ try {
 } catch (Throwable $e) { $ok270 = false; $why270 = $e->getMessage(); }
 check('⚡ السحب الجزئي من الأونلاين: خطّة الفروق (إعدادات الجهاز مستثناة) + واجهة rows (≤1000) + الدورة تسحب جزئياً وتعود للكامل عند الحاجة + الدوري الكامل بـlast_full_ok + قفل الدورة + last_login خارج البصمة', $ok270, $why270);
 
+/**
+ * 271) 🏫🔑 (2026-10-22 «لكل مدرسة أيقونة أبعتها إلها تفتح عندها على المكتب + الخيار اللي بسمحلها تشوفو + اليوزر باسم المنطقة والباسورد متل تبعي»)
+ *      دخول المدارس: اسم الدخول = المنطقة (فريد، المدرسة الرئيسية تأخذ الاسم الصافي) + كلمة سرّ نموذجية Region@السنة + pw_known يتركّب ذاتياً
+ *      + manifest.php?u / icon.php?u / login.php?u (اسم المدرسة + كبسة «تركيب على سطح المكتب») + صفحة school_access (للمدير) بلا شريط تصدير.
+ */
+try {
+    require_once $PROJ . '/includes/school_access.php';
+    $sch271 = ['id' => 99, 'name_fr' => "Collège N.D de la Délivrance", 'name_ar' => 'مدرسة سيدة النجاة', 'address_fr' => 'Hadath - Tilal El Hadath - Sœurs', 'address' => 'الحدث'];
+    $cou271 = ['id' => 98, 'name_fr' => 'Couvent SRS', 'name_ar' => 'دير سيدة البشارة', 'address_fr' => '', 'address' => 'جون الدير'];
+    $slug271 = saRegionSlug($sch271); $slug271b = saRegionSlug($cou271);
+    $uniq271 = saUniqueUsername($cou271, ['joun' => 5], 0);
+    $pw271 = saStandardPassword('hadath');
+    $src271 = (string)file_get_contents($PROJ . '/pages/school_access.php'); $inc271 = (string)file_get_contents($PROJ . '/includes/school_access.php');
+    $lg271 = (string)file_get_contents($PROJ . '/login.php'); $mf271 = (string)file_get_contents($PROJ . '/manifest.php'); $hd271 = (string)file_get_contents($PROJ . '/includes/header.php');
+    $st271 = (string)file_get_contents($PROJ . '/pages/settings.php');
+    $ok271 = $slug271 === 'hadath' && $slug271b === 'joun' && $uniq271 === 'jouncouvent' && $pw271 === 'Hadath@' . date('Y')
+          && saKindRank(['name_fr' => 'Dar al Saadeh', 'name_ar' => '']) < saKindRank(['name_fr' => 'centre physiotherapie', 'name_ar' => ''])
+          && strpos($inc271, "ALTER TABLE users ADD COLUMN pw_known VARCHAR(120) NULL") !== false
+          && strpos($src271, "\$act === 'apply_standard'") !== false && strpos($src271, "\$act === 'send_mail'") !== false && strpos($src271, 'saMessageText($s, $u, $pw, true)') !== false
+          && strpos($lg271, 'manifest.php<?= $suQs ?>') !== false && strpos($lg271, 'Installer sur le bureau / تركيب على سطح المكتب') !== false
+          && strpos($mf271, "'icon.php?u='") !== false && strpos($mf271, "\$id = \$b . 'login.php?u=' . rawurlencode(\$u); \$start = \$id;") !== false
+          && strpos($hd271, "\$noToolbarPages[] = 'school_access.php';") !== false && strpos($hd271, "'school_access'=>'systeme'") !== false && strpos($hd271, 'pages/school_access.php') !== false
+          && strpos($st271, 'UPDATE users SET pw_known = NULL WHERE id = ?') !== false
+          && is_file($PROJ . '/icon.php') && strpos((string)file_get_contents($PROJ . '/icon.php'), 'imagettftext($im, $fs, 0, $x, $y, $white, $font, $txt);') !== false;
+    $why271 = "slug=$slug271/$slug271b uniq=$uniq271 pw=$pw271";
+} catch (Throwable $e) { $ok271 = false; $why271 = $e->getMessage(); }
+check('🏫🔑 دخول المدارس: اسم الدخول = المنطقة (فريد) + كلمة سرّ Region@السنة + pw_known ذاتي + manifest/icon/login لكل مدرسة + صفحة school_access (إرسال/نسخ) بلا شريط تصدير', $ok271, $why271);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

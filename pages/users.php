@@ -194,6 +194,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $db->prepare("UPDATE users SET full_name=?, username=?, password_hash=?, role=?, school_id=?, is_active=?, allowed_pages=?, allowed_schools=? WHERE id=?")
                ->execute([$fullName, $username, $hash, $role, $schoolIdDb, $isActive, $allowedPages, $allowedSchools, $id]);
+            // 🏫 (2026-10-22) المدير وضعها ⇒ تبقى ظاهرة له بصفحة «دخول المدارس» (حسابات المدارس فقط)
+            try { if ($role === 'viewer' && msaHasCol($db, 'users', 'pw_known')) $db->prepare("UPDATE users SET pw_known = ? WHERE id = ?")->execute([$password, $id]); } catch (Throwable $e) {}
         } else {
             $db->prepare("UPDATE users SET full_name=?, username=?, role=?, school_id=?, is_active=?, allowed_pages=?, allowed_schools=? WHERE id=?")
                ->execute([$fullName, $username, $role, $schoolIdDb, $isActive, $allowedPages, $allowedSchools, $id]);
@@ -205,6 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db->prepare("INSERT INTO users (username, password_hash, full_name, role, school_id, is_active, allowed_pages, allowed_schools) VALUES (?,?,?,?,?,?,?,?)")
            ->execute([$username, $hash, $fullName, $role, $schoolIdDb, $isActive, $allowedPages, $allowedSchools]);
         $newId = (int)$db->lastInsertId();
+        try { if ($role === 'viewer' && msaHasCol($db, 'users', 'pw_known')) $db->prepare("UPDATE users SET pw_known = ? WHERE id = ?")->execute([$password, $newId]); } catch (Throwable $e) {} // 🏫 (2026-10-22)
         if (function_exists('logAudit')) logAudit('create', 'users', $newId, null, $username);
         $_SESSION['flash_success'] = 'تمت إضافة الحساب / Compte ajouté';
     }

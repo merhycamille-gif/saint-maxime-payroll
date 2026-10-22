@@ -121,7 +121,7 @@ $pageSection = [
     'employees'=>'personnel','cadre_due'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','family_allowances'=>'personnel','employee_full_history'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel','duplicates'=>'personnel','old_uninsured'=>'personnel','cnss_followup'=>'personnel',
     'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie','hours_reduction'=>'paie',
     'reports'=>'rapports','tax'=>'rapports','legal_calendar'=>'rapports',
-    'schools'=>'systeme','users'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
+    'schools'=>'systeme','users'=>'systeme','school_access'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
 ];
 $sec = $pageSection[$currentPage] ?? 'dashboard';
 [$accentColor, $accentBg] = $sectionColors[$sec];
@@ -142,7 +142,8 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
     
     <!-- Favicon + تطبيق الهاتف (PWA): manifest + أيقونة الشاشة الرئيسية + عامل الخدمة -->
     <link rel="icon" href="<?= BASE_URL ?>assets/img/icon-192.png">
-    <link rel="manifest" href="<?= BASE_URL ?>manifest.php">
+    <link rel="manifest" href="<?= BASE_URL ?>manifest.php<?= (isViewer() && !empty($_SESSION['username'])) ? '?u=' . rawurlencode((string)$_SESSION['username']) : '' ?>"><!-- 🏫 (2026-10-22) حساب مدرسة ⇒ بيان/أيقونة باسم مدرسته -->
+
     <meta name="theme-color" content="#0a2240">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -440,6 +441,10 @@ document.addEventListener('submit', function (e) {
             <?php endif; ?>
 
             <?php if (isAdmin()): ?>
+            <a href="<?= BASE_URL ?>pages/school_access.php" class="<?= $currentPage === 'school_access' ? 'active' : '' ?>">
+                <i class="fas fa-school-lock"></i>
+                <span>Accès écoles / دخول المدارس وأيقوناتها</span>
+            </a>
             <a href="<?= BASE_URL ?>pages/users.php" class="<?= $currentPage === 'users' ? 'active' : '' ?>">
                 <i class="fas fa-user-shield"></i>
                 <span>Utilisateurs / حسابات المدارس</span>
@@ -1036,6 +1041,7 @@ document.addEventListener('submit', function (e) {
         // شريط الطباعة والتصدير — يظهر تلقائياً بكل صفحة (طباعة/PDF/Excel/Word/واتساب/إيميل)
         // (2026-08-29، «ما تخلّي شي ما إلو معنى») صفحات الإعدادات/الإدارة ليست مطبوعات: بلا شريط طباعة/تصدير
         $noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','excel_salaries.php']; // 📤 (2026-10-03 «بكل البرنامج لازم يكون في كل شي من كل شي»): الشريط الكامل بكل صفحة فيها لائحة/جدول — تبقى بلاه صفحات الإدارة البحتة فقط
+        $noToolbarPages[] = 'school_access.php'; // 🏫 (2026-10-22) دخول المدارس وأيقوناتها — صفحة إدارة بلا شريط تصدير
         if (empty($hideExportToolbar) && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), $noToolbarPages, true)) {
             $msaTopBars .= exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);
         } elseif (empty($ownExportRow)) {

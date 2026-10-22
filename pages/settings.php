@@ -38,6 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'chang
     } else {
         $newHash = password_hash($new, PASSWORD_DEFAULT);
         $db->prepare("UPDATE users SET password_hash = ? WHERE id = ?")->execute([$newHash, $uid]);
+        // 🏫 (2026-10-22) غيّرها صاحب الحساب بنفسه ⇒ لم تعد معروفة للمدير بصفحة «دخول المدارس»
+        try { if (msaHasCol($db, 'users', 'pw_known')) $db->prepare("UPDATE users SET pw_known = NULL WHERE id = ?")->execute([$uid]); } catch (Throwable $e) {}
         $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Mot de passe modifié avec succès / تم تغيير كلمة المرور بنجاح'];
     }
     header('Location: ' . BASE_URL . 'pages/settings.php');
