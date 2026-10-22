@@ -745,8 +745,8 @@ function reportDocThumb($path) {
         </script>
 
         <?php // ↔️ (2026-09-13) «مجاميع سنوية» من خانة كشوف الرواتب (لوائح الدولة) ⇒ من الشمال لليمين — الاتجاه فقط ?>
-        <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند' . (m13InReports() ? ' — مع شهر التعويض (13) لمن عنده' : ' — بلا شهر التعويض (13)')], ['dir' => 'ltr', 'annual' => true, 'law' => false]) ?>
-                <div class="report-table-wrap" dir="ltr"><table class="doc-table" dir="ltr">
+        <?= docSheetStart('Totaux annuels par école et par rubrique', 'المجاميع السنوية — لكل مدرسة ولكل بند', [$schoolYear . $empTypeTitle, count($atSel) . ' بند' . (m13InReports() ? ' — مع شهر التعويض (13) لمن عنده' : ' — بلا شهر التعويض (13)')], ['dir' => 'rtl', 'annual' => true, 'law' => false]) ?>
+                <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl"><?php /* 🔁 (2026-10-22 «للدولة من اليمين للشمال») كانت ltr منذ 09-13؛ اللغة المختارة تقلبها */ ?>
                     <thead><tr>
                         <th>#</th><th>المدرسة / École</th><th>عدد الأشخاص<br><small style="font-weight:400;opacity:.8">Effectif</small></th><th>الأشهر المدفوعة<br><small style="font-weight:400;opacity:.8">Mois payés</small></th><?php /* 👥📅 (2026-09-27) رقمان بدل «عدد الكشوف» الغامض */ ?>
                         <?php foreach ($atSel as $k): ?><th><?= e(annualTotalLabel($k, 'ar')) ?><?= annualTotalRateHead($k, $schoolYear) ?><br><small style="font-weight:400;opacity:.8"><?= e(annualTotalLabel($k, 'fr')) ?></small></th><?php endforeach; ?>

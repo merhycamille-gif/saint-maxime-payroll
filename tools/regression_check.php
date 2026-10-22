@@ -5920,14 +5920,14 @@ check('إكسل الفئة/الضريبة (تجربة حيّة تُرجَع): ك
 $of119 = (string)file_get_contents($PROJ . '/pages/official_forms.php'); $rp119 = (string)regReportsSrc(); $rh119 = (string)file_get_contents($PROJ . '/includes/report_helpers.php');
 $tiles119 = []; if (preg_match("/'tiles'=>\[(.*?)\]\],/su", preg_replace('~^\s*//.*$~mu', '', substr($rp119, strpos($rp119, "'كشوف الرواتب / Bulletins de salaire'"))), $mt)) preg_match_all("/\\\$OF\.'([a-z_]+)'|\?report=([a-z_]+)|\\\$PG\.'([a-z_]+)\.php'/", $mt[1], $mm);
 $tiles119 = array_values(array_filter(array_merge($mm[1] ?? [], $mm[2] ?? [], $mm[3] ?? [])));
-check('كشوف الرواتب LTR: خانة «كشوف الرواتب» بالمركز = البطاقة السنوية (مستثناة) + 5 نماذج ofStateLtrForms + مجاميع سنوية — كلها dir=ltr بالكود (لا ربط بفلتر الضريبة)، Résumé mensuel rtl، البطاقة السنوية بلا dir=ltr',
+check('كشوف الرواتب RTL (2026-10-22 «للدولة من اليمين للشمال»، كانت LTR 09-13): خانة «كشوف الرواتب» بالمركز = البطاقة السنوية (مستثناة) + 5 نماذج + مجاميع سنوية — كلها dir=rtl بالكود واللغة تقلبها، Résumé mensuel rtl، البطاقة السنوية بلا dir=ltr',
       function_exists('ofStateLtrForms') === false /* دالة محلية بالصفحة لا بfunctions */
       && strpos($of119, "function ofStateLtrForms(): array { return ['salary_all', 'salary_detail', 'payment_list', 'employer_cost', 'full_register']; }") !== false
-      && strpos($of119, "\$ofDir = in_array(\$form, ofStateLtrForms(), true) ? 'ltr' : 'rtl';") !== false
+      && strpos($of119, "\$ofDir = 'rtl';") !== false /* 🔁 2026-10-22 «للدولة من اليمين للشمال» */
       && substr_count($of119, 'class="official-doc <?= $ofDir ?>') === 5 && substr_count($of119, 'id="ppExportArea" dir="<?= $ofDir ?>"') === 4 && substr_count($of119, 'id="ppExportArea" style="max-width:100%" dir="<?= $ofDir ?>"') === 1
       && strpos($of119, '$ofLtr') === false && strpos($rp119, '$rsDir') === false
       && strpos($rp119, "docSheetStart('Résumé mensuel', 'كشف رواتب شهري', [monthName(\$month) . ' ' . \$year . \$empTypeTitle], ['month' => \$month, 'year' => \$year]) ?>") !== false // (2026-09-19 + سعر الصرف بالعنوان)
-      && preg_match("/docSheetStart\('Totaux annuels par école et par rubrique'.*?\['dir' => 'ltr', 'annual' => true, 'law' => false\]\) \?>/su", $rp119) === 1
+      && preg_match("/docSheetStart\('Totaux annuels par école et par rubrique'.*?\['dir' => 'rtl', 'annual' => true, 'law' => false\]\) \?>/su", $rp119) === 1
       && strpos($rh119, "\$ltr = ((\$opts['dir'] ?? 'rtl') === 'ltr');") !== false && strpos($rh119, '.official-doc.ltr,.official-doc[dir="ltr"]{direction:ltr;text-align:left;}') !== false && strpos($rh119, '.doc-sheet.doc-ltr{direction:ltr;text-align:left;}') !== false
       && sort($tiles119) !== null && $tiles119 === ['annual_slip', 'annual_totals', 'employer_cost', 'full_register', 'payment_list', 'salary_all', 'salary_detail']
       && strpos((string)file_get_contents($PROJ . '/includes/annual_slip_data.php'), 'dir="ltr"') === false && strpos((string)file_get_contents($PROJ . '/pages/annual_slip.php'), 'doc-ltr') === false,
@@ -5939,17 +5939,17 @@ try {
     $y119 = $m119 >= 10 ? 2025 : 2026; $bad119 = [];
     foreach (['salary_all', 'salary_detail', 'payment_list', 'employer_cost', 'full_register'] as $f) {
         $o = renderPage('pages/official_forms.php', ['form' => $f, 'month' => $m119, 'year' => $y119], []);
-        if (!preg_match('/class="official-doc ltr[^"]*" id="ppExportArea"[^>]*dir="ltr"/', $o) || stripos($o, 'Fatal error') !== false) $bad119[] = $f;
+        if (!preg_match('/class="official-doc rtl[^"]*" id="ppExportArea"[^>]*dir="rtl"/', $o) || stripos($o, 'Fatal error') !== false) $bad119[] = $f;   // 🔁 2026-10-22 rtl
     }
     $o = renderPage('pages/reports.php', ['report' => 'annual_totals'], []);
-    if (strpos($o, '<div class="doc-sheet doc-ltr" dir="ltr">') === false || strpos($o, '<table class="doc-table" dir="ltr">') === false || stripos($o, 'Fatal error') !== false) $bad119[] = 'annual_totals';
+    if (strpos($o, 'class="doc-sheet doc-ltr"') !== false || strpos($o, '<table class="doc-table" dir="rtl">') === false || stripos($o, 'Fatal error') !== false) $bad119[] = 'annual_totals';   // 🔁 2026-10-22 rtl
     $o = renderPage('pages/reports.php', ['report' => 'monthly_summary', 'month' => $m119, 'year' => $y119], []);
     if (strpos($o, 'class="doc-sheet doc-ltr"') !== false || strpos($o, '<table class="doc-table" dir="rtl">') === false) $bad119[] = 'monthly_summary(rtl)';
     $o = renderPage('pages/official_forms.php', ['form' => 'cnss_nominative_monthly', 'month' => $m119, 'year' => $y119], []);
     if (strpos($o, 'official-doc ltr') !== false) $bad119[] = 'cnss(rtl)';
     $ok119 = !$bad119; $why119 = "month=$m119/$y119 bad=" . implode(',', $bad119);
 } catch (Throwable $e) { $why119 = $e->getMessage(); }
-check('كشوف الرواتب LTR (تشغيل فعلي): الخمسة + المجاميع السنوية dir=ltr، Résumé mensuel والضمان rtl كما كانا، بلا Fatal', $ok119, $why119);
+check('كشوف الرواتب RTL (تشغيل فعلي، 2026-10-22): الخمسة + المجاميع السنوية dir=rtl، Résumé mensuel والضمان rtl، بلا Fatal', $ok119, $why119);
 
 /* ===================================================================
  * 120) 🔤 أسماء الأساتذة بلوائح الدولة LTR بالفرنسي كمان (2026-09-14 «بدي أسماء الأساتذة اللي بالتقارير من الشمال إلى اليمين

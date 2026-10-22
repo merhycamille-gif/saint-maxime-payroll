@@ -157,7 +157,7 @@ function ofStateNameCell(array $r): string {
     if ($fr === '') return e($ar);
     return e($ar) . '<br><span class="nm-fr" dir="ltr">' . e($fr) . '</span>';
 }
-$ofDir = in_array($form, ofStateLtrForms(), true) ? 'ltr' : 'rtl';
+$ofDir = 'rtl';   // 🔁 (2026-10-22 «صحّح معلوماتك: للدولة من اليمين للشمال») الافتراضي rtl للجميع (كان ltr لكشوف الدولة منذ 09-13)؛ اللغة المختارة بالشريط تقلبه (doclang: فرنسي ⇒ ltr)
 // نسخة لاستعلامات بلا alias (FROM employees WHERE ...)
 $ofEmpFilterPlain = str_replace(' e.', ' ', $ofEmpFilter);
 // نسخة لاستعلامات الرواتب بلا join مع الموظفين (FROM monthly_salaries ms WHERE ...)
