@@ -140,6 +140,7 @@
     var state = { lang: 'both', side: '' };
     try { state.lang = localStorage.getItem('msa_rl') || 'both'; state.side = localStorage.getItem('msa_rs') || ''; } catch (e) {}
     if (['ar', 'fr', 'both'].indexOf(state.lang) < 0) state.lang = 'both';
+    function rlStateSheet(od) { return od.hasAttribute('dir') && !/(cnss-form|mof-form|tcard|eos-doc|fiche-a4|print-only)/.test(od.className); }   // كشف رواتب للدولة (لا نموذج طبق الأصل)
     function effSide() { return state.lang === 'ar' ? 'rtl' : state.lang === 'fr' ? 'ltr' : (state.side === 'rtl' || state.side === 'ltr' ? state.side : ''); }
     function apply() {
         wrapAll();
@@ -166,8 +167,17 @@
                 else { if (sh.__rlDir.dir) sh.setAttribute('dir', sh.__rlDir.dir); else sh.removeAttribute('dir'); sh.classList.toggle('doc-ltr', sh.__rlDir.ltr); sh.querySelectorAll('table').forEach(function (t) { if (t.__rlDir === undefined) return; if (t.__rlDir) t.setAttribute('dir', t.__rlDir); else t.removeAttribute('dir'); }); }
             });
         });
+        // 🔁 (2026-10-22 «فاتح تقرير وحاطط عربي… بس الاتجاه مش من اليمين للشمال»): كشوف الرواتب (official-doc بـdir من ofStateLtrForms، 2026-09-13 LTR للدولة)
+        //    اللغة المختارة تغلب: عربي ⇒ rtl، فرنسي ⇒ ltr، «الاثنان» ⇒ كما بالصفحة. النماذج طبق الأصل (cnss-form/mof-form/tcard/eos-doc/fiche-a4) لا تُمَسّ.
+        var sideOD = effSide();
+        Array.prototype.slice.call(document.querySelectorAll('.official-doc[dir]')).filter(rlStateSheet).forEach(function (od) {
+            if (od.__rlDir === undefined) od.__rlDir = { dir: od.getAttribute('dir'), rtl: od.classList.contains('rtl'), ltr: od.classList.contains('ltr') };
+            var tbls = Array.prototype.slice.call(od.querySelectorAll('table'));
+            if (sideOD) { od.setAttribute('dir', sideOD); od.classList.toggle('rtl', sideOD === 'rtl'); od.classList.toggle('ltr', sideOD === 'ltr'); tbls.forEach(function (t) { if (t.__rlDir === undefined) t.__rlDir = t.getAttribute('dir'); t.setAttribute('dir', sideOD); }); }
+            else { od.setAttribute('dir', od.__rlDir.dir); od.classList.toggle('rtl', od.__rlDir.rtl); od.classList.toggle('ltr', od.__rlDir.ltr); tbls.forEach(function (t) { if (t.__rlDir === undefined) return; if (t.__rlDir) t.setAttribute('dir', t.__rlDir); else t.removeAttribute('dir'); }); }
+        });
         window.MSA_RL = { lang: L, side: effSide(), exportDir: function (area) {
-            if (!area) return null; if (area.classList.contains('official-doc') || area.querySelector('.official-doc')) return null; return effSide() || null; } };
+            if (!area) return null; var od = area.classList.contains('official-doc') ? area : area.querySelector('.official-doc'); if (od && !rlStateSheet(od)) return null; return effSide() || null; } };
         document.querySelectorAll('.rl-chip').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rl') === L); });
         document.querySelectorAll('.rl-side').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rs') === effSide()); });
         document.querySelectorAll('.rl-sides').forEach(function (g) { g.style.display = (L === 'both') ? '' : 'none'; });

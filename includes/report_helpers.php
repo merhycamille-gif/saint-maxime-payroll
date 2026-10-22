@@ -615,8 +615,10 @@ function officialFormStyles(): string {
 /* 📏 (2026-10-17 «بالتقارير لمّا الأسماء تحت بعضها: ارتفاع الخانة 25») صفوف الجدول 25px: حشوة صغيرة وسطر واحد — مرآة الدولار بجانب الليرة لا تحتها */
 .doc-table tbody td{padding:3px 6px;height:30px;line-height:22px;}
 @media print{.doc-table tbody td{height:23px;padding:2px 6px;line-height:18px;}}
-.doc-table tbody td .money-usd{display:inline;margin-inline-start:6px;font-size:.9em;line-height:inherit;}
-.doc-table tbody td:has(.money-usd){direction:ltr;unicode-bidi:isolate;white-space:nowrap;}
+/* 📐 (2026-10-22 «الدولار تحت الليرة مش حدّها — منوفّر مساحة للعواميد» ⇒ «طبّقها») سطر ثانٍ أصغر تحت الليرة؛ الخلية سطران قصيران بدل عمود مزدوج العرض */
+.doc-table tbody td .money-usd{display:block;font-size:.8em;line-height:1.15;margin:0;}
+.doc-table tbody td:has(.money-usd){direction:ltr;unicode-bidi:isolate;white-space:nowrap;height:auto;line-height:1.25;padding:2px 6px;}
+@media print{.doc-table tbody td:has(.money-usd){height:auto;line-height:1.2;padding:1.5px 6px;}}
 .doc-table tfoot td,.doc-table .total-row td{background:#eef1f4;font-weight:700;}
 .doc-table .subtotal-row td{background:#f1f5f9;font-weight:700;}
 .doc-table .num{text-align:left;font-variant-numeric:tabular-nums;}
