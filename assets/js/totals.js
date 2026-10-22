@@ -170,7 +170,7 @@
             if (lbp + usd >= tot * 0.6) lab = (lbp && usd) ? 'ل.ل + $' : (usd ? '$' : 'ل.ل');
             else if (bare >= tot * 0.6) lab = 'ل.ل';   // رقم بفواصل الآلاف بلا وحدة = ليرة (أساس الراتب…)
             if (!lab) continue;
-            var sm = document.createElement('small'); sm.className = 'cur-head'; sm.setAttribute('dir', 'ltr'); sm.textContent = lab;
+            var sm = document.createElement('small'); sm.className = 'cur-head'; sm.setAttribute('dir', 'ltr'); sm.setAttribute('data-ar', lab); sm.textContent = (window.MSA_RL && window.MSA_RL.lang === 'fr') ? lab.replace(/ل\.ل/g, 'L.L') : lab;   // 🌐 (2026-10-22) بالفرنسي L.L
             var rh = th.querySelector('.rate-head'); var br = rh && rh.previousSibling && rh.previousSibling.nodeName === 'BR' ? rh.previousSibling : rh; if (br) th.insertBefore(sm, br); else { var pick = th.querySelector('.msa-colpick'); th.appendChild(sm); if (pick) th.appendChild(pick); }   // العملة مباشرة تحت اسم العمود
             stripColumn(tbl, c);   // الرقم فقط داخل الخانات
         }

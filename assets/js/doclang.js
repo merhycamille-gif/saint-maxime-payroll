@@ -40,6 +40,14 @@
         'كانون الثاني': 'Janvier', 'شباط': 'Février', 'آذار': 'Mars', 'نيسان': 'Avril', 'أيار': 'Mai', 'حزيران': 'Juin', 'تموز': 'Juillet', 'آب': 'Août', 'أيلول': 'Septembre', 'تشرين الأول': 'Octobre', 'تشرين الثاني': 'Novembre', 'كانون الأول': 'Décembre'
     };
     var RDICT = {}; for (var k0 in DICT) if (!RDICT[DICT[k0]]) RDICT[DICT[k0]] = k0;
+    // 🌐 (2026-10-22) عناوين كشوف الدولة الخمسة + المجاميع + سطر العملة/السعر + رؤوس الترويسة
+    DICT['كشف الرواتب والأجور الشهري'] = 'État mensuel des salaires et traitements'; DICT['ليرة لبنانية'] = 'livre libanaise'; DICT['دولار أميركي'] = 'dollar américain';
+    DICT['كشف الدفع'] = 'Bordereau de paiement'; DICT['رواتب'] = 'salaires'; DICT['جميع الأساتذة'] = 'Tous les enseignants'; DICT['كشف شامل بالرواتب وكلفة المؤسسة'] = 'état complet des salaires et du coût de l’établissement';
+    DICT['كلفة المؤسسة الإجمالية'] = 'Coût total de l’établissement'; DICT['للعام الدراسي'] = 'année scolaire'; DICT['كشف الفروقات'] = 'État des différences'; DICT['مقابل'] = 'vs';
+    DICT['إحصاءات الموظفين'] = 'Statistiques des employés'; DICT['معلومات عامة عن الموظفين'] = 'Informations générales sur les employés'; DICT['كل السنين'] = 'Toutes les années';
+    DICT['درجة عادية واستثنائية'] = 'Échelon ordinaire et exceptionnel'; DICT['الضمان الاجتماعي'] = 'Sécurité sociale'; DICT['تعويض عائلي'] = 'Allocation familiale'; DICT['مجموع المدفوعات'] = 'Total des paiements'; DICT['توقيع الموظف'] = 'Signature de l’employé';
+    DICT['إلى صندوق التعويضات'] = 'à la Caisse des indemnités'; DICT['إلى'] = 'à'; DICT['من'] = 'de';
+    DICT['ر.الضمان'] = 'N° CNSS'; DICT['ر.المالية'] = 'N° Finances'; DICT['ر.الصندوق'] = 'N° Caisse'; DICT['المجاميع السنوية'] = 'Totaux annuels'; DICT['لكل مدرسة ولكل بند'] = 'par école et par rubrique';
     DICT['صدر بتاريخ'] = 'Émis le'; DICT['الراتب يشمل'] = 'Salaire inclut'; DICT['سعر الصرف المعتمد'] = 'Taux de change adopté'; DICT['الراتب بعد التدرّج لأصحاب النسبة بالسعر الرسمي'] = 'Salaire après échelon (pourcentage) au taux officiel';
     function kind(s) { s = s.trim(); if (!s) return null; if (AR.test(s)) return 'ar'; if (LA.test(s)) return 'fr'; return null; }
     function norm(s) { return s.replace(/\s+/g, ' ').replace(/[:：]\s*$/, '').trim(); }
@@ -104,6 +112,8 @@
         roots().forEach(function (root) {
             if (root.__rlDone || root.closest('.rl-done')) return; root.__rlDone = true; root.classList.add('rl-done');
             var official = root.classList.contains('official-doc') || !!root.closest('.official-doc');
+            // 🌐 (2026-10-22 «بعناوين التقارير ليش مش مترجمة كمان للفرنسي») كشوف الدولة (rlStateSheet) تُترجَم عناوينها بالقاموس كورقة التقرير؛ النماذج طبق الأصل تبقى
+            var od0 = root.classList.contains('official-doc') ? root : root.closest('.official-doc'); if (official && od0 && rlStateSheet(od0)) official = false;
             root.querySelectorAll('.dh-fr').forEach(function (e) { e.classList.add('rl-fr', 'rl-block'); });
             root.querySelectorAll('.dh-ar').forEach(function (e) { e.classList.add('rl-ar', 'rl-block'); });
             var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: function (n) {
@@ -113,7 +123,7 @@
             var nodes = [], n; while ((n = tw.nextNode())) nodes.push(n);
             nodes.forEach(function (tn) {
                 var t = tn.nodeValue, p = tn.parentElement, inTh = !!p.closest('th'), pr = splitPair(t);
-                if (!pr && !official && (inTh || p.closest('.dh-chip, .dh-meta, caption, .doc-title, .doc-subtitle, label, thead, .report-scope'))) pr = dictPair(t); // عنوان بلغة واحدة ⇒ القاموس (ورقة التقرير فقط)
+                if (!pr && !official && (inTh || p.closest('.dh-chip, .dh-meta, caption, .doc-title, .doc-subtitle, .rate-subtitle, .lh-num, .cat-row, label, thead, .report-scope'))) pr = dictPair(t); // عنوان بلغة واحدة ⇒ القاموس (ورقة التقرير فقط)
                 if (pr) mkPair(tn, pr, inTh);
             });
             // «FR<br>AR» داخل عنصر واحد
@@ -169,6 +179,8 @@
         });
         // 🔁 (2026-10-22 «فاتح تقرير وحاطط عربي… بس الاتجاه مش من اليمين للشمال»): كشوف الرواتب (official-doc بـdir من ofStateLtrForms، 2026-09-13 LTR للدولة)
         //    اللغة المختارة تغلب: عربي ⇒ rtl، فرنسي ⇒ ltr، «الاثنان» ⇒ كما بالصفحة. النماذج طبق الأصل (cnss-form/mof-form/tcard/eos-doc/fiche-a4) لا تُمَسّ.
+        // 🌐 (2026-10-22) سطر العملة تحت الرؤوس (.cur-head من totals.js): بالفرنسي L.L
+        Array.prototype.slice.call(document.querySelectorAll('.cur-head')).forEach(function (e) { var ar0 = e.getAttribute('data-ar') || e.textContent; e.setAttribute('data-ar', ar0); e.textContent = L === 'fr' ? ar0.replace(/ل\.ل/g, 'L.L') : ar0; });
         var sideOD = effSide();
         Array.prototype.slice.call(document.querySelectorAll('.official-doc[dir]')).filter(rlStateSheet).forEach(function (od) {
             if (od.__rlDir === undefined) od.__rlDir = { dir: od.getAttribute('dir'), rtl: od.classList.contains('rtl'), ltr: od.classList.contains('ltr') };
