@@ -71,15 +71,21 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
             $displayRows[] = ['label' => ((int)$s['is_indemnity_month'] ? 'تعويض ' : '') . monthName((int)$s['month'], 'fr', true) . ' ' . $s['year'], 's' => $s];
         }
     }
-    if ((int)$emp['has_13th_month'] === 1) {
+    // 🎁 (2026-10-22 «عم أطبع البطاقة السنوية لإلو أو بطاقة فاضية — يكون قبل الطبع عندي خيار أذكر فيها كمان شهر تعويض وأطبع»):
+    //    خيار طباعة فقط من صفحة البطاقة (?m13=1 يضيف سطر شهر التعويض ولو لم يكن بملفه · ?m13=0 يخفيه لهذه الطبعة) — ملف الأستاذ والحساب المخزَّن لا يتغيّران.
+    $force13 = !empty($GLOBALS['slip_force_m13']); $skip13 = !empty($GLOBALS['slip_skip_m13']);
+    if (((int)$emp['has_13th_month'] === 1 || $force13) && !$skip13) {
         $already13 = false;
         foreach ($displayRows as $dr0) { if (!empty($dr0['s']) && (int)$dr0['s']['is_indemnity_month']) { $already13 = true; break; } }
+        if (!$already13 && empty($salaries) && $force13) $displayRows[] = ['label' => 'شهر التعويض (13) / Indemnité', 's' => null]; // بطاقة فاضية بلا أشهر مخزّنة: سطر فارغ للتعبئة باليد
         if (!$already13 && !empty($salaries)) {
             // شهر 13 = الراتب الأساسي + الأجر الإضافي + المكافأة والمساعدة (الخياران مشغَّلان افتراضياً بملف الأستاذ — 2026-10-19 — ويطفئ ما لا يريده)
             // دائماً بلا محسومات ولا نقل ولا تعويض عائلي.
             $ref = end($salaries);
-            $incExtra = !empty($emp['m13_include_extra']);
-            $incAide  = !empty($emp['m13_include_aide']);
+            // 🎁 خيار الطباعة m13=1 لأستاذ ليس بملفه شهر 13: القاعدة الافتراضية (2026-10-19) = الأساس + الإضافي + المكافأة والمساعدة
+            $def13 = $force13 && (int)$emp['has_13th_month'] !== 1;
+            $incExtra = $def13 ? true : !empty($emp['m13_include_extra']);
+            $incAide  = $def13 ? true : !empty($emp['m13_include_aide']);
             $s13 = $ref; // نسخة من آخر شهر ثم نعدّلها
             $s13['is_indemnity_month'] = 1;
             $extra13 = $incExtra ? ((int)$ref['extra_lbp'] + (int)$ref['prime_fixe_lbp']) : 0;

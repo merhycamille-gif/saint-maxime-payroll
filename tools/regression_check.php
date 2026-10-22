@@ -9360,10 +9360,36 @@ $e211 = $db->query("SELECT ms.employee_id FROM monthly_salaries ms JOIN employee
 if ($e211) $h211 = (string)shell_exec('"' . PHP_BINARY . '" ' . escapeshellarg($PROJ . '/tools/_render_one.php') . ' ' . escapeshellarg('pages/annual_slip.php') . ' ' . base64_encode(json_encode(['employee_id' => (int)$e211, 'school_year' => currentSchoolYear()])) . ' "" ' . base64_encode(json_encode([])) . ' "" ' . escapeshellarg(currentSchoolYear()));
 $ok211 = strpos($src211, '<form method="GET" class="slip-sel">') !== false && strpos($src211, 'class="form-row cols-4"') === false
     && strpos($css211, '.slip-sel { display: grid;') !== false && strpos($css211, '.slip-rows { display: grid; grid-template-columns: max-content minmax(0, 1fr);') !== false
-    && substr_count($h211, '<strong class="slip-k">') === 6 && substr_count($h211, 'class="slip-v') === 6
+    && substr_count($h211, '<strong class="slip-k">') === 7 && substr_count($h211, 'class="slip-v') === 7 /* 🎁 2026-10-22 + سطر «شهر التعويض» */
     && strpos($h211, "<option value='10' selected>") !== false && strpos($h211, "<option value='9' selected>") !== false
     && strpos($h211, 'slip-to-file') !== false && strpos($h211, 'att-row wide') === false;
-check('📐 صفحة البطاقة السنوية مرتّبة: شريط الاختيار شبكة + 6 أسطر أزرار بعمود عناوين محاذى + الفترة الافتراضية ت1 ← أيلول (2026-10-01)', $ok211, 'k=' . substr_count($h211, '<strong class="slip-k">') . ' v=' . substr_count($h211, 'class="slip-v') . ' len=' . strlen($h211));
+check('📐 صفحة البطاقة السنوية مرتّبة: شريط الاختيار شبكة + 7 أسطر أزرار بعمود عناوين محاذى (+ شهر التعويض 2026-10-22) + الفترة الافتراضية ت1 ← أيلول (2026-10-01)', $ok211, 'k=' . substr_count($h211, '<strong class="slip-k">') . ' v=' . substr_count($h211, 'class="slip-v') . ' len=' . strlen($h211));
+
+/* =====================================================================
+ * 211b) 🎁 (2026-10-22 «عم أطبع البطاقة السنوية لإلو أو بطاقة فاضية — قبل الطبع عندي خيار أذكر فيها كمان شهر تعويض وأطبع»):
+ *      خيار طباعة فقط m13=1/0 بصفحة البطاقة: يضيف/يخفي سطر شهر التعويض لهذه الطبعة بلا أي تغيير بملف الأستاذ أو الحساب المخزَّن.
+ *      الأستاذ بلا شهر 13 بملفه يأخذ القاعدة الافتراضية (الأساس + الإضافي + المكافأة، بلا محسومات). يسري على PDF/الإكسل/الفاضية/الجماعي.
+ * =================================================================== */
+$srcM = (string)file_get_contents($PROJ . '/pages/annual_slip.php');
+$dataM = (string)file_get_contents($PROJ . '/includes/annual_slip_data.php');
+$okM = strpos($srcM, "\$GLOBALS['slip_force_m13'] = (\$slipM13 === 1); \$GLOBALS['slip_skip_m13'] = (\$slipM13 === 0);") !== false
+    && strpos($srcM, '13ème mois / شهر التعويض</strong>') !== false && strpos($srcM, 'Avec 13ème mois / مع شهر التعويض') !== false && strpos($srcM, 'Sans 13ème mois / بلا شهر التعويض') !== false
+    && substr_count($srcM, '$blankQ . $m13Q') === 2 && strpos($srcM, "urlencode(\$schoolYear) . \$m13Q;") !== false && strpos($srcM, '&blank=1<?= $m13Q ?>') !== false
+    && strpos($dataM, "(((int)\$emp['has_13th_month'] === 1 || \$force13) && !\$skip13)") !== false && strpos($dataM, "\$def13 = \$force13 && (int)\$emp['has_13th_month'] !== 1;") !== false;
+$eM = $db->query("SELECT e.* FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = " . $db->quote(currentSchoolYear()) . " WHERE e.is_deleted = 0 AND e.has_13th_month = 0 AND ms.net_salary_lbp > 0 GROUP BY e.id HAVING COUNT(*) >= 3 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$liveM = 'no-emp'; $okLiveM = true;
+if ($eM) {
+    $has = function (array $d) { foreach (($d['rows'] ?? []) as $r) if (strpos((string)($r['label'] ?? ''), '(13)') !== false) return $r; return null; };
+    $GLOBALS['slip_force_m13'] = false; $GLOBALS['slip_skip_m13'] = false; $d0 = computeAnnualSlip($db, $eM, currentSchoolYear());
+    $GLOBALS['slip_force_m13'] = true;  $d1 = computeAnnualSlip($db, $eM, currentSchoolYear()); $r1 = $has($d1);
+    $GLOBALS['slip_force_m13'] = false; $GLOBALS['slip_skip_m13'] = false;
+    $ref = null; foreach (array_reverse($d0['rows'] ?? []) as $rr) { if (!empty($rr['s'])) { $ref = $rr['s']; break; } }
+    $expBrut = $ref ? (int)$ref['base_plus_echelon_lbp'] + (int)$ref['extra_lbp'] + (int)$ref['prime_fixe_lbp'] + (int)$ref['aide_complementaire_lbp'] : -1;
+    $okLiveM = $has($d0) === null && $r1 && (int)$r1['total_retenues'] === 0 && (int)$r1['net'] === (int)$r1['brut'] && (int)$r1['brut'] === $expBrut && (int)$r1['brut'] > 0
+        && (int)$db->query("SELECT has_13th_month FROM employees WHERE id = " . (int)$eM['id'])->fetchColumn() === 0;
+    $liveM = 'emp=' . (int)$eM['id'] . ' brut13=' . ($r1 ? (int)$r1['brut'] : 'none') . ' exp=' . $expBrut . ' default13=' . ($has($d0) ? 'yes' : 'no');
+}
+check('🎁 خيار «شهر التعويض» عند الطبع (m13=1/0): كود الصفحة + الروابط (PDF/إكسل/فاضية/جماعي) + حيّاً: أستاذ بلا شهر 13 ⇒ m13=1 يضيف سطراً = الأساس + الإضافي + المكافأة بلا محسومات، والافتراضي كما كان، وملفه لم يتغيّر (2026-10-22)', $okM && $okLiveM, 'src=' . (int)$okM . ' ' . $liveM);
 
 /* =====================================================================
  * 212) 📐 (2026-10-01 «رتّب الكبسات بكل البرنامج مش بس بالبطاقة السنوية»): قواعد ترتيب عامّة بـapp.css — (أ) خانات الفئة تنزل لسطرها

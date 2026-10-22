@@ -20,6 +20,11 @@ if ($schoolYear === 'all') $schoolYear = currentSchoolYear(); // الكشف يح
 $slipBlank = max(0, min(2, (int)($_GET['blank'] ?? 0)));
 $GLOBALS['slip_blank'] = $slipBlank;
 $blankQ = $slipBlank ? '&blank=' . $slipBlank : '';
+// 🎁 (2026-10-22 «قبل الطبع عندي خيار أذكر فيها كمان شهر تعويض وأطبع»): m13=1 يضيف سطر شهر التعويض لهذه الطبعة (ولو لم يكن بملفه)،
+//    m13=0 يخفيه، بلا m13 = كما بملف الأستاذ. خيار طباعة فقط (البطاقة والحساب وملف الأستاذ لا يتغيّرون) — يسري على الشاشة والـPDF والإكسل والفاضية والجماعي.
+$slipM13 = (isset($_GET['m13']) && $_GET['m13'] !== '') ? (int)$_GET['m13'] : null;
+$GLOBALS['slip_force_m13'] = ($slipM13 === 1); $GLOBALS['slip_skip_m13'] = ($slipM13 === 0);
+$m13Q = $slipM13 === null ? '' : '&m13=' . $slipM13;
 // 🗂️ (2026-09-26 «كل سنة تبيّن البطاقة السنوية ورا بعضهن» بصفحة التاريخ الكامل): وضع مكتبة — الصفحة الأخرى تعرّف ANNUAL_SLIP_LIB
 //    ثم تُدرج هذا الملف فتأخذ دوال البطاقة (annualSlipHtml) وتنسيقها (annualSlipStyleHtml) حرفياً بلا أي إخراج — البطاقة نفسها لم تُمَسّ.
 if (defined('ANNUAL_SLIP_LIB')) return;
@@ -623,9 +628,9 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
         <span class="badge badge-info"><?= count($empsP) ?> — <?= e($typeLbl) ?> — <span dir="ltr"><?= e($schoolYear) ?></span></span>
         <div class="btn-bar btn-bar-end">
             <?php
-                $expAllQ = 'all=1' . $typeQ . '&school_year=' . urlencode($schoolYear);
+                $expAllQ = 'all=1' . $typeQ . '&school_year=' . urlencode($schoolYear) . $m13Q;
                 // «PDF رسمي (الكل)» = طبق الأصل عبر Chrome (صفحة لكل أستاذ، نفس تصميم الشاشة)
-                $allTarget = rawurlencode('pages/annual_slip.php?action=print_all' . $typeQ . '&school_year=' . $schoolYear . $blankQ); // ☑️ الفئات المشيّكة (+ فاضية)
+                $allTarget = rawurlencode('pages/annual_slip.php?action=print_all' . $typeQ . '&school_year=' . $schoolYear . $blankQ . $m13Q); // ☑️ الفئات المشيّكة (+ فاضية)
             ?>
             <?php /* 📏 بلا fit=1: المسار العادي صار يملأ الورقة كاملة (وضع fit القديم كان يطبع أصغر — ملاحظة المستخدم p1) */ ?>
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $allTarget ?>&name=releves_<?= e($typeFilter ?: 'tous') ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel (tous) / PDF رسمي (الكل)</a>
@@ -636,11 +641,16 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <?php if (!isViewer()): ?><button type="button" class="btn btn-info" onclick="ppWord('<?= $slipShareAllT ?>')"><i class="fas fa-file-word"></i> Word</button><?php endif; ?>
             <button type="button" class="btn" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $slipShareAllT ?>','')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
             <?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail('<?= $slipShareAllT ?>','')"><i class="fas fa-envelope"></i> Email</button><?php endif; ?>
-            <?php if ($slipBlank): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> Avec montants / بالمبالغ</a><?php endif; ?>
-            <?php if ($slipBlank !== 1): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=1" class="btn btn-warning" title="كل البطاقات بالأسماء بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierges (montants) / فاضية من المبالغ</a><?php endif; ?>
-            <?php if ($slipBlank !== 2): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=2" class="btn btn-warning" title="نماذج فارغة بلا اسم ولا مبالغ — نسخة لكل أستاذ مختار"><i class="fas fa-file"></i> Formulaires vierges / نماذج فارغة بلا اسم</a><?php endif; ?>
+            <?php if ($slipBlank): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?><?= $m13Q ?>" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> Avec montants / بالمبالغ</a><?php endif; ?>
+            <?php if ($slipBlank !== 1): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=1<?= $m13Q ?>" class="btn btn-warning" title="كل البطاقات بالأسماء بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierges (montants) / فاضية من المبالغ</a><?php endif; ?>
+            <?php if ($slipBlank !== 2): ?><a href="?action=print_all&school_year=<?= e($schoolYear) ?><?= $typeQ ?>&blank=2<?= $m13Q ?>" class="btn btn-warning" title="نماذج فارغة بلا اسم ولا مبالغ — نسخة لكل أستاذ مختار"><i class="fas fa-file"></i> Formulaires vierges / نماذج فارغة بلا اسم</a><?php endif; ?>
+            <?php /* 🎁 (2026-10-22) شهر التعويض لهذه الطبعة فقط */ $m13BaseAll = '?action=print_all&school_year=' . e($schoolYear) . $typeQ . $blankQ; ?>
+            <?php if ($slipM13 !== 1): ?><a href="<?= $m13BaseAll ?>&m13=1" class="btn btn-info" title="يضيف سطر شهر التعويض (13) لكل البطاقات بهذه الطبعة — ملفّات الأساتذة لا تتغيّر"><i class="fas fa-gift"></i> Avec 13ème mois / مع شهر التعويض</a><?php endif; ?>
+            <?php if ($slipM13 !== 0): ?><a href="<?= $m13BaseAll ?>&m13=0" class="btn btn-info" title="يخفي سطر شهر التعويض بهذه الطبعة"><i class="fas fa-gift"></i> Sans 13ème mois / بلا شهر التعويض</a><?php endif; ?>
+            <?php if ($slipM13 !== null): ?><a href="<?= $m13BaseAll ?>" class="btn btn-secondary" title="شهر التعويض كما هو بملف كل أستاذ"><i class="fas fa-rotate-left"></i> 13ème mois selon dossier / كما بالملف</a><?php endif; ?>
         </div>
     </div>
+    <?php if ($slipM13 !== null): ?><div class="alert alert-info no-print" style="margin-bottom:12px">🎁 هذه الطبعة <?= $slipM13 === 1 ? 'مع سطر شهر التعويض (13) لكل البطاقات' : 'بلا سطر شهر التعويض' ?> — خيار طباعة فقط، ملفّات الأساتذة والحساب لم يتغيّرا.</div><?php endif; ?>
     <?php if ($slipBlank): ?><div class="alert alert-warning no-print" style="margin-bottom:12px">📝 بطاقات <?= $slipBlank === 2 ? 'نموذج فارغ' : 'بلا مبالغ' ?> — للتعبئة باليد. الحساب لم يُمَسّ.</div><?php endif; ?>
     <div class="alert alert-info no-print" style="margin-bottom:16px">
         <i class="fas fa-info-circle"></i> راجِع كشوف كل الموظفين تحت، وعند التأكد اضغط «طباعة الكل». كل كشف يُطبع بصفحة مستقلة.
@@ -681,9 +691,9 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <strong class="slip-k"><i class="fas fa-print"></i> Export / تصدير وطباعة</strong>
             <div class="slip-v">
             <?php
-                $expQ = 'employee_id=' . $employeeId . '&school_year=' . urlencode($schoolYear);
+                $expQ = 'employee_id=' . $employeeId . '&school_year=' . urlencode($schoolYear) . $m13Q;
                 // «PDF رسمي» = طبق الأصل عن الشاشة عبر Chrome (نفس تصميم الكشف بالضبط، بلا قصّ)
-                $slipTarget = rawurlencode('pages/annual_slip.php?employee_id=' . $employeeId . '&school_year=' . $schoolYear . $blankQ);
+                $slipTarget = rawurlencode('pages/annual_slip.php?employee_id=' . $employeeId . '&school_year=' . $schoolYear . $blankQ . $m13Q);
             ?>
             <?php /* 📏 بلا fit=1: المسار العادي صار يملأ الورقة كاملة (وضع fit القديم كان يطبع أصغر — ملاحظة المستخدم p1) */ ?>
             <a href="<?= BASE_URL ?>pages/print_pdf.php?target=<?= $slipTarget ?>&name=releve_<?= $employeeId ?>" class="btn btn-danger" target="_blank"><i class="fas fa-file-pdf"></i> PDF officiel / PDF رسمي</a>
@@ -704,6 +714,16 @@ if (!empty($_SESSION['flash_error'])) { echo '<div class="alert alert-danger no-
             <a href="?<?= $expQ ?>&blank=1" class="btn btn-warning" title="بطاقة هذا الأستاذ بلا مبالغ — للتعبئة باليد"><i class="fas fa-file-lines"></i> Vierge (montants) / فاضية من المبالغ</a>
             <a href="?<?= $expQ ?>&blank=2" class="btn btn-warning" title="نموذج فارغ بلا اسم ولا مبالغ — لأي أستاذ"><i class="fas fa-file"></i> Formulaire vierge / نموذج فارغ لأي أستاذ</a>
             <?php endif; ?>
+            </div>
+            <?php /* 🎁 (2026-10-22 «قبل الطبع عندي خيار أذكر فيها كمان شهر تعويض وأطبع»): خيار لهذه الطبعة فقط — ملف الأستاذ لا يتغيّر */
+                $empHas13 = ((int)($emp['has_13th_month'] ?? 0) === 1); $eff13 = $slipM13 === null ? $empHas13 : ($slipM13 === 1);
+                $m13Base = '?employee_id=' . $employeeId . '&school_year=' . urlencode($schoolYear) . $blankQ; ?>
+            <strong class="slip-k"><i class="fas fa-gift"></i> 13ème mois / شهر التعويض</strong>
+            <div class="slip-v">
+            <?php if (!$eff13): ?><a href="<?= $m13Base ?>&m13=1" class="btn btn-info" title="يضيف سطر شهر التعويض (13) للبطاقة بهذه الطبعة — ملف الأستاذ لا يتغيّر"><i class="fas fa-gift"></i> Avec 13ème mois / مع شهر التعويض</a>
+            <?php else: ?><a href="<?= $m13Base ?>&m13=0" class="btn btn-info" title="يخفي سطر شهر التعويض بهذه الطبعة"><i class="fas fa-gift"></i> Sans 13ème mois / بلا شهر التعويض</a><?php endif; ?>
+            <?php if ($slipM13 !== null): ?><a href="<?= $m13Base ?>" class="btn btn-secondary" title="كما بملف الأستاذ"><i class="fas fa-rotate-left"></i> Selon dossier / كما بالملف</a><?php endif; ?>
+            <span class="badge badge-light" style="align-self:center"><?= $eff13 ? '🎁 مع شهر التعويض' : 'بلا شهر التعويض' ?><?= $slipM13 !== null ? ' — لهذه الطبعة فقط' : ' — كما بالملف' ?></span>
             </div>
             <strong class="slip-k"><i class="fas fa-folder-open"></i> Dossier / الملف</strong>
             <div class="slip-v">
