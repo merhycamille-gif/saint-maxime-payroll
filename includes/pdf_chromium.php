@@ -221,7 +221,7 @@ JS;
             . "table.pdf-t.doc-table th,table.pdf-t.doc-table th[style]{background:#e5e7eb !important;color:#000 !important;border-color:#555}table.pdf-t.doc-table th *{color:#000 !important;opacity:1 !important}table.pdf-t.doc-table .cat-row td{background:#f1f5f9 !important}"   /* 🖨️ (2026-10-17) رأس الجدول على الورق: رمادي فاتح وخطّ أسود */
             . "table.pdf-t th{white-space:normal;padding:2.5pt 4pt;line-height:1.25}table.pdf-t th .ph{display:block;width:min-content;min-width:100%;margin:0 auto;white-space:normal}"
             . "table.pdf-t td{white-space:nowrap;padding:1pt 4pt;line-height:1.2}table.pdf-t td.pr-wrap{white-space:normal}table.pdf-t td .pw{max-width:58mm;white-space:normal;display:inline-block;vertical-align:middle;text-align:inherit}"
-            . "table.pdf-t td .money-usd{display:inline;font-size:9.5pt;white-space:nowrap}table.pdf-t.doc-table tbody td{height:23px;padding:2pt 4pt}"
+            . "table.pdf-t td .money-usd{display:block;font-size:8.5pt;line-height:1.1;white-space:nowrap;margin:0}table.pdf-t.doc-table tbody td{height:auto;padding:1.5pt 4pt;line-height:1.2}"   /* 📐 (2026-10-22 «الدولار تحت الليرة مش حدّها — منوفّر مساحة للعواميد» ⇒ «طبّقها») سطر ثانٍ أصغر بدل عمود مزدوج العرض */
             . ".pdf-part{break-inside:avoid}.pdf-break{break-before:page;page-break-before:always;height:0}"
             . "table.pdf-lh,table.pdf-gov,table.pdf-info,table.pdf-sign{width:100%}"
             . "img{max-width:100%}";

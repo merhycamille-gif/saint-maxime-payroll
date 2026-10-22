@@ -83,6 +83,9 @@ check('📐 الإكسل/الوورد (قواعد 2026-10-21: خطّ 12 لا ي�
       && strpos((string)file_get_contents($P247 . '/pages/annual_slip_export.php'), '$rep->legacy = true;') !== false
       && strpos($he247, 'function hx_num(string $s): string') !== false && strpos($he247, "if (hx_has_class(\$n, ' money-usd ')) return '';") !== false
       && strpos($ex247, 'window.msaFitOne = false;') !== false
+      /* 📐 (2026-10-22 «الدولار تحت الليرة مش حدّها») سطر ثانٍ تحت الليرة بالشاشة والـPDF */
+      && strpos((string)file_get_contents($P247 . '/assets/css/app.css'), '.doc-table tbody td .money-usd { display: block; font-size: .8em;') !== false
+      && strpos((string)file_get_contents($P247 . '/includes/pdf_chromium.php'), 'table.pdf-t td .money-usd{display:block;font-size:8.5pt;') !== false
       && strpos($he247, 'if ($tablesN === 0 && $pending) { $rep->titleLines($pending); $pending = []; return; }') !== false
       && strpos($he247, "\$cls('badge') . ' or ' . \$cls('tag') . ' or ' . \$cls('pill')") !== false
       && strpos($he247, "\$push(hx_text(\$tt), 'title');") !== false

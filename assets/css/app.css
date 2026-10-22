@@ -3081,8 +3081,10 @@ details.msa-opts[open] > :not(summary) { margin-top: 0 !important; border-top-le
 
 /* ═══ 480 — 📏 (2026-10-17 «ارتفاع الخانة 25 بالتقارير») صفوف جداول المستندات 25px والدولار بجانب الليرة (لا البطاقة السنوية) ═══ */
 .doc-table tbody td { padding: 3px 6px !important; height: 30px; line-height: 22px !important; }   /* «وسّع السطر: 30 بدل 25» */
-.doc-table tbody td .money-usd { display: inline; margin-inline-start: 6px; font-size: .9em; line-height: inherit; margin-top: 0; }
-.doc-table tbody td:has(.money-usd) { direction: ltr; unicode-bidi: isolate; white-space: nowrap; }   /* «4,595,600 L.L  $51» بترتيب واحد مقروء */
+/* 📐 (2026-10-22 «ليش ما بيكون الدولار والليرة تحت بعضهن مش حدّ بعضهن؟ هيك ما منوفّر مساحة لعدد العواميد» ⇒ «طبّقها»): الدولار سطر ثانٍ أصغر تحت الليرة
+ *    بكل جداول المستندات (شاشة + PDF)، فعرض عمود المبلغ = رقم الليرة فقط؛ الخلية سطران قصيران بدل سطر عريض. الإكسل/الوورد لهما عموداهما الرقميّان. */
+.doc-table tbody td .money-usd { display: block; font-size: .8em; line-height: 1.15; margin: 0; }
+.doc-table tbody td:has(.money-usd) { direction: ltr; unicode-bidi: isolate; white-space: nowrap; height: auto; line-height: 1.25 !important; padding: 2px 6px !important; }
 
 /* ═══ 490 — 🖨️ (2026-10-17 «على الورق محلّ العناوين بخطّ أبيض ما عم يبيّن») كل رؤوس الجداول بالطباعة: رمادي فاتح + خطّ أسود ═══ */
 @media print {
