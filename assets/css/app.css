@@ -3208,4 +3208,13 @@ details.msa-pick > summary .mp-edit, details.msa-opts > summary .mo-e, .msa-tabs
 #schoolPicker .school-menu label { font-size: 15px; font-weight: 600; padding: 6px 10px; }
 #schoolPicker .school-menu input[type=checkbox] { width: 18px; height: 18px; }
 #schoolPicker .school-menu button[type=submit] { font-size: 14px; padding: 8px; }
+/* 🏫👀 (2026-10-23 «ما عم اعرف اي مدرسة مشيك عليها») القائمة كانت مثبّتة على يمين الحبّة (right:0) فلمّا يكون اسم المدرسة قصيراً تخرج من الشاشة شمالاً وتختفي خانات التشييك ⇒
+   تُثبَّت على يسار الحبّة (يمينها بالعربي) ولا تتجاوز عرض الشاشة أبداً؛ والمدرسة المشيَّكة تتلوّن بالكامل مع ✓ واضحة */
+#schoolPicker .school-menu { left: 0 !important; right: auto !important; max-width: min(560px, calc(100vw - 24px)) !important; }
+html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !important; }
+#schoolPicker .school-menu label:has(input:checked) { background: #dbeafe; color: #1e3a8a; font-weight: 700; }
+#schoolPicker .school-menu label:has(input:checked)::after { content: "✓"; margin-inline-start: auto; color: #1d4ed8; font-weight: 900; }
+#schoolPicker .school-menu label:has(input:not(:checked)) { color: #64748b; }
+#schoolPicker .school-menu .sm-all:has(input:checked) { background: #c7d2fe; }
+#schoolPicker .school-menu .sm-list { max-height: min(62vh, 560px); } /* لائحة أطول حتى تظهر المدرسة المشيَّكة بلا تمرير غالباً */
 }

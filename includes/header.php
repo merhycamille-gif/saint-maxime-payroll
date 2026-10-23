@@ -613,7 +613,7 @@ document.addEventListener('submit', function (e) {
                 ?>
                 <div class="school-switcher school-multi" id="schoolPicker">
                     <i class="fas fa-school" style="color:#fff;background:#0891b2;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center"></i>
-                    <button type="button" class="sm-btn" onclick="document.getElementById('schoolMenu').classList.toggle('open')">
+                    <button type="button" class="sm-btn" onclick="var m=document.getElementById('schoolMenu');m.classList.toggle('open');if(m.classList.contains('open')){var c=m.querySelector('.sm-list input:checked');if(c&&!document.getElementById('smAll').checked){c.closest('label').scrollIntoView({block:'center'});}}" title="اكبس لاختيار المدرسة / المدارس — المشيَّكة ملوّنة بـ✓">
                         <?= e($selLabel) ?> <i class="fas fa-caret-down"></i>
                     </button>
                     <div class="school-menu" id="schoolMenu">

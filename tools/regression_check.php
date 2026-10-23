@@ -10573,6 +10573,20 @@ try {
 } catch (Throwable $e) { $ok271 = false; $why271 = $e->getMessage(); }
 check('🏫🔑 دخول المدارس: اسم الدخول = المنطقة (فريد) + كلمة سرّ Region@السنة + pw_known ذاتي + manifest/icon/login لكل مدرسة + صفحة school_access (إرسال/نسخ) بلا شريط تصدير', $ok271, $why271);
 
+/* 272) 🏫👀 (2026-10-23 «محل عم فتش على مدرسة… ما عم اعرف اي مدرسة مشيك عليها») قائمة المدارس كانت مثبّتة على يمين الحبّة (right:0) فتخرج من الشاشة شمالاً مع الأسماء القصيرة
+ *      ⇒ مثبّتة على يسار الحبّة (يمينها بالعربي) ولا تتجاوز الشاشة + المشيَّكة ملوّنة بـ✓ + فتح القائمة يمرّر للمشيَّكة + لائحة أطول. */
+try {
+    $css272 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $hd272 = (string)file_get_contents($PROJ . '/includes/header.php');
+    $ok272 = strpos($css272, '#schoolPicker .school-menu { left: 0 !important; right: auto !important; max-width: min(560px, calc(100vw - 24px)) !important; }') !== false
+          && strpos($css272, 'html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !important; }') !== false
+          && strpos($css272, '#schoolPicker .school-menu label:has(input:checked) { background: #dbeafe;') !== false
+          && strpos($css272, '#schoolPicker .school-menu label:has(input:checked)::after { content: "✓";') !== false
+          && strpos($css272, '#schoolPicker .school-menu .sm-list { max-height: min(62vh, 560px); }') !== false
+          && strpos($hd272, "c.closest('label').scrollIntoView({block:'center'})") !== false;
+    $why272 = '';
+} catch (Throwable $e) { $ok272 = false; $why272 = $e->getMessage(); }
+check('🏫👀 منتقي المدارس: القائمة على يسار الحبّة ولا تخرج من الشاشة + المشيَّكة ملوّنة ✓ + تمرير للمشيَّكة + لائحة أطول', $ok272, $why272);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
