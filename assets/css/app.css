@@ -3278,6 +3278,9 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
   body:not(.doc-view) .main-content > .page-content.sheet-wide{max-width:none;margin-left:12px;margin-right:12px}
   body:not(.doc-view) .main-content > .page-content > .card{box-shadow:none;border:1px solid #e9eef5}
   #empForm .tab-content.active{box-shadow:none;border-color:#e9eef5}   /* داخل الورقة العامّة: بلا ظلّ مزدوج */
+  /* 🏠 (2026-10-23 «الصفحة الرئيسية خلّيها على كل الصفحة متل ما كانت») لوحة القيادة بلا ورقة: عرض كامل كما قبل */
+  body.page-dashboard .main-content > .page-content,body.page-dashboard .main-content > .page-content:not(.sheet-wide){max-width:none;background:transparent;border:0;box-shadow:none;border-radius:0;margin:0;padding:10px 20px 40px}
+  body.page-dashboard .main-content > .page-content > .card{box-shadow:var(--shadow,0 1px 3px rgba(0,0,0,.08));border:1px solid var(--gray-200,#e2e8f0)}
 }
 #empForm .form-row > .form-group:has(> textarea),#empForm .form-row > .form-group:has(.school-checks),#empForm .form-row > .form-group:has(.chk-group),#empForm .form-row > .form-group.emp-wide{flex:1 1 100%}
 #empForm .card > .card-body{padding:10px 14px}
