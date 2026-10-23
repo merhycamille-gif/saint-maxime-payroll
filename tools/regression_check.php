@@ -10582,7 +10582,8 @@ try {
           && strpos($css272, '#schoolPicker .school-menu label:has(input:checked) { background: #dbeafe;') !== false
           && strpos($css272, '#schoolPicker .school-menu label:has(input:checked)::after { content: "✓";') !== false
           && strpos($css272, '#schoolPicker .school-menu .sm-list { max-height: min(62vh, 560px); }') !== false
-          && strpos($hd272, "c.closest('label').scrollIntoView({block:'center'})") !== false;
+          && strpos($hd272, "c.closest('label').scrollIntoView({block:'center'})") !== false
+          && strpos((string)file_get_contents($PROJ . '/assets/js/app.js'), "var ids = ['schoolMenu', 'salCompMenu', 'bellMenu'];") !== false;   // ✖️ تُغلَق بأي كبسة خارجها/Escape
     $why272 = '';
 } catch (Throwable $e) { $ok272 = false; $why272 = $e->getMessage(); }
 check('🏫👀 منتقي المدارس: القائمة على يسار الحبّة ولا تخرج من الشاشة + المشيَّكة ملوّنة ✓ + تمرير للمشيَّكة + لائحة أطول', $ok272, $why272);

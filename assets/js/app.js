@@ -1050,3 +1050,20 @@ window.msaDrawer = (function () {
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
 })();
+
+/* 🏫✖️ (2026-10-23 «ليش بس حط الموس بدون ما كبس ببين دغري اسانسور المدارس») قوائم الشريط العلوي (المدارس / الراتب يشمل / الجرس)
+   كانت تبقى مفتوحة بعد الكبس عليها حتى يُكبَس عليها ثانيةً — فتبدو كأنّها تفتح لحالها. صارت تُغلَق بأي كبسة خارجها أو بـEscape. */
+(function () {
+    var ids = ['schoolMenu', 'salCompMenu', 'bellMenu'];
+    function hostOf(m) { return m.closest('.school-switcher') || m.parentElement; }
+    function closeAll(except) { ids.forEach(function (id) { var m = document.getElementById(id); if (m && m !== except && m.classList.contains('open')) m.classList.remove('open'); }); }
+    document.addEventListener('click', function (e) {
+        ids.forEach(function (id) {
+            var m = document.getElementById(id); if (!m || !m.classList.contains('open')) return;
+            var host = hostOf(m); if (host && host.contains(e.target)) return;   // الكبس داخل القائمة أو على حبّتها
+            m.classList.remove('open');
+        });
+    }, true);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(null); });
+    ids.forEach(function (id) { var m = document.getElementById(id); if (!m) return; var host = hostOf(m), b = host && host.querySelector('.sm-btn, .bell-btn'); if (b) b.addEventListener('click', function () { closeAll(m); }); });   // فتح قائمة يغلق الأخرى
+})();
