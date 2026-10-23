@@ -2025,9 +2025,10 @@ check('القفل الشامل: سطور جدول الصفوف مقفولة صف
 // ملف الأستاذ: صفّ أزرار (تعديل + حفظ + حذف) بكل تبويب من التبويبات الستة
 // (طلب المستخدم 2026-08-01: «بكل صفحة من صفحاتو لازم يكون في زر تعديل وزر حذف وزر حفظ»)
 $empSrc30 = (string)file_get_contents(__DIR__ . '/../pages/employees.php');
-check('ملف الأستاذ: صفّ أزرار تعديل/حفظ/حذف بكل تبويب (٦ تبويبات) والقفل يدعم أزرار تعديل متعددة',
-      substr_count($empSrc30, '<?php $empTabBar(); ?>') === 6
-      && strpos($empSrc30, 'function () use ($id, $employee)') !== false
+// 🌍 (2026-10-23 «عالمي… مش معجق») صفّ الأزرار المكرّر أُزيل: زرّ تعديل واحد بالرأس (emp-hero) + حذف بقائمة الإجراءات + شريط حفظ ثابت (emp-savebar)
+check('ملف الأستاذ: زرّ تعديل واحد بالرأس (لا صفوف مكرّرة بكل تبويب) + حذف بقائمة الإجراءات + شريط حفظ ثابت بوضع التعديل، والقفل يدعم أزرار تعديل خارجية',
+      substr_count($empSrc30, '<?php $empTabBar(); ?>') === 0 && substr_count($empSrc30, 'data-lockedit-for="empForm"') === 1
+      && strpos($empSrc30, 'class="eh-danger" data-confirm=') !== false && strpos($empSrc30, '<div class="card emp-savebar">') !== false
       && strpos($flSrc30, 'extBtns.forEach') !== false);
 // الحفظ الفوري بجانب الحقل («بدي بس حط أي رقم يكون دغري بجانبو حفظ»): أي تغيير بأي
 // فورم POST يُظهر زرّ حفظ أخضر نابضاً بجانب الحقل نفسه، مربوطاً بفورم الحقل (سمة form=)
@@ -4559,7 +4560,7 @@ check('المكافآت 2026-09-11: تبويب واحد بأقسام لكل نو
       && strpos($emp0911, 'id="tLinesBody"') !== false
       && strpos($emp0911, 'كيف بتشتغل هالصفحة') !== false
       && strpos($emp0911, 'class="bnPrev"') !== false
-      && strpos($emp0911, 'data-tab="bonuses">🎁 Primes, aides & transport / المكافآت والمساعدات والنقل') !== false);
+      && strpos($emp0911, 'data-tab="bonuses"><span class="t-fr">🎁 Primes, aides & transport</span><span class="t-ar">المكافآت والمساعدات والنقل</span>') !== false);   // 🌍 2026-10-23 التبويب بسطرين
 $finTab0911 = substr($emp0911, strpos($emp0911, 'data-tab-content="finance"'), strpos($emp0911, 'Bonuses Tab') - strpos($emp0911, 'data-tab-content="finance"'));
 check('المكافآت 2026-09-11: لا تكرار — التبويب المالي بلا محرّر بنود/نقل يومي، لا زرّ «إدارة المكافآت»، bonuses.php تحويل لتبويب المكافآت',
       strpos($finTab0911, 'bonus_editor') === false && strpos($finTab0911, 'tLinesBody') === false
@@ -10587,6 +10588,29 @@ try {
     $why272 = '';
 } catch (Throwable $e) { $ok272 = false; $why272 = $e->getMessage(); }
 check('🏫👀 منتقي المدارس: القائمة على يسار الحبّة ولا تخرج من الشاشة + المشيَّكة ملوّنة ✓ + تمرير للمشيَّكة + لائحة أطول', $ok272, $why272);
+
+/* 273) 🌍 (2026-10-23 «بدي ملف الأستاذ مرتّب ترتيب عالمي منظّم واضح مش معجق مش كل كلمة بمحل، وأوعى الأخطاء») ملف الأستاذ:
+ *      رأس (emp-hero) + 6 حقائق (emp-facts) + تعديل واحد + قائمة إجراءات بدل 6 كبسات · تبويبات بسطرين · زوج الاسم FR|AR بخانة واحدة
+ *      · لا صفوف أزرار مكرّرة بكل تبويب · شريط حفظ ثابت بوضع التعديل فقط · سنة التناقص LTR · معادلة الإضافي LTR
+ *      · 🔴 نصف الدرجة بالعرض = الدرجة الكاملة (floor) مثل المحرّك (كان العرض يستوفي: 36.5 ⇒ 3,157,500 بينما المحرّك 3,100,000)
+ *      · المحسومات السارية ومعاينة الإضافي من آخر شهر محسوب لغاية اليوم (لا «أيلول 2027»). */
+try {
+    $src273 = str_replace("\r\n", "\n", (string)file_get_contents($PROJ . '/pages/employees.php')); $css273 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+    $ok273 = strpos($src273, '<div class="emp-hero no-print">') !== false && strpos($src273, '<div class="emp-facts no-print">') !== false
+          && strpos($src273, 'data-lockedit-for="empForm" class="btn btn-primary eh-edit"') !== false && substr_count($src273, 'data-lockedit-for="empForm"') === 1
+          && strpos($src273, '<div class="tabs emp-tabs">') !== false && substr_count($src273, '<span class="t-fr">') === 7
+          && strpos($src273, '<div class="form-row cols-3 name-pairs">') !== false && substr_count($src273, 'class="form-group name-pair"') === 3
+          && strpos($src273, '$empTabBar();') === false
+          && strpos($src273, '<div class="card emp-savebar">') !== false && strpos($src273, 'class="btn btn-light emp-cancel"') !== false
+          && substr_count($src273, 'سنة <span dir="ltr"><?= e($hrSy) ?></span>') === 4
+          && strpos($src273, "<small dir=\"ltr\" style=\"color:var(--gray-500);font-weight:400;unicode-bidi:isolate;display:inline-block\">('+fmt(BASE)+' ÷ '+fmt(OFFICIAL)") !== false
+          && strpos($src273, "    var vLo = SALARY_SCALE[lo];\n    if (vLo == null) return null;\n    return Math.round(vLo);") !== false && strpos($src273, 'vLo + frac * (vHi - vLo)') === false
+          && strpos($src273, 'ORDER BY (year * 100 + month <= ?) DESC, (year * 100 + month <= ?) * (year * 100 + month) DESC, year ASC, month ASC LIMIT 1') !== false
+          && strpos($css273, '.emp-hero{background:#fff;') !== false && strpos($css273, '#empForm .form-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;') !== false
+          && strpos($css273, '#empForm.is-editing .emp-savebar{display:block;position:sticky;') !== false;
+    $why273 = '';
+} catch (Throwable $e) { $ok273 = false; $why273 = $e->getMessage(); }
+check('🌍 ملف الأستاذ بالترتيب العالمي: رأس + 6 حقائق + تعديل واحد + إجراءات · تبويبات بسطرين · زوج الاسم بخانة · بلا أزرار مكرّرة · شريط حفظ ثابت · LTR للسنة والمعادلة · نصف الدرجة floor بالعرض · المحسومات من آخر شهر لغاية اليوم', $ok273, $why273);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

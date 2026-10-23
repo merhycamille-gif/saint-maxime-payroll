@@ -3218,3 +3218,53 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
 #schoolPicker .school-menu .sm-all:has(input:checked) { background: #c7d2fe; }
 #schoolPicker .school-menu .sm-list { max-height: min(62vh, 560px); } /* لائحة أطول حتى تظهر المدرسة المشيَّكة بلا تمرير غالباً */
 }
+
+/* =====================================================================
+ * 🌍 (2026-10-23 «بدي ملف الأستاذ مرتّب ترتيب عالمي منظّم واضح مش معجق») ملف الأستاذ (pages/employees.php):
+ *      رأس ثابت (حرفان + الاسم FR/AR + حبوب) + زرّ تعديل واحد + قائمة إجراءات + شريط 6 حقائق · تبويبات بسطرين · التسمية سطر واحد لا تلتفّ
+ *      · شبكة الحقول لا يتمدّد صفّها بسبب حقل طويل · زوج الاسم FR|AR بخانة واحدة · الشروح مطويّة · شريط حفظ ثابت بوضع التعديل فقط.
+ * =================================================================== */
+.emp-hero{background:#fff;border:1px solid var(--gray-200,#e2e8f0);border-radius:14px;padding:14px 18px;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;margin-bottom:10px}
+.emp-hero .eh-av{width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#1e4fa3,#0e7490);color:#fff;display:grid;place-items:center;font:700 21px/1 Inter,"Segoe UI",sans-serif;letter-spacing:.5px}
+.emp-hero .eh-name{line-height:1.2}.emp-hero .eh-fr{display:block;font-size:22px;font-weight:800;color:#0f172a}.emp-hero .eh-ar{display:block;font-size:16px;font-weight:600;color:#334155;margin-top:2px}
+.emp-hero .eh-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.emp-hero .eh-chip{font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
+.emp-hero .eh-chip.acc{background:#dbeafe;color:#1e3a8a;border-color:#bfdbfe}.emp-hero .eh-chip.ok{background:#dcfce7;color:#15803d;border-color:#bbf7d0}.emp-hero .eh-chip.warn{background:#fef3c7;color:#b45309;border-color:#fde68a}.emp-hero .eh-chip.off{background:#f1f5f9;color:#64748b}
+.emp-hero .eh-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.emp-hero .eh-edit{font-weight:800}
+.emp-hero .eh-menu{position:relative}.emp-hero .eh-dd{display:none;position:absolute;inset-inline-end:0;top:calc(100% + 6px);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 30px rgba(15,23,42,.14);min-width:300px;padding:6px;z-index:60}
+.emp-hero .eh-menu.open .eh-dd{display:block}
+.emp-hero .eh-dd a{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;color:#0f172a;text-decoration:none;font-size:13.5px;font-weight:600}
+.emp-hero .eh-dd a:hover{background:#f1f5f9}.emp-hero .eh-dd a i{width:20px;text-align:center;color:#1e4fa3}.emp-hero .eh-dd a span small{display:block;color:#64748b;font-weight:500;font-size:12px}
+.emp-hero .eh-dd a.eh-danger{color:#b91c1c;border-top:1px dashed #e2e8f0;margin-top:4px;padding-top:10px}.emp-hero .eh-dd a.eh-danger i{color:#b91c1c}
+.emp-facts{display:grid;grid-template-columns:repeat(7,1fr);background:#fff;border:1px solid var(--gray-200,#e2e8f0);border-radius:14px;overflow:hidden;margin-bottom:12px}
+.emp-facts .ef{padding:9px 14px;border-inline-end:1px solid #e2e8f0;min-width:0}.emp-facts .ef:last-child{border-inline-end:0}
+.emp-facts .ef-l{font-size:11.5px;color:#64748b;font-weight:600;line-height:1.3}.emp-facts .ef-l span{display:block;color:#475569}
+.emp-facts .ef-v{font-size:16px;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;direction:ltr;text-align:right;unicode-bidi:isolate;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.emp-facts .ef-v small{display:block;font-size:11px;font-weight:500;color:#64748b;direction:rtl;white-space:normal}
+.emp-facts .ef-v .ef-warn{display:inline-block;font-size:11px;font-weight:700;background:#fef3c7;color:#b45309;border-radius:999px;padding:0 8px;margin-inline-start:6px;direction:rtl}
+@media (max-width:1200px){.emp-facts{grid-template-columns:repeat(4,1fr)}.emp-facts .ef:nth-child(4n){border-inline-end:0}.emp-hero{grid-template-columns:auto 1fr}.emp-hero .eh-acts{grid-column:1/-1;justify-content:flex-start}}
+/* التبويبات بسطرين */
+.tabs.emp-tabs{display:flex;gap:4px;flex-wrap:wrap;position:sticky;top:0;z-index:30;background:var(--gray-100,#f1f5f9);padding-top:4px}
+.tabs.emp-tabs .tab{display:flex;flex-direction:column;align-items:center;gap:0;line-height:1.25;padding:7px 14px 8px;min-width:128px;flex:1 1 auto}
+.tabs.emp-tabs .tab .t-fr{font-weight:700;font-size:13.5px;direction:ltr}.tabs.emp-tabs .tab .t-ar{font-size:12px;font-weight:600;opacity:.85}
+/* الحقول: التسمية سطر واحد · الصفّ لا يتمدّد · التوضيح مطويّ */
+#empForm .form-row{align-items:start}
+#empForm .form-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;color:#334155;margin-bottom:4px}
+#empForm .form-label .req{margin-inline-start:2px}
+#empForm .form-group{margin-bottom:14px;min-width:0}
+#empForm .name-pair .pair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#empForm .name-pair .pair .form-control{min-width:0}
+#empForm details.emp-help{margin-top:4px}#empForm details.emp-help summary{cursor:pointer;color:#1e4fa3;font-weight:600;font-size:12px;list-style:none}#empForm details.emp-help summary::-webkit-details-marker{display:none}
+#empForm details.emp-help[open] summary{margin-bottom:2px}
+/* شريط الحفظ أسفل: ثابت بوضع التعديل فقط */
+#empForm .emp-savebar{display:none}
+#empForm.is-editing .emp-savebar{display:block;position:sticky;bottom:8px;z-index:25;box-shadow:0 -6px 24px rgba(15,23,42,.12);border:1px solid #fde68a;background:#fffbeb}
+#empForm:not(.lockedit) .emp-savebar{display:block}
+#empForm:not(.lockedit) .emp-cancel{display:inline-flex}
+/* البطاقات داخل الملف: رأس أهدأ */
+#empForm .card > .card-header h3 span[dir=ltr]{font-size:15px}
+.emp-hero.is-editing{border-color:#fde68a;box-shadow:inset 0 0 0 2px #fef3c7}
+#empForm details.emp-help.emp-help-box{margin:0 0 10px;padding:8px 12px;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc}
+#empForm details.emp-help.emp-help-box summary{font-size:13px}
+@media print{.emp-hero,.emp-facts{display:none}}

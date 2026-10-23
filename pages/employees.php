@@ -1380,7 +1380,7 @@ if ($id > 0 && ($employee['employee_type'] ?? '') === 'enseignant_titulaire') {
 if ($hrMsg && $hrMsg['reduction'] > 0): ?>
     <div class="alert alert-warning" id="hoursReductionMsg" style="border-right:4px solid #d97706">
         <i class="fas fa-clock"></i>
-        <strong>Réduction d'horaire / تناقص ساعات التدريس — سنة <?= e($hrSy) ?>:</strong>
+        <strong>Réduction d'horaire / تناقص ساعات التدريس — سنة <span dir="ltr"><?= e($hrSy) ?></span>:</strong>
         هذا الأستاذ خلال <strong>سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?></strong> بالملاك،
         ويحقّ له تناقص <strong>−<?= (int)$hrMsg['reduction'] ?> ساعات</strong> —
         ساعاته الأسبوعية القانونية <strong><?= (int)$hrMsg['lawHours'] ?></strong> بدل <?= (int)$hrMsg['baseHours'] ?>
@@ -1388,51 +1388,91 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
         <a href="<?= BASE_URL ?>pages/hours_reduction.php" class="no-print">كل المستحقّين بكل مدرسة ←</a>
         <?php $fmtH = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.'); if ($hrNeeds): ?>
             <div class="no-print" style="margin-top:8px;padding-top:8px;border-top:1px dashed #d97706">
-                <strong><i class="fas fa-bell"></i> قرار مطلوب:</strong> صار عنده تناقص جديد ببداية سنة <?= e($hrSy) ?> —
+                <strong><i class="fas fa-bell"></i> قرار مطلوب:</strong> صار عنده تناقص جديد ببداية سنة <span dir="ltr"><?= e($hrSy) ?></span> —
                 المسجّل بملفه الآن <strong><?= $fmtH($employee['hours_per_week']) ?></strong> ساعة ملاك / تناقص <strong><?= $fmtH($employee['hours_reduction'] ?? 0) ?></strong>.
                 بإذنك يسجّل البرنامج: <strong><?= (int)$hrMsg['lawHours'] ?></strong> ساعة ملاك و<strong>−<?= (int)$hrMsg['reduction'] ?></strong> تناقص (لا يتغيّر أي راتب).
                 <div style="margin-top:6px"><?= hoursReductionDecisionButtons($employee, $hrMsg, 'employees.php?action=edit&id=' . (int)$id . '#hoursReductionMsg') ?></div>
             </div>
         <?php elseif (($employee['hours_reduction_later_sy'] ?? '') === $hrSy && abs((float)($employee['hours_reduction'] ?? 0) - $hrMsg['reduction']) > 0.01): ?>
-            <div style="margin-top:6px"><span class="badge" style="background:#6b7280;color:#fff">مؤجَّل لسنة <?= e($hrSy) ?></span> <small>المسجّل بملفه <?= $fmtH($employee['hours_per_week']) ?> ساعة / تناقص <?= $fmtH($employee['hours_reduction'] ?? 0) ?> — يعود المساج السنة الجاية أو عند تغيّر التناقص.</small></div>
+            <div style="margin-top:6px"><span class="badge" style="background:#6b7280;color:#fff">مؤجَّل لسنة <span dir="ltr"><?= e($hrSy) ?></span></span> <small>المسجّل بملفه <?= $fmtH($employee['hours_per_week']) ?> ساعة / تناقص <?= $fmtH($employee['hours_reduction'] ?? 0) ?> — يعود المساج السنة الجاية أو عند تغيّر التناقص.</small></div>
         <?php else: ?>
             <div style="margin-top:6px"><span class="badge badge-success">✓ مسجّل بملفه</span> <small><?= $fmtH($employee['hours_per_week']) ?> ساعة ملاك / تناقص <?= $fmtH($employee['hours_reduction'] ?? 0) ?><?= !empty($employee['hours_reduction_sy']) ? ' (سنة ' . e($employee['hours_reduction_sy']) . ')' : '' ?></small></div>
         <?php endif; ?>
     </div>
 <?php endif; ?>
 
-<div class="d-flex justify-between align-center mb-3" style="flex-wrap:wrap;gap:8px"><?php /* ☑️📐 (2026-09-27) الأزرار تلتفّ بدل أن تُقصّ من طرف الشاشة */ ?>
-    <a href="<?= BASE_URL ?>pages/employees.php" class="btn btn-light">
-        <i class="fas fa-arrow-left"></i> Retour à la liste / العودة إلى اللائحة
-    </a>
-    <?php if ($id > 0): ?>
-        <div class="d-flex gap-2" style="flex-wrap:wrap">
-            <?php /* 🧹 زرّا «تعديل/حذف» العلويان أُزيلا — مكرّران مع صفّ الأزرار الموجود بكل
-                     تبويب تحتهما مباشرة («ها العجقة كلها لشو» — 2026-08-01) */ ?>
-            <a href="?action=copy_year&id=<?= $id ?>" class="btn btn-light" title="نسخ ملفه كامل لسنة تانية (مثلاً أستاذ ترك ورجع)">
-                <i class="fas fa-copy"></i> Copier vers une année / نسخ لسنة
-            </a>
-            <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>" class="btn btn-light">
-                <i class="fas fa-layer-group"></i> Échelons & Promotions / الدرجات والترقيات
-            </a>
-            <a href="<?= BASE_URL ?>pages/monthly_payroll.php?employee_id=<?= $id ?>" class="btn btn-gold">
-                <i class="fas fa-money-check"></i> Calculer paie / حساب الراتب
-            </a>
-            <a href="<?= BASE_URL ?>pages/annual_slip.php?employee_id=<?= $id ?>" class="btn btn-primary">
-                <i class="fas fa-file-invoice"></i> Bulletin annuel / الكشف السنوي
-            </a>
-            <?php /* 📂 (2026-10-08) «وقت بكون بملف الموظف لازم يكون في كبسة أقدر شوف كامل الملف إذا بدّي أطبعلو إفادة أو استخدام أجير…
-                     أحلى ما أرجع روح على غير محل»: الملف الكامل (مستندات + ر6 + البطاقة السنوية + كل الإفادات والنماذج الرسمية) من هون مباشرة */ ?>
-            <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= $id ?>&dossier=1" class="btn btn-info btn-lg btn-dossier" title="كل شي عن هذا الموظف بمكان واحد: مستنداته، ر6، البطاقة السنوية، وكل الإفادات والنماذج الرسمية (استخدام أجير، ترك أجير…) للطباعة">
-                <i class="fas fa-folder-open"></i> Dossier complet & attestations / الملف الكامل والإفادات
-            </a>
-            <?php /* 🪪 (2026-10-19) بطاقة الأستاذ على ورقة A4 واحدة — كل معلومات ملفّه للطباعة بلا صور المستندات */ ?>
-            <a href="<?= BASE_URL ?>pages/employee_fiche.php?employee_id=<?= $id ?>" class="btn btn-success" title="كل معلومات الأستاذ (شخصية، وظيفية، أرقام رسمية، راتب) على ورقة A4 واحدة للطباعة">
-                <i class="fas fa-id-card"></i> Fiche A4 / بطاقة الأستاذ A4
-            </a>
+<?php
+// 🌍 (2026-10-23 «بدي ملف الأستاذ مرتّب ترتيب عالمي… مش معجق») رأس الملف: صورة/حرفان + الاسم FR وتحته AR + حبوب الحالة
+// + زرّ «تعديل» واحد + قائمة «⋮ إجراءات» تجمع الكبسات الستّ + شريط 6 حقائق — كلّه قراءة من الملف نفسه (لا حساب موازٍ).
+if ($id > 0):
+    $hxTypeFr = ['enseignant_titulaire' => 'Titulaire', 'enseignant_contractuel' => 'Contractuel', 'employe' => 'Employé'][$employee['employee_type']] ?? $employee['employee_type'];
+    $hxTypeAr = ['enseignant_titulaire' => 'ملاك', 'enseignant_contractuel' => 'متعاقد', 'employe' => 'موظف'][$employee['employee_type']] ?? '';
+    $hxIsTeacher = $employee['employee_type'] !== 'employe';
+    $hxStatus = ['actif' => ['Actif', 'نشط', 'ok'], 'suspendu' => ['Suspendu', 'متوقّف', 'warn'], 'retraite' => ['Retraité', 'متقاعد', 'off'], 'demissionne' => ['Démissionné', 'مستقيل', 'off']][$employee['status']] ?? [$employee['status'], '', 'off'];
+    $hxSchool = schoolNameById((int)$employee['school_id']);
+    $hxNameFr = trim(($employee['first_name_fr'] ?? '') . ' ' . ($employee['last_name_fr'] ?? '')); $hxNameAr = function_exists('empFullNameAr') ? empFullNameAr($employee) : trim(($employee['first_name_ar'] ?? '') . ' ' . ($employee['last_name_ar'] ?? ''));
+    $hxIni = mb_strtoupper(mb_substr((string)($employee['first_name_fr'] ?: $employee['first_name_ar']), 0, 1) . mb_substr((string)($employee['last_name_fr'] ?: $employee['last_name_ar']), 0, 1));
+    $hxGrade = (float)($employee['current_grade'] ?? 0);
+    $hxBase = null; $hxBaseNote = '';
+    if ($employee['employee_type'] === 'enseignant_titulaire' && $hxGrade >= 1) { $hxBase = formatLBP(scaleSalaryLBP($hxGrade)); $hxBaseNote = 'درجة ' . rtrim(rtrim(number_format($hxGrade, 1), '0'), '.') . (fmod($hxGrade, 1) ? ' (نصف الدرجة = الدرجة الكاملة بالراتب)' : ''); }
+    elseif ((float)($employee['base_salary_usd'] ?? 0) > 0) { $hxBase = '$' . number_format((float)$employee['base_salary_usd']); $hxBaseNote = 'راتب متّفق بالدولار'; }
+    elseif ((float)($employee['contract_salary_lbp'] ?? 0) > 0) { $hxBase = formatLBP((float)$employee['contract_salary_lbp']); $hxBaseNote = 'راتب متّفق'; }
+    $hxAge = ''; $hx64 = '';
+    if (!empty($employee['birth_date']) && $employee['birth_date'] !== '0000-00-00') { try { $bd = new DateTime($employee['birth_date']); $hxAge = (string)$bd->diff(new DateTime())->y; $hx64 = (clone $bd)->modify('+64 years')->format('d/m/Y'); } catch (Throwable $e) {} }
+    $hxLast = ''; try { $hxNowYm = (int)date('Y') * 100 + (int)date('n'); $hxQ = $db->prepare("SELECT month, year FROM monthly_salaries WHERE employee_id = ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) AND (year * 100 + month) <= ? ORDER BY year DESC, month DESC LIMIT 1"); $hxQ->execute([(int)$id, $hxNowYm]); if ($hxR = $hxQ->fetch(PDO::FETCH_ASSOC)) $hxLast = monthName((int)$hxR['month'], 'ar') . ' ' . (int)$hxR['year']; } catch (Throwable $e) {}
+    $hxHours = rtrim(rtrim(number_format((float)($employee['hours_per_week'] ?? 0), 1), '0'), '.');
+    $hxLaw = ($hrMsg && !empty($hrMsg['reduction']) && $hrMsg['reduction'] > 0) ? (int)$hrMsg['lawHours'] : 0;
+    $hxDel = '⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . ($hxNameAr ?: $hxNameFr) . '» ؟ بعد الحذف لا يعود يظهر في البرنامج (يمكن استرجاعه لاحقاً عند الحاجة).';
+    $fmtD = function ($d) { return ($d && $d !== '0000-00-00') ? date('d/m/Y', strtotime($d)) : '—'; };
+?>
+<div class="emp-hero no-print">
+    <div class="eh-av"><?= e($hxIni ?: '•') ?></div>
+    <div class="eh-id">
+        <div class="eh-name"><span class="eh-fr" dir="ltr"><?= e($hxNameFr ?: $hxNameAr) ?></span><span class="eh-ar"><?= e($hxNameAr) ?></span></div>
+        <div class="eh-chips">
+            <span class="eh-chip acc"><?= $hxIsTeacher ? 'Enseignant · أستاذ' : 'Employé · موظف' ?></span>
+            <?php if ($hxIsTeacher): ?><span class="eh-chip acc"><?= e($hxTypeFr) ?> · <?= e($hxTypeAr) ?></span><?php endif; ?>
+            <span class="eh-chip <?= e($hxStatus[2]) ?>"><?= e($hxStatus[0]) ?> · <?= e($hxStatus[1]) ?></span>
+            <span class="eh-chip"><?= e($hxSchool) ?></span>
+            <span class="eh-chip" dir="ltr">Code <?= e($employee['employee_code']) ?></span>
         </div>
-    <?php endif; ?>
+    </div>
+    <div class="eh-acts">
+        <a href="<?= BASE_URL ?>pages/employees.php" class="btn btn-light btn-sm eh-back"><i class="fas fa-arrow-right"></i> اللائحة / Liste</a>
+        <button type="button" data-lockedit-for="empForm" class="btn btn-primary eh-edit"><i class="fas fa-pen"></i> Modifier / تعديل</button>
+        <div class="eh-menu" id="ehMenu">
+            <button type="button" class="btn btn-light eh-more" onclick="document.getElementById('ehMenu').classList.toggle('open')"><i class="fas fa-ellipsis-v"></i> Actions / إجراءات</button>
+            <div class="eh-dd">
+                <a href="<?= BASE_URL ?>pages/monthly_payroll.php?employee_id=<?= $id ?>"><i class="fas fa-money-check"></i><span>Calculer paie<small>حساب الراتب</small></span></a>
+                <a href="<?= BASE_URL ?>pages/annual_slip.php?employee_id=<?= $id ?>"><i class="fas fa-file-invoice"></i><span>Bulletin annuel<small>الكشف السنوي</small></span></a>
+                <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= $id ?>&dossier=1" class="btn-dossier"><i class="fas fa-folder-open"></i><span>Dossier complet & attestations<small>الملف الكامل والإفادات</small></span></a>
+                <a href="<?= BASE_URL ?>pages/employee_fiche.php?employee_id=<?= $id ?>"><i class="fas fa-id-card"></i><span>Fiche A4<small>بطاقة الأستاذ A4</small></span></a>
+                <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>"><i class="fas fa-layer-group"></i><span>Échelons & Promotions<small>الدرجات والترقيات</small></span></a>
+                <a href="?action=copy_year&id=<?= $id ?>"><i class="fas fa-copy"></i><span>Copier vers une année<small>نسخ الملف لسنة</small></span></a>
+                <a href="?action=delete&id=<?= $id ?>" class="eh-danger" data-confirm="<?= e($hxDel) ?>"><i class="fas fa-trash"></i><span>Supprimer<small>حذف الملف (بتأكيد)</small></span></a>
+            </div>
+        </div>
+    </div>
 </div>
+<div class="emp-facts no-print">
+    <div class="ef"><div class="ef-l"><span dir="ltr">Date d'entrée</span>تاريخ الدخول</div><div class="ef-v"><?= $fmtD($employee['hire_date'] ?? '') ?></div></div>
+    <?php if ($employee['employee_type'] === 'enseignant_titulaire'): ?>
+    <div class="ef"><div class="ef-l"><span dir="ltr">Titularisation</span>دخول الملاك</div><div class="ef-v"><?= $fmtD($employee['titularization_date'] ?? '') ?></div></div>
+    <div class="ef"><div class="ef-l"><span dir="ltr">Échelon actuel</span>الدرجة الحالية</div><div class="ef-v"><?= $hxGrade >= 1 ? e(rtrim(rtrim(number_format($hxGrade, 1), '0'), '.')) : '—' ?></div></div>
+    <?php else: ?>
+    <div class="ef"><div class="ef-l"><span dir="ltr">Fonction</span>الوظيفة</div><div class="ef-v"><?= e($employee['job_title'] ?: ($hxIsTeacher ? 'Enseignant' : '—')) ?></div></div>
+    <div class="ef"><div class="ef-l"><span dir="ltr">Jours / semaine</span>أيام الأسبوع</div><div class="ef-v"><?= e((string)(int)($employee['days_per_week'] ?? 0) ?: '—') ?></div></div>
+    <?php endif; ?>
+    <div class="ef"><div class="ef-l"><span dir="ltr">Salaire de base</span>أساس الراتب</div><div class="ef-v"><?= $hxBase !== null ? e($hxBase) : '—' ?><?= $hxBaseNote ? '<small>' . e($hxBaseNote) . '</small>' : '' ?></div></div>
+    <div class="ef"><div class="ef-l"><span dir="ltr">Heures / semaine</span>ساعات الأسبوع</div><div class="ef-v"><?= e($hxHours ?: '—') ?><?= $hxLaw ? '<span class="ef-warn">قانون: ' . $hxLaw . '</span>' : '' ?></div></div>
+    <div class="ef"><div class="ef-l"><span dir="ltr">Âge · 64 ans</span>العمر · بلوغ الـ64</div><div class="ef-v"><?= $hxAge !== '' ? e($hxAge) . ' · ' . e($hx64) : '—' ?></div></div>
+    <div class="ef"><div class="ef-l"><span dir="ltr">Dernier salaire calculé</span>آخر راتب محسوب</div><div class="ef-v"><?= $hxLast ? e($hxLast) : '—' ?></div></div>
+</div>
+<?php else: ?>
+<div class="d-flex justify-between align-center mb-3" style="flex-wrap:wrap;gap:8px">
+    <a href="<?= BASE_URL ?>pages/employees.php" class="btn btn-light"><i class="fas fa-arrow-left"></i> Retour à la liste / العودة إلى اللائحة</a>
+</div>
+<?php endif; ?>
 
 <?php // 🔒❓ السنة المعروضة سابقة وفيها أشهر مدفوعة لهذا الموظف ⇒ الصفحة تسأل قبل الحفظ (نعم/لا) — app.js لا يعرف، الجافاسكربت أدناه
 $ppSyForm = (string)writeSchoolYear(); $ppPaidN = 0;
@@ -1443,44 +1483,25 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
 <input type="hidden" name="paid_decision" id="paidDecision" value="">
     <input type="hidden" name="active_tab" id="activeTabField" value="<?= e(preg_replace('/[^a-z]/', '', $_GET['tab'] ?? '')) ?>">
     <?php
-    // 💾 صفّ أزرار موحّد أعلى كل تبويب من ملف الأستاذ (طلب المستخدم 2026-08-01:
-    // «بكل صفحة من صفحاتو لازم يكون في زر تعديل وزر حذف وزر حفظ»):
-    // تعديل يفتح القفل (يظهر مقفولاً فقط) · حفظ يحفظ الملف كاملاً (يظهر بوضع التعديل فقط —
-    // القفل يديره) · حذف يحذف الموظف بتأكيد. للموظف المحفوظ فقط.
-    $empTabBar = function () use ($id, $employee) {
-        if ($id <= 0) return;
-        $delMsg = '⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «'
-            . (trim($employee['first_name_ar'] . ' ' . $employee['last_name_ar']) ?: trim($employee['first_name_fr'] . ' ' . $employee['last_name_fr']))
-            . '» ؟ بعد الحذف لا يعود يظهر في البرنامج (يمكن استرجاعه لاحقاً عند الحاجة).';
-        ?>
-        <div class="d-flex gap-2 no-print" style="justify-content:flex-end;margin-bottom:12px;flex-wrap:wrap">
-            <button type="button" data-lockedit-for="empForm" class="btn btn-warning btn-sm" style="display:none">
-                <i class="fas fa-pen"></i> تعديل / Modifier
-            </button>
-            <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-save"></i> حفظ / Enregistrer</button>
-            <a href="?action=delete&id=<?= $id ?>" class="btn btn-danger btn-sm" data-confirm="<?= e($delMsg) ?>">
-                <i class="fas fa-trash"></i> حذف / Supprimer
-            </a>
-        </div>
-        <?php
-    };
+    // 💾 (2026-08-01) كان هنا صفّ أزرار تعديل/حفظ/حذف مكرّر بكل تبويب — 🌍 (2026-10-23 «عالمي… مش معجق») حلّ محلّه:
+    // زرّ «تعديل» واحد + «حذف» بقائمة الإجراءات بالرأس (emp-hero) + شريط حفظ ثابت أسفل الشاشة بوضع التعديل (emp-savebar).
     ?>
     <!-- Tabs -->
-    <div class="tabs">
-        <button type="button" class="tab active" data-tab="personal">👤 Personnel / شخصي</button>
-        <button type="button" class="tab" data-tab="address">🏠 Adresse / العنوان</button>
-        <button type="button" class="tab" data-tab="employment">🎓 Emploi / التوظيف</button>
-        <button type="button" class="tab" data-tab="finance">💰 Financier / مالي</button>
-        <button type="button" class="tab" data-tab="bonuses">🎁 Primes, aides & transport / المكافآت والمساعدات والنقل</button>
-        <button type="button" class="tab" data-tab="deductions">🧾 Retenues / محسومات</button>
+    <?php /* 🌍 (2026-10-23 «ملف الأستاذ مرتّب ترتيب عالمي») التبويبات بسطرين: الفرنسي فوق والعربي تحت، بعرض متساوٍ، تلتصق أثناء التمرير */ ?>
+    <div class="tabs emp-tabs">
+        <button type="button" class="tab active" data-tab="personal"><span class="t-fr">👤 Personnel</span><span class="t-ar">شخصي</span></button>
+        <button type="button" class="tab" data-tab="address"><span class="t-fr">🏠 Adresse</span><span class="t-ar">العنوان</span></button>
+        <button type="button" class="tab" data-tab="employment"><span class="t-fr">🎓 Emploi</span><span class="t-ar">التوظيف</span></button>
+        <button type="button" class="tab" data-tab="finance"><span class="t-fr">💰 Financier</span><span class="t-ar">مالي</span></button>
+        <button type="button" class="tab" data-tab="bonuses"><span class="t-fr">🎁 Primes, aides & transport</span><span class="t-ar">المكافآت والمساعدات والنقل</span></button>
+        <button type="button" class="tab" data-tab="deductions"><span class="t-fr">🧾 Retenues</span><span class="t-ar">المحسومات</span></button>
         <?php if ($id > 0 && $employee['employee_type'] === 'enseignant_titulaire'): ?>
-        <button type="button" class="tab" data-tab="grades">🏆 الدرجات / Échelons</button>
+        <button type="button" class="tab" data-tab="grades"><span class="t-fr">🏆 Échelons</span><span class="t-ar">الدرجات</span></button>
         <?php endif; ?>
     </div>
     
     <!-- ========== Personal Tab ========== -->
     <div class="tab-content active" data-tab-content="personal">
-        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -1547,36 +1568,22 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                     <div style="font-size:0.85em;font-weight:600;opacity:0.9">المعلومات الشخصية</div>
                 </h4>
                 
-                <div class="form-row cols-3">
-                    <div class="form-group">
-                        <label class="form-label">Prénom (FR) / الاسم الأول</label>
-                        <input type="text" name="first_name_fr" class="form-control" value="<?= e($employee['first_name_fr']) ?>">
+                <?php /* 🌍 (2026-10-23) الاسم الأوّل / اسم الأب / الشهرة: الفرنسي والعربي لنفس الاسم جنب بعض بخانة واحدة (كانا مكسورين على سطرين) */ ?>
+                <div class="form-row cols-3 name-pairs">
+                    <div class="form-group name-pair">
+                        <label class="form-label">Prénom · الاسم الأوّل <span class="req">*</span></label>
+                        <div class="pair"><input type="text" name="first_name_fr" class="form-control" value="<?= e($employee['first_name_fr']) ?>" placeholder="FR" dir="ltr"><input type="text" name="first_name_ar" class="form-control" value="<?= e($employee['first_name_ar']) ?>" dir="rtl" placeholder="عربي" required></div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Prénom / الاسم الأول (AR) <span class="req">*</span></label>
-                        <input type="text" name="first_name_ar" class="form-control" value="<?= e($employee['first_name_ar']) ?>" dir="rtl" required>
+                    <div class="form-group name-pair">
+                        <label class="form-label">Nom du père · اسم الأب</label>
+                        <div class="pair"><input type="text" name="father_name_fr" class="form-control" value="<?= e($employee['father_name_fr']) ?>" placeholder="FR" dir="ltr"><input type="text" name="father_name_ar" class="form-control" value="<?= e($employee['father_name_ar']) ?>" dir="rtl" placeholder="عربي"></div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Nom du père (FR) / اسم الأب</label>
-                        <input type="text" name="father_name_fr" class="form-control" value="<?= e($employee['father_name_fr']) ?>">
-                    </div>
-                </div>
-                
-                <div class="form-row cols-3">
-                    <div class="form-group">
-                        <label class="form-label">Nom du père / اسم الأب (AR)</label>
-                        <input type="text" name="father_name_ar" class="form-control" value="<?= e($employee['father_name_ar']) ?>" dir="rtl">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Nom de famille (FR) / الشهرة</label>
-                        <input type="text" name="last_name_fr" class="form-control" value="<?= e($employee['last_name_fr']) ?>">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Nom de famille / الشهرة (AR) <span class="req">*</span></label>
-                        <input type="text" name="last_name_ar" class="form-control" value="<?= e($employee['last_name_ar']) ?>" dir="rtl" required>
+                    <div class="form-group name-pair">
+                        <label class="form-label">Nom de famille · الشهرة <span class="req">*</span></label>
+                        <div class="pair"><input type="text" name="last_name_fr" class="form-control" value="<?= e($employee['last_name_fr']) ?>" placeholder="FR" dir="ltr"><input type="text" name="last_name_ar" class="form-control" value="<?= e($employee['last_name_ar']) ?>" dir="rtl" placeholder="عربي" required></div>
                     </div>
                 </div>
-                
+
                 <div class="form-row cols-2">
                     <div class="form-group">
                         <label class="form-label">Prénom de la mère / اسم الأم</label>
@@ -1702,7 +1709,6 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
 
     <!-- ========== Address Tab ========== -->
     <div class="tab-content" data-tab-content="address">
-        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -1765,7 +1771,6 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
     
     <!-- ========== Employment Tab ========== -->
     <div class="tab-content" data-tab-content="employment">
-        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -1848,7 +1853,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                                 <?php if ($hrMsg['reduction'] > 0): ?>
                                     ساعاته القانونية <strong><?= (int)$hrMsg['lawHours'] ?></strong> بدل <?= (int)$hrMsg['baseHours'] ?> (تناقص −<?= (int)$hrMsg['reduction'] ?>، سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>)<?= $hrNeeds ? ' <span class="badge badge-warning">⏳ قرار مطلوب أعلاه</span>' : '' ?>
                                 <?php else: ?>
-                                    لا تناقص بسنة <?= e($hrSy) ?> (سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>) — يبدأ من سنة <?= e($hrMsg['startSy']) ?>
+                                    لا تناقص بسنة <span dir="ltr"><?= e($hrSy) ?></span> (سنة الخدمة <?= (int)$hrMsg['serviceYear'] ?>) — يبدأ من سنة <?= e($hrMsg['startSy']) ?>
                                 <?php endif; ?>
                             </small>
                         <?php endif; ?>
@@ -1999,7 +2004,6 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
     
     <!-- ========== Finance Tab ========== -->
     <div class="tab-content" data-tab-content="finance">
-        <?php $empTabBar(); ?>
         <?php
         // 💰 «خلّينا نشوف بالملف المالي قدّيش مجموع التنزيلات العائلية الشهرية وقيمة صندوق التعويضات وقيمة الضمان»
         // (طلبه 2026-09-10): قراءة فقط — التنزيل من المصدر الواحد familyDeductionAnnual (السنوي ÷ 12)،
@@ -2008,11 +2012,13 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
         if (!empty($id)) {
             try {
                 $fsSy = activeSchoolYear(); if ($fsSy === 'all') $fsSy = currentSchoolYear();
+                // 📅 (2026-10-23 «بحسب راتب أيلول 2027» شهر مستقبلي) ⇒ آخر شهر محسوب لغاية الشهر الحالي؛ وإن لم يوجد فأقرب شهر مخزّن بالسنة
+                $fsNowYm = (int)date('Y') * 100 + (int)date('n');
                 $fsQ = $db->prepare("SELECT month, year, school_year, caisse_amount_lbp, cnss_amount_lbp, income_tax_lbp
                                      FROM monthly_salaries WHERE employee_id = ? AND school_year = ?
                                        AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0)
-                                     ORDER BY year DESC, month DESC LIMIT 1");
-                $fsQ->execute([(int)$id, $fsSy]);
+                                     ORDER BY (year * 100 + month <= ?) DESC, (year * 100 + month <= ?) * (year * 100 + month) DESC, year ASC, month ASC LIMIT 1");
+                $fsQ->execute([(int)$id, $fsSy, $fsNowYm, $fsNowYm]);
                 $fsRow = $fsQ->fetch(PDO::FETCH_ASSOC);
                 if (!$fsRow) {
                     $fsQ2 = $db->prepare("SELECT month, year, school_year, caisse_amount_lbp, cnss_amount_lbp, income_tax_lbp
@@ -2241,12 +2247,13 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                 <p style="color:var(--gray-500);font-size:13px;">معفاة من كل المحسومات والضرائب</p>
                 <?php /* 👨‍👩‍👧 (2026-09-20) القانون بلسان المستخدم: التعويض العائلي ≠ التنزيل العائلي بالضريبة؛ لا يُقسَّم بين الزوجين؛
                          الملاك من المدرسة (إن أُعطي) · المتعاقد لا يستحقّ (قانون المعلمين) · موظف قانون العمل من الضمان */ ?>
-                <div style="padding:8px 10px;background:#f8fafc;border:1px solid var(--gray-200);border-radius:6px;font-size:12.5px;color:var(--gray-600);margin-bottom:10px;line-height:1.7">
+                <details class="emp-help emp-help-box" style="font-size:12.5px;color:var(--gray-600);line-height:1.7">
+                    <summary><strong>ⓘ Allocations familiales ≠ abattement familial · التعويض العائلي ≠ التنزيل العائلي</strong></summary>
                     <div dir="ltr" style="text-align:left"><strong>Allocations familiales ≠ abattement familial (impôt)</strong> — jamais partagées entre les époux.</div>
                     <div dir="rtl" style="text-align:right"><strong>التعويض العائلي غير التنزيل العائلي بالضريبة</strong> — لا يُقسَّم بين الزوجين أبداً. المصدر حسب الفئة:
                     <strong>ملاك</strong> من المدرسة · <strong>متعاقد</strong> لا يستحقّ (قانون المعلمين — لا يُحسب له) · <strong>موظف</strong> خاضع لقانون العمل من الضمان.
                     يُحسب لكل شهر ضمن المدّة «من شهر ← إلى شهر» تلقائياً؛ لإيقافه حطّ «إلى شهر» (لا تصفّر المبلغ).</div>
-                </div>
+                </details>
 
                 <div class="form-row cols-2">
                     <div class="form-group">
@@ -2361,8 +2368,9 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
     if ($id > 0) {
         try {
             $pvSy = activeSchoolYear(); if ($pvSy === 'all') $pvSy = currentSchoolYear();
-            $pvQ = $db->prepare("SELECT base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND base_plus_echelon_lbp > 0 ORDER BY year DESC, month DESC LIMIT 1");
-            $pvQ->execute([(int)$id, $pvSy]);
+            $pvNowYm = (int)date('Y') * 100 + (int)date('n');   // 📅 (2026-10-23) الأساس من آخر شهر محسوب لغاية اليوم (لا شهر مستقبلي)
+            $pvQ = $db->prepare("SELECT base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND base_plus_echelon_lbp > 0 ORDER BY (year * 100 + month <= ?) DESC, (year * 100 + month <= ?) * (year * 100 + month) DESC, year ASC, month ASC LIMIT 1");
+            $pvQ->execute([(int)$id, $pvSy, $pvNowYm, $pvNowYm]);
             $pvBase = (float)$pvQ->fetchColumn();
             $pvRate = (float)getExchangeRate();
         } catch (Throwable $e) { $pvBase = 0.0; $pvRate = 0.0; }
@@ -2391,7 +2399,6 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
         </div>
     <?php }; ?>
     <div class="tab-content" data-tab-content="bonuses">
-        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -2410,8 +2417,9 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                         <i class="fas fa-info-circle"></i> Enregistrez d'abord l'employé, puis ajoutez les primes / احفظ الأستاذ أولاً، ثم أضِف المكافآت والنقل من هذا التبويب.
                     </div>
                 <?php else: ?>
-                <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:13px;line-height:1.7">
-                    <strong style="color:var(--primary)">Comment ça marche / كيف بتشتغل هالصفحة</strong>
+                <?php /* 🌍 (2026-10-23) الشرح مطويّ «ⓘ» حتى لا يقطع البنود — يُفتح عند الحاجة */ ?>
+                <details class="emp-help emp-help-box" style="font-size:13px;line-height:1.7">
+                    <summary><strong style="color:var(--primary)">ⓘ Comment ça marche / كيف بتشتغل هالصفحة</strong></summary>
                     <ul style="margin:6px 0 0;padding-inline-start:20px">
                         <li>البنود هنا تخصّ <strong>السنة الدراسية المختارة بالأعلى (<?= e(activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()) ?>)</strong> وتدخل بالراتب الشهري تلقائياً.</li>
                         <li>ثلاثة أنواع، لكلٍّ قسمه: <strong>➕ الأجر الإضافي</strong> · <strong>💰 مكافأة ومساعدة</strong> · <strong>🚌 تعويض النقل</strong> (شهري مقطوع <em>أو</em> يومي).</li>
@@ -2419,7 +2427,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                         <li>النسبة٪ تُحسب حسب القانون: الأساس ÷ <?= e(officialUsdRateLbl()) ?> × النسبة ← دولار ← × سعر صرف الشهر ← داون للمليون. المعاينة بعمود «الشهري ≈».</li>
                         <li>بعد <strong>«حفظ»</strong> يعيد البرنامج حساب رواتب السنة تلقائياً. حذف سطر (✕) ثم حفظ = يُصفَّر من الأشهر.</li>
                     </ul>
-                </div>
+                </details>
                 <input type="hidden" name="bonus_editor" value="1">
 
                 <?php
@@ -2566,9 +2574,9 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                         if(vt==='percent'){
                             if(!(BASE>0) || !(RATE>0)){ out.textContent=v+'٪ من الأساس (يُحسب عند الحفظ)'; return; }
                             var usd=Math.floor((BASE/OFFICIAL)*(v/100)); var lbp=Math.floor(usd*RATE); lbp=Math.floor(lbp/1000000)*1000000;
-                            out.innerHTML='≈ '+fmt(lbp)+' ل.ل <small style="color:var(--gray-500);font-weight:400">('+fmt(BASE)+' ÷ '+fmt(OFFICIAL)+' × '+v+'٪ = '+fmt(usd)+'$ × '+fmt(RATE)+')</small>';
+                            out.innerHTML='≈ '+fmt(lbp)+' ل.ل <small dir="ltr" style="color:var(--gray-500);font-weight:400;unicode-bidi:isolate;display:inline-block">('+fmt(BASE)+' ÷ '+fmt(OFFICIAL)+' × '+v+'% = $'+fmt(usd)+' × '+fmt(RATE)+')</small>';
                         } else if(cur==='USD'){
-                            out.innerHTML = (RATE>0) ? ('≈ '+fmt(Math.floor(v*RATE))+' ل.ل <small style="color:var(--gray-500);font-weight:400">('+fmt(v)+'$ × '+fmt(RATE)+')</small>') : (fmt(v)+' $');
+                            out.innerHTML = (RATE>0) ? ('≈ '+fmt(Math.floor(v*RATE))+' ل.ل <small dir="ltr" style="color:var(--gray-500);font-weight:400;unicode-bidi:isolate;display:inline-block">($'+fmt(v)+' × '+fmt(RATE)+')</small>') : ('$'+fmt(v));
                         } else { out.textContent=fmt(v)+' ل.ل'; }
                     }
                     function previewAll(){ document.querySelectorAll('.bnRow').forEach(preview); }
@@ -2592,7 +2600,6 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
 
     <!-- ========== Deductions Tab ========== -->
     <div class="tab-content" data-tab-content="deductions">
-        <?php $empTabBar(); ?>
         <div class="card">
             <div class="card-header">
                 <h3>
@@ -2728,10 +2735,10 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
         </div>
     </div>
     
-    <!-- Save buttons -->
-    <div class="card">
+    <!-- Save buttons — 🌍 (2026-10-23) شريط ثابت أسفل الشاشة يظهر بوضع التعديل فقط؛ لا «إلغاء» بوضع العرض -->
+    <div class="card emp-savebar">
         <div class="card-body d-flex justify-between">
-            <a href="<?= BASE_URL ?>pages/employees.php" class="btn btn-light">
+            <a href="<?= BASE_URL ?>pages/employees.php<?= $id > 0 ? '?action=edit&id=' . (int)$id : '' ?>" class="btn btn-light emp-cancel">
                 <i class="fas fa-times"></i> Annuler / إلغاء
             </a>
             <button type="submit" id="empSaveBtn" class="btn btn-primary btn-lg">
@@ -2778,6 +2785,25 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
 // ملاحظة: قفل ملف الأستاذ صار عبر السكربت المشترك assets/js/form-lock.js
 // (class="lockedit" على الفورم + زر «تعديل» في الشريط العلوي عبر data-lockedit-for).
 ?>
+<script>
+/* 🌍 (2026-10-23 ترتيب ملف الأستاذ) ① النصّ الشارح الطويل تحت الحقل يصير «ⓘ توضيح» مطويّاً حتى لا يقطع الحقول ولا يغيّر ارتفاع السطر
+   ② التسمية سطر واحد (CSS) ⇒ نصّها الكامل بالتلميح ③ وضع التعديل ينعكس على الفورم (is-editing) ليظهر شريط الحفظ وكبسة الإلغاء */
+(function () {
+    var form = document.getElementById('empForm'); if (!form) return;
+    form.querySelectorAll('.form-group > small, .form-group > div > small').forEach(function (sm) {
+        if (sm.closest('details') || sm.querySelector('input, select, button, a.btn')) return;
+        if ((sm.textContent || '').trim().length < 110) return;
+        var d = document.createElement('details'); d.className = 'emp-help';
+        var s = document.createElement('summary'); s.textContent = 'ⓘ توضيح / Explication';
+        sm.parentNode.insertBefore(d, sm); d.appendChild(s); d.appendChild(sm);
+    });
+    form.querySelectorAll('label.form-label').forEach(function (l) { if (!l.title) l.title = (l.textContent || '').replace(/\s+/g, ' ').trim(); });
+    // form-lock.js يعلن الحالة على الفورم: data-lock-state = locked | open
+    function sync() { var st = form.getAttribute('data-lock-state'); var editing = st ? (st === 'open') : !form.classList.contains('lockedit'); form.classList.toggle('is-editing', !!editing); var h = document.querySelector('.emp-hero'); if (h) h.classList.toggle('is-editing', !!editing); }
+    sync(); new MutationObserver(sync).observe(form, { attributes: true, attributeFilter: ['data-lock-state'] }); setTimeout(sync, 300);
+    document.addEventListener('click', function (ev) { var m = document.getElementById('ehMenu'); if (m && !m.contains(ev.target)) m.classList.remove('open'); });
+})();
+</script>
 
 <?php
 // خريطة السلسلة (درجة → راتب) للإصدار الساري — لعرض الراتب فوراً عند اختيار الدرجة
@@ -2791,10 +2817,10 @@ var SALARY_SCALE = <?= json_encode($scaleMap) ?>;
 function scaleSalaryJS(grade) {
     grade = parseFloat(grade); if (isNaN(grade) || grade < 1) return null;
     var lo = Math.floor(grade), hi = Math.ceil(grade), frac = grade - lo;
-    var vLo = SALARY_SCALE[lo], vHi = SALARY_SCALE[hi];
+    // 🔴 (2026-10-23) قاعدة نصف الدرجة (قراره 2026-06-21): الراتب على الدرجة الكاملة (floor) بلا استيفاء — كان العرض يستوفي (36.5 ⇒ 3,157,500) بينما المحرّك 3,100,000
+    var vLo = SALARY_SCALE[lo];
     if (vLo == null) return null;
-    var v = (frac === 0 || vHi == null) ? vLo : vLo + frac * (vHi - vLo);
-    return Math.round(v);
+    return Math.round(vLo);
 }
 function fmtLBP(n) { return n == null ? '—' : n.toLocaleString('en-US') + ' L.L'; }
 function refreshGradeSalaries() {
