@@ -3245,7 +3245,57 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
 .emp-facts .ef-v .ef-warn{display:inline-block;font-size:11px;font-weight:700;background:#fef3c7;color:#b45309;border-radius:999px;padding:0 8px;margin-inline-start:6px;direction:rtl}
 @media (max-width:1200px){.emp-facts{grid-template-columns:repeat(4,1fr)}.emp-facts .ef:nth-child(4n){border-inline-end:0}.emp-hero{grid-template-columns:auto 1fr}.emp-hero .eh-acts{grid-column:1/-1;justify-content:flex-start}}
 /* التبويبات بسطرين */
-.tabs.emp-tabs{display:flex;gap:4px;flex-wrap:wrap;position:sticky;top:0;z-index:30;background:var(--gray-100,#f1f5f9);padding-top:4px}
+.tabs.emp-tabs{display:flex;gap:4px;flex-wrap:wrap;position:sticky;top:var(--msa-topbar-h,0px);z-index:30;background:var(--gray-100,#f1f5f9);padding-top:4px}
+/* 📌 (2026-10-23 «بس اطلع وانزل بالصفحة العناوين تضلّ مبيّنة») عنوان كل بطاقة يلتصق تحت التبويبات أثناء التمرير داخلها */
+#empForm .tab-content > .card{overflow:visible}
+#empForm .tab-content.active > .card > .card-header{position:sticky;top:calc(var(--msa-topbar-h,0px) + var(--emp-tabs-h,0px));z-index:12;background:var(--gray-50,#f8fafc);border-radius:var(--radius,12px) var(--radius,12px) 0 0}
+/* 📐 (2026-10-23 «الصفحة ما تكون هالقد واسعة كرمال كلمة وحدة — المستطيل قدّ الكلمة»): الحقول بعرض محتواها وتتراصف بسطر مرتّب */
+/* («المربّعات كتير بعاد عن بعضهن — الصفحة تصير منمنمة») الحقول متلاصقة بسطر مرتّب (flex) والمستطيل قدّ محتواه؛ الطويلة (نصّ/صفوف/مدارس) سطر كامل */
+#empForm .form-row,#empForm .form-row.name-pairs{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:flex-start}
+#empForm .form-row > .form-group{flex:0 1 auto;min-width:0;max-width:100%;margin-bottom:4px;display:flex;flex-direction:column}
+/* («الفراغات بين مربّع ومربّع لشو») المستطيل يمتدّ تحت تسميته كاملة فلا يبقى فراغ بين مربّع والتالي */
+#empForm .form-group > input.form-control.emp-fit,#empForm .form-group > select.form-select{min-width:100%}
+#empForm .form-group > input[type=date].form-control{min-width:100%}
+/* النوع (أستاذ/موظف) وتحته ملاك/متعاقد: جنب بعض بدل فوق بعض */
+#empForm .form-group:has(> #teacherKindWrap){flex-direction:row;flex-wrap:wrap;align-items:flex-start;gap:4px 14px}
+#empForm .form-group:has(> #teacherKindWrap) > label.form-label,#empForm .form-group:has(> #teacherKindWrap) > details,#empForm .form-group:has(> #teacherKindWrap) > small{flex:1 1 100%}
+#empForm .form-group:has(> #teacherKindWrap) > select#empKind{width:auto;min-width:0}
+#empForm #teacherKindWrap{margin-top:0 !important}
+/* الشرح (details/small) تحت الحقل لا يوسّع مجموعته: عرضه = عرض المجموعة لا عرض نصّه */
+#empForm .form-row > .form-group > details.emp-help,#empForm .form-row > .form-group > small,#empForm .form-group:has(> #teacherKindWrap) > details{contain:inline-size;width:100%;min-width:0;box-sizing:border-box}
+/* 📄 («وقت بكبس شخصي تطلع صفحتو بنصّ الشاشة كأنّها A4 والعناوين كمان») الملف كلّه ورقة بيضاء واحدة بنصّ الشاشة: الرأس + الحقائق + التبويبات + محتوى التبويب */
+/* (كانت هنا ورقة 1140px خاصّة بملف الأستاذ — صارت الورقة عامّة لكل الصفحات أدناه، فالملف يملأ الورقة العامّة) */
+#empForm .tabs.emp-tabs{justify-content:center}
+#empForm .tab-content.active{background:#fff;border:1px solid #dfe5ee;border-radius:16px;padding:16px 20px 22px;box-shadow:0 12px 34px rgba(15,23,42,.10);margin-top:4px}
+#empForm .tab-content.active > .card{box-shadow:none;border:1px solid #e9eef5}
+#empForm .tab-content.active > .card:last-child{margin-bottom:0}
+.emp-facts .ef-v{white-space:normal;overflow:visible;text-overflow:clip}
+/* 📄 (2026-10-23 «عظيم هيك بس تبين الصفحة A4 — طبّقها على الكل بدون ما تخرب») كل صفحة بالبرنامج = ورقة بيضاء واحدة بنصّ الشاشة (≤1400px)؛
+   الصفحة التي محتواها أعرض (جدول عريض) تتوسّع لحالها (sheet-wide يضيفها app.js) — شاشة فقط؛ المستندات (doc-view) بورقتها الخاصّة كما هي */
+@media screen {
+  body:not(.doc-view) .main-content > .page-content{background:#fff;border:1px solid #dfe5ee;border-radius:16px;box-shadow:0 12px 34px rgba(15,23,42,.10);margin:10px auto 24px;padding:16px 20px 28px}
+  body:not(.doc-view) .main-content > .page-content:not(.sheet-wide){max-width:1400px}
+  body:not(.doc-view) .main-content > .page-content.sheet-wide{max-width:none;margin-left:12px;margin-right:12px}
+  body:not(.doc-view) .main-content > .page-content > .card{box-shadow:none;border:1px solid #e9eef5}
+  #empForm .tab-content.active{box-shadow:none;border-color:#e9eef5}   /* داخل الورقة العامّة: بلا ظلّ مزدوج */
+}
+#empForm .form-row > .form-group:has(> textarea),#empForm .form-row > .form-group:has(.school-checks),#empForm .form-row > .form-group:has(.chk-group),#empForm .form-row > .form-group.emp-wide{flex:1 1 100%}
+#empForm .card > .card-body{padding:10px 14px}
+#empForm .card{margin-bottom:10px}
+#empForm h4{margin:10px 0 6px !important}
+#empForm .form-group > select.form-select,#empForm .form-group > input.form-control,#empForm .name-pair .pair .form-control{padding-top:6px;padding-bottom:6px}
+/* 🎨 («عناوين التوظيف/المالي… مرتّبين حدّ بعض وملوّنين تشوفهن») التبويبات حبوب ملوّنة متلاصقة، كلّ تبويب بلونه، والمفتوح بإطار */
+#empForm .tabs.emp-tabs{gap:6px;padding:6px 0 8px;flex-wrap:wrap;border-bottom:0}
+#empForm .tabs.emp-tabs .tab{--tc:#1e4fa3;flex:0 0 auto !important;min-width:0 !important;padding:6px 16px !important;border:0 !important;border-radius:11px !important;background:var(--tc) !important;background-image:none !important;color:#fff !important;opacity:.82;box-shadow:none !important;margin:0 !important}
+#empForm .tabs.emp-tabs .tab .t-fr,#empForm .tabs.emp-tabs .tab .t-ar{color:#fff}
+#empForm .tabs.emp-tabs .tab:hover{opacity:1}
+#empForm .tabs.emp-tabs .tab.active{opacity:1;box-shadow:0 0 0 3px #fff,0 0 0 5px var(--tc) !important;font-weight:800}
+#empForm .tabs.emp-tabs .tab[data-tab=personal]{--tc:#1e4fa3}#empForm .tabs.emp-tabs .tab[data-tab=address]{--tc:#0e7490}#empForm .tabs.emp-tabs .tab[data-tab=employment]{--tc:#7c3aed}
+#empForm .tabs.emp-tabs .tab[data-tab=finance]{--tc:#15803d}#empForm .tabs.emp-tabs .tab[data-tab=bonuses]{--tc:#b45309}#empForm .tabs.emp-tabs .tab[data-tab=deductions]{--tc:#334155}#empForm .tabs.emp-tabs .tab[data-tab=grades]{--tc:#be185d}
+#empForm .form-group > input.form-control.emp-fit{width:auto;min-width:9ch;max-width:100%;box-sizing:content-box}
+#empForm .form-group > select.form-select{width:auto;max-width:100%;padding-inline-end:38px}
+#empForm .form-group > input[type=date].form-control,#empForm .form-group > input[type=month].form-control{width:auto}
+#empForm .form-group > textarea.form-control{width:100%}
 .tabs.emp-tabs .tab{display:flex;flex-direction:column;align-items:center;gap:0;line-height:1.25;padding:7px 14px 8px;min-width:128px;flex:1 1 auto}
 .tabs.emp-tabs .tab .t-fr{font-weight:700;font-size:13.5px;direction:ltr}.tabs.emp-tabs .tab .t-ar{font-size:12px;font-weight:600;opacity:.85}
 /* الحقول: التسمية سطر واحد · الصفّ لا يتمدّد · التوضيح مطويّ */
@@ -3253,8 +3303,9 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
 #empForm .form-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;color:#334155;margin-bottom:4px}
 #empForm .form-label .req{margin-inline-start:2px}
 #empForm .form-group{margin-bottom:14px;min-width:0}
-#empForm .name-pair .pair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-#empForm .name-pair .pair .form-control{min-width:0}
+#empForm .form-row.name-pairs{grid-template-columns:repeat(3,minmax(0,1fr))}   /* لا يتجاوز عرض الصفحة (كانت خانة الشهرة تُقصّ من الطرف) */
+#empForm .name-pair .pair{display:flex;flex-wrap:wrap;gap:6px}
+#empForm .name-pair .pair .form-control{min-width:9ch;max-width:100%;flex:0 1 auto}   /* الفرنسي والعربي كلّ منهما قدّ كلمته */
 #empForm details.emp-help{margin-top:4px}#empForm details.emp-help summary{cursor:pointer;color:#1e4fa3;font-weight:600;font-size:12px;list-style:none}#empForm details.emp-help summary::-webkit-details-marker{display:none}
 #empForm details.emp-help[open] summary{margin-bottom:2px}
 /* شريط الحفظ أسفل: ثابت بوضع التعديل فقط */

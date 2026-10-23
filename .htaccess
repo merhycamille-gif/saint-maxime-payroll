@@ -33,5 +33,26 @@ RewriteRule ^msa-payroll/(.*)$ $1 [L]
 
 # ⚡ (2026-10-02 «في بطء كتير بالبرنامج»): صفحات البرنامج (HTML/JSON) تُرسَل مضغوطة — صفحة الموظفين ~1MB تصير ~100KB.
 <IfModule mod_deflate.c>
-AddOutputFilterByType DEFLATE text/html text/plain application/json text/xml
+# ⚡ (2026-10-23 «من كبسة لكبسة عم تاخذ وقت»): CSS/JS/SVG كانت تُرسَل خاماً (app.css 250KB + app.js 90KB بكل صفحة) ⇒ مضغوطة أيضاً
+AddOutputFilterByType DEFLATE text/html text/plain application/json text/xml text/css application/javascript application/x-javascript text/javascript image/svg+xml
+</IfModule>
+# ⚡ (2026-10-23) الملفات الثابتة بكاش طويل بالمتصفّح — الروابط موسومة ?v=وقت التعديل فأي تحديث يصل فوراً
+<IfModule mod_expires.c>
+ExpiresActive On
+ExpiresByType text/css "access plus 1 year"
+ExpiresByType application/javascript "access plus 1 year"
+ExpiresByType text/javascript "access plus 1 year"
+ExpiresByType image/svg+xml "access plus 30 days"
+ExpiresByType image/png "access plus 30 days"
+ExpiresByType image/jpeg "access plus 30 days"
+ExpiresByType image/x-icon "access plus 30 days"
+ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+<IfModule mod_headers.c>
+<FilesMatch "\.(css|js)$">
+Header set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
+<FilesMatch "\.(png|jpg|jpeg|svg|ico|woff2)$">
+Header set Cache-Control "public, max-age=2592000"
+</FilesMatch>
 </IfModule>

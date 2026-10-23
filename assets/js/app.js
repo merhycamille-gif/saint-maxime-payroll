@@ -1051,6 +1051,13 @@ window.msaDrawer = (function () {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
 })();
 
+/* 📄 (2026-10-23 «طبّقها على الكل بدون ما تخرب») الورقة البيضاء ≤1400px لكل صفحة: إذا كان المحتوى أعرض منها (جدول عريض) تتوسّع لحالها */
+(function () {
+    var pc = document.getElementById('pageContent'); if (!pc || document.body.classList.contains('doc-view')) return;
+    function fit() { pc.classList.remove('sheet-wide'); if (pc.scrollWidth > pc.clientWidth + 2) pc.classList.add('sheet-wide'); }
+    fit(); setTimeout(fit, 400); setTimeout(fit, 1500); window.addEventListener('resize', fit); window.addEventListener('load', fit);
+})();
+
 /* 🏫✖️ (2026-10-23 «ليش بس حط الموس بدون ما كبس ببين دغري اسانسور المدارس») قوائم الشريط العلوي (المدارس / الراتب يشمل / الجرس)
    كانت تبقى مفتوحة بعد الكبس عليها حتى يُكبَس عليها ثانيةً — فتبدو كأنّها تفتح لحالها. صارت تُغلَق بأي كبسة خارجها أو بـEscape. */
 (function () {
@@ -1066,4 +1073,10 @@ window.msaDrawer = (function () {
     }, true);
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(null); });
     ids.forEach(function (id) { var m = document.getElementById(id); if (!m) return; var host = hostOf(m), b = host && host.querySelector('.sm-btn, .bell-btn'); if (b) b.addEventListener('click', function () { closeAll(m); }); });   // فتح قائمة يغلق الأخرى
+    // 🏫🖱️ (2026-10-23 «خلّيها» تفتح بالمرور متل الأبواب العلوية): قائمة المدارس تفتح عند مرور الماوس على الحبّة وتُغلَق بعد مغادرتها (مهلة قصيرة)
+    (function () {
+        var m = document.getElementById('schoolMenu'); if (!m) return; var host = hostOf(m); if (!host) return; var tmr = null;
+        host.addEventListener('mouseenter', function () { clearTimeout(tmr); tmr = setTimeout(function () { closeAll(m); if (!m.classList.contains('open')) { var b = host.querySelector('.sm-btn'); if (b) b.click(); else m.classList.add('open'); } }, 90); });
+        host.addEventListener('mouseleave', function () { clearTimeout(tmr); tmr = setTimeout(function () { m.classList.remove('open'); }, 260); });
+    })();
 })();

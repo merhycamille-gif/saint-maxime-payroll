@@ -1657,7 +1657,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                             <option value="0" <?= empty($employee['spouse_works']) ? 'selected' : '' ?>>Non / كلا</option>
                             <option value="1" <?= !empty($employee['spouse_works']) ? 'selected' : '' ?>>Oui / نعم</option>
                         </select>
-                        <small style="display:block;color:var(--gray-500);margin:6px 0 4px">إذا بدأ العمل بتاريخ معيّن حدّده — زيادة الزوج تنشال تلقائياً من ذاك التاريخ:</small>
+                        <label class="form-label" style="margin-top:6px" title="إذا بدأ العمل بتاريخ معيّن حدّده — زيادة الزوج تنشال تلقائياً من ذاك التاريخ:">Travaille depuis le · يعمل منذ تاريخ <small>(اختياري)</small></label>
                         <?php $swsd = (string)($employee['spouse_work_start_date'] ?? ''); if ($swsd < '1900-01-01') $swsd = ''; /* 0000-00-00 / 0001-01-01 = لا تاريخ */ ?>
                         <input type="date" name="spouse_work_start_date" class="form-control" value="<?= e($swsd) ?>">
                     </div>
@@ -2802,6 +2802,16 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
     function sync() { var st = form.getAttribute('data-lock-state'); var editing = st ? (st === 'open') : !form.classList.contains('lockedit'); form.classList.toggle('is-editing', !!editing); var h = document.querySelector('.emp-hero'); if (h) h.classList.toggle('is-editing', !!editing); }
     sync(); new MutationObserver(sync).observe(form, { attributes: true, attributeFilter: ['data-lock-state'] }); setTimeout(sync, 300);
     document.addEventListener('click', function (ev) { var m = document.getElementById('ehMenu'); if (m && !m.contains(ev.target)) m.classList.remove('open'); });
+    // 📌 ارتفاع شريط التبويبات ⇒ عناوين البطاقات تلتصق تحته
+    function tabsH() { var t = document.querySelector('.tabs.emp-tabs'); document.documentElement.style.setProperty('--emp-tabs-h', (t ? Math.ceil(t.getBoundingClientRect().height) : 0) + 'px'); }
+    tabsH(); window.addEventListener('resize', tabsH); setTimeout(tabsH, 500);
+    // 📐 الحقل بعرض محتواه (قدّ الكلمة + هامش) — يكبر أثناء الكتابة
+    var skip = { date: 1, month: 1, file: 1, checkbox: 1, radio: 1, range: 1, color: 1, hidden: 1 };
+    function fit(el) { if (skip[el.type]) return; var v = String(el.value || el.placeholder || ''); var n = Math.max(9, Math.min(60, v.length + 4)); el.style.width = n + 'ch';   /* +4: الخطّ العريض أوسع من ch فلا تُقصّ آخر حرف */ el.classList.add('emp-fit'); }
+    var FIT_SEL = '.form-group > input.form-control, .name-pair .pair > input.form-control';
+    function fitAll() { form.querySelectorAll(FIT_SEL).forEach(fit); }
+    fitAll(); form.addEventListener('input', function (ev) { if (ev.target.matches(FIT_SEL)) fit(ev.target); });
+    form.addEventListener('change', function (ev) { if (ev.target.matches(FIT_SEL)) fit(ev.target); });
 })();
 </script>
 
