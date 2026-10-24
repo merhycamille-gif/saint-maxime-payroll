@@ -2613,7 +2613,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                     Choisissez les composants soumis à chaque type de retenue. Les allocations familiales sont toujours exonérées.
                 </div>
                 
-                <div class="form-row cols-3">
+                <div class="form-row cols-3 ded-3row">
                     <!-- Tax -->
                     <div class="card" style="margin:0;">
                         <div class="card-header" style="background:#fef2f2;">

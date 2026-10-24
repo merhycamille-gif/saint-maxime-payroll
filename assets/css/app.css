@@ -3308,6 +3308,10 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
 #empForm .form-label .req{margin-inline-start:2px}
 #empForm .form-group{margin-bottom:14px;min-width:0}
 #empForm .form-row.name-pairs{grid-template-columns:repeat(3,minmax(0,1fr))}   /* لا يتجاوز عرض الصفحة (كانت خانة الشهرة تُقصّ من الطرف) */
+/* 🧾 (2026-10-24 p1 «خلّي مربّع محسومات الصندوق بنفس سطر الضمان والمالية») المربّعات الثلاثة (ضريبة/ضمان/صندوق) صفّ واحد ثلاثي — يغلب flex عامّ #empForm */
+#empForm .form-row.ded-3row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+#empForm .form-row.ded-3row > .card{margin:0;min-width:0}
+@media (max-width:900px){#empForm .form-row.ded-3row{grid-template-columns:1fr}}
 #empForm .name-pair .pair{display:flex;flex-wrap:wrap;gap:6px}
 #empForm .name-pair .pair .form-control{min-width:9ch;max-width:100%;flex:0 1 auto}   /* الفرنسي والعربي كلّ منهما قدّ كلمته */
 #empForm details.emp-help{margin-top:4px}#empForm details.emp-help summary{cursor:pointer;color:#1e4fa3;font-weight:600;font-size:12px;list-style:none}#empForm details.emp-help summary::-webkit-details-marker{display:none}
