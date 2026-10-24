@@ -150,7 +150,7 @@
     var state = { lang: 'both', side: '' };
     try { state.lang = localStorage.getItem('msa_rl') || 'both'; state.side = localStorage.getItem('msa_rs') || ''; } catch (e) {}
     if (['ar', 'fr', 'both'].indexOf(state.lang) < 0) state.lang = 'both';
-    function rlStateSheet(od) { return od.hasAttribute('dir') && !/(cnss-form|mof-form|tcard|eos-doc|fiche-a4|print-only)/.test(od.className); }   // كشف رواتب للدولة (لا نموذج طبق الأصل)
+    function rlStateSheet(od) { return od.hasAttribute('dir') && !/\b(cnss-form|mof-form|tcard|eos-doc|fiche-a4|print-only)\b/.test(od.className); }   // كشف رواتب للدولة (لا نموذج طبق الأصل)
     function effSide() { return state.lang === 'ar' ? 'rtl' : state.lang === 'fr' ? 'ltr' : (state.side === 'rtl' || state.side === 'ltr' ? state.side : ''); }
     function apply() {
         wrapAll();

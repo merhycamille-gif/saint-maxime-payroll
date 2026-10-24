@@ -465,7 +465,8 @@ $mmEst = function (string $txt): float {   // تقدير عرض النصّ با�
     }
     return $w;
 };
-$cell = fn($r, $span) => '<td' . ($span > 1 ? ' colspan="2" style="width:100%;' : ' style="width:50%;') . $tdStyle . '"><span class="k">' . e($r[0]) . ':</span> <span class="fill">' . e($r[1]) . '</span></td>';
+// 🔢 (2026-10-24 «بالعربي الهاتف 03-225978 يطلع 225978-03») قيمة بلا حرف عربي (هاتف/رقم/تاريخ/إيميل) تُعزَل ltr داخل السطر العربي فلا تنقلب
+$cell = fn($r, $span) => '<td' . ($span > 1 ? ' colspan="2" style="width:100%;' : ' style="width:50%;') . $tdStyle . '"><span class="k">' . e($r[0]) . ':</span> <span class="fill"' . (preg_match('/\p{Arabic}/u', (string)$r[1]) ? '' : ' dir="ltr" style="unicode-bidi:isolate"') . '>' . e($r[1]) . '</span></td>';
 $dirAttr = $rtl ? 'rtl' : 'ltr';
 $infoTable = function (array $rows) use ($cell, $tdStyle, $mmEst, $dirAttr) {
     $out = '<table class="pdf-info" dir="' . $dirAttr . '" width="100%" style="width:100%;border-collapse:collapse;margin:2pt 0 5pt">';
