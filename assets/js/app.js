@@ -14,13 +14,17 @@ function formatUSD(n) {
 
 // Tab switching
 document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('tab')) {
-        const tabGroup = e.target.closest('.tabs');
-        const tabName = e.target.dataset.tab;
+    // 🩹 (2026-10-24 «كبسات شخصي/العنوان/المالي ما عم بغيرو دغري») الكبسة فيها سطران (فرنسي + عربي) فالضغط على النصّ
+    // كان يصل بـe.target = <span> لا <button.tab> ويُهمَل؛ الآن أقرب .tab من أي نقطة داخل الكبسة.
+    const tabBtn = e.target.closest ? e.target.closest('.tab') : null;
+    if (tabBtn) {
+        const tabGroup = tabBtn.closest('.tabs');
+        const tabName = tabBtn.dataset.tab;
         if (!tabGroup || !tabName) return;
+        if (tabBtn.tagName === 'A') e.preventDefault();
 
         tabGroup.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        e.target.classList.add('active');
+        tabBtn.classList.add('active');
 
         const container = tabGroup.parentElement;
         container.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
