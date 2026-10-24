@@ -1948,7 +1948,7 @@ if (!$emp):
           <p style="margin:2px 0">من : <strong><?= e($schoolNameAr) ?></strong></p>
           <p style="margin:2px 0">إلى <?= $g('الأستاذ', 'الأستاذة', 'الأستاذ(ة)') ?> : <strong><?= e($nomAr) ?></strong></p>
           <p style="margin:2px 0">العنوان : <?= $addr !== '' ? '<strong>' . e($addr) . '</strong>' : $blank(320) ?></p>
-          <p style="margin:2px 0">الهاتف : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong>' . e($emp['phone1']) . '</strong>' : $blank(150) ?></p>
+          <p style="margin:2px 0">الهاتف : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong dir="ltr" style="unicode-bidi:isolate">' . e($emp['phone1']) . '</strong>' : $blank(150) ?></p>
         </div>
         <h2 style="text-align:center;margin:4px 0 18px;text-decoration:underline">كتاب إنهاء خدمات</h2><?= $rateLine ?>
         <p>استناداً إلى القوانين المرعية الإجراء وخاصةً قانون الهيئة التعليمية للمدارس الخاصة ، وعملاً بالمادة 29 وتعديلاتها من القانون المذكور ،</p>
@@ -2192,7 +2192,7 @@ if (!$emp):
           <p style="margin:2px 0">من : <strong><?= e($schoolNameAr) ?></strong></p>
           <p style="margin:2px 0">إلى <?= $g('الأستاذ', 'الأستاذة', 'الأستاذ(ة)') ?> : <strong><?= e($nomAr) ?></strong></p>
           <p style="margin:2px 0">العنوان : <?= $addr !== '' ? '<strong>' . e($addr) . '</strong>' : $blank(320) ?></p>
-          <p style="margin:2px 0">الهاتف : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong>' . e($emp['phone1']) . '</strong>' : $blank(150) ?></p>
+          <p style="margin:2px 0">الهاتف : <?= trim((string)($emp['phone1'] ?? '')) !== '' ? '<strong dir="ltr" style="unicode-bidi:isolate">' . e($emp['phone1']) . '</strong>' : $blank(150) ?></p>
         </div>
         <p>حضرة <?= $g('الأستاذ', 'الأستاذة', 'الأستاذ(ة)') ?> : <strong><?= e($nomAr) ?></strong> <?= $g('المحترم', 'المحترمة', 'المحترم(ة)') ?> .</p>
         <p>الموضوع : <strong><?= e($subjectTxt) ?></strong> .</p>

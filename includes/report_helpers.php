@@ -304,17 +304,17 @@ function schoolLetterhead(?array $school = null, array $opts = []): string {
             <?php if (!empty($school['address']) || !empty($school['phone'])): ?>
             <div class="lh-contact">
                 <?= e($school['address'] ?? '') ?>
-                <?php if (!empty($school['phone'])): ?> &nbsp;•&nbsp; <i class="fas fa-phone"></i> <?= e($school['phone']) ?><?php endif; ?>
+                <?php if (!empty($school['phone'])): ?> &nbsp;•&nbsp; <i class="fas fa-phone"></i> <span dir="ltr" style="unicode-bidi:isolate"><?= e($school['phone']) ?></span><?php endif; ?><?php /* 📞 (2026-10-24 p1 «04-531450 طلع 531450-04») الرقم معزول ltr داخل الترويسة العربية */ ?>
             </div>
             <?php endif; ?>
         </div>
         <div class="lh-right">
             <?php if ($showNumbers): ?>
                 <?php if (!empty($school['nssf_employer_number'])): ?>
-                <div class="lh-num">ر.الضمان: <strong><?= e($school['nssf_employer_number']) ?></strong></div>
+                <div class="lh-num">ر.الضمان: <strong dir="ltr" style="unicode-bidi:isolate"><?= e($school['nssf_employer_number']) ?></strong></div>
                 <?php endif; ?>
                 <?php if (!empty($school['finance_number'])): ?>
-                <div class="lh-num">ر.المالية: <strong><?= e($school['finance_number']) ?></strong></div>
+                <div class="lh-num">ر.المالية: <strong dir="ltr" style="unicode-bidi:isolate"><?= e($school['finance_number']) ?></strong></div>
                 <?php endif; ?>
             <?php endif; ?>
         </div>
