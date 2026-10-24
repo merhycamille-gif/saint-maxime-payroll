@@ -253,17 +253,21 @@
     // بالإفادات فقط (window.MSA_ATT من attestations.php): عند فتح «تعديل / كتابة» نصوّر نصّ كل فقرة؛ عند «احفظ كأساس» نحسب لكل فقرة تغيّرت
     // الجزء المختلف (بكلمات كاملة) ونحفظه استبدالاً دائماً لهذا النوع/اللغة عبر pages/att_rules.php بكلمة السرّ. الخادم يطبّقه على كل إفادة من بعدها.
     var attSnap = null;
-    function attBlocks() {
+    // 🧩 (2026-10-24 p1 «بيحفظ بس بترجع متل ما كانت باللغة الأجنبية») المقارنة على مستوى عقدة النصّ لا الفقرة:
+    //    innerText يدمج نصّ <strong> (الاسم/المبلغ) مع ما حوله فيتوسّع التعديل عبر حدّ الوسم، والخادم يطابق داخل عقدة واحدة فقط ⇒ لا ينطبق فترجع كما كانت.
+    function attTextNodes() {
         var out = [];
         ppEditTargets().forEach(function (root) {
-            root.querySelectorAll('p,h1,h2,h3,h4,h5,li,td,th,div').forEach(function (el) {
-                if (el.closest('.no-print, .att-rules')) return;
-                if (el.querySelector('p,h1,h2,h3,h4,h5,li,td,th,div,table,ul,ol')) return;   // فقرة نهائية فقط
-                var t = (el.innerText || '').replace(/[\s\u00A0]+/g, ' ').trim(); if (t) out.push({ el: el, text: t });
-            });
+            var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: function (n) {
+                if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                if (n.parentElement && n.parentElement.closest('.no-print, .att-rules, script, style')) return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+            } });
+            var n; while (n = w.nextNode()) out.push(n);
         });
         return out;
     }
+    function attSnapshot() { return attTextNodes().map(function (n) { return { node: n, val: (n.nodeValue || '').replace(/[\s\u00A0]+/g, ' ').trim() }; }); }
     function attDiff(a, b) {
         var p = 0; while (p < a.length && p < b.length && a[p] === b[p]) p++;
         var s = 0; while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
@@ -302,8 +306,12 @@
     }
     window.msaAttKeep = function () {
         if (!attSnap) { alert('افتح «تعديل / كتابة» وغيّر الكلمة أوّلاً'); return; }
-        var rules = [];
-        attSnap.forEach(function (sn) { if (!document.body.contains(sn.el)) return; var now = (sn.el.innerText || '').replace(/[\s\u00A0]+/g, ' ').trim(); if (now !== sn.text && now) { var d = attDiff(sn.text, now); if (d.from && d.from !== d.to) rules.push(d); } });
+        var rules = [], seen = {};
+        attSnap.forEach(function (sn) {
+            if (!sn.node.isConnected) return;
+            var now = (sn.node.nodeValue || '').replace(/[\s\u00A0]+/g, ' ').trim();
+            if (now && now !== sn.val) { var d = attDiff(sn.val, now); if (d.from && d.from !== d.to && !seen[d.from]) { seen[d.from] = 1; rules.push(d); } }
+        });
         if (!rules.length) { alert('ما في أي تعديل بالنصّ'); return; }
         if (!confirm('حفظ ' + rules.length + ' تعديل كنصّ أساسي لهذا النوع من الإفادات (' + (window.MSA_ATT.lang || 'ar') + ')؟' + String.fromCharCode(10) + rules.map(function (r) { return '«' + r.from + '» ⇒ «' + r.to + '»'; }).join(String.fromCharCode(10)) + String.fromCharCode(10) + 'بيطبّق تلقائياً على كل إفادة من هذا النوع من بعد هلّق.')) return;
         attRun({ action: 'save', type: window.MSA_ATT.type, lang: window.MSA_ATT.lang, rules: rules }, '✅ انحفظ كأساس — رح يطلع هيك بكل إفادة من هذا النوع');
@@ -322,7 +330,7 @@
         if (!window.MSA_ATT) return;
         var on = document.body.classList.contains('pp-editing'), k = document.getElementById('msaKeepBtn'), eb = btn || document.getElementById('msaEditBtn');
         if (on) {
-            attSnap = attBlocks();
+            attSnap = attSnapshot();
             if (!k && eb) { k = document.createElement('button'); k.type = 'button'; k.id = 'msaKeepBtn'; k.className = 'btn btn-sm btn-primary'; k.title = 'الكلمة/الجملة اللي عدّلتها تصير هي الأساسية بكل إفادة من هذا النوع — بكلمة سرّ'; k.innerHTML = '<i class="fas fa-floppy-disk"></i> احفظ كأساس / Garder comme base'; k.onclick = window.msaAttKeep; eb.insertAdjacentElement('afterend', k); }
             if (k) k.style.display = '';
         } else { attSnap = null; if (k) k.style.display = 'none'; }
