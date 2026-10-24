@@ -190,7 +190,7 @@
         });
         window.MSA_RL = { lang: L, side: effSide(), exportDir: function (area) {
             if (!area) return null; var od = area.classList.contains('official-doc') ? area : area.querySelector('.official-doc'); if (od && !rlStateSheet(od)) return null; return effSide() || null; } };
-        document.querySelectorAll('.rl-chip').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rl') === L); });
+        document.querySelectorAll('.rl-chip[data-rl]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rl') === L); });   // 🌐 (2026-10-24) كبسات لغة المستند (doc-langs روابط) لا تُمَسّ
         document.querySelectorAll('.rl-side').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rs') === effSide()); });
         document.querySelectorAll('.rl-sides').forEach(function (g) { g.style.display = (L === 'both') ? '' : 'none'; });
         // عنوان الطباعة المحقون بالجدول يُبنى من جديد بلغة العرض
@@ -204,9 +204,9 @@
     function setLang(l) { state.lang = l; try { localStorage.setItem('msa_rl', l); document.cookie = 'msa_rl=' + l + ';path=/;max-age=31536000;SameSite=Lax'; } catch (e) {} apply(); }
     function setSide(s) { state.side = s; try { localStorage.setItem('msa_rs', s); document.cookie = 'msa_rs=' + s + ';path=/;max-age=31536000;SameSite=Lax'; } catch (e) {} apply(); }
     document.addEventListener('click', function (e) {
-        var c = e.target.closest('.rl-chip'); if (c) { e.preventDefault(); setLang(c.getAttribute('data-rl')); return; }
+        var c = e.target.closest('.rl-chip[data-rl]'); if (c) { e.preventDefault(); setLang(c.getAttribute('data-rl')); return; }
         var s = e.target.closest('.rl-side'); if (s) { e.preventDefault(); setSide(s.getAttribute('data-rs')); }
     });
-    if (roots().length) apply(); else document.querySelectorAll('.rl-chips').forEach(function (g) { g.style.display = 'none'; });
+    if (roots().length) apply(); else document.querySelectorAll('.rl-chips:not(.doc-langs)').forEach(function (g) { g.style.display = 'none'; });
     window.msaRlApply = apply; window.msaRlTranslate = function (n) { return translate(n, DICT, AR); }; window.msaRlDict = DICT;
 })();

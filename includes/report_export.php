@@ -874,7 +874,27 @@ class ReportTable
         if (!empty($o['align'])) $ppr .= '<w:jc w:val="' . $o['align'] . '"/>';
         if (!empty($o['fill'])) $ppr .= '<w:shd w:val="clear" w:fill="' . $o['fill'] . '"/>';
         $ppr .= '</w:pPr>';
-        return '<w:p>' . $ppr . '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($text) . '</w:t></w:r></w:p>';
+        return '<w:p>' . $ppr . $this->docxRuns((string)$text, $rpr, $this->isRtl()) . '</w:p>';
+    }
+
+    /** 🔢 (2026-10-24 p1 «الوورد بيطلّع الأرقام هندية ٠١٢») الأرقام بسطر عربي (rtl) تُفصَل بسطور runs خاصّة: بلا <w:rtl/> وبلغة فرنسية
+     *  ومعزولة LRE…PDF ⇒ وورد يعرضها لاتينية 0123 وبترتيبها (04-531450، 25 - 82 - 043) مهما كان خيار «Numeral: Context» عند المستخدم. */
+    private function docxRuns(string $text, string $rpr, bool $rtl): string
+    {
+        $rprNum = str_replace('<w:rtl/>', '', $rpr);
+        $rprNum = str_replace('</w:rPr>', '<w:lang w:val="fr-FR" w:eastAsia="fr-FR" w:bidi="fr-FR"/></w:rPr>', $rprNum);
+        $out = '';
+        $lines = preg_split('/\r\n|\n/', $text);
+        foreach ($lines as $i => $ln) {
+            if ($i > 0) $out .= '<w:r>' . $rpr . '<w:br/></w:r>';
+            if (!$rtl || !preg_match('/\d/', $ln)) { $out .= '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($ln) . '</w:t></w:r>'; continue; }
+            $parts = preg_split('/(\d(?:[\d\/\-.,:]*\d)?(?:\s+-\s+\d(?:[\d\/\-.,:]*\d)?)*)/u', $ln, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);   // تنتهي برقم: «13:» ⇒ «13» ثم «:»
+            foreach ($parts as $pt) {
+                if (preg_match('/^\d/', $pt)) $out .= '<w:r>' . $rprNum . '<w:t xml:space="preserve">' . self::xa("\u{202A}" . $pt . "\u{202C}") . '</w:t></w:r>';
+                else $out .= '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($pt) . '</w:t></w:r>';
+            }
+        }
+        return $out;
     }
 
     private function docxTr($cells, $idx, $kind, $mergeAll = false)
@@ -921,8 +941,7 @@ class ReportTable
         $sz = (int)round(($this->docxPt ?? 12.0) * 2);
         $rpr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>' . ($bold ? '<w:b/><w:bCs/>' : '')
              . '<w:sz w:val="' . $sz . '"/><w:szCs w:val="' . $sz . '"/>' . ($this->isRtl() && !$num ? '<w:rtl/>' : '') . '</w:rPr>';
-        $runs = ''; $lines = preg_split('/\r\n|\n/', (string)$text);
-        foreach ($lines as $i => $ln) { if ($i > 0) $runs .= '<w:r>' . $rpr . '<w:br/></w:r>'; $runs .= '<w:r>' . $rpr . '<w:t xml:space="preserve">' . self::xa($ln) . '</w:t></w:r>'; }
+        $runs = $this->docxRuns((string)$text, $rpr, $this->isRtl() && !$num);   // 🔢 (2026-10-24) أرقام لاتينية بالخلايا العربية
         return '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>' . ($this->isRtl() && !$num ? '<w:bidi/>' : '') . '<w:jc w:val="' . $align . '"/></w:pPr>' . $runs . '</w:p>';
     }
 

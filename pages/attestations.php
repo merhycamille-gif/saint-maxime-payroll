@@ -132,7 +132,15 @@ if (!$emp) $hideExportToolbar = true;
 // ↩️ «وقت بكون بصفحة إفادة الأستاذ لازم يكون في محل أرجع ملف الإفادة فوراً» (2026-09-24): زرّ الرجوع بالترويسة يرجّع مباشرة
 //    لملف إفادات هذا الأستاذ (dossier) بدل history.back() الذي كان يرجع خطوة واحدة عن كل تغيير خيار
 if ($emp && $type !== '' && empty($_GET['dossier'])) $backHref = BASE_URL . 'pages/attestations.php?employee_id=' . (int)$employeeId . '&dossier=1';
+// 🌐 (2026-10-24 p1 «بحطّ اللغة فرنسي بتضلّها الكتابة بالعربي») لغة الإفادة بشريط التصدير نفسه (العربية / Français / English) — كل الخيارات الحالية تبقى بالرابط
+if ($emp && $type !== '') { $exportOpts = $exportOpts ?? []; $exportOpts['doc_langs'] = []; foreach ($DOC_LANGS as $__lk => $__ll) $exportOpts['doc_langs'][] = ['key' => $__lk, 'label' => $__ll, 'on' => $__lk === $docLang, 'href' => BASE_URL . 'pages/attestations.php?' . http_build_query(array_merge($_GET, ['lang_doc' => $__lk]))]; }
 include __DIR__ . '/../includes/header.php';
+// ✏️💾 (2026-10-24 «الكلمة أو الجملة اللي بعدّلها تضلّ هي الأساسية… وهالخيار يكون عندو باسوورد») النصوص المعدَّلة المحفوظة لهذا النوع/اللغة
+//    تُطبَّق على نصّ الإفادة عند الإخراج (من #ppExportArea، بين الوسوم فقط) — الحفظ/الحذف بكلمة سرّ عبر pages/att_rules.php
+require_once __DIR__ . '/../includes/att_rules.php';
+$attRules = ($emp && $type !== '') ? attRulesLoad((string)$type, (string)$docLang) : [];
+if ($attRules) ob_start(function ($buf) use ($attRules) { return attRulesApplyHtml($buf, $attRules); });
+if ($emp && $type !== '') echo '<script>window.MSA_ATT = ' . json_encode(['type' => (string)$type, 'lang' => (string)$docLang, 'super' => isSuperAdmin(), 'base' => BASE_URL], JSON_UNESCAPED_UNICODE) . ';</script>';
 
 // ====== ملف الأستاذ الكامل / Dossier: كل شي عن الأستاذ بمكان واحد ======
 // (صور المستندات: الشهادة/التذكرة/العائلي/الصورة + ر6 + بطاقة الراتب السنوية + سيرة الأستاذ + كل الإفادات)
@@ -1101,11 +1109,22 @@ if (!$emp):
         .($idNssf?'&id_nssf=1':'').($idMof?'&id_mof=1':'').($idEoc?'&id_eoc=1':'');
 ?>
     <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
-        <div class="btn-group" role="group">
-            <?php foreach ($DOC_LANGS as $lk => $lbl): ?>
-            <a href="?<?= $qs ?>&lang_doc=<?= $lk ?>" class="btn btn-sm <?= $lk===$docLang?'btn-primary':'btn-light' ?>"><?= e($lbl) ?></a>
-            <?php endforeach; ?>
-        </div>
+        <?php /* 🌐 (2026-10-24) كبسات اللغة بشريط التصدير (doc_langs): روابطها تحمل كل خيارات الإفادة الحالية ($qs: التاريخ، المبلغ، الموقّع، تاريخ الترك…) كما كانت روابط هذا الصفّ */ ?>
+        <script>(function () { var q = <?= json_encode(BASE_URL . 'pages/attestations.php?' . $qs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>; document.querySelectorAll('.export-toolbar .doc-langs a[data-doclang]').forEach(function (a) { a.href = q + '&lang_doc=' + a.getAttribute('data-doclang'); }); })();</script>
+        <?php /* ✏️💾 (2026-10-24) النصوص المعدَّلة المحفوظة لهذا النوع/اللغة — حذف بكلمة سرّ */ ?>
+        <details class="att-rules no-print" style="font-size:13px">
+            <summary style="cursor:pointer;color:#1e3a8a;font-weight:700"><i class="fas fa-pen-to-square"></i> نصوص معدَّلة محفوظة كأساس / Textes de base modifiés (<?= count($attRules) ?>)</summary>
+            <div style="padding:6px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-top:4px;max-width:720px">
+                <?php if (!$attRules): ?><div style="color:#64748b">لا شيء بعد — بوضع «تعديل / كتابة» غيّر الكلمة أو الجملة ثمّ اكبس «احفظ كأساس» (بكلمة السرّ) فتصير هي الأساسية لكل إفادة من هذا النوع.</div><?php endif; ?>
+                <?php foreach ($attRules as $__r): ?>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:3px 0;border-bottom:1px dotted #e2e8f0">
+                    <span style="flex:1;min-width:200px"><s style="color:#b91c1c"><?= e($__r['from_text']) ?></s> ⇒ <b style="color:#166534"><?= e($__r['to_text']) ?></b> <small style="color:#64748b">(<?= e((string)$__r['created_by']) ?> · <?= e(substr((string)$__r['created_at'], 0, 10)) ?>)</small></span>
+                    <button type="button" class="btn btn-sm btn-light" onclick="msaAttRuleDelete(<?= (int)$__r['id'] ?>)" title="حذف هذا التعديل (بكلمة السرّ) — ترجع الإفادة لنصّها الأصلي"><i class="fas fa-trash"></i> حذف</button>
+                </div>
+                <?php endforeach; ?>
+                <?php if (isSuperAdmin()): ?><div style="margin-top:6px"><button type="button" class="btn btn-sm btn-light" onclick="msaAttRulePw()" title="كلمة سرّ حفظ/حذف النصوص الأساسية — المدير العام"><i class="fas fa-key"></i> كلمة سرّ التعديل الأساسي</button></div><?php endif; ?>
+            </div>
+        </details>
         <button type="button" class="btn btn-sm" style="background:#0ea5e9;color:#fff" onclick="ppSendAtt('<?= e(addslashes('pages/attestations.php?'.$qs)) ?>','<?= e($exportOpts['email'] ?? '') ?>','<?= e($exportTitle ?? 'attestation') ?>')"><i class="fas fa-paper-plane"></i> Envoyer par email (PDF auto) / إرسال بالإيميل (PDF تلقائي)</button>
     </div>
     <script>

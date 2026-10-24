@@ -427,6 +427,9 @@ if (!empty($emp['photo_path']) && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', (s
 $notes = trim((string)($emp['notes'] ?? ''));
 if (mb_strlen($notes) > 320) $notes = mb_substr($notes, 0, 320) . '…';   // الملاحظات الطويلة تبقى كاملة بالملف — هنا سطران كي تبقى الورقة واحدة
 
+// 🌐 (2026-10-24) لغة البطاقة بشريط التصدير نفسه (محلّ حبوب قاموس التقارير) — كبسة واحدة بمكان واحد
+$exportOpts = $exportOpts ?? []; $exportOpts['doc_langs'] = [];
+foreach ($DOC_LANGS as $__lk => $__ll) $exportOpts['doc_langs'][] = ['key' => $__lk, 'label' => $__ll, 'on' => $__lk === $L, 'href' => BASE_URL . 'pages/employee_fiche.php?employee_id=' . $employeeId . '&lang_doc=' . $__lk];
 include __DIR__ . '/../includes/header.php';
 echo officialFormStyles();
 ?>
@@ -444,7 +447,7 @@ echo officialFormStyles();
 .fiche-a4 .k{color:#334155}
 .fiche-a4 .fill{font-weight:700;color:#0a3d91;display:inline;padding:0 3px}
 .fiche-a4 .fiche-foot{font-size:10pt;color:#64748b;text-align:center;border-top:1px dashed #cbd5e1;margin-top:12px;padding-top:4px}
-.export-toolbar .rl-chips{display:none !important}   /* لغة الورقة من حبوب البطاقة نفسها (العربية / Français / English) لا من قاموس التقارير */
+.export-toolbar .rl-chips:not(.doc-langs){display:none !important}   /* لغة الورقة من كبسات البطاقة نفسها (doc_langs بالشريط) لا من قاموس التقارير */
 .fiche-langs{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}
 .fiche-langs .btn.on{outline:3px solid #c9a961;outline-offset:1px}
 </style>
@@ -490,11 +493,7 @@ $langUrl = fn($k) => BASE_URL . 'pages/employee_fiche.php?employee_id=' . $emplo
 <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:8px">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <a href="<?= e($backHref) ?>" class="btn btn-light"><i class="fas fa-arrow-left"></i> Dossier complet / الملف الكامل</a>
-        <span class="fiche-langs" title="لغة البطاقة / Langue de la fiche">
-            <?php foreach ($DOC_LANGS as $k => $lbl): ?>
-            <a href="<?= e($langUrl($k)) ?>" class="btn btn-sm btn-light<?= $k === $L ? ' on' : '' ?>"><i class="fas fa-language"></i> <?= e($lbl) ?></a>
-            <?php endforeach; ?>
-        </span>
+        <?php /* 🌐 (2026-10-24) كبسات اللغة انتقلت لشريط التصدير (doc_langs) */ ?>
     </div>
     <?php if (viewerCanSeePage('employees.php')): ?>
     <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= $employeeId ?>" class="btn btn-light"><i class="fas fa-user-pen"></i> Modifier le dossier / تعديل ملف الأستاذ</a>

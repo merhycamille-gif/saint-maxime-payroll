@@ -249,6 +249,84 @@
         btn = btn || document.getElementById('msaEditBtn');
         if (btn) { btn.classList.toggle('btn-success', on); btn.classList.toggle('btn-gold', !on); var sp = btn.querySelector('span'); if (sp) sp.textContent = on ? 'Terminé / خلص التعديل' : 'Modifier / تعديل / كتابة'; }
     };
+    // ===== ✏️💾 احفظ التعديل كأساس (2026-10-24 «الكلمة أو الجملة اللي بعدّلها تضلّ هي الأساسية بالبرنامج… وهالخيار يكون عندو باسوورد») =====
+    // بالإفادات فقط (window.MSA_ATT من attestations.php): عند فتح «تعديل / كتابة» نصوّر نصّ كل فقرة؛ عند «احفظ كأساس» نحسب لكل فقرة تغيّرت
+    // الجزء المختلف (بكلمات كاملة) ونحفظه استبدالاً دائماً لهذا النوع/اللغة عبر pages/att_rules.php بكلمة السرّ. الخادم يطبّقه على كل إفادة من بعدها.
+    var attSnap = null;
+    function attBlocks() {
+        var out = [];
+        ppEditTargets().forEach(function (root) {
+            root.querySelectorAll('p,h1,h2,h3,h4,h5,li,td,th,div').forEach(function (el) {
+                if (el.closest('.no-print, .att-rules')) return;
+                if (el.querySelector('p,h1,h2,h3,h4,h5,li,td,th,div,table,ul,ol')) return;   // فقرة نهائية فقط
+                var t = (el.innerText || '').replace(/[\s\u00A0]+/g, ' ').trim(); if (t) out.push({ el: el, text: t });
+            });
+        });
+        return out;
+    }
+    function attDiff(a, b) {
+        var p = 0; while (p < a.length && p < b.length && a[p] === b[p]) p++;
+        var s = 0; while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+        while (p > 0 && !/\s/.test(a[p - 1])) p--;                     // بداية كلمة
+        while (s > 0 && !/\s/.test(a[a.length - s])) s--;             // نهاية كلمة
+        var words = function (str) { return str.trim() ? str.trim().split(/\s+/).length : 0; };
+        // جملة قصيرة جداً (كلمة أو اثنتان) تُوسَّع بكلمات مجاورة حتى لا تُبدَّل بكل مكان تظهر فيه
+        while (words(a.slice(p, a.length - s)) < 3 && (p > 0 || s > 0)) {
+            if (p > 0) { p--; while (p > 0 && !/\s/.test(a[p - 1])) p--; }
+            else { s--; while (s > 0 && !/\s/.test(a[a.length - s])) s--; }
+        }
+        var from = a.slice(p, a.length - s).trim(), to = b.slice(p, b.length - s).trim();
+        if (!from) { from = a.trim(); to = b.trim(); }
+        return { from: from, to: to };
+    }
+    function attPost(body) {
+        body.csrf = window.CSRF_TOKEN || '';
+        return fetch((window.MSA_ATT && window.MSA_ATT.base ? window.MSA_ATT.base : (window.BASE_URL || '')) + 'pages/att_rules.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) }).then(function (r) { return r.json(); });
+    }
+    function attAskPw(msg) { var pw = window.prompt(msg || 'كلمة سرّ التعديل الأساسي / Mot de passe :', ''); return pw === null ? null : pw; }
+    function attSetNewPw(then) {
+        var a = window.prompt('ما في كلمة سرّ بعد للتعديل الأساسي. اكتب كلمة سرّ جديدة (4 أحرف على الأقلّ) — المدير العام فقط:', ''); if (a === null) return;
+        var b = window.prompt('أعد كتابة كلمة السرّ الجديدة:', ''); if (b === null) return;
+        if (a !== b || a.trim().length < 4) { alert('الكلمتان مختلفتان أو قصيرتان — ما انحفظ شي'); return; }
+        attPost({ action: 'set_pw', pw_old: '', pw_new: a }).then(function (j) { if (!j.ok) { alert('ما انحفظت كلمة السرّ: ' + (j.err || '')); return; } alert('✅ انحفظت كلمة السرّ'); if (then) then(a); });
+    }
+    function attRun(body, okMsg) {
+        var pw = attAskPw(); if (pw === null) return;
+        body.pw = pw;
+        attPost(body).then(function (j) {
+            if (j.ok) { alert(okMsg); location.reload(); return; }
+            if (j.err === 'no_pw') { if (j.super) attSetNewPw(function (npw) { body.pw = npw; attPost(body).then(function (k) { if (k.ok) { alert(okMsg); location.reload(); } else alert('ما انحفظ: ' + (k.err || '')); }); }); else alert('ما في كلمة سرّ بعد — المدير العام يحدّدها من «كلمة سرّ التعديل الأساسي»'); return; }
+            if (j.err === 'bad_pw') { alert('كلمة السرّ غلط — ما انحفظ شي'); return; }
+            alert('ما انحفظ: ' + (j.err || ''));
+        }).catch(function (e) { alert('انقطع الاتصال بالخادم: ' + e); });
+    }
+    window.msaAttKeep = function () {
+        if (!attSnap) { alert('افتح «تعديل / كتابة» وغيّر الكلمة أوّلاً'); return; }
+        var rules = [];
+        attSnap.forEach(function (sn) { if (!document.body.contains(sn.el)) return; var now = (sn.el.innerText || '').replace(/[\s\u00A0]+/g, ' ').trim(); if (now !== sn.text && now) { var d = attDiff(sn.text, now); if (d.from && d.from !== d.to) rules.push(d); } });
+        if (!rules.length) { alert('ما في أي تعديل بالنصّ'); return; }
+        if (!confirm('حفظ ' + rules.length + ' تعديل كنصّ أساسي لهذا النوع من الإفادات (' + (window.MSA_ATT.lang || 'ar') + ')؟' + String.fromCharCode(10) + rules.map(function (r) { return '«' + r.from + '» ⇒ «' + r.to + '»'; }).join(String.fromCharCode(10)) + String.fromCharCode(10) + 'بيطبّق تلقائياً على كل إفادة من هذا النوع من بعد هلّق.')) return;
+        attRun({ action: 'save', type: window.MSA_ATT.type, lang: window.MSA_ATT.lang, rules: rules }, '✅ انحفظ كأساس — رح يطلع هيك بكل إفادة من هذا النوع');
+    };
+    window.msaAttRuleDelete = function (id) { if (!confirm('حذف هذا التعديل؟ ترجع الإفادة لنصّها الأصلي.')) return; attRun({ action: 'delete', id: id }, '✅ انحذف'); };
+    window.msaAttRulePw = function () {
+        var old = window.prompt('كلمة السرّ الحالية (اتركها فاضية إن لم تُحدَّد بعد):', ''); if (old === null) return;
+        var a = window.prompt('كلمة السرّ الجديدة (4 أحرف على الأقلّ):', ''); if (a === null) return;
+        var b = window.prompt('أعد كتابتها:', ''); if (b === null) return;
+        if (a !== b || a.trim().length < 4) { alert('الكلمتان مختلفتان أو قصيرتان — ما تغيّر شي'); return; }
+        attPost({ action: 'set_pw', pw_old: old, pw_new: a }).then(function (j) { alert(j.ok ? '✅ تغيّرت كلمة السرّ' : (j.err === 'bad_pw' ? 'كلمة السرّ الحالية غلط' : 'ما تغيّرت: ' + (j.err || ''))); });
+    };
+    var ppEditToggleBase = window.ppEditToggle;
+    window.ppEditToggle = function (btn) {
+        ppEditToggleBase(btn);
+        if (!window.MSA_ATT) return;
+        var on = document.body.classList.contains('pp-editing'), k = document.getElementById('msaKeepBtn'), eb = btn || document.getElementById('msaEditBtn');
+        if (on) {
+            attSnap = attBlocks();
+            if (!k && eb) { k = document.createElement('button'); k.type = 'button'; k.id = 'msaKeepBtn'; k.className = 'btn btn-sm btn-primary'; k.title = 'الكلمة/الجملة اللي عدّلتها تصير هي الأساسية بكل إفادة من هذا النوع — بكلمة سرّ'; k.innerHTML = '<i class="fas fa-floppy-disk"></i> احفظ كأساس / Garder comme base'; k.onclick = window.msaAttKeep; eb.insertAdjacentElement('afterend', k); }
+            if (k) k.style.display = '';
+        } else { attSnap = null; if (k) k.style.display = 'none'; }
+    };
     function ppEditInit() { var b = document.getElementById('msaEditBtn'); if (b) b.style.display = ppEditTargets().length ? '' : 'none'; }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ppEditInit); else ppEditInit();
     window.addEventListener('load', ppEditInit);
@@ -268,7 +346,9 @@
             if (!start) { var cands = a.querySelectorAll('.official-doc, .doc-sheet, .xls-sheet, .land-report'); for (var pi = 0; pi < cands.length; pi++) if (!cands[pi].closest('.no-print, .export-toolbar, form')) { start = cands[pi]; break; } }
             var rlDir = (window.MSA_RL && window.MSA_RL.exportDir) ? window.MSA_RL.exportDir(a) : null; // 🌐 اختياره: عربي = يمين، فرنسي = شمال، الاثنان = جهته
             var hasAr = /[؀-ۿ]/.test(((start || a).textContent || '').slice(0, 20000));
-            dir = rlDir ? rlDir : (hasAr ? 'rtl' : 'ltr');
+            // 📄 (2026-10-24 p1 «اخترت اطبع وورد» — بطاقة الأستاذ بالفرنسي طلعت من اليمين) أوّل dir صريح من الجدول صعوداً حتى المنطقة يغلب «فيه عربي»
+            var explicit = '', el = start; while (el && el !== a.parentElement) { var dv = el.getAttribute && el.getAttribute('dir'); if (dv === 'rtl' || dv === 'ltr') { explicit = dv; break; } el = el.parentElement; }
+            dir = rlDir ? rlDir : (explicit ? explicit : (hasAr ? 'rtl' : 'ltr'));
         } catch (e) {}
         return dir;
     }

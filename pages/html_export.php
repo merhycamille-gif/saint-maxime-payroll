@@ -77,11 +77,16 @@ function hx_text(DOMNode $n): string {
     if (hx_has_class($n, ' money-usd ')) return ''; // 💵 (2026-10-21) مرآة الدولار لا تدخل الإكسل/الوورد: الخلية رقم ليرة صافٍ (سعر الصرف بسطر العنوان) — كانت تجعل كل خلية نصّاً بسطرين
     $s = '';
     foreach ($n->childNodes as $c) $s .= hx_text($c) . ' ';
+    // 🔢 (2026-10-24 p1 «04-531450 طلع 531450-04 بالوورد») عنصر باتجاه صريح (هاتف/رقم ضمان dir=ltr داخل سطر عربي) يحفظ ترتيبه بعلامة تضمين Unicode
+    $d = $n instanceof DOMElement ? strtolower($n->getAttribute('dir')) : '';
+    if ($d === 'ltr') return "\u{202A}" . trim($s) . "\u{202C} ";
+    if ($d === 'rtl') return "\u{202B}" . trim($s) . "\u{202C} ";
     return $s;
 }
 function hx_clean(string $s): string { $s = preg_replace('/[ \t\r\x{00A0}]+/u', ' ', $s); $s = preg_replace('/ *\n */u', "\n", $s); $s = preg_replace('/\n{2,}/u', "\n", $s); return trim($s); }
 /** 🔢 (2026-10-21) خلية مبلغ «51,944,000 L.L» / «ل.ل» / «$603» ⇒ رقم صافٍ تفهمه الإكسل (مجاميع/تنسيق)؛ غير ذلك يبقى نصّاً */
 function hx_num(string $s): string {
+    $s = preg_replace('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $s) ?? $s;   // 🔢 علامات التضمين لا تمنع الخلية من أن تكون رقماً بالإكسل
     if (preg_match('/^\s*(-?[\d,]+(?:\.\d+)?)\s*(L\.?L\.?|ل\.?ل\.?|LBP|\$|USD)?\s*$/iu', $s, $m) || preg_match('/^\s*(\$|L\.?L\.?|ل\.?ل\.?)\s*(-?[\d,]+(?:\.\d+)?)\s*$/iu', $s, $m2)) {
         $n = isset($m2) && $m2 ? $m2[2] : $m[1];
         return str_replace(',', '', $n);
@@ -192,6 +197,10 @@ $walk = function (DOMNode $node) use (&$walk, $emitTable, &$pending, $xp, $cls, 
     foreach ($node->childNodes as $ch) {
         if (!($ch instanceof DOMElement)) continue;
         $tag = strtolower($ch->nodeName);
+        if ($tag === 'table' && hx_has_class($ch, 'fiche-top')) { // 🪪 (2026-10-24 p1 «اخترت اطبع وورد») عنوان بطاقة الأستاذ (+الصورة) = أسطر عنوان لا جدولاً بخلية فاضية
+            foreach ($xp->query('.//*[' . $cls('doc-title') . ' or ' . $cls('doc-subtitle') . ']', $ch) as $tt) $push(hx_text($tt), hx_has_class($tt, 'doc-title') ? 'title' : 'meta');
+            continue;
+        }
         if ($tag === 'table') { $emitTable($ch); continue; }
         if (in_array($tag, ['h1', 'h2', 'h3', 'h4', 'h5'], true) || hx_has_class($ch, 'doc-title|card-title')) { $push(hx_text($ch), 'title'); continue; }
         if (hx_has_class($ch, 'doc-subtitle|doc-year|doc-period|report-scope')) { $push(hx_text($ch), hx_has_class($ch, 'report-scope') ? 'school' : 'meta'); continue; }

@@ -5662,9 +5662,15 @@ function exportToolbar($title = 'document', $opts = []) {
         <span class="xt-g xt-g4">
         <?php // 🌐 (2026-10-10 مساءً) لغة التقرير: عربي / فرنسي / الاثنان + جهة الأعمدة للإكسل (doclang.js) — ليس بالبطاقة السنوية
               if ((($GLOBALS['currentPage'] ?? '') !== 'annual')): /* تُخفى بالـJS حيث لا مستند بالصفحة */ ?>
+        <?php if (!empty($opts['doc_langs'])): /* 🌐 (2026-10-24 p1 «بحطّ اللغة فرنسي بتضلّها الكتابة بالعربي») مستند بلغته الخاصّة (إفادة/بطاقة): كبسات لغته هنا محلّ حبوب قاموس التقارير — اللغة = كل النصّ */ ?>
+        <span class="rl-chips doc-langs" title="لغة المستند / Langue du document">
+            <?php foreach ($opts['doc_langs'] as $dl): ?><a class="rl-chip<?= !empty($dl['on']) ? ' on' : '' ?>" href="<?= htmlspecialchars((string)$dl['href'], ENT_QUOTES) ?>" data-doclang="<?= htmlspecialchars((string)($dl['key'] ?? ''), ENT_QUOTES) ?>"><?= htmlspecialchars((string)$dl['label'], ENT_QUOTES) ?></a><?php endforeach; ?>
+        </span>
+        <?php else: ?>
         <span class="rl-chips" title="لغة التقرير والإكسل / Langue du rapport et de l’Excel">
             <button type="button" class="rl-chip" data-rl="ar">عربي</button><button type="button" class="rl-chip" data-rl="fr">Français</button><button type="button" class="rl-chip" data-rl="both">عربي + Français</button>
         </span>
+        <?php endif; ?>
         <?php endif; ?>
         </span>
         <details class="xt-more no-print"><summary class="btn btn-sm btn-light" title="خيارات إضافية: اتجاه الورقة، أجزاء الجدول، تسجيل التقديم للدولة"><i class="fas fa-ellipsis"></i> Plus / المزيد</summary>
