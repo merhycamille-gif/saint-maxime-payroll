@@ -6338,7 +6338,8 @@ try {
     $txt129 = function (int $eid, string $type, string $lang) {
         $h = renderPage('pages/attestations.php', ['employee_id' => $eid, 'type' => $type, 'lang_doc' => $lang, 'date' => '2026-09-15'], ['extra'], [], '', 'all');
         $p = mb_strpos($h, 'id="ppExportArea"');
-        return [$h, preg_replace('/\s+/u', ' ', strip_tags(mb_substr($h, $p === false ? 0 : $p, 5000)))];
+        // ✏️💾 (2026-10-27) المستخدم حفظ أساساً بإفادة الراتب «بصفة» بدل «بوظيفة» (attestation_text_rules 24/10) — الفحص يقيس الجنس لا الكلمة
+        return [$h, str_replace('بصفة', 'بوظيفة', preg_replace('/\s+/u', ' ', strip_tags(mb_substr($h, $p === false ? 0 : $p, 5000))))];
     };
     if ($m129) { [$h, $t] = $txt129($m129, 'salaire', 'ar');
         if (!(mb_strpos($t, 'بأنّ السيّد ') !== false && mb_strpos($t, ' يعمل لديها بوظيفة مدرّس لمادة') !== false && mb_strpos($t, 'ولا يزال حتى تاريخه ، ويتقاضى') !== false && mb_strpos($t, 'بناءً على طلبه .') !== false && mb_strpos($t, '(ة)') === false && mb_strpos($t, '(ا)') === false)) { $ok129 = false; $why129[] = "m=$m129"; }
@@ -7543,7 +7544,8 @@ try {
     $src = (string)regReportsSrc(); $srx = (string)file_get_contents($PROJ . '/pages/reports_export.php');
     $ok162 = count($r27) === 1 && $r27[0]['fin_ok'] === false && strpos($r27[0]['fin_note'], 'غير مكتمل') !== false && $r27[0]['via_link'] === false
           && count($r26) === 0 && (!$paid || (count($rp) === 1 && $rp[0]['fin_ok'] === true && strpos($rp[0]['fin_note'], 'مكتمل') !== false && $rp[0]['last_salary']))
-          && count($cols) >= 28 && ($txt['phone'] ?? '') === '03-162162' && ($txt['nssf'] ?? '') === '⚠️ ناقص' && ($txt['setup'] ?? '') === '⚠️ لا أساس بالملف' && ($txt['hire'] ?? '') === formatDate('2026-10-01')
+          && count($cols) >= 28 && ($txt['phone'] ?? '') === '03-162162' && ($txt['nssf'] ?? '') === '⚠️ لا يوجد' && ($txt['cnss_subj'] ?? '') === 'نعم / Oui' && ($txt['setup'] ?? '') === '⚠️ لا أساس بالملف' && ($txt['hire'] ?? '') === formatDate('2026-10-01')
+          && array_search('cnss_subj', array_keys($cols), true) === 3 && array_search('nssf', array_keys($cols), true) === 4   // 🛡️ (2026-10-27) بعد الاسم مباشرة
           && strpos($html, 'Nouveau162') !== false && strpos($html, 'الملف المالي غير مكتمل') !== false && strpos($html, 'الأساتذة الجدد') !== false && strpos($html, 'رقم الضمان / N° CNSS') !== false
           && strpos($src, "'?report=new_teachers'") !== false && strpos($src, "'new_teachers']") !== false && strpos($srx, "\$report === 'new_teachers'") !== false && strpos($srx, 'newTeachersReportCols()') !== false;
     $why162 = 'r27=' . count($r27) . ' r26=' . count($r26) . ' paid=' . (int)$paid . ' paidOk=' . (($rp[0]['fin_ok'] ?? null) ? 'yes' : 'no') . ' cols=' . count($cols) . ' phone=' . ($txt['phone'] ?? '-') . ' nssf=' . ($txt['nssf'] ?? '-') . ' html=' . (strpos($html, 'Nouveau162') !== false ? 'ok' : 'NO') . ' len=' . strlen($html);
@@ -8665,7 +8667,7 @@ $css188 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $at188 = (st
 $emp188 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
 $ok188 = strpos($css188, '.att-opts{display:grid;grid-template-columns:1fr;') !== false /* عمود واحد (p1 لاحقاً) */ && strpos($css188, '.att-opts .att-k{flex:0 0 240px;') !== false
       && strpos($at188, 'color:#cbd5e1">|</span>') === false && strpos($at188, '<div class="card-body att-opts"') !== false && strpos($at188, '<div class="form-group att-opts" style="grid-column:1 / -1">') !== false
-      && substr_count($at188, 'onchange="this.form.submit()"') === 52 && $emp188 > 0;
+      && substr_count($at188, 'onchange="this.form.submit()"') === 53 && $emp188 > 0;   // ⏱️ (2026-10-27) 52 − خانة الساعات (صار لها JS يضبط الدوام) + راديو كامل/جزئي = 53
 $why188 = 'emp=' . $emp188;
 $bal188 = function (string $h) { return preg_match('#<form method="get"[^>]*>.*?</form>#su', $h, $m) ? substr_count($m[0], '<div') - substr_count($m[0], '</div>') : 999; };
 foreach (['salaire' => 10, 'embassy' => 12, 'isqat_haq' => 12, 'aqd_taalim' => 11, 'cnss_leave' => 2] as $t188 => $min188) {
@@ -10611,6 +10613,64 @@ try {
     $why273 = '';
 } catch (Throwable $e) { $ok273 = false; $why273 = $e->getMessage(); }
 check('🌍 ملف الأستاذ بالترتيب العالمي: رأس + 6 حقائق + تعديل واحد + إجراءات · تبويبات بسطرين · زوج الاسم بخانة · بلا أزرار مكرّرة · شريط حفظ ثابت · LTR للسنة والمعادلة · نصف الدرجة floor بالعرض · المحسومات من آخر شهر لغاية اليوم', $ok273, $why273);
+
+/* 274) 🛡️⏱️ (2026-10-27) «بتقرير الجدد أوّل شي: رقم الضمان ويخضع أو لا» (فحص 162) + «إفادة استخدام الضمان: الساعات الشهرية = الأسبوعية × 4
+ *      (ساعات الملف لا تُمسّ)، أقل من 72 بالشهر = دوام جزئي، 72 وما فوق = كامل، والشيك يلحق الرقم وأنا بغيّره قبل الطبع»:
+ *      cnssDawamOf + خانة الساعات (× 4) + راديو كامل/جزئي بالشاشة + dawam بالرابط + الخلايا D23/F23 وB18/E18 بالقالبين + خانة «جزئي» مفرّغة بصورتَي الخلفية + إحداثيات X. */
+try {
+    $at274 = (string)regAttSrc(); $oe274 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+    $okU = cnssDawamOf('', '') === 'full' && cnssDawamOf('60', '') === 'part' && cnssDawamOf('71.9', '') === 'part' && cnssDawamOf('72', '') === 'full'
+         && cnssDawamOf('60', 'full') === 'full' && cnssDawamOf('120', 'part') === 'part' && cnssDawamOf('abc', 'x') === 'full';
+    $okS = strpos($at274, "\$hrsDef = (string)round((float)\$emp['hours_per_week'] * 4);") !== false && strpos($at274, '* 52 / 12') === false
+         && strpos($at274, '<input type="radio" name="dawam" value="full"') !== false && strpos($at274, '<input type="radio" name="dawam" value="part"') !== false
+         && strpos($at274, "'&dawam=' . \$dawamSel") !== false && strpos($at274, "v>=72)?'full':'part'") !== false
+         && strpos($oe274, "\$hrs = (string)round((float)\$emp['hours_per_week'] * 4);") !== false && strpos($oe274, '* 52 / 12') === false
+         && strpos($oe274, "'D23' => \$dawamFull ? 'X' : '1', 'F23' => \$dawamFull ? '2' : 'X'") !== false
+         && strpos($oe274, "'B18' => \$dawamFull ? 'X' : '1', 'E18' => \$dawamFull ? '2' : 'X'") !== false;
+    $pn274 = json_decode((string)file_get_contents($PROJ . '/assets/templates/cnss_hire_new.pos.json'), true); $pr274 = json_decode((string)file_get_contents($PROJ . '/assets/templates/cnss_hire_reg.pos.json'), true);
+    $okP = isset($pn274['cells']['F23'], $pn274['cells']['D23']) && abs((float)$pn274['cells']['F23']['yt'] - (float)$pn274['cells']['D23']['yt']) < 0.01
+         && isset($pr274['cells']['E18'], $pr274['cells']['B18']) && abs((float)$pr274['cells']['E18']['yt'] - (float)$pr274['cells']['B18']['yt']) < 0.01;
+    $dark = function (string $f, array $b): int { $im = imagecreatefrompng($f); $n = 0; for ($y = $b[1]; $y <= $b[3]; $y++) for ($x = $b[0]; $x <= $b[2]; $x++) if (((imagecolorat($im, $x, $y) >> 16) & 255) < 128) $n++; return $n; };
+    $okI = $dark($PROJ . '/assets/templates/cnss_hire_new.png', [796, 921, 828, 952]) === 0 && $dark($PROJ . '/assets/templates/cnss_hire_reg.png', [718, 819, 794, 851]) === 0;
+    // تشغيل فعلي: شاشة الخيارات لكميل مرعي 1387 — الساعات = ساعات ملفه × 4، والشيك يلحق الرقم ويُغلَب باليد، والرابط يحمل dawam
+    $hw274 = (float)getDB()->query("SELECT hours_per_week FROM employees WHERE id = 1387")->fetchColumn();
+    $g274 = ['employee_id' => 1387, 'type' => 'cnss_hire_new', 'date' => '2026-10-27', 'opts_set' => 1];
+    $h0 = renderPage('pages/attestations.php', $g274, [], [3], 'lbp', '2026-2027');
+    $hP = renderPage('pages/attestations.php', $g274 + ['hrs' => '60'], [], [3], 'lbp', '2026-2027');
+    $hF = renderPage('pages/attestations.php', $g274 + ['hrs' => '72'], [], [3], 'lbp', '2026-2027');
+    $hO = renderPage('pages/attestations.php', $g274 + ['hrs' => '60', 'dawam' => 'full'], [], [3], 'lbp', '2026-2027');
+    $chk = fn($h, $v) => strpos($h, 'name="dawam" value="' . $v . '" checked') !== false && strpos($h, 'name="dawam" value="' . ($v === 'full' ? 'part' : 'full') . '" checked') === false;
+    $okL = ($hw274 <= 0 || strpos($h0, 'name="hrs" class="form-control" value="' . round($hw274 * 4) . '"') !== false)
+         && $chk($hP, 'part') && $chk($hF, 'full') && $chk($hO, 'full')
+         && preg_match('/msaOfficialToolbar\(\{pdf: "([^"]+)"/', $hP, $mP) === 1 && strpos($mP[1], '&hrs=60&dawam=part&') !== false
+         && preg_match('/msaOfficialToolbar\(\{pdf: "([^"]+)"/', $hO, $mO) === 1 && strpos($mO[1], '&hrs=60&dawam=full&') !== false;
+    // الإكسل الرسمي الفعلي (القالبان): جزئي ⇒ F23/E18 = X وD23/B18 = 1؛ كامل ⇒ العكس
+    $cellOf = function (string $bin, string $ref): string {
+        $tmp = tempnam(sys_get_temp_dir(), 'r274'); file_put_contents($tmp, $bin); $z = new ZipArchive(); $out = '';
+        if ($z->open($tmp) === true) {
+            $ss = []; $sx = (string)$z->getFromName('xl/sharedStrings.xml');
+            if ($sx !== '' && ($x = @simplexml_load_string($sx))) foreach ($x->si as $si) { $t = ''; foreach ($si->xpath('.//*[local-name()="t"]') as $tt) $t .= (string)$tt; $ss[] = $t; }
+            $sh = @simplexml_load_string((string)$z->getFromName('xl/worksheets/sheet1.xml'));
+            if ($sh) foreach ($sh->sheetData->row as $row) foreach ($row->c as $c) if ((string)$c['r'] === $ref) { $t = (string)$c['t']; $out = $t === 's' ? ($ss[(int)$c->v] ?? '') : ($t === 'inlineStr' ? (string)$c->is->t : (string)$c->v); }
+            $z->close();
+        }
+        @unlink($tmp); return trim($out);
+    };
+    $xf274 = sys_get_temp_dir() . '/r274_out.xlsx';
+    $gx = ['emp' => 1387, 'd' => 27, 'mo' => 10, 'yr' => 2026, 'opts_set' => 1, 'format' => 'xlsx'];
+    $xnP = renderPage('pages/official_export.php', $gx + ['form' => 'cnss_hire_new', 'hrs' => '60'], [], [3], 'lbp', '2026-2027', $xf274);
+    $xnF = renderPage('pages/official_export.php', $gx + ['form' => 'cnss_hire_new', 'hrs' => '60', 'dawam' => 'full'], [], [3], 'lbp', '2026-2027', $xf274);
+    $xrP = renderPage('pages/official_export.php', $gx + ['form' => 'cnss_hire_reg', 'hrs' => '40'], [], [3], 'lbp', '2026-2027', $xf274);
+    $xrF = renderPage('pages/official_export.php', $gx + ['form' => 'cnss_hire_reg', 'hrs' => '80'], [], [3], 'lbp', '2026-2027', $xf274);
+    $okX = $cellOf($xnP, 'F23') === 'X' && $cellOf($xnP, 'D23') === '1' && $cellOf($xnP, 'L22') === '60'
+         && $cellOf($xnF, 'D23') === 'X' && $cellOf($xnF, 'F23') === '2'
+         && $cellOf($xrP, 'E18') === 'X' && $cellOf($xrP, 'B18') === '1' && $cellOf($xrP, 'J17') === '40'
+         && $cellOf($xrF, 'B18') === 'X' && $cellOf($xrF, 'E18') === '2';
+    $ok274 = $okU && $okS && $okP && $okI && $okL && $okX;
+    $why274 = 'unit=' . ($okU ? 'ok' : 'NO') . ' src=' . ($okS ? 'ok' : 'NO') . ' pos=' . ($okP ? 'ok' : 'NO') . ' img=' . ($okI ? 'ok' : 'NO') . ' live=' . ($okL ? 'ok' : 'NO') . ' xlsx=' . ($okX ? 'ok' : 'NO')
+            . ' hw=' . $hw274 . ' F23p=' . $cellOf($xnP, 'F23') . ' D23f=' . $cellOf($xnF, 'D23') . ' E18p=' . $cellOf($xrP, 'E18') . ' B18f=' . $cellOf($xrF, 'B18');
+} catch (Throwable $e) { $ok274 = false; $why274 = $e->getMessage(); }
+check('🛡️⏱️ نماذج استخدام الأجير: الساعات الشهرية = الأسبوعية × 4 (الملف لا يُمسّ) + أقل من 72 = جزئي / 72 وما فوق = كامل + الشيك يلحق الرقم ويُغلَب باليد + dawam بالرابط + X بالخانة الصحيحة بالقالبين (إكسل + صورة مفرّغة + إحداثيات)', $ok274, $why274);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

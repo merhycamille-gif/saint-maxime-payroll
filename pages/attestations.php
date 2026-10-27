@@ -585,8 +585,11 @@ if (!$emp):
         } else {
             $sexSel = $sexFile; // '' = غير محدد → النموذج يطلع بلا × على الجنس
         }
+        // ⏱️ (2026-10-27 «اضرب الساعات الأسبوعية × 4 أسابيع وحطّ الرقم وأنا بغيّر») الافتراضي = ساعات الأسبوع × 4 (ساعات الملف لا تُمسّ)
         $hrsDef = trim((string)($_GET['hrs'] ?? ''));
-        if ($hrsDef === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrsDef = (string)round((float)$emp['hours_per_week'] * 52 / 12);
+        if ($hrsDef === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrsDef = (string)round((float)$emp['hours_per_week'] * 4);
+        // ☑️ دوام العمل: أقل من 72 ساعة بالشهر = جزئي، 72 وما فوق = كامل — يلحق الرقم تلقائياً، والمستخدم يغيّر الشيك بإيده قبل الطبع
+        $dawamSel = cnssDawamOf($hrsDef, (string)($_GET['dawam'] ?? ''));
         // 🔴 تاريخ الترك من ملف الموظف (ترك الضمان، أو الترك من الكل إن كان أبكر) حصراً — يُعرض للعلم فقط ويُعدَّل من ملف الموظف
         $leaveDate = leftDateOfFor($emp, 'cnss') ?: '';
         $reasonSel = (int)($_GET['reason'] ?? 1); if ($reasonSel < 1 || $reasonSel > 7) $reasonSel = 1;
@@ -609,7 +612,7 @@ if (!$emp):
         $decWageUsd = $decSal ? lbpToUsd($decWage, rowRate($decSal)) : 0;
         $expBase = BASE_URL . 'pages/official_export.php?form=' . e($type) . '&emp=' . (int)$employeeId
                  . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr . '&sex=' . genderSexOf($sexSel) . '&hrs=' . urlencode($hrsDef)
-                 . ($isLeave ? '&reason=' . $reasonSel : '')
+                 . ($isLeave ? '&reason=' . $reasonSel : '&dawam=' . $dawamSel)
                  . '&opts_set=1' . ($incExtra ? '&inc_extra=1' : '') . ($incAide ? '&inc_aide=1' : '') . ($incTrans ? '&inc_trans=1' : '') . '&cur=' . $decCur;
     ?>
     <div class="card no-print" style="max-width:760px;margin:0 auto">
@@ -653,8 +656,16 @@ if (!$emp):
                 </div>
                 <?php if (!$isLeave): ?>
                 <div class="form-group">
-                    <label class="form-label">Heures de travail par mois / ساعات العمل في الشهر</label>
-                    <input type="number" name="hrs" class="form-control" value="<?= e($hrsDef) ?>" onchange="this.form.submit()">
+                    <label class="form-label">Heures de travail par mois / ساعات العمل في الشهر <small style="font-weight:400;opacity:.8">(<?= rtrim(rtrim(number_format((float)($emp['hours_per_week'] ?? 0), 1), '0'), '.') ?> س بالأسبوع × 4)</small></label>
+                    <?php /* ⏱️ تغيير الساعات يعيد الشيك تلقائياً حسب الرقم (أقل من 72 = جزئي) — والشيك اليدوي بعده يبقى كما اختاره */ ?>
+                    <input type="number" name="hrs" class="form-control" value="<?= e($hrsDef) ?>" onchange="var f=this.form,v=parseFloat(this.value);f.querySelectorAll('input[name=dawam]').forEach(function(r){r.checked=(r.value===((isNaN(v)||v>=72)?'full':'part'));});f.submit()">
+                </div>
+                <div class="form-group" style="grid-column:1 / -1">
+                    <label class="form-label">Horaire / دوام العمل <small style="font-weight:400;opacity:.8">(تلقائياً: أقل من 72 ساعة بالشهر = جزئي، 72 وما فوق = كامل — غيّر الشيك إذا بدّك)</small></label>
+                    <div class="school-checks">
+                        <label class="chk"><input type="radio" name="dawam" value="full" <?= $dawamSel === 'full' ? 'checked' : '' ?> onchange="this.form.submit()" autocomplete="off"> <span>Temps plein / دوام كامل</span></label>
+                        <label class="chk"><input type="radio" name="dawam" value="part" <?= $dawamSel === 'part' ? 'checked' : '' ?> onchange="this.form.submit()" autocomplete="off"> <span>Temps partiel / دوام جزئي</span></label>
+                    </div>
                 </div>
                 <?php else: ?>
                 <?php if ($leaveDate !== ''): ?>

@@ -565,6 +565,15 @@ function cnssEmployerNumberKey($num): string {
     $parts = preg_split('/[^0-9]+/', $num, -1, PREG_SPLIT_NO_EMPTY);
     return implode('-', array_map('intval', $parts));
 }
+/* ☑️ دوام العمل بنماذج استخدام الأجير (2026-10-27): أقل من 72 ساعة **بالشهر** = جزئي، 72 وما فوق = كامل.
+ * $hrsMonth = ساعات الشهر كما بالشاشة (الافتراضي ساعات الأسبوع × 4)؛ $chosen = اختيار المستخدم الصريح (full|part) يغلب الرقم.
+ * بلا ساعات ولا اختيار = كامل (كما كان النموذج يطلع دائماً). */
+function cnssDawamOf($hrsMonth, string $chosen = ''): string {
+    if ($chosen === 'full' || $chosen === 'part') return $chosen;
+    $h = trim((string)$hrsMonth);
+    if ($h === '' || !is_numeric($h)) return 'full';
+    return (float)$h < 72 ? 'part' : 'full';
+}
 /* «عمل الأجير» في نماذج الضمان (بطلب المستخدم 2026-08-19): الأستاذ يُكتب «أستاذ» فقط
  * (لا «أستاذ في الملاك» ولا «أستاذ متعاقد») — والموظف الإداري حسب وظيفته الفعلية. */
 function cnssOccupationAr(array $emp): string {
@@ -1645,6 +1654,9 @@ function newTeachersReportCols(): array {
         'code'     => ['الرقم / Code', fn($r) => $t($r['employee_code'] ?? ''), 9],
         'name_fr'  => ['الاسم / Nom', fn($r) => $t(($r['first_name_fr'] ?? '') . ' ' . ($r['last_name_fr'] ?? '')), 22],
         'name_ar'  => ['الاسم بالعربي / Nom (ar)', fn($r) => $t(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? '')), 20],
+        // 🛡️ (2026-10-27 «أوّل شي بالتقرير: إذا عندهم رقم ضمان، وإذا يخضع للضمان أو لا») — العمودان مباشرة بعد الاسم
+        'cnss_subj'=> ['يخضع للضمان / Soumis à la CNSS', fn($r) => ((int)($r['cnss_subject'] ?? 1)) === 1 ? 'نعم / Oui' : 'لا / Non', 12],
+        'nssf'     => ['رقم الضمان / N° CNSS', fn($r) => $t($r['nssf_number'] ?? '') !== '' ? cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '') : (((int)($r['cnss_subject'] ?? 1)) === 1 ? '⚠️ لا يوجد' : 'لا يوجد'), 16],
         'type'     => ['الفئة / Catégorie', fn($r) => employeeTypeLabel($r['employee_type']) . (($r['employee_type'] ?? '') === 'employe' && $t($r['job_title'] ?? '') !== '' ? ' — ' . jobTitleLabel($r['job_title'], 'ar') : ''), 16],
         'hire'     => ['دخول المدرسة / Embauche', fn($r) => $d(shownHireDate($r)), 12], // 👁️ المعروض
         'titul'    => ['دخول الملاك / Titularisation', fn($r) => $d(shownTitularizationDate($r)), 12],
@@ -1662,7 +1674,6 @@ function newTeachersReportCols(): array {
         'niveau'   => ['المرحلة / Niveau', fn($r) => $t($r['niveau_scolaire'] ?? ''), 12],
         'hours'    => ['ساعات/أيام بالأسبوع / Heures-jours', fn($r) => $t(rtrim(rtrim(number_format((float)($r['hours_per_week'] ?? 0), 1), '0'), '.') . ' س / ' . (int)($r['days_per_week'] ?? 0) . ' ي'), 12],
         'grade'    => ['الدرجة / Échelon', fn($r) => $t(gradeDisplay($r)), 8],
-        'nssf'     => ['رقم الضمان / N° CNSS', fn($r) => ((int)($r['cnss_subject'] ?? 1)) === 1 ? ($t($r['nssf_number'] ?? '') !== '' ? cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '') : '⚠️ ناقص') : 'لا يخضع', 16],
         'mof'      => ['رقم المالية / N° MOF', fn($r) => ((int)($r['tax_subject'] ?? 1)) === 1 ? ($t($r['finance_ministry_number'] ?? '') !== '' ? $t($r['finance_ministry_number']) : '⚠️ ناقص') : 'لا يخضع', 14],
         'caisse'   => ['رقم الصندوق / N° Caisse', fn($r) => ((int)($r['eoc_subject'] ?? 0)) === 1 ? ($t($r['caisse_number'] ?? '') !== '' ? $t($r['caisse_number']) : '⚠️ ناقص') : 'لا يخضع', 12],
         'setup'    => ['الإعداد المالي بالملف / Paramétrage', function ($r) use ($t, $lbp) {
