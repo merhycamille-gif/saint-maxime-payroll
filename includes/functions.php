@@ -1533,7 +1533,7 @@ function employeeFileGaps($e, $db, $schoolYear) {
     if (!isset($noSal[(int)($e['id'] ?? 0)])) return [];
     $gaps = ['الراتب غير محسوب (الإعداد المالي)'];
     if (empty($e['birth_date']) || $e['birth_date'] === '0000-00-00') $gaps[] = 'تاريخ الولادة';
-    if (((int)($e['cnss_subject'] ?? 1)) === 1 && trim((string)($e['nssf_number'] ?? '')) === '') $gaps[] = 'رقم الضمان';
+    if (((int)($e['cnss_subject'] ?? 1)) === 1 && !hasNssfNumber($e['nssf_number'] ?? '')) $gaps[] = 'رقم الضمان';
     if (((int)($e['tax_subject'] ?? 1)) === 1 && trim((string)($e['finance_ministry_number'] ?? '')) === '') $gaps[] = 'رقم المالية';
     if (($e['employee_type'] ?? '') !== 'employe' && trim((string)($e['diploma'] ?? '')) === '') $gaps[] = 'الشهادة';
     if (trim((string)($e['social_status'] ?? '')) === '') $gaps[] = 'الوضع العائلي';
@@ -1656,7 +1656,7 @@ function newTeachersReportCols(): array {
         'name_ar'  => ['الاسم بالعربي / Nom (ar)', fn($r) => $t(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? '')), 20],
         // 🛡️ (2026-10-27 «أوّل شي بالتقرير: إذا عندهم رقم ضمان، وإذا يخضع للضمان أو لا») — العمودان مباشرة بعد الاسم
         'cnss_subj'=> ['يخضع للضمان / Soumis à la CNSS', fn($r) => ((int)($r['cnss_subject'] ?? 1)) === 1 ? 'نعم / Oui' : 'لا / Non', 12],
-        'nssf'     => ['رقم الضمان / N° CNSS', fn($r) => $t($r['nssf_number'] ?? '') !== '' ? cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '') : (((int)($r['cnss_subject'] ?? 1)) === 1 ? '⚠️ لا يوجد' : 'لا يوجد'), 16],
+        'nssf'     => ['عنده رقم ضمان؟ / N° CNSS', fn($r) => hasNssfNumber($r['nssf_number'] ?? '') ? '✅ عنده رقم: ' . cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '') : (((int)($r['cnss_subject'] ?? 1)) === 1 ? '❌ ما عنده رقم' : '❌ ما عنده رقم (لا يخضع)'), 20],
         'type'     => ['الفئة / Catégorie', fn($r) => employeeTypeLabel($r['employee_type']) . (($r['employee_type'] ?? '') === 'employe' && $t($r['job_title'] ?? '') !== '' ? ' — ' . jobTitleLabel($r['job_title'], 'ar') : ''), 16],
         'hire'     => ['دخول المدرسة / Embauche', fn($r) => $d(shownHireDate($r)), 12], // 👁️ المعروض
         'titul'    => ['دخول الملاك / Titularisation', fn($r) => $d(shownTitularizationDate($r)), 12],
@@ -6704,6 +6704,11 @@ function diplomaLabel($code, $lang = 'fr') {
  * تُستعمل في كل مستندات المدرسة (الكشوف/الإفادات/التقارير) لتوحيد العرض.
  * النماذج الرسمية الحكومية تبقى تعرض الرقم الأصلي وحده.
  */
+/* 🛡️ (2026-10-27 «كيف بعرف إذا عنده رقم ضمان أو ما عنده») رقم ضمان حقيقي = 4 أرقام فأكثر —
+ * الملفات القديمة فيها «0» (152 ملفاً) و«1» وفراغات كأنها أرقام؛ كل مكان يقرّر «عنده رقم» يمرّ من هنا (التقرير، النواقص، تحويل نموذج الضمان). */
+function hasNssfNumber($nssf): bool {
+    return strlen(preg_replace('/\D/', '', (string)$nssf)) >= 4;
+}
 function cnssWithBirthYear($nssf, $birthDate, $fallback = '—') {
     $nssf = trim((string)$nssf);
     $by = $birthDate ? date('Y', strtotime($birthDate)) : '';

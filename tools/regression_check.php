@@ -3174,7 +3174,7 @@ $sid54a = (int)$db->query("SELECT school_id FROM employees WHERE id = " . (int)$
 //             ⇒ نفحص النموذج الرسمي نفسه (mode=image = صفحة القالب بالقيم، بلا ترويسة البرنامج فلا تتسرّب أسماء المدارس الأخرى)
 $t54 = function (int $id) use ($db): string {
     $n = (string)$db->query("SELECT nssf_number FROM employees WHERE id = " . $id)->fetchColumn();
-    return trim($n) !== '' ? 'cnss_hire_reg' : 'cnss_hire_new';
+    return hasNssfNumber($n) ? 'cnss_hire_reg' : 'cnss_hire_new';   // (2026-10-27) «0»/«1» ≠ رقم
 };
 $h54a = renderPage('pages/official_export.php', ['form' => $t54((int)$emp54a), 'emp' => (int)$emp54a, 'mode' => 'image'], [], [$sid54a]);
 $h54b = renderPage('pages/official_export.php', ['form' => $t54((int)$emp54b), 'emp' => (int)$emp54b, 'mode' => 'image'], [], [2]);
@@ -7544,9 +7544,9 @@ try {
     $src = (string)regReportsSrc(); $srx = (string)file_get_contents($PROJ . '/pages/reports_export.php');
     $ok162 = count($r27) === 1 && $r27[0]['fin_ok'] === false && strpos($r27[0]['fin_note'], 'غير مكتمل') !== false && $r27[0]['via_link'] === false
           && count($r26) === 0 && (!$paid || (count($rp) === 1 && $rp[0]['fin_ok'] === true && strpos($rp[0]['fin_note'], 'مكتمل') !== false && $rp[0]['last_salary']))
-          && count($cols) >= 28 && ($txt['phone'] ?? '') === '03-162162' && ($txt['nssf'] ?? '') === '⚠️ لا يوجد' && ($txt['cnss_subj'] ?? '') === 'نعم / Oui' && ($txt['setup'] ?? '') === '⚠️ لا أساس بالملف' && ($txt['hire'] ?? '') === formatDate('2026-10-01')
+          && count($cols) >= 28 && ($txt['phone'] ?? '') === '03-162162' && ($txt['nssf'] ?? '') === '❌ ما عنده رقم' && ($txt['cnss_subj'] ?? '') === 'نعم / Oui' && hasNssfNumber('0') === false && hasNssfNumber('1') === false && hasNssfNumber('2005-2065679') === true && ($txt['setup'] ?? '') === '⚠️ لا أساس بالملف' && ($txt['hire'] ?? '') === formatDate('2026-10-01')
           && array_search('cnss_subj', array_keys($cols), true) === 3 && array_search('nssf', array_keys($cols), true) === 4   // 🛡️ (2026-10-27) بعد الاسم مباشرة
-          && strpos($html, 'Nouveau162') !== false && strpos($html, 'الملف المالي غير مكتمل') !== false && strpos($html, 'الأساتذة الجدد') !== false && strpos($html, 'رقم الضمان / N° CNSS') !== false
+          && strpos($html, 'Nouveau162') !== false && strpos($html, 'الملف المالي غير مكتمل') !== false && strpos($html, 'الأساتذة الجدد') !== false && strpos($html, 'عنده رقم ضمان؟ / N° CNSS') !== false
           && strpos($src, "'?report=new_teachers'") !== false && strpos($src, "'new_teachers']") !== false && strpos($srx, "\$report === 'new_teachers'") !== false && strpos($srx, 'newTeachersReportCols()') !== false;
     $why162 = 'r27=' . count($r27) . ' r26=' . count($r26) . ' paid=' . (int)$paid . ' paidOk=' . (($rp[0]['fin_ok'] ?? null) ? 'yes' : 'no') . ' cols=' . count($cols) . ' phone=' . ($txt['phone'] ?? '-') . ' nssf=' . ($txt['nssf'] ?? '-') . ' html=' . (strpos($html, 'Nouveau162') !== false ? 'ok' : 'NO') . ' len=' . strlen($html);
 } catch (Throwable $e) { $ok162 = false; $why162 .= ' err=' . $e->getMessage(); }

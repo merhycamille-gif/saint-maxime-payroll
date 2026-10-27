@@ -329,7 +329,7 @@ if ($form === 'tax_register' && $emp) {
 // النسخة HTML القديمة هنا كانت تعطي من الشريط إكسل/وورد عامّين (نسخ الشاشة سطراً سطراً) ⇒ باختيار الموظف ننتقل للنموذج الرسمي
 // كما ر3. (raw=1 = احتياط official_export حين تغيب ملفات القالب ⇒ تبقى النسخة المبنية هنا بلا دوران.)
 if ($emp && empty($_GET['raw'])) {
-    $hasReg = trim((string)($emp['nssf_number'] ?? '')) !== ''; // مسجّل سابقاً بالصندوق ⇒ نموذج «أجير عنده رقم»
+    $hasReg = hasNssfNumber($emp['nssf_number'] ?? ''); // مسجّل سابقاً بالصندوق ⇒ نموذج «أجير عنده رقم» («0»/«1» بالملفات القديمة ≠ رقم — 2026-10-27)
     $offType = ['cnss_employ' => ($hasReg ? 'cnss_hire_reg' : 'cnss_hire_new'),
                 'cnss_employ2' => 'cnss_hire_new', 'cnss_terminate' => 'cnss_leave', 'cnss_work' => 'cnss_travail',
                 'cnss_work_detail' => 'cnss_travail'][$form] ?? '';   // 🏛️ (2026-10-18 «إفادة عمل الضمان في نموذج رسمي — حاطط غير شي») المفصّلة (مرض) = القالب الرسمي نفسه + قسم الأجور الثلاثة الأخيرة (detail=1)
@@ -1059,7 +1059,7 @@ elseif ($form === 'cnss_employ' || $form === 'cnss_terminate'):
     <div class="fline"><span class="lbl">سجل تجاري : مكان</span> <?= fval('','g') ?> <span class="lbl">رقم</span> <?= fval('','g') ?> <span class="lbl">هاتف</span> <?= fval($school['phone'],'g') ?></div>
     <div class="fline"><span class="lbl">وعنوانها الكامل :</span> <?= fval($school['address'],'lg') ?></div>
     <div class="doc-p">يصرّح بأن الأجير المبيّنة هويته فيما يلي:</div>
-    <?php $hasReg = !empty(trim((string)$emp['nssf_number'])); ?>
+    <?php $hasReg = hasNssfNumber($emp['nssf_number'] ?? ''); ?>
     <div class="fline">
         <?= fopt('الأجير مسجّل سابقاً في الصندوق تحت الرقم', '', $hasReg) ?> <?= $hasReg ? nssfBoxesWithYear($emp['nssf_number'], $emp['birth_date'] ?? '', 8) : '<span class="val g">&nbsp;</span>' ?>
     </div>
