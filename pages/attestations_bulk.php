@@ -122,6 +122,32 @@ function bulkBuild(array $emp, string $type, string $lang, string $date): array 
     return [$pdf, $name, (string)($ATT_TYPES[$used]['ar'] ?? $used)];
 }
 
+/** mPDF بخطوط البرنامج (Arial كالشاشة) — بلا هذا يطلب DejaVu غير الموجودة */
+function bulkMpdf(array $o): \Mpdf\Mpdf {
+    require_once __DIR__ . '/../includes/pdf_engine.php';
+    $root = realpath(__DIR__ . '/..'); $tmp = $root . '/tmp/mpdf'; if (!is_dir($tmp)) @mkdir($tmp, 0777, true);
+    $cfg = (new \Mpdf\Config\ConfigVariables())->getDefaults(); $fcfg = (new \Mpdf\Config\FontVariables())->getDefaults();
+    $fontdata = $fcfg['fontdata']; $fontdata['arial'] = ['R' => 'arial.ttf', 'B' => 'arialbd.ttf', 'useOTL' => 0xFF, 'useKashida' => 75];
+    return new \Mpdf\Mpdf($o + ['mode' => 'utf-8', 'tempDir' => $tmp, 'fontDir' => array_merge($cfg['fontDir'], [$root . '/assets/fonts/ttf']), 'fontdata' => $fontdata, 'default_font' => 'arial']);
+}
+
+/** 🪪 («أقدر أطبع صورة التذكرة أو إخراج القيد الفردي أو العائلي مع الاستخدام») مستند مرفوع بملف الأستاذ ⇒ PDF (صورة على A4 كاملة، أو PDF كما هو) — null إن لم يوجد */
+function bulkDocPdf(string $rel): ?string {
+    $rel = str_replace('\\', '/', trim($rel));
+    if ($rel === '' || strpos($rel, '..') !== false || strpos($rel, 'uploads/') !== 0) return null;
+    $abs = realpath(__DIR__ . '/..') . '/' . $rel;
+    if (!is_file($abs) || filesize($abs) < 100) return null;
+    $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
+    if ($ext === 'pdf') { $d = (string)file_get_contents($abs); return strpos($d, '%PDF') === 0 ? $d : null; }
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'], true)) return null;
+    $info = @getimagesize($abs); if (!$info) return null;
+    $land = $info[0] > $info[1];
+    $mpdf = bulkMpdf(['format' => $land ? 'A4-L' : 'A4', 'margin_left' => 8, 'margin_right' => 8, 'margin_top' => 8, 'margin_bottom' => 8]);
+    $maxW = ($land ? 297 : 210) - 16; $maxH = ($land ? 210 : 297) - 16;
+    $mpdf->WriteHTML('<div style="text-align:center"><img src="' . htmlspecialchars(str_replace('\\', '/', $abs), ENT_QUOTES) . '" style="max-width:' . $maxW . 'mm;max-height:' . $maxH . 'mm"></div>');
+    return $mpdf->Output('', 'S');
+}
+
 /** دمج ملفات PDF (بالترتيب) عبر خدمة المدرسة؛ وإلا mPDF باستيراد الصفحات */
 function bulkMerge(array $paths): string {
     require_once __DIR__ . '/../includes/pdf_chromium.php';
@@ -136,8 +162,7 @@ function bulkMerge(array $paths): string {
         if ($code === 200 && is_string($r) && strpos($r, '%PDF') === 0) return $r;
     }
     // احتياط: mPDF يستورد الصفحات (ملفات PDF 1.4 كما ينتجها المحرّكان)
-    require_once __DIR__ . '/../includes/pdf_engine.php';
-    $mpdf = new \Mpdf\Mpdf(['mode' => 'utf-8', 'format' => 'A4', 'tempDir' => realpath(__DIR__ . '/..') . '/tmp/mpdf']);
+    $mpdf = bulkMpdf(['format' => 'A4']);
     $first = true;
     foreach ($paths as $p) {
         $n = $mpdf->setSourceFile($p);
@@ -167,9 +192,21 @@ if ($act !== '') {
             try { [$pdf, $name, $label] = bulkBuild($emp, $type, $lang, $date); }
             finally { if ($prevActive === null) unset($_SESSION['active_schools']); else $_SESSION['active_schools'] = $prevActive; if ($prevRep !== null) $_SESSION['report_schools'] = $prevRep; }
             $sch = $schools[(int)$emp['school_id']];
+            // 🪪 المرفقات المختارة بعد ورقة الإفادة: الهوية/إخراج القيد الفردي، إخراج القيد العائلي
+            $docsMissing = []; $parts = [$pdf];
+            foreach ([['att_id', 'id_document_path', 'الهوية / إخراج القيد الفردي'], ['att_fam', 'family_doc_path', 'إخراج القيد العائلي']] as [$flag, $col, $lbl2]) {
+                if (empty($in[$flag])) continue;
+                $dp = bulkDocPdf((string)($emp[$col] ?? ''));
+                if ($dp === null) $docsMissing[] = $lbl2; else $parts[] = $dp;
+            }
+            if (count($parts) > 1) {
+                $tmpPaths = []; foreach ($parts as $pi => $pp) { $tp = $bulkDir . '/part_' . bulkToken() . '.pdf'; file_put_contents($tp, $pp); $tmpPaths[] = $tp; }
+                try { $merged = bulkMerge($tmpPaths); if (strpos($merged, '%PDF') === 0) $pdf = $merged; else $docsMissing[] = 'تعذّر ضمّ المستندات'; }
+                finally { foreach ($tmpPaths as $tp) @unlink($tp); }
+            }
             $tok = bulkToken(); file_put_contents($bulkDir . '/' . $tok . '.pdf', $pdf);
             $_SESSION['bulk_files'][$tok] = $name;
-            $res = ['ok' => true, 'tok' => $tok, 'name' => $name, 'label' => $label, 'size' => strlen($pdf), 'used' => ($type === 'cnss_hire' ? (hasNssfNumber($emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new') : $type)];
+            $res = ['ok' => true, 'tok' => $tok, 'name' => $name, 'label' => $label, 'size' => strlen($pdf), 'docs_missing' => $docsMissing, 'pages' => preg_match_all('/\/Type\s*\/Page[^s]/', $pdf), 'used' => ($type === 'cnss_hire' ? (hasNssfNumber($emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new') : $type)];
             if (!empty($in['email_each'])) {
                 $to = trim((string)($emp['email'] ?? ''));
                 if (!filter_var($to, FILTER_VALIDATE_EMAIL)) { $res['mail'] = 'none'; $res['msg'] = 'ما عنده إيميل بملفه'; }
@@ -376,6 +413,13 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="bk-step">
                 <div class="bk-h"><span class="bk-n">3</span> Que faire ? / شو بدّك تعمل فيهن؟</div>
+                <?php /* 🪪 («أقدر أطبع صورة التذكرة أو إخراج القيد الفردي أو العائلي مع الاستخدام») مرفقات بعد ورقة كل أستاذ من المستندات المرفوعة بملفه */ ?>
+                <div class="school-checks emp-type-checks" style="margin:0 0 12px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;align-items:center">
+                    <strong style="margin-inline-end:8px"><i class="fas fa-paperclip"></i> مرفقات مع كل إفادة / Pièces jointes :</strong>
+                    <label class="chk"><input type="checkbox" id="bk_att_id" value="1"> <span>صورة التذكرة / إخراج القيد الفردي</span></label>
+                    <label class="chk"><input type="checkbox" id="bk_att_fam" value="1"> <span>إخراج القيد العائلي</span></label>
+                    <small class="text-muted">من المستندات المرفوعة بملف الأستاذ — كل مستند على ورقة بعد إفادته؛ الناقص يظهر قدّام اسمه</small>
+                </div>
                 <div class="bk-act">
                     <div class="bk-card">
                         <div class="t"><i class="fas fa-print" style="color:#173f6f"></i> Imprimer / اطبع</div>
@@ -523,11 +567,15 @@ include __DIR__ . '/../includes/header.php';
         var removed = {};
         function one(b, idx) {
             setRow(b, 'wait', '⏳ عم نجهّز…');
-            post({ act: 'gen', emp: b.value, type: type, lang_doc: lang, date: date }).then(function (r) {
+            var gd = { act: 'gen', emp: b.value, type: type, lang_doc: lang, date: date };
+            if (document.getElementById('bk_att_id').checked) gd.att_id = 1; if (document.getElementById('bk_att_fam').checked) gd.att_fam = 1;
+            post(gd).then(function (r) {
                 if (!r.ok) { badN++; setRow(b, 'bad', '✕ ' + (r.msg || 'فشل')); }
                 else {
                     toksBy[idx] = r.tok; b.setAttribute('data-tok', r.tok); b.setAttribute('data-file', r.name);
-                    okN++; var tr = setRow(b, 'ok', '✅ جاهز', r.label);
+                    okN++; var miss = (r.docs_missing && r.docs_missing.length) ? ' — ⚠️ بلا: ' + r.docs_missing.join(' / ') : '';
+                    var tr = setRow(b, miss ? 'ok' : 'ok', '✅ جاهز' + (r.pages > 1 ? ' (' + r.pages + ' صفحات)' : '') + miss, r.label);
+                    if (miss) tr.querySelector('.st').style.color = '#92400e';
                     tr.querySelector('.ac').innerHTML = '<a class="btn btn-sm btn-light" target="_blank" rel="noopener" href="' + API + '?act=file&tok=' + r.tok + '"><i class="fas fa-eye"></i> شوف</a>'
                         + (mode === 'wa' && waMode === 'each' ? ' <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" data-wa="' + r.tok + '"><i class="fab fa-whatsapp"></i> ابعت' + (b.getAttribute('data-phone') ? ' ' + escH(b.getAttribute('data-phone')) : '') + '</button>' : '')
                         + ' <button type="button" class="btn btn-sm btn-light" data-rm="' + idx + '" style="color:#b91c1c"><i class="fas fa-user-xmark"></i> احذف من الإرسال</button>';

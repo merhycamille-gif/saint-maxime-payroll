@@ -10805,9 +10805,20 @@ try {
     $bk = (string)file_get_contents($PROJ . '/pages/attestations_bulk.php'); $hd278 = (string)file_get_contents($PROJ . '/includes/header.php'); $at278 = (string)regAttSrc();
     $okS = strpos($bk, "if (\$act === 'gen') {") !== false && strpos($bk, "if (\$act === 'merge') {") !== false && strpos($bk, "if (\$act === 'file') {") !== false && strpos($bk, "if (\$act === 'mailfile') {") !== false
          && strpos($bk, "if (\$act === 'mailtok') {") !== false && strpos($bk, 'احذف من الإرسال') !== false && strpos($bk, 'function runFinal()') !== false   // 👀 («بدّي وقت قبل ما أبعت») تجهيز ⇒ مراجعة ⇒ كبسة نهائية
+         && strpos($bk, 'function bulkDocPdf(string $rel): ?string') !== false && strpos($bk, 'id="bk_att_id"') !== false && strpos($bk, 'id="bk_att_fam"') !== false   // 🪪 مرفقات الهوية/إخراج القيد
          && strpos($bk, "hasNssfNumber(\$emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new'") !== false && strpos($bk, '/forms/pdfengines/merge') !== false && strpos($bk, '$mpdf->importPage($k)') !== false
          && strpos($bk, 'name="bk_mail_mode" value="one"') !== false && strpos($bk, 'name="bk_wa_mode" value="one"') !== false && strpos($bk, 'data-pick="new"') !== false && strpos($bk, "data-run=\"print\"") !== false
          && strpos($hd278, "\$noToolbarPages[] = 'attestations_bulk.php';") !== false && strpos($hd278, 'pages/attestations_bulk.php"') !== false && strpos($at278, 'pages/attestations_bulk.php"') !== false;
+    // 🪪 تشغيل: إفادة + هوية + قيد عائلي لأستاذ مستنداته مرفوعة ⇒ ملف بصفحات = الإفادة + المستندات الموجودة فعلاً
+    $okD = true; $dPages = '-';
+    $wd = $db->query("SELECT id, school_id, id_document_path, family_doc_path FROM employees WHERE is_deleted = 0 AND id_document_path <> '' AND family_doc_path <> '' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($wd && is_file($PROJ . '/' . $wd['id_document_path'])) {
+        $jd = json_decode(trim(renderPage('pages/attestations_bulk.php', ['act' => 'gen', 'emp' => (int)$wd['id'], 'type' => 'salaire', 'lang_doc' => 'ar', 'date' => '2026-10-27', 'att_id' => 1, 'att_fam' => 1], [], [(int)$wd['school_id']], 'lbp', '2026-2027')), true) ?: [];
+        $dPages = (string)($jd['pages'] ?? '-') . ' miss=' . implode('/', (array)($jd['docs_missing'] ?? []));
+        $okD = !empty($jd['ok']) && (int)($jd['pages'] ?? 0) >= 2 + (is_file($PROJ . '/' . $wd['family_doc_path']) ? 1 : 0);
+        if (!empty($jd['tok'])) @unlink($PROJ . '/tmp/bulk/' . $jd['tok'] . '.pdf');
+    }
+    $okS = $okS && $okD;
     $hB = renderPage('pages/attestations_bulk.php', [], [], [3], 'lbp', '2026-2027');
     $hA = renderPage('pages/attestations_bulk.php', [], [], [], 'lbp', '2026-2027');
     // 🏫📅 (لاحقاً بنفس اليوم «وأكيد كمان حاطط أي مدرسة أو مدارس… ومن أي تاريخ») خانات المدارس داخل الصفحة + «كل المدارس» = اللائحة مجمّعة بالمدارس + «الداخلون بتاريخ»
@@ -10820,7 +10831,7 @@ try {
     $pdfOk = function (array $j) use ($bkDir): bool { if (empty($j['ok']) || empty($j['tok'])) return false; $f = $bkDir . '/' . $j['tok'] . '.pdf'; $ok = is_file($f) && strpos((string)file_get_contents($f), '%PDF') === 0 && filesize($f) > 5000; @unlink($f); return $ok; };
     $okG = $pdfOk($j1) && strpos((string)($j1['name'] ?? ''), 'Attestation_salaire_') === 0 && $pdfOk($j2) && strpos((string)($j2['label'] ?? ''), 'إعلام استخدام أجير') !== false && strpos((string)($j2['name'] ?? ''), 'Declaration_embauche_CNSS_') === 0;
     $ok278 = $okS && $okP && $okG;
-    $why278 = 'src=' . ($okS ? 'ok' : 'NO') . ' page=' . ($okP ? 'ok' : 'NO') . ' gen=' . ($okG ? 'ok' : 'NO') . ' (salaire=' . ($j1['name'] ?? ($j1['msg'] ?? '-')) . ' hire=' . ($j2['label'] ?? ($j2['msg'] ?? '-')) . ')';
+    $why278 = 'src=' . ($okS ? 'ok' : 'NO') . ' page=' . ($okP ? 'ok' : 'NO') . ' gen=' . ($okG ? 'ok' : 'NO') . ' docs=' . $dPages . ' (salaire=' . ($j1['name'] ?? ($j1['msg'] ?? '-')) . ' hire=' . ($j2['label'] ?? ($j2['msg'] ?? '-')) . ')';
 } catch (Throwable $e) { $ok278 = false; $why278 = $e->getMessage(); }
 check('📚 الإفادات الجماعية: صفحة مستقلّة (نوع × مجموعة أساتذة ⇒ طباعة ملف واحد / إيميل لكل أستاذ أو لعنوان واحد / واتساب) + gen يعيد استعمال مسارات الإفادات القائمة + merge + مدرسة واحدة + روابط الشريط', $ok278, $why278);
 
