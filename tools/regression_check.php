@@ -10666,8 +10666,14 @@ try {
          && $cellOf($xnF, 'D23') === 'X' && $cellOf($xnF, 'F23') === '2'
          && $cellOf($xrP, 'E18') === 'X' && $cellOf($xrP, 'B18') === '1' && $cellOf($xrP, 'J17') === '40'
          && $cellOf($xrF, 'B18') === 'X' && $cellOf($xrF, 'E18') === '2';
-    $ok274 = $okU && $okS && $okP && $okI && $okL && $okX;
-    $why274 = 'unit=' . ($okU ? 'ok' : 'NO') . ' src=' . ($okS ? 'ok' : 'NO') . ' pos=' . ($okP ? 'ok' : 'NO') . ' img=' . ($okI ? 'ok' : 'NO') . ' live=' . ($okL ? 'ok' : 'NO') . ' xlsx=' . ($okX ? 'ok' : 'NO')
+    // 🛡️ تقرير «الداخلون» (titularized، الوضعان) يحمل عمودَي الضمان نفسيهما بعد الاسم (مصدر واحد مع تقرير الجدد)
+    $hT = renderPage('pages/reports.php', ['report' => 'titularized', 'tmode' => 'hire'], [], [], '', '2026-2027');
+    //    «يخضع للضرائب» (= خانة الضمان) + «رقم الضمان» (الرقم الحقيقي فقط وإلا فاضية — ليعرف أيّ نموذج استخدام يطبع)
+    $okT = preg_match('#<th>الاسم / Nom</th>\s*<th>يخضع للضرائب / Soumis aux retenues</th>\s*<th>رقم الضمان / N° CNSS</th>\s*<th>الشهادة / Diplôme</th>#u', $hT) === 1
+         && (strpos($hT, '>نعم / Oui</td>') !== false || strpos($hT, 'لا يوجد من دخل') !== false)
+         && strpos((string)regReportsSrc(), "fn(\$r) => hasNssfNumber(\$r['nssf_number'] ?? '') ? cnssWithBirthYear(\$r['nssf_number'], \$r['birth_date'] ?? '', '') : ''") !== false;
+    $ok274 = $okU && $okS && $okP && $okI && $okL && $okX && $okT;
+    $why274 = 'unit=' . ($okU ? 'ok' : 'NO') . ' entrants=' . ($okT ? 'ok' : 'NO') . ' src=' . ($okS ? 'ok' : 'NO') . ' pos=' . ($okP ? 'ok' : 'NO') . ' img=' . ($okI ? 'ok' : 'NO') . ' live=' . ($okL ? 'ok' : 'NO') . ' xlsx=' . ($okX ? 'ok' : 'NO')
             . ' hw=' . $hw274 . ' F23p=' . $cellOf($xnP, 'F23') . ' D23f=' . $cellOf($xnF, 'D23') . ' E18p=' . $cellOf($xrP, 'E18') . ' B18f=' . $cellOf($xrF, 'B18');
 } catch (Throwable $e) { $ok274 = false; $why274 = $e->getMessage(); }
 check('🛡️⏱️ نماذج استخدام الأجير: الساعات الشهرية = الأسبوعية × 4 (الملف لا يُمسّ) + أقل من 72 = جزئي / 72 وما فوق = كامل + الشيك يلحق الرقم ويُغلَب باليد + dawam بالرابط + X بالخانة الصحيحة بالقالبين (إكسل + صورة مفرّغة + إحداثيات)', $ok274, $why274);

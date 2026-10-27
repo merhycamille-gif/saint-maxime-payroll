@@ -848,12 +848,21 @@ function reportDocThumb($path) {
                     <thead><tr>
                         <th>#</th>
                         <?php if ($multi): ?><th>المدرسة / École</th><?php endif; ?>
-                        <th>الاسم / Nom</th><th>الشهادة / Diplôme</th><th>الدرجة الحالية / Échelon</th>
+                        <th>الاسم / Nom</th>
+                        <?php /* 🛡️ (2026-10-27 «بتقرير الداخلين بتاريخ 1/10: قدّام الاسم يخضع للضرائب أو لا، ورقم الضمان إذا بملفه — حتى أعرف أيّ نموذج استخدام أطبع»)
+                                 «ضرائب» عنده = الضمان أوّلاً (وتلقائياً ضريبة الدخل)؛ الصندوق معروف من الفئة فلا عمود له.
+                                 رقم الضمان يظهر فقط إذا كان حقيقياً (hasNssfNumber: «0»/«1» القديمة ≠ رقم) — وإلا الخانة فاضية = نموذج «لا يحمل رقم». */
+                              $tCnssCols = [
+                                  'tax_subj' => ['يخضع للضرائب / Soumis aux retenues', fn($r) => ((int)($r['cnss_subject'] ?? 1)) === 1 ? 'نعم / Oui' : 'لا / Non'],
+                                  'nssf'     => ['رقم الضمان / N° CNSS', fn($r) => hasNssfNumber($r['nssf_number'] ?? '') ? cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '') : ''],
+                              ]; ?>
+                        <?php foreach ($tCnssCols as $c): ?><th><?= e($c[0]) ?></th><?php endforeach; ?>
+                        <th>الشهادة / Diplôme</th><th>الدرجة الحالية / Échelon</th>
                         <th>دخول المدرسة / Embauche</th><th>دخول الملاك / Titularisation</th><th>الحالة / Statut</th>
                     </tr></thead>
                     <tbody>
                         <?php
-                        $colsN = ($multi ? 8 : 7);
+                        $colsN = ($multi ? 8 : 7) + count($tCnssCols);
                         $rn = 0; $curSch = null; $schN = 0;
                         // صفّ عدد المدرسة (عند تعدد المدارس) — «لكل مدرسة» بمجموع فرعي
                         $schSum = function($sid, $n) use ($colsN, $tmode) {
@@ -868,6 +877,9 @@ function reportDocThumb($path) {
                                 <td><?= ++$rn ?></td>
                                 <?php if ($multi): ?><td><small><?= e(schoolNameById($r['school_id'])) ?></small></td><?php endif; ?>
                                 <td><strong><?= e(empFullNameAr($r)) ?></strong><?= empBadges($r, $db, activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()) ?></td>
+                                <?php foreach ($tCnssCols as $k => $c): $txt = (string)($c[1])($r); ?>
+                                    <td style="white-space:nowrap;<?= $txt === 'لا / Non' ? 'color:#92400e;font-weight:700' : '' ?>"<?= $k === 'nssf' ? ' dir="ltr"' : '' ?>><?= e($txt) ?></td>
+                                <?php endforeach; ?>
                                 <td><?= diplomaLabel($r['diploma']) ?></td>
                                 <td><?= e(gradeDisplay($r)) ?></td>
                                 <td><?= formatDate(shownHireDate($r)) ?></td>
