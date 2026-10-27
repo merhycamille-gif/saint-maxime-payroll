@@ -30,7 +30,11 @@ if (!is_dir($bulkDir)) @mkdir($bulkDir, 0777, true);
 foreach ((array)glob($bulkDir . '/*.pdf') as $old) if (@filemtime($old) < time() - 7200) @unlink($old);
 
 function bulkJson(array $a): void { while (ob_get_level()) ob_end_clean(); header('Content-Type: application/json; charset=utf-8'); echo json_encode($a, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit; }
-function bulkLatin(string $s): string { $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s); if ($t === false || $t === '') $t = $s; return trim(preg_replace('/[^a-z0-9]+/i', '_', $t), '_'); }   // Thérèse ⇒ Therese
+function bulkLatin(string $s): string {   // Thérèse ⇒ Therese (خريطة الحروف المشكولة أوّلاً — iconv على ويندوز يضيف فواصل)
+    $s = strtr($s, ['à' => 'a', 'â' => 'a', 'ä' => 'a', 'á' => 'a', 'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e', 'î' => 'i', 'ï' => 'i', 'í' => 'i', 'ô' => 'o', 'ö' => 'o', 'ó' => 'o', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ú' => 'u', 'ç' => 'c', 'ñ' => 'n', 'œ' => 'oe', 'É' => 'E', 'È' => 'E', 'Ê' => 'E', 'À' => 'A', 'Â' => 'A', 'Î' => 'I', 'Ô' => 'O', 'Û' => 'U', 'Ç' => 'C']);
+    $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s); if ($t === false || $t === '') $t = $s;
+    return trim(preg_replace('/[^a-z0-9]+/i', '_', $t), '_');
+}
 function bulkToken(): string { return bin2hex(random_bytes(10)); }
 function bulkOwn(string $tok): bool { return preg_match('/^[a-f0-9]{20}$/', $tok) === 1 && !empty($_SESSION['bulk_files'][$tok]); }
 /** 📧 (p1 «ما بدّي يطلع بالإيميل هالجملة والعنوان بالعربي») عنوان الإيميل ونصّه بالفرنسية الرسمية، بلا أقواس «(officielle — automatique)» ولا شرح */
@@ -177,6 +181,20 @@ if ($act !== '') {
                 }
             }
             bulkJson($res);
+        }
+        if ($act === 'mailtok') {   // 📧 (بعد المراجعة) إرسال ملف جاهز لأستاذه على إيميل ملفه
+            $tok = (string)($in['tok'] ?? ''); $eid = (int)($in['emp'] ?? 0);
+            if (!bulkOwn($tok) || !is_file($bulkDir . '/' . $tok . '.pdf')) bulkJson(['ok' => false, 'msg' => 'انتهت صلاحية الملف — أعد التجهيز']);
+            $st = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0"); $st->execute([$eid]); $emp = $st->fetch(PDO::FETCH_ASSOC);
+            $schools = bulkSchools();
+            if (!$emp || !isset($schools[(int)$emp['school_id']])) bulkJson(['ok' => false, 'msg' => 'الأستاذ غير موجود بمدارسك']);
+            $to = trim((string)($emp['email'] ?? ''));
+            if (!filter_var($to, FILTER_VALIDATE_EMAIL)) bulkJson(['ok' => false, 'mail' => 'none', 'msg' => 'ما عنده إيميل بملفه']);
+            $sch = $schools[(int)$emp['school_id']]; $schoolFr = (string)(($sch['name_fr'] ?? '') ?: ($sch['name_ar'] ?? ''));
+            $used = ($type === 'cnss_hire' ? (hasNssfNumber($emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new') : $type);
+            [$subject, $body] = bulkMailText(bulkFrLabel($used), $schoolFr, 1);
+            [$ok, $err] = msaSendMail($to, $subject, $body, [['name' => (string)$_SESSION['bulk_files'][$tok], 'data' => (string)file_get_contents($bulkDir . '/' . $tok . '.pdf'), 'mime' => 'application/pdf']], false, (int)$sch['id'], $schoolFr);
+            bulkJson(['ok' => (bool)$ok, 'mail' => $ok ? 'sent' : 'failed', 'to' => $to, 'msg' => $ok ? ('انبعت إلى ' . $to) : ('فشل الإرسال: ' . $err)]);
         }
         if ($act === 'merge') {
             $toks = (array)($in['toks'] ?? []); $paths = [];
@@ -362,7 +380,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="bk-card">
                         <div class="t"><i class="fas fa-print" style="color:#173f6f"></i> Imprimer / اطبع</div>
                         <div class="opt text-muted">ملف PDF واحد، كل أستاذ على ورقته، بيفتح وبيطبع دغري.</div>
-                        <button type="button" class="btn btn-primary w-100" data-run="print"><i class="fas fa-print"></i> اطبع الكل</button>
+                        <button type="button" class="btn btn-primary w-100" data-run="print"><i class="fas fa-print"></i> جهّز للطباعة</button>
                     </div>
                     <div class="bk-card">
                         <div class="t"><i class="fas fa-envelope" style="color:#0e7490"></i> E-mail / إيميل</div>
@@ -371,7 +389,7 @@ include __DIR__ . '/../includes/header.php';
                             <label><input type="radio" name="bk_mail_mode" value="one"> كلّها بملف واحد على إيميل واحد:</label>
                             <input type="email" id="bk_mail_to" class="form-control" placeholder="name@example.com" dir="ltr" value="<?= e((string)($school['email'] ?? '')) ?>">
                         </div>
-                        <button type="button" class="btn btn-success w-100" data-run="email"><i class="fas fa-paper-plane"></i> أرسل بالإيميل</button>
+                        <button type="button" class="btn btn-success w-100" data-run="email"><i class="fas fa-paper-plane"></i> جهّز للإيميل</button>
                     </div>
                     <div class="bk-card">
                         <div class="t"><i class="fab fa-whatsapp" style="color:#128C7E"></i> WhatsApp / واتساب</div>
@@ -500,42 +518,73 @@ include __DIR__ . '/../includes/header.php';
             }
             if (done >= picked.length) finish();
         }
+        // 👀 («بدّي وقت بيصير الملف جاهز قبل ما أبعت») التجهيز وحده أوّلاً: قدّام كل أستاذ «جاهز» + «شوف» + «احذف من الإرسال»،
+        //    ولا طباعة ولا إرسال إلّا بالكبسة النهائية بعد المراجعة — على الباقين المشمولين فقط
+        var removed = {};
         function one(b, idx) {
             setRow(b, 'wait', '⏳ عم نجهّز…');
-            var data = { act: 'gen', emp: b.value, type: type, lang_doc: lang, date: date };
-            if (mode === 'email' && mailMode === 'each') data.email_each = 1;
-            post(data).then(function (r) {
+            post({ act: 'gen', emp: b.value, type: type, lang_doc: lang, date: date }).then(function (r) {
                 if (!r.ok) { badN++; setRow(b, 'bad', '✕ ' + (r.msg || 'فشل')); }
                 else {
                     toksBy[idx] = r.tok; b.setAttribute('data-tok', r.tok); b.setAttribute('data-file', r.name);
-                    var tr;
-                    if (mode === 'email' && mailMode === 'each') { if (r.mail === 'sent') { okN++; tr = setRow(b, 'ok', '✅ ' + r.msg, r.label); } else { badN++; tr = setRow(b, 'bad', '✕ ' + (r.msg || 'ما انبعت'), r.label); } }
-                    else { okN++; tr = setRow(b, 'ok', '✅ جاهز', r.label); }
+                    okN++; var tr = setRow(b, 'ok', '✅ جاهز', r.label);
                     tr.querySelector('.ac').innerHTML = '<a class="btn btn-sm btn-light" target="_blank" rel="noopener" href="' + API + '?act=file&tok=' + r.tok + '"><i class="fas fa-eye"></i> شوف</a>'
-                        + (mode === 'wa' && waMode === 'each' ? ' <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" data-wa="' + r.tok + '"><i class="fab fa-whatsapp"></i> ابعت' + (b.getAttribute('data-phone') ? ' ' + escH(b.getAttribute('data-phone')) : '') + '</button>' : '');
+                        + (mode === 'wa' && waMode === 'each' ? ' <button type="button" class="btn btn-sm" style="background:#25D366;color:#fff" data-wa="' + r.tok + '"><i class="fab fa-whatsapp"></i> ابعت' + (b.getAttribute('data-phone') ? ' ' + escH(b.getAttribute('data-phone')) : '') + '</button>' : '')
+                        + ' <button type="button" class="btn btn-sm btn-light" data-rm="' + idx + '" style="color:#b91c1c"><i class="fas fa-user-xmark"></i> احذف من الإرسال</button>';
                     var wb = tr.querySelector('[data-wa]'); if (wb) wb.addEventListener('click', function () { shareTok(r.tok, r.name, b.getAttribute('data-phone'), r.label + ' — ' + b.getAttribute('data-name')); });
+                    tr.querySelector('[data-rm]').addEventListener('click', function () {
+                        removed[idx] = !removed[idx];
+                        tr.style.opacity = removed[idx] ? '.45' : ''; tr.style.textDecoration = removed[idx] ? 'line-through' : '';
+                        this.innerHTML = removed[idx] ? '<i class="fas fa-rotate-left"></i> رجّعه' : '<i class="fas fa-user-xmark"></i> احذف من الإرسال';
+                        this.style.color = removed[idx] ? '#166534' : '#b91c1c';
+                        tr.querySelector('.st').textContent = removed[idx] ? '⛔ محذوف من الإرسال' : '✅ جاهز';
+                        updateFinal();
+                    });
                 }
             }).catch(function (e) { badN++; setRow(b, 'bad', '✕ خطأ اتصال'); })
             .then(function () { active--; done++; fill.style.width = Math.round(done / picked.length * 100) + '%'; sum.textContent = 'خلص ' + done + ' من ' + picked.length + ' — ✅ ' + okN + ' · ✕ ' + badN; next(); });
         }
-        var finished = false;
+        function remaining() { var out = []; picked.forEach(function (b, idx) { if (toksBy[idx] && !removed[idx]) out.push({ b: b, idx: idx, tok: toksBy[idx], name: b.getAttribute('data-file') }); }); return out; }
+        var finished = false, finalBtn = null;
+        function updateFinal() {
+            if (!finished) return;
+            var n = remaining().length;
+            if (!finalBtn) return;
+            var lbl = mode === 'print' ? '🖨️ اطبع الملف الواحد (' + n + ')' : mode === 'email' ? (mailMode === 'each' ? '📧 ابعت لكل أستاذ على إيميله (' + n + ')' : '📧 ابعت الملف الواحد إلى ' + mailTo + ' (' + n + ')') : (waMode === 'each' ? '' : '📲 جهّز الملف الواحد للواتساب (' + n + ')');
+            finalBtn.textContent = lbl; finalBtn.style.display = lbl && n ? '' : 'none';
+            sum.textContent = 'جاهز: ' + n + ' أستاذ' + (Object.keys(removed).filter(function (k) { return removed[k]; }).length ? ' (المحذوفون من الإرسال ما بينبعتوا)' : '') + ' — راجع «شوف» قدّام كل اسم ثمّ اكبس الكبسة النهائية.';
+        }
         function finish() {
-            if (finished) return; finished = true;
-            toks = toksBy.filter(function (t) { return !!t; });
-            running = false;
-            if (!toks.length) { sum.textContent += ' — ما في ولا ملف جاهز.'; return; }
-            if (mode === 'email' && mailMode === 'each') { sum.textContent += ' — الإيميلات بسجلّ الإيميلات.'; fin.innerHTML = '<a class="btn btn-sm btn-light" href="' + BASE + 'pages/mail_log.php"><i class="fas fa-envelope-open-text"></i> سجلّ الإيميلات</a>'; return; }
-            if (mode === 'wa' && waMode === 'each') { sum.textContent += ' — اكبس «ابعت» جنب كل أستاذ.'; return; }
-            sum.textContent += ' — عم ندمج الملفات…';
-            post({ act: 'merge', toks: toks, type: type, date: date }).then(function (m) {
-                if (!m.ok) { sum.textContent = '✕ ' + (m.msg || 'تعذّر الدمج'); return; }
+            if (finished) return; finished = true; running = false;
+            if (!remaining().length) { sum.textContent += ' — ما في ولا ملف جاهز.'; return; }
+            if (mode === 'wa' && waMode === 'each') { sum.textContent = 'جاهز — راجع «شوف» ثمّ اكبس «ابعت» جنب كل أستاذ.'; return; }
+            finalBtn = document.createElement('button'); finalBtn.type = 'button'; finalBtn.className = 'btn btn-primary'; finalBtn.style.fontWeight = '800';
+            fin.innerHTML = ''; fin.appendChild(finalBtn); updateFinal();
+            finalBtn.addEventListener('click', function () { finalBtn.disabled = true; finalBtn.textContent = '⏳ …'; runFinal(); });
+        }
+        function runFinal() {
+            var rem = remaining(); if (!rem.length) { sum.textContent = 'ما بقي أحد مشمولاً بالإرسال.'; finalBtn.style.display = 'none'; return; }
+            if (mode === 'email' && mailMode === 'each') {
+                // إرسال متسلسل لكل أستاذ على إيميل ملفه — الحالة قدّام اسمه
+                var k = 0, sentN = 0, failN = 0;
+                (function nxt() {
+                    if (k >= rem.length) { sum.textContent = '✅ انبعت ' + sentN + (failN ? ' · ✕ ' + failN : '') + ' — التفاصيل بسجلّ الإيميلات.'; fin.innerHTML = '<a class="btn btn-sm btn-light" href="' + BASE + 'pages/mail_log.php"><i class="fas fa-envelope-open-text"></i> سجلّ الإيميلات</a>'; return; }
+                    var it = rem[k++]; setRow(it.b, 'wait', '⏳ عم نبعت…');
+                    post({ act: 'mailtok', tok: it.tok, emp: it.b.value, type: type }).then(function (s) { if (s.ok) { sentN++; setRow(it.b, 'ok', '✅ ' + s.msg); } else { failN++; setRow(it.b, 'bad', '✕ ' + (s.msg || 'ما انبعت')); } })
+                        .catch(function () { failN++; setRow(it.b, 'bad', '✕ خطأ اتصال'); }).then(function () { sum.textContent = 'عم نبعت ' + k + ' من ' + rem.length + '…'; nxt(); });
+                })();
+                return;
+            }
+            sum.textContent = 'عم ندمج ' + rem.length + ' ملفاً…';
+            post({ act: 'merge', toks: rem.map(function (x) { return x.tok; }), type: type, date: date }).then(function (m) {
+                if (!m.ok) { sum.textContent = '✕ ' + (m.msg || 'تعذّر الدمج'); finalBtn.disabled = false; updateFinal(); return; }
                 var url = API + '?act=file&tok=' + m.tok;
                 sum.textContent = 'ملف واحد جاهز: ' + m.name + ' (' + m.pages + ' صفحة)';
                 fin.innerHTML = '<a class="btn btn-sm btn-primary" target="_blank" rel="noopener" href="' + url + '"><i class="fas fa-file-pdf"></i> افتح الملف</a> <a class="btn btn-sm btn-light" href="' + url + '&dl=1"><i class="fas fa-download"></i> نزّل</a>';
                 if (mode === 'print') { if (window.ppPrintFile) window.ppPrintFile(url, false); else window.open(url, '_blank'); }
                 else if (mode === 'email') {
                     sum.textContent += ' — عم نبعت إلى ' + mailTo + '…';
-                    post({ act: 'mailfile', tok: m.tok, to: mailTo, type: type, n: toks.length, sid: picked[0].getAttribute('data-sid') || '' }).then(function (s) { sum.textContent = (s.ok ? '✅ ' : '✕ ') + s.msg + ' — ' + m.name; });
+                    post({ act: 'mailfile', tok: m.tok, to: mailTo, type: type, n: rem.length, sid: rem[0].b.getAttribute('data-sid') || '' }).then(function (s) { sum.textContent = (s.ok ? '✅ ' : '✕ ') + s.msg + ' — ' + m.name; });
                 } else if (mode === 'wa') { shareTok(m.tok, m.name, waTo, m.name); }
             });
         }

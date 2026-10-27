@@ -10804,6 +10804,7 @@ check('📧🏛️ النموذج الرسمي المصوّر بالإيميل/�
 try {
     $bk = (string)file_get_contents($PROJ . '/pages/attestations_bulk.php'); $hd278 = (string)file_get_contents($PROJ . '/includes/header.php'); $at278 = (string)regAttSrc();
     $okS = strpos($bk, "if (\$act === 'gen') {") !== false && strpos($bk, "if (\$act === 'merge') {") !== false && strpos($bk, "if (\$act === 'file') {") !== false && strpos($bk, "if (\$act === 'mailfile') {") !== false
+         && strpos($bk, "if (\$act === 'mailtok') {") !== false && strpos($bk, 'احذف من الإرسال') !== false && strpos($bk, 'function runFinal()') !== false   // 👀 («بدّي وقت قبل ما أبعت») تجهيز ⇒ مراجعة ⇒ كبسة نهائية
          && strpos($bk, "hasNssfNumber(\$emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new'") !== false && strpos($bk, '/forms/pdfengines/merge') !== false && strpos($bk, '$mpdf->importPage($k)') !== false
          && strpos($bk, 'name="bk_mail_mode" value="one"') !== false && strpos($bk, 'name="bk_wa_mode" value="one"') !== false && strpos($bk, 'data-pick="new"') !== false && strpos($bk, "data-run=\"print\"") !== false
          && strpos($hd278, "\$noToolbarPages[] = 'attestations_bulk.php';") !== false && strpos($hd278, 'pages/attestations_bulk.php"') !== false && strpos($at278, 'pages/attestations_bulk.php"') !== false;
