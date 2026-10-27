@@ -86,7 +86,11 @@ function bulkBuild(array $emp, string $type, string $lang, string $date): array 
             require_once __DIR__ . '/../includes/pdf_chromium.php';
             if (!MsaChromePdf::available()) throw new RuntimeException('محرّك PDF غير متاح لهذا النموذج الرسمي');
             $pdf = MsaChromePdf::overlayPageToPdf($r);
-        } else throw new RuntimeException('تعذّر توليد النموذج الرسمي (' . ($ATT_TYPES[$used]['ar'] ?? $used) . ')');
+        } else {
+            // السبب الحقيقي من ردّ الصفحة (نصّ خطأ/تحويل) حتى لا يبقى «تعذّر» غامضاً
+            $why = trim(preg_replace('/\s+/u', ' ', strip_tags((string)$r))); $why = mb_substr($why, 0, 160);
+            throw new RuntimeException('تعذّر توليد النموذج الرسمي (' . ($ATT_TYPES[$used]['ar'] ?? $used) . ')' . ($why !== '' ? ' — ' . $why : ' — ردّ فارغ من الخادم'));
+        }
     } else {
         $r = bulkFetch('pages/attestations.php?employee_id=' . (int)$emp['id'] . '&type=' . rawurlencode($type) . '&lang_doc=' . rawurlencode($lang) . '&date=' . rawurlencode($date));
         libxml_use_internal_errors(true);
