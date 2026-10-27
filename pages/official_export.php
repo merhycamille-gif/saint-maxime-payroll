@@ -1751,7 +1751,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
                             $mx = max($w1, $w2); if ($best === null || $mx < $best[0]) $best = [$mx, $l1, $l2];
                         }
                         $fs2 = min($fs * 0.85, $fs * $avail / max($best[0], 0.1));
-                        if ($fs2 >= 7.0) { $fs = $fs2; $html = $E($best[1]) . '<br>' . $E($best[2]); $lh = ';line-height:1.0;margin-top:-0.35%'; }
+                        if ($fs2 >= 7.0) { $fs = $fs2; $html = $E($best[1]) . '<br>' . $E($best[2]); $lh = ';line-height:1.0;transform:translateY(-32%)'; }   // السطران متوسّطان على سطر الخانة (لا ينزلان على الصفّ التالي)
                         else $fs = max(6.5, $fs * $avail / $needPct);
                     } else $fs = max(6.5, $fs * $avail / $needPct);
                 }
