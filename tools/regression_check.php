@@ -10033,7 +10033,7 @@ check('📧 إيميل البرنامج MSA Payroll + خيار المدرسة (p
       && strpos($ml250, "return \$n !== '' ? \$n : 'MSA Payroll';") !== false
       && strpos($sc250, 'name="email_sender_mode"') !== false && strpos($sc250, 'UPDATE schools SET email_sender_mode = ? WHERE id = ?') !== false
       && strpos($sr250, '[$ok, $err, $via, $fromAddr] = msaSendMail($to, $subject, $text, $att, false, $schoolId,') !== false && strpos($sr250, 'smtpSendMail(') === false && strpos($sr250, '@mail(') === false
-      && substr_count($sa250, 'msaSendMail(') === 2 && strpos($sa250, 'smtpSendMail(') === false
+      && substr_count($sa250, 'msaSendMail(') === 3 && strpos($sa250, 'smtpSendMail(') === false   // 3 منذ 2026-10-27 (النموذج الرسمي المصوّر PDF مرفقاً)
       && strpos($es250, 'name="program_email_name"') !== false && strpos($es250, 'name="test_program"') !== false && strpos($es250, 'programMailSend($testTo,') !== false, $why250);
 
 /* =====================================================================
@@ -10797,6 +10797,31 @@ try {
     $ok277 = $okS && $okL; $why277 = 'src=' . ($okS ? 'ok' : 'NO') . ' live=' . ($okL ? 'ok' : 'NO') . $why277x;
 } catch (Throwable $e) { $ok277 = false; $why277 = $e->getMessage(); }
 check('📧🏛️ النموذج الرسمي المصوّر بالإيميل/الواتساب أونلاين = PDF طبق الأصل مرفق عبر محرّك المدرسة (overlayPageToPdf + raw_pdf=1) لا صفحة ويب بجسم الرسالة', $ok277, $why277);
+
+/* 278) 📚 (2026-10-27 «إذا بدّي مجموعة إفادات لمجموعة أساتذة أبعتها إيميل أو واتساب أو أطبعها دغري بكبسة وحدة» + «بس ما تخرب البرنامج»)
+ *      صفحة مستقلّة pages/attestations_bulk.php: نوع × مجموعة ⇒ gen (الإفادة بالمسار القائم نفسه ⇒ PDF) · merge (Gotenberg وإلا mPDF) · file · mailfile
+ *      + «مدرسة واحدة» شرط + الجدد هالسنة + روابط الشريط/صفحة الإفادات. تشغيل فعلي: gen لإفادة راتب ولإفادة استخدام أجير (تحويل تلقائي) ⇒ JSON ok + PDF. */
+try {
+    $bk = (string)file_get_contents($PROJ . '/pages/attestations_bulk.php'); $hd278 = (string)file_get_contents($PROJ . '/includes/header.php'); $at278 = (string)regAttSrc();
+    $okS = strpos($bk, "if (\$act === 'gen') {") !== false && strpos($bk, "if (\$act === 'merge') {") !== false && strpos($bk, "if (\$act === 'file') {") !== false && strpos($bk, "if (\$act === 'mailfile') {") !== false
+         && strpos($bk, "hasNssfNumber(\$emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new'") !== false && strpos($bk, '/forms/pdfengines/merge') !== false && strpos($bk, '$mpdf->importPage($k)') !== false
+         && strpos($bk, 'name="bk_mail_mode" value="one"') !== false && strpos($bk, 'name="bk_wa_mode" value="one"') !== false && strpos($bk, 'data-pick="new"') !== false && strpos($bk, "data-run=\"print\"") !== false
+         && strpos($hd278, "\$noToolbarPages[] = 'attestations_bulk.php';") !== false && strpos($hd278, 'pages/attestations_bulk.php"') !== false && strpos($at278, 'pages/attestations_bulk.php"') !== false;
+    $hB = renderPage('pages/attestations_bulk.php', [], [], [3], 'lbp', '2026-2027');
+    $hA = renderPage('pages/attestations_bulk.php', [], [], [], 'lbp', '2026-2027');
+    // 🏫📅 (لاحقاً بنفس اليوم «وأكيد كمان حاطط أي مدرسة أو مدارس… ومن أي تاريخ») خانات المدارس داخل الصفحة + «كل المدارس» = اللائحة مجمّعة بالمدارس + «الداخلون بتاريخ»
+    $okP = $noFatal($hB) && substr_count($hB, 'class="bk-emp"') >= 5 && substr_count($hB, 'name="bk_type"') === count(attestationTypes()) && stripos($hB, 'Warning:') === false
+         && strpos($hB, 'name="schools[]"') !== false && strpos($hB, 'data-pick="hire"') !== false && strpos($hB, 'id="bk_hire"') !== false
+         && $noFatal($hA) && substr_count($hA, 'class="bk-sch"') >= 2 && substr_count($hA, 'class="bk-emp"') > substr_count($hB, 'class="bk-emp"');
+    $j1 = json_decode(trim(renderPage('pages/attestations_bulk.php', ['act' => 'gen', 'emp' => 1387, 'type' => 'salaire', 'lang_doc' => 'ar', 'date' => '2026-10-27'], [], [3], 'lbp', '2026-2027')), true) ?: [];
+    $j2 = json_decode(trim(renderPage('pages/attestations_bulk.php', ['act' => 'gen', 'emp' => 1387, 'type' => 'cnss_hire', 'lang_doc' => 'ar', 'date' => '2026-10-27'], [], [3], 'lbp', '2026-2027')), true) ?: [];
+    $bkDir = $PROJ . '/tmp/bulk';
+    $pdfOk = function (array $j) use ($bkDir): bool { if (empty($j['ok']) || empty($j['tok'])) return false; $f = $bkDir . '/' . $j['tok'] . '.pdf'; $ok = is_file($f) && strpos((string)file_get_contents($f), '%PDF') === 0 && filesize($f) > 5000; @unlink($f); return $ok; };
+    $okG = $pdfOk($j1) && strpos((string)($j1['name'] ?? ''), 'Attestation_salaire_') === 0 && $pdfOk($j2) && strpos((string)($j2['label'] ?? ''), 'إعلام استخدام أجير') !== false && strpos((string)($j2['name'] ?? ''), 'Declaration_embauche_CNSS_') === 0;
+    $ok278 = $okS && $okP && $okG;
+    $why278 = 'src=' . ($okS ? 'ok' : 'NO') . ' page=' . ($okP ? 'ok' : 'NO') . ' gen=' . ($okG ? 'ok' : 'NO') . ' (salaire=' . ($j1['name'] ?? ($j1['msg'] ?? '-')) . ' hire=' . ($j2['label'] ?? ($j2['msg'] ?? '-')) . ')';
+} catch (Throwable $e) { $ok278 = false; $why278 = $e->getMessage(); }
+check('📚 الإفادات الجماعية: صفحة مستقلّة (نوع × مجموعة أساتذة ⇒ طباعة ملف واحد / إيميل لكل أستاذ أو لعنوان واحد / واتساب) + gen يعيد استعمال مسارات الإفادات القائمة + merge + مدرسة واحدة + روابط الشريط', $ok278, $why278);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

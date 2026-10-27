@@ -801,7 +801,8 @@ document.addEventListener('submit', function (e) {
                     if ($__others) { $__attLinks .= '<div class="mt-att-col"><div class="mt-att-hd"><span dir="ltr">Autres</span><small>أخرى</small></div>'; foreach ($__others as $__k) $__attLinks .= '<a href="' . BASE_URL . 'pages/attestations.php?type=' . e($__k) . '"><i class="fas fa-file-lines"></i><span class="nl2"><span class="nl-fr">' . e($__attT[$__k]['fr']) . '</span><span class="nl-ar">' . e($__attT[$__k]['ar']) . '</span></span></a>'; $__attLinks .= '</div>'; }
                     $__attLinks .= '</div>';
                     $__attLinks .= '<div class="mt-att-foot"><a href="' . BASE_URL . 'pages/attestations.php" class="' . ($currentPage === 'attestations' && empty($_GET['type']) ? 'active' : '') . '"><i class="fas fa-file-signature"></i><span class="nl2"><span class="nl-fr">Toutes les attestations</span><span class="nl-ar">صفحة الإفادات كاملة</span></span></a>'
-                                 . '<a href="' . BASE_URL . 'pages/attestations.php?dossier=1"><i class="fas fa-folder-open"></i><span class="nl2"><span class="nl-fr">Dossier complet</span><span class="nl-ar">ملف الأستاذ الكامل</span></span></a></div>';
+                                 . '<a href="' . BASE_URL . 'pages/attestations.php?dossier=1"><i class="fas fa-folder-open"></i><span class="nl2"><span class="nl-fr">Dossier complet</span><span class="nl-ar">ملف الأستاذ الكامل</span></span></a>'
+                                 . '<a href="' . BASE_URL . 'pages/attestations_bulk.php" class="' . ($currentPage === 'attestations' && basename((string)($_SERVER['SCRIPT_NAME'] ?? '')) === 'attestations_bulk.php' ? 'active' : '') . '"><i class="fas fa-layer-group"></i><span class="nl2"><span class="nl-fr">Attestations groupées</span><span class="nl-ar">إفادات جماعية لمجموعة أساتذة</span></span></a></div>';   // 📚 (2026-10-27)
                     $__attDoor = ['fr' => 'Attestations', 'ar' => 'الإفادات', 'color' => '#0e7490', 'links' => $__attLinks, 'icon' => 'fa-file-signature', 'wide' => true, 'active' => $currentPage === 'attestations'];
                     $__posA = count($__groups); foreach ($__groups as $__i => $__g) if ($__g['fr'] === 'Paie') { $__posA = $__i + 1; break; }
                     array_splice($__groups, $__posA, 0, [$__attDoor]);
@@ -1042,6 +1043,7 @@ document.addEventListener('submit', function (e) {
         // (2026-08-29، «ما تخلّي شي ما إلو معنى») صفحات الإعدادات/الإدارة ليست مطبوعات: بلا شريط طباعة/تصدير
         $noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','excel_salaries.php']; // 📤 (2026-10-03 «بكل البرنامج لازم يكون في كل شي من كل شي»): الشريط الكامل بكل صفحة فيها لائحة/جدول — تبقى بلاه صفحات الإدارة البحتة فقط
         $noToolbarPages[] = 'school_access.php'; // 🏫 (2026-10-22) دخول المدارس وأيقوناتها — صفحة إدارة بلا شريط تصدير
+        $noToolbarPages[] = 'attestations_bulk.php'; // 📚 (2026-10-27) الإفادات الجماعية — كبساتها الثلاث داخل الصفحة
         if (empty($hideExportToolbar) && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), $noToolbarPages, true)) {
             $msaTopBars .= exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);
         } elseif (empty($ownExportRow)) {

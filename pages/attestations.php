@@ -389,6 +389,8 @@ if (!$emp):
                 <div class="alert alert-info">Aucun employé / لا يوجد موظفون.</div>
             <?php else: ?>
             <p class="text-muted" style="margin-bottom:10px"><i class="fas fa-info-circle"></i> فتّش عن الأستاذ مرّة وحدة (بتقدر تفتّش عنه حتى لو «كل المدارس» مختارة). بعدها إمّا اكبس «الملف الكامل» لتشوف كل شي عنه (مستنداته + ر6 + بطاقة الراتب + سيرته + كل الإفادات)، أو اختَر نوع الإفادة واللغة واكبس «إصدار الإفادة».</p>
+            <?php /* 📚 (2026-10-27 «مجموعة إفادات لمجموعة أساتذة بكبسة وحدة») */ ?>
+            <a class="btn btn-info" style="margin-bottom:12px" href="<?= BASE_URL ?>pages/attestations_bulk.php"><i class="fas fa-layer-group"></i> Attestations groupées — plusieurs enseignants / إفادات جماعية لمجموعة أساتذة (طباعة · إيميل · واتساب)</a>
             <form method="GET" class="form-row cols-4" style="align-items:end">
                 <div class="form-group" style="grid-column:1/-1">
                     <label class="form-label">Employé / الأستاذ</label>
