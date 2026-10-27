@@ -843,6 +843,16 @@ function reportDocThumb($path) {
                 <?php reportSchoolPicker(); ?>
             </div>
         </form>
+        <?php /* 📚 (2026-10-27 «ليش مش بتقرير الداخلون بتاريخ… يكون في كبسة استخدام أجير دغري») ⇒ الصفحة الجماعية بنفس المدارس والتاريخ والداخلين مشيّك عليهم */
+              if ($tmode === 'hire' && $data && function_exists('canEdit') && canEdit()):
+                  $bkSch = ''; foreach ((array)selectedReportSchoolIds() as $bs) $bkSch .= '&schools[]=' . (int)$bs;
+                  $bkUrl = BASE_URL . 'pages/attestations_bulk.php?type=cnss_hire&hire=' . rawurlencode($tdate) . '&span=' . $tspan . $bkSch; ?>
+        <div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 10px;padding:10px 14px;border:1px solid #bae6fd;background:#f0f9ff;border-radius:10px">
+            <strong style="color:#075985"><i class="fas fa-layer-group"></i> لكل الداخلين بهذا التقرير (<?= count($data) ?>):</strong>
+            <a class="btn btn-primary" href="<?= $bkUrl ?>"><i class="fas fa-shield-halved"></i> استخدام أجير بالضمان — طباعة / إيميل / واتساب</a>
+            <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations_bulk.php?hire=<?= rawurlencode($tdate) ?>&span=<?= $tspan . $bkSch ?>"><i class="fas fa-file-lines"></i> إفادة أخرى للكل</a>
+        </div>
+        <?php endif; ?>
         <?= docSheetStart($tLblFr, $tLblAr, ['العدد: ' . count($data)], ['comp' => false]) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
                     <thead><tr>

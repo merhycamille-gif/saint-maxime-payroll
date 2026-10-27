@@ -22,7 +22,7 @@ try {
 } catch (Exception $e) { /* صلاحيات → applyOneSubmission يتجاوز job_title إن بقي ناقصاً */ }
 
 // الحقول القابلة للتحديث من الفورم (نفس مفاتيح teacher_form.php)
-$textFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','mother_first_name','mother_last_name',
+$textFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','father_name_ar','father_name_fr','mother_first_name','mother_last_name',   // 👨 father_* (2026-10-27)
     'birth_date','birth_place','nationality','number_of_children','phone1','phone2','email',
     'gouvernorat','district','ville','quartier','rue','immeuble','etage',
     // الحقول المهنية المضافة
@@ -247,7 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             'hire_date' => $entryStartYear . '-10-01',
             'payment_months_per_year' => 12, // 📆 12 شهراً للجميع (2026-09-20) — كان يأخذ الافتراضي 10 من الجدول
         ];
-        $strFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','mother_first_name','mother_last_name',
+        $strFields = ['first_name_ar','first_name_fr','last_name_ar','last_name_fr','father_name_ar','father_name_fr','mother_first_name','mother_last_name',
             'birth_place','nationality','gouvernorat','district','ville','quartier','rue','immeuble','etage',
             'phone1','phone2','email','diploma','job_title','subjects_taught','niveau_scolaire','classes_taught','nssf_number','finance_ministry_number','caisse_number','notes'];
         foreach ($strFields as $f) { if (($data[$f] ?? '') !== '') $emp[$f] = $data[$f]; }
@@ -373,6 +373,7 @@ $infoTitle = "📋 *تحديث معلومات الأساتذة — Mise à jour 
 $infoIntro = "حضرة الأساتذة المحترمين،\nيرجى تعبئة وتحديث معلوماتكم الشخصية ورفع مستنداتكم (صورة، إخراج قيد فردي وعائلي، الشهادة) عبر الرابط التالي، وذلك قبل تاريخ $infoDeadline. شاكرين تعاونكم.";
 
 $labels = ['first_name_ar'=>'الاسم','first_name_fr'=>'Prénom','last_name_ar'=>'الشهرة','last_name_fr'=>'Nom',
+    'father_name_ar'=>'اسم الأب','father_name_fr'=>'Prénom du père',
     'mother_first_name'=>'اسم الأم','mother_last_name'=>'شهرة الأم','birth_date'=>'تاريخ الولادة','birth_place'=>'محل الولادة',
     'nationality'=>'الجنسية','social_status'=>'الحالة الاجتماعية','number_of_children'=>'عدد الأولاد','phone1'=>'هاتف 1','phone2'=>'هاتف 2','email'=>'إيميل',
     'employee_type'=>'الفئة','entry_school_year'=>'سنة الدخول','diploma'=>'الشهادة','job_title'=>'نوع الوظيفة','subjects_taught'=>'المواد','niveau_scolaire'=>'المرحلة','classes_taught'=>'الصفوف','hours_per_week'=>'الساعات/أسبوع','days_per_week'=>'أيام الحضور',

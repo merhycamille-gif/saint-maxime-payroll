@@ -1533,6 +1533,7 @@ function employeeFileGaps($e, $db, $schoolYear) {
     if (!isset($noSal[(int)($e['id'] ?? 0)])) return [];
     $gaps = ['الراتب غير محسوب (الإعداد المالي)'];
     if (empty($e['birth_date']) || $e['birth_date'] === '0000-00-00') $gaps[] = 'تاريخ الولادة';
+    if (trim((string)($e['father_name_ar'] ?? '')) === '' && trim((string)($e['father_name_fr'] ?? '')) === '') $gaps[] = 'اسم الأب';   // 👨 (2026-10-27) نماذج الضمان تطلبه
     if (((int)($e['cnss_subject'] ?? 1)) === 1 && !hasNssfNumber($e['nssf_number'] ?? '')) $gaps[] = 'رقم الضمان';
     if (((int)($e['tax_subject'] ?? 1)) === 1 && trim((string)($e['finance_ministry_number'] ?? '')) === '') $gaps[] = 'رقم المالية';
     if (($e['employee_type'] ?? '') !== 'employe' && trim((string)($e['diploma'] ?? '')) === '') $gaps[] = 'الشهادة';

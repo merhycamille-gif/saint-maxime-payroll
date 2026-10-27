@@ -1532,6 +1532,15 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     [$sPhPre, $sPhNum] = $phSplit($esch['phone'] ?? '');
 
     // الاسم والأهل والولادة والسجل
+    // 🔤 (2026-10-27 «اللي كاتب الأسماء أو العناوين بالأجنبي لازم يتحوّلوا للعربي») النموذج عربي: أي قيمة لاتينية بالملف تُعرَّب تلقائياً للطباعة
+    //    (القاموس + قواعد النطق — translit_fr_ar.php)، والعربي يمرّ كما هو. اسم الأب: العربي وإلا الفرنسي معرَّباً.
+    require_once __DIR__ . '/../includes/translit_fr_ar.php';
+    foreach (['first_name_ar', 'last_name_ar', 'father_name_ar', 'mother_first_name', 'mother_last_name', 'birth_place', 'civil_registry_place', 'gouvernorat', 'district', 'ville', 'quartier', 'rue', 'immeuble', 'nationality'] as $arF) {
+        if (isset($emp[$arF]) && hasLatin((string)$emp[$arF])) $emp[$arF] = frToAr((string)$emp[$arF]);
+    }
+    if (trim((string)($emp['first_name_ar'] ?? '')) === '' && trim((string)($emp['first_name_fr'] ?? '')) !== '') $emp['first_name_ar'] = frToAr((string)$emp['first_name_fr']);
+    if (trim((string)($emp['last_name_ar'] ?? '')) === '' && trim((string)($emp['last_name_fr'] ?? '')) !== '') $emp['last_name_ar'] = frToAr((string)$emp['last_name_fr']);
+    if (trim((string)($emp['father_name_ar'] ?? '')) === '' && trim((string)($emp['father_name_fr'] ?? '')) !== '') $emp['father_name_ar'] = frToAr((string)$emp['father_name_fr']);
     $name = preg_replace('/\s+/', ' ', trim(($emp['first_name_ar'] ?? '') . ' ' . ($emp['father_name_ar'] ?? '') . ' ' . ($emp['last_name_ar'] ?? '')));
     if ($name === '') $name = empFullNameFr($emp);
     $first  = trim((string)($emp['first_name_ar'] ?? '')) ?: trim((string)($emp['first_name_fr'] ?? ''));

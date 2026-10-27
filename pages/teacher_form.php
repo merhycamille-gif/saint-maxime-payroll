@@ -180,13 +180,17 @@ $defaultEntryYear = $entryYearOptions[0];
 $textFields = [
     'first_name_ar' => 'الاسم (عربي) / Prénom (arabe)', 'first_name_fr' => 'الاسم (فرنسي) / Prénom (FR)',
     'last_name_ar' => 'الشهرة (عربي) / Nom (arabe)', 'last_name_fr' => 'الشهرة (فرنسي) / Nom (FR)',
-    'mother_first_name' => 'اسم الأم / Prénom de la mère', 'mother_last_name' => 'شهرة الأم / Nom de la mère',
-    'birth_date' => 'تاريخ الولادة / Date de naissance', 'birth_place' => 'محل الولادة / Lieu de naissance',
+    // 👨 (2026-10-27 «ما عم يبيّن اسم الأب بالإفادة») اسم الأب إلزامي — الفورم كان بلا خانة له فطلعت نماذج الضمان بلا اسم أب
+    'father_name_ar' => 'اسم الأب (عربي) / Prénom du père (arabe)', 'father_name_fr' => 'اسم الأب (فرنسي) / Prénom du père (FR)',
+    'mother_first_name' => 'اسم الأم (عربي) / Prénom de la mère (arabe)', 'mother_last_name' => 'شهرة الأم (عربي) / Nom de la mère (arabe)',
+    'birth_date' => 'تاريخ الولادة / Date de naissance', 'birth_place' => 'محل الولادة (عربي) / Lieu de naissance (arabe)',
     'nationality' => 'الجنسية / Nationalité', 'number_of_children' => 'عدد الأولاد دون 18 سنة / Nombre d\'enfants de moins de 18 ans',
     'phone1' => 'هاتف 1 / Téléphone 1', 'phone2' => 'هاتف 2 / Téléphone 2', 'email' => 'البريد الإلكتروني / E-mail',
-    'gouvernorat' => 'المحافظة / Gouvernorat', 'district' => 'القضاء / District', 'ville' => 'البلدة / Ville',
-    'quartier' => 'الحي / Quartier', 'rue' => 'الشارع / Rue', 'immeuble' => 'المبنى / Immeuble', 'etage' => 'الطابق / Étage',
+    'gouvernorat' => 'المحافظة (عربي) / Gouvernorat (arabe)', 'district' => 'القضاء (عربي) / District (arabe)', 'ville' => 'البلدة (عربي) / Ville (arabe)',
+    'quartier' => 'الحي (عربي) / Quartier (arabe)', 'rue' => 'الشارع (عربي) / Rue (arabe)', 'immeuble' => 'المبنى (عربي) / Immeuble (arabe)', 'etage' => 'الطابق / Étage',
 ];
+// 🔤 (2026-10-27 «اللي كاتب الأسماء أو العناوين لازم يتحوّلوا للعربي») خانات عربية حصراً: الفورم يرفض الأحرف اللاتينية فيها (النماذج الرسمية عربية)
+$arabicOnlyFields = ['first_name_ar', 'last_name_ar', 'father_name_ar', 'mother_first_name', 'mother_last_name', 'birth_place', 'gouvernorat', 'district', 'ville', 'quartier', 'rue', 'immeuble'];
 // الحقول المهنية الإضافية (شهادة/مواد/ساعات/صفوف/أيام/أرقام رسمية)
 $profFields = [
     'subjects_taught' => 'المواد التي يدرّسها / Matières enseignées',
@@ -338,10 +342,14 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
         // الحالة الاجتماعية إلزامية (أعزب/متزوج)
         if (($data['social_status'] ?? '') === '') $missingFields[] = 'الحالة الاجتماعية / État civil';
     }
-    if ($missingFields || $missingDocs) {
+    // 🔤 الخانات العربية لا تقبل أحرفاً لاتينية
+    $latinFields = [];
+    foreach ($arabicOnlyFields as $k) { if (preg_match('/[A-Za-z]/', (string)($data[$k] ?? ''))) $latinFields[] = $textFields[$k] ?? $k; }
+    if ($missingFields || $missingDocs || $latinFields) {
         $all = array_merge($missingFields, $missingDocs);
-        $error = 'لا يمكن الإرسال قبل تعبئة كل الحقول الإلزامية. الناقص: ' . implode(' — ', $all)
-               . ' / Envoi impossible : champs obligatoires manquants : ' . implode(' — ', $all);
+        $error = ($all ? ('لا يمكن الإرسال قبل تعبئة كل الحقول الإلزامية. الناقص: ' . implode(' — ', $all)
+               . ' / Envoi impossible : champs obligatoires manquants : ' . implode(' — ', $all)) : '')
+               . ($latinFields ? (($all ? ' — ' : '') . 'اكتب بالأحرف العربية: ' . implode(' — ', $latinFields) . ' / À écrire en lettres arabes : ' . implode(' — ', $latinFields)) : '');
     } else {
         $ins = $db->prepare("INSERT INTO info_submissions (employee_id, is_new_teacher, school_id, data, photo_path, id_document_path, family_doc_path, diploma_doc_path, status, submitted_at)
             VALUES (?,?,?,?,?,?,?,?, 'pending', NOW())");
@@ -566,7 +574,7 @@ if ($nameSchoolId) {
                    name="<?= e($k) ?>" value="<?= e(preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fv($k)) ? displayDMY($fv($k)) : $fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?>>
             <?php else: ?>
             <input type="<?= $k === 'email' ? 'email' : ($k === 'number_of_children' ? 'number' : 'text') ?>"
-                   name="<?= e($k) ?>" value="<?= e($fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?>>
+                   name="<?= e($k) ?>" value="<?= e($fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?><?= in_array($k, $arabicOnlyFields, true) ? ' pattern="[^A-Za-z]*" title="بالأحرف العربية فقط / En lettres arabes uniquement" dir="rtl"' : '' ?>>
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
@@ -670,7 +678,7 @@ if ($nameSchoolId) {
         <?php foreach (['gouvernorat','district','ville','quartier','rue','immeuble','etage'] as $k): $req = $tfReq($k); ?>
           <div>
             <label><?= e($textFields[$k]) ?><?= $req ? $reqStar : $optTag ?></label>
-            <input type="text" name="<?= e($k) ?>" value="<?= e($fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?>>
+            <input type="text" name="<?= e($k) ?>" value="<?= e($fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?><?= in_array($k, $arabicOnlyFields, true) ? ' pattern="[^A-Za-z]*" title="بالأحرف العربية فقط / En lettres arabes uniquement" dir="rtl"' : '' ?>>
           </div>
         <?php endforeach; ?>
       </div>

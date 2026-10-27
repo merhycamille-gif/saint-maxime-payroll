@@ -783,7 +783,8 @@ document.addEventListener('submit', function (e) {
                        . $__tileLink(['url' => '?report=titularized', 'icon' => 'fa-user-check', 'fr' => 'Entrés au cadre le 1/10 (année affichée)', 'ar' => 'الداخلون في الملاك بـ1/10 من السنة المعروضة'])
                        . $__tileLink(['url' => '?report=new_teachers', 'icon' => 'fa-user-plus', 'fr' => 'Nouveaux enseignants', 'ar' => 'الأساتذة الجدد — كامل الملف']);
                 if (canEdit()) $__edL .= $__pageLink('left_teachers.php', 'fa-user-slash', 'Départs (année affichée)', 'الأساتذة والموظفون التاركون خلال السنة المعروضة', 'left_teachers')
-                                      . $__pageLink('retirement_64.php', 'fa-hourglass-half', 'Retraite 64', 'بلوغ سنّ الـ64', 'retirement_64');
+                                      . $__pageLink('retirement_64.php', 'fa-hourglass-half', 'Retraite 64', 'بلوغ سنّ الـ64', 'retirement_64')
+                                      . $__pageLink('arabize.php', 'fa-language', 'Arabiser noms & adresses', 'تعريب الأسماء والعناوين المكتوبة بالأجنبي', 'arabize');   // 🔤 (2026-10-27)
                 $__extra[] = ['fr' => 'Entrées & Départs', 'ar' => 'الداخلون والتاركون', 'color' => '#0d9488', 'links' => $__edL, 'icon' => 'fa-people-arrows'];
                 $__tabIcons['Entrées & Départs'] = 'fa-people-arrows';
                 // 📄 (2026-10-16 «لازم يكون باب الإفادات وضمنو الإفادات مع التفتيش عن أستاذ: اسمو أو عيلتو أو رقم تلفونو») باب الإفادات

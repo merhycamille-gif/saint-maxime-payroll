@@ -324,9 +324,10 @@ include __DIR__ . '/../includes/header.php';
                     <span style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;border:1px solid #e2e8f0;border-radius:8px;padding:4px 8px;background:#fff">
                         <i class="fas fa-door-open" style="color:#0e7490"></i> <strong style="font-size:13px">الداخلون بتاريخ</strong>
                         <?php /* «بس حطّ أي تاريخ لازم يبيّنوا بس الموظفين الداخلين بهذا التاريخ»: التاريخ فلتر للائحة نفسها (فاضي = الكل) */ ?>
-                        <input type="date" id="bk_hire" class="form-control" style="width:160px;padding:4px 8px" value="" title="فاضي = كل الأساتذة">
-                        <label style="font-size:12.5px;margin:0"><input type="radio" name="bk_span" value="day" checked> بالضبط</label>
-                        <label style="font-size:12.5px;margin:0"><input type="radio" name="bk_span" value="year"> كل السنة الدراسية</label>
+                        <?php $preHire = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['hire'] ?? '')) ? (string)$_GET['hire'] : ''; $preSpan = (($_GET['span'] ?? 'day') === 'year') ? 'year' : 'day';   // من تقرير الداخلون */ ?>
+                        <input type="date" id="bk_hire" class="form-control" style="width:160px;padding:4px 8px" value="<?= e($preHire) ?>" title="فاضي = كل الأساتذة">
+                        <label style="font-size:12.5px;margin:0"><input type="radio" name="bk_span" value="day" <?= $preSpan === 'day' ? 'checked' : '' ?>> بالضبط</label>
+                        <label style="font-size:12.5px;margin:0"><input type="radio" name="bk_span" value="year" <?= $preSpan === 'year' ? 'checked' : '' ?>> كل السنة الدراسية</label>
                         <button type="button" class="btn btn-sm btn-light" data-pick="hire1010" title="1/10 من السنة المعروضة"><i class="fas fa-calendar-check"></i> 1/10/<?= e($sy1) ?></button>
                         <button type="button" class="btn btn-sm btn-light" data-pick="hireclear"><i class="fas fa-xmark"></i> امسح التاريخ</button>
                         <span id="bk_hire_n" class="text-muted" style="font-size:12px"></span>
@@ -540,7 +541,8 @@ include __DIR__ . '/../includes/header.php';
         }
         next();
     }
-    count(); filter(false);
+    count(); filter(!!document.getElementById('bk_hire').value);   // جايين من تقرير الداخلون بتاريخ ⇒ الداخلون ظاهرون ومختارون جاهزين
+    if (document.getElementById('bk_hire').value && document.querySelector('input[name="bk_type"]:checked')) { var s3 = document.querySelectorAll('.bk-step')[3] || document.querySelector('.bk-act'); if (s3) setTimeout(function () { s3.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); }
 })();
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

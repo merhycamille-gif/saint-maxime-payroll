@@ -10810,7 +10810,7 @@ try {
     $hB = renderPage('pages/attestations_bulk.php', [], [], [3], 'lbp', '2026-2027');
     $hA = renderPage('pages/attestations_bulk.php', [], [], [], 'lbp', '2026-2027');
     // 🏫📅 (لاحقاً بنفس اليوم «وأكيد كمان حاطط أي مدرسة أو مدارس… ومن أي تاريخ») خانات المدارس داخل الصفحة + «كل المدارس» = اللائحة مجمّعة بالمدارس + «الداخلون بتاريخ»
-    $okP = $noFatal($hB) && substr_count($hB, 'class="bk-emp"') >= 5 && substr_count($hB, 'name="bk_type"') === count(attestationTypes()) && stripos($hB, 'Warning:') === false
+    $okP = $noFatal($hB) && substr_count($hB, 'class="bk-emp"') >= 5 && substr_count($hB, '<input type="radio" name="bk_type"') === count(attestationTypes()) && stripos($hB, 'Warning:') === false
          && strpos($hB, 'name="schools[]"') !== false && strpos($hB, 'data-pick="hire1010"') !== false && strpos($hB, 'id="bk_hire"') !== false && strpos($bk, "(!hr || (h && h >= hr[0] && h <= hr[1]))") !== false   // التاريخ فلتر للائحة («بس حطّ أي تاريخ يبيّنوا بس الداخلين»)
          && $noFatal($hA) && substr_count($hA, 'class="bk-sch"') >= 2 && substr_count($hA, 'class="bk-emp"') > substr_count($hB, 'class="bk-emp"');
     $j1 = json_decode(trim(renderPage('pages/attestations_bulk.php', ['act' => 'gen', 'emp' => 1387, 'type' => 'salaire', 'lang_doc' => 'ar', 'date' => '2026-10-27'], [], [3], 'lbp', '2026-2027')), true) ?: [];
@@ -10822,6 +10822,47 @@ try {
     $why278 = 'src=' . ($okS ? 'ok' : 'NO') . ' page=' . ($okP ? 'ok' : 'NO') . ' gen=' . ($okG ? 'ok' : 'NO') . ' (salaire=' . ($j1['name'] ?? ($j1['msg'] ?? '-')) . ' hire=' . ($j2['label'] ?? ($j2['msg'] ?? '-')) . ')';
 } catch (Throwable $e) { $ok278 = false; $why278 = $e->getMessage(); }
 check('📚 الإفادات الجماعية: صفحة مستقلّة (نوع × مجموعة أساتذة ⇒ طباعة ملف واحد / إيميل لكل أستاذ أو لعنوان واحد / واتساب) + gen يعيد استعمال مسارات الإفادات القائمة + merge + مدرسة واحدة + روابط الشريط', $ok278, $why278);
+
+/* 279) 👨🔤 (2026-10-27 «ما عم يبيّن اسم الأب بالإفادة» + «اللي كاتب الأسماء أو العناوين بالأجنبي لازم يتحوّلوا للعربي»):
+ *      (أ) فورم الرابط كان بلا خانة اسم الأب ⇒ father_name_ar/fr إلزاميان + يمرّان بالاعتماد (info_collect) + «اسم الأب» بنواقص الملف
+ *      (ب) الخانات العربية ترفض اللاتيني (pattern + تحقّق خادم) (ج) translit_fr_ar: قاموس لبنان + قواعد؛ النماذج الرسمية تعرّب للطباعة؛ أداة pages/arabize.php تقترح وتحفظ بموافقة. */
+try {
+    require_once $PROJ . '/includes/translit_fr_ar.php';
+    $tf = (string)file_get_contents($PROJ . '/pages/teacher_form.php'); $ic = (string)file_get_contents($PROJ . '/pages/info_collect.php'); $oe = (string)file_get_contents($PROJ . '/pages/official_export.php'); $fn = (string)file_get_contents($PROJ . '/includes/functions.php');
+    $okT = frToAr('Zalka') === 'الزلقا' && frToAr('Mont liban') === 'جبل لبنان' && frToAr('Siham Attallah') === 'سهام عطالله' && frToAr('El hajjar') === 'الحجار' && frToAr('Marje3yun') === 'مرجعيون'
+         && frToAr('Léa Daher') === 'ليا ضاهر' && frToAr('بغدانة/Boughdana') === 'بغدانة' && frToAr('الرميلة/ Rmeileh') === 'الرميلة' && frToAr('زحلة') === 'زحلة' && frToAr('B1') === 'B1'
+         && frToAr('Al chyah') === 'الشياح' && frToAr('Sin el fil') === 'سن الفيل' && arabizeIfLatin('بعبدا') === 'بعبدا' && hasLatin('Zalka') && !hasLatin('الزلقا');
+    $okS = strpos($tf, "'father_name_ar' => 'اسم الأب (عربي) / Prénom du père (arabe)', 'father_name_fr' =>") !== false && strpos($tf, '$arabicOnlyFields = [') !== false
+         && strpos($tf, "pattern=\"[^A-Za-z]*\"") !== false && strpos($tf, 'اكتب بالأحرف العربية: ') !== false
+         && strpos($ic, "'father_name_ar','father_name_fr','mother_first_name'") !== false && substr_count($ic, "'father_name_ar','father_name_fr'") >= 2 && strpos($ic, "'father_name_ar'=>'اسم الأب'") !== false
+         && strpos($fn, "\$gaps[] = 'اسم الأب';") !== false
+         && strpos($oe, "if (isset(\$emp[\$arF]) && hasLatin((string)\$emp[\$arF])) \$emp[\$arF] = frToAr((string)\$emp[\$arF]);") !== false
+         && is_file($PROJ . '/pages/arabize.php') && strpos((string)file_get_contents($PROJ . '/includes/header.php'), "'arabize.php', 'fa-language'") !== false;
+    // تشغيل: أداة التعريب ترندر + النموذج الرسمي لأستاذ خاناته لاتينية يطلع بالعربي (إكسل)
+    $hz = renderPage('pages/arabize.php', [], [], [], 'lbp', '2026-2027');
+    $okP = $noFatal($hz) && (strpos($hz, 'المقترح بالعربي') !== false || strpos($hz, 'ما في ولا خانة') !== false);
+    $lat = $db->query("SELECT id, school_id FROM employees WHERE is_deleted = 0 AND birth_place = 'Zalka' AND gouvernorat REGEXP '[A-Za-z]' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $okX = true; $cells279 = '-';
+    if ($lat) {
+        $xb = renderPage('pages/official_export.php', ['form' => 'cnss_hire_new', 'emp' => (int)$lat['id'], 'd' => 27, 'mo' => 10, 'yr' => 2026, 'opts_set' => 1, 'format' => 'xlsx'], [], [(int)$lat['school_id']], 'lbp', '2026-2027', sys_get_temp_dir() . '/r279.xlsx');
+        $cellOf279 = function (string $bin, string $ref): string {
+            $tmp = tempnam(sys_get_temp_dir(), 'r279'); file_put_contents($tmp, $bin); $z = new ZipArchive(); $out = '';
+            if ($z->open($tmp) === true) {
+                $ss = []; $sx = (string)$z->getFromName('xl/sharedStrings.xml');
+                if ($sx !== '' && ($x = @simplexml_load_string($sx))) foreach ($x->si as $si) { $t = ''; foreach ($si->xpath('.//*[local-name()="t"]') as $tt) $t .= (string)$tt; $ss[] = $t; }
+                $sh = @simplexml_load_string((string)$z->getFromName('xl/worksheets/sheet1.xml'));
+                if ($sh) foreach ($sh->sheetData->row as $row) foreach ($row->c as $c) if ((string)$c['r'] === $ref) { $t = (string)$c['t']; $out = $t === 's' ? ($ss[(int)$c->v] ?? '') : ($t === 'inlineStr' ? (string)$c->is->t : (string)$c->v); }
+                $z->close();
+            }
+            @unlink($tmp); return trim($out);
+        };
+        $cells279 = 'F19=' . $cellOf279($xb, 'F19') . ' J15=' . $cellOf279($xb, 'J15') . ' D20=' . $cellOf279($xb, 'D20');
+        $okX = !hasLatin($cellOf279($xb, 'F19')) && !hasLatin($cellOf279($xb, 'J15')) && !hasLatin($cellOf279($xb, 'D20')) && $cellOf279($xb, 'F19') !== '';
+    }
+    $ok279 = $okT && $okS && $okP && $okX;
+    $why279 = 'translit=' . ($okT ? 'ok' : 'NO') . ' src=' . ($okS ? 'ok' : 'NO') . ' page=' . ($okP ? 'ok' : 'NO') . ' form=' . ($okX ? 'ok' : 'NO') . ' (' . $cells279 . ')';
+} catch (Throwable $e) { $ok279 = false; $why279 = $e->getMessage(); }
+check('👨🔤 اسم الأب بالفورم (إلزامي + اعتماد + نواقص) + الخانات العربية ترفض اللاتيني + تعريب تلقائي بالنماذج الرسمية (قاموس لبنان + قواعد) + أداة «تعريب الأسماء والعناوين»', $ok279, $why279);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
