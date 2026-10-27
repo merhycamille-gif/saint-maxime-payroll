@@ -127,6 +127,12 @@ function bulkBuild(array $emp, string $type, string $lang, string $date): array 
 }
 
 /** mPDF بخطوط البرنامج (Arial كالشاشة) — بلا هذا يطلب DejaVu غير الموجودة */
+function bulkRestoreSchool(): void {   // إعادة مدرسة الشريط كما كانت قبل الدفعة (المدرسة الفعّالة تتبدّل مؤقّتاً أثناء التوليد)
+    if (!array_key_exists('bulk_prev_active', $_SESSION)) return;
+    $p = $_SESSION['bulk_prev_active']; unset($_SESSION['bulk_prev_active']);
+    if (($p['a'] ?? null) === null) unset($_SESSION['active_schools']); else $_SESSION['active_schools'] = $p['a'];
+    if (($p['r'] ?? null) !== null) $_SESSION['report_schools'] = $p['r']; else unset($_SESSION['report_schools']);
+}
 function bulkMpdf(array $o): \Mpdf\Mpdf {
     require_once __DIR__ . '/../includes/pdf_engine.php';
     $root = realpath(__DIR__ . '/..'); $tmp = $root . '/tmp/mpdf'; if (!is_dir($tmp)) @mkdir($tmp, 0777, true);
@@ -190,11 +196,12 @@ if ($act !== '') {
             $st = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0"); $st->execute([$eid]); $emp = $st->fetch(PDO::FETCH_ASSOC);
             $schools = bulkSchools();
             if (!$emp || !isset($schools[(int)$emp['school_id']])) bulkJson(['ok' => false, 'msg' => 'الأستاذ غير موجود بمدارسك']);
-            // 🏫 (عدّة مدارس) كل إفادة بترويسة مدرسة صاحبها: المدرسة الفعّالة بالجلسة = مدرسته أثناء التوليد ثمّ تُعاد كما كانت
-            $prevActive = $_SESSION['active_schools'] ?? null; $prevRep = $_SESSION['report_schools'] ?? null;
+            // 🏫 (عدّة مدارس) كل إفادة بترويسة مدرسة صاحبها: المدرسة الفعّالة بالجلسة = مدرسته أثناء التوليد.
+            // 🐛 (p1 «الموظف غير موجود أو خارج صلاحيتك» لبعض الأساتذة) كانت كل طلبة تعيد المدرسة السابقة عند انتهائها، فالطلبات المتوازية (3 معاً)
+            //    كانت تقرأ مدرسة خاطئة من ملف الجلسة ⇒ الآن المدرسة السابقة تُحفَظ مرّة واحدة وتُعاد بـact=restore (آخر الدفعة) أو عند فتح الصفحة.
+            if (!array_key_exists('bulk_prev_active', $_SESSION)) $_SESSION['bulk_prev_active'] = ['a' => $_SESSION['active_schools'] ?? null, 'r' => $_SESSION['report_schools'] ?? null];
             $_SESSION['active_schools'] = [(int)$emp['school_id']]; unset($_SESSION['report_schools']);
-            try { [$pdf, $name, $label] = bulkBuild($emp, $type, $lang, $date); }
-            finally { if ($prevActive === null) unset($_SESSION['active_schools']); else $_SESSION['active_schools'] = $prevActive; if ($prevRep !== null) $_SESSION['report_schools'] = $prevRep; }
+            [$pdf, $name, $label] = bulkBuild($emp, $type, $lang, $date);
             $sch = $schools[(int)$emp['school_id']];
             // 🪪 المرفقات المختارة بعد ورقة الإفادة: الهوية/إخراج القيد الفردي، إخراج القيد العائلي
             $docsMissing = []; $parts = [$pdf];
@@ -223,6 +230,7 @@ if ($act !== '') {
             }
             bulkJson($res);
         }
+        if ($act === 'restore') { bulkRestoreSchool(); bulkJson(['ok' => true]); }
         if ($act === 'mailtok') {   // 📧 (بعد المراجعة) إرسال ملف جاهز لأستاذه على إيميل ملفه
             $tok = (string)($in['tok'] ?? ''); $eid = (int)($in['emp'] ?? 0);
             if (!bulkOwn($tok) || !is_file($bulkDir . '/' . $tok . '.pdf')) bulkJson(['ok' => false, 'msg' => 'انتهت صلاحية الملف — أعد التجهيز']);
@@ -274,6 +282,7 @@ if ($act !== '') {
 }
 
 /* ======================= الصفحة ======================= */
+bulkRestoreSchool();   // دفعة سابقة انقطعت ⇒ مدرسة الشريط ترجع كما كانت
 $currentPage = 'attestations';
 $pageTitle = 'Attestations groupées / إفادات جماعية';
 $hideExportToolbar = true;   // كبسات الطباعة/الإيميل/الواتساب الثلاث داخل الصفحة نفسها
@@ -608,6 +617,7 @@ include __DIR__ . '/../includes/header.php';
         }
         function finish() {
             if (finished) return; finished = true; running = false;
+            post({ act: 'restore' }).catch(function () {});   // مدرسة الشريط ترجع كما كانت
             if (!remaining().length) { sum.textContent += ' — ما في ولا ملف جاهز.'; return; }
             if (mode === 'wa' && waMode === 'each') { sum.textContent = 'جاهز — راجع «شوف» ثمّ اكبس «ابعت» جنب كل أستاذ.'; return; }
             finalBtn = document.createElement('button'); finalBtn.type = 'button'; finalBtn.className = 'btn btn-primary'; finalBtn.style.fontWeight = '800';
