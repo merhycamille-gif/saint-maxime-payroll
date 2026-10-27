@@ -66,7 +66,7 @@ class MsaChromePdf
                     $c->appendChild($ph);
                 }
                 if (trim($st) === '') $c->removeAttribute('style'); else $c->setAttribute('style', $st);
-                if (strtolower($c->nodeName) === 'td' && mb_strlen(trim(preg_replace('/\s+/u', ' ', $c->textContent)), 'UTF-8') > 30) {
+                if (strtolower($c->nodeName) === 'td' && (int)$c->getAttribute('colspan') <= 1 && mb_strlen(trim(preg_replace('/\s+/u', ' ', $c->textContent)), 'UTF-8') > 30) {   // 📐 (2026-10-27) سطر المجموعة/المجموع الممتدّ على العرض لا يُلفّ على 58mm
                     // الخلية الطويلة تلتفّ عند 60mm فعلاً: كتلة داخلية بعرض أقصى (max-width على الخلية لا يعمل بتخطيط الجدول)
                     $c->setAttribute('class', trim($c->getAttribute('class') . ' pr-wrap'));
                     $pw = $dom->createElement('div'); $pw->setAttribute('class', 'pw');
@@ -181,7 +181,7 @@ function split(t){
 Array.prototype.slice.call(document.querySelectorAll('table.pdf-t')).forEach(function(t){
   if(t.parentNode&&t.parentNode.closest&&t.parentNode.closest('table')) return;
   t.style.width='max-content'; t.style.maxWidth='none'; var w=t.scrollWidth; t.style.width=''; t.style.maxWidth='';
-  if(w<=AVAIL+1) return;
+  if(w<=AVAIL+1){ if(w>=AVAIL*0.7) t.style.width='100%'; return; }   // 📐 (2026-10-27) الجدول القريب من عرض الورقة يملؤها (لا فراغ على جنب) — الأعمدة تتوسّع نسبياً
   if(FIT||!split(t)){ t.style.width=''; t.style.maxWidth=''; t.style.zoom=Math.max(0.4,AVAIL/w).toFixed(3); }
 });
 Array.prototype.slice.call(document.querySelectorAll('table.pdf-t')).forEach(function(t){ var w=t.scrollWidth; if(w>AVAIL+1&&!t.style.zoom) t.style.zoom=Math.max(0.4,AVAIL/w).toFixed(3); });

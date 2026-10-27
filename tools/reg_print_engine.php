@@ -134,7 +134,7 @@ check('📏 المحرّك: قياس حقيقي بخطوط mPDF (OTL) + عرض �
       && strpos($en247, "'useFixedNormalLineHeight' => true,") !== false
       && strpos($en247, 'table.pdf-t td { border: 0.5pt solid #94a3b8; padding: 1.2pt 3pt; text-align: center; vertical-align: middle; line-height: 1.15; }') !== false
       && strpos($en247, "\$cap = (substr_count(trim(\$t), ' ') >= 4) ? 42 : 55;") !== false
-      && strpos($en247, "foreach (['full' => \$m['rows'], 'wrap' => \$m['rows'] + \$m['wrapRows'], 'stack' => \$m['rows'] + \$m['wrapRows'] + \$m['usdRows']] as \$v => \$lines) {") !== false
+      && strpos($en247, "\$ln3 = ['full' => \$m['rows'], 'wrap' => \$m['rows'] + \$m['wrapRows'], 'stack' => \$m['rows'] + \$m['wrapRows'] + \$m['usdRows']];") !== false   // 📐 (2026-10-27) + نسخ الرؤوس الضيّقة fullh/wraph/stackh
       && strpos($en247, '$landscape = $pl < $pp; $variantOf = $landscape ? $cl : $cp;') !== false
       && strpos($en247, "\$parts = (\$sum <= \$usable * 1.15) ? 1 : count(\$partition(\$w, \$usable, \$nameCol)[1]);") !== false
       && strpos($en247, "if (\$isTh && \$cs === 1 && \$nameCol < 0 && preg_match(") !== false

@@ -102,6 +102,72 @@ class MsaPdf
         return $n instanceof DOMElement && preg_match('/(^|\s)(' . $re . ')(\s|$)/', $n->getAttribute('class')) === 1;
     }
 
+    /**
+     * 📐 (2026-10-27 «حاج تعذّبني بترتيب التقارير — برنامج موحّد تلقائياً يرتّب كل شي») العمود المكرّر مع عنوان مجموعته يُشال من الورق:
+     * التقارير متعدّدة المدارس تكتب اسم المدرسة سطرَ مجموعة (cat-row بخلية واحدة تمتدّ على العرض) **و**تعيده بعمود بكل صفّ —
+     * فيتّسع الجدول عبثاً ويقسّمه المحرّك أجزاءً على ورقات. القاعدة عامّة: أي عمود قيمته بكل صفوف البيانات = نصّ آخر سطر مجموعة
+     * قبله (أو جزء منه) يُحذف من الرأس والجسم (مع إنقاص colspan الخلايا الممتدّة). المصدر الواحد لـPDF (mPDF/Chromium) والوورد والإكسل.
+     */
+    public static function dropGroupColumns(DOMDocument $dom, DOMXPath $xp): int
+    {
+        $norm = function (DOMNode $n): string { return trim(preg_replace('/\s+/u', ' ', $n->textContent) ?? ''); };
+        $dropped = 0;
+        foreach ($xp->query('//table[not(ancestor::table)]') as $t) {
+            for ($guard = 0; $guard < 4; $guard++) {
+                $trs = []; foreach ($xp->query('.//tr', $t) as $tr) if ($xp->query('ancestor::table[1]', $tr)->item(0) === $t) $trs[] = $tr;   // صفوف هذا الجدول فقط (لا الجداول المتداخلة)
+                if (count($trs) < 4) break;
+                // الشبكة (colspan/rowspan)
+                $occ = []; $cols = 0;
+                foreach ($trs as $ri => $tr) {
+                    $occ[$ri] = $occ[$ri] ?? []; $c = 0;
+                    foreach ($tr->childNodes as $cell) {
+                        if (!($cell instanceof DOMElement) || !in_array(strtolower($cell->nodeName), ['td', 'th'], true)) continue;
+                        while (isset($occ[$ri][$c])) $c++;
+                        $cs = max(1, (int)$cell->getAttribute('colspan')); $rs = max(1, (int)$cell->getAttribute('rowspan'));
+                        for ($i = 0; $i < $rs; $i++) { $occ[$ri + $i] = $occ[$ri + $i] ?? []; for ($j = 0; $j < $cs; $j++) $occ[$ri + $i][$c + $j] = ['cell' => $cell, 'c0' => $c, 'r0' => $ri, 'cs' => $cs]; }
+                        $c += $cs;
+                    }
+                    // عدد الأعمدة من الصفوف ذات الخلايا المتعدّدة (سطر المجموعة بخلية واحدة قد يحمل colspan أكبر بعمود مخفي no-print)
+                    $nCells = 0; foreach ($tr->childNodes as $cell) if ($cell instanceof DOMElement && in_array(strtolower($cell->nodeName), ['td', 'th'], true)) $nCells++;
+                    if ($nCells > 1) $cols = max($cols, $c);
+                }
+                if ($cols < 4) break;
+                // صفوف المجموعات (خلية واحدة تمتدّ على العرض، ليست مجموعاً) وصفوف البيانات (كل خلاياها مفردة، فيها td)
+                $group = null; $cand = array_fill(0, $cols, true); $dataRows = 0; $seenGroup = false;
+                foreach ($trs as $ri => $tr) {
+                    $cells = []; foreach ($tr->childNodes as $cell) if ($cell instanceof DOMElement && in_array(strtolower($cell->nodeName), ['td', 'th'], true)) $cells[] = $cell;
+                    if (!$cells) continue;
+                    $isTotal = preg_match('/(total|grand|sum|subtotal)-row/', $tr->getAttribute('class')) === 1;
+                    if (count($cells) === 1 && (int)$cells[0]->getAttribute('colspan') >= $cols - 1) {
+                        if (!$isTotal && $norm($cells[0]) !== '') { $group = $norm($cells[0]); $seenGroup = true; }
+                        continue;
+                    }
+                    $allTd = true; foreach ($cells as $cell) if (strtolower($cell->nodeName) !== 'td' || (int)$cell->getAttribute('colspan') > 1 || (int)$cell->getAttribute('rowspan') > 1) { $allTd = false; break; }
+                    if (!$allTd || $isTotal || count($cells) !== $cols) continue;
+                    $dataRows++;
+                    foreach ($cells as $ci => $cell) {
+                        if (!$cand[$ci]) continue;
+                        $v = $norm($cell);
+                        if ($group === null || $v === '' || ($v !== $group && mb_strpos($group, $v, 0, 'UTF-8') === false)) $cand[$ci] = false;
+                    }
+                }
+                if (!$seenGroup || $dataRows < 2) break;
+                $col = -1; foreach ($cand as $ci => $ok) if ($ok) { $col = $ci; break; }
+                if ($col < 0) break;
+                // الحذف: الخلية المفردة تُشال، والممتدّة فوق هذا العمود يُنقَص امتدادها
+                $done = [];
+                foreach ($occ as $r) {
+                    if (!isset($r[$col])) continue;
+                    $e = $r[$col]; $k = spl_object_id($e['cell']); if (isset($done[$k])) continue; $done[$k] = 1;
+                    if ($e['cs'] > 1) { $ncs = $e['cs'] - 1; if ($ncs > 1) $e['cell']->setAttribute('colspan', (string)$ncs); else $e['cell']->removeAttribute('colspan'); }
+                    elseif ($e['cell']->parentNode) $e['cell']->parentNode->removeChild($e['cell']);
+                }
+                $dropped++;
+            }
+        }
+        return $dropped;
+    }
+
     private static function text(DOMNode $n): string
     {
         if ($n->nodeType === XML_TEXT_NODE) return $n->nodeValue;
@@ -143,7 +209,7 @@ class MsaPdf
             $mxWrap = max($mxWrap, ($bold && !$isHead) ? $segMax : $w);
             $mxStack = max($mxStack, $segMax);   // النسخة المكدَّسة: مرآة الدولار سطراً ثانياً بكل الصفوف
         }
-        if ($isHead) { $h = max($wrap, min($mx * 0.55 + 2, 30)); return [$h, $h, $h]; }
+        if ($isHead) { $h = max($wrap, min($mx * 0.55 + 2, 30)); return [$h, $h, $h, $wrap]; }   // [4] = أضيق رأس ممكن (أطول كلمة) — يُعتمد قبل اللجوء إلى الأفقي/الأجزاء (2026-10-27)
         $cap = (substr_count(trim($t), ' ') >= 4) ? 42 : 55;
         return [max($wrap, $mx), max($wrap, min($mxWrap, $cap)), max($wrap, min($mxStack, $cap))];
     }
@@ -273,6 +339,7 @@ class MsaPdf
         }
 
         // ---- 4) الجداول: tfoot ⇒ آخر الجسم (المجاميع مرّة واحدة لا بكل صفحة) + تقسيم العريض أعمدةً ----
+        self::dropGroupColumns($dom, $xp);   // 📐 (2026-10-27) العمود المكرّر مع عنوان مجموعته (المدرسة بكل صفّ) لا يُطبع — قبل قياس العرض
         $landscape = $o['landscape'] ?? null;
         $fitOne = !empty($o['fit']);   // 📄 «ورقة وحدة»: لا تقسيم أعمدةً — الجدول العريض يصغّر خطّه ليسع عرض الورقة
         $isLetter = $o['letter'] ?? null;
@@ -301,8 +368,10 @@ class MsaPdf
 
         // عرض الأعمدة الطبيعي لكل جدول (لتقرير الاتجاه والتقسيم)
         // لكل جدول: عرض الأعمدة «الكامل» (بلا التفاف) و«الملتفّ» + عدد الصفوف وعدد الخلايا التي ستلتفّ لو اعتُمد الملتفّ
+        // 📐 (2026-10-27 «حاج تعذّبني بترتيب التقارير») الرأس لا يقرّر عرض العمود: لكل شكل نسخة ثانية (fullh/wraph/stackh) رأسها بأضيق عرض
+        //    (أطول كلمة — الرأس يلتفّ على كلماته بالمحرّكين) تُفضَّل تلقائياً إن وفّرت ورقة/الاتجاه العمودي/منعت التقسيم أجزاءً
         $measure = function (DOMElement $t) use ($xp) {
-            $full = []; $wrap = []; $stack = []; $n = 0; $rows = 0; $wrapCells = 0; $wrapRows = 0; $usdRows = 0; $nameCol = -1;
+            $full = []; $wrap = []; $stack = []; $hNice = []; $hMin = []; $n = 0; $rows = 0; $wrapCells = 0; $wrapRows = 0; $usdRows = 0; $nameCol = -1;
             foreach ($xp->query('.//tr', $t) as $tr) {
                 $c = 0; $hasTd = false; $hasUsd = false; $hasWrap = false;
                 $rowBold = preg_match('/(total|grand|sum|subtotal)-row/', $tr->getAttribute('class')) === 1;
@@ -313,11 +382,14 @@ class MsaPdf
                     if ($isTh && $cs === 1 && $nameCol < 0 && preg_match('/الاسم|\bnoms?\b|\bname\b/iu', $cell->textContent)) $nameCol = $c;
                     if ($cs === 1) {
                         $bold = $rowBold || $xp->query('.//b|.//strong', $cell)->length > 0 || preg_match('/font-weight\s*:\s*(bold|[6-9]00)/i', (string)$cell->getAttribute('style')) === 1;
-                        [$f, $w, $s] = self::cellMm($cell, $isTh, $bold);
+                        $mm = self::cellMm($cell, $isTh, $bold); [$f, $w, $s] = $mm;
                         $f = min($f + 3.2, 80); $w = min($w + 3.2, 80); $s = min($s + 3.2, 80);   // حشوة 3pt×2 + حدّ + أمان؛ سقف 80mm
-                        if (!$isTh && $f > $w + 0.5) { $wrapCells++; $hasWrap = true; }
-                        if (!$isTh && $s < $w - 0.5) $hasUsd = true;
-                        $full[$c] = max($full[$c] ?? 0, $f); $wrap[$c] = max($wrap[$c] ?? 0, $w); $stack[$c] = max($stack[$c] ?? 0, $s);
+                        if ($isTh) { $hNice[$c] = max($hNice[$c] ?? 0, $f); $hMin[$c] = max($hMin[$c] ?? 0, min(($mm[3] ?? $f) + 3.2, 80)); }
+                        else {
+                            if ($f > $w + 0.5) { $wrapCells++; $hasWrap = true; }
+                            if ($s < $w - 0.5) $hasUsd = true;
+                            $full[$c] = max($full[$c] ?? 0, $f); $wrap[$c] = max($wrap[$c] ?? 0, $w); $stack[$c] = max($stack[$c] ?? 0, $s);
+                        }
                     }
                     $c += $cs;
                 }
@@ -326,9 +398,13 @@ class MsaPdf
                 if ($hasWrap) $wrapRows++;
                 $n = max($n, $c);
             }
-            for ($i = 0; $i < $n; $i++) { $full[$i] = max($full[$i] ?? 0, 7); $wrap[$i] = max($wrap[$i] ?? 0, 7); $stack[$i] = max($stack[$i] ?? 0, 7); }
-            ksort($full); ksort($wrap); ksort($stack);
-            return ['full' => $full, 'wrap' => $wrap, 'stack' => $stack, 'rows' => max(1, $rows), 'wrapCells' => $wrapCells, 'wrapRows' => $wrapRows, 'usdRows' => $usdRows, 'nameCol' => $nameCol];
+            $out = ['full' => [], 'wrap' => [], 'stack' => [], 'fullh' => [], 'wraph' => [], 'stackh' => []];
+            for ($i = 0; $i < $n; $i++) {
+                $df = max($full[$i] ?? 0, 7); $dw = max($wrap[$i] ?? 0, 7); $ds = max($stack[$i] ?? 0, 7); $hn = $hNice[$i] ?? 0; $hm = $hMin[$i] ?? 0;
+                $out['full'][$i] = max($df, $hn); $out['wrap'][$i] = max($dw, $hn); $out['stack'][$i] = max($ds, $hn);
+                $out['fullh'][$i] = max($df, $hm); $out['wraph'][$i] = max($dw, $hm); $out['stackh'][$i] = max($ds, $hm);
+            }
+            return $out + ['rows' => max(1, $rows), 'wrapCells' => $wrapCells, 'wrapRows' => $wrapRows, 'usdRows' => $usdRows, 'nameCol' => $nameCol];
         };
         // تقسيم أعمدة جدول أعرض من الورقة على أجزاء: أعمدة المفتاح (# + أوّل عمود نصّي) تتكرّر بكل جزء ⇒ [key[], parts[][]]
         $partition = function (array $w, float $usable, int $nameCol = -1): array {
@@ -393,7 +469,8 @@ class MsaPdf
             $usable = self::usableWidth($land, $side); $total = 0; $choice = [];
             foreach ($natural as $i => $m) {
                 $best = null;
-                foreach (['full' => $m['rows'], 'wrap' => $m['rows'] + $m['wrapRows'], 'stack' => $m['rows'] + $m['wrapRows'] + $m['usdRows']] as $v => $lines) {
+                $ln3 = ['full' => $m['rows'], 'wrap' => $m['rows'] + $m['wrapRows'], 'stack' => $m['rows'] + $m['wrapRows'] + $m['usdRows']];
+                foreach ($ln3 + ['fullh' => $ln3['full'], 'wraph' => $ln3['wrap'], 'stackh' => $ln3['stack']] as $v => $lines) {   // الرؤوس المريحة أوّلاً، ثم الضيّقة إن وفّرت ورقة/تقسيماً
                     [$pg, $parts] = $pagesOf($m[$v], $usable, $land, $lines, $m['nameCol']);
                     if ($best === null || $pg < $best[0] || ($pg === $best[0] && $parts < $best[2])) $best = [$pg, $v, $parts];   // التساوي: الأقلّ أجزاءً
                 }
@@ -411,7 +488,7 @@ class MsaPdf
         foreach ($natural as $i => $m) {
             $v = $variantOf[$i] ?? 'full';
             if (getenv('MSAPDF_DEBUG')) fwrite(STDERR, sprintf("[pdf] table %d: %s %s full=%.0f wrap=%.0f stack=%.0f usable=%.0f rows=%d wrapCells=%d usdRows=%d\n  %s\n", $i, $landscape ? 'L' : 'P', $v, array_sum($m['full']), array_sum($m['wrap']), array_sum($m['stack']), $usable, $m['rows'], $m['wrapCells'], $m['usdRows'], implode(' ', array_map(fn($x) => round($x), $m[$v]))));
-            if ($v === 'stack') {   // مرآة الدولار سطراً ثانياً فعلاً
+            if ($v === 'stack' || $v === 'stackh') {   // مرآة الدولار سطراً ثانياً فعلاً
                 foreach (iterator_to_array($xp->query('.//*[' . $cls('money-usd') . ']', $tables[$i])) as $mu) $mu->parentNode->insertBefore($dom->createElement('br'), $mu);
             }
             $natural[$i] = $m[$v]; $nameColOf[$i] = $m['nameCol'];

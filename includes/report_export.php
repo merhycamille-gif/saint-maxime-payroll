@@ -800,10 +800,14 @@ class ReportTable
         $noWrap = array_fill(0, $cols, 0); $full = array_fill(0, $cols, 0);
         $longestWord = function (string $t, float $pt) { $w = 0; foreach (preg_split('/[\s\x{00A0}]+/u', $t) as $wd) $w = max($w, self::twText($wd, $pt)); return $w; };
         $longestLine = function (string $t, float $pt) { $w = 0; foreach (preg_split('/\r\n|\n/', $t) as $ln) $w = max($w, self::twText($ln, $pt)); return $w; };
+        // 📐 (2026-10-27 «حاج تعذّبني بترتيب التقارير») الرأس لا يوسّع العمود إلا إذا اتّسعت الورقة: يُقاس الجدول أوّلاً بالبيانات ورؤوس بأطول كلمة،
+        //    فإن بقي متّسع تُعطى الرؤوس سطرها المريح (حتى 3.9 سم) — كان الرأس الطويل («يخضع للضرائب / Soumis aux retenues») يأخذ 3.9 سم بكل عمود
+        //    فيُقسَّم تقرير من 9 أعمدة جزأين بينما بياناته «نعم / لا» وتواريخ.
+        $hdrWord = array_fill(0, $cols, 0); $hdrLine = array_fill(0, $cols, 0);
         for ($c = 0; $c < $cols; $c++) {
             $h = (string)($this->headers[$c] ?? '');
-            $noWrap[$c] = max($noWrap[$c], $longestWord($h, $pt));
-            $full[$c] = max($full[$c], min($longestLine($h, $pt), 2200)); // الرأس يلتفّ فوق ~3.9 سم
+            $hdrWord[$c] = $longestWord($h, $pt); $hdrLine[$c] = min($longestLine($h, $pt), 2200);
+            $noWrap[$c] = max($noWrap[$c], $hdrWord[$c]);
         }
         foreach ($this->rows as $r) {
             if ($r['type'] === 'section') continue;
@@ -815,8 +819,12 @@ class ReportTable
                 else { $noWrap[$c] = max($noWrap[$c], $longestWord($v, $pt)); $full[$c] = max($full[$c], min($longestLine($v, $pt), 4800)); } // النصّ الطويل جداً (> ~8.5 سم) يلتفّ
             }
         }
-        $w = []; for ($c = 0; $c < $cols; $c++) $w[$c] = max($noWrap[$c], $full[$c]) + $padC;
+        $w = []; for ($c = 0; $c < $cols; $c++) $w[$c] = max($noWrap[$c], $full[$c], $hdrLine[$c]) + $padC;   // الرؤوس المريحة
         $sum = array_sum($w);
+        if ($sum > $twDoc) {   // لا تسع ⇒ الرؤوس تلتفّ على كلماتها قبل أي أفقي/أجزاء
+            $w = []; for ($c = 0; $c < $cols; $c++) { $full[$c] = max($full[$c], $hdrWord[$c]); $w[$c] = max($noWrap[$c], $full[$c]) + $padC; }
+            $sum = array_sum($w);
+        }
         $slack = []; $tot = 0; for ($c = 0; $c < $cols; $c++) { $s = max(0, $w[$c] - ($noWrap[$c] + $padC)); $slack[$c] = $s; $tot += $s; }
         if ($compress && $sum > $twDoc) {
             // ضغط أعمدة النصّ نحو أطول كلمة فيها — الأرقام لا تُمسّ، و**عمود الاسم آخر ما يُضغط** (الفئة والرؤوس تلتفّ قبل أن ينكسر اسم)

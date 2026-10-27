@@ -67,6 +67,9 @@ $drop = $xp->query('//*[' . $cls('no-print') . ' or ' . $cls('no-export') . ' or
 $rm = [];
 foreach ($drop as $n) $rm[] = $n;
 foreach ($rm as $n) if ($n->parentNode) $n->parentNode->removeChild($n);
+// 📐 (2026-10-27) القاعدة الموحّدة مع الـPDF: العمود المكرّر مع عنوان مجموعته (اسم المدرسة بكل صفّ تحت سطر المدرسة) لا يُصدَّر — الإكسل/الوورد أضيق فلا «أجزاء»
+require_once __DIR__ . '/../includes/pdf_engine.php';
+MsaPdf::dropGroupColumns($dom, $xp);
 
 /** نص عنصر: النصوص الفرعية مفصولة بمسافة عند حدود العناصر (192,000,000 L.L + $2,155 لا يلتصقان) */
 function hx_text(DOMNode $n): string {

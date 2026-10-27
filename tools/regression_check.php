@@ -10678,6 +10678,46 @@ try {
 } catch (Throwable $e) { $ok274 = false; $why274 = $e->getMessage(); }
 check('🛡️⏱️ نماذج استخدام الأجير: الساعات الشهرية = الأسبوعية × 4 (الملف لا يُمسّ) + أقل من 72 = جزئي / 72 وما فوق = كامل + الشيك يلحق الرقم ويُغلَب باليد + dawam بالرابط + X بالخانة الصحيحة بالقالبين (إكسل + صورة مفرّغة + إحداثيات)', $ok274, $why274);
 
+/* 275) 📐 (2026-10-27 «كنّا متّفقين إنّو التقارير عند الطبع تطلع مظبوطة — شو باك طالع التقرير مجموعة وراق… برنامج موحّد تلقائياً يرتّب كل شي»)
+ *      تقرير «الداخلون» (9 أعمدة) كان يطلع PDF 5 ورقات (جزأين) ووورد جزأين. السبب: (أ) عمود «المدرسة» يتكرّر بكل صفّ تحت سطر المدرسة
+ *      (ب) الرأس الطويل («يخضع للضرائب / Soumis aux retenues») يُحسب سطراً كاملاً فيوسّع عموداً بياناته «نعم/لا».
+ *      القاعدتان بالمحرّك الموحّد: MsaPdf::dropGroupColumns (PDF + الوورد/الإكسل عبر html_export) + الرؤوس تلتفّ على كلماتها قبل الأفقي/الأجزاء
+ *      (نسخ fullh/wraph/stackh بالـPDF، ومرحلتان بـdocxWidths) + سطر المجموعة/المجموع الممتدّ لا يُلفّ على 58mm + الجدول القريب من عرض الورقة يملؤها. */
+try {
+    require_once $PROJ . '/includes/pdf_engine.php'; require_once $PROJ . '/includes/report_export.php';
+    // (أ) DOM: جدول بسطرَي مجموعة + عمود مدرسة مكرّر + عمود no-print بالرأس فقط (colspan سطر المجموعة أكبر بواحد كما بالتقارير)
+    $mk = function (string $sch, array $names) { $h = '<tr class="cat-row"><td colspan="6" style="font-weight:700">' . $sch . '</td></tr>'; foreach ($names as $i => $n) $h .= '<tr><td>' . ($i + 1) . '</td><td><small>' . $sch . '</small></td><td><strong>' . $n . '</strong></td><td>نعم / Oui</td><td>01/10/2026</td></tr>'; return $h . '<tr class="subtotal-row"><td colspan="6">عدد — ' . $sch . ': ' . count($names) . '</td></tr>'; };
+    $html275 = '<div class="doc-sheet"><div class="doc-head"><div class="dh-ar">فحص</div></div><table class="doc-table" dir="rtl"><thead><tr><th>#</th><th>المدرسة / École</th><th>الاسم / Nom</th><th>يخضع للضرائب / Soumis aux retenues</th><th>دخول المدرسة / Embauche</th><th class="no-print"></th></tr></thead><tbody>'
+        . $mk('مدرسة القديس مكسيموس', ['ريتا بو عاصي', 'غريس كرم']) . $mk('مدرسة سيدة النجاة للراهبات المخلصيات', ['تريسي الخضر', 'جورج حنا', 'جوزيف بدر']) . '<tr class="total-row"><td colspan="6">العدد الإجمالي: 5</td></tr></tbody></table></div>';
+    $p275 = MsaPdf::prepare($html275, ['title' => 'فحص', 'dir' => 'rtl']);
+    $out275 = $p275['dom']->saveHTML($p275['body']);
+    $okA = strpos($out275, 'المدرسة / École') === false && strpos($out275, '>الاسم / Nom<') !== false && substr_count($out275, '<small>') === 0
+         && strpos($out275, 'colspan="5"') !== false && strpos($out275, 'colspan="6"') === false   // سطر المجموعة نقص عموداً
+         && strpos($out275, 'ريتا بو عاصي') !== false && strpos($out275, 'جوزيف بدر') !== false;
+    // الحذف لا يمسّ جدولاً بلا مجموعات أو عموداً لا يطابق عنوان مجموعته
+    $html275b = '<table><thead><tr><th>#</th><th>الاسم</th><th>المدرسة</th><th>الراتب</th></tr></thead><tbody><tr><td>1</td><td>أ</td><td>مكسيموس</td><td>5</td></tr><tr><td>2</td><td>ب</td><td>مكسيموس</td><td>6</td></tr><tr><td>3</td><td>ج</td><td>النجاة</td><td>7</td></tr></tbody></table>';
+    $p275b = MsaPdf::prepare($html275b, ['title' => 'x', 'dir' => 'rtl']); $okB = strpos($p275b['dom']->saveHTML($p275b['body']), '>المدرسة<') !== false;
+    // (ب) الوورد: 9 أعمدة برؤوس طويلة وبيانات قصيرة ⇒ جزء واحد (كان جزأين) — عبر docxWidths/docxParts
+    $rep275 = new ReportTable('فحص', false); $rep275->orientMode = 'auto'; $rep275->dir('rtl');
+    $hd275 = ['#', 'الاسم / Nom', 'يخضع للضرائب / Soumis aux retenues', 'رقم الضمان / N° CNSS', 'الشهادة / Diplôme', 'الدرجة الحالية / Échelon', 'دخول المدرسة / Embauche', 'دخول الملاك / Titularisation', 'الحالة / Statut'];
+    $rep275->head($hd275);
+    for ($i = 1; $i <= 12; $i++) $rep275->row([$i, 'جوزيف لويس الاسمر', 'نعم / Oui', $i % 2 ? '1989-1583222' : '', "Licence d'enseignement", 15, '01/10/2026', '01/10/2028', 'Actif']);
+    $rw = new ReflectionMethod($rep275, 'docxWidths'); $rw->setAccessible(true);
+    [$w275, $sum275] = $rw->invoke($rep275, 9, 12.0, 15704, array_fill(0, 9, true), false);
+    $rp = new ReflectionMethod($rep275, 'docxParts'); $rp->setAccessible(true);
+    $parts275 = $rp->invoke($rep275, 9, $w275, 15704);
+    $okC = $sum275 <= 15704 && count($parts275) === 1 && $w275[2] < 1500;   // عمود «نعم / لا» لم يعد 2284 twips بسبب رأسه
+    // (ج) الكود: النسخ الضيّقة الرؤوس بالـPDF + سطر المجموعة لا يُلفّ + ملء العرض + النداء بـhtml_export
+    $pe275 = (string)file_get_contents($PROJ . '/includes/pdf_engine.php'); $pc275 = (string)file_get_contents($PROJ . '/includes/pdf_chromium.php'); $hx275 = (string)file_get_contents($PROJ . '/pages/html_export.php');
+    $okD = strpos($pe275, "self::dropGroupColumns(\$dom, \$xp);") !== false && strpos($pe275, "['fullh' => \$ln3['full'], 'wraph' => \$ln3['wrap'], 'stackh' => \$ln3['stack']]") !== false
+         && strpos($pe275, "if (\$v === 'stack' || \$v === 'stackh')") !== false && strpos($pe275, "return [\$h, \$h, \$h, \$wrap];") !== false
+         && strpos($pc275, "(int)\$c->getAttribute('colspan') <= 1 && mb_strlen(") !== false && strpos($pc275, "if(w<=AVAIL+1){ if(w>=AVAIL*0.7) t.style.width='100%'; return; }") !== false
+         && strpos($hx275, 'MsaPdf::dropGroupColumns($dom, $xp);') !== false;
+    $ok275 = $okA && $okB && $okC && $okD;
+    $why275 = 'drop=' . ($okA ? 'ok' : 'NO') . ' keep=' . ($okB ? 'ok' : 'NO') . ' docx=' . ($okC ? 'ok' : 'NO') . ' (sum=' . $sum275 . ' parts=' . count($parts275) . ' w2=' . ($w275[2] ?? '-') . ') src=' . ($okD ? 'ok' : 'NO');
+} catch (Throwable $e) { $ok275 = false; $why275 = $e->getMessage(); }
+check('📐 الترتيب الموحّد للطباعة: العمود المكرّر مع عنوان مجموعته يُشال (PDF + وورد/إكسل) + الرأس الطويل يلتفّ قبل الأفقي/الأجزاء + سطر المجموعة لا يُلفّ + ملء العرض — تقرير الداخلون 9 أعمدة = قطعة واحدة', $ok275, $why275);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
