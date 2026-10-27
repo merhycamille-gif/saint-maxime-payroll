@@ -33,6 +33,13 @@ function bulkJson(array $a): void { while (ob_get_level()) ob_end_clean(); heade
 function bulkLatin(string $s): string { $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s); if ($t === false || $t === '') $t = $s; return trim(preg_replace('/[^a-z0-9]+/i', '_', $t), '_'); }   // Thérèse ⇒ Therese
 function bulkToken(): string { return bin2hex(random_bytes(10)); }
 function bulkOwn(string $tok): bool { return preg_match('/^[a-f0-9]{20}$/', $tok) === 1 && !empty($_SESSION['bulk_files'][$tok]); }
+/** 📧 (p1 «ما بدّي يطلع بالإيميل هالجملة والعنوان بالعربي») عنوان الإيميل ونصّه بالفرنسية الرسمية، بلا أقواس «(officielle — automatique)» ولا شرح */
+function bulkFrLabel(string $typeKey): string { global $ATT_TYPES; $fr = (string)($ATT_TYPES[$typeKey]['fr'] ?? $typeKey); return trim(preg_replace('/\s*\([^)]*\)\s*/u', ' ', $fr)); }
+function bulkMailText(string $label, string $schoolFr, int $n = 1): array {
+    $subject = $label . ($n > 1 ? ' (' . $n . ')' : '') . ($schoolFr !== '' ? ' — ' . $schoolFr : '');
+    $body = "Bonjour,\n\nVeuillez trouver ci-joint " . ($n > 1 ? "le fichier PDF contenant $n documents : " : 'le document : ') . $label . ".\n\nCordialement,\n" . $schoolFr;
+    return [$subject, $body];
+}
 /** المدارس المسموح بها لهذا الحساب (المدير: كلّها الفاعلة؛ حساب مدرسة: مدارسه) ⇒ [id => صفّ المدرسة] */
 function bulkSchools(): array {
     static $c = null; if ($c !== null) return $c;
@@ -101,7 +108,10 @@ function bulkBuild(array $emp, string $type, string $lang, string $date): array 
         if ($area->getAttribute('dir') === '' && $lang !== 'ar' && preg_match('/[\x{0600}-\x{06FF}]/u', strip_tags($inner))) $dir = 'rtl';
         require_once __DIR__ . '/../includes/pdf_engine.php';
         $sch = currentSchool(); $schoolName = $sch ? (string)($sch['name_ar'] ?: ($sch['name_fr'] ?? '')) : '';
-        $pdf = MsaPdf::fromHtml($inner, ['title' => ($ATT_TYPES[$type][$lang] ?? $type) . ' — ' . trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? '')), 'dir' => $dir, 'school' => $schoolName, 'fit' => true, 'lh_bg' => $lhBg, 'lh_pad' => $lhPad]);
+        $opts = ['title' => ($ATT_TYPES[$type][$lang] ?? $type) . ' — ' . trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? '')), 'dir' => $dir, 'school' => $schoolName, 'fit' => true, 'lh_bg' => $lhBg, 'lh_pad' => $lhPad];
+        // ⚡ («خلّي يكون أسرع») كاش المحرّك ببصمة المحتوى: نفس الإفادة بنفس اليوم ⇒ الملف الجاهز فوراً عند الإعادة
+        $ck = MsaPdf::cacheKey($inner, $opts); $pdf = MsaPdf::cacheGet($ck);
+        if ($pdf === null) { $pdf = MsaPdf::fromHtml($inner, $opts); MsaPdf::cachePut($ck, $pdf); }
     }
     if (strpos($pdf, '%PDF') !== 0 || strlen($pdf) < 400) throw new RuntimeException('ملف PDF فارغ');
     $name = ($LATIN[$used] ?? ('Document_' . bulkLatin($used))) . ($who !== '' ? '_' . $who : '') . '_' . date('Y-m-d', $ts) . '.pdf';
@@ -155,15 +165,14 @@ if ($act !== '') {
             $sch = $schools[(int)$emp['school_id']];
             $tok = bulkToken(); file_put_contents($bulkDir . '/' . $tok . '.pdf', $pdf);
             $_SESSION['bulk_files'][$tok] = $name;
-            $res = ['ok' => true, 'tok' => $tok, 'name' => $name, 'label' => $label, 'size' => strlen($pdf)];
+            $res = ['ok' => true, 'tok' => $tok, 'name' => $name, 'label' => $label, 'size' => strlen($pdf), 'used' => ($type === 'cnss_hire' ? (hasNssfNumber($emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new') : $type)];
             if (!empty($in['email_each'])) {
                 $to = trim((string)($emp['email'] ?? ''));
                 if (!filter_var($to, FILTER_VALIDATE_EMAIL)) { $res['mail'] = 'none'; $res['msg'] = 'ما عنده إيميل بملفه'; }
                 else {
-                    $schoolName = (string)($sch['name_ar'] ?: ($sch['name_fr'] ?? ''));
-                    $subject = $label . ' — ' . $schoolName;
-                    $body = "السلام عليكم،\n\nمرفق " . $label . " بصيغة PDF.\n\n" . $schoolName;
-                    [$ok, $err] = msaSendMail($to, $subject, $body, [['name' => $name, 'data' => $pdf, 'mime' => 'application/pdf']], false, $sch ? (int)$sch['id'] : null, $schoolName);
+                    $schoolFr = (string)(($sch['name_fr'] ?? '') ?: ($sch['name_ar'] ?? ''));
+                    [$subject, $body] = bulkMailText(bulkFrLabel($res['used'] ?? $type), $schoolFr, 1);
+                    [$ok, $err] = msaSendMail($to, $subject, $body, [['name' => $name, 'data' => $pdf, 'mime' => 'application/pdf']], false, $sch ? (int)$sch['id'] : null, $schoolFr);
                     $res['mail'] = $ok ? 'sent' : 'failed'; $res['to'] = $to; $res['msg'] = $ok ? ('انبعت إلى ' . $to) : ('فشل الإرسال: ' . $err);
                 }
             }
@@ -195,11 +204,10 @@ if ($act !== '') {
             if (!bulkOwn($tok) || !is_file($bulkDir . '/' . $tok . '.pdf')) bulkJson(['ok' => false, 'msg' => 'انتهت صلاحية الملف']);
             if (!filter_var($to, FILTER_VALIDATE_EMAIL)) bulkJson(['ok' => false, 'msg' => 'الإيميل غير صحيح']);
             $schools = bulkSchools(); $sch = $schools[(int)($in['sid'] ?? 0)] ?? (currentSchool() ?: (reset($schools) ?: null));
-            $schoolName = $sch ? (string)($sch['name_ar'] ?: ($sch['name_fr'] ?? '')) : '';
-            $label = (string)($ATT_TYPES[$type]['ar'] ?? 'إفادات'); $n = (int)($in['n'] ?? 0);
-            $subject = $label . ($n > 1 ? ' (' . $n . ')' : '') . ' — ' . $schoolName;
-            $body = "السلام عليكم،\n\nمرفق ملف PDF واحد فيه " . ($n > 1 ? $n . ' إفادات' : 'الإفادة') . ": " . $label . ".\n\n" . $schoolName;
-            [$ok, $err] = msaSendMail($to, $subject, $body, [['name' => (string)$_SESSION['bulk_files'][$tok], 'data' => (string)file_get_contents($bulkDir . '/' . $tok . '.pdf'), 'mime' => 'application/pdf']], false, $sch ? (int)$sch['id'] : null, $schoolName);
+            $schoolFr = $sch ? (string)(($sch['name_fr'] ?? '') ?: ($sch['name_ar'] ?? '')) : '';
+            $n = max(1, (int)($in['n'] ?? 0));
+            [$subject, $body] = bulkMailText(bulkFrLabel($type), $schoolFr, $n);
+            [$ok, $err] = msaSendMail($to, $subject, $body, [['name' => (string)$_SESSION['bulk_files'][$tok], 'data' => (string)file_get_contents($bulkDir . '/' . $tok . '.pdf'), 'mime' => 'application/pdf']], false, $sch ? (int)$sch['id'] : null, $schoolFr);
             bulkJson(['ok' => (bool)$ok, 'msg' => $ok ? ('انبعت إلى ' . $to) : ('فشل الإرسال: ' . $err)]);
         }
         bulkJson(['ok' => false, 'msg' => 'طلب غير معروف']);
@@ -480,15 +488,25 @@ include __DIR__ . '/../includes/header.php';
             rows.appendChild(tr);
         });
         function setRow(b, cls, txt, lbl) { var tr = document.getElementById('bkr' + b.value); tr.querySelector('.st').className = 'st ' + cls; tr.querySelector('.st').textContent = txt; if (lbl) tr.querySelector('.lbl').textContent = lbl; return tr; }
+        // ⚡ («خلّي يكون أسرع الإرسال أو الطبع») 3 إفادات تُبنى معاً — مدرسةً مدرسة (الترويسة تتبع المدرسة الفعّالة بالجلسة فلا تختلط بين مدرستين)؛ ترتيب الملف الواحد = ترتيب اللائحة
+        var POOL = 3, done = 0, curSid = null, active = 0, toksBy = new Array(picked.length);
         function next() {
-            if (i >= picked.length) { finish(); return; }
-            var b = picked[i]; setRow(b, 'wait', '⏳ عم نجهّز…');
+            while (active < POOL && i < picked.length) {
+                var b = picked[i], sid = b.getAttribute('data-sid') || '';
+                if (active > 0 && sid !== curSid) break;   // مدرسة تانية: انطر الحاليين يخلصوا
+                curSid = sid; var idx = i; i++; active++;
+                one(b, idx);
+            }
+            if (done >= picked.length) finish();
+        }
+        function one(b, idx) {
+            setRow(b, 'wait', '⏳ عم نجهّز…');
             var data = { act: 'gen', emp: b.value, type: type, lang_doc: lang, date: date };
             if (mode === 'email' && mailMode === 'each') data.email_each = 1;
             post(data).then(function (r) {
                 if (!r.ok) { badN++; setRow(b, 'bad', '✕ ' + (r.msg || 'فشل')); }
                 else {
-                    toks.push(r.tok); b.setAttribute('data-tok', r.tok); b.setAttribute('data-file', r.name);
+                    toksBy[idx] = r.tok; b.setAttribute('data-tok', r.tok); b.setAttribute('data-file', r.name);
                     var tr;
                     if (mode === 'email' && mailMode === 'each') { if (r.mail === 'sent') { okN++; tr = setRow(b, 'ok', '✅ ' + r.msg, r.label); } else { badN++; tr = setRow(b, 'bad', '✕ ' + (r.msg || 'ما انبعت'), r.label); } }
                     else { okN++; tr = setRow(b, 'ok', '✅ جاهز', r.label); }
@@ -497,9 +515,12 @@ include __DIR__ . '/../includes/header.php';
                     var wb = tr.querySelector('[data-wa]'); if (wb) wb.addEventListener('click', function () { shareTok(r.tok, r.name, b.getAttribute('data-phone'), r.label + ' — ' + b.getAttribute('data-name')); });
                 }
             }).catch(function (e) { badN++; setRow(b, 'bad', '✕ خطأ اتصال'); })
-            .then(function () { i++; fill.style.width = Math.round(i / picked.length * 100) + '%'; sum.textContent = 'خلص ' + i + ' من ' + picked.length + ' — ✅ ' + okN + ' · ✕ ' + badN; next(); });
+            .then(function () { active--; done++; fill.style.width = Math.round(done / picked.length * 100) + '%'; sum.textContent = 'خلص ' + done + ' من ' + picked.length + ' — ✅ ' + okN + ' · ✕ ' + badN; next(); });
         }
+        var finished = false;
         function finish() {
+            if (finished) return; finished = true;
+            toks = toksBy.filter(function (t) { return !!t; });
             running = false;
             if (!toks.length) { sum.textContent += ' — ما في ولا ملف جاهز.'; return; }
             if (mode === 'email' && mailMode === 'each') { sum.textContent += ' — الإيميلات بسجلّ الإيميلات.'; fin.innerHTML = '<a class="btn btn-sm btn-light" href="' + BASE + 'pages/mail_log.php"><i class="fas fa-envelope-open-text"></i> سجلّ الإيميلات</a>'; return; }
