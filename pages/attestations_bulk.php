@@ -53,19 +53,26 @@ function bulkSchools(): array {
     return $c;
 }
 
-/** جلب صفحة داخلية بجلسة المستخدم نفسها (كما send_attestation): تُغلق الجلسة أثناء الطلب ثمّ تُفتح */
-function bulkFetch(string $rel): string {
+/** جلب صفحة داخلية بجلسة المستخدم (كما send_attestation) — ومع $sid: **جلسة مؤقّتة مستقلّة** نسخةٌ من جلسته مدرستها الفعّالة = مدرسة الأستاذ،
+ *  فلا تتسابق الطلبات المتوازية (3 معاً) على مدرسة الجلسة المشتركة (p1 «الموظف غير موجود أو خارج صلاحيتك») ولا تتبدّل مدرسة شريطه */
+function bulkFetch(string $rel, ?int $sid = null): string {
     $base = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
     $url = $base . BASE_URL . ltrim($rel, '/');
-    $cn = session_name(); $cv = session_id();
-    session_write_close();
+    $cn = session_name(); $origId = session_id(); $tmpId = null;
+    if ($sid) {
+        $snap = $_SESSION; session_write_close();
+        $tmpId = 'bk' . bin2hex(random_bytes(12)); session_id($tmpId); session_start();
+        $_SESSION = $snap; $_SESSION['active_schools'] = [(int)$sid]; unset($_SESSION['report_schools'], $_SESSION['bulk_files'], $_SESSION['bulk_prev_active']);
+        session_write_close();
+    } else session_write_close();
     $out = '';
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIE => $cn . '=' . $cv, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 120, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0]);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIE => $cn . '=' . ($tmpId ?: $origId), CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 120, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0]);
         $out = (string)curl_exec($ch); curl_close($ch);
     }
-    @session_start();
+    if ($tmpId) { session_id($tmpId); @session_start(); @session_destroy(); }
+    session_id($origId); @session_start();
     return $out;
 }
 
@@ -80,7 +87,7 @@ function bulkBuild(array $emp, string $type, string $lang, string $date): array 
         $form = $used === 'cnss_travail' ? 'cnss_work_attestation' : $used;
         $q = 'pages/official_export.php?form=' . rawurlencode($form) . '&emp=' . (int)$emp['id'] . '&d=' . (int)date('j', $ts) . '&mo=' . (int)date('n', $ts) . '&yr=' . date('Y', $ts) . '&format=pdf&raw_pdf=1';
         if ($used === 'cnss_leave') $q .= '&reason=1';
-        $r = bulkFetch($q);
+        $r = bulkFetch($q, (int)$emp['school_id']);
         if (strpos($r, '%PDF') === 0) $pdf = $r;
         elseif (stripos($r, 'class="pbg"') !== false) {
             require_once __DIR__ . '/../includes/pdf_chromium.php';
@@ -92,7 +99,7 @@ function bulkBuild(array $emp, string $type, string $lang, string $date): array 
             throw new RuntimeException('تعذّر توليد النموذج الرسمي (' . ($ATT_TYPES[$used]['ar'] ?? $used) . ')' . ($why !== '' ? ' — ' . $why : ' — ردّ فارغ من الخادم'));
         }
     } else {
-        $r = bulkFetch('pages/attestations.php?employee_id=' . (int)$emp['id'] . '&type=' . rawurlencode($type) . '&lang_doc=' . rawurlencode($lang) . '&date=' . rawurlencode($date));
+        $r = bulkFetch('pages/attestations.php?employee_id=' . (int)$emp['id'] . '&type=' . rawurlencode($type) . '&lang_doc=' . rawurlencode($lang) . '&date=' . rawurlencode($date), (int)$emp['school_id']);
         libxml_use_internal_errors(true);
         $dom = new DOMDocument(); $dom->loadHTML('<?xml encoding="UTF-8">' . $r);
         $xp = new DOMXPath($dom);
@@ -115,7 +122,7 @@ function bulkBuild(array $emp, string $type, string $lang, string $date): array 
         $dir = strtolower((string)$area->getAttribute('dir')) === 'ltr' ? 'ltr' : ($lang === 'ar' ? 'rtl' : 'ltr');
         if ($area->getAttribute('dir') === '' && $lang !== 'ar' && preg_match('/[\x{0600}-\x{06FF}]/u', strip_tags($inner))) $dir = 'rtl';
         require_once __DIR__ . '/../includes/pdf_engine.php';
-        $sch = currentSchool(); $schoolName = $sch ? (string)($sch['name_ar'] ?: ($sch['name_fr'] ?? '')) : '';
+        $schRow = bulkSchools()[(int)($emp['school_id'] ?? 0)] ?? currentSchool(); $schoolName = $schRow ? (string)($schRow['name_ar'] ?: ($schRow['name_fr'] ?? '')) : '';
         $opts = ['title' => ($ATT_TYPES[$type][$lang] ?? $type) . ' — ' . trim(($emp['first_name_fr'] ?? '') . ' ' . ($emp['last_name_fr'] ?? '')), 'dir' => $dir, 'school' => $schoolName, 'fit' => true, 'lh_bg' => $lhBg, 'lh_pad' => $lhPad];
         // ⚡ («خلّي يكون أسرع») كاش المحرّك ببصمة المحتوى: نفس الإفادة بنفس اليوم ⇒ الملف الجاهز فوراً عند الإعادة
         $ck = MsaPdf::cacheKey($inner, $opts); $pdf = MsaPdf::cacheGet($ck);
@@ -196,11 +203,7 @@ if ($act !== '') {
             $st = $db->prepare("SELECT * FROM employees WHERE id = ? AND is_deleted = 0"); $st->execute([$eid]); $emp = $st->fetch(PDO::FETCH_ASSOC);
             $schools = bulkSchools();
             if (!$emp || !isset($schools[(int)$emp['school_id']])) bulkJson(['ok' => false, 'msg' => 'الأستاذ غير موجود بمدارسك']);
-            // 🏫 (عدّة مدارس) كل إفادة بترويسة مدرسة صاحبها: المدرسة الفعّالة بالجلسة = مدرسته أثناء التوليد.
-            // 🐛 (p1 «الموظف غير موجود أو خارج صلاحيتك» لبعض الأساتذة) كانت كل طلبة تعيد المدرسة السابقة عند انتهائها، فالطلبات المتوازية (3 معاً)
-            //    كانت تقرأ مدرسة خاطئة من ملف الجلسة ⇒ الآن المدرسة السابقة تُحفَظ مرّة واحدة وتُعاد بـact=restore (آخر الدفعة) أو عند فتح الصفحة.
-            if (!array_key_exists('bulk_prev_active', $_SESSION)) $_SESSION['bulk_prev_active'] = ['a' => $_SESSION['active_schools'] ?? null, 'r' => $_SESSION['report_schools'] ?? null];
-            $_SESSION['active_schools'] = [(int)$emp['school_id']]; unset($_SESSION['report_schools']);
+            // 🏫 (عدّة مدارس) كل إفادة بترويسة مدرسة صاحبها: الطلب الداخلي يمرّ بجلسة مؤقّتة مدرستها مدرسته (bulkFetch($rel, $sid)) — لا لمس لجلسة المستخدم ولا سباق بين الطلبات المتوازية
             [$pdf, $name, $label] = bulkBuild($emp, $type, $lang, $date);
             $sch = $schools[(int)$emp['school_id']];
             // 🪪 المرفقات المختارة بعد ورقة الإفادة: الهوية/إخراج القيد الفردي، إخراج القيد العائلي
