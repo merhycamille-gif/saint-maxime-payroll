@@ -624,7 +624,8 @@
         tb.querySelector('#msaOffWa').addEventListener('click', function () {
             // النموذج الرسمي PDF من الخادم (حيث الأداة متوفّرة) يُسلَّم مباشرةً لواتساب؛ وإلا النافذة القديمة
             waSendPdf(o.title || 'formulaire', function () {
-                return fetch(o.pdf, { credentials: 'same-origin' }).then(function (x) { return x.blob(); }).then(function (bl) {
+                // raw_pdf=1 (2026-10-27): أونلاين بلا LibreOffice يرجع PDF طبق الأصل من محرّك المدرسة بدل صفحة الطباعة
+                return fetch(o.pdf + (o.pdf.indexOf('?') >= 0 ? '&' : '?') + 'raw_pdf=1', { credentials: 'same-origin' }).then(function (x) { return x.blob(); }).then(function (bl) {
                     if (!/pdf/i.test(bl.type)) throw new Error('not a pdf');
                     return { blob: bl, name: safeName(o.title || 'formulaire') + '.pdf' };
                 });

@@ -83,6 +83,20 @@ if ($hasPuppeteer) {
             CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 25, CURLOPT_SSL_VERIFYPEER => false]);
         $html = (string)curl_exec($ch); curl_close($ch);
     }
+    // 🏛️📧 (2026-10-27 «بعتت الاستخدام لعندي على الإيميل شوف شو طلع») النموذج الرسمي المصوّر (official_export mode=image) كان يُبعَث صفحةَ ويب مبعثرة
+    //    بجسم الرسالة. الآن: PDF طبق الأصل عبر محرّك المدرسة (Chromium) مرفقاً — كما على الكمبيوتر. إن تعطّل المحرّك يبقى المسار القديم.
+    if ($html !== '' && stripos($html, 'class="pbg"') !== false) {
+        require_once __DIR__ . '/../includes/pdf_chromium.php';
+        if (MsaChromePdf::available()) {
+            try {
+                $pdf = MsaChromePdf::overlayPageToPdf($html);
+                $body = "السلام عليكم،\n\nمرفق النموذج الرسمي المطلوب بصيغة PDF.\n\n" . $schoolName;
+                [$ok, $err] = msaSendMail($to, $subject, $body, [['name' => $name . '.pdf', 'data' => $pdf, 'mime' => 'application/pdf']], false, $attSchoolId, $schoolName);
+                if ($ok) sendResult(true, 'تمّ إرسال النموذج الرسمي (PDF مرفق) إلى ' . $to, $back);
+                sendResult(false, 'تعذّر الإرسال: ' . $err, $back);
+            } catch (Throwable $e) { /* المحرّك متعطّل ⇒ المسار القديم أدناه */ }
+        }
+    }
     $content = '';
     if ($html !== '') {
         // استخرج محتوى منطقة الإفادة #ppExportArea (وإلا أرسل الصفحة كما هي)

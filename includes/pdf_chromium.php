@@ -123,6 +123,55 @@ class MsaChromePdf
         }
     }
 
+    /**
+     * 📧 (2026-10-27 «بعتت الاستخدام لعندي على الإيميل شوف شو طلع») صفحة النموذج الرسمي المصوّر (صورة القالب + القيم فوقها، official_export mode=image)
+     * ⇒ PDF طبق الأصل عبر Chromium بلا أي تحضير (لا prepare ولا جداول): الصورة تُضمَّن data:URI، شريط «اطبع» يُشال، الورقة A4 بلا هوامش.
+     * يُستعمل حيث لا puppeteer (الأونلاين): إيميل/واتساب النموذج الرسمي. يرمي استثناءً عند الفشل.
+     */
+    public static function overlayPageToPdf(string $pageHtml): string
+    {
+        $root = realpath(__DIR__ . '/..'); $base = defined('BASE_URL') ? BASE_URL : '/';
+        $doc = preg_replace_callback('#<img class="pbg" src="([^"]+)"#', function ($m) use ($root, $base) {
+            $src = preg_replace('/[?#].*$/', '', html_entity_decode($m[1]));
+            $p = preg_replace('#^https?://[^/]+#i', '', $src);
+            $rel = ($base !== '/' && strpos($p, $base) === 0) ? substr($p, strlen($base)) : ltrim($p, '/');
+            $abs = $root . '/' . $rel;
+            if (is_file($abs)) return '<img class="pbg" src="data:image/png;base64,' . base64_encode((string)file_get_contents($abs)) . '"';
+            return $m[0];
+        }, $pageHtml);
+        $doc = preg_replace('#<div class="bar">.*?</div>\s*</div>#su', '', $doc);                       // شريط اطبع/احفظ
+        $doc = preg_replace('#@media print\{.*?\}\}#su', '', $doc);                                    // تصغير الطباعة اليدوية (هوامش 8mm)
+        $doc = str_replace('@page{size:A4;margin:8mm}', '@page{size:A4;margin:0}', $doc);
+        $doc = preg_replace('#</head>#i', '<style>' . self::fontCss() . 'body{background:#fff !important;font-family:Arial,"Segoe UI",Tahoma,sans-serif}</style></head>', $doc, 1);
+        return self::rawPdf($doc, ['paperWidth' => '210mm', 'paperHeight' => '297mm', 'marginTop' => '0', 'marginBottom' => '0', 'marginLeft' => '0', 'marginRight' => '0']);
+    }
+
+    /** مستند HTML كامل كما هو ⇒ PDF عبر Gotenberg/Chromium (الخطوط مرفقة) — بلا تذييل ولا تحضير */
+    public static function rawPdf(string $doc, array $opts = []): string
+    {
+        $cfg = self::config();
+        if (!$cfg) throw new RuntimeException('pdf service not configured');
+        $tmp = sys_get_temp_dir() . '/msaraw_' . bin2hex(random_bytes(6)); @mkdir($tmp, 0777, true);
+        $fontDir = realpath(__DIR__ . '/../assets/fonts'); $files = [];
+        try {
+            file_put_contents("$tmp/index.html", $doc); $files['index.html'] = "$tmp/index.html";
+            foreach (['f1.woff2', 'f2.woff2', 'f3.woff2'] as $f) if (is_file("$fontDir/$f")) $files[$f] = "$fontDir/$f";
+            foreach (['arial.ttf', 'arialbd.ttf'] as $f) if (is_file("$fontDir/ttf/$f")) $files[$f] = "$fontDir/ttf/$f";
+            $post = $opts + ['paperWidth' => '210mm', 'paperHeight' => '297mm', 'marginTop' => '0', 'marginBottom' => '0', 'marginLeft' => '0', 'marginRight' => '0',
+                             'printBackground' => 'true', 'emulatedMediaType' => 'print', 'preferCssPageSize' => 'false', 'waitDelay' => '1s'];
+            $i = 0;
+            foreach ($files as $name => $path) { $post['files' . ($i ? $i : '')] = new CURLFile($path, self::mime($name), $name); $i++; }
+            $ch = curl_init(rtrim($cfg['url'], '/') . '/forms/chromium/convert/html');
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_POSTFIELDS => $post, CURLOPT_TIMEOUT => (int)($cfg['timeout'] ?? 120), CURLOPT_CONNECTTIMEOUT => 8]);
+            if (!empty($cfg['user'])) curl_setopt($ch, CURLOPT_USERPWD, $cfg['user'] . ':' . ($cfg['pass'] ?? ''));
+            $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+            if ($code !== 200 || !is_string($r) || substr($r, 0, 4) !== '%PDF') throw new RuntimeException('pdf service ' . $code . ' ' . $err . ' ' . mb_substr((string)$r, 0, 200));
+            return $r;
+        } finally {
+            @unlink("$tmp/index.html"); @rmdir($tmp);
+        }
+    }
+
     /** سكربت داخل الورقة (يشتغل بـChromium قبل الطباعة): الجدول الأعرض من الورقة يُقسَّم أعمدةً بقياسات المتصفّح الحقيقية
      *  (أعمدة المفتاح # + الاسم تتكرّر بكل جزء، كل جزء بورقة) — وبوضع «ورقة وحدة» يُصغَّر بدل التقسيم */
     private static function fitScript(int $availPx, bool $fitOne, bool $rtl): string

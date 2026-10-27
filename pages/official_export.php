@@ -1765,10 +1765,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             $F .= '<div class="f" style="' . $style . '">' . $html . '</div>';
         }
         $titleAr = ['cnss_hire_new' => 'تصريح باستخدام أجير', 'cnss_hire_reg' => 'إعلام عن استخدام أجير', 'cnss_leave' => 'إعلام عن ترك أجير'][$form];
-        header('Content-Type: text/html; charset=UTF-8');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        header('Pragma: no-cache');
-        echo '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>' . $E($titleAr) . '</title>'
+        $pageDoc = '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-store"><title>' . $E($titleAr) . '</title>'
            . '<style>@page{size:A4;margin:8mm}*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
            . 'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:#e9edf2}'
            . '.sheet{width:210mm;margin:0 auto;direction:ltr}' /* direction:ltr حتى لا تفيض الصفحة يساراً بالـRTL وتنقصّ حافتها بالطباعة */
@@ -1782,6 +1779,24 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
            . '<div style="color:#475569;font-size:13px;margin-top:6px">اكبس الزرّ ثمّ اختر طابعتك أو «حفظ كـ PDF» — النموذج طبق الأصل الرسمي</div></div>'
            . '<div class="sheet"><div class="page"><img class="pbg" src="' . BASE_URL . 'assets/templates/' . $form . '.png" alt=""> ' . $F . '</div></div>'
            . '</body></html>';
+        // 📲 (2026-10-27) raw_pdf=1 (واتساب/إيميل أونلاين بلا LibreOffice): الصفحة نفسها ⇒ PDF طبق الأصل عبر محرّك المدرسة (Chromium) بدل صفحة الطباعة
+        if (!empty($_GET['raw_pdf'])) {
+            require_once __DIR__ . '/../includes/pdf_chromium.php';
+            if (MsaChromePdf::available()) {
+                try {
+                    $pdfRaw = MsaChromePdf::overlayPageToPdf($pageDoc);
+                    while (ob_get_level()) ob_end_clean();
+                    header('Content-Type: application/pdf');
+                    header('Content-Disposition: inline; filename="' . $tplName . '_' . $d . '-' . $mo . '-' . $yr . '.pdf"');
+                    header('Content-Length: ' . strlen($pdfRaw)); header('Cache-Control: no-store');
+                    echo $pdfRaw; exit;
+                } catch (Throwable $e) { /* المحرّك متعطّل ⇒ صفحة الطباعة كما قبل */ }
+            }
+        }
+        header('Content-Type: text/html; charset=UTF-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        echo $pageDoc;
         exit;
     }
     // احتياط أخير (ملفات الصورة/الإحداثيات غير موجودة) → النسخة المبنية بالبرنامج بنفس المعلومات

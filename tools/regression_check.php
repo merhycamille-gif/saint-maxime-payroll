@@ -10775,6 +10775,29 @@ try {
 } catch (Throwable $e) { $ok276 = false; $why276 = $e->getMessage(); }
 check('🛡️🤖 إفادة استخدام الأجير بالضمان: خيار واحد يختار النموذج تلقائياً من رقم الضمان بالملف (+ تبديل يدوي + ملاحظة) + النوعان الداخليان مخفيان + القضاء جنب تاريخ الولادة = مكان القيد وإلا قضاء السكن', $ok276, $why276);
 
+/* 277) 📧🏛️ (2026-10-27 «بعتت الاستخدام لعندي على الإيميل شوف شو طلع») النموذج الرسمي المصوّر كان يُبعَث أونلاين صفحةَ ويب مبعثرة بجسم الرسالة (لا puppeteer).
+ *      الآن: MsaChromePdf::overlayPageToPdf (الصورة data:URI + بلا شريط + A4 بلا هوامش) ⇒ PDF مرفق بالإيميل (send_attestation) وبالواتساب (raw_pdf=1). */
+try {
+    require_once $PROJ . '/includes/pdf_chromium.php';
+    $sa277 = (string)file_get_contents($PROJ . '/pages/send_attestation.php'); $oe277 = (string)file_get_contents($PROJ . '/pages/official_export.php'); $js277 = (string)file_get_contents($PROJ . '/assets/js/export.js');
+    $okS = strpos($sa277, "if (\$html !== '' && stripos(\$html, 'class=\"pbg\"') !== false) {") !== false && strpos($sa277, '$pdf = MsaChromePdf::overlayPageToPdf($html);') !== false
+         && strpos($oe277, "if (!empty(\$_GET['raw_pdf'])) {") !== false && strpos($oe277, '$pdfRaw = MsaChromePdf::overlayPageToPdf($pageDoc);') !== false
+         && strpos($js277, "+ 'raw_pdf=1', { credentials: 'same-origin' })") !== false
+         && method_exists('MsaChromePdf', 'overlayPageToPdf') && method_exists('MsaChromePdf', 'rawPdf');
+    $okL = true; $why277x = '';
+    if (MsaChromePdf::available()) {
+        $hp = renderPage('pages/official_export.php', ['form' => 'cnss_hire_new', 'emp' => 1387, 'd' => 27, 'mo' => 10, 'yr' => 2026, 'opts_set' => 1, 'format' => 'pdf', 'mode' => 'image'], [], [3], 'lbp', '2026-2027');
+        $pdf277 = strpos($hp, 'class="pbg"') !== false ? MsaChromePdf::overlayPageToPdf($hp) : '';
+        $okL = strpos($pdf277, '%PDF') === 0 && preg_match_all('/\/Type\s*\/Page[^s]/', $pdf277) === 1 && strlen($pdf277) > 20000;
+        // raw_pdf=1 عبر الصفحة نفسها (مخرجات ثنائية ⇒ ملف)
+        $xr = renderPage('pages/official_export.php', ['form' => 'cnss_hire_new', 'emp' => 1387, 'd' => 27, 'mo' => 10, 'yr' => 2026, 'opts_set' => 1, 'format' => 'pdf', 'mode' => 'image', 'raw_pdf' => 1], [], [3], 'lbp', '2026-2027', sys_get_temp_dir() . '/r277.pdf');
+        $okL = $okL && strpos($xr, '%PDF') === 0;
+        $why277x = ' pdf=' . strlen($pdf277) . ' raw=' . strlen($xr);
+    } else $why277x = ' (محرّك Chromium غير متاح — فُحص الكود فقط)';
+    $ok277 = $okS && $okL; $why277 = 'src=' . ($okS ? 'ok' : 'NO') . ' live=' . ($okL ? 'ok' : 'NO') . $why277x;
+} catch (Throwable $e) { $ok277 = false; $why277 = $e->getMessage(); }
+check('📧🏛️ النموذج الرسمي المصوّر بالإيميل/الواتساب أونلاين = PDF طبق الأصل مرفق عبر محرّك المدرسة (overlayPageToPdf + raw_pdf=1) لا صفحة ويب بجسم الرسالة', $ok277, $why277);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
