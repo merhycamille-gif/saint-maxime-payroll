@@ -315,10 +315,13 @@ include __DIR__ . '/../includes/header.php';
                     <?php /* 📅 (2026-10-27 «إذا بدنا استخدام أجير من أي تاريخ بيطلعوا اللي بهيدا التاريخ») الداخلون بتاريخ — كتقرير الداخلون: بالضبط أو كل السنة الدراسية */ ?>
                     <span style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;border:1px solid #e2e8f0;border-radius:8px;padding:4px 8px;background:#fff">
                         <i class="fas fa-door-open" style="color:#0e7490"></i> <strong style="font-size:13px">الداخلون بتاريخ</strong>
-                        <input type="date" id="bk_hire" class="form-control" style="width:160px;padding:4px 8px" value="<?= e($sy1) ?>-10-01">
+                        <?php /* «بس حطّ أي تاريخ لازم يبيّنوا بس الموظفين الداخلين بهذا التاريخ»: التاريخ فلتر للائحة نفسها (فاضي = الكل) */ ?>
+                        <input type="date" id="bk_hire" class="form-control" style="width:160px;padding:4px 8px" value="" title="فاضي = كل الأساتذة">
                         <label style="font-size:12.5px;margin:0"><input type="radio" name="bk_span" value="day" checked> بالضبط</label>
                         <label style="font-size:12.5px;margin:0"><input type="radio" name="bk_span" value="year"> كل السنة الدراسية</label>
-                        <button type="button" class="btn btn-sm btn-primary" data-pick="hire"><i class="fas fa-check"></i> اختَر الداخلين</button>
+                        <button type="button" class="btn btn-sm btn-light" data-pick="hire1010" title="1/10 من السنة المعروضة"><i class="fas fa-calendar-check"></i> 1/10/<?= e($sy1) ?></button>
+                        <button type="button" class="btn btn-sm btn-light" data-pick="hireclear"><i class="fas fa-xmark"></i> امسح التاريخ</button>
+                        <span id="bk_hire_n" class="text-muted" style="font-size:12px"></span>
                     </span>
                     <span class="school-checks emp-type-checks" style="margin:0">
                         <label class="chk"><input type="checkbox" class="bk-cat" value="enseignant_titulaire" checked> <span>ملاك</span></label>
@@ -393,13 +396,31 @@ include __DIR__ . '/../includes/header.php';
     var boxes = Array.prototype.slice.call(list.querySelectorAll('.bk-emp'));
     function visibleLabels() { return Array.prototype.slice.call(list.querySelectorAll('label')).filter(function (l) { return !l.classList.contains('hide'); }); }
     function count() { var n = boxes.filter(function (b) { return b.checked; }).length; document.getElementById('bk_count').textContent = n + ' مختار'; }
-    function filter() {
+    function hireRange() {
+        var d = document.getElementById('bk_hire').value; if (!d) return null;
+        var span = sel('bk_span'); if (span === 'day') return [d, d];
+        var y = parseInt(d.slice(0, 4), 10), mo = parseInt(d.slice(5, 7), 10), y1 = mo >= 10 ? y : y - 1;
+        return [y1 + '-10-01', (y1 + 1) + '-09-30'];
+    }
+    function filter(autoPick) {
         var q = (document.getElementById('bk_q').value || '').toLowerCase().trim();
         var cats = Array.prototype.slice.call(document.querySelectorAll('.bk-cat')).filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
-        list.querySelectorAll('label').forEach(function (l) { var ok = cats.indexOf(l.getAttribute('data-cat')) >= 0 && (!q || (l.getAttribute('data-q') || '').indexOf(q) >= 0); l.classList.toggle('hide', !ok); });
+        var hr = hireRange(), n = 0;
+        list.querySelectorAll('label').forEach(function (l) {
+            var h = l.getAttribute('data-hire') || '';
+            var ok = cats.indexOf(l.getAttribute('data-cat')) >= 0 && (!q || (l.getAttribute('data-q') || '').indexOf(q) >= 0) && (!hr || (h && h >= hr[0] && h <= hr[1]));
+            l.classList.toggle('hide', !ok); if (ok) n++;
+            if (hr && autoPick) l.querySelector('.bk-emp').checked = ok;   // بتاريخ محدّد: الظاهرون مختارون تلقائياً
+        });
+        // رأس المدرسة يختفي إذا ما ضلّ تحتها أحد
+        list.querySelectorAll('.bk-sch').forEach(function (s) { var sid = s.getAttribute('data-sid'), any = false; list.querySelectorAll('label[data-sid="' + sid + '"]').forEach(function (l) { if (!l.classList.contains('hide')) any = true; }); s.style.display = any ? '' : 'none'; });
+        var hn = document.getElementById('bk_hire_n'); if (hn) hn.textContent = hr ? ('⇐ ' + n + ' داخل' + (sel('bk_span') === 'day' ? ' بهذا التاريخ' : ' بهذه السنة الدراسية')) : '';
+        count();
     }
-    document.getElementById('bk_q').addEventListener('input', filter);
-    document.querySelectorAll('.bk-cat').forEach(function (c) { c.addEventListener('change', filter); });
+    document.getElementById('bk_q').addEventListener('input', function () { filter(false); });
+    document.querySelectorAll('.bk-cat').forEach(function (c) { c.addEventListener('change', function () { filter(false); }); });
+    document.getElementById('bk_hire').addEventListener('change', function () { filter(true); });
+    document.querySelectorAll('input[name="bk_span"]').forEach(function (r) { r.addEventListener('change', function () { filter(true); }); });
     boxes.forEach(function (b) { b.addEventListener('change', count); });
     document.querySelectorAll('[data-pick]').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -407,14 +428,8 @@ include __DIR__ . '/../includes/header.php';
             if (m === 'none') boxes.forEach(function (b) { b.checked = false; });
             else if (m === 'all') visibleLabels().forEach(function (l) { l.querySelector('.bk-emp').checked = true; });
             else if (m === 'new') { boxes.forEach(function (b) { b.checked = false; }); visibleLabels().forEach(function (l) { if (l.getAttribute('data-new') === '1') l.querySelector('.bk-emp').checked = true; }); }
-            else if (m === 'hire') {
-                // 📅 الداخلون بتاريخ: بالضبط، أو كل السنة الدراسية التي يقع فيها التاريخ (1/10 → 30/9)
-                var d = document.getElementById('bk_hire').value, span = sel('bk_span'); if (!d) { alert('اختَر التاريخ'); return; }
-                var y = parseInt(d.slice(0, 4), 10), mo = parseInt(d.slice(5, 7), 10), y1 = mo >= 10 ? y : y - 1, from = y1 + '-10-01', to = (y1 + 1) + '-09-30';
-                boxes.forEach(function (b) { b.checked = false; }); var n = 0;
-                visibleLabels().forEach(function (l) { var h = l.getAttribute('data-hire') || ''; if (!h) return; if (span === 'day' ? h === d : (h >= from && h <= to)) { l.querySelector('.bk-emp').checked = true; n++; } });
-                if (!n) alert('ما في أستاذ داخل ' + (span === 'day' ? 'بتاريخ ' + d : 'بالسنة الدراسية ' + y1 + '-' + (y1 + 1)) + ' بالمدارس المختارة');
-            }
+            else if (m === 'hire1010') { document.getElementById('bk_hire').value = <?= json_encode($sy1 . '-10-01') ?>; filter(true); return; }
+            else if (m === 'hireclear') { document.getElementById('bk_hire').value = ''; boxes.forEach(function (b) { b.checked = false; }); filter(false); return; }
             count();
         });
     });
@@ -504,7 +519,7 @@ include __DIR__ . '/../includes/header.php';
         }
         next();
     }
-    count(); filter();
+    count(); filter(false);
 })();
 </script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

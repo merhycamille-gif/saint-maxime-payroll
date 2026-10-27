@@ -10811,7 +10811,7 @@ try {
     $hA = renderPage('pages/attestations_bulk.php', [], [], [], 'lbp', '2026-2027');
     // 🏫📅 (لاحقاً بنفس اليوم «وأكيد كمان حاطط أي مدرسة أو مدارس… ومن أي تاريخ») خانات المدارس داخل الصفحة + «كل المدارس» = اللائحة مجمّعة بالمدارس + «الداخلون بتاريخ»
     $okP = $noFatal($hB) && substr_count($hB, 'class="bk-emp"') >= 5 && substr_count($hB, 'name="bk_type"') === count(attestationTypes()) && stripos($hB, 'Warning:') === false
-         && strpos($hB, 'name="schools[]"') !== false && strpos($hB, 'data-pick="hire"') !== false && strpos($hB, 'id="bk_hire"') !== false
+         && strpos($hB, 'name="schools[]"') !== false && strpos($hB, 'data-pick="hire1010"') !== false && strpos($hB, 'id="bk_hire"') !== false && strpos($bk, "(!hr || (h && h >= hr[0] && h <= hr[1]))") !== false   // التاريخ فلتر للائحة («بس حطّ أي تاريخ يبيّنوا بس الداخلين»)
          && $noFatal($hA) && substr_count($hA, 'class="bk-sch"') >= 2 && substr_count($hA, 'class="bk-emp"') > substr_count($hB, 'class="bk-emp"');
     $j1 = json_decode(trim(renderPage('pages/attestations_bulk.php', ['act' => 'gen', 'emp' => 1387, 'type' => 'salaire', 'lang_doc' => 'ar', 'date' => '2026-10-27'], [], [3], 'lbp', '2026-2027')), true) ?: [];
     $j2 = json_decode(trim(renderPage('pages/attestations_bulk.php', ['act' => 'gen', 'emp' => 1387, 'type' => 'cnss_hire', 'lang_doc' => 'ar', 'date' => '2026-10-27'], [], [3], 'lbp', '2026-2027')), true) ?: [];
