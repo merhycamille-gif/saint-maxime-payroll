@@ -1526,6 +1526,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     $phSplit = function ($phone) {
         $ph = preg_replace('/[^0-9]/', '', (string)$phone);
         if (strlen($ph) >= 7 && $ph[0] === '0') return [substr($ph, 0, 2), substr($ph, 2)];
+        if (strlen($ph) === 8) return [substr($ph, 0, 2), substr($ph, 2)];   // 📱 (2026-10-27 p1 «81716200 بلا مقدّمة») خلوي 8 أرقام بلا صفر ⇒ 81 / 716200
         return ['', $ph];
     };
     [$sPhPre, $sPhNum] = $phSplit($esch['phone'] ?? '');
@@ -1549,6 +1550,11 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     $regPlace = trim((string)($emp['civil_registry_place'] ?? ''));
     // «عمل الأجير»: الأستاذ = «أستاذ» فقط، والموظف الإداري حسب وظيفته (بطلبه 2026-08-19)
     $fnAr = cnssOccupationAr($emp);
+    // 🏠 (2026-10-27 p1 «الحي والشارع فوق بعض») العنوان بلا تكرار: الشارع = الحي ⇒ يُكتب مرّة (بالحي)؛ الحي = المدينة ⇒ يُكتب مرّة (بالمدينة)
+    $nrmA = function ($s) { return preg_replace('/\s+/u', ' ', trim((string)$s)); };
+    $aVille = $nrmA($emp['ville'] ?? ''); $aQuart = $nrmA($emp['quartier'] ?? ''); $aRue = $nrmA($emp['rue'] ?? '');
+    if ($aRue !== '' && ($aRue === $aQuart || $aRue === $aVille)) $aRue = '';
+    if ($aQuart !== '' && $aQuart === $aVille) $aQuart = '';
     // ساعات العمل في الشهر (قابلة للتعديل من الشاشة؛ الافتراضي = ساعات الأسبوع × 4 — 2026-10-27، وساعات الملف لا تُمسّ)
     $hrs = trim((string)($_GET['hrs'] ?? ''));
     if ($hrs === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrs = (string)round((float)$emp['hours_per_week'] * 4);
@@ -1574,6 +1580,10 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
         $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? " . $salPickSql);
         $q->execute([$empId]);
         $sal = $q->fetch();
+    }
+    // 💰 (2026-10-27 p1 «الراتب الحالي فاضي») الجديد بلا شهر محسوب ⇒ الراتب من ملفه بالمحرّك نفسه (بلا حفظ) — الضمان لا يقبل تصريحاً بلا راتب
+    if (!$sal || ((int)($sal['base_plus_echelon_lbp'] ?? 0) <= 0 && (int)($sal['net_salary_lbp'] ?? 0) <= 0)) {
+        try { require_once __DIR__ . '/../includes/payroll_calculator.php'; $calcRow = (new PayrollCalculator($empId, $mo, $yr))->calculate(); if ((int)($calcRow['base_plus_echelon_lbp'] ?? 0) > 0) $sal = $calcRow; } catch (Throwable $e) { /* بلا إعداد مالي بالملف ⇒ يبقى فاضياً */ }
     }
     // 🔴 «تصريح باستخدام أجير ما عم بيغيّر — صحّح» (2026-09-15): الراتب بالتصريح يتبع خيارات الشاشة نفسها كباقي
     //     الإفادات (الإضافي/المكافأة/النقل + ليرة/دولار/الاثنين). أوّل فتح (بلا opts_set) = زرّا ملف الموظف
@@ -1612,7 +1622,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'D17' => !$married ? 'X' : '1', 'F17' => $married ? 'X' : '2',
             'E18' => $regPlace !== '' ? $regPlace : trim((string)($emp['ville'] ?? '')),
             'F19' => $emp['gouvernorat'] ?? '', 'J19' => $emp['district'] ?? '',
-            'D20' => $emp['ville'] ?? '', 'I20' => $emp['quartier'] ?? '', 'K20' => $emp['rue'] ?? '',
+            'D20' => $aVille, 'I20' => $aQuart, 'K20' => $aRue,
             'C21' => trim(($emp['immeuble'] ?? '') . (trim((string)($emp['etage'] ?? '')) !== '' ? ' طابق ' . $emp['etage'] : '')),
             'D22' => $hD, 'E22' => $hM, 'F22' => $hY, 'L22' => $hrs,
             // دوام العمل: كامل (D23) / جزئي (F23) — المختار X والآخر برقمه المطبوع (خانتا التعبئة مفرّغتان من صورة الخلفية)
@@ -1706,6 +1716,19 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
         $pos = json_decode((string)file_get_contents($posFile), true) ?: [];
         $fsBase = (float)($pos['fs'] ?? 11);
         $E = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
+        // 📏 (2026-10-27 p1 «تاريخ الولادة لاصق بالقضاء / الحي فوق الشارع») تصغير تلقائي كـshrinkToFit: المساحة المتاحة للخانة اليمينية = حتى أقرب خانة على يسارها
+        //    بالسطر نفسه (ناقص 6٪ لتسميتها المطبوعة) أو حتى حافة الورقة؛ عرض النصّ مقيس بخطّ الورق (MsaPdf::textMm × 1.1 أمان) — لا يكبّر أبداً
+        require_once __DIR__ . '/../includes/pdf_engine.php';
+        //    الخانة المجاورة القريبة (< 10٪ — كمقدّمة الهاتف بجانب رقمه) بلا تسمية بينهما؛ الأبعد تسبقها تسمية مطبوعة (≈ 9٪ = 19mm مثل «الشارع»/«القضاء»)
+        $availPct = function (string $ref) use ($pos): float {
+            $p = $pos['cells'][$ref]; $left = 2.0;
+            foreach ($pos['cells'] as $k => $q) {
+                if ($k === $ref || abs((float)$q['yt'] - (float)$p['yt']) > 0.3) continue;
+                $qx = (float)($q['xr'] ?? 0); if ($qx >= (float)$p['xr'] - 0.5) continue;
+                $gap = (float)$p['xr'] - $qx; $left = max($left, $qx + ($gap < 10 ? 0.5 : 9.0));
+            }
+            return max(4.0, (float)$p['xr'] - $left);
+        };
         $F = '';
         foreach ($cells as $ref => $val) {
             $val = trim((string)$val);
@@ -1714,13 +1737,32 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             $len = function_exists('mb_strlen') ? mb_strlen($val, 'UTF-8') : strlen($val);
             // القيم الطويلة (الراتب حروفاً/سطر التوقيع) تصغر تدريجياً حتى لا تفيض عن الورقة
             $fs = $fsBase * ($len > 70 ? 0.62 : ($len > 50 ? 0.75 : 1));
-            $style = 'top:' . $p['yt'] . '%;font-size:' . round($fs, 1) . 'pt';
+            $html = $E($val); $lh = '';
+            if (($p['align'] ?? '') !== 'center' && $len > 1) {
+                $needPct = MsaPdf::textMm($val, true, $fs) * 1.1 / 210 * 100; $avail = $availPct($ref);
+                if ($needPct > $avail) {
+                    $words = preg_split('/\s+/u', $val);
+                    if (count($words) >= 2 && $needPct / $avail < 2.4 && $fs * $avail / $needPct < $fs * 0.8) {
+                        // سطران متوازنان بدل تصغير مفرط («مركز شرطة البلدية» بخانة الحي): الكلمة الأطول تحدّ الخطّ؛ السطران يسعان بين الصفوف (≈ 7mm)
+                        $best = null;
+                        for ($i = 1; $i < count($words); $i++) {
+                            $l1 = implode(' ', array_slice($words, 0, $i)); $l2 = implode(' ', array_slice($words, $i));
+                            $w1 = MsaPdf::textMm($l1, true, $fs) * 1.1 / 210 * 100; $w2 = MsaPdf::textMm($l2, true, $fs) * 1.1 / 210 * 100;
+                            $mx = max($w1, $w2); if ($best === null || $mx < $best[0]) $best = [$mx, $l1, $l2];
+                        }
+                        $fs2 = min($fs * 0.85, $fs * $avail / max($best[0], 0.1));
+                        if ($fs2 >= 7.0) { $fs = $fs2; $html = $E($best[1]) . '<br>' . $E($best[2]); $lh = ';line-height:1.0;margin-top:-0.35%'; }
+                        else $fs = max(6.5, $fs * $avail / $needPct);
+                    } else $fs = max(6.5, $fs * $avail / $needPct);
+                }
+            }
+            $style = 'top:' . $p['yt'] . '%;font-size:' . round($fs, 1) . 'pt' . $lh;
             if (($p['align'] ?? '') === 'center') {
                 $style .= ';left:' . $p['xc'] . '%;transform:translateX(-50%)';
             } else { // محاذاة يمين (النص العربي/العام) — المرساة عند يمين الخانة كما في القالب
                 $style .= ';right:' . round(100 - $p['xr'], 2) . '%';
             }
-            $F .= '<div class="f" style="' . $style . '">' . $E($val) . '</div>';
+            $F .= '<div class="f" style="' . $style . '">' . $html . '</div>';
         }
         $titleAr = ['cnss_hire_new' => 'تصريح باستخدام أجير', 'cnss_hire_reg' => 'إعلام عن استخدام أجير', 'cnss_leave' => 'إعلام عن ترك أجير'][$form];
         header('Content-Type: text/html; charset=UTF-8');

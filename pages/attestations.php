@@ -617,6 +617,10 @@ if (!$emp):
         $decSal = null; $decSy = activeSchoolYear();
         if ($decSy !== 'all') { $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ? " . $decPick); $q->execute([(int)$employeeId, $decSy]); $decSal = $q->fetch(); }
         if (!$decSal) { $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? " . $decPick); $q->execute([(int)$employeeId]); $decSal = $q->fetch(); }
+        // 💰 (2026-10-27) الجديد بلا شهر محسوب ⇒ راتبه من ملفه بالمحرّك (كما بالنموذج الرسمي نفسه — official_export)
+        if (!$decSal || ((int)($decSal['base_plus_echelon_lbp'] ?? 0) <= 0 && (int)($decSal['net_salary_lbp'] ?? 0) <= 0)) {
+            try { require_once __DIR__ . '/../includes/payroll_calculator.php'; $cr = (new PayrollCalculator((int)$employeeId, $mo, $yr))->calculate(); if ((int)($cr['base_plus_echelon_lbp'] ?? 0) > 0) $decSal = $cr; } catch (Throwable $e) {}
+        }
         $decBase = $decSal ? (int)$decSal['base_plus_echelon_lbp'] : 0; $decExtra = $decSal ? extraWageLbp($decSal) : 0; $decAide = $decSal ? aideCompLbp($decSal) : 0; $decTrans = $decSal ? (int)$decSal['transport_lbp'] : 0;
         $decWage = $decBase + ($incExtra ? $decExtra : 0) + ($incAide ? $decAide : 0) + ($incTrans ? $decTrans : 0);
         $decWageUsd = $decSal ? lbpToUsd($decWage, rowRate($decSal)) : 0;
@@ -718,6 +722,11 @@ if (!$emp):
                     <label style="margin:0 8px;cursor:pointer"><input type="radio" name="cur" value="usd" <?= $decCur==='usd'?'checked':'' ?> onchange="this.form.submit()"> دولار ($)</label>
                     <label style="margin:0 8px;cursor:pointer"><input type="radio" name="cur" value="both" <?= $decCur==='both'?'checked':'' ?> onchange="this.form.submit()"> الاثنين</label>
                     </div>
+                    <?php if (!$isLeave && $decWage <= 0): ?>
+                    <div style="border:1px solid #fecaca;background:#fef2f2;border-radius:8px;padding:8px 12px;margin:6px 0;color:#b91c1c;font-weight:700"><i class="fas fa-triangle-exclamation"></i>
+                        ما في راتب بملفه (الإعداد المالي ناقص) — النموذج رح يطلع بخانة الراتب فاضية. <a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$employeeId ?>" style="color:#1d4ed8">أكمل الملف المالي ثمّ ارجع</a>
+                        <small style="display:block;font-weight:400;color:#7f1d1d">Aucun salaire dans le dossier — le formulaire sortira sans salaire.</small></div>
+                    <?php endif; ?>
                     <div class="att-note">الراتب المعتمد بالتصريح: <strong><?= $decCur==='usd' ? ('$' . number_format((int)$decWageUsd)) : (formatLBP($decWage,false) . ' ل.ل' . ($decCur==='both' ? ' ($' . number_format((int)$decWageUsd) . ')' : '')) ?></strong>
                         (الأساس <?= formatLBP($decBase,false) ?><?= $incExtra?' + الإضافي':'' ?><?= $incAide?' + المكافأة':'' ?><?= $incTrans?' + النقل':'' ?><?= $decSal ? ' — شهر ' . monthName((int)$decSal['month'],'ar') . ' ' . $decSal['year'] : ' — لا راتب محسوب' ?>)</div>
                 </div>

@@ -8711,6 +8711,7 @@ check('☑️📐 باقي الشرائط صفوفاً مرتّبة (2026-09-27)
  * 190) 🎨 لائحة الإفادات بملف الأستاذ (dossier=1) — p1 2026-09-27 «يكون مرتبين وفيهن شوي ألوان راكزة لنميّز من بعض»: كل قسم لوحة بلون هادئ
  *      (att-g1 أخضر راتب/ضمان · att-g2 كهرماني نهاية الخدمة · att-g3 نيلي عقود · att-g4 رمادي أخرى) وأزراره بشبكة متساوية — الروابط والأنواع نفسها.
  * =================================================================== */
+require_once $PROJ . '/includes/attestation_types.php';   // لعدّ الأنواع أدناه (count(attestationTypes()))
 $hD190 = $tit184 ? renderPage('pages/attestations.php', ['employee_id' => $tit184, 'dossier' => 1], [], [3], 'both', '2025-2026') : '';
 $css190 = (string)file_get_contents($PROJ . '/assets/css/app.css');
 check('🎨 لائحة الإفادات بملف الأستاذ أقساماً ملوّنة بشبكة متساوية (2026-09-27 p1): 3 لوحات (att-g1/2/3) + كل نوع إفادة له زرّ + CSS الألوان + لا ستايل حدود inline',
@@ -10756,8 +10757,18 @@ try {
         };
         $i16 = $cellOf276($xb, 'I16'); $okQ = ($i16 === trim((string)$eD['district']));
     }
+    // 📱🏠 (p1 شربل عرب 1000021 إن وُجد): هاتف 8 أرقام بلا صفر ⇒ 81 / 716200 · الشارع = الحي ⇒ مرّة واحدة · الراتب فاضي ⇒ تنبيه أحمر بالشاشة
+    $okP = true; $p1 = $db276->query("SELECT id, school_id, phone1, quartier, rue FROM employees WHERE id = 1000021 AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
+    if ($p1 && preg_replace('/\D/', '', (string)$p1['phone1']) === '81716200' && trim((string)$p1['quartier']) !== '' && trim((string)$p1['quartier']) === trim((string)$p1['rue'])) {
+        $xp1 = renderPage('pages/official_export.php', ['form' => 'cnss_hire_new', 'emp' => 1000021, 'd' => 27, 'mo' => 10, 'yr' => 2026, 'opts_set' => 1, 'format' => 'xlsx'], [], [(int)$p1['school_id']], 'lbp', '2026-2027', sys_get_temp_dir() . '/r276b.xlsx');
+        $hp1 = renderPage('pages/attestations.php', ['employee_id' => 1000021, 'type' => 'cnss_hire', 'date' => '2026-10-27'], [], [(int)$p1['school_id']], 'lbp', '2026-2027');
+        $okP = $cellOf276($xp1, 'K21') === '81' && $cellOf276($xp1, 'I21') === '716200' && $cellOf276($xp1, 'K20') === '' && $cellOf276($xp1, 'I20') === trim((string)$p1['quartier'])
+             && (strpos($hp1, 'ما في راتب بملفه') !== false || strpos($hp1, 'الراتب المعتمد بالتصريح: <strong>0') === false);
+    }
     $src276 = (string)file_get_contents($PROJ . '/pages/official_export.php');
-    $okS = strpos($src276, "'I16' => \$regPlace !== '' ? \$regPlace : trim((string)(\$emp['district'] ?? ''))") !== false
+    $okS = $okP && strpos($src276, "if (strlen(\$ph) === 8) return [substr(\$ph, 0, 2), substr(\$ph, 2)];") !== false && strpos($src276, "\$availPct = function (string \$ref) use (\$pos): float {") !== false
+         && strpos($src276, "\$calcRow = (new PayrollCalculator(\$empId, \$mo, \$yr))->calculate();") !== false && strpos($src276, "\$html = \$E(\$best[1]) . '<br>' . \$E(\$best[2]);") !== false
+         && strpos($src276, "'I16' => \$regPlace !== '' ? \$regPlace : trim((string)(\$emp['district'] ?? ''))") !== false
          && strpos((string)regAttSrc(), "\$hireAuto = hasNssfNumber(\$emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new';") !== false;
     $ok276 = $okR && $okL && $okQ && $okS;
     $why276 = 'route=' . ($okR ? 'ok' : 'NO') . " (with=$withN:" . $formOf($hW) . " no=$noN:" . $formOf($hN) . ' forced:' . $formOf($hF) . ') lists=' . ($okL ? 'ok' : 'NO') . ' qada=' . ($okQ ? 'ok' : 'NO') . ' (emp=' . ($eD['id'] ?? '-') . " I16=$i16) src=" . ($okS ? 'ok' : 'NO');
