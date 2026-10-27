@@ -24,8 +24,18 @@ function sendResult($ok, $msg, $back)
 
 $target = ltrim($_GET['target'] ?? '', '/');
 $to = trim($_GET['to'] ?? '');
-$name = preg_replace('/[^a-z0-9_]+/i', '_', (string)($_GET['name'] ?? 'attestation'));
+$name = trim(preg_replace('/[^a-z0-9_]+/i', '_', (string)($_GET['name'] ?? 'attestation')), '_');
 $back = BASE_URL . ($target ?: 'pages/attestations.php');
+// 📎 (2026-10-27 p1 «الملف وصل باسم _.pdf») العنوان العربي يضيع بالتنقية ⇒ اسم لاتيني واضح من الرابط: نوع النموذج/الإفادة + اسم الأستاذ الفرنسي + التاريخ
+if ($name === '' || $name === 'attestation' || $name === 'formulaire') {
+    $q = []; parse_str((string)parse_url($target, PHP_URL_QUERY), $q);
+    $formKey = (string)($q['form'] ?? $q['type'] ?? 'attestation');
+    $latin = ['cnss_hire_new' => 'Declaration_embauche_CNSS', 'cnss_hire_reg' => 'Declaration_embauche_CNSS', 'cnss_leave' => 'Declaration_cessation_CNSS', 'cnss_travail' => 'Attestation_travail_CNSS',
+              'mof_r3' => 'Formulaire_R3', 'salaire' => 'Attestation_salaire', 'tadris' => 'Attestation_enseignement', 'cnss' => 'Attestation_CNSS'][$formKey] ?? ('Document_' . preg_replace('/[^a-z0-9_]+/i', '_', $formKey));
+    $eid = (int)($q['emp'] ?? $q['employee_id'] ?? 0); $who = '';
+    if ($eid > 0) { $st = getDB()->prepare("SELECT first_name_fr, last_name_fr FROM employees WHERE id = ?"); $st->execute([$eid]); if ($e = $st->fetch()) $who = trim(preg_replace('/[^a-z0-9]+/i', '_', $e['first_name_fr'] . '_' . $e['last_name_fr']), '_'); }
+    $name = trim($latin . ($who !== '' ? '_' . $who : '') . '_' . date('Y-m-d'), '_');
+}
 
 if ($target === '' || preg_match('#^[a-z]+://#i', $target) || strpos($target, '..') !== false
     || !preg_match('#^[A-Za-z0-9_./?&=%\-+:\[\]]+$#', $target)) { // ☑️ (2026-09-26) روابط الفئة بخانات type[]=… تحمل [ ]
