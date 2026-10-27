@@ -3070,7 +3070,7 @@ $oe52 = (string)file_get_contents($PROJ . '/pages/official_export.php');
 check('نماذج الضمان الثلاثة: الأنواع مضافة بصفحة الإفادات وبمجموعة «راتب وعمل وضمان» بملف الأستاذ',
       strpos($at52, "'cnss_hire_new'") !== false && strpos($at52, "'cnss_hire_reg'") !== false
       && strpos($at52, "'cnss_leave'") !== false
-      && preg_match("/'Salaire, travail et CNSS[^]]*'cnss_hire_new','cnss_hire_reg','cnss_leave'/u", $at52) === 1);
+      && preg_match("/'Salaire, travail et CNSS[^]]*'cnss_hire','cnss_leave'/u", $at52) === 1);   // 🛡️ (2026-10-27) خيار واحد تلقائي cnss_hire باللوائح؛ النوعان الداخليان بـattestationHireTypes
 check('نماذج الضمان الثلاثة: التصدير الرسمي يعالجها (تعبئة القالب + بديل النسخة المبنية عند تعذّر PDF)',
       strpos($oe52, "['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave']") !== false
       && strpos($oe52, "\$fallbackForm = 'cnss_employ2'") !== false
@@ -7393,7 +7393,7 @@ $raw157 = [];
 foreach ($src157 as $f) {
     foreach (explode("\n", (string)file_get_contents($PROJ . '/' . $f)) as $ln => $line) {
         if (strpos($line, 'nssf_number') === false) continue;
-        if (preg_match('/cnssWithBirthYear|nssfBoxesWithYear|e\.nssf_number|SELECT|\$_POST|name="nssf_number"|hasReg = |\'R6\'|\'O6\'|K11|K13|N13|12\.8, 32\.4|nssfDigits/', $line)) continue;
+        if (preg_match('/cnssWithBirthYear|nssfBoxesWithYear|hasNssfNumber|e\.nssf_number|SELECT|\$_POST|name="nssf_number"|hasReg = |\'R6\'|\'O6\'|K11|K13|N13|12\.8, 32\.4|nssfDigits/', $line)) continue;   // hasNssfNumber (2026-10-27): فحص وجود الرقم لا عرضه
         $raw157[] = $f . ':' . ($ln + 1);
     }
 }
@@ -8715,7 +8715,7 @@ $hD190 = $tit184 ? renderPage('pages/attestations.php', ['employee_id' => $tit18
 $css190 = (string)file_get_contents($PROJ . '/assets/css/app.css');
 check('🎨 لائحة الإفادات بملف الأستاذ أقساماً ملوّنة بشبكة متساوية (2026-09-27 p1): 3 لوحات (att-g1/2/3) + كل نوع إفادة له زرّ + CSS الألوان + لا ستايل حدود inline',
       $noFatal($hD190) && substr_count($hD190, 'class="att-group att-g') === 3 && strpos($hD190, 'class="att-group att-g1"') !== false && strpos($hD190, 'class="att-group att-g3"') !== false
-      && substr_count($hD190, 'class="att-gb"') === 3 && preg_match_all('#pages/attestations\.php\?employee_id=' . (int)$tit184 . '&type=[a-z_0-9]+&lang_doc=#', $hD190) === 20
+      && substr_count($hD190, 'class="att-gb"') === 3 && preg_match_all('#pages/attestations\.php\?employee_id=' . (int)$tit184 . '&type=[a-z_0-9]+&lang_doc=#', $hD190) === count(attestationTypes())   // 19 بعد دمج نموذجَي استخدام الأجير (2026-10-27)
       && strpos($hD190, 'class="btn btn-sm btn-light" style="border:1px solid #cbd5e1"') === false
       && strpos($css190, '.att-groups .att-gb{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));') !== false && strpos($css190, '.att-groups .att-g1{background:#ecfdf5;') !== false && strpos($css190, '.att-groups .att-g3{background:#eef2ff;') !== false,
       'groups=' . substr_count($hD190, 'class="att-group att-g') . ' links=' . preg_match_all('#pages/attestations\.php\?employee_id=' . (int)$tit184 . '&type=#', $hD190));
@@ -8782,7 +8782,7 @@ $src193 = (string)regAttSrc();
 $css193 = (string)file_get_contents($PROJ . '/assets/css/app.css');
 $nTypes193 = preg_match_all("/^    '([a-z0-9_]+)'\s*=>\s*\['fr'/m", substr($src193, strpos($src193, '$ATT_TYPES = ['), strpos($src193, '$DOC_LANGS') - strpos($src193, '$ATT_TYPES = [')), $mt193);
 $radios193 = preg_match_all('/<input type="radio" name="type" value="([a-z0-9_]+)"/', $h193, $mr193);
-$ok193 = $nTypes193 >= 20 && $radios193 === $nTypes193
+$ok193 = $nTypes193 >= 19 && $radios193 === $nTypes193   // 19 بعد دمج نموذجَي استخدام الأجير بخيار تلقائي واحد (2026-10-27)
       && !array_diff($mt193[1], $mr193[1]) && !array_diff($mr193[1], $mt193[1])
       && strpos($h193, '<select name="type"') === false && strpos($h193, '<select name="lang_doc"') === false
       && preg_match_all('/<input type="radio" name="lang_doc" value="(ar|fr|en)"/', $h193) === 3
@@ -10717,6 +10717,52 @@ try {
     $why275 = 'drop=' . ($okA ? 'ok' : 'NO') . ' keep=' . ($okB ? 'ok' : 'NO') . ' docx=' . ($okC ? 'ok' : 'NO') . ' (sum=' . $sum275 . ' parts=' . count($parts275) . ' w2=' . ($w275[2] ?? '-') . ') src=' . ($okD ? 'ok' : 'NO');
 } catch (Throwable $e) { $ok275 = false; $why275 = $e->getMessage(); }
 check('📐 الترتيب الموحّد للطباعة: العمود المكرّر مع عنوان مجموعته يُشال (PDF + وورد/إكسل) + الرأس الطويل يلتفّ قبل الأفقي/الأجزاء + سطر المجموعة لا يُلفّ + ملء العرض — تقرير الداخلون 9 أعمدة = قطعة واحدة', $ok275, $why275);
+
+/* 276) 🛡️🤖 (2026-10-27 «بدّي إفادة استخدام الأجير بالضمان تلقائياً: إذا عنده رقم يطلع نموذج اللي عنده رقم وإذا ما عنده يطلع نموذج اللي ما عنده»
+ *      + «القضاء جنب تاريخ الولادة ما عم يتعبّى»): خيار واحد cnss_hire بكل اللوائح ⇒ cnss_hire_reg/new من hasNssfNumber (+ hire_form=new|reg للاستثناء
+ *      + ملاحظة بالشاشة)؛ النوعان الداخليان لا يظهران بـ«أخرى»؛ نموذج «لا يحمل رقم»: القضاء (I16) = مكان القيد وإلا قضاء السكن. */
+try {
+    $db276 = getDB();
+    $withN = (int)$db276->query("SELECT id FROM employees WHERE is_deleted = 0 AND school_id = 3 AND nssf_number REGEXP '[0-9]{4}' AND left_date_all IS NULL ORDER BY id LIMIT 1")->fetchColumn();
+    $noN   = (int)$db276->query("SELECT id FROM employees WHERE is_deleted = 0 AND school_id = 3 AND (nssf_number IS NULL OR nssf_number NOT REGEXP '[0-9]{4}') AND left_date_all IS NULL ORDER BY id LIMIT 1")->fetchColumn();
+    $hW = $withN ? renderPage('pages/attestations.php', ['employee_id' => $withN, 'type' => 'cnss_hire', 'date' => '2026-10-27'], [], [3], 'lbp', '2026-2027') : '';
+    $hN = $noN ? renderPage('pages/attestations.php', ['employee_id' => $noN, 'type' => 'cnss_hire', 'date' => '2026-10-27'], [], [3], 'lbp', '2026-2027') : '';
+    $hF = $noN ? renderPage('pages/attestations.php', ['employee_id' => $noN, 'type' => 'cnss_hire', 'date' => '2026-10-27', 'hire_form' => 'reg'], [], [3], 'lbp', '2026-2027') : '';
+    $formOf = function (string $h): string { return preg_match('/msaOfficialToolbar\(\{pdf: "[^"]*form=(cnss_hire_(?:reg|new))/', $h, $m) ? $m[1] : '-'; };
+    $okR = (!$withN || ($formOf($hW) === 'cnss_hire_reg' && strpos($hW, 'بملفه رقم ضمان (') !== false && strpos($hW, 'بدّل للنموذج الآخر') !== false))
+         && (!$noN || ($formOf($hN) === 'cnss_hire_new' && strpos($hN, 'ما بملفه رقم ضمان') !== false))
+         && (!$noN || ($formOf($hF) === 'cnss_hire_reg' && strpos($hF, 'بدّلته يدوياً') !== false && strpos($hF, 'ارجع للتلقائي') !== false));
+    // اللوائح: خيار واحد (cnss_hire) ولا أثر للنوعين الداخليين بصفحة الاختيار/الشريط/الملف الكامل
+    $hPick = renderPage('pages/attestations.php', [], [], [3]); $hDos = $noN ? renderPage('pages/attestations.php', ['dossier' => 1, 'employee_id' => $noN], [], [3]) : '';
+    $okL = isset(attestationTypes()['cnss_hire']) && !isset(attestationTypes()['cnss_hire_new']) && isset(attestationHireTypes()['cnss_hire_reg'])
+         && strpos($hPick, 'value="cnss_hire"') !== false && strpos($hPick, 'value="cnss_hire_new"') === false && strpos($hPick, 'value="cnss_hire_reg"') === false
+         && (!$noN || (strpos($hDos, 'type=cnss_hire"') !== false || strpos($hDos, 'type=cnss_hire&') !== false)) && strpos($hDos, 'type=cnss_hire_new') === false;
+    // القضاء بنموذج «لا يحمل رقم»: موظف مكان قيده فاضي وقضاؤه معبّى ⇒ I16 = قضاؤه (إكسل رسمي)
+    $eD = $db276->query("SELECT id, district FROM employees WHERE is_deleted = 0 AND school_id = 3 AND (civil_registry_place IS NULL OR civil_registry_place = '') AND district IS NOT NULL AND district <> '' ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $okQ = true; $i16 = '-';
+    if ($eD) {
+        $xf276 = sys_get_temp_dir() . '/r276_out.xlsx';
+        $xb = renderPage('pages/official_export.php', ['form' => 'cnss_hire_new', 'emp' => (int)$eD['id'], 'd' => 27, 'mo' => 10, 'yr' => 2026, 'opts_set' => 1, 'format' => 'xlsx'], [], [3], 'lbp', '2026-2027', $xf276);
+        $cellOf276 = function (string $bin, string $ref): string {
+            $tmp = tempnam(sys_get_temp_dir(), 'r276'); file_put_contents($tmp, $bin); $z = new ZipArchive(); $out = '';
+            if ($z->open($tmp) === true) {
+                $ss = []; $sx = (string)$z->getFromName('xl/sharedStrings.xml');
+                if ($sx !== '' && ($x = @simplexml_load_string($sx))) foreach ($x->si as $si) { $t = ''; foreach ($si->xpath('.//*[local-name()="t"]') as $tt) $t .= (string)$tt; $ss[] = $t; }
+                $sh = @simplexml_load_string((string)$z->getFromName('xl/worksheets/sheet1.xml'));
+                if ($sh) foreach ($sh->sheetData->row as $row) foreach ($row->c as $c) if ((string)$c['r'] === $ref) { $t = (string)$c['t']; $out = $t === 's' ? ($ss[(int)$c->v] ?? '') : ($t === 'inlineStr' ? (string)$c->is->t : (string)$c->v); }
+                $z->close();
+            }
+            @unlink($tmp); return trim($out);
+        };
+        $i16 = $cellOf276($xb, 'I16'); $okQ = ($i16 === trim((string)$eD['district']));
+    }
+    $src276 = (string)file_get_contents($PROJ . '/pages/official_export.php');
+    $okS = strpos($src276, "'I16' => \$regPlace !== '' ? \$regPlace : trim((string)(\$emp['district'] ?? ''))") !== false
+         && strpos((string)regAttSrc(), "\$hireAuto = hasNssfNumber(\$emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new';") !== false;
+    $ok276 = $okR && $okL && $okQ && $okS;
+    $why276 = 'route=' . ($okR ? 'ok' : 'NO') . " (with=$withN:" . $formOf($hW) . " no=$noN:" . $formOf($hN) . ' forced:' . $formOf($hF) . ') lists=' . ($okL ? 'ok' : 'NO') . ' qada=' . ($okQ ? 'ok' : 'NO') . ' (emp=' . ($eD['id'] ?? '-') . " I16=$i16) src=" . ($okS ? 'ok' : 'NO');
+} catch (Throwable $e) { $ok276 = false; $why276 = $e->getMessage(); }
+check('🛡️🤖 إفادة استخدام الأجير بالضمان: خيار واحد يختار النموذج تلقائياً من رقم الضمان بالملف (+ تبديل يدوي + ملاحظة) + النوعان الداخليان مخفيان + القضاء جنب تاريخ الولادة = مكان القيد وإلا قضاء السكن', $ok276, $why276);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

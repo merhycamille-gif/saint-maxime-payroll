@@ -20,9 +20,11 @@ $DOC_LANGS = ['ar' => 'العربية', 'fr' => 'Français', 'en' => 'English'];
 $ATT_GROUPS = attestationGroups();
 $ATT_GROUPS_OTHERS = array_values(array_diff(array_keys($ATT_TYPES), array_merge(...array_values($ATT_GROUPS))));
 if ($ATT_GROUPS_OTHERS) $ATT_GROUPS['Autres / أخرى'] = $ATT_GROUPS_OTHERS;
+$ATT_TYPES += attestationHireTypes();   // 🛡️ (2026-10-27) النوعان الداخليان بعد بناء المجموعات (لا يظهران بـ«أخرى»)
 
 $employeeId = (int)($_GET['employee_id'] ?? 0);
 $type    = $_GET['type'] ?? '';
+$hireAuto = null; $hireForced = false;
 $docLang = $_GET['lang_doc'] ?? 'ar'; // 🇱🇧 (2026-09-29 «الإفادات تطلع تلقائياً بالعربي، وإذا بدّي غيّر بغيّر») العربي افتراضياً مهما كانت لغة الواجهة — التبديل الصريح يبقى محترَماً
 if (!isset($DOC_LANGS[$docLang])) $docLang = 'ar';
 $effDate = $_GET['date'] ?? date('Y-m-d');
@@ -54,6 +56,14 @@ if ($employeeId > 0) {
         $_SESSION['flash_error'] = 'الموظف غير موجود في هذه المدرسة / Employé introuvable';
         header('Location: ' . BASE_URL . 'pages/attestations.php');
         exit;
+    }
+    // 🛡️ (2026-10-27 «إفادة استخدام الأجير بالضمان تلقائياً») النوع الواحد cnss_hire ⇒ النموذج من رقم الضمان بالملف (hasNssfNumber: «0»/«1» ≠ رقم)؛
+    //    hire_form=new|reg يفرض الآخر للاستثناء. الروابط القديمة المباشرة (cnss_hire_new/reg) تبقى تعمل.
+    if ($type === 'cnss_hire' || $type === 'cnss_hire_new' || $type === 'cnss_hire_reg') {
+        $hireAuto = hasNssfNumber($emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new';
+        $hf = (string)($_GET['hire_form'] ?? '');
+        if ($type === 'cnss_hire') $type = ($hf === 'new' || $hf === 'reg') ? 'cnss_hire_' . $hf : $hireAuto;
+        $hireForced = ($type !== $hireAuto);
     }
     $exportTitle = 'Attestation_' . ($type ?: 'doc') . '_' . strtoupper($docLang) . '_' . $emp['first_name_fr'] . '_' . $emp['last_name_fr'];
     // الأولوية لرقم/إيميل المدرسة (يظهران افتراضاً بالبرومبت)، وإلا رقم/إيميل الأستاذ
@@ -621,6 +631,19 @@ if (!$emp):
           <div style="font-size:0.85em;font-weight:600;opacity:0.9"><?= e($ATT_TYPES[$type]['ar']) ?></div>
         </h3></div>
         <div class="card-body">
+            <?php if (!$isLeave && $hireAuto !== null): $hasNo = hasNssfNumber($emp['nssf_number'] ?? ''); $otherF = ($type === 'cnss_hire_reg') ? 'new' : 'reg';
+                  $swUrl = BASE_URL . 'pages/attestations.php?employee_id=' . (int)$employeeId . '&type=cnss_hire&date=' . e($effDate) . '&hire_form=' . ($hireForced ? 'auto' : $otherF); ?>
+            <div class="att-auto-note" style="border:1px solid <?= $hireForced ? '#fcd34d' : '#bbf7d0' ?>;background:<?= $hireForced ? '#fffbeb' : '#f0fdf4' ?>;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+                <div style="font-weight:700;color:#166534">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    <?= $hasNo ? 'بملفه رقم ضمان (' . e(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'] ?? '', '')) . ')' : 'ما بملفه رقم ضمان' ?>
+                    ⇒ النموذج التلقائي: <strong><?= $hireAuto === 'cnss_hire_reg' ? 'إعلام عن استخدام أجير (يحمل رقم)' : 'تصريح باستخدام أجير (لا يحمل رقم)' ?></strong>
+                    <?php if ($hireForced): ?><span style="color:#92400e"> — بدّلته يدوياً إلى: <?= $type === 'cnss_hire_reg' ? 'إعلام (يحمل رقم)' : 'تصريح (لا يحمل رقم)' ?></span><?php endif; ?>
+                    <small style="display:block;font-weight:400;color:#475569">Formulaire choisi automatiquement d'après le N° CNSS du dossier.</small>
+                </div>
+                <a class="btn btn-sm btn-light" href="<?= $swUrl ?>"><i class="fas fa-right-left"></i> <?= $hireForced ? 'ارجع للتلقائي / Automatique' : 'بدّل للنموذج الآخر / Autre formulaire' ?></a>
+            </div>
+            <?php endif; ?>
             <?php if ($isLeave && $leaveDate === ''): ?>
             <div style="border:1px solid #fecaca;background:#fef2f2;border-radius:10px;padding:12px 16px;margin-bottom:14px">
                 <div style="color:#b91c1c;font-weight:700;margin-bottom:8px"><i class="fas fa-triangle-exclamation"></i>

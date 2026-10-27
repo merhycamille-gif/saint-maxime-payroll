@@ -1608,7 +1608,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'C14' => $first, 'K14' => $last,
             'C15' => $father, 'J15' => $mother,
             'D16' => trim(($emp['birth_place'] ?? '') . ' ' . ($bTs ? formatDate($emp['birth_date']) : '')),
-            'I16' => $regPlace, 'L16' => $registry,
+            'I16' => $regPlace !== '' ? $regPlace : trim((string)($emp['district'] ?? '')), 'L16' => $registry,   // 🏛️ (2026-10-27 «القضاء جنب تاريخ الولادة ما عم يتعبّى») مكان القيد وإلا قضاء السكن من الملف
             'D17' => !$married ? 'X' : '1', 'F17' => $married ? 'X' : '2',
             'E18' => $regPlace !== '' ? $regPlace : trim((string)($emp['ville'] ?? '')),
             'F19' => $emp['gouvernorat'] ?? '', 'J19' => $emp['district'] ?? '',
