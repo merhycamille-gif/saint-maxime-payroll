@@ -1617,7 +1617,7 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
             'C13' => $sex === 'm' ? 'X' : '1', 'E13' => $sex === 'f' ? 'X' : '2',
             'C14' => $first, 'K14' => $last,
             'C15' => $father, 'J15' => $mother,
-            'D16' => trim(($emp['birth_place'] ?? '') . ' ' . ($bTs ? formatDate($emp['birth_date']) : '')),
+            'D16' => $bTs ? formatDate($emp['birth_date']) : '',   // 📅 (2026-10-27 «اكتب تاريخ الولادة بدون محل الولادة») الخانة ضيّقة: التاريخ وحده بخطّ كامل
             'I16' => $regPlace !== '' ? $regPlace : trim((string)($emp['district'] ?? '')), 'L16' => $registry,   // 🏛️ (2026-10-27 «القضاء جنب تاريخ الولادة ما عم يتعبّى») مكان القيد وإلا قضاء السكن من الملف
             'D17' => !$married ? 'X' : '1', 'F17' => $married ? 'X' : '2',
             'E18' => $regPlace !== '' ? $regPlace : trim((string)($emp['ville'] ?? '')),
