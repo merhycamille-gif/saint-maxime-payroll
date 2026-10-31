@@ -566,9 +566,33 @@ function subjectToLang($raw, $lang) {
 /** 📚 (2026-10-31 «إذا في مادتين ما بقول مادة بقول مادتين وإذا أكتر بقول مواد») عدد الموادّ بالحقل: 0 فارغ، 1 مفرد، 2 مثنّى، 3+ جمع.
  *  يُعدّ على ناتج الفرنسي (الفاصل « , » لا يلتبس بأسماء الموادّ) — النصّ الحرّ غير المعروف = مادة واحدة. */
 function subjectCount($raw): int {
+    $raw = trim((string)$raw);
+    if ($raw === '') return 0;
+    // (أ) على ناتج الترجمة: الموادّ المعروفة المتجاورة بمسافات («Maths français arabe») تصير مفصولة بـ« , »
     $fr = subjectToLang($raw, 'fr');
-    if ($fr === '') return 0;
-    return count(array_filter(array_map('trim', explode(', ', $fr)), 'strlen'));
+    $nFr = $fr === '' ? 0 : count(array_filter(array_map('trim', preg_split('/, | et /u', $fr)), 'strlen'));
+    // (ب) على النصّ كما كُتب: الفواصل الصريحة (, ، ; / + & _ -) تفصل دائماً؛ أدوات العطف (و / et / and، والواو الملزوقة «والرياضيات»)
+    //     تفصل فقط إن كان ما بعدها مادة معروفة بالقاموس — فـ«اللغة العربية و آدابها» مادة واحدة، و«علوم وفيزياء وكيمياء» ثلاث.
+    $map = subjectMap();
+    $known = function ($p) use ($map) { $k = subjectNormalize($p); return $k !== '' && isset($map[$k]); };
+    $nRaw = 0;
+    foreach (preg_split('/\s*[,،;\/+&_]\s*|\s+[-–]\s*|\s*[-–]\s+/u', $raw) as $seg) {
+        $seg = trim($seg); if ($seg === '') continue;
+        $groups = [[]];
+        foreach (preg_split('/\s+/u', $seg) as $t) {
+            $lt = mb_strtolower($t, 'UTF-8');
+            if (in_array($lt, ['et', 'and', 'و'], true)) { $groups[] = []; continue; }
+            if (mb_strpos($t, 'و') === 0 && mb_strlen($t, 'UTF-8') > 2 && !$known($t)) {
+                $r = mb_substr($t, 1, null, 'UTF-8');
+                if ($known($r)) { $groups[] = [$r]; continue; }
+            }
+            $groups[count($groups) - 1][] = $t;
+        }
+        $pieces = [];
+        foreach ($groups as $g) { if (!$g) continue; $p = implode(' ', $g); if (!$pieces || $known($p)) $pieces[] = $p; else $pieces[count($pieces) - 1] .= ' ' . $p; }
+        $nRaw += max(1, count($pieces));
+    }
+    return max($nFr, $nRaw, 1);
 }
 /** صيغ «مادة» حسب العدد: ar ⇒ [لمادة|لمادتي|لمواد, مادة|مادتي|مواد] · fr ⇒ [la matière|les matières, de la matière|des matières, matière|matières] · en ⇒ [subject|subjects] */
 function subjectWords($raw): array {

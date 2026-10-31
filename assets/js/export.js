@@ -331,7 +331,8 @@
         var on = document.body.classList.contains('pp-editing'), k = document.getElementById('msaKeepBtn'), eb = btn || document.getElementById('msaEditBtn');
         if (on) {
             attSnap = attSnapshot();
-            if (!k && eb) { k = document.createElement('button'); k.type = 'button'; k.id = 'msaKeepBtn'; k.className = 'btn btn-sm btn-primary'; k.title = 'الكلمة/الجملة اللي عدّلتها تصير هي الأساسية بكل إفادة من هذا النوع — بكلمة سرّ'; k.innerHTML = '<i class="fas fa-floppy-disk"></i> احفظ كأساس / Garder comme base'; k.onclick = window.msaAttKeep; eb.insertAdjacentElement('afterend', k); }
+            // 🏫👁️ (2026-10-31) حساب المدرسة (عرض فقط): يعدّل للطباعة فقط — بلا كبسة «احفظ كأساس» (الخادم يرفضها أصلاً)
+            if (!k && eb && window.MSA_ATT.keep !== false) { k = document.createElement('button'); k.type = 'button'; k.id = 'msaKeepBtn'; k.className = 'btn btn-sm btn-primary'; k.title = 'الكلمة/الجملة اللي عدّلتها تصير هي الأساسية بكل إفادة من هذا النوع — بكلمة سرّ'; k.innerHTML = '<i class="fas fa-floppy-disk"></i> احفظ كأساس / Garder comme base'; k.onclick = window.msaAttKeep; eb.insertAdjacentElement('afterend', k); }
             if (k) k.style.display = '';
         } else { attSnap = null; if (k) k.style.display = 'none'; }
     };

@@ -72,7 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $allowedPages = implode(',', array_values(array_intersect($selP, array_keys($pages))));
         $validIds = array_map(fn($x) => (int)$x['id'], allSchools(false));
         $selS = $_POST['schools'] ?? []; if (!is_array($selS)) $selS = [];
-        $selS = array_values(array_unique(array_filter(array_map('intval', $selS), fn($x) => $x > 0 && in_array($x, $validIds, true))));
+        $hqEx = hqExcludedSchoolIds(); // 🏛️🚫 المدارس المستقلّة (القديس مكسيموس) لا تُختار للرئاسة أبداً
+        $selS = array_values(array_unique(array_filter(array_map('intval', $selS), fn($x) => $x > 0 && in_array($x, $validIds, true) && !in_array($x, $hqEx, true))));
         $allowedSchools = !empty($_POST['all_schools']) ? 'all' : implode(',', $selS);
         $err = '';
         if (strlen($username) < 3) $err = 'Identifiant : 3 caractères minimum / اسم الدخول 3 أحرف على الأقل';
@@ -377,8 +378,10 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div style="margin-top:10px"><b>Écoles visibles / المدارس اللي بتشوفها:</b>
                 <label style="margin-inline-start:12px"><input type="checkbox" name="all_schools" value="1" id="hqAll" <?= empty($hqSel) ? 'checked' : '' ?> onchange="document.querySelectorAll('#hq .hq-schools input').forEach(function(c){c.disabled=document.getElementById('hqAll').checked})"> <b>Toutes les écoles (y compris les futures) / كل المدارس (ومن ينضمّ لاحقاً)</b></label>
+                <?php $hqExIds = hqExcludedSchoolIds(); $hqExNames = []; foreach ($schools as $s) if (in_array((int)$s['id'], $hqExIds, true)) $hqExNames[] = (string)($s['name_fr'] ?: $s['name_ar']); ?>
+                <?php if ($hqExNames): ?><div style="margin:4px 0 2px;color:#173f6f;font-size:13px"><i class="fas fa-lock"></i> Indépendante — jamais visible par la présidence / مستقلّة — ما بتبين للرئاسة أبداً: <b><?= e(implode(' · ', $hqExNames)) ?></b></div><?php endif; ?>
                 <div class="hq-schools">
-                <?php foreach ($schools as $s): if (!(int)$s['is_active']) continue; ?>
+                <?php foreach ($schools as $s): if (!(int)$s['is_active'] || in_array((int)$s['id'], $hqExIds, true)) continue; ?>
                     <label><input type="checkbox" name="schools[]" value="<?= (int)$s['id'] ?>" <?= in_array((int)$s['id'], $hqSel, true) ? 'checked' : '' ?> <?= empty($hqSel) ? 'disabled' : '' ?>> <?= e($s['name_fr'] ?: $s['name_ar']) ?></label>
                 <?php endforeach; ?>
                 </div>

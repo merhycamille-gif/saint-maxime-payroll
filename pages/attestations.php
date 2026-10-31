@@ -150,7 +150,7 @@ include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/att_rules.php';
 $attRules = ($emp && $type !== '') ? attRulesLoad((string)$type, (string)$docLang) : [];
 if ($attRules) ob_start(function ($buf) use ($attRules) { return attRulesApplyHtml($buf, $attRules); });
-if ($emp && $type !== '') echo '<script>window.MSA_ATT = ' . json_encode(['type' => (string)$type, 'lang' => (string)$docLang, 'super' => isSuperAdmin(), 'base' => BASE_URL], JSON_UNESCAPED_UNICODE) . ';</script>';
+if ($emp && $type !== '') echo '<script>window.MSA_ATT = ' . json_encode(['type' => (string)$type, 'lang' => (string)$docLang, 'super' => isSuperAdmin(), 'keep' => canEdit(), 'base' => BASE_URL], JSON_UNESCAPED_UNICODE) . ';</script>';
 
 // ====== ملف الأستاذ الكامل / Dossier: كل شي عن الأستاذ بمكان واحد ======
 // (صور المستندات: الشهادة/التذكرة/العائلي/الصورة + ر6 + بطاقة الراتب السنوية + سيرة الأستاذ + كل الإفادات)
@@ -1160,6 +1160,8 @@ if (!$emp):
         <?php /* 🌐 (2026-10-24) كبسات اللغة بشريط التصدير (doc_langs): روابطها تحمل كل خيارات الإفادة الحالية ($qs: التاريخ، المبلغ، الموقّع، تاريخ الترك…) كما كانت روابط هذا الصفّ */ ?>
         <script>(function () { var q = <?= json_encode(BASE_URL . 'pages/attestations.php?' . $qs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>; document.querySelectorAll('.export-toolbar .doc-langs a[data-doclang]').forEach(function (a) { a.href = q + '&lang_doc=' + a.getAttribute('data-doclang'); }); })();</script>
         <?php /* ✏️💾 (2026-10-24) النصوص المعدَّلة المحفوظة لهذا النوع/اللغة — حذف بكلمة سرّ */ ?>
+        <?php /* 🏫👁️ (2026-10-31) حساب المدرسة (عرض فقط): يعدّل ويطبع لكن لا يحفظ أساساً ولا يحذف — القسم لا يظهر له أصلاً (الخادم يرفضه أيضاً: att_rules.php canEdit) */ ?>
+        <?php if (canEdit()): ?>
         <details class="att-rules no-print" style="font-size:13px">
             <summary style="cursor:pointer;color:#1e3a8a;font-weight:700"><i class="fas fa-pen-to-square"></i> نصوص معدَّلة محفوظة كأساس / Textes de base modifiés (<?= count($attRules) ?>)</summary>
             <div style="padding:6px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-top:4px;max-width:720px">
@@ -1173,6 +1175,7 @@ if (!$emp):
                 <?php if (isSuperAdmin()): ?><div style="margin-top:6px"><button type="button" class="btn btn-sm btn-light" onclick="msaAttRulePw()" title="كلمة سرّ حفظ/حذف النصوص الأساسية — المدير العام"><i class="fas fa-key"></i> كلمة سرّ التعديل الأساسي</button></div><?php endif; ?>
             </div>
         </details>
+        <?php endif; ?>
         <button type="button" class="btn btn-sm" style="background:#0ea5e9;color:#fff" onclick="ppSendAtt('<?= e(addslashes('pages/attestations.php?'.$qs)) ?>','<?= e($exportOpts['email'] ?? '') ?>','<?= e($exportTitle ?? 'attestation') ?>')"><i class="fas fa-paper-plane"></i> Envoyer par email (PDF auto) / إرسال بالإيميل (PDF تلقائي)</button>
     </div>
     <script>

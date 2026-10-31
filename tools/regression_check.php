@@ -10906,6 +10906,28 @@ try {
 } catch (Throwable $e) { $ok281 = false; $why281 = $e->getMessage(); }
 check('🔒👁️ حساب القراءة فقط: كل الصفحات المسموحة بلا نماذج/أزرار كتابة ولا روابط تطرده · POST/GET كتابة على كل ملفّ مرفوض وقاعدة البيانات بلا تغيير · الصفحات غير المسموحة تطرد (viewer_audit)', $ok281, $why281);
 
+/* ---------- 🏛️🚫 (2026-10-31) «مدرسة القديس مكسيموس ما لازم تبين عند الرئاسة العامة — مستقلّة» + حساب المدرسة يعدّل الإفادة للطباعة بلا «احفظ كأساس» + عدّ الموادّ ---------- */
+try {
+    $ex282 = hqExcludedSchoolIds();
+    $mx282 = 0; foreach (allSchools(false) as $s282) if (mb_strpos((string)$s282['name_ar'], 'القديس مكسيموس') !== false) { $mx282 = (int)$s282['id']; break; }
+    $fnSrc282 = (string)file_get_contents($PROJ . '/includes/functions.php');
+    $saSrc282 = (string)file_get_contents($PROJ . '/pages/school_access.php');
+    $atSrc282 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+    $exSrc282 = (string)file_get_contents($PROJ . '/assets/js/export.js');
+    $sc282 = fn(string $s) => subjectWords($s)['n'];
+    $ok282 = $mx282 > 0 && in_array($mx282, $ex282, true)
+      && hqScopeFilter([$mx282, 3, 4]) === [3, 4] && hqScopeFilter([$mx282]) === [$mx282]          // «كل المدارس»/لائحة الرئاسة بلا مكسيموس؛ حساب مكسيموس المفرد كما هو
+      && substr_count($fnSrc282, 'hqScopeFilter(') >= 3 && strpos($fnSrc282, "\$cache = hqScopeFilter(array_map(fn(\$s) => (int)\$s['id'], allSchools(false)))") !== false
+      && strpos($saSrc282, '!in_array($x, $hqEx, true)') !== false && strpos($saSrc282, 'in_array((int)$s[\'id\'], $hqExIds, true)) continue;') !== false
+      && strpos($atSrc282, "<?php if (canEdit()): ?>\n        <details class=\"att-rules") !== false && strpos($atSrc282, "'keep' => canEdit()") !== false
+      && strpos($exSrc282, 'window.MSA_ATT.keep !== false') !== false
+      && $sc282('علوم وفيزياء وكيمياء') === 3 && $sc282('اللغة العربية والرياضيات') === 2 && $sc282('اللغة العربية و ادابها') === 1
+      && $sc282('Français et sciences') === 2 && $sc282('Maths français arabe') === 3 && $sc282('Français') === 1 && $sc282('') === 0
+      && subjectWords('علوم وفيزياء وكيمياء')['ar_l'] === 'لمواد' && subjectWords('Arabe - Maths')['ar_l'] === 'لمادتي' && subjectWords('Arabe - Maths')['fr_la'] === 'les matières' && subjectWords('Français')['fr_de'] === 'de la matière';
+    $why282 = 'maximos=' . $mx282 . ' excluded=' . json_encode($ex282) . ' filter=' . json_encode(hqScopeFilter([$mx282, 3, 4])) . ' n(علوم وفيزياء وكيمياء)=' . $sc282('علوم وفيزياء وكيمياء') . ' n(و ادابها)=' . $sc282('اللغة العربية و ادابها');
+} catch (Throwable $e) { $ok282 = false; $why282 = $e->getMessage(); }
+check('🏛️🚫 الرئاسة العامة لا ترى القديس مكسيموس (كل المدارس/اللائحة/الاختيار) · حساب المدرسة يعدّل الإفادة للطباعة بلا «احفظ كأساس» · عدّ الموادّ: لمادة/لمادتي/لمواد + la/les matières', $ok282, $why282);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

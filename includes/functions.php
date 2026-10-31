@@ -226,6 +226,31 @@ function ensureUsersPermsColumn() {
  *  - NULL/''                  ⇒ مدرسته المفردة (school_id) — توافق خلفي.
  * يرجع مصفوفة ids (مُحلّاة). تُحسب مرّة وتُخزَّن.
  */
+/**
+ * 🏛️🚫 (2026-10-31 «مدرسة القديس مكسيموس ما لازم تبين عند الرئاسة العامة — هيدي مستقلّة») المدارس المستقلّة عن الرئاسة:
+ * لا تدخل بأي حساب متعدّد المدارس (الرئاسة: «كل المدارس» أو لائحة) — لا باللائحة ولا بالتقارير ولا بشريط المدارس.
+ * حساب المدرسة المفرد لمدرسة مستقلّة يبقى كما هو. تُحفَظ بالإعداد hq_excluded_schools (تركيب ذاتي أوّل مرّة: القديس مكسيموس).
+ */
+function hqExcludedSchoolIds(): array {
+    static $c = null;
+    if ($c !== null) return $c;
+    $raw = null;
+    try { $raw = getSetting('hq_excluded_schools', null); } catch (Throwable $e) {}
+    if ($raw === null || $raw === '') {
+        $ids = [];
+        try { foreach (allSchools(false) as $s) if (mb_strpos((string)$s['name_ar'], 'القديس مكسيموس') !== false || stripos((string)$s['name_fr'], 'COLLEGE MAXIMOS') !== false) $ids[] = (int)$s['id']; } catch (Throwable $e) {}
+        $raw = implode(',', $ids);
+        if ($raw !== '') { try { setSetting('hq_excluded_schools', $raw); } catch (Throwable $e) {} }
+    }
+    return $c = array_values(array_unique(array_filter(array_map('intval', explode(',', (string)$raw)), fn($x) => $x > 0)));
+}
+/** يشيل المدارس المستقلّة من نطاق متعدّد المدارس (الرئاسة) — المفرد لا يُمسّ */
+function hqScopeFilter(array $ids): array {
+    if (count($ids) <= 1) return $ids;
+    $ex = hqExcludedSchoolIds();
+    return $ex ? array_values(array_filter($ids, fn($x) => !in_array((int)$x, $ex, true))) : $ids;
+}
+
 function viewerAllowedSchoolIds() {
     static $cache = null;
     if ($cache !== null) return $cache;
@@ -239,10 +264,10 @@ function viewerAllowedSchoolIds() {
     } catch (Exception $e) {}
 
     if ($raw === 'all') {
-        $cache = array_map(fn($s) => (int)$s['id'], allSchools(false)); // كل المدارس
+        $cache = hqScopeFilter(array_map(fn($s) => (int)$s['id'], allSchools(false))); // كل المدارس (ما عدا المستقلّة عن الرئاسة)
     } elseif ($raw !== null && $raw !== '') {
         $ids = array_filter(array_map('intval', explode(',', $raw)), fn($x) => $x > 0);
-        $cache = array_values(array_unique($ids));
+        $cache = hqScopeFilter(array_values(array_unique($ids)));
     } else {
         $cache = $sid > 0 ? [$sid] : []; // مدرسة مفردة (توافق خلفي)
     }
