@@ -23,6 +23,8 @@ if ($u !== '') {
             if ($sid <= 0 && $as !== '' && $as !== 'all' && strpos($as, ',') === false) $sid = (int)$as;
             if ($sid > 0) { foreach (allSchools(false) as $s) if ((int)$s['id'] === $sid) { $label = saShortName($s); break; } }
             elseif ($as === 'all') $label = 'PRESIDENCE';
+            // 🏫 (2026-10-31 «مكسيموس ما إلو علاقة بهالشعار»): المدرسة المستقلّة ⇒ أيقونتها بشعارها هي (icon-<s>-maximos.png)
+            if ($sid > 0 && function_exists('hqExcludedSchoolIds') && in_array($sid, hqExcludedSchoolIds(), true) && is_file(__DIR__ . '/assets/img/icon-' . $size . '-maximos.png')) $base = __DIR__ . '/assets/img/icon-' . $size . '-maximos.png';
         }
     } catch (Throwable $e) { $label = ''; }
 }

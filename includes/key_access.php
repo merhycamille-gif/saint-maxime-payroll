@@ -68,7 +68,20 @@ function kaRequestBase(): string {
     $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
     return ($https ? 'https://' : 'http://') . $host . BASE_URL;
 }
-function kaTemplatePath(): string { return dirname(__DIR__) . '/tools/desktop_icon/MSA Payroll.exe'; }
+function kaTemplatePath(int $schoolId = 0): string {
+    // 🏫 (2026-10-31 «مكسيموس ما إلو علاقة بهالشعار»): المدارس المستقلّة عن الرئاسة (القديس مكسيموس) أيقونتها بشعارها هي لا شعار MSA
+    if ($schoolId > 0 && function_exists('hqExcludedSchoolIds') && in_array($schoolId, hqExcludedSchoolIds(), true)) {
+        $own = dirname(__DIR__) . '/tools/desktop_icon/MSA Payroll Maximos.exe';
+        if (is_file($own) && filesize($own) > 10000) return $own;
+    }
+    return dirname(__DIR__) . '/tools/desktop_icon/MSA Payroll.exe';
+}
+/** مدرسة حساب القراءة فقط المفرد (school_id أو allowed_schools برقم واحد)، 0 للرئاسة/المتعدّد */
+function kaUserSchoolId(array $u): int {
+    $sid = (int)($u['school_id'] ?? 0); $as = trim((string)($u['allowed_schools'] ?? ''));
+    if ($sid <= 0 && $as !== '' && $as !== 'all' && strpos($as, ',') === false) $sid = (int)$as;
+    return max(0, $sid);
+}
 function kaIp(): string { return substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 64); }
 function kaAudit(string $action, int $uid, string $detail): void { try { if (function_exists('logAudit')) logAudit($action, 'app_keys', $uid, null, mb_substr($detail, 0, 250)); } catch (Throwable $e) {} }
 
@@ -93,7 +106,7 @@ function kaFileName(array $u): string { return 'MSA Payroll - ' . kaLabelFor($u)
 /** 🖥️ مفتاح كمبيوتر: [id, exe_bytes] — السرّ لا يُحفظ إلّا داخل الملف المنزَّل */
 function kaCreateExe(int $userId, string $label, string $by): array {
     kaSchema(); $u = kaViewer($userId);
-    $tpl = kaTemplatePath();
+    $tpl = kaTemplatePath(kaUserSchoolId($u));
     if (!is_file($tpl) || filesize($tpl) < 10000) throw new RuntimeException('Modèle d\'icône manquant sur le serveur / قالب الأيقونة غير موجود: tools/desktop_icon/MSA Payroll.exe');
     $sel = bin2hex(random_bytes(8)); $sec = bin2hex(random_bytes(32));
     getDB()->prepare("INSERT INTO app_keys(user_id, kind, selector, secret_hash, label, created_by) VALUES(?,'exe',?,?,?,?)")
