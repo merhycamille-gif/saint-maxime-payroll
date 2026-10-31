@@ -75,6 +75,19 @@ class MsaChromePdf
                 }
             }
         }
+        // 🖼️ (2026-10-31 «شعار MSA ما طلع بالـPDF») الصور (شعار الترويسة/المدرسة): prepare() حوّلها إلى مسارات ملفّات محلّية يفهمها mPDF،
+        //    لكن محرّك Chromium يعمل على خادم آخر فلا يرى ملفّات هذا الخادم ⇒ تُضمَّن داخل الـHTML نفسه (data:base64) فتطلع بالورقة.
+        foreach ($xp->query('//img') as $img) {
+            $src = (string)$img->getAttribute('src');
+            if ($src === '' || strpos($src, 'data:') === 0 || preg_match('#^https?://#i', $src)) continue;
+            $path = $src;
+            if (!is_file($path)) { $root = realpath(__DIR__ . '/..'); $p = preg_replace('/[?#].*$/', '', $src); $b = defined('BASE_URL') ? BASE_URL : '/'; $rel = ($b !== '/' && strpos($p, $b) === 0) ? substr($p, strlen($b)) : ltrim($p, '/'); $path = $root . '/' . $rel; }
+            if (!is_file($path) || filesize($path) > 3000000) continue;
+            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $mime = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'svg' => 'image/svg+xml', 'webp' => 'image/webp', 'bmp' => 'image/bmp'][$ext] ?? '';
+            if ($mime === '') continue;
+            $img->setAttribute('src', 'data:' . $mime . ';base64,' . base64_encode((string)file_get_contents($path)));
+        }
         $inner = '';
         foreach ($body->childNodes as $ch) $inner .= $dom->saveHTML($ch);
         $usableMm = ($landscape ? 297 : 210) - 2 * $side;
