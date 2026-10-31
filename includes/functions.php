@@ -144,6 +144,7 @@ function viewerBaseScripts() {
     return [
         'index.php',                                 // لوحة القيادة (صفحة الوصول)
         'print_pdf.php',                             // طباعة PDF
+        'html_export.php',                           // 🖨️ (2026-10-31) تحويل الصفحة المعروضة إلى PDF/Excel/Word — عرض فقط (كان «احفظها عالكمبيوتر» يحفظ صفحة اللوحة)
         'official_forms.php', 'official_export.php', // النماذج الرسمية (طباعة)
         'settings.php',                              // لتغيير كلمة المرور فقط
         'switch_year.php', 'switch_lang.php', 'switch_school.php', 'logout.php', // ملاحة
@@ -287,8 +288,11 @@ function enforceViewerRestrictions() {
 
     // (3) قفل التعديل — يُسمح فقط بتغيير كلمة المرور من صفحة الإعدادات
     $isPasswordChange = ($script === 'settings.php' && ($_POST['action'] ?? '') === 'change_password');
+    // 🖨️ (2026-10-31 «ما في للطبع… احفظها عالكمبيوتر» بحساب مدرسة) html_export.php = تحويل الصفحة المعروضة إلى PDF/Excel/Word (POST html ⇒ ملف) بلا أي كتابة بالقاعدة —
+    //    كان POST حساب القراءة يُطرد للوحة فيحفظ المتصفّح صفحة اللوحة باسم .pdf. القراءة فقط تبقى: لا يعدّل شيئاً، فقط يطبع ما يراه.
+    $isRenderOnly = ($script === 'html_export.php');
     $isWrite = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') || isset($_GET['delete']);
-    if ($isWrite && !$isPasswordChange) {
+    if ($isWrite && !$isPasswordChange && !$isRenderOnly) {
         $_SESSION['flash_error'] = 'قراءة فقط: التعديل غير مسموح. / Lecture seule : modification interdite.';
         header('Location: ' . BASE_URL . 'index.php');
         exit;

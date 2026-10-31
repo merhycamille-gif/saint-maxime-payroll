@@ -103,7 +103,7 @@ foreach ($allowed as $p) {
 $skip = ['extrawage_data_2025-2026.php', 'login.php', 'logout.php', 'sync_api.php', 'sync_local.php', 'sync_version.php', 'db_backup.php', 'install.php', 'migrate.php', 'migrate_extrawage.php', 'reset_admin_once.php', 'fix_baseurl_once.php', 'fix_departures_once.php', 'cleanup_ghosts.php', 'recu.php', 'dl.php', 'key_login.php', 'key_go.php', 'key_link.php', 'switch_currency.php', 'switch_lang.php', 'switch_school.php', 'switch_year.php', 'switch_m13.php', 'switch_rateline.php', 'switch_totals.php', 'switch_salarycomp.php', 'ajax_search.php', 'manifest.php', 'icon.php', 'sw.js'];
 $targets = [];
 foreach (glob($PROJ . '/*.php') as $f) { $b = basename($f); if (!in_array($b, $skip, true) && strpos($b, '_') !== 0) $targets[] = $b; }
-foreach (glob($PROJ . '/pages/*.php') as $f) { $b = basename($f); if (strpos($b, '_') !== 0 && $b !== 'teacher_form.php') $targets[] = 'pages/' . $b; }   // teacher_form = فورم الأستاذ العامّ برمز (بلا دخول) بتصميمه
+foreach (glob($PROJ . '/pages/*.php') as $f) { $b = basename($f); if (strpos($b, '_') !== 0 && $b !== 'teacher_form.php' && $b !== 'html_export.php') $targets[] = 'pages/' . $b; }   // teacher_form = فورم الأستاذ العامّ برمز (بلا دخول) بتصميمه · html_export = تحويل للطباعة (يُفحص إيجاباً أدناه)
 $evil = ['action' => 'delete', 'act' => 'save', 'id' => 1, 'employee_id' => 1, 'delete' => 1, 'save' => 1, 'approve' => 1, 'recalc' => 1, 'amount' => 1, 'csrf' => 'x', '_t' => 'x', 'decision' => 'yes', 'mark' => 1, 'paid' => 1, 'month' => 1, 'year' => 2026];
 $sumBefore = checksums($db);
 $postBad = 0; $postN = 0;
@@ -119,6 +119,11 @@ $d = diffSums($sumBefore, $sumAfterPost); if ($d) $issues[] = 'POST غيّر ج�
 foreach ($targets as $t) { http('GET', $base . $t . '?delete=1&action=delete&approve=1&recalc=1&save=1&send=1&mark=1&decision=yes&id=1&employee_id=1', [], $cj); }
 $sumAfterGet = checksums($db);
 $d = diffSums($sumAfterPost, $sumAfterGet); if ($d) $issues[] = 'GET بوسائط كتابة غيّر جداول: ' . implode(', ', $d);
+
+/* ───── (3ب) 🖨️ الطباعة شغّالة لحساب القراءة: «احفظها عالكمبيوتر PDF» = POST html_export.php ⇒ ملف PDF حقيقي (لا صفحة اللوحة) ───── */
+[$c, $loc, $body] = http('POST', $base . 'pages/html_export.php', ['format' => 'pdf', 'title' => 'Audit', 'dir' => 'rtl', 'landscape' => '0', 'fit' => '1', 'html' => '<table><tr><td>اختبار طباعة</td><td>123</td></tr></table>'], $cj);
+if (!($c === 200 && strncmp($body, '%PDF', 4) === 0)) $issues[] = "html_export.php (PDF لحساب القراءة) ⇒ $c " . (strncmp($body, '%PDF', 4) === 0 ? 'pdf' : 'ليس PDF: ' . mb_substr(preg_replace('/\s+/', ' ', strip_tags($body)), 0, 80));
+$sumAfterPdf = checksums($db); $d = diffSums($sumAfterGet, $sumAfterPdf); if ($d) $issues[] = 'html_export غيّر جداول: ' . implode(', ', $d);
 $usersAfter = $db->query("SELECT COUNT(*) FROM users")->fetchColumn(); if ($usersAfter !== $usersBefore) $issues[] = 'جدول users تغيّر عدده';
 
 /* ───── (4) صفحات غير مسموحة ⇒ طرد ───── */
