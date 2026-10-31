@@ -5642,9 +5642,8 @@ function exportToolbar($title = 'document', $opts = []) {
     <div class="export-toolbar no-print no-export" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
         <?php /* 🧹 (2026-10-17 «رتّب الكبسات بكل البرنامج… بعد في عجقة») الشريط بمجموعات بسطر واحد: [طباعة · PDF · تعديل] | [Excel · Word] | [واتساب · إيميل] | [اللغة] | «المزيد ▾» (الورقة/الأجزاء/قُدِّم للدولة) */ ?>
         <span class="xt-g xt-g1">
-        <?php if (!$viewerOnly): ?>
-        <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint(this)" title="ورقة جاهزة للطباعة من محرّك الطباعة الرسمي"><i class="fas fa-print"></i> Imprimer / طباعة</button>
-        <?php endif; ?>
+        <?php /* 🖨️ (2026-10-31 «لازم يكون في كبسة اطبع بدون ما نزّلها على الكمبيوتر») كبسة الطباعة ظاهرة لحساب المدرسة أيضاً: تفتح الـPDF الرسمي بشاشة الطباعة مباشرة (html_export inline — عرض فقط، بلا تنزيل) */ ?>
+        <button type="button" class="btn btn-sm btn-primary" onclick="ppPrint(this)" title="ورقة جاهزة للطباعة من محرّك الطباعة الرسمي — تفتح شاشة الطباعة مباشرة بلا تنزيل"><i class="fas fa-print"></i> Imprimer / طباعة</button>
         <?php // 💾 (2026-09-13 «كبسة احفظها على الكمبيوتر عم تطلع متل طباعة على الورق») زرّ PDF = تنزيل ملف حقيقي فوراً بالمتصفّح
               // (pdf-save.js لأي صفحة)؛ «PDF رسمي» عبر Chrome يبقى حيث الأداة متوفّرة (الكمبيوتر) لأن الأونلاين بلا node يرجع لحوار الطباعة
               $hasPup = is_file(__DIR__ . '/../tools/page_to_pdf.js') && is_dir(__DIR__ . '/../tools/node_modules/puppeteer-core') && (@is_file('C:/Program Files/nodejs/node.exe') || stripos(PHP_OS, 'WIN') === 0); ?>
