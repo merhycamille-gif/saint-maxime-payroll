@@ -569,7 +569,7 @@ check('تفتيش الأستاذ: لائحة النتائج لا تنقصّ بب
 check('p1: بلا خانة رقم برأس الإفادات + التاريخ شمال عربي/يمين لاتيني + كلمة هاتف قبل الرقم',
       strpos($attSrc, "'N°' : 'No.'") === false
       && strpos($attSrc, 'الرقم : <span style="display:inline-block;min-width:90px') === false
-      && substr_count($attSrc, '<div dir="rtl" style="text-align:left;margin-bottom:10px">التاريخ : ') === 2
+      && substr_count($attSrc, '<div dir="rtl" style="text-align:right;margin-bottom:10px">التاريخ : ') === 2   // 📐 (2026-10-31) التاريخ يميناً «بالعربي دايماً السطر يبلّش عن اليمين» (كان يساراً منذ 08-21)
       && substr_count($attSrc, ": 'Date : ' ?><?= \$today ?>") === 2 /* سطر التاريخ اللاتيني (مدينة، le/: تاريخ — وDate احتياط) بإفادتي الراتب والعمل */
       && strpos($attSrc, '<div dir="rtl" style="font-size:14px">هاتف : <span dir="ltr">') !== false
       && substr_count($attSrc, '<div dir="rtl"><small>هاتف : <span dir="ltr">') === 2);
@@ -6345,17 +6345,17 @@ try {
         return [$h, str_replace('بصفة', 'بوظيفة', preg_replace('/\s+/u', ' ', strip_tags(mb_substr($h, $p === false ? 0 : $p, 5000))))];
     };
     if ($m129) { [$h, $t] = $txt129($m129, 'salaire', 'ar');
-        if (!(mb_strpos($t, 'بأنّ السيّد ') !== false && mb_strpos($t, ' يعمل لديها بوظيفة مدرّس لمادة') !== false && mb_strpos($t, 'ولا يزال حتى تاريخه ، ويتقاضى') !== false && mb_strpos($t, 'بناءً على طلبه .') !== false && mb_strpos($t, '(ة)') === false && mb_strpos($t, '(ا)') === false)) { $ok129 = false; $why129[] = "m=$m129"; }
+        if (!(mb_strpos($t, 'بأنّ السيّد ') !== false && preg_match('/ يعمل لديها بوظيفة مدرّس لم(ادة|ادتي|واد)/u', $t) && mb_strpos($t, 'ولا يزال حتى تاريخه ، ويتقاضى') !== false && mb_strpos($t, 'بناءً على طلبه .') !== false && mb_strpos($t, '(ة)') === false && mb_strpos($t, '(ا)') === false)) { $ok129 = false; $why129[] = "m=$m129"; }
         [$h, $t] = $txt129($m129, 'salaire', 'fr');
         if (!(mb_strpos($t, 'atteste que M. ') !== false && mb_strpos($t, 'M./Mme') === false)) { $ok129 = false; $why129[] = "m-fr=$m129"; }
     } else $why129[] = 'no-m';
     if ($f129) { [$h, $t] = $txt129($f129, 'tadris', 'ar');
-        if (!(mb_strpos($t, 'بأنّ السيّدة ') !== false && mb_strpos($t, ' تعمل لديها بوظيفة مدرّسة لمادة') !== false && mb_strpos($t, 'ولا تزال حتى تاريخه ، وهي على حسن سلوك والتزام في أداء عملها') !== false && mb_strpos($t, 'بناءً على طلبها .') !== false && mb_strpos($t, '(ة)') === false)) { $ok129 = false; $why129[] = "f=$f129"; }
+        if (!(mb_strpos($t, 'بأنّ السيّدة ') !== false && preg_match('/ تعمل لديها بوظيفة مدرّسة لم(ادة|ادتي|واد)/u', $t) && mb_strpos($t, 'ولا تزال حتى تاريخه ، وهي على حسن سلوك والتزام في أداء عملها') !== false && mb_strpos($t, 'بناءً على طلبها .') !== false && mb_strpos($t, '(ة)') === false)) { $ok129 = false; $why129[] = "f=$f129"; }
         // الآنسة (تجربة فعلية مع ترجيع كامل): نفس الموظفة مؤقتاً 'd' ⇒ «الآنسة … تعمل … طلبها» وMlle بالفرنسي
         $db129->prepare("UPDATE employees SET gender='d' WHERE id=?")->execute([$f129]);
         try {
             [$h, $t] = $txt129($f129, 'salaire', 'ar');
-            if (!(mb_strpos($t, 'بأنّ الآنسة ') !== false && mb_strpos($t, ' تعمل لديها بوظيفة مدرّسة لمادة') !== false && mb_strpos($t, 'بناءً على طلبها .') !== false && mb_strpos($t, 'السيّدة') === false)) { $ok129 = false; $why129[] = "d=$f129"; }
+            if (!(mb_strpos($t, 'بأنّ الآنسة ') !== false && preg_match('/ تعمل لديها بوظيفة مدرّسة لم(ادة|ادتي|واد)/u', $t) && mb_strpos($t, 'بناءً على طلبها .') !== false && mb_strpos($t, 'السيّدة') === false)) { $ok129 = false; $why129[] = "d=$f129"; }
             [$h, $t] = $txt129($f129, 'salaire', 'fr');
             if (!(mb_strpos($t, 'atteste que Mlle ') !== false)) { $ok129 = false; $why129[] = "d-fr=$f129"; }
         } finally { $db129->prepare("UPDATE employees SET gender='f' WHERE id=?")->execute([$f129]); }

@@ -563,6 +563,27 @@ function subjectToLang($raw, $lang) {
     return implode($sep, $parts);
 }
 
+/** 📚 (2026-10-31 «إذا في مادتين ما بقول مادة بقول مادتين وإذا أكتر بقول مواد») عدد الموادّ بالحقل: 0 فارغ، 1 مفرد، 2 مثنّى، 3+ جمع.
+ *  يُعدّ على ناتج الفرنسي (الفاصل « , » لا يلتبس بأسماء الموادّ) — النصّ الحرّ غير المعروف = مادة واحدة. */
+function subjectCount($raw): int {
+    $fr = subjectToLang($raw, 'fr');
+    if ($fr === '') return 0;
+    return count(array_filter(array_map('trim', explode(', ', $fr)), 'strlen'));
+}
+/** صيغ «مادة» حسب العدد: ar ⇒ [لمادة|لمادتي|لمواد, مادة|مادتي|مواد] · fr ⇒ [la matière|les matières, de la matière|des matières, matière|matières] · en ⇒ [subject|subjects] */
+function subjectWords($raw): array {
+    $n = subjectCount($raw);
+    return [
+        'ar_l'  => $n >= 3 ? 'لمواد' : ($n === 2 ? 'لمادتي' : 'لمادة'),
+        'ar'    => $n >= 3 ? 'مواد' : ($n === 2 ? 'مادتي' : 'مادة'),
+        'fr_la' => $n >= 2 ? 'les matières' : 'la matière',
+        'fr_de' => $n >= 2 ? 'des matières' : 'de la matière',
+        'fr'    => $n >= 2 ? 'matières' : 'matière',
+        'en'    => $n >= 2 ? 'subjects' : 'subject',
+        'n'     => $n,
+    ];
+}
+
 /**
  * ترجمة اسم مكان/عنوان عربي إلى التهجئة اللاتينية الصحيحة (للإفادات الفرنسية والإنكليزية):
  * مطابقة المقطع كاملاً بالقاموس، ثم أطول عبارة (حتى 3 كلمات)، ثم كلمة كلمة (مع إسقاط «ال»)،

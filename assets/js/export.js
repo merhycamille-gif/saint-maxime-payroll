@@ -356,7 +356,10 @@
             var hasAr = /[؀-ۿ]/.test(((start || a).textContent || '').slice(0, 20000));
             // 📄 (2026-10-24 p1 «اخترت اطبع وورد» — بطاقة الأستاذ بالفرنسي طلعت من اليمين) أوّل dir صريح من الجدول صعوداً حتى المنطقة يغلب «فيه عربي»
             var explicit = '', el = start; while (el && el !== a.parentElement) { var dv = el.getAttribute && el.getAttribute('dir'); if (dv === 'rtl' || dv === 'ltr') { explicit = dv; break; } el = el.parentElement; }
-            dir = rlDir ? rlDir : (explicit ? explicit : (hasAr ? 'rtl' : 'ltr'));
+            // 📐 (2026-10-31 «آخر سطرين بلّشين بالآخر») الإفادات/المستندات ذات الترويسة (.scr-head/.word-head) لغتها واتجاهها من أزرارها هي (dir على المنطقة):
+            //    إعداد لغة التقارير (فرنسي=شمال) كان يغلب فتُبنى الورقة ltr وتطلع أسطر الإفادة العربية القصيرة من الشمال
+            var ownDoc = a.querySelector('.scr-head, .word-head'), aDir = a.getAttribute('dir');
+            dir = (ownDoc && (aDir === 'rtl' || aDir === 'ltr')) ? aDir : (rlDir ? rlDir : (explicit ? explicit : (hasAr ? 'rtl' : 'ltr')));
         } catch (e) {}
         return dir;
     }
