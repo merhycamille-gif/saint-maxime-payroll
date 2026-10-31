@@ -649,6 +649,8 @@ if ($regEid) {
     // يُجرَّب بشيل المربّع صراحةً (opts_set=1 بلا inc_extra)
     $hAt = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire', 'opts_set' => 1], []);
     $hAtDef = renderPage('pages/attestations.php', ['employee_id' => $regEid, 'type' => 'salaire'], []);
+    // 📐 (2026-10-31) الترويسة العربية صارت جدولاً dir=rtl (الشعار والاسم يميناً) — تُستثنى من فحص «بلا تابلو» الذي يخصّ جدول تفصيل الراتب فقط
+    $noHead = function (string $h): string { return preg_replace('~<div dir="rtl"><table dir="rtl".*?</table></div>~s', '', $h); };
     check('إفادة راتب: الأجر الإضافي محطوط افتراضياً بكل الإفادات (المربّع مؤشَّر بلا أي خيار)',
           strpos($hAtDef, 'name="inc_extra" value="1" checked') !== false);
     // (2026-08-16) بطلب المستخدم: جملة «دون أدنى مسؤولية...» انشالت من إفادة الراتب فقط
@@ -656,7 +658,7 @@ if ($regEid) {
     check('إفادة راتب: الصيغة الرسمية (الأساس وحده = جملة قدره، بلا جملة عدم المسؤولية، بلا جدول، بلا «لاستعمالها لدى من يلزم»)',
           preg_match('/و[يت]تقاضى راتباً شهرياً قدره/u', $hAt) === 1 // (2026-09-15) ويتقاضى/وتتقاضى حسب جنس الموظف
           && strpos($hAt, 'دون أدنى مسؤولية') === false
-          && strpos($hAt, '<table dir="rtl"') === false
+          && strpos($noHead($hAt), '<table dir="rtl"') === false
           && strpos($hAt, 'لاستعمالها لدى من يلزم') === false
           && preg_match('/بناءً على طلبه(ا|\(ا\))? \./u', $hAt) === 1); // (2026-09-15) طلبه/طلبها/طلبه(ا) حسب جنس الموظف بملفه
     // (2026-08-20) «بدون تابلو»: مع المكوّنات المختارة = تفصيل سطوراً (أساس + إضافي + الإجمالي) لا جدولاً
@@ -665,7 +667,7 @@ if ($regEid) {
           strpos($hAtC, 'وفق التفصيل الآتي') !== false
           && strpos($hAtC, '- الأجر الإضافي :') !== false
           && strpos($hAtC, '- الإجمالي :') !== false
-          && strpos($hAtC, '<table dir="rtl"') === false);
+          && strpos($noHead($hAtC), '<table dir="rtl"') === false);
     // (2026-08-16) خيار صفة الموقّع بإفادة الراتب: الرئيسة/الإدارة/المدير (المدير افتراضياً)
     check('إفادة راتب: خيار الإمضاء (الرئيسة/الإدارة/المدير) والافتراضي المدير',
           strpos($hAt, 'المدير — التوقيع والختم') !== false
@@ -10891,7 +10893,7 @@ try {
     $okG = stripos($kg, 'Fatal error') === false && stripos($kg, 'Parse error') === false && stripos($kg, 'Tableau de bord') === false;   // تحويل صامت (لا جلسة ولا لوحة)
     // صفحة «دخول المدارس» ترندر مع قسم الرئاسة وأزرار الأيقونات
     $hs = renderPage('pages/school_access.php', [], [], [], 'lbp', '2026-2027');
-    $okS = $noFatal($hs) && strpos($hs, 'Présidence générale') !== false && strpos($hs, 'Icône ordinateur') !== false && strpos($hs, 'Toutes les écoles') !== false;
+    $okS = $noFatal($hs) && strpos($hs, 'Présidence générale') !== false && strpos($hs, 'Télécharger l\'icône') !== false && strpos($hs, 'Toutes les écoles') !== false;   // (14:20) الكبسة صارت «تنزيل الأيقونة»
     $ok280 = $okF && $okL && $okG && $okS; $why280 = 'files=' . ($okF ? 'ok' : 'NO') . ' key_login=' . ($okL ? 'ok' : 'NO') . ' key_go=' . ($okG ? 'ok' : 'NO') . ' page=' . ($okS ? 'ok' : 'NO');
 } catch (Throwable $e) { $ok280 = false; $why280 = $e->getMessage(); }
 check('🔑 أيقونات الدخول المباشر (exe/رابط) لحسابات القراءة فقط + قسم الرئاسة العامة بصفحة «دخول المدارس» + login.php بالكوكي', $ok280, $why280);
