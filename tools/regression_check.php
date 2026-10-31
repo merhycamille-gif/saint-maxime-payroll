@@ -10912,7 +10912,7 @@ try {
     $mx282 = 0; foreach (allSchools(false) as $s282) if (mb_strpos((string)$s282['name_ar'], 'القديس مكسيموس') !== false) { $mx282 = (int)$s282['id']; break; }
     $fnSrc282 = (string)file_get_contents($PROJ . '/includes/functions.php');
     $saSrc282 = (string)file_get_contents($PROJ . '/pages/school_access.php');
-    $atSrc282 = (string)file_get_contents($PROJ . '/pages/attestations.php');
+    $atSrc282 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/attestations.php')); // CRLF
     $exSrc282 = (string)file_get_contents($PROJ . '/assets/js/export.js');
     $sc282 = fn(string $s) => subjectWords($s)['n'];
     $ok282 = $mx282 > 0 && in_array($mx282, $ex282, true)
