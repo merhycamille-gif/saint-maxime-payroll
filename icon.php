@@ -39,7 +39,7 @@ $im = imagecreatefrompng($base);
 imagesavealpha($im, true); imagealphablending($im, true);
 $w = imagesx($im); $h = imagesy($im);
 $bandH = (int)round($h * 0.26);
-$navy = imagecolorallocatealpha($im, 112, 78, 6, 18); // 🟨 (2026-10-31 «عمول اللون أصفر») أيقونة الرواتب صفراء (شعار MSA متل الأقساط بلون مختلف) ⇒ شريط الاسم ذهبي غامق
+$navy = imagecolorallocatealpha($im, 10, 34, 64, 18); // ⬜ (2026-10-31 «رقم 2 بس الباكروند بيصير أبيض») أيقونة الرواتب بيضاء بشعار MSA ثلاثي الألوان ⇒ شريط الاسم كحلي
 imagefilledrectangle($im, 0, $h - $bandH, $w, $h, $navy);
 $gold = imagecolorallocate($im, 201, 169, 97);
 imagefilledrectangle($im, 0, $h - $bandH, $w, $h - $bandH + max(2, (int)($h * 0.012)), $gold);
