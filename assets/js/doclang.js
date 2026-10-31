@@ -170,7 +170,9 @@
             // الاتجاه — ورقة التقرير الموحّدة فقط (نماذج الدولة تبقى)
             var side = effSide();
             var sheets = root.classList.contains('doc-sheet') ? [root] : Array.prototype.slice.call(root.querySelectorAll('.doc-sheet'));
-            if (!root.classList.contains('official-doc') && !root.querySelector('.official-doc') && !sheets.length && (root.tagName === 'TABLE' || root.querySelector('table'))) sheets = [root];
+            // 📐 (2026-10-31 «عم ضلّ الأيقونة عالشمال بالعربي») الإفادات/المستندات ذات الترويسة (.scr-head/.word-head) لغتها من أزرارها هي (العربية/Français/English)
+            //    لا من إعداد لغة التقارير — صار بترويستها جدول فكان هذا الفرع يقلب اتجاهها (وجدول الترويسة) إلى ltr عند من حفظ «فرنسي/شمال» للتقارير
+            if (!root.classList.contains('official-doc') && !root.querySelector('.official-doc') && !root.querySelector('.scr-head, .word-head') && !sheets.length && (root.tagName === 'TABLE' || root.querySelector('table'))) sheets = [root];
             sheets.forEach(function (sh) {
                 if (sh.__rlDir === undefined) sh.__rlDir = { dir: sh.getAttribute('dir'), ltr: sh.classList.contains('doc-ltr') };
                 if (side) { sh.setAttribute('dir', side); sh.classList.toggle('doc-ltr', side === 'ltr'); sh.querySelectorAll('table').forEach(function (t) { if (t.__rlDir === undefined) t.__rlDir = t.getAttribute('dir'); t.setAttribute('dir', side); }); }
