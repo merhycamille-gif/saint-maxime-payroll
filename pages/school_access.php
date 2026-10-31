@@ -51,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($kind === 'link') { [$kid, $link] = kaCreateLink($uid, $label, (string)($_SESSION['username'] ?? '')); $_SESSION['ka_new_link'] = ['uid' => $uid, 'url' => $link, 'label' => kaLabelFor($vu)]; }
             else {
                 [$kid, $bytes] = kaCreateExe($uid, $label, (string)($_SESSION['username'] ?? ''));
-                [$pkg, $pkgName, $mime] = kaPackage($bytes, kaFileName($vu));
-                $_SESSION['ka_new_file'] = ['uid' => $uid, 't' => kaStoreDownload($pkg, $pkgName, $mime), 'name' => $pkgName, 'label' => kaLabelFor($vu)];   // 📦 يُنزَّل بالصفحة عبر key_dl.php
+                // 🧩 (2026-10-31 «بكل مدرسة بس أيقونة تنزيل عندي… وبنزّلوها عندهن كوبي باست») الأيقونة نفسها (.exe) بلا ملف مضغوط — تُنزَّل بالصفحة عبر key_dl.php
+                $_SESSION['ka_new_file'] = ['uid' => $uid, 't' => kaStoreDownload($bytes, kaFileName($vu), 'application/octet-stream'), 'name' => kaFileName($vu), 'label' => kaLabelFor($vu)];
             }
         } catch (Throwable $e) { $_SESSION['flash_error'] = $e->getMessage(); }
         header('Location: ' . $self . $back); exit;
@@ -212,13 +212,15 @@ function saKeysBlock(?array $u, array $keysBy, ?array $newLink, string $self, st
     $h .= '<div class="ka-title"><i class="fas fa-key"></i> Icône d\'accès direct <span dir="rtl">· أيقونة الدخول المباشر</span></div>';
     if ($newFile && (int)$newFile['uid'] === $uid) {
         $dl = BASE_URL . 'key_dl.php?t=' . rawurlencode((string)$newFile['t']);
-        $h .= '<div class="ka-new" id="kaNewFile"><b>Fichier prêt — il se télécharge maintenant (dossier Téléchargements) ; envoyez-le par WhatsApp à l\'école / الملف جاهز — عم ينزل هلّق (مجلّد التنزيلات)؛ ابعته بالواتساب للمدرسة:</b>'
+        $h .= '<div class="ka-new" id="kaNewFile"><b>L\'icône se télécharge maintenant (dossier Téléchargements) — envoyez-la par WhatsApp, l\'école la copie sur le bureau / الأيقونة عم تنزل هلّق (مجلّد التنزيلات) — ابعتها بالواتساب، والمدرسة تنسخها عالدسك توب:</b>'
             . '<div class="ka-link-row"><a id="kaDl" class="btn btn-success" href="' . e($dl) . '" download="' . e((string)$newFile['name']) . '"><i class="fas fa-download"></i> ' . e((string)$newFile['name']) . ' — Télécharger / نزّل</a></div>'
             . '<small class="text-muted">Si rien ne se passe, cliquez le bouton vert. Ne l\'ouvrez pas vous-même. / إذا ما نزل شي اكبس الزرّ الأخضر. لا تفتحه أنت.</small></div>'
             . '<script>setTimeout(function(){var a=document.getElementById("kaDl");if(a){a.scrollIntoView({block:"center"});a.click();}},400);</script>';
     }
     if ($newLink && (int)$newLink['uid'] === $uid) $h .= '<div class="ka-new"><b>Lien pour le téléphone — à envoyer par WhatsApp (affiché une seule fois) / رابط الموبايل — ابعته بواتساب (يظهر مرّة واحدة):</b><div class="ka-link-row"><input class="form-control" value="' . e($newLink['url']) . '" readonly dir="ltr" onclick="this.select()"><button type="button" class="btn btn-info" onclick="saCopyText(this,this.previousElementSibling.value)"><i class="fas fa-copy"></i> Copier / نسخ</button></div></div>';
+    $revokedN = 0;
     foreach ($keysBy[$uid] ?? [] as $k) {
+        if ($k['revoked']) { $revokedN++; continue; }   // 🧹 الملغاة لا تُعرض (كانت تلخبط السطر) — عددها فقط
         $isLink = $k['kind'] === 'link';
         if ($k['revoked']) $st = '<span class="ka-badge ka-off">Annulé · ملغى</span>';
         elseif ($isLink) { if ($k['devices']) { $st = '<span class="ka-badge ka-on">Installé · مركَّب</span>'; foreach ($k['devices'] as $d) $st .= ' <small>' . e(kaUaShort((string)$d['label'])) . ' ' . e(date('d/m/Y', strtotime($d['created_at']))) . '</small>'; } else $st = '<span class="ka-badge ka-wait">Lien pas encore ouvert · لم يُفتح بعد</span>'; }
@@ -232,9 +234,10 @@ function saKeysBlock(?array $u, array $keysBy, ?array $newLink, string $self, st
         }
         $h .= '</div>';
     }
+    if ($revokedN) $h .= '<div class="ka-row ka-dim"><small class="text-muted">' . $revokedN . ' annulée(s) · ملغاة</small></div>';
     $h .= '<div class="ka-actions">'
         . '<a class="btn btn-warning btn-xs" href="' . e(BASE_URL . 'key_preview.php?u=' . $uid . '&csrf=' . csrfToken()) . '" title="Voir le programme exactement comme ce compte le voit (lecture seule), puis « Retour administrateur » · شوف البرنامج تماماً كما يراه هذا الحساب ثمّ «رجوع للمدير»"><i class="fas fa-eye"></i> Aperçu — voir comme l\'école / معاينة — شوف متل ما بتشوف</a> '
-        . '<form method="POST" action="' . e($self) . '" class="ka-inline"><input type="hidden" name="csrf" value="' . csrfToken() . '"><input type="hidden" name="act" value="key_new"><input type="hidden" name="kind" value="exe"><input type="hidden" name="user_id" value="' . $uid . '"><input type="hidden" name="back" value="' . e($anchor) . '"><button type="submit" class="btn btn-primary btn-xs" title="Fichier à copier sur le bureau : un double-clic ouvre le programme sans mot de passe · ملف يُنسخ على سطح المكتب: كبستان تفتحان البرنامج بلا كلمة سرّ"><i class="fas fa-download"></i> Icône ordinateur / أيقونة الكمبيوتر</button></form> '
+        . '<form method="POST" action="' . e($self) . '" class="ka-inline"><input type="hidden" name="csrf" value="' . csrfToken() . '"><input type="hidden" name="act" value="key_new"><input type="hidden" name="kind" value="exe"><input type="hidden" name="user_id" value="' . $uid . '"><input type="hidden" name="back" value="' . e($anchor) . '"><button type="submit" class="btn btn-primary" title="L\'icône elle-même : envoyez-la par WhatsApp, l\'école la copie sur le bureau et double-clique · الأيقونة نفسها: ابعتها بالواتساب، المدرسة تنسخها على سطح المكتب وتكبسها مرّتين"><i class="fas fa-download"></i> Télécharger l\'icône / تنزيل الأيقونة</button></form> '
         . '<form method="POST" action="' . e($self) . '" class="ka-inline"><input type="hidden" name="csrf" value="' . csrfToken() . '"><input type="hidden" name="act" value="key_new"><input type="hidden" name="kind" value="link"><input type="hidden" name="user_id" value="' . $uid . '"><input type="hidden" name="back" value="' . e($anchor) . '"><button type="submit" class="btn btn-info btn-xs" title="Lien à ouvrir une fois sur le téléphone · رابط يُفتح مرّة على الموبايل"><i class="fas fa-mobile-screen"></i> Icône téléphone / أيقونة الموبايل</button></form>'
         . '</div></div>';
     return $h;
