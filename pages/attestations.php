@@ -1112,14 +1112,16 @@ if (!$emp):
     }
     // جدول بعرض كامل وخانة المحتوى الأولى (= جهة البداية: يمين بالعربي) — «جدول width:auto» كان
     // الوورد يوسّطه بنص الصفحة، وهالشكل يثبت الكتلة بجهتها بالشاشة والوورد سواء
+    // 📐 (2026-10-31 «بالعربي لازم الشعار واسم المدرسة يكون على اليمين») dir=rtl صريح على الكتلة: الخانة الأولى (الشعار والاسم) تثبت يميناً
+    //    بالشاشة والـPDF والوورد سواء — بلا dir كان الجدول يرث ltr فيطلع الشعار يساراً (مرآة $headBodyFr التي تفرض ltr)
     $headBodyAr = function ($logoHtml) use ($headL1, $headL2, $schoolPhone) {
-        return '<table style="width:100%;border-collapse:collapse"><tr><td style="border:none;padding:0;width:32%;text-align:center;line-height:1.8">'
+        return '<div dir="rtl"><table dir="rtl" style="width:100%;border-collapse:collapse"><tr><td style="border:none;padding:0;width:32%;text-align:center;line-height:1.8">'
             . ($logoHtml ? '<div style="margin-bottom:2px">' . $logoHtml . '</div>' : '')
             . '<strong style="font-size:16px">' . e($headL1) . '</strong>'
             . ($headL2 !== '' ? '<br><strong style="font-size:15px">' . e($headL2) . '</strong>' : '')
             // p1 (2026-08-21): سطر الهاتف فقرة dir=rtl مستقلة — بلا rtl صريح كان الوورد يقلب السطر فيظهر الرقم قبل كلمة «هاتف»
             . ($schoolPhone ? '<div dir="rtl" style="font-size:14px">هاتف : <span dir="ltr">' . e($schoolPhone) . '</span></div>' : '')
-            . '</td><td style="border:none;padding:0"></td></tr></table>';
+            . '</td><td style="border:none;padding:0"></td></tr></table></div>';
     };
     $schoolHeadWord = '<div style="margin-bottom:16px">' . $headBodyAr($logoImgWord) . '</div>';
     // أجنبي (مشترَك لكل الإفادات اللاتينية — 2026-08-20 «أي إفادة بأي لغة»): الاسم الفرنسي
@@ -1926,7 +1928,7 @@ if (!$emp):
         <p>فقط <strong><?= e($moneyWords($salShown)) ?> لا غير</strong> .</p>
         <?php /* صيغة «لمن يلزم» شِيلت من كل الإفادات (بطلبه 2026-08-20) */ ?>
         <p>وقد أُعطيت هذه الإفادة بناءً على <?= $g('طلبه', 'طلبها', 'طلبه(ا)') ?> .</p>
-        <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'tadris'): ?>
@@ -1938,7 +1940,7 @@ if (!$emp):
         <p><?= e($sigOpen['ar']) ?> <strong><?= e($schoolNameAr) ?></strong> بأنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <strong><?= e($fnFr['ar']) ?></strong> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php else: ?><?= $endActive ? $g('عمل', 'عملت', 'عمل(ت)') : $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> لديها بوظيفة <?= $g('مدرّس', 'مدرّسة', 'مدرّس(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> منذ تاريخ <strong><?= $emp['hire_date'] ? $hireFmt : $blank(110) ?></strong><?php endif; ?> <?= $endActive ? 'ولغاية تاريخ <strong>' . $endFmt . '</strong> ، ' . $g('وكان', 'وكانت', 'وكان(ت)') : $g('ولا يزال', 'ولا تزال', 'ولا يزال(تزال)') . ' حتى تاريخه ، ' . $g('وهو', 'وهي', 'وهو(هي)') ?> على حسن سلوك والتزام في أداء <?= $g('عمله', 'عملها', 'عمله(ا)') ?> .</p>
         <?php /* صيغة «لمن يلزم» وجملة عدم المسؤولية شِيلتا من كل الإفادات (بطلبه 2026-08-20) */ ?>
         <p>وقد أُعطيت هذه الإفادة بناءً على <?= $g('طلبه', 'طلبها', 'طلبه(ا)') ?> .</p>
-        <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleAr) ?> — التوقيع والختم</strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'riaaya'): ?>
@@ -1948,7 +1950,7 @@ if (!$emp):
         <p><?= e($sigOpen['ar']) ?> <strong><?= e($schoolNameAr) ?></strong> <?= e($assocTxt) ?> ،</p>
         <p>أنّ <?= $g('السيّد', 'السيّدة', 'السيّد(ة)', 'الآنسة') ?> <strong><?= e($nomAr) ?></strong> <?php if ($isEmploye): ?><?= $g('يعمل', 'تعمل', 'يعمل(تعمل)') ?> <strong><?= e($fnFr['ar']) ?></strong> في مدرستنا<?php else: ?><?= $g('هو معلّم', 'هي معلّمة', 'هو(هي) معلّم(ة)') ?> لمادة <strong><?= $subj !== '' ? e($subjAr) : $blank(140) ?></strong> <?= $levelsAr ?> في مدرستنا<?php endif; ?> .</p>
         <p>وللبيان أُعطيت هذه الإفادة .</p>
-        <div style="width:260px;margin:42px auto 0 0;text-align:center"><strong><?= e($sigTitleAr) ?></strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
+        <div style="width:260px;margin:42px 0 0 auto;text-align:center"><strong><?= e($sigTitleAr) ?></strong><?php if ($director): ?><br><?= e($director) ?><?php endif; ?></div>
         <?= $footerHtml ?>
 
       <?php elseif ($type === 'embassy' && $docLang === 'fr'): ?>
