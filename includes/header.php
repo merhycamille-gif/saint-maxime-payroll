@@ -211,7 +211,10 @@ document.addEventListener('submit', function (e) {
         fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', redirect: 'follow', cache: 'no-store' }).then(function (r) {
             return r.text().then(function (html) {
                 f._msaRetrySubmitting = false;
-                if (r.redirected) { window.location.href = r.url; return; }
+                // 🐛 (2026-10-31 «عملت هيك وما شفت الأيقونة بالدونلود»): بعد إعادة التوجيه كنّا نطلب الصفحة مرّة ثانية (location.href) فتضيع
+                //    رسائل الجلسة لمرّة واحدة (flash، صندوق تنزيل الأيقونة مع نقرته التلقائية…) لأنّ fetch استهلكها بالطلب الأوّل ⇒ نعرض الصفحة
+                //    التي رجعت فعلاً (كما بالردّ غير المُعاد توجيهه) ونصحّح العنوان. بلا محتوى ⇒ انتقال عادي.
+                if (r.redirected && !(html && html.length > 200)) { window.location.href = r.url; return; }
                 try { window.history.replaceState(null, '', r.url || url); } catch (x) {}
                 document.open(); document.write(html); document.close();
             });
