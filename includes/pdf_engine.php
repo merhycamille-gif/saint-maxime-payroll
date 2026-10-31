@@ -582,6 +582,8 @@ class MsaPdf
     {
         $eng = [];
         foreach (['pdf_engine.php', 'pdf_chromium.php', 'report_helpers.php'] as $f) $eng[] = (string)@filemtime(__DIR__ . '/' . $f);
+        // 🎨 (2026-10-31 شعار MSA الجديد): الشعارات تُضمَّن بالصورة لا بالـHTML ⇒ تغيّرها لا يغيّر بصمة الـHTML — نضيف تواريخها
+        foreach ((array)glob(dirname(__DIR__) . '/assets/logos/*.{png,jpg,jpeg,svg}', GLOB_BRACE) as $lf) $eng[] = basename($lf) . ':' . (string)@filemtime($lf);
         $eng[] = (class_exists('MsaChromePdf') && MsaChromePdf::available($o)) ? 'chrome' : 'mpdf';
         $eng[] = date('Y-m-d');
         return sha1($html . '|' . json_encode($o, JSON_UNESCAPED_UNICODE) . '|' . implode(',', $eng) . '|v1');
