@@ -80,5 +80,13 @@ function reportCenterCategories(): array {
             ['url'=>$OF.'general_report', 'icon'=>'fa-chart-column', 'color'=>'var(--primary)', 'fr'=>'Rapport général', 'ar'=>'تقرير عام بالمجاميع'],
         ]],
     ];
+    // 🔒 (2026-10-31 «ولا تقرير يقدر يشتغلو فيه بس يشوفو») حساب المدرسة: لا بطاقات تقود لصفحات خارج صلاحياته (كانت تطرده للوحة)
+    if (isViewer()) {
+        foreach ($categories as &$c) {
+            $c['tiles'] = array_values(array_filter($c['tiles'], function ($t) { return !preg_match('~pages/([a-z0-9_]+\.php)~', (string)($t['url'] ?? ''), $m) || viewerCanSeePage($m[1]); }));
+        }
+        unset($c);
+        $categories = array_values(array_filter($categories, fn($c) => !empty($c['tiles'])));
+    }
     return $categories;
 }

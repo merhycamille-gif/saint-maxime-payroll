@@ -699,7 +699,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                                                 <?php if (!isAllSchools()): ?><a href="?action=calc&employee_id=<?= (int)$r['id'] ?>&month=<?= $month ?>&year=<?= $year ?>"><i class="fas fa-calculator"></i> <?= $r['is_calculated'] ? 'Recalculer / إعادة الاحتساب' : 'Calculer / احتساب' ?></a><?php endif; ?>
                                                 <?php if (canEdit()): ?><a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$r['id'] ?>"><i class="fas fa-pen"></i> Modifier le dossier / تعديل الملف</a><?php endif; ?>
                                                 <?php if (viewerCanSeePage('attestations.php')): ?><a href="<?= BASE_URL ?>pages/attestations.php?dossier=1&employee_id=<?= (int)$r['id'] ?>"><i class="fas fa-folder-open"></i> Dossier complet / الملف الكامل</a><?php endif; ?>
-                                                <a href="<?= BASE_URL ?>pages/employee_full_history.php?employee_id=<?= (int)$r['id'] ?>"><i class="fas fa-clock-rotate-left"></i> Historique / التاريخ الكامل</a>
+                                                <?php if (viewerCanSeePage('employee_full_history.php')): ?><a href="<?= BASE_URL ?>pages/employee_full_history.php?employee_id=<?= (int)$r['id'] ?>"><i class="fas fa-clock-rotate-left"></i> Historique / التاريخ الكامل</a><?php endif; ?>
                                             </div>
                                         </div>
                                     </td>

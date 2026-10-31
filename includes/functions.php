@@ -135,6 +135,7 @@ function viewerReportExports() {
         'reports.php'     => ['reports_export.php'],
         'annual_slip.php' => ['annual_slip_export.php'],
         'attestations.php' => ['employee_fiche.php'],   // 🪪 (2026-10-19) بطاقة الأستاذ A4 تتبع صلاحية الإفادات/الملف الكامل
+        'employee_history.php' => ['employee_full_history.php'],   // 🕰️ (2026-10-31) «التاريخ الكامل» قراءة فقط يتبع صلاحية «سيرة الأستاذ» (كان رابطه يطرد حساب المدرسة للوحة)
     ];
 }
 

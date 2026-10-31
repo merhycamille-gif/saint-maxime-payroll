@@ -7,6 +7,13 @@ if (isLoggedIn()) {
     exit;
 }
 
+// 🔑📱 (2026-10-31 «أيقونة كوبي باست وبس») هاتف/تابلت رُكّب عليه رابط الدخول المباشر (كوكي msapay_key) ⇒ دخول تلقائي لحساب المدرسة بلا كلمة سرّ (includes/key_access.php)
+if (!empty($_COOKIE['msapay_key']) && is_file(__DIR__ . '/includes/key_access.php')) {
+    require_once __DIR__ . '/includes/school_access.php';
+    require_once __DIR__ . '/includes/key_access.php';
+    if (kaCookieLogin()) { header('Location: ' . BASE_URL . 'index.php'); exit; }
+}
+
 $error = '';
 
 // 🏫 (2026-10-22 «لكل مدرسة أيقونة تفتح عندها على المكتب») login.php?u=<اسم دخول المدرسة> ⇒ صفحة دخول باسم المدرسة:

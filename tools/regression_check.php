@@ -10876,6 +10876,33 @@ try {
 } catch (Throwable $e) { $ok279 = false; $why279 = $e->getMessage(); }
 check('👨🔤 اسم الأب بالفورم (إلزامي + اعتماد + نواقص) + الخانات العربية ترفض اللاتيني + تعريب تلقائي بالنماذج الرسمية (قاموس لبنان + قواعد) + أداة «تعريب الأسماء والعناوين»', $ok279, $why279);
 
+/* ---------- 🔑 (2026-10-31) أيقونات الدخول المباشر: طبقة فوق حسابات viewer بلا مسّ المحرّك ---------- */
+try {
+    $ka = (string)file_get_contents($PROJ . '/includes/key_access.php'); $lp = (string)file_get_contents($PROJ . '/login.php'); $sa = (string)file_get_contents($PROJ . '/pages/school_access.php');
+    $okF = is_file($PROJ . '/key_login.php') && is_file($PROJ . '/key_go.php') && is_file($PROJ . '/key_link.php') && is_file($PROJ . '/tools/desktop_icon/MSA Payroll.exe') && filesize($PROJ . '/tools/desktop_icon/MSA Payroll.exe') > 10000
+         && strpos($ka, "!== 'viewer'") !== false && strpos($ka, "hash_equals") !== false && strpos($ka, 'kaIsPreviewBot') !== false
+         && strpos($lp, "kaCookieLogin()") !== false && strpos($sa, "act === 'key_new'") !== false && strpos($sa, "act === 'save_hq'") !== false;
+    // key_login بـGET (بلا مفتاح) = رفض نصّي، لا جلسة ولا خطأ
+    $kl = renderPage('key_login.php', [], []);
+    $okL = strpos($kl, 'ERR') === 0 || strpos($kl, "ERR\n") !== false;
+    // key_go بلا وسائط ⇒ تحويل لصفحة الدخول (لا جلسة)
+    $kg = renderPage('key_go.php', [], []);
+    $okG = stripos($kg, 'Fatal error') === false && stripos($kg, 'Parse error') === false && stripos($kg, 'Tableau de bord') === false;   // تحويل صامت (لا جلسة ولا لوحة)
+    // صفحة «دخول المدارس» ترندر مع قسم الرئاسة وأزرار الأيقونات
+    $hs = renderPage('pages/school_access.php', [], [], [], 'lbp', '2026-2027');
+    $okS = $noFatal($hs) && strpos($hs, 'Présidence générale') !== false && strpos($hs, 'Icône ordinateur') !== false && strpos($hs, 'Toutes les écoles') !== false;
+    $ok280 = $okF && $okL && $okG && $okS; $why280 = 'files=' . ($okF ? 'ok' : 'NO') . ' key_login=' . ($okL ? 'ok' : 'NO') . ' key_go=' . ($okG ? 'ok' : 'NO') . ' page=' . ($okS ? 'ok' : 'NO');
+} catch (Throwable $e) { $ok280 = false; $why280 = $e->getMessage(); }
+check('🔑 أيقونات الدخول المباشر (exe/رابط) لحسابات القراءة فقط + قسم الرئاسة العامة بصفحة «دخول المدارس» + login.php بالكوكي', $ok280, $why280);
+
+/* ---------- 🔒👁️ (2026-10-31) «ولا تقرير يقدر يشتغلو فيه بس يشوفو»: فحص عرض-فقط حيّ على نسخة الكمبيوتر (tools/viewer_audit.php) ---------- */
+try {
+    $vaOut = (string)shell_exec('"' . PHP_BINARY . '" ' . escapeshellarg($PROJ . '/tools/viewer_audit.php') . ' 2>&1');
+    $ok281 = strpos($vaOut, 'OK —') === 0 || strpos(ltrim($vaOut), 'OK —') === 0;
+    $why281 = trim(strtok($vaOut, "\n")) . ($ok281 ? '' : ' | ' . mb_substr(preg_replace('/\s+/', ' ', $vaOut), 0, 400));
+} catch (Throwable $e) { $ok281 = false; $why281 = $e->getMessage(); }
+check('🔒👁️ حساب القراءة فقط: كل الصفحات المسموحة بلا نماذج/أزرار كتابة ولا روابط تطرده · POST/GET كتابة على كل ملفّ مرفوض وقاعدة البيانات بلا تغيير · الصفحات غير المسموحة تطرد (viewer_audit)', $ok281, $why281);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

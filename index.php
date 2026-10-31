@@ -73,7 +73,7 @@ $exchangeRate = getExchangeRate();
 
 // تنبيه بلوغ سنّ الـ64 — الرئيسية تعرض **فقط** من بلغوا 64 ضمن السنة الدراسية المختارة؛
 // أما القائمة الكاملة (كل من بلغوا 64) ففي صفحتها الخاصة pages/retirement_64.php.
-$home64 = age64List($db, true);
+$home64 = canEdit() ? age64List($db, true) : [];   // 🔒 (2026-10-31 «ولا تقرير يقدر يشتغلو فيه») بطاقات القرار (إبقاء/ترك) للمدير فقط — حساب القراءة لا يراها (كانت تظهر بأزرارها رغم رفض الحفظ)
 
 // 🕐 تناقص ساعات التدريس: من صار عنده تناقص جديد ببداية السنة المعروضة — مساج بكل مدرسة يطلب الإذن
 $homeHrSy = activeSchoolYear(); if ($homeHrSy === 'all') $homeHrSy = currentSchoolYear();
@@ -174,7 +174,7 @@ $dashSections = [
         canEdit() ? ['pages/exceptional_laws.php','fas fa-scroll','Lois exceptionnelles','القوانين الاستثنائية'] : null,
         canEdit() ? ['pages/bulk_allowances.php','fas fa-gift','Primes & transport','المكافآت والنقل'] : null,
         canEdit() ? ['pages/family_allowances.php','fas fa-people-roof','Allocations familiales','التعويض العائلي'] : null,
-        ['pages/employee_full_history.php','fas fa-clock-rotate-left','Historique complet','التاريخ الكامل للأستاذ'],
+        viewerCanSeePage('employee_full_history.php') ? ['pages/employee_full_history.php','fas fa-clock-rotate-left','Historique complet','التاريخ الكامل للأستاذ'] : null,   // 🔒 (2026-10-31) حساب المدرسة يراه فقط إن سُمح له بـ«سيرة الأستاذ»
         canEdit() ? ['pages/law_check.php','fas fa-balance-scale','Conformité légale','فحص مطابقة القانون'] : null,
     ])],
     ['Paie', 'الرواتب', 'fa-money-check-dollar', '#16a34a', 'rgba(22,163,74,.10)', array_filter([
