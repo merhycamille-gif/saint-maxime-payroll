@@ -160,6 +160,14 @@ $secIcon = $sectionIcons[$sec] ?? 'fa-gauge-high';
 /* 🧭 (2026-10-16 p1 «التبويب والديزاين متل Namecheap»): شريط تبويبات علوي بقوائم منسدلة لكل باب يحلّ محلّ العامود الجانبي؛ msa_side=1 يرجّع العامود (كبسة ☰ بآخر الشريط) */
 try{if(localStorage.getItem('msa_side')==='1')document.body.classList.add('msa-side');}catch(e){}</script>
 
+<?php if (!empty($_SESSION['_impersonator'])): // 👁️ (2026-10-31) وضع المعاينة «كما تراه المدرسة»: شريط ثابت + رجوع للمدير (key_preview.php) ?>
+<div id="kaPreviewBar" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#b45309;color:#fff;font:600 14px/1.3 'Segoe UI',Tahoma,sans-serif;padding:8px 14px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.25)">
+    <span><i class="fas fa-eye"></i> Aperçu : vous voyez le programme exactement comme « <?= e((string)($_SESSION['username'] ?? '')) ?> » (lecture seule — rien ne peut être modifié)</span>
+    <span dir="rtl">معاينة: عم تشوف البرنامج تماماً كما يراه حساب «<?= e((string)($_SESSION['username'] ?? '')) ?>» (قراءة فقط — ما في شي بينعدّل)</span>
+    <a href="<?= BASE_URL ?>key_preview.php?back=1" style="background:#fff;color:#b45309;border-radius:8px;padding:5px 12px;text-decoration:none;font-weight:700"><i class="fas fa-arrow-right-from-bracket"></i> Retour administrateur / رجوع للمدير</a>
+</div>
+<style>body{padding-top:44px!important}</style>
+<?php endif; ?>
 <!-- حماية CSRF: حقن توكن تلقائياً بكل نماذج POST -->
 <script>
 document.addEventListener('submit', function (e) {

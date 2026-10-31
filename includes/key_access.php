@@ -114,6 +114,47 @@ function kaCreateLink(int $userId, string $label, string $by): array {
     return [$id, kaBase() . 'key_link.php?k=' . $sel . '&t=' . $tok];
 }
 
+/* ───── 📦 تسليم ملف الأيقونة عبر رابط تنزيل (لا عبر ردّ النموذج): نافذة التطبيق المركَّب (PWA) كانت تعرض الملف الثنائي كصفحة خربانة
+ *        بدل تنزيله ⇒ الملف يُحفَظ مؤقّتاً بـtmp/keys ويُنزَّل بـ<a download href="key_dl.php?t=…"> (15 دقيقة، مرّة واحدة، للمدير فقط) ───── */
+function kaTmpDir(): string { $d = dirname(__DIR__) . '/tmp/keys'; if (!is_dir($d)) @mkdir($d, 0770, true); return $d; }
+/** ZIP يحوي الـexe (أسهل بالواتساب وبلا تحذير «ملف خطر» بالمتصفّح)؛ بلا ZipArchive ⇒ الـexe نفسه */
+function kaPackage(string $exeBytes, string $exeName): array {
+    if (class_exists('ZipArchive')) {
+        $tmp = tempnam(sys_get_temp_dir(), 'kaz'); $z = new ZipArchive();
+        if ($z->open($tmp, ZipArchive::OVERWRITE) === true) {
+            $z->addFromString($exeName, $exeBytes);
+            $z->addFromString('LISEZ-MOI.txt', "MSA Payroll — Icône d'accès direct / أيقونة الدخول المباشر\r\n\r\n1) Copiez le fichier « $exeName » sur le Bureau.\r\n2) Double-cliquez : le programme s'ouvre directement (sans identifiant ni mot de passe).\r\nSi Windows affiche un écran bleu la première fois : « Informations complémentaires » puis « Exécuter quand même ».\r\n\r\n1) انسخوا الملف «$exeName» على سطح المكتب.\r\n2) اكبسوا عليه مرّتين: يفتح البرنامج مباشرة (بلا اسم مستخدم ولا كلمة سرّ).\r\nإذا ظهرت شاشة زرقاء أوّل مرّة: «More info» ثمّ «Run anyway».\r\n");
+            $z->close(); $zip = (string)file_get_contents($tmp); @unlink($tmp);
+            if ($zip !== '') return [$zip, preg_replace('/\.exe$/i', '.zip', $exeName), 'application/zip'];
+        }
+        @unlink($tmp);
+    }
+    return [$exeBytes, $exeName, 'application/octet-stream'];
+}
+/** يحفظ الملف مؤقّتاً ويرجع رمز التنزيل */
+function kaStoreDownload(string $bytes, string $fileName, string $mime): string {
+    $d = kaTmpDir();
+    foreach (glob($d . '/*.bin') ?: [] as $old) if (filemtime($old) < time() - 3600) { @unlink($old); @unlink(substr($old, 0, -4) . '.json'); }
+    $t = bin2hex(random_bytes(16));
+    file_put_contents($d . '/' . $t . '.bin', $bytes);
+    file_put_contents($d . '/' . $t . '.json', json_encode(['name' => $fileName, 'mime' => $mime, 'uid' => (int)($_SESSION['user_id'] ?? 0), 'at' => time()]));
+    return $t;
+}
+/** يرسل الملف المؤقّت (للمدير صاحب الجلسة نفسها، خلال 15 دقيقة) ويحذفه؛ false إن لم يوجد */
+function kaSendStored(string $t): bool {
+    if (!preg_match('/^[a-f0-9]{32}$/', $t)) return false;
+    $d = kaTmpDir(); $bin = $d . '/' . $t . '.bin'; $meta = $d . '/' . $t . '.json';
+    if (!is_file($bin) || !is_file($meta)) return false;
+    $m = json_decode((string)file_get_contents($meta), true) ?: [];
+    if ((int)($m['uid'] ?? -1) !== (int)($_SESSION['user_id'] ?? 0) || time() - (int)($m['at'] ?? 0) > 900) { @unlink($bin); @unlink($meta); return false; }
+    $bytes = (string)file_get_contents($bin); @unlink($bin); @unlink($meta);
+    while (ob_get_level()) ob_end_clean();
+    $fn = (string)($m['name'] ?? 'MSA-Payroll.zip');
+    header('Content-Type: ' . ($m['mime'] ?? 'application/octet-stream')); header('Content-Length: ' . strlen($bytes)); header('Cache-Control: no-store'); header('X-Content-Type-Options: nosniff');
+    header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9 ._-]/', '', $fn) . '"; filename*=UTF-8\'\'' . rawurlencode($fn));
+    echo $bytes; return true;
+}
+
 function kaSendExe(string $bytes, string $fileName): void {
     header('Content-Type: application/octet-stream'); header('Content-Length: ' . strlen($bytes)); header('Cache-Control: no-store'); header('X-Content-Type-Options: nosniff');
     header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9 ._-]/', '', $fileName) . '"; filename*=UTF-8\'\'' . rawurlencode($fileName));

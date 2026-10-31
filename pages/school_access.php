@@ -49,7 +49,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $vu = kaViewer($uid);
             if ($label === '') $label = ($kind === 'link' ? 'Téléphone — ' : 'Ordinateur — ') . kaLabelFor($vu);
             if ($kind === 'link') { [$kid, $link] = kaCreateLink($uid, $label, (string)($_SESSION['username'] ?? '')); $_SESSION['ka_new_link'] = ['uid' => $uid, 'url' => $link, 'label' => kaLabelFor($vu)]; }
-            else { [$kid, $bytes] = kaCreateExe($uid, $label, (string)($_SESSION['username'] ?? '')); kaSendExe($bytes, kaFileName($vu)); }
+            else {
+                [$kid, $bytes] = kaCreateExe($uid, $label, (string)($_SESSION['username'] ?? ''));
+                [$pkg, $pkgName, $mime] = kaPackage($bytes, kaFileName($vu));
+                $_SESSION['ka_new_file'] = ['uid' => $uid, 't' => kaStoreDownload($pkg, $pkgName, $mime), 'name' => $pkgName, 'label' => kaLabelFor($vu)];   // 📦 يُنزَّل بالصفحة عبر key_dl.php
+            }
         } catch (Throwable $e) { $_SESSION['flash_error'] = $e->getMessage(); }
         header('Location: ' . $self . $back); exit;
     }
@@ -191,6 +195,7 @@ $takenNow = saTakenMap($db);
 // 🔑 المفاتيح لكل حساب + الرابط الجديد (يظهر مرّة واحدة) + حساب الرئاسة (viewer بعدّة مدارس أو all)
 $keysBy = kaAllByUser();
 $newLink = $_SESSION['ka_new_link'] ?? null; unset($_SESSION['ka_new_link']);
+$newFile = $_SESSION['ka_new_file'] ?? null; unset($_SESSION['ka_new_file']);
 $hq = null;
 foreach ($db->query("SELECT * FROM users WHERE role = 'viewer' ORDER BY (username = 'presidence') DESC, id")->fetchAll() as $vu) {
     $as = (string)($vu['allowed_schools'] ?? '');
@@ -201,10 +206,17 @@ $hqSel = ($hqSchools === 'all' || $hqSchools === '') ? [] : array_map('intval', 
 $hqPagesRaw = $hq ? ($hq['allowed_pages'] ?? null) : null;
 $hqPages = $hqPagesRaw === null ? array_keys($pages) : array_filter(array_map('trim', explode(',', (string)$hqPagesRaw)));
 /** 🔑 كتلة الأيقونات لحساب: اللائحة + كبستا الإنشاء */
-function saKeysBlock(?array $u, array $keysBy, ?array $newLink, string $self, string $anchor): string {
+function saKeysBlock(?array $u, array $keysBy, ?array $newLink, string $self, string $anchor, ?array $newFile = null): string {
     if (!$u) return '<small class="text-muted">Enregistrez d\'abord le compte / احفظ الحساب أوّلاً</small>';
     $uid = (int)$u['id']; $h = '<div class="ka-box">';
     $h .= '<div class="ka-title"><i class="fas fa-key"></i> Icône d\'accès direct <span dir="rtl">· أيقونة الدخول المباشر</span></div>';
+    if ($newFile && (int)$newFile['uid'] === $uid) {
+        $dl = BASE_URL . 'key_dl.php?t=' . rawurlencode((string)$newFile['t']);
+        $h .= '<div class="ka-new" id="kaNewFile"><b>Fichier prêt — il se télécharge maintenant (dossier Téléchargements) ; envoyez-le par WhatsApp à l\'école / الملف جاهز — عم ينزل هلّق (مجلّد التنزيلات)؛ ابعته بالواتساب للمدرسة:</b>'
+            . '<div class="ka-link-row"><a id="kaDl" class="btn btn-success" href="' . e($dl) . '" download="' . e((string)$newFile['name']) . '"><i class="fas fa-download"></i> ' . e((string)$newFile['name']) . ' — Télécharger / نزّل</a></div>'
+            . '<small class="text-muted">Si rien ne se passe, cliquez le bouton vert. Ne l\'ouvrez pas vous-même. / إذا ما نزل شي اكبس الزرّ الأخضر. لا تفتحه أنت.</small></div>'
+            . '<script>setTimeout(function(){var a=document.getElementById("kaDl");if(a){a.scrollIntoView({block:"center"});a.click();}},400);</script>';
+    }
     if ($newLink && (int)$newLink['uid'] === $uid) $h .= '<div class="ka-new"><b>Lien pour le téléphone — à envoyer par WhatsApp (affiché une seule fois) / رابط الموبايل — ابعته بواتساب (يظهر مرّة واحدة):</b><div class="ka-link-row"><input class="form-control" value="' . e($newLink['url']) . '" readonly dir="ltr" onclick="this.select()"><button type="button" class="btn btn-info" onclick="saCopyText(this,this.previousElementSibling.value)"><i class="fas fa-copy"></i> Copier / نسخ</button></div></div>';
     foreach ($keysBy[$uid] ?? [] as $k) {
         $isLink = $k['kind'] === 'link';
@@ -221,7 +233,8 @@ function saKeysBlock(?array $u, array $keysBy, ?array $newLink, string $self, st
         $h .= '</div>';
     }
     $h .= '<div class="ka-actions">'
-        . '<form method="POST" action="' . e($self) . '" class="ka-inline" onsubmit="setTimeout(function(){location.reload()},3000)"><input type="hidden" name="csrf" value="' . csrfToken() . '"><input type="hidden" name="act" value="key_new"><input type="hidden" name="kind" value="exe"><input type="hidden" name="user_id" value="' . $uid . '"><input type="hidden" name="back" value="' . e($anchor) . '"><button type="submit" class="btn btn-primary btn-xs" title="Fichier à copier sur le bureau : un double-clic ouvre le programme sans mot de passe · ملف يُنسخ على سطح المكتب: كبستان تفتحان البرنامج بلا كلمة سرّ"><i class="fas fa-download"></i> Icône ordinateur / أيقونة الكمبيوتر</button></form> '
+        . '<a class="btn btn-warning btn-xs" href="' . e(BASE_URL . 'key_preview.php?u=' . $uid . '&csrf=' . csrfToken()) . '" title="Voir le programme exactement comme ce compte le voit (lecture seule), puis « Retour administrateur » · شوف البرنامج تماماً كما يراه هذا الحساب ثمّ «رجوع للمدير»"><i class="fas fa-eye"></i> Aperçu — voir comme l\'école / معاينة — شوف متل ما بتشوف</a> '
+        . '<form method="POST" action="' . e($self) . '" class="ka-inline"><input type="hidden" name="csrf" value="' . csrfToken() . '"><input type="hidden" name="act" value="key_new"><input type="hidden" name="kind" value="exe"><input type="hidden" name="user_id" value="' . $uid . '"><input type="hidden" name="back" value="' . e($anchor) . '"><button type="submit" class="btn btn-primary btn-xs" title="Fichier à copier sur le bureau : un double-clic ouvre le programme sans mot de passe · ملف يُنسخ على سطح المكتب: كبستان تفتحان البرنامج بلا كلمة سرّ"><i class="fas fa-download"></i> Icône ordinateur / أيقونة الكمبيوتر</button></form> '
         . '<form method="POST" action="' . e($self) . '" class="ka-inline"><input type="hidden" name="csrf" value="' . csrfToken() . '"><input type="hidden" name="act" value="key_new"><input type="hidden" name="kind" value="link"><input type="hidden" name="user_id" value="' . $uid . '"><input type="hidden" name="back" value="' . e($anchor) . '"><button type="submit" class="btn btn-info btn-xs" title="Lien à ouvrir une fois sur le téléphone · رابط يُفتح مرّة على الموبايل"><i class="fas fa-mobile-screen"></i> Icône téléphone / أيقونة الموبايل</button></form>'
         . '</div></div>';
     return $h;
@@ -328,7 +341,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php endif; ?>
                         </div>
                 </form>
-                        <?= saKeysBlock($u, $keysBy, $newLink, $self, '#s' . $sid) ?>
+                        <?= saKeysBlock($u, $keysBy, $newLink, $self, '#s' . $sid, $newFile) ?>
                         <?php if ($u): ?>
                         <form method="POST" action="<?= $self ?>" style="margin-top:6px;display:flex;gap:4px;align-items:center" data-confirm="<?= e('Envoyer le lien, l\'identifiant et le mot de passe à cette école ? / إرسال الرابط واسم الدخول وكلمة السرّ لهذه المدرسة؟') ?>">
                             <input type="hidden" name="csrf" value="<?= csrfToken() ?>">
@@ -374,7 +387,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div style="margin-top:10px"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer / حفظ</button> <small class="text-muted">Lecture seule : la présidence ne modifie rien / عرض فقط: الرئاسة ما بتعدّل شي</small></div>
         </form>
-        <?= saKeysBlock($hq, $keysBy, $newLink, $self, '#hq') ?>
+        <?= saKeysBlock($hq, $keysBy, $newLink, $self, '#hq', $newFile) ?>
     </div>
 </div>
 
