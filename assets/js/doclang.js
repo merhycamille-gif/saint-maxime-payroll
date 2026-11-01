@@ -147,11 +147,24 @@
             });
         });
     }
-    var state = { lang: 'both', side: '' };
-    try { state.lang = localStorage.getItem('msa_rl') || 'both'; state.side = localStorage.getItem('msa_rs') || ''; } catch (e) {}
-    if (['ar', 'fr', 'both'].indexOf(state.lang) < 0) state.lang = 'both';
+    // 🌐🔴 (2026-11-01 «اتفقنا إذا حاطط عربي الاتجاه من اليمين وإذا فرنسي من الشمال… لازم يحوّل تلقائي حسب اللغة كل شي بالبرنامج»)
+    //    لغة البرنامج (كبسة الكرة الأرضية = <html lang>) هي الأساس: عربي ⇒ التقارير عربي/يمين، فرنسي ⇒ فرنسي/شمال — تلقائياً بكل صفحة.
+    //    حبّة «عربي / Français / الاثنان» = خيار مؤقّت لهذا المستند فقط (يبقى عند إعادة تحميل نفس الصفحة، ولا ينتقل لصفحة أخرى ولا يُحفَظ على الجهاز):
+    //    كانت الحبّة تُحفَظ بالمتصفّح (msa_rl) فحبّة «عربي» من تقرير قديم قلبت لائحة الموظفين لليمين والبرنامج فرنسي. «الاثنان» بلا جهة مختارة = جهة لغة البرنامج.
+    var UI = (document.documentElement.getAttribute('lang') || 'fr').toLowerCase().indexOf('ar') === 0 ? 'ar' : 'fr';
+    var UI_SIDE = UI === 'ar' ? 'rtl' : 'ltr';
+    // مستند بلغته الخاصّة (إفادة/بطاقة: كبسات .doc-langs العربية/Français/English) ⇒ نصّه واتجاهه من كبساته هو، لا من لغة البرنامج ولا من حبّة
+    var OWN = !!document.querySelector('.export-toolbar .doc-langs');
+    var PGKEY = 'msa_rl_pg:' + UI + ':' + location.pathname + location.search;
+    var state = { lang: OWN ? 'both' : UI, side: '' };
+    try {
+        ['msa_rl', 'msa_rs', 'msa_rl_ui'].forEach(function (k) { localStorage.removeItem(k); });   // تنظيف الحفظ القديم على الجهاز
+        document.cookie = 'msa_rl=;path=/;max-age=0;SameSite=Lax'; document.cookie = 'msa_rs=;path=/;max-age=0;SameSite=Lax';
+        if (!OWN) { var pg = JSON.parse(sessionStorage.getItem(PGKEY) || 'null'); if (pg && ['ar', 'fr', 'both'].indexOf(pg.lang) >= 0) { state.lang = pg.lang; state.side = pg.side === 'rtl' || pg.side === 'ltr' ? pg.side : ''; } }
+    } catch (e) {}
     function rlStateSheet(od) { return od.hasAttribute('dir') && !/\b(cnss-form|mof-form|tcard|eos-doc|fiche-a4|print-only)\b/.test(od.className); }   // كشف رواتب للدولة (لا نموذج طبق الأصل)
-    function effSide() { return state.lang === 'ar' ? 'rtl' : state.lang === 'fr' ? 'ltr' : (state.side === 'rtl' || state.side === 'ltr' ? state.side : ''); }
+    function effSide() { if (OWN) return ''; return state.lang === 'ar' ? 'rtl' : state.lang === 'fr' ? 'ltr' : (state.side === 'rtl' || state.side === 'ltr' ? state.side : UI_SIDE); }
+    function savePg() { try { sessionStorage.setItem(PGKEY, JSON.stringify({ lang: state.lang, side: state.side })); } catch (e) {} }
     function apply() {
         wrapAll();
         var L = state.lang, body = document.body;
@@ -203,8 +216,8 @@
         var pr = splitPair(String(s || '')); if (!pr) return s; var L = state.lang;
         return (L === 'ar' ? pr.ar : L === 'fr' ? pr.fr : pr.fr + ' / ' + pr.ar) + (pr.suf || '');
     };
-    function setLang(l) { state.lang = l; try { localStorage.setItem('msa_rl', l); document.cookie = 'msa_rl=' + l + ';path=/;max-age=31536000;SameSite=Lax'; } catch (e) {} apply(); }
-    function setSide(s) { state.side = s; try { localStorage.setItem('msa_rs', s); document.cookie = 'msa_rs=' + s + ';path=/;max-age=31536000;SameSite=Lax'; } catch (e) {} apply(); }
+    function setLang(l) { state.lang = l; savePg(); apply(); }
+    function setSide(s) { state.side = s; savePg(); apply(); }
     document.addEventListener('click', function (e) {
         var c = e.target.closest('.rl-chip[data-rl]'); if (c) { e.preventDefault(); setLang(c.getAttribute('data-rl')); return; }
         var s = e.target.closest('.rl-side'); if (s) { e.preventDefault(); setSide(s.getAttribute('data-rs')); }
