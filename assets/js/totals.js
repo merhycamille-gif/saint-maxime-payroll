@@ -63,6 +63,9 @@
         // الأعمدة الرقمية: ≥60٪ من خاناتها أرقام (الفارغة لا تُحتسب)؛ العمود الأوّل (#) مستثنى
         var numeric = [];
         for (var c = 1; c < nCols; c++) { var ok = 0, tot = 0; dataRows.forEach(function (r) { var p = parseCell(r.cells[c]); if (p.empty) return; tot++; if (p.ok) ok++; }); numeric[c] = tot > 0 && ok / tot >= 0.6; }
+        // 🚫Σ (2026-11-02 «جمع أرقام الرموز ما إلو معنى») أعمدة الرمز/الأرقام الرسمية/الهاتف/التواريخ ليست مبالغ ⇒ بلا كبسة مجموع
+        var NOSUM = /\b(code|n°|cnss|mof|caisse|registre|t[ée]l|date|année|naissance|embauche|titularisation|échéance|échelon)\b|الرمز|رقم|الضمان|المالية|الصندوق|هاتف|تاريخ|السنة|الولادة|الدخول|الملاك|يستحقّ|الدرجة/i;   // الدرجة ليست مبلغاً («524 L.L» بلا معنى)
+        for (var c2 = 1; c2 < nCols; c2++) { if (numeric[c2] && headOf[c2] && NOSUM.test((headOf[c2].textContent || '').replace(/\s+/g, ' '))) numeric[c2] = false; }
         if (!numeric.some(Boolean)) return;
         tbl.dataset.msaTotals = '1';
         var ctx = { tbl: tbl, ti: ti, nCols: nCols, numeric: numeric, dataRows: dataRows, headOf: headOf, sel: (picked[ti] || []).filter(function (c) { return numeric[c]; }), sumTds: [], grpTds: [] };

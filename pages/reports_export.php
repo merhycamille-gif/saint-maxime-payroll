@@ -284,6 +284,7 @@ if ($report === 'monthly_summary') {
         'name' => ['الاسم', fn($r) => (empFullNameFr($r)) . empBadgesText($r, $db, $bonusSy)], // 🆕 (2026-09-23) (جديد) (ملف ناقص)
         'name_ar' => ['الاسم بالعربي', fn($r) => empFullNameAr($r)],
         'type' => ['الفئة', fn($r) => employeeTypeLabel($r['employee_type'])],
+        'tax' => ['يخضع للضرائب', fn($r) => empDeductionsText($r)], // 🧾 (2026-11-02) الضمان + الضريبة + الصندوق
         'diploma' => ['الشهادة', fn($r) => $r['employee_type'] === 'employe' ? jobTitleLabel($r['job_title'] ?? '') : diplomaLabel($r['diploma'])],
         'diploma_img' => ['صورة الشهادة', fn($r) => !empty($r['diploma_doc_path']) ? (BASE_URL . $r['diploma_doc_path']) : '—'],
         'civil_img' => ['صورة إخراج القيد', fn($r) => !empty($r['id_document_path']) ? (BASE_URL . $r['id_document_path']) : '—'],
@@ -304,14 +305,14 @@ if ($report === 'monthly_summary') {
         'address' => ['السكن', fn($r) => trim(implode(' ', array_filter([$r['gouvernorat'], $r['district'], $r['ville'], $r['rue'], $r['immeuble']])))],
         'birth' => ['الولادة', fn($r) => trim(formatDate($r['birth_date']) . ' ' . $r['birth_place'])],
         'social' => ['الوضع العائلي', fn($r) => $r['social_status'] . ' (' . (int)$r['number_of_children'] . ')'],
-        'hire' => ['الدخول', fn($r) => formatDate(shownHireDate($r))],
+        'hire' => ['تاريخ الدخول', fn($r) => formatDate(shownHireDate($r))],
         'titul' => ['دخول الملاك', fn($r) => formatDate(shownTitularizationDate($r))],
         'hours' => ['ساعات/أسبوع', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'], 1), '0'), '.')],
         'days' => ['أيام/أسبوع', fn($r) => (int)$r['days_per_week']],
         'status' => ['الحالة', fn($r) => employeeStatusLabel($r['status'])['label']],
         'gaps' => ['ملف ناقص', fn($r) => incompleteFileText($r, $db, $bonusSy)], // 🆕 (2026-09-23) نفس عمود الشاشة
     ];
-    $defaultCols = ['code', 'name', 'type', 'grade', 'status'];
+    $defaultCols = ['code', 'name', 'type', 'grade', 'hire', 'tax', 'status'];   // 📅🧾 (2026-11-02) كالشاشة
     $sel = $_GET['cols'] ?? $defaultCols;
     if (!is_array($sel)) $sel = $defaultCols;
     $sel = array_values(array_filter($sel, fn($c) => isset($cols[$c])));

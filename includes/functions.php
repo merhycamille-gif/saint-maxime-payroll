@@ -42,6 +42,25 @@ if (!function_exists('empFullNameAr')) {
     }
 }
 if (!function_exists('empFullNameFr')) {
+    /** 🌐 (2026-11-02) الاسم بوجهين «FR / AR» لخانات التقارير — doclang.js يُظهر وجه لغة التقرير؛ بلا اسم عربي مستقلّ ⇒ الفرنسي وحده (لا تكرار) */
+    function empNamePair(array $e): string {
+        $fr = empFullNameFr($e); $ar = empFullNameAr($e);
+        if ($ar === '' || $ar === $fr || !preg_match('/[\x{0600}-\x{06FF}]/u', $ar)) return htmlspecialchars($fr, ENT_QUOTES, 'UTF-8');
+        return htmlspecialchars($fr . ' / ' . $ar, ENT_QUOTES, 'UTF-8');
+    }
+    /** 🧾 (2026-11-02 «اتفقنا نعتمد أوّل شي ضرائب الضمان») «يخضع للضرائب» = كل المحسومات: الضمان + ضريبة الدخل + الصندوق (كبسات ملف الموظف الثلاث).
+     *  يرجع «Oui / نعم» إن خضع للثلاثة، «Non / كلا» إن لم يخضع لشيء، وإلّا الأسماء بالضبط بالترتيب ضمان ثمّ ضريبة ثمّ صندوق («CNSS + Impôt / ضمان + ضريبة»). */
+    function empDeductionsText(array $e): string {
+        $f = [
+            ['on' => (int)($e['cnss_subject'] ?? 1) === 1, 'fr' => 'CNSS',   'ar' => 'ضمان'],
+            ['on' => (int)($e['tax_subject'] ?? 1) === 1,  'fr' => 'Impôt',  'ar' => 'ضريبة'],
+            ['on' => (int)($e['eoc_subject'] ?? 1) === 1,  'fr' => 'Caisse', 'ar' => 'صندوق'],
+        ];
+        $on = array_values(array_filter($f, fn($x) => $x['on']));
+        if (count($on) === 3) return 'Oui / نعم';
+        if (!$on) return 'Non / كلا';
+        return implode(' + ', array_column($on, 'fr')) . ' / ' . implode(' + ', array_column($on, 'ar'));
+    }
     function empFullNameFr(array $e): string {
         $parts = array_filter([trim((string)($e['first_name_fr'] ?? '')), trim((string)($e['father_name_fr'] ?? '')), trim((string)($e['last_name_fr'] ?? ''))], 'strlen');
         $name = trim(implode(' ', $parts));

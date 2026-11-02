@@ -29,7 +29,7 @@
         'الصندوق': 'Caisse', 'صندوق التعويضات': 'Caisse des indemnités', 'نهاية الخدمة': 'Fin de service', 'التعويض': 'Indemnité', 'المساهمة': 'Contribution',
         'الشهر': 'Mois', 'السنة': 'Année', 'السنة الدراسية': 'Année scolaire', 'من شهر': 'Du mois', 'إلى شهر': 'Au mois', 'الأشهر المدفوعة': 'Mois payés', 'الأشهر': 'Mois', 'الفترة': 'Période',
         'البند': 'Rubrique', 'الملاحظات': 'Notes', 'ملاحظات': 'Notes', 'التاريخ': 'Date', 'العملة': 'Devise', 'سعر الصرف': 'Taux de change', 'المدفوع': 'Payé', 'الباقي': 'Reste',
-        'الملاك': 'Titulaires', 'المتعاقدون': 'Contractuels', 'الموظفون': 'Employés', 'الأساتذة': 'Enseignants', 'الساعات': 'Heures', 'عدد الساعات': 'Nombre d’heures',
+        'الملاك': 'Titulaires', 'المتعاقدون': 'Contractuels', 'الموظفون': 'Employés', 'المتعاقدين': 'Contractuels', 'الموظفين': 'Employés', /* (2026-11-02) صفوف المجموعات بلائحة الموظفين */ 'الأساتذة': 'Enseignants', 'الساعات': 'Heures', 'عدد الساعات': 'Nombre d’heures',
         'العدد': 'Nombre', 'عدد': 'Nombre', 'المدارس': 'Écoles', 'كل المدارس': 'Toutes les écoles', 'الكل': 'Tous', 'التوقيع': 'Signature', 'الإمضاء': 'Signature', 'ختم': 'Cachet',
         // كلمات «الراتب يشمل» وشارات العنوان
         'الأساسي': 'Base', 'المعتمد': 'adopté', 'لأصحاب النسبة بالسعر الرسمي': 'pour les pourcentages au taux officiel', 'ليرة فقط': 'L.L seulement', 'دولار فقط': 'USD seulement', 'الليرة والدولار': 'L.L et USD',

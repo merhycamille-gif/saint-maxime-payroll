@@ -573,9 +573,11 @@ function reportDocThumb($path) {
         // الأعمدة المتاحة: key => [label, دالة العرض]
         $availCols = [
             'code'    => ['Code', fn($r) => '<strong>'.e($r['employee_code']).'</strong>'],
-            'name'    => ['الاسم / Nom', fn($r) => e(empFullNameFr($r)) . empBadges($r, $db, $bonusSy)], // 🆕 شارتا «جديد» و«ملف ناقص» (2026-09-23)
+            // 🌐 (2026-11-02 «التقرير عربي بس نصّه فرنسي») الاسم/الفئة/الوضع/الحالة بوجهين «FR / AR» فتُظهر لغة التقرير وجهها (doclang.js)؛ بلا اسم عربي ⇒ الفرنسي وحده
+            'name'    => ['الاسم / Nom', fn($r) => empNamePair($r) . empBadges($r, $db, $bonusSy)], // 🆕 شارتا «جديد» و«ملف ناقص» (2026-09-23)
             'name_ar' => ['الاسم بالعربي / Nom (arabe)', fn($r) => e(empFullNameAr($r))],
-            'type'    => ['الفئة / Type', fn($r) => employeeTypeLabel($r['employee_type'])],
+            'type'    => ['الفئة / Type', fn($r) => e(employeeTypeLabel($r['employee_type'], 'fr') . ' / ' . employeeTypeLabel($r['employee_type'], 'ar'))],
+            'tax'     => ['يخضع للضرائب / Soumis aux retenues', fn($r) => e(empDeductionsText($r))], // 🧾 (2026-11-02 طلبه) «ضرائب» = الضمان + الضريبة + الصندوق
             // الموظف الإداري: تُعرَض وظيفته بدل الشهادة (مطابق للتصدير — كانا مختلفَين)
             'diploma' => ['الشهادة / Diplôme', fn($r) => $r['employee_type'] === 'employe' ? jobTitleLabel($r['job_title'] ?? '') : diplomaLabel($r['diploma'])],
             'diploma_img' => ['صورة الشهادة / Copie du diplôme', fn($r) => reportDocThumb($r['diploma_doc_path'] ?? '')],
@@ -597,15 +599,15 @@ function reportDocThumb($path) {
             'email'   => ['Email', fn($r) => e($r['email'])],
             'address' => ['السكن / Adresse', fn($r) => e(trim(implode(' ', array_filter([$r['gouvernorat'],$r['district'],$r['ville'],$r['rue'],$r['immeuble']]))))],
             'birth'   => ['الولادة / Naissance', fn($r) => trim(formatDate($r['birth_date']).' '.e($r['birth_place']))],
-            'social'  => ['عائلي / Famille', fn($r) => e($r['social_status']).' ('.(int)$r['number_of_children'].')'],
-            'hire'    => ['الدخول / Embauche', fn($r) => formatDate(shownHireDate($r))],
+            'social'  => ['عائلي / Famille', fn($r) => e(socialStatusLabel($r['social_status'], 'fr') . ' / ' . socialStatusLabel($r['social_status'], 'ar')) . ' ('.(int)$r['number_of_children'].')'],
+            'hire'    => ['تاريخ الدخول / Date d\'embauche', fn($r) => formatDate(shownHireDate($r))],
             'titul'   => ['الملاك / Titularisation', fn($r) => formatDate(shownTitularizationDate($r))],
             'hours'   => ['ساعات/أسبوع / Heures/sem.', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'],1),'0'),'.')],
             'days'    => ['أيام/أسبوع / Jours/sem.', fn($r) => (int)$r['days_per_week']],
-            'status'  => ['الحالة / Statut', fn($r) => '<span class="badge badge-'.employeeStatusLabel($r['status'])['badge'].'">'.e(employeeStatusLabel($r['status'])['label']).'</span>'],
+            'status'  => ['الحالة / Statut', fn($r) => '<span class="badge badge-'.employeeStatusLabel($r['status'])['badge'].'">'.e(employeeStatusLabel($r['status'], 'fr')['label'] . ' / ' . employeeStatusLabel($r['status'], 'ar')['label']).'</span>'],
             'gaps'    => ['ملف ناقص / Dossier incomplet', fn($r) => e(incompleteFileText($r, $db, $bonusSy))], // 🆕 (2026-09-23) النواقص بالتفصيل — فارغ للملف المكتمل
         ];
-        $defaultCols = ['code','name','type','grade','status'];
+        $defaultCols = ['code','name','type','grade','hire','tax','status'];   // 📅🧾 (2026-11-02) + تاريخ الدخول + يخضع للضرائب
         $selectedCols = $_GET['cols'] ?? $defaultCols;
         if (!is_array($selectedCols)) $selectedCols = $defaultCols;
         $selectedCols = array_values(array_filter($selectedCols, fn($c) => isset($availCols[$c])));
@@ -626,7 +628,7 @@ function reportDocThumb($path) {
                     ['Numéros officiels / الأرقام الرسمية', ['nssf', 'mof', 'caisse']],
                     ['Dates / التواريخ',                    ['hire', 'titul']],
                     ['Contact / الاتصال',                   ['phone', 'email', 'address']],
-                    ['Dossier & statut / الملف والحالة',    ['status', 'gaps', 'submit_status', 'diploma_img', 'civil_img']],
+                    ['Dossier & statut / الملف والحالة',    ['status', 'tax', 'gaps', 'submit_status', 'diploma_img', 'civil_img']],
                 ];
                 $grouped = array_merge(...array_map(fn($g) => $g[1], $colGroups)); $rest = array_diff(array_keys($availCols), $grouped); if ($rest) $colGroups[] = ['Autres / أخرى', array_values($rest)]; ?>
                 <div class="school-checks">
@@ -639,6 +641,7 @@ function reportDocThumb($path) {
                     <?php endforeach; ?>
                 </div>
                 <button class="btn btn-primary" style="margin-top:14px"><i class="fas fa-filter"></i> عرض التقرير / Afficher</button>
+                <a class="btn btn-secondary" style="margin-top:14px" href="<?= BASE_URL ?>pages/name_check.php" title="أسماء فيها حرف كبير بنصّ الكلمة أو صغير بأوّلها أو فراغ زائد — للمراجعة والتصحيح"><i class="fas fa-spell-check"></i> Vérifier les noms / فحص الأسماء</a><?php /* 🔤 (2026-11-02) */ ?>
             </div>
         </form>
         <?php $ltParts = explode(' / ', $listTitle, 2); ?>
@@ -689,7 +692,7 @@ function reportDocThumb($path) {
                             foreach ($selectedCols as $k) echo '<td>'.(isset($sumCols[$k]) ? '<strong>'.(isset($colTotUsd[$k]) ? dualFromUsd($colTot[$k], $colTotUsd[$k]) : formatLBP($colTot[$k])).'</strong>' : '').'</td>'; ?>
                         </tr>
                         <?php else: ?>
-                        <tr class="total-row"><td colspan="<?= count($selectedCols) + 1 + ($multi?1:0) ?>">العدد الإجمالي / Total: <?= count($data) ?></td></tr>
+                        <tr class="total-row"><td colspan="<?= count($selectedCols) + 1 + ($multi?1:0) ?>">العدد الإجمالي / Total : <strong><?= count($data) ?></strong></td></tr><?php /* 🌐 (2026-11-02) الرقم بعنصر مستقلّ حتى لا يختفي مع الوجه الفرنسي بالعربي */ ?>
                         <?php endif; ?>
                     </tbody>
                 </table></div>

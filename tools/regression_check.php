@@ -8611,7 +8611,7 @@ check('☑️ مجموعات التشييك شبكة مرصوفة بكل الب�
       && strpos($css185, 'input[name="schools[]"]) { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }') !== false
       && strpos($rp185, 'class="school-checks" style="display:flex') === false && strpos($rp185, 'class="school-checks at-items" style=') === false
       && strpos($rp185, "['Identité / الهوية',") !== false && strpos($rp185, "['Numéros officiels / الأرقام الرسمية', ['nssf', 'mof', 'caisse']],") !== false
-      && $noFatal($hEl185) && substr_count($hEl185, 'class="chk-group-title"') === 6 && substr_count($hEl185, 'name="cols[]"') === 28
+      && $noFatal($hEl185) && substr_count($hEl185, 'class="chk-group-title"') === 6 && substr_count($hEl185, 'name="cols[]"') === 29   // 29 = 28 + عمود «يخضع للضرائب» (2026-11-02)
       && $noFatal($hAt185) && substr_count($hAt185, 'class="chk-group-title"') >= 6 && strpos($hAt185, '<span style="display:inline-flex') === false,
       'cols=' . substr_count($hEl185, 'name="cols[]"') . ' groups=' . substr_count($hEl185, 'class="chk-group-title"') . ' at-groups=' . substr_count($hAt185, 'class="chk-group-title"'));
 
@@ -10927,6 +10927,33 @@ try {
     $why282 = 'maximos=' . $mx282 . ' excluded=' . json_encode($ex282) . ' filter=' . json_encode(hqScopeFilter([$mx282, 3, 4])) . ' n(علوم وفيزياء وكيمياء)=' . $sc282('علوم وفيزياء وكيمياء') . ' n(و ادابها)=' . $sc282('اللغة العربية و ادابها');
 } catch (Throwable $e) { $ok282 = false; $why282 = $e->getMessage(); }
 check('🏛️🚫 الرئاسة العامة لا ترى القديس مكسيموس (كل المدارس/اللائحة/الاختيار) · حساب المدرسة يعدّل الإفادة للطباعة بلا «احفظ كأساس» · عدّ الموادّ: لمادة/لمادتي/لمواد + la/les matières', $ok282, $why282);
+
+/* ===================================================================
+ * 283 🌐📅🧾📐 (2026-11-02 لائحة الموظفين): الاسم/الفئة/الحالة بوجهين «FR / AR» (لغة التقرير تُظهر وجهها) · عمودا «تاريخ الدخول» و«يخضع للضرائب نعم/كلا» افتراضيان
+ *     · الجدول يتوسّط الورقة · لا Σ على الرمز/الأرقام الرسمية · صفوف المجموعات بالقاموس · صفحة «فحص الأسماء» تعمل
+ * =================================================================== */
+try {
+    $hEl283 = renderPage('pages/reports.php', ['report' => 'employee_list'], [], [7], 'lbp', '2026-2027');
+    $fn283 = (string)file_get_contents($PROJ . '/includes/functions.php'); $css283 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+    $tj283 = (string)file_get_contents($PROJ . '/assets/js/totals.js'); $dl283 = (string)file_get_contents($PROJ . '/assets/js/doclang.js');
+    $rx283 = (string)file_get_contents($PROJ . '/pages/reports_export.php');
+    $hNc283 = renderPage('pages/name_check.php', [], [], [7], 'lbp', '2026-2027');
+    $ok283 = strpos($hEl283, 'يخضع للضرائب / Soumis aux retenues') !== false && strpos($hEl283, 'function empDeductionsText') === false && strpos($fn283, 'function empDeductionsText(array $e): string') !== false
+      && preg_match('~<td>(CNSS \+ Impôt / ضمان \+ ضريبة|Oui / نعم)</td>~u', $hEl283);   // «ضرائب» = الضمان + الضريبة + الصندوق
+    $ok283 = $ok283 && (strpos($hEl283, 'تاريخ الدخول / Date d&#039;embauche') !== false || strpos($hEl283, "تاريخ الدخول / Date d'embauche") !== false)
+      && preg_match('~<td>(Oui / نعم|Non / كلا)</td>~u', $hEl283) && strpos($hEl283, 'Enseignant titulaire / أستاذ في الملاك') !== false
+      && preg_match('~Actif / نشط</span>~u', $hEl283) && preg_match('~<td>[A-Za-zÀ-ÿ\' \-]+ / [\x{0600}-\x{06FF} ]+(<span|</td>)~u', $hEl283)
+      && strpos($fn283, 'function empNamePair(array $e): string') !== false
+      && strpos($css283, '.land-report table.doc-table { width: auto !important; max-width: 100%; margin-left: auto !important; margin-right: auto !important; }') !== false
+      && strpos($tj283, 'var NOSUM = /') !== false && strpos($tj283, 'numeric[c2] = false') !== false
+      && strpos($dl283, "'المتعاقدين': 'Contractuels', 'الموظفين': 'Employés'") !== false
+      && strpos($rx283, "'tax' => ['يخضع للضرائب'") !== false && strpos($rx283, "\$defaultCols = ['code', 'name', 'type', 'grade', 'hire', 'tax', 'status'];") !== false
+      && strpos($hNc283, 'Vérification des noms') !== false && stripos($hNc283, 'Fatal error') === false && stripos($hNc283, 'Warning:') === false;
+    $why283 = 'tax_hdr=' . (int)(strpos($hEl283, 'يخضع للضرائب') !== false) . ' hire_hdr=' . (int)(strpos($hEl283, 'تاريخ الدخول') !== false) . ' yesno=' . (int)(bool)preg_match('~<td>(Oui / نعم|Non / كلا)</td>~u', $hEl283)
+      . ' type_pair=' . (int)(strpos($hEl283, 'Enseignant titulaire / أستاذ في الملاك') !== false) . ' name_pair=' . (int)(bool)preg_match('~<td>[A-Za-zÀ-ÿ\' \-]+ / [\x{0600}-\x{06FF} ]+(<span|</td>)~u', $hEl283)
+      . ' name_check=' . (int)(strpos($hNc283, 'Vérification des noms') !== false) . ' len=' . strlen($hEl283);
+} catch (Throwable $e) { $ok283 = false; $why283 = $e->getMessage(); }
+check('🌐📅🧾📐 لائحة الموظفين (2026-11-02): وجهان FR/AR للاسم والفئة والحالة · تاريخ الدخول + يخضع للضرائب نعم/كلا · الجدول موسَّط · لا Σ على الرمز · فحص الأسماء', $ok283, $why283);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
