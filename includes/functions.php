@@ -3501,7 +3501,8 @@ function healNajatSheetFill20260827() {
             if ($addedThis) {
                 $log[] = "$fn $ln+$addedThis";
                 // ملفه وعلاواته (كان قد فاته الشفاء الأول لغياب صفوفه)
-                $db->exec("UPDATE employees SET employee_type='" . $type . "', apply_family_deduction=" . (int)$afd . " WHERE id=$id");
+                // 📅 (2026-11-02) مَن ترسّم بـ1/10/2026 فصاعداً (باميلا نضّور) لا يُرجَع متعاقداً — الكشف يصف فئته بتشرين 2025 لا اليوم
+                $db->exec("UPDATE employees SET employee_type='" . $type . "', apply_family_deduction=" . (int)$afd . " WHERE id=$id AND NOT (employee_type='enseignant_titulaire' AND COALESCE(titularization_date,'1900-01-01') >= '2026-10-01')");
                 foreach ([['prime_fixe', $prime, !$isEmp], ['transport_complement', $tr, true]] as [$bt, $amt, $want]) {
                     if (!$want || $amt <= 0) continue;
                     $c = (int)$db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id=$id
@@ -3819,6 +3820,7 @@ function healAbraCw2_20260827() {
             $st->execute([$fn . '%', $ln . '%']);
             foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) {
                 $id = (int)$id;
+                if ($id === 1847) continue;   // 🛡️ (2026-11-02 قراره «تركهن، بعدين بحطّ الصفوف») جوزيف بولس: صفوفه لا تُمحى أبداً من هذا الشفاء
                 $db->exec("INSERT IGNORE INTO _ms_bk_abra20260827 SELECT * FROM monthly_salaries
                            WHERE employee_id=$id AND (year*100+month) BETWEEN 202510 AND 202609");
                 $n = (int)$db->exec("DELETE FROM monthly_salaries

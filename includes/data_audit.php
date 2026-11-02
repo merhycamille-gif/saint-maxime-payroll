@@ -51,8 +51,9 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
     //     المخزّن بالقانون الحيّ وإعدادات ملفه الحالية (expectedMonthlyTax = مسار المحرّك) — فرق > 1 = شهر قديم يلزمه إعادة حساب
     require_once __DIR__ . '/payroll_calculator.php';
     $txBad = [];
+    // 🔒 (2026-11-02 قراره ب) الشهر المدفوع = كما قُبض ولا يُعاد بأي قانون لاحق ⇒ يُفحص غير المدفوع فقط
     $txRows = $db->prepare("SELECT month, year, taxable_base_lbp, income_tax_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ?
-        AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0)");
+        AND (base_plus_echelon_lbp > 0 OR net_salary_lbp > 0 OR total_due_lbp > 0) AND COALESCE(is_paid,0) = 0");
     foreach ($q("SELECT DISTINCT e.*, $nm nm FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
         WHERE e.is_deleted = 0 AND COALESCE(e.tax_subject,1) = 1 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)", [$sy]) as $e) {
         if (!salaryEngineAllowed($e, $db)) continue;
@@ -96,9 +97,12 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
         . ")")); // 🚪 الأعمدة الأربعة (2026-09-18)
 
     // 9) نسبة ٪ عند غير الملاك (النسبة من أساس السلسلة — لا معنى لها للمتعاقد/الموظف)
+    // 🧾 (2026-11-02 قراره «اتركهم 2026-2027 متل ما هنّي») متعاقدو سيدة الانتقال بسطر نسبة 45٪ لسنة 2026-2027 = استثناء مقصود لا خطأ
+    $pctAllow = ['2026-2027' => [283, 286, 287, 288, 291, 294, 298, 301, 1625, 1740, 1742, 1799, 1852, 279], '2025-2026' => [283]]; // جومانا 22٪ 2025-2026 مدفوعة كما هي (قرار ب)
+    $pctEx = $pctAllow[$sy] ?? [];
     $add('pct_nontit', 'سطر نسبة ٪ فعّال عند متعاقد أو موظف (النسبة للملاك فقط)', $q("
         SELECT $nm nm FROM employees e JOIN employee_bonuses b ON b.employee_id=e.id AND b.is_active=1 AND b.value_type='percent' AND (b.school_year IS NULL OR b.school_year=?)
-        WHERE e.is_deleted=0 AND e.employee_type<>'enseignant_titulaire' GROUP BY e.id", [$sy]));
+        WHERE e.is_deleted=0 AND e.employee_type<>'enseignant_titulaire'" . ($pctEx ? " AND e.id NOT IN (" . implode(',', array_map('intval', $pctEx)) . ")" : '') . " GROUP BY e.id", [$sy]));
 
     // 10) سطر علاوة بلا سنة (ينطبق على كل السنين)
     $add('bonus_nosy', 'سطر علاوة فعّال بلا سنة دراسية (ينطبق على كل السنين — خطر)', $q("

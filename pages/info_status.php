@@ -115,7 +115,7 @@ $newRows = $db->prepare("SELECT s.id, s.employee_id, s.school_id, s.status, s.su
     FROM info_submissions s
     JOIN schools sc ON sc.id = s.school_id
     LEFT JOIN employees e ON e.id = s.employee_id
-    WHERE s.is_new_teacher = 1 AND s.status <> 'rejected'" . $syCond . $activeSchoolCond . schoolScopeSql('s.school_id') . "
+    WHERE s.is_new_teacher = 1 AND s.status <> 'rejected' AND (s.employee_id IS NULL OR e.is_deleted = 0)" . $syCond . $activeSchoolCond . schoolScopeSql('s.school_id') . "   -- 🚪 (2026-11-02) طلب أُنشئ ملفه ثمّ حُذف الملف (تجارب/مكرّرون) لا يظهر
     ORDER BY school_name, FIELD(s.status,'pending','applied'), s.submitted_at DESC");
 $newRows->execute($syParams);
 $newRows = $newRows->fetchAll();

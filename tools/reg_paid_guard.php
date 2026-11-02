@@ -40,7 +40,7 @@ check('❓ ملف الموظف: سؤال «هذه السنة محمية — نع
       && strpos($em248, "['edit', 'delete', 'copy_year', 'apply_paid', 'dismiss_paid']") !== false);
 
 check('🚨 الكشوف الشهرية الأربعة: حارس «المخزّن ≠ الملف» (fileVsStoredBanner بكاش البصمة) + ms.employee_id بالاستعلامات + كبسة «صحّح» ⇒ fix_stale.php',
-      strpos($rh248, 'function fileVsStoredBanner(array $rows, int $month, int $year): string') !== false
+      strpos($rh248, 'function fileVsStoredBanner(array $rows, int $month, int $year, string $cacheSuffix = \'\'): string') !== false
       && strpos($rh248, "msaFpCacheGet(\$key, 900)") !== false && strpos($rh248, "pages/fix_stale.php?emp=") !== false
       && substr_count($rp248, ' . fileVsStoredBanner($data, $month, $year)') === 4
       && substr_count($rp248, '$stmt = $db->prepare("SELECT ms.employee_id, ') >= 4
