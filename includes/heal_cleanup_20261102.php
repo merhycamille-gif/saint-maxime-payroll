@@ -274,3 +274,30 @@ function healCleanup20261102b(): void {
     setSetting('heal_cleanup_20261102b', json_encode(['at' => date('Y-m-d H:i:s'), 'log' => $log], JSON_UNESCAPED_UNICODE));
     if (function_exists('msaLookupFlush')) msaLookupFlush();
 }
+
+/**
+ * 🧹 الجزء الثالث (11-02 مساءً): أونلاين لا جدول `_bk_cleanup1102_employees` فلم تعمل B1 — جومانا بصيبص 283 عُلِّمت بـS8 ثمّ شالت S9 صفوفها 2026-2027
+ *   فبقي علمها بلا راتب. القاعدة بلا اعتماد على نسخة: مَن علّمه شفاء التنظيف (سجلّ التدقيق heal_cleanup_1102_month13) وليس له راتب هذه السنة ⇒ العلم يرجع 0.
+ */
+function healCleanup20261102c(): void {
+    if (getSetting('heal_cleanup_20261102c', '') !== '') return;
+    $db = getDB(); $log = [];
+    try {
+        $cur = currentSchoolYear(); $ids = [];
+        foreach ($db->query("SELECT new_value FROM audit_log WHERE action = 'heal_cleanup_1102_month13' ORDER BY id") as $r) {
+            $d = json_decode((string)$r['new_value'], true); foreach ((array)($d['ids'] ?? []) as $i) $ids[(int)$i] = true;
+        }
+        $reverted = [];
+        if ($ids) {
+            $in = implode(',', array_keys($ids));
+            $st = $db->prepare("SELECT e.id FROM employees e WHERE e.id IN ($in) AND e.is_deleted = 0 AND COALESCE(e.has_13th_month,0) = 1 AND e.employee_type = 'enseignant_contractuel'
+                AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND (ms.net_salary_lbp > 0 OR ms.base_plus_echelon_lbp > 0 OR ms.prime_fixe_lbp > 0))");
+            $st->execute([$cur]); $reverted = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+            if ($reverted) $db->exec("UPDATE employees SET has_13th_month = 0, m13_include_extra = 0, m13_include_aide = 0 WHERE id IN (" . implode(',', $reverted) . ")");
+        }
+        try { logAudit('heal_cleanup_1102_month13_revert', 'employees', 0, null, ['reverted' => $reverted]); } catch (Throwable $e) {}
+        $log['C1_month13_nosalary'] = 'reverted=' . json_encode($reverted);
+    } catch (Throwable $e) { $log['C1_month13_nosalary'] = 'ERR ' . $e->getMessage(); }
+    setSetting('heal_cleanup_20261102c', json_encode(['at' => date('Y-m-d H:i:s'), 'log' => $log], JSON_UNESCAPED_UNICODE));
+    if (function_exists('msaLookupFlush')) msaLookupFlush();
+}
