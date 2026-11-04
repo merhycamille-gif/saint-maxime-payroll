@@ -48,6 +48,14 @@ if (!function_exists('empFullNameFr')) {
         if ($ar === '' || $ar === $fr || !preg_match('/[\x{0600}-\x{06FF}]/u', $ar)) return htmlspecialchars($fr, ENT_QUOTES, 'UTF-8');
         return htmlspecialchars($fr . ' / ' . $ar, ENT_QUOTES, 'UTF-8');
     }
+    /** 🧾 (2026-11-04 «ر3 طلع لغير الخاضع للضرائب — خطأ؛ الخاضع = الخاضع للضمان») المصدر الواحد لنماذج الدولة (ر3 المالية + الضمان):
+     *  خاضع للضرائب = يخضع للضمان ولضريبة الدخل معاً (الصندوق يتبع الفئة فلا يدخل). تقرير الداخلين بتاريخ + الإفادات الجماعية يقرآنه. */
+    function empTaxSubject(array $e): bool { return (int)($e['cnss_subject'] ?? 1) === 1 && (int)($e['tax_subject'] ?? 1) === 1; }
+    /** سبب عدم الخضوع بكلمتين (فاضي إن كان خاضعاً) — للشارة جنب الاسم وتنبيه الخادم */
+    function empTaxMissLabel(array $e): string {
+        $c = (int)($e['cnss_subject'] ?? 1) === 1; $t = (int)($e['tax_subject'] ?? 1) === 1;
+        if (!$c && !$t) return 'غير خاضع للضرائب'; if (!$c) return 'غير خاضع للضمان'; if (!$t) return 'غير خاضع لضريبة الدخل'; return '';
+    }
     /** 🧾 (2026-11-02 «اتفقنا نعتمد أوّل شي ضرائب الضمان») «يخضع للضرائب» = كل المحسومات: الضمان + ضريبة الدخل + الصندوق (كبسات ملف الموظف الثلاث).
      *  يرجع «Oui / نعم» إن خضع للثلاثة، «Non / كلا» إن لم يخضع لشيء، وإلّا الأسماء بالضبط بالترتيب ضمان ثمّ ضريبة ثمّ صندوق («CNSS + Impôt / ضمان + ضريبة»). */
     function empDeductionsText(array $e): string {

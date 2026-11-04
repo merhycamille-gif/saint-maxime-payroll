@@ -853,6 +853,8 @@ function reportDocThumb($path) {
         <div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 10px;padding:10px 14px;border:1px solid #bae6fd;background:#f0f9ff;border-radius:10px">
             <strong style="color:#075985"><i class="fas fa-layer-group"></i> لكل الداخلين بهذا التقرير (<?= count($data) ?>):</strong>
             <a class="btn btn-primary" href="<?= $bkUrl ?>"><i class="fas fa-shield-halved"></i> استخدام أجير بالضمان — طباعة / إيميل / واتساب</a>
+            <?php /* 🧾 (2026-11-04) ر3 المالية للخاضعين للضرائب فقط (الصفحة الجماعية تفلترهم تلقائياً لنماذج الدولة) */ ?>
+            <a class="btn btn-primary" style="background:#0e7490" href="<?= BASE_URL ?>pages/attestations_bulk.php?type=mof_r3&tax=1&hire=<?= rawurlencode($tdate) ?>&span=<?= $tspan . $bkSch ?>"><i class="fas fa-file-invoice-dollar"></i> ر3 المالية — للخاضعين للضرائب</a>
             <a class="btn btn-light" href="<?= BASE_URL ?>pages/attestations_bulk.php?hire=<?= rawurlencode($tdate) ?>&span=<?= $tspan . $bkSch ?>"><i class="fas fa-file-lines"></i> إفادة أخرى للكل</a>
         </div>
         <?php endif; ?>
@@ -866,7 +868,8 @@ function reportDocThumb($path) {
                                  «ضرائب» عنده = الضمان أوّلاً (وتلقائياً ضريبة الدخل)؛ الصندوق معروف من الفئة فلا عمود له.
                                  رقم الضمان يظهر فقط إذا كان حقيقياً (hasNssfNumber: «0»/«1» القديمة ≠ رقم) — وإلا الخانة فاضية = نموذج «لا يحمل رقم». */
                               $tCnssCols = [
-                                  'tax_subj' => ['يخضع للضرائب / Soumis aux retenues', fn($r) => ((int)($r['cnss_subject'] ?? 1)) === 1 ? 'نعم / Oui' : 'لا / Non'],
+                                  // 🧾 (2026-11-04) المصدر الواحد empTaxSubject (ضمان + ضريبة دخل) = نفس فلتر ر3 بالإفادات الجماعية؛ غير الخاضع يظهر سببه
+                                  'tax_subj' => ['يخضع للضرائب / Soumis aux retenues', fn($r) => empTaxSubject($r) ? 'نعم / Oui' : 'لا / Non'],
                                   'nssf'     => ['رقم الضمان / N° CNSS', fn($r) => hasNssfNumber($r['nssf_number'] ?? '') ? cnssWithBirthYear($r['nssf_number'], $r['birth_date'] ?? '', '') : ''],
                               ]; ?>
                         <?php foreach ($tCnssCols as $c): ?><th><?= e($c[0]) ?></th><?php endforeach; ?>

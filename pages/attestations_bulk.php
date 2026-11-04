@@ -221,6 +221,8 @@ if ($act !== '') {
             $tok = bulkToken(); file_put_contents($bulkDir . '/' . $tok . '.pdf', $pdf);
             $_SESSION['bulk_files'][$tok] = $name;
             $res = ['ok' => true, 'tok' => $tok, 'name' => $name, 'label' => $label, 'size' => strlen($pdf), 'docs_missing' => $docsMissing, 'pages' => preg_match_all('/\/Type\s*\/Page[^s]/', $pdf), 'used' => ($type === 'cnss_hire' ? (hasNssfNumber($emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new') : $type)];
+            // 🧾 (2026-11-04) نموذج دولة لغير خاضع للضرائب ⇒ تنبيه قدّام اسمه (الخادم مصدر الحقيقة لا الشاشة)
+            if (in_array($type, $OFFICIAL, true) && !empTaxSubject($emp)) $res['tax_warn'] = empTaxMissLabel($emp);
             if (!empty($in['email_each'])) {
                 $to = trim((string)($emp['email'] ?? ''));
                 if (!filter_var($to, FILTER_VALIDATE_EMAIL)) { $res['mail'] = 'none'; $res['msg'] = 'ما عنده إيميل بملفه'; }
@@ -298,7 +300,7 @@ $school = count($selSch) === 1 ? $schoolsAll[$selSch[0]] : null;
 $employees = [];
 if ($selSch) {
     [$ayf, $ayp] = yearEmploymentFilter(activeSchoolYear());
-    $st = $db->prepare("SELECT id, school_id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar, employee_type, email, phone1, phone2, hire_date, nssf_number, status
+    $st = $db->prepare("SELECT id, school_id, employee_code, first_name_fr, last_name_fr, first_name_ar, last_name_ar, employee_type, email, phone1, phone2, hire_date, nssf_number, status, cnss_subject, tax_subject
                           FROM employees WHERE is_deleted = 0 AND school_id IN (" . implode(',', $selSch) . ")" . $ayf . "
                          ORDER BY school_id, FIELD(employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), " . arSortKeySql('COALESCE(NULLIF(first_name_ar,\'\'),first_name_fr)') . ", " . arSortKeySql('COALESCE(NULLIF(last_name_ar,\'\'),last_name_fr)') . ", id");
     $st->execute($ayp);
@@ -308,6 +310,10 @@ $sy = preg_match('/^\d{4}-\d{4}$/', (string)activeSchoolYear()) ? activeSchoolYe
 [$sy1, $sy2] = schoolYearToYears($sy);
 $preType = (string)($_GET['type'] ?? '');
 $multiSch = count($selSch) > 1;
+// 🧾 (2026-11-04 «طبعت ر3 للداخلين 1/10 وطلع كمان الموظف اللي مش خاضع للضرائب — هيدا خطأ؛ عطينا خيار: الخاضعين / غير الخاضعين / الكل»)
+//    «خاضع للضرائب» عنده = الضمان + ضريبة الدخل معاً (المصدر الواحد empTaxSubject بـfunctions.php — نفسه بتقرير الداخلين بتاريخ).
+//    النماذج الرسمية للدولة (ر3 المالية + نماذج الضمان) افتراضها «الخاضعون فقط»؛ باقي الإفادات (راتب/تدريس/…) افتراضها «الكل».
+$preTax = in_array((string)($_GET['tax'] ?? ''), ['1', '0', 'all'], true) ? (string)$_GET['tax'] : (($preType !== '' && in_array($preType, $OFFICIAL, true)) ? '1' : 'all');
 include __DIR__ . '/../includes/header.php';
 ?>
 <style>
@@ -408,6 +414,13 @@ include __DIR__ . '/../includes/header.php';
                         <label class="chk"><input type="checkbox" class="bk-cat" value="enseignant_contractuel" checked> <span>متعاقدون</span></label>
                         <label class="chk"><input type="checkbox" class="bk-cat" value="employe" checked> <span>موظفون</span></label>
                     </span>
+                    <?php /* 🧾 (2026-11-04) الخضوع للضرائب: ر3 ونماذج الدولة للخاضعين فقط افتراضياً — الخيار بيد المستخدم */ ?>
+                    <span class="school-checks emp-type-checks" style="margin:0" id="bk_tax_wrap" title="«خاضع للضرائب» = يخضع للضمان ولضريبة الدخل معاً (من ملفه)">
+                        <i class="fas fa-file-invoice-dollar" style="color:#0e7490;align-self:center"></i>
+                        <label class="chk"><input type="radio" name="bk_tax" value="1" <?= $preTax === '1' ? 'checked' : '' ?>> <span>الخاضعون للضرائب</span></label>
+                        <label class="chk"><input type="radio" name="bk_tax" value="0" <?= $preTax === '0' ? 'checked' : '' ?>> <span>غير الخاضعين</span></label>
+                        <label class="chk"><input type="radio" name="bk_tax" value="all" <?= $preTax === 'all' ? 'checked' : '' ?>> <span>الكل</span></label>
+                    </span>
                 </div>
                 <div class="bk-list" id="bk_list">
                     <?php $curSid = null; foreach ($employees as $em):
@@ -416,10 +429,11 @@ include __DIR__ . '/../includes/header.php';
                         <?php endif;
                         $isNew = !empty($em['hire_date']) && $em['hire_date'] >= $sy1 . '-10-01' && $em['hire_date'] <= $sy2 . '-09-30';
                         $mail = trim((string)($em['email'] ?? '')); $ph = trim((string)($em['phone1'] ?: ($em['phone2'] ?? '')));
-                        $nameAr = trim(($em['first_name_ar'] ?? '') . ' ' . ($em['last_name_ar'] ?? '')); $nameFr = trim(($em['first_name_fr'] ?? '') . ' ' . ($em['last_name_fr'] ?? '')); ?>
-                    <label data-cat="<?= e($em['employee_type']) ?>" data-new="<?= $isNew ? 1 : 0 ?>" data-sid="<?= (int)$em['school_id'] ?>" data-hire="<?= e((string)($em['hire_date'] ?? '')) ?>" data-q="<?= e(mb_strtolower($nameAr . ' ' . $nameFr . ' ' . $em['employee_code'] . ' ' . $mail . ' ' . $ph)) ?>">
-                        <input type="checkbox" class="bk-emp" value="<?= (int)$em['id'] ?>" data-sid="<?= (int)$em['school_id'] ?>" data-name="<?= e($nameAr ?: $nameFr) ?>" data-mail="<?= e($mail) ?>" data-phone="<?= e($ph) ?>" data-hasnssf="<?= hasNssfNumber($em['nssf_number'] ?? '') ? 1 : 0 ?>">
-                        <span class="nm"><strong><?= e($nameAr ?: $nameFr) ?></strong> <small class="text-muted" dir="ltr"><?= e($nameFr) ?></small><?= $isNew ? ' <span class="badge" style="background:#dcfce7;color:#166534;font-size:10.5px">جديد</span>' : '' ?></span>
+                        $nameAr = trim(($em['first_name_ar'] ?? '') . ' ' . ($em['last_name_ar'] ?? '')); $nameFr = trim(($em['first_name_fr'] ?? '') . ' ' . ($em['last_name_fr'] ?? ''));
+                        $taxOk = empTaxSubject($em); $taxMiss = $taxOk ? '' : empTaxMissLabel($em); ?>
+                    <label data-cat="<?= e($em['employee_type']) ?>" data-new="<?= $isNew ? 1 : 0 ?>" data-tax="<?= $taxOk ? 1 : 0 ?>" data-sid="<?= (int)$em['school_id'] ?>" data-hire="<?= e((string)($em['hire_date'] ?? '')) ?>" data-q="<?= e(mb_strtolower($nameAr . ' ' . $nameFr . ' ' . $em['employee_code'] . ' ' . $mail . ' ' . $ph)) ?>">
+                        <input type="checkbox" class="bk-emp" value="<?= (int)$em['id'] ?>" data-sid="<?= (int)$em['school_id'] ?>" data-name="<?= e($nameAr ?: $nameFr) ?>" data-mail="<?= e($mail) ?>" data-phone="<?= e($ph) ?>" data-hasnssf="<?= hasNssfNumber($em['nssf_number'] ?? '') ? 1 : 0 ?>" data-taxmiss="<?= e($taxMiss) ?>">
+                        <span class="nm"><strong><?= e($nameAr ?: $nameFr) ?></strong> <small class="text-muted" dir="ltr"><?= e($nameFr) ?></small><?= $isNew ? ' <span class="badge" style="background:#dcfce7;color:#166534;font-size:10.5px">جديد</span>' : '' ?><?= $taxMiss !== '' ? ' <span class="badge" style="background:#e2e8f0;color:#334155;font-size:10.5px" title="من ملفه">' . e($taxMiss) . '</span>' : '' ?></span>
                         <span class="ct <?= $mail === '' ? 'miss' : '' ?>" title="<?= e($mail ?: 'لا إيميل بالملف') ?>"><i class="fas fa-envelope"></i><?= $mail === '' ? ' —' : '' ?></span>
                         <span class="ct <?= $ph === '' ? 'miss' : '' ?>" title="<?= e($ph ?: 'لا رقم بالملف') ?>"><i class="fab fa-whatsapp"></i><?= $ph === '' ? ' —' : '' ?></span>
                     </label>
@@ -492,12 +506,15 @@ include __DIR__ . '/../includes/header.php';
     function filter(autoPick) {
         var q = (document.getElementById('bk_q').value || '').toLowerCase().trim();
         var cats = Array.prototype.slice.call(document.querySelectorAll('.bk-cat')).filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
-        var hr = hireRange(), n = 0;
+        var hr = hireRange(), n = 0, tax = sel('bk_tax') || 'all';   // 🧾 الخضوع للضرائب: 1 = الخاضعون فقط · 0 = غير الخاضعين · all
         list.querySelectorAll('label').forEach(function (l) {
             var h = l.getAttribute('data-hire') || '';
-            var ok = cats.indexOf(l.getAttribute('data-cat')) >= 0 && (!q || (l.getAttribute('data-q') || '').indexOf(q) >= 0) && (!hr || (h && h >= hr[0] && h <= hr[1]));
+            var ok = cats.indexOf(l.getAttribute('data-cat')) >= 0 && (!q || (l.getAttribute('data-q') || '').indexOf(q) >= 0) && (!hr || (h && h >= hr[0] && h <= hr[1]))
+                  && (tax === 'all' || (l.getAttribute('data-tax') || '1') === tax);
             l.classList.toggle('hide', !ok); if (ok) n++;
-            if (hr && autoPick) l.querySelector('.bk-emp').checked = ok;   // بتاريخ محدّد: الظاهرون مختارون تلقائياً
+            var cb = l.querySelector('.bk-emp');
+            if (hr && autoPick) cb.checked = ok;   // بتاريخ محدّد: الظاهرون مختارون تلقائياً
+            else if (!ok && cb.checked) cb.checked = false;   // المخفيّ بالفلتر لا يبقى مختاراً خلسةً (سبب خطأ ر3 لغير الخاضع)
         });
         // رأس المدرسة يختفي إذا ما ضلّ تحتها أحد
         list.querySelectorAll('.bk-sch').forEach(function (s) { var sid = s.getAttribute('data-sid'), any = false; list.querySelectorAll('label[data-sid="' + sid + '"]').forEach(function (l) { if (!l.classList.contains('hide')) any = true; }); s.style.display = any ? '' : 'none'; });
@@ -508,6 +525,14 @@ include __DIR__ . '/../includes/header.php';
     document.querySelectorAll('.bk-cat').forEach(function (c) { c.addEventListener('change', function () { filter(false); }); });
     document.getElementById('bk_hire').addEventListener('change', function () { filter(true); });
     document.querySelectorAll('input[name="bk_span"]').forEach(function (r) { r.addEventListener('change', function () { filter(true); }); });
+    // 🧾 الخضوع للضرائب: تغيير يدوي ⇒ يُحترم؛ تغيير نوع الإفادة ⇒ نموذج دولة = «الخاضعون»، غيره = «الكل» (إلّا إذا المستخدم اختار بنفسه)
+    var OFFICIAL = <?= json_encode(array_values($OFFICIAL)) ?>, taxTouched = false;
+    document.querySelectorAll('input[name="bk_tax"]').forEach(function (r) { r.addEventListener('change', function () { taxTouched = true; filter(!!document.getElementById('bk_hire').value); }); });
+    document.querySelectorAll('input[name="bk_type"]').forEach(function (r) { r.addEventListener('change', function () {
+        if (taxTouched) return;
+        var want = OFFICIAL.indexOf(r.value) >= 0 ? '1' : 'all', t = document.querySelector('input[name="bk_tax"][value="' + want + '"]');
+        if (t && !t.checked) { t.checked = true; filter(!!document.getElementById('bk_hire').value); }
+    }); });
     boxes.forEach(function (b) { b.addEventListener('change', count); });
     document.querySelectorAll('[data-pick]').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -551,6 +576,11 @@ include __DIR__ . '/../includes/header.php';
         var picked = boxes.filter(function (b) { return b.checked; });
         if (!type) { alert('اختَر نوع الإفادة أوّلاً (الخطوة 1)'); return; }
         if (!picked.length) { alert('اختَر أستاذاً واحداً على الأقلّ (الخطوة 2)'); return; }
+        // 🧾 نموذج دولة (ر3/الضمان) لغير خاضع = تأكيد صريح قبل التجهيز (الافتراضي يستبعدهم؛ هذا احتياط لمن اختار «الكل» بيده)
+        if (OFFICIAL.indexOf(type) >= 0) {
+            var nt = picked.filter(function (b) { return b.getAttribute('data-taxmiss'); });
+            if (nt.length && !confirm('⚠️ ' + nt.length + ' من المختارين غير خاضع للضرائب:\n' + nt.slice(0, 8).map(function (b) { return '• ' + b.getAttribute('data-name') + ' — ' + b.getAttribute('data-taxmiss'); }).join('\n') + (nt.length > 8 ? '\n…' : '') + '\n\nتكمّل وتطلع لهم النموذج كمان؟')) return;
+        }
         var mailMode = sel('bk_mail_mode'), waMode = sel('bk_wa_mode');
         var mailTo = (document.getElementById('bk_mail_to').value || '').trim(), waTo = (document.getElementById('bk_wa_to').value || '').trim();
         if (mode === 'email' && mailMode === 'one' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mailTo)) { alert('اكتب الإيميل الواحد'); document.getElementById('bk_mail_to').focus(); return; }
@@ -590,6 +620,7 @@ include __DIR__ . '/../includes/header.php';
                 else {
                     toksBy[idx] = r.tok; b.setAttribute('data-tok', r.tok); b.setAttribute('data-file', r.name);
                     okN++; var miss = (r.docs_missing && r.docs_missing.length) ? ' — ⚠️ بلا: ' + r.docs_missing.join(' / ') : '';
+                    if (r.tax_warn) miss += ' — ⚠️ ' + r.tax_warn;
                     var tr = setRow(b, miss ? 'ok' : 'ok', '✅ جاهز' + (r.pages > 1 ? ' (' + r.pages + ' صفحات)' : '') + miss, r.label);
                     if (miss) tr.querySelector('.st').style.color = '#92400e';
                     tr.querySelector('.ac').innerHTML = '<a class="btn btn-sm btn-light" target="_blank" rel="noopener" href="' + API + '?act=file&tok=' + r.tok + '"><i class="fas fa-eye"></i> شوف</a>'

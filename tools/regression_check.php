@@ -10980,6 +10980,44 @@ try {
 } catch (Throwable $e) { $ok283 = false; $why283 = $e->getMessage(); }
 check('🌐📅🧾📐 لائحة الموظفين (2026-11-02): وجهان FR/AR للاسم والفئة والحالة · تاريخ الدخول + يخضع للضرائب نعم/كلا · الجدول موسَّط · لا Σ على الرمز · فحص الأسماء', $ok283, $why283);
 
+/* ===================================================================
+ * 284 🧾 (2026-11-04 «طبعت ر3 للداخلين 1/10 وطلع كمان الموظف اللي مش خاضع للضرائب — خطأ؛ عطينا خيار الخاضعين/غير الخاضعين/الكل»):
+ *     الإفادات الجماعية: فلتر «الخضوع للضرائب» (خاضع = ضمان + ضريبة دخل معاً) · نموذج دولة (ر3/الضمان) افتراضه «الخاضعون» وغيره «الكل»
+ *     · كل اسم يحمل data-tax وشارة سبب عدم الخضوع · تقرير الداخلون بتاريخ فيه كبسة «ر3 المالية — للخاضعين للضرائب»
+ * =================================================================== */
+try {
+    $bkSrc284 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/attestations_bulk.php'));
+    $rpSrc284 = (string)file_get_contents($PROJ . '/pages/reports.php');
+    $allSch284 = array_map(fn($s) => (int)$s['id'], allSchools(false));
+    $hR3 = renderPage('pages/attestations_bulk.php', ['type' => 'mof_r3', 'hire' => '2026-10-01', 'span' => 'day', 'schools' => $allSch284], [], $allSch284, 'lbp', '2026-2027');
+    $hSal = renderPage('pages/attestations_bulk.php', ['type' => 'salaire', 'schools' => $allSch284], [], $allSch284, 'lbp', '2026-2027');
+    // عيّنات من القاعدة نفسها (لا أرقام ثابتة): غير خاضع لضريبة الدخل · غير خاضع للضمان · خاضع للاثنين — بين الداخلين 1/10/2026
+    $pick284 = fn(string $w) => (int)$db->query("SELECT id FROM employees WHERE is_deleted=0 AND hire_date='2026-10-01' AND $w ORDER BY id LIMIT 1")->fetchColumn();
+    $noTax284 = $pick284('cnss_subject=1 AND tax_subject=0'); $noCnss284 = $pick284('cnss_subject=0 AND tax_subject=1'); $yes284 = $pick284('cnss_subject=1 AND tax_subject=1');
+    $rowOf = function (string $h, int $id): string { return preg_match('~<label [^>]*data-tax="(\d)"[^>]*>\s*<input type="checkbox" class="bk-emp" value="' . $id . '"[^>]*data-taxmiss="([^"]*)"~u', $h, $m) ? ($m[1] . '|' . $m[2]) : 'none'; };
+    $ok284 = strpos($hR3, '<input type="radio" name="bk_tax" value="1" checked>') !== false && strpos($hR3, 'الخاضعون للضرائب') !== false && strpos($hR3, 'غير الخاضعين') !== false
+      && strpos($hSal, '<input type="radio" name="bk_tax" value="all" checked>') !== false                             // إفادة عادية ⇒ الكل
+      && (!$noTax284  || $rowOf($hR3, $noTax284)  === '0|غير خاضع لضريبة الدخل')
+      && (!$noCnss284 || $rowOf($hR3, $noCnss284) === '0|غير خاضع للضمان')
+      && ($yes284 && $rowOf($hR3, $yes284) === '1|')
+      && empTaxSubject(['cnss_subject' => 1, 'tax_subject' => 1]) && !empTaxSubject(['cnss_subject' => 1, 'tax_subject' => 0]) && !empTaxSubject(['cnss_subject' => 0, 'tax_subject' => 1])
+      && empTaxMissLabel(['cnss_subject' => 1, 'tax_subject' => 0]) === 'غير خاضع لضريبة الدخل' && empTaxMissLabel(['cnss_subject' => 0, 'tax_subject' => 0]) === 'غير خاضع للضرائب'
+      && strpos($bkSrc284, '$taxOk = empTaxSubject($em); $taxMiss = $taxOk ? \'\' : empTaxMissLabel($em);') !== false
+      && strpos($rpSrc284, "fn(\$r) => empTaxSubject(\$r) ? 'نعم / Oui' : 'لا / Non'") !== false                     // تقرير الداخلين بتاريخ = المصدر نفسه
+      && (!$noTax284 || preg_match('~<td><strong>' . preg_quote(empFullNameAr($db->query("SELECT * FROM employees WHERE id = $noTax284")->fetch(PDO::FETCH_ASSOC)), '~') . '</strong>.*?<td style="white-space:nowrap;color:#92400e;font-weight:700">لا / Non</td>~su',
+                                     renderPage('pages/reports.php', ['report' => 'titularized', 'tmode' => 'hire', 'tdate' => '2026-10-01', 'tspan' => 'day', 'schools' => $allSch284], [], $allSch284, 'lbp', '2026-2027')) === 1)   // غير خاضع لضريبة الدخل (ضمانه 1) ⇒ «لا» بالتقرير أيضاً
+      && strpos($bkSrc284, "&& (tax === 'all' || (l.getAttribute('data-tax') || '1') === tax);") !== false
+      && strpos($bkSrc284, "else if (!ok && cb.checked) cb.checked = false;") !== false                              // المخفيّ بالفلتر لا يبقى مختاراً
+      && strpos($bkSrc284, "var want = OFFICIAL.indexOf(r.value) >= 0 ? '1' : 'all'") !== false                      // تبديل النوع يضبط الافتراضي
+      && strpos($bkSrc284, "if (in_array(\$type, \$OFFICIAL, true) && !empTaxSubject(\$emp)) \$res['tax_warn'] = empTaxMissLabel(\$emp);") !== false
+      && strpos($bkSrc284, "من المختارين غير خاضع للضرائب") !== false                                                  // تأكيد قبل التجهيز
+      && strpos($rpSrc284, 'attestations_bulk.php?type=mof_r3&tax=1&hire=') !== false && strpos($rpSrc284, 'ر3 المالية — للخاضعين للضرائب') !== false
+      && stripos($hR3, 'Fatal error') === false && stripos($hR3, 'Warning:') === false;
+    $why284 = 'r3_default=' . (int)(strpos($hR3, 'name="bk_tax" value="1" checked') !== false) . ' sal_default_all=' . (int)(strpos($hSal, 'name="bk_tax" value="all" checked') !== false)
+      . ' noTax#' . $noTax284 . '=' . ($noTax284 ? $rowOf($hR3, $noTax284) : '-') . ' noCnss#' . $noCnss284 . '=' . ($noCnss284 ? $rowOf($hR3, $noCnss284) : '-') . ' yes#' . $yes284 . '=' . ($yes284 ? $rowOf($hR3, $yes284) : '-') . ' len=' . strlen($hR3);
+} catch (Throwable $e) { $ok284 = false; $why284 = $e->getMessage(); }
+check('🧾 الإفادات الجماعية (2026-11-04): فلتر الخضوع للضرائب (ضمان + ضريبة) · ر3/نماذج الدولة افتراضها الخاضعون وغيرها الكل · data-tax + شارة السبب · المخفيّ لا يبقى مختاراً · تنبيه الخادم · كبسة ر3 بتقرير الداخلين', $ok284, $why284);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
