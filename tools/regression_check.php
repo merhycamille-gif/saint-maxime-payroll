@@ -11018,6 +11018,68 @@ try {
 } catch (Throwable $e) { $ok284 = false; $why284 = $e->getMessage(); }
 check('🧾 الإفادات الجماعية (2026-11-04): فلتر الخضوع للضرائب (ضمان + ضريبة) · ر3/نماذج الدولة افتراضها الخاضعون وغيرها الكل · data-tax + شارة السبب · المخفيّ لا يبقى مختاراً · تنبيه الخادم · كبسة ر3 بتقرير الداخلين', $ok284, $why284);
 
+/* ===================================================================
+ * 285 📬 (2026-11-04 «أوقات عم ابعت إيميل لتقرير أوقات بيوصل أوقات ما بيوصل… بدي الإيميل يوصل بسرعة، أنا ما بعرف كيف هيدا شغلك»):
+ *     التشخيص: الأربع رسائل وصلت لهوتميل (delivered) — واحدة أجّلها هوتميل 7 دقائق، وواحدة عند مستلم جديد بـJunk؛ وسجلّ البرنامج «بانتظار» لـ42 رسالة لأنّه لا يُحدَّث إلا بفتح صفحته.
+ *     ⇒ متابعة الوصول بعد الإرسال (mail_status.php?id + ppEmailTrack بنافذة الإرسال وصفحة نتيجة الإفادة) · تحديث تلقائي للمعلّقة كل 10 دقائق بنبض خلفي من footer.php
+ *     · بيان عام صندوق التعويضات: الفئة بالعنوان ⇒ موضوع الإيميل واسم الملف يميّزان الملاك عن المتعاقدين
+ * =================================================================== */
+try {
+    $ml285 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/mailer.php'));
+    $ft285 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/footer.php'));
+    $ex285 = str_replace("\r", '', (string)file_get_contents($PROJ . '/assets/js/export.js'));
+    $sr285 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/send_report.php'));
+    $sa285 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/send_attestation.php'));
+    $ms285 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/mail_status.php'));
+    $none285 = msaMailLogCheckOne('000000000000000000000000');
+    $lastId285 = (string)$db->query("SELECT id FROM mail_log ORDER BY created_at DESC LIMIT 1")->fetchColumn();
+    $one285 = $lastId285 !== '' ? msaMailLogCheckOne($lastId285) : ['ok' => true, 'status' => 'sent', 'label' => 'x', 'final' => false];
+    $savedTs285 = (string)getSetting('mail_log_refreshed_at', '');
+    setSetting('mail_log_refreshed_at', (string)time()); $dueNow285 = msaMailLogAutoRefreshDue(); $autoNow285 = msaMailLogAutoRefresh();   // جولة قبل دقائق ⇒ لا تحديث
+    setSetting('mail_log_refreshed_at', $savedTs285 !== '' ? $savedTs285 : '0');
+    // 🧷 المزامنة: ما كُتب على الكمبيوتر بين الرفع والسحب لا يُحذف ولا يُدهَس (إيميل 14:41:10 انحذف صفّه من السجلّ بسحب 14:41:24)
+    require_once $PROJ . '/includes/sync_common.php';
+    $plB = localSyncPlan(['1' => 'a', '2' => 'b1', '3' => 'c', '4' => 'd1', '5' => 'e'], ['1' => 'a', '2' => 'b0', '4' => 'd2', '6' => 'f'], 't', ['1' => 'a', '2' => 'b0', '4' => 'd0', '5' => 'e']);
+    // 2 معدَّل محلياً والأونلاين كما الأساس ⇒ لا يُجلب · 3 جديد محلياً ليس بالأساس ⇒ لا يُحذف · 4 تغيّر بالمكانين ⇒ يُجلب (الأونلاين يبقى) · 5 بالأساس وليس أونلاين ⇒ يُحذف · 6 جديد أونلاين ⇒ يُجلب
+    $okPlan285 = $plB['up'] === ['4', '6'] && $plB['del'] === ['5'];
+    $plOld = localSyncPlan(['1' => 'a', '3' => 'c'], ['1' => 'a'], 't'); $okPlanOld285 = $plOld['del'] === ['3'] && $plOld['up'] === [];   // بلا أساس (أوّل مرّة) = السلوك القديم
+    $pdoR = localSyncPdo();
+    foreach (['smp_rt_prev', 'smp_rt_new'] as $d) { $pdoR->exec("DROP DATABASE IF EXISTS `$d`"); $pdoR->exec("CREATE DATABASE `$d` CHARACTER SET utf8mb4"); $pdoR->exec("CREATE TABLE `$d`.`t` (id INT NOT NULL PRIMARY KEY, v VARCHAR(10) NULL) ENGINE=InnoDB"); }
+    $pdoR->exec("CREATE TABLE `smp_rt_prev`.`_sync_base` (tbl VARCHAR(64) NOT NULL, pk VARCHAR(191) NOT NULL, h CHAR(32) NOT NULL, PRIMARY KEY (tbl, pk))");
+    $pdoR->exec("INSERT INTO `smp_rt_prev`.`t` VALUES (1,'a'),(2,'b1'),(3,'c'),(4,'d1'),(5,'e')");
+    $pdoR->exec("INSERT INTO `smp_rt_new`.`t` VALUES (1,'a'),(2,'b0'),(4,'d2')");
+    $mT285 = syncTableMeta($pdoR, 'smp_rt_new', 't');
+    $pdoR->exec("CREATE TABLE `smp_rt_prev`.`_b` LIKE `smp_rt_prev`.`t`"); $pdoR->exec("INSERT INTO `smp_rt_prev`.`_b` VALUES (1,'a'),(2,'b0'),(4,'d0'),(5,'e')");   // الأساس = القيم القديمة (3 ليس بالأساس)
+    $pdoR->exec("INSERT INTO `smp_rt_prev`.`_sync_base` SELECT 't', " . syncPkSql($mT285) . ", " . syncHashSql($mT285) . " FROM `smp_rt_prev`.`_b`");
+    $resc285 = localSyncRescueLocalChanges($pdoR, 'smp_rt_prev', 'smp_rt_new');
+    $after285 = (string)$pdoR->query("SELECT GROUP_CONCAT(CONCAT(id,'=',v) ORDER BY id) FROM `smp_rt_new`.`t`")->fetchColumn();
+    foreach (['smp_rt_prev', 'smp_rt_new'] as $d) $pdoR->exec("DROP DATABASE IF EXISTS `$d`");
+    $okResc285 = $resc285 === 2 && $after285 === '1=a,2=b1,3=c,4=d2';   // 2 رجع المحلي · 3 رجع الجديد · 4 بقي الأونلاين · 5 لم يرجع (حُذف أونلاين)
+    $ls285 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/local_sync.php'));
+    $okSyncSrc285 = strpos($ls285, 'if ($target === $prevdb) { try { $resc = localSyncRescueLocalChanges($pdo, $prevdb, $dbname);') !== false
+      && strpos($ls285, '$plan = localSyncPlan(syncRowHashes($pdo, $s, $t, $m), (array)($hr[\'hashes\'] ?? []), $t, $base);') !== false;
+    $hT285 = renderPage('pages/official_forms.php', ['form' => 'eoc_staff', 'cat' => 'titulaire'], [], [2], 'lbp', '2026-2027');
+    $hC285 = renderPage('pages/official_forms.php', ['form' => 'eoc_staff', 'cat' => 'contractuel'], [], [2], 'lbp', '2026-2027');
+    $ok285 = function_exists('msaMailLogCheckOne') && function_exists('msaMailLogAutoRefreshDue') && function_exists('msaMailLogAutoRefresh')
+      && $none285['ok'] === false && (!$lastId285 || ($one285['ok'] === true && $one285['status'] !== '' && $one285['label'] !== '' && isset($one285['final'])))
+      && $dueNow285 === false && $autoNow285 === 0
+      && $okPlan285 && $okPlanOld285 && $okResc285 && $okSyncSrc285
+      && strpos($ms285, 'msaMailLogCheckOne($id)') !== false && strpos($ms285, 'msaMailLogAutoRefresh()') !== false && strpos($ms285, 'session_write_close();') !== false && strpos($ms285, 'requireLogin();') !== false
+      && strpos($ft285, "pages/mail_status.php?auto=1") !== false && strpos($ft285, 'msaMailLogAutoRefreshDue()') !== false
+      && strpos($sr285, "'log_id' => (string)(\$GLOBALS['msa_mail_log_id'] ?? '')") !== false
+      && strpos($ex285, 'function ppEmailTrack(logId, msg, modalEl, to)') !== false && strpos($ex285, 'if (j.log_id) ppEmailTrack(j.log_id, msg, m.el, to);') !== false
+      && strpos($ex285, "pages/mail_status.php?id=") !== false && strpos($ex285, 'Junk / Courrier indésirable') !== false
+      && strpos($sa285, "pages/mail_status.php?id=' . \$logId") !== false
+      && strpos($hT285, '<title>État général (Titulaires) — Caisse d&#039;indemnités / بيان عام (الداخلون في الملاك) — صندوق التعويضات') !== false
+      && strpos($hC285, '<title>État général (Contractuels) — Caisse d&#039;indemnités / بيان عام (المتعاقدون) — صندوق التعويضات') !== false
+      && strpos($hT285, 'الداخلين في الملاك</div>') !== false && strpos($hC285, 'المتعاقدين</div>') !== false
+      && stripos($hT285, 'Fatal error') === false && stripos($hC285, 'Fatal error') === false && stripos($hT285, 'Warning:') === false;
+    $why285 = 'none_ok=' . var_export($none285['ok'], true) . ' last=' . $lastId285 . ':' . ($one285['status'] ?? '?') . ' due_after_round=' . var_export($dueNow285, true) . ' auto=' . $autoNow285
+      . ' plan=' . json_encode($plB) . ' planOld=' . (int)$okPlanOld285 . ' rescue=' . $resc285 . ':' . $after285 . ' syncSrc=' . (int)$okSyncSrc285
+      . ' titleT=' . (int)(strpos($hT285, '<title>État général (Titulaires)') !== false) . ' titleC=' . (int)(strpos($hC285, '<title>État général (Contractuels)') !== false);
+} catch (Throwable $e) { $ok285 = false; $why285 = $e->getMessage(); }
+check('📬 الإيميل يوصل بسرعة (2026-11-04): متابعة الوصول بعد الإرسال (mail_status + ppEmailTrack + صفحة نتيجة الإفادة) · تحديث تلقائي للمعلّقة كل 10 د من أي صفحة · بيان عام: الفئة بالعنوان/الموضوع/اسم الملف · 🧷 المزامنة لا تحذف/تدهس ما كُتب على الكمبيوتر بين الرفع والسحب (جزئي + كامل)', $ok285, $why285);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

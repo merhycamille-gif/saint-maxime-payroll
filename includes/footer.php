@@ -40,6 +40,12 @@
 })();
 </script>
 <?php endif; ?>
+<?php /* 📬 (2026-11-04 «أوقات بيوصل أوقات ما بيوصل») حالات الإيميلات المعلّقة تُحدَّث تلقائياً كل 10 دقائق بنبض خلفي من أي صفحة — لا فقط بفتح سجلّ الإيميلات
+         (كان السجلّ يقول «بانتظار» لـ42 رسالة من 20/10). الفحص هنا استعلام واحد خفيف، والطلب نفسه بعد ظهور الصفحة بلا انتظار. */
+      if (!function_exists('msaMailLogAutoRefreshDue')) { @include_once __DIR__ . '/mailer.php'; }
+      if (function_exists('msaMailLogAutoRefreshDue') && isLoggedIn() && msaMailLogAutoRefreshDue()): ?>
+<script>window.addEventListener('load', function () { setTimeout(function () { if (document.prerendering) return; fetch(window.BASE_URL + 'pages/mail_status.php?auto=1', { credentials: 'same-origin', cache: 'no-store' }).catch(function () {}); }, 3500); });</script>
+<?php endif; ?>
 <script type="speculationrules">
 {"prerender":[{"where":{"selector_matches":".sidebar-nav a:not([href*='logout']):not([href*='backup']):not([href*='compliance']):not([href*='health_check']):not([target='_blank']), .dash-link:not([href*='backup']):not([target='_blank']), .report-card:not([target='_blank'])"},"eagerness":"moderate"}]}
 </script>

@@ -661,6 +661,26 @@
         });
     };
 
+    // 📬 (2026-11-04 «أوقات بيوصل أوقات ما بيوصل… بدّي الإيميل يوصل بسرعة») بعد الإرسال نسأل خدمة الإرسال عن الرسالة كل بضع ثوانٍ حتى 90 ثانية
+    // ونقول للمستخدم بالنافذة نفسها: ✅ وصلت لبريد المستلم (وإن لم يجدها فهي بـJunk) · ⛔ ارتدّت · ⏳ بريد المستلم متأخّر — بدل أن يتلفن ليسأل أو يبعتها مرّتين
+    function ppEmailTrack(logId, msg, modalEl, to) {
+        var line = document.createElement('div'); line.style.cssText = 'margin-top:6px;font-weight:700;color:#334155'; line.textContent = '⏳ عم نتأكّد إنّها وصلت لبريد ' + to + '…'; msg.appendChild(line);
+        var start = Date.now(), delay = 3000;
+        function tick() {
+            if (!modalEl.isConnected) return;
+            fetch((window.BASE_URL || '') + 'pages/mail_status.php?id=' + encodeURIComponent(logId), { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) {
+                if (!modalEl.isConnected) return;
+                var st = (s && s.status) || '';
+                if (st === 'delivered' || st === 'opened' || st === 'clicked') { line.style.color = '#166534'; line.innerHTML = '✅ وصلت لبريد ' + escH(to) + ' — إذا ما لقيتها بالوارد فتّش بمجلّد <b>Junk / Courrier indésirable</b> وعلّمها «ليست غير مرغوبة» مرّة واحدة، وبعدها بتوصل عالوارد دائماً.'; return; }
+                if (st === 'bounced') { line.style.color = '#173f6f'; line.textContent = '⛔ ارتدّت — العنوان ' + to + ' غير موجود أو فيه غلطة.'; return; }
+                if (st === 'complained' || st === 'failed' || st === 'canceled') { line.style.color = '#173f6f'; line.textContent = (s && s.label) || st; return; }
+                if (Date.now() - start > 90000) { line.style.color = '#0e7490'; line.textContent = '⏳ خرجت من البرنامج، وبريد المستلم بعده ما أكّد الاستلام — هوتميل أحياناً يتأخّر دقائق. البرنامج يتابعها لحاله وتشوف النتيجة بـ📬 سجلّ الإيميلات.'; return; }
+                if (st === 'delivery_delayed') line.textContent = '⏳ بريد المستلم متأخّر — خدمة الإرسال تعيد المحاولة لحالها…';
+                setTimeout(tick, delay); delay = Math.min(delay + 1000, 8000);
+            }).catch(function () { if (Date.now() - start < 90000) setTimeout(tick, 5000); });
+        }
+        setTimeout(tick, 2500);
+    }
     // ===== Email — يُرسَل من الخادم مع الـPDF مرفقاً (pages/send_report.php + إعدادات البريد) =====
     window.ppEmail = function (title, to) {
         var t = docTitle(title);
@@ -702,7 +722,10 @@
                     x.send(fd);
                 });
             }).then(function (j) {
-                if (j && j.ok) { msg.innerHTML = '<span style="color:#166534;font-weight:700">✅ ' + escH(j.msg || 'أُرسل') + '</span>' + (j.log ? ' <a href="' + escH(j.log) + '" target="_blank" style="font-weight:700">📬 سجلّ الإيميلات</a>' : ''); send.textContent = '✅ أُرسل'; }
+                if (j && j.ok) {
+                    msg.innerHTML = '<span style="color:#166534;font-weight:700">✅ ' + escH(j.msg || 'أُرسل') + '</span>' + (j.log ? ' <a href="' + escH(j.log) + '" target="_blank" style="font-weight:700">📬 سجلّ الإيميلات</a>' : ''); send.textContent = '✅ أُرسل';
+                    if (j.log_id) ppEmailTrack(j.log_id, msg, m.el, to);   // 📬 (2026-11-04) نتابع الوصول لحالنا ونقول «وصل»
+                }
                 else { msg.innerHTML = '<span style="color:#b91c1c;font-weight:700">✕ ' + escH((j && j.msg) || 'تعذّر الإرسال') + '</span>' + (j && j.settings ? ' <a href="' + escH(j.settings) + '">إعدادات البريد</a>' : ''); send.innerHTML = old; send.disabled = false; }
             }).catch(function (e) { msg.innerHTML = '<span style="color:#b91c1c">تعذّر الإرسال: ' + escH(e && e.message) + '</span>'; send.innerHTML = old; send.disabled = false; });
         });

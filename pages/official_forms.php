@@ -221,6 +221,13 @@ $titles = [
     'general_info'   => 'Informations générales sur le personnel / معلومات عامة عن الموظفين',
 ];
 $titles += eosForms(); // 🏦 مستند التصفية + جدول السنتين + جدول الأجور السنوية
+// 📬 (2026-11-04 «بعتت بيان عام وصل المتعاقد وما وصل الملاك»): الفئة بالعنوان ⇒ موضوع الإيميل واسم ملف الـPDF يميّزان الملاك عن المتعاقدين
+//    (كانا متطابقَين «État général (titulaires/contractuels)» فلا يُعرَف أيّ الرسالتين وصلت). الفرنسي بلا عربي والعربي بلا فرنسي كي يبقى التقسيم FR/AR سليماً.
+if ($form === 'eoc_staff') {
+    $eocCatT = (($_GET['cat'] ?? 'titulaire') === 'contractuel') ? 'contractuel' : 'titulaire';
+    $titles['eoc_staff'] = $eocCatT === 'contractuel' ? 'État général (Contractuels) — Caisse d\'indemnités / بيان عام (المتعاقدون) — صندوق التعويضات'
+                                                      : 'État général (Titulaires) — Caisse d\'indemnités / بيان عام (الداخلون في الملاك) — صندوق التعويضات';
+}
 $pageTitle = $titles[$form] ?? 'Rapports officiels / تقارير رسمية';
 $currentPage = 'reports';
 

@@ -51,6 +51,7 @@ if ($ok && $via === 'dup') $out(true, 'هذه الرسالة نفسها أُرس
 if ($ok) {
     if ($shOk && !empty($GLOBALS['msa_mail_log_id'])) { try { getDB()->prepare("UPDATE mail_log SET share_token = ? WHERE id = ?")->execute([$shTok, $GLOBALS['msa_mail_log_id']]); } catch (Throwable $e) {} }
     logAudit('send_report_email', 'settings', 0, null, ['to' => $to, 'subject' => $subject, 'file' => $name, 'size' => $size, 'link' => $big, 'via' => $via, 'from' => $fromAddr]);
-    $out(true, 'أُرسل إلى ' . $to . ($big ? ' برابط تنزيل الملف ' . $name . ' (' . msaHumanSize($size) . ')' : ' مع الملف ' . $name . ' مرفقاً') . ' — حالة الوصول والتنزيل تظهر بسجلّ الإيميلات.', ['log' => $logUrl]);
+    // 📬 (2026-11-04) log_id ⇒ النافذة تتابع وصول هذه الرسالة لحالها (pages/mail_status.php) وتقول «✅ وصل» أو «⏳ متأخّر»
+    $out(true, 'أُرسل إلى ' . $to . ($big ? ' برابط تنزيل الملف ' . $name . ' (' . msaHumanSize($size) . ')' : ' مع الملف ' . $name . ' مرفقاً') . '.', ['log' => $logUrl, 'log_id' => (string)($GLOBALS['msa_mail_log_id'] ?? '')]);
 }
 $out(false, 'تعذّر الإرسال: ' . ($err ?: 'خطأ غير معروف'), ['settings' => $settingsUrl]);

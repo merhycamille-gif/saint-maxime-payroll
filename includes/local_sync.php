@@ -195,6 +195,8 @@ function localSyncRun(): array {
         foreach ($new as $t) $pairs[] = "`$tmpdb`.`$t` TO `$dbname`.`$t`";
         $pdo->exec('RENAME TABLE ' . implode(',', $pairs));
         $pdo->exec("DROP DATABASE IF EXISTS `$tmpdb`");
+        // 🧷 (2026-11-04) ما كُتب على الكمبيوتر بين الرفع والسحب يرجع من القاعدة السابقة (لا يضيع) ويُرفع بالدورة التالية
+        if ($target === $prevdb) { try { $resc = localSyncRescueLocalChanges($pdo, $prevdb, $dbname); if ($resc) localSyncLog("🧷 أُعيد $resc صفّاً كُتبت على الكمبيوتر أثناء السحب"); } catch (Throwable $e) { localSyncLog('تعذّر إرجاع تعديلات الكمبيوتر: ' . $e->getMessage()); } }
         $final = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$dbname'")->fetchColumn();
     } catch (Throwable $e) {
         return $done(false, 'خطأ بقاعدة البيانات: ' . mb_substr($e->getMessage(), 0, 200));
@@ -378,12 +380,58 @@ function localSyncCycleInner(bool $force): array {
  *    بصمات كل صفّ أونلاين (sync_api hashes) مقابل بصماتنا ⇒ نجلب الصفوف المختلفة/الناقصة فقط (sync_api rows) ونطبّقها بنسخة احتياطية
  *    (syncApplyChanges) ونحذف ما حُذف أونلاين، ونحدّث الأساس للجداول المتأثّرة. أي اختلاف ببنية الجداول أو حذف جماعي أو واجهة
  *    rows غير منشورة أونلاين ⇒ fallback = السحب الكامل كما كان. السحب الكامل الدوري (ONLINE_SYNC_HOURS) يبقى شبكة أمان + نسخة مضغوطة. */
-/** خطّة جدول واحد (دالّة نقيّة للفحص): ['up' => مفاتيح تُجلب من الأونلاين (ناقصة/مختلفة), 'del' => مفاتيح تُحذف محلياً (غير موجودة أونلاين)] */
-function localSyncPlan(array $local, array $online, string $table = ''): array {
+/** خطّة جدول واحد (دالّة نقيّة للفحص): ['up' => مفاتيح تُجلب من الأونلاين (ناقصة/مختلفة), 'del' => مفاتيح تُحذف محلياً (غير موجودة أونلاين)]
+ *  🧷 (2026-11-04 «أوقات بيوصل أوقات ما بيوصل» — إيميل خرج 14:41:12 بين رفع 14:41:07 وسحب 14:41:24 فحُذف صفّه من سجلّ الإيميلات):
+ *     مع $base (بصمات الأساس) ما كُتب على الكمبيوتر بعد الرفع وقبل السحب ليس «محذوفاً أونلاين»: صفّ جديد ليس بالأساس يبقى ويُرفع بالدورة التالية،
+ *     وصفّ عُدّل محلياً (بصمته ≠ الأساس) والأونلاين كما الأساس يبقى المحلي. ما تغيّر بالمكانين = تعارض كما كان (الأونلاين يبقى). */
+function localSyncPlan(array $local, array $online, string $table = '', ?array $base = null): array {
     $up = []; $del = [];
-    foreach ($online as $pk => $h) { if ($table === 'settings' && syncSettingsKeyIgnored((string)$pk)) continue; if (!isset($local[$pk]) || $local[$pk] !== $h) $up[] = (string)$pk; }
-    foreach ($local as $pk => $h) { if ($table === 'settings' && syncSettingsKeyIgnored((string)$pk)) continue; if (!isset($online[$pk])) $del[] = (string)$pk; }
+    foreach ($online as $pk => $h) {
+        if ($table === 'settings' && syncSettingsKeyIgnored((string)$pk)) continue;
+        if (!isset($local[$pk]) || $local[$pk] !== $h) {
+            if ($base !== null && isset($local[$pk], $base[$pk]) && $local[$pk] !== $base[$pk] && $h === $base[$pk]) continue;   // عُدّل محلياً بعد الرفع والأونلاين كما كان ⇒ المحلي يبقى
+            $up[] = (string)$pk;
+        }
+    }
+    foreach ($local as $pk => $h) {
+        if ($table === 'settings' && syncSettingsKeyIgnored((string)$pk)) continue;
+        if (!isset($online[$pk])) {
+            if ($base !== null && !isset($base[$pk])) continue;   // جديد محلياً وليس بالأساس ⇒ لم يُحذف أونلاين، كُتب بعد الرفع ⇒ يبقى ويُرفع
+            $del[] = (string)$pk;
+        }
+    }
     return ['up' => $up, 'del' => $del];
+}
+/** 🧷 بعد السحب الكامل (القاعدة القديمة صارت prev): إرجاع ما كُتب على الكمبيوتر بين الرفع والسحب — الجديد ليس بأساس prev ولا بالقاعدة الجديدة،
+ *  والمعدَّل بصمته ≠ أساسه والقاعدة الجديدة (الأونلاين) كما الأساس. ما تغيّر بالمكانين يبقى الأونلاين. بنية مختلفة ⇒ الجدول لا يُلمس. يعيد عدد الصفوف المُعادة. */
+function localSyncRescueLocalChanges(PDO $pdo, string $prev, string $new): int {
+    require_once __DIR__ . '/sync_common.php';
+    $hasBase = (bool)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = " . $pdo->quote($prev) . " AND table_name = '_sync_base'")->fetchColumn();
+    if (!$hasBase) return 0;
+    $n = 0; $newTabs = syncRealTables($pdo, $new);
+    foreach (syncRealTables($pdo, $prev) as $t) {
+        if (!in_array($t, $newTabs, true)) continue;
+        try {
+            $mp = syncTableMeta($pdo, $prev, $t); $mn = syncTableMeta($pdo, $new, $t);
+            if (!$mp['pk'] || $mp['cols'] !== $mn['cols'] || $mp['pk'] !== $mn['pk']) continue;
+            $st = $pdo->prepare("SELECT pk, h FROM `$prev`.`_sync_base` WHERE tbl = ?"); $st->execute([$t]);
+            $base = []; foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $base[$r['pk']] = $r['h'];
+            $cand = [];
+            foreach (syncRowHashes($pdo, $prev, $t, $mp) as $pk => $h) { if ($t === 'settings' && syncSettingsKeyIgnored((string)$pk)) continue; if (!isset($base[$pk]) || $base[$pk] !== $h) $cand[(string)$pk] = $h; }
+            if (!$cand) continue;
+            $newH = syncRowHashes($pdo, $new, $t, $mn, array_keys($cand));
+            $take = [];
+            foreach ($cand as $pk => $h) {
+                if (!isset($base[$pk])) { if (!isset($newH[$pk])) $take[] = $pk; }        // جديد محلياً وليس أونلاين ⇒ يرجع
+                elseif (($newH[$pk] ?? null) === $base[$pk]) $take[] = $pk;            // معدَّل محلياً والأونلاين كما الأساس ⇒ المحلي يبقى
+            }
+            if (!$take) continue;
+            $r = syncApplyChanges($pdo, $new, $t, $mn, array_values(syncRowsByPk($pdo, $prev, $t, $mp, $take)), []);
+            if (!empty($r['ok'])) { $n += (int)$r['ins']; localSyncLog("🧷 $t: " . (int)$r['ins'] . " صفّاً كُتبت على الكمبيوتر أثناء السحب أُعيدت (تُرفع بالدورة التالية)"); }
+            else localSyncLog("تعذّر إرجاع تعديلات $t: " . (string)($r['msg'] ?? ''));
+        } catch (Throwable $e) { localSyncLog("تعذّر إرجاع تعديلات $t: " . $e->getMessage()); }
+    }
+    return $n;
 }
 function localSyncPullIncremental(): array {
     require_once __DIR__ . '/sync_common.php';
@@ -407,11 +455,15 @@ function localSyncPullIncremental(): array {
         }
         foreach ($localTabs as $t) if (!isset($T['tables'][$t])) return $end($fb("جدول غير موجود أونلاين: $t"));
         $nUp = 0; $nDel = 0; $parts = [];
+        $hasBase = (bool)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = " . $pdo->quote($s) . " AND table_name = '_sync_base'")->fetchColumn();
+        $baseSt = $hasBase ? $pdo->prepare("SELECT pk, h FROM `$s`.`_sync_base` WHERE tbl = ?") : null;
         foreach ($T['tables'] as $t => $info) {
             $m = syncTableMeta($pdo, $s, $t); if (!$m['pk']) continue;
             [$hj, $code] = $ch($site . '/sync_api.php?action=hashes&table=' . rawurlencode($t)); $hr = json_decode((string)$hj, true);
             if ($code !== 200 || !is_array($hr) || empty($hr['ok'])) return $end(['ok' => false, 'msg' => "$t: تعذّرت قراءة بصمات الأونلاين ($code)"]);
-            $plan = localSyncPlan(syncRowHashes($pdo, $s, $t, $m), (array)($hr['hashes'] ?? []), $t);
+            $base = null;   // 🧷 (2026-11-04) الأساس: ما كُتب على الكمبيوتر بعد الرفع وقبل هذا السحب لا يُحذف ولا يُدهَس
+            if ($baseSt) { $baseSt->execute([$t]); $base = []; foreach ($baseSt->fetchAll(PDO::FETCH_ASSOC) as $br) $base[$br['pk']] = $br['h']; }
+            $plan = localSyncPlan(syncRowHashes($pdo, $s, $t, $m), (array)($hr['hashes'] ?? []), $t, $base);
             if (!$plan['up'] && !$plan['del']) continue;
             $nLoc = (int)$pdo->query("SELECT COUNT(*) FROM `$s`.`$t`")->fetchColumn();
             if ($plan['del'] && $nLoc > 0 && count($plan['del']) > max(50, (int)($nLoc * 0.2))) return $end($fb("$t: حذف جماعي (" . count($plan['del']) . " من $nLoc)"));

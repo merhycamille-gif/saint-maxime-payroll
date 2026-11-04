@@ -17,8 +17,21 @@ function sendResult($ok, $msg, $back)
         . '<style>body{font-family:Tahoma,Arial;background:#f1f5f9;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}'
         . '.box{background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.12);padding:34px;max-width:480px;text-align:center}'
         . '.ic{font-size:46px;color:' . $color . '}a{display:inline-block;margin-top:18px;background:#1e3a5f;color:#fff;padding:9px 20px;border-radius:8px;text-decoration:none}</style></head>'
-        . '<body><div class="box"><div class="ic">' . $icon . '</div><h2 style="color:' . $color . '">' . htmlspecialchars($msg) . '</h2>'
-        . '<a href="' . htmlspecialchars($back) . '">Retour / رجوع</a></div></body></html>';
+        . '<body><div class="box"><div class="ic">' . $icon . '</div><h2 style="color:' . $color . '">' . htmlspecialchars($msg) . '</h2>';
+    // 📬 (2026-11-04 «أوقات بيوصل أوقات ما بيوصل») بعد الإرسال نتابع الوصول عند خدمة الإرسال حتى 90 ثانية ونقول «✅ وصلت» (أو Junk/ارتدّت/متأخّرة) — كنافذة إرسال التقارير
+    $logId = (string)($GLOBALS['msa_mail_log_id'] ?? '');
+    if ($ok && $logId !== '') {
+        echo '<div id="trk" style="margin-top:10px;font-weight:700;color:#334155;line-height:1.8">⏳ عم نتأكّد إنّها وصلت لبريد المستلم…</div>'
+           . '<script>(function(){var u=' . json_encode(BASE_URL . 'pages/mail_status.php?id=' . $logId) . ',l=document.getElementById("trk"),t0=Date.now(),d=3000;'
+           . 'function tick(){fetch(u,{credentials:"same-origin",cache:"no-store"}).then(function(r){return r.json()}).then(function(s){var st=(s&&s.status)||"";'
+           . 'if(st==="delivered"||st==="opened"||st==="clicked"){l.style.color="#166534";l.innerHTML="✅ وصلت لبريد المستلم — إذا ما لقيها بالوارد فليفتّش بمجلّد <b>Junk / Courrier indésirable</b> ويعلّمها «ليست غير مرغوبة» مرّة واحدة.";return}'
+           . 'if(st==="bounced"){l.style.color="#173f6f";l.textContent="⛔ ارتدّت — العنوان غير موجود أو فيه غلطة.";return}'
+           . 'if(st==="complained"||st==="failed"||st==="canceled"){l.style.color="#173f6f";l.textContent=(s&&s.label)||st;return}'
+           . 'if(Date.now()-t0>90000){l.style.color="#0e7490";l.textContent="⏳ خرجت من البرنامج، وبريد المستلم بعده ما أكّد الاستلام — هوتميل أحياناً يتأخّر دقائق. البرنامج يتابعها لحاله وتشوف النتيجة بسجلّ الإيميلات.";return}'
+           . 'if(st==="delivery_delayed")l.textContent="⏳ بريد المستلم متأخّر — خدمة الإرسال تعيد المحاولة لحالها…";setTimeout(tick,d);d=Math.min(d+1000,8000)}).catch(function(){if(Date.now()-t0<90000)setTimeout(tick,5000)})}'
+           . 'setTimeout(tick,2500)})();</script>';
+    }
+    echo '<a href="' . htmlspecialchars($back) . '">Retour / رجوع</a></div></body></html>';
     exit;
 }
 

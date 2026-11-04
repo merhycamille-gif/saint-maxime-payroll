@@ -577,6 +577,46 @@ function msaMailLogRefresh(int $max = 30): int {
     } catch (Throwable $e) {}
     return $n;
 }
+/* ═══ 📬 (2026-11-04 «أوقات بيوصل أوقات ما بيوصل… بدّي الإيميل يوصل بسرعة، أنا ما بعرف كيف هيدا شغلك») ═══
+ *  التشخيص من سجلّ الخدمة: الرسائل الأربع وصلت لهوتميل (delivered) — واحدة أجّلها هوتميل 7 دقائق (greylisting)، وواحدة عند مستلم جديد وقعت بـJunk.
+ *  وسجلّ البرنامج كان يقول «بانتظار» لـ42 رسالة منذ 20/10 لأنّه لا يُحدَّث إلا بفتح صفحته. ⇒
+ *  (١) بعد كبسة الإرسال النافذة تتابع الوصول لحالها (pages/mail_status.php?id=) وتقول «✅ وصل» أو «⏳ متأخّر» بدل أن يتلفن ليسأل
+ *  (٢) الحالات المعلّقة تُحدَّث تلقائياً كل 10 دقائق بنبض خلفي من أي صفحة (footer.php ← mail_status.php?auto=1) — السجلّ صادق دائماً */
+const MSA_MAIL_AUTO_REFRESH_SEC = 600;
+const MSA_MAIL_PENDING = ['sent', 'queued', 'delivery_delayed'];
+/** حالة رسالة واحدة بالسجلّ — المعلّقة تُسأل عنها الخدمة الآن وتُحدَّث. @return [ok, id, to, status, label, final, age] */
+function msaMailLogCheckOne(string $logId): array {
+    try {
+        ensureMailLogTable(); $db = getDB();
+        $st = $db->prepare("SELECT id, to_addr, status, provider_id, created_at FROM mail_log WHERE id = ?"); $st->execute([$logId]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$r) return ['ok' => false, 'status' => '', 'label' => 'لم تُوجَد الرسالة بالسجلّ'];
+        if (in_array((string)$r['status'], MSA_MAIL_PENDING, true) && !empty($r['provider_id'])) {
+            $ev = resendApiStatus((string)$r['provider_id']);
+            if ($ev !== '') { $db->prepare("UPDATE mail_log SET status = ?, checked_at = ? WHERE id = ?")->execute([mb_substr($ev, 0, 24), date('Y-m-d H:i:s'), $r['id']]); $r['status'] = $ev; }
+        }
+        [$label] = msaMailStatusLabel((string)$r['status']);
+        return ['ok' => true, 'id' => (string)$r['id'], 'to' => (string)$r['to_addr'], 'status' => (string)$r['status'], 'label' => $label,
+                'final' => !in_array((string)$r['status'], MSA_MAIL_PENDING, true), 'age' => max(0, time() - (int)strtotime((string)$r['created_at']))];
+    } catch (Throwable $e) { return ['ok' => false, 'status' => '', 'label' => $e->getMessage()]; }
+}
+/** هل حان تحديث تلقائي؟ (مفتاح الخدمة موجود · مرّت 10 دقائق على آخر جولة · يوجد معلّق خلال 10 أيام) — استعلام واحد خفيف */
+function msaMailLogAutoRefreshDue(): bool {
+    try {
+        if (programRelayConfig() === null) return false;
+        if (time() - (int)getSetting('mail_log_refreshed_at', 0) < MSA_MAIL_AUTO_REFRESH_SEC) return false;
+        ensureMailLogTable();
+        $st = getDB()->prepare("SELECT 1 FROM mail_log WHERE status IN ('sent','queued','delivery_delayed') AND provider_id IS NOT NULL AND provider_id <> '' AND created_at >= ? LIMIT 1");
+        $st->execute([date('Y-m-d H:i:s', time() - 10 * 86400)]);
+        return (bool)$st->fetchColumn();
+    } catch (Throwable $e) { return false; }
+}
+/** الجولة التلقائية (من النبض الخلفي): تسجّل وقتها أوّلاً كي لا تتكرّر من صفحتين مفتوحتين معاً، ثم تحدّث حتى 30 رسالة معلّقة */
+function msaMailLogAutoRefresh(): int {
+    if (!msaMailLogAutoRefreshDue()) return 0;
+    setSetting('mail_log_refreshed_at', (string)time());
+    return msaMailLogRefresh(30);
+}
 /** تسمية الحالة بالعربي/الفرنسي + لون (بلا أحمر ولا برتقالي: كحلي للفشل، تركواز للتأخير) */
 function msaMailStatusLabel(string $st): array {
     switch ($st) {
