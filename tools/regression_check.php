@@ -11245,13 +11245,18 @@ try {
         && strpos($h290b, '>15</div>') !== false && strpos($h290b, '>2</div>') !== false && stripos($h290, 'Fatal error') === false;
     $at290 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/attestations.php'));
     $bk290 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/attestations_bulk.php'));
-    $okSrc290 = strpos($at290, "pages/official_export.php?form=mof_r13&n=1&date=<?= e(\$effDate) ?>") !== false
+    $okSrc290 = strpos($at290, "pages/official_forms.php?form=tax_r13&n=1&date=<?= e(\$effDate) ?>") !== false
         && strpos($bk290, "function bulkCoverR13(int \$sid, int \$n, int \$d, int \$mo, int \$yr): ?string {") !== false
         && strpos($bk290, "\$_SESSION['bulk_meta'][\$tok] = (int)\$emp['school_id'];") !== false
         && strpos($bk290, "if (\$type === 'mof_r3' && count(\$bySch) && !isset(\$bySch[0])) {") !== false
-        && strpos($bk290, "'_groupe_' . (count(\$paths) - count(\$covers)) . '_'") !== false;
-    $ok290 = $okPos290 && $okHtml290 && $okSrc290;
-    $why290 = 'pos=' . (int)$okPos290 . ' html=' . (int)$okHtml290 . ' src=' . (int)$okSrc290;
+        && strpos($bk290, "'_groupe_' . (count(\$paths) - count(\$covers)) . '_'") !== false
+        && strpos($bk290, 'id="bk_cover_n"') !== false && strpos($bk290, "\$coverN > 0 ? \$coverN : count(\$files)") !== false && strpos($bk290, "cover_n: coverN") !== false;   // 📨 عدد الطلبات قابل للتغيير
+    $hF290 = renderPage('pages/official_forms.php', ['form' => 'tax_r13', 'n' => '7', 'date' => '2026-10-01'], [], [4], 'lbp', '2026-2027');
+    $rc290 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/report_center.php'));
+    $okForm290 = strpos($hF290, 'official_export.php?form=mof_r13&amp;n=7&amp;date=2026-10-01') !== false && strpos($hF290, 'ر3-1 — كتاب طلب تسجيل مستخدمين/أجراء') !== false && stripos($hF290, 'Fatal error') === false
+        && strpos($rc290, "['url'=>\$OF.'tax_r13', 'icon'=>'fa-envelope-open-text'") !== false && strpos($rc290, "'ar'=>'ر3-1 كتاب طلب التسجيل'") !== false;
+    $ok290 = $okPos290 && $okHtml290 && $okSrc290 && $okForm290;
+    $why290 = 'pos=' . (int)$okPos290 . ' html=' . (int)$okHtml290 . ' src=' . (int)$okSrc290 . ' form=' . (int)$okForm290;
 } catch (Throwable $e) { $ok290 = false; $why290 = $e->getMessage(); }
 check('📨 كتاب طلب التسجيل ر1-3 (2026-11-05): mof_r13 طبق الأصل بالمدرسة والرقم المالي بالمربّعات والضمان والعنوان والمسؤول (كميل سعيد مرعي · مسؤول) وعدد الطلبات والتاريخ (date أو d/mo/yr) · كبسة بشاشة ر3 · أوّل الملف المدموج بالإفادات الجماعية لكل مدرسة', $ok290, $why290);
 

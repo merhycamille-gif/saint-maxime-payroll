@@ -43,6 +43,7 @@ function reportCenterCategories(): array {
         ['title'=>'ضريبة الدخل / Impôt sur le revenu', 'icon'=>'gov-ic gov-mof', 'color'=>'var(--danger)', 'tiles'=>[
             ['url'=>'?report=tax_summary', 'icon'=>'fa-list', 'color'=>'var(--danger)', 'fr'=>'Impôt mensuel', 'ar'=>'كشف ضريبة شهري'],
             ['url'=>$OF.'tax_register', 'icon'=>'fa-id-card-clip', 'color'=>'var(--gold)', 'fr'=>'R3 — Enregistrement', 'ar'=>'ر3 تسجيل أجير'],
+            ['url'=>$OF.'tax_r13', 'icon'=>'fa-envelope-open-text', 'color'=>'var(--gold)', 'fr'=>'R1-3 — Lettre de demande', 'ar'=>'ر3-1 كتاب طلب التسجيل'],   // 📨 (2026-11-05)
             ['url'=>$OF.'tax_r4', 'icon'=>'fa-address-book', 'color'=>'var(--info)', 'fr'=>'R4 — Infos + ayants droit', 'ar'=>'ر4 معلومات + العيال'],
             ['url'=>$OF.'tax_r5', 'icon'=>'fa-file-lines', 'color'=>'var(--primary)', 'fr'=>'R5 — Décl. annuelle', 'ar'=>'ر5 تصريح سنوي'],
             ['url'=>$OF.'tax_r6', 'icon'=>'fa-file-lines', 'color'=>'var(--info)', 'fr'=>'R6 — Kachf individuel', 'ar'=>'ر6 كشف سنوي إفرادي'],

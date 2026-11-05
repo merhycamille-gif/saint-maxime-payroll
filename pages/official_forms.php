@@ -42,7 +42,7 @@ if (!$school && $employeeId > 0) {
 // 🔵 النماذج المؤسّسية (تصاريح الضريبة والضمان) تُصدَر باسم مؤسسة واحدة ورقمها لدى الضمان.
 // في وضع «كل المدارس» كان $school = null فتُطبَع الترويسة فارغة وتُدمَج أرقام كل المدارس
 // في تصريح واحد بلا رقم صاحب عمل. الآن نطلب اختيار مدرسة بوضوح.
-$institutionForms = ['tax_r5','tax_r10','tax_r7','tax_emp_report','cnss_annual','cnss_contrib_monthly','cnss_contrib_annual','cnss_nominative_monthly'];
+$institutionForms = ['tax_r5','tax_r10','tax_r7','tax_emp_report','tax_r13','cnss_annual','cnss_contrib_monthly','cnss_contrib_annual','cnss_nominative_monthly'];   // 📨 tax_r13 (2026-11-05)
 $ofSchoolPicked = false; // 🏫 مدرسة واحدة اختيرت بالرابط (&school_id=) من ضمن المختارة
 $ofSchoolGroup = false;  // 🏫 (2026-09-25 «بدي اختار أو وحدة لحالها أو مجموعة») عدة مدارس مختارة ⇒ التصريح للمجموعة معاً
 if (in_array($form, $institutionForms, true) && !$school) {
@@ -206,6 +206,7 @@ $titles = [
     'tax_emp_report' => 'Impôt sur le revenu — enseignant/employé (détaillé) / تقرير ضريبة الدخل - الأستاذ/الموظف',
     'tax_r10'        => 'Formulaire R10 — état périodique de versement de l\'impôt / نموذج ر10 — بيان دوري بتأدية الضريبة',
     'tax_register'   => 'Formulaire R3 — demande d\'inscription d\'un nouveau salarié / نموذج ر3 — طلب تسجيل مستخدم/أجير جديد',
+    'tax_r13'        => 'Formulaire R1-3 — lettre de demande d\'enregistrement (accompagne les R3) / نموذج ر3-1 — كتاب طلب تسجيل مستخدمين/أجراء (المرافق لطلبات ر3)',
     'teacher_card'   => 'Fiche de l\'enseignant / بطاقة الأستاذ',
     'teaching_staff' => 'Liste du corps enseignant / لائحة الهيئة التعليمية',
     'eoc_card'       => 'Fiche du titulaire — Caisse d\'indemnités / بطاقة ملاك — صندوق التعويضات',
@@ -838,6 +839,38 @@ elseif ($form === 'tax_r6t'):
                 <a class="btn btn-success btn-lg" href="<?= e($exp10) ?>&format=xlsx"><i class="fas fa-file-excel"></i> Excel رسمي (معبّى) / Excel officiel rempli</a>
             </div>
             <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> النموذج يطلع <strong>طبق الأصل عن نموذج ر10 الرسمي</strong> (قالب ملفك نفسه) معبّأً تلقائياً: المؤسسة ورقمها المالي وعنوانها وممثلها والمكلف بتبليغ البريد، وأرقام الفصل المختار ١٠٠–١٩٠ و٢٦٠–٣٠٠ من رواتب أشهر الفصل حصراً (مصدر واحد: monthly_salaries)<?= $ofFilterTitle !== '' ? ' — الفلتر: ' . e($ofFilterTitle) : '' ?>.</p>
+        </div>
+    </div>
+<?php
+    include __DIR__ . '/../includes/footer.php';
+    exit;
+elseif ($form === 'tax_r13'):
+    // 📨 (2026-11-05 «لازم تكون بملف التقارير واسمها ر3-1») كتاب طلب تسجيل مستخدمين/أجراء (ر1-3) المرافق لدفعة ر3 — شاشة خيارات (عدد الطلبات + التاريخ)
+    //    ثمّ الطباعة على النموذج الرسمي (official_export?form=mof_r13). بالإفادات الجماعية يُضاف تلقائياً أوّل الملف المدموج.
+    $n13 = max(1, min(9999, (int)($_GET['n'] ?? 1)));
+    $d13 = (string)($_GET['date'] ?? date('Y-m-d')); if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d13) || !strtotime($d13)) $d13 = date('Y-m-d');
+    $exp13 = BASE_URL . 'pages/official_export.php?form=mof_r13&n=' . $n13 . '&date=' . urlencode($d13) . ($ofSchoolPicked ? '&sch=' . (int)$school['id'] : '');
+?>
+    <div class="card no-print" style="max-width:860px;margin:0 auto">
+        <div class="card-header"><h3>
+            <span dir="ltr"><i class="fas fa-envelope-open-text"></i> Formulaire R1-3 — lettre de demande d'enregistrement — <?= e($school['name_fr'] ?: $school['name_ar']) ?></span>
+            <div style="font-size:0.85em;font-weight:600;opacity:0.9">ر3-1 — كتاب طلب تسجيل مستخدمين/أجراء (المرافق لطلبات ر3)</div>
+        </h3></div>
+        <div class="card-body">
+            <form method="get" class="form-row cols-3" style="align-items:end;margin-bottom:14px">
+                <input type="hidden" name="form" value="tax_r13">
+                <?php if ($ofSchoolPicked): ?><input type="hidden" name="school_id" value="<?= (int)$school['id'] ?>"><?php endif; ?>
+                <div class="form-group mb-0"><label class="form-label">Nombre de demandes R3 jointes / عدد طلبات ر3 المرفقة</label>
+                    <input type="number" name="n" class="form-control" value="<?= $n13 ?>" min="1" max="9999" onchange="this.form.submit()"></div>
+                <div class="form-group mb-0"><label class="form-label">Date du courrier / تاريخ الكتاب</label>
+                    <input type="date" name="date" class="form-control" value="<?= e($d13) ?>" onchange="this.form.submit()"></div>
+            </form>
+            <?= mofProfileBox($school) ?>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <a class="btn btn-danger btn-lg" href="<?= e($exp13) ?>" target="_blank"><i class="fas fa-print"></i> النموذج الرسمي ر3-1 (طباعة / PDF) / Formulaire officiel R1-3</a>
+                <a class="btn btn-light btn-lg" href="<?= BASE_URL ?>pages/attestations_bulk.php?type=mof_r3"><i class="fas fa-layer-group"></i> طلبات ر3 دفعة واحدة (الكتاب يُضاف تلقائياً) / R3 en groupe</a>
+            </div>
+            <p class="text-muted mt-3"><i class="fas fa-info-circle"></i> الكتاب يطلع <strong>طبق الأصل عن نموذج ر1-3 الرسمي</strong> معبّأً تلقائياً: اسم المؤسسة والشهرة، رقمها المالي بالمربّعات ورقم الضمان، البلدة والشارع والهاتف والبريد، المسؤول (الاسم الكامل والصفة) ومقدّم الكتاب، عدد الطلبات المرفقة، والتاريخ المختار. التوقيع وقسم «خاص بالإدارة» يبقيان فارغين.</p>
         </div>
     </div>
 <?php

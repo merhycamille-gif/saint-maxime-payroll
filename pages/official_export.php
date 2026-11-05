@@ -448,12 +448,16 @@ if ($form === 'mof_r13') {
     $addrR = trim((string)($schR['address'] ?? '')) ?: trim((string)($schR['address_fr'] ?? ''));
     $addrPartsR = array_values(array_filter(array_map('trim', preg_split('/\s*(?:-|–|,|،)\s*/u', $addrR, 2))));
     $contactName = (string)getSetting('mof_r13_contact_name', 'كميل سعيد مرعي'); $contactTitle = (string)getSetting('mof_r13_contact_title', 'مسؤول');
+    // 🏛️ عنوان المؤسسة وبياناتها من «معلومات المؤسسة للنماذج الرسمية» (mofProfile — نفس مصدر ر10/ر5)؛ الفارغ منها يُكمَل من ملف المدرسة (العنوان مقسوماً: بلدة ثمّ شارع)
+    $profR = mofProfile($schR); $pv = fn($k) => trim((string)($profR[$k] ?? ''));
     $valsR = [
-        'name' => $nameR, 'trade' => $nameR,
+        'name' => $nameR, 'trade' => $pv('trade_name') ?: $nameR,
         'cnss' => trim((string)($schR['nssf_employer_number'] ?? '')),
-        'zone' => $addrPartsR[0] ?? '', 'street' => $addrPartsR[1] ?? '',   // منطقة – بلدة ثمّ الشارع/الباقي (العنوان مقسوماً على « - » أو «،»)
-        'phone1' => trim((string)($schR['phone'] ?? '')), 'email' => trim((string)($schR['email'] ?? '')),
-        'contact_name' => $contactName, 'contact_title' => $contactTitle, 'contact_phone' => trim((string)($schR['phone'] ?? '')),
+        'gouv' => $pv('gov'), 'qada' => $pv('caza'), 'zone' => $pv('town') ?: ($addrPartsR[0] ?? ''), 'hay' => $pv('quarter'),
+        'street' => $pv('street') ?: ($addrPartsR[1] ?? ''), 'realestate' => $pv('cadastral'), 'parcel' => $pv('lot'),
+        'building' => $pv('building'), 'floor' => $pv('floor'), 'pobox' => $pv('pob'), 'region' => $pv('region'), 'fax' => $pv('fax'),
+        'phone1' => trim((string)($schR['phone'] ?? '')), 'email' => $pv('email') ?: trim((string)($schR['email'] ?? '')),
+        'contact_name' => $contactName, 'contact_title' => $contactTitle, 'contact_phone' => $pv('contact_phone') ?: trim((string)($schR['phone'] ?? '')), 'contact_fax' => $pv('contact_fax') ?: $pv('fax'),
         'count' => (string)$nR,
         'sub_name' => $contactName, 'sub_title' => $contactTitle,
         'day' => date('j', $tsR), 'month' => date('n', $tsR), 'year' => date('Y', $tsR),

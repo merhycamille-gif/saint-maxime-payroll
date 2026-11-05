@@ -266,9 +266,9 @@ if ($act !== '') {
             // 📨 (2026-11-05 «ر3-1») دفعة ر3 ⇒ كتاب طلب التسجيل ر1-3 أوّل ملف كل مدرسة بعدد طلباتها وبالتاريخ المختار (كما يُسلَّم للمالية)
             $covers = [];
             if ($type === 'mof_r3' && count($bySch) && !isset($bySch[0])) {
-                $ordered = []; $tsC = strtotime($date) ?: time();
+                $ordered = []; $tsC = strtotime($date) ?: time(); $coverN = max(0, min(9999, (int)($in['cover_n'] ?? 0)));   // 📨 عدد يكتبه المستخدم (فارغ = عدد الملفات)
                 foreach ($bySch as $sidC => $files) {
-                    $cv = bulkCoverR13((int)$sidC, count($files), (int)date('j', $tsC), (int)date('n', $tsC), (int)date('Y', $tsC));
+                    $cv = bulkCoverR13((int)$sidC, $coverN > 0 ? $coverN : count($files), (int)date('j', $tsC), (int)date('n', $tsC), (int)date('Y', $tsC));
                     if ($cv !== null) { $cp = $bulkDir . '/cover_' . bulkToken() . '.pdf'; file_put_contents($cp, $cv); $covers[] = $cp; $ordered[] = $cp; }
                     foreach ($files as $f) $ordered[] = $f;
                 }
@@ -470,6 +470,12 @@ include __DIR__ . '/../includes/header.php';
                     <label class="chk"><input type="checkbox" id="bk_att_id" value="1"> <span>صورة التذكرة / إخراج القيد الفردي</span></label>
                     <label class="chk"><input type="checkbox" id="bk_att_fam" value="1"> <span>إخراج القيد العائلي</span></label>
                     <small class="text-muted">من المستندات المرفوعة بملف الأستاذ — كل مستند على ورقة بعد إفادته؛ الناقص يظهر قدّام اسمه</small>
+                </div>
+                <?php /* 📨 (2026-11-05 «بدي كمان بر3-1 أقدر غيّر بعدد الطلبات») كتاب ر3-1 المرافق لدفعة ر3: العدد تلقائي = عدد الملفات، أو رقم تكتبه */ ?>
+                <div class="school-checks emp-type-checks" id="bkCoverBox" style="margin:0 0 12px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;align-items:center">
+                    <strong style="margin-inline-end:8px"><i class="fas fa-envelope-open-text"></i> كتاب ر3-1 المرافق (لطلبات ر3 فقط) / Lettre R1-3 :</strong>
+                    <label class="chk" style="gap:6px"><span>عدد الطلبات بالكتاب / Nombre de demandes</span> <input type="number" id="bk_cover_n" min="1" max="9999" class="form-control" style="width:110px;display:inline-block;padding:4px 8px" placeholder="تلقائي"></label>
+                    <small class="text-muted">فارغ = تلقائي (عدد الملفات المدموجة لكل مدرسة) · الكتاب يُوضع أوّل الملف معبّأً بالمدرسة والتاريخ المختار</small>
                 </div>
                 <div class="bk-act">
                     <div class="bk-card">
@@ -693,7 +699,8 @@ include __DIR__ . '/../includes/header.php';
                 return;
             }
             sum.textContent = 'عم ندمج ' + rem.length + ' ملفاً…';
-            post({ act: 'merge', toks: rem.map(function (x) { return x.tok; }), type: type, date: date }).then(function (m) {
+            var coverN = (document.getElementById('bk_cover_n') || {}).value || '';
+            post({ act: 'merge', toks: rem.map(function (x) { return x.tok; }), type: type, date: date, cover_n: coverN }).then(function (m) {
                 if (!m.ok) { sum.textContent = '✕ ' + (m.msg || 'تعذّر الدمج'); finalBtn.disabled = false; updateFinal(); return; }
                 var url = API + '?act=file&tok=' + m.tok;
                 sum.textContent = 'ملف واحد جاهز: ' + m.name + ' (' + m.pages + ' صفحة)';
