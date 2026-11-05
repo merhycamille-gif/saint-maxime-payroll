@@ -547,7 +547,10 @@ if ($form === 'mof_r3') {
     $put($emp['email'] ?? '', 66.0, 75.1, 'r', 8.5);
     // الإفادة (يوقّعها صاحب العمل)
     $put($esch['name_ar'] ?? '', 76.0, 84.05, 'r', 7);
-    $prTs = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date'] ?? '')) ? (strtotime((string)$_GET['date']) ?: time()) : time();   // 📅 (2026-11-05) تاريخ الطباعة المختار بشاشة ر3
+    // 📅 (2026-11-05) تاريخ الطباعة المختار: date=Y-m-d من شاشة ر3 الفردية، أو d/mo/yr من الإفادات الجماعية (كنماذج الضمان)، وإلا اليوم
+    $prTs = time();
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date'] ?? ''))) $prTs = strtotime((string)$_GET['date']) ?: time();
+    elseif (isset($_GET['d'], $_GET['mo'], $_GET['yr']) && checkdate((int)$_GET['mo'], (int)$_GET['d'], (int)$_GET['yr'])) $prTs = mktime(12, 0, 0, (int)$_GET['mo'], (int)$_GET['d'], (int)$_GET['yr']);
     $put(date('j', $prTs), 64.5, 91.0, 'c'); $put(date('n', $prTs), 59.0, 91.0, 'c'); $put(date('Y', $prTs), 52.0, 91.0, 'c');
     // 🔴 قسم «خاص بالإدارة» يبقى فاضياً («لازم يبقى فاضي ما يتعبى هيدا الدولة بتعبي» —
     // p1 ‏2026-08-23، يلغي طلب 2026-08-21): لا رقم مالي بخاناته ولا تاريخ تسجيل — الوزارة تعبّيه.
