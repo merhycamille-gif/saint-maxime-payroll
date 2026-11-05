@@ -57,6 +57,7 @@ function tfMapSocialStatus($choice, $children) {
 // تُرجع رسالة تحذير إن تعذّر تطبيق تغيير الشهادة لأستاذ ملاك (يُعدَّل من ملف الأستاذ ليُعاد بناء الدرجات).
 function applyOneSubmission($db, $sub, $textFields, $uploadCols) {
     $data = json_decode($sub['data'] ?: '{}', true) ?: [];
+    foreach (['phone1', 'phone2'] as $pk) if (($data[$pk] ?? '') !== '') $data[$pk] = normalizeLbPhone($data[$pk]);   // 📞 (2026-11-05) 03-888849
     $intFields = ['number_of_children','days_per_week','tax_subject']; $floatFields = ['hours_per_week'];
     $warn = '';
     $set = []; $vals = [];
@@ -253,6 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             'birth_place','nationality','gouvernorat','district','ville','quartier','rue','immeuble','etage',
             'phone1','phone2','email','diploma','job_title','subjects_taught','niveau_scolaire','classes_taught','nssf_number','finance_ministry_number','caisse_number','notes'];
         foreach ($strFields as $f) { if (($data[$f] ?? '') !== '') $emp[$f] = $data[$f]; }
+        foreach (['phone1', 'phone2'] as $pk) if (!empty($emp[$pk])) $emp[$pk] = normalizeLbPhone($emp[$pk]);   // 📞 (2026-11-05)
         // الوضع الضريبي (يخضع للضريبة؟): إن أرسله الأستاذ يُعتمد، وإلا يبقى الافتراضي (خاضع)
         if (array_key_exists('tax_subject', $data)) $emp['tax_subject'] = ((string)$data['tax_subject'] === '0') ? 0 : 1;
         if (($data['birth_date'] ?? '') !== '') $emp['birth_date'] = $data['birth_date'];

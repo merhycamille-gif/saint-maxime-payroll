@@ -417,8 +417,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'rue' => trim($_POST['rue'] ?? ''),
         'immeuble' => trim($_POST['immeuble'] ?? ''),
         'etage' => trim($_POST['etage'] ?? ''),
-        'phone1' => trim(arabicDigitsFr($_POST['phone1'] ?? '')), // «كل الارقام اكتبو بالفرنسي»
-        'phone2' => trim(arabicDigitsFr($_POST['phone2'] ?? '')),
+        'phone1' => normalizeLbPhone($_POST['phone1'] ?? ''), // «كل الارقام اكتبو بالفرنسي» + 📞 (2026-11-05) الشكل الموحَّد 03-888849
+        'phone2' => normalizeLbPhone($_POST['phone2'] ?? ''),
         'email' => trim($_POST['email'] ?? ''),
         'diploma' => trim($_POST['diploma'] ?? ''),
         'specialization' => trim($_POST['specialization'] ?? ''),
@@ -1415,6 +1415,9 @@ if ($id > 0):
     $hxIsTeacher = $employee['employee_type'] !== 'employe';
     $hxStatus = ['actif' => ['Actif', 'نشط', 'ok'], 'suspendu' => ['Suspendu', 'متوقّف', 'warn'], 'retraite' => ['Retraité', 'متقاعد', 'off'], 'demissionne' => ['Démissionné', 'مستقيل', 'off']][$employee['status']] ?? [$employee['status'], '', 'off'];
     $hxSchool = schoolNameById((int)$employee['school_id']);
+    // 🏫 (2026-11-05 «لفتح ملف الأستاذ يبقى المدرسة اللي هو فيها مبيّنة بالملف المفتوح») اسم المدرسة FR · AR بارز بالرأس وبالشريط الثابت مع التبويبات
+    $hxSchoolFr = schoolNameById((int)$employee['school_id'], 'fr'); $hxSchoolAr = schoolNameById((int)$employee['school_id'], 'ar');
+    $hxSchoolBoth = trim($hxSchoolFr) . (($hxSchoolAr !== '' && $hxSchoolAr !== $hxSchoolFr) ? ' · ' . $hxSchoolAr : '');
     $hxNameFr = trim(($employee['first_name_fr'] ?? '') . ' ' . ($employee['last_name_fr'] ?? '')); $hxNameAr = function_exists('empFullNameAr') ? empFullNameAr($employee) : trim(($employee['first_name_ar'] ?? '') . ' ' . ($employee['last_name_ar'] ?? ''));
     $hxIni = mb_strtoupper(mb_substr((string)($employee['first_name_fr'] ?: $employee['first_name_ar']), 0, 1) . mb_substr((string)($employee['last_name_fr'] ?: $employee['last_name_ar']), 0, 1));
     $hxGrade = (float)($employee['current_grade'] ?? 0);
@@ -1434,11 +1437,11 @@ if ($id > 0):
     <div class="eh-av"><?= e($hxIni ?: '•') ?></div>
     <div class="eh-id">
         <div class="eh-name"><span class="eh-fr" dir="ltr"><?= e($hxNameFr ?: $hxNameAr) ?></span><span class="eh-ar"><?= e($hxNameAr) ?></span></div>
+        <div class="eh-school" title="École / المدرسة"><i class="fas fa-school"></i> <span dir="ltr"><?= e($hxSchoolFr) ?></span><?php if ($hxSchoolAr !== '' && $hxSchoolAr !== $hxSchoolFr): ?><span class="eh-school-ar"><?= e($hxSchoolAr) ?></span><?php endif; ?></div>
         <div class="eh-chips">
             <span class="eh-chip acc"><?= $hxIsTeacher ? 'Enseignant · أستاذ' : 'Employé · موظف' ?></span>
             <?php if ($hxIsTeacher): ?><span class="eh-chip acc"><?= e($hxTypeFr) ?> · <?= e($hxTypeAr) ?></span><?php endif; ?>
             <span class="eh-chip <?= e($hxStatus[2]) ?>"><?= e($hxStatus[0]) ?> · <?= e($hxStatus[1]) ?></span>
-            <span class="eh-chip"><?= e($hxSchool) ?></span>
             <span class="eh-chip" dir="ltr">Code <?= e($employee['employee_code']) ?></span>
         </div>
     </div>
@@ -1515,6 +1518,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
     <!-- Tabs -->
     <?php /* 🌍 (2026-10-23 «ملف الأستاذ مرتّب ترتيب عالمي») التبويبات بسطرين: الفرنسي فوق والعربي تحت، بعرض متساوٍ، تلتصق أثناء التمرير */ ?>
     <div class="tabs emp-tabs">
+        <?php if ($id > 0): /* 🏫 (2026-11-05) المدرسة تبقى ظاهرة بالشريط الثابت أثناء التمرير */ ?><div class="et-school" title="École / المدرسة"><i class="fas fa-school"></i> <span dir="ltr"><?= e($hxSchoolFr) ?></span><?php if ($hxSchoolAr !== '' && $hxSchoolAr !== $hxSchoolFr): ?><small><?= e($hxSchoolAr) ?></small><?php endif; ?></div><?php endif; ?>
         <button type="button" class="tab active" data-tab="personal"><span class="t-fr">👤 Personnel</span><span class="t-ar">شخصي</span></button>
         <button type="button" class="tab" data-tab="address"><span class="t-fr">🏠 Adresse</span><span class="t-ar">العنوان</span></button>
         <button type="button" class="tab" data-tab="employment"><span class="t-fr">🎓 Emploi</span><span class="t-ar">التوظيف</span></button>

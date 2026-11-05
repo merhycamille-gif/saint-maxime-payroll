@@ -5562,6 +5562,21 @@ function schoolSignatories($school) {
 /**
  * رقم هاتف لبناني → صيغة wa.me الدولية (961...) لإرسال واتساب.
  */
+/**
+ * 📞 (2026-11-05 «بأرقام هاتف الأساتذة كلهن مش حاطين - بين الكود والرقم») الشكل الموحَّد للهاتف اللبناني: «03-888849»
+ * (رمزان، شرطة، ستّة أرقام). يقبل أي فواصل (/ - فراغ) و+961/961/00961 والأرقام العربية، والقديم 7 أرقام (3xxxxxx ⇒ 03-xxxxxx).
+ * ما لا يطابق 8 أرقام لبنانية يُعاد كما هو (مقصوصاً) — لا يُخترَع رقم.
+ */
+function normalizeLbPhone($phone): string {
+    $s = trim((string)$phone);
+    if ($s === '') return '';
+    $s = function_exists('arabicDigitsFr') ? arabicDigitsFr($s) : $s;
+    $d = preg_replace('/\D+/', '', $s);
+    if (preg_match('/^(00961|961)(\d{7,8})$/', $d, $m)) { $d = $m[2]; if (strlen($d) === 7) $d = '0' . $d; }
+    if (strlen($d) === 7 && $d[0] === '3') $d = '0' . $d;
+    if (strlen($d) === 8) return substr($d, 0, 2) . '-' . substr($d, 2);   // 03/01…09 و70/71/76/78/79/81
+    return $s;
+}
 function waPhone($phone) {
     $d = preg_replace('/\D+/', '', (string)$phone);
     if ($d === '') return '';

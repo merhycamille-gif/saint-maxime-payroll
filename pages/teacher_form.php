@@ -238,6 +238,7 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     $ssChoice = (string)($_POST['social_status'] ?? '');
     $data['social_status'] = in_array($ssChoice, ['celibataire', 'marie'], true) ? $ssChoice : '';
     // تاريخ الولادة مكتوب يدوياً (يوم/شهر/سنة) → طبّعه إلى Y-m-d قبل الحفظ
+    foreach (['phone1', 'phone2'] as $pk) if (($data[$pk] ?? '') !== '') $data[$pk] = normalizeLbPhone($data[$pk]);   // 📞 (2026-11-05) 03-888849
     foreach (['birth_date', 'mother_birth_date'] as $dk) if (isset($data[$dk]) && $data[$dk] !== '') {
         $data[$dk] = parseFlexibleDate($data[$dk]) ?? $data[$dk];
     }

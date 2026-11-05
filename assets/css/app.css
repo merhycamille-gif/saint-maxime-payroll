@@ -3347,3 +3347,11 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
 .emp-hero .eh-dd .eh-sec i{color:#1e4fa3;margin-inline-end:4px}
 .emp-hero .eh-dd a.eh-all{color:#1e4fa3}
 .emp-hero .eh-dd a.eh-danger{margin-top:2px}
+/* 🏫 2026-11-05 «يبقى المدرسة اللي هو فيها مبيّنة بالملف المفتوح»: اسم المدرسة FR·AR بارز بالرأس + شارة ثابتة بشريط التبويبات */
+.emp-hero .eh-school{margin-top:6px;font-size:15px;font-weight:800;color:#1e4fa3;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.emp-hero .eh-school i{color:#1e4fa3}
+.emp-hero .eh-school .eh-school-ar{font-size:14px;font-weight:700;color:#334155}
+.emp-hero .eh-school .eh-school-ar::before{content:"·";color:#94a3b8;margin-inline-end:8px}
+#empForm .tabs.emp-tabs .et-school{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;padding:4px 14px;border-radius:12px;background:#0f2d5e;color:#fff;font-size:13px;font-weight:800;line-height:1.25;max-width:320px;text-align:center}
+#empForm .tabs.emp-tabs .et-school i{margin-inline-end:4px;color:#fcd34d}
+#empForm .tabs.emp-tabs .et-school small{font-size:12px;font-weight:600;color:#dbe4f3;display:block}

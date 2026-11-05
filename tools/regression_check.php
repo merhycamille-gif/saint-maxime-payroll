@@ -4015,7 +4015,7 @@ check('الأرقام بالفرنسي: التطبيع مربوط بحفظ مل�
       strpos($emp71, "officialNumberFr(\$_POST['caisse_number']") !== false
       && strpos($emp71, "officialNumberFr(\$_POST['nssf_number']") !== false
       && strpos($emp71, "officialNumberFr(\$_POST['finance_ministry_number']") !== false
-      && strpos($emp71, "arabicDigitsFr(\$_POST['phone1']") !== false
+      && strpos($emp71, "normalizeLbPhone(\$_POST['phone1']") !== false   // 📞 (2026-11-05) normalizeLbPhone يستدعي arabicDigitsFr داخلياً
       && strpos($sch71, "officialNumberFr(\$_POST['caisse_number']") !== false
       && strpos($sch71, "officialNumberFr(\$_POST['finance_number']") !== false
       && strpos($sch71, "arabicDigitsFr(\$_POST['phone']") !== false);
@@ -8901,8 +8901,8 @@ check('☑️ خيارات أعمدة الراتب خانات حدّ بعض لا
 $e196 = $db->query("SELECT e.id, e.school_id, e.base_salary_usd, ms.school_year FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.net_salary_lbp > 0 AND ms.exchange_rate > 0
                     WHERE e.is_deleted = 0 AND e.salary_input_mode = 'direct_usd' AND e.base_salary_usd > 0 AND (e.usd_base_from_sy IS NULL OR e.usd_base_from_sy = '' OR ms.school_year >= e.usd_base_from_sy)
                     ORDER BY ms.school_year DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-$ok196 = function_exists('directUsdBaseForRow') && $e196 !== false;
-$why196 = $e196 ? ('emp=' . $e196['id'] . ' sy=' . $e196['school_year'] . ' usd=' . $e196['base_salary_usd']) : 'no direct_usd sample';
+$ok196 = function_exists('directUsdBaseForRow');   // 2026-11-05: بلا عيّنة حيّة (آخرها EMP1000028 حُذف بقراره) ⇒ فحص الدالة فقط لا فشل
+$why196 = $e196 ? ('emp=' . $e196['id'] . ' sy=' . $e196['school_year'] . ' usd=' . $e196['base_salary_usd']) : 'no direct_usd sample (skipped)';
 if ($e196) {
     $h196 = renderPage('pages/annual_slip.php', ['employee_id' => (int)$e196['id'], 'school_year' => $e196['school_year']], ['extra', 'aide'], [(int)$e196['school_id']], 'both', $e196['school_year']);
     $usd196 = number_format((int)floor((float)$e196['base_salary_usd']), 0) . ' $';
@@ -11114,6 +11114,8 @@ try {
         && strpos($hE286, 'name="mother_first_name_fr"') !== false && strpos($hE286, 'name="mother_last_name_fr"') !== false && strpos($hE286, 'name="mother_birth_date"') !== false
         && strpos($hE286, 'name="mother_first_name"') !== false && strpos($hE286, 'name="mother_last_name"') !== false
         && substr_count($hE286, '?action=delete&id=' . $eid286) === 1   // لا أزرار مكرّرة: الحذف مرّة واحدة
+        && strpos($hE286, '<div class="eh-school" title="École / المدرسة"><i class="fas fa-school"></i>') !== false && strpos($hE286, '<div class="et-school" title="École / المدرسة">') !== false   // 🏫 (2026-11-05) المدرسة بارزة بالرأس + شارة ثابتة بشريط التبويبات
+        && strpos($css286, '#empForm .tabs.emp-tabs .et-school{display:flex;') !== false && strpos($css286, '.emp-hero .eh-school{margin-top:6px;') !== false
         && stripos($hE286, 'Fatal error') === false && stripos($hE286, 'Warning:') === false;
     $listOk286 = strpos($hL286, 'class="form-group mb-0 emp-search-big"') !== false && strpos($hL286, 'id="empSearchInput"') !== false && strpos($hL286, 'form-row cols-4 mb-4 emp-filter-row') !== false
         && stripos($hL286, 'Fatal error') === false;
@@ -11153,6 +11155,25 @@ try {
     $why287 = 'teacher_form=' . (int)$tfOk287 . ' info_collect=' . (int)$icOk287;
 } catch (Throwable $e) { $ok287 = false; $why287 = $e->getMessage(); }
 check('🔗🪪👩 رابط الأساتذة (2026-11-05): رقم السجل ومحلّ القيد إلزاميان (المحلّ عربي) + اسم الأم بالفرنسي وتاريخ ولادتها اختيارية (تاريخ يدوي يُطبَّع) · info_collect يطبّقها على الملف والجديد ويعرضها بالطلب', $ok287, $why287);
+
+/* 288) 📞 (2026-11-05 «بأرقام هاتف الأساتذة كلهن مش حاطين - بين الكود والرقم») normalizeLbPhone ⇒ «03-888849» بكل مدخل: ملف الموظف،
+ *      رابط الأساتذة، اعتماد الطلب وإنشاء الجديد. ما ليس 8 أرقام لبنانية يبقى كما هو. */
+$ok288 = false; $why288 = '';
+try {
+    $t288 = ['03888849' => '03-888849', '07/450483' => '07-450483', '71- 245223' => '71-245223', '70 089 852' => '70-089852', '+961 81 428 358' => '81-428358', '00961 3 888849' => '03-888849', '3888849' => '03-888849', '٠٣٨٨٨٨٤٩' => '03-888849', '03-888849' => '03-888849', '' => '', '0932260115' => '0932260115', '05-' => '05-', '0' => '0'];
+    $bad288 = [];
+    foreach ($t288 as $in => $exp) { $got = normalizeLbPhone((string)$in); if ($got !== $exp) $bad288[] = $in . '⇒' . $got . '≠' . $exp; }
+    $em288 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/employees.php'));
+    $tf288 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/teacher_form.php'));
+    $ic288 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/info_collect.php'));
+    $src288 = strpos($em288, "'phone1' => normalizeLbPhone(\$_POST['phone1'] ?? ''),") !== false && strpos($em288, "'phone2' => normalizeLbPhone(\$_POST['phone2'] ?? ''),") !== false
+        && strpos($tf288, "foreach (['phone1', 'phone2'] as \$pk) if ((\$data[\$pk] ?? '') !== '') \$data[\$pk] = normalizeLbPhone(\$data[\$pk]);") !== false
+        && substr_count($ic288, 'normalizeLbPhone(') === 2;
+    $n288 = 0; foreach ($db->query("SELECT phone1, phone2 FROM employees WHERE is_deleted = 0") as $pr288) foreach (['phone1', 'phone2'] as $pk288) { $pv288 = (string)($pr288[$pk288] ?? ''); if ($pv288 !== '' && normalizeLbPhone($pv288) !== $pv288) $n288++; }   // الداتا موحَّدة: لا رقم يغيّره التطبيع (بعد التسوية 2026-11-05)
+    $ok288 = !$bad288 && $src288 && $n288 === 0;
+    $why288 = 'bad=' . implode(' | ', $bad288) . ' src=' . (int)$src288 . ' unnormalized_rows=' . $n288;
+} catch (Throwable $e) { $ok288 = false; $why288 = $e->getMessage(); }
+check('📞 الهاتف بالشكل الموحَّد 03-888849 (2026-11-05): normalizeLbPhone (فواصل/961/عربي/7 أرقام قديمة؛ الغريب يبقى) · ملف الموظف + رابط الأساتذة + الاعتماد والجديد · الداتا الموجودة بلا ملزّق ولا /', $ok288, $why288);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
