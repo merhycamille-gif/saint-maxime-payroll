@@ -2529,7 +2529,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
         <div><span class="k">المؤسسة ورقمها:</span> <?= fillVal($school['name_ar'].' - '.$school['nssf_employer_number']) ?></div>
         <div><span class="k">الأجر الشهري:</span> <?= fillVal($salary?formatLBP($salary):'') ?></div>
         <div><span class="k">اسم الوالد وتاريخ ولادته:</span> <span class="fill dotted" style="min-width:180px">&nbsp;</span></div>
-        <div><span class="k">اسم الوالدة وتاريخ ولادتها:</span> <?= fillVal(trim($emp['mother_first_name'].' '.$emp['mother_last_name'])) ?></div>
+        <div><span class="k">اسم الوالدة وتاريخ ولادتها:</span> <?= fillVal(trim(trim($emp['mother_first_name'].' '.$emp['mother_last_name']) . ((!empty($emp['mother_birth_date']) && $emp['mother_birth_date'] !== '0000-00-00') ? ' — ' . formatDate($emp['mother_birth_date']) : ''))) ?></div><?php /* 👩 (2026-11-05) تاريخ ولادة الأم من الملف */ ?>
         <div class="full"><span class="k">عنوان سكن المضمون:</span> <?= fillVal(empAddress($emp)) ?></div>
         <div class="full"><span class="k">عمل الوالد/الوالدة ومداخيلهما:</span> <span class="fill dotted" style="min-width:260px">&nbsp;</span></div>
     </div>

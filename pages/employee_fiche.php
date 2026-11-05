@@ -305,7 +305,10 @@ $addr = implode(' - ', array_values(array_filter(array_map('trim', [
     ($emp['etage'] ?? '') !== '' ? ($t('floor') . ' ' . $emp['etage']) : '', $emp['district'] ?? '', $emp['gouvernorat'] ?? '',
 ]))));
 $registry = trim(($emp['civil_registry_number'] ?? '') . (($emp['civil_registry_place'] ?? '') ? (' / ' . $placeToLang($emp['civil_registry_place'])) : ''));
-$mother   = $nameToLang(trim(($emp['mother_first_name'] ?? '') . ' ' . ($emp['mother_last_name'] ?? '')));
+// 👩 (2026-11-05) اسم الأم بلغة الورقة: الفرنسي المسجَّل بالملف إن وُجد (وإلا تعريب/ترجمة العربي كما كان) + تاريخ ولادتها إن سُجّل
+$motherFrDb = trim(((string)($emp['mother_first_name_fr'] ?? '')) . ' ' . ((string)($emp['mother_last_name_fr'] ?? '')));
+$mother   = (!$rtl && $motherFrDb !== '') ? $motherFrDb : $nameToLang(trim(($emp['mother_first_name'] ?? '') . ' ' . ($emp['mother_last_name'] ?? '')));
+if ($mother !== '' && !empty($emp['mother_birth_date']) && $emp['mother_birth_date'] !== '0000-00-00') $mother .= ' — ' . formatDate($emp['mother_birth_date']);
 $birth    = trim(($emp['birth_date'] ? formatDate($emp['birth_date']) : '') . (($emp['birth_place'] ?? '') ? (' — ' . $placeToLang($emp['birth_place'])) : ''));
 $addr     = $placeToLang($addr);
 $social   = trim((string)socialStatusLabel($emp['social_status'] ?? '', $vl));

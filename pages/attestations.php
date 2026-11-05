@@ -230,6 +230,9 @@ if ($emp && !empty($_GET['dossier'])):
             $p  = $row2('الاسم الكامل (عربي)', trim(($emp['first_name_ar']??'').' '.($emp['father_name_ar']??'').' '.($emp['last_name_ar']??'')));
             $p .= $row2('Nom complet (FR)', trim(($emp['first_name_fr']??'').' '.($emp['father_name_fr']??'').' '.($emp['last_name_fr']??'')));
             $p .= $row2('اسم الأم', $mother);
+            // 👩 (2026-11-05) اسم الأم بالفرنسي + تاريخ ولادتها إن سُجّلا بالملف
+            if (trim(((string)($emp['mother_first_name_fr'] ?? '')) . ' ' . ((string)($emp['mother_last_name_fr'] ?? ''))) !== '') $p .= $row2('Nom de la mère (FR)', trim(($emp['mother_first_name_fr'] ?? '') . ' ' . ($emp['mother_last_name_fr'] ?? '')));
+            if (!empty($emp['mother_birth_date']) && $emp['mother_birth_date'] !== '0000-00-00') $p .= $row2('تاريخ ولادة الأم', formatDate($emp['mother_birth_date']));
             $p .= $row2('الجنسية', $emp['nationality']??'');
             $p .= $row2('تاريخ الولادة', $emp['birth_date'] ? formatDate($emp['birth_date']) : '');
             $p .= $row2('محل الولادة', $emp['birth_place']??'');
@@ -338,7 +341,7 @@ if ($emp && !empty($_GET['dossier'])):
             ?>
             <?php /* 🎨 (2026-09-27 p1 «يكون مرتبين وفيهن شوي ألوان راكزة لنميّز من بعض»): كل قسم لوحة بلون هادئ خاصّ به (أخضر: راتب وعمل وضمان · كهرماني: نهاية الخدمة · نيلي: عقود وإنذارات · رمادي: أخرى)
                      والأزرار بشبكة خانات متساوية — الروابط نفسها */ ?>
-            <div class="no-print att-groups">
+            <div class="no-print att-groups" id="attGroups">
                 <?php $gi = 0; foreach ($attGroups as $gTitle => $keys): $gi++; $gIcon = ['fa-money-check-dollar', 'fa-door-open', 'fa-file-contract', 'fa-folder-open'][min($gi, 4) - 1]; ?>
                 <div class="att-group att-g<?= min($gi, 4) ?>">
                     <div class="att-gt"><i class="fas <?= $gIcon ?>"></i> <?= e($gTitle) ?></div>

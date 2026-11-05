@@ -3327,3 +3327,23 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
 #empForm details.emp-help.emp-help-box{margin:0 0 10px;padding:8px 12px;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc}
 #empForm details.emp-help.emp-help-box summary{font-size:13px}
 @media print{.emp-hero,.emp-facts{display:none}}
+/* ===================================================================
+ * 🔍🏛️👩 2026-11-05 ملف الموظف: خانة البحث واضحة · قائمة الإجراءات بأقسام (نماذج رسمية/إفادات/الملف) · زوج اسم الأم FR|AR
+ * =================================================================== */
+#empForm .form-row.mother-pairs{margin-top:4px}
+.emp-filter-row .emp-search-big{grid-column:1 / -1}
+.emp-filter-row .emp-search-big .form-label{font-size:15px;font-weight:800;color:#1e4fa3}
+.emp-filter-row .emp-search-big .form-label i{color:#1e4fa3}
+.emp-filter-row #empSearchInput{font-size:18px !important;font-weight:600;padding:12px 16px !important;min-height:54px;border:2px solid #1e4fa3;border-radius:12px;background:#f8fbff;box-shadow:0 2px 8px rgba(30,79,163,.12)}
+.emp-filter-row #empSearchInput::placeholder{font-weight:500;color:#64748b}
+.emp-filter-row #empSearchInput:focus{background:#fff;box-shadow:0 0 0 4px rgba(30,79,163,.18);border-color:#1e4fa3}
+.emp-hero .eh-dd{min-width:680px;max-width:min(760px,calc(100vw - 24px));display:none;grid-template-columns:1fr 1fr;column-gap:4px;max-height:min(85vh,760px);overflow:auto}
+.emp-hero .eh-menu.open .eh-dd{display:grid}
+.emp-hero .eh-dd .eh-sec{grid-column:1 / -1}
+.emp-hero .eh-dd a.eh-danger{grid-column:1 / -1;margin-top:0;border-top:0;padding-top:8px}
+@media (max-width:760px){.emp-hero .eh-dd{min-width:0;width:calc(100vw - 24px);grid-template-columns:1fr}}
+.emp-hero .eh-dd .eh-sec{font-size:11.5px;font-weight:800;color:#64748b;letter-spacing:.3px;padding:8px 10px 3px;margin-top:4px;border-top:1px dashed #e2e8f0;text-transform:none}
+.emp-hero .eh-dd .eh-sec:first-of-type{border-top:1px dashed #e2e8f0}
+.emp-hero .eh-dd .eh-sec i{color:#1e4fa3;margin-inline-end:4px}
+.emp-hero .eh-dd a.eh-all{color:#1e4fa3}
+.emp-hero .eh-dd a.eh-danger{margin-top:2px}

@@ -8726,7 +8726,7 @@ check('☑️📐 باقي الشرائط صفوفاً مرتّبة (2026-09-27)
       && strpos($css189, '.school-checks.emp-type-checks,.fa-cats .school-checks{display:flex;flex-wrap:wrap;gap:4px 14px}') !== false && strpos($css189, '.salcomp-bar.att-opts{display:grid;gap:0 22px}') !== false
       && $noFatal($hS189) && substr_count($hS189, 'Calcul / احتساب</strong>') === 1 && substr_count($hS189, 'Export / تصدير وطباعة</strong>') === 1 /* 211: أسطر slip-rows */ && strpos($hS189, '<span style="color:var(--gray-400)">|</span>') === false && strpos($hS189, 'name="from_m"') !== false && strpos($hS189, 'blank=2') !== false
       && $noFatal($hI189) && substr_count($hI189, 'class="att-row wide"') === 2 && strpos($hI189, '<strong class="att-k"><i class="fas fa-calendar-days"></i> Année de mise à jour') !== false && strpos($hI189, 'name="sy"') !== false
-      && $noFatal($hE189) && strpos($hE189, 'Recherche / بحث</label>') !== false && strpos($hE189, 'Statut / الحالة</label>') !== false && strpos($hE189, 'name="status"') !== false
+      && $noFatal($hE189) && strpos($hE189, 'فتّش عن أستاذ أو موظف</label>') !== false /* 🔍 (2026-11-05) خانة البحث الكبيرة */ && strpos($hE189, 'Statut / الحالة</label>') !== false && strpos($hE189, 'name="status"') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/bulk_allowances.php'), '<div class="ba-cats"><strong>أي بند؟</strong>') !== false && strpos((string)file_get_contents($PROJ . '/pages/bulk_allowances.php'), '.ba-cats label { font-weight:600; cursor:pointer; white-space:nowrap; min-width:150px;') !== false
       && strpos((string)file_get_contents($PROJ . '/pages/open_year.php'), 'Année du programme / سنة البرنامج</label>') !== false,
       'toolbar-rows=' . substr_count($tb189, 'class="att-row'));
@@ -10630,7 +10630,7 @@ try {
     $ok273 = strpos($src273, '<div class="emp-hero no-print">') !== false && strpos($src273, '<div class="emp-facts no-print">') !== false
           && strpos($src273, 'data-lockedit-for="empForm" class="btn btn-primary eh-edit"') !== false && substr_count($src273, 'data-lockedit-for="empForm"') === 1
           && strpos($src273, '<div class="tabs emp-tabs">') !== false && substr_count($src273, '<span class="t-fr">') === 7
-          && strpos($src273, '<div class="form-row cols-3 name-pairs">') !== false && substr_count($src273, 'class="form-group name-pair"') === 3
+          && strpos($src273, '<div class="form-row cols-3 name-pairs">') !== false && substr_count($src273, 'class="form-group name-pair"') === 5 /* 3 للاسم + 2 لاسم الأم FR|AR (2026-11-05) */
           && strpos($src273, '$empTabBar();') === false
           && strpos($src273, '<div class="card emp-savebar">') !== false && strpos($src273, 'class="btn btn-light emp-cancel"') !== false
           && substr_count($src273, 'سنة <span dir="ltr"><?= e($hrSy) ?></span>') === 4
@@ -11079,6 +11079,55 @@ try {
       . ' titleT=' . (int)(strpos($hT285, '<title>État général (Titulaires)') !== false) . ' titleC=' . (int)(strpos($hC285, '<title>État général (Contractuels)') !== false);
 } catch (Throwable $e) { $ok285 = false; $why285 = $e->getMessage(); }
 check('📬 الإيميل يوصل بسرعة (2026-11-04): متابعة الوصول بعد الإرسال (mail_status + ppEmailTrack + صفحة نتيجة الإفادة) · تحديث تلقائي للمعلّقة كل 10 د من أي صفحة · بيان عام: الفئة بالعنوان/الموضوع/اسم الملف · 🧷 المزامنة لا تحذف/تدهس ما كُتب على الكمبيوتر بين الرفع والسحب (جزئي + كامل)', $ok285, $why285);
+
+/* 286) 🏛️👩🔍 ملف الموظف (2026-11-05 «ضمن كبسة إجراءات يكون كمان في ر3، استخدام أو ترك ضمان، إفادات الأستاذ… اسم الأم وشهرتها بالعربي والفرنسي
+ *      وتاريخ ولادتها… خانة البحث واضحة أكتر»): قائمة «إجراءات» بأقسام (نماذج رسمية: ر3/استخدام/ترك/إفادة عمل للضمان/ر6 · إفادات · الملف)
+ *      — الروابط نفسها التي بملف الإفادات · أعمدة mother_first_name_fr/mother_last_name_fr/mother_birth_date تتركّب ذاتياً (header.php)
+ *      · زوج FR|AR لاسم الأم + تاريخ ولادتها بالفورم والحفظ · motherFullName بلغة الورقة · تاريخ ولادة الأم بنموذج 482 (cnss_parent)
+ *      · خانة البحث بلائحة الموظفين على عرض الصفّ بإطار أزرق (emp-search-big). */
+$ok286 = false; $why286 = '';
+try {
+    $src286 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/employees.php'));
+    $hd286 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/header.php'));
+    $css286 = str_replace("\r", '', (string)file_get_contents($PROJ . '/assets/css/app.css'));
+    $of286 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/official_forms.php'));
+    $fi286 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/employee_fiche.php'));
+    $at286 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/attestations.php'));
+    ensureMotherColumns20261105();
+    $cols286 = msaHasCol($db, 'employees', 'mother_first_name_fr') && msaHasCol($db, 'employees', 'mother_last_name_fr') && msaHasCol($db, 'employees', 'mother_birth_date');
+    $mfn286 = motherFullName(['mother_first_name' => 'منى', 'mother_last_name' => 'جروج', 'mother_first_name_fr' => 'Mona', 'mother_last_name_fr' => 'Jarouj'], 'fr') === 'Mona Jarouj'
+        && motherFullName(['mother_first_name' => 'منى', 'mother_last_name' => 'جروج', 'mother_first_name_fr' => 'Mona', 'mother_last_name_fr' => 'Jarouj'], 'ar') === 'منى جروج'
+        && motherFullName(['mother_first_name' => 'منى', 'mother_last_name' => 'جروج', 'mother_first_name_fr' => '', 'mother_last_name_fr' => null], 'fr') === 'منى جروج'
+        && motherFullName(['mother_first_name' => '', 'mother_last_name' => ''], 'fr') === '';
+    $e286 = $db->query("SELECT id, school_id FROM employees WHERE is_deleted = 0 AND status = 'actif' AND school_id > 0 ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $eid286 = (int)($e286['id'] ?? 0); $sch286 = (int)($e286['school_id'] ?? 0);
+    $hE286 = $eid286 ? renderPage('pages/employees.php', ['action' => 'edit', 'id' => (string)$eid286], ['extra','aide','transport'], [$sch286], 'lbp') : '';
+    $hL286 = renderPage('pages/employees.php', [], ['extra','aide','transport'], [$sch286], 'lbp');
+    $menuOk286 = $eid286 > 0
+        && strpos($hE286, 'class="eh-sec"') !== false && substr_count($hE286, 'class="eh-sec"') === 3
+        && strpos($hE286, 'employee_id=' . $eid286 . '&type=mof_r3') !== false && strpos($hE286, 'employee_id=' . $eid286 . '&type=cnss_hire') !== false
+        && strpos($hE286, 'employee_id=' . $eid286 . '&type=cnss_leave') !== false && strpos($hE286, 'employee_id=' . $eid286 . '&type=cnss_travail') !== false
+        && strpos($hE286, 'official_forms.php?form=tax_r6&employee_id=' . $eid286) !== false
+        && strpos($hE286, 'employee_id=' . $eid286 . '&type=salaire') !== false && strpos($hE286, 'employee_id=' . $eid286 . '&type=tadris') !== false
+        && strpos($hE286, 'employee_id=' . $eid286 . '&dossier=1#attGroups') !== false
+        && strpos($hE286, 'class="form-row cols-3 name-pairs mother-pairs"') !== false
+        && strpos($hE286, 'name="mother_first_name_fr"') !== false && strpos($hE286, 'name="mother_last_name_fr"') !== false && strpos($hE286, 'name="mother_birth_date"') !== false
+        && strpos($hE286, 'name="mother_first_name"') !== false && strpos($hE286, 'name="mother_last_name"') !== false
+        && substr_count($hE286, '?action=delete&id=' . $eid286) === 1   // لا أزرار مكرّرة: الحذف مرّة واحدة
+        && stripos($hE286, 'Fatal error') === false && stripos($hE286, 'Warning:') === false;
+    $listOk286 = strpos($hL286, 'class="form-group mb-0 emp-search-big"') !== false && strpos($hL286, 'id="empSearchInput"') !== false && strpos($hL286, 'form-row cols-4 mb-4 emp-filter-row') !== false
+        && stripos($hL286, 'Fatal error') === false;
+    $srcOk286 = strpos($src286, "'mother_first_name_fr' => trim(\$_POST['mother_first_name_fr'] ?? ''),") !== false
+        && strpos($src286, "'mother_birth_date' => (preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', \$_POST['mother_birth_date'] ?? '') ? \$_POST['mother_birth_date'] : null),") !== false
+        && strpos($hd286, 'ensureMotherColumns20261105();') !== false
+        && strpos($css286, '.emp-filter-row #empSearchInput{font-size:18px !important') !== false && strpos($css286, '.emp-hero .eh-menu.open .eh-dd{display:grid}') !== false && strpos($css286, '.emp-hero .eh-dd .eh-sec{grid-column:1 / -1}') !== false
+        && strpos($of286, "اسم الوالدة وتاريخ ولادتها:</span> <?= fillVal(trim(trim(\$emp['mother_first_name'].' '.\$emp['mother_last_name']) . ((!empty(\$emp['mother_birth_date'])") !== false
+        && strpos($fi286, '$mother   = (!$rtl && $motherFrDb !== \'\') ? $motherFrDb : $nameToLang(') !== false
+        && strpos($at286, 'id="attGroups"') !== false && strpos($at286, "\$row2('تاريخ ولادة الأم', formatDate(\$emp['mother_birth_date']))") !== false;
+    $ok286 = $cols286 && $mfn286 && $menuOk286 && $listOk286 && $srcOk286;
+    $why286 = 'cols=' . (int)$cols286 . ' motherFullName=' . (int)$mfn286 . ' menu=' . (int)$menuOk286 . ' (id=' . $eid286 . ' secs=' . substr_count($hE286, 'class="eh-sec"') . ') list=' . (int)$listOk286 . ' src=' . (int)$srcOk286;
+} catch (Throwable $e) { $ok286 = false; $why286 = $e->getMessage(); }
+check('🏛️👩🔍 ملف الموظف (2026-11-05): قائمة «إجراءات» بأقسام (ر3/استخدام/ترك/إفادة عمل للضمان/ر6 + إفادات + الملف) بالروابط نفسها · أعمدة اسم الأم بالفرنسي + تاريخ ولادتها تتركّب ذاتياً · زوج FR|AR + التاريخ بالفورم والحفظ · motherFullName · 482 يطبع تاريخ ولادة الأم · خانة البحث الكبيرة بلائحة الموظفين', $ok286, $why286);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

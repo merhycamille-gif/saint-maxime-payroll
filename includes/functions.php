@@ -9355,6 +9355,31 @@ function ensureDisplayHireDateColumn(): void {
     $done = true;
     try { $db = getDB(); if (!msaHasCol($db, 'employees', 'display_hire_date')) $db->exec("ALTER TABLE employees ADD COLUMN display_hire_date DATE NULL DEFAULT NULL AFTER hire_date"); } catch (Throwable $e) {}
 }
+/**
+ * 👩 اسم الأم بالفرنسي + تاريخ ولادتها (2026-11-05 «اسم الأم وشهرتها يكون بالعربي والفرنسي وتاريخ ولادتها»):
+ * mother_first_name/mother_last_name يبقيان العربي (كل النماذج الرسمية تقرأهما)، ويُضاف mother_first_name_fr /
+ * mother_last_name_fr / mother_birth_date — تتركّب ذاتياً بالمكانين (الكمبيوتر والأونلاين) عند أوّل فتح.
+ */
+function ensureMotherColumns20261105(): void {
+    static $done = false; if ($done) return;
+    if (getDB()->inTransaction()) return; // DDL داخل معاملة = COMMIT ضمني
+    $done = true;
+    try {
+        $db = getDB();
+        foreach (['mother_first_name_fr' => "VARCHAR(100) NULL DEFAULT NULL COMMENT 'اسم الأم بالفرنسي' AFTER mother_last_name",
+                  'mother_last_name_fr' => "VARCHAR(100) NULL DEFAULT NULL COMMENT 'شهرة الأم بالفرنسي' AFTER mother_first_name_fr",
+                  'mother_birth_date' => "DATE NULL DEFAULT NULL COMMENT 'تاريخ ولادة الأم' AFTER mother_last_name_fr"] as $c => $def) {
+            if (!msaHasCol($db, 'employees', $c)) $db->exec("ALTER TABLE employees ADD COLUMN `$c` $def");
+        }
+    } catch (Throwable $e) {}
+}
+/** اسم الأم كاملاً بلغة الورقة: الفرنسي إن وُجد وطُلب، وإلا العربي (بلا فراغات زائدة) */
+function motherFullName($emp, string $lang = 'ar'): string {
+    $e = (array)$emp;
+    $ar = trim(((string)($e['mother_first_name'] ?? '')) . ' ' . ((string)($e['mother_last_name'] ?? '')));
+    $fr = trim(((string)($e['mother_first_name_fr'] ?? '')) . ' ' . ((string)($e['mother_last_name_fr'] ?? '')));
+    return ($lang !== 'ar' && $fr !== '') ? $fr : ($ar !== '' ? $ar : $fr);
+}
 /** خريطة id ⇒ التاريخ الصوري (للصفوف التي لا تحمل العمود، كالتقارير ذات الأعمدة المحدّدة) */
 function displayHireDateMap(): array {
     static $m = null;

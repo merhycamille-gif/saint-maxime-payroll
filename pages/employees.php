@@ -395,6 +395,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'last_name_fr' => trim($_POST['last_name_fr'] ?? ''),
         'mother_first_name' => trim($_POST['mother_first_name'] ?? ''),
         'mother_last_name' => trim($_POST['mother_last_name'] ?? ''),
+        // 👩 (2026-11-05) اسم الأم بالفرنسي + تاريخ ولادتها (الأعمدة تتركّب ذاتياً: ensureMotherColumns20261105)
+        'mother_first_name_fr' => trim($_POST['mother_first_name_fr'] ?? ''),
+        'mother_last_name_fr' => trim($_POST['mother_last_name_fr'] ?? ''),
+        'mother_birth_date' => (preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['mother_birth_date'] ?? '') ? $_POST['mother_birth_date'] : null),
         'nationality' => trim($_POST['nationality'] ?? 'lebanese'),
         'gender' => in_array($_POST['gender'] ?? '', genderValues(), true) ? $_POST['gender'] : null,
         'birth_date' => $_POST['birth_date'] ?: null,
@@ -1109,9 +1113,9 @@ if ($action === 'list') {
             </div>
         </div>
         <div class="card-body">
-            <form method="GET" class="form-row cols-4 mb-4">
-                <div class="form-group mb-0">
-                    <label class="form-label"><i class="fas fa-magnifying-glass"></i> Recherche / بحث</label><?php /* ☑️📐 (2026-09-27) تسمية كباقي الخانات — الصفّ مرصوف */ ?>
+            <form method="GET" class="form-row cols-4 mb-4 emp-filter-row">
+                <div class="form-group mb-0 emp-search-big"><?php /* 🔍📐 (2026-11-05 «محل ما فتّش عن اسم الأستاذ خلّيها هيدي الخانة تكون واضحة أكتر حتى شوفها دغري») خانة كبيرة بإطار أزرق على عرض الصفّ */ ?>
+                    <label class="form-label"><i class="fas fa-magnifying-glass"></i> Rechercher un enseignant / employé · فتّش عن أستاذ أو موظف</label><?php /* ☑️📐 (2026-09-27) تسمية كباقي الخانات — الصفّ مرصوف */ ?>
                     <div id="empSearchBox" style="position:relative">
                         <input type="text" name="q" id="empSearchInput" class="form-control" placeholder="🔍 Nom ou téléphone / اكتب أوّل حرف من الاسم أو رقم الهاتف..." value="<?= e($search) ?>" autocomplete="off">
                         <div id="empSearchPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--gray-200,#e2e8f0);border-radius:10px;box-shadow:0 10px 30px rgba(15,23,42,.12);max-height:380px;overflow:auto;z-index:60;text-align:right"></div>
@@ -1283,6 +1287,7 @@ $employee = [
     'id' => 0, 'employee_code' => '', 'employee_type' => 'enseignant_titulaire',
     'first_name_ar' => '', 'first_name_fr' => '', 'father_name_ar' => '', 'father_name_fr' => '',
     'last_name_ar' => '', 'last_name_fr' => '', 'mother_first_name' => '', 'mother_last_name' => '',
+    'mother_first_name_fr' => '', 'mother_last_name_fr' => '', 'mother_birth_date' => '',
     'nationality' => 'lebanese', 'gender' => '', 'birth_date' => '', 'birth_place' => '',
     'civil_registry_number' => '', 'civil_registry_place' => '',
     'social_status' => 'celibataire', 'spouse_works' => 0, 'number_of_children' => 0,
@@ -1448,6 +1453,27 @@ if ($id > 0):
                 <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= $id ?>&dossier=1" class="btn-dossier"><i class="fas fa-folder-open"></i><span>Dossier complet & attestations<small>الملف الكامل والإفادات</small></span></a>
                 <a href="<?= BASE_URL ?>pages/employee_fiche.php?employee_id=<?= $id ?>"><i class="fas fa-id-card"></i><span>Fiche A4<small>بطاقة الأستاذ A4</small></span></a>
                 <a href="<?= BASE_URL ?>pages/grades.php?employee_id=<?= $id ?>"><i class="fas fa-layer-group"></i><span>Échelons & Promotions<small>الدرجات والترقيات</small></span></a>
+                <?php /* 🏛️📄 (2026-11-05 «ضمن كبسة إجراءات يكون كمان في ر3، استخدام أو ترك ضمان، إفادات الأستاذ… أحلى ما أرجع روح وفتّش بالمحل الآخر»)
+                         النماذج الرسمية والإفادات الأكثر استعمالاً لهذا الأستاذ مباشرة — الروابط نفسها التي بملف الإفادات (attestations.php?type=…) */
+                      $ehAtt = function_exists('attestationTypes') ? attestationTypes() : [];
+                      $ehLink = function (string $k, string $icon) use ($id, $ehAtt): string {
+                          if (!isset($ehAtt[$k])) return '';
+                          return '<a href="' . BASE_URL . 'pages/attestations.php?employee_id=' . (int)$id . '&type=' . $k . '"><i class="fas ' . $icon . '"></i><span>' . e($ehAtt[$k]['fr']) . '<small>' . e($ehAtt[$k]['ar']) . '</small></span></a>';
+                      }; ?>
+                <div class="eh-sec"><i class="fas fa-landmark"></i> Formulaires officiels · نماذج رسمية</div>
+                <?= $ehLink('mof_r3', 'fa-file-signature') ?>
+                <?= $ehLink('cnss_hire', 'fa-user-plus') ?>
+                <?= $ehLink('cnss_leave', 'fa-user-minus') ?>
+                <?= $ehLink('cnss_travail', 'fa-briefcase') ?>
+                <a href="<?= BASE_URL ?>pages/official_forms.php?form=tax_r6&employee_id=<?= $id ?>"><i class="fas fa-file-lines"></i><span>Formulaire R6 — état annuel individuel<small>نموذج ر6 — كشف سنوي إفرادي</small></span></a>
+                <div class="eh-sec"><i class="fas fa-file-pen"></i> Attestations · إفادات الأستاذ</div>
+                <?= $ehLink('salaire', 'fa-money-bill-wave') ?>
+                <?= $ehLink('tadris', 'fa-chalkboard-user') ?>
+                <?= $ehLink('cnss', 'fa-shield-halved') ?>
+                <?= $ehLink('embassy', 'fa-passport') ?>
+                <?= $ehLink('afade_madrasiya', 'fa-school') ?>
+                <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= $id ?>&dossier=1#attGroups" class="eh-all"><i class="fas fa-list"></i><span>Toutes les attestations &amp; formulaires…<small>كل الإفادات والنماذج مرتّبة…</small></span></a>
+                <div class="eh-sec"><i class="fas fa-gears"></i> Dossier · الملف</div>
                 <a href="?action=copy_year&id=<?= $id ?>"><i class="fas fa-copy"></i><span>Copier vers une année<small>نسخ الملف لسنة</small></span></a>
                 <a href="?action=delete&id=<?= $id ?>" class="eh-danger" data-confirm="<?= e($hxDel) ?>"><i class="fas fa-trash"></i><span>Supprimer<small>حذف الملف (بتأكيد)</small></span></a>
             </div>
@@ -1584,14 +1610,19 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                     </div>
                 </div>
 
-                <div class="form-row cols-2">
-                    <div class="form-group">
-                        <label class="form-label">Prénom de la mère / اسم الأم</label>
-                        <input type="text" name="mother_first_name" class="form-control" value="<?= e($employee['mother_first_name']) ?>">
+                <?php /* 👩 (2026-11-05 «اسم الأم وشهرتها يكون بالعربي والفرنسي وتاريخ ولادتها») زوج FR|AR كالاسم + تاريخ ولادة الأم */ ?>
+                <div class="form-row cols-3 name-pairs mother-pairs">
+                    <div class="form-group name-pair">
+                        <label class="form-label">Prénom de la mère · اسم الأم</label>
+                        <div class="pair"><input type="text" name="mother_first_name_fr" class="form-control" value="<?= e($employee['mother_first_name_fr'] ?? '') ?>" placeholder="FR" dir="ltr"><input type="text" name="mother_first_name" class="form-control" value="<?= e($employee['mother_first_name']) ?>" dir="rtl" placeholder="عربي"></div>
+                    </div>
+                    <div class="form-group name-pair">
+                        <label class="form-label">Nom de famille de la mère · شهرة الأم</label>
+                        <div class="pair"><input type="text" name="mother_last_name_fr" class="form-control" value="<?= e($employee['mother_last_name_fr'] ?? '') ?>" placeholder="FR" dir="ltr"><input type="text" name="mother_last_name" class="form-control" value="<?= e($employee['mother_last_name']) ?>" dir="rtl" placeholder="عربي"></div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Nom de famille de la mère / شهرة الأم</label>
-                        <input type="text" name="mother_last_name" class="form-control" value="<?= e($employee['mother_last_name']) ?>">
+                        <label class="form-label">Date de naissance de la mère · تاريخ ولادة الأم</label>
+                        <input type="date" name="mother_birth_date" class="form-control" value="<?= e((string)($employee['mother_birth_date'] ?? '')) ?>">
                     </div>
                 </div>
                 
