@@ -11129,6 +11129,31 @@ try {
 } catch (Throwable $e) { $ok286 = false; $why286 = $e->getMessage(); }
 check('🏛️👩🔍 ملف الموظف (2026-11-05): قائمة «إجراءات» بأقسام (ر3/استخدام/ترك/إفادة عمل للضمان/ر6 + إفادات + الملف) بالروابط نفسها · أعمدة اسم الأم بالفرنسي + تاريخ ولادتها تتركّب ذاتياً · زوج FR|AR + التاريخ بالفورم والحفظ · motherFullName · 482 يطبع تاريخ ولادة الأم · خانة البحث الكبيرة بلائحة الموظفين', $ok286, $why286);
 
+/* 287) 🔗🪪👩 رابط تحديث معلومات الأساتذة (2026-11-05 «بدك تعمل لينك يكون فيه رقم السجل وأكيد معلومات الأم»): teacher_form يطلب رقم السجل ومحلّ القيد
+ *      (إلزاميان، المحلّ عربي حصراً) + اسم الأم بالفرنسي + تاريخ ولادتها (اختيارية، التاريخ يُكتب يدوياً يوم/شهر/سنة ويُطبَّع) · info_collect يطبّقها
+ *      على الملف (textFields/strFields/labels + mother_birth_date للجديد). مجرَّب فعلياً 2026-11-05: طلب بالحقول الجديدة ⇒ «اعتماد» ⇒ انطبقت على 1000016 ثمّ أُرجع. */
+$ok287 = false; $why287 = '';
+try {
+    $tf287 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/teacher_form.php'));
+    $ic287 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/info_collect.php'));
+    $tfOk287 = strpos($tf287, "'mother_first_name_fr' => 'اسم الأم (فرنسي) / Prénom de la mère (FR)', 'mother_last_name_fr' => 'شهرة الأم (فرنسي) / Nom de la mère (FR)',") !== false
+        && strpos($tf287, "'mother_birth_date' => 'تاريخ ولادة الأم / Date de naissance de la mère',") !== false
+        && strpos($tf287, "'civil_registry_number' => 'رقم السجل (كما على الهوية أو إخراج القيد) / N° du registre civil', 'civil_registry_place' => 'محل القيد (عربي) / Lieu d\\'enregistrement (arabe)',") !== false
+        && preg_match("/\\\$arabicOnlyFields = \\[[^\\]]*'civil_registry_place'[^\\]]*\\];/", $tf287) === 1
+        && preg_match("/\\\$optionalFields = \\[[^\\]]*'mother_first_name_fr', 'mother_last_name_fr', 'mother_birth_date'\\];/", $tf287) === 1
+        && strpos($tf287, "foreach (['birth_date', 'mother_birth_date'] as \$dk) if (isset(\$data[\$dk]) && \$data[\$dk] !== '') {") !== false
+        && strpos($tf287, "<?php if (\$k === 'birth_date' || \$k === 'mother_birth_date'): ?>") !== false
+        && !preg_match("/\\\$optionalFields = \\[[^\\]]*'civil_registry_number'/", $tf287);   // رقم السجل إلزامي
+    $icOk287 = preg_match("/\\\$textFields = \\[[^;]*'mother_first_name_fr','mother_last_name_fr','mother_birth_date','civil_registry_number','civil_registry_place',/", $ic287) === 1
+        && preg_match("/\\\$strFields = \\[[^;]*'mother_first_name_fr','mother_last_name_fr','civil_registry_number','civil_registry_place',/", $ic287) === 1
+        && strpos($ic287, "if (preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', (string)(\$data['mother_birth_date'] ?? ''))) \$emp['mother_birth_date'] = \$data['mother_birth_date'];") !== false
+        && strpos($ic287, "'mother_first_name_fr'=>'Prénom de la mère','mother_last_name_fr'=>'Nom de la mère','mother_birth_date'=>'تاريخ ولادة الأم',") !== false
+        && strpos($ic287, "'civil_registry_number'=>'رقم السجل','civil_registry_place'=>'محل القيد',") !== false;
+    $ok287 = $tfOk287 && $icOk287;
+    $why287 = 'teacher_form=' . (int)$tfOk287 . ' info_collect=' . (int)$icOk287;
+} catch (Throwable $e) { $ok287 = false; $why287 = $e->getMessage(); }
+check('🔗🪪👩 رابط الأساتذة (2026-11-05): رقم السجل ومحلّ القيد إلزاميان (المحلّ عربي) + اسم الأم بالفرنسي وتاريخ ولادتها اختيارية (تاريخ يدوي يُطبَّع) · info_collect يطبّقها على الملف والجديد ويعرضها بالطلب', $ok287, $why287);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

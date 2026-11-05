@@ -183,14 +183,18 @@ $textFields = [
     // 👨 (2026-10-27 «ما عم يبيّن اسم الأب بالإفادة») اسم الأب إلزامي — الفورم كان بلا خانة له فطلعت نماذج الضمان بلا اسم أب
     'father_name_ar' => 'اسم الأب (عربي) / Prénom du père (arabe)', 'father_name_fr' => 'اسم الأب (فرنسي) / Prénom du père (FR)',
     'mother_first_name' => 'اسم الأم (عربي) / Prénom de la mère (arabe)', 'mother_last_name' => 'شهرة الأم (عربي) / Nom de la mère (arabe)',
+    // 👩 (2026-11-05 «لينك يكون فيه رقم السجل وأكيد معلومات الأم») اسم الأم بالفرنسي + تاريخ ولادتها + رقم السجل ومحلّه
+    'mother_first_name_fr' => 'اسم الأم (فرنسي) / Prénom de la mère (FR)', 'mother_last_name_fr' => 'شهرة الأم (فرنسي) / Nom de la mère (FR)',
+    'mother_birth_date' => 'تاريخ ولادة الأم / Date de naissance de la mère',
     'birth_date' => 'تاريخ الولادة / Date de naissance', 'birth_place' => 'محل الولادة (عربي) / Lieu de naissance (arabe)',
+    'civil_registry_number' => 'رقم السجل (كما على الهوية أو إخراج القيد) / N° du registre civil', 'civil_registry_place' => 'محل القيد (عربي) / Lieu d\'enregistrement (arabe)',
     'nationality' => 'الجنسية / Nationalité', 'number_of_children' => 'عدد الأولاد دون 18 سنة / Nombre d\'enfants de moins de 18 ans',
     'phone1' => 'هاتف 1 / Téléphone 1', 'phone2' => 'هاتف 2 / Téléphone 2', 'email' => 'البريد الإلكتروني / E-mail',
     'gouvernorat' => 'المحافظة (عربي) / Gouvernorat (arabe)', 'district' => 'القضاء (عربي) / District (arabe)', 'ville' => 'البلدة (عربي) / Ville (arabe)',
     'quartier' => 'الحي (عربي) / Quartier (arabe)', 'rue' => 'الشارع (عربي) / Rue (arabe)', 'immeuble' => 'المبنى (عربي) / Immeuble (arabe)', 'etage' => 'الطابق / Étage',
 ];
 // 🔤 (2026-10-27 «اللي كاتب الأسماء أو العناوين لازم يتحوّلوا للعربي») خانات عربية حصراً: الفورم يرفض الأحرف اللاتينية فيها (النماذج الرسمية عربية)
-$arabicOnlyFields = ['first_name_ar', 'last_name_ar', 'father_name_ar', 'mother_first_name', 'mother_last_name', 'birth_place', 'gouvernorat', 'district', 'ville', 'quartier', 'rue', 'immeuble'];
+$arabicOnlyFields = ['first_name_ar', 'last_name_ar', 'father_name_ar', 'mother_first_name', 'mother_last_name', 'birth_place', 'civil_registry_place', 'gouvernorat', 'district', 'ville', 'quartier', 'rue', 'immeuble'];
 // الحقول المهنية الإضافية (شهادة/مواد/ساعات/صفوف/أيام/أرقام رسمية)
 $profFields = [
     'subjects_taught' => 'المواد التي يدرّسها / Matières enseignées',
@@ -214,7 +218,7 @@ $uploadCol = ['photo' => 'photo_path', 'id_document' => 'id_document_path', 'fam
 $requiredUploads = ['id_document', 'family_doc', 'diploma_doc'];
 
 // 🔴 الحقول غير الإلزامية (كل ما عداها إلزامي). التعديل من هنا فقط.
-$optionalFields = ['email', 'phone2', 'nssf_number', 'finance_ministry_number', 'caisse_number', 'leave_date', 'photo', 'number_of_children'];
+$optionalFields = ['email', 'phone2', 'nssf_number', 'finance_ministry_number', 'caisse_number', 'leave_date', 'photo', 'number_of_children', 'mother_first_name_fr', 'mother_last_name_fr', 'mother_birth_date'];   // 👩 اسم الأم بالفرنسي وتاريخ ولادتها اختياريان؛ رقم السجل ومحلّه إلزاميان
 $tfReq = function ($k) use ($optionalFields) { return !in_array($k, $optionalFields, true); };
 // قيمة الحقل عند إعادة العرض بعد خطأ: يُفضَّل ما أدخله الأستاذ (POST) ثم قيمة ملفه
 $fv = function ($k) use ($emp) { return isset($_POST[$k]) ? (string)$_POST[$k] : (string)($emp[$k] ?? ''); };
@@ -234,8 +238,8 @@ if ($valid && ($isNew || $emp) && $_SERVER['REQUEST_METHOD'] === 'POST' && !$for
     $ssChoice = (string)($_POST['social_status'] ?? '');
     $data['social_status'] = in_array($ssChoice, ['celibataire', 'marie'], true) ? $ssChoice : '';
     // تاريخ الولادة مكتوب يدوياً (يوم/شهر/سنة) → طبّعه إلى Y-m-d قبل الحفظ
-    if (isset($data['birth_date']) && $data['birth_date'] !== '') {
-        $data['birth_date'] = parseFlexibleDate($data['birth_date']) ?? $data['birth_date'];
+    foreach (['birth_date', 'mother_birth_date'] as $dk) if (isset($data[$dk]) && $data[$dk] !== '') {
+        $data[$dk] = parseFlexibleDate($data[$dk]) ?? $data[$dk];
     }
     // فئة الأستاذ التي اختارها (متعاقد/ملاك/موظف) — للجديد تُعتمد عند الإنشاء؛ للحالي تُعرَض للمدير
     // ولا تُطبَّق آلياً إن تغيّرت (تمسّ محرّك الراتب) بل يعدّلها المدير من ملف الأستاذ.
@@ -569,7 +573,7 @@ if ($nameSchoolId) {
           <?php endif; ?>
           <div>
             <label><?= e($lbl) ?><?= $req ? $reqStar : $optTag ?></label>
-            <?php if ($k === 'birth_date'): ?>
+            <?php if ($k === 'birth_date' || $k === 'mother_birth_date'): ?>
             <input type="text" inputmode="numeric" autocomplete="off" class="date-manual" placeholder="يوم/شهر/سنة — مثلاً 15/08/1980"
                    name="<?= e($k) ?>" value="<?= e(preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$fv($k)) ? displayDMY($fv($k)) : $fv($k)) ?>"<?= $req ? ' required data-req="1"' : '' ?>>
             <?php else: ?>
