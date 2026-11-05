@@ -123,7 +123,7 @@ $pageSection = [
     'employees'=>'personnel','cadre_due'=>'personnel','grades'=>'personnel','classes'=>'personnel','exceptional_laws'=>'personnel','bulk_allowances'=>'personnel','family_allowances'=>'personnel','employee_full_history'=>'personnel','excel_salaries'=>'personnel','law_check'=>'personnel','duplicates'=>'personnel','old_uninsured'=>'personnel','cnss_followup'=>'personnel',
     'monthly'=>'paie','annual'=>'paie','attestations'=>'paie','employee_history'=>'paie','info_collect'=>'paie','info_status'=>'paie','left_teachers'=>'paie','retirement_64'=>'paie','hours_reduction'=>'paie',
     'reports'=>'rapports','tax'=>'rapports','legal_calendar'=>'rapports',
-    'schools'=>'systeme','users'=>'systeme','school_access'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
+    'ecoles'=>'systeme','schools'=>'systeme','users'=>'systeme','school_access'=>'systeme','open_year'=>'systeme','rates'=>'systeme','social_security'=>'systeme','tax_brackets'=>'systeme','rates_history'=>'systeme','salary_scales'=>'systeme','backup'=>'systeme','settings'=>'systeme','email_settings'=>'systeme','health_check'=>'systeme',
 ];
 $sec = $pageSection[$currentPage] ?? 'dashboard';
 [$accentColor, $accentBg] = $sectionColors[$sec];
@@ -447,6 +447,10 @@ document.addEventListener('submit', function (e) {
             <div class="nav-section" style="--ns:#2dd4bf">Système / النظام</div><?php /* 🎨 2026-10-19 «شيل الأحمر والأورانج من الأيقونات»: كان أصفر #fbbf24 ⇒ تركواز */ ?>
 
             <?php if (isSuperAdmin()): ?>
+            <a href="<?= BASE_URL ?>pages/ecoles.php" class="<?= $currentPage === 'ecoles' ? 'active' : '' ?>"><?php /* 🏫 (2026-11-05) كل مدرسة ببطاقة واحدة: معلومات + Paie لكل فئة + تعديل/حذف */ ?>
+                <i class="fas fa-building-columns"></i>
+                <span>Écoles &amp; établissements / المدارس والمؤسسات (كل شي بمحل واحد)</span>
+            </a>
             <a href="<?= BASE_URL ?>pages/schools.php" class="<?= $currentPage === 'schools' ? 'active' : '' ?>">
                 <i class="fas fa-school"></i>
                 <span>Écoles / المدارس</span>
@@ -1056,7 +1060,7 @@ document.addEventListener('submit', function (e) {
         // شريط الطباعة والتصدير — يظهر تلقائياً بكل صفحة (طباعة/PDF/Excel/Word/واتساب/إيميل)
         // (2026-08-29، «ما تخلّي شي ما إلو معنى») صفحات الإعدادات/الإدارة ليست مطبوعات: بلا شريط طباعة/تصدير
         $noToolbarPages = ['settings.php','users.php','email_settings.php','open_year.php','excel_salaries.php']; // 📤 (2026-10-03 «بكل البرنامج لازم يكون في كل شي من كل شي»): الشريط الكامل بكل صفحة فيها لائحة/جدول — تبقى بلاه صفحات الإدارة البحتة فقط
-        $noToolbarPages[] = 'school_access.php'; // 🏫 (2026-10-22) دخول المدارس وأيقوناتها — صفحة إدارة بلا شريط تصدير
+        $noToolbarPages[] = 'school_access.php'; $noToolbarPages[] = 'ecoles.php'; // 🏫 (2026-10-22) دخول المدارس وأيقوناتها — صفحة إدارة بلا شريط تصدير
         $noToolbarPages[] = 'attestations_bulk.php'; // 📚 (2026-10-27) الإفادات الجماعية — كبساتها الثلاث داخل الصفحة
         if (empty($hideExportToolbar) && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), $noToolbarPages, true)) {
             $msaTopBars .= exportToolbar($exportTitle ?? $pageTitle, $exportOpts ?? []);

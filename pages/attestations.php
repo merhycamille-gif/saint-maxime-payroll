@@ -511,7 +511,7 @@ if (!$emp):
             $sexSel = $sexFile; // '' = غير محدد → النموذج يطلع بلا × على الجنس
         }
         $wageSel = in_array(($_GET['wage'] ?? 'm'), ['m', 'd', 'h'], true) ? ($_GET['wage'] ?? 'm') : 'm';
-        $expR3 = BASE_URL . 'pages/official_export.php?form=mof_r3&emp=' . (int)$employeeId . '&sex=' . genderSexOf($sexSel) . '&wage=' . $wageSel; // الآنسة ⇒ × أنثى
+        $expR3 = BASE_URL . 'pages/official_export.php?form=mof_r3&emp=' . (int)$employeeId . '&sex=' . genderSexOf($sexSel) . '&wage=' . $wageSel . '&date=' . e($effDate); // الآنسة ⇒ × أنثى · 📅 (2026-11-05) تاريخ الطباعة المختار
         $hasMof = trim((string)($emp['finance_ministry_number'] ?? '')) !== '';
     ?>
     <div class="card no-print" style="max-width:760px;margin:0 auto">
@@ -523,6 +523,10 @@ if (!$emp):
             <form method="GET" class="form-row cols-3" style="align-items:end;margin-bottom:14px">
                 <input type="hidden" name="employee_id" value="<?= (int)$employeeId ?>">
                 <input type="hidden" name="type" value="mof_r3">
+                <div class="form-group"><?php /* 📅 (2026-11-05 «وقت اطبع اي افادة او ر3… يكون عندي خيار حط التاريخ») */ ?>
+                    <label class="form-label">Date du formulaire / تاريخ الطباعة</label>
+                    <input type="date" name="date" class="form-control" value="<?= e($effDate) ?>" onchange="this.form.submit()">
+                </div>
                 <div class="form-group">
                     <label class="form-label">Sexe / الجنس (تلقائي من ملف الموظف — تغييره يُحفَظ بالملف)</label>
                     <select name="sex" class="form-select" onchange="this.form.submit()" <?= $sexSel==='' ? 'style="border:2px solid #dc2626;background:#fef2f2"' : '' ?>>

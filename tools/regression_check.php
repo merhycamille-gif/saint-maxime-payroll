@@ -8691,7 +8691,7 @@ $css188 = (string)file_get_contents($PROJ . '/assets/css/app.css'); $at188 = (st
 $emp188 = (int)$db->query("SELECT e.id FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = '2025-2026' AND ms.net_salary_lbp > 0 WHERE e.employee_type = 'enseignant_titulaire' AND e.is_deleted = 0 AND e.school_id = 3 LIMIT 1")->fetchColumn();
 $ok188 = strpos($css188, '.att-opts{display:grid;grid-template-columns:1fr;') !== false /* عمود واحد (p1 لاحقاً) */ && strpos($css188, '.att-opts .att-k{flex:0 0 240px;') !== false
       && strpos($at188, 'color:#cbd5e1">|</span>') === false && strpos($at188, '<div class="card-body att-opts"') !== false && strpos($at188, '<div class="form-group att-opts" style="grid-column:1 / -1">') !== false
-      && substr_count($at188, 'onchange="this.form.submit()"') === 53 && $emp188 > 0;   // ⏱️ (2026-10-27) 52 − خانة الساعات (صار لها JS يضبط الدوام) + راديو كامل/جزئي = 53
+      && substr_count($at188, 'onchange="this.form.submit()"') === 54 && $emp188 > 0;   // ⏱️ (2026-10-27) 52 − خانة الساعات (صار لها JS يضبط الدوام) + راديو كامل/جزئي = 53 · 📅 (2026-11-05) + تاريخ الطباعة بشاشة ر3 = 54
 $why188 = 'emp=' . $emp188;
 $bal188 = function (string $h) { return preg_match('#<form method="get"[^>]*>.*?</form>#su', $h, $m) ? substr_count($m[0], '<div') - substr_count($m[0], '</div>') : 999; };
 foreach (['salaire' => 10, 'embassy' => 12, 'isqat_haq' => 12, 'aqd_taalim' => 11, 'cnss_leave' => 2] as $t188 => $min188) {
@@ -11174,6 +11174,59 @@ try {
     $why288 = 'bad=' . implode(' | ', $bad288) . ' src=' . (int)$src288 . ' unnormalized_rows=' . $n288;
 } catch (Throwable $e) { $ok288 = false; $why288 = $e->getMessage(); }
 check('📞 الهاتف بالشكل الموحَّد 03-888849 (2026-11-05): normalizeLbPhone (فواصل/961/عربي/7 أرقام قديمة؛ الغريب يبقى) · ملف الموظف + رابط الأساتذة + الاعتماد والجديد · الداتا الموجودة بلا ملزّق ولا /', $ok288, $why288);
+
+/* 289) 🏫 Écoles & établissements — pages/ecoles.php (2026-11-05 «إعدادات المدارس معجّقين… بطاقة لكل مدرسة بكل معلوماتها، تعديل وحذف، خيار لمين بدي طبّق:
+ *      للملاك للمتعاقد للموظف»): بطاقة لكل مدرسة (Identité · Personnel · Paie لكل فئة · Accès) + Modifier/Supprimer (بتأكيد؛ فيها موظفون = تعطيل لا حذف)
+ *      + Nouvelle école + apply_pay بنفس SQL المكافآت الجماعية (إطفاء النوع للسنة ثمّ سطر كل السنة ثمّ recalcEmployeeYear) + حارس قفل السنة + الرابط بالقائمة. */
+$ok289 = false; $why289 = '';
+try {
+    $src289 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/ecoles.php'));
+    $hd289 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/header.php'));
+    $css289 = str_replace("\r", '', (string)file_get_contents($PROJ . '/assets/css/app.css'));
+    $nSch289 = (int)$db->query("SELECT COUNT(*) FROM schools WHERE is_deleted = 0")->fetchColumn();
+    $h289 = renderPage('pages/ecoles.php', [], ['extra','aide','transport'], [], 'lbp', '2026-2027');
+    $hNew289 = renderPage('pages/ecoles.php', ['new' => '1'], ['extra','aide','transport'], [], 'lbp', '2026-2027');
+    $sid289 = (int)$db->query("SELECT school_id FROM employees WHERE is_deleted = 0 GROUP BY school_id ORDER BY COUNT(*) DESC LIMIT 1")->fetchColumn();
+    $hDel289 = renderPage('pages/ecoles.php', ['confirm_delete' => (string)$sid289], ['extra','aide','transport'], [], 'lbp', '2026-2027');
+    $cards289 = substr_count($h289, '<div class="sc-card ');
+    $okPage289 = $cards289 === $nSch289 && substr_count($h289, 'class="sc-pt"') === $nSch289 && substr_count($h289, 'action" value="save_school"') === $nSch289
+        && strpos($h289, 'id="scSearch"') !== false && strpos($h289, 'name="apply[titulaire]"') !== false && strpos($h289, 'name="pay[contractuel][sup]"') !== false && strpos($h289, 'name="pay[employe][tm]"') !== false
+        && strpos($h289, 'onsubmit="return scConfirmPay(this)"') !== false && stripos($h289, 'Fatal error') === false && stripos($h289, 'Warning:') === false
+        && strpos($hNew289, 'action" value="create_school"') !== false && substr_count($hNew289, '<div class="sc-steps">') === 1 && strpos($hNew289, 'name="create_account"') !== false
+        && strpos($hDel289, 'class="card sc-confirm"') !== false && strpos($hDel289, 'action" value="toggle_active"') !== false && strpos($hDel289, 'action" value="delete_school"') === false;   // فيها موظفون ⇒ تعطيل لا حذف
+    $okSrc289 = strpos($src289, "function ecolesApplyPay(PDO \$db, int \$sid, string \$type, string \$bonusType, float \$value, string \$vt, string \$cur, string \$sy): array {") !== false
+        && strpos($src289, "if (\$bonusType !== 'prime_fixe') \$vt = 'amount';") !== false
+        && strpos($src289, "\$off = \$db->prepare(\"UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND bonus_type = ? AND school_year = ?\");") !== false
+        && strpos($src289, "VALUES (?, ?, 1, ?, ?, ?, ?, 10, 9, 1)") !== false && strpos($src289, "if (recalcEmployeeYear(\$id, \$sy) > 0) \$done++;") !== false
+        && strpos($src289, "if (isSchoolYearLocked(\$sid, \$sy)) { \$_SESSION['flash_error'] = yearLockedMsg(\$sid, \$sy);") !== false
+        && strpos($src289, "if (empty(\$_POST['apply'][\$ck])) continue;") !== false
+        && strpos($src289, "requireWriteAction(); requireCsrf();") !== false && strpos($src289, "if (!isSuperAdmin()) {") !== false
+        && strpos($src289, "'phone' => normalizeLbPhone(\$_POST['phone'] ?? ''),") !== false
+        && strpos($src289, "if (\$n > 0) {\n            \$_SESSION['flash_error'] = \"Impossible de supprimer") !== false
+        && strpos($hd289, 'pages/ecoles.php" class="<?= $currentPage === \'ecoles\' ? \'active\' : \'\' ?>"') !== false && strpos($hd289, "'ecoles'=>'systeme',") !== false
+        && strpos($css289, '.sc-card{background:#fff;') !== false && strpos($css289, '.sc-pt th.h-titulaire{background:#fde68a;') !== false;
+    // 🧪 التطبيق الفعلي: موظف تجريبي بمدرسة 2 ⇒ ecolesApplyPay (عبر include الدالة من مصدر الصفحة) نقل شهري 100,000 ⇒ بند كل السنة فعّال ⇒ 0 ⇒ مطفأ (ضمن لقطة الفحص)
+    if (!function_exists('ecolesApplyPay')) { if (preg_match('/function ecolesEmpIds\(.*?\n\}\n.*?function ecolesApplyPay\(.*?\n\}\n/s', $src289, $m289)) eval($m289[0]); }
+    $okApply289 = false;
+    if (function_exists('ecolesApplyPay')) {
+        $db->exec("INSERT INTO employees (school_id, employee_code, employee_type, first_name_ar, last_name_ar, first_name_fr, last_name_fr, hire_date, status, salary_input_mode, base_salary_usd, contract_salary_lbp, payment_months_per_year, days_per_week, hours_per_week, tax_subject, cnss_subject, eoc_subject, is_deleted)
+                   VALUES (2, '__REG289', 'employe', 'فحص', 'إيكول289', 'Reg', 'Ecoles289', '2026-10-01', 'actif', 'direct_lbp', 0, 30000000, 12, 5, 40, 1, 1, 0, 0)");
+        $te289 = (int)$db->lastInsertId();
+        recalcEmployeeYear($te289, '2026-2027');
+        [$n1, $d1] = ecolesApplyPay($db, 2, 'employe', 'transport_complement', 100000.0, 'amount', 'LBP', '2026-2027');
+        $b1 = $db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = $te289 AND bonus_type = 'transport_complement' AND school_year = '2026-2027' AND is_active = 1 AND amount = 100000 AND start_month = 10 AND end_month = 9")->fetchColumn();
+        $t1 = (int)$db->query("SELECT transport_lbp FROM monthly_salaries WHERE employee_id = $te289 AND school_year = '2026-2027' AND month = 10")->fetchColumn();
+        [$n2, $d2] = ecolesApplyPay($db, 2, 'employe', 'transport_complement', 0.0, 'amount', 'LBP', '2026-2027');
+        $b2 = $db->query("SELECT COUNT(*) FROM employee_bonuses WHERE employee_id = $te289 AND school_year = '2026-2027' AND is_active = 1")->fetchColumn();
+        $t2 = (int)$db->query("SELECT transport_lbp FROM monthly_salaries WHERE employee_id = $te289 AND school_year = '2026-2027' AND month = 10")->fetchColumn();
+        $okApply289 = (int)$b1 === 1 && $t1 === 100000 && (int)$b2 === 0 && $t2 === 0 && $n1 >= 1;
+        $db->exec("DELETE FROM employee_bonuses WHERE employee_id = $te289"); $db->exec("DELETE FROM monthly_salaries WHERE employee_id = $te289"); $db->exec("DELETE FROM employees WHERE id = $te289");
+        $why289 = "apply: bonus=$b1 t10=$t1 then bonus=$b2 t10=$t2 n=$n1/$n2 ";
+    }
+    $ok289 = $okPage289 && $okSrc289 && $okApply289;
+    $why289 .= 'page=' . (int)$okPage289 . " (cards=$cards289/$nSch289) src=" . (int)$okSrc289 . ' apply=' . (int)$okApply289;
+} catch (Throwable $e) { $ok289 = false; $why289 = $e->getMessage(); }
+check('🏫 Écoles & établissements (2026-11-05): بطاقة لكل مدرسة (معلومات · موظفون · Paie لكل فئة · دخول) + تعديل/حذف بتأكيد (فيها موظفون = تعطيل) + مدرسة جديدة + apply_pay بنفس SQL المكافآت الجماعية (تجربة فعلية: نقل 100,000 ثمّ 0) + قفل السنة + القائمة', $ok289, $why289);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
