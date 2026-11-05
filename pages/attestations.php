@@ -574,6 +574,8 @@ if (!$emp):
             </form>
             <?php /* 🏛️ (2026-09-15) مجموعة أزرار وحدة = الشريط العلوي يعمل على نموذج ر3 المعبّأ بخيارات الشاشة */ ?>
             <div style="margin:4px 0 10px;color:#1e40af;font-weight:700"><i class="fas fa-arrow-up"></i> الطباعة وPDF وExcel والإرسال: من الشريط أعلى الصفحة — بالخيارات المؤشَّرة هنا.</div>
+            <?php /* 📨 (2026-11-05 «ر3-1») كتاب طلب التسجيل المرافق (ر1-3) معبّأً بالمدرسة والتاريخ المختار؛ بالإفادات الجماعية يُضاف تلقائياً أوّل الملف المدموج بعدد الطلبات */ ?>
+            <a class="btn btn-info" style="margin:0 0 10px" target="_blank" href="<?= BASE_URL ?>pages/official_export.php?form=mof_r13&n=1&date=<?= e($effDate) ?>"><i class="fas fa-envelope-open-text"></i> Lettre R1-3 (demande d'enregistrement) / كتاب طلب التسجيل ر1-3 المرافق</a>
             <script>document.addEventListener('DOMContentLoaded', function () { msaOfficialToolbar({pdf: <?= json_encode($expR3 . '&format=pdf') ?>, xlsx: <?= json_encode($expR3 . '&format=xlsx') ?>,
                 target: <?= json_encode(substr($expR3, strlen(BASE_URL)) . '&format=pdf&mode=image') ?>, base: <?= json_encode(BASE_URL) ?>,
                 title: <?= json_encode('ر3 تسجيل أجير — ' . $nm) ?>, phone: <?= json_encode((string)($exportOpts['phone'] ?? '')) ?>, email: <?= json_encode((string)($exportOpts['email'] ?? '')) ?>}); });</script>

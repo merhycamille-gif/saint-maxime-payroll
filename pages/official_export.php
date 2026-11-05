@@ -432,6 +432,38 @@ if ($form === 'cnss_contrib_monthly') {
     }
 }
 
+if ($form === 'mof_r13') {
+    // 🏛️📨 (2026-11-05 «شوف على الدسك توب ر3-1… الاسم الكامل كميل سعيد مرعي والصفة مسؤول وكمان مقدّم الكتاب»): كتاب طلب تسجيل مستخدمين/أجراء (ر1-3)
+    //    المرافق لدفعة ر3 — طبق الأصل (mof_r13.png + mof_r13.pos.json مقيسة آلياً من خطوط التعبئة). المؤسسة: المدرسة الفعّالة (أو sch= للمدير)،
+    //    n = عدد طلبات ر3 المرفقة، التاريخ = date=Y-m-d أو d/mo/yr (الإفادات الجماعية) وإلا اليوم. قسم «خاص بالإدارة» يبقى فارغاً.
+    $schR = currentSchool();
+    $sidR = (int)($_GET['sch'] ?? 0);
+    if ($sidR > 0 && isSuperAdmin()) { $qR = $db->prepare("SELECT * FROM schools WHERE id = ? AND is_deleted = 0"); $qR->execute([$sidR]); $schR = $qR->fetch(PDO::FETCH_ASSOC) ?: $schR; }
+    if (!$schR) { http_response_code(400); die('اختر مدرسة واحدة / Choisissez une école'); }
+    $nR = max(1, min(9999, (int)($_GET['n'] ?? 1)));
+    $tsR = time();
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date'] ?? ''))) $tsR = strtotime((string)$_GET['date']) ?: time();
+    elseif (isset($_GET['d'], $_GET['mo'], $_GET['yr']) && checkdate((int)$_GET['mo'], (int)$_GET['d'], (int)$_GET['yr'])) $tsR = mktime(12, 0, 0, (int)$_GET['mo'], (int)$_GET['d'], (int)$_GET['yr']);
+    $nameR = trim((string)($schR['name_ar'] ?? '')) ?: trim((string)($schR['name_fr'] ?? ''));
+    $addrR = trim((string)($schR['address'] ?? '')) ?: trim((string)($schR['address_fr'] ?? ''));
+    $addrPartsR = array_values(array_filter(array_map('trim', preg_split('/\s*(?:-|–|,|،)\s*/u', $addrR, 2))));
+    $contactName = (string)getSetting('mof_r13_contact_name', 'كميل سعيد مرعي'); $contactTitle = (string)getSetting('mof_r13_contact_title', 'مسؤول');
+    $valsR = [
+        'name' => $nameR, 'trade' => $nameR,
+        'cnss' => trim((string)($schR['nssf_employer_number'] ?? '')),
+        'zone' => $addrPartsR[0] ?? '', 'street' => $addrPartsR[1] ?? '',   // منطقة – بلدة ثمّ الشارع/الباقي (العنوان مقسوماً على « - » أو «،»)
+        'phone1' => trim((string)($schR['phone'] ?? '')), 'email' => trim((string)($schR['email'] ?? '')),
+        'contact_name' => $contactName, 'contact_title' => $contactTitle, 'contact_phone' => trim((string)($schR['phone'] ?? '')),
+        'count' => (string)$nR,
+        'sub_name' => $contactName, 'sub_title' => $contactTitle,
+        'day' => date('j', $tsR), 'month' => date('n', $tsR), 'year' => date('Y', $tsR),
+    ];
+    // الرقم المالي رقماً رقماً بالمربّعات الأحد عشر (من اليسار إلى اليمين، محاذاة لليمين)
+    $digR = preg_replace('/\D+/', '', (string)($schR['finance_number'] ?? ''));
+    if ($digR !== '' && strlen($digR) <= 11) { $startR = 11 - strlen($digR); for ($iR = 0; $iR < strlen($digR); $iR++) $valsR['mof' . ($startR + $iR)] = $digR[$iR]; }
+    mofOverlayServe('mof_r13', 'كتاب طلب تسجيل مستخدمين/أجراء — ر1-3 — ' . $nameR, $valsR);
+}
+
 if ($form === 'mof_r3') {
     // 🏛️ نموذج وزارة المالية ر3 — «طلب تسجيل مستخدم/أجير جديد» طبق الأصل («شوف ر3 على
     // الدسك توب وبدي متلها طبق الأصل» — 2026-08-21): صورة النموذج الرسمي (mof_r3.png —

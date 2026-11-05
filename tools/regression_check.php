@@ -11228,6 +11228,33 @@ try {
 } catch (Throwable $e) { $ok289 = false; $why289 = $e->getMessage(); }
 check('🏫 Écoles & établissements (2026-11-05): بطاقة لكل مدرسة (معلومات · موظفون · Paie لكل فئة · دخول) + تعديل/حذف بتأكيد (فيها موظفون = تعطيل) + مدرسة جديدة + apply_pay بنفس SQL المكافآت الجماعية (تجربة فعلية: نقل 100,000 ثمّ 0) + قفل السنة + القائمة', $ok289, $why289);
 
+/* 290) 📨 كتاب طلب تسجيل مستخدمين/أجراء ر1-3 (2026-11-05 «شوف على الدسك توب ر3-1… الاسم الكامل كميل سعيد مرعي والصفة مسؤول وكمان مقدّم الكتاب»):
+ *      official_export?form=mof_r13 طبق الأصل (mof_r13.png + pos.json): المدرسة، الرقم المالي بالمربّعات، الضمان، العنوان، الهاتف، البريد، المسؤول،
+ *      عدد الطلبات n، مقدّم الكتاب، التاريخ (date= أو d/mo/yr) · كبسة بشاشة ر3 · الإفادات الجماعية تضع الكتاب أوّل الملف المدموج لكل مدرسة بعدد طلباتها. */
+$ok290 = false; $why290 = '';
+try {
+    $posF290 = $PROJ . '/assets/templates/mof_r13.pos.json';
+    $pos290 = is_file($posF290) ? (json_decode((string)file_get_contents($posF290), true) ?: []) : [];
+    $need290 = ['name', 'trade', 'mof0', 'mof10', 'cnss', 'zone', 'phone1', 'email', 'contact_name', 'contact_title', 'contact_phone', 'count', 'sub_name', 'sub_title', 'day', 'month', 'year'];
+    $okPos290 = is_file($PROJ . '/assets/templates/mof_r13.png') && !array_diff($need290, array_keys($pos290['cells'] ?? []));
+    $h290 = renderPage('pages/official_export.php', ['form' => 'mof_r13', 'n' => '5', 'd' => '1', 'mo' => '10', 'yr' => '2026'], [], [4], 'lbp', '2026-2027');
+    $h290b = renderPage('pages/official_export.php', ['form' => 'mof_r13', 'n' => '2', 'date' => '2026-01-15'], [], [4], 'lbp', '2026-2027');
+    $okHtml290 = strpos($h290, 'assets/templates/mof_r13.png') !== false && strpos($h290, 'كميل سعيد مرعي') !== false && substr_count($h290, '>كميل سعيد مرعي</div>') === 2 && substr_count($h290, '>مسؤول</div>') === 2
+        && strpos($h290, '>5</div>') !== false && strpos($h290, '>1</div>') !== false && strpos($h290, '>10</div>') !== false && strpos($h290, '>2026</div>') !== false
+        && strpos($h290, 'mwazen958@outlook.fr') !== false && strpos($h290, '25 - 82 - 043') !== false && preg_match('/>1<\/div>.*>7<\/div>.*>2<\/div>.*>7<\/div>.*>5<\/div>.*>3<\/div>/s', $h290) === 1   // 172753 رقماً رقماً
+        && strpos($h290b, '>15</div>') !== false && strpos($h290b, '>2</div>') !== false && stripos($h290, 'Fatal error') === false;
+    $at290 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/attestations.php'));
+    $bk290 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/attestations_bulk.php'));
+    $okSrc290 = strpos($at290, "pages/official_export.php?form=mof_r13&n=1&date=<?= e(\$effDate) ?>") !== false
+        && strpos($bk290, "function bulkCoverR13(int \$sid, int \$n, int \$d, int \$mo, int \$yr): ?string {") !== false
+        && strpos($bk290, "\$_SESSION['bulk_meta'][\$tok] = (int)\$emp['school_id'];") !== false
+        && strpos($bk290, "if (\$type === 'mof_r3' && count(\$bySch) && !isset(\$bySch[0])) {") !== false
+        && strpos($bk290, "'_groupe_' . (count(\$paths) - count(\$covers)) . '_'") !== false;
+    $ok290 = $okPos290 && $okHtml290 && $okSrc290;
+    $why290 = 'pos=' . (int)$okPos290 . ' html=' . (int)$okHtml290 . ' src=' . (int)$okSrc290;
+} catch (Throwable $e) { $ok290 = false; $why290 = $e->getMessage(); }
+check('📨 كتاب طلب التسجيل ر1-3 (2026-11-05): mof_r13 طبق الأصل بالمدرسة والرقم المالي بالمربّعات والضمان والعنوان والمسؤول (كميل سعيد مرعي · مسؤول) وعدد الطلبات والتاريخ (date أو d/mo/yr) · كبسة بشاشة ر3 · أوّل الملف المدموج بالإفادات الجماعية لكل مدرسة', $ok290, $why290);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

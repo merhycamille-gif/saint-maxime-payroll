@@ -166,6 +166,15 @@ function bulkDocPdf(string $rel): ?string {
 }
 
 /** دمج ملفات PDF (بالترتيب) عبر خدمة المدرسة؛ وإلا mPDF باستيراد الصفحات */
+/** 📨 كتاب طلب التسجيل ر1-3 لمدرسة (PDF) — نفس مسار النماذج الرسمية (HTML pbg ⇒ Chromium)؛ null إن تعذّر (الدمج يكمل بلا كتاب) */
+function bulkCoverR13(int $sid, int $n, int $d, int $mo, int $yr): ?string {
+    $r = bulkFetch('pages/official_export.php?form=mof_r13&sch=' . $sid . '&n=' . $n . '&d=' . $d . '&mo=' . $mo . '&yr=' . $yr, $sid);
+    if (strpos($r, '%PDF') === 0) return $r;
+    if (stripos($r, 'class="pbg"') === false) return null;
+    require_once __DIR__ . '/../includes/pdf_chromium.php';
+    if (!MsaChromePdf::available()) return null;
+    try { $pdf = MsaChromePdf::overlayPageToPdf($r); return strpos((string)$pdf, '%PDF') === 0 ? $pdf : null; } catch (Throwable $e) { return null; }
+}
 function bulkMerge(array $paths): string {
     require_once __DIR__ . '/../includes/pdf_chromium.php';
     $cfg = MsaChromePdf::config();
@@ -219,7 +228,7 @@ if ($act !== '') {
                 finally { foreach ($tmpPaths as $tp) @unlink($tp); }
             }
             $tok = bulkToken(); file_put_contents($bulkDir . '/' . $tok . '.pdf', $pdf);
-            $_SESSION['bulk_files'][$tok] = $name;
+            $_SESSION['bulk_files'][$tok] = $name; $_SESSION['bulk_meta'][$tok] = (int)$emp['school_id'];   // 📨 مدرسة الملف (لكتاب ر1-3 عند الدمج)
             $res = ['ok' => true, 'tok' => $tok, 'name' => $name, 'label' => $label, 'size' => strlen($pdf), 'docs_missing' => $docsMissing, 'pages' => preg_match_all('/\/Type\s*\/Page[^s]/', $pdf), 'used' => ($type === 'cnss_hire' ? (hasNssfNumber($emp['nssf_number'] ?? '') ? 'cnss_hire_reg' : 'cnss_hire_new') : $type)];
             // 🧾 (2026-11-04) نموذج دولة لغير خاضع للضرائب ⇒ تنبيه قدّام اسمه (الخادم مصدر الحقيقة لا الشاشة)
             if (in_array($type, $OFFICIAL, true) && !empTaxSubject($emp)) $res['tax_warn'] = empTaxMissLabel($emp);
@@ -251,13 +260,25 @@ if ($act !== '') {
             bulkJson(['ok' => (bool)$ok, 'mail' => $ok ? 'sent' : 'failed', 'to' => $to, 'msg' => $ok ? ('انبعت إلى ' . $to) : ('فشل الإرسال: ' . $err)]);
         }
         if ($act === 'merge') {
-            $toks = (array)($in['toks'] ?? []); $paths = [];
-            foreach ($toks as $t) { $t = (string)$t; if (bulkOwn($t) && is_file($bulkDir . '/' . $t . '.pdf')) $paths[] = $bulkDir . '/' . $t . '.pdf'; }
+            $toks = (array)($in['toks'] ?? []); $paths = []; $bySch = [];
+            foreach ($toks as $t) { $t = (string)$t; if (bulkOwn($t) && is_file($bulkDir . '/' . $t . '.pdf')) { $paths[] = $bulkDir . '/' . $t . '.pdf'; $bySch[(int)($_SESSION['bulk_meta'][$t] ?? 0)][] = $bulkDir . '/' . $t . '.pdf'; } }
             if (!$paths) bulkJson(['ok' => false, 'msg' => 'لا ملفات للدمج']);
+            // 📨 (2026-11-05 «ر3-1») دفعة ر3 ⇒ كتاب طلب التسجيل ر1-3 أوّل ملف كل مدرسة بعدد طلباتها وبالتاريخ المختار (كما يُسلَّم للمالية)
+            $covers = [];
+            if ($type === 'mof_r3' && count($bySch) && !isset($bySch[0])) {
+                $ordered = []; $tsC = strtotime($date) ?: time();
+                foreach ($bySch as $sidC => $files) {
+                    $cv = bulkCoverR13((int)$sidC, count($files), (int)date('j', $tsC), (int)date('n', $tsC), (int)date('Y', $tsC));
+                    if ($cv !== null) { $cp = $bulkDir . '/cover_' . bulkToken() . '.pdf'; file_put_contents($cp, $cv); $covers[] = $cp; $ordered[] = $cp; }
+                    foreach ($files as $f) $ordered[] = $f;
+                }
+                if ($covers) $paths = $ordered;
+            }
             $merged = count($paths) === 1 ? (string)file_get_contents($paths[0]) : bulkMerge($paths);
+            foreach ($covers as $cp) @unlink($cp);
             if (strpos($merged, '%PDF') !== 0) bulkJson(['ok' => false, 'msg' => 'تعذّر دمج الملفات']);
             $tok = bulkToken(); file_put_contents($bulkDir . '/' . $tok . '.pdf', $merged);
-            $name = ($LATIN[$type] ?? 'Attestations') . '_groupe_' . count($paths) . '_' . $date . '.pdf';
+            $name = ($LATIN[$type] ?? 'Attestations') . '_groupe_' . (count($paths) - count($covers)) . '_' . $date . '.pdf';   // عدد الإفادات (بلا كتاب ر1-3)
             $_SESSION['bulk_files'][$tok] = $name;
             bulkJson(['ok' => true, 'tok' => $tok, 'name' => $name, 'size' => strlen($merged), 'pages' => preg_match_all('/\/Type\s*\/Page[^s]/', $merged)]);
         }
