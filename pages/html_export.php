@@ -154,10 +154,12 @@ $emitTable = function (DOMElement $t) use ($rep, &$firstHead, &$tablesN, &$pendi
     }
     if (!$bodyRows && !$footRows) return;
     $flushPending();
-    // الرأس: أعمدة مركّبة (صفّان) تُدمج «الأب — الابن»
-    $headers = [];
+    // الرأس: أعمدة مركّبة (صفّان) — 🧩 (2026-11-06) رأس الورقة ذو الصفّين يبقى صفّين بالإكسل/الوورد: «الفئة» مدموجة فوق حاضنة/معلم/مدرس/أستاذ ثانوي
+    //    (headGroups)، والعمود الممتدّ على الصفّين (rowspan) خليّة واحدة. أكثر من صفّين (نادر) أو الجداول التالية: تُدمج «الأب — الابن» كما كان.
+    $headers = []; $groups = [];
     if ($theadRows) {
         [$occ, $cols] = hx_grid($theadRows);
+        $flat = [];
         for ($c = 0; $c < $cols; $c++) {
             $parts = []; $seen = [];
             foreach ($occ as $r) {
@@ -167,9 +169,15 @@ $emitTable = function (DOMElement $t) use ($rep, &$firstHead, &$tablesN, &$pendi
                 $tx = hx_clean(hx_text($e['cell']));
                 if ($tx !== '') $parts[] = $tx;
             }
-            $headers[] = implode(' — ', $parts);
+            $flat[] = implode(' — ', $parts);
+            $top = $occ[0][$c] ?? null; $bot = $occ[1][$c] ?? null;
+            if (count($theadRows) === 2 && $top && $bot && $top['cs'] > 1 && $bot['cell'] !== $top['cell'] && hx_clean(hx_text($top['cell'])) !== '') {
+                $headers[] = hx_clean(hx_text($bot['cell']));
+                if ($top['c0'] === $c) $groups[] = ['t' => hx_clean(hx_text($top['cell'])), 'c0' => $c, 'c1' => $c + $top['cs'] - 1];
+            } else $headers[] = $flat[$c];
         }
-        if ($firstHead) { $rep->head($headers); $firstHead = false; } else $rep->headRow($headers);
+        if ($firstHead) { $rep->head($headers, $groups); $firstHead = false; } else $rep->headRow($flat);
+        $headers = $flat;
     }
     $tablesN++;
     $emitRows = function (array $trs, bool $foot) use ($rep, $headers) {
