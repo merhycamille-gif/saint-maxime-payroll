@@ -136,7 +136,8 @@ try {
         && strpos($styles, 'readingOrder="2"') !== false
         && strpos($sheet, '<autoFilter') === false && preg_match('/<c r="E6" s="12"><v>2155000\.5<\/v>/', $sheet) === 1 && preg_match('/<c r="E5" s="5"><v>2815000<\/v>/', $sheet) === 1
         && strpos($sheet, '<row r="2"><c r="A2" s="0"') !== false && strpos($sheet, '<mergeCell ref="A9:F9"/>') !== false && strpos($sheet, '<mergeCell ref="A8:D8"/>') !== false   // سطر فاصل بلا إطار · عنوان المجموع الوحيد ممتدّ · عنوان المجموع على # والاسم والفارغ بعده
-        && strpos($sheet, '<oddHeader>') === false && strpos($sheet, 'التاريخ: ') !== false;
+        && strpos($sheet, '<oddHeader>') === false && strpos($sheet, 'التاريخ: ') !== false
+        && strpos($sheet, 'tabSelected') === false && strpos($sheet, '<selection pane="bottomLeft" activeCell="A5" sqref="A5"/>') !== false;   // 📋 نسخ/لصق إلى ملف آخر يعمل (كان «multiple selections»)
     $wbx = ''; $rep248->to($f248)->xlsx(); $z = new ZipArchive(); if ($z->open($f248) === true) { $wbx = (string)$z->getFromName('xl/workbook.xml'); $z->close(); } @unlink($f248);
     $okP = strpos($wbx, '!$1:$4</definedName>') !== false;
     $ok248 = $okS248 && $okW && $okX && $okP;

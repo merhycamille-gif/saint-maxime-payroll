@@ -708,8 +708,11 @@ class ReportTable
         $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             . '<sheetPr><pageSetUpPr fitToPage="' . ($fitW ? '1' : '0') . '"/></sheetPr>'
-            . '<sheetViews><sheetView rightToLeft="' . ($this->isRtl() ? '1' : '0') . '" workbookViewId="0" tabSelected="1">'
+            // 📋 (2026-11-06 p1 «عملت كوبي من الإكسل عندك وباست عندي: This action won't work on multiple selections») tabSelected="1" بلا bookViews
+            //    يجعل إكسل يعتبر الورقة «مجمَّعة» فيرفض لصق أي نسخ منها بملف آخر — أُزيلت، مع تحديد صريح لأوّل خليّة بيانات تحت الرأس المجمّد
+            . '<sheetViews><sheetView rightToLeft="' . ($this->isRtl() ? '1' : '0') . '" workbookViewId="0">'
             . '<pane ySplit="' . $headerRow . '" topLeftCell="A' . ($headerRow + 1) . '" activePane="bottomLeft" state="frozen"/>'
+            . '<selection pane="bottomLeft" activeCell="A' . ($headerRow + 1) . '" sqref="A' . ($headerRow + 1) . '"/>'
             . '</sheetView></sheetViews>'
             . '<sheetFormatPr defaultRowHeight="16"/>'
             . $colsXml
@@ -737,6 +740,7 @@ class ReportTable
         $wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
             . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            . '<bookViews><workbookView activeTab="0"/></bookViews>'
             . '<sheets><sheet name="' . self::xa($this->sheetName()) . '" sheetId="1" r:id="rId1"/></sheets>'
             . ($this->headers ? '<definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">' . $printCols . '\'' . str_replace("'", "''", self::xa($this->sheetName())) . '\'!$' . $this->xlsxHeadRows[0] . ':$' . $headerRow . '</definedName></definedNames>' : '')
             . '</workbook>';
