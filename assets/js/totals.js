@@ -194,7 +194,8 @@
     }
     function run() {
         // 🏛️ (2026-10-17) نماذج الدولة الرسمية (ضمان cnss-form / مالية mof-form) تبقى طبق الأصل: لا Σ ولا مجاميع ولا تغيير بخاناتها
-        var tables = Array.prototype.filter.call(document.querySelectorAll('#pageContent table.doc-table'), function (t) { return !t.closest('.cnss-form, .mof-form'); });
+        // 🏛️ (2026-11-06) موازنة الوزارة (.rl-fixed) نموذج دولة بمجاميعه ووحداته المكتوبة: لا Σ ولا «المجموع العام» ولا سطر عملة
+        var tables = Array.prototype.filter.call(document.querySelectorAll('#pageContent table.doc-table'), function (t) { return !t.closest('.cnss-form, .mof-form, .rl-fixed'); });
         tables.forEach(process);
         tables.forEach(curHeads);
         // خانة «مجموع السطر» المضافة: عنوانها يأخذ العملة أيضاً وخاناتها أرقام فقط

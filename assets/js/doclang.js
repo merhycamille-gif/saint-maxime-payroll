@@ -91,11 +91,14 @@
     function lead(t) { var m = /^(\s*)/.exec(t); return m ? m[1] : ''; }
     function trail(t) { var m = /(\s*)$/.exec(t); return m ? m[1] : ''; }
     // 2026-10-11 «ما عندي خيار العربي أو الفرنسي» بالقسائم الجماعية: كل قسيمة (.payslip-card) مستند أيضاً، لا القسيمة الفردية (#ppExportArea) وحدها
+    // 🏛️ (2026-11-06 «موازنة للدولة بدها تكون بالعربي من اليمين للشمال») مستند بلغة واتجاه ثابتين (.rl-fixed مثل موازنة الوزارة):
+    //    لا ترجمة ولا قلب اتجاه مهما كانت لغة البرنامج أو الحبّة — يبقى كما كتبه PHP
+    var FIXED = '.rl-fixed';
     var roots = function () {
-        var r = document.querySelectorAll('#ppExportArea, .payslip-card, .doc-sheet, .official-doc, .land-report, .xls-sheet');
+        var r = Array.prototype.filter.call(document.querySelectorAll('#ppExportArea, .payslip-card, .doc-sheet, .official-doc, .land-report, .xls-sheet'), function (x) { return !x.closest(FIXED); });
         if (r.length) return r;
         // صفحة بلا ورقة مستند لكن فيها جدول (التعويض العائلي، المكافآت…): الجدول نفسه هو المستند ⇒ الخيار موجود بكل صفحة فيها شريط طباعة
-        return Array.prototype.filter.call(document.querySelectorAll('#pageContent table'), function (t) { return !t.closest('.no-print, .no-export, .export-toolbar, .att-opts, table table'); });
+        return Array.prototype.filter.call(document.querySelectorAll('#pageContent table'), function (t) { return !t.closest('.no-print, .no-export, .export-toolbar, .att-opts, table table, ' + FIXED); });
     };
     var SKIP = /^(SCRIPT|STYLE|INPUT|TEXTAREA|SELECT|OPTION|BUTTON)$/;
     function mkPair(tn, pr, inTh) {
@@ -204,7 +207,8 @@
             else { od.setAttribute('dir', od.__rlDir.dir); od.classList.toggle('rtl', od.__rlDir.rtl); od.classList.toggle('ltr', od.__rlDir.ltr); tbls.forEach(function (t) { if (t.__rlDir === undefined) return; if (t.__rlDir) t.setAttribute('dir', t.__rlDir); else t.removeAttribute('dir'); }); }
         });
         window.MSA_RL = { lang: L, side: effSide(), exportDir: function (area) {
-            if (!area) return null; var od = area.classList.contains('official-doc') ? area : area.querySelector('.official-doc'); if (od && !rlStateSheet(od)) return null; return effSide() || null; } };
+            if (!area) return null; if (area.closest(FIXED) || area.querySelector(FIXED)) return null;   // 🏛️ مستند ثابت الاتجاه: التصدير يأخذ dir الورقة نفسها
+            var od = area.classList.contains('official-doc') ? area : area.querySelector('.official-doc'); if (od && !rlStateSheet(od)) return null; return effSide() || null; } };
         document.querySelectorAll('.rl-chip[data-rl]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rl') === L); });   // 🌐 (2026-10-24) كبسات لغة المستند (doc-langs روابط) لا تُمَسّ
         document.querySelectorAll('.rl-side').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-rs') === effSide()); });
         document.querySelectorAll('.rl-sides').forEach(function (g) { g.style.display = (L === 'both') ? '' : 'none'; });

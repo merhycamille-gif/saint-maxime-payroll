@@ -417,7 +417,7 @@ function docSheetStart(string $titleFr, string $titleAr, array $chips = [], arra
             <?php endif; ?>
         <?php endif; ?>
         <div class="doc-head">
-            <div class="dh-fr" dir="ltr"><?= e($titleFr) ?></div>
+            <?php if ($titleFr !== ''): /* 🏛️ (2026-11-06) عنوان فرنسي فارغ = مستند عربي صرف (موازنة الوزارة): لا سطر فرنسي */ ?><div class="dh-fr" dir="ltr"><?= e($titleFr) ?></div><?php endif; ?>
             <div class="dh-ar"><?= e($titleAr) ?></div>
             <div class="dh-meta">
                 <?php foreach (array_merge($chips, $auto) as $c): ?><span class="dh-chip"><?= e($c) ?></span><?php endforeach; ?>

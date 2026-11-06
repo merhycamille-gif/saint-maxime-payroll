@@ -11,6 +11,11 @@
  *    ولها «↺ تلقائي» للرجوع؛ صفّ «عدد الاشهر» يُعدَّل لكل عمود؛ أسطر الملخّص المحسوبة (أ/ب/د) تُفرض
  *    يدوياً أو ترجع محسوبة؛ بنود النفقات تُعدَّل من أي ورقة تظهر فيها. المجاميع تبقى محسوبة دائماً.
  *  - المخرجات: معاينة/طباعة PDF بالورقة الموحّدة + إكسل متعدّد الأوراق بصيغ حيّة.
+ *  - 🏛️🇱🇧 (2026-11-06 «موازنة للدولة بدها تكون بالعربي من اليمين للشمال»): المستند عربي صرف واتجاهه من اليمين
+ *    دائماً مهما كانت لغة البرنامج (.rl-fixed: doclang لا يترجم ولا يقلب، totals لا يضيف مجاميع/عملة) — كانت
+ *    لغة البرنامج الفرنسية تقلب الأوراق للشمال وتترجم الرؤوس.
+ *  - 📄✏️ «كبسة تعديل لكل صفحة بصفحتها وبعدين حفظ» (2026-11-06): فوق كل ورقة «تعديل الصفحة» يفتح كل أسطرها دفعة
+ *    واحدة و«حفظ الصفحة» يرسلها كلّها بطلب واحد (mehe_rows JSON) فتُحفظ مرّة واحدة؛ تعديل السطر الواحد باقٍ.
  */
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/functions.php';
@@ -20,7 +25,7 @@ requireLogin();
 
 $db = getDB();
 $currentPage = 'mehe_budget';
-$pageTitle = 'Budget MEHE / موازنة وزارة التربية';
+$pageTitle = 'موازنة وزارة التربية والتعليم العالي';
 $hideExportToolbar = true; $ownExportRow = true;
 $sy = activeSchoolYear();
 if ($sy === 'all' || !preg_match('/^\d{4}-\d{4}$/', (string)$sy)) $sy = currentSchoolYear();
@@ -52,6 +57,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mehe_row'])) {
     $res = meheApplyRowEdit($data, $_POST);
     if ($res['ok']) { meheSave($db, $ids, $sy, $data); $_SESSION['flash_success'] = $res['msg']; }
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+/* ===== 📄✏️ حفظ صفحة كاملة: كل أسطر الورقة المعدَّلة بطلب واحد (mehe_rows = JSON [{mehe_row,key,f,reset}]) ===== */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mehe_rows'])) {
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    if (!canEdit()) { echo json_encode(['ok' => false, 'msg' => 'قراءة فقط']); exit; }
+    if (!verifyCsrf($_POST['csrf'] ?? '')) { echo json_encode(['ok' => false, 'msg' => 'رمز الأمان غير صحيح — أعد تحميل الصفحة']); exit; }
+    $items = json_decode((string)$_POST['mehe_rows'], true);
+    if (!is_array($items) || !$items) { echo json_encode(['ok' => false, 'msg' => 'لا تعديلات']); exit; }
+    // أسطر القوائم (إيرادات/منح/صرف/إداريون) تُطبَّق من الأعلى فهرساً إلى الأدنى ثم الجديدة أخيراً: حذف سطر لا يزحزح فهارس ما بعده
+    $norm = []; foreach ($items as $it) { if (!is_array($it) || !isset($it['mehe_row'])) continue; $it['f'] = is_array($it['f'] ?? null) ? $it['f'] : []; $norm[] = $it; }
+    $isList = fn($it) => ($it['mehe_row'] ?? '') === 'list';
+    $lists = array_values(array_filter($norm, $isList)); $others = array_values(array_filter($norm, fn($it) => !$isList($it)));
+    usort($lists, function ($a, $b) { $ia = explode('|', (string)($a['key'] ?? ''))[1] ?? ''; $ib = explode('|', (string)($b['key'] ?? ''))[1] ?? '';
+        if ($ia === 'new' || $ib === 'new') return ($ia === 'new') <=> ($ib === 'new'); return (int)$ib <=> (int)$ia; });
+    $n = 0;
+    foreach (array_merge($others, $lists) as $it) {
+        $res = meheApplyRowEdit($data, $it);
+        if (!$res['ok']) { echo json_encode(['ok' => false, 'msg' => $res['msg']], JSON_UNESCAPED_UNICODE); exit; }
+        $n++;
+    }
+    meheSave($db, $ids, $sy, $data);
+    $_SESSION['flash_success'] = 'انحفظت الصفحة (' . $n . ' ' . ($n === 1 ? 'سطر' : 'أسطر') . ')';
+    echo json_encode(['ok' => true, 'n' => $n], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -172,32 +202,43 @@ $empList = $empList->fetchAll();
 .mehe-doc .sig{display:flex;justify-content:space-between;margin-top:14px;font-size:12px}
 .mehe-doc .mehe-cover{max-width:760px;margin:0 auto}
 .mehe-doc .mehe-cover .h{font-weight:800;font-size:15px;margin:6px 0;text-align:center}
+.mehe-doc,.mehe-doc .doc-sheet,.mehe-doc table{direction:rtl}
+.mehe-doc .doc-head .dh-ar{font-size:17px;font-weight:800}
+/* 📄✏️ شريط الصفحة: تعديل الصفحة كلّها / حفظ الصفحة / إلغاء (لا يُطبع) */
+.mehe-doc .sheetctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px}
+.mehe-doc .sheetctl .btn{border-radius:12px;padding:6px 14px;font-weight:700;font-size:13px}
+.mehe-doc .sheetctl .btn-primary{background:#1F4E5F;border-color:#1F4E5F;color:#fff}
+.mehe-doc .sheetctl .btn-success{background:#16a34a;border-color:#16a34a;color:#fff}
+.mehe-doc .sheetctl .sv,.mehe-doc .sheetctl .cx,.mehe-doc .sheetctl .hint{display:none}
+.mehe-doc .sheetctl.editing .sv,.mehe-doc .sheetctl.editing .cx,.mehe-doc .sheetctl.editing .hint{display:inline-block}
+.mehe-doc .sheetctl.editing .ed{display:none}
+.mehe-doc .sheetctl .hint{font-size:12px;color:#475569}
 @media print{@page{size:A4 landscape;margin:8mm}.mehe-doc .doc-table th{background:#f2f2f2 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.mehe-doc .doc-head .dh-fr,.mehe-doc .doc-head .dh-ar{color:#000 !important}.no-print{display:none !important}.mehe-doc .doc-sheet{page-break-after:always;page-break-inside:auto}.mehe-doc .doc-sheet:last-child{page-break-after:auto}.mehe-doc .report-table-wrap{overflow:visible !important}}
 </style>
 
-<div class="card no-print">
+<div class="card no-print" dir="rtl">
     <div class="card-header"><h3>
-        <span dir="ltr"><i class="fas fa-landmark"></i> Budget MEHE — <?= e($school['name_fr'] ?? '') ?> — <?= e($sy) ?></span>
-        <div style="font-size:0.85em;font-weight:600;opacity:0.9">موازنة وزارة التربية والتعليم العالي (مصلحة التعليم الخاص) — <?= e($school['name_ar']) ?> — السنة الدراسية <?= e($sy) ?></div>
+        <span><i class="fas fa-landmark"></i> موازنة وزارة التربية والتعليم العالي — <?= e($school['name_ar']) ?> — <?= e($sy) ?></span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">مصلحة التعليم الخاص — الموازنة المدرسية للسنة الدراسية <?= e($sy) ?></div>
     </h3></div>
     <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <a class="btn btn-success" href="?export=xlsx"><i class="fas fa-file-excel"></i> Excel (صيغ حيّة)</a>
-        <button type="button" class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Imprimer / PDF</button>
-        <?php /* 📤 (2026-10-03 «كل شي من كل شي»): نفس كبسات باقي التقارير */ $mbT = jsAttr('Budget MEHE ' . $sy); ?>
-        <button type="button" class="btn btn-danger" onclick="msaSavePdfStart(this)"><i class="fas fa-file-pdf"></i> PDF</button>
-        <?php if (!isViewer()): ?><button type="button" class="btn btn-info" onclick="ppWord('<?= $mbT ?>')"><i class="fas fa-file-word"></i> Word</button><?php endif; ?>
-        <button type="button" class="btn" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $mbT ?>','')"><i class="fab fa-whatsapp"></i> WhatsApp</button>
-        <?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail('<?= $mbT ?>','')"><i class="fas fa-envelope"></i> Email</button><?php endif; ?>
-        <span class="text-muted" style="font-size:12.5px">جداول الأساتذة والموظفين والملخّص (أ، ب) تُقرأ من رواتب <?= e($sy) ?> تلقائياً — المدرسة (أو مجموعة مدارس أو الكل) والسنة من الأعلى<?= $multi ? '؛ الآن موازنة مجمّعة لـ' . count($schools) . ' مدارس' : '' ?>. كل سطر بالأوراق تحت قدّامه «✏️ تعديل» ثم «💾 حفظ» ويبقى محفوظاً لهذه المدرسة والسنة؛ أسطر الموظفين المعدَّلة يدوياً لها «↺ تلقائي» للرجوع إلى الرواتب.</span>
+        <a class="btn btn-success" href="?export=xlsx"><i class="fas fa-file-excel"></i> إكسل (صيغ حيّة)</a>
+        <button type="button" class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
+        <?php /* 📤 (2026-10-03 «كل شي من كل شي»): نفس كبسات باقي التقارير */ $mbT = jsAttr('موازنة وزارة التربية ' . $sy); ?>
+        <button type="button" class="btn btn-danger" onclick="msaSavePdfStart(this)"><i class="fas fa-file-pdf"></i> حفظ PDF</button>
+        <?php if (!isViewer()): ?><button type="button" class="btn btn-info" onclick="ppWord('<?= $mbT ?>')"><i class="fas fa-file-word"></i> وورد</button><?php endif; ?>
+        <button type="button" class="btn" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $mbT ?>','')"><i class="fab fa-whatsapp"></i> واتساب</button>
+        <?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail('<?= $mbT ?>','')"><i class="fas fa-envelope"></i> بريد إلكتروني</button><?php endif; ?>
+        <span class="text-muted" style="font-size:12.5px">جداول الأساتذة والموظفين والملخّص (أ، ب) تُقرأ من رواتب <?= e($sy) ?> تلقائياً — المدرسة (أو مجموعة مدارس أو الكل) والسنة من الأعلى<?= $multi ? '؛ الآن موازنة مجمّعة لـ' . count($schools) . ' مدارس' : '' ?>. فوق كل ورقة «✏️ تعديل الصفحة» يفتح أسطرها كلّها ثم «💾 حفظ الصفحة»؛ وقدّام كل سطر «✏️ تعديل» ثم «💾 حفظ» لسطر واحد. كل شيء يبقى محفوظاً لهذه المدرسة والسنة؛ أسطر الموظفين المعدَّلة يدوياً لها «↺ تلقائي» للرجوع إلى الرواتب.</span>
     </div>
 </div>
 
 <?php if (canEdit()): ?>
-<form method="POST" class="card no-print mehe-form" id="meheForm">
+<form method="POST" class="card no-print mehe-form" id="meheForm" dir="rtl">
     <?= csrfField() ?>
     <input type="hidden" name="mehe_save" value="1">
     <details>
-    <summary class="card-header" style="cursor:pointer"><h3 style="display:inline"><i class="fas fa-pen-to-square"></i> Données du budget / النموذج الكامل لبيانات الموازنة</h3> <small class="text-muted" style="font-size:12px">— اختياري: كل سطر بأوراق الموازنة تحت قدّامه «تعديل/حفظ» مباشرة؛ هنا أيضاً أساس الراتب واستثناء الموظفين</small></summary>
+    <summary class="card-header" style="cursor:pointer"><h3 style="display:inline"><i class="fas fa-pen-to-square"></i> النموذج الكامل لبيانات الموازنة</h3> <small class="text-muted" style="font-size:12px">— اختياري: كل سطر بأوراق الموازنة تحت قدّامه «تعديل/حفظ» مباشرة؛ هنا أيضاً أساس الراتب واستثناء الموظفين</small></summary>
     <div class="card-body">
         <details open>
             <summary>١) الطلب ومعلومات المدرسة</summary>
@@ -347,7 +388,7 @@ $empList = $empList->fetchAll();
     function fields(scope){ return scope.querySelectorAll('input:not([type=hidden]):not([type=button]):not([type=submit]),select,textarea'); }
     function lock(scope,on){ fields(scope).forEach(function(el){ if(el.tagName==='SELECT'||el.type==='radio'||el.type==='checkbox'){ el.disabled=on; } else { el.readOnly=on; } }); }
     function ctl(){ var sp=document.createElement('span'); sp.className='rowctl';
-        sp.innerHTML='<button type="button" class="ed" title="تعديل / Modifier">✏️ تعديل</button><button type="button" class="sv" title="حفظ / Enregistrer">💾 حفظ</button>'; return sp; }
+        sp.innerHTML='<button type="button" class="ed" title="تعديل">✏️ تعديل</button><button type="button" class="sv" title="حفظ">💾 حفظ</button>'; return sp; }
     function wire(scope, sp){ lock(scope,true);
         sp.querySelector('.ed').onclick=function(){ lock(scope,false); sp.classList.add('editing'); var f=fields(scope)[0]; if(f) f.focus(); };
         sp.querySelector('.sv').onclick=function(){ lock(form,false); form.submit(); }; }
@@ -388,7 +429,7 @@ $E = canEdit(); // ✏️ أزرار التعديل تظهر للمحرّرين 
 $ctl = function (bool $rs = false, string $tag = 'td') use ($E): string {
     if (!$E) return '';
     // 🚀 (2026-10-03): «💾 حفظ» و«✖» يُخلقان بالمتصفّح عند أوّل «تعديل» (كانا ~1000 كبسة مخفية تُحسب بتخطيط كل فتحة)
-    return "<$tag class=\"rowctl no-print\"><button type=\"button\" class=\"ed\" title=\"تعديل / Modifier\">✏️ تعديل</button>" . ($rs ? "<button type=\"button\" class=\"rs\" title=\"رجوع القيمة التلقائية من الرواتب\">↺ تلقائي</button>" : '') . "</$tag>";
+    return "<$tag class=\"rowctl no-print\"><button type=\"button\" class=\"ed\" title=\"تعديل هذا السطر\">✏️ تعديل</button>" . ($rs ? "<button type=\"button\" class=\"rs\" title=\"رجوع القيمة التلقائية من الرواتب\">↺ تلقائي</button>" : '') . "</$tag>";
 };
 $ctlTh = fn() => $E ? '<th class="rowctl no-print"></th>' : '';
 /* خلية قابلة للتعديل: data-f اسم الحقل · data-t النوع (s نص، n رقم، ta نص طويل، sel اختيار) · data-v القيمة الخام */
@@ -421,7 +462,7 @@ $staffTable = function (string $title, string $tk, array $cols, array $keys, arr
         <thead><tr><?= $ctlTh() ?><?php foreach ($cols as $cl): ?><th><?= e($cl) ?></th><?php endforeach; ?></tr></thead>
         <tbody>
         <?php foreach ($rows as $r) echo $rowHtml($r); ?>
-        <?php if (!$rows): ?><tr><?= $E ? '<td class="rowctl no-print"></td>' : '' ?><td colspan="<?= count($cols) ?>" style="text-align:center">لا صفوف / Aucun</td></tr><?php endif; ?>
+        <?php if (!$rows): ?><tr><?= $E ? '<td class="rowctl no-print"></td>' : '' ?><td colspan="<?= count($cols) ?>" style="text-align:center">لا صفوف</td></tr><?php endif; ?>
         <?php if ($tk === 'adm' && $E): $tplRow = ['manual' => true, 'key' => 'mnew', 'name' => '', 'school' => '', 'admin_mode' => '', 'start_date' => '', 'admin_type' => 'عادي', 'cnss_type' => 'غير مضمون']; echo $rowHtml($tplRow, true); endif; ?>
         <tr style="background:#f8fafc;font-weight:700"<?= $rowAttr('months', $tk) ?>><?= $ctl((bool)$ovM) ?><td style="text-align:right">عدد الاشهر</td>
             <?php foreach ($keys as $i => $k): $col = $i + 1; if ($col === 1) continue; ?><?= $col >= $firstNum ? $ed($k, (int)($months[$k] ?? 12), (string)(int)($months[$k] ?? 12), 'n', 'text-align:center', '', isset($ovM[$k])) : '<td></td>' ?><?php endforeach; ?></tr>
@@ -467,8 +508,8 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
     return '<div class="mline"' . $rowAttr('field', $path) . '>' . $ctl(false, 'span') . '<strong>' . e($label) . ':</strong> <span data-f="v" data-t="' . $t . '" data-v="' . e((string)$v) . '" style="flex:1">' . $shown . '</span></div>';
 };
 ?>
-<div class="mehe-doc land-report">
-<?= docSheetStart('Budget scolaire ' . $y1 . '/' . $y2 . ' — Ministère de l\'Éducation', 'موازنة السنة المدرسية ' . $y1 . '/' . $y2 . ' — وزارة التربية والتعليم العالي', $chips, $optsDoc) ?>
+<div class="mehe-doc land-report rl-fixed" dir="rtl">
+<?= docSheetStart('', 'موازنة السنة المدرسية ' . $y1 . '/' . $y2 . ' — وزارة التربية والتعليم العالي', $chips, $optsDoc) ?>
     <div class="mehe-cover">
         <div class="h"<?= $rowAttr('field', 'serial') ?>><?= $ctl(false, 'span') ?>الرقم التسلسلي: <?php if ($E): ?><span data-f="v" data-t="s" data-v="<?= e($data['serial']) ?>"><?= e($data['serial'] ?: '—') ?></span><?php else: ?><?= e($data['serial'] ?: '—') ?><?php endif; ?></div>
         <div class="h">جانب وزارة التربية والتعليم العالي</div>
@@ -481,7 +522,7 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
     </div>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Informations sur l\'école', 'معلومات المدرسة', $chips, $optsDoc) ?>
+<?= docSheetStart('', 'معلومات المدرسة', $chips, $optsDoc) ?>
     <?= $line('اسم المدير', 'director', $data['director']) ?>
     <?= $line('رئيس لجنة أولياء الأمور', 'parents_head', $data['parents_head']) ?>
     <?= $line('رقم هاتف رئيس لجنة أولياء الأمور', 'parents_phone', $data['parents_phone']) ?>
@@ -508,25 +549,25 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
     </div>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Corps enseignant — cadre', 'أعضاء هيئة التدريس في الملاك', array_merge($chips, [count($p['tit']) . ' أستاذاً', $p['mode'] === 'oct' ? 'أساس شهر تشرين الأول' : 'معدل الأشهر']), $optsDoc) ?>
+<?= docSheetStart('', 'أعضاء هيئة التدريس في الملاك', array_merge($chips, [count($p['tit']) . ' أستاذاً', $p['mode'] === 'oct' ? 'أساس شهر تشرين الأول' : 'معدل الأشهر']), $optsDoc) ?>
     <?= $staffTable('', 'tit', ['الاسم', 'دور الموظف', 'مؤهلات المعلم', 'مستوى التعليم', 'تاريخ الدخول الى الملاك', 'تاريخ مباشرة العمل', 'ساعات أسبوعية (ملاك)', 'ساعات أسبوعية (اضافية)', 'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'الأثر الرجعي', 'أجور مهمات تتجاوز نصاب العمل ل.ل', 'أجور مهمات تجاوز الـ35 ساعه', 'المكافآت', 'مهام إضافية ل.ل', 'تعويض نقل', 'تعويض عائلي', 'مساهمة الصندوق الوطني للضمان الاجتماعي', 'صندوق التعويضات'],
         ['name', 'role', 'qual', 'level', 'cadre_date', 'start_date', 'h_cadre', 'h_extra', 'base', 'extra_ll', 'extra_usd', 'retro', 'missions_ll', 'missions35', 'bonus', 'tasks_ll', 'transport', 'family', 'cnss', 'fund'],
         $p['tit'], $p['tit_months'], 9, ['missions_ll', 'missions35', 'cnss', 'fund'], $data) ?>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Corps enseignant — contractuels', 'أعضاء هيئة التدريس المتعاقدين', array_merge($chips, [count($p['con']) . ' أستاذاً']), $optsDoc) ?>
+<?= docSheetStart('', 'أعضاء هيئة التدريس المتعاقدين', array_merge($chips, [count($p['con']) . ' أستاذاً']), $optsDoc) ?>
     <?= $staffTable('', 'con', ['الاسم', 'دور الموظف', 'نمط العمل', 'نوع الضمان', 'مؤهلات المعلم', 'مستوى التعليم', 'تاريخ مباشرة العمل', 'ساعات أسبوعية', 'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'المكافآت', 'مهام إضافية ل.ل', 'تعويض نقل', 'مساهمة الصندوق الوطني للضمان الاجتماعي'],
         ['name', 'role', 'mode', 'cnss_type', 'qual', 'level', 'start_date', 'h_cadre', 'base', 'extra_ll', 'extra_usd', 'bonus', 'tasks_ll', 'transport', 'cnss'],
         $p['con'], $p['con_months'], 9, ['cnss'], $data) ?>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Personnel administratif', 'الموظفون الإداريون', array_merge($chips, [count($p['adm']) . ' موظفاً']), $optsDoc) ?>
+<?= docSheetStart('', 'الموظفون الإداريون', array_merge($chips, [count($p['adm']) . ' موظفاً']), $optsDoc) ?>
     <?= $staffTable('', 'adm', ['الاسم', 'نمط العمل', 'تاريخ مباشرة العمل', 'نوع الموظف الاداري', 'نوع الضمان', 'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'مهام إضافية ل.ل', 'منح مدرسية ل.ل', 'تعويض نقل', 'مساهمة الصندوق الوطني للضمان الاجتماعي'],
         ['name', 'admin_mode', 'start_date', 'admin_type', 'cnss_type', 'base', 'extra_ll', 'extra_usd', 'tasks_ll', 'grants_ll', 'transport', 'cnss'],
         $p['adm'], $p['adm_months'], 6, ['cnss'], $data) ?>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Structure administrative et pédagogique', 'الهيكل الإداري والتعليمي', $chips, $optsDoc) ?>
+<?= docSheetStart('', 'الهيكل الإداري والتعليمي', $chips, $optsDoc) ?>
     <h4 class="sec">الهيكل الإداري والتعليمي</h4>
     <?= $kv([['عدد الإداريين الخاضعين لقانون العمل', $data['struct_admin_law'], 'struct_admin_law'], ['عدد المستخدمين الخاضعين لقانون العمل', $data['struct_workers_law'], 'struct_workers_law'], ['عدد باقي المرتبطين بسير العمل', $data['struct_others'], 'struct_others']], 'n') ?>
     <h4 class="sec">الهيكل التعليمي</h4>
@@ -535,7 +576,7 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
     <?= $kv([['عدد القائمين بالإدارة التعليمية (مدير-مساعد-منسق- مشرف)', $data['staff_mgmt'], 'staff_mgmt'], ['عدد القائمين بالنظارة', $data['staff_supervision'], 'staff_supervision'], ['عدد القائمين بالتدريس', $s['staffTeaching']], ['عدد الداخلين في الملاك', $s['staffInCadre']], ['عدد غير الداخلين في الملاك', $s['staffOutCadre']], ['إجمالي عدد الموظفين', $s['staffTotal']]], 'n') ?>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Élèves exemptés — bourses', 'قائمة الطلاب المعفيين', $chips, $optsDoc) ?>
+<?= docSheetStart('', 'قائمة الطلاب المعفيين', $chips, $optsDoc) ?>
     <?php $grRow = function (array $g, $i, bool $tpl = false) use ($ed, $ctl, $rowAttr, $fmt0): string {
         return '<tr' . ($tpl ? ' class="mtpl"' : '') . $rowAttr('list', 'grants|' . $i, $tpl) . '>' . $ctl()
             . $ed('student', (string)($g['student'] ?? ''), e((string)($g['student'] ?? '')), 's', 'text-align:right;font-weight:700')
@@ -547,7 +588,7 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
     }; ?>
     <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl"><thead><tr><?= $ctlTh() ?><th>اسم الطالب</th><th>عضو هيئة التدريس</th><th>فئة المعلم</th><th>الصف</th><th>المنحة المقدمة ل.ل</th><th>المنحة المقدمة د.أ</th></tr></thead><tbody>
     <?php $gl = array_filter(array_values((array)$data['grants']), fn($g) => trim((string)($g['student'] ?? '')) !== ''); foreach ($gl as $i => $g) echo $grRow($g, $i); ?>
-    <?php if (!$gl): ?><tr><?= $E ? '<td class="rowctl no-print"></td>' : '' ?><td colspan="6" style="text-align:center">لا طلاب معفيين / Aucun</td></tr><?php endif; ?>
+    <?php if (!$gl): ?><tr><?= $E ? '<td class="rowctl no-print"></td>' : '' ?><td colspan="6" style="text-align:center">لا طلاب معفيين</td></tr><?php endif; ?>
     <?php if ($E) echo $grRow(['cat' => 'ملاك'], 'new', true); ?>
     </tbody></table></div>
     <?php if ($E): ?><div class="addrow no-print"><button type="button" class="btn btn-light btn-sm" onclick="meheAddSheetRow(this)">+ طالب معفى</button></div><?php endif; ?>
@@ -557,7 +598,7 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
     <?= $kv([['العدد', $s['grOthN']], ['إجمالي المنحة ل.ل', $s['grOthLL']], ['إجمالي المنحة د.أ', $s['grOthUSD']]], 'n') ?>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Indemnités de licenciement — cadre', 'تعويضات الصرف للداخلين في الملاك', $chips, $optsDoc) ?>
+<?= docSheetStart('', 'تعويضات الصرف للداخلين في الملاك', $chips, $optsDoc) ?>
     <?php $svRow = function (array $x, $i, bool $tpl = false) use ($ed, $ctl, $rowAttr, $fmt0): string {
         $h = '<tr' . ($tpl ? ' class="mtpl"' : '') . $rowAttr('list', 'severance|' . $i, $tpl) . '>' . $ctl() . $ed('name', (string)($x['name'] ?? ''), e((string)($x['name'] ?? '')), 's', 'text-align:right;font-weight:700');
         foreach (['eos_ll', 'eos_usd', 'tasks_ll', 'tasks_usd'] as $f) $h .= $ed($f, (string)(float)($x[$f] ?? 0), $fmt0($x[$f] ?? 0), 'n', 'text-align:center');
@@ -573,14 +614,14 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
     <p><strong>المجموع بالليرة:</strong> <?= $fmt0($s['sevLL']) ?> &nbsp;&nbsp; <strong>المجموع بالدولار:</strong> <?= $fmt0($s['sevUSD']) ?></p>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Coûts de fonctionnement — dépenses', 'تكاليف التشغيل — النفقات', $chips, $optsDoc) ?>
+<?= docSheetStart('', 'تكاليف التشغيل — النفقات', $chips, $optsDoc) ?>
     <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl"><thead><tr><?= $ctlTh() ?><th>النفقة</th><th>القيمة بالليرة اللبنانية</th><th>القيمة بالدولار</th></tr></thead><tbody>
     <?php foreach (meheExpenseItems() as $k => [$lb, $cat]): ?><tr<?= $rowAttr('exp', $k) ?>><?= $ctl() ?><td style="text-align:right;font-weight:700"><?= e($lb) ?></td><?= $ed('ll', (string)(float)($data['expenses'][$k]['ll'] ?? 0), $fmt0($data['expenses'][$k]['ll'] ?? 0), 'n', 'text-align:center') ?><?= $ed('usd', (string)(float)($data['expenses'][$k]['usd'] ?? 0), $fmt0($data['expenses'][$k]['usd'] ?? 0), 'n', 'text-align:center') ?></tr><?php endforeach; ?>
     <tr class="tot"><?= $E ? '<td class="rowctl no-print"></td>' : '' ?><td style="text-align:right">مجموع</td><td style="text-align:center"><?= $fmt0($s['expTotalLL']) ?></td><td style="text-align:center"><?= $fmt0($s['expTotalUSD']) ?></td></tr>
     </tbody></table></div>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Recettes', 'الإيرادات', $chips, $optsDoc) ?>
+<?= docSheetStart('', 'الإيرادات', $chips, $optsDoc) ?>
     <?php $rvRow = function (array $rv, $i, bool $tpl = false) use ($ed, $ctl, $rowAttr, $fmt0): string {
         return '<tr' . ($tpl ? ' class="mtpl"' : '') . $rowAttr('list', 'revenues|' . $i, $tpl) . '>' . $ctl()
             . $ed('program', (string)($rv['program'] ?? ''), e((string)($rv['program'] ?? '')), 's', 'text-align:right;font-weight:700')
@@ -588,20 +629,20 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
             . $ed('fee_ll', (string)(float)($rv['fee_ll'] ?? 0), $fmt0($rv['fee_ll'] ?? 0), 'n', 'text-align:center')
             . $ed('fee_usd', (string)(float)($rv['fee_usd'] ?? 0), $fmt0($rv['fee_usd'] ?? 0), 'n', 'text-align:center')
             . $ed('students', (string)(int)($rv['students'] ?? 0), (string)(int)($rv['students'] ?? 0), 'n', 'text-align:center')
-            . '<td style="text-align:center;white-space:nowrap">LL: ' . $fmt0($rv['tot_ll'] ?? 0) . '<br>USD: ' . $fmt0($rv['tot_usd'] ?? 0) . '</td></tr>';
+            . '<td style="text-align:center;white-space:nowrap">ل.ل: ' . $fmt0($rv['tot_ll'] ?? 0) . '<br>د.أ: ' . $fmt0($rv['tot_usd'] ?? 0) . '</td></tr>';
     }; ?>
     <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl"><thead><tr><?= $ctlTh() ?><th>البرنامج</th><th>الصف</th><th>الرسوم الدراسيه ل.ل</th><th>الرسوم الدراسيه د.أ</th><th>عدد الطلاب</th><th>المجموع للصف</th></tr></thead><tbody>
     <?php foreach ($s['revRows'] as $rv) echo $rvRow($rv, $rv['idx']); ?>
     <?php if (!$s['revRows']): ?><tr><?= $E ? '<td class="rowctl no-print"></td>' : '' ?><td colspan="6" style="text-align:center">لا صفوف — أضف صفّاً بالزرّ تحت</td></tr><?php endif; ?>
     <?php if ($E) echo $rvRow(['program' => 'منهاج لبناني'], 'new', true); ?>
-    <tr class="tot"><?= $E ? '<td class="rowctl no-print"></td>' : '' ?><td colspan="4" style="text-align:right">المجموع</td><td style="text-align:center"><?= (int)$s['students'] ?></td><td style="text-align:center;white-space:nowrap">LL: <?= $fmt0($s['revLL']) ?><br>USD: <?= $fmt0($s['revUSD']) ?></td></tr>
+    <tr class="tot"><?= $E ? '<td class="rowctl no-print"></td>' : '' ?><td colspan="4" style="text-align:right">المجموع</td><td style="text-align:center"><?= (int)$s['students'] ?></td><td style="text-align:center;white-space:nowrap">ل.ل: <?= $fmt0($s['revLL']) ?><br>د.أ: <?= $fmt0($s['revUSD']) ?></td></tr>
     </tbody></table></div>
     <?php if ($E): ?><div class="addrow no-print"><button type="button" class="btn btn-light btn-sm" onclick="meheAddSheetRow(this)">+ صف</button></div><?php endif; ?>
-    <?= $kv([['عدد الطلاب الكلي', $s['students']], ['عدد طلاب المنح للمدرسين داخل الملاك', $s['grTitN']], ['إجمالي الايرادات بعد حسم المنح الدراسية لأبناء المعلمين الملاك', 'LL:' . $fmt0($s['revAfterLL']) . ' USD:' . $fmt0($s['revAfterUSD'])], ['متوسط الرسوم الدراسية', 'LL:' . $fmt2($s['avgFeeLL']) . ' USD:' . $fmt2($s['avgFeeUSD'])]]) ?>
+    <?= $kv([['عدد الطلاب الكلي', $s['students']], ['عدد طلاب المنح للمدرسين داخل الملاك', $s['grTitN']], ['إجمالي الايرادات بعد حسم المنح الدراسية لأبناء المعلمين الملاك', 'ل.ل: ' . $fmt0($s['revAfterLL']) . ' — د.أ: ' . $fmt0($s['revAfterUSD'])], ['متوسط الرسوم الدراسية', 'ل.ل: ' . $fmt2($s['avgFeeLL']) . ' — د.أ: ' . $fmt2($s['avgFeeUSD'])]]) ?>
     <div class="sig"><span>توقيع رئيس لجنة الأهل ومندوبي اللجنة في الهيئة الحالية مادة 10 (أ فقرة 8)</span><span>توقيع مدير المدرسة</span></div>
 <?= docSheetEnd() ?>
 
-<?= docSheetStart('Résumé du budget', 'ملخص الموازنة', $chips, $optsDoc) ?>
+<?= docSheetStart('', 'ملخص الموازنة', $chips, $optsDoc) ?>
     <h4 class="sec">النفقات من الفئة أ</h4><?= $money3($s['A'], 'اسم النفقة', 'A') ?>
     <h4 class="sec">النفقات من الفئة ب</h4><?= $money3($s['B'], 'اسم النفقة', 'B', true) ?>
     <h4 class="sec">النفقات من الفئة ج</h4><?= $money3($s['C'], 'اسم النفقة', 'C') ?>
@@ -635,20 +676,59 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
     function open(row){ row.querySelectorAll('[data-f]').forEach(function(c){ if(c.querySelector('.mi')) return; c.dataset.html=c.innerHTML; c.innerHTML=''; c.appendChild(mk(c)); });
         var f=row.querySelector('.mi'); if(f){ f.focus(); if(f.select) f.select(); } }
     function close(row){ row.querySelectorAll('[data-f]').forEach(function(c){ if(c.dataset.html!==undefined){ c.innerHTML=c.dataset.html; delete c.dataset.html; } }); }
-    function save(row, reset){
-        var p=row.dataset.mrow.split('|'), fd=new FormData(); fd.append('csrf',CSRF); fd.append('mehe_row',p.shift()); fd.append('key',p.join('|')); if(reset) fd.append('reset','1');
-        var changed=0, isNew=!!row.dataset.new;
-        if(!reset) row.querySelectorAll('[data-f]').forEach(function(c){ var i=c.querySelector('.mi'); if(!i) return; if(isNew||i.value!==c.dataset.v){ fd.append('f['+c.dataset.f+']', i.value); changed++; } });
-        if(!reset && !changed){ close(row); row.querySelector('.rowctl').classList.remove('editing'); return; }
-        var kind=row.dataset.mrow.split('|')[0];
-        if(kind==='list' && !isNew){ var reqf={revenues:'class',grants:'student',severance:'name',manual_admins:'name'}[row.dataset.mrow.split('|')[1]]; var rc=row.querySelector('[data-f="'+reqf+'"] .mi'); if(rc && rc.value.trim()===''){ if(!confirm('الخانة الأساسية فارغة — السطر رح ينحذف نهائياً. متأكد؟')) return; } }
-        row.querySelectorAll('.rowctl button').forEach(function(b){ b.disabled=true; });
+    /* القيم المتغيّرة بسطر مفتوح ⇒ {mehe_row,key,f} أو null إن لم يتغيّر شيء */
+    function changesOf(row){
+        var p=row.dataset.mrow.split('|'), it={mehe_row:p.shift(), key:p.join('|'), f:{}}, changed=0, isNew=!!row.dataset.new;
+        row.querySelectorAll('[data-f]').forEach(function(c){ var i=c.querySelector('.mi'); if(!i) return; if(isNew||i.value!==c.dataset.v){ it.f[c.dataset.f]=i.value; changed++; } });
+        return changed ? it : null;
+    }
+    /* سطر قائمة خانته الإلزامية فارغة ⇒ سيُحذف: تأكيد */
+    function confirmDelete(rows){
+        var del=0;
+        rows.forEach(function(row){ if(row.dataset.new || row.dataset.mrow.split('|')[0]!=='list') return; var reqf={revenues:'class',grants:'student',severance:'name',manual_admins:'name'}[row.dataset.mrow.split('|')[1]]; var rc=row.querySelector('[data-f="'+reqf+'"] .mi'); if(rc && rc.value.trim()==='') del++; });
+        return !del || confirm(del===1 ? 'الخانة الأساسية فارغة — السطر رح ينحذف نهائياً. متأكد؟' : 'في '+del+' أسطر خانتها الأساسية فارغة — رح تنحذف نهائياً. متأكد؟');
+    }
+    function reloadKeep(){ try{ sessionStorage.setItem('meheScroll', String(window.scrollY)); }catch(e){} location.reload(); }
+    function post(fd, onFail){
         fetch(location.href, {method:'POST', body:fd, credentials:'same-origin', headers:{'X-Requested-With':'fetch'}})
             .then(function(r){ return r.json(); })
-            .then(function(j){ if(j && j.ok){ try{ sessionStorage.setItem('meheScroll', String(window.scrollY)); }catch(e){} location.reload(); }
-                               else { alert((j && j.msg) || 'تعذّر الحفظ'); row.querySelectorAll('.rowctl button').forEach(function(b){ b.disabled=false; }); } })
-            .catch(function(){ alert('تعذّر الحفظ — تحقّق من الاتصال'); row.querySelectorAll('.rowctl button').forEach(function(b){ b.disabled=false; }); });
+            .then(function(j){ if(j && j.ok) reloadKeep(); else { alert((j && j.msg) || 'تعذّر الحفظ'); onFail(); } })
+            .catch(function(){ alert('تعذّر الحفظ — تحقّق من الاتصال'); onFail(); });
     }
+    function save(row, reset){
+        var fd=new FormData(); fd.append('csrf',CSRF);
+        var it=reset ? null : changesOf(row);
+        if(!reset && !it){ close(row); row.querySelector('.rowctl').classList.remove('editing'); return; }
+        var p=row.dataset.mrow.split('|'); fd.append('mehe_row',p.shift()); fd.append('key',p.join('|')); if(reset) fd.append('reset','1');
+        if(it) Object.keys(it.f).forEach(function(k){ fd.append('f['+k+']', it.f[k]); });
+        if(!reset && !confirmDelete([row])) return;
+        var btns=row.querySelectorAll('.rowctl button'); btns.forEach(function(b){ b.disabled=true; });
+        post(fd, function(){ btns.forEach(function(b){ b.disabled=false; }); });
+    }
+    /* 📄✏️ (2026-11-06 «كبسة تعديل لكل صفحة بصفحتها وبعدين حفظ») شريط فوق كل ورقة: يفتح كل أسطرها، ويحفظها كلّها بطلب واحد */
+    function sheetRows(sh){ return Array.prototype.filter.call(sh.querySelectorAll('[data-mrow]'), function(r){ return !r.classList.contains('mtpl') && r.querySelector('.rowctl .ed'); }); }
+    function openSheet(sh, bar){ var rows=sheetRows(sh); rows.forEach(function(row){ var ctl=row.querySelector('.rowctl'); full(ctl); open(row); ctl.classList.add('editing'); }); bar.classList.add('editing');
+        if(!rows.length){ var add=sh.querySelector('.addrow button'); if(add) add.click(); }   // ورقة فارغة (منح/صرف): أوّل سطر جديد يُفتح مباشرة
+        var f=sh.querySelector('.mi'); if(f){ f.focus(); if(f.select) f.select(); } }
+    function cancelSheet(sh, bar){ sheetRows(sh).forEach(function(row){ cancel(row, row.querySelector('.rowctl')); }); bar.classList.remove('editing'); }
+    function saveSheet(sh, bar){
+        var rows=sheetRows(sh).filter(function(r){ return r.querySelector('.mi'); }), items=[];
+        rows.forEach(function(row){ var it=changesOf(row); if(it) items.push(it); });
+        if(!items.length){ cancelSheet(sh, bar); return; }
+        if(!confirmDelete(rows)) return;
+        var btns=bar.querySelectorAll('button'); btns.forEach(function(b){ b.disabled=true; });
+        var fd=new FormData(); fd.append('csrf',CSRF); fd.append('mehe_rows', JSON.stringify(items));
+        post(fd, function(){ btns.forEach(function(b){ b.disabled=false; }); });
+    }
+    document.querySelectorAll('.mehe-doc .doc-sheet').forEach(function(sh){
+        if(!sheetRows(sh).length && !sh.querySelector('tr.mtpl')) return;
+        var bar=document.createElement('div'); bar.className='sheetctl no-print';
+        bar.innerHTML='<button type="button" class="btn btn-primary ed">✏️ تعديل الصفحة</button><button type="button" class="btn btn-success sv">💾 حفظ الصفحة</button><button type="button" class="btn btn-light cx">✖ إلغاء</button><span class="hint">عدّل ما تشاء بهذه الورقة ثم «حفظ الصفحة» — تُحفظ كل الأسطر دفعة واحدة</span>';
+        var head=sh.querySelector('.doc-head'); if(head && head.nextSibling) sh.insertBefore(bar, head.nextSibling); else sh.appendChild(bar);
+        bar.querySelector('.ed').onclick=function(){ openSheet(sh, bar); };
+        bar.querySelector('.sv').onclick=function(){ saveSheet(sh, bar); };
+        bar.querySelector('.cx').onclick=function(){ cancelSheet(sh, bar); };
+    });
     // 🚀 (2026-10-03): مستمع واحد للصفحة كلها (بدل 4 مستمعات لكل سطر عند كل فتحة)، و«حفظ/إلغاء» يُخلقان للسطر عند أوّل «تعديل»
     function full(ctl){ if(ctl.querySelector('.sv')) return;
         var sv=document.createElement('button'); sv.type='button'; sv.className='sv'; sv.title='حفظ / Enregistrer'; sv.textContent='💾 حفظ';
@@ -667,8 +747,9 @@ $line = function (string $label, string $path, $v, string $t = 's') use ($E, $ct
     doc.addEventListener('keydown', function(ev){
         if(!(ev.target.classList && ev.target.classList.contains('mi'))) return;
         var row=ev.target.closest('[data-mrow]'); if(!row) return;
-        if(ev.key==='Enter' && ev.target.tagName!=='TEXTAREA'){ ev.preventDefault(); save(row,false); }
-        if(ev.key==='Escape'){ cancel(row, row.querySelector('.rowctl')); }
+        var sh=row.closest('.doc-sheet'), bar=sh ? sh.querySelector('.sheetctl.editing') : null;   // الورقة كلّها مفتوحة ⇒ Enter/Escape على الورقة
+        if(ev.key==='Enter' && ev.target.tagName!=='TEXTAREA'){ ev.preventDefault(); if(bar) saveSheet(sh, bar); else save(row,false); }
+        if(ev.key==='Escape'){ if(bar) cancelSheet(sh, bar); else cancel(row, row.querySelector('.rowctl')); }
     });
     window.meheAddSheetRow=function(btn){ var tbl=btn.parentNode.previousElementSibling.querySelector('table'); var tpl=tbl.querySelector('tr.mtpl'); if(!tpl) return;
         var tr=tpl.cloneNode(true); tr.classList.remove('mtpl'); tr.dataset.new='1';

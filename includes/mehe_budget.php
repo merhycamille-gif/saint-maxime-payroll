@@ -350,7 +350,7 @@ function meheApplyRowEdit(array &$data, array $P): array {
     $kind = (string)($P['mehe_row'] ?? ''); $key = (string)($P['key'] ?? ''); $f = (array)($P['f'] ?? []); $reset = !empty($P['reset']);
     $num = fn($v) => (float)str_replace([',', ' ', '٬'], '', (string)$v);
     $txt = fn($v) => trim((string)$v);
-    $ok = fn($m = 'انحفظ السطر / Ligne enregistrée') => ['ok' => true, 'msg' => $m];
+    $ok = fn($m = 'انحفظ السطر') => ['ok' => true, 'msg' => $m];
     $bad = fn($m) => ['ok' => false, 'msg' => $m];
     $data['overrides'] = array_replace(['emp' => [], 'months' => [], 'sum' => []], (array)($data['overrides'] ?? []));
     $parts = explode('|', $key);
@@ -380,7 +380,7 @@ function meheApplyRowEdit(array &$data, array $P): array {
             if ($idx === 'new') { $row = []; foreach ($spec as $fk => $t) $row[$fk] = $t === 'n' ? ($fk === 'months' ? 12 : 0) : ''; if ($lst === 'grants') $row['cat'] = 'ملاك'; if ($lst === 'revenues') $row['program'] = 'منهاج لبناني'; if ($lst === 'manual_admins') { $row['type'] = 'عادي'; $row['cnss_type'] = 'غير مضمون'; } $i = count($rows); }
             else { $i = (int)$idx; if (!isset($rows[$i])) return $bad('السطر غير موجود — أعد تحميل الصفحة'); $row = $rows[$i]; }
             foreach ($spec as $fk => $t) if (array_key_exists($fk, $f)) $row[$fk] = $t === 'n' ? $num($f[$fk]) : $txt($f[$fk]);
-            if ($txt($row[$req] ?? '') === '') { if ($idx !== 'new') array_splice($rows, $i, 1); $data[$lst] = $rows; return $ok('انحذف السطر / Ligne supprimée'); }
+            if ($txt($row[$req] ?? '') === '') { if ($idx !== 'new') array_splice($rows, $i, 1); $data[$lst] = $rows; return $ok('انحذف السطر'); }
             $rows[$i] = $row; $data[$lst] = $rows; return $ok();
         case 'emp': // موظف من الرواتب: key = e<id> — تُخزَّن القيم المتغيّرة فقط؛ reset يرجّع كل شي تلقائياً
             if (!preg_match('/^e(\d+)$/', $key, $m)) return $bad('موظف غير معروف');
