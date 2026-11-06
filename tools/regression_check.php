@@ -3382,8 +3382,10 @@ check('ر6: القالب المفرَّغ بلا علامة وضع عائلي م
 // ملف تعريف المؤسسة: العمود يتركّب ذاتياً ومزروع لسان مكسيم من ملفات المستخدم
 ensureMofProfile20260823();
 $prof59 = json_decode((string)$db->query("SELECT mof_profile FROM schools WHERE REPLACE(COALESCE(finance_number,''),' ','')='2459823' LIMIT 1")->fetchColumn(), true) ?: [];
-check('mof_profile: مزروع لسان مكسيم (المكلف بالبريد 271629 + المنطقة 1825/1)',
-      ($prof59['contact_reg'] ?? '') === '271629' && ($prof59['region'] ?? '') === '1825/1');
+// 🧷 (2026-11-06) «المنطقة» صارت خانة يعدّلها المستخدم أونلاين (مسحها 06/11 06:31 بالمزامنة) ⇒ الفحص يثبّت الهويّة الثابتة (رقم التسجيل + البلدة) لا قيمة قابلة للتعديل
+check('mof_profile: مزروع لسان مكسيم (المكلف بالبريد 271629 + البلدة المنصورية)',
+      ($prof59['contact_reg'] ?? '') === '271629' && ($prof59['town'] ?? '') === 'المنصورية',
+      'reg=' . ($prof59['contact_reg'] ?? '-') . ' town=' . ($prof59['town'] ?? '-') . ' region=' . ($prof59['region'] ?? '-'));
 // شاشات الأزرار الجديدة (فلتر الفئة يبقى + زرا الطباعة والإكسل + صندوق معلومات المؤسسة)
 $scr59 = renderPage('pages/official_forms.php', ['form' => 'tax_r5'], [], [2]);
 check('شاشة ر5: زرا «طباعة/PDF» و«Excel رسمي» + صندوق معلومات المؤسسة',
@@ -10785,12 +10787,12 @@ try {
         };
         $i16 = $cellOf276($xb, 'I16'); $okQ = ($i16 === trim((string)$eD['district']));
     }
-    // 📱🏠 (p1 شربل عرب 1000021 إن وُجد): هاتف 8 أرقام بلا صفر ⇒ 81 / 716200 · الشارع = الحي ⇒ مرّة واحدة · الراتب فاضي ⇒ تنبيه أحمر بالشاشة
+    // 📱🏠 (p1 شربل عرب 1000021 إن وُجد): هاتف 8 أرقام بلا صفر ⇒ 81 / 716200 · الشارع = الحي ⇒ الاثنان يُطبَعان كما بالملف («الشارع ما عم ينطبع» 2026-11-06) · الراتب فاضي ⇒ تنبيه أحمر بالشاشة
     $okP = true; $p1 = $db276->query("SELECT id, school_id, phone1, quartier, rue FROM employees WHERE id = 1000021 AND is_deleted = 0")->fetch(PDO::FETCH_ASSOC);
     if ($p1 && preg_replace('/\D/', '', (string)$p1['phone1']) === '81716200' && trim((string)$p1['quartier']) !== '' && trim((string)$p1['quartier']) === trim((string)$p1['rue'])) {
         $xp1 = renderPage('pages/official_export.php', ['form' => 'cnss_hire_new', 'emp' => 1000021, 'd' => 27, 'mo' => 10, 'yr' => 2026, 'opts_set' => 1, 'format' => 'xlsx'], [], [(int)$p1['school_id']], 'lbp', '2026-2027', sys_get_temp_dir() . '/r276b.xlsx');
         $hp1 = renderPage('pages/attestations.php', ['employee_id' => 1000021, 'type' => 'cnss_hire', 'date' => '2026-10-27'], [], [(int)$p1['school_id']], 'lbp', '2026-2027');
-        $okP = $cellOf276($xp1, 'K21') === '81' && $cellOf276($xp1, 'I21') === '716200' && $cellOf276($xp1, 'K20') === '' && $cellOf276($xp1, 'I20') === trim((string)$p1['quartier'])
+        $okP = $cellOf276($xp1, 'K21') === '81' && $cellOf276($xp1, 'I21') === '716200' && $cellOf276($xp1, 'K20') === trim((string)$p1['rue']) && $cellOf276($xp1, 'I20') === trim((string)$p1['quartier'])
              && (strpos($hp1, 'ما في راتب بملفه') !== false || strpos($hp1, 'الراتب المعتمد بالتصريح: <strong>0') === false);
     }
     $src276 = (string)file_get_contents($PROJ . '/pages/official_export.php');

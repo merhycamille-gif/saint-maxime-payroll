@@ -1599,11 +1599,10 @@ if (in_array($form, ['cnss_hire_new', 'cnss_hire_reg', 'cnss_leave'], true)) {
     $regPlace = trim((string)($emp['civil_registry_place'] ?? ''));
     // «عمل الأجير»: الأستاذ = «أستاذ» فقط، والموظف الإداري حسب وظيفته (بطلبه 2026-08-19)
     $fnAr = cnssOccupationAr($emp);
-    // 🏠 (2026-10-27 p1 «الحي والشارع فوق بعض») العنوان بلا تكرار: الشارع = الحي ⇒ يُكتب مرّة (بالحي)؛ الحي = المدينة ⇒ يُكتب مرّة (بالمدينة)
+    // 🏠 (2026-11-06 «الشارع ما عم ينطبع») المدينة/الحي/الشارع تُطبَع كما كُتبت بالملف — كلّ خانة بمكانها بالنموذج الرسمي
+    //    حتى لو تشابهت (قرية صغيرة: الشارع = الحي = المدينة). قاعدة «بلا تكرار» (10-27) كانت تفرّغ الحي والشارع عند 330 موظفاً ⇒ أُلغيت.
     $nrmA = function ($s) { return preg_replace('/\s+/u', ' ', trim((string)$s)); };
     $aVille = $nrmA($emp['ville'] ?? ''); $aQuart = $nrmA($emp['quartier'] ?? ''); $aRue = $nrmA($emp['rue'] ?? '');
-    if ($aRue !== '' && ($aRue === $aQuart || $aRue === $aVille)) $aRue = '';
-    if ($aQuart !== '' && $aQuart === $aVille) $aQuart = '';
     // ساعات العمل في الشهر (قابلة للتعديل من الشاشة؛ الافتراضي = ساعات الأسبوع × 4 — 2026-10-27، وساعات الملف لا تُمسّ)
     $hrs = trim((string)($_GET['hrs'] ?? ''));
     if ($hrs === '' && (float)($emp['hours_per_week'] ?? 0) > 0) $hrs = (string)round((float)$emp['hours_per_week'] * 4);
