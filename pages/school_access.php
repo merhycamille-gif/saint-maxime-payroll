@@ -57,6 +57,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) { $_SESSION['flash_error'] = $e->getMessage(); }
         header('Location: ' . $self . $back); exit;
     }
+    // 💻✈️ (2026-11-07 «لابتوبي بالسفر… بكبسها ويفتح وين ما كنت») أيقونة المدير نفسه على كمبيوتره الشخصي: بتأكيد كلمة سرّه، exe فقط (مربوطة بأوّل جهاز)، قابلة للإلغاء من هنا
+    if ($act === 'key_admin_new') {
+        $meId = (int)($_SESSION['user_id'] ?? 0); $pw = (string)($_POST['password'] ?? ''); $label = trim((string)($_POST['label'] ?? ''));
+        try {
+            $me = $db->prepare("SELECT * FROM users WHERE id = ? AND is_active = 1"); $me->execute([$meId]); $me = $me->fetch();
+            if (!$me || !in_array((string)$me['role'], ['admin', 'superadmin'], true)) throw new RuntimeException('Réservé à l\'administrateur / للمدير فقط');
+            if ($pw === '' || empty($me['password_hash']) || !password_verify($pw, (string)$me['password_hash'])) { usleep(400000); throw new RuntimeException('Mot de passe incorrect — l\'icône n\'a pas été créée / كلمة السرّ غير صحيحة — ما انعملت الأيقونة'); }
+            if ($label === '') $label = 'Ordinateur personnel — ' . (string)$me['full_name'];
+            [$kid, $bytes] = kaCreateExe($meId, $label, (string)($_SESSION['username'] ?? ''), true);
+            $fn = 'MSA Payroll.exe';
+            $_SESSION['ka_new_file'] = ['uid' => $meId, 't' => kaStoreDownload($bytes, $fn, 'application/octet-stream'), 'name' => $fn, 'label' => 'ADMIN'];
+        } catch (Throwable $e) { $_SESSION['flash_error'] = $e->getMessage(); }
+        header('Location: ' . $self . '#me'); exit;
+    }
     if ($act === 'key_revoke' || $act === 'key_unbind') {
         $kid = (int)($_POST['key_id'] ?? 0); $back = (string)($_POST['back'] ?? '');
         if ($kid > 0) { $act === 'key_revoke' ? kaRevoke($kid) : kaUnbind($kid); $_SESSION['flash_success'] = $act === 'key_revoke' ? 'Accès annulé — il n\'ouvre plus rien / أُلغي هذا الدخول — ما عاد يفتح شيئاً' : 'Appareil délié — l\'icône se liera au prochain appareil qui l\'utilise / فُكّ الربط — الأيقونة ترتبط بأوّل جهاز يستعملها'; }
@@ -394,6 +408,38 @@ include __DIR__ . '/../includes/header.php';
             <div style="margin-top:10px"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer / حفظ</button> <small class="text-muted">Lecture seule : la présidence ne modifie rien / عرض فقط: الرئاسة ما بتعدّل شي</small></div>
         </form>
         <?= saKeysBlock($hq, $keysBy, $newLink, $self, '#hq', $newFile) ?>
+    </div>
+</div>
+
+<!-- 💻✈️ (2026-11-07) أيقونة المدير على كمبيوتره الشخصي (لابتوب السفر): حسابه الكامل، بلا يوزر/باسوورد، مربوطة بالجهاز، تُلغى من هنا -->
+<?php $meId = (int)($_SESSION['user_id'] ?? 0); $meKeys = array_values(array_filter($keysBy[$meId] ?? [], fn($k) => (int)($k['admin_ok'] ?? 0) === 1)); ?>
+<div class="card" id="me">
+    <div class="card-header"><h3><i class="fas fa-laptop"></i> <span dir="ltr">Mon icône — mon ordinateur personnel (administrateur)</span><div style="font-size:0.85em;font-weight:600;opacity:0.9">أيقونتي — كمبيوتري الشخصي (المدير)</div></h3></div>
+    <div class="card-body">
+        <div class="ka-box" style="max-width:720px">
+            <div class="ka-title"><i class="fas fa-key"></i> Accès direct avec <b>mon compte complet</b> (tout voir, tout modifier) <span dir="rtl">· دخول مباشر <b>بحسابي الكامل</b> (أشوف وأعدّل كل شي)</span></div>
+            <?php if ($newFile && (int)$newFile['uid'] === $meId): $dl = BASE_URL . 'key_dl.php?t=' . rawurlencode((string)$newFile['t']); ?>
+            <div class="ka-new" id="kaNewFile"><b>L'icône se télécharge maintenant — copiez-la sur le bureau de votre ordinateur personnel et double-cliquez / الأيقونة عم تنزل هلّق — انسخها على سطح مكتب كمبيوترك الشخصي واكبسها مرّتين:</b>
+                <div class="ka-link-row"><a id="kaDl" class="btn btn-success" href="<?= e($dl) ?>" download="<?= e((string)$newFile['name']) ?>"><i class="fas fa-download"></i> <?= e((string)$newFile['name']) ?> — Télécharger / نزّل</a></div>
+                <small class="text-muted">Elle se lie au premier ordinateur qui l'utilise — ne l'ouvrez pas ici si elle est destinée à un autre ordinateur. / بترتبط بأوّل كمبيوتر يستعملها — لا تفتحها هون إذا هي لكمبيوتر تاني.</small></div>
+            <script>setTimeout(function(){var a=document.getElementById("kaDl");if(a){a.scrollIntoView({block:"center"});a.click();}},400);</script>
+            <?php endif; ?>
+            <?php $revokedMe = 0; foreach ($meKeys as $k): if ($k['revoked']) { $revokedMe++; continue; }
+                $st = $k['machine_hash'] ? '<span class="ka-badge ka-on">Liée · مربوطة</span> <small>' . e($k['machine_label']) . ' ' . e(date('d/m/Y', strtotime($k['bound_at']))) . '</small>' : '<span class="ka-badge ka-wait">Pas encore utilisée · لم تُستعمل بعد</span>'; ?>
+            <div class="ka-row"><i class="fas fa-laptop"></i> <span class="ka-lbl"><?= e($k['label']) ?></span> <?= $st ?>
+                <?= $k['last_used_at'] ? ' <small class="text-muted">dernier / آخر: ' . e(date('d/m/Y H:i', strtotime($k['last_used_at']))) . ' · ' . (int)$k['uses'] . '×</small>' : '' ?><?= (int)$k['fails'] ? ' <small class="text-muted">' . (int)$k['fails'] . ' refus</small>' : '' ?>
+                <?php if ($k['machine_hash']): ?> <form method="POST" action="<?= e($self) ?>" class="ka-inline"><input type="hidden" name="csrf" value="<?= csrfToken() ?>"><input type="hidden" name="act" value="key_unbind"><input type="hidden" name="key_id" value="<?= (int)$k['id'] ?>"><input type="hidden" name="back" value="#me"><button type="submit" class="btn btn-secondary btn-xs" title="Délier l'appareil · فكّ الربط"><i class="fas fa-rotate-left"></i> Délier / فكّ الربط</button></form><?php endif; ?>
+                <form method="POST" action="<?= e($self) ?>" class="ka-inline" data-confirm="<?= e('Annuler cette icône ? Elle n\'ouvrira plus rien (ex. ordinateur perdu ou volé). / إلغاء هذه الأيقونة؟ ما عاد تفتح شيئاً (مثلاً كمبيوتر ضاع أو انسرق).') ?>"><input type="hidden" name="csrf" value="<?= csrfToken() ?>"><input type="hidden" name="act" value="key_revoke"><input type="hidden" name="key_id" value="<?= (int)$k['id'] ?>"><input type="hidden" name="back" value="#me"><button type="submit" class="btn btn-dark btn-xs"><i class="fas fa-ban"></i> Annuler / إلغاء</button></form>
+            </div>
+            <?php endforeach; if ($revokedMe): ?><div class="ka-row ka-dim"><small class="text-muted"><?= $revokedMe ?> annulée(s) · ملغاة</small></div><?php endif; ?>
+            <form method="POST" action="<?= e($self) ?>" class="ka-actions" style="align-items:flex-end" autocomplete="off">
+                <input type="hidden" name="csrf" value="<?= csrfToken() ?>"><input type="hidden" name="act" value="key_admin_new">
+                <div><label class="form-label" style="font-size:12px">Nom de l'ordinateur / اسم الكمبيوتر</label><input type="text" name="label" class="form-control" placeholder="Ordinateur portable — voyage / لابتوب السفر" style="min-width:240px"></div>
+                <div><label class="form-label" style="font-size:12px">Mon mot de passe (confirmation) / كلمة سرّي (تأكيد)</label><input type="password" name="password" class="form-control" required autocomplete="new-password" style="min-width:200px"></div>
+                <button type="submit" class="btn btn-primary" title="Crée l'icône de mon compte complet et la télécharge · بتعمل أيقونة حسابي الكامل وبتنزّلها"><i class="fas fa-download"></i> Créer et télécharger mon icône / اعمل أيقونتي ونزّلها</button>
+            </form>
+            <small class="text-muted" style="display:block;margin-top:6px">Si l'ordinateur est perdu ou volé : « Annuler » ici, et l'icône ne sert plus à rien. / إذا ضاع الكمبيوتر أو انسرق: «إلغاء» من هون وبتبطل الأيقونة تفتح شي.</small>
+        </div>
     </div>
 </div>
 

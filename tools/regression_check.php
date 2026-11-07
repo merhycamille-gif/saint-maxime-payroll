@@ -10911,7 +10911,10 @@ try {
     $ka = (string)file_get_contents($PROJ . '/includes/key_access.php'); $lp = (string)file_get_contents($PROJ . '/login.php'); $sa = (string)file_get_contents($PROJ . '/pages/school_access.php');
     $okF = is_file($PROJ . '/key_login.php') && is_file($PROJ . '/key_go.php') && is_file($PROJ . '/key_link.php') && is_file($PROJ . '/tools/desktop_icon/MSA Payroll.exe') && filesize($PROJ . '/tools/desktop_icon/MSA Payroll.exe') > 10000
          && strpos($ka, "!== 'viewer'") !== false && strpos($ka, "hash_equals") !== false && strpos($ka, 'kaIsPreviewBot') !== false
-         && strpos($lp, "kaCookieLogin()") !== false && strpos($sa, "act === 'key_new'") !== false && strpos($sa, "act === 'save_hq'") !== false;
+         && strpos($lp, "kaCookieLogin()") !== false && strpos($sa, "act === 'key_new'") !== false && strpos($sa, "act === 'save_hq'") !== false
+         // 💻✈️ (2026-11-07) أيقونة المدير لكمبيوتره الشخصي: admin_ok صريح + تأكيد كلمة السرّ + الكوكي/الرابط يبقيان لحسابات القراءة فقط
+         && strpos($ka, 'function kaRoleOk') !== false && strpos($ka, "admin_ok") !== false && strpos($sa, "act === 'key_admin_new'") !== false && strpos($sa, 'password_verify($pw') !== false
+         && strpos($ka, "AND role = 'viewer'\"); \$u->execute([(int)\$d['user_id']])") !== false;
     // key_login بـGET (بلا مفتاح) = رفض نصّي، لا جلسة ولا خطأ
     $kl = renderPage('key_login.php', [], []);
     $okL = strpos($kl, 'ERR') === 0 || strpos($kl, "ERR\n") !== false;

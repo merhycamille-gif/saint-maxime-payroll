@@ -2,7 +2,8 @@
 <?php
 /** 🔑 أيقونة دخول مباشر لحساب قراءة فقط (سطر الأوامر، للصيانة):
  *   php tools/make_key.php <username> "<étiquette>" <sortie.exe>   ⇒ ملف الكمبيوتر
- *   php tools/make_key.php <username> "<étiquette>" --link         ⇒ رابط الموبايل */
+ *   php tools/make_key.php <username> "<étiquette>" --link         ⇒ رابط الموبايل
+ *   php tools/make_key.php admin "<étiquette>" <sortie.exe> --admin ⇒ 💻✈️ (2026-11-07) أيقونة كمبيوتر المدير نفسه (exe فقط، مربوطة بالجهاز) */
 if (php_sapi_name() !== 'cli') { http_response_code(403); die('CLI only'); }
 $PROJ = dirname(__DIR__);
 session_start();
@@ -15,6 +16,6 @@ if ($un === '' || $out === '') { fwrite(STDERR, "usage: make_key.php <username> 
 $st = getDB()->prepare("SELECT id FROM users WHERE username = ?"); $st->execute([$un]); $u = $st->fetch();
 if (!$u) { fwrite(STDERR, "utilisateur inconnu: $un\n"); exit(1); }
 if ($out === '--link') { [$id, $link] = kaCreateLink((int)$u['id'], $label, 'cli'); echo "key id=$id\n$link\n"; exit; }
-[$id, $exe] = kaCreateExe((int)$u['id'], $label, 'cli');
+[$id, $exe] = kaCreateExe((int)$u['id'], $label, 'cli', in_array('--admin', $argv, true));
 file_put_contents($out, $exe);
 echo "key id=$id\tfile=$out\tbytes=" . strlen($exe) . "\n";

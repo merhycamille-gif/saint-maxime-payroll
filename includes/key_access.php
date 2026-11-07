@@ -56,6 +56,9 @@ function kaSchema(): void {
           created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           INDEX (key_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // 💻✈️ (2026-11-07 «لابتوبي بالسفر… كل شي متل كمبيوتر المدرسة») admin_ok = مفتاح كمبيوتر لحساب المدير نفسه (exe فقط، بتأكيد كلمة سرّه)
+        $has = $db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'app_keys' AND COLUMN_NAME = 'admin_ok'")->fetchColumn();
+        if (!(int)$has) $db->exec("ALTER TABLE app_keys ADD COLUMN admin_ok TINYINT NOT NULL DEFAULT 0");
     } catch (Throwable $e) {}
 }
 
@@ -92,6 +95,19 @@ function kaViewer(int $userId): array {
     if (($u['role'] ?? '') !== 'viewer') throw new RuntimeException('Accès direct : comptes « lecture seule » (écoles / présidence) seulement / الدخول المباشر لحسابات القراءة فقط');
     return $u;
 }
+/** 💻✈️ (2026-11-07) الحساب المسموح له بمفتاح: قراءة فقط دائماً؛ المدير (admin/superadmin) فقط حين $admin (أيقونة كمبيوتره الشخصي — بتأكيد كلمة سرّه من الصفحة أو من سطر الأوامر) */
+function kaAccount(int $userId, bool $admin = false): array {
+    if (!$admin) return kaViewer($userId);
+    $st = getDB()->prepare("SELECT * FROM users WHERE id = ? AND is_active = 1"); $st->execute([$userId]); $u = $st->fetch();
+    if (!$u) throw new RuntimeException('Compte introuvable ou inactif / الحساب غير موجود أو غير فعّال');
+    if (!in_array((string)($u['role'] ?? ''), ['viewer', 'admin', 'superadmin'], true)) throw new RuntimeException('Rôle non autorisé / دور غير مسموح');
+    return $u;
+}
+/** هل يحقّ لصفّ مفتاح (مع role/admin_ok) فتح الجلسة؟ قراءة فقط دائماً، المدير فقط إن كان المفتاح مُنشأً له صراحةً (admin_ok) */
+function kaRoleOk(array $k): bool {
+    $role = (string)($k['role'] ?? '');
+    return $role === 'viewer' || ((int)($k['admin_ok'] ?? 0) === 1 && in_array($role, ['admin', 'superadmin'], true));
+}
 
 /** التسمية القصيرة للحساب (اسم المنطقة بالكبيرة أو PRESIDENCE) لاسم الملف وبطاقة المعاينة */
 function kaLabelFor(array $u): string {
@@ -104,15 +120,16 @@ function kaLabelFor(array $u): string {
 function kaFileName(array $u): string { return 'MSA Payroll - ' . kaLabelFor($u) . '.exe'; }
 
 /** 🖥️ مفتاح كمبيوتر: [id, exe_bytes] — السرّ لا يُحفظ إلّا داخل الملف المنزَّل */
-function kaCreateExe(int $userId, string $label, string $by): array {
-    kaSchema(); $u = kaViewer($userId);
+function kaCreateExe(int $userId, string $label, string $by, bool $admin = false): array {
+    kaSchema(); $u = kaAccount($userId, $admin);
+    $isAdminKey = $admin && $u['role'] !== 'viewer';
     $tpl = kaTemplatePath(kaUserSchoolId($u));
     if (!is_file($tpl) || filesize($tpl) < 10000) throw new RuntimeException('Modèle d\'icône manquant sur le serveur / قالب الأيقونة غير موجود: tools/desktop_icon/MSA Payroll.exe');
     $sel = bin2hex(random_bytes(8)); $sec = bin2hex(random_bytes(32));
-    getDB()->prepare("INSERT INTO app_keys(user_id, kind, selector, secret_hash, label, created_by) VALUES(?,'exe',?,?,?,?)")
-           ->execute([$userId, $sel, hash('sha256', $sec), mb_substr(trim($label), 0, 160), mb_substr($by, 0, 60)]);
+    getDB()->prepare("INSERT INTO app_keys(user_id, kind, selector, secret_hash, label, created_by, admin_ok) VALUES(?,'exe',?,?,?,?,?)")
+           ->execute([$userId, $sel, hash('sha256', $sec), mb_substr(trim($label), 0, 160), mb_substr($by, 0, 60), $isAdminKey ? 1 : 0]);
     $id = (int)getDB()->lastInsertId();
-    kaAudit('key_new_exe', $userId, '#' . $id . ' ' . $label);
+    kaAudit($isAdminKey ? 'key_new_admin' : 'key_new_exe', $userId, '#' . $id . ' ' . $label);
     return [$id, file_get_contents($tpl) . "\n\0MSAKEY1|$sel|$sec|" . kaBase() . "|key_login.php|\n"];
 }
 
@@ -199,7 +216,7 @@ function kaVerifyExe(string $sel, string $sec, string $mach, string $mlabel): ar
         kaAudit('key_fail', $k ? (int)$k['user_id'] : 0, 'secret ' . kaIp()); usleep(500000);
         return [false, "Cette icône n'est plus valable — demandez une nouvelle icône à l'administration.", 'هذه الأيقونة لم تعد صالحة — اطلبوا أيقونة جديدة من الإدارة.'];
     }
-    if ($k['revoked'] || !$k['is_active'] || $k['role'] !== 'viewer') { kaAudit('key_revoked', (int)$k['user_id'], '#' . $k['id'] . ' ' . kaIp()); return [false, "Cette icône a été annulée — demandez une nouvelle icône à l'administration.", 'أُلغيت هذه الأيقونة — اطلبوا أيقونة جديدة من الإدارة.']; }
+    if ($k['revoked'] || !$k['is_active'] || !kaRoleOk($k)) { kaAudit('key_revoked', (int)$k['user_id'], '#' . $k['id'] . ' ' . kaIp()); return [false, "Cette icône a été annulée — demandez une nouvelle icône à l'administration.", 'أُلغيت هذه الأيقونة — اطلبوا أيقونة جديدة من الإدارة.']; }
     if ($k['machine_hash'] === null) { getDB()->prepare("UPDATE app_keys SET machine_hash = ?, machine_label = ?, bound_at = NOW() WHERE id = ?")->execute([$mach, mb_substr($mlabel, 0, 160), (int)$k['id']]); kaAudit('key_bind', (int)$k['user_id'], '#' . $k['id'] . ' ' . $mlabel); }
     elseif (!hash_equals((string)$k['machine_hash'], $mach)) { getDB()->prepare("UPDATE app_keys SET fails = fails + 1 WHERE id = ?")->execute([(int)$k['id']]); kaAudit('key_machine', (int)$k['user_id'], '#' . $k['id'] . ' ' . $mlabel); return [false, "Cette icône est liée à un autre ordinateur (" . $k['machine_label'] . "). L'administration peut la délier depuis « Accès écoles ».", 'هذه الأيقونة مربوطة بكمبيوتر آخر. الإدارة تقدر تفكّ الربط من «دخول المدارس».']; }
     $n = bin2hex(random_bytes(32));
@@ -214,8 +231,9 @@ function kaConsumeNonce(string $sel, string $n): ?array {
     $st = getDB()->prepare("SELECT * FROM app_keys WHERE selector = ? AND kind = 'exe' AND revoked = 0 AND nonce_hash IS NOT NULL AND nonce_exp > NOW()"); $st->execute([$sel]); $k = $st->fetch();
     if (!$k || !hash_equals((string)$k['nonce_hash'], hash('sha256', $n))) { kaAudit('key_go_fail', $k ? (int)$k['user_id'] : 0, kaIp()); return null; }
     getDB()->prepare("UPDATE app_keys SET nonce_hash = NULL, nonce_exp = NULL, uses = uses + 1, last_used_at = NOW(), last_ip = ? WHERE id = ?")->execute([kaIp(), (int)$k['id']]);
-    $u = getDB()->prepare("SELECT * FROM users WHERE id = ? AND is_active = 1 AND role = 'viewer'"); $u->execute([(int)$k['user_id']]); $user = $u->fetch();
-    return $user ? $user + ['_key_id' => (int)$k['id']] : null;
+    $u = getDB()->prepare("SELECT * FROM users WHERE id = ? AND is_active = 1"); $u->execute([(int)$k['user_id']]); $user = $u->fetch();
+    if (!$user || !kaRoleOk(['role' => $user['role'], 'admin_ok' => $k['admin_ok'] ?? 0])) return null;   // قراءة فقط، أو المدير بمفتاح admin_ok صريح
+    return $user + ['_key_id' => (int)$k['id']];
 }
 
 /* ───── 📱 الموبايل: كوكي + أجهزة ───── */
