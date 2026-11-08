@@ -25,18 +25,48 @@ function inTabFetch(base) {
     .then(r => (r.headers.get('content-type') || '').indexOf('json') >= 0 ? r.json().then(j => ({ ok: true, json: j })) : { ok: false, url: r.url, status: r.status }, e => ({ ok: false, err: String(e) }));
 }
 const DIAG = []; // سجلّ المحاولات (يُعرض تحت رسالة الخطأ للتشخيص)
+const T0 = { t: 0 }; const since = () => ((Date.now() - T0.t) / 1000).toFixed(1) + 's';
+const withTimeout = (p, ms, label) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('مهلة ' + label + ' انتهت (' + ms / 1000 + ' ث)')), ms))]);
 async function fetchViaTab(b) {
   // أيّ تبويب/نافذة مفتوحة على هذه النسخة من البرنامج (بما فيها نافذة التطبيق المثبّت)
   let tabs = [];
-  try { tabs = await chrome.tabs.query({ url: b + '*' }); } catch (e) { DIAG.push('tabs.query: ' + (e.message || e)); }
-  DIAG.push('تبويبات البرنامج المفتوحة على ' + b + ': ' + tabs.length);
+  try { tabs = await withTimeout(chrome.tabs.query({ url: b + '*' }), 5000, 'tabs.query'); } catch (e) { DIAG.push('tabs.query: ' + (e.message || e)); }
+  DIAG.push(since() + ' تبويبات البرنامج المفتوحة على ' + b + ': ' + tabs.length);
+  const ping = (id) => withTimeout(chrome.scripting.executeScript({ target: { tabId: id }, func: () => location.href + ' | ' + document.readyState + ' | ' + document.visibilityState }), 5000, 'نبضة');
   for (const t of tabs) {
-    try {
-      const [res] = await chrome.scripting.executeScript({ target: { tabId: t.id }, func: inTabFetch, args: [b] });
-      const rr = res && res.result;
-      if (rr && rr.ok) return rr.json;
-      DIAG.push('تبويب ' + t.id + ': ' + JSON.stringify(rr || null));
-    } catch (e) { DIAG.push('تبويب ' + t.id + ' حقن: ' + (e.message || e)); }
+    DIAG.push(since() + ' تبويب ' + t.id + ' حالة: ' + (t.status || '?') + (t.discarded ? ' discarded' : '') + (t.active ? ' active' : ' background'));
+    // نبضة: هل نافذة البرنامج تستجيب للحقن أصلاً؟ (إيدج يُنيم التبويبات/النوافذ الخلفية بعد دقائق فلا تردّ)
+    let alive = false;
+    try { const [pg] = await ping(t.id); DIAG.push(since() + ' تبويب ' + t.id + ' يستجيب: ' + (pg && pg.result)); alive = true; }
+    catch (e) { DIAG.push(since() + ' تبويب ' + t.id + ' لا يستجيب: ' + (e.message || e)); }
+    if (!alive) {
+      // إيقاظ النافذة النائمة: تفعيل تبويبها (يبقى خلف النافذة الحالية) ثمّ انتظار اكتمال التحميل وإعادة النبضة
+      try {
+        await chrome.tabs.update(t.id, { active: true });
+        const tryWake = async (limitMs) => {
+          const end = Date.now() + limitMs;
+          while (!alive && Date.now() < end) {
+            await new Promise(r => setTimeout(r, 700));
+            const cur = await chrome.tabs.get(t.id).catch(() => null);
+            if (!cur || cur.discarded || cur.status !== 'complete') continue;
+            try { const [pg] = await withTimeout(chrome.scripting.executeScript({ target: { tabId: t.id }, func: () => document.readyState }), 2500, 'نبضة'); if (pg) { alive = true; DIAG.push(since() + ' تبويب ' + t.id + ' استيقظ'); } } catch (e) { /* ما زال نائماً */ }
+          }
+        };
+        await tryWake(8000);
+        if (!alive) { DIAG.push(since() + ' تبويب ' + t.id + ' لم يستيقظ بالتفعيل ⇒ إعادة تحميل نافذة البرنامج'); await chrome.tabs.reload(t.id); await tryWake(20000); }
+      } catch (e) { DIAG.push(since() + ' تبويب ' + t.id + ' تعذّر إيقاظه: ' + (e.message || e)); }
+      if (!alive) { DIAG.push(since() + ' تبويب ' + t.id + ' لم يستيقظ'); continue; }
+    }
+    // الاستضافة المشتركة تسقط بعض الاتصالات (مهلة ~21 ث) ⇒ محاولتان بمهلة 30 ث لكل واحدة
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const [res] = await withTimeout(chrome.scripting.executeScript({ target: { tabId: t.id }, func: inTabFetch, args: [b] }), 30000, 'تبويب ' + t.id);
+        const rr = res && res.result;
+        if (rr && rr.ok) return rr.json;
+        DIAG.push(since() + ' تبويب ' + t.id + ': ' + JSON.stringify(rr || null));
+        break; // ردّ واضح (غير JSON) ⇒ لا إعادة
+      } catch (e) { DIAG.push(since() + ' تبويب ' + t.id + ' محاولة ' + attempt + ': ' + (e.message || e)); }
+    }
   }
   return null;
 }
@@ -45,7 +75,8 @@ async function fetchFrom(b) {
   const viaTab = await fetchViaTab(b);
   if (viaTab) return viaTab;
   // ثمّ مباشرة بكوكيز المتصفّح (البرنامج مغلق لكن الجلسة قائمة)
-  const r = await fetch(b + 'pages/mehe_budget.php?export=json', { credentials: 'include', cache: 'no-store' });
+  const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 15000);
+  const r = await fetch(b + 'pages/mehe_budget.php?export=json', { credentials: 'include', cache: 'no-store', signal: ac.signal }).finally(() => clearTimeout(tm));
   const ct = r.headers.get('content-type') || '';
   if (r.ok && ct.indexOf('json') >= 0) return r.json();
   DIAG.push('مباشر ' + b + ' ⇒ ' + r.status + ' ' + ct.split(';')[0] + ' @ ' + r.url);
@@ -54,7 +85,8 @@ async function fetchFrom(b) {
   er.login = atLogin; er.url = r.url; throw er;
 }
 $('#fetch').addEventListener('click', async () => {
-  const sel = $('#base').value; $('#info').textContent = 'جارٍ الجلب…';
+  const sel = $('#base').value; $('#info').textContent = 'جارٍ الجلب…'; T0.t = Date.now(); DIAG.length = 0;
+  const tick = setInterval(() => { $('#info').textContent = 'جارٍ الجلب من البرنامج… ' + Math.round((Date.now() - T0.t) / 1000) + ' ث (الاستضافة قد تتأخّر، انتظر)'; }, 1000);
   let base = sel === 'auto' ? BASES[0] : sel;
   try {
     if (sel === 'auto') {
@@ -68,9 +100,11 @@ $('#fetch').addEventListener('click', async () => {
       }
       budget = got;
     } else budget = await fetchFrom(base);
+    clearInterval(tick);
     chrome.storage.local.set({ budget });
     showInfo();
   } catch (e) {
+    clearInterval(tick);
     $('#info').innerHTML = '<span class="bad">تعذّر الجلب: ' + (e.message || e) + '</span>'
       + (e.login ? '<br><span class="muted">الجلسة تُقرأ من هذا المتصفّح فقط (لو البرنامج مفتوح بمتصفّح آخر لا تصل). افتح البرنامج هنا وسجّل دخولك ثمّ أعد الجلب.</span><br><a href="#" id="openLogin">فتح صفحة دخول البرنامج في تبويب جديد</a>' : '')
       + (DIAG.length ? '<details><summary class="muted">تفاصيل تقنية</summary><div class="muted" dir="ltr" style="font-size:11px;word-break:break-all">' + DIAG.map(x => String(x).replace(/</g, '&lt;')).join('<br>') + '</div></details>' : '');
