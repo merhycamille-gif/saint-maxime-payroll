@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>تعبئة موازنة الوزارة</title>
+<style>
+body{font-family:Arial,Tahoma,sans-serif;font-size:14px;width:380px;margin:0;padding:14px;color:#1f2937;background:#fff}
+h1{font-size:16px;margin:0 0 10px;color:#1F4E5F}
+label{display:block;font-size:12.5px;color:#475569;margin:8px 0 3px}
+select,input{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:7px 9px;font-size:13.5px}
+button{width:100%;border:0;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px}
+.b1{background:#1F4E5F;color:#fff}.b2{background:#5fb3a4;color:#fff}.b3{background:#e5e7eb;color:#111}
+button:disabled{opacity:.5;cursor:default}
+.box{border:1px solid #e5e7eb;border-radius:10px;padding:9px 11px;margin-top:10px;font-size:13px;line-height:1.7;background:#f8fafc}
+.ok{color:#166534}.bad{color:#991b1b}.muted{color:#64748b;font-size:12px}
+ul{margin:4px 18px 0 0;padding:0}
+</style>
+</head>
+<body>
+<h1>⚖️ تعبئة موازنة الوزارة من البرنامج</h1>
+<label>برنامج الرواتب</label>
+<select id="base">
+  <option value="auto">تلقائي — أيّ نسخة مسجَّل دخولك فيها بهذا المتصفّح</option>
+  <option value="https://msapayroll.com/">أونلاين (msapayroll.com)</option>
+  <option value="http://localhost/saint-maxime-payroll/">هذا الكمبيوتر (localhost)</option>
+  <option value="https://192.168.1.60/saint-maxime-payroll/">سيرفر المدرسة (192.168.1.60)</option>
+</select>
+<p class="muted">المدرسة والسنة تؤخذان كما هما مختارتان الآن داخل البرنامج (المبدّل الأعلى). سجّل دخولك بالبرنامج في هذا المتصفّح أوّلاً.</p>
+<button class="b1" id="fetch">١) جلب الموازنة من البرنامج</button>
+<div class="box" id="info">لم تُجلَب بعد.</div>
+<button class="b2" id="fill" disabled>٢) تعبئة صفحة الوزارة المفتوحة</button>
+<button class="b3" id="check" disabled>مراجعة: ما الذي لم يُطابَق؟</button>
+<div class="box" id="out" style="display:none"></div>
+<p class="muted">المساعد يعبّئ الخانات فقط. راجع كل قسم بـ«التالي» ثمّ اكبس «أرسل» أنت على الموقع. لا يرسل شيئاً بنفسه.</p>
+<script src="popup.js"></script>
+</body>
+</html>

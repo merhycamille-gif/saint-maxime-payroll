@@ -598,7 +598,11 @@ function meheSummary(array $d, array $p): array {
     $abL = $sum($A, 1) + $sum($B, 1); $abU = $sum($A, 2) + $sum($B, 2);
     $abcL = $abL + $sum($C, 1); $abcU = $abU + $sum($C, 2);
     $allL = $abcL + $sum($D, 1); $allU = $abcU + $sum($D, 2);
-    $pctAB = ($abcL + $abcU) > 0 ? round(($abL + $abU) / ($abcL + $abcU) * 100) : 0;
+    $pctAB = ($abcL + $abcU) > 0 ? round(($abL + $abU) / ($abcL + $abcU) * 100, 2) : 0;
+    // ⚖️ (2026-11-08 «كل رقم بالبند ج فوق 35 غلط… وكل رقم تحت 65 غلط»): سقف ج = 35٪ من (أ+ب+ج) ⇔ ج ≤ (أ+ب) × 35/65؛ ما فوقه = تجاوز
+    $cSumL = $sum($C, 1); $cSumU = $sum($C, 2);
+    $cMaxL = $abL * 35 / 65; $cMaxU = $abU * 35 / 65;
+    $cOverL = max(0, $cSumL - $cMaxL); $cOverU = max(0, $cSumU - $cMaxU);
     // 🏛️🖥️ «فرق الرسوم الدراسية عن العام الماضي» (آخر سطر بملخّص المنصّة): متوسّط الرسوم هذه السنة − متوسّط آخر موازنة محفوظة سابقة
     $prevAvg = $d['_prev_avg'] ?? null;
     $avgFeeLL = $payers > 0 ? $revAfterLL / $payers : 0; $avgFeeUSD = $payers > 0 ? $revAfterUSD / $payers : 0;
@@ -611,7 +615,8 @@ function meheSummary(array $d, array $p): array {
     return [
         'A' => $A, 'B' => $B, 'C' => $C, 'D' => $D,
         'abL' => $abL, 'abU' => $abU, 'abcL' => $abcL, 'abcU' => $abcU, 'allL' => $allL, 'allU' => $allU,
-        'pctAB' => $pctAB, 'pctC' => 100 - $pctAB,
+        'pctAB' => $pctAB, 'pctC' => round(100 - $pctAB, 2), 'cSumL' => $cSumL, 'cSumU' => $cSumU, 'cMaxL' => $cMaxL, 'cMaxU' => $cMaxU, 'cOverL' => $cOverL, 'cOverU' => $cOverU,
+        'okRatio' => ($cSumL + $cSumU) <= ($cMaxL + $cMaxU) + 0.5, 'okBalance' => abs(($allL - $revAfterLL) + ($allU - $revAfterUSD)) < 1,
         'revRows' => $revRows, 'students' => $students, 'revLL' => $revLL, 'revUSD' => $revUSD,
         'revAfterLL' => $revAfterLL, 'revAfterUSD' => $revAfterUSD, 'payers' => $payers,
         'avgFeeLL' => $avgFeeLL, 'avgFeeUSD' => $avgFeeUSD, 'feeDiffL' => $feeDiffL, 'feeDiffU' => $feeDiffU,
@@ -624,6 +629,71 @@ function meheSummary(array $d, array $p): array {
     ];
 }
 
+/* ===================== ⚖️ «وازِن» (2026-11-08 «بدي كل الخيارات متاحة») ===================== */
+/**
+ * يحسب اقتراح توازن بلا حفظ. $opt: mode = fees | c_item | d_item | mix · c_key بند من ج · d_key بند من د.
+ * القاعدة: الفرق = الإيرادات بعد المنح − النفقات (أ+ب+ج+د). موجب ⇒ فائض نضيفه للنفقات؛ سالب ⇒ عجز نخفّض النفقات (أو نرفع الأقساط).
+ * ج لا يتجاوز سقفه (أ+ب)×35/65؛ د خارج النسبة. يُعاد: changes [{kind,key,label,field,old,new}] + after {diffL,diffU,pctC,pctAB,okRatio,okBalance} + notes.
+ */
+function meheBalancePlan(array $data, array $p, array $s, array $opt): array {
+    $mode = (string)($opt['mode'] ?? 'c_item'); $cKey = (string)($opt['c_key'] ?? 'aid'); $dKey = (string)($opt['d_key'] ?? 'eos_contr');
+    $items = meheExpenseItems();
+    if (!isset($items[$cKey]) || $items[$cKey][1] !== 'ج') $cKey = 'aid';
+    if (!isset($items[$dKey]) || $items[$dKey][1] !== 'د') $dKey = 'eos_contr';
+    $changes = []; $notes = [];
+    $d = $data; // نسخة عمل
+    $gapL = $s['revAfterLL'] - $s['allL']; $gapU = $s['revAfterUSD'] - $s['allU']; // موجب = فائض
+    $rnd = fn($v) => (float)round($v);
+    $expItem = function (string $key, float $addL, float $addU, string $cat) use (&$d, &$changes, $items, $rnd): array { // يضيف للبند (بلا سالب) ويرجع ما تعذّر إضافته
+        $oldL = (float)($d['expenses'][$key]['ll'] ?? 0); $oldU = (float)($d['expenses'][$key]['usd'] ?? 0);
+        $newL = max(0, $oldL + $addL); $newU = max(0, $oldU + $addU);
+        $restL = ($oldL + $addL) - $newL; $restU = ($oldU + $addU) - $newU; // ما لم يُمتصّ (لو نزل تحت الصفر)
+        if ($rnd($newL) !== $rnd($oldL)) $changes[] = ['kind' => 'exp', 'key' => $key, 'label' => $items[$key][0], 'field' => 'll', 'old' => $rnd($oldL), 'new' => $rnd($newL)];
+        if ($rnd($newU) !== $rnd($oldU)) $changes[] = ['kind' => 'exp', 'key' => $key, 'label' => $items[$key][0], 'field' => 'usd', 'old' => $rnd($oldU), 'new' => $rnd($newU)];
+        $d['expenses'][$key] = ['ll' => $rnd($newL), 'usd' => $rnd($newU)];
+        return [$restL, $restU];
+    };
+    if ($mode === 'fees') {
+        // الأقساط بالنسبة: الهدف Σ(قسط×عدد) = النفقات + منح الملاك ⇒ معامل واحد لكل الصفوف، تدوير للألف، والباقي الصغير يُذكر
+        $totL = 0; $totU = 0; foreach ($s['revRows'] as $rv) { $totL += $rv['fee_ll'] * $rv['students']; $totU += $rv['fee_usd'] * $rv['students']; }
+        if ($totL <= 0 && $totU <= 0) { $notes[] = 'لا أقساط ولا طلاب بعد — لا يمكن التوازن بالأقساط'; }
+        else {
+            $fL = $totL > 0 ? ($s['allL'] + $s['grTitLL']) / $totL : 1; $fU = $totU > 0 ? ($s['allU'] + $s['grTitUSD']) / $totU : 1;
+            foreach ($s['revRows'] as $rv) {
+                $i = $rv['idx'];
+                $nL = $totL > 0 ? round($rv['fee_ll'] * $fL / 1000) * 1000 : $rv['fee_ll']; $nU = $totU > 0 ? round($rv['fee_usd'] * $fU) : $rv['fee_usd'];
+                if ($nL != $rv['fee_ll']) { $changes[] = ['kind' => 'rev', 'key' => (string)$i, 'label' => 'قسط ' . $rv['class'], 'field' => 'fee_ll', 'old' => $rv['fee_ll'], 'new' => $nL]; $d['revenues'][$i]['fee_ll'] = $nL; }
+                if ($nU != $rv['fee_usd']) { $changes[] = ['kind' => 'rev', 'key' => (string)$i, 'label' => 'قسط ' . $rv['class'], 'field' => 'fee_usd', 'old' => $rv['fee_usd'], 'new' => $nU]; $d['revenues'][$i]['fee_usd'] = $nU; }
+            }
+            $notes[] = 'الأقساط عُدِّلت بنسبة واحدة لكل الصفوف (' . round(($fL - 1) * 100, 2) . ' %) مع تدوير القسط للألف — الباقي الصغير، إن وُجد، يُمتصّ ببند ' . $items[$cKey][0];
+            $s2 = meheSummary($d, $p); $gapL = $s2['revAfterLL'] - $s2['allL']; $gapU = $s2['revAfterUSD'] - $s2['allU'];
+            if (abs($gapL) >= 1 || abs($gapU) >= 1) { [$rL, $rU] = $expItem($cKey, $gapL, $gapU, 'ج'); if (abs($rL) >= 1 || abs($rU) >= 1) $notes[] = 'باقي التدوير ' . number_format(abs($rL)) . ' ل.ل لم يُمتصّ لأنّ البند عند الصفر — ارفع قسط صفّ واحد بهذا المقدار أو اختر بنداً فيه رصيد'; }
+        }
+    } elseif ($mode === 'c_item') {
+        // بند من ج يسدّ الفرق، مع سقف 35٪
+        $roomL = $s['cMaxL'] - $s['cSumL']; $roomU = $s['cMaxU'] - $s['cSumU']; // المتاح قبل السقف (سالب = متجاوز أصلاً)
+        $addL = $gapL; $addU = $gapU;
+        if ($addL > $roomL) { $notes[] = 'بند ج وصل إلى سقف 35 ٪ — ما بقي (' . number_format($addL - $roomL) . ' ل.ل) لم يُضَف؛ استعمل «مزيج» ليذهب إلى بند د'; $addL = max($roomL, 0); }
+        if ($addU > $roomU) { $addU = max($roomU, 0); }
+        [$rL, $rU] = $expItem($cKey, $addL, $addU, 'ج');
+        if (abs($rL) >= 1 || abs($rU) >= 1) $notes[] = 'البند لا ينزل تحت الصفر — بقي ' . number_format(abs($rL)) . ' ل.ل غير مغطّى؛ اختر بنداً آخر أو خفّض د';
+    } elseif ($mode === 'd_item') {
+        [$rL, $rU] = $expItem($dKey, $gapL, $gapU, 'د');
+        if (abs($rL) >= 1 || abs($rU) >= 1) $notes[] = 'البند لا ينزل تحت الصفر — بقي ' . number_format(abs($rL)) . ' ل.ل غير مغطّى؛ اختر بنداً آخر';
+    } else { // mix: ج حتى سقفه ثم الباقي إلى د
+        $roomL = max(0, $s['cMaxL'] - $s['cSumL']); $roomU = max(0, $s['cMaxU'] - $s['cSumU']);
+        $toCL = $gapL > 0 ? min($gapL, $roomL) : $gapL; $toCU = $gapU > 0 ? min($gapU, $roomU) : $gapU;
+        [$rL, $rU] = $expItem($cKey, $toCL, $toCU, 'ج');
+        $restL = ($gapL - $toCL) + $rL; $restU = ($gapU - $toCU) + $rU;
+        if (abs($restL) >= 1 || abs($restU) >= 1) { [$rL2, $rU2] = $expItem($dKey, $restL, $restU, 'د'); if (abs($rL2) >= 1 || abs($rU2) >= 1) $notes[] = 'بقي ' . number_format(abs($rL2)) . ' ل.ل غير مغطّى (البنود لا تنزل تحت الصفر)'; }
+        $notes[] = 'ج مُلئ حتى سقف 35 ٪ بالضبط والباقي ذهب إلى ' . $items[$dKey][0];
+    }
+    $after = meheSummary($d, $p);
+    return ['changes' => $changes, 'notes' => $notes,
+            'before' => ['diffL' => $s['diffL'], 'diffU' => $s['diffU'], 'pctC' => $s['pctC'], 'pctAB' => $s['pctAB']],
+            'after' => ['diffL' => $after['diffL'], 'diffU' => $after['diffU'], 'pctC' => $after['pctC'], 'pctAB' => $after['pctAB'], 'okRatio' => $after['okRatio'], 'okBalance' => $after['okBalance'], 'cOverL' => $after['cOverL']],
+            'data' => $d];
+}
 /** متوسّط الرسوم (ل.ل/د.أ) من بيانات موازنة محفوظة (الإيرادات والمنح فقط — بلا رواتب) — لسطر «فرق الرسوم عن العام الماضي» */
 function meheAvgFeeFromData(array $d): array {
     $students = 0; $revLL = $revUSD = 0; $grN = 0; $grLL = $grUSD = 0;

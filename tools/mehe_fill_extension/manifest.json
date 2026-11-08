@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "MSA — تعبئة موازنة الوزارة",
+  "description": "يعبّئ خانات موازنة منصّة مصلحة التعليم الخاص (psb.mehe.gov.lb) من أرقام برنامج الرواتب MSA. الإرسال يبقى بيدك على الموقع.",
+  "version": "1.0.0",
+  "icons": { "48": "icon48.png", "128": "icon128.png" },
+  "action": { "default_popup": "popup.html", "default_title": "تعبئة موازنة الوزارة من البرنامج" },
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://psb.mehe.gov.lb/*",
+    "http://localhost/*",
+    "https://msapayroll.com/*",
+    "https://www.msapayroll.com/*",
+    "https://192.168.1.60/*"
+  ],
+  "content_scripts": [
+    { "matches": ["https://psb.mehe.gov.lb/*"], "js": ["content.js"], "run_at": "document_idle" }
+  ]
+}

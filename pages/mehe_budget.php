@@ -79,6 +79,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mehe_rows'])) {
     $_SESSION['flash_success'] = 'انحفظت الصفحة (' . $n . ' ' . ($n === 1 ? 'سطر' : 'أسطر') . ')';
     $jsonOut(['ok' => true, 'n' => $n]);
 }
+/* ===== ⚖️ «وازِن» (2026-11-08 «بدي كل الخيارات متاحة»): اقتراح توازن (fetch → JSON) ثمّ تطبيقه بموافقته (apply=1) ===== */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mehe_balance'])) {
+    if (!canEdit()) $jsonOut(['ok' => false, 'msg' => 'قراءة فقط']);
+    if (!verifyCsrf($_POST['csrf'] ?? '')) $jsonOut(['ok' => false, 'msg' => 'رمز الأمان غير صحيح — أعد تحميل الصفحة']);
+    $pB = mehePayroll($db, $ids, $sy, $data); $sB = meheSummary($data, $pB);
+    $plan = meheBalancePlan($data, $pB, $sB, $_POST);
+    if (!empty($_POST['apply'])) {
+        if (!$plan['changes']) $jsonOut(['ok' => false, 'msg' => 'لا تعديلات لتطبيقها']);
+        $data = $plan['data']; $saveAll();
+        $_SESSION['flash_success'] = 'وُزِّنت الموازنة — ' . count($plan['changes']) . ' ' . (count($plan['changes']) === 1 ? 'تعديل' : 'تعديلات');
+        $jsonOut(['ok' => true, 'applied' => count($plan['changes'])]);
+    }
+    unset($plan['data']);
+    $jsonOut(['ok' => true] + $plan);
+}
 /* ===== 🏛️🖥️ الوثائق المطلوبة (القسم 12): رفع ملف لوثيقة / حذفه — PDF أو صورة، يُخزَّن بـuploads/mehe ===== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit() && isset($_POST['mehe_doc'])) {
     requireCsrf();
@@ -120,6 +135,44 @@ if ($prevSaved) $data['_prev_avg'] = meheAvgFeeFromData($prevSaved['data']);
 $s = meheSummary($data, $p);
 unset($data['_prev_avg']);
 [$y1, $y2] = schoolYearToYears($sy);
+
+/* ===== 🧩 تصدير JSON لمساعد التعبئة (إضافة كروم tools/mehe_fill_extension) — 2026-11-08 «فاتحين موقع الوزارة والبرنامج… نبعت الموازنة على الموقع»:
+ *  البنية بتسميات المنصّة الحرفية؛ المساعد يقرأها وهو على صفحة psb.mehe.gov.lb ويعبّئ الخانات، والإرسال يبقى بيده على الموقع ===== */
+if (($_GET['export'] ?? '') === 'json') {
+    $dmy = function ($s) { $s = trim((string)$s); if ($s === '') return ''; if (preg_match('~^(\d{1,2})/(\d{1,2})/(\d{4})$~', $s, $m)) return sprintf('%02d/%02d/%04d', $m[1], $m[2], $m[3]); return $s; };
+    $staffRow = fn(array $r) => ['mehe_id' => (string)($r['mehe_id'] ?? ''), 'name' => (string)$r['name'], 'role' => (string)($r['role'] ?? $r['admin_mode'] ?? ''), 'level' => (string)($r['level'] ?? ''), 'qual' => (string)($r['qual'] ?? ''),
+        'mode' => (string)($r['mode'] ?? ''), 'cnss_type' => (string)($r['cnss_type'] ?? ''), 'admin_type' => (string)($r['admin_type'] ?? ''), 'cadre_date' => $dmy($r['cadre_date'] ?? ''), 'start_date' => $dmy($r['start_date'] ?? ''),
+        'h_cadre' => (float)($r['h_cadre'] ?? 0), 'h_extra' => (float)($r['h_extra'] ?? 0), 'base' => round((float)($r['base'] ?? 0)), 'extra_ll' => round((float)($r['extra_ll'] ?? 0)), 'extra_usd' => round((float)($r['extra_usd'] ?? 0)),
+        'retro' => round((float)($r['retro'] ?? 0)), 'missions_ll' => round((float)($r['missions_ll'] ?? 0)), 'missions35' => round((float)($r['missions35'] ?? 0)), 'bonus' => round((float)($r['bonus'] ?? 0)), 'tasks_ll' => round((float)($r['tasks_ll'] ?? 0)),
+        'grants_ll' => round((float)($r['grants_ll'] ?? 0)), 'family' => round((float)($r['family'] ?? 0)), 'transport' => round((float)($r['transport'] ?? 0)), 'cnss' => round((float)($r['cnss'] ?? 0)), 'fund' => round((float)($r['fund'] ?? 0)), 'manual' => !empty($r['manual'])];
+    $lblVal = function (array $keys, array $src, string $sub = '') use ($data) { $o = []; foreach ($keys as $k) $o[$k] = $sub === '' ? (int)($src[$k] ?? 0) : ['admin' => (int)($src[$k]['admin'] ?? 0), 'edu' => (int)($src[$k]['edu'] ?? 0)]; return $o; };
+    $langs = []; foreach (meheLanguages() as $k => $lb) $langs[$lb] = (int)($data['languages'][$k] ?? 3);
+    $exp = []; foreach (meheExpenseItems() as $k => [$lb, $cat]) $exp[$lb] = ['ll' => round((float)($data['expenses'][$k]['ll'] ?? 0)), 'usd' => round((float)($data['expenses'][$k]['usd'] ?? 0))];
+    $fin = array_values(array_filter(array_map('trim', explode("\n", (string)$data['fin_committee'])), fn($x) => $x !== ''));
+    $out = [
+        'program' => 'MSA Payroll', 'generated' => date('c'), 'school' => (string)$school['name_ar'], 'school_id' => $sid, 'sy' => $sy, 'multi' => $multi,
+        'info' => ['director' => (string)$data['director'], 'parents_head' => (string)$data['parents_head'], 'parents_phone' => (string)$data['parents_phone'],
+                   'programs' => meheMulti($data['programs_sel'] ?? ''), 'levels' => meheMulti($data['levels_sel'] ?? ''), 'classes' => meheMulti($data['classes_sel'] ?? ''), 'fin' => $fin],
+        'survey' => ['open' => (int)$data['playground_open'], 'closed' => (int)$data['playground_closed'], 'owner' => meheMulti($data['owner_sel'] ?? ''), 'owner_name' => (string)$data['building_owner'],
+                     'buildings' => ['بناء مدرسي' => (int)$data['buildings_school'], 'بناء سكني' => (int)$data['buildings_res']], 'shared' => meheMulti($data['shared_sel'] ?? ''),
+                     'rooms' => $lblVal(meheRoomTypes(), (array)$data['rooms']), 'languages' => $langs, 'equipment' => $lblVal(meheEquipmentTypes(), (array)$data['equipment'], 'x'),
+                     'internet' => meheMulti($data['internet_sel'] ?? ''), 'other' => meheMulti($data['other_sel'] ?? '')],
+        'staff' => ['tit' => array_map($staffRow, $p['tit']), 'con' => array_map($staffRow, $p['con']), 'adm' => array_map($staffRow, $p['adm'])],
+        'months' => ['tit' => $data['months']['tit'], 'con' => $data['months']['con'], 'adm' => $data['months']['adm']],
+        'structure' => ['admin_law' => (int)$data['struct_admin_law'], 'workers_law' => (int)$data['struct_workers_law'], 'others' => (int)$data['struct_others'],
+                        'classes' => $lblVal(meheLevels(), (array)$data['classes_per_level']), 'mgmt' => (int)$data['staff_mgmt'], 'supervision' => (int)$data['staff_supervision']],
+        'students' => array_values(array_map(fn($g) => ['student' => (string)$g['student'], 'teacher' => (string)($g['teacher'] ?? ''), 'class' => (string)($g['class'] ?? ''), 'll' => round((float)($g['ll'] ?? 0)), 'usd' => round((float)($g['usd'] ?? 0))], array_filter((array)$data['grants'], fn($g) => trim((string)($g['student'] ?? '')) !== ''))),
+        'severance' => array_values(array_map(fn($x) => ['name' => (string)$x['name'], 'eos_ll' => round((float)($x['eos_ll'] ?? 0)), 'eos_usd' => round((float)($x['eos_usd'] ?? 0)), 'tasks_ll' => round((float)($x['tasks_ll'] ?? 0)), 'tasks_usd' => round((float)($x['tasks_usd'] ?? 0)), 'receipt_no' => (string)($x['receipt_no'] ?? ''), 'receipt_date' => $dmy($x['receipt_date'] ?? ''), 'notes' => (string)($x['notes'] ?? '')], array_filter((array)$data['severance'], fn($x) => trim((string)($x['name'] ?? '')) !== ''))),
+        'expenses' => $exp,
+        'revenues' => array_values(array_map(fn($rv) => ['program' => (string)$rv['program'], 'class' => (string)$rv['class'], 'fee_ll' => round((float)$rv['fee_ll']), 'fee_usd' => round((float)$rv['fee_usd']), 'students' => (int)$rv['students']], $s['revRows'])),
+        'summary' => ['diffL' => round($s['diffL']), 'diffU' => round($s['diffU']), 'pctC' => $s['pctC'], 'pctAB' => $s['pctAB'], 'okBalance' => $s['okBalance'], 'okRatio' => $s['okRatio']],
+    ];
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 /* ===== تصدير إكسل ===== */
 if (($_GET['export'] ?? '') === 'xlsx') {
@@ -211,6 +264,21 @@ $E = canEdit(); // ✏️ أزرار التعديل تظهر للمحرّرين 
 .mehe-doc .docrow a.f{color:#2563eb;word-break:break-all}
 .mehe-doc .docrow input[type=file]{font-size:13px}
 .mehe-doc .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px}
+/* ⚖️ وازِن + التنبيه الفوري لنسبة ج */
+.mehe-doc .balbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.mehe-doc .balstat{flex:1 1 320px;border-radius:10px;padding:9px 14px;font-weight:700;font-size:13.5px}
+.mehe-doc .balstat.ok{background:#ecfdf5;color:#166534;border:1px solid #bbf7d0}
+.mehe-doc .balstat.bad{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.mehe-doc .balpanel{flex-basis:100%;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;background:#fff}
+.mehe-doc .balopts label{display:block;margin:4px 0;font-size:13.5px;cursor:pointer}
+.mehe-doc .balsel{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:10px 0;font-size:13px}
+.mehe-doc .balsel select{max-width:360px;padding:5px 8px;border:1px solid #d7dde3;border-radius:8px}
+.mehe-doc .balout table{width:100%;margin:8px 0}
+.mehe-doc .balout .after{font-weight:700;margin:6px 0}
+.mehe-doc .balout .ok{color:#166534}.mehe-doc .balout .bad{color:#991b1b}
+.mehe-doc .ballive{display:none;margin:0 0 10px;border-radius:10px;padding:8px 14px;font-weight:700;font-size:13px}
+.mehe-doc .ballive.bad{display:block;background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.mehe-doc .ballive.ok{display:block;background:#ecfdf5;color:#166534;border:1px solid #bbf7d0}
 /* 📄✏️ شريط الصفحة */
 .mehe-doc .sheetctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
 .mehe-doc .sheetctl .btn{border-radius:10px;padding:7px 16px;font-weight:700;font-size:13.5px}
@@ -558,11 +626,35 @@ $finLines = array_values(array_filter(array_map('trim', explode("\n", (string)$d
     <h4 class="sec">النفقات من الفئة ج</h4><?= $money3($s['C'], 'C') ?>
     <h4 class="sec">النفقات من الفئة د</h4><?= $money3($s['D'], 'D', true) ?>
     <h4 class="sec">ملخص الموازنة</h4>
+    <?php if ($E): /* ⚖️ وازِن: الفرق الحالي + 4 طرق — اقتراح بالأرقام ثمّ «طبّق» بموافقته */ ?>
+    <div class="balbar no-print">
+        <div class="balstat <?= $s['okBalance'] && $s['okRatio'] ? 'ok' : 'bad' ?>">
+            <?php if ($s['okBalance'] && $s['okRatio']): ?>✅ الموازنة متوازنة وضمن النسب (ج <?= $fmt2($s['pctC']) ?> ٪ · أ+ب <?= $fmt2($s['pctAB']) ?> ٪)
+            <?php else: ?>⚠️ <?= !$s['okBalance'] ? 'الفرق بين النفقات والإيرادات: ' . $fmt0($s['diffL']) . ' ل.ل' . ($s['diffU'] ? ' و' . $fmt0($s['diffU']) . ' $' : '') . ($s['diffL'] + $s['diffU'] > 0 ? ' (النفقات أكبر — عجز)' : ' (الإيرادات أكبر — فائض)') : '' ?><?= !$s['okRatio'] ? ($s['okBalance'] ? '' : ' · ') . 'بند ج تجاوز 35 ٪ بـ ' . $fmt0($s['cOverL']) . ' ل.ل' : '' ?><?php endif; ?>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="meheBalToggle()">⚖️ وازِن</button>
+        <div class="balpanel" id="balPanel" style="display:none">
+            <div class="balopts">
+                <label><input type="radio" name="balmode" value="c_item" checked> تعديل بند واحد من <b>ج</b> يسدّ الفرق (يتوقّف عند سقف 35 ٪)</label>
+                <label><input type="radio" name="balmode" value="d_item"> تعديل بند واحد من <b>د</b> يسدّ الفرق (خارج النسبة)</label>
+                <label><input type="radio" name="balmode" value="mix"> <b>مزيج</b>: ج حتى سقف 35 ٪ بالضبط والباقي إلى بند د</label>
+                <label><input type="radio" name="balmode" value="fees"> تعديل <b>الأقساط</b> بنسبة واحدة على كل الصفوف (إذا كانت الأقساط حرّة)</label>
+            </div>
+            <div class="balsel">
+                <label>بند ج: <select id="balC"><?php foreach (meheExpenseItems() as $k => [$lb, $cat]) if ($cat === 'ج') echo '<option value="' . e($k) . '"' . ($k === 'aid' ? ' selected' : '') . '>' . e($lb) . '</option>'; ?></select></label>
+                <label>بند د: <select id="balD"><?php foreach (meheExpenseItems() as $k => [$lb, $cat]) if ($cat === 'د') echo '<option value="' . e($k) . '"' . ($k === 'eos_contr' ? ' selected' : '') . '>' . e($lb) . '</option>'; ?></select></label>
+                <button type="button" class="btn btn-light" onclick="meheBalPlan()">احسب الاقتراح</button>
+            </div>
+            <div id="balOut"></div>
+        </div>
+    </div>
+    <?php endif; ?>
     <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl"><thead><tr><th>المعيار</th><th>المجموع بالليرة</th><th>المجموع بالدولار</th><th>المجموع الكلي</th><th>ملاحظات</th></tr></thead><tbody>
         <tr><td style="text-align:right">مجموع البندين 'أ' و 'ب'</td><td style="text-align:center"><?= $fmt2($s['abL']) ?></td><td style="text-align:center"><?= $fmt2($s['abU']) ?></td><td style="text-align:center"><?= $fmt2($s['abL'] + $s['abU']) ?></td><td></td></tr>
         <tr><td style="text-align:right">مجموع البنود 'أ' و 'ب' و 'ج'</td><td style="text-align:center"><?= $fmt2($s['abcL']) ?></td><td style="text-align:center"><?= $fmt2($s['abcU']) ?></td><td style="text-align:center"><?= $fmt2($s['abcL'] + $s['abcU']) ?></td><td></td></tr>
-        <tr><td style="text-align:right">ما يمثله مجموع البندين 'أ' و 'ب' من مجموع البنود 'أ' و 'ب' و 'ج'</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center"><?= $fmt2($s['pctAB']) ?> %</td><td></td></tr>
-        <tr><td style="text-align:right">ما يمثله مجموع البند 'ج' من مجموع البنود 'أ' و 'ب' و 'ج'</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center"><?= $fmt2($s['pctC']) ?> %</td><td style="text-align:center;color:<?= $s['pctC'] <= 35 ? '#2e7d32' : '#c00000' ?>"><?= $s['pctC'] <= 35 ? 'امتثال كامل' : 'تجاوز 35%' ?></td></tr>
+        <?php /* ⚖️ القاعدة (2026-11-08): أ+ب ≥ 65 ٪ و ج ≤ 35 ٪ من (أ+ب+ج) — أخضر «امتثال كامل»، أحمر مع مقدار التجاوز */ ?>
+        <tr><td style="text-align:right">ما يمثله مجموع البندين 'أ' و 'ب' من مجموع البنود 'أ' و 'ب' و 'ج'</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center"><?= $fmt2($s['pctAB']) ?> %</td><td class="bal-ab" style="text-align:center;color:<?= $s['okRatio'] ? '#2e7d32' : '#c00000' ?>"><?= $s['okRatio'] ? 'امتثال كامل' : 'تحت 65 %' ?></td></tr>
+        <tr><td style="text-align:right">ما يمثله مجموع البند 'ج' من مجموع البنود 'أ' و 'ب' و 'ج'</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center"><?= $fmt2($s['pctC']) ?> %</td><td class="bal-c" style="text-align:center;color:<?= $s['okRatio'] ? '#2e7d32' : '#c00000' ?>"><?= $s['okRatio'] ? 'امتثال كامل' : 'تجاوز 35 % بـ ' . $fmt0($s['cOverL']) . ' ل.ل' ?></td></tr>
         <tr><td style="text-align:right">إجمالي النفقات (مجموع البنود 'أ' و 'ب' و 'ج' و 'د')</td><td style="text-align:center"><?= $fmt2($s['allL']) ?></td><td style="text-align:center"><?= $fmt2($s['allU']) ?></td><td style="text-align:center"><?= $fmt2($s['allL'] + $s['allU']) ?></td><td></td></tr>
         <tr><td style="text-align:right">إجمالي الايرادات بعد حسم المنح الدراسية لأبناء المعلمين الملاك</td><td style="text-align:center"><?= $fmt2($s['revAfterLL']) ?></td><td style="text-align:center"><?= $fmt2($s['revAfterUSD']) ?></td><td style="text-align:center"><?= $fmt2($s['revAfterLL'] + $s['revAfterUSD']) ?></td><td></td></tr>
         <tr><td style="text-align:right">الفرق بين النفقات والايرادات</td><td style="text-align:center"><?= $fmt2($s['diffL']) ?></td><td style="text-align:center"><?= $fmt2($s['diffU']) ?></td><td style="text-align:center"><?= $fmt2($s['diffL'] + $s['diffU']) ?></td><td style="text-align:center;color:<?= abs($s['diffL'] + $s['diffU']) < 1 ? '#2e7d32' : '#c00000' ?>"><?= abs($s['diffL'] + $s['diffU']) < 1 ? 'امتثال كامل' : 'غير متوازنة' ?></td></tr>
@@ -727,6 +819,38 @@ function meheFilterCat(sel){ var v=sel.value, sec=sel.closest('.mehe-sec'); sec.
         if(ev.key==='Enter' && ev.target.tagName!=='TEXTAREA'){ ev.preventDefault(); if(bar) saveSheet(sh, bar); else save(row,false); }
         if(ev.key==='Escape'){ if(bar) cancelSheet(sh, bar); else cancel(row, row.querySelector('.rowctl')); }
     });
+    /* ⚖️ وازِن: اقتراح ثمّ تطبيق بموافقته */
+    var BAL = <?= json_encode(['abL' => $s['abL'], 'abU' => $s['abU'], 'cSumL' => $s['cSumL'], 'cSumU' => $s['cSumU'], 'cMaxL' => $s['cMaxL'], 'cMaxU' => $s['cMaxU'], 'cats' => array_map(fn($x) => $x[1], meheExpenseItems())], JSON_UNESCAPED_UNICODE) ?>;
+    var fmt=function(v){ v=Math.round(Number(v)||0); return (v<0?'-':'')+String(Math.abs(v)).replace(/\B(?=(\d{3})+(?!\d))/g,','); };
+    window.meheBalToggle=function(){ var p=document.getElementById('balPanel'); p.style.display=p.style.display==='none'?'block':'none'; };
+    function balForm(){ var fd=new FormData(); fd.append('csrf',CSRF); fd.append('mehe_balance','1'); var m=document.querySelector('input[name=balmode]:checked'); fd.append('mode', m?m.value:'c_item'); fd.append('c_key', document.getElementById('balC').value); fd.append('d_key', document.getElementById('balD').value); return fd; }
+    window.meheBalPlan=function(){
+        var out=document.getElementById('balOut'); out.className='balout'; out.innerHTML='<span class="text-muted">جارٍ الحساب…</span>';
+        fetch(location.pathname,{method:'POST',body:balForm(),credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){
+            if(!j||!j.ok){ out.innerHTML='<span class="bad">'+((j&&j.msg)||'تعذّر الحساب')+'</span>'; return; }
+            var h='';
+            if(!j.changes.length){ h+='<div class="after ok">لا تعديلات مطلوبة — الموازنة كما هي.</div>'; }
+            else { h+='<table class="doc-table" dir="rtl"><thead><tr><th>البند</th><th>الحالي</th><th>المقترح</th><th>الفرق</th></tr></thead><tbody>';
+                j.changes.forEach(function(c){ h+='<tr><td style="text-align:right">'+c.label+(c.field==='usd'||c.field==='fee_usd'?' ($)':'')+'</td><td style="text-align:center">'+fmt(c.old)+'</td><td style="text-align:center;font-weight:700">'+fmt(c.new)+'</td><td style="text-align:center">'+fmt(c.new-c.old)+'</td></tr>'; });
+                h+='</tbody></table>'; }
+            var a=j.after; h+='<div class="after '+(a.okBalance&&a.okRatio?'ok':'bad')+'">بعد التطبيق: الفرق '+fmt(a.diffL)+' ل.ل'+(a.diffU?' و'+fmt(a.diffU)+' $':'')+' · ج '+a.pctC+' ٪ · أ+ب '+a.pctAB+' ٪ — '+(a.okBalance&&a.okRatio?'امتثال كامل':(a.okBalance?'متوازنة لكن ج فوق 35 ٪':'ما زالت غير متوازنة'))+'</div>';
+            (j.notes||[]).forEach(function(n){ h+='<div class="text-muted" style="font-size:12.5px">• '+n+'</div>'; });
+            if(j.changes.length) h+='<div style="margin-top:8px"><button type="button" class="btn btn-success" onclick="meheBalApply()">✔ طبّق</button> <button type="button" class="btn btn-light" onclick="document.getElementById(\'balOut\').innerHTML=\'\'">إلغاء</button></div>';
+            out.innerHTML=h;
+        }).catch(function(){ out.innerHTML='<span class="bad">تعذّر الحساب — تحقّق من الاتصال</span>'; });
+    };
+    window.meheBalApply=function(){ if(!confirm('تطبيق الاقتراح وحفظه بالموازنة؟')) return; var fd=balForm(); fd.append('apply','1'); post(fd, function(){}); };
+    /* تنبيه فوري أثناء تعديل بند من ج (بقسمَي التشغيل والملخّص): النسبة الجديدة قبل الحفظ */
+    function balLive(sh){
+        var sumL=BAL.cSumL, sumU=BAL.cSumU;
+        sh.querySelectorAll('[data-mrow^="exp|"]').forEach(function(row){ var key=row.dataset.mrow.split('|')[1]; if(BAL.cats[key]!=='ج') return;
+            row.querySelectorAll('[data-f] .mi').forEach(function(i){ var c=i.closest('[data-f]'); var o=parseFloat(String(c.dataset.v||'0').replace(/,/g,''))||0, n=parseFloat(String(i.value||'0').replace(/,/g,''))||0; if(c.dataset.f==='ll') sumL+=n-o; else if(c.dataset.f==='usd') sumU+=n-o; }); });
+        var note=sh.querySelector('.ballive'); if(!note){ note=document.createElement('div'); note.className='ballive'; var bar=sh.querySelector('.sheetctl'); (bar&&bar.parentNode?bar.parentNode:sh).insertBefore(note, bar?bar.nextSibling:sh.firstChild); }
+        var over=(sumL-BAL.cMaxL)+(sumU-BAL.cMaxU), tot=BAL.abL+BAL.abU+sumL+sumU, pct=tot>0?((sumL+sumU)/tot*100):0;
+        if(over>0.5){ note.className='ballive bad'; note.textContent='⚠️ بند ج سيصير '+pct.toFixed(2)+' ٪ — تجاوز 35 ٪ بـ '+fmt(over)+' ل.ل (أ+ب تحت 65 ٪). قلّل البند أو انقل الزيادة إلى بند د'; }
+        else { note.className='ballive ok'; note.textContent='✓ بند ج '+pct.toFixed(2)+' ٪ — ضمن 35 ٪ (المتبقّي قبل السقف '+fmt(-over)+' ل.ل)'; }
+    }
+    doc.addEventListener('input', function(ev){ if(!(ev.target.classList&&ev.target.classList.contains('mi'))) return; var row=ev.target.closest('[data-mrow^="exp|"]'); if(!row) return; var sh=row.closest('.doc-sheet'); if(sh) balLive(sh); });
     window.meheAddSheetRow=function(btn){ var tbl=btn.parentNode.previousElementSibling.querySelector('table'); var tpl=tbl.querySelector('tr.mtpl'); if(!tpl) return;
         var tr=tpl.cloneNode(true); tr.classList.remove('mtpl'); tr.dataset.new='1';
         tbl.querySelectorAll('tbody tr:not([data-mrow]):not(.tot):not(.mtpl):not(.mrow)').forEach(function(ph){ ph.style.display='none'; }); // صفّ «لا نتائج»

@@ -11376,6 +11376,44 @@ check('🔢 موازنة الوزارة: خيار «بفواصل / بلا فوا
       && strpos($h294, "['msaSavePdfStart','ppWord','ppWhatsApp','ppEmail'].forEach") !== false && strpos($h294, "window.addEventListener('beforeprint'") !== false
       && stripos($h294, 'Fatal error') === false);
 
+/* 295) ⚖️ «وازِن» (2026-11-08 «بدي كل الخيارات متاحة… ج فوق 35 غلط… أ+ب تحت 65 غلط»): سقف ج = (أ+ب)×35/65، أربع طرق للتوازن بلا حفظ حتى «طبّق»،
+ *      الملخّص يلوّن النسبتين، التنبيه الفوري أثناء تعديل بند ج، ومعالج mehe_balance بالصفحة. */
+$ok295 = false; $why295 = '';
+try {
+    $d295 = meheLoad($db, [2], '2025-2026'); $d295['excluded'] = []; $d295['overrides'] = ['emp' => [], 'months' => [], 'sum' => []];
+    foreach ($d295['revenues'] as $i => $r) { $d295['revenues'][$i]['fee_ll'] = 100000000; $d295['revenues'][$i]['students'] = 20; }
+    $p295 = mehePayroll($db, [2], '2025-2026', $d295); $s295 = meheSummary($d295, $p295);
+    $okDef = abs($s295['cMaxL'] - $s295['abL'] * 35 / 65) < 1 && $s295['okRatio'] === true && $s295['okBalance'] === false && $s295['diffL'] < 0; // فائض ⇒ الفرق سالب (النفقات − الإيرادات)
+    $plC = meheBalancePlan($d295, $p295, $s295, ['mode' => 'c_item', 'c_key' => 'aid']);   // الفائض أكبر من سقف ج ⇒ يتوقّف عند السقف ويترك ملاحظة
+    $plM = meheBalancePlan($d295, $p295, $s295, ['mode' => 'mix', 'c_key' => 'aid', 'd_key' => 'eos_contr']);
+    $plD = meheBalancePlan($d295, $p295, $s295, ['mode' => 'd_item', 'd_key' => 'eos_contr']);
+    $plF = meheBalancePlan($d295, $p295, $s295, ['mode' => 'fees', 'c_key' => 'aid']);
+    // الفائض (6.7 مليار) أصغر من المتاح تحت سقف ج (12.5 مليار) ⇒ بند ج يسدّه كلّه ويتوازن؛ المزيج يضع كل شيء بـج ولا يمسّ د
+    $okC = !empty($plC['changes']) && $plC['after']['okRatio'] && $plC['after']['okBalance'] && abs($plC['data']['expenses']['aid']['ll'] - round(-$s295['diffL'])) < 2;
+    $okM = $plM['after']['okRatio'] && $plM['after']['okBalance'] && abs($plM['data']['expenses']['aid']['ll'] - round(-$s295['diffL'])) < 2 && (float)$plM['data']['expenses']['eos_contr']['ll'] === 0.0;
+    // فائض أكبر من السقف (أقساط 300م): بند ج يتوقّف عند السقف بالضبط ولا يتوازن؛ المزيج يكمل بـد ويتوازن
+    $dBig = $d295; foreach ($dBig['revenues'] as $i => $r) $dBig['revenues'][$i]['fee_ll'] = 300000000;
+    $sBig = meheSummary($dBig, $p295);
+    $plC2 = meheBalancePlan($dBig, $p295, $sBig, ['mode' => 'c_item', 'c_key' => 'aid']); $plM2 = meheBalancePlan($dBig, $p295, $sBig, ['mode' => 'mix', 'c_key' => 'aid', 'd_key' => 'eos_contr']);
+    $okC = $okC && -$sBig['diffL'] > $sBig['cMaxL'] && $plC2['after']['okRatio'] && !$plC2['after']['okBalance'] && abs($plC2['data']['expenses']['aid']['ll'] - round($sBig['cMaxL'] - $sBig['cSumL'])) < 2 && count($plC2['notes']) >= 1;
+    $okM = $okM && $plM2['after']['okRatio'] && $plM2['after']['okBalance'] && abs($plM2['data']['expenses']['aid']['ll'] - round($sBig['cMaxL'] - $sBig['cSumL'])) < 2 && $plM2['data']['expenses']['eos_contr']['ll'] > 0;
+    $okD = $plD['after']['okRatio'] && $plD['after']['okBalance'] && abs($plD['data']['expenses']['eos_contr']['ll'] - (-$s295['diffL'])) < 2;
+    $okF = abs($plF['after']['diffL']) <= 200000 && count(array_filter($plF['changes'], fn($c) => $c['kind'] === 'rev')) >= 1 && $plF['data']['revenues'][0]['fee_ll'] % 1000 === 0; // باقي تدوير الألف فقط
+    // عجز: الأقساط صغيرة ⇒ خفض ج/د حتى الصفر وملاحظة بما بقي
+    foreach ($d295['revenues'] as $i => $r) $d295['revenues'][$i]['fee_ll'] = 1000000;
+    $d295['expenses']['aid'] = ['ll' => 200000000, 'usd' => 0];
+    $sDef = meheSummary($d295, $p295); $plX = meheBalancePlan($d295, $p295, $sDef, ['mode' => 'c_item', 'c_key' => 'aid']);
+    $okX = $sDef['diffL'] > 0 && (float)$plX['data']['expenses']['aid']['ll'] === 0.0 && !$plX['after']['okBalance'] && count($plX['notes']) >= 1;
+    // الصفحة: زرّ وازِن + اللوحة + المعالج + تلوين النسبتين + التنبيه الفوري
+    $h295 = renderPage('pages/mehe_budget.php', [], [], [2], '', '2025-2026');
+    $okPg = strpos($h295, 'onclick="meheBalToggle()">⚖️ وازِن</button>') !== false && strpos($h295, 'id="balPanel"') !== false && substr_count($h295, 'name="balmode"') === 4
+        && strpos($h295, 'class="bal-ab"') !== false && strpos($h295, 'class="bal-c"') !== false && strpos($h295, 'function balLive(sh)') !== false && strpos($h295, "fd.append('mehe_balance','1')") !== false
+        && strpos((string)file_get_contents($PROJ . '/pages/mehe_budget.php'), "isset(\$_POST['mehe_balance'])") !== false && stripos($h295, 'Fatal error') === false;
+    $ok295 = $okDef && $okC && $okM && $okD && $okF && $okX && $okPg;
+    $why295 = 'def=' . (int)$okDef . ' c=' . (int)$okC . ' mix=' . (int)$okM . ' d=' . (int)$okD . ' fees=' . (int)$okF . ' deficit=' . (int)$okX . ' page=' . (int)$okPg . ' cMax=' . number_format($s295['cMaxL']) . ' diff=' . number_format($s295['diffL']);
+} catch (Throwable $e) { $ok295 = false; $why295 = $e->getMessage(); }
+check('⚖️ موازنة الوزارة «وازِن» (2026-11-08): سقف ج = (أ+ب)×35/65 · بند ج يتوقّف عند السقف · مزيج يملأ ج ويكمل بـد ⇒ امتثال كامل · بند د · الأقساط بنسبة واحدة مدوّرة للألف · العجز يخفّض حتى الصفر مع ملاحظة · الصفحة: زرّ + 4 طرق + تلوين النسبتين + تنبيه فوري', $ok295, $why295);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
