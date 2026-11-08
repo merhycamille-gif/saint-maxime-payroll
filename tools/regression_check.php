@@ -5017,13 +5017,19 @@ check('السلسلة 2017 الدرجات 41-52 = الجريدة الرسمية 
 require_once __DIR__ . '/../includes/mehe_budget.php';
 ensureMeheBudget20260906();
 $mb99 = renderPage('pages/mehe_budget.php', [], [], [2], '', '2025-2026');
-check('موازنة الوزارة: الصفحة ترندر لمدرسة واحدة بكل أقسام النموذج (الطلب، معلومات المدرسة، الملاك، المتعاقدون، الإداريون، الهيكل، المعفيون، الصرف، التكاليف، الإيرادات، الملخّص) + نموذج بأزرار تعديل/حفظ لكل سطر + ستايلات الطباعة',
-      strpos($mb99, 'أعضاء هيئة التدريس في الملاك') !== false && strpos($mb99, 'أعضاء هيئة التدريس المتعاقدين') !== false
-      && strpos($mb99, 'الموظفون الإداريون') !== false && strpos($mb99, 'الهيكل الإداري والتعليمي') !== false
-      && strpos($mb99, 'قائمة الطلاب المعفيين') !== false && strpos($mb99, 'تعويضات الصرف للداخلين في الملاك') !== false
-      && strpos($mb99, 'تكاليف التشغيل') !== false && strpos($mb99, 'ملخص الميزانية') !== false
-      && strpos($mb99, 'class="card no-print mehe-form"') !== false && strpos($mb99, 'meheWireRow') !== false && strpos($mb99, 'landscapePage') !== false
-      && strpos($mb99, 'name="mehe_save"') !== false && strpos($mb99, 'FATAL') === false);
+// 🏛️🖥️ (2026-11-08 «فيك تعملها بنفس الترتيب والتنظيم والصفحات والشكل») الصفحة = نسخة منصّة الوزارة: قائمة جانبية بالأقسام الاثني عشر
+//    بعناوينها وترتيبها، قسم = div.doc-sheet.mehe-sec، أعمدة الجداول كالمنصّة (معرف الموظف … إجمالي الراتب)، أشهر الراتب/النقل، السابق/التالي، الوثائق
+$mbNav99 = []; preg_match_all('/<nav class="mehe-nav[^>]*>(.*?)<\/nav>/su', $mb99, $mN); preg_match_all('/data-sec="(\d+)"[^>]*>([^<]+)</u', $mN[1][0] ?? '', $mL); $mbNav99 = $mL[2] ?? [];
+check('موازنة الوزارة: الصفحة = منصّة الوزارة (2026-11-08) — القائمة الجانبية بالأقسام الاثني عشر بعناوين المنصّة وترتيبها + 12 قسماً + أعمدة المنصّة (معرف الموظف، الاسم والشهرة، إجمالي الراتب، أشهر الراتب/النقل) + خانات التفتيش (البرامج/الصفوف/مالك العقار/الانترنت) + الوثائق المطلوبة + السابق/التالي + ستايلات الطباعة',
+      $mbNav99 === meheSectionTitles() && substr_count($mb99, 'class="doc-sheet mehe-sec"') === 12 && count(meheSectionTitles()) === 12
+      && strpos($mb99, '<th>معرف الموظف</th><th>الاسم والشهرة</th><th>دور الموظف</th><th>مستوى التعليم</th><th>مؤهلات المعلم</th><th>تاريخ الدخول الى الملاك</th>') !== false
+      && strpos($mb99, '<th>إجمالي الراتب</th>') !== false && substr_count($mb99, '<label>أشهر الراتب</label>') === 3 && substr_count($mb99, '<label>أشهر النقل</label>') === 3
+      && strpos($mb99, 'data-mrow="field|programs_sel"') !== false && strpos($mb99, 'data-mrow="field|classes_sel"') !== false && strpos($mb99, 'data-mrow="field|owner_sel"') !== false && strpos($mb99, 'data-mrow="field|internet_sel"') !== false
+      && strpos($mb99, 'name="mehe_doc" value="minutes"') !== false && strpos($mb99, 'name="mehe_doc" value="audit"') !== false
+      && strpos($mb99, 'onclick="meheGo(1)">التالي</button>') !== false && strpos($mb99, 'onclick="meheGo(10)">السابق</button>') !== false
+      && strpos($mb99, 'ملخص الموازنة') !== false && strpos($mb99, 'فرق الرسوم الدراسية عن العام الماضي') !== false
+      && strpos($mb99, 'landscapePage') !== false && strpos($mb99, 'mehe-form') === false && strpos($mb99, '">et') === false && strpos($mb99, 'FATAL') === false,
+      'nav=' . count($mbNav99) . ' secs=' . substr_count($mb99, 'class="doc-sheet mehe-sec"'));
 // 🏛️ موازنة تقديرية (2026-11-08 «هيدي موازنة: منشوف الأستاذ قديش راتبه ومنحط عدد الأشهر ومنضرب»): الشهري = راتب آخر شهر مدفوع،
 //    عدد الأشهر = 12 لكل عمود له قيمة، المجموع = الشهري × 12 (لا مجموع السنة الفعلي ولا الأشهر المدفوعة)؛ «avg» القديم يُحوَّل إلى «last»
 $mbLoaded99 = meheLoad($db, [2], '2025-2026'); // meheLoad يطبّع الوضع: كل ما ليس «oct» ⇒ «last»
@@ -5075,7 +5081,7 @@ check('موازنة الوزارة: مجموعة مدارس (مكسيموس + ا
       'tit=' . count($mbPG99['tit']));
 // ✏️💾 «بدي قدام كل سطر من صفحات الموازنة الخيار تعديل وحفظ» (2026-09-07): كل سطر بأوراق الموازنة قدّامه تعديل/حفظ
 //   (موظفون emp، أشهر الأعمدة months، ملخّص sum، خانات field، نفقات exp، قوائم list) + معالج fetch + JS الصفحة
-$mbRows99 = []; foreach (['emp|e', 'months|tit', 'sum|A|0', 'field|serial', 'field|languages|fr', 'field|equipment|', 'field|rooms|', 'exp|phone', 'list|grants|new', 'list|revenues|', 'list|severance|new', 'list|manual_admins|new'] as $mk99) $mbRows99[$mk99] = strpos($mb99, 'data-mrow="' . $mk99) !== false;
+$mbRows99 = []; foreach (['emp|e', 'months|tit', 'months2|tit', 'sum|A|0', 'field|director', 'field|languages|fr', 'field|equipment|', 'field|rooms|', 'exp|phone', 'list|grants|new', 'list|revenues|', 'list|severance|new', 'list|manual_admins|new'] as $mk99) $mbRows99[$mk99] = strpos($mb99, 'data-mrow="' . $mk99) !== false;
 check('موازنة الوزارة: زرّا «تعديل/حفظ» قدّام كل سطر بالأوراق نفسها (موظفون، أشهر الأعمدة، ملخّص، خانات المدرسة، اللغات، المعدات، الغرف، النفقات، منح/إيرادات/صرف/إداريون يدويون) + أزرار «+ سطر» + المعالج والـJS + الأزرار مخفية بالطباعة',
       !in_array(false, $mbRows99, true) && substr_count($mb99, 'class="rowctl no-print"') > 150 && strpos($mb99, "fd.append('mehe_row'") !== false
       && strpos($mb99, 'meheAddSheetRow') !== false
@@ -5106,8 +5112,8 @@ check('موازنة الوزارة: منطق التعديل من الورقة �
       && $mbGi === $mbG0 && $mbGcat === 'بقية الكادر' && $mbG2 === $mbG0
       && $eq99($mbPR['tit'][0]['base'], $mbE0['base']) && empty($mbPR['tit'][0]['overridden']) && !$mbBad['ok'],
       'base=' . $mbE1['base'] . ' tm=' . $mbPM['tit_months']['transport'] . ' A6usd=' . $mbSM1['A'][6][2] . ' grants=' . $mbGi . '/' . $mbG2);
-check('موازنة الوزارة: تصدير إكسل سليم (11 ورقة، صيغ SUM×الأشهر، إعادة حساب عند الفتح) + الرابط بقائمة التقارير',
-      strpos($mbX99, 'PK') === 0 && $mbSheets99 === 11 && $mbFormulas99
+check('موازنة الوزارة: تصدير إكسل سليم (12 ورقة بترتيب المنصّة، صيغ SUM×الأشهر، إعادة حساب عند الفتح) + الرابط بقائمة التقارير',
+      strpos($mbX99, 'PK') === 0 && $mbSheets99 === 12 && $mbFormulas99
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'pages/mehe_budget.php') !== false
       && strpos((string)file_get_contents($PROJ . '/index.php'), "['pages/mehe_budget.php','fas fa-landmark'") !== false, // بطاقة بلوحة القيادة (طلبه: «اسم موازنة وزارة التربية مش موجود بالأيقونات»)
       "sheets=$mbSheets99");
@@ -11299,6 +11305,56 @@ try {
     $why291 = 'head=' . (int)$okHead291 . ' data=' . (int)$okData291 . ' empTot=' . (int)$okEmpTot291 . ' dash=' . (int)$okDash291 . ' xls=' . (int)$okXls291 . ' f6=' . $fmt291($emp291['f6']) . ' e85=' . $fmt291($emp291['e85']);
 } catch (Throwable $e) { $ok291 = false; $why291 = $e->getMessage(); }
 check('🛡️ كشف الضمان الشهري (2026-11-08): عمودا التعويضات العائلية 6٪ ونهاية الخدمة 8.5٪ للموظفين (الأستاذ —) + مجموع حصّة المدرسة = 8+6+8.5 — بالشاشة والإكسل مع النسب المؤرَّخة والمجاميع', $ok291, $why291);
+
+/* 292) 🏛️🖥️ موازنة الوزارة = منصّة psb.mehe.gov.lb (2026-11-08): منطق الخانات الجديدة —
+ *      أشهر الراتب/النقل لكل فئة (months2) تسري على الجداول · استثناء/إرجاع موظف (exclude) · ضمان الموظف الإداري = الفروع الثلاثة ·
+ *      فئة المنحة من عضو هيئة التدريس · ترحيل معلومات المدرسة ومعرّفات الموظفين لسنة جديدة بلا حفظ · خانات التفتيش «أ|ب» · فرق الرسوم عن العام الماضي */
+$ok292 = false; $why292 = '';
+try {
+    $d292 = meheLoad($db, [2], '2025-2026'); $d292['excluded'] = []; $d292['overrides'] = ['emp' => [], 'months' => [], 'sum' => []]; $d292['months'] = [];
+    $p0 = mehePayroll($db, [2], '2025-2026', $d292);
+    // months2: أشهر الراتب 11 والنقل 9 للمتعاقدين ⇒ كل أعمدة الراتب ×11 والنقل ×9
+    meheApplyRowEdit($d292, ['mehe_row' => 'months2', 'key' => 'con', 'f' => ['salary' => '11', 'transport' => '9']]);
+    $p1 = mehePayroll($db, [2], '2025-2026', $d292); $c0 = $p0['con'][0]; $c1 = $p1['con'][0];
+    $okM = (int)$c1['months']['base'] === 11 && abs((float)$c1['base_total'] - 11 * (float)$c1['base']) < 1 && (int)$p1['con_months']['base'] === 11 && (int)$p1['con_months']['transport'] === 9 && (int)$p1['tit_months']['base'] === 12
+        && abs((float)$c1['base'] - (float)$c0['base']) < 1 && (float)$c1['total_ll'] === (float)$c1['base'] + (float)$c1['extra_ll'];
+    $bad292 = meheApplyRowEdit($d292, ['mehe_row' => 'months2', 'key' => 'con', 'f' => ['salary' => '40']]);
+    // exclude: استثناء أوّل ملاك ثمّ إرجاعه
+    $e0 = (int)$p0['tit'][0]['id'];
+    meheApplyRowEdit($d292, ['mehe_row' => 'exclude', 'key' => 'e' . $e0, 'f' => ['v' => '1']]); $p2 = mehePayroll($db, [2], '2025-2026', $d292);
+    meheApplyRowEdit($d292, ['mehe_row' => 'exclude', 'key' => 'e' . $e0, 'f' => ['v' => '0']]); $p3 = mehePayroll($db, [2], '2025-2026', $d292);
+    $okX = count($p2['tit']) === count($p0['tit']) - 1 && !in_array($e0, array_map(fn($r) => (int)$r['id'], $p2['tit']), true) && count($p3['tit']) === count($p0['tit']) && $d292['excluded'] === [];
+    // ضمان الإداري = 8٪ + 6٪ + 8.5٪ المخزّنة بآخر شهر مدفوع
+    $okC = true; $whyC = '';
+    foreach ($p0['adm'] as $a) { if (!empty($a['manual'])) continue;
+        $r = $db->query("SELECT school_cnss_8_lbp + school_family_comp_6_lbp + school_end_of_service_8_5_lbp s FROM monthly_salaries WHERE employee_id = " . (int)$a['id'] . " AND school_year = '2025-2026' AND (school_cnss_8_lbp + school_family_comp_6_lbp + school_end_of_service_8_5_lbp) > 0 ORDER BY year DESC, month DESC LIMIT 1")->fetchColumn();
+        if (abs((float)$r - (float)$a['cnss']) >= 1) { $okC = false; $whyC = ' adm#' . $a['id'] . ' cnss=' . $a['cnss'] . ' db=' . $r; } }
+    $okT = true; foreach ($p0['tit'] as $t) { $r = $db->query("SELECT school_cnss_8_lbp FROM monthly_salaries WHERE employee_id = " . (int)$t['id'] . " AND school_year = '2025-2026' AND school_cnss_8_lbp > 0 ORDER BY year DESC, month DESC LIMIT 1")->fetchColumn(); if (abs((float)$r - (float)$t['cnss']) >= 1) { $okT = false; break; } }
+    // فئة المنحة من عضو هيئة التدريس (ملاك ⇒ ملاك، غيره ⇒ بقية الكادر)
+    $d292['grants'] = [['student' => 'فحص 1', 'teacher' => $p0['tit'][0]['name'], 'class' => 'منهاج لبناني-الاول اساسي', 'll' => 1000, 'usd' => 0, 'cat' => 'بقية الكادر'], ['student' => 'فحص 2', 'teacher' => $p0['con'][0]['name'], 'class' => '', 'll' => 500, 'usd' => 0, 'cat' => 'ملاك']];
+    meheSyncGrantCats($d292, $p0);
+    $okG = $d292['grants'][0]['cat'] === 'ملاك' && $d292['grants'][1]['cat'] === 'بقية الكادر';
+    // خانات التفتيش «أ|ب» + عضو اللجنة المالية رقم 1
+    meheApplyRowEdit($d292, ['mehe_row' => 'field', 'key' => 'programs_sel', 'f' => ['v' => 'منهاج لبناني|AP']]);
+    meheApplyRowEdit($d292, ['mehe_row' => 'field', 'key' => 'fin_member|1', 'f' => ['v' => 'عضو فحص']]);
+    $okF = meheMulti($d292['programs_sel']) === ['منهاج لبناني', 'AP'] && (explode("\n", $d292['fin_committee'])[1] ?? '') === 'عضو فحص';
+    // الترحيل: سنة وهمية بلا حفظ لنطاق فحص ⇒ تأخذ معلومات المدرسة ومعرّف الموظف من السنة السابقة المحفوظة ولا النفقات
+    $scope292 = '999991'; $db->exec("DELETE FROM mehe_budget WHERE scope = '$scope292'");
+    $prev292 = ['director' => 'مدير فحص', 'rooms' => ['مسرح' => 3], 'expenses' => ['phone' => ['ll' => 777, 'usd' => 0]], 'months' => ['tit' => ['salary' => 12, 'transport' => 10]], 'overrides' => ['emp' => ['55' => ['mehe_id' => '2121400476TEST', 'base' => 999]]]];
+    $db->prepare("INSERT INTO mehe_budget (school_id, scope, school_year, data, updated_at) VALUES (999991, ?, '2024-2025', ?, NOW())")->execute([$scope292, json_encode($prev292, JSON_UNESCAPED_UNICODE)]);
+    $new292 = meheLoad($db, [999991], '2025-2026');
+    $okP = ($new292['director'] ?? '') === 'مدير فحص' && (int)($new292['rooms']['مسرح'] ?? 0) === 3 && (float)($new292['expenses']['phone']['ll'] ?? 0) === 0.0
+        && (int)($new292['months']['tit']['transport'] ?? 0) === 10 && ($new292['overrides']['emp']['55']['mehe_id'] ?? '') === '2121400476TEST' && !isset($new292['overrides']['emp']['55']['base']) && !empty($new292['carried_from']);
+    // فرق الرسوم عن العام الماضي: متوسّط الرسوم من بيانات محفوظة
+    $avg292 = meheAvgFeeFromData(['revenues' => [['class' => 'أ', 'fee_ll' => 100, 'fee_usd' => 0, 'students' => 10]], 'grants' => [['student' => 'x', 'cat' => 'ملاك', 'll' => 100, 'usd' => 0]]]);
+    $okA = abs((float)$avg292['ll'] - 100.0) < 0.01 && (int)$avg292['students'] === 10; // (1000-100)/(10-1)=100
+    $db->exec("DELETE FROM mehe_budget WHERE scope = '$scope292'");
+    // قوائم المنصّة الحرفية
+    $okL = count(meheRoleOptions()) === 49 && count(meheQualOptions()) === 37 && meheLevelOptions() === ['غير محدد', 'روضة', 'اساسي', 'متوسط', 'ثانوي', 'كل المراحل'] && meheAdminTypeOptions() === ['عادي', 'فوق السن', 'اجنبي'] && count(meheRoomTypes()) === 22 && count(meheEquipmentTypes()) === 10 && count(meheExpenseItems()) === 21;
+    $ok292 = $okM && !$bad292['ok'] && $okX && $okC && $okT && $okG && $okF && $okP && $okA && $okL;
+    $why292 = 'months2=' . (int)$okM . ' bad40=' . (int)!$bad292['ok'] . ' exclude=' . (int)$okX . ' admCnss=' . (int)$okC . $whyC . ' titCnss=' . (int)$okT . ' grantCat=' . (int)$okG . ' fields=' . (int)$okF . ' carry=' . (int)$okP . ' avg=' . (int)$okA . ' lists=' . (int)$okL;
+} catch (Throwable $e) { $ok292 = false; $why292 = $e->getMessage(); try { $db->exec("DELETE FROM mehe_budget WHERE scope = '999991'"); } catch (Throwable $e2) {} }
+check('🏛️🖥️ موازنة الوزارة = المنصّة (2026-11-08): أشهر الراتب/النقل لكل فئة + حدّها 24 + استثناء/إرجاع موظف + ضمان الإداري بفروعه الثلاثة والأستاذ 8٪ + فئة المنحة من عضو هيئة التدريس + خانات التفتيش وعضو اللجنة + ترحيل سنة جديدة (معلومات/أشهر/معرّفات، لا نفقات) + متوسّط الرسوم + قوائم المنصّة الحرفية (49 دوراً/37 مؤهّلاً)', $ok292, $why292);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

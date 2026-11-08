@@ -55,6 +55,46 @@ function meheLanguages(): array {
     return ['fr' => 'الفرنسية', 'en' => 'الانكليزية', 'hy' => 'الارمنية', 'de' => 'الالمانية', 'it' => 'الايطالية', 'es' => 'الاسبانية', 'other' => 'لغات اخرى'];
 }
 function meheLevels(): array { return ['روضة', 'اساسي', 'متوسط', 'ثانوي']; }
+/* 🏛️🖥️ (2026-11-08 «فيك تعملها بنفس الترتيب والتنظيم والصفحات والشكل») قوائم منصّة الوزارة psb.mehe.gov.lb حرفياً — مأخوذة من
+ *  صفحة «موازنة 2025» المُرسَلة (قوائم الاختيار نفسها بالترتيب نفسه) كي يُنقَل كل سطر إلى المنصّة بلا ترجمة */
+function meheSectionTitles(): array {
+    return ['تحديث معلومات المدرسة', 'استطلاع', 'أعضاء هيئة التدريس في الملاك', 'أعضاء هيئة التدريس المتعاقدين', 'الموظفون الإداريون', 'الهيكل الإداري والتعليمي',
+            'قائمة الطلاب المعفيين', 'تعويضات الصرف للداخلين في الملاك', 'تكاليف التشغيل', 'الإيرادات', 'ملخص الموازنة', 'الوثائق المطلوبة'];
+}
+function meheProgramOptions(): array { return ['منهاج لبناني', 'منهاج اجنبي', 'البكالوريا الفرنسية', 'بكالوريا الدولية', 'AP', 'برامج وصفوف أخرى']; }
+function meheClassesByLevel(): array {
+    return ['روضة' => ['الروضة الاولى', 'الروضة الثانية', 'الروضة الثالثة'],
+            'اساسي' => ['الاول اساسي', 'الثاني اساسي', 'الثالث اساسي', 'الرابع اساسي', 'الخامس اساسي', 'السادس اساسي'],
+            'متوسط' => ['السابع متوسط', 'الثامن متوسط', 'التاسع متوسط'],
+            'ثانوي' => ['العاشر ثانوي', 'الحادي عشر ثانوي', 'الثاني عشر ثانوي']];
+}
+function meheOwnerOptions(): array { return ['بلدية', 'خاص', 'الدولة']; }
+function meheSharedWithOptions(): array { return ['مساكن', 'محلات تجارية', 'مدرسة اخرى/مركز تربوي', 'مرکز دینی']; }
+function meheInternetOptions(): array { return ['محصورة بشبكة تربوية', 'مفتوح ومراقب', 'مفتوح وغير مراقب', 'خاصة بالادارة والمعلميين', 'مفتوح على الشبكات العالمية بأكملها', 'مفتوح للطلاب']; }
+function meheOtherDetailOptions(): array { return ['معدات لذوي الاحتياجات الخاصة', 'الطاقة الخضراء', 'المدارس الدامجة']; }
+function meheRoleOptions(): array {
+    return ['أستاذ \\ معلم', 'محاسب', 'مسؤول قسم الرياضة', 'ناظر', 'مسؤول قسم المعلوماتية', 'مدير المدرسة المتوسطة', 'مدير الحضانة', 'مدير مساعد', 'مسؤول شؤون الاملاك', 'اخصائي موارد بشرية',
+            'مسؤول قسم النشاطات: حدد', 'تربية مختصة: حدد', 'ممرضة', 'مرشد/ة صحي/ة', 'منسق مادة', 'اخصائي شؤون الطلاب', 'موظف مساعد في المكتبة', 'سكرتير: حدد', 'عامل تنظيفات', 'مدير مدرسة',
+            'مسؤول عن المكتبة', 'أمينة مكتبة', 'موظف معلوماتية', 'مساعد/ة لمدرسات صف الروضة التحضيرية', 'موظف اعمال ادارية مدرسية: حدد', 'مساعد مدير', 'مسؤول شؤون مالية', 'مسؤول قسم الفنون', 'سكرتير',
+            'موظف خدمات الغذائية', 'عاملة اجتماعية', 'مدير القسم المهني', 'موظف اعمال ادارية مدرسية', 'مسؤول عن الخدمات الغذائية', 'أخصائي إرشاد', 'مدير القسم الفني', 'مدبر', 'عامل صيانة', 'اخصائي علم نفس',
+            'سائق', 'حارس', 'مسؤول قسم النشاطات', 'تربية مختصة', 'مدير المدرسة الإبتدائية', 'مدير الدروس', 'مدير المدرسة ثانوي', 'موجه تربوي', 'غير محدد', 'اداري'];
+}
+function meheQualOptions(): array {
+    return ['بكالوريا قسم ثاني', 'البكالوريا الفنية BT + BT2', 'اجازة تعليمية', 'اجازة جامعية', 'غيره', 'هاي سكول', 'هندسة', 'توجيهيه', 'دبلوم فني', 'دبلوم ديني', 'لا يحمل شهادة', 'بكالوريا الفنية قسم اول BT1',
+            'الاجازة التعليمية الفنية (LET,LT)', 'دراسات معمقة', 'دكتوراه', 'دبلوم جامعي', 'ثانوية عامة', 'التكميلية المهنية (BP)', 'غيرها من الشهادات التعليمية', 'بكالوريوس', 'اجازة', 'التعليمية المتوسطة',
+            'الامتياز الفني TS', 'دراسات عليا- MA - MS', 'معادلة بكالوريا قسم ثاني', 'دبلوم تربوي', 'جدارة - متريز', 'البكالوريا اوالابتدائية التعليمية', 'الابتدائية العالية', 'فريشمن', 'بكالوريا فرنسية',
+            'افادة من مصلحة التعليم الخاص', 'كفاءة كلية التربية', 'غيرها من الشهادات الاكاديمية', 'c.a.p', 'بكالوريا قسم اول', 'غير محدد'];
+}
+function meheLevelOptions(): array { return ['غير محدد', 'روضة', 'اساسي', 'متوسط', 'ثانوي', 'كل المراحل']; }
+function meheWorkModeOptions(): array { return ['دوام كامل', 'دوام جزئي']; }
+function meheCnssTypeOptions(): array { return ['مضمون', 'غير مضمون']; }
+function meheAdminTypeOptions(): array { return ['عادي', 'فوق السن', 'اجنبي']; }
+/** الوثائق المطلوبة (القسم 12 بالمنصّة) — key => تسمية */
+function meheDocTypes(): array {
+    return ['minutes' => 'محاضر اللجنة المالية', 'fund_statement' => 'بيان صندوق التعويضات', 'eos_receipts' => 'إيصالات تسوية نهاية الخدمة من الضمان الاجتماعي', 'audit' => 'تقرير التدقيق'];
+}
+/** قيمة متعدّدة (خانات تفتيش) مخزّنة نصّاً مفصولاً بـ«|» ⇒ مصفوفة */
+function meheMulti($v): array { return array_values(array_filter(array_map('trim', explode('|', (string)$v)), fn($x) => $x !== '')); }
 /** بنود تكاليف التشغيل بترتيب صفحة «النفقات» بالنموذج — key => [التسمية, الفئة] */
 function meheExpenseItems(): array {
     return [
@@ -132,6 +172,11 @@ function meheDefaults(PDO $db, int $schoolId, string $sy): array {
         'grants' => [],            // [{student, teacher, cat(ملاك|بقية الكادر), class, ll, usd}]
         'severance' => [],         // [{name, eos_ll, eos_usd, tasks_ll, tasks_usd, receipt_no, receipt_date, notes}]
         'manual_admins' => [],     // إداريون خارج الرواتب [{name, mode, start_date, type, cnss_type, base, extra_ll, extra_usd, tasks_ll, grants_ll, transport, cnss, months}]
+        // 🏛️🖥️ (2026-11-08) خانات المنصّة: خانات تفتيش مخزّنة «أ|ب|ج» + أشهر الراتب/النقل لكل فئة + الوثائق المرفوعة
+        'programs_sel' => 'منهاج لبناني', 'levels_sel' => implode('|', meheLevels()), 'classes_sel' => implode('|', array_merge(...array_values(meheClassesByLevel()))),
+        'owner_sel' => 'خاص', 'shared_sel' => '', 'internet_sel' => '', 'other_sel' => '',
+        'months' => ['tit' => ['salary' => 12, 'transport' => 12], 'con' => ['salary' => 12, 'transport' => 12], 'adm' => ['salary' => 12, 'transport' => 12]],
+        'docs' => [],              // key => ['file' => اسم الملف المخزّن, 'orig' => الاسم الأصلي, 'at' => وقت]
         'base_mode' => 'last',     // last = راتب الموظف الحالي (آخر شهر مدفوع) × عدد الأشهر [موازنة تقديرية، طلبه 2026-11-08] · oct = شهر تشرين الأول
         'excluded' => [],          // موظفون يُستثنون من الجداول (بقراره)
         // ✏️ تعديلات يدوية من أوراق الموازنة نفسها («قدام كل سطر تعديل وحفظ» 2026-09-07):
@@ -144,21 +189,48 @@ function meheLoad(PDO $db, array $ids, string $sy): array {
     ensureMeheBudget20260906();
     $schoolId = (int)($ids[0] ?? 0);
     $def = meheDefaults($db, $schoolId, $sy);
+    $apply = function (array $saved) use (&$def) {
+        foreach ($saved as $k => $v) {
+            if (is_array($v) && isset($def[$k]) && is_array($def[$k]) && !isset($v[0]) && !in_array($k, ['revenues', 'grants', 'severance', 'manual_admins', 'excluded', 'docs'], true)) {
+                $def[$k] = array_replace($def[$k], $v);   // قواميس (غرف/معدات/لغات/نفقات)
+            } else {
+                $def[$k] = $v;
+            }
+        }
+    };
     try {
         $st = $db->prepare("SELECT data FROM mehe_budget WHERE scope = ? AND school_year = ?");
         $st->execute([meheScopeKey($ids), $sy]);
         $j = $st->fetchColumn();
         if ($j) {
-            $saved = json_decode((string)$j, true) ?: [];
-            foreach ($saved as $k => $v) {
-                if (is_array($v) && isset($def[$k]) && is_array($def[$k]) && !isset($v[0]) && !in_array($k, ['revenues', 'grants', 'severance', 'manual_admins', 'excluded'], true)) {
-                    $def[$k] = array_replace($def[$k], $v);   // قواميس (غرف/معدات/لغات/نفقات)
-                } else {
-                    $def[$k] = $v;
-                }
+            $apply(json_decode((string)$j, true) ?: []);
+        } else {
+            // 🏛️🖥️ (2026-11-08) سنة جديدة بلا حفظ ⇒ ترحيل ما يثبت من آخر موازنة محفوظة لهذا النطاق (معلومات المدرسة، الاستطلاع، الهيكل،
+            //    الأشهر، معرّفات الموظفين بالمنصّة، الإداريون خارج الرواتب) — لا الأرقام (نفقات/أقساط/منح/صرف/قيم يدوية) ولا الوثائق
+            $pv = $db->prepare("SELECT data FROM mehe_budget WHERE scope = ? AND school_year < ? ORDER BY school_year DESC LIMIT 1");
+            $pv->execute([meheScopeKey($ids), $sy]);
+            $pj = $pv->fetchColumn();
+            if ($pj) {
+                $prev = json_decode((string)$pj, true) ?: [];
+                $carry = [];
+                foreach (['director', 'parents_head', 'parents_phone', 'fin_committee', 'programs_sel', 'levels_sel', 'classes_sel', 'playground_open', 'playground_closed', 'owner_sel', 'building_owner',
+                          'buildings_school', 'buildings_res', 'shared_sel', 'internet_sel', 'other_sel', 'languages', 'rooms', 'equipment', 'struct_admin_law', 'struct_workers_law', 'struct_others',
+                          'classes_per_level', 'staff_mgmt', 'staff_supervision', 'months', 'manual_admins', 'base_mode', 'center_no', 'serial'] as $k) if (array_key_exists($k, $prev)) $carry[$k] = $prev[$k];
+                $ids2 = [];
+                foreach ((array)($prev['overrides']['emp'] ?? []) as $eid => $ov) if (isset($ov['mehe_id']) && trim((string)$ov['mehe_id']) !== '') $ids2[$eid] = ['mehe_id' => (string)$ov['mehe_id']];
+                if ($ids2) $carry['overrides'] = ['emp' => $ids2, 'months' => [], 'sum' => []];
+                $apply($carry);
+                $def['carried_from'] = 'prev';
             }
         }
     } catch (Throwable $e) {}
+    // الخانات المتعدّدة الجديدة فارغة وعندها نصّ قديم (programs/internet/…) ⇒ حوّله مرّة (كان نصّاً حرّاً مفصولاً بفواصل)
+    foreach ([['programs_sel', 'programs'], ['internet_sel', 'internet'], ['shared_sel', 'shared_with'], ['other_sel', 'other_details'], ['owner_sel', 'owner']] as [$nk, $ok]) {
+        if (trim((string)($def[$nk] ?? '')) === '' && trim((string)($def[$ok] ?? '')) !== '') $def[$nk] = implode('|', array_filter(array_map('trim', preg_split('/[,،|]/u', (string)$def[$ok]))));
+    }
+    if (!is_array($def['months'] ?? null)) $def['months'] = [];
+    foreach (['tit', 'con', 'adm'] as $tk) $def['months'][$tk] = array_replace(['salary' => 12, 'transport' => 12], (array)($def['months'][$tk] ?? []));
+    if (!is_array($def['docs'] ?? null)) $def['docs'] = [];
     // 🏛️ 2026-11-08 «هيدي موازنة: منشوف الأستاذ قديش راتبه ومنحط عدد الأشهر ومنضرب»: الوضع القديم «معدل الأشهر المدفوعة» أُلغي ⇒ راتب حالي × أشهر
     if (($def['base_mode'] ?? '') !== 'oct') $def['base_mode'] = 'last';
     // مدير المدرسة الافتراضي من ملف المدرسة إن وُجد (مدرسة واحدة)
@@ -229,6 +301,9 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
     $cols = [
         'base' => 'base_plus_echelon_lbp', 'extra_ll' => 'extra_lbp + prime_fixe_lbp', 'bonus' => 'aide_complementaire_lbp',
         'transport' => 'transport_lbp', 'family' => 'family_allowance_lbp', 'cnss' => 'school_cnss_8_lbp', 'fund' => 'school_eoc_6_lbp',
+        // 🏛️🖥️ (2026-11-08 مطابقة المنصّة): «مساهمة الضمان» للموظف الخاضع لقانون العمل = فروعه الثلاثة (8٪ مرض وأمومة + 6٪ عائلي + 8.5٪ نهاية خدمة)
+        //   كما بموازنة 2025 المُرسَلة (انطوان الدايخ 6,056,400)؛ الأستاذ 8٪ فقط
+        'cnss3' => 'school_cnss_8_lbp + school_family_comp_6_lbp + school_end_of_service_8_5_lbp',
     ];
     $sel = [];
     foreach ($cols as $k => $expr) {
@@ -259,6 +334,7 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
             'h_extra' => 0, 'mode' => 'دوام كامل', 'cnss_type' => ((int)($r['cnss_subject'] ?? 1) === 1) ? 'مضمون' : 'غير مضمون',
             'admin_type' => 'عادي', 'admin_mode' => meheRoleText($r),
             'extra_usd' => 0, 'retro' => 0, 'missions_ll' => 0, 'missions35' => 0, 'tasks_ll' => 0, 'grants_ll' => 0,
+            'mehe_id' => '',   // معرّف الموظف بمنصّة الوزارة (يُدخل مرّة من الورقة ويُرحَّل سنة بعد سنة)
             'months' => [],
         ];
         foreach ($cols as $k => $_) {
@@ -268,12 +344,16 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
                 $monthly = $mode === 'oct' ? (float)$r[$k . '_oct'] : (float)$r[$k . '_last'];
                 if ($monthly <= 0) $monthly = (float)$r[$k . '_last'] > 0 ? (float)$r[$k . '_last'] : $sum / $m; // لا شهر تشرين ⇒ الراتب الحالي ثم المعدل
             }
-            $mm = $monthly > 0 ? 12 : 0; // موازنة السنة كلّها: 12 شهراً لكل عمود له قيمة (يعدّلها من صفّ «عدد الاشهر»)
+            // 🏛️🖥️ أشهر الراتب/النقل لكل فئة كما بالمنصّة (أشهر الراتب لكل الأعمدة، أشهر النقل لعمود النقل) — افتراضها 12
+            $tk0 = $r['employee_type'] === 'enseignant_titulaire' ? 'tit' : ($r['employee_type'] === 'enseignant_contractuel' ? 'con' : 'adm');
+            $mm = $monthly > 0 ? max(0, (int)($data['months'][$tk0][$k === 'transport' ? 'transport' : 'salary'] ?? 12)) : 0;
             $row[$k] = $monthly;
             $row['months'][$k] = $mm;
             $row[$k . '_total'] = $monthly * $mm;
         }
         $row['months_all'] = (int)$r['months_all'];
+        if ((string)$r['employee_type'] === 'employe') { $row['cnss'] = $row['cnss3']; $row['cnss_total'] = $row['cnss3_total']; $row['months']['cnss'] = $row['months']['cnss3']; }
+        unset($row['cnss3'], $row['cnss3_total'], $row['months']['cnss3']);
         meheApplyEmpOverride($row, (array)($data['overrides']['emp'][(string)(int)$r['id']] ?? []));
         $t = (string)$r['employee_type'];
         if ($t === 'enseignant_titulaire') $tit[] = $row;
@@ -283,15 +363,19 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
     // إداريون خارج الرواتب (أُدخلوا يدوياً بالصفحة)
     foreach (array_values((array)($data['manual_admins'] ?? [])) as $mi => $ma) {
         if (trim((string)($ma['name'] ?? '')) === '') continue;
-        $mm = max(1, (int)($ma['months'] ?? 12));
+        $mm = max(1, (int)($ma['months'] ?? ($data['months']['adm']['salary'] ?? 12)));
+        $mmT = max(0, (int)($data['months']['adm']['transport'] ?? $mm));
         $row = ['id' => 0, 'key' => 'm' . $mi, 'school' => (string)($ma['school'] ?? ''), 'name' => (string)$ma['name'], 'admin_mode' => (string)($ma['mode'] ?? ''), 'start_date' => (string)($ma['start_date'] ?? ''),
-                'admin_type' => (string)($ma['type'] ?? 'عادي'), 'cnss_type' => (string)($ma['cnss_type'] ?? 'غير مضمون'), 'months' => [], 'manual' => true];
+                'admin_type' => (string)($ma['type'] ?? 'عادي'), 'cnss_type' => (string)($ma['cnss_type'] ?? 'غير مضمون'), 'mehe_id' => (string)($ma['mehe_id'] ?? ''), 'months' => [], 'manual' => true];
         foreach (['base', 'extra_ll', 'extra_usd', 'tasks_ll', 'grants_ll', 'transport', 'cnss'] as $k) {
-            $v = (float)($ma[$k] ?? 0);
-            $row[$k] = $v; $row['months'][$k] = $v > 0 ? $mm : 0; $row[$k . '_total'] = $v * ($v > 0 ? $mm : 0);
+            $v = (float)($ma[$k] ?? 0); $m1 = $k === 'transport' ? $mmT : $mm;
+            $row[$k] = $v; $row['months'][$k] = $v > 0 ? $m1 : 0; $row[$k . '_total'] = $v * ($v > 0 ? $m1 : 0);
         }
         $adm[] = $row;
     }
+    // إجمالي الراتب الشهري كما بالمنصّة = أساس + أجور إضافية (ل.ل) · والدولار على حدة
+    foreach (['tit', 'con', 'adm'] as $tk) foreach ($$tk as &$row) { $row['total_ll'] = (float)($row['base'] ?? 0) + (float)($row['extra_ll'] ?? 0); $row['total_usd'] = (float)($row['extra_usd'] ?? 0); }
+    unset($row);
     // ✏️ عدد أشهر العمود مفروض يدوياً من الورقة (مثلاً النقل 10 أشهر كالوزارة): يسري على كل موظف له قيمة بالعمود
     $ovM = (array)($data['overrides']['months'] ?? []);
     foreach (['tit', 'con', 'adm'] as $tk) {
@@ -313,14 +397,15 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
     [$tm, $tt] = $mk($tit, ['base', 'extra_ll', 'extra_usd', 'retro', 'missions_ll', 'missions35', 'bonus', 'tasks_ll', 'transport', 'family', 'cnss', 'fund']);
     [$cm, $ct] = $mk($con, ['base', 'extra_ll', 'extra_usd', 'bonus', 'tasks_ll', 'transport', 'cnss']);
     [$am, $at] = $mk($adm, ['base', 'extra_ll', 'extra_usd', 'tasks_ll', 'grants_ll', 'transport', 'cnss']);
-    foreach (['tm', 'cm', 'am'] as $v) foreach ($$v as $k => $m) if ($m === 0) $$v[$k] = 12; // عمود فارغ ⇒ 12 كالنموذج
+    // عمود فارغ ⇒ أشهر الفئة (أشهر الراتب، وللنقل أشهر النقل) كما بالمنصّة — لا 12 ثابتة
+    foreach (['tm' => 'tit', 'cm' => 'con', 'am' => 'adm'] as $v => $tk) foreach ($$v as $k => $m) if ($m === 0) $$v[$k] = max(0, (int)($data['months'][$tk][$k === 'transport' ? 'transport' : 'salary'] ?? 12));
     return ['tit' => $tit, 'con' => $con, 'adm' => $adm, 'tit_months' => $tm, 'tit_tot' => $tt, 'con_months' => $cm, 'con_tot' => $ct,
             'adm_months' => $am, 'adm_tot' => $at, 'mode' => $mode, 'multi' => count($ids) > 1];
 }
 
 /* ===================== ✏️ التعديل اليدوي من أوراق الموازنة («قدام كل سطر تعديل وحفظ» 2026-09-07) ===================== */
 /** أعمدة الموظف القابلة للتعديل من الورقة: نصّية / رقمية (شهري) */
-function meheEmpTextFields(): array { return ['name', 'role', 'qual', 'level', 'cadre_date', 'start_date', 'mode', 'cnss_type', 'admin_type', 'admin_mode']; }
+function meheEmpTextFields(): array { return ['name', 'role', 'qual', 'level', 'cadre_date', 'start_date', 'mode', 'cnss_type', 'admin_type', 'admin_mode', 'mehe_id']; }
 function meheEmpNumFields(): array { return ['h_cadre', 'h_extra', 'base', 'extra_ll', 'extra_usd', 'retro', 'missions_ll', 'missions35', 'bonus', 'tasks_ll', 'grants_ll', 'transport', 'family', 'cnss', 'fund']; }
 /** يحلّ القيم اليدوية محلّ المحسوب لصفّ موظف (الشهري × أشهره = المجموع) */
 function meheApplyEmpOverride(array &$row, array $ov): void {
@@ -343,7 +428,7 @@ function meheListSpecs(): array {
         'revenues'      => [['program' => 's', 'class' => 's', 'fee_ll' => 'n', 'fee_usd' => 'n', 'students' => 'n'], 'class'],
         'grants'        => [['student' => 's', 'teacher' => 's', 'cat' => 's', 'class' => 's', 'll' => 'n', 'usd' => 'n'], 'student'],
         'severance'     => [['name' => 's', 'eos_ll' => 'n', 'eos_usd' => 'n', 'tasks_ll' => 'n', 'tasks_usd' => 'n', 'receipt_no' => 's', 'receipt_date' => 's', 'notes' => 's'], 'name'],
-        'manual_admins' => [['name' => 's', 'school' => 's', 'mode' => 's', 'start_date' => 's', 'type' => 's', 'cnss_type' => 's', 'base' => 'n', 'extra_ll' => 'n', 'extra_usd' => 'n', 'tasks_ll' => 'n', 'grants_ll' => 'n', 'transport' => 'n', 'cnss' => 'n', 'months' => 'n'], 'name'],
+        'manual_admins' => [['name' => 's', 'school' => 's', 'mehe_id' => 's', 'mode' => 's', 'start_date' => 's', 'type' => 's', 'cnss_type' => 's', 'base' => 'n', 'extra_ll' => 'n', 'extra_usd' => 'n', 'tasks_ll' => 'n', 'grants_ll' => 'n', 'transport' => 'n', 'cnss' => 'n', 'months' => 'n'], 'name'],
     ];
 }
 /**
@@ -363,8 +448,17 @@ function meheApplyRowEdit(array &$data, array $P): array {
         case 'field': // خانة مفردة: serial · rooms|<غرفة> · equipment|<معدّة>|admin · languages|fr · classes_per_level|<مرحلة>
             if (!array_key_exists('v', $f)) return $bad('لا قيمة');
             $v = $f['v']; $k0 = $parts[0] ?? '';
-            $strs = ['serial', 'center_no', 'subject', 'reference', 'director', 'parents_head', 'parents_phone', 'programs', 'levels', 'classes', 'fin_committee', 'owner', 'shared_with', 'internet', 'other_details', 'building_owner'];
+            $strs = ['serial', 'center_no', 'subject', 'reference', 'director', 'parents_head', 'parents_phone', 'programs', 'levels', 'classes', 'fin_committee', 'owner', 'shared_with', 'internet', 'other_details', 'building_owner',
+                     'programs_sel', 'levels_sel', 'classes_sel', 'owner_sel', 'shared_sel', 'internet_sel', 'other_sel'];
             $ints = ['playground_open', 'playground_closed', 'buildings_school', 'buildings_res', 'struct_admin_law', 'struct_workers_law', 'struct_others', 'staff_mgmt', 'staff_supervision'];
+            if ($k0 === 'base_mode' && count($parts) === 1) { $data['base_mode'] = $txt($v) === 'oct' ? 'oct' : 'last'; return $ok(); }
+            if ($k0 === 'fin_member' && isset($parts[1])) { // عضو اللجنة المالية رقم n (المنصّة: خانتان «الاسم»)
+                $lines = array_map('trim', explode("\n", (string)($data['fin_committee'] ?? '')));
+                $i = max(0, (int)$parts[1]); while (count($lines) <= $i) $lines[] = '';
+                $lines[$i] = $txt($v); // الموضع يبقى موضعه (العضو 2 يبقى بالسطر الثاني ولو كان الأوّل فارغاً)
+                while ($lines && end($lines) === '') array_pop($lines);
+                $data['fin_committee'] = implode("\n", $lines); return $ok();
+            }
             if (in_array($k0, $strs, true) && count($parts) === 1) { $data[$k0] = $txt($v); return $ok(); }
             if (in_array($k0, $ints, true) && count($parts) === 1) { $data[$k0] = (int)$num($v); return $ok(); }
             if ($k0 === 'rooms' && isset($parts[1]) && in_array($parts[1], meheRoomTypes(), true)) { $data['rooms'][$parts[1]] = (int)$num($v); return $ok(); }
@@ -396,6 +490,18 @@ function meheApplyRowEdit(array &$data, array $P): array {
             foreach (meheEmpNumFields() as $fk) if (array_key_exists($fk, $f)) $cur[$fk] = $num($f[$fk]);
             if ($cur) $data['overrides']['emp'][$id] = $cur; else unset($data['overrides']['emp'][$id]);
             return $ok();
+        case 'months2': // 🏛️🖥️ «أشهر الراتب» و«أشهر النقل» لفئة كما بالمنصّة: key = tit|con|adm، f[salary] و/أو f[transport]
+            if (!in_array($key, ['tit', 'con', 'adm'], true)) return $bad('جدول غير معروف');
+            $cur = array_replace(['salary' => 12, 'transport' => 12], (array)($data['months'][$key] ?? []));
+            foreach (['salary', 'transport'] as $fk) if (array_key_exists($fk, $f)) { $m = (int)$num($f[$fk]); if ($m < 0 || $m > 24) return $bad('عدد الأشهر بين 0 و24'); $cur[$fk] = $m; }
+            $data['months'][$key] = $cur;
+            unset($data['overrides']['months'][$key]); // الأشهر العامّة للفئة تلغي أشهر الأعمدة اليدوية القديمة
+            return $ok('انحفظت الأشهر');
+        case 'exclude': // 🏛️🖥️ استثناء موظف من الموازنة / إرجاعه: key = e<id>، f[v] = 1 استثناء · 0 إرجاع
+            if (!preg_match('/^e(\d+)$/', $key, $m)) return $bad('موظف غير معروف');
+            $id = (int)$m[1]; $ex = array_values(array_filter(array_map('intval', (array)($data['excluded'] ?? [])), fn($x) => $x !== $id));
+            if (!empty($f['v']) && (string)$f['v'] !== '0') $ex[] = $id;
+            $data['excluded'] = $ex; return $ok(!empty($f['v']) && (string)$f['v'] !== '0' ? 'استُثني من الموازنة' : 'رجع إلى الموازنة');
         case 'months': // صفّ «عدد الاشهر» لجدول: key = tit|con|adm، f[<عمود>] = أشهر
             if (!in_array($key, ['tit', 'con', 'adm'], true)) return $bad('جدول غير معروف');
             if ($reset) { unset($data['overrides']['months'][$key]); return $ok('رجعت الأشهر تلقائياً'); }
@@ -493,6 +599,10 @@ function meheSummary(array $d, array $p): array {
     $abcL = $abL + $sum($C, 1); $abcU = $abU + $sum($C, 2);
     $allL = $abcL + $sum($D, 1); $allU = $abcU + $sum($D, 2);
     $pctAB = ($abcL + $abcU) > 0 ? round(($abL + $abU) / ($abcL + $abcU) * 100) : 0;
+    // 🏛️🖥️ «فرق الرسوم الدراسية عن العام الماضي» (آخر سطر بملخّص المنصّة): متوسّط الرسوم هذه السنة − متوسّط آخر موازنة محفوظة سابقة
+    $prevAvg = $d['_prev_avg'] ?? null;
+    $avgFeeLL = $payers > 0 ? $revAfterLL / $payers : 0; $avgFeeUSD = $payers > 0 ? $revAfterUSD / $payers : 0;
+    $feeDiffL = is_array($prevAvg) ? $avgFeeLL - (float)($prevAvg['ll'] ?? 0) : null; $feeDiffU = is_array($prevAvg) ? $avgFeeUSD - (float)($prevAvg['usd'] ?? 0) : null;
     $expTotalLL = 0; $expTotalUSD = 0;
     foreach (meheExpenseItems() as $k => $_) { $expTotalLL += $g($k, 'll'); $expTotalUSD += $g($k, 'usd'); }
     // هيكل الموظفين
@@ -504,7 +614,7 @@ function meheSummary(array $d, array $p): array {
         'pctAB' => $pctAB, 'pctC' => 100 - $pctAB,
         'revRows' => $revRows, 'students' => $students, 'revLL' => $revLL, 'revUSD' => $revUSD,
         'revAfterLL' => $revAfterLL, 'revAfterUSD' => $revAfterUSD, 'payers' => $payers,
-        'avgFeeLL' => $payers > 0 ? $revAfterLL / $payers : 0, 'avgFeeUSD' => $payers > 0 ? $revAfterUSD / $payers : 0,
+        'avgFeeLL' => $avgFeeLL, 'avgFeeUSD' => $avgFeeUSD, 'feeDiffL' => $feeDiffL, 'feeDiffU' => $feeDiffU,
         'diffL' => $allL - $revAfterLL, 'diffU' => $allU - $revAfterUSD,
         'avgDueL' => $students > 0 ? round($allL / $students / 1000) * 1000 : 0, 'avgDueU' => $students > 0 ? round($allU / $students / 1000) * 1000 : 0,
         'grTitN' => $grTitN, 'grTitLL' => $grTitLL, 'grTitUSD' => $grTitUSD, 'grOthN' => $grOthN, 'grOthLL' => $grOthLL, 'grOthUSD' => $grOthUSD,
@@ -513,6 +623,38 @@ function meheSummary(array $d, array $p): array {
         'classesTotal' => array_sum(array_map('intval', (array)$d['classes_per_level'])),
     ];
 }
+
+/** متوسّط الرسوم (ل.ل/د.أ) من بيانات موازنة محفوظة (الإيرادات والمنح فقط — بلا رواتب) — لسطر «فرق الرسوم عن العام الماضي» */
+function meheAvgFeeFromData(array $d): array {
+    $students = 0; $revLL = $revUSD = 0; $grN = 0; $grLL = $grUSD = 0;
+    foreach ((array)($d['revenues'] ?? []) as $rv) { if (trim((string)($rv['class'] ?? '')) === '') continue; $n = (int)($rv['students'] ?? 0); $students += $n; $revLL += (float)($rv['fee_ll'] ?? 0) * $n; $revUSD += (float)($rv['fee_usd'] ?? 0) * $n; }
+    foreach ((array)($d['grants'] ?? []) as $g) { if (trim((string)($g['student'] ?? '')) === '' || ($g['cat'] ?? '') !== 'ملاك') continue; $grN++; $grLL += (float)($g['ll'] ?? 0); $grUSD += (float)($g['usd'] ?? 0); }
+    $payers = max(0, $students - $grN);
+    return ['ll' => $payers > 0 ? ($revLL - $grLL) / $payers : 0, 'usd' => $payers > 0 ? ($revUSD - $grUSD) / $payers : 0, 'students' => $students];
+}
+/** آخر موازنة محفوظة سابقة لهذا النطاق (بياناتها) أو null */
+function mehePrevSaved(PDO $db, array $ids, string $sy): ?array {
+    try {
+        $pv = $db->prepare("SELECT school_year, data FROM mehe_budget WHERE scope = ? AND school_year < ? ORDER BY school_year DESC LIMIT 1");
+        $pv->execute([meheScopeKey($ids), $sy]);
+        $r = $pv->fetch(PDO::FETCH_ASSOC);
+        if (!$r) return null;
+        $d = json_decode((string)$r['data'], true);
+        return is_array($d) ? ['sy' => $r['school_year'], 'data' => $d] : null;
+    } catch (Throwable $e) { return null; }
+}
+/** 🏛️🖥️ المنصّة لا تعرض «فئة المعلم» بقائمة المعفيين بل تستنتجها من عضو هيئة التدريس المختار ⇒ فئة كل منحة = ملاك إن كان اسمه بجدول الملاك وإلا بقية الكادر */
+function meheSyncGrantCats(array &$data, array $p): void {
+    $tit = []; foreach ((array)($p['tit'] ?? []) as $r) $tit[trim((string)$r['name'])] = true;
+    foreach ((array)($data['grants'] ?? []) as $i => $g) {
+        $t = trim((string)($g['teacher'] ?? ''));
+        if ($t === '') continue;
+        $data['grants'][$i]['cat'] = isset($tit[$t]) ? 'ملاك' : 'بقية الكادر';
+    }
+}
+/** 🏛️🖥️ الوثائق المطلوبة: مجلّد الرفع لنطاق وسنة (uploads/mehe/) — يُنشأ عند الحاجة */
+function meheDocsDir(): string { $dir = dirname(__DIR__) . '/uploads/mehe'; if (!is_dir($dir)) @mkdir($dir, 0775, true); return $dir; }
+function meheDocFileName(array $ids, string $sy, string $key, string $ext): string { return preg_replace('/[^A-Za-z0-9_.-]/', '_', meheScopeKey($ids) . '_' . $sy . '_' . $key) . '.' . strtolower($ext); }
 
 /* ===================== مولّد إكسل متعدّد الأوراق (PHP خالص) بصيغ حيّة ===================== */
 class MeheXlsx {
@@ -663,55 +805,47 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
     $head = function (int $si, array $labels, float $h = 30) use ($X, $c) { $X->row($si, array_map(fn($l) => $c($l, 2), $labels), $h); };
     $tot = fn(array $cells) => $cells;
 
-    // ١) الطلب
-    $si = $X->sheet('الطلب', [26, 44]);
-    $X->row($si, [$c('الرقم التسلسلي: ' . $d['serial'], 1)], 24);
-    $X->row($si, [$c('جانب وزارة التربية والتعليم العالي', 1)], 24);
-    $X->row($si, []);
-    $X->row($si, [$c('مصلحة التعليم الخاص', 1)], 24);
-    $X->row($si, []);
-    $X->row($si, [$c('المستدعية', 6), $c($schoolName, 3)], 22);
-    $X->row($si, [$c('رقم المركز التربوي', 6), $c((string)$d['center_no'], 3)], 22);
-    $X->row($si, [$c('الموضوع', 6), $c($d['subject'], 3)], 22);
-    $X->row($si, [$c('المرجع', 6), $c($d['reference'], 3)], 22);
-    $X->row($si, []);
-    $X->row($si, [$c('نودعكم ربط الموازنة المدرسية للسنة ' . $y1 . '/' . $y2 . ' مع المستندات المرفقة:', 12)]);
-    foreach (['1 - محاضر اللجنة المالية', '2 - بيان صندوق التعويضات', '3 - تقرير التدقيق'] as $t) $X->row($si, [$c($t, 12)]);
-    $X->row($si, []); $X->row($si, [$c('واقبلوا فائق الاحترام', 12)]); $X->row($si, []); $X->row($si, []);
-    $X->row($si, [$c('توقيع مدير(ة) المدرسة', 12), $c('ختم المدرسة', 12)]);
-
-    // ٢) معلومات المدرسة
-    $si = $X->sheet('معلومات المدرسة', [34, 30, 30, 30]);
-    $X->row($si, [$c('معلومات المدرسة', 1)], 26); $X->row($si, []);
-    $X->row($si, [$c('اسم المدير: ' . $d['director'], 9)]);
-    $X->row($si, [$c('رئيس لجنة أولياء الأمور: ' . $d['parents_head'], 9)]);
-    $X->row($si, [$c('رقم هاتف رئيس لجنة أولياء الأمور: ' . $d['parents_phone'], 9)]); $X->row($si, []);
-    $r = $X->row($si, [$c('البرامج', 6), $c($d['programs'], 3)]); $X->merge($si, "B$r:D$r");
-    $r = $X->row($si, [$c('مستوى التعليم', 6), $c($d['levels'], 3)]); $X->merge($si, "B$r:D$r");
-    $r = $X->row($si, [$c('الصفوف', 6), $c($d['classes'], 3)], 16 * max(1, substr_count($d['classes'], "\n") + 1)); $X->merge($si, "B$r:D$r");
+    // 🏛️🖥️ (2026-11-08) الأوراق الاثنتا عشرة بترتيب منصّة الوزارة psb.mehe.gov.lb وبعناوينها
+    $T = meheSectionTitles();
+    $multiTxt = fn($v) => implode('، ', meheMulti($v));
+    // ١) تحديث معلومات المدرسة
+    $si = $X->sheet($T[0], [34, 30, 30, 30]);
+    $X->row($si, [$c($T[0] . ' — ' . $schoolName . ' — ' . $y1 . '/' . $y2, 1)], 26); $X->row($si, []);
+    $X->row($si, [$c('اسم المدير', 6), $c($d['director'], 3)]);
+    $X->row($si, [$c('رئيس لجنة أولياء الأمور', 6), $c($d['parents_head'], 3)]);
+    $X->row($si, [$c('رقم هاتف رئيس لجنة أولياء الأمور', 6), $c($d['parents_phone'], 3)]); $X->row($si, []);
+    $r = $X->row($si, [$c('البرامج', 6), $c($multiTxt($d['programs_sel'] ?? ''), 3)]); $X->merge($si, "B$r:D$r");
+    $r = $X->row($si, [$c('مستوى التعليم — منهاج لبناني', 6), $c($multiTxt($d['levels_sel'] ?? ''), 3)]); $X->merge($si, "B$r:D$r");
+    $X->row($si, []); $X->row($si, [$c('الصفوف', 9)]);
+    $selC = meheMulti($d['classes_sel'] ?? '');
+    foreach (meheClassesByLevel() as $lv => $cls) { $r = $X->row($si, [$c($lv, 6), $c(implode('، ', array_values(array_filter($cls, fn($x) => in_array($x, $selC, true)))), 3)]); $X->merge($si, "B$r:D$r"); }
     $X->row($si, []); $X->row($si, [$c('أعضاء اللجنة المالية', 9)]);
-    $i = 0; foreach (array_filter(array_map('trim', explode("\n", (string)$d['fin_committee']))) as $m) $X->row($si, [$c(++$i . '. ' . $m, 12)]);
-    $X->row($si, []); $X->row($si, [$c('استطلاع', 1)], 24);
-    $X->row($si, [$c('مساحة الملاعب المفتوحة (م²): ' . $d['playground_open'], 9)]);
-    $X->row($si, [$c('مساحة الملاعب المغلقة (م²): ' . $d['playground_closed'], 9)]); $X->row($si, []);
-    foreach ([['مالك العقار', $d['owner']], ['مباني مشتركة مع', $d['shared_with']], ['استخدام الانترنت', $d['internet']], ['تفاصيل اخرى', $d['other_details']]] as [$lb, $v]) {
-        $r = $X->row($si, [$c($lb, 6), $c($v, 3)]); $X->merge($si, "B$r:D$r");
-    }
-    $X->row($si, []); $X->row($si, [$c('اسم مالك المبنى: ' . $d['building_owner'], 9)]);
+    $i = 0; foreach (array_filter(array_map('trim', explode("\n", (string)$d['fin_committee']))) as $m) $X->row($si, [$c('الاسم', 6), $c($m, 3)]);
+    // ٢) استطلاع
+    $si = $X->sheet($T[1], [34, 30, 30, 30]);
+    $X->row($si, [$c($T[1], 1)], 26); $X->row($si, [$c('مباني المدرسة', 9)]);
+    $X->row($si, [$c('مساحة الملاعب المفتوحة (م²)', 6), $n((int)$d['playground_open'])]);
+    $X->row($si, [$c('مساحة الملاعب المغلقة (م²)', 6), $n((int)$d['playground_closed'])]);
+    $X->row($si, [$c('مالك العقار', 6), $c($multiTxt($d['owner_sel'] ?? ''), 3)]);
+    $X->row($si, [$c('اسم مالك المبنى', 6), $c($d['building_owner'], 3)]);
     $head($si, ['نوع المبنى', 'عدد المباني']);
     $X->row($si, [$c('بناء مدرسي', 6), $n((int)$d['buildings_school'])]); $X->row($si, [$c('بناء سكني', 6), $n((int)$d['buildings_res'])]);
+    $r = $X->row($si, [$c('مباني مشتركة مع', 6), $c($multiTxt($d['shared_sel'] ?? ''), 3)]); $X->merge($si, "B$r:D$r");
+    $X->row($si, []); $X->row($si, [$c('الغرف والقاعات', 9)]);
+    $head($si, ['نوع الغرفة', 'عدد الغرف']);
+    foreach (meheRoomTypes() as $rt) $X->row($si, [$c($rt, 6), $n((int)($d['rooms'][$rt] ?? 0))]);
     $X->row($si, []); $X->row($si, [$c('اللغات', 9)]);
     $head($si, ['اللغة', 'اولي', 'ثانوي', 'غير معتمدة في المدرسة']);
     foreach (meheLanguages() as $k => $lb) {
         $v = (int)($d['languages'][$k] ?? 3);
         $X->row($si, [$c($lb, 6), $c($v === 1 ? '◉' : '○', 13), $c($v === 2 ? '◉' : '○', 13), $c($v === 3 ? '◉' : '○', 13)]);
     }
-    $X->row($si, []); $X->row($si, [$c('الغرف والقاعات', 9)]);
-    $head($si, ['نوع الغرفة', 'عدد الغرف']);
-    foreach (meheRoomTypes() as $rt) $X->row($si, [$c($rt, 6), $n((int)($d['rooms'][$rt] ?? 0))]);
     $X->row($si, []); $X->row($si, [$c('المعدات التقنية', 9)]);
     $head($si, ['المعدات', 'عدد المستخدم من قبل الإدارة', 'عدد المستخدم لأغراض تعليمية']);
     foreach (meheEquipmentTypes() as $et) $X->row($si, [$c($et, 6), $n((int)($d['equipment'][$et]['admin'] ?? 0)), $n((int)($d['equipment'][$et]['edu'] ?? 0))]);
+    $X->row($si, []);
+    $r = $X->row($si, [$c('استخدام الانترنت', 6), $c($multiTxt($d['internet_sel'] ?? ''), 3)]); $X->merge($si, "B$r:D$r");
+    $r = $X->row($si, [$c('تفاصيل اخرى', 6), $c($multiTxt($d['other_sel'] ?? ''), 3)]); $X->merge($si, "B$r:D$r");
 
     // ٣-٥) جداول الموظفين — دالة مشتركة
     $staffSheet = function (string $name, string $title, array $cols, array $keys, array $rows, array $months, array $widths, int $firstNum, array $dec2, int $sigCol) use ($X, $c, $n, $fx, $L, $head): array {
@@ -730,17 +864,17 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
             $X->row($si, $cells, 20);
         }
         $last = $X->rowCount($si);
-        $mcells = [$c('عدد الاشهر', 2)];
-        foreach ($keys as $i => $k) { $col = $i + 1; if ($col === 1) continue; $mcells[] = $col >= $firstNum ? $n((int)($months[$k] ?? 12), 4) : $c('', 2); }
+        $mcells = [$c('الأشهر', 2)];
+        foreach ($keys as $i => $k) { $col = $i + 1; if ($col === 1) continue; $mcells[] = $col >= $firstNum ? ($k === 'total_ll' || $k === 'total_usd' ? $c('', 2) : $n((int)($months[$k] ?? 12), 4)) : $c('', 2); }
         $mrow = $X->row($si, $mcells);
         $tcells = [$c('المجموع', 6)];
         foreach ($keys as $i => $k) {
             $col = $i + 1; if ($col === 1) continue;
-            $tcells[] = $col >= $firstNum ? $fx('SUM(' . $L($col) . $first . ':' . $L($col) . $last . ')*' . $L($col) . $mrow, 8) : $c('', 6);
+            $tcells[] = $col >= $firstNum ? ($k === 'total_ll' || $k === 'total_usd' ? $c('', 6) : $fx('SUM(' . $L($col) . $first . ':' . $L($col) . $last . ')*' . $L($col) . $mrow, 8)) : $c('', 6);
         }
         $trow = $X->row($si, $tcells, 20);
         $X->row($si, []);
-        $X->row($si, [$c('الراتب الاساسي هو معدل الراتب الشهري على طول السنة', 10)]);
+        $X->row($si, [$c('أشهر الراتب', 6), $n((int)($months['_salary'] ?? 12), 4), $c('أشهر النقل', 6), $n((int)($months['_transport'] ?? 12), 4)]);
         $X->row($si, []);
         $sig = array_fill(0, $sigCol, $c('', 0)); $sig[0] = $c('توقيع رئيس لجنة الأهل ومندوبي اللجنة في الهيئة الحالية مادة 10 (أ فقرة 8)', 12); $sig[$sigCol - 1] = $c('توقيع مدير المدرسة', 12);
         $X->row($si, $sig);
@@ -748,30 +882,33 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
         foreach ($keys as $i => $k) if ($i + 1 >= $firstNum) $refs[$k] = "'" . $name . "'!" . $L($i + 1) . $trow;
         return $refs;
     };
+    // أشهر الراتب/النقل للفئة (المنصّة) تُعرض تحت كل جدول
+    $mwith = function (array $months, string $tk) use ($d): array { $months['_salary'] = (int)($d['months'][$tk]['salary'] ?? 12); $months['_transport'] = (int)($d['months'][$tk]['transport'] ?? 12); return $months; };
     // عند مجموعة مدارس: عمود «المدرسة» بعد الاسم بكل جدول موظفين
     $multi = !empty($p['multi']);
     $mc = fn(array $cols) => $multi ? array_merge([$cols[0], 'المدرسة'], array_slice($cols, 1)) : $cols;
     $mk = fn(array $keys) => $multi ? array_merge([$keys[0], 'school'], array_slice($keys, 1)) : $keys;
     $mw = fn(array $w) => $multi ? array_merge([$w[0], 24], array_slice($w, 1)) : $w;
     $mf = fn(int $f) => $multi ? $f + 1 : $f;
-    $TIT = $staffSheet('هيئة التدريس في الملاك', 'أعضاء هيئة التدريس في الملاك',
-        $mc(['الاسم', 'دور الموظف', 'مؤهلات المعلم', 'مستوى التعليم', 'تاريخ الدخول الى الملاك', 'تاريخ مباشرة العمل', 'ساعات أسبوعية (ملاك)', 'ساعات أسبوعية (اضافية)',
-         'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'الأثر الرجعي', 'أجور مهمات تتجاوز نصاب العمل ل.ل', 'أجور مهمات تجاوز الـ35 ساعه', 'المكافآت', 'مهام إضافية ل.ل',
-         'تعويض نقل', 'تعويض عائلي', 'مساهمة الصندوق الوطني للضمان الاجتماعي', 'صندوق التعويضات']),
-        $mk(['name', 'role', 'qual', 'level', 'cadre_date', 'start_date', 'h_cadre', 'h_extra', 'base', 'extra_ll', 'extra_usd', 'retro', 'missions_ll', 'missions35', 'bonus', 'tasks_ll', 'transport', 'family', 'cnss', 'fund']),
-        $p['tit'], $p['tit_months'], $mw([22, 12, 18, 12, 12, 12, 9, 9, 16, 19, 12, 10, 13, 13, 11, 11, 18, 14, 18, 17]), $mf(9), ['missions_ll', 'missions35', 'cnss', 'fund'], 12);
-    $CON = $staffSheet('هيئة التدريس المتعاقدون', 'أعضاء هيئة التدريس المتعاقدين',
-        $mc(['الاسم', 'دور الموظف', 'نمط العمل', 'نوع الضمان', 'مؤهلات المعلم', 'مستوى التعليم', 'تاريخ مباشرة العمل', 'ساعات أسبوعية', 'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'المكافآت', 'مهام إضافية ل.ل', 'تعويض نقل', 'مساهمة الصندوق الوطني للضمان الاجتماعي']),
-        $mk(['name', 'role', 'mode', 'cnss_type', 'qual', 'level', 'start_date', 'h_cadre', 'base', 'extra_ll', 'extra_usd', 'bonus', 'tasks_ll', 'transport', 'cnss']),
-        $p['con'], $p['con_months'], $mw([22, 12, 10, 10, 18, 12, 12, 9, 16, 19, 13, 11, 12, 17, 18]), $mf(9), ['cnss'], 10);
-    $ADM = $staffSheet('الموظفون الإداريون', 'الموظفون الإداريون',
-        $mc(['الاسم', 'نمط العمل', 'تاريخ مباشرة العمل', 'نوع الموظف الاداري', 'نوع الضمان', 'أساس الراتب', 'الأجور الإضافية ل.ل', 'الأجور الإضافية د.أ', 'مهام إضافية ل.ل', 'منح مدرسية ل.ل', 'تعويض نقل', 'مساهمة الصندوق الوطني للضمان الاجتماعي']),
-        $mk(['name', 'admin_mode', 'start_date', 'admin_type', 'cnss_type', 'base', 'extra_ll', 'extra_usd', 'tasks_ll', 'grants_ll', 'transport', 'cnss']),
-        $p['adm'], $p['adm_months'], $mw([22, 20, 13, 14, 12, 16, 19, 13, 13, 13, 17, 18]), $mf(6), ['cnss'], 8);
+    // أعمدة الجداول = أعمدة المنصّة حرفياً وبترتيبها (معرّف الموظف أوّلاً، إجمالي الراتب بعد الأجور الإضافية)
+    $TIT = $staffSheet($T[2], $T[2],
+        $mc(['معرف الموظف', 'الاسم والشهرة', 'دور الموظف', 'مستوى التعليم', 'مؤهلات المعلم', 'تاريخ الدخول الى الملاك', 'تاريخ مباشرة العمل', 'ساعات أسبوعية (ملاك)', 'ساعات أسبوعية (اضافية)',
+         'أساس الراتب', 'أجور إضافية ل.ل', 'أجور إضافية د.أ', 'إجمالي الراتب ل.ل', 'إجمالي الراتب د.أ', 'الأثر الرجعي ل.ل', 'أجور مهمات تتجاوز نصاب العمل ل.ل', 'ما يتجاوز حد ال35 ساعة ل.ل', 'المكافآت ل.ل', 'مهام إضافية ل.ل',
+         'تعويض عائلي ل.ل', 'تعويض النقل ل.ل', 'مساهمة الصندوق الوطني للضمان الاجتماعي ل.ل', 'صندوق التعويضات ل.ل']),
+        $mk(['mehe_id', 'name', 'role', 'level', 'qual', 'cadre_date', 'start_date', 'h_cadre', 'h_extra', 'base', 'extra_ll', 'extra_usd', 'total_ll', 'total_usd', 'retro', 'missions_ll', 'missions35', 'bonus', 'tasks_ll', 'family', 'transport', 'cnss', 'fund']),
+        $p['tit'], $mwith($p['tit_months'], 'tit'), $mw([17, 22, 12, 12, 18, 12, 12, 9, 9, 16, 19, 12, 18, 12, 10, 13, 13, 11, 11, 14, 18, 18, 17]), $mf(10), ['missions_ll', 'missions35', 'cnss', 'fund'], 12);
+    $CON = $staffSheet($T[3], $T[3],
+        $mc(['معرف الموظف', 'الاسم والشهرة', 'دور الموظف', 'مستوى التعليم', 'نمط العمل', 'نوع الضمان الاجتماعي', 'مؤهلات المعلم', 'تاريخ مباشرة العمل', 'ساعات أسبوعية', 'أساس الراتب', 'أجور إضافية ل.ل', 'أجور إضافية د.أ', 'إجمالي الراتب ل.ل', 'إجمالي الراتب د.أ', 'المكافآت ل.ل', 'مهام إضافية ل.ل', 'تعويض النقل ل.ل', 'مساهمة الصندوق الوطني للضمان الاجتماعي ل.ل']),
+        $mk(['mehe_id', 'name', 'role', 'level', 'mode', 'cnss_type', 'qual', 'start_date', 'h_cadre', 'base', 'extra_ll', 'extra_usd', 'total_ll', 'total_usd', 'bonus', 'tasks_ll', 'transport', 'cnss']),
+        $p['con'], $mwith($p['con_months'], 'con'), $mw([17, 22, 12, 12, 10, 10, 18, 12, 9, 16, 19, 13, 18, 12, 11, 12, 17, 18]), $mf(10), ['cnss'], 10);
+    $ADM = $staffSheet($T[4], $T[4],
+        $mc(['معرف الموظف', 'الاسم والشهرة', 'دور الموظف', 'نوع الموظف الاداري', 'نوع الضمان الاجتماعي', 'تاريخ مباشرة العمل', 'أساس الراتب', 'أجور إضافية ل.ل', 'أجور إضافية د.أ', 'إجمالي الراتب ل.ل', 'إجمالي الراتب د.أ', 'مهام إضافية ل.ل', 'منح مدرسية ل.ل', 'تعويض النقل ل.ل', 'مساهمة الصندوق الوطني للضمان الاجتماعي ل.ل']),
+        $mk(['mehe_id', 'name', 'admin_mode', 'admin_type', 'cnss_type', 'start_date', 'base', 'extra_ll', 'extra_usd', 'total_ll', 'total_usd', 'tasks_ll', 'grants_ll', 'transport', 'cnss']),
+        $p['adm'], $mwith($p['adm_months'], 'adm'), $mw([17, 22, 20, 14, 12, 13, 16, 19, 13, 18, 12, 13, 13, 17, 18]), $mf(7), ['cnss'], 8);
 
     // ٦) الهيكل
-    $si = $X->sheet('الهيكل الإداري والتعليمي', [50, 16]);
-    $X->row($si, [$c('الهيكل الإداري والتعليمي', 1)], 26); $X->row($si, []);
+    $si = $X->sheet($T[5], [50, 16]);
+    $X->row($si, [$c($T[5], 1)], 26); $X->row($si, []);
     $X->row($si, [$c('الهيكل الإداري والتعليمي', 9)]); $head($si, ['الوصف', 'العدد']);
     $X->row($si, [$c('عدد الإداريين الخاضعين لقانون العمل', 6), $n((int)$d['struct_admin_law'])]);
     $X->row($si, [$c('عدد المستخدمين الخاضعين لقانون العمل', 6), $n((int)$d['struct_workers_law'])]);
@@ -789,9 +926,9 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
     $X->row($si, [$c('عدد غير الداخلين في الملاك', 6), $n($s['staffOutCadre'])]);
     $X->row($si, [$c('إجمالي عدد الموظفين', 6), $fx("B$rm+B$rn+B$rt", 7)]);
 
-    // ٧) الطلاب المعفيون
-    $si = $X->sheet('الطلاب المعفيون', [22, 26, 14, 34, 18, 16]);
-    $X->row($si, [$c('قائمة الطلاب المعفيين', 1)], 26);
+    // ٧) الطلاب المعفيون (المنصّة: الفئة تُستنتج من عضو هيئة التدريس؛ تبقى عموداً بالإكسل لأنّ صيغ المجاميع تحتاجها)
+    $si = $X->sheet($T[6], [22, 26, 14, 34, 18, 16]);
+    $X->row($si, [$c($T[6], 1)], 26);
     $head($si, ['اسم الطالب', 'عضو هيئة التدريس', 'فئة المعلم', 'الصف', 'المنحة المقدمة ل.ل', 'المنحة المقدمة د.أ']);
     $g1 = $X->rowCount($si) + 1;
     $grants = array_values(array_filter((array)$d['grants'], fn($g) => trim((string)($g['student'] ?? '')) !== ''));
@@ -810,7 +947,7 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
 
     // ٨) تعويضات الصرف
     $si = $X->sheet('تعويضات الصرف', [22, 20, 20, 22, 22, 16, 16, 20]);
-    $X->row($si, [$c('تعويضات الصرف للداخلين في الملاك', 1)], 26);
+    $X->row($si, [$c($T[7], 1)], 26);
     $head($si, ['اسم المستفيد', 'تعويضات نهاية الخدمة ل.ل', 'تعويضات نهاية الخدمة د.أ', 'تعويضات المهام الإضافية ل.ل', 'تعويضات المهام الإضافية د.أ', 'رقم إيصال الدفع', 'تاريخ الإيصال', 'ملاحظات']);
     $s1 = $X->rowCount($si) + 1;
     $sev = array_values(array_filter((array)$d['severance'], fn($x) => trim((string)($x['name'] ?? '')) !== ''));
@@ -913,7 +1050,12 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
     $rdf = $X->rowCount($si) + 1;
     $X->row($si, [$c('الفرق بين النفقات والايرادات', 6), $fx("B$rex-B$rrv", 5), $fx("C$rex-C$rrv", 5), $fx("D$rex-D$rrv", 5), $fx("IF(ABS(D$rdf)<1,\"امتثال كامل\",\"غير متوازنة\")", 14)]);
     $X->row($si, [$c('متوسط القسط المدرسي الواجب', 6), $fx("IF(" . $REV['students'] . ">0,ROUND(B$rex/" . $REV['students'] . ",-3),0)", 5), $fx("IF(" . $REV['students'] . ">0,ROUND(C$rex/" . $REV['students'] . ",-3),0)", 5), $fx('B' . ($X->rowCount($si) + 1) . '+C' . ($X->rowCount($si) + 1), 5), $c('', 3)]);
+    $X->row($si, [$c('فرق الرسوم الدراسية عن العام الماضي', 6), $s['feeDiffL'] === null ? $c('-', 13) : $n(round((float)$s['feeDiffL'], 2), 5), $s['feeDiffU'] === null ? $c('-', 13) : $n(round((float)$s['feeDiffU'], 2), 5), $c('', 13), $c($s['feeDiffL'] === null ? 'لا موازنة سابقة محفوظة' : '', 3)]);
     $X->row($si, []);
     $X->row($si, [$c('توقيع رئيس لجنة الأهل ومندوبي اللجنة في الهيئة الحالية مادة 10 (أ فقرة 8)', 12), $c('', 0), $c('', 0), $c('توقيع مدير المدرسة', 12)]);
+    // ١٢) الوثائق المطلوبة
+    $si = $X->sheet($T[11], [46, 50]);
+    $X->row($si, [$c($T[11], 1)], 26); $head($si, ['الوثيقة', 'الملف المرفوع']);
+    foreach (meheDocTypes() as $k => $lb) $X->row($si, [$c($lb, 6), $c((string)($d['docs'][$k]['orig'] ?? '—'), 3)]);
     return $X->bytes();
 }
