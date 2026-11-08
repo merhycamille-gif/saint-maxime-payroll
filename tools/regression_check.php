@@ -5024,21 +5024,27 @@ check('موازنة الوزارة: الصفحة ترندر لمدرسة واح�
       && strpos($mb99, 'تكاليف التشغيل') !== false && strpos($mb99, 'ملخص الميزانية') !== false
       && strpos($mb99, 'class="card no-print mehe-form"') !== false && strpos($mb99, 'meheWireRow') !== false && strpos($mb99, 'landscapePage') !== false
       && strpos($mb99, 'name="mehe_save"') !== false && strpos($mb99, 'FATAL') === false);
-// المجاميع من الرواتب = مجاميع monthly_salaries الفعلية (وضع «معدل الأشهر» ⇒ الشهري × الأشهر = مجموع السنة بالضبط)
-$mbData99 = meheLoad($db, [2], '2025-2026'); $mbData99['excluded'] = []; $mbData99['base_mode'] = 'avg'; $mbData99['manual_admins'] = []; $mbData99['overrides'] = ['emp' => [], 'months' => [], 'sum' => []];
-$mbP99 = mehePayroll($db, [2], '2025-2026', $mbData99);
-$q99 = $db->query("SELECT e.employee_type t, SUM(ms.base_plus_echelon_lbp) bpe, SUM(ms.extra_lbp+ms.prime_fixe_lbp) ex, SUM(ms.transport_lbp) tr, SUM(ms.school_cnss_8_lbp) c8, SUM(ms.school_eoc_6_lbp) e6
-    FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id WHERE e.school_id=2 AND e.is_deleted=0 AND ms.school_year='2025-2026'
-      AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) GROUP BY e.employee_type")->fetchAll(PDO::FETCH_ASSOC);
-$sums99 = []; foreach ($q99 as $r99) $sums99[$r99['t']] = $r99;
+// 🏛️ موازنة تقديرية (2026-11-08 «هيدي موازنة: منشوف الأستاذ قديش راتبه ومنحط عدد الأشهر ومنضرب»): الشهري = راتب آخر شهر مدفوع،
+//    عدد الأشهر = 12 لكل عمود له قيمة، المجموع = الشهري × 12 (لا مجموع السنة الفعلي ولا الأشهر المدفوعة)؛ «avg» القديم يُحوَّل إلى «last»
+$mbLoaded99 = meheLoad($db, [2], '2025-2026'); // meheLoad يطبّع الوضع: كل ما ليس «oct» ⇒ «last»
+$mbData99 = $mbLoaded99; $mbData99['excluded'] = []; $mbData99['base_mode'] = 'avg'; $mbData99['manual_admins'] = []; $mbData99['overrides'] = ['emp' => [], 'months' => [], 'sum' => []];
+$mbP99 = mehePayroll($db, [2], '2025-2026', $mbData99); // «avg» يُمرَّر عمداً ⇒ يجب أن يُحسب «last»
+$q99 = $db->query("SELECT e.id, e.employee_type t, (SELECT ms2.base_plus_echelon_lbp FROM monthly_salaries ms2 WHERE ms2.employee_id=e.id AND ms2.school_year='2025-2026' AND ms2.base_plus_echelon_lbp>0 ORDER BY ms2.year DESC, ms2.month DESC LIMIT 1) lastb,
+      (SELECT ms3.transport_lbp FROM monthly_salaries ms3 WHERE ms3.employee_id=e.id AND ms3.school_year='2025-2026' AND ms3.transport_lbp>0 ORDER BY ms3.year DESC, ms3.month DESC LIMIT 1) lastt
+    FROM employees e WHERE e.school_id=2 AND e.is_deleted=0 AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id=e.id AND ms.school_year='2025-2026'
+      AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0))")->fetchAll(PDO::FETCH_ASSOC);
+$sums99 = ['enseignant_titulaire' => ['b' => 0, 't' => 0], 'enseignant_contractuel' => ['b' => 0, 't' => 0], 'employe' => ['b' => 0, 't' => 0]];
+foreach ($q99 as $r99) { $sums99[$r99['t']]['b'] += 12 * (float)$r99['lastb']; $sums99[$r99['t']]['t'] += 12 * (float)$r99['lastt']; }
 $eq99 = fn($a, $b) => abs((float)$a - (float)$b) < 1;
-check('موازنة الوزارة: مجاميع الملاك/المتعاقدين/الإداريين (الأساس، الإضافي، النقل، ضمان 8٪، صندوق 6٪) = مجاميع الرواتب الفعلية بالمليم',
-      $eq99($mbP99['tit_tot']['base'], $sums99['enseignant_titulaire']['bpe'] ?? -1) && $eq99($mbP99['tit_tot']['extra_ll'], $sums99['enseignant_titulaire']['ex'] ?? -1)
-      && $eq99($mbP99['tit_tot']['transport'], $sums99['enseignant_titulaire']['tr'] ?? -1) && $eq99($mbP99['tit_tot']['cnss'], $sums99['enseignant_titulaire']['c8'] ?? -1)
-      && $eq99($mbP99['tit_tot']['fund'], $sums99['enseignant_titulaire']['e6'] ?? -1)
-      && $eq99($mbP99['con_tot']['base'], $sums99['enseignant_contractuel']['bpe'] ?? -1) && $eq99($mbP99['con_tot']['cnss'], $sums99['enseignant_contractuel']['c8'] ?? -1)
-      && $eq99($mbP99['adm_tot']['base'], $sums99['employe']['bpe'] ?? -1) && count($mbP99['tit']) === 20 && count($mbP99['con']) === 8,
-      'tit=' . count($mbP99['tit']) . ' con=' . count($mbP99['con']) . ' adm=' . count($mbP99['adm']) . ' base=' . number_format((float)$mbP99['tit_tot']['base']));
+$mbM12 = true; foreach (array_merge($mbP99['tit'], $mbP99['con'], $mbP99['adm']) as $r99) { foreach (['base', 'transport', 'cnss'] as $k99) if ((float)$r99[$k99] > 0 && ((int)$r99['months'][$k99] !== 12 || !$eq99($r99[$k99 . '_total'], 12 * (float)$r99[$k99]))) $mbM12 = false; }
+check('موازنة الوزارة: موازنة تقديرية — الشهري = راتب آخر شهر مدفوع، عدد الأشهر 12 لكل عمود له قيمة، المجموع = الشهري × 12 (ملاك/متعاقدون/إداريون، الأساس والنقل) + «avg» القديم ⇒ «last» + 20 ملاك/8 متعاقدين',
+      $mbP99['mode'] === 'last' && $mbLoaded99['base_mode'] === 'last' && $mbM12
+      && $eq99($mbP99['tit_tot']['base'], $sums99['enseignant_titulaire']['b']) && $eq99($mbP99['tit_tot']['transport'], $sums99['enseignant_titulaire']['t'])
+      && $eq99($mbP99['con_tot']['base'], $sums99['enseignant_contractuel']['b']) && $eq99($mbP99['con_tot']['transport'], $sums99['enseignant_contractuel']['t'])
+      && $eq99($mbP99['adm_tot']['base'], $sums99['employe']['b'])
+      && (int)$mbP99['con_months']['base'] === 12 && (int)$mbP99['tit_months']['base'] === 12
+      && count($mbP99['tit']) === 20 && count($mbP99['con']) === 8,
+      'mode=' . $mbP99['mode'] . ' tit=' . count($mbP99['tit']) . ' con=' . count($mbP99['con']) . ' adm=' . count($mbP99['adm']) . ' base=' . number_format((float)$mbP99['tit_tot']['base']) . ' vs ' . number_format((float)$sums99['enseignant_titulaire']['b']) . ' m12=' . ($mbM12 ? 1 : 0));
 // الملخّص: أ+ب = مجموع بنود الفئتين، والإجمالي = أ+ب+ج+د، ومساهمة الصندوق مقرَّبة للألف صعوداً كالوزارة
 $mbS99 = meheSummary($mbData99, $mbP99);
 $sumA99 = array_sum(array_map(fn($r) => $r[1], $mbS99['A'])); $sumB99 = array_sum(array_map(fn($r) => $r[1], $mbS99['B']));
@@ -5060,8 +5066,8 @@ if ($mbZ99->open($mbXl99) === true) {
 @unlink($mbXl99);
 // 🏫 مجموعة مدارس مع بعضها: موازنة مجمّعة (عمود «المدرسة» بالجداول + الموظفون من كل النطاق + الحفظ بمفتاح النطاق)
 $mbG99 = renderPage('pages/mehe_budget.php', [], [], [2, 3], '', '2025-2026');
-$mbPG99 = mehePayroll($db, [2, 3], '2025-2026', ['base_mode' => 'avg', 'excluded' => [], 'manual_admins' => []]);
-$mbP3 = mehePayroll($db, [3], '2025-2026', ['base_mode' => 'avg', 'excluded' => [], 'manual_admins' => []]);
+$mbPG99 = mehePayroll($db, [2, 3], '2025-2026', ['base_mode' => 'last', 'excluded' => [], 'manual_admins' => []]);
+$mbP3 = mehePayroll($db, [3], '2025-2026', ['base_mode' => 'last', 'excluded' => [], 'manual_admins' => []]);
 check('موازنة الوزارة: مجموعة مدارس (مكسيموس + النجاة) = موازنة مجمّعة — عمود المدرسة بالجداول + عدد الملاك = مجموع المدرستين + مفتاح النطاق "2,3"',
       strpos($mbG99, '<th>المدرسة</th>') !== false && strpos($mbG99, 'موازنة مجمّعة لـ2 مدارس') !== false && strpos($mbG99, 'FATAL') === false
       && count($mbPG99['tit']) === count($mbP99['tit']) + count($mbP3['tit']) && !empty($mbPG99['multi']) && empty($mbP99['multi'])

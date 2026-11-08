@@ -132,7 +132,7 @@ function meheDefaults(PDO $db, int $schoolId, string $sy): array {
         'grants' => [],            // [{student, teacher, cat(ملاك|بقية الكادر), class, ll, usd}]
         'severance' => [],         // [{name, eos_ll, eos_usd, tasks_ll, tasks_usd, receipt_no, receipt_date, notes}]
         'manual_admins' => [],     // إداريون خارج الرواتب [{name, mode, start_date, type, cnss_type, base, extra_ll, extra_usd, tasks_ll, grants_ll, transport, cnss, months}]
-        'base_mode' => 'avg',      // avg = معدل الأشهر (تعريف النموذج) · oct = شهر تشرين الأول
+        'base_mode' => 'last',     // last = راتب الموظف الحالي (آخر شهر مدفوع) × عدد الأشهر [موازنة تقديرية، طلبه 2026-11-08] · oct = شهر تشرين الأول
         'excluded' => [],          // موظفون يُستثنون من الجداول (بقراره)
         // ✏️ تعديلات يدوية من أوراق الموازنة نفسها («قدام كل سطر تعديل وحفظ» 2026-09-07):
         //   emp[<employee_id>][field] قيم موظف تحلّ محلّ المحسوب من الرواتب · months[tit|con|adm][col] عدد أشهر العمود
@@ -159,6 +159,8 @@ function meheLoad(PDO $db, array $ids, string $sy): array {
             }
         }
     } catch (Throwable $e) {}
+    // 🏛️ 2026-11-08 «هيدي موازنة: منشوف الأستاذ قديش راتبه ومنحط عدد الأشهر ومنضرب»: الوضع القديم «معدل الأشهر المدفوعة» أُلغي ⇒ راتب حالي × أشهر
+    if (($def['base_mode'] ?? '') !== 'oct') $def['base_mode'] = 'last';
     // مدير المدرسة الافتراضي من ملف المدرسة إن وُجد (مدرسة واحدة)
     if ($def['director'] === '' && count($ids) === 1) {
         try { $s = $db->query("SELECT director_name FROM schools WHERE id = $schoolId")->fetchColumn(); if ($s) $def['director'] = (string)$s; } catch (Throwable $e) {}
@@ -212,16 +214,17 @@ function meheRoleText(array $e): string {
 
 /* ===================== قراءة الرواتب: صفّ لكل موظف بأعمدة النموذج ===================== */
 /**
- * لكل موظف بالمدرسة له رواتب بالسنة: القيمة الشهرية لكل عمود = معدل الأشهر التي فيها قيمة
- * (تعريف النموذج «الراتب الاساسي هو معدل الراتب الشهري على طول السنة») أو قيمة شهر تشرين
- * الأول (base_mode=oct)، وعدد الأشهر = الأشهر التي فيها قيمة > 0، والمجموع = الشهري × الأشهر
- * (بوضع المعدل = مجموع السنة الفعلي بالضبط).
+ * 🏛️ موازنة تقديرية (طلبه 2026-11-08 «هيدي موازنة ونحنا منشتغلها هيك: منشوف الأستاذ قديش راتبه ومنحط عدد الأشهر ومنضرب»):
+ * لكل موظف بالمدرسة له رواتب بالسنة: القيمة الشهرية لكل عمود = راتبه الحالي (قيمة آخر شهر مدفوع فيه هذا العمود > 0؛
+ * base_mode=last) أو قيمة شهر تشرين الأول (base_mode=oct)، وعدد الأشهر = 12 افتراضاً لكل عمود له قيمة (يعدّله من صفّ
+ * «عدد الاشهر» بالورقة فيسري على العمود كلّه، مثلاً النقل 10)، والمجموع = الشهري × عدد الأشهر.
+ * (الوضع القديم «معدل الأشهر المدفوعة × الأشهر المدفوعة» أُلغي: كان يُظهر لمَن قبض 3 أشهر ×3 — الموازنة للسنة كلّها.)
  */
 function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
     $ids = array_values(array_filter(array_map('intval', $ids))); if (!$ids) $ids = [-1];
     $in = implode(',', $ids);
     [$y1, $y2] = schoolYearToYears($sy);
-    $mode = ($data['base_mode'] ?? 'avg') === 'oct' ? 'oct' : 'avg';
+    $mode = ($data['base_mode'] ?? 'last') === 'oct' ? 'oct' : 'last';
     $excluded = array_map('intval', (array)($data['excluded'] ?? []));
     $cols = [
         'base' => 'base_plus_echelon_lbp', 'extra_ll' => 'extra_lbp + prime_fixe_lbp', 'bonus' => 'aide_complementaire_lbp',
@@ -232,6 +235,8 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
         $sel[] = "SUM($expr) `{$k}_sum`";
         $sel[] = "SUM(($expr) > 0) `{$k}_m`";
         $sel[] = "SUM(CASE WHEN ms.month = 10 AND ms.year = $y1 THEN ($expr) ELSE 0 END) `{$k}_oct`";
+        // الراتب الحالي = قيمة العمود بآخر شهر فيه قيمة > 0 (الأحدث بالسنة والشهر)
+        $sel[] = "SUBSTRING_INDEX(GROUP_CONCAT(CASE WHEN ($expr) > 0 THEN ($expr) END ORDER BY ms.year DESC, ms.month DESC SEPARATOR '|'), '|', 1) `{$k}_last`";
     }
     $st = $db->prepare("SELECT e.*, s.name_ar school_name, COUNT(ms.id) months_all, " . implode(', ', $sel) . "
                         FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ?
@@ -258,15 +263,15 @@ function mehePayroll(PDO $db, array $ids, string $sy, array $data): array {
         ];
         foreach ($cols as $k => $_) {
             $sum = (float)$r[$k . '_sum']; $m = (int)$r[$k . '_m'];
-            if ($mode === 'oct' && $m > 0) {
-                $monthly = (float)$r[$k . '_oct'];
-                if ($monthly <= 0) $monthly = $m > 0 ? $sum / $m : 0; // لا شهر تشرين ⇒ المعدل
-            } else {
-                $monthly = $m > 0 ? $sum / $m : 0;
+            $monthly = 0.0;
+            if ($m > 0) {
+                $monthly = $mode === 'oct' ? (float)$r[$k . '_oct'] : (float)$r[$k . '_last'];
+                if ($monthly <= 0) $monthly = (float)$r[$k . '_last'] > 0 ? (float)$r[$k . '_last'] : $sum / $m; // لا شهر تشرين ⇒ الراتب الحالي ثم المعدل
             }
+            $mm = $monthly > 0 ? 12 : 0; // موازنة السنة كلّها: 12 شهراً لكل عمود له قيمة (يعدّلها من صفّ «عدد الاشهر»)
             $row[$k] = $monthly;
-            $row['months'][$k] = $m;
-            $row[$k . '_total'] = $monthly * $m;
+            $row['months'][$k] = $mm;
+            $row[$k . '_total'] = $monthly * $mm;
         }
         $row['months_all'] = (int)$r['months_all'];
         meheApplyEmpOverride($row, (array)($data['overrides']['emp'][(string)(int)$r['id']] ?? []));

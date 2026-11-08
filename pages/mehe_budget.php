@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && canEdit() && isset($_POST['mehe_sav
     $data['manual_admins'] = $rows('ma', ['name' => 's', 'school' => 's', 'mode' => 's', 'start_date' => 's', 'type' => 's', 'cnss_type' => 's', 'base' => 'n', 'extra_ll' => 'n', 'tasks_ll' => 'n', 'grants_ll' => 'n', 'transport' => 'n', 'cnss' => 'n', 'months' => 'n'], 'name');
     foreach ($data['manual_admins'] as $i => &$maRow) $maRow['extra_usd'] = (float)($oldMa[$i]['extra_usd'] ?? 0); // الإضافي بالدولار يُدخل من الورقة فقط — لا يضيع بحفظ النموذج
     unset($maRow);
-    $data['base_mode'] = (($P['base_mode'] ?? 'avg') === 'oct') ? 'oct' : 'avg';
+    $data['base_mode'] = (($P['base_mode'] ?? 'last') === 'oct') ? 'oct' : 'last';
     $data['excluded'] = array_values(array_map('intval', (array)($P['excluded'] ?? [])));
     meheSave($db, $ids, $sy, $data);
     $_SESSION['flash_success'] = 'انحفظت بيانات موازنة ' . $sy . ' لـ' . $school['name_ar'] . ' / Budget enregistré.';
@@ -363,7 +363,7 @@ $empList = $empList->fetchAll();
                 <div>
                     <label class="lb">أساس الراتب الشهري بالجداول</label>
                     <select name="base_mode" class="form-control">
-                        <option value="avg" <?= $data['base_mode'] === 'avg' ? 'selected' : '' ?>>معدل الأشهر على طول السنة (تعريف النموذج) — المجموع = مجموع السنة الفعلي</option>
+                        <option value="last" <?= $data['base_mode'] !== 'oct' ? 'selected' : '' ?>>راتب الموظف الحالي (آخر شهر مدفوع) × عدد الأشهر (12 — تعدّله من صفّ «عدد الاشهر»)</option>
                         <option value="oct" <?= $data['base_mode'] === 'oct' ? 'selected' : '' ?>>قيمة شهر تشرين الأول × عدد الأشهر</option>
                     </select>
                 </div>
