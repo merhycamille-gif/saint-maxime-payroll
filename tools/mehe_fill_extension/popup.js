@@ -41,13 +41,14 @@ async function fetchViaTab(b) {
   return null;
 }
 async function fetchFrom(b) {
+  // أوّلاً من داخل نافذة/تبويب البرنامج المفتوح (= المدرسة والسنة اللتان يراهما المستخدم أمامه، ولو كانت نافذة التطبيق المثبّت)
+  const viaTab = await fetchViaTab(b);
+  if (viaTab) return viaTab;
+  // ثمّ مباشرة بكوكيز المتصفّح (البرنامج مغلق لكن الجلسة قائمة)
   const r = await fetch(b + 'pages/mehe_budget.php?export=json', { credentials: 'include', cache: 'no-store' });
   const ct = r.headers.get('content-type') || '';
   if (r.ok && ct.indexOf('json') >= 0) return r.json();
   DIAG.push('مباشر ' + b + ' ⇒ ' + r.status + ' ' + ct.split(';')[0] + ' @ ' + r.url);
-  // الكوكيز لم تصل (SameSite) أو لا جلسة بهذا المتصفّح ⇒ جرّب من داخل تبويب البرنامج المفتوح
-  const viaTab = await fetchViaTab(b);
-  if (viaTab) return viaTab;
   const atLogin = /login\.php/.test(r.url || '');
   const er = new Error(r.status !== 200 ? 'خطأ ' + r.status : (atLogin ? 'أنت غير مسجَّل دخولك بالبرنامج في هذا المتصفّح.' : 'البرنامج لم يُرجع الموازنة — افتح صفحة البرنامج في هذا المتصفّح وسجّل دخولك ثمّ أعد الجلب.'));
   er.login = atLogin; er.url = r.url; throw er;
