@@ -261,7 +261,7 @@ function eocGeneralRows(PDO $db, array $ids, string $sy, array $data): array {
 function eocOvDiff(array $ov, array $auto): array { $num = fn($v) => is_numeric(str_replace(',', '', (string)$v)) ? (string)(float)str_replace(',', '', (string)$v) : trim((string)$v); return array_filter($ov, fn($v, $k) => !array_key_exists($k, $auto) || $num($v) !== $num($auto[$k]), ARRAY_FILTER_USE_BOTH); }
 
 /** خيارات القائمة المنسدلة لخانة «المرحلة» بإكسل النواقص: مراحل الصندوق + كلمات البرنامج */
-function eocStageChoices(): array { return array_values(array_unique(array_merge(array_values(eocPhaseOptions()), ['حضانة', 'ابتدائي', 'متوسط', 'ثانوي']))); }
+function eocStageChoices(): array { return ['ح', 'إ', 'م', 'ث', 'ح - إ', 'إ - م', 'م - ث', 'كل المراحل', 'حضانة', 'ابتدائي', 'متوسط', 'ثانوي']; } // مراحل فقط — لا الشهادات المهنية ولا الإدارة من قائمة المنصّة
 /** نصّ مرحلة (من القائمة أو مكتوب) ⇒ [niveau codes[], eoc_phase_id|null]: رموز الصندوق إ/م/ث/ح ومجموعاتها تُترجَم لمراحل البرنامج، وما ليس له مقابل (إدارة، تنسيق…) يُحفَظ phase فقط */
 function eocParseStage(string $txt): array {
     $norm = fn($s) => eocNorm(trim((string)$s)); $t = $norm($txt); if ($t === '') return [[], null];
