@@ -340,7 +340,7 @@ function reportDocThumb($path) {
                 </table></div>
         <?= docSheetEnd() ?>
     <?php elseif ($report === 'cnss_summary'):
-        $stmt = $db->prepare("SELECT ms.employee_id, e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.nssf_number, e.birth_date, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.cnss_amount_lbp, ms.school_cnss_8_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
+        $stmt = $db->prepare("SELECT ms.employee_id, e.employee_type, e.first_name_fr, e.last_name_fr, e.first_name_ar, e.last_name_ar, e.father_name_ar, e.father_name_fr, e.nssf_number, e.birth_date, e.school_id, ms.base_salary_lbp, ms.base_plus_echelon_lbp, ms.transport_lbp, ms.cnss_amount_lbp, ms.school_cnss_8_lbp, ms.school_family_comp_6_lbp, ms.school_end_of_service_8_5_lbp, ms.taxable_base_lbp, ms.extra_lbp, ms.prime_fixe_lbp, ms.prime_fixe_usd_law, ms.aide_complementaire_lbp
                               FROM monthly_salaries ms
                               JOIN employees e ON e.id = ms.employee_id
                               WHERE ms.year = ? AND ms.month = ? AND e.is_deleted = 0 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) AND e.cnss_subject = 1" . $schoolSql . $empYearFilter . $empTypeSql . "
@@ -362,16 +362,20 @@ function reportDocThumb($path) {
         <?php /* 🏛️ ترويسة كشف الضمان باسم صاحب العمل لدى الصندوق (25-82-043 ⇒ الجمعية) */ ?>
         <?= docSheetStart('CNSS — cotisations mensuelles', 'كشف الضمان الاجتماعي الشهري', [monthName($month) . ' ' . $year . $empTypeTitle], ['month' => $month, 'year' => $year, 'school' => cnssEmployerSchool(reportHeaderSchool())]) . fileVsStoredBanner($data, $month, $year) ?>
                 <div class="report-table-wrap" dir="rtl"><table class="doc-table" dir="rtl">
-                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>وعاء الضمان</th><th>الأجير<?= contribHead('cnss_employee_rate', $month, $year) ?></th><th>المدرسة<?= contribHead('cnss_employer_rate', $month, $year) ?></th></tr></thead>
+                    <thead><tr><th>#</th><?php if ($multi): ?><th>المدرسة</th><?php endif; ?><th>رقم الضمان</th><th>الاسم</th><th>أساس الراتب</th><?= extraAideHeads('', $data, $month, $year) ?><th style="background:#4338ca">الراتب المركّب<br><small style="font-weight:400"><?= e(salaryCompLabel()) ?></small><?= rateHead('mkt', $month, $year) ?></th><th>وعاء الضمان</th><th>الأجير<?= contribHead('cnss_employee_rate', $month, $year) ?></th><th>المدرسة<?= contribHead('cnss_employer_rate', $month, $year) ?></th><th>التعويضات العائلية<?= contribHead('family_compensation_rate', $month, $year) ?></th><th>نهاية الخدمة<?= contribHead('end_of_service_rate', $month, $year) ?></th><th style="background:#4338ca">مجموع حصّة المدرسة</th></tr></thead>
                     <tbody>
                         <?php
-                        $zC = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'composed_usd'=>0,'cnss'=>0,'school'=>0]; $G = $zC; $csL = $multi?4:3;
+                        /* 🛡️ (2026-11-08 «فيك تزيد عامودين الناقصين») فرعا التعويضات العائلية 6٪ ونهاية الخدمة 8.5٪ للموظف الخاضع لقانون العمل فقط
+                         *   (الأستاذ غير خاضع لهما ⇒ «—») من المخزّن بالشهر، + «مجموع حصّة المدرسة» = 8٪ + 6٪ + 8.5٪ */
+                        $zC = ['base'=>0,'extra'=>0,'extra_usd'=>0,'aide'=>0,'composed'=>0,'composed_usd'=>0,'cnss'=>0,'school'=>0,'fam6'=>0,'eos85'=>0,'schtot'=>0]; $G = $zC; $csL = $multi?4:3;
                         $drawTotal = function($label,$a,$isGrand) use ($csL, $repRate){
                             $bg=$isGrand?'':'background:#e0e7ff;'; $cls=$isGrand?'total-row':'subtotal-row'; ?>
                             <tr class="<?= $cls ?>" style="<?= $bg ?>font-weight:700"><td colspan="<?= $csL ?>" style="text-align:right"><?= e($label) ?></td>
                                 <td><?= moneyLaw($a['base']) ?></td><?php if (salaryCompHas('extra')): ?><td><?= dualFromUsd($a['extra'], $a['extra_usd']) ?></td><?php endif; ?><?php if (salaryCompHas('aide')): ?><td><?= money($a['aide'], $repRate) ?></td><?php endif; ?>
                                 <td style="background:#eef2ff"><strong><?= dualFromUsd($a['composed'], $a['composed_usd']) ?></strong></td>
-                                <td></td><td><?= money($a['cnss'], $repRate) ?></td><td><?= money($a['school'], $repRate) ?></td></tr>
+                                <td></td><td><?= money($a['cnss'], $repRate) ?></td><td><?= money($a['school'], $repRate) ?></td>
+                                <?php $naC = !$isGrand && !$a['fam6'] && !$a['eos85']; /* مجموع فئة أساتذة ⇒ «—» كصفوفها */ ?>
+                                <td><?= $naC ? '—' : money($a['fam6'], $repRate) ?></td><td><?= $naC ? '—' : money($a['eos85'], $repRate) ?></td><td style="background:#eef2ff"><strong><?= money($a['schtot'], $repRate) ?></strong></td></tr>
                         <?php };
                         $rn=0; $curCat=null; $sub=$zC;
                         foreach ($data as $r):
@@ -379,9 +383,11 @@ function reportDocThumb($path) {
                             if ($cat !== $curCat):
                                 if ($curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
                                 $sub=$zC; $curCat=$cat;
-                                ?><tr class="cat-row"><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
+                                ?><tr class="cat-row"><td colspan="<?= ($multi?12:11) + compColsCount(false) ?>" style="text-align:right;font-weight:700;background:#dbeafe"><?= e(empCategoryTitle($cat)) ?></td></tr><?php
                             endif;
-                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'extra_usd'=>extraWageUsd($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'composed_usd'=>composedSalaryUsd($r),'cnss'=>(int)$r['cnss_amount_lbp'],'school'=>(int)$r['school_cnss_8_lbp']];
+                            $isEmpl = $cat === 'employe'; $fam6 = $isEmpl ? (int)$r['school_family_comp_6_lbp'] : 0; $eos85 = $isEmpl ? (int)$r['school_end_of_service_8_5_lbp'] : 0;
+                            $add=['base'=>(int)$r['base_salary_lbp'],'extra'=>extraWageLbp($r),'extra_usd'=>extraWageUsd($r),'aide'=>aideCompLbp($r),'composed'=>composedSalaryLbp($r),'composed_usd'=>composedSalaryUsd($r),'cnss'=>(int)$r['cnss_amount_lbp'],'school'=>(int)$r['school_cnss_8_lbp'],
+                                  'fam6'=>$fam6,'eos85'=>$eos85,'schtot'=>(int)$r['school_cnss_8_lbp']+$fam6+$eos85];
                             foreach ($add as $k=>$v){ $G[$k]+=$v; $sub[$k]+=$v; } ?>
                             <tr>
                                 <td><?= ++$rn ?></td>
@@ -396,10 +402,13 @@ function reportDocThumb($path) {
                                 <td><?= money($r['cnss_amount_lbp'] ? (int)round($r['cnss_amount_lbp']/0.03) : 0, $repRate) ?></td>
                                 <td><?= money($r['cnss_amount_lbp'], $repRate) ?></td>
                                 <td><?= money($r['school_cnss_8_lbp'], $repRate) ?></td>
+                                <td><?= $isEmpl ? money($fam6, $repRate) : '—' ?></td>
+                                <td><?= $isEmpl ? money($eos85, $repRate) : '—' ?></td>
+                                <td style="background:#eef2ff"><strong><?= money($add['schtot'], $repRate) ?></strong></td>
                             </tr>
                         <?php endforeach;
                         if ($data && $curCat !== null) $drawTotal('مجموع '.empCategoryTitle($curCat), $sub, false);
-                        if (!$data): ?><tr><td colspan="<?= ($multi?9:8) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
+                        if (!$data): ?><tr><td colspan="<?= ($multi?12:11) + compColsCount(false) ?>" class="text-center text-muted">لا توجد بيانات</td></tr><?php endif; ?>
                         <?php if ($data) $drawTotal('المجموع العام — العدد: '.$rn, $G, true); ?>
                     </tbody>
                 </table></div>

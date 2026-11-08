@@ -118,7 +118,7 @@ if ($report === 'monthly_summary') {
     }
 
 } elseif ($report === 'cnss_summary') {
-    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar, e.father_name_ar, e.father_name_fr,e.nssf_number,e.birth_date,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.cnss_amount_lbp,ms.school_cnss_8_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.prime_fixe_usd_law,ms.aide_complementaire_lbp
+    $st = $db->prepare("SELECT e.employee_type,e.first_name_fr,e.last_name_fr,e.first_name_ar,e.last_name_ar, e.father_name_ar, e.father_name_fr,e.nssf_number,e.birth_date,e.school_id,ms.base_salary_lbp,ms.base_plus_echelon_lbp,ms.transport_lbp,ms.cnss_amount_lbp,ms.school_cnss_8_lbp,ms.school_family_comp_6_lbp,ms.school_end_of_service_8_5_lbp,ms.extra_lbp,ms.prime_fixe_lbp,ms.prime_fixe_usd_law,ms.aide_complementaire_lbp
         FROM monthly_salaries ms JOIN employees e ON e.id=ms.employee_id
         WHERE ms.year=? AND ms.month=? AND e.is_deleted=0 AND (ms.base_plus_echelon_lbp>0 OR ms.net_salary_lbp>0 OR ms.total_due_lbp>0) AND e.cnss_subject=1" . $schoolSql . $empYearFilter . $empTypeSql . "
         ORDER BY e.school_id, FIELD(e.employee_type,'enseignant_titulaire','enseignant_contractuel','employe'), REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr),'أ','ا'),'إ','ا'),'آ','ا'),'ى','ي'),'ة','ه')");
@@ -132,29 +132,34 @@ if ($report === 'monthly_summary') {
     if (salaryCompHas('extra')) $head[] = 'الأجر الإضافي';
     if (salaryCompHas('aide'))  $head[] = 'مكافأة ومساعدة';
     $head[] = 'الراتب المركّب (' . salaryCompLabel() . ')';
-    $head = array_merge($head, ['وعاء الضمان', contribLbl('الأجير', 'cnss_employee_rate', $month, $year), contribLbl('المدرسة', 'cnss_employer_rate', $month, $year)]);
+    // 🛡️ (2026-11-08) + التعويضات العائلية 6٪ ونهاية الخدمة 8.5٪ (الموظف الخاضع لقانون العمل فقط؛ الأستاذ «—») + مجموع حصّة المدرسة — كالشاشة
+    $head = array_merge($head, ['وعاء الضمان', contribLbl('الأجير', 'cnss_employee_rate', $month, $year), contribLbl('المدرسة', 'cnss_employer_rate', $month, $year),
+                                contribLbl('التعويضات العائلية', 'family_compensation_rate', $month, $year), contribLbl('نهاية الخدمة', 'end_of_service_rate', $month, $year), 'مجموع حصّة المدرسة']);
     $rep->head($head);
-    $z = ['base' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'cnss' => 0, 'school' => 0]; $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
+    $z = ['base' => 0, 'extra' => 0, 'aide' => 0, 'composed' => 0, 'cnss' => 0, 'school' => 0, 'fam6' => 0, 'eos85' => 0, 'schtot' => 0]; $G = $z; $cur = null; $sub = $z; $subN = 0; $rn = 0;
     $pad = $schCol ? 4 : 3;
     $emit = function ($label, $a, $n) use ($rep, $pad) {
         $row = array_fill(0, $pad, ''); $row[$pad - 1] = 'مجموع ' . $label . ' — العدد: ' . $n;
         $row[] = $a['base'];
         if (salaryCompHas('extra')) $row[] = $a['extra'];
         if (salaryCompHas('aide'))  $row[] = $a['aide'];
-        $row = array_merge($row, [$a['composed'], '', $a['cnss'], $a['school']]);
+        $naC = $label !== 'المجموع العام' && !$a['fam6'] && !$a['eos85']; // مجموع فئة أساتذة ⇒ «—» كصفوفها
+        $row = array_merge($row, [$a['composed'], '', $a['cnss'], $a['school'], $naC ? '—' : $a['fam6'], $naC ? '—' : $a['eos85'], $a['schtot']]);
         $rep->totalRow($row);
     };
     foreach ($data as $r) {
         if ($cur !== null && $r['employee_type'] !== $cur) { $emit($catTitle($cur), $sub, $subN); $sub = $z; $subN = 0; }
         if ($r['employee_type'] !== $cur) { $cur = $r['employee_type']; $rep->sectionRow($catTitle($cur)); }
+        $isEmpl = $cur === 'employe';
         $base = (int)$r['base_salary_lbp']; $ex = extraWageLbp($r); $ai = aideCompLbp($r); $comp = composedSalaryLbp($r); $cnss = (int)$r['cnss_amount_lbp']; $sch = (int)$r['school_cnss_8_lbp'];
-        foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'cnss' => $cnss, 'school' => $sch] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
+        $fam6 = $isEmpl ? (int)$r['school_family_comp_6_lbp'] : 0; $eos85 = $isEmpl ? (int)$r['school_end_of_service_8_5_lbp'] : 0; $schtot = $sch + $fam6 + $eos85;
+        foreach (['base' => $base, 'extra' => $ex, 'aide' => $ai, 'composed' => $comp, 'cnss' => $cnss, 'school' => $sch, 'fam6' => $fam6, 'eos85' => $eos85, 'schtot' => $schtot] as $k => $val) { $sub[$k] += $val; $G[$k] += $val; }
         $subN++; $rn++;
         $row = [$rn]; if ($schCol) $row[] = schoolNameById($r['school_id']);
         $row = array_merge($row, [cnssWithBirthYear($r['nssf_number'], $r['birth_date']), $nm($r) . empBadgesText($r, $db, $periodSchoolYear), $base]);
         if (salaryCompHas('extra')) $row[] = $ex;
         if (salaryCompHas('aide'))  $row[] = $ai;
-        $row = array_merge($row, [$comp, ($cnss ? (int)round($cnss / 0.03) : 0), $cnss, $sch]);
+        $row = array_merge($row, [$comp, ($cnss ? (int)round($cnss / 0.03) : 0), $cnss, $sch, $isEmpl ? $fam6 : '—', $isEmpl ? $eos85 : '—', $schtot]);
         $rep->row($row);
     }
     if ($data) { $emit($catTitle($cur), $sub, $subN); $emit('المجموع العام', $G, $rn); }

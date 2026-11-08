@@ -25,7 +25,7 @@
         'المجموع': 'Total', 'المجموع العام': 'Total général', 'المبلغ': 'Montant', 'القيمة': 'Valeur', 'النسبة': 'Taux', 'المحسومات': 'Retenues', 'مجموع المحسومات': 'Total des retenues',
         'الضريبة': 'Impôt', 'ضريبة الدخل': 'Impôt sur le revenu', 'الراتب الخاضع للضريبة': 'Salaire imposable', 'التنزيل العائلي': 'Abattement familial', 'عدد الأشخاص': 'Nombre de personnes',
         'التعويضات العائلية': 'Allocations familiales', 'التعويض العائلي': 'Allocation familiale', 'عدد الأولاد': 'Nombre d’enfants', 'الأولاد': 'Enfants', 'الزوج/الزوجة': 'Conjoint',
-        'الضمان': 'CNSS', 'وعاء الضمان': 'Assiette CNSS', 'الأجير': 'Salarié', 'حصّة الأجير': 'Part salarié', 'حصّة المدرسة': 'Part école', 'المرض والأمومة': 'Maladie & maternité',
+        'الضمان': 'CNSS', 'وعاء الضمان': 'Assiette CNSS', 'الأجير': 'Salarié', 'حصّة الأجير': 'Part salarié', 'حصّة المدرسة': 'Part école', 'مجموع حصّة المدرسة': 'Total part école', 'المرض والأمومة': 'Maladie & maternité',
         'الصندوق': 'Caisse', 'صندوق التعويضات': 'Caisse des indemnités', 'نهاية الخدمة': 'Fin de service', 'التعويض': 'Indemnité', 'المساهمة': 'Contribution',
         'الشهر': 'Mois', 'السنة': 'Année', 'السنة الدراسية': 'Année scolaire', 'من شهر': 'Du mois', 'إلى شهر': 'Au mois', 'الأشهر المدفوعة': 'Mois payés', 'الأشهر': 'Mois', 'الفترة': 'Période',
         'البند': 'Rubrique', 'الملاحظات': 'Notes', 'ملاحظات': 'Notes', 'التاريخ': 'Date', 'العملة': 'Devise', 'سعر الصرف': 'Taux de change', 'المدفوع': 'Payé', 'الباقي': 'Reste',

@@ -11271,6 +11271,35 @@ try {
 } catch (Throwable $e) { $ok290 = false; $why290 = $e->getMessage(); }
 check('📨 كتاب طلب التسجيل ر1-3 (2026-11-05): mof_r13 طبق الأصل بالمدرسة والرقم المالي بالمربّعات والضمان والعنوان والمسؤول (كميل سعيد مرعي · مسؤول) وعدد الطلبات والتاريخ (date أو d/mo/yr) · كبسة بشاشة ر3 · أوّل الملف المدموج بالإفادات الجماعية لكل مدرسة', $ok290, $why290);
 
+/* 291) 🛡️ كشف الضمان الشهري (2026-11-08 «فيك تزيد عامودين الناقصين»): + التعويضات العائلية 6٪ + نهاية الخدمة 8.5٪ (الموظف الخاضع لقانون العمل فقط من المخزّن؛
+ *      الأستاذ «—») + «مجموع حصّة المدرسة» = 8٪ + 6٪ + 8.5٪ — الشاشة والإكسل معاً، الرؤوس بالنسبة المؤرَّخة، المجاميع تشملها. */
+$ok291 = false; $why291 = '';
+try {
+    $h291 = renderPage('pages/reports.php', ['report' => 'cnss_summary', 'month' => 10, 'year' => 2026], ['extra', 'aide'], [3], 'lbp', '2026-2027');
+    $t291 = $thTxt184($h291);
+    $okHead291 = $has184($t291, 'التعويضات العائلية ⏎ 6 %') && $has184($t291, 'نهاية الخدمة ⏎ 8.5 %') && $has184($t291, 'مجموع حصّة المدرسة') && stripos($h291, 'Fatal error') === false;
+    // القيم من القاعدة: الموظفون الخاضعون بالمدرسة 3 بتشرين 2026
+    $q291 = $db->query("SELECT e.employee_type t, SUM(ms.school_cnss_8_lbp) c8, SUM(ms.school_family_comp_6_lbp) f6, SUM(ms.school_end_of_service_8_5_lbp) e85
+        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
+        WHERE ms.year = 2026 AND ms.month = 10 AND e.school_id = 3 AND e.is_deleted = 0 AND e.cnss_subject = 1 AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0)
+        GROUP BY e.employee_type")->fetchAll(PDO::FETCH_ASSOC);
+    $s291 = []; foreach ($q291 as $r) $s291[$r['t']] = $r;
+    $emp291 = $s291['employe'] ?? ['c8' => 0, 'f6' => 0, 'e85' => 0];
+    $okData291 = (int)$emp291['f6'] > 0 && (int)$emp291['e85'] > 0;
+    // صفّ مجموع الموظفين يحمل f6 وe85 ومجموع حصّة المدرسة = c8+f6+e85؛ صفّ مجموع المتعاقدين: العمودان 0 (غير خاضعين)
+    $fmt291 = fn($v) => number_format((int)$v);
+    $okEmpTot291 = preg_match('/مجموع الموظفين.*?<\/tr>/su', $h291, $mE) === 1
+        && strpos($mE[0], $fmt291($emp291['f6'])) !== false && strpos($mE[0], $fmt291($emp291['e85'])) !== false
+        && strpos($mE[0], $fmt291((int)$emp291['c8'] + (int)$emp291['f6'] + (int)$emp291['e85'])) !== false;
+    $okDash291 = preg_match('/<tr class="cat-row"><td[^>]*>المتعاقد(?:ين|ون)<\/td><\/tr>\s*<tr>(.*?)<\/tr>/su', $h291, $mC) === 1 && substr_count($mC[1], '>—</td>') === 2;
+    // الإكسل: الرؤوس النصّية بالنسبة
+    $x291 = $sheet184(renderPage('pages/reports_export.php', ['report' => 'cnss_summary', 'month' => 10, 'year' => 2026, 'format' => 'xlsx'], ['extra', 'aide'], [3], 'lbp', '2026-2027', $PROJ . '/tools/_r291.xlsx'));
+    $okXls291 = strpos($x291, 'التعويضات العائلية 6 %') !== false && strpos($x291, 'نهاية الخدمة 8.5 %') !== false && strpos($x291, 'مجموع حصّة المدرسة') !== false;
+    $ok291 = $okHead291 && $okData291 && $okEmpTot291 && $okDash291 && $okXls291;
+    $why291 = 'head=' . (int)$okHead291 . ' data=' . (int)$okData291 . ' empTot=' . (int)$okEmpTot291 . ' dash=' . (int)$okDash291 . ' xls=' . (int)$okXls291 . ' f6=' . $fmt291($emp291['f6']) . ' e85=' . $fmt291($emp291['e85']);
+} catch (Throwable $e) { $ok291 = false; $why291 = $e->getMessage(); }
+check('🛡️ كشف الضمان الشهري (2026-11-08): عمودا التعويضات العائلية 6٪ ونهاية الخدمة 8.5٪ للموظفين (الأستاذ —) + مجموع حصّة المدرسة = 8+6+8.5 — بالشاشة والإكسل مع النسب المؤرَّخة والمجاميع', $ok291, $why291);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
