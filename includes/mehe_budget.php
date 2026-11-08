@@ -733,7 +733,7 @@ class MeheXlsx {
     public static function col(int $i): string { $s = ''; while ($i > 0) { $m = ($i - 1) % 26; $s = chr(65 + $m) . $s; $i = intdiv($i - 1, 26); } return $s; }
     /** أنماط: 0 عادي · 1 عنوان · 2 رأس · 3 نص بإطار · 4 رقم · 5 رقم بخانتين · 6 مجموع نص · 7 مجموع رقم · 8 مجموع رقم بخانتين · 9 نص عريض · 10 ملاحظة حمراء · 11 نسبة · 12 نص عادي · 13 وسط بإطار · 14 أخضر بإطار */
     public function sheet(string $name, array $widths, bool $landscape = true): int {
-        $this->sheets[] = ['name' => mb_substr(str_replace(['/', '\\', '?', '*', '[', ']', ':', "'"], ' ', $name), 0, 31, 'UTF-8'), 'widths' => $widths, 'rows' => [], 'merges' => [], 'breaks' => [], 'landscape' => $landscape];
+        $this->sheets[] = ['name' => mb_substr(str_replace(['/', '\\', '?', '*', '[', ']', ':', "'"], ' ', $name), 0, 31, 'UTF-8'), 'widths' => $widths, 'rows' => [], 'merges' => [], 'breaks' => [], 'validations' => [], 'landscape' => $landscape];
         return count($this->sheets) - 1;
     }
     /** خلية: ['v'=>قيمة, 's'=>نمط, 'f'=>صيغة بلا =] — أو قيمة خام (نص/رقم) */
@@ -743,6 +743,8 @@ class MeheXlsx {
     }
     public function merge(int $si, string $ref): void { $this->sheets[$si]['merges'][] = $ref; }
     public function pageBreak(int $si, int $afterRow): void { $this->sheets[$si]['breaks'][] = $afterRow; }
+    /** قائمة منسدلة على نطاق (مثل G3:G200) بخيارات نصّية؛ الكتابة الحرّة مسموحة (لا رسالة خطأ) */
+    public function listValidation(int $si, string $range, array $options): void { $this->sheets[$si]['validations'][] = [$range, $options]; }
     public function rowCount(int $si): int { return count($this->sheets[$si]['rows']); }
     public static function c($v, int $s = 3, ?string $f = null): array { return ['v' => $v, 's' => $s, 'f' => $f]; }
     public static function n($v, int $s = 4): array { return ['v' => $v, 's' => $s, 'f' => null]; }
@@ -781,12 +783,14 @@ class MeheXlsx {
             foreach ($sh['breaks'] as $b) $breaksXml .= '<brk id="' . $b . '" max="16383" man="1"/>';
             $breaksXml .= '</rowBreaks>';
         }
+        $dvXml = '';
+        if (!empty($sh['validations'])) { $dvXml = '<dataValidations count="' . count($sh['validations']) . '">'; foreach ($sh['validations'] as [$rg, $opts]) $dvXml .= '<dataValidation type="list" allowBlank="1" showDropDown="0" showInputMessage="1" showErrorMessage="0" sqref="' . $rg . '"><formula1>"' . self::xa(implode(',', $opts)) . '"</formula1></dataValidation>'; $dvXml .= '</dataValidations>'; }
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             . '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'
             . '<sheetViews><sheetView rightToLeft="1" workbookViewId="0" zoomScale="90"/></sheetViews>'
             . '<sheetFormatPr defaultRowHeight="16"/>' . $colsXml
-            . '<sheetData>' . $rowsXml . '</sheetData>' . $mergesXml
+            . '<sheetData>' . $rowsXml . '</sheetData>' . $mergesXml . $dvXml
             . '<printOptions horizontalCentered="1"/>'
             . '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>'
             . '<pageSetup paperSize="9" orientation="' . ($sh['landscape'] ? 'landscape' : 'portrait') . '" fitToWidth="1" fitToHeight="0"/>'
@@ -806,13 +810,14 @@ class MeheXlsx {
             . '<font><b/><sz val="11"/><name val="Arial"/></font>'                           // 4 عنوان فرعي
             . '<font><sz val="10"/><color rgb="FF2E7D32"/><name val="Arial"/></font>'        // 5 أخضر
             . '</fonts>'
-            . '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
+            . '<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
             . '<fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/></patternFill></fill>'   // 2 رأس
             . '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF4D6"/></patternFill></fill>'   // 3 مجموع
+            . '<fill><patternFill patternType="solid"><fgColor rgb="FFFCE4E4"/></patternFill></fill>'   // 4 ناقص (أحمر فاتح)
             . '</fills>'
             . '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' . $b . '</borders>'
             . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            . '<cellXfs count="15">'
+            . '<cellXfs count="16">'
             . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'                                                                                              // 0
             . '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'       // 1 عنوان
             . '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' // 2 رأس
@@ -828,6 +833,7 @@ class MeheXlsx {
             . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf>'         // 12 نص عادي
             . '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' // 13 وسط بإطار
             . '<xf numFmtId="0" fontId="5" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' // 14 أخضر
+            . '<xf numFmtId="0" fontId="3" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf>' // 15 ناقص: خلفية حمراء فاتحة بإطار
             . '</cellXfs>'
             . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             . '</styleSheet>';

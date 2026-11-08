@@ -209,8 +209,11 @@ function eocMonthSalaries(PDO $db, array $ids, int $y, int $m): array {
 /** أساتذة السنة الدراسية (ملاك + متعاقدون) الذين لهم رواتب فيها */
 function eocTeachersOfYear(PDO $db, array $ids, string $sy): array {
     $in = implode(',', array_map('intval', $ids)) ?: '0';
+    // 🚪 (2026-11-08 «اللي تاركين لغاية 30-9 ما تذكرهن بالسنة»): التارك قبل بداية السنة الدراسية لا يظهر ولو بقيت له صفوف
+    [$y1] = schoolYearToYears($sy); $cut = $y1 . '-09-30';
+    $leaveSql = " AND NOT (e.left_date_all IS NOT NULL AND e.left_date_all <= '$cut') AND NOT (e.employee_type = 'enseignant_titulaire' AND e.left_date_eoc IS NOT NULL AND e.left_date_eoc <= '$cut')";
     $st = $db->prepare("SELECT e.*, (SELECT MAX(CONCAT(ms.year, LPAD(ms.month,2,'0'))) FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.base_plus_echelon_lbp > 0) last_ym
-        FROM employees e WHERE e.school_id IN ($in) AND e.is_deleted = 0 AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel')
+        FROM employees e WHERE e.school_id IN ($in) AND e.is_deleted = 0 AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel')$leaveSql
           AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.base_plus_echelon_lbp > 0)
         ORDER BY " . eocArSort("COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)") . ", " . eocArSort("COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)") . ", e.id");
     $st->execute([$sy, $sy]);
@@ -256,6 +259,22 @@ function eocGeneralRows(PDO $db, array $ids, string $sy, array $data): array {
 }
 /** التعديل الخاص بالبيان = ما يختلف فعلاً عن المحسوب (المتساوي لا يُعدّ تعديلاً ولا يُظلَّل) */
 function eocOvDiff(array $ov, array $auto): array { $num = fn($v) => is_numeric(str_replace(',', '', (string)$v)) ? (string)(float)str_replace(',', '', (string)$v) : trim((string)$v); return array_filter($ov, fn($v, $k) => !array_key_exists($k, $auto) || $num($v) !== $num($auto[$k]), ARRAY_FILTER_USE_BOTH); }
+
+/** خيارات القائمة المنسدلة لخانة «المرحلة» بإكسل النواقص: مراحل الصندوق + كلمات البرنامج */
+function eocStageChoices(): array { return array_values(array_unique(array_merge(array_values(eocPhaseOptions()), ['حضانة', 'ابتدائي', 'متوسط', 'ثانوي']))); }
+/** نصّ مرحلة (من القائمة أو مكتوب) ⇒ [niveau codes[], eoc_phase_id|null]: رموز الصندوق إ/م/ث/ح ومجموعاتها تُترجَم لمراحل البرنامج، وما ليس له مقابل (إدارة، تنسيق…) يُحفَظ phase فقط */
+function eocParseStage(string $txt): array {
+    $norm = fn($s) => eocNorm(trim((string)$s)); $t = $norm($txt); if ($t === '') return [[], null];
+    $codes = []; $phase = null;
+    $sym = ['ح' => 'maternelle', 'إ' => 'primaire', 'ا' => 'primaire', 'م' => 'intermediaire', 'ث' => 'secondaire'];
+    $words = ['حضانة' => 'maternelle', 'حضانه' => 'maternelle', 'روضة' => 'maternelle', 'روضه' => 'maternelle', 'ابتدائي' => 'primaire', 'ابتدائى' => 'primaire', 'متوسط' => 'intermediaire', 'تكميلي' => 'intermediaire', 'تكميلى' => 'intermediaire', 'ثانوي' => 'secondaire', 'ثانوى' => 'secondaire'];
+    // مرحلة من قائمة الصندوق حرفياً؟
+    foreach (eocPhaseOptions() as $id => $lb) if ($norm($lb) === $t) { $phase = (int)$id; break; }
+    if ($t === $norm('كل المراحل')) return [['maternelle', 'primaire', 'intermediaire', 'secondaire'], $phase];
+    foreach (preg_split('/[،,\/\s\-+]+/u', $t) as $w) { $w = trim($w); if ($w === '') continue; if (mb_substr($w, 0, 1) === 'و' && isset($words[mb_substr($w, 1)])) $w = mb_substr($w, 1);
+        if (isset($words[$w])) $codes[$words[$w]] = true; elseif (isset($sym[$w]) && mb_strlen($w) === 1) $codes[$sym[$w]] = true; }
+    return [array_keys($codes), $phase];
+}
 function eocNorm(string $s): string { return trim(str_replace(['أ', 'إ', 'آ', 'ى', 'ة', 'ّ', 'ً', 'ٌ', 'ٍ', 'َ', 'ُ', 'ِ', 'ْ'], ['ا', 'ا', 'ا', 'ي', 'ه', '', '', '', '', '', '', '', ''], $s)); }
 
 /** حقول سطر البيان المالي (بأسماء خانات المنصّة) */
@@ -270,7 +289,9 @@ function eocFinancialRows(PDO $db, array $ids, string $code, array $data): array
     $in = implode(',', array_map('intval', $ids)) ?: '0';
     $emps = [];
     if ($cur) {
+        $cutF = sprintf('%04d-%02d-01', $y, $m); // 🚪 من ترك قبل أوّل شهر الفترة (من الصندوق أو من المدرسة) لا يظهر
         $st = $db->prepare("SELECT e.* FROM employees e WHERE e.id IN (" . implode(',', array_keys($cur)) . ") AND e.school_id IN ($in) AND e.is_deleted = 0 AND e.employee_type = 'enseignant_titulaire' AND COALESCE(e.eoc_subject,1) = 1
+            AND NOT (e.left_date_all IS NOT NULL AND e.left_date_all < '$cutF') AND NOT (e.left_date_eoc IS NOT NULL AND e.left_date_eoc < '$cutF')
             ORDER BY " . eocArSort("COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)") . ", " . eocArSort("COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)") . ", e.id");
         $st->execute(); $emps = $st->fetchAll();
     }
