@@ -11367,6 +11367,15 @@ check('🌐 التقرير العام: رأس الضمان/الصندوق الث
       && strpos($hG293, 'class="bi-fr" style="font-weight:400">salarié 3 % + école 8 %</small><small class="bi-ar" style="font-weight:400">الأجير 3 % + المدرسة 8 %</small>') !== false
       && stripos($hG293, 'Fatal error') === false);
 
+/* 294) 🔢 موازنة الوزارة «بفواصل / بلا فواصل» (2026-11-08 «فيك تعمل خيار… بفواصل أو بلا فواصل» للنسخ إلى المنصّة): زرّان بشريط الصفحة + دالة الشاشة فقط
+ *      (الطباعة والتصدير ترجع الفواصل) + الاختيار يبقى على الجهاز. */
+$h294 = renderPage('pages/mehe_budget.php', [], [], [2], '', '2025-2026');
+check('🔢 موازنة الوزارة: خيار «بفواصل / بلا فواصل» لأرقام الشاشة (نسخ إلى منصّة الوزارة) — زرّان + meheSep + استعادة الفواصل عند الطباعة/PDF/وورد + حفظ الاختيار محلياً',
+      strpos($h294, 'class="mehe-sep"') !== false && strpos($h294, 'onclick="meheSep(true)"') !== false && strpos($h294, '>بفواصل</button>') !== false && strpos($h294, 'onclick="meheSep(false)"') !== false
+      && strpos($h294, "function meheSepApply(on){") !== false && strpos($h294, "localStorage.setItem('mehe_sep', on?'1':'0')") !== false
+      && strpos($h294, "['msaSavePdfStart','ppWord','ppWhatsApp','ppEmail'].forEach") !== false && strpos($h294, "window.addEventListener('beforeprint'") !== false
+      && stripos($h294, 'Fatal error') === false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

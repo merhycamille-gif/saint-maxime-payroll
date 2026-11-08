@@ -248,6 +248,10 @@ $E = canEdit(); // ✏️ أزرار التعديل تظهر للمحرّرين 
         <?php if (!isViewer()): ?><button type="button" class="btn btn-info" onclick="ppWord('<?= $mbT ?>')"><i class="fas fa-file-word"></i> وورد</button><?php endif; ?>
         <button type="button" class="btn" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $mbT ?>','')"><i class="fab fa-whatsapp"></i> واتساب</button>
         <?php if (!isViewer()): ?><button type="button" class="btn btn-light" onclick="ppEmail('<?= $mbT ?>','')"><i class="fas fa-envelope"></i> بريد إلكتروني</button><?php endif; ?>
+        <?php /* 🔢 (2026-11-08 «خيار بفواصل أو بلا فواصل» للنسخ إلى منصّة الوزارة): يبدّل عرض أرقام الشاشة فقط؛ الطباعة/PDF/وورد/إكسل تبقى بفواصل */ ?>
+        <span class="mehe-sep" role="group" aria-label="عرض الأرقام" style="display:inline-flex;border:1px solid #cbd5e1;border-radius:12px;overflow:hidden">
+            <button type="button" class="btn btn-light sep-on" data-sep="1" onclick="meheSep(true)" title="54,000,000">بفواصل</button><button type="button" class="btn btn-light sep-off" data-sep="0" onclick="meheSep(false)" title="54000000 — للنسخ واللصق إلى موقع الوزارة">بلا فواصل</button>
+        </span>
         <span class="text-muted" style="font-size:12.5px">جداول الأساتذة والموظفين والملخّص (أ، ب) تُقرأ من رواتب <?= e($sy) ?> تلقائياً (راتب الموظف الحالي × أشهر الراتب). المدرسة (أو مجموعة مدارس) والسنة من الأعلى<?= $multi ? '؛ الآن موازنة مجمّعة لـ' . count($schools) . ' مدارس' : '' ?>. فوق كل قسم «✏️ تعديل الصفحة» ثم «💾 حفظ الصفحة»؛ وقدّام كل سطر «✏️ تعديل» ثم «💾 حفظ». الأسطر المعدَّلة يدوياً لها «↺ تلقائي» للرجوع إلى الرواتب.<?= !empty($data['carried_from']) ? ' <strong>سنة جديدة:</strong> معلومات المدرسة والاستطلاع والهيكل والأشهر ومعرّفات الموظفين رُحِّلت من آخر موازنة محفوظة؛ النفقات والأقساط والمنح تُدخل من جديد.' : '' ?></span>
     </div>
 </div>
@@ -593,6 +597,30 @@ function meheGo(i){
     var card=document.querySelector('.mehe-app'); if(card && window.scrollY>card.offsetTop) window.scrollTo(0, Math.max(0, card.offsetTop-8));
 }
 (function(){ var m=(location.hash||'').match(/sec=(\d+)/), i=m?parseInt(m[1],10):null; if(i===null){ try{ var s=sessionStorage.getItem('meheSec'); if(s!==null) i=parseInt(s,10); }catch(e){} } meheGo(i||0); })();
+/* 🔢 «بفواصل / بلا فواصل» (2026-11-08): على الشاشة فقط — كل رقم بفواصل آلاف داخل الموازنة يُعرض بلا فواصل لينسخه ويلصقه بخانات منصّة الوزارة.
+   الأصل يُحفظ بـdata-sepv؛ الطباعة/PDF/وورد/واتساب/بريد ترجع الفواصل مؤقّتاً. الاختيار يبقى على هذا الجهاز (localStorage). */
+var MEHE_SEP_RE=/\d{1,3}(?:,\d{3})+(?:\.\d+)?/g;
+function meheSepApply(on){
+    var root=document.querySelector('.mehe-doc'); if(!root) return;
+    var tw=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode:function(n){ var p=n.parentElement; if(!p||p.closest('input,textarea,select,script,style,.mi')) return NodeFilter.FILTER_REJECT; return NodeFilter.FILTER_ACCEPT; } });
+    var nodes=[], n; while((n=tw.nextNode())) nodes.push(n);
+    nodes.forEach(function(tn){
+        if(!on){ if(MEHE_SEP_RE.test(tn.nodeValue)){ MEHE_SEP_RE.lastIndex=0; if(tn.__sepv===undefined) tn.__sepv=tn.nodeValue; tn.nodeValue=tn.__sepv.replace(MEHE_SEP_RE,function(m){ return m.replace(/,/g,''); }); } MEHE_SEP_RE.lastIndex=0; }
+        else if(tn.__sepv!==undefined){ tn.nodeValue=tn.__sepv; delete tn.__sepv; }
+    });
+    document.querySelectorAll('.mehe-sep button').forEach(function(b){ var act=(b.dataset.sep==='1')===on; b.classList.toggle('btn-primary',act); b.classList.toggle('btn-light',!act); });
+    document.body.classList.toggle('mehe-nosep',!on);
+}
+function meheSep(on){ try{ localStorage.setItem('mehe_sep', on?'1':'0'); }catch(e){} meheSepApply(on); }
+(function(){
+    var on=true; try{ on=localStorage.getItem('mehe_sep')!=='0'; }catch(e){}
+    meheSepApply(on);
+    // الطباعة والتصدير بفواصل دائماً: نرجّعها قبل، ونعيد خيار الشاشة بعد
+    var restoreThen=function(fn){ return function(){ var cur=document.body.classList.contains('mehe-nosep'); if(cur) meheSepApply(true); var r; try{ r=fn.apply(this,arguments); } finally { if(cur) setTimeout(function(){ meheSepApply(false); },1500); } return r; }; };
+    ['msaSavePdfStart','ppWord','ppWhatsApp','ppEmail'].forEach(function(k){ if(typeof window[k]==='function' && !window[k].__meheSep){ var o=window[k]; window[k]=restoreThen(o); window[k].__meheSep=true; } });
+    window.addEventListener('beforeprint', function(){ if(document.body.classList.contains('mehe-nosep')){ meheSepApply(true); document.body.classList.add('mehe-nosep-print'); } });
+    window.addEventListener('afterprint', function(){ if(document.body.classList.contains('mehe-nosep-print')){ document.body.classList.remove('mehe-nosep-print'); meheSepApply(false); } });
+})();
 /* بحث داخل جدول القسم (الاسم أو المعرّف) + فلتر نمط الموظف بقائمة المعفيين */
 function meheFilter(inp){ var q=inp.value.trim().toLowerCase(), sec=inp.closest('.mehe-sec'); sec.querySelectorAll('tbody tr[data-mrow]:not(.mtpl)').forEach(function(tr){ tr.style.display=(!q||tr.textContent.toLowerCase().indexOf(q)>=0)?'':'none'; }); }
 function meheFilterCat(sel){ var v=sel.value, sec=sel.closest('.mehe-sec'); sec.querySelectorAll('tbody tr[data-mrow]:not(.mtpl)').forEach(function(tr){ var c=tr.dataset.cat||''; var ok=!v||(v==='ملاك'?c==='ملاك':c!=='ملاك'); tr.style.display=ok?'':'none'; }); }
