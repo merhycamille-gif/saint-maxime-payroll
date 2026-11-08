@@ -52,6 +52,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     catch (Exception $e) { try { $db->exec("ALTER TABLE schools ADD COLUMN caisse_number VARCHAR(50) NULL COMMENT 'رقم المدرسة لدى صندوق التعويضات'"); } catch (Exception $e2) {} }
     // 📧 (2026-10-12) الإرسال بالإيميل من: إيميل البرنامج (program) أو إيميل المدرسة (school)
     $emailModeP = (($_POST['email_sender_mode'] ?? 'program') === 'school') ? 'school' : 'program';
+    // 🏛️💼 (2026-11-08) خلوي المدرسة ونوعها لصندوق التعويضات (بيان الصندوق يطلبهما)
+    require_once __DIR__ . '/../includes/eoc_portal.php'; eocEnsureColumns($db);
+    $mobileP = preg_replace('/[^\d]+/', '', (string)arabicDigitsFr($_POST['mobile_phone'] ?? ''));
+    $stypeP = isset(eocSchoolTypes()[(string)($_POST['school_type_eoc'] ?? '')]) ? (string)$_POST['school_type_eoc'] : 'non_free';
+    $saveEoc = function (int $sid) use ($db, $mobileP, $stypeP) { try { $db->prepare("UPDATE schools SET mobile_phone = ?, school_type_eoc = ? WHERE id = ?")->execute([$mobileP, $stypeP, $sid]); } catch (Throwable $t) {} };
     ensureEmployeeFlagColumns();
 
     if ($data[1] === '' && $data[2] === '') {
@@ -64,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logAudit('update', 'schools', $id, null, $data[2]);
         $savedId = $id;
         try { $db->prepare("UPDATE schools SET email_sender_mode = ? WHERE id = ?")->execute([$emailModeP, $id]); } catch (Throwable $t) {}
+        $saveEoc($id);
         $_SESSION['flash_success'] = 'تم تحديث المدرسة / École mise à jour';
     } else {
         $sql = "INSERT INTO schools (code, name_ar, name_fr, address, address_fr, phone, email,
@@ -75,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logAudit('create', 'schools', $newId, null, $data[2]);
         $savedId = (int)$newId;
         try { $db->prepare("UPDATE schools SET email_sender_mode = ? WHERE id = ?")->execute([$emailModeP, (int)$newId]); } catch (Throwable $t) {}
+        $saveEoc((int)$newId);
         $_SESSION['flash_success'] = 'تمت إضافة المدرسة / École ajoutée';
     }
     // حفظ المسؤولين الموقّعين (اسم/أجنبي/صفة/هاتف) كـ JSON بجدول الإعدادات لكل مدرسة
@@ -261,6 +268,19 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-group">
                     <label class="form-label">N° Caisse / رقم المدرسة لدى صندوق التعويضات</label>
                     <input type="text" name="caisse_number" class="form-control" value="<?= e($editSchool['caisse_number'] ?? '') ?>">
+                </div>
+            </div>
+            <?php // 🏛️💼 (2026-11-08) ما تطلبه بوّابة الصندوق عن المدرسة (الخطوة 1 من البيان العام) — مصدره الواحد هنا
+                require_once __DIR__ . '/../includes/eoc_portal.php'; $stEoc = (string)($editSchool['school_type_eoc'] ?? 'non_free'); ?>
+            <div class="form-row cols-3">
+                <div class="form-group">
+                    <label class="form-label">Mobile (Caisse) / هاتف المدرسة الخلوي لصندوق التعويضات</label>
+                    <input type="text" name="mobile_phone" class="form-control" value="<?= e($editSchool['mobile_phone'] ?? '') ?>" placeholder="03 123 456">
+                    <small class="text-muted d-block">الصندوق يقبل خلوياً لبنانياً فقط (03، 70، 71، 76، 78، 79، 81)</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type (Caisse) / نوع المدرسة عند الصندوق</label>
+                    <select name="school_type_eoc" class="form-select"><?php foreach (eocSchoolTypes() as $v => $l): ?><option value="<?= $v ?>" <?= $stEoc === $v ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
                 </div>
             </div>
             <div class="form-row cols-3">

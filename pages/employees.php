@@ -464,6 +464,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         'keep_working_past_64' => isset($_POST['keep_working_past_64']) ? 1 : 0,
         // 🧾 (2026-10-12) نصف الراتب لصندوق التعويضات بت1 من سنة يحدّدها — اختياري: الخانة مطفأة أو السنة فارغة ⇒ NULL
         'eoc_half_salary_year' => (isset($_POST['eoc_half_salary_on']) && preg_match('/^\d{4}$/', (string)($_POST['eoc_half_salary_year'] ?? ''))) ? (int)$_POST['eoc_half_salary_year'] : null,
+        // 🏛️💼 (2026-11-08) بيانات الأستاذ عند صندوق التعويضات بصيغة منصّته (فارغ = يُستنتَج)
+        'eoc_certificate_id' => (int)($_POST['eoc_certificate_id'] ?? 0) ?: null,
+        'eoc_category_id' => (int)($_POST['eoc_category_id'] ?? 0) ?: null,
+        'eoc_phase_id' => (int)($_POST['eoc_phase_id'] ?? 0) ?: null,
+        'eoc_trainee' => isset($_POST['eoc_trainee']) ? 1 : 0,
+        'eoc_contribution' => isset($_POST['eoc_contribution']) ? 1 : 0,
         'tax_subject' => isset($_POST['tax_subject']) ? 1 : 0,
         'apply_family_deduction' => isset($_POST['apply_family_deduction']) ? 1 : 0,
         // قائمتا نعم/كلا بالحالة العائلية (2026-09-10 جورج العموري «ما حسبلهن التنزيل») — القيمة لا isset
@@ -531,6 +537,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
     try {
         if (!msaHasCol($db, 'employees', 'eoc_half_salary_year')) unset($data['eoc_half_salary_year']);
     } catch (Exception $e) { unset($data['eoc_half_salary_year']); }
+    // 🏛️💼 أعمدة الصندوق تتركّب ذاتياً (eocEnsureColumns) — حارس إضافي
+    try {
+        require_once __DIR__ . '/../includes/eoc_portal.php'; eocEnsureColumns($db);
+        foreach (['eoc_certificate_id', 'eoc_category_id', 'eoc_phase_id', 'eoc_trainee', 'eoc_contribution'] as $ec) if (!msaHasCol($db, 'employees', $ec)) unset($data[$ec]);
+    } catch (Throwable $e) { unset($data['eoc_certificate_id'], $data['eoc_category_id'], $data['eoc_phase_id'], $data['eoc_trainee'], $data['eoc_contribution']); }
     // عمود job_title قد لا يكون موجوداً قبل migration 018 أونلاين → أزِله من الحفظ لتفادي الكسر
     try {
         if (!msaHasCol($db, 'employees', 'job_title')) unset($data['job_title']);
@@ -1296,7 +1307,7 @@ $employee = [
     'diploma' => 'ijaza_jamiya', 'specialization' => '', 'subjects_taught' => '', 'niveau_scolaire' => '', 'classes_taught' => '', 'job_title' => '',
     'hire_date' => '', 'display_hire_date' => '', 'titularization_date' => '', 'tenure_confirmation_date' => '', 'starting_grade' => 1, 'current_grade' => 1,
     'days_per_week' => 5, 'hours_per_week' => 18, 'status' => 'actif',
-    'nssf_number' => '', 'finance_ministry_number' => '', 'caisse_number' => '',
+    'nssf_number' => '', 'finance_ministry_number' => '', 'caisse_number' => '', 'eoc_certificate_id' => null, 'eoc_category_id' => null, 'eoc_phase_id' => null, 'eoc_trainee' => 0, 'eoc_contribution' => 0,
     'salary_input_mode' => 'percent_of_lbp', 'salary_labor_law' => 0, 'base_salary_usd' => 0, 'base_salary_lbp_percent' => 100, 'contract_salary_lbp' => 0,
     'payment_months_per_year' => 12, 'pay_from_month' => 10, 'pay_to_month' => 9, 'has_13th_month' => 0, 'm13_include_extra' => 1, 'm13_include_aide' => 1, // 📆 12 = ت1 ← أيلول للجميع (2026-09-20) · 🎁 (2026-10-19) خيارا شهر التعويض مشغَّلان افتراضياً
     'tax_subject' => 1, 'apply_family_deduction' => 1, 'tax_includes_echelon' => 1, 'tax_includes_extra' => 1, 'tax_includes_prime_aide' => 1,
@@ -2712,6 +2723,20 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                             <label><input type="checkbox" name="eoc_includes_echelon" value="1" <?= $employee['eoc_includes_echelon'] ? 'checked' : '' ?>> الدرجة والتدرّج / Échelon</label><br>
                             <label><input type="checkbox" name="eoc_includes_extra" value="1" <?= $employee['eoc_includes_extra'] ? 'checked' : '' ?>> الأجر الإضافي / Supplément</label><br>
                             <label><input type="checkbox" name="eoc_includes_prime_aide" value="1" <?= $employee['eoc_includes_prime_aide'] ? 'checked' : '' ?>> مكافأة ومساعدة / Prime &amp; aide</label>
+                            <?php // 🏛️💼 (2026-11-08 «لازم نوجدهن بالبرنامج»): خانات بيانات الصندوق بصيغة منصّته — فارغة = تُستنتَج من الشهادة والمرحلة التي يعلّم فيها
+                                require_once __DIR__ . '/../includes/eoc_portal.php'; eocEnsureColumns($db);
+                                $eocSug = ['cert' => eocCertFromDiploma($employee['diploma'] ?? null), 'cat' => eocCatFromEmp($employee), 'phase' => eocPhaseFromNiveau($employee['niveau_scolaire'] ?? null)];
+                                $eocSel = function (string $name, array $opts, $cur, int $sug, string $empty) { $h = '<select name="' . $name . '" class="form-select"><option value="">' . e($empty . ($sug && isset($opts[$sug]) ? ' — تلقائياً: ' . $opts[$sug] : '')) . '</option>'; foreach ($opts as $v => $l) $h .= '<option value="' . $v . '"' . ((int)$cur === (int)$v && (int)$cur ? ' selected' : '') . '>' . e($l) . '</option>'; return $h . '</select>'; }; ?>
+                            <div class="emp-teacher-only" style="margin-top:12px;padding-top:10px;border-top:1px dashed #fcd34d">
+                                <strong style="display:block;margin-bottom:6px">بيانات الأستاذ عند الصندوق / Données pour la Caisse <small style="font-weight:400;color:var(--gray-600)">(كما بقوائم منصّة caisseindemnite.com — تُستعمل بالبيان العام والمالي)</small></strong>
+                                <div class="form-row cols-3">
+                                    <div class="form-group" style="margin:0"><label class="form-label">الشهادة عند الصندوق / Certificat (Caisse)</label><?= $eocSel('eoc_certificate_id', eocCertOptions(), $employee['eoc_certificate_id'] ?? 0, $eocSug['cert'], 'من الشهادة') ?></div>
+                                    <div class="form-group" style="margin:0"><label class="form-label">الفئة / Catégorie</label><?= $eocSel('eoc_category_id', eocCatOptions(), $employee['eoc_category_id'] ?? 0, $eocSug['cat'], 'من المرحلة') ?></div>
+                                    <div class="form-group" style="margin:0"><label class="form-label">المرحلة / Phase</label><?= $eocSel('eoc_phase_id', eocPhaseOptions(), $employee['eoc_phase_id'] ?? 0, $eocSug['phase'], 'من المرحلة') ?></div>
+                                </div>
+                                <div style="margin-top:8px"><label><input type="checkbox" name="eoc_trainee" value="1" <?= !empty($employee['eoc_trainee']) ? 'checked' : '' ?>> متمرن / Stagiaire <small style="color:var(--gray-600)">(لا مساهمة للمدرسة بالبيان المالي)</small></label>
+                                    <label style="margin-inline-start:16px"><input type="checkbox" name="eoc_contribution" value="1" <?= !empty($employee['eoc_contribution']) ? 'checked' : '' ?>> مساهمة / Contribution <small style="color:var(--gray-600)">(لا محسوم على الأستاذ)</small></label></div>
+                            </div>
                             <?php // 🧾 (2026-10-12) اختياري: نصف الراتب (أساس + درجة، بلا إضافي) لصندوق التعويضات بشهر تشرين الأول من سنة يحدّدها المستخدم
                                 $ehsY = (int)($employee['eoc_half_salary_year'] ?? 0);
                                 $ehsCur = (int)substr((string)(activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear()), 0, 4);

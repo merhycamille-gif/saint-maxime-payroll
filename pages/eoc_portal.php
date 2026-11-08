@@ -38,8 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $kind && $validPeriod) {
     $locked = ($data['status'] ?? 'open') === 'locked';
     if ($act === 'status') { $data['status'] = $locked ? 'open' : 'locked'; $_SESSION['flash_success'] = $locked ? 'فُتح البيان للتعديل' : 'اعتُمد البيان وأُقفل'; }
     elseif ($locked) { $_SESSION['flash_error'] = 'البيان معتمد — مقفل. افتحه أوّلاً للتعديل.'; header('Location: ' . $back()); exit; }
-    elseif ($act === 'step1') { $data['phone'] = trim((string)($_POST['phone'] ?? '')); $st = (string)($_POST['school_type'] ?? 'non_free'); $data['school_type'] = isset(eocSchoolTypes()[$st]) ? $st : 'non_free'; $_SESSION['flash_success'] = 'حُفظت معلومات المدرسة'; }
-    elseif ($act === 'line') { $res = eocApplyLine($data, $kind, $_POST); if ($res['ok']) $_SESSION['flash_success'] = $res['msg']; else { $_SESSION['flash_error'] = $res['msg']; header('Location: ' . $back(['edit' => (string)($_POST['key'] ?? ''), 'add' => ($_POST['key'] ?? '') === '' ? 1 : null])); exit; } }
+    elseif ($act === 'step1') { $data['phone'] = preg_replace('/[^\d]+/', '', (string)($_POST['phone'] ?? '')); $st = (string)($_POST['school_type'] ?? 'non_free'); $data['school_type'] = isset(eocSchoolTypes()[$st]) ? $st : 'non_free';
+        eocSchoolSync($db, $ids, $data['phone'], $data['school_type']); $_SESSION['flash_success'] = count($ids) === 1 ? 'حُفظت معلومات المدرسة (بملف المدرسة أيضاً)' : 'حُفظت معلومات المدرسة'; }
+    elseif ($act === 'line') { $res = eocApplyLine($data, $kind, $_POST, $db); if ($res['ok']) $_SESSION['flash_success'] = $res['msg']; else { $_SESSION['flash_error'] = $res['msg']; header('Location: ' . $back(['edit' => (string)($_POST['key'] ?? ''), 'add' => ($_POST['key'] ?? '') === '' ? 1 : null])); exit; } }
     elseif ($act === 'del') { eocDeleteLine($data, (string)($_POST['key'] ?? '')); $_SESSION['flash_success'] = 'حُذف السطر من البيان'; }
     elseif ($act === 'restore') { eocRestoreLine($data, (string)($_POST['key'] ?? '')); $_SESSION['flash_success'] = 'أُرجع السطر'; }
     elseif ($act === 'reset') { eocResetLine($data, (string)($_POST['key'] ?? '')); $_SESSION['flash_success'] = 'رجع السطر محسوباً من البرنامج'; }
@@ -50,7 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $kind && $validPeriod) {
 
 /* ===== البيانات المعروضة ===== */
 $data = $kind && $validPeriod ? eocLoad($db, $ids, $kind, $period) : null;
-if ($data && $kind === 'general' && $data['phone'] === '') $data['phone'] = preg_replace('/\D+/', '', (string)($school['phone'] ?? ''));
 $rows = $data ? ($kind === 'general' ? eocGeneralRows($db, $ids, $period, $data) : eocFinancialRows($db, $ids, $period, $data)) : [];
 $pi = $kind === 'financial' && $validPeriod ? eocPeriodInfo($period) : null;
 $fmt0 = fn($v) => number_format((float)str_replace([',', ' '], '', (string)$v), 0);
@@ -285,7 +285,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
       <div class="sp-panel-body"><form method="post" class="sp-step1"><?= csrfField() ?><input type="hidden" name="eoc_act" value="step1">
         <div class="sp-field"><label for="sp-school-phone">رقم هاتف المدرسة (خلوي)<span class="sp-req">*</span></label><input id="sp-school-phone" name="phone" type="tel" placeholder="03 123 456" value="<?= e($data['phone']) ?>" <?= $E && !$locked ? '' : 'readonly' ?>><div class="sp-hint">خلوي لبناني فقط: 03، 70، 71، 76، 78، 79، 81</div></div>
         <div class="sp-field"><label>نوع المدرسة<span class="sp-req">*</span></label><div class="sp-radios"><?php foreach (eocSchoolTypes() as $v => $l): ?><label class="sp-radio"><input type="radio" name="school_type" value="<?= $v ?>" <?= $data['school_type'] === $v ? 'checked' : '' ?> <?= $E && !$locked ? '' : 'disabled' ?>><span><?= $l ?></span></label><?php endforeach; ?></div></div>
-        <?php if ($E && !$locked): ?><div class="sp-step1-actions"><button type="submit" class="sp-btn sp-btn-go">تحديث</button></div><?php endif; ?>
+        <?php if ($E && !$locked): ?><div class="sp-step1-actions"><button type="submit" class="sp-btn sp-btn-go">تحديث</button><?php if (!$multi): ?><span class="sp-panel-meta">تُحفَظ بملف المدرسة (إعدادات المدارس) فتظهر بكل البيانات</span><?php endif; ?></div><?php endif; ?>
       </form></div>
     </section>
 
@@ -318,7 +318,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
           </div></div>
         </div>
         <div class="sp-panel-foot"><button type="submit" class="sp-btn sp-btn-go"><i class="fas fa-check"></i> <?= $editRow ? 'حفظ التعديل' : 'إضافة' ?></button><a class="sp-btn sp-btn-view" href="<?= e($back()) ?>#sp-list">إلغاء</a>
-          <?php if ($editRow && $editRow['src'] === 'auto' && $editRow['ov']): ?><span class="sp-panel-meta">هذا السطر فيه قيم معدَّلة يدوياً (مظلَّلة بالأصفر بالجدول)</span><?php endif; ?></div>
+          <?php if ($editRow && $editRow['src'] === 'auto'): ?><span class="sp-panel-meta">الرقم المالي، اسم الأب، تاريخا الولادة والدخول، الشهادة، الفئة، المرحلة والساعات تُحفَظ بملف الأستاذ نفسه (لكل السنين)؛ الراتب والإضافي تعديل خاص بهذا البيان<?= $editRow['ov'] ? ' (المعدَّل مظلَّل بالأصفر بالجدول)' : '' ?></span><?php endif; ?></div>
       </form>
       <?php endif; ?>
     </section>
@@ -408,7 +408,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
             <div><label for="bm_remarks">ملاحظات</label><textarea id="bm_remarks" name="remarks" rows="2" placeholder="أدخل أي ملاحظات..."><?= e((string)$r['remarks']) ?></textarea></div>
           </div></div>
         </div>
-        <div class="sp-panel-foot"><button type="submit" class="sp-btn sp-btn-go"><i class="fas fa-check"></i> حفظ</button><a class="sp-btn sp-btn-view" href="<?= e($back()) ?>#sp-list">إلغاء</a><span class="sp-panel-meta">المحسومات الشهرية = 6٪ × (الراتب الحالي + الأجر الإضافي)، الفصلية = × <?= $nM ?>؛ اتركها فارغة لتُحتسب تلقائياً</span></div>
+        <div class="sp-panel-foot"><button type="submit" class="sp-btn sp-btn-go"><i class="fas fa-check"></i> حفظ</button><a class="sp-btn sp-btn-view" href="<?= e($back()) ?>#sp-list">إلغاء</a><span class="sp-panel-meta">المحسومات الشهرية = 6٪ × (الراتب الحالي + الأجر الإضافي)، الفصلية = × <?= $nM ?>؛ اتركها فارغة لتُحتسب تلقائياً<?= $r['src'] === 'auto' ? ' · الرقم المالي و«متمرن/مساهمة» تُحفَظ بملف الأستاذ' : '' ?></span></div>
       </form>
       <script>(function(){ var g=function(id){return document.getElementById(id);}, num=function(v){v=parseFloat(String(v||'').replace(/,/g,''));return isNaN(v)?0:v;}, f=function(n){return Math.round(n).toLocaleString('en-US');};
         var sal=g('bm_salary'),add=g('bm_addsal'),tm=g('bm_tmdisc'),tq=g('bm_tqdisc'),sq=g('bm_sqdisc'),tr=g('bm_trainee'),co=g('bm_contrib'),prev=g('bm_prevsal'),deg=g('bm_degree'),N=<?= $nM ?>;

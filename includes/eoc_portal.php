@@ -56,12 +56,63 @@ function eocCatFromEmp(array $e): int {
     return 3;
 }
 
-/* ===== الجدول ===== */
+/* ===== الجدول + أعمدة الملف (تتركّب ذاتياً) =====
+ * 🏛️ (2026-11-08 «لازم نوجدهن بالبرنامج… وبيتعبّوا تلقائياً»): خانات الصندوق صارت بملف الأستاذ وبملف المدرسة نفسيهما:
+ *  employees: eoc_certificate_id (الشهادة بصيغة الصندوق، 31)، eoc_category_id (الفئة، 11)، eoc_phase_id (المرحلة، 15)، eoc_trainee، eoc_contribution
+ *  schools: mobile_phone (الخلوي الذي يطلبه الصندوق)، school_type_eoc (free/non_free/professional)
+ * الفارغ منها يُستنتَج من الشهادة/المرحلة التي يعلّم فيها؛ وما يُعبَّأ من صفحة البيان يُحفَظ بالملف مباشرة. */
 function eocEnsureTable(PDO $db): void {
     static $done = false; if ($done) return; $done = true;
     $db->exec("CREATE TABLE IF NOT EXISTS eoc_portal (
         id INT AUTO_INCREMENT PRIMARY KEY, school_id INT NOT NULL, scope VARCHAR(120) NOT NULL, kind VARCHAR(12) NOT NULL, period VARCHAR(20) NOT NULL,
         data LONGTEXT NULL, updated_at DATETIME NULL, UNIQUE KEY uq_eoc_scope (scope, kind, period)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+    eocEnsureColumns($db);
+}
+function eocEnsureColumns(PDO $db): void {
+    static $done = false; if ($done) return; $done = true;
+    try {
+        foreach (['eoc_certificate_id' => 'INT NULL', 'eoc_category_id' => 'INT NULL', 'eoc_phase_id' => 'INT NULL', 'eoc_trainee' => 'TINYINT(1) NOT NULL DEFAULT 0', 'eoc_contribution' => 'TINYINT(1) NOT NULL DEFAULT 0'] as $c => $def)
+            if (!msaHasCol($db, 'employees', $c)) $db->exec("ALTER TABLE employees ADD COLUMN $c $def");
+        foreach (['mobile_phone' => "VARCHAR(30) NULL COMMENT 'الخلوي لصندوق التعويضات'", 'school_type_eoc' => "VARCHAR(20) NULL COMMENT 'نوع المدرسة عند الصندوق free/non_free/professional'", 'caisse_number' => 'VARCHAR(50) NULL'] as $c => $def)
+            if (!msaHasCol($db, 'schools', $c)) $db->exec("ALTER TABLE schools ADD COLUMN $c $def");
+    } catch (Throwable $e) { /* صلاحيات ناقصة ⇒ تبقى الصفحة تعمل بالاستنتاج */ }
+}
+/** حقول ملف الأستاذ التي يكتبها البيان (الباقي يبقى تعديلاً خاصاً بالبيان) */
+function eocProfileFieldMap(): array {
+    return ['teacher_no' => 'caisse_number', 'father_name' => 'father_name_ar', 'birth_date' => 'birth_date', 'start_date' => 'display_hire_date', 'certificate_id' => 'eoc_certificate_id', 'category_id' => 'eoc_category_id', 'phase_id' => 'eoc_phase_id', 'teaching_hours' => 'hours_per_week', 'is_trainee' => 'eoc_trainee', 'is_contribution' => 'eoc_contribution'];
+}
+/** يكتب قيم البيان في ملف الأستاذ نفسه ويعيد الحقول التي كُتبت (فلا تُحفَظ كـoverride) */
+function eocProfileSync(PDO $db, int $empId, array $vals): array {
+    eocEnsureColumns($db); $written = [];
+    $set = []; $args = [];
+    foreach (eocProfileFieldMap() as $f => $col) {
+        if (!array_key_exists($f, $vals) || !msaHasCol($db, 'employees', $col)) continue;
+        $v = $vals[$f];
+        if (in_array($f, ['certificate_id', 'category_id', 'phase_id'], true)) { $v = (int)$v ?: null; }
+        elseif (in_array($f, ['is_trainee', 'is_contribution'], true)) { $v = (int)!empty($v); }
+        elseif (in_array($f, ['birth_date', 'start_date'], true)) { if ($v === '') continue; }
+        elseif ($f === 'teaching_hours') { if ($v === '') continue; $v = (float)$v; }
+        elseif ($f === 'teacher_no') { $v = preg_replace('/\D+/', '', (string)$v); if ($v === '') continue; }
+        else { $v = trim((string)$v); if ($v === '') continue; }
+        $set[] = "`$col` = ?"; $args[] = $v; $written[] = $f;
+    }
+    if ($set) { $args[] = $empId; $db->prepare("UPDATE employees SET " . implode(', ', $set) . " WHERE id = ?")->execute($args); }
+    return $written;
+}
+/** يكتب خلوي المدرسة ونوعها (عند مدرسة واحدة بالنطاق) */
+function eocSchoolSync(PDO $db, array $ids, string $phone, string $type): void {
+    if (count($ids) !== 1) return; eocEnsureColumns($db);
+    if (msaHasCol($db, 'schools', 'mobile_phone')) $db->prepare("UPDATE schools SET mobile_phone = ?, school_type_eoc = ? WHERE id = ?")->execute([$phone, $type, (int)$ids[0]]);
+}
+/** خلوي المدرسة ونوعها من ملفها (أو الهاتف العام إن كان خلوياً) */
+function eocSchoolDefaults(PDO $db, array $ids): array {
+    eocEnsureColumns($db); $r = ['phone' => '', 'school_type' => 'non_free'];
+    if (count($ids) !== 1 || !msaHasCol($db, 'schools', 'mobile_phone')) return $r;
+    $s = $db->query("SELECT phone, mobile_phone, school_type_eoc FROM schools WHERE id = " . (int)$ids[0])->fetch(PDO::FETCH_ASSOC) ?: [];
+    $mob = preg_replace('/\D+/', '', (string)($s['mobile_phone'] ?? ''));
+    if ($mob === '') { $p = preg_replace('/\D+/', '', (string)($s['phone'] ?? '')); if (preg_match('/^0?(3|70|71|76|78|79|81)\d{6}$/', $p)) $mob = $p; }
+    $r['phone'] = $mob; if (!empty($s['school_type_eoc']) && isset(eocSchoolTypes()[$s['school_type_eoc']])) $r['school_type'] = $s['school_type_eoc'];
+    return $r;
 }
 function eocScope(array $ids): string { $ids = array_values(array_unique(array_map('intval', $ids))); sort($ids); return implode(',', $ids); }
 function eocDefaults(string $kind): array {
@@ -73,6 +124,8 @@ function eocLoad(PDO $db, array $ids, string $kind, string $period): array {
     $j = $st->fetchColumn(); $d = $j ? (json_decode((string)$j, true) ?: []) : [];
     $d = array_replace(eocDefaults($kind), $d);
     foreach (['lines', 'manual', 'deleted'] as $k) if (!is_array($d[$k])) $d[$k] = [];
+    // هاتف المدرسة ونوعها من ملف المدرسة (مصدرهما الواحد)
+    $sd = eocSchoolDefaults($db, $ids); if ($sd['phone'] !== '') $d['phone'] = $sd['phone']; $d['school_type'] = $sd['school_type'];
     return $d;
 }
 function eocSave(PDO $db, array $ids, string $kind, string $period, array $data): void {
@@ -183,12 +236,15 @@ function eocGeneralRows(PDO $db, array $ids, string $sy, array $data): array {
             'employment_type' => $e['employee_type'] === 'enseignant_titulaire' ? 'staff' : 'contract',
             'teacher_no' => trim((string)($e['caisse_number'] ?? '')),
             'teacher_name' => eocNameAr($e), 'father_name' => trim((string)($e['father_name_ar'] ?? '')),
-            'certificate_id' => eocCertFromDiploma($e['diploma'] ?? null), 'category_id' => eocCatFromEmp($e), 'phase_id' => eocPhaseFromNiveau($e['niveau_scolaire'] ?? null),
+            // خانات الصندوق بالملف أوّلاً، وإلا الاستنتاج من الشهادة/المرحلة التي يعلّم فيها
+            'certificate_id' => (int)($e['eoc_certificate_id'] ?? 0) ?: eocCertFromDiploma($e['diploma'] ?? null),
+            'category_id' => (int)($e['eoc_category_id'] ?? 0) ?: eocCatFromEmp($e),
+            'phase_id' => (int)($e['eoc_phase_id'] ?? 0) ?: eocPhaseFromNiveau($e['niveau_scolaire'] ?? null),
             'birth_date' => eocDateStr(...eocYmd($e['birth_date'] ?? null)), 'start_date' => eocDateStr(...eocYmd($e['display_hire_date'] ?: ($e['hire_date'] ?? null))),
             'teaching_hours' => $e['hours_per_week'] !== null && $e['hours_per_week'] !== '' ? (float)$e['hours_per_week'] : '',
             'salary' => $sal ? round($sal['base']) : '', 'add_salary' => $sal ? round($sal['extra']) : '',
         ];
-        $ov = (array)($data['lines'][(string)$id] ?? []);
+        $ov = eocOvDiff((array)($data['lines'][(string)$id] ?? []), $auto);
         $row = ['key' => (string)$id, 'src' => 'auto', 'emp_id' => $id, 'auto' => $auto, 'ov' => $ov] + array_replace($auto, array_intersect_key($ov, array_flip(eocGeneralFields())));
         $rows[] = $row;
     }
@@ -198,6 +254,8 @@ function eocGeneralRows(PDO $db, array $ids, string $sy, array $data): array {
     usort($rows, fn($a, $b) => strcmp(eocNorm($a['teacher_name']), eocNorm($b['teacher_name'])));
     return $rows;
 }
+/** التعديل الخاص بالبيان = ما يختلف فعلاً عن المحسوب (المتساوي لا يُعدّ تعديلاً ولا يُظلَّل) */
+function eocOvDiff(array $ov, array $auto): array { $num = fn($v) => is_numeric(str_replace(',', '', (string)$v)) ? (string)(float)str_replace(',', '', (string)$v) : trim((string)$v); return array_filter($ov, fn($v, $k) => !array_key_exists($k, $auto) || $num($v) !== $num($auto[$k]), ARRAY_FILTER_USE_BOTH); }
 function eocNorm(string $s): string { return trim(str_replace(['أ', 'إ', 'آ', 'ى', 'ة', 'ّ', 'ً', 'ٌ', 'ٍ', 'َ', 'ُ', 'ِ', 'ْ'], ['ا', 'ا', 'ا', 'ي', 'ه', '', '', '', '', '', '', '', ''], $s)); }
 
 /** حقول سطر البيان المالي (بأسماء خانات المنصّة) */
@@ -232,9 +290,9 @@ function eocFinancialRows(PDO $db, array $ids, string $code, array $data): array
             'teacher_no' => trim((string)($e['caisse_number'] ?? '')), 'teacher_name' => eocNameAr($e),
             'previous_salary' => $p ? round($p['base']) : $base, 'current_salary' => $base, 'add_salary' => $extra,
             'teacher_m_disc' => $monthly, 'teacher_q_disc' => $monthly * count($pi['months']), 'school_q_disc' => $monthly * count($pi['months']),
-            'discount_half_salary' => $half, 'training_degree' => $deg, 'extra_amount' => $half + $deg, 'is_trainee' => 0, 'is_contribution' => 0, 'remarks' => '',
+            'discount_half_salary' => $half, 'training_degree' => $deg, 'extra_amount' => $half + $deg, 'is_trainee' => (int)!empty($e['eoc_trainee']), 'is_contribution' => (int)!empty($e['eoc_contribution']), 'remarks' => '',
         ];
-        $ov = (array)($data['lines'][(string)$id] ?? []);
+        $ov = eocOvDiff((array)($data['lines'][(string)$id] ?? []), $auto);
         $row = ['key' => (string)$id, 'src' => 'auto', 'emp_id' => $id, 'auto' => $auto, 'ov' => $ov] + array_replace($auto, array_intersect_key($ov, array_flip(eocFinancialFields())));
         $rows[] = eocFinRecalc($row);
     }
@@ -275,7 +333,7 @@ function eocGeneralTotals(array $rows): array {
 
 /* ===== حفظ سطر من النموذج (نفس أسماء خانات المنصّة) ===== */
 function eocNumIn($v): string { $s = str_replace([',', ' ', '٬'], '', trim((string)$v)); return $s === '' ? '' : (string)(float)$s; }
-function eocApplyLine(array &$data, string $kind, array $P): array {
+function eocApplyLine(array &$data, string $kind, array $P, ?PDO $db = null): array {
     $key = trim((string)($P['key'] ?? '')); $isNew = $key === '';
     $fields = $kind === 'general' ? eocGeneralFields() : eocFinancialFields();
     $vals = [];
@@ -299,8 +357,13 @@ function eocApplyLine(array &$data, string $kind, array $P): array {
     }
     if ($isNew) { $k = 'm' . substr(md5(uniqid('', true)), 0, 8); $data['manual'][$k] = $vals; return ['ok' => true, 'msg' => 'أُضيف السطر', 'key' => $k]; }
     if (isset($data['manual'][$key])) { $data['manual'][$key] = array_replace($data['manual'][$key], $vals); return ['ok' => true, 'msg' => 'حُفظ التعديل', 'key' => $key]; }
-    $data['lines'][$key] = array_replace((array)($data['lines'][$key] ?? []), $vals);
-    return ['ok' => true, 'msg' => 'حُفظ التعديل', 'key' => $key];
+    // سطر محسوب من البرنامج: خانات الملف تُكتب بملف الأستاذ نفسه (تظهر بكل السنين)، والباقي (الرواتب/المحسومات/الملاحظات) تعديل خاص بهذا البيان
+    $written = [];
+    if ($db instanceof PDO && ctype_digit($key)) { $written = eocProfileSync($db, (int)$key, $vals); foreach ($written as $f) unset($vals[$f]); }
+    $ov = array_replace((array)($data['lines'][$key] ?? []), $vals);
+    foreach ($written as $f) unset($ov[$f]); // ما صار بالملف لا يبقى تعديلاً خاصاً
+    if ($ov) $data['lines'][$key] = $ov; else unset($data['lines'][$key]);
+    return ['ok' => true, 'msg' => $written ? 'حُفظ التعديل وكُتب بملف الأستاذ' : 'حُفظ التعديل', 'key' => $key];
 }
 function eocDeleteLine(array &$data, string $key): void {
     if (isset($data['manual'][$key])) { unset($data['manual'][$key]); return; }
