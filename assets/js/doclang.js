@@ -119,9 +119,13 @@
             var od0 = root.classList.contains('official-doc') ? root : root.closest('.official-doc'); if (official && od0 && rlStateSheet(od0)) official = false;
             root.querySelectorAll('.dh-fr').forEach(function (e) { e.classList.add('rl-fr', 'rl-block'); });
             root.querySelectorAll('.dh-ar').forEach(function (e) { e.classList.add('rl-ar', 'rl-block'); });
+            // 🌐 (2026-11-08 p1 «3 % مرّتين») رؤوس مكتوبة باللغتين أصلاً (.bi-fr/.bi-ar بالتقرير العام): وجهاها جاهزان ⇒ لا يُترجَم السطر العربي
+            //    بالقاموس (كان يطلع «Salarié 3 % + % École 8» تحت «salarié 3 % + école 8 %») — يُعامَلان كزوج: فرنسي يظهر بالفرنسي، عربي بالعربي
+            root.querySelectorAll('.bi-fr').forEach(function (e) { e.classList.add('rl-fr', 'rl-block'); });
+            root.querySelectorAll('.bi-ar').forEach(function (e) { e.classList.add('rl-ar', 'rl-block'); });
             var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: function (n) {
                 if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-                var p = n.parentElement; if (!p || SKIP.test(p.tagName) || p.closest('.no-print, .no-export, .export-toolbar, .rl-pair, script, style, select, .official-doc .rl-keep')) return NodeFilter.FILTER_REJECT;
+                var p = n.parentElement; if (!p || SKIP.test(p.tagName) || p.closest('.no-print, .no-export, .export-toolbar, .rl-pair, .rl-fr, .rl-ar, script, style, select, .official-doc .rl-keep')) return NodeFilter.FILTER_REJECT;
                 return NodeFilter.FILTER_ACCEPT; } });
             var nodes = [], n; while ((n = tw.nextNode())) nodes.push(n);
             nodes.forEach(function (tn) {

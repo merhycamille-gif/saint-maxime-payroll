@@ -11356,6 +11356,17 @@ try {
 } catch (Throwable $e) { $ok292 = false; $why292 = $e->getMessage(); try { $db->exec("DELETE FROM mehe_budget WHERE scope = '999991'"); } catch (Throwable $e2) {} }
 check('🏛️🖥️ موازنة الوزارة = المنصّة (2026-11-08): أشهر الراتب/النقل لكل فئة + حدّها 24 + استثناء/إرجاع موظف + ضمان الإداري بفروعه الثلاثة والأستاذ 8٪ + فئة المنحة من عضو هيئة التدريس + خانات التفتيش وعضو اللجنة + ترحيل سنة جديدة (معلومات/أشهر/معرّفات، لا نفقات) + متوسّط الرسوم + قوائم المنصّة الحرفية (49 دوراً/37 مؤهّلاً)', $ok292, $why292);
 
+/* 293) 🌐 p1 (2026-11-08 «3 % مرّتين»): رؤوس التقرير العام الثنائية (.bi-fr/.bi-ar) لا يُترجَم سطرها العربي بالقاموس — doclang يعاملهما كزوج جاهز
+ *      (كان «Salarié 3 % + % École 8» يظهر تحت «salarié 3 % + école 8 %» عندما لغة البرنامج فرنسية). */
+$dl293 = (string)file_get_contents($PROJ . '/assets/js/doclang.js');
+$hG293 = renderPage('pages/official_forms.php', ['form' => 'general_report', 'school_year' => '2025-2026'], ['extra', 'aide'], [3], 'lbp', '2025-2026');
+check('🌐 التقرير العام: رأس الضمان/الصندوق الثنائي لا يُترجَم مرّتين (p1 2026-11-08) — .bi-fr/.bi-ar يُعلَّمان rl-fr/rl-ar ويُستثنيان من ماسح الترجمة + المصدر ما زال يحمل الوجهين',
+      strpos($dl293, "root.querySelectorAll('.bi-fr').forEach(function (e) { e.classList.add('rl-fr', 'rl-block'); });") !== false
+      && strpos($dl293, "root.querySelectorAll('.bi-ar').forEach(function (e) { e.classList.add('rl-ar', 'rl-block'); });") !== false
+      && strpos($dl293, "p.closest('.no-print, .no-export, .export-toolbar, .rl-pair, .rl-fr, .rl-ar, script, style, select, .official-doc .rl-keep')") !== false
+      && strpos($hG293, 'class="bi-fr" style="font-weight:400">salarié 3 % + école 8 %</small><small class="bi-ar" style="font-weight:400">الأجير 3 % + المدرسة 8 %</small>') !== false
+      && stripos($hG293, 'Fatal error') === false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
