@@ -436,6 +436,12 @@ document.addEventListener('submit', function (e) {
                 <span>Budget MEHE / موازنة وزارة التربية</span>
             </a>
             <?php endif; ?>
+            <?php if (viewerCanSeePage('eoc_portal.php')): /* 🏛️💼 (2026-11-08) بوّابة صندوق التعويضات طبق منصّة caisseindemnite.com */ ?>
+            <a href="<?= BASE_URL ?>pages/eoc_portal.php" class="<?= $currentPage === 'eoc_portal' ? 'active' : '' ?>">
+                <i class="fas gov-ic gov-eoc"></i>
+                <span>Portail Caisse EOC / بوّابة صندوق التعويضات</span>
+            </a>
+            <?php endif; ?>
 
             <?php if (canEdit()): ?>
             <a href="<?= BASE_URL ?>pages/tax_declarations.php" class="<?= $currentPage === 'tax' ? 'active' : '' ?>">
@@ -783,7 +789,8 @@ document.addEventListener('submit', function (e) {
                     // 🏛️🖼️ (2026-10-18 «لوغو الضمان تمون أيقونة الضمان») gov-ic = شعار الجهة الرسمية محلّ الأيقونة (app.css قسم 500)
                     ['fr' => 'CNSS', 'ar' => 'الضمان الاجتماعي', 'icon' => 'gov-ic gov-cnss', 'color' => '#3b82f6', 'cat' => $__pick('CNSS'),
                      'pages' => canEdit() ? [['cnss_followup.php', 'fa-user-shield', 'Suivi CNSS', 'متابعة الضمان', 'cnss_followup'], ['social_security.php', 'fa-shield-alt', 'Plafonds CNSS', 'حدود الضمان', 'social_security']] : []],
-                    ['fr' => 'Caisse EOC', 'ar' => 'صندوق التعويضات', 'icon' => 'gov-ic gov-eoc', 'color' => '#c9a961', 'cat' => $__pick('Caisse EOC'), 'pages' => []],
+                    ['fr' => 'Caisse EOC', 'ar' => 'صندوق التعويضات', 'icon' => 'gov-ic gov-eoc', 'color' => '#c9a961', 'cat' => $__pick('Caisse EOC'),
+                     'pages' => viewerCanSeePage('eoc_portal.php') ? [['eoc_portal.php', 'fa-landmark', 'Portail Caisse (réplique)', 'بوّابة الصندوق — طبق المنصّة', 'eoc_portal']] : []], // 🏛️💼 2026-11-08
                     ['fr' => 'Finances', 'ar' => 'المالية — الضريبة', 'icon' => 'gov-ic gov-mof', 'color' => '#be185d', 'cat' => $__pick('Impôt'),   /* 🎨 2026-10-19 كان أحمر */
                      'pages' => canEdit() ? [['tax_declarations.php', 'fa-file-contract', 'Déclarations', 'التصاريح', 'tax'], ['tax_brackets.php', 'fa-percent', "Tranches d'impôt", 'الشطور الضريبية', 'tax_brackets']] : []],
                 ];

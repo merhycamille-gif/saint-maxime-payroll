@@ -53,6 +53,7 @@ function reportCenterCategories(): array {
             ['url'=>$OF.'tax_emp_report', 'icon'=>'fa-table-list', 'color'=>'var(--danger)', 'fr'=>'Impôt sur le revenu — détaillé', 'ar'=>'تقرير ضريبة الدخل - الأستاذ/الموظف'],
         ]],
         ['title'=>'صندوق التعليم الخاص / Caisse EOC', 'icon'=>'gov-ic gov-eoc', 'color'=>'var(--gold)', 'tiles'=>[
+            ['url'=>BASE_URL.'pages/eoc_portal.php', 'icon'=>'fa-landmark', 'color'=>'var(--gold)', 'fr'=>'Portail Caisse — réplique du site (bilan général + financier)', 'ar'=>'بوّابة الصندوق — طبق الموقع (البيان العام + البيان المالي)'], // 🏛️💼 2026-11-08
             ['url'=>'?report=eoc_summary', 'icon'=>'fa-list', 'color'=>'var(--gold)', 'fr'=>'Caisse mensuelle', 'ar'=>'كشف صندوق شهري'],
             ['url'=>$OF.'eoc_card', 'icon'=>'fa-id-badge', 'color'=>'var(--primary)', 'fr'=>'Carte titulaire', 'ar'=>'بطاقة ملاك'],
             ['url'=>$OF.'eoc_staff&cat=titulaire', 'icon'=>'fa-users', 'color'=>'var(--primary)', 'fr'=>'État général — titulaires', 'ar'=>'بيان عام — الملاك'],

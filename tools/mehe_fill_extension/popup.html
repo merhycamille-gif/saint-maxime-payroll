@@ -2,22 +2,27 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<title>تعبئة موازنة الوزارة</title>
+<title>تعبئة الوزارة وصندوق التعويضات</title>
 <style>
-body{font-family:Arial,Tahoma,sans-serif;font-size:14px;width:380px;margin:0;padding:14px;color:#1f2937;background:#fff}
-h1{font-size:16px;margin:0 0 10px;color:#1F4E5F}
-label{display:block;font-size:12.5px;color:#475569;margin:8px 0 3px}
+body{font-family:Arial,Tahoma,sans-serif;font-size:14px;width:400px;margin:0;padding:12px 14px;color:#1f2937;background:#fff}
+h1{font-size:15px;margin:0 0 8px;color:#1F4E5F}
+h2{font-size:13.5px;margin:12px 0 6px;color:#1F4E5F;display:flex;align-items:center;gap:6px}
+label{display:block;font-size:12.5px;color:#475569;margin:6px 0 3px}
 select,input{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:7px 9px;font-size:13.5px}
-button{width:100%;border:0;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px}
-.b1{background:#1F4E5F;color:#fff}.b2{background:#5fb3a4;color:#fff}.b3{background:#e5e7eb;color:#111}
+button{width:100%;border:0;border-radius:10px;padding:9px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:6px}
+.b1{background:#1F4E5F;color:#fff}.b2{background:#5fb3a4;color:#fff}.b3{background:#e5e7eb;color:#111}.b4{background:#c9a961;color:#fff}.b5{background:#b3261e;color:#fff}
+.row{display:flex;gap:6px}.row button{margin-top:6px}
 button:disabled{opacity:.5;cursor:default}
-.box{border:1px solid #e5e7eb;border-radius:10px;padding:9px 11px;margin-top:10px;font-size:13px;line-height:1.7;background:#f8fafc}
+.box{border:1px solid #e5e7eb;border-radius:10px;padding:8px 11px;margin-top:8px;font-size:13px;line-height:1.7;background:#f8fafc}
 .ok{color:#166534}.bad{color:#991b1b}.muted{color:#64748b;font-size:12px}
 ul{margin:4px 18px 0 0;padding:0}
+section{border:1px solid #e5e7eb;border-radius:12px;padding:8px 10px;margin-top:10px}
+section.dim{opacity:.75}
+details summary{cursor:pointer}
 </style>
 </head>
 <body>
-<h1>⚖️ تعبئة موازنة الوزارة من البرنامج</h1>
+<h1>⚖️ من البرنامج إلى مواقع الدولة</h1>
 <label>برنامج الرواتب</label>
 <select id="base">
   <option value="auto">تلقائي — أيّ نسخة مسجَّل دخولك فيها بهذا المتصفّح</option>
@@ -25,13 +30,32 @@ ul{margin:4px 18px 0 0;padding:0}
   <option value="http://localhost/saint-maxime-payroll/">هذا الكمبيوتر (localhost)</option>
   <option value="https://192.168.1.60/saint-maxime-payroll/">سيرفر المدرسة (192.168.1.60)</option>
 </select>
-<p class="muted">المدرسة والسنة تؤخذان كما هما مختارتان الآن داخل البرنامج (المبدّل الأعلى). سجّل دخولك بالبرنامج في هذا المتصفّح أوّلاً.</p>
-<button class="b1" id="fetch">١) جلب الموازنة من البرنامج</button>
-<div class="box" id="info">لم تُجلَب بعد.</div>
-<button class="b2" id="fill" disabled>٢) تعبئة صفحة الوزارة المفتوحة</button>
-<button class="b3" id="check" disabled>مراجعة: ما الذي لم يُطابَق؟</button>
-<div class="box" id="out" style="display:none"></div>
-<p class="muted">المساعد يعبّئ الخانات فقط. راجع كل قسم بـ«التالي» ثمّ اكبس «أرسل» أنت على الموقع. لا يرسل شيئاً بنفسه.</p>
+<p class="muted" style="margin:6px 0 0">المدرسة والسنة تؤخذان كما هما مختارتان الآن داخل البرنامج (المبدّل الأعلى).</p>
+
+<section id="secEoc">
+  <h2>🏛️ صندوق التعويضات — caisseindemnite.com</h2>
+  <button class="b1" id="eocList">١) جلب لائحة البيانات من البرنامج</button>
+  <select id="eocStmt" style="display:none;margin-top:6px"></select>
+  <button class="b1" id="eocFetch" style="display:none">٢) جلب هذا البيان</button>
+  <div class="box" id="eocInfo">لم يُجلَب بعد.</div>
+  <button class="b3" id="eocCheck" disabled>مراجعة: مَن ناقص على الموقع؟</button>
+  <select id="eocPick" style="display:none;margin-top:6px"></select>
+  <button class="b2" id="eocFill" disabled>تعبئة النموذج المفتوح على الموقع (أنت تكبس حفظ)</button>
+  <div class="row"><button class="b4" id="eocAutoMissing" disabled>ترحيل تلقائي: الناقصين فقط</button><button class="b4" id="eocAutoAll" disabled>ترحيل تلقائي: الكل (تحديث)</button></div>
+  <button class="b5" id="eocStop" style="display:none">⏹ إيقاف الترحيل التلقائي</button>
+  <div class="box" id="eocOut" style="display:none"></div>
+  <p class="muted" style="margin:6px 0 0">الترحيل التلقائي يعبّئ ويكبس «حفظ» سطراً سطراً. حفظ السطر على الموقع قابل للتعديل والحذف، والاعتماد النهائي يبقى عند الصندوق. لا يعتمد ولا يقفل أيّ بيان.</p>
+</section>
+
+<section id="secMehe">
+  <h2>🏫 موازنة وزارة التربية — psb.mehe.gov.lb</h2>
+  <button class="b1" id="fetch">١) جلب الموازنة من البرنامج</button>
+  <div class="box" id="info">لم تُجلَب بعد.</div>
+  <button class="b2" id="fill" disabled>٢) تعبئة صفحة الوزارة المفتوحة</button>
+  <button class="b3" id="check" disabled>مراجعة: ما الذي لم يُطابَق؟</button>
+  <div class="box" id="out" style="display:none"></div>
+  <p class="muted" style="margin:6px 0 0">المساعد يعبّئ الخانات فقط. راجع كل قسم بـ«التالي» ثمّ اكبس «أرسل» أنت على الموقع.</p>
+</section>
 <script src="popup.js"></script>
 </body>
 </html>

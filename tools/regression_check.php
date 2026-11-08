@@ -11414,6 +11414,43 @@ try {
 } catch (Throwable $e) { $ok295 = false; $why295 = $e->getMessage(); }
 check('⚖️ موازنة الوزارة «وازِن» (2026-11-08): سقف ج = (أ+ب)×35/65 · بند ج يتوقّف عند السقف · مزيج يملأ ج ويكمل بـد ⇒ امتثال كامل · بند د · الأقساط بنسبة واحدة مدوّرة للألف · العجز يخفّض حتى الصفر مع ملاحظة · الصفحة: زرّ + 4 طرق + تلوين النسبتين + تنبيه فوري', $ok295, $why295);
 
+/* 296) 🏛️💼 بوّابة صندوق التعويضات طبق منصّة caisseindemnite.com (2026-11-08 «بدي ياه طبق الأصل»): الصفحات الثلاث، البيان العام من رواتب ت1 السنة،
+ *      البيان المالي: فصول المنصّة تتبع السنة الدراسية (202601 = ت1–ك1 2025)، المحسوم = 6٪ × (الراتب + الإضافي) ×3، الدرجة = الحالي − السابق، مجموع المدرسة = الأساتذة،
+ *      overrides/يدوي/حذف/إرجاع، JSON للمساعد بأسماء خانات المنصّة، إكسل. المرجع: بيان 202601 المعتمد على المنصّة = 410,594,200 (مكسيموس). */
+$ok296 = false; $why296 = '';
+try {
+    require_once $PROJ . '/includes/eoc_portal.php';
+    $pi = eocPeriodInfo('202601'); $okMap = $pi && $pi['months'] === [[2025, 10], [2025, 11], [2025, 12]] && eocPeriodInfo('202604')['months'][0] === [2026, 7] && eocPeriodInfo('2025010')['months'] === [[2025, 10]] && eocCodeOfMonth(2026, 10) === '202701' && eocCodeOfMonth(2026, 2) === '202602';
+    $d0 = eocDefaults('financial'); $fr = eocFinancialRows($db, [2], '202601', $d0); $ft = eocFinancialTotals($fr);
+    $alin = null; foreach ($fr as $r) if ($r['teacher_no'] === '102829') $alin = $r;
+    $okFin = count($fr) === 20 && $alin && (int)$alin['teacher_m_disc'] === 3446700 && (int)$alin['teacher_q_disc'] === 10340100 && (int)$alin['school_q_disc'] === 10340100 && (int)$ft['grand'] === 410594200 && (int)$ft['school_total'] === (int)$ft['teacher_q_disc'];
+    $andre = null; foreach ($fr as $r) if ($r['teacher_no'] === '3938') $andre = $r; $okDeg = $andre && (int)$andre['training_degree'] === (int)$andre['current_salary'] - (int)$andre['previous_salary'] && (int)$andre['extra_amount'] === (int)$andre['training_degree'];
+    // override + يدوي + حذف + إرجاع + إعادة احتساب المشتقّ
+    $d1 = $d0; $res1 = eocApplyLine($d1, 'financial', ['key' => '191', 'current_salary' => '3,560,000', 'add_salary' => '54,000,000', 'previous_salary' => '3,445,000']); $r1 = eocFinancialRows($db, [2], '202601', $d1); $a1 = null; foreach ($r1 as $r) if ($r['key'] === '191') $a1 = $r;
+    $okOv = $res1['ok'] && $a1 && (int)$a1['teacher_m_disc'] === (int)round(57560000 * 0.06) && (int)$a1['teacher_q_disc'] === (int)round(57560000 * 0.06) * 3 && array_key_exists('current_salary', $a1['ov']);
+    $res2 = eocApplyLine($d1, 'financial', ['key' => '', 'teacher_no' => '999', 'teacher_name' => 'فحص', 'previous_salary' => '1,000,000', 'current_salary' => '1,000,000', 'add_salary' => '0', 'is_contribution' => '1']); $r2 = eocFinancialRows($db, [2], '202601', $d1); $m2 = null; foreach ($r2 as $r) if ($r['key'] === ($res2['key'] ?? '')) $m2 = $r;
+    $okMan = $res2['ok'] && $m2 && $m2['src'] === 'manual' && (int)$m2['teacher_m_disc'] === 0 && (int)$m2['school_q_disc'] === 180000;
+    eocDeleteLine($d1, '191'); $okDel = !in_array('191', array_column(eocFinancialRows($db, [2], '202601', $d1), 'key'), true); eocRestoreLine($d1, '191'); $okDel = $okDel && in_array('191', array_column(eocFinancialRows($db, [2], '202601', $d1), 'key'), true);
+    $bad = eocApplyLine($d1, 'financial', ['key' => '', 'teacher_no' => '', 'current_salary' => '5']); $okVal = $bad['ok'] === false;
+    // البيان العام: أساتذة السنة ملاكاً ومتعاقدين، راتب ت1، الشهادة/المرحلة من الملف، النواقص معلَّمة
+    $gr = eocGeneralRows($db, [2], '2026-2027', eocDefaults('general')); $gt = eocGeneralTotals($gr); $ga = null; foreach ($gr as $r) if ($r['key'] === '191') $ga = $r;
+    $okGen = count($gr) >= 25 && $gt['staff'] >= 18 && $gt['contract'] >= 5 && $ga && (int)$ga['salary'] === 3560000 && (int)$ga['add_salary'] === 54000000 && $ga['employment_type'] === 'staff' && (int)$ga['certificate_id'] === 11 && $ga['birth_date'] === '1984-08-01' && count(array_filter($gr, fn($r) => in_array('teacher_no', $r['missing'], true) && $r['employment_type'] === 'staff')) >= 1 && eocPhaseFromNiveau('maternelle,primaire') === 10 && eocPhaseFromNiveau('intermediaire,secondaire') === 5 && eocCatFromEmp(['niveau_scolaire' => 'maternelle']) === 1;
+    // الصفحة بحالاتها + JSON + إكسل
+    $hH = renderPage('pages/eoc_portal.php', ['tab' => 'home'], [], [2], '', '2026-2027'); $hL = renderPage('pages/eoc_portal.php', ['tab' => 'financial'], [], [2], '', '2026-2027'); $hF = renderPage('pages/eoc_portal.php', ['tab' => 'financial', 'period' => '202601'], [], [2], '', '2026-2027'); $hG = renderPage('pages/eoc_portal.php', ['tab' => 'general', 'period' => '2026-2027', 'add' => '1'], [], [2], '', '2026-2027');
+    $okPg = strpos($hH, 'بوابة المدارس') !== false && strpos($hH, 'معلومات المدرسة') !== false && strpos($hH, '75210') !== false && strpos($hL, 'البيانات السابقة') !== false && strpos($hL, '>202601</span>') !== false && strpos($hL, '410,594,200') !== false
+        && strpos($hF, 'سطور البيان') !== false && strpos($hF, 'المحسومات المقتطعة') !== false && strpos($hF, '3,446,700') !== false && strpos($hF, 'المادة 6 من المرسوم الاشتراعي 47') !== false && strpos($hF, 'class="eoc-sep"') !== false && strpos($hF, 'id="ppExportArea"') !== false
+        && strpos($hG, 'الخطوة 1 — معلومات المدرسة') !== false && strpos($hG, 'name="certificate_id"') !== false && strpos($hG, 'name="birth_year"') !== false && strpos($hG, 'sp-cell-missing') !== false && stripos($hH . $hL . $hF . $hG, 'Fatal error') === false;
+    $j = json_decode(renderPage('pages/eoc_portal.php', ['tab' => 'financial', 'period' => '202601', 'export' => 'json'], [], [2], '', '2026-2027'), true); $jl = json_decode(renderPage('pages/eoc_portal.php', ['tab' => 'general', 'export' => 'json'], [], [2], '', '2026-2027'), true);
+    $okJs = is_array($j) && ($j['kind'] ?? '') === 'financial' && count($j['lines']) === 20 && ($j['lines'][0]['teacher_m_disc'] ?? '') !== '' && isset($j['totals']['grand']) && is_array($jl) && !empty($jl['financial']) && !empty($jl['general']);
+    $xl = renderPage('pages/eoc_portal.php', ['tab' => 'financial', 'period' => '202601', 'export' => 'xlsx'], [], [2], '', '2026-2027'); $okXl = substr($xl, 0, 2) === 'PK';
+    // المساعد: الملفات والصلاحيات
+    $mf = json_decode((string)file_get_contents($PROJ . '/tools/mehe_fill_extension/manifest.json'), true); $ce = (string)file_get_contents($PROJ . '/tools/mehe_fill_extension/content_eoc.js'); $pj = (string)file_get_contents($PROJ . '/tools/mehe_fill_extension/popup.js');
+    $okExt = $mf && in_array('https://www.caisseindemnite.com/*', $mf['host_permissions'], true) && count(array_filter($mf['content_scripts'], fn($c) => in_array('content_eoc.js', $c['js'], true))) === 1 && strpos($ce, "msg.target !== 'eoc'") !== false && strpos($ce, 'eocAuto') !== false && strpos($ce, 'bm_teacherno') !== false && strpos($ce, 'data-sp-roster-form') !== false && strpos($pj, 'pages/eoc_portal.php?tab=') !== false;
+    $ok296 = $okMap && $okFin && $okDeg && $okOv && $okMan && $okDel && $okVal && $okGen && $okPg && $okJs && $okXl && $okExt;
+    $why296 = 'map=' . (int)$okMap . ' fin=' . (int)$okFin . ' deg=' . (int)$okDeg . ' ov=' . (int)$okOv . ' man=' . (int)$okMan . ' del=' . (int)$okDel . ' val=' . (int)$okVal . ' gen=' . (int)$okGen . ' page=' . (int)$okPg . ' json=' . (int)$okJs . ' xlsx=' . (int)$okXl . ' ext=' . (int)$okExt . ' grand=' . number_format($ft['grand'] ?? 0);
+} catch (Throwable $e) { $ok296 = false; $why296 = $e->getMessage(); }
+check('🏛️💼 بوّابة صندوق التعويضات (2026-11-08): فصول المنصّة بالسنة الدراسية · بيان 202601 = 410,594,200 كالمعتمد · 6٪ × (الراتب + الإضافي) ×3 · الدرجة = الحالي − السابق · تعديل/يدوي/حذف/إرجاع · البيان العام من ت1 · الصفحات الثلاث + JSON + إكسل + المساعد', $ok296, $why296);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
