@@ -5820,6 +5820,20 @@ function numLoose($v): float {
     return (float)str_replace(',', '', $s);
 }
 
+/**
+ * 🩹 مرّة واحدة (2026-11-09): رقم مدرسة أبلح عند صندوق التعويضات = 3751 (كما يكتبه موقع الصندوق بحسابها «راهبات المخلصيات - سيدة النياح»)؛
+ *    خانته كانت فارغة بالبرنامج، وكبسة «رحّل من برنامج الرواتب» تعرف المدرسة بهذا الرقم. يُكتب فقط إن كانت الخانة فارغة ولا مدرسة أخرى تحمله.
+ */
+function healAblahCaisseNo20261109(): void {
+    if (getSetting('heal_ablah_caisse_no_20261109', '') !== '') return;
+    try {
+        $db = getDB(); $done = 'skip';
+        $taken = (int)$db->query("SELECT COUNT(*) FROM schools WHERE TRIM(COALESCE(caisse_number, '')) = '3751'")->fetchColumn();
+        if (!$taken) { $n = $db->exec("UPDATE schools SET caisse_number = '3751' WHERE id = 7 AND is_deleted = 0 AND TRIM(COALESCE(caisse_number, '')) = '' AND name_ar LIKE '%النياح%'"); if ($n) $done = 'set'; }
+        setSetting('heal_ablah_caisse_no_20261109', date('Y-m-d H:i:s') . ' ' . $done);
+    } catch (Throwable $e) { /* يُعاد بالفتحة التالية */ }
+}
+
 /** 🔢 نصّ محفوظ قديم (سجلّ/قرار) فيه كسر بنقطة «23.5» ⇒ يُعرض بفاصلة «23,5» — التواريخ والأرقام المنقّطة (30.9.2026، v2.0.0) لا تُمسّ. للعرض فقط. */
 function nfcText($s): string { return (string)preg_replace('/(?<![\d.,])(\d+)\.(\d{1,2})(?![\d.])/u', '$1,$2', (string)$s); }
 

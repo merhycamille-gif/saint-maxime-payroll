@@ -152,6 +152,67 @@
   }
   chrome.storage.local.get(['eocAuto'], (st) => { if (st && st.eocAuto && st.eocAuto.base === baseUrl()) setTimeout(() => autoStep(st.eocAuto), 600); });
 
+  /* ---- 🔘 الكبسة الواحدة داخل الصفحة (2026-11-09 «عملّي حلّ سهل بلا هاللفّ والدوران»): «رحّل من برنامج الرواتب» ----
+     تقرأ رقم المدرسة والسنة/الفصل من الصفحة نفسها، تطلب البيان من البرنامج بهذا الرقم (bg.js)، تعرض الخلاصة، ثمّ ترحّل (تحديث الموجود + إضافة الناقص).
+     رقم مدرسة البرنامج ≠ رقم مدرسة الموقع ⇒ لا ترحيل. لا تعتمد ولا تقفل ولا تحذف شيئاً. */
+  function siteSchoolNo() { const el = document.querySelector('.sp-user-school'); const t = el ? String(el.textContent) : ''; const m = t.match(/رقم المدرسة\s*(\d+)/) || t.match(/(\d{3,})\s*$/); return m ? m[1] : ''; }
+  function sitePeriod() { const h = document.querySelector('h1.sp-title'); const t = h ? h.textContent : ''; const m = page() === 'roster' ? t.match(/(\d{4})\s*-\s*(\d{4})/) : t.match(/(\d{6,7})/); return m ? (page() === 'roster' ? m[1] + '-' + m[2] : m[1]) : ''; }
+  function siteLocked() { return !document.querySelector('a[href*="edit="], [data-sp-unfold], form[data-sp-roster-form], #bm_teacherno'); }
+  const esc = (s) => String(s === null || s === undefined ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function bar() {
+    let b = document.getElementById('msa-eoc-bar'); if (b) return b;
+    const host = document.querySelector('.sp-page-head') || document.querySelector('main') || document.body;
+    b = document.createElement('div'); b.id = 'msa-eoc-bar';
+    b.style.cssText = 'direction:rtl;text-align:right;background:#eef7f3;border:2px solid #1F4E5F;border-radius:10px;padding:12px 16px;margin:0 0 14px;font:600 14px/1.7 "Noto Sans Arabic",Tahoma,Arial;color:#12303a';
+    host.parentNode.insertBefore(b, host.nextSibling); return b;
+  }
+  const BTN = 'border:0;border-radius:8px;padding:10px 20px;font:700 15px "Noto Sans Arabic",Tahoma,Arial;cursor:pointer;margin-inline-end:8px';
+  function barIdle(note) {
+    const b = bar();
+    b.innerHTML = '<button id="msa-eoc-go" style="' + BTN + ';background:#1F4E5F;color:#fff">⬇ رحّل من برنامج الرواتب</button>'
+      + '<span style="font-weight:500;color:#3b5560">يجيب أرقام هذه المدرسة لهذا البيان من البرنامج ويعبّيها هنا. البيان يبقى مفتوحاً للتعديل.</span>'
+      + (note ? '<div style="margin-top:8px">' + note + '</div>' : '');
+    document.getElementById('msa-eoc-go').onclick = oneClick;
+  }
+  async function oneClick() {
+    const b = bar(); const no = siteSchoolNo(); const per = sitePeriod(); const kind = page() === 'roster' ? 'general' : 'financial';
+    if (!no || !per) { barIdle('<span style="color:#b3261e">ما قدرت إقرا رقم المدرسة أو ' + (kind === 'general' ? 'السنة' : 'الفصل') + ' من الصفحة.</span>'); return; }
+    // لائحة الموقع على أكثر من صفحة: المطابقة ترى الصفحة الحالية فقط ⇒ خطر تكرار الأساتذة — لا ترحيل تلقائي
+    if (document.querySelector('a[href*="page=2"]')) { barIdle('<span style="color:#b3261e">⛔ لائحة الأساتذة هنا على أكثر من صفحة — الترحيل بكبسة واحدة غير متاح لها بعد (حتى لا يتكرّر أحد). خبّر المبرمج.</span>'); return; }
+    b.innerHTML = '⏳ عم جيب بيان المدرسة رقم ' + esc(no) + ' (' + esc(per) + ') من برنامج الرواتب…';
+    let res;
+    try { res = await chrome.runtime.sendMessage({ target: 'bg', action: 'program', path: 'pages/eoc_portal.php?tab=' + kind + '&period=' + encodeURIComponent(per) + '&export=json&caisse_no=' + no }); }
+    catch (e) { res = { ok: false, msg: 'المساعد لم يستجب — حدّث الصفحة (F5) وجرّب.' }; }
+    if (!res || !res.ok) {
+      barIdle('<span style="color:#b3261e">' + esc((res && res.msg) || 'تعذّر الجلب') + '</span>' + (res && res.login ? ' <a href="#" id="msa-eoc-login" style="color:#1F4E5F">افتح البرنامج وسجّل دخولك</a> ثمّ ارجع واكبس من جديد.' : ''));
+      const a = document.getElementById('msa-eoc-login'); if (a) a.onclick = (ev) => { ev.preventDefault(); chrome.runtime.sendMessage({ target: 'bg', action: 'openLogin' }); };
+      return;
+    }
+    const B = res.json;
+    if (!B || B.ok === false || !B.lines) { barIdle('<span style="color:#b3261e">' + esc((B && B.msg) || 'البرنامج لم يُرجع البيان') + '</span>'); return; }
+    // 🛡️ الحارس: المدرسة والبيان يجب أن يطابقا الصفحة
+    if (digits(B.school_no) !== no || B.kind !== kind || String(B.period) !== per) { barIdle('<span style="color:#b3261e">⛔ لا ترحيل: البرنامج أرجع «' + esc(B.school) + '» رقم ' + esc(B.school_no || '—') + ' (' + esc(B.period) + ') وهذه الصفحة للمدرسة رقم ' + esc(no) + ' (' + esc(per) + ').</span>'); return; }
+    const rv = review(B); const incomplete = (B.lines || []).filter((x) => x.missing && x.missing.length);
+    b.innerHTML = '<div><b>' + esc(B.school) + '</b> — ' + (kind === 'general' ? 'البيان العام ' : 'البيان المالي ') + esc(B.period) + '</div>'
+      + '<div style="font-weight:500">بالبرنامج <b>' + B.lines.length + '</b> أستاذاً · موجودون هنا <b>' + rv.matched + '</b> (تتحدّث أرقامهم) · ناقصون هنا <b>' + rv.missing.length + '</b> (يُضافون)'
+      + (rv.extra.length ? ' · <span style="color:#8a5a00">هنا وليسوا بالبرنامج <b>' + rv.extra.length + '</b>: ' + esc(rv.extra.join('، ')) + ' — لا يُمسّون</span>' : '') + '</div>'
+      + (incomplete.length ? '<div style="font-weight:500;color:#b3261e">⚠ ' + incomplete.length + ' بياناتهم ناقصة بالبرنامج وقد يرفضهم الموقع: ' + esc(incomplete.map((x) => x.teacher_name).join('، ')) + '</div>' : '')
+      + '<div style="margin-top:8px"><button id="msa-eoc-start" style="' + BTN + ';background:#1e7a4f;color:#fff">✔ ابدأ الترحيل (' + B.lines.length + ')</button><button id="msa-eoc-cancel" style="' + BTN + ';background:#fff;color:#12303a;border:1px solid #9bb">إلغاء</button></div>';
+    document.getElementById('msa-eoc-cancel').onclick = () => barIdle('');
+    document.getElementById('msa-eoc-start').onclick = async () => {
+      const Q = { base: baseUrl(), kind: B.kind, period: B.period, mode: 'all', lines: B.lines.slice(), idx: 0, done: 0, errors: [], started: Date.now() };
+      await chrome.storage.local.set({ eocAuto: Q, eocStmt: B });
+      b.innerHTML = '⏳ بدأ الترحيل — تابع الشريط أعلى الصفحة. «إيقاف» يوقفه بأيّ لحظة.';
+      setTimeout(() => autoStep(Q), 300);
+    };
+  }
+  function initBar() {
+    const p = page(); if (p !== 'roster' && p !== 'financial') return;
+    if (siteLocked()) return;   // بيان معتمد/مقفل: لا كبسة
+    chrome.storage.local.get(['eocAuto'], (st) => { if (st && st.eocAuto && st.eocAuto.base === baseUrl()) return; barIdle(''); });   // ترحيل جارٍ ⇒ الشريط العلوي يكفي
+  }
+  try { initBar(); } catch (e) { /* لا تكسر الصفحة */ }
+
   /* ---- أوامر النافذة ---- */
   async function run(msg) {
     const B = msg.statement; const p = page();

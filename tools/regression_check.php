@@ -11629,6 +11629,27 @@ try {
 } catch (Throwable $e) { $ok301 = false; $why301 = $e->getMessage(); }
 check('🤝 البيان العام الجديد للصندوق = البيان العام القديم بالحرف (2026-11-09 «أي تقرير بأي محلّ لازم يكونو مطابقين لبعضهن»): نفس الأساتذة (ومنهم الداخل ضمن السنة بلا راتب محسوب — شربل عرب) ونفس الأساس والإضافي لكل واحد — مكسيموس + أبلح على الصفحتين المعروضتين', $ok301, $why301);
 
+/* 302) 🔘 (2026-11-09 «عملّي حلّ سهل بلا هاللفّ والدوران، كنت عملتن يدوياً وخلصت»): كبسة واحدة «رحّل من برنامج الرواتب» داخل صفحة بيان موقع الصندوق —
+   تعرف المدرسة من رقمها عند الصندوق المكتوب على الموقع (export=json&caisse_no=)، لهذا الطلب فقط؛ رقم غير مسجَّل ⇒ خطأ بلا بيانات؛ والمساعد لا يرحّل
+   إن اختلف رقم مدرسة البرنامج عن رقم الصفحة أو السنة/النوع، ولا إن كانت لائحة الموقع على أكثر من صفحة. لا يعتمد ولا يقفل ولا يحذف. */
+$ok302 = false; $why302 = '';
+try {
+    $j2a = json_decode(renderPage('pages/eoc_portal.php', ['tab' => 'general', 'period' => '2026-2027', 'export' => 'json', 'caisse_no' => '75210'], [], [7], '', '2026-2027'), true);   // الجلسة على أبلح والطلب برقم مكسيموس
+    $j2b = json_decode(renderPage('pages/eoc_portal.php', ['tab' => 'general', 'period' => '2026-2027', 'export' => 'json', 'caisse_no' => '99999'], [], [2], '', '2026-2027'), true);
+    $j2c = json_decode(renderPage('pages/eoc_portal.php', ['tab' => 'general', 'period' => '2026-2027', 'export' => 'json'], [], [2], '', '2026-2027'), true);   // بلا رقم: كما كان (مدرسة الجلسة)
+    $okEp2 = is_array($j2a) && ($j2a['school_no'] ?? '') === '75210' && ($j2a['kind'] ?? '') === 'general' && count($j2a['lines'] ?? []) >= 25
+        && is_array($j2b) && ($j2b['ok'] ?? null) === false && ($j2b['error'] ?? '') === 'school_not_found' && !isset($j2b['lines'])
+        && is_array($j2c) && ($j2c['school_no'] ?? '') === '75210' && count($j2c['lines'] ?? []) === count($j2a['lines'] ?? []);
+    $mf2 = json_decode((string)file_get_contents($PROJ . '/tools/mehe_fill_extension/manifest.json'), true); $ce2 = (string)file_get_contents($PROJ . '/tools/mehe_fill_extension/content_eoc.js'); $bg2 = (string)@file_get_contents($PROJ . '/tools/mehe_fill_extension/bg.js');
+    $okExt2 = ($mf2['background']['service_worker'] ?? '') === 'bg.js' && strpos($ce2, 'id="msa-eoc-go"') !== false && strpos($ce2, "digits(B.school_no) !== no || B.kind !== kind || String(B.period) !== per") !== false
+        && strpos($ce2, "'&export=json&caisse_no=' + no") !== false && strpos($ce2, 'a[href*="page=2"]') !== false && strpos($ce2, "mode: 'all'") !== false
+        && strpos($bg2, "msg.action === 'program'") !== false && strpos($bg2, "indexOf('export=json') < 0") !== false && strpos($bg2, 'method:') === false;   // الخلفية تقرأ فقط
+    $fn2 = (string)file_get_contents($PROJ . '/includes/header.php'); $okHeal2 = function_exists('healAblahCaisseNo20261109') && strpos($fn2, 'healAblahCaisseNo20261109();') !== false;
+    $ok302 = $okEp2 && $okExt2 && $okHeal2;
+    $why302 = 'endpoint=' . (int)$okEp2 . ' ext=' . (int)$okExt2 . ' heal=' . (int)$okHeal2 . ' lines=' . count($j2a['lines'] ?? []);
+} catch (Throwable $e) { $ok302 = false; $why302 = $e->getMessage(); }
+check('🔘 كبسة واحدة «رحّل من برنامج الرواتب» بصفحة موقع الصندوق (2026-11-09): المدرسة تُعرَف برقمها عند الصندوق لهذا الطلب فقط · رقم غير مسجَّل ⇒ خطأ بلا بيانات · لا ترحيل إن اختلفت المدرسة/السنة أو تعدّدت صفحات اللائحة · الخلفية قراءة فقط', $ok302, $why302);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

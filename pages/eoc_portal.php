@@ -16,6 +16,19 @@ $db = getDB();
 $currentPage = 'eoc_portal';
 $pageTitle = 'بوّابة صندوق التعويضات';
 $hideExportToolbar = true; $ownExportRow = true;
+/* 🔘 (2026-11-09 «عملّي حلّ سهل بلا هاللفّ والدوران»): كبسة «رحّل من برنامج الرواتب» داخل صفحة موقع الصندوق تطلب البيان برقم المدرسة عند الصندوق
+   (المكتوب على الموقع: «رقم المدرسة 3751») ⇒ البرنامج يختار المدرسة صاحبة هذا الرقم من المسموح للمستخدم — لهذا الطلب فقط (لا يغيّر اختياره).
+   لا مدرسة بهذا الرقم (أو أكثر من واحدة) ⇒ جواب JSON بالخطأ ولا بيانات: لا يُرحَّل بيان مدرسة إلى حساب مدرسة أخرى. */
+if (($_GET['export'] ?? '') === 'json' && ($eocCn = preg_replace('/\D+/', '', (string)($_GET['caisse_no'] ?? ''))) !== '') {
+    $eocAllow = array_values(array_map('intval', (array)(isViewer() ? viewerAllowedSchoolIds() : allActiveSchoolIdsCached()))); $eocHit = [];
+    if ($eocAllow) foreach ($db->query("SELECT id, caisse_number FROM schools WHERE is_deleted = 0 AND id IN (" . implode(',', $eocAllow) . ")")->fetchAll() as $eocS) if (preg_replace('/\D+/', '', (string)$eocS['caisse_number']) === $eocCn) $eocHit[] = (int)$eocS['id'];
+    if (count($eocHit) !== 1) {
+        while (ob_get_level()) ob_end_clean(); header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
+        echo json_encode(['ok' => false, 'error' => $eocHit ? 'school_ambiguous' : 'school_not_found', 'caisse_no' => $eocCn,
+            'msg' => $eocHit ? 'رقم المدرسة ' . $eocCn . ' مسجَّل لأكثر من مدرسة بالبرنامج — صحّحه بإعدادات المدارس.' : 'رقم المدرسة ' . $eocCn . ' غير مسجَّل بالبرنامج. افتح البرنامج ← إعدادات المدرسة ← خانة «رقم الصندوق» واكتبه، ثمّ أعد الكبس.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    $GLOBALS['msa_school_override'] = $eocHit;
+}
 $ids = activeSchoolIds(); if (!$ids) $ids = allActiveSchoolIdsCached(); $ids = array_values(array_map('intval', $ids));
 $schools = $ids ? $db->query("SELECT * FROM schools WHERE id IN (" . implode(',', $ids) . ") AND is_deleted = 0 ORDER BY FIELD(id," . implode(',', $ids) . ")")->fetchAll() : [];
 if (!$schools) { $_SESSION['flash_error'] = 'لا مدارس بالنطاق المختار / Aucune école.'; header('Location: ' . BASE_URL . 'pages/reports.php'); exit; }
