@@ -11591,6 +11591,31 @@ try {
 } catch (Throwable $e) { $ok300 = false; $why300 = $e->getMessage(); }
 check('🔢 الأرقام بلا «.00» والكسر بفاصلة (2026-11-09): nfc/numLoose · الدرجات 38,5 · موازنة الوزارة بلا رقم بنقطة (شاشة + خانة التعديل + إكسل) · المجاميع والتصدير يقرأون الفاصلة كسراً لا آلافاً · خانات type=number تبقى بنقطة', $ok300, $why300);
 
+/* 301) 🆕 (2026-11-09 «هيدا البيان طالع من البرنامج… هلّق عم اطبع نفس البيان بطّل مبيّن اسم شربل عرب»): البيان العام ببوّابة الصندوق كان يأخذ فقط مَن له
+   راتب محسوب بالسنة، فسقط الداخل الجديد (1/10) الذي لم يُكمَل ملفّه المالي — مع أنّه بالبيان العام القديم الموقَّع. القاعدة الواحدة (yearEmploymentFilter):
+   الداخل ضمن السنة من أساتذتها ولو بلا راتب؛ أساسه = السلسلة عند درجته (كالبيان القديم) والإضافي «ناقص» حتى يُكمَل ملفّه. التارك قبل السنة لا يرجع. */
+$ok301 = false; $why301 = '';
+try {
+    require_once $PROJ . '/includes/eoc_portal.php';
+    $sy1 = '2026-2027';
+    $n1 = $db->query("SELECT e.id, e.school_id, e.current_grade FROM employees e WHERE e.is_deleted = 0 AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel') AND e.hire_date BETWEEN '2026-10-01' AND '2027-09-30'
+        AND " . leftDateSql('e.') . " = '9999-12-31' AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = '$sy1' AND ms.base_plus_echelon_lbp > 0) ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $okNew1 = true; $new1 = 'no-candidate';
+    if ($n1) {
+        $r1 = null; foreach (eocGeneralRows($db, [(int)$n1['school_id']], $sy1, eocDefaults('general')) as $r) if ($r['key'] === (string)$n1['id']) $r1 = $r;
+        $okNew1 = $r1 !== null && in_array('add_salary', $r1['missing'], true) && ((float)$n1['current_grade'] < 1 || (int)$r1['salary'] === (int)round((float)scaleSalaryLBP($n1['current_grade'])));
+        $new1 = 'id=' . $n1['id'] . ' in=' . (int)($r1 !== null) . ' salary=' . ($r1['salary'] ?? '?');
+    }
+    // التارك قبل بداية السنة لا يدخل ولو كان تاريخ دخوله... (الحارس القديم باقٍ) + لا تكرار
+    $all1 = eocGeneralRows($db, [2], $sy1, eocDefaults('general')); $keys1 = array_column($all1, 'key');
+    $left1 = (int)$db->query("SELECT COUNT(*) FROM employees e WHERE e.school_id = 2 AND e.is_deleted = 0 AND e.left_date_all IS NOT NULL AND e.left_date_all > '1900-01-01' AND e.left_date_all <= '2026-09-30' AND e.id IN (" . (implode(',', array_map('intval', $keys1)) ?: '0') . ")")->fetchColumn();
+    $okGuard1 = $left1 === 0 && count($keys1) === count(array_unique($keys1));
+    $src1 = (string)file_get_contents($PROJ . '/includes/eoc_portal.php'); $okSrc1 = strpos($src1, "OR e.hire_date BETWEEN '\$yStart' AND '\$yEnd')") !== false;
+    $ok301 = $okNew1 && $okGuard1 && $okSrc1;
+    $why301 = 'new=' . (int)$okNew1 . ' [' . $new1 . '] guard=' . (int)$okGuard1 . ' src=' . (int)$okSrc1;
+} catch (Throwable $e) { $ok301 = false; $why301 = $e->getMessage(); }
+check('🆕 البيان العام للصندوق يشمل الداخل ضمن السنة ولو بلا راتب محسوب (2026-11-09 «بطّل مبيّن اسم شربل عرب»): أساسه من السلسلة عند درجته، الإضافي «ناقص» · التارك قبل السنة لا يرجع · لا تكرار', $ok301, $why301);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

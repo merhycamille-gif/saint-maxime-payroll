@@ -210,11 +210,12 @@ function eocMonthSalaries(PDO $db, array $ids, int $y, int $m): array {
 function eocTeachersOfYear(PDO $db, array $ids, string $sy): array {
     $in = implode(',', array_map('intval', $ids)) ?: '0';
     // 🚪 (2026-11-08 «اللي تاركين لغاية 30-9 ما تذكرهن بالسنة»): التارك قبل بداية السنة الدراسية لا يظهر ولو بقيت له صفوف
-    [$y1] = schoolYearToYears($sy); $cut = $y1 . '-09-30';
+    [$y1] = schoolYearToYears($sy); $cut = $y1 . '-09-30'; $yStart = $y1 . '-10-01'; $yEnd = ($y1 + 1) . '-09-30';
     $leaveSql = " AND NOT (e.left_date_all IS NOT NULL AND e.left_date_all <= '$cut') AND NOT (e.employee_type = 'enseignant_titulaire' AND e.left_date_eoc IS NOT NULL AND e.left_date_eoc <= '$cut')";
     $st = $db->prepare("SELECT e.*, (SELECT MAX(CONCAT(ms.year, LPAD(ms.month,2,'0'))) FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.base_plus_echelon_lbp > 0) last_ym
         FROM employees e WHERE e.school_id IN ($in) AND e.is_deleted = 0 AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel')$leaveSql
-          AND EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.base_plus_echelon_lbp > 0)
+          AND (EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.base_plus_echelon_lbp > 0)
+               OR e.hire_date BETWEEN '$yStart' AND '$yEnd')   /* 🆕 (2026-11-09 «بطّل مبيّن اسم شربل عرب»): الداخل ضمن السنة من أساتذتها ولو لم يُحسب له راتب بعد — كقاعدة yearEmploymentFilter وكالبيان العام القديم */
         ORDER BY " . eocArSort("COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)") . ", " . eocArSort("COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)") . ", e.id");
     $st->execute([$sy, $sy]);
     return $st->fetchAll();
@@ -245,7 +246,8 @@ function eocGeneralRows(PDO $db, array $ids, string $sy, array $data): array {
             'phase_id' => (int)($e['eoc_phase_id'] ?? 0) ?: eocPhaseFromNiveau($e['niveau_scolaire'] ?? null),
             'birth_date' => eocDateStr(...eocYmd($e['birth_date'] ?? null)), 'start_date' => eocDateStr(...eocYmd($e['display_hire_date'] ?: ($e['hire_date'] ?? null))),
             'teaching_hours' => $e['hours_per_week'] !== null && $e['hours_per_week'] !== '' ? (float)$e['hours_per_week'] : '',
-            'salary' => $sal ? round($sal['base']) : '', 'add_salary' => $sal ? round($sal['extra']) : '',
+            // 🆕 بلا راتب محسوب بعد (داخل جديد ملفّه المالي ناقص): الأساس = السلسلة عند درجته كالبيان العام القديم الموقَّع، والإضافي يبقى «ناقص» حتى يُكمَل ملفّه
+            'salary' => $sal ? round($sal['base']) : ((float)($e['current_grade'] ?? 0) >= 1 && function_exists('scaleSalaryLBP') ? (round((float)scaleSalaryLBP($e['current_grade'])) ?: '') : ''), 'add_salary' => $sal ? round($sal['extra']) : '',
         ];
         $ov = eocOvDiff((array)($data['lines'][(string)$id] ?? []), $auto);
         $row = ['key' => (string)$id, 'src' => 'auto', 'emp_id' => $id, 'auto' => $auto, 'ov' => $ov] + array_replace($auto, array_intersect_key($ov, array_flip(eocGeneralFields())));
