@@ -115,8 +115,16 @@
     const used = new Set();
     const renamed = [], noDiff = [];
     (B.lines || []).forEach((L) => { const r = matchRow(L, rows.filter((x) => !used.has(x))); if (r) { matched++; used.add(r); if (r.name !== norm(L.teacher_name)) renamed.push(r.name + ' ⇐ ' + L.teacher_name); const pn = digits(L.teacher_no); if ((r.no || pn) && r.no !== pn) noDiff.push({ name: L.teacher_name, site: r.no, prog: pn, key: L.key || '' }); } else missing.push(L.teacher_name + (L.teacher_no ? ' (' + L.teacher_no + ')' : '')); });
-    rows.forEach((r) => { if (!used.has(r)) extra.push(r.name + (r.no ? ' (' + r.no + ')' : '')); });
-    return { rows, matched, missing, extra, renamed, noDiff };
+    // 🚪 (2026-11-09 «إذا موجود بالموقع وبطّل بالبرنامج بيكون موجود السنة القبلها بالبرنامج وترك — أنت تتأكّد»): الزائد على الموقع يُشال فقط إن طابق بقوّة
+    //    أستاذاً سابقاً بالبرنامج (B.gone: الرقم المالي نفسه، أو الاسم الأوّل + اسم الأب + الشهرة)؛ وغيره يبقى ويُذكر.
+    const gone = [], unknown = []; const usedG = new Set();
+    const strong = (g, r) => { const gn = digits(g.teacher_no); if (gn && r.no) return gn === r.no; const a = norm(g.teacher_name).split(' '), b = r.name.split(' '); if (!a[0] || skel(a[0]) !== skel(b[0])) return false;
+      const fa = skel(norm(g.father_name)), fb = skel(r.father || ''); const la = skel(a.slice(1).join('')), lb = skel(b.slice(1).join('')); return !!fa && fa === fb && !!la && (la === lb || la.indexOf(lb) >= 0 || lb.indexOf(la) >= 0); };
+    rows.forEach((r) => { if (used.has(r)) return; const label = r.name + (r.no ? ' (' + r.no + ')' : ''); extra.push(label);
+      const c = (B.gone || []).filter((g) => !usedG.has(g) && strong(g, r));
+      const isCurrent = (B.lines || []).some((L) => strong(L, r));   // 🛡️ يشبه أستاذاً حالياً بالبرنامج ⇒ لا يُشال أبداً
+      if (c.length === 1 && r.lineId && !isCurrent) { usedG.add(c[0]); gone.push({ lineId: r.lineId, name: label, why: c[0].why }); } else unknown.push(label); });
+    return { rows, matched, missing, extra, renamed, noDiff, gone, unknown };
   }
   function pageMatchesKind(B) { const p = page(); return (B.kind === 'general' && p === 'roster') || (B.kind === 'financial' && p === 'financial'); }
 
@@ -133,7 +141,20 @@
   async function autoStep(Q) {
     if (!Q || !Q.lines || baseUrl() !== Q.base) return;
     const total = Q.lines.length;
-    if (Q.idx >= total) { await chrome.storage.local.set({ eocAuto: null }); banner('✅ انتهت التعبئة من برنامج الرواتب: ' + Q.done + ' سطراً حُفظ' + (Q.errors.length ? ' · ' + Q.errors.length + ' لم يُحفَظ: ' + Q.errors.join('؛ ') : '') + ' — راجع الجدول. البيان ما زال مفتوحاً للتعديل.', false); return; }
+    if (Q.idx >= total) {
+      // 🚪 بعد التعبئة: شيل مَن تركوا (المثبَتون بالبرنامج) سطراً سطراً — نموذج الحذف نفسه الذي بالموقع
+      if (Q.del && (Q.delIdx || 0) < Q.del.length) {
+        if (new URL(location.href).searchParams.get('edit')) { await chrome.storage.local.set({ eocAuto: Q }); location.href = Q.base; return; }
+        const d = Q.del[Q.delIdx || 0]; Q.delIdx = (Q.delIdx || 0) + 1;
+        const df = document.querySelector('form[action*="/line/' + d.lineId + '/delete"]');
+        if (!df) { Q.errors.push(d.name + ' (لم يُعثر على سطره لشيله)'); await chrome.storage.local.set({ eocAuto: Q }); return autoStep(Q); }
+        Q.deleted = (Q.deleted || 0) + 1; await chrome.storage.local.set({ eocAuto: Q });
+        banner('🚪 شيل مَن ترك ' + Q.delIdx + ' / ' + Q.del.length + ' — ' + d.name + ' (' + d.why + ')', true);
+        await sleep(250); HTMLFormElement.prototype.submit.call(df); return;
+      }
+      await chrome.storage.local.set({ eocAuto: null });
+      banner('✅ انتهت التعبئة من برنامج الرواتب: ' + Q.done + ' سطراً حُفظ' + (Q.deleted ? ' · ' + Q.deleted + ' شِيل (ترك)' : '') + (Q.note || '') + (Q.errors.length ? ' · ' + Q.errors.length + ' لم يتمّ: ' + Q.errors.join('؛ ') : '') + ' — راجع الجدول. البيان ما زال مفتوحاً للتعديل.', false); return;
+    }
     const L = Q.lines[Q.idx];
     banner('⏳ تعبئة من برنامج الرواتب ' + (Q.idx + 1) + ' / ' + total + ' — ' + L.teacher_name + (Q.errors.length ? ' · أخطاء: ' + Q.errors.length : ''), true);
     const rows = siteRows(); const existing = matchRow(L, rows);
@@ -176,7 +197,7 @@
   const BTN = 'border:0;border-radius:8px;padding:10px 20px;font:700 15px "Noto Sans Arabic",Tahoma,Arial;cursor:pointer;margin-inline-end:8px';
   function barIdle(note) {
     const b = bar();
-    b.innerHTML = '<button id="msa-eoc-go" style="' + BTN + ';background:#1F4E5F;color:#fff">⬇ عبّي هذا البيان من برنامج الرواتب</button>'
+    b.innerHTML = '<button id="msa-eoc-go" style="' + BTN + ';background:#1F4E5F !important;color:#fff !important">⬇ عبّي هذا البيان من برنامج الرواتب</button>'
       + '<span style="font-weight:500;color:#3b5560">يجيب أرقام هذه المدرسة لهذا البيان من البرنامج ويعبّيها هنا. البيان يبقى مفتوحاً للتعديل.</span>'
       + (note ? '<div style="margin-top:8px">' + note + '</div>' : '');
     document.getElementById('msa-eoc-go').onclick = oneClick;
@@ -204,12 +225,21 @@
       + '<div style="font-weight:500">بالبرنامج <b>' + B.lines.length + '</b> أستاذاً · موجودون هنا <b>' + rv.matched + '</b> (تتحدّث أرقامهم) · ناقصون هنا <b>' + rv.missing.length + '</b> (يُضافون)'
       + '<div style="font-weight:500;color:#1F4E5F">🔢 الأرقام المالية الموجودة هنا على الموقع هي المرجع — لا تتغيّر.' + (rv.noDiff.length ? ' <span style="color:#b3261e">البرنامج مختلف عنها عند <b>' + rv.noDiff.length + '</b>: ' + esc(rv.noDiff.map((d) => d.name + ' (الموقع ' + (d.site || 'فارغ') + ' / البرنامج ' + (d.prog || 'فارغ') + ')').join(' · ')) + '</span>' : ' البرنامج مطابق لها عند الجميع ✓') + '</div>'
       + (rv.renamed.length ? '<div style="font-weight:500;color:#1F4E5F">✎ أسماء مكتوبة هنا بشكل مختلف — تتصحّح كالبرنامج: ' + esc(rv.renamed.join(' · ')) + '</div>' : '')
-      + (rv.extra.length ? ' · <span style="color:#8a5a00">هنا وليسوا بالبرنامج <b>' + rv.extra.length + '</b>: ' + esc(rv.extra.join('، ')) + ' — لا يُمسّون</span>' : '') + '</div>'
+      + '</div>'
+      + (rv.gone.length ? '<div style="font-weight:500;color:#b3261e">🚪 على الموقع وتركوا المدرسة بحسب البرنامج — يُشالون من هنا (' + rv.gone.length + '): ' + esc(rv.gone.map((g) => g.name + ' — ' + g.why).join(' · ')) + '</div>' : '')
+      + (rv.unknown.length ? '<div style="font-weight:500;color:#8a5a00">❔ على الموقع ولا أثر لهم بالبرنامج — لا يُمسّون (' + rv.unknown.length + '): ' + esc(rv.unknown.join('، ')) + '</div>' : '')
       + (incomplete.length ? '<div style="font-weight:500;color:#b3261e">⚠ ' + incomplete.length + ' بياناتهم ناقصة بالبرنامج وقد يرفضهم الموقع: ' + esc(incomplete.map((x) => x.teacher_name).join('، ')) + '</div>' : '')
-      + '<div style="margin-top:8px"><button id="msa-eoc-start" style="' + BTN + ';background:#1e7a4f;color:#fff">✔ ابدأ التعبئة (' + B.lines.length + ')</button><button id="msa-eoc-cancel" style="' + BTN + ';background:#fff;color:#12303a;border:1px solid #9bb">إلغاء</button></div>';
+      + '<div style="margin-top:8px"><button id="msa-eoc-start" style="' + BTN + ';background:#1e7a4f !important;color:#fff !important">✔ ابدأ التعبئة (' + B.lines.length + ')</button><button id="msa-eoc-cancel" style="' + BTN + ';background:#5f697a !important;color:#fff !important">إلغاء</button></div>';
     document.getElementById('msa-eoc-cancel').onclick = () => barIdle('');
     document.getElementById('msa-eoc-start').onclick = async () => {
-      const Q = { base: baseUrl(), kind: B.kind, period: B.period, mode: 'all', lines: B.lines.slice(), idx: 0, done: 0, errors: [], started: Date.now() };
+      let fixedNote = '';
+      const fix = (rv.noDiff || []).filter((d) => d.site && /^\d+$/.test(String(d.key)));   // رقم الموقع موجود والبرنامج مختلف/فارغ ⇒ البرنامج يصير كالموقع
+      if (fix.length && B.csrf && kind === 'general') {
+        b.innerHTML = '⏳ عم صحّح بالبرنامج ' + fix.length + ' رقماً ماليّاً ليصير كالموقع…';
+        let fr = null; try { fr = await chrome.runtime.sendMessage({ target: 'bg', action: 'siteNumbers', base: res.base, csrf: B.csrf, path: 'pages/eoc_portal.php?tab=general&period=' + per + '&caisse_no=' + no, items: fix.map((d) => ({ key: String(d.key), no: String(d.site) })) }); } catch (e) { fr = null; }
+        fixedNote = fr && fr.ok ? ' · صُحّح بالبرنامج ' + (fr.updated || 0) + ' رقماً ماليّاً كالموقع' : ' · ⚠ لم تُصحَّح أرقام البرنامج (' + esc((fr && fr.msg) || 'لا جواب') + ') — أرقام الموقع لم تُمسّ';
+      }
+      const Q = { base: baseUrl(), kind: B.kind, period: B.period, mode: 'all', lines: B.lines.slice(), idx: 0, done: 0, errors: [], started: Date.now(), del: (rv.gone || []).slice(), delIdx: 0, deleted: 0, note: fixedNote };
       await chrome.storage.local.set({ eocAuto: Q, eocStmt: B });
       b.innerHTML = '⏳ بدأت التعبئة — تابع الشريط أعلى الصفحة. «إيقاف» يوقفها بأيّ لحظة.';
       setTimeout(() => autoStep(Q), 300);

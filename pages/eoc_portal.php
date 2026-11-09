@@ -19,7 +19,8 @@ $hideExportToolbar = true; $ownExportRow = true;
 /* 🔘 (2026-11-09 «عملّي حلّ سهل بلا هاللفّ والدوران»): كبسة «رحّل من برنامج الرواتب» داخل صفحة موقع الصندوق تطلب البيان برقم المدرسة عند الصندوق
    (المكتوب على الموقع: «رقم المدرسة 3751») ⇒ البرنامج يختار المدرسة صاحبة هذا الرقم من المسموح للمستخدم — لهذا الطلب فقط (لا يغيّر اختياره).
    لا مدرسة بهذا الرقم (أو أكثر من واحدة) ⇒ جواب JSON بالخطأ ولا بيانات: لا يُرحَّل بيان مدرسة إلى حساب مدرسة أخرى. */
-if (($_GET['export'] ?? '') === 'json' && ($eocCn = preg_replace('/\D+/', '', (string)($_GET['caisse_no'] ?? ''))) !== '') {
+$eocSiteNoReq = $_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['eoc_act'] ?? '') === 'site_numbers';   // 🔢 تصحيح أرقام البرنامج المالية من الموقع (جواب JSON)
+if (((($_GET['export'] ?? '') === 'json') || $eocSiteNoReq) && ($eocCn = preg_replace('/\D+/', '', (string)($_GET['caisse_no'] ?? ''))) !== '') {
     $eocAllow = array_values(array_map('intval', (array)(isViewer() ? viewerAllowedSchoolIds() : allActiveSchoolIdsCached()))); $eocHit = [];
     if ($eocAllow) foreach ($db->query("SELECT id, caisse_number FROM schools WHERE is_deleted = 0 AND id IN (" . implode(',', $eocAllow) . ")")->fetchAll() as $eocS) if (preg_replace('/\D+/', '', (string)$eocS['caisse_number']) === $eocCn) $eocHit[] = (int)$eocS['id'];
     if (count($eocHit) !== 1) {
@@ -41,6 +42,29 @@ $period = trim((string)($_GET['period'] ?? ''));
 $kind = $tab === 'general' ? 'general' : ($tab === 'financial' ? 'financial' : '');
 $validPeriod = $kind === 'general' ? (bool)preg_match('/^\d{4}-\d{4}$/', $period) : ($kind === 'financial' ? eocPeriodInfo($period) !== null : false);
 $back = fn(array $q = []) => $self . '?' . http_build_query(array_filter(['tab' => $tab, 'period' => $period] + $q, fn($v) => $v !== '' && $v !== null));
+
+/* 🔢 (2026-11-09 «أرقام مالية الصندوق الموجودة على الموقع هي الصحّ، أرقام البرنامج أنت ناقلها وما شيّكت عليها» ثمّ «أنت لازم تشتغل هيدا الشغل ويكون تلقائي»):
+   المساعد يرسل [{key: رقم ملف الأستاذ, no: رقمه المالي كما هو على موقع الصندوق}] ⇒ رقم الصندوق بملفّه يصير كالموقع (فقط أساتذة هذا البيان، رقم غير فارغ)، بسجلّ تدقيق. جواب JSON. */
+if ($eocSiteNoReq) {
+    $jsonOut = function (array $a) { while (ob_get_level()) ob_end_clean(); header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store'); echo json_encode($a, JSON_UNESCAPED_UNICODE); exit; };
+    if ($kind !== 'general' || !$validPeriod) $jsonOut(['ok' => false, 'msg' => 'بيان غير صالح']);
+    if (!$E) $jsonOut(['ok' => false, 'msg' => 'قراءة فقط — حسابك لا يعدّل']);
+    if (!verifyCsrf((string)($_POST['csrf'] ?? ''))) $jsonOut(['ok' => false, 'msg' => 'رمز الأمان غير صحيح']);
+    if (empty($GLOBALS['msa_school_override']) || count($ids) !== 1) $jsonOut(['ok' => false, 'msg' => 'المدرسة غير محدّدة برقمها عند الصندوق']);
+    $items = json_decode((string)($_POST['items'] ?? '[]'), true); if (!is_array($items)) $items = [];
+    $own = []; foreach (eocGeneralRows($db, $ids, $period, eocLoad($db, $ids, 'general', $period)) as $r0) if (($r0['src'] ?? '') === 'auto') $own[(int)$r0['emp_id']] = true;
+    $fixed = [];
+    foreach (array_slice($items, 0, 500) as $it) {
+        $eid = (int)($it['key'] ?? 0); $no = preg_replace('/\D+/', '', (string)($it['no'] ?? ''));
+        if (!$eid || $no === '' || strlen($no) > 12 || empty($own[$eid])) continue;
+        $q = $db->prepare("SELECT COALESCE(caisse_number, '') FROM employees WHERE id = ? AND school_id = ?"); $q->execute([$eid, (int)$ids[0]]); $old = $q->fetchColumn();
+        if ($old === false || preg_replace('/\D+/', '', (string)$old) === $no) continue;
+        $db->prepare("UPDATE employees SET caisse_number = ? WHERE id = ? AND school_id = ?")->execute([$no, $eid, (int)$ids[0]]);
+        try { logAudit('eoc_site_number', 'employees', $eid, ['caisse_number' => (string)$old], ['caisse_number' => $no, 'source' => 'caisseindemnite.com', 'period' => $period]); } catch (Throwable $e) {}
+        $fixed[] = ['key' => $eid, 'old' => (string)$old, 'new' => $no];
+    }
+    $jsonOut(['ok' => true, 'updated' => count($fixed), 'fixed' => $fixed]);
+}
 
 /* ===== الكتابة (POST) — كالمنصّة: حفظ ثمّ عودة إلى نفس الصفحة ===== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $kind && $validPeriod) {
@@ -92,7 +116,7 @@ if (($_GET['export'] ?? '') === 'json' && $data) {
         'phone' => $data['phone'] ?? '', 'school_type' => $data['school_type'] ?? 'non_free', 'lines' => []];
     foreach ($rows as $r) {
         if ($kind === 'general') { [$by, $bm, $bd] = eocYmd($r['birth_date']); [$sy_, $sm, $sd] = eocYmd($r['start_date']);
-            $out['lines'][] = ['employment_type' => $r['employment_type'], 'teacher_no' => (string)$r['teacher_no'], 'teacher_name' => (string)$r['teacher_name'], 'father_name' => (string)$r['father_name'], 'birth_day' => (string)$bd, 'birth_month' => (string)$bm, 'birth_year' => (string)$by, 'start_day' => (string)$sd, 'start_month' => (string)$sm, 'start_year' => (string)$sy_,
+            $out['lines'][] = ['key' => (string)$r['key'], 'src' => (string)$r['src'], 'employment_type' => $r['employment_type'], 'teacher_no' => (string)$r['teacher_no'], 'teacher_name' => (string)$r['teacher_name'], 'father_name' => (string)$r['father_name'], 'birth_day' => (string)$bd, 'birth_month' => (string)$bm, 'birth_year' => (string)$by, 'start_day' => (string)$sd, 'start_month' => (string)$sm, 'start_year' => (string)$sy_,
                 'certificate_id' => (string)((int)$r['certificate_id'] ?: ''), 'certificate' => eocCertOptions()[(int)$r['certificate_id']] ?? '', 'category_id' => (string)((int)$r['category_id'] ?: ''), 'category' => eocCatOptions()[(int)$r['category_id']] ?? '', 'phase_id' => (string)((int)$r['phase_id'] ?: ''), 'phase' => eocPhaseOptions()[(int)$r['phase_id']] ?? '',
                 'teaching_hours' => (string)$numv($r['teaching_hours']), 'salary' => (string)round($numv($r['salary'])), 'add_salary' => (string)round($numv($r['add_salary'])), 'missing' => $r['missing']]; }
         else $out['lines'][] = ['teacher_no' => (string)$r['teacher_no'], 'teacher_name' => (string)$r['teacher_name'], 'previous_salary' => (string)round($numv($r['previous_salary'])), 'current_salary' => (string)round($numv($r['current_salary'])), 'add_salary' => (string)round($numv($r['add_salary'])),
@@ -100,6 +124,10 @@ if (($_GET['export'] ?? '') === 'json' && $data) {
             'is_trainee' => (int)$r['is_trainee'], 'is_contribution' => (int)$r['is_contribution'], 'remarks' => (string)$r['remarks'], 'missing' => $r['missing']];
     }
     $out['totals'] = $kind === 'general' ? eocGeneralTotals($rows) : eocFinancialTotals($rows);
+    if (!empty($GLOBALS['msa_school_override'])) {   // طلب المساعد برقم المدرسة: رمز أمان لتصحيح الأرقام + مَن كان من أساتذتها وليس بهذا البيان (ليتأكّد قبل شيل سطره عن الموقع)
+        $out['csrf'] = $E ? csrfToken() : '';
+        if ($kind === 'general') $out['gone'] = eocGoneTeachers($db, $ids, $period, array_values(array_filter(array_map(fn($r) => (int)($r['emp_id'] ?? 0), $rows))), $rows);
+    }
     while (ob_get_level()) ob_end_clean(); header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
     echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); exit;
 }

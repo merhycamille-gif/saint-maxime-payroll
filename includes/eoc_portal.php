@@ -231,6 +231,31 @@ function eocTeachersOfYear(PDO $db, array $ids, string $sy): array {
     $st->execute([$sy, $sy]);
     return $st->fetchAll();
 }
+/**
+ * 🚪 (2026-11-09 «إذا موجود بالموقع وبطّل بالبرنامج بيكون موجود السنة القبلها بالبرنامج وترك — حتى تتأكّد… أنت برنامج لازم تنتبه لكل شي مش أنا»):
+ *    مَن كان من أساتذة المدرسة وليس ببيان هذه السنة، مع السبب المثبَت بالبرنامج: ملفّه محذوف · ترك بتاريخ · آخر راتب له بسنة سابقة.
+ *    مَن لا أثر له كأستاذ سابق لا يدخل (المساعد لا يشيل عن الموقع إلّا مَن يطابق أحد هؤلاء).
+ */
+function eocGoneTeachers(PDO $db, array $ids, string $sy, array $currentEmpIds, array $currentRows = []): array {
+    [$y1] = schoolYearToYears($sy); $cut = $y1 . '-09-30';
+    // 🛡️ ملفّ قديم/محذوف لأستاذ ما زال بالبيان (نفس الرقم المالي أو نفس الاسم) ليس «تاركاً»: لا يدخل اللائحة أبداً — وإلا شِيل سطر أستاذ حاليّ عن الموقع
+    $curNo = []; $curNm = []; foreach ($currentRows as $cr) { $n0 = preg_replace('/\D+/', '', (string)($cr['teacher_no'] ?? '')); if ($n0 !== '') $curNo[$n0] = 1; $m0 = eocNorm((string)($cr['teacher_name'] ?? '')); if ($m0 !== '') $curNm[$m0] = 1; }
+    $in = implode(',', array_map('intval', $ids)) ?: '0'; $cur = implode(',', array_map('intval', $currentEmpIds)) ?: '0';
+    $st = $db->prepare("SELECT e.id, e.first_name_ar, e.last_name_ar, e.first_name_fr, e.last_name_fr, e.father_name_ar, e.caisse_number, e.is_deleted, e.left_date_all, e.left_date_eoc,
+            (SELECT MAX(ms.school_year) FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year < ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0)) last_sy
+        FROM employees e WHERE e.school_id IN ($in) AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel') AND e.id NOT IN ($cur)");
+    $st->execute([$sy]); $out = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $left = (string)($r['left_date_all'] ?? ''); $left = ($left !== '' && $left >= '1900-01-01') ? substr($left, 0, 10) : '';
+        if ((int)$r['is_deleted'] === 1) $why = 'ملفّه محذوف من البرنامج';
+        elseif ($left !== '' && $left <= $cut) $why = 'ترك بتاريخ ' . date('d/m/Y', strtotime($left));
+        elseif (!empty($r['last_sy'])) $why = 'آخر سنة له بالبرنامج ' . $r['last_sy'];
+        else continue;
+        $gn = preg_replace('/\D+/', '', (string)($r['caisse_number'] ?? '')); if (($gn !== '' && isset($curNo[$gn])) || isset($curNm[eocNorm(eocNameAr($r))])) continue;
+        $out[] = ['key' => (string)$r['id'], 'teacher_no' => trim((string)($r['caisse_number'] ?? '')), 'teacher_name' => eocNameAr($r), 'father_name' => trim((string)($r['father_name_ar'] ?? '')), 'why' => $why];
+    }
+    return $out;
+}
 function eocYmd(?string $d): array { if (!$d || $d === '0000-00-00' || substr($d, 0, 4) === '1900') return ['', '', '']; [$y, $m, $dd] = array_pad(explode('-', substr($d, 0, 10)), 3, ''); return [(int)$y ?: '', (int)$m ?: '', (int)$dd ?: '']; }
 function eocDateStr($y, $m, $d): string { return ($y && $m && $d) ? sprintf('%04d-%02d-%02d', (int)$y, (int)$m, (int)$d) : ''; }
 

@@ -11643,10 +11643,22 @@ try {
     $mf2 = json_decode((string)file_get_contents($PROJ . '/tools/mehe_fill_extension/manifest.json'), true); $ce2 = (string)file_get_contents($PROJ . '/tools/mehe_fill_extension/content_eoc.js'); $bg2 = (string)@file_get_contents($PROJ . '/tools/mehe_fill_extension/bg.js');
     $okExt2 = ($mf2['background']['service_worker'] ?? '') === 'bg.js' && strpos($ce2, 'id="msa-eoc-go"') !== false && strpos($ce2, "digits(B.school_no) !== no || B.kind !== kind || String(B.period) !== per") !== false
         && strpos($ce2, "'&export=json&caisse_no=' + no") !== false && strpos($ce2, 'a[href*="page=2"]') !== false && strpos($ce2, "mode: 'all'") !== false
-        && strpos($bg2, "msg.action === 'program'") !== false && strpos($bg2, "indexOf('export=json') < 0") !== false && strpos($bg2, 'method:') === false;   // الخلفية تقرأ فقط
+        && strpos($bg2, "msg.action === 'program'") !== false && strpos($bg2, "indexOf('export=json') < 0") !== false
+        && substr_count($bg2, "method: 'POST'") === 2 && strpos($bg2, "eoc_act: 'site_numbers'") !== false && strpos($bg2, 'BASES.indexOf(base) < 0') !== false;   // الكتابة الوحيدة بالبرنامج = تصحيح الأرقام المالية من الموقع
+    // 🔢🚪 (2026-11-09 «أرقام الموقع المالية هي الصحّ» + «لائحة البرنامج هي الصحّ… أنت تتأكّد أنّه كان بالسنة القبلها وترك»): رقم الموقع لا يُمسّ ورقم البرنامج يُصحَّح منه؛
+    //    الزائد على الموقع يُشال فقط إن طابق بقوّة أستاذاً سابقاً بالبرنامج ولا يشبه أيّ أستاذ حاليّ (ملفّ مكرّر محذوف ليس «تاركاً»).
+    $okAuto2 = strpos($ce2, 'function fillRoster(f, L, keepNo)') !== false && strpos($ce2, 'const isCurrent = (B.lines || []).some((L) => strong(L, r));') !== false && strpos($ce2, 'c.length === 1 && r.lineId && !isCurrent') !== false
+        && strpos($ce2, 'HTMLFormElement.prototype.submit.call(df)') !== false && strpos($ce2, "action: 'siteNumbers'") !== false;
+    require_once $PROJ . '/includes/eoc_portal.php'; $r2 = eocGeneralRows($db, [2], '2026-2027', eocDefaults('general'));
+    $g2 = eocGoneTeachers($db, [2], '2026-2027', array_values(array_filter(array_map(fn($r) => (int)($r['emp_id'] ?? 0), $r2))), $r2);
+    $cn2 = []; $cm2 = []; foreach ($r2 as $r) { $n = preg_replace('/\D+/', '', (string)$r['teacher_no']); if ($n !== '') $cn2[$n] = 1; $cm2[eocNorm((string)$r['teacher_name'])] = 1; }
+    $coll2 = 0; foreach ($g2 as $g) { $n = preg_replace('/\D+/', '', (string)$g['teacher_no']); if (($n !== '' && isset($cn2[$n])) || isset($cm2[eocNorm((string)$g['teacher_name'])]) || trim((string)$g['why']) === '') $coll2++; }
+    $src2 = (string)file_get_contents($PROJ . '/pages/eoc_portal.php');
+    $okGone2 = count($g2) >= 1 && $coll2 === 0 && isset($j2a['gone']) && count($j2a['gone']) === count($g2) && ($j2a['csrf'] ?? '') !== '' && isset($j2a['lines'][0]['key']) && !isset($j2c['gone']) && !isset($j2c['csrf'])
+        && strpos($src2, "(string)(\$_POST['eoc_act'] ?? '') === 'site_numbers'") !== false && strpos($src2, "logAudit('eoc_site_number'") !== false && strpos($src2, 'empty($own[$eid])') !== false;
     $fn2 = (string)file_get_contents($PROJ . '/includes/header.php'); $okHeal2 = function_exists('healAblahCaisseNo20261109') && strpos($fn2, 'healAblahCaisseNo20261109();') !== false;
-    $ok302 = $okEp2 && $okExt2 && $okHeal2;
-    $why302 = 'endpoint=' . (int)$okEp2 . ' ext=' . (int)$okExt2 . ' heal=' . (int)$okHeal2 . ' lines=' . count($j2a['lines'] ?? []);
+    $ok302 = $okEp2 && $okExt2 && $okHeal2 && $okAuto2 && $okGone2;
+    $why302 = 'endpoint=' . (int)$okEp2 . ' ext=' . (int)$okExt2 . ' heal=' . (int)$okHeal2 . ' auto=' . (int)$okAuto2 . ' gone=' . (int)$okGone2 . '(' . count($g2) . ') lines=' . count($j2a['lines'] ?? []);
 } catch (Throwable $e) { $ok302 = false; $why302 = $e->getMessage(); }
 check('🔘 كبسة واحدة «رحّل من برنامج الرواتب» بصفحة موقع الصندوق (2026-11-09): المدرسة تُعرَف برقمها عند الصندوق لهذا الطلب فقط · رقم غير مسجَّل ⇒ خطأ بلا بيانات · لا ترحيل إن اختلفت المدرسة/السنة أو تعدّدت صفحات اللائحة · الخلفية قراءة فقط', $ok302, $why302);
 
