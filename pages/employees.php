@@ -817,38 +817,97 @@ if ($action === 'apply_paid' && $id > 0) {
 }
 if ($action === 'delete' && $id > 0) {
     requireWriteAction();
+    require_once __DIR__ . '/../includes/emp_delete.php';
     // 🛡️ قاعدة المستخدم (2026-08-01 بعد حادثة أندره مراد): «بس بدي امحي أي شغلة لازم
     // تسألني قبل ما امحي» — الحذف لا يتمّ إلا بعد صفحة تأكيد حقيقية (لا رسالة متصفح فقط)
-    if (empty($_GET['confirmed'])) {
-        $dq = $db->prepare("SELECT first_name_ar, last_name_ar, first_name_fr, last_name_fr FROM employees WHERE id = ? AND is_deleted = 0");
-        $dq->execute([$id]);
-        $dEmp = $dq->fetch();
-        $dName = $dEmp ? (trim($dEmp['first_name_ar'] . ' ' . $dEmp['last_name_ar']) ?: trim($dEmp['first_name_fr'] . ' ' . $dEmp['last_name_fr'])) : '';
+    // 🗑️📅 (2026-11-09 «حذفت معلمة من سنة 2026-2027، رجعت شفتها بسنة 2025-2026 كمان حذفها وهيدا خطأ — لازم بس احذف شي ينحذف
+    //    محلّ ما هو موجود» ثمّ «بدي قبل كل شي أساس البرنامج ما يكون غلط»): الحذف يتبع السنة المعروضة — له سنين قبلها ⇒ يُشال منها
+    //    وما بعدها فقط ويبقى بما قبلها (includes/emp_delete.php)؛ حذف الملف كلّه يبقى خياراً صريحاً يعدّد السنين. التنفيذ POST + رمز أمان.
+    $dq = $db->prepare("SELECT first_name_ar, father_name_ar, last_name_ar, first_name_fr, last_name_fr FROM employees WHERE id = ? AND school_id = ? AND is_deleted = 0");
+    $dq->execute([$id, currentSchoolId()]);
+    $dEmp = $dq->fetch();
+    if (!$dEmp) {
+        $_SESSION['flash_error'] = 'Employé introuvable / الموظف غير موجود في هذه المدرسة';
+        header('Location: ' . BASE_URL . 'pages/employees.php'); exit;
+    }
+    $dName = trim($dEmp['first_name_ar'] . ' ' . $dEmp['last_name_ar']) ?: trim($dEmp['first_name_fr'] . ' ' . $dEmp['last_name_fr']);
+    $dSy = activeSchoolYear();
+    $dSc = empDeleteScope($db, $id, $dSy);
+    $dSelf = BASE_URL . 'pages/employees.php?action=delete&id=' . $id;
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_POST['confirmed'])) {
         $currentPage = 'employees';
         $pageTitle = 'Confirmer la suppression / تأكيد الحذف';
         $hideExportToolbar = true;
         include __DIR__ . '/../includes/header.php';
+        $dYears = []; foreach ($dSc['years'] as $y => $d) $dYears[] = '<span dir="ltr" style="unicode-bidi:isolate;font-weight:700">' . e($y) . '</span> (' . (int)$d['n'] . ' شهراً' . ($d['paid'] ? '، ' . (int)$d['paid'] . ' مدفوعاً' : '') . ')';
+        $dAllList = implode('، ', array_map(fn($y) => '<span dir="ltr" style="unicode-bidi:isolate">' . e($y) . '</span>', array_keys($dSc['years'])));
+        $dSyH = '<span dir="ltr" style="unicode-bidi:isolate">' . e($dSy) . '</span>';
+        $dLeftH = $dSc['left_date'] ? '<span dir="ltr" style="unicode-bidi:isolate">' . e(date('d/m/Y', strtotime($dSc['left_date']))) . '</span>' : '';
+        $dLastBefore = $dSc['before'] ? '<span dir="ltr" style="unicode-bidi:isolate">' . e(end($dSc['before'])) . '</span>' : '';
+        $dAllForm = function (string $label, string $cls = 'btn btn-danger btn-lg') use ($dSelf) {
+            return '<form method="post" action="' . e($dSelf) . '" style="margin:0">' . csrfField() . '<input type="hidden" name="confirmed" value="1"><input type="hidden" name="scope" value="all">'
+                 . '<button type="submit" class="' . $cls . '"><i class="fas fa-trash"></i> ' . $label . '</button></form>';
+        };
         ?>
-        <div class="card" style="max-width:640px;margin:40px auto;border:2px solid #dc2626">
+        <div class="card" style="max-width:720px;margin:40px auto;border:2px solid #dc2626">
             <div class="card-body" style="text-align:center;padding:30px">
                 <div style="font-size:44px;margin-bottom:10px">⚠️</div>
                 <h3 style="margin:0 0 8px">هل تريد فعلاً حذف الموظف؟</h3>
                 <p style="font-size:18px;font-weight:800;color:#b91c1c;margin:6px 0 4px"><?= e($dName ?: '—') ?></p>
-                <p style="color:#64748b;margin:4px 0 18px">بعد الحذف لا يعود يظهر في البرنامج — ويمكن استرجاعه لاحقاً عند الحاجة.</p>
-                <div class="d-flex gap-2" style="justify-content:center">
+                <p style="color:#334155;margin:8px 0 16px;line-height:1.9"><?= $dYears ? 'موجود بالسنين: ' . implode(' · ', $dYears) : 'لا رواتب محسوبة له بأي سنة.' ?></p>
+                <?php if ($dSc['can_year']): /* له سنين قبل السنة المعروضة ⇒ يُشال منها وما بعدها فقط */ ?>
+                    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;margin-bottom:14px;line-height:1.9">
+                        <div style="font-weight:800;margin-bottom:6px">أنت على سنة <?= $dSyH ?> — الحذف يشيله منها وما بعدها فقط</div>
+                        <div style="color:#334155;margin-bottom:12px">يبقى كما هو بسنة <?= $dLastBefore ?> وما قبلها. يُسجَّل تاركاً بتاريخ <?= $dLeftH ?> وتُشال أشهره غير المدفوعة من <?= $dSyH ?>.</div>
+                        <form method="post" action="<?= e($dSelf) ?>" style="margin:0"><?= csrfField() ?><input type="hidden" name="confirmed" value="1"><input type="hidden" name="scope" value="year"><input type="hidden" name="sy" value="<?= e($dSy) ?>">
+                            <button type="submit" class="btn btn-danger btn-lg"><i class="fas fa-trash"></i> نعم، شيله من سنة <?= $dSyH ?> وما بعدها فقط / Retirer à partir de <?= e($dSy) ?></button></form>
+                    </div>
                     <a href="?action=edit&id=<?= $id ?>" class="btn btn-light btn-lg"><i class="fas fa-arrow-left"></i> لا، رجوع / Non</a>
-                    <a href="?action=delete&id=<?= $id ?>&confirmed=1" class="btn btn-danger btn-lg"><i class="fas fa-trash"></i> نعم، احذف / Oui, supprimer</a>
-                </div>
+                    <details style="margin-top:18px;text-align:center"><summary style="cursor:pointer;color:#64748b">ملف مكرّر أو مُدخَل بالغلط؟ حذف الملف كلّه من كل السنين…</summary>
+                        <p style="color:#b91c1c;margin:10px 0;line-height:1.9">يختفي من <strong>كل</strong> السنين: <?= $dAllList ?> — ويمكن استرجاعه لاحقاً عند الحاجة.</p>
+                        <?= $dAllForm('احذف الملف كلّه من كل السنين / Supprimer le dossier entier', 'btn btn-danger') ?>
+                    </details>
+                <?php else: ?>
+                    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;margin-bottom:14px;line-height:1.9">
+                        <?php if ($dSc['is_year'] && $dSc['before'] && $dSc['paid_from'] > 0): ?>
+                            <div style="font-weight:800;margin-bottom:6px">له <?= (int)$dSc['paid_from'] ?> شهراً مدفوعاً بسنة <?= $dSyH ?> أو بعدها — الأشهر المدفوعة محميّة فلا يُشال من هذه السنة وحدها</div>
+                            <div style="color:#334155">لشيله من <?= $dSyH ?> فقط: سجّل تاريخ تركه بملفه. الخيار تحت يحذف الملف كلّه.</div>
+                        <?php elseif ($dSc['is_year']): ?>
+                            <div style="font-weight:800">لا سنين له قبل <?= $dSyH ?> — الحذف يشيل الملف كلّه</div>
+                        <?php else: ?>
+                            <div style="font-weight:800">أنت على «كل السنين» — الحذف يشيل الملف كلّه</div>
+                            <div style="color:#334155">لشيله من سنة واحدة وما بعدها فقط: اختر تلك السنة من فوق ثمّ احذف.</div>
+                        <?php endif; ?>
+                        <p style="color:#b91c1c;margin:10px 0 0"><?= $dAllList !== '' ? 'يختفي من كل السنين: ' . $dAllList . ' — ' : '' ?>لا يعود يظهر في البرنامج، ويمكن استرجاعه لاحقاً عند الحاجة.</p>
+                    </div>
+                    <div class="d-flex gap-2" style="justify-content:center;flex-wrap:wrap">
+                        <a href="?action=edit&id=<?= $id ?>" class="btn btn-light btn-lg"><i class="fas fa-arrow-left"></i> لا، رجوع / Non</a>
+                        <?= $dAllForm('نعم، احذف الملف كلّه / Oui, supprimer') ?>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
         <?php
         include __DIR__ . '/../includes/footer.php';
         exit;
     }
+    if (!verifyCsrf((string)($_POST['csrf'] ?? ''))) {
+        $_SESSION['flash_error'] = 'رمز الأمان غير صحيح — أعد المحاولة / Jeton invalide';
+        header('Location: ' . $dSelf); exit;
+    }
+    $dScope = (string)($_POST['scope'] ?? '');
+    if ($dScope === 'year') {
+        // السنة المؤكَّدة بصفحة التأكيد يجب أن تبقى هي المعروضة (تبويب آخر قد يكون غيّرها) — وإلا تُعرض الصفحة من جديد
+        $res = ((string)($_POST['sy'] ?? '') === $dSy) ? empRemoveFromYear($db, $id, $dSy) : ['ok' => false, 'msg' => 'تغيّرت السنة المعروضة — راجع التأكيد من جديد.'];
+        if (!$res['ok']) { $_SESSION['flash_error'] = $res['msg']; header('Location: ' . $dSelf); exit; }
+        $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'تمّ: «' . $dName . '» انشال من سنة ' . $dSy . ' وما بعدها فقط (' . (int)$res['deleted'] . ' شهراً غير مدفوع) — باقٍ كما هو بسنة ' . end($dSc['before']) . ' وما قبلها. / Retiré à partir de ' . $dSy];
+        header('Location: ' . BASE_URL . 'pages/employees.php'); exit;
+    }
+    if ($dScope !== 'all') { header('Location: ' . $dSelf); exit; }
     $db->prepare("UPDATE employees SET is_deleted = 1 WHERE id = ? AND school_id = ?")
        ->execute([$id, currentSchoolId()]);
-    logAudit('delete', 'employees', $id);
-    $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'Employé supprimé / تم حذف الموظف'];
+    logAudit('delete', 'employees', $id, null, ['scope' => 'all', 'viewing' => $dSy, 'years' => array_keys($dSc['years'])]);
+    $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'Employé supprimé / تم حذف ملف «' . $dName . '» من كل السنين'];
     header('Location: ' . BASE_URL . 'pages/employees.php');
     exit;
 }
@@ -1441,7 +1500,7 @@ if ($id > 0):
     $hxLast = ''; try { $hxNowYm = (int)date('Y') * 100 + (int)date('n'); $hxQ = $db->prepare("SELECT month, year FROM monthly_salaries WHERE employee_id = ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) AND (year * 100 + month) <= ? ORDER BY year DESC, month DESC LIMIT 1"); $hxQ->execute([(int)$id, $hxNowYm]); if ($hxR = $hxQ->fetch(PDO::FETCH_ASSOC)) $hxLast = monthName((int)$hxR['month'], 'ar') . ' ' . (int)$hxR['year']; } catch (Throwable $e) {}
     $hxHours = rtrim(rtrim(number_format((float)($employee['hours_per_week'] ?? 0), 1), '0'), '.');
     $hxLaw = ($hrMsg && !empty($hrMsg['reduction']) && $hrMsg['reduction'] > 0) ? (int)$hrMsg['lawHours'] : 0;
-    $hxDel = '⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . ($hxNameAr ?: $hxNameFr) . '» ؟ بعد الحذف لا يعود يظهر في البرنامج (يمكن استرجاعه لاحقاً عند الحاجة).';
+    $hxDel = '⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . ($hxNameAr ?: $hxNameFr) . '» ؟ الصفحة التالية تبيّن بأي سنين هو موجود وماذا سيُشال بالضبط قبل أي حذف.';
     $fmtD = function ($d) { return ($d && $d !== '0000-00-00') ? date('d/m/Y', strtotime($d)) : '—'; };
 ?>
 <div class="emp-hero no-print">
@@ -1489,7 +1548,7 @@ if ($id > 0):
                 <a href="<?= BASE_URL ?>pages/attestations.php?employee_id=<?= $id ?>&dossier=1#attGroups" class="eh-all"><i class="fas fa-list"></i><span>Toutes les attestations &amp; formulaires…<small>كل الإفادات والنماذج مرتّبة…</small></span></a>
                 <div class="eh-sec"><i class="fas fa-gears"></i> Dossier · الملف</div>
                 <a href="?action=copy_year&id=<?= $id ?>"><i class="fas fa-copy"></i><span>Copier vers une année<small>نسخ الملف لسنة</small></span></a>
-                <a href="?action=delete&id=<?= $id ?>" class="eh-danger" data-confirm="<?= e($hxDel) ?>"><i class="fas fa-trash"></i><span>Supprimer<small>حذف الملف (بتأكيد)</small></span></a>
+                <a href="?action=delete&id=<?= $id ?>" class="eh-danger" data-confirm="<?= e($hxDel) ?>"><i class="fas fa-trash"></i><span>Supprimer<small>حذف (بتأكيد — حسب السنة)</small></span></a>
             </div>
         </div>
     </div>

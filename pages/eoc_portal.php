@@ -160,8 +160,12 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
 .sp-footer{text-align:center;color:var(--sp-muted);font-size:12.5px;padding:14px;border-top:1px solid var(--sp-border)}
 .sp-ovd{background:#fffbea !important} .sp-del-list{margin-top:10px;font-size:13px;color:var(--sp-muted)} .sp-del-list form{display:inline}
 @media (max-width:900px){.sp-record{grid-template-columns:1fr}.sp-record-group+.sp-record-group{border:0;margin-top:16px}.sp-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}.sp-fs{grid-template-columns:1fr}.sp-step1{grid-template-columns:1fr}.sp-summary{grid-template-columns:1fr}.sp-choices{grid-template-columns:1fr}.sp-top-row{flex-direction:column;align-items:flex-start}}
+/* 🖊️ (2026-11-09 «ناقص عامود لإمضاء الأستاذ») ما تزيده ورقة الطباعة الرسمية بالمنصّة (/my/roster/{id}/print) على جدول الشاشة:
+   ترويسة الصندوق والمدرسة + عمود «التوقيع» + تذييل «خاتم المدرسة / توقيع المدير» — .sp-po = للطباعة والتصدير فقط، الشاشة تبقى كالمنصّة */
+@media screen{.sp-app .sp-po{display:none !important}}
 @media print{
   @page{size:A4 landscape;margin:8mm}
+  .sp-app .sp-po-hide{display:none !important} .sp-app td.sp-sign{min-width:26mm} .sp-app .sp-data tbody td{height:8mm}
   .no-print,.sp-top,.sp-nav,.sp-page-actions,.sp-col-act,.sp-toolbar,.sp-foldable,.sp-step,.sp-del-list,.sp-footer,.sp-app .alert{display:none !important}
   .sp-app{border:0;background:#fff;border-radius:0} .sp-body{padding:0} .sp-panel{break-inside:avoid;border-color:#bbb} .sp-table-wrap{overflow:visible;border:0} .sp-app table.sp-data{width:100%;min-width:0}
   .sp-app thead th{background:#eef1f6 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact} .sp-stat-main{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -176,7 +180,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
     <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <?php if ($data): ?>
         <a class="btn btn-success" href="<?= e($back(['export' => 'xlsx', 'emp' => $emp !== 'all' ? $emp : null, 'sort' => $sort !== 'name' ? $sort : null, 'search' => $search ?: null])) ?>"><i class="fas fa-file-excel"></i> إكسل (صيغ حيّة)</a>
-        <button type="button" class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
+        <button type="button" class="btn btn-primary" onclick="ppPrint(this)"><i class="fas fa-print"></i> طباعة</button>
         <button type="button" class="btn btn-danger" onclick="msaSavePdfStart(this)"><i class="fas fa-file-pdf"></i> حفظ PDF</button>
         <?php if (!isViewer()): ?><button type="button" class="btn btn-info" onclick="ppWord('<?= $exT ?>')"><i class="fas fa-file-word"></i> وورد</button><?php endif; ?>
         <button type="button" class="btn" style="background:#25D366;color:#fff" onclick="ppWhatsApp('<?= $exT ?>','')"><i class="fab fa-whatsapp"></i> واتساب</button>
@@ -270,13 +274,13 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
 
   <?php elseif ($kind === 'general'): /* ===== البيان العام لسنة ===== */
     $tot = eocGeneralTotals($rows); $missCount = count(array_filter($rows, fn($r) => $r['missing'])); $delIds = array_map('intval', $data['deleted']); ?>
-    <div class="sp-page-head"><div class="sp-page-head-main">
+    <div class="sp-page-head sp-po-hide"><div class="sp-page-head-main">
         <a href="<?= e($self) ?>?tab=general" class="sp-back no-print"><i class="fas fa-arrow-right"></i> البيان العام</a>
         <div class="sp-title-row"><h1 class="sp-title">البيان العام <span class="sp-title-sub num"><?= e($period) ?></span></h1><?= $pill($data['status']) ?></div>
         <div class="sp-title-note"><?= e($school['name_ar']) ?> — رقم المدرسة <?= e((string)($school['caisse_number'] ?: '—')) ?></div></div>
       <div class="sp-page-actions no-print">
         <?php if ($E): ?><form method="post" style="display:inline"><?= csrfField() ?><input type="hidden" name="eoc_act" value="status"><button type="submit" class="sp-btn sp-btn-view"><i class="fas <?= $locked ? 'fa-lock-open' : 'fa-lock' ?>"></i> <?= $locked ? 'فتح للتعديل' : 'اعتماد وإقفال' ?></button></form><?php endif; ?>
-        <button type="button" class="sp-btn sp-btn-view" onclick="window.print()" <?= $missCount ? 'disabled title="بيانات ناقصة"' : '' ?>><i class="fas fa-print"></i> <?= $missCount ? 'الطباعة غير متاحة' : 'طباعة البيان' ?></button>
+        <button type="button" class="sp-btn sp-btn-view" onclick="ppPrint(this)" <?= $missCount ? 'disabled title="بيانات ناقصة"' : '' ?>><i class="fas fa-print"></i> <?= $missCount ? 'الطباعة غير متاحة' : 'طباعة البيان' ?></button>
       </div></div>
     <?php if ($missCount): ?><div class="alert alert-warning"><i class="fas fa-exclamation-triangle"></i><span>لا يمكن طباعة البيان العام على المنصّة: بيانات <?= $missCount ?> أستاذ ناقصة (جميع حقول البيان العام إلزامية). الخانات الناقصة معلّمة بـ «ناقص» في الجدول — اضغط على ✎ لإكمالها هنا، أو أكملها بملف الأستاذ بالبرنامج فتُحسب تلقائياً.</span></div><?php endif; ?>
 
@@ -326,17 +330,29 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
 
     <div id="ppExportArea" class="doc-sheet land-report rl-fixed" dir="rtl" style="padding:0;border:0;background:transparent;box-shadow:none">
     <div class="doc-head" style="display:none"><div class="dh-ar">البيان العام <?= e($period) ?> — <?= e($school['name_ar']) ?></div></div>
+    <?php /* 🖊️ ترويسة ورقة الطباعة الرسمية بالمنصّة — للطباعة والتصدير فقط */ ?>
+    <div class="sp-po sp-ba-head" style="color:#111;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+        <div class="doc-period" style="font-weight:700;font-size:15pt;line-height:1.35;text-align:right">صندوق التعويضات<br>لأفراد الهيئة التعليمية في المدارس الخاصة</div>
+        <div class="doc-period" style="font-size:12pt;max-width:95mm;text-align:left">البيان العام السنوي لأفراد الهيئة التعليمية الداخلين في الملاك والتعاقد</div>
+      </div>
+      <div class="doc-period" style="font-weight:700;font-size:13pt;margin-top:6px">في مدرسة <?= e(preg_replace('/^\s*مدرسة\s+/u', '', (string)$school['name_ar'])) ?> / <?= e(eocSchoolTypes()[$data['school_type'] ?? 'non_free'] ?? 'غير مجاني') ?></div>
+      <div class="doc-period" style="font-size:12pt">رقم المدرسة <span class="num"><?= e((string)($school['caisse_number'] ?: '—')) ?></span></div>
+      <div class="doc-period" style="font-size:12pt">هاتف المدرسة <span class="num" dir="ltr" style="direction:ltr;unicode-bidi:embed"><?= e((string)($data['phone'] ?: ($school['phone'] ?? ''))) ?></span></div>
+      <div class="doc-period" style="font-size:12pt">من السنة المدرسية <span class="num" dir="ltr" style="direction:ltr;unicode-bidi:embed"><?= e($period) ?></span></div>
+    </div>
     <section class="sp-panel" id="sp-list">
-      <div class="sp-panel-head"><h2 class="sp-panel-title">قائمة الأساتذة</h2><span class="sp-count">عدد الأساتذة: <strong><?= $tot['count'] ?></strong> — ملاك: <strong><?= $tot['staff'] ?></strong> — متعاقدين: <strong><?= $tot['contract'] ?></strong></span></div>
+      <div class="sp-panel-head"><h2 class="sp-panel-title no-print">قائمة الأساتذة</h2><span class="sp-count doc-period">عدد الأساتذة: <strong><?= $tot['count'] ?></strong> — ملاك: <strong><?= $tot['staff'] ?></strong> — متعاقدين: <strong><?= $tot['contract'] ?></strong></span></div>
       <div class="sp-panel-body">
         <div class="sp-toolbar no-print"><form method="get" class="sp-toolbar-form"><input type="hidden" name="tab" value="general"><input type="hidden" name="period" value="<?= e($period) ?>">
           <label>الفئة</label><select name="emp" onchange="this.form.submit()"><option value="all" <?= $emp === 'all' ? 'selected' : '' ?>>الكل</option><option value="staff" <?= $emp === 'staff' ? 'selected' : '' ?>>ملاك</option><option value="contract" <?= $emp === 'contract' ? 'selected' : '' ?>>متعاقد</option></select>
           <label>ترتيب حسب</label><select name="sort" onchange="this.form.submit()"><option value="name" <?= $sort === 'name' ? 'selected' : '' ?>>الاسم (أبجدي)</option><option value="teacher_no" <?= $sort === 'teacher_no' ? 'selected' : '' ?>>الرقم المالي</option><option value="salary" <?= $sort === 'salary' ? 'selected' : '' ?>>الراتب (الأعلى أولاً)</option><option value="hours" <?= $sort === 'hours' ? 'selected' : '' ?>>الساعات (الأعلى أولاً)</option></select>
           <input type="text" name="search" placeholder="الرقم المالي أو الاسم" value="<?= e($search) ?>"><button type="submit" class="sp-btn sp-btn-view sp-btn-sm">بحث</button></form></div>
         <div class="sp-table-wrap"><table class="sp-data">
-          <thead><tr><th class="sp-col-idx">#</th><th>ملاك/متعاقد</th><th>الرقم المالي</th><th>الاسم والشهرة</th><th>اسم الاب</th><th>الشهادة</th><th>الفئة</th><th>المرحلة</th><th>تاريخ الولادة</th><th>تاريخ دخول الخدمة</th><th class="num">ساعات</th><th class="num">الراتب</th><th class="num">الأجر الاضافي</th><th class="sp-col-act no-print"></th></tr></thead>
+          <thead><tr><th class="sp-col-idx">#</th><th>ملاك/متعاقد</th><th>الرقم المالي</th><th>الاسم والشهرة</th><th>اسم الاب</th><th>الشهادة</th><th>الفئة</th><th>المرحلة</th><th>تاريخ الولادة</th><th>تاريخ دخول الخدمة</th><th class="num">ساعات</th><th class="num">الراتب</th><th class="num">الأجر الاضافي</th><th class="sp-po">التوقيع</th><th class="sp-col-act no-print"></th></tr></thead>
           <tbody>
-          <?php $i = 0; foreach ($rows as $r): $i++; $mc = fn(string $f, string $extra = '') => 'class="' . $extra . (in_array($f, $r['missing'], true) ? ' sp-cell-missing' : '') . (array_key_exists($f, $r['ov']) ? ' sp-ovd' : '') . '"';
+          <?php $signPad = str_repeat('&emsp;', 5); /* خانة توقيع فاضية بعرض حقيقي بكل المخارج (طباعة/PDF/وورد): مسافات عريضة لا تُطوى */
+                $i = 0; foreach ($rows as $r): $i++; $mc =fn(string $f, string $extra = '') => 'class="' . $extra . (in_array($f, $r['missing'], true) ? ' sp-cell-missing' : '') . (array_key_exists($f, $r['ov']) ? ' sp-ovd' : '') . '"';
                 $cell = fn(string $f, string $html, string $extra = '') => '<td ' . $mc($f, $extra) . '>' . (in_array($f, $r['missing'], true) ? '<span class="sp-miss">ناقص</span>' : $html) . '</td>'; ?>
             <tr class="<?= $r['missing'] ? 'sp-row-has-missing' : '' ?>" data-key="<?= e($r['key']) ?>">
               <td class="num sp-col-idx"><?= $i ?></td>
@@ -352,6 +368,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
               <?= $cell('teaching_hours', e(rtrim(rtrim(number_format($numv($r['teaching_hours']), 1), '0'), '.')), 'num') ?>
               <?= $cell('salary', $fmt0($r['salary']), 'num') ?>
               <?= $cell('add_salary', $amtM($r['add_salary']), 'num') ?>
+              <td class="sp-po sp-sign"><?= $signPad ?></td>
               <td class="sp-col-act no-print"><?php if ($E && !$locked): ?><div class="sp-actions">
                 <a class="sp-btn sp-btn-sm sp-btn-view sp-btn-icon" title="تعديل" href="<?= e($back(['edit' => $r['key']])) ?>#sp-teacher-form"><i class="fas fa-pencil-alt"></i></a>
                 <?php if ($r['src'] === 'auto' && $r['ov']): ?><form method="post" onsubmit="return confirm('إرجاع السطر محسوباً من البرنامج؟')"><?= csrfField() ?><input type="hidden" name="eoc_act" value="reset"><input type="hidden" name="key" value="<?= e($r['key']) ?>"><button class="sp-btn sp-btn-sm sp-btn-view sp-btn-icon" title="↺ تلقائي من البرنامج">↺</button></form><?php endif; ?>
@@ -360,13 +377,25 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
             </tr>
           <?php endforeach; if (!$rows): ?><tr><td colspan="14" class="sp-empty">لا يوجد أساتذة بعد.</td></tr><?php endif; ?>
           </tbody>
-          <tfoot><tr><td colspan="10">المجموع (كل الأساتذة)</td><td class="num"><?= e(rtrim(rtrim(number_format($tot['hours'], 1), '0'), '.')) ?></td><td class="num"><?= $fmt0($tot['salary']) ?></td><td class="num"><?= $amtM($tot['add_salary']) ?></td><td class="no-print"></td></tr></tfoot>
+          <tfoot><tr><td colspan="10">المجموع (كل الأساتذة)</td><td class="num"><?= e(rtrim(rtrim(number_format($tot['hours'], 1), '0'), '.')) ?></td><td class="num"><?= $fmt0($tot['salary']) ?></td><td class="num"><?= $amtM($tot['add_salary']) ?></td><td class="sp-po"></td><td class="no-print"></td></tr></tfoot>
         </table></div>
         <?php if ($E && $delIds): $nm = $db->query("SELECT id, first_name_ar, last_name_ar FROM employees WHERE id IN (" . implode(',', $delIds) . ")")->fetchAll(); ?>
         <div class="sp-del-list no-print">أساتذة محذوفون من هذا البيان (يُحسبون بالبرنامج لكن لا يظهرون هنا): <?php foreach ($nm as $x): ?><form method="post"><?= csrfField() ?><input type="hidden" name="eoc_act" value="restore"><input type="hidden" name="key" value="<?= (int)$x['id'] ?>"><button class="sp-btn sp-btn-sm sp-btn-view"><?= e(eocNameAr($x)) ?> ↩ إرجاع</button></form> <?php endforeach; ?></div>
         <?php endif; ?>
       </div>
     </section>
+    <?php /* 🖊️ تذييل ورقة الطباعة الرسمية بالمنصّة — للطباعة والتصدير فقط */ ?>
+    <div class="sp-po sp-ba-foot" style="color:#111;font-size:12pt;margin-top:10px;page-break-inside:avoid">
+      <div style="display:flex;justify-content:space-between;gap:12px;border-top:1px dashed #333;padding-top:8px">
+        <div class="doc-period" style="flex:1;text-align:right">ملحوظة: ينظم هذا البيان عن جميع أفراد الهيئة التعليمية في المدرسة</div>
+        <div class="doc-period" style="flex:1;text-align:center">نظم وصدق على مسؤوليتي بتاريخ</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:12px;padding-top:14px;min-height:22mm">
+        <div class="doc-period" style="flex:1;text-align:center">خاتم المدرسة</div>
+        <div class="doc-period" style="flex:1;text-align:center">توقيع المدير أو من يقوم مقامه</div>
+      </div>
+      <div class="doc-period" style="font-weight:700">عدد الاساتذة: <span class="num"><?= $tot['count'] ?></span></div>
+    </div>
     </div>
 
   <?php else: /* ===== البيان المالي لفترة ===== */
@@ -377,7 +406,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
         <div class="sp-title-note"><?= e($pi['label']) ?> — <?= e($pi['range']) ?> — <?= e($school['name_ar']) ?></div></div>
       <div class="sp-page-actions no-print">
         <?php if ($E): ?><form method="post" style="display:inline"><?= csrfField() ?><input type="hidden" name="eoc_act" value="status"><button type="submit" class="sp-btn sp-btn-view"><i class="fas <?= $locked ? 'fa-lock-open' : 'fa-lock' ?>"></i> <?= $locked ? 'فتح للتعديل' : 'اعتماد وإقفال' ?></button></form><?php endif; ?>
-        <button type="button" class="sp-btn sp-btn-view" onclick="window.print()"><i class="fas fa-print"></i> طباعة البيان</button>
+        <button type="button" class="sp-btn sp-btn-view" onclick="ppPrint(this)"><i class="fas fa-print"></i> طباعة البيان</button>
       </div></div>
     <?php if ($locked): ?><div class="alert alert-success"><i class="fas fa-check-circle"></i><span>هذا البيان معتمد ومقفل.</span></div><?php endif; ?>
     <?php if ($pi['special']): ?><div class="alert alert-info"><i class="fas fa-info-circle"></i><span>بيان خاص بشهر <?= e(monthName($pi['first'][1], 'ar')) ?> <?= $pi['first'][0] ?>: يُعبَّأ تلقائياً بأساتذة الملاك الذين لهم درجة أو نصف راتب بهذا الشهر (المبالغ بعمودَي «درجة» و«نصف راتب»)، والمحسومات لشهر واحد. عدّل أو احذف أو أضف كما يلزم.</span></div><?php endif; ?>
@@ -476,6 +505,10 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
 </div>
 
 <script>
+<?php if ($kind === 'general' && $data): ?>
+/* 🖊️ (2026-11-09) البيان العام نموذج رسمي بعمود توقيع: PDF/الطباعة قطعة واحدة («ورقة وحدة») لا أجزاء — التوقيع يبقى قدّام اسم صاحبه */
+window.msaFitOne = true; document.addEventListener('DOMContentLoaded', function(){ window.msaFitOne = true; });
+<?php endif; ?>
 /* 🔢 «بفواصل / بلا فواصل» على الشاشة فقط (للنسخ واللصق إلى خانات المنصّة) — الطباعة والتصدير بفواصل دائماً */
 var EOC_SEP_RE=/\d{1,3}(?:,\d{3})+(?:\.\d+)?/g;
 function eocSepApply(on){
@@ -490,7 +523,7 @@ function eocSep(on){ try{ localStorage.setItem('eoc_sep', on?'1':'0'); }catch(e)
 (function(){
     var on=true; try{ on=localStorage.getItem('eoc_sep')!=='0'; }catch(e){} eocSepApply(on);
     var restoreThen=function(fn){ return function(){ var cur=document.body.classList.contains('eoc-nosep'); if(cur) eocSepApply(true); var r; try{ r=fn.apply(this,arguments); } finally { if(cur) setTimeout(function(){ eocSepApply(false); },1500); } return r; }; };
-    ['msaSavePdfStart','ppWord','ppWhatsApp','ppEmail'].forEach(function(k){ if(typeof window[k]==='function' && !window[k].__eocSep){ var o=window[k]; window[k]=restoreThen(o); window[k].__eocSep=true; } });
+    ['msaSavePdfStart','ppPrint','ppWord','ppWhatsApp','ppEmail'].forEach(function(k){ if(typeof window[k]==='function' && !window[k].__eocSep){ var o=window[k]; window[k]=restoreThen(o); window[k].__eocSep=true; } });
     window.addEventListener('beforeprint', function(){ if(document.body.classList.contains('eoc-nosep')){ eocSepApply(true); document.body.classList.add('eoc-nosep-print'); } });
     window.addEventListener('afterprint', function(){ if(document.body.classList.contains('eoc-nosep-print')){ document.body.classList.remove('eoc-nosep-print'); eocSepApply(false); } });
     if(location.hash){ var t=document.querySelector(location.hash); if(t) setTimeout(function(){ t.scrollIntoView({block:'start'}); },50); }

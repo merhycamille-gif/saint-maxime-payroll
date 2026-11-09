@@ -400,14 +400,19 @@ function eocBuildXlsx(string $kind, string $period, array $rows, array $school, 
     $num = fn($v) => (float)str_replace([',', ' '], '', (string)$v);
     $name = (string)($school['name_ar'] ?? '');
     if ($kind === 'general') {
-        $si = $X->sheet('البيان العام ' . $period, [5, 11, 13, 28, 14, 26, 12, 12, 13, 15, 9, 14, 14]);
-        $X->row($si, [$c('البيان العام ' . $period . ' — ' . $name . ' — رقم المدرسة ' . ($school['caisse_number'] ?? ''), 1)], 26); $X->merge($si, 'A1:M1');
-        $X->row($si, [$c('رقم هاتف المدرسة: ' . ($extra['phone'] ?? '') . ' — نوع المدرسة: ' . (eocSchoolTypes()[$extra['school_type'] ?? 'non_free'] ?? ''), 12)]); $X->merge($si, 'A2:M2');
-        $X->row($si, array_map(fn($l) => $c($l, 2), ['#', 'ملاك/متعاقد', 'الرقم المالي', 'الاسم والشهرة', 'اسم الاب', 'الشهادة', 'الفئة', 'المرحلة', 'تاريخ الولادة', 'تاريخ دخول الخدمة', 'ساعات', 'الراتب', 'الأجر الاضافي']), 30);
+        // 🖊️ (2026-11-09 «ناقص عامود لإمضاء الأستاذ») كورقة الطباعة الرسمية بالمنصّة: عمود «التوقيع» + تذييل خاتم المدرسة وتوقيع المدير
+        $si = $X->sheet('البيان العام ' . $period, [5, 11, 13, 28, 14, 26, 12, 12, 13, 15, 9, 14, 14, 18]);
+        $X->row($si, [$c('البيان العام ' . $period . ' — ' . $name . ' — رقم المدرسة ' . ($school['caisse_number'] ?? ''), 1)], 26); $X->merge($si, 'A1:N1');
+        $X->row($si, [$c('رقم هاتف المدرسة: ' . ($extra['phone'] ?? '') . ' — نوع المدرسة: ' . (eocSchoolTypes()[$extra['school_type'] ?? 'non_free'] ?? ''), 12)]); $X->merge($si, 'A2:N2');
+        $X->row($si, array_map(fn($l) => $c($l, 2), ['#', 'ملاك/متعاقد', 'الرقم المالي', 'الاسم والشهرة', 'اسم الاب', 'الشهادة', 'الفئة', 'المرحلة', 'تاريخ الولادة', 'تاريخ دخول الخدمة', 'ساعات', 'الراتب', 'الأجر الاضافي', 'التوقيع']), 30);
         $r0 = $X->rowCount($si) + 1; $i = 0;
-        foreach ($rows as $r) { $i++; $X->row($si, [$n($i, 13), $c($r['employment_type'] === 'staff' ? 'ملاك' : 'متعاقد'), $c($r['teacher_no']), $c($r['teacher_name']), $c($r['father_name']), $c(eocCertOptions()[(int)$r['certificate_id']] ?? ''), $c(eocCatOptions()[(int)$r['category_id']] ?? ''), $c(eocPhaseOptions()[(int)$r['phase_id']] ?? ''), $c($r['birth_date']), $c($r['start_date']), $n($num($r['teaching_hours'])), $n($num($r['salary'])), $n($num($r['add_salary']))]); }
+        foreach ($rows as $r) { $i++; $X->row($si, [$n($i, 13), $c($r['employment_type'] === 'staff' ? 'ملاك' : 'متعاقد'), $c($r['teacher_no']), $c($r['teacher_name']), $c($r['father_name']), $c(eocCertOptions()[(int)$r['certificate_id']] ?? ''), $c(eocCatOptions()[(int)$r['category_id']] ?? ''), $c(eocPhaseOptions()[(int)$r['phase_id']] ?? ''), $c($r['birth_date']), $c($r['start_date']), $n($num($r['teaching_hours'])), $n($num($r['salary'])), $n($num($r['add_salary'])), $c('')], 24); }
         $r1 = $X->rowCount($si);
-        if ($i) $X->row($si, [$c('المجموع (كل الأساتذة)', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $fx("SUM(K$r0:K$r1)", 7), $fx("SUM(L$r0:L$r1)", 7), $fx("SUM(M$r0:M$r1)", 7)]);
+        if ($i) $X->row($si, [$c('المجموع (كل الأساتذة)', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $c('', 6), $fx("SUM(K$r0:K$r1)", 7), $fx("SUM(L$r0:L$r1)", 7), $fx("SUM(M$r0:M$r1)", 7), $c('', 6)]);
+        $X->row($si, []);
+        $rn = $X->rowCount($si) + 1; $X->row($si, [$c('ملحوظة: ينظم هذا البيان عن جميع أفراد الهيئة التعليمية في المدرسة', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('نظم وصدق على مسؤوليتي بتاريخ', 12)]); $X->merge($si, "A$rn:G$rn"); $X->merge($si, "H$rn:N$rn");
+        $rn++; $X->row($si, [$c('خاتم المدرسة', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('', 12), $c('توقيع المدير أو من يقوم مقامه', 12)], 60); $X->merge($si, "A$rn:G$rn"); $X->merge($si, "H$rn:N$rn");
+        $rn++; $X->row($si, [$c('عدد الاساتذة: ' . $i, 9)]); $X->merge($si, "A$rn:G$rn");
         return $X->bytes();
     }
     $pi = eocPeriodInfo($period);

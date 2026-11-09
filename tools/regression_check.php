@@ -2084,7 +2084,7 @@ check('🛡️ الحفظ الفوري لا يظهر على فورم مقفول 
       strpos($flSrc31, "form.dataset.lockState === 'locked'") !== false
       && strpos($flSrc31, 'b.disabled = locked;') !== false);
 check('🛡️ «أي محي لازم يسألني قبل»: حذف الموظف بصفحة تأكيد حقيقية (لا يتمّ بلا confirmed=1)',
-      strpos($empSrc31, "empty(\$_GET['confirmed'])") !== false
+      strpos($empSrc31, "empty(\$_POST['confirmed'])") !== false && strpos($empSrc31, "verifyCsrf((string)(\$_POST['csrf'] ?? ''))") !== false
       && strpos($empSrc31, 'هل تريد فعلاً حذف الموظف؟') !== false);
 // أندره مراد (1673) مُستعاد وغير محذوف — بياناته التعريفية موجودة
 $aq31 = $db->query("SELECT first_name_ar, last_name_ar, finance_ministry_number, nssf_number, is_deleted FROM employees WHERE id = 1673")->fetch();
@@ -11463,6 +11463,91 @@ try {
     $why296 = 'map=' . (int)$okMap . ' fin=' . (int)$okFin . ' deg=' . (int)$okDeg . ' ov=' . (int)$okOv . ' man=' . (int)$okMan . ' del=' . (int)$okDel . ' val=' . (int)$okVal . ' gen=' . (int)$okGen . ' page=' . (int)$okPg . ' json=' . (int)$okJs . ' xlsx=' . (int)$okXl . ' ext=' . (int)$okExt . ' grand=' . number_format($ft['grand'] ?? 0);
 } catch (Throwable $e) { $ok296 = false; $why296 = $e->getMessage(); }
 check('🏛️💼 بوّابة صندوق التعويضات (2026-11-08): فصول المنصّة بالسنة الدراسية · بيان 202601 = 410,594,200 كالمعتمد · 6٪ × (الراتب + الإضافي) ×3 · الدرجة = الحالي − السابق · تعديل/يدوي/حذف/إرجاع · البيان العام من ت1 · الصفحات الثلاث + JSON + إكسل + المساعد', $ok296, $why296);
+
+/* 297) 🖊️ (2026-11-09 «بيان العام صندوق التعويضات ناقص عامود لإمضاء الأستاذ» ⇒ «شفت على الموقع الرسمي؟»): ورقة الطباعة الرسمية بالمنصّة (/my/roster/{id}/print)
+   تزيد على جدول الشاشة: ترويسة الصندوق والمدرسة + عمود «التوقيع» + تذييل «خاتم المدرسة / توقيع المدير». بالبرنامج: للطباعة والتصدير فقط (.sp-po)،
+   الشاشة تبقى كالمنصّة؛ الطباعة من المحرّك الموحّد (ppPrint) قطعة واحدة (msaFitOne)؛ الإكسل بعمود التوقيع والتذييل؛ البيان المالي لا يُمسّ محتواه. */
+$ok297 = false; $why297 = '';
+try {
+    $g7 = renderPage('pages/eoc_portal.php', ['tab' => 'general', 'period' => '2026-2027'], [], [2], '', '2026-2027');
+    $f7 = renderPage('pages/eoc_portal.php', ['tab' => 'financial', 'period' => '202601'], [], [2], '', '2026-2027');
+    $nRow7 = preg_match_all('/<tr class="[^"]*" data-key="/', $g7); $nSig7 = substr_count($g7, '<td class="sp-po sp-sign">');
+    $okCol7 = strpos($g7, '<th class="sp-po">التوقيع</th>') !== false && $nRow7 >= 25 && $nSig7 === $nRow7 && strpos($g7, '<td class="sp-po"></td><td class="no-print"></td></tr></tfoot>') !== false;
+    $okHead7 = strpos($g7, 'البيان العام السنوي لأفراد الهيئة التعليمية الداخلين في الملاك والتعاقد') !== false && strpos($g7, 'في مدرسة القديس مكسيموس') !== false && strpos($g7, 'في مدرسة مدرسة') === false
+        && preg_match('/من السنة المدرسية <span class="num" dir="ltr"[^>]*>2026-2027<\/span>/', $g7) === 1 && preg_match('/هاتف المدرسة <span class="num" dir="ltr"/', $g7) === 1;
+    $okFoot7 = strpos($g7, 'ملحوظة: ينظم هذا البيان عن جميع أفراد الهيئة التعليمية في المدرسة') !== false && strpos($g7, 'نظم وصدق على مسؤوليتي بتاريخ') !== false && strpos($g7, '>خاتم المدرسة<') !== false && strpos($g7, '>توقيع المدير أو من يقوم مقامه<') !== false && preg_match('/عدد الاساتذة: <span class="num">' . $nRow7 . '<\/span>/', $g7) === 1;
+    $okScr7 = strpos($g7, '@media screen{.sp-app .sp-po{display:none !important}}') !== false && substr_count($g7, 'class="sp-po sp-ba-head"') === 1 && substr_count($g7, 'class="sp-po sp-ba-foot"') === 1;
+    $okPrn7 = strpos((string)file_get_contents($PROJ . '/pages/eoc_portal.php'), 'window.print()') === false && substr_count($g7, 'onclick="ppPrint(this)"') === 2 && substr_count($f7, 'onclick="ppPrint(this)"') === 2 && strpos($g7, 'window.msaFitOne = true') !== false && strpos($f7, 'window.msaFitOne = true') === false && strpos($g7, "'ppPrint','ppWord'") !== false;
+    $okFin7 = strpos($f7, 'class="sp-po sp-sign"') === false && strpos($f7, 'class="sp-po sp-ba-head"') === false && strpos($f7, 'class="sp-po sp-ba-foot"') === false && strpos($f7, '<th class="sp-po">') === false && strpos($f7, 'المحسومات المقتطعة') !== false;
+    require_once $PROJ . '/includes/eoc_portal.php'; $d7 = eocLoad($db, [2], 'general', '2026-2027'); $x7 = eocBuildXlsx('general', '2026-2027', eocGeneralRows($db, [2], '2026-2027', $d7), (array)$db->query('SELECT * FROM schools WHERE id = 2')->fetch(PDO::FETCH_ASSOC), ['phone' => $d7['phone'] ?? '', 'school_type' => $d7['school_type'] ?? '']); $xs7 = '';   // مباشرةً (مخرج العملية الفرعية نصّي فيتلف الملف الثنائي)
+    $tmp7 = tempnam(sys_get_temp_dir(), 'eocx'); file_put_contents($tmp7, $x7); $z7 = new ZipArchive();
+    if ($z7->open($tmp7) === true) { for ($i7 = 0; $i7 < $z7->numFiles; $i7++) $xs7 .= (string)$z7->getFromIndex($i7); $z7->close(); } @unlink($tmp7);
+    $okXl7 = substr($x7, 0, 2) === 'PK' && strpos($xs7, 'التوقيع') !== false && strpos($xs7, 'توقيع المدير أو من يقوم مقامه') !== false && strpos($xs7, 'خاتم المدرسة') !== false && strpos($xs7, 'A1:N1') !== false;
+    $ok297 = $okCol7 && $okHead7 && $okFoot7 && $okScr7 && $okPrn7 && $okFin7 && $okXl7;
+    $why297 = 'col=' . (int)$okCol7 . ' head=' . (int)$okHead7 . ' foot=' . (int)$okFoot7 . ' screen=' . (int)$okScr7 . ' print=' . (int)$okPrn7 . ' fin=' . (int)$okFin7 . ' xlsx=' . (int)$okXl7 . ' rows=' . $nRow7 . ' sign=' . $nSig7;
+} catch (Throwable $e) { $ok297 = false; $why297 = $e->getMessage(); }
+check('🖊️ البيان العام للصندوق كورقة المنصّة المطبوعة (2026-11-09): عمود «التوقيع» لكل أستاذ + ترويسة الصندوق/المدرسة + تذييل خاتم المدرسة وتوقيع المدير — للطباعة والتصدير فقط، الشاشة كالمنصّة · الطباعة من المحرّك قطعة واحدة · الإكسل · البيان المالي كما هو', $ok297, $why297);
+
+/* 298) 🗑️📅 (2026-11-09 «حذفت معلمة من سنة 2026-2027، رجعت شفتها بسنة 2025-2026 كمان حذفها وهيدا خطأ — لازم بس احذف شي ينحذف محلّ ما هو موجود»
+   ثمّ «بدي قبل كل شي أساس البرنامج ما يكون غلط»): حذف الموظف يتبع السنة المعروضة — له سنين قبلها ⇒ يُشال منها وما بعدها فقط (آلية الترك: 30/9 قبل
+   بدايتها + شيل أشهرها غير المدفوعة) ويبقى بما قبلها حرفياً؛ الأشهر المدفوعة تمنع؛ لا سنين قبلها/«كل السنين» ⇒ الملف كلّه بتأكيد يعدّد السنين؛ التنفيذ POST + رمز أمان.
+   التجربة الحيّة داخل معاملة تُلغى (rollBack) فلا أثر على الداتا. */
+$ok298 = false; $why298 = '';
+try {
+    require_once $PROJ . '/includes/emp_delete.php';
+    $src8 = (string)file_get_contents($PROJ . '/pages/employees.php'); $hdr8 = (string)file_get_contents($PROJ . '/includes/header.php');
+    $okSrc8 = strpos($src8, 'empRemoveFromYear($db, $id, $dSy)') !== false && strpos($src8, 'name="scope" value="year"') !== false && strpos($src8, 'name="scope" value="all"') !== false
+        && strpos($src8, "\$_SERVER['REQUEST_METHOD'] !== 'POST' || empty(\$_POST['confirmed'])") !== false && strpos($src8, "&confirmed=1") === false
+        && function_exists('healRestoreRosalieZeito20261109') && strpos($hdr8, 'healRestoreRosalieZeito20261109();') !== false;
+    $sy8 = '2026-2027'; $py8 = '2025-2026'; $qy8 = '2024-2025';
+    $vis8 = function (int $id, string $sy) use ($db): int { [$yf, $yp] = yearEmploymentFilter($sy, 'e.'); $q = $db->prepare("SELECT COUNT(*) FROM employees e WHERE e.id = ? AND e.is_deleted = 0" . $yf); $q->execute(array_merge([$id], $yp)); return (int)$q->fetchColumn(); };
+    $sig8 = function (int $id, string $sy) use ($db): string { $q = $db->prepare("SELECT COUNT(*), COALESCE(SUM(net_salary_lbp), 0), COALESCE(SUM(COALESCE(is_paid, 0)), 0) FROM monthly_salaries WHERE employee_id = ? AND school_year = ?"); $q->execute([$id, $sy]); return implode('|', $q->fetch(PDO::FETCH_NUM)); };
+    // (أ) موجود بالسنتين وبلا شهر مدفوع بالجديدة وبلا تاريخ ترك ⇒ يُشال من الجديدة فقط
+    $c8 = $db->query("SELECT e.id, e.school_id FROM employees e WHERE e.is_deleted = 0 AND " . leftDateSql('e.') . " = '9999-12-31'
+        AND EXISTS (SELECT 1 FROM monthly_salaries a WHERE a.employee_id = e.id AND a.school_year = '$py8' AND a.net_salary_lbp > 0)
+        AND EXISTS (SELECT 1 FROM monthly_salaries b WHERE b.employee_id = e.id AND b.school_year = '$sy8' AND b.net_salary_lbp > 0)
+        AND NOT EXISTS (SELECT 1 FROM monthly_salaries p WHERE p.employee_id = e.id AND p.school_year >= '$sy8' AND COALESCE(p.is_paid, 0) = 1) ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $okLive8 = true; $okPg8 = true; $live8 = 'no-candidate';
+    if ($c8) {
+        $id8 = (int)$c8['id']; $sc8 = empDeleteScope($db, $id8, $sy8); $scP8 = empDeleteScope($db, $id8, 'all');
+        $hY8 = renderPage('pages/employees.php', ['action' => 'delete', 'id' => $id8], [], [(int)$c8['school_id']], '', $sy8);
+        $hA8 = renderPage('pages/employees.php', ['action' => 'delete', 'id' => $id8], [], [(int)$c8['school_id']], '', 'all');
+        $okPg8 = strpos($hY8, 'هل تريد فعلاً حذف الموظف؟') !== false && strpos($hY8, 'name="scope" value="year"') !== false && strpos($hY8, 'وما بعدها فقط') !== false && strpos($hY8, 'name="sy" value="' . $sy8 . '"') !== false && strpos($hY8, 'name="csrf"') !== false
+            && strpos($hA8, 'name="scope" value="year"') === false && strpos($hA8, 'أنت على «كل السنين»') !== false && strpos($hA8, 'name="scope" value="all"') !== false
+            && $vis8($id8, $sy8) === 1 && (int)$db->query("SELECT is_deleted FROM employees WHERE id = $id8")->fetchColumn() === 0;   // عرض صفحة التأكيد لا يحذف شيئاً
+        $before8 = $sig8($id8, $py8);
+        ensureLeftDateAllColumn();   // تسخين قبل المعاملة: لا DDL داخلها (قاعدة «لا DDL داخل transaction»)
+        $db->beginTransaction();
+        try {
+            $res8 = empRemoveFromYear($db, $id8, $sy8); $inTx8 = $db->inTransaction();
+            $row8 = $db->query("SELECT is_deleted, left_date_all FROM employees WHERE id = $id8")->fetch(PDO::FETCH_ASSOC);
+            $left8 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = $id8 AND school_year >= '$sy8'")->fetchColumn();
+            $okLive8 = $inTx8 && $sc8['can_year'] && !$scP8['can_year'] && $res8['ok'] && (int)$res8['deleted'] >= 1 && $left8 === 0 && $vis8($id8, $sy8) === 0 && $vis8($id8, $py8) === 1
+                && $sig8($id8, $py8) === $before8 && (int)$row8['is_deleted'] === 0 && substr((string)$row8['left_date_all'], 0, 10) === '2026-09-30';
+            $live8 = 'id=' . $id8 . ' removed=' . (int)($res8['deleted'] ?? -1) . ' left=' . substr((string)$row8['left_date_all'], 0, 10) . ' vis26=' . $vis8($id8, $sy8) . ' vis25=' . $vis8($id8, $py8);
+        } finally { if ($db->inTransaction()) $db->rollBack(); }
+        $okLive8 = $okLive8 && $vis8($id8, $sy8) === 1 && $sig8($id8, $py8) === $before8;   // المعاملة أُلغيت: كل شي كما كان
+    }
+    // (ب) الأشهر المدفوعة محميّة: له سنة قبلها وشهر مدفوع بالسنة ⇒ لا يُشال منها ولا يتغيّر شيء
+    $g8 = $db->query("SELECT e.id, e.school_id FROM employees e WHERE e.is_deleted = 0
+        AND EXISTS (SELECT 1 FROM monthly_salaries a WHERE a.employee_id = e.id AND a.school_year = '$qy8' AND a.net_salary_lbp > 0)
+        AND EXISTS (SELECT 1 FROM monthly_salaries b WHERE b.employee_id = e.id AND b.school_year = '$py8' AND COALESCE(b.is_paid, 0) = 1) ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $okPaid8 = true; $paid8 = 'no-candidate';
+    if ($g8) {
+        $gid8 = (int)$g8['id']; $gb8 = $sig8($gid8, $py8) . '#' . (string)$db->query("SELECT COALESCE(left_date_all, '') FROM employees WHERE id = $gid8")->fetchColumn();
+        $gs8 = empDeleteScope($db, $gid8, $py8); $gr8 = empRemoveFromYear($db, $gid8, $py8);
+        $hP8 = renderPage('pages/employees.php', ['action' => 'delete', 'id' => $gid8], [], [(int)$g8['school_id']], '', $py8);
+        $okPaid8 = !$gs8['can_year'] && $gs8['paid_from'] >= 1 && !$gr8['ok'] && strpos((string)$gr8['msg'], 'مدفوع') !== false
+            && $gb8 === $sig8($gid8, $py8) . '#' . (string)$db->query("SELECT COALESCE(left_date_all, '') FROM employees WHERE id = $gid8")->fetchColumn()
+            && strpos($hP8, 'الأشهر المدفوعة محميّة') !== false && strpos($hP8, 'name="scope" value="year"') === false;
+        $paid8 = 'id=' . $gid8 . ' paid=' . $gs8['paid_from'];
+    }
+    // (ج) لا سنين قبلها ⇒ ليس «من سنة» بل الملف كلّه؛ وسنة غير صالحة مرفوضة
+    $n8 = empDeleteScope($db, 0, $sy8); $okNone8 = !$n8['can_year'] && $n8['before'] === [] && empRemoveFromYear($db, 0, $sy8)['ok'] === false && empRemoveFromYear($db, 0, 'all')['ok'] === false && $n8['left_date'] === '2026-09-30';
+    $ok298 = $okSrc8 && $okLive8 && $okPg8 && $okPaid8 && $okNone8;
+    $why298 = 'src=' . (int)$okSrc8 . ' live=' . (int)$okLive8 . ' [' . $live8 . '] page=' . (int)$okPg8 . ' paid=' . (int)$okPaid8 . ' [' . $paid8 . '] none=' . (int)$okNone8;
+} catch (Throwable $e) { if (isset($db) && $db->inTransaction()) $db->rollBack(); $ok298 = false; $why298 = $e->getMessage(); }
+check('🗑️📅 حذف الموظف يتبع السنة المعروضة (2026-11-09 «ينحذف محلّ ما هو موجود»): له سنين قبلها ⇒ يُشال منها وما بعدها فقط ويبقى بما قبلها حرفياً · الأشهر المدفوعة تمنع · «كل السنين»/بلا سنين قبلها ⇒ الملف كلّه بتأكيد صريح · POST + رمز أمان · عرض التأكيد لا يحذف', $ok298, $why298);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
