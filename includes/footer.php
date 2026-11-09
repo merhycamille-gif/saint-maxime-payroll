@@ -7,6 +7,7 @@
 <script src="<?= BASE_URL ?>assets/js/export.js?v=<?= @filemtime(__DIR__ . '/../assets/js/export.js') ?: '1' ?>"></script>
 <script src="<?= BASE_URL ?>assets/js/form-lock.js?v=<?= @filemtime(__DIR__ . '/../assets/js/form-lock.js') ?: '1' ?>"></script>
 <script src="<?= BASE_URL ?>assets/js/select-search.js?v=<?= @filemtime(__DIR__ . '/../assets/js/select-search.js') ?: '1' ?>"></script>
+<script src="<?= BASE_URL ?>assets/js/keynav.js?v=<?= @filemtime(__DIR__ . '/../assets/js/keynav.js') ?: '1' ?>"></script><?php /* ⌨️ (2026-11-09) Enter = الخانة التالية (لا حفظ) + الأسهم بين الخانات — كل الصفحات */ ?>
 <script>window.BASE_URL = <?= json_encode(BASE_URL) ?>; window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>; window.MSA_PAGE = <?= json_encode((string)($currentPage ?? '')) ?>;</script>
 <?php // 📧 (2026-10-12 «أبعت من ملف الأستاذ أو المدرسة يروح على إيميل المدرسة تلقائياً، وإذا بدّي أبعته لأستاذ يكون عندي خيار»):
       //    إيميل المدرسة المختارة + إيميل الأستاذ المعروض (إن وُجد) لنافذة الإرسال — الاختيار «للمدرسة / للأستاذ / إيميل آخر»

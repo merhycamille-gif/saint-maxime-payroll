@@ -11549,6 +11549,24 @@ try {
 } catch (Throwable $e) { if (isset($db) && $db->inTransaction()) $db->rollBack(); $ok298 = false; $why298 = $e->getMessage(); }
 check('🗑️📅 حذف الموظف يتبع السنة المعروضة (2026-11-09 «ينحذف محلّ ما هو موجود»): له سنين قبلها ⇒ يُشال منها وما بعدها فقط ويبقى بما قبلها حرفياً · الأشهر المدفوعة تمنع · «كل السنين»/بلا سنين قبلها ⇒ الملف كلّه بتأكيد صريح · POST + رمز أمان · عرض التأكيد لا يحذف', $ok298, $why298);
 
+/* 299) ⌨️ (2026-11-09 «وأنا عم عبّي بشي خانة بالبرنامج لازم إذا استعملت الإنتر ينقلني للبعدها دغري… بس عبّي خانة وحطّ إنتر بياخدني على الحفظ وأنا بعد
+   ما خلصت شغل بقلب الصفحة — وكمان لازم اقدر استعمل الأسهم طالع نازل شمال يمين»): assets/js/keynav.js بكل الصفحات — Enter = الخانة التالية بلا حفظ
+   (آخر خانة تقف على كبسة الحفظ)، الأسهم بين الخانات؛ البحث/الفلترة/كلمة السرّ/النصّ الطويل كما هي؛ موازنة الوزارة: Enter لا يحفظ القسم. */
+$ok299 = false; $why299 = '';
+try {
+    $kn9 = (string)@file_get_contents($PROJ . '/assets/js/keynav.js'); $ft9 = (string)file_get_contents($PROJ . '/includes/footer.php'); $mb9 = (string)file_get_contents($PROJ . '/pages/mehe_budget.php');
+    $okJs9 = strlen($kn9) > 3000 && strpos($kn9, "e.defaultPrevented || e.isComposing || e.ctrlKey") !== false && strpos($kn9, "'msa:keynav-end'") !== false
+        && strpos($kn9, "!== 'post') return true") !== false && strpos($kn9, 'input[type="password"]') !== false && strpos($kn9, "fieldsIn(f).length < 2") !== false
+        && strpos($kn9, "tag === 'TEXTAREA'") !== false && strpos($kn9, 'function tableVertical') !== false && strpos($kn9, "if (t === 'number') e.preventDefault();") !== false
+        && strpos($kn9, 'b.focus()') !== false && strpos($kn9, '.click()') === false && strpos($kn9, '.submit()') === false;   // يقف على كبسة الحفظ ولا يكبسها أبداً
+    $okFt9 = strpos($ft9, "assets/js/keynav.js?v=") !== false;
+    $okMehe9 = strpos($mb9, "if(ev.key==='Enter'") === false && strpos($mb9, "doc.addEventListener('msa:keynav-end'") !== false && strpos($mb9, "sh.setAttribute('data-keynav','1')") !== false && strpos($mb9, "if(ev.key==='Escape')") !== false;
+    $h9 = renderPage('pages/mehe_budget.php', [], [], [2], '', '2026-2027'); $okPg9 = strpos($h9, 'assets/js/keynav.js?v=') !== false && stripos($h9, 'Fatal error') === false;
+    $ok299 = $okJs9 && $okFt9 && $okMehe9 && $okPg9;
+    $why299 = 'js=' . (int)$okJs9 . ' footer=' . (int)$okFt9 . ' mehe=' . (int)$okMehe9 . ' page=' . (int)$okPg9;
+} catch (Throwable $e) { $ok299 = false; $why299 = $e->getMessage(); }
+check('⌨️ التنقّل بالكيبورد بكل الصفحات (2026-11-09): Enter = الخانة التالية بلا حفظ (آخر خانة تقف على كبسة الحفظ ولا تكبسها) · الأسهم فوق/تحت/شمال/يمين بين الخانات · البحث والفلترة وكلمة السرّ والنصّ الطويل كما هي · موازنة الوزارة: Enter لا يحفظ القسم', $ok299, $why299);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

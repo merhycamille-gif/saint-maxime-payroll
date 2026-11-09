@@ -816,8 +816,15 @@ function meheFilterCat(sel){ var v=sel.value, sec=sel.closest('.mehe-sec'); sec.
         if(!(ev.target.classList && ev.target.classList.contains('mi'))) return;
         var row=ev.target.closest('[data-mrow]'); if(!row) return;
         var sh=row.closest('.doc-sheet'), bar=sh ? sh.querySelector('.sheetctl.editing') : null;   // القسم كلّه مفتوح ⇒ Enter/Escape على القسم
-        if(ev.key==='Enter' && ev.target.tagName!=='TEXTAREA'){ ev.preventDefault(); if(bar) saveSheet(sh, bar); else save(row,false); }
         if(ev.key==='Escape'){ if(bar) cancelSheet(sh, bar); else cancel(row, row.querySelector('.rowctl')); }
+    });
+    /* ⌨️ (2026-11-09 «بس عبّي خانة وحطّ إنتر بياخدني على الحفظ وأنا بعد ما خلصت شغل بقلب الصفحة»): Enter لا يحفظ — ينقل للخانة التالية (assets/js/keynav.js)،
+       وبآخر خانة يقف على كبسة الحفظ (القسم المفتوح كلّه ⇒ «حفظ الصفحة»، وإلا حفظ السطر) بلا ما يكبسها. الحفظ بكبسته فقط. */
+    document.querySelectorAll('.mehe-doc .doc-sheet').forEach(function(sh){ sh.setAttribute('data-keynav','1'); });
+    doc.addEventListener('msa:keynav-end', function(ev){
+        var row=ev.target.closest ? ev.target.closest('[data-mrow]') : null; if(!row) return;
+        var sh=row.closest('.doc-sheet'), bar=sh ? sh.querySelector('.sheetctl.editing') : null, b=bar ? bar.querySelector('.sv') : row.querySelector('.rowctl .sv');
+        if(b){ ev.preventDefault(); b.focus(); }
     });
     /* ⚖️ وازِن: اقتراح ثمّ تطبيق بموافقته */
     var BAL = <?= json_encode(['abL' => $s['abL'], 'abU' => $s['abU'], 'cSumL' => $s['cSumL'], 'cSumU' => $s['cSumU'], 'cMaxL' => $s['cMaxL'], 'cMaxU' => $s['cMaxU'], 'cats' => array_map(fn($x) => $x[1], meheExpenseItems())], JSON_UNESCAPED_UNICODE) ?>;
