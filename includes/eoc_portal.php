@@ -206,6 +206,17 @@ function eocMonthSalaries(PDO $db, array $ids, int $y, int $m): array {
     foreach ($st->fetchAll() as $r) $out[(int)$r['employee_id']] = ['base' => (float)$r['b'], 'extra' => (float)$r['x'], 'caisse' => (float)$r['c'], 'grade' => (float)$r['g'], 'school' => (float)$r['s']];
     return $out;
 }
+/**
+ * 🤝 راتب الأستاذ بالبيان العام = قاعدة البيان العام القديم نفسها (pages/official_forms.php ofOctoberSalary، قراره 2026-10-18 «الراتب بعد التدرّج تبع 1-10»):
+ *    تشرين الأول من السنة، وإلا أوّل شهر محسوب فيها، وإلا آخر راتب محسوب له. null = لا راتب محسوباً أبداً (داخل جديد ملفّه المالي ناقص).
+ */
+function eocGeneralSalaryRow(PDO $db, int $id, string $sy): ?array {
+    [$y1] = schoolYearToYears($sy);
+    $q = $db->prepare("SELECT * FROM monthly_salaries WHERE is_calculated = 1 AND school_year = ? AND employee_id = ? ORDER BY (year = ? AND month = 10) DESC, year, month LIMIT 1");
+    $q->execute([$sy, $id, (int)$y1]); $r = $q->fetch(PDO::FETCH_ASSOC);
+    if (!$r) { $q = $db->prepare("SELECT * FROM monthly_salaries WHERE employee_id = ? AND is_calculated = 1 ORDER BY year DESC, month DESC LIMIT 1"); $q->execute([$id]); $r = $q->fetch(PDO::FETCH_ASSOC); }
+    return $r ?: null;
+}
 /** أساتذة السنة الدراسية (ملاك + متعاقدون) الذين لهم رواتب فيها */
 function eocTeachersOfYear(PDO $db, array $ids, string $sy): array {
     $in = implode(',', array_map('intval', $ids)) ?: '0';
@@ -235,7 +246,8 @@ function eocGeneralRows(PDO $db, array $ids, string $sy, array $data): array {
     foreach (eocTeachersOfYear($db, $ids, $sy) as $e) {
         $id = (int)$e['id']; if (in_array($id, array_map('intval', $data['deleted']), true)) continue;
         $sal = $oct[$id] ?? null;
-        if (!$sal && !empty($e['last_ym'])) { $ly = (int)substr($e['last_ym'], 0, 4); $lm = (int)substr($e['last_ym'], 4, 2); $sal = eocMonthSalaries($db, [(int)$e['school_id']], $ly, $lm)[$id] ?? null; }
+        // 🤝 (2026-11-09 «أي تقرير بأي محلّ لازم يكونو مطابقين لبعضهن») بلا راتب تشرين الأول بأساس: نفس قاعدة البيان العام القديم بالحرف (eocGeneralSalaryRow)
+        if (!$sal && ($gr = eocGeneralSalaryRow($db, $id, $sy))) $sal = ['base' => (float)$gr['base_plus_echelon_lbp'], 'extra' => (float)$gr['extra_lbp'] + (float)$gr['prime_fixe_lbp']];   // الأساس كما هو بصفّ الراتب (ولو صفراً ⇒ «ناقص») — كخانة «أساس الراتب بعد التدرّج» بالقديم
         $auto = [
             'employment_type' => $e['employee_type'] === 'enseignant_titulaire' ? 'staff' : 'contract',
             'teacher_no' => trim((string)($e['caisse_number'] ?? '')),
@@ -247,7 +259,7 @@ function eocGeneralRows(PDO $db, array $ids, string $sy, array $data): array {
             'birth_date' => eocDateStr(...eocYmd($e['birth_date'] ?? null)), 'start_date' => eocDateStr(...eocYmd($e['display_hire_date'] ?: ($e['hire_date'] ?? null))),
             'teaching_hours' => $e['hours_per_week'] !== null && $e['hours_per_week'] !== '' ? (float)$e['hours_per_week'] : '',
             // 🆕 بلا راتب محسوب بعد (داخل جديد ملفّه المالي ناقص): الأساس = السلسلة عند درجته كالبيان العام القديم الموقَّع، والإضافي يبقى «ناقص» حتى يُكمَل ملفّه
-            'salary' => $sal ? round($sal['base']) : ((float)($e['current_grade'] ?? 0) >= 1 && function_exists('scaleSalaryLBP') ? (round((float)scaleSalaryLBP($e['current_grade'])) ?: '') : ''), 'add_salary' => $sal ? round($sal['extra']) : '',
+            'salary' => $sal ? (round($sal['base']) ?: '') : (function_exists('scaleSalaryLBP') ? (round((float)scaleSalaryLBP($e['current_grade'] ?? 0)) ?: '') : ''), 'add_salary' => $sal ? round($sal['extra']) : '',   // بلا أيّ راتب محسوب ⇒ السلسلة عند درجته (كالقديم)
         ];
         $ov = eocOvDiff((array)($data['lines'][(string)$id] ?? []), $auto);
         $row = ['key' => (string)$id, 'src' => 'auto', 'emp_id' => $id, 'auto' => $auto, 'ov' => $ov] + array_replace($auto, array_intersect_key($ov, array_flip(eocGeneralFields())));

@@ -11591,30 +11591,43 @@ try {
 } catch (Throwable $e) { $ok300 = false; $why300 = $e->getMessage(); }
 check('🔢 الأرقام بلا «.00» والكسر بفاصلة (2026-11-09): nfc/numLoose · الدرجات 38,5 · موازنة الوزارة بلا رقم بنقطة (شاشة + خانة التعديل + إكسل) · المجاميع والتصدير يقرأون الفاصلة كسراً لا آلافاً · خانات type=number تبقى بنقطة', $ok300, $why300);
 
-/* 301) 🆕 (2026-11-09 «هيدا البيان طالع من البرنامج… هلّق عم اطبع نفس البيان بطّل مبيّن اسم شربل عرب»): البيان العام ببوّابة الصندوق كان يأخذ فقط مَن له
-   راتب محسوب بالسنة، فسقط الداخل الجديد (1/10) الذي لم يُكمَل ملفّه المالي — مع أنّه بالبيان العام القديم الموقَّع. القاعدة الواحدة (yearEmploymentFilter):
-   الداخل ضمن السنة من أساتذتها ولو بلا راتب؛ أساسه = السلسلة عند درجته (كالبيان القديم) والإضافي «ناقص» حتى يُكمَل ملفّه. التارك قبل السنة لا يرجع. */
+/* 301) 🤝 (2026-11-09 «هيدا البيان طالع من البرنامج… هلّق عم اطبع نفس البيان بطّل مبيّن اسم شربل عرب» ثمّ «انتبه أي تقرير بأي محلّ لازم يكونو
+   مطابقين لبعضهن وما تخربط»): البيان العام الجديد (بوّابة الصندوق) = البيان العام القديم (النماذج الرسمية، ملاك + متعاقدون) بالحرف — نفس الأساتذة
+   (قاعدة العضوية الواحدة: راتب بالسنة أو دخول ضمنها، غير تارك قبلها) ونفس أساس الراتب والأجر الإضافي لكل واحد. المقارنة على الصفحتين المعروضتين فعلاً. */
 $ok301 = false; $why301 = '';
 try {
     require_once $PROJ . '/includes/eoc_portal.php';
-    $sy1 = '2026-2027';
-    $n1 = $db->query("SELECT e.id, e.school_id, e.current_grade FROM employees e WHERE e.is_deleted = 0 AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel') AND e.hire_date BETWEEN '2026-10-01' AND '2027-09-30'
-        AND " . leftDateSql('e.') . " = '9999-12-31' AND NOT EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = '$sy1' AND ms.base_plus_echelon_lbp > 0) ORDER BY e.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-    $okNew1 = true; $new1 = 'no-candidate';
-    if ($n1) {
-        $r1 = null; foreach (eocGeneralRows($db, [(int)$n1['school_id']], $sy1, eocDefaults('general')) as $r) if ($r['key'] === (string)$n1['id']) $r1 = $r;
-        $okNew1 = $r1 !== null && in_array('add_salary', $r1['missing'], true) && ((float)$n1['current_grade'] < 1 || (int)$r1['salary'] === (int)round((float)scaleSalaryLBP($n1['current_grade'])));
-        $new1 = 'id=' . $n1['id'] . ' in=' . (int)($r1 !== null) . ' salary=' . ($r1['salary'] ?? '?');
+    $sy1 = '2026-2027'; $n301 = 0; $bad301 = []; $num301 = fn($v) => (int)round((float)str_replace([',', ' '], '', (string)$v));
+    foreach ([2, 7] as $sid301) {
+        // القديم: الصفحتان المعروضتان (ملاك، متعاقدون) بالليرة وعمود الإضافي ظاهر ⇒ [الاسم الثلاثي => [أساس, إضافي]]
+        $old301 = [];
+        foreach (['titulaire', 'contractuel'] as $cat301) {
+            $h301 = renderPage('pages/official_forms.php', ['form' => 'eoc_staff', 'cat' => $cat301], ['extra'], [$sid301], 'lbp', $sy1);
+            if (!preg_match('#<div class="official-doc rtl land-report" id="ppExportArea".*?<tbody>(.*?)</tbody>#su', $h301, $mb301)) { $bad301[] = "s$sid301 $cat301: لا جدول"; continue; }
+            foreach (explode('</tr>', $mb301[1]) as $tr301) {
+                if (!preg_match('#<td style="text-align:right">([^<]+)</td>#u', $tr301, $mn301)) continue;
+                preg_match_all('#<td class="num"[^>]*>(?:<strong>)?\s*([\d,]+)#u', $tr301, $mv301);
+                $old301[trim(html_entity_decode($mn301[1], ENT_QUOTES, 'UTF-8'))] = [$num301($mv301[1][0] ?? 0), $num301($mv301[1][1] ?? 0)];
+            }
+        }
+        // الجديد: أسطر البوّابة المحسوبة (بلا تعديلات محفوظة) ⇒ الاسم الثلاثي من الملف نفسه
+        $new301 = [];
+        foreach (eocGeneralRows($db, [$sid301], $sy1, eocDefaults('general')) as $r) {
+            if ($r['src'] !== 'auto') continue;
+            $e301 = $db->query("SELECT * FROM employees WHERE id = " . (int)$r['emp_id'])->fetch(PDO::FETCH_ASSOC);
+            $new301[trim(empFullNameAr($e301))] = [$num301($r['salary']), $num301($r['add_salary'])];
+        }
+        $n301 += count($new301);
+        foreach (array_diff_key($old301, $new301) as $k => $v) $bad301[] = "s$sid301 بالقديم فقط: $k";
+        foreach (array_diff_key($new301, $old301) as $k => $v) $bad301[] = "s$sid301 بالجديد فقط: $k";
+        foreach ($new301 as $k => $v) if (isset($old301[$k]) && $old301[$k] !== $v) $bad301[] = "s$sid301 $k: قديم " . implode('/', $old301[$k]) . ' جديد ' . implode('/', $v);
     }
-    // التارك قبل بداية السنة لا يدخل ولو كان تاريخ دخوله... (الحارس القديم باقٍ) + لا تكرار
-    $all1 = eocGeneralRows($db, [2], $sy1, eocDefaults('general')); $keys1 = array_column($all1, 'key');
-    $left1 = (int)$db->query("SELECT COUNT(*) FROM employees e WHERE e.school_id = 2 AND e.is_deleted = 0 AND e.left_date_all IS NOT NULL AND e.left_date_all > '1900-01-01' AND e.left_date_all <= '2026-09-30' AND e.id IN (" . (implode(',', array_map('intval', $keys1)) ?: '0') . ")")->fetchColumn();
-    $okGuard1 = $left1 === 0 && count($keys1) === count(array_unique($keys1));
-    $src1 = (string)file_get_contents($PROJ . '/includes/eoc_portal.php'); $okSrc1 = strpos($src1, "OR e.hire_date BETWEEN '\$yStart' AND '\$yEnd')") !== false;
-    $ok301 = $okNew1 && $okGuard1 && $okSrc1;
-    $why301 = 'new=' . (int)$okNew1 . ' [' . $new1 . '] guard=' . (int)$okGuard1 . ' src=' . (int)$okSrc1;
+    $src1 = (string)file_get_contents($PROJ . '/includes/eoc_portal.php');
+    $okSrc1 = strpos($src1, "OR e.hire_date BETWEEN '\$yStart' AND '\$yEnd')") !== false && strpos($src1, 'function eocGeneralSalaryRow') !== false;
+    $ok301 = $n301 >= 40 && !$bad301 && $okSrc1;
+    $why301 = 'teachers=' . $n301 . ' diffs=' . count($bad301) . ($bad301 ? ' [' . implode(' · ', array_slice($bad301, 0, 4)) . ']' : '') . ' src=' . (int)$okSrc1;
 } catch (Throwable $e) { $ok301 = false; $why301 = $e->getMessage(); }
-check('🆕 البيان العام للصندوق يشمل الداخل ضمن السنة ولو بلا راتب محسوب (2026-11-09 «بطّل مبيّن اسم شربل عرب»): أساسه من السلسلة عند درجته، الإضافي «ناقص» · التارك قبل السنة لا يرجع · لا تكرار', $ok301, $why301);
+check('🤝 البيان العام الجديد للصندوق = البيان العام القديم بالحرف (2026-11-09 «أي تقرير بأي محلّ لازم يكونو مطابقين لبعضهن»): نفس الأساتذة (ومنهم الداخل ضمن السنة بلا راتب محسوب — شربل عرب) ونفس الأساس والإضافي لكل واحد — مكسيموس + أبلح على الصفحتين المعروضتين', $ok301, $why301);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
