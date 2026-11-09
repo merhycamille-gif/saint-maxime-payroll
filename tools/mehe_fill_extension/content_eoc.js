@@ -26,16 +26,23 @@
   const baseUrl = () => location.origin + location.pathname.replace(/\/+$/, '');
 
   /* ---- سطور الجدول على الموقع ---- */
+  /* 🔴 (2026-11-09 الفرزل): الصفحة فيها جدولان بنفس الصنف — «أساتذة جدد» (#sp-pending: مَن أُضيف ولم يُضمّ إلى القائمة بعد) يأتي قبل «قائمة الأساتذة» (#sp-list).
+     القراءة بـ«أوّل جدول» صارت تقرأ قسم الجدد بعد أوّل إضافة ⇒ حُسب 25 أستاذاً ناقصين وأُضيفوا مكرّرين. القائمة = #sp-list حصراً، والجدد يُقرأون لوحدهم. */
   function siteRows() {
-    const t = document.querySelector('table.sp-data'); if (!t) return [];
+    const t = document.querySelector('#sp-list table.sp-data') || Array.from(document.querySelectorAll('table.sp-data')).find((x) => !x.closest('#sp-pending'));
+    return t ? tableRows(t) : [];
+  }
+  function pendingRows() { const t = document.querySelector('#sp-pending table.sp-data'); return t ? tableRows(t) : []; }
+  function tableRows(t) {
     const heads = Array.from(t.querySelectorAll('thead th')).map((th) => norm(th.textContent));
     const ix = (lb) => heads.findIndex((h) => h === norm(lb));
-    const iNo = ix('الرقم المالي'), iName = ix('الاسم والشهرة'), iType = ix('ملاك/متعاقد'), iFa = ix('اسم الاب');
+    const iNo = ix('الرقم المالي'), iName = ix('الاسم والشهرة'), iType = ix('ملاك/متعاقد'), iFa = ix('اسم الاب'), iB = heads.findIndex((h) => h.indexOf('الولاده') >= 0);
     return Array.from(t.querySelectorAll('tbody tr')).map((tr) => {
       const tds = tr.querySelectorAll('td'); if (tds.length < 3) return null;
       const a = tr.querySelector('a[href*="edit="]');
-      const m = a ? (a.getAttribute('href') || '').match(/[?&]edit=(\d+)/) : null;
-      return { tr, no: iNo >= 0 ? digits(tds[iNo].textContent) : '', name: iName >= 0 ? norm(tds[iName].textContent) : '', type: iType >= 0 ? norm(tds[iType].textContent) : '', father: iFa >= 0 ? norm(tds[iFa].textContent) : '', editHref: a ? a.href : '', lineId: m ? m[1] : '' };
+      const df = tr.querySelector('form[action*="/delete"]');
+      const m = (a ? (a.getAttribute('href') || '').match(/[?&]edit=(\d+)/) : null) || (df ? (df.getAttribute('action') || '').match(/\/line\/(\d+)\/delete/) : null);
+      return { tr, no: iNo >= 0 ? digits(tds[iNo].textContent) : '', name: iName >= 0 ? norm(tds[iName].textContent) : '', type: iType >= 0 ? norm(tds[iType].textContent) : '', father: iFa >= 0 ? norm(tds[iFa].textContent) : '', birth: iB >= 0 && tds[iB] ? bdKey(tds[iB].textContent) : 0, editHref: a ? a.href : '', lineId: m ? m[1] : '' };
     }).filter(Boolean);
   }
   function matchRow(line, rows) {
@@ -49,6 +56,58 @@
     return r || null;
   }
   function L_father(line) { return line && line.father_name ? line.father_name : ''; }
+  /* 🤝 مطابقة اللائحتين كلّها معاً على مراحل (2026-11-09 الفرزل: «ايلان رحمة» المتعاقدة بلا رقم سبقت بالترتيب «ايلين الياس» 14861 فأخذت سطرها ورقمها):
+     المرحلة الأقوى تُستنفَد عند الجميع قبل الأضعف — الرقم المالي أوّلاً، ثمّ الاسم الحرفي، ثمّ أشكال الكتابة المختلفة. تُرجع سطر الموقع لكل سطر برنامج (أو null). */
+  /* 🎂 تاريخ الولادة رقماً واحداً (سنة-شهر-يوم أو يوم/شهر/سنة)؛ فارغ أو سنة وهمية (≤1900) ⇒ 0 = غير معروف */
+  function bdKey(t) {
+    const s = String(t || ''); let m = s.match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/); let y, mo, d;
+    if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; } else { m = s.match(/(\d{1,2})\D(\d{1,2})\D(\d{4})/); if (!m) return 0; d = +m[1]; mo = +m[2]; y = +m[3]; }
+    return y > 1900 ? y * 10000 + mo * 100 + d : 0;
+  }
+  const lineBd = (L) => (L && L.birth_year ? bdKey(L.birth_year + '-' + (L.birth_month || 0) + '-' + (L.birth_day || 0)) : 0);
+  function assign(lines, rows) {
+    const res = (lines || []).map(() => null); const used = new Set(); const hold = (lines || []).map(() => null);
+    const free = () => rows.filter((x) => !used.has(x));
+    const passes = [
+      (L, no) => (no ? free().filter((x) => x.no === no).slice(0, 1) : []),
+      (L, no, nm) => (nm ? free().filter((x) => x.name === nm).slice(0, 1) : []),
+      (L, no, nm) => (nm ? free().filter((x) => skel(x.name) === skel(nm)) : []),
+      (L, no, nm) => { if (!nm) return []; const k2 = nm.split(' ').slice(0, 2).join(' '); return free().filter((x) => x.name.indexOf(k2) === 0 || nm.indexOf(x.name.split(' ').slice(0, 2).join(' ')) === 0); },
+      (L, no, nm) => { const f1 = skel(nm.split(' ')[0]); const fa = skel(norm(L_father(L))); return f1 && fa ? free().filter((x) => skel(x.name.split(' ')[0]) === f1 && skel(x.father || '') === fa && (!x.no || !no || x.no === no)) : []; },
+    ];
+    // 🎂 المرحلة الأخيرة (الشهرة مختلفة: الاسم الأوّل + اسم الأب فقط) أضعف المراحل: تاريخا ولادة معروفان ومختلفان ⇒ شخصان مختلفان محتملان ⇒ «معلَّق»: لا يُعدَّل سطر الموقع ولا يُضاف الأستاذ، ويُذكر للمراجعة
+    passes.forEach((pass, pi) => (lines || []).forEach((L, i) => { if (res[i] || hold[i]) return; const c = pass(L, digits(L.teacher_no), norm(L.teacher_name)); if (c.length !== 1) return;
+      if (pi === passes.length - 1) { const a = lineBd(L), b = c[0].birth || 0; if (a && b && a !== b) { hold[i] = c[0]; return; } }
+      res[i] = c[0]; used.add(c[0]); }));
+    res.hold = hold; return res;
+  }
+  function holdFor(L, lines, rows) {
+    let i = (lines || []).indexOf(L);
+    if (i < 0) i = (lines || []).findIndex((x) => String(x.key || '') === String(L.key || '') && x.teacher_name === L.teacher_name && digits(x.teacher_no) === digits(L.teacher_no));
+    return i >= 0 ? assign(lines, rows).hold[i] : null;
+  }
+  function rowFor(L, lines, rows) {
+    let i = (lines || []).indexOf(L);
+    if (i < 0) i = (lines || []).findIndex((x) => String(x.key || '') === String(L.key || '') && x.teacher_name === L.teacher_name && digits(x.teacher_no) === digits(L.teacher_no));
+    return i >= 0 ? assign(lines, rows)[i] : matchRow(L, rows);
+  }
+  /* 🕓 قسم «أساتذة جدد»: أيّ سطر فيه مكرّر عن القائمة (أستاذه موجود بالقائمة أو مكرّر بالقسم نفسه) ⇒ dup يُشال؛ أستاذ من البرنامج ناقص عن القائمة ⇒ keep يُضمّ؛
+     سطر لا يطابق أيّ أستاذ بالبرنامج بالحرف (أو أستاذه «معلَّق») ⇒ foreign لا يُمسّ ويمنع الضمّ التلقائي. المطابقة هنا حرفية فقط: الرقم المالي، أو الاسم + اسم الأب. */
+  function strictSame(L, p) { const n = digits(L.teacher_no); if (n && p.no) return n === p.no; return !!p.name && norm(L.teacher_name) === p.name && skel(norm(L_father(L))) === skel(p.father || ''); }
+  function pendPlan(lines, rows, pend) {
+    const as = assign(lines || [], rows); const dup = [], keep = [], foreign = []; const seen = new Set();
+    (pend || []).forEach((p) => { const i = (lines || []).findIndex((L) => strictSame(L, p));
+      if (i < 0 || as.hold[i]) { foreign.push(p); return; }
+      if (as[i] || seen.has(i)) dup.push(p); else { seen.add(i); keep.push(p); } });
+    return { dup, keep, foreign };
+  }
+  /* 🔎 اللائحة معروضة جزئياً (ملاك فقط / متعاقدين فقط / بحث): الجدول يُظهر بعض الأساتذة ⇒ المخفيّون يُحسبون «ناقصين» فيتكرّرون — لا مطابقة على لائحة مفلترة */
+  function siteFiltered() {
+    const emp = new URL(location.href).searchParams.get('emp') || ''; const sel = document.getElementById('sp-emp');
+    if (emp === 'staff' || emp === 'contract' || (sel && sel.value && sel.value !== 'all')) return true;
+    const m = String(document.body ? document.body.textContent : '').match(/(\d+)\s*من\s*[أا]صل\s*(\d+)/);
+    return !!m && m[1] !== m[2];
+  }
 
   /* ---- تعبئة نموذج البيان العام ---- */
   function setSel(sel, value, label) {
@@ -113,8 +172,8 @@
   function review(B) {
     const rows = siteRows(); const missing = [], extra = []; let matched = 0;
     const used = new Set();
-    const renamed = [], noDiff = [];
-    (B.lines || []).forEach((L) => { const r = matchRow(L, rows.filter((x) => !used.has(x))); if (r) { matched++; used.add(r); if (r.name !== norm(L.teacher_name)) renamed.push(r.name + ' ⇐ ' + L.teacher_name); const pn = digits(L.teacher_no); if ((r.no || pn) && r.no !== pn) noDiff.push({ name: L.teacher_name, site: r.no, prog: pn, key: L.key || '' }); } else missing.push(L.teacher_name + (L.teacher_no ? ' (' + L.teacher_no + ')' : '')); });
+    const renamed = [], noDiff = [], doubt = []; const as = assign(B.lines || [], rows); const heldRows = new Set(as.hold.filter(Boolean));
+    (B.lines || []).forEach((L, i) => { const r = as[i]; if (r) { matched++; used.add(r); if (r.name !== norm(L.teacher_name)) renamed.push(r.name + ' ⇐ ' + L.teacher_name); const pn = digits(L.teacher_no); if ((r.no || pn) && r.no !== pn) noDiff.push({ name: L.teacher_name, site: r.no, prog: pn, key: L.key || '' }); } else if (as.hold[i]) doubt.push(L.teacher_name + ' ↔ ' + as.hold[i].name); else missing.push(L.teacher_name + (L.teacher_no ? ' (' + L.teacher_no + ')' : '')); });
     // 🚪 (2026-11-09 «إذا موجود بالموقع وبطّل بالبرنامج بيكون موجود السنة القبلها بالبرنامج وترك — أنت تتأكّد»): الزائد على الموقع يُشال فقط إن طابق بقوّة
     //    أستاذاً سابقاً بالبرنامج (B.gone: الرقم المالي نفسه، أو الاسم الأوّل + اسم الأب + الشهرة)؛ وغيره يبقى ويُذكر.
     const gone = [], unknown = []; const usedG = new Set();
@@ -123,8 +182,9 @@
     rows.forEach((r) => { if (used.has(r)) return; const label = r.name + (r.no ? ' (' + r.no + ')' : ''); extra.push(label);
       const c = (B.gone || []).filter((g) => !usedG.has(g) && strong(g, r));
       const isCurrent = (B.lines || []).some((L) => strong(L, r));   // 🛡️ يشبه أستاذاً حالياً بالبرنامج ⇒ لا يُشال أبداً
-      if (c.length === 1 && r.lineId && !isCurrent) { usedG.add(c[0]); gone.push({ lineId: r.lineId, name: label, why: c[0].why }); } else unknown.push(label); });
-    return { rows, matched, missing, extra, renamed, noDiff, gone, unknown };
+      if (c.length === 1 && r.lineId && !isCurrent && !heldRows.has(r)) { usedG.add(c[0]); gone.push({ lineId: r.lineId, name: label, why: c[0].why }); } else unknown.push(label); });
+    const pend = pendPlan(B.lines || [], rows, pendingRows());
+    return { rows, matched, missing, extra, renamed, noDiff, gone, unknown, doubt, pend };
   }
   function pageMatchesKind(B) { const p = page(); return (B.kind === 'general' && p === 'roster') || (B.kind === 'financial' && p === 'financial'); }
 
@@ -137,29 +197,80 @@
     const c = document.getElementById('msa-eoc-close'); if (c) c.onclick = () => b.remove();
   }
 
+  /* 🔎 تحقّق آخر التعبئة (يُكتب بالشريط): كل أساتذة البرنامج لهم سطر بالقائمة، لا سطر مكرّر (برقم مالي أو باسم + اسم أب)، ولا أحد عالق بقسم «أساتذة جدد» */
+  function verifyFinal(lines) {
+    const rows = siteRows(); const as = assign(lines || [], rows); const bad = [];
+    const miss = (lines || []).filter((L, i) => !as[i] && !as.hold[i]).map((L) => L.teacher_name); const held = (lines || []).filter((L, i) => !as[i] && as.hold[i]).map((L) => L.teacher_name);
+    const seen = new Set(); const dups = [];
+    rows.forEach((r) => { const k1 = r.no ? 'n:' + r.no : ''; const k2 = 'm:' + r.name + '|' + skel(r.father || ''); if ((k1 && seen.has(k1)) || seen.has(k2)) dups.push(r.name); if (k1) seen.add(k1); seen.add(k2); });
+    const pend = pendingRows().length;
+    if (miss.length) bad.push(miss.length + ' من البرنامج ليسوا بالقائمة: ' + miss.join('، '));
+    if (held.length) bad.push(held.length + ' معلَّقون للمراجعة: ' + held.join('، '));
+    if (dups.length) bad.push(dups.length + ' سطراً مكرّراً: ' + dups.join('، '));
+    if (pend) bad.push(pend + ' عالقون بقسم «أساتذة جدد»');
+    return bad.length ? ' ⚠ تحقّق: ' + bad.join(' · ') : ' 🔎 تحقّق: أساتذة البرنامج الـ' + (lines || []).length + ' كلّهم بالقائمة (' + rows.length + ' سطراً) بلا تكرار ✓';
+  }
+
   /* ---- الترحيل التلقائي: طابور بـchrome.storage يتابع بعد كل إعادة تحميل ---- */
   async function autoStep(Q) {
     if (!Q || !Q.lines || baseUrl() !== Q.base) return;
+    // 🔎 لائحة مفلترة ⇒ ارجع إلى اللائحة الكاملة (مع إبقاء نموذج التعديل المفتوح)؛ إن بقيت مفلترة ⇒ توقّف بلا أيّ إضافة
+    if (siteFiltered()) {
+      const e0 = new URL(location.href).searchParams.get('edit') || '';
+      if ((Q.unf || 0) >= 2) { await chrome.storage.local.set({ eocAuto: null }); banner('⛔ توقّفت التعبئة: لائحة الأساتذة هنا معروضة جزئياً (فلتر) ولم تنفتح كاملة — ما حُفظ بقي محفوظاً. افتح البيان من «البيان العام» واكبس من جديد.', false); return; }
+      Q.unf = (Q.unf || 0) + 1; await chrome.storage.local.set({ eocAuto: Q }); location.href = Q.base + (e0 ? '?edit=' + encodeURIComponent(e0) : ''); return;
+    }
+    Q.unf = 0;
+    // 🧯 سلك الأمان (2026-11-09 «ما عاد اتحمّل أخطاء»): قبل كل إرسال نسجّل عدد القائمة وعدد «أساتذة جدد» والعملية؛ بعد رجوع الصفحة، إن لم يتغيّر العددان كما تفرضه العملية
+    //    (الموقع رفض، أو تصرّف بشكل لم نحسبه) ⇒ توقّف فوراً عند أوّل سطر — الضرر الأقصى سطر واحد لا لائحة كاملة.
+    if (Q.expect) {
+      const e = Q.expect; const m = siteRows().length, p = pendingRows().length; Q.expect = null;
+      const okX = e.op === 'add' ? ((m === e.m && p === e.p + 1) || (m === e.m + 1 && p === e.p)) : e.op === 'edit' ? (m === e.m && p === e.p) : e.op === 'pdel' ? (m === e.m && p === e.p - 1)
+        : e.op === 'padd' ? (p === 0 && m === e.m + e.k) : e.op === 'gdel' ? (m === e.m - 1 && p === e.p) : true;
+      if (!okX) { await chrome.storage.local.set({ eocAuto: null });
+        banner('⛔ توقّفت التعبئة عند «' + esc(e.who) + '»: الموقع ما تصرّف متل المتوقَّع بعد ' + ({ add: 'إضافة أستاذ', edit: 'تعديل سطر', pdel: 'شيل مكرّر من «أساتذة جدد»', padd: 'ضمّ الجدد إلى القائمة', gdel: 'شيل مَن ترك' }[e.op] || e.op)
+          + ' (القائمة ' + e.m + ' ⇐ ' + m + ' · أساتذة جدد ' + e.p + ' ⇐ ' + p + '). ما حُفظ قبلها بقي كما هو ولم يُكمَل شيء بعدها — خبّر المبرمج قبل أيّ كبسة.', false); return; }
+    }
+    const expect = (op, who, k) => { Q.expect = { op, who: String(who || ''), m: siteRows().length, p: pendingRows().length, k: k || 0 }; };
     const total = Q.lines.length;
     if (Q.idx >= total) {
+      // 🕓 قسم «أساتذة جدد» (الموقع يحفظ الأستاذ المضاف هناك أوّلاً ولا يُحتسب قبل ضمّه): المكرّر عن القائمة يُشال سطراً سطراً، ثمّ الجدد يُضمّون بكبسة الموقع نفسها «إضافة إلى القائمة»
+      if (Q.kind === 'general' && !Q.pendDone) {
+        const plan = pendPlan(Q.all || Q.lines, siteRows(), pendingRows()); const save = () => chrome.storage.local.set({ eocAuto: Q });
+        if (plan.dup.length) {
+          if (new URL(location.href).searchParams.get('edit')) { await save(); location.href = Q.base; return; }
+          const d = plan.dup[0]; const df = d.lineId ? document.querySelector('#sp-pending form[action*="/line/' + d.lineId + '/delete"]') : null;
+          if (df && (Q.pdel || 0) < 80) { Q.pdel = (Q.pdel || 0) + 1; expect('pdel', d.name); await save(); banner('🧹 شيل المكرّر من «أساتذة جدد» (' + plan.dup.length + ' باقي) — ' + d.name, true); await sleep(250); HTMLFormElement.prototype.submit.call(df); return; }
+          Q.errors.push('بقي ' + plan.dup.length + ' مكرّراً بقسم «أساتذة جدد» لم يُشل — لا تكبس «إضافة إلى القائمة» قبل شيلهم');
+        } else if (plan.keep.length && !plan.foreign.length && !Q.padd) {
+          const af = document.querySelector('#sp-pending form[action*="/pending/add"]');
+          if (af) { Q.padd = plan.keep.length; expect('padd', 'أساتذة جدد', plan.keep.length); await save(); banner('➕ ضمّ ' + plan.keep.length + ' أستاذاً جديداً إلى القائمة…', true); await sleep(250); HTMLFormElement.prototype.submit.call(af); return; }
+        }
+        if (!plan.dup.length && (plan.keep.length || plan.foreign.length)) Q.errors.push('بقي بقسم «أساتذة جدد» ' + (plan.keep.length + plan.foreign.length) + (plan.foreign.length ? ' (منهم ' + plan.foreign.length + ' ليسوا من لائحة البرنامج)' : '') + ' — راجعهم واكبس «إضافة إلى القائمة» بيدك');
+        Q.pendDone = 1; await save();
+      }
       // 🚪 بعد التعبئة: شيل مَن تركوا (المثبَتون بالبرنامج) سطراً سطراً — نموذج الحذف نفسه الذي بالموقع
       if (Q.del && (Q.delIdx || 0) < Q.del.length) {
         if (new URL(location.href).searchParams.get('edit')) { await chrome.storage.local.set({ eocAuto: Q }); location.href = Q.base; return; }
         const d = Q.del[Q.delIdx || 0]; Q.delIdx = (Q.delIdx || 0) + 1;
         const df = document.querySelector('form[action*="/line/' + d.lineId + '/delete"]');
         if (!df) { Q.errors.push(d.name + ' (لم يُعثر على سطره لشيله)'); await chrome.storage.local.set({ eocAuto: Q }); return autoStep(Q); }
-        Q.deleted = (Q.deleted || 0) + 1; await chrome.storage.local.set({ eocAuto: Q });
+        Q.deleted = (Q.deleted || 0) + 1; expect('gdel', d.name); await chrome.storage.local.set({ eocAuto: Q });
         banner('🚪 شيل مَن ترك ' + Q.delIdx + ' / ' + Q.del.length + ' — ' + d.name + ' (' + d.why + ')', true);
         await sleep(250); HTMLFormElement.prototype.submit.call(df); return;
       }
       await chrome.storage.local.set({ eocAuto: null });
-      banner('✅ انتهت التعبئة من برنامج الرواتب: ' + Q.done + ' سطراً حُفظ' + (Q.deleted ? ' · ' + Q.deleted + ' شِيل (ترك)' : '') + (Q.note || '') + (Q.errors.length ? ' · ' + Q.errors.length + ' لم يتمّ: ' + Q.errors.join('؛ ') : '') + ' — راجع الجدول. البيان ما زال مفتوحاً للتعديل.', false); return;
+      banner('✅ انتهت التعبئة من برنامج الرواتب: ' + Q.done + ' سطراً حُفظ' + (Q.pdel ? ' · ' + Q.pdel + ' مكرّراً شِيل من «أساتذة جدد»' : '') + (Q.padd ? ' · ' + Q.padd + ' جديداً ضُمّ إلى القائمة' : '') + (Q.deleted ? ' · ' + Q.deleted + ' شِيل (ترك)' : '') + (Q.note || '') + (Q.errors.length ? ' · ' + Q.errors.length + ' لم يتمّ: ' + esc(Q.errors.join('؛ ')) : '') + ' —' + esc(verifyFinal(Q.all || Q.lines)) + ' البيان ما زال مفتوحاً للتعديل.', false); return;
     }
     const L = Q.lines[Q.idx];
     banner('⏳ تعبئة من برنامج الرواتب ' + (Q.idx + 1) + ' / ' + total + ' — ' + L.teacher_name + (Q.errors.length ? ' · أخطاء: ' + Q.errors.length : ''), true);
-    const rows = siteRows(); const existing = matchRow(L, rows);
+    const rows = siteRows(); const existing = rowFor(L, Q.all || Q.lines, rows);
     const url = new URL(location.href); const curEdit = url.searchParams.get('edit') || '';
     const finish = async (ok, why) => { Q.idx++; if (ok) Q.done++; else Q.errors.push(L.teacher_name + (why ? ' (' + why + ')' : '')); await chrome.storage.local.set({ eocAuto: Q }); };
+    // 🕓 ليس بالقائمة لكنّه محفوظ بقسم «أساتذة جدد» ⇒ لا يُضاف مرّة ثانية (يُضمّ بآخر التعبئة)
+    if (!existing && Q.kind === 'general' && pendingRows().some((p) => strictSame(L, p))) { await finish(true, ''); return autoStep(Q); }
+    const held = existing ? null : holdFor(L, Q.all || Q.lines, rows);   // 🎂 معلَّق: لا تعديل ولا إضافة
+    if (held) { await finish(false, 'لم يُمسّ: اسمه قريب من «' + held.name + '» على الموقع وتاريخ الولادة مختلف — راجعه بيدك'); return autoStep(Q); }
     if (existing && Q.mode !== 'all') { await finish(true, ''); return autoStep(Q); } // موجود ⇒ تخطَّ
     if (existing && Q.mode === 'all') {
       if (!existing.lineId) { await finish(false, 'لا رابط تعديل'); return autoStep(Q); }
@@ -174,6 +285,7 @@
     const bad = res.notes.find((x) => /غير موجود عند الصندوق|معطّل|مقفل/.test(x));
     if (bad) { await finish(false, bad); return autoStep(Q); }
     if (!f.checkValidity()) { const inv = f.querySelector(':invalid'); await finish(false, 'خانة ناقصة: ' + (inv ? (inv.name || inv.id) : '؟')); if (inv) f.reportValidity(); return autoStep(Q); }
+    expect(existing ? 'edit' : 'add', L.teacher_name);
     Q.idx++; Q.done++; await chrome.storage.local.set({ eocAuto: Q }); // نحسبه محفوظاً قبل الإرسال كي لا يتكرّر لو أعاد الموقع الصفحة بخطأ
     await sleep(250);
     if (f.requestSubmit) f.requestSubmit(); else f.submit();
@@ -194,7 +306,8 @@
     b.style.cssText = 'direction:rtl;text-align:right;background:#eef7f3;border:2px solid #1F4E5F;border-radius:10px;padding:12px 16px;margin:0 0 14px;font:600 14px/1.7 "Noto Sans Arabic",Tahoma,Arial;color:#12303a';
     host.parentNode.insertBefore(b, host.nextSibling); return b;
   }
-  const BTN = 'border:0;border-radius:8px;padding:10px 20px;font:700 15px "Noto Sans Arabic",Tahoma,Arial;cursor:pointer;margin-inline-end:8px';
+  // 🔴 بلا علامات " داخل النصّ: يوضع داخل style="…" فتقطعه (كانت الكبسات تطلع باهتة بلا لون)
+  const BTN = 'border:0;border-radius:8px;padding:10px 20px;font:700 15px Noto Sans Arabic,Tahoma,Arial;cursor:pointer;margin-inline-end:8px';
   function barIdle(note) {
     const b = bar();
     b.innerHTML = '<button id="msa-eoc-go" style="' + BTN + ';background:#1F4E5F !important;color:#fff !important">⬇ عبّي هذا البيان من برنامج الرواتب</button>'
@@ -206,6 +319,14 @@
     const b = bar(); const no = siteSchoolNo(); const per = sitePeriod(); const kind = page() === 'roster' ? 'general' : 'financial';
     if (!no || !per) { barIdle('<span style="color:#b3261e">ما قدرت إقرا رقم المدرسة أو ' + (kind === 'general' ? 'السنة' : 'الفصل') + ' من الصفحة.</span>'); return; }
     // لائحة الموقع على أكثر من صفحة: المطابقة ترى الصفحة الحالية فقط ⇒ خطر تكرار الأساتذة — لا ترحيل تلقائي
+    // 🔎 لائحة مفلترة (ملاك فقط/متعاقدين فقط) ⇒ افتح اللائحة الكاملة وكمّل لحالك (مرّة واحدة)
+    if (siteFiltered()) {
+      let tried = ''; try { tried = sessionStorage.getItem('msaEocGo') || ''; } catch (e) {}
+      if (tried === 'tried') { try { sessionStorage.removeItem('msaEocGo'); } catch (e) {} barIdle('<span style="color:#b3261e">⛔ لائحة الأساتذة هنا معروضة جزئياً (فلتر أو بحث) — افتح البيان من «البيان العام» بلا فلتر واكبس من جديد.</span>'); return; }
+      try { sessionStorage.setItem('msaEocGo', '1'); } catch (e) {}
+      b.innerHTML = '⏳ اللائحة معروضة جزئياً — عم افتح اللائحة الكاملة…'; location.href = baseUrl(); return;
+    }
+    try { sessionStorage.removeItem('msaEocGo'); } catch (e) {}
     if (document.querySelector('a[href*="page=2"]')) { barIdle('<span style="color:#b3261e">⛔ لائحة الأساتذة هنا على أكثر من صفحة — التعبئة بكبسة واحدة غير متاحة لها بعد (حتى لا يتكرّر أحد). خبّر المبرمج.</span>'); return; }
     b.innerHTML = '⏳ عم جيب بيان المدرسة رقم ' + esc(no) + ' (' + esc(per) + ') من برنامج الرواتب…';
     let res;
@@ -227,17 +348,21 @@
       + (rv.renamed.length ? '<div style="font-weight:500;color:#1F4E5F">✎ أسماء مكتوبة هنا بشكل مختلف — تتصحّح كالبرنامج: ' + esc(rv.renamed.join(' · ')) + '</div>' : '')
       + '</div>'
       + (rv.gone.length ? '<div style="font-weight:500;color:#b3261e">🚪 على الموقع وتركوا المدرسة بحسب البرنامج — يُشالون من هنا (' + rv.gone.length + '): ' + esc(rv.gone.map((g) => g.name + ' — ' + g.why).join(' · ')) + '</div>' : '')
+      + (rv.pend.dup.length + rv.pend.keep.length + rv.pend.foreign.length ? '<div style="font-weight:700;color:#8a5a00">🕓 بقسم «أساتذة جدد» (ناطرين) ' + (rv.pend.dup.length + rv.pend.keep.length + rv.pend.foreign.length) + ': '
+          + [rv.pend.dup.length ? rv.pend.dup.length + ' مكرّرين عن القائمة — يُشالون' : '', rv.pend.keep.length ? rv.pend.keep.length + ' جدد من البرنامج — يُضمّون إلى القائمة' : '', rv.pend.foreign.length ? rv.pend.foreign.length + ' ليسوا من لائحة البرنامج — لا يُمسّون (' + esc(rv.pend.foreign.map((p) => p.name).join('، ')) + ')' : ''].filter(Boolean).join(' · ') + '</div>' : '')
+      + (rv.doubt.length ? '<div style="font-weight:700;color:#b3261e">✋ اسم قريب من سطر هنا لكن تاريخ الولادة مختلف — لا يُعدَّل ولا يُضاف، راجعه بيدك (' + rv.doubt.length + '): ' + esc(rv.doubt.join(' · ')) + '</div>' : '')
       + (rv.unknown.length ? '<div style="font-weight:500;color:#8a5a00">❔ على الموقع ولا أثر لهم بالبرنامج — لا يُمسّون (' + rv.unknown.length + '): ' + esc(rv.unknown.join('، ')) + '</div>' : '')
       + (incomplete.length ? '<div style="font-weight:500;color:#b3261e">⚠ ' + incomplete.length + ' بياناتهم ناقصة بالبرنامج وقد يرفضهم الموقع: ' + esc(incomplete.map((x) => x.teacher_name).join('، ')) + '</div>' : '')
       + '<div style="margin-top:8px"><button id="msa-eoc-start" style="' + BTN + ';background:#1e7a4f !important;color:#fff !important">✔ ابدأ التعبئة (' + B.lines.length + ')</button><button id="msa-eoc-cancel" style="' + BTN + ';background:#5f697a !important;color:#fff !important">إلغاء</button></div>';
     document.getElementById('msa-eoc-cancel').onclick = () => barIdle('');
     document.getElementById('msa-eoc-start').onclick = async () => {
       let fixedNote = '';
-      const fix = (rv.noDiff || []).filter((d) => d.site && /^\d+$/.test(String(d.key)));   // رقم الموقع موجود والبرنامج مختلف/فارغ ⇒ البرنامج يصير كالموقع
+      // رقم الموقع موجود والبرنامج مختلف/فارغ ⇒ البرنامج يصير كالموقع — إلا إذا الرقم نفسه مسجَّل بالبرنامج لأستاذ آخر بهذا البيان (شخصان مختلفان)
+      const fix = (rv.noDiff || []).filter((d) => d.site && /^\d+$/.test(String(d.key)) && !(B.lines || []).some((x) => String(x.key) !== String(d.key) && digits(x.teacher_no) === d.site));
       if (fix.length && B.csrf && kind === 'general') {
         b.innerHTML = '⏳ عم صحّح بالبرنامج ' + fix.length + ' رقماً ماليّاً ليصير كالموقع…';
         let fr = null; try { fr = await chrome.runtime.sendMessage({ target: 'bg', action: 'siteNumbers', base: res.base, csrf: B.csrf, path: 'pages/eoc_portal.php?tab=general&period=' + per + '&caisse_no=' + no, items: fix.map((d) => ({ key: String(d.key), no: String(d.site) })) }); } catch (e) { fr = null; }
-        fixedNote = fr && fr.ok ? ' · صُحّح بالبرنامج ' + (fr.updated || 0) + ' رقماً ماليّاً كالموقع' : ' · ⚠ لم تُصحَّح أرقام البرنامج (' + esc((fr && fr.msg) || 'لا جواب') + ') — أرقام الموقع لم تُمسّ';
+        fixedNote = fr && fr.ok ? ' · صُحّح بالبرنامج ' + (fr.updated || 0) + ' رقماً ماليّاً كالموقع' + (fr.skipped ? ' (' + fr.skipped + ' لم يُنقل: الرقم عند أستاذ آخر بالبرنامج)' : '') :' · ⚠ لم تُصحَّح أرقام البرنامج (' + esc((fr && fr.msg) || 'لا جواب') + ') — أرقام الموقع لم تُمسّ';
       }
       const Q = { base: baseUrl(), kind: B.kind, period: B.period, mode: 'all', lines: B.lines.slice(), idx: 0, done: 0, errors: [], started: Date.now(), del: (rv.gone || []).slice(), delIdx: 0, deleted: 0, note: fixedNote };
       await chrome.storage.local.set({ eocAuto: Q, eocStmt: B });
@@ -248,7 +373,10 @@
   function initBar() {
     const p = page(); if (p !== 'roster' && p !== 'financial') return;
     if (siteLocked()) return;   // بيان معتمد/مقفل: لا كبسة
-    chrome.storage.local.get(['eocAuto'], (st) => { if (st && st.eocAuto && st.eocAuto.base === baseUrl()) return; barIdle(''); });   // ترحيل جارٍ ⇒ الشريط العلوي يكفي
+    chrome.storage.local.get(['eocAuto'], (st) => { if (st && st.eocAuto && st.eocAuto.base === baseUrl()) return; barIdle('');   // ترحيل جارٍ ⇒ الشريط العلوي يكفي
+      let go = ''; try { go = sessionStorage.getItem('msaEocGo') || ''; } catch (e) {}
+      if (go === '1') { try { sessionStorage.setItem('msaEocGo', 'tried'); } catch (e) {} oneClick(); }   // رجعنا من لائحة مفلترة ⇒ كمّل الكبسة تلقائياً
+    });
   }
   try { initBar(); } catch (e) { /* لا تكسر الصفحة */ }
 
@@ -271,17 +399,20 @@
       if (!f2) return { title: head, filled: n, notes: ['لا نموذج مفتوح — اكبس «+ إضافة» على الموقع أو ✎ لتعديل سطر، ثمّ أعد التعبئة'] };
       // أيّ أستاذ؟ نموذج تعديل ⇒ صاحب السطر؛ نموذج إضافة ⇒ المختار من النافذة أو أوّل ناقص
       let L = null; const curEdit = new URL(location.href).searchParams.get('edit') || (byName('line_id', f2) || {}).value || '';
-      if (curEdit) { const r = rv.rows.find((x) => x.lineId === curEdit); if (r) L = (B.lines || []).find((x) => matchRow(x, [r])); if (!L) notes.push('سطر التعديل المفتوح لا يطابق أيّ أستاذ بالبرنامج'); }
+      const as = assign(B.lines || [], rv.rows);
+      if (curEdit) { const r = rv.rows.find((x) => x.lineId === curEdit); if (r) L = (B.lines || [])[as.indexOf(r)] || null; if (!L) notes.push('سطر التعديل المفتوح لا يطابق أيّ أستاذ بالبرنامج'); }
       else if (msg.pick !== undefined && msg.pick !== null && B.lines[msg.pick]) L = B.lines[msg.pick];
-      else { const miss = (B.lines || []).filter((x) => !matchRow(x, rv.rows)); L = miss[0] || null; if (!L) notes.push('كل أساتذة البرنامج موجودون على الموقع — اختر أستاذاً من النافذة لتعبئته'); }
+      else { const miss = (B.lines || []).filter((x, i) => !as[i] && !as.hold[i]); L = miss[0] || null; if (!L) notes.push('كل أساتذة البرنامج موجودون على الموقع — اختر أستاذاً من النافذة لتعبئته'); }
       if (!L) return { title: head, filled: n, notes };
       const res = B.kind === 'general' ? fillRoster(f2, L, !!curEdit) : await fillFinancial(f2, L);
       return { title: head, filled: n + res.filled, who: L.teacher_name, notes: notes.concat(res.notes), next: 'راجع الخانات ثمّ اكبس «حفظ» على الموقع.' };
     }
     if (msg.action === 'auto') {
-      const lines = msg.mode === 'all' ? B.lines.slice() : B.lines.filter((x) => !matchRow(x, rv.rows));
+      if (siteFiltered()) return { title: head, notes: ['لائحة الأساتذة على الموقع معروضة جزئياً (ملاك فقط / متعاقدين فقط / بحث) — افتحها كاملة بلا فلتر ثمّ أعد المحاولة، حتى لا يتكرّر أحد'] };
+      const as2 = assign(B.lines || [], rv.rows);
+      const lines = msg.mode === 'all' ? B.lines.slice() : B.lines.filter((x, i) => !as2[i]);
       if (!lines.length) return { title: head, notes: ['لا شيء للترحيل — كل الأساتذة موجودون على الموقع'] };
-      const Q = { base: baseUrl(), kind: B.kind, period: B.period, mode: msg.mode === 'all' ? 'all' : 'missing', lines, idx: 0, done: 0, errors: [], started: Date.now() };
+      const Q = { base: baseUrl(), kind: B.kind, period: B.period, mode: msg.mode === 'all' ? 'all' : 'missing', lines, all: B.lines.slice(), idx: 0, done: 0, errors: [], started: Date.now() };
       await chrome.storage.local.set({ eocAuto: Q });
       setTimeout(() => autoStep(Q), 300);
       return { title: head, notes: ['بدأ الترحيل التلقائي لـ' + lines.length + ' سطراً — تابع الشريط أعلى الصفحة؛ «إيقاف» يوقفه بأيّ لحظة'] };

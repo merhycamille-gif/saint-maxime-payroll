@@ -63,18 +63,31 @@
       const hids = tr.querySelectorAll('input[type=hidden][name$=".IsPrimary"], input[type=hidden][name$=".IsSecondary"], input[type=hidden][name$=".IsNotExistInSchool"]'); hids.forEach((h, i) => { h.value = i === idx ? 'true' : 'false'; }); });
   }
   function staffTable(id) { return document.getElementById(id); }
-  function matchRow(table, emp) { // بمعرّف الموظف (FundId) ثمّ بالاسم المطبَّع ثمّ بأوّل كلمتين
+  /* 🤝 (2026-11-09، بعد حادثة مطابقة صندوق التعويضات بالفرزل — «عم نشتغل مع الدولة مع أرزاق الناس»): مطابقة جدول الموظفين كلّه معاً على مراحل:
+     معرّف الموظف (FundId) عند الجميع أوّلاً، ثمّ الاسم الحرفي، ثمّ أوّل كلمتين، ثمّ هيكل الاسم (اندره/اندريه…). الضمانات:
+     · سطر الموقع لا يأخذه موظفان (كان الثاني يكتب فوق الأوّل) · سطر معرّفه لموظف آخر بالموازنة لا يُعطى لغيره ·
+     · معرّف البرنامج ≠ معرّف السطر ⇒ لا تعبئة · أكثر من مرشّح ⇒ لا تعبئة. كل حالة شكّ تُذكر بالملاحظات ولا تُعبَّأ. تُرجع سطر الموقع لكل موظف (أو null). */
+  function assignStaff(table, emps, allIds) {
     const rows = Array.from(table.querySelectorAll('tbody tr')).filter((tr) => tr.querySelector('input[name$=".Name"]'));
-    const idv = norm(emp.mehe_id); const nm = norm(emp.name);
-    const rn = (r) => norm((r.querySelector('input[name$=".Name"]') || {}).value);
-    let tr = idv ? rows.find((r) => norm((r.querySelector('input[name$=".FundId"]') || {}).value) === idv) : null;
-    if (!tr) tr = rows.find((r) => rn(r) === nm);
-    if (!tr) { const k2 = nm.split(' ').slice(0, 2).join(' '); const c = rows.filter((r) => rn(r).indexOf(k2) === 0); if (c.length === 1) tr = c[0]; }
-    if (!tr) { // هيكل الاسم بلا حروف العلّة (اندره/اندريه، جما/جمّا…) — مرشّح واحد فقط
-      const sk = (s) => norm(s).replace(/[اويءآ]/g, ''); const want = sk(nm); const c = rows.filter((r) => sk(rn(r)) === want); if (c.length === 1) tr = c[0];
-    }
-    return tr || null;
+    const rn = (r) => norm((r.querySelector('input[name$=".Name"]') || {}).value); const rid = (r) => norm((r.querySelector('input[name$=".FundId"]') || {}).value);
+    const sk = (s) => norm(s).replace(/[اويءآ]/g, '');
+    const res = (emps || []).map(() => null); const used = new Set();
+    const free = (r, idv) => { if (used.has(r)) return false; const x = rid(r); if (!x) return true; return idv ? x === idv : !allIds.has(x); };
+    const passes = [
+      (idv) => (idv ? rows.filter((r) => !used.has(r) && rid(r) === idv) : []),
+      (idv, nm) => (nm ? rows.filter((r) => free(r, idv) && rn(r) === nm) : []),
+      (idv, nm) => { if (!nm) return []; const k2 = nm.split(' ').slice(0, 2).join(' '); return rows.filter((r) => free(r, idv) && rn(r).indexOf(k2) === 0); },
+      (idv, nm) => (nm ? rows.filter((r) => free(r, idv) && sk(rn(r)) === sk(nm)) : []),
+    ];
+    passes.forEach((pass) => (emps || []).forEach((e, i) => { if (res[i]) return; const c = pass(norm(e.mehe_id), norm(e.name)); if (c.length === 1) { res[i] = c[0]; used.add(c[0]); } }));
+    (emps || []).forEach((e, i) => { if (res[i]) return; const idv = norm(e.mehe_id), nm = norm(e.name);
+      const same = rows.filter((r) => rn(r) === nm);
+      if (same.length > 1) notes.push('✋ ' + e.name + ': الاسم مكرّر على الموقع (' + same.length + ' أسطر) — لم يُعبَّأ، عبّه بيدك');
+      else if (same.length === 1 && idv && rid(same[0]) && rid(same[0]) !== idv) notes.push('✋ ' + e.name + ': معرّف الموظف بالبرنامج (' + idv + ') غير المعرّف على الموقع (' + rid(same[0]) + ') — لم يُعبَّأ، راجعه');
+      else if (same.length === 1 && used.has(same[0])) notes.push('✋ ' + e.name + ': سطره على الموقع أخذه موظف آخر بنفس الاسم/المعرّف — لم يُعبَّأ، راجعه'); });
+    return res;
   }
+  const staffIds = (b) => { const s = new Set(); ['tit', 'con', 'adm'].forEach((k) => ((b.staff || {})[k] || []).forEach((e) => { const v = norm(e.mehe_id); if (v) s.add(v); })); return s; };
   const setSfx = (tr, sfx, v) => setVal(tr.querySelector('input[name$=".' + sfx + '"]'), v);
   const selSfx = (tr, sfx, label, opt) => { const el = tr.querySelector('select[name$="' + sfx + '"]'); if (el && label) setSelect(el, label, opt || {}); };
   // قوائم الصفّ تُعرَف بمحتواها لا بترتيبها (ترتيب PickListItems[n] يختلف من صفّ لآخر على المنصّة): القائمة التي فيها «أستاذ \ معلم» هي الدور…
@@ -85,19 +98,20 @@
     if (el) setSelect(el, lab, opt || {}); else notes.push('قائمة «' + kind + '» غير موجودة بصفّ ' + ((tr.querySelector('input[name$=".Name"]') || {}).value || '')); };
   function fillStaff(b) {
     const T = staffTable('permanentherTable'); const C = staffTable('conractedTeacherTable'); const A = staffTable('adminTeacherTable');
-    if (T) b.staff.tit.forEach((e) => { const tr = matchRow(T, e); if (!tr) { unmatched.push('ملاك: ' + e.name); return; } matched++;
+    const ids = staffIds(b); const mT = T ? assignStaff(T, b.staff.tit, ids) : [], mC = C ? assignStaff(C, b.staff.con, ids) : [], mA = A ? assignStaff(A, b.staff.adm, ids) : [];
+    if (T) b.staff.tit.forEach((e, i) => { const tr = mT[i]; if (!tr) { unmatched.push('ملاك: ' + e.name); return; } matched++;
       if (e.mehe_id) setSfx(tr, 'FundId', e.mehe_id);
       selKind(tr, 'role', e.role); selKind(tr, 'level', e.level, { multi: true }); selKind(tr, 'qual', e.qual);
       setSfx(tr, 'StartDate', e.cadre_date); setSfx(tr, 'WorkStartDate', e.start_date); setSfx(tr, 'WeeklyHoursPerm', e.h_cadre); setSfx(tr, 'WeeklyHoursContract', e.h_extra);
       setSfx(tr, 'BasicSalary', e.base); setSfx(tr, 'SocialAssistanceLL', e.extra_ll); setSfx(tr, 'SocialAssistanceUSD', e.extra_usd); setSfx(tr, 'RetroEffectLL', e.retro);
       setSfx(tr, 'CompensationWorkDoneAboveQuotaLL', e.missions_ll); setSfx(tr, 'CompensationWorkGreater35HoursLL', e.missions35); setSfx(tr, 'BonuseAssistanceLL', e.bonus); setSfx(tr, 'AdditionalTasksFees', e.tasks_ll);
       setSfx(tr, 'FamilyContributionLL', e.family); setSfx(tr, 'TransportationLL', e.transport); setSfx(tr, 'NSSFContributionLL', e.cnss); setSfx(tr, 'CompensationFundLL', e.fund); });
-    if (C) b.staff.con.forEach((e) => { const tr = matchRow(C, e); if (!tr) { unmatched.push('متعاقد: ' + e.name); return; } matched++;
+    if (C) b.staff.con.forEach((e, i) => { const tr = mC[i]; if (!tr) { unmatched.push('متعاقد: ' + e.name); return; } matched++;
       if (e.mehe_id) setSfx(tr, 'FundId', e.mehe_id);
       selKind(tr, 'role', e.role); selKind(tr, 'level', e.level, { multi: true }); selKind(tr, 'mode', e.mode); selKind(tr, 'nssf', e.cnss_type); selKind(tr, 'qual', e.qual);
       setSfx(tr, 'WorkStartDate', e.start_date); setSfx(tr, 'WeeklyHoursContract', e.h_cadre);
       setSfx(tr, 'BasicSalary', e.base); setSfx(tr, 'SocialAssistanceLL', e.extra_ll); setSfx(tr, 'SocialAssistanceUSD', e.extra_usd); setSfx(tr, 'BonuseAssistanceLL', e.bonus); setSfx(tr, 'AdditionalTasksFees', e.tasks_ll); setSfx(tr, 'TransportationLL', e.transport); setSfx(tr, 'NSSFContributionLL', e.cnss); });
-    if (A) b.staff.adm.forEach((e) => { const tr = matchRow(A, e); if (!tr) { unmatched.push('إداري: ' + e.name); return; } matched++;
+    if (A) b.staff.adm.forEach((e, i) => { const tr = mA[i]; if (!tr) { unmatched.push('إداري: ' + e.name); return; } matched++;
       if (e.mehe_id) setSfx(tr, 'FundId', e.mehe_id);
       selKind(tr, 'role', e.role); selKind(tr, 'adm', e.admin_type); selKind(tr, 'nssf', e.cnss_type);
       setSfx(tr, 'WorkStartDate', e.start_date); setSfx(tr, 'BasicSalary', e.base); setSfx(tr, 'SocialAssistanceLL', e.extra_ll); setSfx(tr, 'SocialAssistanceUSD', e.extra_usd); setSfx(tr, 'AdditionalTasksFees', e.tasks_ll); setSfx(tr, 'ScholarshipsLL', e.grants_ll); setSfx(tr, 'TransportationLL', e.transport); setSfx(tr, 'NSSFContributionLL', e.cnss); });
@@ -137,9 +151,10 @@
     if (!b || !b.staff) return { title: 'لا موازنة', filled: 0, matched: 0, unmatched: [], notes: ['اجلب الموازنة من البرنامج أوّلاً'] };
     if (dry) { // مراجعة فقط: مطابقة الموظفين
       const T = staffTable('permanentherTable'), C = staffTable('conractedTeacherTable'), A = staffTable('adminTeacherTable');
-      if (T) b.staff.tit.forEach((e) => { if (matchRow(T, e)) matched++; else unmatched.push('ملاك: ' + e.name); });
-      if (C) b.staff.con.forEach((e) => { if (matchRow(C, e)) matched++; else unmatched.push('متعاقد: ' + e.name); });
-      if (A) b.staff.adm.forEach((e) => { if (matchRow(A, e)) matched++; else unmatched.push('إداري: ' + e.name); });
+      const ids = staffIds(b);
+      if (T) { const m = assignStaff(T, b.staff.tit, ids); b.staff.tit.forEach((e, i) => { if (m[i]) matched++; else unmatched.push('ملاك: ' + e.name); }); }
+      if (C) { const m = assignStaff(C, b.staff.con, ids); b.staff.con.forEach((e, i) => { if (m[i]) matched++; else unmatched.push('متعاقد: ' + e.name); }); }
+      if (A) { const m = assignStaff(A, b.staff.adm, ids); b.staff.adm.forEach((e, i) => { if (m[i]) matched++; else unmatched.push('إداري: ' + e.name); }); }
       if (!T && !C && !A) notes.push('هذه ليست صفحة إدخال الموازنة (لا جداول موظفين) — افتح «أرسل الآن» بموازنة السنة');
       return { title: b.school + ' — ' + b.sy + ' (مراجعة)', filled: 0, matched, unmatched: unmatched.slice(), notes: notes.slice() };
     }

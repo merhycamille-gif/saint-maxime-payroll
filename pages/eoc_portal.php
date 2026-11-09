@@ -53,17 +53,21 @@ if ($eocSiteNoReq) {
     if (empty($GLOBALS['msa_school_override']) || count($ids) !== 1) $jsonOut(['ok' => false, 'msg' => 'المدرسة غير محدّدة برقمها عند الصندوق']);
     $items = json_decode((string)($_POST['items'] ?? '[]'), true); if (!is_array($items)) $items = [];
     $own = []; foreach (eocGeneralRows($db, $ids, $period, eocLoad($db, $ids, 'general', $period)) as $r0) if (($r0['src'] ?? '') === 'auto') $own[(int)$r0['emp_id']] = true;
-    $fixed = [];
+    // 🛡️ (2026-11-09 الفرزل: رقم «ايلين الياس» كاد يُكتب على «ايلان رحمة»): رقم مسجَّل بالبرنامج لأستاذ آخر بالمدرسة لا يُنقل إلى غيره
+    $holders = []; $hq = $db->prepare("SELECT id, caisse_number FROM employees WHERE school_id = ? AND COALESCE(is_deleted, 0) = 0 AND caisse_number IS NOT NULL AND caisse_number <> ''"); $hq->execute([(int)$ids[0]]);
+    foreach ($hq->fetchAll() as $h) { $hn = preg_replace('/\D+/', '', (string)$h['caisse_number']); if ($hn !== '') $holders[$hn][] = (int)$h['id']; }
+    $fixed = []; $skipped = [];
     foreach (array_slice($items, 0, 500) as $it) {
         $eid = (int)($it['key'] ?? 0); $no = preg_replace('/\D+/', '', (string)($it['no'] ?? ''));
         if (!$eid || $no === '' || strlen($no) > 12 || empty($own[$eid])) continue;
+        if (array_diff($holders[$no] ?? [], [$eid])) { $skipped[] = ['key' => $eid, 'no' => $no]; continue; }
         $q = $db->prepare("SELECT COALESCE(caisse_number, '') FROM employees WHERE id = ? AND school_id = ?"); $q->execute([$eid, (int)$ids[0]]); $old = $q->fetchColumn();
         if ($old === false || preg_replace('/\D+/', '', (string)$old) === $no) continue;
         $db->prepare("UPDATE employees SET caisse_number = ? WHERE id = ? AND school_id = ?")->execute([$no, $eid, (int)$ids[0]]);
         try { logAudit('eoc_site_number', 'employees', $eid, ['caisse_number' => (string)$old], ['caisse_number' => $no, 'source' => 'caisseindemnite.com', 'period' => $period]); } catch (Throwable $e) {}
-        $fixed[] = ['key' => $eid, 'old' => (string)$old, 'new' => $no];
+        $fixed[] = ['key' => $eid, 'old' => (string)$old, 'new' => $no]; $holders[$no][] = $eid;
     }
-    $jsonOut(['ok' => true, 'updated' => count($fixed), 'fixed' => $fixed]);
+    $jsonOut(['ok' => true, 'updated' => count($fixed), 'fixed' => $fixed, 'skipped' => count($skipped), 'skipped_items' => $skipped]);
 }
 
 /* ===== الكتابة (POST) — كالمنصّة: حفظ ثمّ عودة إلى نفس الصفحة ===== */

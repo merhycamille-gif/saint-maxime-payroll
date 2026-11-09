@@ -11657,8 +11657,28 @@ try {
     $okGone2 = count($g2) >= 1 && $coll2 === 0 && isset($j2a['gone']) && count($j2a['gone']) === count($g2) && ($j2a['csrf'] ?? '') !== '' && isset($j2a['lines'][0]['key']) && !isset($j2c['gone']) && !isset($j2c['csrf'])
         && strpos($src2, "(string)(\$_POST['eoc_act'] ?? '') === 'site_numbers'") !== false && strpos($src2, "logAudit('eoc_site_number'") !== false && strpos($src2, 'empty($own[$eid])') !== false;
     $fn2 = (string)file_get_contents($PROJ . '/includes/header.php'); $okHeal2 = function_exists('healAblahCaisseNo20261109') && strpos($fn2, 'healAblahCaisseNo20261109();') !== false;
-    $ok302 = $okEp2 && $okExt2 && $okHeal2 && $okAuto2 && $okGone2;
-    $why302 = 'endpoint=' . (int)$okEp2 . ' ext=' . (int)$okExt2 . ' heal=' . (int)$okHeal2 . ' auto=' . (int)$okAuto2 . ' gone=' . (int)$okGone2 . '(' . count($g2) . ') lines=' . count($j2a['lines'] ?? []);
+    // 🤝🔎 (2026-11-09 الفرزل: «ايلان رحمة» بلا رقم أخذت سطر «ايلين الياس» 14861 + الصفحة مفلترة «ملاك فقط» فحُسب المتعاقدون ناقصين):
+    //    المطابقة على مراحل للّائحة كلّها (الرقم المالي عند الجميع قبل الاسم) · لائحة مفلترة ⇒ تُفتح كاملة ولا تعبئة عليها · رقم مسجَّل لأستاذ آخر لا يُنقل إلى غيره.
+    $okMatch2 = strpos($ce2, 'function assign(lines, rows)') !== false && strpos($ce2, 'const as = assign(B.lines || [], rows);') !== false && strpos($ce2, 'rowFor(L, Q.all || Q.lines, rows)') !== false
+        && strpos($ce2, 'function siteFiltered()') !== false && substr_count($ce2, 'siteFiltered()') >= 4 && strpos($ce2, "sessionStorage.setItem('msaEocGo', 'tried')") !== false
+        && strpos($ce2, 'digits(x.teacher_no) === d.site') !== false
+        && strpos($ce2, 'function bdKey(t)') !== false && strpos($ce2, 'if (a && b && a !== b) { hold[i] = c[0]; return; }') !== false && strpos($ce2, '!heldRows.has(r)') !== false && strpos($ce2, 'holdFor(L, Q.all || Q.lines, rows)') !== false   // 🎂 اسم قريب + تاريخ ولادة مختلف ⇒ معلَّق لا يُمسّ
+        && strpos($ce2, '"Noto Sans Arabic",Tahoma,Arial;cursor:pointer') === false   // 🎨 لا علامات " داخل style المضمَّن (كانت تقطع لون الكبسات)
+        && strpos($src2, 'if (array_diff($holders[$no] ?? [], [$eid])) {') !== false && strpos($src2, "'skipped' => count(\$skipped)") !== false;
+    // 🕓 (2026-11-09 الفرزل: 25 أستاذاً أُضيفوا مكرّرين): الصفحة فيها جدولان — «أساتذة جدد» (#sp-pending) قبل «قائمة الأساتذة» (#sp-list). القائمة تُقرأ من #sp-list حصراً؛
+    //    المحفوظ بقسم الجدد لا يُضاف ثانيةً؛ بآخر التعبئة المكرّر يُشال من قسم الجدد فقط والجدد يُضمّون بكبسة الموقع؛ سطر غريب هناك يمنع الضمّ التلقائي.
+    $okMatch2 = $okMatch2 && strpos($ce2, "document.querySelector('#sp-list table.sp-data')") !== false && strpos($ce2, "document.querySelector('table.sp-data')") === false
+        && strpos($ce2, 'function pendingRows()') !== false && strpos($ce2, 'function pendPlan(lines, rows, pend)') !== false && strpos($ce2, 'pendingRows().some((p) => strictSame(L, p))') !== false
+        && strpos($ce2, "'#sp-pending form[action*=\"/line/' + d.lineId + '/delete\"]'") !== false && strpos($ce2, 'plan.keep.length && !plan.foreign.length && !Q.padd') !== false;
+    // 🧯🔎 (2026-11-09 «ما عاد اتحمّل أخطاء»): سلك الأمان — بعد كل إرسال يُقارَن عدد القائمة وعدد «أساتذة جدد» بما تفرضه العملية، وأوّل مفاجأة توقف التعبئة؛ وبآخرها تحقّق مكتوب بالشريط.
+    $okMatch2 = $okMatch2 && strpos($ce2, 'if (Q.expect) {') !== false && strpos($ce2, "expect(existing ? 'edit' : 'add', L.teacher_name);") !== false && strpos($ce2, "expect('pdel', d.name)") !== false
+        && strpos($ce2, "expect('padd', 'أساتذة جدد', plan.keep.length)") !== false && strpos($ce2, "expect('gdel', d.name)") !== false && strpos($ce2, 'function verifyFinal(lines)') !== false && strpos($ce2, 'verifyFinal(Q.all || Q.lines)') !== false;
+    // 🏛️ مساعد موازنة الوزارة بنفس الضمانات (2026-11-09 «بدّي البرنامج آخذ احتياط لكل الحالات… الموازنات»): مطابقة الجدول كلّه على مراحل، سطر الموقع لا يأخذه موظفان، والشكّ لا يُعبَّأ ويُذكر
+    $cm2 = (string)file_get_contents($PROJ . '/tools/mehe_fill_extension/content.js');
+    $okMatch2 = $okMatch2 && strpos($cm2, 'function assignStaff(table, emps, allIds)') !== false && strpos($cm2, 'function matchRow(') === false && substr_count($cm2, 'assignStaff(') >= 7
+        && strpos($cm2, 'return idv ? x === idv : !allIds.has(x);') !== false && strpos($cm2, 'if (c.length === 1) { res[i] = c[0]; used.add(c[0]); }') !== false;
+    $ok302 = $okEp2 && $okExt2 && $okHeal2 && $okAuto2 && $okGone2 && $okMatch2;
+    $why302 = 'endpoint=' . (int)$okEp2 . ' ext=' . (int)$okExt2 . ' heal=' . (int)$okHeal2 . ' auto=' . (int)$okAuto2 . ' gone=' . (int)$okGone2 . '(' . count($g2) . ') match=' . (int)$okMatch2 . ' lines=' . count($j2a['lines'] ?? []);
 } catch (Throwable $e) { $ok302 = false; $why302 = $e->getMessage(); }
 check('🔘 كبسة واحدة «رحّل من برنامج الرواتب» بصفحة موقع الصندوق (2026-11-09): المدرسة تُعرَف برقمها عند الصندوق لهذا الطلب فقط · رقم غير مسجَّل ⇒ خطأ بلا بيانات · لا ترحيل إن اختلفت المدرسة/السنة أو تعدّدت صفحات اللائحة · الخلفية قراءة فقط', $ok302, $why302);
 

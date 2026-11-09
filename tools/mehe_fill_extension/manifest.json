@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "MSA — تعبئة الوزارة وصندوق التعويضات",
   "description": "يعبّئ خانات موازنة منصّة مصلحة التعليم الخاص (psb.mehe.gov.lb) وبيانات بوّابة صندوق التعويضات (caisseindemnite.com) من أرقام برنامج الرواتب MSA. الإرسال والاعتماد يبقيان بيدك على الموقع.",
-  "version": "1.3.0",
+  "version": "1.3.3",
   "icons": { "48": "icon48.png", "128": "icon128.png" },
   "action": { "default_popup": "popup.html", "default_title": "تعبئة الوزارة وصندوق التعويضات من البرنامج" },
   "background": { "service_worker": "bg.js" },
