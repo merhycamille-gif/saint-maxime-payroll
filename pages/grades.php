@@ -242,7 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['manual_add']) && $emp
         $eDate = $db->query("SELECT hire_date FROM employees WHERE id=" . (int)$employeeId)->fetchColumn();
         $y0 = $eDate ? (int)date('Y', strtotime($eDate)) : (int)date('Y') - 5;
         for ($y = $y0; $y <= (int)date('Y'); $y++) recalcEmployeeYear($employeeId, $y . '-' . ($y + 1));
-        $amtTxt = rtrim(rtrim(number_format($amt, 1), '0'), '.');
+        $amtTxt = nfc($amt, 1, true);
         $okMsg = "تمت إضافة درجة يدوية (+$amtTxt) بتاريخ $mdate — الدرجة الحالية صارت $g وأُعيد حساب الراتب (يتدرّج من بعدها).";
         if (($_POST['return_to'] ?? '') === 'employee') { $_SESSION['flash_success'] = $okMsg; }
         else { $_SESSION['flash'] = ['type' => 'success', 'msg' => $okMsg]; }
@@ -330,7 +330,7 @@ include __DIR__ . '/../includes/header.php';
                 • <strong>درجة الدخول</strong> حسب الشهادة (قسم ثاني 1 · جارديني ب.ت 6 · إجازة جامعية 6 · جارديني ت.س 11 · إجازة تعليمية 15 · كابس 16).<br>
                 • <strong>التدرّج العادي</strong>: نص درجة كل سنة من السنة التالية لدخول الملاك (= درجة كاملة كل سنتين) في 1/10. كل الشهادات تأخذ درجة عادية فورية عند دخول الملاك <strong>إلا الإجازة التعليمية</strong>.<br>
                 • <strong>الدرجات الاستثنائية</strong> تلقائياً حسب تاريخ الملاك: القدامى قوانين 244/2000 (+3)، 102/2010 (+3)، 223/2012 (+4½) وقانون 2017 (6/2/0 حسب التاريخ والشهادة)؛ الداخلون بعد 2/4/2012: 4+4+2 بكانون ثم تقديم التدرّج نص درجة. قانون 344 يدوي فقط.<br>
-                • الراتب دائماً على الدرجة الكاملة (39.5 = راتب 39)، والنص يكمّل السنة التالية. Échelle 2017 (JO n°37).
+                • الراتب دائماً على الدرجة الكاملة (39,5 = راتب 39)، والنص يكمّل السنة التالية. Échelle 2017 (JO n°37).
             </div>
             <div class="table-wrapper">
                 <table class="table">
@@ -354,8 +354,8 @@ include __DIR__ . '/../includes/header.php';
                                 <?php if (isAllSchools()): ?><td><small><?= e(schoolNameById($e['school_id'])) ?></small></td><?php endif; ?>
                                 <td><?= e(diplomaLabel($e['diploma'])) ?></td>
                                 <td><?= formatDate(shownTitularizationDate($e)) ?></td>
-                                <td><?= $e['starting_grade'] ?></td>
-                                <td><span class="badge badge-gold" style="font-size:14px"><?= $e['current_grade'] ?></span></td>
+                                <td><?= nfc($e['starting_grade'], 1, true) ?></td>
+                                <td><span class="badge badge-gold" style="font-size:14px"><?= nfc($e['current_grade'], 1, true) ?></span></td>
                                 <td><?= formatLBP($e['new_salary_2017']) ?></td>
                                 <td><?= formatLBP($e['new_grade_value']) ?></td>
                                 <td class="no-print">
@@ -407,8 +407,8 @@ include __DIR__ . '/../includes/header.php';
                     <tr><td><strong>Diplôme / الشهادة</strong></td><td><?= diplomaLabel($emp['diploma']) ?></td></tr>
                     <tr><td><strong>Entrée (école) / دخول المدرسة</strong></td><td><?= formatDate(shownHireDate($emp)) ?></td></tr>
                     <tr><td><strong>Date titularisation / تاريخ التثبيت</strong></td><td><?= formatDate(tenureReferenceDate($emp)) ?> <small class="text-muted">(منه الاستثنائية — تلقائي دخول+سنتين)</small></td></tr>
-                    <tr><td><strong>Échelon initial / الدرجة الأولية</strong></td><td><?= $emp['starting_grade'] ?></td></tr>
-                    <tr><td><strong>Échelon actuel / الدرجة الحالية</strong></td><td><span class="badge badge-gold" style="font-size:16px"><?= $emp['current_grade'] ?></span></td></tr>
+                    <tr><td><strong>Échelon initial / الدرجة الأولية</strong></td><td><?= nfc($emp['starting_grade'], 1, true) ?></td></tr>
+                    <tr><td><strong>Échelon actuel / الدرجة الحالية</strong></td><td><span class="badge badge-gold" style="font-size:16px"><?= nfc($emp['current_grade'], 1, true) ?></span></td></tr>
                     <?php if ($emp['employee_type'] === 'enseignant_titulaire'):
                         $lc = lawConsistencyCheckOne($employeeId); ?>
                     <tr>
@@ -488,7 +488,7 @@ include __DIR__ . '/../includes/header.php';
                                     </td>
                                     <td><strong><?= e($law['law_number']) ?></strong></td>
                                     <td><?= formatDate($excDate) ?> <small>(كانون الثاني)</small></td>
-                                    <td><?= $na ? '<small class="text-muted">N/A / لا ينطبق</small>' : '+' . (float)$nGrades ?></td>
+                                    <td><?= $na ? '<small class="text-muted">N/A / لا ينطبق</small>' : '+' . nfc((float)$nGrades, 1, true) ?></td>
                                     <td><small><?= e($law['description_ar'] ?: $law['description_fr']) ?></small></td>
                                 </tr>
                             <?php endforeach; ?>
@@ -563,7 +563,7 @@ include __DIR__ . '/../includes/header.php';
                         <?php foreach ($history as $h): $diff=(float)$h['grade_after']-(float)$h['grade_before']; ?>
                             <tr>
                                 <td><?= formatDate($h['change_date']) ?></td>
-                                <td><?= $h['grade_before'] ?></td><td><strong><?= $h['grade_after'] ?></strong></td>
+                                <td><?= nfc($h['grade_before'], 1, true) ?></td><td><strong><?= nfc($h['grade_after'], 1, true) ?></strong></td>
                                 <td><span class="badge badge-<?= $diff>0?'success':'warning' ?>"><?= $diff>=0?'+':'' ?><?= $diff ?></span></td>
                                 <td><small><?= e($h['notes']) ?></small></td>
                             </tr>
@@ -624,7 +624,7 @@ include __DIR__ . '/../includes/header.php';
                                 <tr<?= $r['type']==='stable' ? ' style="color:var(--gray-400)"' : '' ?>>
                                     <td><?= formatDate($r['date']) ?></td>
                                     <td><span class="badge badge-<?= $badge ?>"><?= e($lbl) ?><?= $r['law'] ? ' '.e($r['law']) : '' ?></span></td>
-                                    <td><strong><?= rtrim(rtrim(number_format($r['grade_after'],1),'0'),'.') ?></strong></td>
+                                    <td><strong><?= nfc($r['grade_after'], 1, true) ?></strong></td>
                                     <td class="text-end"><?= formatLBP($r['base'], false) ?></td>
                                     <td class="text-end text-success"><?= $r['ordinary'] ? '+'.formatLBP($r['ordinary'], false) : '—' ?></td>
                                     <td class="text-end text-info"><?= $r['exceptional'] ? '+'.formatLBP($r['exceptional'], false) : '—' ?></td>

@@ -173,7 +173,7 @@ if (!$emp):
                         <tr>
                             <td><?= formatDate($r['date']) ?></td>
                             <td><?= e($evLabels[$r['type']] ?? $r['type']) ?><?= $r['law'] ? ' <small class="text-muted">('.e($r['law']).')</small>' : '' ?></td>
-                            <td><?= rtrim(rtrim(number_format($r['grade_after'],1),'0'),'.') ?></td>
+                            <td><?= nfc($r['grade_after'], 1, true) ?></td>
                             <td class="text-end"><?= money($r['base'], null, ['withCur'=>false]) ?></td>
                             <td class="text-end"><?= $r['ordinary'] ? money($r['ordinary'], null, ['withCur'=>false]) : '—' ?></td>
                             <td class="text-end"><?= $r['exceptional'] ? money($r['exceptional'], null, ['withCur'=>false]) : '—' ?></td>

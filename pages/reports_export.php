@@ -312,7 +312,7 @@ if ($report === 'monthly_summary') {
         'social' => ['الوضع العائلي', fn($r) => $r['social_status'] . ' (' . (int)$r['number_of_children'] . ')'],
         'hire' => ['تاريخ الدخول', fn($r) => formatDate(shownHireDate($r))],
         'titul' => ['دخول الملاك', fn($r) => formatDate(shownTitularizationDate($r))],
-        'hours' => ['ساعات/أسبوع', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'], 1), '0'), '.')],
+        'hours' => ['ساعات/أسبوع', fn($r) => nfc((float)$r['hours_per_week'], 1, true)],
         'days' => ['أيام/أسبوع', fn($r) => (int)$r['days_per_week']],
         'status' => ['الحالة', fn($r) => employeeStatusLabel($r['status'])['label']],
         'gaps' => ['ملف ناقص', fn($r) => incompleteFileText($r, $db, $bonusSy)], // 🆕 (2026-09-23) نفس عمود الشاشة

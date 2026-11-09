@@ -264,7 +264,7 @@ if ($editSet) {
                     <td><?= $r['monthly_to'] !== null ? formatLBP($r['monthly_to']) : '<span class="badge badge-info">illimité / غير محدود</span>' ?></td>
                     <td><?= formatLBP($r['annual_from']) ?></td>
                     <td><?= $r['annual_to'] !== null ? formatLBP($r['annual_to']) : '<span class="badge badge-info">illimité / غير محدود</span>' ?></td>
-                    <td><strong><?= rtrim(rtrim(number_format((float)$r['rate_percent'],2),'0'),'.') ?>%</strong></td>
+                    <td><strong><?= nfc((float)$r['rate_percent'], 2, true) ?>%</strong></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

@@ -189,7 +189,7 @@ include __DIR__ . '/../includes/header.php';
 echo officialFormStyles(); // ستايلات الورقة الموحّدة + الملاءمة التلقائية للجداول الواسعة بالطباعة (--pz) كسائر التقارير
 
 $fmt0 = fn($v) => number_format((float)$v, 0);
-$fmt2 = fn($v) => number_format((float)$v, 2);
+$fmt2 = fn($v) => nfc((float)$v, 2);
 $fmtLU = fn($l, $u) => number_format((float)$l, 0) . 'LL ' . number_format((float)$u, 0) . 'USD'; // صيغة المنصّة للمجاميع المزدوجة
 // كل موظفي السنة (لقائمة المستثنين) — بمن فيهم المستثنون حالياً
 $empList = $db->prepare("SELECT DISTINCT e.id, e.school_id, CONCAT_WS(' ', e.first_name_ar, NULLIF(e.father_name_ar,''), e.last_name_ar) nm, e.employee_type FROM employees e JOIN monthly_salaries ms ON ms.employee_id = e.id AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0) WHERE e.school_id IN (" . implode(',', $ids) . ") AND e.is_deleted = 0 ORDER BY e.school_id, e.employee_type, nm"); // 🚪 (2026-09-28) أساتذة السنة فقط: صفوف صفرية منقولة لا تُدخل التارك
@@ -733,8 +733,10 @@ function meheFilterCat(sel){ var v=sel.value, sec=sel.closest('.mehe-sec'); sec.
                 cb.onchange=function(){ var vals=[]; wrap.querySelectorAll('input[type=checkbox]').forEach(function(x){ if(x.checked) vals.push(x.value); }); hid.value=vals.join('|'); }; lb.appendChild(cb); lb.appendChild(document.createTextNode(o)); wrap.appendChild(lb); });
             wrap.appendChild(hid); return wrap; }
         else if(t==='ta'){ inp=document.createElement('textarea'); inp.value=v; }
-        else { inp=document.createElement('input'); inp.type='text'; inp.value=v; if(t==='n'){ inp.inputMode='decimal'; inp.style.textAlign='center'; inp.dir='ltr'; } }
+        else { inp=document.createElement('input'); inp.type='text'; inp.value=v; if(t==='n'){ inp.inputMode='decimal'; inp.style.textAlign='center'; inp.dir='ltr'; inp.value=numClean(v); inp.dataset.v0=inp.value; } }
         inp.className='mi'; return inp; }
+    /* 🔢 (2026-11-09 «ما تحطّلي الرقم في نقطة ومن بعدو صفورا» + «إذا في كسور منحطّ فاصلة») خانة الرقم تفتح بلا «.00»، والكسر الحقيقي بفاصلة */
+    function numClean(v){ v=String(v==null?'':v).trim(); if(!/^-?\d+(\.\d+)?$/.test(v)) return v; var p=v.split('.'), f=(p[1]||'').replace(/0+$/,''); return f ? p[0]+','+f : p[0]; }
     function open(row){ row.querySelectorAll('[data-f]').forEach(function(c){ if(c.querySelector('.mi')) return; c.dataset.html=c.innerHTML; c.innerHTML=''; c.appendChild(mk(c)); });
         var f=row.querySelector('.mi:not([type=hidden])'); if(f){ f.focus(); if(f.select) f.select(); } }
     function close(row){ row.querySelectorAll('[data-f]').forEach(function(c){ if(c.dataset.html!==undefined){ c.innerHTML=c.dataset.html; delete c.dataset.html; } }); }
@@ -742,7 +744,7 @@ function meheFilterCat(sel){ var v=sel.value, sec=sel.closest('.mehe-sec'); sec.
     function changesOf(row){
         var p=row.dataset.mrow.split('|'), it={mehe_row:p.shift(), key:p.join('|'), f:{}}, changed=0, isNew=!!row.dataset.new;
         if(it.mehe_row==='months2') it.key=it.key.replace(/\|t$/,'');
-        row.querySelectorAll('[data-f]').forEach(function(c){ var i=c.querySelector('.mi'); if(!i) return; if(isNew||i.value!==c.dataset.v){ it.f[c.dataset.f]=i.value; changed++; } });
+        row.querySelectorAll('[data-f]').forEach(function(c){ var i=c.querySelector('.mi'); if(!i) return; if(isNew||i.value!==(i.dataset.v0!==undefined ? i.dataset.v0 : c.dataset.v)){ it.f[c.dataset.f]=i.value; changed++; } });
         return changed ? it : null;
     }
     /* سطر قائمة خانته الإلزامية فارغة ⇒ سيُحذف: تأكيد */
@@ -840,7 +842,7 @@ function meheFilterCat(sel){ var v=sel.value, sec=sel.closest('.mehe-sec'); sec.
             else { h+='<table class="doc-table" dir="rtl"><thead><tr><th>البند</th><th>الحالي</th><th>المقترح</th><th>الفرق</th></tr></thead><tbody>';
                 j.changes.forEach(function(c){ h+='<tr><td style="text-align:right">'+c.label+(c.field==='usd'||c.field==='fee_usd'?' ($)':'')+'</td><td style="text-align:center">'+fmt(c.old)+'</td><td style="text-align:center;font-weight:700">'+fmt(c.new)+'</td><td style="text-align:center">'+fmt(c.new-c.old)+'</td></tr>'; });
                 h+='</tbody></table>'; }
-            var a=j.after; h+='<div class="after '+(a.okBalance&&a.okRatio?'ok':'bad')+'">بعد التطبيق: الفرق '+fmt(a.diffL)+' ل.ل'+(a.diffU?' و'+fmt(a.diffU)+' $':'')+' · ج '+a.pctC+' ٪ · أ+ب '+a.pctAB+' ٪ — '+(a.okBalance&&a.okRatio?'امتثال كامل':(a.okBalance?'متوازنة لكن ج فوق 35 ٪':'ما زالت غير متوازنة'))+'</div>';
+            var a=j.after; h+='<div class="after '+(a.okBalance&&a.okRatio?'ok':'bad')+'">بعد التطبيق: الفرق '+fmt(a.diffL)+' ل.ل'+(a.diffU?' و'+fmt(a.diffU)+' $':'')+' · ج '+String(a.pctC).replace('.',',')+' ٪ · أ+ب '+String(a.pctAB).replace('.',',')+' ٪ — '+(a.okBalance&&a.okRatio?'امتثال كامل':(a.okBalance?'متوازنة لكن ج فوق 35 ٪':'ما زالت غير متوازنة'))+'</div>';
             (j.notes||[]).forEach(function(n){ h+='<div class="text-muted" style="font-size:12.5px">• '+n+'</div>'; });
             if(j.changes.length) h+='<div style="margin-top:8px"><button type="button" class="btn btn-success" onclick="meheBalApply()">✔ طبّق</button> <button type="button" class="btn btn-light" onclick="document.getElementById(\'balOut\').innerHTML=\'\'">إلغاء</button></div>';
             out.innerHTML=h;
@@ -854,8 +856,8 @@ function meheFilterCat(sel){ var v=sel.value, sec=sel.closest('.mehe-sec'); sec.
             row.querySelectorAll('[data-f] .mi').forEach(function(i){ var c=i.closest('[data-f]'); var o=parseFloat(String(c.dataset.v||'0').replace(/,/g,''))||0, n=parseFloat(String(i.value||'0').replace(/,/g,''))||0; if(c.dataset.f==='ll') sumL+=n-o; else if(c.dataset.f==='usd') sumU+=n-o; }); });
         var note=sh.querySelector('.ballive'); if(!note){ note=document.createElement('div'); note.className='ballive'; var bar=sh.querySelector('.sheetctl'); (bar&&bar.parentNode?bar.parentNode:sh).insertBefore(note, bar?bar.nextSibling:sh.firstChild); }
         var over=(sumL-BAL.cMaxL)+(sumU-BAL.cMaxU), tot=BAL.abL+BAL.abU+sumL+sumU, pct=tot>0?((sumL+sumU)/tot*100):0;
-        if(over>0.5){ note.className='ballive bad'; note.textContent='⚠️ بند ج سيصير '+pct.toFixed(2)+' ٪ — تجاوز 35 ٪ بـ '+fmt(over)+' ل.ل (أ+ب تحت 65 ٪). قلّل البند أو انقل الزيادة إلى بند د'; }
-        else { note.className='ballive ok'; note.textContent='✓ بند ج '+pct.toFixed(2)+' ٪ — ضمن 35 ٪ (المتبقّي قبل السقف '+fmt(-over)+' ل.ل)'; }
+        if(over>0.5){ note.className='ballive bad'; note.textContent='⚠️ بند ج سيصير '+pct.toFixed(2).replace('.',',').replace(/,00$/,'')+' ٪ — تجاوز 35 ٪ بـ '+fmt(over)+' ل.ل (أ+ب تحت 65 ٪). قلّل البند أو انقل الزيادة إلى بند د'; }
+        else { note.className='ballive ok'; note.textContent='✓ بند ج '+pct.toFixed(2).replace('.',',').replace(/,00$/,'')+' ٪ — ضمن 35 ٪ (المتبقّي قبل السقف '+fmt(-over)+' ل.ل)'; }
     }
     doc.addEventListener('input', function(ev){ if(!(ev.target.classList&&ev.target.classList.contains('mi'))) return; var row=ev.target.closest('[data-mrow^="exp|"]'); if(!row) return; var sh=row.closest('.doc-sheet'); if(sh) balLive(sh); });
     window.meheAddSheetRow=function(btn){ var tbl=btn.parentNode.previousElementSibling.querySelector('table'); var tpl=tbl.querySelector('tr.mtpl'); if(!tpl) return;

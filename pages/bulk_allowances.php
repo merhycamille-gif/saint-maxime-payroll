@@ -118,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
     $describeLines = function (array $valid) {
         $tl = ['prime_fixe'=>'الأجر الإضافي','aide_complementaire'=>'مكافأة ومساعدة','transport_complement'=>'نقل شهري'];
         return implode(' · ', array_map(function ($v) use ($tl) {
-            $val = $v['vt'] === 'percent' ? rtrim(rtrim(number_format($v['val'], 2, '.', ''), '0'), '.') . '٪' : number_format($v['val']) . ($v['cur'] === 'USD' ? ' $' : ' ل.ل');
+            $val = $v['vt'] === 'percent' ? nfc($v['val'], 2, true) . '٪' : number_format($v['val']) . ($v['cur'] === 'USD' ? ' $' : ' ل.ل');
             $per = ($v['from'] === 10 && $v['to'] === 9) ? 'كل السنة' : monthName($v['from'], 'ar') . ' ← ' . monthName($v['to'], 'ar');
             return $tl[$v['type']] . ' ' . $val . ' (' . $per . ')';
         }, $valid));
@@ -363,7 +363,7 @@ if ($hasScope && $preview) {
     $qp->execute([$schoolYear]);
     foreach ($qp as $r) {
         $k = ['prime_fixe'=>'prime','aide_complementaire'=>'aide','transport_complement'=>'trans'][$r['bonus_type']];
-        $indivPer[(int)$r['employee_id']][$k][] = ($r['value_type'] === 'percent' ? rtrim(rtrim(number_format((float)$r['amount'], 2), '0'), '.') . '٪' : number_format((float)$r['amount']) . ($r['currency'] === 'USD' ? ' $' : ''))
+        $indivPer[(int)$r['employee_id']][$k][] = ($r['value_type'] === 'percent' ? nfc((float)$r['amount'], 2, true) . '٪' : number_format((float)$r['amount']) . ($r['currency'] === 'USD' ? ' $' : ''))
             . ' (' . monthName((int)$r['start_month'], 'ar') . ' ← ' . monthName((int)$r['end_month'], 'ar') . ')';
     }
     foreach ($qi as $r) {
@@ -716,7 +716,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                 <tr>
                     <td><span class="ba-badge-type <?= $typeCls ?>"><?= e($typeTxt) ?></span></td>
                     <td><?php if ($isPct): ?>
-                            <span class="ba-badge-pct"><?= rtrim(rtrim(number_format((float)$al['amount'], 2), '0'), '.') ?>٪</span>
+                            <span class="ba-badge-pct"><?= nfc((float)$al['amount'], 2, true) ?>٪</span>
                             <small style="color:#64748b">من الأساس (÷<?= e(officialUsdRateLbl()) ?>)</small>
                         <?php else: ?>
                             <strong><?= $al['currency'] === 'USD' ? formatUSD($al['amount']) : formatLBP($al['amount']) ?></strong>
@@ -1134,7 +1134,7 @@ $bonusTypeLbl = ['prime_fixe'=>'➕ الأجر الإضافي / Supplément', 'a
                     <td><?= (int)$days ?></td>
                     <td><?= $td>0 ? number_format($td).' '.(($p['transport_daily_currency']??'LBP')==='USD'?'$':'ل.ل') : '—' ?></td>
                     <td><?= $monthly>0 ? formatLBP($monthly) : '—' ?></td>
-                    <td style="font-size:11px"><?= e($p['bonuses'] ?: '—') ?></td>
+                    <td style="font-size:11px"><?= e($p['bonuses'] ? preg_replace_callback('/:(-?\d+(?:\.\d+)?)/', fn($m) => ':' . nfc($m[1], 2, true), (string)$p['bonuses']) : '—') ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>

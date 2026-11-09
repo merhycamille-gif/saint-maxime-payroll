@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sy3 = $pe['school_year'] ?: currentSchoolYear();
             if (recalcEmployeeYear((int)$pe['employee_id'], $sy3) > 0) $nRec3++;
         }
-        $msg .= " + السعر الرسمي صار " . rtrim(rtrim(number_format($newOfficial, 2), '0'), '.') . ": أُعيد حساب أصحاب النسبة المئوية ($nRec3). / Taux officiel modifié, salaires en % recalculés.";
+        $msg .= " + السعر الرسمي صار " . nfc($newOfficial, 2, true) . ": أُعيد حساب أصحاب النسبة المئوية ($nRec3). / Taux officiel modifié, salaires en % recalculés.";
     }
     $_SESSION['flash'] = ['type' => 'success', 'msg' => $msg];
     header('Location: ' . BASE_URL . 'pages/settings.php');
@@ -180,7 +180,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="form-group">
                 <label class="form-label">Présence par heure de réduction / ساعات الحضور مقابل كل ساعة تناقص</label>
                 <input type="number" name="hours_reduction_presence_factor" class="form-control" value="<?= e(getSetting('hours_reduction_presence_factor', 1.5)) ?>" step="0.1" min="0.1">
-                <small class="text-muted">⏱️ <strong>كل ساعة تناقص = ساعة ونصف حضور</strong> (افتراضي 1.5): أستاذ عنده 4 ساعات تناقص ← ساعات حضور التناقص 6. تُحسب تلقائياً بملف الأستاذ وببطاقة الرواتب من ساعات التناقص المسجّلة.</small>
+                <small class="text-muted">⏱️ <strong>كل ساعة تناقص = ساعة ونصف حضور</strong> (افتراضي 1,5): أستاذ عنده 4 ساعات تناقص ← ساعات حضور التناقص 6. تُحسب تلقائياً بملف الأستاذ وببطاقة الرواتب من ساعات التناقص المسجّلة.</small>
             </div>
             <div class="d-flex justify-end" style="margin-top:8px">
                 <button type="submit" class="btn btn-primary btn-lg">
@@ -211,7 +211,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
             <?php foreach (ratedParams() as $key => $info):
                 $cur = getRateAsOf($key, (int)date('n'), (int)date('Y'));
-                $disp = ($info['unit'] === 'lbp') ? formatLBP($cur) : (rtrim(rtrim(number_format($cur,4,'.',''),'0'),'.').' %'); ?>
+                $disp = ($info['unit'] === 'lbp') ? formatLBP($cur) : (nfc($cur, 4, true).' %'); ?>
                 <tr><td><?= e($info[$lang==='ar'?'ar':'fr']) ?></td><td><strong><?= $disp ?></strong></td></tr>
             <?php endforeach; ?>
             </tbody>

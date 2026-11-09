@@ -173,7 +173,7 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
         $tl = [];
         if (shownHireDate($emp) !== '') $tl[] = ['d' => shownHireDate($emp), 'c' => '', 't' => 'دخول المدرسة / Embauche'];
         if (shownTitularizationDate($emp) !== '' && $emp['employee_type'] === 'enseignant_titulaire') $tl[] = ['d' => shownTitularizationDate($emp), 'c' => 'g', 't' => 'دخول الملاك / Titularisation' . (!empty($emp['cadre_from_sy']) ? ' (سنة ' . $emp['cadre_from_sy'] . ')' : '')];
-        foreach ($grades as $g) { if ((float)$g['grade_before'] == 0 && $g['reason'] === 'titularization') continue; $tl[] = ['d' => $g['change_date'], 'c' => 'g', 't' => 'درجة: ' . rtrim(rtrim(number_format((float)$g['grade_before'], 1), '0'), '.') . ' ← ' . rtrim(rtrim(number_format((float)$g['grade_after'], 1), '0'), '.') . ' — ' . e($g['notes'] ?: $g['reason']) . ((int)($g['counted'] ?? 1) === 0 ? ' (غير محتسبة)' : '') . (!empty($g['user_edited']) ? ' ✍️' : '')]; }
+        foreach ($grades as $g) { if ((float)$g['grade_before'] == 0 && $g['reason'] === 'titularization') continue; $tl[] = ['d' => $g['change_date'], 'c' => 'g', 't' => 'درجة: ' . nfc((float)$g['grade_before'], 1, true) . ' ← ' . nfc((float)$g['grade_after'], 1, true) . ' — ' . e($g['notes'] ?: $g['reason']) . ((int)($g['counted'] ?? 1) === 0 ? ' (غير محتسبة)' : '') . (!empty($g['user_edited']) ? ' ✍️' : '')]; }
         foreach ($decisions as $dc) { $tl[] = ['d' => substr((string)$dc['decided_at'], 0, 10), 'c' => 'd', 't' => e(($dc['decision'] === 'auto' ? 'تلقائياً: ' : ($dc['decision'] === 'approved' ? 'موافقة: ' : 'رفض: ')) . mb_substr((string)$dc['violation'], 0, 140))]; }
         foreach (['left_date_all' => 'ترك من الكل (نهائي)', 'left_date_cnss' => 'ترك الضمان', 'left_date_finance' => 'ترك المالية', 'left_date_eoc' => 'ترك صندوق التعويضات'] as $k => $l) if (!empty($emp[$k]) && $emp[$k] >= '1900-01-01') $tl[] = ['d' => $emp[$k], 'c' => 'x', 't' => $l];
         if (!empty($emp['keep_working_past_64'])) $tl[] = ['d' => date('Y-m-d', strtotime(($emp['birth_date'] ?: '1900-01-01') . ' +64 years')), 'c' => 'd', 't' => 'بلوغ 64 مع قرار الإبقاء'];
@@ -213,7 +213,7 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
             <div><div class="k">دخول المدرسة / Embauche</div><div class="v eh-num"><?= $d(shownHireDate($emp)) ?></div></div>
             <div><div class="k">دخول الملاك / Titularisation</div><div class="v eh-num"><?= $emp['employee_type'] === 'enseignant_titulaire' ? $d(shownTitularizationDate($emp)) : '—' ?></div></div>
             <div><div class="k">مدّة الخدمة / Ancienneté</div><div class="v"><?= e($svc ?: '—') ?><?= $isLeft ? ' (حتى تركه)' : '' ?></div></div>
-            <div><div class="k">الدرجة الحالية / Échelon</div><div class="v eh-num"><?= $emp['employee_type'] === 'employe' ? '—' : rtrim(rtrim(number_format((float)$emp['current_grade'], 1), '0'), '.') ?></div></div>
+            <div><div class="k">الدرجة الحالية / Échelon</div><div class="v eh-num"><?= $emp['employee_type'] === 'employe' ? '—' : nfc((float)$emp['current_grade'], 1, true) ?></div></div>
             <div><div class="k">رقم الضمان / N° CNSS</div><div class="v eh-num"><?= e(cnssWithBirthYear($emp['nssf_number'], $emp['birth_date'])) ?></div></div>
             <div><div class="k">رقم وزارة المالية / N° Finances</div><div class="v eh-num"><?= e($emp['finance_ministry_number'] ?: '—') ?></div></div>
             <div><div class="k">رقم صندوق التعويضات / N° Caisse</div><div class="v eh-num"><?= e($emp['caisse_number'] ?: '—') ?></div></div>
@@ -240,7 +240,7 @@ table.eh-year { width:100%; border-collapse:collapse; font-size:12.5px; white-sp
                 <tr>
                     <td><?= e($b['school_year'] ?: '—') ?></td>
                     <td><?= e($bonusLbl[$b['bonus_type']] ?? $b['bonus_type']) ?></td>
-                    <td class="num"><?= $b['value_type'] === 'percent' ? rtrim(rtrim(number_format((float)$b['amount'], 2), '0'), '.') . ' %' : number_format((float)$b['amount']) . ' ' . e($b['currency'] ?: 'LBP') ?></td>
+                    <td class="num"><?= $b['value_type'] === 'percent' ? nfc((float)$b['amount'], 2, true) . ' %' : number_format((float)$b['amount']) . ' ' . e($b['currency'] ?: 'LBP') ?></td>
                     <td><?= $b['start_month'] ? monthName((int)$b['start_month'], 'ar') : 'كل السنة' ?></td>
                     <td><?= $b['end_month'] ? monthName((int)$b['end_month'], 'ar') : '' ?></td>
                     <td><?= (int)$b['is_active'] ? '<span class="eh-now">فعّال</span>' : '<span style="color:#94a3b8">ملغى</span>' ?></td>

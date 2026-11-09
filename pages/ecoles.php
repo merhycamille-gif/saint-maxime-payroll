@@ -70,7 +70,7 @@ function ecolesApplyPay(PDO $db, int $sid, string $type, string $bonusType, floa
 }
 /** وصف قيمة بند للرسائل/العرض */
 function ecolesValLabel(string $vt, $amount, string $cur): string {
-    if ($vt === 'percent') return rtrim(rtrim(number_format((float)$amount, 2, '.', ''), '0'), '.') . ' %';
+    if ($vt === 'percent') return nfc((float)$amount, 2, true) . ' %';
     return number_format((float)$amount) . ($cur === 'USD' ? ' $' : ' L.L');
 }
 

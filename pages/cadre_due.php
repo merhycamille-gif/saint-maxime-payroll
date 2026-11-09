@@ -78,7 +78,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><?= e($a['school_name_ar'] ?: (string)$a['school_name_fr']) ?></td>
                 <td style="white-space:nowrap"><?= e((string)$a['hire_date']) ?></td>
                 <td style="white-space:nowrap"><?= e((string)$a['titularization_date']) ?></td>
-                <td><?= $a['current_grade'] !== null ? e(rtrim(rtrim(number_format((float)$a['current_grade'], 1), '0'), '.')) : '—' ?></td>
+                <td><?= $a['current_grade'] !== null ? e(nfc((float)$a['current_grade'], 1, true)) : '—' ?></td>
                 <td><small><?= e((string)$a['result']) ?></small></td>
                 <td><small><?= e((string)$a['decided_by']) ?> — <?= e((string)$a['decided_at']) ?></small></td>
             </tr>
@@ -103,7 +103,7 @@ include __DIR__ . '/../includes/header.php';
                 <td><a href="<?= BASE_URL ?>pages/employees.php?action=edit&id=<?= (int)$c['id'] ?>"><strong><?= e($c['name']) ?></strong></a></td>
                 <td><?= e($c['school_name']) ?></td>
                 <td style="white-space:nowrap"><?= e($c['hire_date']) ?> <small class="text-muted">(<?= (int)$c['years'] ?> سنة)</small></td>
-                <td><?= e($c['diploma_label']) ?><?= $c['grade_start'] !== null ? ' — درجة ' . e(rtrim(rtrim(number_format($c['grade_start'], 1), '0'), '.')) : ' <small style="color:#b45309">' . e($c['why']) . '</small>' ?></td>
+                <td><?= e($c['diploma_label']) ?><?= $c['grade_start'] !== null ? ' — درجة ' . e(nfc($c['grade_start'], 1, true)) : ' <small style="color:#b45309">' . e($c['why']) . '</small>' ?></td>
                 <td><?= e($c['pay']) ?></td>
                 <td style="white-space:nowrap"><?= $c['base_oct'] !== null ? '<strong>' . number_format($c['base_oct']) . '</strong> <small>(درجة ' . pctFmt($c['g_oct']) . ')</small>' : '—' ?></td>
                 <td style="white-space:nowrap"><?= e($c['tit']) ?></td>

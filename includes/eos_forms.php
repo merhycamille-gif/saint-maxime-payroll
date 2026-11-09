@@ -231,7 +231,7 @@ function eosHead(string $sub = ''): string {
 /** p1 — مستند تصفية تعويض نهاية خدمة */
 function eosRenderDoc(array $emp, array $d): string {
     $s = $d['school'];
-    $pct = rtrim(rtrim(number_format((float)$d['rate_pct'], 2, '.', ''), '0'), '.');
+    $pct = nfc((float)$d['rate_pct'], 2, true);
     ob_start(); ?>
     <div class="official-doc cnss-form rtl eos-doc" id="ppExportArea">
         <?= eosHead('(مستند تصفية تعويض نهاية خدمة)') ?>

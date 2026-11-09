@@ -222,7 +222,7 @@ if ($emp && !empty($_GET['dossier'])):
             $modeLbl = isLaborLawSalary($emp) ? 'قانون العمل (الحد الأدنى للأجور الساري)'
                      : (['direct_usd'=>'راتب مباشر بالدولار','percent_of_lbp'=>'نسبة من راتب الليرة','direct_lbp'=>'راتب مباشر بالليرة'][$emp['salary_input_mode']??''] ?? ($emp['salary_input_mode']??''));
             $transport = ((float)($emp['transport_daily_amount']??0) > 0)
-                ? (rtrim(rtrim(number_format((float)$emp['transport_daily_amount'],2),'0'),'.').' '.($emp['transport_daily_currency']??'LBP').' × '.(int)($emp['transport_days_per_week']??0).' يوم/أسبوع × '.rtrim(rtrim(number_format((float)($emp['transport_weeks']??0),1),'0'),'.').' أسبوع')
+                ? (nfc((float)$emp['transport_daily_amount'], 2, true).' '.($emp['transport_daily_currency']??'LBP').' × '.(int)($emp['transport_days_per_week']??0).' يوم/أسبوع × '.nfc((float)($emp['transport_weeks']??0), 1, true).' أسبوع')
                 : '';
             $m13 = (int)($emp['has_13th_month']??0) ? ('نعم'.(($emp['m13_include_extra']??0)||($emp['m13_include_aide']??0)?' — يشمل: '.implode('، ',array_filter([($emp['m13_include_extra']??0)?'الإضافي':'',($emp['m13_include_aide']??0)?'المكافأة':''])):'')) : 'لا';
 
@@ -256,8 +256,8 @@ if ($emp && !empty($_GET['dossier'])):
             $w .= $row2('المرحلة', $emp['niveau_scolaire']??'');
             $w .= $row2('الصفوف', classLevelNames($emp['classes_taught']??''));
             $w .= $row2('الدرجة الحالية', gradeDisplay($emp));
-            $w .= $row2('الدرجة الابتدائية', rtrim(rtrim(number_format((float)($emp['starting_grade']??0),1),'0'),'.'));
-            $w .= $row2('ساعات/أسبوع', rtrim(rtrim(number_format((float)($emp['hours_per_week']??0),1),'0'),'.'));
+            $w .= $row2('الدرجة الابتدائية', nfc((float)($emp['starting_grade']??0), 1, true));
+            $w .= $row2('ساعات/أسبوع', nfc((float)($emp['hours_per_week']??0), 1, true));
             $w .= $row2('أيام/أسبوع', (int)($emp['days_per_week']??0));
             $w .= $row2('تاريخ الدخول', shownHireDate($emp) ? formatDate(shownHireDate($emp)) : '');
             $w .= $row2('تاريخ الملاك', shownTitularizationDate($emp) ? formatDate(shownTitularizationDate($emp)) : '');
@@ -276,8 +276,8 @@ if ($emp && !empty($_GET['dossier'])):
 
             // الراتب والاقتطاعات
             $s  = $row2('طريقة إدخال الراتب', $modeLbl);
-            if (($emp['salary_input_mode']??'')==='direct_usd') $s .= $row2('أساس الراتب بالدولار', (float)($emp['base_salary_usd']??0) ? ('$'.number_format((float)$emp['base_salary_usd'],2)) : '');
-            if (($emp['salary_input_mode']??'')==='percent_of_lbp') $s .= $row2('النسبة من راتب الليرة', (float)($emp['base_salary_lbp_percent']??0) ? (rtrim(rtrim(number_format((float)$emp['base_salary_lbp_percent'],2),'0'),'.').'%') : '');
+            if (($emp['salary_input_mode']??'')==='direct_usd') $s .= $row2('أساس الراتب بالدولار', (float)($emp['base_salary_usd']??0) ? ('$'.nfc((float)$emp['base_salary_usd'], 2)) : '');
+            if (($emp['salary_input_mode']??'')==='percent_of_lbp') $s .= $row2('النسبة من راتب الليرة', (float)($emp['base_salary_lbp_percent']??0) ? (nfc((float)$emp['base_salary_lbp_percent'], 2, true).'%') : '');
             if (($emp['salary_input_mode']??'')==='direct_lbp') $s .= $row2('راتب العقد (ل.ل)', (float)($emp['contract_salary_lbp']??0) ? formatLBP($emp['contract_salary_lbp']) : '');
             $s .= $row2('الفترة المدفوعة بالسنة', paidPeriodLabel($emp, 'ar')); // 📆 (2026-09-28) من شهر ← إلى شهر
             $s .= $row2('الشهر الثالث عشر', $m13);
@@ -694,7 +694,7 @@ if (!$emp):
                 </div>
                 <?php if (!$isLeave): ?>
                 <div class="form-group">
-                    <label class="form-label">Heures de travail par mois / ساعات العمل في الشهر <small style="font-weight:400;opacity:.8">(<?= rtrim(rtrim(number_format((float)($emp['hours_per_week'] ?? 0), 1), '0'), '.') ?> س بالأسبوع × 4)</small></label>
+                    <label class="form-label">Heures de travail par mois / ساعات العمل في الشهر <small style="font-weight:400;opacity:.8">(<?= nfc((float)($emp['hours_per_week'] ?? 0), 1, true) ?> س بالأسبوع × 4)</small></label>
                     <?php /* ⏱️ تغيير الساعات يعيد الشيك تلقائياً حسب الرقم (أقل من 72 = جزئي) — والشيك اليدوي بعده يبقى كما اختاره */ ?>
                     <input type="number" name="hrs" class="form-control" value="<?= e($hrsDef) ?>" onchange="var f=this.form,v=parseFloat(this.value);f.querySelectorAll('input[name=dawam]').forEach(function(r){r.checked=(r.value===((isNaN(v)||v>=72)?'full':'part'));});f.submit()">
                 </div>
@@ -1152,7 +1152,7 @@ if (!$emp):
     $schoolHeadFr = '<div class="scr-head" style="margin-bottom:18px">' . $headBodyFr($logoImg) . '</div>';
     $schoolHeadWordFr = '<div style="margin-bottom:16px">' . $headBodyFr($logoImgWord) . '</div>';
     $freeNum   = function ($v) use ($cur) {
-        if ($cur === 'usd') return '$' . number_format($v, 2);
+        if ($cur === 'usd') return '$' . nfc($v, 2);
         return formatLBP($v, false) . ' ل.ل';
     };
     $freeWords = function ($v) use ($cur) { return numToArabicWords((int)round($v)) . ($cur === 'usd' ? ' دولار أميركي' : ' ليرة لبنانية'); };
@@ -1833,7 +1833,7 @@ if (!$emp):
         $cDailyTrans = (float)($emp['transport_daily_amount'] ?? 0);
         $cDailyStr = $cDailyTrans > 0
             ? ((($emp['transport_daily_currency'] ?? 'LBP') === 'USD')
-                ? ('$' . rtrim(rtrim(number_format($cDailyTrans, 2), '0'), '.'))
+                ? ('$' . nfc($cDailyTrans, 2, true))
                 : (number_format($cDailyTrans) . ' LBP'))
             : '';
         $natLat = $FR ? (in_array(mb_strtolower((string)($emp['nationality'] ?? '')), ['lebanese','lebanaise','libanaise','لبنانية','لبناني']) ? 'libanaise' : (string)($emp['nationality'] ?? '')) : (in_array(mb_strtolower((string)($emp['nationality'] ?? '')), ['lebanese','lebanaise','libanaise','لبنانية','لبناني']) ? 'Lebanese' : (string)($emp['nationality'] ?? ''));
@@ -2155,7 +2155,7 @@ if (!$emp):
         $cDailyTrans = (float)($emp['transport_daily_amount'] ?? 0);
         $cDailyStr = $cDailyTrans > 0
             ? ((($emp['transport_daily_currency'] ?? 'LBP') === 'USD')
-                ? ('$' . rtrim(rtrim(number_format($cDailyTrans, 2), '0'), '.'))
+                ? ('$' . nfc($cDailyTrans, 2, true))
                 : (formatLBP($cDailyTrans, false) . ' ل.ل'))
             : '';
       ?>

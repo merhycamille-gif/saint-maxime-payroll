@@ -218,7 +218,7 @@ function computeAnnualSlip($db, $emp, $schoolYear) {
                             ? (trim((string)($emp['job_title'] ?? '')) !== '' ? jobTitleLabel($emp['job_title'], 'ar') : '—')
                             : (!empty($emp['diploma']) ? diplomaLabel($emp['diploma'], 'ar') : '—'),
         'type'        => employeeTypeLabel($emp['employee_type']),
-        'grade'       => gradeDisplay($emp), // — للموظف الإداري (لا درجة، قانون العمل)
+        'grade'       => str_replace(',', '.', gradeDisplay($emp)),   /* 🔒 البطاقة السنوية مجمّدة: الدرجة تبقى كما كانت (38.5) — gradeDisplay صار بفاصلة 2026-11-09 */ // — للموظف الإداري (لا درجة، قانون العمل)
         // 🧮 النسبة المئوية للأجر الإضافي المعطاة له بهذه السنة (بخانة الدرجة نفسها — '' إن لا نسبة)
         'extra_pct'   => employeeExtraPercentForYear($db, $emp['id'], $schoolYear),
         'has_pct'     => $hasPct,

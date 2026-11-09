@@ -299,7 +299,7 @@ hc($groups, $G4, preg_match('/[\/*]\s*0\.(11|085|06|03)\b/', $ofp) === 0 && strp
    'نِسَب الضمان والصندوق مؤرّخة (لا أرقام ثابتة بالكود)', 'مؤرّخة ✓',
    'لو فشل: تعديل نسبة يجعل عمود الاشتراك صحيحاً وعمود الأجر خاطئاً بالنموذج نفسه.');
 hc($groups, $G4, abs(rateFrac('cnss_employee_rate', null, null, 3) - 0.03) < 1e-9,
-   'نسبة الضمان السارية تُقرأ صحيحة', number_format(getRateAsOf('cnss_employee_rate', null, null, 3), 2) . '%',
+   'نسبة الضمان السارية تُقرأ صحيحة', nfc(getRateAsOf('cnss_employee_rate', null, null, 3), 2) . '%',
    'لو فشل: جدول النِّسَب المؤرّخة لا يُقرأ.');
 hc($groups, $G4, strpos($fn, 'function dueShownLbp') !== false || strpos(@file_get_contents($PROJ . '/includes/report_helpers.php') ?: '', 'function dueShownLbp') !== false,
    'قاعدة «الأرقام تركب» مركزية بالتقارير', 'موجودة ✓',

@@ -9,6 +9,8 @@
     var b = document.body; if (!b) return;
     var ROWSUM = b.getAttribute('data-totals-rowsum') === '1', GROUP = b.getAttribute('data-totals-group') !== '0', COLS = b.getAttribute('data-totals-cols') !== '0';
     var NUM = /^-?[\d,]+(\.\d+)?$/;
+    // 🔢 (2026-11-09 «ما تحطّلي الرقم في نقطة… إذا في كسور منحطّ فاصلة») «12,5» / «1,250,50» = كسر بفاصلة (خانة أو خانتان بعد آخر فاصلة)؛ مجموعة الآلاف دائماً 3 أرقام
+    function pn(s) { s = String(s); var m = s.indexOf('.') < 0 ? /^(-?[\d,]*\d),(\d{1,2})$/.exec(s) : null; return parseFloat(m ? m[1].replace(/,/g, '') + '.' + m[2] : s.replace(/,/g, '')) || 0; }
     function txt(el) { return (el.textContent || '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim(); }
     function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
     // يقرأ خلية: {lbp, usd, ok} — ok=false إن لم تكن رقمية (نسبة %، تاريخ، رقم مركّب، نصّ)
@@ -18,13 +20,13 @@
         if (/%|\/|[A-Za-z]{3,}(?!\.L)|\d-\d/.test(t.replace(/L\.L|ل\.ل/g, ''))) return { ok: false };
         var lbp = 0, usd = 0, found = false, rest = t;
         // الدولار: «$643» أو «643 $» — لا «57,560,000 $643» (الرقم قبل $ يجب ألّا يتبعه رقم آخر بعد الـ$)
-        rest = rest.replace(/\$\s*(-?[\d,]+(?:\.\d+)?)|(-?[\d,]+(?:\.\d+)?)\s*\$(?!\s*\d)/g, function (m, a, c) { usd += parseFloat((a || c).replace(/,/g, '')) || 0; found = true; return ' '; });
-        rest = rest.replace(/(?:L\.L|ل\.ل)\s*(-?[\d,]+(?:\.\d+)?)|(-?[\d,]+(?:\.\d+)?)\s*(?:L\.L|ل\.ل\.?)/g, function (m, a, c) { lbp += parseFloat((a || c).replace(/,/g, '')) || 0; found = true; return ' '; });
+        rest = rest.replace(/\$\s*(-?[\d,]+(?:\.\d+)?)|(-?[\d,]+(?:\.\d+)?)\s*\$(?!\s*\d)/g, function (m, a, c) { usd += pn(a || c); found = true; return ' '; });
+        rest = rest.replace(/(?:L\.L|ل\.ل)\s*(-?[\d,]+(?:\.\d+)?)|(-?[\d,]+(?:\.\d+)?)\s*(?:L\.L|ل\.ل\.?)/g, function (m, a, c) { lbp += pn(a || c); found = true; return ' '; });
         rest = rest.trim();
-        if (rest !== '') { if (NUM.test(rest)) { lbp += parseFloat(rest.replace(/,/g, '')) || 0; found = true; } else return { ok: false }; }
+        if (rest !== '') { if (NUM.test(rest)) { lbp += pn(rest); found = true; } else return { ok: false }; }
         return { lbp: lbp, usd: usd, ok: found };
     }
-    function fmt(n) { n = Math.round(n * 100) / 100; var s = Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 2 }); return (n < 0 ? '-' : '') + s; }
+    function fmt(n) { n = Math.round(n * 100) / 100; var s = Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 2 }).replace('.', ','); return (n < 0 ? '-' : '') + s; }
     function cellHtml(s) { var h = []; if (s.lbp) h.push('<span dir="ltr">' + fmt(s.lbp) + ' L.L</span>'); if (s.usd) h.push('<span dir="ltr" class="msa-usd">$' + fmt(s.usd) + '</span>'); return h.length ? h.join('<br>') : '—'; }
     // 🧮 (2026-10-17 «المجاميع لكل شي، عواميد وخطوط — بكشف الضمان مجموع وعاء الضمان مش موجود») نمط العمود: both/lbp/usd/bare ليُكتب المجموع بنفس شكل خاناته
     function colStyle(rows, c) { var l = 0, u = 0, bare = 0, tot = 0; rows.forEach(function (r) { var t = txt(r.cells[c]); if (!t || t === '—' || t === '-') return; tot++; var hL = /L\.L|ل\.ل/.test(t), hU = /\$/.test(t); if (hL) l++; if (hU) u++; if (!hL && !hU) bare++; }); if (!tot) return 'bare'; if (u && (l || bare)) return 'both'; if (u) return 'usd'; if (l) return 'lbp'; return 'bare'; }

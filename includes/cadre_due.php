@@ -393,7 +393,7 @@ function titularizeContractTeacher(PDO $db, int $empId, string $sy, string $who 
     // 🧮 إعادة حساب سنة الترسيم فقط — سنواته السابقة كمتعاقد لا تُلمَس (صمام cadre_from_sy بالمحرّك)
     $months = (int)recalcEmployeeYear($empId, $sy);
     $name = cadreDueEmpName($emp);
-    $res = 'رُسِّم بالملاك من ' . $tit . ': درجة الدخول ' . rtrim(rtrim(number_format($startG, 1), '0'), '.') . ' ← ' . rtrim(rtrim(number_format($gEnd, 1), '0'), '.') . ' بنهاية ' . $sy
+    $res = 'رُسِّم بالملاك من ' . $tit . ': درجة الدخول ' . nfc($startG, 1, true) . ' ← ' . nfc($gEnd, 1, true) . ' بنهاية ' . $sy
          . ($pct ? ' + إضافي ' . pctFmt($pct['pct']) . ' % كملاك المدرسة' : ' (المدرسة بلا نسبة — بنوده كما هي)')
          . ($trText ? ' + ' . $trText : '') . ' — حُسب ' . $months . ' شهراً';
     logAudit('cadre_titularize', 'employees', $empId, $old, ['employee_type' => 'enseignant_titulaire', 'titularization_date' => $tit, 'sy' => $sy, 'starting_grade' => $startG, 'grade_end' => $gEnd, 'pct' => $pct['pct'] ?? null, 'transport' => $trText, 'months' => $months]);
@@ -588,7 +588,7 @@ function cadreDuePctText(?array $pct): string {
 
 /** صفوف جدول المرشَّحين (مشتركة بين المساج وصفحة المراجعة) */
 function cadreDueRowCells(array $c): string {
-    $gs = $c['grade_start'] !== null ? rtrim(rtrim(number_format($c['grade_start'], 1), '0'), '.') : '—';
+    $gs = $c['grade_start'] !== null ? nfc($c['grade_start'], 1, true) : '—';
     $h = '<td><a href="' . BASE_URL . 'pages/employees.php?action=edit&id=' . (int)$c['id'] . '"><strong>' . e($c['name']) . '</strong></a>'
        . ($c['has_grades'] ? '<br><small style="color:#b45309">⚠️ له سجلّ درجات قديم (' . (int)$c['has_grades'] . ' صفّاً) — يُستبدَل بسجلّ ملاك جديد من ' . e($c['tit']) . ' (اليدوية تبقى، والقديم بنسخة احتياطية)</small>' : '') . '</td>'
        . '<td style="white-space:nowrap">' . e($c['hire_date']) . '<br><small class="text-muted">' . (int)$c['years'] . ' سنة</small></td>'
@@ -688,7 +688,7 @@ function healCadreNew20260913(): void {
                         $g0->execute([$id, sprintf('%04d-10-01', $y1)]);
                         $gNow = (float)($g0->fetchColumn() ?: $emp['starting_grade']);
                         $db->prepare("UPDATE employees SET current_grade = ? WHERE id = ?")->execute([$gNow, $id]);
-                        $log[] = 'درجات سنة الترسيم بالقانون (' . rtrim(rtrim(number_format($maxStored, 1), '0'), '.') . ' ← ' . rtrim(rtrim(number_format((float)$dry['final_grade'], 1), '0'), '.') . ')';
+                        $log[] = 'درجات سنة الترسيم بالقانون (' . nfc($maxStored, 1, true) . ' ← ' . nfc((float)$dry['final_grade'], 1, true) . ')';
                     }
                 } } catch (Throwable $eg) { $errs[] = 'الدرجات: ' . $eg->getMessage(); }
                 // (2) 🔴 قراره 2026-09-23 «دايماً بس نحطّ ملاك بيطبّق عليه كل شي»: كل ملاك صار ملاكاً هذه السنة (مُحوَّل أو جديد) يأخذ

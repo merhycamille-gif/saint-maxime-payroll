@@ -73,7 +73,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php endif; ?></td>
                     <td><strong><?= (int)$hr['lawHours'] ?></strong> بدل <?= (int)$hr['baseHours'] ?></td>
                     <td><span class="badge badge-danger" style="font-size:12px">−<?= (int)$hr['reduction'] ?> ساعات</span></td>
-                    <td style="white-space:nowrap"><?php $fmtH = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.');
+                    <td style="white-space:nowrap"><?php $fmtH = fn($v) => nfc((float)$v, 1, true);
                         if (hoursReductionNeedsDecision($e, $hr, $sy)): ?>
                             <span class="badge badge-warning" title="ينتظر إذنك بالمساج أعلى الصفحة">⏳ قرار مطلوب</span>
                             <small><?= $fmtH($e['hours_per_week']) ?> ساعة / تناقص <?= $fmtH($e['hours_reduction'] ?? 0) ?></small>

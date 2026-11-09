@@ -182,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'open'
         // 🎓 تنفيذ قراراته بعد الفتح (حتى تكون نسب الملاك منسوخة للسنة الجديدة فيأخذها المرسَّم): وافق ⇒ ترسيم، وإلا ⇒ يبقى متعاقداً (قرار مسجَّل)
         $cdDone = []; $cdErr = []; $whoCd = (string)($_SESSION['username'] ?? '');
         foreach ($cdApprove as $c) {
-            try { $r = titularizeContractTeacher($db, (int)$c['id'], $newYear, $whoCd); $cdDone[] = $r['name'] . ' (درجة ' . rtrim(rtrim(number_format($r['grade_start'], 1), '0'), '.') . ($r['pct'] !== null ? '، ' . rtrim(rtrim((string)$r['pct'], '0'), '.') . ' %' : '') . ')'; }
+            try { $r = titularizeContractTeacher($db, (int)$c['id'], $newYear, $whoCd); $cdDone[] = $r['name'] . ' (درجة ' . nfc($r['grade_start'], 1, true) . ($r['pct'] !== null ? '، ' . rtrim(rtrim((string)$r['pct'], '0'), '.') . ' %' : '') . ')'; }
             catch (Throwable $e) { $cdErr[] = $c['name'] . ': ' . $e->getMessage(); }
         }
         foreach ($cdLeave as $c) cadreDueRecordDecision($db, $c, $newYear, 'rejected', 'بقراره عند فتح السنة: يبقى متعاقداً بسنة ' . $newYear, $whoCd);

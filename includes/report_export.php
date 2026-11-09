@@ -375,7 +375,7 @@ class ReportTable
         return max(1, $n);
     }
 
-    private function isNum($v) { return is_int($v) || is_float($v) || (is_string($v) && $v !== '' && preg_match('/^-?\d+(\.\d+)?$/', str_replace(',', '', $v))); }
+    private function isNum($v) { return is_int($v) || is_float($v) || (is_string($v) && $v !== '' && (preg_match('/^-?\d+(\.\d+)?$/', str_replace(',', '', $v)) || preg_match('/^-?[\d,]*\d,\d{1,2}$/', $v))); }   // 🔢 2026-11-09: «12,5» كسر بفاصلة (nfc)
     /** عمود «رمز/رقم» (#، Code، الرمز، رقم الضمان…): أرقامه معرِّفات تُكتب كما هي بلا فواصل آلاف */
     private function isCodeCol(int $c): bool
     {
@@ -383,7 +383,7 @@ class ReportTable
         if (!isset($cache[$c])) { $h = trim((string)($this->headers[$c] ?? '')); $cache[$c] = ($c === 0 && ($h === '#' || $h === '')) || preg_match('/^(#|code|الرمز|رقم|n°|no\.?|id)\b/iu', $h) === 1; }
         return $cache[$c];
     }
-    private function numVal($v) { return (float)str_replace(',', '', (string)$v); }
+    private function numVal($v) { return (is_int($v) || is_float($v)) ? (float)$v : numLoose($v); }
 
     private static function xa($s) { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_XML1, 'UTF-8'); }
 
@@ -441,7 +441,7 @@ class ReportTable
     {
         if ($this->isCodeCol($c)) return str_replace(',', '', (string)$v);
         $nv = $this->numVal($v);
-        return ($nv == floor($nv)) ? number_format($nv) : number_format($nv, 2);   // الكسر بخانتين كما يعرضه التنسيق #,##0.00 («12.50» — كان يُقاس «12.5» فيطلع ####)
+        return ($nv == floor($nv)) ? number_format($nv) : nfc($nv, 2);   // الكسر بخانتين كما يعرضه التنسيق #,##0.00 («12.50» — كان يُقاس «12.5» فيطلع ####)
     }
     /** أضيق عرض يوزّع الكلمات على $k أسطر (أطول سطر أقصر ما يمكن) — تقسيم متوازن؛ k ≤ 4 والكلمات قليلة ⇒ رخيص */
     private function balancedLines(array $words, int $k, bool $bold): float
@@ -1118,7 +1118,7 @@ class ReportTable
             $v = $cells[$c] ?? '';
             $num = $this->isNum($v) && $v !== '';
             if ($num && $this->isCodeCol($c)) $disp = (string)$v;
-            elseif ($num) { $nv = $this->numVal($v); $disp = ($nv == floor($nv)) ? number_format($nv) : rtrim(rtrim(number_format($nv, 2), '0'), '.'); }
+            elseif ($num) { $nv = $this->numVal($v); $disp = ($nv == floor($nv)) ? number_format($nv) : nfc($nv, 2, true); }
             else $disp = (string)$v;
             $align = $num ? ($this->isCodeCol($c) ? 'center' : 'right') : (($kind === 'header' || in_array(trim($disp), ['—', '-', '–', '✓', '✗', '×'], true)) ? 'center' : ($this->isRtl() ? 'right' : 'left'));
             $tr .= '<w:tc><w:tcPr><w:tcW w:w="' . (int)($this->docxColWs[$c] ?? 0) . '" w:type="dxa"/>' . $shd . ($num ? '<w:noWrap/>' : '') . '<w:vAlign w:val="center"/></w:tcPr>'
@@ -1259,7 +1259,7 @@ class ReportTable
                 $align = ($this->isNum($v) && $v !== '') ? 'center' : ($kind === 'header' ? 'center' : ($this->isRtl() ? 'right' : 'left'));
                 if ($this->isNum($v) && $v !== '') {
                     $nv = $this->numVal($v);
-                    $disp = ($nv == floor($nv)) ? number_format($nv) : rtrim(rtrim(number_format($nv, 2), '0'), '.');
+                    $disp = ($nv == floor($nv)) ? number_format($nv) : nfc($nv, 2, true);
                 } else { $disp = $v; }
                 $tc = '<w:tcPr><w:tcW w:w="' . (int)($this->docxColWs[$c] ?? 0) . '" w:type="' . (isset($this->docxColWs[$c]) ? 'dxa' : 'auto') . '"/>';
                 $tc .= $fill ? '<w:shd w:val="clear" w:fill="' . $fill . '"/>' : '';

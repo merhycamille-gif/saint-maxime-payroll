@@ -365,7 +365,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
               <?= $cell('phase_id', e(eocPhaseOptions()[(int)$r['phase_id']] ?? '')) ?>
               <?= $cell('birth_date', e((string)$r['birth_date']), 'num') ?>
               <?= $cell('start_date', e((string)$r['start_date']), 'num') ?>
-              <?= $cell('teaching_hours', e(rtrim(rtrim(number_format($numv($r['teaching_hours']), 1), '0'), '.')), 'num') ?>
+              <?= $cell('teaching_hours', e(nfc($numv($r['teaching_hours']), 1, true)), 'num') ?>
               <?= $cell('salary', $fmt0($r['salary']), 'num') ?>
               <?= $cell('add_salary', $amtM($r['add_salary']), 'num') ?>
               <td class="sp-po sp-sign"><?= $signPad ?></td>
@@ -377,7 +377,7 @@ $exT = jsAttr('بوّابة صندوق التعويضات — ' . ($kind === 'ge
             </tr>
           <?php endforeach; if (!$rows): ?><tr><td colspan="14" class="sp-empty">لا يوجد أساتذة بعد.</td></tr><?php endif; ?>
           </tbody>
-          <tfoot><tr><td colspan="10">المجموع (كل الأساتذة)</td><td class="num"><?= e(rtrim(rtrim(number_format($tot['hours'], 1), '0'), '.')) ?></td><td class="num"><?= $fmt0($tot['salary']) ?></td><td class="num"><?= $amtM($tot['add_salary']) ?></td><td class="sp-po"></td><td class="no-print"></td></tr></tfoot>
+          <tfoot><tr><td colspan="10">المجموع (كل الأساتذة)</td><td class="num"><?= e(nfc($tot['hours'], 1, true)) ?></td><td class="num"><?= $fmt0($tot['salary']) ?></td><td class="num"><?= $amtM($tot['add_salary']) ?></td><td class="sp-po"></td><td class="no-print"></td></tr></tfoot>
         </table></div>
         <?php if ($E && $delIds): $nm = $db->query("SELECT id, first_name_ar, last_name_ar FROM employees WHERE id IN (" . implode(',', $delIds) . ")")->fetchAll(); ?>
         <div class="sp-del-list no-print">أساتذة محذوفون من هذا البيان (يُحسبون بالبرنامج لكن لا يظهرون هنا): <?php foreach ($nm as $x): ?><form method="post"><?= csrfField() ?><input type="hidden" name="eoc_act" value="restore"><input type="hidden" name="key" value="<?= (int)$x['id'] ?>"><button class="sp-btn sp-btn-sm sp-btn-view"><?= e(eocNameAr($x)) ?> ↩ إرجاع</button></form> <?php endforeach; ?></div>

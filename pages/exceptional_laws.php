@@ -210,7 +210,7 @@ include __DIR__ . '/../includes/header.php';
                 <tr style="<?= $r['is_active'] ? '' : 'opacity:.5;background:#f3f4f6' ?>">
                     <td><strong><?= e($r['law_number']) ?></strong></td>
                     <td><?= formatDate($r['law_date']) ?></td>
-                    <td><?= $is2017 ? '<span class="badge badge-gold">6/2/0 selon ens. / حسب الأستاذ</span>' : '+'.(float)$r['grades_count'] ?></td>
+                    <td><?= $is2017 ? '<span class="badge badge-gold">6/2/0 selon ens. / حسب الأستاذ</span>' : '+'.nfc((float)$r['grades_count'], 1, true) ?></td>
                     <td><?= formatDate($r['effective_from'] ?? $r['effective_date']) ?></td>
                     <td><?= $r['effective_to'] ? formatDate($r['effective_to']) : '<span class="badge badge-success">En cours / مفتوح</span>' ?></td>
                     <td><?= $r['auto_apply']

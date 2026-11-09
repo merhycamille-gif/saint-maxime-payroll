@@ -70,8 +70,8 @@ include __DIR__ . '/../includes/header.php';
                 <?php foreach ($rep['rejected'] as $it): $d = $it['decision']; ?>
                 <tr>
                     <td><strong><?= e($it['emp_name']) ?></strong><?= $it['school_name'] !== '' ? '<br><small class="text-muted">' . e($it['school_name']) . '</small>' : '' ?></td>
-                    <td><span class="badge" style="background:<?= $rules[$it['rule']][2] ?? '#64748b' ?>;color:#fff"><?= e($rules[$it['rule']][1] ?? $it['rule']) ?></span> <?= e($it['violation']) ?></td>
-                    <td><?= e($it['fix']) ?></td>
+                    <td><span class="badge" style="background:<?= $rules[$it['rule']][2] ?? '#64748b' ?>;color:#fff"><?= e($rules[$it['rule']][1] ?? $it['rule']) ?></span> <?= e(nfcText($it['violation'])) ?></td>
+                    <td><?= e(nfcText($it['fix'])) ?></td>
                     <td><small><?= e((string)$d['decided_by']) ?> — <?= e((string)$d['decided_at']) ?></small></td>
                     <td style="white-space:nowrap"><?php if (canEdit()): ?><form method="post" style="display:inline"><?= csrfField() ?><input type="hidden" name="action" value="comp_reopen"><input type="hidden" name="key" value="<?= e($it['key']) ?>"><button class="btn btn-sm btn-light"><i class="fas fa-rotate-left"></i> إعادة فتح</button></form><?php endif; ?></td>
                 </tr>
@@ -97,9 +97,9 @@ include __DIR__ . '/../includes/header.php';
                     <td style="white-space:nowrap"><small><?= e((string)$d['decided_at']) ?></small></td>
                     <td><strong><?= e((string)$d['emp_name']) ?></strong></td>
                     <td><?= e((string)$d['school_year']) ?></td>
-                    <td><span class="badge" style="background:<?= $rules[$d['rule_key']][2] ?? '#64748b' ?>;color:#fff"><?= e($rules[$d['rule_key']][1] ?? $d['rule_key']) ?></span> <?= e((string)$d['violation']) ?></td>
-                    <td><?= e((string)$d['fix']) ?></td>
-                    <td><?= e((string)$d['result']) ?></td>
+                    <td><span class="badge" style="background:<?= $rules[$d['rule_key']][2] ?? '#64748b' ?>;color:#fff"><?= e($rules[$d['rule_key']][1] ?? $d['rule_key']) ?></span> <?= e(nfcText($d['violation'])) ?></td>
+                    <td><?= e(nfcText($d['fix'])) ?></td>
+                    <td><?= e(nfcText($d['result'])) ?></td>
                     <td><?= $d['decision'] === 'auto' ? '<span class="badge badge-success">تلقائياً</span>' : e((string)$d['decided_by']) ?></td>
                 </tr>
                 <?php endforeach; ?>

@@ -438,7 +438,7 @@ function meheListSpecs(): array {
  */
 function meheApplyRowEdit(array &$data, array $P): array {
     $kind = (string)($P['mehe_row'] ?? ''); $key = (string)($P['key'] ?? ''); $f = (array)($P['f'] ?? []); $reset = !empty($P['reset']);
-    $num = fn($v) => (float)str_replace([',', ' ', '٬'], '', (string)$v);
+    $num = fn($v) => numLoose($v);   // 🔢 (2026-11-09) «12,5» كسر بفاصلة · «1,250» آلاف
     $txt = fn($v) => trim((string)$v);
     $ok = fn($m = 'انحفظ السطر') => ['ok' => true, 'msg' => $m];
     $bad = fn($m) => ['ok' => false, 'msg' => $m];
@@ -801,7 +801,7 @@ class MeheXlsx {
         $b = '<border><left style="thin"><color rgb="FFBBBBBB"/></left><right style="thin"><color rgb="FFBBBBBB"/></right><top style="thin"><color rgb="FFBBBBBB"/></top><bottom style="thin"><color rgb="FFBBBBBB"/></bottom><diagonal/></border>';
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            . '<numFmts count="3"><numFmt numFmtId="164" formatCode="#,##0"/><numFmt numFmtId="165" formatCode="#,##0.00"/><numFmt numFmtId="166" formatCode="0.00 %"/></numFmts>'
+            . '<numFmts count="3"><numFmt numFmtId="164" formatCode="#,##0"/><numFmt numFmtId="165" formatCode="#,##0"/><numFmt numFmtId="166" formatCode="0.00 %"/></numFmts>'
             . '<fonts count="6">'
             . '<font><sz val="10"/><name val="Arial"/></font>'                               // 0
             . '<font><b/><sz val="14"/><name val="Arial"/></font>'                           // 1 عنوان

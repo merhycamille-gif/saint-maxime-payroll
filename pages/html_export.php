@@ -90,6 +90,7 @@ function hx_clean(string $s): string { $s = preg_replace('/[ \t\r\x{00A0}]+/u', 
 /** 🔢 (2026-10-21) خلية مبلغ «51,944,000 L.L» / «ل.ل» / «$603» ⇒ رقم صافٍ تفهمه الإكسل (مجاميع/تنسيق)؛ غير ذلك يبقى نصّاً */
 function hx_num(string $s): string {
     $s = preg_replace('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $s) ?? $s;   // 🔢 علامات التضمين لا تمنع الخلية من أن تكون رقماً بالإكسل
+    if (preg_match('/^\s*(-?[\d,]*\d,\d{1,2})\s*(L\.?L\.?|ل\.?ل\.?|LBP|\$|USD)?\s*$/iu', $s, $mc) && strpos($mc[1], '.') === false) return (string)numLoose($mc[1]);   // 🔢 (2026-11-09) كسر بفاصلة (nfc: 12,5 · 1,250,50)
     if (preg_match('/^\s*(-?[\d,]+(?:\.\d+)?)\s*(L\.?L\.?|ل\.?ل\.?|LBP|\$|USD)?\s*$/iu', $s, $m) || preg_match('/^\s*(\$|L\.?L\.?|ل\.?ل\.?)\s*(-?[\d,]+(?:\.\d+)?)\s*$/iu', $s, $m2)) {
         $n = isset($m2) && $m2 ? $m2[2] : $m[1];
         return str_replace(',', '', $n);

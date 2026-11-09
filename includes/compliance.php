@@ -163,8 +163,8 @@ function complianceItems(PDO $db, string $sy): array {
                 $add('grade_law', $e, 'تعذّر حساب درجته من القانون: ' . $r['err'], 'أكمل بملفه الشهادة وتاريخ الدخول وتاريخ الملاك ثم أعد الفحص', false);
             } else {
                 $add('grade_law', $e,
-                    'الدرجة بملفه ' . rtrim(rtrim(number_format($r['stored'], 1), '0'), '.') . ' والقانون (شهادته + تاريخ دخوله + ملاكه + تدرّج كل سنتين + استثنائية) يعطي ' . rtrim(rtrim(number_format($r['law'], 1), '0'), '.') . ' — فرق ' . rtrim(rtrim(number_format($r['gap'], 1), '0'), '.'),
-                    'ضبط درجته على القانون (' . rtrim(rtrim(number_format($r['law'], 1), '0'), '.') . ') وإعادة بناء سلسلة درجاته وإعادة حساب رواتب سنة ' . $sy,
+                    'الدرجة بملفه ' . nfc($r['stored'], 1, true) . ' والقانون (شهادته + تاريخ دخوله + ملاكه + تدرّج كل سنتين + استثنائية) يعطي ' . nfc($r['law'], 1, true) . ' — فرق ' . nfc($r['gap'], 1, true),
+                    'ضبط درجته على القانون (' . nfc($r['law'], 1, true) . ') وإعادة بناء سلسلة درجاته وإعادة حساب رواتب سنة ' . $sy,
                     true, ['law' => $r['law'], 'stored' => $r['stored']]);
             }
         }
@@ -179,7 +179,7 @@ function complianceItems(PDO $db, string $sy): array {
           AND NOT (e.last_name_ar LIKE '%حليحل%' AND e.first_name_ar IN ('ريتا','ماريا') AND e.father_name_ar IN ('مارون','الياس')) /* استثناء موثّق: كشفه بالمليم (سلفة) 2026-08-27 */
         GROUP BY ms.employee_id ORDER BY ms.year, ms.month", [$sy]) as $r) {
         $add('base_scale', $r,
-            'بشهر ' . complianceMonthLabel((int)$r['month'], (int)$r['year']) . ' أساسه بعد التدرّج ' . complianceFmt($r['bpe']) . ' ل.ل والسلسلة عند الدرجة ' . rtrim(rtrim(number_format((float)$r['g'], 1), '0'), '.') . ' تعطي ' . complianceFmt($r['scale_base']),
+            'بشهر ' . complianceMonthLabel((int)$r['month'], (int)$r['year']) . ' أساسه بعد التدرّج ' . complianceFmt($r['bpe']) . ' ل.ل والسلسلة عند الدرجة ' . nfc((float)$r['g'], 1, true) . ' تعطي ' . complianceFmt($r['scale_base']),
             'إعادة حساب رواتب سنة ' . $sy . ' من السلسلة القانونية', true);
     }
 
@@ -207,7 +207,7 @@ function complianceItems(PDO $db, string $sy): array {
             }
             if (abs($exp - (float)$m['prime']) > 1) {
                 $add('pct_law', $e,
-                    'بشهر ' . complianceMonthLabel($mo, (int)$m['year']) . ' الإضافي المخزّن ' . complianceFmt($m['prime']) . ' ل.ل — والقانون (نسبة ' . rtrim(rtrim(number_format($pct, 2), '0'), '.') . ' % من ' . complianceFmt($m['bpe']) . ' ÷ ' . complianceFmt($official) . ' × سعر الشهر ' . complianceFmt($rate) . ') يعطي ' . complianceFmt($exp),
+                    'بشهر ' . complianceMonthLabel($mo, (int)$m['year']) . ' الإضافي المخزّن ' . complianceFmt($m['prime']) . ' ل.ل — والقانون (نسبة ' . nfc($pct, 2, true) . ' % من ' . complianceFmt($m['bpe']) . ' ÷ ' . complianceFmt($official) . ' × سعر الشهر ' . complianceFmt($rate) . ') يعطي ' . complianceFmt($exp),
                     'إعادة حساب رواتب سنة ' . $sy . ' بقانون النسبة', true);
                 break;
             }
@@ -220,7 +220,7 @@ function complianceItems(PDO $db, string $sy): array {
         GROUP BY b.employee_id HAVING COUNT(*) > 1", [$sy]) as $r) {
         $ids = explode(',', $r['ids']); $amts = explode(',', $r['amts']);
         $lbl = implode(' % + ', array_map(fn($a) => rtrim(rtrim($a, '0'), '.'), $amts)) . ' %';
-        $add('multi_percent', $r, 'عنده بنود نسبة فاعلة معاً بسنة ' . $sy . ': ' . $lbl . ' — المحرّك يجمعها فتصير ' . rtrim(rtrim(number_format(array_sum(array_map('floatval', $amts)), 2), '0'), '.') . ' %',
+        $add('multi_percent', $r, 'عنده بنود نسبة فاعلة معاً بسنة ' . $sy . ': ' . $lbl . ' — المحرّك يجمعها فتصير ' . nfc(array_sum(array_map('floatval', $amts)), 2, true) . ' %',
             'الإبقاء على الأحدث (' . rtrim(rtrim(end($amts), '0'), '.') . ' %) وإطفاء الأقدم وإعادة حساب سنة ' . $sy, true, ['keep' => (int)end($ids), 'off' => array_map('intval', array_slice($ids, 0, -1))]);
     }
 
@@ -453,7 +453,7 @@ function complianceItems(PDO $db, string $sy): array {
     foreach ($q("SELECT e.*, b.id bid, b.amount pct, b.start_month bfrom, b.end_month bto FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0
         WHERE b.is_active = 1 AND b.bonus_type = 'transport_complement' AND b.value_type = 'percent' AND b.school_year = ?" . $sc . " ORDER BY e.school_id, e.id", [$sy]) as $r) {
         $add('transport_pct', $r,
-            'بند تعويض نقل شهري بنسبة ' . rtrim(rtrim(number_format((float)$r['pct'], 2, '.', ''), '0'), '.') . '٪ من الأساس' . ($r['bfrom'] ? ' (' . monthName((int)$r['bfrom'], 'ar') . ' ← ' . monthName((int)$r['bto'], 'ar') . ')' : '') . ' — النقل مبلغ لا نسبة، وهذا يضيف مبلغاً يساوي الأجر الإضافي كنقل',
+            'بند تعويض نقل شهري بنسبة ' . nfc((float)$r['pct'], 2, true) . '٪ من الأساس' . ($r['bfrom'] ? ' (' . monthName((int)$r['bfrom'], 'ar') . ' ← ' . monthName((int)$r['bto'], 'ar') . ')' : '') . ' — النقل مبلغ لا نسبة، وهذا يضيف مبلغاً يساوي الأجر الإضافي كنقل',
             'إطفاء هذا البند وإعادة حساب سنة ' . $sy . ' (الأجر الإضافي بنسبته يبقى)', true, ['bid' => (int)$r['bid']], (string)$r['bid']);
     }
 
@@ -644,7 +644,7 @@ function complianceApply(PDO $db, array $it): string {
             try { buildLegalGradeHistory($eid); } catch (Throwable $e) {}
             $n = $recalcYear();
             logAudit('compliance_grade_law', 'employees', $eid, ['current_grade' => $old], ['current_grade' => (float)$d['law'], 'sy' => $sy]);
-            return 'الدرجة ' . rtrim(rtrim(number_format($old, 1), '0'), '.') . ' → ' . rtrim(rtrim(number_format((float)$d['law'], 1), '0'), '.') . ' وأُعيد حساب ' . $n . ' شهراً';
+            return 'الدرجة ' . nfc($old, 1, true) . ' → ' . nfc((float)$d['law'], 1, true) . ' وأُعيد حساب ' . $n . ' شهراً';
         case 'month_stale':
             $n = $recalcYear();
             try { ensureMonthStaleTable(); $db->prepare("DELETE FROM month_stale_findings WHERE employee_id = ? AND school_year = ?")->execute([$eid, $sy]); } catch (Throwable $e) {}
@@ -782,7 +782,7 @@ function complianceButtons(array $it, string $formAction = ''): string {
     $act = $formAction !== '' ? ' action="' . e($formAction) . '"' : '';
     $h = '';
     if ($it['auto']) {
-        $h .= '<form method="post"' . $act . ' style="display:inline" onsubmit="return confirm(\'' . e($it['fix']) . ' — لـ' . e($it['emp_name']) . '؟\')">' . csrfField()
+        $h .= '<form method="post"' . $act . ' style="display:inline" onsubmit="return confirm(\'' . e(nfcText($it['fix'])) . ' — لـ' . e($it['emp_name']) . '؟\')">' . csrfField()
             . '<input type="hidden" name="action" value="comp_approve"><input type="hidden" name="key" value="' . e($it['key']) . '">'
             . '<button class="btn btn-sm btn-success"><i class="fas fa-check"></i> موافق — صحّح</button></form> ';
     } elseif ($it['link'] !== '') {
@@ -821,7 +821,7 @@ function renderComplianceTable(array $items, string $formAction = '', bool $coll
             $shown++;
             echo '<tr><td>' . ($it['link'] !== '' && $it['emp_id'] ? '<a href="' . e($it['link']) . '"><strong>' . e($it['emp_name']) . '</strong></a>' : '<strong>' . e($it['emp_name']) . '</strong>')
                . ($it['school_name'] !== '' ? '<br><small class="text-muted">' . e($it['school_name']) . '</small>' : '') . '</td>'
-               . '<td>' . e($it['violation']) . '</td><td>' . e($it['fix']) . '</td><td style="white-space:nowrap">' . complianceButtons($it, $formAction) . '</td></tr>';
+               . '<td>' . e(nfcText($it['violation'])) . '</td><td>' . e(nfcText($it['fix'])) . '</td><td style="white-space:nowrap">' . complianceButtons($it, $formAction) . '</td></tr>';
         }
         echo '</tbody></table></div></' . $tag . '>';
     }
@@ -861,7 +861,7 @@ function renderCompliancePending(array $rep, bool $compact = true): void {
             <details style="margin-top:8px"><summary style="cursor:pointer;color:#166534;font-weight:700"><i class="fas fa-wand-magic-sparkles"></i> صُحِّح تلقائياً (مكرّر حرفي لا يحتاج قراراً) — <?= $autoN ?></summary>
                 <ul style="margin:6px 0 0;padding-inline-start:18px">
                 <?php foreach (array_slice($rep['auto'], 0, 10) as $a): ?>
-                    <li><strong><?= e($a['emp_name']) ?></strong> (<?= e($a['school_year']) ?>): <?= e($a['violation']) ?> → <?= e($a['result']) ?> <small class="text-muted"><?= e($a['decided_at']) ?></small></li>
+                    <li><strong><?= e($a['emp_name']) ?></strong> (<?= e($a['school_year']) ?>): <?= e(nfcText($a['violation'])) ?> → <?= e(nfcText($a['result'])) ?> <small class="text-muted"><?= e($a['decided_at']) ?></small></li>
                 <?php endforeach; ?>
                 </ul></details>
             <?php endif; ?>

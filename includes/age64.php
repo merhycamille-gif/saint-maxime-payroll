@@ -125,7 +125,7 @@ function renderAge64Cards($rows, $emptyHtml = '') {
     <div class="card no-print" style="border:2px solid #dc2626;margin-bottom:16px">
         <div class="card-header" style="background:#fef2f2"><h3 style="color:#b91c1c"><i class="fas fa-triangle-exclamation"></i> بلغوا سنّ الـ64 — قرار مطلوب (<?= count($need) ?>)</h3></div>
         <div class="card-body">
-            <p style="color:var(--gray-600);margin-top:0">قرّر لكلٍّ: <strong>يبقى</strong> (تُوقَف محسومات التقاعد تلقائياً — للأستاذ الملاك صندوق التعويضات ٦٪ <strong>عنه وعن المدرسة</strong>، وللموظف نهاية الخدمة ٨.٥٪)، أو <strong>تركه</strong> (يُسجَّل تاريخ الترك فيخرج من السنة).</p>
+            <p style="color:var(--gray-600);margin-top:0">قرّر لكلٍّ: <strong>يبقى</strong> (تُوقَف محسومات التقاعد تلقائياً — للأستاذ الملاك صندوق التعويضات ٦٪ <strong>عنه وعن المدرسة</strong>، وللموظف نهاية الخدمة ٨,٥٪)، أو <strong>تركه</strong> (يُسجَّل تاريخ الترك فيخرج من السنة).</p>
             <div class="table-wrapper"><table class="table">
                 <thead><tr><th>الاسم</th><th>الفئة</th><th>العمر</th><th>تاريخ بلوغ 64</th><th>المدرسة</th><th>القرار</th></tr></thead>
                 <tbody>

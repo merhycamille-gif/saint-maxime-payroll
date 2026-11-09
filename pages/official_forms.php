@@ -2253,7 +2253,7 @@ elseif ($form === 'tax_r4'): // بيان معلومات من الأجير إلى
                 <td class="num"><?= formatLBP($dFin, false) ?></td>
                 <td class="num"><?= formatLBP($dFam, false) ?></td>
                 <td class="num"><?= formatLBP($dMal, false) ?></td></tr>
-            <tr class="total-row"><td>اشتراكات التسوية (<?= rtrim(rtrim(number_format($rFin * 100, 1), '0'), '.') ?>% / <?= rtrim(rtrim(number_format($rFam * 100, 1), '0'), '.') ?>% / <?= rtrim(rtrim(number_format($rMal * 100, 1), '0'), '.') ?>%)</td>
+            <tr class="total-row"><td>اشتراكات التسوية (<?= nfc($rFin * 100, 1, true) ?>% / <?= nfc($rFam * 100, 1, true) ?>% / <?= nfc($rMal * 100, 1, true) ?>%)</td>
                 <td class="num"><?= formatLBP($cFin, false) ?></td>
                 <td class="num"><?= formatLBP($cFam, false) ?></td>
                 <td class="num"><?= formatLBP($cMal, false) ?></td></tr>

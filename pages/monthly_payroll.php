@@ -83,7 +83,7 @@ function payslipCardHtml($emp, $salary, $month, $year) {
                     <table class="table">
                         <tr><th colspan="2" style="background:#e3f0ff;color:#000">SALAIRE / الراتب</th></tr>
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= moneyLaw($salary['base_salary_lbp']) ?></td></tr>
-                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= moneyLaw($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
+                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= nfc($salary['grade_at_month'], 1, true) ?>)</td><td class="text-end"><?= moneyLaw($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
                         <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= moneyLaw($salary['base_plus_echelon_lbp'], [], $salary, 'bpe') ?></strong></td></tr><?php endif; ?>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= extraWageMoney($salary) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
@@ -378,7 +378,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                     <?php endif; ?>
                 </tr>
                 <tr>
-                    <td>Heures/semaine / عدد الساعات الأسبوعية</td><td><strong><?= rtrim(rtrim(number_format((float)$emp['hours_per_week'],1),'0'),'.') ?></strong><?php $hrSlip = hoursReductionSlipText($emp, 'ar'); if ($hrSlip !== ''): ?> <small style="color:#b45309">— <?= e($hrSlip) ?></small><?php endif; ?></td>
+                    <td>Heures/semaine / عدد الساعات الأسبوعية</td><td><strong><?= nfc((float)$emp['hours_per_week'], 1, true) ?></strong><?php $hrSlip = hoursReductionSlipText($emp, 'ar'); if ($hrSlip !== ''): ?> <small style="color:#b45309">— <?= e($hrSlip) ?></small><?php endif; ?></td>
                     <td>Jours/semaine / أيام الحضور الأسبوعية</td><td><strong><?= (int)$emp['days_per_week'] ?></strong></td>
                 </tr>
                 <tr>
@@ -402,7 +402,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                     <table class="table">
                         <tr><th colspan="2" style="background:#e3f0ff;color:#000">SALAIRE / الراتب</th></tr>
                         <tr><td>Salaire de base / أساس الراتب</td><td class="text-end"><?= moneyLaw($salary['base_salary_lbp']) ?></td></tr>
-                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= $salary['grade_at_month'] ?>)</td><td class="text-end"><?= moneyLaw($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
+                        <?php if (!$isAdminEmp): ?><tr><td>Échelons / الدرجات (G<?= nfc($salary['grade_at_month'], 1, true) ?>)</td><td class="text-end"><?= moneyLaw($salary['echelon_value_lbp']) ?></td></tr><?php endif; ?>
                         <?php if (!$isAdminEmp): ?><tr style="background:var(--gray-50)"><td><strong>Base + Échelon</strong></td><td class="text-end"><strong><?= moneyLaw($salary['base_plus_echelon_lbp'], [], $salary, 'bpe') ?></strong></td></tr><?php endif; ?>
                         <tr><td>الأجر الإضافي / Supplément</td><td class="text-end"><?= extraWageMoney($salary) ?></td></tr>
                         <tr><td>مكافأة ومساعدة / Prime &amp; aide</td><td class="text-end"><?= money((int)$salary['aide_complementaire_lbp'], rowRate($salary)) ?></td></tr>
@@ -615,7 +615,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                 <div class="mp-spark" title="<?= e(implode(' · ', array_map(fn($s) => $s['lbl'] . ': ' . moneyText($s['v'], $curRate, ['withCur' => false]), $spark))) ?>">
                     <?php foreach ($spark as $s): ?><s style="height:<?= max(3, round($s['v'] / $spMax * 30)) ?>px" title="<?= e($s['lbl']) ?>: <?= e(moneyText($s['v'], $curRate)) ?>"></s><?php endforeach; ?>
                 </div>
-                <?php if ($deltaPct !== null): ?><span class="mp-d <?= $deltaPct > 0.05 ? 'up' : ($deltaPct < -0.05 ? 'dn' : 'nt') ?>" title="vs <?= e($prevLbl) ?> — الفرق عن الشهر الماضي (الإجمالي المتوجب)"><?= ($deltaPct > 0 ? '+' : '') . number_format($deltaPct, 1) ?>%</span><?php endif; ?>
+                <?php if ($deltaPct !== null): ?><span class="mp-d <?= $deltaPct > 0.05 ? 'up' : ($deltaPct < -0.05 ? 'dn' : 'nt') ?>" title="vs <?= e($prevLbl) ?> — الفرق عن الشهر الماضي (الإجمالي المتوجب)"><?= ($deltaPct > 0 ? '+' : '') . nfc($deltaPct, 1) ?>%</span><?php endif; ?>
             </div>
         </div>
     </div>
@@ -666,7 +666,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                                 $gp = null; $gpCls = 'eq'; $gpTxt = '—';
                                 if ($r['is_calculated'] && $r['prev_calc'] && (int)$r['prev_due_lbp'] > 0) {
                                     $gp = ((int)$r['total_due_lbp'] - (int)$r['prev_due_lbp']) / (int)$r['prev_due_lbp'] * 100;
-                                    $gpCls = $gp > 0.5 ? 'up' : ($gp < -0.5 ? 'dn' : 'eq'); $gpTxt = $gpCls === 'eq' ? '=' : (($gp > 0 ? '+' : '') . number_format($gp, 1) . '%');
+                                    $gpCls = $gp > 0.5 ? 'up' : ($gp < -0.5 ? 'dn' : 'eq'); $gpTxt = $gpCls === 'eq' ? '=' : (($gp > 0 ? '+' : '') . nfc($gp, 1) . '%');
                                 } elseif ($r['is_calculated'] && !$r['prev_calc']) { $gpCls = 'nw'; $gpTxt = 'Nouveau'; }
                                 $viewUrl = '?employee_id=' . (int)$r['id'] . '&month=' . $month . '&year=' . $year;
                             ?>
@@ -714,7 +714,7 @@ echo officialFormStyles(); // ستايلات الترويسة/التوقيع/ا�
                             <td class="mp-det text-end text-danger">−<?= money($S['ret'], $curRate) ?></td>
                             <td class="text-end"><?= dualFromUsd($mpT['net'], $mpT['net_usd']) ?></td>
                             <td class="text-end"><strong><?= dualFromUsd($mpT['due'], $mpT['due_usd']) ?></strong></td>
-                            <td class="mp-cmp"><?php if ($deltaPct !== null): ?><span class="mp-dl <?= $deltaPct > 0.5 ? 'up' : ($deltaPct < -0.5 ? 'dn' : 'eq') ?>"><?= ($deltaPct > 0 ? '+' : '') . number_format($deltaPct, 1) ?>%</span><?php endif; ?></td>
+                            <td class="mp-cmp"><?php if ($deltaPct !== null): ?><span class="mp-dl <?= $deltaPct > 0.5 ? 'up' : ($deltaPct < -0.5 ? 'dn' : 'eq') ?>"><?= ($deltaPct > 0 ? '+' : '') . nfc($deltaPct, 1) ?>%</span><?php endif; ?></td>
                             <td></td><td class="no-print"></td>
                         </tr></tfoot><?php endif; ?>
                     </table>

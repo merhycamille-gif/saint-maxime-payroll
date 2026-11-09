@@ -497,7 +497,7 @@ function msaSharePurgeExpired(): void {
         }
     } catch (Throwable $e) {}
 }
-function msaHumanSize(int $b): string { return $b >= 1048576 ? round($b / 1048576, 1) . ' MB' : ($b >= 1024 ? round($b / 1024) . ' KB' : $b . ' B'); }
+function msaHumanSize(int $b): string { return $b >= 1048576 ? nfc($b / 1048576, 1, true) . ' MB' : ($b >= 1024 ? round($b / 1024) . ' KB' : $b . ' B'); }
 function msaMailDupKey($to, $subject, array $attachments, $body): string {
     $tos = array_map('strtolower', array_map('trim', (array)$to)); sort($tos);
     $h = implode(',', $tos) . '|' . trim((string)$subject) . '|' . md5((string)$body);

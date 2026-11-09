@@ -37,7 +37,7 @@ try {
         $taxSets[$r['effective_from'] . '|' . ($r['effective_to'] ?: '')][] = $r;
 } catch (Exception $e) {}
 
-$fmtPct = fn($v) => rtrim(rtrim(number_format((float)$v, 2), '0'), '.') . '%';
+$fmtPct = fn($v) => nfc((float)$v, 2, true) . '%';
 $fmtPeriod = fn($f, $t) => formatDate($f) . ' ← ' . ($t ? formatDate($t) : '<span class="badge badge-success">حتى الآن / En cours</span>');
 
 // جدول نِسَب لركن

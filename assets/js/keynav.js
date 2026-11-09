@@ -142,3 +142,19 @@
     });
     window.msaKeyNav = { fieldsIn: fieldsIn, go: go };
 })();
+
+/**
+ * 🔢 خانات الأرقام تفتح بلا «.00» (2026-11-09 «ببرنامج الرواتب ما تحطّلي الرقم في نقطة ومن بعدو صفورا»): القيمة الآتية من القاعدة
+ *    «9000000.00» تُعرض «9000000» و«1250.50» تُعرض «1250.5». القيمة نفسها لا تتغيّر (أصفار آخر الكسر فقط)، و defaultValue يتبعها
+ *    فلا تُحسب الخانة «معدَّلة». لخانات type=number وخانات المبالغ النصّية (inputmode=decimal/numeric).
+ */
+(function () {
+    'use strict';
+    function clean(v) { var m = /^(-?\d+)\.(\d*?)0+$/.exec(String(v)); return m ? (m[2] ? m[1] + '.' + m[2] : m[1]) : null; }
+    function run(root) {
+        var list = (root || document).querySelectorAll('input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"]');
+        for (var i = 0; i < list.length; i++) { var el = list[i], c = clean(el.value); if (c !== null && document.activeElement !== el) { var same = el.defaultValue === el.value; el.value = c; if (same) el.defaultValue = c; } }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { run(); }); else run();
+    window.msaNumClean = run;
+})();

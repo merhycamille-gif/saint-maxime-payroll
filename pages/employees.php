@@ -1461,7 +1461,7 @@ if ($hrMsg && $hrMsg['reduction'] > 0): ?>
         ساعاته الأسبوعية القانونية <strong><?= (int)$hrMsg['lawHours'] ?></strong> بدل <?= (int)$hrMsg['baseHours'] ?>
         (<?= e($hrMsg['stageLabel']) ?> — الجدول <?= (int)$hrMsg['table'] ?> من المرسوم 2601/2018<?= $hrMsg['assumed'] ? ' — المرحلة افتراضية: حدّد «المرحلة» أو «الصفوف» بملفه للتدقيق' : '' ?>).
         <a href="<?= BASE_URL ?>pages/hours_reduction.php" class="no-print">كل المستحقّين بكل مدرسة ←</a>
-        <?php $fmtH = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.'); if ($hrNeeds): ?>
+        <?php $fmtH = fn($v) => nfc((float)$v, 1, true); if ($hrNeeds): ?>
             <div class="no-print" style="margin-top:8px;padding-top:8px;border-top:1px dashed #d97706">
                 <strong><i class="fas fa-bell"></i> قرار مطلوب:</strong> صار عنده تناقص جديد ببداية سنة <span dir="ltr"><?= e($hrSy) ?></span> —
                 المسجّل بملفه الآن <strong><?= $fmtH($employee['hours_per_week']) ?></strong> ساعة ملاك / تناقص <strong><?= $fmtH($employee['hours_reduction'] ?? 0) ?></strong>.
@@ -1492,13 +1492,13 @@ if ($id > 0):
     $hxIni = mb_strtoupper(mb_substr((string)($employee['first_name_fr'] ?: $employee['first_name_ar']), 0, 1) . mb_substr((string)($employee['last_name_fr'] ?: $employee['last_name_ar']), 0, 1));
     $hxGrade = (float)($employee['current_grade'] ?? 0);
     $hxBase = null; $hxBaseNote = '';
-    if ($employee['employee_type'] === 'enseignant_titulaire' && $hxGrade >= 1) { $hxBase = formatLBP(scaleSalaryLBP($hxGrade)); $hxBaseNote = 'درجة ' . rtrim(rtrim(number_format($hxGrade, 1), '0'), '.') . (fmod($hxGrade, 1) ? ' (نصف الدرجة = الدرجة الكاملة بالراتب)' : ''); }
+    if ($employee['employee_type'] === 'enseignant_titulaire' && $hxGrade >= 1) { $hxBase = formatLBP(scaleSalaryLBP($hxGrade)); $hxBaseNote = 'درجة ' . nfc($hxGrade, 1, true) . (fmod($hxGrade, 1) ? ' (نصف الدرجة = الدرجة الكاملة بالراتب)' : ''); }
     elseif ((float)($employee['base_salary_usd'] ?? 0) > 0) { $hxBase = '$' . number_format((float)$employee['base_salary_usd']); $hxBaseNote = 'راتب متّفق بالدولار'; }
     elseif ((float)($employee['contract_salary_lbp'] ?? 0) > 0) { $hxBase = formatLBP((float)$employee['contract_salary_lbp']); $hxBaseNote = 'راتب متّفق'; }
     $hxAge = ''; $hx64 = '';
     if (!empty($employee['birth_date']) && $employee['birth_date'] !== '0000-00-00') { try { $bd = new DateTime($employee['birth_date']); $hxAge = (string)$bd->diff(new DateTime())->y; $hx64 = (clone $bd)->modify('+64 years')->format('d/m/Y'); } catch (Throwable $e) {} }
     $hxLast = ''; try { $hxNowYm = (int)date('Y') * 100 + (int)date('n'); $hxQ = $db->prepare("SELECT month, year FROM monthly_salaries WHERE employee_id = ? AND (net_salary_lbp > 0 OR base_plus_echelon_lbp > 0) AND (year * 100 + month) <= ? ORDER BY year DESC, month DESC LIMIT 1"); $hxQ->execute([(int)$id, $hxNowYm]); if ($hxR = $hxQ->fetch(PDO::FETCH_ASSOC)) $hxLast = monthName((int)$hxR['month'], 'ar') . ' ' . (int)$hxR['year']; } catch (Throwable $e) {}
-    $hxHours = rtrim(rtrim(number_format((float)($employee['hours_per_week'] ?? 0), 1), '0'), '.');
+    $hxHours = nfc((float)($employee['hours_per_week'] ?? 0), 1, true);
     $hxLaw = ($hrMsg && !empty($hrMsg['reduction']) && $hrMsg['reduction'] > 0) ? (int)$hrMsg['lawHours'] : 0;
     $hxDel = '⚠️ تأكيد الحذف — هل تريد فعلاً حذف الموظف: «' . ($hxNameAr ?: $hxNameFr) . '» ؟ الصفحة التالية تبيّن بأي سنين هو موجود وماذا سيُشال بالضبط قبل أي حذف.';
     $fmtD = function ($d) { return ($d && $d !== '0000-00-00') ? date('d/m/Y', strtotime($d)) : '—'; };
@@ -1557,7 +1557,7 @@ if ($id > 0):
     <div class="ef"><div class="ef-l"><span dir="ltr">Date d'entrée</span>تاريخ الدخول</div><div class="ef-v"><?= $fmtD($employee['hire_date'] ?? '') ?></div></div>
     <?php if ($employee['employee_type'] === 'enseignant_titulaire'): ?>
     <div class="ef"><div class="ef-l"><span dir="ltr">Titularisation</span>دخول الملاك</div><div class="ef-v"><?= $fmtD($employee['titularization_date'] ?? '') ?></div></div>
-    <div class="ef"><div class="ef-l"><span dir="ltr">Échelon actuel</span>الدرجة الحالية</div><div class="ef-v"><?= $hxGrade >= 1 ? e(rtrim(rtrim(number_format($hxGrade, 1), '0'), '.')) : '—' ?></div></div>
+    <div class="ef"><div class="ef-l"><span dir="ltr">Échelon actuel</span>الدرجة الحالية</div><div class="ef-v"><?= $hxGrade >= 1 ? e(nfc($hxGrade, 1, true)) : '—' ?></div></div>
     <?php else: ?>
     <div class="ef"><div class="ef-l"><span dir="ltr">Fonction</span>الوظيفة</div><div class="ef-v"><?= e($employee['job_title'] ?: ($hxIsTeacher ? 'Enseignant' : '—')) ?></div></div>
     <div class="ef"><div class="ef-l"><span dir="ltr">Jours / semaine</span>أيام الأسبوع</div><div class="ef-v"><?= e((string)(int)($employee['days_per_week'] ?? 0) ?: '—') ?></div></div>
@@ -1918,7 +1918,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                         <select name="diploma" class="form-select">
                             <?php foreach ($diplomas as $d): ?>
                                 <option value="<?= e($d['diploma_code']) ?>" data-grade="<?= $d['starting_grade'] ?>" data-immediate="<?= (int)$d['gets_immediate_grade'] ?>" <?= $employee['diploma'] === $d['diploma_code'] ? 'selected' : '' ?>>
-                                    <?= e($d['diploma_name_fr']) ?> / <?= e($d['diploma_name_ar']) ?> (G<?= $d['starting_grade'] ?>)
+                                    <?= e($d['diploma_name_fr']) ?> / <?= e($d['diploma_name_ar']) ?> (G<?= nfc($d['starting_grade'], 1, true) ?>)
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -1968,7 +1968,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                         $hrRedStored = (float)($employee['hours_reduction'] ?? 0); $hrFactor = hoursReductionPresenceFactor(); ?>
                     <div class="form-group" id="hoursReductionFields" data-factor="<?= e($hrFactor) ?>">
                         <label class="form-label">Heures de réduction / ساعات التناقص <small>(مرسوم 2601/2018)</small></label>
-                        <input type="number" name="hours_reduction" id="hoursReductionInput" class="form-control" value="<?= hoursFmt($hrRedStored) ?>" step="0.5" min="0">
+                        <input type="number" name="hours_reduction" id="hoursReductionInput" class="form-control" value="<?= rtrim(rtrim(number_format((float)$hrRedStored, 1, '.', ''), '0'), '.') ?>" step="0.5" min="0">
                         <small style="display:block;margin-top:3px;color:#b45309">
                             <i class="fas fa-user-clock"></i> Présence de réduction / ساعات حضور التناقص: <strong id="hoursReductionPresence"><?= hoursFmt(hoursReductionPresence($hrRedStored)) ?></strong>
                             <span class="text-muted">(كل ساعة تناقص = <?= hoursFmt($hrFactor) ?> ساعة حضور — تلقائياً)</span>
@@ -2229,7 +2229,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                     </div>
                     <div class="form-group salmode-field" data-mode="direct_usd">
                         <label class="form-label">Salaire en USD ($) / الراتب بالدولار</label>
-                        <input type="number" name="base_salary_usd" class="form-control" value="<?= e($employee['base_salary_usd']) ?>" step="0.01" min="0">
+                        <input type="number" name="base_salary_usd" class="form-control" value="<?= e(rtrim(rtrim(number_format((float)($employee['base_salary_usd'] ?? 0), 2, '.', ''), '0'), '.')) ?>" step="0.01" min="0">
                         <?php // 💵📅 (2026-09-21) أساس الدولار «يسري من السنة الدراسية» — قبلها يُعتمد الراتب المتفق عليه بالليرة (كشوف عبرا القديمة)
                         $usdFromSy = (string)($employee['usd_base_from_sy'] ?? '');
                         $usdSyOpts = [currentSchoolYear()];
@@ -2841,7 +2841,7 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                             <label class="switch"><input type="checkbox" name="keep_working_past_64" value="1" <?= !empty($employee['keep_working_past_64']) ? 'checked' : '' ?>><span class="slider"></span></label>
                         </label>
                         <p style="font-size:12px;color:var(--gray-600);margin:0">
-                            عند تفعيله لمن بلغ 64 سنة: تُوقَف تلقائياً — للأستاذ <strong>الملاك</strong>: صندوق التعويضات ٦٪ <strong>عنه وعن المدرسة</strong>؛ وللموظف: نهاية الخدمة ٨.٥٪ (المدرسة). يبدأ الإعفاء من <strong>شهر بلوغه 64</strong> فقط (الأشهر السابقة تبقى كما هي). إن كنت <strong>لا تريد إبقاءه</strong>، سجّل تاريخ الترك في أعلى البطاقة بدل ذلك.
+                            عند تفعيله لمن بلغ 64 سنة: تُوقَف تلقائياً — للأستاذ <strong>الملاك</strong>: صندوق التعويضات ٦٪ <strong>عنه وعن المدرسة</strong>؛ وللموظف: نهاية الخدمة ٨,٥٪ (المدرسة). يبدأ الإعفاء من <strong>شهر بلوغه 64</strong> فقط (الأشهر السابقة تبقى كما هي). إن كنت <strong>لا تريد إبقاءه</strong>، سجّل تاريخ الترك في أعلى البطاقة بدل ذلك.
                         </p>
                     </div>
                 </div>

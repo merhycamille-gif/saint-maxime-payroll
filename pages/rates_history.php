@@ -81,7 +81,7 @@ foreach ($rows as $r) $byKey[$r['param_key']][] = $r;
 function fmtRate($key, $val) {
     $p = ratedParams();
     if (($p[$key]['unit'] ?? '') === 'lbp') return formatLBP($val);
-    $v = rtrim(rtrim(number_format((float)$val, 4, '.', ''), '0'), '.');
+    $v = nfc((float)$val, 4, true);
     return $v . ' %';
 }
 

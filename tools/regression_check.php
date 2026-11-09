@@ -11567,6 +11567,30 @@ try {
 } catch (Throwable $e) { $ok299 = false; $why299 = $e->getMessage(); }
 check('⌨️ التنقّل بالكيبورد بكل الصفحات (2026-11-09): Enter = الخانة التالية بلا حفظ (آخر خانة تقف على كبسة الحفظ ولا تكبسها) · الأسهم فوق/تحت/شمال/يمين بين الخانات · البحث والفلترة وكلمة السرّ والنصّ الطويل كما هي · موازنة الوزارة: Enter لا يحفظ القسم', $ok299, $why299);
 
+/* 300) 🔢 (2026-11-09 «ببرنامج الرواتب ما تحطّلي الرقم في نقطة ومن بعدو صفورا… خاصّة أرقام الموازنة» ثمّ «إذا في كسور منحطّ فاصلة»):
+   الرقم الصحيح بلا «.00»، والكسر الحقيقي بفاصلة لا نقطة (nfc)، والقراءة العكسية تفهم الفاصلة (numLoose + المجاميع + التصدير) فلا يصير 12,5 ⇒ 125.
+   موازنة الوزارة: لا رقم ظاهر بـ«.00»، خانة التعديل تفتح نظيفة، والإكسل بلا «.00». خانات type=number تبقى بنقطة (المتصفّح). */
+$ok300 = false; $why300 = '';
+try {
+    $okFn0 = nfc(9000000.00) === '9,000,000' && nfc('56000000.00') === '56,000,000' && nfc(1250.5) === '1,250,50' && nfc(12.5, 1, true) === '12,5' && nfc(34.875, 2, true) === '34,88'
+        && nfc(0) === '0' && nfc(-0.004) === '0' && nfc(38.0, 1, true) === '38' && nfc(0.5, 2, true) === '0,5' && strpos(nfc(1234567.891), '.') === false;
+    $okRd0 = numLoose('1,250') === 1250.0 && numLoose('12,5') === 12.5 && numLoose('1,250,50') === 1250.5 && numLoose('12.5') === 12.5 && numLoose('9,000,000') === 9000000.0 && numLoose('9000000.00') === 9000000.0 && numLoose('-3,75') === -3.75 && numLoose('') === 0.0;
+    $okGr0 = gradeDisplay('enseignant_titulaire', 38.5) === '38,5' && gradeDisplay('enseignant_titulaire', 38.0) === '38' && nfcText('الدرجة 24 → 23.5') === 'الدرجة 24 → 23,5' && nfcText('30.9.2026') === '30.9.2026';
+    $hx0 = (string)file_get_contents($PROJ . '/pages/html_export.php'); $tj0 = (string)file_get_contents($PROJ . '/assets/js/totals.js'); $re0 = (string)file_get_contents($PROJ . '/includes/report_export.php'); $kn0 = (string)file_get_contents($PROJ . '/assets/js/keynav.js');
+    $okPar0 = strpos($hx0, 'return (string)numLoose($mc[1]);') !== false && strpos($tj0, 'function pn(s)') !== false && strpos($tj0, "replace(/,/g, '')) || 0; found") === false && strpos($re0, 'numLoose($v)') !== false && strpos($kn0, 'window.msaNumClean') !== false;
+    $mb0 = (string)file_get_contents($PROJ . '/pages/mehe_budget.php'); $mi0 = (string)file_get_contents($PROJ . '/includes/mehe_budget.php');
+    $h0 = renderPage('pages/mehe_budget.php', [], [], [2], '', '2026-2027'); $v0 = (string)preg_replace('#<script\b.*?</script>|<style\b.*?</style>#si', '', $h0);
+    $nDot0 = preg_match_all('/>\s*-?[\d,]*\d\.\d{1,2}\s*(?:%|٪)?\s*</u', $v0);
+    $okMehe0 = $nDot0 === 0 && strlen($h0) > 50000 && strpos($mb0, 'function numClean(v)') !== false && strpos($mb0, 'i.dataset.v0!==undefined') !== false && strpos($mb0, '$fmt2 = fn($v) => nfc((float)$v, 2);') !== false
+        && strpos($mi0, '$num = fn($v) => numLoose($v);') !== false && strpos($mi0, '<numFmt numFmtId="165" formatCode="#,##0"/>') !== false;
+    // خانة type=number لا تأخذ فاصلة (تفرغ بالمتصفّح فيضيع الرقم عند الحفظ)
+    $es0 = (string)file_get_contents($PROJ . '/pages/employees.php');
+    $okInp0 = strpos($es0, 'value="<?= hoursFmt(') === false && preg_match('/type="number"[^>]*value="<\?= *(e\()?nfc\(/', $es0 . $mb0) === 0;
+    $ok300 = $okFn0 && $okRd0 && $okGr0 && $okPar0 && $okMehe0 && $okInp0;
+    $why300 = 'nfc=' . (int)$okFn0 . ' read=' . (int)$okRd0 . ' grade=' . (int)$okGr0 . ' parsers=' . (int)$okPar0 . ' mehe=' . (int)$okMehe0 . ' (dots=' . $nDot0 . ') inputs=' . (int)$okInp0;
+} catch (Throwable $e) { $ok300 = false; $why300 = $e->getMessage(); }
+check('🔢 الأرقام بلا «.00» والكسر بفاصلة (2026-11-09): nfc/numLoose · الدرجات 38,5 · موازنة الوزارة بلا رقم بنقطة (شاشة + خانة التعديل + إكسل) · المجاميع والتصدير يقرأون الفاصلة كسراً لا آلافاً · خانات type=number تبقى بنقطة', $ok300, $why300);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

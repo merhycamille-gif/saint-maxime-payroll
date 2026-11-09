@@ -611,7 +611,7 @@ function reportDocThumb($path) {
             'social'  => ['عائلي / Famille', fn($r) => e(socialStatusLabel($r['social_status'], 'fr') . ' / ' . socialStatusLabel($r['social_status'], 'ar')) . ' ('.(int)$r['number_of_children'].')'],
             'hire'    => ['تاريخ الدخول / Date d\'embauche', fn($r) => formatDate(shownHireDate($r))],
             'titul'   => ['الملاك / Titularisation', fn($r) => formatDate(shownTitularizationDate($r))],
-            'hours'   => ['ساعات/أسبوع / Heures/sem.', fn($r) => rtrim(rtrim(number_format((float)$r['hours_per_week'],1),'0'),'.')],
+            'hours'   => ['ساعات/أسبوع / Heures/sem.', fn($r) => nfc((float)$r['hours_per_week'], 1, true)],
             'days'    => ['أيام/أسبوع / Jours/sem.', fn($r) => (int)$r['days_per_week']],
             'status'  => ['الحالة / Statut', fn($r) => '<span class="badge badge-'.employeeStatusLabel($r['status'])['badge'].'">'.e(employeeStatusLabel($r['status'], 'fr')['label'] . ' / ' . employeeStatusLabel($r['status'], 'ar')['label']).'</span>'],
             'gaps'    => ['ملف ناقص / Dossier incomplet', fn($r) => e(incompleteFileText($r, $db, $bonusSy))], // 🆕 (2026-09-23) النواقص بالتفصيل — فارغ للملف المكتمل

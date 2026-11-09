@@ -1731,7 +1731,7 @@ function newTeachersReportCols(): array {
         'subjects' => ['المواد / Matières', fn($r) => $t($r['subjects_taught'] ?? ''), 18],
         'classes'  => ['الصفوف / Classes', fn($r) => $t($r['classes_taught'] ?? '') !== '' ? $t(strip_tags((string)classLevelNames($r['classes_taught']))) : '', 18],
         'niveau'   => ['المرحلة / Niveau', fn($r) => $t($r['niveau_scolaire'] ?? ''), 12],
-        'hours'    => ['ساعات/أيام بالأسبوع / Heures-jours', fn($r) => $t(rtrim(rtrim(number_format((float)($r['hours_per_week'] ?? 0), 1), '0'), '.') . ' س / ' . (int)($r['days_per_week'] ?? 0) . ' ي'), 12],
+        'hours'    => ['ساعات/أيام بالأسبوع / Heures-jours', fn($r) => $t(nfc((float)($r['hours_per_week'] ?? 0), 1, true) . ' س / ' . (int)($r['days_per_week'] ?? 0) . ' ي'), 12],
         'grade'    => ['الدرجة / Échelon', fn($r) => $t(gradeDisplay($r)), 8],
         'mof'      => ['رقم المالية / N° MOF', fn($r) => ((int)($r['tax_subject'] ?? 1)) === 1 ? ($t($r['finance_ministry_number'] ?? '') !== '' ? $t($r['finance_ministry_number']) : '⚠️ ناقص') : 'لا يخضع', 14],
         'caisse'   => ['رقم الصندوق / N° Caisse', fn($r) => ((int)($r['eoc_subject'] ?? 0)) === 1 ? ($t($r['caisse_number'] ?? '') !== '' ? $t($r['caisse_number']) : '⚠️ ناقص') : 'لا يخضع', 12],
@@ -1739,9 +1739,9 @@ function newTeachersReportCols(): array {
             $mode = $t($r['salary_input_mode'] ?? '');
             if (($r['employee_type'] ?? '') === 'enseignant_titulaire') return 'ملاك — السلسلة حسب الدرجة';
             // المبلغ الفعلي أولاً (وضع الإدخال وحده لا يكفي: «دولار» بصفر = لا أساس)
-            if ((float)($r['base_salary_usd'] ?? 0) > 0) return 'أساس بالدولار: ' . number_format((float)$r['base_salary_usd'], 2) . ' $';
+            if ((float)($r['base_salary_usd'] ?? 0) > 0) return 'أساس بالدولار: ' . nfc((float)$r['base_salary_usd'], 2) . ' $';
             if ((float)($r['contract_salary_lbp'] ?? 0) > 0) return 'أساس بالليرة: ' . $lbp($r['contract_salary_lbp']) . ' ل.ل';
-            if ((float)($r['base_salary_lbp_percent'] ?? 0) > 0) return 'نسبة من السلسلة: ' . rtrim(rtrim(number_format((float)$r['base_salary_lbp_percent'], 2), '0'), '.') . '٪';
+            if ((float)($r['base_salary_lbp_percent'] ?? 0) > 0) return 'نسبة من السلسلة: ' . nfc((float)$r['base_salary_lbp_percent'], 2, true) . '٪';
             if (!empty($r['fin_ok'])) return 'راتب مخزّن بالأشهر (منقول — بلا أساس بالملف)'; // منقول بالمليم: الأساس بالأشهر لا بالإعداد
             return '⚠️ لا أساس بالملف';
         }, 20],
@@ -5795,6 +5795,34 @@ function exportToolbar($title = 'document', $opts = []) {
 // =====================================================
 // Formatting
 // =====================================================
+/**
+ * 🔢 رقم للعرض بلا «.00» وبلا نقطة (2026-11-09 «ببرنامج الرواتب ما تحطّلي الرقم في نقطة ومن بعدو صفورا… خاصّة أرقام الموازنة»
+ *    ثمّ «إذا في كسور منحطّ فاصلة»): الآلاف بفاصلة، الرقم الصحيح بلا كسر، والكسر الحقيقي بفاصلة لا نقطة (12,5 · 1,250,50).
+ *    $trimAll = true ⇒ تُشال أصفار آخر الكسر كلّها (نِسَب/ساعات/درجات: 12,5)؛ false ⇒ الكسر بخاناته كاملة إن وُجد (مبالغ: 12,50).
+ *    للعرض فقط — لا تُستعمل لقيمة تُحسَب أو تُخزَّن أو لخانة type=number. القراءة العكسية = numLoose().
+ */
+function nfc($v, int $dec = 2, bool $trimAll = false): string {
+    $s = number_format((float)$v, max(0, $dec), '.', ',');
+    $p = strpos($s, '.'); if ($p === false) return $s;
+    $int = substr($s, 0, $p); $frac = substr($s, $p + 1);
+    if ($trimAll || trim($frac, '0') === '') $frac = rtrim($frac, '0');
+    if ($frac === '') return ($int === '-0') ? '0' : $int;
+    return $int . ',' . $frac;
+}
+/**
+ * 🔢 قراءة رقم مكتوب بفواصل: «1,250» = 1250 (آلاف) · «12,5» / «1,250,50» = كسر بفاصلة (خانة أو خانتان بعد آخر فاصلة) · «12.5» كسر بنقطة.
+ *    مجموعة الآلاف دائماً 3 أرقام، فخانة/خانتان بعد آخر فاصلة لا تكونان إلا كسراً.
+ */
+function numLoose($v): float {
+    $s = str_replace([' ', "\u{00A0}", '٬', "\u{202A}", "\u{202C}"], '', trim((string)$v));
+    if ($s === '') return 0.0;
+    if (strpos($s, '.') === false && preg_match('/^(-?[\d,]*\d),(\d{1,2})$/', $s, $m)) return (float)(str_replace(',', '', $m[1]) . '.' . $m[2]);
+    return (float)str_replace(',', '', $s);
+}
+
+/** 🔢 نصّ محفوظ قديم (سجلّ/قرار) فيه كسر بنقطة «23.5» ⇒ يُعرض بفاصلة «23,5» — التواريخ والأرقام المنقّطة (30.9.2026، v2.0.0) لا تُمسّ. للعرض فقط. */
+function nfcText($s): string { return (string)preg_replace('/(?<![\d.,])(\d+)\.(\d{1,2})(?![\d.])/u', '$1,$2', (string)$s); }
+
 function formatLBP($amount, $withCurrency = true) {
     $formatted = number_format((float)$amount, 0, '.', ',');
     return $withCurrency ? $formatted . ' L.L' : $formatted;
@@ -6666,7 +6694,7 @@ function gradeDisplay($empOrType, $grade = null) {
         $type = (string)$empOrType;
     }
     if ($type === 'employe') return '—'; // موظف إداري: لا درجة (قانون العمل)
-    return rtrim(rtrim(number_format((float)$grade, 1, '.', ''), '0'), '.');
+    return nfc((float)$grade, 1, true);   // 🔢 (2026-11-09) بلا نقطة: 38,5
 }
 
 /**
@@ -7249,7 +7277,8 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
     $st = $db->prepare("SELECT * FROM employee_grade_history WHERE employee_id = ? ORDER BY change_date ASC, id ASC");
     $st->execute([(int)$emp['id']]);
     $history = $st->fetchAll(PDO::FETCH_ASSOC);
-    $fmtG = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.');
+    $fmtG = fn($v) => nfc((float)$v, 1, true);   // 🔢 عرض بلا نقطة (2026-11-09)؛ خانة type=number تحت تبقى بنقطة ($fmtGIn)
+    $fmtGIn = fn($v) => rtrim(rtrim(number_format((float)$v, 1, '.', ''), '0'), '.');
 
     // 🪄 عرض «درجة كل سنتين» (طلبه 2026-08-29 — «بيكون أفضل بس انتبه ما تخرب الاحتساب»):
     // التخزين والحساب يبقيان بالأنصاف (0.5 كل سنة) **بلا أي تغيير**؛ هنا **عرضاً فقط** نلمّ كل نصفَي
@@ -7379,7 +7408,7 @@ function renderGradeChecklist($emp, $returnTo = 'grades') {
                         <?php if ($isTitul || $pairRow): ?>
                             <span class="badge badge-success" <?= $pairRow ? 'title="نصّان: تشرين ' . (int)substr($pairRow['change_date'], 0, 4) . ' + تشرين ' . (int)substr($h['change_date'], 0, 4) . '"' : '' ?>>+<?= $fmtG($amount) ?></span>
                         <?php else: ?>
-                            <input type="number" name="gamt[<?= (int)$h['id'] ?>]" value="<?= $fmtG($amount) ?>" step="0.5" min="-52" max="52" readonly
+                            <input type="number" name="gamt[<?= (int)$h['id'] ?>]" value="<?= $fmtGIn($amount) ?>" step="0.5" min="-52" max="52" readonly
                                    class="form-control gr-field" style="max-width:75px;padding:4px 6px;text-align:center;margin:0 auto">
                         <?php endif; ?>
                     </td>

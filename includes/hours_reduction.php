@@ -204,7 +204,7 @@ function handleHoursReductionPost($db, $redirectTo) {
 
 /**
  * ⏱️ ساعات حضور التناقص (طلبه 2026-09-03): «كل ساعة تناقص بتصير ساعة ونص» — 4 ساعات تناقص = 6 ساعات حضور.
- * المعامل إعداد عام قابل للتعديل (hours_reduction_presence_factor، افتراضي 1.5) — البرنامج يحسبها تلقائياً من ساعات التناقص المسجّلة بملفه.
+ * المعامل إعداد عام قابل للتعديل (hours_reduction_presence_factor، افتراضي 1,5) — البرنامج يحسبها تلقائياً من ساعات التناقص المسجّلة بملفه.
  */
 function hoursReductionPresenceFactor() {
     $f = (float)getSetting('hours_reduction_presence_factor', 1.5);
@@ -215,7 +215,7 @@ function hoursReductionPresence($reductionHours) {
 }
 /** رقم ساعات بلا أصفار زائدة (4 · 6 · 1.5). */
 function hoursFmt($v) {
-    return rtrim(rtrim(number_format((float)$v, 1), '0'), '.');
+    return nfc((float)$v, 1, true);
 }
 /**
  * نص سطر التناقص لبطاقة الرواتب/القسيمة بجانب الساعات الفعلية: «تناقص 4 س — حضور التناقص 6 س»، أو '' إن لا تناقص مسجّلاً.
@@ -257,7 +257,7 @@ function renderHoursReductionPending($bySchool, $sy, $collapsed = false) {
     // $collapsed = true (لوحة القيادة): كل مدرسة سطر واحد (الاسم + العدد) يُفتح لرؤية الأسماء — حتى لا تتعجّق الرئيسية بعشرات الأسطر
     if (!$bySchool) return;
     $total = 0; foreach ($bySchool as $rows) $total += count($rows);
-    $fmt = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.');
+    $fmt = fn($v) => nfc((float)$v, 1, true);
     ?>
     <div class="card no-print" id="hrPending" style="border:2px solid #d97706;margin-bottom:16px">
         <div class="card-header" style="background:#fffbeb"><h3 style="color:#b45309"><i class="fas fa-clock"></i>

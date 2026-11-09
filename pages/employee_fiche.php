@@ -295,7 +295,7 @@ $exportOpts = [
 $backHref = BASE_URL . 'pages/attestations.php?employee_id=' . $employeeId . '&dossier=1';
 
 // ===== القيم — نفس مصادر «الملف الكامل»، مترجمة للغة المختارة، والفارغ لا يُطبع =====
-$num  = fn($v) => rtrim(rtrim(number_format((float)$v, 2), '0'), '.');
+$num  = fn($v) => nfc((float)$v, 2, true);
 $typeKey = ['enseignant_titulaire' => 'type_tit', 'enseignant_contractuel' => 'type_con', 'employe' => 'type_emp'][$emp['employee_type'] ?? ''] ?? null;
 $typeLbl = $typeKey ? $t($typeKey) : employeeTypeLabel($emp['employee_type'], $vl);
 $stKey = 'st_' . ($emp['status'] ?? '');
@@ -323,7 +323,7 @@ $phones   = implode(' · ', array_filter([trim((string)($emp['phone1'] ?? '')), 
 $modeLbl  = isLaborLawSalary($emp) ? $t('m_law')
           : (['direct_usd' => $t('m_usd'), 'percent_of_lbp' => $t('m_pct'), 'direct_lbp' => $t('m_lbp')][$emp['salary_input_mode'] ?? ''] ?? ($emp['salary_input_mode'] ?? ''));
 $baseLbl  = '';
-if (($emp['salary_input_mode'] ?? '') === 'direct_usd' && (float)($emp['base_salary_usd'] ?? 0)) $baseLbl = '$' . number_format((float)$emp['base_salary_usd'], 2);
+if (($emp['salary_input_mode'] ?? '') === 'direct_usd' && (float)($emp['base_salary_usd'] ?? 0)) $baseLbl = '$' . nfc((float)$emp['base_salary_usd'], 2);
 if (($emp['salary_input_mode'] ?? '') === 'percent_of_lbp' && (float)($emp['base_salary_lbp_percent'] ?? 0)) $baseLbl = $num($emp['base_salary_lbp_percent']) . '%';
 if (($emp['salary_input_mode'] ?? '') === 'direct_lbp' && (float)($emp['contract_salary_lbp'] ?? 0)) $baseLbl = formatLBP($emp['contract_salary_lbp']);
 $transport = ((float)($emp['transport_daily_amount'] ?? 0) > 0)
