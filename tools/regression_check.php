@@ -4335,9 +4335,10 @@ $ent77 = (int)$db->query("SELECT id FROM schools WHERE name_ar LIKE 'مدرسة 
 $ecw77 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, COALESCE(SUM(ms.transport_lbp),0) tr, COALESCE(SUM(ms.total_due_lbp),0) due
     FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
     WHERE e.school_id=$ent77 AND e.is_deleted=0 AND e.id <> 283 AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();   // 📅 الفئة بشهر الكشف؛ جومانا بصيبص 283 كانت ملاكاً بتشرين 2025 («صارت متعاقدة» 2026-2027 بقراره 11-02)
-check('الانتقال: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم (17 شخصاً، صافي 649,445,000 + نقل 113,400,000 = مجموع 762,845,000 — الصافي داون للألف)',
-      (int)$ecw77['n'] === 17 && (float)$ecw77['net'] === 649445000.0
-      && (float)$ecw77['tr'] === 113400000.0 && (float)$ecw77['due'] === 762845000.0,
+// ⚖️ (2026-11-09 «صحّح كل شي على القانون يا أستاذ») ضريبة سمير اعزان 155,000→230,000 وطانيوس سابا 325,500→438,000 بتشرين 2025 ⇒ الصافي 649,445,000→649,258,000 والمجموع 762,845,000→762,658,000
+check('الانتقال: كشف تشرين للمتعاقدين والموظفين الخاضعين = كشفه القديم بالمليم بعد تصحيح ضريبة القانون 11-09 (17 شخصاً، صافي 649,258,000 + نقل 113,400,000 = مجموع 762,658,000 — الصافي داون للألف)',
+      (int)$ecw77['n'] === 17 && (float)$ecw77['net'] === 649258000.0
+      && (float)$ecw77['tr'] === 113400000.0 && (float)$ecw77['due'] === 762658000.0,
       "n={$ecw77['n']} net={$ecw77['net']}");
 $who77 = function (string $first, string $last) use ($db, $ent77) {
     $st = $db->prepare("SELECT e.id, e.employee_type FROM employees e WHERE e.school_id=$ent77 AND e.is_deleted=0
@@ -4349,9 +4350,9 @@ $who77 = function (string $first, string $last) use ($db, $ent77) {
 $samir77 = $who77('سمير', 'اعزان'); $almas77 = $who77('الماس', 'فرح'); $clarita77 = $who77('كلاريتا', 'مساعد');
 $samOct77 = $db->query("SELECT net_salary_lbp nt, income_tax_lbp tx FROM monthly_salaries WHERE employee_id=" . (int)$samir77['id'] . " AND year=2025 AND month=10")->fetch();
 $clRows77 = (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id=" . (int)$clarita77['id'] . " AND (year*100+month) BETWEEN 202510 AND 202609")->fetchColumn();
-check('الانتقال: الخمسة صاروا متعاقدين حسب كشفه (الماس فرح وسمير اعزان نموذجاً) وسمير على ضريبة تنزيله العائلي (155,000 وصافي 47,375,000) + كلاريتا بلا أشهر + الشفاء موصول',
+check('الانتقال: الخمسة صاروا متعاقدين حسب كشفه (الماس فرح وسمير اعزان نموذجاً) وسمير على ضريبة القانون بعد تصحيح 11-09 (230,000 وصافي 47,300,000 — كان 155,000/47,375,000 بتنزيل ولد لا يملكه) + كلاريتا بلا أشهر + الشفاء موصول',
       $almas77['employee_type'] === 'enseignant_contractuel' && $samir77['employee_type'] === 'enseignant_contractuel'
-      && (float)$samOct77['nt'] === 47375000.0 && (float)$samOct77['tx'] === 155000.0
+      && (float)$samOct77['nt'] === 47300000.0 && (float)$samOct77['tx'] === 230000.0
       && $clRows77 === 0
       && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healEntikalCw20260827') !== false,
       "سمير net={$samOct77['nt']} tax={$samOct77['tx']} كلاريتا=$clRows77");
@@ -11681,6 +11682,45 @@ try {
     $why302 = 'endpoint=' . (int)$okEp2 . ' ext=' . (int)$okExt2 . ' heal=' . (int)$okHeal2 . ' auto=' . (int)$okAuto2 . ' gone=' . (int)$okGone2 . '(' . count($g2) . ') match=' . (int)$okMatch2 . ' lines=' . count($j2a['lines'] ?? []);
 } catch (Throwable $e) { $ok302 = false; $why302 = $e->getMessage(); }
 check('🔘 كبسة واحدة «رحّل من برنامج الرواتب» بصفحة موقع الصندوق (2026-11-09): المدرسة تُعرَف برقمها عند الصندوق لهذا الطلب فقط · رقم غير مسجَّل ⇒ خطأ بلا بيانات · لا ترحيل إن اختلفت المدرسة/السنة أو تعدّدت صفحات اللائحة · الخلفية قراءة فقط', $ok302, $why302);
+
+/* 303) 🔒🧷 (2026-11-10 «بدون أخطاء ما تخرّب البرنامج»):
+   (أ) إعادة حساب المدى (سعر الصرف/الشطور/السلسلة/الإعدادات) كانت تعيد 54 ألف شهر مدفوع منذ 2017 بملف الموظف الحالي — الآن الشهر المدفوع بسنة سابقة محميّ (كما recalcEmployeeYear) إلا بالتطبيق الصريح.
+   (ب) المزامنة: الصفّ المرفوع يحدّث أساسه فوراً، والمطابق أونلاين أصلاً ليس تعارضاً (6 أسعار صرف ظهرت «تعارضاً» كل دورة 11-09). */
+$ok303 = false; $why303 = '';
+try {
+    require_once $PROJ . '/includes/payroll_calculator.php'; require_once $PROJ . '/includes/local_sync.php'; require_once $PROJ . '/includes/sync_common.php';
+    $curSy303 = currentSchoolYear(); $c303 = [];
+    $prevOk303 = $GLOBALS['msa_recalc_paid_ok'] ?? null; unset($GLOBALS['msa_recalc_paid_ok']);   // أداة الفحص ترفع علم الفعل الصريح عامّاً (السطر 39) — الحارس يُختبر بلا العلم
+    $okGuard303 = recalcRangeRowProtected(['is_paid' => 1, 'school_year' => '2024-2025', 'year' => 2025, 'month' => 3], $c303) === true
+        && recalcRangeRowProtected(['is_paid' => 0, 'school_year' => '2024-2025', 'year' => 2025, 'month' => 3], $c303) === false                 // غير مدفوع ⇒ يُعاد
+        && recalcRangeRowProtected(['is_paid' => 1, 'school_year' => $curSy303, 'year' => 2026, 'month' => 10], $c303) === false                    // مدفوع بسنة البرنامج ⇒ يُعاد (قاعدة البرنامج)
+        && recalcRangeRowProtected(['is_paid' => 1, 'school_year' => '', 'year' => 2024, 'month' => 11], $c303) === true;                           // بلا سنة مخزّنة ⇒ تُستنتج من الشهر
+    $GLOBALS['msa_recalc_paid_ok'] = true; $c303b = [];
+    $okExplicit303 = recalcRangeRowProtected(['is_paid' => 1, 'school_year' => '2024-2025', 'year' => 2025, 'month' => 3], $c303b) === false;    // التطبيق الصريح يفتح الحارس
+    if ($prevOk303 === null) unset($GLOBALS['msa_recalc_paid_ok']); else $GLOBALS['msa_recalc_paid_ok'] = $prevOk303;
+    $pc303 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/payroll_calculator.php'));
+    $okSrcA303 = strpos($pc303, 'if (recalcRangeRowProtected($r, $protCache)) { $skipped++; continue; }') !== false && strpos($pc303, 'ms.school_year, COALESCE(ms.is_paid, 0) is_paid') !== false
+        && strpos($pc303, "logAudit('recalc_skipped_paid_range'") !== false;
+    // (ب) خطّة الرفع النقيّة: 4 الأونلاين كما الأساس ⇒ يُرفع · 1 جديد وليس أونلاين ⇒ يُرفع · 5 و2 مطابقان أونلاين أصلاً ⇒ أساس فقط · 9 محذوف هناك أصلاً ⇒ أساس فقط · 7 يُحذف · 6/3/8 تعارض
+    $pp303 = localSyncPushPlan(['ins' => ['1', '2', '3'], 'upd' => ['4', '5', '6'], 'del' => ['7', '8', '9'], 'base' => ['4' => 'd0', '5' => 'e0', '6' => 'f0', '7' => 'g0', '8' => 'h0', '9' => 'i0']],
+        ['2' => 'b', '3' => 'X', '4' => 'd0', '5' => 'e1', '6' => 'Z', '7' => 'g0', '8' => 'h1'], ['1' => 'a', '2' => 'b', '3' => 'c', '4' => 'd1', '5' => 'e1', '6' => 'f1']);
+    $okPlan303 = $pp303['up'] === ['4', '1'] && $pp303['same'] === ['5', '2', '9'] && $pp303['del'] === ['7'] && $pp303['conf'] === [['6', 'upd'], ['3', 'ins'], ['8', 'del']];
+    $pdoB = localSyncPdo(); $pdoB->exec("DROP DATABASE IF EXISTS `smp_rt_b`"); $pdoB->exec("CREATE DATABASE `smp_rt_b` CHARACTER SET utf8mb4");
+    $pdoB->exec("CREATE TABLE `smp_rt_b`.`t` (id INT NOT NULL PRIMARY KEY, v VARCHAR(10) NULL) ENGINE=InnoDB"); $pdoB->exec("INSERT INTO `smp_rt_b`.`t` VALUES (1,'a'),(2,'b')");
+    $pdoB->exec("CREATE TABLE `smp_rt_b`.`_sync_base` (tbl VARCHAR(64) NOT NULL, pk VARCHAR(191) NOT NULL, h CHAR(32) NOT NULL, PRIMARY KEY (tbl, pk))");
+    $pdoB->exec("INSERT INTO `smp_rt_b`.`_sync_base` VALUES ('t','1','oldhash'),('t','3','gonehash'),('u','1','other')");
+    $mB303 = syncTableMeta($pdoB, 'smp_rt_b', 't'); $realH = syncRowHashes($pdoB, 'smp_rt_b', 't', $mB303);
+    localSyncBaseRefreshRows($pdoB, 'smp_rt_b', 't', $mB303, ['1', '2', '3']);
+    $baseAfter = []; foreach ($pdoB->query("SELECT tbl, pk, h FROM `smp_rt_b`.`_sync_base` ORDER BY tbl, pk")->fetchAll(PDO::FETCH_ASSOC) as $br) $baseAfter[$br['tbl'] . '|' . $br['pk']] = $br['h'];
+    $pdoB->exec("DROP DATABASE IF EXISTS `smp_rt_b`");
+    $okBase303 = $baseAfter === ['t|1' => $realH['1'], 't|2' => $realH['2'], 'u|1' => 'other'];   // 1 تحدّث · 2 أُضيف · 3 (محذوف محلياً) شيل · جدول آخر لا يُمسّ
+    $ls303 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/local_sync.php'));
+    $okSrcB303 = strpos($ls303, '$pp = localSyncPushPlan($d, $online, $cur);') !== false && strpos($ls303, "localSyncBaseRefreshRows(\$pdo, \$s, \$t, \$m, array_merge(\$upPks, \$delPks, \$pp['same']));") !== false
+        && strpos($ls303, '$cur = syncRowHashes($pdo, $s, $t, $m, $pks);') !== false && strpos($ls303, "foreach (\$pp['conf'] as [\$cpk, \$ckind]) \$conflict(\$cpk, \$ckind);") !== false;
+    $ok303 = $okGuard303 && $okExplicit303 && $okSrcA303 && $okPlan303 && $okBase303 && $okSrcB303;
+    $why303 = 'guard=' . (int)$okGuard303 . ' explicit=' . (int)$okExplicit303 . ' srcA=' . (int)$okSrcA303 . ' plan=' . (int)$okPlan303 . ' base=' . (int)$okBase303 . ' srcB=' . (int)$okSrcB303;
+} catch (Throwable $e) { $ok303 = false; $why303 = $e->getMessage(); }
+check('🔒🧷 (2026-11-10) إعادة حساب المدى لا تمسّ الأشهر المدفوعة بالسنين السابقة (سعر الصرف/الشطور/السلسلة/الإعدادات) إلا بالتطبيق الصريح · المزامنة: المرفوع يحدّث أساسه فوراً والمطابق أونلاين ليس تعارضاً', $ok303, $why303);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

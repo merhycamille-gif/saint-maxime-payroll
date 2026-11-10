@@ -995,6 +995,14 @@ function fillCarriedMissingMonths(int $employeeId, string $schoolYear): int {
  * أمان حاسم: تتخطّى الموظفين «المنقولين بلا إعداد» (غير الملاك وأساسهم بالدولار/بالعقد = صفر)
  * تماماً كما يفعل recalcEmployeeYear، لئلا تُصفَّر رواتبهم المنقولة من البرنامج القديم.
  */
+/** 🔒 (2026-11-10) هل صفّ الراتب محميّ من إعادة حساب المدى؟ = مدفوع وسنته الدراسية سابقة (protectPaidMonths) — دالّة نقيّة للفحص؛ $cache لكل سنة */
+function recalcRangeRowProtected(array $r, array &$cache = []): bool {
+    if ((int)($r['is_paid'] ?? 0) !== 1) return false;
+    $sy = (string)($r['school_year'] ?? '');
+    if (!preg_match('/^\d{4}-\d{4}$/', $sy)) $sy = (string)schoolYearOfMonth((int)($r['year'] ?? 0), (int)($r['month'] ?? 0));
+    if (!isset($cache[$sy])) $cache[$sy] = protectPaidMonths($sy);
+    return (bool)$cache[$sy];
+}
 function recalcSalariesInRange($db, $fromDate, $toDate = null) {
     @set_time_limit(0);
     @ignore_user_abort(true);
@@ -1002,19 +1010,23 @@ function recalcSalariesInRange($db, $fromDate, $toDate = null) {
     $fromKey = (int)date('Y', strtotime($fromDate)) * 12 + ((int)date('n', strtotime($fromDate)) - 1);
     $toKey = $toDate ? ((int)date('Y', strtotime($toDate)) * 12 + ((int)date('n', strtotime($toDate)) - 1)) : PHP_INT_MAX;
     // فقط الموظفون الذين لهم إعداد فعلي (ملاك أو أساس>0) — لا تُمسّ رواتب المنقولين بلا إعداد
-    $rows = $db->query("SELECT ms.employee_id, ms.year, ms.month
+    $rows = $db->query("SELECT ms.employee_id, ms.year, ms.month, ms.school_year, COALESCE(ms.is_paid, 0) is_paid
         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id
         WHERE e.is_deleted = 0
           AND (e.employee_type = 'enseignant_titulaire'
                OR COALESCE(e.base_salary_usd,0) > 0
                OR COALESCE(e.contract_salary_lbp,0) > 0)")->fetchAll(PDO::FETCH_ASSOC);
-    $n = 0;
+    $n = 0; $skipped = 0; $protCache = [];
     foreach ($rows as $r) {
         $key = (int)$r['year'] * 12 + ((int)$r['month'] - 1);
         if ($key < $fromKey || $key > $toKey) continue;
+        // 🔒 (2026-11-10) شهر مدفوع بسنة دراسية سابقة لا يُعاد حسابه من هذا المسار (سعر صرف/شطور/سلسلة/إعدادات) — كان يعيد 54 ألف شهر مدفوع منذ 2017
+        //    بملف الموظف الحالي (طانيوس: عقد 2025 يصير عقد اليوم). نفس حارس recalcEmployeeYear؛ التطبيق الصريح (msa_recalc_paid_ok) يفتحه.
+        if (recalcRangeRowProtected($r, $protCache)) { $skipped++; continue; }
         try { (new PayrollCalculator((int)$r['employee_id'], (int)$r['month'], (int)$r['year']))->calculateAndSave(); $n++; }
         catch (Throwable $e) {}
     }
+    if ($skipped) { try { logAudit('recalc_skipped_paid_range', 'monthly_salaries', 0, null, ['from' => $fromDate, 'to' => $toDate, 'skipped' => $skipped, 'recalculated' => $n]); } catch (Throwable $e) {} }
     // يُكمَّل دائماً بإعادة احتساب حصص المؤسسة للموظفين المستوردين (الذين تتخطّاهم
     // الحلقة أعلاه لأن راتبهم مُدخَل مباشرة على جدول الرواتب بلا إعداد على البطاقة).
     backfillEmployerCharges($db, $fromDate, $toDate);

@@ -310,7 +310,6 @@ function localSyncPush(array $diff): array {
             $hr = json_decode((string)$hj, true);
             if ($code !== 200 || !is_array($hr) || empty($hr['ok'])) { $msgs[] = "$t: تعذّرت قراءة بصمات الأونلاين"; continue; }
             $online = (array)($hr['hashes'] ?? []);
-            $upPks = []; $delPks = [];
             $conflict = function (string $pk, string $kind) use ($pdo, $s, $t, $m, &$conf) {
                 $label = $t . ' #' . str_replace(chr(31), '/', $pk);
                 if ($t === 'employees') { $r = syncRowsByPk($pdo, $s, $t, $m, [$pk]); $r = reset($r); if ($r) $label = trim(($r['first_name_ar'] ?? '') . ' ' . ($r['last_name_ar'] ?? '')) ?: $label; }
@@ -318,9 +317,11 @@ function localSyncPush(array $diff): array {
                 $pdo->prepare("INSERT INTO `$s`.`_sync_conflicts` (tbl, pk, kind, label, row_json, created_at) VALUES (?,?,?,?,?,NOW())")->execute([$t, $pk, $kind, $label, json_encode(reset($rows) ?: null, JSON_UNESCAPED_UNICODE), ]);
                 $conf++;
             };
-            foreach ($d['upd'] as $pk) { if (($online[$pk] ?? null) === ($d['base'][$pk] ?? '')) $upPks[] = $pk; else $conflict($pk, 'upd'); }   // الأونلاين كما كان ⇒ نرفع؛ تغيّر ⇒ تعارض
-            foreach ($d['ins'] as $pk) { if (!isset($online[$pk])) $upPks[] = $pk; else $conflict($pk, 'ins'); }
-            foreach ($d['del'] as $pk) { if (!isset($online[$pk])) continue; if ($online[$pk] === ($d['base'][$pk] ?? '')) $delPks[] = $pk; else $conflict($pk, 'del'); }
+            // 🧷 (2026-11-10) الخطّة بدالّة نقيّة: الأونلاين كما كان ⇒ نرفع · مطابق لما عندنا أصلاً ⇒ لا رفع ولا تعارض (يُحدَّث الأساس فقط) · تغيّر هناك ⇒ تعارض
+            $cur = syncRowHashes($pdo, $s, $t, $m, $pks);
+            $pp = localSyncPushPlan($d, $online, $cur);
+            $upPks = $pp['up']; $delPks = $pp['del'];
+            foreach ($pp['conf'] as [$cpk, $ckind]) $conflict($cpk, $ckind);
             $rows = $upPks ? syncRowsByPk($pdo, $s, $t, $m, $upPks) : [];
             $ups = array_values($rows); $dels = array_map(fn($pk) => explode(chr(31), $pk), $delPks);
             $chunksU = array_chunk($ups, 400); $chunksD = array_chunk($dels, 400);
@@ -332,12 +333,47 @@ function localSyncPush(array $diff): array {
                 if ($code !== 200 || !is_array($ar) || empty($ar['ok'])) { $msgs[] = "$t: فشل الرفع (" . (is_array($ar) ? ($ar['msg'] ?? $code) : $code) . ')'; @unlink($cj); return ['ok' => false, 'pushed' => $pushed, 'conflicts' => $conf, 'msg' => implode(' · ', $msgs)]; }
                 $pushed += (int)($ar['ins'] ?? 0) + (int)($ar['del'] ?? 0);
             }
-            $msgs[] = "$t: " . count($upPks) . '↑ ' . count($delPks) . '🗑';
+            // 🧷 (2026-11-10 تعارضات وهمية: 6 أسعار صرف رُفعت 19:49 ثمّ عُدّت «جديدة» كل دورة وظهرت «تعارضاً» لأنّ الأساس لم يتحدّث إلا بالسحب الكامل)
+            //    بعد نجاح الرفع يصير الأساس = ما رُفع (وما كان مطابقاً، وما حُذف) فلا يُعاد رفعه ولا يُعدّ تعارضاً بالدورة التالية
+            localSyncBaseRefreshRows($pdo, $s, $t, $m, array_merge($upPks, $delPks, $pp['same']));
+            $msgs[] = "$t: " . count($upPks) . '↑ ' . count($delPks) . '🗑' . ($pp['same'] ? ' ' . count($pp['same']) . '=' : '');
         }
     } catch (Throwable $e) { @unlink($cj); return ['ok' => false, 'pushed' => $pushed, 'conflicts' => $conf, 'msg' => 'خطأ بالرفع: ' . mb_substr($e->getMessage(), 0, 200)]; }
     @unlink($cj);
     localSyncLog("رُفعت تعديلات الكمبيوتر: $pushed صفّاً، تعارضات $conf — " . implode(' · ', $msgs));
     return ['ok' => true, 'pushed' => $pushed, 'conflicts' => $conf, 'msg' => "رُفع $pushed صفّاً" . ($conf ? "، تعارضات $conf (بقي الأونلاين)" : '')];
+}
+/** 🧷 (2026-11-10) خطّة رفع جدول واحد — دالّة نقيّة للفحص. $d = ['ins','upd','del','base'] من localSyncLocalDiff · $online بصمات الأونلاين للمفاتيح المعنيّة · $cur بصمات الكمبيوتر الحالية.
+ *  up = يُرفع · del = يُحذف أونلاين · same = مطابق للأونلاين أصلاً أو محذوف هناك أصلاً (يُحدَّث الأساس فقط، لا رفع ولا تعارض) · conf = [[pk, kind]] تغيّر بالمكانين (الأونلاين يبقى) */
+function localSyncPushPlan(array $d, array $online, array $cur): array {
+    $up = []; $del = []; $same = []; $conf = [];
+    foreach ((array)($d['upd'] ?? []) as $pk) {
+        $o = $online[$pk] ?? null;
+        if ($o === ($d['base'][$pk] ?? '')) $up[] = (string)$pk;                          // الأونلاين كما كان ⇒ نرفع
+        elseif ($o !== null && $o === ($cur[$pk] ?? null)) $same[] = (string)$pk;         // الأونلاين صار مثل عندنا (رُفع سابقاً) ⇒ أساس فقط
+        else $conf[] = [(string)$pk, 'upd'];
+    }
+    foreach ((array)($d['ins'] ?? []) as $pk) {
+        if (!isset($online[$pk])) $up[] = (string)$pk;
+        elseif ($online[$pk] === ($cur[$pk] ?? null)) $same[] = (string)$pk;             // موجود أونلاين بنفس البصمة (رُفع بدورة سابقة) ⇒ ليس تعارضاً
+        else $conf[] = [(string)$pk, 'ins'];
+    }
+    foreach ((array)($d['del'] ?? []) as $pk) {
+        if (!isset($online[$pk])) { $same[] = (string)$pk; continue; }                    // محذوف أونلاين أصلاً ⇒ يُشال من الأساس فقط
+        if ($online[$pk] === ($d['base'][$pk] ?? '')) $del[] = (string)$pk; else $conf[] = [(string)$pk, 'del'];
+    }
+    return ['up' => $up, 'del' => $del, 'same' => $same, 'conf' => $conf];
+}
+/** 🧷 (2026-11-10) تحديث أساس الدمج لمفاتيح محدّدة بعد رفعها: بصمتها الحالية على الكمبيوتر (والمحذوف محلياً يُشال من الأساس) */
+function localSyncBaseRefreshRows(PDO $pdo, string $s, string $t, array $m, array $pks): void {
+    $pks = array_values(array_unique(array_map('strval', $pks))); if (!$pks || empty($m['pk'])) return;
+    $has = (bool)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = " . $pdo->quote($s) . " AND table_name = '_sync_base'")->fetchColumn();
+    if (!$has) return;
+    foreach (array_chunk($pks, 300) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $pdo->prepare("DELETE FROM `$s`.`_sync_base` WHERE tbl = ? AND pk IN ($ph)")->execute(array_merge([$t], $chunk));
+        $pdo->prepare("INSERT INTO `$s`.`_sync_base` (tbl, pk, h) SELECT " . $pdo->quote($t) . ", " . syncPkSql($m) . ", " . syncHashSql($m) . " FROM `$s`.`$t` WHERE " . syncPkSql($m) . " IN ($ph)")->execute($chunk);
+    }
 }
 /** الدورة الكاملة: رفع ما تغيّر على الكمبيوتر (إن وُجد) ثم سحب إن لزم (دوري/تغيّر الأونلاين/بعد الرفع). لا سحب قبل نجاح الرفع. */
 /** ⏸️ إيقاف مؤقّت للرفع: فحص الانحدار (tools/regression_check.php) يعدّل القاعدة المحلية مؤقّتاً — ممنوع رفع تلك التغييرات للأونلاين؛ الملف يبلى بعد ساعتين */
