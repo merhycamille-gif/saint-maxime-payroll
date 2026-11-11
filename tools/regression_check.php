@@ -11335,6 +11335,13 @@ try {
     $d292['grants'] = [['student' => 'فحص 1', 'teacher' => $p0['tit'][0]['name'], 'class' => 'منهاج لبناني-الاول اساسي', 'll' => 1000, 'usd' => 0, 'cat' => 'بقية الكادر'], ['student' => 'فحص 2', 'teacher' => $p0['con'][0]['name'], 'class' => '', 'll' => 500, 'usd' => 0, 'cat' => 'ملاك']];
     meheSyncGrantCats($d292, $p0);
     $okG = $d292['grants'][0]['cat'] === 'ملاك' && $d292['grants'][1]['cat'] === 'بقية الكادر';
+    // 2026-11-11 كالمنصّة: منحة ولد الإداري ⇒ سطر «أبناء الموظفين الإداريين» ببند د، والمتعاقد ⇒ «أبناء المتعاقدين»؛ وصيغ الإكسل تشير إلى اسم الورقة الفعلي
+    if (!empty($p0['adm'][0]['name'])) {
+        $dG = $d292; $dG['grants'][] = ['student' => 'فحص 3', 'teacher' => $p0['adm'][0]['name'], 'class' => '', 'll' => 300, 'usd' => 0, 'cat' => 'بقية الكادر'];
+        $sG = meheSummary($dG, $p0); $ordG = array_flip(meheSummaryDOrder());
+        $okG = $okG && abs((float)$sG['D'][$ordG['grants_admin_kids']][1] - 300) < 1 && abs((float)$sG['D'][$ordG['grants_contr']][1] - 500) < 1 && abs((float)$sG['grOthLL'] - 800) < 1;
+    }
+    $okG = $okG && strpos((string)file_get_contents(__DIR__ . '/../includes/mehe_budget.php'), "'الطلاب المعفيون'!") === false;
     // خانات التفتيش «أ|ب» + عضو اللجنة المالية رقم 1
     meheApplyRowEdit($d292, ['mehe_row' => 'field', 'key' => 'programs_sel', 'f' => ['v' => 'منهاج لبناني|AP']]);
     meheApplyRowEdit($d292, ['mehe_row' => 'field', 'key' => 'fin_member|1', 'f' => ['v' => 'عضو فحص']]);

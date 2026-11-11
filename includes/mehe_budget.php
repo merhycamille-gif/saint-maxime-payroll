@@ -522,16 +522,21 @@ function meheApplyRowEdit(array &$data, array $P): array {
 }
 
 /* ===================== الملخّص (الفئات أ/ب/ج/د + ملخّص الميزانية + الإيرادات + المنح) ===================== */
+/** أسماء جدول الإداريين (من الرواتب + خارج الرواتب) — لتوجيه منحة ولد الإداري إلى سطرها ببند د */
+function meheAdminNames(array $p): array { $o = []; foreach ((array)($p['adm'] ?? []) as $r) { $nm = trim((string)($r['name'] ?? '')); if ($nm !== '') $o[$nm] = true; } return $o; }
 function meheSummary(array $d, array $p): array {
     $tt = $p['tit_tot']; $ct = $p['con_tot']; $at = $p['adm_tot'];
     $exp = $d['expenses'];
     $g = function ($k, $c) use ($exp) { return (float)($exp[$k][$c] ?? 0); };
     // المنح
     $grTitLL = $grTitUSD = $grOthLL = $grOthUSD = 0; $grTitN = $grOthN = 0;
+    // 🏛️ 2026-11-11 كالمنصّة: منحة ولد الموظف الإداري ⇒ سطر «أبناء الموظفين الإداريين»، وغيره من بقية الكادر ⇒ «أبناء المعلمين المتعاقدين»
+    $grAdmLL = $grAdmUSD = 0; $admNames = meheAdminNames($p);
     foreach ((array)$d['grants'] as $gr) {
         if (trim((string)($gr['student'] ?? '')) === '') continue;
         if (($gr['cat'] ?? '') === 'ملاك') { $grTitN++; $grTitLL += (float)($gr['ll'] ?? 0); $grTitUSD += (float)($gr['usd'] ?? 0); }
-        else { $grOthN++; $grOthLL += (float)($gr['ll'] ?? 0); $grOthUSD += (float)($gr['usd'] ?? 0); }
+        else { $grOthN++; $grOthLL += (float)($gr['ll'] ?? 0); $grOthUSD += (float)($gr['usd'] ?? 0);
+            if (isset($admNames[trim((string)($gr['teacher'] ?? ''))])) { $grAdmLL += (float)($gr['ll'] ?? 0); $grAdmUSD += (float)($gr['usd'] ?? 0); } }
     }
     // تعويضات الصرف
     $sevLL = $sevUSD = 0;
@@ -571,7 +576,7 @@ function meheSummary(array $d, array $p): array {
     foreach (meheSummaryCOrder() as $k) $C[] = [meheExpenseItems()[$k][0], $g($k, 'll'), $g($k, 'usd'), ['exp' => $k]];
     $dl = meheDLabels();
     $Dm = [
-        'over_limits' => [0, 0], 'grants_contr' => [$grOthLL, $grOthUSD], 'grants_admin_kids' => [0, 0],
+        'over_limits' => [0, 0], 'grants_contr' => [$grOthLL - $grAdmLL, $grOthUSD - $grAdmUSD], 'grants_admin_kids' => [$grAdmLL, $grAdmUSD],
         'grants_admin' => [$at['grants_ll'], 0], 'severance' => [$sevLL, $sevUSD], 'admin_tasks' => [$at['tasks_ll'], 0],
     ];
     $D = [];
@@ -1018,7 +1023,7 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
         $rc = $X->row($si, [$c('العدد', 6), $fx("COUNTIF(C$g1:C$g2,\"$cat\")", 7)]);
         $rl = $X->row($si, [$c('إجمالي المنحة ل.ل', 6), $fx("SUMIF(C$g1:C$g2,\"$cat\",E$g1:E$g2)", 7)]);
         $ru = $X->row($si, [$c('إجمالي المنحة د.أ', 6), $fx("SUMIF(C$g1:C$g2,\"$cat\",F$g1:F$g2)", 7)]);
-        $GR[$key] = ['n' => "'الطلاب المعفيون'!B$rc", 'll' => "'الطلاب المعفيون'!B$rl", 'usd' => "'الطلاب المعفيون'!B$ru"];
+        $GR[$key] = ['n' => "'{$T[6]}'!B$rc", 'll' => "'{$T[6]}'!B$rl", 'usd' => "'{$T[6]}'!B$ru"];
     }
 
     // ٨) تعويضات الصرف
@@ -1105,7 +1110,10 @@ function meheBuildXlsx(array $d, array $p, array $s, array $school, string $sy):
     $X->pageBreak($si, $X->rowCount($si));
     $d1 = $section('النفقات من الفئة د');
     $dl = meheDLabels();
-    $Dm = ['over_limits' => ['0', '0'], 'grants_contr' => [$GR['oth']['ll'], $GR['oth']['usd']], 'grants_admin_kids' => ['0', '0'],
+    // منح أولاد الإداريين = مجموع أسطر المعفيين التي عضوها من جدول الإداريين (صيغة حيّة بالأسماء) والباقي من «بقية الكادر» للمتعاقدين
+    $gAdmNames = []; foreach ($grants as $g) { $t = trim((string)($g['teacher'] ?? '')); if (($g['cat'] ?? '') !== 'ملاك' && isset(meheAdminNames($p)[$t])) $gAdmNames[$t] = '"' . str_replace('"', '""', $t) . '"'; }
+    $gAdmFx = fn(string $col) => $gAdmNames ? "SUM(SUMIF('{$T[6]}'!B$g1:B$g2,{" . implode(',', $gAdmNames) . "},'{$T[6]}'!$col$g1:$col$g2))" : '0';
+    $Dm = ['over_limits' => ['0', '0'], 'grants_contr' => [$GR['oth']['ll'] . '-' . $gAdmFx('E'), $GR['oth']['usd'] . '-' . $gAdmFx('F')], 'grants_admin_kids' => [$gAdmFx('E'), $gAdmFx('F')],
            'grants_admin' => [$ADM['grants_ll'], '0'], 'severance' => [$SEV['ll'], $SEV['usd']], 'admin_tasks' => [$ADM['tasks_ll'], '0']];
     foreach (meheSummaryDOrder() as $di => $k) {
         if (!empty($s['D'][$di][3]['ov'])) $X->row($si, [$c($dl[$k] ?? meheExpenseItems()[$k][0], 6), $n((float)$s['D'][$di][1], 5), $n((float)$s['D'][$di][2], 5)]);
