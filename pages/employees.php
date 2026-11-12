@@ -655,7 +655,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
                     }
                 } catch (Throwable $t) {}
             }
-            $datesChanged = ($oldDates && (
+            // 🧷 (2026-11-12 كارلا صوما #1783) صمام «يُحسب كملاك من سنة ملاكه» (cadre_from_sy) يلحق تاريخ دخول الملاك إن صُحِّح لاحقاً:
+            //    كان يبقى على سنة التاريخ القديم (2027-2028) فتبقى سنة ملاكه الفعلية (2026-2027) بلا حسم صندوق ٦٪ وبضمان المتعاقد.
+            $cfsMoved = false;
+            if ($data['employee_type'] === 'enseignant_titulaire' && $data['titularization_date']) {
+                try {
+                    if (function_exists('cadreDueEnsureColumns')) cadreDueEnsureColumns($db);
+                    $cfsOld = (string)$db->query("SELECT COALESCE(cadre_from_sy,'') FROM employees WHERE id = " . (int)$id)->fetchColumn();
+                    $cfsWant = (string)schoolYearOfDate($data['titularization_date']);
+                    if ($cfsOld !== '' && $cfsWant !== '' && $cfsOld !== $cfsWant) { $db->prepare("UPDATE employees SET cadre_from_sy = ? WHERE id = ?")->execute([$cfsWant, $id]); $cfsMoved = true; }
+                } catch (Throwable $t) {}
+            }
+            $datesChanged = $cfsMoved || ($oldDates && (
                 ($oldDates['titularization_date'] ?? null) != $data['titularization_date'] ||
                 ($oldDates['hire_date'] ?? null) != $data['hire_date'] ||
                 ($oldDates['tenure_confirmation_date'] ?? null) != $data['tenure_confirmation_date']

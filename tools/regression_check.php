@@ -3954,7 +3954,7 @@ check('عبرا: ≥160 شخصاً برقم (بعد لمّ المكرّرين) +
       $abCnt69 >= 140 && $lostCn69 === 0
       // (2026-11-02 قراره «يبقوا كلهم») كل ملاك فاعل بعبرا له رقم صندوق إلّا التسعة المعروفين (ترسيمهم حديث أو ينتظرون رقمهم)
       && (int)$db->query("SELECT COUNT(*) FROM employees e JOIN schools s ON s.id=e.school_id WHERE s.name_ar LIKE 'مدرسة%ثانوية السيدة%' AND e.is_deleted=0 AND e.employee_type='enseignant_titulaire' AND e.left_date_all IS NULL
-            AND TRIM(COALESCE(e.caisse_number,''))='' AND e.id NOT IN (1810,1725,1803,1781,1782,1785,1786,1788,1791)")->fetchColumn() === 0
+            AND TRIM(COALESCE(e.caisse_number,''))='' AND e.id NOT IN (1810,1725,1803,1781,1782,1785,1786,1788,1791,1783 /* كارلا صوما: صارت ملاكاً 2026-11-12 وتنتظر رقمها من الصندوق */)")->fetchColumn() === 0
       && !array_diff($abRita['يوسف'] ?? ['x'], ['101141']) && in_array('101141', $abRita['يوسف'] ?? [], true)
       && !array_diff($abRita['مارون'] ?? ['x'], ['130587'])
       && !array_filter($abRita['.'] ?? []),
@@ -11746,6 +11746,22 @@ try {
     $why304 = 'أسطر ' . $n304 . ' · مخالف ' . count($bad304) . ' ' . implode(',', array_slice($bad304, 0, 6));
 } catch (Throwable $e) { $ok304 = false; $why304 = $e->getMessage(); }
 check('🏛️ (2026-11-12) البيان المالي للصندوق: الراتب السابق = قبل التدرّج من بطاقة سنة البيان (لا أيلول السنة الماضية) والحالي بعد التدرّج', $ok304, $why304);
+
+/* 🧷 (2026-11-12 كارلا صوما) ملف الموظف: تاريخ الملاك الذي على القاعدة يلحق تاريخ الدخول (واجهة + خادم)، وصمام cadre_from_sy يلحق تاريخ الملاك المصحَّح؛
+   ولا ملاك سنة ملاكه (حسب تاريخه) قبل الصمام — وإلا بقيت سنته بلا محسومات الملاك. */
+try {
+    $ep305 = str_replace("\r", '', (string)file_get_contents($PROJ . '/pages/employees.php'));
+    $okSrc305 = strpos($ep305, "var wasAuto = !md.value || md.value === plus2(prevHire);") !== false
+        && strpos($ep305, "\$data['titularization_date'] = date('Y-m-d', strtotime(\$nh . ' +2 years'));") !== false
+        && strpos($ep305, "\$db->prepare(\"UPDATE employees SET cadre_from_sy = ? WHERE id = ?\")->execute([\$cfsWant, \$id]); \$cfsMoved = true;") !== false
+        && strpos($ep305, '$datesChanged = $cfsMoved || ($oldDates && (') !== false;
+    $bad305 = [];
+    if (msaHasCol($db, 'employees', 'cadre_from_sy')) foreach ($db->query("SELECT id, titularization_date t, cadre_from_sy c FROM employees WHERE is_deleted = 0 AND employee_type = 'enseignant_titulaire' AND COALESCE(cadre_from_sy,'') <> '' AND titularization_date IS NOT NULL")->fetchAll(PDO::FETCH_ASSOC) as $r305) {
+        $w305 = (string)schoolYearOfDate($r305['t']); if ($w305 !== '' && strcmp((string)$r305['c'], $w305) > 0) $bad305[] = $r305['id'];
+    }
+    $ok305 = $okSrc305 && !$bad305; $why305 = 'src=' . (int)$okSrc305 . ' صمام بعد سنة الملاك: ' . count($bad305) . ' ' . implode(',', array_slice($bad305, 0, 8));
+} catch (Throwable $e) { $ok305 = false; $why305 = $e->getMessage(); }
+check('🧷 (2026-11-12) تاريخ الملاك يلحق تاريخ الدخول إن كان على القاعدة + صمام سنة الملاك يلحق التاريخ المصحَّح (لا ملاك سنته بلا محسومات)', $ok305, $why305);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
