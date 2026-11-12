@@ -608,6 +608,11 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
 /* الطباعة كما هي: لا صناديق تمرير — الرأس يتكرّر على كل صفحة بآلية الطباعة نفسها */
 @media print {
     .tbl-scroll { max-height: none !important; overflow: visible !important; }
+    /* 🖨️ (2026-11-12 «عم يطلع بأسفل الورقة الفلاش اللي بتزيح فيه الصفحة شمال يمين» — بطاقة كارلا صوما): الجدول الأعرض من نافذته يأخذ على
+       الشاشة أسانسوراً أفقياً بستايل مباشر على حاويته (app.js initStickyHeads ⇒ data-stkvis) — كان يبقى على الورق: شريط تمرير مرسوم تحت
+       الجدول يأكل من عرض الورقة ويقصّ العمود الأخير (التوقيع). على الورق لا أسانسور إطلاقاً، ولا إزاحة يدوية لرأس الجدول. تصميم البطاقة لم يُمسّ. */
+    [data-stkvis] { overflow: visible !important; }
+    table thead th, table thead td { transform: none !important; }
 }
 
 .table {

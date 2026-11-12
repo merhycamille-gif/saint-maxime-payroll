@@ -11763,6 +11763,12 @@ try {
 } catch (Throwable $e) { $ok305 = false; $why305 = $e->getMessage(); }
 check('🧷 (2026-11-12) تاريخ الملاك يلحق تاريخ الدخول إن كان على القاعدة + صمام سنة الملاك يلحق التاريخ المصحَّح (لا ملاك سنته بلا محسومات)', $ok305, $why305);
 
+/* 🖨️ (2026-11-12 بطاقة كارلا صوما «عم يطلع بأسفل الورقة الفلاش») على الورق لا أسانسور شاشة ولا إزاحة رأس يدوية — قاعدة بمحرّك الطباعة العام، وتصميم البطاقة لم يُمسّ */
+$css306 = preg_replace('/\s+/', ' ', (string)file_get_contents($PROJ . '/assets/css/app.css'));
+check('🖨️ (2026-11-12) الطباعة: حاوية الجدول ذات أسانسور الشاشة (data-stkvis) تُفتح على الورق + لا إزاحة يدوية لرأس الجدول',
+      (bool)preg_match('/@media print \{[^@]*\[data-stkvis\] \{ overflow: visible !important; \} table thead th, table thead td \{ transform: none !important; \} \}/', $css306)
+      && strpos((string)file_get_contents($PROJ . '/assets/js/app.js'), "t2.parentElement.setAttribute('data-stkvis', '1');") !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";
