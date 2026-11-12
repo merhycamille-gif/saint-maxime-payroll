@@ -29,9 +29,41 @@
   /* 🔴 (2026-11-09 الفرزل): الصفحة فيها جدولان بنفس الصنف — «أساتذة جدد» (#sp-pending: مَن أُضيف ولم يُضمّ إلى القائمة بعد) يأتي قبل «قائمة الأساتذة» (#sp-list).
      القراءة بـ«أوّل جدول» صارت تقرأ قسم الجدد بعد أوّل إضافة ⇒ حُسب 25 أستاذاً ناقصين وأُضيفوا مكرّرين. القائمة = #sp-list حصراً، والجدد يُقرأون لوحدهم. */
   function siteRows() {
+    if (isMulti()) { if (!ALLROWS) throw new Error('multi-page roster not loaded'); return ALLROWS.slice(); }   // 📄 لائحة على عدّة صفحات: تُقرأ كلّها (ensureAll) وإلا لا شيء
     const t = document.querySelector('#sp-list table.sp-data') || Array.from(document.querySelectorAll('table.sp-data')).find((x) => !x.closest('#sp-pending'));
     return t ? tableRows(t) : [];
   }
+  /* 📄 (2026-11-11 عبرا، 155 أستاذاً على 6 صفحات): الموقع يعرض 30 سطراً بالصفحة. المطابقة على صفحة واحدة = لائحة جزئية ⇒ ممنوعة.
+     ensureAll() تقرأ **كل** صفحات القائمة (نفس الترتيب sort=name وبلا فلتر emp=all) بطلبات قراءة فقط، وتتحقّق: كل صفحة هي المطلوبة، لا سطر بلا معرّف ولا مكرّر
+     بين الصفحات، والمجموع = العدد المكتوب بالموقع. أيّ خلل ⇒ لا قائمة ⇒ لا مطابقة ولا تعبئة (MULTI_ERR يُعرض). تُستدعى بأوّل كل دخول (كبسة/متابعة/نافذة). */
+  let ALLROWS = null, MULTI_ERR = '';
+  const pagerPages = (doc) => Array.from((doc || document).querySelectorAll('.sp-pager a.sp-page')).map((a) => +(((a.getAttribute('href') || '').match(/[?&]page=(\d+)/) || [])[1] || 0)).filter(Boolean);
+  const pagerCur = (doc) => { const on = (doc || document).querySelector('.sp-pager a.sp-page-on'); return on ? (+digits(on.textContent) || 1) : 1; };
+  const pagerTotal = (doc) => { const el = (doc || document).querySelector('.sp-pager-total'); const m = el ? String(el.textContent).match(/(\d+)/) : null; return m ? +m[1] : -1; };
+  function isMulti() { return page() === 'roster' && Math.max(0, ...pagerPages()) > 1; }
+  async function ensureAll() {
+    ALLROWS = null; MULTI_ERR = '';
+    if (!isMulti()) return true;
+    try {
+      let last = Math.max(...pagerPages()); const out = []; let total = -1;
+      for (let k = 1; k <= last; k++) {
+        const r = await fetch(baseUrl() + '?sort=name&emp=all&page=' + k, { credentials: 'same-origin', cache: 'no-store' });
+        if (!r.ok) throw new Error('الصفحة ' + k + ' لم تنفتح (' + r.status + ')');
+        const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+        const t = doc.querySelector('#sp-list table.sp-data');
+        if (!t || pagerCur(doc) !== k) throw new Error('الصفحة ' + k + ' لم تُقرأ كما يجب');
+        if (k === 1) { total = pagerTotal(doc); last = Math.max(last, ...pagerPages(doc)); }
+        else if (pagerTotal(doc) !== total) throw new Error('عدد الأساتذة تغيّر أثناء القراءة');
+        tableRows(t).forEach((x) => { x.tr = null; x.page = k; out.push(x); });
+      }
+      const ids = out.map((x) => x.lineId);
+      if (ids.some((i) => !i)) throw new Error('سطر بلا معرّف');
+      if (new Set(ids).size !== ids.length) throw new Error('سطر ظهر بصفحتين');
+      if (total < 0 || ids.length !== total) throw new Error('قُرئ ' + ids.length + ' سطراً والموقع يقول ' + total);
+      ALLROWS = out; return true;
+    } catch (e) { ALLROWS = null; MULTI_ERR = String((e && e.message) || e); return false; }
+  }
+  const multiMsg = () => '⛔ لائحة الأساتذة هنا على أكثر من صفحة ولم تُقرأ كاملة (' + MULTI_ERR + ') — لا تعبئة على لائحة جزئية. حدّث الصفحة (F5) وجرّب؛ إن تكرّر خبّر المبرمج.';
   function pendingRows() { const t = document.querySelector('#sp-pending table.sp-data'); return t ? tableRows(t) : []; }
   function tableRows(t) {
     const heads = Array.from(t.querySelectorAll('thead th')).map((th) => norm(th.textContent));
@@ -42,7 +74,7 @@
       const a = tr.querySelector('a[href*="edit="]');
       const df = tr.querySelector('form[action*="/delete"]');
       const m = (a ? (a.getAttribute('href') || '').match(/[?&]edit=(\d+)/) : null) || (df ? (df.getAttribute('action') || '').match(/\/line\/(\d+)\/delete/) : null);
-      return { tr, no: iNo >= 0 ? digits(tds[iNo].textContent) : '', name: iName >= 0 ? norm(tds[iName].textContent) : '', type: iType >= 0 ? norm(tds[iType].textContent) : '', father: iFa >= 0 ? norm(tds[iFa].textContent) : '', birth: iB >= 0 && tds[iB] ? bdKey(tds[iB].textContent) : 0, editHref: a ? a.href : '', lineId: m ? m[1] : '' };
+      return { tr, no: iNo >= 0 ? digits(tds[iNo].textContent) : '', name: iName >= 0 ? norm(tds[iName].textContent) : '', type: iType >= 0 ? norm(tds[iType].textContent) : '', father: iFa >= 0 ? norm(tds[iFa].textContent) : '', birth: iB >= 0 && tds[iB] ? bdKey(tds[iB].textContent) : 0, editHref: a ? new URL(a.getAttribute('href') || '', location.href).href : '', lineId: m ? m[1] : '' };
     }).filter(Boolean);
   }
   function matchRow(line, rows) {
@@ -135,6 +167,12 @@
     ok(setIn(byName('teaching_hours', f), L.teaching_hours), 'الساعات'); ok(setIn(byName('salary', f), digits(L.salary)), 'الراتب'); ok(setIn(byName('add_salary', f), digits(L.add_salary)), 'الأجر الإضافي');
     return { filled: n, notes };
   }
+  /* الخطوة 1 (خلوي المدرسة ونوعها) غير محفوظة ⇒ الموقع يرفض كل حفظ. العلامة: قفل نموذج الأستاذ «أكمل الخطوة 1» أو خانة الخلوي فارغة */
+  function step1Missing() {
+    if (page() !== 'roster') return false;
+    const ph = document.querySelector('form.sp-step1 [name="phone"]') || document.querySelector('#sp-school-phone');
+    return !!ph && !digits(ph.value);
+  }
   function fillStep1(B) { // هاتف المدرسة ونوعها (بلا حفظ)
     const f = document.querySelector('form.sp-step1'); if (!f) return 0; let n = 0;
     if (B.phone && setIn(byName('phone', f), B.phone)) n++;
@@ -212,8 +250,14 @@
   }
 
   /* ---- الترحيل التلقائي: طابور بـchrome.storage يتابع بعد كل إعادة تحميل ---- */
-  async function autoStep(Q) {
+  async function autoStep(Q, warm) {
     if (!Q || !Q.lines || baseUrl() !== Q.base) return;
+    // 🧯 (2026-11-11 عبرا): الموقع رجّع الصفحة بخطأ (?error=…، مثل phone_required = الخطوة 1 غير محفوظة) ⇒ السطر لم يُحفظ ⇒ توقّف فوراً (كان يُحسب «محفوظاً» ويُكمل)
+    const siteErr = new URL(location.href).searchParams.get('error') || '';
+    if (siteErr || step1Missing()) { await chrome.storage.local.set({ eocAuto: null });
+      banner('⛔ توقّفت التعبئة: ' + (siteErr === 'phone_required' || !siteErr ? 'الموقع لا يحفظ أيّ أستاذ قبل «الخطوة 1» — رقم خلوي المدرسة ونوعها. عبّيها واكبس «حفظ» ثمّ اكبس التعبئة من جديد.' : 'الموقع رفض الحفظ (' + esc(siteErr) + ').') + ' لم يُحفظ شيء من هذه المحاولة.', false); return; }
+    // 📄 لائحة على عدّة صفحات: تُقرأ كاملة بأوّل كل تحميل؛ إن لم تُقرأ ⇒ توقّف بلا أيّ إرسال
+    if (!warm && !(await ensureAll())) { await chrome.storage.local.set({ eocAuto: null }); banner(esc(multiMsg()) + ' ما حُفظ قبلها بقي كما هو.', false); return; }
     // 🔎 لائحة مفلترة ⇒ ارجع إلى اللائحة الكاملة (مع إبقاء نموذج التعديل المفتوح)؛ إن بقيت مفلترة ⇒ توقّف بلا أيّ إضافة
     if (siteFiltered()) {
       const e0 = new URL(location.href).searchParams.get('edit') || '';
@@ -252,9 +296,13 @@
       // 🚪 بعد التعبئة: شيل مَن تركوا (المثبَتون بالبرنامج) سطراً سطراً — نموذج الحذف نفسه الذي بالموقع
       if (Q.del && (Q.delIdx || 0) < Q.del.length) {
         if (new URL(location.href).searchParams.get('edit')) { await chrome.storage.local.set({ eocAuto: Q }); location.href = Q.base; return; }
-        const d = Q.del[Q.delIdx || 0]; Q.delIdx = (Q.delIdx || 0) + 1;
+        const d = Q.del[Q.delIdx || 0];
         const df = document.querySelector('form[action*="/line/' + d.lineId + '/delete"]');
-        if (!df) { Q.errors.push(d.name + ' (لم يُعثر على سطره لشيله)'); await chrome.storage.local.set({ eocAuto: Q }); return autoStep(Q); }
+        // 📄 سطره بصفحة أخرى من القائمة ⇒ افتح صفحته أوّلاً (مرّتان كحدّ أقصى) ثمّ شِله بنموذج الموقع نفسه
+        if (!df && isMulti()) { const rr = siteRows().find((x) => x.lineId === String(d.lineId));
+          if (rr && rr.page && (Q.delNav || 0) < 2) { Q.delNav = (Q.delNav || 0) + 1; await chrome.storage.local.set({ eocAuto: Q }); location.href = Q.base + '?sort=name&emp=all&page=' + rr.page; return; } }
+        Q.delNav = 0; Q.delIdx = (Q.delIdx || 0) + 1;
+        if (!df) { Q.errors.push(d.name + ' (لم يُعثر على سطره لشيله)'); await chrome.storage.local.set({ eocAuto: Q }); return autoStep(Q, 1); }
         Q.deleted = (Q.deleted || 0) + 1; expect('gdel', d.name); await chrome.storage.local.set({ eocAuto: Q });
         banner('🚪 شيل مَن ترك ' + Q.delIdx + ' / ' + Q.del.length + ' — ' + d.name + ' (' + d.why + ')', true);
         await sleep(250); HTMLFormElement.prototype.submit.call(df); return;
@@ -268,23 +316,23 @@
     const url = new URL(location.href); const curEdit = url.searchParams.get('edit') || '';
     const finish = async (ok, why) => { Q.idx++; if (ok) Q.done++; else Q.errors.push(L.teacher_name + (why ? ' (' + why + ')' : '')); await chrome.storage.local.set({ eocAuto: Q }); };
     // 🕓 ليس بالقائمة لكنّه محفوظ بقسم «أساتذة جدد» ⇒ لا يُضاف مرّة ثانية (يُضمّ بآخر التعبئة)
-    if (!existing && Q.kind === 'general' && pendingRows().some((p) => strictSame(L, p))) { await finish(true, ''); return autoStep(Q); }
+    if (!existing && Q.kind === 'general' && pendingRows().some((p) => strictSame(L, p))) { await finish(true, ''); return autoStep(Q, 1); }
     const held = existing ? null : holdFor(L, Q.all || Q.lines, rows);   // 🎂 معلَّق: لا تعديل ولا إضافة
-    if (held) { await finish(false, 'لم يُمسّ: اسمه قريب من «' + held.name + '» على الموقع وتاريخ الولادة مختلف — راجعه بيدك'); return autoStep(Q); }
-    if (existing && Q.mode !== 'all') { await finish(true, ''); return autoStep(Q); } // موجود ⇒ تخطَّ
+    if (held) { await finish(false, 'لم يُمسّ: اسمه قريب من «' + held.name + '» على الموقع وتاريخ الولادة مختلف — راجعه بيدك'); return autoStep(Q, 1); }
+    if (existing && Q.mode !== 'all') { await finish(true, ''); return autoStep(Q, 1); } // موجود ⇒ تخطَّ
     if (existing && Q.mode === 'all') {
-      if (!existing.lineId) { await finish(false, 'لا رابط تعديل'); return autoStep(Q); }
+      if (!existing.lineId) { await finish(false, 'لا رابط تعديل'); return autoStep(Q, 1); }
       if (curEdit !== existing.lineId) { await chrome.storage.local.set({ eocAuto: Q }); location.href = existing.editHref; return; } // افتح نموذج التعديل ثمّ تابع بعد التحميل
     } else if (curEdit) { await chrome.storage.local.set({ eocAuto: Q }); location.href = Q.base; return; } // نموذج تعديل مفتوح لغير أستاذنا ⇒ ارجع للقائمة
     // نموذج الإضافة/التعديل
     let f = Q.kind === 'general' ? rosterForm() : finForm();
     if (!f) { const un = document.querySelector('[data-sp-unfold]'); if (un) { un.click(); await sleep(400); } f = Q.kind === 'general' ? rosterForm() : finForm(); }
-    if (!f) { await finish(false, 'لا نموذج إدخال بالصفحة'); return autoStep(Q); }
-    if (Q.kind === 'general' && existing && (byName('line_id', f) || {}).value !== existing.lineId) { await finish(false, 'نموذج التعديل لا يطابق السطر'); return autoStep(Q); }
+    if (!f) { await finish(false, 'لا نموذج إدخال بالصفحة'); return autoStep(Q, 1); }
+    if (Q.kind === 'general' && existing && (byName('line_id', f) || {}).value !== existing.lineId) { await finish(false, 'نموذج التعديل لا يطابق السطر'); return autoStep(Q, 1); }
     const res = Q.kind === 'general' ? fillRoster(f, L, !!existing) : await fillFinancial(f, L);
     const bad = res.notes.find((x) => /غير موجود عند الصندوق|معطّل|مقفل/.test(x));
-    if (bad) { await finish(false, bad); return autoStep(Q); }
-    if (!f.checkValidity()) { const inv = f.querySelector(':invalid'); await finish(false, 'خانة ناقصة: ' + (inv ? (inv.name || inv.id) : '؟')); if (inv) f.reportValidity(); return autoStep(Q); }
+    if (bad) { await finish(false, bad); return autoStep(Q, 1); }
+    if (!f.checkValidity()) { const inv = f.querySelector(':invalid'); await finish(false, 'خانة ناقصة: ' + (inv ? (inv.name || inv.id) : '؟')); if (inv) f.reportValidity(); return autoStep(Q, 1); }
     expect(existing ? 'edit' : 'add', L.teacher_name);
     Q.idx++; Q.done++; await chrome.storage.local.set({ eocAuto: Q }); // نحسبه محفوظاً قبل الإرسال كي لا يتكرّر لو أعاد الموقع الصفحة بخطأ
     await sleep(250);
@@ -327,7 +375,8 @@
       b.innerHTML = '⏳ اللائحة معروضة جزئياً — عم افتح اللائحة الكاملة…'; location.href = baseUrl(); return;
     }
     try { sessionStorage.removeItem('msaEocGo'); } catch (e) {}
-    if (document.querySelector('a[href*="page=2"]')) { barIdle('<span style="color:#b3261e">⛔ لائحة الأساتذة هنا على أكثر من صفحة — التعبئة بكبسة واحدة غير متاحة لها بعد (حتى لا يتكرّر أحد). خبّر المبرمج.</span>'); return; }
+    if (step1Missing()) { barIdle('<span style="color:#b3261e">⛔ قبل التعبئة: الموقع يطلب «الخطوة 1» — رقم خلوي المدرسة ونوعها. عبّيها تحت واكبس «حفظ»، ثمّ اكبس هنا من جديد.</span>'); return; }
+    if (isMulti()) { b.innerHTML = '⏳ لائحة الأساتذة هنا على أكثر من صفحة — عم إقراها كلّها…'; if (!(await ensureAll())) { barIdle('<span style="color:#b3261e">' + esc(multiMsg()) + '</span>'); return; } }
     b.innerHTML = '⏳ عم جيب بيان المدرسة رقم ' + esc(no) + ' (' + esc(per) + ') من برنامج الرواتب…';
     let res;
     try { res = await chrome.runtime.sendMessage({ target: 'bg', action: 'program', path: 'pages/eoc_portal.php?tab=' + kind + '&period=' + encodeURIComponent(per) + '&export=json&caisse_no=' + no }); }
@@ -387,6 +436,7 @@
     if (msg.action === 'stop') { await chrome.storage.local.set({ eocAuto: null }); banner('⏹ أُوقفت التعبئة.', false); return { title: 'أُوقف', notes: [] }; }
     if (!pageMatchesKind(B)) return { title: B.kind === 'general' ? 'البيان العام' : 'البيان المالي', notes: [B.kind === 'general' ? 'افتح البيان العام للسنة على الموقع (البيان العام ← تعبئة) ثمّ أعد المحاولة. أنت الآن على: ' + p : 'افتح البيان المالي للفصل على الموقع (البيان المالي ← تعبئة) ثمّ أعد المحاولة. أنت الآن على: ' + p] };
     const title = document.querySelector('h1.sp-title'); const siteTitle = title ? norm(title.textContent) : '';
+    if (!(await ensureAll())) return { title: 'لائحة على أكثر من صفحة', notes: [multiMsg()] };
     const rv = review(B);
     const head = (B.kind === 'general' ? 'البيان العام ' : 'البيان المالي ') + B.period + ' ⇐ ' + siteTitle;
     if (msg.action === 'check') return { title: head, matched: rv.matched, missing: rv.missing, extra: rv.extra, notes: [] };
@@ -419,7 +469,7 @@
     }
     return { title: head, notes: ['أمر غير معروف'] };
   }
-  window.__msaEocRun = run; window.__msaEocReview = review;
+  window.__msaEocRun = run; window.__msaEocReview = review; window.__msaEocEnsure = ensureAll; window.__msaEocRows = () => siteRows();
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => { if (!msg || !msg.action || msg.target !== 'eoc') return; run(msg).then(sendResponse, (e) => sendResponse({ title: 'خطأ', notes: [String(e && e.message || e)] })); return true; });
   }

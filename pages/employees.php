@@ -520,6 +520,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['new', 'edit']))
         try { $oldRow['eoc_half_salary_year'] = msaHasCol($db, 'employees', 'eoc_half_salary_year') ? $db->query("SELECT eoc_half_salary_year FROM employees WHERE id = " . (int)$id)->fetchColumn() : null; } catch (Throwable $t) { $oldRow['eoc_half_salary_year'] = null; }
         $oldDiploma = $oldRow['diploma'] ?? null;
         $oldDates = $oldRow;
+        // 🧷 (2026-11-12 كارلا صوما) تغيّر تاريخ الدخول وتاريخ الملاك وصل كما كان وهو ما زال على القاعدة (= الدخول القديم + سنتين) ⇒ يلحق الدخول الجديد. المعدَّل يدوياً لا يُمسّ.
+        $oh = (string)($oldRow['hire_date'] ?? ''); $ot = (string)($oldRow['titularization_date'] ?? ''); $nh = (string)($data['hire_date'] ?? '');
+        if ($oh !== '' && $nh !== '' && $nh !== $oh && $ot !== '' && (string)($data['titularization_date'] ?? '') === $ot && $ot === date('Y-m-d', strtotime($oh . ' +2 years')))
+            $data['titularization_date'] = date('Y-m-d', strtotime($nh . ' +2 years'));
         // 📆 الفترة المدفوعة قبل الحفظ (لمعرفة إن تغيّرت — 2026-09-30)
         try { ensurePayPeriodColumns(); $oldPayPeriod = $db->query("SELECT pay_from_month, pay_to_month FROM employees WHERE id = " . (int)$id)->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Throwable $t) { $oldPayPeriod = null; }
     }
@@ -2023,7 +2027,9 @@ if ($id > 0 && function_exists('protectPaidMonths') && protectPaidMonths($ppSyFo
                             if(force || !md.value){ md.value=want; }
                             hint.textContent = want ? ('القاعدة: دخول المدرسة + سنتين = '+want+(md.value!==want?' (عدّلته يدوياً)':'')) : '';
                         }
-                        if(hd){ hd.addEventListener('change', function(){ sync(!md.value); }); }
+                        // 🧷 (2026-11-12 كارلا صوما) تاريخ الملاك الذي ما زال على القاعدة (= الدخول القديم + سنتين) يلحق تاريخ الدخول الجديد؛ المعدَّل يدوياً لا يُمسّ
+                        var prevHire = hd ? hd.value : '';
+                        if(hd){ hd.addEventListener('change', function(){ var wasAuto = !md.value || md.value === plus2(prevHire); prevHire = hd.value; sync(wasAuto); }); }
                         sync(false);
                     })();
                     </script>

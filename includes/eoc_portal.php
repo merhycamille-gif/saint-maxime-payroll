@@ -201,9 +201,9 @@ function eocArSort(string $col): string { return "REPLACE(REPLACE(REPLACE(REPLAC
 /** راتب شهر معيّن لموظفي النطاق: [emp_id => ['base'=>,'extra'=>,'caisse'=>,'grade'=>]] مع بديل: آخر شهر له قيمة قبله بنفس السنة الدراسية */
 function eocMonthSalaries(PDO $db, array $ids, int $y, int $m): array {
     $in = implode(',', array_map('intval', $ids)) ?: '0';
-    $st = $db->prepare("SELECT employee_id, base_plus_echelon_lbp b, (extra_lbp + prime_fixe_lbp) x, caisse_amount_lbp c, eoc_grade_lbp g, school_eoc_6_lbp s FROM monthly_salaries WHERE school_id IN ($in) AND year = ? AND month = ? AND base_plus_echelon_lbp > 0");
+    $st = $db->prepare("SELECT employee_id, base_plus_echelon_lbp b, base_salary_lbp b0, (extra_lbp + prime_fixe_lbp) x, caisse_amount_lbp c, eoc_grade_lbp g, school_eoc_6_lbp s FROM monthly_salaries WHERE school_id IN ($in) AND year = ? AND month = ? AND base_plus_echelon_lbp > 0");
     $st->execute([$y, $m]); $out = [];
-    foreach ($st->fetchAll() as $r) $out[(int)$r['employee_id']] = ['base' => (float)$r['b'], 'extra' => (float)$r['x'], 'caisse' => (float)$r['c'], 'grade' => (float)$r['g'], 'school' => (float)$r['s']];
+    foreach ($st->fetchAll() as $r) $out[(int)$r['employee_id']] = ['base' => (float)$r['b'], 'pre' => (float)$r['b0'], 'extra' => (float)$r['x'], 'caisse' => (float)$r['c'], 'grade' => (float)$r['g'], 'school' => (float)$r['s']];
     return $out;
 }
 /**
@@ -339,16 +339,21 @@ function eocFinancialRows(PDO $db, array $ids, string $code, array $data): array
         $id = (int)$e['id']; if (in_array($id, array_map('intval', $data['deleted']), true)) continue;
         $s = $cur[$id]; $p = $prev[$id] ?? null;
         $base = round($s['base']); $extra = round($s['extra']);
+        // 🏛️ (2026-11-12 قراره) «الراتب السابق» = الراتب قبل التدرّج كما بالبطاقة السنوية لسنة البيان، و«الحالي» = بعد التدرّج.
+        //    أوّل فصل بالسنة (تشرين الأول) لا يرجع إلى أيلول السنة الماضية؛ داخل السنة: تدرّج وقع بين أوّلَي الفصلين يُلتقَط من راتب أوّل الفصل السابق.
+        $pre = round($s['pre'] ?? 0); if ($pre <= 0 || $pre > $base) $pre = $base;
+        $prevSal = $pre;
+        if ($m !== 10 && $p && round($p['base']) > 0 && round($p['base']) < $prevSal) $prevSal = round($p['base']);
         $monthly = round(($base + $extra) * EOC_RATE);
         // 🔴 نصف الراتب (الدخول في الملاك/الخيار اليدوي) ≈ نصف الأساس ⇒ عمود «نصف راتب»؛ وإلا فالمحسوم للصندوق بالشهر = درجة
         $g = round($s['grade']); $half = 0; $deg = 0;
         if ($g > 0) { if (abs($g - $base / 2) <= 1) $half = $g; else $deg = $g; }
         if ($pi['special'] === '') { // بالفصل: الدرجة تلقائياً = الحالي − السابق كالمنصّة إن لم تكن بالرواتب
-            if ($deg === 0 && $half === 0 && $p && $base > round($p['base'])) $deg = $base - round($p['base']);
+            if ($deg === 0 && $half === 0 && $base > $prevSal) $deg = $base - $prevSal;
         }
         $auto = [
             'teacher_no' => trim((string)($e['caisse_number'] ?? '')), 'teacher_name' => eocNameAr($e),
-            'previous_salary' => $p ? round($p['base']) : $base, 'current_salary' => $base, 'add_salary' => $extra,
+            'previous_salary' => $prevSal, 'current_salary' => $base, 'add_salary' => $extra,
             'teacher_m_disc' => $monthly, 'teacher_q_disc' => $monthly * count($pi['months']), 'school_q_disc' => $monthly * count($pi['months']),
             'discount_half_salary' => $half, 'training_degree' => $deg, 'extra_amount' => $half + $deg, 'is_trainee' => (int)!empty($e['eoc_trainee']), 'is_contribution' => (int)!empty($e['eoc_contribution']), 'remarks' => '',
         ];

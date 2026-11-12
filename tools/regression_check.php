@@ -3987,10 +3987,10 @@ $n70 = function($like) use ($db) {
     return (int)$q->fetchColumn();
 };
 check('الأربع مدارس: عيّنة رقم صح بكل مدرسة + عدد الأرقام المميزة = عدد بيانها',
-      $c70('%سيدة النياح%', 'جوسلين', 'يوسف', 'عازار') === '36967' && $n70('%سيدة النياح%') === 17
-      && $c70('%سيدة الانتقال%', 'وفاء', 'توفيق', 'مهنا') === '14887' && $n70('%سيدة الانتقال%') === 14
-      && $c70('%سيدة النجاة%', 'جونا', 'فادي', 'زوبا') === '130695' && $n70('%سيدة النجاة%') === 24
-      && $n70('مدرسة%سيدة البشارة%') === 19,
+      $c70('%سيدة النياح%', 'جوسلين', 'يوسف', 'عازار') === '36967' && $n70('%سيدة النياح%') >= 17
+      && $c70('%سيدة الانتقال%', 'وفاء', 'توفيق', 'مهنا') === '14887' && $n70('%سيدة الانتقال%') >= 14
+      && $c70('%سيدة النجاة%', 'جونا', 'فادي', 'زوبا') === '130695' && $n70('%سيدة النجاة%') >= 24 /* 2026-11-12: الأرقام تزيد مع الداخلين الجدد بالملاك (ردود الصندوق 11/11 و12/11) */
+      && $n70('مدرسة%سيدة البشارة%') >= 19,
       'مميزة: نياح=' . $n70('%سيدة النياح%') . ' انتقال=' . $n70('%سيدة الانتقال%')
       . ' نجاة=' . $n70('%سيدة النجاة%') . ' بشارة=' . $n70('مدرسة%سيدة البشارة%'));
 check('احتياط الأب↔الشهرة المعكوسين: تيا (البشارة) أخذت 133694 رغم انعكاس ديب/نخلة بملفها',
@@ -11650,7 +11650,7 @@ try {
         && is_array($j2c) && ($j2c['school_no'] ?? '') === '75210' && count($j2c['lines'] ?? []) === count($j2a['lines'] ?? []);
     $mf2 = json_decode((string)file_get_contents($PROJ . '/tools/mehe_fill_extension/manifest.json'), true); $ce2 = (string)file_get_contents($PROJ . '/tools/mehe_fill_extension/content_eoc.js'); $bg2 = (string)@file_get_contents($PROJ . '/tools/mehe_fill_extension/bg.js');
     $okExt2 = ($mf2['background']['service_worker'] ?? '') === 'bg.js' && strpos($ce2, 'id="msa-eoc-go"') !== false && strpos($ce2, "digits(B.school_no) !== no || B.kind !== kind || String(B.period) !== per") !== false
-        && strpos($ce2, "'&export=json&caisse_no=' + no") !== false && strpos($ce2, 'a[href*="page=2"]') !== false && strpos($ce2, "mode: 'all'") !== false
+        && strpos($ce2, "'&export=json&caisse_no=' + no") !== false && strpos($ce2, 'async function ensureAll()') !== false && strpos($ce2, 'function step1Missing()') !== false && strpos($ce2, "throw new Error('multi-page roster not loaded')") !== false /* 1.4.1 (2026-11-11): لائحة متعدّدة الصفحات تُقرأ كلّها وتُتحقَّق بدل الرفض + حارس «الخطوة 1» */ && strpos($ce2, "mode: 'all'") !== false
         && strpos($bg2, "msg.action === 'program'") !== false && strpos($bg2, "indexOf('export=json') < 0") !== false
         && substr_count($bg2, "method: 'POST'") === 2 && strpos($bg2, "eoc_act: 'site_numbers'") !== false && strpos($bg2, 'BASES.indexOf(base) < 0') !== false;   // الكتابة الوحيدة بالبرنامج = تصحيح الأرقام المالية من الموقع
     // 🔢🚪 (2026-11-09 «أرقام الموقع المالية هي الصحّ» + «لائحة البرنامج هي الصحّ… أنت تتأكّد أنّه كان بالسنة القبلها وترك»): رقم الموقع لا يُمسّ ورقم البرنامج يُصحَّح منه؛
@@ -11728,6 +11728,24 @@ try {
     $why303 = 'guard=' . (int)$okGuard303 . ' explicit=' . (int)$okExplicit303 . ' srcA=' . (int)$okSrcA303 . ' plan=' . (int)$okPlan303 . ' base=' . (int)$okBase303 . ' srcB=' . (int)$okSrcB303;
 } catch (Throwable $e) { $ok303 = false; $why303 = $e->getMessage(); }
 check('🔒🧷 (2026-11-10) إعادة حساب المدى لا تمسّ الأشهر المدفوعة بالسنين السابقة (سعر الصرف/الشطور/السلسلة/الإعدادات) إلا بالتطبيق الصريح · المزامنة: المرفوع يحدّث أساسه فوراً والمطابق أونلاين ليس تعارضاً', $ok303, $why303);
+
+/* 🏛️ (2026-11-12 قراره) البيان المالي للصندوق: «الراتب السابق» = الراتب قبل التدرّج كما بالبطاقة السنوية لسنة البيان (أساس تشرين الأول)، لا راتب أيلول السنة الماضية؛
+   «الحالي» = بعد التدرّج؛ والدرجة = الفرق بينهما فقط. يُفحَص على كل مدرسة لها رواتب تشرين الأول من السنة الحالية. */
+try {
+    require_once $PROJ . '/includes/eoc_portal.php';
+    [$y304] = schoolYearToYears(currentSchoolYear()); $code304 = ((int)$y304 + 1) . '01'; $bad304 = []; $n304 = 0;
+    foreach ($db->query("SELECT DISTINCT school_id FROM monthly_salaries WHERE year = " . (int)$y304 . " AND month = 10 AND base_plus_echelon_lbp > 0")->fetchAll(PDO::FETCH_COLUMN) as $sid304) {
+        $rs304 = eocFinancialRows($db, [(int)$sid304], $code304, eocDefaults('financial'));
+        $q304 = $db->prepare("SELECT base_salary_lbp b0, base_plus_echelon_lbp bp FROM monthly_salaries WHERE employee_id = ? AND year = ? AND month = 10");
+        foreach ($rs304 as $r304) { if (($r304['src'] ?? '') !== 'auto') continue; $q304->execute([(int)$r304['emp_id'], (int)$y304]); $m304 = $q304->fetch(PDO::FETCH_ASSOC); if (!$m304) continue; $n304++;
+            $bp = round((float)$m304['bp']); $b0 = round((float)$m304['b0']); if ($b0 <= 0 || $b0 > $bp) $b0 = $bp;
+            if (round((float)$r304['auto']['previous_salary']) != $b0 || round((float)$r304['auto']['current_salary']) != $bp) $bad304[] = $sid304 . '/' . $r304['emp_id']; }
+    }
+    $src304 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/eoc_portal.php'));
+    $ok304 = !$bad304 && $n304 > 0 && strpos($src304, "'previous_salary' => \$prevSal, 'current_salary' => \$base,") !== false && strpos($src304, 'if ($m !== 10 && $p && round($p[\'base\']) > 0 && round($p[\'base\']) < $prevSal)') !== false;
+    $why304 = 'أسطر ' . $n304 . ' · مخالف ' . count($bad304) . ' ' . implode(',', array_slice($bad304, 0, 6));
+} catch (Throwable $e) { $ok304 = false; $why304 = $e->getMessage(); }
+check('🏛️ (2026-11-12) البيان المالي للصندوق: الراتب السابق = قبل التدرّج من بطاقة سنة البيان (لا أيلول السنة الماضية) والحالي بعد التدرّج', $ok304, $why304);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
