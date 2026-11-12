@@ -11769,6 +11769,12 @@ check('🖨️ (2026-11-12) الطباعة: حاوية الجدول ذات أس�
       (bool)preg_match('/@media print \{[^@]*\[data-stkvis\] \{ overflow: visible !important; \} table thead th, table thead td \{ transform: none !important; \} \}/', $css306)
       && strpos((string)file_get_contents($PROJ . '/assets/js/app.js'), "t2.parentElement.setAttribute('data-stkvis', '1');") !== false);
 
+/* 🧹 (2026-11-12 «شوف هالكبسات كيف مطيشرين») كل الكبسات بخطّ البرنامج (button كان Arial والرابط خطّ البرنامج) + شريط الطباعة الأصفر ضمن تدفّق الصفحة لا فوق الشريط العلوي */
+$ft307 = (string)file_get_contents($PROJ . '/includes/footer.php');
+check('🧹 (2026-11-12) الكبسات بخطّ البرنامج نفسه وارتفاع سطر واحد + شريط «اطبع عالورق» لا يغطّي الشريط العلوي',
+      strpos((string)file_get_contents($PROJ . '/assets/css/app.css'), '.btn { font-family: inherit; line-height: 1.5; }') !== false
+      && strpos($ft307, "b.style.cssText = 'position:static;background:#fff8e1;") !== false && strpos($ft307, 'document.body.insertBefore(b, document.body.firstChild);') !== false);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

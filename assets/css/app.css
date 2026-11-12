@@ -485,6 +485,9 @@ body.rtl .user-menu { padding: 5px 6px 5px 13px; }
 }
 
 /* =================== Buttons =================== */
+/* 🧹 (2026-11-12 «شوف هالكبسات كيف مطيشرين»): <button class="btn"> كان يأخذ خطّ المتصفّح الافتراضي (Arial) بينما <a class="btn"> يرث خطّ البرنامج —
+   فتطلع كبسات الصفّ الواحد بخطّين وارتفاعين (30 و34) والعربي ببعضها صغير. الآن كل الكبسات بخطّ البرنامج نفسه وارتفاع سطر واحد. */
+.btn { font-family: inherit; line-height: 1.5; }
 .btn {
     display: inline-flex;
     align-items: center;
