@@ -3410,3 +3410,29 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
 .sc-confirm{max-width:680px;margin:40px auto;border:2px solid #dc2626}
 @media (max-width:1100px){.sc-cols{grid-template-columns:1fr 1fr}.sc-grid{grid-template-columns:1fr 1fr}}
 @media (max-width:640px){.sc-cols,.sc-grid{grid-template-columns:1fr}}
+
+
+/* ===== 🎩 msa-calm-2026-11-12 — «بدّي الرسمي والدارج… والرايق» (اختار صورة الاقتراح ثمّ «طبّق») =====
+   شاشة فقط (الطباعة لا تُمسّ). اللون يبقى لما له معنى: شعارات الدولة، تبويبات ملف الأستاذ (مخفَّفة)، شارات الحالة، وأحمر الحذف/PDF.
+   الباقي: خلفية رمادي فاتح · شريط علوي أبيض بخانات موحّدة · أيقونات القائمة بيضاء على الكحلي · كبسات كحلي واحد.
+   للرجوع عنه: احذف هذا القسم كلّه (النسخة قبله: msa_helper_tests/app_css_before_calm_20261112.css). */
+@media screen {
+  html body, html body .main-content, html body .app-layout, html body .page-content { background: #f2f4f7 !important; background-image: none !important; }
+  html body #msaTabs { background: #16365c !important; background-image: none !important; border-bottom: 3px solid #b8944a !important; box-shadow: none !important; }
+  html body #msaTabs .mt-tab > i.fas:not(.gov-ic), html body #msaTabs .mt-btn > i.fas:not(.gov-ic):not(.mt-car) { background: rgba(255,255,255,.08) !important; background-image: none !important; color: #fff !important; border: 1px solid rgba(255,255,255,.28) !important; box-shadow: none !important; }
+  html body #msaTabs .gov-ic { box-shadow: none !important; border: 1px solid rgba(255,255,255,.28) !important; }
+  html body .topbar { background: #fff !important; }
+  html body .topbar .school-switcher, html body .topbar .topbar-dossier, html body .topbar .user-menu, html body .topbar .btn, html body .topbar .bell-btn, html body .topbar .school-switcher.year-switcher
+    { background: #fff !important; background-image: none !important; border: 1px solid #c5ced9 !important; color: #16365c !important; box-shadow: none !important; text-shadow: none !important; }
+  html body .topbar .school-switcher > *:not(.school-menu), html body .topbar .school-switcher .sm-btn *, html body .topbar .topbar-dossier *, html body .topbar .user-menu *, html body .topbar .btn *, html body .topbar .bell-btn i, html body .topbar .school-switcher select, html body .topbar .school-switcher.year-switcher select.form-control { color: #16365c !important; text-shadow: none !important; }
+  html body .topbar .school-switcher > i, html body .topbar .school-switcher.year-switcher .ys-ic, html body .topbar .td-ic, html body .topbar .user-avatar, html body .topbar .btn i { background: #e8edf3 !important; background-image: none !important; color: #16365c !important; }
+  html body .topbar > div:first-child > div > span:first-child { background: #16365c !important; background-image: none !important; }
+  html body .topbar > div:first-child > div > span:first-child i { color: #fff !important; }
+  html body .btn.btn-primary, html body .btn.btn-info, html body .btn.btn-gold, html body .btn.btn-warning, html body .btn.btn-secondary, html body .page-content .btn.btn-light, html body .export-toolbar .btn.btn-primary, html body .export-toolbar .btn.btn-info, html body .export-toolbar .btn.btn-gold
+    { background: #16365c !important; background-image: none !important; border-color: #16365c !important; color: #fff !important; text-shadow: none !important; box-shadow: none !important; border-bottom-width: 1px !important; }
+  html body .page-content .btn.btn-primary *, html body .page-content .btn.btn-info *, html body .page-content .btn.btn-gold *, html body .page-content .btn.btn-warning *, html body .page-content .btn.btn-secondary *, html body .page-content .btn.btn-light * { color: #fff !important; }
+  html body .page-content .btn.btn-success, html body .export-toolbar .btn.btn-success { background: #fff !important; background-image: none !important; color: #16365c !important; border: 1px solid #16365c !important; text-shadow: none !important; box-shadow: none !important; }
+  html body .page-content .btn.btn-success * { color: #16365c !important; }
+  html body .btn.btn-danger { background-image: none !important; box-shadow: none !important; border-bottom-width: 1px !important; }
+  html body .tabs.emp-tabs .tab { filter: saturate(.62) brightness(.97); box-shadow: none !important; }
+}
