@@ -182,8 +182,22 @@ window.msaFitScreenTables = function () {
                 if (b.type === 'submit' || !inZone(b)) continue;
                 movers.push(b);
             }
-            if (!strip && !movers.length) return;
+            // 📌 (2026-11-13 «كمّل») صفحة بشريطها الخاصّ داخل أوّل بطاقة (موازنة الوزارة، بوّابة الصندوق): كبساته نفسها تنتقل إلى الشريط اللاصق
+            var own = [];
+            if (!strip && !movers.length) {
+                var cb = pc.querySelector('.card.no-print > .card-body');
+                if (cb && inZone(cb.parentElement) && cb.querySelectorAll(':scope > .btn').length >= 3) {
+                    for (i = 0; i < cb.children.length; i++) { var ch = cb.children[i]; if (ch.matches('.btn') || (ch.getAttribute('role') === 'group' && ch.querySelector('.btn'))) own.push(ch); }
+                }
+            }
+            if (!strip && !movers.length && !own.length) return;
             if (!strip) { strip = document.createElement('div'); strip.className = 'msa-bars-row no-print'; pc.insertBefore(strip, pc.firstElementChild); }
+            if (own.length) {
+                var ob = document.createElement('span'); ob.className = 'msa-acts-own'; var cbp = own[0].parentElement;
+                for (i = 0; i < own.length; i++) ob.appendChild(own[i]);
+                strip.appendChild(ob);
+                if (cbp && !cbp.children.length && !(cbp.textContent || '').trim()) cbp.style.display = 'none';
+            }
             if (movers.length) {
                 var box = document.createElement('span'); box.className = 'msa-acts-page';
                 for (i = 0; i < movers.length; i++) box.appendChild(movers[i]);
@@ -263,6 +277,7 @@ window.msaFitScreenTables = function () {
             w.needX = tt.scrollWidth > host.clientWidth + 2;   // أعرض من حاويته = بدو أسانسور أفقي
             // 📌 (2026-11-13) جدول داخل فورم مقفول: شريط «تعديل/حفظ» اللاصق فوقه ⇒ الرأس يلتصق تحته
             var lkF = tt.closest('form'), lkB = lkF ? lkF.querySelector('.lockedit-bar') : null;
+            if (!lkB) { var lkS = tt.closest('.doc-sheet'); lkB = lkS ? lkS.querySelector(':scope > .sheetctl') : null; }   // موازنة الوزارة: شريط «تعديل الصفحة» اللاصق
             w.lk = (lkB && lkB.offsetParent && getComputedStyle(lkB).position === 'sticky') ? Math.ceil(lkB.getBoundingClientRect().height) : 0;
             w.h = []; var rows = tt.tHead.rows;
             for (i = 0; i < rows.length; i++) w.h.push(rows[i].offsetHeight);
@@ -312,7 +327,7 @@ window.msaFitScreenTables = function () {
     var stkSig = '';
     function stkSignature() {
         var tbS = document.querySelector('.topbar');   // 📌 (2026-10-08) ارتفاع الشريط العلوي جزء من البصمة: يكبر بعد الخطوط/الالتفاف فتبقى الرؤوس خلفه
-        var ts = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, table.xlsf'), acS = document.querySelector('.msa-bars-row.msa-acts'), a = [window.innerWidth, tbS ? Math.ceil(tbS.getBoundingClientRect().height) : 0, acS ? Math.ceil(acS.getBoundingClientRect().height) : 0, document.querySelectorAll('.lockedit-bar').length];
+        var ts = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, table.xlsf'), acS = document.querySelector('.msa-bars-row.msa-acts'), a = [window.innerWidth, tbS ? Math.ceil(tbS.getBoundingClientRect().height) : 0, acS ? Math.ceil(acS.getBoundingClientRect().height) : 0, document.querySelectorAll('.lockedit-bar, .sheetctl').length];
         for (var i = 0; i < ts.length; i++) { var h = ts[i].parentElement; a.push(ts[i].scrollWidth + '/' + (h ? h.clientWidth : 0) + '/' + (ts[i].tHead ? ts[i].tHead.offsetHeight : 0)); }
         return a.join(',');
     }

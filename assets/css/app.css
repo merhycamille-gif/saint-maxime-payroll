@@ -3456,6 +3456,17 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
   .msa-bars-row.msa-acts.msa-acts-tight > .export-toolbar .btn, .msa-bars-row.msa-acts.msa-acts-tight .msa-acts-page .btn:not(.sc-btn) { padding: 6px 6px !important; font-size: 11.5px !important; gap: 4px; letter-spacing: -.1px; }
   .msa-bars-row.msa-acts.msa-acts-tight > .export-toolbar .rl-chip { padding: 5px 6px; font-size: 11.5px; }
   .msa-bars-row.msa-acts.msa-acts-tight > .export-toolbar .xt-g { margin-inline: 0 !important; padding-inline: 2px !important; }
+  /* صفحات بشريطها الخاصّ (موازنة الوزارة، بوّابة الصندوق): كبساتها نفسها بالشريط اللاصق بألوانها */
+  .msa-bars-row.msa-acts > .msa-acts-own { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .msa-bars-row.msa-acts > .msa-acts-own .btn { margin: 0 !important; padding: 6px 10px !important; font-size: 12.5px !important; min-height: 36px !important; }
+  html body .msa-bars-row.msa-acts > .msa-acts-own .btn.btn-danger { background: #dc2626 !important; border-color: #dc2626 !important; color: #fff !important; }
+  html body .msa-bars-row.msa-acts > .msa-acts-own .btn[style*="25D366"] { background: #25D366 !important; border-color: #25D366 !important; color: #fff !important; }
+  html body .msa-bars-row.msa-acts > .msa-acts-own [role=group] .btn { border-radius: 0 !important; border: 0 !important; }
+  html body .msa-bars-row.msa-acts > .msa-acts-own [role=group] .btn.btn-light { background: #fff !important; color: #16365c !important; }
+  html body .msa-bars-row.msa-acts > .msa-acts-own [role=group] .btn.btn-light * { color: #16365c !important; }
+  /* موازنة الوزارة: شريط «تعديل الصفحة / حفظ الصفحة» لكل قسم يبقى ظاهراً طول ما القسم ظاهر، و«حفظ» أخضر */
+  .mehe-doc .doc-sheet > .sheetctl { position: sticky; top: var(--msa-topbar-h, 0px); z-index: 15; background: #fff; padding: 6px 0; margin-bottom: 8px; }
+  html body .page-content .mehe-doc .sheetctl .btn.sv, html body .page-content .mehe-doc .rowctl button.sv { background: #1e9e4a !important; border-color: #1e9e4a !important; color: #fff !important; }
   /* 💚 «حفظ» أخضر بكل البرنامج (زرّ إرسال الفورم + الحفظ الفوري بجانب الحقل + «حفظ» بشريط التعديل) */
   html body .page-content .btn.msa-save, html body .btn.quicksave-btn, html body .page-content .btn.btn-success.msa-save, html body .page-content .btn.btn-primary.msa-save
     { background: #1e9e4a !important; background-image: none !important; border: 1px solid #1e9e4a !important; color: #fff !important; text-shadow: none !important; box-shadow: none !important; }

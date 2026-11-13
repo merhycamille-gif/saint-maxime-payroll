@@ -11782,7 +11782,7 @@ check('📌💚 (2026-11-13) شريط الكبسات اللاصق (pinActs) + «
       strpos($js308, "if (/annual_slip/.test(location.pathname)) return;") !== false && strpos($js308, "strip.classList.add('msa-acts');") !== false
       && strpos($js308, "setProperty('--msa-acts-top', topOffG + 'px')") !== false && strpos($js308, 'top = Math.ceil((topOffG + w2.lk) / w2.z);') !== false
       && strpos($fl308, "'position:sticky;top:var(--msa-topbar-h,0px);z-index:20}'") !== false && strpos($fl308, 'proxySave.addEventListener') !== false && strpos($fl308, "b.classList.add('msa-save')") !== false
-      && strpos($css308, '.msa-bars-row.msa-acts { position: sticky; top: var(--msa-acts-top, 0px);') !== false && strpos($css308, 'html body .page-content .btn.msa-save, html body .btn.quicksave-btn') !== false);
+      && strpos($css308, '.msa-bars-row.msa-acts { position: sticky; top: var(--msa-acts-top, 0px);') !== false && strpos($js308, "ob.className = 'msa-acts-own'") !== false && strpos($css308, '.mehe-doc .doc-sheet > .sheetctl { position: sticky; top: var(--msa-topbar-h, 0px);') !== false && strpos($css308, 'html body .page-content .btn.msa-save, html body .btn.quicksave-btn') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
