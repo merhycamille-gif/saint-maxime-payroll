@@ -3471,6 +3471,13 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
   html body .sp-app thead th { position: sticky; z-index: 5; }
   /* صفحة المدارس والمؤسسات: «حفظ/إلغاء» تعديل بطاقة المدرسة يبقى ظاهراً أسفل الشاشة طول ما فورم التعديل ظاهر */
   .sc-edit .sc-save { position: sticky; bottom: 8px; z-index: 6; background: #fff; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 -6px 18px rgba(15,23,42,.10); }
+  /* 🔍 «محل بدي فتّش عن اسم كمان لازم نضلّ مبيّني»: سطر التفتيش فوق اللائحة يلتصق تحت شريط الكبسات (app.js يُنزل رأس الجدول تحته) */
+  .mp-tool { position: sticky; top: var(--msa-topbar-h, 0px); z-index: 21; margin-bottom: 0 !important; box-shadow: 0 8px 10px -10px rgba(15,23,42,.35); }
+  .sc-bar { position: sticky; top: var(--msa-topbar-h, 0px); z-index: 21; }
+  .mp-tool.has-big #empSearchBox { flex: 1.6 1 340px; min-width: 260px; }
+  .mp-tool.has-big #empQuick { flex: 1 1 220px; }
+  .mp-tool.has-big #empSearchInput { width: 100%; font-size: 17px !important; font-weight: 600; padding: 9px 14px !important; min-height: 46px; border: 2px solid #1e4fa3; border-radius: 12px; background: #f8fbff; }
+  .mp-tool.has-big #empSearchInput::placeholder { font-weight: 500; color: #64748b; }
   /* 💚 «حفظ» أخضر بكل البرنامج (زرّ إرسال الفورم + الحفظ الفوري بجانب الحقل + «حفظ» بشريط التعديل) */
   html body .page-content .btn.msa-save, html body .btn.quicksave-btn, html body .page-content .btn.btn-success.msa-save, html body .page-content .btn.btn-primary.msa-save
     { background: #1e9e4a !important; background-image: none !important; border: 1px solid #1e9e4a !important; color: #fff !important; text-shadow: none !important; box-shadow: none !important; }

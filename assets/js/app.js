@@ -165,6 +165,23 @@ window.msaFitScreenTables = function () {
             if (wrapped()) { strip.classList.add('msa-acts-tight'); if (wrapped()) strip.classList.add('msa-acts-2row'); }
         } catch (e) {}
     }
+    // 🔍📌 (2026-11-13 «محل بدي فتّش عن اسم كمان لازم نضلّ مبيّني») سطر التفتيش فوق اللائحة (mp-tool) يلتصق تحت شريط الكبسات بكل الصفحات،
+    // وبلائحة الموظفين خانة «فتّش عن أستاذ» الكبيرة نفسها تنتقل إلى هذا السطر (تبقى مربوطة بفورم التصفية بسمة form=) — سطر واحد بلا عجقة.
+    var srchDone = false;
+    function pinSearch() {
+        if (srchDone) return; srchDone = true;
+        try {
+            var box = document.getElementById('empSearchBox'), inp = document.getElementById('empSearchInput'), quick = document.getElementById('empQuick');
+            var tool = quick ? quick.closest('.mp-tool') : null;
+            if (box && inp && tool && inp.form) {
+                var f = inp.form; if (!f.getAttribute('id')) f.setAttribute('id', 'empFilterForm');
+                inp.setAttribute('form', f.getAttribute('id'));
+                var cell = box.closest('.emp-search-big');
+                tool.insertBefore(box, quick); tool.classList.add('has-big');
+                if (cell) cell.style.display = 'none';
+            }
+        } catch (e) {}
+    }
     function pinActs() {
         if (actsDone) return; actsDone = true;
         try {
@@ -213,7 +230,7 @@ window.msaFitScreenTables = function () {
         } catch (e) {}
     }
     function initStickyHeads() {
-        pinActs(); fitActs();
+        pinActs(); fitActs(); pinSearch();
         // إرجاع ما عدّلناه بجولة سابقة (تغيّر المقاس قد يقلب الحالة)
         var prev = document.querySelectorAll('[data-stkvis]');
         for (var r0 = 0; r0 < prev.length; r0++) { prev[r0].style.overflow = ''; prev[r0].style.overflowX = ''; prev[r0].removeAttribute('data-stkvis'); }
@@ -279,6 +296,9 @@ window.msaFitScreenTables = function () {
             var lkF = tt.closest('form'), lkB = lkF ? lkF.querySelector('.lockedit-bar') : null;
             if (!lkB) { var lkS = tt.closest('.doc-sheet'); lkB = lkS ? lkS.querySelector(':scope > .sheetctl') : null; }   // موازنة الوزارة: شريط «تعديل الصفحة» اللاصق
             w.lk = (lkB && lkB.offsetParent && getComputedStyle(lkB).position === 'sticky') ? Math.ceil(lkB.getBoundingClientRect().height) : 0;
+            // 🔍 سطر التفتيش اللاصق فوق الجدول مباشرةً ⇒ الرأس يلتصق تحته
+            var pvT = null, pvA = tt; for (var pvN = 0; pvN < 5 && pvA && !pvT; pvN++) { var pvS = pvA.previousElementSibling; while (pvS && !pvT) { if (pvS.classList && pvS.classList.contains('mp-tool')) pvT = pvS; pvS = pvS.previousElementSibling; } pvA = pvA.parentElement; if (pvA && pvA.classList && pvA.classList.contains('page-content')) break; }
+            if (pvT && pvT.classList && pvT.classList.contains('mp-tool') && pvT.offsetParent && getComputedStyle(pvT).position === 'sticky') w.lk += Math.ceil(pvT.getBoundingClientRect().height);
             w.h = []; var rows = tt.tHead.rows;
             for (i = 0; i < rows.length; i++) w.h.push(rows[i].offsetHeight);
         }
@@ -327,7 +347,7 @@ window.msaFitScreenTables = function () {
     var stkSig = '';
     function stkSignature() {
         var tbS = document.querySelector('.topbar');   // 📌 (2026-10-08) ارتفاع الشريط العلوي جزء من البصمة: يكبر بعد الخطوط/الالتفاف فتبقى الرؤوس خلفه
-        var ts = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, table.xlsf'), acS = document.querySelector('.msa-bars-row.msa-acts'), a = [window.innerWidth, tbS ? Math.ceil(tbS.getBoundingClientRect().height) : 0, acS ? Math.ceil(acS.getBoundingClientRect().height) : 0, document.querySelectorAll('.lockedit-bar, .sheetctl').length];
+        var ts = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, table.xlsf'), acS = document.querySelector('.msa-bars-row.msa-acts'), a = [window.innerWidth, tbS ? Math.ceil(tbS.getBoundingClientRect().height) : 0, acS ? Math.ceil(acS.getBoundingClientRect().height) : 0, document.querySelectorAll('.lockedit-bar, .sheetctl').length, document.querySelectorAll('.mp-tool.has-big').length];
         for (var i = 0; i < ts.length; i++) { var h = ts[i].parentElement; a.push(ts[i].scrollWidth + '/' + (h ? h.clientWidth : 0) + '/' + (ts[i].tHead ? ts[i].tHead.offsetHeight : 0)); }
         return a.join(',');
     }

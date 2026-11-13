@@ -1339,7 +1339,7 @@ if ($action === 'list') {
                 <script>
                 (function () {
                     var rows = Array.prototype.slice.call(document.querySelectorAll('tr.mp-row')), inp = document.getElementById('empQuick'), cnt = document.getElementById('empQuickCount');
-                    function filter() { var q = (inp.value || '').trim().toLowerCase(), n = 0; rows.forEach(function (tr) { var ok = !q || tr.getAttribute('data-q').indexOf(q) !== -1; tr.style.display = ok ? '' : 'none'; if (ok) n++; }); cnt.textContent = q ? (n + ' / ' + rows.length) : rows.length + ' employés / موظفاً'; }
+                    function filter() { var q = (inp.value || '').trim().toLowerCase(), n = 0; rows.forEach(function (tr) { var ok = !q || (window.msaNz || (window.msaNz = function (s) { s = String(s || '').toLowerCase(); try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {} return s; }))(tr.getAttribute('data-q')).indexOf((window.msaNz || (window.msaNz = function (s) { s = String(s || '').toLowerCase(); try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {} return s; }))(q)) !== -1; tr.style.display = ok ? '' : 'none'; if (ok) n++; }); cnt.textContent = q ? (n + ' / ' + rows.length) : rows.length + ' employés / موظفاً'; }
                     function filterE() { filter(); var n = rows.filter(function (tr) { return tr.style.display !== 'none'; }).length; if (window.msaFilterEmpty) msaFilterEmpty(inp, n); }
                     inp.addEventListener('input', filterE); filterE();
                     document.addEventListener('DOMContentLoaded', function () { if (window.msaBulk) msaBulk({ actions: [
