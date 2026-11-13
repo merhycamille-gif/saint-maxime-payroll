@@ -149,7 +149,57 @@ window.msaFitScreenTables = function () {
 (function () {
     var xTables = [];   // الجداول الأعرض من شاشتها: رأسها يُثبَّت يدوياً مع تمرير الصفحة
     var topOffG = 0;
+    // 📌 (2026-11-13 «أي كبسة كل ما نزل وطلع بالصفحة ضلّ شوفهن… وما بدي عجقة») شريط واحد للكبسات يلتصق تحت القائمة:
+    // سطر الطباعة/التصدير (msa-bars-row) يصير ثابتاً، وكبسات رأس الصفحة (جديد، تعديل، إجراءات، رجوع…) تنتقل إليه كما هي
+    // (العنصر نفسه بمعالجاته — لا نسخ ولا تكرار). كبسات سطور الجداول والفورمات تبقى بمكانها. البطاقة السنوية لا تُمسّ.
+    var actsDone = false; var actsStrip = null;
+    // «ما بدي عجقة»: الشريط بسطر واحد — إن التفّ تُضغط الهوامش (msa-acts-tight)؛ وإن لم يسع حتى مضغوطاً ⇒ سطران مرتّبان:
+    // شريط الطباعة كاملاً فوق وكبسات الصفحة تحته (msa-acts-2row). يُعاد القياس مع كل جولة (الخطوط تُحمَّل لاحقاً فتغيّر العرض).
+    function fitActs() {
+        var strip = actsStrip; if (!strip) return;
+        try {
+            var bx = strip.querySelector('.msa-acts-page'), tbx = strip.querySelector(':scope > .export-toolbar');
+            strip.classList.remove('msa-acts-tight', 'msa-acts-2row');
+            if (!bx) return;
+            var wrapped = function () { return (bx.offsetTop - strip.firstElementChild.offsetTop) > 10 || (!!tbx && tbx.offsetHeight > 52); };
+            if (wrapped()) { strip.classList.add('msa-acts-tight'); if (wrapped()) strip.classList.add('msa-acts-2row'); }
+        } catch (e) {}
+    }
+    function pinActs() {
+        if (actsDone) return; actsDone = true;
+        try {
+            if (/annual_slip/.test(location.pathname)) return;
+            var pc = document.querySelector('.page-content'); if (!pc) return;
+            var strip = pc.querySelector('.msa-bars-row');
+            var lim = pc.getBoundingClientRect().top + window.scrollY + 175, movers = [], i;
+            function inZone(e) { var r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.top + window.scrollY) < lim; }
+            var groups = pc.querySelectorAll('.eh-acts, .page-actions, .sc-acts');
+            for (i = 0; i < groups.length; i++) { if (inZone(groups[i]) && !groups[i].closest('form, table, .msa-bars-row, .modal, .ba-overlay')) movers.push(groups[i]); }
+            var singles = pc.querySelectorAll('a.btn, button.btn');
+            for (i = 0; i < singles.length; i++) {
+                var b = singles[i];
+                if (b.closest('form, table, details, .tabs, .card-body, .alert, .eh-acts, .page-actions, .sc-acts, .msa-bars-row, .export-toolbar, .export-compact, .lockedit-bar, .modal, .ba-overlay, .doc-sheet, .official-doc')) continue;
+                if (b.type === 'submit' || !inZone(b)) continue;
+                movers.push(b);
+            }
+            if (!strip && !movers.length) return;
+            if (!strip) { strip = document.createElement('div'); strip.className = 'msa-bars-row no-print'; pc.insertBefore(strip, pc.firstElementChild); }
+            if (movers.length) {
+                var box = document.createElement('span'); box.className = 'msa-acts-page';
+                for (i = 0; i < movers.length; i++) box.appendChild(movers[i]);
+                strip.appendChild(box);
+            }
+            // خلفية الشريط = خلفية ما تحته (حتى لا يظهر المحتوى من خلفه وهو لاصق)
+            var a = strip.parentElement, bg = '';
+            while (a && a !== document.documentElement) { var c = getComputedStyle(a).backgroundColor; if (c && c !== 'transparent' && !/rgba\(\s*0,\s*0,\s*0,\s*0\)/.test(c)) { bg = c; break; } a = a.parentElement; }
+            strip.style.backgroundColor = bg || '#f2f4f7';
+            strip.classList.add('msa-acts');
+            actsStrip = strip; fitActs();
+            if (window.ResizeObserver) { var at = 0; new ResizeObserver(function () { clearTimeout(at); at = setTimeout(stkRunIfChanged, 120); }).observe(strip); }
+        } catch (e) {}
+    }
     function initStickyHeads() {
+        pinActs(); fitActs();
         // إرجاع ما عدّلناه بجولة سابقة (تغيّر المقاس قد يقلب الحالة)
         var prev = document.querySelectorAll('[data-stkvis]');
         for (var r0 = 0; r0 < prev.length; r0++) { prev[r0].style.overflow = ''; prev[r0].style.overflowX = ''; prev[r0].removeAttribute('data-stkvis'); }
@@ -162,6 +212,8 @@ window.msaFitScreenTables = function () {
         // 📌 (2026-10-01) شريط تبويبات ملف الموظف ثابت تحت الشريط العلوي ⇒ رؤوس الجداول تلتصق تحته لا خلفه
         // 🧭 (2026-10-16) شريط التبويبات العلوي ملتصق تحت الشريط العلوي ⇒ رؤوس الجداول وتبويبات الملف تلتصق تحته
         try { document.documentElement.style.setProperty('--msa-topbar1-h', topOffG + 'px'); var mtEl = document.getElementById('msaTabs'); if (mtEl && mtEl.offsetParent && getComputedStyle(mtEl).display !== 'none') topOffG += Math.ceil(mtEl.getBoundingClientRect().height); } catch (e) {}
+        // 📌 (2026-11-13) شريط الكبسات الثابت تحت القائمة ⇒ كل ما يلتصق (تبويبات الملف، رؤوس الجداول، شريط «تعديل») ينزل تحته
+        try { document.documentElement.style.setProperty('--msa-acts-top', topOffG + 'px'); var acEl = document.querySelector('.msa-bars-row.msa-acts'); if (acEl && acEl.offsetParent && getComputedStyle(acEl).position === 'sticky') topOffG += Math.ceil(acEl.getBoundingClientRect().height); } catch (e) {}
         try { document.documentElement.style.setProperty('--msa-topbar-h', topOffG + 'px'); var tabsEl = document.querySelector('.main-content .tabs'); if (tabsEl && tabsEl.offsetParent && getComputedStyle(tabsEl).position === 'sticky') topOffG += Math.ceil(tabsEl.getBoundingClientRect().height); } catch (e) {}
         // 🚀 (2026-10-02 «كل البرنامج متل البرق»): على دفعات — كل القراءات معاً ثم كل الكتابات معاً. كان كل جدول يكتب ثم يقرأ
         // (فتح حاوياته ← قياسه ← كتابة top ← قراءة ارتفاع الصف…) فيعيد المتصفّح التخطيط لكل جدول ولكل صفّ رأس — صفحة فيها
@@ -209,6 +261,9 @@ window.msaFitScreenTables = function () {
             var w = work[k], tt = w.t, host = tt.parentElement;
             w.z = parseFloat(getComputedStyle(tt).zoom) || 1;
             w.needX = tt.scrollWidth > host.clientWidth + 2;   // أعرض من حاويته = بدو أسانسور أفقي
+            // 📌 (2026-11-13) جدول داخل فورم مقفول: شريط «تعديل/حفظ» اللاصق فوقه ⇒ الرأس يلتصق تحته
+            var lkF = tt.closest('form'), lkB = lkF ? lkF.querySelector('.lockedit-bar') : null;
+            w.lk = (lkB && lkB.offsetParent && getComputedStyle(lkB).position === 'sticky') ? Math.ceil(lkB.getBoundingClientRect().height) : 0;
             w.h = []; var rows = tt.tHead.rows;
             for (i = 0; i < rows.length; i++) w.h.push(rows[i].offsetHeight);
         }
@@ -220,11 +275,11 @@ window.msaFitScreenTables = function () {
                 // بالتمرير (translateY) لأن sticky لا يخترق حاوية متمرّرة
                 t2.parentElement.style.overflowX = 'auto';
                 t2.parentElement.setAttribute('data-stkvis', '1');
-                xTables.push({ t: t2, z: w2.z });
+                xTables.push({ t: t2, z: w2.z, lk: w2.lk });
             } else {
                 // الرأس يلتصق بأعلى الشاشة تحت الشريط (sticky عادي — الإحداثيات داخل
                 // الجدول المصغَّر بالـzoom مقسومة على تصغيره)
-                top = Math.ceil(topOffG / w2.z);
+                top = Math.ceil((topOffG + w2.lk) / w2.z);
             }
             // صفوف الرأس المتعدّدة: top تراكمي حتى لا يغطي الصف الأول الثاني
             var rows2 = t2.tHead.rows;
@@ -243,7 +298,7 @@ window.msaFitScreenTables = function () {
             var t = xTables[k].t, z = xTables[k].z;
             var r = t.getBoundingClientRect();
             var hH = t.tHead.getBoundingClientRect().height;
-            var dy = topOffG - r.top;
+            var dy = topOffG + (xTables[k].lk || 0) - r.top;
             if (dy > 0) dy = Math.min(dy, r.height - hH * 1.5);
             var tf = dy > 0 ? 'translateY(' + Math.round(dy / z) + 'px)' : '';
             var rows = t.tHead.rows;
@@ -257,11 +312,12 @@ window.msaFitScreenTables = function () {
     var stkSig = '';
     function stkSignature() {
         var tbS = document.querySelector('.topbar');   // 📌 (2026-10-08) ارتفاع الشريط العلوي جزء من البصمة: يكبر بعد الخطوط/الالتفاف فتبقى الرؤوس خلفه
-        var ts = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, table.xlsf'), a = [window.innerWidth, tbS ? Math.ceil(tbS.getBoundingClientRect().height) : 0];
+        var ts = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, table.xlsf'), acS = document.querySelector('.msa-bars-row.msa-acts'), a = [window.innerWidth, tbS ? Math.ceil(tbS.getBoundingClientRect().height) : 0, acS ? Math.ceil(acS.getBoundingClientRect().height) : 0, document.querySelectorAll('.lockedit-bar').length];
         for (var i = 0; i < ts.length; i++) { var h = ts[i].parentElement; a.push(ts[i].scrollWidth + '/' + (h ? h.clientWidth : 0) + '/' + (ts[i].tHead ? ts[i].tHead.offsetHeight : 0)); }
         return a.join(',');
     }
     function stkRun() { initStickyHeads(); stkSig = stkSignature(); }
+    window.msaStkRunIfChanged = function () { stkRunIfChanged(); };
     function stkRunIfChanged() { if (stkSignature() !== stkSig) stkRun(); }
     var stkTimer = 0;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', stkRun);

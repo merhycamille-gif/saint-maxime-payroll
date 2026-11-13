@@ -11140,7 +11140,7 @@ try {
     $srcOk286 = strpos($src286, "'mother_first_name_fr' => trim(\$_POST['mother_first_name_fr'] ?? ''),") !== false
         && strpos($src286, "'mother_birth_date' => (preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', \$_POST['mother_birth_date'] ?? '') ? \$_POST['mother_birth_date'] : null),") !== false
         && strpos($hd286, 'ensureMotherColumns20261105();') !== false
-        && strpos($css286, '.emp-filter-row #empSearchInput{font-size:18px !important') !== false && strpos($css286, '.emp-hero .eh-menu.open .eh-dd{display:grid}') !== false && strpos($css286, '.emp-hero .eh-dd .eh-sec{grid-column:1 / -1}') !== false
+        && strpos($css286, '.emp-filter-row #empSearchInput{font-size:18px !important') !== false && strpos($css286, '.eh-menu.open .eh-dd{display:grid}') !== false && strpos($css286, '.eh-dd .eh-sec{grid-column:1 / -1}') !== false
         && strpos($of286, "اسم الوالدة وتاريخ ولادتها:</span> <?= fillVal(trim(trim(\$emp['mother_first_name'].' '.\$emp['mother_last_name']) . ((!empty(\$emp['mother_birth_date'])") !== false
         && strpos($fi286, '$mother   = (!$rtl && $motherFrDb !== \'\') ? $motherFrDb : $nameToLang(') !== false
         && strpos($at286, 'id="attGroups"') !== false && strpos($at286, "\$row2('تاريخ ولادة الأم', formatDate(\$emp['mother_birth_date']))") !== false;
@@ -11774,6 +11774,15 @@ $ft307 = (string)file_get_contents($PROJ . '/includes/footer.php');
 check('🧹 (2026-11-12) الكبسات بخطّ البرنامج نفسه وارتفاع سطر واحد + شريط «اطبع عالورق» لا يغطّي الشريط العلوي',
       strpos((string)file_get_contents($PROJ . '/assets/css/app.css'), '.btn { font-family: inherit; line-height: 1.5; }') !== false
       && strpos($ft307, "b.style.cssText = 'position:static;background:#fff8e1;") !== false && strpos($ft307, 'document.body.insertBefore(b, document.body.firstChild);') !== false);
+
+/* 📌💚 (2026-11-13 «تعديل تضلّ ظاهرة كيف ما طلعت أو نزلت الصفحة… أي كبسة ضلّ شوفهن… حفظ أخضر… وما بدي عجقة») شريط كبسات واحد لاصق تحت القائمة
+   (app.js pinActs ينقل كبسات رأس الصفحة إلى سطر الطباعة ويضيف ارتفاعه لمواضع الالتصاق) + شريط «تعديل» اللاصق وفيه «حفظ» أخضر (form-lock.js) + msa-save أخضر. البطاقة السنوية مستثناة. */
+$js308 = (string)file_get_contents($PROJ . '/assets/js/app.js'); $fl308 = (string)file_get_contents($PROJ . '/assets/js/form-lock.js'); $css308 = (string)file_get_contents($PROJ . '/assets/css/app.css');
+check('📌💚 (2026-11-13) شريط الكبسات اللاصق (pinActs) + «تعديل/حفظ» لاصق وحفظ أخضر بكل البرنامج — والبطاقة السنوية لا تُمسّ',
+      strpos($js308, "if (/annual_slip/.test(location.pathname)) return;") !== false && strpos($js308, "strip.classList.add('msa-acts');") !== false
+      && strpos($js308, "setProperty('--msa-acts-top', topOffG + 'px')") !== false && strpos($js308, 'top = Math.ceil((topOffG + w2.lk) / w2.z);') !== false
+      && strpos($fl308, "'position:sticky;top:var(--msa-topbar-h,0px);z-index:20}'") !== false && strpos($fl308, 'proxySave.addEventListener') !== false && strpos($fl308, "b.classList.add('msa-save')") !== false
+      && strpos($css308, '.msa-bars-row.msa-acts { position: sticky; top: var(--msa-acts-top, 0px);') !== false && strpos($css308, 'html body .page-content .btn.msa-save, html body .btn.quicksave-btn') !== false);
 
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";

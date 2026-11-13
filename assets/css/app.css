@@ -3239,20 +3239,20 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
 .emp-hero .eh-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
 .emp-hero .eh-chip{font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
 .emp-hero .eh-chip.acc{background:#dbeafe;color:#1e3a8a;border-color:#bfdbfe}.emp-hero .eh-chip.ok{background:#dcfce7;color:#15803d;border-color:#bbf7d0}.emp-hero .eh-chip.warn{background:#fef3c7;color:#b45309;border-color:#fde68a}.emp-hero .eh-chip.off{background:#f1f5f9;color:#64748b}
-.emp-hero .eh-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.emp-hero .eh-edit{font-weight:800}
-.emp-hero .eh-menu{position:relative}.emp-hero .eh-dd{display:none;position:absolute;inset-inline-end:0;top:calc(100% + 6px);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 30px rgba(15,23,42,.14);min-width:300px;padding:6px;z-index:60}
-.emp-hero .eh-menu.open .eh-dd{display:block}
-.emp-hero .eh-dd a{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;color:#0f172a;text-decoration:none;font-size:13.5px;font-weight:600}
-.emp-hero .eh-dd a:hover{background:#f1f5f9}.emp-hero .eh-dd a i{width:20px;text-align:center;color:#1e4fa3}.emp-hero .eh-dd a span small{display:block;color:#64748b;font-weight:500;font-size:12px}
-.emp-hero .eh-dd a.eh-danger{color:#b91c1c;border-top:1px dashed #e2e8f0;margin-top:4px;padding-top:10px}.emp-hero .eh-dd a.eh-danger i{color:#b91c1c}
+.eh-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.eh-edit{font-weight:800}
+.eh-menu{position:relative}.eh-dd{display:none;position:absolute;inset-inline-end:0;top:calc(100% + 6px);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 30px rgba(15,23,42,.14);min-width:300px;padding:6px;z-index:60}
+.eh-menu.open .eh-dd{display:block}
+.eh-dd a{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;color:#0f172a;text-decoration:none;font-size:13.5px;font-weight:600}
+.eh-dd a:hover{background:#f1f5f9}.eh-dd a i{width:20px;text-align:center;color:#1e4fa3}.eh-dd a span small{display:block;color:#64748b;font-weight:500;font-size:12px}
+.eh-dd a.eh-danger{color:#b91c1c;border-top:1px dashed #e2e8f0;margin-top:4px;padding-top:10px}.eh-dd a.eh-danger i{color:#b91c1c}
 .emp-facts{display:grid;grid-template-columns:repeat(7,1fr);background:#fff;border:1px solid var(--gray-200,#e2e8f0);border-radius:14px;overflow:hidden;margin-bottom:12px}
 .emp-facts .ef{padding:9px 14px;border-inline-end:1px solid #e2e8f0;min-width:0}.emp-facts .ef:last-child{border-inline-end:0}
 .emp-facts .ef-l{font-size:11.5px;color:#64748b;font-weight:600;line-height:1.3}.emp-facts .ef-l span{display:block;color:#475569}
 .emp-facts .ef-v{font-size:16px;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;direction:ltr;text-align:right;unicode-bidi:isolate;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .emp-facts .ef-v small{display:block;font-size:11px;font-weight:500;color:#64748b;direction:rtl;white-space:normal}
 .emp-facts .ef-v .ef-warn{display:inline-block;font-size:11px;font-weight:700;background:#fef3c7;color:#b45309;border-radius:999px;padding:0 8px;margin-inline-start:6px;direction:rtl}
-@media (max-width:1200px){.emp-facts{grid-template-columns:repeat(4,1fr)}.emp-facts .ef:nth-child(4n){border-inline-end:0}.emp-hero{grid-template-columns:auto 1fr}.emp-hero .eh-acts{grid-column:1/-1;justify-content:flex-start}}
+@media (max-width:1200px){.emp-facts{grid-template-columns:repeat(4,1fr)}.emp-facts .ef:nth-child(4n){border-inline-end:0}.emp-hero{grid-template-columns:auto 1fr}.eh-acts{grid-column:1/-1;justify-content:flex-start}}
 /* التبويبات بسطرين */
 .tabs.emp-tabs{display:flex;gap:4px;flex-wrap:wrap;position:sticky;top:var(--msa-topbar-h,0px);z-index:30;background:var(--gray-100,#f1f5f9);padding-top:4px}
 /* 📌 (2026-10-23 «بس اطلع وانزل بالصفحة العناوين تضلّ مبيّنة») عنوان كل بطاقة يلتصق تحت التبويبات أثناء التمرير داخلها */
@@ -3345,16 +3345,16 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
 .emp-filter-row #empSearchInput{font-size:18px !important;font-weight:600;padding:12px 16px !important;min-height:54px;border:2px solid #1e4fa3;border-radius:12px;background:#f8fbff;box-shadow:0 2px 8px rgba(30,79,163,.12)}
 .emp-filter-row #empSearchInput::placeholder{font-weight:500;color:#64748b}
 .emp-filter-row #empSearchInput:focus{background:#fff;box-shadow:0 0 0 4px rgba(30,79,163,.18);border-color:#1e4fa3}
-.emp-hero .eh-dd{min-width:680px;max-width:min(760px,calc(100vw - 24px));display:none;grid-template-columns:1fr 1fr;column-gap:4px;max-height:min(85vh,760px);overflow:auto}
-.emp-hero .eh-menu.open .eh-dd{display:grid}
-.emp-hero .eh-dd .eh-sec{grid-column:1 / -1}
-.emp-hero .eh-dd a.eh-danger{grid-column:1 / -1;margin-top:0;border-top:0;padding-top:8px}
-@media (max-width:760px){.emp-hero .eh-dd{min-width:0;width:calc(100vw - 24px);grid-template-columns:1fr}}
-.emp-hero .eh-dd .eh-sec{font-size:11.5px;font-weight:800;color:#64748b;letter-spacing:.3px;padding:8px 10px 3px;margin-top:4px;border-top:1px dashed #e2e8f0;text-transform:none}
-.emp-hero .eh-dd .eh-sec:first-of-type{border-top:1px dashed #e2e8f0}
-.emp-hero .eh-dd .eh-sec i{color:#1e4fa3;margin-inline-end:4px}
-.emp-hero .eh-dd a.eh-all{color:#1e4fa3}
-.emp-hero .eh-dd a.eh-danger{margin-top:2px}
+.eh-dd{min-width:680px;max-width:min(760px,calc(100vw - 24px));display:none;grid-template-columns:1fr 1fr;column-gap:4px;max-height:min(85vh,760px);overflow:auto}
+.eh-menu.open .eh-dd{display:grid}
+.eh-dd .eh-sec{grid-column:1 / -1}
+.eh-dd a.eh-danger{grid-column:1 / -1;margin-top:0;border-top:0;padding-top:8px}
+@media (max-width:760px){.eh-dd{min-width:0;width:calc(100vw - 24px);grid-template-columns:1fr}}
+.eh-dd .eh-sec{font-size:11.5px;font-weight:800;color:#64748b;letter-spacing:.3px;padding:8px 10px 3px;margin-top:4px;border-top:1px dashed #e2e8f0;text-transform:none}
+.eh-dd .eh-sec:first-of-type{border-top:1px dashed #e2e8f0}
+.eh-dd .eh-sec i{color:#1e4fa3;margin-inline-end:4px}
+.eh-dd a.eh-all{color:#1e4fa3}
+.eh-dd a.eh-danger{margin-top:2px}
 /* 🏫 2026-11-05 «يبقى المدرسة اللي هو فيها مبيّنة بالملف المفتوح»: اسم المدرسة FR·AR بارز بالرأس + شارة ثابتة بشريط التبويبات */
 .emp-hero .eh-school{margin-top:6px;font-size:15px;font-weight:800;color:#1e4fa3;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .emp-hero .eh-school i{color:#1e4fa3}
@@ -3435,4 +3435,30 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
   html body .page-content .btn.btn-success * { color: #16365c !important; }
   html body .btn.btn-danger { background-image: none !important; box-shadow: none !important; border-bottom-width: 1px !important; }
   html body .tabs.emp-tabs .tab { filter: saturate(.62) brightness(.97); box-shadow: none !important; }
+}
+
+
+/* ===== 📌 msa-acts-2026-11-13 — «تعديل تضلّ ظاهرة كيف ما طلعت أو نزلت الصفحة… أي كبسة ضلّ شوفهن… حفظ أخضر… وما بدي عجقة» =====
+   شريط واحد للكبسات (سطر الطباعة/التصدير + كبسات رأس الصفحة التي ينقلها app.js pinActs) يلتصق تحت القائمة.
+   --msa-acts-top = ارتفاع الشريط العلوي + القائمة (يضعه app.js)؛ ارتفاع هذا الشريط يُضاف إلى --msa-topbar-h فينزل تحته كل لاصق آخر.
+   الطباعة لا تُمسّ (الشريط no-print). */
+@media screen {
+  .msa-bars-row.msa-acts { position: sticky; top: var(--msa-acts-top, 0px); z-index: 35; align-items: center; margin: 0 0 8px !important; padding: 6px 0; box-shadow: 0 8px 10px -10px rgba(15,23,42,.35); }
+  .msa-bars-row.msa-acts > .msa-acts-page { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-inline-start: auto; }
+  .msa-acts-page > .eh-acts, .msa-acts-page > .page-actions, .msa-acts-page > .sc-acts { display: inline-flex !important; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 !important; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; }
+  .msa-acts-page .btn { margin: 0 !important; }
+  .msa-bars-row.msa-acts .msa-acts-page .btn:not(.sc-btn) { padding: 6px 10px !important; font-size: 12px !important; min-height: 36px !important; }
+  html body .msa-bars-row.msa-acts .msa-acts-page .btn.btn-danger { background: #dc2626 !important; border-color: #dc2626 !important; color: #fff !important; }
+  /* ما في عجقة: إن لم يسع الشريط بسطر واحد تُضغَط الهوامش قليلاً (app.js يضع msa-acts-tight) */
+  .msa-bars-row.msa-acts.msa-acts-2row > .msa-acts-page { flex-basis: 100%; justify-content: flex-end; }
+  .msa-bars-row.msa-acts.msa-acts-tight { gap: 4px; }
+  .msa-bars-row.msa-acts.msa-acts-tight > .export-toolbar { gap: 3px !important; }
+  .msa-bars-row.msa-acts.msa-acts-tight > .export-toolbar .btn, .msa-bars-row.msa-acts.msa-acts-tight .msa-acts-page .btn:not(.sc-btn) { padding: 6px 6px !important; font-size: 11.5px !important; gap: 4px; letter-spacing: -.1px; }
+  .msa-bars-row.msa-acts.msa-acts-tight > .export-toolbar .rl-chip { padding: 5px 6px; font-size: 11.5px; }
+  .msa-bars-row.msa-acts.msa-acts-tight > .export-toolbar .xt-g { margin-inline: 0 !important; padding-inline: 2px !important; }
+  /* 💚 «حفظ» أخضر بكل البرنامج (زرّ إرسال الفورم + الحفظ الفوري بجانب الحقل + «حفظ» بشريط التعديل) */
+  html body .page-content .btn.msa-save, html body .btn.quicksave-btn, html body .page-content .btn.btn-success.msa-save, html body .page-content .btn.btn-primary.msa-save
+    { background: #1e9e4a !important; background-image: none !important; border: 1px solid #1e9e4a !important; color: #fff !important; text-shadow: none !important; box-shadow: none !important; }
+  html body .page-content .btn.msa-save *, html body .btn.quicksave-btn * { color: #fff !important; }
+  html body .page-content .btn.msa-save:hover, html body .btn.quicksave-btn:hover { background: #17863d !important; border-color: #17863d !important; }
 }

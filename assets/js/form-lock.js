@@ -41,7 +41,10 @@
     if (document.getElementById('lockedit-style')) return;
     var css =
       '.lockedit-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;' +
-      'background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:14px}' +
+      'background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:14px;' +
+      'position:sticky;top:var(--msa-topbar-h,0px);z-index:20}' +
+      '.lockedit-bar .lockedit-btns{display:inline-flex;gap:8px;align-items:center}' +
+      '@media print{.lockedit-bar{display:none!important}}' +
       '.lockedit-bar.is-editing{background:#fef9c3;border-color:#fde68a}' +
       '.lockedit-msg{font-size:13px;font-weight:600;color:#475569}' +
       '.lockedit-bar.is-editing .lockedit-msg{color:#92400e}';
@@ -66,7 +69,7 @@
         ? Array.prototype.slice.call(document.querySelectorAll('[data-lockedit-for="' + lockFid + '"]'))
         : [];
     var extBtn = extBtns.length ? extBtns[0] : null;
-    var bar = null, editBtn = extBtn, msgEl = null;
+    var bar = null, editBtn = extBtn, msgEl = null, proxySave = null;
     // وضع مضغوط (سطور الجداول): زر «تعديل» صغير فقط بلا شريط رسالة
     var compact = form.classList.contains('lockedit-compact');
 
@@ -84,7 +87,22 @@
         msgEl = document.createElement('span');
         msgEl.className = 'lockedit-msg';
         bar.appendChild(msgEl);
-        bar.appendChild(editBtn);
+        // 📌💚 (2026-11-13 «تعديل تضلّ ظاهرة… وحفظ بعد ما عدّل لونها أخضر») الشريط يلتصق بأعلى الصفحة طول ما الفورم ظاهر،
+        // وبوضع التعديل تظهر فيه «حفظ» خضراء بمحلّ «تعديل» — تكبس زرّ الحفظ الأصلي نفسه (نفس الاسم/القيمة/الحرّاس)،
+        // والأصلي يُخفى فلا تتكرّر الكبسة. فورم فيه أكثر من زرّ إرسال يبقى بأزراره كما هي.
+        var btns = document.createElement('span'); btns.className = 'lockedit-btns';
+        btns.appendChild(editBtn);
+        var mains = subs.filter(function (b) { return !b.classList.contains('btn-danger'); });
+        if (subs.length === 1 && mains.length === 1) {
+          proxySave = document.createElement('button');
+          proxySave.type = 'button';
+          proxySave.className = 'btn btn-success btn-sm msa-save lockedit-save';
+          proxySave.innerHTML = '<i class="fas fa-save"></i> حفظ / Enregistrer';
+          proxySave.style.display = 'none';
+          proxySave.addEventListener('click', function (e) { e.preventDefault(); mains[0].click(); });
+          btns.appendChild(proxySave);
+        }
+        bar.appendChild(btns);
         form.insertBefore(bar, form.firstChild);
       }
     }
@@ -104,10 +122,11 @@
       // أزرار الإجراءات (إضافة سطر...) تُقفل أيضاً — كانت تبقى فعّالة بالوضع المقفول
       // فتضيف حقولاً مفتوحة بفورم مقفول (نفس ثغرة الحادثة). التبويبات مستثناة.
       Array.prototype.forEach.call(form.querySelectorAll('button[type=button]'), function (b) {
-        if (b === editBtn || b.classList.contains('tab') || b.hasAttribute('data-lockedit-for')) return;
+        if (b === editBtn || b === proxySave || b.classList.contains('tab') || b.hasAttribute('data-lockedit-for')) return;
         b.disabled = locked;
       });
-      subs.forEach(function (b) { b.style.display = locked ? 'none' : ''; });
+      subs.forEach(function (b) { b.style.display = (locked || proxySave) ? 'none' : ''; });
+      if (proxySave) proxySave.style.display = locked ? 'none' : '';
       if (extBtns.length) {
         extBtns.forEach(function (b) { b.style.display = locked ? '' : 'none'; });
       } else {
@@ -133,6 +152,15 @@
 
   function init() {
     document.querySelectorAll('form.lockedit, form[data-lockedit]').forEach(setup);
+    // 💚 (2026-11-13) كل زرّ «حفظ» (إرسال فورم) أخضر بكل البرنامج — يُعلَّم بصنف msa-save (اللون بـapp.css)
+    try {
+      document.querySelectorAll('.page-content button[type=submit], .page-content input[type=submit], .page-content button:not([type])').forEach(function (b) {
+        if (b.classList.contains('btn-danger')) return;
+        if (/حفظ|احفظ|Enregistrer|Sauvegarder/.test(b.textContent || b.value || '')) b.classList.add('msa-save');
+      });
+    } catch (e) {}
+    // رؤوس الجداول داخل الفورمات المقفولة تُعاد مواضعها تحت الشريط اللاصق
+    try { if (window.msaStkRunIfChanged) window.msaStkRunIfChanged(); } catch (e) {}
   }
 
   if (document.readyState === 'loading') {
