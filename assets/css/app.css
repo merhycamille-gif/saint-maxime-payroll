@@ -3467,6 +3467,10 @@ html[dir=rtl] #schoolPicker .school-menu { left: auto !important; right: 0 !impo
   /* موازنة الوزارة: شريط «تعديل الصفحة / حفظ الصفحة» لكل قسم يبقى ظاهراً طول ما القسم ظاهر، و«حفظ» أخضر */
   .mehe-doc .doc-sheet > .sheetctl { position: sticky; top: var(--msa-topbar-h, 0px); z-index: 15; background: #fff; padding: 6px 0; margin-bottom: 8px; }
   html body .page-content .mehe-doc .sheetctl .btn.sv, html body .page-content .mehe-doc .rowctl button.sv { background: #1e9e4a !important; border-color: #1e9e4a !important; color: #fff !important; }
+  /* بوّابة الصندوق (طبق الموقع): عناوين أعمدة جداولها تبقى ظاهرة مع التمرير متل باقي البرنامج (app.js يضع top) */
+  html body .sp-app thead th { position: sticky; z-index: 5; }
+  /* صفحة المدارس والمؤسسات: «حفظ/إلغاء» تعديل بطاقة المدرسة يبقى ظاهراً أسفل الشاشة طول ما فورم التعديل ظاهر */
+  .sc-edit .sc-save { position: sticky; bottom: 8px; z-index: 6; background: #fff; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 -6px 18px rgba(15,23,42,.10); }
   /* 💚 «حفظ» أخضر بكل البرنامج (زرّ إرسال الفورم + الحفظ الفوري بجانب الحقل + «حفظ» بشريط التعديل) */
   html body .page-content .btn.msa-save, html body .btn.quicksave-btn, html body .page-content .btn.btn-success.msa-save, html body .page-content .btn.btn-primary.msa-save
     { background: #1e9e4a !important; background-image: none !important; border: 1px solid #1e9e4a !important; color: #fff !important; text-shadow: none !important; box-shadow: none !important; }

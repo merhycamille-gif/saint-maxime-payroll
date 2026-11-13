@@ -239,7 +239,7 @@ window.msaFitScreenTables = function () {
             for (var c = 0; c < r0.cells.length; c++) if (r0.cells[c].tagName !== 'TH') return;
             var th = t.createTHead(); th.appendChild(r0);
         });
-        var tables = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, .doc-sheet table, .official-doc table, #ppExportArea table'), work = [], k, i, j;
+        var tables = document.querySelectorAll('table.table, table.doc-table, table.salary-slip-table, .doc-sheet table, .official-doc table, #ppExportArea table, .sp-app table'), work = [], k, i, j;
         var openRe = /(^|\s)(card|card-body|report-table-wrap|table-wrapper|tbl-scroll|official-doc|doc-sheet|xls-sheet|mof-form)(\s|$)/, toOpen = [];
         // (أ) قراءة: الحاويات المقصوصة/المتمرّرة على سلسلة كل جدول
         for (k = 0; k < tables.length; k++) {

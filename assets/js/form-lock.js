@@ -69,7 +69,20 @@
         ? Array.prototype.slice.call(document.querySelectorAll('[data-lockedit-for="' + lockFid + '"]'))
         : [];
     var extBtn = extBtns.length ? extBtns[0] : null;
-    var bar = null, editBtn = extBtn, msgEl = null, proxySave = null;
+    var bar = null, editBtn = extBtn, msgEl = null, proxySave = null, movedExtras = [];
+    // 📌💚 (2026-11-13 «وبصفحة الموظفين كمان… رتّب هالقاعدة بكل البرنامج») القاعدة واحدة: «حفظ» الأخضر يظهر بمحلّ «تعديل» نفسه.
+    // زرّ «تعديل» الخارجي صار بالشريط اللاصق (ملف الأستاذ) ⇒ زرّ الحفظ الأصلي نفسه (و«إلغاء» بجانبه) ينتقلان إلى جانبه
+    // ويبقى مربوطاً بالفورم بسمة form=؛ الشريط السفلي الفارغ يُخفى فلا تتكرّر الكبسة.
+    try {
+      var mains0 = subs.filter(function (b) { return (b.getAttribute('type') || '').toLowerCase() === 'submit' && !b.classList.contains('btn-danger'); });
+      if (extBtn && lockFid && extBtn.closest('.msa-acts') && (mains0.length === 1 || form.querySelector('.emp-savebar button[type=submit]'))) {
+        var sv = mains0.length === 1 ? mains0[0] : form.querySelector('.emp-savebar button[type=submit]'), holder = sv.closest('.emp-savebar') || sv.parentElement, cancel = holder ? holder.querySelector('a.btn') : null;
+        sv.setAttribute('form', lockFid); sv.classList.remove('btn-lg'); sv.classList.add('msa-save');
+        extBtn.parentNode.insertBefore(sv, extBtn.nextSibling);
+        if (cancel) { extBtn.parentNode.insertBefore(cancel, sv.nextSibling); movedExtras.push(cancel); }
+        if (holder && !holder.querySelector('input, select, textarea, button, a')) holder.style.setProperty('display', 'none', 'important');
+      }
+    } catch (e) {}
     // وضع مضغوط (سطور الجداول): زر «تعديل» صغير فقط بلا شريط رسالة
     var compact = form.classList.contains('lockedit-compact');
 
@@ -127,6 +140,7 @@
       });
       subs.forEach(function (b) { b.style.display = (locked || proxySave) ? 'none' : ''; });
       if (proxySave) proxySave.style.display = locked ? 'none' : '';
+      movedExtras.forEach(function (b) { b.style.display = locked ? 'none' : ''; });
       if (extBtns.length) {
         extBtns.forEach(function (b) { b.style.display = locked ? '' : 'none'; });
       } else {
