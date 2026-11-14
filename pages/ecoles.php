@@ -64,6 +64,7 @@ function ecolesApplyPay(PDO $db, int $sid, string $type, string $bonusType, floa
         $off->execute([$id, $bonusType, $sy]);
         if ($bonusType === 'transport_daily') $zeroCol->execute([$id]);   // لا ازدواج مع عمود النقل الثابت
         if ($value > 0) $ins->execute([$id, $bonusType, $sy, $value, $vt, $cur]);
+        if ($value > 0 && $bonusType !== 'prime_fixe') transportFamilyEnforce($db, (int)$id, $sy, $bonusType);   // 🚌 النقل واحد: النوع المطبَّق يبقى والآخر يُطفأ (2026-11-14)
         if (recalcEmployeeYear($id, $sy) > 0) $done++;
     }
     return [count($ids), $done];

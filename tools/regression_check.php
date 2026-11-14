@@ -11784,6 +11784,58 @@ check('📌💚 (2026-11-13) شريط الكبسات اللاصق (pinActs) + «
       && strpos($fl308, "'position:sticky;top:var(--msa-topbar-h,0px);z-index:20}'") !== false && strpos($fl308, 'proxySave.addEventListener') !== false && strpos($fl308, "b.classList.add('msa-save')") !== false
       && strpos($css308, '.msa-bars-row.msa-acts { position: sticky; top: var(--msa-acts-top, 0px);') !== false && strpos($js308, "ob.className = 'msa-acts-own'") !== false && strpos($css308, '.mehe-doc .doc-sheet > .sheetctl { position: sticky; top: var(--msa-topbar-h, 0px);') !== false && strpos($css308, 'html body .page-content .btn.msa-save, html body .btn.quicksave-btn') !== false);
 
+/* 🚌 (2026-11-14 «في شي غلط بتعويض النقل» — ألين منصور 18,000,000 بدل 9,000,000، 27 شخصاً) النقل لا يتضاعف أبداً:
+   لا أحد عنده سطر نقل ثابت + سطر يومي فاعلان معاً (2026-2027 وطالع) · صمام النسخ (فتح السنة + نسخ الملف لسنة) يعتبر النقل عائلة واحدة
+   · الشفاء موصول بالهيدر · قاعدة الفحص الرسمي · والنقل المخزّن لكل شهر لا يتجاوز ما يعطيه سطر اليومي بالملف (لا رقم عالق مضاعف). */
+try {
+    $fn309 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/functions.php'));
+    $src309 = strpos($fn309, "function findDoubleTransportLines(PDO \$db, string \$fromSy = '2026-2027'): array") !== false
+        && strpos($fn309, 'function healTransportDouble20261114()') !== false
+        && strpos($fn309, "if (in_array((string)(\$b['bonus_type'] ?? ''), ['transport_complement', 'transport_daily'], true)) {") !== false
+        && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healTransportDouble20261114();') !== false
+        && strpos((string)file_get_contents($PROJ . '/includes/data_audit.php'), "\$add('double_transport'") !== false;
+    $dbl309 = findDoubleTransportLines($db);
+    // صمام النسخ بتجربة فعلية (قراءة فقط): من عنده نقل فاعل بسنة ⇒ سطر نقل من النوع الآخر يُعتبر مكرّراً، وبند من غير عائلة النقل لا يتأثّر
+    $one309 = $db->query("SELECT employee_id, school_year, bonus_type FROM employee_bonuses WHERE is_active = 1 AND amount > 0 AND school_year >= '2026-2027' AND bonus_type IN ('transport_complement','transport_daily') LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $guard309 = true;
+    if ($one309) {
+        $other309 = $one309['bonus_type'] === 'transport_daily' ? 'transport_complement' : 'transport_daily';
+        $probe309 = ['period_number' => 99, 'value_type' => 'amount', 'amount' => 123456, 'start_month' => null, 'end_month' => null];
+        $guard309 = bonusDuplicateExists($db, (int)$one309['employee_id'], (string)$one309['school_year'], ['bonus_type' => $other309] + $probe309)
+            && !bonusDuplicateExists($db, (int)$one309['employee_id'], (string)$one309['school_year'], ['bonus_type' => 'aide_complementaire'] + $probe309);
+    }
+    // المخزّن لا يتجاوز الملف: شهر غير مدفوع لمن نقله سطر يومي واحد بالليرة (بلا ثابت وبلا خانة يومي بالملف) ⇒ النقل ≤ اليومي × الأيام × الأسابيع
+    $bad309 = $db->query("SELECT COUNT(*) FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id AND e.is_deleted = 0
+        WHERE ms.school_year >= '2026-2027' AND COALESCE(ms.is_paid,0) = 0 AND COALESCE(e.transport_daily_amount,0) = 0
+          AND (SELECT COUNT(*) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_complement') = 0
+          AND (SELECT COUNT(*) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_daily') = 1
+          AND (SELECT COUNT(*) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_daily' AND b.currency = 'LBP') = 1
+          AND ms.transport_lbp > (SELECT MAX(b.amount) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1 AND b.bonus_type = 'transport_daily')
+                * (CASE WHEN COALESCE(e.transport_days_per_week,0) > 0 THEN e.transport_days_per_week ELSE COALESCE(e.days_per_week,0) END)
+                * (CASE WHEN COALESCE(e.transport_weeks,0) > 0 THEN e.transport_weeks ELSE 4 END) + 1")->fetchColumn();
+    // ⚖️ «طبّق البرنامج بالقانون على كل المدارس»: شاشات الحفظ الأربع تفرض «النقل واحد» + شفاءا المدفوع والتحويل موصولان + لا مضاعَف بـ2025-2026
+    //    + لا نقل «ثابت بالشهر» باقٍ بـ2026-2027 يركب على 450,000 × أيام (كلّه صار يومياً)
+    $src309b = strpos($fn309, "function transportFamilyEnforce(PDO \$db, int \$empId, string \$sy, string \$prefer = 'transport_daily'): bool") !== false
+        && strpos($fn309, 'function healTransportDoublePaid20261114()') !== false && strpos($fn309, 'function healTransportDailyLaw20261114()') !== false
+        && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healTransportDoublePaid20261114();') !== false
+        && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healTransportDailyLaw20261114();') !== false
+        && strpos((string)file_get_contents($PROJ . '/pages/employees.php'), "transportFamilyEnforce(\$db, (int)\$employeeId, (string)\$sy, 'transport_daily')") !== false
+        && strpos((string)file_get_contents($PROJ . '/pages/ecoles.php'), 'transportFamilyEnforce($db, (int)$id, $sy, $bonusType)') !== false
+        && substr_count((string)file_get_contents($PROJ . '/pages/bulk_allowances.php'), 'transportFamilyEnforce($db, (int)$id, (string)$schoolYear,') === 2;
+    $dblPaid309 = count(findDoubleTransportLines($db, '2025-2026'));
+    $fixedLeft309 = (int)$db->query("SELECT COUNT(*) FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0
+        WHERE b.school_year = '2026-2027' AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_complement' AND b.currency = 'LBP' AND MOD(b.amount, 1800000) = 0 AND b.amount <= 12600000")->fetchColumn();
+    $ok309 = $src309 && $src309b && !$dbl309 && $dblPaid309 === 0 && $fixedLeft309 === 0 && $guard309 && (int)$bad309 === 0
+        && strpos((string)getSetting('heal_transport_double_20261114', ''), 'done') === 0 && strpos((string)getSetting('heal_transport_double_paid_20261114', ''), 'done') === 0
+        && strpos((string)getSetting('heal_transport_daily_law_20261114', ''), 'done') === 0
+        // «إذا عندها 4 أيام لازم تطبّق القانون صحّ»: شفاء «النقل يتبع أيام الملف» موصول ومنجَز
+        && strpos($fn309, 'function healTransportDaysFollowFile20261114()') !== false
+        && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healTransportDaysFollowFile20261114();') !== false
+        && strpos((string)getSetting('heal_transport_days_file_20261114', ''), 'done') === 0;
+    $why309 = 'src=' . (int)$src309 . (int)$src309b . ' مضاعَف 25-26=' . $dblPaid309 . ' ثابت باقٍ=' . $fixedLeft309 . ' مضاعَفون=' . count($dbl309) . ' صمام=' . (int)$guard309 . ' أشهر نقلها فوق الملف=' . (int)$bad309 . ' | ' . (string)getSetting('heal_transport_double_20261114', '');
+} catch (Throwable $e) { $ok309 = false; $why309 = $e->getMessage(); }
+check('🚌 (2026-11-14) النقل لا يتضاعف: لا سطرَي نقل (ثابت + يومي) فاعلَين معاً + صمام النسخ يعتبر النقل عائلة واحدة + المخزّن لا يتجاوز ما بالملف', $ok309, $why309);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

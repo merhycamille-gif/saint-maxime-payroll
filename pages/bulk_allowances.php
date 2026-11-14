@@ -134,6 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
             foreach ($typesUsed as $t) $del->execute([$id, $t, $schoolYear]);   // امسح الأنواع المستعملة ثم أعد بناءها بالأسطر
             $pn = 0;
             foreach ($valid as $v) { $pn++; $ins->execute([$id, $v['type'], $pn, $schoolYear, $v['val'], $v['vt'], ($v['vt']==='percent'?'LBP':$v['cur']), $v['from'], $v['to']]); }
+            if (in_array('transport_complement', $typesUsed, true)) transportFamilyEnforce($db, (int)$id, (string)$schoolYear, 'transport_complement');   // 🚌 النقل واحد (2026-11-14)
         }
         [$tot, $done] = recalcScope($db, $scopeAll, $schoolId, $cats, $schoolYear);
         return [count($ids), $done];
@@ -254,6 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $hasScope) {
                 $delCol->execute([$id]);
                 $pn = 0;
                 foreach ($valid as $v) { $pn++; $ins->execute([$id, $pn, $schoolYear, $v['val'], $v['cur'], $v['from'], $v['to']]); }
+                transportFamilyEnforce($db, (int)$id, (string)$schoolYear, 'transport_daily');   // 🚌 النقل واحد: اليومي يبقى والثابت يُطفأ (2026-11-14)
             }
             [$tot, $done] = recalcScope($db, $scopeAll, $schoolId, $categories, $schoolYear);
             $_SESSION['flash_success'] = "طُبّقت " . count($valid) . " سطور نقل يومي على " . count($ids) . " (" . catLabel($categories) . " — " . scopeLabel($scopeAll,$schoolId) . ") — الشهري = اليومي × أيام الحضور × 4. أُعيد حساب $done.";

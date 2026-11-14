@@ -190,5 +190,15 @@ function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
             GROUP BY ms.employee_id", [$sy]));
     } catch (Throwable $t) { $add('pay_period_rows', 'شهر غير مدفوع مخزّن خارج الفترة المدفوعة بملف الموظف (من شهر ← إلى شهر)', []); /* دمب قديم بلا أعمدة الفترة */ }
 
+
+    // 24) 🚌 سطرا نقل فاعلان معاً لنفس الموظف والسنة (ثابت + يومي) — المحرّك يجمعهما فيتضاعف النقل (ألين منصور 18,000,000 بدل 9,000,000،
+    //     2026-11-14). من 2026-2027 وطالع (2025-2026 المدفوعة لا تُفحَص). SQL مضمّن (دمب الأونلاين).
+    try {
+        $add('double_transport', 'سطرا نقل فاعلان معاً لنفس الموظف والسنة (ثابت + يومي) — يتضاعف تعويض النقل', $q("
+            SELECT CONCAT($nm,' ',b.school_year) nm FROM employee_bonuses b JOIN employees e ON e.id=b.employee_id
+            WHERE e.is_deleted=0 AND b.is_active=1 AND b.amount>0 AND b.school_year>='2026-2027' AND b.bonus_type IN ('transport_complement','transport_daily')
+            GROUP BY b.employee_id, b.school_year HAVING COUNT(DISTINCT b.bonus_type)>1"));
+    } catch (Throwable $t) { $add('double_transport', 'سطرا نقل فاعلان معاً لنفس الموظف والسنة (ثابت + يومي) — يتضاعف تعويض النقل', []); }
+
     return $out;
 }

@@ -2505,6 +2505,14 @@ function healYearAdditions2627() {
  *   (ج) نفس القيمة ونوع القيمة والنافذة الشهرية.
  */
 function bonusDuplicateExists(PDO $db, int $empId, string $targetSY, array $b): bool {
+    // 🚌 (2026-11-14 النقل المضاعف — ألين منصور 18,000,000 بدل 9,000,000) النقل عائلة واحدة: سطر نقل فاعل بالسنة الهدف (ثابت أو يومي)
+    //    = لا يُنسخ فوقه سطر نقل آخر من أي نوع (فتح السنة كان يفحص «نفس النوع» فقط فنسخ الثابت فوق اليومي).
+    if (in_array((string)($b['bonus_type'] ?? ''), ['transport_complement', 'transport_daily'], true)) {
+        $tr = $db->prepare("SELECT 1 FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND is_active = 1 AND amount > 0
+                            AND bonus_type IN ('transport_complement','transport_daily') LIMIT 1");
+        $tr->execute([$empId, $targetSY]);
+        if ($tr->fetchColumn()) return true;
+    }
     $st = $db->prepare("SELECT 1 FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND bonus_type = ? AND is_active = 1
         AND (period_number = ?
              OR (value_type = 'percent' AND ? = 'percent')
@@ -2986,6 +2994,250 @@ function healTransportWindow20260825() {
         }
         setSetting('heal_transport_window_20260825', 'done:' . $n);
     } catch (Throwable $e) { /* لا تكسر الصفحة */ }
+}
+
+/** 🚌🔎 (2026-11-14 «في شي غلط بتعويض النقل» — ألين منصور 18,000,000 بدل 9,000,000) من عنده بنفس السنة سطر نقل «ثابت»
+ *  (transport_complement) **و**سطر نقل «يومي» (transport_daily) فاعلان معاً ⇒ المحرّك يجمعهما فيتضاعف النقل.
+ *  السبب: نقل 2025-2026 استُورد من برنامجه القديم رقماً شهرياً ثابتاً، وفتح السنة نسخه على سنة فيها أصلاً سطر اليومي.
+ *  مصدر واحد للفحص (الشفاء + فحص الانحدار). */
+function findDoubleTransportLines(PDO $db, string $fromSy = '2026-2027'): array {
+    $st = $db->prepare("SELECT b.employee_id, b.school_year, e.employee_type, e.school_id,
+                               TRIM(CONCAT_WS(' ', e.first_name_ar, e.father_name_ar, e.last_name_ar)) emp_name,
+                               GROUP_CONCAT(CASE WHEN b.bonus_type = 'transport_complement' THEN b.id END ORDER BY b.id) fixed_ids,
+                               GROUP_CONCAT(CASE WHEN b.bonus_type = 'transport_daily' THEN b.id END ORDER BY b.id) daily_ids
+                        FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0
+                        WHERE b.is_active = 1 AND b.amount > 0 AND b.school_year >= ? AND b.bonus_type IN ('transport_complement','transport_daily')
+                        GROUP BY b.employee_id, b.school_year
+                        HAVING fixed_ids IS NOT NULL AND daily_ids IS NOT NULL
+                        ORDER BY e.school_id, b.employee_id, b.school_year");
+    $st->execute([$fromSy]);
+    return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** 🩹 شفاء ذاتي مرّة واحدة (2026-11-14، قاعدته: «القانون واضح: 450,000 باليوم ومنضربو بعدد أيام حضور الأستاذ»):
+ *  لمن عنده السطران معاً (2026-2027 وطالع — 2025-2026 المدفوعة لا تُمسّ): يُطفأ السطر «الثابت» ويبقى «اليومي» (اليومي × أيام الحضور)،
+ *  ثم تُعاد أشهر السنة. الموظف الإداري نقله كل السنة ⇒ سطره اليومي يُفتح على السنة كلّها (كان الثابت هو الذي يغطّي صيفه).
+ *  نسخة احتياطية للسطور والأشهر بجدولَي _bk_bonuses_trdouble_1114 / _bk_ms_trdouble_1114 قبل أي تعديل.
+ *  🔒 من له شهر مدفوع بتلك السنة لا يُمسّ (يُذكر بالنتيجة) — «الشهر المدفوع ما بيتغيّر بلا سؤال». */
+function healTransportDouble20261114() {
+    if (function_exists('isViewer') && isViewer()) return;
+    try {
+        if (getSetting('heal_transport_double_20261114', '') !== '') return;
+        $db = getDB();
+        $groups = findDoubleTransportLines($db);
+        if (!$groups) { setSetting('heal_transport_double_20261114', 'done: 0 @' . date('Y-m-d H:i')); return; }
+        @set_time_limit(600);
+        require_once __DIR__ . '/payroll_calculator.php';
+        // النسخة الاحتياطية (CREATE خارج أي معاملة)
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_bonuses_trdouble_1114 LIKE employee_bonuses");
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_ms_trdouble_1114 LIKE monthly_salaries");
+        $bkB = $db->prepare("INSERT IGNORE INTO _bk_bonuses_trdouble_1114 SELECT * FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND bonus_type IN ('transport_complement','transport_daily')");
+        $bkM = $db->prepare("INSERT IGNORE INTO _bk_ms_trdouble_1114 SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ?");
+        $paid = $db->prepare("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_paid,0) = 1");
+        $offFixed = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type = 'transport_complement' AND is_active = 1");
+        $allYear = $db->prepare("UPDATE employee_bonuses SET start_month = NULL, end_month = NULL WHERE employee_id = ? AND school_year = ? AND bonus_type = 'transport_daily' AND is_active = 1");
+        $fixed = 0; $months = 0; $who = []; $skippedPaid = [];
+        foreach ($groups as $g) {
+            $eid = (int)$g['employee_id']; $sy = (string)$g['school_year'];
+            $paid->execute([$eid, $sy]);
+            if ((int)$paid->fetchColumn() > 0) { $skippedPaid[] = "#$eid $sy"; continue; }
+            $bkB->execute([$eid, $sy]); $bkM->execute([$eid, $sy]);
+            $offFixed->execute([$eid, $sy]);
+            if ((string)$g['employee_type'] === 'employe') $allYear->execute([$eid, $sy]);
+            $months += (int)recalcEmployeeYear($eid, $sy);
+            $fixed++; $who[] = (string)$g['emp_name'] . " #$eid $sy";
+            try {
+                require_once __DIR__ . '/compliance.php';
+                complianceLogAuto($db, 'double_transport', $eid, $sy, (string)$g['emp_name'],
+                    'سطرا نقل فاعلان معاً (ثابت ' . $g['fixed_ids'] . ' + يومي ' . $g['daily_ids'] . ') فكان النقل يُحسب مرّتين',
+                    'إطفاء السطر الثابت والإبقاء على اليومي (القانون: اليومي × أيام الحضور) وإعادة حساب السنة', 'أُعيد حساب أشهر ' . $sy);
+            } catch (Throwable $e) {}
+        }
+        if (function_exists('logAudit') && $fixed) logAudit('heal_transport_double', 'employee_bonuses', 0, null, ['fixed' => $fixed, 'months' => $months, 'who' => $who, 'skipped_paid' => $skippedPaid]);
+        setSetting('heal_transport_double_20261114', 'done: ' . $fixed . ' months=' . $months . ($skippedPaid ? ' skipped_paid=' . implode(',', $skippedPaid) : '') . ' @' . date('Y-m-d H:i'));
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
+/** 🩹 شفاء ذاتي مرّة واحدة (2026-11-14 قراره «صحّح»): النقل المضاعف بسنة 2025-2026 المدفوعة (رامونا الأسمر، أنطوان دايخ: 9 أشهر
+ *  بـ18,000,000). سنة 2025-2026 كلّها نقلها «ثابت» كما استُورد من برنامجه ⇒ يُطفأ السطر اليومي الزايد ويبقى الثابت، ثم **جراحياً**:
+ *  الشهر الذي نقله المخزّن أكبر ممّا يعطيه الملف يُنزَّل إلى رقم الملف، والمستحق ومرآة دولاره بالفرق نفسه — لا إعادة حساب
+ *  (الأساس/المحسومات/الصافي وعلامة «مدفوع» لا تُمسّ). نسخة احتياطية بجدولَي _bk_bonuses_trdouble_1114 / _bk_ms_trdouble_1114. */
+function healTransportDoublePaid20261114() {
+    if (function_exists('isViewer') && isViewer()) return;
+    try {
+        if (getSetting('heal_transport_double_paid_20261114', '') !== '') return;
+        $db = getDB();
+        $groups = array_values(array_filter(findDoubleTransportLines($db, '2025-2026'), fn($g) => (string)$g['school_year'] === '2025-2026'));
+        if (!$groups) { setSetting('heal_transport_double_paid_20261114', 'done: 0 @' . date('Y-m-d H:i')); return; }
+        @set_time_limit(600);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_bonuses_trdouble_1114 LIKE employee_bonuses");
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_ms_trdouble_1114 LIKE monthly_salaries");
+        $bkB = $db->prepare("INSERT IGNORE INTO _bk_bonuses_trdouble_1114 SELECT * FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND bonus_type IN ('transport_complement','transport_daily')");
+        $bkM = $db->prepare("INSERT IGNORE INTO _bk_ms_trdouble_1114 SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ?");
+        $offDaily = $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type = 'transport_daily' AND is_active = 1");
+        $rowsSt = $db->prepare("SELECT id, month, year, transport_lbp, base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month,0) = 0");
+        $up = $db->prepare("UPDATE monthly_salaries SET transport_lbp = :t, transport_complement_lbp = :t2, total_due_lbp = total_due_lbp - :d,
+                              total_due_usd = CASE WHEN exchange_rate > 0 THEN ROUND(total_due_lbp / exchange_rate, 2) ELSE total_due_usd END WHERE id = :id");
+        $people = 0; $months = 0; $who = [];
+        foreach ($groups as $g) {
+            $eid = (int)$g['employee_id']; $sy = (string)$g['school_year'];
+            $bkB->execute([$eid, $sy]); $bkM->execute([$eid, $sy]);
+            $offDaily->execute([$eid, $sy]);
+            $rowsSt->execute([$eid, $sy]); $n = 0;
+            foreach ($rowsSt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                try { [, , $tc] = (new PayrollCalculator($eid, (int)$r['month'], (int)$r['year']))->bonusComponents((float)$r['base_plus_echelon_lbp']); } catch (Throwable $e) { continue; }
+                $tc = (int)round((float)$tc); $old = (int)round((float)$r['transport_lbp']);
+                if ($old <= $tc) continue;                                   // تنزيل الزايد فقط — لا زيادة ولا لمس للمطابق
+                $up->execute(['t' => $tc, 't2' => $tc, 'd' => $old - $tc, 'id' => (int)$r['id']]); $n++;
+            }
+            $people++; $months += $n; $who[] = (string)$g['emp_name'] . " #$eid $sy ($n شهراً)";
+            try {
+                require_once __DIR__ . '/compliance.php';
+                complianceLogAuto($db, 'double_transport', $eid, $sy, (string)$g['emp_name'],
+                    'سطرا نقل فاعلان معاً بسنة مدفوعة (ثابت ' . $g['fixed_ids'] . ' + يومي ' . $g['daily_ids'] . ') فكان النقل يُحسب مرّتين',
+                    'إطفاء السطر اليومي الزايد وتنزيل النقل والمستحق بالفرق (بقراره «صحّح»)', 'صُحِّح ' . $n . ' شهراً');
+            } catch (Throwable $e) {}
+        }
+        if (function_exists('logAudit')) logAudit('heal_transport_double_paid', 'monthly_salaries', 0, null, ['people' => $people, 'months' => $months, 'who' => $who]);
+        setSetting('heal_transport_double_paid_20261114', 'done: ' . $people . ' months=' . $months . ' @' . date('Y-m-d H:i'));
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
+/** 🚌🛡️ (2026-11-14) النقل عائلة واحدة عند الحفظ: بعد أي شاشة تكتب سطور نقل لموظف وسنة — إن صار عنده نوعان فاعلان معاً
+ *  (ثابت بالشهر + يومي، أو ثابت + خانة اليومي بالملف) يبقى النوع المفضَّل $prefer ويُطفأ الآخر، فلا يتضاعف النقل أبداً.
+ *  القانون: اليومي × أيام الحضور ⇒ ملف الأستاذ يفضّل اليومي؛ الشاشات الجماعية تفضّل النوع الذي طُبِّق للتوّ. يُرجع true إن أطفأ شيئاً. */
+function transportFamilyEnforce(PDO $db, int $empId, string $sy, string $prefer = 'transport_daily'): bool {
+    try {
+        $q = $db->prepare("SELECT SUM(bonus_type = 'transport_complement') f, SUM(bonus_type = 'transport_daily') d FROM employee_bonuses
+                           WHERE employee_id = ? AND school_year = ? AND is_active = 1 AND amount > 0 AND bonus_type IN ('transport_complement','transport_daily')");
+        $q->execute([$empId, $sy]); [$f, $d] = $q->fetch(PDO::FETCH_NUM);
+        $col = (float)$db->query("SELECT COALESCE(transport_daily_amount, 0) FROM employees WHERE id = " . (int)$empId)->fetchColumn();
+        $hasDaily = (int)$d > 0 || $col > 0;
+        if ((int)$f === 0 || !$hasDaily) return false;
+        if ($prefer === 'transport_complement') {
+            $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type = 'transport_daily' AND is_active = 1")->execute([$empId, $sy]);
+            $db->prepare("UPDATE employees SET transport_daily_amount = 0 WHERE id = ?")->execute([$empId]);
+        } else {
+            $db->prepare("UPDATE employee_bonuses SET is_active = 0 WHERE employee_id = ? AND school_year = ? AND bonus_type = 'transport_complement' AND is_active = 1")->execute([$empId, $sy]);
+        }
+        return true;
+    } catch (Throwable $e) { return false; }
+}
+
+/** ⚖️🚌 قيمة تعويض النقل اليومي بالقانون (ليرة) — إعداد transport_law_daily_lbp (افتراضي 450,000). */
+function transportLawDailyLbp(): float {
+    $v = (float)getSetting('transport_law_daily_lbp', 450000);
+    return $v > 0 ? $v : 450000.0;
+}
+
+/** 🩹 شفاء ذاتي مرّة واحدة (2026-11-14 «طبّق البرنامج بالقانون على كل المدارس» — القانون: 450,000 باليوم × أيام حضور الأستاذ):
+ *  كل نقل مكتوب «ثابت بالشهر» بسنة 2026-2027 (كما استُورد من برنامجه القديم) يتحوّل إلى سطر «يومي» 450,000 وأيام الحضور بملفه
+ *  (9,000,000 = 5 أيام · 7,200,000 = 4 · 5,400,000 = 3 · 3,600,000 = 2 — على 4 أسابيع). **المبلغ لا يتغيّر ولا ليرة**:
+ *  بعد التحويل يُحسب نقل كل شهر مخزّن بالمحرّك ويُقارَن بالمخزّن — أي فرق ⇒ يُلغى تحويل ذلك الشخص (معاملة) ويبقى كما كان.
+ *  لا إعادة حساب ولا لمس لأي راتب مخزّن. من مبلغه لا يركب على 450,000 × أيام، أو عنده أكثر من سطر/دولار ⇒ يبقى كما هو ويُذكر.
+ *  نسخة احتياطية: _bk_bonuses_trlaw_1114 (السطور) و_bk_emp_trlaw_1114 (أيام النقل بالملف). */
+function healTransportDailyLaw20261114() {
+    if (function_exists('isViewer') && isViewer()) return;
+    try {
+        if (getSetting('heal_transport_daily_law_20261114', '') !== '') return;
+        $db = getDB(); $sy = '2026-2027'; $daily = transportLawDailyLbp();
+        @set_time_limit(900);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $rows = $db->prepare("SELECT b.id, b.employee_id, b.amount, b.currency, b.value_type, e.days_per_week, e.transport_days_per_week, e.transport_weeks, e.transport_daily_amount,
+                                     (SELECT COUNT(*) FROM employee_bonuses x WHERE x.employee_id = b.employee_id AND x.school_year = b.school_year AND x.is_active = 1 AND x.amount > 0 AND x.bonus_type = 'transport_complement') n_fixed,
+                                     (SELECT COUNT(*) FROM employee_bonuses x WHERE x.employee_id = b.employee_id AND x.school_year = b.school_year AND x.is_active = 1 AND x.amount > 0 AND x.bonus_type = 'transport_daily') n_daily
+                              FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0
+                              WHERE b.school_year = ? AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_complement' ORDER BY b.employee_id, b.id");
+        $rows->execute([$sy]); $rows = $rows->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) { setSetting('heal_transport_daily_law_20261114', 'done: 0 @' . date('Y-m-d H:i')); return; }
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_bonuses_trlaw_1114 LIKE employee_bonuses");
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_emp_trlaw_1114 (id INT PRIMARY KEY, transport_days_per_week DECIMAL(6,2) NULL, saved_at DATETIME NULL)");
+        $bkB = $db->prepare("INSERT IGNORE INTO _bk_bonuses_trlaw_1114 SELECT * FROM employee_bonuses WHERE id = ?");
+        $bkE = $db->prepare("INSERT IGNORE INTO _bk_emp_trlaw_1114 (id, transport_days_per_week, saved_at) SELECT id, transport_days_per_week, NOW() FROM employees WHERE id = ?");
+        $setDays = $db->prepare("UPDATE employees SET transport_days_per_week = ? WHERE id = ?");
+        $toDaily = $db->prepare("UPDATE employee_bonuses SET bonus_type = 'transport_daily', amount = ? WHERE id = ? AND bonus_type = 'transport_complement'");
+        $msSt = $db->prepare("SELECT month, year, transport_lbp, base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month,0) = 0");
+        $backDays = $db->prepare("UPDATE employees SET transport_days_per_week = ? WHERE id = ?");
+        $backLine = $db->prepare("UPDATE employee_bonuses SET bonus_type = 'transport_complement', amount = ? WHERE id = ?");
+        // 🧨 أوّل تشغيل للمحرّك قد يركّب أعمدة (DDL = commit ضمني) ⇒ يُسخَّن قبل أي معاملة، والتراجع اليدوي جاهز إن انقطعت المعاملة
+        try { (new PayrollCalculator((int)$rows[0]['employee_id'], 10, 2026))->bonusComponents(0); } catch (Throwable $e) {}
+        $done = 0; $kept = [];
+        foreach ($rows as $r) {
+            $eid = (int)$r['employee_id']; $amt = (float)$r['amount'];
+            $weeks = (float)$r['transport_weeks'] > 0 ? (float)$r['transport_weeks'] : 4.0;
+            $k = $amt / ($daily * $weeks);
+            if ((int)$r['n_fixed'] !== 1 || (int)$r['n_daily'] !== 0 || (float)$r['transport_daily_amount'] > 0 || (string)$r['currency'] !== 'LBP' || (string)$r['value_type'] !== 'amount'
+                || abs($k - round($k)) > 0.0001 || $k < 1 || $k > 7) { $kept[] = "#$eid:" . (int)$amt; continue; }
+            $k = (int)round($k);
+            $eff = (float)$r['transport_days_per_week'] > 0 ? (float)$r['transport_days_per_week'] : (float)$r['days_per_week'];
+            $bkB->execute([(int)$r['id']]); $bkE->execute([$eid]);
+            $db->beginTransaction();
+            try {
+                if (abs($eff - $k) > 0.0001) $setDays->execute([$k, $eid]);
+                $toDaily->execute([$daily, (int)$r['id']]);
+                $msSt->execute([$eid, $sy]); $same = true;
+                foreach ($msSt->fetchAll(PDO::FETCH_ASSOC) as $m) {
+                    [, , $tc] = (new PayrollCalculator($eid, (int)$m['month'], (int)$m['year']))->bonusComponents((float)$m['base_plus_echelon_lbp']);
+                    if ((int)round((float)$tc) !== (int)round((float)$m['transport_lbp'])) { $same = false; break; }
+                }
+                if ($same) { if ($db->inTransaction()) $db->commit(); $done++; }
+                else {
+                    if ($db->inTransaction()) $db->rollBack();
+                    else { $backLine->execute([$amt, (int)$r['id']]); $backDays->execute([$r['transport_days_per_week'], $eid]); }
+                    $kept[] = "#$eid:" . (int)$amt . '≠';
+                }
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) $db->rollBack();
+                else { try { $backLine->execute([$amt, (int)$r['id']]); $backDays->execute([$r['transport_days_per_week'], $eid]); } catch (Throwable $e2) {} }
+                $kept[] = "#$eid:!";
+            }
+        }
+        if (function_exists('logAudit')) logAudit('heal_transport_daily_law', 'employee_bonuses', 0, null, ['sy' => $sy, 'daily' => $daily, 'converted' => $done, 'kept' => $kept]);
+        setSetting('heal_transport_daily_law_20261114', 'done: ' . $done . ' kept=' . count($kept) . ' @' . date('Y-m-d H:i') . ($kept ? ' | ' . implode(' ', array_slice($kept, 0, 60)) : ''));
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
+/** 🩹 شفاء ذاتي مرّة واحدة (2026-11-14 «إذا عندها 4 أيام يعني إنت لازم تطبّق القانون صحّ»): تحويل الثابت إلى يومي حفظ المبلغ كما هو
+ *  بوضع «أيام النقل» بالملف لمن مبلغه لا يطابق أيام دوامه (ريتا طنوس: 4 أيام بالملف ونقلها 9,000,000 = 5 أيام). القانون: 450,000 × أيام
+ *  الدوام المكتوبة بالملف ⇒ تُرجَع «أيام النقل» إلى ما كانت (فتتبع أيام الدوام) وتُعاد أشهر 2026-2027. من له شهر مدفوع بالسنة لا يُمسّ ويُذكر.
+ *  ينتظر انتهاء شفاء التحويل. نسخة احتياطية للأشهر بـ_bk_ms_trdays_1114. */
+function healTransportDaysFollowFile20261114() {
+    if (function_exists('isViewer') && isViewer()) return;
+    try {
+        if (getSetting('heal_transport_days_file_20261114', '') !== '') return;
+        if (strpos((string)getSetting('heal_transport_daily_law_20261114', ''), 'done') !== 0) return;   // بعد التحويل فقط
+        $db = getDB(); $sy = '2026-2027';
+        try { $rows = $db->query("SELECT k.id, k.transport_days_per_week old_days, e.transport_days_per_week cur_days, e.days_per_week,
+                                         TRIM(CONCAT_WS(' ', e.first_name_ar, e.father_name_ar, e.last_name_ar)) emp_name
+                                  FROM _bk_emp_trlaw_1114 k JOIN employees e ON e.id = k.id AND e.is_deleted = 0
+                                  WHERE NOT (k.transport_days_per_week <=> e.transport_days_per_week)")->fetchAll(PDO::FETCH_ASSOC); }
+        catch (Throwable $e) { $rows = []; }                                                              // لا جدول = لم يتحوّل أحد
+        if (!$rows) { setSetting('heal_transport_days_file_20261114', 'done: 0 @' . date('Y-m-d H:i')); return; }
+        @set_time_limit(600);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_ms_trdays_1114 LIKE monthly_salaries");
+        $bkM = $db->prepare("INSERT IGNORE INTO _bk_ms_trdays_1114 SELECT * FROM monthly_salaries WHERE employee_id = ? AND school_year = ?");
+        $paid = $db->prepare("SELECT COUNT(*) FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_paid,0) = 1");
+        $set = $db->prepare("UPDATE employees SET transport_days_per_week = ? WHERE id = ?");
+        $n = 0; $who = []; $skippedPaid = [];
+        foreach ($rows as $r) {
+            $eid = (int)$r['id'];
+            $paid->execute([$eid, $sy]);
+            if ((int)$paid->fetchColumn() > 0) { $skippedPaid[] = "#$eid"; continue; }
+            $bkM->execute([$eid, $sy]);
+            $set->execute([$r['old_days'], $eid]);
+            recalcEmployeeYear($eid, $sy);
+            $n++; $who[] = (string)$r['emp_name'] . " #$eid (" . (float)$r['cur_days'] . ' ⇒ ' . ((float)$r['old_days'] > 0 ? (float)$r['old_days'] : (float)$r['days_per_week']) . ' أيام)';
+            try {
+                require_once __DIR__ . '/compliance.php';
+                complianceLogAuto($db, 'transport_days_law', $eid, $sy, (string)$r['emp_name'],
+                    'تعويض النقل لا يطابق أيام الدوام بالملف (' . (float)$r['days_per_week'] . ' أيام)', 'النقل = 450,000 × أيام الدوام بالملف (القانون) وإعادة حساب السنة', 'أُعيد حساب أشهر ' . $sy);
+            } catch (Throwable $e) {}
+        }
+        if (function_exists('logAudit')) logAudit('heal_transport_days_file', 'employees', 0, null, ['n' => $n, 'who' => $who, 'skipped_paid' => $skippedPaid]);
+        setSetting('heal_transport_days_file_20261114', 'done: ' . $n . ($skippedPaid ? ' skipped_paid=' . implode(',', $skippedPaid) : '') . ' @' . date('Y-m-d H:i'));
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 
 function healAlineVille20260824() {

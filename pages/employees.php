@@ -339,6 +339,9 @@ function saveEmployeeBonuses($db, $employeeId) {
     if ($tpn > 0) {
         $db->prepare("UPDATE employees SET transport_daily_amount = 0 WHERE id = ?")->execute([$employeeId]);
     }
+    // 🚌🛡️ (2026-11-14 النقل المضاعف) النقل واحد: يومي × أيام الحضور (القانون) — إن كُتب معه نقل ثابت بالشهر لنفس السنة يُطفأ الثابت ويُنبَّه
+    if (transportFamilyEnforce($db, (int)$employeeId, (string)$sy, 'transport_daily'))
+        $_SESSION['flash_info'] = trim(($_SESSION['flash_info'] ?? '') . ' 🚌 النقل يُحسب مرّة واحدة: اليومي × أيام الحضور — سطر «النقل الثابت بالشهر» لم يُحتسَب معه (لا يُجمعان). / Transport : une seule fois (journalier × jours).');
 }
 
 // =====================================================
