@@ -3135,39 +3135,62 @@ function transportLawDailyLbp(): float {
  *  قيمة النقل اليومي بالقانون **لكل شهر**، مصدر واحد لكل المدارس: جدول rate_history بمفتاح transport_daily_lbp (سطر لكل شهر كُتبت له قيمة،
  *  effective_from = أوّل الشهر). الشهر بلا قيمة يأخذ آخر قيمة قبله؛ بلا أي قيمة ⇒ القيمة الأساسية transportLawDailyLbp() (450,000).
  *  $reset = true يمسح ذاكرة الطلب (بعد الحفظ). */
-function transportDailyLawForMonth(int $month, int $year, bool $reset = false): float {
+function transportDailyLawForMonth(int $month, int $year, bool $reset = false, int $schoolId = 0): float {
+    // 🏫 (2026-11-14 «ليش ما حطّيتن متل ما اتّفقنا بصفحة المدرسة») القيمة لكل مدرسة: مفتاح transport_daily_lbp:S<رقم المدرسة> (من صفحة المدرسة)
+    //    يغلب القيمة العامة transport_daily_lbp (صفحة النظام = كل المدارس). الشهر الفارغ عند المدرسة يرث شهرها السابق، وبلا أي قيمة لها ⇒ العامة.
     static $rows = null;
     if ($reset) { $rows = null; if ($month <= 0) return 0.0; }
     if ($rows === null) {
         $rows = [];
-        try { foreach (getDB()->query("SELECT DATE_FORMAT(effective_from, '%Y%m') ym, value FROM rate_history WHERE param_key = 'transport_daily_lbp' ORDER BY effective_from, id")->fetchAll(PDO::FETCH_ASSOC) as $r) $rows[(int)$r['ym']] = (float)$r['value']; }
+        try { foreach (getDB()->query("SELECT param_key k, DATE_FORMAT(effective_from, '%Y%m') ym, value FROM rate_history WHERE param_key LIKE 'transport\\_daily\\_lbp%' ORDER BY effective_from, id")->fetchAll(PDO::FETCH_ASSOC) as $r) $rows[(string)$r['k']][(int)$r['ym']] = (float)$r['value']; }
         catch (Throwable $e) { $rows = []; }
     }
-    $ym = $year * 100 + $month; $v = null;
-    foreach ($rows as $k => $val) { if ($k <= $ym) $v = $val; else break; }
-    return ($v !== null && $v > 0) ? $v : transportLawDailyLbp();
+    $ym = $year * 100 + $month;
+    foreach (($schoolId > 0 ? ['transport_daily_lbp:S' . $schoolId, 'transport_daily_lbp'] : ['transport_daily_lbp']) as $key) {
+        $v = null; foreach (($rows[$key] ?? []) as $k => $val) { if ($k <= $ym) $v = $val; else break; }
+        if ($v !== null && $v > 0) return $v;
+    }
+    return transportLawDailyLbp();
 }
-/** كل القيم التي أخذها القانون (الأساسية + ما كُتب بالجدول) — سطر نقل يومي بالليرة مبلغه واحدة منها = «يتبع القانون». */
+/** كل القيم التي أخذها القانون (الأساسية + ما كُتب بالجدول العامّ وجداول المدارس) — سطر نقل يومي بالليرة مبلغه واحدة منها = «يتبع القانون». */
 function transportLawValues(bool $reset = false): array {
     static $vals = null;
     if ($reset) $vals = null;
     if ($vals === null) {
         $vals = [(string)round(transportLawDailyLbp()) => true];
-        try { foreach (getDB()->query("SELECT DISTINCT value FROM rate_history WHERE param_key = 'transport_daily_lbp'")->fetchAll(PDO::FETCH_COLUMN) as $v) $vals[(string)round((float)$v)] = true; }
+        try { foreach (getDB()->query("SELECT DISTINCT value FROM rate_history WHERE param_key LIKE 'transport\\_daily\\_lbp%'")->fetchAll(PDO::FETCH_COLUMN) as $v) $vals[(string)round((float)$v)] = true; }
         catch (Throwable $e) {}
     }
     return $vals;
 }
-/** القيمة اليومية الفعلية لسطر نقل بالليرة بشهر معيّن: السطر الذي يتبع القانون (مبلغه من قيم القانون) يأخذ قيمة الشهر من الجدول؛
- *  السطر الخاصّ (مبلغ آخر كتبه لأستاذ بعينه = استثناء بملفه) يبقى كما كُتب. */
-function transportDailyEffective(float $lineAmount, int $month, int $year): float {
+/** القيمة اليومية الفعلية لسطر نقل بالليرة بشهر معيّن: السطر الذي يتبع القانون (مبلغه من قيم القانون) يأخذ قيمة الشهر من جدول مدرسته
+ *  (وإلا العامّ)؛ السطر الخاصّ (مبلغ آخر كتبه لأستاذ بعينه = استثناء بملفه) يبقى كما كُتب. */
+function transportDailyEffective(float $lineAmount, int $month, int $year, int $schoolId = 0): float {
     if ($lineAmount <= 0) return $lineAmount;
-    return isset(transportLawValues()[(string)round($lineAmount)]) ? transportDailyLawForMonth($month, $year) : $lineAmount;
+    return isset(transportLawValues()[(string)round($lineAmount)]) ? transportDailyLawForMonth($month, $year, false, $schoolId) : $lineAmount;
+}
+/** 💾 حفظ قيم النقل اليومي لأشهر سنة (العامّة $schoolId = 0، أو لمدرسة) ثمّ إعادة نقل الأشهر التي تغيّرت قيمتها (غير المدفوع فقط).
+ *  $vals = [YYYYMM => قيمة] (الشهر الغائب = فارغ يرث). يُرجع ['changed' => [أشهر], 'res' => نتيجة transportResyncMonths]. */
+function transportRatesSave(PDO $db, string $sy, array $vals, int $schoolId = 0): array {
+    $yms = schoolYearYms($sy); if (!$yms) return ['changed' => [], 'res' => ['changed' => 0, 'paid' => 0, 'locked' => 0, 'people' => 0]];
+    $key = 'transport_daily_lbp' . ($schoolId > 0 ? ':S' . $schoolId : '');
+    $before = []; foreach ($yms as $ym) $before[$ym] = transportDailyLawForMonth($ym % 100, intdiv($ym, 100), false, $schoolId);
+    $from = sprintf('%04d-10-01', intdiv($yms[0], 100)); $to = sprintf('%04d-09-30', intdiv($yms[11], 100));
+    $old = $db->prepare("SELECT effective_from, value FROM rate_history WHERE param_key = ? AND effective_from BETWEEN ? AND ? ORDER BY effective_from"); $old->execute([$key, $from, $to]);
+    $oldRows = $old->fetchAll(PDO::FETCH_ASSOC);
+    $db->prepare("DELETE FROM rate_history WHERE param_key = ? AND effective_from BETWEEN ? AND ?")->execute([$key, $from, $to]);
+    $ins = $db->prepare("INSERT INTO rate_history (param_key, value, effective_from, effective_to, notes) VALUES (?, ?, ?, NULL, ?)");
+    foreach ($yms as $ym) if (isset($vals[$ym]) && (float)$vals[$ym] > 0) $ins->execute([$key, round((float)$vals[$ym]), sprintf('%04d-%02d-01', intdiv($ym, 100), $ym % 100), 'النقل اليومي — ' . $sy . ($schoolId > 0 ? ' — مدرسة ' . $schoolId : ' — كل المدارس')]);
+    transportDailyLawForMonth(0, 0, true); transportLawValues(true);
+    $changed = []; foreach ($yms as $ym) if (abs(transportDailyLawForMonth($ym % 100, intdiv($ym, 100), false, $schoolId) - $before[$ym]) > 0.001) $changed[] = $ym;
+    $res = transportResyncMonths($db, $changed, $schoolId);
+    if (function_exists('logAudit')) logAudit('transport_daily_rates', 'rate_history', $schoolId, $oldRows, ['sy' => $sy, 'school' => $schoolId, 'values' => $vals, 'months_changed' => $changed, 'resync' => $res]);
+    return ['changed' => $changed, 'res' => $res];
 }
 /** 🚌🔁 بعد تغيير قيمة النقل اليومي لشهر/أشهر: يُعاد نقل الأشهر **غير المدفوعة** فقط، جراحياً — النقل والمستحق ومرآة دولاره بالفرق،
  *  بلا إعادة حساب (الأساس/المحسومات/الصافي لا تُمسّ؛ النقل خارج الصافي). الشهر المدفوع والسنة المقفولة لا يُمسّان ويُعدّان.
  *  $yms = [YYYYMM…] الأشهر المعنيّة. يُرجع ['changed','paid','locked','people']. */
-function transportResyncMonths(PDO $db, array $yms): array {
+function transportResyncMonths(PDO $db, array $yms, int $schoolId = 0): array {
     $out = ['changed' => 0, 'paid' => 0, 'locked' => 0, 'people' => 0];
     $yms = array_values(array_unique(array_map('intval', $yms)));
     if (!$yms) return $out;
@@ -3177,7 +3200,7 @@ function transportResyncMonths(PDO $db, array $yms): array {
     $in = implode(',', $yms);
     $rows = $db->query("SELECT ms.id, ms.employee_id, ms.month, ms.year, ms.school_year, ms.transport_lbp, ms.base_plus_echelon_lbp, COALESCE(ms.is_paid,0) paid, e.school_id
                         FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id AND e.is_deleted = 0
-                        WHERE (ms.year * 100 + ms.month) IN ($in) AND COALESCE(ms.is_indemnity_month,0) = 0 AND ms.transport_lbp > 0
+                        WHERE (ms.year * 100 + ms.month) IN ($in) AND COALESCE(ms.is_indemnity_month,0) = 0 AND ms.transport_lbp > 0" . ($schoolId > 0 ? ' AND e.school_id = ' . (int)$schoolId : '') . "
                           AND (COALESCE(e.transport_daily_amount,0) > 0 OR EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year
                                AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_daily'))")->fetchAll(PDO::FETCH_ASSOC);
     $up = $db->prepare("UPDATE monthly_salaries SET transport_lbp = :t, transport_complement_lbp = :t2, total_due_lbp = total_due_lbp + :d,

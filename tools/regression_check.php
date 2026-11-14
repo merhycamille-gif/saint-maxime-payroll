@@ -11837,14 +11837,18 @@ try {
         && strpos((string)getSetting('heal_transport_days_file_20261114', ''), 'done') === 0
         // ⛽📅 «لكل شهر أقدر حطّ قدّيش صار النقل اليومي» + «رقم لكل الأشهر كمان»: جدول القيمة الشهرية (rate_history: transport_daily_lbp) يقرأه المحرّك،
         //    السطر الخاصّ (مبلغ غير قيمة القانون) يبقى كما كُتب، إعادة النقل جراحية بمعاملة واحدة، والمنقولون بلا سطر صار لهم سطر يومي
-        && strpos($fn309, 'function transportDailyLawForMonth(int $month, int $year, bool $reset = false): float') !== false
-        && strpos($fn309, 'function transportResyncMonths(PDO $db, array $yms): array') !== false && strpos($fn309, '@ignore_user_abort(true);') !== false
+        && strpos($fn309, 'function transportDailyLawForMonth(int $month, int $year, bool $reset = false, int $schoolId = 0): float') !== false
+        && strpos($fn309, 'function transportResyncMonths(PDO $db, array $yms, int $schoolId = 0): array') !== false && strpos($fn309, '@ignore_user_abort(true);') !== false
         && strpos($fn309, 'function healTransportCarriedToDaily20261114()') !== false
         && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healTransportCarriedToDaily20261114();') !== false
         && strpos((string)getSetting('heal_transport_carried_20261114', ''), 'done') === 0
         && substr_count((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), 'transportDailyEffective(') === 2
         && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), "(\$_POST['action'] ?? '') === 'save_transport_rates'") !== false
         && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), 'id="trAllBtn"') !== false && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), 'tr-cancel') !== false
+        // 🏫 «ليش ما حطّيتن متل ما اتّفقنا بصفحة المدرسة»: القيمة لكل مدرسة من صفحتها (مفتاح :S<رقم>) تغلب العامّة — والعمود بجدول المدرسة نفسه
+        && strpos($fn309, 'function transportRatesSave(PDO $db, string $sy, array $vals, int $schoolId = 0): array') !== false
+        && strpos((string)file_get_contents($PROJ . '/pages/ecoles.php'), 'name="apply_tr"') !== false && strpos((string)file_get_contents($PROJ . '/pages/ecoles.php'), 'transportRatesSave($db, $sy, $tv, $sid)') !== false
+        && transportDailyLawForMonth(11, 2026, false, 987654) === transportDailyLawForMonth(11, 2026)   // مدرسة بلا قيمة خاصّة = العامّة
         && transportDailyEffective(123457.0, 11, 2026) === 123457.0                                   // مبلغ خاصّ = يبقى
         && transportDailyLawForMonth(1, 2001) === transportLawDailyLbp()                              // بلا قيمة قبله = القيمة الأساسية
         && transportDailyEffective(transportLawDailyLbp(), 11, 2026) === transportDailyLawForMonth(11, 2026);   // سطر القانون = قيمة شهره

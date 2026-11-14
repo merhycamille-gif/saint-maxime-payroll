@@ -54,7 +54,6 @@ if (!preg_match('/^(\d{4})-(\d{4})$/', $trSy, $trM) || (int)$trM[2] !== (int)$tr
 $trYm = []; foreach ([10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9] as $mm_) $trYm[] = [($mm_ >= 10 ? (int)$trM[1] : (int)$trM[2]), $mm_];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_transport_rates') {
     if (!isAdmin()) { $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'صلاحية المدير مطلوبة / Accès administrateur requis']; header('Location: ' . BASE_URL . 'pages/settings.php'); exit; }
-    $before = []; foreach ($trYm as [$y_, $m_]) $before[$y_ * 100 + $m_] = transportDailyLawForMonth($m_, $y_);
     $in = (array)($_POST['tr_rate'] ?? []); $bad = false; $vals = [];
     foreach ($trYm as [$y_, $m_]) {
         $raw = trim((string)($in[$y_ * 100 + $m_] ?? ''));
@@ -65,16 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     }
     if ($bad) { $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'قيمة غير صالحة — اكتب رقماً بالليرة أكبر من صفر، أو اترك الخانة فارغة. / Valeur invalide.']; }
     else {
-        $from = sprintf('%04d-10-01', (int)$trM[1]); $to = sprintf('%04d-09-30', (int)$trM[2]);
-        $old = $db->prepare("SELECT effective_from, value FROM rate_history WHERE param_key = 'transport_daily_lbp' AND effective_from BETWEEN ? AND ? ORDER BY effective_from"); $old->execute([$from, $to]);
-        $oldRows = $old->fetchAll(PDO::FETCH_ASSOC);
-        $db->prepare("DELETE FROM rate_history WHERE param_key = 'transport_daily_lbp' AND effective_from BETWEEN ? AND ?")->execute([$from, $to]);
-        $ins = $db->prepare("INSERT INTO rate_history (param_key, value, effective_from, effective_to, notes) VALUES ('transport_daily_lbp', ?, ?, NULL, ?)");
-        foreach ($vals as $ym => $v) $ins->execute([$v, sprintf('%04d-%02d-01', intdiv($ym, 100), $ym % 100), 'النقل اليومي بالقانون — ' . $trSy]);
-        transportDailyLawForMonth(0, 0, true); transportLawValues(true);
-        $changed = []; foreach ($trYm as [$y_, $m_]) if (abs(transportDailyLawForMonth($m_, $y_) - $before[$y_ * 100 + $m_]) > 0.001) $changed[] = $y_ * 100 + $m_;
-        $res = transportResyncMonths($db, $changed);
-        logAudit('transport_daily_rates', 'rate_history', 0, $oldRows, ['sy' => $trSy, 'values' => $vals, 'months_changed' => $changed, 'resync' => $res]);
+        $sv = transportRatesSave($db, $trSy, $vals, 0); $changed = $sv['changed']; $res = $sv['res'];   // القيمة العامّة لكل المدارس (المدرسة التي لها قيمة خاصّة بصفحتها تبقى عليها)
         $msg = '✅ حُفظت قيمة النقل اليومي لسنة ' . $trSy . '. ';
         $msg .= $changed ? ('تغيّرت قيمة ' . count($changed) . ' شهراً ⇒ عُدّل نقل ' . $res['changed'] . ' راتباً شهرياً عند ' . $res['people'] . ' شخصاً (النقل والمستحق فقط).') : 'لا شهر تغيّرت قيمته — لم يُمسّ أي راتب.';
         if ($res['paid']) $msg .= ' 🔒 ' . $res['paid'] . ' راتباً مدفوعاً لم يُمسّ.';
@@ -271,8 +261,8 @@ $trAr = $lang === 'ar';
                 </tbody>
             </table>
             <small class="text-muted"><?= $trAr
-                ? 'القيمة واحدة لكل المدارس. نقل الأستاذ = قيمة الشهر × أيام دوامه × 4 أسابيع. الخانة الفارغة تأخذ قيمة الشهر الذي قبلها. الشهر المدفوع 🔒 لا يتغيّر.'
-                : "Valeur unique pour toutes les écoles. Transport = valeur du mois × jours de présence × 4 semaines. Une case vide reprend la valeur du mois précédent. Un mois payé 🔒 ne change pas." ?></small>
+                ? 'هذه القيمة العامّة لكل المدارس دفعة واحدة — ولمدرسة بعينها: من صفحة المدرسة. نقل الأستاذ = قيمة الشهر × أيام دوامه × 4 أسابيع. الخانة الفارغة تأخذ قيمة الشهر الذي قبلها. الشهر المدفوع 🔒 لا يتغيّر.'
+                : "Valeur générale pour toutes les écoles — pour une école en particulier : dans sa fiche. Transport = valeur du mois × jours de présence × 4 semaines. Une case vide reprend la valeur du mois précédent. Un mois payé 🔒 ne change pas." ?></small>
             <div class="d-flex justify-end" style="margin-top:10px;gap:8px">
                 <button type="button" class="btn btn-secondary tr-cancel" onclick="location.reload()"><i class="fas fa-rotate-left"></i> <?= $trAr ? 'إلغاء' : 'Annuler' ?></button>
                 <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Enregistrer / حفظ</button>

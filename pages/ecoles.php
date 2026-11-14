@@ -156,6 +156,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'apply_sup_rule' && $sid > 0) {
         if (isSchoolYearLocked($sid, $sy)) { $_SESSION['flash_error'] = yearLockedMsg($sid, $sy); header('Location: ' . $back); exit; }
         $parts = []; $errs = []; $yms = schoolYearYms($sy);
+        // ⛽ النقل اليومي لهذه المدرسة لكل شهر (العمود الأوّل) — فارغ = يأخذ الشهر قبله، وبلا أي قيمة = القيمة العامّة من صفحة النظام
+        if (!empty($_POST['apply_tr'])) {
+            $tv = []; $badT = false;
+            foreach ($yms as $ym) { $raw = trim((string)($_POST['tr'][$ym] ?? '')); if ($raw === '') continue; $v = numLoose($raw); if ($v <= 0 || $v > 100000000) { $badT = true; break; } $tv[$ym] = round($v); }
+            if ($badT) $errs[] = 'Transport : valeur invalide / النقل: قيمة غير صالحة';
+            else { $sv = transportRatesSave($db, $sy, $tv, $sid);
+                   $parts[] = 'Transport / jour · النقل اليومي : ' . ($sv['changed'] ? count($sv['changed']) . ' mois modifiés / شهراً تغيّر ⇒ ' . $sv['res']['changed'] . ' salaires / راتباً (' . $sv['res']['people'] . ' pers.)' : 'inchangé / لم يتغيّر شيء') . ($sv['res']['paid'] ? ' · 🔒 ' . $sv['res']['paid'] . ' payés inchangés / مدفوعاً لم يتغيّر' : ''); }
+        }
         foreach ($CATS as $ck => $c) {
             if (empty($_POST['apply'][$ck])) continue;                       // الفئة غير المؤشَّرة لا تُمسّ
             $kind = (string)($_POST['sup_kind'][$ck] ?? 'percent'); if (!in_array($kind, ['percent', 'LBP', 'USD'], true)) $kind = 'percent';
@@ -174,8 +182,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $parts[] = $c['fr'] . ' · ' . $c['ar'] . ' : ' . $lbl . ' — appliqué à / طُبّق على ' . $res['applied'] . ($res['paid_kept'] ? ' · 🔒 ' . $res['paid_kept'] . ' mois payés inchangés / شهراً مدفوعاً لم يتغيّر' : '')
                      . ((empty($_POST['with_custom'][$ck]) && $res['custom']) ? ' · ' . $res['custom'] . ' valeur propre inchangée / قيمة خاصّة بملفه لم تُمسّ' : '');
         }
-        if ($parts) $_SESSION['flash_success'] = '✅ ' . $sy . ' — Supplément / الأجر الإضافي — ' . implode(' · ', $parts);
-        elseif (!$errs) $_SESSION['flash_error'] = 'Cochez une catégorie / أشّر فئة واحدة على الأقلّ';
+        if ($parts) $_SESSION['flash_success'] = '✅ ' . $sy . ' — ' . implode(' · ', $parts);
+        elseif (!$errs) $_SESSION['flash_error'] = 'Cochez une colonne / أشّر عموداً واحداً على الأقلّ';
         if ($errs) $_SESSION['flash_error'] = implode(' · ', $errs);
         header('Location: ' . $back); exit;
     }
@@ -263,6 +271,12 @@ foreach ($schools as $s) {
         $i['sup'][$ck] = ['rule' => $cr['rule'], 'saved' => $cr['saved'], 'kind' => $one ? ($one['vt'] === 'percent' ? 'percent' : ($one['cur'] === 'USD' ? 'USD' : 'LBP')) : 'percent',
                           'mem' => $i['cnt'][$ck] > 0 ? schoolRuleMembers($db, $sid, $sy, $c['type'], $cr['rule']) : ['follow' => [], 'custom' => [], 'none' => []]];
     }
+    // ⛽ قيم النقل اليومي المكتوبة لهذه المدرسة (لكل شهر) + القيمة السارية (منها أو من العامّة)
+    $i['tr'] = []; $i['tr_eff'] = [];
+    $tq = $db->prepare("SELECT DATE_FORMAT(effective_from, '%Y%m') ym, value FROM rate_history WHERE param_key = ? AND effective_from BETWEEN ? AND ?");
+    try { $ty = schoolYearYms($sy); $tq->execute(['transport_daily_lbp:S' . $sid, sprintf('%04d-10-01', intdiv($ty[0], 100)), sprintf('%04d-09-30', intdiv($ty[11], 100))]);
+          foreach ($tq->fetchAll(PDO::FETCH_ASSOC) as $tr_) $i['tr'][(int)$tr_['ym']] = (float)$tr_['value'];
+          foreach ($ty as $ym_) $i['tr_eff'][$ym_] = transportDailyLawForMonth($ym_ % 100, intdiv($ym_, 100), false, $sid); } catch (Throwable $e) {}
     $i['users'] = $usersBySchool[$sid] ?? [];
     $i['locks'] = array_keys($locks[$sid] ?? []); sort($i['locks']);
     // التنبيهات
@@ -421,7 +435,7 @@ $kv = function (string $fr, string $ar, $val, bool $rtl = false) use ($miss) {
                         <?php endforeach; ?></tr>
                     <tr><td>Transport / jour <i>نقل يومي</i></td>
                         <?php foreach ($CATS as $ck => $c): $p = $i['pay'][$ck]['transport_daily'] ?? null; ?>
-                        <td><?php if ($i['cnt'][$ck] === 0 || !$p): ?><span class="sc-dim">—</span><?php else: ?><b><?= e(number_format(transportDailyLawForMonth((int)date('n'), (int)date('Y')))) ?> L.L</b><?php if ($p['n'] < $i['cnt'][$ck]): ?><small><?= $p['n'] ?>/<?= $i['cnt'][$ck] ?></small><?php endif; ?><?php endif; ?></td>
+                        <td><?php if ($i['cnt'][$ck] === 0 || !$p): ?><span class="sc-dim">—</span><?php else: ?><b><?= e(number_format(transportDailyLawForMonth((int)date('n'), (int)date('Y'), false, $sid))) ?> L.L</b><?php if ($p['n'] < $i['cnt'][$ck]): ?><small><?= $p['n'] ?>/<?= $i['cnt'][$ck] ?></small><?php endif; ?><?php endif; ?></td>
                         <?php endforeach; ?></tr>
                     <tr><td>13e mois <i>شهر 13</i></td><?php foreach ($CATS as $ck => $c): ?><td><?= $i['cnt'][$ck] === 0 ? '<span class="sc-dim">—</span>' : ($i['m13'][$ck] === $i['cnt'][$ck] ? '<b>Oui</b>' : ($i['m13'][$ck] === 0 ? '<b>Non</b>' : '<b>' . $i['m13'][$ck] . '/' . $i['cnt'][$ck] . '</b>')) ?></td><?php endforeach; ?></tr>
                 </table>
@@ -462,30 +476,32 @@ $kv = function (string $fr, string $ar, $val, bool $rtl = false) use ($miss) {
         <?php // 📅➕ (2026-11-14) الأجر الإضافي لكل شهر ولكل فئة: نسبة ٪ أو مبلغ مقطوع (ل.ل / $) + «طبّق على كل الأشهر» — مرتّب بلا عجقة: جدول واحد، الأشهر سطور والفئات أعمدة ?>
         <form method="post" class="sc-form sc-payform" onsubmit="return scConfirmSup(this)">
             <?= csrfField() ?><input type="hidden" name="action" value="apply_sup_rule"><input type="hidden" name="id" value="<?= $sid ?>"><input type="hidden" name="sy" value="<?= e($sy) ?>">
-            <div class="sc-sec"><h4>Supplément <?= e($sy) ?> — par mois et par catégorie <i>الأجر الإضافي: لكل شهر ولكل فئة</i></h4>
+            <div class="sc-sec"><h4>Transport &amp; supplément <?= e($sy) ?> — par mois <i>النقل اليومي والأجر الإضافي: لكل شهر</i></h4>
                 <?php if ($locked): ?><p class="sc-note" style="color:#b45309">🔒 <?= e(yearLockedMsg($sid, $sy)) ?></p><?php else: ?>
                 <table class="sc-pt sc-ptedit sc-sup">
-                    <tr><th></th><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; ?>
+                    <tr><th></th><th class="h-tr"><label class="sc-check"><input type="checkbox" name="apply_tr" value="1"> Transport / jour<small>النقل اليومي</small></label></th><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; ?>
                         <th class="h-<?= $ck ?>"><label class="sc-check"><input type="checkbox" name="apply[<?= $ck ?>]" value="1" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>> <?= e($c['fr']) ?> (<?= $i['cnt'][$ck] ?>)<small><?= e($c['ar']) ?></small></label></th><?php endforeach; ?></tr>
-                    <tr><td>Type <i>النوع</i></td><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; ?>
+                    <tr><td>Type <i>النوع</i></td><td class="sc-dim">L.L × jours × 4<small>ل.ل × أيام الدوام × 4</small></td><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; ?>
                         <td><select class="form-select" name="sup_kind[<?= $ck ?>]" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>>
                             <option value="percent" <?= $sr['kind'] === 'percent' ? 'selected' : '' ?>>% de la base / نسبة ٪</option>
                             <option value="LBP" <?= $sr['kind'] === 'LBP' ? 'selected' : '' ?>>Montant L.L / مقطوع ل.ل</option>
                             <option value="USD" <?= $sr['kind'] === 'USD' ? 'selected' : '' ?>>Montant $ / مقطوع $</option></select></td><?php endforeach; ?></tr>
-                    <tr class="sc-allrow"><td><b>Toute l'année</b> <i>كل أشهر السنة</i></td><?php foreach ($CATS as $ck => $c): ?>
+                    <tr class="sc-allrow"><td><b>Toute l'année</b> <i>كل أشهر السنة</i></td>
+                        <td><div class="sc-in"><input class="form-control sc-supall" data-cat="tr" inputmode="numeric" autocomplete="off"><button type="button" class="btn btn-primary btn-sm" onclick="scSupAll(this)">↓</button></div></td><?php foreach ($CATS as $ck => $c): ?>
                         <td><div class="sc-in"><input class="form-control sc-supall" data-cat="<?= $ck ?>" inputmode="decimal" autocomplete="off" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>>
                             <button type="button" class="btn btn-primary btn-sm" onclick="scSupAll(this)" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>>↓</button></div></td><?php endforeach; ?></tr>
                     <?php foreach ($yms_ as $ym_): ?>
-                    <tr><td><?= e(monthName($ym_ % 100, 'fr')) ?> <?= intdiv($ym_, 100) ?> <i><?= e(monthName($ym_ % 100, 'ar')) ?></i></td><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; $v_ = $sr['rule'][$ym_]['amount'] ?? null; ?>
+                    <tr><td><?= e(monthName($ym_ % 100, 'fr')) ?> <?= intdiv($ym_, 100) ?> <i><?= e(monthName($ym_ % 100, 'ar')) ?></i></td>
+                        <td><input class="form-control sc-supm" data-cat="tr" name="tr[<?= $ym_ ?>]" inputmode="numeric" autocomplete="off" value="<?= isset($i['tr'][$ym_]) ? e(number_format($i['tr'][$ym_])) : '' ?>" placeholder="<?= e(number_format($i['tr_eff'][$ym_] ?? 0)) ?>"></td><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; $v_ = $sr['rule'][$ym_]['amount'] ?? null; ?>
                         <td><input class="form-control sc-supm" data-cat="<?= $ck ?>" name="sup[<?= $ck ?>][<?= $ym_ ?>]" inputmode="decimal" autocomplete="off" value="<?= $v_ === null ? '' : e($sr['kind'] === 'percent' ? nfc((float)$v_, 2, true) : number_format((float)$v_, ((float)$v_ == floor((float)$v_)) ? 0 : 2)) ?>" <?= $i['cnt'][$ck] === 0 ? 'disabled' : '' ?>></td><?php endforeach; ?></tr>
                     <?php endforeach; ?>
-                    <tr><td>Aussi <i>وكمان</i></td><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; ?>
+                    <tr><td>Aussi <i>وكمان</i></td><td></td><?php foreach ($CATS as $ck => $c): $sr = $i['sup'][$ck]; ?>
                         <td style="text-align:start"><?php if ($i['cnt'][$ck] > 0): ?>
                             <label class="sc-check" data-n="<?= count($sr['mem']['custom']) ?>"><input type="checkbox" name="with_custom[<?= $ck ?>]" value="1" <?= count($sr['mem']['custom']) ? '' : 'disabled' ?>> <?= count($sr['mem']['custom']) ?> à valeur propre<small>اللي قيمتهم خاصّة بملفهم</small></label>
                             <label class="sc-check" data-n="<?= count($sr['mem']['none']) ?>"><input type="checkbox" name="with_none[<?= $ck ?>]" value="1" <?= count($sr['mem']['none']) ? '' : 'disabled' ?>> <?= count($sr['mem']['none']) ?> sans supplément<small>اللي ما عندهم إضافي</small></label>
                         <?php endif; ?></td><?php endforeach; ?></tr>
                 </table>
-                <p class="sc-note">La règle s'applique aux employés de la catégorie qui la suivent (<?= e(implode(' · ', array_map(fn($ck) => $CATS[$ck]['fr'] . ' ' . count($i['sup'][$ck]['mem']['follow']), array_keys($CATS)))) ?>). Case vide = pas de supplément ce mois. Un mois payé ne change pas. Exception pour un employé : dans son dossier. <span class="ar-sub">القاعدة بتنزل على اللي ماشيين عليها بالفئة. الخانة الفاضية = بلا إضافي بهالشهر. الشهر المدفوع ما بيتغيّر. استثناء لأستاذ: من ملفه.</span></p>
+                <p class="sc-note">La règle s'applique aux employés de la catégorie qui la suivent (<?= e(implode(' · ', array_map(fn($ck) => $CATS[$ck]['fr'] . ' ' . count($i['sup'][$ck]['mem']['follow']), array_keys($CATS)))) ?>). Supplément : case vide = pas de supplément ce mois. Transport : case vide = valeur du mois précédent (ou valeur générale). Un mois payé ne change pas. Exception pour un employé : dans son dossier. <span class="ar-sub">القاعدة بتنزل على اللي ماشيين عليها بالفئة. الإضافي: الخانة الفاضية = بلا إضافي بهالشهر. النقل: الخانة الفاضية = قيمة الشهر قبله (أو القيمة العامّة). الشهر المدفوع ما بيتغيّر. استثناء لأستاذ: من ملفه.</span></p>
                 <div class="sc-save"><button class="btn btn-success"><i class="fas fa-check"></i> Enregistrer / حفظ</button> <button type="button" class="btn btn-light" onclick="scEdit(<?= $sid ?>, true)">Annuler / إلغاء</button></div>
                 <?php endif; ?>
             </div>
@@ -505,7 +521,7 @@ function scEdit(id, close) {
 function scSupAll(btn) {
     var inp = btn.parentNode.querySelector('.sc-supall'), v = inp.value.trim(); if (v === '') { inp.focus(); return; }
     btn.closest('form').querySelectorAll('.sc-supm[data-cat="' + inp.getAttribute('data-cat') + '"]').forEach(function (i) { i.value = v; });
-    var cb = btn.closest('form').querySelector('[name="apply[' + inp.getAttribute('data-cat') + ']"]'); if (cb && !cb.disabled) cb.checked = true;
+    var cat = inp.getAttribute('data-cat'), cb = btn.closest('form').querySelector(cat === 'tr' ? '[name="apply_tr"]' : '[name="apply[' + cat + ']"]'); if (cb && !cb.disabled) cb.checked = true;
 }
 function scConfirmSup(f) {
     var cats = { titulaire: 'Titulaires / ملاك', contractuel: 'Contractuels / متعاقد', employe: 'Employés / موظف' }, lines = [];
@@ -517,7 +533,10 @@ function scConfirmSup(f) {
         var extra = []; ['with_custom', 'with_none'].forEach(function (n) { var c = f.querySelector('[name="' + n + '[' + ck + ']"]'); if (c && c.checked) extra.push(c.parentNode.innerText.trim().replace(/\s+/g, ' ')); });
         lines.push(cats[ck] + ' : ' + (uniq.length === 1 ? uniq[0] + ' (toute l\'année / كل السنة)' : vals.join(' · ')) + (extra.length ? '\n   + ' + extra.join(' + ') : ''));
     });
-    if (!lines.length) { alert('Cochez une catégorie / أشّر فئة واحدة على الأقلّ'); return false; }
+    var tcb = f.querySelector('[name="apply_tr"]');
+    if (tcb && tcb.checked) { var tv = []; f.querySelectorAll('.sc-supm[data-cat="tr"]').forEach(function (i) { tv.push(i.value.trim() === '' ? '—' : i.value.trim()); }); var tu = tv.filter(function (v, i) { return tv.indexOf(v) === i; });
+        lines.unshift('Transport / jour · النقل اليومي : ' + (tu.length === 1 ? tu[0] + ' L.L (toute l\'année / كل السنة)' : tv.join(' · '))); }
+    if (!lines.length) { alert('Cochez une colonne / أشّر عموداً واحداً على الأقلّ'); return false; }
     return confirm('Enregistrer le supplément et recalculer les salaires non payés ?\nحفظ الأجر الإضافي وإعادة حساب الرواتب غير المدفوعة؟\n\n' + lines.join('\n'));
 }
 function scConfirmPay(f) {
