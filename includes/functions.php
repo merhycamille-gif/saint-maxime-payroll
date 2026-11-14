@@ -835,8 +835,16 @@ function classLevelNames($csv, bool $frOnly = false) {
  * غير المدير العام: مدارسه المسموحة فقط مهما أرسل. «الكل» = المدارس الفاعلة فقط (المعطّلة لا تُدمَج).
  * يعيد: all (bool) · ids (المدارس المعنيّة فعلياً، حتى بوضع الكل) · multi (أكثر من مدرسة) · label · query (للروابط) · hidden (للفورمات).
  */
+/** 🏫 (2026-11-14 «إذا مختار مدرسة معيّنة… بكل الأيقونات وحتى النظام يعطيني معلومات المدرسة اللي مختارها… وإذا مختار مدرستين أو كلّن بيفرجيني اللي مختارهن»)
+ *  لائحة مدارس للعرض ⇒ فقط المختارة من الأعلى (فارغ = كل المدارس). للعرض فقط — لوائح التحقّق من الصلاحية تبقى كاملة. */
+function msaSelectedSchools(array $schools): array {
+    $sel = activeSchoolIds();
+    if (!$sel) return $schools;
+    return array_values(array_filter($schools, fn($s) => in_array((int)($s['id'] ?? 0), $sel, true)));
+}
 function pageSchoolScope(): array {
     $active = allActiveSchoolIdsCached();
+    $top_ = activeSchoolIds(); if ($top_ && isSuperAdmin()) $active = array_values(array_intersect($active, $top_));   // 🏫 منتقي الصفحة ضمن المدارس المختارة من الأعلى فقط
     $ids = []; $all = false;
     if (!isSuperAdmin()) {
         $ids = activeSchoolIds();
@@ -879,7 +887,7 @@ function pageSchoolPickerHtml(array $scope, string $formId = ''): string {
        . '<span hidden data-msa-sync-name="sch_all" data-msa-sync-values="' . ($scope['all'] ? '1' : '') . '"></span>' // 🔁 msaSyncForms
        . '<span hidden data-msa-sync-name="sch[]" data-msa-sync-values="' . ($scope['all'] ? '' : implode(',', $scope['ids'])) . '"></span>'
        . '<label class="chk all"><input type="checkbox" autocomplete="off" name="sch_all" value="1"' . ($scope['all'] ? ' checked' : '') . ' onclick="msaSchoolPickAll(this);' . $sub . '"> <strong>Toutes / الكل</strong></label>';
-    foreach (allSchools() as $s) {
+    foreach (msaSelectedSchools(allSchools()) as $s) {
         $sid = (int)$s['id'];
         $h .= '<label class="chk"><input type="checkbox" autocomplete="off" name="sch[]" value="' . $sid . '"' . ((!$scope['all'] && in_array($sid, $scope['ids'], true)) ? ' checked' : '') . ' onclick="msaSchoolPickOne(this);' . $sub . '"> ' . e($s['name_ar'] ?: $s['name_fr']) . '</label>';
     }
@@ -3412,8 +3420,24 @@ function schoolYearYms(string $sy): array {
     $o = []; foreach ([10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9] as $mm) $o[] = ($mm >= 10 ? (int)$m[1] : (int)$m[2]) * 100 + $mm;
     return $o;
 }
+/** ⚡ (2026-11-14 «ما لازم يكون في بطء، بدّي كل شي سريع بلمح البصر») تحميل جماعي لصفحة المدارس: القواعد المحفوظة + أعضاء كل فئة + سطور الإضافي
+ *  لكل المدارس بثلاثة استعلامات بدل استعلام لكل موظف/فئة/مدرسة. للعرض فقط (GET) — schoolRuleApply يمسحه قبل أي كتابة. */
+function schoolRulePreload(PDO $db, string $sy, string $bt = 'prime_fixe'): void {
+    schoolRuleEnsureTable($db);
+    $c = ['sy' => $sy, 'bt' => $bt, 'rules' => [], 'members' => [], 'lines' => []];
+    $q = $db->prepare("SELECT school_id, employee_type, ym, value_type vt, amount, currency cur FROM school_bonus_rules WHERE school_year = ? AND bonus_type = ?"); $q->execute([$sy, $bt]);
+    foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) { $k = (int)$r['school_id'] . '|' . $r['employee_type']; if (!isset($c['rules'][$k])) $c['rules'][$k] = []; if ((float)$r['amount'] > 0) $c['rules'][$k][(int)$r['ym']] = ['vt' => (string)$r['vt'], 'amount' => (float)$r['amount'], 'cur' => (string)$r['cur']]; }
+    [$yf, $yp] = yearEmploymentFilter($sy);
+    $q = $db->prepare("SELECT id, school_id, employee_type FROM employees WHERE is_deleted = 0" . $yf); $q->execute($yp);
+    foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) $c['members'][(int)$r['school_id'] . '|' . $r['employee_type']][] = (int)$r['id'];
+    $q = $db->prepare("SELECT employee_id, value_type vt, amount, currency cur, start_month `from`, end_month `to` FROM employee_bonuses WHERE school_year = ? AND bonus_type = ? AND is_active = 1 AND amount > 0"); $q->execute([$sy, $bt]);
+    foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) { $e = (int)$r['employee_id']; unset($r['employee_id']); $c['lines'][$e][] = $r; }
+    $GLOBALS['__school_rule_preload'] = $c;
+}
+function schoolRulePre(string $sy, string $bt): ?array { $c = $GLOBALS['__school_rule_preload'] ?? null; return ($c && $c['sy'] === $sy && $c['bt'] === $bt) ? $c : null; }
 /** القاعدة المحفوظة ⇒ [ym => ['vt','amount','cur']] (فقط الأشهر التي لها قيمة > 0) · null = لا قاعدة محفوظة بعد */
 function schoolRuleGet(PDO $db, int $sid, string $sy, string $type, string $bt = 'prime_fixe'): ?array {
+    if ($pc = schoolRulePre($sy, $bt)) return $pc['rules'][$sid . '|' . $type] ?? null;
     schoolRuleEnsureTable($db);
     $q = $db->prepare("SELECT ym, value_type vt, amount, currency cur FROM school_bonus_rules WHERE school_id = ? AND school_year = ? AND employee_type = ? AND bonus_type = ?");
     $q->execute([$sid, $sy, $type, $bt]); $rows = $q->fetchAll(PDO::FETCH_ASSOC);
@@ -3446,11 +3470,22 @@ function schoolRuleSig(array $lines): string {
 }
 /** سطور الأجر الإضافي الفاعلة بملف موظف لسنة ⇒ بنفس شكل schoolRuleLines */
 function schoolRuleEmpLines(PDO $db, int $empId, string $sy, string $bt = 'prime_fixe'): array {
+    if ($pc = schoolRulePre($sy, $bt)) return $pc['lines'][$empId] ?? [];
     $q = $db->prepare("SELECT value_type vt, amount, currency cur, start_month `from`, end_month `to` FROM employee_bonuses WHERE employee_id = ? AND school_year = ? AND bonus_type = ? AND is_active = 1 AND amount > 0");
     $q->execute([$empId, $sy, $bt]); return $q->fetchAll(PDO::FETCH_ASSOC);
 }
 /** القيمة السائدة اليوم عند فئة (سطر واحد «كل السنة») — نقطة البداية حين لا قاعدة محفوظة: ['vt','amount','cur','n'] أو null */
 function schoolRuleDominant(PDO $db, int $sid, string $sy, string $type, string $bt = 'prime_fixe'): ?array {
+    if ($pc = schoolRulePre($sy, $bt)) {   // ⚡ نفس القاعدة من الذاكرة: سطر واحد «كل السنة» لكل عضو ⇒ الأكثر عدداً ثمّ الأكبر مبلغاً
+        $g = [];
+        foreach (($pc['members'][$sid . '|' . $type] ?? []) as $id) {
+            $ls = $pc['lines'][$id] ?? []; if (count($ls) !== 1) continue; $l = $ls[0];
+            if (!($l['from'] === null || ((int)$l['from'] === 10 && (int)$l['to'] === 9))) continue;
+            $k = $l['vt'] . '|' . $l['amount'] . '|' . $l['cur']; if (!isset($g[$k])) $g[$k] = ['vt' => (string)$l['vt'], 'amount' => (float)$l['amount'], 'cur' => (string)$l['cur'], 'n' => 0]; $g[$k]['n']++;
+        }
+        if (!$g) return null;
+        usort($g, fn($a, $b) => [$b['n'], $b['amount']] <=> [$a['n'], $a['amount']]); return $g[0];
+    }
     [$yf, $yp] = yearEmploymentFilter($sy, 'e.');
     $q = $db->prepare("SELECT b.value_type vt, b.amount, b.currency cur, COUNT(DISTINCT b.employee_id) n
                        FROM employee_bonuses b JOIN employees e ON e.id = b.employee_id AND e.is_deleted = 0 AND e.school_id = ? AND e.employee_type = ?" . $yf . "
@@ -3471,11 +3506,12 @@ function schoolRuleCurrent(PDO $db, int $sid, string $sy, string $type, string $
 }
 /** أعضاء الفئة بالسنة مقسومون: يتبع القاعدة / قيمة خاصّة بملفه / بلا إضافي ⇒ ['follow' => [id…], 'custom' => [id…], 'none' => [id…]] */
 function schoolRuleMembers(PDO $db, int $sid, string $sy, string $type, array $rule, string $bt = 'prime_fixe'): array {
-    [$yf, $yp] = yearEmploymentFilter($sy);
-    $q = $db->prepare("SELECT id FROM employees WHERE is_deleted = 0 AND school_id = ? AND employee_type = ?" . $yf);
-    $q->execute(array_merge([$sid, $type], $yp));
+    if ($pc = schoolRulePre($sy, $bt)) $ids_ = $pc['members'][$sid . '|' . $type] ?? [];
+    else { [$yf, $yp] = yearEmploymentFilter($sy);
+           $q = $db->prepare("SELECT id FROM employees WHERE is_deleted = 0 AND school_id = ? AND employee_type = ?" . $yf);
+           $q->execute(array_merge([$sid, $type], $yp)); $ids_ = $q->fetchAll(PDO::FETCH_COLUMN); }
     $sig = schoolRuleSig(schoolRuleLines($rule, $sy)); $o = ['follow' => [], 'custom' => [], 'none' => []];
-    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $id) {
+    foreach ($ids_ as $id) {
         $el = schoolRuleEmpLines($db, (int)$id, $sy, $bt);
         if (!$el) $o['none'][] = (int)$id; elseif ($sig !== '' && schoolRuleSig($el) === $sig) $o['follow'][] = (int)$id; else $o['custom'][] = (int)$id;
     }
@@ -3487,6 +3523,7 @@ function schoolRuleMembers(PDO $db, int $sid, string $sy, string $type, array $r
  * أشهره المدفوعة تُرجَع كما كانت بالحرف. بلا تغيير بالقاعدة ولا بالنطاق ⇒ لا يُمسّ أحد. يُرجع ['applied','recalc','paid_kept','custom','none','changed'].
  */
 function schoolRuleApply(PDO $db, int $sid, string $sy, string $type, array $new, bool $withCustom = false, bool $withNone = false, string $bt = 'prime_fixe'): array {
+    unset($GLOBALS['__school_rule_preload']);   // ⚡ الكتابة تقرأ القاعدة مباشرةً لا من ذاكرة العرض
     schoolRuleEnsureTable($db);
     require_once __DIR__ . '/payroll_calculator.php';
     @set_time_limit(900); @ignore_user_abort(true);

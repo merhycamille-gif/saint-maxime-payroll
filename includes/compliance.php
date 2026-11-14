@@ -524,7 +524,8 @@ function complianceItems(PDO $db, string $sy): array {
 function complianceDecisions(PDO $db): array {
     complianceEnsureTable($db);
     $out = [];
-    try { foreach ($db->query("SELECT * FROM compliance_decisions")->fetchAll(PDO::FETCH_ASSOC) as $r) $out[$r['item_key']] = $r; } catch (Throwable $e) {}
+    try { $selC_ = function_exists('activeSchoolIds') ? activeSchoolIds() : [];   // 🏫 (2026-11-14) السجلّ يتبع المدارس المختارة من الأعلى (سطر بلا مدرسة يبقى)
+        foreach ($db->query("SELECT * FROM compliance_decisions" . ($selC_ ? ' WHERE (school_id IN (' . implode(',', array_map('intval', $selC_)) . ') OR school_id IS NULL OR school_id = 0)' : ''))->fetchAll(PDO::FETCH_ASSOC) as $r) $out[$r['item_key']] = $r; } catch (Throwable $e) {}
     return $out;
 }
 
@@ -585,7 +586,7 @@ function complianceCacheFile(): string {
     $dir = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'msa_cache_' . substr(md5(__DIR__), 0, 10);
     if (!is_dir($dir)) @mkdir($dir, 0700, true);
     $who = (string)($_SESSION['user_id'] ?? '0');
-    return $dir . DIRECTORY_SEPARATOR . 'compliance_' . md5($who . '|' . complianceScopeKey() . '|' . complianceYear() . '|' . lawEnforceFromSy()) . '.ser';
+    return $dir . DIRECTORY_SEPARATOR . 'compliance_' . md5($who . '|' . complianceScopeKey() . '|' . complianceYear() . '|' . lawEnforceFromSy() . '|v20261114') . '.ser';   // v20261114: سجلّ القرارات صار يتبع المدارس المختارة
 }
 function complianceBuildCached(PDO $db, int $ttl = 900): array {
     if (function_exists('msaFpTtl')) $ttl = msaFpTtl($ttl); // عمر طويل فقط حين يثبت أنّ البصمة تلتقط كل تعديل

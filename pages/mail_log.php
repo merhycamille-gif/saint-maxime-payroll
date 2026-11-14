@@ -20,6 +20,8 @@ $db = getDB();
 $q = trim((string)($_GET['q'] ?? ''));
 $days = max(1, min(365, (int)($_GET['days'] ?: 30)));
 $where = 'm.created_at >= ?'; $args = [date('Y-m-d 00:00:00', time() - ($days - 1) * 86400)];
+// 🏫 (2026-11-14) السجلّ يتبع المدارس المختارة من الأعلى
+$selM_ = activeSchoolIds(); if ($selM_ && msaHasCol($db, 'mail_log', 'school_id')) $where .= ' AND m.school_id IN (' . implode(',', array_map('intval', $selM_)) . ')';
 if ($q !== '') { $where .= ' AND (m.to_addr LIKE ? OR m.subject LIKE ? OR m.file_name LIKE ?)'; $like = '%' . $q . '%'; array_push($args, $like, $like, $like); }
 $st = $db->prepare("SELECT m.*, s.downloads sh_downloads, s.last_download_at sh_last, s.size_bytes sh_size, s.expires_at sh_exp FROM mail_log m LEFT JOIN shared_files s ON s.token = m.share_token WHERE $where ORDER BY m.created_at DESC LIMIT 400");
 $st->execute($args);

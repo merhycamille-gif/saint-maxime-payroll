@@ -217,6 +217,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ===================== القراءة =====================
 $schools = $db->query("SELECT * FROM schools WHERE is_deleted = 0 ORDER BY is_active DESC, name_fr, name_ar")->fetchAll(PDO::FETCH_ASSOC);
+// 🏫 (2026-11-14 «إذا مختار مدرسة معيّنة… بكل الأيقونات وحتى النظام يعطيني معلومات المدرسة اللي مختارها… وإذا مختار مدرستين أو كلّن بيفرجيني اللي مختارهن»)
+//    الصفحة تتبع المدارس المختارة من الأعلى: واحدة/اثنتان = بطاقاتها فقط · «كل المدارس» = الكل (ومنها المعطّلة لإعادة تفعيلها).
+$nAllSchools = count($schools); $selSchools = activeSchoolIds();
+if ($selSchools) $schools = array_values(array_filter($schools, fn($s_) => in_array((int)$s_['id'], $selSchools, true)));
 [$yfSql, $yfParams] = yearEmploymentFilter($sy, 'e.');
 $nowYm = (int)date('Y') * 100 + (int)date('n');
 $locks = yearLocksMap(true);
@@ -229,12 +233,18 @@ foreach ($db->query("SELECT id, username, is_active, school_id, allowed_schools 
 $rate = (float)getExchangeRate();
 $progSy = (string)getSetting('program_school_year', currentSchoolYear());
 $info = []; $typeToCat = []; foreach ($CATS as $ck => $c) $typeToCat[$c['type']] = $ck;
+// ⚡ (2026-11-14 «بدّي كل شي سريع بلمح البصر») أعداد الفئات + آخر راتب + آخر سنة لكل المدارس باستعلامين مجمَّعين بدل ثلاثة لكل مدرسة، وقواعد الإضافي بتحميل جماعي
+$cntMap = []; $q = $db->prepare("SELECT e.school_id s, e.employee_type t, COUNT(*) n, SUM(e.has_13th_month = 1) m13 FROM employees e WHERE e.is_deleted = 0" . $yfSql . " GROUP BY e.school_id, e.employee_type");
+$q->execute($yfParams); foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r_) $cntMap[(int)$r_['s']][(string)$r_['t']] = [(int)$r_['n'], (int)$r_['m13']];
+$lastMap = []; $q = $db->prepare("SELECT e.school_id s, MAX(CASE WHEN m.net_salary_lbp > 0 AND (m.year * 100 + m.month) <= ? THEN m.year * 100 + m.month END) ly, MAX(m.school_year) msy,
+                                   SUM(m.school_year = ? AND m.net_salary_lbp > 0) pr FROM monthly_salaries m JOIN employees e ON e.id = m.employee_id AND e.is_deleted = 0 GROUP BY e.school_id");
+$q->execute([$nowYm, $sy]); foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r_) $lastMap[(int)$r_['s']] = $r_;
+schoolRulePreload($db, $sy);
 foreach ($schools as $s) {
     $sid = (int)$s['id']; $i = ['cnt' => [], 'pay' => [], 'm13' => [], 'tot' => 0];
     $i['all'] = (int)$db->query("SELECT COUNT(*) FROM employees WHERE is_deleted = 0 AND school_id = $sid")->fetchColumn();   // كل الملفات (الكبسة) — tot = الموجودون فعلاً بالسنة
     foreach ($CATS as $ck => $c) {
-        $q = $db->prepare("SELECT COUNT(*), SUM(e.has_13th_month = 1) FROM employees e WHERE e.is_deleted = 0 AND e.school_id = ? AND e.employee_type = ?" . $yfSql);
-        $q->execute(array_merge([$sid, $c['type']], $yfParams)); [$n, $m13] = $q->fetch(PDO::FETCH_NUM);
+        [$n, $m13] = $cntMap[$sid][$c['type']] ?? [0, 0];
         $i['cnt'][$ck] = (int)$n; $i['m13'][$ck] = (int)$m13; $i['tot'] += (int)$n;
     }
     // البنود السائدة لكل فئة ونوع (سطر «كل السنة» فقط — كما تعرضها المكافآت الجماعية)
@@ -257,13 +267,10 @@ foreach ($schools as $s) {
         $ck = $typeToCat[$r['t']] ?? null;
         if ($ck !== null && !isset($i['pay'][$ck]['transport_daily'])) $i['pay'][$ck]['transport_daily'] = ['label' => ecolesValLabel('amount', $r['a'], (string)$r['c']), 'n' => (int)$r['n'], 'variants' => 1, 'vt' => 'amount', 'amount' => $r['a'], 'cur' => (string)$r['c']];
     }
-    $q = $db->prepare("SELECT MAX(m.year * 100 + m.month), MAX(m.school_year) FROM monthly_salaries m JOIN employees e ON e.id = m.employee_id AND e.is_deleted = 0 WHERE e.school_id = ? AND m.net_salary_lbp > 0 AND (m.year * 100 + m.month) <= ?");
-    $q->execute([$sid, $nowYm]); [$lastYm, $maxSy] = $q->fetch(PDO::FETCH_NUM);
+    $lm_ = $lastMap[$sid] ?? ['ly' => null, 'msy' => '', 'pr' => 0]; $lastYm = $lm_['ly'];
     $i['last'] = $lastYm ? monthName((int)substr((string)$lastYm, 4), 'fr') . ' ' . substr((string)$lastYm, 0, 4) : '';
-    $q = $db->prepare("SELECT MAX(m.school_year) FROM monthly_salaries m JOIN employees e ON e.id = m.employee_id AND e.is_deleted = 0 WHERE e.school_id = ?"); $q->execute([$sid]);
-    $i['max_sy'] = (string)$q->fetchColumn();
-    $q = $db->prepare("SELECT COUNT(*) FROM monthly_salaries m JOIN employees e ON e.id = m.employee_id AND e.is_deleted = 0 WHERE e.school_id = ? AND m.school_year = ? AND m.net_salary_lbp > 0"); $q->execute([$sid, $sy]);
-    $i['paid_rows_sy'] = (int)$q->fetchColumn();
+    $i['max_sy'] = (string)$lm_['msy'];
+    $i['paid_rows_sy'] = (int)$lm_['pr'];
     // 📅➕ قاعدة الأجر الإضافي لكل فئة (المحفوظة أو السائدة) + مَن يتبعها/خاصّ/بلا إضافي
     $i['sup'] = [];
     foreach ($CATS as $ck => $c) {
@@ -344,7 +351,7 @@ $kv = function (string $fr, string $ar, $val, bool $rtl = false) use ($miss) {
     <form method="get" class="sc-year"><label>Année / السنة</label><select name="sy" class="form-select" onchange="this.form.submit()"><?php foreach ($sys as $y): ?><option value="<?= e($y) ?>" <?= $y === $sy ? 'selected' : '' ?>><?= e($y) ?></option><?php endforeach; ?></select></form>
     <div class="sc-info">Année du programme <b><?= e($progSy) ?></b> <i>سنة البرنامج</i></div>
     <div class="sc-info">Taux <b><?= number_format($rate) ?> L.L / $</b> <i>سعر الصرف</i></div>
-    <div class="sc-info"><b><?= count($schools) ?></b> établissements<?= $nAlerts ? ' · <b style="color:#b45309">' . $nAlerts . ' ⚠️</b>' : '' ?> <i>مؤسسة</i></div>
+    <div class="sc-info"><b><?= count($schools) ?></b><?= count($schools) < $nAllSchools ? ' / ' . $nAllSchools : '' ?> établissements<?= $nAlerts ? ' · <b style="color:#b45309">' . $nAlerts . ' ⚠️</b>' : '' ?> <i><?= count($schools) < $nAllSchools ? 'المدارس المختارة من فوق' : 'مؤسسة' ?></i></div>
 </div>
 
 <?php if ($newMode): ?>

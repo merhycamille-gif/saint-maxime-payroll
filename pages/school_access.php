@@ -204,7 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: ' . $self); exit;
 }
 
-$schools = allSchools(false);
+$schools = msaSelectedSchools(allSchools(false));   // 🏫 (2026-11-14) فقط المدارس المختارة من الأعلى
 usort($schools, fn($a, $b) => ((int)$b['is_active'] <=> (int)$a['is_active']) ?: strcmp((string)$a['name_fr'], (string)$b['name_fr']));
 $takenNow = saTakenMap($db);
 // 🔑 المفاتيح لكل حساب + الرابط الجديد (يظهر مرّة واحدة) + حساب الرئاسة (viewer بعدّة مدارس أو all)

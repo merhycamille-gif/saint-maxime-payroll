@@ -48,7 +48,7 @@ function bulkMailText(string $label, string $schoolFr, int $n = 1): array {
 function bulkSchools(): array {
     static $c = null; if ($c !== null) return $c;
     $db = getDB(); $c = [];
-    $ids = isSuperAdmin() ? array_map(fn($s) => (int)$s['id'], allSchools(false)) : viewerAllowedSchoolIds();
+    $ids = isSuperAdmin() ? array_map(fn($s) => (int)$s['id'], msaSelectedSchools(allSchools(false))) : viewerAllowedSchoolIds();   // 🏫 (2026-11-14) ضمن المدارس المختارة من الأعلى
     if ($ids) foreach ($db->query("SELECT * FROM schools WHERE id IN (" . implode(',', array_map('intval', $ids)) . ") ORDER BY id") as $s) $c[(int)$s['id']] = $s;
     return $c;
 }

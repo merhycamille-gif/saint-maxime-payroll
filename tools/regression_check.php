@@ -11881,6 +11881,34 @@ try {
 } catch (Throwable $e) { $ok310 = false; $why310 = $e->getMessage(); }
 check('📅➕ (2026-11-14) الأجر الإضافي لكل شهر ولكل فئة بصفحة المدرسة (نسبة/مقطوع، ل.ل/$): الأشهر تُضغط فترات، الخاصّ لا يُمسّ، المدفوع يبقى، القاعدة تُحفَظ بعد التطبيق', $ok310, $why310);
 
+/* 🏫 (2026-11-14 «إذا مختار من الصفحة الرئيسية مدرسة معيّنة… بكل الأيقونات وحتى النظام يعطيني معلومات المدرسة اللي مختارها والسنة… وإذا مختار
+   مدرستين أو كلّن بيفرجيني اللي مختارهن») صفحات النظام تتبع المدارس المختارة من الأعلى: المصدر الواحد msaSelectedSchools + منتقيات الصفحات
+   ضمن المختارة + الفحص الرسمي وسجلّ القرارات وسجلّ الإيميلات. + ⚡ صفحة المدارس باستعلامات مجمَّعة (كانت 4 ث). */
+try {
+    $fn311 = str_replace("\r", '', (string)file_get_contents($PROJ . '/includes/functions.php'));
+    $rd311 = fn($f) => (string)file_get_contents($PROJ . '/' . $f);
+    $one311 = [['id' => 1], ['id' => 2], ['id' => 3]];
+    $GLOBALS['msa_school_override'] = [2, 3]; $two311 = msaSelectedSchools($one311); unset($GLOBALS['msa_school_override']);
+    $ok311 = strpos($fn311, 'function msaSelectedSchools(array $schools): array') !== false && array_column($two311, 'id') === [2, 3]
+        && strpos($fn311, '$top_ = activeSchoolIds(); if ($top_ && isSuperAdmin()) $active = array_values(array_intersect($active, $top_));') !== false
+        && strpos($fn311, 'foreach (msaSelectedSchools(allSchools()) as $s) {') !== false
+        && strpos($rd311('pages/ecoles.php'), 'if ($selSchools) $schools = array_values(array_filter($schools,') !== false && strpos($rd311('pages/ecoles.php'), 'schoolRulePreload($db, $sy);') !== false
+        && strpos($rd311('pages/schools.php'), '= msaSelectedSchools(') !== false && strpos($rd311('pages/school_access.php'), '$schools = msaSelectedSchools(allSchools(false));') !== false
+        && substr_count($rd311('pages/open_year.php'), 'msaSelectedSchools(allSchools())') === 5
+        && strpos($rd311('pages/email_settings.php'), "schoolScopeSql('id')") !== false && strpos($rd311('pages/mail_log.php'), "\$selM_ = activeSchoolIds();") !== false
+        && strpos($rd311('pages/users.php'), '$selU_ = activeSchoolIds();') !== false && strpos($rd311('pages/attestations_bulk.php'), 'msaSelectedSchools(allSchools(false))') !== false
+        && strpos($rd311('includes/data_audit.php'), "function dataAuditRules(PDO \$db, string \$sy = '2025-2026', array \$schoolIds = []): array") !== false
+        && strpos($rd311('pages/health_check.php'), 'dataAuditRules(getDB(), $auditSy, $auditSel)') !== false
+        && strpos($rd311('includes/compliance.php'), "\$selC_ = function_exists('activeSchoolIds') ? activeSchoolIds() : [];") !== false
+        && strpos($fn311, 'function schoolRulePreload(PDO $db, string $sy, string $bt = \'prime_fixe\'): void') !== false
+        && strpos($fn311, "unset(\$GLOBALS['__school_rule_preload']);") !== false;
+    // الفحص الرسمي المحصور بمدرسة ⊆ الفحص العامّ (لا قاعدة يزيد عددها بالحصر)
+    $all311 = []; foreach (dataAuditRules($db, '2026-2027') as $a) $all311[$a['key']] = (int)$a['n'];
+    $sub311 = true; foreach (dataAuditRules($db, '2026-2027', [2]) as $a) if ((int)$a['n'] > ($all311[$a['key']] ?? 0)) $sub311 = false;
+    $ok311 = $ok311 && $sub311; $why311 = 'sel=' . implode(',', array_column($two311, 'id')) . ' subset=' . (int)$sub311;
+} catch (Throwable $e) { $ok311 = false; $why311 = $e->getMessage(); }
+check('🏫 (2026-11-14) صفحات النظام تتبع المدارس المختارة من الأعلى (المدارس، دخول المدارس، فتح السنة، الحسابات، البريد، الفحص الرسمي، التقرير) + صفحة المدارس سريعة', $ok311, $why311);
+
 /* ---------- الخلاصة ---------- */
 echo implode("\n", $results) . "\n\n";
 echo "═══ النتيجة: $pass ناجح · $fail فاشل ═══\n";

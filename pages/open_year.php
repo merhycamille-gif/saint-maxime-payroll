@@ -396,7 +396,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
         $stY = ($startN + 1) . '-' . ($startN + 2);
         $stRows = [];
         if (isSuperAdmin()) {
-            foreach (allSchools() as $sc) {
+            foreach (msaSelectedSchools(allSchools()) as $sc) {   // 🏫 (2026-11-14) فقط المدارس المختارة من الأعلى
                 $sid = (int)$sc['id'];
                 $act = (int)$db->query("SELECT COUNT(*) FROM employees WHERE school_id = $sid AND is_deleted = 0 AND status = 'actif'
                     AND " . leftDateSql() . " >= '" . ($startN + 1) . "-10-01'" . openYearCarrySql($db, $sid, $startN + 1))->fetchColumn();
@@ -422,7 +422,7 @@ $cyN = (int)date('Y'); $cmN = (int)date('n'); $startN = ($cmN >= 10) ? $cyN : $c
                         <label class="chk all">
                             <input type="checkbox" id="oy_all" name="all_schools" value="1" checked onchange="document.querySelectorAll('#openYearForm input[name=&quot;school_ids[]&quot;]').forEach(function(c){c.checked=this.checked;c.disabled=this.checked;}.bind(this))" title="مؤشَّر = كل المدارس؛ شيل الصحّ واختر"> 🌐 كل المدارس دفعة وحدة / Toutes les écoles
                         </label>
-                                                <?php foreach (allSchools() as $s): ?>
+                                                <?php foreach (msaSelectedSchools(allSchools()) as $s): ?>
                             <label class="chk"><input type="checkbox" name="school_ids[]" value="<?= (int)$s['id'] ?>" checked disabled> <?= e($s['name_ar'] ?: $s['name_fr']) ?></label>
                         <?php endforeach; ?>
                         <small style="color:#64748b;display:block;grid-column:1/-1">شيل صحّ «كل المدارس» لتختار مدرسة أو أكثر.</small>
@@ -554,7 +554,7 @@ if (canEdit()) {
                     <label class="form-label">المدرسة / École</label>
                     <select name="ba_school_id" class="form-select" required>
                         <option value="">— Choisir / اختر —</option>
-                        <?php foreach (allSchools() as $s): ?>
+                        <?php foreach (msaSelectedSchools(allSchools()) as $s): ?>
                             <option value="<?= (int)$s['id'] ?>" <?= currentSchoolId() === (int)$s['id'] ? 'selected' : '' ?>><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -599,7 +599,7 @@ if (canEdit()) {
                     <label class="form-label">المدرسة / École</label>
                     <select name="clear_school_id" class="form-select" required>
                         <option value="all">🏫 Toutes les écoles / كل المدارس</option>
-                        <?php foreach (allSchools() as $s): ?>
+                        <?php foreach (msaSelectedSchools(allSchools()) as $s): ?>
                             <option value="<?= (int)$s['id'] ?>"><?= e($s['name_ar'] ?: $s['name_fr']) ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -633,7 +633,7 @@ if (canEdit()) {
         <table class="table">
             <thead><tr><th>École / المدرسة</th><th>Années existantes / السنوات الموجودة</th></tr></thead>
             <tbody>
-                <?php foreach (allSchools() as $s): $sy = $bySchool[$s['id']] ?? []; krsort($sy); ?>
+                <?php foreach (msaSelectedSchools(allSchools()) as $s): $sy = $bySchool[$s['id']] ?? []; krsort($sy); ?>
                     <tr>
                         <td><strong><?= e($s['name_ar'] ?: $s['name_fr']) ?></strong></td>
                         <td><?= $sy ? implode('، ', array_keys($sy)) : '<span style="color:var(--gray-400)">— لا يوجد —</span>' ?></td>

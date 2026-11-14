@@ -147,6 +147,7 @@ $schools = $db->query("
         (SELECT COUNT(*) FROM employees e WHERE e.school_id = s.id AND e.is_deleted = 0) AS emp_count
     FROM schools s WHERE s.is_deleted = 0 ORDER BY s.name_fr
 ")->fetchAll();
+$schools = msaSelectedSchools($schools);   // 🏫 (2026-11-14) فقط المدارس المختارة من الأعلى
 
 include __DIR__ . '/../includes/header.php';
 ?>

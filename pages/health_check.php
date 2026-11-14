@@ -528,8 +528,9 @@ include __DIR__ . '/../includes/header.php';
   require_once __DIR__ . '/../includes/data_audit.php';
   $auditSy = activeSchoolYear(); if ($auditSy === 'all') $auditSy = currentSchoolYear();
   // 🚀 الفحص الرسمي (21 قاعدة على كل رواتب السنة ~3 ثوانٍ) من آخر فحص ما دامت الداتا لم تتغيّر — «أعد الفحص الآن» يعيده
-  $auditRows = (empty($_GET['fresh']) && function_exists('msaFpCacheGet')) ? msaFpCacheGet('health_audit|' . $auditSy, 900) : null;
-  if (!is_array($auditRows)) { $auditRows = dataAuditRules(getDB(), $auditSy); if (function_exists('msaFpCachePut')) msaFpCachePut('health_audit|' . $auditSy, $auditRows); if ($hcAt === '' && !empty($hcC)) $hcAt = date('H:i'); }
+  $auditSel = activeSchoolIds(); $auditKey = 'health_audit|' . $auditSy . '|' . ($auditSel ? implode(',', $auditSel) : 'all');   // 🏫 (2026-11-14) الفحص يتبع المدارس المختارة من الأعلى
+  $auditRows = (empty($_GET['fresh']) && function_exists('msaFpCacheGet')) ? msaFpCacheGet($auditKey, 900) : null;
+  if (!is_array($auditRows)) { $auditRows = dataAuditRules(getDB(), $auditSy, $auditSel); if (function_exists('msaFpCachePut')) msaFpCachePut($auditKey, $auditRows); if ($hcAt === '' && !empty($hcC)) $hcAt = date('H:i'); }
   $auditInfo = ['active_nomonths', 'rate_missing', 'no_diploma', 'dupes', 'left_rows', 'row_rate0', 'pay_period_rows'];   // للمراجعة (قرارات/إدخال — ليست أخطاء حساب)
   $auditErrors = 0; $auditReview = 0;
   foreach ($auditRows as $ar) { if ($ar['n'] <= 0) continue; if (in_array($ar['key'], $auditInfo, true)) $auditReview += $ar['n']; else $auditErrors += $ar['n']; }

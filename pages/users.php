@@ -268,6 +268,14 @@ if (isset($_GET['edit'])) {
 // ===== القوائم =====
 $schools = allSchools(false); // كل المدارس (حتى غير الفعّالة) لربط الحساب
 $users = $db->query("SELECT * FROM users ORDER BY (role='superadmin') DESC, role, full_name")->fetchAll();
+// 🏫 (2026-11-14) حسابات المدارس: فقط حسابات المدارس المختارة من الأعلى (حسابات الإدارة وحساب «كل المدارس» تبقى ظاهرة)
+$selU_ = activeSchoolIds();
+if ($selU_) $users = array_values(array_filter($users, function ($u) use ($selU_) {
+    if (($u['role'] ?? '') !== 'viewer') return true;
+    $as = (string)($u['allowed_schools'] ?? ''); if ($as === 'all') return true;
+    $ids = array_filter(array_map('intval', explode(',', $as))); if ((int)($u['school_id'] ?? 0) > 0) $ids[] = (int)$u['school_id'];
+    return !$ids || (bool)array_intersect($ids, $selU_);
+}));
 
 include __DIR__ . '/../includes/header.php';
 ?>

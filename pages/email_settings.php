@@ -113,7 +113,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 <?php // 📧 (2026-10-12) إيميل البرنامج — يبعت منه خادم الموقع بلا كلمة سرّ؛ كل مدرسة تختار بصفحة المدارس: إيميل البرنامج (الافتراضي) أو إيميلها
-    $progSchools = []; try { $progSchools = getDB()->query("SELECT name_ar, name_fr, email, IFNULL(email_sender_mode,'program') m FROM schools WHERE is_active = 1 ORDER BY id")->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $t) {} ?>
+    $progSchools = []; try { $progSchools = getDB()->query("SELECT name_ar, name_fr, email, IFNULL(email_sender_mode,'program') m FROM schools WHERE is_active = 1" . schoolScopeSql('id') . " ORDER BY id")->fetchAll(PDO::FETCH_ASSOC); } catch (Throwable $t) {} ?>
 <div class="card" style="max-width:680px;border:1px solid #bfdbfe">
     <div class="card-header" style="background:#eff6ff"><h3>
         <span dir="ltr"><i class="fas fa-paper-plane"></i> E-mail du programme</span>

@@ -7,9 +7,12 @@
  * لا تعدّل أي بيانات — قراءة فقط.
  */
 
-function dataAuditRules(PDO $db, string $sy = '2025-2026'): array {
+function dataAuditRules(PDO $db, string $sy = '2025-2026', array $schoolIds = []): array {
     $out = [];
-    $q = function (string $sql, array $p = []) use ($db) { $st = $db->prepare($sql); $st->execute($p); return $st->fetchAll(PDO::FETCH_ASSOC); };
+    // 🏫 (2026-11-14 «إذا مختار مدرسة… وحتى النظام يعطيني معلومات المدرسة اللي مختارها») $schoolIds غير فارغة ⇒ الفحص على هذه المدارس فقط
+    //    (كل قاعدة تمرّ بموظفين غير محذوفين e.is_deleted=0 تُحصَر بها؛ الأدوات والفحص الشامل ينادون بلا مدارس = الكل كما كان).
+    $scope = $schoolIds ? ' AND e.school_id IN (' . implode(',', array_map('intval', $schoolIds)) . ')' : '';
+    $q = function (string $sql, array $p = []) use ($db, $scope) { if ($scope !== '') $sql = str_replace('e.is_deleted=0', 'e.is_deleted=0' . $scope, $sql); $st = $db->prepare($sql); $st->execute($p); return $st->fetchAll(PDO::FETCH_ASSOC); };
     $add = function (string $key, string $label, array $rows, string $nameCol = 'nm') use (&$out) {
         $out[] = ['key' => $key, 'label' => $label, 'n' => count($rows), 'samples' => array_slice(array_map(fn($r) => $r[$nameCol] ?? json_encode($r, JSON_UNESCAPED_UNICODE), $rows), 0, 8)];
     };
