@@ -3131,6 +3131,76 @@ function transportLawDailyLbp(): float {
     return $v > 0 ? $v : 450000.0;
 }
 
+/** ⛽📅 (2026-11-14 «لازم لكل شهر أقدر حطّ قدّيش صار النقل اليومي — صار عم يتغيّر حسب سعر تنكة البنزين الشهري» + «وإذا بدّي حطّ رقم لكل الأشهر كمان»)
+ *  قيمة النقل اليومي بالقانون **لكل شهر**، مصدر واحد لكل المدارس: جدول rate_history بمفتاح transport_daily_lbp (سطر لكل شهر كُتبت له قيمة،
+ *  effective_from = أوّل الشهر). الشهر بلا قيمة يأخذ آخر قيمة قبله؛ بلا أي قيمة ⇒ القيمة الأساسية transportLawDailyLbp() (450,000).
+ *  $reset = true يمسح ذاكرة الطلب (بعد الحفظ). */
+function transportDailyLawForMonth(int $month, int $year, bool $reset = false): float {
+    static $rows = null;
+    if ($reset) { $rows = null; if ($month <= 0) return 0.0; }
+    if ($rows === null) {
+        $rows = [];
+        try { foreach (getDB()->query("SELECT DATE_FORMAT(effective_from, '%Y%m') ym, value FROM rate_history WHERE param_key = 'transport_daily_lbp' ORDER BY effective_from, id")->fetchAll(PDO::FETCH_ASSOC) as $r) $rows[(int)$r['ym']] = (float)$r['value']; }
+        catch (Throwable $e) { $rows = []; }
+    }
+    $ym = $year * 100 + $month; $v = null;
+    foreach ($rows as $k => $val) { if ($k <= $ym) $v = $val; else break; }
+    return ($v !== null && $v > 0) ? $v : transportLawDailyLbp();
+}
+/** كل القيم التي أخذها القانون (الأساسية + ما كُتب بالجدول) — سطر نقل يومي بالليرة مبلغه واحدة منها = «يتبع القانون». */
+function transportLawValues(bool $reset = false): array {
+    static $vals = null;
+    if ($reset) $vals = null;
+    if ($vals === null) {
+        $vals = [(string)round(transportLawDailyLbp()) => true];
+        try { foreach (getDB()->query("SELECT DISTINCT value FROM rate_history WHERE param_key = 'transport_daily_lbp'")->fetchAll(PDO::FETCH_COLUMN) as $v) $vals[(string)round((float)$v)] = true; }
+        catch (Throwable $e) {}
+    }
+    return $vals;
+}
+/** القيمة اليومية الفعلية لسطر نقل بالليرة بشهر معيّن: السطر الذي يتبع القانون (مبلغه من قيم القانون) يأخذ قيمة الشهر من الجدول؛
+ *  السطر الخاصّ (مبلغ آخر كتبه لأستاذ بعينه = استثناء بملفه) يبقى كما كُتب. */
+function transportDailyEffective(float $lineAmount, int $month, int $year): float {
+    if ($lineAmount <= 0) return $lineAmount;
+    return isset(transportLawValues()[(string)round($lineAmount)]) ? transportDailyLawForMonth($month, $year) : $lineAmount;
+}
+/** 🚌🔁 بعد تغيير قيمة النقل اليومي لشهر/أشهر: يُعاد نقل الأشهر **غير المدفوعة** فقط، جراحياً — النقل والمستحق ومرآة دولاره بالفرق،
+ *  بلا إعادة حساب (الأساس/المحسومات/الصافي لا تُمسّ؛ النقل خارج الصافي). الشهر المدفوع والسنة المقفولة لا يُمسّان ويُعدّان.
+ *  $yms = [YYYYMM…] الأشهر المعنيّة. يُرجع ['changed','paid','locked','people']. */
+function transportResyncMonths(PDO $db, array $yms): array {
+    $out = ['changed' => 0, 'paid' => 0, 'locked' => 0, 'people' => 0];
+    $yms = array_values(array_unique(array_map('intval', $yms)));
+    if (!$yms) return $out;
+    @set_time_limit(900); @ignore_user_abort(true);   // 🧷 لو سكّر الصفحة بالنصّ: الشغل يكمل لآخره (لا نصف أشهر معدَّلة ونصف لا)
+    require_once __DIR__ . '/payroll_calculator.php';
+    transportDailyLawForMonth(0, 0, true); transportLawValues(true);
+    $in = implode(',', $yms);
+    $rows = $db->query("SELECT ms.id, ms.employee_id, ms.month, ms.year, ms.school_year, ms.transport_lbp, ms.base_plus_echelon_lbp, COALESCE(ms.is_paid,0) paid, e.school_id
+                        FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id AND e.is_deleted = 0
+                        WHERE (ms.year * 100 + ms.month) IN ($in) AND COALESCE(ms.is_indemnity_month,0) = 0 AND ms.transport_lbp > 0
+                          AND (COALESCE(e.transport_daily_amount,0) > 0 OR EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year
+                               AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_daily'))")->fetchAll(PDO::FETCH_ASSOC);
+    $up = $db->prepare("UPDATE monthly_salaries SET transport_lbp = :t, transport_complement_lbp = :t2, total_due_lbp = total_due_lbp + :d,
+                          total_due_usd = CASE WHEN exchange_rate > 0 THEN ROUND(total_due_lbp / exchange_rate, 2) ELSE total_due_usd END WHERE id = :id");
+    // (1) الحساب أوّلاً بلا أي كتابة (المحرّك هو المصدر الواحد) · (2) ثمّ كل التعديلات بمعاملة واحدة: كلّها أو لا شيء
+    $ppl = []; $todo = [];
+    foreach ($rows as $r) {
+        try { [, , $tc] = (new PayrollCalculator((int)$r['employee_id'], (int)$r['month'], (int)$r['year']))->bonusComponents((float)$r['base_plus_echelon_lbp']); } catch (Throwable $e) { continue; }
+        $tc = (int)round((float)$tc); $old = (int)round((float)$r['transport_lbp']);
+        if ($tc === $old) continue;
+        if ((int)$r['paid'] === 1) { $out['paid']++; continue; }
+        if (function_exists('isSchoolYearLocked') && isSchoolYearLocked((int)$r['school_id'], (string)$r['school_year'])) { $out['locked']++; continue; }
+        $todo[] = ['t' => $tc, 't2' => $tc, 'd' => $tc - $old, 'id' => (int)$r['id']]; $ppl[(int)$r['employee_id']] = 1;
+    }
+    if ($todo) {
+        $own = !$db->inTransaction(); if ($own) $db->beginTransaction();
+        try { foreach ($todo as $t) $up->execute($t); if ($own) $db->commit(); }
+        catch (Throwable $e) { if ($own && $db->inTransaction()) $db->rollBack(); throw $e; }
+    }
+    $out['changed'] = count($todo); $out['people'] = count($ppl);
+    return $out;
+}
+
 /** 🩹 شفاء ذاتي مرّة واحدة (2026-11-14 «طبّق البرنامج بالقانون على كل المدارس» — القانون: 450,000 باليوم × أيام حضور الأستاذ):
  *  كل نقل مكتوب «ثابت بالشهر» بسنة 2026-2027 (كما استُورد من برنامجه القديم) يتحوّل إلى سطر «يومي» 450,000 وأيام الحضور بملفه
  *  (9,000,000 = 5 أيام · 7,200,000 = 4 · 5,400,000 = 3 · 3,600,000 = 2 — على 4 أسابيع). **المبلغ لا يتغيّر ولا ليرة**:
@@ -3237,6 +3307,64 @@ function healTransportDaysFollowFile20261114() {
         }
         if (function_exists('logAudit')) logAudit('heal_transport_days_file', 'employees', 0, null, ['n' => $n, 'who' => $who, 'skipped_paid' => $skippedPaid]);
         setSetting('heal_transport_days_file_20261114', 'done: ' . $n . ($skippedPaid ? ' skipped_paid=' . implode(',', $skippedPaid) : '') . ' @' . date('Y-m-d H:i'));
+    } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
+}
+
+/** 🩹 شفاء ذاتي مرّة واحدة (2026-11-14، تكملة «طبّق البرنامج بالقانون على كل المدارس» + جدول النقل الشهري): من نقله بسنة 2026-2027 **رقم
+ *  مخزّن منقول** من السنة الماضية بلا أي سطر نقل بملفه (46 شخصاً أغلبهم موظفون — فتح السنة نسخ أشهرهم شهراً مقابل شهر) لا يطاله
+ *  جدول «النقل اليومي لكل شهر». يُكتب له سطر يومي 450,000 وأيام النقل = مبلغه ÷ 450,000 ÷ الأسابيع — **والمبلغ لا يتغيّر ولا ليرة**:
+ *  يُحسب نقل كل أشهره المخزّنة بالمحرّك ويُقارَن بالمخزّن؛ أي فرق ⇒ يُلغى تحويله ويبقى كما كان ويُذكر. لا إعادة حساب ولا لمس لأي راتب.
+ *  نسخة احتياطية: _bk_emp_trcarried_1114 (أيام النقل قبل) — السطور المضافة تُعرف من الجدول نفسه. */
+function healTransportCarriedToDaily20261114() {
+    if (function_exists('isViewer') && isViewer()) return;
+    try {
+        if (getSetting('heal_transport_carried_20261114', '') !== '') return;
+        if (strpos((string)getSetting('heal_transport_daily_law_20261114', ''), 'done') !== 0) return;   // بعد تحويل الثابت
+        $db = getDB(); $sy = '2026-2027'; $daily = transportLawDailyLbp();
+        @set_time_limit(900); @ignore_user_abort(true);
+        require_once __DIR__ . '/payroll_calculator.php';
+        $rows = $db->prepare("SELECT ms.employee_id, e.days_per_week, e.transport_days_per_week, e.transport_weeks,
+                                     COUNT(DISTINCT CASE WHEN ms.transport_lbp > 0 THEN ROUND(ms.transport_lbp) END) n_amounts, MAX(ms.transport_lbp) amt
+                              FROM monthly_salaries ms JOIN employees e ON e.id = ms.employee_id AND e.is_deleted = 0
+                              WHERE ms.school_year = ? AND COALESCE(ms.is_indemnity_month,0) = 0 AND COALESCE(e.transport_daily_amount,0) = 0
+                                AND NOT EXISTS (SELECT 1 FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year
+                                                AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type IN ('transport_daily','transport_complement'))
+                              GROUP BY ms.employee_id HAVING amt > 0");
+        $rows->execute([$sy]); $rows = $rows->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) { setSetting('heal_transport_carried_20261114', 'done: 0 @' . date('Y-m-d H:i')); return; }
+        $db->exec("CREATE TABLE IF NOT EXISTS _bk_emp_trcarried_1114 (id INT PRIMARY KEY, transport_days_per_week DECIMAL(6,2) NULL, bonus_id INT NULL, saved_at DATETIME NULL)");
+        $bkE = $db->prepare("INSERT IGNORE INTO _bk_emp_trcarried_1114 (id, transport_days_per_week, saved_at) SELECT id, transport_days_per_week, NOW() FROM employees WHERE id = ?");
+        $bkL = $db->prepare("UPDATE _bk_emp_trcarried_1114 SET bonus_id = ? WHERE id = ?");
+        $setDays = $db->prepare("UPDATE employees SET transport_days_per_week = ? WHERE id = ?");
+        $ins = $db->prepare("INSERT INTO employee_bonuses (employee_id, bonus_type, period_number, school_year, amount, value_type, currency, start_month, end_month, is_active) VALUES (?, 'transport_daily', 1, ?, ?, 'amount', 'LBP', NULL, NULL, 1)");
+        $delLine = $db->prepare("DELETE FROM employee_bonuses WHERE id = ?");
+        $msSt = $db->prepare("SELECT month, year, transport_lbp, base_plus_echelon_lbp FROM monthly_salaries WHERE employee_id = ? AND school_year = ? AND COALESCE(is_indemnity_month,0) = 0");
+        try { (new PayrollCalculator((int)$rows[0]['employee_id'], 10, 2026))->bonusComponents(0); } catch (Throwable $e) {}   // 🧨 تسخين المحرّك (DDL) قبل أي كتابة
+        $done = 0; $kept = [];
+        foreach ($rows as $r) {
+            $eid = (int)$r['employee_id']; $amt = (float)$r['amt'];
+            $weeks = (float)$r['transport_weeks'] > 0 ? (float)$r['transport_weeks'] : 4.0;
+            $k = $amt / ($daily * $weeks);
+            if ((int)$r['n_amounts'] !== 1 || abs($k - round($k)) > 0.0001 || $k < 1 || $k > 7) { $kept[] = "#$eid:" . (int)$amt; continue; }
+            $k = (int)round($k);
+            $eff = (float)$r['transport_days_per_week'] > 0 ? (float)$r['transport_days_per_week'] : (float)$r['days_per_week'];
+            $bkE->execute([$eid]);
+            $ins->execute([$eid, $sy, $daily]); $lineId = (int)$db->lastInsertId(); $bkL->execute([$lineId, $eid]);
+            if (abs($eff - $k) > 0.0001) $setDays->execute([$k, $eid]);
+            $same = true;
+            try {
+                $msSt->execute([$eid, $sy]);
+                foreach ($msSt->fetchAll(PDO::FETCH_ASSOC) as $m) {
+                    [, , $tc] = (new PayrollCalculator($eid, (int)$m['month'], (int)$m['year']))->bonusComponents((float)$m['base_plus_echelon_lbp']);
+                    if ((int)round((float)$tc) !== (int)round((float)$m['transport_lbp'])) { $same = false; break; }
+                }
+            } catch (Throwable $e) { $same = false; }
+            if ($same) { $done++; continue; }
+            $delLine->execute([$lineId]); $setDays->execute([$r['transport_days_per_week'], $eid]); $bkL->execute([null, $eid]);   // تراجع: يبقى كما كان
+            $kept[] = "#$eid:" . (int)$amt . '≠';
+        }
+        if (function_exists('logAudit')) logAudit('heal_transport_carried', 'employee_bonuses', 0, null, ['sy' => $sy, 'converted' => $done, 'kept' => $kept]);
+        setSetting('heal_transport_carried_20261114', 'done: ' . $done . ' kept=' . count($kept) . ' @' . date('Y-m-d H:i') . ($kept ? ' | ' . implode(' ', array_slice($kept, 0, 60)) : ''));
     } catch (Throwable $e) { /* لا تكسر الصفحة — يُعاد عند الفتح التالي */ }
 }
 

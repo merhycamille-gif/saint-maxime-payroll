@@ -147,7 +147,10 @@ class PayrollCalculator {
                 if ($start <= $end) { if ($this->month < $start || $this->month > $end) continue; }
                 else { if ($this->month < $start && $this->month > $end) continue; }
             }
-            $monthly = (float)$row['amount'] * $days * $weeks;
+            // ⛽📅 (2026-11-14) قيمة النقل اليومي بالقانون تتغيّر شهرياً (سعر البنزين): سطر الليرة الذي يتبع القانون يأخذ قيمة شهره من الجدول
+            $dailyAmt = (float)$row['amount'];
+            if ($row['currency'] !== 'USD') $dailyAmt = transportDailyEffective($dailyAmt, (int)$this->month, (int)$this->year);
+            $monthly = $dailyAmt * $days * $weeks;
             if ($row['currency'] === 'USD') $monthly = usdToLbp($monthly, $this->exchangeRate);
             $total += $monthly;
         }
@@ -329,6 +332,7 @@ class PayrollCalculator {
         // (أ) تعويض النقل اليومي الثابت (عمود الموظف، قيمة واحدة كل السنة): اليومي × الأيام × الأسابيع.
         $tDaily = (float)($emp['transport_daily_amount'] ?? 0);
         if ($tDaily > 0) {
+            if (($emp['transport_daily_currency'] ?? 'LBP') !== 'USD') $tDaily = transportDailyEffective($tDaily, (int)$this->month, (int)$this->year); // ⛽📅 قيمة الشهر بالقانون
             $dailyMonthly = $tDaily * $tDays * $tWeeks;
             if (($emp['transport_daily_currency'] ?? 'LBP') === 'USD') $dailyMonthly = usdToLbp($dailyMonthly, $this->exchangeRate);
             $transportComp += $dailyMonthly;

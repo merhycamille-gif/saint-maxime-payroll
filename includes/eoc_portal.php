@@ -225,7 +225,7 @@ function eocTeachersOfYear(PDO $db, array $ids, string $sy): array {
     $leaveSql = " AND NOT (e.left_date_all IS NOT NULL AND e.left_date_all <= '$cut') AND NOT (e.employee_type = 'enseignant_titulaire' AND e.left_date_eoc IS NOT NULL AND e.left_date_eoc <= '$cut')";
     $st = $db->prepare("SELECT e.*, (SELECT MAX(CONCAT(ms.year, LPAD(ms.month,2,'0'))) FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.base_plus_echelon_lbp > 0) last_ym
         FROM employees e WHERE e.school_id IN ($in) AND e.is_deleted = 0 AND e.employee_type IN ('enseignant_titulaire','enseignant_contractuel')$leaveSql
-          AND (EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND ms.base_plus_echelon_lbp > 0)
+          AND (EXISTS (SELECT 1 FROM monthly_salaries ms WHERE ms.employee_id = e.id AND ms.school_year = ? AND (ms.base_plus_echelon_lbp > 0 OR ms.net_salary_lbp > 0 OR ms.total_due_lbp > 0))   /* 🤝 (2026-11-14) قاعدة العضوية بالحرف كالبيان القديم (yearEmploymentFilter): من له مستحق بالسنة ولو نقلاً فقط (اسبر منصور، زويا سمعان، ندى باصيل/أبلح) */
                OR e.hire_date BETWEEN '$yStart' AND '$yEnd')   /* 🆕 (2026-11-09 «بطّل مبيّن اسم شربل عرب»): الداخل ضمن السنة من أساتذتها ولو لم يُحسب له راتب بعد — كقاعدة yearEmploymentFilter وكالبيان العام القديم */
         ORDER BY " . eocArSort("COALESCE(NULLIF(e.first_name_ar,''),e.first_name_fr)") . ", " . eocArSort("COALESCE(NULLIF(e.last_name_ar,''),e.last_name_fr)") . ", e.id");
     $st->execute([$sy, $sy]);

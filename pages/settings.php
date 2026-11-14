@@ -46,6 +46,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'chang
     exit;
 }
 
+// ===== ⛽📅 (2026-11-14) قيمة النقل اليومي بالقانون لكل شهر («صار عم يتغيّر حسب سعر تنكة البنزين الشهري» + «رقم لكل الأشهر كمان») =====
+//  سطر لكل شهر من السنة المختارة (ت1 ← أيلول) بجدول rate_history مفتاح transport_daily_lbp · فارغ = يأخذ آخر قيمة قبله.
+//  بعد الحفظ: نقل الأشهر التي تغيّرت قيمتها يُعاد جراحياً لغير المدفوع فقط (transportResyncMonths) — المدفوع والسنة المقفولة لا يُمسّان.
+$trSy = (string)($_GET['trsy'] ?? $_POST['trsy'] ?? '');
+if (!preg_match('/^(\d{4})-(\d{4})$/', $trSy, $trM) || (int)$trM[2] !== (int)$trM[1] + 1) { $trSy = activeSchoolYear() === 'all' ? currentSchoolYear() : activeSchoolYear(); preg_match('/^(\d{4})-(\d{4})$/', $trSy, $trM); }
+$trYm = []; foreach ([10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9] as $mm_) $trYm[] = [($mm_ >= 10 ? (int)$trM[1] : (int)$trM[2]), $mm_];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_transport_rates') {
+    if (!isAdmin()) { $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'صلاحية المدير مطلوبة / Accès administrateur requis']; header('Location: ' . BASE_URL . 'pages/settings.php'); exit; }
+    $before = []; foreach ($trYm as [$y_, $m_]) $before[$y_ * 100 + $m_] = transportDailyLawForMonth($m_, $y_);
+    $in = (array)($_POST['tr_rate'] ?? []); $bad = false; $vals = [];
+    foreach ($trYm as [$y_, $m_]) {
+        $raw = trim((string)($in[$y_ * 100 + $m_] ?? ''));
+        if ($raw === '') continue;
+        $v = numLoose($raw);
+        if ($v <= 0 || $v > 100000000) { $bad = true; break; }
+        $vals[$y_ * 100 + $m_] = round($v);
+    }
+    if ($bad) { $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'قيمة غير صالحة — اكتب رقماً بالليرة أكبر من صفر، أو اترك الخانة فارغة. / Valeur invalide.']; }
+    else {
+        $from = sprintf('%04d-10-01', (int)$trM[1]); $to = sprintf('%04d-09-30', (int)$trM[2]);
+        $old = $db->prepare("SELECT effective_from, value FROM rate_history WHERE param_key = 'transport_daily_lbp' AND effective_from BETWEEN ? AND ? ORDER BY effective_from"); $old->execute([$from, $to]);
+        $oldRows = $old->fetchAll(PDO::FETCH_ASSOC);
+        $db->prepare("DELETE FROM rate_history WHERE param_key = 'transport_daily_lbp' AND effective_from BETWEEN ? AND ?")->execute([$from, $to]);
+        $ins = $db->prepare("INSERT INTO rate_history (param_key, value, effective_from, effective_to, notes) VALUES ('transport_daily_lbp', ?, ?, NULL, ?)");
+        foreach ($vals as $ym => $v) $ins->execute([$v, sprintf('%04d-%02d-01', intdiv($ym, 100), $ym % 100), 'النقل اليومي بالقانون — ' . $trSy]);
+        transportDailyLawForMonth(0, 0, true); transportLawValues(true);
+        $changed = []; foreach ($trYm as [$y_, $m_]) if (abs(transportDailyLawForMonth($m_, $y_) - $before[$y_ * 100 + $m_]) > 0.001) $changed[] = $y_ * 100 + $m_;
+        $res = transportResyncMonths($db, $changed);
+        logAudit('transport_daily_rates', 'rate_history', 0, $oldRows, ['sy' => $trSy, 'values' => $vals, 'months_changed' => $changed, 'resync' => $res]);
+        $msg = '✅ حُفظت قيمة النقل اليومي لسنة ' . $trSy . '. ';
+        $msg .= $changed ? ('تغيّرت قيمة ' . count($changed) . ' شهراً ⇒ عُدّل نقل ' . $res['changed'] . ' راتباً شهرياً عند ' . $res['people'] . ' شخصاً (النقل والمستحق فقط).') : 'لا شهر تغيّرت قيمته — لم يُمسّ أي راتب.';
+        if ($res['paid']) $msg .= ' 🔒 ' . $res['paid'] . ' راتباً مدفوعاً لم يُمسّ.';
+        if ($res['locked']) $msg .= ' 🔒 ' . $res['locked'] . ' راتباً بسنة مقفولة لم يُمسّ.';
+        $_SESSION['flash'] = ['type' => 'success', 'msg' => $msg . ' / Transport journalier enregistré.'];
+    }
+    header('Location: ' . BASE_URL . 'pages/settings.php?trsy=' . urlencode($trSy) . '#trRates'); exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 🔒 صلاحية: هذه إعدادات عامة تمسّ كل المدارس (سعر الصرف الافتراضي يعيد حساب الرواتب
     // من 2017 لكل المدارس) — للمدير فقط.
@@ -190,6 +228,73 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </form>
+
+<?php // ⛽📅 (2026-11-14) قيمة النقل اليومي بالقانون — سطر لكل شهر + «طبّق على كل أشهر السنة» + تعديل/حفظ/إلغاء (lockedit). «مرتّب ورسمي وبدون عجقة»: ثلاثة أعمدة وسطر شرح واحد.
+$trStored = []; $trQ = $db->prepare("SELECT DATE_FORMAT(effective_from, '%Y%m') ym, value FROM rate_history WHERE param_key = 'transport_daily_lbp' AND effective_from BETWEEN ? AND ?");
+try { $trQ->execute([sprintf('%04d-10-01', (int)$trM[1]), sprintf('%04d-09-30', (int)$trM[2])]); foreach ($trQ->fetchAll(PDO::FETCH_ASSOC) as $r_) $trStored[(int)$r_['ym']] = (float)$r_['value']; } catch (Throwable $e) {}
+$trSys = []; foreach ($db->query("SELECT DISTINCT school_year FROM monthly_salaries WHERE school_year >= '2026-2027' ORDER BY school_year DESC") as $r_) $trSys[] = (string)$r_['school_year'];
+if (!in_array($trSy, $trSys, true)) { $trSys[] = $trSy; rsort($trSys); }
+$trPaid = []; foreach ($db->query("SELECT (year * 100 + month) ym, SUM(COALESCE(is_paid,0) = 1) p FROM monthly_salaries WHERE school_year = " . $db->quote($trSy) . " AND transport_lbp > 0 GROUP BY 1") as $r_) $trPaid[(int)$r_['ym']] = (int)$r_['p'];
+$trAr = $lang === 'ar';
+?>
+<div class="card" id="trRates">
+    <div class="card-header"><h3>
+        <span dir="ltr"><i class="fas fa-gas-pump"></i> Indemnité de transport journalière — par mois</span>
+        <div style="font-size:0.85em;font-weight:600;opacity:0.9">تعويض النقل اليومي — لكل شهر</div>
+    </h3></div>
+    <div class="card-body">
+        <form method="get" class="no-print" style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+            <label class="form-label" style="margin:0"><?= $trAr ? 'السنة الدراسية' : 'Année scolaire' ?></label>
+            <select name="trsy" class="form-select" style="width:auto" onchange="this.form.submit()"><?php foreach ($trSys as $y_): ?><option value="<?= e($y_) ?>" <?= $y_ === $trSy ? 'selected' : '' ?>><?= e($y_) ?></option><?php endforeach; ?></select>
+        </form>
+        <form method="POST" class="lockedit" id="trRatesForm">
+            <?= csrfField() ?><input type="hidden" name="action" value="save_transport_rates"><input type="hidden" name="trsy" value="<?= e($trSy) ?>">
+            <table class="table" style="max-width:720px">
+                <thead><tr>
+                    <th><?= $trAr ? 'الشهر' : 'Mois' ?></th>
+                    <th><?= $trAr ? 'النقل اليومي (ل.ل)' : 'Transport par jour (L.L)' ?></th>
+                    <th><?= $trAr ? 'نقل الشهر — أستاذ 5 أيام' : 'Transport du mois — 5 jours' ?></th>
+                </tr></thead>
+                <tbody>
+                    <tr style="background:#f1f5f9">
+                        <td><strong><?= $trAr ? 'كل أشهر السنة' : "Toute l'année" ?></strong></td>
+                        <td><input type="text" inputmode="numeric" id="trAllVal" class="form-control" style="max-width:200px" autocomplete="off"></td>
+                        <td><button type="button" class="btn btn-primary btn-sm" id="trAllBtn"><?= $trAr ? 'طبّق على كل الأشهر' : 'Appliquer à tous les mois' ?></button></td>
+                    </tr>
+                <?php foreach ($trYm as [$y_, $m_]): $ym_ = $y_ * 100 + $m_; $eff_ = transportDailyLawForMonth($m_, $y_); $has_ = isset($trStored[$ym_]); ?>
+                    <tr>
+                        <td><?= e(monthName($m_, $trAr ? 'ar' : 'fr')) ?> <?= $y_ ?><?= !empty($trPaid[$ym_]) ? ' <span title="' . ($trAr ? 'رواتب مدفوعة لا تتغيّر' : 'Salaires payés : inchangés') . '">🔒</span>' : '' ?></td>
+                        <td><input type="text" inputmode="numeric" name="tr_rate[<?= $ym_ ?>]" class="form-control tr-rate" style="max-width:200px" value="<?= $has_ ? e(number_format($trStored[$ym_])) : '' ?>" placeholder="<?= e(number_format($eff_)) ?>" autocomplete="off"></td>
+                        <td class="tr-month"><?= e(number_format($eff_ * 20)) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <small class="text-muted"><?= $trAr
+                ? 'القيمة واحدة لكل المدارس. نقل الأستاذ = قيمة الشهر × أيام دوامه × 4 أسابيع. الخانة الفارغة تأخذ قيمة الشهر الذي قبلها. الشهر المدفوع 🔒 لا يتغيّر.'
+                : "Valeur unique pour toutes les écoles. Transport = valeur du mois × jours de présence × 4 semaines. Une case vide reprend la valeur du mois précédent. Un mois payé 🔒 ne change pas." ?></small>
+            <div class="d-flex justify-end" style="margin-top:10px;gap:8px">
+                <button type="button" class="btn btn-secondary tr-cancel" onclick="location.reload()"><i class="fas fa-rotate-left"></i> <?= $trAr ? 'إلغاء' : 'Annuler' ?></button>
+                <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Enregistrer / حفظ</button>
+            </div>
+        </form>
+        <style>#trRatesForm .tr-cancel[disabled] { display: none; }</style>
+        <script>
+        (function () {
+            var f = document.getElementById('trRatesForm'); if (!f) return;
+            var fmt = function (v) { v = String(v).replace(/[^\d]/g, ''); return v ? Number(v).toLocaleString('en-US') : ''; };
+            var all = document.getElementById('trAllVal');
+            all.addEventListener('blur', function () { all.value = fmt(all.value); });
+            f.querySelectorAll('.tr-rate').forEach(function (i) { i.addEventListener('blur', function () { i.value = fmt(i.value); }); });
+            document.getElementById('trAllBtn').addEventListener('click', function () {
+                var v = fmt(all.value); if (!v) { all.focus(); return; }
+                f.querySelectorAll('.tr-rate').forEach(function (i) { if (!i.disabled && !i.readOnly) { i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); } });
+            });
+            f.addEventListener('submit', function () { var b = f.querySelectorAll('button[type=submit], .lockedit-save'); b.forEach(function (x) { x.style.opacity = .6; }); });
+        })();
+        </script>
+    </div>
+</div>
 
 <div class="card">
     <div class="card-header"><h3>

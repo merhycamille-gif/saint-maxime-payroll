@@ -4280,8 +4280,10 @@ $cw75 = $db->query("SELECT COUNT(*) n, COALESCE(SUM(ms.net_salary_lbp),0) net, C
     WHERE e.school_id=$abra75 AND e.is_deleted=0 AND (e.employee_type <> 'enseignant_titulaire' OR COALESCE(e.titularization_date,'1900-01-01') >= '2026-10-01') AND ms.year=2025 AND ms.month=10")->fetch();
 // 🔒 (2026-11-02 قراره ب: الأشهر المدفوعة 2025-2026 ثابتة) المرجع المجمَّد بعد إرجاع عيف عيد 1815 من نسخة 20/8 (كان صافيه 970,000 بخطأ 21/9):
 //    52 شخصاً، صافي 2,029,397,000. ملاحظة موثَّقة: كشفه القديم (27/8) كان 2,063,537,000 — الفارق 34,140,000 لم يُفكّ (لا نسخة صفّية للكشف القديم)؛ أي تغيّر لاحق = فشل
-check('عبرا: كشف تشرين 2025 للمتعاقدين والموظفين (الفئة بشهر الكشف) = المرجع المجمَّد 2026-11-02: 52 شخصاً، صافي 2,029,397,000، نقل 376,200,000 — لا يتغيّر بعد اليوم',
-      (int)$cw75['n'] === 52 && (float)$cw75['net'] === 2029397000.0 && (float)$cw75['tr'] === 376200000.0,
+// ➕ (2026-11-14 قراره «مرسال سلوم حطّها تاكسابل كمان 2025-2026»): مرسال مطانيوس سلوم #1576 (موظفة، كانت غير تاكسابل ببرنامجه ومحذوفة 10/10)
+//    رجعت بسنة 2025-2026: +1 شخص، +27,160,000 صافٍ (28,000,000 − ضمان 840,000)، +9,000,000 نقل ⇒ 53 / 2,056,557,000 / 385,200,000
+check('عبرا: كشف تشرين 2025 للمتعاقدين والموظفين (الفئة بشهر الكشف) = المرجع المجمَّد 2026-11-02 + مرسال سلوم بقراره 2026-11-14: 53 شخصاً، صافي 2,056,557,000، نقل 385,200,000 — لا يتغيّر بعد اليوم',
+      (int)$cw75['n'] === 53 && (float)$cw75['net'] === 2056557000.0 && (float)$cw75['tr'] === 385200000.0,
       "n={$cw75['n']} net={$cw75['net']} tr={$cw75['tr']}");
 $terSplit75 = $db->query("SELECT base_plus_echelon_lbp be, prime_fixe_lbp p, net_salary_lbp nt FROM monthly_salaries WHERE employee_id=" . (int)$ter75['id'] . " AND year=2025 AND month=10")->fetch();
 $vioSplit75 = $db->query("SELECT base_plus_echelon_lbp be, prime_fixe_lbp p, net_salary_lbp nt FROM monthly_salaries WHERE employee_id=" . (int)$vio75['id'] . " AND year=2025 AND month=10")->fetch();
@@ -9800,7 +9802,8 @@ check('🚀 استعلامات مكرّرة أُزيلت: أعمدة الجدا�
 $fn237 = (string)file_get_contents($PROJ . '/includes/functions.php');
 preg_match('/function healCarriedNoPay20261003\(\): void \{.*?\$ids = \[(.*?)\];/s', $fn237, $m237);
 $ids237 = array_filter(array_map('intval', preg_split('/[\s,]+/', (string)($m237[1] ?? ''))));
-$left237 = $ids237 ? (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE school_year = '2026-2027' AND employee_id IN (" . implode(',', $ids237) . ")")->fetchColumn() : -1;
+// ➕ (2026-11-14 قراره «مرسال بتصير تاكسابل عندك»): مرسال سلوم #1576 من اللائحة رجعت بقراره الصريح (راتب 28,000,000 ونقل 9,000,000) ⇒ مستثناة من «لا أشهر 2026-2027»
+$left237 = $ids237 ? (int)$db->query("SELECT COUNT(*) FROM monthly_salaries WHERE school_year = '2026-2027' AND employee_id <> 1576 AND employee_id IN (" . implode(',', $ids237) . ")")->fetchColumn() : -1;
 $ok237 = count($ids237) === 40 && count(array_unique($ids237)) === 40
     && strpos($fn237, "if (getSetting('heal_carried_nopay_20261003', '') !== '') return;") !== false
     && strpos($fn237, 'CREATE TABLE IF NOT EXISTS _ms_bk_carried20261003 LIKE monthly_salaries') !== false
@@ -11810,7 +11813,7 @@ try {
           AND (SELECT COUNT(*) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_complement') = 0
           AND (SELECT COUNT(*) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_daily') = 1
           AND (SELECT COUNT(*) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1 AND b.amount > 0 AND b.bonus_type = 'transport_daily' AND b.currency = 'LBP') = 1
-          AND ms.transport_lbp > (SELECT MAX(b.amount) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1 AND b.bonus_type = 'transport_daily')
+          AND ms.transport_lbp > GREATEST((SELECT MAX(b.amount) FROM employee_bonuses b WHERE b.employee_id = ms.employee_id AND b.school_year = ms.school_year AND b.is_active = 1 AND b.bonus_type = 'transport_daily'), COALESCE((SELECT MAX(value) FROM rate_history WHERE param_key = 'transport_daily_lbp'), 0))
                 * (CASE WHEN COALESCE(e.transport_days_per_week,0) > 0 THEN e.transport_days_per_week ELSE COALESCE(e.days_per_week,0) END)
                 * (CASE WHEN COALESCE(e.transport_weeks,0) > 0 THEN e.transport_weeks ELSE 4 END) + 1")->fetchColumn();
     // ⚖️ «طبّق البرنامج بالقانون على كل المدارس»: شاشات الحفظ الأربع تفرض «النقل واحد» + شفاءا المدفوع والتحويل موصولان + لا مضاعَف بـ2025-2026
@@ -11831,7 +11834,20 @@ try {
         // «إذا عندها 4 أيام لازم تطبّق القانون صحّ»: شفاء «النقل يتبع أيام الملف» موصول ومنجَز
         && strpos($fn309, 'function healTransportDaysFollowFile20261114()') !== false
         && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healTransportDaysFollowFile20261114();') !== false
-        && strpos((string)getSetting('heal_transport_days_file_20261114', ''), 'done') === 0;
+        && strpos((string)getSetting('heal_transport_days_file_20261114', ''), 'done') === 0
+        // ⛽📅 «لكل شهر أقدر حطّ قدّيش صار النقل اليومي» + «رقم لكل الأشهر كمان»: جدول القيمة الشهرية (rate_history: transport_daily_lbp) يقرأه المحرّك،
+        //    السطر الخاصّ (مبلغ غير قيمة القانون) يبقى كما كُتب، إعادة النقل جراحية بمعاملة واحدة، والمنقولون بلا سطر صار لهم سطر يومي
+        && strpos($fn309, 'function transportDailyLawForMonth(int $month, int $year, bool $reset = false): float') !== false
+        && strpos($fn309, 'function transportResyncMonths(PDO $db, array $yms): array') !== false && strpos($fn309, '@ignore_user_abort(true);') !== false
+        && strpos($fn309, 'function healTransportCarriedToDaily20261114()') !== false
+        && strpos((string)file_get_contents($PROJ . '/includes/header.php'), 'healTransportCarriedToDaily20261114();') !== false
+        && strpos((string)getSetting('heal_transport_carried_20261114', ''), 'done') === 0
+        && substr_count((string)file_get_contents($PROJ . '/includes/payroll_calculator.php'), 'transportDailyEffective(') === 2
+        && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), "(\$_POST['action'] ?? '') === 'save_transport_rates'") !== false
+        && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), 'id="trAllBtn"') !== false && strpos((string)file_get_contents($PROJ . '/pages/settings.php'), 'tr-cancel') !== false
+        && transportDailyEffective(123457.0, 11, 2026) === 123457.0                                   // مبلغ خاصّ = يبقى
+        && transportDailyLawForMonth(1, 2001) === transportLawDailyLbp()                              // بلا قيمة قبله = القيمة الأساسية
+        && transportDailyEffective(transportLawDailyLbp(), 11, 2026) === transportDailyLawForMonth(11, 2026);   // سطر القانون = قيمة شهره
     $why309 = 'src=' . (int)$src309 . (int)$src309b . ' مضاعَف 25-26=' . $dblPaid309 . ' ثابت باقٍ=' . $fixedLeft309 . ' مضاعَفون=' . count($dbl309) . ' صمام=' . (int)$guard309 . ' أشهر نقلها فوق الملف=' . (int)$bad309 . ' | ' . (string)getSetting('heal_transport_double_20261114', '');
 } catch (Throwable $e) { $ok309 = false; $why309 = $e->getMessage(); }
 check('🚌 (2026-11-14) النقل لا يتضاعف: لا سطرَي نقل (ثابت + يومي) فاعلَين معاً + صمام النسخ يعتبر النقل عائلة واحدة + المخزّن لا يتجاوز ما بالملف', $ok309, $why309);
